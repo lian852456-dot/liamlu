@@ -1248,7 +1248,7 @@
       <div class="kpi-input-wrap">
         <label>RT 締結率</label>
         <span class="ki-icon">📊</span>
-        <input type="number" id="f_rt_close_pct" placeholder="自動計算" step="0.1" readonly style="background:rgba(255,102,0,0.08);color:#ff8533;cursor:default;">
+        <input type="text" id="f_rt_close_pct" placeholder="—" readonly style="background:rgba(255,102,0,0.08);color:#ff8533;cursor:default;text-align:left;">
       </div>
       <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
         <span class="ks-icon">📱</span> 設備案佔比
@@ -1267,7 +1267,7 @@
       <div class="kpi-input-wrap">
         <label>設備案佔比</label>
         <span class="ki-icon">📊</span>
-        <input type="number" id="f_device_ratio" placeholder="自動計算" step="0.1" readonly style="background:rgba(255,102,0,0.08);color:#ff8533;cursor:default;">
+        <input type="text" id="f_device_ratio" placeholder="—" readonly style="background:rgba(255,102,0,0.08);color:#ff8533;cursor:default;text-align:left;">
       </div>
       <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
         <span class="ks-icon">☂️</span> 保險搭售率
@@ -1286,7 +1286,7 @@
       <div class="kpi-input-wrap">
         <label>保險搭售率</label>
         <span class="ki-icon">📊</span>
-        <input type="number" id="f_insurance_pct" placeholder="自動計算" step="0.1" readonly style="background:rgba(255,102,0,0.08);color:#ff8533;cursor:default;">
+        <input type="text" id="f_insurance_pct" placeholder="—" readonly style="background:rgba(255,102,0,0.08);color:#ff8533;cursor:default;text-align:left;">
       </div>
     </div>
 
@@ -1313,7 +1313,7 @@
       <div class="kpi-input-wrap highlight">
         <label>設備佔比 %（自動）</label>
         <span class="ki-icon">📊</span>
-        <input type="number" id="f_device_ratio" placeholder="自動計算" step="0.1" readonly style="background:rgba(255,102,0,0.06);cursor:not-allowed;color:#ff8533;">
+        <input type="text" id="f_device_ratio" placeholder="—" readonly style="background:rgba(255,102,0,0.06);cursor:default;color:#ff8533;text-align:left;">
         <span class="kpi-hot-badge">佔比</span>
       </div>
       <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
@@ -3744,18 +3744,23 @@ setInterval(updateBrowserTitle, 60000);
 // 自動計算百分比（分子÷分母×100）
 // ════════════════════════════════════
 function calcPct(numId, denId, pctId) {
-  const num = parseFloat(document.getElementById('f_' + numId)?.value);
-  const den = parseFloat(document.getElementById('f_' + denId)?.value);
-  const el  = document.getElementById('f_' + pctId);
-  if (!el) return;
+  const numEl = document.getElementById('f_' + numId);
+  const denEl = document.getElementById('f_' + denId);
+  const el    = document.getElementById('f_' + pctId);
+  if (!numEl || !denEl || !el) {
+    console.warn('calcPct: element not found', numId, denId, pctId);
+    return;
+  }
+  const num = parseFloat(numEl.value);
+  const den = parseFloat(denEl.value);
   if (!isNaN(num) && !isNaN(den) && den > 0) {
     const val = (num / den * 100).toFixed(1);
-    el.value = val;
+    el.value = val + '%';
     const v = parseFloat(val);
     el.style.color = v >= 100 ? '#22c55e' : v >= 80 ? '#ff8533' : '#ef4444';
+    el.style.fontWeight = '700';
   } else {
     el.value = '';
-    el.style.color = '#ff8533';
   }
 }
 function autoCalc() {}
