@@ -1234,7 +1234,7 @@
         <input type="number" id="f_rank" placeholder="0">
       </div>
       <div class="kpi-input-wrap">
-        <label>提前續約數</label>
+        <label>提前續約數（筆）</label>
         <span class="ki-icon">🔄</span>
         <input type="number" id="f_early_renew" placeholder="0">
       </div>
@@ -1245,17 +1245,17 @@
       <div class="kpi-input-wrap">
         <label>RT 締結 分子</label>
         <span class="ki-icon">➗</span>
-        <input type="number" id="f_rt_close_num" placeholder="0">
+        <input type="number" id="f_rt_close_num" placeholder="0" oninput="calcPct('rt_close_num','rt_close_den','rt_close_pct')">
       </div>
       <div class="kpi-input-wrap">
         <label>RT 締結 分母</label>
         <span class="ki-icon">➗</span>
-        <input type="number" id="f_rt_close_den" placeholder="0">
+        <input type="number" id="f_rt_close_den" placeholder="0" oninput="calcPct('rt_close_num','rt_close_den','rt_close_pct')">
       </div>
       <div class="kpi-input-wrap">
-        <label>RT 締結率</label>
+        <label>RT 締結率（自動）</label>
         <span class="ki-icon">📊</span>
-        <input type="number" id="f_rt_close_pct" placeholder="0.0">
+        <input type="number" id="f_rt_close_pct" placeholder="0.0" readonly style="background:rgba(255,102,0,0.05);cursor:not-allowed;">
       </div>
       <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
         <span class="ks-icon">📱</span> 設備案佔比
@@ -1264,17 +1264,17 @@
       <div class="kpi-input-wrap">
         <label>設備案 分子</label>
         <span class="ki-icon">➗</span>
-        <input type="number" id="f_device_num" placeholder="0">
+        <input type="number" id="f_device_num" placeholder="0" oninput="calcPct('device_num','device_den','device_ratio')">
       </div>
       <div class="kpi-input-wrap">
         <label>設備案 分母</label>
         <span class="ki-icon">➗</span>
-        <input type="number" id="f_device_den" placeholder="0">
+        <input type="number" id="f_device_den" placeholder="0" oninput="calcPct('device_num','device_den','device_ratio')">
       </div>
       <div class="kpi-input-wrap">
-        <label>設備案佔比</label>
+        <label>設備案佔比（自動）</label>
         <span class="ki-icon">📊</span>
-        <input type="number" id="f_device_ratio" placeholder="0.0">
+        <input type="number" id="f_device_ratio" placeholder="0.0" readonly style="background:rgba(255,102,0,0.05);cursor:not-allowed;">
       </div>
       <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
         <span class="ks-icon">☂️</span> 保險搭售率
@@ -1283,17 +1283,17 @@
       <div class="kpi-input-wrap">
         <label>保險搭售 分子</label>
         <span class="ki-icon">➗</span>
-        <input type="number" id="f_insurance_num" placeholder="0">
+        <input type="number" id="f_insurance_num" placeholder="0" oninput="calcPct('insurance_num','insurance_den','insurance_pct')">
       </div>
       <div class="kpi-input-wrap">
         <label>保險搭售 分母</label>
         <span class="ki-icon">➗</span>
-        <input type="number" id="f_insurance_den" placeholder="0">
+        <input type="number" id="f_insurance_den" placeholder="0" oninput="calcPct('insurance_num','insurance_den','insurance_pct')">
       </div>
       <div class="kpi-input-wrap">
-        <label>保險搭售率</label>
+        <label>保險搭售率（自動）</label>
         <span class="ki-icon">📊</span>
-        <input type="number" id="f_insurance_pct" placeholder="0.0">
+        <input type="number" id="f_insurance_pct" placeholder="0.0" readonly style="background:rgba(255,102,0,0.05);cursor:not-allowed;">
       </div>
     </div>
 
@@ -1303,86 +1303,62 @@
       <div class="ks-line"></div>
     </div>
     <div class="form-grid">
-      <div class="kpi-section-title" style="grid-column:1/-1;margin:4px 0 6px;">
-        <span class="ks-icon">📱</span> 設備佔比
-        <div class="ks-line"></div>
-      </div>
       <div class="kpi-input-wrap">
-        <label>Device 銷售數（分子）</label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_device_num" placeholder="0">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>總銷售數（分母）</label>
-        <span class="ki-icon">➗</span>
-        <input type="number" id="f_device_den" placeholder="0">
-      </div>
-      <div class="kpi-input-wrap highlight">
-        <label>設備佔比 %（自動）</label>
-        <span class="ki-icon">📊</span>
-        <input type="number" id="f_device_ratio" placeholder="0.0">
-        
-      </div>
-      <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
-        <span class="ks-icon">5️⃣</span> 其他主力 KPI
-        <div class="ks-line"></div>
-      </div>
-      <div class="kpi-input-wrap">
-        <label>5G 銷售數</label>
+        <label>5G 銷售數（筆）</label>
         <span class="ki-icon">5️⃣</span>
-        <input type="number" id="f_5g" placeholder="0.0" step="0.1">
+        <input type="number" id="f_5g" placeholder="0">
       </div>
       <div class="kpi-input-wrap">
         <label>TTL AQ 上線點數</label>
         <span class="ki-icon">📡</span>
-        <input type="number" id="f_aq_ttl" placeholder="0.0" step="0.1">
+        <input type="number" id="f_aq_ttl" placeholder="0" step="0.01">
       </div>
       <div class="kpi-input-wrap highlight">
-        <label>AQ V+D 999(含)以上</label>
+        <label>AQ V+D 999(含)以上（筆）</label>
         <span class="ki-icon">⭐</span>
-        <input type="number" id="f_aq999" placeholder="0.0" step="0.1" oninput="onFieldInput(this,'aq999')">
+        <input type="number" id="f_aq999" placeholder="0" oninput="onFieldInput(this,'aq999')">
         <span class="kpi-hot-badge">A999</span>
       </div>
       <div class="kpi-input-wrap highlight">
-        <label>AQ V+D 1399(含)以上</label>
+        <label>AQ V+D 1399(含)以上（筆）</label>
         <span class="ki-icon">👑</span>
-        <input type="number" id="f_aq1399" placeholder="0.0" step="0.1" oninput="onFieldInput(this,'aq1399')">
+        <input type="number" id="f_aq1399" placeholder="0" oninput="onFieldInput(this,'aq1399')">
         <span class="kpi-hot-badge">A1399</span>
       </div>
       <div class="kpi-input-wrap">
         <label>預付卡開卡面額</label>
         <span class="ki-icon">💳</span>
-        <input type="number" id="f_prepaid" placeholder="0.0" step="0.1">
+        <input type="number" id="f_prepaid" placeholder="0" step="0.01">
       </div>
       <div class="kpi-input-wrap">
         <label>RT 上線點數</label>
         <span class="ki-icon">📶</span>
-        <input type="number" id="f_rt_pts" placeholder="0.0" step="0.1">
+        <input type="number" id="f_rt_pts" placeholder="0" step="0.01">
       </div>
       <div class="kpi-input-wrap">
-        <label>特殊維繫用戶續約</label>
+        <label>特殊維繫用戶續約（筆）</label>
         <span class="ki-icon">🤝</span>
-        <input type="number" id="f_special_renew" placeholder="0.0" step="0.1">
+        <input type="number" id="f_special_renew" placeholder="0">
       </div>
       <div class="kpi-input-wrap">
-        <label>高高特維用戶續約</label>
+        <label>高高特維用戶續約（筆）</label>
         <span class="ki-icon">💎</span>
-        <input type="number" id="f_premium_renew" placeholder="0.0" step="0.1">
+        <input type="number" id="f_premium_renew" placeholder="0">
       </div>
       <div class="kpi-input-wrap">
-        <label>RT V+D 999(含)以上</label>
+        <label>RT V+D 999(含)以上（筆）</label>
         <span class="ki-icon">📲</span>
-        <input type="number" id="f_rt999" placeholder="0.0" step="0.1">
+        <input type="number" id="f_rt999" placeholder="0">
       </div>
       <div class="kpi-input-wrap">
-        <label>RT V+D 1399(含)以上</label>
+        <label>RT V+D 1399(含)以上（筆）</label>
         <span class="ki-icon">🌐</span>
-        <input type="number" id="f_rt1399" placeholder="0.0" step="0.1">
+        <input type="number" id="f_rt1399" placeholder="0">
       </div>
       <div class="kpi-input-wrap highlight">
-        <label>好速索銷售點數</label>
+        <label>好速銷售點數</label>
         <span class="ki-icon">⚡</span>
-        <input type="number" id="f_haosu" placeholder="0.0" step="0.1" oninput="onFieldInput(this,'haosu')">
+        <input type="number" id="f_haosu" placeholder="0" step="0.01" oninput="onFieldInput(this,'haosu')">
         <span class="kpi-hot-badge">好速</span>
       </div>
     </div>
@@ -1408,59 +1384,59 @@
         <input type="number" id="f_hang_delta" placeholder="0.00" step="0.01">
       </div>
       <div class="kpi-input-wrap">
-        <label>Device 專案銷售</label>
+        <label>Device 專案銷售（筆）</label>
         <span class="ki-icon">📱</span>
-        <input type="number" id="f_device_proj" placeholder="0.0" step="0.1">
+        <input type="number" id="f_device_proj" placeholder="0">
       </div>
       <div class="kpi-input-wrap">
-        <label>重點 Device 銷售量</label>
+        <label>重點 Device 銷售量（筆）</label>
         <span class="ki-icon">🔑</span>
-        <input type="number" id="f_device_key" placeholder="0.0" step="0.1">
+        <input type="number" id="f_device_key" placeholder="0">
       </div>
       <div class="kpi-input-wrap">
         <label>換約淨新增金額</label>
         <span class="ki-icon">💰</span>
-        <input type="number" id="f_contract_net" placeholder="0.0" step="0.1">
+        <input type="number" id="f_contract_net" placeholder="0" step="0.01">
       </div>
       <div class="kpi-input-wrap">
         <label>空機/3C 及門市營收</label>
         <span class="ki-icon">📦</span>
-        <input type="number" id="f_3c" placeholder="0.0" step="0.1">
+        <input type="number" id="f_3c" placeholder="0" step="0.01">
       </div>
       <div class="kpi-input-wrap">
         <label>配件及其他營收</label>
         <span class="ki-icon">🎧</span>
-        <input type="number" id="f_acc" placeholder="0.0" step="0.1">
+        <input type="number" id="f_acc" placeholder="0" step="0.01">
       </div>
       <div class="kpi-input-wrap">
-        <label>包膜與保貼</label>
+        <label>包膜與保貼（筆）</label>
         <span class="ki-icon">🛡️</span>
-        <input type="number" id="f_film" placeholder="0.0" step="0.1">
+        <input type="number" id="f_film" placeholder="0">
       </div>
       <div class="kpi-input-wrap">
-        <label>手機保險</label>
+        <label>手機保險（筆）</label>
         <span class="ki-icon">☂️</span>
-        <input type="number" id="f_insurance" placeholder="0.0" step="0.1">
+        <input type="number" id="f_insurance" placeholder="0">
       </div>
       <div class="kpi-input-wrap">
-        <label>MyVideo & K KBOX</label>
+        <label>MyVideo & K KBOX（筆）</label>
         <span class="ki-icon">🎵</span>
-        <input type="number" id="f_myvideo" placeholder="0.0" step="0.1">
+        <input type="number" id="f_myvideo" placeholder="0">
       </div>
       <div class="kpi-input-wrap">
-        <label>Apple/Google 服務</label>
+        <label>Apple/Google 服務（筆）</label>
         <span class="ki-icon">🍎</span>
-        <input type="number" id="f_apple_google" placeholder="0.0" step="0.1">
+        <input type="number" id="f_apple_google" placeholder="0">
       </div>
       <div class="kpi-input-wrap">
-        <label>HBO Max&Disney+</label>
+        <label>HBO Max&Disney+（筆）</label>
         <span class="ki-icon">🎬</span>
-        <input type="number" id="f_hbo" placeholder="0.0" step="0.1">
+        <input type="number" id="f_hbo" placeholder="0">
       </div>
       <div class="kpi-input-wrap">
-        <label>Netflix 多享組</label>
+        <label>Netflix 多享組（筆）</label>
         <span class="ki-icon">🎭</span>
-        <input type="number" id="f_netflix" placeholder="0.0" step="0.1">
+        <input type="number" id="f_netflix" placeholder="0">
       </div>
     </div>
 
