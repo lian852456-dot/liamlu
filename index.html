@@ -1,0 +1,2683 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>北一二B 每日回報系統</title>
+<style>
+  :root {
+    /* 台灣大哥大配色 */
+    --bg-deep: #111111;
+    --bg-card: #1a1a1a;
+    --bg-panel: #242424;
+    --bg-row-alt: #1e1e1e;
+    --accent: #ff6600;
+    --accent-bright: #ff8533;
+    --accent-glow: rgba(255,102,0,0.15);
+    --gold: #ff6600;
+    --gold-bright: #ff8533;
+    --green: #22c55e;
+    --green-bright: #4ade80;
+    --red: #ef4444;
+    --red-soft: rgba(239,68,68,0.15);
+    --green-soft: rgba(34,197,94,0.12);
+    --warn: #f59e0b;
+    --purple: #ff6600;
+    --pink: #ff8533;
+    --cyan: #ffaa55;
+    --text: #f0f0f0;
+    --text-dim: #b8b8b8;
+    --text-muted: #707070;
+    --border: rgba(255,102,0,0.25);
+    --border-dim: rgba(255,255,255,0.08);
+    --radius: 12px;
+    --font: 'Segoe UI', 'Noto Sans TC', sans-serif;
+    --tmo-orange: #ff6600;
+    --tmo-orange-light: #ff8533;
+    --tmo-orange-dark: #cc5200;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  .site-header {
+    background: linear-gradient(135deg, #111111 0%, #1a1111 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .site-title {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #fff;
+  }
+  .site-title span { color: var(--accent-bright); }
+  .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .date-badge {
+    background: var(--accent-glow);
+    border: 1px solid var(--border);
+    color: var(--accent-bright);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* ── TABS ── */
+  .tab-bar {
+    display: flex;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-dim);
+    padding: 0 20px;
+    gap: 4px;
+  }
+  .tab-btn {
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .tab-btn:hover { color: var(--text-dim); }
+  .tab-btn.active {
+    color: #ff8533;
+    border-bottom-color: #ff6600;
+  }
+
+  /* ── PANELS ── */
+  .panel { display: none; padding: 20px; }
+  .panel.active { display: block; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-dim);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent-bright);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+  }
+
+  /* ── FORM ── */
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .form-group input, .form-group select {
+    background: var(--bg-deep);
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 8px 10px;
+    font-size: 13px;
+    transition: border-color 0.2s;
+  }
+  .form-group input:focus, .form-group select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+  }
+  .form-group input::placeholder { color: var(--text-muted); }
+
+  /* selector row */
+  .selector-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .selector-row .form-group { min-width: 160px; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    padding: 9px 20px;
+    border-radius: 7px;
+    border: none;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #2563eb; transform: translateY(-1px); }
+  .btn-secondary {
+    background: var(--bg-panel);
+    color: var(--text-dim);
+    border: 1px solid var(--border-dim);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent-bright); }
+  .btn-success { background: var(--green); color: #fff; }
+  .btn-success:hover { background: #059669; }
+  .btn-gold { background: var(--gold); color: #000; }
+
+  /* ── TABLES ── */
+  .table-wrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead th {
+    background: #0d1529;
+    color: var(--accent-bright);
+    font-weight: 700;
+    padding: 10px 8px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    font-size: 11px;
+    letter-spacing: 0.3px;
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border-dim);
+    transition: background 0.15s;
+  }
+  tbody tr:nth-child(even) { background: var(--bg-row-alt); }
+  tbody tr:hover { background: rgba(59,130,246,0.07); }
+  tbody td {
+    padding: 9px 8px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  td.store-name {
+    text-align: left;
+    font-weight: 700;
+    color: #fff;
+    padding-left: 14px;
+  }
+  td.store-name.new-store::after {
+    content: ' 🆕';
+    font-size: 10px;
+  }
+
+  /* color badges */
+  .val-green { color: var(--green); font-weight: 700; }
+  .val-red { color: var(--red); font-weight: 700; }
+  .val-gold { color: var(--gold); font-weight: 700; }
+  .val-warn { color: var(--warn); font-weight: 700; }
+  .val-dim { color: var(--text-muted); }
+  .cell-green { background: var(--green-soft); color: var(--green); font-weight: 700; }
+  .cell-red { background: var(--red-soft); color: var(--red); font-weight: 700; }
+  .cell-warn { background: rgba(249,115,22,0.12); color: var(--warn); font-weight: 700; }
+
+  /* ── TIME SEGMENT TOGGLE ── */
+  .seg-toggle {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .seg-btn {
+    padding: 8px 18px;
+    border-radius: 6px;
+    border: 1px solid var(--border-dim);
+    background: var(--bg-panel);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    transition: all 0.2s;
+  }
+  .seg-btn.active-16 {
+    background: rgba(245,158,11,0.15);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  .seg-btn.active-21 {
+    background: rgba(59,130,246,0.15);
+    border-color: var(--accent);
+    color: var(--accent-bright);
+  }
+
+  /* ── STATUS INDICATORS ── */
+  .status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+  }
+  .status-dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-dot.red { background: var(--red); }
+  .status-dot.gold { background: var(--gold); }
+
+  /* ── SUMMARY CARDS ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .summary-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-dim);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .summary-card .sc-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .summary-card .sc-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--accent-bright);
+  }
+  .summary-card .sc-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #1e293b;
+    border: 1px solid var(--accent);
+    color: var(--text);
+    padding: 12px 24px;
+    border-radius: 30px;
+    font-weight: 600;
+    font-size: 13px;
+    z-index: 9999;
+    transition: transform 0.3s;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── FILL STATUS BAR ── */
+  .fill-status {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .fill-chip {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid;
+  }
+  .fill-chip.done {
+    background: var(--green-soft);
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .fill-chip.pending {
+    background: var(--red-soft);
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .fill-chip.new-s {
+    background: rgba(245,158,11,0.1);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  /* ── SECTION DIVIDER ── */
+  .section-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 20px 0 12px;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+  }
+  .section-divider::before, .section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-dim);
+  }
+
+  /* ── DATE PICKER ROW ── */
+  .playback-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .playback-row label { color: var(--text-dim); font-size: 12px; font-weight: 600; }
+  .playback-row input[type=date] {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+  .playback-row input[type=date]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .site-header { padding: 10px 14px; }
+    .panel { padding: 14px; }
+    .form-grid { grid-template-columns: 1fr 1fr; }
+    .tab-btn { padding: 10px 12px; font-size: 12px; }
+    table { font-size: 11px; }
+    thead th, tbody td { padding: 7px 5px; }
+  }
+
+  /* ══ FILL PANEL 美化 ══ */
+
+  /* 店點選擇卡片 */
+  .store-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  @media(max-width:500px){ .store-grid { grid-template-columns: repeat(2,1fr); } }
+
+  .store-card {
+    background: var(--bg-panel);
+    border: 2px solid var(--border-dim);
+    border-radius: 14px;
+    padding: 14px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .store-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 60%, rgba(255,255,255,0.03));
+    pointer-events: none;
+  }
+  .store-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59,130,246,0.2);
+  }
+  .store-card.selected {
+    border-color: var(--accent-bright);
+    background: linear-gradient(135deg, #1a2a4a, #1c2333);
+    box-shadow: 0 0 0 3px rgba(96,165,250,0.2), 0 6px 24px rgba(59,130,246,0.25);
+  }
+  .store-card .store-emoji { font-size: 26px; display: block; margin-bottom: 6px; }
+  .store-card .store-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dim);
+    transition: color 0.2s;
+  }
+  .store-card.selected .store-label { color: var(--accent-bright); }
+  .store-card .store-status {
+    font-size: 10px;
+    margin-top: 4px;
+    color: var(--text-muted);
+  }
+  .store-card.selected .store-status { color: var(--green); }
+  .new-badge {
+    position: absolute;
+    top: 6px; right: 6px;
+    background: var(--gold);
+    color: #000;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+  }
+
+  /* 時段大按鈕 */
+  .seg-big {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .seg-big-btn {
+    padding: 16px;
+    border-radius: 14px;
+    border: 2px solid var(--border-dim);
+    background: var(--bg-panel);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+  }
+  .seg-big-btn .seg-time {
+    font-size: 22px;
+    font-weight: 800;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .seg-big-btn .seg-desc { font-size: 11px; color: var(--text-muted); }
+  .seg-big-btn:hover { border-color: var(--accent); }
+  .seg-big-btn.active-16 {
+    border-color: var(--gold);
+    background: linear-gradient(135deg, #2a1f0a, #1c2333);
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.15);
+  }
+  .seg-big-btn.active-16 .seg-time { color: var(--gold-bright); }
+  .seg-big-btn.active-21 {
+    border-color: var(--accent);
+    background: linear-gradient(135deg, #0d1f3a, #1c2333);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+  }
+  .seg-big-btn.active-21 .seg-time { color: var(--accent-bright); }
+
+  /* KPI 卡片式輸入 */
+  .kpi-input-card {
+    background: var(--bg-panel);
+    border: 1.5px solid var(--border-dim);
+    border-radius: 14px;
+    padding: 14px 12px 10px;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .kpi-input-card:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .kpi-input-card.achieved {
+    border-color: var(--green);
+    background: linear-gradient(135deg, #0a1f17, var(--bg-panel));
+    box-shadow: 0 0 0 2px rgba(16,185,129,0.15);
+  }
+  .kpi-input-card.achieved::after {
+    content: '✓';
+    position: absolute;
+    top: 8px; right: 10px;
+    color: var(--green);
+    font-size: 14px;
+    font-weight: 900;
+  }
+  .kpi-input-card .kic-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .kic-icon { font-size: 14px; }
+  .kpi-input-card input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--border-dim);
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 800;
+    padding: 4px 0 6px;
+    transition: border-color 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .kpi-input-card input:focus { outline: none; border-bottom-color: var(--accent); }
+  .kpi-input-card input::placeholder { color: var(--text-muted); font-size: 15px; font-weight: 400; }
+  .kic-unit {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    text-align: right;
+  }
+
+  /* 特殊高亮卡（A999 / A1399 / 好速） */
+  .kpi-input-card.highlight-gold { border-color: rgba(245,158,11,0.3); }
+  .kpi-input-card.highlight-gold .kic-label { color: var(--gold); }
+  .kpi-input-card.highlight-gold:focus-within { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(245,158,11,0.12); }
+  .kpi-input-card.highlight-purple { border-color: rgba(167,139,250,0.3); }
+  .kpi-input-card.highlight-purple .kic-label { color: var(--purple); }
+  .kpi-input-card.highlight-cyan { border-color: rgba(34,211,238,0.3); }
+  .kpi-input-card.highlight-cyan .kic-label { color: var(--cyan); }
+
+  /* 進度條 */
+  .fill-progress-wrap {
+    margin: 14px 0 4px;
+    background: var(--bg-panel);
+    border-radius: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--border-dim);
+  }
+  .fill-progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 7px;
+  }
+  .fill-progress-label span:last-child { color: var(--accent-bright); font-weight: 700; }
+  .fill-progress-bar {
+    height: 6px;
+    background: var(--bg-deep);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .fill-progress-inner {
+    height: 100%;
+    border-radius: 10px;
+    background: linear-gradient(90deg, var(--accent), var(--cyan));
+    transition: width 0.4s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* 儲存按鈕超大版 */
+  .save-btn-big {
+    width: 100%;
+    padding: 18px;
+    border-radius: 16px;
+    border: none;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(37,99,235,0.4);
+    position: relative;
+    overflow: hidden;
+  }
+  .save-btn-big::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -60%;
+    width: 40%; height: 200%;
+    background: rgba(255,255,255,0.1);
+    transform: skewX(-20deg);
+    transition: left 0.4s;
+  }
+  .save-btn-big:hover::before { left: 120%; }
+  .save-btn-big:hover {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(37,99,235,0.5);
+  }
+  .save-btn-big:active { transform: scale(0.98); }
+
+  /* ══ 慶祝 OVERLAY ══ */
+  #celebOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    pointer-events: none;
+    display: none;
+  }
+  #celebOverlay.show { display: block; }
+  .celeb-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    animation: celebPop 0.4s cubic-bezier(.175,.885,.32,1.5) both;
+  }
+  @keyframes celebPop {
+    from { opacity:0; transform: translate(-50%,-50%) scale(0.4); }
+    to   { opacity:1; transform: translate(-50%,-50%) scale(1); }
+  }
+  .celeb-bg {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    pointer-events: all;
+    cursor: pointer;
+  }
+  .celeb-card {
+    background: linear-gradient(135deg, #1a1f35, #111827);
+    border: 2px solid var(--gold);
+    border-radius: 24px;
+    padding: 32px 36px;
+    min-width: 280px;
+    box-shadow: 0 0 60px rgba(245,158,11,0.3), 0 20px 60px rgba(0,0,0,0.6);
+    position: relative;
+    z-index: 1;
+  }
+  .celeb-emoji { font-size: 64px; display: block; margin-bottom: 8px; animation: spin1 0.6s ease; }
+  @keyframes spin1 { from { transform: rotate(-20deg) scale(0.5); } to { transform: rotate(0) scale(1); } }
+  .celeb-title {
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--gold-bright);
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+  }
+  .celeb-sub { font-size: 14px; color: var(--text-dim); margin-bottom: 16px; }
+  .celeb-items { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .celeb-item {
+    background: rgba(245,158,11,0.12);
+    border: 1px solid var(--gold);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold-bright);
+  }
+  .celeb-close {
+    margin-top: 18px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* 煙火粒子 */
+  .particle {
+    position: fixed;
+    pointer-events: none;
+    border-radius: 50%;
+    animation: particleFly 1.2s ease-out forwards;
+  }
+  @keyframes particleFly {
+    0%   { opacity:1; transform: translate(0,0) scale(1); }
+    100% { opacity:0; transform: translate(var(--tx), var(--ty)) scale(0.2); }
+  }
+  .coin {
+    position: fixed;
+    font-size: 20px;
+    pointer-events: none;
+    animation: coinDrop 1.5s ease-in forwards;
+  }
+  @keyframes coinDrop {
+    0%   { opacity:1; transform: translateY(0) rotate(0deg); }
+    100% { opacity:0; transform: translateY(200px) rotate(720deg); }
+  }
+  .star-burst {
+    position: fixed;
+    pointer-events: none;
+    font-size: 18px;
+    animation: starSpin 1s ease-out forwards;
+  }
+  @keyframes starSpin {
+    0%   { opacity:1; transform: scale(0) rotate(0); }
+    50%  { opacity:1; transform: scale(1.5) rotate(180deg); }
+    100% { opacity:0; transform: scale(0.5) rotate(360deg); }
+  }
+
+  /* section 標題 美化 */
+  .fill-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+    margin: 20px 0 10px;
+  }
+  .fill-section-title .fst-icon { font-size: 16px; }
+  .fill-section-title .fst-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border-dim);
+  }
+  .fill-section-title.gold-title { color: var(--gold); }
+  .fill-section-title.gold-title .fst-line { background: rgba(245,158,11,0.2); }
+  .fill-section-title.purple-title { color: var(--purple); }
+  .fill-section-title.purple-title .fst-line { background: rgba(167,139,250,0.2); }
+  .fill-section-title.cyan-title { color: var(--cyan); }
+  .fill-section-title.cyan-title .fst-line { background: rgba(34,211,238,0.2); }
+
+  /* store header banner */
+  .store-banner {
+    background: linear-gradient(135deg, #1a2a4a 0%, #1c2333 100%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity:0; transform: translateY(-8px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
+  .store-banner .sb-emoji { font-size: 36px; }
+  .store-banner .sb-name { font-size: 20px; font-weight: 900; color: #fff; }
+  .store-banner .sb-seg  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .store-banner .sb-seg span { color: var(--gold-bright); font-weight: 700; }
+
+
+
+  /* ════ 慶祝動畫系統 ════ */
+  #celebCanvas {
+    position: fixed; inset: 0; pointer-events: none;
+    z-index: 9000; width: 100%; height: 100%;
+  }
+
+  /* ── 慶祝彈窗 ── */
+  #celebModal {
+    position: fixed; inset: 0; z-index: 9100;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
+  }
+  #celebModal.show { display: flex; }
+  .celeb-box {
+    background: linear-gradient(135deg, #1a1111 0%, #111111 60%, #1a0e00 100%);
+    border: 2px solid transparent;
+    border-radius: 20px;
+    padding: 32px 28px 24px;
+    text-align: center;
+    max-width: 340px; width: 90%;
+    position: relative;
+    overflow: hidden;
+    animation: celebPop .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  .celeb-box::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 20px;
+    padding: 2px;
+    background: linear-gradient(135deg, #ff6600, #ffaa00, #ff6600, #ff8533);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: destination-out;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  @keyframes celebPop {
+    from { transform: scale(.6); opacity: 0; }
+    to   { transform: scale(1);  opacity: 1; }
+  }
+  .celeb-emoji { font-size: 56px; margin-bottom: 8px; animation: bounce 0.6s ease infinite alternate; }
+  @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-8px); } }
+  .celeb-title {
+    font-size: 22px; font-weight: 900; letter-spacing: 1px;
+    background: linear-gradient(90deg, #f59e0b, #fbbf24, #f97316);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+  }
+  .celeb-subtitle { font-size: 13px; color: #94a3b8; margin-bottom: 16px; }
+  .celeb-badges {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    justify-content: center; margin-bottom: 20px;
+  }
+  .celeb-badge {
+    padding: 6px 14px; border-radius: 20px;
+    font-size: 12px; font-weight: 700; border: 1px solid;
+    animation: badgePulse 1.5s ease infinite;
+  }
+  @keyframes badgePulse {
+    0%,100% { transform: scale(1); }
+    50%      { transform: scale(1.06); }
+  }
+  .badge-gold  { background: rgba(245,158,11,.15); border-color:#f59e0b; color:#fbbf24; }
+  .badge-blue  { background: rgba(59,130,246,.15);  border-color:#3b82f6; color:#60a5fa; }
+  .badge-green { background: rgba(16,185,129,.15);  border-color:#10b981; color:#34d399; }
+  .badge-pink  { background: rgba(236,72,153,.15);  border-color:#ec4899; color:#f472b6; }
+  .celeb-close {
+    background: linear-gradient(135deg,#3b82f6,#8b5cf6);
+    color:#fff; border:none; border-radius:10px;
+    padding:10px 28px; font-size:14px; font-weight:700;
+    cursor:pointer; transition: transform .2s;
+  }
+  .celeb-close:hover { transform: scale(1.05); }
+
+  /* ── 填報區美化 ── */
+  .fill-hero {
+    background: linear-gradient(135deg, #1a1111 0%, #221100 50%, #1a1111 100%);
+    border: 1px solid rgba(255,102,0,0.3);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .fill-hero::after {
+    content: '';
+    position: absolute; top: -40px; right: -40px;
+    width: 150px; height: 150px;
+    background: radial-gradient(circle, rgba(255,102,0,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .fill-hero-title {
+    font-size: 16px; font-weight: 800; color: #fff;
+    margin-bottom: 4px; letter-spacing: 0.5px;
+  }
+  .fill-hero-sub { font-size: 12px; color: #7c8fa6; }
+
+  /* ── 門市選擇卡片 ── */
+  .store-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  @media(max-width:480px){ .store-grid { grid-template-columns: repeat(3,1fr); } }
+  .store-card {
+    background: var(--bg-panel);
+    border: 1.5px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 10px 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    position: relative;
+  }
+  .store-card:hover {
+    border-color: rgba(255,102,0,0.6);
+    color: var(--text);
+    transform: translateY(-2px);
+  }
+  .store-card.selected {
+    background: linear-gradient(135deg, rgba(255,102,0,0.25), rgba(255,133,51,0.15));
+    border-color: #ff6600;
+    color: #fff;
+    box-shadow: 0 0 14px rgba(255,102,0,0.4);
+  }
+  .store-card.new-badge::after {
+    content: 'NEW';
+    position: absolute; top: 3px; right: 3px;
+    background: #f59e0b; color: #000;
+    font-size: 8px; font-weight: 900;
+    padding: 1px 4px; border-radius: 4px;
+  }
+  .store-card .store-icon { font-size: 20px; margin-bottom: 4px; }
+
+  /* ── 時段選擇 ── */
+  .seg-cards { display: flex; gap: 10px; margin-bottom: 16px; }
+  .seg-card {
+    flex: 1; padding: 14px 10px; border-radius: 12px;
+    border: 1.5px solid rgba(255,255,255,0.07);
+    background: var(--bg-panel);
+    text-align: center; cursor: pointer; transition: all .2s;
+  }
+  .seg-card .seg-time { font-size: 20px; font-weight: 900; color: var(--text-muted); }
+  .seg-card .seg-label { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  .seg-card.sel-16 {
+    background: linear-gradient(135deg,rgba(255,102,0,.2),rgba(255,133,51,.1));
+    border-color: #ff6600;
+    box-shadow: 0 0 16px rgba(255,102,0,.3);
+  }
+  .seg-card.sel-16 .seg-time { color: #ff8533; }
+  .seg-card.sel-16 .seg-label { color: #ff6600; }
+  .seg-card.sel-21 {
+    background: linear-gradient(135deg,rgba(255,255,255,.1),rgba(200,200,200,.05));
+    border-color: #aaaaaa;
+    box-shadow: 0 0 16px rgba(255,255,255,.1);
+  }
+  .seg-card.sel-21 .seg-time { color: #ffffff; }
+  .seg-card.sel-21 .seg-label { color: #cccccc; }
+
+  /* ── KPI 輸入卡片 ── */
+  .kpi-section-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text-muted); margin: 16px 0 10px;
+  }
+  .kpi-section-title .ks-line { flex:1; height:1px; background:rgba(255,255,255,0.06); }
+  .kpi-section-title .ks-icon { font-size: 14px; }
+
+  /* 輸入框脈衝光圈（焦點時） */
+  .kpi-input-wrap { position: relative; }
+  .kpi-input-wrap input {
+    background: rgba(15,24,42,0.8);
+    border: 1.5px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px 10px 36px;
+    font-size: 14px; font-weight: 700;
+    width: 100%;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .kpi-input-wrap input:focus {
+    outline: none;
+    border-color: #ff6600;
+    box-shadow: 0 0 0 3px rgba(255,102,0,0.15);
+  }
+  .kpi-input-wrap .ki-icon {
+    position: absolute; left: 10px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 15px; pointer-events: none;
+  }
+  .kpi-input-wrap label {
+    display: block; font-size: 10px; font-weight: 700;
+    color: #64748b; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 4px;
+  }
+  /* 特別標記的重點欄位 */
+  .kpi-input-wrap.highlight input {
+    border-color: rgba(255,102,0,0.4);
+    background: rgba(255,102,0,0.05);
+  }
+  .kpi-input-wrap.highlight input:focus {
+    border-color: #ff6600;
+    box-shadow: 0 0 0 3px rgba(255,102,0,0.2);
+  }
+  .kpi-hot-badge {
+    position: absolute; right: 8px; top: 28px;
+    font-size: 9px; font-weight: 800;
+    padding: 2px 6px; border-radius: 4px;
+    background: rgba(255,102,0,.2); color: #ff8533; border: 1px solid #ff6600;
+    pointer-events: none;
+  }
+
+  /* ── 儲存按鈕 ── */
+  .save-btn-wrap { padding: 16px 0 8px; }
+  .btn-save-main {
+    width: 100%; padding: 15px;
+    background: linear-gradient(135deg, #ff6600, #ff8533);
+    border: none; border-radius: 12px;
+    color: #fff; font-size: 15px; font-weight: 800;
+    cursor: pointer; letter-spacing: 0.5px;
+    transition: all .25s;
+    box-shadow: 0 4px 20px rgba(255,102,0,0.4);
+  }
+  .btn-save-main:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(255,102,0,0.6);
+  }
+  .btn-save-main:active { transform: scale(.97); }
+
+  /* ── 已填摘要條 ── */
+  .filled-summary {
+    background: rgba(16,185,129,0.07);
+    border: 1px solid rgba(16,185,129,0.2);
+    border-radius: 10px; padding: 12px 14px;
+    margin-bottom: 12px; display: none;
+  }
+  .filled-summary.show { display: block; }
+  .filled-summary-title { font-size: 11px; color: #10b981; font-weight: 700; margin-bottom: 6px; }
+  .filled-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .filled-chip {
+    font-size: 11px; padding: 3px 9px; border-radius: 12px;
+    background: rgba(16,185,129,0.12); color: #34d399;
+    border: 1px solid rgba(16,185,129,0.3); font-weight: 700;
+  }
+
+
+  /* ── 未達標說明彈窗 ── */
+  #underModal {
+    position: fixed; inset: 0; z-index: 9200;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    padding: 16px;
+  }
+  .under-box {
+    background: #1a1a1a;
+    border: 1.5px solid rgba(255,102,0,0.4);
+    border-radius: 16px;
+    padding: 20px;
+    width: 100%; max-width: 520px;
+    max-height: 85vh; overflow-y: auto;
+  }
+  .under-title {
+    font-size: 15px; font-weight: 800; color: #ff8533;
+    margin-bottom: 4px;
+  }
+  .under-subtitle {
+    font-size: 11px; color: #707070; margin-bottom: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- HEADER -->
+<header class="site-header">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <!-- 大可鴨 SVG -->
+    <div style="width:44px;height:44px;flex-shrink:0;">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <!-- 身體 -->
+        <ellipse cx="50" cy="65" rx="28" ry="24" fill="#ff6600"/>
+        <!-- 頭 -->
+        <circle cx="50" cy="36" r="20" fill="#ff6600"/>
+        <!-- 臉白色 -->
+        <ellipse cx="53" cy="40" rx="13" ry="11" fill="#fff"/>
+        <!-- 眼睛 -->
+        <circle cx="46" cy="32" r="4" fill="#fff"/>
+        <circle cx="46" cy="32" r="2.5" fill="#111"/>
+        <circle cx="47" cy="31" r="0.8" fill="#fff"/>
+        <!-- 嘴巴/嘴喙 -->
+        <ellipse cx="61" cy="40" rx="10" ry="6" fill="#ffaa00"/>
+        <!-- 翅膀左 -->
+        <ellipse cx="24" cy="68" rx="10" ry="16" fill="#e55a00" transform="rotate(-15 24 68)"/>
+        <!-- 翅膀右 -->
+        <ellipse cx="76" cy="68" rx="10" ry="16" fill="#e55a00" transform="rotate(15 76 68)"/>
+        <!-- 腳 -->
+        <ellipse cx="40" cy="87" rx="8" ry="4" fill="#ffaa00" transform="rotate(-10 40 87)"/>
+        <ellipse cx="60" cy="87" rx="8" ry="4" fill="#ffaa00" transform="rotate(10 60 87)"/>
+        <!-- 頭髮/頂毛 -->
+        <path d="M44 18 Q50 8 56 18 Q53 14 50 16 Q47 14 44 18Z" fill="#e55a00"/>
+      </svg>
+    </div>
+    <div>
+      <div class="site-title">北一二<span>B</span> 每日回報</div>
+      <div style="font-size:11px;color:var(--text-muted);letter-spacing:1px;">Taiwan Mobile · 台灣大哥大</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="date-badge" id="todayBadge"></div>
+    <div class="date-badge" id="connBadge" onclick="openSettings()" style="cursor:pointer;border-color:var(--warn);color:var(--warn)">⚙️ 設定 Sheets</div>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('fill')">📝 填報（店長）</button>
+  <button class="tab-btn" onclick="switchTab('summary')">📊 彙整大盤（督導）</button>
+  <button class="tab-btn" onclick="switchTab('playback')">🕐 日期回放</button>
+</div>
+
+<!-- ═══════════════════════════════════
+     PANEL 1: 填報（美化版）
+═══════════════════════════════════ -->
+<div class="panel active" id="panel-fill">
+
+  <!-- Hero Banner -->
+  <div class="fill-hero">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <div>
+        <div class="fill-hero-title">🏪 北一二B 每日回報</div>
+        <div class="fill-hero-sub" id="fillHeroSub">選擇門市與時段開始填報</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:#64748b;">填報日期</div>
+        <input type="date" id="fillDate" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:7px;color:#fff;padding:5px 10px;font-size:13px;font-weight:700;margin-top:3px;">
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 1：選門市 -->
+  <div class="kpi-section-title">
+    <span class="ks-icon">🏪</span> STEP 1 · 選擇門市
+    <div class="ks-line"></div>
+  </div>
+  <div class="store-grid">
+    <div class="store-card" data-store="通化" onclick="selectStore('通化')">
+      <div class="store-icon">🛒</div>通化
+    </div>
+    <div class="store-card" data-store="酒泉" onclick="selectStore('酒泉')">
+      <div class="store-icon">🍶</div>酒泉
+    </div>
+    <div class="store-card" data-store="台北三創" onclick="selectStore('台北三創')">
+      <div class="store-icon">💡</div>三創
+    </div>
+    <div class="store-card" data-store="萬大" onclick="selectStore('萬大')">
+      <div class="store-icon">🌟</div>萬大
+    </div>
+    <div class="store-card" data-store="六張犁" onclick="selectStore('六張犁')">
+      <div class="store-icon">🌿</div>六張犁
+    </div>
+    <div class="store-card" data-store="復興南" onclick="selectStore('復興南')">
+      <div class="store-icon">⚡</div>復興南
+    </div>
+    <div class="store-card" data-store="永吉" onclick="selectStore('永吉')">
+      <div class="store-icon">🔥</div>永吉
+    </div>
+    <div class="store-card" data-store="大稻埕" onclick="selectStore('大稻埕')">
+      <div class="store-icon">🎪</div>大稻埕
+    </div>
+    <div class="store-card new-badge" data-store="杭州南" onclick="selectStore('杭州南')">
+      <div class="store-icon">🚀</div>杭州南
+    </div>
+  </div>
+
+  <!-- STEP 2：選時段 -->
+  <div class="kpi-section-title">
+    <span class="ks-icon">⏰</span> STEP 2 · 選擇時段
+    <div class="ks-line"></div>
+  </div>
+  <div class="seg-cards">
+<div class="seg-card sel-16" id="newSeg16" onclick="setSeg(16)">
+      <div class="seg-time">16:00</div>
+      <div class="seg-label">下午回報</div>
+    </div>
+    <div class="seg-card" id="newSeg21" onclick="setSeg(21)">
+      <div class="seg-time">21:00</div>
+      <div class="seg-label">晚間收工</div>
+    </div>
+  </div>
+
+  <!-- 已有資料摘要 -->
+  <div class="filled-summary" id="filledSummary">
+    <div class="filled-summary-title">✅ 本時段已填資料</div>
+    <div class="filled-chip-row" id="filledChips"></div>
+  </div>
+
+  <!-- 填報表單 -->
+  <select id="fillStore" style="display:none">
+    <option value="">— 選擇店點 —</option>
+    <option value="通化">通化</option>
+    <option value="酒泉">酒泉</option>
+    <option value="台北三創">台北三創</option>
+    <option value="萬大">萬大</option>
+    <option value="六張犁">六張犁</option>
+    <option value="復興南">復興南</option>
+    <option value="永吉">永吉</option>
+    <option value="大稻埕">大稻埕</option>
+    <option value="杭州南">杭州南</option>
+  </select>
+  <div id="fillFormArea" style="display:none">
+
+    <!-- 基本 KPI -->
+    <div class="kpi-section-title">
+      <span class="ks-icon">📊</span> 基本 KPI
+      <div class="ks-line"></div>
+    </div>
+    <div class="form-grid">
+      <div class="kpi-input-wrap">
+        <label>KPI 達成率</label>
+        <span class="ki-icon">📈</span>
+        <input type="number" id="f_kpi" placeholder="0.0" step="0.1" oninput="onFieldInput(this,'kpi')">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>公司 KPI 排名</label>
+        <span class="ki-icon">🏅</span>
+        <input type="number" id="f_rank" placeholder="0">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>提前續約數</label>
+        <span class="ki-icon">🔄</span>
+        <input type="number" id="f_early_renew" placeholder="0">
+      </div>
+      <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
+        <span class="ks-icon">📡</span> RT 締結率
+        <div class="ks-line"></div>
+      </div>
+      <div class="kpi-input-wrap">
+        <label>RT 締結 分子</label>
+        <span class="ki-icon">➗</span>
+        <input type="number" id="f_rt_close_num" placeholder="0">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>RT 締結 分母</label>
+        <span class="ki-icon">➗</span>
+        <input type="number" id="f_rt_close_den" placeholder="0">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>RT 締結率</label>
+        <span class="ki-icon">📊</span>
+        <input type="number" id="f_rt_close_pct" placeholder="0.0">
+      </div>
+      <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
+        <span class="ks-icon">📱</span> 設備案佔比
+        <div class="ks-line"></div>
+      </div>
+      <div class="kpi-input-wrap">
+        <label>設備案 分子</label>
+        <span class="ki-icon">➗</span>
+        <input type="number" id="f_device_num" placeholder="0">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>設備案 分母</label>
+        <span class="ki-icon">➗</span>
+        <input type="number" id="f_device_den" placeholder="0">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>設備案佔比</label>
+        <span class="ki-icon">📊</span>
+        <input type="number" id="f_device_ratio" placeholder="0.0">
+      </div>
+      <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
+        <span class="ks-icon">☂️</span> 保險搭售率
+        <div class="ks-line"></div>
+      </div>
+      <div class="kpi-input-wrap">
+        <label>保險搭售 分子</label>
+        <span class="ki-icon">➗</span>
+        <input type="number" id="f_insurance_num" placeholder="0">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>保險搭售 分母</label>
+        <span class="ki-icon">➗</span>
+        <input type="number" id="f_insurance_den" placeholder="0">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>保險搭售率</label>
+        <span class="ki-icon">📊</span>
+        <input type="number" id="f_insurance_pct" placeholder="0.0">
+      </div>
+    </div>
+
+    <!-- 加掛類 -->
+    <div class="kpi-section-title">
+      <span class="ks-icon">🏆</span> 主力 KPI（重點項目）
+      <div class="ks-line"></div>
+    </div>
+    <div class="form-grid">
+      <div class="kpi-section-title" style="grid-column:1/-1;margin:4px 0 6px;">
+        <span class="ks-icon">📱</span> 設備佔比
+        <div class="ks-line"></div>
+      </div>
+      <div class="kpi-input-wrap">
+        <label>Device 銷售數（分子）</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_device_num" placeholder="0">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>總銷售數（分母）</label>
+        <span class="ki-icon">➗</span>
+        <input type="number" id="f_device_den" placeholder="0">
+      </div>
+      <div class="kpi-input-wrap highlight">
+        <label>設備佔比 %（自動）</label>
+        <span class="ki-icon">📊</span>
+        <input type="number" id="f_device_ratio" placeholder="0.0">
+        
+      </div>
+      <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
+        <span class="ks-icon">5️⃣</span> 其他主力 KPI
+        <div class="ks-line"></div>
+      </div>
+      <div class="kpi-input-wrap">
+        <label>5G 銷售數</label>
+        <span class="ki-icon">5️⃣</span>
+        <input type="number" id="f_5g" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>TTL AQ 上線點數</label>
+        <span class="ki-icon">📡</span>
+        <input type="number" id="f_aq_ttl" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap highlight">
+        <label>AQ V+D 999(含)以上</label>
+        <span class="ki-icon">⭐</span>
+        <input type="number" id="f_aq999" placeholder="0.0" step="0.1" oninput="onFieldInput(this,'aq999')">
+        <span class="kpi-hot-badge">A999</span>
+      </div>
+      <div class="kpi-input-wrap highlight">
+        <label>AQ V+D 1399(含)以上</label>
+        <span class="ki-icon">👑</span>
+        <input type="number" id="f_aq1399" placeholder="0.0" step="0.1" oninput="onFieldInput(this,'aq1399')">
+        <span class="kpi-hot-badge">A1399</span>
+      </div>
+      <div class="kpi-input-wrap">
+        <label>預付卡開卡面額</label>
+        <span class="ki-icon">💳</span>
+        <input type="number" id="f_prepaid" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>RT 上線點數</label>
+        <span class="ki-icon">📶</span>
+        <input type="number" id="f_rt_pts" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>特殊維繫用戶續約</label>
+        <span class="ki-icon">🤝</span>
+        <input type="number" id="f_special_renew" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>高高特維用戶續約</label>
+        <span class="ki-icon">💎</span>
+        <input type="number" id="f_premium_renew" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>RT V+D 999(含)以上</label>
+        <span class="ki-icon">📲</span>
+        <input type="number" id="f_rt999" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>RT V+D 1399(含)以上</label>
+        <span class="ki-icon">🌐</span>
+        <input type="number" id="f_rt1399" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap highlight">
+        <label>好速索銷售點數</label>
+        <span class="ki-icon">⚡</span>
+        <input type="number" id="f_haosu" placeholder="0.0" step="0.1" oninput="onFieldInput(this,'haosu')">
+        <span class="kpi-hot-badge">好速</span>
+      </div>
+    </div>
+
+    <div class="kpi-section-title">
+      <span class="ks-icon">🔗</span> 加掛類得分
+      <div class="ks-line"></div>
+    </div>
+    <div class="form-grid">
+      <div class="kpi-input-wrap">
+        <label>加掛類猶得分</label>
+        <span class="ki-icon">🎯</span>
+        <input type="number" id="f_hang_score" placeholder="0.00" step="0.01">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>前日加掛得分</label>
+        <span class="ki-icon">📅</span>
+        <input type="number" id="f_hang_prev" placeholder="0.00" step="0.01">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>加掛得分增減</label>
+        <span class="ki-icon">↕️</span>
+        <input type="number" id="f_hang_delta" placeholder="0.00" step="0.01">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>Device 專案銷售</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_device_proj" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>重點 Device 銷售量</label>
+        <span class="ki-icon">🔑</span>
+        <input type="number" id="f_device_key" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>換約淨新增金額</label>
+        <span class="ki-icon">💰</span>
+        <input type="number" id="f_contract_net" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>空機/3C 及門市營收</label>
+        <span class="ki-icon">📦</span>
+        <input type="number" id="f_3c" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>配件及其他營收</label>
+        <span class="ki-icon">🎧</span>
+        <input type="number" id="f_acc" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>包膜與保貼</label>
+        <span class="ki-icon">🛡️</span>
+        <input type="number" id="f_film" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>手機保險</label>
+        <span class="ki-icon">☂️</span>
+        <input type="number" id="f_insurance" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>MyVideo & K KBOX</label>
+        <span class="ki-icon">🎵</span>
+        <input type="number" id="f_myvideo" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>Apple/Google 服務</label>
+        <span class="ki-icon">🍎</span>
+        <input type="number" id="f_apple_google" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>HBO Max&Disney+</label>
+        <span class="ki-icon">🎬</span>
+        <input type="number" id="f_hbo" placeholder="0.0" step="0.1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>Netflix 多享組</label>
+        <span class="ki-icon">🎭</span>
+        <input type="number" id="f_netflix" placeholder="0.0" step="0.1">
+      </div>
+    </div>
+
+    <!-- 主力 KPI（重點欄位） -->
+
+    <!-- 儲存 -->
+    <div class="save-btn-wrap">
+      <button class="btn-save-main" onclick="saveData()">
+        💾 送出回報
+      </button>
+      <div style="text-align:center;margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <button class="btn btn-secondary" style="font-size:12px;padding:6px 18px;" onclick="clearForm()">🗑️ 清除重填</button>
+        <button onclick="copyReport()" style="
+          background:linear-gradient(135deg,#1a1a1a,#2a2a2a);
+          border:1.5px solid #ff6600;
+          color:#ff8533;
+          border-radius:8px;
+          padding:6px 18px;
+          font-size:12px;
+          font-weight:700;
+          cursor:pointer;
+          transition:all .2s;
+        ">📋 複製回報訊息</button>
+      </div>
+    </div>
+
+    <!-- 複製預覽區 -->
+    <div id="copyPreview" style="display:none;margin-top:12px;margin-bottom:20px;">
+      <div style="font-size:11px;color:#ff6600;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">📋 複製預覽</div>
+      <div style="position:relative;">
+        <textarea id="copyText" readonly style="
+          width:100%;min-height:280px;
+          background:#0a0a0a;
+          border:1px solid rgba(255,102,0,0.3);
+          border-radius:10px;
+          color:#f0f0f0;
+          font-family:'Courier New',monospace;
+          font-size:13px;
+          line-height:1.7;
+          padding:14px;
+          resize:none;
+        "></textarea>
+        <button onclick="doCopy()" style="
+          position:absolute;top:10px;right:10px;
+          background:#ff6600;color:#fff;
+          border:none;border-radius:6px;
+          padding:5px 14px;font-size:12px;font-weight:700;
+          cursor:pointer;
+        " id="copyBtn">複製</button>
+      </div>
+    </div>
+
+  </div><!-- /fillFormArea -->
+</div><!-- /panel-fill -->
+
+
+<!-- ═══════════════════════════════════
+     PANEL 2: 督導彙整
+═══════════════════════════════════ -->
+<div class="panel" id="panel-summary">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+    <div style="font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;">
+      <span style="font-size:20px;">🦆</span> 今日彙整 <span id="summaryDateLabel" style="color:var(--accent-bright);font-size:13px;"></span>
+    </div>
+    <div class="seg-toggle">
+      <button class="seg-btn active-16" id="sumSeg16" onclick="setSumSeg(16)">16:00 回報</button>
+      <button class="seg-btn" id="sumSeg21" onclick="setSumSeg(21)">21:00 回報</button>
+    </div>
+  </div>
+
+  <!-- 填報狀態 -->
+  <div class="card" style="padding:14px 18px;">
+    <div class="card-title" style="margin-bottom:10px;"><span class="dot"></span>填報狀態</div>
+    <div id="missingAlert" style="display:none;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.4);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#ef4444;font-weight:700;"></div>
+    <div class="fill-status" id="fillStatus"></div>
+  </div>
+
+  <!-- 概覽數字 -->
+  <div class="summary-grid" id="summaryCards"></div>
+
+  <!-- 大盤表 - 基本KPI -->
+  <div class="section-divider">主力 KPI 達成</div>
+  <div class="card" style="padding:14px 10px;">
+    <div class="table-wrap">
+      <table id="summaryTable1"></table>
+    </div>
+  </div>
+
+  <!-- 大盤表 - 加掛類 -->
+  <div class="section-divider">加掛類得分</div>
+  <div class="card" style="padding:14px 10px;">
+    <div class="table-wrap">
+      <table id="summaryTable2"></table>
+    </div>
+  </div>
+
+</div><!-- /panel-summary -->
+
+
+<!-- ═══════════════════════════════════
+     PANEL 3: 日期回放
+═══════════════════════════════════ -->
+<div class="panel" id="panel-playback">
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>選擇日期回放</div>
+    <div class="playback-row">
+      <label>查詢日期</label>
+      <input type="date" id="playbackDate">
+      <div class="seg-toggle" style="margin:0">
+        <button class="seg-btn" id="pbSeg13" onclick="setPbSeg(13)">13:00</button>
+        <button class="seg-btn active-16" id="pbSeg16" onclick="setPbSeg(16)">16:00</button>
+        <button class="seg-btn" id="pbSeg21" onclick="setPbSeg(21)">21:00</button>
+      </div>
+      <button class="btn btn-primary" onclick="renderPlayback()">🔍 查詢</button>
+    </div>
+  </div>
+
+  <div id="playbackResult"></div>
+
+</div><!-- /panel-playback -->
+
+
+<script>
+// ════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════
+const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
+const NEW_STORES = ['杭州南']; // 新開幕，6/25起
+const KPI_THRESHOLDS = {
+  kpi: 80, hang_score: 10, device_proj: 80, device_key: 80,
+  contract_net: 80, '3c': 80, acc: 80, film: 70, insurance: 70,
+  myvideo: 80, apple_google: 80, hbo: 80, netflix: 80,
+  '5g': 80, aq_ttl: 80, aq999: 80, aq1399: 80, prepaid: 80,
+  rt_pts: 80, special_renew: 80, premium_renew: 80, rt999: 80, rt1399: 80, haosu: 80
+};
+
+let currentSeg = 16;
+let sumSeg = 16;
+let pbSeg = 16;
+
+// ════════════════════════════════════
+// GOOGLE SHEETS 設定
+// ════════════════════════════════════
+let GAS_URL = localStorage.getItem('bei12b_gas_url') || 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
+
+// 記憶體快取（避免重複拉資料）
+const _cache = {};
+function cacheKey(date, seg) { return `${date}_${seg}`; }
+
+// ════════════════════════════════════
+// UTILS
+// ════════════════════════════════════
+function today() {
+  // 使用台灣時間（UTC+8）
+  const now = new Date();
+  const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  return tw.toISOString().slice(0,10);
+}
+
+// ── 讀取：先查快取，再打 GAS
+async function getData(date, store, seg) {
+  const ck = cacheKey(date, seg);
+  if (!_cache[ck]) {
+    await fetchDayData(date, seg);
+  }
+  return (_cache[ck] && _cache[ck][store]) ? _cache[ck][store] : null;
+}
+
+// ── 拉取整天所有門市資料存入快取
+async function fetchDayData(date, seg) {
+  const ck = cacheKey(date, seg);
+  if (!GAS_URL) { _cache[ck] = {}; return; }
+  try {
+    const url = `${GAS_URL}?action=read&date=${date}&seg=${seg}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    const json = await res.json();
+    _cache[ck] = json.data || {};
+  } catch(e) {
+    console.error('fetchDayData error', e);
+    _cache[ck] = {};
+  }
+}
+
+// ── 寫入到 GAS
+async function saveToStorage(date, store, seg, data) {
+  if (!GAS_URL) {
+    showToast('⚠️ 尚未設定 Apps Script 網址');
+    return false;
+  }
+  // 同時更新本地快取
+  const ck = cacheKey(date, seg);
+  if (!_cache[ck]) _cache[ck] = {};
+  _cache[ck][store] = { ...data, date, store, seg };
+
+  // 用 GET + URL 參數 + no-cors 模式
+  const payload = encodeURIComponent(JSON.stringify({ date, store, seg, data }));
+  const url = `${GAS_URL}?action=write&payload=${payload}`;
+  
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    const cbName = 'gasCallback_' + Date.now();
+    window[cbName] = function(result) {
+      delete window[cbName];
+      document.head.removeChild(script);
+      resolve(result && result.status === 'ok');
+    };
+    script.onerror = function() {
+      delete window[cbName];
+      // 即使有 error 也嘗試用 fetch
+      fetch(url + '&callback=' + cbName)
+        .then(r => r.json())
+        .then(j => resolve(j.status === 'ok'))
+        .catch(() => {
+          // 最後嘗試：no-cors 送出（無法確認結果但資料會到）
+          fetch(url, { mode: 'no-cors' })
+            .then(() => resolve(true))
+            .catch(() => resolve(false));
+        });
+    };
+    // 先試 fetch
+    fetch(url)
+      .then(r => r.json())
+      .then(j => {
+        delete window[cbName];
+        resolve(j.status === 'ok');
+      })
+      .catch(() => {
+        // fetch 失敗，改用 no-cors
+        fetch(url, { mode: 'no-cors' })
+          .then(() => {
+            delete window[cbName];
+            resolve(true);
+          })
+          .catch(() => {
+            delete window[cbName];
+            resolve(false);
+          });
+      });
+  });
+}
+function pct(val) {
+  if (val === null || val === undefined || val === '') return '—';
+  return parseFloat(val).toFixed(1) + '%';
+}
+function colorClass(val, threshold) {
+  if (val === null || val === undefined || val === '') return 'val-dim';
+  const v = parseFloat(val);
+  if (v >= 100) return 'val-green';
+  if (v >= threshold) return 'val-warn';
+  return 'val-red';
+}
+function cellColorClass(val, threshold) {
+  if (val === null || val === undefined || val === '') return '';
+  const v = parseFloat(val);
+  if (v >= 100) return 'cell-green';
+  if (v >= threshold) return 'cell-warn';
+  return 'cell-red';
+}
+function delta(d) {
+  if (d === null || d === undefined || d === '') return '—';
+  const v = parseFloat(d);
+  if (v > 0) return `<span class="val-green">+${v.toFixed(2)}</span>`;
+  if (v < 0) return `<span class="val-red">${v.toFixed(2)}</span>`;
+  return `<span class="val-dim">±0</span>`;
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ════════════════════════════════════
+// INIT
+// ════════════════════════════════════
+window.onload = async () => {
+  const td = today();
+  document.getElementById('fillDate').value = td;
+  document.getElementById('playbackDate').value = td;
+  document.getElementById('todayBadge').textContent = '📅 ' + td;
+  document.getElementById('summaryDateLabel').textContent = td;
+  updateConnectionBadge();
+  if (GAS_URL) {
+    await fetchDayData(td, 16);
+    await fetchDayData(td, 21);
+  }
+  renderSummary();
+};
+
+function updateConnectionBadge() {
+  const badge = document.getElementById('connBadge');
+  if (!badge) return;
+  if (GAS_URL) {
+    badge.innerHTML = '🟢 已連接 Sheets';
+    badge.style.color = 'var(--green)';
+    badge.style.borderColor = 'var(--green)';
+    badge.style.background = 'rgba(16,185,129,0.1)';
+  } else {
+    badge.innerHTML = '⚙️ 設定 Sheets';
+    badge.style.color = 'var(--warn)';
+    badge.style.borderColor = 'var(--warn)';
+    badge.style.background = 'rgba(249,115,22,0.1)';
+  }
+}
+function openSettings() {
+  document.getElementById('settingsModal').style.display = 'flex';
+  document.getElementById('gasUrlInput').value = GAS_URL;
+}
+function closeSettings() {
+  document.getElementById('settingsModal').style.display = 'none';
+}
+async function saveSettings() {
+  const url = document.getElementById('gasUrlInput').value.trim();
+  if (!url) { showToast('⚠️ 請貼上 Apps Script 網址'); return; }
+  showToast('🔄 測試連線中…');
+  try {
+    const res = await fetch(url + '?action=ping');
+    const json = await res.json();
+    if (json.status === 'ok') {
+      GAS_URL = url;
+      localStorage.setItem('bei12b_gas_url', GAS_URL);
+      updateConnectionBadge();
+      closeSettings();
+      showToast('✅ 連線成功！Google Sheets 已串接');
+      const td = today();
+      await fetchDayData(td, 16);
+      await fetchDayData(td, 21);
+      renderSummary();
+    } else {
+      showToast('❌ 連線失敗，請確認網址');
+    }
+  } catch(e) {
+    showToast('❌ 錯誤：' + e.message);
+  }
+}
+function clearSettings() {
+  if (!confirm('確定要清除設定？')) return;
+  GAS_URL = '';
+  localStorage.removeItem('bei12b_gas_url');
+  updateConnectionBadge();
+  closeSettings();
+  showToast('已清除設定');
+}
+
+// ════════════════════════════════════
+// TABS
+// ════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'summary') renderSummary();
+}
+
+// ════════════════════════════════════
+// SEG TOGGLE (FILL)
+// ════════════════════════════════════
+function setSeg(s) {
+  currentSeg = s;
+  document.getElementById('seg16').className = 'seg-btn' + (s===16?' active-16':'');
+  document.getElementById('seg21').className = 'seg-btn' + (s===21?' active-21':'');
+  loadStoreData();
+}
+function setSumSeg(s) {
+  sumSeg = s;
+  ['sumSeg13','sumSeg16','sumSeg21'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'seg-btn';
+  });
+  const el = document.getElementById('sumSeg' + s);
+  if (el) el.className = 'seg-btn ' + (s===16?'active-16':'active-21');
+  renderSummary();
+}
+function setPbSeg(s) {
+  pbSeg = s;
+  ['pbSeg13','pbSeg16','pbSeg21'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'seg-btn';
+  });
+  const el = document.getElementById('pbSeg' + s);
+  if (el) el.className = 'seg-btn ' + (s===16?'active-16':'active-21');
+}
+
+// ════════════════════════════════════
+// FILL FORM
+// ════════════════════════════════════
+const FIELDS = [
+  'kpi','rank','prevRank','prevKpi',
+  'hang_score','hang_prev','hang_delta',
+  'device_proj','device_key','contract_net','3c','acc','film','insurance',
+  'myvideo','apple_google','hbo','netflix',
+  '5g','aq_ttl','aq999','aq1399','prepaid','rt_pts',
+  'special_renew','premium_renew','rt999','rt1399','haosu',
+  'early_renew','rt_close_num','rt_close_den','rt_close_pct',
+  'insurance_num','insurance_den','insurance_pct',
+  'device_num','device_den','device_ratio'
+];
+
+function loadStoreData() {
+  const store = document.getElementById('fillStore').value;
+  if (!store) {
+    document.getElementById('fillFormArea').style.display = 'none';
+    document.getElementById('fillStoreNotice').textContent = '';
+    return;
+  }
+  document.getElementById('fillFormArea').style.display = 'block';
+  const date = document.getElementById('fillDate').value;
+  const notice = document.getElementById('fillStoreNotice');
+
+  if (NEW_STORES.includes(store)) {
+    notice.innerHTML = `<span style="color:var(--gold)">🆕 新店（6/25 起營業），如尚未開始，填報後數值填 0 即可。</span>`;
+  } else {
+    notice.textContent = '';
+  }
+
+  getData(date, store, currentSeg).then(data => {
+    FIELDS.forEach(f => {
+      const el = document.getElementById('f_' + f);
+      if (el) el.value = data ? (data[f] ?? '') : '';
+    });
+  });
+}
+
+function getFormData() {
+  const obj = {};
+  FIELDS.forEach(f => {
+    const el = document.getElementById('f_' + f);
+    obj[f] = el ? (el.value !== '' ? parseFloat(el.value) : null) : null;
+  });
+  return obj;
+}
+
+async function saveData() {
+  const store = getSelectedStore();
+  if (!store) { showToast('⚠️ 請先選擇門市！'); return; }
+  if (!GAS_URL) { showToast('⚠️ 請先設定 Apps Script 網址'); openSettings(); return; }
+  const date = document.getElementById('fillDate').value;
+  const data = getFormData();
+  data.savedAt = new Date().toLocaleTimeString('zh-TW');
+  showToast('🔄 上傳中…');
+  try {
+    const ok = await saveToStorage(date, store, currentSeg, data);
+    if (ok) {
+      showToast(`✅ ${store} ${currentSeg}:00 已儲存`);
+    } else {
+      showToast('❌ 儲存失敗，請檢查連線');
+    }
+  } catch(e) {
+    showToast('❌ 錯誤：' + e.message);
+  }
+}
+
+function clearForm() {
+  FIELDS.forEach(f => {
+    const el = document.getElementById('f_' + f);
+    if (el) el.value = '';
+  });
+}
+
+// ════════════════════════════════════
+// SUMMARY RENDER
+// ════════════════════════════════════
+async function renderSummary() {
+  const date = today();
+  document.getElementById('summaryDateLabel').textContent = date + `  ${sumSeg}:00 時段`;
+
+  // 先拉雲端資料（若有設定）
+  if (GAS_URL) await fetchDayData(date, sumSeg);
+  const ck = cacheKey(date, sumSeg);
+  const dayCache = _cache[ck] || {};
+  console.log('彙整讀取：日期=' + date + ' 時段=' + sumSeg + ' 門市數=' + Object.keys(dayCache).length, dayCache);
+
+  // Fill status chips
+  const fsEl = document.getElementById('fillStatus');
+  fsEl.innerHTML = STORES.map(s => {
+    const d = dayCache[s];
+    const isNew = NEW_STORES.includes(s);
+    if (isNew && date < '2026-06-25') {
+      return `<span class="fill-chip new-s">${s} 🆕 未開幕</span>`;
+    }
+    return d
+      ? `<span class="fill-chip done">✓ ${s} ${d.savedAt||''}</span>`
+      : `<span class="fill-chip pending">○ ${s} 未填</span>`;
+  }).join('');
+
+  // 未填警示
+  const missing = STORES.filter(s => !dayCache[s] && !(NEW_STORES.includes(s) && date < '2026-06-25'));
+  const alertEl = document.getElementById('missingAlert');
+  if (alertEl) {
+    if (missing.length > 0) {
+      alertEl.style.display = 'block';
+      alertEl.innerHTML = `⚠️ 尚有 ${missing.length} 間未填：${missing.join('、')}`;
+    } else {
+      alertEl.style.display = 'none';
+    }
+  }
+  // 同步更新瀏覽器標題
+  if (missing.length > 0) {
+    document.title = `⚠️ ${missing.length}間未填 · 北一二B回報`;
+  } else {
+    document.title = `✅ 全數完成 · 北一二B回報`;
+  }
+
+  // Summary cards
+  const filled = STORES.filter(s => !!dayCache[s]);
+  const total = STORES.filter(s => !(NEW_STORES.includes(s) && date < '2026-06-25')).length;
+  const kpis = STORES.map(s => dayCache[s]?.kpi).filter(v => v != null && v !== '');
+  const avgKpi = kpis.length ? (kpis.reduce((a,b)=>parseFloat(a)+parseFloat(b),0)/kpis.length).toFixed(1) : '—';
+  const above100 = kpis.filter(v=>parseFloat(v)>=100).length;
+
+  document.getElementById('summaryCards').innerHTML = `
+    <div class="summary-card">
+      <div class="sc-label">填報完成</div>
+      <div class="sc-val" style="color:${filled.length===total?'var(--green)':'var(--warn)'}">${filled.length}/${total}</div>
+      <div class="sc-sub">間門市</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">平均 KPI</div>
+      <div class="sc-val">${avgKpi}%</div>
+      <div class="sc-sub">區內均值</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">達成 100%</div>
+      <div class="sc-val" style="color:var(--green)">${above100}</div>
+      <div class="sc-sub">間門市</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">時段</div>
+      <div class="sc-val" style="color:${sumSeg===16?'var(--gold)':'var(--accent-bright)'}">${sumSeg}:00</div>
+      <div class="sc-sub">${date}</div>
+    </div>
+  `;
+
+  // Table 1: Main KPI
+  const cols1 = [
+    {key:'kpi', label:'KPI%', th:80},
+    {key:'rank', label:'公司排名', isRank:true},
+    {key:'prevKpi', label:'前日KPI%', th:80},
+    {key:'5g', label:'5G銷售%', th:80},
+    {key:'aq_ttl', label:'AQ上線%', th:80},
+    {key:'aq999', label:'AQ V+D 999%', th:80},
+    {key:'aq1399', label:'AQ V+D 1399%', th:80},
+    {key:'prepaid', label:'預付卡%', th:80},
+    {key:'rt_pts', label:'RT上線%', th:80},
+    {key:'special_renew', label:'特殊維繫%', th:80},
+    {key:'premium_renew', label:'高高特維%', th:80},
+    {key:'rt999', label:'RT V+D 999%', th:80},
+    {key:'rt1399', label:'RT V+D 1399%', th:80},
+    {key:'haosu', label:'好速銷售%', th:80},
+  ];
+  renderSummaryTable('summaryTable1', date, sumSeg, cols1);
+
+  // Table 2: Hang
+  const cols2 = [
+    {key:'hang_score', label:'加掛得分', th:10, isScore:true},
+    {key:'hang_delta', label:'增減', isDelta:true},
+    {key:'device_proj', label:'Device專案%', th:80},
+    {key:'device_key', label:'重點Device%', th:80},
+    {key:'contract_net', label:'換約淨增%', th:80},
+    {key:'3c', label:'空機/3C%', th:80},
+    {key:'acc', label:'配件%', th:80},
+    {key:'film', label:'包膜保貼%', th:70},
+    {key:'insurance', label:'手機保險%', th:70},
+    {key:'myvideo', label:'MyVideo%', th:80},
+    {key:'apple_google', label:'Apple/Google%', th:80},
+    {key:'hbo', label:'HBO%', th:80},
+    {key:'netflix', label:'Netflix%', th:80},
+  ];
+  renderSummaryTable('summaryTable2', date, sumSeg, cols2);
+}
+
+function renderSummaryTable(tableId, date, seg, cols) {
+  const t = document.getElementById(tableId);
+  if (!t) return;
+  const ck = cacheKey(date, seg);
+  const dayCache = _cache[ck] || {};
+
+  const header = `<thead><tr>
+    <th style="text-align:left;padding-left:14px;">店點</th>
+    ${cols.map(c=>`<th>${c.label}</th>`).join('')}
+  </tr></thead>`;
+
+  const rows = STORES.map(s => {
+    const d = dayCache[s];
+    const isNew = NEW_STORES.includes(s) && date < '2026-06-25';
+    const cells = cols.map(c => {
+      if (!d) return `<td class="val-dim">—</td>`;
+      const v = d[c.key];
+      if (c.isDelta) return `<td>${delta(v)}</td>`;
+      if (c.isRank) {
+        const vc = (v !== '' && v != null) ? `<span class="val-gold">${v}</span>` : '—';
+        return `<td>${vc}</td>`;
+      }
+      if (c.isScore) {
+        const n = parseFloat(v);
+        const cls = !isNaN(n) && n >= 13 ? 'cell-green' : !isNaN(n) && n >= 10 ? 'cell-warn' : 'cell-red';
+        return `<td class="${cls}">${!isNaN(n) ? n.toFixed(2) : '—'}</td>`;
+      }
+      const cls = cellColorClass(v, c.th);
+      return `<td class="${cls}">${pct(v)}</td>`;
+    }).join('');
+    return `<tr>
+      <td class="store-name${isNew?' new-store':''}">${s}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  t.innerHTML = header + `<tbody>${rows}</tbody>`;
+}
+
+// ════════════════════════════════════
+// PLAYBACK
+// ════════════════════════════════════
+async function renderPlayback() {
+  const date = document.getElementById('playbackDate').value;
+  if (!date) { showToast('⚠️ 請選擇日期'); return; }
+
+  document.getElementById('playbackResult').innerHTML =
+    `<div class="card" style="text-align:center;padding:24px;color:var(--text-muted)">🔄 載入中…</div>`;
+
+  if (GAS_URL) await fetchDayData(date, pbSeg);
+  const ck = cacheKey(date, pbSeg);
+  const dayCache = _cache[ck] || {};
+  const filled = STORES.filter(s => !!dayCache[s]);
+  const missing = STORES.filter(s => !dayCache[s]);
+
+  const cols1 = [
+    {key:'kpi', label:'KPI%', th:80},
+    {key:'rank', label:'公司排名', isRank:true},
+    {key:'5g', label:'5G%', th:80},
+    {key:'aq_ttl', label:'AQ上線%', th:80},
+    {key:'aq999', label:'AQ V+D 999%', th:80},
+    {key:'aq1399', label:'AQ V+D 1399%', th:80},
+    {key:'rt_pts', label:'RT上線%', th:80},
+    {key:'rt999', label:'RT 999%', th:80},
+    {key:'rt1399', label:'RT 1399%', th:80},
+    {key:'haosu', label:'好速%', th:80},
+  ];
+  const cols2 = [
+    {key:'hang_score', label:'加掛得分', th:10, isScore:true},
+    {key:'device_proj', label:'Device專案%', th:80},
+    {key:'contract_net', label:'換約淨增%', th:80},
+    {key:'insurance', label:'手機保險%', th:70},
+    {key:'film', label:'包膜保貼%', th:70},
+    {key:'netflix', label:'Netflix%', th:80},
+    {key:'hbo', label:'HBO%', th:80},
+    {key:'apple_google', label:'Apple/Google%', th:80},
+  ];
+
+  document.getElementById('playbackResult').innerHTML = `
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>${date} ${pbSeg}:00 回放</div>
+      <div style="color:var(--text-dim);font-size:12px;margin-bottom:8px;">
+        共 <strong style="color:var(--accent-bright)">${filled.length}</strong> 間門市有資料
+        ${missing.length ? `｜<span style="color:var(--red)">未填：${missing.join('、')}</span>` : '｜<span style="color:var(--green)">全數填報</span>'}
+      </div>
+    </div>
+    <div class="section-divider">主力 KPI</div>
+    <div class="card" style="padding:14px 10px;">
+      <div class="table-wrap"><table id="pbTable1"></table></div>
+    </div>
+    <div class="section-divider">加掛類</div>
+    <div class="card" style="padding:14px 10px;">
+      <div class="table-wrap"><table id="pbTable2"></table></div>
+    </div>
+  `;
+
+  renderSummaryTable('pbTable1', date, pbSeg, cols1);
+  renderSummaryTable('pbTable2', date, pbSeg, cols2);
+}
+
+// ════════════════════════════════════
+// 填報 UI - 門市選擇
+// ════════════════════════════════════
+function selectStore(store) {
+  document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector(`.store-card[data-store="${store}"]`);
+  if (card) card.classList.add('selected');
+  document.getElementById('fillFormArea').style.display = 'block';
+
+  const sub = document.getElementById('fillHeroSub');
+  const icons = {'通化':'🛒','酒泉':'🍶','台北三創':'💡','萬大':'🌟','六張犁':'🌿',
+                 '復興南':'⚡','永吉':'🔥','大稻埕':'🎪','杭州南':'🚀'};
+  sub.textContent = `${icons[store]||'🏪'} ${store} · 目前選擇 ${currentSeg}:00 時段`;
+
+  const date = document.getElementById('fillDate').value;
+  const isNew = NEW_STORES.includes(store);
+  if (isNew) showToast(`🚀 ${store} 新店！6/25 起營業`);
+
+  // 載入已填資料
+  getData(date, store, currentSeg).then(data => {
+    FIELDS.forEach(f => {
+      const el = document.getElementById('f_' + f);
+      if (el) el.value = data ? (data[f] ?? '') : '';
+    });
+    updateFilledSummary(data);
+  });
+
+  // 更新隱藏 select（相容舊邏輯）
+  const sel = document.getElementById('fillStore');
+  if (sel) sel.value = store;
+}
+
+function updateFilledSummary(data) {
+  const wrap = document.getElementById('filledSummary');
+  const chips = document.getElementById('filledChips');
+  if (!data) { wrap.classList.remove('show'); return; }
+
+  const highlights = [];
+  if (data.kpi && parseFloat(data.kpi) >= 100) highlights.push(`KPI ${data.kpi}% ✅`);
+  if (data.aq999 && parseFloat(data.aq999) >= 100) highlights.push(`A999 達標 🌟`);
+  if (data.aq1399 && parseFloat(data.aq1399) >= 100) highlights.push(`A1399 達標 👑`);
+  if (data.haosu && parseFloat(data.haosu) >= 100) highlights.push(`好速 達標 ⚡`);
+
+  chips.innerHTML = highlights.length
+    ? highlights.map(h => `<span class="filled-chip">${h}</span>`).join('')
+    : '<span style="color:#64748b;font-size:11px;">已有填報資料，可修改後重新送出</span>';
+  wrap.classList.add('show');
+}
+
+// 門市選擇時更新 sub title
+function onFieldInput(el, field) {
+  // 即時預覽達成提示（只在 A999/A1399/好速）
+  const val = parseFloat(el.value);
+  if (!isNaN(val) && val >= 100) {
+    el.style.borderColor = '#10b981';
+    el.style.boxShadow = '0 0 0 3px rgba(16,185,129,0.15)';
+  } else {
+    el.style.borderColor = '';
+    el.style.boxShadow = '';
+  }
+}
+
+// 覆蓋 setSeg 增加新 UI 同步
+const _origSetSeg = setSeg;
+function setSeg(s) {
+  currentSeg = s;
+  // 舊 seg toggle
+  ['seg13','seg16','seg21'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'seg-btn';
+  });
+  const sOld = document.getElementById('seg' + s);
+  if (sOld) sOld.className = 'seg-btn ' + (s===16?'active-16':'active-21');
+  // 新 seg cards
+  ['newSeg13','newSeg16','newSeg21'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'seg-card';
+  });
+  const nEl = document.getElementById('newSeg' + s);
+  if (nEl) nEl.className = 'seg-card ' + (s===16?'sel-16':'sel-21');
+
+  const store = getSelectedStore();
+  if (store) selectStore(store);
+}
+
+function getSelectedStore() {
+  const card = document.querySelector('.store-card.selected');
+  return card ? card.dataset.store : (document.getElementById('fillStore')?.value || '');
+}
+
+// 覆蓋 clearForm
+function clearForm() {
+  FIELDS.forEach(f => {
+    const el = document.getElementById('f_' + f);
+    if (el) { el.value = ''; el.style.borderColor = ''; el.style.boxShadow = ''; }
+  });
+  document.getElementById('filledSummary').classList.remove('show');
+  showToast('🗑️ 已清除');
+}
+
+// ════════════════════════════════════
+// 慶祝動畫系統
+// ════════════════════════════════════
+(function() {
+  // 建立 canvas
+  const canvas = document.createElement('canvas');
+  canvas.id = 'celebCanvas';
+  canvas.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9000;width:100%;height:100%';
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  let animId = null;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Particle 類型：confetti / coin / star / firework
+  function spawnConfetti(count) {
+    const colors = ['#f59e0b','#3b82f6','#10b981','#ec4899','#8b5cf6','#ef4444','#fff'];
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        type: 'confetti',
+        x: Math.random() * canvas.width,
+        y: -10,
+        vx: (Math.random()-0.5)*4,
+        vy: Math.random()*4+2,
+        w: Math.random()*10+5,
+        h: Math.random()*6+3,
+        rot: Math.random()*360,
+        rotV: (Math.random()-0.5)*8,
+        color: colors[Math.floor(Math.random()*colors.length)],
+        life: 1, decay: Math.random()*0.005+0.003
+      });
+    }
+  }
+
+  function spawnCoins(count) {
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        type: 'medal',
+        x: Math.random() * canvas.width,
+        y: -30,
+        vx: (Math.random()-0.5)*2.5,
+        vy: Math.random()*2.5+1.5,
+        r: Math.random()*10+13,
+        rot: Math.random()*Math.PI,
+        rotV: (Math.random()-0.5)*0.1,
+        swing: Math.random()*Math.PI*2,
+        life: 1, decay: 0.0032
+      });
+    }
+  }
+
+  function spawnFirework(x, y, color) {
+    const count = 28;
+    for (let i = 0; i < count; i++) {
+      const angle = (i/count)*Math.PI*2;
+      const speed = Math.random()*6+3;
+      particles.push({
+        type: 'spark',
+        x, y,
+        vx: Math.cos(angle)*speed,
+        vy: Math.sin(angle)*speed,
+        r: Math.random()*3+2,
+        color,
+        life: 1, decay: Math.random()*0.015+0.012
+      });
+    }
+  }
+
+  function spawnFireworks(count) {
+    const colors = ['#f59e0b','#ff4d4d','#3b82f6','#10b981','#ec4899','#fff','#8b5cf6'];
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => {
+        spawnFirework(
+          Math.random()*canvas.width*0.8 + canvas.width*0.1,
+          Math.random()*canvas.height*0.5 + 50,
+          colors[Math.floor(Math.random()*colors.length)]
+        );
+      }, i * 180);
+    }
+  }
+
+  function spawnStars(count) {
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        type: 'star',
+        x: Math.random()*canvas.width,
+        y: Math.random()*canvas.height*0.6,
+        vx: (Math.random()-0.5)*1.5,
+        vy: (Math.random()-0.5)*1.5,
+        r: Math.random()*10+6,
+        life: 1, decay: Math.random()*0.008+0.004,
+        phase: Math.random()*Math.PI*2
+      });
+    }
+  }
+
+  function drawStar(cx,cy,r,life) {
+    ctx.save();
+    ctx.globalAlpha = life;
+    ctx.fillStyle = '#fbbf24';
+    ctx.shadowColor = '#f59e0b';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = (i*4*Math.PI/5) - Math.PI/2;
+      const ai = a + 2*Math.PI/5;
+      if (i===0) ctx.moveTo(cx+r*Math.cos(a), cy+r*Math.sin(a));
+      else ctx.lineTo(cx+r*Math.cos(a), cy+r*Math.sin(a));
+      ctx.lineTo(cx+(r*0.4)*Math.cos(ai), cy+(r*0.4)*Math.sin(ai));
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles = particles.filter(p => p.life > 0);
+
+    for (const p of particles) {
+      if (p.type === 'confetti') {
+        ctx.save();
+        ctx.globalAlpha = p.life;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot * Math.PI/180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+        ctx.restore();
+        p.x += p.vx; p.y += p.vy; p.rot += p.rotV; p.vy += 0.05;
+        p.life -= p.decay;
+      } else if (p.type === 'medal') {
+        ctx.save();
+        ctx.globalAlpha = p.life;
+        ctx.translate(p.x, p.y);
+        p.swing += 0.06;
+        ctx.scale(Math.cos(p.swing), 1);
+        // 緞帶
+        const rw = p.r * 0.55, rh = p.r * 0.7;
+        const rg = ctx.createLinearGradient(-rw/2, -p.r-rh, rw/2, -p.r);
+        rg.addColorStop(0,'#ef4444');
+        rg.addColorStop(0.5,'#fca5a5');
+        rg.addColorStop(1,'#b91c1c');
+        ctx.fillStyle = rg;
+        ctx.beginPath();
+        ctx.roundRect(-rw/2, -p.r-rh, rw, rh, 3);
+        ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,0.3)';
+        ctx.lineWidth=1.5;
+        ctx.beginPath();
+        ctx.moveTo(-rw/2+4,-p.r-rh+4);
+        ctx.lineTo(-rw/2+4,-p.r-4);
+        ctx.stroke();
+        // 金牌圓盤
+        ctx.shadowColor='#f59e0b'; ctx.shadowBlur=14;
+        const mg = ctx.createRadialGradient(-p.r*0.2,-p.r*0.2,0,0,0,p.r);
+        mg.addColorStop(0,'#fde68a');
+        mg.addColorStop(0.5,'#f59e0b');
+        mg.addColorStop(1,'#92400e');
+        ctx.fillStyle = mg;
+        ctx.beginPath(); ctx.arc(0,0,p.r,0,Math.PI*2); ctx.fill();
+        ctx.shadowBlur=0;
+        // 內圈凹紋
+        ctx.strokeStyle='rgba(180,83,9,0.6)';
+        ctx.lineWidth=2;
+        ctx.beginPath(); ctx.arc(0,0,p.r*0.78,0,Math.PI*2); ctx.stroke();
+        // 「金」字
+        ctx.fillStyle='#7c2d12';
+        ctx.font=`900 ${p.r*0.85}px sans-serif`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('金',0,1);
+        // 高光
+        ctx.fillStyle='rgba(255,255,255,0.18)';
+        ctx.beginPath();
+        ctx.ellipse(-p.r*0.25,-p.r*0.3,p.r*0.35,p.r*0.2,-0.5,0,Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+        p.x += p.vx; p.y += p.vy; p.rot += p.rotV; p.vy += 0.06;
+        p.life -= p.decay;
+      } else if (p.type === 'spark') {
+        ctx.save();
+        ctx.globalAlpha = p.life;
+        ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r*p.life, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+        p.x += p.vx; p.y += p.vy; p.vx *= 0.95; p.vy *= 0.95; p.vy += 0.1;
+        p.life -= p.decay;
+      } else if (p.type === 'star') {
+        p.phase += 0.05;
+        const pulse = 1 + Math.sin(p.phase)*0.2;
+        drawStar(p.x, p.y, p.r * pulse, p.life);
+        p.x += p.vx; p.y += p.vy;
+        p.life -= p.decay;
+      }
+    }
+
+    if (particles.length > 0) animId = requestAnimationFrame(animate);
+    else animId = null;
+  }
+
+  function startAnim() {
+    if (!animId) animId = requestAnimationFrame(animate);
+  }
+
+  // 公開 API
+  window.CelebFX = {
+    coins: (n=30) => { spawnCoins(n); startAnim(); },
+    fireworks: (n=8) => { spawnFireworks(n); startAnim(); },
+    stars: (n=25) => { spawnStars(n); startAnim(); },
+    confetti: (n=80) => { spawnConfetti(n); startAnim(); },
+    mega: () => {
+      spawnConfetti(120); spawnCoins(40); spawnStars(30);
+      spawnFireworks(12); startAnim();
+    }
+  };
+})();
+
+// ════════════════════════════════════
+// 慶祝彈窗
+// ════════════════════════════════════
+function showCelebModal(achievements) {
+  // 決定等級
+  const count = achievements.length;
+  let emoji, title, subtitle, fx;
+  if (count === 0) {
+    return; // 無達標不彈
+  } else if (achievements.includes('ALL')) {
+    emoji = '🎆'; title = '全滿貫！神級表現！';
+    subtitle = '三大項目全達標，今日英雄！';
+    fx = () => CelebFX.mega();
+  } else if (count >= 2) {
+    emoji = '🎊'; title = '雙重達標！太強了！';
+    subtitle = '繼續保持，衝金牌！';
+    fx = () => { CelebFX.fireworks(8); CelebFX.coins(30); };
+  } else if (achievements.includes('A1399')) {
+    emoji = '👑'; title = 'A1399 達成！';
+    subtitle = '高資費方案制霸！';
+    fx = () => { CelebFX.fireworks(10); CelebFX.stars(20); };
+  } else if (achievements.includes('A999')) {
+    emoji = '🪙'; title = 'A999 達成！';
+    subtitle = '金牌到手，繼續衝！';
+    fx = () => { CelebFX.coins(50); CelebFX.confetti(60); };
+  } else if (achievements.includes('好速')) {
+    emoji = '⚡'; title = '好速 達成！';
+    subtitle = '寬頻銷售全速前進！';
+    fx = () => { CelebFX.stars(35); CelebFX.confetti(50); };
+  }
+
+  const badges = achievements.filter(a=>a!=='ALL').map(a => {
+    const map = {
+      'A999': ['badge-gold','🥇 A999 達標'],
+      'A1399': ['badge-pink','👑 A1399 達標'],
+      '好速': ['badge-blue','⚡ 好速 達標'],
+      'KPI': ['badge-green','📈 KPI 100%+']
+    };
+    const [cls, label] = map[a] || ['badge-gold', a];
+    return `<span class="celeb-badge ${cls}">${label}</span>`;
+  }).join('');
+
+  document.getElementById('celebEmoji').textContent = emoji;
+  document.getElementById('celebTitle').textContent = title;
+  document.getElementById('celebSubtitle').textContent = subtitle;
+  document.getElementById('celebBadges').innerHTML = badges;
+
+  const modal = document.getElementById('celebModal');
+  modal.classList.add('show');
+  setTimeout(fx, 200);
+}
+
+function closeCelebModal() {
+  document.getElementById('celebModal').classList.remove('show');
+}
+
+// ════════════════════════════════════
+// 覆寫 saveData（加入達成判斷）
+// ════════════════════════════════════
+async function saveData() {
+  const store = getSelectedStore();
+  if (!store) { showToast('⚠️ 請先選擇門市'); return; }
+  if (!GAS_URL) { showToast('⚠️ 請先設定 Apps Script 網址'); openSettings(); return; }
+  const date = document.getElementById('fillDate').value;
+  const data = getFormData();
+  data.savedAt = new Date().toLocaleTimeString('zh-TW');
+
+  showToast('🔄 上傳中…');
+  try {
+    const ok = await saveToStorage(date, store, currentSeg, data);
+    if (ok) {
+      showToast(`✅ ${store} ${currentSeg}:00 已儲存`);
+      updateFilledSummary(data);
+
+      // 判斷達成項目
+      const achievements = [];
+      if (data.kpi && parseFloat(data.kpi) >= 100) achievements.push('KPI');
+      if (data.aq999 && parseFloat(data.aq999) >= 100) achievements.push('A999');
+      if (data.aq1399 && parseFloat(data.aq1399) >= 100) achievements.push('A1399');
+      if (data.haosu && parseFloat(data.haosu) >= 100) achievements.push('好速');
+      if (achievements.includes('A999') && achievements.includes('A1399') && achievements.includes('好速')) {
+        achievements.push('ALL');
+      }
+      if (achievements.length > 0) {
+        setTimeout(() => showCelebModal(achievements), 400);
+      }
+    } else {
+      showToast('❌ 儲存失敗，請檢查連線');
+    }
+  } catch(e) {
+    showToast('❌ 錯誤：' + e.message);
+  }
+}
+
+
+// ════════════════════════════════════
+// 自動計算百分比
+// ════════════════════════════════════
+function calcPct(numId, denId, pctId) {
+  const numEl = document.getElementById('f_' + numId);
+  const denEl = document.getElementById('f_' + denId);
+  const el    = document.getElementById('f_' + pctId);
+  if (!numEl || !denEl || !el) return;
+  const num = parseFloat(numEl.value);
+  const den = parseFloat(denEl.value);
+  if (!isNaN(num) && !isNaN(den) && den > 0) {
+    const val = (num / den * 100).toFixed(1);
+    el.value = val;
+    const v = parseFloat(val);
+    el.style.color = v >= 100 ? '#22c55e' : v >= 80 ? '#ff8533' : '#ef4444';
+    el.style.fontWeight = '700';
+  } else {
+    el.value = '';
+    el.style.color = '';
+  }
+}
+
+// ════════════════════════════════════
+// 複製回報訊息
+// ════════════════════════════════════
+function copyReport() {
+  const store = getSelectedStore();
+  if (!store) { showToast('⚠️ 請先選擇門市'); return; }
+  const date = document.getElementById('fillDate').value;
+  const seg = currentSeg;
+  const g = (id) => { const el = document.getElementById('f_' + id); return el ? (el.value || '—') : '—'; };
+  const pct = (v) => v === '—' || v === '' ? '—' : parseFloat(v).toFixed(1) + '%';
+  const line = '─────────────────────────';
+  const rows = [
+    `【${store} ${seg}:00 回報】${date}`,
+    line,
+    `📊 KPI達成率   ${pct(g('kpi'))}   排名 #${g('rank')}`,
+    `🔄 提前續約    ${g('early_renew')} 件`,
+    `📡 RT締結率    ${g('rt_close_num')}/${g('rt_close_den')}  ${pct(g('rt_close_pct'))}`,
+    `☂️  保險搭售    ${g('insurance_num')}/${g('insurance_den')}  ${pct(g('insurance_pct'))}`,
+    `📱 設備佔比    ${g('device_num')}/${g('device_den')}  ${pct(g('device_ratio'))}`,
+    line,
+    `⭐ A999        ${pct(g('aq999'))}`,
+    `👑 A1399       ${pct(g('aq1399'))}`,
+    `⚡ 好速         ${pct(g('haosu'))}`,
+    `📶 RT999       ${pct(g('rt999'))}`,
+    `🌐 RT1399      ${pct(g('rt1399'))}`,
+    `5️⃣  5G銷售     ${pct(g('5g'))}`,
+    `📡 AQ上線      ${pct(g('aq_ttl'))}`,
+    line,
+  ].join('\n');
+  const preview = document.getElementById('copyPreview');
+  const textArea = document.getElementById('copyText');
+  if (preview && textArea) {
+    preview.style.display = 'block';
+    textArea.value = rows;
+    preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function doCopy() {
+  const textArea = document.getElementById('copyText');
+  if (!textArea) return;
+  textArea.select();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(textArea.value).catch(() => {
+      document.execCommand('copy');
+    });
+  } else {
+    document.execCommand('copy');
+  }
+  const btn = document.getElementById('copyBtn');
+  if (btn) {
+    btn.textContent = '✅ 已複製';
+    btn.style.background = '#22c55e';
+    setTimeout(() => { btn.textContent = '複製'; btn.style.background = '#ff6600'; }, 2000);
+  }
+  showToast('✅ 已複製，貼到群組吧！');
+}
+
+</script>
+
+
+<!-- ══ 未達標說明彈窗 ══ -->
+<div id="underModal" style="display:none;position:fixed;inset:0;z-index:9200;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);padding:16px;">
+  <div class="under-box">
+    <div class="under-title">📋 未達標項目說明</div>
+    <div class="under-subtitle">請填寫以下說明後送出，協助督導了解現況與請益進度</div>
+    <div id="underForms"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+      <button class="btn btn-secondary" onclick="closeUnderModal()" style="font-size:13px;">略過，直接送出</button>
+      <button onclick="submitUnderModal()" style="background:linear-gradient(135deg,#ff6600,#ff8533);color:#fff;border:none;border-radius:9px;padding:10px 22px;font-size:13px;font-weight:800;cursor:pointer;">📤 填完送出</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 慶祝彈窗 ══ -->
+<div id="celebModal">
+  <div class="celeb-box">
+    <div class="celeb-emoji" id="celebEmoji">🎊</div>
+    <div class="celeb-title" id="celebTitle">達標！</div>
+    <div class="celeb-subtitle" id="celebSubtitle">繼續加油！</div>
+    <div class="celeb-badges" id="celebBadges"></div>
+    <button class="celeb-close" onclick="closeCelebModal()">太棒了，繼續衝！🔥</button>
+  </div>
+</div>
+
+<!-- ══ SETTINGS MODAL ══ -->
+<div id="settingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:90%;max-width:480px;">
+    <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:16px;">⚙️ Google Sheets 設定</div>
+    <div style="color:var(--text-dim);font-size:12px;margin-bottom:12px;line-height:1.6;">
+      請貼上 Apps Script 部署後的 <strong style="color:var(--accent-bright)">網路應用程式網址</strong>
+    </div>
+    <input id="gasUrlInput" type="url" placeholder="https://script.google.com/macros/s/..." style="width:100%;background:var(--bg-deep);border:1px solid var(--border-dim);border-radius:7px;color:var(--text);padding:10px 12px;font-size:13px;margin-bottom:16px;">
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+      <button class="btn btn-secondary" onclick="clearSettings()">清除設定</button>
+      <button class="btn btn-secondary" onclick="closeSettings()">取消</button>
+      <button class="btn btn-primary" onclick="saveSettings()">✅ 儲存並測試連線</button>
+    </div>
+    <div style="margin-top:16px;padding:12px;background:var(--bg-panel);border-radius:8px;font-size:11px;color:var(--text-muted);line-height:1.7;">
+      <strong style="color:var(--accent-bright)">如何取得網址？</strong><br>
+      Apps Script → 部署 → 管理部署作業 → 複製「網路應用程式」網址
+    </div>
+  </div>
+</div>
+</body>
+</html>
