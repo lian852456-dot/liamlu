@@ -1051,7 +1051,7 @@
   }
 
 
-  /* ── 未達標說明彈窗 ── */
+  /* ── 零報說明彈窗 ── */
   #underModal {
     position: fixed; inset: 0; z-index: 9200;
     display: none; align-items: center; justify-content: center;
@@ -1060,16 +1060,53 @@
   }
   .under-box {
     background: #1a1a1a;
-    border: 1.5px solid rgba(255,102,0,0.4);
+    border: 1.5px solid rgba(239,68,68,0.5);
     border-radius: 16px;
     padding: 20px;
     width: 100%; max-width: 520px;
-    max-height: 85vh; overflow-y: auto;
+    max-height: 90vh; overflow-y: auto;
   }
   .under-title {
     font-size: 15px; font-weight: 800; color: #ff8533;
     margin-bottom: 4px;
   }
+  .zero-field-group { margin-bottom: 12px; }
+  .zero-label {
+    display: block; font-size: 12px; font-weight: 700;
+    color: var(--text-dim); margin-bottom: 5px;
+  }
+  .zero-textarea {
+    width: 100%; background: var(--bg-deep);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 8px; color: var(--text);
+    padding: 9px 11px; font-size: 13px; resize: vertical;
+    font-family: var(--font); line-height: 1.5;
+    transition: border-color .2s;
+  }
+  .zero-textarea:focus { outline: none; border-color: #ff8533; }
+
+  /* ── 零報說明彙整卡片（督導彙整） ── */
+  .zero-report-card {
+    background: var(--bg-card);
+    border: 1px solid rgba(239,68,68,0.35);
+    border-left: 3px solid #ef4444;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .zrc-store {
+    font-size: 14px; font-weight: 800; color: #ff8533;
+    margin-bottom: 8px;
+  }
+  .zrc-row {
+    display: flex; gap: 8px; margin-bottom: 5px;
+    font-size: 12px; line-height: 1.5;
+  }
+  .zrc-label {
+    color: var(--text-muted); min-width: 72px; flex-shrink: 0; font-weight: 600;
+  }
+  .zrc-val { color: var(--text); }
+
   .under-subtitle {
     font-size: 11px; color: #707070; margin-bottom: 14px;
   }
@@ -1533,6 +1570,9 @@
       <table id="summaryTable2"></table>
     </div>
   </div>
+
+  <!-- 零報說明彙整（21:00才顯示）-->
+  <div id="zeroReportSection" style="display:none;"></div>
 
 </div><!-- /panel-summary -->
 
@@ -2051,6 +2091,42 @@ async function renderSummary() {
     {key:'netflix', label:'Netflix(筆)', isRaw:true},
   ];
   renderSummaryTable('summaryTable2', date, sumSeg, cols2);
+
+  // 零報說明彙整（21:00）
+  renderZeroReportSection(date, sumSeg, dayCache);
+}
+
+function renderZeroReportSection(date, seg, dayCache) {
+  const el = document.getElementById('zeroReportSection');
+  if (!el) return;
+  if (seg !== 21) { el.style.display = 'none'; return; }
+
+  const reports = STORES.map(s => {
+    const d = dayCache[s];
+    if (!d) return null;
+    const a999  = parseFloat(d.aq999)  || 0;
+    const haosu = parseFloat(d.haosu)  || 0;
+    const r1399 = parseFloat(d.rt1399) || 0;
+    if (a999 > 0 || haosu > 0 || r1399 > 0) return null;
+    if (!d.zero_reason && !d.zero_consult) return null;
+    return { s, d };
+  }).filter(Boolean);
+
+  if (reports.length === 0) { el.style.display = 'none'; return; }
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="section-divider" style="margin-top:16px;">🔴 21:00 零報說明彙整</div>
+    ${reports.map(({s, d}) => `
+      <div class="zero-report-card">
+        <div class="zrc-store">${s}</div>
+        <div class="zrc-row"><span class="zrc-label">① 未開市原因</span><span class="zrc-val">${d.zero_reason || '—'}</span></div>
+        <div class="zrc-row"><span class="zrc-label">② 請益對象</span><span class="zrc-val">${d.zero_consult || '—'}</span></div>
+        <div class="zrc-row"><span class="zrc-label">③ 請益做法</span><span class="zrc-val">${d.zero_method || '—'}</span></div>
+        <div class="zrc-row"><span class="zrc-label">④ 明天計劃</span><span class="zrc-val">${d.zero_plan || '—'}</span></div>
+      </div>
+    `).join('')}
+  `;
 }
 
 function renderSummaryTable(tableId, date, seg, cols) {
@@ -2213,15 +2289,39 @@ function updateFilledSummary(data) {
 }
 
 // 門市選擇時更新 sub title
+const _prevFieldVal = {};
 function onFieldInput(el, field) {
-  // 即時預覽達成提示（只在 A999/A1399/好速）
   const val = parseFloat(el.value);
-  if (!isNaN(val) && val >= 100) {
-    el.style.borderColor = '#10b981';
-    el.style.boxShadow = '0 0 0 3px rgba(16,185,129,0.15)';
-  } else {
-    el.style.borderColor = '';
-    el.style.boxShadow = '';
+  const celebFields = ['aq999','aq1399','haosu'];
+  if (celebFields.includes(field)) {
+    const prev = _prevFieldVal[field] || 0;
+    if (!isNaN(val) && val > 0) {
+      el.style.borderColor = '#ff8533';
+      el.style.boxShadow = '0 0 0 3px rgba(255,133,51,0.25)';
+      // 每輸入一個新的正值就觸發迷你慶祝（防抖：值改變才觸發）
+      if (val !== prev) {
+        _prevFieldVal[field] = val;
+        _miniCelebFX(field, val);
+      }
+    } else {
+      _prevFieldVal[field] = 0;
+      el.style.borderColor = '';
+      el.style.boxShadow = '';
+    }
+  }
+}
+
+function _miniCelebFX(field, val) {
+  if (typeof CelebFX === 'undefined') return;
+  if (field === 'aq999') {
+    CelebFX.coins(12 + Math.min(val * 2, 25));
+    CelebFX.confetti(15);
+  } else if (field === 'aq1399') {
+    CelebFX.fireworks(3);
+    CelebFX.stars(15);
+  } else if (field === 'haosu') {
+    CelebFX.stars(10 + Math.min(val, 15));
+    CelebFX.confetti(20);
   }
 }
 
@@ -2543,8 +2643,10 @@ function closeCelebModal() {
 }
 
 // ════════════════════════════════════
-// 覆寫 saveData（加入達成判斷）
+// 覆寫 saveData（加入達成判斷 + 21:00零報攔截）
 // ════════════════════════════════════
+let _zeroPending = null; // 暫存等待零報說明的資料
+
 async function saveData() {
   const store = getSelectedStore();
   if (!store) { showToast('⚠️ 請先選擇門市'); return; }
@@ -2553,6 +2655,22 @@ async function saveData() {
   const data = getFormData();
   data.savedAt = new Date().toLocaleTimeString('zh-TW');
 
+  // 21:00 零報攔截：A999=0 且 好速=0 且 R1399=0 → 強制填說明
+  if (currentSeg === 21) {
+    const a999  = parseFloat(data.aq999)  || 0;
+    const haosu = parseFloat(data.haosu)  || 0;
+    const r1399 = parseFloat(data.rt1399) || 0;
+    if (a999 === 0 && haosu === 0 && r1399 === 0) {
+      _zeroPending = { store, date, data };
+      openZeroModal(store);
+      return;
+    }
+  }
+
+  await _doSave(store, date, data);
+}
+
+async function _doSave(store, date, data) {
   showToast('🔄 上傳中…');
   try {
     const ok = await saveToStorage(date, store, currentSeg, data);
@@ -2560,7 +2678,6 @@ async function saveData() {
       showToast(`✅ ${store} ${currentSeg}:00 已儲存`);
       updateFilledSummary(data);
 
-      // 判斷達成項目
       const achievements = [];
       if (data.kpi && parseFloat(data.kpi) >= 100) achievements.push('KPI');
       if (data.aq999 && parseFloat(data.aq999) >= 100) achievements.push('A999');
@@ -2578,6 +2695,66 @@ async function saveData() {
   } catch(e) {
     showToast('❌ 錯誤：' + e.message);
   }
+}
+
+// ════════════════════════════════════
+// 21:00 零報說明 Modal
+// ════════════════════════════════════
+function openZeroModal(store) {
+  const m = document.getElementById('underModal');
+  document.getElementById('underModalTitle').textContent = `📋 ${store} 21:00 零報說明（必填）`;
+  document.getElementById('underForms').innerHTML = `
+    <div class="zero-field-group">
+      <label class="zero-label">① 未開市原因 <span style="color:#ef4444">*</span></label>
+      <textarea id="z_reason" class="zero-textarea" placeholder="說明未開出 A999／好速／R1399 的原因…" rows="2"></textarea>
+    </div>
+    <div class="zero-field-group">
+      <label class="zero-label">② 請益店點 ／ 請益人員 <span style="color:#ef4444">*</span></label>
+      <textarea id="z_consult" class="zero-textarea" placeholder="請填：請益的店點名稱 / 人員姓名…" rows="2"></textarea>
+    </div>
+    <div class="zero-field-group">
+      <label class="zero-label">③ A999 ／ 好速 請益做法 <span style="color:#ef4444">*</span></label>
+      <textarea id="z_method" class="zero-textarea" placeholder="請填：對方分享的銷售技巧或做法…" rows="3"></textarea>
+    </div>
+    <div class="zero-field-group">
+      <label class="zero-label">④ 明天如何開出（行動計劃）<span style="color:#ef4444">*</span></label>
+      <textarea id="z_plan" class="zero-textarea" placeholder="請填：明天具體計劃，例如目標客群、銷售時段安排…" rows="3"></textarea>
+    </div>
+  `;
+  // 監聽輸入，更新送出按鈕狀態
+  ['z_reason','z_consult','z_method','z_plan'].forEach(id => {
+    document.getElementById(id).addEventListener('input', _updateZeroSubmitBtn);
+  });
+  _updateZeroSubmitBtn();
+  m.style.display = 'flex';
+}
+
+function _updateZeroSubmitBtn() {
+  const allFilled = ['z_reason','z_consult','z_method','z_plan']
+    .every(id => (document.getElementById(id)?.value || '').trim().length > 0);
+  const btn = document.getElementById('zeroSubmitBtn');
+  if (btn) {
+    btn.disabled = !allFilled;
+    btn.style.opacity = allFilled ? '1' : '0.4';
+    btn.style.cursor = allFilled ? 'pointer' : 'not-allowed';
+  }
+}
+
+async function submitZeroModal() {
+  if (!_zeroPending) return;
+  const ids = ['z_reason','z_consult','z_method','z_plan'];
+  if (!ids.every(id => (document.getElementById(id)?.value || '').trim())) {
+    showToast('⚠️ 請填寫所有必填欄位');
+    return;
+  }
+  const { store, date, data } = _zeroPending;
+  data.zero_reason  = document.getElementById('z_reason').value.trim();
+  data.zero_consult = document.getElementById('z_consult').value.trim();
+  data.zero_method  = document.getElementById('z_method').value.trim();
+  data.zero_plan    = document.getElementById('z_plan').value.trim();
+  document.getElementById('underModal').style.display = 'none';
+  _zeroPending = null;
+  await _doSave(store, date, data);
 }
 
 
@@ -2664,15 +2841,14 @@ function doCopy() {
 </script>
 
 
-<!-- ══ 未達標說明彈窗 ══ -->
-<div id="underModal" style="display:none;position:fixed;inset:0;z-index:9200;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);padding:16px;">
+<!-- ══ 21:00 零報說明彈窗（強制填寫）══ -->
+<div id="underModal" style="display:none;position:fixed;inset:0;z-index:9200;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(5px);padding:16px;">
   <div class="under-box">
-    <div class="under-title">📋 未達標項目說明</div>
-    <div class="under-subtitle">請填寫以下說明後送出，協助督導了解現況與請益進度</div>
+    <div class="under-title" id="underModalTitle">📋 21:00 零報說明（必填）</div>
+    <div class="under-subtitle">⚠️ A999／好速／R1399 三項均為 0，請完整填寫以下說明才能送出回報</div>
     <div id="underForms"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
-      <button class="btn btn-secondary" onclick="closeUnderModal()" style="font-size:13px;">略過，直接送出</button>
-      <button onclick="submitUnderModal()" style="background:linear-gradient(135deg,#ff6600,#ff8533);color:#fff;border:none;border-radius:9px;padding:10px 22px;font-size:13px;font-weight:800;cursor:pointer;">📤 填完送出</button>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+      <button id="zeroSubmitBtn" onclick="submitZeroModal()" disabled style="background:linear-gradient(135deg,#ff6600,#ff8533);color:#fff;border:none;border-radius:9px;padding:11px 24px;font-size:13px;font-weight:800;cursor:not-allowed;opacity:0.4;transition:opacity .2s;">📤 填完送出</button>
     </div>
   </div>
 </div>
