@@ -2107,7 +2107,7 @@ function renderZeroReportSection(date, seg, dayCache) {
     const a999  = parseFloat(d.aq999)  || 0;
     const haosu = parseFloat(d.haosu)  || 0;
     const r1399 = parseFloat(d.rt1399) || 0;
-    if (a999 > 0 || haosu > 0 || r1399 > 0) return null;
+    if (a999 > 0 && haosu > 0 && r1399 > 0) return null;
     if (!d.zero_reason && !d.zero_consult) return null;
     return { s, d };
   }).filter(Boolean);
@@ -2655,12 +2655,12 @@ async function saveData() {
   const data = getFormData();
   data.savedAt = new Date().toLocaleTimeString('zh-TW');
 
-  // 21:00 零報攔截：A999=0 且 好速=0 且 R1399=0 → 強制填說明
+  // 21:00 零報攔截：A999=0 或 好速=0 或 R1399=0 任一項 → 強制填說明
   if (currentSeg === 21) {
     const a999  = parseFloat(data.aq999)  || 0;
     const haosu = parseFloat(data.haosu)  || 0;
     const r1399 = parseFloat(data.rt1399) || 0;
-    if (a999 === 0 && haosu === 0 && r1399 === 0) {
+    if (a999 === 0 || haosu === 0 || r1399 === 0) {
       _zeroPending = { store, date, data };
       openZeroModal(store);
       return;
@@ -2845,7 +2845,7 @@ function doCopy() {
 <div id="underModal" style="display:none;position:fixed;inset:0;z-index:9200;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(5px);padding:16px;">
   <div class="under-box">
     <div class="under-title" id="underModalTitle">📋 21:00 零報說明（必填）</div>
-    <div class="under-subtitle">⚠️ A999／好速／R1399 三項均為 0，請完整填寫以下說明才能送出回報</div>
+    <div class="under-subtitle">⚠️ A999／好速／R1399 有任一項為 0，請完整填寫以下說明才能送出回報</div>
     <div id="underForms"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
       <button id="zeroSubmitBtn" onclick="submitZeroModal()" disabled style="background:linear-gradient(135deg,#ff6600,#ff8533);color:#fff;border:none;border-radius:9px;padding:11px 24px;font-size:13px;font-weight:800;cursor:not-allowed;opacity:0.4;transition:opacity .2s;">📤 填完送出</button>
