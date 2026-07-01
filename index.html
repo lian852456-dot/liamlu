@@ -1110,6 +1110,63 @@
   .under-subtitle {
     font-size: 11px; color: #707070; margin-bottom: 14px;
   }
+
+  /* ── 個人追蹤 ── */
+  .review-item-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-dim);
+    border-left: 3px solid #ef4444;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .review-item-card.passed { border-left-color: #22c55e; }
+  .ri-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .ri-name { font-size: 13px; font-weight: 700; color: var(--text); }
+  .ri-val  { font-size: 13px; font-weight: 800; }
+  .ri-val.fail { color: #ef4444; }
+  .ri-val.warn { color: #f59e0b; }
+  .ri-val.pass { color: #22c55e; }
+  .ri-textarea {
+    width: 100%; background: var(--bg-deep);
+    border: 1px solid var(--border-dim); border-radius: 7px;
+    color: var(--text); padding: 7px 10px; font-size: 12px;
+    resize: none; font-family: var(--font); margin-top: 4px;
+  }
+  .ri-textarea:focus { outline: none; border-color: #ff8533; }
+  .ri-sublabel { font-size: 11px; color: var(--text-muted); margin-top:8px; }
+
+  /* 追蹤牆 */
+  .track-wall { display: flex; flex-direction: column; gap: 8px; }
+  .track-row { display: flex; gap: 6px; align-items: center; }
+  .track-row-label { font-size: 11px; color: var(--text-dim); min-width: 80px; }
+  .track-cell {
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; cursor: pointer;
+    transition: transform .15s;
+  }
+  .track-cell:hover { transform: scale(1.2); }
+  .tc-pass { background: rgba(34,197,94,.2); color: #22c55e; border: 1px solid rgba(34,197,94,.3); }
+  .tc-fail { background: rgba(239,68,68,.2); color: #ef4444; border: 1px solid rgba(239,68,68,.3); }
+  .tc-empty { background: var(--bg-panel); color: var(--text-muted); border: 1px solid var(--border-dim); }
+  .tc-today { box-shadow: 0 0 0 2px #ff8533; }
+  .track-dates { display: flex; gap: 6px; padding-left: 86px; margin-bottom: 2px; }
+  .track-date-label { width: 28px; font-size: 9px; color: var(--text-muted); text-align: center; }
+
+  /* 新增人員 modal */
+  .add-name-modal {
+    position: fixed; inset: 0; z-index: 9300;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); padding: 16px;
+  }
+  .add-name-box {
+    background: var(--bg-card); border: 1.5px solid var(--border);
+    border-radius: 14px; padding: 20px; width: 100%; max-width: 340px;
+  }
 </style>
 </head>
 <body>
@@ -1161,6 +1218,7 @@
   <button class="tab-btn active" onclick="switchTab('fill')">📝 填報（店長）</button>
   <button class="tab-btn" onclick="switchTab('summary')">📊 彙整大盤（督導）</button>
   <button class="tab-btn" onclick="switchTab('playback')">🕐 日期回放</button>
+  <button class="tab-btn" onclick="switchTab('personal')">👤 個人追蹤</button>
 </div>
 
 <!-- ═══════════════════════════════════
@@ -1599,6 +1657,39 @@
   <div id="playbackResult"></div>
 
 </div><!-- /panel-playback -->
+
+<!-- ═══════════════════════════════════
+     PANEL 4: 個人追蹤
+═══════════════════════════════════ -->
+<div class="panel" id="panel-personal">
+
+  <!-- 身份選擇 -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>👤 個人每日追蹤</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;">
+      <select id="personalStore" onchange="renderPersonal()" style="background:var(--bg-deep);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:13px;flex:1;min-width:120px;">
+        <option value="">— 選擇門市 —</option>
+      </select>
+      <select id="personalName" onchange="renderPersonal()" style="background:var(--bg-deep);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:13px;flex:1;min-width:120px;">
+        <option value="">— 選擇姓名 —</option>
+      </select>
+      <button onclick="openAddNameModal()" style="background:var(--bg-panel);border:1px solid var(--border);color:var(--accent-bright);border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer;">＋ 新增人員</button>
+    </div>
+  </div>
+
+  <!-- 今日未過關 -->
+  <div id="personalTodaySection" style="display:none;">
+    <div class="section-divider">📋 今日未過關項目</div>
+    <div id="personalToday"></div>
+  </div>
+
+  <!-- 累積追蹤牆 -->
+  <div id="personalHistorySection" style="display:none;">
+    <div class="section-divider">📅 近14天追蹤牆</div>
+    <div id="personalHistory"></div>
+  </div>
+
+</div><!-- /panel-personal -->
 
 
 <script>
@@ -2689,6 +2780,13 @@ async function _doSave(store, date, data) {
       if (achievements.length > 0) {
         setTimeout(() => showCelebModal(achievements), 400);
       }
+
+      // 個人檢討單（慶祝彈窗後觸發，或無慶祝時直接觸發）
+      const personalName = document.getElementById('personalName')?.value || '';
+      if (personalName) {
+        const delay = achievements.length > 0 ? 3000 : 600;
+        setTimeout(() => triggerReviewModal(store, personalName, date, currentSeg, data), delay);
+      }
     } else {
       showToast('❌ 儲存失敗，請檢查連線');
     }
@@ -2838,6 +2936,282 @@ function doCopy() {
   showToast('✅ 已複製，貼到群組吧！');
 }
 
+// ════════════════════════════════════
+// 個人追蹤系統
+// ════════════════════════════════════
+
+// 未過關判斷：重點項目（筆數 > 0 才算過）
+const PERSONAL_ITEMS = [
+  { key: 'aq999',  label: 'A999 上線',   type: 'count' },
+  { key: 'aq1399', label: 'A1399 上線',  type: 'count' },
+  { key: 'haosu',  label: '好速銷售',     type: 'count' },
+  { key: 'rt999',  label: 'R999 上線',   type: 'count' },
+  { key: 'rt1399', label: 'R1399 上線',  type: 'count' },
+  { key: 'kpi',    label: 'KPI 達成率',  type: 'pct', th: 100 },
+  { key: 'rt_close_pct',   label: 'RT締結率',   type: 'pct', th: 80 },
+  { key: 'insurance_pct',  label: '保險搭售率',  type: 'pct', th: 70 },
+  { key: 'device_ratio',   label: '設備案佔比',  type: 'pct', th: 80 },
+];
+
+function _reviewKey(store, name, date, seg) {
+  return `review_${store}_${name}_${date}_${seg}`;
+}
+function _namesKey(store) { return `names_${store}`; }
+
+function getStoreNames(store) {
+  try { return JSON.parse(localStorage.getItem(_namesKey(store)) || '[]'); } catch { return []; }
+}
+function saveStoreNames(store, names) {
+  localStorage.setItem(_namesKey(store), JSON.stringify(names));
+}
+
+// 初始化門市下拉
+function initPersonalStoreSelect() {
+  ['personalStore','addNameStore'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = `<option value="">— 選擇門市 —</option>` +
+      STORES.map(s => `<option value="${s}">${s}</option>`).join('');
+  });
+  // 記憶上次選擇
+  const lastStore = localStorage.getItem('personal_last_store') || '';
+  const lastName  = localStorage.getItem('personal_last_name') || '';
+  if (lastStore) {
+    document.getElementById('personalStore').value = lastStore;
+    _refreshNameSelect(lastStore);
+    if (lastName) document.getElementById('personalName').value = lastName;
+  }
+}
+
+function _refreshNameSelect(store) {
+  const el = document.getElementById('personalName');
+  if (!el) return;
+  const names = getStoreNames(store);
+  el.innerHTML = `<option value="">— 選擇姓名 —</option>` +
+    names.map(n => `<option value="${n}">${n}</option>`).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initPersonalStoreSelect, 100);
+  document.getElementById('personalStore').addEventListener('change', e => {
+    _refreshNameSelect(e.target.value);
+    renderPersonal();
+  });
+});
+
+// 新增人員
+function openAddNameModal() {
+  document.getElementById('addNameStore').value = document.getElementById('personalStore').value || '';
+  document.getElementById('addNameInput').value = '';
+  document.getElementById('addNameModal').style.display = 'flex';
+}
+function closeAddNameModal() {
+  document.getElementById('addNameModal').style.display = 'none';
+}
+function saveNewName() {
+  const store = document.getElementById('addNameStore').value;
+  const name  = document.getElementById('addNameInput').value.trim();
+  if (!store || !name) { showToast('⚠️ 請選門市並輸入姓名'); return; }
+  const names = getStoreNames(store);
+  if (!names.includes(name)) { names.push(name); saveStoreNames(store, names); }
+  document.getElementById('personalStore').value = store;
+  _refreshNameSelect(store);
+  document.getElementById('personalName').value = name;
+  closeAddNameModal();
+  renderPersonal();
+  showToast(`✅ 已新增 ${name}`);
+}
+
+// ── 個人檢討單 Modal（送出後自動觸發）──
+let _reviewPending = null;
+
+function triggerReviewModal(store, name, date, seg, data) {
+  if (!name) return;
+  const failed = PERSONAL_ITEMS.filter(item => {
+    const v = parseFloat(data[item.key]);
+    if (isNaN(v) || v === 0) return item.type === 'count'; // count 為 0 = 未過關
+    if (item.type === 'pct') return v < item.th;
+    return false;
+  });
+  if (failed.length === 0) return; // 全過關，不彈
+
+  _reviewPending = { store, name, date, seg, failed };
+  const title = `📋 ${name}（${store}）${seg}:00 個人檢討`;
+  document.getElementById('reviewModalTitle').textContent = title;
+  document.getElementById('reviewModalSub').textContent =
+    `以下 ${failed.length} 項今日未過關，請填原因與明日改善行動`;
+
+  document.getElementById('reviewForms').innerHTML = failed.map((item, i) => {
+    const v = parseFloat(data[item.key]);
+    const display = item.type === 'count'
+      ? (isNaN(v) || v === 0 ? '0 筆' : v + ' 筆')
+      : (isNaN(v) ? '—' : v.toFixed(1) + '%');
+    return `
+      <div class="review-item-card" style="margin-bottom:10px;">
+        <div class="ri-header">
+          <span class="ri-name">❌ ${item.label}</span>
+          <span class="ri-val fail">${display}</span>
+        </div>
+        <div class="ri-sublabel">📌 今日未開出原因</div>
+        <textarea class="ri-textarea" id="rv_reason_${i}" rows="2" placeholder="請說明今日未開出的原因…"></textarea>
+        <div class="ri-sublabel" style="margin-top:6px;">🚀 明日改善行動</div>
+        <textarea class="ri-textarea" id="rv_plan_${i}" rows="2" placeholder="明天具體要怎麼做？目標是什麼？"></textarea>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('reviewModal').style.display = 'flex';
+}
+
+function skipReview() {
+  document.getElementById('reviewModal').style.display = 'none';
+  _reviewPending = null;
+}
+
+function submitReview() {
+  if (!_reviewPending) return;
+  const { store, name, date, seg, failed } = _reviewPending;
+  const reviews = failed.map((item, i) => ({
+    key:    item.key,
+    label:  item.label,
+    reason: (document.getElementById(`rv_reason_${i}`)?.value || '').trim(),
+    plan:   (document.getElementById(`rv_plan_${i}`)?.value || '').trim(),
+  }));
+  const record = { date, seg, store, name, reviews, ts: Date.now() };
+  const key = _reviewKey(store, name, date, seg);
+  localStorage.setItem(key, JSON.stringify(record));
+  document.getElementById('reviewModal').style.display = 'none';
+  _reviewPending = null;
+  showToast('✅ 個人檢討已儲存');
+  // 若目前在個人追蹤頁，重新渲染
+  if (document.getElementById('panel-personal').classList.contains('active')) renderPersonal();
+}
+
+// ── 個人追蹤頁渲染 ──
+function renderPersonal() {
+  const store = document.getElementById('personalStore').value;
+  const name  = document.getElementById('personalName').value;
+  localStorage.setItem('personal_last_store', store);
+  localStorage.setItem('personal_last_name', name);
+
+  const todaySec = document.getElementById('personalTodaySection');
+  const histSec  = document.getElementById('personalHistorySection');
+  if (!store || !name) {
+    todaySec.style.display = 'none';
+    histSec.style.display  = 'none';
+    return;
+  }
+
+  const td = document.getElementById('fillDate').value || today();
+
+  // 今日未過關
+  const todayRecord16 = _loadReview(store, name, td, 16);
+  const todayRecord21 = _loadReview(store, name, td, 21);
+  todaySec.style.display = 'block';
+  document.getElementById('personalToday').innerHTML =
+    _renderTodayCards(todayRecord16, 16) + _renderTodayCards(todayRecord21, 21);
+
+  // 近14天追蹤牆
+  histSec.style.display = 'block';
+  document.getElementById('personalHistory').innerHTML = _renderTrackWall(store, name, td);
+}
+
+function _loadReview(store, name, date, seg) {
+  try {
+    const raw = localStorage.getItem(_reviewKey(store, name, date, seg));
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function _renderTodayCards(record, seg) {
+  if (!record) {
+    return `<div style="color:var(--text-muted);font-size:12px;padding:10px 0 4px;">${seg}:00 ─ 尚無檢討記錄</div>`;
+  }
+  return `
+    <div style="font-size:11px;color:var(--text-muted);margin:10px 0 6px;font-weight:700;">${seg}:00 回報</div>
+    ${record.reviews.map(r => `
+      <div class="review-item-card">
+        <div class="ri-header"><span class="ri-name">❌ ${r.label}</span></div>
+        ${r.reason ? `<div class="ri-sublabel">📌 原因</div><div style="font-size:12px;color:var(--text);padding:4px 0;">${r.reason}</div>` : ''}
+        ${r.plan   ? `<div class="ri-sublabel">🚀 明日計劃</div><div style="font-size:12px;color:var(--text);padding:4px 0;">${r.plan}</div>` : ''}
+      </div>
+    `).join('')}
+  `;
+}
+
+function _renderTrackWall(store, name, today) {
+  // 產生近14天日期陣列
+  const dates = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+
+  // 統計每天的失敗數（16:00 + 21:00）
+  const dayStats = dates.map(date => {
+    const r16 = _loadReview(store, name, date, 16);
+    const r21 = _loadReview(store, name, date, 21);
+    const fails = (r16?.reviews?.length || 0) + (r21?.reviews?.length || 0);
+    const has16 = !!r16, has21 = !!r21;
+    return { date, fails, has16, has21 };
+  });
+
+  // 取所有出現過失敗的項目 key
+  const itemsSet = new Set();
+  dates.forEach(date => {
+    [16,21].forEach(seg => {
+      const r = _loadReview(store, name, date, seg);
+      (r?.reviews || []).forEach(rv => itemsSet.add(rv.label));
+    });
+  });
+  const items = [...itemsSet];
+
+  if (items.length === 0) {
+    return `<div style="color:var(--text-muted);font-size:13px;padding:16px;text-align:center;">🎉 近14天無未過關記錄！</div>`;
+  }
+
+  const dateLabels = `<div class="track-dates">${dates.map(d => `<span class="track-date-label">${d.slice(5)}</span>`).join('')}</div>`;
+
+  const rows = items.map(label => {
+    const cells = dates.map(date => {
+      const failed = [16,21].some(seg => {
+        const r = _loadReview(store, name, date, seg);
+        return (r?.reviews || []).some(rv => rv.label === label);
+      });
+      const isToday = date === today;
+      const cls = failed ? 'tc-fail' : 'tc-pass';
+      const todayCls = isToday ? ' tc-today' : '';
+      const txt = failed ? '✗' : '✓';
+      return `<div class="track-cell ${cls}${todayCls}" title="${date}">${txt}</div>`;
+    }).join('');
+    return `<div class="track-row"><span class="track-row-label">${label}</span>${cells}</div>`;
+  }).join('');
+
+  // 連續失敗警示
+  const streaks = items.map(label => {
+    let streak = 0;
+    for (let i = dates.length - 1; i >= 0; i--) {
+      const failed = [16,21].some(seg => {
+        const r = _loadReview(store, name, dates[i], seg);
+        return (r?.reviews || []).some(rv => rv.label === label);
+      });
+      if (failed) streak++; else break;
+    }
+    return { label, streak };
+  }).filter(s => s.streak >= 2);
+
+  const alerts = streaks.length > 0
+    ? `<div style="margin-bottom:12px;">${streaks.map(s =>
+        `<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:#f87171;margin-bottom:6px;">
+          🔴 <strong>${s.label}</strong> 已連續 <strong>${s.streak} 天</strong>未過關，需重點關注！
+        </div>`
+      ).join('')}</div>`
+    : '';
+
+  return `${alerts}<div class="track-wall">${dateLabels}${rows}</div>`;
+}
+
 </script>
 
 
@@ -2861,6 +3235,34 @@ function doCopy() {
     <div class="celeb-subtitle" id="celebSubtitle">繼續加油！</div>
     <div class="celeb-badges" id="celebBadges"></div>
     <button class="celeb-close" onclick="closeCelebModal()">太棒了，繼續衝！🔥</button>
+  </div>
+</div>
+
+<!-- ══ 個人檢討單 Modal（送出後自動彈出）══ -->
+<div id="reviewModal" style="display:none;position:fixed;inset:0;z-index:9250;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(5px);padding:16px;">
+  <div class="under-box" style="border-color:rgba(245,158,11,0.4);max-height:92vh;">
+    <div class="under-title" id="reviewModalTitle">📋 今日個人檢討單</div>
+    <div class="under-subtitle" id="reviewModalSub">以下項目今日未過關，請填寫原因與明日改善行動</div>
+    <div id="reviewForms"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+      <button onclick="skipReview()" style="background:var(--bg-panel);color:var(--text-dim);border:1px solid var(--border-dim);border-radius:8px;padding:9px 18px;font-size:12px;cursor:pointer;">稍後填寫</button>
+      <button id="reviewSubmitBtn" onclick="submitReview()" style="background:linear-gradient(135deg,#f59e0b,#ff8533);color:#fff;border:none;border-radius:9px;padding:10px 22px;font-size:13px;font-weight:800;cursor:pointer;">💾 儲存檢討</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 新增人員 Modal ══ -->
+<div class="add-name-modal" id="addNameModal">
+  <div class="add-name-box">
+    <div style="font-size:14px;font-weight:800;color:#ff8533;margin-bottom:12px;">＋ 新增人員</div>
+    <select id="addNameStore" style="width:100%;background:var(--bg-deep);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:10px;">
+      <option value="">— 選擇門市 —</option>
+    </select>
+    <input id="addNameInput" type="text" placeholder="輸入姓名" style="width:100%;background:var(--bg-deep);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:14px;">
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="closeAddNameModal()" style="background:var(--bg-panel);color:var(--text-dim);border:1px solid var(--border-dim);border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;">取消</button>
+      <button onclick="saveNewName()" style="background:linear-gradient(135deg,#ff6600,#ff8533);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;">新增</button>
+    </div>
   </div>
 </div>
 
