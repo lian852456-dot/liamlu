@@ -1946,30 +1946,63 @@ async function renderSummary() {
   // Summary cards
   const filled = STORES.filter(s => !!dayCache[s]);
   const total = STORES.filter(s => !(NEW_STORES.includes(s) && date < '2026-06-25')).length;
-  const kpis = STORES.map(s => dayCache[s]?.kpi).filter(v => v != null && v !== '');
-  const avgKpi = kpis.length ? (kpis.reduce((a,b)=>parseFloat(a)+parseFloat(b),0)/kpis.length).toFixed(1) : '—';
-  const above100 = kpis.filter(v=>parseFloat(v)>=100).length;
+
+  const sumRaw = key => STORES.reduce((acc, s) => {
+    const v = parseFloat(dayCache[s]?.[key]);
+    return acc + (isNaN(v) ? 0 : v);
+  }, 0);
+  const avgPct = key => {
+    const vals = STORES.map(s => parseFloat(dayCache[s]?.[key])).filter(v => !isNaN(v));
+    return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : '—';
+  };
+
+  const aq999Total    = sumRaw('aq999');
+  const haosuTotal    = sumRaw('haosu');
+  const rt1399Total   = sumRaw('rt1399');
+  const rt999Total    = sumRaw('rt999');
+  const avgInsurance  = avgPct('insurance_pct');
+  const avgDevice     = avgPct('device_ratio');
 
   document.getElementById('summaryCards').innerHTML = `
+    <div class="summary-card">
+      <div class="sc-label">時段</div>
+      <div class="sc-val" style="color:${sumSeg===16?'var(--gold)':'var(--accent-bright)'}">${sumSeg}:00</div>
+      <div class="sc-sub">${date}</div>
+    </div>
     <div class="summary-card">
       <div class="sc-label">填報完成</div>
       <div class="sc-val" style="color:${filled.length===total?'var(--green)':'var(--warn)'}">${filled.length}/${total}</div>
       <div class="sc-sub">間門市</div>
     </div>
     <div class="summary-card">
-      <div class="sc-label">平均 KPI</div>
-      <div class="sc-val">${avgKpi}%</div>
+      <div class="sc-label">A999 上線數</div>
+      <div class="sc-val" style="color:var(--accent-bright)">${aq999Total}</div>
+      <div class="sc-sub">全區合計(筆)</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">好速銷售數</div>
+      <div class="sc-val" style="color:var(--accent-bright)">${haosuTotal}</div>
+      <div class="sc-sub">全區合計(筆)</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">R1399 上線數</div>
+      <div class="sc-val" style="color:var(--accent-bright)">${rt1399Total}</div>
+      <div class="sc-sub">全區合計(筆)</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">R999 上線數</div>
+      <div class="sc-val" style="color:var(--accent-bright)">${rt999Total}</div>
+      <div class="sc-sub">全區合計(筆)</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">保險搭售率</div>
+      <div class="sc-val" style="color:${avgInsurance!=='—'&&parseFloat(avgInsurance)>=80?'var(--green)':avgInsurance!=='—'?'var(--warn)':'var(--text-muted)'}">${avgInsurance==='—'?'—':avgInsurance+'%'}</div>
       <div class="sc-sub">區內均值</div>
     </div>
     <div class="summary-card">
-      <div class="sc-label">達成 100%</div>
-      <div class="sc-val" style="color:var(--green)">${above100}</div>
-      <div class="sc-sub">間門市</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">時段</div>
-      <div class="sc-val" style="color:${sumSeg===16?'var(--gold)':'var(--accent-bright)'}">${sumSeg}:00</div>
-      <div class="sc-sub">${date}</div>
+      <div class="sc-label">設備案佔比</div>
+      <div class="sc-val" style="color:${avgDevice!=='—'&&parseFloat(avgDevice)>=80?'var(--green)':avgDevice!=='—'?'var(--warn)':'var(--text-muted)'}">${avgDevice==='—'?'—':avgDevice+'%'}</div>
+      <div class="sc-sub">區內均值</div>
     </div>
   `;
 
