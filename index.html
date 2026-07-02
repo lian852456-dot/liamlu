@@ -2432,6 +2432,31 @@ function renderSummaryTable(tableId, date, seg, cols) {
     ${cols.map(c=>`<th>${c.label}</th>`).join('')}
   </tr></thead>`;
 
+  // 計算 N12B 合計列
+  const totalCells = cols.map(c => {
+    if (c.isRank || c.isDelta || c.isScore) return `<td style="color:var(--text-dim);">—</td>`;
+    if (c.isRaw) {
+      const sum = STORES.reduce((acc, s) => {
+        const v = parseFloat(dayCache[s]?.[c.key]);
+        return acc + (isNaN(v) ? 0 : v);
+      }, 0);
+      const hasAny = STORES.some(s => dayCache[s] && dayCache[s][c.key] != null && dayCache[s][c.key] !== '');
+      return hasAny
+        ? `<td style="color:var(--accent-bright);font-weight:700;">${sum % 1 === 0 ? sum : sum.toFixed(1)}</td>`
+        : `<td class="val-dim">—</td>`;
+    }
+    // percentage: average of stores that have data
+    const vals = STORES.map(s => parseFloat(dayCache[s]?.[c.key])).filter(v => !isNaN(v));
+    if (!vals.length) return `<td class="val-dim">—</td>`;
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const cls = cellColorClass(avg, c.th);
+    return `<td class="${cls}" style="font-weight:700;">${avg.toFixed(1)}%</td>`;
+  }).join('');
+  const totalRow = `<tr style="background:rgba(255,102,0,0.08);border-top:2px solid rgba(255,102,0,0.3);">
+    <td class="store-name" style="color:var(--accent-bright);font-weight:700;">🏢 N12B</td>
+    ${totalCells}
+  </tr>`;
+
   const rows = STORES.map(s => {
     const d = dayCache[s];
     const isNew = NEW_STORES.includes(s) && date < '2026-06-25';
@@ -2449,7 +2474,6 @@ function renderSummaryTable(tableId, date, seg, cols) {
         return `<td class="${cls}">${!isNaN(n) ? n.toFixed(2) : '—'}</td>`;
       }
       if (c.isRaw) {
-        // 原始數字，不加 %（件數、分子、分母等）
         const n = parseFloat(v);
         if (v === '' || v === null || v === undefined || isNaN(n)) return `<td class="val-dim">—</td>`;
         return `<td style="color:var(--text-dim)">${n % 1 === 0 ? n : n.toFixed(1)}</td>`;
@@ -2463,7 +2487,7 @@ function renderSummaryTable(tableId, date, seg, cols) {
     </tr>`;
   }).join('');
 
-  t.innerHTML = header + `<tbody>${rows}</tbody>`;
+  t.innerHTML = header + `<tbody>${totalRow}${rows}</tbody>`;
 }
 
 // ════════════════════════════════════
