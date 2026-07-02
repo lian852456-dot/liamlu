@@ -1632,6 +1632,9 @@
   <!-- 零報說明彙整（21:00才顯示）-->
   <div id="zeroReportSection" style="display:none;"></div>
 
+  <!-- 個人未過關彙整 -->
+  <div id="personalFailSummarySection" style="display:none;"></div>
+
 </div><!-- /panel-summary -->
 
 
@@ -1663,23 +1666,102 @@
 ═══════════════════════════════════ -->
 <div class="panel" id="panel-personal">
 
+  <!-- 連續未過關警示 -->
+  <div id="personalStreakAlert" style="display:none;"></div>
+
   <!-- 身份選擇 -->
   <div class="card">
-    <div class="card-title"><span class="dot"></span>👤 個人每日追蹤</div>
+    <div class="card-title"><span class="dot"></span>👤 個人每日回報</div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;">
-      <select id="personalStore" onchange="renderPersonal()" style="background:var(--bg-deep);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:13px;flex:1;min-width:120px;">
+      <select id="personalStore" onchange="onPersonalIdentityChange()" style="background:var(--bg-deep);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:13px;flex:1;min-width:120px;">
         <option value="">— 選擇門市 —</option>
       </select>
-      <select id="personalName" onchange="renderPersonal()" style="background:var(--bg-deep);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:13px;flex:1;min-width:120px;">
+      <select id="personalName" onchange="onPersonalIdentityChange()" style="background:var(--bg-deep);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:13px;flex:1;min-width:120px;">
         <option value="">— 選擇姓名 —</option>
       </select>
       <button onclick="openAddNameModal()" style="background:var(--bg-panel);border:1px solid var(--border);color:var(--accent-bright);border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer;">＋ 新增人員</button>
     </div>
   </div>
 
-  <!-- 今日未過關 -->
+  <!-- 每日回報表單 -->
+  <div id="personalFormSection" style="display:none;">
+    <div class="section-divider">📊 今日數據回報</div>
+    <div class="card" style="padding:14px;">
+      <!-- 時段選擇 -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button id="pSeg16" onclick="setPersonalSeg(16)" class="seg-btn active-16" style="flex:1;padding:10px;">16:00 下午</button>
+        <button id="pSeg21" onclick="setPersonalSeg(21)" class="seg-btn" style="flex:1;padding:10px;">21:00 收工</button>
+      </div>
+      <!-- 數據欄位 -->
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="kpi-input-wrap">
+          <label>今日 KPI</label>
+          <span class="ki-icon">📈</span>
+          <input type="number" id="p_kpi" placeholder="0" step="0.1">
+        </div>
+        <div class="kpi-input-wrap">
+          <label>達成率 %</label>
+          <span class="ki-icon">🎯</span>
+          <input type="number" id="p_achieve" placeholder="0.0" step="0.1">
+        </div>
+        <div class="kpi-input-wrap highlight">
+          <label>A999 上線（筆）</label>
+          <span class="ki-icon">⭐</span>
+          <input type="number" id="p_a999" placeholder="0">
+          <span class="kpi-hot-badge">A999</span>
+        </div>
+        <div class="kpi-input-wrap">
+          <label>RT 點數</label>
+          <span class="ki-icon">📶</span>
+          <input type="number" id="p_rt" placeholder="0" step="0.01">
+        </div>
+        <div class="kpi-input-wrap highlight">
+          <label>好速（筆）</label>
+          <span class="ki-icon">⚡</span>
+          <input type="number" id="p_haosu" placeholder="0">
+          <span class="kpi-hot-badge">好速</span>
+        </div>
+        <div class="kpi-input-wrap">
+          <label>保險搭售率 %</label>
+          <span class="ki-icon">☂️</span>
+          <input type="number" id="p_insurance" placeholder="0.0" step="0.1">
+        </div>
+      </div>
+      <button onclick="submitPersonalData()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#ff6600,#ff8533);color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;">✅ 確認送出</button>
+    </div>
+
+    <!-- 未過關說明區（動態顯示） -->
+    <div id="personalFailSection" style="display:none;">
+      <div class="section-divider" style="color:#ef4444;">❌ 未過關項目說明（必填）</div>
+      <div class="card" style="padding:14px;">
+        <div id="personalFailItems"></div>
+        <div style="border-top:1px solid var(--border-dim);margin:14px 0 10px;"></div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-dim);margin-bottom:8px;">📞 請益紀錄（A999 / 好速）</div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div class="kpi-input-wrap">
+            <label>請益店點</label>
+            <span class="ki-icon">🏪</span>
+            <input type="text" id="p_consult_store" placeholder="店點名稱">
+          </div>
+          <div class="kpi-input-wrap">
+            <label>請益人員</label>
+            <span class="ki-icon">👤</span>
+            <input type="text" id="p_consult_person" placeholder="姓名">
+          </div>
+        </div>
+        <div class="kpi-input-wrap" style="margin-bottom:8px;">
+          <label>A999 / 好速 請益做法</label>
+          <span class="ki-icon">💡</span>
+          <textarea id="p_consult_method" placeholder="對方分享的銷售技巧或具體做法…" rows="2" style="width:100%;background:var(--bg-deep);border:1px solid var(--border-dim);border-radius:7px;color:var(--text);padding:8px 10px;font-size:12px;resize:none;font-family:var(--font);"></textarea>
+        </div>
+        <button onclick="submitPersonalFail()" style="width:100%;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;">📤 送出未過關說明</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 今日回報記錄 -->
   <div id="personalTodaySection" style="display:none;">
-    <div class="section-divider">📋 今日未過關項目</div>
+    <div class="section-divider">📋 今日已回報記錄</div>
     <div id="personalToday"></div>
   </div>
 
@@ -2185,6 +2267,8 @@ async function renderSummary() {
 
   // 零報說明彙整（21:00）
   renderZeroReportSection(date, sumSeg, dayCache);
+  // 個人未過關彙整
+  renderPersonalFailSummary(date, sumSeg);
 }
 
 function renderZeroReportSection(date, seg, dayCache) {
@@ -2215,6 +2299,47 @@ function renderZeroReportSection(date, seg, dayCache) {
         <div class="zrc-row"><span class="zrc-label">② 請益對象</span><span class="zrc-val">${d.zero_consult || '—'}</span></div>
         <div class="zrc-row"><span class="zrc-label">③ 請益做法</span><span class="zrc-val">${d.zero_method || '—'}</span></div>
         <div class="zrc-row"><span class="zrc-label">④ 明天計劃</span><span class="zrc-val">${d.zero_plan || '—'}</span></div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function renderPersonalFailSummary(date, seg) {
+  const el = document.getElementById('personalFailSummarySection');
+  if (!el) return;
+  const key = `pIdx_${date}_${seg}`;
+  let idx = {};
+  try { idx = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
+
+  // collect stores that have at least one failure
+  const storeRows = STORES.map(store => {
+    const storeData = idx[store];
+    if (!storeData) return null;
+    const failNames = Object.entries(storeData).filter(([,hasFail]) => hasFail).map(([n]) => n);
+    const passNames = Object.entries(storeData).filter(([,hasFail]) => !hasFail).map(([n]) => n);
+    if (failNames.length === 0 && passNames.length === 0) return null;
+    return { store, failNames, passNames };
+  }).filter(Boolean);
+
+  if (storeRows.length === 0) { el.style.display = 'none'; return; }
+
+  const segLabel = seg === 16 ? '16:00' : '21:00';
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="section-divider" style="margin-top:16px;">👤 個人未過關彙整（${segLabel}）</div>
+    ${storeRows.map(({store, failNames, passNames}) => `
+      <div class="zero-report-card">
+        <div class="zrc-store">${store}</div>
+        ${failNames.length > 0 ? `
+          <div class="zrc-row">
+            <span class="zrc-label" style="color:#e74c3c;">❌ 未過關</span>
+            <span class="zrc-val">${failNames.join('、')}</span>
+          </div>` : ''}
+        ${passNames.length > 0 ? `
+          <div class="zrc-row">
+            <span class="zrc-label" style="color:#27ae60;">✅ 過關</span>
+            <span class="zrc-val">${passNames.join('、')}</span>
+          </div>` : ''}
       </div>
     `).join('')}
   `;
@@ -2940,21 +3065,16 @@ function doCopy() {
 // 個人追蹤系統
 // ════════════════════════════════════
 
-// 未過關判斷：重點項目（筆數 > 0 才算過）
+// 個人回報欄位及未過關門檻
 const PERSONAL_ITEMS = [
-  { key: 'aq999',  label: 'A999 上線',   type: 'count' },
-  { key: 'aq1399', label: 'A1399 上線',  type: 'count' },
-  { key: 'haosu',  label: '好速銷售',     type: 'count' },
-  { key: 'rt999',  label: 'R999 上線',   type: 'count' },
-  { key: 'rt1399', label: 'R1399 上線',  type: 'count' },
-  { key: 'kpi',    label: 'KPI 達成率',  type: 'pct', th: 100 },
-  { key: 'rt_close_pct',   label: 'RT締結率',   type: 'pct', th: 80 },
-  { key: 'insurance_pct',  label: '保險搭售率',  type: 'pct', th: 70 },
-  { key: 'device_ratio',   label: '設備案佔比',  type: 'pct', th: 80 },
+  { key: 'a999',     label: 'A999 上線',   type: 'count' },
+  { key: 'haosu',    label: '好速',         type: 'count' },
+  { key: 'achieve',  label: '達成率',       type: 'pct', th: 100 },
+  { key: 'insurance',label: '保險搭售率',   type: 'pct', th: 70  },
 ];
 
 function _reviewKey(store, name, date, seg) {
-  return `review_${store}_${name}_${date}_${seg}`;
+  return `pr_${store}_${name}_${date}_${seg}`;
 }
 function _namesKey(store) { return `names_${store}`; }
 
@@ -2965,7 +3085,7 @@ function saveStoreNames(store, names) {
   localStorage.setItem(_namesKey(store), JSON.stringify(names));
 }
 
-// 初始化門市下拉
+// ── 初始化 ──
 function initPersonalStoreSelect() {
   ['personalStore','addNameStore'].forEach(id => {
     const el = document.getElementById(id);
@@ -2973,13 +3093,15 @@ function initPersonalStoreSelect() {
     el.innerHTML = `<option value="">— 選擇門市 —</option>` +
       STORES.map(s => `<option value="${s}">${s}</option>`).join('');
   });
-  // 記憶上次選擇
   const lastStore = localStorage.getItem('personal_last_store') || '';
   const lastName  = localStorage.getItem('personal_last_name') || '';
   if (lastStore) {
     document.getElementById('personalStore').value = lastStore;
     _refreshNameSelect(lastStore);
-    if (lastName) document.getElementById('personalName').value = lastName;
+    if (lastName) {
+      document.getElementById('personalName').value = lastName;
+      onPersonalIdentityChange();
+    }
   }
 }
 
@@ -2993,13 +3115,27 @@ function _refreshNameSelect(store) {
 
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(initPersonalStoreSelect, 100);
-  document.getElementById('personalStore').addEventListener('change', e => {
-    _refreshNameSelect(e.target.value);
-    renderPersonal();
-  });
 });
 
-// 新增人員
+function onPersonalIdentityChange() {
+  const store = document.getElementById('personalStore').value;
+  const name  = document.getElementById('personalName').value;
+  if (store) _refreshNameSelect(store);
+  localStorage.setItem('personal_last_store', store);
+  localStorage.setItem('personal_last_name', name);
+  const formSec = document.getElementById('personalFormSection');
+  if (store && name) {
+    formSec.style.display = 'block';
+    renderPersonal();
+  } else {
+    formSec.style.display = 'none';
+    document.getElementById('personalTodaySection').style.display = 'none';
+    document.getElementById('personalHistorySection').style.display = 'none';
+    document.getElementById('personalStreakAlert').style.display = 'none';
+  }
+}
+
+// ── 新增人員 ──
 function openAddNameModal() {
   document.getElementById('addNameStore').value = document.getElementById('personalStore').value || '';
   document.getElementById('addNameInput').value = '';
@@ -3018,102 +3154,111 @@ function saveNewName() {
   _refreshNameSelect(store);
   document.getElementById('personalName').value = name;
   closeAddNameModal();
-  renderPersonal();
+  onPersonalIdentityChange();
   showToast(`✅ 已新增 ${name}`);
 }
 
-// ── 個人檢討單 Modal（送出後自動觸發）──
-let _reviewPending = null;
-
-function triggerReviewModal(store, name, date, seg, data) {
-  if (!name) return;
-  const failed = PERSONAL_ITEMS.filter(item => {
-    const v = parseFloat(data[item.key]);
-    if (isNaN(v) || v === 0) return item.type === 'count'; // count 為 0 = 未過關
-    if (item.type === 'pct') return v < item.th;
-    return false;
-  });
-  if (failed.length === 0) return; // 全過關，不彈
-
-  _reviewPending = { store, name, date, seg, failed };
-  const title = `📋 ${name}（${store}）${seg}:00 個人檢討`;
-  document.getElementById('reviewModalTitle').textContent = title;
-  document.getElementById('reviewModalSub').textContent =
-    `以下 ${failed.length} 項今日未過關，請填原因與明日改善行動`;
-
-  document.getElementById('reviewForms').innerHTML = failed.map((item, i) => {
-    const v = parseFloat(data[item.key]);
-    const display = item.type === 'count'
-      ? (isNaN(v) || v === 0 ? '0 筆' : v + ' 筆')
-      : (isNaN(v) ? '—' : v.toFixed(1) + '%');
-    return `
-      <div class="review-item-card" style="margin-bottom:10px;">
-        <div class="ri-header">
-          <span class="ri-name">❌ ${item.label}</span>
-          <span class="ri-val fail">${display}</span>
-        </div>
-        <div class="ri-sublabel">📌 今日未開出原因</div>
-        <textarea class="ri-textarea" id="rv_reason_${i}" rows="2" placeholder="請說明今日未開出的原因…"></textarea>
-        <div class="ri-sublabel" style="margin-top:6px;">🚀 明日改善行動</div>
-        <textarea class="ri-textarea" id="rv_plan_${i}" rows="2" placeholder="明天具體要怎麼做？目標是什麼？"></textarea>
-      </div>
-    `;
-  }).join('');
-
-  document.getElementById('reviewModal').style.display = 'flex';
+// ── 時段切換 ──
+let personalSeg = 16;
+function setPersonalSeg(s) {
+  personalSeg = s;
+  document.getElementById('pSeg16').className = 'seg-btn' + (s===16?' active-16':'');
+  document.getElementById('pSeg21').className = 'seg-btn' + (s===21?' active-21':'');
 }
 
-function skipReview() {
-  document.getElementById('reviewModal').style.display = 'none';
-  _reviewPending = null;
-}
-
-function submitReview() {
-  if (!_reviewPending) return;
-  const { store, name, date, seg, failed } = _reviewPending;
-  const reviews = failed.map((item, i) => ({
-    key:    item.key,
-    label:  item.label,
-    reason: (document.getElementById(`rv_reason_${i}`)?.value || '').trim(),
-    plan:   (document.getElementById(`rv_plan_${i}`)?.value || '').trim(),
-  }));
-  const record = { date, seg, store, name, reviews, ts: Date.now() };
-  const key = _reviewKey(store, name, date, seg);
-  localStorage.setItem(key, JSON.stringify(record));
-  document.getElementById('reviewModal').style.display = 'none';
-  _reviewPending = null;
-  showToast('✅ 個人檢討已儲存');
-  // 若目前在個人追蹤頁，重新渲染
-  if (document.getElementById('panel-personal').classList.contains('active')) renderPersonal();
-}
-
-// ── 個人追蹤頁渲染 ──
-function renderPersonal() {
+// ── 送出今日數據 ──
+function submitPersonalData() {
   const store = document.getElementById('personalStore').value;
   const name  = document.getElementById('personalName').value;
-  localStorage.setItem('personal_last_store', store);
-  localStorage.setItem('personal_last_name', name);
+  if (!store || !name) { showToast('⚠️ 請先選擇門市與姓名'); return; }
+  const td = document.getElementById('fillDate').value || today();
 
-  const todaySec = document.getElementById('personalTodaySection');
-  const histSec  = document.getElementById('personalHistorySection');
-  if (!store || !name) {
-    todaySec.style.display = 'none';
-    histSec.style.display  = 'none';
+  const data = {
+    kpi:      parseFloat(document.getElementById('p_kpi').value)      || 0,
+    a999:     parseFloat(document.getElementById('p_a999').value)     || 0,
+    rt:       parseFloat(document.getElementById('p_rt').value)       || 0,
+    haosu:    parseFloat(document.getElementById('p_haosu').value)    || 0,
+    achieve:  parseFloat(document.getElementById('p_achieve').value)  || 0,
+    insurance:parseFloat(document.getElementById('p_insurance').value)|| 0,
+  };
+
+  // 判斷未過關項目
+  const failed = PERSONAL_ITEMS.filter(item => {
+    const v = data[item.key];
+    if (item.type === 'count') return v === 0;
+    if (item.type === 'pct')   return v < item.th;
+    return false;
+  });
+
+  if (failed.length === 0) {
+    // 全過關 → 直接儲存並慶祝
+    _savePersonalRecord(store, name, td, personalSeg, data, [], {});
+    showToast('🎉 全部過關！太棒了！');
+    if (typeof CelebFX !== 'undefined') { CelebFX.coins(30); CelebFX.confetti(50); }
+    renderPersonal();
     return;
   }
 
-  const td = document.getElementById('fillDate').value || today();
+  // 有未過關 → 顯示說明區
+  document.getElementById('personalFailSection').style.display = 'block';
+  document.getElementById('personalFailSection').scrollIntoView({behavior:'smooth'});
+  document.getElementById('personalFailItems').innerHTML = `
+    <div style="margin-bottom:12px;">
+      ${failed.map(item => {
+        const v = data[item.key];
+        const display = item.type==='count' ? v+' 筆' : v.toFixed(1)+'%';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border-dim);">
+          <span style="font-size:13px;color:var(--text);">❌ ${item.label}</span>
+          <span style="font-size:13px;font-weight:800;color:#ef4444;">${display}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="kpi-input-wrap" style="margin-bottom:10px;">
+      <label>今日接客數（繳費＋異動）</label>
+      <span class="ki-icon">👥</span>
+      <input type="number" id="p_customers" placeholder="0">
+    </div>
+    <div class="kpi-input-wrap" style="margin-bottom:10px;">
+      <label>今日上線項目</label>
+      <span class="ki-icon">📋</span>
+      <input type="text" id="p_sold_items" placeholder="例：AQ999 x1, 好速 x0…">
+    </div>
+  `;
+  // 儲存暫存數據以便後續 submitPersonalFail 使用
+  window._pPending = { store, name, td, data, failed };
+}
 
-  // 今日未過關
-  const todayRecord16 = _loadReview(store, name, td, 16);
-  const todayRecord21 = _loadReview(store, name, td, 21);
-  todaySec.style.display = 'block';
-  document.getElementById('personalToday').innerHTML =
-    _renderTodayCards(todayRecord16, 16) + _renderTodayCards(todayRecord21, 21);
+function submitPersonalFail() {
+  if (!window._pPending) return;
+  const { store, name, td, data, failed } = window._pPending;
+  const extra = {
+    customers:     (document.getElementById('p_customers')?.value || '').trim(),
+    sold_items:    (document.getElementById('p_sold_items')?.value || '').trim(),
+    consult_store: (document.getElementById('p_consult_store')?.value || '').trim(),
+    consult_person:(document.getElementById('p_consult_person')?.value || '').trim(),
+    consult_method:(document.getElementById('p_consult_method')?.value || '').trim(),
+  };
+  _savePersonalRecord(store, name, td, personalSeg, data, failed, extra);
+  document.getElementById('personalFailSection').style.display = 'none';
+  window._pPending = null;
+  showToast('✅ 個人回報已儲存');
+  renderPersonal();
+}
 
-  // 近14天追蹤牆
-  histSec.style.display = 'block';
-  document.getElementById('personalHistory').innerHTML = _renderTrackWall(store, name, td);
+function _savePersonalRecord(store, name, date, seg, data, failed, extra) {
+  const record = { date, seg, store, name, data, failed: failed.map(f=>f.key), extra, ts: Date.now() };
+  localStorage.setItem(_reviewKey(store, name, date, seg), JSON.stringify(record));
+  // 同步到督導彙整用的公共索引
+  _updateSummaryIndex(store, name, date, seg, failed.length > 0);
+}
+
+function _updateSummaryIndex(store, name, date, seg, hasFail) {
+  const key = `pIdx_${date}_${seg}`;
+  let idx = {};
+  try { idx = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
+  if (!idx[store]) idx[store] = {};
+  idx[store][name] = hasFail;
+  localStorage.setItem(key, JSON.stringify(idx));
 }
 
 function _loadReview(store, name, date, seg) {
@@ -3123,93 +3268,120 @@ function _loadReview(store, name, date, seg) {
   } catch { return null; }
 }
 
-function _renderTodayCards(record, seg) {
-  if (!record) {
-    return `<div style="color:var(--text-muted);font-size:12px;padding:10px 0 4px;">${seg}:00 ─ 尚無檢討記錄</div>`;
+// ── 個人追蹤頁渲染 ──
+function renderPersonal() {
+  const store = document.getElementById('personalStore').value;
+  const name  = document.getElementById('personalName').value;
+  if (!store || !name) return;
+
+  const td = document.getElementById('fillDate').value || today();
+
+  // 今日記錄
+  const r16 = _loadReview(store, name, td, 16);
+  const r21 = _loadReview(store, name, td, 21);
+  const todaySec = document.getElementById('personalTodaySection');
+  todaySec.style.display = 'block';
+  document.getElementById('personalToday').innerHTML =
+    _renderTodayCard(r16, 16) + _renderTodayCard(r21, 21);
+
+  // 14天追蹤牆 + 連續警示
+  const histSec = document.getElementById('personalHistorySection');
+  histSec.style.display = 'block';
+  const { html, streaks } = _renderTrackWall(store, name, td);
+  document.getElementById('personalHistory').innerHTML = html;
+
+  // 連續未過關警示（頂部）
+  const alertEl = document.getElementById('personalStreakAlert');
+  if (streaks.length > 0) {
+    alertEl.style.display = 'block';
+    alertEl.innerHTML = streaks.map(s =>
+      `<div style="background:rgba(239,68,68,0.12);border:1.5px solid rgba(239,68,68,0.5);border-radius:10px;padding:10px 14px;font-size:13px;color:#f87171;font-weight:700;margin-bottom:8px;">
+        🔴 ${name} 的「${s.label}」已連續 <strong>${s.streak} 天</strong>未過關，請加速改善！
+      </div>`
+    ).join('');
+  } else {
+    alertEl.style.display = 'none';
   }
+}
+
+function _renderTodayCard(record, seg) {
+  if (!record) {
+    return `<div style="color:var(--text-muted);font-size:12px;padding:8px 0;">${seg}:00 ─ 尚未回報</div>`;
+  }
+  const { data, failed, extra } = record;
+  const allPass = !failed || failed.length === 0;
+  const statusColor = allPass ? '#22c55e' : '#ef4444';
+  const statusText  = allPass ? '✅ 全部過關' : `❌ ${failed.length} 項未過關`;
   return `
-    <div style="font-size:11px;color:var(--text-muted);margin:10px 0 6px;font-weight:700;">${seg}:00 回報</div>
-    ${record.reviews.map(r => `
-      <div class="review-item-card">
-        <div class="ri-header"><span class="ri-name">❌ ${r.label}</span></div>
-        ${r.reason ? `<div class="ri-sublabel">📌 原因</div><div style="font-size:12px;color:var(--text);padding:4px 0;">${r.reason}</div>` : ''}
-        ${r.plan   ? `<div class="ri-sublabel">🚀 明日計劃</div><div style="font-size:12px;color:var(--text);padding:4px 0;">${r.plan}</div>` : ''}
+    <div class="review-item-card" style="border-left-color:${statusColor};margin-bottom:10px;">
+      <div class="ri-header">
+        <span style="font-size:12px;font-weight:700;color:var(--text-dim);">${seg}:00 回報</span>
+        <span style="font-size:12px;font-weight:800;color:${statusColor};">${statusText}</span>
       </div>
-    `).join('')}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:8px 0;font-size:12px;">
+        <span style="color:var(--text-dim);">KPI <strong style="color:var(--text);">${data.kpi||0}</strong></span>
+        <span style="color:var(--text-dim);">達成率 <strong style="color:${(data.achieve||0)>=100?'#22c55e':'#ef4444'};">${data.achieve||0}%</strong></span>
+        <span style="color:var(--text-dim);">A999 <strong style="color:${(data.a999||0)>0?'#22c55e':'#ef4444'};">${data.a999||0}筆</strong></span>
+        <span style="color:var(--text-dim);">RT <strong style="color:var(--text);">${data.rt||0}</strong></span>
+        <span style="color:var(--text-dim);">好速 <strong style="color:${(data.haosu||0)>0?'#22c55e':'#ef4444'};">${data.haosu||0}筆</strong></span>
+        <span style="color:var(--text-dim);">保險 <strong style="color:${(data.insurance||0)>=70?'#22c55e':'#ef4444'};">${data.insurance||0}%</strong></span>
+      </div>
+      ${!allPass && extra ? `
+        <div style="border-top:1px solid var(--border-dim);padding-top:8px;margin-top:4px;font-size:11px;color:var(--text-dim);">
+          ${extra.customers ? `<div>👥 接客數：<span style="color:var(--text);">${extra.customers}</span></div>` : ''}
+          ${extra.sold_items ? `<div>📋 上線項目：<span style="color:var(--text);">${extra.sold_items}</span></div>` : ''}
+          ${extra.consult_store ? `<div>🏪 請益店點：<span style="color:var(--text);">${extra.consult_store}</span> ／ ${extra.consult_person||'—'}</div>` : ''}
+          ${extra.consult_method ? `<div>💡 請益做法：<span style="color:var(--text);">${extra.consult_method}</span></div>` : ''}
+        </div>
+      ` : ''}
+    </div>
   `;
 }
 
-function _renderTrackWall(store, name, today) {
-  // 產生近14天日期陣列
+function _renderTrackWall(store, name, todayStr) {
   const dates = [];
   for (let i = 13; i >= 0; i--) {
-    const d = new Date(today);
+    const d = new Date(todayStr);
     d.setDate(d.getDate() - i);
     dates.push(d.toISOString().slice(0, 10));
   }
 
-  // 統計每天的失敗數（16:00 + 21:00）
-  const dayStats = dates.map(date => {
-    const r16 = _loadReview(store, name, date, 16);
-    const r21 = _loadReview(store, name, date, 21);
-    const fails = (r16?.reviews?.length || 0) + (r21?.reviews?.length || 0);
-    const has16 = !!r16, has21 = !!r21;
-    return { date, fails, has16, has21 };
-  });
-
-  // 取所有出現過失敗的項目 key
-  const itemsSet = new Set();
-  dates.forEach(date => {
-    [16,21].forEach(seg => {
-      const r = _loadReview(store, name, date, seg);
-      (r?.reviews || []).forEach(rv => itemsSet.add(rv.label));
-    });
-  });
-  const items = [...itemsSet];
-
-  if (items.length === 0) {
-    return `<div style="color:var(--text-muted);font-size:13px;padding:16px;text-align:center;">🎉 近14天無未過關記錄！</div>`;
-  }
+  const itemLabels = PERSONAL_ITEMS.map(i => i.label);
+  const itemKeys   = PERSONAL_ITEMS.map(i => i.key);
 
   const dateLabels = `<div class="track-dates">${dates.map(d => `<span class="track-date-label">${d.slice(5)}</span>`).join('')}</div>`;
 
-  const rows = items.map(label => {
+  const rows = itemLabels.map((label, li) => {
+    const key = itemKeys[li];
     const cells = dates.map(date => {
       const failed = [16,21].some(seg => {
         const r = _loadReview(store, name, date, seg);
-        return (r?.reviews || []).some(rv => rv.label === label);
+        return r && r.failed && r.failed.includes(key);
       });
-      const isToday = date === today;
-      const cls = failed ? 'tc-fail' : 'tc-pass';
+      const hasData = [16,21].some(seg => !!_loadReview(store, name, date, seg));
+      const isToday = date === todayStr;
+      const cls = !hasData ? 'tc-empty' : failed ? 'tc-fail' : 'tc-pass';
       const todayCls = isToday ? ' tc-today' : '';
-      const txt = failed ? '✗' : '✓';
-      return `<div class="track-cell ${cls}${todayCls}" title="${date}">${txt}</div>`;
+      return `<div class="track-cell ${cls}${todayCls}" title="${date}">${!hasData?'·':failed?'✗':'✓'}</div>`;
     }).join('');
     return `<div class="track-row"><span class="track-row-label">${label}</span>${cells}</div>`;
   }).join('');
 
-  // 連續失敗警示
-  const streaks = items.map(label => {
+  // 連續失敗天數
+  const streaks = PERSONAL_ITEMS.map(item => {
     let streak = 0;
     for (let i = dates.length - 1; i >= 0; i--) {
       const failed = [16,21].some(seg => {
         const r = _loadReview(store, name, dates[i], seg);
-        return (r?.reviews || []).some(rv => rv.label === label);
+        return r && r.failed && r.failed.includes(item.key);
       });
       if (failed) streak++; else break;
     }
-    return { label, streak };
+    return { label: item.label, streak };
   }).filter(s => s.streak >= 2);
 
-  const alerts = streaks.length > 0
-    ? `<div style="margin-bottom:12px;">${streaks.map(s =>
-        `<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:#f87171;margin-bottom:6px;">
-          🔴 <strong>${s.label}</strong> 已連續 <strong>${s.streak} 天</strong>未過關，需重點關注！
-        </div>`
-      ).join('')}</div>`
-    : '';
-
-  return `${alerts}<div class="track-wall">${dateLabels}${rows}</div>`;
+  const html = `<div class="track-wall">${dateLabels}${rows}</div>`;
+  return { html, streaks };
 }
 
 </script>
