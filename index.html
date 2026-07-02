@@ -1700,9 +1700,9 @@
           <input type="number" id="p_kpi" placeholder="0" step="0.1">
         </div>
         <div class="kpi-input-wrap">
-          <label>達成率 %</label>
-          <span class="ki-icon">🎯</span>
-          <input type="number" id="p_achieve" placeholder="0.0" step="0.1">
+          <label>R999 上線（筆）</label>
+          <span class="ki-icon">📶</span>
+          <input type="number" id="p_achieve" placeholder="0" step="1">
         </div>
         <div class="kpi-input-wrap highlight">
           <label>A999 上線（筆）</label>
@@ -3069,7 +3069,7 @@ function doCopy() {
 const PERSONAL_ITEMS = [
   { key: 'a999',     label: 'A999 上線',   type: 'count' },
   { key: 'haosu',    label: '好速',         type: 'count' },
-  { key: 'achieve',  label: '達成率',       type: 'pct', th: 100 },
+  { key: 'achieve',  label: 'R999 上線',    type: 'count' },
   { key: 'insurance',label: '保險搭售率',   type: 'pct', th: 70  },
 ];
 
@@ -3335,7 +3335,7 @@ function _renderTodayCard(record, seg) {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:8px 0;font-size:12px;">
         <span style="color:var(--text-dim);">KPI <strong style="color:var(--text);">${data.kpi||0}</strong></span>
-        <span style="color:var(--text-dim);">達成率 <strong style="color:${(data.achieve||0)>=100?'#22c55e':'#ef4444'};">${data.achieve||0}%</strong></span>
+        <span style="color:var(--text-dim);">R999 <strong style="color:var(--text);">${data.achieve||0} 筆</strong></span>
         <span style="color:var(--text-dim);">A999 <strong style="color:${(data.a999||0)>0?'#22c55e':'#ef4444'};">${data.a999||0}筆</strong></span>
         <span style="color:var(--text-dim);">RT <strong style="color:var(--text);">${data.rt||0}</strong></span>
         <span style="color:var(--text-dim);">好速 <strong style="color:${(data.haosu||0)>0?'#22c55e':'#ef4444'};">${data.haosu||0}筆</strong></span>
