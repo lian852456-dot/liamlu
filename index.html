@@ -2071,15 +2071,9 @@ function switchTab(name) {
 // ════════════════════════════════════
 // SEG TOGGLE (FILL)
 // ════════════════════════════════════
-function setSeg(s) {
-  currentSeg = s;
-  document.getElementById('seg16').className = 'seg-btn' + (s===16?' active-16':'');
-  document.getElementById('seg21').className = 'seg-btn' + (s===21?' active-21':'');
-  loadStoreData();
-}
 function setSumSeg(s) {
   sumSeg = s;
-  ['sumSeg13','sumSeg16','sumSeg21'].forEach(id => {
+  ['sumSeg16','sumSeg21'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.className = 'seg-btn';
   });
@@ -2101,8 +2095,7 @@ function setPbSeg(s) {
 // FILL FORM
 // ════════════════════════════════════
 const FIELDS = [
-  'kpi','rank','prevRank','prevKpi',
-  'hang_score',
+  'kpi','rank',
   'acc','film','insurance',
   'myvideo','apple_google','hbo','netflix',
   '5g','aq_ttl','aq999','aq1399','rt_pts',
@@ -2115,30 +2108,6 @@ const FIELDS = [
   'tw_oppoa6x','tw_a27','tw_y21','tw_myfirst'
 ];
 
-function loadStoreData() {
-  const store = document.getElementById('fillStore').value;
-  if (!store) {
-    document.getElementById('fillFormArea').style.display = 'none';
-    document.getElementById('fillStoreNotice').textContent = '';
-    return;
-  }
-  document.getElementById('fillFormArea').style.display = 'block';
-  const date = document.getElementById('fillDate').value;
-  const notice = document.getElementById('fillStoreNotice');
-
-  if (NEW_STORES.includes(store)) {
-    notice.innerHTML = `<span style="color:var(--gold)">🆕 新店（6/25 起營業），如尚未開始，填報後數值填 0 即可。</span>`;
-  } else {
-    notice.textContent = '';
-  }
-
-  getData(date, store, currentSeg).then(data => {
-    FIELDS.forEach(f => {
-      const el = document.getElementById('f_' + f);
-      if (el) el.value = data ? (data[f] ?? '') : '';
-    });
-  });
-}
 
 function getFormData() {
   const obj = {};
@@ -2257,9 +2226,9 @@ async function renderSummary() {
       <div class="sc-sub">全區合計(筆)</div>
     </div>
     <div class="summary-card">
-      <div class="sc-label">好速銷售數</div>
-      <div class="sc-val" style="color:var(--accent-bright)">${haosuTotal}</div>
-      <div class="sc-sub">全區合計(筆)</div>
+      <div class="sc-label">好速銷售點數</div>
+      <div class="sc-val" style="color:var(--accent-bright)">${haosuTotal % 1 === 0 ? haosuTotal : haosuTotal.toFixed(2)}</div>
+      <div class="sc-sub">全區合計(點)</div>
     </div>
     <div class="summary-card">
       <div class="sc-label">R1399 上線數</div>
@@ -2659,8 +2628,6 @@ function _miniCelebFX(field, val) {
   }
 }
 
-// 覆蓋 setSeg 增加新 UI 同步
-const _origSetSeg = setSeg;
 function setSeg(s) {
   currentSeg = s;
   // 舊 seg toggle
@@ -3130,24 +3097,25 @@ function copyReport() {
   const date = document.getElementById('fillDate').value;
   const seg = currentSeg;
   const g = (id) => { const el = document.getElementById('f_' + id); return el ? (el.value || '—') : '—'; };
-  const pct = (v) => v === '—' || v === '' ? '—' : parseFloat(v).toFixed(1) + '%';
+  const fmtPct = (v) => v === '—' || v === '' ? '—' : parseFloat(v).toFixed(1) + '%';
+  const fmtNum = (v) => v === '—' || v === '' ? '—' : (parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(2));
   const line = '─────────────────────────';
   const rows = [
     `【${store} ${seg}:00 回報】${date}`,
     line,
-    `📊 KPI達成率   ${pct(g('kpi'))}   排名 #${g('rank')}`,
-    `🔄 提前續約    ${g('early_renew')} 件`,
-    `📡 RT締結率    ${g('rt_close_num')}/${g('rt_close_den')}  ${pct(g('rt_close_pct'))}`,
-    `☂️  保險搭售    ${g('insurance_num')}/${g('insurance_den')}  ${pct(g('insurance_pct'))}`,
-    `📱 設備佔比    ${g('device_num')}/${g('device_den')}  ${pct(g('device_ratio'))}`,
+    `📊 KPI達成率   ${fmtPct(g('kpi'))}   排名 #${g('rank')}`,
+    `🔄 提前續約    ${fmtNum(g('early_renew'))} 件`,
+    `📡 RT締結率    ${g('rt_close_num')}/${g('rt_close_den')}  ${fmtPct(g('rt_close_pct'))}`,
+    `☂️  保險搭售    ${g('insurance_num')}/${g('insurance_den')}  ${fmtPct(g('insurance_pct'))}`,
+    `📱 設備佔比    ${g('device_num')}/${g('device_den')}  ${fmtPct(g('device_ratio'))}`,
     line,
-    `⭐ A999        ${pct(g('aq999'))}`,
-    `👑 A1399       ${pct(g('aq1399'))}`,
-    `⚡ 好速         ${pct(g('haosu'))}`,
-    `📶 RT999       ${pct(g('rt999'))}`,
-    `🌐 RT1399      ${pct(g('rt1399'))}`,
-    `5️⃣  5G銷售     ${pct(g('5g'))}`,
-    `📡 AQ上線      ${pct(g('aq_ttl'))}`,
+    `⭐ A999        ${fmtNum(g('aq999'))} 筆`,
+    `👑 A1399       ${fmtNum(g('aq1399'))} 筆`,
+    `⚡ 好速         ${fmtNum(g('haosu'))} 點`,
+    `📶 RT999       ${fmtNum(g('rt999'))} 筆`,
+    `🌐 RT1399      ${fmtNum(g('rt1399'))} 筆`,
+    `5️⃣  5G銷售     ${fmtNum(g('5g'))} 筆`,
+    `📡 AQ上線      ${fmtNum(g('aq_ttl'))} 點`,
     line,
   ].join('\n');
   const preview = document.getElementById('copyPreview');
@@ -3515,6 +3483,53 @@ function _renderTrackWall(store, name, todayStr) {
 
   const html = `<div class="track-wall">${dateLabels}${rows}</div>`;
   return { html, streaks };
+}
+
+// ════════════════════════════════════
+// 個人檢討單 Modal（送出回報後自動觸發）
+// ════════════════════════════════════
+function triggerReviewModal(store, name, date, seg, data) {
+  const checks = [
+    { key: 'aq999',  label: 'A999 上線' },
+    { key: 'haosu',  label: '好速銷售' },
+    { key: 'rt1399', label: 'R1399 上線' },
+  ];
+  const zeros = checks.filter(c => !(parseFloat(data[c.key]) > 0));
+  if (zeros.length === 0) return;
+
+  document.getElementById('reviewModalTitle').textContent = `📋 ${name}・今日個人檢討單`;
+  document.getElementById('reviewModalSub').textContent = `以下重點項目今日為 0，請說明原因與明日行動計劃`;
+  document.getElementById('reviewForms').innerHTML = zeros.map(c => `
+    <div class="zero-field-group">
+      <label class="zero-label">❌ ${c.label} 為 0 — 原因說明 <span style="color:#ef4444">*</span></label>
+      <textarea id="rv_${c.key}" class="zero-textarea" placeholder="今日未開出的原因…" rows="2"></textarea>
+    </div>
+  `).join('') + `
+    <div class="zero-field-group">
+      <label class="zero-label">📅 明日行動計劃</label>
+      <textarea id="rv_plan" class="zero-textarea" placeholder="明天打算如何改善？" rows="2"></textarea>
+    </div>
+  `;
+  window._reviewPending = { store, name, date, seg, zeros };
+  document.getElementById('reviewModal').style.display = 'flex';
+}
+
+function skipReview() {
+  document.getElementById('reviewModal').style.display = 'none';
+  window._reviewPending = null;
+}
+
+function submitReview() {
+  if (!window._reviewPending) { skipReview(); return; }
+  const { store, name, date, seg, zeros } = window._reviewPending;
+  const reviewData = { plan: (document.getElementById('rv_plan')?.value || '').trim() };
+  zeros.forEach(c => {
+    reviewData[c.key] = (document.getElementById('rv_' + c.key)?.value || '').trim();
+  });
+  const key = `review_${store}_${name}_${date}_${seg}`;
+  localStorage.setItem(key, JSON.stringify({ store, name, date, seg, reviewData, ts: Date.now() }));
+  skipReview();
+  showToast('✅ 檢討單已儲存');
 }
 
 </script>
