@@ -1424,11 +1424,6 @@
         <span class="kpi-hot-badge">A1399</span>
       </div>
       <div class="kpi-input-wrap">
-        <label>預付卡開卡面額</label>
-        <span class="ki-icon">💳</span>
-        <input type="number" id="f_prepaid" placeholder="0" step="0.01">
-      </div>
-      <div class="kpi-input-wrap">
         <label>RT 上線點數</label>
         <span class="ki-icon">📶</span>
         <input type="number" id="f_rt_pts" placeholder="0" step="0.01">
@@ -1466,16 +1461,6 @@
       <div class="ks-line"></div>
     </div>
     <div class="form-grid">
-      <div class="kpi-input-wrap">
-        <label>換約淨新增金額</label>
-        <span class="ki-icon">💰</span>
-        <input type="number" id="f_contract_net" placeholder="0" step="0.01">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>空機/3C 及門市營收</label>
-        <span class="ki-icon">📦</span>
-        <input type="number" id="f_3c" placeholder="0" step="0.01">
-      </div>
       <div class="kpi-input-wrap">
         <label>配件及其他營收</label>
         <span class="ki-icon">🎧</span>
@@ -2110,9 +2095,9 @@ function setPbSeg(s) {
 const FIELDS = [
   'kpi','rank','prevRank','prevKpi',
   'hang_score',
-  'contract_net','3c','acc','film','insurance',
+  'acc','film','insurance',
   'myvideo','apple_google','hbo','netflix',
-  '5g','aq_ttl','aq999','aq1399','prepaid','rt_pts',
+  '5g','aq_ttl','aq999','aq1399','rt_pts',
   'special_renew','premium_renew','rt999','rt1399','haosu',
   'early_renew','rt_close_num','rt_close_den','rt_close_pct',
   'insurance_num','insurance_den','insurance_pct',
