@@ -206,3 +206,18 @@ test.describe('設定 Modal', () => {
     await expect(page.locator('#settingsModal')).not.toBeVisible();
   });
 });
+
+test.describe('個人追蹤 - 新增人員', () => {
+  test('新增人員後可被選擇且表單顯示', async ({ page }) => {
+    await page.goto(FILE_URL);
+    await page.click('button:has-text("個人追蹤")');
+    await page.click('button[onclick="openAddNameModal()"]');
+    await page.selectOption('#addNameStore', { index: 1 });
+    await page.fill('#addNameInput', '測試員工A');
+    await page.click('button[onclick="saveNewName()"]');
+    await page.waitForTimeout(200);
+    const name = await page.$eval('#personalName', el => el.value);
+    expect(name).toBe('測試員工A');
+    await expect(page.locator('#personalFormSection')).toBeVisible();
+  });
+});
