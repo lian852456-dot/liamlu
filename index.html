@@ -3119,8 +3119,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function onPersonalIdentityChange() {
   const store = document.getElementById('personalStore').value;
-  const name  = document.getElementById('personalName').value;
+  // refresh name list first, then restore selected name
   if (store) _refreshNameSelect(store);
+  const name  = document.getElementById('personalName').value;
   localStorage.setItem('personal_last_store', store);
   localStorage.setItem('personal_last_name', name);
   const formSec = document.getElementById('personalFormSection');
@@ -3154,7 +3155,12 @@ function saveNewName() {
   _refreshNameSelect(store);
   document.getElementById('personalName').value = name;
   closeAddNameModal();
-  onPersonalIdentityChange();
+  // save last selection and update UI without re-refreshing the select
+  localStorage.setItem('personal_last_store', store);
+  localStorage.setItem('personal_last_name', name);
+  const formSec = document.getElementById('personalFormSection');
+  if (formSec) { formSec.style.display = 'block'; }
+  renderPersonal();
   showToast(`✅ 已新增 ${name}`);
 }
 
