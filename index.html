@@ -1682,6 +1682,14 @@
     </div>
   </div>
 
+  <!-- 大盤表 - 台獎手機 -->
+  <div class="section-divider">🏅 台獎手機專區</div>
+  <div class="card" style="padding:14px 10px;">
+    <div class="table-wrap">
+      <table id="summaryTable3"></table>
+    </div>
+  </div>
+
   <!-- 零報說明彙整（21:00才顯示）-->
   <div id="zeroReportSection" style="display:none;"></div>
 
@@ -2316,6 +2324,25 @@ async function renderSummary() {
   ];
   renderSummaryTable('summaryTable2', date, sumSeg, cols2);
 
+  // Table 3: 台獎手機
+  const cols3 = [
+    {key:'tw_pixel10',    label:'Pixel 10系列',      isRaw:true},
+    {key:'tw_s26u',       label:'S26 Ultra',          isRaw:true},
+    {key:'tw_sharpr11',   label:'SHARP R11',          isRaw:true},
+    {key:'tw_vivo',       label:'vivo X300系列',      isRaw:true},
+    {key:'tw_s26',        label:'S26/S26+/A57',       isRaw:true},
+    {key:'tw_reno16f',    label:'Reno16 F',           isRaw:true},
+    {key:'tw_pixel10fold',label:'Pixel 10 Pro Fold',  isRaw:true},
+    {key:'tw_findx9s',    label:'Find X9s',           isRaw:true},
+    {key:'tw_sony1',      label:'SONY 1 VIII/razr',   isRaw:true},
+    {key:'tw_poketomo',   label:'SHARP Poketomo',     isRaw:true},
+    {key:'tw_oppoa6x',    label:'OPPO A6x',           isRaw:true},
+    {key:'tw_a27',        label:'A27 & A17',          isRaw:true},
+    {key:'tw_y21',        label:'Y21/Redmi 15 Pro',   isRaw:true},
+    {key:'tw_myfirst',    label:'兒錶',               isRaw:true},
+  ];
+  renderSummaryTable('summaryTable3', date, sumSeg, cols3);
+
   // 零報說明彙整（21:00）
   renderZeroReportSection(date, sumSeg, dayCache);
   // 個人未過關彙整
@@ -2498,10 +2525,31 @@ async function renderPlayback() {
     <div class="card" style="padding:14px 10px;">
       <div class="table-wrap"><table id="pbTable2"></table></div>
     </div>
+    <div class="section-divider">🏅 台獎手機專區</div>
+    <div class="card" style="padding:14px 10px;">
+      <div class="table-wrap"><table id="pbTable3"></table></div>
+    </div>
   `;
 
   renderSummaryTable('pbTable1', date, pbSeg, cols1);
   renderSummaryTable('pbTable2', date, pbSeg, cols2);
+  const colsTw = [
+    {key:'tw_pixel10',    label:'Pixel 10系列',      isRaw:true},
+    {key:'tw_s26u',       label:'S26 Ultra',          isRaw:true},
+    {key:'tw_sharpr11',   label:'SHARP R11',          isRaw:true},
+    {key:'tw_vivo',       label:'vivo X300系列',      isRaw:true},
+    {key:'tw_s26',        label:'S26/S26+/A57',       isRaw:true},
+    {key:'tw_reno16f',    label:'Reno16 F',           isRaw:true},
+    {key:'tw_pixel10fold',label:'Pixel 10 Pro Fold',  isRaw:true},
+    {key:'tw_findx9s',    label:'Find X9s',           isRaw:true},
+    {key:'tw_sony1',      label:'SONY 1 VIII/razr',   isRaw:true},
+    {key:'tw_poketomo',   label:'SHARP Poketomo',     isRaw:true},
+    {key:'tw_oppoa6x',    label:'OPPO A6x',           isRaw:true},
+    {key:'tw_a27',        label:'A27 & A17',          isRaw:true},
+    {key:'tw_y21',        label:'Y21/Redmi 15 Pro',   isRaw:true},
+    {key:'tw_myfirst',    label:'兒錶',               isRaw:true},
+  ];
+  renderSummaryTable('pbTable3', date, pbSeg, colsTw);
 }
 
 // ════════════════════════════════════
