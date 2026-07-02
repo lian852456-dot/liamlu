@@ -1459,35 +1459,10 @@
     </div>
 
     <div class="kpi-section-title">
-      <span class="ks-icon">🔗</span> 加掛類得分
+      <span class="ks-icon">🔗</span> 加掛類
       <div class="ks-line"></div>
     </div>
     <div class="form-grid">
-      <div class="kpi-input-wrap">
-        <label>加掛類猶得分</label>
-        <span class="ki-icon">🎯</span>
-        <input type="number" id="f_hang_score" placeholder="0.00" step="0.01">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>前日加掛得分</label>
-        <span class="ki-icon">📅</span>
-        <input type="number" id="f_hang_prev" placeholder="0.00" step="0.01">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>加掛得分增減</label>
-        <span class="ki-icon">↕️</span>
-        <input type="number" id="f_hang_delta" placeholder="0.00" step="0.01">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>Device 專案銷售（筆）</label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_device_proj" placeholder="0">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>重點 Device 銷售量（筆）</label>
-        <span class="ki-icon">🔑</span>
-        <input type="number" id="f_device_key" placeholder="0">
-      </div>
       <div class="kpi-input-wrap">
         <label>換約淨新增金額</label>
         <span class="ki-icon">💰</span>
@@ -1535,7 +1510,97 @@
       </div>
     </div>
 
-    <!-- 主力 KPI（重點欄位） -->
+    <!-- 台獎手機專區 -->
+    <div class="kpi-section-title" style="margin-top:18px;">
+      <span class="ks-icon">🏅</span> 台獎手機專區
+      <div class="ks-line"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;padding:0 2px;">填寫今日各機款銷售筆數（0可不填）</div>
+
+    <!-- KPI 高SD - 黃底 -->
+    <div style="font-size:11px;font-weight:700;color:#b8860b;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);border-radius:6px;padding:4px 10px;margin-bottom:6px;">KPI 高SD</div>
+    <div class="form-grid">
+      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
+        <label style="color:#b8860b;">Pixel 10/10 Pro/10 Pro XL/10a</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_pixel10" placeholder="0" step="1">
+      </div>
+      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
+        <label style="color:#b8860b;">S26 Ultra</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_s26u" placeholder="0" step="1">
+      </div>
+      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
+        <label style="color:#b8860b;">SHARP R11</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_sharpr11" placeholder="0" step="1">
+      </div>
+      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
+        <label style="color:#b8860b;">vivo X300/X300 Pro/V70 FE</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_vivo" placeholder="0" step="1">
+      </div>
+      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
+        <label style="color:#b8860b;">S26/S26+/A57</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_s26" placeholder="0" step="1">
+      </div>
+      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
+        <label style="color:#b8860b;">Reno16 F</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_reno16f" placeholder="0" step="1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>Pixel 10 Pro Fold</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_pixel10fold" placeholder="0" step="1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>Find X9s</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_findx9s" placeholder="0" step="1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>SONY 1 VIII &amp; moto razr fold（動店）</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_sony1" placeholder="0" step="1">
+      </div>
+      <div class="kpi-input-wrap">
+        <label>SHARP Poketomo</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_poketomo" placeholder="0" step="1">
+      </div>
+    </div>
+
+    <!-- KPI 中SD - 黃底 -->
+    <div style="font-size:11px;font-weight:700;color:#b8860b;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);border-radius:6px;padding:4px 10px;margin:8px 0 6px;">KPI 中SD</div>
+    <div class="form-grid">
+      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
+        <label style="color:#b8860b;">OPPO A6x 6G/128G</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_oppoa6x" placeholder="0" step="1">
+      </div>
+      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
+        <label style="color:#b8860b;">A27 &amp; A17</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_a27" placeholder="0" step="1">
+      </div>
+      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
+        <label style="color:#b8860b;">Y21 &amp; Redmi Note 15 Pro</label>
+        <span class="ki-icon">📱</span>
+        <input type="number" id="f_tw_y21" placeholder="0" step="1">
+      </div>
+    </div>
+
+    <!-- KPI 穿戴 -->
+    <div style="font-size:11px;font-weight:700;color:#6b7280;background:rgba(107,114,128,0.1);border:1px solid rgba(107,114,128,0.3);border-radius:6px;padding:4px 10px;margin:8px 0 6px;">KPI 穿戴</div>
+    <div class="form-grid">
+      <div class="kpi-input-wrap">
+        <label>myFirst兒錶 &amp; 咖波TCL兒錶（動店）</label>
+        <span class="ki-icon">⌚</span>
+        <input type="number" id="f_tw_myfirst" placeholder="0" step="1">
+      </div>
+    </div>
 
     <!-- 儲存 -->
     <div class="save-btn-wrap">
@@ -2041,14 +2106,17 @@ function setPbSeg(s) {
 // ════════════════════════════════════
 const FIELDS = [
   'kpi','rank','prevRank','prevKpi',
-  'hang_score','hang_prev','hang_delta',
-  'device_proj','device_key','contract_net','3c','acc','film','insurance',
+  'hang_score',
+  'contract_net','3c','acc','film','insurance',
   'myvideo','apple_google','hbo','netflix',
   '5g','aq_ttl','aq999','aq1399','prepaid','rt_pts',
   'special_renew','premium_renew','rt999','rt1399','haosu',
   'early_renew','rt_close_num','rt_close_den','rt_close_pct',
   'insurance_num','insurance_den','insurance_pct',
-  'device_num','device_den','device_ratio'
+  'device_num','device_den','device_ratio',
+  'tw_pixel10','tw_s26u','tw_sharpr11','tw_vivo','tw_s26','tw_reno16f',
+  'tw_pixel10fold','tw_findx9s','tw_sony1','tw_poketomo',
+  'tw_oppoa6x','tw_a27','tw_y21','tw_myfirst'
 ];
 
 function loadStoreData() {
