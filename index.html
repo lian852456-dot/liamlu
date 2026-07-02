@@ -1835,9 +1835,9 @@ const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南
 const NEW_STORES = ['杭州南']; // 新開幕，6/25起
 const KPI_THRESHOLDS = {
   kpi: 80, hang_score: 10, device_proj: 80, device_key: 80,
-  contract_net: 80, '3c': 80, acc: 80, film: 70, insurance: 70,
+  acc: 80, film: 70, insurance: 70,
   myvideo: 80, apple_google: 80, hbo: 80, netflix: 80,
-  '5g': 80, aq_ttl: 80, aq999: 80, aq1399: 80, prepaid: 80,
+  '5g': 80, aq_ttl: 80, aq999: 80, aq1399: 80,
   rt_pts: 80, special_renew: 80, premium_renew: 80, rt999: 80, rt1399: 80, haosu: 80
 };
 
@@ -2293,7 +2293,6 @@ async function renderSummary() {
     {key:'aq_ttl', label:'AQ上線(筆)', isRaw:true},
     {key:'aq999', label:'AQ V+D 999(筆)', isRaw:true},
     {key:'aq1399', label:'AQ V+D 1399(筆)', isRaw:true},
-    {key:'prepaid', label:'預付卡(筆)', isRaw:true},
     {key:'rt_pts', label:'RT上線(筆)', isRaw:true},
     {key:'special_renew', label:'特殊維繫(筆)', isRaw:true},
     {key:'premium_renew', label:'高高特維(筆)', isRaw:true},
@@ -2307,10 +2306,6 @@ async function renderSummary() {
   const cols2 = [
     {key:'hang_score', label:'加掛得分', th:10, isScore:true},
     {key:'hang_delta', label:'增減', isDelta:true},
-    {key:'device_proj', label:'Device專案(筆)', isRaw:true},
-    {key:'device_key', label:'重點Device(筆)', isRaw:true},
-    {key:'contract_net', label:'換約淨增(筆)', isRaw:true},
-    {key:'3c', label:'空機/3C(元)', isRaw:true},
     {key:'acc', label:'配件(元)', isRaw:true},
     {key:'film', label:'包膜保貼(筆)', isRaw:true},
     {key:'insurance', label:'手機保險(筆)', isRaw:true},
@@ -2480,8 +2475,6 @@ async function renderPlayback() {
   ];
   const cols2 = [
     {key:'hang_score', label:'加掛得分', th:10, isScore:true},
-    {key:'device_proj', label:'Device專案(筆)', isRaw:true},
-    {key:'contract_net', label:'換約淨增(筆)', isRaw:true},
     {key:'insurance', label:'手機保險(筆)', isRaw:true},
     {key:'film', label:'包膜保貼(筆)', isRaw:true},
     {key:'netflix', label:'Netflix(筆)', isRaw:true},
