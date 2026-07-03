@@ -2448,35 +2448,82 @@ function renderPersonalFailSummary(date, seg) {
   let idx = {};
   try { idx = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
 
-  // collect stores that have at least one failure
+  const segLabel = seg === 16 ? '16:00' : '21:00';
+  const itemLabelMap = Object.fromEntries(PERSONAL_ITEMS.map(i => [i.key, i.label]));
+
   const storeRows = STORES.map(store => {
     const storeData = idx[store];
     if (!storeData) return null;
-    const failNames = Object.entries(storeData).filter(([,hasFail]) => hasFail).map(([n]) => n);
-    const passNames = Object.entries(storeData).filter(([,hasFail]) => !hasFail).map(([n]) => n);
-    if (failNames.length === 0 && passNames.length === 0) return null;
-    return { store, failNames, passNames };
+    const entries = Object.entries(storeData);
+    if (!entries.length) return null;
+    const failNames = entries.filter(([,hasFail]) => hasFail).map(([n]) => n);
+    const passNames = entries.filter(([,hasFail]) => !hasFail).map(([n]) => n);
+
+    // 讀取每位未過關人員的詳細記錄
+    const failDetails = failNames.map(name => {
+      const r = _loadReview(store, name, date, seg);
+      return { name, r };
+    });
+
+    return { store, failDetails, passNames };
   }).filter(Boolean);
 
   if (storeRows.length === 0) { el.style.display = 'none'; return; }
 
-  const segLabel = seg === 16 ? '16:00' : '21:00';
   el.style.display = 'block';
   el.innerHTML = `
-    <div class="section-divider" style="margin-top:16px;">👤 個人未過關彙整（${segLabel}）</div>
-    ${storeRows.map(({store, failNames, passNames}) => `
-      <div class="zero-report-card">
-        <div class="zrc-store">${store}</div>
-        ${failNames.length > 0 ? `
-          <div class="zrc-row">
-            <span class="zrc-label" style="color:#e74c3c;">❌ 未過關</span>
-            <span class="zrc-val">${failNames.join('、')}</span>
-          </div>` : ''}
+    <div class="section-divider" style="margin-top:16px;">👤 個人回報彙整（${segLabel}）</div>
+    ${storeRows.map(({ store, failDetails, passNames }) => `
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+        <div style="font-size:15px;font-weight:800;color:var(--accent-bright);margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #fed7aa;">
+          🏪 ${store}
+          <span style="float:right;font-size:12px;font-weight:600;color:var(--text-muted);">
+            ${failDetails.length > 0 ? `❌ ${failDetails.length} 人未過關` : ''}
+            ${passNames.length > 0 ? `　✅ ${passNames.length} 人過關` : ''}
+          </span>
+        </div>
+
         ${passNames.length > 0 ? `
-          <div class="zrc-row">
-            <span class="zrc-label" style="color:#27ae60;">✅ 過關</span>
-            <span class="zrc-val">${passNames.join('、')}</span>
+          <div style="font-size:12px;color:#16a34a;font-weight:600;margin-bottom:10px;padding:6px 10px;background:#f0fdf4;border-radius:8px;">
+            ✅ 過關：${passNames.join('、')}
           </div>` : ''}
+
+        ${failDetails.map(({ name, r }) => `
+          <div style="background:#fff5f5;border:1px solid #fecaca;border-left:3px solid #ef4444;border-radius:8px;padding:12px;margin-bottom:8px;">
+            <div style="font-size:14px;font-weight:800;color:#dc2626;margin-bottom:8px;">❌ ${name}</div>
+
+            ${r ? `
+              <!-- 未過關項目 -->
+              ${r.failed && r.failed.length > 0 ? `
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+                  ${r.failed.map(k => {
+                    const item = PERSONAL_ITEMS.find(i => i.key === k);
+                    const v = r.data?.[k];
+                    const display = item?.type === 'pct' ? (v != null ? parseFloat(v).toFixed(1)+'%' : '0%') : (v != null ? v+'筆' : '0筆');
+                    return `<span style="background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;">
+                      ${itemLabelMap[k] || k}：${display}
+                    </span>`;
+                  }).join('')}
+                </div>` : ''}
+
+              <!-- 請益資訊 -->
+              ${r.extra?.consult_store || r.extra?.consult_person ? `
+                <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">
+                  🏪 請益：<strong>${r.extra.consult_store || '—'}</strong>
+                  ${r.extra.consult_person ? `／ <strong>${r.extra.consult_person}</strong>` : ''}
+                </div>` : ''}
+
+              <!-- 請益做法 -->
+              ${r.extra?.consult_method ? `
+                <div style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px;color:var(--text);line-height:1.6;">
+                  💡 ${r.extra.consult_method}
+                </div>` : `
+                <div style="font-size:12px;color:#9ca3af;font-style:italic;">（尚未填寫請益做法）</div>`}
+            ` : `
+              <div style="font-size:12px;color:#9ca3af;font-style:italic;">（未過關但尚未填寫說明）</div>
+            `}
+          </div>
+        `).join('')}
       </div>
     `).join('')}
   `;
