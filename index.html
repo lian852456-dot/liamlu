@@ -2543,49 +2543,64 @@ function renderStorePersonalDetail(date, seg, dayCache) {
   const pIdx = (() => { try { return JSON.parse(localStorage.getItem(`pIdx_${date}_${seg}`) || '{}'); } catch { return {}; } })();
   const itemLabelMap = Object.fromEntries(PERSONAL_ITEMS.map(i => [i.key, i.label]));
 
-  const storeCards = STORES.map(store => {
-    const d = dayCache[store];
+  const fmt = (v, isP) => {
+    const n = parseFloat(v);
+    return isNaN(n) ? '—' : (isP ? n.toFixed(1)+'%' : n % 1 === 0 ? n : n.toFixed(1));
+  };
+  const kpiColor = (v, th=100) => parseFloat(v) >= th ? '#16a34a' : parseFloat(v) >= th*0.8 ? '#d97706' : '#dc2626';
+
+  // ══════════════════════════════════════
+  // 區塊一：店點未過關（零報說明）
+  // ══════════════════════════════════════
+  const zeroStores = seg === 21 ? STORES.filter(s => {
+    const d = dayCache[s];
+    return d && d.zero_reason;
+  }) : [];
+
+  let zeroSection = '';
+  if (seg === 21) {
+    if (zeroStores.length === 0) {
+      zeroSection = `
+        <div class="section-divider" style="margin-top:16px;">🔴 店點零報說明（${segLabel}）</div>
+        <div style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:12px;padding:16px;text-align:center;color:#9ca3af;font-size:14px;">
+          目前無零報店點 🎉
+        </div>`;
+    } else {
+      const zeroCards = zeroStores.map(store => {
+        const d = dayCache[store];
+        return `
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+            <div style="font-size:15px;font-weight:800;color:#92400e;margin-bottom:8px;">🏪 ${store}</div>
+            <div style="font-size:13px;color:#713f12;line-height:1.9;">
+              <div>① 零報原因：${d.zero_reason}</div>
+              ${d.zero_consult ? `<div>② 請益對象：${d.zero_consult}</div>` : ''}
+              ${d.zero_method  ? `<div>③ 改善做法：${d.zero_method}</div>` : ''}
+              ${d.zero_plan    ? `<div>④ 明日計劃：${d.zero_plan}</div>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+      zeroSection = `
+        <div class="section-divider" style="margin-top:16px;">🔴 店點零報說明（${segLabel}）— 共 ${zeroStores.length} 間</div>
+        ${zeroCards}`;
+    }
+  }
+
+  // ══════════════════════════════════════
+  // 區塊二：個人未過關（含店點統整）
+  // ══════════════════════════════════════
+  const storeFailRows = STORES.map(store => {
     const pData = pIdx[store];
-    if (!d && !pData) return null;
-
-    // ── 店點關鍵數字 ──
-    const fmt = (v, isP) => {
-      const n = parseFloat(v);
-      return isNaN(n) ? '—' : (isP ? n.toFixed(1)+'%' : n % 1 === 0 ? n : n.toFixed(1));
-    };
-    const kpiColor = (v, th=100) => parseFloat(v) >= th ? '#16a34a' : parseFloat(v) >= th*0.8 ? '#d97706' : '#dc2626';
-
-    const storeMetrics = d ? `
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-        <span style="font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:3px 10px;border-radius:20px;color:${kpiColor(d.kpi)};">KPI ${fmt(d.kpi,true)}</span>
-        <span style="font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:3px 10px;border-radius:20px;color:#1d4ed8;">A999 ${fmt(d.aq999)} 筆</span>
-        <span style="font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:3px 10px;border-radius:20px;color:#7c3aed;">好速 ${fmt(d.haosu)} 點</span>
-        <span style="font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:3px 10px;border-radius:20px;color:#0891b2;">R1399 ${fmt(d.rt1399)} 筆</span>
-        ${d.insurance_pct ? `<span style="font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:3px 10px;border-radius:20px;color:${kpiColor(d.insurance_pct,70)};">保險 ${fmt(d.insurance_pct,true)}</span>` : ''}
-      </div>` : `<div style="font-size:12px;color:#9ca3af;margin-bottom:8px;">（尚未填報）</div>`;
-
-    // ── 零報說明（21:00）──
-    const zeroBlock = (seg === 21 && d && d.zero_reason) ? `
-      <div style="background:#fef9c3;border:1px solid #fde047;border-left:3px solid #eab308;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
-        <div style="font-size:12px;font-weight:800;color:#854d0e;margin-bottom:6px;">🔴 零報說明</div>
-        <div style="font-size:12px;color:#713f12;line-height:1.7;">
-          <div>① 原因：${d.zero_reason}</div>
-          ${d.zero_consult ? `<div>② 請益：${d.zero_consult}</div>` : ''}
-          ${d.zero_method  ? `<div>③ 做法：${d.zero_method}</div>` : ''}
-          ${d.zero_plan    ? `<div>④ 計劃：${d.zero_plan}</div>` : ''}
-        </div>
-      </div>` : '';
-
-    // ── 個人明細 ──
-    const people = pData ? Object.entries(pData) : [];
+    if (!pData) return null;
+    const people = Object.entries(pData);
     const passNames = people.filter(([,f]) => !f).map(([n]) => n);
     const failEntries = people.filter(([,f]) => f).map(([n]) => {
       const r = _loadReview(store, n, date, seg);
       return { name: n, r };
     });
+    if (passNames.length === 0 && failEntries.length === 0) return null;
 
     const passBlock = passNames.length > 0 ? `
-      <div style="font-size:12px;color:#16a34a;font-weight:600;margin-bottom:8px;padding:5px 10px;background:#f0fdf4;border-radius:8px;">
+      <div style="font-size:13px;color:#16a34a;font-weight:600;margin-bottom:8px;padding:6px 12px;background:#f0fdf4;border-radius:8px;">
         ✅ 過關：${passNames.join('、')}
       </div>` : '';
 
@@ -2610,27 +2625,36 @@ function renderStorePersonalDetail(date, seg, dayCache) {
           `<div style="font-size:12px;color:#9ca3af;font-style:italic;">（尚未填寫請益做法）</div>`}
       </div>`).join('');
 
-    const hasPersonal = passNames.length > 0 || failEntries.length > 0;
+    // 店點數字小標籤
+    const d = dayCache[store];
+    const storeTag = d ? `
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">
+        <span style="font-size:11px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:2px 8px;border-radius:16px;color:${kpiColor(d.kpi)};">KPI ${fmt(d.kpi,true)}</span>
+        <span style="font-size:11px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:2px 8px;border-radius:16px;color:#1d4ed8;">A999 ${fmt(d.aq999)}筆</span>
+        <span style="font-size:11px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:2px 8px;border-radius:16px;color:#7c3aed;">好速 ${fmt(d.haosu)}點</span>
+      </div>` : '';
 
     return `
-      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
-        <div style="font-size:16px;font-weight:800;color:var(--accent-bright);margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #fed7aa;">
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+        <div style="font-size:15px;font-weight:800;color:var(--accent-bright);margin-bottom:8px;padding-bottom:8px;border-bottom:2px solid #fed7aa;">
           🏪 ${store}
-          <span style="float:right;font-size:11px;font-weight:600;color:var(--text-muted);">${segLabel}</span>
+          <span style="float:right;font-size:11px;font-weight:500;color:var(--text-muted);">${segLabel}</span>
         </div>
-        ${storeMetrics}
-        ${zeroBlock}
-        ${hasPersonal ? `
-          <div style="font-size:12px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 8px;">👤 個人回報</div>
-          ${passBlock}${failBlock}` : ''}
+        ${storeTag}
+        ${passBlock}${failBlock}
       </div>`;
   }).filter(Boolean);
 
-  if (!storeCards.length) { el.style.display = 'none'; return; }
+  const personalSection = storeFailRows.length === 0 ? `
+    <div class="section-divider" style="margin-top:16px;">👤 個人回報未過關彙整（${segLabel}）</div>
+    <div style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:12px;padding:16px;text-align:center;color:#9ca3af;font-size:14px;">
+      尚無個人回報資料<br><span style="font-size:12px;">請同仁至「個人回報」頁填寫後才會顯示</span>
+    </div>` : `
+    <div class="section-divider" style="margin-top:16px;">👤 個人回報未過關彙整（${segLabel}）— ${storeFailRows.length} 間有回報</div>
+    ${storeFailRows.join('')}`;
+
   el.style.display = 'block';
-  el.innerHTML = `
-    <div class="section-divider" style="margin-top:16px;">📋 各店回報明細（${segLabel}）</div>
-    ${storeCards.join('')}`;
+  el.innerHTML = zeroSection + personalSection;
   updateMarquee();
 }
 
