@@ -111,6 +111,12 @@ function writeData(date, store, seg, data) {
   }
 }
 
+function toDateStr(v) {
+  if (!v && v !== 0) return '';
+  if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Taipei', 'yyyy-MM-dd');
+  return String(v).substring(0, 10);
+}
+
 function readData(date, seg) {
   const sh = getSheet();
   const allData = sh.getDataRange().getValues();
@@ -122,10 +128,13 @@ function readData(date, seg) {
   const result = {};
   for (let i = 1; i < allData.length; i++) {
     const r = allData[i];
-    if (String(r[dateIdx]) === String(date) && Number(r[segIdx]) === Number(seg)) {
+    if (toDateStr(r[dateIdx]) === date && Number(r[segIdx]) === Number(seg)) {
       const store = r[storeIdx];
       const obj = {};
-      headers.forEach((h, idx) => { obj[h] = r[idx]; });
+      headers.forEach((h, idx) => {
+        const v = r[idx];
+        obj[h] = (v instanceof Date) ? toDateStr(v) : v;
+      });
       result[store] = obj;
     }
   }
