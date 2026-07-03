@@ -6,35 +6,35 @@
 <title>北一二B 每日回報系統</title>
 <style>
   :root {
-    /* 台灣大哥大配色 */
-    --bg-deep: #111111;
-    --bg-card: #1a1a1a;
-    --bg-panel: #242424;
-    --bg-row-alt: #1e1e1e;
-    --accent: #ff6600;
-    --accent-bright: #ff8533;
-    --accent-glow: rgba(255,102,0,0.15);
-    --gold: #ff6600;
-    --gold-bright: #ff8533;
-    --green: #22c55e;
-    --green-bright: #4ade80;
-    --red: #ef4444;
-    --red-soft: rgba(239,68,68,0.15);
-    --green-soft: rgba(34,197,94,0.12);
-    --warn: #f59e0b;
-    --purple: #ff6600;
-    --pink: #ff8533;
-    --cyan: #ffaa55;
-    --text: #f0f0f0;
-    --text-dim: #b8b8b8;
-    --text-muted: #707070;
-    --border: rgba(255,102,0,0.25);
-    --border-dim: rgba(255,255,255,0.08);
+    /* 戰情室配色 */
+    --bg-deep: #07101e;
+    --bg-card: #0e1d33;
+    --bg-panel: #152840;
+    --bg-row-alt: #0c1a2e;
+    --accent: #00d4ff;
+    --accent-bright: #33ddff;
+    --accent-glow: rgba(0,212,255,0.15);
+    --gold: #ff9500;
+    --gold-bright: #ffb347;
+    --green: #00e878;
+    --green-bright: #33ff99;
+    --red: #ff3a4a;
+    --red-soft: rgba(255,58,74,0.15);
+    --green-soft: rgba(0,232,120,0.12);
+    --warn: #ff9500;
+    --purple: #a78bfa;
+    --pink: #f472b6;
+    --cyan: #00d4ff;
+    --text: #e8f4f8;
+    --text-dim: #9ab8cc;
+    --text-muted: #4a6a82;
+    --border: rgba(0,212,255,0.25);
+    --border-dim: rgba(0,212,255,0.1);
     --radius: 12px;
     --font: 'Segoe UI', 'Noto Sans TC', sans-serif;
-    --tmo-orange: #ff6600;
-    --tmo-orange-light: #ff8533;
-    --tmo-orange-dark: #cc5200;
+    --tmo-orange: #ff9500;
+    --tmo-orange-light: #ffb347;
+    --tmo-orange-dark: #cc7700;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -43,13 +43,13 @@
     background: var(--bg-deep);
     color: var(--text);
     font-family: var(--font);
-    font-size: 15px;
+    font-size: 16px;
     min-height: 100vh;
   }
 
   /* ── HEADER ── */
   .site-header {
-    background: linear-gradient(135deg, #111111 0%, #1a1111 100%);
+    background: linear-gradient(135deg, #07101e 0%, #0a1a30 60%, #0d1f3a 100%);
     border-bottom: 1px solid var(--border);
     padding: 14px 20px;
     display: flex;
@@ -101,8 +101,8 @@
   }
   .tab-btn:hover { color: var(--text-dim); }
   .tab-btn.active {
-    color: #ff8533;
-    border-bottom-color: #ff6600;
+    color: var(--accent-bright);
+    border-bottom-color: var(--accent);
   }
 
   /* ── PANELS ── */
@@ -118,7 +118,7 @@
     margin-bottom: 16px;
   }
   .card-title {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--accent-bright);
     text-transform: uppercase;
@@ -210,14 +210,14 @@
     font-size: 13px;
   }
   thead th {
-    background: #0d1529;
+    background: #071020;
     color: var(--accent-bright);
     font-weight: 700;
     padding: 10px 8px;
     text-align: center;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: 0.3px;
   }
   tbody tr {
@@ -227,9 +227,10 @@
   tbody tr:nth-child(even) { background: var(--bg-row-alt); }
   tbody tr:hover { background: rgba(59,130,246,0.07); }
   tbody td {
-    padding: 9px 8px;
+    padding: 10px 8px;
     text-align: center;
     white-space: nowrap;
+    font-size: 14px;
   }
   td.store-name {
     text-align: left;
@@ -418,9 +419,9 @@
     .site-header { padding: 10px 14px; }
     .panel { padding: 14px; }
     .form-grid { grid-template-columns: 1fr 1fr; }
-    .tab-btn { padding: 10px 12px; font-size: 12px; }
-    table { font-size: 11px; }
-    thead th, tbody td { padding: 7px 5px; }
+    .tab-btn { padding: 10px 12px; font-size: 13px; }
+    table { font-size: 13px; }
+    thead th, tbody td { padding: 8px 5px; }
   }
 
   /* ══ FILL PANEL 美化 ══ */
@@ -815,7 +816,7 @@
   }
   #celebModal.show { display: flex; }
   .celeb-box {
-    background: linear-gradient(135deg, #1a1111 0%, #111111 60%, #1a0e00 100%);
+    background: linear-gradient(135deg, #071528 0%, #0a1e38 60%, #071020 100%);
     border: 2px solid transparent;
     border-radius: 20px;
     padding: 32px 28px 24px;
@@ -876,8 +877,8 @@
 
   /* ── 填報區美化 ── */
   .fill-hero {
-    background: linear-gradient(135deg, #1a1111 0%, #221100 50%, #1a1111 100%);
-    border: 1px solid rgba(255,102,0,0.3);
+    background: linear-gradient(135deg, #071528 0%, #0d2040 50%, #071528 100%);
+    border: 1px solid rgba(0,212,255,0.2);
     border-radius: 14px;
     padding: 20px;
     margin-bottom: 14px;
@@ -888,7 +889,7 @@
     content: '';
     position: absolute; top: -40px; right: -40px;
     width: 150px; height: 150px;
-    background: radial-gradient(circle, rgba(255,102,0,0.15) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(0,212,255,0.12) 0%, transparent 70%);
     pointer-events: none;
   }
   .fill-hero-title {
@@ -919,20 +920,20 @@
     position: relative;
   }
   .store-card:hover {
-    border-color: rgba(255,102,0,0.6);
+    border-color: rgba(0,212,255,0.6);
     color: var(--text);
     transform: translateY(-2px);
   }
   .store-card.selected {
-    background: linear-gradient(135deg, rgba(255,102,0,0.25), rgba(255,133,51,0.15));
-    border-color: #ff6600;
+    background: linear-gradient(135deg, rgba(0,212,255,0.18), rgba(0,180,220,0.08));
+    border-color: var(--accent);
     color: #fff;
-    box-shadow: 0 0 14px rgba(255,102,0,0.4);
+    box-shadow: 0 0 16px rgba(0,212,255,0.4);
   }
   .store-card.new-badge::after {
     content: 'NEW';
     position: absolute; top: 3px; right: 3px;
-    background: #f59e0b; color: #000;
+    background: var(--gold); color: #000;
     font-size: 8px; font-weight: 900;
     padding: 1px 4px; border-radius: 4px;
   }
@@ -956,39 +957,40 @@
   .seg-card.sel-16 .seg-time { color: #ff8533; }
   .seg-card.sel-16 .seg-label { color: #ff6600; }
   .seg-card.sel-21 {
-    background: linear-gradient(135deg,rgba(255,255,255,.1),rgba(200,200,200,.05));
-    border-color: #aaaaaa;
-    box-shadow: 0 0 16px rgba(255,255,255,.1);
+    background: linear-gradient(135deg,rgba(0,212,255,.12),rgba(0,180,220,.05));
+    border-color: var(--accent);
+    box-shadow: 0 0 16px rgba(0,212,255,.2);
   }
-  .seg-card.sel-21 .seg-time { color: #ffffff; }
-  .seg-card.sel-21 .seg-label { color: #cccccc; }
+  .seg-card.sel-21 .seg-time { color: var(--accent-bright); }
+  .seg-card.sel-21 .seg-label { color: var(--accent); }
 
   /* ── KPI 輸入卡片 ── */
   .kpi-section-title {
     display: flex; align-items: center; gap: 8px;
-    font-size: 11px; font-weight: 800;
+    font-size: 12px; font-weight: 800;
     text-transform: uppercase; letter-spacing: 1.5px;
-    color: var(--text-muted); margin: 16px 0 10px;
+    color: var(--accent); margin: 16px 0 10px;
+    opacity: 0.85;
   }
-  .kpi-section-title .ks-line { flex:1; height:1px; background:rgba(255,255,255,0.06); }
+  .kpi-section-title .ks-line { flex:1; height:1px; background:rgba(0,212,255,0.15); }
   .kpi-section-title .ks-icon { font-size: 14px; }
 
   /* 輸入框脈衝光圈（焦點時） */
   .kpi-input-wrap { position: relative; }
   .kpi-input-wrap input {
-    background: rgba(15,24,42,0.8);
-    border: 1.5px solid rgba(255,255,255,0.08);
+    background: rgba(7,16,32,0.8);
+    border: 1.5px solid rgba(0,212,255,0.12);
     border-radius: 8px;
     color: var(--text);
     padding: 10px 12px 10px 36px;
-    font-size: 14px; font-weight: 700;
+    font-size: 15px; font-weight: 700;
     width: 100%;
     transition: border-color .2s, box-shadow .2s;
   }
   .kpi-input-wrap input:focus {
     outline: none;
-    border-color: #ff6600;
-    box-shadow: 0 0 0 3px rgba(255,102,0,0.15);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.15);
   }
   .kpi-input-wrap .ki-icon {
     position: absolute; left: 10px; top: 50%;
@@ -996,8 +998,8 @@
     font-size: 15px; pointer-events: none;
   }
   .kpi-input-wrap label {
-    display: block; font-size: 10px; font-weight: 700;
-    color: #64748b; text-transform: uppercase;
+    display: block; font-size: 12px; font-weight: 700;
+    color: var(--text-dim); text-transform: uppercase;
     letter-spacing: 0.5px; margin-bottom: 4px;
   }
   .tw-bonus { display:flex; gap:4px; margin-top:3px; flex-wrap:wrap; }
@@ -1005,18 +1007,18 @@
   .tw-b100 { font-size:10px; font-weight:700; color:#ff6600; background:rgba(255,102,0,0.12); border:1px solid rgba(255,102,0,0.3); border-radius:4px; padding:1px 5px; letter-spacing:0; text-transform:none; }
   /* 特別標記的重點欄位 */
   .kpi-input-wrap.highlight input {
-    border-color: rgba(255,102,0,0.4);
-    background: rgba(255,102,0,0.05);
+    border-color: rgba(0,212,255,0.35);
+    background: rgba(0,212,255,0.05);
   }
   .kpi-input-wrap.highlight input:focus {
-    border-color: #ff6600;
-    box-shadow: 0 0 0 3px rgba(255,102,0,0.2);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.2);
   }
   .kpi-hot-badge {
     position: absolute; right: 8px; top: 28px;
     font-size: 9px; font-weight: 800;
     padding: 2px 6px; border-radius: 4px;
-    background: rgba(255,102,0,.2); color: #ff8533; border: 1px solid #ff6600;
+    background: rgba(0,212,255,.15); color: var(--accent-bright); border: 1px solid var(--accent);
     pointer-events: none;
   }
 
@@ -1024,16 +1026,16 @@
   .save-btn-wrap { padding: 16px 0 8px; }
   .btn-save-main {
     width: 100%; padding: 15px;
-    background: linear-gradient(135deg, #ff6600, #ff8533);
+    background: linear-gradient(135deg, #0099cc, #00d4ff);
     border: none; border-radius: 12px;
-    color: #fff; font-size: 15px; font-weight: 800;
+    color: #07101e; font-size: 16px; font-weight: 800;
     cursor: pointer; letter-spacing: 0.5px;
     transition: all .25s;
-    box-shadow: 0 4px 20px rgba(255,102,0,0.4);
+    box-shadow: 0 4px 20px rgba(0,212,255,0.35);
   }
   .btn-save-main:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 28px rgba(255,102,0,0.6);
+    box-shadow: 0 8px 28px rgba(0,212,255,0.5);
   }
   .btn-save-main:active { transform: scale(.97); }
 
