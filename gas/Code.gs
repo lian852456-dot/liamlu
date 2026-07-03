@@ -23,13 +23,7 @@ const FIELDS = [
 const SPREADSHEET_ID = '10MqzAWOPc4UPE-g5ZZPNZG3tYAndKW-DApLuuhIpQWA';
 
 function getSheet() {
-  let ss;
-  try {
-    ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!ss) throw new Error('no active');
-  } catch(e) {
-    ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  }
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   let sh = ss.getSheetByName(SHEET_NAME);
   if (!sh) {
     sh = ss.insertSheet(SHEET_NAME);
