@@ -1913,6 +1913,39 @@ let GAS_URL = localStorage.getItem('bei12b_gas_url') || 'https://script.google.c
 // 記憶體快取（避免重複拉資料）
 const _cache = {};
 function cacheKey(date, seg) { return `${date}_${seg}`; }
+function shadowKey(date, seg) { return `bei12b_shadow_${date}_${seg}`; }
+
+function readLocalShadow(date, seg) {
+  try {
+    return JSON.parse(localStorage.getItem(shadowKey(date, seg)) || '{}') || {};
+  } catch(e) {
+    console.warn('readLocalShadow error', e);
+    return {};
+  }
+}
+
+function writeLocalShadow(date, store, seg, data) {
+  const shadow = readLocalShadow(date, seg);
+  shadow[store] = { ...data, date, store, seg, _shadowTs: Date.now() };
+  localStorage.setItem(shadowKey(date, seg), JSON.stringify(shadow));
+}
+
+function mergeDayData(remoteData, localData) {
+  const merged = { ...(remoteData || {}) };
+  Object.entries(localData || {}).forEach(([store, localRecord]) => {
+    if (!merged[store]) {
+      merged[store] = localRecord;
+      return;
+    }
+    const record = { ...merged[store] };
+    Object.entries(localRecord || {}).forEach(([key, value]) => {
+      if (!key.startsWith('tw_')) return;
+      if (value !== null && value !== undefined && value !== '') record[key] = value;
+    });
+    merged[store] = record;
+  });
+  return merged;
+}
 
 // ════════════════════════════════════
 // UTILS
@@ -1936,15 +1969,16 @@ async function getData(date, store, seg) {
 // ── 拉取整天所有門市資料存入快取
 async function fetchDayData(date, seg) {
   const ck = cacheKey(date, seg);
+  const localShadow = readLocalShadow(date, seg);
   if (!GAS_URL) { _cache[ck] = {}; return; }
   try {
     const url = `${GAS_URL}?action=read&date=${date}&seg=${seg}`;
     const res = await fetch(url, { cache: 'no-store' });
     const json = await res.json();
-    _cache[ck] = json.data || {};
+    _cache[ck] = mergeDayData(json.data || {}, localShadow);
   } catch(e) {
     console.error('fetchDayData error', e);
-    _cache[ck] = {};
+    _cache[ck] = mergeDayData({}, localShadow);
   }
 }
 
@@ -1954,6 +1988,7 @@ async function saveToStorage(date, store, seg, data) {
     showToast('⚠️ 尚未設定 Apps Script 網址');
     return false;
   }
+  writeLocalShadow(date, store, seg, data);
   // 同時更新本地快取
   const ck = cacheKey(date, seg);
   if (!_cache[ck]) _cache[ck] = {};
