@@ -1739,7 +1739,10 @@
   <!-- 零報說明彙整（21:00才顯示）-->
   <div id="zeroReportSection" style="display:none;"></div>
 
-  <!-- 個人未過關彙整 -->
+  <!-- 整合彙整：店點回報 + 個人明細 -->
+  <div id="storePersonalSection" style="display:none;"></div>
+
+  <!-- 個人未過關彙整（舊區塊保留相容）-->
   <div id="personalFailSummarySection" style="display:none;"></div>
 
 </div><!-- /panel-summary -->
@@ -2404,8 +2407,10 @@ async function renderSummary() {
 
   // 零報說明彙整（21:00）
   renderZeroReportSection(date, sumSeg, dayCache);
-  // 個人未過關彙整
-  renderPersonalFailSummary(date, sumSeg);
+  // 整合：店點回報 + 個人明細
+  renderStorePersonalDetail(date, sumSeg, dayCache);
+  // 個人未過關彙整（舊）
+  document.getElementById('personalFailSummarySection').style.display = 'none';
 }
 
 function renderZeroReportSection(date, seg, dayCache) {
@@ -2527,6 +2532,105 @@ function renderPersonalFailSummary(date, seg) {
       </div>
     `).join('')}
   `;
+  updateMarquee();
+}
+
+function renderStorePersonalDetail(date, seg, dayCache) {
+  const el = document.getElementById('storePersonalSection');
+  if (!el) return;
+
+  const segLabel = seg === 16 ? '16:00' : '21:00';
+  const pIdx = (() => { try { return JSON.parse(localStorage.getItem(`pIdx_${date}_${seg}`) || '{}'); } catch { return {}; } })();
+  const itemLabelMap = Object.fromEntries(PERSONAL_ITEMS.map(i => [i.key, i.label]));
+
+  const storeCards = STORES.map(store => {
+    const d = dayCache[store];
+    const pData = pIdx[store];
+    if (!d && !pData) return null;
+
+    // ── 店點關鍵數字 ──
+    const fmt = (v, isP) => {
+      const n = parseFloat(v);
+      return isNaN(n) ? '—' : (isP ? n.toFixed(1)+'%' : n % 1 === 0 ? n : n.toFixed(1));
+    };
+    const kpiColor = (v, th=100) => parseFloat(v) >= th ? '#16a34a' : parseFloat(v) >= th*0.8 ? '#d97706' : '#dc2626';
+
+    const storeMetrics = d ? `
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+        <span style="font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:3px 10px;border-radius:20px;color:${kpiColor(d.kpi)};">KPI ${fmt(d.kpi,true)}</span>
+        <span style="font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:3px 10px;border-radius:20px;color:#1d4ed8;">A999 ${fmt(d.aq999)} 筆</span>
+        <span style="font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:3px 10px;border-radius:20px;color:#7c3aed;">好速 ${fmt(d.haosu)} 點</span>
+        <span style="font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:3px 10px;border-radius:20px;color:#0891b2;">R1399 ${fmt(d.rt1399)} 筆</span>
+        ${d.insurance_pct ? `<span style="font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fed7aa;padding:3px 10px;border-radius:20px;color:${kpiColor(d.insurance_pct,70)};">保險 ${fmt(d.insurance_pct,true)}</span>` : ''}
+      </div>` : `<div style="font-size:12px;color:#9ca3af;margin-bottom:8px;">（尚未填報）</div>`;
+
+    // ── 零報說明（21:00）──
+    const zeroBlock = (seg === 21 && d && d.zero_reason) ? `
+      <div style="background:#fef9c3;border:1px solid #fde047;border-left:3px solid #eab308;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+        <div style="font-size:12px;font-weight:800;color:#854d0e;margin-bottom:6px;">🔴 零報說明</div>
+        <div style="font-size:12px;color:#713f12;line-height:1.7;">
+          <div>① 原因：${d.zero_reason}</div>
+          ${d.zero_consult ? `<div>② 請益：${d.zero_consult}</div>` : ''}
+          ${d.zero_method  ? `<div>③ 做法：${d.zero_method}</div>` : ''}
+          ${d.zero_plan    ? `<div>④ 計劃：${d.zero_plan}</div>` : ''}
+        </div>
+      </div>` : '';
+
+    // ── 個人明細 ──
+    const people = pData ? Object.entries(pData) : [];
+    const passNames = people.filter(([,f]) => !f).map(([n]) => n);
+    const failEntries = people.filter(([,f]) => f).map(([n]) => {
+      const r = _loadReview(store, n, date, seg);
+      return { name: n, r };
+    });
+
+    const passBlock = passNames.length > 0 ? `
+      <div style="font-size:12px;color:#16a34a;font-weight:600;margin-bottom:8px;padding:5px 10px;background:#f0fdf4;border-radius:8px;">
+        ✅ 過關：${passNames.join('、')}
+      </div>` : '';
+
+    const failBlock = failEntries.map(({ name, r }) => `
+      <div style="background:#fff5f5;border:1px solid #fecaca;border-left:3px solid #ef4444;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:800;color:#dc2626;margin-bottom:6px;">❌ ${name}</div>
+        ${r && r.failed?.length > 0 ? `
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px;">
+            ${r.failed.map(k => {
+              const item = PERSONAL_ITEMS.find(i => i.key === k);
+              const v = r.data?.[k];
+              const disp = item?.type === 'pct' ? (v != null ? parseFloat(v).toFixed(1)+'%' : '0%') : (v != null ? v+'筆' : '0筆');
+              return `<span style="background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;">${itemLabelMap[k] || k}：${disp}</span>`;
+            }).join('')}
+          </div>` : ''}
+        ${r?.extra?.consult_store || r?.extra?.consult_person ? `
+          <div style="font-size:12px;color:var(--text-dim);margin-bottom:5px;">
+            🏪 請益：<strong>${r.extra.consult_store || '—'}</strong>${r.extra.consult_person ? `／<strong>${r.extra.consult_person}</strong>` : ''}
+          </div>` : ''}
+        ${r?.extra?.consult_method ? `
+          <div style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:7px 10px;color:var(--text);line-height:1.6;">💡 ${r.extra.consult_method}</div>` :
+          `<div style="font-size:12px;color:#9ca3af;font-style:italic;">（尚未填寫請益做法）</div>`}
+      </div>`).join('');
+
+    const hasPersonal = passNames.length > 0 || failEntries.length > 0;
+
+    return `
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+        <div style="font-size:16px;font-weight:800;color:var(--accent-bright);margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #fed7aa;">
+          🏪 ${store}
+          <span style="float:right;font-size:11px;font-weight:600;color:var(--text-muted);">${segLabel}</span>
+        </div>
+        ${storeMetrics}
+        ${zeroBlock}
+        ${hasPersonal ? `
+          <div style="font-size:12px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 8px;">👤 個人回報</div>
+          ${passBlock}${failBlock}` : ''}
+      </div>`;
+  }).filter(Boolean);
+
+  if (!storeCards.length) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="section-divider" style="margin-top:16px;">📋 各店回報明細（${segLabel}）</div>
+    ${storeCards.join('')}`;
   updateMarquee();
 }
 
