@@ -1780,13 +1780,16 @@
   <div class="card">
     <div class="card-title"><span class="dot"></span>👤 個人每日回報</div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;">
-      <select id="personalStore" onchange="onPersonalStoreChange()" style="background:var(--bg-deep);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:13px;flex:1;min-width:120px;">
+      <select id="personalStore" onchange="onPersonalStoreChange()" style="background:#fff;border:1.5px solid #d1d5db;color:var(--text);border-radius:8px;padding:8px 12px;font-size:14px;flex:1;min-width:120px;">
         <option value="">— 選擇門市 —</option>
       </select>
-      <select id="personalName" onchange="onPersonalNameChange()" style="background:var(--bg-deep);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:13px;flex:1;min-width:120px;">
-        <option value="">— 選擇姓名 —</option>
-      </select>
-      <button onclick="openAddNameModal()" style="background:var(--bg-panel);border:1px solid var(--border);color:var(--accent-bright);border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer;">＋ 新增人員</button>
+      <div style="position:relative;flex:1;min-width:120px;">
+        <input id="personalName" type="text" placeholder="輸入姓名" list="personalNameList"
+          oninput="onPersonalNameChange()" onchange="onPersonalNameChange()"
+          style="background:#fff;border:1.5px solid #d1d5db;color:var(--text);border-radius:8px;padding:8px 12px;font-size:14px;width:100%;">
+        <datalist id="personalNameList"></datalist>
+      </div>
+      <button onclick="openAddNameModal()" style="background:var(--bg-panel);border:1px solid var(--border);color:var(--accent);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap;">＋ 新增人員</button>
     </div>
   </div>
 
@@ -3274,19 +3277,18 @@ function initPersonalStoreSelect() {
   if (lastStore) {
     document.getElementById('personalStore').value = lastStore;
     _refreshNameSelect(lastStore);
-    if (lastName) {
-      document.getElementById('personalName').value = lastName;
-      onPersonalIdentityChange();
-    }
+  }
+  if (lastName) {
+    document.getElementById('personalName').value = lastName;
+    if (lastStore) onPersonalIdentityChange();
   }
 }
 
 function _refreshNameSelect(store) {
-  const el = document.getElementById('personalName');
-  if (!el) return;
+  const dl = document.getElementById('personalNameList');
+  if (!dl) return;
   const names = getStoreNames(store);
-  el.innerHTML = `<option value="">— 選擇姓名 —</option>` +
-    names.map(n => `<option value="${n}">${n}</option>`).join('');
+  dl.innerHTML = names.map(n => `<option value="${n}">`).join('');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -3302,9 +3304,20 @@ function onPersonalStoreChange() {
 }
 function onPersonalNameChange() {
   const store = document.getElementById('personalStore').value;
-  const name  = document.getElementById('personalName').value;
+  const name  = document.getElementById('personalName').value.trim();
   localStorage.setItem('personal_last_store', store);
-  localStorage.setItem('personal_last_name', name);
+  if (name) {
+    localStorage.setItem('personal_last_name', name);
+    // 自動加入門市名單（若尚未存在）
+    if (store) {
+      const names = getStoreNames(store);
+      if (!names.includes(name)) {
+        names.push(name);
+        saveStoreNames(store, names);
+        _refreshNameSelect(store);
+      }
+    }
+  }
   _applyPersonalUI(store, name);
 }
 function onPersonalIdentityChange() { onPersonalNameChange(); }
