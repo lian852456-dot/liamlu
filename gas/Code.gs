@@ -49,6 +49,23 @@ function doGet(e) {
     return jsonResponse({ status: 'ok' });
   }
 
+  if (action === 'debug') {
+    try {
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const sheets = ss.getSheets().map(s => ({
+        name: s.getName(),
+        rows: s.getLastRow(),
+        cols: s.getLastColumn()
+      }));
+      const sh = ss.getSheetByName(SHEET_NAME);
+      const headers = sh ? sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0] : [];
+      const sample = sh && sh.getLastRow() > 1 ? sh.getRange(2,1,1,sh.getLastColumn()).getValues()[0] : [];
+      return jsonResponse({ status:'ok', sheets, headers, sample });
+    } catch(err) {
+      return jsonResponse({ status:'error', message: err.message });
+    }
+  }
+
   if (action === 'write') {
     try {
       const payload = JSON.parse(decodeURIComponent(e.parameter.payload));
