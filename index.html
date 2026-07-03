@@ -1177,6 +1177,12 @@
     display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); padding: 16px;
   }
+  @keyframes marqueeScroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  #marqueeBar:hover #marqueeTrack { animation-play-state: paused; }
+
   .add-name-box {
     background: #ffffff; border: 1.5px solid #e5e7eb;
     border-radius: 14px; padding: 20px; width: 100%; max-width: 340px;
@@ -1226,6 +1232,35 @@
     <div class="date-badge" id="connBadge" onclick="openSettings()" style="cursor:pointer;border-color:var(--warn);color:var(--warn)">⚙️ 設定 Sheets</div>
   </div>
 </header>
+
+<!-- 跑馬燈 -->
+<div id="marqueeBar" style="
+  background: linear-gradient(90deg, #fff7ed, #ffedd5, #fff7ed);
+  border-bottom: 2px solid #fed7aa;
+  padding: 7px 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  position: relative;
+">
+  <div style="
+    flex-shrink:0; background:#f97316; color:#fff;
+    font-size:11px; font-weight:800; padding:3px 10px;
+    border-radius:0 20px 20px 0; margin-right:8px; white-space:nowrap;
+    letter-spacing:0.5px;
+  ">📣 戰報</div>
+  <div style="overflow:hidden;flex:1;position:relative;">
+    <div id="marqueeTrack" style="
+      display:flex; gap:0;
+      animation: marqueeScroll 30s linear infinite;
+      white-space:nowrap;
+    ">
+      <span id="marqueeText" style="font-size:13px;font-weight:600;color:#92400e;padding-right:80px;">載入中…</span>
+      <span id="marqueeText2" aria-hidden="true" style="font-size:13px;font-weight:600;color:#92400e;padding-right:80px;">載入中…</span>
+    </div>
+  </div>
+</div>
 
 <!-- TABS -->
 <div class="tab-bar">
@@ -2011,7 +2046,50 @@ window.onload = async () => {
     await fetchDayData(td, 21);
   }
   renderSummary();
+  updateMarquee();
+  setInterval(updateMarquee, 60000);
 };
+
+function updateMarquee() {
+  const CHEERS = [
+    '💪 大家加油！今天也要全力衝刺！',
+    '🔥 團隊最強！每筆都是勝利！',
+    '🌟 北一二B，一起創造佳績！',
+    '⚡ 衝吧！今天的努力成就明天的榮耀！',
+    '🏆 保持節奏，勝利就在前方！',
+    '🎯 精準出擊，每個目標都能達成！',
+    '🚀 北一二B全員加速，衝破目標！',
+  ];
+  const td = today();
+  const seg = currentSeg || 16;
+  const ck = td + '_' + seg;
+  const dayCache = _cache[ck] || {};
+
+  const noA999 = STORES.filter(s => {
+    if (NEW_STORES.includes(s) && td < '2026-06-25') return false;
+    const v = parseFloat(dayCache[s]?.aq999);
+    return isNaN(v) || v === 0;
+  });
+
+  const cheer = CHEERS[Math.floor(Date.now() / 60000) % CHEERS.length];
+  let msg = cheer;
+  if (noA999.length > 0) {
+    msg += '　　🔴 尚未開出A999：' + noA999.map(s => '【' + s + '】').join(' ') + '　快跟進！';
+  } else if (Object.keys(dayCache).length > 0) {
+    msg += '　　✅ 所有門市 A999 均已開出！太棒了！';
+  }
+
+  const t1 = document.getElementById('marqueeText');
+  const t2 = document.getElementById('marqueeText2');
+  if (t1) t1.textContent = msg;
+  if (t2) t2.textContent = msg;
+
+  // 依文字長度動態調整速度
+  const len = msg.length;
+  const duration = Math.max(20, len * 0.35) + 's';
+  const track = document.getElementById('marqueeTrack');
+  if (track) track.style.animationDuration = duration;
+}
 
 function updateConnectionBadge() {
   const badge = document.getElementById('connBadge');
@@ -2399,6 +2477,7 @@ function renderPersonalFailSummary(date, seg) {
       </div>
     `).join('')}
   `;
+  updateMarquee();
 }
 
 function renderSummaryTable(tableId, date, seg, cols) {
