@@ -1947,6 +1947,52 @@ function mergeDayData(remoteData, localData) {
   return merged;
 }
 
+function fetchJsonp(url, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    const cbName = 'gasCallback_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    const script = document.createElement('script');
+    const sep = url.includes('?') ? '&' : '?';
+    let settled = false;
+
+    const cleanup = () => {
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('GAS 回應逾時'));
+    }, timeoutMs);
+
+    window[cbName] = function(result) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cleanup();
+      resolve(result);
+    };
+    script.onerror = function() {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cleanup();
+      reject(new Error('GAS callback 載入失敗'));
+    };
+    script.src = `${url}${sep}callback=${encodeURIComponent(cbName)}`;
+    document.head.appendChild(script);
+  });
+}
+
+async function fetchGasJson(url) {
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    return await res.json();
+  } catch(e) {
+    return fetchJsonp(url);
+  }
+}
+
 // ════════════════════════════════════
 // UTILS
 // ════════════════════════════════════
@@ -1973,8 +2019,7 @@ async function fetchDayData(date, seg) {
   if (!GAS_URL) { _cache[ck] = {}; return; }
   try {
     const url = `${GAS_URL}?action=read&date=${date}&seg=${seg}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    const json = await res.json();
+    const json = await fetchGasJson(url);
     _cache[ck] = mergeDayData(json.data || {}, localShadow);
   } catch(e) {
     console.error('fetchDayData error', e);
@@ -1988,57 +2033,23 @@ async function saveToStorage(date, store, seg, data) {
     showToast('⚠️ 尚未設定 Apps Script 網址');
     return false;
   }
-  writeLocalShadow(date, store, seg, data);
-  // 同時更新本地快取
-  const ck = cacheKey(date, seg);
-  if (!_cache[ck]) _cache[ck] = {};
-  _cache[ck][store] = { ...data, date, store, seg };
-
-  // 用 GET + URL 參數 + no-cors 模式
+  // 用 callback 方式送出，避免跨網域時出現「看似成功但其實無法確認」。
   const payload = encodeURIComponent(JSON.stringify({ date, store, seg, data }));
   const url = `${GAS_URL}?action=write&payload=${payload}`;
-  
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    const cbName = 'gasCallback_' + Date.now();
-    window[cbName] = function(result) {
-      delete window[cbName];
-      document.head.removeChild(script);
-      resolve(result && result.status === 'ok');
-    };
-    script.onerror = function() {
-      delete window[cbName];
-      // 即使有 error 也嘗試用 fetch
-      fetch(url + '&callback=' + cbName)
-        .then(r => r.json())
-        .then(j => resolve(j.status === 'ok'))
-        .catch(() => {
-          // 最後嘗試：no-cors 送出（無法確認結果但資料會到）
-          fetch(url, { mode: 'no-cors' })
-            .then(() => resolve(true))
-            .catch(() => resolve(false));
-        });
-    };
-    // 先試 fetch
-    fetch(url)
-      .then(r => r.json())
-      .then(j => {
-        delete window[cbName];
-        resolve(j.status === 'ok');
-      })
-      .catch(() => {
-        // fetch 失敗，改用 no-cors
-        fetch(url, { mode: 'no-cors' })
-          .then(() => {
-            delete window[cbName];
-            resolve(true);
-          })
-          .catch(() => {
-            delete window[cbName];
-            resolve(false);
-          });
-      });
-  });
+
+  try {
+    const result = await fetchJsonp(url);
+    if (!result || result.status !== 'ok') return false;
+
+    writeLocalShadow(date, store, seg, data);
+    const ck = cacheKey(date, seg);
+    if (!_cache[ck]) _cache[ck] = {};
+    _cache[ck][store] = { ...data, date, store, seg };
+    return true;
+  } catch(e) {
+    console.error('saveToStorage error', e);
+    return false;
+  }
 }
 function pct(val) {
   if (val === null || val === undefined || val === '') return '—';

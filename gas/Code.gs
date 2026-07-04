@@ -44,9 +44,10 @@ function getSheet() {
 
 function doGet(e) {
   const action = e.parameter.action;
+  const cb = e.parameter.callback;
 
   if (action === 'ping') {
-    return jsonResponse({ status: 'ok' });
+    return jsonResponse({ status: 'ok' }, cb);
   }
 
   if (action === 'debug') {
@@ -60,9 +61,9 @@ function doGet(e) {
       const sh = ss.getSheetByName(SHEET_NAME);
       const headers = sh ? sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0] : [];
       const sample = sh && sh.getLastRow() > 1 ? sh.getRange(2,1,1,sh.getLastColumn()).getValues()[0] : [];
-      return jsonResponse({ status:'ok', sheets, headers, sample });
+      return jsonResponse({ status:'ok', sheets, headers, sample }, cb);
     } catch(err) {
-      return jsonResponse({ status:'error', message: err.message });
+      return jsonResponse({ status:'error', message: err.message }, cb);
     }
   }
 
@@ -70,14 +71,9 @@ function doGet(e) {
     try {
       const payload = JSON.parse(decodeURIComponent(e.parameter.payload));
       writeData(payload.date, payload.store, payload.seg, payload.data);
-      const cb = e.parameter.callback;
-      if (cb) {
-        return ContentService.createTextOutput(`${cb}({"status":"ok"})`)
-          .setMimeType(ContentService.MimeType.JAVASCRIPT);
-      }
-      return jsonResponse({ status: 'ok' });
+      return jsonResponse({ status: 'ok' }, cb);
     } catch(err) {
-      return jsonResponse({ status: 'error', message: err.message });
+      return jsonResponse({ status: 'error', message: err.message }, cb);
     }
   }
 
@@ -86,13 +82,13 @@ function doGet(e) {
       const date = e.parameter.date;
       const seg  = parseInt(e.parameter.seg);
       const data = readData(date, seg);
-      return jsonResponse({ status: 'ok', data });
+      return jsonResponse({ status: 'ok', data }, cb);
     } catch(err) {
-      return jsonResponse({ status: 'error', message: err.message });
+      return jsonResponse({ status: 'error', message: err.message }, cb);
     }
   }
 
-  return jsonResponse({ status: 'error', message: 'unknown action' });
+  return jsonResponse({ status: 'error', message: 'unknown action' }, cb);
 }
 
 function writeData(date, store, seg, data) {
@@ -158,7 +154,12 @@ function readData(date, seg) {
   return result;
 }
 
-function jsonResponse(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
+function jsonResponse(obj, callback) {
+  const body = JSON.stringify(obj);
+  if (callback && /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
+    return ContentService.createTextOutput(`${callback}(${body})`)
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(body)
     .setMimeType(ContentService.MimeType.JSON);
 }

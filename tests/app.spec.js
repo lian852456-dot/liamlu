@@ -1,19 +1,32 @@
 const { test, expect } = require('@playwright/test');
+const path = require('path');
+const { pathToFileURL } = require('url');
 
-const FILE_URL = 'file:///home/user/liamlu/index.html';
+const FILE_URL = pathToFileURL(path.join(__dirname, '..', 'index.html')).href;
 
 // Mock GAS 回應（讓 fetch 不需要真正連線）
 async function mockGAS(page) {
   await page.route('https://script.google.com/**', async route => {
     const url = route.request().url();
+    const callback = new URL(url).searchParams.get('callback');
+    const fulfill = async (body) => {
+      if (callback) {
+        await route.fulfill({
+          contentType: 'application/javascript',
+          body: `${callback}(${JSON.stringify(body)})`,
+        });
+      } else {
+        await route.fulfill({ json: body });
+      }
+    };
     if (url.includes('action=ping')) {
-      await route.fulfill({ json: { status: 'ok' } });
+      await fulfill({ status: 'ok' });
     } else if (url.includes('action=read')) {
-      await route.fulfill({ json: { data: {} } });
+      await fulfill({ status: 'ok', data: {} });
     } else if (url.includes('action=write')) {
-      await route.fulfill({ json: { status: 'ok' } });
+      await fulfill({ status: 'ok' });
     } else {
-      await route.fulfill({ json: { status: 'ok', data: {} } });
+      await fulfill({ status: 'ok', data: {} });
     }
   });
 }
