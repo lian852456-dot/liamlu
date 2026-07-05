@@ -2570,8 +2570,8 @@ function renderPersonalFailSummary(date, seg) {
   updateMarquee();
 }
 
-function renderStorePersonalDetail(date, seg, dayCache) {
-  const el = document.getElementById('storePersonalSection');
+function renderStorePersonalDetail(date, seg, dayCache, targetId) {
+  const el = document.getElementById(targetId || 'storePersonalSection');
   if (!el) return;
 
   const segLabel = seg === 16 ? '16:00' : '21:00';
@@ -2822,6 +2822,7 @@ async function renderPlayback() {
     <div class="card" style="padding:14px 10px;">
       <div class="table-wrap"><table id="pbTable3"></table></div>
     </div>
+    <div id="pbStorePersonalSection"></div>
   `;
 
   renderSummaryTable('pbTable1', date, pbSeg, cols1);
@@ -2843,6 +2844,7 @@ async function renderPlayback() {
     {key:'tw_myfirst',    label:'兒錶',               isRaw:true},
   ];
   renderSummaryTable('pbTable3', date, pbSeg, colsTw);
+  renderStorePersonalDetail(date, pbSeg, dayCache, 'pbStorePersonalSection');
 }
 
 // ════════════════════════════════════
