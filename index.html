@@ -2570,12 +2570,24 @@ function renderPersonalFailSummary(date, seg) {
   updateMarquee();
 }
 
-function renderStorePersonalDetail(date, seg, dayCache, targetId) {
+async function renderStorePersonalDetail(date, seg, dayCache, targetId) {
   const el = document.getElementById(targetId || 'storePersonalSection');
   if (!el) return;
 
   const segLabel = seg === 16 ? '16:00' : '21:00';
+  // 雲端個人回報 { store: { name: record } }
+  const pCloud = await _fetchPersonalCloud(date, seg);
+  // 本機索引 { store: { name: hasFail } }
   const pIdx = (() => { try { return JSON.parse(localStorage.getItem(`pIdx_${date}_${seg}`) || '{}'); } catch { return {}; } })();
+  // 合併：雲端先鋪底，本機覆蓋（本機較即時）
+  Object.entries(pCloud).forEach(([store, people]) => {
+    if (!pIdx[store]) pIdx[store] = {};
+    Object.entries(people || {}).forEach(([name, rec]) => {
+      if (!(name in pIdx[store])) pIdx[store][name] = !!(rec && rec.failed && rec.failed.length > 0);
+    });
+  });
+  // 讀取記錄：本機優先，沒有就用雲端
+  const loadRec = (store, name) => _loadReview(store, name, date, seg) || (pCloud[store] && pCloud[store][name]) || null;
   const itemLabelMap = Object.fromEntries(PERSONAL_ITEMS.map(i => [i.key, i.label]));
 
   const fmt = (v, isP) => {
@@ -2629,7 +2641,7 @@ function renderStorePersonalDetail(date, seg, dayCache, targetId) {
     const people = Object.entries(pData);
     const passNames = people.filter(([,f]) => !f).map(([n]) => n);
     const failEntries = people.filter(([,f]) => f).map(([n]) => {
-      const r = _loadReview(store, n, date, seg);
+      const r = loadRec(store, n);
       return { name: n, r };
     });
     if (passNames.length === 0 && failEntries.length === 0) return null;
@@ -3666,6 +3678,45 @@ function _savePersonalRecord(store, name, date, seg, data, failed, extra) {
   localStorage.setItem(_reviewKey(store, name, date, seg), JSON.stringify(record));
   // 同步到督導彙整用的公共索引
   _updateSummaryIndex(store, name, date, seg, failed.length > 0);
+  // 同步上雲端（跨裝置彙整用）
+  _pushPersonalToCloud(store, name, date, seg, record);
+}
+
+// ── 個人回報上雲（JSONP，失敗不影響本機儲存）──
+function _pushPersonalToCloud(store, name, date, seg, record) {
+  if (!GAS_URL) return;
+  const payload = encodeURIComponent(JSON.stringify({ date, seg, store, name, record }));
+  const url = `${GAS_URL}?action=pwrite&payload=${payload}`;
+  const script = document.createElement('script');
+  const cbName = 'gasPCallback_' + Date.now();
+  window[cbName] = function() {
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+  };
+  script.onerror = function() {
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+    // 備援：no-cors 送出
+    fetch(url, { mode: 'no-cors' }).catch(()=>{});
+  };
+  script.src = url + '&callback=' + cbName;
+  document.head.appendChild(script);
+}
+
+// ── 從雲端抓某日某時段的個人回報 { store: { name: record } } ──
+const _pCloudCache = {};
+async function _fetchPersonalCloud(date, seg) {
+  const ck = `${date}_${seg}`;
+  if (!GAS_URL) return {};
+  try {
+    const res = await fetch(`${GAS_URL}?action=pread&date=${date}&seg=${seg}`, { cache: 'no-store' });
+    const json = await res.json();
+    _pCloudCache[ck] = json.data || {};
+  } catch(e) {
+    console.error('_fetchPersonalCloud error', e);
+    if (!_pCloudCache[ck]) _pCloudCache[ck] = {};
+  }
+  return _pCloudCache[ck];
 }
 
 function _updateSummaryIndex(store, name, date, seg, hasFail) {
