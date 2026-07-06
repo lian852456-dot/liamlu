@@ -2441,7 +2441,9 @@ async function renderSummary() {
   renderSummaryTable('summaryTable3', date, sumSeg, cols3);
 
   // 零報說明彙整（21:00）
-  renderZeroReportSection(date, sumSeg, dayCache);
+  // 舊零報區塊已由「店點零報說明」取代，避免重複顯示
+  const _zrEl = document.getElementById('zeroReportSection');
+  if (_zrEl) _zrEl.style.display = 'none';
   // 整合：店點回報 + 個人明細
   renderStorePersonalDetail(date, sumSeg, dayCache);
   // 個人未過關彙整（舊）
