@@ -40,6 +40,14 @@ GAS 依標題列欄名寫入。前端新增欄位（如 `tw_pixel10`）後，若
 - `5cb0fba` 加了 localStorage 影子備份（`bei12b_shadow_*`），fetch 後會把本機 `tw_` 欄位
   合併進雲端資料——這是同裝置的備援，跨裝置仍靠 GAS
 
+## 自動檢查未回報 + Email 通知
+
+`gas/Code.gs` 有 `checkSegAndNotify()`：每天 16:20、21:20（台北時間）由時間觸發器自動比對
+「回報資料」工作表，有未填門市寄警示信、全數完成寄報平安信（含 A999/好速/R1399 進度與最佳/最差店點），
+收件人為 `NOTIFY_EMAIL`。啟用方式：GAS 編輯器執行一次 `setupTriggers()`（會要求授權）。
+注意：**時間觸發器跑的是編輯器最新存檔的程式碼，不需要重新部署 Web App**；
+只有 `doGet` 相關改動才要重新部署。門市清單 `STORES` 在 GAS 端也有一份，開新店時記得同步。
+
 ## 常用檢查清單（改動資料欄位時）
 
 1. `index.html`：表單 input（`f_` 前綴 id）+ `FIELDS` 陣列 + 彙整表格 cols
