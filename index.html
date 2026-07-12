@@ -2792,6 +2792,18 @@ async function renderPlayback() {
   const filled = STORES.filter(s => !!dayCache[s]);
   const missing = STORES.filter(s => !dayCache[s]);
 
+  const pbSum = key => STORES.reduce((acc, s) => {
+    const v = parseFloat(dayCache[s]?.[key]);
+    return acc + (isNaN(v) ? 0 : v);
+  }, 0);
+  const pbFmt = n => n % 1 === 0 ? n : n.toFixed(2);
+  const pbTotals = [
+    { label: 'A999 上線數',  val: pbFmt(pbSum('aq999')),  sub: '當日合計(筆)' },
+    { label: 'A1399 上線數', val: pbFmt(pbSum('aq1399')), sub: '當日合計(筆)' },
+    { label: '好速銷售點數', val: pbFmt(pbSum('haosu')),  sub: '當日合計(點)' },
+    { label: 'R1399 上線數', val: pbFmt(pbSum('rt1399')), sub: '當日合計(筆)' },
+  ];
+
   const cols1 = [
     {key:'kpi', label:'KPI%', th:80},
     {key:'rank', label:'公司排名', isRank:true},
@@ -2823,6 +2835,14 @@ async function renderPlayback() {
         共 <strong style="color:var(--accent-bright)">${filled.length}</strong> 間門市有資料
         ${missing.length ? `｜<span style="color:var(--red)">未填：${missing.join('、')}</span>` : '｜<span style="color:var(--green)">全數填報</span>'}
       </div>
+    </div>
+    <div class="summary-grid">
+      ${pbTotals.map(c => `
+      <div class="summary-card">
+        <div class="sc-label">${c.label}</div>
+        <div class="sc-val" style="color:var(--accent-bright)">${c.val}</div>
+        <div class="sc-sub">${c.sub}</div>
+      </div>`).join('')}
     </div>
     <div class="section-divider">主力 KPI</div>
     <div class="card" style="padding:14px 10px;">
