@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>督導巡店追蹤 · 北一二B</title>
+<style>
+  :root{
+    --tw-black:#1a1a1a;
+    --tw-orange:#ff6900;
+    --tw-orange-soft:#fff3e9;
+    --ink:#222;
+    --muted:#8a8a8a;
+    --line:#e8e8e8;
+    --bg:#f7f7f5;
+    --ok:#1a8f4c;
+    --ok-bg:#eaf7ef;
+    --miss:#d64545;
+    --miss-bg:#fdecec;
+    --na:#b8b8b8;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+
+  /* 跑馬燈 */
+  .ticker{
+    background:var(--tw-orange);color:#fff;border-radius:10px;
+    margin-bottom:14px;overflow:hidden;position:relative;height:40px;display:flex;align-items:center;
+  }
+  .ticker.clear{background:var(--ok)}
+  .ticker .tk-label{
+    flex-shrink:0;background:rgba(0,0,0,.18);height:100%;display:flex;align-items:center;
+    padding:0 14px;font-size:13px;font-weight:800;letter-spacing:.5px;z-index:2;
+  }
+  .ticker .tk-track{
+    flex:1;overflow:hidden;white-space:nowrap;position:relative;height:100%;
+  }
+  .ticker .tk-move{
+    display:inline-block;white-space:nowrap;padding-left:100%;
+    animation:scroll-left 22s linear infinite;font-size:13.5px;font-weight:600;
+    line-height:40px;
+  }
+  .ticker:hover .tk-move{animation-play-state:paused}
+  .ticker .tk-move span{margin-right:44px;display:inline-block}
+  .ticker .tk-move .sep{color:rgba(255,255,255,.5);margin-right:44px}
+  @keyframes scroll-left{
+    0%{transform:translateX(0)}
+    100%{transform:translateX(-100%)}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .ticker .tk-move{animation:none;padding-left:14px}
+  }
+
+  body{
+    font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",-apple-system,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:20px 16px 80px}
+
+  /* Header */
+  header{
+    background:var(--tw-black);color:#fff;border-radius:14px;
+    padding:22px 24px;margin-bottom:18px;position:relative;overflow:hidden;
+  }
+  header::after{
+    content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;
+    background:radial-gradient(circle,var(--tw-orange) 0%,transparent 70%);opacity:.25;
+  }
+  header h1{font-size:20px;font-weight:800;letter-spacing:.5px;display:flex;align-items:center;gap:10px}
+  header h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--tw-orange);display:inline-block}
+  header .sub{color:#bbb;font-size:13px;margin-top:6px}
+  .month-pick{margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .month-pick label{font-size:13px;color:#ccc}
+  .month-pick input{
+    background:#2a2a2a;border:1px solid #3a3a3a;color:#fff;border-radius:8px;
+    padding:7px 10px;font-size:14px;font-family:inherit;
+  }
+  .cloud-row{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .cloud-row input{
+    flex:1;min-width:200px;background:#2a2a2a;border:1px solid #3a3a3a;color:#fff;
+    border-radius:8px;padding:8px 12px;font-size:12.5px;font-family:inherit;
+  }
+  .cloud-row input::placeholder{color:#777}
+  .btn-cloud{
+    background:var(--tw-orange);color:#fff;border:none;border-radius:8px;
+    padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;
+  }
+  .btn-cloud:hover{background:#e85f00}
+  .btn-cloud.ghost{background:#333;color:#ccc}
+  .btn-cloud.ghost:hover{background:#3d3d3d}
+
+  /* Progress ring row */
+  .overview{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:18px;
+  }
+  .stat{
+    background:var(--card);border-radius:12px;padding:16px;border:1px solid var(--line);
+  }
+  .stat .num{font-size:26px;font-weight:800;color:var(--tw-black)}
+  .stat .num.warn{color:var(--miss)}
+  .stat .num.good{color:var(--ok)}
+  .stat .lbl{font-size:12px;color:var(--muted);margin-top:2px}
+
+  /* Input panel */
+  .panel{
+    background:var(--card);border-radius:12px;border:1px solid var(--line);
+    padding:18px;margin-bottom:18px;
+  }
+  .panel h2{font-size:15px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+  .panel h2::before{content:"";width:4px;height:16px;background:var(--tw-orange);border-radius:2px}
+  .panel p.hint{font-size:12.5px;color:var(--muted);margin-bottom:10px}
+  textarea{
+    width:100%;min-height:110px;border:1px solid var(--line);border-radius:8px;
+    padding:10px 12px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;
+    resize:vertical;background:#fafafa;color:#333;
+  }
+  .btn-row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  button{
+    font-family:inherit;font-size:14px;font-weight:600;border:none;border-radius:8px;
+    padding:10px 18px;cursor:pointer;transition:all .15s;
+  }
+  .btn-primary{background:var(--tw-orange);color:#fff}
+  .btn-primary:hover{background:#e85f00}
+  .btn-ghost{background:#f0f0f0;color:#555}
+  .btn-ghost:hover{background:#e4e4e4}
+  .parse-msg{font-size:13px;margin-top:10px;padding:8px 12px;border-radius:8px;display:none}
+  .parse-msg.ok{background:var(--ok-bg);color:var(--ok);display:block}
+  .parse-msg.err{background:var(--miss-bg);color:var(--miss);display:block}
+
+  /* Store cards */
+  .section-title{font-size:16px;font-weight:800;margin:22px 0 12px;color:var(--tw-black);display:flex;align-items:center;gap:10px}
+  .section-title .badge{font-size:12px;font-weight:600;background:var(--tw-orange-soft);color:var(--tw-orange);padding:2px 10px;border-radius:20px}
+
+  .store-card{
+    background:var(--card);border-radius:12px;border:1px solid var(--line);
+    margin-bottom:12px;overflow:hidden;
+  }
+  .store-head{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:14px 18px;cursor:pointer;user-select:none;
+  }
+  .store-head:hover{background:#fafafa}
+  .store-head .left{display:flex;align-items:center;gap:12px;min-width:0}
+  .store-name{font-size:15px;font-weight:700}
+  .store-code{font-size:11px;color:var(--muted);font-family:ui-monospace,monospace}
+  .store-head .right{display:flex;align-items:center;gap:12px;flex-shrink:0}
+  .pill{font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px}
+  .pill.done{background:var(--ok-bg);color:var(--ok)}
+  .pill.partial{background:var(--miss-bg);color:var(--miss)}
+  .pill.none{background:#f0f0f0;color:var(--na)}
+  .chevron{font-size:12px;color:var(--muted);transition:transform .2s}
+  .store-card.open .chevron{transform:rotate(90deg)}
+
+  .bar{height:6px;background:#eee;border-radius:4px;overflow:hidden;width:90px}
+  .bar span{display:block;height:100%;background:var(--ok);border-radius:4px;transition:width .3s}
+
+  .store-body{display:none;padding:0 18px 16px;border-top:1px solid var(--line)}
+  .store-card.open .store-body{display:block}
+
+  .miss-group{margin-top:14px}
+  .miss-group h4{font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+  .item{
+    display:flex;gap:10px;padding:8px 0;font-size:13px;border-bottom:1px dashed var(--line);
+  }
+  .item:last-child{border-bottom:none}
+  .item .no{
+    flex-shrink:0;width:26px;height:22px;border-radius:5px;font-size:12px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .item.miss .no{background:var(--miss-bg);color:var(--miss)}
+  .item.done .no{background:var(--ok-bg);color:var(--ok)}
+  .item .txt{color:#444;flex:1}
+  .item .tag{font-size:11px;color:var(--muted);flex-shrink:0;align-self:center}
+  .all-done{font-size:13px;color:var(--ok);padding:12px 0;display:flex;align-items:center;gap:8px}
+
+  .legend{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.8}
+  .legend b{color:#555}
+  .empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px}
+  .empty-state .big{font-size:32px;margin-bottom:8px}
+
+  footer{text-align:center;font-size:11px;color:#bbb;margin-top:30px}
+
+  @media(max-width:560px){
+    .store-head .right .bar{display:none}
+    header h1{font-size:17px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="dot"></span>督導巡店追蹤系統</h1>
+    <div class="sub">北一二B區 · 盧蔚榮 · 33 項檢核追蹤</div>
+    <div class="month-pick">
+      <label>追蹤月份</label>
+      <input type="month" id="monthInput">
+      <span id="cloudStatus" style="font-size:12px;font-weight:700;color:#ff9c9c;margin-left:6px">● 未連線</span>
+    </div>
+    <div class="cloud-row">
+      <input type="text" id="gasUrl" placeholder="貼上 Google Apps Script 網頁應用程式 URL（設定一次即可）">
+      <button class="btn-cloud" onclick="cloudConnect()">連線</button>
+      <button class="btn-cloud ghost" onclick="cloudLoad()">重新載入</button>
+    </div>
+  </header>
+
+  <div class="ticker" id="ticker" style="display:none">
+    <div class="tk-label">📢 提醒</div>
+    <div class="tk-track"><div class="tk-move" id="tickerText"></div></div>
+  </div>
+
+  <div class="overview" id="overview"></div>
+
+  <div class="panel">
+    <h2>貼上巡店紀錄</h2>
+    <p class="hint">貼上你的明細表（含表頭那幾行也沒關係，系統會自動略過）。可一次貼整月，或每次巡完一店就補貼，資料會累加。</p>
+    <textarea id="pasteBox" placeholder="填表時間	到店時間	離店時間	區處別	營業點代碼	檢查店點	檢查人員	題號	檢查內容	是否合格	未查／不合格原因&#10;2026/7/1 16:43	...	1	督導駐點		na&#10;..."></textarea>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="parseData()">解析並更新</button>
+      <button class="btn-ghost" onclick="exportData()">匯出存檔</button>
+      <button class="btn-ghost" onclick="document.getElementById('importFile').click()">匯入存檔</button>
+      <button class="btn-ghost" onclick="clearAll()">清空全部資料</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
+    <div class="parse-msg" id="parseMsg"></div>
+  </div>
+
+  <div id="content"></div>
+
+  <footer>資料僅存於本頁面（重新整理會清除）· 台灣大哥大 北一二B</footer>
+</div>
+
+<script>
+/* ---------- 檢核規則設定 ---------- */
+// 九店（用於顯示「尚未巡店」的店）
+const STORES = [
+  {code:"DNB10059", name:"台北通化"},
+  {code:"DNB10062", name:"台北酒泉"},
+  {code:"DNB10307", name:"台北三創"},
+  {code:"DNB10xxx_wanda", name:"台北萬大", alias:["萬大"]},
+  {code:"DNB10440", name:"台北六張犁"},
+  {code:"DNB10094", name:"台北復興南"},
+  {code:"DNB10082", name:"台北永吉"},
+  {code:"DNB10284", name:"台北大稻埕"},
+  {code:"DNB10146", name:"台北杭州南"},
+];
+
+// 題號頻率分類
+// type: 'station'(駐點,任一店na或v都算), 'twice'(上下月各1次), 'monthly'(每月至少1次), 'bimonthly'(2月1次)
+const ITEM_RULES = {};
+for(let i=1;i<=33;i++){
+  if(i===1) ITEM_RULES[i]={type:'station', label:'駐點'};
+  else if(i>=2 && i<=13) ITEM_RULES[i]={type:'twice', label:'上下月各1次'};
+  else if(i>=14 && i<=17) ITEM_RULES[i]={type:'monthly', label:'每月1次'};
+  else if(i===18) ITEM_RULES[i]={type:'bimonthly', label:'2月1次'};
+  else ITEM_RULES[i]={type:'monthly', label:'每月1次'};
+}
+
+// 題目短描述（用於顯示）
+const ITEM_TEXT = {
+  1:"督導駐點",
+  2:"店格陳列／展機防盜／回收桶上鎖",
+  3:"中島展示機無不當資訊且開機恆亮",
+  4:"前後場整潔、公佈欄符合規範",
+  5:"有價商品櫃是否上鎖",
+  6:"電腦記事本／資料夾mail個資檢查",
+  7:"申裝書3日回送、無不當留存個資",
+  8:"同仁服裝儀容與服務態度",
+  9:"出勤與班表一致並載休息時間",
+  10:"人員面談及輔導",
+  11:"門市安全（禁菸／禁火源）",
+  12:"監控設備運作正常",
+  13:"店務日誌與督導簽名",
+  14:"待銷毀文件打包歸檔上鎖",
+  15:"待回送／未結案維修機盤點",
+  16:"保全金零找金現金盤點",
+  17:"iPhone手機盤點盤差登載",
+  18:"到店全盤作業（2月1次）",
+  19:"知悉：NCC風險管理機制指引公布",
+  20:"知悉：受理申請證件納入KYC審核",
+  21:"知悉：拒絕提供資料者應拒辦",
+  22:"知悉：公司已成立查核部門",
+  23:"知悉：自然人雙證件正本核對",
+  24:"知悉：法人團體證件核對",
+  25:"知悉：企業客戶用途清冊實地查訪",
+  26:"知悉：委託代理人證件核對",
+  27:"知悉：初次申辦臨櫃／數位簽章",
+  28:"知悉：初次申辦拍照留存1年",
+  29:"知悉：外籍短效預付卡免拍照條件",
+  30:"知悉：外籍申辦以1門為原則",
+  31:"知悉：外籍簽證少於1月限短效卡",
+  32:"知悉：詐欺受限3年申辦限制",
+  33:"知悉：受限用戶3年再申辦限制",
+};
+
+/* ---------- 資料儲存（記憶體） ---------- */
+// records: { "storeName": { code, entries:[{date, half, item, result}] } }
+let records = {};
+// rawDetails: 完整明細陣列，供上傳雲端與匯出（每筆一列）
+let rawDetails = [];
+let currentMonth = "";
+let GAS_URL = "https://script.google.com/macros/s/AKfycbxTI8mK-WBl28OEUCWILQxvyjhjS7O4RCpNVyfIJbxzVTRI6zzCOSUXAAF7YnedW_dg/exec"; // 已預設
+let cloudOn = false;    // 雲端連線狀態
+
+/* ---------- 初始化月份 ---------- */
+function initMonth(){
+  const now = new Date();
+  const mi = document.getElementById('monthInput');
+  mi.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  currentMonth = mi.value;
+  mi.addEventListener('change', e=>{ currentMonth=e.target.value; render(); });
+}
+
+/* ---------- 解析貼上資料 ---------- */
+function parseData(){
+  const raw = document.getElementById('pasteBox').value;
+  const msg = document.getElementById('parseMsg');
+  if(!raw.trim()){ showMsg('請先貼上資料','err'); return; }
+
+  const lines = raw.split('\n');
+  let added=0;
+  const newDetails=[]; // 這次解析出的完整明細
+
+  lines.forEach(line=>{
+    const cols = line.split('\t');
+    if(cols.length < 8) { return; }
+    // 欄位: 0填表 1到店 2離店 3區處 4代碼 5店點 6人員 7題號 8內容 9合格 10原因
+    const fillTime = (cols[0]||'').trim();
+    const arriveTime = (cols[1]||'').trim();
+    const leaveTime = (cols[2]||'').trim();
+    const district = (cols[3]||'').trim();
+    const code = (cols[4]||'').trim();
+    const store = (cols[5]||'').trim();
+    const inspector = (cols[6]||'').trim();
+    const itemNo = parseInt((cols[7]||'').trim(),10);
+    const content = (cols[8]||'').trim();
+    const result = (cols[9]||'').trim().toLowerCase(); // v 或空
+    const reason = (cols[10]||'').trim().toLowerCase(); // na 或空
+
+    if(!itemNo || itemNo<1 || itemNo>33) return;
+    const dm = fillTime.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+    if(!dm) return;
+    const y=+dm[1], mo=+dm[2], d=+dm[3];
+    const monthKey = `${y}-${String(mo).padStart(2,'0')}`;
+    const half = d<=15 ? 'H1' : 'H2';
+
+    let cell = '';
+    if(result==='v') cell='v';
+    else if(reason==='na') cell='na';
+
+    // 供看板判定用的精簡結構
+    if(!records[store]) records[store]={code, entries:[]};
+    if(code && !records[store].code) records[store].code=code;
+    records[store].entries.push({month:monthKey, date:`${y}/${mo}/${d}`, half, item:itemNo, result:cell});
+
+    // 供雲端與匯出用的完整明細
+    newDetails.push({
+      fillTime, arriveTime, leaveTime, district, code, store, inspector,
+      item:itemNo, content, result: cell, reason:(cols[10]||'').trim(), month:monthKey
+    });
+    added++;
+  });
+
+  if(added>0){
+    rawDetails = rawDetails.concat(newDetails);
+    document.getElementById('pasteBox').value='';
+    render();
+    if(cloudOn){
+      showMsg(`已解析 ${added} 筆，正在上傳雲端…`,'ok');
+      cloudWrite(newDetails);
+    } else {
+      showMsg(`已解析 ${added} 筆檢核紀錄，追蹤看板已更新`,'ok');
+    }
+  } else {
+    showMsg('未解析到有效資料，請確認貼上的是明細表（Tab分隔）','err');
+  }
+}
+
+// 從 rawDetails 重建 records（雲端載入後用）
+function rebuildFromRaw(){
+  records = {};
+  rawDetails.forEach(it=>{
+    const dm = String(it.fillTime).match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+    if(!dm) return;
+    const d=+dm[3];
+    const half = d<=15?'H1':'H2';
+    const store=it.store, code=it.code;
+    if(!records[store]) records[store]={code, entries:[]};
+    if(code && !records[store].code) records[store].code=code;
+    records[store].entries.push({
+      month: it.month || `${dm[1]}-${String(+dm[2]).padStart(2,'0')}`,
+      date:`${dm[1]}/${+dm[2]}/${d}`, half, item:+it.item, result:it.result
+    });
+  });
+}
+
+function showMsg(t,type){
+  const msg=document.getElementById('parseMsg');
+  msg.textContent=t; msg.className='parse-msg '+type;
+  setTimeout(()=>{ if(type==='ok') msg.style.display='none'; },4000);
+}
+
+function clearAll(){
+  if(confirm('確定清空所有已貼上的巡店紀錄？（雲端資料不受影響，重新載入即可還原）')){
+    records={}; rawDetails=[]; render();
+    showMsg('已清空本地資料','ok');
+  }
+}
+
+/* ---------- 匯出 / 匯入（離線備援） ---------- */
+function exportData(){
+  if(rawDetails.length===0){ showMsg('目前沒有資料可匯出','err'); return; }
+  const blob=new Blob([JSON.stringify(rawDetails,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const stamp=new Date().toISOString().slice(0,10);
+  a.href=url; a.download=`巡店明細存檔_${stamp}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  showMsg('已匯出明細存檔','ok');
+}
+
+function importData(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(Array.isArray(data)){ rawDetails=data; rebuildFromRaw(); }
+      else { records=data; } // 相容舊格式
+      render();
+      showMsg('已匯入存檔','ok');
+    }catch(err){
+      showMsg('匯入失敗，檔案格式不正確','err');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+}
+
+/* ---------- 完成度判定 ---------- */
+// 回傳某店某題在當月的狀態: {status:'done'|'miss'|'na-only', detail}
+function itemStatus(storeName, itemNo){
+  const rec = records[storeName];
+  const rule = ITEM_RULES[itemNo];
+  if(!rec) return {status:'miss'};
+
+  const monthEntries = rec.entries.filter(e=>e.month===currentMonth && e.item===itemNo);
+  if(monthEntries.length===0) return {status:'miss'};
+
+  const hasV = monthEntries.some(e=>e.result==='v');
+  const naOnly = monthEntries.every(e=>e.result==='na');
+
+  if(rule.type==='station'){
+    // 駐點：只要當月該店有出現紀錄（v或na皆可）即算完成
+    return {status:'done'};
+  }
+  if(rule.type==='twice'){
+    // 上下月各1次
+    const h1 = monthEntries.some(e=>e.half==='H1' && e.result==='v');
+    const h2 = monthEntries.some(e=>e.half==='H2' && e.result==='v');
+    if(h1 && h2) return {status:'done'};
+    if(h1 || h2) return {status:'miss', detail: h1?'缺下半月':'缺上半月'};
+    return {status:'miss', detail:'上下半月皆缺'};
+  }
+  if(rule.type==='monthly'){
+    return hasV ? {status:'done'} : {status:'miss'};
+  }
+  if(rule.type==='bimonthly'){
+    // 2月1次：當月或上月有v即可
+    const [y,m]=currentMonth.split('-').map(Number);
+    const prevM = m===1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}`;
+    const hasVbi = rec.entries.some(e=>(e.month===currentMonth||e.month===prevM)&&e.item===itemNo&&e.result==='v');
+    return hasVbi ? {status:'done'} : {status:'miss', detail:'本月/上月皆缺'};
+  }
+  return {status:'miss'};
+}
+
+/* ---------- 統計某店完成度 ---------- */
+function storeSummary(storeName){
+  let done=0, miss=0, missItems=[];
+  for(let i=1;i<=33;i++){
+    const s=itemStatus(storeName,i);
+    if(s.status==='done') done++;
+    else { miss++; missItems.push({no:i, detail:s.detail}); }
+  }
+  return {done, miss, total:33, missItems, pct:Math.round(done/33*100)};
+}
+
+/* ---------- 渲染 ---------- */
+function render(){
+  renderTicker();
+  renderOverview();
+  renderStores();
+}
+
+/* ---------- 跑馬燈 ---------- */
+function renderTicker(){
+  const ticker=document.getElementById('ticker');
+  const track=document.getElementById('tickerText');
+  const visitedStores = Object.keys(records).filter(s=>
+    records[s].entries.some(e=>e.month===currentMonth));
+
+  const items=[];
+
+  // 尚未巡店
+  const notVisited = STORES.filter(st=>
+    !visitedStores.some(vs=>vs.includes(st.name.replace('台北',''))||st.name.includes(vs)||(records[vs]&&records[vs].code===st.code))
+  );
+  if(notVisited.length>0){
+    items.push(`⚠ 本月尚未巡店：${notVisited.map(s=>s.name).join('、')}`);
+  }
+
+  // 缺漏最多的店（前3）
+  const withMiss = visitedStores.map(s=>({name:s, miss:storeSummary(s).miss}))
+    .filter(o=>o.miss>0).sort((a,b)=>b.miss-a.miss).slice(0,3);
+  withMiss.forEach(o=>{
+    items.push(`${o.name} 尚缺 ${o.miss} 項待補`);
+  });
+
+  if(visitedStores.length===0){
+    ticker.style.display='none';
+    return;
+  }
+
+  ticker.style.display='flex';
+  if(items.length===0){
+    ticker.classList.add('clear');
+    track.innerHTML=`<span>✓ 本月所有已巡店點皆完成檢核，狀態良好</span>`;
+  } else {
+    ticker.classList.remove('clear');
+    // 重複兩份確保滾動連續
+    const line=items.map(t=>`<span>${t}</span>`).join('<span class="sep">•</span>');
+    track.innerHTML=line;
+  }
+}
+
+function renderOverview(){
+  const ov=document.getElementById('overview');
+  const visitedStores = Object.keys(records).filter(s=>
+    records[s].entries.some(e=>e.month===currentMonth));
+
+  let totalDone=0, totalMiss=0;
+  visitedStores.forEach(s=>{
+    const sm=storeSummary(s);
+    totalDone+=sm.done; totalMiss+=sm.miss;
+  });
+  const fullyDone = visitedStores.filter(s=>storeSummary(s).miss===0).length;
+  const notVisited = STORES.filter(st=>
+    !visitedStores.some(vs=>vs.includes(st.name.replace('台北',''))||st.name.includes(vs))
+  ).length;
+
+  ov.innerHTML=`
+    <div class="stat"><div class="num">${visitedStores.length}</div><div class="lbl">本月已巡店數</div></div>
+    <div class="stat"><div class="num good">${fullyDone}</div><div class="lbl">全項完成店數</div></div>
+    <div class="stat"><div class="num ${totalMiss>0?'warn':''}">${totalMiss}</div><div class="lbl">尚缺檢核項次</div></div>
+    <div class="stat"><div class="num ${notVisited>0?'warn':''}">${notVisited}</div><div class="lbl">尚未巡店數</div></div>
+  `;
+}
+
+function renderStores(){
+  const c=document.getElementById('content');
+  const visitedStores = Object.keys(records).filter(s=>
+    records[s].entries.some(e=>e.month===currentMonth))
+    .sort((a,b)=>storeSummary(a).miss - storeSummary(b).miss ? storeSummary(b).miss-storeSummary(a).miss : 0);
+
+  if(visitedStores.length===0){
+    c.innerHTML=`<div class="empty-state"><div class="big">📋</div>本月尚無巡店紀錄<br>貼上明細表後即可開始追蹤</div>`;
+    return;
+  }
+
+  let html='';
+
+  // 需注意的店（有缺漏）排前面
+  const withMiss = visitedStores.filter(s=>storeSummary(s).miss>0)
+    .sort((a,b)=>storeSummary(b).miss-storeSummary(a).miss);
+  const allDone = visitedStores.filter(s=>storeSummary(s).miss===0);
+
+  if(withMiss.length>0){
+    html+=`<div class="section-title">待補完成 <span class="badge">${withMiss.length} 店</span></div>`;
+    withMiss.forEach(s=>html+=storeCardHTML(s));
+  }
+  if(allDone.length>0){
+    html+=`<div class="section-title">本月已完成 <span class="badge">${allDone.length} 店</span></div>`;
+    allDone.forEach(s=>html+=storeCardHTML(s));
+  }
+
+  // 未巡店提醒
+  const notVisited = STORES.filter(st=>
+    !visitedStores.some(vs=>vs.includes(st.name.replace('台北',''))||st.name.includes(vs)||(records[vs]&&records[vs].code===st.code))
+  );
+  if(notVisited.length>0){
+    html+=`<div class="section-title">本月尚未巡店 <span class="badge">${notVisited.length} 店</span></div>`;
+    html+=`<div class="store-card"><div class="store-body" style="display:block;border-top:none;padding-top:14px">`;
+    notVisited.forEach(st=>{
+      html+=`<div class="item miss"><div class="no">—</div><div class="txt">${st.name}</div><div class="tag">${st.code}</div></div>`;
+    });
+    html+=`</div></div>`;
+  }
+
+  c.innerHTML=html;
+}
+
+function storeCardHTML(storeName){
+  const sm=storeSummary(storeName);
+  const rec=records[storeName];
+  const pillClass = sm.miss===0?'done':(sm.done>0?'partial':'none');
+  const pillText = sm.miss===0?'完成':`缺 ${sm.miss} 項`;
+
+  let bodyHtml='';
+  if(sm.miss===0){
+    bodyHtml=`<div class="all-done">✓ 本月 33 項檢核全數完成</div>`;
+  } else {
+    bodyHtml=`<div class="miss-group"><h4>尚未完成項目</h4>`;
+    sm.missItems.forEach(mi=>{
+      const detail=mi.detail?`<span class="tag">${mi.detail}</span>`:`<span class="tag">${ITEM_RULES[mi.no].label}</span>`;
+      bodyHtml+=`<div class="item miss"><div class="no">${mi.no}</div><div class="txt">${ITEM_TEXT[mi.no]}</div>${detail}</div>`;
+    });
+    bodyHtml+=`</div>`;
+  }
+
+  return `
+  <div class="store-card" onclick="this.classList.toggle('open')">
+    <div class="store-head">
+      <div class="left">
+        <div>
+          <div class="store-name">${storeName}</div>
+          <div class="store-code">${rec.code||''}</div>
+        </div>
+      </div>
+      <div class="right">
+        <div class="bar"><span style="width:${sm.pct}%;background:${sm.miss===0?'var(--ok)':'var(--tw-orange)'}"></span></div>
+        <div class="pill ${pillClass}">${pillText}</div>
+        <div class="chevron">▶</div>
+      </div>
+    </div>
+    <div class="store-body" onclick="event.stopPropagation()">${bodyHtml}</div>
+  </div>`;
+}
+
+/* ---------- 雲端同步（Google Apps Script） ---------- */
+// 用 GET + 參數避開 CORS preflight，寫入時 payload 走 query string
+function cloudCall(action, params={}){
+  const url = new URL(GAS_URL);
+  url.searchParams.set('action', action);
+  Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
+  return fetch(url.toString(), {method:'GET'}).then(r=>r.json());
+}
+
+function cloudConnect(){
+  const input=document.getElementById('gasUrl').value.trim();
+  if(input) GAS_URL=input;
+  if(!GAS_URL){ setCloudStatus('未設定',false); showMsg('請先貼上 GAS 網址','err'); return; }
+  setCloudStatus('連線中…',false);
+  cloudCall('ping').then(res=>{
+    if(res.ok){
+      cloudOn=true;
+      setCloudStatus('已連線',true);
+      showMsg('雲端已連線，正在載入資料…','ok');
+      cloudLoad();
+    }else{
+      cloudOn=false; setCloudStatus('連線失敗',false);
+      showMsg('連線失敗：'+(res.error||'未知錯誤'),'err');
+    }
+  }).catch(err=>{
+    cloudOn=false; setCloudStatus('連線失敗',false);
+    showMsg('連線失敗，請確認網址與部署權限（需設為「任何人」可存取）','err');
+  });
+}
+
+function cloudLoad(){
+  if(!cloudOn) return;
+  cloudCall('read').then(res=>{
+    if(res.ok){
+      rawDetails = (res.rows||[]).map(r=>({
+        fillTime:r.fillTime, arriveTime:r.arriveTime, leaveTime:r.leaveTime,
+        district:r.district, code:r.code, store:r.store, inspector:r.inspector,
+        item:+r.item, content:r.content, result:r.result, reason:r.reason, month:r.month
+      }));
+      rebuildFromRaw();
+      render();
+      showMsg(`雲端已載入 ${rawDetails.length} 筆明細`,'ok');
+    }else{
+      showMsg('讀取失敗：'+(res.error||''),'err');
+    }
+  }).catch(()=>showMsg('讀取雲端失敗','err'));
+}
+
+function cloudWrite(details){
+  if(!cloudOn) return;
+  cloudCall('write', {payload: JSON.stringify(details)}).then(res=>{
+    if(res.ok) showMsg(`已同步 ${res.written} 筆至雲端`,'ok');
+    else showMsg('雲端寫入失敗：'+(res.error||''),'err');
+  }).catch(()=>showMsg('雲端寫入失敗（本地已保留）','err'));
+}
+
+function setCloudStatus(text, on){
+  const el=document.getElementById('cloudStatus');
+  if(!el) return;
+  el.textContent='● '+text;
+  el.style.color = on ? '#7CFFA0' : '#ff9c9c';
+}
+
+/* ---------- 啟動 ---------- */
+initMonth();
+render();
+// 有預設 GAS URL 時自動連線
+if(GAS_URL){
+  const gi=document.getElementById('gasUrl');
+  if(gi) gi.value=GAS_URL;
+  cloudConnect();
+}
+
+</script>
+</body>
+</html>
