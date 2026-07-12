@@ -252,3 +252,110 @@ function jsonResponse(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+// ════════════════════════════════════
+// 自動檢查未回報 + Email 通知
+//
+// 啟用方式（只需做一次）：
+//   1. 把本檔最新內容貼進 GAS 編輯器並存檔
+//   2. 上方函式選單選「setupTriggers」→ 執行（會跳出授權畫面，同意即可）
+//   3. 之後每天 16:20、21:20（台北時間，±15分）自動檢查並寄信
+//
+// 注意：時間觸發器執行的是「編輯器裡最新存檔的程式碼」，
+// 這部分【不需要】重新部署 Web App；只有 doGet 相關改動才要重新部署。
+// 想立即測試：函式選單選「testNotify」執行，會用目前時段寄一封測試信。
+// ════════════════════════════════════
+
+const NOTIFY_EMAIL = 'lian852456@gmail.com';
+const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
+
+function setupTriggers() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (['check16', 'check21'].indexOf(t.getHandlerFunction()) !== -1) {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger('check16').timeBased().everyDays(1)
+    .atHour(16).nearMinute(20).inTimezone('Asia/Taipei').create();
+  ScriptApp.newTrigger('check21').timeBased().everyDays(1)
+    .atHour(21).nearMinute(20).inTimezone('Asia/Taipei').create();
+}
+
+function check16() { checkSegAndNotify(16); }
+function check21() { checkSegAndNotify(21); }
+
+// 手動測試用：依目前台北時間挑最近的時段檢查一次
+function testNotify() {
+  const hour = Number(Utilities.formatDate(new Date(), 'Asia/Taipei', 'H'));
+  checkSegAndNotify(hour >= 19 ? 21 : 16);
+}
+
+function checkSegAndNotify(seg) {
+  const today = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd');
+  const data = readData(today, seg);
+  const missing = STORES.filter(s => !data[s]);
+
+  if (missing.length > 0) {
+    const filled = STORES.filter(s => !!data[s]);
+    const subject = '⚠️ 北一二B ' + today + ' ' + seg + ':00 尚有 ' + missing.length + ' 間未回報';
+    const body =
+      '📋 ' + today + ' ' + seg + ':00 時段回報檢查\n\n' +
+      '🔴 未回報（' + missing.length + ' 間）：\n' +
+      missing.map(s => '　・' + s).join('\n') + '\n\n' +
+      '✅ 已回報（' + filled.length + ' 間）：' + (filled.join('、') || '無') + '\n\n' +
+      '請儘速跟進未填門市。';
+    MailApp.sendEmail(NOTIFY_EMAIL, subject, body);
+    return;
+  }
+
+  // ── 全數完成：報平安 + A999/好速/R1399 三項進度 ──
+  const items = [
+    { key: 'aq999',  label: 'A999(筆)' },
+    { key: 'haosu',  label: '好速(點)' },
+    { key: 'rt1399', label: 'R1399(筆)' },
+  ];
+  const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+  const rows = STORES.map(s => {
+    const vals = items.map(it => num(data[s][it.key]));
+    return { store: s, vals: vals, total: vals[0] + vals[1] + vals[2] };
+  });
+  const totals = items.map((it, i) => rows.reduce((a, r) => a + r.vals[i], 0));
+  const sorted = rows.slice().sort((a, b) => b.total - a.total);
+  const best = sorted[0];
+  const worst = sorted[sorted.length - 1];
+  const zeroStores = rows.filter(r => r.vals.some(v => v === 0));
+
+  const fmtN = n => n % 1 === 0 ? String(n) : n.toFixed(2);
+  const td = 'padding:6px 12px;border:1px solid #e5e7eb;text-align:center;';
+  const tableRows = rows.map(r => {
+    const mark = r.store === best.store ? ' 🏆' : (r.store === worst.store ? ' 📢' : '');
+    const cells = r.vals.map(v =>
+      '<td style="' + td + (v === 0 ? 'color:#ef4444;font-weight:700;' : '') + '">' + fmtN(v) + '</td>'
+    ).join('');
+    return '<tr><td style="' + td + 'text-align:left;font-weight:700;">' + r.store + mark + '</td>' +
+           cells + '<td style="' + td + '">' + fmtN(r.total) + '</td></tr>';
+  }).join('');
+  const totalRow =
+    '<tr style="background:#fff7ed;font-weight:800;"><td style="' + td + 'text-align:left;">全區合計</td>' +
+    totals.map(t => '<td style="' + td + '">' + fmtN(t) + '</td>').join('') +
+    '<td style="' + td + '">' + fmtN(totals[0] + totals[1] + totals[2]) + '</td></tr>';
+
+  const htmlBody =
+    '<div style="font-family:sans-serif;font-size:14px;color:#1f2937;">' +
+    '<h2 style="color:#16a34a;">✅ ' + today + ' ' + seg + ':00 全數回報完成！</h2>' +
+    '<p>🏆 表現最佳：<strong>' + best.store + '</strong>（三項合計 ' + fmtN(best.total) + '）<br>' +
+    '📢 需要加油：<strong>' + worst.store + '</strong>（三項合計 ' + fmtN(worst.total) + '）</p>' +
+    (zeroStores.length
+      ? '<p style="color:#ef4444;">🔴 有項目掛 0 的門市：' + zeroStores.map(r => r.store).join('、') + '</p>'
+      : '<p style="color:#16a34a;">🌟 所有門市三項皆有開出！</p>') +
+    '<table style="border-collapse:collapse;font-size:13px;">' +
+    '<tr style="background:#f9fafb;font-weight:700;"><td style="' + td + '">店點</td>' +
+    items.map(it => '<td style="' + td + '">' + it.label + '</td>').join('') +
+    '<td style="' + td + '">合計</td></tr>' +
+    tableRows + totalRow +
+    '</table></div>';
+
+  const subject = '✅ 北一二B ' + today + ' ' + seg + ':00 全數回報完成｜A999 ' +
+    fmtN(totals[0]) + '筆・好速 ' + fmtN(totals[1]) + '點・R1399 ' + fmtN(totals[2]) + '筆';
+  MailApp.sendEmail(NOTIFY_EMAIL, subject, '請用支援 HTML 的信箱檢視此郵件。', { htmlBody: htmlBody });
+}
