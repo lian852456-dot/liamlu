@@ -2,6 +2,12 @@
 
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）+ Google Sheets。
 
+另有 `patrol.html`（督導巡店追蹤系統）：貼上巡店明細表 → 33 項檢核看板。
+與 index.html **共用同一個 GAS 部署**（localStorage `bei12b_gas_url` 也共用），
+資料存「巡店明細」工作表，API 為 `?action=ptread`（fetch GET 讀全部）與
+`?action=ptwrite&payload=...`（JSONP 寫入，前端每 10 筆分批送避免網址過長；
+GAS 端以 fillTime+store+item 為唯一鍵去重，content 欄不上傳、由題號 ITEM_TEXT 還原）。
+
 ## 架構
 
 - **前端**：`index.html`（HTML/CSS/JS 全在一個檔案），localStorage 存個人回報資料

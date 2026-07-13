@@ -213,7 +213,7 @@
 
   <div class="panel">
     <h2>貼上巡店紀錄</h2>
-    <p class="hint">貼上你的明細表（含表頭那幾行也沒關係，系統會自動略過）。可一次貼整月，或每次巡完一店就補貼，資料會累加。</p>
+    <p class="hint">貼上你的明細表（含表頭那幾行也沒關係，系統會自動略過）。可一次貼整月，或每次巡完一店就補貼，資料會累加並自動同步雲端——手機開同一網址就看得到。</p>
     <textarea id="pasteBox" placeholder="填表時間	到店時間	離店時間	區處別	營業點代碼	檢查店點	檢查人員	題號	檢查內容	是否合格	未查／不合格原因&#10;2026/7/1 16:43	...	1	督導駐點		na&#10;..."></textarea>
     <div class="btn-row">
       <button class="btn-primary" onclick="parseData()">解析並更新</button>
@@ -227,7 +227,7 @@
 
   <div id="content"></div>
 
-  <footer>資料僅存於本頁面（重新整理會清除）· 台灣大哥大 北一二B</footer>
+  <footer>資料透過 GAS 同步至雲端試算表（跨裝置共用）· 台灣大哥大 北一二B</footer>
 </div>
 
 <script>
@@ -299,7 +299,8 @@ let records = {};
 // rawDetails: 完整明細陣列，供上傳雲端與匯出（每筆一列）
 let rawDetails = [];
 let currentMonth = "";
-let GAS_URL = "https://script.google.com/macros/s/AKfycbxTI8mK-WBl28OEUCWILQxvyjhjS7O4RCpNVyfIJbxzVTRI6zzCOSUXAAF7YnedW_dg/exec"; // 已預設
+// 與 index.html 共用同一個 GAS 部署（可在畫面上貼新網址覆蓋，會存進 localStorage）
+let GAS_URL = localStorage.getItem('bei12b_gas_url') || "https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec";
 let cloudOn = false;    // 雲端連線狀態
 
 /* ---------- 初始化月份 ---------- */
@@ -639,12 +640,30 @@ function storeCardHTML(storeName){
 }
 
 /* ---------- 雲端同步（Google Apps Script） ---------- */
-// 用 GET + 參數避開 CORS preflight，寫入時 payload 走 query string
+// 讀取用 fetch GET（GAS 對簡單 GET 沒有 CORS 問題，與 index.html 同作法）
 function cloudCall(action, params={}){
   const url = new URL(GAS_URL);
   url.searchParams.set('action', action);
   Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
-  return fetch(url.toString(), {method:'GET'}).then(r=>r.json());
+  return fetch(url.toString(), {method:'GET', cache:'no-store'}).then(r=>r.json());
+}
+
+// 寫入走 JSONP（script tag + callback，與 index.html 同作法）
+function cloudCallJsonp(action, params={}){
+  return new Promise((resolve, reject)=>{
+    const cbName = 'ptCb_' + Date.now() + '_' + Math.floor(Math.random()*1e6);
+    const url = new URL(GAS_URL);
+    url.searchParams.set('action', action);
+    Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
+    url.searchParams.set('callback', cbName);
+    const s = document.createElement('script');
+    const timer = setTimeout(()=>{ cleanup(); reject(new Error('連線逾時')); }, 30000);
+    function cleanup(){ clearTimeout(timer); delete window[cbName]; s.remove(); }
+    window[cbName] = res => { cleanup(); resolve(res); };
+    s.onerror = ()=>{ cleanup(); reject(new Error('網路錯誤')); };
+    s.src = url.toString();
+    document.body.appendChild(s);
+  });
 }
 
 function cloudConnect(){
@@ -653,14 +672,15 @@ function cloudConnect(){
   if(!GAS_URL){ setCloudStatus('未設定',false); showMsg('請先貼上 GAS 網址','err'); return; }
   setCloudStatus('連線中…',false);
   cloudCall('ping').then(res=>{
-    if(res.ok){
+    if(res.status==='ok'){
       cloudOn=true;
+      localStorage.setItem('bei12b_gas_url', GAS_URL);
       setCloudStatus('已連線',true);
       showMsg('雲端已連線，正在載入資料…','ok');
       cloudLoad();
     }else{
       cloudOn=false; setCloudStatus('連線失敗',false);
-      showMsg('連線失敗：'+(res.error||'未知錯誤'),'err');
+      showMsg('連線失敗：'+(res.message||'未知錯誤'),'err');
     }
   }).catch(err=>{
     cloudOn=false; setCloudStatus('連線失敗',false);
@@ -670,28 +690,42 @@ function cloudConnect(){
 
 function cloudLoad(){
   if(!cloudOn) return;
-  cloudCall('read').then(res=>{
-    if(res.ok){
+  cloudCall('ptread').then(res=>{
+    if(res.status==='ok'){
       rawDetails = (res.rows||[]).map(r=>({
-        fillTime:r.fillTime, arriveTime:r.arriveTime, leaveTime:r.leaveTime,
-        district:r.district, code:r.code, store:r.store, inspector:r.inspector,
-        item:+r.item, content:r.content, result:r.result, reason:r.reason, month:r.month
+        fillTime:String(r.fillTime||''), arriveTime:String(r.arriveTime||''), leaveTime:String(r.leaveTime||''),
+        district:String(r.district||''), code:String(r.code||''), store:String(r.store||''), inspector:String(r.inspector||''),
+        item:+r.item, content:ITEM_TEXT[+r.item]||'', result:String(r.result||'').toLowerCase(),
+        reason:String(r.reason||''), month:String(r.month||'')
       }));
       rebuildFromRaw();
       render();
       showMsg(`雲端已載入 ${rawDetails.length} 筆明細`,'ok');
     }else{
-      showMsg('讀取失敗：'+(res.error||''),'err');
+      showMsg('讀取失敗：'+(res.message||''),'err');
     }
   }).catch(()=>showMsg('讀取雲端失敗','err'));
 }
 
 function cloudWrite(details){
   if(!cloudOn) return;
-  cloudCall('write', {payload: JSON.stringify(details)}).then(res=>{
-    if(res.ok) showMsg(`已同步 ${res.written} 筆至雲端`,'ok');
-    else showMsg('雲端寫入失敗：'+(res.error||''),'err');
-  }).catch(()=>showMsg('雲端寫入失敗（本地已保留）','err'));
+  // content 可由題號還原，不上傳以縮短網址（JSONP payload 走 query string，有長度限制故分批）
+  const slim = details.map(d=>({
+    fillTime:d.fillTime, arriveTime:d.arriveTime, leaveTime:d.leaveTime, district:d.district,
+    code:d.code, store:d.store, inspector:d.inspector, item:d.item,
+    result:d.result, reason:d.reason, month:d.month
+  }));
+  const CHUNK = 10;
+  let written = 0, chain = Promise.resolve();
+  for(let i=0; i<slim.length; i+=CHUNK){
+    const part = slim.slice(i, i+CHUNK);
+    chain = chain.then(()=>cloudCallJsonp('ptwrite', {payload: JSON.stringify(part)})).then(res=>{
+      if(res.status==='ok') written += (res.written||0);
+      else throw new Error(res.message||'寫入失敗');
+    });
+  }
+  chain.then(()=>showMsg(`已同步至雲端（新增 ${written} 筆，重複資料自動略過）`,'ok'))
+    .catch(err=>showMsg('雲端寫入失敗：'+err.message+'（資料仍在本頁看板，請檢查網路後按「連線」重試上傳）','err'));
 }
 
 function setCloudStatus(text, on){
