@@ -493,11 +493,10 @@ function itemStatus(storeName, itemNo){
     return hasV ? {status:'done'} : {status:'miss'};
   }
   if(rule.type==='bimonthly'){
-    // 2月1次：當月或上月有v即可
-    const [y,m]=currentMonth.split('-').map(Number);
-    const prevM = m===1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}`;
-    const hasVbi = rec.entries.some(e=>(e.month===currentMonth||e.month===prevM)&&e.item===itemNo&&e.result==='v');
-    return hasVbi ? {status:'done'} : {status:'miss', detail:'本月/上月皆缺'};
+    // 2月1次：固定週期 1-2、3-4、5-6、7-8、9-10、11-12 月，週期內任一月有v即算
+    const win = bimWindow(currentMonth);
+    const hasVbi = rec.entries.some(e=>win.months.includes(e.month)&&e.item===itemNo&&e.result==='v');
+    return hasVbi ? {status:'done'} : {status:'miss', detail:`本期(${win.label})未完成`};
   }
   return {status:'miss'};
 }
@@ -533,15 +532,24 @@ function findRecordStore(st){
   ) || null;
 }
 
-function prevMonthKey(mk){
+// 題18固定雙月週期：1-2、3-4、5-6、7-8、9-10、11-12
+function bimWindow(mk){
   const [y,m] = mk.split('-').map(Number);
-  return m===1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}`;
+  const s = (m%2===1) ? m : m-1; // 週期起始月（奇數月）
+  const pad = n=>String(n).padStart(2,'0');
+  return { months:[`${y}-${pad(s)}`, `${y}-${pad(s+1)}`], label:`${s}–${s+1}月` };
+}
+function prevBimWindow(mk){
+  const [y,m] = mk.split('-').map(Number);
+  const s = (m%2===1) ? m : m-1;
+  return s===1 ? bimWindow(`${y-1}-11`) : bimWindow(`${y}-${String(s-2).padStart(2,'0')}`);
 }
 
 function renderInvPanels(){
   const c = document.getElementById('invPanels');
   const [cy,cm] = currentMonth.split('-');
-  const prevM = prevMonthKey(currentMonth);
+  const win = bimWindow(currentMonth);
+  const pwin = prevBimWindow(currentMonth);
 
   // ── 題14-17：每店每月各1次 ──
   let doneStores = 0, rowsA = '';
@@ -557,21 +565,18 @@ function renderInvPanels(){
     rowsA += `<tr><td class="store">${st.name.replace('台北','')}</td>${cells}</tr>`;
   });
 
-  // ── 題18：2個月1次（本月或上月完成過即算）──
+  // ── 題18：2個月1次，固定週期 1-2、3-4、5-6、7-8、9-10、11-12 ──
   let done18 = 0, rowsB = '';
   STORES.forEach(st=>{
     const rs = findRecordStore(st);
-    let last = null;
-    if(rs){
-      records[rs].entries.forEach(e=>{
-        if(e.item===18 && e.result==='v' && (!last || e.month > last.month)) last = e;
-      });
-    }
-    const ok = last && (last.month===currentMonth || last.month===prevM);
-    if(ok) done18++;
+    const vs = rs ? records[rs].entries.filter(e=>e.item===18 && e.result==='v') : [];
+    const cur  = vs.find(e=>win.months.includes(e.month));
+    const prev = vs.find(e=>pwin.months.includes(e.month));
+    if(cur) done18++;
     rowsB += `<tr><td class="store">${st.name.replace('台北','')}</td>
-      <td class="${ok?'inv-ok':'inv-miss'}">${ok?'✓ 已完成':'✗ 未完成'}</td>
-      <td class="inv-last">${last ? last.date : '—'}</td></tr>`;
+      <td class="${cur?'inv-ok':'inv-miss'}">${cur?'✓ 已完成':'✗ 未完成'}</td>
+      <td class="inv-last">${cur ? cur.date : '—'}</td>
+      <td class="inv-last">${prev ? '✓ '+prev.date : '✗'}</td></tr>`;
   });
 
   c.innerHTML = `
@@ -584,10 +589,10 @@ function renderInvPanels(){
     </table></div>
   </div>
   <div class="panel">
-    <h2>到店全盤提醒（題 18・2個月1次）<span class="inv-badge ${done18===STORES.length?'ok':''}">${done18}/${STORES.length} 店完成</span></h2>
-    <p class="hint">本月（${currentMonth}）或上月（${prevM}）內完成過即算完成</p>
+    <h2>到店全盤提醒（題 18・本期 ${win.label}）<span class="inv-badge ${done18===STORES.length?'ok':''}">${done18}/${STORES.length} 店完成</span></h2>
+    <p class="hint">固定週期 1–2、3–4、5–6、7–8、9–10、11–12 月，週期內任一月完成即算；每筆紀錄永久保存於雲端「巡店明細」工作表，切換上方月份可回看歷史週期</p>
     <div class="inv-wrap"><table class="inv-table">
-      <tr><th style="text-align:left">店點</th><th>狀態</th><th>最近完成日</th></tr>
+      <tr><th style="text-align:left">店點</th><th>本期 ${win.label}</th><th>完成日</th><th>上期 ${pwin.label}</th></tr>
       ${rowsB}
     </table></div>
   </div>`;
