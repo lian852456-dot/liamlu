@@ -185,7 +185,11 @@
   .inv-table td.store{text-align:left;font-weight:700}
   .inv-ok{color:var(--ok);font-weight:800}
   .inv-miss{color:var(--miss);font-weight:800}
+  .inv-warn{color:var(--tw-orange);font-weight:800}
   .inv-last{font-size:12px;color:var(--muted)}
+  .inv-prog{display:flex;align-items:center;gap:8px;justify-content:center}
+  .inv-prog .bar{width:64px}
+  .inv-prog .num{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:38px;text-align:left}
 
   .legend{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.8}
   .legend b{color:#555}
@@ -579,6 +583,45 @@ function renderInvPanels(){
       <td class="inv-last">${prev ? '✓ '+prev.date : '✗'}</td></tr>`;
   });
 
+  // ── 題19-33：每月20日前全數完成（只看總進度，不逐項列出）──
+  const AWARE_ITEMS = [];
+  for(let i=19;i<=33;i++) AWARE_ITEMS.push(i);
+  const today = new Date();
+  const realMonth = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
+  const isCurMonth = currentMonth===realMonth;
+  const daysLeft = 20 - today.getDate();
+  let doneAware = 0, rowsC = '';
+  STORES.forEach(st=>{
+    const rs = findRecordStore(st);
+    let cnt = 0, doneDay = 0;
+    AWARE_ITEMS.forEach(it=>{
+      const days = (rs ? records[rs].entries : [])
+        .filter(e=>e.month===currentMonth && e.item===it && e.result==='v')
+        .map(e=>+e.date.split('/')[2]);
+      if(days.length){
+        cnt++;
+        const first = Math.min.apply(null, days); // 該題最早完成日
+        if(first > doneDay) doneDay = first;      // 全部完成日＝最晚補齊那題的日期
+      }
+    });
+    const all = cnt===AWARE_ITEMS.length;
+    if(all) doneAware++;
+    let stateCell;
+    if(all){
+      stateCell = `<td class="inv-ok">✓ 已完成${doneDay>20?'<span class="inv-last">（逾20日）</span>':''}</td>`;
+    }else if(isCurMonth && daysLeft>=0){
+      stateCell = `<td class="inv-warn">剩 ${daysLeft} 天</td>`;
+    }else if(isCurMonth){
+      stateCell = `<td class="inv-miss">⚠ 逾期 ${-daysLeft} 天</td>`;
+    }else{
+      stateCell = `<td class="inv-miss">✗ 未完成</td>`;
+    }
+    rowsC += `<tr><td class="store">${st.name.replace('台北','')}</td>
+      <td><div class="inv-prog"><div class="bar"><span style="width:${Math.round(cnt/AWARE_ITEMS.length*100)}%;background:${all?'var(--ok)':'var(--tw-orange)'}"></span></div><span class="num">${cnt}/${AWARE_ITEMS.length}</span></div></td>
+      ${stateCell}
+      <td class="inv-last">${all ? `${+cm}/${doneDay}` : '—'}</td></tr>`;
+  });
+
   c.innerHTML = `
   <div class="panel">
     <h2>每月盤點提醒（題 14–17）<span class="inv-badge ${doneStores===STORES.length?'ok':''}">${doneStores}/${STORES.length} 店完成</span></h2>
@@ -594,6 +637,14 @@ function renderInvPanels(){
     <div class="inv-wrap"><table class="inv-table">
       <tr><th style="text-align:left">店點</th><th>本期 ${win.label}</th><th>完成日</th><th>上期 ${pwin.label}</th></tr>
       ${rowsB}
+    </table></div>
+  </div>
+  <div class="panel">
+    <h2>知悉宣導提醒（題 19–33・每月20日前）<span class="inv-badge ${doneAware===STORES.length?'ok':''}">${doneAware}/${STORES.length} 店完成</span></h2>
+    <p class="hint">15 題知悉項目需於每月 20 日前全數勾核一次；此處只看總進度，缺哪幾題請展開下方店點卡片查看</p>
+    <div class="inv-wrap"><table class="inv-table">
+      <tr><th style="text-align:left">店點</th><th>進度</th><th>狀態</th><th>完成日</th></tr>
+      ${rowsC}
     </table></div>
   </div>`;
 }
