@@ -732,17 +732,34 @@ function cloudWrite(details){
     code:d.code, store:d.store, inspector:d.inspector, item:d.item,
     result:d.result, reason:d.reason, month:d.month
   }));
-  const CHUNK = 10;
-  let written = 0, chain = Promise.resolve();
-  for(let i=0; i<slim.length; i+=CHUNK){
-    const part = slim.slice(i, i+CHUNK);
-    chain = chain.then(()=>cloudCallJsonp('ptwrite', {payload: JSON.stringify(part), key: PT_KEY})).then(res=>{
-      if(res.status==='ok') written += (res.written||0);
-      else throw new Error(res.message==='unauthorized' ? '通行碼錯誤' : (res.message||'寫入失敗'));
+  // 依編碼後長度分批，避免單筆「未查原因」文字太長把網址撐爆
+  const chunks = []; let part = [];
+  slim.forEach(r=>{
+    part.push(r);
+    if(encodeURIComponent(JSON.stringify(part)).length > 3500){
+      if(part.length > 1){ part.pop(); chunks.push(part); part = [r]; }
+      else { chunks.push(part); part = []; }
+    }
+  });
+  if(part.length) chunks.push(part);
+
+  // 每批失敗自動重試一次，避免一批網路閃斷讓後面全部沒送
+  const sendChunk = (c, attempt)=>cloudCallJsonp('ptwrite', {payload: JSON.stringify(c), key: PT_KEY})
+    .then(res=>{
+      if(res.status==='ok') return res.written||0;
+      throw new Error(res.message==='unauthorized' ? '通行碼錯誤' : (res.message||'寫入失敗'));
+    })
+    .catch(err=>{
+      if(attempt < 1 && err.message !== '通行碼錯誤') return sendChunk(c, attempt+1);
+      throw err;
     });
-  }
-  chain.then(()=>showMsg(`已同步至雲端（新增 ${written} 筆，重複資料自動略過）`,'ok'))
-    .catch(err=>showMsg('雲端寫入失敗：'+err.message+'（資料仍在本頁看板，請檢查網路後按「連線」重試上傳）','err'));
+
+  let written = 0, chain = Promise.resolve();
+  chunks.forEach(c=>{ chain = chain.then(()=>sendChunk(c, 0)).then(n=>{ written += n; }); });
+  chain.then(()=>{
+    showMsg(`已同步至雲端（新增 ${written} 筆，重複資料自動略過），正在核對…`,'ok');
+    cloudLoad(true); // 同步完成後改以雲端資料為準，看板內容＝手機看到的內容
+  }).catch(err=>showMsg('雲端寫入失敗：'+err.message+'（資料仍在本頁看板，請重新整理後把完整明細整份重貼一次補齊）','err'));
 }
 
 function setCloudStatus(text, on){

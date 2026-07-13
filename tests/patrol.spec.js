@@ -5,6 +5,7 @@ const path = require('path');
 // 驗證「電腦貼上 → 上雲 → 另一裝置載入」的跨裝置同步流程
 const PT_KEY = 'test123';
 let cloudRows;
+let writeCalls;
 
 async function stubGas(page) {
   await page.route('https://script.google.com/**', route => {
@@ -20,6 +21,7 @@ async function stubGas(page) {
         ? JSON.stringify({ status: 'ok', rows: cloudRows })
         : JSON.stringify({ status: 'error', message: 'unauthorized' });
     } else if (action === 'ptwrite') {
+      writeCalls++;
       if (!authed) {
         body = JSON.stringify({ status: 'error', message: 'unauthorized' });
       } else {
@@ -56,7 +58,7 @@ function pasteLine(d, store, code, item, result, reason) {
   return `2026/7/${d} 16:43\t2026/7/${d} 16:00\t2026/7/${d} 18:00\t北一二B\t${code}\t${store}\t盧蔚榮\t${item}\t內容\t${result}\t${reason}`;
 }
 
-test.beforeEach(() => { cloudRows = []; });
+test.beforeEach(() => { cloudRows = []; writeCalls = 0; });
 
 test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
   // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
@@ -73,7 +75,8 @@ test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', as
   ].join('\n');
   await desktop.fill('#pasteBox', lines);
   await desktop.click('button.btn-primary');
-  await expect(desktop.locator('#parseMsg')).toHaveText(/已同步至雲端（新增 3 筆/);
+  // 上傳成功後會自動核對雲端，看板改以雲端資料為準
+  await expect(desktop.locator('#parseMsg')).toHaveText(/雲端已載入 3 筆明細/);
   expect(cloudRows.length).toBe(3);
 
   // ── 裝置二（手機）：全新頁面，輸入通行碼後直接看到雲端資料 ──
@@ -108,15 +111,17 @@ test('重複貼上同一批資料，雲端自動去重', async ({ page }) => {
   const line = pasteLine(3, '台北永吉', 'DNB10082', 16, 'v', '');
   await page.fill('#pasteBox', line);
   await page.click('button.btn-primary');
-  await expect(page.locator('#parseMsg')).toHaveText(/新增 1 筆/);
+  await expect.poll(() => cloudRows.length).toBe(1);
+  const callsAfterFirst = writeCalls;
 
   await page.fill('#pasteBox', line);
   await page.click('button.btn-primary');
-  await expect(page.locator('#parseMsg')).toHaveText(/新增 0 筆/);
+  await expect.poll(() => writeCalls).toBeGreaterThan(callsAfterFirst);
+  await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 1 筆明細/);
   expect(cloudRows.length).toBe(1);
 });
 
-test('超過 10 筆會分批上傳且全數送達', async ({ page }) => {
+test('大量資料會分批上傳且全數送達', async ({ page }) => {
   await stubGas(page);
   answerKeyPrompt(page, PT_KEY);
   await page.goto(PAGE_URL);
@@ -128,6 +133,7 @@ test('超過 10 筆會分批上傳且全數送達', async ({ page }) => {
   }
   await page.fill('#pasteBox', lines.join('\n'));
   await page.click('button.btn-primary');
-  await expect(page.locator('#parseMsg')).toHaveText(/新增 25 筆/);
+  await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 25 筆明細/);
   expect(cloudRows.length).toBe(25);
+  expect(writeCalls).toBeGreaterThan(1); // 確實有分批
 });
