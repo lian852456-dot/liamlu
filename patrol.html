@@ -174,6 +174,19 @@
   .item .tag{font-size:11px;color:var(--muted);flex-shrink:0;align-self:center}
   .all-done{font-size:13px;color:var(--ok);padding:12px 0;display:flex;align-items:center;gap:8px}
 
+  /* 盤點提醒框（題14-17每月、題18兩個月） */
+  .inv-badge{font-size:12px;font-weight:700;background:var(--miss-bg);color:var(--miss);padding:2px 10px;border-radius:20px;margin-left:8px}
+  .inv-badge.ok{background:var(--ok-bg);color:var(--ok)}
+  .inv-wrap{overflow-x:auto}
+  .inv-table{width:100%;border-collapse:collapse;font-size:13px}
+  .inv-table th,.inv-table td{padding:8px 6px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}
+  .inv-table tr:last-child td{border-bottom:none}
+  .inv-table th{font-size:11.5px;color:var(--muted);font-weight:700}
+  .inv-table td.store{text-align:left;font-weight:700}
+  .inv-ok{color:var(--ok);font-weight:800}
+  .inv-miss{color:var(--miss);font-weight:800}
+  .inv-last{font-size:12px;color:var(--muted)}
+
   .legend{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.8}
   .legend b{color:#555}
   .empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px}
@@ -210,6 +223,8 @@
   </div>
 
   <div class="overview" id="overview"></div>
+
+  <div id="invPanels"></div>
 
   <div class="panel">
     <h2>貼上巡店紀錄</h2>
@@ -502,7 +517,80 @@ function storeSummary(storeName){
 function render(){
   renderTicker();
   renderOverview();
+  renderInvPanels();
   renderStores();
+}
+
+/* ---------- 盤點提醒框（題14-17每月1次、題18兩個月1次） ---------- */
+const INV_ITEMS = [14,15,16,17];
+const INV_LABELS = {14:'銷毀文件', 15:'維修機盤點', 16:'現金盤點', 17:'iPhone盤點'};
+
+// 官方九店 ↔ 貼上資料的店名對應（店名寫法可能不同，用代碼或關鍵字比對）
+function findRecordStore(st){
+  return Object.keys(records).find(vs=>
+    (st.code && records[vs].code===st.code) ||
+    vs.includes(st.name.replace('台北','')) || st.name.includes(vs)
+  ) || null;
+}
+
+function prevMonthKey(mk){
+  const [y,m] = mk.split('-').map(Number);
+  return m===1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}`;
+}
+
+function renderInvPanels(){
+  const c = document.getElementById('invPanels');
+  const [cy,cm] = currentMonth.split('-');
+  const prevM = prevMonthKey(currentMonth);
+
+  // ── 題14-17：每店每月各1次 ──
+  let doneStores = 0, rowsA = '';
+  STORES.forEach(st=>{
+    const rs = findRecordStore(st);
+    let allDone = !!rs;
+    const cells = INV_ITEMS.map(it=>{
+      const done = rs && itemStatus(rs, it).status==='done';
+      if(!done) allDone = false;
+      return `<td class="${done?'inv-ok':'inv-miss'}">${done?'✓':'✗'}</td>`;
+    }).join('');
+    if(allDone) doneStores++;
+    rowsA += `<tr><td class="store">${st.name.replace('台北','')}</td>${cells}</tr>`;
+  });
+
+  // ── 題18：2個月1次（本月或上月完成過即算）──
+  let done18 = 0, rowsB = '';
+  STORES.forEach(st=>{
+    const rs = findRecordStore(st);
+    let last = null;
+    if(rs){
+      records[rs].entries.forEach(e=>{
+        if(e.item===18 && e.result==='v' && (!last || e.month > last.month)) last = e;
+      });
+    }
+    const ok = last && (last.month===currentMonth || last.month===prevM);
+    if(ok) done18++;
+    rowsB += `<tr><td class="store">${st.name.replace('台北','')}</td>
+      <td class="${ok?'inv-ok':'inv-miss'}">${ok?'✓ 已完成':'✗ 未完成'}</td>
+      <td class="inv-last">${last ? last.date : '—'}</td></tr>`;
+  });
+
+  c.innerHTML = `
+  <div class="panel">
+    <h2>每月盤點提醒（題 14–17）<span class="inv-badge ${doneStores===STORES.length?'ok':''}">${doneStores}/${STORES.length} 店完成</span></h2>
+    <p class="hint">${cy} 年 ${+cm} 月，每店每月至少 1 次：待銷毀文件歸檔、維修機盤點、現金盤點、iPhone 盤點</p>
+    <div class="inv-wrap"><table class="inv-table">
+      <tr><th style="text-align:left">店點</th>${INV_ITEMS.map(i=>`<th>${i}.${INV_LABELS[i]}</th>`).join('')}</tr>
+      ${rowsA}
+    </table></div>
+  </div>
+  <div class="panel">
+    <h2>到店全盤提醒（題 18・2個月1次）<span class="inv-badge ${done18===STORES.length?'ok':''}">${done18}/${STORES.length} 店完成</span></h2>
+    <p class="hint">本月（${currentMonth}）或上月（${prevM}）內完成過即算完成</p>
+    <div class="inv-wrap"><table class="inv-table">
+      <tr><th style="text-align:left">店點</th><th>狀態</th><th>最近完成日</th></tr>
+      ${rowsB}
+    </table></div>
+  </div>`;
 }
 
 /* ---------- 跑馬燈 ---------- */

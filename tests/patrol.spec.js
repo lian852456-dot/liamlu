@@ -121,6 +121,36 @@ test('重複貼上同一批資料，雲端自動去重', async ({ page }) => {
   expect(cloudRows.length).toBe(1);
 });
 
+test('盤點提醒框：題14-17每月與題18兩個月獨立顯示進度', async ({ page }) => {
+  await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
+  await page.goto(PAGE_URL);
+  await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
+
+  // 通化完成 14-17 全部；酒泉只完成 14；三創上個月(6月)做過 18 全盤
+  const lines = [
+    pasteLine(5, '台北通化', 'DNB10059', 14, 'v', ''),
+    pasteLine(5, '台北通化', 'DNB10059', 15, 'v', ''),
+    pasteLine(5, '台北通化', 'DNB10059', 16, 'v', ''),
+    pasteLine(5, '台北通化', 'DNB10059', 17, 'v', ''),
+    pasteLine(6, '台北酒泉', 'DNB10062', 14, 'v', ''),
+    `2026/6/20 10:00\t2026/6/20 09:00\t2026/6/20 12:00\t北一二B\tDNB10307\t台北三創\t盧蔚榮\t18\t內容\tv\t`,
+  ].join('\n');
+  await page.fill('#pasteBox', lines);
+  await page.click('button.btn-primary');
+  await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 6 筆明細/);
+
+  const panels = page.locator('#invPanels');
+  // 每月盤點：只有通化 4 項全完成 → 1/9
+  await expect(panels).toContainText('每月盤點提醒');
+  await expect(panels).toContainText('1/9 店完成');
+  // 到店全盤：三創上月完成 → 本月仍算完成，顯示完成日
+  await expect(panels).toContainText('到店全盤提醒');
+  await expect(panels).toContainText('2026/6/20');
+  const invRows = panels.locator('table').nth(1).locator('tr', { hasText: '三創' });
+  await expect(invRows).toContainText('✓ 已完成');
+});
+
 test('大量資料會分批上傳且全數送達', async ({ page }) => {
   await stubGas(page);
   answerKeyPrompt(page, PT_KEY);
