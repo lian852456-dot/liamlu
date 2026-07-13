@@ -245,6 +245,84 @@ function readPatrol() {
 }
 
 // ════════════════════════════════════
+// 知悉宣導月中提醒（題19-33，每月20日前需全數完成）
+//
+// 啟用方式（只需做一次）：
+//   函式選單選「setupAwareTrigger」→ 執行（會要求授權，同意即可）
+//   之後每月 15 號 09:00（台北時間）自動檢查「巡店明細」，
+//   未完成門市寄提醒信到 NOTIFY_EMAIL。
+// 注意：時間觸發器跑的是編輯器最新存檔的程式碼，【不需要】重新部署。
+// 想立即測試：函式選單選「testAwareNotify」執行，馬上寄一封。
+// ════════════════════════════════════
+const AWARE_FROM = 19, AWARE_TO = 33;
+const AWARE_TOTAL = AWARE_TO - AWARE_FROM + 1; // 15 題
+
+function setupAwareTrigger() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'checkAwareAndNotify') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('checkAwareAndNotify').timeBased()
+    .onMonthDay(15).atHour(9).inTimezone('Asia/Taipei').create();
+}
+
+function testAwareNotify() { checkAwareAndNotify(); }
+
+function checkAwareAndNotify() {
+  const tz = 'Asia/Taipei';
+  const monthKey = Utilities.formatDate(new Date(), tz, 'yyyy-MM');
+  const monthLabel = Number(monthKey.split('-')[1]) + '月';
+
+  const sh = getPatrolSheet();
+  const data = sh.getDataRange().getValues();
+  const headers = data[0];
+  const idx = {};
+  headers.forEach((h, i) => idx[h] = i);
+
+  // 每個貼上店名 → 本月已勾核(v)的知悉題號集合
+  const done = {};
+  for (let i = 1; i < data.length; i++) {
+    const r = data[i];
+    const item = Number(r[idx.item]);
+    if (item < AWARE_FROM || item > AWARE_TO) continue;
+    if (String(r[idx.result]).toLowerCase() !== 'v') continue;
+    if (String(r[idx.month]) !== monthKey) continue;
+    const store = String(r[idx.store]);
+    if (!done[store]) done[store] = {};
+    done[store][item] = true;
+  }
+
+  // 對應官方九店（貼上店名可能含「台北」前綴，用關鍵字比對）
+  const rows = STORES.map(s => {
+    const key = s.replace('台北', '');
+    let cnt = 0;
+    Object.keys(done).forEach(ps => {
+      if (ps.indexOf(key) !== -1) cnt = Math.max(cnt, Object.keys(done[ps]).length);
+    });
+    return { store: s, cnt: cnt };
+  });
+  const incomplete = rows.filter(r => r.cnt < AWARE_TOTAL)
+    .sort((a, b) => a.cnt - b.cnt);
+  const complete = rows.filter(r => r.cnt >= AWARE_TOTAL);
+
+  if (incomplete.length > 0) {
+    const subject = '📣 巡店知悉提醒 ' + monthKey + '：尚有 ' + incomplete.length + ' 店未完成（20日前需全數勾核）';
+    const body =
+      '📋 ' + monthLabel + ' 知悉宣導（題19-33）進度檢查\n' +
+      '⏰ 截止：' + monthLabel + '20日前每店需全數勾核一次\n\n' +
+      '🔴 未完成（' + incomplete.length + ' 店）：\n' +
+      incomplete.map(r => '　・' + r.store + '　' + r.cnt + '/' + AWARE_TOTAL).join('\n') + '\n\n' +
+      '✅ 已完成（' + complete.length + ' 店）：' + (complete.map(r => r.store).join('、') || '無') + '\n\n' +
+      '追蹤看板：https://lian852456-dot.github.io/liamlu/patrol.html';
+    MailApp.sendEmail(NOTIFY_EMAIL, subject, body);
+  } else {
+    const subject = '✅ 巡店知悉 ' + monthKey + ' 九店全數完成';
+    const body = monthLabel + ' 知悉宣導（題19-33）九店皆已於期限前全數勾核，無需跟進。\n\n' +
+      '追蹤看板：https://lian852456-dot.github.io/liamlu/patrol.html';
+    MailApp.sendEmail(NOTIFY_EMAIL, subject, body);
+  }
+}
+
+// ════════════════════════════════════
 // 個人回報（工作表：個人回報）
 // 欄位：date, seg, store, name, record(JSON字串), savedAt
 // ════════════════════════════════════
