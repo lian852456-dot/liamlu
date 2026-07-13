@@ -1,8 +1,9 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
-// 模擬 GAS 後端：ping / ptread / ptwrite（含 JSONP callback）
+// 模擬 GAS 後端：ping / ptread / ptwrite（含 JSONP callback 與通行碼驗證）
 // 驗證「電腦貼上 → 上雲 → 另一裝置載入」的跨裝置同步流程
+const PT_KEY = 'test123';
 let cloudRows;
 
 async function stubGas(page) {
@@ -10,23 +11,30 @@ async function stubGas(page) {
     const url = new URL(route.request().url());
     const action = url.searchParams.get('action');
     const cb = url.searchParams.get('callback');
+    const authed = url.searchParams.get('key') === PT_KEY;
     let body;
     if (action === 'ping') {
       body = JSON.stringify({ status: 'ok' });
     } else if (action === 'ptread') {
-      body = JSON.stringify({ status: 'ok', rows: cloudRows });
+      body = authed
+        ? JSON.stringify({ status: 'ok', rows: cloudRows })
+        : JSON.stringify({ status: 'error', message: 'unauthorized' });
     } else if (action === 'ptwrite') {
-      const rows = JSON.parse(url.searchParams.get('payload'));
-      const seen = new Set(cloudRows.map(r => `${r.fillTime}|${r.store}|${r.item}`));
-      let written = 0;
-      rows.forEach(r => {
-        const k = `${r.fillTime}|${r.store}|${r.item}`;
-        if (seen.has(k)) return;
-        seen.add(k);
-        cloudRows.push({ ...r, savedAt: new Date().toISOString() });
-        written++;
-      });
-      body = JSON.stringify({ status: 'ok', written });
+      if (!authed) {
+        body = JSON.stringify({ status: 'error', message: 'unauthorized' });
+      } else {
+        const rows = JSON.parse(url.searchParams.get('payload'));
+        const seen = new Set(cloudRows.map(r => `${r.fillTime}|${r.store}|${r.item}`));
+        let written = 0;
+        rows.forEach(r => {
+          const k = `${r.fillTime}|${r.store}|${r.item}`;
+          if (seen.has(k)) return;
+          seen.add(k);
+          cloudRows.push({ ...r, savedAt: new Date().toISOString() });
+          written++;
+        });
+        body = JSON.stringify({ status: 'ok', written });
+      }
     } else {
       body = JSON.stringify({ status: 'error', message: 'unknown action' });
     }
@@ -37,6 +45,11 @@ async function stubGas(page) {
   });
 }
 
+// 通行碼輸入框自動作答
+function answerKeyPrompt(page, answer) {
+  page.on('dialog', d => d.accept(answer));
+}
+
 const PAGE_URL = 'file://' + path.resolve(__dirname, '../patrol.html');
 
 function pasteLine(d, store, code, item, result, reason) {
@@ -45,10 +58,11 @@ function pasteLine(d, store, code, item, result, reason) {
 
 test.beforeEach(() => { cloudRows = []; });
 
-test('電腦貼上後自動上雲，另一裝置重新載入看得到', async ({ browser }) => {
-  // ── 裝置一（電腦）：連線並貼上 ──
+test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
+  // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
   const desktop = await browser.newPage();
   await stubGas(desktop);
+  answerKeyPrompt(desktop, PT_KEY);
   await desktop.goto(PAGE_URL);
   await expect(desktop.locator('#cloudStatus')).toHaveText(/已連線/);
 
@@ -62,9 +76,10 @@ test('電腦貼上後自動上雲，另一裝置重新載入看得到', async ({
   await expect(desktop.locator('#parseMsg')).toHaveText(/已同步至雲端（新增 3 筆/);
   expect(cloudRows.length).toBe(3);
 
-  // ── 裝置二（手機）：全新頁面載入，應直接看到雲端資料 ──
+  // ── 裝置二（手機）：全新頁面，輸入通行碼後直接看到雲端資料 ──
   const mobile = await browser.newPage();
   await stubGas(mobile);
+  answerKeyPrompt(mobile, PT_KEY);
   await mobile.goto(PAGE_URL);
   await expect(mobile.locator('#cloudStatus')).toHaveText(/已連線/);
   await expect(mobile.locator('#parseMsg')).toHaveText(/雲端已載入 3 筆明細/);
@@ -75,8 +90,18 @@ test('電腦貼上後自動上雲，另一裝置重新載入看得到', async ({
   await mobile.close();
 });
 
+test('通行碼錯誤時拿不到資料', async ({ page }) => {
+  await stubGas(page);
+  answerKeyPrompt(page, '猜錯的密碼');
+  await page.goto(PAGE_URL);
+  await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
+  await expect(page.locator('#parseMsg')).toHaveText(/通行碼錯誤/);
+  await expect(page.locator('#content')).not.toContainText('台北通化');
+});
+
 test('重複貼上同一批資料，雲端自動去重', async ({ page }) => {
   await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
   await page.goto(PAGE_URL);
   await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
 
@@ -93,6 +118,7 @@ test('重複貼上同一批資料，雲端自動去重', async ({ page }) => {
 
 test('超過 10 筆會分批上傳且全數送達', async ({ page }) => {
   await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
   await page.goto(PAGE_URL);
   await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
 

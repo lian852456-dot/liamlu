@@ -124,6 +124,7 @@ function doGet(e) {
   if (action === 'ptwrite') {
     const cb = e.parameter.callback;
     try {
+      if (!ptAuthorized(e)) throw new Error('unauthorized');
       const rows = JSON.parse(e.parameter.payload);
       const written = writePatrol(rows);
       if (cb) {
@@ -140,9 +141,10 @@ function doGet(e) {
     }
   }
 
-  // ── 巡店追蹤：讀取全部明細（patrol.html）──
+  // ── 巡店追蹤：讀取全部明細（patrol.html，需通行碼）──
   if (action === 'ptread') {
     try {
+      if (!ptAuthorized(e)) throw new Error('unauthorized');
       return jsonResponse({ status: 'ok', rows: readPatrol() });
     } catch(err) {
       return jsonResponse({ status: 'error', message: err.message });
@@ -158,7 +160,17 @@ function doGet(e) {
 // 欄位：fillTime, arriveTime, leaveTime, district, code, store,
 //       inspector, item, result, reason, month, savedAt
 // 以 fillTime+store+item 為唯一鍵，重複上傳自動略過
+//
+// ⚠️ 通行碼：貼進 GAS 編輯器後，把下面 PT_KEY 的 'CHANGE_ME'
+// 改成你自己的密碼再存檔部署（repo 裡只放佔位字，密碼不會公開）。
+// 保持 'CHANGE_ME' 不改的話，巡店讀寫一律拒絕。
 // ════════════════════════════════════
+const PT_KEY = 'CHANGE_ME';
+
+function ptAuthorized(e) {
+  return PT_KEY !== 'CHANGE_ME' && e.parameter.key === PT_KEY;
+}
+
 const PATROL_SHEET = '巡店明細';
 const PATROL_HEADERS = ['fillTime','arriveTime','leaveTime','district','code','store','inspector','item','result','reason','month','savedAt'];
 

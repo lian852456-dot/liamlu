@@ -7,6 +7,8 @@
 資料存「巡店明細」工作表，API 為 `?action=ptread`（fetch GET 讀全部）與
 `?action=ptwrite&payload=...`（JSONP 寫入，前端每 10 筆分批送避免網址過長；
 GAS 端以 fillTime+store+item 為唯一鍵去重，content 欄不上傳、由題號 ITEM_TEXT 還原）。
+巡店讀寫需通行碼：GAS 端 `PT_KEY`（repo 只放 `CHANGE_ME` 佔位字，實際密碼只改在
+GAS 編輯器裡，**不要 commit**），前端存 localStorage `bei12b_pt_key`，錯誤會重新詢問。
 
 ## 架構
 

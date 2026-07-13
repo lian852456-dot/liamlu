@@ -301,6 +301,16 @@ let rawDetails = [];
 let currentMonth = "";
 // 與 index.html 共用同一個 GAS 部署（可在畫面上貼新網址覆蓋，會存進 localStorage）
 let GAS_URL = localStorage.getItem('bei12b_gas_url') || "https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec";
+// 巡店通行碼（GAS 端 PT_KEY 驗證），輸入一次後記在本裝置
+let PT_KEY = localStorage.getItem('bei12b_pt_key') || '';
+
+function askKey(msg){
+  const k = prompt(msg || '請輸入督導巡店通行碼');
+  if(k === null) return false;
+  PT_KEY = k.trim();
+  localStorage.setItem('bei12b_pt_key', PT_KEY);
+  return true;
+}
 let cloudOn = false;    // 雲端連線狀態
 
 /* ---------- 初始化月份 ---------- */
@@ -688,9 +698,10 @@ function cloudConnect(){
   });
 }
 
-function cloudLoad(){
+function cloudLoad(retried){
   if(!cloudOn) return;
-  cloudCall('ptread').then(res=>{
+  if(!PT_KEY && !askKey()){ showMsg('未輸入通行碼，無法載入雲端資料','err'); return; }
+  cloudCall('ptread', {key: PT_KEY}).then(res=>{
     if(res.status==='ok'){
       rawDetails = (res.rows||[]).map(r=>({
         fillTime:String(r.fillTime||''), arriveTime:String(r.arriveTime||''), leaveTime:String(r.leaveTime||''),
@@ -701,6 +712,12 @@ function cloudLoad(){
       rebuildFromRaw();
       render();
       showMsg(`雲端已載入 ${rawDetails.length} 筆明細`,'ok');
+    }else if(res.message==='unauthorized' && !retried){
+      localStorage.removeItem('bei12b_pt_key'); PT_KEY='';
+      if(askKey('通行碼錯誤，請重新輸入')) cloudLoad(true);
+      else showMsg('未輸入通行碼，無法載入雲端資料','err');
+    }else if(res.message==='unauthorized'){
+      showMsg('通行碼錯誤（或 GAS 端尚未設定 PT_KEY 密碼），請重新整理再試','err');
     }else{
       showMsg('讀取失敗：'+(res.message||''),'err');
     }
@@ -719,9 +736,9 @@ function cloudWrite(details){
   let written = 0, chain = Promise.resolve();
   for(let i=0; i<slim.length; i+=CHUNK){
     const part = slim.slice(i, i+CHUNK);
-    chain = chain.then(()=>cloudCallJsonp('ptwrite', {payload: JSON.stringify(part)})).then(res=>{
+    chain = chain.then(()=>cloudCallJsonp('ptwrite', {payload: JSON.stringify(part), key: PT_KEY})).then(res=>{
       if(res.status==='ok') written += (res.written||0);
-      else throw new Error(res.message||'寫入失敗');
+      else throw new Error(res.message==='unauthorized' ? '通行碼錯誤' : (res.message||'寫入失敗'));
     });
   }
   chain.then(()=>showMsg(`已同步至雲端（新增 ${written} 筆，重複資料自動略過）`,'ok'))
