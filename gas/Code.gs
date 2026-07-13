@@ -120,7 +120,116 @@ function doGet(e) {
     }
   }
 
+  // ── 巡店追蹤：寫入（patrol.html，JSONP）──
+  if (action === 'ptwrite') {
+    const cb = e.parameter.callback;
+    try {
+      const rows = JSON.parse(e.parameter.payload);
+      const written = writePatrol(rows);
+      if (cb) {
+        return ContentService.createTextOutput(cb + '(' + JSON.stringify({ status: 'ok', written: written }) + ')')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return jsonResponse({ status: 'ok', written: written });
+    } catch(err) {
+      if (cb) {
+        return ContentService.createTextOutput(cb + '(' + JSON.stringify({ status: 'error', message: err.message }) + ')')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return jsonResponse({ status: 'error', message: err.message });
+    }
+  }
+
+  // ── 巡店追蹤：讀取全部明細（patrol.html）──
+  if (action === 'ptread') {
+    try {
+      return jsonResponse({ status: 'ok', rows: readPatrol() });
+    } catch(err) {
+      return jsonResponse({ status: 'error', message: err.message });
+    }
+  }
+
   return jsonResponse({ status: 'error', message: 'unknown action' });
+}
+
+// ════════════════════════════════════
+// 督導巡店追蹤（patrol.html）
+// 工作表：巡店明細
+// 欄位：fillTime, arriveTime, leaveTime, district, code, store,
+//       inspector, item, result, reason, month, savedAt
+// 以 fillTime+store+item 為唯一鍵，重複上傳自動略過
+// ════════════════════════════════════
+const PATROL_SHEET = '巡店明細';
+const PATROL_HEADERS = ['fillTime','arriveTime','leaveTime','district','code','store','inspector','item','result','reason','month','savedAt'];
+
+function getPatrolSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sh = ss.getSheetByName(PATROL_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(PATROL_SHEET);
+    sh.appendRow(PATROL_HEADERS);
+    sh.setFrozenRows(1);
+    // 全欄設純文字，避免 2026/7/1 之類被試算表轉成 Date 物件
+    sh.getRange('A:L').setNumberFormat('@');
+  }
+  return sh;
+}
+
+function patrolTimeStr(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Taipei', 'yyyy/M/d H:mm');
+  return String(v == null ? '' : v).trim();
+}
+
+function patrolKey(fillTime, store, item) {
+  return patrolTimeStr(fillTime) + '|' + String(store) + '|' + Number(item);
+}
+
+function writePatrol(rows) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = getPatrolSheet();
+    const data = sh.getDataRange().getValues();
+    const seen = {};
+    for (let i = 1; i < data.length; i++) {
+      seen[patrolKey(data[i][0], data[i][5], data[i][7])] = true;
+    }
+    const now = new Date().toISOString();
+    const toAdd = [];
+    rows.forEach(r => {
+      const k = patrolKey(r.fillTime, r.store, r.item);
+      if (seen[k]) return;
+      seen[k] = true;
+      toAdd.push([
+        patrolTimeStr(r.fillTime), String(r.arriveTime || ''), String(r.leaveTime || ''),
+        String(r.district || ''), String(r.code || ''), String(r.store || ''), String(r.inspector || ''),
+        String(r.item || ''), String(r.result || ''), String(r.reason || ''), String(r.month || ''), now
+      ]);
+    });
+    if (toAdd.length > 0) {
+      sh.getRange(sh.getLastRow() + 1, 1, toAdd.length, PATROL_HEADERS.length).setValues(toAdd);
+    }
+    return toAdd.length;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function readPatrol() {
+  const sh = getPatrolSheet();
+  const data = sh.getDataRange().getValues();
+  const headers = data[0];
+  const rows = [];
+  for (let i = 1; i < data.length; i++) {
+    const o = {};
+    headers.forEach((h, idx) => {
+      let v = data[i][idx];
+      if (v instanceof Date) v = patrolTimeStr(v);
+      o[h] = v;
+    });
+    rows.push(o);
+  }
+  return rows;
 }
 
 // ════════════════════════════════════
