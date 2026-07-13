@@ -157,6 +157,32 @@ test('盤點提醒框：題14-17每月與題18兩個月獨立顯示進度', asyn
   await expect(sanchuang).toContainText('✓ 2026/6/20');
 });
 
+test('知悉宣導提醒：題19-33只看總進度與20日前完成狀態', async ({ page }) => {
+  await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
+  await page.goto(PAGE_URL);
+  await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
+
+  // 通化 7/5 完成全部 19-33；酒泉只完成題 19
+  const lines = [];
+  for (let i = 19; i <= 33; i++) lines.push(pasteLine(5, '台北通化', 'DNB10059', i, 'v', ''));
+  lines.push(pasteLine(6, '台北酒泉', 'DNB10062', 19, 'v', ''));
+  await page.fill('#pasteBox', lines.join('\n'));
+  await page.click('button.btn-primary');
+  await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 16 筆明細/);
+
+  const panels = page.locator('#invPanels');
+  await expect(panels).toContainText('知悉宣導提醒');
+  const table = panels.locator('table').nth(2);
+  const tonghua = table.locator('tr', { hasText: '通化' });
+  await expect(tonghua).toContainText('15/15');
+  await expect(tonghua).toContainText('✓ 已完成');
+  await expect(tonghua).toContainText('7/5');
+  const jiuquan = table.locator('tr', { hasText: '酒泉' });
+  await expect(jiuquan).toContainText('1/15');
+  await expect(jiuquan).toContainText(/剩 \d+ 天|⚠ 逾期/);
+});
+
 test('大量資料會分批上傳且全數送達', async ({ page }) => {
   await stubGas(page);
   answerKeyPrompt(page, PT_KEY);
