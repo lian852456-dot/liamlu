@@ -71,6 +71,10 @@ GAS 依標題列欄名寫入。前端新增欄位（如 `tw_pixel10`）後，若
 另有 `checkAwareAndNotify()`：每月 15 號 09:00 檢查「巡店明細」的知悉題（19-33）
 本月進度，未完成門市寄提醒信（20 日前需全數勾核）。啟用：執行一次 `setupAwareTrigger()`。
 
+另有 `sendWeeklyPatrolReport()`：每週一 08:00 寄巡店週報，夾檔 xlsx（暫存試算表→
+export URL + OAuth token 匯出→寄出→刪除），含「檢核總表」與「本月明細」。
+啟用：執行一次 `setupWeeklyReport()`（首次會多要 Drive/UrlFetch 授權）；試寄：`testWeeklyReport()`。
+
 ## 常用檢查清單（改動資料欄位時）
 
 1. `index.html`：表單 input（`f_` 前綴 id）+ `FIELDS` 陣列 + 彙整表格 cols
