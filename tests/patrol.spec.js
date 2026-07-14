@@ -6,6 +6,7 @@ const path = require('path');
 const PT_KEY = 'test123';
 let cloudRows;
 let writeCalls;
+let cloudConfig; // 模擬各區 GAS 回傳的 PT_STORES / PT_TITLE
 
 async function stubGas(page) {
   await page.route('https://script.google.com/**', route => {
@@ -18,7 +19,7 @@ async function stubGas(page) {
       body = JSON.stringify({ status: 'ok' });
     } else if (action === 'ptread') {
       body = authed
-        ? JSON.stringify({ status: 'ok', rows: cloudRows })
+        ? JSON.stringify({ status: 'ok', rows: cloudRows, ...(cloudConfig || {}) })
         : JSON.stringify({ status: 'error', message: 'unauthorized' });
     } else if (action === 'ptwrite') {
       writeCalls++;
@@ -58,7 +59,7 @@ function pasteLine(d, store, code, item, result, reason) {
   return `2026/7/${d} 16:43\t2026/7/${d} 16:00\t2026/7/${d} 18:00\t北一二B\t${code}\t${store}\t盧蔚榮\t${item}\t內容\t${result}\t${reason}`;
 }
 
-test.beforeEach(() => { cloudRows = []; writeCalls = 0; });
+test.beforeEach(() => { cloudRows = []; writeCalls = 0; cloudConfig = null; });
 
 test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
   // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
@@ -181,6 +182,27 @@ test('知悉宣導提醒：題19-33只看總進度與20日前完成狀態', asyn
   const jiuquan = table.locator('tr', { hasText: '酒泉' });
   await expect(jiuquan).toContainText('1/15');
   await expect(jiuquan).toContainText(/剩 \d+ 天|⚠ 逾期/);
+});
+
+test('其他督導：GAS 回傳自己的標題與門市清單，看板跟著切換', async ({ page }) => {
+  cloudConfig = {
+    title: '南區A · 王督導 · 33 項檢核追蹤',
+    stores: [
+      { code: 'DNS20001', name: '高雄夢時代' },
+      { code: 'DNS20002', name: '高雄左營' },
+    ],
+  };
+  await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
+  await page.goto(PAGE_URL);
+  await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
+
+  await expect(page.locator('#subTitle')).toHaveText('南區A · 王督導 · 33 項檢核追蹤');
+  const panels = page.locator('#invPanels');
+  await expect(panels).toContainText('0/2 店完成'); // 門市數變成該區的 2 店
+  await expect(panels).toContainText('夢時代');
+  await expect(panels).toContainText('左營');
+  await expect(panels).not.toContainText('通化'); // 不會出現北一二B 的店
 });
 
 test('大量資料會分批上傳且全數送達', async ({ page }) => {
