@@ -126,12 +126,13 @@ function doGet(e) {
     try {
       if (!ptAuthorized(e)) throw new Error('unauthorized');
       const rows = JSON.parse(e.parameter.payload);
-      const written = writePatrol(rows);
+      const res = writePatrol(rows);
+      const out = { status: 'ok', written: res.written, updated: res.updated };
       if (cb) {
-        return ContentService.createTextOutput(cb + '(' + JSON.stringify({ status: 'ok', written: written }) + ')')
+        return ContentService.createTextOutput(cb + '(' + JSON.stringify(out) + ')')
           .setMimeType(ContentService.MimeType.JAVASCRIPT);
       }
-      return jsonResponse({ status: 'ok', written: written });
+      return jsonResponse(out);
     } catch(err) {
       if (cb) {
         return ContentService.createTextOutput(cb + '(' + JSON.stringify({ status: 'error', message: err.message }) + ')')
@@ -217,16 +218,30 @@ function writePatrol(rows) {
   try {
     const sh = getPatrolSheet();
     const data = sh.getDataRange().getValues();
+    // key → { row: 試算表列號, result, reason }
     const seen = {};
     for (let i = 1; i < data.length; i++) {
-      seen[patrolKey(data[i][0], data[i][5], data[i][7])] = true;
+      seen[patrolKey(data[i][0], data[i][5], data[i][7])] =
+        { row: i + 1, result: String(data[i][8] || ''), reason: String(data[i][9] || '') };
     }
     const now = new Date().toISOString();
     const toAdd = [];
+    let updated = 0;
     rows.forEach(r => {
       const k = patrolKey(r.fillTime, r.store, r.item);
-      if (seen[k]) return;
-      seen[k] = true;
+      const ex = seen[k];
+      if (ex) {
+        // 同一筆但結果/原因有變（來源表事後補填「是否合格」）→ 就地更新
+        const nr = String(r.result || ''), nrs = String(r.reason || '');
+        if (ex.row > 0 && (nr !== ex.result || nrs !== ex.reason)) {
+          sh.getRange(ex.row, 9, 1, 2).setValues([[nr, nrs]]);
+          sh.getRange(ex.row, 12).setValue(now);
+          ex.result = nr; ex.reason = nrs;
+          updated++;
+        }
+        return;
+      }
+      seen[k] = { row: -1, result: String(r.result || ''), reason: String(r.reason || '') };
       toAdd.push([
         patrolTimeStr(r.fillTime), String(r.arriveTime || ''), String(r.leaveTime || ''),
         String(r.district || ''), String(r.code || ''), String(r.store || ''), String(r.inspector || ''),
@@ -236,7 +251,7 @@ function writePatrol(rows) {
     if (toAdd.length > 0) {
       sh.getRange(sh.getLastRow() + 1, 1, toAdd.length, PATROL_HEADERS.length).setValues(toAdd);
     }
-    return toAdd.length;
+    return { written: toAdd.length, updated: updated };
   } finally {
     lock.releaseLock();
   }
@@ -324,52 +339,139 @@ function ptItemDone(storeRows, item, monthKey) {
   return mRows.some(isV);                  // 每月至少1次
 }
 
+// 某官方門市對應的所有明細列（店名關鍵字或營業點代碼比對，與前端 findRecordStore 一致）
+function ptStoreRows(all, st) {
+  const key = st.name.replace('台北', '');
+  return all.filter(r => {
+    const rs = String(r.store || '');
+    if (!rs) return false;
+    if (st.code && String(r.code || '') === st.code) return true;
+    return rs.indexOf(key) !== -1 || st.name.indexOf(rs) !== -1;
+  });
+}
+
+// 由 fillTime 取 'M/D' 顯示用日期
+function ptDateOf(fillTime) {
+  const m = String(fillTime).match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  return m ? (Number(m[2]) + '/' + Number(m[3])) : '';
+}
+
 function sendWeeklyPatrolReport() {
   const tz = 'Asia/Taipei';
   const now = new Date();
   const monthKey = Utilities.formatDate(now, tz, 'yyyy-MM');
   const dateStr = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+  const todayDay = Number(Utilities.formatDate(now, tz, 'd'));
+  const monthNum = Number(monthKey.split('-')[1]);
   const all = readPatrol();
+  const isV = r => String(r.result).toLowerCase() === 'v';
+  const inMonth = r => String(r.month) === monthKey;
 
-  // ── 工作表1：檢核總表（每店×33題）──
-  const header = ['店點', '本月完成/33'];
-  for (let i = 1; i <= 33; i++) header.push(String(i));
-  const matrix = [header];
-  const summary = [];
-  PT_STORES.forEach(st => {
-    const key = st.name.replace('台北', '');
-    const srows = all.filter(r => String(r.store).indexOf(key) !== -1);
-    let done = 0;
-    const row = [st.name, ''];
-    for (let it = 1; it <= 33; it++) {
-      const ok = ptItemDone(srows, it, monthKey);
-      if (ok) done++;
-      row.push(ok ? '✓' : '✗');
-    }
-    row[1] = done + '/33';
-    matrix.push(row);
-    summary.push({ store: st.name, done: done });
-  });
+  // 每店明細（官方門市清單順序）
+  const stores = PT_STORES.map(st => ({ st: st, rows: ptStoreRows(all, st) }));
 
-  // ── 工作表2：本月明細 ──
-  const detail = [['填表時間', '店點', '題號', '檢查內容', '結果', '未查/不合格原因', '上傳時間']];
-  all.filter(r => String(r.month) === monthKey)
+  // ── 分頁1：巡店紀錄（本月明細）──
+  const tabDetail = [['填表時間', '店點', '題號', '檢查內容', '結果', '未查/不合格原因', '上傳時間']];
+  all.filter(inMonth)
     .sort((a, b) => String(a.fillTime) < String(b.fillTime) ? -1 : 1)
     .forEach(r => {
-      detail.push([String(r.fillTime), String(r.store), Number(r.item),
+      tabDetail.push([String(r.fillTime), String(r.store), Number(r.item),
         PT_ITEM_TEXT[Number(r.item)] || '', String(r.result || ''), String(r.reason || ''), String(r.savedAt || '')]);
     });
 
-  // ── 產生暫存試算表 → 匯出 xlsx → 寄出 → 刪除暫存 ──
+  // ── 分頁2：未巡店（本月無任何紀錄）──
+  const notVisited = stores.filter(s => !s.rows.some(inMonth));
+  const tabNotVisited = [['店點', '營業點代碼', '本月狀態', '最近一次巡店']];
+  notVisited.forEach(s => {
+    let lastDate = '';
+    s.rows.forEach(r => { const d = String(r.fillTime); if (d > lastDate) lastDate = d; });
+    tabNotVisited.push([s.st.name, s.st.code, '本月尚未巡店', lastDate || '（從無紀錄）']);
+  });
+  if (notVisited.length === 0) tabNotVisited.push(['—', '—', '✓ 九店本月皆已巡店', '—']);
+
+  // ── 分頁3：上下半月（題2-13）──
+  const tabHalf = [['店點'].concat(Array.from({length: 12}, (_, i) => String(i + 2)))];
+  stores.forEach(s => {
+    const row = [s.st.name];
+    for (let it = 2; it <= 13; it++) {
+      const mRows = s.rows.filter(r => inMonth(r) && Number(r.item) === it);
+      const h1 = mRows.some(r => isV(r) && ptDayOf(r.fillTime) <= 15);
+      const h2 = mRows.some(r => isV(r) && ptDayOf(r.fillTime) > 15);
+      row.push(h1 && h2 ? '完成' : (h1 ? '缺下' : (h2 ? '缺上' : '未做')));
+    }
+    tabHalf.push(row);
+  });
+  tabHalf.push(['說明：完成=上下半月各1次皆✓／缺上·缺下=只做一半／未做=本月無合格紀錄']);
+
+  // ── 分頁4：每月盤點（題14-17）──
+  const tabMonthly = [['店點', '14.銷毀文件', '15.維修機盤點', '16.現金盤點', '17.iPhone盤點', '四項完成']];
+  let monthlyDone = 0;
+  stores.forEach(s => {
+    const cells = [];
+    let all4 = true;
+    for (let it = 14; it <= 17; it++) {
+      const e = s.rows.find(r => inMonth(r) && Number(r.item) === it && isV(r));
+      cells.push(e ? '✓ ' + ptDateOf(e.fillTime) : '✗');
+      if (!e) all4 = false;
+    }
+    if (all4) monthlyDone++;
+    tabMonthly.push([s.st.name].concat(cells, [all4 ? '✓' : '✗']));
+  });
+
+  // ── 分頁5：雙月全盤（題18，固定週期）──
+  const winM = ptWinMonths(monthKey);
+  const prevStart = (Number(winM[0].split('-')[1]) === 1)
+    ? (Number(winM[0].split('-')[0]) - 1) + '-11'
+    : winM[0].split('-')[0] + '-' + ('0' + (Number(winM[0].split('-')[1]) - 2)).slice(-2);
+  const prevWinM = ptWinMonths(prevStart);
+  const winLabel = Number(winM[0].split('-')[1]) + '–' + Number(winM[1].split('-')[1]) + '月';
+  const tab18 = [['店點', '本期 ' + winLabel, '本期完成日', '上期完成日']];
+  let done18 = 0;
+  stores.forEach(s => {
+    const v18 = s.rows.filter(r => Number(r.item) === 18 && isV(r));
+    const cur = v18.find(r => winM.indexOf(String(r.month)) !== -1);
+    const prev = v18.find(r => prevWinM.indexOf(String(r.month)) !== -1);
+    if (cur) done18++;
+    tab18.push([s.st.name, cur ? '✓ 已完成' : '✗ 未完成',
+      cur ? ptDateOf(cur.fillTime) : '—', prev ? ptDateOf(prev.fillTime) : '—']);
+  });
+
+  // ── 分頁6：知悉20日前（題19-33）──
+  const daysLeft = 20 - todayDay;
+  const tabAware = [['店點', '進度', '狀態', '完成日']];
+  let doneAware = 0;
+  stores.forEach(s => {
+    let cnt = 0, doneDay = 0;
+    for (let it = 19; it <= 33; it++) {
+      const days = s.rows.filter(r => inMonth(r) && Number(r.item) === it && isV(r))
+        .map(r => ptDayOf(r.fillTime)).filter(d => d > 0);
+      if (days.length) {
+        cnt++;
+        const first = Math.min.apply(null, days);
+        if (first > doneDay) doneDay = first;
+      }
+    }
+    const allDone = cnt === 15;
+    if (allDone) doneAware++;
+    const state = allDone ? ('✓ 已完成' + (doneDay > 20 ? '（逾20日）' : ''))
+      : (daysLeft >= 0 ? '剩 ' + daysLeft + ' 天' : '⚠ 逾期 ' + (-daysLeft) + ' 天');
+    tabAware.push([s.st.name, cnt + '/15', state, allDone ? monthNum + '/' + doneDay : '—']);
+  });
+
+  // ── 產生暫存試算表（6個分頁）→ 匯出 xlsx → 寄出 → 刪除暫存 ──
   const ss = SpreadsheetApp.create('巡店報告_' + dateStr);
-  const sh1 = ss.getSheets()[0];
-  sh1.setName('檢核總表');
-  sh1.getRange(1, 1, matrix.length, matrix[0].length).setValues(matrix);
-  sh1.setFrozenRows(1);
-  sh1.setFrozenColumns(2);
-  const sh2 = ss.insertSheet('本月明細');
-  sh2.getRange(1, 1, detail.length, detail[0].length).setValues(detail);
-  sh2.setFrozenRows(1);
+  const tabs = [
+    ['巡店紀錄', tabDetail], ['未巡店', tabNotVisited], ['上下半月2-13', tabHalf],
+    ['每月盤點14-17', tabMonthly], ['雙月全盤18', tab18], ['知悉20日前19-33', tabAware]
+  ];
+  tabs.forEach((t, i) => {
+    const sh = i === 0 ? ss.getSheets()[0] : ss.insertSheet();
+    sh.setName(t[0]);
+    const w = Math.max.apply(null, t[1].map(r => r.length));
+    const grid = t[1].map(r => r.concat(Array(w - r.length).fill('')));
+    sh.getRange(1, 1, grid.length, w).setValues(grid);
+    sh.setFrozenRows(1);
+  });
   SpreadsheetApp.flush();
 
   const blob = UrlFetchApp.fetch(
@@ -377,12 +479,15 @@ function sendWeeklyPatrolReport() {
     { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() } }
   ).getBlob().setName('巡店報告_' + dateStr + '.xlsx');
 
-  const sorted = summary.slice().sort((a, b) => b.done - a.done);
   const body =
     '📋 巡店週報 ' + dateStr + '（追蹤月份 ' + monthKey + '）\n\n' +
-    '本月完成度：\n' +
-    sorted.map(s => '　・' + s.store + '　' + s.done + '/33').join('\n') + '\n\n' +
-    '完整「檢核總表」（每店×33題）與「本月明細」請見夾檔 Excel。\n' +
+    '・已巡店：' + (PT_STORES.length - notVisited.length) + '/' + PT_STORES.length +
+    (notVisited.length ? '（未巡：' + notVisited.map(s => s.st.name).join('、') + '）' : '') + '\n' +
+    '・每月盤點(14-17)四項完成：' + monthlyDone + '/' + PT_STORES.length + ' 店\n' +
+    '・雙月全盤(18)本期 ' + winLabel + '：' + done18 + '/' + PT_STORES.length + ' 店\n' +
+    '・知悉(19-33)全數勾核：' + doneAware + '/' + PT_STORES.length + ' 店' +
+    (daysLeft >= 0 ? '（截止 ' + monthNum + '/20，剩 ' + daysLeft + ' 天）' : '（已逾 ' + monthNum + '/20 截止日）') + '\n\n' +
+    '各項明細請見夾檔 Excel 的六個分頁。\n' +
     '看板：https://lian852456-dot.github.io/liamlu/patrol.html';
   MailApp.sendEmail(NOTIFY_EMAIL, '📊 巡店週報 ' + dateStr + '｜' + PT_TITLE, body, { attachments: [blob] });
   DriveApp.getFileById(ss.getId()).setTrashed(true);
