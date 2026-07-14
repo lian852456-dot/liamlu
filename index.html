@@ -1849,7 +1849,18 @@
       <div class="card" style="padding:14px;">
         <div id="personalFailItems"></div>
         <div style="border-top:1px solid var(--border-dim);margin:14px 0 10px;"></div>
-        <div style="font-size:12px;font-weight:700;color:var(--text-dim);margin-bottom:8px;">📞 請益紀錄（A999 / 好速）</div>
+        <div class="kpi-input-wrap" style="margin-bottom:8px;">
+          <label>① 未過關原因說明 <span style="color:#ef4444">*</span></label>
+          <span class="ki-icon">📝</span>
+          <textarea id="p_fail_reason" placeholder="說明今天為什麼沒過關（客流狀況、被拒絕的情境…）" rows="2" style="width:100%;background:var(--bg-deep);border:1px solid var(--border-dim);border-radius:7px;color:var(--text);padding:8px 10px;font-size:12px;resize:none;font-family:var(--font);"></textarea>
+        </div>
+        <div class="kpi-input-wrap" style="margin-bottom:8px;">
+          <label>② 明日改善計畫 <span style="color:#ef4444">*</span></label>
+          <span class="ki-icon">🎯</span>
+          <textarea id="p_improve_plan" placeholder="明天具體要怎麼做、目標幾筆…" rows="2" style="width:100%;background:var(--bg-deep);border:1px solid var(--border-dim);border-radius:7px;color:var(--text);padding:8px 10px;font-size:12px;resize:none;font-family:var(--font);"></textarea>
+        </div>
+        <div style="border-top:1px solid var(--border-dim);margin:12px 0 10px;"></div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-dim);margin-bottom:8px;">📞 ③ 請益紀錄（A999 / 好速）</div>
         <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
           <div class="kpi-input-wrap">
             <label>請益店點</label>
@@ -2665,6 +2676,14 @@ async function renderStorePersonalDetail(date, seg, dayCache, targetId) {
               return `<span style="background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;">${itemLabelMap[k] || k}：${disp}</span>`;
             }).join('')}
           </div>` : ''}
+        ${r?.extra?.customers || r?.extra?.sold_items ? `
+          <div style="font-size:12px;color:var(--text-dim);margin-bottom:5px;">
+            👥 接客數：<strong>${r.extra.customers || '—'}</strong>　📋 上線項目：<strong>${r.extra.sold_items || '—'}</strong>
+          </div>` : ''}
+        ${r?.extra?.fail_reason ? `
+          <div style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:7px 10px;color:var(--text);line-height:1.6;margin-bottom:5px;">📝 原因：${r.extra.fail_reason}</div>` : ''}
+        ${r?.extra?.improve_plan ? `
+          <div style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:7px 10px;color:var(--text);line-height:1.6;margin-bottom:5px;">🎯 明日改善：${r.extra.improve_plan}</div>` : ''}
         ${r?.extra?.consult_store || r?.extra?.consult_person ? `
           <div style="font-size:12px;color:var(--text-dim);margin-bottom:5px;">
             🏪 請益：<strong>${r.extra.consult_store || '—'}</strong>${r.extra.consult_person ? `／<strong>${r.extra.consult_person}</strong>` : ''}
@@ -3649,7 +3668,9 @@ function submitPersonalData() {
     return;
   }
 
-  // 有未過關 → 顯示說明區
+  // 有未過關 → 顯示說明區（清掉上次殘留的文字，避免沿用舊說明）
+  document.getElementById('p_fail_reason').value = '';
+  document.getElementById('p_improve_plan').value = '';
   document.getElementById('personalFailSection').style.display = 'block';
   document.getElementById('personalFailSection').scrollIntoView({behavior:'smooth'});
   document.getElementById('personalFailItems').innerHTML = `
@@ -3681,7 +3702,21 @@ function submitPersonalData() {
 function submitPersonalFail() {
   if (!window._pPending) return;
   const { store, name, td, data, failed } = window._pPending;
+  const failReason   = (document.getElementById('p_fail_reason')?.value || '').trim();
+  const improvePlan  = (document.getElementById('p_improve_plan')?.value || '').trim();
+  if (!failReason) {
+    showToast('⚠️ 請填寫「① 未過關原因說明」');
+    document.getElementById('p_fail_reason').focus();
+    return;
+  }
+  if (!improvePlan) {
+    showToast('⚠️ 請填寫「② 明日改善計畫」');
+    document.getElementById('p_improve_plan').focus();
+    return;
+  }
   const extra = {
+    fail_reason:   failReason,
+    improve_plan:  improvePlan,
     customers:     (document.getElementById('p_customers')?.value || '').trim(),
     sold_items:    (document.getElementById('p_sold_items')?.value || '').trim(),
     consult_store: (document.getElementById('p_consult_store')?.value || '').trim(),
@@ -3817,6 +3852,8 @@ function _renderTodayCard(record, seg) {
       </div>
       ${!allPass && extra ? `
         <div style="border-top:1px solid var(--border-dim);padding-top:8px;margin-top:4px;font-size:11px;color:var(--text-dim);">
+          ${extra.fail_reason ? `<div>📝 未過關原因：<span style="color:var(--text);">${extra.fail_reason}</span></div>` : ''}
+          ${extra.improve_plan ? `<div>🎯 明日改善：<span style="color:var(--text);">${extra.improve_plan}</span></div>` : ''}
           ${extra.customers ? `<div>👥 接客數：<span style="color:var(--text);">${extra.customers}</span></div>` : ''}
           ${extra.sold_items ? `<div>📋 上線項目：<span style="color:var(--text);">${extra.sold_items}</span></div>` : ''}
           ${extra.consult_store ? `<div>🏪 請益店點：<span style="color:var(--text);">${extra.consult_store}</span> ／ ${extra.consult_person||'—'}</div>` : ''}
