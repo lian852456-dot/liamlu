@@ -260,6 +260,135 @@ function readPatrol() {
 }
 
 // ════════════════════════════════════
+// 每週一巡店週報（Email 夾 Excel）
+//
+// 啟用方式（只需做一次）：
+//   函式選單選「setupWeeklyReport」→ 執行（會要求授權，同意即可）
+//   之後每週一 08:00（台北時間）寄巡店報告到 NOTIFY_EMAIL，
+//   夾檔 Excel 含「檢核總表」（每店×33題 ✓✗矩陣）與「本月明細」。
+// 想立即試寄：函式選單選「testWeeklyReport」執行。
+// 注意：時間觸發器跑最新存檔程式碼，不需重新部署。
+// ════════════════════════════════════
+const PT_ITEM_TEXT = {
+  1:'督導駐點', 2:'店格陳列／展機防盜／回收桶上鎖', 3:'中島展示機無不當資訊且開機恆亮',
+  4:'前後場整潔、公佈欄符合規範', 5:'有價商品櫃是否上鎖', 6:'電腦記事本／資料夾mail個資檢查',
+  7:'申裝書3日回送、無不當留存個資', 8:'同仁服裝儀容與服務態度', 9:'出勤與班表一致並載休息時間',
+  10:'人員面談及輔導', 11:'門市安全（禁菸／禁火源）', 12:'監控設備運作正常',
+  13:'店務日誌與督導簽名', 14:'待銷毀文件打包歸檔上鎖', 15:'待回送／未結案維修機盤點',
+  16:'保全金零找金現金盤點', 17:'iPhone手機盤點盤差登載', 18:'到店全盤作業（2月1次）',
+  19:'知悉：NCC風險管理機制指引公布', 20:'知悉：受理申請證件納入KYC審核', 21:'知悉：拒絕提供資料者應拒辦',
+  22:'知悉：公司已成立查核部門', 23:'知悉：自然人雙證件正本核對', 24:'知悉：法人團體證件核對',
+  25:'知悉：企業客戶用途清冊實地查訪', 26:'知悉：委託代理人證件核對', 27:'知悉：初次申辦臨櫃／數位簽章',
+  28:'知悉：初次申辦拍照留存1年', 29:'知悉：外籍短效預付卡免拍照條件', 30:'知悉：外籍申辦以1門為原則',
+  31:'知悉：外籍簽證少於1月限短效卡', 32:'知悉：詐欺受限3年申辦限制', 33:'知悉：受限用戶3年再申辦限制'
+};
+
+function setupWeeklyReport() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'sendWeeklyPatrolReport') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('sendWeeklyPatrolReport').timeBased().everyWeeks(1)
+    .onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).inTimezone('Asia/Taipei').create();
+}
+
+function testWeeklyReport() { sendWeeklyPatrolReport(); }
+
+// 題18固定雙月週期（1-2、3-4、5-6、7-8、9-10、11-12）的兩個月份
+function ptWinMonths(monthKey) {
+  const p = monthKey.split('-');
+  const y = Number(p[0]), m = Number(p[1]);
+  const s = (m % 2 === 1) ? m : m - 1;
+  const pad = n => ('0' + n).slice(-2);
+  return [y + '-' + pad(s), y + '-' + pad(s + 1)];
+}
+
+function ptDayOf(fillTime) {
+  const m = String(fillTime).match(/\d{4}\/\d{1,2}\/(\d{1,2})/);
+  return m ? Number(m[1]) : 0;
+}
+
+// 與前端看板同一套完成度判定
+function ptItemDone(storeRows, item, monthKey) {
+  const isV = r => String(r.result).toLowerCase() === 'v';
+  if (item === 18) {
+    const winM = ptWinMonths(monthKey);
+    return storeRows.some(r => Number(r.item) === 18 && isV(r) && winM.indexOf(String(r.month)) !== -1);
+  }
+  const mRows = storeRows.filter(r => Number(r.item) === item && String(r.month) === monthKey);
+  if (item === 1) return mRows.length > 0; // 駐點：當月有紀錄即可（v或na）
+  if (item >= 2 && item <= 13) {           // 上下半月各1次
+    const h1 = mRows.some(r => isV(r) && ptDayOf(r.fillTime) <= 15);
+    const h2 = mRows.some(r => isV(r) && ptDayOf(r.fillTime) > 15);
+    return h1 && h2;
+  }
+  return mRows.some(isV);                  // 每月至少1次
+}
+
+function sendWeeklyPatrolReport() {
+  const tz = 'Asia/Taipei';
+  const now = new Date();
+  const monthKey = Utilities.formatDate(now, tz, 'yyyy-MM');
+  const dateStr = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+  const all = readPatrol();
+
+  // ── 工作表1：檢核總表（每店×33題）──
+  const header = ['店點', '本月完成/33'];
+  for (let i = 1; i <= 33; i++) header.push(String(i));
+  const matrix = [header];
+  const summary = [];
+  PT_STORES.forEach(st => {
+    const key = st.name.replace('台北', '');
+    const srows = all.filter(r => String(r.store).indexOf(key) !== -1);
+    let done = 0;
+    const row = [st.name, ''];
+    for (let it = 1; it <= 33; it++) {
+      const ok = ptItemDone(srows, it, monthKey);
+      if (ok) done++;
+      row.push(ok ? '✓' : '✗');
+    }
+    row[1] = done + '/33';
+    matrix.push(row);
+    summary.push({ store: st.name, done: done });
+  });
+
+  // ── 工作表2：本月明細 ──
+  const detail = [['填表時間', '店點', '題號', '檢查內容', '結果', '未查/不合格原因', '上傳時間']];
+  all.filter(r => String(r.month) === monthKey)
+    .sort((a, b) => String(a.fillTime) < String(b.fillTime) ? -1 : 1)
+    .forEach(r => {
+      detail.push([String(r.fillTime), String(r.store), Number(r.item),
+        PT_ITEM_TEXT[Number(r.item)] || '', String(r.result || ''), String(r.reason || ''), String(r.savedAt || '')]);
+    });
+
+  // ── 產生暫存試算表 → 匯出 xlsx → 寄出 → 刪除暫存 ──
+  const ss = SpreadsheetApp.create('巡店報告_' + dateStr);
+  const sh1 = ss.getSheets()[0];
+  sh1.setName('檢核總表');
+  sh1.getRange(1, 1, matrix.length, matrix[0].length).setValues(matrix);
+  sh1.setFrozenRows(1);
+  sh1.setFrozenColumns(2);
+  const sh2 = ss.insertSheet('本月明細');
+  sh2.getRange(1, 1, detail.length, detail[0].length).setValues(detail);
+  sh2.setFrozenRows(1);
+  SpreadsheetApp.flush();
+
+  const blob = UrlFetchApp.fetch(
+    'https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?format=xlsx',
+    { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() } }
+  ).getBlob().setName('巡店報告_' + dateStr + '.xlsx');
+
+  const sorted = summary.slice().sort((a, b) => b.done - a.done);
+  const body =
+    '📋 巡店週報 ' + dateStr + '（追蹤月份 ' + monthKey + '）\n\n' +
+    '本月完成度：\n' +
+    sorted.map(s => '　・' + s.store + '　' + s.done + '/33').join('\n') + '\n\n' +
+    '完整「檢核總表」（每店×33題）與「本月明細」請見夾檔 Excel。\n' +
+    '看板：https://lian852456-dot.github.io/liamlu/patrol.html';
+  MailApp.sendEmail(NOTIFY_EMAIL, '📊 巡店週報 ' + dateStr + '｜' + PT_TITLE, body, { attachments: [blob] });
+  DriveApp.getFileById(ss.getId()).setTrashed(true);
+}
+
+// ════════════════════════════════════
 // 知悉宣導月中提醒（題19-33，每月20日前需全數完成）
 //
 // 啟用方式（只需做一次）：
