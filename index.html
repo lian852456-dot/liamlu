@@ -1839,6 +1839,38 @@
           <span class="ki-icon">☂️</span>
           <input type="number" id="p_insurance" placeholder="0.0" step="0.1">
         </div>
+        <div class="kpi-input-wrap highlight">
+          <label>A1399 上線（筆）</label>
+          <span class="ki-icon">👑</span>
+          <input type="number" id="p_a1399" placeholder="0">
+          <span class="kpi-hot-badge">A1399</span>
+        </div>
+        <div class="kpi-input-wrap highlight">
+          <label>R1399 上線（筆）</label>
+          <span class="ki-icon">🚀</span>
+          <input type="number" id="p_r1399" placeholder="0">
+          <span class="kpi-hot-badge">R1399</span>
+        </div>
+        <div class="kpi-input-wrap">
+          <label>提前續約（件）</label>
+          <span class="ki-icon">🔄</span>
+          <input type="number" id="p_early_renew" placeholder="0">
+        </div>
+        <div class="kpi-input-wrap">
+          <label>5G（筆）</label>
+          <span class="ki-icon">📡</span>
+          <input type="number" id="p_5g" placeholder="0">
+        </div>
+        <div class="kpi-input-wrap">
+          <label>手機保險（筆）</label>
+          <span class="ki-icon">🛡️</span>
+          <input type="number" id="p_ins_cnt" placeholder="0">
+        </div>
+        <div class="kpi-input-wrap">
+          <label>包膜保貼（筆）</label>
+          <span class="ki-icon">📱</span>
+          <input type="number" id="p_film" placeholder="0">
+        </div>
       </div>
       <button onclick="submitPersonalData()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#ff6600,#ff8533);color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;">✅ 確認送出</button>
     </div>
@@ -3513,6 +3545,7 @@ function doCopy() {
 const PERSONAL_ITEMS = [
   { key: 'a999',     label: 'A999 上線',   type: 'count' },
   { key: 'haosu',    label: '好速',         type: 'count' },
+  { key: 'r1399',    label: 'R1399 上線',   type: 'count' },
   { key: 'achieve',  label: 'R999 上線',    type: 'count' },
   { key: 'insurance',label: '保險搭售率',   type: 'pct', th: 70  },
 ];
@@ -3649,6 +3682,12 @@ function submitPersonalData() {
     haosu:    parseFloat(document.getElementById('p_haosu').value)    || 0,
     achieve:  parseFloat(document.getElementById('p_achieve').value)  || 0,
     insurance:parseFloat(document.getElementById('p_insurance').value)|| 0,
+    a1399:    parseFloat(document.getElementById('p_a1399').value)    || 0,
+    r1399:    parseFloat(document.getElementById('p_r1399').value)    || 0,
+    early_renew: parseFloat(document.getElementById('p_early_renew').value) || 0,
+    '5g':     parseFloat(document.getElementById('p_5g').value)       || 0,
+    ins_cnt:  parseFloat(document.getElementById('p_ins_cnt').value)  || 0,
+    film:     parseFloat(document.getElementById('p_film').value)     || 0,
   };
 
   // 判斷未過關項目
@@ -3849,6 +3888,12 @@ function _renderTodayCard(record, seg) {
         <span style="color:var(--text-dim);">RT <strong style="color:var(--text);">${data.rt||0}</strong></span>
         <span style="color:var(--text-dim);">好速 <strong style="color:${(data.haosu||0)>0?'#22c55e':'#ef4444'};">${data.haosu||0}筆</strong></span>
         <span style="color:var(--text-dim);">保險 <strong style="color:${(data.insurance||0)>=70?'#22c55e':'#ef4444'};">${data.insurance||0}%</strong></span>
+        <span style="color:var(--text-dim);">A1399 <strong style="color:var(--text);">${data.a1399||0}筆</strong></span>
+        <span style="color:var(--text-dim);">R1399 <strong style="color:${(data.r1399||0)>0?'#22c55e':'#ef4444'};">${data.r1399||0}筆</strong></span>
+        <span style="color:var(--text-dim);">提前續約 <strong style="color:var(--text);">${data.early_renew||0}件</strong></span>
+        <span style="color:var(--text-dim);">5G <strong style="color:var(--text);">${data['5g']||0}筆</strong></span>
+        <span style="color:var(--text-dim);">手機保險 <strong style="color:var(--text);">${data.ins_cnt||0}筆</strong></span>
+        <span style="color:var(--text-dim);">包膜 <strong style="color:var(--text);">${data.film||0}筆</strong></span>
       </div>
       ${!allPass && extra ? `
         <div style="border-top:1px solid var(--border-dim);padding-top:8px;margin-top:4px;font-size:11px;color:var(--text-dim);">
