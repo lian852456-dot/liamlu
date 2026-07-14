@@ -141,11 +141,11 @@ function doGet(e) {
     }
   }
 
-  // ── 巡店追蹤：讀取全部明細（patrol.html，需通行碼）──
+  // ── 巡店追蹤：讀取全部明細＋本區設定（patrol.html，需通行碼）──
   if (action === 'ptread') {
     try {
       if (!ptAuthorized(e)) throw new Error('unauthorized');
-      return jsonResponse({ status: 'ok', rows: readPatrol() });
+      return jsonResponse({ status: 'ok', rows: readPatrol(), stores: PT_STORES, title: PT_TITLE });
     } catch(err) {
       return jsonResponse({ status: 'error', message: err.message });
     }
@@ -166,6 +166,21 @@ function doGet(e) {
 // 保持 'CHANGE_ME' 不改的話，巡店讀寫一律拒絕。
 // ════════════════════════════════════
 const PT_KEY = 'CHANGE_ME';
+
+// ── 分享給其他督導時，每人自建試算表與 GAS 部署，改這兩個設定即可 ──
+// （網頁 patrol.html 大家共用，會自動抓各自 GAS 回傳的標題與門市清單）
+const PT_TITLE = '北一二B區 · 盧蔚榮 · 33 項檢核追蹤';
+const PT_STORES = [
+  { code: 'DNB10059', name: '台北通化' },
+  { code: 'DNB10062', name: '台北酒泉' },
+  { code: 'DNB10307', name: '台北三創' },
+  { code: 'DNB10xxx_wanda', name: '台北萬大' },
+  { code: 'DNB10440', name: '台北六張犁' },
+  { code: 'DNB10094', name: '台北復興南' },
+  { code: 'DNB10082', name: '台北永吉' },
+  { code: 'DNB10284', name: '台北大稻埕' },
+  { code: 'DNB10146', name: '台北杭州南' },
+];
 
 function ptAuthorized(e) {
   return PT_KEY !== 'CHANGE_ME' && e.parameter.key === PT_KEY;
@@ -291,14 +306,14 @@ function checkAwareAndNotify() {
     done[store][item] = true;
   }
 
-  // 對應官方九店（貼上店名可能含「台北」前綴，用關鍵字比對）
-  const rows = STORES.map(s => {
-    const key = s.replace('台北', '');
+  // 對應本區門市（貼上店名可能含「台北」前綴，用關鍵字比對）
+  const rows = PT_STORES.map(s => {
+    const key = s.name.replace('台北', '');
     let cnt = 0;
     Object.keys(done).forEach(ps => {
       if (ps.indexOf(key) !== -1) cnt = Math.max(cnt, Object.keys(done[ps]).length);
     });
-    return { store: s, cnt: cnt };
+    return { store: s.name, cnt: cnt };
   });
   const incomplete = rows.filter(r => r.cnt < AWARE_TOTAL)
     .sort((a, b) => a.cnt - b.cnt);

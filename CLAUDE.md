@@ -3,7 +3,11 @@
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）+ Google Sheets。
 
 另有 `patrol.html`（督導巡店追蹤系統）：貼上巡店明細表 → 33 項檢核看板。
-與 index.html **共用同一個 GAS 部署**（localStorage `bei12b_gas_url` 也共用），
+與 index.html **共用同一個 GAS 部署**（巡店網址存 localStorage `bei12b_pt_gas_url`，
+相容回退舊的 `bei12b_gas_url`）。**可分享給其他督導**：每人自建試算表＋自己的
+GAS 部署（改 `SPREADSHEET_ID`/`PT_KEY`/`PT_TITLE`/`PT_STORES`/`NOTIFY_EMAIL`），
+在 patrol.html 貼自己的 GAS 網址即可；前端標題與門市清單由 ptread 回傳的
+`title`/`stores` 覆蓋，資料實體隔離互不可見。
 資料存「巡店明細」工作表，API 為 `?action=ptread`（fetch GET 讀全部）與
 `?action=ptwrite&payload=...`（JSONP 寫入，前端每 10 筆分批送避免網址過長；
 GAS 端以 fillTime+store+item 為唯一鍵去重，content 欄不上傳、由題號 ITEM_TEXT 還原）。

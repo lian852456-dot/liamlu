@@ -208,7 +208,7 @@
 <div class="wrap">
   <header>
     <h1><span class="dot"></span>督導巡店追蹤系統</h1>
-    <div class="sub">北一二B區 · 盧蔚榮 · 33 項檢核追蹤</div>
+    <div class="sub" id="subTitle">北一二B區 · 盧蔚榮 · 33 項檢核追蹤</div>
     <div class="month-pick">
       <label>追蹤月份</label>
       <input type="month" id="monthInput">
@@ -251,8 +251,9 @@
 
 <script>
 /* ---------- 檢核規則設定 ---------- */
-// 九店（用於顯示「尚未巡店」的店）
-const STORES = [
+// 預設門市清單（北一二B）。連上雲端後會改用 GAS 回傳的本區清單，
+// 其他督導只要在自己的 GAS 改 PT_STORES / PT_TITLE，不用碰這個網頁。
+let STORES = [
   {code:"DNB10059", name:"台北通化"},
   {code:"DNB10062", name:"台北酒泉"},
   {code:"DNB10307", name:"台北三創"},
@@ -318,8 +319,11 @@ let records = {};
 // rawDetails: 完整明細陣列，供上傳雲端與匯出（每筆一列）
 let rawDetails = [];
 let currentMonth = "";
-// 與 index.html 共用同一個 GAS 部署（可在畫面上貼新網址覆蓋，會存進 localStorage）
-let GAS_URL = localStorage.getItem('bei12b_gas_url') || "https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec";
+// 巡店專用網址鍵（優先），相容舊的共用鍵，最後才用預設（北一二B 的 GAS 部署）。
+// 其他督導在畫面上貼自己的 GAS 網址即可，只記在自己的裝置，資料互不相通。
+let GAS_URL = localStorage.getItem('bei12b_pt_gas_url') ||
+              localStorage.getItem('bei12b_gas_url') ||
+              "https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec";
 // 巡店通行碼（GAS 端 PT_KEY 驗證），輸入一次後記在本裝置
 let PT_KEY = localStorage.getItem('bei12b_pt_key') || '';
 
@@ -828,7 +832,7 @@ function cloudConnect(){
   cloudCall('ping').then(res=>{
     if(res.status==='ok'){
       cloudOn=true;
-      localStorage.setItem('bei12b_gas_url', GAS_URL);
+      localStorage.setItem('bei12b_pt_gas_url', GAS_URL);
       setCloudStatus('已連線',true);
       showMsg('雲端已連線，正在載入資料…','ok');
       cloudLoad();
@@ -847,6 +851,11 @@ function cloudLoad(retried){
   if(!PT_KEY && !askKey()){ showMsg('未輸入通行碼，無法載入雲端資料','err'); return; }
   cloudCall('ptread', {key: PT_KEY}).then(res=>{
     if(res.status==='ok'){
+      // 套用各區自己的設定（GAS 的 PT_STORES / PT_TITLE），沒回傳就用預設
+      if(Array.isArray(res.stores) && res.stores.length){
+        STORES = res.stores.map(s=>({code:String(s.code||''), name:String(s.name||'')}));
+      }
+      if(res.title) document.getElementById('subTitle').textContent = res.title;
       rawDetails = (res.rows||[]).map(r=>({
         fillTime:String(r.fillTime||''), arriveTime:String(r.arriveTime||''), leaveTime:String(r.leaveTime||''),
         district:String(r.district||''), code:String(r.code||''), store:String(r.store||''), inspector:String(r.inspector||''),
