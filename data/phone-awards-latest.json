@@ -1,0 +1,919 @@
+{
+  "version": 1,
+  "report_date": "2026-07-15",
+  "generated_at": "2026-07-15T14:47:53+08:00",
+  "source_mode": "01-08-03/01-08-04 -> Y26 tabs -> screenshots",
+  "source_files": {
+    "store": "/Users/liamlu/Downloads/liam-agent/report-automation/input/google-drive/phone-awards/01-08-03-(密)直營_手機競賽日報_店點達成率、排名及獎金.xlsx",
+    "person": "/Users/liamlu/Downloads/liam-agent/report-automation/input/google-drive/phone-awards/01-08-04-(密)直營_手機競賽日報_個人達成率、排名及獎金.xlsx",
+    "y26": "/Users/liamlu/Downloads/liam-agent/report-automation/input/google-drive/phone-awards/Y26重點台獎手機.xlsx"
+  },
+  "phone_items": 10,
+  "store_rows": 10,
+  "person_award_y_rows": 32,
+  "items": [
+    {
+      "name": "X300/X300Pro/V70FE",
+      "display_name": "vivo X300/X300 Pro/V70 FE",
+      "actual": 31.0,
+      "target": 87.0,
+      "rate": 0.3563218390804598,
+      "gap": 39.0,
+      "status": "落後"
+    },
+    {
+      "name": "S26/S26+/A57",
+      "display_name": "Samsung S26/S26+/A57",
+      "actual": 57.0,
+      "target": 119.0,
+      "rate": 0.4789915966386555,
+      "gap": 39.0,
+      "status": "落後"
+    },
+    {
+      "name": "A6x",
+      "display_name": "OPPO A6x 6G/128G",
+      "actual": 51.0,
+      "target": 100.0,
+      "rate": 0.51,
+      "gap": 29.0,
+      "status": "追蹤"
+    },
+    {
+      "name": "Pixel10/10 Pro/10 Pro XL/10a",
+      "display_name": "Google Pixel 10/10 Pro/10 Pro XL/10a",
+      "actual": 21.0,
+      "target": 48.0,
+      "rate": 0.4375,
+      "gap": 18.0,
+      "status": "落後"
+    },
+    {
+      "name": "R11",
+      "display_name": "SHARP AQUOS R11",
+      "actual": 5.0,
+      "target": 24.0,
+      "rate": 0.20833333333333334,
+      "gap": 15.0,
+      "status": "落後"
+    },
+    {
+      "name": "1VIII/razrfold",
+      "display_name": "SONY Xperia 1 VIII & moto razr fold",
+      "actual": 2.0,
+      "target": 13.0,
+      "rate": 0.15384615384615385,
+      "gap": 9.0,
+      "status": "落後"
+    },
+    {
+      "name": "A27/A17",
+      "display_name": "Samsung Galaxy A27 & Samsung Galaxy A17",
+      "actual": 31.0,
+      "target": 46.0,
+      "rate": 0.6739130434782609,
+      "gap": 6.0,
+      "status": "追蹤"
+    },
+    {
+      "name": "Y21/Note15Pro",
+      "display_name": "vivo Y21 & Redmi Note 15 Pro",
+      "actual": 10.0,
+      "target": 16.0,
+      "rate": 0.625,
+      "gap": 3.0,
+      "status": "追蹤"
+    },
+    {
+      "name": "Reno16F",
+      "display_name": "OPPO Reno16 F",
+      "actual": 34.0,
+      "target": 44.0,
+      "rate": 0.7727272727272727,
+      "gap": 2.0,
+      "status": "追蹤"
+    },
+    {
+      "name": "S26Ultra",
+      "display_name": "Samsung S26 Ultra",
+      "actual": 13.0,
+      "target": 17.0,
+      "rate": 0.7647058823529411,
+      "gap": 1.0,
+      "status": "追蹤"
+    }
+  ],
+  "stores": [
+    {
+      "store": "北一二B整體",
+      "risk_threshold": 0.8,
+      "risk_label": "80%",
+      "green_count": 0,
+      "blue_count": 5,
+      "lag_count": 5,
+      "risk_count": 10,
+      "strengths": [],
+      "risks": [
+        {
+          "name": "X300/X300Pro/V70FE",
+          "display_name": "vivo X300/X300 Pro/V70 FE",
+          "actual": 31.0,
+          "target": 87.0,
+          "rate": 0.3563218390804598,
+          "gap": 39.0,
+          "status": "落後"
+        },
+        {
+          "name": "S26/S26+/A57",
+          "display_name": "Samsung S26/S26+/A57",
+          "actual": 57.0,
+          "target": 119.0,
+          "rate": 0.4789915966386555,
+          "gap": 39.0,
+          "status": "落後"
+        },
+        {
+          "name": "A6x",
+          "display_name": "OPPO A6x 6G/128G",
+          "actual": 51.0,
+          "target": 100.0,
+          "rate": 0.51,
+          "gap": 29.0,
+          "status": "追蹤"
+        },
+        {
+          "name": "Pixel10/10 Pro/10 Pro XL/10a",
+          "display_name": "Google Pixel 10/10 Pro/10 Pro XL/10a",
+          "actual": 21.0,
+          "target": 48.0,
+          "rate": 0.4375,
+          "gap": 18.0,
+          "status": "落後"
+        },
+        {
+          "name": "R11",
+          "display_name": "SHARP AQUOS R11",
+          "actual": 5.0,
+          "target": 24.0,
+          "rate": 0.20833333333333334,
+          "gap": 15.0,
+          "status": "落後"
+        },
+        {
+          "name": "1VIII/razrfold",
+          "display_name": "SONY Xperia 1 VIII & moto razr fold",
+          "actual": 2.0,
+          "target": 13.0,
+          "rate": 0.15384615384615385,
+          "gap": 9.0,
+          "status": "落後"
+        },
+        {
+          "name": "A27/A17",
+          "display_name": "Samsung Galaxy A27 & Samsung Galaxy A17",
+          "actual": 31.0,
+          "target": 46.0,
+          "rate": 0.6739130434782609,
+          "gap": 6.0,
+          "status": "追蹤"
+        },
+        {
+          "name": "Y21/Note15Pro",
+          "display_name": "vivo Y21 & Redmi Note 15 Pro",
+          "actual": 10.0,
+          "target": 16.0,
+          "rate": 0.625,
+          "gap": 3.0,
+          "status": "追蹤"
+        },
+        {
+          "name": "Reno16F",
+          "display_name": "OPPO Reno16 F",
+          "actual": 34.0,
+          "target": 44.0,
+          "rate": 0.7727272727272727,
+          "gap": 2.0,
+          "status": "追蹤"
+        },
+        {
+          "name": "S26Ultra",
+          "display_name": "Samsung S26 Ultra",
+          "actual": 13.0,
+          "target": 17.0,
+          "rate": 0.7647058823529411,
+          "gap": 1.0,
+          "status": "追蹤"
+        }
+      ]
+    },
+    {
+      "store": "台北酒泉",
+      "risk_threshold": 0.5,
+      "risk_label": "50%",
+      "green_count": 3,
+      "blue_count": 3,
+      "lag_count": 4,
+      "risk_count": 4,
+      "strengths": [
+        {
+          "name": "A27/A17",
+          "display_name": "Samsung Galaxy A27 & Samsung Galaxy A17",
+          "actual": 4.0,
+          "target": 3.0,
+          "rate": 1.3333333333333333,
+          "gap": 0,
+          "status": "超標"
+        },
+        {
+          "name": "Reno16F",
+          "display_name": "OPPO Reno16 F",
+          "actual": 3.0,
+          "target": 3.0,
+          "rate": 1.0,
+          "gap": 0,
+          "status": "超標"
+        },
+        {
+          "name": "S26Ultra",
+          "display_name": "Samsung S26 Ultra",
+          "actual": 1.0,
+          "target": 1.0,
+          "rate": 1.0,
+          "gap": 0.0,
+          "status": "超標"
+        }
+      ],
+      "risks": [
+        {
+          "name": "Pixel10/10 Pro/10 Pro XL/10a",
+          "display_name": "Google Pixel 10/10 Pro/10 Pro XL/10a",
+          "actual": 0.0,
+          "target": 4.0,
+          "rate": 0.0,
+          "gap": 2.0,
+          "status": "落後"
+        },
+        {
+          "name": "1VIII/razrfold",
+          "display_name": "SONY Xperia 1 VIII & moto razr fold",
+          "actual": 0.0,
+          "target": 1.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "Y21/Note15Pro",
+          "display_name": "vivo Y21 & Redmi Note 15 Pro",
+          "actual": 0.0,
+          "target": 1.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "X300/X300Pro/V70FE",
+          "display_name": "vivo X300/X300 Pro/V70 FE",
+          "actual": 2.0,
+          "target": 6.0,
+          "rate": 0.3333333333333333,
+          "gap": 1.0,
+          "status": "落後"
+        }
+      ]
+    },
+    {
+      "store": "台北永吉",
+      "risk_threshold": 0.5,
+      "risk_label": "50%",
+      "green_count": 1,
+      "blue_count": 2,
+      "lag_count": 7,
+      "risk_count": 7,
+      "strengths": [
+        {
+          "name": "Y21/Note15Pro",
+          "display_name": "vivo Y21 & Redmi Note 15 Pro",
+          "actual": 5.0,
+          "target": 1.0,
+          "rate": 5.0,
+          "gap": 0,
+          "status": "超標"
+        }
+      ],
+      "risks": [
+        {
+          "name": "X300/X300Pro/V70FE",
+          "display_name": "vivo X300/X300 Pro/V70 FE",
+          "actual": 0.0,
+          "target": 7.0,
+          "rate": 0.0,
+          "gap": 4.0,
+          "status": "落後"
+        },
+        {
+          "name": "Pixel10/10 Pro/10 Pro XL/10a",
+          "display_name": "Google Pixel 10/10 Pro/10 Pro XL/10a",
+          "actual": 0.0,
+          "target": 4.0,
+          "rate": 0.0,
+          "gap": 2.0,
+          "status": "落後"
+        },
+        {
+          "name": "Reno16F",
+          "display_name": "OPPO Reno16 F",
+          "actual": 0.0,
+          "target": 4.0,
+          "rate": 0.0,
+          "gap": 2.0,
+          "status": "落後"
+        },
+        {
+          "name": "R11",
+          "display_name": "SHARP AQUOS R11",
+          "actual": 0.0,
+          "target": 2.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "S26Ultra",
+          "display_name": "Samsung S26 Ultra",
+          "actual": 0.0,
+          "target": 1.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "1VIII/razrfold",
+          "display_name": "SONY Xperia 1 VIII & moto razr fold",
+          "actual": 0.0,
+          "target": 1.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "A27/A17",
+          "display_name": "Samsung Galaxy A27 & Samsung Galaxy A17",
+          "actual": 1.0,
+          "target": 3.0,
+          "rate": 0.3333333333333333,
+          "gap": 1.0,
+          "status": "落後"
+        }
+      ]
+    },
+    {
+      "store": "台北復興南",
+      "risk_threshold": 0.5,
+      "risk_label": "50%",
+      "green_count": 0,
+      "blue_count": 4,
+      "lag_count": 6,
+      "risk_count": 6,
+      "strengths": [],
+      "risks": [
+        {
+          "name": "X300/X300Pro/V70FE",
+          "display_name": "vivo X300/X300 Pro/V70 FE",
+          "actual": 2.0,
+          "target": 10.0,
+          "rate": 0.2,
+          "gap": 3.0,
+          "status": "落後"
+        },
+        {
+          "name": "R11",
+          "display_name": "SHARP AQUOS R11",
+          "actual": 0.0,
+          "target": 3.0,
+          "rate": 0.0,
+          "gap": 2.0,
+          "status": "落後"
+        },
+        {
+          "name": "A27/A17",
+          "display_name": "Samsung Galaxy A27 & Samsung Galaxy A17",
+          "actual": 1.0,
+          "target": 5.0,
+          "rate": 0.2,
+          "gap": 2.0,
+          "status": "落後"
+        },
+        {
+          "name": "1VIII/razrfold",
+          "display_name": "SONY Xperia 1 VIII & moto razr fold",
+          "actual": 0.0,
+          "target": 1.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "Y21/Note15Pro",
+          "display_name": "vivo Y21 & Redmi Note 15 Pro",
+          "actual": 0.0,
+          "target": 2.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "S26/S26+/A57",
+          "display_name": "Samsung S26/S26+/A57",
+          "actual": 6.0,
+          "target": 14.0,
+          "rate": 0.42857142857142855,
+          "gap": 1.0,
+          "status": "落後"
+        }
+      ]
+    },
+    {
+      "store": "台北杭州南",
+      "risk_threshold": 0.5,
+      "risk_label": "50%",
+      "green_count": 0,
+      "blue_count": 4,
+      "lag_count": 6,
+      "risk_count": 6,
+      "strengths": [],
+      "risks": [
+        {
+          "name": "X300/X300Pro/V70FE",
+          "display_name": "vivo X300/X300 Pro/V70 FE",
+          "actual": 0.0,
+          "target": 10.0,
+          "rate": 0.0,
+          "gap": 5.0,
+          "status": "落後"
+        },
+        {
+          "name": "A6x",
+          "display_name": "OPPO A6x 6G/128G",
+          "actual": 4.0,
+          "target": 14.0,
+          "rate": 0.2857142857142857,
+          "gap": 3.0,
+          "status": "落後"
+        },
+        {
+          "name": "1VIII/razrfold",
+          "display_name": "SONY Xperia 1 VIII & moto razr fold",
+          "actual": 0.0,
+          "target": 2.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "Reno16F",
+          "display_name": "OPPO Reno16 F",
+          "actual": 2.0,
+          "target": 6.0,
+          "rate": 0.3333333333333333,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "R11",
+          "display_name": "SHARP AQUOS R11",
+          "actual": 1.0,
+          "target": 3.0,
+          "rate": 0.3333333333333333,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "A27/A17",
+          "display_name": "Samsung Galaxy A27 & Samsung Galaxy A17",
+          "actual": 3.0,
+          "target": 7.0,
+          "rate": 0.42857142857142855,
+          "gap": 1.0,
+          "status": "落後"
+        }
+      ]
+    },
+    {
+      "store": "台北萬大",
+      "risk_threshold": 0.5,
+      "risk_label": "50%",
+      "green_count": 2,
+      "blue_count": 2,
+      "lag_count": 6,
+      "risk_count": 6,
+      "strengths": [
+        {
+          "name": "1VIII/razrfold",
+          "display_name": "SONY Xperia 1 VIII & moto razr fold",
+          "actual": 1.0,
+          "target": 1.0,
+          "rate": 1.0,
+          "gap": 0.0,
+          "status": "超標"
+        },
+        {
+          "name": "A27/A17",
+          "display_name": "Samsung Galaxy A27 & Samsung Galaxy A17",
+          "actual": 6.0,
+          "target": 6.0,
+          "rate": 1.0,
+          "gap": 0,
+          "status": "超標"
+        }
+      ],
+      "risks": [
+        {
+          "name": "A6x",
+          "display_name": "OPPO A6x 6G/128G",
+          "actual": 0.0,
+          "target": 11.0,
+          "rate": 0.0,
+          "gap": 6.0,
+          "status": "落後"
+        },
+        {
+          "name": "Pixel10/10 Pro/10 Pro XL/10a",
+          "display_name": "Google Pixel 10/10 Pro/10 Pro XL/10a",
+          "actual": 1.0,
+          "target": 5.0,
+          "rate": 0.2,
+          "gap": 2.0,
+          "status": "落後"
+        },
+        {
+          "name": "S26/S26+/A57",
+          "display_name": "Samsung S26/S26+/A57",
+          "actual": 5.0,
+          "target": 13.0,
+          "rate": 0.38461538461538464,
+          "gap": 2.0,
+          "status": "落後"
+        },
+        {
+          "name": "R11",
+          "display_name": "SHARP AQUOS R11",
+          "actual": 0.0,
+          "target": 2.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "S26Ultra",
+          "display_name": "Samsung S26 Ultra",
+          "actual": 0.0,
+          "target": 2.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "Y21/Note15Pro",
+          "display_name": "vivo Y21 & Redmi Note 15 Pro",
+          "actual": 0.0,
+          "target": 2.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        }
+      ]
+    },
+    {
+      "store": "台北通化",
+      "risk_threshold": 0.5,
+      "risk_label": "50%",
+      "green_count": 4,
+      "blue_count": 2,
+      "lag_count": 4,
+      "risk_count": 4,
+      "strengths": [
+        {
+          "name": "Pixel10/10 Pro/10 Pro XL/10a",
+          "display_name": "Google Pixel 10/10 Pro/10 Pro XL/10a",
+          "actual": 11.0,
+          "target": 7.0,
+          "rate": 1.5714285714285714,
+          "gap": 0,
+          "status": "超標"
+        },
+        {
+          "name": "Reno16F",
+          "display_name": "OPPO Reno16 F",
+          "actual": 11.0,
+          "target": 7.0,
+          "rate": 1.5714285714285714,
+          "gap": 0,
+          "status": "超標"
+        },
+        {
+          "name": "A6x",
+          "display_name": "OPPO A6x 6G/128G",
+          "actual": 14.0,
+          "target": 13.0,
+          "rate": 1.0769230769230769,
+          "gap": 0,
+          "status": "超標"
+        },
+        {
+          "name": "Y21/Note15Pro",
+          "display_name": "vivo Y21 & Redmi Note 15 Pro",
+          "actual": 2.0,
+          "target": 2.0,
+          "rate": 1.0,
+          "gap": 0,
+          "status": "超標"
+        }
+      ],
+      "risks": [
+        {
+          "name": "S26/S26+/A57",
+          "display_name": "Samsung S26/S26+/A57",
+          "actual": 6.0,
+          "target": 17.0,
+          "rate": 0.35294117647058826,
+          "gap": 3.0,
+          "status": "落後"
+        },
+        {
+          "name": "R11",
+          "display_name": "SHARP AQUOS R11",
+          "actual": 0.0,
+          "target": 3.0,
+          "rate": 0.0,
+          "gap": 2.0,
+          "status": "落後"
+        },
+        {
+          "name": "S26Ultra",
+          "display_name": "Samsung S26 Ultra",
+          "actual": 1.0,
+          "target": 3.0,
+          "rate": 0.3333333333333333,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "A27/A17",
+          "display_name": "Samsung Galaxy A27 & Samsung Galaxy A17",
+          "actual": 2.0,
+          "target": 6.0,
+          "rate": 0.3333333333333333,
+          "gap": 1.0,
+          "status": "落後"
+        }
+      ]
+    },
+    {
+      "store": "台北大稻埕",
+      "risk_threshold": 0.5,
+      "risk_label": "50%",
+      "green_count": 3,
+      "blue_count": 3,
+      "lag_count": 4,
+      "risk_count": 4,
+      "strengths": [
+        {
+          "name": "A27/A17",
+          "display_name": "Samsung Galaxy A27 & Samsung Galaxy A17",
+          "actual": 11.0,
+          "target": 3.0,
+          "rate": 3.6666666666666665,
+          "gap": 0,
+          "status": "超標"
+        },
+        {
+          "name": "S26Ultra",
+          "display_name": "Samsung S26 Ultra",
+          "actual": 3.0,
+          "target": 1.0,
+          "rate": 3.0,
+          "gap": 0,
+          "status": "超標"
+        },
+        {
+          "name": "Y21/Note15Pro",
+          "display_name": "vivo Y21 & Redmi Note 15 Pro",
+          "actual": 1.0,
+          "target": 1.0,
+          "rate": 1.0,
+          "gap": 0.0,
+          "status": "超標"
+        }
+      ],
+      "risks": [
+        {
+          "name": "Pixel10/10 Pro/10 Pro XL/10a",
+          "display_name": "Google Pixel 10/10 Pro/10 Pro XL/10a",
+          "actual": 0.0,
+          "target": 4.0,
+          "rate": 0.0,
+          "gap": 2.0,
+          "status": "落後"
+        },
+        {
+          "name": "X300/X300Pro/V70FE",
+          "display_name": "vivo X300/X300 Pro/V70 FE",
+          "actual": 2.0,
+          "target": 7.0,
+          "rate": 0.2857142857142857,
+          "gap": 2.0,
+          "status": "落後"
+        },
+        {
+          "name": "1VIII/razrfold",
+          "display_name": "SONY Xperia 1 VIII & moto razr fold",
+          "actual": 0.0,
+          "target": 1.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "Reno16F",
+          "display_name": "OPPO Reno16 F",
+          "actual": 1.0,
+          "target": 3.0,
+          "rate": 0.3333333333333333,
+          "gap": 1.0,
+          "status": "落後"
+        }
+      ]
+    },
+    {
+      "store": "台灣大哥大數位生活台北三創",
+      "risk_threshold": 0.5,
+      "risk_label": "50%",
+      "green_count": 1,
+      "blue_count": 1,
+      "lag_count": 8,
+      "risk_count": 8,
+      "strengths": [
+        {
+          "name": "S26Ultra",
+          "display_name": "Samsung S26 Ultra",
+          "actual": 5.0,
+          "target": 4.0,
+          "rate": 1.25,
+          "gap": 0,
+          "status": "超標"
+        }
+      ],
+      "risks": [
+        {
+          "name": "X300/X300Pro/V70FE",
+          "display_name": "vivo X300/X300 Pro/V70 FE",
+          "actual": 3.0,
+          "target": 18.0,
+          "rate": 0.16666666666666666,
+          "gap": 6.0,
+          "status": "落後"
+        },
+        {
+          "name": "A6x",
+          "display_name": "OPPO A6x 6G/128G",
+          "actual": 4.0,
+          "target": 20.0,
+          "rate": 0.2,
+          "gap": 6.0,
+          "status": "落後"
+        },
+        {
+          "name": "S26/S26+/A57",
+          "display_name": "Samsung S26/S26+/A57",
+          "actual": 8.0,
+          "target": 25.0,
+          "rate": 0.32,
+          "gap": 5.0,
+          "status": "落後"
+        },
+        {
+          "name": "Pixel10/10 Pro/10 Pro XL/10a",
+          "display_name": "Google Pixel 10/10 Pro/10 Pro XL/10a",
+          "actual": 1.0,
+          "target": 10.0,
+          "rate": 0.1,
+          "gap": 4.0,
+          "status": "落後"
+        },
+        {
+          "name": "A27/A17",
+          "display_name": "Samsung Galaxy A27 & Samsung Galaxy A17",
+          "actual": 2.0,
+          "target": 10.0,
+          "rate": 0.2,
+          "gap": 3.0,
+          "status": "落後"
+        },
+        {
+          "name": "1VIII/razrfold",
+          "display_name": "SONY Xperia 1 VIII & moto razr fold",
+          "actual": 0.0,
+          "target": 3.0,
+          "rate": 0.0,
+          "gap": 2.0,
+          "status": "落後"
+        },
+        {
+          "name": "Y21/Note15Pro",
+          "display_name": "vivo Y21 & Redmi Note 15 Pro",
+          "actual": 0.0,
+          "target": 4.0,
+          "rate": 0.0,
+          "gap": 2.0,
+          "status": "落後"
+        },
+        {
+          "name": "R11",
+          "display_name": "SHARP AQUOS R11",
+          "actual": 1.0,
+          "target": 5.0,
+          "rate": 0.2,
+          "gap": 2.0,
+          "status": "落後"
+        }
+      ]
+    },
+    {
+      "store": "台北六張犁",
+      "risk_threshold": 0.5,
+      "risk_label": "50%",
+      "green_count": 4,
+      "blue_count": 3,
+      "lag_count": 3,
+      "risk_count": 3,
+      "strengths": [
+        {
+          "name": "Reno16F",
+          "display_name": "OPPO Reno16 F",
+          "actual": 4.0,
+          "target": 3.0,
+          "rate": 1.3333333333333333,
+          "gap": 0,
+          "status": "超標"
+        },
+        {
+          "name": "S26Ultra",
+          "display_name": "Samsung S26 Ultra",
+          "actual": 1.0,
+          "target": 1.0,
+          "rate": 1.0,
+          "gap": 0.0,
+          "status": "超標"
+        },
+        {
+          "name": "A6x",
+          "display_name": "OPPO A6x 6G/128G",
+          "actual": 8.0,
+          "target": 8.0,
+          "rate": 1.0,
+          "gap": 0,
+          "status": "超標"
+        },
+        {
+          "name": "Y21/Note15Pro",
+          "display_name": "vivo Y21 & Redmi Note 15 Pro",
+          "actual": 1.0,
+          "target": 1.0,
+          "rate": 1.0,
+          "gap": 0.0,
+          "status": "超標"
+        }
+      ],
+      "risks": [
+        {
+          "name": "1VIII/razrfold",
+          "display_name": "SONY Xperia 1 VIII & moto razr fold",
+          "actual": 0.0,
+          "target": 1.0,
+          "rate": 0.0,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "Pixel10/10 Pro/10 Pro XL/10a",
+          "display_name": "Google Pixel 10/10 Pro/10 Pro XL/10a",
+          "actual": 1.0,
+          "target": 4.0,
+          "rate": 0.25,
+          "gap": 1.0,
+          "status": "落後"
+        },
+        {
+          "name": "A27/A17",
+          "display_name": "Samsung Galaxy A27 & Samsung Galaxy A17",
+          "actual": 1.0,
+          "target": 3.0,
+          "rate": 0.3333333333333333,
+          "gap": 1.0,
+          "status": "落後"
+        }
+      ]
+    }
+  ]
+}

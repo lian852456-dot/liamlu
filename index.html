@@ -420,6 +420,104 @@
     border-color: var(--accent);
   }
 
+  /* ══ RANGE / PHONE ANALYTICS ══ */
+  .analytics-toolbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .analytics-toolbar label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .analytics-toolbar input,
+  .analytics-toolbar select {
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 7px;
+    color: var(--text);
+    padding: 8px 9px;
+    font-size: 13px;
+  }
+  .analytics-toolbar .btn { padding: 8px 12px; font-size: 12px; }
+  .range-presets { display: flex; gap: 5px; flex-wrap: wrap; }
+  .range-preset {
+    border: 1px solid #fed7aa;
+    background: #fff7ed;
+    color: #9a3412;
+    border-radius: 18px;
+    padding: 7px 11px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .range-preset.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .analytics-note { color: var(--text-muted); font-size: 11px; line-height: 1.6; }
+  .analytics-alert {
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+  .analytics-alert.ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+  .analytics-alert.warn { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; }
+  .analytics-alert.bad { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+  .momentum-chart-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    padding: 8px;
+  }
+  .momentum-chart { display: block; width: 100%; min-width: 680px; height: auto; }
+  .momentum-legend {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .momentum-legend button {
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: var(--text-dim);
+    border-radius: 16px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .momentum-legend button.off { opacity: .38; text-decoration: line-through; }
+  .momentum-legend button.down { border-color: #fca5a5; color: #b91c1c; background: #fef2f2; }
+  .momentum-table td, .momentum-table th { font-size: 12px; }
+  .momentum-table td:first-child { text-align: left; font-weight: 800; }
+  .phone-store-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .phone-store-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  }
+  .phone-store-card.overall { border: 2px solid var(--accent); background: #fff7ed; }
+  .phone-store-card .psc-name { font-weight: 800; font-size: 13px; margin-bottom: 7px; }
+  .phone-store-card .psc-rate { font-size: 22px; font-weight: 900; color: var(--accent-bright); }
+  .phone-store-card .psc-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  .phone-risk-list { margin-top: 8px; padding-left: 16px; color: #991b1b; font-size: 11px; line-height: 1.6; }
+  .phone-status { font-weight: 800; border-radius: 12px; padding: 3px 8px; font-size: 11px; display: inline-block; }
+  .phone-status.over { color: #166534; background: #dcfce7; }
+  .phone-status.track { color: #1d4ed8; background: #dbeafe; }
+  .phone-status.lag { color: #991b1b; background: #fee2e2; }
+  .phone-gate { font-size: 12px; font-weight: 800; }
+  @media(max-width:700px){ .phone-store-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media(max-width:500px){ .phone-store-grid { grid-template-columns: 1fr; } }
+
   /* ── RESPONSIVE ── */
   @media (max-width: 600px) {
     .site-header { padding: 10px 14px; }
@@ -1268,6 +1366,8 @@
   <button class="tab-btn" onclick="switchTab('summary')">📊 彙整大盤（督導）</button>
   <button class="tab-btn" onclick="switchTab('playback')">🕐 日期回放</button>
   <button class="tab-btn" onclick="switchTab('personal')">👤 個人追蹤</button>
+  <button class="tab-btn" onclick="switchTab('momentum')">📈 區間彙整</button>
+  <button class="tab-btn" onclick="switchTab('phone')">🏅 台獎提醒</button>
 </div>
 
 <!-- ═══════════════════════════════════
@@ -1560,12 +1660,12 @@
         <input type="number" id="f_tw_pixel10" placeholder="0" step="1">
       </div>
       <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">S26 Ultra<span class="tw-bonus"><span class="tw-b50">50%・$405</span><span class="tw-b100">100%・$610</span></span></label>
+        <label style="color:#b8860b;">Samsung S26 Ultra<span class="tw-bonus"><span class="tw-b50">50%・$405</span><span class="tw-b100">100%・$610</span></span></label>
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_s26u" placeholder="0" step="1">
       </div>
       <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">SHARP R11<span class="tw-bonus"><span class="tw-b50">50%・$470</span><span class="tw-b100">100%・$705</span></span></label>
+        <label style="color:#b8860b;">SHARP AQUOS R11<span class="tw-bonus"><span class="tw-b50">50%・$470</span><span class="tw-b100">100%・$705</span></span></label>
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_sharpr11" placeholder="0" step="1">
       </div>
@@ -1585,24 +1685,9 @@
         <input type="number" id="f_tw_reno16f" placeholder="0" step="1">
       </div>
       <div class="kpi-input-wrap">
-        <label>Pixel 10 Pro Fold<span class="tw-bonus"><span class="tw-b50">50%・$50</span><span class="tw-b100">100%・$75</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_pixel10fold" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>Find X9s<span class="tw-bonus"><span class="tw-b50">50%・$210</span><span class="tw-b100">100%・$315</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_findx9s" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap">
         <label>SONY 1 VIII &amp; moto razr fold（動店）<span class="tw-bonus"><span class="tw-b50">50%・$275</span><span class="tw-b100">100%・$415</span></span></label>
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_sony1" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>SHARP Poketomo<span class="tw-bonus"><span class="tw-b50">50%・$35</span><span class="tw-b100">100%・$50</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_poketomo" placeholder="0" step="1">
       </div>
     </div>
 
@@ -1615,7 +1700,7 @@
         <input type="number" id="f_tw_oppoa6x" placeholder="0" step="1">
       </div>
       <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">A27 &amp; A17<span class="tw-bonus"><span class="tw-b50">50%・$265</span><span class="tw-b100">100%・$400</span></span></label>
+        <label style="color:#b8860b;">Samsung Galaxy A27 &amp; A17<span class="tw-bonus"><span class="tw-b50">50%・$265</span><span class="tw-b100">100%・$400</span></span></label>
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_a27" placeholder="0" step="1">
       </div>
@@ -1623,16 +1708,6 @@
         <label style="color:#b8860b;">Y21 &amp; Redmi Note 15 Pro<span class="tw-bonus"><span class="tw-b50">50%・$85</span><span class="tw-b100">100%・$125</span></span></label>
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_y21" placeholder="0" step="1">
-      </div>
-    </div>
-
-    <!-- KPI 穿戴 -->
-    <div style="font-size:11px;font-weight:700;color:#6b7280;background:rgba(107,114,128,0.1);border:1px solid rgba(107,114,128,0.3);border-radius:6px;padding:4px 10px;margin:8px 0 6px;">⌚ KPI 穿戴</div>
-    <div class="form-grid">
-      <div class="kpi-input-wrap">
-        <label>myFirst兒錶 &amp; 咖波TCL兒錶（動店）<span class="tw-bonus"><span class="tw-b50">50%・$75</span><span class="tw-b100">100%・$115</span></span></label>
-        <span class="ki-icon">⌚</span>
-        <input type="number" id="f_tw_myfirst" placeholder="0" step="1">
       </div>
     </div>
 
@@ -1886,6 +1961,73 @@
 
 </div><!-- /panel-personal -->
 
+<!-- ═══════════════════════════════════
+     PANEL 5: 區間彙整（OneDrive 日動能）
+═══════════════════════════════════ -->
+<div class="panel" id="panel-momentum">
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>📈 區間彙整 · 每日動能</div>
+    <div class="analytics-toolbar">
+      <div>
+        <div class="range-presets">
+          <button class="range-preset active" data-range="week" onclick="setMomentumRange('week')">本週</button>
+          <button class="range-preset" data-range="lastWeek" onclick="setMomentumRange('lastWeek')">上週</button>
+          <button class="range-preset" data-range="month" onclick="setMomentumRange('month')">本月</button>
+          <button class="range-preset" data-range="lastMonth" onclick="setMomentumRange('lastMonth')">上月</button>
+        </div>
+      </div>
+      <label>起日<input type="date" id="momentumStart"></label>
+      <label>迄日<input type="date" id="momentumEnd"></label>
+      <label>KPI<select id="momentumMetric" onchange="renderMomentum()">
+        <option value="a999">A999</option>
+        <option value="haosu">好速</option>
+        <option value="r1399">R1399</option>
+        <option value="aq_points">AQ點數</option>
+        <option value="rt_points">RT點數</option>
+        <option value="aq_count">AQ上線數</option>
+        <option value="rt_count">RT上線數</option>
+      </select></label>
+      <button class="btn btn-primary" onclick="applyMomentumCustomRange()">🔍 查詢</button>
+      <button class="btn btn-secondary" onclick="loadMomentumData(true)">↻ 更新</button>
+    </div>
+    <div id="momentumSourceNote" class="analytics-note"></div>
+  </div>
+  <div id="momentumAlertSummary"></div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <div class="card-title" style="margin:0;border:0;padding:0;"><span class="dot"></span><span id="momentumChartTitle">每日走勢</span></div>
+      <div class="range-presets">
+        <button class="range-preset active" data-horizon="7" onclick="setMomentumHorizon(7)">近7天</button>
+        <button class="range-preset" data-horizon="30" onclick="setMomentumHorizon(30)">近30天</button>
+      </div>
+    </div>
+    <div class="momentum-chart-wrap"><div id="momentumChart"></div></div>
+    <div id="momentumLegend" class="momentum-legend"></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>門市趨勢摘要</div>
+    <div class="table-wrap"><table id="momentumValueTable" class="momentum-table"></table></div>
+  </div>
+</div><!-- /panel-momentum -->
+
+<!-- ═══════════════════════════════════
+     PANEL 6: 台獎提醒
+═══════════════════════════════════ -->
+<div class="panel" id="panel-phone">
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>🏅 台獎進度提醒 · 10台機款</div>
+    <div id="phoneSourceNote" class="analytics-note"></div>
+    <div id="phoneGate" class="phone-gate" style="margin-top:8px;"></div>
+  </div>
+  <div class="summary-grid" id="phoneSummaryCards"></div>
+  <div class="section-divider">10台機款進度</div>
+  <div class="card" style="padding:14px 10px;">
+    <div class="table-wrap"><table id="phoneItemsTable"></table></div>
+  </div>
+  <div class="section-divider">各店提醒排序</div>
+  <div id="phoneStoreGrid" class="phone-store-grid"></div>
+</div><!-- /panel-phone -->
+
 
 <script>
 // ════════════════════════════════════
@@ -1904,6 +2046,14 @@ const KPI_THRESHOLDS = {
 let currentSeg = 16;
 let sumSeg = 16;
 let pbSeg = 16;
+
+const MOMENTUM_DATA_URL = './data/daily-momentum.json';
+const PHONE_DATA_URL = './data/phone-awards-latest.json';
+let _momentumData = null;
+let _phoneData = null;
+let _momentumRange = 'week';
+let _momentumHorizon = 7;
+let _momentumHiddenStores = new Set();
 
 // ════════════════════════════════════
 // GOOGLE SHEETS 設定
@@ -2207,6 +2357,319 @@ function switchTab(name) {
   document.getElementById('panel-' + name).classList.add('active');
   event.currentTarget.classList.add('active');
   if (name === 'summary') renderSummary();
+  if (name === 'momentum') loadMomentumData();
+  if (name === 'phone') loadPhoneData();
+}
+
+// ════════════════════════════════════
+// OneDrive 日動能區間彙整
+// ════════════════════════════════════
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function momentumDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function momentumDateObj(text) {
+  const [y, m, d] = String(text).split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function momentumDatesAll() {
+  if (!_momentumData) return [];
+  return Object.keys(_momentumData.latest_source_by_date || {})
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function momentumLatestDate() {
+  const dates = momentumDatesAll();
+  return dates[dates.length - 1] || today();
+}
+
+function momentumRangeFor(preset) {
+  const anchor = momentumDateObj(momentumLatestDate());
+  const day = (anchor.getDay() + 6) % 7;
+  const monday = new Date(anchor);
+  monday.setDate(anchor.getDate() - day);
+  if (preset === 'lastWeek') {
+    const end = new Date(monday); end.setDate(end.getDate() - 1);
+    const start = new Date(end); start.setDate(end.getDate() - 6);
+    return [momentumDateStr(start), momentumDateStr(end)];
+  }
+  if (preset === 'month') {
+    return [momentumDateStr(new Date(anchor.getFullYear(), anchor.getMonth(), 1)), momentumDateStr(anchor)];
+  }
+  if (preset === 'lastMonth') {
+    const start = new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1);
+    const end = new Date(anchor.getFullYear(), anchor.getMonth(), 0);
+    return [momentumDateStr(start), momentumDateStr(end)];
+  }
+  return [momentumDateStr(monday), momentumDateStr(anchor)];
+}
+
+function momentumRangeDates() {
+  const start = document.getElementById('momentumStart').value;
+  const end = document.getElementById('momentumEnd').value;
+  if (!start || !end || start > end) return [];
+  return momentumDatesAll().filter(d => d >= start && d <= end);
+}
+
+function setMomentumRange(preset) {
+  _momentumRange = preset;
+  const [start, end] = momentumRangeFor(preset);
+  document.getElementById('momentumStart').value = start;
+  document.getElementById('momentumEnd').value = end;
+  document.querySelectorAll('.range-preset[data-range]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.range === preset);
+  });
+  renderMomentum();
+}
+
+function applyMomentumCustomRange() {
+  _momentumRange = 'custom';
+  document.querySelectorAll('.range-preset[data-range]').forEach(btn => btn.classList.remove('active'));
+  renderMomentum();
+}
+
+function setMomentumHorizon(days) {
+  _momentumHorizon = days;
+  document.querySelectorAll('.range-preset[data-horizon]').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.horizon) === days);
+  });
+  renderMomentum();
+}
+
+function momentumMetricMeta(key) {
+  return (_momentumData && _momentumData.metrics && _momentumData.metrics[key]) || { label: key, unit: '' };
+}
+
+function momentumValues(store, metric, dates) {
+  return dates.map(date => {
+    const value = _momentumData?.data?.[store]?.[date]?.[metric];
+    return value === null || value === undefined || value === '' ? null : Number(value);
+  });
+}
+
+function momentumLastValues(values) {
+  return values.filter(value => value !== null && Number.isFinite(value));
+}
+
+function momentumIsDown(values) {
+  const recent = momentumLastValues(values).slice(-3);
+  return recent.length === 3 && recent[0] > recent[1] && recent[1] > recent[2];
+}
+
+function momentumEggStreak(values) {
+  const recent = momentumLastValues(values);
+  let count = 0;
+  for (let i = recent.length - 1; i >= 0 && recent[i] === 0; i--) count++;
+  return count;
+}
+
+function momentumFmt(value) {
+  if (value === null || value === undefined) return '—';
+  return Number(value) % 1 === 0 ? String(value) : Number(value).toFixed(2);
+}
+
+function momentumColor(index) {
+  const colors = ['#f97316','#2563eb','#16a34a','#7c3aed','#0891b2','#db2777','#ca8a04','#475569','#0f766e','#9333ea'];
+  return colors[index % colors.length];
+}
+
+function toggleMomentumStore(store) {
+  if (_momentumHiddenStores.has(store)) _momentumHiddenStores.delete(store);
+  else _momentumHiddenStores.add(store);
+  renderMomentum();
+}
+
+function renderMomentumSvg(dates, metric) {
+  const stores = (_momentumData?.stores || []).filter(s => !_momentumHiddenStores.has(s));
+  const meta = momentumMetricMeta(metric);
+  const width = 780, height = 340;
+  const pad = { left: 44, right: 16, top: 16, bottom: 38 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const series = stores.map(store => ({ store, values: momentumValues(store, metric, dates) }));
+  const allValues = series.flatMap(s => momentumLastValues(s.values));
+  const max = Math.max(1, ...(allValues.length ? allValues : [1]));
+  const yMax = max * 1.12;
+  const x = index => pad.left + (dates.length <= 1 ? plotW / 2 : (index / (dates.length - 1)) * plotW);
+  const y = value => pad.top + plotH - (value / yMax) * plotH;
+  const parts = [`<svg class="momentum-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(meta.label)}每日走勢圖">`];
+  for (let i = 0; i <= 4; i++) {
+    const value = yMax * i / 4;
+    const yy = y(value);
+    parts.push(`<line x1="${pad.left}" y1="${yy.toFixed(1)}" x2="${width-pad.right}" y2="${yy.toFixed(1)}" stroke="#e5e7eb"/>`);
+    parts.push(`<text x="${pad.left-7}" y="${(yy+4).toFixed(1)}" text-anchor="end" font-size="10" fill="#6b7280">${momentumFmt(value)}</text>`);
+  }
+  const labelStep = Math.max(1, Math.ceil(dates.length / 8));
+  dates.forEach((date, index) => {
+    if (index % labelStep !== 0 && index !== dates.length - 1) return;
+    parts.push(`<text x="${x(index).toFixed(1)}" y="${height-14}" text-anchor="middle" font-size="10" fill="#6b7280">${date.slice(5)}</text>`);
+  });
+  series.forEach((item, seriesIndex) => {
+    const color = item.store === '北一二B整體' ? '#f97316' : momentumColor(seriesIndex);
+    const points = item.values.map((value, index) => value === null ? null : `${x(index).toFixed(1)},${y(value).toFixed(1)}`).filter(Boolean);
+    if (points.length >= 2) {
+      parts.push(`<polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="${item.store === '北一二B整體' ? 3 : 1.7}" stroke-linejoin="round" stroke-linecap="round"/>`);
+    }
+    item.values.forEach((value, index) => {
+      if (value === null) return;
+      parts.push(`<circle cx="${x(index).toFixed(1)}" cy="${y(value).toFixed(1)}" r="${item.store === '北一二B整體' ? 3 : 2.2}" fill="${color}"><title>${escapeHtml(item.store)} ${dates[index]}：${momentumFmt(value)}${meta.unit}</title></circle>`);
+    });
+  });
+  parts.push('</svg>');
+  return parts.join('');
+}
+
+function renderMomentum() {
+  if (!_momentumData) return;
+  const dates = momentumRangeDates();
+  const metric = document.getElementById('momentumMetric').value;
+  const meta = momentumMetricMeta(metric);
+  const sourceDates = momentumDatesAll();
+  const latest = sourceDates[sourceDates.length - 1] || '—';
+  document.getElementById('momentumSourceNote').textContent =
+    `資料來源：OneDrive 每日報表「${_momentumData.source_sheet || '上線數KPI_每日上線'}」｜資料至 ${latest}｜區間 ${dates[0] || '—'} ～ ${dates[dates.length - 1] || '—'}`;
+  document.getElementById('momentumChartTitle').textContent = `${meta.label}每日走勢（${meta.unit}）`;
+  if (!dates.length) {
+    document.getElementById('momentumChart').innerHTML = '<div class="analytics-alert warn">目前區間沒有可用的日動能資料。</div>';
+    document.getElementById('momentumLegend').innerHTML = '';
+    document.getElementById('momentumValueTable').innerHTML = '';
+    document.getElementById('momentumAlertSummary').innerHTML = '';
+    return;
+  }
+
+  const chartDates = dates.slice(-_momentumHorizon);
+  document.getElementById('momentumChart').innerHTML = renderMomentumSvg(chartDates, metric);
+  const allStores = _momentumData.stores || [];
+  document.getElementById('momentumLegend').innerHTML = allStores.map((store, index) => {
+    const down = momentumIsDown(momentumValues(store, metric, chartDates));
+    const off = _momentumHiddenStores.has(store);
+    return `<button class="${off ? 'off ' : ''}${down ? 'down' : ''}" onclick="toggleMomentumStore('${escapeHtml(store)}')"><span style="color:${store === '北一二B整體' ? '#f97316' : momentumColor(index)}">●</span> ${escapeHtml(store)}${down ? ' ↘' : ''}</button>`;
+  }).join('');
+
+  const summaryRows = allStores.map((store, index) => {
+    const values = momentumValues(store, metric, chartDates);
+    const recent = momentumLastValues(values);
+    const latestValue = recent.length ? recent[recent.length - 1] : null;
+    const total = recent.reduce((sum, value) => sum + value, 0);
+    const zeros = recent.filter(value => value === 0).length;
+    const streak = momentumEggStreak(values);
+    const down = momentumIsDown(values);
+    const flags = [];
+    if (latestValue === 0) flags.push('今日掛🥚');
+    if (streak >= 2) flags.push(`連續${streak}日掛🥚`);
+    if (down) flags.push('近3日下滑');
+    return { store, index, latestValue, total, zeros, flags, down };
+  });
+  document.getElementById('momentumValueTable').innerHTML = `<thead><tr><th style="text-align:left">店點</th><th>最新</th><th>區間合計</th><th>掛蛋日數</th><th>提醒</th></tr></thead><tbody>${summaryRows.map(row => `<tr><td>${escapeHtml(row.store)}</td><td>${momentumFmt(row.latestValue)}${meta.unit}</td><td>${momentumFmt(row.total)}${meta.unit}</td><td>${row.zeros}</td><td>${row.flags.length ? `<span class="val-red">${row.flags.join('／')}</span>` : '<span class="val-green">正常</span>'}</td></tr>`).join('')}</tbody>`;
+
+  const alerts = summaryRows.filter(row => row.store !== '北一二B整體' && row.flags.length);
+  document.getElementById('momentumAlertSummary').innerHTML = alerts.length
+    ? `<div class="analytics-alert bad">⚠️ ${meta.label} 需要跟進：${alerts.map(row => `<strong>${escapeHtml(row.store)}</strong>（${row.flags.join('、')}）`).join('、')}</div>`
+    : `<div class="analytics-alert ok">✅ ${meta.label} 目前沒有門市觸發掛蛋或連續下滑提醒。</div>`;
+}
+
+function momentumDemoData() {
+  const dates = [];
+  for (let i = 13; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); dates.push(momentumDateStr(d)); }
+  const stores = ['北一二B整體', ...STORES];
+  const data = {};
+  stores.forEach((store, si) => {
+    data[store] = {};
+    dates.forEach((date, di) => {
+      const base = Math.max(0, 8 + ((si * 3 + di) % 7) - (si === 7 && di > 10 ? di - 10 : 0));
+      data[store][date] = { a999: base, haosu: base + 2, r1399: Math.max(0, base - 3), aq_points: base * 8, rt_points: base * 35, aq_count: base, rt_count: base * 2 };
+    });
+  });
+  return { version: 1, source_sheet: '預覽資料', stores, metrics: { a999:{label:'A999',unit:'筆'}, haosu:{label:'好速',unit:'點'}, r1399:{label:'R1399',unit:'筆'}, aq_points:{label:'AQ',unit:'點'}, rt_points:{label:'RT',unit:'點'}, aq_count:{label:'AQ上線數',unit:'筆'}, rt_count:{label:'RT上線數',unit:'筆'} }, data, latest_source_by_date: Object.fromEntries(dates.map(d => [d, 'preview'])) };
+}
+
+async function loadMomentumData(force = false) {
+  if (_momentumData && !force) { renderMomentum(); return; }
+  try {
+    const response = await fetch(`${MOMENTUM_DATA_URL}?v=${Date.now()}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error('資料載入失敗');
+    _momentumData = await response.json();
+  } catch (error) {
+    _momentumData = momentumDemoData();
+    document.getElementById('momentumSourceNote').textContent = '目前無法讀取網站資料檔，畫面使用預覽資料；正式網站會以 OneDrive 日動能為準。';
+  }
+  const [start, end] = momentumRangeFor(_momentumRange === 'custom' ? 'week' : _momentumRange);
+  if (!document.getElementById('momentumStart').value) document.getElementById('momentumStart').value = start;
+  if (!document.getElementById('momentumEnd').value) document.getElementById('momentumEnd').value = end;
+  renderMomentum();
+}
+
+// ════════════════════════════════════
+// 台獎 10 台機款進度提醒
+// ════════════════════════════════════
+function phoneStatusClass(status) {
+  if (status === '超標') return 'over';
+  if (status === '追蹤') return 'track';
+  return 'lag';
+}
+
+function phoneDemoData() {
+  return { report_date: today(), phone_items: 10, store_rows: 10, person_award_y_rows: 0, source_mode: '預覽資料', items: [], stores: [] };
+}
+
+function renderPhoneAwards() {
+  if (!_phoneData) return;
+  const gateOk = Number(_phoneData.phone_items) === 10 && Number(_phoneData.store_rows) === 10;
+  document.getElementById('phoneSourceNote').textContent = `資料日期：${_phoneData.report_date || '—'}｜來源：${_phoneData.source_mode || '最新台獎摘要'}｜個人台獎資料：${_phoneData.person_award_y_rows || 0} 筆`;
+  document.getElementById('phoneGate').innerHTML = gateOk
+    ? '<span style="color:#166534">✅ 10台機款／10店資料完整，可作為提醒依據</span>'
+    : '<span style="color:#991b1b">⛔ 台獎資料未通過 10台／10店檢查，暫不使用舊資料補位</span>';
+
+  const items = [...(_phoneData.items || [])].sort((a, b) => Number(a.rate || 0) - Number(b.rate || 0));
+  const overall = (_phoneData.stores || []).find(row => row.store === '北一二B整體');
+  const lagCount = overall ? (overall.risk_count ?? (overall.risks || []).length) : 0;
+  document.getElementById('phoneSummaryCards').innerHTML = `
+    <div class="summary-card"><div class="sc-label">資料狀態</div><div class="sc-val" style="color:${gateOk ? 'var(--green)' : 'var(--red)'}">${gateOk ? '完整' : '阻擋'}</div><div class="sc-sub">${_phoneData.report_date || '—'}</div></div>
+    <div class="summary-card"><div class="sc-label">追蹤機款</div><div class="sc-val" style="color:var(--accent-bright)">${_phoneData.phone_items || 0}/10</div><div class="sc-sub">指定機款</div></div>
+    <div class="summary-card"><div class="sc-label">整體落後</div><div class="sc-val" style="color:var(--red)">${lagCount}</div><div class="sc-sub">機款</div></div>
+  `;
+  document.getElementById('phoneItemsTable').innerHTML = `<thead><tr><th style="text-align:left">機款</th><th>實際／目標</th><th>達成率</th><th>缺口</th><th>狀態</th></tr></thead><tbody>${items.map(item => `<tr><td class="store-name">${escapeHtml(item.display_name || item.name)}</td><td>${item.actual ?? 0}／${item.target ?? 0}</td><td>${(Number(item.rate || 0) * 100).toFixed(0)}%</td><td>${item.gap ?? 0}</td><td><span class="phone-status ${phoneStatusClass(item.status)}">${escapeHtml(item.status || '追蹤')}</span></td></tr>`).join('')}</tbody>`;
+
+  const stores = [...(_phoneData.stores || [])].sort((a, b) => {
+    if (a.store === '北一二B整體') return -1;
+    if (b.store === '北一二B整體') return 1;
+    return Number(b.risk_count ?? (b.risks || []).length) - Number(a.risk_count ?? (a.risks || []).length);
+  });
+  document.getElementById('phoneStoreGrid').innerHTML = stores.map(row => {
+    const risks = (row.risks || []).slice(0, 3);
+    const riskCount = row.risk_count ?? (row.risks || []).length;
+    const total = _phoneData.phone_items || 10;
+    return `<div class="phone-store-card ${row.store === '北一二B整體' ? 'overall' : ''}">
+      <div class="psc-name">${escapeHtml(row.display_store || row.store)}</div>
+      <div class="psc-rate">${riskCount}/${total}</div>
+      <div class="psc-sub">${escapeHtml(row.risk_label || '落後')}機款</div>
+      ${risks.length ? `<ul class="phone-risk-list">${risks.map(item => `<li>${escapeHtml(item.display_name || item.name)}：${(Number(item.rate || 0) * 100).toFixed(0)}%，尚缺 ${item.gap ?? 0} 台</li>`).join('')}</ul>` : '<div class="analytics-note" style="margin-top:8px;color:#166534">目前沒有主要落後項目</div>'}
+    </div>`;
+  }).join('') || '<div class="analytics-alert warn">尚無台獎門市資料。</div>';
+}
+
+async function loadPhoneData(force = false) {
+  if (_phoneData && !force) { renderPhoneAwards(); return; }
+  try {
+    const response = await fetch(`${PHONE_DATA_URL}?v=${Date.now()}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error('台獎資料載入失敗');
+    _phoneData = await response.json();
+  } catch (error) {
+    _phoneData = phoneDemoData();
+    document.getElementById('phoneSourceNote').textContent = '目前無法讀取台獎資料檔，請確認每日報表同步流程。';
+  }
+  renderPhoneAwards();
 }
 
 // ════════════════════════════════════
@@ -2245,8 +2708,7 @@ const FIELDS = [
   'insurance_num','insurance_den','insurance_pct',
   'device_num','device_den','device_ratio',
   'tw_pixel10','tw_s26u','tw_sharpr11','tw_vivo','tw_s26','tw_reno16f',
-  'tw_pixel10fold','tw_findx9s','tw_sony1','tw_poketomo',
-  'tw_oppoa6x','tw_a27','tw_y21','tw_myfirst'
+  'tw_sony1','tw_oppoa6x','tw_a27','tw_y21'
 ];
 
 
@@ -2434,20 +2896,16 @@ async function renderSummary() {
 
   // Table 3: 台獎手機
   const cols3 = [
-    {key:'tw_pixel10',    label:'Pixel 10系列',      isRaw:true},
-    {key:'tw_s26u',       label:'S26 Ultra',          isRaw:true},
-    {key:'tw_sharpr11',   label:'SHARP R11',          isRaw:true},
-    {key:'tw_vivo',       label:'vivo X300系列',      isRaw:true},
-    {key:'tw_s26',        label:'S26/S26+/A57',       isRaw:true},
-    {key:'tw_reno16f',    label:'Reno16 F',           isRaw:true},
-    {key:'tw_pixel10fold',label:'Pixel 10 Pro Fold',  isRaw:true},
-    {key:'tw_findx9s',    label:'Find X9s',           isRaw:true},
-    {key:'tw_sony1',      label:'SONY 1 VIII/razr',   isRaw:true},
-    {key:'tw_poketomo',   label:'SHARP Poketomo',     isRaw:true},
-    {key:'tw_oppoa6x',    label:'OPPO A6x',           isRaw:true},
-    {key:'tw_a27',        label:'A27 & A17',          isRaw:true},
-    {key:'tw_y21',        label:'Y21/Redmi 15 Pro',   isRaw:true},
-    {key:'tw_myfirst',    label:'兒錶',               isRaw:true},
+    {key:'tw_pixel10', label:'Pixel 10/10 Pro/10 Pro XL/10a', isRaw:true},
+    {key:'tw_s26u', label:'Samsung S26 Ultra', isRaw:true},
+    {key:'tw_sharpr11', label:'SHARP AQUOS R11', isRaw:true},
+    {key:'tw_sony1', label:'SONY 1 VIII/razr fold', isRaw:true},
+    {key:'tw_vivo', label:'vivo X300/X300 Pro/V70 FE', isRaw:true},
+    {key:'tw_s26', label:'Samsung S26/S26+/A57', isRaw:true},
+    {key:'tw_reno16f', label:'OPPO Reno16 F', isRaw:true},
+    {key:'tw_oppoa6x', label:'OPPO A6x 6G/128G', isRaw:true},
+    {key:'tw_a27', label:'Samsung Galaxy A27/A17', isRaw:true},
+    {key:'tw_y21', label:'vivo Y21/Redmi Note 15 Pro', isRaw:true},
   ];
   renderSummaryTable('summaryTable3', date, sumSeg, cols3);
 
@@ -2873,20 +3331,16 @@ async function renderPlayback() {
   renderSummaryTable('pbTable1', date, pbSeg, cols1);
   renderSummaryTable('pbTable2', date, pbSeg, cols2);
   const colsTw = [
-    {key:'tw_pixel10',    label:'Pixel 10系列',      isRaw:true},
-    {key:'tw_s26u',       label:'S26 Ultra',          isRaw:true},
-    {key:'tw_sharpr11',   label:'SHARP R11',          isRaw:true},
-    {key:'tw_vivo',       label:'vivo X300系列',      isRaw:true},
-    {key:'tw_s26',        label:'S26/S26+/A57',       isRaw:true},
-    {key:'tw_reno16f',    label:'Reno16 F',           isRaw:true},
-    {key:'tw_pixel10fold',label:'Pixel 10 Pro Fold',  isRaw:true},
-    {key:'tw_findx9s',    label:'Find X9s',           isRaw:true},
-    {key:'tw_sony1',      label:'SONY 1 VIII/razr',   isRaw:true},
-    {key:'tw_poketomo',   label:'SHARP Poketomo',     isRaw:true},
-    {key:'tw_oppoa6x',    label:'OPPO A6x',           isRaw:true},
-    {key:'tw_a27',        label:'A27 & A17',          isRaw:true},
-    {key:'tw_y21',        label:'Y21/Redmi 15 Pro',   isRaw:true},
-    {key:'tw_myfirst',    label:'兒錶',               isRaw:true},
+    {key:'tw_pixel10', label:'Pixel 10/10 Pro/10 Pro XL/10a', isRaw:true},
+    {key:'tw_s26u', label:'Samsung S26 Ultra', isRaw:true},
+    {key:'tw_sharpr11', label:'SHARP AQUOS R11', isRaw:true},
+    {key:'tw_sony1', label:'SONY 1 VIII/razr fold', isRaw:true},
+    {key:'tw_vivo', label:'vivo X300/X300 Pro/V70 FE', isRaw:true},
+    {key:'tw_s26', label:'Samsung S26/S26+/A57', isRaw:true},
+    {key:'tw_reno16f', label:'OPPO Reno16 F', isRaw:true},
+    {key:'tw_oppoa6x', label:'OPPO A6x 6G/128G', isRaw:true},
+    {key:'tw_a27', label:'Samsung Galaxy A27/A17', isRaw:true},
+    {key:'tw_y21', label:'vivo Y21/Redmi Note 15 Pro', isRaw:true},
   ];
   renderSummaryTable('pbTable3', date, pbSeg, colsTw);
   renderStorePersonalDetail(date, pbSeg, dayCache, 'pbStorePersonalSection');

@@ -37,8 +37,8 @@ test.describe('頁面載入', () => {
     await page.goto(FILE_URL);
     await expect(page).toHaveTitle(/北一二B/);
     await expect(page.locator('.site-title')).toContainText('北一二');
-    // 三個頁籤
-    await expect(page.locator('.tab-btn')).toHaveCount(4);
+    // 六個頁籤
+    await expect(page.locator('.tab-btn')).toHaveCount(6);
   });
 
   test('日期 badge 顯示今日日期', async ({ page }) => {
@@ -197,9 +197,31 @@ test.describe('日期回放', () => {
     await page.locator('.tab-btn:has-text("日期回放")').click();
     // 設日期
     await page.locator('#playbackDate').fill('2026-06-25');
-    await page.locator('button:has-text("查詢")').click();
+    await page.locator('#panel-playback button:has-text("查詢")').click();
     // 結果區出現回放標題
     await expect(page.locator('#playbackResult')).toContainText('回放');
+  });
+});
+
+test.describe('區間彙整與台獎提醒', () => {
+  test('區間彙整頁籤可顯示日動能圖表與提醒表', async ({ page }) => {
+    await mockGAS(page);
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("區間彙整")').click();
+    await expect(page.locator('#panel-momentum')).toBeVisible();
+    await expect(page.locator('#momentumChart svg')).toBeVisible();
+    await expect(page.locator('#momentumValueTable')).toBeVisible();
+    await expect(page.locator('#momentumAlertSummary')).toBeVisible();
+  });
+
+  test('台獎提醒頁籤可顯示10台機款區塊', async ({ page }) => {
+    await mockGAS(page);
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("台獎提醒")').click();
+    await expect(page.locator('#panel-phone')).toBeVisible();
+    await expect(page.locator('#phoneGate')).toBeVisible();
+    await expect(page.locator('#phoneItemsTable')).toBeVisible();
+    await expect(page.locator('#phoneSourceNote')).toBeVisible();
   });
 });
 
