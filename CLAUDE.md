@@ -3,7 +3,11 @@
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）+ Google Sheets。
 
 另有 `patrol.html`（督導巡店追蹤系統）：貼上巡店明細表 → 33 項檢核看板。
-與 index.html **共用同一個 GAS 部署**（localStorage `bei12b_gas_url` 也共用），
+與 index.html **共用同一個 GAS 部署**（巡店網址存 localStorage `bei12b_pt_gas_url`，
+相容回退舊的 `bei12b_gas_url`）。**可分享給其他督導**：每人自建試算表＋自己的
+GAS 部署（改 `SPREADSHEET_ID`/`PT_KEY`/`PT_TITLE`/`PT_STORES`/`NOTIFY_EMAIL`），
+在 patrol.html 貼自己的 GAS 網址即可；前端標題與門市清單由 ptread 回傳的
+`title`/`stores` 覆蓋，資料實體隔離互不可見。給其他督導的操作手冊：`patrol-guide.html`。
 資料存「巡店明細」工作表，API 為 `?action=ptread`（fetch GET 讀全部）與
 `?action=ptwrite&payload=...`（JSONP 寫入，前端每 10 筆分批送避免網址過長；
 GAS 端以 fillTime+store+item 為唯一鍵去重，content 欄不上傳、由題號 ITEM_TEXT 還原）。
@@ -72,6 +76,10 @@ GAS 依標題列欄名寫入。前端新增欄位（如 `tw_pixel10`）後，若
 
 另有 `checkAwareAndNotify()`：每月 15 號 09:00 檢查「巡店明細」的知悉題（19-33）
 本月進度，未完成門市寄提醒信（20 日前需全數勾核）。啟用：執行一次 `setupAwareTrigger()`。
+
+另有 `sendWeeklyPatrolReport()`：每週一 08:00 寄巡店週報，夾檔 xlsx（暫存試算表→
+export URL + OAuth token 匯出→寄出→刪除），含「檢核總表」與「本月明細」。
+啟用：執行一次 `setupWeeklyReport()`（首次會多要 Drive/UrlFetch 授權）；試寄：`testWeeklyReport()`。
 
 ## 常用檢查清單（改動資料欄位時）
 

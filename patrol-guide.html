@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>督導巡店追蹤系統 · 操作手冊</title>
+<style>
+  :root{
+    --tw-black:#1a1a1a; --tw-orange:#ff6900; --tw-orange-soft:#fff3e9;
+    --ink:#222; --muted:#8a8a8a; --line:#e8e8e8; --bg:#f7f7f5;
+    --ok:#1a8f4c; --ok-bg:#eaf7ef; --warn:#d64545; --warn-bg:#fdecec; --card:#fff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",-apple-system,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.7;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:24px 18px 80px}
+  header{
+    background:var(--tw-black);color:#fff;border-radius:14px;
+    padding:26px 26px;margin-bottom:22px;position:relative;overflow:hidden;
+  }
+  header::after{
+    content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;
+    background:radial-gradient(circle,var(--tw-orange) 0%,transparent 70%);opacity:.25;
+  }
+  header h1{font-size:21px;font-weight:800;display:flex;align-items:center;gap:10px}
+  header h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--tw-orange);display:inline-block;flex-shrink:0}
+  header .sub{color:#bbb;font-size:13.5px;margin-top:8px}
+
+  nav{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:22px;font-size:14px}
+  nav b{display:block;margin-bottom:6px;font-size:13px;color:var(--muted);letter-spacing:.5px}
+  nav a{color:var(--tw-orange);text-decoration:none;font-weight:700}
+  nav ol{padding-left:22px}
+  nav li{margin:3px 0}
+
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px}
+  h2{font-size:17px;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px;scroll-margin-top:16px}
+  h2::before{content:"";width:4px;height:18px;background:var(--tw-orange);border-radius:2px;flex-shrink:0}
+  h3{font-size:14.5px;font-weight:800;margin:16px 0 6px}
+  p{margin:8px 0;font-size:14.5px}
+  ul,ol{padding-left:24px;font-size:14.5px}
+  li{margin:5px 0}
+  code{
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px;
+    background:#f0f0ee;padding:1px 6px;border-radius:5px;word-break:break-all;
+  }
+  pre{
+    background:#14161a;color:#d6dbe1;border-radius:10px;padding:14px 16px;
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;line-height:1.6;
+    overflow-x:auto;margin:10px 0;
+  }
+  pre .c{color:#7a8794}
+  pre .hl{color:#ffb266;font-weight:700}
+  .tip{background:var(--ok-bg);border:1px solid var(--ok);border-radius:10px;padding:11px 14px;font-size:13.5px;margin:12px 0}
+  .tip b{color:var(--ok)}
+  .alert{background:var(--warn-bg);border:1px solid var(--warn);border-radius:10px;padding:11px 14px;font-size:13.5px;margin:12px 0}
+  .alert b{color:var(--warn)}
+  .kbd{background:#f0f0ee;border:1px solid #ddd;border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:12.5px;font-weight:700;white-space:nowrap}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;margin:10px 0}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#fafaf8;font-weight:800;white-space:nowrap}
+  .table-wrap{overflow-x:auto}
+  a{color:var(--tw-orange);font-weight:700}
+  footer{text-align:center;font-size:11.5px;color:#bbb;margin-top:26px}
+  .step-num{
+    display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--tw-orange);
+    color:#fff;font-size:13px;font-weight:800;align-items:center;justify-content:center;
+    margin-right:8px;flex-shrink:0;
+  }
+  .bigstep{display:flex;align-items:baseline;margin:14px 0 4px;font-weight:800;font-size:15px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="dot"></span>督導巡店追蹤系統 · 操作手冊</h1>
+    <div class="sub">貼上巡店明細 → 自動追蹤 33 項檢核 · 電腦手機同步 · 每週一 Email 巡店週報<br>
+    每位督導一套獨立資料庫（自己的 Google 試算表），彼此的資料完全分離、互不可見。</div>
+  </header>
+
+  <nav>
+    <b>目錄</b>
+    <ol>
+      <li><a href="#intro">這套系統能做什麼</a></li>
+      <li><a href="#setup">初次設定（約 15 分鐘，建議用電腦）</a></li>
+      <li><a href="#daily">日常使用</a></li>
+      <li><a href="#mail">啟用自動信件（週報＋月中提醒）</a></li>
+      <li><a href="#faq">常見問題</a></li>
+    </ol>
+  </nav>
+
+  <section id="intro">
+    <h2>1. 這套系統能做什麼</h2>
+    <ul>
+      <li><b>貼上巡店明細表</b>（從公司系統複製）→ 自動整理成 33 項檢核看板</li>
+      <li>四種週期自動判定：駐點（題1）、上下半月各一次（題2–13）、每月一次（題14–17、19–33）、兩個月一次（題18，固定 1-2/3-4/5-6/7-8/9-10/11-12 月）</li>
+      <li>三個提醒框：<b>每月盤點</b>（14–17 逐店矩陣）、<b>到店全盤</b>（18 本期/上期）、<b>知悉宣導</b>（19–33 進度條＋每月 20 日截止倒數）</li>
+      <li><b>跨裝置</b>：電腦貼資料，手機打開同一網址就看得到（有通行碼保護，只有你自己看得到）</li>
+      <li><b>自動信件</b>：每週一 8:00 巡店週報（Email 夾 Excel 六分頁）、每月 15 號知悉進度提醒</li>
+    </ul>
+    <p>看板網址（所有督導共用，資料各自獨立）：<br>
+    <a href="https://lian852456-dot.github.io/liamlu/patrol.html">https://lian852456-dot.github.io/liamlu/patrol.html</a></p>
+  </section>
+
+  <section id="setup">
+    <h2>2. 初次設定（只做一次，約 15 分鐘）</h2>
+    <p>做完這一節，你就有一套<b>完全屬於自己</b>的巡店資料庫——存在你自己的 Google 帳號裡，其他人（包括建立這套系統的督導）都看不到。</p>
+
+    <div class="bigstep"><span class="step-num">1</span>建立自己的試算表</div>
+    <ol>
+      <li>用自己的 Google 帳號開 <a href="https://sheets.new">sheets.new</a>，隨意命名（例如「巡店追蹤」）</li>
+      <li>看網址列：<code>docs.google.com/spreadsheets/d/<b>這一長串就是試算表ID</b>/edit</code>，複製起來備用</li>
+    </ol>
+
+    <div class="bigstep"><span class="step-num">2</span>建立自己的 Apps Script 專案</div>
+    <ol>
+      <li>開 <a href="https://script.google.com">script.google.com</a> → 「新專案」</li>
+      <li>開 <a href="https://github.com/lian852456-dot/liamlu/blob/main/gas/Code.gs">程式碼原始檔（GitHub）</a>，按右上角的複製圖示 📋 複製全部</li>
+      <li>回到 Apps Script，刪掉編輯器裡原本的內容，貼上</li>
+    </ol>
+
+    <div class="bigstep"><span class="step-num">3</span>改五個設定（都在程式碼前 100 行內）</div>
+    <pre><span class="c">// 用 Ctrl+F 搜尋這些名字，改成你自己的：</span>
+const SPREADSHEET_ID = '<span class="hl">貼上步驟1複製的試算表ID</span>';
+const NOTIFY_EMAIL = '<span class="hl">你的email@gmail.com</span>';
+const PT_KEY = '<span class="hl">自己想一組密碼（原本是 CHANGE_ME，必改）</span>';
+const PT_TITLE = '<span class="hl">你的區名 · 你的名字</span> · 33 項檢核追蹤';
+const PT_STORES = [
+  { code: '<span class="hl">營業點代碼</span>', name: '<span class="hl">門市名稱</span>' },
+  <span class="c">// ……照這格式列完你區內所有門市，多退少補</span>
+];</pre>
+    <div class="alert"><b>注意：</b><code>PT_KEY</code> 一定要改（保持 CHANGE_ME 系統會拒絕所有讀寫）。另外程式碼裡還有一個 <code>STORES</code> 清單（業績回報用），你用不到可以不管它。</div>
+    <p>改完按 <span class="kbd">Ctrl</span>＋<span class="kbd">S</span> 存檔。</p>
+
+    <div class="bigstep"><span class="step-num">4</span>部署成網頁服務</div>
+    <ol>
+      <li>右上角「部署」→「新增部署作業」</li>
+      <li>左邊齒輪 ⚙️ 選「網頁應用程式」</li>
+      <li>「誰可以存取」選「<b>任何人</b>」（資料仍受你的密碼保護，別人沒密碼拿不到）</li>
+      <li>按「部署」→ 授權（跳出警告畫面時：進階 → 前往專案）→ 複製「網頁應用程式」網址（<code>https://script.google.com/macros/s/…/exec</code>）</li>
+    </ol>
+
+    <div class="bigstep"><span class="step-num">5</span>連上看板</div>
+    <ol>
+      <li>開 <a href="https://lian852456-dot.github.io/liamlu/patrol.html">巡店看板</a></li>
+      <li>把剛複製的網址貼進最上方欄位 → 按「連線」</li>
+      <li>輸入你在步驟 3 設的密碼 → 看到「● 已連線」且標題變成你的區名＝完成 🎉</li>
+    </ol>
+    <div class="tip"><b>驗證隔離：</b>連線成功後看板門市清單應該是「你的」門市。網址和密碼會記在你的裝置裡，之後打開直接可用；每台新裝置（如手機）輸入一次即可。</div>
+  </section>
+
+  <section id="daily">
+    <h2>3. 日常使用</h2>
+    <ol>
+      <li>從公司系統複製巡店明細（含表頭也沒關係）</li>
+      <li>貼進看板的「貼上巡店紀錄」框 → 按「解析並更新」</li>
+      <li>看到「已同步至雲端」→ 手機開同一網址就能看</li>
+    </ol>
+    <ul>
+      <li><b>重複貼不會壞</b>：同一批資料重貼會自動略過；如果來源表有<b>事後補填的「是否合格」</b>，重貼會自動更新雲端的舊值——所以定期整份重貼一次反而是好習慣</li>
+      <li><b>回看歷史</b>：切換上方「追蹤月份」可回看任何月份的完成狀態</li>
+      <li>缺了哪幾題：點門市卡片展開就看得到</li>
+    </ul>
+  </section>
+
+  <section id="mail">
+    <h2>4. 啟用自動信件（選用，各做一次）</h2>
+    <p>在 Apps Script 編輯器上方，函式下拉選單（「執行」鈕旁）選函式 → 按「執行」→ 第一次會要求授權，同意即可：</p>
+    <div class="table-wrap"><table>
+      <tr><th>執行函式</th><th>效果</th></tr>
+      <tr><td><code>setupWeeklyReport</code></td><td>每週一 08:00 寄「📊 巡店週報」到你的信箱，夾 Excel 六分頁（巡店紀錄／未巡店／上下半月／每月盤點／雙月全盤／知悉進度）</td></tr>
+      <tr><td><code>setupAwareTrigger</code></td><td>每月 15 號 09:00 檢查知悉題（19–33）進度，未完成門市寄提醒（20 日前需全數勾核）</td></tr>
+      <tr><td><code>testWeeklyReport</code></td><td>立刻試寄一份週報（驗證用）</td></tr>
+      <tr><td><code>testAwareNotify</code></td><td>立刻試寄一份知悉提醒（驗證用）</td></tr>
+    </table></div>
+    <div class="tip"><b>提示：</b>信寄到你在步驟 3 填的 <code>NOTIFY_EMAIL</code>。排程建立後全自動，不用再管。</div>
+  </section>
+
+  <section id="faq">
+    <h2>5. 常見問題</h2>
+    <h3>連線失敗？</h3>
+    <ul>
+      <li>確認貼的是「網頁應用程式」網址（<code>…/exec</code> 結尾），且部署時「誰可以存取」選了「任何人」</li>
+    </ul>
+    <h3>顯示「通行碼錯誤」？</h3>
+    <ul>
+      <li>密碼跟 GAS 裡的 <code>PT_KEY</code> 不一致，或 <code>PT_KEY</code> 還是 CHANGE_ME 沒改</li>
+      <li>頁面會自動再問一次，輸入正確的即可</li>
+    </ul>
+    <h3>改了 GAS 程式碼卻沒生效？（最常見！）</h3>
+    <div class="alert"><b>「存檔」不等於「部署」。</b>改完程式碼要：部署 → 管理部署作業 → ✏️ 編輯 → 版本選「<b>新版本</b>」→ 部署，網頁才會用到新版。只有時間觸發器（自動信件）例外——它跑的是最新存檔，不用重新部署。</div>
+    <h3>手機看不到電腦貼的資料？</h3>
+    <ul>
+      <li>手機開的是同一個看板網址嗎？連線的是同一個 GAS 網址嗎？（手機第一次要貼一次你的 GAS 網址＋輸入密碼）</li>
+      <li>電腦貼完有出現「已同步至雲端」嗎？沒有的話檢查連線狀態再貼一次</li>
+    </ul>
+    <h3>資料真的只有我看得到嗎？</h3>
+    <ul>
+      <li>是。資料存在<b>你自己 Google 帳號</b>的試算表，讀寫都要你的密碼。其他督導連的是他們自己的資料庫，跟你的毫無關聯</li>
+    </ul>
+  </section>
+
+  <footer>台灣大哥大 督導巡店追蹤系統 · 操作手冊 v1</footer>
+</div>
+</body>
+</html>
