@@ -52,6 +52,7 @@ function doGet(e) {
 
   if (action === 'debug') {
     try {
+      if (!ptAuthorized(e)) throw new Error('unauthorized');
       const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       const sheets = ss.getSheets().map(s => ({
         name: s.getName(),
@@ -167,6 +168,16 @@ function doGet(e) {
     try {
       if (!ptAuthorized(e)) throw new Error('unauthorized');
       return jsonResponse({ status: 'ok', rows: readHalfCheck() });
+    } catch(err) {
+      return jsonResponse({ status: 'error', message: err.message });
+    }
+  }
+
+  // ── 每月班表：讀取指定月份（patrol.html，需通行碼）──
+  if (action === 'sread') {
+    try {
+      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      return jsonResponse({ status: 'ok', schedule: readSchedule(e.parameter.month || '') });
     } catch(err) {
       return jsonResponse({ status: 'error', message: err.message });
     }
@@ -296,14 +307,14 @@ function readPatrol() {
 
 // ════════════════════════════════════
 // 督導半月檢查
-// 工作表：督導半月檢查
-// 一個 checkId（日期|店點|H1/H2）有 33 列，方便後續逐題篩選缺失與改善。
-// 照片／影片不直接塞進試算表，只保存附件檔名；原始媒體保留在填寫裝置。
+// 工作表：半月督導檢查
+// 預先建立每店、每期 33 題，寫入時更新對應題目，不碰每日回報與巡店頁籤。
+// 證據只保存私有 Google Drive 連結／檔名；原始影像不寫入試算表。
 // ════════════════════════════════════
-const HALF_CHECK_SHEET = '督導半月檢查';
+const HALF_CHECK_SHEET = '半月督導檢查';
 const HALF_CHECK_HEADERS = [
-  'checkId','date','period','month','store','inspector','item','result',
-  'note','improvement','evidenceNames','savedAt'
+  '檢查ID','檢查期別','檢查日期','門市','督導','項目','檢查結果','缺失說明',
+  '改善措施','改善期限','改善狀態','證據檔案連結','建立時間','更新時間','執行頻率','填寫狀態'
 ];
 
 function getHalfCheckSheet() {
@@ -313,13 +324,26 @@ function getHalfCheckSheet() {
     sh = ss.insertSheet(HALF_CHECK_SHEET);
     sh.appendRow(HALF_CHECK_HEADERS);
     sh.setFrozenRows(1);
-    sh.getRange('A:L').setNumberFormat('@');
+    sh.getRange('A:P').setNumberFormat('@');
   }
   return sh;
 }
 
+function halfCheckItemNo(value) {
+  const match = String(value || '').match(/^(\d+)/);
+  return match ? Number(match[1]) : Number(value || 0);
+}
+
 function halfCheckKey(row) {
-  return String(row[0] || '') + '|' + String(row[6] || '');
+  return [String(row[1] || ''), String(row[3] || ''), halfCheckItemNo(row[5])].join('|');
+}
+
+function halfResultToSheet(result) {
+  return ({ ok:'符合', abnormal:'缺失／異常', na:'不適用' })[String(result || '')] || '';
+}
+
+function halfResultToClient(result) {
+  return ({ '符合':'ok', '缺失／異常':'abnormal', '不適用':'na' })[String(result || '')] || '';
 }
 
 function writeHalfCheck(rows) {
@@ -329,17 +353,28 @@ function writeHalfCheck(rows) {
   for (let i = 1; i < data.length; i++) existing[halfCheckKey(data[i])] = i + 1;
   let written = 0;
   (rows || []).forEach(r => {
+    const month = String(r.month || String(r.date || '').slice(0, 7));
+    const period = `${month}-${String(r.period || '')}`;
+    const itemNo = Number(r.item || 0);
+    const key = [period, String(r.store || ''), itemNo].join('|');
+    const oldRow = existing[key] ? data[existing[key] - 1] : [];
+    const now = String(r.savedAt || new Date().toISOString());
+    const itemText = oldRow[5] || String(itemNo);
     const row = [
-      String(r.checkId || ''), String(r.date || ''), String(r.period || ''), String(r.month || ''),
-      String(r.store || ''), String(r.inspector || ''), String(r.item || ''), String(r.result || ''),
-      String(r.note || ''), String(r.improvement || ''), String(r.evidenceNames || ''), String(r.savedAt || new Date().toISOString())
+      String(r.checkId || `${r.date}|${r.store}|${r.period}`), period, String(r.date || ''),
+      String(r.store || ''), String(r.inspector || ''), String(itemText), halfResultToSheet(r.result),
+      String(r.note || ''), String(r.improvement || ''), String(oldRow[9] || ''),
+      String(r.result === 'abnormal' ? '待改善' : (oldRow[10] || '')),
+      String(r.evidenceNames || ''), String(oldRow[12] || now), now,
+      String(oldRow[14] || ''), String(r.result ? '已完成' : '填寫中')
     ];
-    const key = halfCheckKey(row);
     if (existing[key]) {
       sh.getRange(existing[key], 1, 1, HALF_CHECK_HEADERS.length).setValues([row]);
+      data[existing[key] - 1] = row;
     } else {
       sh.getRange(sh.getLastRow() + 1, 1, 1, HALF_CHECK_HEADERS.length).setValues([row]);
       existing[key] = sh.getLastRow();
+      data.push(row);
     }
     written++;
   });
@@ -354,9 +389,73 @@ function readHalfCheck() {
   return data.slice(1).map(row => {
     const o = {};
     headers.forEach((h, idx) => o[h] = row[idx] instanceof Date ? patrolTimeStr(row[idx]) : row[idx]);
-    o.item = Number(o.item || 0);
-    return o;
+    const periodText = String(o['檢查期別'] || '');
+    return {
+      checkId: String(o['檢查ID'] || ''),
+      date: String(o['檢查日期'] || ''),
+      period: periodText.slice(-2),
+      month: periodText.slice(0, 7),
+      store: String(o['門市'] || ''),
+      inspector: String(o['督導'] || ''),
+      item: halfCheckItemNo(o['項目']),
+      result: halfResultToClient(o['檢查結果']),
+      note: String(o['缺失說明'] || ''),
+      improvement: String(o['改善措施'] || ''),
+      evidenceNames: String(o['證據檔案連結'] || ''),
+      savedAt: String(o['更新時間'] || o['建立時間'] || '')
+    };
+  }).filter(o => o.date || o.result || o.inspector);
+}
+
+// ════════════════════════════════════
+// 每月班表（工作表：班表明細）
+// 僅由受保護頁籤讀取，GitHub Pages 不保存任何班表內容。
+// ════════════════════════════════════
+const SCHEDULE_SHEET = '班表明細';
+
+function readSchedule(requestedMonth) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sh = ss.getSheetByName(SCHEDULE_SHEET);
+  if (!sh || sh.getLastRow() < 2) throw new Error('尚無已匯入的班表資料');
+  const data = sh.getDataRange().getValues();
+  const headers = data[0];
+  const idx = {};
+  headers.forEach((h, i) => idx[h] = i);
+  const available = data.slice(1).map(r => String(r[idx['版本月份']] || '')).filter(Boolean).sort();
+  const month = requestedMonth && available.indexOf(requestedMonth) >= 0 ? requestedMonth : available[available.length - 1];
+  if (!month) throw new Error('找不到指定月份班表');
+  const stores = {};
+  data.slice(1).filter(r => String(r[idx['版本月份']] || '') === month).forEach(r => {
+    const storeName = String(r[idx['門市']] || '');
+    const date = scheduleDateString(r[idx['日期']]);
+    if (!storeName || !date) return;
+    if (!stores[storeName]) stores[storeName] = { store: storeName, title: storeName, staff: {}, days: {} };
+    const store = stores[storeName];
+    const name = String(r[idx['同仁']] || '');
+    const role = String(r[idx['職務']] || '');
+    const status = String(r[idx['班別']] || '');
+    const working = String(r[idx['出勤']] || '') === '是';
+    const manager = String(r[idx['值班主管']] || '') === '是';
+    if (name && !store.staff[name]) store.staff[name] = { name: name, role: role };
+    if (!store.days[date]) store.days[date] = { date: date, staff: [], managers: [], workingStaff: [] };
+    const assignment = { name: name, role: role, status: status, working: working };
+    store.days[date].staff.push(assignment);
+    if (working) store.days[date].workingStaff.push(assignment);
+    if (manager) store.days[date].managers.push(assignment);
   });
+  const list = Object.keys(stores).sort().map(name => ({
+    store: stores[name].store,
+    title: stores[name].title,
+    staff: Object.keys(stores[name].staff).sort().map(k => stores[name].staff[k]),
+    days: Object.keys(stores[name].days).sort().map(k => stores[name].days[k])
+  }));
+  const parts = month.split('-').map(Number);
+  return { month: month, rocMonth: `民國${parts[0] - 1911}年${String(parts[1]).padStart(2, '0')}月`, stores: list };
+}
+
+function scheduleDateString(value) {
+  if (value instanceof Date) return Utilities.formatDate(value, 'Asia/Taipei', 'yyyy-MM-dd');
+  return String(value || '').slice(0, 10);
 }
 
 // 每週一巡店週報（Email 夾 Excel）

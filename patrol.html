@@ -7,9 +7,9 @@
 <!--
   Privacy boundary: employee schedules, names, inspection records, and evidence
   must never be bundled into this public GitHub Pages file. Private data is
-  loaded only after Microsoft 365 authentication through PATROL_PRIVATE_CONFIG.
+  read from the private Google Sheet only after the existing patrol access code
+  has been verified by Google Apps Script.
 -->
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 <style>
   :root{
     --tw-black:#1a1a1a;
@@ -298,9 +298,9 @@
       <button class="secure-tab locked" data-view="schedule" onclick="switchPatrolView('schedule')">每月班表</button>
       <button class="secure-tab locked" data-view="half" onclick="switchPatrolView('half')">半月督導檢查</button>
     </nav>
-    <div class="private-auth-bar" aria-label="Microsoft 365 私有資料登入">
-      <span id="privateAuthStatus" class="auth-status">班表與督導檢查：尚未登入 Microsoft 365；資料不放在公開 GitHub</span>
-      <button id="privateLoginBtn" class="private-auth-btn primary" type="button" onclick="privateSignIn()">登入 Microsoft 365</button>
+    <div class="private-auth-bar" aria-label="受保護資料解鎖">
+      <span id="privateAuthStatus" class="auth-status">班表與督導檢查：尚未解鎖；資料不放在公開 GitHub</span>
+      <button id="privateLoginBtn" class="private-auth-btn primary" type="button" onclick="privateSignIn()">解鎖受保護資料</button>
       <button id="privateLogoutBtn" class="private-auth-btn" type="button" onclick="privateSignOut()" hidden>登出</button>
     </div>
     <div class="month-pick">
@@ -343,8 +343,9 @@
   <section id="scheduleView" class="secure-view" aria-label="每月班表">
     <div class="secure-card">
       <h2>每月班表・每日 / 每週 / 每月出勤</h2>
-      <p class="hint">資料來源：登入後的私人 OneDrive「TWM 班表」。GitHub Pages 不保存班表、人名或出勤資料。</p>
+      <p class="hint">資料來源：私有 Google Sheet 的班表封存。GitHub Pages 不保存班表、人名或出勤資料。</p>
       <div class="secure-toolbar">
+        <label>班表月份<input id="scheduleMonth" type="month" onchange="loadSchedule(true)"></label>
         <label>檢視方式<select id="scheduleMode" onchange="renderSchedule()"><option value="day">每日</option><option value="week">每週</option><option value="month">每月</option></select></label>
         <label>日期<input id="scheduleDate" type="date" onchange="renderSchedule()"></label>
         <button class="secure-btn" onclick="exportScheduleExcel()">匯出 Excel</button>
@@ -357,7 +358,7 @@
   <section id="halfView" class="secure-view" aria-label="半月督導檢查">
     <div class="secure-card">
       <h2>半月督導檢查・缺失改善回填</h2>
-      <p class="hint">登入 Microsoft 365 後填寫本期檢查；異常項目請填改善說明。照片／影片只會送到已設定的私人資料服務，不會上傳 GitHub。</p>
+      <p class="hint">解鎖後填寫本期檢查；異常項目請填改善說明。照片／影片上傳至私有 Drive，表內只保存檔案連結，不會上傳 GitHub。</p>
       <div id="halfSummary" class="half-summary"></div>
       <div class="half-meta">
         <label>檢查日期<input id="halfDate" type="date" onchange="renderHalfForm()"></label>
@@ -455,7 +456,7 @@ let currentMonth = "";
 // 其他督導在畫面上貼自己的 GAS 網址即可，只記在自己的裝置，資料互不相通。
 // GAS 網址本身不是密碼，也不包含巡店資料；保留部署端點以便既有資料自動恢復。
 // 真正的資料仍需 PT_KEY 驗證，PT_KEY 不寫入公開原始碼。
-const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
+const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
 let GAS_URL = localStorage.getItem('bei12b_pt_gas_url') ||
               localStorage.getItem('bei12b_gas_url') ||
               window.PATROL_LEGACY_GAS_URL || DEFAULT_PATROL_GAS_URL;
@@ -471,32 +472,11 @@ function askKey(msg){
 }
 let cloudOn = false;    // 雲端連線狀態
 
-/* ---------- 私有資料邊界（Microsoft 365 / OneDrive） ----------
- * 這裡只放非秘密設定。Client ID 不是密碼；不要把 client secret、token、
- * 員工班表或照片放進 GitHub。正式環境由部署設定注入 PATROL_PRIVATE_CONFIG：
- * {
- *   clientId: 'Entra application client id',
- *   tenantId: 'organizations',
- *   scheduleApi: 'https://private-service.example/schedule',
- *   inspectionApi: 'https://private-service.example/inspections',
- *   scopes: ['User.Read']
- * }
- * 私有 API 必須自行驗證 Microsoft 365 access token，並從 OneDrive／SharePoint
- * 讀寫資料；本頁不接受公開 JSON 或 repo 內的班表檔案。
+/* ---------- 受保護資料邊界（Google Apps Script + 私有 Sheet） ----------
+ * GitHub Pages 只有介面；班表、巡店與督導資料均留在私有 Google Sheet。
+ * 讀寫時必須通過既有巡店通行碼，通行碼只保存在使用者目前瀏覽器。
  */
-const PATROL_PRIVATE_CONFIG = Object.assign({
-  clientId: '',
-  tenantId: 'organizations',
-  scheduleApi: '',
-  inspectionApi: '',
-  scopes: ['User.Read']
-}, window.PATROL_PRIVATE_CONFIG || {});
-let privateMsal = null;
 let privateAccount = null;
-let privateToken = '';
-
-function privateAuthConfigured(){ return Boolean(PATROL_PRIVATE_CONFIG.clientId); }
-function privateTestMode(){ return window.__PATROL_TEST_PRIVATE_AUTH__ === true; }
 function setPrivateAuthStatus(text, ok){
   const el=document.getElementById('privateAuthStatus');
   if(el){ el.textContent=text; el.classList.toggle('ok',Boolean(ok)); }
@@ -506,70 +486,32 @@ function setPrivateAuthStatus(text, ok){
   if(logout) logout.hidden=!ok;
 }
 function privateConfigMessage(){
-  return '尚未設定 Microsoft Entra 應用程式；班表與督導檢查不會從公開 GitHub 載入。';
-}
-async function ensurePrivateMsal(){
-  if(privateTestMode()){ privateAccount={username:'test@local'}; setPrivateAuthStatus('測試私有資料連線已啟用（正式環境需 Microsoft 365 登入）',true); return true; }
-  if(!privateAuthConfigured()){ setPrivateAuthStatus(privateConfigMessage(),false); return false; }
-  if(!window.msal){ setPrivateAuthStatus('Microsoft 365 登入元件尚未載入，請稍後重試',false); return false; }
-  if(!privateMsal){
-    privateMsal=new msal.PublicClientApplication({auth:{clientId:PATROL_PRIVATE_CONFIG.clientId,authority:`https://login.microsoftonline.com/${PATROL_PRIVATE_CONFIG.tenantId||'organizations'}`,redirectUri:window.location.origin+window.location.pathname}});
-  }
-  const accounts=privateMsal.getAllAccounts();
-  if(!privateAccount && accounts.length) privateAccount=accounts[0];
-  if(privateAccount){ setPrivateAuthStatus(`Microsoft 365 已登入：${privateAccount.username||privateAccount.name||'目前帳號'}`,true); return true; }
-  return false;
+  return '請先連線既有 Google Apps Script，並輸入巡店通行碼；班表與督導檢查不會從公開 GitHub 載入。';
 }
 async function privateSignIn(){
-  if(privateTestMode()){ privateAccount={username:'test@local'}; setPrivateAuthStatus('測試私有資料連線已啟用（正式環境需 Microsoft 365 登入）',true); return true; }
-  if(!privateAuthConfigured()){ setPrivateAuthStatus(privateConfigMessage(),false); showMsg('請先完成 Microsoft Entra 應用程式設定；目前沒有任何班表資料被載入','err'); return false; }
-  if(!window.msal){ setPrivateAuthStatus('Microsoft 365 登入元件尚未載入，請重新整理後再試',false); return false; }
+  if(!GAS_URL){ setPrivateAuthStatus(privateConfigMessage(),false); showMsg('請先連線既有 Google Apps Script','err'); return false; }
+  if(!PT_KEY && !askKey()) return false;
   try{
-    if(!privateMsal){
-      privateMsal=new msal.PublicClientApplication({auth:{clientId:PATROL_PRIVATE_CONFIG.clientId,authority:`https://login.microsoftonline.com/${PATROL_PRIVATE_CONFIG.tenantId||'organizations'}`,redirectUri:window.location.origin+window.location.pathname}});
-    }
-    const result=await privateMsal.loginPopup({scopes:PATROL_PRIVATE_CONFIG.scopes||['User.Read']});
-    privateAccount=result.account; privateToken=result.accessToken||'';
-    setPrivateAuthStatus(`Microsoft 365 已登入：${privateAccount.username||privateAccount.name||'目前帳號'}`,true);
+    const res=await cloudCall('sread',{key:PT_KEY});
+    if(res.status!=='ok') throw new Error(res.message||'通行碼錯誤');
+    privateAccount={username:'通行碼已驗證'};
+    setPrivateAuthStatus('受保護資料已解鎖（班表與督導資料不存於 GitHub）',true);
+    scheduleData=res.schedule;
     return true;
   }catch(err){
-    setPrivateAuthStatus('Microsoft 365 登入未完成；私人資料仍保持鎖定',false);
-    showMsg('Microsoft 365 登入失敗：'+(err.message||'請稍後重試'),'err');
+    privateAccount=null; setPrivateAuthStatus('解鎖失敗；資料仍保持鎖定',false);
+    showMsg(err.message==='unauthorized'?'巡店通行碼錯誤':`解鎖失敗：${err.message}`,'err');
     return false;
   }
 }
 async function privateSignOut(){
-  if(privateTestMode()){ privateAccount=null; privateToken=''; setPrivateAuthStatus('測試私有資料連線已登出',false); return; }
-  try{ if(privateMsal && privateAccount) await privateMsal.logoutPopup({account:privateAccount}); }catch(err){ /* 登出失敗不保留本頁 token */ }
-  privateAccount=null; privateToken=''; setPrivateAuthStatus('班表與督導檢查：尚未登入 Microsoft 365；資料不放在公開 GitHub',false);
+  privateAccount=null; setPrivateAuthStatus('班表與督導檢查：尚未解鎖；資料不放在公開 GitHub',false);
   scheduleData=null; secureUnlocked=false;
 }
-async function privateAccessToken(){
-  if(privateTestMode()) return 'test-private-token';
-  if(!(await ensurePrivateMsal())) throw new Error(privateConfigMessage());
-  if(privateToken) return privateToken;
-  try{
-    const result=await privateMsal.acquireTokenSilent({account:privateAccount,scopes:PATROL_PRIVATE_CONFIG.scopes||['User.Read']});
-    privateToken=result.accessToken; return privateToken;
-  }catch(err){
-    const result=await privateMsal.acquireTokenPopup({account:privateAccount,scopes:PATROL_PRIVATE_CONFIG.scopes||['User.Read']});
-    privateToken=result.accessToken; return privateToken;
-  }
-}
-async function privateApiJson(url, options={}){
-  if(!url) throw new Error('尚未設定私人資料服務網址');
-  const headers=new Headers(options.headers||{});
-  headers.set('Accept','application/json');
-  headers.set('Authorization',`Bearer ${await privateAccessToken()}`);
-  const response=await fetch(url,{...options,headers,cache:'no-store'});
-  if(!response.ok) throw new Error(`私人資料服務 ${response.status}`);
-  return response.json();
-}
-function privateScheduleFixture(){ return privateTestMode() ? window.__PATROL_TEST_SCHEDULE__ : null; }
+async function privateScheduleRequest(month){ return cloudCall('sread',{key:PT_KEY,month:month||''}); }
 async function privateInspectionRequest(action, rows){
-  if(!PATROL_PRIVATE_CONFIG.inspectionApi) throw new Error('尚未設定私人督導檢查資料服務網址');
-  if(action==='read') return privateApiJson(PATROL_PRIVATE_CONFIG.inspectionApi);
-  return privateApiJson(PATROL_PRIVATE_CONFIG.inspectionApi,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'write',rows})});
+  if(action==='read') return cloudCall('hread',{key:PT_KEY});
+  return cloudCallJsonp('hwrite',{payload:JSON.stringify(rows||[]),key:PT_KEY});
 }
 
 /* ---------- 初始化月份 ---------- */
@@ -1170,9 +1112,9 @@ function esc(v){
 }
 async function secureAccess(){
   if(secureUnlocked && privateAccount) return true;
-  const ok=await ensurePrivateMsal();
+  const ok=await privateSignIn();
   if(!ok){
-    showMsg('請先按「登入 Microsoft 365」；班表與督導檢查資料目前保持鎖定','err');
+    showMsg('請先解鎖受保護資料；班表與督導檢查資料目前保持鎖定','err');
     return false;
   }
   secureUnlocked = true;
@@ -1199,14 +1141,19 @@ async function switchPatrolView(view){
   }
 }
 
-async function loadSchedule(){
+async function loadSchedule(force){
   const status=document.getElementById('scheduleStatus');
-  if(scheduleData){ renderSchedule(); return; }
-  status.textContent='正在從私人資料服務載入 OneDrive 班表…';
+  const monthEl=document.getElementById('scheduleMonth');
+  const requested=monthEl?.value||'';
+  if(scheduleData && !force && (!requested || scheduleData.month===requested)){ renderSchedule(); return; }
+  if(!privateAccount){ status.textContent='班表資料仍鎖定'; return; }
+  status.textContent='正在載入私有班表…';
   try{
-    scheduleData=privateScheduleFixture();
-    if(!scheduleData) scheduleData=await privateApiJson(PATROL_PRIVATE_CONFIG.scheduleApi);
+    const res=await privateScheduleRequest(requested);
+    if(res.status!=='ok') throw new Error(res.message||'班表讀取失敗');
+    scheduleData=res.schedule;
     if(!scheduleData || !Array.isArray(scheduleData.stores)) throw new Error('私人班表資料格式不正確');
+    if(monthEl) monthEl.value=scheduleData.month;
     const dateEl=document.getElementById('scheduleDate');
     const today=new Date().toISOString().slice(0,10);
     dateEl.value=today.slice(0,7)===scheduleData.month?today:`${scheduleData.month}-01`;
@@ -1296,11 +1243,11 @@ function halfPeriod(date){ return Number((date||'').slice(-2))<=15?'H1':'H2'; }
 function halfPeriodLabel(p){ return p==='H1'?'上半月（1–15日）':'下半月（16日–月底）'; }
 async function loadHalfChecks(){
   loadHalfLocal(); renderHalfSummary(); renderHalfForm(); renderHalfHistory();
-  if(!privateAccount || !PATROL_PRIVATE_CONFIG.inspectionApi) return;
+  if(!privateAccount) return;
   try{
     const res=await privateInspectionRequest('read');
     if(res.status==='ok'){ mergeHalfRows((res.rows||[]).map(r=>({...r,item:Number(r.item)}))); renderHalfSummary(); renderHalfForm(); renderHalfHistory(); }
-    else if(res.message==='unauthorized'){ secureUnlocked=false; showHalfMsg('Microsoft 365 權限不足，私人檢查資料保持鎖定','err'); }
+    else if(res.message==='unauthorized'){ secureUnlocked=false; privateAccount=null; showHalfMsg('巡店通行碼錯誤，私人檢查資料保持鎖定','err'); }
   }catch(err){ showHalfMsg('半月檢查雲端讀取失敗，先顯示本機資料','err'); }
 }
 function initHalfSelectors(){
@@ -1315,14 +1262,13 @@ function renderHalfForm(){
   initHalfSelectors(); const {date,store,period,checkId,rows}=currentHalfRows();
   const inspector=document.getElementById('halfInspector'); const saved=rows.find(r=>r.inspector)?.inspector||''; if(inspector && !inspector.value) inspector.value=saved;
   const c=document.getElementById('halfForm'); if(!c) return;
-  c.innerHTML=HALF_ITEMS.map(i=>{const r=rows.find(x=>Number(x.item)===i)||{};const result=r.result||'';return `<div class="half-item ${result==='abnormal'?'issue':''}" data-half-item="${i}"><div class="half-item-head"><span class="half-no">${i}</span><div><div class="half-item-title">${esc(ITEM_TEXT[i])}</div><div class="half-item-tag">${esc(ITEM_RULES[i]?.label||'本期檢查')}</div></div></div><select class="half-result" aria-label="第${i}題結果"><option value="">待填</option><option value="ok" ${result==='ok'?'selected':''}>符合</option><option value="abnormal" ${result==='abnormal'?'selected':''}>缺失／異常</option><option value="na" ${result==='na'?'selected':''}>不適用</option></select><textarea class="half-note" placeholder="檢查紀錄／缺失內容">${esc(r.note||'')}</textarea><textarea class="half-improvement" placeholder="改善說明（異常時填寫）">${esc(r.improvement||'')}</textarea><input class="half-files" type="file" accept="image/*,video/*" multiple aria-label="第${i}題照片或影片"><div class="half-evidence">${r.evidenceNames?`已記錄附件：${esc(r.evidenceNames)}`:'可拍照／錄影留下現場證據'}</div></div>`;}).join('');
+  c.innerHTML=HALF_ITEMS.map(i=>{const r=rows.find(x=>Number(x.item)===i)||{};const result=r.result||'';return `<div class="half-item ${result==='abnormal'?'issue':''}" data-half-item="${i}"><div class="half-item-head"><span class="half-no">${i}</span><div><div class="half-item-title">${esc(ITEM_TEXT[i])}</div><div class="half-item-tag">${esc(ITEM_RULES[i]?.label||'本期檢查')}</div></div></div><select class="half-result" aria-label="第${i}題結果"><option value="">待填</option><option value="ok" ${result==='ok'?'selected':''}>符合</option><option value="abnormal" ${result==='abnormal'?'selected':''}>缺失／異常</option><option value="na" ${result==='na'?'selected':''}>不適用</option></select><textarea class="half-note" placeholder="檢查紀錄／缺失內容">${esc(r.note||'')}</textarea><textarea class="half-improvement" placeholder="改善說明（異常時填寫）">${esc(r.improvement||'')}</textarea><input class="half-evidence-link" type="url" inputmode="url" placeholder="貼上私有 Google Drive 照片／影片連結" value="${esc(r.evidenceNames||'')}" aria-label="第${i}題證據連結"><div class="half-evidence">照片／影片請先上傳到私有 Google Drive，再貼上連結</div></div>`;}).join('');
   c.querySelectorAll('.half-result').forEach(el=>el.addEventListener('change',()=>el.closest('.half-item').classList.toggle('issue',el.value==='abnormal')));
-  c.querySelectorAll('.half-files').forEach(el=>el.addEventListener('change',()=>{const names=Array.from(el.files||[]).map(f=>f.name).join('、');el.nextElementSibling.textContent=names?`本次附件：${names}`:'可拍照／錄影留下現場證據';}));
   document.getElementById('halfMsg').textContent=`${dateLabel(date)}・${halfPeriodLabel(period)}・${store}；共 ${rows.length}/33 題已有雲端／本機紀錄`;
 }
 function readHalfForm(){
   const date=document.getElementById('halfDate').value, store=document.getElementById('halfStore').value, inspector=document.getElementById('halfInspector').value.trim(), period=halfPeriod(date), checkId=`${date}|${store}|${period}`, savedAt=new Date().toISOString();
-  const rows=HALF_ITEMS.map(i=>{const box=document.querySelector(`[data-half-item="${i}"]`);const files=Array.from(box.querySelector('.half-files').files||[]).map(f=>f.name);return {checkId,date,period,month:date.slice(0,7),store,inspector,item:i,result:box.querySelector('.half-result').value,note:box.querySelector('.half-note').value.trim(),improvement:box.querySelector('.half-improvement').value.trim(),evidenceNames:files.join('、')||box.querySelector('.half-evidence').textContent.replace(/^已記錄附件：|^本次附件：/,'').replace('可拍照／錄影留下現場證據','').trim(),savedAt};});
+  const rows=HALF_ITEMS.map(i=>{const box=document.querySelector(`[data-half-item="${i}"]`);return {checkId,date,period,month:date.slice(0,7),store,inspector,item:i,result:box.querySelector('.half-result').value,note:box.querySelector('.half-note').value.trim(),improvement:box.querySelector('.half-improvement').value.trim(),evidenceNames:box.querySelector('.half-evidence-link').value.trim(),savedAt};});
   return rows;
 }
 function saveHalfDraft(){
@@ -1332,10 +1278,10 @@ function showHalfMsg(text,type){const el=document.getElementById('halfMsg');if(e
 function submitHalfCheck(){
   const inspector=document.getElementById('halfInspector').value.trim(); if(!inspector){showHalfMsg('請填寫督導姓名','err');return;}
   const rows=readHalfForm(); mergeHalfRows(rows); renderHalfSummary(); renderHalfHistory();
-  if(!privateAccount || !PATROL_PRIVATE_CONFIG.inspectionApi){showHalfMsg('已保留本機資料；尚未設定私人資料服務，未上傳雲端','err');return;}
+  if(!privateAccount){showHalfMsg('已保留本機資料；尚未解鎖，未上傳雲端','err');return;}
   const chunks=[];let part=[];rows.forEach(r=>{part.push(r);if(encodeURIComponent(JSON.stringify(part)).length>3500){if(part.length>1){part.pop();chunks.push(part);part=[r];}else{chunks.push(part);part=[];}}});if(part.length)chunks.push(part);
   let chain=Promise.resolve(),written=0;chunks.forEach(chunk=>{chain=chain.then(()=>privateInspectionRequest('write',chunk)).then(res=>{if(res.status!=='ok')throw new Error(res.message||'寫入失敗');written+=Number(res.written||chunk.length||0);});});
-  chain.then(()=>{showHalfMsg(`已同步雲端（${written} 列），照片／影片附件名稱已記錄；原檔仍保留在本機裝置`,'ok');loadHalfChecks();}).catch(err=>showHalfMsg('雲端同步失敗：'+err.message+'；本機資料仍保留','err'));
+  chain.then(()=>{showHalfMsg(`已同步雲端（${written} 列）；照片／影片請放私有 Drive，並在證據欄貼上連結`,'ok');loadHalfChecks();}).catch(err=>showHalfMsg('雲端同步失敗：'+err.message+'；本機資料仍保留','err'));
 }
 function renderHalfSummary(){
   const c=document.getElementById('halfSummary');if(!c)return;const groups={};halfChecks.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const issues=halfChecks.filter(r=>r.result==='abnormal').length;const pending=Object.values(groups).filter(rows=>rows.some(r=>!r.result)).length;c.innerHTML=`<div class="half-stat"><strong>${Object.keys(groups).length}</strong><span>已建立本期檢查</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>缺失／異常項目</span></div><div class="half-stat"><strong>${pending}</strong><span>尚有待填本期</span></div>`;}
