@@ -10,6 +10,12 @@ GAS 端以 fillTime+store+item 為唯一鍵去重，content 欄不上傳、由�
 巡店讀寫需通行碼：GAS 端 `PT_KEY`（repo 只放 `CHANGE_ME` 佔位字，實際密碼只改在
 GAS 編輯器裡，**不要 commit**），前端存 localStorage `bei12b_pt_key`，錯誤會重新詢問。
 
+### 2026-07-15 班表與半月督導檢查頁籤
+
+`patrol.html` 新增兩個沿用 `PT_KEY` 的受保護頁籤：`每月班表` 由 `scripts/build_schedule_data.py` 從本機 OneDrive `TWM 班表/*.xls` 產生 `data/schedule.js` / `data/schedule.json`，支援每日、每週、每月檢視與 Excel 匯出；`半月督導檢查` 支援 33 題逐題回填、異常改善說明與照片／影片附件名稱，透過 GAS `hread` / `hwrite` 寫入 `督導半月檢查` 工作表。
+
+照片／影片原檔不寫入 Google Sheets，以免超過儲存限制；頁面保留本機附件清單，原始媒體留在填寫裝置。GAS 修改後必須重新部署 Web App 新版本。
+
 ## 跨 AI 協作
 
 本專案同時由 Claude 與 Codex 等多個 AI 助手協作維護：

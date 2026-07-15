@@ -5,6 +5,7 @@ const path = require('path');
 // 驗證「電腦貼上 → 上雲 → 另一裝置載入」的跨裝置同步流程
 const PT_KEY = 'test123';
 let cloudRows;
+let halfRows;
 let writeCalls;
 
 async function stubGas(page) {
@@ -37,6 +38,26 @@ async function stubGas(page) {
         });
         body = JSON.stringify({ status: 'ok', written });
       }
+    } else if (action === 'hread') {
+      body = authed
+        ? JSON.stringify({ status: 'ok', rows: halfRows })
+        : JSON.stringify({ status: 'error', message: 'unauthorized' });
+    } else if (action === 'hwrite') {
+      if (!authed) {
+        body = JSON.stringify({ status: 'error', message: 'unauthorized' });
+      } else {
+        const rows = JSON.parse(url.searchParams.get('payload'));
+        const keys = new Set(halfRows.map(r => `${r.checkId}|${r.item}`));
+        let written = 0;
+        rows.forEach(r => {
+          const key = `${r.checkId}|${r.item}`;
+          const index = halfRows.findIndex(x => `${x.checkId}|${x.item}` === key);
+          if (index >= 0) halfRows[index] = r;
+          else { halfRows.push(r); keys.add(key); }
+          written++;
+        });
+        body = JSON.stringify({ status: 'ok', written });
+      }
     } else {
       body = JSON.stringify({ status: 'error', message: 'unknown action' });
     }
@@ -58,7 +79,7 @@ function pasteLine(d, store, code, item, result, reason) {
   return `2026/7/${d} 16:43\t2026/7/${d} 16:00\t2026/7/${d} 18:00\t北一二B\t${code}\t${store}\t盧蔚榮\t${item}\t內容\t${result}\t${reason}`;
 }
 
-test.beforeEach(() => { cloudRows = []; writeCalls = 0; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; });
 
 test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
   // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
@@ -198,4 +219,39 @@ test('大量資料會分批上傳且全數送達', async ({ page }) => {
   await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 25 筆明細/);
   expect(cloudRows.length).toBe(25);
   expect(writeCalls).toBeGreaterThan(1); // 確實有分批
+});
+
+test('加密頁籤：每月班表可切換日週月檢視', async ({ page }) => {
+  await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
+  await page.goto(PAGE_URL);
+  await page.locator('.secure-tab[data-view="schedule"]').click();
+  await expect(page.locator('#scheduleView')).toBeVisible();
+  await expect(page.locator('#scheduleContent')).toContainText('通化');
+  await page.locator('#scheduleMode').selectOption('week');
+  await expect(page.locator('#scheduleContent')).toContainText('每週出勤');
+  await page.locator('#scheduleMode').selectOption('month');
+  await expect(page.locator('#scheduleContent')).toContainText('每月班表');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '匯出 Excel' }).click();
+  expect((await downloadPromise).suggestedFilename()).toMatch(/TWM_班表_2026-07\.xls/);
+});
+
+test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({ page }) => {
+  await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
+  await page.goto(PAGE_URL);
+  await page.locator('.secure-tab[data-view="half"]').click();
+  await expect(page.locator('#halfView')).toBeVisible();
+  await expect(page.locator('.half-item')).toHaveCount(33);
+  await page.locator('#halfInspector').fill('盧蔚榮');
+  await page.locator('.half-result').first().selectOption('abnormal');
+  await page.locator('.half-note').first().fill('展示機未亮');
+  await page.locator('.half-improvement').first().fill('當日完成開機並拍照回存');
+  await page.getByRole('button', { name: '只暫存本機' }).click();
+  await expect(page.locator('#halfHistory')).toContainText('通化');
+  await expect(page.locator('#halfHistory')).toContainText('1 項異常');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '匯出 Excel' }).click();
+  expect((await downloadPromise).suggestedFilename()).toMatch(/半月督導檢查_.*\.xls/);
 });

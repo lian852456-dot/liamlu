@@ -25,3 +25,19 @@ python3 /Users/liamlu/Downloads/liam-agent/report-automation/work/build_github_p
 - `data/phone-awards-latest.json`
 
 完成後用 `.claude/scripts/auto-push.sh` 發布 GitHub Pages。
+
+## patrol.html 受保護工作頁籤
+
+`patrol.html` 除原有巡店看板外，另有兩個沿用 `PT_KEY` 的通行碼保護頁籤：
+
+- `每月班表`：由本機同步的 OneDrive `TWM 班表/*.xls` 產生瀏覽器資料，支援每日、每週、每月檢視與 Excel `.xls` 匯出。
+- `半月督導檢查`：督導可逐題填寫 33 項檢查、缺失與改善說明，選取照片／影片並匯出完整紀錄與缺失改善追蹤 Excel。
+
+班表資料更新：
+
+```bash
+cd /Users/liamlu/Downloads/liam-agent/github-pages-liamlu
+python3 scripts/build_schedule_data.py
+```
+
+GAS `Code.gs` 新增 `hread` / `hwrite` 端點，修改後要在 Apps Script「管理部署作業」建立新版本。照片／影片原檔不直接寫入 Google Sheets，試算表只保存附件名稱，原檔留在填寫裝置。
