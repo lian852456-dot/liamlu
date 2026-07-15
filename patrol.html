@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>督導巡店追蹤 · 北一二B</title>
+<!--
+  Privacy boundary: employee schedules, names, inspection records, and evidence
+  must never be bundled into this public GitHub Pages file. Private data is
+  loaded only after Microsoft 365 authentication through PATROL_PRIVATE_CONFIG.
+-->
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 <style>
   :root{
     --tw-black:#1a1a1a;
@@ -202,13 +208,101 @@
     .store-head .right .bar{display:none}
     header h1{font-size:17px}
   }
+
+  /* ---------- 加密工作頁籤 ---------- */
+  .secure-tabs{display:flex;gap:7px;flex-wrap:wrap;margin-top:16px;position:relative;z-index:2}
+  .secure-tab{border:1px solid #454545;background:#292929;color:#ddd;border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+  .secure-tab:hover,.secure-tab.active{background:var(--tw-orange);border-color:var(--tw-orange);color:#fff}
+  .secure-tab.locked::before{content:'🔒 ';font-size:11px}
+  .private-auth-bar{margin-top:12px;padding:10px 12px;border:1px solid #454545;border-radius:9px;background:#242424;color:#ddd;display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:12px;position:relative;z-index:2}
+  .private-auth-bar .auth-status{flex:1;min-width:220px;color:#cfcfcf}
+  .private-auth-bar .auth-status.ok{color:#9ff0b4}
+  .private-auth-btn{border:1px solid #666;background:#343434;color:#fff;border-radius:7px;padding:7px 11px;font:inherit;font-weight:800;cursor:pointer}
+  .private-auth-btn.primary{background:var(--tw-orange);border-color:var(--tw-orange)}
+  .private-auth-btn:hover{filter:brightness(1.08)}
+  .legacy-hidden{display:none!important}
+  .secure-view{display:none}
+  .secure-view.active{display:block}
+  .secure-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+  .secure-card h2{font-size:17px;margin-bottom:5px}
+  .secure-card h3{font-size:14px;margin-bottom:8px}
+  .secure-card .hint{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+  .secure-toolbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+  .secure-toolbar label,.half-meta label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:700}
+  .secure-toolbar input,.secure-toolbar select,.half-meta input,.half-meta select,.half-item select,.half-item textarea{font:inherit;border:1px solid #d7d7d7;border-radius:8px;padding:8px 10px;background:#fff;color:var(--ink)}
+  .secure-toolbar input,.secure-toolbar select{font-size:14px;color:var(--ink)}
+  .secure-btn{border:none;border-radius:8px;background:var(--tw-orange);color:#fff;font-weight:800;padding:9px 14px;cursor:pointer;font-family:inherit}
+  .secure-btn.secondary{background:#f0f0f0;color:#555}
+  .secure-btn:hover{filter:brightness(.95)}
+  .secure-note{font-size:12px;color:var(--muted);margin-top:10px}
+  .secure-table-wrap{overflow:auto;border:1px solid var(--line);border-radius:9px}
+  .secure-table{width:100%;border-collapse:collapse;min-width:720px;font-size:13px}
+  .secure-table th,.secure-table td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}
+  .secure-table th{background:#fff3e9;color:#b94b00;font-size:12px;white-space:nowrap}
+  .secure-table tr:last-child td{border-bottom:0}
+  .secure-table .center{text-align:center}
+  .schedule-person{display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;padding:3px 7px;border-radius:6px;background:#f5f5f5;white-space:nowrap}
+  .schedule-person.manager{background:#fff0df;color:#b94b00;font-weight:800}
+  .schedule-person.off{color:#999;text-decoration:line-through;background:#fafafa}
+  .schedule-cell{min-width:105px;line-height:1.45;white-space:normal}
+  .schedule-cell .mgr{color:#b94b00;font-weight:800}
+  .schedule-cell .count{display:block;color:#888;font-size:11px;margin-top:3px}
+  .week-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}
+  .week-day{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+  .week-day-head{padding:10px 12px;background:#fff3e9;color:#a94300;font-weight:800;display:flex;justify-content:space-between}
+  .week-store{padding:10px 12px;border-top:1px solid var(--line);font-size:13px}
+  .week-store strong{display:block;margin-bottom:5px}
+  .week-store p{color:#555;line-height:1.55}
+  .month-grid{min-width:1200px}
+  .month-grid th,.month-grid td{text-align:center;padding:6px 4px;font-size:11px}
+  .month-grid th:first-child,.month-grid td:first-child{text-align:left;position:sticky;left:0;background:#fff;z-index:1;min-width:76px}
+  .month-grid td:first-child{font-weight:800}
+  .month-grid .empty{color:#ccc;background:#fafafa}
+  .month-grid .busy{background:#fffaf4}
+  .secure-lock{padding:34px 20px;text-align:center;color:#777;border:1px dashed #ddd;border-radius:10px;background:#fafafa}
+  .secure-lock .big{font-size:28px;margin-bottom:8px}
+  .half-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px}
+  .half-stat{border:1px solid var(--line);border-radius:9px;padding:12px;background:#fff}
+  .half-stat strong{display:block;font-size:22px}
+  .half-stat span{font-size:12px;color:var(--muted)}
+  .half-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+  .half-meta input,.half-meta select{width:100%;font-size:14px}
+  .half-items{display:grid;gap:8px}
+  .half-item{border:1px solid var(--line);border-radius:9px;padding:10px;background:#fff;display:grid;grid-template-columns:minmax(0,1fr) 125px;gap:8px;align-items:start}
+  .half-item.issue{border-color:#f0b5b5;background:#fffafa}
+  .half-item-head{display:flex;gap:8px;align-items:flex-start}
+  .half-no{width:26px;height:24px;border-radius:6px;background:#fff0df;color:#b94b00;font-weight:800;display:grid;place-items:center;flex:none;font-size:12px}
+  .half-item-title{font-size:13px;font-weight:800;line-height:1.45}
+  .half-item-tag{font-size:11px;color:#999;margin-top:2px}
+  .half-item textarea{grid-column:1 / -1;min-height:44px;resize:vertical;font-size:13px}
+  .half-item input[type=file]{grid-column:1 / -1;font-size:12px;max-width:100%}
+  .half-evidence{grid-column:1 / -1;font-size:12px;color:#777}
+  .half-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+  .half-history{overflow:auto}
+  .half-history table{min-width:900px}
+  .status-ok{color:var(--ok);font-weight:800}.status-issue{color:var(--miss);font-weight:800}.status-na{color:#999;font-weight:800}
+  @media(max-width:650px){
+    .secure-tab{flex:1;min-width:0;padding:8px 7px;font-size:11.5px}
+    .half-item{grid-template-columns:1fr}
+    .half-item select{width:100%}
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1><span class="dot"></span>督導巡店追蹤系統</h1>
-    <div class="sub" id="subTitle">北一二B區 · 盧蔚榮 · 33 項檢核追蹤</div>
+    <div class="sub" id="subTitle">北一二B區 · 33 項檢核追蹤</div>
+    <nav class="secure-tabs" aria-label="受保護工作頁籤">
+      <button class="secure-tab active" data-view="patrol" onclick="switchPatrolView('patrol')">📋 巡店看板</button>
+      <button class="secure-tab locked" data-view="schedule" onclick="switchPatrolView('schedule')">每月班表</button>
+      <button class="secure-tab locked" data-view="half" onclick="switchPatrolView('half')">半月督導檢查</button>
+    </nav>
+    <div class="private-auth-bar" aria-label="Microsoft 365 私有資料登入">
+      <span id="privateAuthStatus" class="auth-status">班表與督導檢查：尚未登入 Microsoft 365；資料不放在公開 GitHub</span>
+      <button id="privateLoginBtn" class="private-auth-btn primary" type="button" onclick="privateSignIn()">登入 Microsoft 365</button>
+      <button id="privateLogoutBtn" class="private-auth-btn" type="button" onclick="privateSignOut()" hidden>登出</button>
+    </div>
     <div class="month-pick">
       <label>追蹤月份</label>
       <input type="month" id="monthInput">
@@ -230,7 +324,7 @@
 
   <div id="invPanels"></div>
 
-  <div class="panel">
+  <div class="panel" id="patrolInputPanel">
     <h2>貼上巡店紀錄</h2>
     <p class="hint">貼上你的明細表（含表頭那幾行也沒關係，系統會自動略過）。可一次貼整月，或每次巡完一店就補貼，資料會累加並自動同步雲端——手機開同一網址就看得到。</p>
     <textarea id="pasteBox" placeholder="填表時間	到店時間	離店時間	區處別	營業點代碼	檢查店點	檢查人員	題號	檢查內容	是否合格	未查／不合格原因&#10;2026/7/1 16:43	...	1	督導駐點		na&#10;..."></textarea>
@@ -245,6 +339,44 @@
   </div>
 
   <div id="content"></div>
+
+  <section id="scheduleView" class="secure-view" aria-label="每月班表">
+    <div class="secure-card">
+      <h2>每月班表・每日 / 每週 / 每月出勤</h2>
+      <p class="hint">資料來源：登入後的私人 OneDrive「TWM 班表」。GitHub Pages 不保存班表、人名或出勤資料。</p>
+      <div class="secure-toolbar">
+        <label>檢視方式<select id="scheduleMode" onchange="renderSchedule()"><option value="day">每日</option><option value="week">每週</option><option value="month">每月</option></select></label>
+        <label>日期<input id="scheduleDate" type="date" onchange="renderSchedule()"></label>
+        <button class="secure-btn" onclick="exportScheduleExcel()">匯出 Excel</button>
+        <span id="scheduleStatus" class="secure-note"></span>
+      </div>
+    </div>
+    <div id="scheduleContent"></div>
+  </section>
+
+  <section id="halfView" class="secure-view" aria-label="半月督導檢查">
+    <div class="secure-card">
+      <h2>半月督導檢查・缺失改善回填</h2>
+      <p class="hint">登入 Microsoft 365 後填寫本期檢查；異常項目請填改善說明。照片／影片只會送到已設定的私人資料服務，不會上傳 GitHub。</p>
+      <div id="halfSummary" class="half-summary"></div>
+      <div class="half-meta">
+        <label>檢查日期<input id="halfDate" type="date" onchange="renderHalfForm()"></label>
+        <label>檢查店點<select id="halfStore" onchange="renderHalfForm()"></select></label>
+        <label>督導姓名<input id="halfInspector" type="text" placeholder="請輸入督導姓名"></label>
+      </div>
+      <div id="halfForm" class="half-items"></div>
+      <div class="half-actions">
+        <button class="secure-btn" onclick="submitHalfCheck()">儲存並同步本期檢查</button>
+        <button class="secure-btn secondary" onclick="saveHalfDraft()">只暫存本機</button>
+        <button class="secure-btn secondary" onclick="exportHalfChecksExcel()">匯出 Excel</button>
+      </div>
+      <div id="halfMsg" class="secure-note"></div>
+    </div>
+    <div class="secure-card">
+      <h3>歷次半月檢查與改善追蹤</h3>
+      <div id="halfHistory" class="half-history"></div>
+    </div>
+  </section>
 
   <footer>資料透過 GAS 同步至雲端試算表（跨裝置共用）· 台灣大哥大 北一二B</footer>
 </div>
@@ -323,7 +455,7 @@ let currentMonth = "";
 // 其他督導在畫面上貼自己的 GAS 網址即可，只記在自己的裝置，資料互不相通。
 let GAS_URL = localStorage.getItem('bei12b_pt_gas_url') ||
               localStorage.getItem('bei12b_gas_url') ||
-              "https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec";
+              window.PATROL_LEGACY_GAS_URL || '';
 // 巡店通行碼（GAS 端 PT_KEY 驗證），輸入一次後記在本裝置
 let PT_KEY = localStorage.getItem('bei12b_pt_key') || '';
 
@@ -335,6 +467,107 @@ function askKey(msg){
   return true;
 }
 let cloudOn = false;    // 雲端連線狀態
+
+/* ---------- 私有資料邊界（Microsoft 365 / OneDrive） ----------
+ * 這裡只放非秘密設定。Client ID 不是密碼；不要把 client secret、token、
+ * 員工班表或照片放進 GitHub。正式環境由部署設定注入 PATROL_PRIVATE_CONFIG：
+ * {
+ *   clientId: 'Entra application client id',
+ *   tenantId: 'organizations',
+ *   scheduleApi: 'https://private-service.example/schedule',
+ *   inspectionApi: 'https://private-service.example/inspections',
+ *   scopes: ['User.Read']
+ * }
+ * 私有 API 必須自行驗證 Microsoft 365 access token，並從 OneDrive／SharePoint
+ * 讀寫資料；本頁不接受公開 JSON 或 repo 內的班表檔案。
+ */
+const PATROL_PRIVATE_CONFIG = Object.assign({
+  clientId: '',
+  tenantId: 'organizations',
+  scheduleApi: '',
+  inspectionApi: '',
+  scopes: ['User.Read']
+}, window.PATROL_PRIVATE_CONFIG || {});
+let privateMsal = null;
+let privateAccount = null;
+let privateToken = '';
+
+function privateAuthConfigured(){ return Boolean(PATROL_PRIVATE_CONFIG.clientId); }
+function privateTestMode(){ return window.__PATROL_TEST_PRIVATE_AUTH__ === true; }
+function setPrivateAuthStatus(text, ok){
+  const el=document.getElementById('privateAuthStatus');
+  if(el){ el.textContent=text; el.classList.toggle('ok',Boolean(ok)); }
+  const login=document.getElementById('privateLoginBtn');
+  const logout=document.getElementById('privateLogoutBtn');
+  if(login) login.hidden=Boolean(ok);
+  if(logout) logout.hidden=!ok;
+}
+function privateConfigMessage(){
+  return '尚未設定 Microsoft Entra 應用程式；班表與督導檢查不會從公開 GitHub 載入。';
+}
+async function ensurePrivateMsal(){
+  if(privateTestMode()){ privateAccount={username:'test@local'}; setPrivateAuthStatus('測試私有資料連線已啟用（正式環境需 Microsoft 365 登入）',true); return true; }
+  if(!privateAuthConfigured()){ setPrivateAuthStatus(privateConfigMessage(),false); return false; }
+  if(!window.msal){ setPrivateAuthStatus('Microsoft 365 登入元件尚未載入，請稍後重試',false); return false; }
+  if(!privateMsal){
+    privateMsal=new msal.PublicClientApplication({auth:{clientId:PATROL_PRIVATE_CONFIG.clientId,authority:`https://login.microsoftonline.com/${PATROL_PRIVATE_CONFIG.tenantId||'organizations'}`,redirectUri:window.location.origin+window.location.pathname}});
+  }
+  const accounts=privateMsal.getAllAccounts();
+  if(!privateAccount && accounts.length) privateAccount=accounts[0];
+  if(privateAccount){ setPrivateAuthStatus(`Microsoft 365 已登入：${privateAccount.username||privateAccount.name||'目前帳號'}`,true); return true; }
+  return false;
+}
+async function privateSignIn(){
+  if(privateTestMode()){ privateAccount={username:'test@local'}; setPrivateAuthStatus('測試私有資料連線已啟用（正式環境需 Microsoft 365 登入）',true); return true; }
+  if(!privateAuthConfigured()){ setPrivateAuthStatus(privateConfigMessage(),false); showMsg('請先完成 Microsoft Entra 應用程式設定；目前沒有任何班表資料被載入','err'); return false; }
+  if(!window.msal){ setPrivateAuthStatus('Microsoft 365 登入元件尚未載入，請重新整理後再試',false); return false; }
+  try{
+    if(!privateMsal){
+      privateMsal=new msal.PublicClientApplication({auth:{clientId:PATROL_PRIVATE_CONFIG.clientId,authority:`https://login.microsoftonline.com/${PATROL_PRIVATE_CONFIG.tenantId||'organizations'}`,redirectUri:window.location.origin+window.location.pathname}});
+    }
+    const result=await privateMsal.loginPopup({scopes:PATROL_PRIVATE_CONFIG.scopes||['User.Read']});
+    privateAccount=result.account; privateToken=result.accessToken||'';
+    setPrivateAuthStatus(`Microsoft 365 已登入：${privateAccount.username||privateAccount.name||'目前帳號'}`,true);
+    return true;
+  }catch(err){
+    setPrivateAuthStatus('Microsoft 365 登入未完成；私人資料仍保持鎖定',false);
+    showMsg('Microsoft 365 登入失敗：'+(err.message||'請稍後重試'),'err');
+    return false;
+  }
+}
+async function privateSignOut(){
+  if(privateTestMode()){ privateAccount=null; privateToken=''; setPrivateAuthStatus('測試私有資料連線已登出',false); return; }
+  try{ if(privateMsal && privateAccount) await privateMsal.logoutPopup({account:privateAccount}); }catch(err){ /* 登出失敗不保留本頁 token */ }
+  privateAccount=null; privateToken=''; setPrivateAuthStatus('班表與督導檢查：尚未登入 Microsoft 365；資料不放在公開 GitHub',false);
+  scheduleData=null; secureUnlocked=false;
+}
+async function privateAccessToken(){
+  if(privateTestMode()) return 'test-private-token';
+  if(!(await ensurePrivateMsal())) throw new Error(privateConfigMessage());
+  if(privateToken) return privateToken;
+  try{
+    const result=await privateMsal.acquireTokenSilent({account:privateAccount,scopes:PATROL_PRIVATE_CONFIG.scopes||['User.Read']});
+    privateToken=result.accessToken; return privateToken;
+  }catch(err){
+    const result=await privateMsal.acquireTokenPopup({account:privateAccount,scopes:PATROL_PRIVATE_CONFIG.scopes||['User.Read']});
+    privateToken=result.accessToken; return privateToken;
+  }
+}
+async function privateApiJson(url, options={}){
+  if(!url) throw new Error('尚未設定私人資料服務網址');
+  const headers=new Headers(options.headers||{});
+  headers.set('Accept','application/json');
+  headers.set('Authorization',`Bearer ${await privateAccessToken()}`);
+  const response=await fetch(url,{...options,headers,cache:'no-store'});
+  if(!response.ok) throw new Error(`私人資料服務 ${response.status}`);
+  return response.json();
+}
+function privateScheduleFixture(){ return privateTestMode() ? window.__PATROL_TEST_SCHEDULE__ : null; }
+async function privateInspectionRequest(action, rows){
+  if(!PATROL_PRIVATE_CONFIG.inspectionApi) throw new Error('尚未設定私人督導檢查資料服務網址');
+  if(action==='read') return privateApiJson(PATROL_PRIVATE_CONFIG.inspectionApi);
+  return privateApiJson(PATROL_PRIVATE_CONFIG.inspectionApi,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'write',rows})});
+}
 
 /* ---------- 初始化月份 ---------- */
 function initMonth(){
@@ -922,8 +1155,195 @@ function setCloudStatus(text, on){
   el.style.color = on ? '#7CFFA0' : '#ff9c9c';
 }
 
+/* ---------- 受保護頁籤：班表 + 督導半月檢查 ---------- */
+let activePatrolView = 'patrol';
+let secureUnlocked = false;
+let scheduleData = null;
+let halfChecks = [];
+const HALF_ITEMS = Array.from({length:33}, (_,i)=>i+1);
+
+function esc(v){
+  return String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+async function secureAccess(){
+  if(secureUnlocked && privateAccount) return true;
+  const ok=await ensurePrivateMsal();
+  if(!ok){
+    showMsg('請先按「登入 Microsoft 365」；班表與督導檢查資料目前保持鎖定','err');
+    return false;
+  }
+  secureUnlocked = true;
+  return true;
+}
+function toggleLegacyPatrol(hidden){
+  ['ticker','overview','invPanels','patrolInputPanel','content'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.classList.toggle('legacy-hidden', hidden);
+  });
+}
+async function switchPatrolView(view){
+  if(view!=='patrol' && !(await secureAccess())) return;
+  activePatrolView=view;
+  toggleLegacyPatrol(view!=='patrol');
+  document.querySelectorAll('.secure-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view));
+  document.querySelectorAll('.secure-view').forEach(el=>el.classList.remove('active'));
+  if(view==='schedule'){
+    document.getElementById('scheduleView').classList.add('active');
+    loadSchedule();
+  }else if(view==='half'){
+    document.getElementById('halfView').classList.add('active');
+    loadHalfChecks();
+  }
+}
+
+async function loadSchedule(){
+  const status=document.getElementById('scheduleStatus');
+  if(scheduleData){ renderSchedule(); return; }
+  status.textContent='正在從私人資料服務載入 OneDrive 班表…';
+  try{
+    scheduleData=privateScheduleFixture();
+    if(!scheduleData) scheduleData=await privateApiJson(PATROL_PRIVATE_CONFIG.scheduleApi);
+    if(!scheduleData || !Array.isArray(scheduleData.stores)) throw new Error('私人班表資料格式不正確');
+    const dateEl=document.getElementById('scheduleDate');
+    const today=new Date().toISOString().slice(0,10);
+    dateEl.value=today.slice(0,7)===scheduleData.month?today:`${scheduleData.month}-01`;
+    status.textContent=`已載入 ${scheduleData.stores.length} 間門市・${scheduleData.rocMonth}`;
+    const sel=document.getElementById('halfStore');
+    if(sel && !sel.options.length) sel.innerHTML=scheduleData.stores.map(s=>`<option value="${esc(s.store)}">${esc(s.store)}</option>`).join('');
+    renderSchedule();
+  }catch(err){
+    status.textContent='班表資料仍鎖定或載入失敗';
+    document.getElementById('scheduleContent').innerHTML=`<div class="secure-lock"><div class="big">⚠️</div>${esc(err.message)}</div>`;
+  }
+}
+function scheduleDay(store,date){ return (store.days||[]).find(d=>d.date===date); }
+function dateObj(date){ const [y,m,d]=date.split('-').map(Number); return new Date(Date.UTC(y,m-1,d)); }
+function dateIso(d){ return d.toISOString().slice(0,10); }
+function dateLabel(date){ const d=dateObj(date); return `${d.getUTCMonth()+1}/${d.getUTCDate()}（${['日','一','二','三','四','五','六'][d.getUTCDay()]}）`; }
+function weekDates(date){
+  const d=dateObj(date); const diff=(d.getUTCDay()+6)%7; d.setUTCDate(d.getUTCDate()-diff);
+  return Array.from({length:7},()=>{const v=dateIso(d);d.setUTCDate(d.getUTCDate()+1);return v;});
+}
+function monthDays(month){
+  const [y,m]=month.split('-').map(Number); return new Date(Date.UTC(y,m,0)).getUTCDate();
+}
+function scheduleAssignmentHtml(day, compact){
+  if(!day) return '<span class="val-dim">—</span>';
+  const managers=day.managers||[];
+  const working=day.workingStaff||[];
+  if(compact) return `<span class="mgr">主管：${esc(managers.map(x=>x.name).join('、')||'未排')}</span><span class="count">出勤 ${working.length} 人：${esc(working.map(x=>x.name).join('、')||'無')}</span>`;
+  const all=(day.staff||[]).map(a=>`<span class="schedule-person ${a.working?'':'off'} ${a.role&&a.role.includes('店長')?'manager':''}">${esc(a.name)} ${esc(a.status||'未填')}</span>`).join('');
+  return `<div><strong>值班主管：${esc(managers.map(x=>x.name).join('、')||'未排')}</strong><br>${all||'—'}</div>`;
+}
+function renderSchedule(){
+  if(!scheduleData) return;
+  const mode=document.getElementById('scheduleMode').value;
+  const date=document.getElementById('scheduleDate').value||`${scheduleData.month}-01`;
+  const c=document.getElementById('scheduleContent');
+  if(mode==='day'){
+    const rows=scheduleData.stores.map(s=>{const d=scheduleDay(s,date);return `<tr><td><strong>${esc(s.store)}</strong><br><span class="inv-last">${esc(s.title)}</span></td><td>${esc((d?.managers||[]).map(x=>x.name).join('、')||'未排')}</td><td>${esc((d?.workingStaff||[]).map(x=>`${x.name}（${x.role}）`).join('、')||'無')}</td><td>${scheduleAssignmentHtml(d,false)}</td></tr>`;}).join('');
+    c.innerHTML=`<div class="secure-card"><h3>${esc(dateLabel(date))} 出勤名單</h3><div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>門市</th><th>值班主管</th><th>出勤同仁</th><th>全員班別</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }else if(mode==='week'){
+    const days=weekDates(date);
+    c.innerHTML=`<div class="secure-card"><h3>${esc(dateLabel(days[0]))}～${esc(dateLabel(days[6]))} 每週出勤</h3><div class="week-grid">${days.map(day=>`<article class="week-day"><div class="week-day-head"><span>${esc(dateLabel(day))}</span><span>${esc(day)}</span></div>${scheduleData.stores.map(s=>{const d=scheduleDay(s,day);return `<div class="week-store"><strong>${esc(s.store)}・主管：${esc((d?.managers||[]).map(x=>x.name).join('、')||'未排')}</strong><p>出勤：${esc((d?.workingStaff||[]).map(x=>x.name).join('、')||'無')}</p></div>`;}).join('')}</article>`).join('')}</div></div>`;
+  }else{
+    const total=monthDays(scheduleData.month);
+    const head=Array.from({length:total},(_,i)=>`<th>${i+1}</th>`).join('');
+    const rows=scheduleData.stores.map(s=>`<tr><td>${esc(s.store)}</td>${Array.from({length:total},(_,i)=>{const day=`${scheduleData.month}-${String(i+1).padStart(2,'0')}`;const d=scheduleDay(s,day);return `<td class="schedule-cell ${d?'busy':'empty'}">${scheduleAssignmentHtml(d,true)}</td>`;}).join('')}</tr>`).join('');
+    c.innerHTML=`<div class="secure-card"><h3>${esc(scheduleData.rocMonth)} 每月班表</h3><p class="hint">每格顯示值班主管與當日出勤人數；點「匯出 Excel」可取得含每位同仁班別的完整月表。</p><div class="secure-table-wrap"><table class="secure-table month-grid"><thead><tr><th>門市＼日期</th>${head}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }
+}
+
+function xmlEsc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;').replace(/\n/g,'&#10;'); }
+function xmlCell(value){ const type=typeof value==='number'?'Number':'String'; return `<Cell><Data ss:Type="${type}">${xmlEsc(value)}</Data></Cell>`; }
+function excelXml(sheets){
+  const ns='urn:schemas-microsoft-com:office:spreadsheet';
+  const body=sheets.map(s=>`<Worksheet ss:Name="${xmlEsc(s.name)}"><Table>${s.rows.map(row=>`<Row>${row.map(xmlCell).join('')}</Row>`).join('')}</Table></Worksheet>`).join('');
+  return `<?xml version="1.0"?><Workbook xmlns="${ns}" xmlns:ss="${ns}"><Styles><Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Microsoft JhengHei" ss:Size="10"/></Style></Styles>${body}</Workbook>`;
+}
+function downloadExcel(name,sheets){
+  const blob=new Blob([excelXml(sheets)],{type:'application/vnd.ms-excel'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function exportScheduleExcel(){
+  if(!scheduleData){ showMsg('班表尚未載入','err'); return; }
+  const total=monthDays(scheduleData.month); const monthRows=[['台灣大哥大 北一二B 每月班表',scheduleData.rocMonth],['店點','姓名','職務',...Array.from({length:total},(_,i)=>i+1)]];
+  scheduleData.stores.forEach(s=>s.staff.forEach(p=>{
+    const statuses=Array.from({length:total},(_,i)=>{
+      const day=scheduleDay(s,`${scheduleData.month}-${String(i+1).padStart(2,'0')}`);
+      const assignment=day ? (day.staff||[]).find(a=>a.name===p.name) : null;
+      return assignment ? (assignment.status||'') : '';
+    });
+    monthRows.push([s.store,p.name,p.role,...statuses]);
+  }));
+  const selected=document.getElementById('scheduleDate').value||`${scheduleData.month}-01`;
+  const dayRows=[['日期',selected,dateLabel(selected)],['門市','值班主管','出勤同仁','全員班別']];
+  scheduleData.stores.forEach(s=>{const d=scheduleDay(s,selected);dayRows.push([s.store,(d?.managers||[]).map(x=>x.name).join('、')||'未排',(d?.workingStaff||[]).map(x=>x.name).join('、')||'無',(d?.staff||[]).map(x=>`${x.name}:${x.status||''}`).join('、')]);});
+  const weekRows=[['每週出勤',selected],['日期','星期','門市','值班主管','出勤同仁']];
+  weekDates(selected).forEach(day=>scheduleData.stores.forEach(s=>{const d=scheduleDay(s,day);weekRows.push([day,dateLabel(day).slice(-2,-1),s.store,(d?.managers||[]).map(x=>x.name).join('、')||'未排',(d?.workingStaff||[]).map(x=>x.name).join('、')||'無']);}));
+  downloadExcel(`TWM_班表_${scheduleData.month}.xls`,[{name:'每月班表',rows:monthRows},{name:'每日出勤',rows:dayRows},{name:'每週出勤',rows:weekRows}]);
+  document.getElementById('scheduleStatus').textContent='已匯出 Excel（月表＋每日＋每週）';
+}
+
+function halfKey(row){ return `${row.checkId||`${row.date}|${row.store}|${row.period}`}|${row.item}`; }
+function mergeHalfRows(rows){
+  const map=new Map(halfChecks.map(r=>[halfKey(r),r])); rows.forEach(r=>map.set(halfKey(r),r)); halfChecks=Array.from(map.values()).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(a.store).localeCompare(String(b.store))||Number(a.item)-Number(b.item)); localStorage.setItem('bei12b_half_checks',JSON.stringify(halfChecks));
+}
+function loadHalfLocal(){ try{const rows=JSON.parse(localStorage.getItem('bei12b_half_checks')||'[]');if(Array.isArray(rows)) halfChecks=rows;}catch{halfChecks=[];} }
+function halfPeriod(date){ return Number((date||'').slice(-2))<=15?'H1':'H2'; }
+function halfPeriodLabel(p){ return p==='H1'?'上半月（1–15日）':'下半月（16日–月底）'; }
+async function loadHalfChecks(){
+  loadHalfLocal(); renderHalfSummary(); renderHalfForm(); renderHalfHistory();
+  if(!privateAccount || !PATROL_PRIVATE_CONFIG.inspectionApi) return;
+  try{
+    const res=await privateInspectionRequest('read');
+    if(res.status==='ok'){ mergeHalfRows((res.rows||[]).map(r=>({...r,item:Number(r.item)}))); renderHalfSummary(); renderHalfForm(); renderHalfHistory(); }
+    else if(res.message==='unauthorized'){ secureUnlocked=false; showHalfMsg('Microsoft 365 權限不足，私人檢查資料保持鎖定','err'); }
+  }catch(err){ showHalfMsg('半月檢查雲端讀取失敗，先顯示本機資料','err'); }
+}
+function initHalfSelectors(){
+  const store=document.getElementById('halfStore'); if(store && !store.options.length){ store.innerHTML=STORES.map(s=>`<option value="${esc(s.name.replace('台北',''))}">${esc(s.name.replace('台北',''))}</option>`).join(''); }
+  const date=document.getElementById('halfDate'); if(date && !date.value) date.value=new Date().toISOString().slice(0,10);
+}
+function currentHalfRows(){
+  const date=document.getElementById('halfDate').value; const store=document.getElementById('halfStore').value; const period=halfPeriod(date); const checkId=`${date}|${store}|${period}`;
+  return {date,store,period,checkId,rows:halfChecks.filter(r=>halfKey(r).startsWith(`${checkId}|`))};
+}
+function renderHalfForm(){
+  initHalfSelectors(); const {date,store,period,checkId,rows}=currentHalfRows();
+  const inspector=document.getElementById('halfInspector'); const saved=rows.find(r=>r.inspector)?.inspector||''; if(inspector && !inspector.value) inspector.value=saved;
+  const c=document.getElementById('halfForm'); if(!c) return;
+  c.innerHTML=HALF_ITEMS.map(i=>{const r=rows.find(x=>Number(x.item)===i)||{};const result=r.result||'';return `<div class="half-item ${result==='abnormal'?'issue':''}" data-half-item="${i}"><div class="half-item-head"><span class="half-no">${i}</span><div><div class="half-item-title">${esc(ITEM_TEXT[i])}</div><div class="half-item-tag">${esc(ITEM_RULES[i]?.label||'本期檢查')}</div></div></div><select class="half-result" aria-label="第${i}題結果"><option value="">待填</option><option value="ok" ${result==='ok'?'selected':''}>符合</option><option value="abnormal" ${result==='abnormal'?'selected':''}>缺失／異常</option><option value="na" ${result==='na'?'selected':''}>不適用</option></select><textarea class="half-note" placeholder="檢查紀錄／缺失內容">${esc(r.note||'')}</textarea><textarea class="half-improvement" placeholder="改善說明（異常時填寫）">${esc(r.improvement||'')}</textarea><input class="half-files" type="file" accept="image/*,video/*" multiple aria-label="第${i}題照片或影片"><div class="half-evidence">${r.evidenceNames?`已記錄附件：${esc(r.evidenceNames)}`:'可拍照／錄影留下現場證據'}</div></div>`;}).join('');
+  c.querySelectorAll('.half-result').forEach(el=>el.addEventListener('change',()=>el.closest('.half-item').classList.toggle('issue',el.value==='abnormal')));
+  c.querySelectorAll('.half-files').forEach(el=>el.addEventListener('change',()=>{const names=Array.from(el.files||[]).map(f=>f.name).join('、');el.nextElementSibling.textContent=names?`本次附件：${names}`:'可拍照／錄影留下現場證據';}));
+  document.getElementById('halfMsg').textContent=`${dateLabel(date)}・${halfPeriodLabel(period)}・${store}；共 ${rows.length}/33 題已有雲端／本機紀錄`;
+}
+function readHalfForm(){
+  const date=document.getElementById('halfDate').value, store=document.getElementById('halfStore').value, inspector=document.getElementById('halfInspector').value.trim(), period=halfPeriod(date), checkId=`${date}|${store}|${period}`, savedAt=new Date().toISOString();
+  const rows=HALF_ITEMS.map(i=>{const box=document.querySelector(`[data-half-item="${i}"]`);const files=Array.from(box.querySelector('.half-files').files||[]).map(f=>f.name);return {checkId,date,period,month:date.slice(0,7),store,inspector,item:i,result:box.querySelector('.half-result').value,note:box.querySelector('.half-note').value.trim(),improvement:box.querySelector('.half-improvement').value.trim(),evidenceNames:files.join('、')||box.querySelector('.half-evidence').textContent.replace(/^已記錄附件：|^本次附件：/,'').replace('可拍照／錄影留下現場證據','').trim(),savedAt};});
+  return rows;
+}
+function saveHalfDraft(){
+  const rows=readHalfForm(); mergeHalfRows(rows); renderHalfSummary(); renderHalfHistory(); showHalfMsg('已暫存本機；尚未同步雲端','ok');
+}
+function showHalfMsg(text,type){const el=document.getElementById('halfMsg');if(el){el.textContent=text;el.className='secure-note '+(type==='err'?'status-issue':type==='ok'?'status-ok':'');}}
+function submitHalfCheck(){
+  const inspector=document.getElementById('halfInspector').value.trim(); if(!inspector){showHalfMsg('請填寫督導姓名','err');return;}
+  const rows=readHalfForm(); mergeHalfRows(rows); renderHalfSummary(); renderHalfHistory();
+  if(!privateAccount || !PATROL_PRIVATE_CONFIG.inspectionApi){showHalfMsg('已保留本機資料；尚未設定私人資料服務，未上傳雲端','err');return;}
+  const chunks=[];let part=[];rows.forEach(r=>{part.push(r);if(encodeURIComponent(JSON.stringify(part)).length>3500){if(part.length>1){part.pop();chunks.push(part);part=[r];}else{chunks.push(part);part=[];}}});if(part.length)chunks.push(part);
+  let chain=Promise.resolve(),written=0;chunks.forEach(chunk=>{chain=chain.then(()=>privateInspectionRequest('write',chunk)).then(res=>{if(res.status!=='ok')throw new Error(res.message||'寫入失敗');written+=Number(res.written||chunk.length||0);});});
+  chain.then(()=>{showHalfMsg(`已同步雲端（${written} 列），照片／影片附件名稱已記錄；原檔仍保留在本機裝置`,'ok');loadHalfChecks();}).catch(err=>showHalfMsg('雲端同步失敗：'+err.message+'；本機資料仍保留','err'));
+}
+function renderHalfSummary(){
+  const c=document.getElementById('halfSummary');if(!c)return;const groups={};halfChecks.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const issues=halfChecks.filter(r=>r.result==='abnormal').length;const pending=Object.values(groups).filter(rows=>rows.some(r=>!r.result)).length;c.innerHTML=`<div class="half-stat"><strong>${Object.keys(groups).length}</strong><span>已建立本期檢查</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>缺失／異常項目</span></div><div class="half-stat"><strong>${pending}</strong><span>尚有待填本期</span></div>`;}
+function renderHalfHistory(){
+  const c=document.getElementById('halfHistory');if(!c)return;const groups={};halfChecks.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const keys=Object.keys(groups).sort().reverse();if(!keys.length){c.innerHTML='<div class="empty-state"><div class="big">📝</div>尚無半月督導檢查紀錄</div>';return;}c.innerHTML=`<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>日期／期別</th><th>店點</th><th>督導</th><th>進度</th><th>缺失與改善</th></tr></thead><tbody>${keys.map(k=>{const rows=groups[k],first=rows[0],issue=rows.filter(r=>r.result==='abnormal').length,pending=rows.filter(r=>!r.result).length;return `<tr><td>${esc(first.date)}<br>${esc(halfPeriodLabel(first.period))}</td><td>${esc(first.store)}</td><td>${esc(first.inspector||'—')}</td><td>${rows.filter(r=>r.result).length}/33</td><td class="${issue?'status-issue':''}">${issue?`${issue} 項異常`:'無異常'}${pending?`・待填 ${pending} 題`:''}<br><span class="inv-last">${esc(rows.filter(r=>r.result==='abnormal'&&r.improvement).map(r=>`#${r.item} ${r.improvement}`).join('；')||'')}</span></td></tr>`;}).join('')}</tbody></table></div>`;}
+function exportHalfChecksExcel(){
+  if(!halfChecks.length){showHalfMsg('目前沒有半月檢查資料可匯出','err');return;}const rows=[['北一二B 半月督導檢查紀錄'],['日期','期別','店點','督導','題號','檢查內容','結果','檢查紀錄','改善說明','照片／影片附件','最後更新']];halfChecks.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.store).localeCompare(String(b.store))||Number(a.item)-Number(b.item)).forEach(r=>rows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,r.item,ITEM_TEXT[r.item]||'',r.result==='ok'?'符合':r.result==='abnormal'?'缺失／異常':r.result==='na'?'不適用':'待填',r.note||'',r.improvement||'',r.evidenceNames||'',r.savedAt||'']));const issueRows=[['缺失改善追蹤'],['日期','期別','店點','督導','題號','缺失內容','改善說明','照片／影片附件']];halfChecks.filter(r=>r.result==='abnormal').forEach(r=>issueRows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,r.item,r.note||'',r.improvement||'',r.evidenceNames||'']));downloadExcel(`北一二B_半月督導檢查_${new Date().toISOString().slice(0,10)}.xls`,[{name:'半月檢查紀錄',rows},{name:'缺失改善追蹤',rows:issueRows}]);showHalfMsg('已匯出 Excel（完整紀錄＋缺失改善追蹤）','ok');}
+
 /* ---------- 啟動 ---------- */
 initMonth();
+loadHalfLocal();
 render();
 // 有預設 GAS URL 時自動連線
 if(GAS_URL){
