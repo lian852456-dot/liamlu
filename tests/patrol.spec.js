@@ -5,10 +5,42 @@ const path = require('path');
 // 驗證「電腦貼上 → 上雲 → 另一裝置載入」的跨裝置同步流程
 const PT_KEY = 'test123';
 let cloudRows;
+let halfRows;
 let writeCalls;
 let cloudConfig; // 模擬各區 GAS 回傳的 PT_STORES / PT_TITLE
 
+function privateScheduleFixture() {
+  const names = ['酒泉', '萬大', '大稻埕', '復興', '三創', '杭州', '永吉', '通化', '六張犁'];
+  return {
+    generatedAt: '2026-07-15T00:00:00+08:00',
+    month: '2026-07',
+    rocMonth: '115/07',
+    stores: names.map(store => ({
+      store,
+      title: `台北${store}`,
+      staff: [{ name: '測試主管', role: '店長' }, { name: '測試同仁', role: '業務代表' }],
+      days: [{
+        date: '2026-07-15', day: 15, weekday: '三',
+        staff: [
+          { name: '測試主管', role: '店長', status: '全', working: true },
+          { name: '測試同仁', role: '業務代表', status: '早1', working: true },
+        ],
+        workingStaff: [
+          { name: '測試主管', role: '店長', status: '全', working: true },
+          { name: '測試同仁', role: '業務代表', status: '早1', working: true },
+        ],
+        managers: [{ name: '測試主管', role: '店長', status: '全', working: true }],
+      }],
+    })),
+  };
+}
+
 async function stubGas(page) {
+  await page.addInitScript(schedule => {
+    window.__PATROL_TEST_PRIVATE_AUTH__ = true;
+    window.__PATROL_TEST_SCHEDULE__ = schedule;
+    window.PATROL_LEGACY_GAS_URL = 'https://script.google.com/macros/s/test/exec';
+  }, privateScheduleFixture());
   await page.route('https://script.google.com/**', route => {
     const url = new URL(route.request().url());
     const action = url.searchParams.get('action');
@@ -38,6 +70,26 @@ async function stubGas(page) {
         });
         body = JSON.stringify({ status: 'ok', written });
       }
+    } else if (action === 'hread') {
+      body = authed
+        ? JSON.stringify({ status: 'ok', rows: halfRows })
+        : JSON.stringify({ status: 'error', message: 'unauthorized' });
+    } else if (action === 'hwrite') {
+      if (!authed) {
+        body = JSON.stringify({ status: 'error', message: 'unauthorized' });
+      } else {
+        const rows = JSON.parse(url.searchParams.get('payload'));
+        const keys = new Set(halfRows.map(r => `${r.checkId}|${r.item}`));
+        let written = 0;
+        rows.forEach(r => {
+          const key = `${r.checkId}|${r.item}`;
+          const index = halfRows.findIndex(x => `${x.checkId}|${x.item}` === key);
+          if (index >= 0) halfRows[index] = r;
+          else { halfRows.push(r); keys.add(key); }
+          written++;
+        });
+        body = JSON.stringify({ status: 'ok', written });
+      }
     } else {
       body = JSON.stringify({ status: 'error', message: 'unknown action' });
     }
@@ -56,10 +108,10 @@ function answerKeyPrompt(page, answer) {
 const PAGE_URL = 'file://' + path.resolve(__dirname, '../patrol.html');
 
 function pasteLine(d, store, code, item, result, reason) {
-  return `2026/7/${d} 16:43\t2026/7/${d} 16:00\t2026/7/${d} 18:00\t北一二B\t${code}\t${store}\t盧蔚榮\t${item}\t內容\t${result}\t${reason}`;
+  return `2026/7/${d} 16:43\t2026/7/${d} 16:00\t2026/7/${d} 18:00\t北一二B\t${code}\t${store}\t測試督導\t${item}\t內容\t${result}\t${reason}`;
 }
 
-test.beforeEach(() => { cloudRows = []; writeCalls = 0; cloudConfig = null; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; cloudConfig = null; });
 
 test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
   // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
@@ -137,7 +189,7 @@ test('盤點提醒框：題14-17每月與題18兩個月獨立顯示進度', asyn
     pasteLine(5, '台北通化', 'DNB10059', 17, 'v', ''),
     pasteLine(5, '台北通化', 'DNB10059', 18, 'v', ''),
     pasteLine(6, '台北酒泉', 'DNB10062', 14, 'v', ''),
-    `2026/6/20 10:00\t2026/6/20 09:00\t2026/6/20 12:00\t北一二B\tDNB10307\t台北三創\t盧蔚榮\t18\t內容\tv\t`,
+    `2026/6/20 10:00\t2026/6/20 09:00\t2026/6/20 12:00\t北一二B\tDNB10307\t台北三創\t測試督導\t18\t內容\tv\t`,
   ].join('\n');
   await page.fill('#pasteBox', lines);
   await page.click('button.btn-primary');
@@ -220,4 +272,48 @@ test('大量資料會分批上傳且全數送達', async ({ page }) => {
   await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 25 筆明細/);
   expect(cloudRows.length).toBe(25);
   expect(writeCalls).toBeGreaterThan(1); // 確實有分批
+});
+
+test('公開頁面不載入班表副本，未設定 Microsoft 365 時保持鎖定', async ({ page }) => {
+  await page.route('https://script.google.com/**', route => route.abort());
+  await page.goto(PAGE_URL);
+  await expect(page.locator('script[src="data/schedule.js"]')).toHaveCount(0);
+  await page.locator('.secure-tab[data-view="schedule"]').click();
+  await expect(page.locator('#privateAuthStatus')).toContainText('尚未設定 Microsoft Entra');
+  await expect(page.locator('#scheduleView')).not.toBeVisible();
+});
+
+test('加密頁籤：每月班表可切換日週月檢視', async ({ page }) => {
+  await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
+  await page.goto(PAGE_URL);
+  await page.locator('.secure-tab[data-view="schedule"]').click();
+  await expect(page.locator('#scheduleView')).toBeVisible();
+  await expect(page.locator('#scheduleContent')).toContainText('通化');
+  await page.locator('#scheduleMode').selectOption('week');
+  await expect(page.locator('#scheduleContent')).toContainText('每週出勤');
+  await page.locator('#scheduleMode').selectOption('month');
+  await expect(page.locator('#scheduleContent')).toContainText('每月班表');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '匯出 Excel' }).click();
+  expect((await downloadPromise).suggestedFilename()).toMatch(/TWM_班表_2026-07\.xls/);
+});
+
+test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({ page }) => {
+  await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
+  await page.goto(PAGE_URL);
+  await page.locator('.secure-tab[data-view="half"]').click();
+  await expect(page.locator('#halfView')).toBeVisible();
+  await expect(page.locator('.half-item')).toHaveCount(33);
+  await page.locator('#halfInspector').fill('測試督導');
+  await page.locator('.half-result').first().selectOption('abnormal');
+  await page.locator('.half-note').first().fill('展示機未亮');
+  await page.locator('.half-improvement').first().fill('當日完成開機並拍照回存');
+  await page.getByRole('button', { name: '只暫存本機' }).click();
+  await expect(page.locator('#halfHistory')).toContainText('通化');
+  await expect(page.locator('#halfHistory')).toContainText('1 項異常');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '匯出 Excel' }).click();
+  expect((await downloadPromise).suggestedFilename()).toMatch(/半月督導檢查_.*\.xls/);
 });
