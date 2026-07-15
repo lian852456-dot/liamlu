@@ -319,7 +319,7 @@ const HALF_CHECK_HEADERS = [
 
 function getHalfCheckSheet() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let sh = ss.getSheetByName(HALF_CHECK_SHEET);
+  let sh = findNamedSheet(ss, HALF_CHECK_SHEET);
   if (!sh) {
     sh = ss.insertSheet(HALF_CHECK_SHEET);
     sh.appendRow(HALF_CHECK_HEADERS);
@@ -413,9 +413,18 @@ function readHalfCheck() {
 // ════════════════════════════════════
 const SCHEDULE_SHEET = '班表明細';
 
+// Some imported Excel sheets can carry invisible leading/trailing whitespace
+// in their tab name. Match the exact name first, then a normalized fallback.
+function findNamedSheet(ss, sheetName) {
+  return ss.getSheetByName(sheetName) || ss.getSheets().find(sh => {
+    const normalized = String(sh.getName() || '').replace(/\u3000/g, ' ').trim();
+    return normalized === sheetName;
+  });
+}
+
 function readSchedule(requestedMonth) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sh = ss.getSheetByName(SCHEDULE_SHEET);
+  const sh = findNamedSheet(ss, SCHEDULE_SHEET);
   if (!sh || sh.getLastRow() < 2) throw new Error('尚無已匯入的班表資料');
   const data = sh.getDataRange().getValues();
   const headers = data[0];
