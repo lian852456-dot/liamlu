@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
-// 模擬 GAS 後端：ping / ptread / ptwrite（含 JSONP callback 與通行碼驗證）
+// 模擬 GAS 後端：每日回報、巡店、班表與半月督導檢查（含通行碼驗證）
 // 驗證「電腦貼上 → 上雲 → 另一裝置載入」的跨裝置同步流程
 const PT_KEY = 'test123';
 let cloudRows;
@@ -37,8 +37,6 @@ function privateScheduleFixture() {
 
 async function stubGas(page) {
   await page.addInitScript(schedule => {
-    window.__PATROL_TEST_PRIVATE_AUTH__ = true;
-    window.__PATROL_TEST_SCHEDULE__ = schedule;
     window.PATROL_LEGACY_GAS_URL = 'https://script.google.com/macros/s/test/exec';
   }, privateScheduleFixture());
   await page.route('https://script.google.com/**', route => {
@@ -90,6 +88,10 @@ async function stubGas(page) {
         });
         body = JSON.stringify({ status: 'ok', written });
       }
+    } else if (action === 'sread') {
+      body = authed
+        ? JSON.stringify({ status: 'ok', schedule: privateScheduleFixture() })
+        : JSON.stringify({ status: 'error', message: 'unauthorized' });
     } else {
       body = JSON.stringify({ status: 'error', message: 'unknown action' });
     }
@@ -274,12 +276,12 @@ test('大量資料會分批上傳且全數送達', async ({ page }) => {
   expect(writeCalls).toBeGreaterThan(1); // 確實有分批
 });
 
-test('公開頁面不載入班表副本，未設定 Microsoft 365 時保持鎖定', async ({ page }) => {
+test('公開頁面不載入班表副本，未連線或未輸入通行碼時保持鎖定', async ({ page }) => {
   await page.route('https://script.google.com/**', route => route.abort());
   await page.goto(PAGE_URL);
   await expect(page.locator('script[src="data/schedule.js"]')).toHaveCount(0);
   await page.locator('.secure-tab[data-view="schedule"]').click();
-  await expect(page.locator('#privateAuthStatus')).toContainText('尚未設定 Microsoft Entra');
+  await expect(page.locator('#privateAuthStatus')).toContainText('尚未解鎖');
   await expect(page.locator('#scheduleView')).not.toBeVisible();
 });
 
