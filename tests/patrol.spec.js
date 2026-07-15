@@ -9,7 +9,37 @@ let halfRows;
 let writeCalls;
 let cloudConfig; // 模擬各區 GAS 回傳的 PT_STORES / PT_TITLE
 
+function privateScheduleFixture() {
+  const names = ['酒泉', '萬大', '大稻埕', '復興', '三創', '杭州', '永吉', '通化', '六張犁'];
+  return {
+    generatedAt: '2026-07-15T00:00:00+08:00',
+    month: '2026-07',
+    rocMonth: '115/07',
+    stores: names.map(store => ({
+      store,
+      title: `台北${store}`,
+      staff: [{ name: '測試主管', role: '店長' }, { name: '測試同仁', role: '業務代表' }],
+      days: [{
+        date: '2026-07-15', day: 15, weekday: '三',
+        staff: [
+          { name: '測試主管', role: '店長', status: '全', working: true },
+          { name: '測試同仁', role: '業務代表', status: '早1', working: true },
+        ],
+        workingStaff: [
+          { name: '測試主管', role: '店長', status: '全', working: true },
+          { name: '測試同仁', role: '業務代表', status: '早1', working: true },
+        ],
+        managers: [{ name: '測試主管', role: '店長', status: '全', working: true }],
+      }],
+    })),
+  };
+}
+
 async function stubGas(page) {
+  await page.addInitScript(schedule => {
+    window.__PATROL_TEST_PRIVATE_AUTH__ = true;
+    window.__PATROL_TEST_SCHEDULE__ = schedule;
+  }, privateScheduleFixture());
   await page.route('https://script.google.com/**', route => {
     const url = new URL(route.request().url());
     const action = url.searchParams.get('action');
@@ -241,6 +271,15 @@ test('大量資料會分批上傳且全數送達', async ({ page }) => {
   await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 25 筆明細/);
   expect(cloudRows.length).toBe(25);
   expect(writeCalls).toBeGreaterThan(1); // 確實有分批
+});
+
+test('公開頁面不載入班表副本，未設定 Microsoft 365 時保持鎖定', async ({ page }) => {
+  await page.route('https://script.google.com/**', route => route.abort());
+  await page.goto(PAGE_URL);
+  await expect(page.locator('script[src="data/schedule.js"]')).toHaveCount(0);
+  await page.locator('.secure-tab[data-view="schedule"]').click();
+  await expect(page.locator('#privateAuthStatus')).toContainText('尚未設定 Microsoft Entra');
+  await expect(page.locator('#scheduleView')).not.toBeVisible();
 });
 
 test('加密頁籤：每月班表可切換日週月檢視', async ({ page }) => {

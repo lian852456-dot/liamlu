@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Convert the locally synced TWM 班表 .xls files into browser-ready JSON.
+"""Convert the locally synced TWM 班表 .xls files into private JSON.
 
 LibreOffice is used only for reading the legacy .xls files. The source files
-remain untouched; the generated JSON is the static data consumed by patrol.html.
+remain untouched. The generated JSON is written to an ignored private-data
+folder for a separately authenticated private service; it is never bundled
+into patrol.html or published to GitHub Pages.
 """
 
 from __future__ import annotations
@@ -19,8 +21,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ONEDRIVE = Path("/Users/liamlu/Library/CloudStorage/OneDrive-個人/TWM 班表")
-OUT = ROOT / "data" / "schedule.json"
-OUT_JS = ROOT / "data" / "schedule.js"
+OUT = ROOT / "private-data" / "schedule.json"
 SOFFICE = Path("/Users/liamlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice")
 STORE_ORDER = ["酒泉", "萬大", "大稻埕", "復興", "三創", "杭州", "永吉", "通化", "六張犁"]
 
@@ -145,8 +146,8 @@ def main() -> None:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     serialized = json.dumps(payload, ensure_ascii=False, indent=2)
     OUT.write_text(serialized, encoding="utf-8")
-    OUT_JS.write_text("window.__TWM_SCHEDULE__ = " + serialized + ";\n", encoding="utf-8")
-    print(f"Wrote {OUT} ({len(stores)} stores, {sum(len(s['days']) for s in stores)} store-days)")
+    print(f"Wrote private schedule {OUT} ({len(stores)} stores, {sum(len(s['days']) for s in stores)} store-days)")
+    print("This file is intentionally ignored by Git; expose it only through an authenticated private data service.")
 
 
 if __name__ == "__main__":
