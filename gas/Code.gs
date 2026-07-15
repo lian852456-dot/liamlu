@@ -44,9 +44,10 @@ function getSheet() {
 
 function doGet(e) {
   const action = e.parameter.action;
+  const cb = e.parameter.callback;
 
   if (action === 'ping') {
-    return jsonResponse({ status: 'ok' });
+    return jsonResponse({ status: 'ok' }, cb);
   }
 
   if (action === 'debug') {
@@ -60,9 +61,9 @@ function doGet(e) {
       const sh = ss.getSheetByName(SHEET_NAME);
       const headers = sh ? sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0] : [];
       const sample = sh && sh.getLastRow() > 1 ? sh.getRange(2,1,1,sh.getLastColumn()).getValues()[0] : [];
-      return jsonResponse({ status:'ok', sheets, headers, sample });
+      return jsonResponse({ status:'ok', sheets, headers, sample }, cb);
     } catch(err) {
-      return jsonResponse({ status:'error', message: err.message });
+      return jsonResponse({ status:'error', message: err.message }, cb);
     }
   }
 
@@ -70,14 +71,9 @@ function doGet(e) {
     try {
       const payload = JSON.parse(decodeURIComponent(e.parameter.payload));
       writeData(payload.date, payload.store, payload.seg, payload.data);
-      const cb = e.parameter.callback;
-      if (cb) {
-        return ContentService.createTextOutput(`${cb}({"status":"ok"})`)
-          .setMimeType(ContentService.MimeType.JAVASCRIPT);
-      }
-      return jsonResponse({ status: 'ok' });
+      return jsonResponse({ status: 'ok' }, cb);
     } catch(err) {
-      return jsonResponse({ status: 'error', message: err.message });
+      return jsonResponse({ status: 'error', message: err.message }, cb);
     }
   }
 
@@ -86,9 +82,9 @@ function doGet(e) {
       const date = e.parameter.date;
       const seg  = parseInt(e.parameter.seg);
       const data = readData(date, seg);
-      return jsonResponse({ status: 'ok', data });
+      return jsonResponse({ status: 'ok', data }, cb);
     } catch(err) {
-      return jsonResponse({ status: 'error', message: err.message });
+      return jsonResponse({ status: 'error', message: err.message }, cb);
     }
   }
 
@@ -97,14 +93,9 @@ function doGet(e) {
     try {
       const payload = JSON.parse(decodeURIComponent(e.parameter.payload));
       writePersonal(payload);
-      const cb = e.parameter.callback;
-      if (cb) {
-        return ContentService.createTextOutput(`${cb}({"status":"ok"})`)
-          .setMimeType(ContentService.MimeType.JAVASCRIPT);
-      }
-      return jsonResponse({ status: 'ok' });
+      return jsonResponse({ status: 'ok' }, cb);
     } catch(err) {
-      return jsonResponse({ status: 'error', message: err.message });
+      return jsonResponse({ status: 'error', message: err.message }, cb);
     }
   }
 
@@ -114,9 +105,9 @@ function doGet(e) {
       const date = e.parameter.date;
       const seg  = parseInt(e.parameter.seg);
       const data = readPersonal(date, seg);
-      return jsonResponse({ status: 'ok', data });
+      return jsonResponse({ status: 'ok', data }, cb);
     } catch(err) {
-      return jsonResponse({ status: 'error', message: err.message });
+      return jsonResponse({ status: 'error', message: err.message }, cb);
     }
   }
 
@@ -152,7 +143,36 @@ function doGet(e) {
     }
   }
 
-  return jsonResponse({ status: 'error', message: 'unknown action' });
+  // ── 督導半月檢查：寫入（patrol.html，JSONP）──
+  if (action === 'hwrite') {
+    const cb = e.parameter.callback;
+    try {
+      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      const rows = JSON.parse(e.parameter.payload);
+      const written = writeHalfCheck(rows);
+      const body = { status: 'ok', written: written };
+      if (cb) return ContentService.createTextOutput(cb + '(' + JSON.stringify(body) + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      return jsonResponse(body);
+    } catch(err) {
+      const body = { status: 'error', message: err.message };
+      if (cb) return ContentService.createTextOutput(cb + '(' + JSON.stringify(body) + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      return jsonResponse(body);
+    }
+  }
+
+  // ── 督導半月檢查：讀取（patrol.html，需通行碼）──
+  if (action === 'hread') {
+    try {
+      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      return jsonResponse({ status: 'ok', rows: readHalfCheck() });
+    } catch(err) {
+      return jsonResponse({ status: 'error', message: err.message });
+    }
+  }
+
+  return jsonResponse({ status: 'error', message: 'unknown action' }, cb);
 }
 
 // ════════════════════════════════════
@@ -170,7 +190,7 @@ const PT_KEY = 'CHANGE_ME';
 
 // ── 分享給其他督導時，每人自建試算表與 GAS 部署，改這兩個設定即可 ──
 // （網頁 patrol.html 大家共用，會自動抓各自 GAS 回傳的標題與門市清單）
-const PT_TITLE = '北一二B區 · 盧蔚榮 · 33 項檢核追蹤';
+const PT_TITLE = '北一二B區 · 33 項檢核追蹤';
 const PT_STORES = [
   { code: 'DNB10059', name: '台北通化' },
   { code: 'DNB10062', name: '台北酒泉' },
@@ -275,6 +295,70 @@ function readPatrol() {
 }
 
 // ════════════════════════════════════
+// 督導半月檢查
+// 工作表：督導半月檢查
+// 一個 checkId（日期|店點|H1/H2）有 33 列，方便後續逐題篩選缺失與改善。
+// 照片／影片不直接塞進試算表，只保存附件檔名；原始媒體保留在填寫裝置。
+// ════════════════════════════════════
+const HALF_CHECK_SHEET = '督導半月檢查';
+const HALF_CHECK_HEADERS = [
+  'checkId','date','period','month','store','inspector','item','result',
+  'note','improvement','evidenceNames','savedAt'
+];
+
+function getHalfCheckSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sh = ss.getSheetByName(HALF_CHECK_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(HALF_CHECK_SHEET);
+    sh.appendRow(HALF_CHECK_HEADERS);
+    sh.setFrozenRows(1);
+    sh.getRange('A:L').setNumberFormat('@');
+  }
+  return sh;
+}
+
+function halfCheckKey(row) {
+  return String(row[0] || '') + '|' + String(row[6] || '');
+}
+
+function writeHalfCheck(rows) {
+  const sh = getHalfCheckSheet();
+  const data = sh.getDataRange().getValues();
+  const existing = {};
+  for (let i = 1; i < data.length; i++) existing[halfCheckKey(data[i])] = i + 1;
+  let written = 0;
+  (rows || []).forEach(r => {
+    const row = [
+      String(r.checkId || ''), String(r.date || ''), String(r.period || ''), String(r.month || ''),
+      String(r.store || ''), String(r.inspector || ''), String(r.item || ''), String(r.result || ''),
+      String(r.note || ''), String(r.improvement || ''), String(r.evidenceNames || ''), String(r.savedAt || new Date().toISOString())
+    ];
+    const key = halfCheckKey(row);
+    if (existing[key]) {
+      sh.getRange(existing[key], 1, 1, HALF_CHECK_HEADERS.length).setValues([row]);
+    } else {
+      sh.getRange(sh.getLastRow() + 1, 1, 1, HALF_CHECK_HEADERS.length).setValues([row]);
+      existing[key] = sh.getLastRow();
+    }
+    written++;
+  });
+  return written;
+}
+
+function readHalfCheck() {
+  const sh = getHalfCheckSheet();
+  const data = sh.getDataRange().getValues();
+  if (!data.length) return [];
+  const headers = data[0];
+  return data.slice(1).map(row => {
+    const o = {};
+    headers.forEach((h, idx) => o[h] = row[idx] instanceof Date ? patrolTimeStr(row[idx]) : row[idx]);
+    o.item = Number(o.item || 0);
+    return o;
+  });
+}
+
 // 每週一巡店週報（Email 夾 Excel）
 //
 // 啟用方式（只需做一次）：
@@ -696,8 +780,13 @@ function readData(date, seg) {
   return result;
 }
 
-function jsonResponse(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
+function jsonResponse(obj, callback) {
+  const body = JSON.stringify(obj);
+  if (callback && /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
+    return ContentService.createTextOutput(`${callback}(${body})`)
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(body)
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -714,7 +803,8 @@ function jsonResponse(obj) {
 // 想立即測試：函式選單選「testNotify」執行，會用目前時段寄一封測試信。
 // ════════════════════════════════════
 
-const NOTIFY_EMAIL = 'lian852456@gmail.com';
+// 在 Apps Script「專案設定 > 指令碼屬性」設定 NOTIFY_EMAIL，避免收件地址進入公開原始碼。
+const NOTIFY_EMAIL = PropertiesService.getScriptProperties().getProperty('NOTIFY_EMAIL') || 'CHANGE_ME@example.invalid';
 const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
 
 function setupTriggers() {
