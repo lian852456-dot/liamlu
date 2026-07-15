@@ -453,9 +453,12 @@ let rawDetails = [];
 let currentMonth = "";
 // 巡店專用網址鍵（優先），相容舊的共用鍵，最後才用預設（北一二B 的 GAS 部署）。
 // 其他督導在畫面上貼自己的 GAS 網址即可，只記在自己的裝置，資料互不相通。
+// GAS 網址本身不是密碼，也不包含巡店資料；保留部署端點以便既有資料自動恢復。
+// 真正的資料仍需 PT_KEY 驗證，PT_KEY 不寫入公開原始碼。
+const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
 let GAS_URL = localStorage.getItem('bei12b_pt_gas_url') ||
               localStorage.getItem('bei12b_gas_url') ||
-              window.PATROL_LEGACY_GAS_URL || '';
+              window.PATROL_LEGACY_GAS_URL || DEFAULT_PATROL_GAS_URL;
 // 巡店通行碼（GAS 端 PT_KEY 驗證），輸入一次後記在本裝置
 let PT_KEY = localStorage.getItem('bei12b_pt_key') || '';
 
