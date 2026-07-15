@@ -39,6 +39,7 @@ async function stubGas(page) {
   await page.addInitScript(schedule => {
     window.__PATROL_TEST_PRIVATE_AUTH__ = true;
     window.__PATROL_TEST_SCHEDULE__ = schedule;
+    window.PATROL_LEGACY_GAS_URL = 'https://script.google.com/macros/s/test/exec';
   }, privateScheduleFixture());
   await page.route('https://script.google.com/**', route => {
     const url = new URL(route.request().url());
@@ -107,7 +108,7 @@ function answerKeyPrompt(page, answer) {
 const PAGE_URL = 'file://' + path.resolve(__dirname, '../patrol.html');
 
 function pasteLine(d, store, code, item, result, reason) {
-  return `2026/7/${d} 16:43\t2026/7/${d} 16:00\t2026/7/${d} 18:00\t北一二B\t${code}\t${store}\t盧蔚榮\t${item}\t內容\t${result}\t${reason}`;
+  return `2026/7/${d} 16:43\t2026/7/${d} 16:00\t2026/7/${d} 18:00\t北一二B\t${code}\t${store}\t測試督導\t${item}\t內容\t${result}\t${reason}`;
 }
 
 test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; cloudConfig = null; });
@@ -188,7 +189,7 @@ test('盤點提醒框：題14-17每月與題18兩個月獨立顯示進度', asyn
     pasteLine(5, '台北通化', 'DNB10059', 17, 'v', ''),
     pasteLine(5, '台北通化', 'DNB10059', 18, 'v', ''),
     pasteLine(6, '台北酒泉', 'DNB10062', 14, 'v', ''),
-    `2026/6/20 10:00\t2026/6/20 09:00\t2026/6/20 12:00\t北一二B\tDNB10307\t台北三創\t盧蔚榮\t18\t內容\tv\t`,
+    `2026/6/20 10:00\t2026/6/20 09:00\t2026/6/20 12:00\t北一二B\tDNB10307\t台北三創\t測試督導\t18\t內容\tv\t`,
   ].join('\n');
   await page.fill('#pasteBox', lines);
   await page.click('button.btn-primary');
@@ -305,7 +306,7 @@ test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({
   await page.locator('.secure-tab[data-view="half"]').click();
   await expect(page.locator('#halfView')).toBeVisible();
   await expect(page.locator('.half-item')).toHaveCount(33);
-  await page.locator('#halfInspector').fill('盧蔚榮');
+  await page.locator('#halfInspector').fill('測試督導');
   await page.locator('.half-result').first().selectOption('abnormal');
   await page.locator('.half-note').first().fill('展示機未亮');
   await page.locator('.half-improvement').first().fill('當日完成開機並拍照回存');

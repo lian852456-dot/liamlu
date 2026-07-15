@@ -292,7 +292,7 @@
 <div class="wrap">
   <header>
     <h1><span class="dot"></span>督導巡店追蹤系統</h1>
-    <div class="sub" id="subTitle">北一二B區 · 盧蔚榮 · 33 項檢核追蹤</div>
+    <div class="sub" id="subTitle">北一二B區 · 33 項檢核追蹤</div>
     <nav class="secure-tabs" aria-label="受保護工作頁籤">
       <button class="secure-tab active" data-view="patrol" onclick="switchPatrolView('patrol')">📋 巡店看板</button>
       <button class="secure-tab locked" data-view="schedule" onclick="switchPatrolView('schedule')">每月班表</button>
@@ -362,7 +362,7 @@
       <div class="half-meta">
         <label>檢查日期<input id="halfDate" type="date" onchange="renderHalfForm()"></label>
         <label>檢查店點<select id="halfStore" onchange="renderHalfForm()"></select></label>
-        <label>督導姓名<input id="halfInspector" type="text" placeholder="盧蔚榮"></label>
+        <label>督導姓名<input id="halfInspector" type="text" placeholder="請輸入督導姓名"></label>
       </div>
       <div id="halfForm" class="half-items"></div>
       <div class="half-actions">
@@ -455,7 +455,7 @@ let currentMonth = "";
 // 其他督導在畫面上貼自己的 GAS 網址即可，只記在自己的裝置，資料互不相通。
 let GAS_URL = localStorage.getItem('bei12b_pt_gas_url') ||
               localStorage.getItem('bei12b_gas_url') ||
-              "https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec";
+              window.PATROL_LEGACY_GAS_URL || '';
 // 巡店通行碼（GAS 端 PT_KEY 驗證），輸入一次後記在本裝置
 let PT_KEY = localStorage.getItem('bei12b_pt_key') || '';
 

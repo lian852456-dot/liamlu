@@ -190,7 +190,7 @@ const PT_KEY = 'CHANGE_ME';
 
 // ── 分享給其他督導時，每人自建試算表與 GAS 部署，改這兩個設定即可 ──
 // （網頁 patrol.html 大家共用，會自動抓各自 GAS 回傳的標題與門市清單）
-const PT_TITLE = '北一二B區 · 盧蔚榮 · 33 項檢核追蹤';
+const PT_TITLE = '北一二B區 · 33 項檢核追蹤';
 const PT_STORES = [
   { code: 'DNB10059', name: '台北通化' },
   { code: 'DNB10062', name: '台北酒泉' },
@@ -803,7 +803,8 @@ function jsonResponse(obj, callback) {
 // 想立即測試：函式選單選「testNotify」執行，會用目前時段寄一封測試信。
 // ════════════════════════════════════
 
-const NOTIFY_EMAIL = 'lian852456@gmail.com';
+// 在 Apps Script「專案設定 > 指令碼屬性」設定 NOTIFY_EMAIL，避免收件地址進入公開原始碼。
+const NOTIFY_EMAIL = PropertiesService.getScriptProperties().getProperty('NOTIFY_EMAIL') || 'CHANGE_ME@example.invalid';
 const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
 
 function setupTriggers() {

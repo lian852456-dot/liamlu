@@ -43,3 +43,5 @@ python3 scripts/build_schedule_data.py
 ```
 
 腳本輸出到被 `.gitignore` 保護的 `private-data/schedule.json`，不再輸出到 `data/` 或產生可被 GitHub Pages 直接讀取的 JavaScript。私有資料服務需自行驗證 token；未設定服務時，頁面只允許本機草稿，不會假裝已同步雲端。
+
+舊版巡店 GAS 網址不再硬編碼在頁面，請由使用者在畫面貼上網址並只保存在自己的瀏覽器；GAS 的 `PT_KEY` 與 `NOTIFY_EMAIL` 也必須留在 Apps Script 設定，不要提交實際值。
