@@ -1,2 +1,8 @@
 node_modules/
 test-results/
+
+# Never publish employee schedules, names, inspection records, or evidence.
+private-data/
+data/schedule.js
+data/schedule.json
+private-config.js
