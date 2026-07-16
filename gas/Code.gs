@@ -899,6 +899,322 @@ function jsonResponse(obj, callback) {
 }
 
 // ════════════════════════════════════
+// 北一二B KPI／台獎私有戰情
+//
+// 重要：資料快照、員編、裝置綁定皆不會放進 GitHub Pages 或公開原始碼。
+// 請先在「專案設定 > 指令碼屬性」設定：
+// - DASHBOARD_PRIVATE_FOLDER_ID：私有 Google Drive 資料夾 ID
+// - DASHBOARD_ADMIN_SECRET：僅區主管持有的強密碼
+// - DASHBOARD_BOOTSTRAP_CODE：首次綁定碼（目前為 0935）
+// 然後在 Apps Script 編輯器手動執行一次 setupPrivateDashboard()。
+// ════════════════════════════════════
+
+const PRIVATE_DASHBOARD_FILE = 'north12b-dashboard-private-latest.json';
+const PRIVATE_DASHBOARD_USERS_SHEET = 'DashboardUsers';
+const PRIVATE_DASHBOARD_REQUESTS_SHEET = 'DashboardRequests';
+const PRIVATE_DASHBOARD_USERS_HEADERS = [
+  'employee_id', 'masked_name', 'store', 'role', 'status',
+  'device_id', 'device_bound_at', 'last_login_at'
+];
+const PRIVATE_DASHBOARD_REQUEST_HEADERS = [
+  'request_id', 'employee_id', 'device_id', 'requested_at', 'status',
+  'approved_at', 'approved_by', 'replaced_device_id'
+];
+
+function doPost(e) {
+  try {
+    const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const action = String(payload.action || '');
+    let result;
+    if (action === 'private_request') result = privateDashboardRequestBinding(payload);
+    else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
+    else if (action === 'private_access') result = privateDashboardAccess(payload);
+    else if (action === 'private_admin_requests') result = privateDashboardAdminRequests(payload);
+    else if (action === 'private_admin_approve') result = privateDashboardAdminApprove(payload);
+    else if (action === 'private_admin_revoke') result = privateDashboardAdminRevoke(payload);
+    else if (action === 'private_sync_roster') result = privateDashboardSyncRoster(payload);
+    else if (action === 'private_publish') result = privateDashboardPublish(payload);
+    else throw new Error('unknown private dashboard action');
+    return jsonResponse({ status: 'ok', ...result });
+  } catch (err) {
+    return jsonResponse({ status: 'error', message: err && err.message ? err.message : String(err) });
+  }
+}
+
+function privateDashboardProperties() {
+  return PropertiesService.getScriptProperties();
+}
+
+function privateDashboardRequiredProperty(name) {
+  const value = privateDashboardProperties().getProperty(name);
+  if (!value || /^CHANGE_ME/i.test(value)) throw new Error('private dashboard is not configured: ' + name);
+  return value;
+}
+
+function privateDashboardNow() {
+  return Utilities.formatDate(new Date(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
+}
+
+function privateDashboardCleanEmployeeId(value) {
+  const employeeId = String(value || '').trim();
+  if (!/^\d{5,12}$/.test(employeeId)) throw new Error('員編格式不正確');
+  return employeeId;
+}
+
+function privateDashboardCleanDeviceId(value) {
+  const deviceId = String(value || '').trim();
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(deviceId)) throw new Error('裝置識別不正確，請重新開啟頁面');
+  return deviceId;
+}
+
+function privateDashboardHash(value) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value || ''));
+  return bytes.map(function(byte) {
+    const normalized = byte < 0 ? byte + 256 : byte;
+    return ('0' + normalized.toString(16)).slice(-2);
+  }).join('');
+}
+
+function privateDashboardAdminAuthorized(payload) {
+  const expected = privateDashboardRequiredProperty('DASHBOARD_ADMIN_SECRET');
+  const actual = String((payload || {}).adminSecret || '');
+  if (privateDashboardHash(actual) !== privateDashboardHash(expected)) throw new Error('管理者驗證失敗');
+}
+
+function privateDashboardFolder() {
+  return DriveApp.getFolderById(privateDashboardRequiredProperty('DASHBOARD_PRIVATE_FOLDER_ID'));
+}
+
+function privateDashboardRoster() {
+  const props = privateDashboardProperties();
+  const id = props.getProperty('DASHBOARD_ROSTER_SHEET_ID');
+  if (!id) throw new Error('尚未初始化私有戰情名冊，請先執行 setupPrivateDashboard');
+  return SpreadsheetApp.openById(id);
+}
+
+function privateDashboardSheet(name, headers) {
+  const ss = privateDashboardRoster();
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+  }
+  const existing = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+  if (existing.join('|') !== headers.join('|')) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return sheet;
+}
+
+function privateDashboardRows(sheet, headers) {
+  if (sheet.getLastRow() < 2) return [];
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues().map(function(row, offset) {
+    const item = { _row: offset + 2 };
+    headers.forEach(function(header, index) { item[header] = row[index] == null ? '' : String(row[index]); });
+    return item;
+  });
+}
+
+function privateDashboardWriteObject(sheet, headers, rowIndex, item) {
+  sheet.getRange(rowIndex, 1, 1, headers.length).setValues([headers.map(function(header) { return item[header] || ''; })]);
+}
+
+// 由管理者在 Apps Script 編輯器執行一次。建立的 Sheet 位於同一個私有 Drive 資料夾中。
+function setupPrivateDashboard() {
+  const props = privateDashboardProperties();
+  const folder = privateDashboardFolder();
+  let rosterId = props.getProperty('DASHBOARD_ROSTER_SHEET_ID');
+  let roster;
+  if (rosterId) {
+    roster = SpreadsheetApp.openById(rosterId);
+  } else {
+    roster = SpreadsheetApp.create('北一二B 私有戰情登入名冊（系統管理）');
+    const file = DriveApp.getFileById(roster.getId());
+    folder.addFile(file);
+    DriveApp.getRootFolder().removeFile(file);
+    props.setProperty('DASHBOARD_ROSTER_SHEET_ID', roster.getId());
+    rosterId = roster.getId();
+  }
+  privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
+  privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS);
+  return { rosterSheetId: rosterId, folderId: folder.getId() };
+}
+
+function privateDashboardUserByEmployeeId(employeeId) {
+  const sheet = privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
+  const found = privateDashboardRows(sheet, PRIVATE_DASHBOARD_USERS_HEADERS)
+    .filter(function(item) { return item.employee_id === employeeId; });
+  return { sheet: sheet, user: found.length ? found[0] : null };
+}
+
+function privateDashboardRequestBinding(payload) {
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
+  const bootstrapCode = String(payload.bootstrapCode || '');
+  if (privateDashboardHash(bootstrapCode) !== privateDashboardHash(privateDashboardRequiredProperty('DASHBOARD_BOOTSTRAP_CODE'))) {
+    throw new Error('首次啟用碼不正確');
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const lookup = privateDashboardUserByEmployeeId(employeeId);
+    if (!lookup.user || lookup.user.status !== 'active') throw new Error('此員編不在可使用名冊中');
+    if (lookup.user.device_id === deviceId) return { requestStatus: 'approved', message: '此裝置已核准，可直接以員編登入。' };
+    const requestSheet = privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS);
+    const requests = privateDashboardRows(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS);
+    const prior = requests.filter(function(item) {
+      return item.employee_id === employeeId && item.device_id === deviceId && item.status === 'pending';
+    })[0];
+    if (prior) return { requestStatus: 'pending', requestId: prior.request_id, message: '已送出綁定申請，等待管理者核准。' };
+    const request = {
+      request_id: Utilities.getUuid(), employee_id: employeeId, device_id: deviceId,
+      requested_at: privateDashboardNow(), status: 'pending', approved_at: '', approved_by: '', replaced_device_id: ''
+    };
+    privateDashboardWriteObject(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS, requestSheet.getLastRow() + 1, request);
+    return { requestStatus: 'pending', requestId: request.request_id, message: '已送出綁定申請，等待管理者核准。' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function privateDashboardRequestStatus(payload) {
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
+  const requests = privateDashboardRows(
+    privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS),
+    PRIVATE_DASHBOARD_REQUEST_HEADERS
+  ).filter(function(item) { return item.employee_id === employeeId && item.device_id === deviceId; });
+  requests.sort(function(a, b) { return b.requested_at.localeCompare(a.requested_at); });
+  const latest = requests[0];
+  if (!latest) return { requestStatus: 'none' };
+  return { requestStatus: latest.status, requestedAt: latest.requested_at, approvedAt: latest.approved_at };
+}
+
+function privateDashboardSnapshot() {
+  const files = privateDashboardFolder().getFilesByName(PRIVATE_DASHBOARD_FILE);
+  if (!files.hasNext()) throw new Error('今日私有戰情尚未更新');
+  const snapshot = JSON.parse(files.next().getBlob().getDataAsString('UTF-8'));
+  if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
+  return snapshot;
+}
+
+function privateDashboardAccess(payload) {
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  if (!lookup.user || lookup.user.status !== 'active' || lookup.user.device_id !== deviceId) {
+    throw new Error('此員編尚未核准此裝置，請先申請並等待管理者核准');
+  }
+  lookup.user.last_login_at = privateDashboardNow();
+  privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
+  const snapshot = privateDashboardSnapshot();
+  return { snapshot: snapshot, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role } };
+}
+
+function privateDashboardAdminRequests(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const requests = privateDashboardRows(
+    privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS),
+    PRIVATE_DASHBOARD_REQUEST_HEADERS
+  ).filter(function(item) { return item.status === 'pending'; })
+    .sort(function(a, b) { return b.requested_at.localeCompare(a.requested_at); });
+  return { requests: requests.map(function(item) { return {
+    requestId: item.request_id, employeeId: item.employee_id, requestedAt: item.requested_at
+  }; }) };
+}
+
+function privateDashboardAdminApprove(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const requestId = String(payload.requestId || '');
+  if (!requestId) throw new Error('缺少綁定申請編號');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const requestSheet = privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS);
+    const requests = privateDashboardRows(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS);
+    const request = requests.filter(function(item) { return item.request_id === requestId; })[0];
+    if (!request || request.status !== 'pending') throw new Error('找不到待核准的綁定申請');
+    const lookup = privateDashboardUserByEmployeeId(request.employee_id);
+    if (!lookup.user || lookup.user.status !== 'active') throw new Error('名冊內找不到啟用中的員編');
+    const previousDeviceId = lookup.user.device_id || '';
+    lookup.user.device_id = request.device_id;
+    lookup.user.device_bound_at = privateDashboardNow();
+    lookup.user.last_login_at = '';
+    privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
+    requests.forEach(function(item) {
+      if (item.employee_id !== request.employee_id || item.status !== 'pending') return;
+      item.status = item.request_id === request.request_id ? 'approved' : 'superseded';
+      if (item.request_id === request.request_id) {
+        item.approved_at = privateDashboardNow();
+        item.approved_by = 'admin';
+        item.replaced_device_id = previousDeviceId;
+      }
+      privateDashboardWriteObject(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS, item._row, item);
+    });
+    return { approved: true, employeeId: request.employee_id };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function privateDashboardAdminRevoke(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  if (!lookup.user) throw new Error('找不到員編');
+  lookup.user.device_id = '';
+  lookup.user.device_bound_at = '';
+  lookup.user.last_login_at = '';
+  privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
+  return { revoked: true, employeeId: employeeId };
+}
+
+// 每日自動化以管理者密碼同步遮罩後名冊。既有裝置綁定不會被覆蓋。
+function privateDashboardSyncRoster(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const members = Array.isArray(payload.members) ? payload.members : [];
+  const sheet = privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
+  const existing = privateDashboardRows(sheet, PRIVATE_DASHBOARD_USERS_HEADERS);
+  const byId = {};
+  existing.forEach(function(item) { byId[item.employee_id] = item; });
+  let synced = 0;
+  members.forEach(function(member) {
+    const employeeId = privateDashboardCleanEmployeeId(member.employeeId);
+    const item = byId[employeeId] || {
+      employee_id: employeeId, device_id: '', device_bound_at: '', last_login_at: ''
+    };
+    item.masked_name = String(member.maskedName || '');
+    item.store = String(member.store || '');
+    item.role = String(member.role || '');
+    item.status = member.status === 'inactive' ? 'inactive' : 'active';
+    if (item._row) privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, item._row, item);
+    else privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, sheet.getLastRow() + 1, item);
+    synced += 1;
+  });
+  return { synced: synced };
+}
+
+// 每日自動化在寄件成功後呼叫。快照僅存於私有 Drive，不經 GitHub。
+function privateDashboardPublish(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const encoded = String(payload.snapshotBase64 || '');
+  if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('私有戰情快照缺少或過大');
+  const text = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
+  const snapshot = JSON.parse(text);
+  if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
+  const folder = privateDashboardFolder();
+  const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
+  const blob = Utilities.newBlob(text, 'application/json', PRIVATE_DASHBOARD_FILE);
+  if (files.hasNext()) {
+    files.next().setContent(blob.getDataAsString('UTF-8'));
+  } else {
+    folder.createFile(blob);
+  }
+  return { publishedAt: privateDashboardNow(), reportDate: snapshot.kpiBattle.report_date || '' };
+}
+
+// ════════════════════════════════════
 // 自動檢查未回報 + Email 通知
 //
 // 啟用方式（只需做一次）：

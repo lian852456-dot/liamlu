@@ -3,6 +3,10 @@ test-results/
 
 # Never publish employee schedules, names, inspection records, or evidence.
 private-data/
+# Daily dashboard extracts are generated locally. Do not publish KPI or awards
+# snapshots unless a separate, explicitly approved public view is designed.
+data/daily-momentum.json
+data/phone-awards-latest.json
 data/schedule.js
 data/schedule.json
 private-config.js

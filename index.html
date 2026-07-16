@@ -89,6 +89,7 @@
     border-bottom: 1px solid var(--border-dim);
     padding: 0 16px;
     gap: 4px;
+    overflow-x: auto;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   }
   .tab-btn {
@@ -112,6 +113,111 @@
   /* ── PANELS ── */
   .panel { display: none; padding: 20px; }
   .panel.active { display: block; }
+
+  /* ── KPI 戰情 ── */
+  .kpi-battle-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .kpi-battle-toggle { display: flex; gap: 6px; flex-wrap: wrap; }
+  .kpi-battle-toggle button {
+    border: 1px solid #fed7aa;
+    background: #fff7ed;
+    color: var(--accent-bright);
+    border-radius: 18px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .kpi-battle-toggle button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .kpi-battle-note { color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+  .kpi-battle-filter {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 12px 0;
+  }
+  .kpi-battle-filter label { color: var(--text-dim); font-size: 13px; font-weight: 700; }
+  .kpi-battle-filter select {
+    margin-left: 6px;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-size: 13px;
+  }
+  .kpi-rate { font-weight: 800; }
+  .kpi-rate.good { color: var(--green); }
+  .kpi-rate.warn { color: var(--warn); }
+  .kpi-rate.bad { color: var(--red); }
+  .kpi-sub { display: block; margin-top: 3px; color: var(--text-muted); font-size: 11px; font-weight: 500; }
+  .kpi-dod { display: block; margin-top: 3px; color: var(--text-muted); font-size: 11px; font-weight: 700; }
+  .kpi-dod.up { color: var(--green); }
+  .kpi-dod.down { color: var(--red); }
+  .kpi-gap.up { color: var(--green); font-weight: 800; }
+  .kpi-gap.down { color: var(--red); font-weight: 800; }
+  .kpi-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .kpi-metric-card { border: 1px solid var(--border-dim); border-radius: 10px; padding: 11px; background: #fff; }
+  .kpi-metric-card .label { color: var(--text-dim); font-size: 12px; font-weight: 700; min-height: 32px; }
+  .kpi-metric-card .value { margin-top: 6px; font-size: 16px; font-weight: 800; }
+  .kpi-empty { padding: 22px; border: 1px dashed #d1d5db; border-radius: 12px; color: var(--text-muted); text-align: center; background: #f9fafb; }
+  .kpi-award-val { display:block; color:#7c3aed; font-size:15px; font-weight:900; }
+  .kpi-award-meta { display:block; margin-top:3px; color:var(--text-muted); font-size:11px; font-weight:700; }
+  .kpi-award-meta.no { color:var(--red); }
+  .private-lock { max-width:620px; margin:0 auto; text-align:left; }
+  .private-lock h3 { margin:0 0 8px; color:var(--text); font-size:20px; font-weight:900; }
+  .private-lock p { color:var(--text-muted); font-size:14px; font-weight:700; line-height:1.7; }
+  .private-lock-form { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  .private-lock-form input { min-width:0; border:1px solid #d1d5db; border-radius:9px; padding:11px 12px; color:var(--text); font:inherit; font-size:15px; font-weight:800; }
+  .private-lock-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .private-lock-actions button { border:0; border-radius:9px; padding:11px 14px; font:inherit; font-size:14px; font-weight:900; cursor:pointer; background:var(--accent); color:#fff; }
+  .private-lock-actions button.secondary { background:#f3f4f6; color:var(--text); border:1px solid #d1d5db; }
+  .private-lock-status { margin-top:12px; min-height:22px; color:var(--text-muted); font-size:13px; font-weight:800; line-height:1.6; }
+  .private-admin { margin-top:18px; border-top:1px solid var(--border-dim); padding-top:14px; }
+  .private-admin-list { display:grid; gap:8px; margin-top:10px; }
+  .private-admin-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid var(--border-dim); border-radius:9px; font-size:13px; font-weight:800; }
+  .private-admin-item button { border:0; border-radius:7px; padding:7px 10px; background:#166534; color:#fff; font:inherit; font-size:12px; font-weight:900; cursor:pointer; }
+
+  /* ── 台獎戰情 ── */
+  .awards-battle-note { color:var(--text-muted); font-size:12px; font-weight:700; line-height:1.7; }
+  .awards-hero { border:2px solid #c4b5fd; background:linear-gradient(135deg,#faf5ff,#fff); }
+  .awards-hero .card-title { color:#6d28d9; }
+  .award-priority-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+  .award-priority-card { border:1px solid #ddd6fe; border-radius:12px; padding:12px; background:#fff; }
+  .award-priority-card.unlock { border:2px solid #f97316; background:#fff7ed; }
+  .award-priority-title { color:var(--text); font-size:15px; font-weight:900; line-height:1.35; }
+  .award-priority-action { margin-top:6px; color:#7c3aed; font-size:14px; font-weight:900; }
+  .award-priority-action.unlock { color:#ea580c; }
+  .award-priority-sub { margin-top:4px; color:var(--text-muted); font-size:12px; font-weight:700; }
+  .award-store-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(285px,1fr)); gap:12px; }
+  .award-store-card { border:1px solid var(--border-dim); border-radius:14px; padding:14px; background:#fff; }
+  .award-store-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .award-store-name { color:var(--text); font-size:18px; font-weight:900; }
+  .award-store-rank { color:#7c3aed; font-size:13px; font-weight:900; white-space:nowrap; }
+  .award-store-values { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0; }
+  .award-value { border-radius:9px; padding:9px; background:#f5f3ff; }
+  .award-value .label { color:var(--text-dim); font-size:12px; font-weight:800; }
+  .award-value .number { margin-top:2px; color:#6d28d9; font-size:18px; font-weight:900; }
+  .award-store-card details { margin-top:12px; border-top:1px solid var(--border-dim); padding-top:10px; }
+  .award-store-card summary { color:var(--accent-bright); font-size:13px; font-weight:900; cursor:pointer; }
+  .award-model-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
+  .award-model { border:1px solid var(--border-dim); border-radius:9px; padding:9px; }
+  .award-model-name { color:var(--text); font-size:12px; font-weight:900; min-height:33px; }
+  .award-model-rate { margin-top:4px; font-size:17px; font-weight:900; }
+  .award-model-sub { display:block; margin-top:3px; color:var(--text-muted); font-size:11px; font-weight:700; }
+  .award-model-next { display:block; margin-top:3px; color:#7c3aed; font-size:11px; font-weight:900; }
+
+  @media (max-width: 620px) {
+    .private-lock-form { grid-template-columns:1fr; }
+    .private-lock h3 { font-size:19px; }
+  }
 
   /* ── CARDS ── */
   .card {
@@ -428,6 +534,18 @@
     .tab-btn { padding: 10px 12px; font-size: 13px; }
     table { font-size: 13px; }
     thead th, tbody td { padding: 8px 5px; }
+    #panel-kpi-battle table { font-size:15px; }
+    #panel-kpi-battle thead th, #panel-kpi-battle tbody td { padding:11px 8px; font-weight:700; }
+    #panel-kpi-battle .kpi-rate, #panel-kpi-battle .kpi-award-val { font-size:18px; font-weight:900; }
+    #panel-kpi-battle .kpi-sub, #panel-kpi-battle .kpi-dod, #panel-kpi-battle .kpi-award-meta { font-size:13px; font-weight:800; line-height:1.45; }
+    #panel-kpi-battle .kpi-metric-card .label { font-size:14px; font-weight:900; }
+    #panel-kpi-battle .kpi-metric-card .value { font-size:20px; font-weight:900; }
+    #panel-awards-battle .sc-label { font-size:14px; font-weight:900; }
+    #panel-awards-battle .sc-val, #panel-awards-battle .award-value .number { font-size:22px; font-weight:900; }
+    #panel-awards-battle .sc-sub, #panel-awards-battle .awards-battle-note, #panel-awards-battle .award-priority-sub, #panel-awards-battle .award-model-sub, #panel-awards-battle .award-model-next { font-size:13px; font-weight:800; }
+    #panel-awards-battle .award-priority-title, #panel-awards-battle .award-store-name { font-size:18px; font-weight:900; }
+    #panel-awards-battle .award-priority-action { font-size:16px; font-weight:900; }
+    .award-model-grid { grid-template-columns:1fr; }
   }
 
   /* ══ FILL PANEL 美化 ══ */
@@ -1268,6 +1386,8 @@
   <button class="tab-btn" onclick="switchTab('summary')">📊 彙整大盤（督導）</button>
   <button class="tab-btn" onclick="switchTab('playback')">🕐 日期回放</button>
   <button class="tab-btn" onclick="switchTab('personal')">👤 個人追蹤</button>
+  <button class="tab-btn" onclick="switchTab('kpi-battle')">🏆 KPI戰情</button>
+  <button class="tab-btn" onclick="switchTab('awards-battle')">🏅 台獎戰情</button>
 </div>
 
 <!-- ═══════════════════════════════════
@@ -1759,7 +1879,6 @@
       <label>查詢日期</label>
       <input type="date" id="playbackDate">
       <div class="seg-toggle" style="margin:0">
-        <button class="seg-btn" id="pbSeg13" onclick="setPbSeg(13)">13:00</button>
         <button class="seg-btn active-16" id="pbSeg16" onclick="setPbSeg(16)">16:00</button>
         <button class="seg-btn" id="pbSeg21" onclick="setPbSeg(21)">21:00</button>
       </div>
@@ -1929,6 +2048,34 @@
 
 </div><!-- /panel-personal -->
 
+<!-- ═══════════════════════════════════
+     PANEL 5: KPI 戰情（正式每日戰報）
+═══════════════════════════════════ -->
+<div class="panel" id="panel-kpi-battle">
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>🏆 KPI戰情 · 正式每日戰報</div>
+    <div class="kpi-battle-toolbar">
+      <div class="kpi-battle-toggle">
+        <button id="kpiBattleStoreBtn" class="active" onclick="setKpiBattleView('stores')">店點總覽</button>
+        <button id="kpiBattlePersonalBtn" onclick="setKpiBattleView('personal')">個績排名</button>
+      </div>
+      <div class="kpi-battle-note" id="kpiBattleSourceNote">讀取本機受保護資料中…</div>
+    </div>
+  </div>
+  <div id="kpiBattleContent"><div class="kpi-empty">讀取 KPI 戰情資料中…</div></div>
+</div>
+
+<!-- ═══════════════════════════════════
+     PANEL 6: 台獎戰情（私有獎金資料）
+═══════════════════════════════════ -->
+<div class="panel" id="panel-awards-battle">
+  <div class="card awards-hero">
+    <div class="card-title"><span class="dot"></span>🏅 台獎戰情 · 督導優先補量</div>
+    <div class="awards-battle-note" id="awardsBattleSourceNote">讀取本機受保護獎金資料中…</div>
+  </div>
+  <div id="awardsBattleContent"><div class="kpi-empty">讀取台獎戰情資料中…</div></div>
+</div>
+
 
 <script>
 // ════════════════════════════════════
@@ -1951,7 +2098,11 @@ let pbSeg = 16;
 // ════════════════════════════════════
 // GOOGLE SHEETS 設定
 // ════════════════════════════════════
-let GAS_URL = localStorage.getItem('bei12b_gas_url') || 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
+const LEGACY_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
+const savedGasUrl = localStorage.getItem('bei12b_gas_url');
+let GAS_URL = !savedGasUrl || savedGasUrl === LEGACY_GAS_URL ? DEFAULT_GAS_URL : savedGasUrl;
+if (savedGasUrl === LEGACY_GAS_URL) localStorage.setItem('bei12b_gas_url', DEFAULT_GAS_URL);
 
 // 記憶體快取（避免重複拉資料）
 const _cache = {};
@@ -2239,6 +2390,390 @@ function switchTab(name) {
   document.getElementById('panel-' + name).classList.add('active');
   event.currentTarget.classList.add('active');
   if (name === 'summary') renderSummary();
+  if (name === 'kpi-battle') loadKpiBattle();
+  if (name === 'awards-battle') loadAwardsBattle();
+}
+
+// ════════════════════════════════════
+// KPI BATTLE — official daily report, protected by employee ID + approved device
+// ════════════════════════════════════
+let _kpiBattleData = null;
+let _kpiBattleView = 'stores';
+let _privateDashboardProfile = null;
+let _privateDashboardAdminSecret = '';
+
+function privateDashboardDeviceId() {
+  const key = 'north12b_private_dashboard_device_id';
+  let deviceId = localStorage.getItem(key);
+  if (deviceId) return deviceId;
+  if (window.crypto && crypto.randomUUID) deviceId = crypto.randomUUID().replace(/-/g, '');
+  else {
+    const bytes = new Uint8Array(24);
+    (window.crypto || {}).getRandomValues?.(bytes);
+    deviceId = Array.from(bytes).map(value => value.toString(16).padStart(2, '0')).join('') || `${Date.now()}${Math.random()}`.replace(/\D/g, '');
+  }
+  localStorage.setItem(key, deviceId);
+  return deviceId;
+}
+
+function privateDashboardSessionEmployeeId() {
+  return sessionStorage.getItem('north12b_private_dashboard_employee_id') || '';
+}
+
+function privateDashboardSetStatus(message, error = false) {
+  document.querySelectorAll('.private-lock-status').forEach(el => {
+    el.textContent = message || '';
+    el.style.color = error ? 'var(--red)' : 'var(--text-muted)';
+  });
+}
+
+async function privateDashboardPost(payload) {
+  if (!GAS_URL) throw new Error('尚未設定 Apps Script 服務網址');
+  const response = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error(`服務連線失敗（HTTP ${response.status}）`);
+  const body = await response.json();
+  if (!body || body.status !== 'ok') throw new Error((body && body.message) || '服務回應失敗');
+  return body;
+}
+
+function privateDashboardLockMarkup(kind) {
+  const title = kind === 'awards' ? '台獎戰情受保護' : 'KPI 戰情受保護';
+  return `<div class="card private-lock">
+    <h3>🔐 ${title}</h3>
+    <p>僅限北一二B在職同仁使用。姓名維持遮罩，KPI、排名與獎金不會出現在公開 GitHub 頁面。</p>
+    <div class="private-lock-form">
+      <input id="privateEmployeeId" inputmode="numeric" autocomplete="username" placeholder="輸入員工編號">
+      <input id="privateBootstrapCode" inputmode="numeric" autocomplete="one-time-code" placeholder="首次綁定碼（首次才需填）">
+    </div>
+    <div class="private-lock-actions">
+      <button onclick="privateDashboardLogin()">以員編登入</button>
+      <button class="secondary" onclick="privateDashboardRequestBinding()">首次申請綁定</button>
+      <button class="secondary" onclick="privateDashboardCheckRequest()">查看核准結果</button>
+      <button class="secondary" onclick="privateDashboardOpenAdmin()">管理者核准</button>
+    </div>
+    <div class="private-lock-status">首次使用：輸入員編＋啟用碼提出申請；管理者核准後，該員編只綁定這一台手機或電腦。往後僅輸入員編登入。</div>
+    <div class="private-admin" id="privateAdminPanel" style="display:none;"></div>
+  </div>`;
+}
+
+function renderPrivateDashboardLock() {
+  const kpiContent = document.getElementById('kpiBattleContent');
+  const awardsContent = document.getElementById('awardsBattleContent');
+  if (kpiContent && !_kpiBattleData) kpiContent.innerHTML = privateDashboardLockMarkup('kpi');
+  if (awardsContent && !_awardsBattleData) awardsContent.innerHTML = privateDashboardLockMarkup('awards');
+  const storedId = privateDashboardSessionEmployeeId();
+  document.querySelectorAll('#privateEmployeeId').forEach(input => { input.value = storedId; });
+}
+
+function privateDashboardEmployeeInput() {
+  const input = Array.from(document.querySelectorAll('#privateEmployeeId')).find(el => el.offsetParent !== null) || document.querySelector('#privateEmployeeId');
+  return String(input?.value || '').trim();
+}
+
+function privateDashboardBootstrapInput() {
+  const input = Array.from(document.querySelectorAll('#privateBootstrapCode')).find(el => el.offsetParent !== null) || document.querySelector('#privateBootstrapCode');
+  return String(input?.value || '').trim();
+}
+
+async function privateDashboardLogin() {
+  const employeeId = privateDashboardEmployeeInput();
+  if (!employeeId) { privateDashboardSetStatus('請先輸入員工編號。', true); return; }
+  privateDashboardSetStatus('正在驗證這台裝置…');
+  try {
+    const result = await privateDashboardPost({ action: 'private_access', employeeId, deviceId: privateDashboardDeviceId() });
+    sessionStorage.setItem('north12b_private_dashboard_employee_id', employeeId);
+    _kpiBattleData = result.snapshot.kpiBattle;
+    _awardsBattleData = result.snapshot.awardsBattle;
+    _privateDashboardProfile = result.profile || null;
+    renderKpiBattle();
+    renderAwardsBattle();
+  } catch (error) {
+    privateDashboardSetStatus(error.message, true);
+  }
+}
+
+async function privateDashboardRequestBinding() {
+  const employeeId = privateDashboardEmployeeInput();
+  const bootstrapCode = privateDashboardBootstrapInput();
+  if (!employeeId || !bootstrapCode) { privateDashboardSetStatus('首次申請需要輸入員編與啟用碼。', true); return; }
+  privateDashboardSetStatus('正在送出裝置綁定申請…');
+  try {
+    const result = await privateDashboardPost({ action: 'private_request', employeeId, bootstrapCode, deviceId: privateDashboardDeviceId() });
+    sessionStorage.setItem('north12b_private_dashboard_employee_id', employeeId);
+    privateDashboardSetStatus(result.message || '已送出申請，請等待管理者核准。');
+  } catch (error) {
+    privateDashboardSetStatus(error.message, true);
+  }
+}
+
+async function privateDashboardCheckRequest() {
+  const employeeId = privateDashboardEmployeeInput();
+  if (!employeeId) { privateDashboardSetStatus('請輸入員工編號。', true); return; }
+  privateDashboardSetStatus('正在查看申請狀態…');
+  try {
+    const result = await privateDashboardPost({ action: 'private_request_status', employeeId, deviceId: privateDashboardDeviceId() });
+    if (result.requestStatus === 'approved') {
+      privateDashboardSetStatus('這台裝置已核准，現在可直接登入。');
+    } else if (result.requestStatus === 'pending') {
+      privateDashboardSetStatus(`已申請，等待管理者核准（${result.requestedAt || ''}）。`);
+    } else if (result.requestStatus === 'superseded') {
+      privateDashboardSetStatus('此申請已被新的裝置申請取代，請重新提出綁定。', true);
+    } else {
+      privateDashboardSetStatus('尚未找到此裝置的申請紀錄。', true);
+    }
+  } catch (error) {
+    privateDashboardSetStatus(error.message, true);
+  }
+}
+
+async function privateDashboardOpenAdmin() {
+  const secret = window.prompt('請輸入管理者密碼（不會儲存在瀏覽器）');
+  if (!secret) return;
+  _privateDashboardAdminSecret = secret;
+  await privateDashboardLoadAdminRequests();
+}
+
+async function privateDashboardLoadAdminRequests() {
+  if (!_privateDashboardAdminSecret) {
+    privateDashboardSetStatus('請先通過管理者驗證。', true);
+    return;
+  }
+  try {
+    const result = await privateDashboardPost({ action: 'private_admin_requests', adminSecret: _privateDashboardAdminSecret });
+    document.querySelectorAll('#privateAdminPanel').forEach(panel => {
+      panel.style.display = 'block';
+      panel.innerHTML = `<strong>管理者待核准裝置</strong><div class="private-admin-list">${(result.requests || []).map(request =>
+        `<div class="private-admin-item"><span>員編 ${request.employeeId}<br><small>${request.requestedAt}</small></span><button onclick="privateDashboardApprove('${request.requestId}')">核准此裝置</button></div>`
+      ).join('') || '<div class="val-dim">目前沒有待核准申請</div>'}</div>`;
+    });
+  } catch (error) {
+    _privateDashboardAdminSecret = '';
+    privateDashboardSetStatus(error.message, true);
+  }
+}
+
+async function privateDashboardApprove(requestId) {
+  if (!_privateDashboardAdminSecret) { privateDashboardSetStatus('管理者驗證已逾時，請重新開啟管理者核准。', true); return; }
+  try {
+    await privateDashboardPost({ action: 'private_admin_approve', adminSecret: _privateDashboardAdminSecret, requestId });
+    privateDashboardSetStatus('已核准此裝置；若該員編原本綁定其他裝置，舊裝置已自動失效。');
+    await privateDashboardLoadAdminRequests();
+  } catch (error) {
+    privateDashboardSetStatus(error.message, true);
+  }
+}
+
+function kpiBattlePercent(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? `${(number * 100).toFixed(1)}%` : '—';
+}
+
+function kpiBattleTone(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '';
+  if (number >= 1) return 'good';
+  if (number >= 0.8) return 'warn';
+  return 'bad';
+}
+
+function kpiBattleNumber(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '—';
+  return number % 1 === 0 ? String(number) : number.toFixed(1);
+}
+
+function kpiBattleMetricCell(metric) {
+  if (!metric || metric.rate == null) return '<span class="val-dim">—</span>';
+  return `<span class="kpi-rate ${kpiBattleTone(metric.rate)}">${kpiBattlePercent(metric.rate)}</span>${kpiBattleTargetLine(metric)}${kpiBattleDod(metric.dod)}`;
+}
+
+function kpiBattleTargetLine(metric, verbose = false) {
+  if (!metric || metric.actual == null || metric.target == null) return '';
+  const gap = Number(metric.daily_gap);
+  const gapText = Number.isFinite(gap) ? `${gap > 0 ? '+' : ''}${kpiBattleNumber(gap)}` : '—';
+  const gapTone = gap > 0.05 ? 'up' : gap < -0.05 ? 'down' : '';
+  if (verbose) {
+    return `<span class="kpi-sub">實績 ${kpiBattleNumber(metric.actual)} ／ 月目標 ${kpiBattleNumber(metric.target)} ／ 100%日目標 ${kpiBattleNumber(metric.daily_target)} ／ 差異 <span class="kpi-gap ${gapTone}">${gapText}</span></span>`;
+  }
+  return `<span class="kpi-sub" title="實績／月目標／100%日目標／差異">${kpiBattleNumber(metric.actual)} ／ ${kpiBattleNumber(metric.target)} ／ ${kpiBattleNumber(metric.daily_target)} ／ <span class="kpi-gap ${gapTone}">${gapText}</span></span>`;
+}
+
+function kpiBattleDod(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '';
+  const direction = number > 0.0005 ? 'up' : number < -0.0005 ? 'down' : '';
+  const sign = number > 0 ? '+' : '';
+  return `<span class="kpi-dod ${direction}">DOD ${sign}${(number * 100).toFixed(1)}pp</span>`;
+}
+
+function kpiBattleRankDod(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '';
+  if (number > 0) return `<span class="kpi-dod up">DOD ↑ ${number}名</span>`;
+  if (number < 0) return `<span class="kpi-dod down">DOD ↓ ${Math.abs(number)}名</span>`;
+  return '<span class="kpi-dod">DOD 持平</span>';
+}
+
+function kpiBattleRate(value, dod) {
+  if (value == null || !Number.isFinite(Number(value))) return '<span class="val-dim">—</span>';
+  return `<span class="kpi-rate ${kpiBattleTone(value)}">${kpiBattlePercent(value)}</span>${kpiBattleDod(dod)}`;
+}
+
+function kpiBattleAwardCell(row) {
+  if (row.phone_award_projected == null) return '<span class="val-dim">—</span>';
+  const eligible = row.phone_award_eligible === 'Y';
+  return `<span class="kpi-award-val">$${kpiBattleNumber(row.phone_award_projected)}</span><span class="kpi-award-meta ${eligible ? '' : 'no'}">獎金排名 ${row.phone_award_rank ?? '—'}｜${eligible ? '可領獎' : '未領獎'}</span>`;
+}
+
+async function loadKpiBattle() {
+  if (_kpiBattleData) { renderKpiBattle(); return; }
+  if (window.__KPI_BATTLE_DATA__) {
+    _kpiBattleData = window.__KPI_BATTLE_DATA__;
+    renderKpiBattle();
+    return;
+  }
+  const note = document.getElementById('kpiBattleSourceNote');
+  if (note) note.textContent = '需通過員編與已核准裝置驗證後，才會由私有 Google Drive 載入資料。';
+  renderPrivateDashboardLock();
+}
+
+function setKpiBattleView(view) {
+  _kpiBattleView = view;
+  document.getElementById('kpiBattleStoreBtn')?.classList.toggle('active', view === 'stores');
+  document.getElementById('kpiBattlePersonalBtn')?.classList.toggle('active', view === 'personal');
+  renderKpiBattle();
+}
+
+function renderKpiBattle() {
+  if (!_kpiBattleData) return;
+  const note = document.getElementById('kpiBattleSourceNote');
+  if (note) {
+    note.textContent = `資料至 ${_kpiBattleData.report_date || '—'}｜區間 ${_kpiBattleData.source_date_range || '—'}｜日目標截至 ${_kpiBattleData.source_as_of_date || '—'}｜明細：實績／月目標／100%日目標／差異｜DOD對照 ${_kpiBattleData.previous_report_date || '無前日資料'}｜個資僅供本機受保護預覽`;
+  }
+  const content = document.getElementById('kpiBattleContent');
+  if (!content) return;
+  content.innerHTML = _kpiBattleView === 'personal' ? renderKpiBattlePersonal() : renderKpiBattleStores();
+}
+
+function renderKpiBattleStores() {
+  const aggregate = _kpiBattleData.aggregate || {};
+  const stores = [...(_kpiBattleData.stores || [])].sort((a, b) => (a.company_rank || 9999) - (b.company_rank || 9999));
+  const selected = stores.find(row => row.store === document.getElementById('kpiBattleStoreSelect')?.value) || stores[0];
+  return `
+    <div class="summary-grid">
+      <div class="summary-card"><div class="sc-label">北一二B KPI</div><div class="sc-val ${kpiBattleTone(aggregate.overall_kpi)}">${kpiBattlePercent(aggregate.overall_kpi)}</div><div class="sc-sub">${kpiBattleDod(aggregate.overall_kpi_dod) || '整體達成率'}</div></div>
+      <div class="summary-card"><div class="sc-label">公司排名</div><div class="sc-val" style="color:var(--gold)">${aggregate.company_rank ?? '—'}</div><div class="sc-sub">${kpiBattleRankDod(aggregate.company_rank_dod) || '北一二B整體'}</div></div>
+      <div class="summary-card"><div class="sc-label">加掛得分</div><div class="sc-val" style="color:var(--purple)">${kpiBattleNumber(aggregate.addon_score)}</div><div class="sc-sub">${aggregate.addon_score_dod == null ? '整體得分' : `DOD ${aggregate.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(aggregate.addon_score_dod)} 分`}</div></div>
+      <div class="summary-card"><div class="sc-label">KPI未達100%</div><div class="sc-val" style="color:var(--red)">${stores.filter(row => Number(row.overall_kpi) < 1).length}</div><div class="sc-sub">間門市</div></div>
+    </div>
+    <div class="section-divider">店點 KPI 排名</div>
+    <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
+      <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th><th>加掛</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
+      <tbody>${stores.map(row => `<tr><td class="store-name">${row.store}</td><td><span class="val-gold">${row.company_rank ?? '—'}</span>${kpiBattleRankDod(row.company_rank_dod)}</td><td>${kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${kpiBattleNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleMetricCell(row.core?.a999)}</td><td>${kpiBattleMetricCell(row.core?.a1399)}</td><td>${kpiBattleMetricCell(row.core?.haosu)}</td><td>${kpiBattleMetricCell(row.core?.r1399)}</td></tr>`).join('')}</tbody>
+    </table></div></div>
+    <div class="section-divider">各項 KPI 達成</div>
+    <div class="card">
+      <div class="kpi-battle-filter"><label>選擇店點<select id="kpiBattleStoreSelect" onchange="renderKpiBattle()">${stores.map(row => `<option value="${row.store}" ${row.store === selected?.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label></div>
+      <div class="kpi-metric-grid">${Object.entries(selected?.metrics || {}).map(([name, metric]) => `<div class="kpi-metric-card"><div class="label">${name}</div><div class="value kpi-rate ${kpiBattleTone(metric.rate)}">${kpiBattlePercent(metric.rate)}</div>${kpiBattleTargetLine(metric, true)}${kpiBattleDod(metric.dod)}</div>`).join('')}</div>
+    </div>`;
+}
+
+function renderKpiBattlePersonal() {
+  const people = _kpiBattleData.personal || [];
+  const storeOptions = [...new Set(people.map(row => row.store))];
+  const roleOptions = [...new Set(people.map(row => row.category))];
+  const store = document.getElementById('kpiBattlePersonalStore')?.value || 'all';
+  const role = document.getElementById('kpiBattlePersonalRole')?.value || 'all';
+  const rows = people.filter(row => (store === 'all' || row.store === store) && (role === 'all' || row.category === role))
+    .sort((a, b) => Number(b.overall_rate || -1) - Number(a.overall_rate || -1));
+  return `
+    <div class="card"><div class="kpi-battle-filter">
+      <label>店點<select id="kpiBattlePersonalStore" onchange="renderKpiBattle()"><option value="all">全部店點</option>${storeOptions.map(value => `<option value="${value}" ${value === store ? 'selected' : ''}>${value}</option>`).join('')}</select></label>
+      <label>職類<select id="kpiBattlePersonalRole" onchange="renderKpiBattle()"><option value="all">全部職類</option>${roleOptions.map(value => `<option value="${value}" ${value === role ? 'selected' : ''}>${value}</option>`).join('')}</select></label>
+      <span class="kpi-battle-note">共 ${rows.length} 人｜姓名已遮罩</span>
+    </div></div>
+    <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
+      <thead><tr><th style="text-align:left">店點</th><th>職類</th><th>姓名</th><th>總達成率</th><th>KPI排名</th><th>個人台獎</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
+      <tbody>${rows.map(row => `<tr><td class="store-name">${row.store}</td><td>${row.role || '—'}</td><td>${row.name}</td><td>${kpiBattleRate(row.overall_rate, row.overall_rate_dod)}</td><td>${row.rank ?? '—'}${kpiBattleRankDod(row.rank_dod)}</td><td>${kpiBattleAwardCell(row)}</td><td>${kpiBattleMetricCell(row.metrics?.A999)}</td><td>${kpiBattleMetricCell(row.metrics?.A1399)}</td><td>${kpiBattleMetricCell(row.metrics?.好速)}</td><td>${kpiBattleMetricCell(row.metrics?.R1399)}</td></tr>`).join('') || '<tr><td colspan="10" class="val-dim">目前篩選條件沒有資料</td></tr>'}</tbody>
+    </table></div></div>`;
+}
+
+// ════════════════════════════════════
+// AWARDS BATTLE — shares the same approved private session as KPI battle
+// ════════════════════════════════════
+let _awardsBattleData = null;
+
+function awardMoney(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? `$${Math.round(number).toLocaleString('en-US')}` : '—';
+}
+
+function awardRateTone(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '';
+  if (number >= 1) return 'good';
+  if (number >= 0.5) return 'warn';
+  return 'bad';
+}
+
+function renderAwardPriority(item) {
+  if (!item) return '';
+  const unlock = item.close_unlock ? ' unlock' : '';
+  return `<div class="award-priority-card${unlock}">
+    <div class="award-priority-title">${item.display_name}</div>
+    <div class="award-priority-action${unlock}">差 ${item.units_needed} 台｜${item.next_label}</div>
+    <div class="award-priority-sub">${kpiBattleNumber(item.actual)}／${kpiBattleNumber(item.target)}（${kpiBattlePercent(item.rate)}）｜補到後店長＋督導 ${awardMoney(item.incremental_award)}</div>
+  </div>`;
+}
+
+function renderAwardModel(item) {
+  const next = item.next_label ? `差 ${item.units_needed} 台 ${item.next_label}，+${awardMoney(item.incremental_award)}` : '已達最高獎階';
+  return `<div class="award-model"><div class="award-model-name">${item.display_name}</div><div class="award-model-rate ${awardRateTone(item.rate)}">${kpiBattlePercent(item.rate)}</div><span class="award-model-sub">${kpiBattleNumber(item.actual)} ／ ${kpiBattleNumber(item.target)}</span><span class="award-model-next">${next}</span></div>`;
+}
+
+async function loadAwardsBattle() {
+  if (_awardsBattleData) { renderAwardsBattle(); return; }
+  if (window.__AWARDS_BATTLE_DATA__) {
+    _awardsBattleData = window.__AWARDS_BATTLE_DATA__;
+    renderAwardsBattle();
+    return;
+  }
+  const note = document.getElementById('awardsBattleSourceNote');
+  if (note) note.textContent = '需通過員編與已核准裝置驗證後，才會由私有 Google Drive 載入資料。';
+  renderPrivateDashboardLock();
+}
+
+function renderAwardsBattle() {
+  if (!_awardsBattleData) return;
+  const data = _awardsBattleData;
+  const supervisor = data.supervisor || {};
+  const note = document.getElementById('awardsBattleSourceNote');
+  if (note) note.textContent = `10 台重點機款｜督導資料置頂｜優先規則：先差 1～3 台解鎖店長 50%，其餘依「下一獎階可增加店長＋督導獎金 ÷ 所需台數」排序｜資料僅供本機受保護預覽`;
+  const content = document.getElementById('awardsBattleContent');
+  if (!content) return;
+  content.innerHTML = `
+    <div class="summary-grid">
+      <div class="summary-card"><div class="sc-label">北一二B 督導預估</div><div class="sc-val" style="color:#6d28d9">${awardMoney(supervisor.supervisor_award)}</div><div class="sc-sub">整體督導台獎</div></div>
+      <div class="summary-card"><div class="sc-label">北一二B 店長預估</div><div class="sc-val" style="color:#7c3aed">${awardMoney(supervisor.manager_award)}</div><div class="sc-sub">整體店長台獎</div></div>
+      <div class="summary-card"><div class="sc-label">整體推估獎金</div><div class="sc-val" style="color:var(--accent)">${awardMoney(supervisor.projected)}</div><div class="sc-sub">公司排名 ${supervisor.rank ?? '—'}｜${supervisor.award === 'Y' ? '可領獎' : '未領獎'}</div></div>
+      <div class="summary-card"><div class="sc-label">優先補量店點</div><div class="sc-val" style="color:var(--red)">${(data.stores || []).filter(row => row.priorities?.[0]?.close_unlock).length}</div><div class="sc-sub">間有近距離 50% 門檻</div></div>
+    </div>
+    <div class="section-divider">督導今日優先機款</div>
+    <div class="award-priority-grid">${(data.overall_priorities || []).map(renderAwardPriority).join('') || '<div class="kpi-empty">目前沒有下一獎階資料</div>'}</div>
+    <div class="section-divider">店點台獎與優先補量</div>
+    <div class="award-store-grid">${(data.stores || []).map(row => {
+      const award = row.award || {};
+      return `<div class="award-store-card"><div class="award-store-head"><div class="award-store-name">${row.store}</div><div class="award-store-rank">店獎排名 ${award.rank ?? '—'}<br>${award.award === 'Y' ? '✅ 可領獎' : '⚠️ 未領獎'}</div></div>
+        <div class="award-store-values"><div class="award-value"><div class="label">店長預估</div><div class="number">${awardMoney(award.manager_award)}</div></div><div class="award-value"><div class="label">督導預估</div><div class="number">${awardMoney(award.supervisor_award)}</div></div></div>
+        <div class="award-priority-grid">${(row.priorities || []).map(renderAwardPriority).join('') || '<span class="val-dim">目前無下一獎階</span>'}</div>
+        <details><summary>查看 10 台機款與下一獎階</summary><div class="award-model-grid">${(row.items || []).map(renderAwardModel).join('')}</div></details>
+      </div>`;
+    }).join('')}</div>`;
 }
 
 // ════════════════════════════════════
@@ -2256,7 +2791,7 @@ function setSumSeg(s) {
 }
 function setPbSeg(s) {
   pbSeg = s;
-  ['pbSeg13','pbSeg16','pbSeg21'].forEach(id => {
+  ['pbSeg16','pbSeg21'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.className = 'seg-btn';
   });

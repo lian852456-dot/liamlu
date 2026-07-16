@@ -7,7 +7,15 @@ const FILE_URL = 'file://' + path.resolve(__dirname, '../index.html');
 async function mockGAS(page) {
   await page.route('https://script.google.com/**', async route => {
     const url = route.request().url();
-    if (url.includes('action=ping')) {
+    const request = route.request();
+    if (request.method() === 'POST') {
+      const payload = JSON.parse(request.postData() || '{}');
+      if (payload.action === 'private_access') {
+        await route.fulfill({ json: { status: 'ok', profile: { maskedName: '測＊員', store: '大稻埕', role: '業代' }, snapshot: { kpiBattle: KPI_BATTLE_FIXTURE, awardsBattle: AWARDS_BATTLE_FIXTURE } } });
+      } else {
+        await route.fulfill({ json: { status: 'ok' } });
+      }
+    } else if (url.includes('action=ping')) {
       await route.fulfill({ json: { status: 'ok' } });
     } else if (url.includes('action=read')) {
       await route.fulfill({ json: { data: {} } });
@@ -19,14 +27,61 @@ async function mockGAS(page) {
   });
 }
 
+const KPI_BATTLE_FIXTURE = {
+  report_date: '2026-07-16',
+  previous_report_date: '2026-07-15',
+  source_date_range: '2026/07/01 ~ 07/15',
+  aggregate: { overall_kpi: 1.0547, overall_kpi_dod: 0.009, company_rank: 27, company_rank_dod: 2, addon_score: 13.36, addon_score_dod: 0.09 },
+  stores: [{
+    store: '大稻埕', company_rank: 65, company_rank_dod: -3, overall_kpi: 1.2435, overall_kpi_dod: 0.056, addon_score: 13.57, addon_score_dod: 0.23,
+    core: {
+      a999: { actual: 10, target: 16, daily_target: 7.7, daily_gap: 2.3, rate: 1.2917, dod: 0.012 },
+      a1399: { actual: 6, target: 8, daily_target: 3.9, daily_gap: 2.1, rate: 1.55, dod: -0.02 },
+      haosu: { actual: 4.25, target: 18, daily_target: 8.7, daily_gap: -4.5, rate: 0.488, dod: 0.01 },
+      r1399: { actual: 18, target: 33, daily_target: 16, daily_gap: 2, rate: 1.1273, dod: 0.03 },
+    },
+    metrics: { '好速案銷售點數': { actual: 4.25, target: 18, daily_target: 8.7, daily_gap: -4.5, rate: 0.488, dod: 0.01 } },
+  }],
+  personal: [{
+    store: '大稻埕', role: '業務代表(I)', category: '業代', name: '測＊員', rank: 8, rank_dod: 2, overall_rate: 1.056, overall_rate_dod: 0.01,
+    phone_award_projected: 3200, phone_award_rank: 8, phone_award_eligible: 'Y',
+    metrics: {
+      A999: { actual: 4, target: 3, rate: 1.3333 },
+      A1399: { actual: 2, target: 2, rate: 1 },
+      '好速': { actual: 2, target: 3, rate: 0.6667 },
+      R1399: { actual: 3, target: 2, rate: 1.5 },
+    },
+  }],
+};
+
+const AWARDS_BATTLE_FIXTURE = {
+  supervisor: { supervisor_award: 720, manager_award: 4520, projected: 11260, rank: '22', award: 'Y' },
+  overall_priorities: [{
+    display_name: 'Google Pixel 10', actual: 23, target: 48, rate: 0.4792,
+    units_needed: 1, next_label: '解鎖店長50%', incremental_award: 1105, close_unlock: true,
+  }],
+  stores: [{
+    store: '通化', award: { rank: '18', award: 'Y', manager_award: 7395, supervisor_award: 7465 },
+    priorities: [{ display_name: 'Samsung S26', actual: 8, target: 17, rate: 0.4706, units_needed: 1, next_label: '解鎖店長50%', incremental_award: 2335, close_unlock: true }],
+    items: [{ display_name: 'Samsung S26', actual: 8, target: 17, rate: 0.4706, units_needed: 1, next_label: '解鎖店長50%', incremental_award: 2335 }],
+  }],
+};
+
+async function mockKpiBattle(page) {
+  await page.addInitScript(data => { window.__KPI_BATTLE_DATA__ = data; }, KPI_BATTLE_FIXTURE);
+}
+
+async function mockAwardsBattle(page) {
+  await page.addInitScript(data => { window.__AWARDS_BATTLE_DATA__ = data; }, AWARDS_BATTLE_FIXTURE);
+}
+
 test.describe('頁面載入', () => {
   test('標題與頁籤顯示正確', async ({ page }) => {
     await mockGAS(page);
     await page.goto(FILE_URL);
     await expect(page).toHaveTitle(/北一二B/);
     await expect(page.locator('.site-title')).toContainText('北一二');
-    // 三個頁籤
-    await expect(page.locator('.tab-btn')).toHaveCount(4);
+    await expect(page.locator('.tab-btn')).toHaveCount(6);
   });
 
   test('日期 badge 顯示今日日期', async ({ page }) => {
@@ -178,6 +233,65 @@ test.describe('頁籤切換', () => {
   });
 });
 
+test.describe('KPI 戰情', () => {
+  test('公開頁面未提供私有資料，必須先登入', async ({ page }) => {
+    await mockGAS(page);
+    await page.goto(FILE_URL);
+    await page.getByRole('button', { name: /KPI戰情/ }).click();
+    await expect(page.locator('#kpiBattleContent')).toContainText('KPI 戰情受保護');
+    await expect(page.locator('#kpiBattleContent input[placeholder="輸入員工編號"]')).toBeVisible();
+    await expect(page.locator('#kpiBattleContent')).not.toContainText('大稻埕');
+  });
+
+  test('核准裝置只需輸入員編即可讀取私有戰情', async ({ page }) => {
+    await mockGAS(page);
+    await page.goto(FILE_URL);
+    await page.getByRole('button', { name: /KPI戰情/ }).click();
+    await page.locator('#kpiBattleContent input[placeholder="輸入員工編號"]').fill('1234567');
+    await page.getByRole('button', { name: '以員編登入' }).click();
+    await expect(page.locator('#kpiBattleContent')).toContainText('大稻埕');
+    await expect(page.locator('#kpiBattleContent')).toContainText('KPI總達成');
+  });
+
+  test('店點總覽顯示正式 KPI 核心欄位', async ({ page }) => {
+    await mockGAS(page);
+    await mockKpiBattle(page);
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("KPI戰情")').click();
+    await expect(page.locator('#panel-kpi-battle')).toBeVisible();
+    await expect(page.locator('#kpiBattleContent')).toContainText('大稻埕');
+    await expect(page.locator('#kpiBattleContent')).toContainText('A999');
+    await expect(page.locator('#kpiBattleContent')).toContainText('R1399');
+    await expect(page.locator('#kpiBattleContent')).toContainText('DOD');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('100%日目標');
+  });
+
+  test('可切換至個績排名且顯示遮罩姓名', async ({ page }) => {
+    await mockGAS(page);
+    await mockKpiBattle(page);
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("KPI戰情")').click();
+    await page.locator('#kpiBattlePersonalBtn').click();
+    await expect(page.locator('#kpiBattleContent')).toContainText('測＊員');
+    await expect(page.locator('#kpiBattleContent')).toContainText('總達成率');
+    await expect(page.locator('#kpiBattleContent')).toContainText('個人台獎');
+    await expect(page.locator('#kpiBattleContent')).toContainText('DOD');
+  });
+});
+
+test.describe('台獎戰情', () => {
+  test('督導獎金與店點優先補量顯示正確', async ({ page }) => {
+    await mockGAS(page);
+    await mockAwardsBattle(page);
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("台獎戰情")').click();
+    await expect(page.locator('#panel-awards-battle')).toBeVisible();
+    await expect(page.locator('#awardsBattleContent')).toContainText('北一二B 督導預估');
+    await expect(page.locator('#awardsBattleContent')).toContainText('解鎖店長50%');
+    await expect(page.locator('#awardsBattleContent')).toContainText('通化');
+  });
+});
+
 test.describe('日期回放', () => {
   test('選日期後點查詢顯示結果', async ({ page }) => {
     await mockGAS(page);
@@ -188,6 +302,15 @@ test.describe('日期回放', () => {
     await page.locator('button:has-text("查詢")').click();
     // 結果區出現回放標題
     await expect(page.locator('#playbackResult')).toContainText('回放');
+  });
+
+  test('日期回放只保留16:00與21:00', async ({ page }) => {
+    await mockGAS(page);
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("日期回放")').click();
+    await expect(page.locator('#pbSeg13')).toHaveCount(0);
+    await expect(page.locator('#pbSeg16')).toBeVisible();
+    await expect(page.locator('#pbSeg21')).toBeVisible();
   });
 });
 
