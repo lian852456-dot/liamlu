@@ -932,6 +932,7 @@ function doPost(e) {
     else if (action === 'private_admin_requests') result = privateDashboardAdminRequests(payload);
     else if (action === 'private_admin_approve') result = privateDashboardAdminApprove(payload);
     else if (action === 'private_admin_revoke') result = privateDashboardAdminRevoke(payload);
+    else if (action === 'private_admin_set_trusted_employee') result = privateDashboardAdminSetTrustedEmployee(payload);
     else if (action === 'private_sync_roster') result = privateDashboardSyncRoster(payload);
     else if (action === 'private_publish') result = privateDashboardPublish(payload);
     else throw new Error('unknown private dashboard action');
@@ -959,6 +960,13 @@ function privateDashboardCleanEmployeeId(value) {
   const employeeId = String(value || '').trim().toUpperCase();
   if (!/^[A-Z0-9]{5,12}$/.test(employeeId)) throw new Error('員編格式不正確');
   return employeeId;
+}
+
+function privateDashboardIsTrustedEmployee(employeeId) {
+  const trustedEmployeeId = String(privateDashboardProperties().getProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID') || '')
+    .trim()
+    .toUpperCase();
+  return /^[A-Z0-9]{5,12}$/.test(trustedEmployeeId) && employeeId === trustedEmployeeId;
 }
 
 function privateDashboardCleanDeviceId(value) {
@@ -1103,7 +1111,7 @@ function privateDashboardAccess(payload) {
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
   const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
   const lookup = privateDashboardUserByEmployeeId(employeeId);
-  if (!lookup.user || lookup.user.status !== 'active' || lookup.user.device_id !== deviceId) {
+  if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
     throw new Error('此員編尚未核准此裝置，請先申請並等待管理者核准');
   }
   lookup.user.last_login_at = privateDashboardNow();
@@ -1168,6 +1176,15 @@ function privateDashboardAdminRevoke(payload) {
   lookup.user.last_login_at = '';
   privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
   return { revoked: true, employeeId: employeeId };
+}
+
+function privateDashboardAdminSetTrustedEmployee(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  if (!lookup.user || lookup.user.status !== 'active') throw new Error('此員編不在可使用名冊中');
+  privateDashboardProperties().setProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID', employeeId);
+  return { trustedEmployeeId: employeeId };
 }
 
 // 每日自動化以管理者密碼同步遮罩後名冊。既有裝置綁定不會被覆蓋。
