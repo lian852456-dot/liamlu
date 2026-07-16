@@ -1264,7 +1264,7 @@ function privateDashboardPublish(payload) {
 // 啟用方式（只需做一次）：
 //   1. 把本檔最新內容貼進 GAS 編輯器並存檔
 //   2. 上方函式選單選「setupTriggers」→ 執行（會跳出授權畫面，同意即可）
-//   3. 之後每天 16:20、21:20（台北時間，±15分）自動檢查並寄信
+//   3. 之後每天 16:30、22:00（台北時間，±15分）自動檢查並寄信
 //
 // 注意：時間觸發器執行的是「編輯器裡最新存檔的程式碼」，
 // 這部分【不需要】重新部署 Web App；只有 doGet 相關改動才要重新部署。
@@ -1282,9 +1282,9 @@ function setupTriggers() {
     }
   });
   ScriptApp.newTrigger('check16').timeBased().everyDays(1)
-    .atHour(16).nearMinute(20).inTimezone('Asia/Taipei').create();
+    .atHour(16).nearMinute(30).inTimezone('Asia/Taipei').create();
   ScriptApp.newTrigger('check21').timeBased().everyDays(1)
-    .atHour(21).nearMinute(20).inTimezone('Asia/Taipei').create();
+    .atHour(22).nearMinute(0).inTimezone('Asia/Taipei').create();
 }
 
 function check16() { checkSegAndNotify(16); }
@@ -1303,12 +1303,24 @@ function checkSegAndNotify(seg) {
 
   if (missing.length > 0) {
     const filled = STORES.filter(s => !!data[s]);
+    const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+    const fmt = n => n % 1 === 0 ? String(n) : n.toFixed(2);
+    const sum = k => filled.reduce((a, s) => a + num(data[s][k]), 0);
+    const kpiVals = filled.map(s => parseFloat(data[s].kpi)).filter(v => !isNaN(v));
+    const kpiAvg = kpiVals.length
+      ? (kpiVals.reduce((a, b) => a + b, 0) / kpiVals.length).toFixed(1) + '%' : '—';
+    const n12b = filled.length === 0
+      ? '　（尚無回填資料）'
+      : '　KPI 均值 ' + kpiAvg + '\n' +
+        '　A999 ' + fmt(sum('aq999')) + ' 筆｜A1399 ' + fmt(sum('aq1399')) + ' 筆\n' +
+        '　好速 ' + fmt(sum('haosu')) + ' 點｜R1399 ' + fmt(sum('rt1399')) + ' 筆';
     const subject = '⚠️ 北一二B ' + today + ' ' + seg + ':00 尚有 ' + missing.length + ' 間未回報';
     const body =
       '📋 ' + today + ' ' + seg + ':00 時段回報檢查\n\n' +
       '🔴 未回報（' + missing.length + ' 間）：\n' +
       missing.map(s => '　・' + s).join('\n') + '\n\n' +
       '✅ 已回報（' + filled.length + ' 間）：' + (filled.join('、') || '無') + '\n\n' +
+      '📊 N12B 目前加總（已回報 ' + filled.length + ' 間）：\n' + n12b + '\n\n' +
       '請儘速跟進未填門市。';
     MailApp.sendEmail(NOTIFY_EMAIL, subject, body);
     return;
