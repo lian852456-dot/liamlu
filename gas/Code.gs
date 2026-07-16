@@ -956,8 +956,8 @@ function privateDashboardNow() {
 }
 
 function privateDashboardCleanEmployeeId(value) {
-  const employeeId = String(value || '').trim();
-  if (!/^\d{5,12}$/.test(employeeId)) throw new Error('員編格式不正確');
+  const employeeId = String(value || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{5,12}$/.test(employeeId)) throw new Error('員編格式不正確');
   return employeeId;
 }
 
