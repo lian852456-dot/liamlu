@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
+const path = require('path');
 
-const FILE_URL = 'file:///home/user/liamlu/index.html';
+const FILE_URL = 'file://' + path.resolve(__dirname, '../index.html');
 
 // Mock GAS 回應（讓 fetch 不需要真正連線）
 async function mockGAS(page) {
