@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
+const fs = require('fs/promises');
 
 // 模擬 GAS 後端：每日回報、巡店、班表與半月督導檢查（含通行碼驗證）
 // 驗證「電腦貼上 → 上雲 → 另一裝置載入」的跨裝置同步流程
@@ -18,11 +19,12 @@ function privateScheduleFixture() {
     stores: names.map(store => ({
       store,
       title: `台北${store}`,
-      staff: [{ name: '測試主管', role: '店長' }, { name: '測試同仁', role: '業務代表' }],
+      staff: [{ name: '測試主管', role: '店長' }, { name: '測試副店', role: '副店長' }, { name: '測試同仁', role: '業務代表' }],
       days: [{
         date: '2026-07-15', day: 15, weekday: '三',
         staff: [
           { name: '測試主管', role: '店長', status: '全', working: true },
+          { name: '測試副店', role: '副店長', status: '休假', working: false },
           { name: '測試同仁', role: '業務代表', status: '早1', working: true },
         ],
         workingStaff: [
@@ -298,7 +300,16 @@ test('加密頁籤：每月班表可切換日週月檢視', async ({ page }) => 
   await expect(page.locator('#scheduleContent')).toContainText('每月班表');
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '匯出 Excel' }).click();
-  expect((await downloadPromise).suggestedFilename()).toMatch(/TWM_班表_2026-07\.xls/);
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/TWM_班表_2026-07\.xls/);
+  const xml = await fs.readFile(await download.path(), 'utf8');
+  expect(xml).toContain('班表顏色備註');
+  expect(xml).toContain('店長：淺膚色');
+  expect(xml).toContain('副店長：淺藍色');
+  expect(xml).toContain('休假：淺綠色');
+  expect(xml).toContain('ss:StyleID="Manager"');
+  expect(xml).toContain('ss:StyleID="AssistantManager"');
+  expect(xml).toContain('ss:StyleID="Vacation"');
 });
 
 test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({ page }) => {
