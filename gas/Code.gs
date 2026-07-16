@@ -1080,6 +1080,7 @@ function privateDashboardRequestBinding(payload) {
       requested_at: privateDashboardNow(), status: 'pending', approved_at: '', approved_by: '', replaced_device_id: ''
     };
     privateDashboardWriteObject(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS, requestSheet.getLastRow() + 1, request);
+    privateDashboardNotifyAdminOfBindingRequest(request, lookup.user);
     return { requestStatus: 'pending', requestId: request.request_id, message: '已送出綁定申請，等待管理者核准。' };
   } finally {
     lock.releaseLock();
@@ -1097,6 +1098,26 @@ function privateDashboardRequestStatus(payload) {
   const latest = requests[0];
   if (!latest) return { requestStatus: 'none' };
   return { requestStatus: latest.status, requestedAt: latest.requested_at, approvedAt: latest.approved_at };
+}
+
+function privateDashboardNotifyAdminOfBindingRequest(request, user) {
+  const notifyEmail = String(privateDashboardProperties().getProperty('DASHBOARD_NOTIFY_EMAIL') || '').trim();
+  if (!notifyEmail) return;
+  const body = [
+    '北一二B KPI／台獎戰情有新的裝置綁定申請。',
+    '員編：' + request.employee_id,
+    '姓名：' + String(user.masked_name || ''),
+    '店點：' + String(user.store || ''),
+    '職務：' + String(user.role || ''),
+    '申請時間：' + request.requested_at,
+    '',
+    '請開啟網站的 KPI戰情或台獎戰情頁籤，按「管理者核准」處理。'
+  ].join('\n');
+  try {
+    MailApp.sendEmail(notifyEmail, '🔐 北一二B 戰情登入申請待核准', body);
+  } catch (error) {
+    console.log('private dashboard binding notification failed: ' + error);
+  }
 }
 
 function privateDashboardSnapshot() {
@@ -1183,7 +1204,13 @@ function privateDashboardAdminSetTrustedEmployee(payload) {
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
   const lookup = privateDashboardUserByEmployeeId(employeeId);
   if (!lookup.user || lookup.user.status !== 'active') throw new Error('此員編不在可使用名冊中');
-  privateDashboardProperties().setProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID', employeeId);
+  const props = privateDashboardProperties();
+  props.setProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID', employeeId);
+  const notificationEmail = String(payload.notificationEmail || '').trim();
+  if (notificationEmail) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notificationEmail)) throw new Error('通知信箱格式不正確');
+    props.setProperty('DASHBOARD_NOTIFY_EMAIL', notificationEmail);
+  }
   return { trustedEmployeeId: employeeId };
 }
 
