@@ -1385,7 +1385,6 @@
   <button class="tab-btn active" onclick="switchTab('fill')">📝 填報（店長）</button>
   <button class="tab-btn" onclick="switchTab('summary')">📊 彙整大盤（督導）</button>
   <button class="tab-btn" onclick="switchTab('playback')">🕐 日期回放</button>
-  <button class="tab-btn" onclick="switchTab('perf')">🏆 KPI/個績</button>
   <button class="tab-btn" onclick="switchTab('personal')">👤 個人追蹤</button>
   <button class="tab-btn" onclick="switchTab('kpi-battle')">🏆 KPI戰情</button>
   <button class="tab-btn" onclick="switchTab('awards-battle')">🏅 台獎戰情</button>
@@ -1892,28 +1891,6 @@
 </div><!-- /panel-playback -->
 
 <!-- ═══════════════════════════════════
-     PANEL: KPI 達成與個績
-═══════════════════════════════════ -->
-<div class="panel" id="panel-perf">
-
-  <div class="card">
-    <div class="card-title"><span class="dot"></span>🏆 KPI 達成與個績</div>
-    <div class="playback-row">
-      <label>查詢日期</label>
-      <input type="date" id="perfDate">
-      <div class="seg-toggle" style="margin:0">
-        <button class="seg-btn active-16" id="perfSeg16" onclick="setPerfSeg(16)">16:00</button>
-        <button class="seg-btn" id="perfSeg21" onclick="setPerfSeg(21)">21:00</button>
-      </div>
-      <button class="btn btn-primary" onclick="renderPerf()">🔍 查詢</button>
-    </div>
-  </div>
-
-  <div id="perfResult"></div>
-
-</div><!-- /panel-perf -->
-
-<!-- ═══════════════════════════════════
      PANEL 4: 個人追蹤
 ═══════════════════════════════════ -->
 <div class="panel" id="panel-personal">
@@ -2415,7 +2392,6 @@ function switchTab(name) {
   if (name === 'summary') renderSummary();
   if (name === 'kpi-battle') loadKpiBattle();
   if (name === 'awards-battle') loadAwardsBattle();
-  if (name === 'perf') renderPerf();
 }
 
 // ════════════════════════════════════

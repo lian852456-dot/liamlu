@@ -81,7 +81,8 @@ test.describe('頁面載入', () => {
     await page.goto(FILE_URL);
     await expect(page).toHaveTitle(/北一二B/);
     await expect(page.locator('.site-title')).toContainText('北一二');
-    await expect(page.locator('.tab-btn')).toHaveCount(7);
+    await expect(page.locator('.tab-btn')).toHaveCount(6);
+    await expect(page.getByRole('button', { name: '🏆 KPI/個績' })).toHaveCount(0);
   });
 
   test('日期 badge 顯示今日日期', async ({ page }) => {
