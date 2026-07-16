@@ -81,7 +81,7 @@ test.describe('頁面載入', () => {
     await page.goto(FILE_URL);
     await expect(page).toHaveTitle(/北一二B/);
     await expect(page.locator('.site-title')).toContainText('北一二');
-    await expect(page.locator('.tab-btn')).toHaveCount(6);
+    await expect(page.locator('.tab-btn')).toHaveCount(7);
   });
 
   test('日期 badge 顯示今日日期', async ({ page }) => {
@@ -299,7 +299,7 @@ test.describe('日期回放', () => {
     await page.locator('.tab-btn:has-text("日期回放")').click();
     // 設日期
     await page.locator('#playbackDate').fill('2026-06-25');
-    await page.locator('button:has-text("查詢")').click();
+    await page.locator('#panel-playback button:has-text("查詢")').click();
     // 結果區出現回放標題
     await expect(page.locator('#playbackResult')).toContainText('回放');
   });
