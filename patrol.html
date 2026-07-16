@@ -1229,32 +1229,37 @@ function renderSchedule(){
 }
 
 function xmlEsc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;').replace(/\n/g,'&#10;'); }
-function xmlCell(value){ const type=typeof value==='number'?'Number':'String'; return `<Cell><Data ss:Type="${type}">${xmlEsc(value)}</Data></Cell>`; }
+function excelCell(value,style){ return style ? {value,style} : value; }
+function xmlCell(cell){ const styled=cell&&typeof cell==='object'&&Object.prototype.hasOwnProperty.call(cell,'value'); const value=styled?cell.value:cell; const style=styled&&cell.style?` ss:StyleID="${xmlEsc(cell.style)}"`:''; const type=typeof value==='number'?'Number':'String'; return `<Cell${style}><Data ss:Type="${type}">${xmlEsc(value)}</Data></Cell>`; }
 function excelXml(sheets){
   const ns='urn:schemas-microsoft-com:office:spreadsheet';
   const body=sheets.map(s=>`<Worksheet ss:Name="${xmlEsc(s.name)}"><Table>${s.rows.map(row=>`<Row>${row.map(xmlCell).join('')}</Row>`).join('')}</Table></Worksheet>`).join('');
-  return `<?xml version="1.0"?><Workbook xmlns="${ns}" xmlns:ss="${ns}"><Styles><Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Microsoft JhengHei" ss:Size="10"/></Style></Styles>${body}</Workbook>`;
+  return `<?xml version="1.0"?><Workbook xmlns="${ns}" xmlns:ss="${ns}"><Styles><Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Microsoft JhengHei" ss:Size="10"/></Style><Style ss:ID="Title"><Font ss:FontName="Microsoft JhengHei" ss:Size="12" ss:Bold="1"/></Style><Style ss:ID="Header"><Font ss:FontName="Microsoft JhengHei" ss:Bold="1"/><Interior ss:Color="#FFD966" ss:Pattern="Solid"/></Style><Style ss:ID="Manager"><Interior ss:Color="#FCE4D6" ss:Pattern="Solid"/></Style><Style ss:ID="AssistantManager"><Interior ss:Color="#DDEBF7" ss:Pattern="Solid"/></Style><Style ss:ID="Vacation"><Interior ss:Color="#E2F0D9" ss:Pattern="Solid"/></Style></Styles>${body}</Workbook>`;
 }
 function downloadExcel(name,sheets){
   const blob=new Blob([excelXml(sheets)],{type:'application/vnd.ms-excel'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function exportScheduleExcel(){
   if(!scheduleData){ showMsg('班表尚未載入','err'); return; }
-  const total=monthDays(scheduleData.month); const monthRows=[['台灣大哥大 北一二B 每月班表',scheduleData.rocMonth],['店點','姓名','職務',...Array.from({length:total},(_,i)=>i+1)]];
+  const roleStyle=role=>{const text=String(role||'');if(/副店/.test(text))return'AssistantManager';if(/店長|店經理|店主管/.test(text))return'Manager';return'';};
+  const vacationStyle=status=>/休|假/.test(String(status||''))?'Vacation':'';
+  const total=monthDays(scheduleData.month); const legendRows=[[excelCell('班表顏色備註','Title')],[excelCell('店長：淺膚色','Manager')],[excelCell('副店長：淺藍色','AssistantManager')],[excelCell('休假：淺綠色','Vacation')]];
+  const monthRows=[[excelCell('台灣大哥大 北一二B 每月班表','Title'),excelCell(scheduleData.rocMonth,'Title')],[...['店點','姓名','職務',...Array.from({length:total},(_,i)=>i+1)].map(v=>excelCell(v,'Header'))]];
   scheduleData.stores.forEach(s=>s.staff.forEach(p=>{
-    const statuses=Array.from({length:total},(_,i)=>{
+    const rowStyle=roleStyle(p.role); const statuses=Array.from({length:total},(_,i)=>{
       const day=scheduleDay(s,`${scheduleData.month}-${String(i+1).padStart(2,'0')}`);
       const assignment=day ? (day.staff||[]).find(a=>a.name===p.name) : null;
-      return assignment ? (assignment.status||'') : '';
+      const status=assignment ? (assignment.status||'') : '';
+      return excelCell(status,vacationStyle(status)||rowStyle);
     });
-    monthRows.push([s.store,p.name,p.role,...statuses]);
+    monthRows.push([excelCell(s.store,rowStyle),excelCell(p.name,rowStyle),excelCell(p.role,rowStyle),...statuses]);
   }));
   const selected=document.getElementById('scheduleDate').value||`${scheduleData.month}-01`;
-  const dayRows=[['日期',selected,dateLabel(selected)],['門市','值班主管','出勤同仁','全員班別']];
-  scheduleData.stores.forEach(s=>{const d=scheduleDay(s,selected);dayRows.push([s.store,(d?.managers||[]).map(x=>x.name).join('、')||'未排',(d?.workingStaff||[]).map(x=>x.name).join('、')||'無',(d?.staff||[]).map(x=>`${x.name}:${x.status||''}`).join('、')]);});
-  const weekRows=[['每週出勤',selected],['日期','星期','門市','值班主管','出勤同仁']];
-  weekDates(selected).forEach(day=>scheduleData.stores.forEach(s=>{const d=scheduleDay(s,day);weekRows.push([day,dateLabel(day).slice(-2,-1),s.store,(d?.managers||[]).map(x=>x.name).join('、')||'未排',(d?.workingStaff||[]).map(x=>x.name).join('、')||'無']);}));
-  downloadExcel(`TWM_班表_${scheduleData.month}.xls`,[{name:'每月班表',rows:monthRows},{name:'每日出勤',rows:dayRows},{name:'每週出勤',rows:weekRows}]);
+  const dayRows=[[excelCell('日期','Title'),excelCell(selected,'Title'),excelCell(dateLabel(selected),'Title')],[...['門市','值班主管','出勤同仁','全員班別'].map(v=>excelCell(v,'Header'))]];
+  scheduleData.stores.forEach(s=>{const d=scheduleDay(s,selected);const managers=d?.managers||[];const managerStyle=roleStyle(managers[0]?.role);dayRows.push([s.store,excelCell(managers.map(x=>x.name).join('、')||'未排',managerStyle),(d?.workingStaff||[]).map(x=>x.name).join('、')||'無',(d?.staff||[]).map(x=>`${x.name}:${x.status||''}`).join('、')]);});
+  const weekRows=[[excelCell('每週出勤','Title'),excelCell(selected,'Title')],[...['日期','星期','門市','值班主管','出勤同仁'].map(v=>excelCell(v,'Header'))]];
+  weekDates(selected).forEach(day=>scheduleData.stores.forEach(s=>{const d=scheduleDay(s,day);const managers=d?.managers||[];weekRows.push([day,dateLabel(day).slice(-2,-1),s.store,excelCell(managers.map(x=>x.name).join('、')||'未排',roleStyle(managers[0]?.role)),(d?.workingStaff||[]).map(x=>x.name).join('、')||'無']);}));
+  downloadExcel(`TWM_班表_${scheduleData.month}.xls`,[{name:'顏色備註',rows:legendRows},{name:'每月班表',rows:monthRows},{name:'每日出勤',rows:dayRows},{name:'每週出勤',rows:weekRows}]);
   document.getElementById('scheduleStatus').textContent='已匯出 Excel（月表＋每日＋每週）';
 }
 
