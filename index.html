@@ -1704,25 +1704,10 @@
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_reno16f" placeholder="0" step="1">
       </div>
-      <div class="kpi-input-wrap">
-        <label>Pixel 10 Pro Fold<span class="tw-bonus"><span class="tw-b50">50%・$50</span><span class="tw-b100">100%・$75</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_pixel10fold" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>Find X9s<span class="tw-bonus"><span class="tw-b50">50%・$210</span><span class="tw-b100">100%・$315</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_findx9s" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>SONY 1 VIII &amp; moto razr fold（動店）<span class="tw-bonus"><span class="tw-b50">50%・$275</span><span class="tw-b100">100%・$415</span></span></label>
+      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
+        <label style="color:#b8860b;">moto razr fold<span class="tw-bonus"><span class="tw-b50">50%・$275</span><span class="tw-b100">100%・$415</span></span></label>
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_sony1" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>SHARP Poketomo<span class="tw-bonus"><span class="tw-b50">50%・$35</span><span class="tw-b100">100%・$50</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_poketomo" placeholder="0" step="1">
       </div>
     </div>
 
@@ -1743,16 +1728,6 @@
         <label style="color:#b8860b;">Y21 &amp; Redmi Note 15 Pro<span class="tw-bonus"><span class="tw-b50">50%・$85</span><span class="tw-b100">100%・$125</span></span></label>
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_y21" placeholder="0" step="1">
-      </div>
-    </div>
-
-    <!-- KPI 穿戴 -->
-    <div style="font-size:11px;font-weight:700;color:#6b7280;background:rgba(107,114,128,0.1);border:1px solid rgba(107,114,128,0.3);border-radius:6px;padding:4px 10px;margin:8px 0 6px;">⌚ KPI 穿戴</div>
-    <div class="form-grid">
-      <div class="kpi-input-wrap">
-        <label>myFirst兒錶 &amp; 咖波TCL兒錶（動店）<span class="tw-bonus"><span class="tw-b50">50%・$75</span><span class="tw-b100">100%・$115</span></span></label>
-        <span class="ki-icon">⌚</span>
-        <input type="number" id="f_tw_myfirst" placeholder="0" step="1">
       </div>
     </div>
 
@@ -2813,8 +2788,7 @@ const FIELDS = [
   'insurance_num','insurance_den','insurance_pct',
   'device_num','device_den','device_ratio',
   'tw_pixel10','tw_s26u','tw_sharpr11','tw_vivo','tw_s26','tw_reno16f',
-  'tw_pixel10fold','tw_findx9s','tw_sony1','tw_poketomo',
-  'tw_oppoa6x','tw_a27','tw_y21','tw_myfirst'
+  'tw_sony1','tw_oppoa6x','tw_a27','tw_y21'
 ];
 
 
@@ -3008,14 +2982,10 @@ async function renderSummary() {
     {key:'tw_vivo',       label:'vivo X300系列',      isRaw:true},
     {key:'tw_s26',        label:'S26/S26+/A57',       isRaw:true},
     {key:'tw_reno16f',    label:'Reno16 F',           isRaw:true},
-    {key:'tw_pixel10fold',label:'Pixel 10 Pro Fold',  isRaw:true},
-    {key:'tw_findx9s',    label:'Find X9s',           isRaw:true},
-    {key:'tw_sony1',      label:'SONY 1 VIII/razr',   isRaw:true},
-    {key:'tw_poketomo',   label:'SHARP Poketomo',     isRaw:true},
+    {key:'tw_sony1',      label:'moto razr fold',     isRaw:true},
     {key:'tw_oppoa6x',    label:'OPPO A6x',           isRaw:true},
     {key:'tw_a27',        label:'A27 & A17',          isRaw:true},
-    {key:'tw_y21',        label:'Y21/Redmi 15 Pro',   isRaw:true},
-    {key:'tw_myfirst',    label:'兒錶',               isRaw:true},
+    {key:'tw_y21',        label:'Y21/Redmi Note 15 Pro', isRaw:true},
   ];
   renderSummaryTable('summaryTable3', date, sumSeg, cols3);
 
@@ -3455,14 +3425,10 @@ async function renderPlayback() {
     {key:'tw_vivo',       label:'vivo X300系列',      isRaw:true},
     {key:'tw_s26',        label:'S26/S26+/A57',       isRaw:true},
     {key:'tw_reno16f',    label:'Reno16 F',           isRaw:true},
-    {key:'tw_pixel10fold',label:'Pixel 10 Pro Fold',  isRaw:true},
-    {key:'tw_findx9s',    label:'Find X9s',           isRaw:true},
-    {key:'tw_sony1',      label:'SONY 1 VIII/razr',   isRaw:true},
-    {key:'tw_poketomo',   label:'SHARP Poketomo',     isRaw:true},
+    {key:'tw_sony1',      label:'moto razr fold',     isRaw:true},
     {key:'tw_oppoa6x',    label:'OPPO A6x',           isRaw:true},
     {key:'tw_a27',        label:'A27 & A17',          isRaw:true},
-    {key:'tw_y21',        label:'Y21/Redmi 15 Pro',   isRaw:true},
-    {key:'tw_myfirst',    label:'兒錶',               isRaw:true},
+    {key:'tw_y21',        label:'Y21/Redmi Note 15 Pro', isRaw:true},
   ];
   renderSummaryTable('pbTable3', date, pbSeg, colsTw);
   renderStorePersonalDetail(date, pbSeg, dayCache, 'pbStorePersonalSection');

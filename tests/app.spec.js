@@ -165,6 +165,15 @@ test.describe('填報頁籤 - 時段切換', () => {
 });
 
 test.describe('填報頁籤 - 表單輸入', () => {
+  test('台獎填報維持 10 款且只保留 moto', async ({ page }) => {
+    await mockGAS(page);
+    await page.goto(FILE_URL);
+    await page.locator('.store-card[data-store="通化"]').click();
+    await expect(page.locator('#f_tw_sony1')).toBeVisible();
+    await expect(page.locator('label').filter({ hasText: 'moto razr fold' })).toBeVisible();
+    await expect(page.locator('#f_tw_pixel10fold, #f_tw_findx9s, #f_tw_poketomo, #f_tw_myfirst')).toHaveCount(0);
+  });
+
   test('KPI 欄位可以輸入數值', async ({ page }) => {
     await mockGAS(page);
     await page.goto(FILE_URL);
