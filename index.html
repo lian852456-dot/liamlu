@@ -2638,7 +2638,8 @@ function renderKpiBattle() {
 function renderKpiBattleStores() {
   const aggregate = _kpiBattleData.aggregate || {};
   const stores = [...(_kpiBattleData.stores || [])].sort((a, b) => (a.company_rank || 9999) - (b.company_rank || 9999));
-  const selected = stores.find(row => row.store === document.getElementById('kpiBattleStoreSelect')?.value) || stores[0];
+  const rows = [{ ...aggregate, store: '北一二B整體', isDistrict: true }, ...stores];
+  const selected = rows.find(row => row.store === document.getElementById('kpiBattleStoreSelect')?.value) || rows[0];
   return `
     <div class="summary-grid">
       <div class="summary-card"><div class="sc-label">北一二B KPI</div><div class="sc-val ${kpiBattleTone(aggregate.overall_kpi)}">${kpiBattlePercent(aggregate.overall_kpi)}</div><div class="sc-sub">${kpiBattleDod(aggregate.overall_kpi_dod) || '整體達成率'}</div></div>
@@ -2646,14 +2647,14 @@ function renderKpiBattleStores() {
       <div class="summary-card"><div class="sc-label">加掛得分</div><div class="sc-val" style="color:var(--purple)">${kpiBattleNumber(aggregate.addon_score)}</div><div class="sc-sub">${aggregate.addon_score_dod == null ? '整體得分' : `DOD ${aggregate.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(aggregate.addon_score_dod)} 分`}</div></div>
       <div class="summary-card"><div class="sc-label">KPI未達100%</div><div class="sc-val" style="color:var(--red)">${stores.filter(row => Number(row.overall_kpi) < 1).length}</div><div class="sc-sub">間門市</div></div>
     </div>
-    <div class="section-divider">店點 KPI 排名</div>
+    <div class="section-divider">北一二B／店點 KPI 排名</div>
     <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
       <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th><th>加掛</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
-      <tbody>${stores.map(row => `<tr><td class="store-name">${row.store}</td><td><span class="val-gold">${row.company_rank ?? '—'}</span>${kpiBattleRankDod(row.company_rank_dod)}</td><td>${kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${kpiBattleNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleMetricCell(row.core?.a999)}</td><td>${kpiBattleMetricCell(row.core?.a1399)}</td><td>${kpiBattleMetricCell(row.core?.haosu)}</td><td>${kpiBattleMetricCell(row.core?.r1399)}</td></tr>`).join('')}</tbody>
+      <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${row.store}</td><td><span class="val-gold">${row.company_rank ?? '—'}</span>${kpiBattleRankDod(row.company_rank_dod)}</td><td>${kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${kpiBattleNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleMetricCell(row.core?.a999)}</td><td>${kpiBattleMetricCell(row.core?.a1399)}</td><td>${kpiBattleMetricCell(row.core?.haosu)}</td><td>${kpiBattleMetricCell(row.core?.r1399)}</td></tr>`).join('')}</tbody>
     </table></div></div>
     <div class="section-divider">各項 KPI 達成</div>
     <div class="card">
-      <div class="kpi-battle-filter"><label>選擇店點<select id="kpiBattleStoreSelect" onchange="renderKpiBattle()">${stores.map(row => `<option value="${row.store}" ${row.store === selected?.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label></div>
+      <div class="kpi-battle-filter"><label>選擇區／店點<select id="kpiBattleStoreSelect" onchange="renderKpiBattle()">${rows.map(row => `<option value="${row.store}" ${row.store === selected?.store ? 'selected' : ''}>${row.isDistrict ? '🏢 ' : ''}${row.store}</option>`).join('')}</select></label></div>
       <div class="kpi-metric-grid">${Object.entries(selected?.metrics || {}).map(([name, metric]) => `<div class="kpi-metric-card"><div class="label">${name}</div><div class="value kpi-rate ${kpiBattleTone(metric.rate)}">${kpiBattlePercent(metric.rate)}</div>${kpiBattleTargetLine(metric, true)}${kpiBattleDod(metric.dod)}</div>`).join('')}</div>
     </div>`;
 }

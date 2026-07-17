@@ -31,7 +31,16 @@ const KPI_BATTLE_FIXTURE = {
   report_date: '2026-07-16',
   previous_report_date: '2026-07-15',
   source_date_range: '2026/07/01 ~ 07/15',
-  aggregate: { overall_kpi: 1.0547, overall_kpi_dod: 0.009, company_rank: 27, company_rank_dod: 2, addon_score: 13.36, addon_score_dod: 0.09 },
+  aggregate: {
+    overall_kpi: 1.0547, overall_kpi_dod: 0.009, company_rank: 27, company_rank_dod: 2, addon_score: 13.36, addon_score_dod: 0.09,
+    core: {
+      a999: { actual: 72, target: 80, daily_target: 38.7, daily_gap: 33.3, rate: 0.9, dod: 0.01 },
+      a1399: { actual: 31, target: 40, daily_target: 19.4, daily_gap: 11.6, rate: 0.775, dod: 0.02 },
+      haosu: { actual: 46, target: 45, daily_target: 21.8, daily_gap: 24.2, rate: 1.0222, dod: 0.01 },
+      r1399: { actual: 60, target: 70, daily_target: 33.9, daily_gap: 26.1, rate: 0.8571, dod: -0.01 },
+    },
+    metrics: { '好速案銷售點數': { actual: 46, target: 45, daily_target: 21.8, daily_gap: 24.2, rate: 1.0222, dod: 0.01 } },
+  },
   stores: [{
     store: '大稻埕', company_rank: 65, company_rank_dod: -3, overall_kpi: 1.2435, overall_kpi_dod: 0.056, addon_score: 13.57, addon_score_dod: 0.23,
     core: {
@@ -274,6 +283,16 @@ test.describe('KPI 戰情', () => {
     await expect(page.locator('#kpiBattleContent')).toContainText('R1399');
     await expect(page.locator('#kpiBattleContent')).toContainText('DOD');
     await expect(page.locator('#kpiBattleSourceNote')).toContainText('100%日目標');
+  });
+
+  test('北一二B整體列置頂，且可查看整體 KPI 明細', async ({ page }) => {
+    await mockGAS(page);
+    await mockKpiBattle(page);
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("KPI戰情")').click();
+    await expect(page.locator('#kpiBattleContent tbody tr').first()).toContainText('北一二B整體');
+    await page.selectOption('#kpiBattleStoreSelect', '北一二B整體');
+    await expect(page.locator('#kpiBattleContent')).toContainText('好速案銷售點數');
   });
 
   test('可切換至個績排名且顯示遮罩姓名', async ({ page }) => {
