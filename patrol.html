@@ -277,6 +277,22 @@
   .half-item textarea{grid-column:1 / -1;min-height:44px;resize:vertical;font-size:13px}
   .half-item input[type=file]{grid-column:1 / -1;font-size:12px;max-width:100%}
   .half-evidence{grid-column:1 / -1;font-size:12px;color:#777}
+  .half-media-actions{grid-column:1 / -1;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .half-media-actions button,.half-media-card a,.half-media-card button,.half-media-view{border:1px solid #ffd1b4;background:#fff7f1;color:#a94300;border-radius:7px;padding:6px 8px;font:inherit;font-size:12px;font-weight:800;text-decoration:none;cursor:pointer}
+  .half-media-actions button:disabled{opacity:.55;cursor:not-allowed}
+  .half-media-list{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:8px}
+  .half-media-card{border:1px solid var(--line);border-radius:8px;padding:7px;background:#fcfcfc;overflow:hidden}
+  .half-media-card img,.half-media-card video{display:block;width:100%;height:92px;object-fit:cover;border-radius:5px;background:#f1f1f1}
+  .half-media-card iframe{display:block;width:100%;height:92px;border:0;border-radius:5px;background:#111}
+  .half-media-card strong{display:block;margin:6px 0 5px;font-size:11px;line-height:1.35;word-break:break-word}
+  .half-media-card .pending{color:#a94300;font-size:11px}
+  .half-media-card .media-links{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+  .half-media-empty{grid-column:1 / -1;color:#999;font-size:12px;padding:3px 0}
+  .half-media-modal{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.66);padding:20px;display:grid;place-items:center}
+  .half-media-modal-card{width:min(960px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:13px;padding:16px;position:relative}
+  .half-media-modal-close{position:sticky;top:0;float:right;border:0;background:#222;color:#fff;border-radius:7px;padding:7px 10px;font-weight:800;cursor:pointer}
+  .half-media-modal-grid{clear:both;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;padding-top:10px}
+  .half-media-modal-grid .half-media-card img,.half-media-modal-grid .half-media-card video,.half-media-modal-grid .half-media-card iframe{height:190px}
   .half-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
   .half-history{overflow:auto}
   .half-history table{min-width:900px}
@@ -536,6 +552,20 @@ async function privateScheduleRequest(month){ return privateCloudCall('sread',{k
 async function privateInspectionRequest(action, rows){
   if(action==='read') return privateCloudCall('hread',{key:PT_KEY});
   return privateCloudCallJsonp('hwrite',{payload:JSON.stringify(rows||[]),key:PT_KEY});
+}
+async function privateInspectionMediaUpload(file, context){
+  if(!privateAccount) throw new Error('請先解鎖受保護資料');
+  const maxBytes=25*1024*1024;
+  if(!file || !file.size) throw new Error('請先選擇照片或影片');
+  if(file.size>maxBytes) throw new Error('單一檔案上限為 25 MB，請縮短影片後再上傳');
+  if(!/^(image|video)\//.test(file.type||'')) throw new Error('僅支援照片或影片檔案');
+  const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('讀取檔案失敗'));reader.onload=()=>resolve(String(reader.result||''));reader.readAsDataURL(file);});
+  const base64=dataUrl.split(',')[1]||'';
+  const response=await fetch(PRIVATE_GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'half_media_upload',key:PT_KEY,file:{name:file.name,type:file.type,size:file.size,base64},context})});
+  if(!response.ok) throw new Error('上傳服務暫時無法使用');
+  const result=await response.json();
+  if(result.status!=='ok') throw new Error(result.message||'媒體上傳失敗');
+  return result.media;
 }
 
 /* ---------- 初始化月份 ---------- */
@@ -1287,17 +1317,53 @@ function currentHalfRows(){
   const date=document.getElementById('halfDate').value; const store=document.getElementById('halfStore').value; const period=halfPeriod(date); const checkId=`${date}|${store}|${period}`;
   return {date,store,period,checkId,rows:halfChecks.filter(r=>halfKey(r).startsWith(`${checkId}|`))};
 }
+const halfPendingMedia=new Map();
+function halfMediaKey(checkId,item){ return `${checkId}|${Number(item)}`; }
+function driveFileId(url){ const text=String(url||'');const match=text.match(/\/d\/([A-Za-z0-9_-]+)/)||text.match(/[?&]id=([A-Za-z0-9_-]+)/);return match?match[1]:''; }
+function mediaItems(value){
+  const text=String(value||'').trim();if(!text)return[];
+  try{const parsed=JSON.parse(text);const rows=Array.isArray(parsed)?parsed:(Array.isArray(parsed.media)?parsed.media:[]);return rows.filter(x=>x&&typeof x==='object').map(x=>({...x,name:String(x.name||'附件'),mimeType:String(x.mimeType||''),viewUrl:String(x.viewUrl||x.url||''),previewUrl:String(x.previewUrl||x.url||''),id:String(x.id||'')}));}catch{}
+  const id=driveFileId(text);return[{id,name:'既有私有 Drive 附件',mimeType:'',viewUrl:text,previewUrl:id?`https://drive.google.com/uc?export=view&id=${id}`:text,legacy:true}];
+}
+function mediaValue(items){ return items.length?JSON.stringify(items.map(x=>({id:x.id||'',name:x.name||'附件',mimeType:x.mimeType||'',viewUrl:x.viewUrl||x.url||'',previewUrl:x.previewUrl||x.url||''}))):''; }
+function mediaKind(item){ return /^video\//.test(item.mimeType||'')?'video':/^image\//.test(item.mimeType||'')?'image':'link'; }
+function halfMediaCard(item,pending=false){
+  const kind=mediaKind(item);let preview='';
+  if(kind==='image'&&item.previewUrl)preview=`<img src="${esc(item.previewUrl)}" alt="${esc(item.name)}" loading="lazy">`;
+  else if(kind==='video'&&item.previewUrl)preview=pending?`<video src="${esc(item.previewUrl)}" controls muted playsinline></video>`:`<iframe src="${esc(item.previewUrl||item.viewUrl)}" title="${esc(item.name)}" allow="autoplay" loading="lazy"></iframe>`;
+  else preview='<div class="half-media-empty">已附私有連結</div>';
+  const open=item.viewUrl?`<a href="${esc(item.viewUrl)}" target="_blank" rel="noopener">${kind==='video'?'播放':'開啟'}</a>`:'';
+  return `<div class="half-media-card">${preview}<strong>${esc(item.name)}</strong>${pending?'<span class="pending">尚未上傳</span>':''}<div class="media-links">${open}</div></div>`;
+}
+function renderHalfMediaList(box){
+  const target=box.querySelector('.half-media-list');if(!target)return;
+  const key=box.dataset.mediaKey;const stored=mediaItems(box.dataset.evidence||'');const pending=(halfPendingMedia.get(key)||[]).map(file=>({name:file.name,mimeType:file.type,previewUrl:URL.createObjectURL(file)}));
+  target.innerHTML=(stored.length||pending.length)?[...stored.map(x=>halfMediaCard(x)),...pending.map(x=>halfMediaCard(x,true))].join(''):'<div class="half-media-empty">尚未附上照片或影片</div>';
+}
+async function uploadHalfMedia(box){
+  const key=box.dataset.mediaKey;const files=halfPendingMedia.get(key)||[];if(!files.length){showHalfMsg('請先選擇照片或影片','err');return;}
+  const item=Number(box.dataset.halfItem);const current=currentHalfRows();const inspector=document.getElementById('halfInspector').value.trim();const button=box.querySelector('.half-media-upload');button.disabled=true;
+  try{
+    const stored=mediaItems(box.dataset.evidence||'');const uploaded=[];
+    for(let i=0;i<files.length;i++){
+      showHalfMsg(`正在上傳第 ${i+1}/${files.length} 個檔案…`,'ok');
+      uploaded.push(await privateInspectionMediaUpload(files[i],{checkId:current.checkId,date:current.date,period:current.period,month:current.date.slice(0,7),store:current.store,inspector,item}));
+    }
+    box.dataset.evidence=mediaValue([...stored,...uploaded]);halfPendingMedia.delete(key);box.querySelector('.half-evidence-file').value='';renderHalfMediaList(box);showHalfMsg(`已上傳 ${uploaded.length} 個私有檔案；按「同步雲端」即可將附件連到本期檢查`,'ok');
+  }catch(err){showHalfMsg(`上傳失敗：${err.message}`,'err');}finally{button.disabled=false;}
+}
 function renderHalfForm(){
   initHalfSelectors(); const {date,store,period,checkId,rows}=currentHalfRows();
   const inspector=document.getElementById('halfInspector'); const saved=rows.find(r=>r.inspector)?.inspector||''; if(inspector && !inspector.value) inspector.value=saved;
   const c=document.getElementById('halfForm'); if(!c) return;
-  c.innerHTML=HALF_ITEMS.map(i=>{const r=rows.find(x=>Number(x.item)===i)||{};const result=r.result||'';return `<div class="half-item ${result==='abnormal'?'issue':''}" data-half-item="${i}"><div class="half-item-head"><span class="half-no">${i}</span><div><div class="half-item-title">${esc(ITEM_TEXT[i])}</div><div class="half-item-tag">${esc(ITEM_RULES[i]?.label||'本期檢查')}</div></div></div><select class="half-result" aria-label="第${i}題結果"><option value="">待填</option><option value="ok" ${result==='ok'?'selected':''}>符合</option><option value="abnormal" ${result==='abnormal'?'selected':''}>缺失／異常</option><option value="na" ${result==='na'?'selected':''}>不適用</option></select><textarea class="half-note" placeholder="檢查紀錄／缺失內容">${esc(r.note||'')}</textarea><textarea class="half-improvement" placeholder="改善說明（異常時填寫）">${esc(r.improvement||'')}</textarea><input class="half-evidence-link" type="url" inputmode="url" placeholder="貼上私有 Google Drive 照片／影片連結" value="${esc(r.evidenceNames||'')}" aria-label="第${i}題證據連結"><div class="half-evidence">照片／影片請先上傳到私有 Google Drive，再貼上連結</div></div>`;}).join('');
+  c.innerHTML=HALF_ITEMS.map(i=>{const r=rows.find(x=>Number(x.item)===i)||{};const result=r.result||'';const key=halfMediaKey(checkId,i);const legacy=mediaItems(r.evidenceNames||'').some(x=>x.legacy)?String(r.evidenceNames||''):'';return `<div class="half-item ${result==='abnormal'?'issue':''}" data-half-item="${i}" data-media-key="${esc(key)}" data-evidence="${esc(r.evidenceNames||'')}"><div class="half-item-head"><span class="half-no">${i}</span><div><div class="half-item-title">${esc(ITEM_TEXT[i])}</div><div class="half-item-tag">${esc(ITEM_RULES[i]?.label||'本期檢查')}</div></div></div><select class="half-result" aria-label="第${i}題結果"><option value="">待填</option><option value="ok" ${result==='ok'?'selected':''}>符合</option><option value="abnormal" ${result==='abnormal'?'selected':''}>缺失／異常</option><option value="na" ${result==='na'?'selected':''}>不適用</option></select><textarea class="half-note" placeholder="檢查紀錄／缺失內容">${esc(r.note||'')}</textarea><textarea class="half-improvement" placeholder="改善說明（異常時填寫）">${esc(r.improvement||'')}</textarea><input class="half-evidence-file" type="file" accept="image/*,video/*" multiple aria-label="第${i}題上傳照片或影片"><div class="half-media-actions"><button type="button" class="half-media-upload">上傳選取的照片／影片</button><span class="half-evidence">單檔最多 25 MB；檔案僅會存入私有 Google Drive。</span></div><div class="half-media-list"></div><input class="half-evidence-link" type="url" inputmode="url" placeholder="已有私有 Google Drive 連結可貼在此處" value="${esc(legacy)}" aria-label="第${i}題既有證據連結"></div>`;}).join('');
   c.querySelectorAll('.half-result').forEach(el=>el.addEventListener('change',()=>el.closest('.half-item').classList.toggle('issue',el.value==='abnormal')));
+  c.querySelectorAll('.half-item').forEach(box=>{renderHalfMediaList(box);box.querySelector('.half-evidence-file').addEventListener('change',e=>{halfPendingMedia.set(box.dataset.mediaKey,Array.from(e.target.files||[]));renderHalfMediaList(box);});box.querySelector('.half-media-upload').addEventListener('click',()=>uploadHalfMedia(box));});
   document.getElementById('halfMsg').textContent=`${dateLabel(date)}・${halfPeriodLabel(period)}・${store}；共 ${rows.length}/33 題已有雲端／本機紀錄`;
 }
 function readHalfForm(){
   const date=document.getElementById('halfDate').value, store=document.getElementById('halfStore').value, inspector=document.getElementById('halfInspector').value.trim(), period=halfPeriod(date), checkId=`${date}|${store}|${period}`, savedAt=new Date().toISOString();
-  const rows=HALF_ITEMS.map(i=>{const box=document.querySelector(`[data-half-item="${i}"]`);return {checkId,date,period,month:date.slice(0,7),store,inspector,item:i,result:box.querySelector('.half-result').value,note:box.querySelector('.half-note').value.trim(),improvement:box.querySelector('.half-improvement').value.trim(),evidenceNames:box.querySelector('.half-evidence-link').value.trim(),savedAt};});
+  const rows=HALF_ITEMS.map(i=>{const box=document.querySelector(`[data-half-item="${i}"]`);const saved=box.dataset.evidence||'';const manual=box.querySelector('.half-evidence-link').value.trim();const evidence=manual&&manual!==saved?manual:saved;return {checkId,date,period,month:date.slice(0,7),store,inspector,item:i,result:box.querySelector('.half-result').value,note:box.querySelector('.half-note').value.trim(),improvement:box.querySelector('.half-improvement').value.trim(),evidenceNames:evidence,savedAt};});
   return rows;
 }
 function saveHalfDraft(){
@@ -1310,12 +1376,16 @@ function submitHalfCheck(){
   if(!privateAccount){showHalfMsg('已保留本機資料；尚未解鎖，未上傳雲端','err');return;}
   const chunks=[];let part=[];rows.forEach(r=>{part.push(r);if(encodeURIComponent(JSON.stringify(part)).length>3500){if(part.length>1){part.pop();chunks.push(part);part=[r];}else{chunks.push(part);part=[];}}});if(part.length)chunks.push(part);
   let chain=Promise.resolve(),written=0;chunks.forEach(chunk=>{chain=chain.then(()=>privateInspectionRequest('write',chunk)).then(res=>{if(res.status!=='ok')throw new Error(res.message||'寫入失敗');written+=Number(res.written||chunk.length||0);});});
-  chain.then(()=>{showHalfMsg(`已同步雲端（${written} 列）；照片／影片請放私有 Drive，並在證據欄貼上連結`,'ok');loadHalfChecks();}).catch(err=>showHalfMsg('雲端同步失敗：'+err.message+'；本機資料仍保留','err'));
+  chain.then(()=>{showHalfMsg(`已同步雲端（${written} 列）；照片／影片已連結至本期檢查，可從歷史紀錄預覽／回放`,'ok');loadHalfChecks();}).catch(err=>showHalfMsg('雲端同步失敗：'+err.message+'；本機資料仍保留','err'));
 }
 function renderHalfSummary(){
   const c=document.getElementById('halfSummary');if(!c)return;const groups={};halfChecks.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const issues=halfChecks.filter(r=>r.result==='abnormal').length;const pending=Object.values(groups).filter(rows=>rows.some(r=>!r.result)).length;c.innerHTML=`<div class="half-stat"><strong>${Object.keys(groups).length}</strong><span>已建立本期檢查</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>缺失／異常項目</span></div><div class="half-stat"><strong>${pending}</strong><span>尚有待填本期</span></div>`;}
 function renderHalfHistory(){
-  const c=document.getElementById('halfHistory');if(!c)return;const groups={};halfChecks.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const keys=Object.keys(groups).sort().reverse();if(!keys.length){c.innerHTML='<div class="empty-state"><div class="big">📝</div>尚無半月督導檢查紀錄</div>';return;}c.innerHTML=`<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>日期／期別</th><th>店點</th><th>督導</th><th>進度</th><th>缺失與改善</th></tr></thead><tbody>${keys.map(k=>{const rows=groups[k],first=rows[0],issue=rows.filter(r=>r.result==='abnormal').length,pending=rows.filter(r=>!r.result).length;return `<tr><td>${esc(first.date)}<br>${esc(halfPeriodLabel(first.period))}</td><td>${esc(first.store)}</td><td>${esc(first.inspector||'—')}</td><td>${rows.filter(r=>r.result).length}/33</td><td class="${issue?'status-issue':''}">${issue?`${issue} 項異常`:'無異常'}${pending?`・待填 ${pending} 題`:''}<br><span class="inv-last">${esc(rows.filter(r=>r.result==='abnormal'&&r.improvement).map(r=>`#${r.item} ${r.improvement}`).join('；')||'')}</span></td></tr>`;}).join('')}</tbody></table></div>`;}
+  const c=document.getElementById('halfHistory');if(!c)return;const groups={};halfChecks.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const keys=Object.keys(groups).sort().reverse();if(!keys.length){c.innerHTML='<div class="empty-state"><div class="big">📝</div>尚無半月督導檢查紀錄</div>';return;}c.innerHTML=`<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>日期／期別</th><th>店點</th><th>督導</th><th>進度</th><th>缺失與改善</th><th>照片／影片</th></tr></thead><tbody>${keys.map(k=>{const rows=groups[k],first=rows[0],issue=rows.filter(r=>r.result==='abnormal').length,pending=rows.filter(r=>!r.result).length,media=rows.flatMap(r=>mediaItems(r.evidenceNames));return `<tr><td>${esc(first.date)}<br>${esc(halfPeriodLabel(first.period))}</td><td>${esc(first.store)}</td><td>${esc(first.inspector||'—')}</td><td>${rows.filter(r=>r.result).length}/33</td><td class="${issue?'status-issue':''}">${issue?`${issue} 項異常`:'無異常'}${pending?`・待填 ${pending} 題`:''}<br><span class="inv-last">${esc(rows.filter(r=>r.result==='abnormal'&&r.improvement).map(r=>`#${r.item} ${r.improvement}`).join('；')||'')}</span></td><td>${media.length?`<button type="button" class="half-media-view" data-check-id="${esc(k)}">預覽／回放 ${media.length} 個檔案</button>`:'—'}</td></tr>`;}).join('')}</tbody></table></div>`;c.querySelectorAll('.half-media-view').forEach(button=>button.addEventListener('click',()=>openHalfMediaViewer(button.dataset.checkId)));}
+function openHalfMediaViewer(checkId){
+  const rows=halfChecks.filter(r=>(r.checkId||`${r.date}|${r.store}|${r.period}`)===checkId);const items=rows.flatMap(r=>mediaItems(r.evidenceNames));if(!items.length){showHalfMsg('此期檢查尚無可預覽的照片或影片','err');return;}
+  document.getElementById('halfMediaModal')?.remove();const modal=document.createElement('div');modal.id='halfMediaModal';modal.className='half-media-modal';modal.innerHTML=`<div class="half-media-modal-card" role="dialog" aria-modal="true" aria-label="巡店照片與影片回放"><button type="button" class="half-media-modal-close">關閉</button><h3>巡店照片／影片回放</h3><p class="hint">${esc(rows[0]?.date||'')}・${esc(rows[0]?.store||'')}</p><div class="half-media-modal-grid">${items.map(x=>halfMediaCard(x)).join('')}</div></div>`;modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});modal.querySelector('.half-media-modal-close').addEventListener('click',()=>modal.remove());document.body.appendChild(modal);
+}
 function exportHalfChecksExcel(){
   if(!halfChecks.length){showHalfMsg('目前沒有半月檢查資料可匯出','err');return;}const rows=[['北一二B 半月督導檢查紀錄'],['日期','期別','店點','督導','題號','檢查內容','結果','檢查紀錄','改善說明','照片／影片附件','最後更新']];halfChecks.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.store).localeCompare(String(b.store))||Number(a.item)-Number(b.item)).forEach(r=>rows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,r.item,ITEM_TEXT[r.item]||'',r.result==='ok'?'符合':r.result==='abnormal'?'缺失／異常':r.result==='na'?'不適用':'待填',r.note||'',r.improvement||'',r.evidenceNames||'',r.savedAt||'']));const issueRows=[['缺失改善追蹤'],['日期','期別','店點','督導','題號','缺失內容','改善說明','照片／影片附件']];halfChecks.filter(r=>r.result==='abnormal').forEach(r=>issueRows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,r.item,r.note||'',r.improvement||'',r.evidenceNames||'']));downloadExcel(`北一二B_半月督導檢查_${new Date().toISOString().slice(0,10)}.xls`,[{name:'半月檢查紀錄',rows},{name:'缺失改善追蹤',rows:issueRows}]);showHalfMsg('已匯出 Excel（完整紀錄＋缺失改善追蹤）','ok');}
 
