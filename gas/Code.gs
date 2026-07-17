@@ -926,7 +926,8 @@ function doPost(e) {
     const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(payload.action || '');
     let result;
-    if (action === 'private_request') result = privateDashboardRequestBinding(payload);
+    if (action === 'half_media_upload') result = uploadHalfMedia(payload);
+    else if (action === 'private_request') result = privateDashboardRequestBinding(payload);
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
     else if (action === 'private_access') result = privateDashboardAccess(payload);
     else if (action === 'private_admin_requests') result = privateDashboardAdminRequests(payload);
