@@ -9,6 +9,7 @@ let cloudRows;
 let halfRows;
 let writeCalls;
 let cloudConfig; // 模擬各區 GAS 回傳的 PT_STORES / PT_TITLE
+let mediaUploads;
 
 function privateScheduleFixture() {
   const names = ['酒泉', '萬大', '大稻埕', '復興', '三創', '杭州', '永吉', '通化', '六張犁'];
@@ -42,6 +43,26 @@ async function stubGas(page) {
     window.PATROL_LEGACY_GAS_URL = 'https://script.google.com/macros/s/test/exec';
   }, privateScheduleFixture());
   await page.route('https://script.google.com/**', route => {
+    const request = route.request();
+    if (request.method() === 'POST') {
+      const payload = JSON.parse(request.postData() || '{}');
+      if (payload.action === 'half_media_upload') {
+        const authed = payload.key === PT_KEY;
+        if (!authed) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'error', message: 'unauthorized' }) });
+        const file = payload.file || {};
+        const id = `media-${mediaUploads.length + 1}`;
+        const media = {
+          id,
+          name: file.name,
+          mimeType: file.type,
+          viewUrl: `https://drive.google.com/file/d/${id}/view`,
+          previewUrl: /^image\//.test(file.type) ? `https://drive.google.com/uc?export=view&id=${id}` : `https://drive.google.com/file/d/${id}/preview`,
+        };
+        mediaUploads.push(media);
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'ok', media }) });
+      }
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'error', message: 'unknown action' }) });
+    }
     const url = new URL(route.request().url());
     const action = url.searchParams.get('action');
     const cb = url.searchParams.get('callback');
@@ -115,7 +136,7 @@ function pasteLine(d, store, code, item, result, reason) {
   return `2026/7/${d} 16:43\t2026/7/${d} 16:00\t2026/7/${d} 18:00\t北一二B\t${code}\t${store}\t測試督導\t${item}\t內容\t${result}\t${reason}`;
 }
 
-test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; cloudConfig = null; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; cloudConfig = null; mediaUploads = []; });
 
 test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
   // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
@@ -329,4 +350,28 @@ test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '匯出 Excel' }).click();
   expect((await downloadPromise).suggestedFilename()).toMatch(/半月督導檢查_.*\.xls/);
+});
+
+test('加密頁籤：半月督導檢查可上傳照片影片並在歷史回放', async ({ page }) => {
+  await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
+  await page.goto(PAGE_URL);
+  await page.locator('.secure-tab[data-view="half"]').click();
+  await page.locator('#halfInspector').fill('測試督導');
+  await page.locator('.half-evidence-file').first().setInputFiles([
+    { name: '展示機.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('photo') },
+    { name: '展示機說明.mp4', mimeType: 'video/mp4', buffer: Buffer.from('video') },
+  ]);
+  await page.getByRole('button', { name: '上傳選取的照片／影片' }).first().click();
+  await expect.poll(() => mediaUploads.length).toBe(2);
+  await expect(page.locator('.half-media-card img').first()).toBeVisible();
+  await expect(page.locator('.half-media-card iframe').first()).toBeVisible();
+
+  await page.getByRole('button', { name: '儲存並同步本期檢查' }).click();
+  await expect.poll(() => halfRows.length).toBe(33);
+  expect(halfRows[0].evidenceNames).toContain('media-1');
+  await page.getByRole('button', { name: /預覽／回放 2 個檔案/ }).click();
+  await expect(page.locator('#halfMediaModal')).toBeVisible();
+  await expect(page.locator('#halfMediaModal img')).toBeVisible();
+  await expect(page.locator('#halfMediaModal iframe')).toBeVisible();
 });
