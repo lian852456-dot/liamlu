@@ -1416,31 +1416,31 @@
   </div>
   <div class="store-grid">
     <div class="store-card" data-store="通化" onclick="selectStore('通化')">
-      <div class="store-icon">🐯</div>通化
+      <div class="store-icon">🛒</div>通化
     </div>
     <div class="store-card" data-store="酒泉" onclick="selectStore('酒泉')">
-      <div class="store-icon">🐻</div>酒泉
+      <div class="store-icon">🍶</div>酒泉
     </div>
     <div class="store-card" data-store="台北三創" onclick="selectStore('台北三創')">
-      <div class="store-icon">🦅</div>三創
+      <div class="store-icon">💡</div>三創
     </div>
     <div class="store-card" data-store="萬大" onclick="selectStore('萬大')">
-      <div class="store-icon">🐘</div>萬大
+      <div class="store-icon">🌟</div>萬大
     </div>
     <div class="store-card" data-store="六張犁" onclick="selectStore('六張犁')">
-      <div class="store-icon">🦌</div>六張犁
+      <div class="store-icon">🌿</div>六張犁
     </div>
     <div class="store-card" data-store="復興南" onclick="selectStore('復興南')">
-      <div class="store-icon">🐺</div>復興南
+      <div class="store-icon">⚡</div>復興南
     </div>
     <div class="store-card" data-store="永吉" onclick="selectStore('永吉')">
-      <div class="store-icon">🐲</div>永吉
+      <div class="store-icon">🔥</div>永吉
     </div>
     <div class="store-card" data-store="大稻埕" onclick="selectStore('大稻埕')">
-      <div class="store-icon">🦁</div>大稻埕
+      <div class="store-icon">🎪</div>大稻埕
     </div>
     <div class="store-card new-badge" data-store="杭州南" onclick="selectStore('杭州南')">
-      <div class="store-icon">🐎</div>杭州南
+      <div class="store-icon">🚀</div>杭州南
     </div>
   </div>
 
@@ -1704,25 +1704,10 @@
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_reno16f" placeholder="0" step="1">
       </div>
-      <div class="kpi-input-wrap">
-        <label>Pixel 10 Pro Fold<span class="tw-bonus"><span class="tw-b50">50%・$50</span><span class="tw-b100">100%・$75</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_pixel10fold" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>Find X9s<span class="tw-bonus"><span class="tw-b50">50%・$210</span><span class="tw-b100">100%・$315</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_findx9s" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>SONY 1 VIII &amp; moto razr fold（動店）<span class="tw-bonus"><span class="tw-b50">50%・$275</span><span class="tw-b100">100%・$415</span></span></label>
+      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
+        <label style="color:#b8860b;">moto razr fold<span class="tw-bonus"><span class="tw-b50">50%・$275</span><span class="tw-b100">100%・$415</span></span></label>
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_sony1" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>SHARP Poketomo<span class="tw-bonus"><span class="tw-b50">50%・$35</span><span class="tw-b100">100%・$50</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_poketomo" placeholder="0" step="1">
       </div>
     </div>
 
@@ -1743,16 +1728,6 @@
         <label style="color:#b8860b;">Y21 &amp; Redmi Note 15 Pro<span class="tw-bonus"><span class="tw-b50">50%・$85</span><span class="tw-b100">100%・$125</span></span></label>
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_y21" placeholder="0" step="1">
-      </div>
-    </div>
-
-    <!-- KPI 穿戴 -->
-    <div style="font-size:11px;font-weight:700;color:#6b7280;background:rgba(107,114,128,0.1);border:1px solid rgba(107,114,128,0.3);border-radius:6px;padding:4px 10px;margin:8px 0 6px;">⌚ KPI 穿戴</div>
-    <div class="form-grid">
-      <div class="kpi-input-wrap">
-        <label>myFirst兒錶 &amp; 咖波TCL兒錶（動店）<span class="tw-bonus"><span class="tw-b50">50%・$75</span><span class="tw-b100">100%・$115</span></span></label>
-        <span class="ki-icon">⌚</span>
-        <input type="number" id="f_tw_myfirst" placeholder="0" step="1">
       </div>
     </div>
 
@@ -2663,7 +2638,8 @@ function renderKpiBattle() {
 function renderKpiBattleStores() {
   const aggregate = _kpiBattleData.aggregate || {};
   const stores = [...(_kpiBattleData.stores || [])].sort((a, b) => (a.company_rank || 9999) - (b.company_rank || 9999));
-  const selected = stores.find(row => row.store === document.getElementById('kpiBattleStoreSelect')?.value) || stores[0];
+  const rows = [{ ...aggregate, store: '北一二B整體', isDistrict: true }, ...stores];
+  const selected = rows.find(row => row.store === document.getElementById('kpiBattleStoreSelect')?.value) || rows[0];
   return `
     <div class="summary-grid">
       <div class="summary-card"><div class="sc-label">北一二B KPI</div><div class="sc-val ${kpiBattleTone(aggregate.overall_kpi)}">${kpiBattlePercent(aggregate.overall_kpi)}</div><div class="sc-sub">${kpiBattleDod(aggregate.overall_kpi_dod) || '整體達成率'}</div></div>
@@ -2671,14 +2647,14 @@ function renderKpiBattleStores() {
       <div class="summary-card"><div class="sc-label">加掛得分</div><div class="sc-val" style="color:var(--purple)">${kpiBattleNumber(aggregate.addon_score)}</div><div class="sc-sub">${aggregate.addon_score_dod == null ? '整體得分' : `DOD ${aggregate.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(aggregate.addon_score_dod)} 分`}</div></div>
       <div class="summary-card"><div class="sc-label">KPI未達100%</div><div class="sc-val" style="color:var(--red)">${stores.filter(row => Number(row.overall_kpi) < 1).length}</div><div class="sc-sub">間門市</div></div>
     </div>
-    <div class="section-divider">店點 KPI 排名</div>
+    <div class="section-divider">北一二B／店點 KPI 排名</div>
     <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
       <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th><th>加掛</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
-      <tbody>${stores.map(row => `<tr><td class="store-name">${row.store}</td><td><span class="val-gold">${row.company_rank ?? '—'}</span>${kpiBattleRankDod(row.company_rank_dod)}</td><td>${kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${kpiBattleNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleMetricCell(row.core?.a999)}</td><td>${kpiBattleMetricCell(row.core?.a1399)}</td><td>${kpiBattleMetricCell(row.core?.haosu)}</td><td>${kpiBattleMetricCell(row.core?.r1399)}</td></tr>`).join('')}</tbody>
+      <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${row.store}</td><td><span class="val-gold">${row.company_rank ?? '—'}</span>${kpiBattleRankDod(row.company_rank_dod)}</td><td>${kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${kpiBattleNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleMetricCell(row.core?.a999)}</td><td>${kpiBattleMetricCell(row.core?.a1399)}</td><td>${kpiBattleMetricCell(row.core?.haosu)}</td><td>${kpiBattleMetricCell(row.core?.r1399)}</td></tr>`).join('')}</tbody>
     </table></div></div>
     <div class="section-divider">各項 KPI 達成</div>
     <div class="card">
-      <div class="kpi-battle-filter"><label>選擇店點<select id="kpiBattleStoreSelect" onchange="renderKpiBattle()">${stores.map(row => `<option value="${row.store}" ${row.store === selected?.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label></div>
+      <div class="kpi-battle-filter"><label>選擇區／店點<select id="kpiBattleStoreSelect" onchange="renderKpiBattle()">${rows.map(row => `<option value="${row.store}" ${row.store === selected?.store ? 'selected' : ''}>${row.isDistrict ? '🏢 ' : ''}${row.store}</option>`).join('')}</select></label></div>
       <div class="kpi-metric-grid">${Object.entries(selected?.metrics || {}).map(([name, metric]) => `<div class="kpi-metric-card"><div class="label">${name}</div><div class="value kpi-rate ${kpiBattleTone(metric.rate)}">${kpiBattlePercent(metric.rate)}</div>${kpiBattleTargetLine(metric, true)}${kpiBattleDod(metric.dod)}</div>`).join('')}</div>
     </div>`;
 }
@@ -2813,8 +2789,7 @@ const FIELDS = [
   'insurance_num','insurance_den','insurance_pct',
   'device_num','device_den','device_ratio',
   'tw_pixel10','tw_s26u','tw_sharpr11','tw_vivo','tw_s26','tw_reno16f',
-  'tw_pixel10fold','tw_findx9s','tw_sony1','tw_poketomo',
-  'tw_oppoa6x','tw_a27','tw_y21','tw_myfirst'
+  'tw_sony1','tw_oppoa6x','tw_a27','tw_y21'
 ];
 
 
@@ -3008,14 +2983,10 @@ async function renderSummary() {
     {key:'tw_vivo',       label:'vivo X300系列',      isRaw:true},
     {key:'tw_s26',        label:'S26/S26+/A57',       isRaw:true},
     {key:'tw_reno16f',    label:'Reno16 F',           isRaw:true},
-    {key:'tw_pixel10fold',label:'Pixel 10 Pro Fold',  isRaw:true},
-    {key:'tw_findx9s',    label:'Find X9s',           isRaw:true},
-    {key:'tw_sony1',      label:'SONY 1 VIII/razr',   isRaw:true},
-    {key:'tw_poketomo',   label:'SHARP Poketomo',     isRaw:true},
+    {key:'tw_sony1',      label:'moto razr fold',     isRaw:true},
     {key:'tw_oppoa6x',    label:'OPPO A6x',           isRaw:true},
     {key:'tw_a27',        label:'A27 & A17',          isRaw:true},
-    {key:'tw_y21',        label:'Y21/Redmi 15 Pro',   isRaw:true},
-    {key:'tw_myfirst',    label:'兒錶',               isRaw:true},
+    {key:'tw_y21',        label:'Y21/Redmi Note 15 Pro', isRaw:true},
   ];
   renderSummaryTable('summaryTable3', date, sumSeg, cols3);
 
@@ -3455,17 +3426,227 @@ async function renderPlayback() {
     {key:'tw_vivo',       label:'vivo X300系列',      isRaw:true},
     {key:'tw_s26',        label:'S26/S26+/A57',       isRaw:true},
     {key:'tw_reno16f',    label:'Reno16 F',           isRaw:true},
-    {key:'tw_pixel10fold',label:'Pixel 10 Pro Fold',  isRaw:true},
-    {key:'tw_findx9s',    label:'Find X9s',           isRaw:true},
-    {key:'tw_sony1',      label:'SONY 1 VIII/razr',   isRaw:true},
-    {key:'tw_poketomo',   label:'SHARP Poketomo',     isRaw:true},
+    {key:'tw_sony1',      label:'moto razr fold',     isRaw:true},
     {key:'tw_oppoa6x',    label:'OPPO A6x',           isRaw:true},
     {key:'tw_a27',        label:'A27 & A17',          isRaw:true},
-    {key:'tw_y21',        label:'Y21/Redmi 15 Pro',   isRaw:true},
-    {key:'tw_myfirst',    label:'兒錶',               isRaw:true},
+    {key:'tw_y21',        label:'Y21/Redmi Note 15 Pro', isRaw:true},
   ];
   renderSummaryTable('pbTable3', date, pbSeg, colsTw);
   renderStorePersonalDetail(date, pbSeg, dayCache, 'pbStorePersonalSection');
+}
+
+// ════════════════════════════════════
+// KPI 達成與個績
+// ════════════════════════════════════
+let perfSeg = 16;
+let perfScope = 'day'; // 'day' | 'month'
+let _perfInited = false;
+const _perfDayCache = {}; // date -> { ok, entries }
+
+function setPerfSeg(s) {
+  perfSeg = s;
+  document.getElementById('perfSeg16').className = 'seg-btn' + (s === 16 ? ' active-16' : '');
+  document.getElementById('perfSeg21').className = 'seg-btn' + (s === 21 ? ' active-21' : '');
+  renderPerf();
+}
+function setPerfScope(sc) {
+  perfScope = sc;
+  renderPerf();
+}
+
+// 單日個人成績：雲端(pread) 16/21 都抓、21 優先，本機記錄覆蓋雲端
+// 回傳 { ok, entries: { 'store|name': {store,name,seg,a999,a1399,haosu,r1399,kpi} } }
+async function _getPersonalDay(date) {
+  const n = v => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
+  const entries = {};
+  let ok = true;
+  for (const seg of [16, 21]) {
+    const recs = {};
+    if (GAS_URL) {
+      try {
+        const res = await fetch(`${GAS_URL}?action=pread&date=${date}&seg=${seg}`, { cache: 'no-store' });
+        const json = await res.json();
+        if (json.status !== 'ok') throw new Error(json.message || 'pread error');
+        Object.entries(json.data || {}).forEach(([store, people]) => {
+          Object.entries(people || {}).forEach(([name, rec]) => { recs[store + '|' + name] = rec; });
+        });
+      } catch (e) {
+        ok = false; // 網路失敗 → 這天不寫入永久快取，避免月累計永遠少算
+      }
+    }
+    STORES.forEach(store => {
+      getStoreNames(store).forEach(name => {
+        const r = _loadReview(store, name, date, seg);
+        if (r) recs[store + '|' + name] = r;
+      });
+    });
+    Object.entries(recs).forEach(([key, rec]) => {
+      const d = rec && rec.data;
+      if (!d) return;
+      const [store, name] = key.split('|');
+      entries[key] = { store, name, seg,
+        a999: n(d.a999), a1399: n(d.a1399), haosu: n(d.haosu), r1399: n(d.r1399),
+        kpi: (d.kpi !== '' && d.kpi != null) ? n(d.kpi) : null };
+    });
+  }
+  return { ok, entries };
+}
+
+// 帶快取版：過去日期成功抓過就存 localStorage，今天永遠重抓
+async function _getPersonalDayCached(date) {
+  if (_perfDayCache[date]) return _perfDayCache[date];
+  const isPast = date < today();
+  if (isPast) {
+    try {
+      const raw = localStorage.getItem('perfDay_' + date);
+      if (raw) return (_perfDayCache[date] = { ok: true, entries: JSON.parse(raw) });
+    } catch (e) {}
+  }
+  const day = await _getPersonalDay(date);
+  _perfDayCache[date] = day;
+  if (isPast && day.ok) {
+    try { localStorage.setItem('perfDay_' + date, JSON.stringify(day.entries)); } catch (e) {}
+  }
+  return day;
+}
+
+// 月累計：當月 1 號到查詢日，每人四項加總＋最新 KPI＋回報天數
+async function _getPersonalMonth(date, statusEl) {
+  const ym = date.slice(0, 7);
+  const lastDay = Number(date.slice(8, 10));
+  const dates = [];
+  for (let d = 1; d <= lastDay; d++) dates.push(ym + '-' + String(d).padStart(2, '0'));
+
+  const agg = {};
+  let done = 0, failed = 0;
+  const chunk = 7;
+  for (let i = 0; i < dates.length; i += chunk) {
+    await Promise.all(dates.slice(i, i + chunk).map(async d => {
+      const day = await _getPersonalDayCached(d);
+      if (!day.ok) failed++;
+      Object.entries(day.entries).forEach(([key, e]) => {
+        if (!agg[key]) agg[key] = { store: e.store, name: e.name,
+          a999: 0, a1399: 0, haosu: 0, r1399: 0, days: 0, kpi: null, lastDate: '' };
+        const a = agg[key];
+        a.a999 += e.a999; a.a1399 += e.a1399; a.haosu += e.haosu; a.r1399 += e.r1399;
+        a.days += 1;
+        if (d >= a.lastDate) { a.lastDate = d; if (e.kpi != null) a.kpi = e.kpi; }
+      });
+      done++;
+      if (statusEl) statusEl.textContent = `📅 載入中… ${done}/${dates.length} 天`;
+    }));
+  }
+  if (statusEl) statusEl.textContent = failed > 0 ? `⚠️ 有 ${failed} 天讀取失敗，數字可能少算` : '';
+  return agg;
+}
+
+function _perfPersonalTable(rows, isMonth) {
+  const fmtV = v => v % 1 === 0 ? v : v.toFixed(1);
+  const td = 'padding:8px 10px;border-bottom:1px solid var(--border-dim);text-align:center;font-size:13px;white-space:nowrap;';
+  if (rows.length === 0) {
+    return `<div style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:12px;padding:16px;text-align:center;color:#9ca3af;font-size:13px;">${isMonth ? '本月' : '這天'}還沒有任何個人回報資料</div>`;
+  }
+  const body = rows.map((r, i) => {
+    const medal = r.total > 0 && i < 3 ? ['🥇', '🥈', '🥉'][i] : `${i + 1}`;
+    const kpiTxt = r.kpi != null
+      ? `<span style="font-weight:800;color:${r.kpi >= 100 ? '#16a34a' : r.kpi >= 80 ? '#d97706' : '#dc2626'};">${fmtV(r.kpi)}%</span>` : '—';
+    return `<tr${i < 3 && r.total > 0 ? ' style="background:#fffbeb;"' : ''}>
+      <td style="${td}font-weight:800;">${medal}</td>
+      <td style="${td}text-align:left;"><strong>${r.name}</strong><span style="color:var(--text-muted);font-size:11px;">｜${r.store}</span></td>
+      <td style="${td}${r.a999 === 0 ? 'color:#d1d5db;' : ''}">${fmtV(r.a999)}</td>
+      <td style="${td}${r.a1399 === 0 ? 'color:#d1d5db;' : ''}">${fmtV(r.a1399)}</td>
+      <td style="${td}${r.haosu === 0 ? 'color:#d1d5db;' : ''}">${fmtV(r.haosu)}</td>
+      <td style="${td}${r.r1399 === 0 ? 'color:#d1d5db;' : ''}">${fmtV(r.r1399)}</td>
+      <td style="${td}font-weight:800;color:var(--accent-bright);">${fmtV(r.total)}</td>
+      <td style="${td}">${kpiTxt}</td>
+      ${isMonth ? `<td style="${td}color:var(--text-dim);">${r.days}</td>` : ''}
+    </tr>`;
+  }).join('');
+  const th = 'padding:8px 10px;font-size:12px;font-weight:800;color:var(--text-dim);border-bottom:2px solid var(--border);text-align:center;white-space:nowrap;';
+  return `<div class="table-wrap"><table style="width:100%;border-collapse:collapse;">
+    <tr>
+      <th style="${th}">排名</th><th style="${th}text-align:left;">同仁</th>
+      <th style="${th}">A999</th><th style="${th}">A1399</th><th style="${th}">好速</th><th style="${th}">R1399</th>
+      <th style="${th}">四項合計</th><th style="${th}">KPI</th>
+      ${isMonth ? `<th style="${th}">回報天數</th>` : ''}
+    </tr>${body}</table></div>`;
+}
+
+async function renderPerf() {
+  const dateEl = document.getElementById('perfDate');
+  if (!dateEl.value) dateEl.value = today();
+  if (!_perfInited) {
+    _perfInited = true;
+    const hour = new Date().getHours();
+    if (hour >= 19 || hour < 6) setPerfSeg(21); // setPerfSeg 會再呼叫 renderPerf
+    if (hour >= 19 || hour < 6) return;
+  }
+  const date = dateEl.value;
+  const el = document.getElementById('perfResult');
+  el.innerHTML = `<div class="card" style="text-align:center;padding:24px;color:var(--text-muted)">🔄 載入中…</div>`;
+
+  // ── 店點 KPI 達成 ──
+  if (GAS_URL) await fetchDayData(date, perfSeg);
+  const dayCache = _cache[cacheKey(date, perfSeg)] || {};
+  const storeRows = STORES.map(s => {
+    const d = dayCache[s];
+    const kpi = d ? parseFloat(d.kpi) : NaN;
+    return { store: s, kpi, rank: d && d.rank !== '' && d.rank != null ? d.rank : null };
+  }).sort((a, b) => (isNaN(b.kpi) ? -1 : b.kpi) - (isNaN(a.kpi) ? -1 : a.kpi));
+  const validKpi = storeRows.filter(r => !isNaN(r.kpi));
+  const avgKpi = validKpi.length ? validKpi.reduce((a, r) => a + r.kpi, 0) / validKpi.length : null;
+  const hitCount = validKpi.filter(r => r.kpi >= 100).length;
+
+  const storeBars = storeRows.map(r => {
+    const has = !isNaN(r.kpi);
+    const color = !has ? '#d1d5db' : r.kpi >= 100 ? '#16a34a' : r.kpi >= 90 ? '#d97706' : '#dc2626';
+    const w = has ? Math.min(r.kpi, 120) / 120 * 100 : 0;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border-dim);">
+      <span style="flex:0 0 72px;font-size:13px;font-weight:700;color:var(--text);">${r.store}</span>
+      <div style="flex:1;height:14px;background:#f3f4f6;border-radius:7px;overflow:hidden;">
+        <div style="width:${w}%;height:100%;background:${color};border-radius:7px;transition:width .4s;"></div>
+      </div>
+      <span style="flex:0 0 62px;text-align:right;font-size:13px;font-weight:800;color:${color};">${has ? r.kpi.toFixed(1) + '%' : '未回報'}</span>
+      <span style="flex:0 0 46px;text-align:right;font-size:11px;color:var(--text-muted);">${r.rank ? '#' + r.rank : ''}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="section-divider">🎯 店點 KPI 達成（${date} ${perfSeg}:00）</div>
+    <div class="card" style="padding:14px 16px;">
+      <div style="display:flex;gap:14px;margin-bottom:10px;font-size:12px;color:var(--text-dim);">
+        <span>區內均值 <strong style="color:${avgKpi != null && avgKpi >= 100 ? '#16a34a' : 'var(--accent-bright)'};font-size:15px;">${avgKpi != null ? avgKpi.toFixed(1) + '%' : '—'}</strong></span>
+        <span>達標 <strong style="color:#16a34a;font-size:15px;">${hitCount}</strong>/${validKpi.length || '—'} 間</span>
+      </div>
+      ${storeBars}
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">#數字為公司排名｜綠 ≥100%・橘 ≥90%・紅 <90%</div>
+    </div>
+    <div class="section-divider">👤 個績排行（主力四項）</div>
+    <div class="card" style="padding:14px 12px;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+        <button class="seg-btn ${perfScope === 'day' ? 'active-16' : ''}" style="flex:0 0 auto;padding:7px 18px;" onclick="setPerfScope('day')">當日</button>
+        <button class="seg-btn ${perfScope === 'month' ? 'active-21' : ''}" style="flex:0 0 auto;padding:7px 18px;" onclick="setPerfScope('month')">月累計</button>
+        <span id="perfMonthStatus" style="font-size:11px;color:var(--text-muted);"></span>
+      </div>
+      <div id="perfPersonalArea"><div style="text-align:center;padding:14px;color:var(--text-muted);font-size:13px;">🔄 載入中…</div></div>
+    </div>`;
+
+  // ── 個績 ──
+  const area = document.getElementById('perfPersonalArea');
+  const statusEl = document.getElementById('perfMonthStatus');
+  let rows;
+  if (perfScope === 'day') {
+    const day = await _getPersonalDay(date);
+    if (!day.ok && statusEl) statusEl.textContent = '⚠️ 雲端讀取失敗，僅顯示本機資料';
+    rows = Object.values(day.entries);
+  } else {
+    rows = Object.values(await _getPersonalMonth(date, statusEl));
+  }
+  rows.forEach(r => { r.total = r.a999 + r.a1399 + r.haosu + r.r1399; });
+  rows.sort((a, b) => b.total - a.total || (b.kpi || 0) - (a.kpi || 0));
+  if (document.getElementById('perfPersonalArea') === area) {
+    area.innerHTML = _perfPersonalTable(rows, perfScope === 'month');
+  }
 }
 
 // ════════════════════════════════════
@@ -3478,8 +3659,8 @@ function selectStore(store) {
   document.getElementById('fillFormArea').style.display = 'block';
 
   const sub = document.getElementById('fillHeroSub');
-  const icons = {'通化':'🐯','酒泉':'🐻','台北三創':'🦅','萬大':'🐘','六張犁':'🦌',
-                 '復興南':'🐺','永吉':'🐲','大稻埕':'🦁','杭州南':'🐎'};
+  const icons = {'通化':'🛒','酒泉':'🍶','台北三創':'💡','萬大':'🌟','六張犁':'🌿',
+                 '復興南':'⚡','永吉':'🔥','大稻埕':'🎪','杭州南':'🚀'};
   sub.textContent = `${icons[store]||'🏪'} ${store} · 目前選擇 ${currentSeg}:00 時段`;
 
   const date = document.getElementById('fillDate').value;
