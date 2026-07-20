@@ -31,7 +31,16 @@ const KPI_BATTLE_FIXTURE = {
   report_date: '2026-07-16',
   previous_report_date: '2026-07-15',
   source_date_range: '2026/07/01 ~ 07/15',
-  aggregate: { overall_kpi: 1.0547, overall_kpi_dod: 0.009, company_rank: 27, company_rank_dod: 2, addon_score: 13.36, addon_score_dod: 0.09 },
+  aggregate: {
+    overall_kpi: 1.0547, overall_kpi_dod: 0.009, company_rank: 27, company_rank_dod: 2, addon_score: 13.36, addon_score_dod: 0.09,
+    core: {
+      a999: { actual: 72, target: 80, daily_target: 38.7, daily_gap: 33.3, rate: 0.9, dod: 0.01 },
+      a1399: { actual: 31, target: 40, daily_target: 19.4, daily_gap: 11.6, rate: 0.775, dod: 0.02 },
+      haosu: { actual: 46, target: 45, daily_target: 21.8, daily_gap: 24.2, rate: 1.0222, dod: 0.01 },
+      r1399: { actual: 60, target: 70, daily_target: 33.9, daily_gap: 26.1, rate: 0.8571, dod: -0.01 },
+    },
+    metrics: { '好速案銷售點數': { actual: 46, target: 45, daily_target: 21.8, daily_gap: 24.2, rate: 1.0222, dod: 0.01 } },
+  },
   stores: [{
     store: '大稻埕', company_rank: 65, company_rank_dod: -3, overall_kpi: 1.2435, overall_kpi_dod: 0.056, addon_score: 13.57, addon_score_dod: 0.23,
     core: {
@@ -44,27 +53,47 @@ const KPI_BATTLE_FIXTURE = {
   }],
   personal: [{
     store: '大稻埕', role: '業務代表(I)', category: '業代', name: '測＊員', rank: 8, rank_dod: 2, overall_rate: 1.056, overall_rate_dod: 0.01,
-    phone_award_projected: 3200, phone_award_rank: 8, phone_award_eligible: 'Y',
+    phone_award_actual: 1800, phone_award_projected: 3200, phone_award_rank: 8, phone_award_eligible: 'Y', insurance_attach_rate: 0.42,
     metrics: {
       A999: { actual: 4, target: 3, rate: 1.3333 },
       A1399: { actual: 2, target: 2, rate: 1 },
       '好速': { actual: 2, target: 3, rate: 0.6667 },
       R1399: { actual: 3, target: 2, rate: 1.5 },
+      RT: { actual: 8, target: 10, rate: 0.8 },
+      R999: { actual: 4, target: 5, rate: 0.8 },
+      '特維': { actual: 3, target: 4, rate: 0.75 },
+      '配件': { actual: 9000, target: 10000, rate: 0.9 },
+      '包膜': { actual: 1800, target: 2000, rate: 0.9 },
     },
   }],
 };
 
+const AWARD_ITEMS = [
+  ['Samsung S26/S26+/A57', 8, 17, 0.4706, -1, 2335],
+  ['vivo X300/X300 Pro/V70 FE', 7, 10, 0.7, 2, 1500],
+  ['Google Pixel 10/10 Pro/10 Pro XL/10a', 3, 8, 0.375, -1, 1105],
+  ['OPPO Reno16 F', 4, 6, 0.6667, 1, 780],
+  ['OPPO A6x', 2, 5, 0.4, -1, 600],
+  ['SHARP AQUOS R11', 1, 4, 0.25, -1, 470],
+  ['Samsung S26 Ultra', 1, 3, 0.3333, -1, 405],
+  ['moto razr fold', 0, 2, 0, -1, 300],
+  ['Samsung A27/A17', 2, 3, 0.6667, 0, 250],
+  ['vivo Y21/Redmi Note 15 Pro', 1, 2, 0.5, 0, 100],
+].map(([display_name, actual, target, rate, difference, incremental_award]) => ({
+  display_name, actual, target, rate, difference, incremental_award,
+  next_label: '下一獎階', threshold_target: Math.ceil(target * 0.5),
+}));
+
 const AWARDS_BATTLE_FIXTURE = {
-  supervisor: { supervisor_award: 720, manager_award: 4520, projected: 11260, rank: '22', award: 'Y' },
-  overall_priorities: [{
-    display_name: 'Google Pixel 10', actual: 23, target: 48, rate: 0.4792,
-    units_needed: 1, next_label: '解鎖店長50%', incremental_award: 1105, close_unlock: true,
-  }],
-  stores: [{
-    store: '通化', award: { rank: '18', award: 'Y', manager_award: 7395, supervisor_award: 7465 },
-    priorities: [{ display_name: 'Samsung S26', actual: 8, target: 17, rate: 0.4706, units_needed: 1, next_label: '解鎖店長50%', incremental_award: 2335, close_unlock: true }],
-    items: [{ display_name: 'Samsung S26', actual: 8, target: 17, rate: 0.4706, units_needed: 1, next_label: '解鎖店長50%', incremental_award: 2335 }],
-  }],
+  supervisor: { actual_total: 2431, projected: 11260, rank: '22', award: 'Y' },
+  overall: {
+    store: '北一二B整體', award: { actual_total: 2431, projected: 11260, rank: '22', award: 'Y' },
+    priorities: AWARD_ITEMS.slice(0, 3), items: AWARD_ITEMS,
+  },
+  stores: [
+    { store: '通化', award: { actual_total: 11465, projected: 14860, rank: '18', award: 'Y' }, priorities: AWARD_ITEMS.slice(0, 3), items: AWARD_ITEMS },
+    { store: '酒泉', award: { actual_total: 8645, projected: 11460, rank: '189', award: 'N' }, priorities: AWARD_ITEMS.slice(1, 4), items: AWARD_ITEMS },
+  ],
 };
 
 async function mockKpiBattle(page) {
@@ -165,6 +194,15 @@ test.describe('填報頁籤 - 時段切換', () => {
 });
 
 test.describe('填報頁籤 - 表單輸入', () => {
+  test('台獎填報維持 10 款且只保留 moto', async ({ page }) => {
+    await mockGAS(page);
+    await page.goto(FILE_URL);
+    await page.locator('.store-card[data-store="通化"]').click();
+    await expect(page.locator('#f_tw_sony1')).toBeVisible();
+    await expect(page.locator('label').filter({ hasText: 'moto razr fold' })).toBeVisible();
+    await expect(page.locator('#f_tw_pixel10fold, #f_tw_findx9s, #f_tw_poketomo, #f_tw_myfirst')).toHaveCount(0);
+  });
+
   test('KPI 欄位可以輸入數值', async ({ page }) => {
     await mockGAS(page);
     await page.goto(FILE_URL);
@@ -263,8 +301,18 @@ test.describe('KPI 戰情', () => {
     await expect(page.locator('#kpiBattleContent')).toContainText('大稻埕');
     await expect(page.locator('#kpiBattleContent')).toContainText('A999');
     await expect(page.locator('#kpiBattleContent')).toContainText('R1399');
-    await expect(page.locator('#kpiBattleContent')).toContainText('DOD');
-    await expect(page.locator('#kpiBattleSourceNote')).toContainText('100%日目標');
+    await expect(page.locator('#kpiBattleContent')).toContainText('較昨日');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('尚差或超前');
+  });
+
+  test('北一二B整體列置頂，且可查看整體 KPI 明細', async ({ page }) => {
+    await mockGAS(page);
+    await mockKpiBattle(page);
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("KPI戰情")').click();
+    await expect(page.locator('#kpiBattleContent tbody tr').first()).toContainText('北一二B整體');
+    await page.selectOption('#kpiBattleStoreSelect', '北一二B整體');
+    await expect(page.locator('#kpiBattleContent')).toContainText('好速案銷售點數');
   });
 
   test('可切換至個績排名且顯示遮罩姓名', async ({ page }) => {
@@ -276,20 +324,31 @@ test.describe('KPI 戰情', () => {
     await expect(page.locator('#kpiBattleContent')).toContainText('測＊員');
     await expect(page.locator('#kpiBattleContent')).toContainText('總達成率');
     await expect(page.locator('#kpiBattleContent')).toContainText('個人台獎');
+    await expect(page.locator('#kpiBattleContent')).toContainText('實際獎金');
+    await expect(page.locator('#kpiBattleContent')).toContainText('推估獎金');
+    await expect(page.locator('#kpiBattleContent')).toContainText('特維');
+    await expect(page.locator('#kpiBattleContent')).toContainText('保險搭售率');
     await expect(page.locator('#kpiBattleContent')).toContainText('DOD');
   });
 });
 
 test.describe('台獎戰情', () => {
-  test('督導獎金與店點優先補量顯示正確', async ({ page }) => {
+  test('督導六卡、店點實際獎金排序與 10 台篩選顯示正確', async ({ page }) => {
     await mockGAS(page);
     await mockAwardsBattle(page);
     await page.goto(FILE_URL);
     await page.locator('.tab-btn:has-text("台獎戰情")').click();
     await expect(page.locator('#panel-awards-battle')).toBeVisible();
-    await expect(page.locator('#awardsBattleContent')).toContainText('北一二B 督導預估');
-    await expect(page.locator('#awardsBattleContent')).toContainText('解鎖店長50%');
+    await expect(page.locator('#awardsBattleContent')).toContainText('督導區實際獎金');
+    await expect(page.locator('#awardsBattleContent')).toContainText('督導區推估獎金');
+    await expect(page.locator('#awardsBattleContent')).toContainText('有領獎店');
+    await expect(page.locator('#awardsBattleContent')).toContainText('會增加多少獎金');
     await expect(page.locator('#awardsBattleContent')).toContainText('通化');
+    await expect(page.locator('.award-store-card').nth(1)).toContainText('通化');
+    await expect(page.locator('#awardsStoreSelect')).toHaveValue('通化');
+    await expect(page.locator('#awardsBattleContent .award-model')).toHaveCount(10);
+    await page.selectOption('#awardsStoreSelect', '酒泉');
+    await expect(page.locator('#awardsStoreSelect')).toHaveValue('酒泉');
   });
 });
 
