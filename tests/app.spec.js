@@ -329,6 +329,9 @@ test.describe('KPI 戰情', () => {
     await expect(page.locator('#kpiBattleContent')).toContainText('特維');
     await expect(page.locator('#kpiBattleContent')).toContainText('保險搭售率');
     await expect(page.locator('#kpiBattleContent')).toContainText('DOD');
+    const headers = await page.locator('#kpiBattleContent thead th').allTextContents();
+    expect(headers.indexOf('保險搭售率')).toBe(headers.indexOf('個人台獎') + 1);
+    expect(headers.indexOf('R999')).toBe(headers.indexOf('R1399') + 1);
   });
 });
 
