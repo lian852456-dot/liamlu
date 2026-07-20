@@ -1285,6 +1285,26 @@ const KPICALC_ITEMS = [
   ['MyVideo&KKBOX','MyVideo&KKBOX',1],['Apple&Google服務及雜誌週刊開通數','Apple&Google開通',1],
 ];
 
+// 督導本人免裝置綁定：
+//   1. 專案設定（⚙️）→ 指令碼屬性 → 新增 DASHBOARD_TRUSTED_EMPLOYEE_ID = 你的員編
+//   2. 函式選單選 kpiCalcSetupSelf → 執行一次
+// 之後該員編在任何裝置輸入員編即可登入 kpi.html 與戰情，不用申請綁定。
+function kpiCalcSetupSelf() {
+  const raw = PropertiesService.getScriptProperties().getProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID');
+  if (!raw) throw new Error('請先在「專案設定 > 指令碼屬性」新增 DASHBOARD_TRUSTED_EMPLOYEE_ID = 你的員編');
+  const employeeId = privateDashboardCleanEmployeeId(raw);
+  const sheet = privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  const user = lookup.user || {
+    employee_id: employeeId, masked_name: '督導', store: '北一二B', role: '督導',
+    device_id: '', device_bound_at: '', last_login_at: ''
+  };
+  user.status = 'active';
+  if (user._row) privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, user._row, user);
+  else privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, sheet.getLastRow() + 1, user);
+  return { trusted: employeeId, status: 'active', note: '此員編已可在任何裝置直接登入' };
+}
+
 function setupKpiCalcAutoUpdate() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     if (t.getHandlerFunction() === 'kpiCalcAutoUpdate') ScriptApp.deleteTrigger(t);
