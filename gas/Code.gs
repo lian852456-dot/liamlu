@@ -936,6 +936,8 @@ function doPost(e) {
     else if (action === 'private_admin_set_trusted_employee') result = privateDashboardAdminSetTrustedEmployee(payload);
     else if (action === 'private_sync_roster') result = privateDashboardSyncRoster(payload);
     else if (action === 'private_publish') result = privateDashboardPublish(payload);
+    else if (action === 'kpicalc_access') result = kpiCalcAccess(payload);
+    else if (action === 'kpicalc_publish') result = kpiCalcPublish(payload);
     else throw new Error('unknown private dashboard action');
     return jsonResponse({ status: 'ok', ...result });
   } catch (err) {
@@ -1213,6 +1215,45 @@ function privateDashboardAdminSetTrustedEmployee(payload) {
     props.setProperty('DASHBOARD_NOTIFY_EMAIL', notificationEmail);
   }
   return { trustedEmployeeId: employeeId };
+}
+
+// ════════════════════════════════════
+// KPI 試算（kpi.html）— 與私有戰情共用員編名冊、裝置綁定與審核流程
+// 資料檔存在同一個私有 Drive 資料夾，不進 GitHub。
+// 發佈方式：kpi.html 進階設定 → 督導發佈區（管理者密碼＋JSON 檔）。
+// ════════════════════════════════════
+
+const PRIVATE_KPICALC_FILE = 'north12b-kpicalc-private-latest.json';
+
+function kpiCalcAccess(payload) {
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
+    throw new Error('此員編尚未核准此裝置，請先「首次申請綁定」並等待督導核准');
+  }
+  lookup.user.last_login_at = privateDashboardNow();
+  privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
+  const files = privateDashboardFolder().getFilesByName(PRIVATE_KPICALC_FILE);
+  if (!files.hasNext()) throw new Error('KPI 試算資料尚未發佈，請通知督導');
+  const data = JSON.parse(files.next().getBlob().getDataAsString('UTF-8'));
+  if (!data || !data.meta || !data.stores || !data.persons) throw new Error('KPI 試算資料格式不完整');
+  return { data: data, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role } };
+}
+
+function kpiCalcPublish(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const encoded = String(payload.dataBase64 || '');
+  if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('KPI 試算資料缺少或過大');
+  const text = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
+  const data = JSON.parse(text);
+  if (!data || !data.meta || !data.stores || !data.persons) throw new Error('KPI 試算資料格式不完整');
+  const folder = privateDashboardFolder();
+  const files = folder.getFilesByName(PRIVATE_KPICALC_FILE);
+  const blob = Utilities.newBlob(text, 'application/json', PRIVATE_KPICALC_FILE);
+  if (files.hasNext()) files.next().setContent(blob.getDataAsString('UTF-8'));
+  else folder.createFile(blob);
+  return { publishedAt: privateDashboardNow(), period: (data.meta && data.meta.period) || '' };
 }
 
 // 每日自動化以管理者密碼同步遮罩後名冊。既有裝置綁定不會被覆蓋。
