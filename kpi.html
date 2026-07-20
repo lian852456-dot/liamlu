@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>北一二B KPI 試算</title>
+<style>
+  :root {
+    --bg-deep: #f5f6f8;
+    --bg-card: #ffffff;
+    --bg-panel: #f0f2f5;
+    --bg-row-alt: #f8f9fb;
+    --accent: #f97316;
+    --accent-bright: #ea580c;
+    --green: #16a34a;
+    --red: #dc2626;
+    --red-soft: rgba(220,38,38,0.08);
+    --green-soft: rgba(22,163,74,0.08);
+    --warn: #d97706;
+    --text: #111827;
+    --text-dim: #374151;
+    --text-muted: #6b7280;
+    --border: rgba(0,0,0,0.12);
+    --border-dim: rgba(0,0,0,0.07);
+    --radius: 12px;
+    --font: 'Segoe UI', 'Noto Sans TC', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg-deep); color: var(--text); font-family: var(--font); font-size: 16px; min-height: 100vh; padding-bottom: 60px; }
+
+  .site-header { background:#fff; border-bottom:3px solid var(--accent); padding:12px 16px; position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .site-header h1 { font-size:1.15rem; color:var(--accent-bright); }
+  .site-header .sub { font-size:.72rem; color:var(--text-muted); }
+
+  .wrap { max-width: 860px; margin: 0 auto; padding: 12px; }
+
+  .tabs { display:flex; gap:8px; margin:10px 0; }
+  .tab-btn { flex:1; padding:10px; border:1px solid var(--border); background:#fff; border-radius:var(--radius); font-size:1rem; font-weight:700; color:var(--text-dim); cursor:pointer; }
+  .tab-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+  .selrow { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .selrow select { flex:1; min-width:150px; padding:10px; font-size:1rem; border:1px solid var(--border); border-radius:10px; background:#fff; color:var(--text); }
+
+  .summary { background:#fff; border:1px solid var(--border-dim); border-radius:var(--radius); padding:14px 16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+  .summary .who { font-weight:700; font-size:1.02rem; margin-bottom:8px; }
+  .sumgrid { display:flex; gap:10px; flex-wrap:wrap; }
+  .sumbox { flex:1; min-width:130px; background:var(--bg-panel); border-radius:10px; padding:10px 12px; text-align:center; }
+  .sumbox .lbl { font-size:.72rem; color:var(--text-muted); }
+  .sumbox .val { font-size:1.5rem; font-weight:800; margin-top:2px; }
+  .sumbox.big { background:linear-gradient(135deg,#fff7ed,#ffedd5); border:1px solid rgba(249,115,22,.35); }
+  .sumbox .val.good { color:var(--green); }
+  .sumbox .val.bad { color:var(--red); }
+  .delta { font-size:.8rem; font-weight:700; }
+  .delta.up { color:var(--green); }
+  .delta.down { color:var(--red); }
+  .breakdown { margin-top:8px; font-size:.78rem; color:var(--text-muted); line-height:1.5; }
+
+  .ctrlrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; font-size:.85rem; }
+  .ctrlrow label { color:var(--text-dim); }
+  .ctrlrow input[type=number] { width:64px; padding:6px; border:1px solid var(--border); border-radius:8px; font-size:.95rem; text-align:center; }
+  .btn { padding:8px 12px; border:1px solid var(--border); background:#fff; border-radius:10px; font-size:.85rem; cursor:pointer; color:var(--text-dim); }
+  .btn:active { background:var(--bg-panel); }
+  .btn.warn { color:var(--red); border-color:rgba(220,38,38,.4); }
+  .btn.toggled { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+  table.items { width:100%; border-collapse:collapse; background:#fff; border-radius:var(--radius); overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.05); font-size:.86rem; }
+  table.items th { background:var(--bg-panel); padding:8px 6px; font-size:.74rem; color:var(--text-muted); text-align:center; white-space:nowrap; }
+  table.items td { padding:7px 6px; border-top:1px solid var(--border-dim); text-align:center; }
+  table.items tr:nth-child(even) td { background:var(--bg-row-alt); }
+  td.iname { text-align:left; font-weight:600; max-width:150px; }
+  td.iname .w { display:block; font-size:.68rem; color:var(--text-muted); font-weight:400; }
+  td.iname .anti { color:var(--warn); font-size:.68rem; }
+  .num { font-variant-numeric: tabular-nums; }
+  td input.today { width:70px; padding:6px 4px; border:1.5px solid var(--accent); border-radius:8px; font-size:.95rem; text-align:center; background:#fff7ed; }
+  td input.today:focus { outline:2px solid var(--accent); }
+  td input.cum { width:84px; padding:5px 4px; border:1px dashed var(--border); border-radius:8px; font-size:.88rem; text-align:center; }
+  .rate.good { color:var(--green); font-weight:700; }
+  .rate.bad { color:var(--red); font-weight:700; }
+  .gap { display:block; font-size:.66rem; color:var(--text-muted); }
+  .scorecell { font-size:.8rem; color:var(--text-dim); }
+
+  details.adv { margin-top:12px; background:#fff; border:1px solid var(--border-dim); border-radius:var(--radius); padding:10px 14px; font-size:.85rem; }
+  details.adv summary { font-weight:700; cursor:pointer; color:var(--text-dim); }
+  .advgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; margin-top:10px; }
+  .advgrid .fld { display:flex; flex-direction:column; gap:4px; }
+  .advgrid .fld label { font-size:.74rem; color:var(--text-muted); }
+  .advgrid .fld input { padding:7px; border:1px solid var(--border); border-radius:8px; font-size:.92rem; }
+  .advnote { margin-top:8px; font-size:.74rem; color:var(--text-muted); line-height:1.5; }
+
+  .foot { margin-top:16px; font-size:.72rem; color:var(--text-muted); line-height:1.6; }
+  .managerNote { background:var(--red-soft); border:1px solid rgba(220,38,38,.25); color:var(--red); padding:10px 14px; border-radius:10px; font-size:.85rem; margin-bottom:10px; display:none; }
+
+  @media (max-width:640px){
+    table.items { font-size:.78rem; }
+    td input.today { width:58px; }
+    td input.cum { width:70px; }
+    th.hide-m, td.hide-m { display:none; }
+  }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div>
+    <h1>📊 北一二B KPI 試算</h1>
+    <div class="sub" id="srcNote"></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab-btn active" id="tabStore" onclick="setTab('store')">🏪 店點試算</button>
+    <button class="tab-btn" id="tabPerson" onclick="setTab('person')">🙋 個人試算</button>
+  </div>
+
+  <div class="selrow">
+    <select id="selStore" onchange="onSelectStore()"></select>
+    <select id="selPerson" onchange="onSelectPerson()" style="display:none"></select>
+  </div>
+  <div class="managerNote" id="managerNote">店長／代理店長沒有個人 KPI 成績，請切換到「店點試算」看店績。</div>
+
+  <div class="summary" id="summaryCard"></div>
+
+  <div class="ctrlrow">
+    <label>試算日（今天是本月第幾天）</label>
+    <input type="number" id="calcDay" min="1" max="31" onchange="setCalcDay(this.value)">
+    <button class="btn" id="btnCum" onclick="toggleCumEdit()">✏️ 修改累計</button>
+    <button class="btn warn" onclick="clearToday()">清除今日輸入</button>
+  </div>
+
+  <div id="itemArea"></div>
+
+  <details class="adv">
+    <summary>⚙️ 進階設定（店長／督導用）</summary>
+    <div class="advgrid">
+      <div class="fld"><label>本月天數</label><input type="number" id="advMonthDays" onchange="setMonthDays(this.value)"></div>
+      <div class="fld"><label>累計資料到位日（報表資料算到本月第幾天）</label><input type="number" id="advSnapDay" onchange="setSnapDay(this.value)"></div>
+      <div class="fld"><label>官方報表總達成率(%)（用於自動校正）</label><input type="number" step="0.01" id="advOfficial" onchange="setOfficial(this.value)"></div>
+    </div>
+    <div style="margin-top:10px;font-weight:700;color:var(--text-dim)">激勵加分資料（店級）</div>
+    <div class="advgrid">
+      <div class="fld"><label>AQ件數加分項：累計件數</label><input type="number" id="bxAqA" onchange="setBx(&quot;aqA&quot;, this.value)"></div>
+      <div class="fld"><label>AQ件數加分項：月目標</label><input type="number" id="bxAqT" onchange="setBx(&quot;aqT&quot;, this.value)"></div>
+      <div class="fld"><label>降轉數（前約V+D≧1399）</label><input type="number" id="bxDnHiN" onchange="setBx(&quot;dnHiN&quot;, this.value)"></div>
+      <div class="fld"><label>上線件數（前約V+D≧1399）</label><input type="number" id="bxDnHiD" onchange="setBx(&quot;dnHiD&quot;, this.value)"></div>
+      <div class="fld"><label>升轉數（前約V+D&lt;1399）</label><input type="number" id="bxUpN" onchange="setBx(&quot;upN&quot;, this.value)"></div>
+      <div class="fld"><label>上線件數（前約V+D&lt;1399）</label><input type="number" id="bxUpD" onchange="setBx(&quot;upD&quot;, this.value)"></div>
+    </div>
+    <div class="advnote">
+      激勵加分規則（由 0720 報表反推驗證）：降轉率(≧1399)≦37% 加 0.75%；升轉率(&lt;1399)≧30% 加 0.75%；AQ件數加分項推估達成率≧130% 加 1%。<br>
+      校正值＝官方總達成率 − 本站模型值，會自動加回預估，吸收模型與公司系統的微小差異。
+    </div>
+    <div style="margin-top:10px"><button class="btn warn" onclick="resetEntity()">🗑 重設此對象全部資料（還原內建報表值）</button></div>
+  </details>
+
+  <div class="foot">
+    ・公式依「KPIPI資料設定」模板＋0720 日報反推驗證：逐項達成率 100% 吻合；總達成率 9 店中 7 店完全一致，其餘差異以「校正值」自動吸收。<br>
+    ・「明日預估」＝（累計＋今日KEY入）÷ 月目標 × 本月天數 ÷ 試算日，各項有上限 250%、店績有下限規則、防退類反向計分（含 2025/07 解約NP OUT 新制）。<br>
+    ・防退類（自退數、解約後NP OUT）：數字越少越好，今日KEY入會「扣分」。<br>
+    ・僅供試算參考，正式成績以公司報表為準。目標數如有異動請通知督導更新。
+  </div>
+</div>
+
+<script>
+const DATA = {"meta": {"period": "2026/07/01 ~ 07/19", "snapshotDay": 19, "monthDays": 31, "month": "2026-07", "sourceFile": "0720.xlsx"}, "items": [{"key": "5G銷售數", "short": "5G", "step": 1}, {"key": "HBO Max&Disney+&Prime Video銷售數", "short": "HBO/D+/PV", "step": 1}, {"key": "Netflix多享組銷售數", "short": "Netflix多享組", "step": 1}, {"key": "TTL AQ上線點數", "short": "AQ上線點數", "step": 0.5}, {"key": "自退數", "short": "自退數", "step": 1}, {"key": "解約後NP OUT", "short": "解約後NP OUT", "step": 1}, {"key": "解約後NP OUT(督導績)", "short": "NP OUT(督導績)", "step": 1}, {"key": "AQ V+D 999 (含)以上", "short": "AQ V+D≧999", "step": 1}, {"key": "AQ V+D 1399 (含)以上", "short": "AQ V+D≧1399", "step": 1}, {"key": "預付卡開卡面額", "short": "預付卡開卡面額", "step": 1}, {"key": "RT上線點數", "short": "RT上線點數", "step": 0.1}, {"key": "特殊維繫用戶續約數", "short": "特殊維繫續約", "step": 1}, {"key": "高高特維用戶續約數", "short": "高高特維續約", "step": 1}, {"key": "RT V+D 999 (含)以上", "short": "RT V+D≧999", "step": 1}, {"key": "RT V+D 1399 (含)以上", "short": "RT V+D≧1399", "step": 1}, {"key": "Device專案銷售數", "short": "Device專案", "step": 1}, {"key": "重點Device銷售量", "short": "重點Device", "step": 1}, {"key": "好速案銷售點數", "short": "好速案點數", "step": 0.25}, {"key": "換約淨新增金額", "short": "換約淨新增金額", "step": 1}, {"key": "空機、3C、物聯網及門市購營收", "short": "空機/3C/物聯網營收", "step": 1}, {"key": "配件及其他營收", "short": "配件及其他營收", "step": 1}, {"key": "包膜與保貼營收", "short": "包膜與保貼營收", "step": 1}, {"key": "手機保險服務點數", "short": "手機保險點數", "step": 0.5}, {"key": "MyVideo&KKBOX", "short": "MyVideo&KKBOX", "step": 1}, {"key": "Apple&Google服務及雜誌週刊開通數", "short": "Apple&Google開通", "step": 1}], "stores": [{"code": "DNB10062", "name": "台北酒泉", "official": 1.089, "items": {"5G銷售數": {"t": 46, "a": 27, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 12, "a": 2, "w": 0.0075}, "Netflix多享組銷售數": {"t": 5, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 138, "a": 89, "w": 0.15}, "自退數": {"t": 15, "a": 9, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 16, "a": 10, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 8, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 35986, "a": 25738, "w": 0.03}, "RT上線點數": {"t": 627, "a": 419.2, "w": 0.2}, "特殊維繫用戶續約數": {"t": 52, "a": 30, "w": 0.1}, "高高特維用戶續約數": {"t": 13, "a": 8, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 47, "a": 31, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 28, "a": 17, "w": 0.05}, "Device專案銷售數": {"t": 72, "a": 53, "w": 0.02}, "重點Device銷售量": {"t": 58, "a": 46, "w": 0.03}, "好速案銷售點數": {"t": 20, "a": 13.25, "w": 0.05}, "換約淨新增金額": {"t": 4238, "a": 1797, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 89233, "a": 42655, "w": 0.01}, "配件及其他營收": {"t": 42779, "a": 20459, "w": 0.01}, "包膜與保貼營收": {"t": 22024, "a": 9085, "w": 0.01}, "手機保險服務點數": {"t": 33, "a": 22, "w": 0.01}, "MyVideo&KKBOX": {"t": 37, "a": 32.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 27, "a": 44, "w": 0.0025}}, "bonus": {"aqA": 24, "aqT": 30, "dnHiN": 4, "dnHiD": 13, "upN": 25, "upD": 85}}, {"code": "DNB10082", "name": "台北永吉", "official": 0.9747, "items": {"5G銷售數": {"t": 52, "a": 43, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 11, "a": 8, "w": 0.0075}, "Netflix多享組銷售數": {"t": 5, "a": 2, "w": 0.005}, "TTL AQ上線點數": {"t": 157, "a": 89, "w": 0.15}, "自退數": {"t": 18, "a": 8, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 20, "a": 8, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 10, "a": 5, "w": 0.05}, "預付卡開卡面額": {"t": 35539, "a": 33754, "w": 0.03}, "RT上線點數": {"t": 697, "a": 413.7, "w": 0.2}, "特殊維繫用戶續約數": {"t": 50, "a": 30, "w": 0.1}, "高高特維用戶續約數": {"t": 11, "a": 7, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 55, "a": 30, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 35, "a": 19, "w": 0.05}, "Device專案銷售數": {"t": 85, "a": 48, "w": 0.02}, "重點Device銷售量": {"t": 69, "a": 40, "w": 0.03}, "好速案銷售點數": {"t": 16, "a": 11.25, "w": 0.05}, "換約淨新增金額": {"t": 3209, "a": 898, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 86139, "a": 56715, "w": 0.01}, "配件及其他營收": {"t": 49888, "a": 6746, "w": 0.01}, "包膜與保貼營收": {"t": 25664, "a": 1490, "w": 0.01}, "手機保險服務點數": {"t": 39, "a": 21, "w": 0.01}, "MyVideo&KKBOX": {"t": 42, "a": 24, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 28, "a": 14, "w": 0.0025}}, "bonus": {"aqA": 23, "aqT": 36, "dnHiN": 6, "dnHiD": 12, "upN": 30, "upD": 86}}, {"code": "DNB10094", "name": "台北復興南", "official": 1.1597, "items": {"5G銷售數": {"t": 73, "a": 55, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 14, "a": 6, "w": 0.0075}, "Netflix多享組銷售數": {"t": 6, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 236, "a": 149, "w": 0.15}, "自退數": {"t": 22, "a": 11, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 3, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 28, "a": 14, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 16, "a": 9, "w": 0.05}, "預付卡開卡面額": {"t": 72625, "a": 54579, "w": 0.03}, "RT上線點數": {"t": 900, "a": 604.1, "w": 0.2}, "特殊維繫用戶續約數": {"t": 71, "a": 44, "w": 0.1}, "高高特維用戶續約數": {"t": 17, "a": 16, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 70, "a": 52, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 43, "a": 28, "w": 0.05}, "Device專案銷售數": {"t": 116, "a": 76, "w": 0.02}, "重點Device銷售量": {"t": 94, "a": 61, "w": 0.03}, "好速案銷售點數": {"t": 21, "a": 16.5, "w": 0.05}, "換約淨新增金額": {"t": 4285, "a": 4965, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 129428, "a": 78115, "w": 0.01}, "配件及其他營收": {"t": 68480, "a": 32292, "w": 0.01}, "包膜與保貼營收": {"t": 35155, "a": 30645, "w": 0.01}, "手機保險服務點數": {"t": 53, "a": 43.25, "w": 0.01}, "MyVideo&KKBOX": {"t": 59, "a": 49.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 37, "a": 17, "w": 0.0025}}, "bonus": {"aqA": 36, "aqT": 56, "dnHiN": 8, "dnHiD": 26, "upN": 39, "upD": 126}}, {"code": "DNB10146", "name": "台北杭州南", "official": 1.2573, "items": {"5G銷售數": {"t": 80, "a": 67, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 12, "a": 7, "w": 0.0075}, "Netflix多享組銷售數": {"t": 5, "a": 2, "w": 0.005}, "TTL AQ上線點數": {"t": 235, "a": 218, "w": 0.15}, "自退數": {"t": 22, "a": 31, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 29, "a": 25, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 16, "a": 9, "w": 0.05}, "預付卡開卡面額": {"t": 82418, "a": 72017, "w": 0.03}, "RT上線點數": {"t": 1080, "a": 698.7, "w": 0.2}, "特殊維繫用戶續約數": {"t": 94, "a": 44, "w": 0.1}, "高高特維用戶續約數": {"t": 23, "a": 13, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 82, "a": 55, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 51, "a": 40, "w": 0.05}, "Device專案銷售數": {"t": 131, "a": 79, "w": 0.02}, "重點Device銷售量": {"t": 107, "a": 74, "w": 0.03}, "好速案銷售點數": {"t": 12, "a": 10.75, "w": 0.05}, "換約淨新增金額": {"t": 2994, "a": 3246, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 139122, "a": 91735, "w": 0.01}, "配件及其他營收": {"t": 78438, "a": 24875, "w": 0.01}, "包膜與保貼營收": {"t": 40288, "a": 40890, "w": 0.01}, "手機保險服務點數": {"t": 61, "a": 42.75, "w": 0.01}, "MyVideo&KKBOX": {"t": 64, "a": 39.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 37, "a": 2, "w": 0.0025}}, "bonus": {"aqA": 52, "aqT": 56, "dnHiN": 15, "dnHiD": 27, "upN": 39, "upD": 120}}, {"code": "DNB10168", "name": "台北萬大", "official": 1.1312, "items": {"5G銷售數": {"t": 75, "a": 45, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 20, "a": 7, "w": 0.0075}, "Netflix多享組銷售數": {"t": 7, "a": 4, "w": 0.005}, "TTL AQ上線點數": {"t": 234, "a": 119, "w": 0.15}, "自退數": {"t": 24, "a": 12, "w": 0.01}, "解約後NP OUT": {"t": 7, "a": 6, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 26, "a": 15, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 13, "a": 10, "w": 0.05}, "預付卡開卡面額": {"t": 40454, "a": 21132, "w": 0.03}, "RT上線點數": {"t": 880, "a": 617.2, "w": 0.2}, "特殊維繫用戶續約數": {"t": 97, "a": 51, "w": 0.1}, "高高特維用戶續約數": {"t": 22, "a": 15, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 63, "a": 46, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 37, "a": 28, "w": 0.05}, "Device專案銷售數": {"t": 112, "a": 73, "w": 0.02}, "重點Device銷售量": {"t": 92, "a": 57, "w": 0.03}, "好速案銷售點數": {"t": 13, "a": 16, "w": 0.05}, "換約淨新增金額": {"t": 3199, "a": 2268, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 137264, "a": 64555, "w": 0.01}, "配件及其他營收": {"t": 66515, "a": 33432, "w": 0.01}, "包膜與保貼營收": {"t": 34234, "a": 13640, "w": 0.01}, "手機保險服務點數": {"t": 51, "a": 38, "w": 0.01}, "MyVideo&KKBOX": {"t": 61, "a": 38, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 42, "a": 46, "w": 0.0025}}, "bonus": {"aqA": 27, "aqT": 51, "dnHiN": 6, "dnHiD": 22, "upN": 40, "upD": 111}}, {"code": "DNB10174", "name": "台北通化", "official": 0.9392, "items": {"5G銷售數": {"t": 87, "a": 53, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 21, "a": 11, "w": 0.0075}, "Netflix多享組銷售數": {"t": 7, "a": 4, "w": 0.005}, "TTL AQ上線點數": {"t": 260, "a": 125, "w": 0.15}, "自退數": {"t": 29, "a": 14, "w": 0.01}, "解約後NP OUT": {"t": 5, "a": 7, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 31, "a": 14, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 17, "a": 5, "w": 0.05}, "預付卡開卡面額": {"t": 82828, "a": 44354, "w": 0.03}, "RT上線點數": {"t": 1213, "a": 750, "w": 0.2}, "特殊維繫用戶續約數": {"t": 98, "a": 58, "w": 0.1}, "高高特維用戶續約數": {"t": 22, "a": 10, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 99, "a": 66, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 62, "a": 37, "w": 0.05}, "Device專案銷售數": {"t": 149, "a": 119, "w": 0.02}, "重點Device銷售量": {"t": 121, "a": 99, "w": 0.03}, "好速案銷售點數": {"t": 33, "a": 17.25, "w": 0.05}, "換約淨新增金額": {"t": 7044, "a": 2098, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 172660, "a": 76057, "w": 0.01}, "配件及其他營收": {"t": 89195, "a": 40821, "w": 0.01}, "包膜與保貼營收": {"t": 45835, "a": 19820, "w": 0.01}, "手機保險服務點數": {"t": 69, "a": 59.25, "w": 0.01}, "MyVideo&KKBOX": {"t": 69, "a": 48.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 54, "a": 35, "w": 0.0025}}, "bonus": {"aqA": 28, "aqT": 62, "dnHiN": 18, "dnHiD": 40, "upN": 36, "upD": 141}}, {"code": "DNB10284", "name": "台北大稻埕", "official": 1.3035, "items": {"5G銷售數": {"t": 45, "a": 33, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 12, "a": 10, "w": 0.0075}, "Netflix多享組銷售數": {"t": 5, "a": 3, "w": 0.005}, "TTL AQ上線點數": {"t": 126, "a": 119.5, "w": 0.15}, "自退數": {"t": 19, "a": 18, "w": 0.01}, "解約後NP OUT": {"t": 9, "a": 6, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 15, "a": 12, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 7, "a": 8, "w": 0.05}, "預付卡開卡面額": {"t": 42695, "a": 42866, "w": 0.03}, "RT上線點數": {"t": 650, "a": 482.45, "w": 0.2}, "特殊維繫用戶續約數": {"t": 53, "a": 37, "w": 0.1}, "高高特維用戶續約數": {"t": 15, "a": 7, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 51, "a": 40, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 31, "a": 20, "w": 0.05}, "Device專案銷售數": {"t": 80, "a": 77, "w": 0.02}, "重點Device銷售量": {"t": 64, "a": 68, "w": 0.03}, "好速案銷售點數": {"t": 17, "a": 6.75, "w": 0.05}, "換約淨新增金額": {"t": 3667, "a": 1198, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 85425, "a": 37905, "w": 0.01}, "配件及其他營收": {"t": 47050, "a": 29271, "w": 0.01}, "包膜與保貼營收": {"t": 24208, "a": 6365, "w": 0.01}, "手機保險服務點數": {"t": 36, "a": 29, "w": 0.01}, "MyVideo&KKBOX": {"t": 36, "a": 17, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 28, "a": 3, "w": 0.0025}}, "bonus": {"aqA": 29, "aqT": 28, "dnHiN": 11, "dnHiD": 24, "upN": 19, "upD": 86}}, {"code": "DNB10307", "name": "台灣大哥大數位生活台北三創", "official": 1.2078, "items": {"5G銷售數": {"t": 123, "a": 76, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 21, "a": 19, "w": 0.0075}, "Netflix多享組銷售數": {"t": 7, "a": 8, "w": 0.005}, "TTL AQ上線點數": {"t": 384, "a": 219.5, "w": 0.15}, "自退數": {"t": 34, "a": 23, "w": 0.01}, "解約後NP OUT": {"t": 22, "a": 12, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 41, "a": 23, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 21, "a": 7, "w": 0.05}, "預付卡開卡面額": {"t": 113374, "a": 90444, "w": 0.03}, "RT上線點數": {"t": 1630, "a": 1114.75, "w": 0.2}, "特殊維繫用戶續約數": {"t": 140, "a": 101, "w": 0.1}, "高高特維用戶續約數": {"t": 34, "a": 27, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 136, "a": 106, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 84, "a": 61, "w": 0.05}, "Device專案銷售數": {"t": 219, "a": 126, "w": 0.02}, "重點Device銷售量": {"t": 173, "a": 108, "w": 0.03}, "好速案銷售點數": {"t": 6, "a": 20.25, "w": 0.05}, "換約淨新增金額": {"t": 1796, "a": 7259, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 145475, "a": 45905, "w": 0.01}, "配件及其他營收": {"t": 128766, "a": 52828, "w": 0.01}, "包膜與保貼營收": {"t": 40461, "a": 15240, "w": 0.01}, "手機保險服務點數": {"t": 99, "a": 62.5, "w": 0.01}, "MyVideo&KKBOX": {"t": 99, "a": 41.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 59, "a": 48, "w": 0.0025}}, "bonus": {"aqA": 61, "aqT": 92, "dnHiN": 19, "dnHiD": 55, "upN": 57, "upD": 193}}, {"code": "DNB10440", "name": "台北六張犁", "official": 1.0047, "items": {"5G銷售數": {"t": 47, "a": 43, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 14, "a": 5, "w": 0.0075}, "Netflix多享組銷售數": {"t": 6, "a": 2, "w": 0.005}, "TTL AQ上線點數": {"t": 131, "a": 71.5, "w": 0.15}, "自退數": {"t": 22, "a": 16, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 17, "a": 9, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 8, "a": 4, "w": 0.05}, "預付卡開卡面額": {"t": 35564, "a": 29586, "w": 0.03}, "RT上線點數": {"t": 682, "a": 407.35, "w": 0.2}, "特殊維繫用戶續約數": {"t": 57, "a": 30, "w": 0.1}, "高高特維用戶續約數": {"t": 12, "a": 10, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 52, "a": 30, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 32, "a": 13, "w": 0.05}, "Device專案銷售數": {"t": 80, "a": 58, "w": 0.02}, "重點Device銷售量": {"t": 64, "a": 51, "w": 0.03}, "好速案銷售點數": {"t": 21, "a": 5.75, "w": 0.05}, "換約淨新增金額": {"t": 4350, "a": 1900, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 95165, "a": 77356, "w": 0.01}, "配件及其他營收": {"t": 46728, "a": 31832, "w": 0.01}, "包膜與保貼營收": {"t": 23987, "a": 15000, "w": 0.01}, "手機保險服務點數": {"t": 36, "a": 31.5, "w": 0.01}, "MyVideo&KKBOX": {"t": 37, "a": 27.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 32, "a": 11, "w": 0.0025}}, "bonus": {"aqA": 14, "aqT": 31, "dnHiN": 5, "dnHiD": 14, "upN": 23, "upD": 86}}], "persons": [{"store": "DNB10062", "role": "店長", "pname": "賴*雯", "official": 0, "items": {"5G銷售數": {"t": 0, "a": 1, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 0, "a": 1, "w": 0.0075}, "Netflix多享組銷售數": {"t": 0, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 0, "a": 17, "w": 0.15}, "自退數": {"t": 15, "a": 9, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 0, "a": 0, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 0, "a": 0, "w": 0.05}, "預付卡開卡面額": {"t": 0, "a": 8892, "w": 0.03}, "RT上線點數": {"t": 0, "a": 71.35, "w": 0.2}, "特殊維繫用戶續約數": {"t": 0, "a": 8, "w": 0.1}, "高高特維用戶續約數": {"t": 0, "a": 1, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 0, "a": 3, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 0, "a": 0, "w": 0.05}, "Device專案銷售數": {"t": 0, "a": 4, "w": 0.02}, "重點Device銷售量": {"t": 0, "a": 4, "w": 0.03}, "好速案銷售點數": {"t": 20, "a": 13.25, "w": 0.05}, "換約淨新增金額": {"t": 0, "a": 798, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 0, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 0, "a": 769, "w": 0.01}, "包膜與保貼營收": {"t": 0, "a": 0, "w": 0.01}, "手機保險服務點數": {"t": 0, "a": 0, "w": 0.01}, "MyVideo&KKBOX": {"t": 0, "a": 2, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 0, "a": 5, "w": 0.0025}}}, {"store": "DNB10062", "role": "副店長", "pname": "李*文", "official": 0.7597, "items": {"5G銷售數": {"t": 20, "a": 6, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 1, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 60, "a": 25.5, "w": 0.15}, "自退數": {"t": 15, "a": 9, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 4, "a": 1, "w": 0.05}, "預付卡開卡面額": {"t": 11187, "a": 2813, "w": 0.03}, "RT上線點數": {"t": 234, "a": 114.05, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 8, "w": 0.1}, "高高特維用戶續約數": {"t": 7, "a": 2, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 19, "a": 8, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 12, "a": 4, "w": 0.05}, "Device專案銷售數": {"t": 31, "a": 16, "w": 0.02}, "重點Device銷售量": {"t": 24, "a": 12, "w": 0.03}, "好速案銷售點數": {"t": 8, "a": 4.75, "w": 0.05}, "換約淨新增金額": {"t": 1320, "a": 999, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 33093, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 17721, "a": 9730, "w": 0.01}, "包膜與保貼營收": {"t": 9333, "a": 550, "w": 0.01}, "手機保險服務點數": {"t": 14, "a": 6, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 6, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 12, "w": 0.0025}}}, {"store": "DNB10062", "role": "業務代表(I)", "pname": "方*羽", "official": 1.1414, "items": {"5G銷售數": {"t": 20, "a": 13, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 0, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 63, "a": 44.5, "w": 0.15}, "自退數": {"t": 15, "a": 9, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 7, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 1, "w": 0.05}, "預付卡開卡面額": {"t": 11010, "a": 11833, "w": 0.03}, "RT上線點數": {"t": 248, "a": 155.5, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 7, "w": 0.1}, "高高特維用戶續約數": {"t": 6, "a": 2, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 14, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 7, "w": 0.05}, "Device專案銷售數": {"t": 32, "a": 25, "w": 0.02}, "重點Device銷售量": {"t": 26, "a": 22, "w": 0.03}, "好速案銷售點數": {"t": 6, "a": 5, "w": 0.05}, "換約淨新增金額": {"t": 1386, "a": 0, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 32590, "a": 42655, "w": 0.01}, "配件及其他營收": {"t": 18090, "a": 9180, "w": 0.01}, "包膜與保貼營收": {"t": 9530, "a": 7735, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 14, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 23, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 27, "w": 0.0025}}}, {"store": "DNB10082", "role": "代理店長", "pname": "丁*瑋", "official": 0, "items": {"5G銷售數": {"t": 0, "a": 8, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 0, "a": 2, "w": 0.0075}, "Netflix多享組銷售數": {"t": 0, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 0, "a": 12.5, "w": 0.15}, "自退數": {"t": 18, "a": 8, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 0, "a": 0, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 0, "a": 0, "w": 0.05}, "預付卡開卡面額": {"t": 0, "a": 2961, "w": 0.03}, "RT上線點數": {"t": 0, "a": 30.2, "w": 0.2}, "特殊維繫用戶續約數": {"t": 0, "a": 1, "w": 0.1}, "高高特維用戶續約數": {"t": 0, "a": 0, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 0, "a": 0, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 0, "a": 0, "w": 0.05}, "Device專案銷售數": {"t": 0, "a": 2, "w": 0.02}, "重點Device銷售量": {"t": 0, "a": 1, "w": 0.03}, "好速案銷售點數": {"t": 16, "a": 11.25, "w": 0.05}, "換約淨新增金額": {"t": 0, "a": 0, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 0, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 0, "a": 0, "w": 0.01}, "包膜與保貼營收": {"t": 0, "a": 0, "w": 0.01}, "手機保險服務點數": {"t": 0, "a": 1, "w": 0.01}, "MyVideo&KKBOX": {"t": 0, "a": 2, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 0, "a": 5, "w": 0.0025}}}, {"store": "DNB10082", "role": "副店長", "pname": "陳*如", "official": 1.3758, "items": {"5G銷售數": {"t": 18, "a": 17, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 2, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 57, "a": 39, "w": 0.15}, "自退數": {"t": 18, "a": 8, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 6, "a": 4, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 9909, "a": 15301, "w": 0.03}, "RT上線點數": {"t": 223, "a": 188.95, "w": 0.2}, "特殊維繫用戶續約數": {"t": 21, "a": 15, "w": 0.1}, "高高特維用戶續約數": {"t": 5, "a": 4, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 18, "a": 15, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 12, "a": 11, "w": 0.05}, "Device專案銷售數": {"t": 29, "a": 24, "w": 0.02}, "重點Device銷售量": {"t": 23, "a": 20, "w": 0.03}, "好速案銷售點數": {"t": 6, "a": 7.5, "w": 0.05}, "換約淨新增金額": {"t": 1247, "a": 99, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 29331, "a": 54915, "w": 0.01}, "配件及其他營收": {"t": 16281, "a": 4568, "w": 0.01}, "包膜與保貼營收": {"t": 8577, "a": 690, "w": 0.01}, "手機保險服務點數": {"t": 14, "a": 9, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 14, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 10, "a": 5, "w": 0.0025}}}, {"store": "DNB10082", "role": "業務代表(I)", "pname": "蕭*翔", "official": 0.9757, "items": {"5G銷售數": {"t": 20, "a": 15, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 4, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 2, "w": 0.005}, "TTL AQ上線點數": {"t": 63, "a": 33, "w": 0.15}, "自退數": {"t": 18, "a": 8, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 3, "w": 0.05}, "預付卡開卡面額": {"t": 11010, "a": 12192, "w": 0.03}, "RT上線點數": {"t": 248, "a": 152.35, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 9, "w": 0.1}, "高高特維用戶續約數": {"t": 6, "a": 2, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 13, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 6, "w": 0.05}, "Device專案銷售數": {"t": 32, "a": 12, "w": 0.02}, "重點Device銷售量": {"t": 26, "a": 11, "w": 0.03}, "好速案銷售點數": {"t": 6, "a": 3.75, "w": 0.05}, "換約淨新增金額": {"t": 1386, "a": 799, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 32590, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 18090, "a": 1234, "w": 0.01}, "包膜與保貼營收": {"t": 9530, "a": 0, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 6, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 8, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 4, "w": 0.0025}}}, {"store": "DNB10094", "role": "店長", "pname": "賴*維", "official": 0, "items": {"5G銷售數": {"t": 0, "a": 8, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 0, "a": 0, "w": 0.0075}, "Netflix多享組銷售數": {"t": 0, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 0, "a": 29, "w": 0.15}, "自退數": {"t": 22, "a": 11, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 3, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 0, "a": 2, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 0, "a": 1, "w": 0.05}, "預付卡開卡面額": {"t": 0, "a": 9075, "w": 0.03}, "RT上線點數": {"t": 0, "a": 88.65, "w": 0.2}, "特殊維繫用戶續約數": {"t": 0, "a": 5, "w": 0.1}, "高高特維用戶續約數": {"t": 0, "a": 2, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 0, "a": 6, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 0, "a": 1, "w": 0.05}, "Device專案銷售數": {"t": 0, "a": 11, "w": 0.02}, "重點Device銷售量": {"t": 0, "a": 8, "w": 0.03}, "好速案銷售點數": {"t": 21, "a": 16.5, "w": 0.05}, "換約淨新增金額": {"t": 0, "a": 0, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 0, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 0, "a": 7493, "w": 0.01}, "包膜與保貼營收": {"t": 0, "a": 7650, "w": 0.01}, "手機保險服務點數": {"t": 0, "a": 4, "w": 0.01}, "MyVideo&KKBOX": {"t": 0, "a": 5.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 0, "a": 2, "w": 0.0025}}}, {"store": "DNB10094", "role": "副店長", "pname": "何*言", "official": 0.9977, "items": {"5G銷售數": {"t": 20, "a": 13, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 4, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 60, "a": 31.5, "w": 0.15}, "自退數": {"t": 22, "a": 11, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 3, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 4, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 4, "a": 3, "w": 0.05}, "預付卡開卡面額": {"t": 11187, "a": 13689, "w": 0.03}, "RT上線點數": {"t": 234, "a": 115.8, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 6, "w": 0.1}, "高高特維用戶續約數": {"t": 7, "a": 2, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 19, "a": 10, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 12, "a": 6, "w": 0.05}, "Device專案銷售數": {"t": 31, "a": 16, "w": 0.02}, "重點Device銷售量": {"t": 24, "a": 14, "w": 0.03}, "好速案銷售點數": {"t": 8, "a": 8.25, "w": 0.05}, "換約淨新增金額": {"t": 1320, "a": 1798, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 33093, "a": 21900, "w": 0.01}, "配件及其他營收": {"t": 17721, "a": 6130, "w": 0.01}, "包膜與保貼營收": {"t": 9333, "a": 4400, "w": 0.01}, "手機保險服務點數": {"t": 14, "a": 11, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 15, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 5, "w": 0.0025}}}, {"store": "DNB10094", "role": "業代", "pname": "張*誠", "official": 1.2652, "items": {"5G銷售數": {"t": 19, "a": 13, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 3, "a": 2, "w": 0.0075}, "Netflix多享組銷售數": {"t": 1, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 56, "a": 36, "w": 0.15}, "自退數": {"t": 22, "a": 11, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 3, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 5, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 10730, "a": 16554, "w": 0.03}, "RT上線點數": {"t": 223, "a": 182.35, "w": 0.2}, "特殊維繫用戶續約數": {"t": 21, "a": 19, "w": 0.1}, "高高特維用戶續約數": {"t": 5, "a": 7, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 14, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 11, "a": 8, "w": 0.05}, "Device專案銷售數": {"t": 31, "a": 15, "w": 0.02}, "重點Device銷售量": {"t": 25, "a": 11, "w": 0.03}, "好速案銷售點數": {"t": 5, "a": 1.25, "w": 0.05}, "換約淨新增金額": {"t": 1303, "a": 600, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 31750, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 17430, "a": 5740, "w": 0.01}, "包膜與保貼營收": {"t": 8740, "a": 6400, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 11, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 8, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 9, "a": 1, "w": 0.0025}}}, {"store": "DNB10094", "role": "業務代表(I)", "pname": "張*瑜", "official": 1.0457, "items": {"5G銷售數": {"t": 20, "a": 8, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 0, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 63, "a": 34.5, "w": 0.15}, "自退數": {"t": 22, "a": 11, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 3, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 11010, "a": 5141, "w": 0.03}, "RT上線點數": {"t": 248, "a": 138.2, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 10, "w": 0.1}, "高高特維用戶續約數": {"t": 6, "a": 5, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 16, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 10, "w": 0.05}, "Device專案銷售數": {"t": 32, "a": 23, "w": 0.02}, "重點Device銷售量": {"t": 26, "a": 19, "w": 0.03}, "好速案銷售點數": {"t": 6, "a": 5.5, "w": 0.05}, "換約淨新增金額": {"t": 1386, "a": 1898, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 32590, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 18090, "a": 5330, "w": 0.01}, "包膜與保貼營收": {"t": 9530, "a": 7150, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 10.25, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 12, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 9, "w": 0.0025}}}, {"store": "DNB10094", "role": "業務代表(I)", "pname": "劉*偉", "official": 2.3779, "items": {"5G銷售數": {"t": 4, "a": 14, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 1, "a": 1, "w": 0.0075}, "Netflix多享組銷售數": {"t": 0, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 13, "a": 20, "w": 0.15}, "自退數": {"t": 22, "a": 11, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 3, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 1, "a": 2, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 1, "a": 1, "w": 0.05}, "預付卡開卡面額": {"t": 2202, "a": 10608, "w": 0.03}, "RT上線點數": {"t": 50, "a": 95.85, "w": 0.2}, "特殊維繫用戶續約數": {"t": 5, "a": 6, "w": 0.1}, "高高特維用戶續約數": {"t": 1, "a": 1, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 4, "a": 7, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 3, "a": 4, "w": 0.05}, "Device專案銷售數": {"t": 6, "a": 14, "w": 0.02}, "重點Device銷售量": {"t": 5, "a": 11, "w": 0.03}, "好速案銷售點數": {"t": 1, "a": 1.5, "w": 0.05}, "換約淨新增金額": {"t": 278, "a": 669, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 6518, "a": 56215, "w": 0.01}, "配件及其他營收": {"t": 3618, "a": 8189, "w": 0.01}, "包膜與保貼營收": {"t": 1906, "a": 5045, "w": 0.01}, "手機保險服務點數": {"t": 3, "a": 7, "w": 0.01}, "MyVideo&KKBOX": {"t": 3, "a": 11, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 2, "a": 0, "w": 0.0025}}}, {"store": "DNB10146", "role": "店長", "pname": "王*業", "official": 0, "items": {"5G銷售數": {"t": 0, "a": 7, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 0, "a": 0, "w": 0.0075}, "Netflix多享組銷售數": {"t": 0, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 0, "a": 31.5, "w": 0.15}, "自退數": {"t": 22, "a": 31, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 0, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 0, "a": 1, "w": 0.05}, "預付卡開卡面額": {"t": 0, "a": 8514, "w": 0.03}, "RT上線點數": {"t": 0, "a": 50.25, "w": 0.2}, "特殊維繫用戶續約數": {"t": 0, "a": 2, "w": 0.1}, "高高特維用戶續約數": {"t": 0, "a": 0, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 0, "a": 4, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 0, "a": 3, "w": 0.05}, "Device專案銷售數": {"t": 0, "a": 9, "w": 0.02}, "重點Device銷售量": {"t": 0, "a": 9, "w": 0.03}, "好速案銷售點數": {"t": 12, "a": 10.75, "w": 0.05}, "換約淨新增金額": {"t": 0, "a": 899, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 0, "a": 15666, "w": 0.01}, "配件及其他營收": {"t": 0, "a": 2450, "w": 0.01}, "包膜與保貼營收": {"t": 0, "a": 6300, "w": 0.01}, "手機保險服務點數": {"t": 0, "a": 8.5, "w": 0.01}, "MyVideo&KKBOX": {"t": 0, "a": 2, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 0, "a": 0, "w": 0.0025}}}, {"store": "DNB10146", "role": "副店長", "pname": "董*德", "official": 1.1042, "items": {"5G銷售數": {"t": 20, "a": 12, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 0, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 60, "a": 41.5, "w": 0.15}, "自退數": {"t": 22, "a": 31, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 4, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 4, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 11187, "a": 16756, "w": 0.03}, "RT上線點數": {"t": 234, "a": 186.25, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 11, "w": 0.1}, "高高特維用戶續約數": {"t": 7, "a": 5, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 19, "a": 12, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 12, "a": 8, "w": 0.05}, "Device專案銷售數": {"t": 31, "a": 20, "w": 0.02}, "重點Device銷售量": {"t": 24, "a": 17, "w": 0.03}, "好速案銷售點數": {"t": 8, "a": 2.75, "w": 0.05}, "換約淨新增金額": {"t": 1320, "a": 0, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 33093, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 17721, "a": 9851, "w": 0.01}, "包膜與保貼營收": {"t": 9333, "a": 4150, "w": 0.01}, "手機保險服務點數": {"t": 14, "a": 6, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 6, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 0, "w": 0.0025}}}, {"store": "DNB10146", "role": "業務代表(I)", "pname": "蘇*凱", "official": 1.0633, "items": {"5G銷售數": {"t": 20, "a": 19, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 2, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 63, "a": 35.5, "w": 0.15}, "自退數": {"t": 22, "a": 31, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 4, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 11010, "a": 14767, "w": 0.03}, "RT上線點數": {"t": 248, "a": 163.05, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 7, "w": 0.1}, "高高特維用戶續約數": {"t": 6, "a": 2, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 14, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 10, "w": 0.05}, "Device專案銷售數": {"t": 32, "a": 19, "w": 0.02}, "重點Device銷售量": {"t": 26, "a": 17, "w": 0.03}, "好速案銷售點數": {"t": 6, "a": 1.25, "w": 0.05}, "換約淨新增金額": {"t": 1386, "a": 749, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 32590, "a": 49987, "w": 0.01}, "配件及其他營收": {"t": 18090, "a": 6439, "w": 0.01}, "包膜與保貼營收": {"t": 9530, "a": 15300, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 10, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 10, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 1, "w": 0.0025}}}, {"store": "DNB10146", "role": "業務代表(II)", "pname": "李*翰", "official": 1.4169, "items": {"5G銷售數": {"t": 22, "a": 20, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 0, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 67, "a": 92, "w": 0.15}, "自退數": {"t": 22, "a": 31, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 8, "a": 13, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 4, "a": 3, "w": 0.05}, "預付卡開卡面額": {"t": 12430, "a": 14476, "w": 0.03}, "RT上線點數": {"t": 260, "a": 156.95, "w": 0.2}, "特殊維繫用戶續約數": {"t": 25, "a": 12, "w": 0.1}, "高高特維用戶續約數": {"t": 8, "a": 5, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 21, "a": 16, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 9, "w": 0.05}, "Device專案銷售數": {"t": 34, "a": 21, "w": 0.02}, "重點Device銷售量": {"t": 27, "a": 20, "w": 0.03}, "好速案銷售點數": {"t": 8, "a": 3.5, "w": 0.05}, "換約淨新增金額": {"t": 1466, "a": 300, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 36770, "a": 26082, "w": 0.01}, "配件及其他營收": {"t": 19690, "a": 2269, "w": 0.01}, "包膜與保貼營收": {"t": 10370, "a": 6840, "w": 0.01}, "手機保險服務點數": {"t": 16, "a": 11.25, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 6, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 12, "a": 1, "w": 0.0025}}}, {"store": "DNB10146", "role": "銷售人員", "pname": "范*茜", "official": 1.2346, "items": {"5G銷售數": {"t": 19, "a": 13, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 3, "a": 5, "w": 0.0075}, "Netflix多享組銷售數": {"t": 1, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 56, "a": 35, "w": 0.15}, "自退數": {"t": 22, "a": 31, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 5, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 3, "w": 0.05}, "預付卡開卡面額": {"t": 10730, "a": 18104, "w": 0.03}, "RT上線點數": {"t": 223, "a": 164.2, "w": 0.2}, "特殊維繫用戶續約數": {"t": 21, "a": 14, "w": 0.1}, "高高特維用戶續約數": {"t": 5, "a": 2, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 11, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 11, "a": 11, "w": 0.05}, "Device專案銷售數": {"t": 31, "a": 16, "w": 0.02}, "重點Device銷售量": {"t": 25, "a": 15, "w": 0.03}, "好速案銷售點數": {"t": 5, "a": 3, "w": 0.05}, "換約淨新增金額": {"t": 1303, "a": 1298, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 31750, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 17430, "a": 6150, "w": 0.01}, "包膜與保貼營收": {"t": 8740, "a": 9500, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 9, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 15.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 9, "a": 0, "w": 0.0025}}}, {"store": "DNB10168", "role": "店長", "pname": "林*翔", "official": 0, "items": {"5G銷售數": {"t": 0, "a": 8, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 0, "a": 0, "w": 0.0075}, "Netflix多享組銷售數": {"t": 0, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 0, "a": 16, "w": 0.15}, "自退數": {"t": 24, "a": 12, "w": 0.01}, "解約後NP OUT": {"t": 7, "a": 6, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 0, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 0, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 0, "a": 1199, "w": 0.03}, "RT上線點數": {"t": 0, "a": 98, "w": 0.2}, "特殊維繫用戶續約數": {"t": 0, "a": 5, "w": 0.1}, "高高特維用戶續約數": {"t": 0, "a": 1, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 0, "a": 10, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 0, "a": 5, "w": 0.05}, "Device專案銷售數": {"t": 0, "a": 8, "w": 0.02}, "重點Device銷售量": {"t": 0, "a": 8, "w": 0.03}, "好速案銷售點數": {"t": 13, "a": 16, "w": 0.05}, "換約淨新增金額": {"t": 0, "a": 999, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 0, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 0, "a": 6169, "w": 0.01}, "包膜與保貼營收": {"t": 0, "a": 1650, "w": 0.01}, "手機保險服務點數": {"t": 0, "a": 4, "w": 0.01}, "MyVideo&KKBOX": {"t": 0, "a": 10, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 0, "a": 17, "w": 0.0025}}}, {"store": "DNB10168", "role": "副店長", "pname": "吳*燕", "official": 0.6036, "items": {"5G銷售數": {"t": 20, "a": 6, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 3, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 2, "w": 0.005}, "TTL AQ上線點數": {"t": 60, "a": 22.5, "w": 0.15}, "自退數": {"t": 24, "a": 12, "w": 0.01}, "解約後NP OUT": {"t": 7, "a": 6, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 4, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 11187, "a": 6553, "w": 0.03}, "RT上線點數": {"t": 234, "a": 88.25, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 8, "w": 0.1}, "高高特維用戶續約數": {"t": 7, "a": 0, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 19, "a": 4, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 12, "a": 3, "w": 0.05}, "Device專案銷售數": {"t": 32, "a": 10, "w": 0.02}, "重點Device銷售量": {"t": 24, "a": 6, "w": 0.03}, "好速案銷售點數": {"t": 4, "a": 0, "w": 0.05}, "換約淨新增金額": {"t": 1320, "a": 0, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 33093, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 17721, "a": 9843, "w": 0.01}, "包膜與保貼營收": {"t": 9333, "a": 4400, "w": 0.01}, "手機保險服務點數": {"t": 14, "a": 4, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 4, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 12, "w": 0.0025}}}, {"store": "DNB10168", "role": "業務代表(I)", "pname": "鄭*華", "official": 0.5412, "items": {"5G銷售數": {"t": 20, "a": 4, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 1, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 63, "a": 22, "w": 0.15}, "自退數": {"t": 24, "a": 12, "w": 0.01}, "解約後NP OUT": {"t": 7, "a": 6, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 2, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 1, "w": 0.05}, "預付卡開卡面額": {"t": 11010, "a": 5470, "w": 0.03}, "RT上線點數": {"t": 248, "a": 82.45, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 5, "w": 0.1}, "高高特維用戶續約數": {"t": 6, "a": 1, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 5, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 4, "w": 0.05}, "Device專案銷售數": {"t": 33, "a": 8, "w": 0.02}, "重點Device銷售量": {"t": 26, "a": 8, "w": 0.03}, "好速案銷售點數": {"t": 4, "a": 1.25, "w": 0.05}, "換約淨新增金額": {"t": 1386, "a": 0, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 32590, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 18090, "a": 2860, "w": 0.01}, "包膜與保貼營收": {"t": 9530, "a": 2800, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 4, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 6, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 0, "w": 0.0025}}}, {"store": "DNB10168", "role": "業務代表(I)", "pname": "徐*安", "official": 0.8588, "items": {"5G銷售數": {"t": 20, "a": 10, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 1, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 63, "a": 29, "w": 0.15}, "自退數": {"t": 24, "a": 12, "w": 0.01}, "解約後NP OUT": {"t": 7, "a": 6, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 3, "w": 0.05}, "預付卡開卡面額": {"t": 11010, "a": 4829, "w": 0.03}, "RT上線點數": {"t": 248, "a": 111.95, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 11, "w": 0.1}, "高高特維用戶續約數": {"t": 6, "a": 6, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 10, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 7, "w": 0.05}, "Device專案銷售數": {"t": 33, "a": 14, "w": 0.02}, "重點Device銷售量": {"t": 26, "a": 12, "w": 0.03}, "好速案銷售點數": {"t": 4, "a": 0, "w": 0.05}, "換約淨新增金額": {"t": 1386, "a": 0, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 32590, "a": 42655, "w": 0.01}, "配件及其他營收": {"t": 18090, "a": 5930, "w": 0.01}, "包膜與保貼營收": {"t": 9530, "a": 0, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 7, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 4, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 10, "w": 0.0025}}}, {"store": "DNB10168", "role": "業務代表(II)", "pname": "李*盈", "official": 1.2114, "items": {"5G銷售數": {"t": 22, "a": 16, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 2, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 67, "a": 34, "w": 0.15}, "自退數": {"t": 24, "a": 12, "w": 0.01}, "解約後NP OUT": {"t": 7, "a": 6, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 8, "a": 4, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 4, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 12430, "a": 2781, "w": 0.03}, "RT上線點數": {"t": 260, "a": 224.55, "w": 0.2}, "特殊維繫用戶續約數": {"t": 25, "a": 21, "w": 0.1}, "高高特維用戶續約數": {"t": 8, "a": 6, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 21, "a": 16, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 8, "w": 0.05}, "Device專案銷售數": {"t": 35, "a": 30, "w": 0.02}, "重點Device銷售量": {"t": 27, "a": 21, "w": 0.03}, "好速案銷售點數": {"t": 4, "a": 4.75, "w": 0.05}, "換約淨新增金額": {"t": 1466, "a": 1269, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 36770, "a": 21900, "w": 0.01}, "配件及其他營收": {"t": 19690, "a": 8630, "w": 0.01}, "包膜與保貼營收": {"t": 10370, "a": 4790, "w": 0.01}, "手機保險服務點數": {"t": 16, "a": 17, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 14, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 12, "a": 7, "w": 0.0025}}}, {"store": "DNB10174", "role": "店長", "pname": "楊*竣", "official": 0, "items": {"5G銷售數": {"t": 0, "a": 11, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 0, "a": 3, "w": 0.0075}, "Netflix多享組銷售數": {"t": 0, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 0, "a": 16, "w": 0.15}, "自退數": {"t": 29, "a": 14, "w": 0.01}, "解約後NP OUT": {"t": 5, "a": 7, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 0, "a": 2, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 0, "a": 0, "w": 0.05}, "預付卡開卡面額": {"t": 0, "a": 4398, "w": 0.03}, "RT上線點數": {"t": 0, "a": 118.6, "w": 0.2}, "特殊維繫用戶續約數": {"t": 0, "a": 4, "w": 0.1}, "高高特維用戶續約數": {"t": 0, "a": 1, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 0, "a": 13, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 0, "a": 4, "w": 0.05}, "Device專案銷售數": {"t": 0, "a": 22, "w": 0.02}, "重點Device銷售量": {"t": 0, "a": 21, "w": 0.03}, "好速案銷售點數": {"t": 33, "a": 17.25, "w": 0.05}, "換約淨新增金額": {"t": 0, "a": 0, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 0, "a": 14442, "w": 0.01}, "配件及其他營收": {"t": 0, "a": 6130, "w": 0.01}, "包膜與保貼營收": {"t": 0, "a": 2080, "w": 0.01}, "手機保險服務點數": {"t": 0, "a": 10, "w": 0.01}, "MyVideo&KKBOX": {"t": 0, "a": 9.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 0, "a": 8, "w": 0.0025}}}, {"store": "DNB10174", "role": "副店長", "pname": "張*瑋", "official": 0.9036, "items": {"5G銷售數": {"t": 21, "a": 11, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 4, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 65, "a": 26.5, "w": 0.15}, "自退數": {"t": 29, "a": 14, "w": 0.01}, "解約後NP OUT": {"t": 5, "a": 7, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 5, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 12195, "a": 977, "w": 0.03}, "RT上線點數": {"t": 257, "a": 161.3, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 6, "w": 0.1}, "高高特維用戶續約數": {"t": 8, "a": 1, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 18, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 12, "w": 0.05}, "Device專案銷售數": {"t": 32, "a": 24, "w": 0.02}, "重點Device銷售量": {"t": 24, "a": 24, "w": 0.03}, "好速案銷售點數": {"t": 9, "a": 7, "w": 0.05}, "換約淨新增金額": {"t": 1392, "a": 799, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 36099, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 18612, "a": 13759, "w": 0.01}, "包膜與保貼營收": {"t": 9594, "a": 3600, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 12, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 14, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 12, "a": 11, "w": 0.0025}}}, {"store": "DNB10174", "role": "副店長", "pname": "郭*芯", "official": 0.8757, "items": {"5G銷售數": {"t": 21, "a": 10, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 2, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 65, "a": 36.5, "w": 0.15}, "自退數": {"t": 29, "a": 14, "w": 0.01}, "解約後NP OUT": {"t": 5, "a": 7, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 5, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 5, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 12195, "a": 11402, "w": 0.03}, "RT上線點數": {"t": 257, "a": 114.2, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 11, "w": 0.1}, "高高特維用戶續約數": {"t": 8, "a": 1, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 8, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 4, "w": 0.05}, "Device專案銷售數": {"t": 32, "a": 17, "w": 0.02}, "重點Device銷售量": {"t": 24, "a": 11, "w": 0.03}, "好速案銷售點數": {"t": 9, "a": 8, "w": 0.05}, "換約淨新增金額": {"t": 1392, "a": 799, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 36099, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 18612, "a": 7230, "w": 0.01}, "包膜與保貼營收": {"t": 9594, "a": 3590, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 12, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 11.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 12, "a": 3, "w": 0.0025}}}, {"store": "DNB10174", "role": "業務代表(I)", "pname": "吳*璧", "official": 0.6291, "items": {"5G銷售數": {"t": 20, "a": 9, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 1, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 63, "a": 20, "w": 0.15}, "自退數": {"t": 29, "a": 14, "w": 0.01}, "解約後NP OUT": {"t": 5, "a": 7, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 2, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 0, "w": 0.05}, "預付卡開卡面額": {"t": 11010, "a": 8844, "w": 0.03}, "RT上線點數": {"t": 248, "a": 116.6, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 12, "w": 0.1}, "高高特維用戶續約數": {"t": 6, "a": 2, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 7, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 4, "w": 0.05}, "Device專案銷售數": {"t": 32, "a": 18, "w": 0.02}, "重點Device銷售量": {"t": 26, "a": 11, "w": 0.03}, "好速案銷售點數": {"t": 6, "a": 0, "w": 0.05}, "換約淨新增金額": {"t": 1386, "a": 100, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 32590, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 18090, "a": 4350, "w": 0.01}, "包膜與保貼營收": {"t": 9530, "a": 2950, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 12.25, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 3.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 1, "w": 0.0025}}}, {"store": "DNB10174", "role": "業務代表(II)", "pname": "周*聖", "official": 1.2153, "items": {"5G銷售數": {"t": 22, "a": 13, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 1, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 67, "a": 28, "w": 0.15}, "自退數": {"t": 29, "a": 14, "w": 0.01}, "解約後NP OUT": {"t": 5, "a": 7, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 8, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 4, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 12430, "a": 18733, "w": 0.03}, "RT上線點數": {"t": 260, "a": 239.3, "w": 0.2}, "特殊維繫用戶續約數": {"t": 25, "a": 25, "w": 0.1}, "高高特維用戶續約數": {"t": 8, "a": 5, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 21, "a": 20, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 13, "w": 0.05}, "Device專案銷售數": {"t": 34, "a": 39, "w": 0.02}, "重點Device銷售量": {"t": 27, "a": 32, "w": 0.03}, "好速案銷售點數": {"t": 8, "a": 0, "w": 0.05}, "換約淨新增金額": {"t": 1466, "a": 400, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 36770, "a": 61615, "w": 0.01}, "配件及其他營收": {"t": 19690, "a": 9352, "w": 0.01}, "包膜與保貼營收": {"t": 10370, "a": 7600, "w": 0.01}, "手機保險服務點數": {"t": 16, "a": 15, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 10, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 12, "a": 12, "w": 0.0025}}}, {"store": "DNB10284", "role": "店長", "pname": "黃*勛", "official": 0, "items": {"5G銷售數": {"t": 0, "a": 4, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 0, "a": 2, "w": 0.0075}, "Netflix多享組銷售數": {"t": 0, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 0, "a": 27.5, "w": 0.15}, "自退數": {"t": 19, "a": 18, "w": 0.01}, "解約後NP OUT": {"t": 9, "a": 6, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 0, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 0, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 0, "a": 300, "w": 0.03}, "RT上線點數": {"t": 0, "a": 34, "w": 0.2}, "特殊維繫用戶續約數": {"t": 0, "a": 3, "w": 0.1}, "高高特維用戶續約數": {"t": 0, "a": 0, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 0, "a": 4, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 0, "a": 2, "w": 0.05}, "Device專案銷售數": {"t": 0, "a": 11, "w": 0.02}, "重點Device銷售量": {"t": 0, "a": 10, "w": 0.03}, "好速案銷售點數": {"t": 17, "a": 6.75, "w": 0.05}, "換約淨新增金額": {"t": 0, "a": 0, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 0, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 0, "a": 6679, "w": 0.01}, "包膜與保貼營收": {"t": 0, "a": 0, "w": 0.01}, "手機保險服務點數": {"t": 0, "a": 5, "w": 0.01}, "MyVideo&KKBOX": {"t": 0, "a": 4, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 0, "a": 1, "w": 0.0025}}}, {"store": "DNB10284", "role": "副店長", "pname": "曹*如", "official": 1.5324, "items": {"5G銷售數": {"t": 18, "a": 14, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 4, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 2, "w": 0.005}, "TTL AQ上線點數": {"t": 57, "a": 50.5, "w": 0.15}, "自退數": {"t": 19, "a": 18, "w": 0.01}, "解約後NP OUT": {"t": 9, "a": 6, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 6, "a": 5, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 4, "w": 0.05}, "預付卡開卡面額": {"t": 9909, "a": 14807, "w": 0.03}, "RT上線點數": {"t": 223, "a": 215.7, "w": 0.2}, "特殊維繫用戶續約數": {"t": 21, "a": 20, "w": 0.1}, "高高特維用戶續約數": {"t": 5, "a": 5, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 18, "a": 17, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 12, "a": 8, "w": 0.05}, "Device專案銷售數": {"t": 29, "a": 30, "w": 0.02}, "重點Device銷售量": {"t": 23, "a": 28, "w": 0.03}, "好速案銷售點數": {"t": 6, "a": 1.5, "w": 0.05}, "換約淨新增金額": {"t": 1247, "a": 300, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 29331, "a": 37905, "w": 0.01}, "配件及其他營收": {"t": 16281, "a": 14058, "w": 0.01}, "包膜與保貼營收": {"t": 8577, "a": 3765, "w": 0.01}, "手機保險服務點數": {"t": 14, "a": 15, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 8, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 10, "a": 1, "w": 0.0025}}}, {"store": "DNB10284", "role": "業務代表(I)", "pname": "王*弘", "official": 1.103, "items": {"5G銷售數": {"t": 20, "a": 12, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 3, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 63, "a": 30.5, "w": 0.15}, "自退數": {"t": 19, "a": 18, "w": 0.01}, "解約後NP OUT": {"t": 9, "a": 6, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 3, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 1, "w": 0.05}, "預付卡開卡面額": {"t": 11010, "a": 22572, "w": 0.03}, "RT上線點數": {"t": 248, "a": 210, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 12, "w": 0.1}, "高高特維用戶續約數": {"t": 6, "a": 2, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 18, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 10, "w": 0.05}, "Device專案銷售數": {"t": 32, "a": 31, "w": 0.02}, "重點Device銷售量": {"t": 26, "a": 27, "w": 0.03}, "好速案銷售點數": {"t": 6, "a": 4, "w": 0.05}, "換約淨新增金額": {"t": 1386, "a": 898, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 32590, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 18090, "a": 5660, "w": 0.01}, "包膜與保貼營收": {"t": 9530, "a": 1400, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 9, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 3, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 1, "w": 0.0025}}}, {"store": "DNB10307", "role": "店長", "pname": "游*琪", "official": 0, "items": {"5G銷售數": {"t": 0, "a": 1, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 0, "a": 0, "w": 0.0075}, "Netflix多享組銷售數": {"t": 0, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 0, "a": 10, "w": 0.15}, "自退數": {"t": 34, "a": 23, "w": 0.01}, "解約後NP OUT": {"t": 22, "a": 12, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 0, "a": 0, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 0, "a": 0, "w": 0.05}, "預付卡開卡面額": {"t": 0, "a": 6586, "w": 0.03}, "RT上線點數": {"t": 0, "a": 17, "w": 0.2}, "特殊維繫用戶續約數": {"t": 0, "a": 2, "w": 0.1}, "高高特維用戶續約數": {"t": 0, "a": 0, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 0, "a": 0, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 0, "a": 0, "w": 0.05}, "Device專案銷售數": {"t": 0, "a": 1, "w": 0.02}, "重點Device銷售量": {"t": 0, "a": 1, "w": 0.03}, "好速案銷售點數": {"t": 6, "a": 20.25, "w": 0.05}, "換約淨新增金額": {"t": 0, "a": 99, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 0, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 0, "a": 0, "w": 0.01}, "包膜與保貼營收": {"t": 0, "a": 0, "w": 0.01}, "手機保險服務點數": {"t": 0, "a": 0, "w": 0.01}, "MyVideo&KKBOX": {"t": 0, "a": 0, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 0, "a": 0, "w": 0.0025}}}, {"store": "DNB10307", "role": "副店長", "pname": "蔡*?", "official": 1.1847, "items": {"5G銷售數": {"t": 21, "a": 14, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 2, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 65, "a": 16.5, "w": 0.15}, "自退數": {"t": 34, "a": 23, "w": 0.01}, "解約後NP OUT": {"t": 22, "a": 12, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 1, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 5, "a": 0, "w": 0.05}, "預付卡開卡面額": {"t": 12195, "a": 21834, "w": 0.03}, "RT上線點數": {"t": 257, "a": 225.25, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 14, "w": 0.1}, "高高特維用戶續約數": {"t": 8, "a": 4, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 25, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 13, "w": 0.05}, "Device專案銷售數": {"t": 32, "a": 32, "w": 0.02}, "重點Device銷售量": {"t": 25, "a": 28, "w": 0.03}, "好速案銷售點數": {"t": 4, "a": 7.25, "w": 0.05}, "換約淨新增金額": {"t": 1392, "a": 2697, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 36099, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 18612, "a": 6921, "w": 0.01}, "包膜與保貼營收": {"t": 9594, "a": 5750, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 16, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 8, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 12, "a": 2, "w": 0.0025}}}, {"store": "DNB10307", "role": "副店長", "pname": "鍾*玲", "official": 1.48, "items": {"5G銷售數": {"t": 21, "a": 11, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 4, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 65, "a": 57, "w": 0.15}, "自退數": {"t": 34, "a": 23, "w": 0.01}, "解約後NP OUT": {"t": 22, "a": 12, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 6, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 5, "a": 3, "w": 0.05}, "預付卡開卡面額": {"t": 12195, "a": 21720, "w": 0.03}, "RT上線點數": {"t": 257, "a": 229.65, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 26, "w": 0.1}, "高高特維用戶續約數": {"t": 8, "a": 7, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 20, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 14, "w": 0.05}, "Device專案銷售數": {"t": 32, "a": 22, "w": 0.02}, "重點Device銷售量": {"t": 25, "a": 15, "w": 0.03}, "好速案銷售點數": {"t": 4, "a": 2.75, "w": 0.05}, "換約淨新增金額": {"t": 1392, "a": 1197, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 36099, "a": 3250, "w": 0.01}, "配件及其他營收": {"t": 18612, "a": 14371, "w": 0.01}, "包膜與保貼營收": {"t": 9594, "a": 4590, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 10, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 4, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 12, "a": 10, "w": 0.0025}}}, {"store": "DNB10307", "role": "業務代表(I)", "pname": "蔡*琪", "official": 1.1886, "items": {"5G銷售數": {"t": 20, "a": 13, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 1, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 2, "w": 0.005}, "TTL AQ上線點數": {"t": 63, "a": 38, "w": 0.15}, "自退數": {"t": 34, "a": 23, "w": 0.01}, "解約後NP OUT": {"t": 22, "a": 12, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 5, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 1, "w": 0.05}, "預付卡開卡面額": {"t": 11010, "a": 12788, "w": 0.03}, "RT上線點數": {"t": 248, "a": 157.05, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 21, "w": 0.1}, "高高特維用戶續約數": {"t": 6, "a": 8, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 18, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 12, "w": 0.05}, "Device專案銷售數": {"t": 33, "a": 20, "w": 0.02}, "重點Device銷售量": {"t": 26, "a": 18, "w": 0.03}, "好速案銷售點數": {"t": 4, "a": 0.75, "w": 0.05}, "換約淨新增金額": {"t": 1386, "a": 1017, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 32590, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 18090, "a": 4031, "w": 0.01}, "包膜與保貼營收": {"t": 9530, "a": 800, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 10, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 6.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 4, "w": 0.0025}}}, {"store": "DNB10307", "role": "業務代表(I)", "pname": "袁*程", "official": 1.1785, "items": {"5G銷售數": {"t": 20, "a": 16, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 5, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 63, "a": 45, "w": 0.15}, "自退數": {"t": 34, "a": 23, "w": 0.01}, "解約後NP OUT": {"t": 22, "a": 12, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 6, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 1, "w": 0.05}, "預付卡開卡面額": {"t": 11010, "a": 17871, "w": 0.03}, "RT上線點數": {"t": 248, "a": 192.6, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 13, "w": 0.1}, "高高特維用戶續約數": {"t": 6, "a": 2, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 14, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 6, "w": 0.05}, "Device專案銷售數": {"t": 33, "a": 26, "w": 0.02}, "重點Device銷售量": {"t": 26, "a": 24, "w": 0.03}, "好速案銷售點數": {"t": 4, "a": 1.5, "w": 0.05}, "換約淨新增金額": {"t": 1386, "a": 750, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 32590, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 18090, "a": 13319, "w": 0.01}, "包膜與保貼營收": {"t": 9530, "a": 2500, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 18, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 10, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 24, "w": 0.0025}}}, {"store": "DNB10307", "role": "業務代表(II)", "pname": "莊*璇", "official": 0.835, "items": {"5G銷售數": {"t": 22, "a": 9, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 2, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 2, "w": 0.005}, "TTL AQ上線點數": {"t": 67, "a": 18, "w": 0.15}, "自退數": {"t": 34, "a": 23, "w": 0.01}, "解約後NP OUT": {"t": 22, "a": 12, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 8, "a": 1, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 4, "a": 0, "w": 0.05}, "預付卡開卡面額": {"t": 12430, "a": 3465, "w": 0.03}, "RT上線點數": {"t": 260, "a": 169.9, "w": 0.2}, "特殊維繫用戶續約數": {"t": 25, "a": 13, "w": 0.1}, "高高特維用戶續約數": {"t": 8, "a": 3, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 21, "a": 18, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 9, "w": 0.05}, "Device專案銷售數": {"t": 35, "a": 15, "w": 0.02}, "重點Device銷售量": {"t": 27, "a": 13, "w": 0.03}, "好速案銷售點數": {"t": 4, "a": 5.5, "w": 0.05}, "換約淨新增金額": {"t": 1466, "a": 499, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 36770, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 19690, "a": 5067, "w": 0.01}, "包膜與保貼營收": {"t": 10370, "a": 0, "w": 0.01}, "手機保險服務點數": {"t": 16, "a": 4, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 9.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 12, "a": 3, "w": 0.0025}}}, {"store": "DNB10307", "role": "業務代表(II)", "pname": "李*帆", "official": 0.9189, "items": {"5G銷售數": {"t": 22, "a": 12, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 5, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 1, "w": 0.005}, "TTL AQ上線點數": {"t": 67, "a": 37, "w": 0.15}, "自退數": {"t": 34, "a": 23, "w": 0.01}, "解約後NP OUT": {"t": 22, "a": 12, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 8, "a": 4, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 4, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 12430, "a": 10579, "w": 0.03}, "RT上線點數": {"t": 260, "a": 131.8, "w": 0.2}, "特殊維繫用戶續約數": {"t": 25, "a": 13, "w": 0.1}, "高高特維用戶續約數": {"t": 8, "a": 3, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 21, "a": 11, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 7, "w": 0.05}, "Device專案銷售數": {"t": 35, "a": 11, "w": 0.02}, "重點Device銷售量": {"t": 27, "a": 10, "w": 0.03}, "好速案銷售點數": {"t": 4, "a": 2.5, "w": 0.05}, "換約淨新增金額": {"t": 1466, "a": 1000, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 36770, "a": 42655, "w": 0.01}, "配件及其他營收": {"t": 19690, "a": 9119, "w": 0.01}, "包膜與保貼營收": {"t": 10370, "a": 1600, "w": 0.01}, "手機保險服務點數": {"t": 16, "a": 4.5, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 3.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 12, "a": 5, "w": 0.0025}}}, {"store": "DNB10440", "role": "店長", "pname": "劉*妮", "official": 0, "items": {"5G銷售數": {"t": 0, "a": 8, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 0, "a": 0, "w": 0.0075}, "Netflix多享組銷售數": {"t": 0, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 0, "a": 7, "w": 0.15}, "自退數": {"t": 22, "a": 16, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 0, "a": 0, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 0, "a": 0, "w": 0.05}, "預付卡開卡面額": {"t": 0, "a": 5509, "w": 0.03}, "RT上線點數": {"t": 0, "a": 28.4, "w": 0.2}, "特殊維繫用戶續約數": {"t": 0, "a": 2, "w": 0.1}, "高高特維用戶續約數": {"t": 0, "a": 0, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 0, "a": 0, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 0, "a": 0, "w": 0.05}, "Device專案銷售數": {"t": 0, "a": 5, "w": 0.02}, "重點Device銷售量": {"t": 0, "a": 3, "w": 0.03}, "好速案銷售點數": {"t": 21, "a": 5.75, "w": 0.05}, "換約淨新增金額": {"t": 0, "a": 100, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 0, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 0, "a": 890, "w": 0.01}, "包膜與保貼營收": {"t": 0, "a": 0, "w": 0.01}, "手機保險服務點數": {"t": 0, "a": 1.5, "w": 0.01}, "MyVideo&KKBOX": {"t": 0, "a": 2, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 0, "a": 0, "w": 0.0025}}}, {"store": "DNB10440", "role": "副店長", "pname": "林*安", "official": 1.2182, "items": {"5G銷售數": {"t": 18, "a": 19, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 4, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 2, "w": 0.005}, "TTL AQ上線點數": {"t": 57, "a": 41, "w": 0.15}, "自退數": {"t": 22, "a": 16, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 6, "a": 6, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 2, "w": 0.05}, "預付卡開卡面額": {"t": 9909, "a": 6752, "w": 0.03}, "RT上線點數": {"t": 223, "a": 138.55, "w": 0.2}, "特殊維繫用戶續約數": {"t": 21, "a": 13, "w": 0.1}, "高高特維用戶續約數": {"t": 5, "a": 5, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 18, "a": 11, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 12, "a": 4, "w": 0.05}, "Device專案銷售數": {"t": 29, "a": 26, "w": 0.02}, "重點Device銷售量": {"t": 23, "a": 23, "w": 0.03}, "好速案銷售點數": {"t": 6, "a": 2.25, "w": 0.05}, "換約淨新增金額": {"t": 1247, "a": 400, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 29331, "a": 0, "w": 0.01}, "配件及其他營收": {"t": 16281, "a": 15359, "w": 0.01}, "包膜與保貼營收": {"t": 8577, "a": 6650, "w": 0.01}, "手機保險服務點數": {"t": 14, "a": 11, "w": 0.01}, "MyVideo&KKBOX": {"t": 15, "a": 13.5, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 10, "a": 9, "w": 0.0025}}}, {"store": "DNB10440", "role": "業務代表(I)", "pname": "任*言", "official": 0.8526, "items": {"5G銷售數": {"t": 20, "a": 10, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 5, "a": 0, "w": 0.0075}, "Netflix多享組銷售數": {"t": 2, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 63, "a": 15, "w": 0.15}, "自退數": {"t": 22, "a": 16, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 7, "a": 2, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 3, "a": 1, "w": 0.05}, "預付卡開卡面額": {"t": 11010, "a": 11674, "w": 0.03}, "RT上線點數": {"t": 248, "a": 161.9, "w": 0.2}, "特殊維繫用戶續約數": {"t": 23, "a": 8, "w": 0.1}, "高高特維用戶續約數": {"t": 6, "a": 3, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 20, "a": 13, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 13, "a": 5, "w": 0.05}, "Device專案銷售數": {"t": 32, "a": 14, "w": 0.02}, "重點Device銷售量": {"t": 26, "a": 13, "w": 0.03}, "好速案銷售點數": {"t": 6, "a": 2.5, "w": 0.05}, "換約淨新增金額": {"t": 1386, "a": 1400, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 32590, "a": 68815, "w": 0.01}, "配件及其他營收": {"t": 18090, "a": 14003, "w": 0.01}, "包膜與保貼營收": {"t": 9530, "a": 4200, "w": 0.01}, "手機保險服務點數": {"t": 15, "a": 9, "w": 0.01}, "MyVideo&KKBOX": {"t": 17, "a": 8, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 11, "a": 1, "w": 0.0025}}}, {"store": "DNB10440", "role": "銷售人員", "pname": "謝*言", "official": 1.8111, "items": {"5G銷售數": {"t": 9, "a": 9, "w": 0.03}, "HBO Max&Disney+&Prime Video銷售數": {"t": 1, "a": 1, "w": 0.0075}, "Netflix多享組銷售數": {"t": 1, "a": 0, "w": 0.005}, "TTL AQ上線點數": {"t": 24, "a": 13, "w": 0.15}, "自退數": {"t": 22, "a": 16, "w": 0.01}, "解約後NP OUT": {"t": 4, "a": 1, "w": 0.025}, "解約後NP OUT(督導績)": {"t": 63, "a": 38, "w": 0.025}, "AQ V+D 999 (含)以上": {"t": 1, "a": 2, "w": 0.1}, "AQ V+D 1399 (含)以上": {"t": 1, "a": 1, "w": 0.05}, "預付卡開卡面額": {"t": 7910, "a": 8951, "w": 0.03}, "RT上線點數": {"t": 104, "a": 120.7, "w": 0.2}, "特殊維繫用戶續約數": {"t": 9, "a": 12, "w": 0.1}, "高高特維用戶續約數": {"t": 1, "a": 3, "w": 0.05}, "RT V+D 999 (含)以上": {"t": 9, "a": 8, "w": 0.05}, "RT V+D 1399 (含)以上": {"t": 4, "a": 6, "w": 0.05}, "Device專案銷售數": {"t": 16, "a": 23, "w": 0.02}, "重點Device銷售量": {"t": 11, "a": 20, "w": 0.03}, "好速案銷售點數": {"t": 2, "a": 1, "w": 0.05}, "換約淨新增金額": {"t": 542, "a": 0, "w": 0.02}, "空機、3C、物聯網及門市購營收": {"t": 23400, "a": 8541, "w": 0.01}, "配件及其他營收": {"t": 7090, "a": 2524, "w": 0.01}, "包膜與保貼營收": {"t": 3420, "a": 4950, "w": 0.01}, "手機保險服務點數": {"t": 5, "a": 15, "w": 0.01}, "MyVideo&KKBOX": {"t": 7, "a": 4, "w": 0.01}, "Apple&Google服務及雜誌週刊開通數": {"t": 4, "a": 1, "w": 0.0025}}}]};
+
+const FLOORS = {'5G銷售數':.7,'HBO Max&Disney+&Prime Video銷售數':.7,'Netflix多享組銷售數':.7,'TTL AQ上線點數':.6,
+'AQ V+D 999 (含)以上':.7,'預付卡開卡面額':.7,'RT上線點數':.7,'特殊維繫用戶續約數':.7,'高高特維用戶續約數':.7,
+'RT V+D 999 (含)以上':.7,'RT V+D 1399 (含)以上':.7};
+const ANTI_SELF = new Set(['自退數','解約後NP OUT(督導績)']);
+const ANTI_NPOUT = '解約後NP OUT';
+const isAnti = k => ANTI_SELF.has(k) || k === ANTI_NPOUT;
+
+const LS_KEY = 'bei12b_kpi_v1';
+let LS = {};
+try { LS = JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch(e) { LS = {}; }
+LS.entities = LS.entities || {};
+
+let tab = LS.tab || 'store';
+let curStore = LS.curStore || DATA.stores[0].code;
+let curPerson = LS.curPerson || '';
+let cumEdit = false;
+
+const r4 = x => Math.round(x * 10000) / 10000;
+const pctTxt = x => (x * 100).toFixed(2) + '%';
+
+function storeByCode(c){ return DATA.stores.find(s => s.code === c) || DATA.stores[0]; }
+function personsOf(c){ return DATA.persons.filter(p => p.store === c); }
+function isManager(p){ return p.role === '店長' || p.role === '代理店長'; }
+
+function entKey(){ return tab === 'store' ? 'S:' + curStore : 'P:' + curStore + '|' + curPerson; }
+function entState(){
+  const k = entKey();
+  if (!LS.entities[k]) LS.entities[k] = { today:{}, cum:{}, bx:{}, official:null, snapDay:null };
+  return LS.entities[k];
+}
+function entData(){
+  if (tab === 'store') return storeByCode(curStore);
+  return personsOf(curStore).find(p => p.pname === curPerson);
+}
+
+function settings(){
+  const st = entState();
+  return {
+    monthDays: LS.monthDays || DATA.meta.monthDays,
+    snapDay: st.snapDay || DATA.meta.snapshotDay,
+    calcDay: LS.calcDay || defaultCalcDay()
+  };
+}
+function defaultCalcDay(){
+  const now = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Taipei'}));
+  const ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  if (ym === DATA.meta.month) return Math.min(now.getDate(), DATA.meta.monthDays);
+  return Math.min(DATA.meta.snapshotDay + 1, DATA.meta.monthDays);
+}
+
+// ── 核心公式（與 0720 報表勾稽） ──
+function itemRate(key, a, t, f){
+  if (!t) return null;
+  const x = r4(a / t * f);
+  if (ANTI_SELF.has(key)) return Math.max(0, Math.min(2.5, r4(2 - x)));
+  if (key === ANTI_NPOUT){
+    const raw = r4(2 - x);
+    return raw >= 1 ? Math.min(2.5, raw) : r4(0.5 + 0.5 * Math.max(raw, 0));
+  }
+  return Math.min(2.5, x);
+}
+function itemScore(key, w, rate, useFloors){
+  if (rate === null || !w) return 0;
+  const fl = useFloors ? (FLOORS[key] || 0) : 0;
+  return w * rate * (fl && rate < fl ? 0.5 : 1);
+}
+function bonusOf(bx, f){
+  let b = 0, parts = [];
+  if (bx.dnHiD > 0 && bx.dnHiN / bx.dnHiD <= 0.37){ b += 0.0075; parts.push('降轉率(≧1399)達標 +0.75%'); }
+  if (bx.upD > 0 && bx.upN / bx.upD >= 0.30){ b += 0.0075; parts.push('升轉率(<1399)達標 +0.75%'); }
+  if (bx.aqT > 0 && Math.min(2.5, r4(bx.aqA / bx.aqT * f)) >= 1.3){ b += 0.01; parts.push('AQ件數加分 +1%'); }
+  return { b, parts };
+}
+
+function effCum(ent, st, key){
+  return (st.cum[key] !== undefined && st.cum[key] !== null) ? st.cum[key] : ent.items[key].a;
+}
+function effBx(){
+  const s = storeByCode(curStore);
+  const st = LS.entities['S:' + curStore] || { bx:{} };
+  const bx = Object.assign({}, s.bonus);
+  for (const k of ['aqA','aqT','dnHiN','dnHiD','upN','upD']){
+    if (st.bx && st.bx[k] !== undefined && st.bx[k] !== null && st.bx[k] !== '') bx[k] = Number(st.bx[k]);
+  }
+  return bx;
+}
+
+// total: mode 'base' (無今日輸入, 用到位日) or 'proj' (含今日輸入, 用試算日)
+function calcTotal(mode){
+  const ent = entData();
+  if (!ent) return null;
+  const st = entState();
+  const cfg = settings();
+  const useFloors = tab === 'store';
+  const D = mode === 'proj' ? cfg.calcDay : cfg.snapDay;
+  const f = cfg.monthDays / D;
+  let sum = 0;
+  const detail = {};
+  for (const it of DATA.items){
+    const d = ent.items[it.key];
+    const add = mode === 'proj' ? (Number(st.today[it.key]) || 0) : 0;
+    const a = effCum(ent, st, it.key) + add;
+    const rate = itemRate(it.key, a, d.t, f);
+    const sc = itemScore(it.key, d.w, rate, useFloors);
+    sum += sc;
+    detail[it.key] = { a, rate, sc };
+  }
+  const bn = bonusOf(effBx(), f);
+  return { base: r4(sum), bonus: bn, total: r4(sum + bn.b), detail };
+}
+function official(){
+  const st = entState();
+  if (st.official !== null && st.official !== undefined && st.official !== '') return Number(st.official) / 100;
+  const ent = entData();
+  return ent ? (ent.official || 0) : 0;
+}
+function calib(){
+  const base = calcTotal('base');
+  return r4(official() - base.total);
+}
+
+// ── UI ──
+function setTab(t){
+  tab = t; LS.tab = t;
+  document.getElementById('tabStore').classList.toggle('active', t === 'store');
+  document.getElementById('tabPerson').classList.toggle('active', t === 'person');
+  document.getElementById('selPerson').style.display = t === 'person' ? '' : 'none';
+  if (t === 'person') fillPersonSel();
+  saveAndRender();
+}
+function fillStoreSel(){
+  const sel = document.getElementById('selStore');
+  sel.innerHTML = DATA.stores.map(s => `<option value="${s.code}">${s.name}</option>`).join('');
+  sel.value = curStore;
+}
+function fillPersonSel(){
+  const sel = document.getElementById('selPerson');
+  const ps = personsOf(curStore).filter(p => !isManager(p));
+  sel.innerHTML = ps.map(p => `<option value="${p.pname}">${p.role}｜${p.pname}</option>`).join('');
+  if (!ps.find(p => p.pname === curPerson)) curPerson = ps.length ? ps[0].pname : '';
+  sel.value = curPerson;
+  document.getElementById('managerNote').style.display = ps.length ? 'none' : 'block';
+}
+function onSelectStore(){
+  curStore = document.getElementById('selStore').value;
+  LS.curStore = curStore;
+  if (tab === 'person') fillPersonSel();
+  saveAndRender();
+}
+function onSelectPerson(){
+  curPerson = document.getElementById('selPerson').value;
+  LS.curPerson = curPerson;
+  saveAndRender();
+}
+function toggleCumEdit(){
+  cumEdit = !cumEdit;
+  document.getElementById('btnCum').classList.toggle('toggled', cumEdit);
+  render();
+}
+function clearToday(){
+  entState().today = {};
+  saveAndRender();
+}
+function resetEntity(){
+  if (!confirm('確定要清除此對象的所有輸入（今日、累計修改、進階設定），還原成內建報表值？')) return;
+  delete LS.entities[entKey()];
+  saveAndRender();
+}
+function onToday(key, v){
+  entState().today[key] = v === '' ? undefined : Number(v);
+  saveAndRender();
+}
+function onCum(key, v){
+  entState().cum[key] = v === '' ? null : Number(v);
+  saveAndRender();
+}
+
+function render(){
+  const ent = entData();
+  const cfg = settings();
+  document.getElementById('srcNote').textContent =
+    `資料基準：${DATA.meta.sourceFile}（${DATA.meta.period}）`;
+  document.getElementById('calcDay').value = cfg.calcDay;
+  document.getElementById('advMonthDays').value = cfg.monthDays;
+  document.getElementById('advSnapDay').value = cfg.snapDay;
+
+  const sumEl = document.getElementById('summaryCard');
+  const area = document.getElementById('itemArea');
+  if (!ent){
+    sumEl.innerHTML = '<div class="who">此店沒有可試算的個人（店長請看店點）</div>';
+    area.innerHTML = '';
+    return;
+  }
+  const st = entState();
+  document.getElementById('advOfficial').value =
+    (st.official !== null && st.official !== undefined && st.official !== '') ? st.official : r4(official()*100);
+  const bx = effBx();
+  document.getElementById('bxAqA').value = bx.aqA;
+  document.getElementById('bxAqT').value = bx.aqT;
+  document.getElementById('bxDnHiN').value = bx.dnHiN;
+  document.getElementById('bxDnHiD').value = bx.dnHiD;
+  document.getElementById('bxUpN').value = bx.upN;
+  document.getElementById('bxUpD').value = bx.upD;
+
+  const base = calcTotal('base');
+  const proj = calcTotal('proj');
+  const cal = calib();
+  const projAdj = r4(proj.total + cal);
+  const off = official();
+  const delta = r4(projAdj - off);
+  const hasToday = Object.values(st.today).some(v => v !== undefined && v !== null && v !== '');
+  const who = tab === 'store'
+    ? `🏪 ${storeByCode(curStore).name}（店績）`
+    : `🙋 ${storeByCode(curStore).name}｜${ent.role} ${ent.pname}（個績）`;
+
+  sumEl.innerHTML = `
+    <div class="who">${who}</div>
+    <div class="sumgrid">
+      <div class="sumbox">
+        <div class="lbl">報表總達成率（至 ${DATA.meta.month.split('-')[1]}/${String(cfg.snapDay).padStart(2,'0')}）</div>
+        <div class="val num">${pctTxt(off)}</div>
+      </div>
+      <div class="sumbox big">
+        <div class="lbl">明日預估總達成率${hasToday ? '（含今日KEY入）' : '（尚未KEY今日）'}</div>
+        <div class="val num ${projAdj >= 1 ? 'good' : 'bad'}">${pctTxt(projAdj)}</div>
+        <div class="delta ${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '▲' : '▼'} ${pctTxt(Math.abs(delta))} vs 報表</div>
+      </div>
+    </div>
+    <div class="breakdown">
+      基礎加權 ${pctTxt(proj.base)} ＋ 激勵加分 ${pctTxt(proj.bonus.b)}${proj.bonus.parts.length ? '（' + proj.bonus.parts.join('、') + '）' : ''} ＋ 校正 ${pctTxt(cal)}
+      ｜推估係數 ${cfg.monthDays}/${cfg.calcDay}
+    </div>`;
+
+  let rows = '';
+  for (const it of DATA.items){
+    const d = ent.items[it.key];
+    if (!d.w && !d.t) continue;
+    const cum = effCum(ent, st, it.key);
+    const today = st.today[it.key];
+    const pd = proj.detail[it.key];
+    const rateTxt = pd.rate === null ? '－' : pctTxt(pd.rate);
+    const rateCls = pd.rate === null ? '' : (pd.rate >= 1 ? 'good' : 'bad');
+    const anti = isAnti(it.key);
+    const gap = (!anti && d.t > 0) ? Math.max(0, r4(d.t - pd.a)) : 0;
+    const cumCell = cumEdit
+      ? `<input class="cum num" type="number" step="any" value="${cum}" onchange="onCum('${it.key}', this.value)">`
+      : `<span class="num">${cum}</span>`;
+    rows += `<tr>
+      <td class="iname">${it.short}<span class="w">權重 ${(d.w*100).toFixed(2)}%${anti ? '<span class="anti">｜防退類↓越少越好</span>' : ''}</span></td>
+      <td class="num hide-m">${d.t}</td>
+      <td>${cumCell}</td>
+      <td><input class="today num" type="number" step="${it.step}" min="0" placeholder="0" value="${today !== undefined && today !== null ? today : ''}" onchange="onToday('${it.key}', this.value)"></td>
+      <td><span class="rate ${rateCls} num">${rateTxt}</span>${gap > 0 ? `<span class="gap">距月目標缺 ${gap}</span>` : ''}</td>
+      <td class="scorecell num hide-m">${pctTxt(pd.sc)}</td>
+    </tr>`;
+  }
+  area.innerHTML = `<table class="items">
+    <thead><tr><th style="text-align:left">項目</th><th class="hide-m">月目標</th><th>累計</th><th>今日KEY入</th><th>明日達成率</th><th class="hide-m">得分貢獻</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(LS)); }
+function saveAndRender(){ save(); render(); }
+function setCalcDay(v){ LS.calcDay = Number(v) || defaultCalcDay(); saveAndRender(); }
+function setMonthDays(v){ LS.monthDays = Number(v) || DATA.meta.monthDays; saveAndRender(); }
+function setSnapDay(v){ entState().snapDay = Number(v) || null; saveAndRender(); }
+function setOfficial(v){ entState().official = v === '' ? null : Number(v); saveAndRender(); }
+function setBx(k, v){
+  const sst = LS.entities['S:' + curStore] || (LS.entities['S:' + curStore] = { today:{}, cum:{}, bx:{}, official:null, snapDay:null });
+  sst.bx = sst.bx || {};
+  if (v === '' || Number(v) === storeByCode(curStore).bonus[k]) delete sst.bx[k];
+  else sst.bx[k] = Number(v);
+  saveAndRender();
+}
+
+fillStoreSel();
+if (tab === 'person'){ document.getElementById('tabStore').classList.remove('active'); document.getElementById('tabPerson').classList.add('active'); document.getElementById('selPerson').style.display=''; fillPersonSel(); }
+render();
+localStorage.setItem(LS_KEY, JSON.stringify(LS));
+</script>
+</body>
+</html>
