@@ -10,7 +10,14 @@
 - **完成一項有意義的工作後**（新功能、修 bug、踩到新坑），在 `docs/COLLAB-LOG.md` 最上方追加一則紀錄，格式見該檔案開頭說明。
 - **開工前先看日誌最近幾則**，避免重做別人做過的事、重踩已記錄的坑。
 - 修改資料欄位時，務必照 `CLAUDE.md` 的「常用檢查清單」走完五步。
-- GAS 相關改動（`gas/Code.gs`）本地無法測試（開發環境 proxy 封鎖 script.google.com），只能請 Liam 在瀏覽器開 `?action=debug` 等端點驗證。
+- 驗證分三層，詳見 `CLAUDE.md`「驗證方式」節，不可互相替代：
+  1. **試算表資料驗證**（資料是否寫入／欄位是否存在／歷史是否完整）：有 Google Drive
+     連接器的環境（如 Claude 遠端 session）**直接讀試算表**，不要請 Liam 人工複製 JSON。
+  2. **GAS 部署版本驗證**：讀試算表看不出來，仍需請 Liam 開 `?action=debug`
+     （proxy 封鎖 script.google.com，AI 無法直接呼叫 GAS）。
+  3. **正式網站端到端操作驗證**：需 Liam 在真實裝置實測。
+  需要 Liam 人工做的項目（第 2、3 層），完工時集中成**一份一次性驗收清單**交付，
+  不要逐項來回詢問。
 - 密碼（GAS `PT_KEY`）只存在 GAS 編輯器裡，repo 只放 `CHANGE_ME` 佔位字，**不要 commit 真實密碼**。
 
 ## 溝通管道
