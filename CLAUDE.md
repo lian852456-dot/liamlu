@@ -19,9 +19,11 @@ GAS 編輯器裡，**不要 commit**），前端存 localStorage `bei12b_pt_key`
 反推驗證（逐項 100% 吻合、總分 7/9 店完全一致，殘差由校正值吸收），細節見
 `docs/COLLAB-LOG.md` 2026-07-20 兩則。**資料不內嵌**（repo 公開）：登入採
 Codex 私有戰情同一套員編＋裝置綁定授權（GAS `kpicalc_access`），資料存私有 Drive
-`north12b-kpicalc-private-latest.json`，每日更新走 kpi.html 進階「督導發佈區」
-上傳 JSON（`kpicalc_publish`，管理者密碼）。localStorage 鍵：`bei12b_kpi_v1`
-（試算輸入）、`bei12b_kpi_emp`（員編）；裝置 ID 與戰情共用。
+`north12b-kpicalc-private-latest.json`。**每日更新全自動**：GAS `kpiCalcAutoUpdate()`
+時間觸發器每天 11:00 掃日報資料夾（檔名 `MMDD.xlsx`）自動解析發佈＋email 通知
+（啟用需 Drive API v3 服務＋執行 `setupKpiCalcAutoUpdate()`）；手動備援走 kpi.html
+進階「督導發佈區」上傳 JSON（`kpicalc_publish`，管理者密碼）。localStorage 鍵：
+`bei12b_kpi_v1`（試算輸入）、`bei12b_kpi_emp`（員編）；裝置 ID 與戰情共用。
 
 ## 跨 AI 協作
 
