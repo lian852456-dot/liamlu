@@ -157,6 +157,7 @@
   .kpi-rate.good { color: var(--green); }
   .kpi-rate.warn { color: var(--warn); }
   .kpi-rate.bad { color: var(--red); }
+  .kpi-rate.rate-only { color:#6d28d9; }
   .kpi-sub { display: block; margin-top: 3px; color: var(--text-muted); font-size: 11px; font-weight: 500; }
   .kpi-dod { display: block; margin-top: 3px; color: var(--text-muted); font-size: 11px; font-weight: 700; }
   .kpi-dod.up { color: var(--green); }
@@ -196,6 +197,10 @@
   .award-priority-action { margin-top:6px; color:#7c3aed; font-size:14px; font-weight:900; }
   .award-priority-action.unlock { color:#ea580c; }
   .award-priority-sub { margin-top:4px; color:var(--text-muted); font-size:12px; font-weight:700; }
+  .award-priority-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; margin-top:9px; }
+  .award-metric { border-radius:8px; padding:7px; background:#f8fafc; color:var(--text-muted); font-size:11px; font-weight:800; }
+  .award-metric strong { display:block; margin-top:2px; color:var(--text); font-size:14px; }
+  .award-metric.wide { grid-column:1 / -1; }
   .award-store-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(285px,1fr)); gap:12px; }
   .award-store-card { border:1px solid var(--border-dim); border-radius:14px; padding:14px; background:#fff; }
   .award-store-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
@@ -213,6 +218,9 @@
   .award-model-rate { margin-top:4px; font-size:17px; font-weight:900; }
   .award-model-sub { display:block; margin-top:3px; color:var(--text-muted); font-size:11px; font-weight:700; }
   .award-model-next { display:block; margin-top:3px; color:#7c3aed; font-size:11px; font-weight:900; }
+  .award-store-selector { display:flex; align-items:end; gap:10px; flex-wrap:wrap; }
+  .award-store-selector label { min-width:220px; color:var(--text-muted); font-size:12px; font-weight:900; }
+  .award-store-selector select { width:100%; margin-top:5px; border:1px solid var(--border); border-radius:9px; padding:10px; background:#fff; color:var(--text); font-weight:800; }
 
   @media (max-width: 620px) {
     .private-lock-form { grid-template-columns:1fr; }
@@ -2562,28 +2570,26 @@ function kpiBattleNumber(value) {
   return number % 1 === 0 ? String(number) : number.toFixed(1);
 }
 
-function kpiBattleMetricCell(metric) {
+function kpiBattleMetricCell(metric, includeDod = true) {
   if (!metric || metric.rate == null) return '<span class="val-dim">—</span>';
-  return `<span class="kpi-rate ${kpiBattleTone(metric.rate)}">${kpiBattlePercent(metric.rate)}</span>${kpiBattleTargetLine(metric)}${kpiBattleDod(metric.dod)}`;
+  return `<span class="kpi-rate ${kpiBattleTone(metric.rate)}">${kpiBattlePercent(metric.rate)}</span>${kpiBattleTargetLine(metric)}${includeDod ? kpiBattleDod(metric.dod) : ''}`;
 }
 
 function kpiBattleTargetLine(metric, verbose = false) {
   if (!metric || metric.actual == null || metric.target == null) return '';
   const gap = Number(metric.daily_gap);
-  const gapText = Number.isFinite(gap) ? `${gap > 0 ? '+' : ''}${kpiBattleNumber(gap)}` : '—';
+  const gapText = !Number.isFinite(gap) ? '進度差 —' : gap < -0.05 ? `尚差 ${kpiBattleNumber(Math.abs(gap))}` : gap > 0.05 ? `超前 ${kpiBattleNumber(gap)}` : '已達進度';
   const gapTone = gap > 0.05 ? 'up' : gap < -0.05 ? 'down' : '';
-  if (verbose) {
-    return `<span class="kpi-sub">實績 ${kpiBattleNumber(metric.actual)} ／ 月目標 ${kpiBattleNumber(metric.target)} ／ 100%日目標 ${kpiBattleNumber(metric.daily_target)} ／ 差異 <span class="kpi-gap ${gapTone}">${gapText}</span></span>`;
-  }
-  return `<span class="kpi-sub" title="實績／月目標／100%日目標／差異">${kpiBattleNumber(metric.actual)} ／ ${kpiBattleNumber(metric.target)} ／ ${kpiBattleNumber(metric.daily_target)} ／ <span class="kpi-gap ${gapTone}">${gapText}</span></span>`;
+  const separator = verbose ? '｜' : '｜';
+  return `<span class="kpi-sub" title="依資料截止日換算應達進度">實績 ${kpiBattleNumber(metric.actual)} ${separator} 月目標 ${kpiBattleNumber(metric.target)} ${separator} <span class="kpi-gap ${gapTone}">${gapText}</span></span>`;
 }
 
 function kpiBattleDod(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '';
   const direction = number > 0.0005 ? 'up' : number < -0.0005 ? 'down' : '';
-  const sign = number > 0 ? '+' : '';
-  return `<span class="kpi-dod ${direction}">DOD ${sign}${(number * 100).toFixed(1)}pp</span>`;
+  const wording = direction === 'up' ? `較昨日上升 ${(number * 100).toFixed(1)}pp` : direction === 'down' ? `較昨日下降 ${Math.abs(number * 100).toFixed(1)}pp` : '較昨日持平';
+  return `<span class="kpi-dod ${direction}">${wording}</span>`;
 }
 
 function kpiBattleRankDod(value) {
@@ -2600,9 +2606,9 @@ function kpiBattleRate(value, dod) {
 }
 
 function kpiBattleAwardCell(row) {
-  if (row.phone_award_projected == null) return '<span class="val-dim">—</span>';
+  if (row.phone_award_actual == null && row.phone_award_projected == null) return '<span class="val-dim">—</span>';
   const eligible = row.phone_award_eligible === 'Y';
-  return `<span class="kpi-award-val">$${kpiBattleNumber(row.phone_award_projected)}</span><span class="kpi-award-meta ${eligible ? '' : 'no'}">獎金排名 ${row.phone_award_rank ?? '—'}｜${eligible ? '可領獎' : '未領獎'}</span>`;
+  return `<span class="kpi-award-meta">實際獎金</span><span class="kpi-award-val">${awardMoney(row.phone_award_actual)}</span><span class="kpi-award-meta">推估獎金 ${awardMoney(row.phone_award_projected)}</span><span class="kpi-award-meta ${eligible ? '' : 'no'}">獎金排名 ${row.phone_award_rank ?? '—'}｜${eligible ? '可領獎' : '未領獎'}</span>`;
 }
 
 async function loadKpiBattle() {
@@ -2628,7 +2634,7 @@ function renderKpiBattle() {
   if (!_kpiBattleData) return;
   const note = document.getElementById('kpiBattleSourceNote');
   if (note) {
-    note.textContent = `資料至 ${_kpiBattleData.report_date || '—'}｜區間 ${_kpiBattleData.source_date_range || '—'}｜日目標截至 ${_kpiBattleData.source_as_of_date || '—'}｜明細：實績／月目標／100%日目標／差異｜DOD對照 ${_kpiBattleData.previous_report_date || '無前日資料'}｜個資僅供本機受保護預覽`;
+    note.textContent = `資料至 ${_kpiBattleData.report_date || '—'}｜區間 ${_kpiBattleData.source_date_range || '—'}｜進度截至 ${_kpiBattleData.source_as_of_date || '—'}｜明細：實績／月目標／尚差或超前｜較昨日對照 ${_kpiBattleData.previous_report_date || '無前日資料'}｜個資僅供本機受保護預覽`;
   }
   const content = document.getElementById('kpiBattleContent');
   if (!content) return;
@@ -2674,8 +2680,8 @@ function renderKpiBattlePersonal() {
       <span class="kpi-battle-note">共 ${rows.length} 人｜姓名已遮罩</span>
     </div></div>
     <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
-      <thead><tr><th style="text-align:left">店點</th><th>職類</th><th>姓名</th><th>總達成率</th><th>KPI排名</th><th>個人台獎</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
-      <tbody>${rows.map(row => `<tr><td class="store-name">${row.store}</td><td>${row.role || '—'}</td><td>${row.name}</td><td>${kpiBattleRate(row.overall_rate, row.overall_rate_dod)}</td><td>${row.rank ?? '—'}${kpiBattleRankDod(row.rank_dod)}</td><td>${kpiBattleAwardCell(row)}</td><td>${kpiBattleMetricCell(row.metrics?.A999)}</td><td>${kpiBattleMetricCell(row.metrics?.A1399)}</td><td>${kpiBattleMetricCell(row.metrics?.好速)}</td><td>${kpiBattleMetricCell(row.metrics?.R1399)}</td></tr>`).join('') || '<tr><td colspan="10" class="val-dim">目前篩選條件沒有資料</td></tr>'}</tbody>
+      <thead><tr><th style="text-align:left">店點</th><th>職類</th><th>姓名</th><th>總達成率</th><th>KPI排名</th><th>個人台獎</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th><th>RT</th><th>R999</th><th>特維</th><th>配件</th><th>包膜</th><th>保險搭售率</th></tr></thead>
+      <tbody>${rows.map(row => `<tr><td class="store-name">${row.store}</td><td>${row.role || '—'}</td><td>${row.name}</td><td>${kpiBattleRate(row.overall_rate, row.overall_rate_dod)}</td><td>${row.rank ?? '—'}${kpiBattleRankDod(row.rank_dod)}</td><td>${kpiBattleAwardCell(row)}</td><td>${kpiBattleMetricCell(row.metrics?.A999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.A1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.好速, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.RT, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.特維, false)}</td><td>${kpiBattleMetricCell(row.metrics?.配件, false)}</td><td>${kpiBattleMetricCell(row.metrics?.包膜, false)}</td><td><span class="kpi-rate rate-only">${kpiBattlePercent(row.insurance_attach_rate)}</span><span class="kpi-sub">個人搭售率</span></td></tr>`).join('') || '<tr><td colspan="16" class="val-dim">目前篩選條件沒有資料</td></tr>'}</tbody>
     </table></div></div>`;
 }
 
@@ -2699,17 +2705,33 @@ function awardRateTone(value) {
 
 function renderAwardPriority(item) {
   if (!item) return '';
-  const unlock = item.close_unlock ? ' unlock' : '';
-  return `<div class="award-priority-card${unlock}">
+  const difference = Number(item.difference);
+  const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${kpiBattleNumber(difference)}` : '—';
+  return `<div class="award-priority-card">
     <div class="award-priority-title">${item.display_name}</div>
-    <div class="award-priority-action${unlock}">差 ${item.units_needed} 台｜${item.next_label}</div>
-    <div class="award-priority-sub">${kpiBattleNumber(item.actual)}／${kpiBattleNumber(item.target)}（${kpiBattlePercent(item.rate)}）｜補到後店長＋督導 ${awardMoney(item.incremental_award)}</div>
+    <div class="award-priority-action">${item.next_label || '已達最高獎階'}</div>
+    <div class="award-priority-metrics">
+      <div class="award-metric">實際數<strong>${kpiBattleNumber(item.actual)}</strong></div>
+      <div class="award-metric">目標數<strong>${kpiBattleNumber(item.target)}</strong></div>
+      <div class="award-metric">達成率<strong class="${awardRateTone(item.rate)}">${kpiBattlePercent(item.rate)}</strong></div>
+      <div class="award-metric">差異數<strong class="${difference < 0 ? 'bad' : 'good'}">${differenceText}</strong></div>
+      <div class="award-metric wide">會增加多少獎金<strong>${awardMoney(item.incremental_award)}</strong></div>
+    </div>
   </div>`;
 }
 
 function renderAwardModel(item) {
-  const next = item.next_label ? `差 ${item.units_needed} 台 ${item.next_label}，+${awardMoney(item.incremental_award)}` : '已達最高獎階';
-  return `<div class="award-model"><div class="award-model-name">${item.display_name}</div><div class="award-model-rate ${awardRateTone(item.rate)}">${kpiBattlePercent(item.rate)}</div><span class="award-model-sub">${kpiBattleNumber(item.actual)} ／ ${kpiBattleNumber(item.target)}</span><span class="award-model-next">${next}</span></div>`;
+  const difference = Number(item.difference);
+  const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${kpiBattleNumber(difference)}` : '—';
+  return `<div class="award-model"><div class="award-model-name">${item.display_name}</div><div class="award-model-rate ${awardRateTone(item.rate)}">${kpiBattlePercent(item.rate)}</div><span class="award-model-sub">實際 ${kpiBattleNumber(item.actual)}｜目標 ${kpiBattleNumber(item.target)}</span><span class="award-model-sub">差異 ${differenceText}｜${item.next_label || '最高獎階'}</span><span class="award-model-next">會增加 ${awardMoney(item.incremental_award)}</span></div>`;
+}
+
+function renderAwardUnit(row, district = false) {
+  const award = row?.award || {};
+  return `<div class="award-store-card"><div class="award-store-head"><div class="award-store-name">${district ? '🏢 ' : ''}${row?.store || '—'}</div><div class="award-store-rank">排名 ${award.rank ?? '—'}<br>${award.award === 'Y' ? '✅ 可領獎' : '⚠️ 未領獎'}</div></div>
+    <div class="award-store-values"><div class="award-value"><div class="label">實際金額</div><div class="number">${awardMoney(award.actual_total)}</div></div><div class="award-value"><div class="label">推估金額</div><div class="number">${awardMoney(award.projected)}</div></div></div>
+    <div class="award-priority-grid">${(row?.priorities || []).map(renderAwardPriority).join('') || '<span class="val-dim">沒有符合優先順位的機款</span>'}</div>
+  </div>`;
 }
 
 async function loadAwardsBattle() {
@@ -2728,28 +2750,27 @@ function renderAwardsBattle() {
   if (!_awardsBattleData) return;
   const data = _awardsBattleData;
   const supervisor = data.supervisor || {};
+  const stores = data.stores || [];
+  const eligibleStores = stores.filter(row => row.award?.award === 'Y').length;
+  const selectedBefore = document.getElementById('awardsStoreSelect')?.value;
+  const selectedStore = stores.find(row => row.store === selectedBefore) || stores[0];
   const note = document.getElementById('awardsBattleSourceNote');
-  if (note) note.textContent = `10 台重點機款｜督導資料置頂｜優先規則：先差 1～3 台解鎖店長 50%，其餘依「下一獎階可增加店長＋督導獎金 ÷ 所需台數」排序｜資料僅供本機受保護預覽`;
+  if (note) note.textContent = `10 台重點機款｜前三台依本月最高台獎順位；達成率超過 100% 由下一順位遞補｜店點差異數以 50% 目標無條件進位計算｜資料僅供受保護預覽`;
   const content = document.getElementById('awardsBattleContent');
   if (!content) return;
   content.innerHTML = `
     <div class="summary-grid">
-      <div class="summary-card"><div class="sc-label">北一二B 督導預估</div><div class="sc-val" style="color:#6d28d9">${awardMoney(supervisor.supervisor_award)}</div><div class="sc-sub">整體督導台獎</div></div>
-      <div class="summary-card"><div class="sc-label">北一二B 店長預估</div><div class="sc-val" style="color:#7c3aed">${awardMoney(supervisor.manager_award)}</div><div class="sc-sub">整體店長台獎</div></div>
-      <div class="summary-card"><div class="sc-label">整體推估獎金</div><div class="sc-val" style="color:var(--accent)">${awardMoney(supervisor.projected)}</div><div class="sc-sub">公司排名 ${supervisor.rank ?? '—'}｜${supervisor.award === 'Y' ? '可領獎' : '未領獎'}</div></div>
-      <div class="summary-card"><div class="sc-label">優先補量店點</div><div class="sc-val" style="color:var(--red)">${(data.stores || []).filter(row => row.priorities?.[0]?.close_unlock).length}</div><div class="sc-sub">間有近距離 50% 門檻</div></div>
+      <div class="summary-card"><div class="sc-label">督導區實際獎金</div><div class="sc-val" style="color:#6d28d9">${awardMoney(supervisor.actual_total)}</div><div class="sc-sub">公司實際獎金</div></div>
+      <div class="summary-card"><div class="sc-label">督導區推估獎金</div><div class="sc-val" style="color:var(--accent)">${awardMoney(supervisor.projected)}</div><div class="sc-sub">依目前進度推估</div></div>
+      <div class="summary-card"><div class="sc-label">督導區排名</div><div class="sc-val" style="color:var(--gold)">${supervisor.rank ?? '—'}</div><div class="sc-sub">公司獎金排名</div></div>
+      <div class="summary-card"><div class="sc-label">是否領獎</div><div class="sc-val" style="color:${supervisor.award === 'Y' ? 'var(--green)' : 'var(--red)'}">${supervisor.award === 'Y' ? '有' : '無'}</div><div class="sc-sub">督導區資格</div></div>
+      <div class="summary-card"><div class="sc-label">有領獎店</div><div class="sc-val" style="color:var(--green)">${eligibleStores}</div><div class="sc-sub">家門市</div></div>
+      <div class="summary-card"><div class="sc-label">未領獎店</div><div class="sc-val" style="color:var(--red)">${stores.length - eligibleStores}</div><div class="sc-sub">家門市</div></div>
     </div>
-    <div class="section-divider">督導今日優先機款</div>
-    <div class="award-priority-grid">${(data.overall_priorities || []).map(renderAwardPriority).join('') || '<div class="kpi-empty">目前沒有下一獎階資料</div>'}</div>
-    <div class="section-divider">店點台獎與優先補量</div>
-    <div class="award-store-grid">${(data.stores || []).map(row => {
-      const award = row.award || {};
-      return `<div class="award-store-card"><div class="award-store-head"><div class="award-store-name">${row.store}</div><div class="award-store-rank">店獎排名 ${award.rank ?? '—'}<br>${award.award === 'Y' ? '✅ 可領獎' : '⚠️ 未領獎'}</div></div>
-        <div class="award-store-values"><div class="award-value"><div class="label">店長預估</div><div class="number">${awardMoney(award.manager_award)}</div></div><div class="award-value"><div class="label">督導預估</div><div class="number">${awardMoney(award.supervisor_award)}</div></div></div>
-        <div class="award-priority-grid">${(row.priorities || []).map(renderAwardPriority).join('') || '<span class="val-dim">目前無下一獎階</span>'}</div>
-        <details><summary>查看 10 台機款與下一獎階</summary><div class="award-model-grid">${(row.items || []).map(renderAwardModel).join('')}</div></details>
-      </div>`;
-    }).join('')}</div>`;
+    <div class="section-divider">督導區及各店台獎（依實際獎金排序）</div>
+    <div class="award-store-grid">${renderAwardUnit(data.overall || { store: '北一二B整體', award: supervisor, priorities: [] }, true)}${stores.map(row => renderAwardUnit(row)).join('')}</div>
+    <div class="section-divider">門市 10 台機款篩選</div>
+    <div class="card"><div class="award-store-selector"><label>選擇門市<select id="awardsStoreSelect" onchange="renderAwardsBattle()">${stores.map(row => `<option value="${row.store}" ${row.store === selectedStore?.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label><span class="kpi-battle-note">差異數＝實際數－50%目標台數（無條件進位）</span></div><div class="award-model-grid">${(selectedStore?.items || []).map(renderAwardModel).join('')}</div></div>`;
 
 }
 
