@@ -1256,6 +1256,208 @@ function kpiCalcPublish(payload) {
   return { publishedAt: privateDashboardNow(), period: (data.meta && data.meta.period) || '' };
 }
 
+// ════════════════════════════════════
+// KPI 試算：每日自動更新（讀 Drive 日報 xlsx → 解析 → 發佈私有資料檔）
+//
+// 啟用方式（只需做一次）：
+//   1. 左側「服務 +」加入「Drive API」（識別碼 Drive，版本 v3）
+//   2. 函式選單選「setupKpiCalcAutoUpdate」→ 執行（會要求授權）
+//   3. 之後每天 11:00（台北時間，±15分）自動檢查來源資料夾，
+//      有新日報（檔名 MMDD.xlsx）就更新；沒有新檔就靜靜略過。
+// 想立即測試或當天補跑：函式選單選「testKpiCalcAutoUpdate」執行。
+// 注意：時間觸發器跑最新存檔程式碼，這部分不需重新部署 Web App。
+// 來源資料夾可用指令碼屬性 KPICALC_SOURCE_FOLDER_ID 覆蓋。
+// ════════════════════════════════════
+
+const KPICALC_SOURCE_FOLDER_ID_DEFAULT = '1zs4flckF4uysz55tXkAxojM5-yB6a9sH';
+const KPICALC_ITEMS = [
+  ['5G銷售數','5G',1],['HBO Max&Disney+&Prime Video銷售數','HBO/D+/PV',1],
+  ['Netflix多享組銷售數','Netflix多享組',1],['TTL AQ上線點數','AQ上線點數',0.5],
+  ['自退數','自退數',1],['解約後NP OUT','解約後NP OUT',1],['解約後NP OUT(督導績)','NP OUT(督導績)',1],
+  ['AQ V+D 999 (含)以上','AQ V+D≧999',1],['AQ V+D 1399 (含)以上','AQ V+D≧1399',1],
+  ['預付卡開卡面額','預付卡開卡面額',1],['RT上線點數','RT上線點數',0.1],
+  ['特殊維繫用戶續約數','特殊維繫續約',1],['高高特維用戶續約數','高高特維續約',1],
+  ['RT V+D 999 (含)以上','RT V+D≧999',1],['RT V+D 1399 (含)以上','RT V+D≧1399',1],
+  ['Device專案銷售數','Device專案',1],['重點Device銷售量','重點Device',1],
+  ['好速案銷售點數','好速案點數',0.25],['換約淨新增金額','換約淨新增金額',1],
+  ['空機、3C、物聯網及門市購營收','空機/3C/物聯網營收',1],['配件及其他營收','配件及其他營收',1],
+  ['包膜與保貼營收','包膜與保貼營收',1],['手機保險服務點數','手機保險點數',0.5],
+  ['MyVideo&KKBOX','MyVideo&KKBOX',1],['Apple&Google服務及雜誌週刊開通數','Apple&Google開通',1],
+];
+
+function setupKpiCalcAutoUpdate() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'kpiCalcAutoUpdate') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('kpiCalcAutoUpdate').timeBased().everyDays(1).atHour(11).inTimezone('Asia/Taipei').create();
+  return kpiCalcAutoUpdate();
+}
+
+function testKpiCalcAutoUpdate() {
+  PropertiesService.getScriptProperties().deleteProperty('KPICALC_LAST_IMPORT');
+  return kpiCalcAutoUpdate();
+}
+
+function kpiCalcNotify(subject, body) {
+  const email = String(PropertiesService.getScriptProperties().getProperty('DASHBOARD_NOTIFY_EMAIL') || '').trim() || NOTIFY_EMAIL;
+  if (!email || /CHANGE_ME/.test(email)) return;
+  try { MailApp.sendEmail(email, subject, body); } catch (e) { console.log('kpicalc notify failed: ' + e); }
+}
+
+function kpiCalcAutoUpdate() {
+  const props = PropertiesService.getScriptProperties();
+  let latest = null;
+  try {
+    const folderId = props.getProperty('KPICALC_SOURCE_FOLDER_ID') || KPICALC_SOURCE_FOLDER_ID_DEFAULT;
+    const files = DriveApp.getFolderById(folderId).getFiles();
+    while (files.hasNext()) {
+      const f = files.next();
+      const m = f.getName().match(/^(\d{4})\.xlsx$/);
+      if (!m) continue;
+      if (!latest || Number(m[1]) > Number(latest.tag) ||
+          (Number(m[1]) === Number(latest.tag) && f.getLastUpdated() > latest.file.getLastUpdated())) {
+        latest = { file: f, tag: m[1] };
+      }
+    }
+    if (!latest) { console.log('kpicalc: 找不到 MMDD.xlsx 日報檔'); return { status: 'no-file' }; }
+    const stamp = latest.file.getName() + ':' + latest.file.getLastUpdated().getTime();
+    if (props.getProperty('KPICALC_LAST_IMPORT') === stamp) return { status: 'up-to-date', file: latest.file.getName() };
+
+    const data = kpiCalcParseReport(latest.file);
+    const text = JSON.stringify(data);
+    const folder = privateDashboardFolder();
+    const existing = folder.getFilesByName(PRIVATE_KPICALC_FILE);
+    if (existing.hasNext()) existing.next().setContent(text);
+    else folder.createFile(Utilities.newBlob(text, 'application/json', PRIVATE_KPICALC_FILE));
+    props.setProperty('KPICALC_LAST_IMPORT', stamp);
+    kpiCalcNotify('✅ KPI試算資料已更新（' + latest.file.getName() + '）',
+      '來源：' + latest.file.getName() + '\n期間：' + data.meta.period +
+      '\n店點 ' + data.stores.length + ' 家、人員 ' + data.persons.length + ' 位。\n同仁重新登入 kpi.html 即可看到新累計數。');
+    return { status: 'updated', file: latest.file.getName(), period: data.meta.period };
+  } catch (err) {
+    console.log('kpicalc auto update failed: ' + err);
+    kpiCalcNotify('❌ KPI試算資料自動更新失敗' + (latest ? '（' + latest.file.getName() + '）' : ''),
+      '錯誤：' + (err && err.message ? err.message : String(err)) +
+      '\n舊資料維持不變。可能是日報欄位排版變動，請把檔案交給 Claude 檢查。');
+    return { status: 'error', message: String(err) };
+  }
+}
+
+// xlsx → 暫存 Google 試算表 → 解析兩張明細表 → 刪暫存
+function kpiCalcParseReport(xlsxFile) {
+  const converted = Drive.Files.create(
+    { name: 'kpicalc-tmp-' + xlsxFile.getName(), mimeType: 'application/vnd.google-apps.spreadsheet' },
+    xlsxFile.getBlob()
+  );
+  try {
+    const ss = SpreadsheetApp.openById(converted.id);
+    const storeSheet = ss.getSheetByName('上線數KPI_店點達成率_明細');
+    const personSheet = ss.getSheetByName('上線數KPI_個人達成率_明細');
+    if (!storeSheet || !personSheet) throw new Error('找不到「上線數KPI_店點/個人達成率_明細」工作表');
+    const sv = storeSheet.getRange(1, 1, Math.min(60, storeSheet.getLastRow()), 236).getValues();
+    const pv = personSheet.getRange(1, 1, Math.min(120, personSheet.getLastRow()), 236).getValues();
+
+    const meta = kpiCalcParseMeta(sv, xlsxFile.getName());
+    const sBands = kpiCalcBands(sv[12], 8);   // 店點表：標題列 13、I 欄(9)起
+    const pBands = kpiCalcBands(pv[7], 10);   // 個人表：標題列 8、K 欄(11)起
+
+    const stores = [];
+    for (let r = 14; r < sv.length; r++) {
+      const code = String(sv[r][3] || '').trim();
+      if (!/^DNB/i.test(code)) { if (stores.length) break; else continue; }
+      const items = {};
+      KPICALC_ITEMS.forEach(function(it) {
+        const c = sBands[it[0]];
+        if (c === undefined) throw new Error('店點表缺少欄位：' + it[0]);
+        items[it[0]] = { t: kpiCalcNum(sv[r][c + 1]), a: kpiCalcNum(sv[r][c]), w: kpiCalcPct(sv[r][c + 2]) };
+      });
+      const bx = {};
+      const aq = sBands['TTL AQ上線數_加分項'];
+      bx.aqA = aq === undefined ? 0 : kpiCalcNum(sv[r][aq]);
+      bx.aqT = aq === undefined ? 0 : kpiCalcNum(sv[r][aq + 1]);
+      bx.dnHiN = kpiCalcBandVal(sBands, sv[r], 'RT降轉率_降轉數(前約 V+D 1399(含)以上)');
+      bx.dnHiD = kpiCalcBandVal(sBands, sv[r], 'RT降轉率_上線件數(前約 V+D 1399(含)以上)');
+      bx.upN = kpiCalcBandVal(sBands, sv[r], 'RT升轉率_升轉數(前約 V+D 1399以下)');
+      bx.upD = kpiCalcBandVal(sBands, sv[r], 'RT升轉率_上線件數(前約 V+D 1399以下)');
+      stores.push({ code: code, name: String(sv[r][4] || ''), official: kpiCalcNum(sv[r][7]), items: items, bonus: bx });
+    }
+
+    const persons = [];
+    for (let r = 9; r < pv.length; r++) {
+      const code = String(pv[r][2] || '').trim();
+      if (!/^DNB/i.test(code)) { if (persons.length) break; else continue; }
+      const items = {};
+      KPICALC_ITEMS.forEach(function(it) {
+        const c = pBands[it[0]];
+        if (c === undefined) throw new Error('個人表缺少欄位：' + it[0]);
+        items[it[0]] = { t: kpiCalcNum(pv[r][c + 1]), a: kpiCalcNum(pv[r][c]), w: kpiCalcPct(pv[r][c + 2]) };
+      });
+      persons.push({ store: code, role: String(pv[r][4] || ''), pname: String(pv[r][6] || ''),
+                     official: kpiCalcNum(pv[r][9]), items: items });
+    }
+
+    if (stores.length < 5 || persons.length < 10) {
+      throw new Error('解析結果不合理（店 ' + stores.length + '、人 ' + persons.length + '），疑似格式變動');
+    }
+    return {
+      meta: meta,
+      items: KPICALC_ITEMS.map(function(it) { return { key: it[0], short: it[1], step: it[2] }; }),
+      stores: stores,
+      persons: persons
+    };
+  } finally {
+    try { DriveApp.getFileById(converted.id).setTrashed(true); } catch (e) { console.log('kpicalc tmp cleanup failed: ' + e); }
+  }
+}
+
+function kpiCalcBands(headerRow, startCol0) {
+  const bands = {};
+  for (let c = startCol0; c <= 233; c += 4) {
+    const name = String(headerRow[c] || '').trim();
+    if (name) bands[name] = c;
+  }
+  return bands;
+}
+
+function kpiCalcBandVal(bands, row, name) {
+  const c = bands[name];
+  return c === undefined ? 0 : kpiCalcNum(row[c]);
+}
+
+function kpiCalcNum(v) {
+  if (v === '' || v === null || v === undefined) return 0;
+  const n = Number(String(v).replace(/,/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+function kpiCalcPct(v) {
+  if (v === '' || v === null || v === undefined) return 0;
+  if (typeof v === 'number') return Math.round(v * 1e6) / 1e6;
+  const s = String(v).trim();
+  const n = Number(s.replace(/[%,]/g, ''));
+  if (isNaN(n)) return 0;
+  return /%/.test(s) ? Math.round(n / 100 * 1e6) / 1e6 : Math.round(n * 1e6) / 1e6;
+}
+
+function kpiCalcParseMeta(sv, fileName) {
+  for (let r = 0; r < Math.min(10, sv.length); r++) {
+    for (let c = 0; c < 12; c++) {
+      const m = String(sv[r][c] || '').match(/(\d{4})\/(\d{1,2})\/(\d{1,2})\s*~\s*(\d{1,2})\/(\d{1,2})/);
+      if (m) {
+        const year = Number(m[1]), month = Number(m[2]), endDay = Number(m[5]);
+        return {
+          period: m[0],
+          snapshotDay: endDay,
+          monthDays: new Date(year, month, 0).getDate(),
+          month: year + '-' + ('0' + month).slice(-2),
+          sourceFile: fileName
+        };
+      }
+    }
+  }
+  throw new Error('找不到資料期間（例：2026/07/01 ~ 07/19）');
+}
+
 // 每日自動化以管理者密碼同步遮罩後名冊。既有裝置綁定不會被覆蓋。
 function privateDashboardSyncRoster(payload) {
   privateDashboardAdminAuthorized(payload);
