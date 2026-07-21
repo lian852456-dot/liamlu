@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>KPI 通用試算（自行輸入版）</title>
+<style>
+  :root {
+    --bg-deep: #f5f6f8;
+    --bg-card: #ffffff;
+    --bg-panel: #f0f2f5;
+    --bg-row-alt: #f8f9fb;
+    --accent: #0891b2;
+    --accent-bright: #0e7490;
+    --green: #16a34a;
+    --red: #dc2626;
+    --red-soft: rgba(220,38,38,0.08);
+    --warn: #d97706;
+    --text: #111827;
+    --text-dim: #374151;
+    --text-muted: #6b7280;
+    --border: rgba(0,0,0,0.12);
+    --border-dim: rgba(0,0,0,0.07);
+    --radius: 12px;
+    --font: 'Segoe UI', 'Noto Sans TC', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg-deep); color: var(--text); font-family: var(--font); font-size: 16px; min-height: 100vh; padding-bottom: 60px; }
+
+  .site-header { background:#fff; border-bottom:3px solid var(--accent); padding:12px 16px; position:sticky; top:0; z-index:20; }
+  .site-header h1 { font-size:1.15rem; color:var(--accent-bright); }
+  .site-header .sub { font-size:.72rem; color:var(--text-muted); margin-top:2px; }
+
+  .wrap { max-width: 880px; margin: 0 auto; padding: 12px; }
+
+  .intro { background:#ecfeff; border:1px solid rgba(8,145,178,.25); border-radius:var(--radius); padding:12px 14px; font-size:.8rem; color:var(--text-dim); line-height:1.6; margin-bottom:12px; }
+
+  .tabs { display:flex; gap:8px; margin:10px 0; }
+  .tab-btn { flex:1; padding:10px; border:1px solid var(--border); background:#fff; border-radius:var(--radius); font-size:1rem; font-weight:700; color:var(--text-dim); cursor:pointer; }
+  .tab-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+  .fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:12px; }
+  .fields .fld { display:flex; flex-direction:column; gap:4px; }
+  .fields .fld label { font-size:.72rem; color:var(--text-muted); }
+  .fields .fld input { padding:9px; border:1px solid var(--border); border-radius:8px; font-size:1rem; }
+
+  .summary { background:#fff; border:1px solid var(--border-dim); border-radius:var(--radius); padding:14px 16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+  .summary .who { font-weight:700; font-size:1.02rem; margin-bottom:8px; }
+  .sumgrid { display:flex; gap:10px; flex-wrap:wrap; }
+  .sumbox { flex:1; min-width:150px; background:linear-gradient(135deg,#ecfeff,#cffafe); border:1px solid rgba(8,145,178,.35); border-radius:10px; padding:12px; text-align:center; }
+  .sumbox .lbl { font-size:.72rem; color:var(--text-muted); }
+  .sumbox .val { font-size:1.7rem; font-weight:800; margin-top:2px; }
+  .sumbox .val.good { color:var(--green); }
+  .sumbox .val.bad { color:var(--red); }
+  .breakdown { margin-top:8px; font-size:.78rem; color:var(--text-muted); line-height:1.5; }
+
+  .ctrlrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; font-size:.85rem; }
+  .ctrlrow label { color:var(--text-dim); }
+  .ctrlrow input[type=number] { width:64px; padding:6px; border:1px solid var(--border); border-radius:8px; font-size:.95rem; text-align:center; }
+  .btn { padding:8px 12px; border:1px solid var(--border); background:#fff; border-radius:10px; font-size:.85rem; cursor:pointer; color:var(--text-dim); }
+  .btn:active { background:var(--bg-panel); }
+  .btn.warn { color:var(--red); border-color:rgba(220,38,38,.4); }
+  .btn.toggled { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+  table.items { width:100%; border-collapse:collapse; background:#fff; border-radius:var(--radius); overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.05); font-size:.86rem; }
+  table.items th { background:var(--bg-panel); padding:8px 6px; font-size:.72rem; color:var(--text-muted); text-align:center; white-space:nowrap; }
+  table.items td { padding:6px 6px; border-top:1px solid var(--border-dim); text-align:center; }
+  table.items tr:nth-child(even) td { background:var(--bg-row-alt); }
+  td.iname { text-align:left; font-weight:600; max-width:150px; }
+  td.iname .anti { color:var(--warn); font-size:.66rem; display:block; }
+  .num { font-variant-numeric: tabular-nums; }
+  td input.inp { width:80px; padding:6px 4px; border:1px solid var(--border); border-radius:8px; font-size:.92rem; text-align:center; }
+  td input.today { border:1.5px solid var(--accent); background:#ecfeff; }
+  td input.wt { width:60px; padding:5px 3px; border:1px dashed var(--border); border-radius:6px; font-size:.82rem; text-align:center; }
+  .rate.good { color:var(--green); font-weight:700; }
+  .rate.bad { color:var(--red); font-weight:700; }
+  .gap { display:block; font-size:.64rem; color:var(--text-muted); }
+
+  details.adv { margin-top:12px; background:#fff; border:1px solid var(--border-dim); border-radius:var(--radius); padding:10px 14px; font-size:.85rem; }
+  details.adv summary { font-weight:700; cursor:pointer; color:var(--text-dim); }
+  .advgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; margin-top:10px; }
+  .advgrid .fld { display:flex; flex-direction:column; gap:4px; }
+  .advgrid .fld label { font-size:.72rem; color:var(--text-muted); }
+  .advgrid .fld input { padding:7px; border:1px solid var(--border); border-radius:8px; font-size:.92rem; }
+  .advnote { margin-top:8px; font-size:.74rem; color:var(--text-muted); line-height:1.5; }
+
+  .foot { margin-top:16px; font-size:.72rem; color:var(--text-muted); line-height:1.6; }
+  textarea#ioBox { width:100%; height:90px; margin-top:8px; border:1px solid var(--border); border-radius:8px; padding:8px; font-size:.78rem; font-family:monospace; }
+
+  @media (max-width:640px){
+    table.items { font-size:.78rem; }
+    td input.inp { width:64px; }
+    th.hide-m, td.hide-m { display:none; }
+  }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <h1>📊 KPI 通用試算</h1>
+  <div class="sub">自行輸入目標與實績，即算各項達成率與明日 KPI 總進度達成率</div>
+</header>
+
+<div class="wrap">
+  <div class="intro">
+    這是<strong>通用試算工具</strong>：所有數字、店點、姓名都由你自己輸入，本頁<strong>不含任何人員或門市資料</strong>，也不會上傳。
+    計算架構（項目、權重、達成率公式、上限/下限、防退類與激勵加分規則）依中華電信門市 KPI 制度內建，算法與正式報表一致。輸入只存在你自己的裝置。
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabStore" onclick="setMode('store')">🏪 店績試算</button>
+    <button class="tab-btn" id="tabPerson" onclick="setMode('person')">🙋 個績試算</button>
+  </div>
+
+  <div class="fields">
+    <div class="fld"><label>對象名稱（店點／姓名，可留空）</label><input id="fLabel" type="text" placeholder="例：OO店 / 王小明" oninput="onField()"></div>
+    <div class="fld"><label>本月天數</label><input id="fMonthDays" type="number" min="28" max="31" oninput="onField()"></div>
+    <div class="fld"><label>累計資料到位日（實績算到第幾天）</label><input id="fSnapDay" type="number" min="1" max="31" oninput="onField()"></div>
+    <div class="fld"><label>試算日（今天是第幾天）</label><input id="fCalcDay" type="number" min="1" max="31" oninput="onField()"></div>
+  </div>
+
+  <div class="summary" id="summaryCard"></div>
+
+  <div class="ctrlrow">
+    <button class="btn" id="btnWt" onclick="toggleWtEdit()">⚖️ 編輯權重</button>
+    <button class="btn warn" onclick="clearToday()">清除今日輸入</button>
+    <button class="btn warn" onclick="clearAll()">🗑 全部清空</button>
+  </div>
+
+  <div id="itemArea"></div>
+
+  <details class="adv">
+    <summary>⚙️ 進階：激勵加分資料（選填）</summary>
+    <div class="advgrid">
+      <div class="fld"><label>AQ件數加分項：累計件數</label><input type="number" id="bxAqA" oninput="onField()"></div>
+      <div class="fld"><label>AQ件數加分項：月目標</label><input type="number" id="bxAqT" oninput="onField()"></div>
+      <div class="fld"><label>降轉數（前約V+D≧1399）</label><input type="number" id="bxDnHiN" oninput="onField()"></div>
+      <div class="fld"><label>上線件數（前約V+D≧1399）</label><input type="number" id="bxDnHiD" oninput="onField()"></div>
+      <div class="fld"><label>升轉數（前約V+D&lt;1399）</label><input type="number" id="bxUpN" oninput="onField()"></div>
+      <div class="fld"><label>上線件數（前約V+D&lt;1399）</label><input type="number" id="bxUpD" oninput="onField()"></div>
+    </div>
+    <div class="advnote">
+      激勵加分規則（依制度）：降轉率(≧1399)＝降轉數/上線件數 ≦37% 加 0.75%；升轉率(&lt;1399)＝升轉數/上線件數 ≧30% 加 0.75%；
+      AQ件數加分項推估達成率 ≧130% 加 1%。留空則不計加分。
+    </div>
+  </details>
+
+  <details class="adv">
+    <summary>💾 匯出／匯入（換裝置、存檔用）</summary>
+    <div class="advnote">按「匯出」把目前輸入複製成一段文字自行保存；貼回下框按「匯入」即可還原。</div>
+    <textarea id="ioBox" placeholder="匯出的資料會出現在這裡，或貼上要匯入的資料"></textarea>
+    <div style="margin-top:8px"><button class="btn" onclick="doExport()">📤 匯出</button> <button class="btn" onclick="doImport()">📥 匯入</button> <span id="ioMsg" style="font-size:.78rem;color:var(--text-muted)"></span></div>
+  </details>
+
+  <div class="foot">
+    ・「明日預估達成率」＝（累計實績＋今日）÷ 月目標 × 本月天數 ÷ 試算日；各項有上限 250%。<br>
+    ・店績模式：部分項目有下限，低於下限該項得分打 5 折（個績模式無下限）。<br>
+    ・防退類（自退數、解約後NP OUT）反向計分：數字越少越好，今日輸入會扣分；解約後NP OUT(店績) 採 2025/07 新制（原始達成率&lt;100% 時改 50%+50%×原始）。<br>
+    ・總達成率＝各項（權重×達成率）加總＋激勵加分；未填目標的項目不計入。權重合計 105.5%（含好速、Netflix 疊加權重），全項 100% 達成時總分會略高於 100%，屬制度設計。<br>
+    ・僅供試算參考，正式成績以公司報表為準。
+  </div>
+</div>
+
+<script>
+// ── 計算架構（內建；非個資，為公司 KPI 制度規則）──
+const ARCH = [{"key":"5G銷售數","short":"5G","step":1,"w":0.03,"floor":0.7,"anti":""},{"key":"HBO Max&Disney+&Prime Video銷售數","short":"HBO/D+/PV","step":1,"w":0.0075,"floor":0.7,"anti":""},{"key":"Netflix多享組銷售數","short":"Netflix多享組","step":1,"w":0.005,"floor":0.7,"anti":""},{"key":"TTL AQ上線點數","short":"AQ上線點數","step":0.5,"w":0.15,"floor":0.6,"anti":""},{"key":"自退數","short":"自退數","step":1,"w":0.01,"floor":0,"anti":"self"},{"key":"解約後NP OUT","short":"解約後NP OUT","step":1,"w":0.025,"floor":0,"anti":"npout"},{"key":"解約後NP OUT(督導績)","short":"NP OUT(督導績)","step":1,"w":0.025,"floor":0,"anti":"self"},{"key":"AQ V+D 999 (含)以上","short":"AQ V+D≧999","step":1,"w":0.1,"floor":0.7,"anti":""},{"key":"AQ V+D 1399 (含)以上","short":"AQ V+D≧1399","step":1,"w":0.05,"floor":0,"anti":""},{"key":"預付卡開卡面額","short":"預付卡開卡面額","step":1,"w":0.03,"floor":0.7,"anti":""},{"key":"RT上線點數","short":"RT上線點數","step":0.1,"w":0.2,"floor":0.7,"anti":""},{"key":"特殊維繫用戶續約數","short":"特殊維繫續約","step":1,"w":0.1,"floor":0.7,"anti":""},{"key":"高高特維用戶續約數","short":"高高特維續約","step":1,"w":0.05,"floor":0.7,"anti":""},{"key":"RT V+D 999 (含)以上","short":"RT V+D≧999","step":1,"w":0.05,"floor":0.7,"anti":""},{"key":"RT V+D 1399 (含)以上","short":"RT V+D≧1399","step":1,"w":0.05,"floor":0.7,"anti":""},{"key":"Device專案銷售數","short":"Device專案","step":1,"w":0.02,"floor":0,"anti":""},{"key":"重點Device銷售量","short":"重點Device","step":1,"w":0.03,"floor":0,"anti":""},{"key":"好速案銷售點數","short":"好速案點數","step":0.25,"w":0.05,"floor":0,"anti":""},{"key":"換約淨新增金額","short":"換約淨新增金額","step":1,"w":0.02,"floor":0,"anti":""},{"key":"空機、3C、物聯網及門市購營收","short":"空機/3C/物聯網營收","step":1,"w":0.01,"floor":0,"anti":""},{"key":"配件及其他營收","short":"配件及其他營收","step":1,"w":0.01,"floor":0,"anti":""},{"key":"包膜與保貼營收","short":"包膜與保貼營收","step":1,"w":0.01,"floor":0,"anti":""},{"key":"手機保險服務點數","short":"手機保險點數","step":0.5,"w":0.01,"floor":0,"anti":""},{"key":"MyVideo&KKBOX","short":"MyVideo&KKBOX","step":1,"w":0.01,"floor":0,"anti":""},{"key":"Apple&Google服務及雜誌週刊開通數","short":"Apple&Google開通","step":1,"w":0.0025,"floor":0,"anti":""}];
+
+const LS_KEY = 'bei12b_kpitry_v1';
+let LS = {};
+try { LS = JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch(e) { LS = {}; }
+LS.mode = LS.mode || 'store';
+LS.fields = LS.fields || {};
+LS.rows = LS.rows || {};   // key -> {t, a, today}
+LS.wt = LS.wt || {};       // key -> custom weight (fraction)
+LS.bx = LS.bx || {};
+let wtEdit = false;
+
+const r4 = x => Math.round(x * 10000) / 10000;
+const pctTxt = x => (x * 100).toFixed(2) + '%';
+const numOr = (v, d) => { const n = Number(v); return isNaN(n) || v === '' || v === null ? d : n; };
+
+function weightOf(k){ const c = LS.wt[k]; return (c !== undefined && c !== null && c !== '') ? Number(c) : ARCH.find(a=>a.key===k).w; }
+function cfg(){
+  return {
+    monthDays: numOr(LS.fields.monthDays, 30),
+    snapDay: numOr(LS.fields.snapDay, 1),
+    calcDay: numOr(LS.fields.calcDay, 1)
+  };
+}
+
+// ── 核心公式（與正式版一致）──
+function itemRate(a, floor, anti, t, f){
+  if (!t) return null;
+  const x = r4(a / t * f);
+  if (anti === 'self') return Math.max(0, Math.min(2.5, r4(2 - x)));
+  if (anti === 'npout'){
+    const raw = r4(2 - x);
+    return raw >= 1 ? Math.min(2.5, raw) : r4(0.5 + 0.5 * Math.max(raw, 0));
+  }
+  return Math.min(2.5, x);
+}
+function itemScore(w, rate, floor, useFloor){
+  if (rate === null || !w) return 0;
+  const fl = useFloor ? (floor || 0) : 0;
+  return w * rate * (fl && rate < fl ? 0.5 : 1);
+}
+function bonusOf(f){
+  const b = LS.bx; let add = 0, parts = [];
+  const dnN = numOr(b.dnHiN,0), dnD = numOr(b.dnHiD,0), upN = numOr(b.upN,0), upD = numOr(b.upD,0),
+        aqA = numOr(b.aqA,0), aqT = numOr(b.aqT,0);
+  if (dnD > 0 && dnN / dnD <= 0.37){ add += 0.0075; parts.push('降轉率(≧1399)達標 +0.75%'); }
+  if (upD > 0 && upN / upD >= 0.30){ add += 0.0075; parts.push('升轉率(<1399)達標 +0.75%'); }
+  if (aqT > 0 && Math.min(2.5, r4(aqA / aqT * f)) >= 1.3){ add += 0.01; parts.push('AQ件數加分 +1%'); }
+  return { add, parts };
+}
+
+function calc(mode){ // 'base' 用到位日不含今日；'proj' 用試算日含今日
+  const c = cfg();
+  const useFloor = LS.mode === 'store';
+  const D = mode === 'proj' ? c.calcDay : c.snapDay;
+  const f = D > 0 ? c.monthDays / D : 0;
+  let sum = 0; const detail = {};
+  for (const it of ARCH){
+    const row = LS.rows[it.key] || {};
+    const t = numOr(row.t, 0);
+    const cumA = numOr(row.a, 0);
+    const add = mode === 'proj' ? numOr(row.today, 0) : 0;
+    const a = cumA + add;
+    const rate = itemRate(a, it.floor, it.anti, t, f);
+    const w = weightOf(it.key);
+    const sc = itemScore(w, rate, it.floor, useFloor);
+    sum += sc;
+    detail[it.key] = { a, rate, sc, w, t };
+  }
+  const bn = bonusOf(f);
+  return { base: r4(sum), bonus: bn, total: r4(sum + bn.add), detail };
+}
+
+// ── UI ──
+function setMode(m){
+  LS.mode = m;
+  document.getElementById('tabStore').classList.toggle('active', m === 'store');
+  document.getElementById('tabPerson').classList.toggle('active', m === 'person');
+  saveAndRender();
+}
+function toggleWtEdit(){ wtEdit = !wtEdit; document.getElementById('btnWt').classList.toggle('toggled', wtEdit); render(); }
+function clearToday(){ for (const k in LS.rows) if (LS.rows[k]) delete LS.rows[k].today; saveAndRender(); }
+function clearAll(){
+  if (!confirm('確定清空所有輸入（目標、實績、今日、名稱、激勵加分）？')) return;
+  LS.rows = {}; LS.fields = {}; LS.bx = {}; LS.wt = {};
+  saveAndRender();
+}
+function onField(){
+  LS.fields.label = document.getElementById('fLabel').value;
+  LS.fields.monthDays = document.getElementById('fMonthDays').value;
+  LS.fields.snapDay = document.getElementById('fSnapDay').value;
+  LS.fields.calcDay = document.getElementById('fCalcDay').value;
+  for (const [id,k] of [['bxAqA','aqA'],['bxAqT','aqT'],['bxDnHiN','dnHiN'],['bxDnHiD','dnHiD'],['bxUpN','upN'],['bxUpD','upD']])
+    LS.bx[k] = document.getElementById(id).value;
+  saveAndRender();
+}
+function onCell(key, field, v){
+  if (!LS.rows[key]) LS.rows[key] = {};
+  LS.rows[key][field] = v;
+  saveAndRender();
+}
+function onWeight(key, v){
+  if (v === '' || v === null) delete LS.wt[key];
+  else LS.wt[key] = Number(v) / 100;   // 使用者輸入百分比
+  saveAndRender();
+}
+
+function render(){
+  const c = cfg();
+  document.getElementById('fLabel').value = LS.fields.label || '';
+  document.getElementById('fMonthDays').value = LS.fields.monthDays ?? '';
+  document.getElementById('fSnapDay').value = LS.fields.snapDay ?? '';
+  document.getElementById('fCalcDay').value = LS.fields.calcDay ?? '';
+  for (const [id,k] of [['bxAqA','aqA'],['bxAqT','aqT'],['bxDnHiN','dnHiN'],['bxDnHiD','dnHiD'],['bxUpN','upN'],['bxUpD','upD']])
+    document.getElementById(id).value = LS.bx[k] ?? '';
+
+  const proj = calc('proj');
+  const hasToday = ARCH.some(it => { const r = LS.rows[it.key]; return r && r.today !== undefined && r.today !== null && r.today !== ''; });
+  const label = LS.fields.label ? (LS.fields.label + '　') : '';
+  const modeTxt = LS.mode === 'store' ? '店績' : '個績';
+  let filledN = 0, coverW = 0;
+  for (const it of ARCH){ if (proj.detail[it.key].t > 0){ filledN++; coverW += proj.detail[it.key].w; } }
+  const partial = filledN > 0 && coverW < 1.0;
+
+  document.getElementById('summaryCard').innerHTML = `
+    <div class="who">${label}<span style="color:var(--accent-bright)">（${modeTxt}試算）</span></div>
+    <div class="sumgrid">
+      <div class="sumbox">
+        <div class="lbl">明日預估 KPI 總進度達成率${hasToday ? '（含今日輸入）' : ''}</div>
+        <div class="val num ${proj.total >= 1 ? 'good' : 'bad'}">${pctTxt(proj.total)}</div>
+      </div>
+    </div>
+    <div class="breakdown">
+      基礎加權 ${pctTxt(proj.base)}${proj.bonus.add ? '　＋　激勵加分 ' + pctTxt(proj.bonus.add) + '（' + proj.bonus.parts.join('、') + '）' : ''}
+      ｜推估係數 ${c.monthDays}/${c.calcDay || '?'}（本月天數 ÷ 試算日）
+      ｜已填 ${filledN} 項、權重覆蓋 ${pctTxt(coverW)}
+      ${partial ? '<br><span style="color:var(--warn)">⚠️ 尚未填滿全部項目，總達成率是以「全項權重 105.5%」為基準，未填項目以 0 計，故偏低屬正常。填齊才會反映真實總達成率。</span>' : ''}
+    </div>`;
+
+  let rows = '';
+  for (const it of ARCH){
+    const row = LS.rows[it.key] || {};
+    const pd = proj.detail[it.key];
+    const rateTxt = pd.rate === null ? '－' : pctTxt(pd.rate);
+    const rateCls = pd.rate === null ? '' : (pd.rate >= 1 ? 'good' : 'bad');
+    const gap = (!it.anti && pd.t > 0) ? Math.max(0, r4(pd.t - pd.a)) : 0;
+    const wCell = wtEdit
+      ? `<input class="wt num" type="number" step="0.01" value="${(pd.w*100)}" onchange="onWeight('${it.key}', this.value)">%`
+      : `<span class="num" style="color:var(--text-muted);font-size:.78rem">${(pd.w*100).toFixed(2)}%</span>`;
+    rows += `<tr>
+      <td class="iname">${it.short}${it.anti ? '<span class="anti">防退類↓越少越好</span>' : ''}</td>
+      <td class="hide-m">${wCell}</td>
+      <td><input class="inp num" type="number" step="${it.step}" min="0" placeholder="目標" value="${row.t ?? ''}" onchange="onCell('${it.key}','t',this.value)"></td>
+      <td><input class="inp num" type="number" step="${it.step}" min="0" placeholder="實績" value="${row.a ?? ''}" onchange="onCell('${it.key}','a',this.value)"></td>
+      <td><input class="inp today num" type="number" step="${it.step}" placeholder="0" value="${row.today ?? ''}" onchange="onCell('${it.key}','today',this.value)"></td>
+      <td><span class="rate ${rateCls} num">${rateTxt}</span>${gap > 0 ? `<span class="gap">距月目標缺 ${gap}</span>` : ''}</td>
+    </tr>`;
+  }
+  document.getElementById('itemArea').innerHTML = `<table class="items">
+    <thead><tr><th style="text-align:left">項目</th><th class="hide-m">權重</th><th>月目標</th><th>累計實績</th><th>今日</th><th>明日達成率</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(LS)); }
+function saveAndRender(){ save(); render(); }
+
+function doExport(){
+  document.getElementById('ioBox').value = JSON.stringify(LS);
+  document.getElementById('ioMsg').textContent = '已匯出，請全選複製保存。';
+}
+function doImport(){
+  try {
+    const obj = JSON.parse(document.getElementById('ioBox').value);
+    if (!obj || typeof obj !== 'object') throw new Error('格式錯誤');
+    LS = Object.assign({ mode:'store', fields:{}, rows:{}, wt:{}, bx:{} }, obj);
+    document.getElementById('tabStore').classList.toggle('active', LS.mode === 'store');
+    document.getElementById('tabPerson').classList.toggle('active', LS.mode === 'person');
+    saveAndRender();
+    document.getElementById('ioMsg').textContent = '✅ 匯入成功';
+  } catch(e) {
+    document.getElementById('ioMsg').textContent = '❌ 匯入失敗：' + e.message;
+  }
+}
+
+setMode(LS.mode);
+</script>
+</body>
+</html>

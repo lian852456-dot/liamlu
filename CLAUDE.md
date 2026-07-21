@@ -2,6 +2,11 @@
 
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）+ Google Sheets。
 
+另有 `kpitry.html`（KPI 通用試算版，2026-07 新增）：給**非本區同仁**的公開試算工具，
+與 kpi.html **共用同一套計算引擎**但**完全不含個資**——無登入、無後端、無內建資料，
+店點/姓名/目標/實績全部使用者自行輸入，內建的只有計算架構（`ARCH` 陣列：24 項加權項目
+＋標準權重＋公式＋上下限）。權重進階可改，localStorage 鍵 `bei12b_kpitry_v1`，可公開分享。
+
 另有 `patrol.html`（督導巡店追蹤系統）：貼上巡店明細表 → 33 項檢核看板。
 與 index.html **共用同一個 GAS 部署**（巡店網址存 localStorage `bei12b_pt_gas_url`，
 相容回退舊的 `bei12b_gas_url`）。**可分享給其他督導**：每人自建試算表＋自己的
