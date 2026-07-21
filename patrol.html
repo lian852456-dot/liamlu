@@ -472,10 +472,10 @@ let currentMonth = "";
 // 其他督導在畫面上貼自己的 GAS 網址即可，只記在自己的裝置，資料互不相通。
 // GAS 網址本身不是密碼，也不包含巡店資料；保留部署端點以便既有資料自動恢復。
 // 真正的資料仍需 PT_KEY 驗證，PT_KEY 不寫入公開原始碼。
-const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
+const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
 // 受保護班表／督導資料固定使用新版私有後端。如此即使瀏覽器保留了舊巡店網址，
 // 新頁籤仍不會誤連舊版而出現「unknown action」。
-const PRIVATE_GAS_URL = 'https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
+const PRIVATE_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
 let GAS_URL = localStorage.getItem('bei12b_pt_gas_url') ||
               localStorage.getItem('bei12b_gas_url') ||
               window.PATROL_LEGACY_GAS_URL || DEFAULT_PATROL_GAS_URL;
@@ -529,7 +529,7 @@ function privateCloudCallJsonp(action, params={}){
     document.body.appendChild(s);
   });
 }
-async function privateSignIn(){
+async function privateSignIn(retried){
   if(!PT_KEY && !askKey()) return false;
   try{
     const res=await privateCloudCall('sread',{key:PT_KEY});
@@ -539,6 +539,13 @@ async function privateSignIn(){
     scheduleData=res.schedule;
     return true;
   }catch(err){
+    // 受保護頁籤與舊巡店看板共用同一個本機通行碼。若裝置保留舊值，
+    // 需清除後重新詢問，否則手機／電腦會一直直接送出錯誤值而無法登入。
+    if(err.message==='unauthorized' && !retried){
+      localStorage.removeItem('bei12b_pt_key');
+      PT_KEY='';
+      if(askKey('巡店通行碼錯誤，請重新輸入')) return privateSignIn(true);
+    }
     privateAccount=null; setPrivateAuthStatus('解鎖失敗；資料仍保持鎖定',false);
     showMsg(err.message==='unauthorized'?'巡店通行碼錯誤':`解鎖失敗：${err.message}`,'err');
     return false;
