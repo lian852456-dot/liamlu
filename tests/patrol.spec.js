@@ -339,7 +339,7 @@ test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({
   await page.goto(PAGE_URL);
   await page.locator('.secure-tab[data-view="half"]').click();
   await expect(page.locator('#halfView')).toBeVisible();
-  await expect(page.locator('.half-item')).toHaveCount(33);
+  await expect(page.locator('.half-item')).toHaveCount(18);
   await page.locator('#halfInspector').fill('測試督導');
   await page.locator('.half-result').first().selectOption('abnormal');
   await page.locator('.half-note').first().fill('展示機未亮');
@@ -349,7 +349,11 @@ test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({
   await expect(page.locator('#halfHistory')).toContainText('1 項異常');
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '匯出 Excel' }).click();
-  expect((await downloadPromise).suggestedFilename()).toMatch(/半月督導檢查_.*\.xls/);
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/半月督導檢查_.*\.xls/);
+  const xml = await fs.readFile(await download.path(), 'utf8');
+  expect(xml).toContain('照片影片附件');
+  expect(xml).toContain('第 1–18 項');
 });
 
 test('加密頁籤：半月督導檢查可上傳照片影片並在歷史回放', async ({ page }) => {
@@ -358,20 +362,28 @@ test('加密頁籤：半月督導檢查可上傳照片影片並在歷史回放',
   await page.goto(PAGE_URL);
   await page.locator('.secure-tab[data-view="half"]').click();
   await page.locator('#halfInspector').fill('測試督導');
-  await page.locator('.half-evidence-file').first().setInputFiles([
-    { name: '展示機.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('photo') },
-    { name: '展示機說明.mp4', mimeType: 'video/mp4', buffer: Buffer.from('video') },
-  ]);
+  const mediaInput = page.locator('.half-evidence-file').first();
+  await mediaInput.setInputFiles({ name: '展示機.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('photo') });
+  await expect(page.locator('.half-media-card .pending')).toHaveCount(1);
+  await mediaInput.setInputFiles({ name: '展示機說明.mp4', mimeType: 'video/mp4', buffer: Buffer.from('video') });
+  await expect(page.locator('.half-media-card .pending')).toHaveCount(2);
   await page.getByRole('button', { name: '上傳選取的照片／影片' }).first().click();
   await expect.poll(() => mediaUploads.length).toBe(2);
   await expect(page.locator('.half-media-card img').first()).toBeVisible();
   await expect(page.locator('.half-media-card iframe').first()).toBeVisible();
 
   await page.getByRole('button', { name: '儲存並同步本期檢查' }).click();
-  await expect.poll(() => halfRows.length).toBe(33);
+  await expect.poll(() => halfRows.length).toBe(18);
   expect(halfRows[0].evidenceNames).toContain('media-1');
   await page.getByRole('button', { name: /預覽／回放 2 個檔案/ }).click();
   await expect(page.locator('#halfMediaModal')).toBeVisible();
   await expect(page.locator('#halfMediaModal img')).toBeVisible();
   await expect(page.locator('#halfMediaModal iframe')).toBeVisible();
+  await page.locator('#halfMediaModal .half-media-modal-close').click();
+  await expect(page.locator('#halfMediaModal')).toHaveCount(0);
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '匯出 Excel' }).click();
+  const xml = await fs.readFile(await (await downloadPromise).path(), 'utf8');
+  expect(xml).toContain('開啟私有附件');
+  expect(xml).toContain('ss:HRef="https://drive.google.com/file/d/media-1/view"');
 });
