@@ -1318,6 +1318,45 @@ function testKpiCalcAutoUpdate() {
   return kpiCalcAutoUpdate();
 }
 
+// 中午巡檢：每天 12:30 檢查今日資料是否已更新，未更新才寄提醒（正常則靜默）。
+// 啟用：執行一次 setupKpiCalcWatchdog()（用同一個授權，不需重新部署）。
+function setupKpiCalcWatchdog() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'kpiCalcWatchdog') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('kpiCalcWatchdog').timeBased().everyDays(1)
+    .atHour(12).nearMinute(30).inTimezone('Asia/Taipei').create();
+  return kpiCalcWatchdog();
+}
+
+function kpiCalcWatchdog() {
+  const props = PropertiesService.getScriptProperties();
+  const folderId = props.getProperty('KPICALC_SOURCE_FOLDER_ID') || KPICALC_SOURCE_FOLDER_ID_DEFAULT;
+  const todayTag = Utilities.formatDate(new Date(), 'Asia/Taipei', 'MMdd');
+  let todayFile = null;
+  const files = DriveApp.getFolderById(folderId).getFiles();
+  while (files.hasNext()) {
+    const f = files.next();
+    const m = f.getName().match(/^(\d{4})\.xlsx$/);
+    if (m && m[1] === todayTag) { todayFile = f; break; }
+  }
+  if (!todayFile) {
+    kpiCalcNotify('⚠️ 今日尚未上傳 KPI 日報（' + todayTag + '.xlsx）',
+      '中午 12:30 巡檢：來源資料夾還沒有今天的 ' + todayTag + '.xlsx。\n' +
+      '請記得上傳今日日報，否則 kpi.html 的同仁實際數會停留在前一天。\n' +
+      '上傳後可在 GAS 手動執行 testKpiCalcAutoUpdate 立即更新，或等明天 11:00 自動處理。');
+    return { status: 'no-today-file', tag: todayTag };
+  }
+  const stamp = todayFile.getName() + ':' + todayFile.getLastUpdated().getTime();
+  if (props.getProperty('KPICALC_LAST_IMPORT') !== stamp) {
+    kpiCalcNotify('⚠️ 今日 KPI 試算資料可能未更新（' + todayFile.getName() + '）',
+      '中午 12:30 巡檢：今天的 ' + todayFile.getName() + ' 已上傳，但自動更新的紀錄對不上——上午 11:00 的更新可能沒跑成功。\n' +
+      '請開 kpi.html 登入確認資料日期；或在 GAS 手動執行 testKpiCalcAutoUpdate 補跑，若補跑仍失敗代表日報格式有變，請把檔案交給 AI 檢查。');
+    return { status: 'not-imported', tag: todayTag };
+  }
+  return { status: 'ok', tag: todayTag };  // 正常：不寄信
+}
+
 function kpiCalcNotify(subject, body) {
   const email = String(PropertiesService.getScriptProperties().getProperty('DASHBOARD_NOTIFY_EMAIL') || '').trim() || NOTIFY_EMAIL;
   if (!email || /CHANGE_ME/.test(email)) return;
