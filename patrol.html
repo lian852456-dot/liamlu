@@ -414,14 +414,14 @@
   <section id="halfDashboardView" class="secure-view" aria-label="督導檢查大盤">
     <div class="secure-card">
       <h2>督導巡店檢查大盤</h2>
-      <p class="hint">資料直接採用「貼上巡店紀錄」及其雲端同步明細，依原本巡店規則拆出上、下半月、月盤點與雙月全盤。</p>
+      <p class="hint">資料直接採用「貼上巡店紀錄」及其雲端同步明細，依原本巡店規則拆出上、下半月、每月檢查一次項目與雙月全盤。</p>
       <div class="secure-toolbar">
         <label>檢視月份<input id="halfDashboardMonth" type="month" onchange="renderHalfDashboard()"></label>
       </div>
     </div>
     <div class="secure-card">
       <div id="halfDashboardSummary" class="half-summary"></div>
-      <p class="half-dashboard-rule">上、下半月採計第 2–13 項；每月盤點採計第 14–17 項；第 18 項依固定雙月規範獨立採計。資料更新後會立即反映於此。</p>
+      <p class="half-dashboard-rule">上、下半月採計第 2–13 項；每月檢查一次項目採計第 14–17 項；第 18 項依固定雙月規範獨立採計。資料更新後會立即反映於此。</p>
       <div id="halfDashboardContent" class="half-dashboard-list"></div>
     </div>
   </section>
@@ -1509,10 +1509,10 @@ function renderHalfDashboard(){
   if(!monthInput.value) monthInput.value=currentMonth||new Date().toISOString().slice(0,7);const month=monthInput.value;const window=dashboardBiWindow(month);const twiceItems=Array.from({length:12},(_,i)=>i+2);const monthlyItems=[14,15,16,17];const stores=dashboardStoreList();
   const cards=stores.map(store=>{const rows=dashboardPatrolRows(store);const h1=dashboardProgress(rows.filter(row=>dashboardRowMonth(row)===month&&dashboardRowHalf(row)==='H1'),twiceItems);const h2=dashboardProgress(rows.filter(row=>dashboardRowMonth(row)===month&&dashboardRowHalf(row)==='H2'),twiceItems);const monthly=dashboardProgress(rows.filter(row=>dashboardRowMonth(row)===month),monthlyItems);const bi=dashboardProgress(rows.filter(row=>[window.start,window.end].includes(dashboardRowMonth(row))),[18]);return {store,h1,h2,monthly,bi};});
   const done=key=>cards.filter(card=>card[key].className==='done').length;const issues=cards.reduce((sum,card)=>sum+card.h1.issues+card.h2.issues+card.monthly.issues+card.bi.issues,0);
-  summary.innerHTML=`<div class="half-stat"><strong>${done('h1')}/${cards.length}</strong><span>上半月完成門市</span></div><div class="half-stat"><strong>${done('h2')}/${cards.length}</strong><span>下半月完成門市</span></div><div class="half-stat"><strong>${done('monthly')}/${cards.length}</strong><span>月盤點完成門市</span></div><div class="half-stat"><strong>${done('bi')}/${cards.length}</strong><span>${esc(window.label)}完成門市</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>巡店明細異常項目</span></div>`;
+  summary.innerHTML=`<div class="half-stat"><strong>${done('h1')}/${cards.length}</strong><span>上半月完成門市</span></div><div class="half-stat"><strong>${done('h2')}/${cards.length}</strong><span>下半月完成門市</span></div><div class="half-stat"><strong>${done('monthly')}/${cards.length}</strong><span>每月檢查一次項目完成門市</span></div><div class="half-stat"><strong>${done('bi')}/${cards.length}</strong><span>${esc(window.label)}完成門市</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>巡店明細異常項目</span></div>`;
   const source=rawDetails.length?`目前已載入 ${rawDetails.length} 筆巡店明細`:'尚未載入巡店明細';
   if(!cards.length){content.innerHTML='<div class="empty-state"><div class="big">📊</div>尚無可檢視的門市資料</div>';return;}
-  content.innerHTML=`<p class="secure-note">資料來源：${esc(source)}。</p>`+cards.map(card=>`<article class="half-dashboard-store"><div class="half-dashboard-store-head"><strong>${esc(card.store.title)}</strong><span>${esc(card.store.name)}</span></div><div class="half-dashboard-states">${dashboardStateHtml('上半月・題 2–13',card.h1)}${dashboardStateHtml('下半月・題 2–13',card.h2)}${dashboardStateHtml('每月盤點・題 14–17',card.monthly)}${dashboardStateHtml(window.label+'・題 18',card.bi)}</div></article>`).join('');
+  content.innerHTML=`<p class="secure-note">資料來源：${esc(source)}。</p>`+cards.map(card=>`<article class="half-dashboard-store"><div class="half-dashboard-store-head"><strong>${esc(card.store.title)}</strong><span>${esc(card.store.name)}</span></div><div class="half-dashboard-states">${dashboardStateHtml('上半月・題 2–13',card.h1)}${dashboardStateHtml('下半月・題 2–13',card.h2)}${dashboardStateHtml('每月檢查一次項目・題 14–17',card.monthly)}${dashboardStateHtml(window.label+'・題 18',card.bi)}</div></article>`).join('');
 }
 function renderHalfHistory(){
   const c=document.getElementById('halfHistory');if(!c)return;const groups={};activeHalfRows(halfChecks).forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const keys=Object.keys(groups).sort().reverse();if(!keys.length){c.innerHTML='<div class="empty-state"><div class="big">📝</div>尚無半月督導檢查紀錄</div>';return;}c.innerHTML=`<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>日期／期別</th><th>店點</th><th>督導</th><th>進度</th><th>缺失與改善</th><th>照片／影片</th></tr></thead><tbody>${keys.map(k=>{const rows=groups[k],first=rows[0],issue=rows.filter(r=>r.result==='abnormal').length,pending=rows.filter(r=>!r.result).length,media=rows.flatMap(r=>mediaItems(r.evidenceNames));return `<tr><td>${esc(first.date)}<br>${esc(halfPeriodLabel(first.period))}</td><td>${esc(first.store)}</td><td>${esc(first.inspector||'—')}</td><td>${rows.filter(r=>r.result).length}/${HALF_ITEMS.length}</td><td class="${issue?'status-issue':''}">${issue?`${issue} 項異常`:'無異常'}${pending?`・待填 ${pending} 題`:''}<br><span class="inv-last">${esc(rows.filter(r=>r.result==='abnormal'&&r.improvement).map(r=>`#${r.item} ${r.improvement}`).join('；')||'')}</span></td><td>${media.length?`<button type="button" class="half-media-view" data-check-id="${esc(k)}">預覽／回放 ${media.length} 個檔案</button>`:'—'}</td></tr>`;}).join('')}</tbody></table></div>`;c.querySelectorAll('.half-media-view').forEach(button=>button.addEventListener('click',()=>openHalfMediaViewer(button.dataset.checkId)));}
