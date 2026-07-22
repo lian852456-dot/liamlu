@@ -1400,8 +1400,21 @@ async function uploadHalfMedia(box){
       showHalfMsg(`正在上傳第 ${i+1}/${files.length} 個檔案…`,'ok');
       uploaded.push(await privateInspectionMediaUpload(files[i],{checkId:current.checkId,date:current.date,period:current.period,month:current.date.slice(0,7),store:current.store,inspector,item}));
     }
-    box.dataset.evidence=mediaValue([...stored,...uploaded]);halfPendingMedia.delete(key);box.querySelector('.half-evidence-file').value='';renderHalfMediaList(box);showHalfMsg(`已上傳 ${uploaded.length} 個私有檔案；按「同步雲端」即可將附件連到本期檢查`,'ok');
-  }catch(err){showHalfMsg(`上傳失敗：${err.message}`,'err');}finally{button.disabled=false;}
+    box.dataset.evidence=mediaValue([...stored,...uploaded]);halfPendingMedia.delete(key);box.querySelector('.half-evidence-file').value='';renderHalfMediaList(box);
+    // 成功上傳後立刻把附件中繼資料寫入本機與雲端，避免重新整理前尚未按同步而遺失連結。
+    const mediaRow=readHalfForm().find(r=>Number(r.item)===item);
+    if(mediaRow){
+      mergeHalfRows([mediaRow]); renderHalfSummary(); renderHalfHistory();
+      if(privateAccount){
+        const linked=await privateInspectionRequest('write',[mediaRow]);
+        if(linked.status!=='ok') throw new Error(linked.message||'附件連結同步失敗');
+      }
+    }
+    showHalfMsg(`已上傳並同步 ${uploaded.length} 個私有檔案；可立即從歷史紀錄預覽／回放`,'ok');
+  }catch(err){
+    const linked=mediaItems(box.dataset.evidence||'').length;
+    showHalfMsg(linked?`檔案已上傳 ${linked} 個，但附件連結同步失敗：${err.message}；本機仍保留連結，請稍後按「儲存並同步本期檢查」`:`上傳失敗：${err.message}`,'err');
+  }finally{button.disabled=false;}
 }
 function renderHalfForm(){
   initHalfSelectors(); const {date,store,period,checkId,rows}=currentHalfRows();
@@ -1423,6 +1436,8 @@ function saveHalfDraft(){
 function showHalfMsg(text,type){const el=document.getElementById('halfMsg');if(el){el.textContent=text;el.className='secure-note '+(type==='err'?'status-issue':type==='ok'?'status-ok':'');}}
 function submitHalfCheck(){
   const inspector=document.getElementById('halfInspector').value.trim(); if(!inspector){showHalfMsg('請填寫督導姓名','err');return;}
+  const pendingCount=Array.from(halfPendingMedia.values()).reduce((sum,files)=>sum+(files||[]).length,0);
+  if(pendingCount){showHalfMsg(`尚有 ${pendingCount} 個照片／影片尚未上傳；請先按各題的「上傳選取的照片／影片」`,'err');return;}
   const rows=readHalfForm(); mergeHalfRows(rows); renderHalfSummary(); renderHalfHistory();
   if(!privateAccount){showHalfMsg('已保留本機資料；尚未解鎖，未上傳雲端','err');return;}
   const chunks=[];let part=[];rows.forEach(r=>{part.push(r);if(encodeURIComponent(JSON.stringify(part)).length>3500){if(part.length>1){part.pop();chunks.push(part);part=[r];}else{chunks.push(part);part=[];}}});if(part.length)chunks.push(part);
