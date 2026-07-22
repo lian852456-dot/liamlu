@@ -215,7 +215,9 @@ const PT_STORES = [
 ];
 
 function ptAuthorized(e) {
-  return PT_KEY !== 'CHANGE_ME' && e.parameter.key === PT_KEY;
+  // 巡店追蹤頁依管理者明確授權改為免密碼使用。
+  // 保留此函式供既有 ptread / ptwrite 呼叫，不再以 PT_KEY 阻擋讀寫。
+  return true;
 }
 
 const PATROL_SHEET = '巡店明細';
