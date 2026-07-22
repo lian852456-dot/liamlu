@@ -866,11 +866,16 @@ function toDateStr(v) {
 
 function readData(date, seg) {
   const sh = getSheet();
-  const allData = sh.getDataRange().getValues();
+  const range = sh.getDataRange();
+  const allData = range.getValues();
+  // savedAt 在試算表是「純時間」值，getValues() 會回傳 1899-12-30 基準的 Date 物件，
+  // 若走 toDateStr() 會被格式化成「1899-12-30」。改用該欄的原始顯示字串（如 16:00:00）。
+  const displayData = range.getDisplayValues();
   const headers = allData[0];
-  const dateIdx  = headers.indexOf('date');
-  const storeIdx = headers.indexOf('store');
-  const segIdx   = headers.indexOf('seg');
+  const dateIdx    = headers.indexOf('date');
+  const storeIdx   = headers.indexOf('store');
+  const segIdx     = headers.indexOf('seg');
+  const savedAtIdx = headers.indexOf('savedAt');
 
   const result = {};
   for (let i = 1; i < allData.length; i++) {
@@ -879,6 +884,10 @@ function readData(date, seg) {
       const store = r[storeIdx];
       const obj = {};
       headers.forEach((h, idx) => {
+        if (idx === savedAtIdx) {
+          obj[h] = displayData[i][idx];
+          return;
+        }
         const v = r[idx];
         obj[h] = (v instanceof Date) ? toDateStr(v) : v;
       });
