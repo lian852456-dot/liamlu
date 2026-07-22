@@ -1238,7 +1238,7 @@ function kpiCalcAccess(payload) {
   if (!files.hasNext()) throw new Error('KPI 試算資料尚未發佈，請通知督導');
   const data = JSON.parse(files.next().getBlob().getDataAsString('UTF-8'));
   if (!data || !data.meta || !data.stores || !data.persons) throw new Error('KPI 試算資料格式不完整');
-  return { data: data, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role } };
+  return { data: data, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role, isTrusted: privateDashboardIsTrustedEmployee(employeeId) } };
 }
 
 function kpiCalcPublish(payload) {
