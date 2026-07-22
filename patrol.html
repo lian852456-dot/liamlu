@@ -296,11 +296,26 @@
   .half-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
   .half-history{overflow:auto}
   .half-history table{min-width:900px}
+  .half-dashboard-list{display:grid;gap:10px}
+  .half-dashboard-store{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}
+  .half-dashboard-store-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:10px}
+  .half-dashboard-store-head strong{font-size:15px}
+  .half-dashboard-store-head span{font-size:12px;color:var(--muted)}
+  .half-dashboard-states{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .half-dashboard-state{border:1px solid var(--line);border-radius:8px;padding:9px;background:#fafafa}
+  .half-dashboard-state .label{display:block;color:var(--muted);font-size:11px;font-weight:800;margin-bottom:4px}
+  .half-dashboard-state strong{font-size:14px}
+  .half-dashboard-state small{display:block;font-size:11px;color:var(--muted);margin-top:4px}
+  .half-dashboard-state.done{border-color:#bfe6d0;background:#f1fff7}.half-dashboard-state.done strong{color:var(--ok)}
+  .half-dashboard-state.issue{border-color:#f4d08a;background:#fffaf0}.half-dashboard-state.issue strong{color:#b87900}
+  .half-dashboard-state.miss{border-color:#efc4c4;background:#fff8f8}.half-dashboard-state.miss strong{color:var(--miss)}
+  .half-dashboard-rule{margin:2px 0 13px;font-size:12px;color:var(--muted)}
   .status-ok{color:var(--ok);font-weight:800}.status-issue{color:var(--miss);font-weight:800}.status-na{color:#999;font-weight:800}
   @media(max-width:650px){
     .secure-tab{flex:1;min-width:0;padding:8px 7px;font-size:11.5px}
     .half-item{grid-template-columns:1fr}
     .half-item select{width:100%}
+    .half-dashboard-states{grid-template-columns:1fr}
   }
 </style>
 </head>
@@ -313,6 +328,7 @@
       <button class="secure-tab active" data-view="patrol" onclick="switchPatrolView('patrol')">📋 巡店看板</button>
       <button class="secure-tab locked" data-view="schedule" onclick="switchPatrolView('schedule')">每月班表</button>
       <button class="secure-tab locked" data-view="half" onclick="switchPatrolView('half')">半月督導檢查</button>
+      <button class="secure-tab locked" data-view="halfDashboard" onclick="switchPatrolView('halfDashboard')">📊 督導檢查大盤</button>
     </nav>
     <div class="private-auth-bar" aria-label="受保護資料解鎖">
       <span id="privateAuthStatus" class="auth-status">班表與督導檢查：尚未解鎖；資料不放在公開 GitHub</span>
@@ -392,6 +408,21 @@
     <div class="secure-card">
       <h3>歷次半月檢查與改善追蹤</h3>
       <div id="halfHistory" class="half-history"></div>
+    </div>
+  </section>
+
+  <section id="halfDashboardView" class="secure-view" aria-label="督導檢查大盤">
+    <div class="secure-card">
+      <h2>督導店務檢查大盤</h2>
+      <p class="hint">將上半月、下半月與第 18 項雙月全盤分開呈現，方便快速比對每家門市的完成、缺漏與異常狀況。</p>
+      <div class="secure-toolbar">
+        <label>檢視月份<input id="halfDashboardMonth" type="month" onchange="renderHalfDashboard()"></label>
+      </div>
+    </div>
+    <div class="secure-card">
+      <div id="halfDashboardSummary" class="half-summary"></div>
+      <p class="half-dashboard-rule">上、下半月各採計第 1–17 項；第 18 項依固定雙月規範獨立採計，不會混入上下半月進度。</p>
+      <div id="halfDashboardContent" class="half-dashboard-list"></div>
     </div>
   </section>
 
@@ -1239,6 +1270,10 @@ async function switchPatrolView(view){
   if(view==='schedule'){
     document.getElementById('scheduleView').classList.add('active');
     loadSchedule();
+  }else if(view==='halfDashboard'){
+    document.getElementById('halfDashboardView').classList.add('active');
+    loadHalfChecks();
+    renderHalfDashboard();
   }else if(view==='half'){
     document.getElementById('halfView').classList.add('active');
     loadHalfChecks();
@@ -1352,11 +1387,11 @@ function loadHalfLocal(){ try{const rows=JSON.parse(localStorage.getItem('bei12b
 function halfPeriod(date){ return Number((date||'').slice(-2))<=15?'H1':'H2'; }
 function halfPeriodLabel(p){ return p==='H1'?'上半月（1–15日）':'下半月（16日–月底）'; }
 async function loadHalfChecks(){
-  loadHalfLocal(); renderHalfSummary(); renderHalfForm(); renderHalfHistory();
+  loadHalfLocal(); renderHalfSummary(); renderHalfForm(); renderHalfHistory(); renderHalfDashboard();
   if(!privateAccount) return;
   try{
     const res=await privateInspectionRequest('read');
-    if(res.status==='ok'){ mergeHalfRows((res.rows||[]).map(r=>({...r,item:Number(r.item)}))); renderHalfSummary(); renderHalfForm(); renderHalfHistory(); }
+    if(res.status==='ok'){ mergeHalfRows((res.rows||[]).map(r=>({...r,item:Number(r.item)}))); renderHalfSummary(); renderHalfForm(); renderHalfHistory(); renderHalfDashboard(); }
     else if(res.message==='unauthorized'){ secureUnlocked=false; privateAccount=null; showHalfMsg('巡店通行碼錯誤，私人檢查資料保持鎖定','err'); }
   }catch(err){ showHalfMsg('半月檢查雲端讀取失敗，先顯示本機資料','err'); }
 }
@@ -1446,6 +1481,30 @@ function submitHalfCheck(){
 }
 function renderHalfSummary(){
   const c=document.getElementById('halfSummary');if(!c)return;const active=activeHalfRows(halfChecks);const groups={};active.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const issues=active.filter(r=>r.result==='abnormal').length;const pending=Object.values(groups).filter(rows=>rows.some(r=>!r.result)).length;c.innerHTML=`<div class="half-stat"><strong>${Object.keys(groups).length}</strong><span>已建立本期檢查</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>缺失／異常項目</span></div><div class="half-stat"><strong>${pending}</strong><span>尚有待填本期</span></div>`;}
+function dashboardStoreKey(store){ return String(store||'').replace('台灣大哥大數位生活','').replace(/^台北/,'').replace(/南$/,'').trim(); }
+function dashboardStoreList(){
+  const configured=(scheduleData?.stores?.length?scheduleData.stores:STORES).map(s=>({name:String(s.store||s.name||''),title:String(s.title||s.name||s.store||''),key:dashboardStoreKey(s.store||s.name)})).filter(s=>s.key);
+  const keys=new Set(configured.map(s=>s.key));
+  activeHalfRows(halfChecks).forEach(r=>{const key=dashboardStoreKey(r.store);if(key&&!keys.has(key)){configured.push({name:String(r.store),title:String(r.store),key});keys.add(key);}});
+  return configured;
+}
+function dashboardLatestRows(rows){ const latest=new Map();rows.forEach(row=>{const key=Number(row.item);const old=latest.get(key);if(!old||String(row.savedAt||row.date||'')>String(old.savedAt||old.date||''))latest.set(key,row);});return latest; }
+function dashboardRowMonth(row){ return String(row.month||row.date||'').slice(0,7); }
+function dashboardProgress(rows, expected){
+  const latest=dashboardLatestRows(rows);const completed=expected.filter(item=>latest.get(item)?.result).length;const issues=expected.filter(item=>latest.get(item)?.result==='abnormal').length;const missing=expected.length-completed;
+  const className=missing?'miss':issues?'issue':'done';const text=missing?(completed?`缺 ${missing} 項`:'尚未開始'):(issues?`完成・${issues} 異常`:'完成');
+  return {className,text,detail:`${completed}/${expected.length}`,issues};
+}
+function dashboardBiWindow(month){ const [year,number]=month.split('-').map(Number);const start=number%2?number:number-1;return {start:`${year}-${String(start).padStart(2,'0')}`,end:`${year}-${String(start+1).padStart(2,'0')}`,label:`${start}–${start+1}月雙月全盤`}; }
+function dashboardStateHtml(label,state){ return `<div class="half-dashboard-state ${state.className}"><span class="label">${esc(label)}</span><strong>${esc(state.text)}</strong><small>${esc(state.detail)}</small></div>`; }
+function renderHalfDashboard(){
+  const content=document.getElementById('halfDashboardContent');const summary=document.getElementById('halfDashboardSummary');const monthInput=document.getElementById('halfDashboardMonth');if(!content||!summary||!monthInput)return;
+  if(!monthInput.value) monthInput.value=new Date().toISOString().slice(0,7);const month=monthInput.value;const window=dashboardBiWindow(month);const expected=HALF_ITEMS.filter(item=>item!==18);const stores=dashboardStoreList();
+  const cards=stores.map(store=>{const match=row=>dashboardStoreKey(row.store)===store.key;const h1=dashboardProgress(activeHalfRows(halfChecks.filter(row=>match(row)&&dashboardRowMonth(row)===month&&row.period==='H1')),expected);const h2=dashboardProgress(activeHalfRows(halfChecks.filter(row=>match(row)&&dashboardRowMonth(row)===month&&row.period==='H2')),expected);const bi=dashboardProgress(activeHalfRows(halfChecks.filter(row=>match(row)&&[window.start,window.end].includes(dashboardRowMonth(row))&&Number(row.item)===18)),[18]);return {store,h1,h2,bi};});
+  const done=key=>cards.filter(card=>card[key].className!=='miss').length;const issues=cards.reduce((sum,card)=>sum+card.h1.issues+card.h2.issues+card.bi.issues,0);
+  summary.innerHTML=`<div class="half-stat"><strong>${done('h1')}/${cards.length}</strong><span>上半月完成門市</span></div><div class="half-stat"><strong>${done('h2')}/${cards.length}</strong><span>下半月完成門市</span></div><div class="half-stat"><strong>${done('bi')}/${cards.length}</strong><span>${esc(window.label)}完成門市</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>三段合計異常項目</span></div>`;
+  content.innerHTML=cards.length?cards.map(card=>`<article class="half-dashboard-store"><div class="half-dashboard-store-head"><strong>${esc(card.store.title)}</strong><span>${esc(card.store.name)}</span></div><div class="half-dashboard-states">${dashboardStateHtml('上半月（1–15日）',card.h1)}${dashboardStateHtml('下半月（16日–月底）',card.h2)}${dashboardStateHtml(window.label,card.bi)}</div></article>`).join(''):'<div class="empty-state"><div class="big">📊</div>尚無可檢視的門市資料</div>';
+}
 function renderHalfHistory(){
   const c=document.getElementById('halfHistory');if(!c)return;const groups={};activeHalfRows(halfChecks).forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const keys=Object.keys(groups).sort().reverse();if(!keys.length){c.innerHTML='<div class="empty-state"><div class="big">📝</div>尚無半月督導檢查紀錄</div>';return;}c.innerHTML=`<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>日期／期別</th><th>店點</th><th>督導</th><th>進度</th><th>缺失與改善</th><th>照片／影片</th></tr></thead><tbody>${keys.map(k=>{const rows=groups[k],first=rows[0],issue=rows.filter(r=>r.result==='abnormal').length,pending=rows.filter(r=>!r.result).length,media=rows.flatMap(r=>mediaItems(r.evidenceNames));return `<tr><td>${esc(first.date)}<br>${esc(halfPeriodLabel(first.period))}</td><td>${esc(first.store)}</td><td>${esc(first.inspector||'—')}</td><td>${rows.filter(r=>r.result).length}/${HALF_ITEMS.length}</td><td class="${issue?'status-issue':''}">${issue?`${issue} 項異常`:'無異常'}${pending?`・待填 ${pending} 題`:''}<br><span class="inv-last">${esc(rows.filter(r=>r.result==='abnormal'&&r.improvement).map(r=>`#${r.item} ${r.improvement}`).join('；')||'')}</span></td><td>${media.length?`<button type="button" class="half-media-view" data-check-id="${esc(k)}">預覽／回放 ${media.length} 個檔案</button>`:'—'}</td></tr>`;}).join('')}</tbody></table></div>`;c.querySelectorAll('.half-media-view').forEach(button=>button.addEventListener('click',()=>openHalfMediaViewer(button.dataset.checkId)));}
 function openHalfMediaViewer(checkId){

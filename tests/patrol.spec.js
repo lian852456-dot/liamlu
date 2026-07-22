@@ -387,3 +387,30 @@ test('加密頁籤：半月督導檢查可上傳照片影片並在歷史回放',
   expect(xml).toContain('開啟私有附件');
   expect(xml).toContain('ss:HRef="https://drive.google.com/file/d/media-1/view"');
 });
+
+test('督導檢查大盤分開呈現上下半月與雙月第 18 項', async ({ page }) => {
+  const full = (store, period, date) => Array.from({ length: 17 }, (_, index) => ({
+    checkId: `${date}|${store}|${period}`, date, period, month: '2026-07', store,
+    inspector: '測試督導', item: index + 1, result: 'ok', savedAt: `${date}T10:00:00.000Z`,
+  }));
+  halfRows = [
+    ...full('通化', 'H1', '2026-07-10'),
+    ...full('通化', 'H2', '2026-07-20'),
+    { checkId: '2026-07-20|通化|H2', date: '2026-07-20', period: 'H2', month: '2026-07', store: '通化', inspector: '測試督導', item: 18, result: 'ok', savedAt: '2026-07-20T10:00:00.000Z' },
+    ...full('酒泉', 'H1', '2026-07-10').slice(0, 4),
+  ];
+  await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
+  await page.goto(PAGE_URL);
+  await page.locator('button[data-view="halfDashboard"]').click();
+  await page.locator('#halfDashboardMonth').fill('2026-07');
+  await page.locator('#halfDashboardMonth').press('Tab');
+  const dashboard = page.locator('#halfDashboardView');
+  await expect(dashboard).toBeVisible();
+  await expect(dashboard).toContainText('7–8月雙月全盤');
+  const tonghua = dashboard.locator('.half-dashboard-store', { hasText: '台北通化' });
+  await expect(tonghua).toContainText('完成');
+  const jiuquan = dashboard.locator('.half-dashboard-store', { hasText: '台北酒泉' });
+  await expect(jiuquan).toContainText('缺 13 項');
+  await expect(jiuquan).toContainText('尚未開始');
+});
