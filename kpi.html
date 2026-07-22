@@ -140,7 +140,7 @@
   <div class="tabs">
     <button class="tab-btn active" id="tabStore" onclick="setTab('store')">🏪 店點試算</button>
     <button class="tab-btn" id="tabPerson" onclick="setTab('person')">🙋 個人試算</button>
-    <button class="tab-btn" id="tabStrategy" onclick="setTab('strategy')">🎯 追分策略</button>
+    <button class="tab-btn" id="tabStrategy" onclick="setTab('strategy')" style="display:none">🎯 督導試算區</button>
   </div>
 
   <div id="calcView">
@@ -695,7 +695,88 @@ function renderStrategy(){
     </div>
     <div class="advnote">數字越大該級店分到越多。分配量 ＝ 區缺口 × 該店權重 ÷ 全區權重總和。</div></details>`;
 
+  // ── 全區彙總試算 ──
+  html += renderSim(agg);
+
   el.innerHTML = html;
+}
+
+// 全區彙總試算：督導輸入假設「今日」量，看全區明日預估總達成率如何變化
+function simState(){ LS.stratSim = LS.stratSim || { calcDay:null, today:{}, dayT:{} }; return LS.stratSim; }
+function setSimCalcDay(v){ simState().calcDay = Number(v) || null; saveAndRender(); }
+function setSimToday(key, v){ const s = simState(); if (v==='' || v==null) delete s.today[key]; else s.today[key] = Number(v); saveAndRender(); }
+function setSimDayT(key, v){ const s = simState(); if (v==='' || v==null) delete s.dayT[key]; else s.dayT[key] = Number(v); saveAndRender(); }
+function clearSim(){ LS.stratSim = { calcDay: simState().calcDay, today:{}, dayT: simState().dayT }; saveAndRender(); }
+
+function simCalc(withToday){
+  const monthDays = LS.monthDays || DATA.meta.monthDays;
+  const s = simState();
+  const D = s.calcDay || defaultCalcDay();
+  const f = D > 0 ? monthDays / D : 1;
+  let sum = 0; const detail = {};
+  for (const it of DATA.items){
+    let T = 0, A = 0, w = 0, any = false;
+    for (const st of DATA.stores){ const d = st.items[it.key]; if (!d) continue; T += d.t||0; A += d.a||0; w = d.w; any = true; }
+    if (!any || !w || T <= 0){ detail[it.key] = { skip:true }; continue; }
+    const add = withToday ? (Number(s.today[it.key]) || 0) : 0;
+    const rate = itemRate(it.key, A + add, T, f);
+    sum += itemScore(it.key, w, rate, true);
+    const dayT = (s.dayT[it.key] !== undefined && s.dayT[it.key] !== null && s.dayT[it.key] !== '') ? Number(s.dayT[it.key]) : Math.ceil(T / monthDays * 10) / 10;
+    detail[it.key] = { T, A, w, rate, dayT };
+  }
+  let b = { aqA:0,aqT:0,dnHiN:0,dnHiD:0,upN:0,upD:0 };
+  for (const st of DATA.stores) for (const k in b) b[k] += (st.bonus[k] || 0);
+  const bn = bonusOf(b, f);
+  return { base: r4(sum), bonus: bn, total: r4(sum + bn.b), detail, f, D, monthDays };
+}
+
+function renderSim(agg){
+  const s = simState();
+  const monthDays = LS.monthDays || DATA.meta.monthDays;
+  const D = s.calcDay || defaultCalcDay();
+  const regionAvg = regionAvgOfficial();
+  const simP = simCalc(true), simB = simCalc(false);
+  const display = r4(regionAvg + (simP.total - simB.total));  // 以官方區平均為錨點，試算今日只移動增量
+  const delta = r4(display - regionAvg);
+  const hasSim = DATA.items.some(it => { const v = s.today[it.key]; return v !== undefined && v !== null && v !== ''; });
+
+  let rows = '';
+  for (const it of DATA.items){
+    const d = simP.detail[it.key];
+    if (!d || d.skip) continue;
+    const rateTxt = d.rate === null ? '－' : pctTxt(d.rate);
+    const rateCls = d.rate === null ? '' : (d.rate >= 1 ? 'good' : 'bad');
+    const todayVal = s.today[it.key];
+    const meets = (todayVal !== undefined && todayVal !== '' && Number(todayVal) >= d.dayT);
+    rows += `<tr>
+      <td class="iname">${DATA.items.find(x=>x.key===it.key).short}</td>
+      <td class="num hide-m">${d.T}</td>
+      <td><input class="cum num" type="number" step="any" value="${(s.dayT[it.key]!==undefined&&s.dayT[it.key]!==null&&s.dayT[it.key]!=='')?s.dayT[it.key]:d.dayT}" onchange="setSimDayT('${it.key}',this.value)" title="日目標(自動=月目標÷天數，可改)"></td>
+      <td class="num hide-m">${d.A}</td>
+      <td><input class="today num" type="number" step="${it.step}" placeholder="0" value="${todayVal ?? ''}" onchange="setSimToday('${it.key}',this.value)"></td>
+      <td><span class="rate ${rateCls} num">${rateTxt}</span>${todayVal!==undefined&&todayVal!==''?(meets?'<span class="gap" style="color:var(--green)">達日目標</span>':'<span class="gap" style="color:var(--red)">未到日目標</span>'):''}</td>
+    </tr>`;
+  }
+
+  return `
+  <div style="border-top:2px dashed var(--border);margin-top:22px;padding-top:8px"></div>
+  <div class="summary">
+    <div class="who">🧮 全區彙總試算</div>
+    <div class="sumgrid">
+      <div class="sumbox"><div class="lbl">目前區平均總達成率</div><div class="val num">${pctTxt(regionAvg)}</div></div>
+      <div class="sumbox big"><div class="lbl">全區明日預估${hasSim?'（含試算今日）':''}</div><div class="val num ${display>=1?'good':'bad'}">${pctTxt(display)}</div>${hasSim?`<div class="delta ${delta>=0?'up':'down'}">${delta>=0?'▲':'▼'} ${pctTxt(Math.abs(delta))}</div>`:''}</div>
+    </div>
+    <div class="breakdown">在下表各項「試算今日」欄輸入假設要衝的量，看全區總達成率怎麼動。「日目標」＝月目標÷本月天數（可手動改）；今日輸入 ≧ 日目標會標「達日目標」。</div>
+  </div>
+  <div class="ctrlrow">
+    <label>試算日（今天第幾天）</label>
+    <input type="number" min="1" max="31" value="${D}" onchange="setSimCalcDay(this.value)">
+    <button class="btn warn" onclick="clearSim()">清除試算今日</button>
+  </div>
+  <table class="items">
+    <thead><tr><th style="text-align:left">項目</th><th class="hide-m">月目標</th><th>日目標</th><th class="hide-m">區累計</th><th>試算今日</th><th>明日達成率</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+  <div class="advnote" style="margin-top:6px">全區彙總為近似值（以官方區平均為基準、試算今日移動增量），正式成績仍以各店加總報表為準。此區僅督導本人可見。</div>`;
 }
 
 function buildAdvice(agg, chase){
@@ -734,6 +815,10 @@ function initApp(){
   const who = document.getElementById('whoami');
   const p = window._profile;
   who.innerHTML = (p ? `${p.store || ''}｜${p.maskedName || ''}　` : '') + '<a onclick="kpiLogout()">登出</a>';
+  // 督導試算區僅督導本人可見
+  const trusted = !!(window._profile && window._profile.isTrusted);
+  document.getElementById('tabStrategy').style.display = trusted ? '' : 'none';
+  if (!trusted && tab === 'strategy'){ tab = 'store'; LS.tab = 'store'; }
   fillStoreSel();
   if (tab === 'person'){ document.getElementById('tabStore').classList.remove('active'); document.getElementById('tabPerson').classList.add('active'); document.getElementById('selPerson').style.display=''; fillPersonSel(); }
   if (tab === 'strategy') setTab('strategy');
