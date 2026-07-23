@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>北一二B 智慧營運中心 · 空白線框原型（草稿）</title>
+<style>
+  /* ⚠️ 純靜態線框原型：無資料、無後端、無 localStorage、不連既有 App。全部為佔位內容。 */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: #e9edf2; color: #1a1a1a; line-height: 1.5; }
+  .draft-banner { background: #ffe0b2; color: #7a3b00; text-align: center; font-size: 13px; padding: 6px 10px; border-bottom: 1px solid #e0a457; }
+  .stage { max-width: 720px; margin: 0 auto; padding: 16px; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .crumb { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #555; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+  .btn-back { background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 4px 12px; cursor: pointer; font-size: 13px; color:#333; }
+  .btn-back:hover { background: #f0f0f0; }
+
+  /* Q版 Liam 佔位 */
+  .qliam { display: inline-flex; align-items: center; gap: 8px; background: rgba(0,0,0,.06); border: 1px dashed #999; border-radius: 20px; padding: 6px 14px; font-size: 13px; margin-bottom: 14px; }
+  .qliam .avatar { width: 26px; height: 26px; border-radius: 50%; background: #ffcc80; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+  .qliam .state { color: #555; }
+
+  /* 卡片 */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 10px 0 18px; }
+  .card { border-radius: 14px; padding: 22px 12px; text-align: center; cursor: pointer; border: 1px solid rgba(0,0,0,.08); transition: transform .1s; user-select: none; }
+  .card:hover { transform: translateY(-2px); }
+  .card .ico { font-size: 30px; display: block; margin-bottom: 6px; }
+  .card .lbl { font-weight: 700; font-size: 15px; }
+  .card .sub { font-size: 11px; color: #888; margin-top: 3px; }
+  .grid-sm { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .chip { border-radius: 10px; padding: 12px 8px; text-align: center; font-size: 13px; cursor: pointer; border: 1px solid rgba(0,0,0,.1); }
+  .section-title { font-size: 13px; color: #777; margin: 14px 0 8px; letter-spacing: 1px; }
+  .todo { color: #c0392b; font-size: 11px; }
+  .future { opacity: .55; }
+
+  /* P0 外站入口 */
+  #p0 { text-align: center; padding-top: 30px; }
+  #p0 .logo { font-size: 40px; }
+  #p0 h1 { font-size: 24px; margin: 8px 0 2px; }
+  #p0 .tagline { color: #667; font-size: 14px; letter-spacing: 1px; margin-bottom: 26px; }
+  .gate { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 460px; margin: 0 auto; }
+  .gate .card { padding: 34px 12px; }
+
+  /* 同仁大廳 亮 */
+  .lobby { background: #fbfbfd; border-radius: 16px; padding: 18px; }
+  .lobby .card { background: #fff; }
+  .lobby .card.kpi { background: #fff3e0; border-color:#ffcc80; }
+  .lobby .card.tw  { background: #fff8e1; border-color:#ffe082; }
+  .lobby .card.gold{ background: #f1f8e9; border-color:#c5e1a5; }
+  .lobby .chip { background: #fff; }
+  .lobby h2 { font-size: 15px; color:#e65100; }
+
+  /* 督導指揮室 深 */
+  .cmd { background: #0f1622; border-radius: 16px; padding: 18px; color: #cfe6e6; box-shadow: inset 0 0 40px rgba(0,255,200,.04); }
+  .cmd .crumb { color: #8fb; }
+  .cmd .card { background: #16202f; border-color: rgba(0,255,200,.15); color: #d9f2f0; }
+  .cmd .card .sub { color: #6a9; }
+  .cmd .chip { background: #16202f; border-color: rgba(0,255,200,.12); color: #bfe; }
+  .cmd .section-title { color: #6ba; }
+  .cmd .btn-back { background:#16202f; color:#bfe; border-color:#2a4; }
+  .cmd .qliam { background: rgba(0,255,200,.08); border-color:#2a5; color:#bfe; }
+  .cmd .qliam .state { color:#8fd; }
+  .cmd h2 { color:#4fd6c0; font-size:15px; }
+
+  /* AI 協作中心 */
+  .roles { display:grid; grid-template-columns: repeat(2,1fr); gap:10px; margin:8px 0 16px; }
+  .role { background:#16202f; border:1px solid rgba(0,255,200,.15); border-radius:12px; padding:12px; color:#d9f2f0; font-size:13px; }
+  .role b { display:block; font-size:14px; margin-bottom:2px; }
+  .log { background:#0b1119; border:1px solid rgba(0,255,200,.1); border-radius:10px; padding:12px; font-size:12px; color:#9cc; font-family: ui-monospace, monospace; }
+  .log div { padding:3px 0; border-bottom:1px dashed rgba(255,255,255,.06); }
+
+  /* Liam Strategy Room */
+  .lsr { background:#08080c; border-radius:16px; padding:20px; color:#e8d9a8; border:1px solid #3a3320; }
+  .lsr .crumb { color:#caa64a; }
+  .lsr .btn-back { background:#1a160c; color:#e8d9a8; border-color:#5a4a20; }
+  .lsr .grid-sm .chip { background:#141018; border-color:#3a3320; color:#e8d9a8; }
+  .lsr h2 { color:#e0c060; }
+  .lock { font-size:12px; color:#a98; margin-top:14px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="draft-banner">🧾 空白線框原型（草稿）· 全部為佔位內容 · 無真實資料/無後端/不影響正式系統 · 待 Liam 確認</div>
+<div class="stage">
+
+  <!-- P0 外站入口 -->
+  <section id="p0" class="page active">
+    <div class="logo">🏛️</div>
+    <h1>北一二B 智慧營運中心</h1>
+    <div class="tagline">One Portal. All Operations.</div>
+    <div class="gate">
+      <div class="card" onclick="go('p1')"><span class="ico">👥</span><span class="lbl">同仁大廳</span><span class="sub">進入 →</span></div>
+      <div class="card" onclick="go('p2')"><span class="ico">🛰️</span><span class="lbl">督導指揮室</span><span class="sub">進入 →</span></div>
+    </div>
+    <div style="margin-top:26px;">
+      <span class="qliam"><span class="avatar">🧑‍✈️</span><span class="state">Q版 Liam · 平常走動</span></span>
+    </div>
+    <div style="margin-top:20px;font-size:12px;color:#889;">
+      <span onclick="go('p4')" style="cursor:pointer;text-decoration:underline;">🔒 Liam Strategy Room（僅 Liam · 隱藏入口示意）</span>
+    </div>
+  </section>
+
+  <!-- P1 同仁大廳 -->
+  <section id="p1" class="page">
+    <div class="lobby">
+      <div class="crumb"><span>🏛️ 智慧營運中心 › 👥 同仁大廳</span><button class="btn-back" onclick="go('p0')">回入口</button></div>
+      <span class="qliam"><span class="avatar">🧑‍✈️</span><span class="state">Q版 Liam · 早安問候：「早安，今天也順順的！」</span></span>
+      <h2>★ 前三順位</h2>
+      <div class="cards">
+        <div class="card kpi"><span class="ico">📊</span><span class="lbl">KPI</span><span class="sub">→ kpi.html（待確認）</span></div>
+        <div class="card tw"><span class="ico">🏅</span><span class="lbl">台獎</span><span class="sub">→ 台獎戰情（待確認）</span></div>
+        <div class="card gold"><span class="ico">🥇</span><span class="lbl">金牌</span><span class="sub todo">功能待確認</span></div>
+      </div>
+      <div class="section-title">接續功能</div>
+      <div class="grid-sm">
+        <div class="chip">🧮 試算表</div>
+        <div class="chip">🗒️ 店務檢查·日</div>
+        <div class="chip">🗓️ 店務檢查·半月</div>
+        <div class="chip">📅 店務檢查·每月</div>
+        <div class="chip">📣 公告<br><span class="todo">待確認</span></div>
+        <div class="chip">🧰 常用工具</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- P2 督導指揮室 -->
+  <section id="p2" class="page">
+    <div class="cmd">
+      <div class="crumb"><span>🏛️ 智慧營運中心 › 🛰️ 督導指揮室</span><button class="btn-back" onclick="go('p0')">回入口</button></div>
+      <span class="qliam"><span class="avatar">🧑‍✈️</span><span class="state">Q版 Liam · 巡視系統（點我 → 提醒落後店點）</span></span>
+      <h2>★ 前三順位</h2>
+      <div class="cards">
+        <div class="card"><span class="ico">📡</span><span class="lbl">督導雷達</span><span class="sub todo">功能待確認</span></div>
+        <div class="card"><span class="ico">🗓️</span><span class="lbl">班表</span><span class="sub">→ patrol.html</span></div>
+        <div class="card"><span class="ico">🚶</span><span class="lbl">巡店</span><span class="sub">→ patrol.html</span></div>
+      </div>
+      <div class="section-title">未來擴充</div>
+      <div class="grid-sm future">
+        <div class="chip">💰 資費分析</div>
+        <div class="chip">📈 上線分析</div>
+        <div class="chip">🔬 KPI 深度分析</div>
+      </div>
+      <div class="section-title">協作</div>
+      <div class="grid-sm">
+        <div class="chip" onclick="go('p3')" style="grid-column:span 3;cursor:pointer;">🤖 AI 協作中心 →</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- P3 AI 協作中心 -->
+  <section id="p3" class="page">
+    <div class="cmd">
+      <div class="crumb"><span>🛰️ 督導指揮室 › 🤖 AI 協作中心</span><button class="btn-back" onclick="go('p2')">回上層</button></div>
+      <h2>隊員</h2>
+      <div class="roles">
+        <div class="role"><b>🧑‍✈️ Liam</b>隊長 · 最終決策</div>
+        <div class="role"><b>📱 小葳</b>資料分析（抱平板）</div>
+        <div class="role"><b>📐 小恩</b>架構整理（拿藍圖）</div>
+        <div class="role"><b>⛑️ 小榮</b>開發（戴安全帽）</div>
+      </div>
+      <div class="section-title">交接與進度（唯讀顯示 COLLAB-LOG · 建議）</div>
+      <div class="log">
+        <div>2026-07-23 小恩：AI 平台架構整理草案（佔位）</div>
+        <div>2026-07-22 …（佔位，實際串接 docs/COLLAB-LOG.md）</div>
+        <div>2026-07-21 …（佔位）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- P4 Liam Strategy Room -->
+  <section id="p4" class="page">
+    <div class="lsr">
+      <div class="crumb"><span>🔒 Liam Strategy Room（僅 Liam）</span><button class="btn-back" onclick="go('p0')">回入口</button></div>
+      <h2>私人策略與總控空間</h2>
+      <div class="grid-sm" style="margin-top:12px;">
+        <div class="chip">🎯 管理策略</div>
+        <div class="chip">📌 未完成事項</div>
+        <div class="chip">🤖 AI 工作規劃</div>
+        <div class="chip">🛠️ 開發進度</div>
+        <div class="chip">💡 想法筆記</div>
+        <div class="chip">🗂️ 最終決策紀錄</div>
+      </div>
+      <div class="lock">🔒 第一版：版面 + 佔位，不接任何資料、不放個資或密碼</div>
+    </div>
+  </section>
+
+</div>
+<script>
+  // 純前端頁面切換示意，不做任何資料存取
+  function go(id){
+    document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById(id).classList.add('active');
+    window.scrollTo(0,0);
+  }
+</script>
+</body>
+</html>
