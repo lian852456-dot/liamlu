@@ -1221,8 +1221,9 @@ function cloudWrite(details){
   let written = 0, chain = Promise.resolve();
   chunks.forEach(c=>{ chain = chain.then(()=>sendChunk(c, 0)).then(n=>{ written += n; }); });
   chain.then(()=>{
-    showMsg(`已同步至雲端（新增 ${written} 筆，重複資料自動略過），正在核對…`,'ok');
-    cloudLoad(true); // 同步完成後改以雲端資料為準，看板內容＝手機看到的內容
+    // JSONP 已收到 ptwrite 成功回覆，保留目前解析出的明細。
+    // 不在此時立刻重讀，避免 Apps Script 讀取落後寫入時，把剛貼上的資料覆蓋成舊資料。
+    showMsg(`已同步至雲端（新增 ${written} 筆，重複資料自動略過）`,'ok');
   }).catch(err=>showMsg('雲端寫入失敗：'+err.message+'（資料仍在本頁看板，請重新整理後把完整明細整份重貼一次補齊）','err'));
 }
 
@@ -1273,7 +1274,8 @@ async function switchPatrolView(view){
     loadSchedule();
   }else if(view==='halfDashboard'){
     document.getElementById('halfDashboardView').classList.add('active');
-    if(cloudOn) cloudLoad();
+    // 大盤與巡店看板共用 rawDetails。切頁只重繪目前資料，
+    // 不觸發雲端重讀，以免背景寫入尚未完成時還原成舊明細。
     renderHalfDashboard();
   }else if(view==='half'){
     document.getElementById('halfView').classList.add('active');

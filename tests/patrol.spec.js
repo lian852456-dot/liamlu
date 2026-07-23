@@ -8,6 +8,7 @@ const PT_KEY = 'test123';
 let cloudRows;
 let halfRows;
 let writeCalls;
+let ptReadCalls;
 let cloudConfig; // 模擬各區 GAS 回傳的 PT_STORES / PT_TITLE
 let mediaUploads;
 
@@ -71,6 +72,7 @@ async function stubGas(page) {
     if (action === 'ping') {
       body = JSON.stringify({ status: 'ok' });
     } else if (action === 'ptread') {
+      ptReadCalls++;
       body = authed
         ? JSON.stringify({ status: 'ok', rows: cloudRows, ...(cloudConfig || {}) })
         : JSON.stringify({ status: 'error', message: 'unauthorized' });
@@ -136,7 +138,7 @@ function pasteLine(d, store, code, item, result, reason) {
   return `2026/7/${d} 16:43\t2026/7/${d} 16:00\t2026/7/${d} 18:00\t北一二B\t${code}\t${store}\t測試督導\t${item}\t內容\t${result}\t${reason}`;
 }
 
-test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; cloudConfig = null; mediaUploads = []; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; cloudConfig = null; mediaUploads = []; });
 
 test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
   // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
@@ -153,8 +155,7 @@ test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', as
   ].join('\n');
   await desktop.fill('#pasteBox', lines);
   await desktop.click('button.btn-primary');
-  // 上傳成功後會自動核對雲端，看板改以雲端資料為準
-  await expect(desktop.locator('#parseMsg')).toHaveText(/雲端已載入 3 筆明細/);
+  await expect(desktop.locator('#parseMsg')).toHaveText(/已同步至雲端/);
   expect(cloudRows.length).toBe(3);
 
   // ── 裝置二（手機）：全新頁面，輸入通行碼後直接看到雲端資料 ──
@@ -195,8 +196,29 @@ test('重複貼上同一批資料，雲端自動去重', async ({ page }) => {
   await page.fill('#pasteBox', line);
   await page.click('button.btn-primary');
   await expect.poll(() => writeCalls).toBeGreaterThan(callsAfterFirst);
-  await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 1 筆明細/);
+  await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
   expect(cloudRows.length).toBe(1);
+});
+
+test('貼上明細後切到督導檢查大盤不會用舊雲端資料覆蓋', async ({ page }) => {
+  // 雲端原先只有酒泉的一筆；通化是這次剛貼上的新明細。
+  cloudRows = [
+    { fillTime: '2026/7/1 16:43', arriveTime: '2026/7/1 16:00', leaveTime: '2026/7/1 18:00', district: '北一二B', code: 'DNB10062', store: '台北酒泉', inspector: '測試督導', item: 14, result: 'v', reason: '', month: '2026-07' },
+  ];
+  await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
+  await page.goto(PAGE_URL);
+  await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 1 筆明細/);
+
+  await page.fill('#pasteBox', pasteLine(5, '台北通化', 'DNB10059', 14, 'v', ''));
+  await page.click('button.btn-primary');
+  await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+  const readsBeforeSwitch = ptReadCalls;
+
+  await page.click('[data-view="halfDashboard"]');
+  await expect(page.locator('#halfDashboardView')).toContainText('目前已載入 2 筆巡店明細');
+  await expect(page.locator('#halfDashboardView')).toContainText('台北通化');
+  expect(ptReadCalls).toBe(readsBeforeSwitch);
 });
 
 test('盤點提醒框：題14-17每月與題18兩個月獨立顯示進度', async ({ page }) => {
@@ -218,7 +240,7 @@ test('盤點提醒框：題14-17每月與題18兩個月獨立顯示進度', asyn
   ].join('\n');
   await page.fill('#pasteBox', lines);
   await page.click('button.btn-primary');
-  await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 7 筆明細/);
+  await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
 
   const panels = page.locator('#invPanels');
   // 每月盤點：只有通化 4 項全完成 → 1/9
@@ -247,7 +269,7 @@ test('知悉宣導提醒：題19-33只看總進度與20日前完成狀態', asyn
   lines.push(pasteLine(6, '台北酒泉', 'DNB10062', 19, 'v', ''));
   await page.fill('#pasteBox', lines.join('\n'));
   await page.click('button.btn-primary');
-  await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 16 筆明細/);
+  await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
 
   const panels = page.locator('#invPanels');
   await expect(panels).toContainText('知悉宣導提醒');
@@ -294,7 +316,7 @@ test('大量資料會分批上傳且全數送達', async ({ page }) => {
   }
   await page.fill('#pasteBox', lines.join('\n'));
   await page.click('button.btn-primary');
-  await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 25 筆明細/);
+  await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
   expect(cloudRows.length).toBe(25);
   expect(writeCalls).toBeGreaterThan(1); // 確實有分批
 });
