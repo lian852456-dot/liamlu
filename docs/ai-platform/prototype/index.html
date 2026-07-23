@@ -4,195 +4,542 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>北一二B 智慧營運中心 · 空白線框原型（草稿）</title>
+<!-- ⚠️ 純靜態視覺原型 v2：無資料、無後端、無 localStorage、不連既有 App。全部為佔位內容。 -->
+<title>北一二B 智慧營運中心 · 視覺原型 v2</title>
 <style>
-  /* ⚠️ 純靜態線框原型：無資料、無後端、無 localStorage、不連既有 App。全部為佔位內容。 */
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: #e9edf2; color: #1a1a1a; line-height: 1.5; }
-  .draft-banner { background: #ffe0b2; color: #7a3b00; text-align: center; font-size: 13px; padding: 6px 10px; border-bottom: 1px solid #e0a457; }
-  .stage { max-width: 720px; margin: 0 auto; padding: 16px; }
-  .page { display: none; }
-  .page.active { display: block; }
-  .crumb { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #555; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-  .btn-back { background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 4px 12px; cursor: pointer; font-size: 13px; color:#333; }
-  .btn-back:hover { background: #f0f0f0; }
+  :root{
+    --shell:#e8edf3; --shell-ink:#26313f; --shell-muted:#66748a; --shell-line:#d3dae4;
+    --shell-card:#ffffff;
+    --maxw:820px; --r:20px;
+    --shadow-s:0 4px 14px rgba(30,45,70,.08);
+    --shadow-m:0 14px 40px rgba(30,45,70,.14);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --shell:#0e131b; --shell-ink:#e6ecf4; --shell-muted:#8c99ac; --shell-line:#232d3a; --shell-card:#141b25;
+      --shadow-s:0 4px 14px rgba(0,0,0,.4); --shadow-m:0 14px 40px rgba(0,0,0,.5); }
+  }
+  :root[data-theme="light"]{ --shell:#e8edf3; --shell-ink:#26313f; --shell-muted:#66748a; --shell-line:#d3dae4; --shell-card:#ffffff; }
+  :root[data-theme="dark"]{ --shell:#0e131b; --shell-ink:#e6ecf4; --shell-muted:#8c99ac; --shell-line:#232d3a; --shell-card:#141b25;
+    --shadow-s:0 4px 14px rgba(0,0,0,.4); --shadow-m:0 14px 40px rgba(0,0,0,.5); }
 
-  /* Q版 Liam 佔位 */
-  .qliam { display: inline-flex; align-items: center; gap: 8px; background: rgba(0,0,0,.06); border: 1px dashed #999; border-radius: 20px; padding: 6px 14px; font-size: 13px; margin-bottom: 14px; }
-  .qliam .avatar { width: 26px; height: 26px; border-radius: 50%; background: #ffcc80; display: flex; align-items: center; justify-content: center; font-size: 15px; }
-  .qliam .state { color: #555; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--shell); color:var(--shell-ink);
+    font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased; }
 
-  /* 卡片 */
-  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 10px 0 18px; }
-  .card { border-radius: 14px; padding: 22px 12px; text-align: center; cursor: pointer; border: 1px solid rgba(0,0,0,.08); transition: transform .1s; user-select: none; }
-  .card:hover { transform: translateY(-2px); }
-  .card .ico { font-size: 30px; display: block; margin-bottom: 6px; }
-  .card .lbl { font-weight: 700; font-size: 15px; }
-  .card .sub { font-size: 11px; color: #888; margin-top: 3px; }
-  .grid-sm { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .chip { border-radius: 10px; padding: 12px 8px; text-align: center; font-size: 13px; cursor: pointer; border: 1px solid rgba(0,0,0,.1); }
-  .section-title { font-size: 13px; color: #777; margin: 14px 0 8px; letter-spacing: 1px; }
-  .todo { color: #c0392b; font-size: 11px; }
-  .future { opacity: .55; }
+  .banner{ position:sticky; top:0; z-index:30; text-align:center; font-size:12.5px; font-weight:600;
+    padding:7px 12px; background:linear-gradient(90deg,#ffe3b0,#ffd28c); color:#7a3b00; border-bottom:1px solid #e5a95a; }
+  :root[data-theme="dark"] .banner, .banner.dk{ }
+  @media (prefers-color-scheme: dark){ .banner{ background:linear-gradient(90deg,#4a3512,#5c4214); color:#ffdca8; border-color:#6a4a1c; } }
+  :root[data-theme="dark"] .banner{ background:linear-gradient(90deg,#4a3512,#5c4214); color:#ffdca8; border-color:#6a4a1c; }
 
-  /* P0 外站入口 */
-  #p0 { text-align: center; padding-top: 30px; }
-  #p0 .logo { font-size: 40px; }
-  #p0 h1 { font-size: 24px; margin: 8px 0 2px; }
-  #p0 .tagline { color: #667; font-size: 14px; letter-spacing: 1px; margin-bottom: 26px; }
-  .gate { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 460px; margin: 0 auto; }
-  .gate .card { padding: 34px 12px; }
+  .wrap{ max-width:var(--maxw); margin:0 auto; padding:16px 16px 64px; }
+  .masthead{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:6px 2px 14px; }
+  .masthead h1{ font-size:17px; margin:0; letter-spacing:.01em; }
+  .masthead .meta{ font-size:12px; color:var(--shell-muted); }
 
-  /* 同仁大廳 亮 */
-  .lobby { background: #fbfbfd; border-radius: 16px; padding: 18px; }
-  .lobby .card { background: #fff; }
-  .lobby .card.kpi { background: #fff3e0; border-color:#ffcc80; }
-  .lobby .card.tw  { background: #fff8e1; border-color:#ffe082; }
-  .lobby .card.gold{ background: #f1f8e9; border-color:#c5e1a5; }
-  .lobby .chip { background: #fff; }
-  .lobby h2 { font-size: 15px; color:#e65100; }
+  nav.seg{ display:flex; gap:6px; overflow-x:auto; padding:6px; background:var(--shell-card);
+    border:1px solid var(--shell-line); border-radius:15px; margin-bottom:16px; scrollbar-width:none; box-shadow:var(--shadow-s); }
+  nav.seg::-webkit-scrollbar{ display:none; }
+  nav.seg button{ flex:0 0 auto; border:0; background:transparent; color:var(--shell-muted); cursor:pointer;
+    font:inherit; font-size:13px; font-weight:600; padding:8px 13px; border-radius:10px; white-space:nowrap; transition:.15s; }
+  nav.seg button:hover{ color:var(--shell-ink); background:rgba(120,140,170,.10); }
+  nav.seg button[aria-current="true"]{ background:linear-gradient(135deg,#5b9bd5,#4f86c6); color:#fff; box-shadow:0 6px 16px rgba(79,134,198,.4); }
+  nav.seg button:focus-visible{ outline:2px solid #5b9bd5; outline-offset:2px; }
+  nav.seg .k{ font-variant-numeric:tabular-nums; opacity:.55; margin-right:5px; }
 
-  /* 督導指揮室 深 */
-  .cmd { background: #0f1622; border-radius: 16px; padding: 18px; color: #cfe6e6; box-shadow: inset 0 0 40px rgba(0,255,200,.04); }
-  .cmd .crumb { color: #8fb; }
-  .cmd .card { background: #16202f; border-color: rgba(0,255,200,.15); color: #d9f2f0; }
-  .cmd .card .sub { color: #6a9; }
-  .cmd .chip { background: #16202f; border-color: rgba(0,255,200,.12); color: #bfe; }
-  .cmd .section-title { color: #6ba; }
-  .cmd .btn-back { background:#16202f; color:#bfe; border-color:#2a4; }
-  .cmd .qliam { background: rgba(0,255,200,.08); border-color:#2a5; color:#bfe; }
-  .cmd .qliam .state { color:#8fd; }
-  .cmd h2 { color:#4fd6c0; font-size:15px; }
+  .device{ border-radius:24px; overflow:hidden; border:1px solid var(--shell-line); box-shadow:var(--shadow-m); }
+  .page{ display:none; }
+  .page.active{ display:block; animation:fade .3s ease; }
+  @keyframes fade{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;} }
+  @media (prefers-reduced-motion: reduce){ .page.active{ animation:none; } }
+  .crumb{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; font-size:12.5px; margin-bottom:14px; }
+  .back{ font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; border-radius:9px; padding:5px 12px; border:1px solid currentColor; background:transparent; opacity:.85; }
+  .back:hover{ opacity:1; }
+  .lead{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; font-weight:700; opacity:.6; margin:2px 0 10px; }
 
-  /* AI 協作中心 */
-  .roles { display:grid; grid-template-columns: repeat(2,1fr); gap:10px; margin:8px 0 16px; }
-  .role { background:#16202f; border:1px solid rgba(0,255,200,.15); border-radius:12px; padding:12px; color:#d9f2f0; font-size:13px; }
-  .role b { display:block; font-size:14px; margin-bottom:2px; }
-  .log { background:#0b1119; border:1px solid rgba(0,255,200,.1); border-radius:10px; padding:12px; font-size:12px; color:#9cc; font-family: ui-monospace, monospace; }
-  .log div { padding:3px 0; border-bottom:1px dashed rgba(255,255,255,.06); }
+  /* ========== Q版 Liam 角色 ========== */
+  .liam-svg{ width:100%; height:100%; display:block; overflow:visible; }
+  .liam .mood, .liam .arm-v{ display:none; }
+  .liam[data-mood="normal"] .m-normal{ display:block; }
+  .liam[data-mood="happy"]  .m-happy{ display:block; }
+  .liam[data-mood="worry"]  .m-worry{ display:block; }
+  .liam[data-arm="rest"]  .a-rest{ display:block; }
+  .liam[data-arm="wave"]  .a-wave{ display:block; }
+  .liam[data-arm="point"] .a-point{ display:block; }
+  .liam[data-arm="thumb"] .a-thumb{ display:block; }
+  .float{ animation:float 4s ease-in-out infinite; transform-origin:center; }
+  @keyframes float{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-7px); } }
+  @media (prefers-reduced-motion: reduce){ .float{ animation:none; } }
 
-  /* Liam Strategy Room */
-  .lsr { background:#08080c; border-radius:16px; padding:20px; color:#e8d9a8; border:1px solid #3a3320; }
-  .lsr .crumb { color:#caa64a; }
-  .lsr .btn-back { background:#1a160c; color:#e8d9a8; border-color:#5a4a20; }
-  .lsr .grid-sm .chip { background:#141018; border-color:#3a3320; color:#e8d9a8; }
-  .lsr h2 { color:#e0c060; }
-  .lock { font-size:12px; color:#a98; margin-top:14px; text-align:center; }
+  /* ========== P0 外站入口 ========== */
+  .gate{ background:radial-gradient(130% 100% at 50% 0%,#24406e 0%,#122544 55%,#0c1a30 100%); color:#dce8fa; padding:30px 22px 34px; text-align:center; }
+  .gate .logo{ font-size:44px; }
+  .gate h2{ font-size:25px; margin:8px 0 2px; }
+  .gate .tag{ font-size:12px; letter-spacing:.26em; text-transform:uppercase; color:#8fa8cf; margin-bottom:8px; }
+  .gate .lead2{ font-size:13px; color:#a9bcdc; margin-bottom:22px; }
+  .doors{ display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:480px; margin:0 auto; }
+  .door{ border-radius:18px; padding:26px 14px 22px; cursor:pointer; border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.06); transition:.16s; }
+  .door:hover{ background:rgba(255,255,255,.12); transform:translateY(-3px); }
+  .door:focus-visible{ outline:2px solid #7fe4d4; outline-offset:3px; }
+  .door .ic{ font-size:30px; } .door .nm{ font-weight:700; font-size:16px; margin-top:6px; } .door .ar{ font-size:12px; margin-top:3px; }
+  .door.lob .ar{ color:#ffc98a; } .door.cmd .ar{ color:#7fe4d4; }
+  .gate .liam-mini{ width:120px; height:150px; margin:20px auto 0; }
+  .gate .hidden{ margin-top:14px; font-size:12px; }
+  .gate .hidden button{ background:none; border:0; color:#8fa8cf; text-decoration:underline; cursor:pointer; font:inherit; font-size:12px; }
+
+  /* ========== P1 同仁大廳（明亮溫暖）========== */
+  .lobby{ background:linear-gradient(180deg,#fdfbf7 0%,#f4f7fb 100%); color:#2b3542; padding:22px 20px 28px; }
+  .lobby .crumb, .lobby .back{ color:#93867a; }
+  .greet{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:4px; }
+  .greet h2{ font-size:23px; margin:0; color:#2b3542; letter-spacing:.01em; }
+  .greet .sun{ font-size:24px; }
+  .greet .date{ font-size:12.5px; color:#94a1b0; }
+  .greet-sub{ font-size:13px; color:#7c8a99; margin-bottom:16px; }
+
+  /* hero: Liam 主角 */
+  .hero{ position:relative; display:grid; grid-template-columns:1.15fr .85fr; gap:14px; align-items:end;
+    background:linear-gradient(135deg,#eaf3fb 0%,#f3f0fb 55%,#fdeede 100%); border:1px solid #e4ecf5;
+    border-radius:22px; padding:18px 18px 0; margin-bottom:18px; overflow:hidden; }
+  .hero .talk{ align-self:start; }
+  .bubble{ position:relative; background:#fff; border:1px solid #e6ecf4; border-radius:16px 16px 16px 4px;
+    padding:12px 15px; font-size:14.5px; color:#3a4756; box-shadow:0 8px 22px rgba(60,90,140,.12); max-width:300px; }
+  .bubble .who{ font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:#5b9bd5; font-weight:800; display:block; margin-bottom:3px; }
+  .hero .stage{ position:relative; height:230px; }
+  .hero .liam-fig{ position:absolute; right:0; bottom:0; width:200px; height:230px; }
+  .hero .prop{ position:absolute; right:150px; top:22px; font-size:30px; filter:drop-shadow(0 4px 6px rgba(0,0,0,.15)); }
+
+  .state-rail{ display:flex; gap:8px; overflow-x:auto; padding:2px 2px 10px; margin-bottom:6px; scrollbar-width:none; }
+  .state-rail::-webkit-scrollbar{ display:none; }
+  .state-chip{ flex:0 0 auto; border:1px solid #dfe7f0; background:#fff; border-radius:20px; padding:7px 13px; font-size:12.5px;
+    color:#55636f; cursor:pointer; font:inherit; font-weight:600; transition:.14s; }
+  .state-chip:hover{ border-color:#5b9bd5; color:#3a4756; }
+  .state-chip[aria-pressed="true"]{ background:#5b9bd5; border-color:#5b9bd5; color:#fff; box-shadow:0 5px 14px rgba(91,155,213,.4); }
+  .state-chip .e{ margin-right:5px; }
+
+  .sec-h{ font-size:14px; font-weight:800; margin:16px 0 10px; color:#2b3542; }
+  .sec-h .star{ color:#f0954a; }
+  .cards3{ display:grid; grid-template-columns:repeat(3,1fr); gap:13px; margin-bottom:18px; }
+  .bigcard{ border-radius:18px; padding:20px 14px; text-align:center; border:1px solid; cursor:default; transition:transform .12s, box-shadow .12s; }
+  .bigcard:hover{ transform:translateY(-3px); box-shadow:var(--shadow-s); }
+  .bigcard .ic{ font-size:30px; display:block; margin-bottom:8px; }
+  .bigcard .t{ font-weight:800; font-size:16px; }
+  .bigcard .s{ font-size:11px; margin-top:5px; opacity:.75; }
+  .bigcard .s.todo{ color:#c9433d; opacity:1; font-weight:700; }
+  .c-kpi{ background:#eaf3fb; border-color:#c9e0f4; color:#245680; }
+  .c-tw { background:#e9f6ef; border-color:#c4e6d3; color:#1f6a45; }
+  .c-gold{ background:#fdf1e3; border-color:#f4d9b6; color:#9a5a1a; }
+  .tiles{ display:grid; grid-template-columns:repeat(3,1fr); gap:11px; }
+  .tile{ background:#fff; border:1px solid #e6ecf4; border-radius:14px; padding:14px 10px; text-align:center; font-size:12.5px; color:#41505f; box-shadow:var(--shadow-s); }
+  .tile .ic{ font-size:20px; display:block; margin-bottom:5px; }
+  .tile small{ display:block; color:#c9433d; font-weight:700; font-size:10px; margin-top:2px; }
+
+  /* ========== P2 督導指揮室（深色戰情）========== */
+  .cmd{ background:
+      radial-gradient(120% 80% at 85% -10%, rgba(63,214,192,.14), transparent 55%),
+      radial-gradient(90% 70% at 0% 0%, rgba(74,158,255,.14), transparent 50%),
+      linear-gradient(180deg,#0b1622 0%,#0c1b2c 100%);
+    color:#cfe3e6; padding:22px 20px 28px; position:relative; }
+  .cmd::before{ content:""; position:absolute; inset:0; pointer-events:none;
+    background-image:linear-gradient(rgba(63,214,192,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(63,214,192,.05) 1px,transparent 1px);
+    background-size:34px 34px; mask:linear-gradient(180deg,#000,transparent 70%); }
+  .cmd > *{ position:relative; }
+  .cmd .crumb, .cmd .back{ color:#7fe0cf; }
+  .cmd .topbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  .cmd .rm-title{ font-size:18px; font-weight:800; color:#eafffb; letter-spacing:.03em; }
+  .cmd .rm-title .g{ color:#e6c15a; }
+  .cmd .health{ display:flex; gap:8px; flex-wrap:wrap; }
+  .pill{ font-size:11px; font-weight:700; padding:5px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:6px; border:1px solid; }
+  .pill i{ width:7px; height:7px; border-radius:50%; display:inline-block; }
+  .pill.ok{ color:#8ff0d6; border-color:rgba(63,214,192,.4); background:rgba(63,214,192,.08); } .pill.ok i{ background:#3fd6a0; box-shadow:0 0 8px #3fd6a0; }
+  .pill.warn{ color:#ffdd8f; border-color:rgba(230,181,63,.4); background:rgba(230,181,63,.08); } .pill.warn i{ background:#e6b53f; box-shadow:0 0 8px #e6b53f; }
+
+  .cmd .grid2{ display:grid; grid-template-columns:1.05fr .95fr; gap:14px; }
+  @media (max-width:640px){ .cmd .grid2{ grid-template-columns:1fr; } .hero{ grid-template-columns:1fr; } .hero .stage{ height:200px; } }
+  .panel{ background:linear-gradient(180deg,rgba(19,39,58,.9),rgba(13,27,42,.9)); border:1px solid rgba(63,214,192,.16);
+    border-radius:16px; padding:15px; box-shadow:inset 0 0 30px rgba(63,214,192,.04); }
+  .panel h4{ margin:0 0 12px; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#5fbfb0; font-weight:800; }
+  .radar3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  .tac{ background:#122536; border:1px solid rgba(63,214,192,.18); border-radius:13px; padding:14px 8px; text-align:center; }
+  .tac .ic{ font-size:24px; display:block; margin-bottom:6px; }
+  .tac .t{ font-weight:800; font-size:13.5px; color:#dffaf4; }
+  .tac .s{ font-size:10px; margin-top:4px; color:#6fb3a8; }
+  .tac .s.todo{ color:#ff9a8f; font-weight:700; }
+
+  /* squad status */
+  .squad{ display:flex; flex-direction:column; gap:11px; }
+  .mate{ display:grid; grid-template-columns:auto 1fr auto; gap:11px; align-items:center; }
+  .ava{ width:40px; height:40px; border-radius:12px; display:grid; place-items:center; font-size:20px; border:1px solid rgba(63,214,192,.25); background:#0e2032; }
+  .mate .nm{ font-weight:700; font-size:13.5px; color:#e6fff9; }
+  .mate .rl{ font-size:11px; color:#7fb8ad; }
+  .mate .task{ font-size:10.5px; color:#9fc; opacity:.8; margin-top:3px; }
+  .mate .st{ font-size:10px; font-weight:700; padding:3px 8px; border-radius:12px; white-space:nowrap; }
+  .st.live{ color:#0c1b2c; background:#3fd6a0; } .st.busy{ color:#0c1b2c; background:#e6c15a; } .st.idle{ color:#9fb; background:rgba(120,160,180,.2); }
+  .bar{ grid-column:1 / -1; height:6px; border-radius:6px; background:rgba(120,160,180,.15); overflow:hidden; }
+  .bar > span{ display:block; height:100%; border-radius:6px; background:linear-gradient(90deg,#3fd6c0,#4a9eff); }
+
+  .cmd .liam-cmd{ position:absolute; right:14px; bottom:10px; width:96px; height:120px; opacity:.96; }
+  .cmd .cmd-note{ font-size:11px; color:#6fb3a8; margin-top:14px; }
+
+  /* ========== P3 AI 協作中心 ========== */
+  .collab{ background:linear-gradient(180deg,#0c1b2c,#0a1826); color:#cfe3e6; padding:22px 20px 28px; }
+  .collab .crumb, .collab .back{ color:#7fe0cf; }
+  .collab h3{ font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#5fbfb0; font-weight:800; margin:0 0 12px; }
+  .roles4{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+  .rolec{ background:linear-gradient(180deg,rgba(19,39,58,.9),rgba(13,27,42,.9)); border:1px solid rgba(63,214,192,.16); border-radius:15px; padding:14px; }
+  .rolec .hd{ display:flex; align-items:center; gap:10px; margin-bottom:7px; }
+  .rolec .ava{ width:42px; height:42px; }
+  .rolec b{ font-size:15px; color:#eafffb; } .rolec .cap{ font-size:11px; color:#e6c15a; font-weight:700; }
+  .rolec p{ margin:0; font-size:12px; color:#9fc; opacity:.85; }
+  .log{ background:#08131f; border:1px solid rgba(63,214,192,.12); border-radius:14px; padding:14px; font-size:12px; font-family:ui-monospace,"SF Mono",Menlo,monospace; color:#9ccfc6; }
+  .log div{ padding:6px 0; border-bottom:1px dashed rgba(255,255,255,.07); } .log div:last-child{ border-bottom:0; }
+  .log .d{ color:#4fd6c0; }
+
+  /* ========== P4 Strategy Room ========== */
+  .lsr{ background:radial-gradient(120% 90% at 50% -10%, #1a1710, #0a0a0f 60%); color:#eadfba; padding:22px 20px 30px; }
+  .lsr .crumb, .lsr .back{ color:#d9b64e; }
+  .lsr h3{ font-size:14px; color:#e6c760; margin:0 0 12px; }
+  .lsr .grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:11px; }
+  .lsr .chip{ background:#161219; border:1px solid #3a3320; border-radius:13px; padding:16px 10px; text-align:center; font-size:12.5px; color:#eadfba; }
+  .lsr .chip .ic{ font-size:20px; display:block; margin-bottom:5px; }
+  .lsr .lock{ text-align:center; font-size:11.5px; color:#9c8f66; margin-top:18px; }
+
+  footer.note{ max-width:var(--maxw); margin:16px auto 0; padding:0 16px; font-size:11.5px; color:var(--shell-muted); text-align:center; }
 </style>
 </head>
 <body>
-<div class="draft-banner">🧾 空白線框原型（草稿）· 全部為佔位內容 · 無真實資料/無後端/不影響正式系統 · 待 Liam 確認</div>
-<div class="stage">
+<div class="banner">🧾 視覺原型 v2（草稿）· 全部為佔位內容 · 無真實資料 / 無後端 / 不影響正式系統 · 待 Liam 確認</div>
 
-  <!-- P0 外站入口 -->
-  <section id="p0" class="page active">
-    <div class="logo">🏛️</div>
-    <h1>北一二B 智慧營運中心</h1>
-    <div class="tagline">One Portal. All Operations.</div>
-    <div class="gate">
-      <div class="card" onclick="go('p1')"><span class="ico">👥</span><span class="lbl">同仁大廳</span><span class="sub">進入 →</span></div>
-      <div class="card" onclick="go('p2')"><span class="ico">🛰️</span><span class="lbl">督導指揮室</span><span class="sub">進入 →</span></div>
-    </div>
-    <div style="margin-top:26px;">
-      <span class="qliam"><span class="avatar">🧑‍✈️</span><span class="state">Q版 Liam · 平常走動</span></span>
-    </div>
-    <div style="margin-top:20px;font-size:12px;color:#889;">
-      <span onclick="go('p4')" style="cursor:pointer;text-decoration:underline;">🔒 Liam Strategy Room（僅 Liam · 隱藏入口示意）</span>
-    </div>
-  </section>
+<div class="wrap">
+  <div class="masthead">
+    <h1>北一二B 智慧營運中心 · 視覺原型</h1>
+    <span class="meta">架構整理：小恩 · v2 · 2026-07-23</span>
+  </div>
 
-  <!-- P1 同仁大廳 -->
-  <section id="p1" class="page">
-    <div class="lobby">
-      <div class="crumb"><span>🏛️ 智慧營運中心 › 👥 同仁大廳</span><button class="btn-back" onclick="go('p0')">回入口</button></div>
-      <span class="qliam"><span class="avatar">🧑‍✈️</span><span class="state">Q版 Liam · 早安問候：「早安，今天也順順的！」</span></span>
-      <h2>★ 前三順位</h2>
-      <div class="cards">
-        <div class="card kpi"><span class="ico">📊</span><span class="lbl">KPI</span><span class="sub">→ kpi.html（待確認）</span></div>
-        <div class="card tw"><span class="ico">🏅</span><span class="lbl">台獎</span><span class="sub">→ 台獎戰情（待確認）</span></div>
-        <div class="card gold"><span class="ico">🥇</span><span class="lbl">金牌</span><span class="sub todo">功能待確認</span></div>
-      </div>
-      <div class="section-title">接續功能</div>
-      <div class="grid-sm">
-        <div class="chip">🧮 試算表</div>
-        <div class="chip">🗒️ 店務檢查·日</div>
-        <div class="chip">🗓️ 店務檢查·半月</div>
-        <div class="chip">📅 店務檢查·每月</div>
-        <div class="chip">📣 公告<br><span class="todo">待確認</span></div>
-        <div class="chip">🧰 常用工具</div>
-      </div>
-    </div>
-  </section>
+  <nav class="seg" aria-label="頁面導覽">
+    <button data-go="p0" aria-current="true"><span class="k">P0</span>外站入口</button>
+    <button data-go="p1"><span class="k">P1</span>同仁大廳</button>
+    <button data-go="p2"><span class="k">P2</span>督導指揮室</button>
+    <button data-go="p3"><span class="k">P3</span>AI 協作中心</button>
+    <button data-go="p4"><span class="k">P4</span>Strategy Room</button>
+  </nav>
 
-  <!-- P2 督導指揮室 -->
-  <section id="p2" class="page">
-    <div class="cmd">
-      <div class="crumb"><span>🏛️ 智慧營運中心 › 🛰️ 督導指揮室</span><button class="btn-back" onclick="go('p0')">回入口</button></div>
-      <span class="qliam"><span class="avatar">🧑‍✈️</span><span class="state">Q版 Liam · 巡視系統（點我 → 提醒落後店點）</span></span>
-      <h2>★ 前三順位</h2>
-      <div class="cards">
-        <div class="card"><span class="ico">📡</span><span class="lbl">督導雷達</span><span class="sub todo">功能待確認</span></div>
-        <div class="card"><span class="ico">🗓️</span><span class="lbl">班表</span><span class="sub">→ patrol.html</span></div>
-        <div class="card"><span class="ico">🚶</span><span class="lbl">巡店</span><span class="sub">→ patrol.html</span></div>
-      </div>
-      <div class="section-title">未來擴充</div>
-      <div class="grid-sm future">
-        <div class="chip">💰 資費分析</div>
-        <div class="chip">📈 上線分析</div>
-        <div class="chip">🔬 KPI 深度分析</div>
-      </div>
-      <div class="section-title">協作</div>
-      <div class="grid-sm">
-        <div class="chip" onclick="go('p3')" style="grid-column:span 3;cursor:pointer;">🤖 AI 協作中心 →</div>
-      </div>
-    </div>
-  </section>
+  <div class="device">
 
-  <!-- P3 AI 協作中心 -->
-  <section id="p3" class="page">
-    <div class="cmd">
-      <div class="crumb"><span>🛰️ 督導指揮室 › 🤖 AI 協作中心</span><button class="btn-back" onclick="go('p2')">回上層</button></div>
-      <h2>隊員</h2>
-      <div class="roles">
-        <div class="role"><b>🧑‍✈️ Liam</b>隊長 · 最終決策</div>
-        <div class="role"><b>📱 小葳</b>資料分析（抱平板）</div>
-        <div class="role"><b>📐 小恩</b>架構整理（拿藍圖）</div>
-        <div class="role"><b>⛑️ 小榮</b>開發（戴安全帽）</div>
+    <!-- ===== P0 ===== -->
+    <section id="p0" class="page active">
+      <div class="gate">
+        <div class="logo">🏛️</div>
+        <h2>北一二B 智慧營運中心</h2>
+        <div class="tag">One Portal · All Operations</div>
+        <div class="lead2">一個入口，AI 小隊陪你把每天的營運跑順</div>
+        <div class="doors">
+          <div class="door lob" tabindex="0" role="button" data-go="p1"><div class="ic">👥</div><div class="nm">同仁大廳</div><div class="ar">進入 →</div></div>
+          <div class="door cmd" tabindex="0" role="button" data-go="p2"><div class="ic">🛰️</div><div class="nm">督導指揮室</div><div class="ar">進入 →</div></div>
+        </div>
+        <div class="liam-mini float" id="liamGate"></div>
+        <div class="hidden">🔒 <button data-go="p4">Liam Strategy Room（僅 Liam · 隱藏入口）</button></div>
       </div>
-      <div class="section-title">交接與進度（唯讀顯示 COLLAB-LOG · 建議）</div>
-      <div class="log">
-        <div>2026-07-23 小恩：AI 平台架構整理草案（佔位）</div>
-        <div>2026-07-22 …（佔位，實際串接 docs/COLLAB-LOG.md）</div>
-        <div>2026-07-21 …（佔位）</div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- P4 Liam Strategy Room -->
-  <section id="p4" class="page">
-    <div class="lsr">
-      <div class="crumb"><span>🔒 Liam Strategy Room（僅 Liam）</span><button class="btn-back" onclick="go('p0')">回入口</button></div>
-      <h2>私人策略與總控空間</h2>
-      <div class="grid-sm" style="margin-top:12px;">
-        <div class="chip">🎯 管理策略</div>
-        <div class="chip">📌 未完成事項</div>
-        <div class="chip">🤖 AI 工作規劃</div>
-        <div class="chip">🛠️ 開發進度</div>
-        <div class="chip">💡 想法筆記</div>
-        <div class="chip">🗂️ 最終決策紀錄</div>
-      </div>
-      <div class="lock">🔒 第一版：版面 + 佔位，不接任何資料、不放個資或密碼</div>
-    </div>
-  </section>
+    <!-- ===== P1 同仁大廳 ===== -->
+    <section id="p1" class="page">
+      <div class="lobby">
+        <div class="crumb"><span>🏛️ 智慧營運中心 › 👥 同仁大廳</span><button class="back" data-go="p0">回入口</button></div>
 
+        <div class="greet">
+          <span class="sun" id="greetIcon">☀️</span>
+          <h2 id="greetText">早安，團隊</h2>
+          <span class="date" id="greetDate">2026 / 07 / 23（三）</span>
+        </div>
+        <div class="greet-sub">今天也一起把每一件小事做好 💪</div>
+
+        <!-- HERO：Q版 Liam 主角 -->
+        <div class="hero">
+          <div class="talk">
+            <div class="bubble" id="liamBubble"><span class="who">🧭 Q版 Liam · 隊長</span><span id="bubbleText">早安，團隊！今天的目標我幫你們盯著，有狀況我會提醒 👍</span></div>
+          </div>
+          <div class="stage">
+            <div class="prop" id="liamProp">☀️</div>
+            <div class="liam-fig" id="liamHero"></div>
+          </div>
+        </div>
+
+        <div class="lead">點狀態卡，看隊長切換動作</div>
+        <div class="state-rail" role="group" aria-label="Q版 Liam 狀態">
+          <button class="state-chip" data-state="walk"><span class="e">🚶</span>平常走動</button>
+          <button class="state-chip" aria-pressed="true" data-state="morning"><span class="e">🌅</span>早安問候</button>
+          <button class="state-chip" data-state="notice"><span class="e">📣</span>公告提醒</button>
+          <button class="state-chip" data-state="error"><span class="e">⚠️</span>系統異常</button>
+          <button class="state-chip" data-state="report"><span class="e">📝</span>回報提醒</button>
+          <button class="state-chip" data-state="done"><span class="e">✅</span>完成手勢</button>
+          <button class="state-chip" data-state="patrol"><span class="e">🔦</span>巡視系統</button>
+          <button class="state-chip" data-state="today"><span class="e">📋</span>今日提醒</button>
+        </div>
+
+        <div class="sec-h"><span class="star">★</span> 前三順位</div>
+        <div class="cards3">
+          <div class="bigcard c-kpi"><span class="ic">📊</span><span class="t">KPI</span><span class="s">→ kpi.html（待確認）</span></div>
+          <div class="bigcard c-tw"><span class="ic">🏅</span><span class="t">台獎</span><span class="s">→ 台獎戰情（待確認）</span></div>
+          <div class="bigcard c-gold"><span class="ic">🥇</span><span class="t">金牌</span><span class="s todo">功能待確認</span></div>
+        </div>
+
+        <div class="lead">接續功能</div>
+        <div class="tiles">
+          <div class="tile"><span class="ic">📝</span>每日回報</div>
+          <div class="tile"><span class="ic">🚶</span>巡店</div>
+          <div class="tile"><span class="ic">🗂️</span>店務檢查</div>
+          <div class="tile"><span class="ic">🧮</span>試算表</div>
+          <div class="tile"><span class="ic">📣</span>公告<small>待確認</small></div>
+          <div class="tile"><span class="ic">🧰</span>常用工具</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== P2 督導指揮室 ===== -->
+    <section id="p2" class="page">
+      <div class="cmd">
+        <div class="crumb"><span>🏛️ 智慧營運中心 › 🛰️ 督導指揮室</span><button class="back" data-go="p0">回入口</button></div>
+        <div class="topbar">
+          <div class="rm-title">🛰️ 督導指揮室 <span class="g">· AI 指揮中心</span></div>
+          <div class="health">
+            <span class="pill ok"><i></i>資料流 正常</span>
+            <span class="pill ok"><i></i>GAS 正常</span>
+            <span class="pill warn"><i></i>2 店未回報</span>
+          </div>
+        </div>
+
+        <div class="lead" style="color:#5fbfb0;">★ 前三順位</div>
+        <div class="radar3" style="margin-bottom:16px;">
+          <div class="tac"><span class="ic">📡</span><span class="t">督導雷達</span><span class="s todo">功能待確認</span></div>
+          <div class="tac"><span class="ic">🗓️</span><span class="t">班表</span><span class="s">→ patrol.html</span></div>
+          <div class="tac"><span class="ic">🚶</span><span class="t">巡店</span><span class="s">→ patrol.html</span></div>
+        </div>
+
+        <div class="grid2">
+          <div class="panel" style="position:relative;">
+            <h4>AI 小隊 · 成員狀態</h4>
+            <div class="squad">
+              <div class="mate">
+                <div class="ava">🧭</div>
+                <div><div class="nm">Liam</div><div class="rl">AI 小隊隊長 · 統籌決策</div><div class="task">任務：督導全區 · 最終拍板</div></div>
+                <div class="st live">在線</div>
+                <div class="bar"><span style="width:100%"></span></div>
+              </div>
+              <div class="mate">
+                <div class="ava">📊</div>
+                <div><div class="nm">小葳</div><div class="rl">分析、判讀與營運協助</div><div class="task">任務：營運數據判讀</div></div>
+                <div class="st busy">分析中</div>
+                <div class="bar"><span style="width:68%"></span></div>
+              </div>
+              <div class="mate">
+                <div class="ava">📐</div>
+                <div><div class="nm">小恩</div><div class="rl">架構整理、文件與系統規劃</div><div class="task">任務：平台架構藍圖 v2</div></div>
+                <div class="st busy">整理中</div>
+                <div class="bar"><span style="width:55%"></span></div>
+              </div>
+              <div class="mate">
+                <div class="ava">🛠️</div>
+                <div><div class="nm">小榮</div><div class="rl">Codex 工程開發與修正</div><div class="task">任務：待架構定案後接手</div></div>
+                <div class="st idle">待命</div>
+                <div class="bar"><span style="width:8%"></span></div>
+              </div>
+            </div>
+            <div class="liam-cmd" id="liamCmd"></div>
+          </div>
+
+          <div class="panel">
+            <h4>系統健康 · 今日概況</h4>
+            <div class="squad">
+              <div class="mate"><div class="ava">🟢</div><div><div class="nm">回報進度</div><div class="rl">7 / 9 店已回報</div></div><div class="st busy">78%</div><div class="bar"><span style="width:78%"></span></div></div>
+              <div class="mate"><div class="ava">📈</div><div><div class="nm">KPI 總達成</div><div class="rl">區平均（佔位）</div></div><div class="st live">——%</div><div class="bar"><span style="width:64%"></span></div></div>
+              <div class="mate"><div class="ava">📮</div><div><div class="nm">通知系統</div><div class="rl">16:30 / 22:00 排程</div></div><div class="st live">正常</div><div class="bar"><span style="width:100%"></span></div></div>
+            </div>
+            <div class="cmd-note">🔦 Q版 Liam 正在巡視系統 · 點雷達可提醒落後店點（示意）</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== P3 AI 協作中心 ===== -->
+    <section id="p3" class="page">
+      <div class="collab">
+        <div class="crumb"><span>🛰️ 督導指揮室 › 🤖 AI 協作中心</span><button class="back" data-go="p2">回上層</button></div>
+        <h3>AI 小隊 · 四位成員</h3>
+        <div class="roles4">
+          <div class="rolec"><div class="hd"><div class="ava">🧭</div><div><b>Liam</b><div class="cap">AI 小隊隊長</div></div></div><p>統籌全局、最終決策，指派任務並拍板方向。</p></div>
+          <div class="rolec"><div class="hd"><div class="ava">📊</div><div><b>小葳</b><div class="cap">分析 · 判讀 · 營運協助</div></div></div><p>解讀數據與營運狀況，提供判斷與建議。</p></div>
+          <div class="rolec"><div class="hd"><div class="ava">📐</div><div><b>小恩</b><div class="cap">架構 · 文件 · 系統規劃</div></div></div><p>整理架構、撰寫規格文件、規劃系統藍圖。</p></div>
+          <div class="rolec"><div class="hd"><div class="ava">🛠️</div><div><b>小榮</b><div class="cap">Codex 工程開發與修正</div></div></div><p>依定案規格進行程式開發、修正與部署。</p></div>
+        </div>
+        <h3>交接與進度（唯讀顯示 · 建議串接 COLLAB-LOG）</h3>
+        <div class="log">
+          <div><span class="d">2026-07-23</span> 小恩：AI 平台架構整理 v2 視覺原型（佔位）</div>
+          <div><span class="d">2026-07-22</span> …（佔位，實際唯讀串接 docs/COLLAB-LOG.md）</div>
+          <div><span class="d">2026-07-21</span> …（佔位）</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== P4 Strategy Room ===== -->
+    <section id="p4" class="page">
+      <div class="lsr">
+        <div class="crumb"><span>🔒 Liam Strategy Room（僅 Liam）</span><button class="back" data-go="p0">回入口</button></div>
+        <h3>私人策略與總控空間</h3>
+        <div class="grid">
+          <div class="chip"><span class="ic">🎯</span>管理策略</div>
+          <div class="chip"><span class="ic">📌</span>未完成事項</div>
+          <div class="chip"><span class="ic">🤖</span>AI 工作規劃</div>
+          <div class="chip"><span class="ic">🛠️</span>開發進度</div>
+          <div class="chip"><span class="ic">💡</span>想法筆記</div>
+          <div class="chip"><span class="ic">🗂️</span>最終決策紀錄</div>
+        </div>
+        <div class="lock">🔒 第一版：版面 + 佔位，不接任何資料、不放個資或密碼</div>
+      </div>
+    </section>
+
+  </div>
 </div>
+
+<footer class="note">此為視覺／流程／架構驗收用原型 v2，非成品；Q版 Liam 為手繪 SVG 角色示意，功能入口僅示意、未真正串接既有 App。</footer>
+
 <script>
-  // 純前端頁面切換示意，不做任何資料存取
-  function go(id){
-    document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
-    document.getElementById(id).classList.add('active');
-    window.scrollTo(0,0);
+  /* ---------- Q版 Liam 角色（手繪 inline SVG）---------- */
+  function liamSVG(){
+    return `
+    <svg class="liam-svg" viewBox="0 0 220 260" role="img" aria-label="Q版 Liam 角色">
+      <defs>
+        <linearGradient id="uni" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#3a8794"/><stop offset="1" stop-color="#2b6a76"/>
+        </linearGradient>
+        <linearGradient id="cap" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#2c4066"/><stop offset="1" stop-color="#20304d"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="110" cy="248" rx="52" ry="9" fill="rgba(20,30,50,.14)"/>
+      <!-- legs -->
+      <rect x="90"  y="198" width="16" height="42" rx="8" fill="#2d5560"/>
+      <rect x="114" y="198" width="16" height="42" rx="8" fill="#2d5560"/>
+      <ellipse cx="98"  cy="242" rx="12" ry="7" fill="#25323f"/>
+      <ellipse cx="122" cy="242" rx="12" ry="7" fill="#25323f"/>
+      <!-- left arm (rest, always) -->
+      <g><rect x="66" y="158" width="17" height="46" rx="9" fill="url(#uni)"/><circle cx="74" cy="206" r="10" fill="#ffd9b8"/></g>
+      <!-- body -->
+      <path d="M74 206 Q70 152 110 150 Q150 152 146 206 Q110 216 74 206 Z" fill="url(#uni)"/>
+      <!-- scarf -->
+      <path d="M86 158 Q110 172 134 158 L130 148 Q110 160 90 148 Z" fill="#f0954a"/>
+      <!-- chest badge -->
+      <circle cx="110" cy="182" r="10" fill="#20304d"/>
+      <path d="M110 175 l2.2 4.5 5 .5 -3.7 3.3 1 4.9 -4.5-2.5 -4.5 2.5 1-4.9 -3.7-3.3 5-.5 Z" fill="#e6c15a"/>
+      <!-- right arm variants -->
+      <g class="arm-v a-rest"><rect x="137" y="158" width="17" height="46" rx="9" fill="url(#uni)"/><circle cx="146" cy="206" r="10" fill="#ffd9b8"/></g>
+      <g class="arm-v a-wave" transform="rotate(-42 146 160)"><rect x="138" y="120" width="17" height="52" rx="9" fill="url(#uni)"/><circle cx="146" cy="118" r="11" fill="#ffd9b8"/></g>
+      <g class="arm-v a-point" transform="rotate(-18 146 160)"><rect x="138" y="126" width="17" height="52" rx="9" fill="url(#uni)"/><circle cx="146" cy="124" r="10" fill="#ffd9b8"/><rect x="143" y="104" width="6" height="16" rx="3" fill="#ffd9b8"/></g>
+      <g class="arm-v a-thumb" transform="rotate(-8 146 160)"><rect x="138" y="150" width="17" height="40" rx="9" fill="url(#uni)"/><circle cx="147" cy="146" r="11" fill="#ffd9b8"/><rect x="144" y="128" width="6" height="14" rx="3" fill="#ffd9b8"/></g>
+      <!-- ears -->
+      <circle cx="62" cy="100" r="10" fill="#ffd9b8"/><circle cx="158" cy="100" r="10" fill="#ffd9b8"/>
+      <!-- head -->
+      <circle cx="110" cy="98" r="52" fill="#ffd9b8"/>
+      <!-- hair sides/back -->
+      <path d="M60 92 Q58 52 110 48 Q162 52 160 92 Q150 74 110 72 Q70 74 60 92 Z" fill="#2e2a33"/>
+      <!-- cap -->
+      <path d="M64 74 Q110 40 156 74 Q158 80 150 82 Q110 70 70 82 Q62 80 64 74 Z" fill="url(#cap)"/>
+      <path d="M60 82 Q110 70 160 82 L160 88 Q110 78 60 88 Z" fill="#1a2740"/>
+      <ellipse cx="110" cy="88" rx="16" ry="8" fill="#182338"/>
+      <!-- cap badge -->
+      <circle cx="110" cy="66" r="8" fill="#e6c15a"/>
+      <path d="M110 61 l1.6 3.3 3.6 .4 -2.7 2.4 .7 3.6 -3.2-1.8 -3.2 1.8 .7-3.6 -2.7-2.4 3.6-.4 Z" fill="#8a6a12"/>
+      <!-- headset -->
+      <path d="M64 100 Q60 116 78 122" fill="none" stroke="#20304d" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="80" cy="123" r="5" fill="#3a8794"/>
+      <!-- cheeks -->
+      <circle cx="84" cy="112" r="8" fill="#ff9d8a" opacity=".35"/>
+      <circle cx="136" cy="112" r="8" fill="#ff9d8a" opacity=".35"/>
+      <!-- eyes -->
+      <ellipse cx="92" cy="100" rx="6" ry="8" fill="#2e2a33"/><circle cx="94" cy="97" r="2" fill="#fff"/>
+      <ellipse cx="128" cy="100" rx="6" ry="8" fill="#2e2a33"/><circle cx="130" cy="97" r="2" fill="#fff"/>
+      <!-- mouth: normal -->
+      <g class="mood m-normal"><path d="M100 120 Q110 128 120 120" fill="none" stroke="#8a4a2a" stroke-width="3.4" stroke-linecap="round"/></g>
+      <!-- mouth: happy -->
+      <g class="mood m-happy"><path d="M98 118 Q110 134 122 118 Q110 126 98 118 Z" fill="#a23a2a"/><path d="M101 121 Q110 128 119 121" fill="#ffb3a0"/></g>
+      <!-- mouth + brows: worry -->
+      <g class="mood m-worry">
+        <path d="M100 124 Q110 118 120 124" fill="none" stroke="#8a4a2a" stroke-width="3.4" stroke-linecap="round"/>
+        <path d="M84 90 L98 94" stroke="#2e2a33" stroke-width="3" stroke-linecap="round"/>
+        <path d="M136 90 L122 94" stroke="#2e2a33" stroke-width="3" stroke-linecap="round"/>
+      </g>
+    </svg>`;
   }
+
+  var STATES = {
+    walk:    { mood:"normal", arm:"rest",  prop:"👣", text:"（巡邏中）我先在區內走一圈，有事叫我 🙂" },
+    morning: { mood:"happy",  arm:"wave",  prop:"☀️", text:"早安，團隊！今天的目標我幫你們盯著，有狀況我會提醒 👍" },
+    notice:  { mood:"normal", arm:"point", prop:"📣", text:"有新公告囉，記得撥空看一下～" },
+    error:   { mood:"worry",  arm:"point", prop:"⚠️", text:"系統偵測到異常，我先幫你標記起來了！" },
+    report:  { mood:"normal", arm:"point", prop:"📝", text:"還有門市沒回報，我提醒一下，別忘了喔！" },
+    done:    { mood:"happy",  arm:"thumb", prop:"☕", text:"全部完成，太棒了！今天請大家喝咖啡 ✅" },
+    patrol:  { mood:"normal", arm:"point", prop:"🔦", text:"巡視系統中…目前運作一切正常。" },
+    today:   { mood:"happy",  arm:"rest",  prop:"📋", text:"點我看今日提醒：目前有 3 件待辦事項。" }
+  };
+
+  function mountLiam(id, state){
+    var el = document.getElementById(id);
+    if(!el) return;
+    el.classList.add("liam");
+    el.innerHTML = liamSVG();
+    applyMood(el, state || "morning");
+  }
+  function applyMood(el, state){
+    var s = STATES[state] || STATES.morning;
+    el.setAttribute("data-mood", s.mood);
+    el.setAttribute("data-arm", s.arm);
+  }
+
+  function setHeroState(state){
+    var hero = document.getElementById("liamHero");
+    applyMood(hero, state);
+    var s = STATES[state] || STATES.morning;
+    document.getElementById("liamProp").textContent = s.prop;
+    document.getElementById("bubbleText").textContent = s.text;
+    document.querySelectorAll(".state-chip").forEach(function(c){
+      c.setAttribute("aria-pressed", c.dataset.state===state ? "true":"false");
+    });
+  }
+
+  /* time-based greeting */
+  function initGreeting(){
+    var h = new Date().getHours();
+    var t="早安，團隊", ic="☀️";
+    if(h>=11 && h<14){ t="午安，團隊"; ic="🌤️"; }
+    else if(h>=14 && h<18){ t="下午好，團隊"; ic="⛅"; }
+    else if(h>=18 || h<5){ t="晚安，團隊"; ic="🌙"; }
+    document.getElementById("greetText").textContent = t;
+    document.getElementById("greetIcon").textContent = ic;
+    var d = new Date(), wk=["日","一","二","三","四","五","六"][d.getDay()];
+    document.getElementById("greetDate").textContent =
+      d.getFullYear()+" / "+String(d.getMonth()+1).padStart(2,"0")+" / "+String(d.getDate()).padStart(2,"0")+"（"+wk+"）";
+  }
+
+  /* nav */
+  function go(id){
+    document.querySelectorAll(".page").forEach(function(p){ p.classList.toggle("active", p.id===id); });
+    document.querySelectorAll("nav.seg button").forEach(function(b){ b.setAttribute("aria-current", b.dataset.go===id ? "true":"false"); });
+    window.scrollTo({ top:0, behavior:"smooth" });
+  }
+  document.addEventListener("click", function(e){
+    var g = e.target.closest("[data-go]"); if(g){ go(g.dataset.go); return; }
+    var s = e.target.closest(".state-chip"); if(s){ setHeroState(s.dataset.state); }
+  });
+  document.addEventListener("keydown", function(e){
+    if((e.key==="Enter"||e.key===" ") && e.target.dataset && e.target.dataset.go){ e.preventDefault(); go(e.target.dataset.go); }
+  });
+
+  /* init */
+  mountLiam("liamHero","morning");
+  mountLiam("liamGate","walk");
+  mountLiam("liamCmd","patrol");
+  setHeroState("morning");
+  initGreeting();
 </script>
 </body>
 </html>
