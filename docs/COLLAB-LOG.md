@@ -13,6 +13,23 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-07-25 ｜ Claude（自動更新停擺 4 天：根因與補救管道）
+- 做了什麼：稽核發現 kpi.html 資料自 0721 起停更 4 天（0722~0725 日報都有上傳，但私有資料檔
+  modifiedTime 停在 7/21）。**根因：GAS 編輯器被貼成舊版程式碼**，kpiCalc* 函式消失 →
+  11:00 觸發器空轉、也不會寄失敗信（同仁登入仍正常，因為走已部署的舊網頁版本，與編輯器脫鉤）。
+  補救：(1) 本機解析 0725 產生 JSON、Liam 經「督導發佈區」上傳，資料補到 07/24（已驗證
+  檔案 83,395 bytes 與 modifiedTime 相符）；(2) `kpiCalcAccess` 讀取改為
+  `kpiCalcLatestDataFile()`——掃私有資料夾取 `north12b-kpicalc-*.json` 中**最後更新最新**者，
+  相容舊的 `-private-latest.json`，並讓外部工具（AI 經 Drive 連接器）可直接補
+  `north12b-kpicalc-<日期>.json` 當緊急管道。
+- 結果：語法檢查通過、挑檔邏輯單元驗證正確（正確排除 north12b-dashboard-* 與非 json）。
+  **需 Liam 貼最新 Code.gs＋部署新版本**才生效。
+- 經驗 / 給下一位的提醒：**時間觸發器跑「編輯器最新存檔」的碼，貼到舊版會無聲停掉自動化**——
+  貼 Code.gs 前務必確認是 repo 最新版（可用 grep testKpiCalcAutoUpdate 驗證）。
+  這次 4 天沒被發現是因為 `setupKpiCalcWatchdog()` 從未啟用，務必補跑。
+  環境限制：雲端 Claude 的 proxy 封鎖 script.google.com（實測 403 CONNECT），無法代跑 GAS；
+  但 **Drive 連接器可寫入私有資料夾**（已實測），故緊急補資料可繞過 GAS。
+
 ## 2026-07-22 ｜ Claude（追分策略頁改為「督導試算區」＋督導限定＋全區試算＋日目標）
 - 做了什麼：(1) kpi.html 第三頁籤改名「🎯 督導試算區」，**僅督導本人可見**——GAS
   `kpiCalcAccess` 回傳 `profile.isTrusted`（用 `DASHBOARD_TRUSTED_EMPLOYEE_ID` 判斷），
