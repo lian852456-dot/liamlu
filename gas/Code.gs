@@ -1236,11 +1236,26 @@ function kpiCalcAccess(payload) {
   }
   lookup.user.last_login_at = privateDashboardNow();
   privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
-  const files = privateDashboardFolder().getFilesByName(PRIVATE_KPICALC_FILE);
-  if (!files.hasNext()) throw new Error('KPI 試算資料尚未發佈，請通知督導');
-  const data = JSON.parse(files.next().getBlob().getDataAsString('UTF-8'));
+  const file = kpiCalcLatestDataFile();
+  if (!file) throw new Error('KPI 試算資料尚未發佈，請通知督導');
+  const data = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!data || !data.meta || !data.stores || !data.persons) throw new Error('KPI 試算資料格式不完整');
   return { data: data, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role, isTrusted: privateDashboardIsTrustedEmployee(employeeId) } };
+}
+
+// 取私有資料夾中最新的一份 KPI 試算資料。
+// 相容三種來源：自動更新/督導發佈寫的 north12b-kpicalc-private-latest.json，
+// 以及外部工具（例如 AI 助手經 Drive 直接補檔）建立的 north12b-kpicalc-<日期>.json。
+// 一律取「最後更新時間最新」者，避免舊檔覆蓋新資料。
+function kpiCalcLatestDataFile() {
+  const files = privateDashboardFolder().getFiles();
+  let best = null;
+  while (files.hasNext()) {
+    const f = files.next();
+    if (!/^north12b-kpicalc-.*\.json$/i.test(f.getName())) continue;
+    if (!best || f.getLastUpdated() > best.getLastUpdated()) best = f;
+  }
+  return best;
 }
 
 function kpiCalcPublish(payload) {
