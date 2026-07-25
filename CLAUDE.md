@@ -76,6 +76,58 @@ GAS 依標題列欄名寫入。前端新增欄位（如 `tw_pixel10`）後，若
 - `5cb0fba` 加了 localStorage 影子備份（`bei12b_shadow_*`），fetch 後會把本機 `tw_` 欄位
   合併進雲端資料——這是同裝置的備援，跨裝置仍靠 GAS
 
+## 🚨 踩過的坑（2026-07-25 自動化被無聲洗掉事件）※所有 AI 協作者必讀
+
+**症狀**：kpi.html 的同仁實績從 0721 起停更 **4 天**沒人發現。日報 0722~0725 都有上傳、
+同仁也照樣登入得到（看似正常），但數字全是舊的。
+
+**根因**：有人把 `gas/Code.gs` **從舊基準整檔貼進 GAS 編輯器**，把 `kpiCalc*` 系列函式
+洗掉了。因為：
+- **時間觸發器跑的是「編輯器最新存檔」的程式碼** → 函式不存在 = 每天空轉，
+  **而且不會寄失敗信**（連錯誤都沒有，所以完全無聲）
+- **同仁登入走的是「已部署的網頁版本」**，跟編輯器脫鉤 → 前台看起來完全正常，
+  掩蓋了後台已死的事實
+
+**這是第二次同類事故**：先前 index.html 的門市動物圖案也被「整檔從舊版覆蓋」洗掉兩次
+（見協作日誌 2026-07-17 / 2026-07-22）。**同一個坑，換一個檔案再犯一次。**
+
+### 鐵則：貼 `gas/Code.gs` 進 GAS 前，必須這樣做
+
+1. `git fetch origin && git checkout main && git pull` → **一定要用 repo main 最新版**，
+   不要用自己分支的舊基準、不要用手邊留的舊檔
+2. 貼上前**自我驗證關鍵函式都在**（少任何一個就是版本錯了，不要貼）：
+   ```bash
+   for f in kpiCalcAutoUpdate testKpiCalcAutoUpdate setupKpiCalcAutoUpdate \
+            kpiCalcWatchdog setupKpiCalcWatchdog kpiCalcSetupSelf \
+            kpiCalcAccess kpiCalcPublish kpiCalcLatestDataFile \
+            checkSegAndNotify checkAwareAndNotify sendWeeklyPatrolReport; do
+     printf "%-26s %s\n" "$f" "$(grep -c "function $f" gas/Code.gs)"
+   done   # 全部都要是 1
+   grep -c "action === 'ptread'\|action === 'hread'\|half_media_upload" gas/Code.gs  # 要 3
+   ```
+3. 貼完存檔後，**函式下拉選單要看得到 `testKpiCalcAutoUpdate`**（看不到＝貼到舊版）
+4. 改動涉及 `doGet`/`doPost` → 必須「部署 → 管理部署作業 → ✏️ → **新版本** → 部署」
+5. 若動到觸發器相關 → 重跑 `setupKpiCalcAutoUpdate()` 與 `setupKpiCalcWatchdog()`
+
+### 為什麼「沒人發現」：巡檢從未啟用
+
+`setupKpiCalcWatchdog()`（每天 12:30 巡檢，資料沒更新就寄信）**當時還沒被執行過**，
+所以少了唯一的守門員。**任何人動完 GAS，請確認這個巡檢是啟用狀態。**
+
+### 環境限制（決定誰能做什麼）
+
+| 動作 | 雲端 Claude | 本機 AI | Liam |
+|---|---|---|---|
+| 讀 Drive 日報、解析、產生資料 JSON | ✅ | ✅ | ✅ |
+| 改 repo 程式碼、git 推送 | ✅ | ✅ | ✅ |
+| **呼叫 GAS 端點** | ❌ proxy 封鎖 script.google.com（實測 403 CONNECT） | 視環境 | ✅ |
+| **GAS 編輯器貼碼／執行／部署** | ❌ 做不到 | ❌ 做不到 | ✅ 只有 Liam 能做 |
+| **寫入私有 Drive 資料夾** | ✅（已實測可建檔，但**無刪檔權限**） | 視環境 | ✅ |
+
+因此 `kpiCalcAccess` 已改為讀取私有資料夾中**最後更新最新**的
+`north12b-kpicalc-*.json`（相容舊的 `-private-latest.json`）。
+意義：**GAS 排程若失效，AI 可直接補 `north12b-kpicalc-<日期>.json` 救資料，不必等 Liam 進 GAS**。
+
 ## 自動檢查未回報 + Email 通知
 
 `gas/Code.gs` 有 `checkSegAndNotify()`：每天 16:30、22:00（台北時間）由時間觸發器自動比對
