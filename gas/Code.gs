@@ -1270,7 +1270,16 @@ function kpiCalcPublish(payload) {
   const blob = Utilities.newBlob(text, 'application/json', PRIVATE_KPICALC_FILE);
   if (files.hasNext()) files.next().setContent(blob.getDataAsString('UTF-8'));
   else folder.createFile(blob);
-  return { publishedAt: privateDashboardNow(), period: (data.meta && data.meta.period) || '' };
+  // 手動發佈也寄確認信，留下更新紀錄（與自動更新的 ✅ 信格式一致）
+  const meta = data.meta || {};
+  kpiCalcNotify('✅ KPI試算資料已更新（手動發佈｜' + (meta.sourceFile || '未標示來源') + '）',
+    '發佈方式：督導發佈區（手動上傳）\n' +
+    '來源：' + (meta.sourceFile || '-') + '\n' +
+    '期間：' + (meta.period || '-') + '（累計到第 ' + (meta.snapshotDay || '?') + ' 天）\n' +
+    '店點 ' + data.stores.length + ' 家、人員 ' + data.persons.length + ' 位。\n\n' +
+    '同仁重新登入 kpi.html 即可看到新累計數。\n' +
+    '※ 收到這封信代表資料已更新成功；若某天既沒有自動更新信也沒有這封，就是當天沒更新。');
+  return { publishedAt: privateDashboardNow(), period: meta.period || '' };
 }
 
 // ════════════════════════════════════
