@@ -1276,8 +1276,9 @@ function kpiCalcPublish(payload) {
     '發佈方式：督導發佈區（手動上傳）\n' +
     '來源：' + (meta.sourceFile || '-') + '\n' +
     '期間：' + (meta.period || '-') + '（累計到第 ' + (meta.snapshotDay || '?') + ' 天）\n' +
-    '店點 ' + data.stores.length + ' 家、人員 ' + data.persons.length + ' 位。\n\n' +
-    '同仁重新登入 kpi.html 即可看到新累計數。\n' +
+    '店點 ' + data.stores.length + ' 家、人員 ' + data.persons.length + ' 位。\n' +
+    kpiCalcBrief(data) +
+    '\n同仁重新登入 kpi.html 即可看到新累計數。\n' +
     '※ 收到這封信代表資料已更新成功；若某天既沒有自動更新信也沒有這封，就是當天沒更新。');
   return { publishedAt: privateDashboardNow(), period: meta.period || '' };
 }
@@ -1417,7 +1418,9 @@ function kpiCalcAutoUpdate() {
     props.setProperty('KPICALC_LAST_IMPORT', stamp);
     kpiCalcNotify('✅ KPI試算資料已更新（' + latest.file.getName() + '）',
       '來源：' + latest.file.getName() + '\n期間：' + data.meta.period +
-      '\n店點 ' + data.stores.length + ' 家、人員 ' + data.persons.length + ' 位。\n同仁重新登入 kpi.html 即可看到新累計數。');
+      '\n店點 ' + data.stores.length + ' 家、人員 ' + data.persons.length + ' 位。\n' +
+      kpiCalcBrief(data) +
+      '\n同仁重新登入 kpi.html 即可看到新累計數。');
     return { status: 'updated', file: latest.file.getName(), period: data.meta.period };
   } catch (err) {
     console.log('kpicalc auto update failed: ' + err);
@@ -1425,6 +1428,120 @@ function kpiCalcAutoUpdate() {
       '錯誤：' + (err && err.message ? err.message : String(err)) +
       '\n舊資料維持不變。可能是日報欄位排版變動，請把檔案交給 Claude 檢查。');
     return { status: 'error', message: String(err) };
+  }
+}
+
+// ── 業績重點提醒（附在更新通知信裡）──
+// 與 kpi.html「督導試算區」同一套算法：潛力分＝權重×落後幅度、激勵加分門檻、防退警示。
+// 與 Codex 的每日戰報互補（那份報現況，這份報「該追什麼」）。
+const KPICALC_FLOORS = {
+  '5G銷售數': 0.7, 'HBO Max&Disney+&Prime Video銷售數': 0.7, 'Netflix多享組銷售數': 0.7,
+  'TTL AQ上線點數': 0.6, 'AQ V+D 999 (含)以上': 0.7, '預付卡開卡面額': 0.7, 'RT上線點數': 0.7,
+  '特殊維繫用戶續約數': 0.7, '高高特維用戶續約數': 0.7,
+  'RT V+D 999 (含)以上': 0.7, 'RT V+D 1399 (含)以上': 0.7
+};
+const KPICALC_ANTI = ['自退數', '解約後NP OUT', '解約後NP OUT(督導績)'];
+
+function kpiCalcRound4(x) { return Math.round(x * 10000) / 10000; }
+
+function kpiCalcRate(key, a, t, f) {
+  if (!t) return null;
+  const x = kpiCalcRound4(a / t * f);
+  if (key === '自退數' || key === '解約後NP OUT(督導績)') return Math.max(0, Math.min(2.5, kpiCalcRound4(2 - x)));
+  if (key === '解約後NP OUT') {
+    const raw = kpiCalcRound4(2 - x);
+    return raw >= 1 ? Math.min(2.5, raw) : kpiCalcRound4(0.5 + 0.5 * Math.max(raw, 0));
+  }
+  return Math.min(2.5, x);
+}
+
+function kpiCalcPct(x) { return (x * 100).toFixed(2) + '%'; }
+
+function kpiCalcBrief(data) {
+  try {
+    const monthDays = data.meta.monthDays, snapDay = data.meta.snapshotDay;
+    const left = Math.max(1, monthDays - snapDay);   // 含今天的剩餘天數
+    const f = monthDays / snapDay;
+    const shortOf = {};
+    (data.items || []).forEach(function(it) { shortOf[it.key] = it.short; });
+
+    // 區平均與未達標店
+    let sum = 0, below = [];
+    data.stores.forEach(function(s) {
+      sum += (s.official || 0);
+      if ((s.official || 0) < 1) below.push(s.name + ' ' + kpiCalcPct(s.official || 0));
+    });
+    const avg = kpiCalcRound4(sum / data.stores.length);
+    const over = data.stores.length - below.length;
+
+    // 區彙總各項 → 潛力分
+    const rows = [];
+    (data.items || []).forEach(function(it) {
+      let T = 0, A = 0, w = 0, any = false;
+      data.stores.forEach(function(s) {
+        const d = s.items[it.key]; if (!d) return;
+        T += (d.t || 0); A += (d.a || 0); w = d.w; any = true;
+      });
+      if (!any || !w || T <= 0) return;
+      const anti = KPICALC_ANTI.indexOf(it.key) !== -1;
+      const r = kpiCalcRate(it.key, A, T, f);
+      rows.push({ short: shortOf[it.key] || it.key, w: w, r: r, anti: anti,
+                  pot: anti ? 0 : w * Math.max(0, 1 - r), need: Math.max(0, kpiCalcRound4(T - A)) });
+    });
+
+    const chase = rows.filter(function(r) { return !r.anti && r.pot > 0; })
+                      .sort(function(a, b) { return b.pot - a.pot; }).slice(0, 3);
+    const antiBad = rows.filter(function(r) { return r.anti && r.r < 1; });
+
+    // 激勵加分
+    const b = { aqA:0, aqT:0, dnHiN:0, dnHiD:0, upN:0, upD:0 };
+    data.stores.forEach(function(s) {
+      for (const k in b) b[k] += (s.bonus[k] || 0);
+    });
+    const bonusLines = [];
+    if (b.upD > 0) {
+      const up = b.upN / b.upD;
+      bonusLines.push(up >= 0.30
+        ? '・升轉率(<1399) ' + kpiCalcPct(up) + '｜✅ 已達標 +0.75%'
+        : '・升轉率(<1399) ' + kpiCalcPct(up) + '｜門檻30%｜還差約 ' +
+          Math.ceil((0.30 * b.upD - b.upN) / 0.70) + ' 件 ← 通常最划算');
+    }
+    if (b.dnHiD > 0) {
+      const dn = b.dnHiN / b.dnHiD;
+      bonusLines.push(dn <= 0.37
+        ? '・降轉率(≧1399) ' + kpiCalcPct(dn) + '｜✅ 已達標 +0.75%'
+        : '・降轉率(≧1399) ' + kpiCalcPct(dn) + '｜門檻≦37%｜需再 ' +
+          Math.ceil(b.dnHiN / 0.37 - b.dnHiD) + ' 件「≧1399上線且不降轉」');
+    }
+    if (b.aqT > 0) {
+      const aq = Math.min(2.5, kpiCalcRound4(b.aqA / b.aqT * f));
+      bonusLines.push(aq >= 1.3
+        ? '・AQ件數加分 ' + kpiCalcPct(aq) + '｜✅ 已達標 +1%'
+        : '・AQ件數加分 ' + kpiCalcPct(aq) + '｜門檻130%｜還需 ' +
+          Math.ceil(1.30 * b.aqT / f - b.aqA) + ' 件');
+    }
+
+    let out = '\n━━━━━━━━━━━━━━\n📊 業績重點提醒（月底剩 ' + left + ' 天）\n━━━━━━━━━━━━━━\n';
+    out += '區平均總達成率 ' + kpiCalcPct(avg) + '（' + over + '/' + data.stores.length + ' 店破百）\n';
+    out += below.length ? '\n🔴 未達100%：' + below.join('、') + '\n' : '\n🟢 全店破百\n';
+
+    if (chase.length) {
+      out += '\n🎯 最該追（潛力分＝權重×落後幅度）\n';
+      chase.forEach(function(r, i) {
+        out += (i + 1) + '. ' + r.short + ' ' + kpiCalcPct(r.r) + ' → 潛力 +' + kpiCalcPct(r.pot) +
+               '｜月底還需 ' + Math.round(r.need) + '（日均 ' + (r.need / left).toFixed(1) + '）\n';
+      });
+    }
+    if (bonusLines.length) out += '\n💰 激勵加分（共 +2.5% 空間，不吃權重）\n' + bonusLines.join('\n') + '\n';
+    if (antiBad.length) {
+      out += '\n⚠️ 防退未達標：' + antiBad.map(function(r) { return r.short + ' ' + kpiCalcPct(r.r); }).join('、') +
+             '\n（衝量時注意退件，退一件是雙重損失）\n';
+    }
+    out += '\n※ 完整分析與各店分配請開 kpi.html → 督導試算區\n';
+    return out;
+  } catch (e) {
+    console.log('kpiCalcBrief failed: ' + e);
+    return '\n（業績重點提醒產生失敗：' + e + '）\n';   // 不讓提醒失敗影響更新通知
   }
 }
 
