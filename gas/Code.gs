@@ -1457,6 +1457,34 @@ function kpiCalcRate(key, a, t, f) {
 
 function kpiCalcPct(x) { return (x * 100).toFixed(2) + '%'; }
 
+// 前一日各店總達成率快照（存指令碼屬性，用於算「昨日變化」）
+// 結構：{ cur:{snapDay, totals:{店名:率}}, prev:{snapDay, totals:{...}} }
+// 設計要點：同一天重複發佈時只更新 cur、不動 prev，避免把昨日基準洗掉而讓變化變成 0。
+const KPICALC_PREV_KEY = 'KPICALC_PREV_TOTALS';
+
+function kpiCalcReadSnapshots() {
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty(KPICALC_PREV_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    return (o && o.cur) ? o : null;
+  } catch (e) { return null; }
+}
+
+function kpiCalcSaveSnapshots(store, data) {
+  const totals = {};
+  data.stores.forEach(function(s) { totals[s.name] = s.official || 0; });
+  const incoming = { snapDay: data.meta.snapshotDay, totals: totals };
+  let next;
+  if (!store) next = { cur: incoming, prev: null };
+  else if (incoming.snapDay > store.cur.snapDay) next = { cur: incoming, prev: store.cur };
+  else if (incoming.snapDay === store.cur.snapDay) next = { cur: incoming, prev: store.prev || null };
+  else return;   // 補發舊檔：不動快照
+  try {
+    PropertiesService.getScriptProperties().setProperty(KPICALC_PREV_KEY, JSON.stringify(next));
+  } catch (e) { console.log('kpicalc snapshot save failed: ' + e); }
+}
+
 function kpiCalcBrief(data) {
   try {
     const monthDays = data.meta.monthDays, snapDay = data.meta.snapshotDay;
@@ -1537,7 +1565,48 @@ function kpiCalcBrief(data) {
       out += '\n⚠️ 防退未達標：' + antiBad.map(function(r) { return r.short + ' ' + kpiCalcPct(r.r); }).join('、') +
              '\n（衝量時注意退件，退一件是雙重損失）\n';
     }
+
+    // ── 昨日變化 + 各店一行摘要 ──
+    const snaps = kpiCalcReadSnapshots();
+    const base = snaps && snaps.prev ? snaps.prev :
+                 (snaps && snaps.cur && snaps.cur.snapDay < snapDay ? snaps.cur : null);
+    const storeLines = [];
+    const dropped = [];
+    data.stores.slice().sort(function(a, b) { return (a.official || 0) - (b.official || 0); })
+      .forEach(function(s) {
+        const off = s.official || 0;
+        const flag = off < 1 ? '🔴' : (off < 1.05 ? '🟡' : '🟢');
+        // 昨日變化
+        let dTxt = '';
+        if (base && base.totals && base.totals[s.name] !== undefined) {
+          const d = (off - base.totals[s.name]) * 100;
+          dTxt = (d >= 0 ? ' ▲' : ' ▼') + Math.abs(d).toFixed(2);
+          if (d <= -1.0) dropped.push(s.name + ' ' + d.toFixed(2));
+        }
+        // 該店潛力最高項
+        let best = null;
+        (data.items || []).forEach(function(it) {
+          const d = s.items[it.key];
+          if (!d || KPICALC_ANTI.indexOf(it.key) !== -1 || !d.w || (d.t || 0) <= 0) return;
+          const r = kpiCalcRate(it.key, d.a || 0, d.t || 0, f);
+          const pot = d.w * Math.max(0, 1 - r);
+          if (pot > 0 && (!best || pot > best.pot)) {
+            best = { pot: pot, short: shortOf[it.key] || it.key, r: r,
+                     need: Math.max(0, kpiCalcRound4((d.t || 0) - (d.a || 0))) };
+          }
+        });
+        const bTxt = best ? '｜追 ' + best.short + ' ' + Math.round(best.r * 100) + '%(缺' + Math.round(best.need) + ')' : '｜各項已達標';
+        storeLines.push(flag + ' ' + s.name + ' ' + kpiCalcPct(off) + dTxt + bTxt);
+      });
+
+    if (dropped.length) {
+      out += '\n📉 昨日掉分（≧1pp）：' + dropped.join('、') + '\n（單日大幅下滑通常代表前一日幾乎沒進單，連兩天要注意）\n';
+    }
+    out += '\n🏪 各店現況' + (base ? '（▲▼＝與資料第 ' + base.snapDay + ' 天相比）' : '（首次執行，尚無昨日基準）') + '\n' +
+           storeLines.join('\n') + '\n';
+
     out += '\n※ 完整分析與各店分配請開 kpi.html → 督導試算區\n';
+    kpiCalcSaveSnapshots(snaps, data);   // 產生完才更新快照
     return out;
   } catch (e) {
     console.log('kpiCalcBrief failed: ' + e);
