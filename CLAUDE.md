@@ -2,6 +2,13 @@
 
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）+ Google Sheets。
 
+另有 `home.html`（**Liam 智慧管理中心**，導覽首頁，2026-07-29 新增）：給門市同仁跳轉用的入口頁，
+四張卡片連到 `index.html` / `patrol.html` / `kpi.html` / `kpitry.html`。
+**純靜態導覽頁——不含任何資料、不做登入、不呼叫 GAS**，權限由各系統自己把關
+（Liam情報站需通行碼、KPI 試算需員編授權）。**不要因為「首頁方便」就把資料或密碼搬進來。**
+※ 目前是獨立網址 `home.html`，沒有動 `index.html`（每日回報系統仍是預設首頁），
+因為門市同仁的既有書籤都指向 index.html，換掉會讓他們每天多點一次。
+
 另有 `kpitry.html`（KPI 通用試算版，2026-07 新增）：給**非本區同仁**的公開試算工具，
 與 kpi.html **共用同一套計算引擎**但**完全不含個資**——無登入、無後端、無內建資料，
 店點/姓名/目標/實績全部使用者自行輸入，內建的只有計算架構（`ARCH` 陣列：24 項加權項目

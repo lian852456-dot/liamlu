@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Liam 智慧管理中心 · 北一二B</title>
+<!--
+  純導覽頁：只放四個系統的連結，不經手任何資料、不做登入。
+  各系統的權限各自獨立（Liam情報站需 GAS PT_KEY 通行碼、KPI 試算需員編授權），
+  不要因為這頁公開就把任何資料或密碼搬進來。
+-->
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --ink-soft: #55504a;
+    --ink-faint: #8b8478;
+    --paper: #f6f4ef;
+    --paper-raised: #ffffff;
+    --line: #e4dfd4;
+    --orange: #ff6900;
+    --orange-deep: #c24f00;
+    --cyan: #0891b2;
+    --cyan-deep: #0a6d86;
+    --shadow: 0 10px 26px -14px rgba(26,20,10,.35);
+  }
+  :root[data-theme="dark"] {
+    --ink: #f1ece2;
+    --ink-soft: #bcb4a6;
+    --ink-faint: #837b6e;
+    --paper: #16130e;
+    --paper-raised: #201c15;
+    --line: #35301f;
+    --orange: #ff8a3d;
+    --orange-deep: #ffb27a;
+    --cyan: #35c4e8;
+    --cyan-deep: #8fe0f5;
+    --shadow: 0 14px 30px -14px rgba(0,0,0,.6);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #f1ece2;
+      --ink-soft: #bcb4a6;
+      --ink-faint: #837b6e;
+      --paper: #16130e;
+      --paper-raised: #201c15;
+      --line: #35301f;
+      --orange: #ff8a3d;
+      --orange-deep: #ffb27a;
+      --cyan: #35c4e8;
+      --cyan-deep: #8fe0f5;
+      --shadow: 0 14px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Microsoft YaHei', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  .mono {
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, 'Roboto Mono', monospace;
+  }
+
+  .page {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 56px 24px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  .masthead { display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: .06em;
+    color: var(--orange-deep);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: 34px;
+    line-height: 1.25;
+    font-weight: 800;
+    margin: 0;
+    text-wrap: balance;
+    letter-spacing: -.01em;
+  }
+  .lede {
+    font-size: 15.5px;
+    line-height: 1.7;
+    color: var(--ink-soft);
+    max-width: 46ch;
+    margin: 0;
+  }
+  .today {
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin: 2px 0 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 620px) {
+    .board { grid-template-columns: 1fr; }
+    .page { padding: 40px 18px 32px; }
+    h1 { font-size: 28px; }
+  }
+
+  .card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 14px 17px 14px 17px;
+    padding: 24px 20px 20px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    outline-offset: 3px;
+  }
+  .card:hover, .card:focus-visible {
+    transform: translateY(-3px);
+    border-color: var(--card-accent);
+    box-shadow: var(--shadow);
+  }
+  .card:focus-visible { outline: 2px solid var(--card-accent); }
+
+  .stamp {
+    position: absolute;
+    top: -12px;
+    right: 20px;
+    width: 46px;
+    height: 46px;
+    background: var(--card-accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 21px;
+    font-weight: 700;
+    border-radius: 8px 13px 9px 14px;
+    box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--card-accent) 70%, transparent);
+    transform: rotate(-4deg);
+    transition: transform .18s ease;
+  }
+  .card:hover .stamp, .card:focus-visible .stamp {
+    transform: rotate(0deg) translateY(-1px);
+  }
+
+  .tag {
+    font-size: 11.5px;
+    letter-spacing: .03em;
+    color: var(--card-accent-deep);
+    font-weight: 600;
+  }
+  .card h2 {
+    font-size: 19px;
+    font-weight: 700;
+    margin: 0;
+    padding-right: 40px;
+  }
+  .card p {
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+  .go {
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: auto;   /* 同一列的卡片高度相同，靠這行讓「開啟」一律貼齊卡片底部 */
+    padding-top: 8px;
+    align-self: flex-end;
+    transition: color .18s ease;
+  }
+  .card:hover .go, .card:focus-visible .go { color: var(--card-accent-deep); }
+
+  .foot {
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .foot p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--ink-faint);
+  }
+  .foot .brand {
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card, .stamp, .go { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <header class="masthead">
+    <div class="eyebrow mono">工具導覽</div>
+    <h1>Liam 智慧管理中心</h1>
+    <p class="lede">四個各自獨立的系統，各自登入、各自的資料庫。點一項進去。</p>
+    <p class="today mono" id="today"></p>
+  </header>
+
+  <nav class="board" aria-label="系統選單">
+    <a class="card" href="index.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
+      <span class="stamp">報</span>
+      <div class="card-body">
+        <span class="tag mono">門市使用</span>
+        <h2>每日回報系統</h2>
+        <p>門市每日鍵入業績數字，自動彙整回報資料。</p>
+      </div>
+      <span class="go mono">開啟 →</span>
+    </a>
+
+    <a class="card" href="patrol.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
+      <span class="stamp">巡</span>
+      <div class="card-body">
+        <span class="tag mono">督導專用 · 需通行碼</span>
+        <h2>Liam情報站</h2>
+        <p>巡店紀錄、班表、半月檢查、檢核大盤，一次追蹤 33 項。</p>
+      </div>
+      <span class="go mono">開啟 →</span>
+    </a>
+
+    <a class="card" href="kpi.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
+      <span class="stamp">績</span>
+      <div class="card-body">
+        <span class="tag mono">員編登入</span>
+        <h2>KPI 試算</h2>
+        <p>鍵入今日上線數，試算個人與店點的 KPI 達成率。</p>
+      </div>
+      <span class="go mono">開啟 →</span>
+    </a>
+
+    <a class="card" href="kpitry.html" style="--card-accent:var(--cyan);--card-accent-deep:var(--cyan-deep)">
+      <span class="stamp">算</span>
+      <div class="card-body">
+        <span class="tag mono">免登入公開</span>
+        <h2>KPI 通用試算</h2>
+        <p>通用計算引擎，免登入，自行輸入店點與目標試算。</p>
+      </div>
+      <span class="go mono">開啟 →</span>
+    </a>
+  </nav>
+
+  <footer class="foot">
+    <p>各系統資料各自獨立存放，本頁僅提供連結、不經手任何資料。</p>
+    <p class="brand">台灣大哥大 · 北一二B</p>
+  </footer>
+</div>
+
+<script>
+  document.getElementById('today').textContent =
+    new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+</script>
+</body>
+</html>
