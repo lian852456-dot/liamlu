@@ -7,19 +7,20 @@
 店點/姓名/目標/實績全部使用者自行輸入，內建的只有計算架構（`ARCH` 陣列：24 項加權項目
 ＋標準權重＋公式＋上下限）。權重進階可改，localStorage 鍵 `bei12b_kpitry_v1`，可公開分享。
 
-另有 `patrol.html`（**督導管理系統**，2026-07-28 由「督導巡店追蹤系統」改名，因已含班表／半月檢查／檢查大盤，
-不只巡店）：貼上巡店明細表 → 33 項檢核看板。改名只動前端 `<title>`／`<h1>`，GAS 的 `PT_TITLE`
-（副標題，其他督導自行改自己的區名）刻意不動，避免為改名多貼一次 Code.gs。
+另有 `patrol.html`（**Liam情報站**，2026-07-28 由「督導巡店追蹤系統」改名為「督導管理系統」，
+2026-07-29 再改為現在的個人化名稱，因已含班表／半月檢查／檢查大盤，不只巡店）：
+貼上巡店明細表 → 33 項檢核看板。改名只動前端 `<title>`／`<h1>`，GAS 的 `PT_TITLE`
+（副標題，顯示「北一二B區 · 33 項檢核追蹤」）刻意不動，避免為改名多貼一次 Code.gs。
 與 index.html **共用同一個 GAS 部署**（巡店網址存 localStorage `bei12b_pt_gas_url`，
-相容回退舊的 `bei12b_gas_url`）。**可分享給其他督導**：每人自建試算表＋自己的
-GAS 部署（改 `SPREADSHEET_ID`/`PT_KEY`/`PT_TITLE`/`PT_STORES`/`NOTIFY_EMAIL`），
-在 patrol.html 貼自己的 GAS 網址即可；前端標題與門市清單由 ptread 回傳的
-`title`/`stores` 覆蓋，資料實體隔離互不可見。給其他督導的操作手冊：`patrol-guide.html`。
+相容回退舊的 `bei12b_gas_url`）。
+**2026-07-29 起確定不再分享給其他督導**（原本 `patrol-guide.html` 是為此設計的操作手冊，
+現已停止維護／過時，內容仍在但不代表目前狀態——不用再因為它而擔心「其他督導看到 Liam 的個人化名稱」這件事）。
 資料存「巡店明細」工作表，API 為 `?action=ptread`（fetch GET 讀全部）與
 `?action=ptwrite&payload=...`（JSONP 寫入，前端每 10 筆分批送避免網址過長；
 GAS 端以 fillTime+store+item 為唯一鍵去重，content 欄不上傳、由題號 ITEM_TEXT 還原）。
-巡店讀寫需通行碼：GAS 端 `PT_KEY`（repo 只放 `CHANGE_ME` 佔位字，實際密碼只改在
-GAS 編輯器裡，**不要 commit**），前端存 localStorage `bei12b_pt_key`，錯誤會重新詢問。
+**讀寫免通行碼**：`ptAuthorized()` 自 2026-07-23 起固定 `return true`，前端雖仍會跳出
+「請輸入通行碼」提示框、`PT_KEY` 也仍會送出，但後端不檢查內容——這是 Liam 明確要求維持的現況
+（2026-07-29 再次確認過，不要復原），純粹是圖方便，**不是真的有密碼保護**，不要誤以為有資安防線。
 
 另有 `kpi.html`（KPI 試算網站，2026-07 新增）：單檔前端，同仁 KEY 今日上線數即可
 試算各項目與「明日 KPI 總進度達成率」。計分公式由「KPIPI資料設定」模板＋0720 日報
