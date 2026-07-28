@@ -1623,14 +1623,31 @@ function kpiCalcParseReport(xlsxFile) {
   try {
     const ss = SpreadsheetApp.openById(converted.id);
     const storeSheet = ss.getSheetByName('上線數KPI_店點達成率_明細');
-    const personSheet = ss.getSheetByName('上線數KPI_個人達成率_明細');
-    if (!storeSheet || !personSheet) throw new Error('找不到「上線數KPI_店點/個人達成率_明細」工作表');
+    if (!storeSheet) throw new Error('找不到「上線數KPI_店點達成率_明細」工作表');
+
+    // 個人資料有兩個來源。優先用 _明細；2026-07-28 起日報有時不含這張表，
+    // 此時回退到 _個人達成率_店點（依門市分群的版面）。兩張表在 0727 逐項
+    // 3000 格完全一致，差別只在 _店點 沒有「職稱」與店代碼欄，需另外補。
+    let personSheet = ss.getSheetByName('上線數KPI_個人達成率_明細');
+    let personLayout = 'detail';
+    if (!personSheet) {
+      personSheet = ss.getSheetByName('上線數KPI_個人達成率_店點');
+      personLayout = 'byStore';
+    }
+    if (!personSheet) throw new Error('找不到個人達成率工作表（_明細 與 _店點 都不存在）');
+
     const sv = storeSheet.getRange(1, 1, Math.min(60, storeSheet.getLastRow()), 236).getValues();
-    const pv = personSheet.getRange(1, 1, Math.min(120, personSheet.getLastRow()), 236).getValues();
+    const pv = personSheet.getRange(1, 1,
+      Math.min(personLayout === 'detail' ? 120 : 160, personSheet.getLastRow()),
+      Math.min(236, personSheet.getLastColumn())).getValues();
 
     const meta = kpiCalcParseMeta(sv, xlsxFile.getName());
     const sBands = kpiCalcBands(sv[12], 8);   // 店點表：標題列 13、I 欄(9)起
-    const pBands = kpiCalcBands(pv[7], 10);   // 個人表：標題列 8、K 欄(11)起
+    // 個人表：_明細 標題列 8、K 欄(11)起且固定 4 欄一段；
+    // _店點 標題列 9／子標題列 10、D 欄(4)起，且合併儲存格會讓欄寬不固定，改逐段偵測
+    const pBands = personLayout === 'detail'
+      ? kpiCalcBands(pv[7], 10)
+      : kpiCalcBandsPairs(pv[8], pv[9], 2);
 
     const stores = [];
     for (let r = 14; r < sv.length; r++) {
@@ -1654,17 +1671,48 @@ function kpiCalcParseReport(xlsxFile) {
     }
 
     const persons = [];
-    for (let r = 9; r < pv.length; r++) {
-      const code = String(pv[r][2] || '').trim();
-      if (!/^DNB/i.test(code)) { if (persons.length) break; else continue; }
-      const items = {};
-      KPICALC_ITEMS.forEach(function(it) {
-        const c = pBands[it[0]];
-        if (c === undefined) throw new Error('個人表缺少欄位：' + it[0]);
-        items[it[0]] = { t: kpiCalcNum(pv[r][c + 1]), a: kpiCalcNum(pv[r][c]), w: kpiCalcPct(pv[r][c + 2]) };
-      });
-      persons.push({ store: code, role: String(pv[r][4] || ''), pname: String(pv[r][6] || ''),
-                     official: kpiCalcNum(pv[r][9]), items: items });
+    if (personLayout === 'detail') {
+      for (let r = 9; r < pv.length; r++) {
+        const code = String(pv[r][2] || '').trim();
+        if (!/^DNB/i.test(code)) { if (persons.length) break; else continue; }
+        const items = {};
+        KPICALC_ITEMS.forEach(function(it) {
+          const c = pBands[it[0]];
+          if (c === undefined) throw new Error('個人表缺少欄位：' + it[0]);
+          items[it[0]] = { t: kpiCalcNum(pv[r][c + 1]), a: kpiCalcNum(pv[r][c]), w: kpiCalcPct(pv[r][c + 2]) };
+        });
+        persons.push({ store: code, role: String(pv[r][4] || ''), pname: String(pv[r][6] || ''),
+                       official: kpiCalcNum(pv[r][9]), items: items });
+      }
+    } else {
+      // _店點 版面：每間門市一段，段首是「…／門市名」，段尾是「合計」列
+      const codeByName = {};
+      stores.forEach(function(s) { codeByName[s.name] = s.code; });
+      const roleMap = kpiCalcPrevRoles();   // 職稱沿用上一份已發佈資料
+      const noRole = [];
+      let curStore = null;
+      for (let r = 0; r < pv.length; r++) {
+        const c0 = String(pv[r][0] || '').trim();
+        const c1 = String(pv[r][1] || '').trim();
+        if (!c1 && c0.indexOf('/') >= 0) {
+          const seg = c0.split('/').pop().trim();
+          if (codeByName[seg]) { curStore = seg; }
+          continue;
+        }
+        if (!c0 || !c1 || c1 === '合計') continue;
+        const code = codeByName[curStore];
+        if (!code) throw new Error('個人表門市名對不到代碼：' + curStore);
+        const items = {};
+        KPICALC_ITEMS.forEach(function(it) {
+          const b = pBands[it[0]];
+          if (!b) throw new Error('個人表缺少欄位：' + it[0]);
+          items[it[0]] = { t: kpiCalcNum(pv[r][b.t]), a: kpiCalcNum(pv[r][b.a]), w: kpiCalcPct(pv[r][b.w]) };
+        });
+        const role = roleMap[code + '|' + c1] || '';
+        if (!role) noRole.push(curStore + '/' + c1);
+        persons.push({ store: code, role: role, pname: c1, official: kpiCalcNum(pv[r][2]), items: items });
+      }
+      if (noRole.length) console.log('kpicalc 查不到職稱（新進或改名）：' + noRole.join('、'));
     }
 
     if (stores.length < 5 || persons.length < 10) {
@@ -1688,6 +1736,43 @@ function kpiCalcBands(headerRow, startCol0) {
     if (name) bands[name] = c;
   }
   return bands;
+}
+
+// 名稱列＋子標題列（實際數／目標數／權重）成對偵測，容忍合併儲存格造成的欄寬不一
+function kpiCalcBandsPairs(nameRow, subRow, startCol0) {
+  const starts = [];
+  for (let c = startCol0; c < nameRow.length; c++) {
+    if (String(nameRow[c] || '').trim()) starts.push(c);
+  }
+  const bands = {};
+  for (let i = 0; i < starts.length; i++) {
+    const from = starts[i];
+    const to = (i + 1 < starts.length) ? starts[i + 1] : nameRow.length;
+    const name = String(nameRow[from]).replace(/\n/g, '').trim();
+    const b = {};
+    for (let c = from; c < to; c++) {
+      const s = String(subRow[c] || '').replace(/\n/g, '').trim();
+      if (s === '實際數') b.a = c;
+      else if (s === '目標數') b.t = c;
+      else if (s === '權重') b.w = c;
+    }
+    if (b.a !== undefined && b.t !== undefined && b.w !== undefined) bands[name] = b;
+  }
+  return bands;
+}
+
+// 讀最近一份已發佈的 KPI 資料，取出「店代碼|姓名 → 職稱」對照
+function kpiCalcPrevRoles() {
+  const map = {};
+  try {
+    const f = kpiCalcLatestDataFile();
+    if (!f) return map;
+    const j = JSON.parse(f.getBlob().getDataAsString('UTF-8'));
+    (j.persons || []).forEach(function(p) { map[p.store + '|' + p.pname] = p.role || ''; });
+  } catch (e) {
+    console.log('kpiCalcPrevRoles failed: ' + e);
+  }
+  return map;
 }
 
 function kpiCalcBandVal(bands, row, name) {

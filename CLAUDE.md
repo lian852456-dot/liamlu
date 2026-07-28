@@ -146,6 +146,16 @@ GAS 依標題列欄名寫入。前端新增欄位（如 `tw_pixel10`）後，若
 export URL + OAuth token 匯出→寄出→刪除），含「檢核總表」與「本月明細」。
 啟用：執行一次 `setupWeeklyReport()`（首次會多要 Drive/UrlFetch 授權）；試寄：`testWeeklyReport()`。
 
+## ⚠️ 日報格式會變（2026-07-28）
+
+0728.xlsx 少了 `上線數KPI_個人達成率_明細`（26 張表變 25 張），個人資料整個沒來源。
+`kpiCalcParseReport()` 已加回退：找不到該表就改用 `上線數KPI_個人達成率_店點`
+（依門市分群的版面，內容經 0727 交叉驗證逐項完全一致）。兩個要補的落差：
+店代碼靠店點表的「店名→代碼」對照，職稱靠 `kpiCalcPrevRoles()` 沿用上一份已發佈 JSON。
+※ `_店點` **不是固定 4 欄一段**（合併儲存格會讓 Netflix 那段佔 5 欄），
+所以用 `kpiCalcBandsPairs()` 逐段偵測「實際數／目標數／權重」，不要用 `c += 4`。
+解析失敗時第一步先印 `wb.sheetnames` 比對，不要預設是欄位錯位。
+
 ## 常用檢查清單（改動資料欄位時）
 
 1. `index.html`：表單 input（`f_` 前綴 id）+ `FIELDS` 陣列 + 彙整表格 cols
