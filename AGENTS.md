@@ -12,7 +12,9 @@
 - 修改資料欄位時，務必照 `CLAUDE.md` 的「常用檢查清單」走完五步。
 - GAS 相關改動（`gas/Code.gs`）本地無法測試（開發環境 proxy 封鎖 script.google.com），只能請 Liam 在瀏覽器開 `?action=debug` 等端點驗證。
 - 密碼（GAS `PT_KEY`）只存在 GAS 編輯器裡，repo 只放 `CHANGE_ME` 佔位字，**不要 commit 真實密碼**。
-  ※ 2026-07-23 起巡店已改為免密碼（`ptAuthorized()` 直接 `return true`），改 Code.gs 時不要把這行改回去。
+  ※ 巡店曾在 2026-07-23～07-29 間免密碼（`ptAuthorized()` 直接 `return true`），
+  但 **2026-07-29 起已改回真的檢查**（因為導覽首頁會給門市同仁用，Liam情報站的卡片會被看到，
+  必須真的擋人）。改 Code.gs 時**不要**再把 `ptAuthorized()` 改回 `return true`。
 
 ## 🚨 兩條鐵則（違反過兩次，都造成線上事故）
 

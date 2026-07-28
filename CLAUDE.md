@@ -18,9 +18,13 @@
 資料存「巡店明細」工作表，API 為 `?action=ptread`（fetch GET 讀全部）與
 `?action=ptwrite&payload=...`（JSONP 寫入，前端每 10 筆分批送避免網址過長；
 GAS 端以 fillTime+store+item 為唯一鍵去重，content 欄不上傳、由題號 ITEM_TEXT 還原）。
-**讀寫免通行碼**：`ptAuthorized()` 自 2026-07-23 起固定 `return true`，前端雖仍會跳出
-「請輸入通行碼」提示框、`PT_KEY` 也仍會送出，但後端不檢查內容——這是 Liam 明確要求維持的現況
-（2026-07-29 再次確認過，不要復原），純粹是圖方便，**不是真的有密碼保護**，不要誤以為有資安防線。
+**讀寫需通行碼（2026-07-29 恢復）**：`ptAuthorized()` 曾在 2026-07-23～07-29 之間固定
+`return true`（免密碼，圖方便），但 2026-07-29 起**改回真的檢查**
+（`return PT_KEY !== 'CHANGE_ME' && e.parameter.key === PT_KEY`）——因為導覽首頁
+（工具導覽／Liam 智慧管理中心）會給門市同仁用來跳轉到其他系統，Liam情報站的卡片也會被看到，
+所以巡店/半月檢查/班表這幾項必須真的擋人。**`PT_KEY` 的真實密碼只存在 GAS 編輯器裡，
+repo 永遠只放 `CHANGE_ME` 佔位字**——貼 Code.gs 進 GAS 後，記得把 `PT_KEY` 改成實際密碼再存檔部署，
+不然 `ptAuthorized()` 會擋下所有人（包含 Liam 自己）。
 
 另有 `kpi.html`（KPI 試算網站，2026-07 新增）：單檔前端，同仁 KEY 今日上線數即可
 試算各項目與「明日 KPI 總進度達成率」。計分公式由「KPIPI資料設定」模板＋0720 日報

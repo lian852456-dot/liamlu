@@ -215,9 +215,10 @@ const PT_STORES = [
 ];
 
 function ptAuthorized(e) {
-  // 巡店追蹤頁依管理者明確授權改為免密碼使用。
-  // 保留此函式供既有 ptread / ptwrite 呼叫，不再以 PT_KEY 阻擋讀寫。
-  return true;
+  // 2026-07-29 起恢復真的通行碼檢查（Liam情報站僅供本人使用）。
+  // PT_KEY 保持 'CHANGE_ME' 會讓所有巡店讀寫一律被拒絕——
+  // 貼進 GAS 編輯器後，務必把上面的 PT_KEY 改成你自己的密碼再存檔部署。
+  return PT_KEY !== 'CHANGE_ME' && e.parameter.key === PT_KEY;
 }
 
 const PATROL_SHEET = '巡店明細';
