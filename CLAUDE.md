@@ -7,7 +7,9 @@
 店點/姓名/目標/實績全部使用者自行輸入，內建的只有計算架構（`ARCH` 陣列：24 項加權項目
 ＋標準權重＋公式＋上下限）。權重進階可改，localStorage 鍵 `bei12b_kpitry_v1`，可公開分享。
 
-另有 `patrol.html`（督導巡店追蹤系統）：貼上巡店明細表 → 33 項檢核看板。
+另有 `patrol.html`（**督導管理系統**，2026-07-28 由「督導巡店追蹤系統」改名，因已含班表／半月檢查／檢查大盤，
+不只巡店）：貼上巡店明細表 → 33 項檢核看板。改名只動前端 `<title>`／`<h1>`，GAS 的 `PT_TITLE`
+（副標題，其他督導自行改自己的區名）刻意不動，避免為改名多貼一次 Code.gs。
 與 index.html **共用同一個 GAS 部署**（巡店網址存 localStorage `bei12b_pt_gas_url`，
 相容回退舊的 `bei12b_gas_url`）。**可分享給其他督導**：每人自建試算表＋自己的
 GAS 部署（改 `SPREADSHEET_ID`/`PT_KEY`/`PT_TITLE`/`PT_STORES`/`NOTIFY_EMAIL`），
