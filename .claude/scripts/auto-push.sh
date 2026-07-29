@@ -5,7 +5,8 @@ if [ -z "$TOKEN" ]; then
   echo "❌ 找不到 token，請先提供 PAT"
   exit 1
 fi
-REPO=/home/user/liamlu
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+REPO=$(cd "$SCRIPT_DIR/../.." && pwd)
 git -C "$REPO" remote set-url gh-direct "https://${TOKEN}@github.com/lian852456-dot/liamlu.git" 2>/dev/null || \
   git -C "$REPO" remote add gh-direct "https://${TOKEN}@github.com/lian852456-dot/liamlu.git"
 git -C "$REPO" push gh-direct main

@@ -26,12 +26,20 @@
 `?action=ptwrite&payload=...`（JSONP 寫入，前端每 10 筆分批送避免網址過長；
 GAS 端以 fillTime+store+item 為唯一鍵去重，content 欄不上傳、由題號 ITEM_TEXT 還原）。
 **讀寫需通行碼（2026-07-29 恢復）**：`ptAuthorized()` 曾在 2026-07-23～07-29 之間固定
-`return true`（免密碼，圖方便），但 2026-07-29 起**改回真的檢查**
+`return true`（免密碼，圖方便，Codex 當時的記錄有標註「未取得 Liam 明確指示前不得自行改回」——
+這次是 Liam 本人在 07-29 明確要求恢復，不是 AI 自行決定），2026-07-29 起**改回真的檢查**
 （`return PT_KEY !== 'CHANGE_ME' && e.parameter.key === PT_KEY`）——因為導覽首頁
 （工具導覽／Liam 智慧管理中心）會給門市同仁用來跳轉到其他系統，Liam情報站的卡片也會被看到，
 所以巡店/半月檢查/班表這幾項必須真的擋人。**`PT_KEY` 的真實密碼只存在 GAS 編輯器裡，
 repo 永遠只放 `CHANGE_ME` 佔位字**——貼 Code.gs 進 GAS 後，記得把 `PT_KEY` 改成實際密碼再存檔部署，
-不然 `ptAuthorized()` 會擋下所有人（包含 Liam 自己）。
+不然 `ptAuthorized()` 會擋下所有人（包含 Liam 自己）。媒體 POST 另外由
+`HalfMedia.gs` 的 `halfMediaAuthorized()` 驗證，用的也是同一組 `PT_KEY`。
+
+### 2026-07-15 Microsoft 365 路線（停用版）
+
+曾規劃以 Microsoft 365／MSAL、`scheduleApi`／`inspectionApi` 與公開班表產物提供班表及
+半月檢查。2026-07-21 已決定停用；目前正式基準是既有 GAS／Google Sheet／私有 Drive
+路線。相關歷史只可作追溯，不可當成現行部署說明。
 
 另有 `kpi.html`（KPI 試算網站，2026-07 新增）：單檔前端，同仁 KEY 今日上線數即可
 試算各項目與「明日 KPI 總進度達成率」。計分公式由「KPIPI資料設定」模板＋0720 日報
@@ -47,10 +55,14 @@ Codex 私有戰情同一套員編＋裝置綁定授權（GAS `kpicalc_access`）
 ## 跨 AI 協作
 
 本專案同時由 Claude 與 Codex 等多個 AI 助手協作維護：
+- 正式接手順序以 `../AI協作中心/00_WEBSITE_INDEX.md`、`AI_WORKFLOW.md` 與目標網站的
+  `PROJECT_HANDOFF.md` 為準，再讀本檔、`AGENTS.md`、`README.md` 與協作日誌。
 - `AGENTS.md`：給所有 AI 協作者的通用指示（Codex 會自動讀取）。
 - `docs/COLLAB-LOG.md`：共享工作日誌。**完成有意義的工作（新功能、修 bug、踩到新坑）後，
   在該檔最上方追加一則紀錄**，讓其他助手接手時有脈絡；長期性的坑同步記進本檔「踩過的坑」。
 - 開工前先看日誌最近幾則，避免重工或重踩已知的坑。
+- 不重寫、不整檔覆蓋、不擅自改資料流；資訊不足時標記待確認。
+- 展示版、占位資料、HTTP 200、本機測試、正式部署、正式資料驗證與使用者驗收必須分開記錄。
 
 ## 架構
 
@@ -74,7 +86,8 @@ GAS 依標題列欄名寫入。前端新增欄位（如 `tw_pixel10`）後，若
 試算表會把 `2026-06-27` 自動轉成 Date 物件，`String(dateObj)` 變成
 `Sat Jun 27 2026 ...`，跟查詢參數 `"2026-06-27"` 對不上 → 讀取永遠回空 `{}`。
 **對策**：用 `toDateStr()`（`Utilities.formatDate(v, 'Asia/Taipei', 'yyyy-MM-dd')`）統一轉換再比對。
-同理 `savedAt` 這類時間字串會被轉成 1899-12-30 基準的 Date，顯示時要注意。
+`savedAt` 是純時間序號，讀取時必須從同一資料範圍的 `getDisplayValues()` 取顯示時間；
+不可套用 `toDateStr()`，否則會被轉成 `1899-12-30` 基準日。
 
 ### 3. GAS「存檔」≠「部署」——最容易中招
 在 Apps Script 編輯器貼上新程式碼、Ctrl+S 存檔後，**線上跑的還是舊版**。

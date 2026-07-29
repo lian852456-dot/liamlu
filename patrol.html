@@ -502,7 +502,7 @@ let currentMonth = "";
 // 巡店專用網址鍵（優先），相容舊的共用鍵，最後才用預設（北一二B 的 GAS 部署）。
 // 其他督導在畫面上貼自己的 GAS 網址即可，只記在自己的裝置，資料互不相通。
 // GAS 網址本身不是密碼，也不包含巡店資料；保留部署端點以便既有資料自動恢復。
-// 真正的資料仍需 PT_KEY 驗證，PT_KEY 不寫入公開原始碼。
+// 一般資料端點目前依管理者決策免後端密碼；私有媒體 POST 仍需 PT_KEY。
 const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
 // 受保護班表／督導資料固定使用新版私有後端。如此即使瀏覽器保留了舊巡店網址，
 // 新頁籤仍不會誤連舊版而出現「unknown action」。
@@ -511,7 +511,7 @@ const PRIVATE_KEY_ENDPOINT_STORAGE = 'bei12b_pt_key_endpoint';
 let GAS_URL = localStorage.getItem('bei12b_pt_gas_url') ||
               localStorage.getItem('bei12b_gas_url') ||
               window.PATROL_LEGACY_GAS_URL || DEFAULT_PATROL_GAS_URL;
-// 巡店通行碼（GAS 端 PT_KEY 驗證），輸入一次後記在本裝置
+// 前端巡店解鎖碼；輸入一次後記在本裝置。一般資料端點目前不做後端密碼驗證。
 let PT_KEY = localStorage.getItem('bei12b_pt_key') || '';
 
 // 受保護服務換版時，舊裝置保存的碼不得直接送往新端點；強制重新驗證一次。

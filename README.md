@@ -56,20 +56,22 @@ node /Users/liamlu/Downloads/liam-agent/report-automation/work/publish_private_d
 
 ## patrol.html 受保護工作頁籤與個資邊界
 
-`patrol.html` 除原有巡店看板外，另有兩個需要 Microsoft 365 登入的私有頁籤：
+`patrol.html` 除原有巡店看板外，另有兩個使用既有 GAS／Google Sheet／私有 Drive
+資料流的工作頁籤；Microsoft 365／MSAL 路線已停用：
 
-- `每月班表`：從登入後的私人資料服務讀取 OneDrive `TWM 班表`，支援每日、每週、每月檢視與 Excel `.xls` 匯出。
-- `半月督導檢查`：督導可逐題填寫 33 項檢查、缺失與改善說明，選取照片／影片，並匯出完整紀錄與缺失改善追蹤 Excel。
+- `每月班表`：透過 GAS `sread` 讀取班表封存，支援每日、每週、每月檢視與 Excel `.xls` 匯出。
+- `半月督導檢查`：固定第 1–18 項，透過 `hread`／`hwrite` 保存檢查、缺失與改善；照片／影片由 `half_media_upload` 存入私有 Drive，Excel 保留私有附件連結。
 
-安全規則：GitHub Pages 只放介面程式，不放員工姓名、班表、檢查紀錄、照片／影片，也不接受 `data/schedule.json` 或 `data/schedule.js` 公開載入。正式環境須在部署設定注入 `PATROL_PRIVATE_CONFIG`，由私有服務驗證 Microsoft 365 access token，再從 OneDrive／SharePoint 讀寫資料；不要把 client secret、token 或密碼提交到 GitHub。
+GitHub Pages 只放介面程式，不提交員工姓名、班表、檢查紀錄或媒體原檔。必須特別注意：
+前端雖仍顯示通行碼解鎖，但目前 GAS `ptAuthorized()` 固定回傳 `true`，因此
+`ptread`／`ptwrite`／`sread`／`hread`／`hwrite` 並沒有後端通行碼防護；只有媒體 POST
+仍由 `HalfMedia.gs` 驗證 `PT_KEY`。這是現行權限邊界與已知風險，不代表所有頁籤都已
+完成正式安全驗收。未取得 Liam 明確授權前，不得自行改權限、資料欄位或既有串接。
 
-班表資料更新：
+## 文件與完成狀態
 
-```bash
-cd /Users/liamlu/Downloads/liam-agent/github-pages-liamlu
-python3 scripts/build_schedule_data.py
-```
-
-腳本輸出到被 `.gitignore` 保護的 `private-data/schedule.json`，不再輸出到 `data/` 或產生可被 GitHub Pages 直接讀取的 JavaScript。私有資料服務需自行驗證 token；未設定服務時，頁面只允許本機草稿，不會假裝已同步雲端。
-
-舊版巡店 GAS 網址可保留在頁面作為資料服務端點；網址本身不含資料或密碼，實際巡店資料仍由 GAS 的 `PT_KEY` 驗證。`PT_KEY` 與 `NOTIFY_EMAIL` 必須留在 Apps Script 設定，不要提交實際值。
+- 所有 AI 開工前先讀 `../AI協作中心/00_WEBSITE_INDEX.md`、`AI_WORKFLOW.md`、目標網站正式
+  `PROJECT_HANDOFF.md`，再讀本 repo 的 `AGENTS.md`、`CLAUDE.md` 與 `docs/COLLAB-LOG.md`。
+- 展示頁、占位資料、HTTP 200、本機測試、GitHub Pages／GAS 部署、正式資料驗證與
+  Liam／門市驗收是不同狀態，不得只因頁面可開啟就寫成「已完成」。
+- 不確定或疑似舊版的檔案先保留並標記，不直接刪除；有意義的工作完成後更新交接文件與協作日誌。

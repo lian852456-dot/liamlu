@@ -134,7 +134,7 @@ function doGet(e) {
     }
   }
 
-  // ── 巡店追蹤：讀取全部明細＋本區設定（patrol.html，需通行碼）──
+  // ── 巡店追蹤：讀取全部明細＋本區設定（patrol.html；現行資料端點免密碼）──
   if (action === 'ptread') {
     try {
       if (!ptAuthorized(e)) throw new Error('unauthorized');
@@ -163,7 +163,7 @@ function doGet(e) {
     }
   }
 
-  // ── 督導半月檢查：讀取（patrol.html，需通行碼）──
+  // ── 督導半月檢查：讀取（patrol.html；現行資料端點免密碼）──
   if (action === 'hread') {
     try {
       if (!ptAuthorized(e)) throw new Error('unauthorized');
@@ -173,7 +173,7 @@ function doGet(e) {
     }
   }
 
-  // ── 每月班表：讀取指定月份（patrol.html，需通行碼）──
+  // ── 每月班表：讀取指定月份（patrol.html；現行資料端點免密碼）──
   if (action === 'sread') {
     try {
       if (!ptAuthorized(e)) throw new Error('unauthorized');
@@ -193,9 +193,8 @@ function doGet(e) {
 //       inspector, item, result, reason, month, savedAt
 // 以 fillTime+store+item 為唯一鍵，重複上傳自動略過
 //
-// ⚠️ 通行碼：貼進 GAS 編輯器後，把下面 PT_KEY 的 'CHANGE_ME'
-// 改成你自己的密碼再存檔部署（repo 裡只放佔位字，密碼不會公開）。
-// 保持 'CHANGE_ME' 不改的話，巡店讀寫一律拒絕。
+// ⚠️ PT_KEY 只保留給 HalfMedia.gs 的私有媒體 POST 驗證，實值只存在 GAS、不進 git。
+// 2026-07-23 起一般資料端點依管理者決策免密碼；不要把 CHANGE_ME 當成現行資料讀寫防線。
 // ════════════════════════════════════
 const PT_KEY = 'CHANGE_ME';
 
@@ -368,7 +367,8 @@ function writeHalfCheck(rows) {
       String(r.store || ''), String(r.inspector || ''), String(itemText), halfResultToSheet(r.result),
       String(r.note || ''), String(r.improvement || ''), String(oldRow[9] || ''),
       String(r.result === 'abnormal' ? '待改善' : (oldRow[10] || '')),
-      String(r.evidenceNames || ''), String(oldRow[12] || now), now,
+      // 不允許晚到的空白表單同步覆蓋既有私有 Drive 附件連結。
+      String(r.evidenceNames || oldRow[11] || ''), String(oldRow[12] || now), now,
       String(oldRow[14] || ''), String(r.result ? '已完成' : '填寫中')
     ];
     if (existing[key]) {
@@ -869,7 +869,10 @@ function toDateStr(v) {
 
 function readData(date, seg) {
   const sh = getSheet();
-  const allData = sh.getDataRange().getValues();
+  const dataRange = sh.getDataRange();
+  const allData = dataRange.getValues();
+  // savedAt 是純時間序號；使用試算表顯示值，避免被格式化為 1899-12-30。
+  const displayData = dataRange.getDisplayValues();
   const headers = allData[0];
   const dateIdx  = headers.indexOf('date');
   const storeIdx = headers.indexOf('store');
@@ -883,7 +886,11 @@ function readData(date, seg) {
       const obj = {};
       headers.forEach((h, idx) => {
         const v = r[idx];
-        obj[h] = (v instanceof Date) ? toDateStr(v) : v;
+        if (h === 'savedAt') {
+          obj[h] = displayData[i][idx] || '';
+        } else {
+          obj[h] = (v instanceof Date) ? toDateStr(v) : v;
+        }
       });
       result[store] = obj;
     }

@@ -43,6 +43,22 @@ Liam 從 kpi.html 進階「督導發佈區」上傳（約 2 分鐘）。
 
 **另**：私有資料夾有一個 AI 建的測試檔 `zz-claude-write-test.txt` 可刪（AI 無刪檔權限）。
 
+## 2026-07-29 ｜ Codex（Git 與交接文件最終封版）
+
+- 做了什麼：以最新 `origin/main` 為正式程式基準，保留本機已驗證的
+  `savedAt` 顯示時間修正、半月檢查附件連結防覆蓋契約與跨 AI 文件規範；完成衝突逐檔
+  核對，未改 Google Sheet、資料欄位、Apps Script 串接或網站功能。跨站正式狀態同步至
+  `../AI協作中心/00_WEBSITE_INDEX.md` 與三站 `PROJECT_HANDOFF.md`（Claude 雲端環境讀不到
+  這兩份文件，只能靠這則日誌轉述結論）。
+- 結果：成功。Node 契約測試 4/4、Playwright 44/44、五個主要頁面煙霧測試 5/5；
+  `Code.gs` Node 語法檢查與 `.claude/scripts/auto-push.sh` Bash 語法檢查通過。
+  舊版店務檢查 QA 頁仍引用缺少的 `qa-assets/` 圖檔，已記錄但未刪除或補造。
+- 經驗 / 給下一位的提醒：正式接手先讀 `../AI協作中心/00_WEBSITE_INDEX.md`，
+  再讀目標站 `PROJECT_HANDOFF.md`。**這則之後 Claude 又在同一天（07-29）繼續動了
+  `gas/Code.gs`（恢復通行碼、日報解析回退）跟新增 `home.html`**，上面的「🔴 進行中／
+  待辦」已經是合併兩邊之後的最新狀態，不是本則提到的舊快照——正式部署、GAS 線上版本
+  與 Liam 驗收仍須各自取得證據。
+
 ## 2026-07-29｜Claude｜新增導覽首頁 home.html（Liam 智慧管理中心）
 
 - 做了什麼：新增 `home.html`，四張卡片連到既有四個系統，給**門市同仁**當跳轉入口。
