@@ -554,7 +554,7 @@ let cloudOn = false;    // 雲端連線狀態
 
 /* ---------- 受保護資料邊界（Google Apps Script + 私有 Sheet） ----------
  * GitHub Pages 只有介面；班表、巡店與督導資料均留在私有 Google Sheet。
- * 讀寫時必須通過既有巡店通行碼，通行碼只保存在使用者目前瀏覽器。
+ * 通行碼只送至正式 GAS 一次；驗證成功後改用本頁 sessionStorage 的短效 token。
  */
 let privateAccount = null;
 function setPrivateAuthStatus(text, ok){
