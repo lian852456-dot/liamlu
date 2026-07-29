@@ -171,6 +171,14 @@ GAS 依標題列欄名寫入。前端新增欄位（如 `tw_pixel10`）後，若
 export URL + OAuth token 匯出→寄出→刪除），含「檢核總表」與「本月明細」。
 啟用：執行一次 `setupWeeklyReport()`（首次會多要 Drive/UrlFetch 授權）；試寄：`testWeeklyReport()`。
 
+## ⚠️ 「Drive is not defined」＝忘了加 Drive API 進階服務（2026-07-29）
+
+`kpiCalcParseReport()` 用 `Drive.Files.create()` 把 xlsx 轉成暫存 Google 試算表，這需要
+GAS 編輯器左側「服務」手動加入「**Drive API**」進階服務——這一步**不在 `Code.gs` 檔案裡**，
+貼程式碼、存檔、部署都不會補上它，是每個 GAS 專案要單獨設定一次的東西。
+少了它，11:00 自動更新會寄「❌ 自動更新失敗：Drive is not defined」，**跟日報欄位格式無關**，
+不要看到失敗信就去查解析器。加入服務後不用重新部署（時間觸發器用的，不是 `doGet`/`doPost`）。
+
 ## ⚠️ 日報格式會變（2026-07-28）
 
 0728.xlsx 少了 `上線數KPI_個人達成率_明細`（26 張表變 25 張），個人資料整個沒來源。
