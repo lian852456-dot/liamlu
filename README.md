@@ -62,11 +62,12 @@ node /Users/liamlu/Downloads/liam-agent/report-automation/work/publish_private_d
 - `每月班表`：透過 GAS `sread` 讀取班表封存，支援每日、每週、每月檢視與 Excel `.xls` 匯出。
 - `半月督導檢查`：固定第 1–18 項，透過 `hread`／`hwrite` 保存檢查、缺失與改善；照片／影片由 `half_media_upload` 存入私有 Drive，Excel 保留私有附件連結。
 
-GitHub Pages 只放介面程式，不提交員工姓名、班表、檢查紀錄或媒體原檔。必須特別注意：
-前端雖仍顯示通行碼解鎖，但目前 GAS `ptAuthorized()` 固定回傳 `true`，因此
-`ptread`／`ptwrite`／`sread`／`hread`／`hwrite` 並沒有後端通行碼防護；只有媒體 POST
-仍由 `HalfMedia.gs` 驗證 `PT_KEY`。這是現行權限邊界與已知風險，不代表所有頁籤都已
-完成正式安全驗收。未取得 Liam 明確授權前，不得自行改權限、資料欄位或既有串接。
+GitHub Pages 只放介面程式，不提交員工姓名、班表、檢查紀錄或媒體原檔。**2026-07-29 起
+`ptAuthorized()` 已改回真的檢查**（`ptread`／`ptwrite`／`sread`／`hread`／`hwrite` 都要
+`PT_KEY` 才能通過），因為新增的導覽首頁 `home.html` 會給門市同仁用來跳轉，Liam情報站的
+卡片也會被看到，免密碼不再安全。媒體 POST 仍另外由 `HalfMedia.gs` 驗證同一組 `PT_KEY`。
+`PT_KEY` 真實密碼只存在 GAS 編輯器，repo 只放 `CHANGE_ME` 佔位字。未取得 Liam 明確授權前，
+不得自行改權限、資料欄位或既有串接。
 
 ## 文件與完成狀態
 
