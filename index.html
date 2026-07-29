@@ -1424,31 +1424,31 @@
   </div>
   <div class="store-grid">
     <div class="store-card" data-store="通化" onclick="selectStore('通化')">
-      <div class="store-icon">🛒</div>通化
+      <div class="store-icon">🐯</div>通化
     </div>
     <div class="store-card" data-store="酒泉" onclick="selectStore('酒泉')">
-      <div class="store-icon">🍶</div>酒泉
+      <div class="store-icon">🐻</div>酒泉
     </div>
     <div class="store-card" data-store="台北三創" onclick="selectStore('台北三創')">
-      <div class="store-icon">💡</div>三創
+      <div class="store-icon">🦅</div>三創
     </div>
     <div class="store-card" data-store="萬大" onclick="selectStore('萬大')">
-      <div class="store-icon">🌟</div>萬大
+      <div class="store-icon">🐘</div>萬大
     </div>
     <div class="store-card" data-store="六張犁" onclick="selectStore('六張犁')">
-      <div class="store-icon">🌿</div>六張犁
+      <div class="store-icon">🦌</div>六張犁
     </div>
     <div class="store-card" data-store="復興南" onclick="selectStore('復興南')">
-      <div class="store-icon">⚡</div>復興南
+      <div class="store-icon">🐺</div>復興南
     </div>
     <div class="store-card" data-store="永吉" onclick="selectStore('永吉')">
-      <div class="store-icon">🔥</div>永吉
+      <div class="store-icon">🐲</div>永吉
     </div>
     <div class="store-card" data-store="大稻埕" onclick="selectStore('大稻埕')">
-      <div class="store-icon">🎪</div>大稻埕
+      <div class="store-icon">🦁</div>大稻埕
     </div>
     <div class="store-card new-badge" data-store="杭州南" onclick="selectStore('杭州南')">
-      <div class="store-icon">🚀</div>杭州南
+      <div class="store-icon">🐎</div>杭州南
     </div>
   </div>
 
@@ -3680,8 +3680,8 @@ function selectStore(store) {
   document.getElementById('fillFormArea').style.display = 'block';
 
   const sub = document.getElementById('fillHeroSub');
-  const icons = {'通化':'🛒','酒泉':'🍶','台北三創':'💡','萬大':'🌟','六張犁':'🌿',
-                 '復興南':'⚡','永吉':'🔥','大稻埕':'🎪','杭州南':'🚀'};
+  const icons = {'通化':'🐯','酒泉':'🐻','台北三創':'🦅','萬大':'🐘','六張犁':'🦌',
+                 '復興南':'🐺','永吉':'🐲','大稻埕':'🦁','杭州南':'🐎'};
   sub.textContent = `${icons[store]||'🏪'} ${store} · 目前選擇 ${currentSeg}:00 時段`;
 
   const date = document.getElementById('fillDate').value;

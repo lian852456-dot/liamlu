@@ -12,6 +12,8 @@
 - `🏅 台獎戰情`：督導獎金置頂呈現；每店顯示店長／督導預估、前三項優先補量與完整 10 機款下一獎階。補量規則先救差 1～3 台的店長 50% 門檻，其餘依可增加獎金除以所需台數排序。
 
 兩個戰情頁籤都受保護：首次以「員編＋啟用碼」提出裝置綁定，必須由管理者核准；核准後，該員編只可在該一台手機或電腦輸入員編登入。重新核准新裝置時，舊裝置會立即失效。登入後可查看所有店點與個人 KPI／獎金資料，但所有姓名一律維持遮罩。
+- `📈 區間彙整`：讀取 OneDrive 每日報表的 `上線數KPI_每日上線`，呈現 AQ／A999／好速／RT／R1399 等日動能趨勢、掛蛋與下滑提醒。
+- `🏅 台獎提醒`：讀取最新 10 台機款的店點實際、目標、達成率與缺口。
 
 ## 分析資料更新
 
@@ -54,9 +56,22 @@ node /Users/liamlu/Downloads/liam-agent/report-automation/work/publish_private_d
 
 ## patrol.html 受保護工作頁籤與個資邊界
 
-`patrol.html` 除原有巡店看板外，另有兩個沿用既有 `PT_KEY` 通行碼的受保護頁籤（2026-07-21 合併決策：不採用 Microsoft 365／MSAL，避免新增另一套帳號與權限系統）：
+`patrol.html` 除原有巡店看板外，另有兩個使用既有 GAS／Google Sheet／私有 Drive
+資料流的工作頁籤；Microsoft 365／MSAL 路線已停用：
 
-- `每月班表`：解鎖後透過 GAS `sread` 讀取私有 Google Sheet 的班表封存，支援每日、每週、每月檢視與 Excel `.xls` 匯出（含店長／副店／休假顏色圖例）。
-- `半月督導檢查`：督導可逐題填寫第 1–18 項檢查（原 33 項若仍需要，應另立「每月巡檢」清單，不與此混用）、缺失與改善說明，照片／影片可直接上傳私有 Google Drive 並在歷史紀錄回放，匯出 Excel 含「照片影片附件」頁籤與私有連結。
+- `每月班表`：透過 GAS `sread` 讀取班表封存，支援每日、每週、每月檢視與 Excel `.xls` 匯出。
+- `半月督導檢查`：固定第 1–18 項，透過 `hread`／`hwrite` 保存檢查、缺失與改善；照片／影片由 `half_media_upload` 存入私有 Drive，Excel 保留私有附件連結。
 
-安全規則：GitHub Pages 只放介面程式，不放員工姓名、班表、檢查紀錄、照片／影片。班表與半月檢查資料都留在私有 Google Sheet／Drive，讀寫一律透過既有 GAS 部署並以 `PT_KEY` 通行碼驗證；`PT_KEY` 與 `NOTIFY_EMAIL` 必須留在 Apps Script 指令碼屬性，不要提交實際值到 repo。
+GitHub Pages 只放介面程式，不提交員工姓名、班表、檢查紀錄或媒體原檔。必須特別注意：
+前端雖仍顯示通行碼解鎖，但目前 GAS `ptAuthorized()` 固定回傳 `true`，因此
+`ptread`／`ptwrite`／`sread`／`hread`／`hwrite` 並沒有後端通行碼防護；只有媒體 POST
+仍由 `HalfMedia.gs` 驗證 `PT_KEY`。這是現行權限邊界與已知風險，不代表所有頁籤都已
+完成正式安全驗收。未取得 Liam 明確授權前，不得自行改權限、資料欄位或既有串接。
+
+## 文件與完成狀態
+
+- 所有 AI 開工前先讀 `../AI協作中心/00_WEBSITE_INDEX.md`、`AI_WORKFLOW.md`、目標網站正式
+  `PROJECT_HANDOFF.md`，再讀本 repo 的 `AGENTS.md`、`CLAUDE.md` 與 `docs/COLLAB-LOG.md`。
+- 展示頁、占位資料、HTTP 200、本機測試、GitHub Pages／GAS 部署、正式資料驗證與
+  Liam／門市驗收是不同狀態，不得只因頁面可開啟就寫成「已完成」。
+- 不確定或疑似舊版的檔案先保留並標記，不直接刪除；有意義的工作完成後更新交接文件與協作日誌。

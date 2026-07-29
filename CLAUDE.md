@@ -16,16 +16,17 @@ GAS 部署（改 `SPREADSHEET_ID`/`PT_KEY`/`PT_TITLE`/`PT_STORES`/`NOTIFY_EMAIL`
 資料存「巡店明細」工作表，API 為 `?action=ptread`（fetch GET 讀全部）與
 `?action=ptwrite&payload=...`（JSONP 寫入，前端每 10 筆分批送避免網址過長；
 GAS 端以 fillTime+store+item 為唯一鍵去重，content 欄不上傳、由題號 ITEM_TEXT 還原）。
-巡店讀寫需通行碼：GAS 端 `PT_KEY`（repo 只放 `CHANGE_ME` 佔位字，實際密碼只改在
-GAS 編輯器裡，**不要 commit**），前端存 localStorage `bei12b_pt_key`，錯誤會重新詢問。
+巡店前端仍會要求輸入通行碼並保存於 localStorage `bei12b_pt_key`；但 2026-07-23 起
+GAS `ptAuthorized()` 依管理者決策固定回傳 `true`，所以 `ptread`／`ptwrite`／`sread`／
+`hread`／`hwrite` 的後端實際上不再以 `PT_KEY` 阻擋。媒體 POST 仍由
+`HalfMedia.gs` 的 `halfMediaAuthorized()` 驗證 `PT_KEY`。這是目前正式程式現況與已知
+權限風險；未取得 Liam 明確指示前，不得自行改回或擴大調整。
 
-### 2026-07-15 班表與半月督導檢查頁籤（規劃階段，未採用）
+### 2026-07-15 Microsoft 365 路線（停用版）
 
-當時曾規劃 `patrol.html` 用 Microsoft 365（MSAL）登入 + 外部 `scheduleApi`/`inspectionApi` 私有服務、
-33 題半月檢查、`scripts/build_schedule_data.py` 產生 `data/schedule.js`/`data/schedule.json` 這條路線。
-**2026-07-21 合併決策：不採用**，避免新增 MSAL 這套獨立帳號與權限系統；正式路線改用下方雲端既有
-GAS + `PT_KEY` 的 `sread`/`hread`/`hwrite` 架構、私有 Drive 上傳與 18 題半月檢查（原 33 題若仍需要，
-應另立「每月巡檢」清單，不與半月檢查混用）。此段保留作為歷史記錄，程式碼不含 MSAL 實作。
+曾規劃以 Microsoft 365／MSAL、`scheduleApi`／`inspectionApi` 與公開班表產物提供班表及
+半月檢查。2026-07-21 已決定停用；目前正式基準是既有 GAS／Google Sheet／私有 Drive
+路線。相關歷史只可作追溯，不可當成現行部署說明。
 
 另有 `kpi.html`（KPI 試算網站，2026-07 新增）：單檔前端，同仁 KEY 今日上線數即可
 試算各項目與「明日 KPI 總進度達成率」。計分公式由「KPIPI資料設定」模板＋0720 日報
@@ -41,10 +42,14 @@ Codex 私有戰情同一套員編＋裝置綁定授權（GAS `kpicalc_access`）
 ## 跨 AI 協作
 
 本專案同時由 Claude 與 Codex 等多個 AI 助手協作維護：
+- 正式接手順序以 `../AI協作中心/00_WEBSITE_INDEX.md`、`AI_WORKFLOW.md` 與目標網站的
+  `PROJECT_HANDOFF.md` 為準，再讀本檔、`AGENTS.md`、`README.md` 與協作日誌。
 - `AGENTS.md`：給所有 AI 協作者的通用指示（Codex 會自動讀取）。
 - `docs/COLLAB-LOG.md`：共享工作日誌。**完成有意義的工作（新功能、修 bug、踩到新坑）後，
   在該檔最上方追加一則紀錄**，讓其他助手接手時有脈絡；長期性的坑同步記進本檔「踩過的坑」。
 - 開工前先看日誌最近幾則，避免重工或重踩已知的坑。
+- 不重寫、不整檔覆蓋、不擅自改資料流；資訊不足時標記待確認。
+- 展示版、占位資料、HTTP 200、本機測試、正式部署、正式資料驗證與使用者驗收必須分開記錄。
 
 ## 架構
 
@@ -68,7 +73,8 @@ GAS 依標題列欄名寫入。前端新增欄位（如 `tw_pixel10`）後，若
 試算表會把 `2026-06-27` 自動轉成 Date 物件，`String(dateObj)` 變成
 `Sat Jun 27 2026 ...`，跟查詢參數 `"2026-06-27"` 對不上 → 讀取永遠回空 `{}`。
 **對策**：用 `toDateStr()`（`Utilities.formatDate(v, 'Asia/Taipei', 'yyyy-MM-dd')`）統一轉換再比對。
-同理 `savedAt` 這類時間字串會被轉成 1899-12-30 基準的 Date，顯示時要注意。
+`savedAt` 是純時間序號，讀取時必須從同一資料範圍的 `getDisplayValues()` 取顯示時間；
+不可套用 `toDateStr()`，否則會被轉成 `1899-12-30` 基準日。
 
 ### 3. GAS「存檔」≠「部署」——最容易中招
 在 Apps Script 編輯器貼上新程式碼、Ctrl+S 存檔後，**線上跑的還是舊版**。
@@ -83,6 +89,58 @@ GAS 依標題列欄名寫入。前端新增欄位（如 `tw_pixel10`）後，若
 - 前端寫入用 JSONP（script tag + callback），因為 GAS 的 CORS 限制
 - `5cb0fba` 加了 localStorage 影子備份（`bei12b_shadow_*`），fetch 後會把本機 `tw_` 欄位
   合併進雲端資料——這是同裝置的備援，跨裝置仍靠 GAS
+
+## 🚨 踩過的坑（2026-07-25 自動化被無聲洗掉事件）※所有 AI 協作者必讀
+
+**症狀**：kpi.html 的同仁實績從 0721 起停更 **4 天**沒人發現。日報 0722~0725 都有上傳、
+同仁也照樣登入得到（看似正常），但數字全是舊的。
+
+**根因**：有人把 `gas/Code.gs` **從舊基準整檔貼進 GAS 編輯器**，把 `kpiCalc*` 系列函式
+洗掉了。因為：
+- **時間觸發器跑的是「編輯器最新存檔」的程式碼** → 函式不存在 = 每天空轉，
+  **而且不會寄失敗信**（連錯誤都沒有，所以完全無聲）
+- **同仁登入走的是「已部署的網頁版本」**，跟編輯器脫鉤 → 前台看起來完全正常，
+  掩蓋了後台已死的事實
+
+**這是第二次同類事故**：先前 index.html 的門市動物圖案也被「整檔從舊版覆蓋」洗掉兩次
+（見協作日誌 2026-07-17 / 2026-07-22）。**同一個坑，換一個檔案再犯一次。**
+
+### 鐵則：貼 `gas/Code.gs` 進 GAS 前，必須這樣做
+
+1. `git fetch origin && git checkout main && git pull` → **一定要用 repo main 最新版**，
+   不要用自己分支的舊基準、不要用手邊留的舊檔
+2. 貼上前**自我驗證關鍵函式都在**（少任何一個就是版本錯了，不要貼）：
+   ```bash
+   for f in kpiCalcAutoUpdate testKpiCalcAutoUpdate setupKpiCalcAutoUpdate \
+            kpiCalcWatchdog setupKpiCalcWatchdog kpiCalcSetupSelf \
+            kpiCalcAccess kpiCalcPublish kpiCalcLatestDataFile \
+            checkSegAndNotify checkAwareAndNotify sendWeeklyPatrolReport; do
+     printf "%-26s %s\n" "$f" "$(grep -c "function $f" gas/Code.gs)"
+   done   # 全部都要是 1
+   grep -c "action === 'ptread'\|action === 'hread'\|half_media_upload" gas/Code.gs  # 要 3
+   ```
+3. 貼完存檔後，**函式下拉選單要看得到 `testKpiCalcAutoUpdate`**（看不到＝貼到舊版）
+4. 改動涉及 `doGet`/`doPost` → 必須「部署 → 管理部署作業 → ✏️ → **新版本** → 部署」
+5. 若動到觸發器相關 → 重跑 `setupKpiCalcAutoUpdate()` 與 `setupKpiCalcWatchdog()`
+
+### 為什麼「沒人發現」：巡檢從未啟用
+
+`setupKpiCalcWatchdog()`（每天 12:30 巡檢，資料沒更新就寄信）**當時還沒被執行過**，
+所以少了唯一的守門員。**任何人動完 GAS，請確認這個巡檢是啟用狀態。**
+
+### 環境限制（決定誰能做什麼）
+
+| 動作 | 雲端 Claude | 本機 AI | Liam |
+|---|---|---|---|
+| 讀 Drive 日報、解析、產生資料 JSON | ✅ | ✅ | ✅ |
+| 改 repo 程式碼、git 推送 | ✅ | ✅ | ✅ |
+| **呼叫 GAS 端點** | ❌ proxy 封鎖 script.google.com（實測 403 CONNECT） | 視環境 | ✅ |
+| **GAS 編輯器貼碼／執行／部署** | ❌ 做不到 | ❌ 做不到 | ✅ 只有 Liam 能做 |
+| **寫入私有 Drive 資料夾** | ✅（已實測可建檔，但**無刪檔權限**） | 視環境 | ✅ |
+
+因此 `kpiCalcAccess` 已改為讀取私有資料夾中**最後更新最新**的
+`north12b-kpicalc-*.json`（相容舊的 `-private-latest.json`）。
+意義：**GAS 排程若失效，AI 可直接補 `north12b-kpicalc-<日期>.json` 救資料，不必等 Liam 進 GAS**。
 
 ## 自動檢查未回報 + Email 通知
 

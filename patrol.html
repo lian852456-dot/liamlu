@@ -296,11 +296,26 @@
   .half-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
   .half-history{overflow:auto}
   .half-history table{min-width:900px}
+  .half-dashboard-list{display:grid;gap:10px}
+  .half-dashboard-store{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}
+  .half-dashboard-store-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:10px}
+  .half-dashboard-store-head strong{font-size:15px}
+  .half-dashboard-store-head span{font-size:12px;color:var(--muted)}
+  .half-dashboard-states{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  .half-dashboard-state{border:1px solid var(--line);border-radius:8px;padding:9px;background:#fafafa}
+  .half-dashboard-state .label{display:block;color:var(--muted);font-size:11px;font-weight:800;margin-bottom:4px}
+  .half-dashboard-state strong{font-size:14px}
+  .half-dashboard-state small{display:block;font-size:11px;color:var(--muted);margin-top:4px}
+  .half-dashboard-state.done{border-color:#bfe6d0;background:#f1fff7}.half-dashboard-state.done strong{color:var(--ok)}
+  .half-dashboard-state.issue{border-color:#f4d08a;background:#fffaf0}.half-dashboard-state.issue strong{color:#b87900}
+  .half-dashboard-state.miss{border-color:#efc4c4;background:#fff8f8}.half-dashboard-state.miss strong{color:var(--miss)}
+  .half-dashboard-rule{margin:2px 0 13px;font-size:12px;color:var(--muted)}
   .status-ok{color:var(--ok);font-weight:800}.status-issue{color:var(--miss);font-weight:800}.status-na{color:#999;font-weight:800}
   @media(max-width:650px){
     .secure-tab{flex:1;min-width:0;padding:8px 7px;font-size:11.5px}
     .half-item{grid-template-columns:1fr}
     .half-item select{width:100%}
+    .half-dashboard-states{grid-template-columns:1fr}
   }
 </style>
 </head>
@@ -313,6 +328,7 @@
       <button class="secure-tab active" data-view="patrol" onclick="switchPatrolView('patrol')">📋 巡店看板</button>
       <button class="secure-tab locked" data-view="schedule" onclick="switchPatrolView('schedule')">每月班表</button>
       <button class="secure-tab locked" data-view="half" onclick="switchPatrolView('half')">半月督導檢查</button>
+      <button class="secure-tab locked" data-view="halfDashboard" onclick="switchPatrolView('halfDashboard')">📊 督導檢查大盤</button>
     </nav>
     <div class="private-auth-bar" aria-label="受保護資料解鎖">
       <span id="privateAuthStatus" class="auth-status">班表與督導檢查：尚未解鎖；資料不放在公開 GitHub</span>
@@ -395,6 +411,21 @@
     </div>
   </section>
 
+  <section id="halfDashboardView" class="secure-view" aria-label="督導檢查大盤">
+    <div class="secure-card">
+      <h2>督導巡店檢查大盤</h2>
+      <p class="hint">資料直接採用「貼上巡店紀錄」及其雲端同步明細，依原本巡店規則拆出上、下半月、每月檢查一次項目與雙月全盤。</p>
+      <div class="secure-toolbar">
+        <label>檢視月份<input id="halfDashboardMonth" type="month" onchange="renderHalfDashboard()"></label>
+      </div>
+    </div>
+    <div class="secure-card">
+      <div id="halfDashboardSummary" class="half-summary"></div>
+      <p class="half-dashboard-rule">上、下半月採計第 2–13 項；每月檢查一次項目採計第 14–17 項；第 18 項依固定雙月規範獨立採計。資料更新後會立即反映於此。</p>
+      <div id="halfDashboardContent" class="half-dashboard-list"></div>
+    </div>
+  </section>
+
   <footer>資料透過 GAS 同步至雲端試算表（跨裝置共用）· 台灣大哥大 北一二B</footer>
 </div>
 
@@ -471,7 +502,7 @@ let currentMonth = "";
 // 巡店專用網址鍵（優先），相容舊的共用鍵，最後才用預設（北一二B 的 GAS 部署）。
 // 其他督導在畫面上貼自己的 GAS 網址即可，只記在自己的裝置，資料互不相通。
 // GAS 網址本身不是密碼，也不包含巡店資料；保留部署端點以便既有資料自動恢復。
-// 真正的資料仍需 PT_KEY 驗證，PT_KEY 不寫入公開原始碼。
+// 一般資料端點目前依管理者決策免後端密碼；私有媒體 POST 仍需 PT_KEY。
 const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
 // 受保護班表／督導資料固定使用新版私有後端。如此即使瀏覽器保留了舊巡店網址，
 // 新頁籤仍不會誤連舊版而出現「unknown action」。
@@ -480,7 +511,7 @@ const PRIVATE_KEY_ENDPOINT_STORAGE = 'bei12b_pt_key_endpoint';
 let GAS_URL = localStorage.getItem('bei12b_pt_gas_url') ||
               localStorage.getItem('bei12b_gas_url') ||
               window.PATROL_LEGACY_GAS_URL || DEFAULT_PATROL_GAS_URL;
-// 巡店通行碼（GAS 端 PT_KEY 驗證），輸入一次後記在本裝置
+// 前端巡店解鎖碼；輸入一次後記在本裝置。一般資料端點目前不做後端密碼驗證。
 let PT_KEY = localStorage.getItem('bei12b_pt_key') || '';
 
 // 受保護服務換版時，舊裝置保存的碼不得直接送往新端點；強制重新驗證一次。
@@ -805,6 +836,7 @@ function render(){
   renderOverview();
   renderInvPanels();
   renderStores();
+  renderHalfDashboard();
 }
 
 /* ---------- 盤點提醒框（題14-17每月1次、題18兩個月1次） ---------- */
@@ -1189,8 +1221,9 @@ function cloudWrite(details){
   let written = 0, chain = Promise.resolve();
   chunks.forEach(c=>{ chain = chain.then(()=>sendChunk(c, 0)).then(n=>{ written += n; }); });
   chain.then(()=>{
-    showMsg(`已同步至雲端（新增 ${written} 筆，重複資料自動略過），正在核對…`,'ok');
-    cloudLoad(true); // 同步完成後改以雲端資料為準，看板內容＝手機看到的內容
+    // JSONP 已收到 ptwrite 成功回覆，保留目前解析出的明細。
+    // 不在此時立刻重讀，避免 Apps Script 讀取落後寫入時，把剛貼上的資料覆蓋成舊資料。
+    showMsg(`已同步至雲端（新增 ${written} 筆，重複資料自動略過）`,'ok');
   }).catch(err=>showMsg('雲端寫入失敗：'+err.message+'（資料仍在本頁看板，請重新整理後把完整明細整份重貼一次補齊）','err'));
 }
 
@@ -1239,6 +1272,11 @@ async function switchPatrolView(view){
   if(view==='schedule'){
     document.getElementById('scheduleView').classList.add('active');
     loadSchedule();
+  }else if(view==='halfDashboard'){
+    document.getElementById('halfDashboardView').classList.add('active');
+    // 大盤與巡店看板共用 rawDetails。切頁只重繪目前資料，
+    // 不觸發雲端重讀，以免背景寫入尚未完成時還原成舊明細。
+    renderHalfDashboard();
   }else if(view==='half'){
     document.getElementById('halfView').classList.add('active');
     loadHalfChecks();
@@ -1352,11 +1390,11 @@ function loadHalfLocal(){ try{const rows=JSON.parse(localStorage.getItem('bei12b
 function halfPeriod(date){ return Number((date||'').slice(-2))<=15?'H1':'H2'; }
 function halfPeriodLabel(p){ return p==='H1'?'上半月（1–15日）':'下半月（16日–月底）'; }
 async function loadHalfChecks(){
-  loadHalfLocal(); renderHalfSummary(); renderHalfForm(); renderHalfHistory();
+  loadHalfLocal(); renderHalfSummary(); renderHalfForm(); renderHalfHistory(); renderHalfDashboard();
   if(!privateAccount) return;
   try{
     const res=await privateInspectionRequest('read');
-    if(res.status==='ok'){ mergeHalfRows((res.rows||[]).map(r=>({...r,item:Number(r.item)}))); renderHalfSummary(); renderHalfForm(); renderHalfHistory(); }
+    if(res.status==='ok'){ mergeHalfRows((res.rows||[]).map(r=>({...r,item:Number(r.item)}))); renderHalfSummary(); renderHalfForm(); renderHalfHistory(); renderHalfDashboard(); }
     else if(res.message==='unauthorized'){ secureUnlocked=false; privateAccount=null; showHalfMsg('巡店通行碼錯誤，私人檢查資料保持鎖定','err'); }
   }catch(err){ showHalfMsg('半月檢查雲端讀取失敗，先顯示本機資料','err'); }
 }
@@ -1400,8 +1438,21 @@ async function uploadHalfMedia(box){
       showHalfMsg(`正在上傳第 ${i+1}/${files.length} 個檔案…`,'ok');
       uploaded.push(await privateInspectionMediaUpload(files[i],{checkId:current.checkId,date:current.date,period:current.period,month:current.date.slice(0,7),store:current.store,inspector,item}));
     }
-    box.dataset.evidence=mediaValue([...stored,...uploaded]);halfPendingMedia.delete(key);box.querySelector('.half-evidence-file').value='';renderHalfMediaList(box);showHalfMsg(`已上傳 ${uploaded.length} 個私有檔案；按「同步雲端」即可將附件連到本期檢查`,'ok');
-  }catch(err){showHalfMsg(`上傳失敗：${err.message}`,'err');}finally{button.disabled=false;}
+    box.dataset.evidence=mediaValue([...stored,...uploaded]);halfPendingMedia.delete(key);box.querySelector('.half-evidence-file').value='';renderHalfMediaList(box);
+    // 成功上傳後立刻把附件中繼資料寫入本機與雲端，避免重新整理前尚未按同步而遺失連結。
+    const mediaRow=readHalfForm().find(r=>Number(r.item)===item);
+    if(mediaRow){
+      mergeHalfRows([mediaRow]); renderHalfSummary(); renderHalfHistory();
+      if(privateAccount){
+        const linked=await privateInspectionRequest('write',[mediaRow]);
+        if(linked.status!=='ok') throw new Error(linked.message||'附件連結同步失敗');
+      }
+    }
+    showHalfMsg(`已上傳並同步 ${uploaded.length} 個私有檔案；可立即從歷史紀錄預覽／回放`,'ok');
+  }catch(err){
+    const linked=mediaItems(box.dataset.evidence||'').length;
+    showHalfMsg(linked?`檔案已上傳 ${linked} 個，但附件連結同步失敗：${err.message}；本機仍保留連結，請稍後按「儲存並同步本期檢查」`:`上傳失敗：${err.message}`,'err');
+  }finally{button.disabled=false;}
 }
 function renderHalfForm(){
   initHalfSelectors(); const {date,store,period,checkId,rows}=currentHalfRows();
@@ -1423,6 +1474,8 @@ function saveHalfDraft(){
 function showHalfMsg(text,type){const el=document.getElementById('halfMsg');if(el){el.textContent=text;el.className='secure-note '+(type==='err'?'status-issue':type==='ok'?'status-ok':'');}}
 function submitHalfCheck(){
   const inspector=document.getElementById('halfInspector').value.trim(); if(!inspector){showHalfMsg('請填寫督導姓名','err');return;}
+  const pendingCount=Array.from(halfPendingMedia.values()).reduce((sum,files)=>sum+(files||[]).length,0);
+  if(pendingCount){showHalfMsg(`尚有 ${pendingCount} 個照片／影片尚未上傳；請先按各題的「上傳選取的照片／影片」`,'err');return;}
   const rows=readHalfForm(); mergeHalfRows(rows); renderHalfSummary(); renderHalfHistory();
   if(!privateAccount){showHalfMsg('已保留本機資料；尚未解鎖，未上傳雲端','err');return;}
   const chunks=[];let part=[];rows.forEach(r=>{part.push(r);if(encodeURIComponent(JSON.stringify(part)).length>3500){if(part.length>1){part.pop();chunks.push(part);part=[r];}else{chunks.push(part);part=[];}}});if(part.length)chunks.push(part);
@@ -1431,6 +1484,41 @@ function submitHalfCheck(){
 }
 function renderHalfSummary(){
   const c=document.getElementById('halfSummary');if(!c)return;const active=activeHalfRows(halfChecks);const groups={};active.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const issues=active.filter(r=>r.result==='abnormal').length;const pending=Object.values(groups).filter(rows=>rows.some(r=>!r.result)).length;c.innerHTML=`<div class="half-stat"><strong>${Object.keys(groups).length}</strong><span>已建立本期檢查</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>缺失／異常項目</span></div><div class="half-stat"><strong>${pending}</strong><span>尚有待填本期</span></div>`;}
+function dashboardStoreKey(store){ return String(store||'').replace('台灣大哥大數位生活','').replace(/^台北/,'').replace(/南$/,'').trim(); }
+function dashboardStoreList(){
+  const configured=STORES.map(s=>({name:String(s.name||''),title:String(s.name||''),code:String(s.code||''),key:dashboardStoreKey(s.name)})).filter(s=>s.key);
+  const keys=new Set(configured.map(s=>s.key));
+  rawDetails.forEach(row=>{const key=dashboardStoreKey(row.store);if(key&&!keys.has(key)){configured.push({name:String(row.store),title:String(row.store),code:String(row.code||''),key});keys.add(key);}});
+  return configured;
+}
+function dashboardRowMonth(row){
+  const saved=String(row.month||'').slice(0,7);if(/^\d{4}-\d{2}$/.test(saved)) return saved;
+  const found=String(row.fillTime||'').match(/(\d{4})\/(\d{1,2})/);return found?`${found[1]}-${String(found[2]).padStart(2,'0')}`:'';
+}
+function dashboardRowHalf(row){ const found=String(row.fillTime||'').match(/\d{4}\/\d{1,2}\/(\d{1,2})/);return found&&Number(found[1])<=15?'H1':found?'H2':''; }
+function dashboardPatrolRows(store){ return rawDetails.filter(row=>(store.code&&String(row.code||'')===store.code)||dashboardStoreKey(row.store)===store.key); }
+function dashboardVisitDate(row){ const found=String(row.arriveTime||row.fillTime||'').match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);return found?`${found[1]}-${String(found[2]).padStart(2,'0')}-${String(found[3]).padStart(2,'0')}`:''; }
+function dashboardVisitCount(rows, month){ return new Set(rows.filter(row=>dashboardRowMonth(row)===month).map(dashboardVisitDate).filter(Boolean)).size; }
+function dashboardCheckedItemCount(rows, month){ return new Set(rows.filter(row=>dashboardRowMonth(row)===month&&(String(row.result||'').toLowerCase()==='v'||/^na$/i.test(String(row.reason||'').trim()))).map(row=>Number(row.item)).filter(item=>item>=1&&item<=33)).size; }
+function dashboardProgress(rows, expected){
+  const done=item=>rows.some(row=>Number(row.item)===item&&String(row.result||'').toLowerCase()==='v');
+  const abnormal=item=>!done(item)&&rows.some(row=>Number(row.item)===item&&String(row.reason||'').trim()&&!/^na$/i.test(String(row.reason||'').trim()));
+  const completed=expected.filter(done).length;const issues=expected.filter(abnormal).length;const missing=expected.length-completed;
+  const className=issues?'issue':missing?'miss':'done';const text=missing?(issues?`缺 ${missing} 項・${issues} 異常`:(completed?`缺 ${missing} 項`:'尚未開始')):'完成';
+  return {className,text,detail:`${completed}/${expected.length}`,issues};
+}
+function dashboardBiWindow(month){ const [year,number]=month.split('-').map(Number);const start=number%2?number:number-1;return {start:`${year}-${String(start).padStart(2,'0')}`,end:`${year}-${String(start+1).padStart(2,'0')}`,label:`${start}–${start+1}月雙月全盤`}; }
+function dashboardStateHtml(label,state){ return `<div class="half-dashboard-state ${state.className}"><span class="label">${esc(label)}</span><strong>${esc(state.text)}</strong><small>${esc(state.detail)}</small></div>`; }
+function renderHalfDashboard(){
+  const content=document.getElementById('halfDashboardContent');const summary=document.getElementById('halfDashboardSummary');const monthInput=document.getElementById('halfDashboardMonth');if(!content||!summary||!monthInput)return;
+  if(!monthInput.value) monthInput.value=currentMonth||new Date().toISOString().slice(0,7);const month=monthInput.value;const window=dashboardBiWindow(month);const twiceItems=Array.from({length:12},(_,i)=>i+2);const monthlyItems=[14,15,16,17];const stores=dashboardStoreList();
+  const cards=stores.map(store=>{const rows=dashboardPatrolRows(store);const h1=dashboardProgress(rows.filter(row=>dashboardRowMonth(row)===month&&dashboardRowHalf(row)==='H1'),twiceItems);const h2=dashboardProgress(rows.filter(row=>dashboardRowMonth(row)===month&&dashboardRowHalf(row)==='H2'),twiceItems);const monthly=dashboardProgress(rows.filter(row=>dashboardRowMonth(row)===month),monthlyItems);const bi=dashboardProgress(rows.filter(row=>[window.start,window.end].includes(dashboardRowMonth(row))),[18]);const visits=dashboardVisitCount(rows,month);const checkedItems=dashboardCheckedItemCount(rows,month);return {store,h1,h2,monthly,bi,visits,checkedItems,eligibleForIssues:checkedItems>=10&&visits>4};});
+  const done=key=>cards.filter(card=>card[key].className==='done').length;const eligible=cards.filter(card=>card.eligibleForIssues);const issues=eligible.reduce((sum,card)=>sum+card.h1.issues+card.h2.issues+card.monthly.issues+card.bi.issues,0);
+  summary.innerHTML=`<div class="half-stat"><strong>${done('h1')}/${cards.length}</strong><span>上半月完成門市</span></div><div class="half-stat"><strong>${done('h2')}/${cards.length}</strong><span>下半月完成門市</span></div><div class="half-stat"><strong>${done('monthly')}/${cards.length}</strong><span>每月檢查一次項目完成門市</span></div><div class="half-stat"><strong>${done('bi')}/${cards.length}</strong><span>${esc(window.label)}完成門市</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>巡店異常明細（檢查≥10項、到店≥5次）</span></div>`;
+  const source=rawDetails.length?`目前已載入 ${rawDetails.length} 筆巡店明細`:'尚未載入巡店明細';
+  if(!cards.length){content.innerHTML='<div class="empty-state"><div class="big">📊</div>尚無可檢視的門市資料</div>';return;}
+  content.innerHTML=`<p class="secure-note">資料來源：${esc(source)}。本月到店次數以不同到店日期計算。</p>`+cards.map(card=>`<article class="half-dashboard-store"><div class="half-dashboard-store-head"><strong>${esc(card.store.title)}</strong><span>本月到店 ${card.visits} 次</span></div><div class="half-dashboard-states">${dashboardStateHtml('上半月・題 2–13',card.h1)}${dashboardStateHtml('下半月・題 2–13',card.h2)}${dashboardStateHtml('每月檢查一次項目・題 14–17',card.monthly)}${dashboardStateHtml(window.label+'・題 18',card.bi)}</div></article>`).join('');
+}
 function renderHalfHistory(){
   const c=document.getElementById('halfHistory');if(!c)return;const groups={};activeHalfRows(halfChecks).forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const keys=Object.keys(groups).sort().reverse();if(!keys.length){c.innerHTML='<div class="empty-state"><div class="big">📝</div>尚無半月督導檢查紀錄</div>';return;}c.innerHTML=`<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>日期／期別</th><th>店點</th><th>督導</th><th>進度</th><th>缺失與改善</th><th>照片／影片</th></tr></thead><tbody>${keys.map(k=>{const rows=groups[k],first=rows[0],issue=rows.filter(r=>r.result==='abnormal').length,pending=rows.filter(r=>!r.result).length,media=rows.flatMap(r=>mediaItems(r.evidenceNames));return `<tr><td>${esc(first.date)}<br>${esc(halfPeriodLabel(first.period))}</td><td>${esc(first.store)}</td><td>${esc(first.inspector||'—')}</td><td>${rows.filter(r=>r.result).length}/${HALF_ITEMS.length}</td><td class="${issue?'status-issue':''}">${issue?`${issue} 項異常`:'無異常'}${pending?`・待填 ${pending} 題`:''}<br><span class="inv-last">${esc(rows.filter(r=>r.result==='abnormal'&&r.improvement).map(r=>`#${r.item} ${r.improvement}`).join('；')||'')}</span></td><td>${media.length?`<button type="button" class="half-media-view" data-check-id="${esc(k)}">預覽／回放 ${media.length} 個檔案</button>`:'—'}</td></tr>`;}).join('')}</tbody></table></div>`;c.querySelectorAll('.half-media-view').forEach(button=>button.addEventListener('click',()=>openHalfMediaViewer(button.dataset.checkId)));}
 function openHalfMediaViewer(checkId){

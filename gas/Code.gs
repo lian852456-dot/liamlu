@@ -134,7 +134,7 @@ function doGet(e) {
     }
   }
 
-  // ── 巡店追蹤：讀取全部明細＋本區設定（patrol.html，需通行碼）──
+  // ── 巡店追蹤：讀取全部明細＋本區設定（patrol.html；現行資料端點免密碼）──
   if (action === 'ptread') {
     try {
       if (!ptAuthorized(e)) throw new Error('unauthorized');
@@ -163,7 +163,7 @@ function doGet(e) {
     }
   }
 
-  // ── 督導半月檢查：讀取（patrol.html，需通行碼）──
+  // ── 督導半月檢查：讀取（patrol.html；現行資料端點免密碼）──
   if (action === 'hread') {
     try {
       if (!ptAuthorized(e)) throw new Error('unauthorized');
@@ -173,7 +173,7 @@ function doGet(e) {
     }
   }
 
-  // ── 每月班表：讀取指定月份（patrol.html，需通行碼）──
+  // ── 每月班表：讀取指定月份（patrol.html；現行資料端點免密碼）──
   if (action === 'sread') {
     try {
       if (!ptAuthorized(e)) throw new Error('unauthorized');
@@ -193,9 +193,8 @@ function doGet(e) {
 //       inspector, item, result, reason, month, savedAt
 // 以 fillTime+store+item 為唯一鍵，重複上傳自動略過
 //
-// ⚠️ 通行碼：貼進 GAS 編輯器後，把下面 PT_KEY 的 'CHANGE_ME'
-// 改成你自己的密碼再存檔部署（repo 裡只放佔位字，密碼不會公開）。
-// 保持 'CHANGE_ME' 不改的話，巡店讀寫一律拒絕。
+// ⚠️ PT_KEY 只保留給 HalfMedia.gs 的私有媒體 POST 驗證，實值只存在 GAS、不進 git。
+// 2026-07-23 起一般資料端點依管理者決策免密碼；不要把 CHANGE_ME 當成現行資料讀寫防線。
 // ════════════════════════════════════
 const PT_KEY = 'CHANGE_ME';
 
@@ -215,7 +214,9 @@ const PT_STORES = [
 ];
 
 function ptAuthorized(e) {
-  return PT_KEY !== 'CHANGE_ME' && e.parameter.key === PT_KEY;
+  // 巡店追蹤頁依管理者明確授權改為免密碼使用。
+  // 保留此函式供既有 ptread / ptwrite 呼叫，不再以 PT_KEY 阻擋讀寫。
+  return true;
 }
 
 const PATROL_SHEET = '巡店明細';
@@ -365,7 +366,8 @@ function writeHalfCheck(rows) {
       String(r.store || ''), String(r.inspector || ''), String(itemText), halfResultToSheet(r.result),
       String(r.note || ''), String(r.improvement || ''), String(oldRow[9] || ''),
       String(r.result === 'abnormal' ? '待改善' : (oldRow[10] || '')),
-      String(r.evidenceNames || ''), String(oldRow[12] || now), now,
+      // 不允許晚到的空白表單同步覆蓋既有私有 Drive 附件連結。
+      String(r.evidenceNames || oldRow[11] || ''), String(oldRow[12] || now), now,
       String(oldRow[14] || ''), String(r.result ? '已完成' : '填寫中')
     ];
     if (existing[key]) {
@@ -866,7 +868,10 @@ function toDateStr(v) {
 
 function readData(date, seg) {
   const sh = getSheet();
-  const allData = sh.getDataRange().getValues();
+  const dataRange = sh.getDataRange();
+  const allData = dataRange.getValues();
+  // savedAt 是純時間序號；使用試算表顯示值，避免被格式化為 1899-12-30。
+  const displayData = dataRange.getDisplayValues();
   const headers = allData[0];
   const dateIdx  = headers.indexOf('date');
   const storeIdx = headers.indexOf('store');
@@ -880,7 +885,11 @@ function readData(date, seg) {
       const obj = {};
       headers.forEach((h, idx) => {
         const v = r[idx];
-        obj[h] = (v instanceof Date) ? toDateStr(v) : v;
+        if (h === 'savedAt') {
+          obj[h] = displayData[i][idx] || '';
+        } else {
+          obj[h] = (v instanceof Date) ? toDateStr(v) : v;
+        }
       });
       result[store] = obj;
     }
@@ -1234,11 +1243,26 @@ function kpiCalcAccess(payload) {
   }
   lookup.user.last_login_at = privateDashboardNow();
   privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
-  const files = privateDashboardFolder().getFilesByName(PRIVATE_KPICALC_FILE);
-  if (!files.hasNext()) throw new Error('KPI 試算資料尚未發佈，請通知督導');
-  const data = JSON.parse(files.next().getBlob().getDataAsString('UTF-8'));
+  const file = kpiCalcLatestDataFile();
+  if (!file) throw new Error('KPI 試算資料尚未發佈，請通知督導');
+  const data = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!data || !data.meta || !data.stores || !data.persons) throw new Error('KPI 試算資料格式不完整');
-  return { data: data, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role } };
+  return { data: data, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role, isTrusted: privateDashboardIsTrustedEmployee(employeeId) } };
+}
+
+// 取私有資料夾中最新的一份 KPI 試算資料。
+// 相容三種來源：自動更新/督導發佈寫的 north12b-kpicalc-private-latest.json，
+// 以及外部工具（例如 AI 助手經 Drive 直接補檔）建立的 north12b-kpicalc-<日期>.json。
+// 一律取「最後更新時間最新」者，避免舊檔覆蓋新資料。
+function kpiCalcLatestDataFile() {
+  const files = privateDashboardFolder().getFiles();
+  let best = null;
+  while (files.hasNext()) {
+    const f = files.next();
+    if (!/^north12b-kpicalc-.*\.json$/i.test(f.getName())) continue;
+    if (!best || f.getLastUpdated() > best.getLastUpdated()) best = f;
+  }
+  return best;
 }
 
 function kpiCalcPublish(payload) {
@@ -1253,7 +1277,17 @@ function kpiCalcPublish(payload) {
   const blob = Utilities.newBlob(text, 'application/json', PRIVATE_KPICALC_FILE);
   if (files.hasNext()) files.next().setContent(blob.getDataAsString('UTF-8'));
   else folder.createFile(blob);
-  return { publishedAt: privateDashboardNow(), period: (data.meta && data.meta.period) || '' };
+  // 手動發佈也寄確認信，留下更新紀錄（與自動更新的 ✅ 信格式一致）
+  const meta = data.meta || {};
+  kpiCalcNotify('✅ KPI試算資料已更新（手動發佈｜' + (meta.sourceFile || '未標示來源') + '）',
+    '發佈方式：督導發佈區（手動上傳）\n' +
+    '來源：' + (meta.sourceFile || '-') + '\n' +
+    '期間：' + (meta.period || '-') + '（累計到第 ' + (meta.snapshotDay || '?') + ' 天）\n' +
+    '店點 ' + data.stores.length + ' 家、人員 ' + data.persons.length + ' 位。\n' +
+    kpiCalcBrief(data) +
+    '\n同仁重新登入 kpi.html 即可看到新累計數。\n' +
+    '※ 收到這封信代表資料已更新成功；若某天既沒有自動更新信也沒有這封，就是當天沒更新。');
+  return { publishedAt: privateDashboardNow(), period: meta.period || '' };
 }
 
 // ════════════════════════════════════
@@ -1318,6 +1352,45 @@ function testKpiCalcAutoUpdate() {
   return kpiCalcAutoUpdate();
 }
 
+// 中午巡檢：每天 12:30 檢查今日資料是否已更新，未更新才寄提醒（正常則靜默）。
+// 啟用：執行一次 setupKpiCalcWatchdog()（用同一個授權，不需重新部署）。
+function setupKpiCalcWatchdog() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'kpiCalcWatchdog') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('kpiCalcWatchdog').timeBased().everyDays(1)
+    .atHour(12).nearMinute(30).inTimezone('Asia/Taipei').create();
+  return kpiCalcWatchdog();
+}
+
+function kpiCalcWatchdog() {
+  const props = PropertiesService.getScriptProperties();
+  const folderId = props.getProperty('KPICALC_SOURCE_FOLDER_ID') || KPICALC_SOURCE_FOLDER_ID_DEFAULT;
+  const todayTag = Utilities.formatDate(new Date(), 'Asia/Taipei', 'MMdd');
+  let todayFile = null;
+  const files = DriveApp.getFolderById(folderId).getFiles();
+  while (files.hasNext()) {
+    const f = files.next();
+    const m = f.getName().match(/^(\d{4})\.xlsx$/);
+    if (m && m[1] === todayTag) { todayFile = f; break; }
+  }
+  if (!todayFile) {
+    kpiCalcNotify('⚠️ 今日尚未上傳 KPI 日報（' + todayTag + '.xlsx）',
+      '中午 12:30 巡檢：來源資料夾還沒有今天的 ' + todayTag + '.xlsx。\n' +
+      '請記得上傳今日日報，否則 kpi.html 的同仁實際數會停留在前一天。\n' +
+      '上傳後可在 GAS 手動執行 testKpiCalcAutoUpdate 立即更新，或等明天 11:00 自動處理。');
+    return { status: 'no-today-file', tag: todayTag };
+  }
+  const stamp = todayFile.getName() + ':' + todayFile.getLastUpdated().getTime();
+  if (props.getProperty('KPICALC_LAST_IMPORT') !== stamp) {
+    kpiCalcNotify('⚠️ 今日 KPI 試算資料可能未更新（' + todayFile.getName() + '）',
+      '中午 12:30 巡檢：今天的 ' + todayFile.getName() + ' 已上傳，但自動更新的紀錄對不上——上午 11:00 的更新可能沒跑成功。\n' +
+      '請開 kpi.html 登入確認資料日期；或在 GAS 手動執行 testKpiCalcAutoUpdate 補跑，若補跑仍失敗代表日報格式有變，請把檔案交給 AI 檢查。');
+    return { status: 'not-imported', tag: todayTag };
+  }
+  return { status: 'ok', tag: todayTag };  // 正常：不寄信
+}
+
 function kpiCalcNotify(subject, body) {
   const email = String(PropertiesService.getScriptProperties().getProperty('DASHBOARD_NOTIFY_EMAIL') || '').trim() || NOTIFY_EMAIL;
   if (!email || /CHANGE_ME/.test(email)) return;
@@ -1352,7 +1425,9 @@ function kpiCalcAutoUpdate() {
     props.setProperty('KPICALC_LAST_IMPORT', stamp);
     kpiCalcNotify('✅ KPI試算資料已更新（' + latest.file.getName() + '）',
       '來源：' + latest.file.getName() + '\n期間：' + data.meta.period +
-      '\n店點 ' + data.stores.length + ' 家、人員 ' + data.persons.length + ' 位。\n同仁重新登入 kpi.html 即可看到新累計數。');
+      '\n店點 ' + data.stores.length + ' 家、人員 ' + data.persons.length + ' 位。\n' +
+      kpiCalcBrief(data) +
+      '\n同仁重新登入 kpi.html 即可看到新累計數。');
     return { status: 'updated', file: latest.file.getName(), period: data.meta.period };
   } catch (err) {
     console.log('kpicalc auto update failed: ' + err);
@@ -1360,6 +1435,189 @@ function kpiCalcAutoUpdate() {
       '錯誤：' + (err && err.message ? err.message : String(err)) +
       '\n舊資料維持不變。可能是日報欄位排版變動，請把檔案交給 Claude 檢查。');
     return { status: 'error', message: String(err) };
+  }
+}
+
+// ── 業績重點提醒（附在更新通知信裡）──
+// 與 kpi.html「督導試算區」同一套算法：潛力分＝權重×落後幅度、激勵加分門檻、防退警示。
+// 與 Codex 的每日戰報互補（那份報現況，這份報「該追什麼」）。
+const KPICALC_FLOORS = {
+  '5G銷售數': 0.7, 'HBO Max&Disney+&Prime Video銷售數': 0.7, 'Netflix多享組銷售數': 0.7,
+  'TTL AQ上線點數': 0.6, 'AQ V+D 999 (含)以上': 0.7, '預付卡開卡面額': 0.7, 'RT上線點數': 0.7,
+  '特殊維繫用戶續約數': 0.7, '高高特維用戶續約數': 0.7,
+  'RT V+D 999 (含)以上': 0.7, 'RT V+D 1399 (含)以上': 0.7
+};
+const KPICALC_ANTI = ['自退數', '解約後NP OUT', '解約後NP OUT(督導績)'];
+
+function kpiCalcRound4(x) { return Math.round(x * 10000) / 10000; }
+
+function kpiCalcRate(key, a, t, f) {
+  if (!t) return null;
+  const x = kpiCalcRound4(a / t * f);
+  if (key === '自退數' || key === '解約後NP OUT(督導績)') return Math.max(0, Math.min(2.5, kpiCalcRound4(2 - x)));
+  if (key === '解約後NP OUT') {
+    const raw = kpiCalcRound4(2 - x);
+    return raw >= 1 ? Math.min(2.5, raw) : kpiCalcRound4(0.5 + 0.5 * Math.max(raw, 0));
+  }
+  return Math.min(2.5, x);
+}
+
+function kpiCalcPct(x) { return (x * 100).toFixed(2) + '%'; }
+
+// 前一日各店總達成率快照（存指令碼屬性，用於算「昨日變化」）
+// 結構：{ cur:{snapDay, totals:{店名:率}}, prev:{snapDay, totals:{...}} }
+// 設計要點：同一天重複發佈時只更新 cur、不動 prev，避免把昨日基準洗掉而讓變化變成 0。
+const KPICALC_PREV_KEY = 'KPICALC_PREV_TOTALS';
+
+function kpiCalcReadSnapshots() {
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty(KPICALC_PREV_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    return (o && o.cur) ? o : null;
+  } catch (e) { return null; }
+}
+
+function kpiCalcSaveSnapshots(store, data) {
+  const totals = {};
+  data.stores.forEach(function(s) { totals[s.name] = s.official || 0; });
+  const incoming = { snapDay: data.meta.snapshotDay, totals: totals };
+  let next;
+  if (!store) next = { cur: incoming, prev: null };
+  else if (incoming.snapDay > store.cur.snapDay) next = { cur: incoming, prev: store.cur };
+  else if (incoming.snapDay === store.cur.snapDay) next = { cur: incoming, prev: store.prev || null };
+  else return;   // 補發舊檔：不動快照
+  try {
+    PropertiesService.getScriptProperties().setProperty(KPICALC_PREV_KEY, JSON.stringify(next));
+  } catch (e) { console.log('kpicalc snapshot save failed: ' + e); }
+}
+
+function kpiCalcBrief(data) {
+  try {
+    const monthDays = data.meta.monthDays, snapDay = data.meta.snapshotDay;
+    const left = Math.max(1, monthDays - snapDay);   // 含今天的剩餘天數
+    const f = monthDays / snapDay;
+    const shortOf = {};
+    (data.items || []).forEach(function(it) { shortOf[it.key] = it.short; });
+
+    // 區平均與未達標店
+    let sum = 0, below = [];
+    data.stores.forEach(function(s) {
+      sum += (s.official || 0);
+      if ((s.official || 0) < 1) below.push(s.name + ' ' + kpiCalcPct(s.official || 0));
+    });
+    const avg = kpiCalcRound4(sum / data.stores.length);
+    const over = data.stores.length - below.length;
+
+    // 區彙總各項 → 潛力分
+    const rows = [];
+    (data.items || []).forEach(function(it) {
+      let T = 0, A = 0, w = 0, any = false;
+      data.stores.forEach(function(s) {
+        const d = s.items[it.key]; if (!d) return;
+        T += (d.t || 0); A += (d.a || 0); w = d.w; any = true;
+      });
+      if (!any || !w || T <= 0) return;
+      const anti = KPICALC_ANTI.indexOf(it.key) !== -1;
+      const r = kpiCalcRate(it.key, A, T, f);
+      rows.push({ short: shortOf[it.key] || it.key, w: w, r: r, anti: anti,
+                  pot: anti ? 0 : w * Math.max(0, 1 - r), need: Math.max(0, kpiCalcRound4(T - A)) });
+    });
+
+    const chase = rows.filter(function(r) { return !r.anti && r.pot > 0; })
+                      .sort(function(a, b) { return b.pot - a.pot; }).slice(0, 3);
+    const antiBad = rows.filter(function(r) { return r.anti && r.r < 1; });
+
+    // 激勵加分
+    const b = { aqA:0, aqT:0, dnHiN:0, dnHiD:0, upN:0, upD:0 };
+    data.stores.forEach(function(s) {
+      for (const k in b) b[k] += (s.bonus[k] || 0);
+    });
+    const bonusLines = [];
+    if (b.upD > 0) {
+      const up = b.upN / b.upD;
+      bonusLines.push(up >= 0.30
+        ? '・升轉率(<1399) ' + kpiCalcPct(up) + '｜✅ 已達標 +0.75%'
+        : '・升轉率(<1399) ' + kpiCalcPct(up) + '｜門檻30%｜還差約 ' +
+          Math.ceil((0.30 * b.upD - b.upN) / 0.70) + ' 件 ← 通常最划算');
+    }
+    if (b.dnHiD > 0) {
+      const dn = b.dnHiN / b.dnHiD;
+      bonusLines.push(dn <= 0.37
+        ? '・降轉率(≧1399) ' + kpiCalcPct(dn) + '｜✅ 已達標 +0.75%'
+        : '・降轉率(≧1399) ' + kpiCalcPct(dn) + '｜門檻≦37%｜需再 ' +
+          Math.ceil(b.dnHiN / 0.37 - b.dnHiD) + ' 件「≧1399上線且不降轉」');
+    }
+    if (b.aqT > 0) {
+      const aq = Math.min(2.5, kpiCalcRound4(b.aqA / b.aqT * f));
+      bonusLines.push(aq >= 1.3
+        ? '・AQ件數加分 ' + kpiCalcPct(aq) + '｜✅ 已達標 +1%'
+        : '・AQ件數加分 ' + kpiCalcPct(aq) + '｜門檻130%｜還需 ' +
+          Math.ceil(1.30 * b.aqT / f - b.aqA) + ' 件');
+    }
+
+    let out = '\n━━━━━━━━━━━━━━\n📊 業績重點提醒（月底剩 ' + left + ' 天）\n━━━━━━━━━━━━━━\n';
+    out += '區平均總達成率 ' + kpiCalcPct(avg) + '（' + over + '/' + data.stores.length + ' 店破百）\n';
+    out += below.length ? '\n🔴 未達100%：' + below.join('、') + '\n' : '\n🟢 全店破百\n';
+
+    if (chase.length) {
+      out += '\n🎯 最該追（潛力分＝權重×落後幅度）\n';
+      chase.forEach(function(r, i) {
+        out += (i + 1) + '. ' + r.short + ' ' + kpiCalcPct(r.r) + ' → 潛力 +' + kpiCalcPct(r.pot) +
+               '｜月底還需 ' + Math.round(r.need) + '（日均 ' + (r.need / left).toFixed(1) + '）\n';
+      });
+    }
+    if (bonusLines.length) out += '\n💰 激勵加分（共 +2.5% 空間，不吃權重）\n' + bonusLines.join('\n') + '\n';
+    if (antiBad.length) {
+      out += '\n⚠️ 防退未達標：' + antiBad.map(function(r) { return r.short + ' ' + kpiCalcPct(r.r); }).join('、') +
+             '\n（衝量時注意退件，退一件是雙重損失）\n';
+    }
+
+    // ── 昨日變化 + 各店一行摘要 ──
+    const snaps = kpiCalcReadSnapshots();
+    const base = snaps && snaps.prev ? snaps.prev :
+                 (snaps && snaps.cur && snaps.cur.snapDay < snapDay ? snaps.cur : null);
+    const storeLines = [];
+    const dropped = [];
+    data.stores.slice().sort(function(a, b) { return (a.official || 0) - (b.official || 0); })
+      .forEach(function(s) {
+        const off = s.official || 0;
+        const flag = off < 1 ? '🔴' : (off < 1.05 ? '🟡' : '🟢');
+        // 昨日變化
+        let dTxt = '';
+        if (base && base.totals && base.totals[s.name] !== undefined) {
+          const d = (off - base.totals[s.name]) * 100;
+          dTxt = (d >= 0 ? ' ▲' : ' ▼') + Math.abs(d).toFixed(2);
+          if (d <= -1.0) dropped.push(s.name + ' ' + d.toFixed(2));
+        }
+        // 該店潛力最高項
+        let best = null;
+        (data.items || []).forEach(function(it) {
+          const d = s.items[it.key];
+          if (!d || KPICALC_ANTI.indexOf(it.key) !== -1 || !d.w || (d.t || 0) <= 0) return;
+          const r = kpiCalcRate(it.key, d.a || 0, d.t || 0, f);
+          const pot = d.w * Math.max(0, 1 - r);
+          if (pot > 0 && (!best || pot > best.pot)) {
+            best = { pot: pot, short: shortOf[it.key] || it.key, r: r,
+                     need: Math.max(0, kpiCalcRound4((d.t || 0) - (d.a || 0))) };
+          }
+        });
+        const bTxt = best ? '｜追 ' + best.short + ' ' + Math.round(best.r * 100) + '%(缺' + Math.round(best.need) + ')' : '｜各項已達標';
+        storeLines.push(flag + ' ' + s.name + ' ' + kpiCalcPct(off) + dTxt + bTxt);
+      });
+
+    if (dropped.length) {
+      out += '\n📉 昨日掉分（≧1pp）：' + dropped.join('、') + '\n（單日大幅下滑通常代表前一日幾乎沒進單，連兩天要注意）\n';
+    }
+    out += '\n🏪 各店現況' + (base ? '（▲▼＝與資料第 ' + base.snapDay + ' 天相比）' : '（首次執行，尚無昨日基準）') + '\n' +
+           storeLines.join('\n') + '\n';
+
+    out += '\n※ 完整分析與各店分配請開 kpi.html → 督導試算區\n';
+    kpiCalcSaveSnapshots(snaps, data);   // 產生完才更新快照
+    return out;
+  } catch (e) {
+    console.log('kpiCalcBrief failed: ' + e);
+    return '\n（業績重點提醒產生失敗：' + e + '）\n';   // 不讓提醒失敗影響更新通知
   }
 }
 

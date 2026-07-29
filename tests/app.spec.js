@@ -4,7 +4,7 @@ const path = require('path');
 const FILE_URL = 'file://' + path.resolve(__dirname, '../index.html');
 
 // Mock GAS 回應（讓 fetch 不需要真正連線）
-async function mockGAS(page) {
+async function mockGAS(page, { readData = {} } = {}) {
   await page.route('https://script.google.com/**', async route => {
     const url = route.request().url();
     const request = route.request();
@@ -18,7 +18,7 @@ async function mockGAS(page) {
     } else if (url.includes('action=ping')) {
       await route.fulfill({ json: { status: 'ok' } });
     } else if (url.includes('action=read')) {
-      await route.fulfill({ json: { data: {} } });
+      await route.fulfill({ json: { status: 'ok', data: readData } });
     } else if (url.includes('action=write')) {
       await route.fulfill({ json: { status: 'ok' } });
     } else {
@@ -260,6 +260,18 @@ test.describe('頁籤切換', () => {
     // 填報狀態欄應有 9 個 chip（每間門市一個）
     const chips = page.locator('#fillStatus .fill-chip');
     await expect(chips).toHaveCount(9);
+  });
+
+  test('彙整大盤顯示 GAS 回傳的純時間，不顯示 1899 基準日', async ({ page }) => {
+    await mockGAS(page, {
+      readData: {
+        '萬大': { store: '萬大', date: '2026-07-20', seg: 16, savedAt: '下午 3:42:26' },
+      },
+    });
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("彙整大盤")').click();
+    await expect(page.locator('#fillStatus')).toContainText('萬大 下午 3:42:26');
+    await expect(page.locator('#fillStatus')).not.toContainText('1899-12-30');
   });
 
   test('彙整大盤 16:00/21:00 時段切換', async ({ page }) => {
