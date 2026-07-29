@@ -462,3 +462,241 @@ test('巡店異常明細只計入檢查至少 10 項且到店至少 5 次的門�
   const issueStat = dashboard.locator('.half-stat').filter({ hasText: '巡店異常明細' });
   await expect(issueStat).toHaveText(/1.*巡店異常明細/);
 });
+
+/* =========================================================================
+   每日移動里程頁籤
+   夾具＝2026-06 實際巡店明細（6/1～6/22，21 次到店）。刻意為部分到店重複
+   多列題號，用來驗證「同店只取最早一筆」。
+   ========================================================================= */
+const JUNE_VISITS = [
+  ['2026/6/1 20:13', '2026/6/1 10:11', 'DNB10062', '台北酒泉'],
+  ['2026/6/2 17:47', '2026/6/2 10:22', 'DNB10284', '台北大稻埕'],
+  ['2026/6/3 16:38', '2026/6/3 10:19', 'DNB10307', '台北三創'],
+  ['2026/6/3 19:51', '2026/6/3 17:17', 'DNB10440', '台北六張犁'],
+  ['2026/6/4 15:16', '2026/6/4 10:15', 'DNB10062', '台北酒泉'],
+  ['2026/6/4 19:39', '2026/6/4 15:53', 'DNB10174', '台北通化'],
+  ['2026/6/5 16:10', '2026/6/5 10:21', 'DNB10307', '台北三創'],
+  ['2026/6/5 19:54', '2026/6/5 16:46', 'DNB10168', '台北萬大'],
+  ['2026/6/8 19:27', '2026/6/8 10:26', 'DNB10284', '台北大稻埕'],
+  ['2026/6/9 17:10', '2026/6/9 10:08', 'DNB10307', '台北三創'],
+  ['2026/6/9 19:36', '2026/6/9 17:45', 'DNB10094', '台北復興南'],
+  ['2026/6/10 19:32', '2026/6/10 10:20', 'DNB10062', '台北酒泉'],
+  ['2026/6/15 14:49', '2026/6/15 10:20', 'DNB10307', '台北三創'],
+  ['2026/6/15 17:26', '2026/6/15 15:24', 'DNB10082', '台北永吉'],
+  ['2026/6/15 19:51', '2026/6/15 18:49', 'DNB10062', '台北酒泉'],
+  ['2026/6/16 15:03', '2026/6/16 10:20', 'DNB10062', '台北酒泉'],
+  ['2026/6/16 19:30', '2026/6/16 15:41', 'DNB10168', '台北萬大'],
+  ['2026/6/18 14:05', '2026/6/18 10:10', 'DNB10284', '台北大稻埕'],
+  ['2026/6/18 19:35', '2026/6/18 14:41', 'DNB10440', '台北六張犁'],
+  ['2026/6/22 14:21', '2026/6/22 10:20', 'DNB10284', '台北大稻埕'],
+  ['2026/6/22 16:38', '2026/6/22 14:50', 'DNB10094', '台北復興南'],
+];
+function juneDetails() {
+  const rows = [];
+  JUNE_VISITS.forEach(([fillTime, arriveTime, code, store]) => {
+    // 每次到店產生 3 列題號；且第 2 列刻意給「更晚的到店時間」，
+    // 驗證去重時取最早那筆、不會被較晚的覆蓋。
+    for (let i = 1; i <= 3; i++) {
+      const at = i === 2 ? arriveTime.replace(/(\d+):(\d+)$/, (m, h) => `${Number(h) + 1}:59`) : arriveTime;
+      rows.push({
+        fillTime, arriveTime: at, leaveTime: fillTime, district: '北一二B',
+        code, store, inspector: '測試督導', item: String(i), content: '', result: 'v',
+        reason: '', month: '2026-06',
+      });
+    }
+  });
+  return rows;
+}
+async function openMileage(page, details) {
+  await stubGas(page);
+  await page.goto(PAGE_URL);
+  await page.evaluate(rows => { rawDetails = rows; currentMonth = '2026-06'; rows.forEach(r => {
+    const s = r.store; if (!records[s]) records[s] = { code: r.code, entries: [] };
+    records[s].entries.push({ month: r.month, date: r.arriveTime.split(' ')[0], half: 1, item: r.item, result: r.result });
+  }); render(); }, details || juneDetails());
+  await page.click('.secure-tab[data-view="mileage"]');
+  await expect(page.locator('#mileageView')).toHaveClass(/active/);
+  await page.evaluate(() => MI.setMonth('2026-06'));
+}
+
+test('里程頁籤可正常開啟，且不影響原有頁籤', async ({ page }) => {
+  await openMileage(page);
+  await expect(page.locator('#miStats .mi-card')).toHaveCount(4);
+  // 切回巡店看板，原功能仍在
+  await page.click('.secure-tab[data-view="patrol"]');
+  await expect(page.locator('#mileageView')).not.toHaveClass(/active/);
+  await expect(page.locator('#patrolInputPanel')).toBeVisible();
+  await expect(page.locator('#content')).toContainText('台北酒泉');
+});
+
+test('同日巡店依到店時間排序，同店重複只取最早一筆', async ({ page }) => {
+  await openMileage(page);
+  const plan = await page.evaluate(() => {
+    const d = MI._days();
+    return { names: d['2026-06-15'].map(n => n.name), times: d['2026-06-15'].map(n => n.time) };
+  });
+  expect(plan.names).toEqual(['台北三創', '台北永吉', '台北酒泉']);
+  expect(plan.times).toEqual(['10:20', '15:24', '18:49']); // 皆為最早一筆，未被 +1 小時那列覆蓋
+});
+
+test('單店日公里數為 0 且備註為單店不計', async ({ page }) => {
+  await openMileage(page);
+  const p = await page.evaluate(() => { const d = MI._days(); return MI._dayPlan('2026-06-01', d['2026-06-01']); });
+  expect(p.km).toBe(0);
+  expect(p.note).toBe('單店，不計油料里程');
+  expect(p.storeCount).toBe(1);
+});
+
+test('未知路段不會被填成 0，且維持待查狀態', async ({ page }) => {
+  await openMileage(page);
+  const r = await page.evaluate(() => {
+    const nodes = [{ name: '台北杭州南', time: '10:00', key: '1000' }, { name: '台北通化', time: '15:00', key: '1500' }];
+    const p = MI._dayPlan('2026-06-27', nodes);
+    return { km: p.km, todo: p.todo, legKm: p.legs[0].km };
+  });
+  expect(r.km).toBeNull();      // 不是 0
+  expect(r.legKm).toBeNull();   // 不是 0
+  expect(r.todo).toEqual(['台北杭州南→台北通化']);
+});
+
+test('三店以上不平均拆分：可拆段就逐段加總，不可拆就不猜', async ({ page }) => {
+  await openMileage(page);
+  const p = await page.evaluate(() => { const d = MI._days(); return MI._dayPlan('2026-06-15', d['2026-06-15']); });
+  expect(p.legs.map(l => l.km)).toEqual([4.4, 10]);   // 逐段各自查表，非 14.4/2
+  expect(p.km).toBe(14.4);
+  // 有未知段時整日不給總數、也不平均
+  const q = await page.evaluate(() => MI._dayPlan('2026-06-28', [
+    { name: '台北三創', key: '1000' }, { name: '台北杭州南', key: '1200' }, { name: '台北通化', key: '1500' }]));
+  expect(q.legs[0].km).toBe(3);   // 已知段照給
+  expect(q.legs[1].km).toBeNull();// 未知段留空
+  expect(q.km).toBeNull();        // 不用已知段回推、不平均
+});
+
+test('台北電信為特殊地點，不計入巡店門市數但可作里程起訖點', async ({ page }) => {
+  await openMileage(page);
+  const r = await page.evaluate(() => {
+    const nodes = [{ name: '台北電信', time: '09:00', key: '0900' }, { name: '台北萬大', time: '11:00', key: '1100' }];
+    const p = MI._dayPlan('2026-06-27', nodes);
+    return { isOffice: MI._isOffice('台北電信'), storeCount: p.storeCount, km: p.km, verify: p.legs[0].verify };
+  });
+  expect(r.isOffice).toBe(true);
+  expect(r.storeCount).toBe(1);   // 兩個節點，只有萬大算巡店門市
+  expect(r.km).toBe(6.4);         // 仍可作為里程起訖點
+  expect(r.verify).toBe('manual');
+});
+
+test('1.5KM 路段為台北電信→台北復興南，且不存在萬大→復興南', async ({ page }) => {
+  await openMileage(page);
+  const r = await page.evaluate(() => ({
+    telecom: MI._legFor('台北電信', '台北復興南'),
+    wanda: MI._legFor('台北萬大', '台北復興南'),
+  }));
+  expect(r.telecom.km).toBe(1.5);
+  expect(r.telecom.month).toBe('Y2511');
+  expect(r.telecom.date).toBe('2025-11-18');
+  expect(r.telecom.source).toContain('原文誤植');
+  expect(r.wanda).toBeNull();     // 不建立不存在的路段
+});
+
+test('Excel 產出「油料」與「距離計算明細」兩張工作表，欄位順序與固定值正確', async ({ page }) => {
+  await openMileage(page);
+  const r = await page.evaluate(() => {
+    const b = MI._buildSheets('2026-06');
+    const val = c => (c && typeof c === 'object' && 'value' in c) ? c.value : c;
+    return {
+      names: b.sheets.map(s => s.name),
+      fareHead: b.sheets[0].rows[0].map(val),
+      detailHead: b.sheets[1].rows[1].map(val),
+      row1: b.sheets[0].rows[1].map(val),
+      tail: b.sheets[1].rows.slice(-2).map(r => r.map(val)),
+      cols: b.sheets.map(s => s.cols),
+      merges: b.sheets[1].merges,
+      total: b.total,
+    };
+  });
+  expect(r.names).toEqual(['油料', '距離計算明細']);
+  // 欄名含換行，與受控版 Y2606月車資.xls 逐字一致
+  expect(r.fareHead).toEqual(['出差日期\n(起)', '出差日期\n(迄)', '出差地點', '事由及\n洽訪目標', '油料補助\n里程數(KM)', '車號', '備註']);
+  expect(r.detailHead).toEqual(['日期', '起點', '迄點', '騎車距離(KM)', '來源', '備註']);
+  expect(r.row1).toEqual(['2026-06-01', '2026-06-01', '台北酒泉', '巡店', 0, 'NAS-9666', '單店，不計油料里程']);
+  expect(r.tail[0][0]).toBe('全月出差日');
+  expect(r.tail[1][0]).toBe('全月油料里程合計');
+  expect(r.cols).toEqual([[24, 24, 48, 14, 21, 18, 18], [12, 18, 18, 14, 42, 28]]);
+  expect(r.merges).toEqual([{ row: 0, col: 0, across: 5 }]);
+  expect(r.total).toBe(57.1);
+});
+
+test('待查路段存在時不得產生正式報銷檔，只能匯出標示未完成的測試版', async ({ page }) => {
+  await openMileage(page);
+  // 製造一個未知路段：新增一天走「杭州南→通化」
+  await page.evaluate(() => {
+    rawDetails.push(
+      { fillTime: '2026/6/27 20:00', arriveTime: '2026/6/27 10:00', code: 'DNB10146', store: '台北杭州南', item: '1', month: '2026-06' },
+      { fillTime: '2026/6/27 20:00', arriveTime: '2026/6/27 15:00', code: 'DNB10174', store: '台北通化', item: '1', month: '2026-06' });
+    MI.render();
+  });
+  await page.click('button:has-text("匯出公司報銷 Excel")');
+  const dlg = page.locator('#miExportDlg');
+  await expect(dlg).toContainText('待查路段數');
+  await expect(dlg).toContainText('已停用正式匯出');
+  await expect(dlg.locator('button:has-text("匯出正式報銷檔")')).toBeDisabled();
+  await expect(dlg.locator('button:has-text("匯出測試版")')).toBeEnabled();
+  const name = await page.evaluate(() => {
+    let f = null;
+    const orig = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { f = this.download; };
+    MI.doExport(true);
+    HTMLAnchorElement.prototype.click = orig;
+    return f;
+  });
+  expect(name).toContain('未完成請勿報銷');
+});
+
+test('無待查路段時可匯出正式報銷檔，檔名不帶測試標記', async ({ page }) => {
+  await openMileage(page);
+  await page.click('button:has-text("匯出公司報銷 Excel")');
+  const dlg = page.locator('#miExportDlg');
+  await expect(dlg).toContainText('出差日數');
+  await expect(dlg.locator('button:has-text("匯出正式報銷檔")')).toBeEnabled();
+  const out = await page.evaluate(() => {
+    let f = null; const orig = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { f = this.download; };
+    MI.doExport(false);
+    HTMLAnchorElement.prototype.click = orig;
+    return { file: f, log: MI._store().exportLog };
+  });
+  expect(out.file).toBe('北一二B_巡店車資報銷_202606.xls');
+  expect(out.file).not.toContain('未完成');
+  expect(out.log[0].totalKm).toBe(57.1);
+});
+
+test('人工修改只寫入里程資料層，不改寫原始巡店紀錄', async ({ page }) => {
+  await openMileage(page);
+  const before = await page.evaluate(() => JSON.stringify(rawDetails));
+  await page.evaluate(() => MI.setLegKm('2026-06-03', '台北三創', '台北六張犁', 4.9, '實走修正'));
+  const after = await page.evaluate(() => ({
+    raw: JSON.stringify(rawDetails),
+    plan: MI._dayPlan('2026-06-03', MI._days()['2026-06-03']),
+    saved: MI._store().dayEdits['2026-06-03'].legKm['台北三創|台北六張犁'],
+  }));
+  expect(after.raw).toBe(before);            // 原始明細一字未動
+  expect(after.plan.km).toBe(4.9);           // 里程層生效
+  expect(after.saved.prev).toBe(4.5);        // 保留修改前數值
+  expect(after.saved.note).toBe('實走修正');
+});
+
+test('資料涵蓋日期與缺少日期會明確提示，不自動補值', async ({ page }) => {
+  await openMileage(page);
+  const cov = await page.evaluate(() => MI._coverage('2026-06'));
+  expect(cov.first).toBe('2026-06-01');
+  expect(cov.last).toBe('2026-06-22');
+  expect(cov.have).toHaveLength(12);
+  expect(cov.missingTail[0]).toBe('2026-06-23');
+  expect(cov.missingTail[cov.missingTail.length - 1]).toBe('2026-06-30');
+  await expect(page.locator('#miCoverage')).toContainText('2026-06-01 ～ 2026-06-22');
+  await expect(page.locator('#miCoverage')).toContainText('不會自動補值');
+  // 未涵蓋日期不得憑空出現在彙整
+  const plans = await page.evaluate(() => MI._monthPlans('2026-06').map(p => p.date));
+  expect(plans).not.toContain('2026-06-23');
+  expect(plans).toHaveLength(12);
+});
