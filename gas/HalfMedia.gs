@@ -7,7 +7,8 @@
 const HALF_MEDIA_MAX_BYTES = 25 * 1024 * 1024;
 
 function halfMediaAuthorized(payload) {
-  return PT_KEY !== 'CHANGE_ME' && String((payload || {}).key || '') === PT_KEY;
+  const body = payload || {};
+  return ptCredentialAuthorized_(body.key, body.token);
 }
 
 function halfMediaSafeName(value, fallback) {

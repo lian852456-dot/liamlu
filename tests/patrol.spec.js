@@ -5,6 +5,7 @@ const fs = require('fs/promises');
 // 模擬 GAS 後端：每日回報、巡店、班表與半月督導檢查（含通行碼驗證）
 // 驗證「電腦貼上 → 上雲 → 另一裝置載入」的跨裝置同步流程
 const PT_KEY = 'test123';
+const PT_TOKEN = 'test-session-token';
 let cloudRows;
 let halfRows;
 let writeCalls;
@@ -47,8 +48,20 @@ async function stubGas(page) {
     const request = route.request();
     if (request.method() === 'POST') {
       const payload = JSON.parse(request.postData() || '{}');
+      if (payload.action === 'ptauth') {
+        const authed = payload.key === PT_KEY || payload.token === PT_TOKEN;
+        return route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify(authed
+            ? { status: 'ok', token: PT_TOKEN, expiresIn: 1800 }
+            : { status: 'error', message: 'unauthorized' }),
+        });
+      }
+      if (payload.action === 'ptlogout') {
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'ok' }) });
+      }
       if (payload.action === 'half_media_upload') {
-        const authed = payload.key === PT_KEY;
+        const authed = payload.token === PT_TOKEN;
         if (!authed) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'error', message: 'unauthorized' }) });
         const file = payload.file || {};
         const id = `media-${mediaUploads.length + 1}`;
@@ -67,10 +80,12 @@ async function stubGas(page) {
     const url = new URL(route.request().url());
     const action = url.searchParams.get('action');
     const cb = url.searchParams.get('callback');
-    const authed = url.searchParams.get('key') === PT_KEY;
+    const authed = url.searchParams.get('token') === PT_TOKEN;
     let body;
     if (action === 'ping') {
       body = JSON.stringify({ status: 'ok' });
+    } else if (action === 'pthealth') {
+      body = JSON.stringify({ status: 'ok', configured: true, contract: 'patrol-auth-v3' });
     } else if (action === 'ptread') {
       ptReadCalls++;
       body = authed
@@ -127,9 +142,11 @@ async function stubGas(page) {
   });
 }
 
-// 通行碼輸入框自動作答
-function answerKeyPrompt(page, answer) {
-  page.on('dialog', d => d.accept(answer));
+async function openAndUnlock(page, answer = PT_KEY) {
+  await page.goto(PAGE_URL);
+  await page.locator('#patrolPasscode').fill(answer);
+  await page.getByRole('button', { name: '驗證並進入' }).click();
+  if (answer === PT_KEY) await expect(page.locator('#patrolAuthGate')).toBeHidden();
 }
 
 const PAGE_URL = 'file://' + path.resolve(__dirname, '../patrol.html');
@@ -144,8 +161,7 @@ test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', as
   // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
   const desktop = await browser.newPage();
   await stubGas(desktop);
-  answerKeyPrompt(desktop, PT_KEY);
-  await desktop.goto(PAGE_URL);
+  await openAndUnlock(desktop);
   await expect(desktop.locator('#cloudStatus')).toHaveText(/已連線/);
 
   const lines = [
@@ -161,8 +177,7 @@ test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', as
   // ── 裝置二（手機）：全新頁面，輸入通行碼後直接看到雲端資料 ──
   const mobile = await browser.newPage();
   await stubGas(mobile);
-  answerKeyPrompt(mobile, PT_KEY);
-  await mobile.goto(PAGE_URL);
+  await openAndUnlock(mobile);
   await expect(mobile.locator('#cloudStatus')).toHaveText(/已連線/);
   await expect(mobile.locator('#parseMsg')).toHaveText(/雲端已載入 3 筆明細/);
   await expect(mobile.locator('#content')).toContainText('台北通化');
@@ -174,17 +189,15 @@ test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', as
 
 test('通行碼錯誤時拿不到資料', async ({ page }) => {
   await stubGas(page);
-  answerKeyPrompt(page, '猜錯的密碼');
-  await page.goto(PAGE_URL);
-  await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
-  await expect(page.locator('#parseMsg')).toHaveText(/通行碼錯誤/);
-  await expect(page.locator('#content')).not.toContainText('台北通化');
+  await openAndUnlock(page, '猜錯的密碼');
+  await expect(page.locator('#patrolAuthGate')).toBeVisible();
+  await expect(page.locator('#patrolAuthMessage')).toHaveText(/通行碼錯誤/);
+  await expect(page.locator('#patrolAppHost')).toBeEmpty();
 });
 
 test('重複貼上同一批資料，雲端自動去重', async ({ page }) => {
   await stubGas(page);
-  answerKeyPrompt(page, PT_KEY);
-  await page.goto(PAGE_URL);
+  await openAndUnlock(page);
   await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
 
   const line = pasteLine(3, '台北永吉', 'DNB10082', 16, 'v', '');
@@ -206,8 +219,7 @@ test('貼上明細後切到督導檢查大盤不會用舊雲端資料覆蓋', as
     { fillTime: '2026/7/1 16:43', arriveTime: '2026/7/1 16:00', leaveTime: '2026/7/1 18:00', district: '北一二B', code: 'DNB10062', store: '台北酒泉', inspector: '測試督導', item: 14, result: 'v', reason: '', month: '2026-07' },
   ];
   await stubGas(page);
-  answerKeyPrompt(page, PT_KEY);
-  await page.goto(PAGE_URL);
+  await openAndUnlock(page);
   await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 1 筆明細/);
 
   await page.fill('#pasteBox', pasteLine(5, '台北通化', 'DNB10059', 14, 'v', ''));
@@ -223,8 +235,7 @@ test('貼上明細後切到督導檢查大盤不會用舊雲端資料覆蓋', as
 
 test('盤點提醒框：題14-17每月與題18兩個月獨立顯示進度', async ({ page }) => {
   await stubGas(page);
-  answerKeyPrompt(page, PT_KEY);
-  await page.goto(PAGE_URL);
+  await openAndUnlock(page);
   await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
 
   // 通化完成 14-17 全部＋本期(7月)做過 18；酒泉只完成 14；
@@ -259,8 +270,7 @@ test('盤點提醒框：題14-17每月與題18兩個月獨立顯示進度', asyn
 
 test('知悉宣導提醒：題19-33只看總進度與20日前完成狀態', async ({ page }) => {
   await stubGas(page);
-  answerKeyPrompt(page, PT_KEY);
-  await page.goto(PAGE_URL);
+  await openAndUnlock(page);
   await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
 
   // 通化 7/5 完成全部 19-33；酒泉只完成題 19
@@ -292,8 +302,7 @@ test('其他督導：GAS 回傳自己的標題與門市清單，看板跟著切�
     ],
   };
   await stubGas(page);
-  answerKeyPrompt(page, PT_KEY);
-  await page.goto(PAGE_URL);
+  await openAndUnlock(page);
   await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
 
   await expect(page.locator('#subTitle')).toHaveText('南區A · 王督導 · 33 項檢核追蹤');
@@ -306,8 +315,7 @@ test('其他督導：GAS 回傳自己的標題與門市清單，看板跟著切�
 
 test('大量資料會分批上傳且全數送達', async ({ page }) => {
   await stubGas(page);
-  answerKeyPrompt(page, PT_KEY);
-  await page.goto(PAGE_URL);
+  await openAndUnlock(page);
   await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
 
   const lines = [];
@@ -325,15 +333,14 @@ test('公開頁面不載入班表副本，未連線或未輸入通行碼時保�
   await page.route('https://script.google.com/**', route => route.abort());
   await page.goto(PAGE_URL);
   await expect(page.locator('script[src="data/schedule.js"]')).toHaveCount(0);
-  await page.locator('.secure-tab[data-view="schedule"]').click();
-  await expect(page.locator('#privateAuthStatus')).toContainText('尚未解鎖');
-  await expect(page.locator('#scheduleView')).not.toBeVisible();
+  await expect(page.locator('#patrolAuthGate')).toBeVisible();
+  await expect(page.locator('.secure-tab')).toHaveCount(0);
+  await expect(page.locator('#scheduleView')).toHaveCount(0);
 });
 
 test('加密頁籤：每月班表可切換日週月檢視', async ({ page }) => {
   await stubGas(page);
-  answerKeyPrompt(page, PT_KEY);
-  await page.goto(PAGE_URL);
+  await openAndUnlock(page);
   await page.locator('.secure-tab[data-view="schedule"]').click();
   await expect(page.locator('#scheduleView')).toBeVisible();
   await expect(page.locator('#scheduleContent')).toContainText('通化');
@@ -357,8 +364,7 @@ test('加密頁籤：每月班表可切換日週月檢視', async ({ page }) => 
 
 test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({ page }) => {
   await stubGas(page);
-  answerKeyPrompt(page, PT_KEY);
-  await page.goto(PAGE_URL);
+  await openAndUnlock(page);
   await page.locator('.secure-tab[data-view="half"]').click();
   await expect(page.locator('#halfView')).toBeVisible();
   await expect(page.locator('.half-item')).toHaveCount(18);
@@ -380,8 +386,7 @@ test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({
 
 test('加密頁籤：半月督導檢查可上傳照片影片並在歷史回放', async ({ page }) => {
   await stubGas(page);
-  answerKeyPrompt(page, PT_KEY);
-  await page.goto(PAGE_URL);
+  await openAndUnlock(page);
   await page.locator('.secure-tab[data-view="half"]').click();
   await page.locator('#halfInspector').fill('測試督導');
   const mediaInput = page.locator('.half-evidence-file').first();
@@ -422,8 +427,7 @@ test('督導檢查大盤直接採計貼上巡店紀錄的上下半月、月盤�
     ...full('台北酒泉', 'DNB10062', '2026/7/10', 2, 5),
   ];
   await stubGas(page);
-  answerKeyPrompt(page, PT_KEY);
-  await page.goto(PAGE_URL);
+  await openAndUnlock(page);
   await page.locator('button[data-view="halfDashboard"]').click();
   await page.locator('#halfDashboardMonth').fill('2026-07');
   await page.locator('#halfDashboardMonth').press('Tab');
@@ -453,8 +457,7 @@ test('巡店異常明細只計入檢查至少 10 項且到店至少 5 次的門�
     ...rows('台北酒泉', 'DNB10062', [2, 5, 10, 16]),
   ];
   await stubGas(page);
-  answerKeyPrompt(page, PT_KEY);
-  await page.goto(PAGE_URL);
+  await openAndUnlock(page);
   await page.locator('button[data-view="halfDashboard"]').click();
   const dashboard = page.locator('#halfDashboardView');
   await expect(dashboard).toContainText('本月到店 5 次');

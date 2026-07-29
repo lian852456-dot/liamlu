@@ -311,6 +311,18 @@
   .half-dashboard-state.miss{border-color:#efc4c4;background:#fff8f8}.half-dashboard-state.miss strong{color:var(--miss)}
   .half-dashboard-rule{margin:2px 0 13px;font-size:12px;color:var(--muted)}
   .status-ok{color:var(--ok);font-weight:800}.status-issue{color:var(--miss);font-weight:800}.status-na{color:#999;font-weight:800}
+  .auth-gate{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(145deg,#101820,#1d2d3c)}
+  .auth-gate[hidden]{display:none}
+  .auth-gate-card{width:min(440px,100%);background:#fff;border-radius:18px;padding:30px;box-shadow:0 24px 70px rgba(0,0,0,.32)}
+  .auth-gate-card h1{margin:0 0 8px;color:#17212b;font-size:27px}
+  .auth-gate-card p{margin:0 0 22px;color:#5f6b76;line-height:1.65}
+  .auth-gate-form{display:grid;gap:12px}
+  .auth-gate-form label{font-size:13px;font-weight:800;color:#34414e}
+  .auth-gate-form input{width:100%;box-sizing:border-box;border:1px solid #cbd3dc;border-radius:10px;padding:13px 14px;font-size:16px}
+  .auth-gate-form button{border:0;border-radius:10px;padding:13px 16px;background:#f47b20;color:#fff;font-weight:800;cursor:pointer}
+  .auth-gate-form button:disabled{opacity:.55;cursor:wait}
+  .auth-gate-message{min-height:20px;margin-top:14px;font-size:13px;font-weight:700;color:#b42318}
+  .auth-gate-note{margin-top:18px!important;font-size:12px;color:#7a8692!important}
   @media(max-width:650px){
     .secure-tab{flex:1;min-width:0;padding:8px 7px;font-size:11.5px}
     .half-item{grid-template-columns:1fr}
@@ -320,6 +332,21 @@
 </style>
 </head>
 <body>
+<main id="patrolAuthGate" class="auth-gate" aria-labelledby="patrolAuthTitle">
+  <section class="auth-gate-card">
+    <h1 id="patrolAuthTitle">Liam 情報站</h1>
+    <p>本區包含巡店看板、門市資料、班表與半月檢查。請先通過正式後端驗證。</p>
+    <form id="patrolAuthForm" class="auth-gate-form" onsubmit="unlockPatrol(event)">
+      <label for="patrolPasscode">督導通行碼</label>
+      <input id="patrolPasscode" type="password" autocomplete="current-password" required>
+      <button id="patrolAuthSubmit" type="submit">驗證並進入</button>
+    </form>
+    <div id="patrolAuthMessage" class="auth-gate-message" role="alert" aria-live="polite"></div>
+    <p class="auth-gate-note">通行碼不會保存於 localStorage；驗證成功後只保存本頁短效 session。</p>
+  </section>
+</main>
+<div id="patrolAppHost"></div>
+<template id="patrolAppTemplate">
 <div class="wrap">
   <header>
     <h1><span class="dot"></span>Liam情報站</h1>
@@ -331,9 +358,8 @@
       <button class="secure-tab locked" data-view="halfDashboard" onclick="switchPatrolView('halfDashboard')">📊 督導檢查大盤</button>
     </nav>
     <div class="private-auth-bar" aria-label="受保護資料解鎖">
-      <span id="privateAuthStatus" class="auth-status">班表與督導檢查：尚未解鎖；資料不放在公開 GitHub</span>
-      <button id="privateLoginBtn" class="private-auth-btn primary" type="button" onclick="privateSignIn()">解鎖受保護資料</button>
-      <button id="privateLogoutBtn" class="private-auth-btn" type="button" onclick="privateSignOut()" hidden>登出</button>
+      <span id="privateAuthStatus" class="auth-status ok">已通過正式後端驗證；session 關閉頁面或逾時即失效</span>
+      <button id="privateLogoutBtn" class="private-auth-btn" type="button" onclick="privateSignOut()">登出</button>
     </div>
     <div class="month-pick">
       <label>追蹤月份</label>
@@ -428,6 +454,7 @@
 
   <footer>資料透過 GAS 同步至雲端試算表（跨裝置共用）· 台灣大哥大 北一二B</footer>
 </div>
+</template>
 
 <script>
 /* ---------- 檢核規則設定 ---------- */
@@ -499,41 +526,30 @@ let records = {};
 // rawDetails: 完整明細陣列，供上傳雲端與匯出（每筆一列）
 let rawDetails = [];
 let currentMonth = "";
-// 巡店專用網址鍵（優先），相容舊的共用鍵，最後才用預設（北一二B 的 GAS 部署）。
-// 其他督導在畫面上貼自己的 GAS 網址即可，只記在自己的裝置，資料互不相通。
-// GAS 網址本身不是密碼，也不包含巡店資料；保留部署端點以便既有資料自動恢復。
-// 一般資料端點目前依管理者決策免後端密碼；私有媒體 POST 仍需 PT_KEY。
+// 巡店所有資料 action 固定走同一個正式受保護部署。
 const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
-// 受保護班表／督導資料固定使用新版私有後端。如此即使瀏覽器保留了舊巡店網址，
-// 新頁籤仍不會誤連舊版而出現「unknown action」。
 const PRIVATE_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
-const PRIVATE_KEY_ENDPOINT_STORAGE = 'bei12b_pt_key_endpoint';
-let GAS_URL = localStorage.getItem('bei12b_pt_gas_url') ||
-              localStorage.getItem('bei12b_gas_url') ||
-              window.PATROL_LEGACY_GAS_URL || DEFAULT_PATROL_GAS_URL;
-// 前端巡店解鎖碼；輸入一次後記在本裝置。一般資料端點目前不做後端密碼驗證。
-let PT_KEY = localStorage.getItem('bei12b_pt_key') || '';
+const PT_SESSION_TOKEN_STORAGE = 'bei12b_pt_session_token';
+let GAS_URL = PRIVATE_GAS_URL;
+let PT_KEY = '';
+let PT_TOKEN = sessionStorage.getItem(PT_SESSION_TOKEN_STORAGE) || '';
+let appMounted = false;
 
-// 受保護服務換版時，舊裝置保存的碼不得直接送往新端點；強制重新驗證一次。
-if(PT_KEY && localStorage.getItem(PRIVATE_KEY_ENDPOINT_STORAGE)!==PRIVATE_GAS_URL){
+function clearPatrolAuthState(){
   localStorage.removeItem('bei12b_pt_key');
-  localStorage.removeItem(PRIVATE_KEY_ENDPOINT_STORAGE);
-  PT_KEY='';
+  localStorage.removeItem('bei12b_pt_key_endpoint');
+  localStorage.removeItem('bei12b_pt_gas_url');
+  localStorage.removeItem('bei12b_half_checks');
+  sessionStorage.removeItem(PT_SESSION_TOKEN_STORAGE);
+  sessionStorage.removeItem('bei12b_half_checks');
+  PT_KEY = '';
+  PT_TOKEN = '';
+  privateAccount = null;
+  secureUnlocked = false;
 }
-
-function askKey(msg){
-  const k = prompt(msg || '請輸入督導巡店通行碼');
-  if(k === null) return false;
-  PT_KEY = k.trim();
-  localStorage.setItem('bei12b_pt_key', PT_KEY);
-  localStorage.setItem(PRIVATE_KEY_ENDPOINT_STORAGE, PRIVATE_GAS_URL);
-  return true;
-}
-function clearPatrolKey(){
-  localStorage.removeItem('bei12b_pt_key');
-  localStorage.removeItem(PRIVATE_KEY_ENDPOINT_STORAGE);
-  PT_KEY='';
-}
+localStorage.removeItem('bei12b_pt_key');
+localStorage.removeItem('bei12b_pt_key_endpoint');
+localStorage.removeItem('bei12b_half_checks');
 let cloudOn = false;    // 雲端連線狀態
 
 /* ---------- 受保護資料邊界（Google Apps Script + 私有 Sheet） ----------
@@ -544,15 +560,14 @@ let privateAccount = null;
 function setPrivateAuthStatus(text, ok){
   const el=document.getElementById('privateAuthStatus');
   if(el){ el.textContent=text; el.classList.toggle('ok',Boolean(ok)); }
-  const login=document.getElementById('privateLoginBtn');
-  const logout=document.getElementById('privateLogoutBtn');
-  if(login) login.hidden=Boolean(ok);
-  if(logout) logout.hidden=!ok;
 }
 function privateConfigMessage(){
-  return '請輸入巡店通行碼；班表與督導檢查不會從公開 GitHub 載入。';
+  return '請輸入巡店通行碼；驗證成功前不會建立看板或讀取任何受保護資料。';
 }
 function privateCloudCall(action, params={}){
+  if(action!=='pthealth' && (!secureUnlocked || !privateAccount || !PT_TOKEN)){
+    return Promise.resolve({status:'error',message:'unauthorized'});
+  }
   const url = new URL(PRIVATE_GAS_URL);
   url.searchParams.set('action', action);
   Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
@@ -560,18 +575,26 @@ function privateCloudCall(action, params={}){
 }
 async function privateHealthCheck(){
   const res=await privateCloudCall('pthealth');
-  // 舊版端點不認識健康檢查時，仍保留原有的登入流程；新版才會明確提示設定問題。
-  if(res?.status==='ok' && res.configured===false) throw new Error('patrol_not_configured');
-  if(res?.status==='ok' && res.contract && res.contract!=='patrol-auth-v2') throw new Error('patrol_contract_mismatch');
+  if(res?.status!=='ok') throw new Error('patrol_contract_mismatch');
+  if(res.configured!==true) throw new Error('patrol_not_configured');
+  if(res.contract!=='patrol-auth-v3') throw new Error('patrol_contract_mismatch');
 }
 function privateAuthErrorText(err){
   const message=String(err?.message||err||'');
-  if(message==='patrol_not_configured') return '巡店服務尚未完成通行碼設定，請由管理者完成部署後再試';
+  if(message==='patrol_not_configured') return '管理者尚未完成安全設定，請先在 Apps Script Script Properties 設定 PT_KEY';
   if(message==='patrol_contract_mismatch') return '巡店服務版本不相容，請重新部署受保護服務後再試';
   if(message==='unauthorized') return '巡店通行碼錯誤';
   return `解鎖失敗：${message||'未知錯誤'}`;
 }
+function privateAuthPost(payload){
+  return fetch(PRIVATE_GAS_URL,{
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(payload||{})
+  }).then(r=>r.json());
+}
 function privateCloudCallJsonp(action, params={}){
+  if(!secureUnlocked || !privateAccount || !PT_TOKEN) return Promise.reject(new Error('unauthorized'));
   return new Promise((resolve, reject)=>{
     const cbName = 'privateCb_' + Date.now() + '_' + Math.floor(Math.random()*1e6);
     const url = new URL(PRIVATE_GAS_URL);
@@ -587,38 +610,105 @@ function privateCloudCallJsonp(action, params={}){
     document.body.appendChild(s);
   });
 }
-async function privateSignIn(retried){
-  if(!PT_KEY && !askKey()) return false;
+function setPatrolAuthMessage(text){
+  const el=document.getElementById('patrolAuthMessage');
+  if(el) el.textContent=text||'';
+}
+async function privateSignIn(passcode){
+  const submitted=String(passcode||'').trim();
+  if(!submitted){
+    setPatrolAuthMessage('請輸入督導通行碼');
+    return false;
+  }
+  PT_KEY=submitted;
   try{
     await privateHealthCheck();
-    const res=await privateCloudCall('sread',{key:PT_KEY});
+    const res=await privateAuthPost({action:'ptauth',key:PT_KEY});
     if(res.status!=='ok') throw new Error(res.message||'通行碼錯誤');
+    PT_TOKEN=String(res.token||'');
+    if(!PT_TOKEN) throw new Error('patrol_contract_mismatch');
+    sessionStorage.setItem(PT_SESSION_TOKEN_STORAGE,PT_TOKEN);
     privateAccount={username:'通行碼已驗證'};
-    setPrivateAuthStatus('受保護資料已解鎖（班表與督導資料不存於 GitHub）',true);
-    scheduleData=res.schedule;
+    secureUnlocked=true;
     return true;
   }catch(err){
-    // 受保護頁籤與舊巡店看板共用同一個本機通行碼。若裝置保留舊值，
-    // 需清除後重新詢問，否則手機／電腦會一直直接送出錯誤值而無法登入。
-    if(err.message==='unauthorized' && !retried){
-      clearPatrolKey();
-      if(askKey('巡店通行碼錯誤，請重新輸入')) return privateSignIn(true);
-    }
-    privateAccount=null;
+    clearPatrolAuthState();
     const errorText=privateAuthErrorText(err);
-    setPrivateAuthStatus(errorText+'；資料仍保持鎖定',false);
-    showMsg(errorText,'err');
+    setPatrolAuthMessage(errorText+'；資料仍保持鎖定');
+    const input=document.getElementById('patrolPasscode');
+    if(input) input.value='';
+    return false;
+  }finally{
+    PT_KEY='';
+  }
+}
+async function restorePatrolSession(){
+  if(!PT_TOKEN) return false;
+  try{
+    await privateHealthCheck();
+    const res=await privateAuthPost({action:'ptauth',token:PT_TOKEN});
+    if(res.status!=='ok' || !res.token) throw new Error('unauthorized');
+    PT_TOKEN=String(res.token);
+    sessionStorage.setItem(PT_SESSION_TOKEN_STORAGE,PT_TOKEN);
+    privateAccount={username:'短效 session 已驗證'};
+    secureUnlocked=true;
+    mountPatrolApp();
+    return true;
+  }catch{
+    clearPatrolAuthState();
+    setPatrolAuthMessage('session 已失效，請重新輸入督導通行碼');
     return false;
   }
 }
-async function privateSignOut(){
-  privateAccount=null; setPrivateAuthStatus('班表與督導檢查：尚未解鎖；資料不放在公開 GitHub',false);
-  scheduleData=null; secureUnlocked=false;
+async function unlockPatrol(event){
+  event?.preventDefault();
+  const input=document.getElementById('patrolPasscode');
+  const button=document.getElementById('patrolAuthSubmit');
+  if(button) button.disabled=true;
+  setPatrolAuthMessage('正在向正式後端驗證…');
+  const ok=await privateSignIn(input?.value||'');
+  if(ok) mountPatrolApp();
+  if(button) button.disabled=false;
 }
-async function privateScheduleRequest(month){ return privateCloudCall('sread',{key:PT_KEY,month:month||''}); }
+function mountPatrolApp(){
+  if(appMounted || !secureUnlocked || !privateAccount || !PT_TOKEN) return;
+  const template=document.getElementById('patrolAppTemplate');
+  const host=document.getElementById('patrolAppHost');
+  if(!template || !host) return;
+  host.replaceChildren(template.content.cloneNode(true));
+  appMounted=true;
+  const gate=document.getElementById('patrolAuthGate');
+  if(gate) gate.hidden=true;
+  initMonth();
+  loadHalfLocal();
+  activePatrolView='patrol';
+  render();
+  setPrivateAuthStatus('已通過正式後端驗證；session 關閉頁面或逾時即失效',true);
+  const gi=document.getElementById('gasUrl');
+  if(gi){ gi.value=PRIVATE_GAS_URL; gi.readOnly=true; }
+  cloudConnect();
+}
+function unmountPatrolApp(){
+  const host=document.getElementById('patrolAppHost');
+  if(host) host.replaceChildren();
+  appMounted=false;
+  const gate=document.getElementById('patrolAuthGate');
+  if(gate) gate.hidden=false;
+}
+async function privateSignOut(){
+  const token=PT_TOKEN;
+  clearPatrolAuthState();
+  records={};rawDetails=[];scheduleData=null;halfChecks=[];cloudOn=false;activePatrolView=null;
+  unmountPatrolApp();
+  setPatrolAuthMessage('已登出；請重新驗證後再進入');
+  const input=document.getElementById('patrolPasscode');
+  if(input) input.value='';
+  if(token) privateAuthPost({action:'ptlogout',token}).catch(()=>{});
+}
+async function privateScheduleRequest(month){ return privateCloudCall('sread',{token:PT_TOKEN,month:month||''}); }
 async function privateInspectionRequest(action, rows){
-  if(action==='read') return privateCloudCall('hread',{key:PT_KEY});
-  return privateCloudCallJsonp('hwrite',{payload:JSON.stringify(rows||[]),key:PT_KEY});
+  if(action==='read') return privateCloudCall('hread',{token:PT_TOKEN});
+  return privateCloudCallJsonp('hwrite',{payload:JSON.stringify(rows||[]),token:PT_TOKEN});
 }
 function halfMediaMimeType(file){
   const reported=String(file?.type||'').toLowerCase();
@@ -637,7 +727,7 @@ async function privateInspectionMediaUpload(file, context){
   const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('讀取檔案失敗'));reader.onload=()=>resolve(String(reader.result||''));reader.readAsDataURL(file);});
   const base64=dataUrl.split(',')[1]||'';
   let response;
-  try{response=await fetch(PRIVATE_GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'half_media_upload',key:PT_KEY,file:{name:file.name,type:mimeType,size:file.size,base64},context})});}
+  try{response=await fetch(PRIVATE_GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'half_media_upload',token:PT_TOKEN,file:{name:file.name,type:mimeType,size:file.size,base64},context})});}
   catch{throw new Error('無法連上私有上傳服務，請確認網路後再試');}
   const raw=await response.text();let result;
   try{result=JSON.parse(raw);}catch{throw new Error(response.ok?'上傳服務回應無法辨識，請稍後再試':`上傳服務暫時無法使用（${response.status}）`);}
@@ -832,6 +922,7 @@ function storeSummary(storeName){
 
 /* ---------- 渲染 ---------- */
 function render(){
+  if(!secureUnlocked || !privateAccount || !appMounted) return;
   renderTicker();
   renderOverview();
   renderInvPanels();
@@ -1111,6 +1202,9 @@ function storeCardHTML(storeName){
 /* ---------- 雲端同步（Google Apps Script） ---------- */
 // 讀取用 fetch GET（GAS 對簡單 GET 沒有 CORS 問題，與 index.html 同作法）
 function cloudCall(action, params={}){
+  if(!['ping','pthealth'].includes(action) && (!secureUnlocked || !privateAccount || !PT_TOKEN)){
+    return Promise.resolve({status:'error',message:'unauthorized'});
+  }
   const url = new URL(GAS_URL);
   url.searchParams.set('action', action);
   Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
@@ -1119,6 +1213,7 @@ function cloudCall(action, params={}){
 
 // 寫入走 JSONP（script tag + callback，與 index.html 同作法）
 function cloudCallJsonp(action, params={}){
+  if(!secureUnlocked || !privateAccount || !PT_TOKEN) return Promise.reject(new Error('unauthorized'));
   return new Promise((resolve, reject)=>{
     const cbName = 'ptCb_' + Date.now() + '_' + Math.floor(Math.random()*1e6);
     const url = new URL(GAS_URL);
@@ -1136,14 +1231,13 @@ function cloudCallJsonp(action, params={}){
 }
 
 function cloudConnect(){
-  const input=document.getElementById('gasUrl').value.trim();
-  if(input) GAS_URL=input;
+  if(!secureUnlocked || !privateAccount || !appMounted || !PT_TOKEN) return;
+  GAS_URL=PRIVATE_GAS_URL;
   if(!GAS_URL){ setCloudStatus('未設定',false); showMsg('請先貼上 GAS 網址','err'); return; }
   setCloudStatus('連線中…',false);
   cloudCall('ping').then(res=>{
     if(res.status==='ok'){
       cloudOn=true;
-      localStorage.setItem('bei12b_pt_gas_url', GAS_URL);
       setCloudStatus('已連線',true);
       showMsg('雲端已連線，正在載入資料…','ok');
       cloudLoad();
@@ -1157,10 +1251,9 @@ function cloudConnect(){
   });
 }
 
-function cloudLoad(retried){
-  if(!cloudOn) return;
-  if(!PT_KEY && !askKey()){ showMsg('未輸入通行碼，無法載入雲端資料','err'); return; }
-  cloudCall('ptread', {key: PT_KEY}).then(res=>{
+function cloudLoad(){
+  if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN) return;
+  cloudCall('ptread', {token: PT_TOKEN}).then(res=>{
     if(res.status==='ok'){
       // 套用各區自己的設定（GAS 的 PT_STORES / PT_TITLE），沒回傳就用預設
       if(Array.isArray(res.stores) && res.stores.length){
@@ -1176,12 +1269,8 @@ function cloudLoad(retried){
       rebuildFromRaw();
       render();
       showMsg(`雲端已載入 ${rawDetails.length} 筆明細`,'ok');
-    }else if(res.message==='unauthorized' && !retried){
-      clearPatrolKey();
-      if(askKey('通行碼錯誤，請重新輸入')) cloudLoad(true);
-      else showMsg('未輸入通行碼，無法載入雲端資料','err');
     }else if(res.message==='unauthorized'){
-      showMsg('通行碼錯誤（或 GAS 端尚未設定 PT_KEY 密碼），請重新整理再試','err');
+      privateSignOut();
     }else{
       showMsg('讀取失敗：'+(res.message||''),'err');
     }
@@ -1189,7 +1278,7 @@ function cloudLoad(retried){
 }
 
 function cloudWrite(details){
-  if(!cloudOn) return;
+  if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN) return;
   // content 可由題號還原，不上傳以縮短網址（JSONP payload 走 query string，有長度限制故分批）
   const slim = details.map(d=>({
     fillTime:d.fillTime, arriveTime:d.arriveTime, leaveTime:d.leaveTime, district:d.district,
@@ -1208,7 +1297,7 @@ function cloudWrite(details){
   if(part.length) chunks.push(part);
 
   // 每批失敗自動重試一次，避免一批網路閃斷讓後面全部沒送
-  const sendChunk = (c, attempt)=>cloudCallJsonp('ptwrite', {payload: JSON.stringify(c), key: PT_KEY})
+  const sendChunk = (c, attempt)=>cloudCallJsonp('ptwrite', {payload: JSON.stringify(c), token: PT_TOKEN})
     .then(res=>{
       if(res.status==='ok') return res.written||0;
       throw new Error(res.message==='unauthorized' ? '通行碼錯誤' : (res.message||'寫入失敗'));
@@ -1235,7 +1324,7 @@ function setCloudStatus(text, on){
 }
 
 /* ---------- 受保護頁籤：班表 + 督導半月檢查 ---------- */
-let activePatrolView = 'patrol';
+let activePatrolView = null;
 let secureUnlocked = false;
 let scheduleData = null;
 let halfChecks = [];
@@ -1249,13 +1338,7 @@ function esc(v){
 }
 async function secureAccess(){
   if(secureUnlocked && privateAccount) return true;
-  const ok=await privateSignIn();
-  if(!ok){
-    showMsg('請先解鎖受保護資料；班表與督導檢查資料目前保持鎖定','err');
-    return false;
-  }
-  secureUnlocked = true;
-  return true;
+  return false;
 }
 function toggleLegacyPatrol(hidden){
   ['ticker','overview','invPanels','patrolInputPanel','content'].forEach(id=>{
@@ -1264,7 +1347,7 @@ function toggleLegacyPatrol(hidden){
   });
 }
 async function switchPatrolView(view){
-  if(view!=='patrol' && !(await secureAccess())) return;
+  if(!(await secureAccess())) return;
   activePatrolView=view;
   toggleLegacyPatrol(view!=='patrol');
   document.querySelectorAll('.secure-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view));
@@ -1384,9 +1467,10 @@ function exportScheduleExcel(){
 
 function halfKey(row){ return `${row.checkId||`${row.date}|${row.store}|${row.period}`}|${row.item}`; }
 function mergeHalfRows(rows){
-  const map=new Map(halfChecks.map(r=>[halfKey(r),r])); rows.forEach(r=>map.set(halfKey(r),r)); halfChecks=Array.from(map.values()).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(a.store).localeCompare(String(b.store))||Number(a.item)-Number(b.item)); localStorage.setItem('bei12b_half_checks',JSON.stringify(halfChecks));
+  if(!secureUnlocked || !privateAccount) return;
+  const map=new Map(halfChecks.map(r=>[halfKey(r),r])); rows.forEach(r=>map.set(halfKey(r),r)); halfChecks=Array.from(map.values()).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(a.store).localeCompare(String(b.store))||Number(a.item)-Number(b.item)); sessionStorage.setItem('bei12b_half_checks',JSON.stringify(halfChecks));
 }
-function loadHalfLocal(){ try{const rows=JSON.parse(localStorage.getItem('bei12b_half_checks')||'[]');if(Array.isArray(rows)) halfChecks=rows;}catch{halfChecks=[];} }
+function loadHalfLocal(){ if(!secureUnlocked || !privateAccount) return;try{const rows=JSON.parse(sessionStorage.getItem('bei12b_half_checks')||'[]');if(Array.isArray(rows)) halfChecks=rows;}catch{halfChecks=[];} }
 function halfPeriod(date){ return Number((date||'').slice(-2))<=15?'H1':'H2'; }
 function halfPeriodLabel(p){ return p==='H1'?'上半月（1–15日）':'下半月（16日–月底）'; }
 async function loadHalfChecks(){
@@ -1540,15 +1624,7 @@ function exportHalfChecksExcel(){
 }
 
 /* ---------- 啟動 ---------- */
-initMonth();
-loadHalfLocal();
-render();
-// 有預設 GAS URL 時自動連線
-if(GAS_URL){
-  const gi=document.getElementById('gasUrl');
-  if(gi) gi.value=GAS_URL;
-  cloudConnect();
-}
+restorePatrolSession();
 
 </script>
 </body>

@@ -50,6 +50,14 @@ function doGet(e) {
     return jsonResponse({ status: 'ok' }, cb);
   }
 
+  if (action === 'pthealth') {
+    return jsonResponse({
+      status: 'ok',
+      configured: Boolean(ptConfiguredKey_()),
+      contract: 'patrol-auth-v3'
+    }, cb);
+  }
+
   if (action === 'debug') {
     try {
       if (!ptAuthorized(e)) throw new Error('unauthorized');
@@ -193,10 +201,10 @@ function doGet(e) {
 //       inspector, item, result, reason, month, savedAt
 // 以 fillTime+store+item 為唯一鍵，重複上傳自動略過
 //
-// ⚠️ PT_KEY 只保留給 HalfMedia.gs 的私有媒體 POST 驗證，實值只存在 GAS、不進 git。
-// 2026-07-23 起一般資料端點依管理者決策免密碼；不要把 CHANGE_ME 當成現行資料讀寫防線。
+// PT_KEY 僅從 Apps Script Script Properties 讀取，絕不寫入 repo。
+// 驗證成功後簽發短效 token；巡店、班表、半月檢查與私有媒體共用同一授權邊界。
 // ════════════════════════════════════
-const PT_KEY = 'CHANGE_ME';
+const PATROL_SESSION_TTL_SECONDS = 1800;
 
 // ── 分享給其他督導時，每人自建試算表與 GAS 部署，改這兩個設定即可 ──
 // （網頁 patrol.html 大家共用，會自動抓各自 GAS 回傳的標題與門市清單）
@@ -213,11 +221,54 @@ const PT_STORES = [
   { code: 'DNB10146', name: '台北杭州南' },
 ];
 
+function ptConfiguredKey_() {
+  const value = PropertiesService.getScriptProperties().getProperty('PT_KEY');
+  const key = String(value || '').trim();
+  return key && !/^CHANGE_ME$/i.test(key) ? key : '';
+}
+
+function ptSessionCacheKey_(token) {
+  return 'patrol_session:' + String(token || '');
+}
+
+function ptSessionAuthorized_(token) {
+  const clean = String(token || '').trim();
+  if (!/^[A-Za-z0-9-]{20,160}$/.test(clean)) return false;
+  return CacheService.getScriptCache().get(ptSessionCacheKey_(clean)) === 'ok';
+}
+
+function ptCredentialAuthorized_(key, token) {
+  const configuredKey = ptConfiguredKey_();
+  if (!configuredKey) return false;
+  if (ptSessionAuthorized_(token)) return true;
+  return String(key || '') === configuredKey;
+}
+
 function ptAuthorized(e) {
-  // 2026-07-29 起恢復真的通行碼檢查（Liam情報站僅供本人使用）。
-  // PT_KEY 保持 'CHANGE_ME' 會讓所有巡店讀寫一律被拒絕——
-  // 貼進 GAS 編輯器後，務必把上面的 PT_KEY 改成你自己的密碼再存檔部署。
-  return PT_KEY !== 'CHANGE_ME' && e.parameter.key === PT_KEY;
+  const params = (e && e.parameter) || {};
+  return ptCredentialAuthorized_(params.key, params.token);
+}
+
+function ptAuthenticatePayload(payload) {
+  const body = payload || {};
+  if (!ptConfiguredKey_()) throw new Error('unauthorized');
+
+  const existingToken = String(body.token || '').trim();
+  if (ptSessionAuthorized_(existingToken)) {
+    CacheService.getScriptCache().put(ptSessionCacheKey_(existingToken), 'ok', PATROL_SESSION_TTL_SECONDS);
+    return { token: existingToken, expiresIn: PATROL_SESSION_TTL_SECONDS };
+  }
+
+  if (!ptCredentialAuthorized_(body.key, '')) throw new Error('unauthorized');
+  const token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
+  CacheService.getScriptCache().put(ptSessionCacheKey_(token), 'ok', PATROL_SESSION_TTL_SECONDS);
+  return { token: token, expiresIn: PATROL_SESSION_TTL_SECONDS };
+}
+
+function ptLogoutPayload(payload) {
+  const token = String((payload || {}).token || '').trim();
+  if (token) CacheService.getScriptCache().remove(ptSessionCacheKey_(token));
+  return {};
 }
 
 const PATROL_SHEET = '巡店明細';
@@ -936,7 +987,9 @@ function doPost(e) {
     const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(payload.action || '');
     let result;
-    if (action === 'half_media_upload') result = uploadHalfMedia(payload);
+    if (action === 'ptauth') result = ptAuthenticatePayload(payload);
+    else if (action === 'ptlogout') result = ptLogoutPayload(payload);
+    else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
     else if (action === 'private_request') result = privateDashboardRequestBinding(payload);
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
     else if (action === 'private_access') result = privateDashboardAccess(payload);
