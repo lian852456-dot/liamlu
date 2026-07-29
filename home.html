@@ -6,17 +6,19 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Liam 智慧管理中心 · 北一二B</title>
+<meta name="robots" content="noindex, nofollow">
+<title>北一二B 智慧營運中心</title>
 <!--
   純導覽頁：只放四個系統的連結，不經手任何資料、不做登入。
-  各系統的權限各自獨立（Liam情報站需 GAS PT_KEY 通行碼、KPI 試算需員編授權），
+  各系統的權限各自獨立（Liam 情報站需 GAS PT_KEY 通行碼、同仁 KPI 試算需員編授權），
   不要因為這頁公開就把任何資料或密碼搬進來。
 -->
 <style>
   :root {
     --ink: #1a1a1a;
     --ink-soft: #55504a;
-    --ink-faint: #8b8478;
+    /* 調深：原 #8b8478 對比僅 3.37:1，日期／開啟／頁尾偏淡；現為 5.4:1 */
+    --ink-faint: #6b6459;
     --paper: #f6f4ef;
     --paper-raised: #ffffff;
     --line: #e4dfd4;
@@ -29,7 +31,8 @@
   :root[data-theme="dark"] {
     --ink: #f1ece2;
     --ink-soft: #bcb4a6;
-    --ink-faint: #837b6e;
+    /* 深色底要「調亮」才等於調深色底下的可讀性（原 4.46:1 → 現 6.2:1） */
+    --ink-faint: #9c9384;
     --paper: #16130e;
     --paper-raised: #201c15;
     --line: #35301f;
@@ -43,7 +46,7 @@
     :root:not([data-theme="light"]) {
       --ink: #f1ece2;
       --ink-soft: #bcb4a6;
-      --ink-faint: #837b6e;
+      --ink-faint: #9c9384;
       --paper: #16130e;
       --paper-raised: #201c15;
       --line: #35301f;
@@ -69,15 +72,21 @@
   }
 
   .page {
-    max-width: 780px;
+    max-width: 900px;
     margin: 0 auto;
     padding: 56px 24px 40px;
     display: flex;
     flex-direction: column;
-    gap: 40px;
+    gap: 36px;
   }
 
   .masthead { display: flex; flex-direction: column; gap: 10px; }
+  .crew {
+    font-size: 13px;
+    letter-spacing: .04em;
+    color: var(--ink-faint);
+    margin: -4px 0 0;
+  }
   .eyebrow {
     font-size: 12px;
     letter-spacing: .06em;
@@ -100,10 +109,29 @@
     margin: 0;
   }
   .today {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--ink-faint);
     margin: 2px 0 0;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* 功能分區：純視覺分組，不牽涉任何權限判斷 */
+  .zone { display: flex; flex-direction: column; gap: 14px; }
+  .zone-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--ink-soft);
+    letter-spacing: .02em;
+  }
+  .zone-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
   }
 
   .board {
@@ -161,12 +189,12 @@
   }
 
   .tag {
-    font-size: 11.5px;
+    font-size: 12px;
     letter-spacing: .03em;
     color: var(--card-accent-deep);
     font-weight: 600;
   }
-  .card h2 {
+  .card h3 {
     font-size: 19px;
     font-weight: 700;
     margin: 0;
@@ -179,7 +207,7 @@
     margin: 0;
   }
   .go {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--ink-faint);
     margin-top: auto;   /* 同一列的卡片高度相同，靠這行讓「開啟」一律貼齊卡片底部 */
     padding-top: 8px;
@@ -197,7 +225,7 @@
   }
   .foot p {
     margin: 0;
-    font-size: 12px;
+    font-size: 13px;
     line-height: 1.7;
     color: var(--ink-faint);
   }
@@ -215,63 +243,76 @@
 
 <div class="page">
   <header class="masthead">
-    <div class="eyebrow mono">工具導覽</div>
-    <h1>Liam 智慧管理中心</h1>
-    <p class="lede">四個各自獨立的系統，各自登入、各自的資料庫。點一項進去。</p>
+    <div class="eyebrow mono">One Portal. All Operations.</div>
+    <h1>北一二B 智慧營運中心</h1>
+    <p class="crew mono">Liam AI Crew</p>
+    <p class="lede">整合每日回報、KPI 試算與督導管理工具，依使用權限進入。</p>
     <p class="today mono" id="today"></p>
   </header>
 
-  <nav class="board" aria-label="系統選單">
-    <a class="card" href="index.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
-      <span class="stamp">報</span>
-      <div class="card-body">
-        <span class="tag mono">門市使用</span>
-        <h2>每日回報系統</h2>
-        <p>門市每日鍵入業績數字，自動彙整回報資料。</p>
-      </div>
-      <span class="go mono">開啟 →</span>
-    </a>
+  <section class="zone" aria-labelledby="zone-staff">
+    <h2 class="zone-title" id="zone-staff">同仁大廳</h2>
+    <nav class="board" aria-label="同仁大廳">
+      <a class="card" href="index.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
+        <span class="stamp">報</span>
+        <div class="card-body">
+          <span class="tag mono">門市使用</span>
+          <h3>每日回報系統</h3>
+          <p>門市每日鍵入業績數字，自動彙整回報資料。</p>
+        </div>
+        <span class="go mono">開啟 →</span>
+      </a>
 
-    <a class="card" href="patrol.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
-      <span class="stamp">巡</span>
-      <div class="card-body">
-        <span class="tag mono">督導專用 · 需通行碼</span>
-        <h2>Liam情報站</h2>
-        <p>巡店紀錄、班表、半月檢查、檢核大盤，一次追蹤 33 項。</p>
-      </div>
-      <span class="go mono">開啟 →</span>
-    </a>
+      <a class="card" href="kpi.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
+        <span class="stamp">績</span>
+        <div class="card-body">
+          <span class="tag mono">員編登入</span>
+          <h3>同仁 KPI 試算</h3>
+          <p>鍵入今日上線數，試算個人與店點的 KPI 達成率。</p>
+        </div>
+        <span class="go mono">開啟 →</span>
+      </a>
 
-    <a class="card" href="kpi.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
-      <span class="stamp">績</span>
-      <div class="card-body">
-        <span class="tag mono">員編登入</span>
-        <h2>KPI 試算</h2>
-        <p>鍵入今日上線數，試算個人與店點的 KPI 達成率。</p>
-      </div>
-      <span class="go mono">開啟 →</span>
-    </a>
+      <a class="card" href="kpitry.html" style="--card-accent:var(--cyan);--card-accent-deep:var(--cyan-deep)">
+        <span class="stamp">算</span>
+        <div class="card-body">
+          <span class="tag mono">公開試算 · 不讀取正式資料</span>
+          <h3>自訂 KPI 模擬器</h3>
+          <p>通用計算引擎，免登入，自行輸入店點與目標試算。</p>
+        </div>
+        <span class="go mono">開啟 →</span>
+      </a>
+    </nav>
+  </section>
 
-    <a class="card" href="kpitry.html" style="--card-accent:var(--cyan);--card-accent-deep:var(--cyan-deep)">
-      <span class="stamp">算</span>
-      <div class="card-body">
-        <span class="tag mono">免登入公開</span>
-        <h2>KPI 通用試算</h2>
-        <p>通用計算引擎，免登入，自行輸入店點與目標試算。</p>
-      </div>
-      <span class="go mono">開啟 →</span>
-    </a>
-  </nav>
+  <section class="zone" aria-labelledby="zone-sup">
+    <h2 class="zone-title" id="zone-sup">督導專區</h2>
+    <nav class="board" aria-label="督導專區">
+      <a class="card" href="patrol.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
+        <span class="stamp">巡</span>
+        <div class="card-body">
+          <span class="tag mono">督導專用 · 需通行碼</span>
+          <h3>Liam 情報站</h3>
+          <p>巡店紀錄、班表、半月檢查、檢核大盤，一次追蹤 33 項。</p>
+        </div>
+        <span class="go mono">開啟 →</span>
+      </a>
+    </nav>
+  </section>
 
   <footer class="foot">
     <p>各系統資料各自獨立存放，本頁僅提供連結、不經手任何資料。</p>
+    <p>內部工作輔助入口，非官方對外網站。</p>
     <p class="brand">台灣大哥大 · 北一二B</p>
   </footer>
 </div>
 
 <script>
   document.getElementById('today').textContent =
-    new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+    new Date().toLocaleDateString('zh-TW', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+    });
 </script>
 </body>
 </html>
