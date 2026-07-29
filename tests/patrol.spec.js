@@ -1,13 +1,15 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
+const fs = require('fs/promises');
 
-// 模擬 GAS 後端：ping / ptread / ptwrite（含 JSONP callback 與通行碼驗證）
+// 模擬 GAS 後端：每日回報、巡店、班表與半月督導檢查（含通行碼驗證）
 // 驗證「電腦貼上 → 上雲 → 另一裝置載入」的跨裝置同步流程
 const PT_KEY = 'test123';
 let cloudRows;
 let halfRows;
 let writeCalls;
 let cloudConfig; // 模擬各區 GAS 回傳的 PT_STORES / PT_TITLE
+let mediaUploads;
 
 function privateScheduleFixture() {
   const names = ['酒泉', '萬大', '大稻埕', '復興', '三創', '杭州', '永吉', '通化', '六張犁'];
@@ -18,11 +20,12 @@ function privateScheduleFixture() {
     stores: names.map(store => ({
       store,
       title: `台北${store}`,
-      staff: [{ name: '測試主管', role: '店長' }, { name: '測試同仁', role: '業務代表' }],
+      staff: [{ name: '測試主管', role: '店長' }, { name: '測試副店', role: '副店長' }, { name: '測試同仁', role: '業務代表' }],
       days: [{
         date: '2026-07-15', day: 15, weekday: '三',
         staff: [
           { name: '測試主管', role: '店長', status: '全', working: true },
+          { name: '測試副店', role: '副店長', status: '休假', working: false },
           { name: '測試同仁', role: '業務代表', status: '早1', working: true },
         ],
         workingStaff: [
@@ -37,11 +40,29 @@ function privateScheduleFixture() {
 
 async function stubGas(page) {
   await page.addInitScript(schedule => {
-    window.__PATROL_TEST_PRIVATE_AUTH__ = true;
-    window.__PATROL_TEST_SCHEDULE__ = schedule;
     window.PATROL_LEGACY_GAS_URL = 'https://script.google.com/macros/s/test/exec';
   }, privateScheduleFixture());
   await page.route('https://script.google.com/**', route => {
+    const request = route.request();
+    if (request.method() === 'POST') {
+      const payload = JSON.parse(request.postData() || '{}');
+      if (payload.action === 'half_media_upload') {
+        const authed = payload.key === PT_KEY;
+        if (!authed) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'error', message: 'unauthorized' }) });
+        const file = payload.file || {};
+        const id = `media-${mediaUploads.length + 1}`;
+        const media = {
+          id,
+          name: file.name,
+          mimeType: file.type,
+          viewUrl: `https://drive.google.com/file/d/${id}/view`,
+          previewUrl: /^image\//.test(file.type) ? `https://drive.google.com/uc?export=view&id=${id}` : `https://drive.google.com/file/d/${id}/preview`,
+        };
+        mediaUploads.push(media);
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'ok', media }) });
+      }
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'error', message: 'unknown action' }) });
+    }
     const url = new URL(route.request().url());
     const action = url.searchParams.get('action');
     const cb = url.searchParams.get('callback');
@@ -90,6 +111,10 @@ async function stubGas(page) {
         });
         body = JSON.stringify({ status: 'ok', written });
       }
+    } else if (action === 'sread') {
+      body = authed
+        ? JSON.stringify({ status: 'ok', schedule: privateScheduleFixture() })
+        : JSON.stringify({ status: 'error', message: 'unauthorized' });
     } else {
       body = JSON.stringify({ status: 'error', message: 'unknown action' });
     }
@@ -111,7 +136,7 @@ function pasteLine(d, store, code, item, result, reason) {
   return `2026/7/${d} 16:43\t2026/7/${d} 16:00\t2026/7/${d} 18:00\t北一二B\t${code}\t${store}\t測試督導\t${item}\t內容\t${result}\t${reason}`;
 }
 
-test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; cloudConfig = null; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; cloudConfig = null; mediaUploads = []; });
 
 test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
   // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
@@ -274,12 +299,12 @@ test('大量資料會分批上傳且全數送達', async ({ page }) => {
   expect(writeCalls).toBeGreaterThan(1); // 確實有分批
 });
 
-test('公開頁面不載入班表副本，未設定 Microsoft 365 時保持鎖定', async ({ page }) => {
+test('公開頁面不載入班表副本，未連線或未輸入通行碼時保持鎖定', async ({ page }) => {
   await page.route('https://script.google.com/**', route => route.abort());
   await page.goto(PAGE_URL);
   await expect(page.locator('script[src="data/schedule.js"]')).toHaveCount(0);
   await page.locator('.secure-tab[data-view="schedule"]').click();
-  await expect(page.locator('#privateAuthStatus')).toContainText('尚未設定 Microsoft Entra');
+  await expect(page.locator('#privateAuthStatus')).toContainText('尚未解鎖');
   await expect(page.locator('#scheduleView')).not.toBeVisible();
 });
 
@@ -296,7 +321,16 @@ test('加密頁籤：每月班表可切換日週月檢視', async ({ page }) => 
   await expect(page.locator('#scheduleContent')).toContainText('每月班表');
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '匯出 Excel' }).click();
-  expect((await downloadPromise).suggestedFilename()).toMatch(/TWM_班表_2026-07\.xls/);
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/TWM_班表_2026-07\.xls/);
+  const xml = await fs.readFile(await download.path(), 'utf8');
+  expect(xml).toContain('班表顏色備註');
+  expect(xml).toContain('店長：淺膚色');
+  expect(xml).toContain('副店長：淺藍色');
+  expect(xml).toContain('休假：淺綠色');
+  expect(xml).toContain('ss:StyleID="Manager"');
+  expect(xml).toContain('ss:StyleID="AssistantManager"');
+  expect(xml).toContain('ss:StyleID="Vacation"');
 });
 
 test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({ page }) => {
@@ -305,7 +339,7 @@ test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({
   await page.goto(PAGE_URL);
   await page.locator('.secure-tab[data-view="half"]').click();
   await expect(page.locator('#halfView')).toBeVisible();
-  await expect(page.locator('.half-item')).toHaveCount(33);
+  await expect(page.locator('.half-item')).toHaveCount(18);
   await page.locator('#halfInspector').fill('測試督導');
   await page.locator('.half-result').first().selectOption('abnormal');
   await page.locator('.half-note').first().fill('展示機未亮');
@@ -315,5 +349,41 @@ test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({
   await expect(page.locator('#halfHistory')).toContainText('1 項異常');
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '匯出 Excel' }).click();
-  expect((await downloadPromise).suggestedFilename()).toMatch(/半月督導檢查_.*\.xls/);
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/半月督導檢查_.*\.xls/);
+  const xml = await fs.readFile(await download.path(), 'utf8');
+  expect(xml).toContain('照片影片附件');
+  expect(xml).toContain('第 1–18 項');
+});
+
+test('加密頁籤：半月督導檢查可上傳照片影片並在歷史回放', async ({ page }) => {
+  await stubGas(page);
+  answerKeyPrompt(page, PT_KEY);
+  await page.goto(PAGE_URL);
+  await page.locator('.secure-tab[data-view="half"]').click();
+  await page.locator('#halfInspector').fill('測試督導');
+  const mediaInput = page.locator('.half-evidence-file').first();
+  await mediaInput.setInputFiles({ name: '展示機.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('photo') });
+  await expect(page.locator('.half-media-card .pending')).toHaveCount(1);
+  await mediaInput.setInputFiles({ name: '展示機說明.mp4', mimeType: 'video/mp4', buffer: Buffer.from('video') });
+  await expect(page.locator('.half-media-card .pending')).toHaveCount(2);
+  await page.getByRole('button', { name: '上傳選取的照片／影片' }).first().click();
+  await expect.poll(() => mediaUploads.length).toBe(2);
+  await expect(page.locator('.half-media-card img').first()).toBeVisible();
+  await expect(page.locator('.half-media-card iframe').first()).toBeVisible();
+
+  await page.getByRole('button', { name: '儲存並同步本期檢查' }).click();
+  await expect.poll(() => halfRows.length).toBe(18);
+  expect(halfRows[0].evidenceNames).toContain('media-1');
+  await page.getByRole('button', { name: /預覽／回放 2 個檔案/ }).click();
+  await expect(page.locator('#halfMediaModal')).toBeVisible();
+  await expect(page.locator('#halfMediaModal img')).toBeVisible();
+  await expect(page.locator('#halfMediaModal iframe')).toBeVisible();
+  await page.locator('#halfMediaModal .half-media-modal-close').click();
+  await expect(page.locator('#halfMediaModal')).toHaveCount(0);
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '匯出 Excel' }).click();
+  const xml = await fs.readFile(await (await downloadPromise).path(), 'utf8');
+  expect(xml).toContain('開啟私有附件');
+  expect(xml).toContain('ss:HRef="https://drive.google.com/file/d/media-1/view"');
 });

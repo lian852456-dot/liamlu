@@ -52,6 +52,7 @@ function doGet(e) {
 
   if (action === 'debug') {
     try {
+      if (!ptAuthorized(e)) throw new Error('unauthorized');
       const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       const sheets = ss.getSheets().map(s => ({
         name: s.getName(),
@@ -167,6 +168,16 @@ function doGet(e) {
     try {
       if (!ptAuthorized(e)) throw new Error('unauthorized');
       return jsonResponse({ status: 'ok', rows: readHalfCheck() });
+    } catch(err) {
+      return jsonResponse({ status: 'error', message: err.message });
+    }
+  }
+
+  // ── 每月班表：讀取指定月份（patrol.html，需通行碼）──
+  if (action === 'sread') {
+    try {
+      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      return jsonResponse({ status: 'ok', schedule: readSchedule(e.parameter.month || '') });
     } catch(err) {
       return jsonResponse({ status: 'error', message: err.message });
     }
@@ -296,30 +307,43 @@ function readPatrol() {
 
 // ════════════════════════════════════
 // 督導半月檢查
-// 工作表：督導半月檢查
-// 一個 checkId（日期|店點|H1/H2）有 33 列，方便後續逐題篩選缺失與改善。
-// 照片／影片不直接塞進試算表，只保存附件檔名；原始媒體保留在填寫裝置。
+// 工作表：半月督導檢查
+// 預先建立每店、每期 33 題，寫入時更新對應題目，不碰每日回報與巡店頁籤。
+// 證據只保存私有 Google Drive 連結／檔名；原始影像不寫入試算表。
 // ════════════════════════════════════
-const HALF_CHECK_SHEET = '督導半月檢查';
+const HALF_CHECK_SHEET = '半月督導檢查';
 const HALF_CHECK_HEADERS = [
-  'checkId','date','period','month','store','inspector','item','result',
-  'note','improvement','evidenceNames','savedAt'
+  '檢查ID','檢查期別','檢查日期','門市','督導','項目','檢查結果','缺失說明',
+  '改善措施','改善期限','改善狀態','證據檔案連結','建立時間','更新時間','執行頻率','填寫狀態'
 ];
 
 function getHalfCheckSheet() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let sh = ss.getSheetByName(HALF_CHECK_SHEET);
+  let sh = findNamedSheet(ss, HALF_CHECK_SHEET);
   if (!sh) {
     sh = ss.insertSheet(HALF_CHECK_SHEET);
     sh.appendRow(HALF_CHECK_HEADERS);
     sh.setFrozenRows(1);
-    sh.getRange('A:L').setNumberFormat('@');
+    sh.getRange('A:P').setNumberFormat('@');
   }
   return sh;
 }
 
+function halfCheckItemNo(value) {
+  const match = String(value || '').match(/^(\d+)/);
+  return match ? Number(match[1]) : Number(value || 0);
+}
+
 function halfCheckKey(row) {
-  return String(row[0] || '') + '|' + String(row[6] || '');
+  return [String(row[1] || ''), String(row[3] || ''), halfCheckItemNo(row[5])].join('|');
+}
+
+function halfResultToSheet(result) {
+  return ({ ok:'符合', abnormal:'缺失／異常', na:'不適用' })[String(result || '')] || '';
+}
+
+function halfResultToClient(result) {
+  return ({ '符合':'ok', '缺失／異常':'abnormal', '不適用':'na' })[String(result || '')] || '';
 }
 
 function writeHalfCheck(rows) {
@@ -329,17 +353,28 @@ function writeHalfCheck(rows) {
   for (let i = 1; i < data.length; i++) existing[halfCheckKey(data[i])] = i + 1;
   let written = 0;
   (rows || []).forEach(r => {
+    const month = String(r.month || String(r.date || '').slice(0, 7));
+    const period = `${month}-${String(r.period || '')}`;
+    const itemNo = Number(r.item || 0);
+    const key = [period, String(r.store || ''), itemNo].join('|');
+    const oldRow = existing[key] ? data[existing[key] - 1] : [];
+    const now = String(r.savedAt || new Date().toISOString());
+    const itemText = oldRow[5] || String(itemNo);
     const row = [
-      String(r.checkId || ''), String(r.date || ''), String(r.period || ''), String(r.month || ''),
-      String(r.store || ''), String(r.inspector || ''), String(r.item || ''), String(r.result || ''),
-      String(r.note || ''), String(r.improvement || ''), String(r.evidenceNames || ''), String(r.savedAt || new Date().toISOString())
+      String(r.checkId || `${r.date}|${r.store}|${r.period}`), period, String(r.date || ''),
+      String(r.store || ''), String(r.inspector || ''), String(itemText), halfResultToSheet(r.result),
+      String(r.note || ''), String(r.improvement || ''), String(oldRow[9] || ''),
+      String(r.result === 'abnormal' ? '待改善' : (oldRow[10] || '')),
+      String(r.evidenceNames || ''), String(oldRow[12] || now), now,
+      String(oldRow[14] || ''), String(r.result ? '已完成' : '填寫中')
     ];
-    const key = halfCheckKey(row);
     if (existing[key]) {
       sh.getRange(existing[key], 1, 1, HALF_CHECK_HEADERS.length).setValues([row]);
+      data[existing[key] - 1] = row;
     } else {
       sh.getRange(sh.getLastRow() + 1, 1, 1, HALF_CHECK_HEADERS.length).setValues([row]);
       existing[key] = sh.getLastRow();
+      data.push(row);
     }
     written++;
   });
@@ -354,9 +389,82 @@ function readHalfCheck() {
   return data.slice(1).map(row => {
     const o = {};
     headers.forEach((h, idx) => o[h] = row[idx] instanceof Date ? patrolTimeStr(row[idx]) : row[idx]);
-    o.item = Number(o.item || 0);
-    return o;
+    const periodText = String(o['檢查期別'] || '');
+    return {
+      checkId: String(o['檢查ID'] || ''),
+      date: String(o['檢查日期'] || ''),
+      period: periodText.slice(-2),
+      month: periodText.slice(0, 7),
+      store: String(o['門市'] || ''),
+      inspector: String(o['督導'] || ''),
+      item: halfCheckItemNo(o['項目']),
+      result: halfResultToClient(o['檢查結果']),
+      note: String(o['缺失說明'] || ''),
+      improvement: String(o['改善措施'] || ''),
+      evidenceNames: String(o['證據檔案連結'] || ''),
+      savedAt: String(o['更新時間'] || o['建立時間'] || '')
+    };
+  }).filter(o => o.date || o.result || o.inspector);
+}
+
+// ════════════════════════════════════
+// 每月班表（工作表：班表明細）
+// 僅由受保護頁籤讀取，GitHub Pages 不保存任何班表內容。
+// ════════════════════════════════════
+const SCHEDULE_SHEET = '班表明細';
+
+// Some imported Excel sheets can carry invisible leading/trailing whitespace
+// in their tab name. Match the exact name first, then a normalized fallback.
+function findNamedSheet(ss, sheetName) {
+  return ss.getSheetByName(sheetName) || ss.getSheets().find(sh => {
+    const normalized = String(sh.getName() || '').replace(/\u3000/g, ' ').trim();
+    return normalized === sheetName;
   });
+}
+
+function readSchedule(requestedMonth) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sh = findNamedSheet(ss, SCHEDULE_SHEET);
+  if (!sh || sh.getLastRow() < 2) throw new Error('尚無已匯入的班表資料');
+  const data = sh.getDataRange().getValues();
+  const headers = data[0];
+  const idx = {};
+  headers.forEach((h, i) => idx[h] = i);
+  const available = data.slice(1).map(r => String(r[idx['版本月份']] || '')).filter(Boolean).sort();
+  const month = requestedMonth && available.indexOf(requestedMonth) >= 0 ? requestedMonth : available[available.length - 1];
+  if (!month) throw new Error('找不到指定月份班表');
+  const stores = {};
+  data.slice(1).filter(r => String(r[idx['版本月份']] || '') === month).forEach(r => {
+    const storeName = String(r[idx['門市']] || '');
+    const date = scheduleDateString(r[idx['日期']]);
+    if (!storeName || !date) return;
+    if (!stores[storeName]) stores[storeName] = { store: storeName, title: storeName, staff: {}, days: {} };
+    const store = stores[storeName];
+    const name = String(r[idx['同仁']] || '');
+    const role = String(r[idx['職務']] || '');
+    const status = String(r[idx['班別']] || '');
+    const working = String(r[idx['出勤']] || '') === '是';
+    const manager = String(r[idx['值班主管']] || '') === '是';
+    if (name && !store.staff[name]) store.staff[name] = { name: name, role: role };
+    if (!store.days[date]) store.days[date] = { date: date, staff: [], managers: [], workingStaff: [] };
+    const assignment = { name: name, role: role, status: status, working: working };
+    store.days[date].staff.push(assignment);
+    if (working) store.days[date].workingStaff.push(assignment);
+    if (manager) store.days[date].managers.push(assignment);
+  });
+  const list = Object.keys(stores).sort().map(name => ({
+    store: stores[name].store,
+    title: stores[name].title,
+    staff: Object.keys(stores[name].staff).sort().map(k => stores[name].staff[k]),
+    days: Object.keys(stores[name].days).sort().map(k => stores[name].days[k])
+  }));
+  const parts = month.split('-').map(Number);
+  return { month: month, rocMonth: `民國${parts[0] - 1911}年${String(parts[1]).padStart(2, '0')}月`, stores: list };
+}
+
+function scheduleDateString(value) {
+  if (value instanceof Date) return Utilities.formatDate(value, 'Asia/Taipei', 'yyyy-MM-dd');
+  return String(value || '').slice(0, 10);
 }
 
 // 每週一巡店週報（Email 夾 Excel）
@@ -788,6 +896,630 @@ function jsonResponse(obj, callback) {
   }
   return ContentService.createTextOutput(body)
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ════════════════════════════════════
+// 北一二B KPI／台獎私有戰情
+//
+// 重要：資料快照、員編、裝置綁定皆不會放進 GitHub Pages 或公開原始碼。
+// 請先在「專案設定 > 指令碼屬性」設定：
+// - DASHBOARD_PRIVATE_FOLDER_ID：私有 Google Drive 資料夾 ID
+// - DASHBOARD_ADMIN_SECRET：僅區主管持有的強密碼
+// - DASHBOARD_BOOTSTRAP_CODE：首次綁定碼（目前為 0935）
+// 然後在 Apps Script 編輯器手動執行一次 setupPrivateDashboard()。
+// ════════════════════════════════════
+
+const PRIVATE_DASHBOARD_FILE = 'north12b-dashboard-private-latest.json';
+const PRIVATE_DASHBOARD_USERS_SHEET = 'DashboardUsers';
+const PRIVATE_DASHBOARD_REQUESTS_SHEET = 'DashboardRequests';
+const PRIVATE_DASHBOARD_USERS_HEADERS = [
+  'employee_id', 'masked_name', 'store', 'role', 'status',
+  'device_id', 'device_bound_at', 'last_login_at'
+];
+const PRIVATE_DASHBOARD_REQUEST_HEADERS = [
+  'request_id', 'employee_id', 'device_id', 'requested_at', 'status',
+  'approved_at', 'approved_by', 'replaced_device_id'
+];
+
+function doPost(e) {
+  try {
+    const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const action = String(payload.action || '');
+    let result;
+    if (action === 'half_media_upload') result = uploadHalfMedia(payload);
+    else if (action === 'private_request') result = privateDashboardRequestBinding(payload);
+    else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
+    else if (action === 'private_access') result = privateDashboardAccess(payload);
+    else if (action === 'private_admin_requests') result = privateDashboardAdminRequests(payload);
+    else if (action === 'private_admin_approve') result = privateDashboardAdminApprove(payload);
+    else if (action === 'private_admin_revoke') result = privateDashboardAdminRevoke(payload);
+    else if (action === 'private_admin_set_trusted_employee') result = privateDashboardAdminSetTrustedEmployee(payload);
+    else if (action === 'private_sync_roster') result = privateDashboardSyncRoster(payload);
+    else if (action === 'private_publish') result = privateDashboardPublish(payload);
+    else if (action === 'kpicalc_access') result = kpiCalcAccess(payload);
+    else if (action === 'kpicalc_publish') result = kpiCalcPublish(payload);
+    else throw new Error('unknown private dashboard action');
+    return jsonResponse({ status: 'ok', ...result });
+  } catch (err) {
+    return jsonResponse({ status: 'error', message: err && err.message ? err.message : String(err) });
+  }
+}
+
+function privateDashboardProperties() {
+  return PropertiesService.getScriptProperties();
+}
+
+function privateDashboardRequiredProperty(name) {
+  const value = privateDashboardProperties().getProperty(name);
+  if (!value || /^CHANGE_ME/i.test(value)) throw new Error('private dashboard is not configured: ' + name);
+  return value;
+}
+
+function privateDashboardNow() {
+  return Utilities.formatDate(new Date(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
+}
+
+function privateDashboardCleanEmployeeId(value) {
+  const employeeId = String(value || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{5,12}$/.test(employeeId)) throw new Error('員編格式不正確');
+  return employeeId;
+}
+
+function privateDashboardIsTrustedEmployee(employeeId) {
+  const trustedEmployeeId = String(privateDashboardProperties().getProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID') || '')
+    .trim()
+    .toUpperCase();
+  return /^[A-Z0-9]{5,12}$/.test(trustedEmployeeId) && employeeId === trustedEmployeeId;
+}
+
+function privateDashboardCleanDeviceId(value) {
+  const deviceId = String(value || '').trim();
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(deviceId)) throw new Error('裝置識別不正確，請重新開啟頁面');
+  return deviceId;
+}
+
+function privateDashboardHash(value) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value || ''));
+  return bytes.map(function(byte) {
+    const normalized = byte < 0 ? byte + 256 : byte;
+    return ('0' + normalized.toString(16)).slice(-2);
+  }).join('');
+}
+
+function privateDashboardAdminAuthorized(payload) {
+  const expected = privateDashboardRequiredProperty('DASHBOARD_ADMIN_SECRET');
+  const actual = String((payload || {}).adminSecret || '');
+  if (privateDashboardHash(actual) !== privateDashboardHash(expected)) throw new Error('管理者驗證失敗');
+}
+
+function privateDashboardFolder() {
+  return DriveApp.getFolderById(privateDashboardRequiredProperty('DASHBOARD_PRIVATE_FOLDER_ID'));
+}
+
+function privateDashboardRoster() {
+  const props = privateDashboardProperties();
+  const id = props.getProperty('DASHBOARD_ROSTER_SHEET_ID');
+  if (!id) throw new Error('尚未初始化私有戰情名冊，請先執行 setupPrivateDashboard');
+  return SpreadsheetApp.openById(id);
+}
+
+function privateDashboardSheet(name, headers) {
+  const ss = privateDashboardRoster();
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+  }
+  const existing = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+  if (existing.join('|') !== headers.join('|')) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return sheet;
+}
+
+function privateDashboardRows(sheet, headers) {
+  if (sheet.getLastRow() < 2) return [];
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues().map(function(row, offset) {
+    const item = { _row: offset + 2 };
+    headers.forEach(function(header, index) { item[header] = row[index] == null ? '' : String(row[index]); });
+    return item;
+  });
+}
+
+function privateDashboardWriteObject(sheet, headers, rowIndex, item) {
+  sheet.getRange(rowIndex, 1, 1, headers.length).setValues([headers.map(function(header) { return item[header] || ''; })]);
+}
+
+// 由管理者在 Apps Script 編輯器執行一次。建立的 Sheet 位於同一個私有 Drive 資料夾中。
+function setupPrivateDashboard() {
+  const props = privateDashboardProperties();
+  const folder = privateDashboardFolder();
+  let rosterId = props.getProperty('DASHBOARD_ROSTER_SHEET_ID');
+  let roster;
+  if (rosterId) {
+    roster = SpreadsheetApp.openById(rosterId);
+  } else {
+    roster = SpreadsheetApp.create('北一二B 私有戰情登入名冊（系統管理）');
+    const file = DriveApp.getFileById(roster.getId());
+    folder.addFile(file);
+    DriveApp.getRootFolder().removeFile(file);
+    props.setProperty('DASHBOARD_ROSTER_SHEET_ID', roster.getId());
+    rosterId = roster.getId();
+  }
+  privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
+  privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS);
+  return { rosterSheetId: rosterId, folderId: folder.getId() };
+}
+
+function privateDashboardUserByEmployeeId(employeeId) {
+  const sheet = privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
+  const found = privateDashboardRows(sheet, PRIVATE_DASHBOARD_USERS_HEADERS)
+    .filter(function(item) { return item.employee_id === employeeId; });
+  return { sheet: sheet, user: found.length ? found[0] : null };
+}
+
+function privateDashboardRequestBinding(payload) {
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
+  const bootstrapCode = String(payload.bootstrapCode || '');
+  if (privateDashboardHash(bootstrapCode) !== privateDashboardHash(privateDashboardRequiredProperty('DASHBOARD_BOOTSTRAP_CODE'))) {
+    throw new Error('首次啟用碼不正確');
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const lookup = privateDashboardUserByEmployeeId(employeeId);
+    if (!lookup.user || lookup.user.status !== 'active') throw new Error('此員編不在可使用名冊中');
+    if (lookup.user.device_id === deviceId) return { requestStatus: 'approved', message: '此裝置已核准，可直接以員編登入。' };
+    const requestSheet = privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS);
+    const requests = privateDashboardRows(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS);
+    const prior = requests.filter(function(item) {
+      return item.employee_id === employeeId && item.device_id === deviceId && item.status === 'pending';
+    })[0];
+    if (prior) return { requestStatus: 'pending', requestId: prior.request_id, message: '已送出綁定申請，等待管理者核准。' };
+    const request = {
+      request_id: Utilities.getUuid(), employee_id: employeeId, device_id: deviceId,
+      requested_at: privateDashboardNow(), status: 'pending', approved_at: '', approved_by: '', replaced_device_id: ''
+    };
+    privateDashboardWriteObject(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS, requestSheet.getLastRow() + 1, request);
+    privateDashboardNotifyAdminOfBindingRequest(request, lookup.user);
+    return { requestStatus: 'pending', requestId: request.request_id, message: '已送出綁定申請，等待管理者核准。' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function privateDashboardRequestStatus(payload) {
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
+  const requests = privateDashboardRows(
+    privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS),
+    PRIVATE_DASHBOARD_REQUEST_HEADERS
+  ).filter(function(item) { return item.employee_id === employeeId && item.device_id === deviceId; });
+  requests.sort(function(a, b) { return b.requested_at.localeCompare(a.requested_at); });
+  const latest = requests[0];
+  if (!latest) return { requestStatus: 'none' };
+  return { requestStatus: latest.status, requestedAt: latest.requested_at, approvedAt: latest.approved_at };
+}
+
+function privateDashboardNotifyAdminOfBindingRequest(request, user) {
+  const notifyEmail = String(privateDashboardProperties().getProperty('DASHBOARD_NOTIFY_EMAIL') || '').trim();
+  if (!notifyEmail) return;
+  const body = [
+    '北一二B KPI／台獎戰情有新的裝置綁定申請。',
+    '員編：' + request.employee_id,
+    '姓名：' + String(user.masked_name || ''),
+    '店點：' + String(user.store || ''),
+    '職務：' + String(user.role || ''),
+    '申請時間：' + request.requested_at,
+    '',
+    '請開啟網站的 KPI戰情或台獎戰情頁籤，按「管理者核准」處理。'
+  ].join('\n');
+  try {
+    MailApp.sendEmail(notifyEmail, '🔐 北一二B 戰情登入申請待核准', body);
+  } catch (error) {
+    console.log('private dashboard binding notification failed: ' + error);
+  }
+}
+
+function privateDashboardSnapshot() {
+  const files = privateDashboardFolder().getFilesByName(PRIVATE_DASHBOARD_FILE);
+  if (!files.hasNext()) throw new Error('今日私有戰情尚未更新');
+  const snapshot = JSON.parse(files.next().getBlob().getDataAsString('UTF-8'));
+  if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
+  return snapshot;
+}
+
+function privateDashboardAccess(payload) {
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
+    throw new Error('此員編尚未核准此裝置，請先申請並等待管理者核准');
+  }
+  lookup.user.last_login_at = privateDashboardNow();
+  privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
+  const snapshot = privateDashboardSnapshot();
+  return { snapshot: snapshot, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role } };
+}
+
+function privateDashboardAdminRequests(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const requests = privateDashboardRows(
+    privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS),
+    PRIVATE_DASHBOARD_REQUEST_HEADERS
+  ).filter(function(item) { return item.status === 'pending'; })
+    .sort(function(a, b) { return b.requested_at.localeCompare(a.requested_at); });
+  return { requests: requests.map(function(item) { return {
+    requestId: item.request_id, employeeId: item.employee_id, requestedAt: item.requested_at
+  }; }) };
+}
+
+function privateDashboardAdminApprove(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const requestId = String(payload.requestId || '');
+  if (!requestId) throw new Error('缺少綁定申請編號');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const requestSheet = privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS);
+    const requests = privateDashboardRows(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS);
+    const request = requests.filter(function(item) { return item.request_id === requestId; })[0];
+    if (!request || request.status !== 'pending') throw new Error('找不到待核准的綁定申請');
+    const lookup = privateDashboardUserByEmployeeId(request.employee_id);
+    if (!lookup.user || lookup.user.status !== 'active') throw new Error('名冊內找不到啟用中的員編');
+    const previousDeviceId = lookup.user.device_id || '';
+    lookup.user.device_id = request.device_id;
+    lookup.user.device_bound_at = privateDashboardNow();
+    lookup.user.last_login_at = '';
+    privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
+    requests.forEach(function(item) {
+      if (item.employee_id !== request.employee_id || item.status !== 'pending') return;
+      item.status = item.request_id === request.request_id ? 'approved' : 'superseded';
+      if (item.request_id === request.request_id) {
+        item.approved_at = privateDashboardNow();
+        item.approved_by = 'admin';
+        item.replaced_device_id = previousDeviceId;
+      }
+      privateDashboardWriteObject(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS, item._row, item);
+    });
+    return { approved: true, employeeId: request.employee_id };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function privateDashboardAdminRevoke(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  if (!lookup.user) throw new Error('找不到員編');
+  lookup.user.device_id = '';
+  lookup.user.device_bound_at = '';
+  lookup.user.last_login_at = '';
+  privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
+  return { revoked: true, employeeId: employeeId };
+}
+
+function privateDashboardAdminSetTrustedEmployee(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  if (!lookup.user || lookup.user.status !== 'active') throw new Error('此員編不在可使用名冊中');
+  const props = privateDashboardProperties();
+  props.setProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID', employeeId);
+  const notificationEmail = String(payload.notificationEmail || '').trim();
+  if (notificationEmail) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notificationEmail)) throw new Error('通知信箱格式不正確');
+    props.setProperty('DASHBOARD_NOTIFY_EMAIL', notificationEmail);
+  }
+  return { trustedEmployeeId: employeeId };
+}
+
+// ════════════════════════════════════
+// KPI 試算（kpi.html）— 與私有戰情共用員編名冊、裝置綁定與審核流程
+// 資料檔存在同一個私有 Drive 資料夾，不進 GitHub。
+// 發佈方式：kpi.html 進階設定 → 督導發佈區（管理者密碼＋JSON 檔）。
+// ════════════════════════════════════
+
+const PRIVATE_KPICALC_FILE = 'north12b-kpicalc-private-latest.json';
+
+function kpiCalcAccess(payload) {
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
+    throw new Error('此員編尚未核准此裝置，請先「首次申請綁定」並等待督導核准');
+  }
+  lookup.user.last_login_at = privateDashboardNow();
+  privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
+  const files = privateDashboardFolder().getFilesByName(PRIVATE_KPICALC_FILE);
+  if (!files.hasNext()) throw new Error('KPI 試算資料尚未發佈，請通知督導');
+  const data = JSON.parse(files.next().getBlob().getDataAsString('UTF-8'));
+  if (!data || !data.meta || !data.stores || !data.persons) throw new Error('KPI 試算資料格式不完整');
+  return { data: data, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role } };
+}
+
+function kpiCalcPublish(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const encoded = String(payload.dataBase64 || '');
+  if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('KPI 試算資料缺少或過大');
+  const text = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
+  const data = JSON.parse(text);
+  if (!data || !data.meta || !data.stores || !data.persons) throw new Error('KPI 試算資料格式不完整');
+  const folder = privateDashboardFolder();
+  const files = folder.getFilesByName(PRIVATE_KPICALC_FILE);
+  const blob = Utilities.newBlob(text, 'application/json', PRIVATE_KPICALC_FILE);
+  if (files.hasNext()) files.next().setContent(blob.getDataAsString('UTF-8'));
+  else folder.createFile(blob);
+  return { publishedAt: privateDashboardNow(), period: (data.meta && data.meta.period) || '' };
+}
+
+// ════════════════════════════════════
+// KPI 試算：每日自動更新（讀 Drive 日報 xlsx → 解析 → 發佈私有資料檔）
+//
+// 啟用方式（只需做一次）：
+//   1. 左側「服務 +」加入「Drive API」（識別碼 Drive，版本 v3）
+//   2. 函式選單選「setupKpiCalcAutoUpdate」→ 執行（會要求授權）
+//   3. 之後每天 11:00（台北時間，±15分）自動檢查來源資料夾，
+//      有新日報（檔名 MMDD.xlsx）就更新；沒有新檔就靜靜略過。
+// 想立即測試或當天補跑：函式選單選「testKpiCalcAutoUpdate」執行。
+// 注意：時間觸發器跑最新存檔程式碼，這部分不需重新部署 Web App。
+// 來源資料夾可用指令碼屬性 KPICALC_SOURCE_FOLDER_ID 覆蓋。
+// ════════════════════════════════════
+
+const KPICALC_SOURCE_FOLDER_ID_DEFAULT = '1zs4flckF4uysz55tXkAxojM5-yB6a9sH';
+const KPICALC_ITEMS = [
+  ['5G銷售數','5G',1],['HBO Max&Disney+&Prime Video銷售數','HBO/D+/PV',1],
+  ['Netflix多享組銷售數','Netflix多享組',1],['TTL AQ上線點數','AQ上線點數',0.5],
+  ['自退數','自退數',1],['解約後NP OUT','解約後NP OUT',1],['解約後NP OUT(督導績)','NP OUT(督導績)',1],
+  ['AQ V+D 999 (含)以上','AQ V+D≧999',1],['AQ V+D 1399 (含)以上','AQ V+D≧1399',1],
+  ['預付卡開卡面額','預付卡開卡面額',1],['RT上線點數','RT上線點數',0.1],
+  ['特殊維繫用戶續約數','特殊維繫續約',1],['高高特維用戶續約數','高高特維續約',1],
+  ['RT V+D 999 (含)以上','RT V+D≧999',1],['RT V+D 1399 (含)以上','RT V+D≧1399',1],
+  ['Device專案銷售數','Device專案',1],['重點Device銷售量','重點Device',1],
+  ['好速案銷售點數','好速案點數',0.25],['換約淨新增金額','換約淨新增金額',1],
+  ['空機、3C、物聯網及門市購營收','空機/3C/物聯網營收',1],['配件及其他營收','配件及其他營收',1],
+  ['包膜與保貼營收','包膜與保貼營收',1],['手機保險服務點數','手機保險點數',0.5],
+  ['MyVideo&KKBOX','MyVideo&KKBOX',1],['Apple&Google服務及雜誌週刊開通數','Apple&Google開通',1],
+];
+
+// 督導本人免裝置綁定：
+//   1. 專案設定（⚙️）→ 指令碼屬性 → 新增 DASHBOARD_TRUSTED_EMPLOYEE_ID = 你的員編
+//   2. 函式選單選 kpiCalcSetupSelf → 執行一次
+// 之後該員編在任何裝置輸入員編即可登入 kpi.html 與戰情，不用申請綁定。
+function kpiCalcSetupSelf() {
+  const raw = PropertiesService.getScriptProperties().getProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID');
+  if (!raw) throw new Error('請先在「專案設定 > 指令碼屬性」新增 DASHBOARD_TRUSTED_EMPLOYEE_ID = 你的員編');
+  const employeeId = privateDashboardCleanEmployeeId(raw);
+  const sheet = privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  const user = lookup.user || {
+    employee_id: employeeId, masked_name: '督導', store: '北一二B', role: '督導',
+    device_id: '', device_bound_at: '', last_login_at: ''
+  };
+  user.status = 'active';
+  if (user._row) privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, user._row, user);
+  else privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, sheet.getLastRow() + 1, user);
+  return { trusted: employeeId, status: 'active', note: '此員編已可在任何裝置直接登入' };
+}
+
+function setupKpiCalcAutoUpdate() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'kpiCalcAutoUpdate') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('kpiCalcAutoUpdate').timeBased().everyDays(1).atHour(11).inTimezone('Asia/Taipei').create();
+  return kpiCalcAutoUpdate();
+}
+
+function testKpiCalcAutoUpdate() {
+  PropertiesService.getScriptProperties().deleteProperty('KPICALC_LAST_IMPORT');
+  return kpiCalcAutoUpdate();
+}
+
+function kpiCalcNotify(subject, body) {
+  const email = String(PropertiesService.getScriptProperties().getProperty('DASHBOARD_NOTIFY_EMAIL') || '').trim() || NOTIFY_EMAIL;
+  if (!email || /CHANGE_ME/.test(email)) return;
+  try { MailApp.sendEmail(email, subject, body); } catch (e) { console.log('kpicalc notify failed: ' + e); }
+}
+
+function kpiCalcAutoUpdate() {
+  const props = PropertiesService.getScriptProperties();
+  let latest = null;
+  try {
+    const folderId = props.getProperty('KPICALC_SOURCE_FOLDER_ID') || KPICALC_SOURCE_FOLDER_ID_DEFAULT;
+    const files = DriveApp.getFolderById(folderId).getFiles();
+    while (files.hasNext()) {
+      const f = files.next();
+      const m = f.getName().match(/^(\d{4})\.xlsx$/);
+      if (!m) continue;
+      if (!latest || Number(m[1]) > Number(latest.tag) ||
+          (Number(m[1]) === Number(latest.tag) && f.getLastUpdated() > latest.file.getLastUpdated())) {
+        latest = { file: f, tag: m[1] };
+      }
+    }
+    if (!latest) { console.log('kpicalc: 找不到 MMDD.xlsx 日報檔'); return { status: 'no-file' }; }
+    const stamp = latest.file.getName() + ':' + latest.file.getLastUpdated().getTime();
+    if (props.getProperty('KPICALC_LAST_IMPORT') === stamp) return { status: 'up-to-date', file: latest.file.getName() };
+
+    const data = kpiCalcParseReport(latest.file);
+    const text = JSON.stringify(data);
+    const folder = privateDashboardFolder();
+    const existing = folder.getFilesByName(PRIVATE_KPICALC_FILE);
+    if (existing.hasNext()) existing.next().setContent(text);
+    else folder.createFile(Utilities.newBlob(text, 'application/json', PRIVATE_KPICALC_FILE));
+    props.setProperty('KPICALC_LAST_IMPORT', stamp);
+    kpiCalcNotify('✅ KPI試算資料已更新（' + latest.file.getName() + '）',
+      '來源：' + latest.file.getName() + '\n期間：' + data.meta.period +
+      '\n店點 ' + data.stores.length + ' 家、人員 ' + data.persons.length + ' 位。\n同仁重新登入 kpi.html 即可看到新累計數。');
+    return { status: 'updated', file: latest.file.getName(), period: data.meta.period };
+  } catch (err) {
+    console.log('kpicalc auto update failed: ' + err);
+    kpiCalcNotify('❌ KPI試算資料自動更新失敗' + (latest ? '（' + latest.file.getName() + '）' : ''),
+      '錯誤：' + (err && err.message ? err.message : String(err)) +
+      '\n舊資料維持不變。可能是日報欄位排版變動，請把檔案交給 Claude 檢查。');
+    return { status: 'error', message: String(err) };
+  }
+}
+
+// xlsx → 暫存 Google 試算表 → 解析兩張明細表 → 刪暫存
+function kpiCalcParseReport(xlsxFile) {
+  const converted = Drive.Files.create(
+    { name: 'kpicalc-tmp-' + xlsxFile.getName(), mimeType: 'application/vnd.google-apps.spreadsheet' },
+    xlsxFile.getBlob()
+  );
+  try {
+    const ss = SpreadsheetApp.openById(converted.id);
+    const storeSheet = ss.getSheetByName('上線數KPI_店點達成率_明細');
+    const personSheet = ss.getSheetByName('上線數KPI_個人達成率_明細');
+    if (!storeSheet || !personSheet) throw new Error('找不到「上線數KPI_店點/個人達成率_明細」工作表');
+    const sv = storeSheet.getRange(1, 1, Math.min(60, storeSheet.getLastRow()), 236).getValues();
+    const pv = personSheet.getRange(1, 1, Math.min(120, personSheet.getLastRow()), 236).getValues();
+
+    const meta = kpiCalcParseMeta(sv, xlsxFile.getName());
+    const sBands = kpiCalcBands(sv[12], 8);   // 店點表：標題列 13、I 欄(9)起
+    const pBands = kpiCalcBands(pv[7], 10);   // 個人表：標題列 8、K 欄(11)起
+
+    const stores = [];
+    for (let r = 14; r < sv.length; r++) {
+      const code = String(sv[r][3] || '').trim();
+      if (!/^DNB/i.test(code)) { if (stores.length) break; else continue; }
+      const items = {};
+      KPICALC_ITEMS.forEach(function(it) {
+        const c = sBands[it[0]];
+        if (c === undefined) throw new Error('店點表缺少欄位：' + it[0]);
+        items[it[0]] = { t: kpiCalcNum(sv[r][c + 1]), a: kpiCalcNum(sv[r][c]), w: kpiCalcPct(sv[r][c + 2]) };
+      });
+      const bx = {};
+      const aq = sBands['TTL AQ上線數_加分項'];
+      bx.aqA = aq === undefined ? 0 : kpiCalcNum(sv[r][aq]);
+      bx.aqT = aq === undefined ? 0 : kpiCalcNum(sv[r][aq + 1]);
+      bx.dnHiN = kpiCalcBandVal(sBands, sv[r], 'RT降轉率_降轉數(前約 V+D 1399(含)以上)');
+      bx.dnHiD = kpiCalcBandVal(sBands, sv[r], 'RT降轉率_上線件數(前約 V+D 1399(含)以上)');
+      bx.upN = kpiCalcBandVal(sBands, sv[r], 'RT升轉率_升轉數(前約 V+D 1399以下)');
+      bx.upD = kpiCalcBandVal(sBands, sv[r], 'RT升轉率_上線件數(前約 V+D 1399以下)');
+      stores.push({ code: code, name: String(sv[r][4] || ''), official: kpiCalcNum(sv[r][7]), items: items, bonus: bx });
+    }
+
+    const persons = [];
+    for (let r = 9; r < pv.length; r++) {
+      const code = String(pv[r][2] || '').trim();
+      if (!/^DNB/i.test(code)) { if (persons.length) break; else continue; }
+      const items = {};
+      KPICALC_ITEMS.forEach(function(it) {
+        const c = pBands[it[0]];
+        if (c === undefined) throw new Error('個人表缺少欄位：' + it[0]);
+        items[it[0]] = { t: kpiCalcNum(pv[r][c + 1]), a: kpiCalcNum(pv[r][c]), w: kpiCalcPct(pv[r][c + 2]) };
+      });
+      persons.push({ store: code, role: String(pv[r][4] || ''), pname: String(pv[r][6] || ''),
+                     official: kpiCalcNum(pv[r][9]), items: items });
+    }
+
+    if (stores.length < 5 || persons.length < 10) {
+      throw new Error('解析結果不合理（店 ' + stores.length + '、人 ' + persons.length + '），疑似格式變動');
+    }
+    return {
+      meta: meta,
+      items: KPICALC_ITEMS.map(function(it) { return { key: it[0], short: it[1], step: it[2] }; }),
+      stores: stores,
+      persons: persons
+    };
+  } finally {
+    try { DriveApp.getFileById(converted.id).setTrashed(true); } catch (e) { console.log('kpicalc tmp cleanup failed: ' + e); }
+  }
+}
+
+function kpiCalcBands(headerRow, startCol0) {
+  const bands = {};
+  for (let c = startCol0; c <= 233; c += 4) {
+    const name = String(headerRow[c] || '').trim();
+    if (name) bands[name] = c;
+  }
+  return bands;
+}
+
+function kpiCalcBandVal(bands, row, name) {
+  const c = bands[name];
+  return c === undefined ? 0 : kpiCalcNum(row[c]);
+}
+
+function kpiCalcNum(v) {
+  if (v === '' || v === null || v === undefined) return 0;
+  const n = Number(String(v).replace(/,/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+function kpiCalcPct(v) {
+  if (v === '' || v === null || v === undefined) return 0;
+  if (typeof v === 'number') return Math.round(v * 1e6) / 1e6;
+  const s = String(v).trim();
+  const n = Number(s.replace(/[%,]/g, ''));
+  if (isNaN(n)) return 0;
+  return /%/.test(s) ? Math.round(n / 100 * 1e6) / 1e6 : Math.round(n * 1e6) / 1e6;
+}
+
+function kpiCalcParseMeta(sv, fileName) {
+  for (let r = 0; r < Math.min(10, sv.length); r++) {
+    for (let c = 0; c < 12; c++) {
+      const m = String(sv[r][c] || '').match(/(\d{4})\/(\d{1,2})\/(\d{1,2})\s*~\s*(\d{1,2})\/(\d{1,2})/);
+      if (m) {
+        const year = Number(m[1]), month = Number(m[2]), endDay = Number(m[5]);
+        return {
+          period: m[0],
+          snapshotDay: endDay,
+          monthDays: new Date(year, month, 0).getDate(),
+          month: year + '-' + ('0' + month).slice(-2),
+          sourceFile: fileName
+        };
+      }
+    }
+  }
+  throw new Error('找不到資料期間（例：2026/07/01 ~ 07/19）');
+}
+
+// 每日自動化以管理者密碼同步遮罩後名冊。既有裝置綁定不會被覆蓋。
+function privateDashboardSyncRoster(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const members = Array.isArray(payload.members) ? payload.members : [];
+  const sheet = privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
+  const existing = privateDashboardRows(sheet, PRIVATE_DASHBOARD_USERS_HEADERS);
+  const byId = {};
+  existing.forEach(function(item) { byId[item.employee_id] = item; });
+  let synced = 0;
+  members.forEach(function(member) {
+    const employeeId = privateDashboardCleanEmployeeId(member.employeeId);
+    const item = byId[employeeId] || {
+      employee_id: employeeId, device_id: '', device_bound_at: '', last_login_at: ''
+    };
+    item.masked_name = String(member.maskedName || '');
+    item.store = String(member.store || '');
+    item.role = String(member.role || '');
+    item.status = member.status === 'inactive' ? 'inactive' : 'active';
+    if (item._row) privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, item._row, item);
+    else privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, sheet.getLastRow() + 1, item);
+    synced += 1;
+  });
+  return { synced: synced };
+}
+
+// 每日自動化在寄件成功後呼叫。快照僅存於私有 Drive，不經 GitHub。
+function privateDashboardPublish(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const encoded = String(payload.snapshotBase64 || '');
+  if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('私有戰情快照缺少或過大');
+  const text = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
+  const snapshot = JSON.parse(text);
+  if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
+  const folder = privateDashboardFolder();
+  const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
+  const blob = Utilities.newBlob(text, 'application/json', PRIVATE_DASHBOARD_FILE);
+  if (files.hasNext()) {
+    files.next().setContent(blob.getDataAsString('UTF-8'));
+  } else {
+    folder.createFile(blob);
+  }
+  return { publishedAt: privateDashboardNow(), reportDate: snapshot.kpiBattle.report_date || '' };
 }
 
 // ════════════════════════════════════

@@ -7,9 +7,9 @@
 <!--
   Privacy boundary: employee schedules, names, inspection records, and evidence
   must never be bundled into this public GitHub Pages file. Private data is
-  loaded only after Microsoft 365 authentication through PATROL_PRIVATE_CONFIG.
+  read from the private Google Sheet only after the existing patrol access code
+  has been verified by Google Apps Script.
 -->
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 <style>
   :root{
     --tw-black:#1a1a1a;
@@ -277,6 +277,22 @@
   .half-item textarea{grid-column:1 / -1;min-height:44px;resize:vertical;font-size:13px}
   .half-item input[type=file]{grid-column:1 / -1;font-size:12px;max-width:100%}
   .half-evidence{grid-column:1 / -1;font-size:12px;color:#777}
+  .half-media-actions{grid-column:1 / -1;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .half-media-actions button,.half-media-card a,.half-media-card button,.half-media-view{border:1px solid #ffd1b4;background:#fff7f1;color:#a94300;border-radius:7px;padding:6px 8px;font:inherit;font-size:12px;font-weight:800;text-decoration:none;cursor:pointer}
+  .half-media-actions button:disabled{opacity:.55;cursor:not-allowed}
+  .half-media-list{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:8px}
+  .half-media-card{border:1px solid var(--line);border-radius:8px;padding:7px;background:#fcfcfc;overflow:hidden}
+  .half-media-card img,.half-media-card video{display:block;width:100%;height:92px;object-fit:cover;border-radius:5px;background:#f1f1f1}
+  .half-media-card iframe{display:block;width:100%;height:92px;border:0;border-radius:5px;background:#111}
+  .half-media-card strong{display:block;margin:6px 0 5px;font-size:11px;line-height:1.35;word-break:break-word}
+  .half-media-card .pending{color:#a94300;font-size:11px}
+  .half-media-card .media-links{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+  .half-media-empty{grid-column:1 / -1;color:#999;font-size:12px;padding:3px 0}
+  .half-media-modal{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.66);padding:20px;display:grid;place-items:center}
+  .half-media-modal-card{width:min(960px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:13px;padding:16px;position:relative}
+  .half-media-modal-close{position:sticky;top:0;float:right;border:0;background:#222;color:#fff;border-radius:7px;padding:7px 10px;font-weight:800;cursor:pointer}
+  .half-media-modal-grid{clear:both;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;padding-top:10px}
+  .half-media-modal-grid .half-media-card img,.half-media-modal-grid .half-media-card video,.half-media-modal-grid .half-media-card iframe{height:190px}
   .half-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
   .half-history{overflow:auto}
   .half-history table{min-width:900px}
@@ -298,9 +314,9 @@
       <button class="secure-tab locked" data-view="schedule" onclick="switchPatrolView('schedule')">每月班表</button>
       <button class="secure-tab locked" data-view="half" onclick="switchPatrolView('half')">半月督導檢查</button>
     </nav>
-    <div class="private-auth-bar" aria-label="Microsoft 365 私有資料登入">
-      <span id="privateAuthStatus" class="auth-status">班表與督導檢查：尚未登入 Microsoft 365；資料不放在公開 GitHub</span>
-      <button id="privateLoginBtn" class="private-auth-btn primary" type="button" onclick="privateSignIn()">登入 Microsoft 365</button>
+    <div class="private-auth-bar" aria-label="受保護資料解鎖">
+      <span id="privateAuthStatus" class="auth-status">班表與督導檢查：尚未解鎖；資料不放在公開 GitHub</span>
+      <button id="privateLoginBtn" class="private-auth-btn primary" type="button" onclick="privateSignIn()">解鎖受保護資料</button>
       <button id="privateLogoutBtn" class="private-auth-btn" type="button" onclick="privateSignOut()" hidden>登出</button>
     </div>
     <div class="month-pick">
@@ -343,8 +359,9 @@
   <section id="scheduleView" class="secure-view" aria-label="每月班表">
     <div class="secure-card">
       <h2>每月班表・每日 / 每週 / 每月出勤</h2>
-      <p class="hint">資料來源：登入後的私人 OneDrive「TWM 班表」。GitHub Pages 不保存班表、人名或出勤資料。</p>
+      <p class="hint">資料來源：私有 Google Sheet 的班表封存。GitHub Pages 不保存班表、人名或出勤資料。</p>
       <div class="secure-toolbar">
+        <label>班表月份<input id="scheduleMonth" type="month" onchange="loadSchedule(true)"></label>
         <label>檢視方式<select id="scheduleMode" onchange="renderSchedule()"><option value="day">每日</option><option value="week">每週</option><option value="month">每月</option></select></label>
         <label>日期<input id="scheduleDate" type="date" onchange="renderSchedule()"></label>
         <button class="secure-btn" onclick="exportScheduleExcel()">匯出 Excel</button>
@@ -357,7 +374,7 @@
   <section id="halfView" class="secure-view" aria-label="半月督導檢查">
     <div class="secure-card">
       <h2>半月督導檢查・缺失改善回填</h2>
-      <p class="hint">登入 Microsoft 365 後填寫本期檢查；異常項目請填改善說明。照片／影片只會送到已設定的私人資料服務，不會上傳 GitHub。</p>
+      <p class="hint">解鎖後填寫本期檢查；異常項目請填改善說明。照片／影片上傳至私有 Drive，表內只保存檔案連結，不會上傳 GitHub。</p>
       <div id="halfSummary" class="half-summary"></div>
       <div class="half-meta">
         <label>檢查日期<input id="halfDate" type="date" onchange="renderHalfForm()"></label>
@@ -455,48 +472,44 @@ let currentMonth = "";
 // 其他督導在畫面上貼自己的 GAS 網址即可，只記在自己的裝置，資料互不相通。
 // GAS 網址本身不是密碼，也不包含巡店資料；保留部署端點以便既有資料自動恢復。
 // 真正的資料仍需 PT_KEY 驗證，PT_KEY 不寫入公開原始碼。
-const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
+const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
+// 受保護班表／督導資料固定使用新版私有後端。如此即使瀏覽器保留了舊巡店網址，
+// 新頁籤仍不會誤連舊版而出現「unknown action」。
+const PRIVATE_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
+const PRIVATE_KEY_ENDPOINT_STORAGE = 'bei12b_pt_key_endpoint';
 let GAS_URL = localStorage.getItem('bei12b_pt_gas_url') ||
               localStorage.getItem('bei12b_gas_url') ||
               window.PATROL_LEGACY_GAS_URL || DEFAULT_PATROL_GAS_URL;
 // 巡店通行碼（GAS 端 PT_KEY 驗證），輸入一次後記在本裝置
 let PT_KEY = localStorage.getItem('bei12b_pt_key') || '';
 
+// 受保護服務換版時，舊裝置保存的碼不得直接送往新端點；強制重新驗證一次。
+if(PT_KEY && localStorage.getItem(PRIVATE_KEY_ENDPOINT_STORAGE)!==PRIVATE_GAS_URL){
+  localStorage.removeItem('bei12b_pt_key');
+  localStorage.removeItem(PRIVATE_KEY_ENDPOINT_STORAGE);
+  PT_KEY='';
+}
+
 function askKey(msg){
   const k = prompt(msg || '請輸入督導巡店通行碼');
   if(k === null) return false;
   PT_KEY = k.trim();
   localStorage.setItem('bei12b_pt_key', PT_KEY);
+  localStorage.setItem(PRIVATE_KEY_ENDPOINT_STORAGE, PRIVATE_GAS_URL);
   return true;
+}
+function clearPatrolKey(){
+  localStorage.removeItem('bei12b_pt_key');
+  localStorage.removeItem(PRIVATE_KEY_ENDPOINT_STORAGE);
+  PT_KEY='';
 }
 let cloudOn = false;    // 雲端連線狀態
 
-/* ---------- 私有資料邊界（Microsoft 365 / OneDrive） ----------
- * 這裡只放非秘密設定。Client ID 不是密碼；不要把 client secret、token、
- * 員工班表或照片放進 GitHub。正式環境由部署設定注入 PATROL_PRIVATE_CONFIG：
- * {
- *   clientId: 'Entra application client id',
- *   tenantId: 'organizations',
- *   scheduleApi: 'https://private-service.example/schedule',
- *   inspectionApi: 'https://private-service.example/inspections',
- *   scopes: ['User.Read']
- * }
- * 私有 API 必須自行驗證 Microsoft 365 access token，並從 OneDrive／SharePoint
- * 讀寫資料；本頁不接受公開 JSON 或 repo 內的班表檔案。
+/* ---------- 受保護資料邊界（Google Apps Script + 私有 Sheet） ----------
+ * GitHub Pages 只有介面；班表、巡店與督導資料均留在私有 Google Sheet。
+ * 讀寫時必須通過既有巡店通行碼，通行碼只保存在使用者目前瀏覽器。
  */
-const PATROL_PRIVATE_CONFIG = Object.assign({
-  clientId: '',
-  tenantId: 'organizations',
-  scheduleApi: '',
-  inspectionApi: '',
-  scopes: ['User.Read']
-}, window.PATROL_PRIVATE_CONFIG || {});
-let privateMsal = null;
 let privateAccount = null;
-let privateToken = '';
-
-function privateAuthConfigured(){ return Boolean(PATROL_PRIVATE_CONFIG.clientId); }
-function privateTestMode(){ return window.__PATROL_TEST_PRIVATE_AUTH__ === true; }
 function setPrivateAuthStatus(text, ok){
   const el=document.getElementById('privateAuthStatus');
   if(el){ el.textContent=text; el.classList.toggle('ok',Boolean(ok)); }
@@ -506,70 +519,100 @@ function setPrivateAuthStatus(text, ok){
   if(logout) logout.hidden=!ok;
 }
 function privateConfigMessage(){
-  return '尚未設定 Microsoft Entra 應用程式；班表與督導檢查不會從公開 GitHub 載入。';
+  return '請輸入巡店通行碼；班表與督導檢查不會從公開 GitHub 載入。';
 }
-async function ensurePrivateMsal(){
-  if(privateTestMode()){ privateAccount={username:'test@local'}; setPrivateAuthStatus('測試私有資料連線已啟用（正式環境需 Microsoft 365 登入）',true); return true; }
-  if(!privateAuthConfigured()){ setPrivateAuthStatus(privateConfigMessage(),false); return false; }
-  if(!window.msal){ setPrivateAuthStatus('Microsoft 365 登入元件尚未載入，請稍後重試',false); return false; }
-  if(!privateMsal){
-    privateMsal=new msal.PublicClientApplication({auth:{clientId:PATROL_PRIVATE_CONFIG.clientId,authority:`https://login.microsoftonline.com/${PATROL_PRIVATE_CONFIG.tenantId||'organizations'}`,redirectUri:window.location.origin+window.location.pathname}});
-  }
-  const accounts=privateMsal.getAllAccounts();
-  if(!privateAccount && accounts.length) privateAccount=accounts[0];
-  if(privateAccount){ setPrivateAuthStatus(`Microsoft 365 已登入：${privateAccount.username||privateAccount.name||'目前帳號'}`,true); return true; }
-  return false;
+function privateCloudCall(action, params={}){
+  const url = new URL(PRIVATE_GAS_URL);
+  url.searchParams.set('action', action);
+  Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
+  return fetch(url.toString(), {method:'GET', cache:'no-store'}).then(r=>r.json());
 }
-async function privateSignIn(){
-  if(privateTestMode()){ privateAccount={username:'test@local'}; setPrivateAuthStatus('測試私有資料連線已啟用（正式環境需 Microsoft 365 登入）',true); return true; }
-  if(!privateAuthConfigured()){ setPrivateAuthStatus(privateConfigMessage(),false); showMsg('請先完成 Microsoft Entra 應用程式設定；目前沒有任何班表資料被載入','err'); return false; }
-  if(!window.msal){ setPrivateAuthStatus('Microsoft 365 登入元件尚未載入，請重新整理後再試',false); return false; }
+async function privateHealthCheck(){
+  const res=await privateCloudCall('pthealth');
+  // 舊版端點不認識健康檢查時，仍保留原有的登入流程；新版才會明確提示設定問題。
+  if(res?.status==='ok' && res.configured===false) throw new Error('patrol_not_configured');
+  if(res?.status==='ok' && res.contract && res.contract!=='patrol-auth-v2') throw new Error('patrol_contract_mismatch');
+}
+function privateAuthErrorText(err){
+  const message=String(err?.message||err||'');
+  if(message==='patrol_not_configured') return '巡店服務尚未完成通行碼設定，請由管理者完成部署後再試';
+  if(message==='patrol_contract_mismatch') return '巡店服務版本不相容，請重新部署受保護服務後再試';
+  if(message==='unauthorized') return '巡店通行碼錯誤';
+  return `解鎖失敗：${message||'未知錯誤'}`;
+}
+function privateCloudCallJsonp(action, params={}){
+  return new Promise((resolve, reject)=>{
+    const cbName = 'privateCb_' + Date.now() + '_' + Math.floor(Math.random()*1e6);
+    const url = new URL(PRIVATE_GAS_URL);
+    url.searchParams.set('action', action);
+    Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
+    url.searchParams.set('callback', cbName);
+    const s = document.createElement('script');
+    const timer = setTimeout(()=>{ cleanup(); reject(new Error('連線逾時')); }, 30000);
+    function cleanup(){ clearTimeout(timer); delete window[cbName]; s.remove(); }
+    window[cbName] = res => { cleanup(); resolve(res); };
+    s.onerror = ()=>{ cleanup(); reject(new Error('網路錯誤')); };
+    s.src = url.toString();
+    document.body.appendChild(s);
+  });
+}
+async function privateSignIn(retried){
+  if(!PT_KEY && !askKey()) return false;
   try{
-    if(!privateMsal){
-      privateMsal=new msal.PublicClientApplication({auth:{clientId:PATROL_PRIVATE_CONFIG.clientId,authority:`https://login.microsoftonline.com/${PATROL_PRIVATE_CONFIG.tenantId||'organizations'}`,redirectUri:window.location.origin+window.location.pathname}});
-    }
-    const result=await privateMsal.loginPopup({scopes:PATROL_PRIVATE_CONFIG.scopes||['User.Read']});
-    privateAccount=result.account; privateToken=result.accessToken||'';
-    setPrivateAuthStatus(`Microsoft 365 已登入：${privateAccount.username||privateAccount.name||'目前帳號'}`,true);
+    await privateHealthCheck();
+    const res=await privateCloudCall('sread',{key:PT_KEY});
+    if(res.status!=='ok') throw new Error(res.message||'通行碼錯誤');
+    privateAccount={username:'通行碼已驗證'};
+    setPrivateAuthStatus('受保護資料已解鎖（班表與督導資料不存於 GitHub）',true);
+    scheduleData=res.schedule;
     return true;
   }catch(err){
-    setPrivateAuthStatus('Microsoft 365 登入未完成；私人資料仍保持鎖定',false);
-    showMsg('Microsoft 365 登入失敗：'+(err.message||'請稍後重試'),'err');
+    // 受保護頁籤與舊巡店看板共用同一個本機通行碼。若裝置保留舊值，
+    // 需清除後重新詢問，否則手機／電腦會一直直接送出錯誤值而無法登入。
+    if(err.message==='unauthorized' && !retried){
+      clearPatrolKey();
+      if(askKey('巡店通行碼錯誤，請重新輸入')) return privateSignIn(true);
+    }
+    privateAccount=null;
+    const errorText=privateAuthErrorText(err);
+    setPrivateAuthStatus(errorText+'；資料仍保持鎖定',false);
+    showMsg(errorText,'err');
     return false;
   }
 }
 async function privateSignOut(){
-  if(privateTestMode()){ privateAccount=null; privateToken=''; setPrivateAuthStatus('測試私有資料連線已登出',false); return; }
-  try{ if(privateMsal && privateAccount) await privateMsal.logoutPopup({account:privateAccount}); }catch(err){ /* 登出失敗不保留本頁 token */ }
-  privateAccount=null; privateToken=''; setPrivateAuthStatus('班表與督導檢查：尚未登入 Microsoft 365；資料不放在公開 GitHub',false);
+  privateAccount=null; setPrivateAuthStatus('班表與督導檢查：尚未解鎖；資料不放在公開 GitHub',false);
   scheduleData=null; secureUnlocked=false;
 }
-async function privateAccessToken(){
-  if(privateTestMode()) return 'test-private-token';
-  if(!(await ensurePrivateMsal())) throw new Error(privateConfigMessage());
-  if(privateToken) return privateToken;
-  try{
-    const result=await privateMsal.acquireTokenSilent({account:privateAccount,scopes:PATROL_PRIVATE_CONFIG.scopes||['User.Read']});
-    privateToken=result.accessToken; return privateToken;
-  }catch(err){
-    const result=await privateMsal.acquireTokenPopup({account:privateAccount,scopes:PATROL_PRIVATE_CONFIG.scopes||['User.Read']});
-    privateToken=result.accessToken; return privateToken;
-  }
-}
-async function privateApiJson(url, options={}){
-  if(!url) throw new Error('尚未設定私人資料服務網址');
-  const headers=new Headers(options.headers||{});
-  headers.set('Accept','application/json');
-  headers.set('Authorization',`Bearer ${await privateAccessToken()}`);
-  const response=await fetch(url,{...options,headers,cache:'no-store'});
-  if(!response.ok) throw new Error(`私人資料服務 ${response.status}`);
-  return response.json();
-}
-function privateScheduleFixture(){ return privateTestMode() ? window.__PATROL_TEST_SCHEDULE__ : null; }
+async function privateScheduleRequest(month){ return privateCloudCall('sread',{key:PT_KEY,month:month||''}); }
 async function privateInspectionRequest(action, rows){
-  if(!PATROL_PRIVATE_CONFIG.inspectionApi) throw new Error('尚未設定私人督導檢查資料服務網址');
-  if(action==='read') return privateApiJson(PATROL_PRIVATE_CONFIG.inspectionApi);
-  return privateApiJson(PATROL_PRIVATE_CONFIG.inspectionApi,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'write',rows})});
+  if(action==='read') return privateCloudCall('hread',{key:PT_KEY});
+  return privateCloudCallJsonp('hwrite',{payload:JSON.stringify(rows||[]),key:PT_KEY});
+}
+function halfMediaMimeType(file){
+  const reported=String(file?.type||'').toLowerCase();
+  if(/^(image|video)\//.test(reported)) return reported;
+  const ext=String(file?.name||'').split('.').pop().toLowerCase();
+  const types={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',heic:'image/heic',heif:'image/heif',mp4:'video/mp4',mov:'video/quicktime',m4v:'video/x-m4v',webm:'video/webm'};
+  return types[ext]||'';
+}
+async function privateInspectionMediaUpload(file, context){
+  if(!privateAccount) throw new Error('請先解鎖受保護資料');
+  const maxBytes=25*1024*1024;
+  if(!file || !file.size) throw new Error('請先選擇照片或影片');
+  if(file.size>maxBytes) throw new Error('單一檔案上限為 25 MB，請縮短影片後再上傳');
+  const mimeType=halfMediaMimeType(file);
+  if(!mimeType) throw new Error('僅支援照片或影片檔案');
+  const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('讀取檔案失敗'));reader.onload=()=>resolve(String(reader.result||''));reader.readAsDataURL(file);});
+  const base64=dataUrl.split(',')[1]||'';
+  let response;
+  try{response=await fetch(PRIVATE_GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'half_media_upload',key:PT_KEY,file:{name:file.name,type:mimeType,size:file.size,base64},context})});}
+  catch{throw new Error('無法連上私有上傳服務，請確認網路後再試');}
+  const raw=await response.text();let result;
+  try{result=JSON.parse(raw);}catch{throw new Error(response.ok?'上傳服務回應無法辨識，請稍後再試':`上傳服務暫時無法使用（${response.status}）`);}
+  if(!response.ok) throw new Error(result.message||'上傳服務暫時無法使用');
+  if(result.status!=='ok') throw new Error(result.message||'媒體上傳失敗');
+  return result.media;
 }
 
 /* ---------- 初始化月份 ---------- */
@@ -1102,7 +1145,7 @@ function cloudLoad(retried){
       render();
       showMsg(`雲端已載入 ${rawDetails.length} 筆明細`,'ok');
     }else if(res.message==='unauthorized' && !retried){
-      localStorage.removeItem('bei12b_pt_key'); PT_KEY='';
+      clearPatrolKey();
       if(askKey('通行碼錯誤，請重新輸入')) cloudLoad(true);
       else showMsg('未輸入通行碼，無法載入雲端資料','err');
     }else if(res.message==='unauthorized'){
@@ -1163,16 +1206,19 @@ let activePatrolView = 'patrol';
 let secureUnlocked = false;
 let scheduleData = null;
 let halfChecks = [];
-const HALF_ITEMS = Array.from({length:33}, (_,i)=>i+1);
+// 督導半月檢查固定只採計第 1–18 項；原每日巡店 33 題不受影響。
+const HALF_ITEMS = Array.from({length:18}, (_,i)=>i+1);
+function isActiveHalfItem(item){ return HALF_ITEMS.includes(Number(item)); }
+function activeHalfRows(rows){ return (rows||[]).filter(row=>isActiveHalfItem(row.item)); }
 
 function esc(v){
   return String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 async function secureAccess(){
   if(secureUnlocked && privateAccount) return true;
-  const ok=await ensurePrivateMsal();
+  const ok=await privateSignIn();
   if(!ok){
-    showMsg('請先按「登入 Microsoft 365」；班表與督導檢查資料目前保持鎖定','err');
+    showMsg('請先解鎖受保護資料；班表與督導檢查資料目前保持鎖定','err');
     return false;
   }
   secureUnlocked = true;
@@ -1199,14 +1245,19 @@ async function switchPatrolView(view){
   }
 }
 
-async function loadSchedule(){
+async function loadSchedule(force){
   const status=document.getElementById('scheduleStatus');
-  if(scheduleData){ renderSchedule(); return; }
-  status.textContent='正在從私人資料服務載入 OneDrive 班表…';
+  const monthEl=document.getElementById('scheduleMonth');
+  const requested=monthEl?.value||'';
+  if(scheduleData && !force && (!requested || scheduleData.month===requested)){ renderSchedule(); return; }
+  if(!privateAccount){ status.textContent='班表資料仍鎖定'; return; }
+  status.textContent='正在載入私有班表…';
   try{
-    scheduleData=privateScheduleFixture();
-    if(!scheduleData) scheduleData=await privateApiJson(PATROL_PRIVATE_CONFIG.scheduleApi);
+    const res=await privateScheduleRequest(requested);
+    if(res.status!=='ok') throw new Error(res.message||'班表讀取失敗');
+    scheduleData=res.schedule;
     if(!scheduleData || !Array.isArray(scheduleData.stores)) throw new Error('私人班表資料格式不正確');
+    if(monthEl) monthEl.value=scheduleData.month;
     const dateEl=document.getElementById('scheduleDate');
     const today=new Date().toISOString().slice(0,10);
     dateEl.value=today.slice(0,7)===scheduleData.month?today:`${scheduleData.month}-01`;
@@ -1258,32 +1309,38 @@ function renderSchedule(){
 }
 
 function xmlEsc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;').replace(/\n/g,'&#10;'); }
-function xmlCell(value){ const type=typeof value==='number'?'Number':'String'; return `<Cell><Data ss:Type="${type}">${xmlEsc(value)}</Data></Cell>`; }
+function excelCell(value,style){ return style ? {value,style} : value; }
+function excelLink(value,link,style='Link'){ return {value,link,style}; }
+function xmlCell(cell){ const styled=cell&&typeof cell==='object'&&Object.prototype.hasOwnProperty.call(cell,'value'); const value=styled?cell.value:cell; const style=styled&&cell.style?` ss:StyleID="${xmlEsc(cell.style)}"`:''; const link=styled&&cell.link?` ss:HRef="${xmlEsc(cell.link)}"`:''; const type=typeof value==='number'?'Number':'String'; return `<Cell${style}${link}><Data ss:Type="${type}">${xmlEsc(value)}</Data></Cell>`; }
 function excelXml(sheets){
   const ns='urn:schemas-microsoft-com:office:spreadsheet';
   const body=sheets.map(s=>`<Worksheet ss:Name="${xmlEsc(s.name)}"><Table>${s.rows.map(row=>`<Row>${row.map(xmlCell).join('')}</Row>`).join('')}</Table></Worksheet>`).join('');
-  return `<?xml version="1.0"?><Workbook xmlns="${ns}" xmlns:ss="${ns}"><Styles><Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Microsoft JhengHei" ss:Size="10"/></Style></Styles>${body}</Workbook>`;
+  return `<?xml version="1.0"?><Workbook xmlns="${ns}" xmlns:ss="${ns}"><Styles><Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Microsoft JhengHei" ss:Size="10"/></Style><Style ss:ID="Title"><Font ss:FontName="Microsoft JhengHei" ss:Size="12" ss:Bold="1"/></Style><Style ss:ID="Header"><Font ss:FontName="Microsoft JhengHei" ss:Bold="1"/><Interior ss:Color="#FFD966" ss:Pattern="Solid"/></Style><Style ss:ID="Link"><Font ss:FontName="Microsoft JhengHei" ss:Color="#0563C1" ss:Underline="Single"/></Style><Style ss:ID="Manager"><Interior ss:Color="#FCE4D6" ss:Pattern="Solid"/></Style><Style ss:ID="AssistantManager"><Interior ss:Color="#DDEBF7" ss:Pattern="Solid"/></Style><Style ss:ID="Vacation"><Interior ss:Color="#E2F0D9" ss:Pattern="Solid"/></Style></Styles>${body}</Workbook>`;
 }
 function downloadExcel(name,sheets){
   const blob=new Blob([excelXml(sheets)],{type:'application/vnd.ms-excel'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function exportScheduleExcel(){
   if(!scheduleData){ showMsg('班表尚未載入','err'); return; }
-  const total=monthDays(scheduleData.month); const monthRows=[['台灣大哥大 北一二B 每月班表',scheduleData.rocMonth],['店點','姓名','職務',...Array.from({length:total},(_,i)=>i+1)]];
+  const roleStyle=role=>{const text=String(role||'');if(/副店/.test(text))return'AssistantManager';if(/店長|店經理|店主管/.test(text))return'Manager';return'';};
+  const vacationStyle=status=>/休|假/.test(String(status||''))?'Vacation':'';
+  const total=monthDays(scheduleData.month); const legendRows=[[excelCell('班表顏色備註','Title')],[excelCell('店長：淺膚色','Manager')],[excelCell('副店長：淺藍色','AssistantManager')],[excelCell('休假：淺綠色','Vacation')]];
+  const monthRows=[[excelCell('台灣大哥大 北一二B 每月班表','Title'),excelCell(scheduleData.rocMonth,'Title')],[...['店點','姓名','職務',...Array.from({length:total},(_,i)=>i+1)].map(v=>excelCell(v,'Header'))]];
   scheduleData.stores.forEach(s=>s.staff.forEach(p=>{
-    const statuses=Array.from({length:total},(_,i)=>{
+    const rowStyle=roleStyle(p.role); const statuses=Array.from({length:total},(_,i)=>{
       const day=scheduleDay(s,`${scheduleData.month}-${String(i+1).padStart(2,'0')}`);
       const assignment=day ? (day.staff||[]).find(a=>a.name===p.name) : null;
-      return assignment ? (assignment.status||'') : '';
+      const status=assignment ? (assignment.status||'') : '';
+      return excelCell(status,vacationStyle(status)||rowStyle);
     });
-    monthRows.push([s.store,p.name,p.role,...statuses]);
+    monthRows.push([excelCell(s.store,rowStyle),excelCell(p.name,rowStyle),excelCell(p.role,rowStyle),...statuses]);
   }));
   const selected=document.getElementById('scheduleDate').value||`${scheduleData.month}-01`;
-  const dayRows=[['日期',selected,dateLabel(selected)],['門市','值班主管','出勤同仁','全員班別']];
-  scheduleData.stores.forEach(s=>{const d=scheduleDay(s,selected);dayRows.push([s.store,(d?.managers||[]).map(x=>x.name).join('、')||'未排',(d?.workingStaff||[]).map(x=>x.name).join('、')||'無',(d?.staff||[]).map(x=>`${x.name}:${x.status||''}`).join('、')]);});
-  const weekRows=[['每週出勤',selected],['日期','星期','門市','值班主管','出勤同仁']];
-  weekDates(selected).forEach(day=>scheduleData.stores.forEach(s=>{const d=scheduleDay(s,day);weekRows.push([day,dateLabel(day).slice(-2,-1),s.store,(d?.managers||[]).map(x=>x.name).join('、')||'未排',(d?.workingStaff||[]).map(x=>x.name).join('、')||'無']);}));
-  downloadExcel(`TWM_班表_${scheduleData.month}.xls`,[{name:'每月班表',rows:monthRows},{name:'每日出勤',rows:dayRows},{name:'每週出勤',rows:weekRows}]);
+  const dayRows=[[excelCell('日期','Title'),excelCell(selected,'Title'),excelCell(dateLabel(selected),'Title')],[...['門市','值班主管','出勤同仁','全員班別'].map(v=>excelCell(v,'Header'))]];
+  scheduleData.stores.forEach(s=>{const d=scheduleDay(s,selected);const managers=d?.managers||[];const managerStyle=roleStyle(managers[0]?.role);dayRows.push([s.store,excelCell(managers.map(x=>x.name).join('、')||'未排',managerStyle),(d?.workingStaff||[]).map(x=>x.name).join('、')||'無',(d?.staff||[]).map(x=>`${x.name}:${x.status||''}`).join('、')]);});
+  const weekRows=[[excelCell('每週出勤','Title'),excelCell(selected,'Title')],[...['日期','星期','門市','值班主管','出勤同仁'].map(v=>excelCell(v,'Header'))]];
+  weekDates(selected).forEach(day=>scheduleData.stores.forEach(s=>{const d=scheduleDay(s,day);const managers=d?.managers||[];weekRows.push([day,dateLabel(day).slice(-2,-1),s.store,excelCell(managers.map(x=>x.name).join('、')||'未排',roleStyle(managers[0]?.role)),(d?.workingStaff||[]).map(x=>x.name).join('、')||'無']);}));
+  downloadExcel(`TWM_班表_${scheduleData.month}.xls`,[{name:'顏色備註',rows:legendRows},{name:'每月班表',rows:monthRows},{name:'每日出勤',rows:dayRows},{name:'每週出勤',rows:weekRows}]);
   document.getElementById('scheduleStatus').textContent='已匯出 Excel（月表＋每日＋每週）';
 }
 
@@ -1296,11 +1353,11 @@ function halfPeriod(date){ return Number((date||'').slice(-2))<=15?'H1':'H2'; }
 function halfPeriodLabel(p){ return p==='H1'?'上半月（1–15日）':'下半月（16日–月底）'; }
 async function loadHalfChecks(){
   loadHalfLocal(); renderHalfSummary(); renderHalfForm(); renderHalfHistory();
-  if(!privateAccount || !PATROL_PRIVATE_CONFIG.inspectionApi) return;
+  if(!privateAccount) return;
   try{
     const res=await privateInspectionRequest('read');
     if(res.status==='ok'){ mergeHalfRows((res.rows||[]).map(r=>({...r,item:Number(r.item)}))); renderHalfSummary(); renderHalfForm(); renderHalfHistory(); }
-    else if(res.message==='unauthorized'){ secureUnlocked=false; showHalfMsg('Microsoft 365 權限不足，私人檢查資料保持鎖定','err'); }
+    else if(res.message==='unauthorized'){ secureUnlocked=false; privateAccount=null; showHalfMsg('巡店通行碼錯誤，私人檢查資料保持鎖定','err'); }
   }catch(err){ showHalfMsg('半月檢查雲端讀取失敗，先顯示本機資料','err'); }
 }
 function initHalfSelectors(){
@@ -1309,20 +1366,55 @@ function initHalfSelectors(){
 }
 function currentHalfRows(){
   const date=document.getElementById('halfDate').value; const store=document.getElementById('halfStore').value; const period=halfPeriod(date); const checkId=`${date}|${store}|${period}`;
-  return {date,store,period,checkId,rows:halfChecks.filter(r=>halfKey(r).startsWith(`${checkId}|`))};
+  return {date,store,period,checkId,rows:activeHalfRows(halfChecks.filter(r=>halfKey(r).startsWith(`${checkId}|`)))};
+}
+const halfPendingMedia=new Map();
+function halfMediaKey(checkId,item){ return `${checkId}|${Number(item)}`; }
+function driveFileId(url){ const text=String(url||'');const match=text.match(/\/d\/([A-Za-z0-9_-]+)/)||text.match(/[?&]id=([A-Za-z0-9_-]+)/);return match?match[1]:''; }
+function mediaItems(value){
+  const text=String(value||'').trim();if(!text)return[];
+  try{const parsed=JSON.parse(text);const rows=Array.isArray(parsed)?parsed:(Array.isArray(parsed.media)?parsed.media:[]);return rows.filter(x=>x&&typeof x==='object').map(x=>({...x,name:String(x.name||'附件'),mimeType:String(x.mimeType||''),viewUrl:String(x.viewUrl||x.url||''),previewUrl:String(x.previewUrl||x.url||''),id:String(x.id||'')}));}catch{}
+  const id=driveFileId(text);return[{id,name:'既有私有 Drive 附件',mimeType:'',viewUrl:text,previewUrl:id?`https://drive.google.com/uc?export=view&id=${id}`:text,legacy:true}];
+}
+function mediaValue(items){ return items.length?JSON.stringify(items.map(x=>({id:x.id||'',name:x.name||'附件',mimeType:x.mimeType||'',viewUrl:x.viewUrl||x.url||'',previewUrl:x.previewUrl||x.url||''}))):''; }
+function mediaKind(item){ return /^video\//.test(item.mimeType||'')?'video':/^image\//.test(item.mimeType||'')?'image':'link'; }
+function halfMediaCard(item,pending=false){
+  const kind=mediaKind(item);let preview='';
+  if(kind==='image'&&item.previewUrl)preview=`<img src="${esc(item.previewUrl)}" alt="${esc(item.name)}" loading="lazy">`;
+  else if(kind==='video'&&item.previewUrl)preview=pending?`<video src="${esc(item.previewUrl)}" controls muted playsinline></video>`:`<iframe src="${esc(item.previewUrl||item.viewUrl)}" title="${esc(item.name)}" allow="autoplay" loading="lazy"></iframe>`;
+  else preview='<div class="half-media-empty">已附私有連結</div>';
+  const open=item.viewUrl?`<a href="${esc(item.viewUrl)}" target="_blank" rel="noopener">${kind==='video'?'播放':'開啟'}</a>`:'';
+  return `<div class="half-media-card">${preview}<strong>${esc(item.name)}</strong>${pending?'<span class="pending">尚未上傳</span>':''}<div class="media-links">${open}</div></div>`;
+}
+function renderHalfMediaList(box){
+  const target=box.querySelector('.half-media-list');if(!target)return;
+  const key=box.dataset.mediaKey;const stored=mediaItems(box.dataset.evidence||'');const pending=(halfPendingMedia.get(key)||[]).map(file=>({name:file.name,mimeType:halfMediaMimeType(file),previewUrl:URL.createObjectURL(file)}));
+  target.innerHTML=(stored.length||pending.length)?[...stored.map(x=>halfMediaCard(x)),...pending.map(x=>halfMediaCard(x,true))].join(''):'<div class="half-media-empty">尚未附上照片或影片</div>';
+}
+async function uploadHalfMedia(box){
+  const key=box.dataset.mediaKey;const files=halfPendingMedia.get(key)||[];if(!files.length){showHalfMsg('請先選擇照片或影片','err');return;}
+  const item=Number(box.dataset.halfItem);const current=currentHalfRows();const inspector=document.getElementById('halfInspector').value.trim();const button=box.querySelector('.half-media-upload');button.disabled=true;
+  try{
+    const stored=mediaItems(box.dataset.evidence||'');const uploaded=[];
+    for(let i=0;i<files.length;i++){
+      showHalfMsg(`正在上傳第 ${i+1}/${files.length} 個檔案…`,'ok');
+      uploaded.push(await privateInspectionMediaUpload(files[i],{checkId:current.checkId,date:current.date,period:current.period,month:current.date.slice(0,7),store:current.store,inspector,item}));
+    }
+    box.dataset.evidence=mediaValue([...stored,...uploaded]);halfPendingMedia.delete(key);box.querySelector('.half-evidence-file').value='';renderHalfMediaList(box);showHalfMsg(`已上傳 ${uploaded.length} 個私有檔案；按「同步雲端」即可將附件連到本期檢查`,'ok');
+  }catch(err){showHalfMsg(`上傳失敗：${err.message}`,'err');}finally{button.disabled=false;}
 }
 function renderHalfForm(){
   initHalfSelectors(); const {date,store,period,checkId,rows}=currentHalfRows();
   const inspector=document.getElementById('halfInspector'); const saved=rows.find(r=>r.inspector)?.inspector||''; if(inspector && !inspector.value) inspector.value=saved;
   const c=document.getElementById('halfForm'); if(!c) return;
-  c.innerHTML=HALF_ITEMS.map(i=>{const r=rows.find(x=>Number(x.item)===i)||{};const result=r.result||'';return `<div class="half-item ${result==='abnormal'?'issue':''}" data-half-item="${i}"><div class="half-item-head"><span class="half-no">${i}</span><div><div class="half-item-title">${esc(ITEM_TEXT[i])}</div><div class="half-item-tag">${esc(ITEM_RULES[i]?.label||'本期檢查')}</div></div></div><select class="half-result" aria-label="第${i}題結果"><option value="">待填</option><option value="ok" ${result==='ok'?'selected':''}>符合</option><option value="abnormal" ${result==='abnormal'?'selected':''}>缺失／異常</option><option value="na" ${result==='na'?'selected':''}>不適用</option></select><textarea class="half-note" placeholder="檢查紀錄／缺失內容">${esc(r.note||'')}</textarea><textarea class="half-improvement" placeholder="改善說明（異常時填寫）">${esc(r.improvement||'')}</textarea><input class="half-files" type="file" accept="image/*,video/*" multiple aria-label="第${i}題照片或影片"><div class="half-evidence">${r.evidenceNames?`已記錄附件：${esc(r.evidenceNames)}`:'可拍照／錄影留下現場證據'}</div></div>`;}).join('');
+  c.innerHTML=HALF_ITEMS.map(i=>{const r=rows.find(x=>Number(x.item)===i)||{};const result=r.result||'';const key=halfMediaKey(checkId,i);const legacy=mediaItems(r.evidenceNames||'').some(x=>x.legacy)?String(r.evidenceNames||''):'';return `<div class="half-item ${result==='abnormal'?'issue':''}" data-half-item="${i}" data-media-key="${esc(key)}" data-evidence="${esc(r.evidenceNames||'')}"><div class="half-item-head"><span class="half-no">${i}</span><div><div class="half-item-title">${esc(ITEM_TEXT[i])}</div><div class="half-item-tag">${esc(ITEM_RULES[i]?.label||'本期檢查')}</div></div></div><select class="half-result" aria-label="第${i}題結果"><option value="">待填</option><option value="ok" ${result==='ok'?'selected':''}>符合</option><option value="abnormal" ${result==='abnormal'?'selected':''}>缺失／異常</option><option value="na" ${result==='na'?'selected':''}>不適用</option></select><textarea class="half-note" placeholder="檢查紀錄／缺失內容">${esc(r.note||'')}</textarea><textarea class="half-improvement" placeholder="改善說明（異常時填寫）">${esc(r.improvement||'')}</textarea><input class="half-evidence-file" type="file" accept="image/*,video/*" multiple aria-label="第${i}題上傳照片或影片"><div class="half-media-actions"><button type="button" class="half-media-upload">上傳選取的照片／影片</button><span class="half-evidence">可連續拍照／多選；單檔最多 25 MB，檔案僅會存入私有 Google Drive。</span></div><div class="half-media-list"></div><input class="half-evidence-link" type="url" inputmode="url" placeholder="已有私有 Google Drive 連結可貼在此處" value="${esc(legacy)}" aria-label="第${i}題既有證據連結"></div>`;}).join('');
   c.querySelectorAll('.half-result').forEach(el=>el.addEventListener('change',()=>el.closest('.half-item').classList.toggle('issue',el.value==='abnormal')));
-  c.querySelectorAll('.half-files').forEach(el=>el.addEventListener('change',()=>{const names=Array.from(el.files||[]).map(f=>f.name).join('、');el.nextElementSibling.textContent=names?`本次附件：${names}`:'可拍照／錄影留下現場證據';}));
-  document.getElementById('halfMsg').textContent=`${dateLabel(date)}・${halfPeriodLabel(period)}・${store}；共 ${rows.length}/33 題已有雲端／本機紀錄`;
+  c.querySelectorAll('.half-item').forEach(box=>{renderHalfMediaList(box);box.querySelector('.half-evidence-file').addEventListener('change',e=>{const key=box.dataset.mediaKey;const current=halfPendingMedia.get(key)||[];const incoming=Array.from(e.target.files||[]);const seen=new Set(current.map(file=>`${file.name}|${file.size}|${file.lastModified}`));halfPendingMedia.set(key,[...current,...incoming.filter(file=>{const id=`${file.name}|${file.size}|${file.lastModified}`;if(seen.has(id))return false;seen.add(id);return true;})]);e.target.value='';renderHalfMediaList(box);});box.querySelector('.half-media-upload').addEventListener('click',()=>uploadHalfMedia(box));});
+  document.getElementById('halfMsg').textContent=`${dateLabel(date)}・${halfPeriodLabel(period)}・${store}；共 ${rows.length}/${HALF_ITEMS.length} 題已有雲端／本機紀錄`;
 }
 function readHalfForm(){
   const date=document.getElementById('halfDate').value, store=document.getElementById('halfStore').value, inspector=document.getElementById('halfInspector').value.trim(), period=halfPeriod(date), checkId=`${date}|${store}|${period}`, savedAt=new Date().toISOString();
-  const rows=HALF_ITEMS.map(i=>{const box=document.querySelector(`[data-half-item="${i}"]`);const files=Array.from(box.querySelector('.half-files').files||[]).map(f=>f.name);return {checkId,date,period,month:date.slice(0,7),store,inspector,item:i,result:box.querySelector('.half-result').value,note:box.querySelector('.half-note').value.trim(),improvement:box.querySelector('.half-improvement').value.trim(),evidenceNames:files.join('、')||box.querySelector('.half-evidence').textContent.replace(/^已記錄附件：|^本次附件：/,'').replace('可拍照／錄影留下現場證據','').trim(),savedAt};});
+  const rows=HALF_ITEMS.map(i=>{const box=document.querySelector(`[data-half-item="${i}"]`);const saved=box.dataset.evidence||'';const manual=box.querySelector('.half-evidence-link').value.trim();const evidence=manual&&manual!==saved?manual:saved;return {checkId,date,period,month:date.slice(0,7),store,inspector,item:i,result:box.querySelector('.half-result').value,note:box.querySelector('.half-note').value.trim(),improvement:box.querySelector('.half-improvement').value.trim(),evidenceNames:evidence,savedAt};});
   return rows;
 }
 function saveHalfDraft(){
@@ -1332,17 +1424,32 @@ function showHalfMsg(text,type){const el=document.getElementById('halfMsg');if(e
 function submitHalfCheck(){
   const inspector=document.getElementById('halfInspector').value.trim(); if(!inspector){showHalfMsg('請填寫督導姓名','err');return;}
   const rows=readHalfForm(); mergeHalfRows(rows); renderHalfSummary(); renderHalfHistory();
-  if(!privateAccount || !PATROL_PRIVATE_CONFIG.inspectionApi){showHalfMsg('已保留本機資料；尚未設定私人資料服務，未上傳雲端','err');return;}
+  if(!privateAccount){showHalfMsg('已保留本機資料；尚未解鎖，未上傳雲端','err');return;}
   const chunks=[];let part=[];rows.forEach(r=>{part.push(r);if(encodeURIComponent(JSON.stringify(part)).length>3500){if(part.length>1){part.pop();chunks.push(part);part=[r];}else{chunks.push(part);part=[];}}});if(part.length)chunks.push(part);
   let chain=Promise.resolve(),written=0;chunks.forEach(chunk=>{chain=chain.then(()=>privateInspectionRequest('write',chunk)).then(res=>{if(res.status!=='ok')throw new Error(res.message||'寫入失敗');written+=Number(res.written||chunk.length||0);});});
-  chain.then(()=>{showHalfMsg(`已同步雲端（${written} 列），照片／影片附件名稱已記錄；原檔仍保留在本機裝置`,'ok');loadHalfChecks();}).catch(err=>showHalfMsg('雲端同步失敗：'+err.message+'；本機資料仍保留','err'));
+  chain.then(()=>{showHalfMsg(`已同步雲端（${written} 列）；照片／影片已連結至本期檢查，可從歷史紀錄預覽／回放`,'ok');loadHalfChecks();}).catch(err=>showHalfMsg('雲端同步失敗：'+err.message+'；本機資料仍保留','err'));
 }
 function renderHalfSummary(){
-  const c=document.getElementById('halfSummary');if(!c)return;const groups={};halfChecks.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const issues=halfChecks.filter(r=>r.result==='abnormal').length;const pending=Object.values(groups).filter(rows=>rows.some(r=>!r.result)).length;c.innerHTML=`<div class="half-stat"><strong>${Object.keys(groups).length}</strong><span>已建立本期檢查</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>缺失／異常項目</span></div><div class="half-stat"><strong>${pending}</strong><span>尚有待填本期</span></div>`;}
+  const c=document.getElementById('halfSummary');if(!c)return;const active=activeHalfRows(halfChecks);const groups={};active.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const issues=active.filter(r=>r.result==='abnormal').length;const pending=Object.values(groups).filter(rows=>rows.some(r=>!r.result)).length;c.innerHTML=`<div class="half-stat"><strong>${Object.keys(groups).length}</strong><span>已建立本期檢查</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>缺失／異常項目</span></div><div class="half-stat"><strong>${pending}</strong><span>尚有待填本期</span></div>`;}
 function renderHalfHistory(){
-  const c=document.getElementById('halfHistory');if(!c)return;const groups={};halfChecks.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const keys=Object.keys(groups).sort().reverse();if(!keys.length){c.innerHTML='<div class="empty-state"><div class="big">📝</div>尚無半月督導檢查紀錄</div>';return;}c.innerHTML=`<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>日期／期別</th><th>店點</th><th>督導</th><th>進度</th><th>缺失與改善</th></tr></thead><tbody>${keys.map(k=>{const rows=groups[k],first=rows[0],issue=rows.filter(r=>r.result==='abnormal').length,pending=rows.filter(r=>!r.result).length;return `<tr><td>${esc(first.date)}<br>${esc(halfPeriodLabel(first.period))}</td><td>${esc(first.store)}</td><td>${esc(first.inspector||'—')}</td><td>${rows.filter(r=>r.result).length}/33</td><td class="${issue?'status-issue':''}">${issue?`${issue} 項異常`:'無異常'}${pending?`・待填 ${pending} 題`:''}<br><span class="inv-last">${esc(rows.filter(r=>r.result==='abnormal'&&r.improvement).map(r=>`#${r.item} ${r.improvement}`).join('；')||'')}</span></td></tr>`;}).join('')}</tbody></table></div>`;}
+  const c=document.getElementById('halfHistory');if(!c)return;const groups={};activeHalfRows(halfChecks).forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const keys=Object.keys(groups).sort().reverse();if(!keys.length){c.innerHTML='<div class="empty-state"><div class="big">📝</div>尚無半月督導檢查紀錄</div>';return;}c.innerHTML=`<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>日期／期別</th><th>店點</th><th>督導</th><th>進度</th><th>缺失與改善</th><th>照片／影片</th></tr></thead><tbody>${keys.map(k=>{const rows=groups[k],first=rows[0],issue=rows.filter(r=>r.result==='abnormal').length,pending=rows.filter(r=>!r.result).length,media=rows.flatMap(r=>mediaItems(r.evidenceNames));return `<tr><td>${esc(first.date)}<br>${esc(halfPeriodLabel(first.period))}</td><td>${esc(first.store)}</td><td>${esc(first.inspector||'—')}</td><td>${rows.filter(r=>r.result).length}/${HALF_ITEMS.length}</td><td class="${issue?'status-issue':''}">${issue?`${issue} 項異常`:'無異常'}${pending?`・待填 ${pending} 題`:''}<br><span class="inv-last">${esc(rows.filter(r=>r.result==='abnormal'&&r.improvement).map(r=>`#${r.item} ${r.improvement}`).join('；')||'')}</span></td><td>${media.length?`<button type="button" class="half-media-view" data-check-id="${esc(k)}">預覽／回放 ${media.length} 個檔案</button>`:'—'}</td></tr>`;}).join('')}</tbody></table></div>`;c.querySelectorAll('.half-media-view').forEach(button=>button.addEventListener('click',()=>openHalfMediaViewer(button.dataset.checkId)));}
+function openHalfMediaViewer(checkId){
+  const rows=activeHalfRows(halfChecks.filter(r=>(r.checkId||`${r.date}|${r.store}|${r.period}`)===checkId));const items=rows.flatMap(r=>mediaItems(r.evidenceNames));if(!items.length){showHalfMsg('此期檢查尚無可預覽的照片或影片','err');return;}
+  document.getElementById('halfMediaModal')?.remove();const modal=document.createElement('div');modal.id='halfMediaModal';modal.className='half-media-modal';modal.innerHTML=`<div class="half-media-modal-card" role="dialog" aria-modal="true" aria-label="巡店照片與影片回放"><button type="button" class="half-media-modal-close">關閉</button><h3>巡店照片／影片回放</h3><p class="hint">${esc(rows[0]?.date||'')}・${esc(rows[0]?.store||'')}</p><div class="half-media-modal-grid">${items.map(x=>halfMediaCard(x)).join('')}</div></div>`;modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});modal.querySelector('.half-media-modal-close').addEventListener('click',()=>modal.remove());document.body.appendChild(modal);
+}
 function exportHalfChecksExcel(){
-  if(!halfChecks.length){showHalfMsg('目前沒有半月檢查資料可匯出','err');return;}const rows=[['北一二B 半月督導檢查紀錄'],['日期','期別','店點','督導','題號','檢查內容','結果','檢查紀錄','改善說明','照片／影片附件','最後更新']];halfChecks.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.store).localeCompare(String(b.store))||Number(a.item)-Number(b.item)).forEach(r=>rows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,r.item,ITEM_TEXT[r.item]||'',r.result==='ok'?'符合':r.result==='abnormal'?'缺失／異常':r.result==='na'?'不適用':'待填',r.note||'',r.improvement||'',r.evidenceNames||'',r.savedAt||'']));const issueRows=[['缺失改善追蹤'],['日期','期別','店點','督導','題號','缺失內容','改善說明','照片／影片附件']];halfChecks.filter(r=>r.result==='abnormal').forEach(r=>issueRows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,r.item,r.note||'',r.improvement||'',r.evidenceNames||'']));downloadExcel(`北一二B_半月督導檢查_${new Date().toISOString().slice(0,10)}.xls`,[{name:'半月檢查紀錄',rows},{name:'缺失改善追蹤',rows:issueRows}]);showHalfMsg('已匯出 Excel（完整紀錄＋缺失改善追蹤）','ok');}
+  const active=activeHalfRows(halfChecks);if(!active.length){showHalfMsg('目前沒有半月檢查資料可匯出','err');return;}
+  const attachmentLabel=r=>{const count=mediaItems(r.evidenceNames).length;return count?`${count} 個檔案（詳見「照片影片附件」）`:'—';};
+  const sortRows=rows=>rows.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.store).localeCompare(String(b.store))||Number(a.item)-Number(b.item));
+  const rows=[['北一二B 半月督導檢查紀錄（第 1–18 項）'],['日期','期別','店點','督導','題號','檢查內容','結果','檢查紀錄','改善說明','照片／影片附件','最後更新']];
+  sortRows(active).forEach(r=>rows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,r.item,ITEM_TEXT[r.item]||'',r.result==='ok'?'符合':r.result==='abnormal'?'缺失／異常':r.result==='na'?'不適用':'待填',r.note||'',r.improvement||'',attachmentLabel(r),r.savedAt||'']));
+  const issueRows=[['缺失改善追蹤（第 1–18 項）'],['日期','期別','店點','督導','題號','缺失內容','改善說明','照片／影片附件']];
+  active.filter(r=>r.result==='abnormal').forEach(r=>issueRows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,r.item,r.note||'',r.improvement||'',attachmentLabel(r)]));
+  const mediaRows=[[excelCell('照片影片附件','Title')],['說明','附件維持在私有 Google Drive；請使用有權限的帳號開啟連結。'],['日期','期別','店點','督導','題號','檢查內容','檔案名稱','檔案類型','開啟附件','預覽／播放'].map(v=>excelCell(v,'Header'))];
+  sortRows(active).forEach(r=>mediaItems(r.evidenceNames).forEach(media=>{const kind=mediaKind(media);mediaRows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,r.item,ITEM_TEXT[r.item]||'',media.name,kind==='video'?'影片':kind==='image'?'照片':'附件',media.viewUrl?excelLink('開啟私有附件',media.viewUrl):'—',media.previewUrl?excelLink(kind==='video'?'播放／預覽影片':'預覽照片',media.previewUrl):'—']);}));
+  downloadExcel(`北一二B_半月督導檢查_${new Date().toISOString().slice(0,10)}.xls`,[{name:'半月檢查紀錄',rows},{name:'缺失改善追蹤',rows:issueRows},{name:'照片影片附件',rows:mediaRows}]);
+  showHalfMsg('已匯出 Excel（檢查紀錄＋缺失改善＋照片影片附件連結）','ok');
+}
 
 /* ---------- 啟動 ---------- */
 initMonth();

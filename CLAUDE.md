@@ -2,6 +2,11 @@
 
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）+ Google Sheets。
 
+另有 `kpitry.html`（KPI 通用試算版，2026-07 新增）：給**非本區同仁**的公開試算工具，
+與 kpi.html **共用同一套計算引擎**但**完全不含個資**——無登入、無後端、無內建資料，
+店點/姓名/目標/實績全部使用者自行輸入，內建的只有計算架構（`ARCH` 陣列：24 項加權項目
+＋標準權重＋公式＋上下限）。權重進階可改，localStorage 鍵 `bei12b_kpitry_v1`，可公開分享。
+
 另有 `patrol.html`（督導巡店追蹤系統）：貼上巡店明細表 → 33 項檢核看板。
 與 index.html **共用同一個 GAS 部署**（巡店網址存 localStorage `bei12b_pt_gas_url`，
 相容回退舊的 `bei12b_gas_url`）。**可分享給其他督導**：每人自建試算表＋自己的
@@ -14,11 +19,24 @@ GAS 端以 fillTime+store+item 為唯一鍵去重，content 欄不上傳、由�
 巡店讀寫需通行碼：GAS 端 `PT_KEY`（repo 只放 `CHANGE_ME` 佔位字，實際密碼只改在
 GAS 編輯器裡，**不要 commit**），前端存 localStorage `bei12b_pt_key`，錯誤會重新詢問。
 
-### 2026-07-15 班表與半月督導檢查頁籤
+### 2026-07-15 班表與半月督導檢查頁籤（規劃階段，未採用）
 
-`patrol.html` 新增兩個沿用 `PT_KEY` 的受保護頁籤：`每月班表` 由 `scripts/build_schedule_data.py` 從本機 OneDrive `TWM 班表/*.xls` 產生 `data/schedule.js` / `data/schedule.json`，支援每日、每週、每月檢視與 Excel 匯出；`半月督導檢查` 支援 33 題逐題回填、異常改善說明與照片／影片附件名稱，透過 GAS `hread` / `hwrite` 寫入 `督導半月檢查` 工作表。
+當時曾規劃 `patrol.html` 用 Microsoft 365（MSAL）登入 + 外部 `scheduleApi`/`inspectionApi` 私有服務、
+33 題半月檢查、`scripts/build_schedule_data.py` 產生 `data/schedule.js`/`data/schedule.json` 這條路線。
+**2026-07-21 合併決策：不採用**，避免新增 MSAL 這套獨立帳號與權限系統；正式路線改用下方雲端既有
+GAS + `PT_KEY` 的 `sread`/`hread`/`hwrite` 架構、私有 Drive 上傳與 18 題半月檢查（原 33 題若仍需要，
+應另立「每月巡檢」清單，不與半月檢查混用）。此段保留作為歷史記錄，程式碼不含 MSAL 實作。
 
-照片／影片原檔不寫入 Google Sheets，以免超過儲存限制；頁面保留本機附件清單，原始媒體留在填寫裝置。GAS 修改後必須重新部署 Web App 新版本。
+另有 `kpi.html`（KPI 試算網站，2026-07 新增）：單檔前端，同仁 KEY 今日上線數即可
+試算各項目與「明日 KPI 總進度達成率」。計分公式由「KPIPI資料設定」模板＋0720 日報
+反推驗證（逐項 100% 吻合、總分 7/9 店完全一致，殘差由校正值吸收），細節見
+`docs/COLLAB-LOG.md` 2026-07-20 兩則。**資料不內嵌**（repo 公開）：登入採
+Codex 私有戰情同一套員編＋裝置綁定授權（GAS `kpicalc_access`），資料存私有 Drive
+`north12b-kpicalc-private-latest.json`。**每日更新全自動**：GAS `kpiCalcAutoUpdate()`
+時間觸發器每天 11:00 掃日報資料夾（檔名 `MMDD.xlsx`）自動解析發佈＋email 通知
+（啟用需 Drive API v3 服務＋執行 `setupKpiCalcAutoUpdate()`）；手動備援走 kpi.html
+進階「督導發佈區」上傳 JSON（`kpicalc_publish`，管理者密碼）。localStorage 鍵：
+`bei12b_kpi_v1`（試算輸入）、`bei12b_kpi_emp`（員編）；裝置 ID 與戰情共用。
 
 ## 跨 AI 協作
 
@@ -68,9 +86,10 @@ GAS 依標題列欄名寫入。前端新增欄位（如 `tw_pixel10`）後，若
 
 ## 自動檢查未回報 + Email 通知
 
-`gas/Code.gs` 有 `checkSegAndNotify()`：每天 16:20、21:20（台北時間）由時間觸發器自動比對
-「回報資料」工作表，有未填門市寄警示信、全數完成寄報平安信（含 A999/好速/R1399 進度與最佳/最差店點），
-收件人為 `NOTIFY_EMAIL`。啟用方式：GAS 編輯器執行一次 `setupTriggers()`（會要求授權）。
+`gas/Code.gs` 有 `checkSegAndNotify()`：每天 16:30、22:00（台北時間）由時間觸發器自動比對
+「回報資料」工作表，有未填門市寄警示信（含已回報門市的 N12B 加總：KPI 均值＋A999/A1399/好速/R1399）、
+全數完成寄報平安信（含 A999/好速/R1399 進度與最佳/最差店點），收件人為 `NOTIFY_EMAIL`
+（存在指令碼屬性，不進 repo）。啟用方式：GAS 編輯器執行一次 `setupTriggers()`（會要求授權）。
 注意：**時間觸發器跑的是編輯器最新存檔的程式碼，不需要重新部署 Web App**；
 只有 `doGet` 相關改動才要重新部署。門市清單 `STORES` 在 GAS 端也有一份，開新店時記得同步。
 

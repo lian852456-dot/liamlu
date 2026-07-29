@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="robots" content="noindex, nofollow">
+<title>北一二B KPI 試算</title>
+<style>
+  :root {
+    --bg-deep: #f5f6f8;
+    --bg-card: #ffffff;
+    --bg-panel: #f0f2f5;
+    --bg-row-alt: #f8f9fb;
+    --accent: #f97316;
+    --accent-bright: #ea580c;
+    --green: #16a34a;
+    --red: #dc2626;
+    --red-soft: rgba(220,38,38,0.08);
+    --green-soft: rgba(22,163,74,0.08);
+    --warn: #d97706;
+    --text: #111827;
+    --text-dim: #374151;
+    --text-muted: #6b7280;
+    --border: rgba(0,0,0,0.12);
+    --border-dim: rgba(0,0,0,0.07);
+    --radius: 12px;
+    --font: 'Segoe UI', 'Noto Sans TC', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg-deep); color: var(--text); font-family: var(--font); font-size: 16px; min-height: 100vh; padding-bottom: 60px; }
+
+  .site-header { background:#fff; border-bottom:3px solid var(--accent); padding:12px 16px; position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .site-header h1 { font-size:1.15rem; color:var(--accent-bright); }
+  .site-header .sub { font-size:.72rem; color:var(--text-muted); }
+
+  .wrap { max-width: 860px; margin: 0 auto; padding: 12px; }
+
+  .tabs { display:flex; gap:8px; margin:10px 0; }
+  .tab-btn { flex:1; padding:10px; border:1px solid var(--border); background:#fff; border-radius:var(--radius); font-size:1rem; font-weight:700; color:var(--text-dim); cursor:pointer; }
+  .tab-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+  .selrow { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .selrow select { flex:1; min-width:150px; padding:10px; font-size:1rem; border:1px solid var(--border); border-radius:10px; background:#fff; color:var(--text); }
+
+  .summary { background:#fff; border:1px solid var(--border-dim); border-radius:var(--radius); padding:14px 16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+  .summary .who { font-weight:700; font-size:1.02rem; margin-bottom:8px; }
+  .sumgrid { display:flex; gap:10px; flex-wrap:wrap; }
+  .sumbox { flex:1; min-width:130px; background:var(--bg-panel); border-radius:10px; padding:10px 12px; text-align:center; }
+  .sumbox .lbl { font-size:.72rem; color:var(--text-muted); }
+  .sumbox .val { font-size:1.5rem; font-weight:800; margin-top:2px; }
+  .sumbox.big { background:linear-gradient(135deg,#fff7ed,#ffedd5); border:1px solid rgba(249,115,22,.35); }
+  .sumbox .val.good { color:var(--green); }
+  .sumbox .val.bad { color:var(--red); }
+  .delta { font-size:.8rem; font-weight:700; }
+  .delta.up { color:var(--green); }
+  .delta.down { color:var(--red); }
+  .breakdown { margin-top:8px; font-size:.78rem; color:var(--text-muted); line-height:1.5; }
+
+  .ctrlrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; font-size:.85rem; }
+  .ctrlrow label { color:var(--text-dim); }
+  .ctrlrow input[type=number] { width:64px; padding:6px; border:1px solid var(--border); border-radius:8px; font-size:.95rem; text-align:center; }
+  .btn { padding:8px 12px; border:1px solid var(--border); background:#fff; border-radius:10px; font-size:.85rem; cursor:pointer; color:var(--text-dim); }
+  .btn:active { background:var(--bg-panel); }
+  .btn.warn { color:var(--red); border-color:rgba(220,38,38,.4); }
+  .btn.toggled { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+  table.items { width:100%; border-collapse:collapse; background:#fff; border-radius:var(--radius); overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.05); font-size:.86rem; }
+  table.items th { background:var(--bg-panel); padding:8px 6px; font-size:.74rem; color:var(--text-muted); text-align:center; white-space:nowrap; }
+  table.items td { padding:7px 6px; border-top:1px solid var(--border-dim); text-align:center; }
+  table.items tr:nth-child(even) td { background:var(--bg-row-alt); }
+  td.iname { text-align:left; font-weight:600; max-width:150px; }
+  td.iname .w { display:block; font-size:.68rem; color:var(--text-muted); font-weight:400; }
+  td.iname .anti { color:var(--warn); font-size:.68rem; }
+  .num { font-variant-numeric: tabular-nums; }
+  td input.today { width:70px; padding:6px 4px; border:1.5px solid var(--accent); border-radius:8px; font-size:.95rem; text-align:center; background:#fff7ed; }
+  td input.today:focus { outline:2px solid var(--accent); }
+  td input.cum { width:84px; padding:5px 4px; border:1px dashed var(--border); border-radius:8px; font-size:.88rem; text-align:center; }
+  .rate.good { color:var(--green); font-weight:700; }
+  .rate.bad { color:var(--red); font-weight:700; }
+  .gap { display:block; font-size:.66rem; color:var(--text-muted); }
+  .scorecell { font-size:.8rem; color:var(--text-dim); }
+
+  details.adv { margin-top:12px; background:#fff; border:1px solid var(--border-dim); border-radius:var(--radius); padding:10px 14px; font-size:.85rem; }
+  details.adv summary { font-weight:700; cursor:pointer; color:var(--text-dim); }
+  .advgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; margin-top:10px; }
+  .advgrid .fld { display:flex; flex-direction:column; gap:4px; }
+  .advgrid .fld label { font-size:.74rem; color:var(--text-muted); }
+  .advgrid .fld input { padding:7px; border:1px solid var(--border); border-radius:8px; font-size:.92rem; }
+  .advnote { margin-top:8px; font-size:.74rem; color:var(--text-muted); line-height:1.5; }
+
+  .lock { background:#fff; border:1px solid var(--border-dim); border-radius:var(--radius); padding:20px 18px; margin:24px auto; max-width:480px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+  .lock h2 { font-size:1.05rem; margin-bottom:8px; }
+  .lock p { font-size:.82rem; color:var(--text-muted); line-height:1.6; margin-bottom:12px; }
+  .lock input { width:100%; padding:11px; font-size:1rem; border:1px solid var(--border); border-radius:10px; margin-bottom:8px; }
+  .lock .actions { display:flex; flex-direction:column; gap:8px; margin-top:4px; }
+  .lock .actions button { padding:11px; font-size:.95rem; border-radius:10px; border:1px solid var(--border); background:#fff; cursor:pointer; color:var(--text-dim); }
+  .lock .actions button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700; }
+  .lock .status { margin-top:10px; font-size:.8rem; color:var(--text-muted); line-height:1.5; min-height:1.2em; }
+  .lock .status.err { color:var(--red); }
+  .whoami { font-size:.72rem; color:var(--text-muted); text-align:right; }
+  .whoami a { color:var(--accent-bright); cursor:pointer; text-decoration:underline; }
+
+  .foot { margin-top:16px; font-size:.72rem; color:var(--text-muted); line-height:1.6; }
+  .managerNote { background:var(--red-soft); border:1px solid rgba(220,38,38,.25); color:var(--red); padding:10px 14px; border-radius:10px; font-size:.85rem; margin-bottom:10px; display:none; }
+
+  @media (max-width:640px){
+    table.items { font-size:.78rem; }
+    td input.today { width:58px; }
+    td input.cum { width:70px; }
+    th.hide-m, td.hide-m { display:none; }
+  }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div>
+    <h1>📊 北一二B KPI 試算</h1>
+    <div class="sub" id="srcNote"></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="lock" id="lockCard" style="display:none">
+    <h2>🔐 北一二B 同仁專用</h2>
+    <p>僅限北一二B在職同仁使用。首次使用請輸入員編＋啟用碼提出申請，督導核准後，員編會綁定這台手機／電腦，之後輸入員編即可登入。（已在「戰情頁籤」核准過這台裝置的同仁，直接輸入員編登入即可。）</p>
+    <input id="lockEmp" autocomplete="username" autocapitalize="characters" placeholder="員工編號">
+    <input id="lockCode" inputmode="numeric" autocomplete="one-time-code" placeholder="首次啟用碼（首次申請才需填）">
+    <div class="actions">
+      <button class="primary" onclick="kpiLogin()">以員編登入</button>
+      <button onclick="kpiRequestBinding()">首次申請綁定</button>
+      <button onclick="kpiCheckRequest()">查看核准結果</button>
+    </div>
+    <div class="status" id="lockStatus"></div>
+  </div>
+
+  <div id="appArea" style="display:none">
+  <div class="whoami" id="whoami"></div>
+  <div class="tabs">
+    <button class="tab-btn active" id="tabStore" onclick="setTab('store')">🏪 店點試算</button>
+    <button class="tab-btn" id="tabPerson" onclick="setTab('person')">🙋 個人試算</button>
+  </div>
+
+  <div class="selrow">
+    <select id="selStore" onchange="onSelectStore()"></select>
+    <select id="selPerson" onchange="onSelectPerson()" style="display:none"></select>
+  </div>
+  <div class="managerNote" id="managerNote">店長／代理店長沒有個人 KPI 成績，請切換到「店點試算」看店績。</div>
+
+  <div class="summary" id="summaryCard"></div>
+
+  <div class="ctrlrow">
+    <label>試算日（今天是本月第幾天）</label>
+    <input type="number" id="calcDay" min="1" max="31" onchange="setCalcDay(this.value)">
+    <button class="btn" id="btnCum" onclick="toggleCumEdit()">✏️ 修改累計</button>
+    <button class="btn warn" onclick="clearToday()">清除今日輸入</button>
+  </div>
+
+  <div id="itemArea"></div>
+
+  <details class="adv">
+    <summary>⚙️ 進階設定（店長／督導用）</summary>
+    <div class="advgrid">
+      <div class="fld"><label>本月天數</label><input type="number" id="advMonthDays" onchange="setMonthDays(this.value)"></div>
+      <div class="fld"><label>累計資料到位日（報表資料算到本月第幾天）</label><input type="number" id="advSnapDay" onchange="setSnapDay(this.value)"></div>
+      <div class="fld"><label>官方報表總達成率(%)（用於自動校正）</label><input type="number" step="0.01" id="advOfficial" onchange="setOfficial(this.value)"></div>
+    </div>
+    <div style="margin-top:10px;font-weight:700;color:var(--text-dim)">激勵加分資料（店級）</div>
+    <div class="advgrid">
+      <div class="fld"><label>AQ件數加分項：累計件數</label><input type="number" id="bxAqA" onchange="setBx(&quot;aqA&quot;, this.value)"></div>
+      <div class="fld"><label>AQ件數加分項：月目標</label><input type="number" id="bxAqT" onchange="setBx(&quot;aqT&quot;, this.value)"></div>
+      <div class="fld"><label>降轉數（前約V+D≧1399）</label><input type="number" id="bxDnHiN" onchange="setBx(&quot;dnHiN&quot;, this.value)"></div>
+      <div class="fld"><label>上線件數（前約V+D≧1399）</label><input type="number" id="bxDnHiD" onchange="setBx(&quot;dnHiD&quot;, this.value)"></div>
+      <div class="fld"><label>升轉數（前約V+D&lt;1399）</label><input type="number" id="bxUpN" onchange="setBx(&quot;upN&quot;, this.value)"></div>
+      <div class="fld"><label>上線件數（前約V+D&lt;1399）</label><input type="number" id="bxUpD" onchange="setBx(&quot;upD&quot;, this.value)"></div>
+    </div>
+    <div class="advnote">
+      激勵加分規則（由 0720 報表反推驗證）：降轉率(≧1399)≦37% 加 0.75%；升轉率(&lt;1399)≧30% 加 0.75%；AQ件數加分項推估達成率≧130% 加 1%。<br>
+      校正值＝官方總達成率 − 本站模型值，會自動加回預估，吸收模型與公司系統的微小差異。
+    </div>
+    <div style="margin-top:10px"><button class="btn warn" onclick="resetEntity()">🗑 重設此對象全部資料（還原報表值）</button></div>
+    <div style="margin-top:14px;font-weight:700;color:var(--text-dim)">督導發佈區（更新每日資料用）</div>
+    <div class="advgrid">
+      <div class="fld"><label>管理者密碼</label><input type="password" id="pubSecret" autocomplete="off"></div>
+      <div class="fld"><label>KPI 試算資料 JSON 檔</label><input type="file" id="pubFile" accept=".json,application/json"></div>
+    </div>
+    <div style="margin-top:8px"><button class="btn" onclick="kpiPublish()">📤 發佈到私有 Drive</button> <span id="pubMsg" style="font-size:.78rem;color:var(--text-muted)"></span></div>
+    <div class="advnote" style="margin-top:6px">Apps Script 服務網址預設與回報系統相同；如需覆蓋，請在瀏覽器主控台設定 localStorage 的 <code>bei12b_gas_url</code>。</div>
+  </details>
+
+  <div class="foot">
+    ・公式依「KPIPI資料設定」模板＋0720 日報反推驗證：逐項達成率 100% 吻合；總達成率 9 店中 7 店完全一致，其餘差異以「校正值」自動吸收。<br>
+    ・「明日預估」＝（累計＋今日KEY入）÷ 月目標 × 本月天數 ÷ 試算日，各項有上限 250%、店績有下限規則、防退類反向計分（含 2025/07 解約NP OUT 新制）。<br>
+    ・防退類（自退數、解約後NP OUT）：數字越少越好，今日KEY入會「扣分」。<br>
+    ・僅供試算參考，正式成績以公司報表為準。目標數如有異動請通知督導更新。<br>
+    ・資料受員編授權保護：僅督導核准的裝置能讀取，本頁原始碼不含任何 KPI 數據。
+  </div>
+  </div><!-- /appArea -->
+</div>
+
+<script>
+let DATA = null;
+
+// ── 授權（與 index.html 戰情頁籤共用同一套 GAS 私有戰情機制與裝置ID）──
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
+function gasUrl(){ return localStorage.getItem('bei12b_gas_url') || DEFAULT_GAS_URL; }
+function deviceId(){
+  const key = 'north12b_private_dashboard_device_id';
+  let id = localStorage.getItem(key);
+  if (id) return id;
+  if (window.crypto && crypto.randomUUID) id = crypto.randomUUID().replace(/-/g, '');
+  else {
+    const bytes = new Uint8Array(24);
+    (window.crypto || {}).getRandomValues?.(bytes);
+    id = Array.from(bytes).map(v => v.toString(16).padStart(2, '0')).join('') || `${Date.now()}${Math.random()}`.replace(/\D/g, '');
+  }
+  localStorage.setItem(key, id);
+  return id;
+}
+async function gasPost(payload){
+  const response = await fetch(gasUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error(`服務連線失敗（HTTP ${response.status}）`);
+  const body = await response.json();
+  if (!body || body.status !== 'ok') throw new Error((body && body.message) || '服務回應失敗');
+  return body;
+}
+function lockStatus(msg, err){
+  const el = document.getElementById('lockStatus');
+  el.textContent = msg || '';
+  el.className = 'status' + (err ? ' err' : '');
+}
+function lockEmp(){ return String(document.getElementById('lockEmp').value || '').trim().toUpperCase(); }
+async function kpiLogin(){
+  const emp = lockEmp() || localStorage.getItem('bei12b_kpi_emp') || '';
+  if (!emp){ lockStatus('請先輸入員工編號。', true); return; }
+  lockStatus('正在驗證這台裝置…');
+  try {
+    const result = await gasPost({ action: 'kpicalc_access', employeeId: emp, deviceId: deviceId() });
+    localStorage.setItem('bei12b_kpi_emp', emp);
+    DATA = result.data;
+    window._profile = result.profile || null;
+    document.getElementById('lockCard').style.display = 'none';
+    document.getElementById('appArea').style.display = '';
+    initApp();
+  } catch (error) {
+    lockStatus(String(error.message || error), true);
+  }
+}
+async function kpiRequestBinding(){
+  const emp = lockEmp();
+  const code = String(document.getElementById('lockCode').value || '').trim();
+  if (!emp || !code){ lockStatus('首次申請需要輸入員編與啟用碼。', true); return; }
+  lockStatus('正在送出申請…');
+  try {
+    const result = await gasPost({ action: 'private_request', employeeId: emp, bootstrapCode: code, deviceId: deviceId() });
+    localStorage.setItem('bei12b_kpi_emp', emp);
+    lockStatus(result.message || '已送出申請，督導收到通知後會核准。');
+  } catch (error) {
+    lockStatus(String(error.message || error), true);
+  }
+}
+async function kpiCheckRequest(){
+  const emp = lockEmp() || localStorage.getItem('bei12b_kpi_emp') || '';
+  if (!emp){ lockStatus('請先輸入員工編號。', true); return; }
+  lockStatus('查詢中…');
+  try {
+    const result = await gasPost({ action: 'private_request_status', employeeId: emp, deviceId: deviceId() });
+    const map = { none: '沒有這台裝置的申請紀錄，請先「首次申請綁定」。', pending: '申請還在等督導核准，請稍候。',
+                  approved: '已核准！請直接按「以員編登入」。', superseded: '這筆申請已被較新的申請取代。' };
+    lockStatus(map[result.requestStatus] || ('狀態：' + result.requestStatus));
+  } catch (error) {
+    lockStatus(String(error.message || error), true);
+  }
+}
+function kpiLogout(){
+  localStorage.removeItem('bei12b_kpi_emp');
+  location.reload();
+}
+async function kpiPublish(){
+  const secret = String(document.getElementById('pubSecret').value || '');
+  const fileInput = document.getElementById('pubFile');
+  const file = fileInput.files && fileInput.files[0];
+  const msg = document.getElementById('pubMsg');
+  if (!secret || !file){ msg.textContent = '需要管理者密碼＋選擇 JSON 檔。'; return; }
+  msg.textContent = '發佈中…';
+  try {
+    const text = await file.text();
+    JSON.parse(text); // 先驗格式
+    const bytes = new TextEncoder().encode(text);
+    let bin = '';
+    bytes.forEach(b => { bin += String.fromCharCode(b); });
+    const result = await gasPost({ action: 'kpicalc_publish', adminSecret: secret, dataBase64: btoa(bin) });
+    msg.textContent = '✅ 發佈成功（' + (result.period || '') + '），重新登入即可看到新資料。';
+  } catch (error) {
+    msg.textContent = '❌ ' + String(error.message || error);
+  }
+}
+
+const FLOORS = {'5G銷售數':.7,'HBO Max&Disney+&Prime Video銷售數':.7,'Netflix多享組銷售數':.7,'TTL AQ上線點數':.6,
+'AQ V+D 999 (含)以上':.7,'預付卡開卡面額':.7,'RT上線點數':.7,'特殊維繫用戶續約數':.7,'高高特維用戶續約數':.7,
+'RT V+D 999 (含)以上':.7,'RT V+D 1399 (含)以上':.7};
+const ANTI_SELF = new Set(['自退數','解約後NP OUT(督導績)']);
+const ANTI_NPOUT = '解約後NP OUT';
+const isAnti = k => ANTI_SELF.has(k) || k === ANTI_NPOUT;
+
+const LS_KEY = 'bei12b_kpi_v1';
+let LS = {};
+try { LS = JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch(e) { LS = {}; }
+LS.entities = LS.entities || {};
+
+let tab = LS.tab || 'store';
+let curStore = LS.curStore || '';
+let curPerson = LS.curPerson || '';
+let cumEdit = false;
+
+const r4 = x => Math.round(x * 10000) / 10000;
+const pctTxt = x => (x * 100).toFixed(2) + '%';
+
+function storeByCode(c){ return DATA.stores.find(s => s.code === c) || DATA.stores[0]; }
+function personsOf(c){ return DATA.persons.filter(p => p.store === c); }
+function isManager(p){ return p.role === '店長' || p.role === '代理店長'; }
+
+function entKey(){ return tab === 'store' ? 'S:' + curStore : 'P:' + curStore + '|' + curPerson; }
+function entState(){
+  const k = entKey();
+  if (!LS.entities[k]) LS.entities[k] = { today:{}, cum:{}, bx:{}, official:null, snapDay:null };
+  return LS.entities[k];
+}
+function entData(){
+  if (tab === 'store') return storeByCode(curStore);
+  return personsOf(curStore).find(p => p.pname === curPerson);
+}
+
+function settings(){
+  const st = entState();
+  return {
+    monthDays: LS.monthDays || DATA.meta.monthDays,
+    snapDay: st.snapDay || DATA.meta.snapshotDay,
+    calcDay: LS.calcDay || defaultCalcDay()
+  };
+}
+function defaultCalcDay(){
+  const now = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Taipei'}));
+  const ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  if (ym === DATA.meta.month) return Math.min(now.getDate(), DATA.meta.monthDays);
+  return Math.min(DATA.meta.snapshotDay + 1, DATA.meta.monthDays);
+}
+
+// ── 核心公式（與 0720 報表勾稽） ──
+function itemRate(key, a, t, f){
+  if (!t) return null;
+  const x = r4(a / t * f);
+  if (ANTI_SELF.has(key)) return Math.max(0, Math.min(2.5, r4(2 - x)));
+  if (key === ANTI_NPOUT){
+    const raw = r4(2 - x);
+    return raw >= 1 ? Math.min(2.5, raw) : r4(0.5 + 0.5 * Math.max(raw, 0));
+  }
+  return Math.min(2.5, x);
+}
+function itemScore(key, w, rate, useFloors){
+  if (rate === null || !w) return 0;
+  const fl = useFloors ? (FLOORS[key] || 0) : 0;
+  return w * rate * (fl && rate < fl ? 0.5 : 1);
+}
+function bonusOf(bx, f){
+  let b = 0, parts = [];
+  if (bx.dnHiD > 0 && bx.dnHiN / bx.dnHiD <= 0.37){ b += 0.0075; parts.push('降轉率(≧1399)達標 +0.75%'); }
+  if (bx.upD > 0 && bx.upN / bx.upD >= 0.30){ b += 0.0075; parts.push('升轉率(<1399)達標 +0.75%'); }
+  if (bx.aqT > 0 && Math.min(2.5, r4(bx.aqA / bx.aqT * f)) >= 1.3){ b += 0.01; parts.push('AQ件數加分 +1%'); }
+  return { b, parts };
+}
+
+function effCum(ent, st, key){
+  return (st.cum[key] !== undefined && st.cum[key] !== null) ? st.cum[key] : ent.items[key].a;
+}
+function effBx(){
+  const s = storeByCode(curStore);
+  const st = LS.entities['S:' + curStore] || { bx:{} };
+  const bx = Object.assign({}, s.bonus);
+  for (const k of ['aqA','aqT','dnHiN','dnHiD','upN','upD']){
+    if (st.bx && st.bx[k] !== undefined && st.bx[k] !== null && st.bx[k] !== '') bx[k] = Number(st.bx[k]);
+  }
+  return bx;
+}
+
+// total: mode 'base' (無今日輸入, 用到位日) or 'proj' (含今日輸入, 用試算日)
+function calcTotal(mode){
+  const ent = entData();
+  if (!ent) return null;
+  const st = entState();
+  const cfg = settings();
+  const useFloors = tab === 'store';
+  const D = mode === 'proj' ? cfg.calcDay : cfg.snapDay;
+  const f = cfg.monthDays / D;
+  let sum = 0;
+  const detail = {};
+  for (const it of DATA.items){
+    const d = ent.items[it.key];
+    const add = mode === 'proj' ? (Number(st.today[it.key]) || 0) : 0;
+    const a = effCum(ent, st, it.key) + add;
+    const rate = itemRate(it.key, a, d.t, f);
+    const sc = itemScore(it.key, d.w, rate, useFloors);
+    sum += sc;
+    detail[it.key] = { a, rate, sc };
+  }
+  const bn = bonusOf(effBx(), f);
+  return { base: r4(sum), bonus: bn, total: r4(sum + bn.b), detail };
+}
+function official(){
+  const st = entState();
+  if (st.official !== null && st.official !== undefined && st.official !== '') return Number(st.official) / 100;
+  const ent = entData();
+  return ent ? (ent.official || 0) : 0;
+}
+function calib(){
+  const base = calcTotal('base');
+  return r4(official() - base.total);
+}
+
+// ── UI ──
+function setTab(t){
+  tab = t; LS.tab = t;
+  document.getElementById('tabStore').classList.toggle('active', t === 'store');
+  document.getElementById('tabPerson').classList.toggle('active', t === 'person');
+  document.getElementById('selPerson').style.display = t === 'person' ? '' : 'none';
+  if (t === 'person') fillPersonSel();
+  saveAndRender();
+}
+function fillStoreSel(){
+  const sel = document.getElementById('selStore');
+  sel.innerHTML = DATA.stores.map(s => `<option value="${s.code}">${s.name}</option>`).join('');
+  sel.value = curStore;
+}
+function fillPersonSel(){
+  const sel = document.getElementById('selPerson');
+  const ps = personsOf(curStore).filter(p => !isManager(p));
+  sel.innerHTML = ps.map(p => `<option value="${p.pname}">${p.role}｜${p.pname}</option>`).join('');
+  if (!ps.find(p => p.pname === curPerson)) curPerson = ps.length ? ps[0].pname : '';
+  sel.value = curPerson;
+  document.getElementById('managerNote').style.display = ps.length ? 'none' : 'block';
+}
+function onSelectStore(){
+  curStore = document.getElementById('selStore').value;
+  LS.curStore = curStore;
+  if (tab === 'person') fillPersonSel();
+  saveAndRender();
+}
+function onSelectPerson(){
+  curPerson = document.getElementById('selPerson').value;
+  LS.curPerson = curPerson;
+  saveAndRender();
+}
+function toggleCumEdit(){
+  cumEdit = !cumEdit;
+  document.getElementById('btnCum').classList.toggle('toggled', cumEdit);
+  render();
+}
+function clearToday(){
+  entState().today = {};
+  saveAndRender();
+}
+function resetEntity(){
+  if (!confirm('確定要清除此對象的所有輸入（今日、累計修改、進階設定），還原成內建報表值？')) return;
+  delete LS.entities[entKey()];
+  saveAndRender();
+}
+function onToday(key, v){
+  entState().today[key] = v === '' ? undefined : Number(v);
+  saveAndRender();
+}
+function onCum(key, v){
+  entState().cum[key] = v === '' ? null : Number(v);
+  saveAndRender();
+}
+
+function render(){
+  const ent = entData();
+  const cfg = settings();
+  document.getElementById('srcNote').textContent =
+    `資料基準：${DATA.meta.sourceFile}（${DATA.meta.period}）`;
+  document.getElementById('calcDay').value = cfg.calcDay;
+  document.getElementById('advMonthDays').value = cfg.monthDays;
+  document.getElementById('advSnapDay').value = cfg.snapDay;
+
+  const sumEl = document.getElementById('summaryCard');
+  const area = document.getElementById('itemArea');
+  if (!ent){
+    sumEl.innerHTML = '<div class="who">此店沒有可試算的個人（店長請看店點）</div>';
+    area.innerHTML = '';
+    return;
+  }
+  const st = entState();
+  document.getElementById('advOfficial').value =
+    (st.official !== null && st.official !== undefined && st.official !== '') ? st.official : r4(official()*100);
+  const bx = effBx();
+  document.getElementById('bxAqA').value = bx.aqA;
+  document.getElementById('bxAqT').value = bx.aqT;
+  document.getElementById('bxDnHiN').value = bx.dnHiN;
+  document.getElementById('bxDnHiD').value = bx.dnHiD;
+  document.getElementById('bxUpN').value = bx.upN;
+  document.getElementById('bxUpD').value = bx.upD;
+
+  const base = calcTotal('base');
+  const proj = calcTotal('proj');
+  const cal = calib();
+  const projAdj = r4(proj.total + cal);
+  const off = official();
+  const delta = r4(projAdj - off);
+  const hasToday = Object.values(st.today).some(v => v !== undefined && v !== null && v !== '');
+  const who = tab === 'store'
+    ? `🏪 ${storeByCode(curStore).name}（店績）`
+    : `🙋 ${storeByCode(curStore).name}｜${ent.role} ${ent.pname}（個績）`;
+
+  sumEl.innerHTML = `
+    <div class="who">${who}</div>
+    <div class="sumgrid">
+      <div class="sumbox">
+        <div class="lbl">報表總達成率（至 ${DATA.meta.month.split('-')[1]}/${String(cfg.snapDay).padStart(2,'0')}）</div>
+        <div class="val num">${pctTxt(off)}</div>
+      </div>
+      <div class="sumbox big">
+        <div class="lbl">明日預估總達成率${hasToday ? '（含今日KEY入）' : '（尚未KEY今日）'}</div>
+        <div class="val num ${projAdj >= 1 ? 'good' : 'bad'}">${pctTxt(projAdj)}</div>
+        <div class="delta ${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '▲' : '▼'} ${pctTxt(Math.abs(delta))} vs 報表</div>
+      </div>
+    </div>
+    <div class="breakdown">
+      基礎加權 ${pctTxt(proj.base)} ＋ 激勵加分 ${pctTxt(proj.bonus.b)}${proj.bonus.parts.length ? '（' + proj.bonus.parts.join('、') + '）' : ''} ＋ 校正 ${pctTxt(cal)}
+      ｜推估係數 ${cfg.monthDays}/${cfg.calcDay}
+    </div>`;
+
+  let rows = '';
+  for (const it of DATA.items){
+    const d = ent.items[it.key];
+    if (!d.w && !d.t) continue;
+    const cum = effCum(ent, st, it.key);
+    const today = st.today[it.key];
+    const pd = proj.detail[it.key];
+    const rateTxt = pd.rate === null ? '－' : pctTxt(pd.rate);
+    const rateCls = pd.rate === null ? '' : (pd.rate >= 1 ? 'good' : 'bad');
+    const anti = isAnti(it.key);
+    const gap = (!anti && d.t > 0) ? Math.max(0, r4(d.t - pd.a)) : 0;
+    const cumCell = cumEdit
+      ? `<input class="cum num" type="number" step="any" value="${cum}" onchange="onCum('${it.key}', this.value)">`
+      : `<span class="num">${cum}</span>`;
+    rows += `<tr>
+      <td class="iname">${it.short}<span class="w">權重 ${(d.w*100).toFixed(2)}%${anti ? '<span class="anti">｜防退類↓越少越好</span>' : ''}</span></td>
+      <td class="num hide-m">${d.t}</td>
+      <td>${cumCell}</td>
+      <td><input class="today num" type="number" step="${it.step}" min="0" placeholder="0" value="${today !== undefined && today !== null ? today : ''}" onchange="onToday('${it.key}', this.value)"></td>
+      <td><span class="rate ${rateCls} num">${rateTxt}</span>${gap > 0 ? `<span class="gap">距月目標缺 ${gap}</span>` : ''}</td>
+      <td class="scorecell num hide-m">${pctTxt(pd.sc)}</td>
+    </tr>`;
+  }
+  area.innerHTML = `<table class="items">
+    <thead><tr><th style="text-align:left">項目</th><th class="hide-m">月目標</th><th>累計</th><th>今日KEY入</th><th>明日達成率</th><th class="hide-m">得分貢獻</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(LS)); }
+function saveAndRender(){ save(); render(); }
+function setCalcDay(v){ LS.calcDay = Number(v) || defaultCalcDay(); saveAndRender(); }
+function setMonthDays(v){ LS.monthDays = Number(v) || DATA.meta.monthDays; saveAndRender(); }
+function setSnapDay(v){ entState().snapDay = Number(v) || null; saveAndRender(); }
+function setOfficial(v){ entState().official = v === '' ? null : Number(v); saveAndRender(); }
+function setBx(k, v){
+  const sst = LS.entities['S:' + curStore] || (LS.entities['S:' + curStore] = { today:{}, cum:{}, bx:{}, official:null, snapDay:null });
+  sst.bx = sst.bx || {};
+  if (v === '' || Number(v) === storeByCode(curStore).bonus[k]) delete sst.bx[k];
+  else sst.bx[k] = Number(v);
+  saveAndRender();
+}
+
+function initApp(){
+  if (!DATA.stores.find(s => s.code === curStore)) curStore = DATA.stores[0].code;
+  const who = document.getElementById('whoami');
+  const p = window._profile;
+  who.innerHTML = (p ? `${p.store || ''}｜${p.maskedName || ''}　` : '') + '<a onclick="kpiLogout()">登出</a>';
+  fillStoreSel();
+  if (tab === 'person'){ document.getElementById('tabStore').classList.remove('active'); document.getElementById('tabPerson').classList.add('active'); document.getElementById('selPerson').style.display=''; fillPersonSel(); }
+  render();
+  save();
+}
+
+(function boot(){
+  const emp = localStorage.getItem('bei12b_kpi_emp');
+  document.getElementById('lockCard').style.display = '';
+  if (emp){
+    document.getElementById('lockEmp').value = emp;
+    kpiLogin();
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,34 +1,107 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
-const { pathToFileURL } = require('url');
 
-const FILE_URL = pathToFileURL(path.join(__dirname, '..', 'index.html')).href;
+const FILE_URL = 'file://' + path.resolve(__dirname, '../index.html');
 
 // Mock GAS 回應（讓 fetch 不需要真正連線）
 async function mockGAS(page) {
   await page.route('https://script.google.com/**', async route => {
     const url = route.request().url();
-    const callback = new URL(url).searchParams.get('callback');
-    const fulfill = async (body) => {
-      if (callback) {
-        await route.fulfill({
-          contentType: 'application/javascript',
-          body: `${callback}(${JSON.stringify(body)})`,
-        });
+    const request = route.request();
+    if (request.method() === 'POST') {
+      const payload = JSON.parse(request.postData() || '{}');
+      if (payload.action === 'private_access') {
+        await route.fulfill({ json: { status: 'ok', profile: { maskedName: '測＊員', store: '大稻埕', role: '業代' }, snapshot: { kpiBattle: KPI_BATTLE_FIXTURE, awardsBattle: AWARDS_BATTLE_FIXTURE } } });
       } else {
-        await route.fulfill({ json: body });
+        await route.fulfill({ json: { status: 'ok' } });
       }
-    };
-    if (url.includes('action=ping')) {
-      await fulfill({ status: 'ok' });
+    } else if (url.includes('action=ping')) {
+      await route.fulfill({ json: { status: 'ok' } });
     } else if (url.includes('action=read')) {
-      await fulfill({ status: 'ok', data: {} });
+      await route.fulfill({ json: { data: {} } });
     } else if (url.includes('action=write')) {
-      await fulfill({ status: 'ok' });
+      await route.fulfill({ json: { status: 'ok' } });
     } else {
-      await fulfill({ status: 'ok', data: {} });
+      await route.fulfill({ json: { status: 'ok', data: {} } });
     }
   });
+}
+
+const KPI_BATTLE_FIXTURE = {
+  report_date: '2026-07-16',
+  previous_report_date: '2026-07-15',
+  source_date_range: '2026/07/01 ~ 07/15',
+  aggregate: {
+    overall_kpi: 1.0547, overall_kpi_dod: 0.009, company_rank: 27, company_rank_dod: 2, addon_score: 13.36, addon_score_dod: 0.09,
+    core: {
+      a999: { actual: 72, target: 80, daily_target: 38.7, daily_gap: 33.3, rate: 0.9, dod: 0.01 },
+      a1399: { actual: 31, target: 40, daily_target: 19.4, daily_gap: 11.6, rate: 0.775, dod: 0.02 },
+      haosu: { actual: 46, target: 45, daily_target: 21.8, daily_gap: 24.2, rate: 1.0222, dod: 0.01 },
+      r1399: { actual: 60, target: 70, daily_target: 33.9, daily_gap: 26.1, rate: 0.8571, dod: -0.01 },
+    },
+    metrics: { '好速案銷售點數': { actual: 46, target: 45, daily_target: 21.8, daily_gap: 24.2, rate: 1.0222, dod: 0.01 } },
+  },
+  stores: [{
+    store: '大稻埕', company_rank: 65, company_rank_dod: -3, overall_kpi: 1.2435, overall_kpi_dod: 0.056, addon_score: 13.57, addon_score_dod: 0.23,
+    core: {
+      a999: { actual: 10, target: 16, daily_target: 7.7, daily_gap: 2.3, rate: 1.2917, dod: 0.012 },
+      a1399: { actual: 6, target: 8, daily_target: 3.9, daily_gap: 2.1, rate: 1.55, dod: -0.02 },
+      haosu: { actual: 4.25, target: 18, daily_target: 8.7, daily_gap: -4.5, rate: 0.488, dod: 0.01 },
+      r1399: { actual: 18, target: 33, daily_target: 16, daily_gap: 2, rate: 1.1273, dod: 0.03 },
+    },
+    metrics: { '好速案銷售點數': { actual: 4.25, target: 18, daily_target: 8.7, daily_gap: -4.5, rate: 0.488, dod: 0.01 } },
+  }],
+  personal: [{
+    store: '大稻埕', role: '業務代表(I)', category: '業代', name: '測＊員', rank: 8, rank_dod: 2, overall_rate: 1.056, overall_rate_dod: 0.01,
+    phone_award_actual: 1800, phone_award_projected: 3200, phone_award_rank: 8, phone_award_eligible: 'Y', insurance_attach_rate: 0.42,
+    metrics: {
+      A999: { actual: 4, target: 3, rate: 1.3333 },
+      A1399: { actual: 2, target: 2, rate: 1 },
+      '好速': { actual: 2, target: 3, rate: 0.6667 },
+      R1399: { actual: 3, target: 2, rate: 1.5 },
+      RT: { actual: 8, target: 10, rate: 0.8 },
+      R999: { actual: 4, target: 5, rate: 0.8 },
+      '特維': { actual: 3, target: 4, rate: 0.75 },
+      '配件': { actual: 9000, target: 10000, rate: 0.9 },
+      '包膜': { actual: 1800, target: 2000, rate: 0.9 },
+    },
+  }],
+};
+
+const AWARD_ITEMS = [
+  ['Samsung S26/S26+/A57', 8, 17, 0.4706, -1, 2335],
+  ['vivo X300/X300 Pro/V70 FE', 7, 10, 0.7, 2, 1500],
+  ['Google Pixel 10/10 Pro/10 Pro XL/10a', 3, 8, 0.375, -1, 1105],
+  ['OPPO Reno16 F', 4, 6, 0.6667, 1, 780],
+  ['OPPO A6x', 2, 5, 0.4, -1, 600],
+  ['SHARP AQUOS R11', 1, 4, 0.25, -1, 470],
+  ['Samsung S26 Ultra', 1, 3, 0.3333, -1, 405],
+  ['moto razr fold', 0, 2, 0, -1, 300],
+  ['Samsung A27/A17', 2, 3, 0.6667, 0, 250],
+  ['vivo Y21/Redmi Note 15 Pro', 1, 2, 0.5, 0, 100],
+].map(([display_name, actual, target, rate, difference, incremental_award]) => ({
+  display_name, actual, target, rate, difference, incremental_award,
+  next_label: '下一獎階', threshold_target: Math.ceil(target * 0.5),
+}));
+
+const AWARDS_BATTLE_FIXTURE = {
+  supervisor: { actual_total: 2431, projected: 11260, rank: '22', award: 'Y' },
+  overall: {
+    store: '北一二B整體', award: { actual_total: 2431, projected: 11260, rank: '22', award: 'Y' },
+    priorities: AWARD_ITEMS.slice(0, 3), items: AWARD_ITEMS,
+  },
+  stores: [
+    { store: '通化', award: { actual_total: 11465, projected: 14860, rank: '18', award: 'Y' }, priorities: AWARD_ITEMS.slice(0, 3), items: AWARD_ITEMS },
+    { store: '酒泉', award: { actual_total: 8645, projected: 11460, rank: '189', award: 'N' }, priorities: AWARD_ITEMS.slice(1, 4), items: AWARD_ITEMS },
+  ],
+};
+
+async function mockKpiBattle(page) {
+  await page.addInitScript(data => { window.__KPI_BATTLE_DATA__ = data; }, KPI_BATTLE_FIXTURE);
+}
+
+async function mockAwardsBattle(page) {
+  await page.addInitScript(data => { window.__AWARDS_BATTLE_DATA__ = data; }, AWARDS_BATTLE_FIXTURE);
 }
 
 test.describe('頁面載入', () => {
@@ -37,8 +110,8 @@ test.describe('頁面載入', () => {
     await page.goto(FILE_URL);
     await expect(page).toHaveTitle(/北一二B/);
     await expect(page.locator('.site-title')).toContainText('北一二');
-    // 六個頁籤
     await expect(page.locator('.tab-btn')).toHaveCount(6);
+    await expect(page.getByRole('button', { name: '🏆 KPI/個績' })).toHaveCount(0);
   });
 
   test('日期 badge 顯示今日日期', async ({ page }) => {
@@ -121,6 +194,15 @@ test.describe('填報頁籤 - 時段切換', () => {
 });
 
 test.describe('填報頁籤 - 表單輸入', () => {
+  test('台獎填報維持 10 款且只保留 moto', async ({ page }) => {
+    await mockGAS(page);
+    await page.goto(FILE_URL);
+    await page.locator('.store-card[data-store="通化"]').click();
+    await expect(page.locator('#f_tw_sony1')).toBeVisible();
+    await expect(page.locator('label').filter({ hasText: 'moto razr fold' })).toBeVisible();
+    await expect(page.locator('#f_tw_pixel10fold, #f_tw_findx9s, #f_tw_poketomo, #f_tw_myfirst')).toHaveCount(0);
+  });
+
   test('KPI 欄位可以輸入數值', async ({ page }) => {
     await mockGAS(page);
     await page.goto(FILE_URL);
@@ -190,6 +272,89 @@ test.describe('頁籤切換', () => {
   });
 });
 
+test.describe('KPI 戰情', () => {
+  test('公開頁面未提供私有資料，必須先登入', async ({ page }) => {
+    await mockGAS(page);
+    await page.goto(FILE_URL);
+    await page.getByRole('button', { name: /KPI戰情/ }).click();
+    await expect(page.locator('#kpiBattleContent')).toContainText('KPI 戰情受保護');
+    await expect(page.locator('#kpiBattleContent input[placeholder="輸入員工編號"]')).toBeVisible();
+    await expect(page.locator('#kpiBattleContent')).not.toContainText('大稻埕');
+  });
+
+  test('核准裝置只需輸入員編即可讀取私有戰情', async ({ page }) => {
+    await mockGAS(page);
+    await page.goto(FILE_URL);
+    await page.getByRole('button', { name: /KPI戰情/ }).click();
+    await page.locator('#kpiBattleContent input[placeholder="輸入員工編號"]').fill('1234567');
+    await page.getByRole('button', { name: '以員編登入' }).click();
+    await expect(page.locator('#kpiBattleContent')).toContainText('大稻埕');
+    await expect(page.locator('#kpiBattleContent')).toContainText('KPI總達成');
+  });
+
+  test('店點總覽顯示正式 KPI 核心欄位', async ({ page }) => {
+    await mockGAS(page);
+    await mockKpiBattle(page);
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("KPI戰情")').click();
+    await expect(page.locator('#panel-kpi-battle')).toBeVisible();
+    await expect(page.locator('#kpiBattleContent')).toContainText('大稻埕');
+    await expect(page.locator('#kpiBattleContent')).toContainText('A999');
+    await expect(page.locator('#kpiBattleContent')).toContainText('R1399');
+    await expect(page.locator('#kpiBattleContent')).toContainText('較昨日');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('尚差或超前');
+  });
+
+  test('北一二B整體列置頂，且可查看整體 KPI 明細', async ({ page }) => {
+    await mockGAS(page);
+    await mockKpiBattle(page);
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("KPI戰情")').click();
+    await expect(page.locator('#kpiBattleContent tbody tr').first()).toContainText('北一二B整體');
+    await page.selectOption('#kpiBattleStoreSelect', '北一二B整體');
+    await expect(page.locator('#kpiBattleContent')).toContainText('好速案銷售點數');
+  });
+
+  test('可切換至個績排名且顯示遮罩姓名', async ({ page }) => {
+    await mockGAS(page);
+    await mockKpiBattle(page);
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("KPI戰情")').click();
+    await page.locator('#kpiBattlePersonalBtn').click();
+    await expect(page.locator('#kpiBattleContent')).toContainText('測＊員');
+    await expect(page.locator('#kpiBattleContent')).toContainText('總達成率');
+    await expect(page.locator('#kpiBattleContent')).toContainText('個人台獎');
+    await expect(page.locator('#kpiBattleContent')).toContainText('實際獎金');
+    await expect(page.locator('#kpiBattleContent')).toContainText('推估獎金');
+    await expect(page.locator('#kpiBattleContent')).toContainText('特維');
+    await expect(page.locator('#kpiBattleContent')).toContainText('保險搭售率');
+    await expect(page.locator('#kpiBattleContent')).toContainText('DOD');
+    const headers = await page.locator('#kpiBattleContent thead th').allTextContents();
+    expect(headers.indexOf('保險搭售率')).toBe(headers.indexOf('個人台獎') + 1);
+    expect(headers.indexOf('R999')).toBe(headers.indexOf('R1399') + 1);
+  });
+});
+
+test.describe('台獎戰情', () => {
+  test('督導六卡、店點實際獎金排序與 10 台篩選顯示正確', async ({ page }) => {
+    await mockGAS(page);
+    await mockAwardsBattle(page);
+    await page.goto(FILE_URL);
+    await page.locator('.tab-btn:has-text("台獎戰情")').click();
+    await expect(page.locator('#panel-awards-battle')).toBeVisible();
+    await expect(page.locator('#awardsBattleContent')).toContainText('督導區實際獎金');
+    await expect(page.locator('#awardsBattleContent')).toContainText('督導區推估獎金');
+    await expect(page.locator('#awardsBattleContent')).toContainText('有領獎店');
+    await expect(page.locator('#awardsBattleContent')).toContainText('會增加多少獎金');
+    await expect(page.locator('#awardsBattleContent')).toContainText('通化');
+    await expect(page.locator('.award-store-card').nth(1)).toContainText('通化');
+    await expect(page.locator('#awardsStoreSelect')).toHaveValue('通化');
+    await expect(page.locator('#awardsBattleContent .award-model')).toHaveCount(10);
+    await page.selectOption('#awardsStoreSelect', '酒泉');
+    await expect(page.locator('#awardsStoreSelect')).toHaveValue('酒泉');
+  });
+});
+
 test.describe('日期回放', () => {
   test('選日期後點查詢顯示結果', async ({ page }) => {
     await mockGAS(page);
@@ -201,27 +366,14 @@ test.describe('日期回放', () => {
     // 結果區出現回放標題
     await expect(page.locator('#playbackResult')).toContainText('回放');
   });
-});
 
-test.describe('區間彙整與台獎提醒', () => {
-  test('區間彙整頁籤可顯示日動能圖表與提醒表', async ({ page }) => {
+  test('日期回放只保留16:00與21:00', async ({ page }) => {
     await mockGAS(page);
     await page.goto(FILE_URL);
-    await page.locator('.tab-btn:has-text("區間彙整")').click();
-    await expect(page.locator('#panel-momentum')).toBeVisible();
-    await expect(page.locator('#momentumChart svg')).toBeVisible();
-    await expect(page.locator('#momentumValueTable')).toBeVisible();
-    await expect(page.locator('#momentumAlertSummary')).toBeVisible();
-  });
-
-  test('台獎提醒頁籤可顯示10台機款區塊', async ({ page }) => {
-    await mockGAS(page);
-    await page.goto(FILE_URL);
-    await page.locator('.tab-btn:has-text("台獎提醒")').click();
-    await expect(page.locator('#panel-phone')).toBeVisible();
-    await expect(page.locator('#phoneGate')).toBeVisible();
-    await expect(page.locator('#phoneItemsTable')).toBeVisible();
-    await expect(page.locator('#phoneSourceNote')).toBeVisible();
+    await page.locator('.tab-btn:has-text("日期回放")').click();
+    await expect(page.locator('#pbSeg13')).toHaveCount(0);
+    await expect(page.locator('#pbSeg16')).toBeVisible();
+    await expect(page.locator('#pbSeg21')).toBeVisible();
   });
 });
 
