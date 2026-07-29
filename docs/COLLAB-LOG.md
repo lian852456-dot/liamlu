@@ -13,9 +13,30 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-07-29 ｜ Codex（P0 Liam 情報站全站權限修復）
+
+- 做了什麼：由執行當下最新 `origin/main` 建立
+  `security/patrol-full-auth-gate-20260729`；先以獨立 commit `c67e012` 關閉
+  `home.html` 督導入口。`patrol.html` 改為正式 GAS 回 `status:"ok"` 前只建立全頁鎖定，
+  不建立督導 DOM、不執行 render／cloudLoad、不切頁或讀取巡店、班表、半月資料。
+  通行碼只送一次，成功後改用 sessionStorage 的 30 分鐘 token，登出與錯誤驗證清除全部狀態。
+  正式 GAS 只套用權限最小差異：`PT_KEY` 移至 Script Properties，全部巡店／班表／半月／媒體
+  action 統一後端驗證，`ping`／`pthealth` 只保留最小健康資訊。
+- 結果：成功。正式 Apps Script 專案
+  `1SW9qr0CU9Xvy97XkVr3n51_4Dx_6GArnTXT8780t0HofIB74v9IDMkWf`、
+  Deployment ID
+  `AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv`
+  已由第 20 版更新至第 21 版。GAS 負向契約 8/8、Node 9/9、Playwright 51/51，
+  正式 A/B/C 全新隔離瀏覽器與登出驗收全數通過。確認既有 KPI、自動更新、通知與週報
+  關鍵函式仍存在後，入口才由 commit `f17e41e` 重新開放；Pages run `30448659037` 成功。
+- 經驗 / 給下一位的提醒：前端顯示密碼框不等於授權；巡店主頁本身也必須受同一個
+  verified session 約束。正式密碼不得進 repo／文件／localStorage。後續若權限回歸，
+  先重新套用 `c67e012` 的緊急關閉，再將 GAS 部署切回第 20 版；未完成正式 GAS 與無痕
+  驗收前不得重新開放入口。正確憑證的寫入／媒體上傳仍需另行指定安全測試資料。
+
 ## 🔴 進行中／待辦（2026-07-29 更新第三次，接手者先看這段）
 
-**狀態：全部正常運作。Drive API 缺服務的問題已由 Codex 修好並驗證成功。**
+**狀態：P0 權限漏洞已修復並正式驗證；其餘 Drive API／KPI 自動化維持原狀。**
 
 | 項目 | 狀態 |
 |---|---|
@@ -25,7 +46,7 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 | 11:00 自動更新 | ✅ **0729 這次已成功**：收到 `✅ KPI試算資料已更新（0729.xlsx）`，通化 0.9026／六張犁 0.9991／區平均 1.0867，與 AI 獨立解析結果逐店一致 |
 | 12:30 巡檢 | 已啟用（`setupKpiCalcWatchdog` 已跑），今天沒收到失敗信，正常 |
 | 同仁看到的資料 | ✅ 累計 **07/28**，由自動流程本身產生（不是人工上傳） |
-| patrol.html／home.html／督導試算區 | ✅ 全部上線 |
+| patrol.html／home.html／督導試算區 | ✅ 全部上線；Liam 情報站需正式 GAS 驗證 |
 
 **這次怎麼驗證「是真的自動修好、還是人工補救蓋過去」**（Liam 問「Codex已修正」時的排查法，之後可複用）：
 1. 私有資料夾 `north12b-kpicalc-private-latest.json` 的 `modifiedTime` 是否為最近
