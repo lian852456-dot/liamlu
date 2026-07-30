@@ -1633,9 +1633,9 @@ function exportScheduleExcel(){
 function halfKey(row){ return `${row.checkId||`${row.date}|${row.store}|${row.period}`}|${row.item}`; }
 function mergeHalfRows(rows){
   if(!secureUnlocked || !privateAccount) return;
-  const map=new Map(halfChecks.map(r=>[halfKey(r),r])); rows.forEach(r=>map.set(halfKey(r),r)); halfChecks=Array.from(map.values()).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(a.store).localeCompare(String(b.store))||Number(a.item)-Number(b.item)); sessionStorage.setItem('bei12b_half_checks',JSON.stringify(halfChecks));
+  const map=new Map(halfChecks.map(r=>[halfKey(r),r])); rows.forEach(r=>map.set(halfKey(r),r)); halfChecks=Array.from(map.values()).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(a.store).localeCompare(String(b.store))||Number(a.item)-Number(b.item));
 }
-function loadHalfLocal(){ if(!secureUnlocked || !privateAccount) return;try{const rows=JSON.parse(sessionStorage.getItem('bei12b_half_checks')||'[]');if(Array.isArray(rows)) halfChecks=rows;}catch{halfChecks=[];} }
+function loadHalfLocal(){ if(!secureUnlocked || !privateAccount) return; }
 function halfPeriod(date){ return Number((date||'').slice(-2))<=15?'H1':'H2'; }
 function halfPeriodLabel(p){ return p==='H1'?'上半月（1–15日）':'下半月（16日–月底）'; }
 async function loadHalfChecks(){
@@ -1658,19 +1658,24 @@ function currentHalfRows(){
 const halfPendingMedia=new Map();
 function halfMediaKey(checkId,item){ return `${checkId}|${Number(item)}`; }
 function driveFileId(url){ const text=String(url||'');const match=text.match(/\/d\/([A-Za-z0-9_-]+)/)||text.match(/[?&]id=([A-Za-z0-9_-]+)/);return match?match[1]:''; }
+function safeMediaUrl(url,pending=false){
+  const text=String(url||'').trim();if(!text)return'';
+  if(pending&&text.startsWith('blob:'))return text;
+  try{const parsed=new URL(text);const host=parsed.hostname.toLowerCase();return parsed.protocol==='https:'&&(host==='drive.google.com'||host==='docs.google.com'||host.endsWith('.googleusercontent.com'))?text:'';}catch{return'';}
+}
 function mediaItems(value){
   const text=String(value||'').trim();if(!text)return[];
-  try{const parsed=JSON.parse(text);const rows=Array.isArray(parsed)?parsed:(Array.isArray(parsed.media)?parsed.media:[]);return rows.filter(x=>x&&typeof x==='object').map(x=>({...x,name:String(x.name||'附件'),mimeType:String(x.mimeType||''),viewUrl:String(x.viewUrl||x.url||''),previewUrl:String(x.previewUrl||x.url||''),id:String(x.id||'')}));}catch{}
-  const id=driveFileId(text);return[{id,name:'既有私有 Drive 附件',mimeType:'',viewUrl:text,previewUrl:id?`https://drive.google.com/uc?export=view&id=${id}`:text,legacy:true}];
+  try{const parsed=JSON.parse(text);const rows=Array.isArray(parsed)?parsed:(Array.isArray(parsed.media)?parsed.media:[]);return rows.filter(x=>x&&typeof x==='object').map(x=>({...x,name:String(x.name||'附件'),mimeType:String(x.mimeType||''),viewUrl:safeMediaUrl(x.viewUrl||x.url||''),previewUrl:safeMediaUrl(x.previewUrl||x.url||''),id:String(x.id||'')}));}catch{}
+  const safe=safeMediaUrl(text),id=driveFileId(safe);return safe?[{id,name:'既有私有 Drive 附件',mimeType:'',viewUrl:safe,previewUrl:id?`https://drive.google.com/uc?export=view&id=${id}`:safe,legacy:true}]:[];
 }
 function mediaValue(items){ return items.length?JSON.stringify(items.map(x=>({id:x.id||'',name:x.name||'附件',mimeType:x.mimeType||'',viewUrl:x.viewUrl||x.url||'',previewUrl:x.previewUrl||x.url||''}))):''; }
 function mediaKind(item){ return /^video\//.test(item.mimeType||'')?'video':/^image\//.test(item.mimeType||'')?'image':'link'; }
 function halfMediaCard(item,pending=false){
-  const kind=mediaKind(item);let preview='';
-  if(kind==='image'&&item.previewUrl)preview=`<img src="${esc(item.previewUrl)}" alt="${esc(item.name)}" loading="lazy">`;
-  else if(kind==='video'&&item.previewUrl)preview=pending?`<video src="${esc(item.previewUrl)}" controls muted playsinline></video>`:`<iframe src="${esc(item.previewUrl||item.viewUrl)}" title="${esc(item.name)}" allow="autoplay" loading="lazy"></iframe>`;
+  const kind=mediaKind(item),previewUrl=safeMediaUrl(item.previewUrl,pending),viewUrl=safeMediaUrl(item.viewUrl);let preview='';
+  if(kind==='image'&&previewUrl)preview=`<img src="${esc(previewUrl)}" alt="${esc(item.name)}" loading="lazy">`;
+  else if(kind==='video'&&previewUrl)preview=pending?`<video src="${esc(previewUrl)}" controls muted playsinline></video>`:`<iframe src="${esc(previewUrl||viewUrl)}" title="${esc(item.name)}" allow="autoplay" loading="lazy"></iframe>`;
   else preview='<div class="half-media-empty">已附私有連結</div>';
-  const open=item.viewUrl?`<a href="${esc(item.viewUrl)}" target="_blank" rel="noopener">${kind==='video'?'播放':'開啟'}</a>`:'';
+  const open=viewUrl?`<a href="${esc(viewUrl)}" target="_blank" rel="noopener">${kind==='video'?'播放':'開啟'}</a>`:'';
   return `<div class="half-media-card">${preview}<strong>${esc(item.name)}</strong>${pending?'<span class="pending">尚未上傳</span>':''}<div class="media-links">${open}</div></div>`;
 }
 function renderHalfMediaList(box){

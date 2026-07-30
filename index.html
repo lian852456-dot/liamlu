@@ -2086,25 +2086,91 @@ const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92F
 const savedGasUrl = localStorage.getItem('bei12b_gas_url');
 let GAS_URL = !savedGasUrl || savedGasUrl === LEGACY_GAS_URL ? DEFAULT_GAS_URL : savedGasUrl;
 if (savedGasUrl === LEGACY_GAS_URL) localStorage.setItem('bei12b_gas_url', DEFAULT_GAS_URL);
+let _reportSessionToken = '';
+let _reportSessionScope = '';
+let _privateDashboardEmployeeId = '';
+let _reportAuthPending = null;
+
+async function protectedGasPost(payload) {
+  const response = await fetch(DEFAULT_GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+    cache: 'no-store',
+  });
+  const body = await response.json();
+  if (!body || body.status !== 'ok') throw new Error((body && body.message) || 'unauthorized');
+  return body;
+}
+
+async function ensureReportSession(requiredScope = 'employee') {
+  if (requiredScope === 'employee' && _reportAuthPending) return _reportAuthPending;
+  const task = ensureReportSessionInner(requiredScope);
+  if (requiredScope !== 'employee') return task;
+  _reportAuthPending = task;
+  try { return await task; }
+  finally { _reportAuthPending = null; }
+}
+
+async function ensureReportSessionInner(requiredScope) {
+  if (_reportSessionToken) {
+    try {
+      const refreshed = await protectedGasPost({ action: 'report_auth', token: _reportSessionToken });
+      _reportSessionScope = refreshed.scope || '';
+      if (requiredScope !== 'supervisor' || _reportSessionScope === 'supervisor') return _reportSessionToken;
+    } catch (error) {
+      _reportSessionToken = '';
+      _reportSessionScope = '';
+    }
+  }
+  if (requiredScope === 'supervisor') {
+    const key = String(prompt('請輸入督導通行碼') || '');
+    if (!key) throw new Error('unauthorized');
+    const auth = await protectedGasPost({ action: 'report_auth', key });
+    _reportSessionToken = auth.token || '';
+    _reportSessionScope = auth.scope || '';
+  } else {
+    const employeeId = _privateDashboardEmployeeId || String(prompt('請輸入已核准裝置的員工編號') || '').trim();
+    if (!employeeId) throw new Error('unauthorized');
+    const auth = await protectedGasPost({
+      action: 'report_auth',
+      employeeId,
+      deviceId: privateDashboardDeviceId()
+    });
+    _privateDashboardEmployeeId = employeeId;
+    _reportSessionToken = auth.token || '';
+    _reportSessionScope = auth.scope || '';
+  }
+  if (!_reportSessionToken || (requiredScope === 'supervisor' && _reportSessionScope !== 'supervisor')) {
+    throw new Error('unauthorized');
+  }
+  return _reportSessionToken;
+}
+
+async function reportLogout() {
+  const token = _reportSessionToken;
+  _reportSessionToken = '';
+  _reportSessionScope = '';
+  _privateDashboardEmployeeId = '';
+  if (token) {
+    try { await protectedGasPost({ action: 'report_logout', token }); } catch (error) {}
+  }
+}
 
 // 記憶體快取（避免重複拉資料）
 const _cache = {};
 function cacheKey(date, seg) { return `${date}_${seg}`; }
 function shadowKey(date, seg) { return `bei12b_shadow_${date}_${seg}`; }
+const _shadowMemory = {};
 
 function readLocalShadow(date, seg) {
-  try {
-    return JSON.parse(localStorage.getItem(shadowKey(date, seg)) || '{}') || {};
-  } catch(e) {
-    console.warn('readLocalShadow error', e);
-    return {};
-  }
+  return _shadowMemory[shadowKey(date, seg)] || {};
 }
 
 function writeLocalShadow(date, store, seg, data) {
   const shadow = readLocalShadow(date, seg);
   shadow[store] = { ...data, date, store, seg, _shadowTs: Date.now() };
-  localStorage.setItem(shadowKey(date, seg), JSON.stringify(shadow));
+  _shadowMemory[shadowKey(date, seg)] = shadow;
 }
 
 function mergeDayData(remoteData, localData) {
@@ -2133,6 +2199,11 @@ function today() {
   const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
   return tw.toISOString().slice(0,10);
 }
+function escapeHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
 
 // ── 讀取：先查快取，再打 GAS
 async function getData(date, store, seg) {
@@ -2149,9 +2220,8 @@ async function fetchDayData(date, seg) {
   const localShadow = readLocalShadow(date, seg);
   if (!GAS_URL) { _cache[ck] = {}; return; }
   try {
-    const url = `${GAS_URL}?action=read&date=${date}&seg=${seg}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    const json = await res.json();
+    const token = await ensureReportSession('employee');
+    const json = await protectedGasPost({ action: 'read', token, date, seg });
     _cache[ck] = mergeDayData(json.data || {}, localShadow);
   } catch(e) {
     console.error('fetchDayData error', e);
@@ -2171,51 +2241,14 @@ async function saveToStorage(date, store, seg, data) {
   if (!_cache[ck]) _cache[ck] = {};
   _cache[ck][store] = { ...data, date, store, seg };
 
-  // 用 GET + URL 參數 + no-cors 模式
-  const payload = encodeURIComponent(JSON.stringify({ date, store, seg, data }));
-  const url = `${GAS_URL}?action=write&payload=${payload}`;
-  
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    const cbName = 'gasCallback_' + Date.now();
-    window[cbName] = function(result) {
-      delete window[cbName];
-      document.head.removeChild(script);
-      resolve(result && result.status === 'ok');
-    };
-    script.onerror = function() {
-      delete window[cbName];
-      // 即使有 error 也嘗試用 fetch
-      fetch(url + '&callback=' + cbName)
-        .then(r => r.json())
-        .then(j => resolve(j.status === 'ok'))
-        .catch(() => {
-          // 最後嘗試：no-cors 送出（無法確認結果但資料會到）
-          fetch(url, { mode: 'no-cors' })
-            .then(() => resolve(true))
-            .catch(() => resolve(false));
-        });
-    };
-    // 先試 fetch
-    fetch(url)
-      .then(r => r.json())
-      .then(j => {
-        delete window[cbName];
-        resolve(j.status === 'ok');
-      })
-      .catch(() => {
-        // fetch 失敗，改用 no-cors
-        fetch(url, { mode: 'no-cors' })
-          .then(() => {
-            delete window[cbName];
-            resolve(true);
-          })
-          .catch(() => {
-            delete window[cbName];
-            resolve(false);
-          });
-      });
-  });
+  try {
+    const token = await ensureReportSession('employee');
+    await protectedGasPost({ action: 'write', token, date, store, seg, data });
+    return true;
+  } catch (error) {
+    console.error('saveToStorage authorization error', error);
+    return false;
+  }
 }
 function pct(val) {
   if (val === null || val === undefined || val === '') return '—';
@@ -2400,7 +2433,7 @@ function privateDashboardDeviceId() {
 }
 
 function privateDashboardSessionEmployeeId() {
-  return sessionStorage.getItem('north12b_private_dashboard_employee_id') || '';
+  return _privateDashboardEmployeeId;
 }
 
 function privateDashboardSetStatus(message, error = false) {
@@ -2411,17 +2444,7 @@ function privateDashboardSetStatus(message, error = false) {
 }
 
 async function privateDashboardPost(payload) {
-  if (!GAS_URL) throw new Error('尚未設定 Apps Script 服務網址');
-  const response = await fetch(GAS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload),
-    cache: 'no-store',
-  });
-  if (!response.ok) throw new Error(`服務連線失敗（HTTP ${response.status}）`);
-  const body = await response.json();
-  if (!body || body.status !== 'ok') throw new Error((body && body.message) || '服務回應失敗');
-  return body;
+  return protectedGasPost(payload);
 }
 
 function privateDashboardLockMarkup(kind) {
@@ -2469,7 +2492,9 @@ async function privateDashboardLogin() {
   privateDashboardSetStatus('正在驗證這台裝置…');
   try {
     const result = await privateDashboardPost({ action: 'private_access', employeeId, deviceId: privateDashboardDeviceId() });
-    sessionStorage.setItem('north12b_private_dashboard_employee_id', employeeId);
+    _privateDashboardEmployeeId = employeeId;
+    _reportSessionToken = result.reportSession?.token || '';
+    _reportSessionScope = result.reportSession?.scope || '';
     _kpiBattleData = result.snapshot.kpiBattle;
     _awardsBattleData = result.snapshot.awardsBattle;
     _privateDashboardProfile = result.profile || null;
@@ -2480,6 +2505,15 @@ async function privateDashboardLogin() {
   }
 }
 
+async function privateDashboardLogout() {
+  await reportLogout();
+  _kpiBattleData = null;
+  _awardsBattleData = null;
+  _privateDashboardProfile = null;
+  renderPrivateDashboardLock();
+  privateDashboardSetStatus('已登出，短效 session 已失效。');
+}
+
 async function privateDashboardRequestBinding() {
   const employeeId = privateDashboardEmployeeInput();
   const bootstrapCode = privateDashboardBootstrapInput();
@@ -2487,7 +2521,7 @@ async function privateDashboardRequestBinding() {
   privateDashboardSetStatus('正在送出裝置綁定申請…');
   try {
     const result = await privateDashboardPost({ action: 'private_request', employeeId, bootstrapCode, deviceId: privateDashboardDeviceId() });
-    sessionStorage.setItem('north12b_private_dashboard_employee_id', employeeId);
+    _privateDashboardEmployeeId = employeeId;
     privateDashboardSetStatus(result.message || '已送出申請，請等待管理者核准。');
   } catch (error) {
     privateDashboardSetStatus(error.message, true);
@@ -2638,7 +2672,8 @@ function renderKpiBattle() {
   }
   const content = document.getElementById('kpiBattleContent');
   if (!content) return;
-  content.innerHTML = _kpiBattleView === 'personal' ? renderKpiBattlePersonal() : renderKpiBattleStores();
+  content.innerHTML = `<div style="text-align:right;margin-bottom:8px"><button class="secondary" onclick="privateDashboardLogout()">登出</button></div>` +
+    (_kpiBattleView === 'personal' ? renderKpiBattlePersonal() : renderKpiBattleStores());
 }
 
 function renderKpiBattleStores() {
@@ -2758,7 +2793,7 @@ function renderAwardsBattle() {
   if (note) note.textContent = `10 台重點機款｜前三台依本月最高台獎順位；達成率超過 100% 由下一順位遞補｜店點差異數以 50% 目標無條件進位計算｜資料僅供受保護預覽`;
   const content = document.getElementById('awardsBattleContent');
   if (!content) return;
-  content.innerHTML = `
+  content.innerHTML = `<div style="text-align:right;margin-bottom:8px"><button class="secondary" onclick="privateDashboardLogout()">登出</button></div>` + `
     <div class="summary-grid">
       <div class="summary-card"><div class="sc-label">督導區實際獎金</div><div class="sc-val" style="color:#6d28d9">${awardMoney(supervisor.actual_total)}</div><div class="sc-sub">公司實際獎金</div></div>
       <div class="summary-card"><div class="sc-label">督導區推估獎金</div><div class="sc-val" style="color:var(--accent)">${awardMoney(supervisor.projected)}</div><div class="sc-sub">依目前進度推估</div></div>
@@ -3044,11 +3079,11 @@ function renderZeroReportSection(date, seg, dayCache) {
     <div class="section-divider" style="margin-top:16px;">🔴 21:00 零報說明彙整</div>
     ${reports.map(({s, d}) => `
       <div class="zero-report-card">
-        <div class="zrc-store">${s}</div>
-        <div class="zrc-row"><span class="zrc-label">① 未開市原因</span><span class="zrc-val">${d.zero_reason || '—'}</span></div>
-        <div class="zrc-row"><span class="zrc-label">② 請益對象</span><span class="zrc-val">${d.zero_consult || '—'}</span></div>
-        <div class="zrc-row"><span class="zrc-label">③ 請益做法</span><span class="zrc-val">${d.zero_method || '—'}</span></div>
-        <div class="zrc-row"><span class="zrc-label">④ 明天計劃</span><span class="zrc-val">${d.zero_plan || '—'}</span></div>
+        <div class="zrc-store">${escapeHtml(s)}</div>
+        <div class="zrc-row"><span class="zrc-label">① 未開市原因</span><span class="zrc-val">${escapeHtml(d.zero_reason || '—')}</span></div>
+        <div class="zrc-row"><span class="zrc-label">② 請益對象</span><span class="zrc-val">${escapeHtml(d.zero_consult || '—')}</span></div>
+        <div class="zrc-row"><span class="zrc-label">③ 請益做法</span><span class="zrc-val">${escapeHtml(d.zero_method || '—')}</span></div>
+        <div class="zrc-row"><span class="zrc-label">④ 明天計劃</span><span class="zrc-val">${escapeHtml(d.zero_plan || '—')}</span></div>
       </div>
     `).join('')}
   `;
@@ -3058,8 +3093,7 @@ function renderPersonalFailSummary(date, seg) {
   const el = document.getElementById('personalFailSummarySection');
   if (!el) return;
   const key = `pIdx_${date}_${seg}`;
-  let idx = {};
-  try { idx = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
+  const idx = _personalGet(key) || {};
 
   const segLabel = seg === 16 ? '16:00' : '21:00';
   const itemLabelMap = Object.fromEntries(PERSONAL_ITEMS.map(i => [i.key, i.label]));
@@ -3089,7 +3123,7 @@ function renderPersonalFailSummary(date, seg) {
     ${storeRows.map(({ store, failDetails, passNames }) => `
       <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
         <div style="font-size:15px;font-weight:800;color:var(--accent-bright);margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #fed7aa;">
-          🏪 ${store}
+          🏪 ${escapeHtml(store)}
           <span style="float:right;font-size:12px;font-weight:600;color:var(--text-muted);">
             ${failDetails.length > 0 ? `❌ ${failDetails.length} 人未過關` : ''}
             ${passNames.length > 0 ? `　✅ ${passNames.length} 人過關` : ''}
@@ -3098,12 +3132,12 @@ function renderPersonalFailSummary(date, seg) {
 
         ${passNames.length > 0 ? `
           <div style="font-size:12px;color:#16a34a;font-weight:600;margin-bottom:10px;padding:6px 10px;background:#f0fdf4;border-radius:8px;">
-            ✅ 過關：${passNames.join('、')}
+            ✅ 過關：${passNames.map(escapeHtml).join('、')}
           </div>` : ''}
 
         ${failDetails.map(({ name, r }) => `
           <div style="background:#fff5f5;border:1px solid #fecaca;border-left:3px solid #ef4444;border-radius:8px;padding:12px;margin-bottom:8px;">
-            <div style="font-size:14px;font-weight:800;color:#dc2626;margin-bottom:8px;">❌ ${name}</div>
+            <div style="font-size:14px;font-weight:800;color:#dc2626;margin-bottom:8px;">❌ ${escapeHtml(name)}</div>
 
             ${r ? `
               <!-- 未過關項目 -->
@@ -3122,14 +3156,14 @@ function renderPersonalFailSummary(date, seg) {
               <!-- 請益資訊 -->
               ${r.extra?.consult_store || r.extra?.consult_person ? `
                 <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">
-                  🏪 請益：<strong>${r.extra.consult_store || '—'}</strong>
-                  ${r.extra.consult_person ? `／ <strong>${r.extra.consult_person}</strong>` : ''}
+                  🏪 請益：<strong>${escapeHtml(r.extra.consult_store || '—')}</strong>
+                  ${r.extra.consult_person ? `／ <strong>${escapeHtml(r.extra.consult_person)}</strong>` : ''}
                 </div>` : ''}
 
               <!-- 請益做法 -->
               ${r.extra?.consult_method ? `
                 <div style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px;color:var(--text);line-height:1.6;">
-                  💡 ${r.extra.consult_method}
+                  💡 ${escapeHtml(r.extra.consult_method)}
                 </div>` : `
                 <div style="font-size:12px;color:#9ca3af;font-style:italic;">（尚未填寫請益做法）</div>`}
             ` : `
@@ -3151,7 +3185,7 @@ async function renderStorePersonalDetail(date, seg, dayCache, targetId) {
   // 雲端個人回報 { store: { name: record } }
   const pCloud = await _fetchPersonalCloud(date, seg);
   // 本機索引 { store: { name: hasFail } }
-  const pIdx = (() => { try { return JSON.parse(localStorage.getItem(`pIdx_${date}_${seg}`) || '{}'); } catch { return {}; } })();
+  const pIdx = _personalGet(`pIdx_${date}_${seg}`) || {};
   // 合併：雲端先鋪底，本機覆蓋（本機較即時）
   Object.entries(pCloud).forEach(([store, people]) => {
     if (!pIdx[store]) pIdx[store] = {};
@@ -3190,12 +3224,12 @@ async function renderStorePersonalDetail(date, seg, dayCache, targetId) {
         const d = dayCache[store];
         return `
           <div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
-            <div style="font-size:15px;font-weight:800;color:#92400e;margin-bottom:8px;">🏪 ${store}</div>
+            <div style="font-size:15px;font-weight:800;color:#92400e;margin-bottom:8px;">🏪 ${escapeHtml(store)}</div>
             <div style="font-size:13px;color:#713f12;line-height:1.9;">
-              <div>① 零報原因：${d.zero_reason}</div>
-              ${d.zero_consult ? `<div>② 請益對象：${d.zero_consult}</div>` : ''}
-              ${d.zero_method  ? `<div>③ 改善做法：${d.zero_method}</div>` : ''}
-              ${d.zero_plan    ? `<div>④ 明日計劃：${d.zero_plan}</div>` : ''}
+              <div>① 零報原因：${escapeHtml(d.zero_reason)}</div>
+              ${d.zero_consult ? `<div>② 請益對象：${escapeHtml(d.zero_consult)}</div>` : ''}
+              ${d.zero_method  ? `<div>③ 改善做法：${escapeHtml(d.zero_method)}</div>` : ''}
+              ${d.zero_plan    ? `<div>④ 明日計劃：${escapeHtml(d.zero_plan)}</div>` : ''}
             </div>
           </div>`;
       }).join('');
@@ -3221,12 +3255,12 @@ async function renderStorePersonalDetail(date, seg, dayCache, targetId) {
 
     const passBlock = passNames.length > 0 ? `
       <div style="font-size:13px;color:#16a34a;font-weight:600;margin-bottom:8px;padding:6px 12px;background:#f0fdf4;border-radius:8px;">
-        ✅ 過關：${passNames.join('、')}
+        ✅ 過關：${passNames.map(escapeHtml).join('、')}
       </div>` : '';
 
     const failBlock = failEntries.map(({ name, r }) => `
       <div style="background:#fff5f5;border:1px solid #fecaca;border-left:3px solid #ef4444;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-        <div style="font-size:13px;font-weight:800;color:#dc2626;margin-bottom:6px;">❌ ${name}</div>
+        <div style="font-size:13px;font-weight:800;color:#dc2626;margin-bottom:6px;">❌ ${escapeHtml(name)}</div>
         ${r && r.failed?.length > 0 ? `
           <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px;">
             ${r.failed.map(k => {
@@ -3238,18 +3272,18 @@ async function renderStorePersonalDetail(date, seg, dayCache, targetId) {
           </div>` : ''}
         ${r?.extra?.customers || r?.extra?.sold_items ? `
           <div style="font-size:12px;color:var(--text-dim);margin-bottom:5px;">
-            👥 接客數：<strong>${r.extra.customers || '—'}</strong>　📋 上線項目：<strong>${r.extra.sold_items || '—'}</strong>
+            👥 接客數：<strong>${escapeHtml(r.extra.customers || '—')}</strong>　📋 上線項目：<strong>${escapeHtml(r.extra.sold_items || '—')}</strong>
           </div>` : ''}
         ${r?.extra?.fail_reason ? `
-          <div style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:7px 10px;color:var(--text);line-height:1.6;margin-bottom:5px;">📝 原因：${r.extra.fail_reason}</div>` : ''}
+          <div style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:7px 10px;color:var(--text);line-height:1.6;margin-bottom:5px;">📝 原因：${escapeHtml(r.extra.fail_reason)}</div>` : ''}
         ${r?.extra?.improve_plan ? `
-          <div style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:7px 10px;color:var(--text);line-height:1.6;margin-bottom:5px;">🎯 明日改善：${r.extra.improve_plan}</div>` : ''}
+          <div style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:7px 10px;color:var(--text);line-height:1.6;margin-bottom:5px;">🎯 明日改善：${escapeHtml(r.extra.improve_plan)}</div>` : ''}
         ${r?.extra?.consult_store || r?.extra?.consult_person ? `
           <div style="font-size:12px;color:var(--text-dim);margin-bottom:5px;">
-            🏪 請益：<strong>${r.extra.consult_store || '—'}</strong>${r.extra.consult_person ? `／<strong>${r.extra.consult_person}</strong>` : ''}
+            🏪 請益：<strong>${escapeHtml(r.extra.consult_store || '—')}</strong>${r.extra.consult_person ? `／<strong>${escapeHtml(r.extra.consult_person)}</strong>` : ''}
           </div>` : ''}
         ${r?.extra?.consult_method ? `
-          <div style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:7px 10px;color:var(--text);line-height:1.6;">💡 ${r.extra.consult_method}</div>` :
+          <div style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:7px 10px;color:var(--text);line-height:1.6;">💡 ${escapeHtml(r.extra.consult_method)}</div>` :
           `<div style="font-size:12px;color:#9ca3af;font-style:italic;">（尚未填寫請益做法）</div>`}
       </div>`).join('');
 
@@ -3265,7 +3299,7 @@ async function renderStorePersonalDetail(date, seg, dayCache, targetId) {
     return `
       <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
         <div style="font-size:15px;font-weight:800;color:var(--accent-bright);margin-bottom:8px;padding-bottom:8px;border-bottom:2px solid #fed7aa;">
-          🏪 ${store}
+          🏪 ${escapeHtml(store)}
           <span style="float:right;font-size:11px;font-weight:500;color:var(--text-muted);">${segLabel}</span>
         </div>
         ${storeTag}
@@ -3273,7 +3307,12 @@ async function renderStorePersonalDetail(date, seg, dayCache, targetId) {
       </div>`;
   }).filter(Boolean);
 
-  const personalSection = storeFailRows.length === 0 ? `
+  const personalSection = _reportSessionScope !== 'supervisor' ? `
+    <div class="section-divider" style="margin-top:16px;">👤 個人回報彙整（${segLabel}）</div>
+    <div style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:12px;padding:16px;text-align:center;color:#6b7280;font-size:14px;">
+      個人彙整僅限督導短效 session。
+      <button type="button" class="secondary" onclick="unlockSupervisorSummary()" style="margin-left:8px">督導驗證後載入</button>
+    </div>` : storeFailRows.length === 0 ? `
     <div class="section-divider" style="margin-top:16px;">👤 個人回報未過關彙整（${segLabel}）</div>
     <div style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:12px;padding:16px;text-align:center;color:#9ca3af;font-size:14px;">
       尚無個人回報資料<br><span style="font-size:12px;">請同仁至「個人回報」頁填寫後才會顯示</span>
@@ -3483,11 +3522,9 @@ async function _getPersonalDay(date) {
   let ok = true;
   for (const seg of [16, 21]) {
     const recs = {};
-    if (GAS_URL) {
+    if (GAS_URL && _reportSessionScope === 'supervisor') {
       try {
-        const res = await fetch(`${GAS_URL}?action=pread&date=${date}&seg=${seg}`, { cache: 'no-store' });
-        const json = await res.json();
-        if (json.status !== 'ok') throw new Error(json.message || 'pread error');
+        const json = await protectedGasPost({ action: 'pread', token: _reportSessionToken, date, seg });
         Object.entries(json.data || {}).forEach(([store, people]) => {
           Object.entries(people || {}).forEach(([name, rec]) => { recs[store + '|' + name] = rec; });
         });
@@ -3513,21 +3550,11 @@ async function _getPersonalDay(date) {
   return { ok, entries };
 }
 
-// 帶快取版：過去日期成功抓過就存 localStorage，今天永遠重抓
+// 帶記憶體快取版：過去日期僅保留在本頁，重新整理後重新驗證並讀取
 async function _getPersonalDayCached(date) {
   if (_perfDayCache[date]) return _perfDayCache[date];
-  const isPast = date < today();
-  if (isPast) {
-    try {
-      const raw = localStorage.getItem('perfDay_' + date);
-      if (raw) return (_perfDayCache[date] = { ok: true, entries: JSON.parse(raw) });
-    } catch (e) {}
-  }
   const day = await _getPersonalDay(date);
   _perfDayCache[date] = day;
-  if (isPast && day.ok) {
-    try { localStorage.setItem('perfDay_' + date, JSON.stringify(day.entries)); } catch (e) {}
-  }
   return day;
 }
 
@@ -4292,12 +4319,16 @@ function _reviewKey(store, name, date, seg) {
   return `pr_${store}_${name}_${date}_${seg}`;
 }
 function _namesKey(store) { return `names_${store}`; }
+const _personalMemory = new Map();
+function _personalGet(key) { return _personalMemory.has(key) ? _personalMemory.get(key) : null; }
+function _personalSet(key, value) { _personalMemory.set(key, value); }
+function _personalRemove(key) { _personalMemory.delete(key); }
 
 function getStoreNames(store) {
-  try { return JSON.parse(localStorage.getItem(_namesKey(store)) || '[]'); } catch { return []; }
+  return _personalGet(_namesKey(store)) || [];
 }
 function saveStoreNames(store, names) {
-  localStorage.setItem(_namesKey(store), JSON.stringify(names));
+  _personalSet(_namesKey(store), [...names]);
 }
 
 // ── 初始化 ──
@@ -4308,8 +4339,8 @@ function initPersonalStoreSelect() {
     el.innerHTML = `<option value="">— 選擇門市 —</option>` +
       STORES.map(s => `<option value="${s}">${s}</option>`).join('');
   });
-  const lastStore = localStorage.getItem('personal_last_store') || '';
-  const lastName  = localStorage.getItem('personal_last_name') || '';
+  const lastStore = _personalGet('personal_last_store') || '';
+  const lastName  = _personalGet('personal_last_name') || '';
   if (lastStore) {
     document.getElementById('personalStore').value = lastStore;
     _refreshNameSelect(lastStore);
@@ -4324,7 +4355,7 @@ function _refreshNameSelect(store) {
   const dl = document.getElementById('personalNameList');
   if (!dl) return;
   const names = getStoreNames(store);
-  dl.innerHTML = names.map(n => `<option value="${n}">`).join('');
+  dl.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -4334,16 +4365,16 @@ document.addEventListener('DOMContentLoaded', () => {
 function onPersonalStoreChange() {
   const store = document.getElementById('personalStore').value;
   if (store) _refreshNameSelect(store);
-  localStorage.setItem('personal_last_store', store);
-  localStorage.removeItem('personal_last_name');
+  _personalSet('personal_last_store', store);
+  _personalRemove('personal_last_name');
   _applyPersonalUI(store, '');
 }
 function onPersonalNameChange() {
   const store = document.getElementById('personalStore').value;
   const name  = document.getElementById('personalName').value.trim();
-  localStorage.setItem('personal_last_store', store);
+  _personalSet('personal_last_store', store);
   if (name) {
-    localStorage.setItem('personal_last_name', name);
+    _personalSet('personal_last_name', name);
     // 自動加入門市名單（若尚未存在）
     if (store) {
       const names = getStoreNames(store);
@@ -4390,8 +4421,8 @@ function saveNewName() {
   document.getElementById('personalName').value = name;
   closeAddNameModal();
   // save last selection and update UI without re-refreshing the select
-  localStorage.setItem('personal_last_store', store);
-  localStorage.setItem('personal_last_name', name);
+  _personalSet('personal_last_store', store);
+  _personalSet('personal_last_name', name);
   const formSec = document.getElementById('personalFormSection');
   if (formSec) { formSec.style.display = 'block'; }
   renderPersonal();
@@ -4509,7 +4540,7 @@ function submitPersonalFail() {
 
 function _savePersonalRecord(store, name, date, seg, data, failed, extra) {
   const record = { date, seg, store, name, data, failed: failed.map(f=>f.key), extra, ts: Date.now() };
-  localStorage.setItem(_reviewKey(store, name, date, seg), JSON.stringify(record));
+  _personalSet(_reviewKey(store, name, date, seg), record);
   // 同步到督導彙整用的公共索引
   _updateSummaryIndex(store, name, date, seg, failed.length > 0);
   // 同步上雲端（跨裝置彙整用）
@@ -4517,24 +4548,14 @@ function _savePersonalRecord(store, name, date, seg, data, failed, extra) {
 }
 
 // ── 個人回報上雲（JSONP，失敗不影響本機儲存）──
-function _pushPersonalToCloud(store, name, date, seg, record) {
+async function _pushPersonalToCloud(store, name, date, seg, record) {
   if (!GAS_URL) return;
-  const payload = encodeURIComponent(JSON.stringify({ date, seg, store, name, record }));
-  const url = `${GAS_URL}?action=pwrite&payload=${payload}`;
-  const script = document.createElement('script');
-  const cbName = 'gasPCallback_' + Date.now();
-  window[cbName] = function() {
-    delete window[cbName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-  };
-  script.onerror = function() {
-    delete window[cbName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-    // 備援：no-cors 送出
-    fetch(url, { mode: 'no-cors' }).catch(()=>{});
-  };
-  script.src = url + '&callback=' + cbName;
-  document.head.appendChild(script);
+  try {
+    const token = await ensureReportSession('employee');
+    await protectedGasPost({ action: 'pwrite', token, date, seg, store, name, record });
+  } catch (error) {
+    console.error('_pushPersonalToCloud authorization error', error);
+  }
 }
 
 // ── 從雲端抓某日某時段的個人回報 { store: { name: record } } ──
@@ -4542,9 +4563,9 @@ const _pCloudCache = {};
 async function _fetchPersonalCloud(date, seg) {
   const ck = `${date}_${seg}`;
   if (!GAS_URL) return {};
+  if (_reportSessionScope !== 'supervisor') return {};
   try {
-    const res = await fetch(`${GAS_URL}?action=pread&date=${date}&seg=${seg}`, { cache: 'no-store' });
-    const json = await res.json();
+    const json = await protectedGasPost({ action: 'pread', token: _reportSessionToken, date, seg });
     _pCloudCache[ck] = json.data || {};
   } catch(e) {
     console.error('_fetchPersonalCloud error', e);
@@ -4553,20 +4574,25 @@ async function _fetchPersonalCloud(date, seg) {
   return _pCloudCache[ck];
 }
 
+async function unlockSupervisorSummary() {
+  try {
+    await ensureReportSession('supervisor');
+    renderSummary();
+  } catch (error) {
+    showToast('⚠️ 督導驗證失敗，個人彙整維持鎖定');
+  }
+}
+
 function _updateSummaryIndex(store, name, date, seg, hasFail) {
   const key = `pIdx_${date}_${seg}`;
-  let idx = {};
-  try { idx = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
+  const idx = _personalGet(key) || {};
   if (!idx[store]) idx[store] = {};
   idx[store][name] = hasFail;
-  localStorage.setItem(key, JSON.stringify(idx));
+  _personalSet(key, idx);
 }
 
 function _loadReview(store, name, date, seg) {
-  try {
-    const raw = localStorage.getItem(_reviewKey(store, name, date, seg));
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  return _personalGet(_reviewKey(store, name, date, seg));
 }
 
 // ── 個人追蹤頁渲染 ──
@@ -4735,7 +4761,7 @@ function submitReview() {
     reviewData[c.key] = (document.getElementById('rv_' + c.key)?.value || '').trim();
   });
   const key = `review_${store}_${name}_${date}_${seg}`;
-  localStorage.setItem(key, JSON.stringify({ store, name, date, seg, reviewData, ts: Date.now() }));
+  _personalSet(key, { store, name, date, seg, reviewData, ts: Date.now() });
   skipReview();
   showToast('✅ 檢討單已儲存');
 }

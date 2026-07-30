@@ -66,6 +66,15 @@ test('seventh tab preserves reminder, improvement, photo and private-link behavi
   assert.match(format, /照片嵌入失敗，請使用右側私有連結/);
 });
 
+test('seventh tab neutralizes spreadsheet formulas and rejects non-Drive links', () => {
+  assert.match(code, /function weeklySafeCellText_\(value\)/);
+  assert.match(code, /\/\^\[=\+\\-@\]\//);
+  assert.match(code, /function weeklySafeDriveUrl_\(value\)/);
+  assert.match(code, /weeklySafeCellText_\(r\.note\)/);
+  assert.match(code, /weeklySafeCellText_\(r\.improvement\)/);
+  assert.match(code, /weeklySafeDriveUrl_\(media\.viewUrl \|\| media\.previewUrl\)/);
+});
+
 test('four formal trigger handlers and shared automation remain present', () => {
   for (const name of [
     'check21',

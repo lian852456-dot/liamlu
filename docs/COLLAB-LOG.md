@@ -13,6 +13,29 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-07-31 ｜ Codex（匿名讀寫 P0 資安修補與正式 GAS 部署）
+
+- 做了什麼：只針對本次確認的匿名讀寫與瀏覽器敏感資料風險做最小修補。
+  `read/write/pread/pwrite` 已停止 GET／JSONP 存取，改為 GAS 後端驗證短效
+  session；員工 session 必須同時符合啟用名冊、員編與已核准裝置，`pread`
+  僅限督導，員工 `read/write/pwrite` 另受店別範圍限制。session 只存記憶體，
+  登出會在後端撤銷；姓名、員編、改善內容與私有附件不再寫入
+  localStorage／sessionStorage。另固定受保護 GAS URL、移除 repo 內固定通行碼，
+  補上輸出 HTML escaping、七分頁公式注入防護與 Drive 連結 allowlist。
+- 結果：正式七分頁 Script `17XfhB1cYOIWIyIm0_1mO1a9-ba-H4QCBJHX56bYHiEX06XSSG05FWtlg`
+  由第 19 版更新至第 20 版；正式主 Script
+  `1SW9qr0CU9Xvy97XkVr3n51_4Dx_6GArnTXT8780t0HofIB74v9IDMkWf`
+  的巡店與每日回報兩個 Deployment 均更新至第 22 版。`PT_KEY` 已輪替並只保存在
+  Script Properties，管理用副本在 macOS Keychain。完整本機契約 20/20、
+  Playwright 71/71、npm audit 0。正式匿名、假 token、模擬過期 token、登出後舊 token
+  均只回 unauthorized；匿名寫入隔離標記授權讀回為 0 筆。
+- 經驗 / 給下一位的提醒：Apps Script ContentService 無法自行設定 HTTP status，
+  因此外層 HTTP 仍為 200，應以 JSON `status:"error", code:403` 判斷拒絕。
+  部署前備份位於
+  `private-backups/patrol-security-predeploy-20260731004841/`；四個既有觸發器未重建。
+  正式金鑰不可回填 repo、文件或瀏覽器 storage；若要回滾，應在原 Deployment ID
+  選回第 19／15／21 版並以備份最小還原 HEAD，不能整份六分頁覆蓋七分頁專案。
+
 ## 2026-07-30 ｜ Codex（巡店里程＋正式 GAS 七分頁安全整合，待 Liam 驗收）
 
 - 做了什麼：由最新 `origin/main` `f4de11f` 建立
