@@ -8,7 +8,7 @@
 - 會造成資料外洩或匿名竄改的中風險：0
 - 剩餘低風險：有
 - 是否可部署：可以；正式 GAS 已以既有 Deployment ID 建立新版本，GitHub Pages
-  僅在本報告所列本機與正式負向契約通過後才可推送。
+  已部署安全修補 commit `bde4c6ba9c0618ba2f6ff4b6a0e012aa35f27e39`。
 
 ## 已修正
 
@@ -37,6 +37,9 @@
 | 本機 GAS／前端契約 | 20/20 |
 | Playwright 完整回歸 | 71/71 |
 | npm audit | 0 vulnerabilities |
+| 正式桌機無痕 A／B／C | 空白與錯誤完全鎖定；正確登入後巡店、班表、半月檢查只用短效 token；登出重鎖 |
+| 正式行動版 390×844 | 登入成功、11 天／74.5 KM、對帳相符、正式 Excel 下載成功、無水平溢位 |
+| GitHub Pages | run `30564346083` success |
 
 Apps Script `ContentService` 無法自訂外層 HTTP status，所以 Web App 的傳輸層仍回 HTTP
 200；應用層以 `code:403` 表示拒絕。拒絕內容只有 `status/message/code`，不含資料欄位、
@@ -51,7 +54,7 @@ Apps Script `ContentService` 無法自訂外層 HTTP status，所以 Web App 的
 - 七分頁 Deployment：第 19 版 → 第 20 版
 - 備份：`private-backups/patrol-security-predeploy-20260731004841/`
 - 觸發器：`check16`、`check21`、`checkAwareAndNotify`、
-  `sendWeeklyPatrolReport`；未刪除、未重建。
+  `sendWeeklyPatrolReport`；部署後再次確認四個均存在，未刪除、未重建。
 
 ## 剩餘低風險
 
@@ -62,6 +65,8 @@ Apps Script `ContentService` 無法自訂外層 HTTP status，所以 Web App 的
 3. 開發輔助腳本仍有以本機 PAT 執行推送的舊流程文件，但 repo 未發現實際 PAT；
    本次部署不使用該流程。
 4. 公里數、店到店距離與 Y2606 報銷里程維持公開，依 Liam 明確判定為可接受內容。
+5. 正式一般同仁範圍測試未另建測試帳號或改動正式名冊；其名冊、裝置與店別限制由
+   GAS 契約測試覆蓋。正式互動驗收使用督導帳號，避免為測試污染正式 DashboardUsers。
 
 ## 回滾
 

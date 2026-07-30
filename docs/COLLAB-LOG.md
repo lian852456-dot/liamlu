@@ -28,7 +28,9 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
   的巡店與每日回報兩個 Deployment 均更新至第 22 版。`PT_KEY` 已輪替並只保存在
   Script Properties，管理用副本在 macOS Keychain。完整本機契約 20/20、
   Playwright 71/71、npm audit 0。正式匿名、假 token、模擬過期 token、登出後舊 token
-  均只回 unauthorized；匿名寫入隔離標記授權讀回為 0 筆。
+  均只回 unauthorized；匿名寫入隔離標記授權讀回為 0 筆。GitHub Pages
+  `bde4c6b` 的 run `30564346083` 成功；正式桌機無痕 A／B／C 與 390×844 行動版
+  均通過，行動版另確認 11 天／74.5 KM、對帳相符、正式 Excel 可下載且無水平溢位。
 - 經驗 / 給下一位的提醒：Apps Script ContentService 無法自行設定 HTTP status，
   因此外層 HTTP 仍為 200，應以 JSON `status:"error", code:403` 判斷拒絕。
   部署前備份位於
