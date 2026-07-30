@@ -626,7 +626,7 @@ test('Excel 產出「油料」與「距離計算明細」兩張工作表，欄�
   expect(r.tail[1][0]).toBe('全月油料里程合計');
   expect(r.cols).toEqual([[18, 18, 24, 24, 48, 14, 21, 18, 18], [12, 18, 18, 14, 12, 42, 14]]);
   expect(r.merges).toEqual([{ row: 0, col: 0, across: 6 }]);
-  expect(r.total).toBe(57.1);
+  expect(r.total).toBe(74.5);
 });
 
 test('單店 0 KM 日不列入正式報銷表，但仍顯示於畫面', async ({ page }) => {
@@ -641,12 +641,12 @@ test('單店 0 KM 日不列入正式報銷表，但仍顯示於畫面', async ({
       fareDates: b.sheets[0].rows.slice(1).map(r => val(r[2])),
     };
   });
-  expect(r.allDays).toBe(12);                 // 畫面仍看得到 12 天
-  expect(r.billDays).toBe(8);                 // 其中 8 天可報銷
+  expect(r.allDays).toBe(15);                 // 12 個巡店日 + 3 個由正式報銷表補入
+  expect(r.billDays).toBe(11);                // 其中 11 天可報銷（＝正式報銷表天數）
   expect(r.zeroDays).toEqual(['2026-06-01', '2026-06-02', '2026-06-08', '2026-06-10']);
   r.zeroDays.forEach(d => expect(r.fareDates).not.toContain(d));
   await expect(page.locator('#miSummary')).toContainText('不列入報銷');
-  await expect(page.locator('#miSummary')).toContainText('8 個報銷出差日');
+  await expect(page.locator('#miSummary')).toContainText('11 個報銷出差日');
 });
 
 test('與正式報銷表對帳：11 天／74.5 KM 為基準', async ({ page }) => {
@@ -675,7 +675,9 @@ test('對帳面板顯示正式基準與差異，不再出現 18 天', async ({ p
   const cov = page.locator('#miCoverage');
   await expect(cov).toContainText('正式出差日：11 天');
   await expect(cov).toContainText('74.5 KM');
+  await expect(cov).toContainText('已與正式報銷表完成對帳');
   await expect(cov).not.toContainText('18 天');
+  await expect(cov).not.toContainText('缺少日期');
   await expect(cov).toContainText('單店 0 KM 日，不列入報銷');
   // 6/22 依正式報銷表照片為台北大稻埕，與巡店明細一致
   const off22 = await page.evaluate(() => MI.OFFICIAL['2026-06'].rows.find(r => r[0] === '2026-06-22'));
@@ -723,8 +725,56 @@ test('無待查路段時可匯出正式報銷檔，檔名不帶測試標記', as
   });
   expect(out.file).toBe('北一二B_巡店車資報銷_202606.xls');
   expect(out.file).not.toContain('未完成');
-  expect(out.log[0].totalKm).toBe(57.1);
-  expect(out.log[0].days).toBe(8);   // 12 天中 8 天可報銷
+  expect(out.log[0].totalKm).toBe(74.5);
+  expect(out.log[0].days).toBe(11);
+});
+
+test('6/23、6/24、6/30 由正式報銷表補入且標為正式受控，不再視為缺漏', async ({ page }) => {
+  await openMileage(page);
+  const r = await page.evaluate(() => ['2026-06-23', '2026-06-24', '2026-06-30'].map(d => {
+    const p = MI._dayPlan(d, MI._days()[d]);
+    return { date: d, place: p.nodes.map(n => n.name).join('/'), km: p.km, official: !!p.official,
+             src: p.legs[0].source, verify: p.legs[0].verify };
+  }));
+  expect(r[0]).toMatchObject({ place: '台北酒泉/台北萬大', km: 6.6, official: true, verify: 'official' });
+  expect(r[1]).toMatchObject({ place: '台北大稻埕/台北永吉', km: 7.2, official: true, verify: 'official' });
+  expect(r[2]).toMatchObject({ place: '台北三創/台北通化', km: 3.6, official: true, verify: 'official' });
+  r.forEach(x => expect(x.src).toBe('2026 年 6 月正式公司報銷表'));
+  // 這三天必須進正式匯出
+  const dates = await page.evaluate(() => {
+    const b = MI._buildSheets('2026-06');
+    const v = c => (c && typeof c === 'object' && 'value' in c) ? c.value : c;
+    return b.sheets[0].rows.slice(1).map(r => v(r[2]));
+  });
+  ['2026/6/23', '2026/6/24', '2026/6/30'].forEach(d => expect(dates).toContain(d));
+});
+
+test('Y2606 完整對帳：油料 11 列、合計 74.5 KM、備註留白', async ({ page }) => {
+  await openMileage(page);
+  const r = await page.evaluate(() => {
+    const b = MI._buildSheets('2026-06');
+    const v = c => (c && typeof c === 'object' && 'value' in c) ? c.value : c;
+    const rc = MI._reconcile('2026-06');
+    return {
+      rows: b.sheets[0].rows.slice(1).map(r => r.map(v)),
+      detail: b.sheets[1].rows.slice(2, -3).map(r => r.map(v)),
+      tail: b.sheets[1].rows.slice(-2).map(r => r.map(v)),
+      total: b.total, match: rc.match, mineDays: rc.mineDays,
+    };
+  });
+  expect(r.rows).toHaveLength(11);
+  expect(r.total).toBe(74.5);
+  expect(r.match).toBe(true);
+  expect(r.mineDays).toBe(11);
+  expect(Math.round(r.rows.reduce((a, x) => a + x[6], 0) * 10) / 10).toBe(74.5);
+  r.rows.forEach(x => expect(x[8]).toBe(''));            // 備註全部留白
+  // 距離計算明細涵蓋 11 天、共 12 段（6/15 拆兩段）
+  expect(new Set(r.detail.map(x => x[0])).size).toBe(11);
+  expect(r.detail).toHaveLength(12);
+  const d15 = r.detail.filter(x => x[0] === '2026/6/15');
+  expect(d15.map(x => [x[3], x[4]])).toEqual([[4.4, '第 1 段'], [10, '第 2 段']]);
+  expect(r.tail[0]).toEqual(['全月出差日', 11]);
+  expect(r.tail[1]).toEqual(['全月油料里程合計', 74.5]);
 });
 
 test('人工修改只寫入里程資料層，不改寫原始巡店紀錄', async ({ page }) => {
@@ -742,17 +792,19 @@ test('人工修改只寫入里程資料層，不改寫原始巡店紀錄', async
   expect(after.saved.note).toBe('實走修正');
 });
 
-test('資料涵蓋日期與缺少日期會明確提示，不自動補值', async ({ page }) => {
+test('資料涵蓋日期以正式報銷表為完整依據，未列於報銷表者不憑空出現', async ({ page }) => {
   await openMileage(page);
   const cov = await page.evaluate(() => MI._coverage('2026-06'));
   expect(cov.first).toBe('2026-06-01');
-  expect(cov.last).toBe('2026-06-22');
-  expect(cov.have).toHaveLength(12);
-  expect(cov.missingTail[0]).toBe('2026-06-23');
-  expect(cov.missingTail[cov.missingTail.length - 1]).toBe('2026-06-30');
+  // 涵蓋範圍含正式報銷表補入的 6/23、6/24、6/30
+  expect(cov.last).toBe('2026-06-30');
+  expect(cov.have).toHaveLength(15);         // 12 巡店日 + 3 正式報銷表補入
+  // 有正式報銷表基準的月份不再列缺漏
+  expect(cov.missingTail).toEqual([]);
   await expect(page.locator('#miCoverage')).toContainText('正式出差日：11 天');
   // 未涵蓋日期不得憑空出現在彙整
   const plans = await page.evaluate(() => MI._monthPlans('2026-06').map(p => p.date));
-  expect(plans).not.toContain('2026-06-23');
-  expect(plans).toHaveLength(12);
+  expect(plans).toContain('2026-06-23');   // 由正式報銷表補入
+  expect(plans).not.toContain('2026-06-25'); // 不在報銷表內者仍不憑空出現
+  expect(plans).toHaveLength(15);
 });

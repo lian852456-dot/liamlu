@@ -1828,7 +1828,8 @@ const MI = (function(){
     if(man) return Object.assign({},man,{verify:'manual'});
     return DIST.find(d=>(d.from===a&&d.to===b)||(d.from===b&&d.to===a))||null;
   }
-  const VERIFY_LABEL={verified:['已驗證','ok'],observed:['歷史觀測','hist'],manual:['人工確認','manual']};
+  const VERIFY_LABEL={verified:['已驗證','ok'],observed:['歷史觀測','hist'],
+                      manual:['人工確認','manual'],official:['正式受控','ok']};
 
   /* ---------- 由 rawDetails 推導每日路線 ---------- */
   function parseArrive(s){
@@ -1850,6 +1851,14 @@ const MI = (function(){
     Object.keys(by).sort().forEach(d=>{
       out[d]=Object.values(by[d]).sort((x,y)=>x.key.localeCompare(y.key));
     });
+    // 正式公司報銷表為該月的正式依據：巡店明細沒有的日子，直接採用報銷表的路線與順序。
+    // ptread 日後可作為到店時間／順序的交叉驗證，但不阻擋正式里程對帳。
+    Object.keys(OFFICIAL).forEach(m=>{
+      OFFICIAL[m].rows.forEach(([d,place])=>{
+        if(out[d]&&out[d].length) return;              // 已有巡店明細者以明細為準
+        out[d]=place.split('/').map((n,i)=>({name:n,time:'',key:String(100+i),code:'',official:true}));
+      });
+    });
     // 併入人工新增的節點（依指定時間插入排序）
     const s=store();
     (s.manualLegs||[]).forEach(()=>{});
@@ -1867,11 +1876,23 @@ const MI = (function(){
   }
 
   /* ---------- 單日計算 ---------- */
+  function officialRow(date){
+    const m=date.slice(0,7), o=OFFICIAL[m];
+    return o?(o.rows.find(r=>r[0]===date)||null):null;
+  }
   function dayPlan(date, nodes){
     const stores=nodes.filter(n=>!isOffice(n.name));
     const plan={date, nodes, storeCount:stores.length, legs:[], km:null, note:'', todo:[], totalOnly:false};
     if(nodes.length<2){
       plan.km=0; plan.note=SINGLE_NOTE; return plan;
+    }
+    // 由正式報銷表提供的兩店日：當日里程即該唯一一段店到店距離
+    const off=officialRow(date);
+    if(off && nodes.length===2 && nodes.every(n=>n.official)){
+      const src='2026 年 6 月正式公司報銷表';
+      plan.legs=[{from:nodes[0].name,to:nodes[1].name,km:off[2],month:'Y2606',date,source:src,verify:'official'}];
+      plan.km=off[2]; plan.note=LEG_NOTE; plan.official=true;
+      return plan;
     }
     const edits=(store().dayEdits||{})[date]||{};
     let sum=0, anyTodo=false;
@@ -1907,7 +1928,8 @@ const MI = (function(){
     const y=+month.slice(0,4), m=+month.slice(5,7), last=new Date(y,m,0).getDate();
     const lastHave=+have[have.length-1].slice(8);
     const tail=[];
-    for(let i=lastHave+1;i<=last;i++) tail.push(`${month}-${String(i).padStart(2,'0')}`);
+    // 有正式報銷表基準的月份，以報銷表為完整依據，不列缺漏
+    if(!OFFICIAL[month]) for(let i=lastHave+1;i<=last;i++) tail.push(`${month}-${String(i).padStart(2,'0')}`);
     return {have, first:have[0], last:have[have.length-1], monthLast:`${month}-${String(last).padStart(2,'0')}`, missingTail:tail};
   }
 
@@ -1958,7 +1980,7 @@ const MI = (function(){
       const done=rc.match;
       h+=`<div class="mi-note${done?'':' bad'}"><b>${esc2(state.month.replace('-','年 '))} 月</b>　`+
          `正式出差日：<b>${rc.off.days} 天</b>　總里程：<b>${km1(rc.off.km)} KM</b>　`+
-         `對帳狀態：<b>${done?'✅ 符合正式報銷表':`⚠ ${hit}/${rc.off.days} 列完全相符（里程相符 ${kmhit}/${rc.off.days}）`}</b>`;
+         `對帳狀態：<b>${done?'✅ 已與正式報銷表完成對帳':`⚠ ${hit}/${rc.off.days} 列完全相符（里程相符 ${kmhit}/${rc.off.days}）`}</b>`;
       if(!done){
         const bad=rc.rows.filter(r=>!r.ok);
         h+='<ul>'+bad.map(r=>{
@@ -1969,7 +1991,10 @@ const MI = (function(){
         (rc.extra.length?`<li>本機多出未列於正式表的日期：${rc.extra.map(esc2).join('、')}</li>`:'')+
         '</ul>';
       }
-      h+=`<br>本機推導：${rc.mineDays} 個報銷日、${km1(rc.myKm)} KM（另有 ${all.length-bill.length} 個單店 0 KM 日，不列入報銷）</div>`;
+      const fromOff=bill.filter(p=>p.official).length;
+      h+=`<br>本機推導：${rc.mineDays} 個報銷日、${km1(rc.myKm)} KM`+
+         `（另有 ${all.length-bill.length} 個單店 0 KM 日，不列入報銷`+
+         (fromOff?`；其中 ${fromOff} 日依正式報銷表補入，巡店明細尚無紀錄`:'')+`）</div>`;
     }else{
       const c=coverage(state.month);
       h+=`<div class="mi-note"><b>資料涵蓋日期</b>：${esc2(c.first)} ～ ${esc2(c.last)}　`+
@@ -2122,7 +2147,8 @@ const MI = (function(){
   const HEAD_FARE=['成本歸屬部門','成本歸屬者','出差日期\n(起)','出差日期\n(迄)','出差地點',
                    '事由及\n洽訪目標','油料補助\n里程數(KM)','車號','備註'];
   const HEAD_DETAIL=['日期','起點','迄點','騎車距離(KM)','巡店順序','距離來源','驗證狀態'];
-  const VERIFY_TEXT={verified:'已驗證',observed:'歷史觀測',manual:'人工確認'};
+  const VERIFY_TEXT={verified:'已驗證',observed:'歷史觀測',manual:'人工確認',
+                     official:'人工確認／正式受控'};
   // 正式報銷表日期格式為 2026/6/3（斜線、月日不補零）
   const fareDate=d=>{const [y,m,dd]=d.split('-');return `${y}/${+m}/${+dd}`;};
 
