@@ -221,6 +221,73 @@
   .private-auth-btn.primary{background:var(--tw-orange);border-color:var(--tw-orange)}
   .private-auth-btn:hover{filter:brightness(1.08)}
   .legacy-hidden{display:none!important}
+  /* ---------- 每日移動里程（獨立模組，樣式一律 .mi- 前綴，不影響既有元件） ---------- */
+  .mi-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+  .mi-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;position:relative;overflow:hidden}
+  .mi-card::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tw-orange)}
+  .mi-card.warn::after{background:var(--miss)}
+  .mi-card .k{font-size:11.5px;color:var(--muted);font-weight:700}
+  .mi-card .v{font-size:22px;font-weight:800;line-height:1.25;margin-top:2px}
+  .mi-card .u{font-size:12px;font-weight:700;color:var(--muted);margin-left:3px}
+  .mi-card .s{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .mi-card.warn .v{color:var(--miss)}
+  .mi-note{border:1px solid var(--line);border-left:3px solid var(--tw-orange);background:var(--tw-orange-soft);border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:12px}
+  .mi-note.bad{border-left-color:var(--miss);background:var(--miss-bg)}
+  .mi-note b{font-weight:800}
+  .mi-note ul{margin:5px 0 0 16px;padding:0}
+  .mi-note li{margin:2px 0}
+  .mi-datebar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .mi-btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:7px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+  .mi-btn:hover{border-color:var(--tw-orange)}
+  .mi-btn.primary{background:var(--tw-orange);border-color:var(--tw-orange);color:#fff}
+  .mi-btn.ghost{background:transparent}
+  .mi-btn[disabled]{opacity:.5;cursor:not-allowed}
+  .mi-btn.export{font-size:13.5px;padding:9px 16px}
+  .mi-tl{margin:6px 0 4px}
+  .mi-day{font-size:13px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .mi-day .tot{color:var(--tw-orange)}
+  .mi-leg{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin-bottom:2px}
+  .mi-node{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);animation:miFade .45s ease both}
+  .mi-node.office{border-style:dashed;border-color:#8a6fc4}
+  .mi-node-dot{width:10px;height:10px;border-radius:50%;background:var(--tw-orange);flex:none}
+  .mi-node.office .mi-node-dot{border-radius:2px;background:#8a6fc4}
+  .mi-node-name{font-size:13px;font-weight:700}
+  .mi-node-time{font-size:11.5px;color:var(--muted)}
+  .mi-leg-mid{text-align:center;font-size:11.5px;min-width:118px;border-top:2px solid var(--line);padding-top:6px;position:relative}
+  .mi-leg-mid .km{font-size:14px;font-weight:800}
+  .mi-leg-mid.todo{border-top-style:dashed}
+  .mi-leg-mid.todo .km{color:var(--miss)}
+  .mi-car{position:absolute;top:-13px;left:0;font-size:13px;animation:miDrive 2.4s ease-in-out infinite}
+  @keyframes miFade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+  @keyframes miDrive{0%{left:0}50%{left:calc(100% - 14px)}100%{left:0}}
+  .mi-tag{display:inline-block;font-size:10.5px;font-weight:800;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:1px}
+  .mi-tag.ok{background:var(--ok-bg);color:var(--ok)}
+  .mi-tag.hist{background:#fff6e0;color:#9a6b00}
+  .mi-tag.manual{background:#eef0ff;color:#4a4fb5}
+  .mi-tag.todo{background:var(--miss-bg);color:var(--miss)}
+  .mi-tag.office{background:#f2edff;color:#6b4fb0}
+  .mi-src{font-size:11px;color:var(--muted);margin-top:3px;word-break:break-all}
+  .mi-sum-wrap{overflow-x:auto}
+  .mi-sum{width:100%;border-collapse:collapse;font-size:12.5px}
+  .mi-sum th,.mi-sum td{border:1px solid var(--line);padding:6px 8px;text-align:left;white-space:nowrap}
+  .mi-sum th{background:var(--tw-orange-soft);font-weight:800}
+  .mi-sum td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .mi-sum tr.tot td{font-weight:800;background:#fafafa}
+  .mi-sum tr.todo td{background:var(--miss-bg)}
+  .mi-bar{height:7px;border-radius:4px;background:var(--tw-orange);opacity:.75;min-width:2px}
+  .mi-empty{color:var(--muted);font-size:12.5px;padding:14px 0}
+  .mi-dlg{border:none;border-radius:14px;padding:0;max-width:min(460px,92vw);box-shadow:0 12px 40px rgba(0,0,0,.22)}
+  .mi-dlg::backdrop{background:rgba(0,0,0,.42)}
+  .mi-dlg .bd{padding:18px 20px}
+  .mi-dlg h3{font-size:15px;font-weight:800;margin-bottom:10px}
+  .mi-dlg dl{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:13px;margin-bottom:12px}
+  .mi-dlg dt{color:var(--muted);font-weight:700}
+  .mi-dlg dd{font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+  .mi-dlg .act{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+  @media (prefers-reduced-motion:reduce){
+    .mi-node{animation:none}
+    .mi-car{animation:none;left:calc(50% - 7px)}
+  }
   .secure-view{display:none}
   .secure-view.active{display:block}
   .secure-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
@@ -325,6 +392,11 @@
   .auth-gate-note{margin-top:18px!important;font-size:12px;color:#7a8692!important}
   @media(max-width:650px){
     .secure-tab{flex:1;min-width:0;padding:8px 7px;font-size:11.5px}
+    .mi-stats{grid-template-columns:repeat(2,1fr)}
+    .mi-leg{grid-template-columns:1fr;gap:4px}
+    .mi-leg-mid{padding:8px 0 8px 18px;border-left:2px dashed var(--line);border-top:0;margin-left:6px}
+    .mi-node-time{min-width:0}
+    .mi-sum-wrap{overflow-x:auto}
     .half-item{grid-template-columns:1fr}
     .half-item select{width:100%}
     .half-dashboard-states{grid-template-columns:1fr}
@@ -353,6 +425,7 @@
     <div class="sub" id="subTitle">北一二B區 · 33 項檢核追蹤</div>
     <nav class="secure-tabs" aria-label="受保護工作頁籤">
       <button class="secure-tab active" data-view="patrol" onclick="switchPatrolView('patrol')">📋 巡店看板</button>
+      <button class="secure-tab" data-view="mileage" onclick="switchPatrolView('mileage')">🚗 每日移動里程</button>
       <button class="secure-tab locked" data-view="schedule" onclick="switchPatrolView('schedule')">每月班表</button>
       <button class="secure-tab locked" data-view="half" onclick="switchPatrolView('half')">半月督導檢查</button>
       <button class="secure-tab locked" data-view="halfDashboard" onclick="switchPatrolView('halfDashboard')">📊 督導檢查大盤</button>
@@ -451,6 +524,53 @@
       <div id="halfDashboardContent" class="half-dashboard-list"></div>
     </div>
   </section>
+
+  <section id="mileageView" class="secure-view" aria-label="每日移動里程">
+    <div class="secure-card">
+      <h2>每日移動里程</h2>
+      <p class="hint">由「貼上巡店紀錄」及雲端明細推導：同日多店依<b>到店時間</b>逐段加總，同店重複只取最早一筆。距離取自受控版車資對照表，未知路段一律留白標「待查」，不填 0、不猜測、不平均拆分。</p>
+      <div class="secure-toolbar">
+        <label>檢視月份<input id="miMonth" type="month" onchange="MI.setMonth(this.value)"></label>
+        <button class="mi-btn ghost" type="button" onclick="MI.importPick()">📂 匯入巡店明細</button>
+        <button class="mi-btn ghost" type="button" onclick="MI.exportDetails()">💾 匯出明細存檔</button>
+        <input id="miImportFile" type="file" accept=".json,.csv,.txt" hidden onchange="MI.importFile(this)">
+      </div>
+    </div>
+
+    <div id="miCoverage"></div>
+    <div class="mi-stats" id="miStats"></div>
+    <div id="miAlerts"></div>
+
+    <div class="secure-card">
+      <div class="mi-datebar">
+        <button class="mi-btn" type="button" onclick="MI.step(-1)">◀ 上一天</button>
+        <input id="miDate" type="date" onchange="MI.setDate(this.value)">
+        <button class="mi-btn" type="button" onclick="MI.step(1)">下一天 ▶</button>
+        <button class="mi-btn ghost" type="button" onclick="MI.today()">今天</button>
+        <span style="flex:1"></span>
+        <button class="mi-btn ghost" type="button" onclick="MI.addLegPrompt()">＋ 新增路段</button>
+      </div>
+      <div id="miTimeline" class="mi-tl"></div>
+    </div>
+
+    <div class="secure-card">
+      <div class="mi-datebar">
+        <h2 style="margin:0;font-size:15px;font-weight:700">月份彙整</h2>
+        <span style="flex:1"></span>
+        <button class="mi-btn primary export" type="button" onclick="MI.exportConfirm()">📥 匯出公司報銷 Excel</button>
+      </div>
+      <div class="mi-sum-wrap"><table class="mi-sum" id="miSummary"></table></div>
+    </div>
+  </section>
+
+  <dialog class="mi-dlg" id="miExportDlg">
+    <div class="bd">
+      <h3 id="miDlgTitle">匯出公司報銷 Excel</h3>
+      <dl id="miDlgList"></dl>
+      <div id="miDlgWarn"></div>
+      <div class="act" id="miDlgAct"></div>
+    </div>
+  </dialog>
 
   <footer>資料透過 GAS 同步至雲端試算表（跨裝置共用）· 台灣大哥大 北一二B</footer>
 </div>
@@ -1352,6 +1472,12 @@ async function switchPatrolView(view){
   toggleLegacyPatrol(view!=='patrol');
   document.querySelectorAll('.secure-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view));
   document.querySelectorAll('.secure-view').forEach(el=>el.classList.remove('active'));
+  if(view==='mileage'){
+    document.getElementById('mileageView').classList.add('active');
+    // 只重繪目前已解析的 rawDetails，不另觸發 ptread（避免背景寫入未完成時被舊資料覆蓋）
+    MI.render();
+    return;
+  }
   if(view==='schedule'){
     document.getElementById('scheduleView').classList.add('active');
     loadSchedule();
@@ -1440,6 +1566,45 @@ function excelXml(sheets){
 }
 function downloadExcel(name,sheets){
   const blob=new Blob([excelXml(sheets)],{type:'application/vnd.ms-excel'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+/* ---------- 車資報銷專用組裝（沿用同一套 SpreadsheetML／xmlCell，不改動 excelXml/downloadExcel） ----------
+   版面規格逐項取自受控版 Y2606月車資.xls：
+   字型 微軟正黑體（標題 12pt 粗體／欄名 10pt 粗體／內文 10pt）、細框線；
+   欄寬見各 sheet.cols；明細首列 A1:F1 合併；
+   列印：A4 直向、100%、fit 1×1 頁、邊界 左右 0.3" 上 0.61" 下 0.37"、頁首頁尾 0.3"。 */
+function fareExcelXml(sheets){
+  const ns='urn:schemas-microsoft-com:office:spreadsheet';
+  const B='<Borders>'+['Top','Bottom','Left','Right'].map(p=>`<Border ss:Position="${p}" ss:LineStyle="Continuous" ss:Weight="1"/>`).join('')+'</Borders>';
+  const styles=
+    `<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Font ss:FontName="微軟正黑體" ss:Size="14"/></Style>`+
+    `<Style ss:ID="FareTitle"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Font ss:FontName="微軟正黑體" ss:Size="12" ss:Bold="1"/></Style>`+
+    `<Style ss:ID="FareHeader"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="微軟正黑體" ss:Size="14" ss:Bold="1"/>${B}</Style>`+
+    `<Style ss:ID="FareCell"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="微軟正黑體" ss:Size="14"/>${B}</Style>`+
+    `<Style ss:ID="FareDate"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="微軟正黑體" ss:Size="14"/>${B}</Style>`+
+    `<Style ss:ID="FareNum"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="微軟正黑體" ss:Size="14"/>${B}</Style>`;
+  const opts='<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">'+
+    '<PageSetup><Layout x:Orientation="Portrait" xmlns:x="urn:schemas-microsoft-com:office:excel"/>'+
+    '<PageMargins x:Bottom="0.37" x:Left="0.3" x:Right="0.3" x:Top="0.61" xmlns:x="urn:schemas-microsoft-com:office:excel"/></PageSetup>'+
+    '<FitToPage/><Print><ValidPrinterInfo/><PaperSizeIndex>9</PaperSizeIndex><Scale>100</Scale>'+
+    '<HorizontalResolution>300</HorizontalResolution><VerticalResolution>300</VerticalResolution>'+
+    '<FitWidth>1</FitWidth><FitHeight>1</FitHeight></Print></WorksheetOptions>';
+  const body=sheets.map(s=>{
+    const cols=(s.cols||[]).map((w,i)=>`<Column ss:Index="${i+1}" ss:AutoFitWidth="0" ss:Width="${Math.round(w*7)}"/>`).join('');
+    const mg=(s.merges||[]);
+    const rows=s.rows.map((row,ri)=>{
+      const m=mg.find(x=>x.row===ri);
+      const cells=row.map((c,ci)=>{
+        const base=xmlCell(c);
+        return (m && ci===m.col) ? base.replace('<Cell',`<Cell ss:MergeAcross="${m.across}"`) : base;
+      }).join('');
+      return `<Row${ri===0&&s.name==='油料'?' ss:Height="57.5"':''}>${cells}</Row>`;
+    }).join('');
+    return `<Worksheet ss:Name="${xmlEsc(s.name)}"><Table ss:DefaultRowHeight="${s.name==='油料'?'15.6':'16.2'}">${cols}${rows}</Table>${opts}</Worksheet>`;
+  }).join('');
+  return `<?xml version="1.0"?><Workbook xmlns="${ns}" xmlns:ss="${ns}" xmlns:x="urn:schemas-microsoft-com:office:excel"><Styles>${styles}</Styles>${body}</Workbook>`;
+}
+function downloadFareExcel(name,sheets){
+  const blob=new Blob([fareExcelXml(sheets)],{type:'application/vnd.ms-excel'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function exportScheduleExcel(){
   if(!scheduleData){ showMsg('班表尚未載入','err'); return; }
@@ -1625,6 +1790,547 @@ function exportHalfChecksExcel(){
 
 /* ---------- 啟動 ---------- */
 restorePatrolSession();
+
+/* =========================================================================
+   每日移動里程（獨立模組）
+   - 資料來源：既有 rawDetails（唯讀，不改寫原始巡店紀錄）
+   - 人工調整只存 localStorage:bei12b_mileage_v1，與 GAS 完全脫鉤
+   - 匯出沿用 excelXml()/downloadExcel()，格式比照受控版 Y2606月車資.xls
+   ========================================================================= */
+const MI = (function(){
+  const LS = 'bei12b_mileage_v1';
+  const PLATE='NAS-9666', PURPOSE='巡店';
+  // 依 2026-06 公司正式報銷表 A/B 欄
+  const COST_DEPT='北一二區直營部', COST_OWNER='盧蔚榮';
+  const SINGLE_NOTE='單店，不計油料里程';
+  const LEG_NOTE='同日多店依到店時間逐段加總';
+
+  // ---- 地點主檔（代碼以實際巡店明細為準，佐證見「門市代碼別名對照表」）----
+  const NODES=[
+    {name:'台北酒泉',  kind:'store', code:'DNB10062', aliases:['酒泉'],   status:'confirmed'},
+    {name:'台北大稻埕',kind:'store', code:'DNB10284', aliases:['大稻埕'], status:'confirmed'},
+    {name:'台北三創',  kind:'store', code:'DNB10307', aliases:['三創','台灣大哥大數位生活台北三創'], status:'confirmed'},
+    {name:'台北六張犁',kind:'store', code:'DNB10440', aliases:['六張犁'], status:'confirmed'},
+    {name:'台北復興南',kind:'store', code:'DNB10094', aliases:['復興南'], status:'confirmed'},
+    {name:'台北萬大',  kind:'store', code:'DNB10168', aliases:['萬大'], provisional:['DNB10xxx_wanda'], status:'confirmed'},
+    {name:'台北通化',  kind:'store', code:'DNB10174', aliases:['通化'], legacy:['DNB10059'], status:'single_evidence'},
+    {name:'台北永吉',  kind:'store', code:'DNB10082', aliases:['永吉'],   status:'single_evidence'},
+    {name:'台北杭州南',kind:'store', code:'DNB10146', aliases:['杭州南'], status:'pending_review'},
+    // 特殊地點／非巡店節點：不計入巡店門市數，可作里程起訖點
+    {name:'台北電信',  kind:'office', code:null, aliases:['電信'], status:'pending_review'}
+  ];
+
+  // ---- 距離對照表 ----
+  // verify: verified=已驗證(受控版) / observed=歷史觀測 / manual=人工確認
+  const seg=(from,to,km,month,date,source,verify)=>({from,to,km,month,date,source,verify,confirmedAt:null});
+  const DIST=[
+    // 受控版 Y2606月車資.xls「距離計算明細」逐段照抄
+    seg('台北三創','台北六張犁',4.5,'Y2606','2026-06-03','OSRM bike 202606_bike_distance_legs.json','verified'),
+    seg('台北酒泉','台北通化',  8.5,'Y2606','2026-06-04','歷史同路線範例：Y2511 8.4、Y2605 8.5','verified'),
+    seg('台北三創','台北萬大',  5.4,'Y2606','2026-06-05','歷史同路線範例中位數：Y2509/Y2604 5.4','verified'),
+    seg('台北三創','台北復興南',3.5,'Y2606','2026-06-09','歷史同路線範例中位數','verified'),
+    seg('台北三創','台北永吉',  4.4,'Y2606','2026-06-15','歷史同路線範例中位數','verified'),
+    seg('台北永吉','台北酒泉', 10.0,'Y2606','2026-06-15','歷史反向同路線範例多數：酒泉/永吉 10.0','verified'),
+    seg('台北酒泉','台北萬大',  6.6,'Y2606','2026-06-16','歷史同路線範例中位數','verified'),
+    seg('台北大稻埕','台北六張犁',7.7,'Y2606','2026-06-18','近期歷史同路線範例：Y2604/Y2605 7.7','verified'),
+    seg('台北大稻埕','台北復興南',6.5,'Y2606','2026-06-22','歷史同路線範例：Y2604 6.5','verified'),
+    seg('台北大稻埕','台北永吉',7.2,'Y2606','2026-06-24','歷史同路線範例一致：Y2509/Y2602/Y2604 7.2','verified'),
+    seg('台北三創','台北通化',  3.6,'Y2606','2026-06-30','歷史同路線範例中位數','verified'),
+    // 歷史觀測：僅見於歷史月份，尚未進受控版
+    seg('台北酒泉','台北復興南',8.2,'Y2605','2026-05-06','Y2605 月車資實際觀測','observed'),
+    seg('台北酒泉','台北杭州南',5.7,'Y2605','2026-05-11','Y2605 月車資實際觀測','observed'),
+    seg('台北大稻埕','台北通化',6.5,'Y2604','2026-04-13','Y2604 月車資實際觀測','observed'),
+    seg('台北三創','台北杭州南',3.0,'Y2511','2025-11-17','多數：Y2511 3.0（Y2604 另有 3.2）','observed'),
+    seg('台北杭州南','台北六張犁',3.8,'Y2604','2026-04-27','Y2604 月車資實際觀測','observed'),
+    seg('台北大稻埕','台北萬大',4.5,'Y2605','2026-05-12','多數：Y2604/Y2605 4.5（Y2509/Y2604 另有 7.3）','observed'),
+    seg('台北六張犁','台北萬大',6.3,'Y2509','2025-09-10','Y2509 月車資實際觀測','observed'),
+    seg('台北六張犁','台北酒泉',9.5,'Y2511','2025-11-05','Y2511 月車資實際觀測','observed'),
+    seg('台北大稻埕','台北酒泉',2.0,'Y2511','2025-11-03','Y2511 月車資實際觀測','observed'),
+    seg('台北大稻埕','台北杭州南',4.5,'Y2509','2025-09-22','Y2509 月車資實際觀測','observed'),
+    seg('台北三創','台北酒泉',4.5,'Y2509','2025-09-02','Y2509 月車資實際觀測','observed'),
+    // 特殊地點固定受控（人工確認）
+    seg('台北電信','台北復興南',1.5,'Y2511','2025-11-18','Y2511 實際觀測｜原文誤植為「台北萬大→台北復興南」，最終採用「台北電信→台北復興南」｜Y2606 受控版／人工確認','manual'),
+    seg('台北電信','台北萬大',  6.4,'Y2605','2026-05-27','Y2605 實際觀測｜Y2606 受控版／人工確認','manual')
+  ];
+
+  // 三店以上、僅有當日總里程且無逐段依據者（僅備查，不入樣本庫）
+  const DAY_TOTAL_ONLY=[];
+
+  // ---- 正式公司報銷表基準（對帳用，唯讀）----
+  // 2026-06：11 個報銷出差日、合計 74.5 KM。單店日不列入報銷，故不在此表。
+  const OFFICIAL={'2026-06':{days:11,km:74.5,rows:[
+    ['2026-06-03','台北三創/台北六張犁',4.5],
+    ['2026-06-04','台北酒泉/台北通化',8.5],
+    ['2026-06-05','台北三創/台北萬大',5.4],
+    ['2026-06-09','台北三創/台北復興南',3.5],
+    ['2026-06-15','台北三創/台北永吉/台北酒泉',14.4],
+    ['2026-06-16','台北酒泉/台北萬大',6.6],
+    ['2026-06-18','台北大稻埕/台北六張犁',7.7],
+    ['2026-06-22','台北大稻埕/台北復興南',6.5],
+    ['2026-06-23','台北酒泉/台北萬大',6.6],
+    ['2026-06-24','台北大稻埕/台北永吉',7.2],
+    ['2026-06-30','台北三創/台北通化',3.6]
+  ]}};
+
+  let state={date:'', month:''};
+
+  /* ---------- 人工資料層（localStorage，不觸碰 GAS／原始明細） ---------- */
+  function store(){
+    try{ return Object.assign({nodes:[],manualLegs:[],dayEdits:{},exportLog:[]}, JSON.parse(localStorage.getItem(LS)||'{}')); }
+    catch(e){ return {nodes:[],manualLegs:[],dayEdits:{},exportLog:[]}; }
+  }
+  function save(s){ try{ localStorage.setItem(LS, JSON.stringify(s)); }catch(e){} }
+
+  function allNodes(){ return NODES.concat(store().nodes||[]); }
+  function nodeOf(name){ return allNodes().find(n=>n.name===name)||null; }
+  function isOffice(name){ const n=nodeOf(name); return !!n && n.kind!=='store'; }
+
+  /* ---------- 代碼／店名正規化 ---------- */
+  function normalize(code, store){
+    const c=String(code||'').trim(), s=String(store||'').trim();
+    for(const n of allNodes()){
+      if(c && (n.code===c || (n.legacy||[]).includes(c) || (n.provisional||[]).includes(c))) return n.name;
+    }
+    for(const n of allNodes()){
+      if(s && (n.name===s || (n.aliases||[]).includes(s))) return n.name;
+    }
+    return s || (c?('<未知代碼 '+c+'>'):'');
+  }
+
+  /* ---------- 距離查詢 ---------- */
+  function legFor(a,b){
+    const man=(store().manualLegs||[]).find(l=>(l.from===a&&l.to===b)||(l.from===b&&l.to===a));
+    if(man) return Object.assign({},man,{verify:'manual'});
+    return DIST.find(d=>(d.from===a&&d.to===b)||(d.from===b&&d.to===a))||null;
+  }
+  const VERIFY_LABEL={verified:['已驗證','ok'],observed:['歷史觀測','hist'],
+                      manual:['人工確認','manual'],official:['正式受控','ok']};
+
+  /* ---------- 由 rawDetails 推導每日路線 ---------- */
+  function parseArrive(s){
+    const m=String(s||'').trim().match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/);
+    if(!m) return null;
+    const p=n=>String(n).padStart(2,'0');
+    return {date:`${m[1]}-${p(m[2])}-${p(m[3])}`, time:`${p(m[4])}:${m[5]}`, key:`${m[4].padStart(2,'0')}${m[5]}`};
+  }
+  function days(){
+    const by={};
+    (rawDetails||[]).forEach(r=>{
+      const t=parseArrive(r.arriveTime); if(!t) return;
+      const name=normalize(r.code, r.store); if(!name) return;
+      (by[t.date]=by[t.date]||{});
+      // 同店重複只取最早一筆到店時間
+      if(!by[t.date][name] || t.key < by[t.date][name].key) by[t.date][name]={name,time:t.time,key:t.key,code:r.code||''};
+    });
+    const out={};
+    Object.keys(by).sort().forEach(d=>{
+      out[d]=Object.values(by[d]).sort((x,y)=>x.key.localeCompare(y.key));
+    });
+    // 正式公司報銷表為該月的正式依據：巡店明細沒有的日子，直接採用報銷表的路線與順序。
+    // ptread 日後可作為到店時間／順序的交叉驗證，但不阻擋正式里程對帳。
+    Object.keys(OFFICIAL).forEach(m=>{
+      OFFICIAL[m].rows.forEach(([d,place])=>{
+        if(out[d]&&out[d].length) return;              // 已有巡店明細者以明細為準
+        out[d]=place.split('/').map((n,i)=>({name:n,time:'',key:String(100+i),code:'',official:true}));
+      });
+    });
+    // 併入人工新增的節點（依指定時間插入排序）
+    const s=store();
+    (s.manualLegs||[]).forEach(()=>{});
+    Object.keys(s.dayEdits||{}).forEach(d=>{
+      const e=s.dayEdits[d]||{};
+      (e.addNodes||[]).forEach(n=>{
+        out[d]=out[d]||[];
+        if(!out[d].some(x=>x.name===n.name)) out[d].push({name:n.name,time:n.time||'',key:(n.time||'99:99').replace(':',''),code:'',manual:true});
+      });
+      (e.removeNodes||[]).forEach(nm=>{ if(out[d]) out[d]=out[d].filter(x=>x.name!==nm); });
+      if(out[d]) out[d].sort((x,y)=>x.key.localeCompare(y.key));
+      if(e.order && out[d]) out[d].sort((x,y)=>e.order.indexOf(x.name)-e.order.indexOf(y.name));
+    });
+    return out;
+  }
+
+  /* ---------- 單日計算 ---------- */
+  function officialRow(date){
+    const m=date.slice(0,7), o=OFFICIAL[m];
+    return o?(o.rows.find(r=>r[0]===date)||null):null;
+  }
+  function dayPlan(date, nodes){
+    const stores=nodes.filter(n=>!isOffice(n.name));
+    const plan={date, nodes, storeCount:stores.length, legs:[], km:null, note:'', todo:[], totalOnly:false};
+    if(nodes.length<2){
+      plan.km=0; plan.note=SINGLE_NOTE; return plan;
+    }
+    // 由正式報銷表提供的兩店日：當日里程即該唯一一段店到店距離
+    const off=officialRow(date);
+    if(off && nodes.length===2 && nodes.every(n=>n.official)){
+      const src='2026 年 6 月正式公司報銷表';
+      plan.legs=[{from:nodes[0].name,to:nodes[1].name,km:off[2],month:'Y2606',date,source:src,verify:'official'}];
+      plan.km=off[2]; plan.note=LEG_NOTE; plan.official=true;
+      return plan;
+    }
+    const edits=(store().dayEdits||{})[date]||{};
+    let sum=0, anyTodo=false;
+    for(let i=0;i<nodes.length-1;i++){
+      const a=nodes[i].name,b=nodes[i+1].name;
+      const ov=(edits.legKm||{})[a+'|'+b];
+      let L;
+      if(ov!=null){ L={from:a,to:b,km:ov.km,month:'—',date:date,source:ov.note||'人工修改',verify:'manual'}; }
+      else L=legFor(a,b);
+      if(L && L.km!=null){ sum+=L.km; plan.legs.push(Object.assign({},L,{from:a,to:b})); }
+      else { anyTodo=true; plan.todo.push(a+'→'+b); plan.legs.push({from:a,to:b,km:null,source:'無歷史同路線範例',verify:null}); }
+    }
+    const forced=DAY_TOTAL_ONLY.find(d=>d.date===date);
+    if(anyTodo && forced){
+      plan.km=forced.km; plan.totalOnly=true; plan.note=LEG_NOTE+'（部分路段待補路段明細）';
+    }else if(anyTodo){
+      plan.km=null; plan.note='待查：'+plan.todo.join('、');
+    }else{
+      plan.km=Math.round(sum*10)/10; plan.note=LEG_NOTE;
+    }
+    return plan;
+  }
+  function monthPlans(month){
+    const D=days(), out=[];
+    Object.keys(D).filter(d=>d.slice(0,7)===month).sort().forEach(d=>out.push(dayPlan(d,D[d])));
+    return out;
+  }
+
+  /* ---------- 資料涵蓋範圍 ---------- */
+  function coverage(month){
+    const D=days(), have=Object.keys(D).filter(d=>d.slice(0,7)===month).sort();
+    if(!have.length) return {have:[],first:null,last:null,missingTail:[]};
+    const y=+month.slice(0,4), m=+month.slice(5,7), last=new Date(y,m,0).getDate();
+    const lastHave=+have[have.length-1].slice(8);
+    const tail=[];
+    // 有正式報銷表基準的月份，以報銷表為完整依據，不列缺漏
+    if(!OFFICIAL[month]) for(let i=lastHave+1;i<=last;i++) tail.push(`${month}-${String(i).padStart(2,'0')}`);
+    return {have, first:have[0], last:have[have.length-1], monthLast:`${month}-${String(last).padStart(2,'0')}`, missingTail:tail};
+  }
+
+  /* ---------- 畫面 ---------- */
+  const esc2=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const km1=v=>v==null?'—':(Math.round(v*10)/10).toFixed(1).replace(/\.0$/,'');
+
+  function ensureState(){
+    const D=days(), all=Object.keys(D).sort();
+    if(!state.month) state.month=(all.length?all[all.length-1].slice(0,7):new Date().toISOString().slice(0,7));
+    const inM=all.filter(d=>d.slice(0,7)===state.month);
+    if(!state.date || state.date.slice(0,7)!==state.month) state.date=inM.length?inM[inM.length-1]:state.month+'-01';
+    const mEl=document.getElementById('miMonth'), dEl=document.getElementById('miDate');
+    if(mEl) mEl.value=state.month;
+    if(dEl) dEl.value=state.date;
+  }
+
+  function render(){
+    if(!document.getElementById('miStats')) return;
+    ensureState();
+    renderCoverage(); renderStats(); renderAlerts(); renderTimeline(); renderSummary();
+  }
+
+  // 與正式公司報銷表對帳
+  function reconcile(month){
+    const off=OFFICIAL[month]; if(!off) return null;
+    const mine=billable(monthPlans(month));
+    const mineBy={}; mine.forEach(p=>mineBy[p.date]={place:p.nodes.map(n=>n.name).join('/'),km:p.km});
+    const rows=off.rows.map(([d,place,km])=>{
+      const g=mineBy[d];
+      return {date:d, offPlace:place, offKm:km, gotPlace:g?g.place:null, gotKm:g?g.km:null,
+              ok: !!g && g.km===km && g.place===place,
+              kmOk: !!g && g.km===km};
+    });
+    const extra=mine.filter(p=>!off.rows.some(r=>r[0]===p.date)).map(p=>p.date);
+    const myKm=Math.round(mine.reduce((a,p)=>a+p.km,0)*10)/10;
+    return {off, rows, extra, mineDays:mine.length, myKm,
+            match: rows.every(r=>r.ok) && !extra.length && mine.length===off.days};
+  }
+
+  function renderCoverage(){
+    const el=document.getElementById('miCoverage'), rc=reconcile(state.month);
+    const all=monthPlans(state.month), bill=billable(all);
+    if(!all.length){ el.innerHTML=`<div class="mi-note">目前沒有 ${esc2(state.month)} 的巡店明細。請先在「巡店看板」貼上紀錄，或用上方「匯入巡店明細」載入存檔。</div>`; return; }
+    let h='';
+    if(rc){
+      const hit=rc.rows.filter(r=>r.ok).length, kmhit=rc.rows.filter(r=>r.kmOk).length;
+      const done=rc.match;
+      h+=`<div class="mi-note${done?'':' bad'}"><b>${esc2(state.month.replace('-','年 '))} 月</b>　`+
+         `正式出差日：<b>${rc.off.days} 天</b>　總里程：<b>${km1(rc.off.km)} KM</b>　`+
+         `對帳狀態：<b>${done?'✅ 已與正式報銷表完成對帳':`⚠ ${hit}/${rc.off.days} 列完全相符（里程相符 ${kmhit}/${rc.off.days}）`}</b>`;
+      if(!done){
+        const bad=rc.rows.filter(r=>!r.ok);
+        h+='<ul>'+bad.map(r=>{
+          if(r.gotKm==null) return `<li>${esc2(r.date)}　正式表 ${esc2(r.offPlace)} ${km1(r.offKm)} KM——本機巡店明細無此日資料</li>`;
+          if(!r.kmOk) return `<li>${esc2(r.date)}　里程不符：正式表 ${km1(r.offKm)} / 本機 ${km1(r.gotKm)}</li>`;
+          return `<li>${esc2(r.date)}　地點不符：正式表「${esc2(r.offPlace)}」/ 巡店明細「${esc2(r.gotPlace)}」（里程同為 ${km1(r.offKm)} KM）</li>`;
+        }).join('')+
+        (rc.extra.length?`<li>本機多出未列於正式表的日期：${rc.extra.map(esc2).join('、')}</li>`:'')+
+        '</ul>';
+      }
+      const fromOff=bill.filter(p=>p.official).length;
+      h+=`<br>本機推導：${rc.mineDays} 個報銷日、${km1(rc.myKm)} KM`+
+         `（另有 ${all.length-bill.length} 個單店 0 KM 日，不列入報銷`+
+         (fromOff?`；其中 ${fromOff} 日依正式報銷表補入，巡店明細尚無紀錄`:'')+`）</div>`;
+    }else{
+      const c=coverage(state.month);
+      h+=`<div class="mi-note"><b>資料涵蓋日期</b>：${esc2(c.first)} ～ ${esc2(c.last)}　`+
+         `報銷出差日 <b>${bill.length} 天</b>、合計 <b>${km1(Math.round(bill.reduce((a,p)=>a+p.km,0)*10)/10)} KM</b>`+
+         `（另有 ${all.length-bill.length} 個單店 0 KM 日，不列入報銷）<br>`+
+         `本月無正式報銷表基準可對帳；統計僅涵蓋現有明細，<b>不會自動補值</b>。</div>`;
+    }
+    el.innerHTML=h;
+  }
+
+  function renderStats(){
+    const D=days(), today=D[state.date]||[], plan=today.length?dayPlan(state.date,today):null;
+    const plans=monthPlans(state.month), bill=billable(plans);
+    const monthKm=Math.round(bill.reduce((a,p)=>a+p.km,0)*10)/10;
+    const todoCnt=plans.reduce((a,p)=>a+p.todo.length,0);
+    const card=(k,v,u,s,warn)=>`<div class="mi-card${warn?' warn':''}"><div class="k">${k}</div><div class="v">${v}<span class="u">${u||''}</span></div><div class="s">${s||''}</div></div>`;
+    document.getElementById('miStats').innerHTML=
+      card('今日巡店數', plan?plan.storeCount:0, '店', esc2(state.date)+(plan&&plan.nodes.length>plan.storeCount?'（含特殊地點）':''))+
+      card('今日總公里', plan?km1(plan.km):'—', 'KM', plan&&plan.km===0?'單店，不列入報銷':(plan&&plan.km==null?'有待查路段':''))+
+      card('本月累積公里', km1(monthKm), 'KM', bill.length+' 個報銷出差日')+
+      card('待確認路段', todoCnt, '段', todoCnt?'需人工補距離':'全數有來源', todoCnt>0);
+  }
+
+  function renderAlerts(){
+    const plans=monthPlans(state.month), el=document.getElementById('miAlerts');
+    const todo=[]; plans.forEach(p=>p.todo.forEach(t=>todo.push({d:p.date,t})));
+    const pend=[]; plans.forEach(p=>p.nodes.forEach(n=>{const x=nodeOf(n.name); if(x&&x.status!=='confirmed'&&!pend.some(q=>q.n===n.name)) pend.push({n:n.name,s:x.status});}));
+    let h='';
+    if(todo.length) h+=`<div class="mi-note bad"><b>⚠ 未知路段提醒（${todo.length} 段）</b>——里程留空、不填 0、不猜測：<ul>`+todo.map(x=>`<li>${esc2(x.d)}　${esc2(x.t)}</li>`).join('')+`</ul></div>`;
+    if(pend.length) h+=`<div class="mi-note"><b>門市代碼待複核</b>：`+pend.map(x=>`${esc2(x.n)}（${x.s==='single_evidence'?'單一佐證':'未佐證'}）`).join('、')+`</div>`;
+    el.innerHTML=h;
+  }
+
+  function renderTimeline(){
+    const D=days(), nodes=D[state.date], el=document.getElementById('miTimeline');
+    if(!nodes||!nodes.length){ el.innerHTML=`<div class="mi-empty">${esc2(state.date)} 沒有巡店紀錄。</div>`; return; }
+    const p=dayPlan(state.date,nodes);
+    let h=`<div class="mi-day"><span>${esc2(state.date)}</span><span>巡店 ${p.storeCount} 店</span><span class="tot">合計 ${km1(p.km)} KM</span>`;
+    if(p.totalOnly) h+=`<span class="mi-tag todo">當日總里程（待補路段明細）</span>`;
+    h+=`</div>`;
+    const nodeHtml=(n,i)=>`<div class="mi-node${isOffice(n.name)?' office':''}" style="animation-delay:${i*0.08}s"><span class="mi-node-dot"></span><span><span class="mi-node-name">${esc2(n.name)}</span>${isOffice(n.name)?'<span class="mi-tag office">特殊地點</span>':''}<br><span class="mi-node-time">${esc2(n.time||'—')}${n.code?' · '+esc2(n.code):''}</span></span></div>`;
+    if(nodes.length===1){ h+=`<div class="mi-leg">${nodeHtml(nodes[0],0)}<div class="mi-leg-mid"><div class="km">0</div>單店不計</div><div></div></div>`; }
+    p.legs.forEach((L,i)=>{
+      const vt=L.verify?VERIFY_LABEL[L.verify]:null;
+      const mid=L.km==null
+        ? `<div class="mi-leg-mid todo"><span class="mi-car">🚗</span><div class="km">待查</div><span class="mi-tag todo">無範例</span><div class="mi-src">${esc2(L.source||'')}</div></div>`
+        : `<div class="mi-leg-mid"><span class="mi-car">🚗</span><div class="km">${km1(L.km)}<span style="font-size:10px"> KM</span></div><span class="mi-tag ${vt[1]}">${vt[0]}</span><div class="mi-src">${esc2(L.month||'')}${L.date?' · '+esc2(L.date):''}<br>${esc2(L.source||'')}</div></div>`;
+      h+=`<div class="mi-leg">${nodeHtml(nodes[i],i)}${mid}${nodeHtml(nodes[i+1],i+1)}</div>`;
+    });
+    el.innerHTML=h;
+  }
+
+  function renderSummary(){
+    const plans=monthPlans(state.month), el=document.getElementById('miSummary');
+    if(!plans.length){ el.innerHTML=`<tr><td class="mi-empty">本月無資料</td></tr>`; return; }
+    const bill=billable(plans);
+    const max=Math.max.apply(null,plans.map(p=>p.km||0))||1;
+    let rows='';
+    plans.forEach(p=>{
+      const w=Math.round(((p.km||0)/max)*100);
+      const nb=(p.km===0);
+      rows+=`<tr class="${p.todo.length?'todo':''}"><td>${esc2(p.date)}</td><td class="num">${p.storeCount}</td><td>${esc2(p.nodes.map(n=>n.name).join('/'))}</td><td class="num">${km1(p.km)}</td><td><div class="mi-bar" style="width:${w}%"></div></td><td>${esc2(p.note)}${nb?'<span class="mi-tag todo">不列入報銷</span>':''}</td></tr>`;
+    });
+    const tot=Math.round(bill.reduce((a,p)=>a+p.km,0)*10)/10;
+    el.innerHTML=`<thead><tr><th>日期</th><th>巡店數</th><th>出差地點</th><th>公里</th><th>趨勢</th><th>備註</th></tr></thead><tbody>${rows}<tr class="tot"><td>合計</td><td class="num">—</td><td>${bill.length} 個報銷出差日</td><td class="num">${km1(tot)}</td><td></td><td>${(store().exportLog||[]).some(x=>x.month===state.month)?'已匯出':'尚未匯出'}</td></tr></tbody>`;
+  }
+
+  /* ---------- 日期／月份切換 ---------- */
+  function setMonth(v){ if(!v) return; state.month=v; state.date=''; render(); }
+  function setDate(v){ if(!v) return; state.date=v; state.month=v.slice(0,7); render(); }
+  function step(n){ const d=new Date(state.date+'T00:00:00'); d.setDate(d.getDate()+n); setDate(d.toISOString().slice(0,10)); }
+  function today(){ setDate(new Date().toISOString().slice(0,10)); }
+
+  /* ---------- 人工調整 ---------- */
+  function addLegPrompt(){
+    const names=allNodes().map(n=>n.name).join('、');
+    const nm=prompt('新增節點到 '+state.date+'\n可用地點：'+names+'\n（新名稱會建立為特殊地點）');
+    if(!nm) return;
+    const tm=prompt('到店／抵達時間（HH:MM），可留空','')||'';
+    const s=store();
+    if(!nodeOf(nm)) s.nodes.push({name:nm,kind:'other',code:null,aliases:[],status:'pending_review'});
+    s.dayEdits[state.date]=s.dayEdits[state.date]||{};
+    (s.dayEdits[state.date].addNodes=s.dayEdits[state.date].addNodes||[]).push({name:nm,time:tm,at:new Date().toISOString()});
+    save(s); render();
+    alert('已新增節點。系統不會推測距離——若該路段無歷史範例，會顯示「待查」，請用路段修改功能填入實際公里數。');
+  }
+  function setLegKm(date,from,to,km,note){
+    const s=store();
+    s.dayEdits[date]=s.dayEdits[date]||{};
+    s.dayEdits[date].legKm=s.dayEdits[date].legKm||{};
+    s.dayEdits[date].legKm[from+'|'+to]={km:Number(km),note:note||'人工確認',at:new Date().toISOString(),prev:(legFor(from,to)||{}).km??null};
+    save(s); render();
+  }
+  function removeNode(date,name){
+    const s=store();
+    s.dayEdits[date]=s.dayEdits[date]||{};
+    (s.dayEdits[date].removeNodes=s.dayEdits[date].removeNodes||[]).push(name);
+    save(s); render();
+  }
+
+  /* ---------- 匯入／匯出巡店明細存檔 ---------- */
+  function importPick(){ document.getElementById('miImportFile').click(); }
+  function importFile(input){
+    const f=input.files&&input.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=()=>{
+      try{
+        const txt=String(rd.result||'');
+        let rows;
+        if(txt.trim().startsWith('[')) rows=JSON.parse(txt);
+        else rows=csvToDetails(txt);
+        if(!Array.isArray(rows)||!rows.length) throw new Error('沒有可用資料');
+        const key=r=>[r.fillTime,r.store||r.code,r.item].join('|');
+        const seen=new Set((rawDetails||[]).map(key));
+        const add=rows.filter(r=>!seen.has(key(r)));
+        rawDetails=(rawDetails||[]).concat(add);
+        render();
+        alert('已匯入 '+add.length+' 筆（略過重複 '+(rows.length-add.length)+' 筆）。此匯入只影響本機畫面，不會寫回雲端。');
+      }catch(e){ alert('匯入失敗：'+e.message); }
+      input.value='';
+    };
+    rd.readAsText(f);
+  }
+  function csvToDetails(txt){
+    const lines=txt.split(/\r?\n/).filter(l=>l.trim());
+    const out=[];
+    lines.slice(1).forEach(l=>{
+      const c=l.split(',');
+      if(c.length<5) return;
+      out.push({fillTime:(c[0]||'').trim(), arriveTime:(c[1]||'').trim(), leaveTime:(c[2]||'').trim(),
+                district:(c[3]||'').trim(), code:(c[4]||'').trim(), store:(c[5]||'').trim(),
+                inspector:(c[6]||'').trim(), item:'', content:'', result:'', reason:'',
+                month:((c[1]||'').trim().match(/^(\d{4})\/(\d{1,2})/)||[]).slice(1).map((v,i)=>i?String(v).padStart(2,'0'):v).join('-')});
+    });
+    return out;
+  }
+  function exportDetails(){
+    if(!(rawDetails||[]).length){ alert('目前沒有明細可匯出'); return; }
+    const blob=new Blob([JSON.stringify(rawDetails,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob), a=document.createElement('a');
+    a.href=url; a.download='巡店明細_'+state.month+'.json'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+
+  /* ---------- 匯出公司報銷 Excel ---------- */
+  // 欄位依公司正式報銷表（9 欄）。版面規格取自受控版 Y2606月車資.xls：
+  // 字型 微軟正黑體；A4 直向 100% fit 1x1、邊界 左右 0.3" 上 0.61" 下 0.37"、頁首頁尾 0.3"。
+  const FARE_COLW=[18,18,24,24,48,14,21,18,18], DETAIL_COLW=[12,18,18,14,12,42,14];
+  // 欄名含換行，與受控版逐字一致（FareHeader 樣式已設 WrapText）
+  const HEAD_FARE=['成本歸屬部門','成本歸屬者','出差日期\n(起)','出差日期\n(迄)','出差地點',
+                   '事由及\n洽訪目標','油料補助\n里程數(KM)','車號','備註'];
+  const HEAD_DETAIL=['日期','起點','迄點','騎車距離(KM)','巡店順序','距離來源','驗證狀態'];
+  const VERIFY_TEXT={verified:'已驗證',observed:'歷史觀測',manual:'人工確認',
+                     official:'人工確認／正式受控'};
+  // 正式報銷表日期格式為 2026/6/3（斜線、月日不補零）
+  const fareDate=d=>{const [y,m,dd]=d.split('-');return `${y}/${+m}/${+dd}`;};
+
+  // 只有實際產生里程的日子才進正式報銷表；單店 0 KM 日不列入（與公司報銷表一致）
+  function billable(plans){ return plans.filter(p=>p.km!=null && p.km>0); }
+
+  // plansOverride：可直接餵入既有的每日結果（例如以正式報銷表路線產檔／對帳）
+  function buildSheets(month, plansOverride){
+    const all=plansOverride||monthPlans(month), plans=billable(all);
+    const s=store();
+    const dept=s.costDept||COST_DEPT, owner=s.costOwner||COST_OWNER;
+    const fare=[HEAD_FARE.map(h=>excelCell(h,'FareHeader'))];
+    const detail=[[excelCell(month.replace('-','').replace(/^20/,'Y')+' 月車資距離計算明細','FareTitle')],
+                  HEAD_DETAIL.map(h=>excelCell(h,'FareHeader'))];
+    let tot=0;
+    plans.forEach(p=>{
+      tot+=p.km;
+      // 油料工作表只填當日加總里程；備註依公司格式留白
+      fare.push([excelCell(dept,'FareCell'),excelCell(owner,'FareCell'),
+                 excelCell(fareDate(p.date),'FareDate'),excelCell(fareDate(p.date),'FareDate'),
+                 excelCell(p.nodes.map(n=>n.name).join('/'),'FareCell'),
+                 excelCell(PURPOSE,'FareCell'),excelCell(p.km,'FareNum'),
+                 excelCell(PLATE,'FareCell'),excelCell('','FareCell')]);
+      // 逐段計算全部放在距離計算明細
+      p.legs.forEach((L,i)=>{
+        detail.push([excelCell(fareDate(p.date),'FareDate'),excelCell(L.from,'FareCell'),excelCell(L.to,'FareCell'),
+                     L.km==null?excelCell('','FareNum'):excelCell(L.km,'FareNum'),
+                     excelCell('第 '+(i+1)+' 段','FareDate'),
+                     excelCell(L.km==null?'（待查，無歷史同路線範例）':(L.source||''),'FareCell'),
+                     excelCell(L.km==null?'待查':(VERIFY_TEXT[L.verify]||''),'FareDate')]);
+      });
+    });
+    detail.push([]);
+    detail.push([excelCell('全月出差日','FareHeader'),excelCell(plans.length,'FareNum')]);
+    detail.push([excelCell('全月油料里程合計','FareHeader'),excelCell(Math.round(tot*10)/10,'FareNum')]);
+    return {sheets:[{name:'油料',rows:fare,cols:FARE_COLW},
+                    {name:'距離計算明細',rows:detail,cols:DETAIL_COLW,merges:[{row:0,col:0,across:6}]}],
+            plans, all, total:Math.round(tot*10)/10};
+  }
+
+  function exportConfirm(){
+    const {plans,all,total}=buildSheets(state.month);
+    const todo=all.reduce((a,p)=>a+p.todo.length,0);
+    const bad=all.filter(p=>p.km==null).length;
+    const c=coverage(state.month), rc=reconcile(state.month), s=store();
+    document.getElementById('miDlgList').innerHTML=
+      `<dt>匯出月份</dt><dd>${esc2(state.month)}</dd>`+
+      `<dt>資料涵蓋日期</dt><dd>${c.first?esc2(c.first)+' ～ '+esc2(c.last):'—'}</dd>`+
+      `<dt>出差日數</dt><dd>${plans.length} 天</dd>`+
+      `<dt>總公里數</dt><dd>${km1(total)} KM</dd>`+
+      `<dt>待查路段數</dt><dd>${todo} 段</dd>`+
+      `<dt>異常資料數</dt><dd>${bad} 筆</dd>`+
+      (rc?`<dt>對帳正式報銷表</dt><dd>${rc.match?'✅ 相符':'⚠ 不符（'+rc.off.days+' 天 / '+km1(rc.off.km)+' KM）'}</dd>`:'');
+    const warn=document.getElementById('miDlgWarn'), act=document.getElementById('miDlgAct');
+    warn.innerHTML='';
+    warn.innerHTML+=`<div class="mi-note">成本歸屬部門：<b>${esc2(s.costDept||COST_DEPT)}</b>　成本歸屬者：<b>${esc2(s.costOwner||COST_OWNER)}</b>（可用下方按鈕修改）</div>`;
+    if(rc&&!rc.match)
+      warn.innerHTML+=`<div class="mi-note bad"><b>⚠ 與正式報銷表不符</b>，請先於上方對帳區確認差異再匯出。</div>`;
+    if(c.missingTail.length&&!rc){
+      warn.innerHTML+=`<div class="mi-note"><b>提醒</b>：本月 ${esc2(c.missingTail[0])} 之後尚無明細，匯出內容僅涵蓋已有日期，未自動補值。</div>`;
+    }
+    if(todo>0){
+      warn.innerHTML+=`<div class="mi-note bad"><b>⚠ 有 ${todo} 段未知路段</b>，里程留空未填 0。<br>為避免報銷金額錯誤，<b>已停用正式匯出</b>；如需檢視可匯出測試版（檔名標示未完成，不可用於報銷）。</div>`;
+      act.innerHTML=`<button class="mi-btn ghost" type="button" onclick="MI.dlgClose()">取消</button>`+
+                    `<button class="mi-btn" type="button" onclick="MI.doExport(true)">匯出測試版</button>`+
+                    `<button class="mi-btn primary" type="button" disabled>匯出正式報銷檔</button>`;
+    }else{
+      act.innerHTML=`<button class="mi-btn ghost" type="button" onclick="MI.dlgClose()">取消</button>`+
+                    `<button class="mi-btn ghost" type="button" onclick="MI.setCost()">修改成本歸屬</button>`+
+                    `<button class="mi-btn primary" type="button" onclick="MI.doExport(false)">匯出正式報銷檔</button>`;
+    }
+    const d=document.getElementById('miExportDlg');
+    if(d.showModal) d.showModal(); else d.setAttribute('open','');
+  }
+  // 依正式報銷表基準的路線逐段計算並產檔（本機巡店明細不足時使用；來源仍逐段可追溯）
+  function officialPlans(month){
+    const off=OFFICIAL[month]; if(!off) return null;
+    return off.rows.map(([d,place])=>dayPlan(d, place.split('/').map((n,i)=>({name:n,time:'',key:String(100+i)}))));
+  }
+  function dlgClose(){ const d=document.getElementById('miExportDlg'); if(d.close) d.close(); else d.removeAttribute('open'); }
+  function setCost(){
+    const s=store();
+    const dept=prompt('成本歸屬部門（依公司報銷表填寫）', s.costDept||COST_DEPT); if(dept===null) return;
+    const owner=prompt('成本歸屬者（依公司報銷表填寫）', s.costOwner||COST_OWNER); if(owner===null) return;
+    s.costDept=dept.trim(); s.costOwner=owner.trim(); save(s);
+    dlgClose(); exportConfirm();
+  }
+  function doExport(draft){
+    const {sheets,plans,total}=buildSheets(state.month);
+    const ym=state.month.replace('-','');
+    const name=draft?`北一二B_巡店車資報銷_${ym}_未完成請勿報銷.xls`:`北一二B_巡店車資報銷_${ym}.xls`;
+    downloadFareExcel(name,sheets);
+    if(!draft){
+      const s=store();
+      s.exportLog.push({month:state.month,at:new Date().toISOString(),days:plans.length,totalKm:total,fileName:name});
+      save(s);
+    }
+    dlgClose(); render();
+  }
+
+  return {render,setMonth,setDate,step,today,addLegPrompt,setLegKm,removeNode,setCost,
+          importPick,importFile,exportDetails,exportConfirm,doExport,dlgClose,
+          _reconcile:reconcile,_billable:billable,_officialPlans:officialPlans,OFFICIAL,
+          _days:days,_dayPlan:dayPlan,_monthPlans:monthPlans,_coverage:coverage,
+          _buildSheets:buildSheets,_normalize:normalize,_legFor:legFor,
+          _isOffice:isOffice,_store:store,NODES,DIST};
+})();
 
 </script>
 </body>

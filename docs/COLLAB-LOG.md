@@ -13,6 +13,28 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-07-30 ｜ Codex（巡店里程＋正式 GAS 七分頁安全整合，待 Liam 驗收）
+
+- 做了什麼：由最新 `origin/main` `f4de11f` 建立
+  `integration/patrol-mileage-gas7-20260730`；確認里程最終 commit `c5bf782`，只取其
+  `patrol.html`、`tests/patrol.spec.js` 與協作紀錄內容。另以 Apps Script 後台實測鎖定
+  4-trigger 專案 `17XfhB1cYOIWIyIm0_1mO1a9-ba-H4QCBJHX56bYHiEX06XSSG05FWtlg`，
+  完整備份正式 `程式碼.gs`、`appsscript.json`、第 19 版部署與 4 個觸發器；把線上第七分頁
+  `改善提醒與照片` 的 7 個獨有函式與 `sendWeeklyPatrolReport` 最小差異納入 repo，
+  未整份覆蓋任一正式專案。
+- 結果：Y2606 11 個報銷出差日／74.5 KM、6/15 4.4＋10.0＝14.4、油料 11 列、
+  距離明細 12 段與空白備註均通過；Node／GAS 契約 12/12、完整 Playwright 68/68。
+  里程 DOM 仍位於 P0 驗證後才建立的 template，所有頁籤共用 verified session。
+  `patrol.html` 正式 API 仍指向另一路第 21 版專案 `1SW9...`，URL 未改。
+- 經驗 / 給下一位的提醒：目前是兩個正式 Apps Script 角色，不可只看同名專案。
+  里程是純前端，不需要 GAS 新版；未經 Liam 驗收不得部署 Pages，也不得把 repo
+  `gas/Code.gs` 整份貼到任一專案。4-trigger 專案排程跑 editor HEAD，切回 Web App
+  第 19 版不會回滾觸發器程式；需用安全備份還原 HEAD。另因 Y2606 路線／公里數、
+  成本歸屬與車號預設值仍是 `patrol.html` 內的靜態 JavaScript，P0 DOM gate 無法阻止
+  view-source；Liam 尚未確認可公開或授權改由 verified token 後載入前，正式部署維持
+  blocked。詳見
+  `docs/PATROL_MILEAGE_GAS7_PREDEPLOY_20260730.md`。
+
 ## 2026-07-29 ｜ Codex（P0 Liam 情報站全站權限修復）
 
 - 做了什麼：由執行當下最新 `origin/main` 建立

@@ -97,6 +97,7 @@ test('新無痕頁面只建立全頁鎖定畫面，驗證前不載入敏感資�
   await expect(page.locator('#patrolAuthGate')).toBeVisible();
   await expect(page.locator('#patrolAppHost')).toBeEmpty();
   await expect(page.locator('#pasteBox')).toHaveCount(0);
+  await expect(page.locator('#mileageView')).toHaveCount(0);
   await expect(page.getByText('台北通化')).toHaveCount(0);
   expect(state.authCalls).toBe(0);
   expect(state.protectedCalls).toEqual([]);
@@ -152,6 +153,7 @@ test('正確密碼取得後端 token 後才建立看板並載入資料', async (
 
   await expect(page.locator('#patrolAuthGate')).toBeHidden();
   await expect(page.locator('#pasteBox')).toBeVisible();
+  await expect(page.locator('#mileageView')).toHaveCount(1);
   await expect(page.locator('#patrolAppHost #content')).toBeVisible();
   await expect(page.locator('#patrolAppHost #invPanels')).toContainText('通化');
   await expect.poll(() => state.protectedCalls.filter(call => call.action === 'ptread').length).toBe(1);
@@ -172,6 +174,7 @@ test('登出立即移除督導 DOM 與 session，重新載入後再次鎖定', a
 
   await expect(page.locator('#patrolAuthGate')).toBeVisible();
   await expect(page.locator('#patrolAppHost')).toBeEmpty();
+  await expect(page.locator('#mileageView')).toHaveCount(0);
   expect(await page.evaluate(() => sessionStorage.getItem('bei12b_pt_session_token'))).toBeNull();
   await page.reload();
   await expect(page.locator('#patrolAuthGate')).toBeVisible();

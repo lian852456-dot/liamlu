@@ -602,6 +602,150 @@ function ptDateOf(fillTime) {
   return m ? (Number(m[2]) + '/' + Number(m[3])) : '';
 }
 
+function weeklyHalfMediaItems(value) {
+  const text = String(value || '').trim();
+  if (!text) return [];
+  try {
+    const parsed = JSON.parse(text);
+    const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.media) ? parsed.media : []);
+    return list.filter(item => item && typeof item === 'object').map(item => ({
+      id: String(item.id || ''),
+      name: String(item.name || '附件'),
+      mimeType: String(item.mimeType || ''),
+      viewUrl: String(item.viewUrl || item.url || ''),
+      previewUrl: String(item.previewUrl || item.url || '')
+    }));
+  } catch (err) {
+    return [{ id: '', name: '既有附件', mimeType: '', viewUrl: text, previewUrl: text }];
+  }
+}
+
+function weeklyHalfResultLabel(result) {
+  return ({ ok:'符合', abnormal:'缺失／異常', na:'不適用' })[String(result || '')] || '待填';
+}
+
+function weeklyHalfPeriodLabel(period) {
+  return String(period || '') === 'H2' ? '下半月' : '上半月';
+}
+
+function weeklyReadHalfCheck() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheetName = '半月督導檢查';
+  const sh = ss.getSheetByName(sheetName) || ss.getSheets().find(sheet => {
+    return String(sheet.getName() || '').replace(/\u3000/g, ' ').trim() === sheetName;
+  });
+  if (!sh || sh.getLastRow() < 2) return [];
+  const data = sh.getDataRange().getValues();
+  const headers = data[0].map(value => String(value || '').replace(/\u3000/g, ' ').trim());
+  return data.slice(1).map(row => {
+    const item = {};
+    headers.forEach((header, index) => {
+      const value = row[index];
+      item[header] = value instanceof Date ? Utilities.formatDate(value, 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX") : value;
+    });
+    const periodText = String(item['檢查期別'] || '');
+    const itemMatch = String(item['項目'] || '').match(/^(\d+)/);
+    const result = ({ '符合':'ok', '缺失／異常':'abnormal', '不適用':'na' })[String(item['檢查結果'] || '')] || '';
+    return {
+      date: String(item['檢查日期'] || ''),
+      period: periodText.slice(-2),
+      month: periodText.slice(0, 7),
+      store: String(item['門市'] || ''),
+      inspector: String(item['督導'] || ''),
+      item: itemMatch ? Number(itemMatch[1]) : Number(item['項目'] || 0),
+      result: result,
+      note: String(item['缺失說明'] || ''),
+      improvement: String(item['改善措施'] || ''),
+      evidenceNames: String(item['證據檔案連結'] || ''),
+      savedAt: String(item['更新時間'] || item['建立時間'] || '')
+    };
+  }).filter(item => item.date || item.result || item.inspector);
+}
+
+function weeklyHalfPhotoBlob(media) {
+  if (!media.id || String(media.mimeType || '').indexOf('image/') !== 0) return null;
+  const file = DriveApp.getFileById(media.id);
+  let blob = file.getBlob();
+  const type = String(blob.getContentType() || media.mimeType || '').toLowerCase();
+  if (['image/jpeg', 'image/png', 'image/gif'].indexOf(type) === -1) {
+    blob = blob.getAs('image/jpeg').setName(String(media.name || 'photo') + '.jpg');
+  }
+  return blob;
+}
+
+function buildWeeklyHalfCheckTab(monthKey) {
+  const source = weeklyReadHalfCheck().filter(r => {
+    const month = String(r.month || String(r.date || '').slice(0, 7));
+    const item = Number(r.item || 0);
+    return month === monthKey && item >= 1 && item <= 18;
+  }).filter(r => String(r.note || '').trim() || String(r.improvement || '').trim() || weeklyHalfMediaItems(r.evidenceNames).length);
+
+  source.sort((a, b) => {
+    const ka = [a.date, a.store, Number(a.item || 0)].join('|');
+    const kb = [b.date, b.store, Number(b.item || 0)].join('|');
+    return ka < kb ? -1 : (ka > kb ? 1 : 0);
+  });
+
+  const rows = [[
+    '日期', '期別', '店點', '督導', '題號', '檢查內容', '結果',
+    '提醒／缺失內容', '改善說明', '照片', '私有附件連結', '最後更新'
+  ]];
+  const mediaJobs = [];
+  let photoCount = 0;
+
+  source.forEach(r => {
+    const media = weeklyHalfMediaItems(r.evidenceNames);
+    const items = media.length ? media : [null];
+    items.forEach(item => {
+      rows.push([
+        String(r.date || ''), weeklyHalfPeriodLabel(r.period), String(r.store || ''),
+        String(r.inspector || ''), Number(r.item || 0), PT_ITEM_TEXT[Number(r.item)] || '',
+        weeklyHalfResultLabel(r.result), String(r.note || ''), String(r.improvement || ''),
+        item ? String(item.name || '附件') : '—', item && (item.viewUrl || item.previewUrl) ? '開啟私有附件' : '—',
+        String(r.savedAt || '')
+      ]);
+      if (item) {
+        const row = rows.length;
+        const isPhoto = String(item.mimeType || '').indexOf('image/') === 0;
+        if (isPhoto) photoCount++;
+        mediaJobs.push({ row: row, media: item, isPhoto: isPhoto });
+      }
+    });
+  });
+
+  if (rows.length === 1) rows.push(['—', '—', '—', '—', '—', '本月尚無已填寫的提醒、改善或照片', '—', '—', '—', '—', '—', '—']);
+  return { rows: rows, mediaJobs: mediaJobs, sourceCount: source.length, photoCount: photoCount };
+}
+
+function formatWeeklyHalfCheckSheet(sheet, tab) {
+  const lastRow = tab.rows.length;
+  const lastCol = tab.rows[0].length;
+  sheet.setFrozenRows(1);
+  sheet.getRange(1, 1, lastRow, lastCol).setWrap(true).setVerticalAlignment('top');
+  sheet.getRange(1, 1, 1, lastCol).setFontWeight('bold').setBackground('#fce7d6');
+  [90, 75, 100, 85, 50, 240, 85, 240, 240, 150, 110, 160].forEach((width, index) => sheet.setColumnWidth(index + 1, width));
+
+  tab.mediaJobs.forEach(job => {
+    const media = job.media;
+    const link = String(media.viewUrl || media.previewUrl || '');
+    if (link) {
+      const rich = SpreadsheetApp.newRichTextValue().setText('開啟私有附件').setLinkUrl(link).build();
+      sheet.getRange(job.row, 11).setRichTextValue(rich);
+    }
+    if (!job.isPhoto) return;
+    try {
+      const blob = weeklyHalfPhotoBlob(media);
+      if (!blob) throw new Error('無法取得照片');
+      const image = sheet.insertImage(blob, 10, job.row);
+      image.setWidth(140).setHeight(100);
+      sheet.setRowHeight(job.row, 110);
+      sheet.getRange(job.row, 10).setValue('');
+    } catch (err) {
+      sheet.getRange(job.row, 10).setValue('照片嵌入失敗，請使用右側私有連結');
+    }
+  });
+}
+
 function sendWeeklyPatrolReport() {
   const tz = 'Asia/Taipei';
   const now = new Date();
@@ -704,11 +848,15 @@ function sendWeeklyPatrolReport() {
     tabAware.push([s.st.name, cnt + '/15', state, allDone ? monthNum + '/' + doneDay : '—']);
   });
 
-  // ── 產生暫存試算表（6個分頁）→ 匯出 xlsx → 寄出 → 刪除暫存 ──
+  // ── 分頁7：半月督導檢查的提醒、改善與照片 ──
+  const halfCheckTab = buildWeeklyHalfCheckTab(monthKey);
+
+  // ── 產生暫存試算表（7個分頁）→ 匯出 xlsx → 寄出 → 刪除暫存 ──
   const ss = SpreadsheetApp.create('巡店報告_' + dateStr);
   const tabs = [
     ['巡店紀錄', tabDetail], ['未巡店', tabNotVisited], ['上下半月2-13', tabHalf],
-    ['每月盤點14-17', tabMonthly], ['雙月全盤18', tab18], ['知悉20日前19-33', tabAware]
+    ['每月盤點14-17', tabMonthly], ['雙月全盤18', tab18], ['知悉20日前19-33', tabAware],
+    ['改善提醒與照片', halfCheckTab.rows]
   ];
   tabs.forEach((t, i) => {
     const sh = i === 0 ? ss.getSheets()[0] : ss.insertSheet();
@@ -717,6 +865,7 @@ function sendWeeklyPatrolReport() {
     const grid = t[1].map(r => r.concat(Array(w - r.length).fill('')));
     sh.getRange(1, 1, grid.length, w).setValues(grid);
     sh.setFrozenRows(1);
+    if (t[0] === '改善提醒與照片') formatWeeklyHalfCheckSheet(sh, halfCheckTab);
   });
   SpreadsheetApp.flush();
 
@@ -733,7 +882,8 @@ function sendWeeklyPatrolReport() {
     '・雙月全盤(18)本期 ' + winLabel + '：' + done18 + '/' + PT_STORES.length + ' 店\n' +
     '・知悉(19-33)全數勾核：' + doneAware + '/' + PT_STORES.length + ' 店' +
     (daysLeft >= 0 ? '（截止 ' + monthNum + '/20，剩 ' + daysLeft + ' 天）' : '（已逾 ' + monthNum + '/20 截止日）') + '\n\n' +
-    '各項明細請見夾檔 Excel 的六個分頁。\n' +
+    '・本月改善／提醒：' + halfCheckTab.sourceCount + ' 項；照片：' + halfCheckTab.photoCount + ' 張\n\n' +
+    '各項明細請見夾檔 Excel 的七個分頁；「改善提醒與照片」已直接嵌入照片並保留私有附件連結。\n' +
     '看板：https://lian852456-dot.github.io/liamlu/patrol.html';
   MailApp.sendEmail(NOTIFY_EMAIL, '📊 巡店週報 ' + dateStr + '｜' + PT_TITLE, body, { attachments: [blob] });
   DriveApp.getFileById(ss.getId()).setTrashed(true);
