@@ -1779,6 +1779,22 @@ const MI = (function(){
   // 三店以上、僅有當日總里程且無逐段依據者（僅備查，不入樣本庫）
   const DAY_TOTAL_ONLY=[];
 
+  // ---- 正式公司報銷表基準（對帳用，唯讀）----
+  // 2026-06：11 個報銷出差日、合計 74.5 KM。單店日不列入報銷，故不在此表。
+  const OFFICIAL={'2026-06':{days:11,km:74.5,rows:[
+    ['2026-06-03','台北三創/台北六張犁',4.5],
+    ['2026-06-04','台北酒泉/台北通化',8.5],
+    ['2026-06-05','台北三創/台北萬大',5.4],
+    ['2026-06-09','台北三創/台北復興南',3.5],
+    ['2026-06-15','台北三創/台北永吉/台北酒泉',14.4],
+    ['2026-06-16','台北酒泉/台北萬大',6.6],
+    ['2026-06-18','台北大稻埕/台北六張犁',7.7],
+    ['2026-06-22','台北永吉/台北復興南',6.5],
+    ['2026-06-23','台北酒泉/台北萬大',6.6],
+    ['2026-06-24','台北大稻埕/台北永吉',7.2],
+    ['2026-06-30','台北三創/台北通化',3.6]
+  ]}};
+
   let state={date:'', month:''};
 
   /* ---------- 人工資料層（localStorage，不觸碰 GAS／原始明細） ---------- */
@@ -1913,24 +1929,65 @@ const MI = (function(){
     renderCoverage(); renderStats(); renderAlerts(); renderTimeline(); renderSummary();
   }
 
+  // 與正式公司報銷表對帳
+  function reconcile(month){
+    const off=OFFICIAL[month]; if(!off) return null;
+    const mine=billable(monthPlans(month));
+    const mineBy={}; mine.forEach(p=>mineBy[p.date]={place:p.nodes.map(n=>n.name).join('/'),km:p.km});
+    const rows=off.rows.map(([d,place,km])=>{
+      const g=mineBy[d];
+      return {date:d, offPlace:place, offKm:km, gotPlace:g?g.place:null, gotKm:g?g.km:null,
+              ok: !!g && g.km===km && g.place===place,
+              kmOk: !!g && g.km===km};
+    });
+    const extra=mine.filter(p=>!off.rows.some(r=>r[0]===p.date)).map(p=>p.date);
+    const myKm=Math.round(mine.reduce((a,p)=>a+p.km,0)*10)/10;
+    return {off, rows, extra, mineDays:mine.length, myKm,
+            match: rows.every(r=>r.ok) && !extra.length && mine.length===off.days};
+  }
+
   function renderCoverage(){
-    const c=coverage(state.month), el=document.getElementById('miCoverage');
-    if(!c.have.length){ el.innerHTML=`<div class="mi-note">目前沒有 ${esc2(state.month)} 的巡店明細。請先在「巡店看板」貼上紀錄，或用上方「匯入巡店明細」載入存檔。</div>`; return; }
-    let h=`<div class="mi-note"><b>資料涵蓋日期</b>：${esc2(c.first)} ～ ${esc2(c.last)}（共 ${c.have.length} 個出差日）`;
-    if(c.missingTail.length) h+=`<br><b>缺少日期</b>：${esc2(c.missingTail[0])} ～ ${esc2(c.missingTail[c.missingTail.length-1])}（${c.missingTail.length} 天）——本月尚未有明細，<b>不會自動補值</b>，統計與匯出僅涵蓋上述已有日期。`;
-    return void(el.innerHTML=h+'</div>');
+    const el=document.getElementById('miCoverage'), rc=reconcile(state.month);
+    const all=monthPlans(state.month), bill=billable(all);
+    if(!all.length){ el.innerHTML=`<div class="mi-note">目前沒有 ${esc2(state.month)} 的巡店明細。請先在「巡店看板」貼上紀錄，或用上方「匯入巡店明細」載入存檔。</div>`; return; }
+    let h='';
+    if(rc){
+      const hit=rc.rows.filter(r=>r.ok).length, kmhit=rc.rows.filter(r=>r.kmOk).length;
+      const done=rc.match;
+      h+=`<div class="mi-note${done?'':' bad'}"><b>${esc2(state.month.replace('-','年 '))} 月</b>　`+
+         `正式出差日：<b>${rc.off.days} 天</b>　總里程：<b>${km1(rc.off.km)} KM</b>　`+
+         `對帳狀態：<b>${done?'✅ 符合正式報銷表':`⚠ ${hit}/${rc.off.days} 列完全相符（里程相符 ${kmhit}/${rc.off.days}）`}</b>`;
+      if(!done){
+        const bad=rc.rows.filter(r=>!r.ok);
+        h+='<ul>'+bad.map(r=>{
+          if(r.gotKm==null) return `<li>${esc2(r.date)}　正式表 ${esc2(r.offPlace)} ${km1(r.offKm)} KM——本機巡店明細無此日資料</li>`;
+          if(!r.kmOk) return `<li>${esc2(r.date)}　里程不符：正式表 ${km1(r.offKm)} / 本機 ${km1(r.gotKm)}</li>`;
+          return `<li>${esc2(r.date)}　地點不符：正式表「${esc2(r.offPlace)}」/ 巡店明細「${esc2(r.gotPlace)}」（里程同為 ${km1(r.offKm)} KM）</li>`;
+        }).join('')+
+        (rc.extra.length?`<li>本機多出未列於正式表的日期：${rc.extra.map(esc2).join('、')}</li>`:'')+
+        '</ul>';
+      }
+      h+=`<br>本機推導：${rc.mineDays} 個報銷日、${km1(rc.myKm)} KM（另有 ${all.length-bill.length} 個單店 0 KM 日，不列入報銷）</div>`;
+    }else{
+      const c=coverage(state.month);
+      h+=`<div class="mi-note"><b>資料涵蓋日期</b>：${esc2(c.first)} ～ ${esc2(c.last)}　`+
+         `報銷出差日 <b>${bill.length} 天</b>、合計 <b>${km1(Math.round(bill.reduce((a,p)=>a+p.km,0)*10)/10)} KM</b>`+
+         `（另有 ${all.length-bill.length} 個單店 0 KM 日，不列入報銷）<br>`+
+         `本月無正式報銷表基準可對帳；統計僅涵蓋現有明細，<b>不會自動補值</b>。</div>`;
+    }
+    el.innerHTML=h;
   }
 
   function renderStats(){
     const D=days(), today=D[state.date]||[], plan=today.length?dayPlan(state.date,today):null;
-    const plans=monthPlans(state.month);
-    const monthKm=plans.reduce((a,p)=>a+(p.km||0),0);
+    const plans=monthPlans(state.month), bill=billable(plans);
+    const monthKm=Math.round(bill.reduce((a,p)=>a+p.km,0)*10)/10;
     const todoCnt=plans.reduce((a,p)=>a+p.todo.length,0);
     const card=(k,v,u,s,warn)=>`<div class="mi-card${warn?' warn':''}"><div class="k">${k}</div><div class="v">${v}<span class="u">${u||''}</span></div><div class="s">${s||''}</div></div>`;
     document.getElementById('miStats').innerHTML=
       card('今日巡店數', plan?plan.storeCount:0, '店', esc2(state.date)+(plan&&plan.nodes.length>plan.storeCount?'（含特殊地點）':''))+
-      card('今日總公里', plan?km1(plan.km):'—', 'KM', plan&&plan.km==null?'有待查路段':'')+
-      card('本月累積公里', km1(Math.round(monthKm*10)/10), 'KM', plans.length+' 個出差日')+
+      card('今日總公里', plan?km1(plan.km):'—', 'KM', plan&&plan.km===0?'單店，不列入報銷':(plan&&plan.km==null?'有待查路段':''))+
+      card('本月累積公里', km1(monthKm), 'KM', bill.length+' 個報銷出差日')+
       card('待確認路段', todoCnt, '段', todoCnt?'需人工補距離':'全數有來源', todoCnt>0);
   }
 
@@ -1966,14 +2023,16 @@ const MI = (function(){
   function renderSummary(){
     const plans=monthPlans(state.month), el=document.getElementById('miSummary');
     if(!plans.length){ el.innerHTML=`<tr><td class="mi-empty">本月無資料</td></tr>`; return; }
+    const bill=billable(plans);
     const max=Math.max.apply(null,plans.map(p=>p.km||0))||1;
-    let tot=0, rows='';
+    let rows='';
     plans.forEach(p=>{
-      tot+=p.km||0;
       const w=Math.round(((p.km||0)/max)*100);
-      rows+=`<tr class="${p.todo.length?'todo':''}"><td>${esc2(p.date)}</td><td class="num">${p.storeCount}</td><td>${esc2(p.nodes.map(n=>n.name).join('/'))}</td><td class="num">${km1(p.km)}</td><td><div class="mi-bar" style="width:${w}%"></div></td><td>${esc2(p.note)}</td></tr>`;
+      const nb=(p.km===0);
+      rows+=`<tr class="${p.todo.length?'todo':''}"><td>${esc2(p.date)}</td><td class="num">${p.storeCount}</td><td>${esc2(p.nodes.map(n=>n.name).join('/'))}</td><td class="num">${km1(p.km)}</td><td><div class="mi-bar" style="width:${w}%"></div></td><td>${esc2(p.note)}${nb?'<span class="mi-tag todo">不列入報銷</span>':''}</td></tr>`;
     });
-    el.innerHTML=`<thead><tr><th>日期</th><th>巡店數</th><th>出差地點</th><th>公里</th><th>趨勢</th><th>備註</th></tr></thead><tbody>${rows}<tr class="tot"><td>合計</td><td class="num">—</td><td>${plans.length} 個出差日</td><td class="num">${km1(Math.round(tot*10)/10)}</td><td></td><td>${(store().exportLog||[]).some(x=>x.month===state.month)?'已匯出':'尚未匯出'}</td></tr></tbody>`;
+    const tot=Math.round(bill.reduce((a,p)=>a+p.km,0)*10)/10;
+    el.innerHTML=`<thead><tr><th>日期</th><th>巡店數</th><th>出差地點</th><th>公里</th><th>趨勢</th><th>備註</th></tr></thead><tbody>${rows}<tr class="tot"><td>合計</td><td class="num">—</td><td>${bill.length} 個報銷出差日</td><td class="num">${km1(tot)}</td><td></td><td>${(store().exportLog||[]).some(x=>x.month===state.month)?'已匯出':'尚未匯出'}</td></tr></tbody>`;
   }
 
   /* ---------- 日期／月份切換 ---------- */
@@ -2054,57 +2113,73 @@ const MI = (function(){
   }
 
   /* ---------- 匯出公司報銷 Excel ---------- */
-  // 版面規格取自受控版 Y2606月車資.xls：字型 微軟正黑體；油料欄寬 24/24/48/14/21/18/18、
-  // 明細欄寬 12/18/18/14/42/28；明細首列 A1:F1 合併；A4 直向 100% fit 1x1、
-  // 邊界 左右 0.3" 上 0.61" 下 0.37"、頁首頁尾 0.3"。
-  const FARE_COLW=[24,24,48,14,21,18,18], DETAIL_COLW=[12,18,18,14,42,28];
+  // 欄位依公司正式報銷表（9 欄）。版面規格取自受控版 Y2606月車資.xls：
+  // 字型 微軟正黑體；A4 直向 100% fit 1x1、邊界 左右 0.3" 上 0.61" 下 0.37"、頁首頁尾 0.3"。
+  const FARE_COLW=[18,18,24,24,48,14,21,18,18], DETAIL_COLW=[12,18,18,14,12,42,14];
   // 欄名含換行，與受控版逐字一致（FareHeader 樣式已設 WrapText）
-  const HEAD_FARE=['出差日期\n(起)','出差日期\n(迄)','出差地點','事由及\n洽訪目標','油料補助\n里程數(KM)','車號','備註'];
-  const HEAD_DETAIL=['日期','起點','迄點','騎車距離(KM)','來源','備註'];
+  const HEAD_FARE=['成本歸屬部門','成本歸屬者','出差日期\n(起)','出差日期\n(迄)','出差地點',
+                   '事由及\n洽訪目標','油料補助\n里程數(KM)','車號','備註'];
+  const HEAD_DETAIL=['日期','起點','迄點','騎車距離(KM)','巡店順序','距離來源','驗證狀態'];
+  const VERIFY_TEXT={verified:'已驗證',observed:'歷史觀測',manual:'人工確認'};
+
+  // 只有實際產生里程的日子才進正式報銷表；單店 0 KM 日不列入（與公司報銷表一致）
+  function billable(plans){ return plans.filter(p=>p.km!=null && p.km>0); }
 
   function buildSheets(month){
-    const plans=monthPlans(month);
+    const all=monthPlans(month), plans=billable(all);
+    const s=store();
+    const dept=s.costDept||'', owner=s.costOwner||'';
     const fare=[HEAD_FARE.map(h=>excelCell(h,'FareHeader'))];
     const detail=[[excelCell(month.replace('-','').replace(/^20/,'Y')+' 月車資距離計算明細','FareTitle')],
                   HEAD_DETAIL.map(h=>excelCell(h,'FareHeader'))];
     let tot=0;
     plans.forEach(p=>{
-      tot+=p.km||0;
-      fare.push([excelCell(p.date,'FareDate'),excelCell(p.date,'FareDate'),excelCell(p.nodes.map(n=>n.name).join('/'),'FareCell'),
-                 excelCell(PURPOSE,'FareCell'),
-                 p.km==null?excelCell('','FareNum'):excelCell(p.km,'FareNum'),
-                 excelCell(PLATE,'FareCell'),excelCell(p.note,'FareCell')]);
-      if(p.nodes.length>=2) p.legs.forEach(L=>{
+      tot+=p.km;
+      // 油料工作表只填當日加總里程；備註依公司格式留白
+      fare.push([excelCell(dept,'FareCell'),excelCell(owner,'FareCell'),
+                 excelCell(p.date,'FareDate'),excelCell(p.date,'FareDate'),
+                 excelCell(p.nodes.map(n=>n.name).join('/'),'FareCell'),
+                 excelCell(PURPOSE,'FareCell'),excelCell(p.km,'FareNum'),
+                 excelCell(PLATE,'FareCell'),excelCell('','FareCell')]);
+      // 逐段計算全部放在距離計算明細
+      p.legs.forEach((L,i)=>{
         detail.push([excelCell(p.date,'FareDate'),excelCell(L.from,'FareCell'),excelCell(L.to,'FareCell'),
                      L.km==null?excelCell('','FareNum'):excelCell(L.km,'FareNum'),
+                     excelCell('第 '+(i+1)+' 段','FareDate'),
                      excelCell(L.km==null?'（待查，無歷史同路線範例）':(L.source||''),'FareCell'),
-                     excelCell(p.totalOnly&&L.km==null?'待補路段明細':LEG_NOTE,'FareCell')]);
+                     excelCell(L.km==null?'待查':(VERIFY_TEXT[L.verify]||''),'FareDate')]);
       });
     });
     detail.push([]);
     detail.push([excelCell('全月出差日','FareHeader'),excelCell(plans.length,'FareNum')]);
     detail.push([excelCell('全月油料里程合計','FareHeader'),excelCell(Math.round(tot*10)/10,'FareNum')]);
     return {sheets:[{name:'油料',rows:fare,cols:FARE_COLW},
-                    {name:'距離計算明細',rows:detail,cols:DETAIL_COLW,merges:[{row:0,col:0,across:5}]}],
-            plans, total:Math.round(tot*10)/10};
+                    {name:'距離計算明細',rows:detail,cols:DETAIL_COLW,merges:[{row:0,col:0,across:6}]}],
+            plans, all, total:Math.round(tot*10)/10};
   }
 
   function exportConfirm(){
-    const {plans,total}=buildSheets(state.month);
-    const todo=plans.reduce((a,p)=>a+p.todo.length,0);
-    const bad=plans.filter(p=>p.km==null).length;
-    const c=coverage(state.month);
+    const {plans,all,total}=buildSheets(state.month);
+    const todo=all.reduce((a,p)=>a+p.todo.length,0);
+    const bad=all.filter(p=>p.km==null).length;
+    const c=coverage(state.month), rc=reconcile(state.month), s=store();
     document.getElementById('miDlgList').innerHTML=
       `<dt>匯出月份</dt><dd>${esc2(state.month)}</dd>`+
       `<dt>資料涵蓋日期</dt><dd>${c.first?esc2(c.first)+' ～ '+esc2(c.last):'—'}</dd>`+
       `<dt>出差日數</dt><dd>${plans.length} 天</dd>`+
       `<dt>總公里數</dt><dd>${km1(total)} KM</dd>`+
       `<dt>待查路段數</dt><dd>${todo} 段</dd>`+
-      `<dt>異常資料數</dt><dd>${bad} 筆</dd>`;
+      `<dt>異常資料數</dt><dd>${bad} 筆</dd>`+
+      (rc?`<dt>對帳正式報銷表</dt><dd>${rc.match?'✅ 相符':'⚠ 不符（'+rc.off.days+' 天 / '+km1(rc.off.km)+' KM）'}</dd>`:'');
     const warn=document.getElementById('miDlgWarn'), act=document.getElementById('miDlgAct');
-    if(c.missingTail.length){
-      warn.innerHTML=`<div class="mi-note"><b>提醒</b>：本月 ${esc2(c.missingTail[0])} 之後尚無明細，匯出內容僅涵蓋已有日期，未自動補值。</div>`;
-    }else warn.innerHTML='';
+    warn.innerHTML='';
+    if(!s.costDept||!s.costOwner)
+      warn.innerHTML+=`<div class="mi-note"><b>成本歸屬部門／成本歸屬者尚未填寫</b>，匯出後這兩欄會留白，需人工補。點下方「填寫成本歸屬」可先設定。</div>`;
+    if(rc&&!rc.match)
+      warn.innerHTML+=`<div class="mi-note bad"><b>⚠ 與正式報銷表不符</b>，請先於上方對帳區確認差異再匯出。</div>`;
+    if(c.missingTail.length&&!rc){
+      warn.innerHTML+=`<div class="mi-note"><b>提醒</b>：本月 ${esc2(c.missingTail[0])} 之後尚無明細，匯出內容僅涵蓋已有日期，未自動補值。</div>`;
+    }
     if(todo>0){
       warn.innerHTML+=`<div class="mi-note bad"><b>⚠ 有 ${todo} 段未知路段</b>，里程留空未填 0。<br>為避免報銷金額錯誤，<b>已停用正式匯出</b>；如需檢視可匯出測試版（檔名標示未完成，不可用於報銷）。</div>`;
       act.innerHTML=`<button class="mi-btn ghost" type="button" onclick="MI.dlgClose()">取消</button>`+
@@ -2112,12 +2187,20 @@ const MI = (function(){
                     `<button class="mi-btn primary" type="button" disabled>匯出正式報銷檔</button>`;
     }else{
       act.innerHTML=`<button class="mi-btn ghost" type="button" onclick="MI.dlgClose()">取消</button>`+
+                    `<button class="mi-btn ghost" type="button" onclick="MI.setCost()">填寫成本歸屬</button>`+
                     `<button class="mi-btn primary" type="button" onclick="MI.doExport(false)">匯出正式報銷檔</button>`;
     }
     const d=document.getElementById('miExportDlg');
     if(d.showModal) d.showModal(); else d.setAttribute('open','');
   }
   function dlgClose(){ const d=document.getElementById('miExportDlg'); if(d.close) d.close(); else d.removeAttribute('open'); }
+  function setCost(){
+    const s=store();
+    const dept=prompt('成本歸屬部門（依公司報銷表填寫）', s.costDept||''); if(dept===null) return;
+    const owner=prompt('成本歸屬者（依公司報銷表填寫）', s.costOwner||''); if(owner===null) return;
+    s.costDept=dept.trim(); s.costOwner=owner.trim(); save(s);
+    dlgClose(); exportConfirm();
+  }
   function doExport(draft){
     const {sheets,plans,total}=buildSheets(state.month);
     const ym=state.month.replace('-','');
@@ -2131,8 +2214,9 @@ const MI = (function(){
     dlgClose(); render();
   }
 
-  return {render,setMonth,setDate,step,today,addLegPrompt,setLegKm,removeNode,
+  return {render,setMonth,setDate,step,today,addLegPrompt,setLegKm,removeNode,setCost,
           importPick,importFile,exportDetails,exportConfirm,doExport,dlgClose,
+          _reconcile:reconcile,_billable:billable,OFFICIAL,
           _days:days,_dayPlan:dayPlan,_monthPlans:monthPlans,_coverage:coverage,
           _buildSheets:buildSheets,_normalize:normalize,_legFor:legFor,
           _isOffice:isOffice,_store:store,NODES,DIST};

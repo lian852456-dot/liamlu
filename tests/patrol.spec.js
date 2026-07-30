@@ -615,15 +615,72 @@ test('Excel 產出「油料」與「距離計算明細」兩張工作表，欄�
     };
   });
   expect(r.names).toEqual(['油料', '距離計算明細']);
-  // 欄名含換行，與受控版 Y2606月車資.xls 逐字一致
-  expect(r.fareHead).toEqual(['出差日期\n(起)', '出差日期\n(迄)', '出差地點', '事由及\n洽訪目標', '油料補助\n里程數(KM)', '車號', '備註']);
-  expect(r.detailHead).toEqual(['日期', '起點', '迄點', '騎車距離(KM)', '來源', '備註']);
-  expect(r.row1).toEqual(['2026-06-01', '2026-06-01', '台北酒泉', '巡店', 0, 'NAS-9666', '單店，不計油料里程']);
+  // 9 欄，依公司正式報銷表；欄名含換行
+  expect(r.fareHead).toEqual(['成本歸屬部門', '成本歸屬者', '出差日期\n(起)', '出差日期\n(迄)', '出差地點',
+    '事由及\n洽訪目標', '油料補助\n里程數(KM)', '車號', '備註']);
+  expect(r.detailHead).toEqual(['日期', '起點', '迄點', '騎車距離(KM)', '巡店順序', '距離來源', '驗證狀態']);
+  // 單店 0 KM 日不列入正式報銷表，首列為 6/3；備註留白
+  expect(r.row1).toEqual(['', '', '2026-06-03', '2026-06-03', '台北三創/台北六張犁', '巡店', 4.5, 'NAS-9666', '']);
   expect(r.tail[0][0]).toBe('全月出差日');
   expect(r.tail[1][0]).toBe('全月油料里程合計');
-  expect(r.cols).toEqual([[24, 24, 48, 14, 21, 18, 18], [12, 18, 18, 14, 42, 28]]);
-  expect(r.merges).toEqual([{ row: 0, col: 0, across: 5 }]);
+  expect(r.cols).toEqual([[18, 18, 24, 24, 48, 14, 21, 18, 18], [12, 18, 18, 14, 12, 42, 14]]);
+  expect(r.merges).toEqual([{ row: 0, col: 0, across: 6 }]);
   expect(r.total).toBe(57.1);
+});
+
+test('單店 0 KM 日不列入正式報銷表，但仍顯示於畫面', async ({ page }) => {
+  await openMileage(page);
+  const r = await page.evaluate(() => {
+    const all = MI._monthPlans('2026-06'), bill = MI._billable(all);
+    const b = MI._buildSheets('2026-06');
+    const val = c => (c && typeof c === 'object' && 'value' in c) ? c.value : c;
+    return {
+      allDays: all.length, billDays: bill.length,
+      zeroDays: all.filter(p => p.km === 0).map(p => p.date),
+      fareDates: b.sheets[0].rows.slice(1).map(r => val(r[2])),
+    };
+  });
+  expect(r.allDays).toBe(12);                 // 畫面仍看得到 12 天
+  expect(r.billDays).toBe(8);                 // 其中 8 天可報銷
+  expect(r.zeroDays).toEqual(['2026-06-01', '2026-06-02', '2026-06-08', '2026-06-10']);
+  r.zeroDays.forEach(d => expect(r.fareDates).not.toContain(d));
+  await expect(page.locator('#miSummary')).toContainText('不列入報銷');
+  await expect(page.locator('#miSummary')).toContainText('8 個報銷出差日');
+});
+
+test('與正式報銷表對帳：11 天／74.5 KM 為基準', async ({ page }) => {
+  await openMileage(page);
+  const off = await page.evaluate(() => MI.OFFICIAL['2026-06']);
+  expect(off.days).toBe(11);
+  expect(off.km).toBe(74.5);
+  expect(Math.round(off.rows.reduce((a, r) => a + r[2], 0) * 10) / 10).toBe(74.5);
+  // 逐日把正式報銷表的路線餵進計算引擎，驗證逐段加總可還原官方里程
+  const rep = await page.evaluate(() => MI.OFFICIAL['2026-06'].rows.map(([d, place, km]) => {
+    const nodes = place.split('/').map((n, i) => ({ name: n, time: `${10 + i}:00`, key: `${10 + i}00` }));
+    const p = MI._dayPlan(d, nodes);
+    return { date: d, place, offKm: km, gotKm: p.km, legs: p.legs.map(l => l.km) };
+  }));
+  const ok = rep.filter(r => r.gotKm === r.offKm);
+  const bad = rep.filter(r => r.gotKm !== r.offKm);
+  expect(ok).toHaveLength(10);
+  // 唯一不符者為 6/22：正式表寫「台北永吉/台北復興南」，該路段十個月車資皆無觀測；
+  // 巡店明細與 Y2606月車資.xls 均為「台北大稻埕/台北復興南」＝6.5 KM。待人工裁示，不猜測。
+  expect(bad).toHaveLength(1);
+  expect(bad[0].date).toBe('2026-06-22');
+  expect(bad[0].gotKm).toBeNull();
+  // 6/15 三店：逐段加總 4.4 + 10.0 = 14.4，非平均
+  const d15 = rep.find(r => r.date === '2026-06-15');
+  expect(d15.legs).toEqual([4.4, 10]);
+  expect(d15.gotKm).toBe(14.4);
+});
+
+test('對帳面板顯示正式基準與差異，不再出現 18 天', async ({ page }) => {
+  await openMileage(page);
+  const cov = page.locator('#miCoverage');
+  await expect(cov).toContainText('正式出差日：11 天');
+  await expect(cov).toContainText('74.5 KM');
+  await expect(cov).not.toContainText('18 天');
+  await expect(cov).toContainText('單店 0 KM 日，不列入報銷');
 });
 
 test('待查路段存在時不得產生正式報銷檔，只能匯出標示未完成的測試版', async ({ page }) => {
@@ -668,6 +725,7 @@ test('無待查路段時可匯出正式報銷檔，檔名不帶測試標記', as
   expect(out.file).toBe('北一二B_巡店車資報銷_202606.xls');
   expect(out.file).not.toContain('未完成');
   expect(out.log[0].totalKm).toBe(57.1);
+  expect(out.log[0].days).toBe(8);   // 12 天中 8 天可報銷
 });
 
 test('人工修改只寫入里程資料層，不改寫原始巡店紀錄', async ({ page }) => {
@@ -693,8 +751,7 @@ test('資料涵蓋日期與缺少日期會明確提示，不自動補值', async
   expect(cov.have).toHaveLength(12);
   expect(cov.missingTail[0]).toBe('2026-06-23');
   expect(cov.missingTail[cov.missingTail.length - 1]).toBe('2026-06-30');
-  await expect(page.locator('#miCoverage')).toContainText('2026-06-01 ～ 2026-06-22');
-  await expect(page.locator('#miCoverage')).toContainText('不會自動補值');
+  await expect(page.locator('#miCoverage')).toContainText('正式出差日：11 天');
   // 未涵蓋日期不得憑空出現在彙整
   const plans = await page.evaluate(() => MI._monthPlans('2026-06').map(p => p.date));
   expect(plans).not.toContain('2026-06-23');
