@@ -48,6 +48,8 @@ repo 永遠只放 `CHANGE_ME` 佔位字**——貼 Code.gs 進 GAS 後，記得�
 Codex 私有戰情同一套員編＋裝置綁定授權（GAS `kpicalc_access`），資料存私有 Drive
 `north12b-kpicalc-private-latest.json`。**每日更新全自動**：GAS `kpiCalcAutoUpdate()`
 時間觸發器每天 11:00 掃日報資料夾（檔名 `MMDD.xlsx`）自動解析發佈＋email 通知
+（⚠️ `.atHour(11)` 沒有 `.nearMinute()`，GAS 會在 **11:00–12:00 任意時間**觸發，實測穩定
+落在 **11:51**；查當天結果請等台北 12:00 後，別在 11:20 就判定失敗——已誤判過一次）
 （啟用需 Drive API v3 服務＋執行 `setupKpiCalcAutoUpdate()`）；手動備援走 kpi.html
 進階「督導發佈區」上傳 JSON（`kpicalc_publish`，管理者密碼）。localStorage 鍵：
 `bei12b_kpi_v1`（試算輸入）、`bei12b_kpi_emp`（員編）；裝置 ID 與戰情共用。
