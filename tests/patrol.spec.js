@@ -620,7 +620,8 @@ test('Excel 產出「油料」與「距離計算明細」兩張工作表，欄�
     '事由及\n洽訪目標', '油料補助\n里程數(KM)', '車號', '備註']);
   expect(r.detailHead).toEqual(['日期', '起點', '迄點', '騎車距離(KM)', '巡店順序', '距離來源', '驗證狀態']);
   // 單店 0 KM 日不列入正式報銷表，首列為 6/3；備註留白
-  expect(r.row1).toEqual(['', '', '2026-06-03', '2026-06-03', '台北三創/台北六張犁', '巡店', 4.5, 'NAS-9666', '']);
+  // 成本歸屬與日期格式依 2026-06 公司正式報銷表；備註留白
+  expect(r.row1).toEqual(['北一二區直營部', '盧蔚榮', '2026/6/3', '2026/6/3', '台北三創/台北六張犁', '巡店', 4.5, 'NAS-9666', '']);
   expect(r.tail[0][0]).toBe('全月出差日');
   expect(r.tail[1][0]).toBe('全月油料里程合計');
   expect(r.cols).toEqual([[18, 18, 24, 24, 48, 14, 21, 18, 18], [12, 18, 18, 14, 12, 42, 14]]);
@@ -661,13 +662,8 @@ test('與正式報銷表對帳：11 天／74.5 KM 為基準', async ({ page }) =
     return { date: d, place, offKm: km, gotKm: p.km, legs: p.legs.map(l => l.km) };
   }));
   const ok = rep.filter(r => r.gotKm === r.offKm);
-  const bad = rep.filter(r => r.gotKm !== r.offKm);
-  expect(ok).toHaveLength(10);
-  // 唯一不符者為 6/22：正式表寫「台北永吉/台北復興南」，該路段十個月車資皆無觀測；
-  // 巡店明細與 Y2606月車資.xls 均為「台北大稻埕/台北復興南」＝6.5 KM。待人工裁示，不猜測。
-  expect(bad).toHaveLength(1);
-  expect(bad[0].date).toBe('2026-06-22');
-  expect(bad[0].gotKm).toBeNull();
+  expect(ok).toHaveLength(11);            // 11/11 逐日相符
+  expect(Math.round(rep.reduce((a, r) => a + r.gotKm, 0) * 10) / 10).toBe(74.5);
   // 6/15 三店：逐段加總 4.4 + 10.0 = 14.4，非平均
   const d15 = rep.find(r => r.date === '2026-06-15');
   expect(d15.legs).toEqual([4.4, 10]);
@@ -681,6 +677,9 @@ test('對帳面板顯示正式基準與差異，不再出現 18 天', async ({ p
   await expect(cov).toContainText('74.5 KM');
   await expect(cov).not.toContainText('18 天');
   await expect(cov).toContainText('單店 0 KM 日，不列入報銷');
+  // 6/22 依正式報銷表照片為台北大稻埕，與巡店明細一致
+  const off22 = await page.evaluate(() => MI.OFFICIAL['2026-06'].rows.find(r => r[0] === '2026-06-22'));
+  expect(off22[1]).toBe('台北大稻埕/台北復興南');
 });
 
 test('待查路段存在時不得產生正式報銷檔，只能匯出標示未完成的測試版', async ({ page }) => {

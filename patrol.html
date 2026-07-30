@@ -1494,12 +1494,12 @@ function fareExcelXml(sheets){
   const ns='urn:schemas-microsoft-com:office:spreadsheet';
   const B='<Borders>'+['Top','Bottom','Left','Right'].map(p=>`<Border ss:Position="${p}" ss:LineStyle="Continuous" ss:Weight="1"/>`).join('')+'</Borders>';
   const styles=
-    `<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Font ss:FontName="微軟正黑體" ss:Size="10"/></Style>`+
+    `<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Font ss:FontName="微軟正黑體" ss:Size="14"/></Style>`+
     `<Style ss:ID="FareTitle"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Font ss:FontName="微軟正黑體" ss:Size="12" ss:Bold="1"/></Style>`+
-    `<Style ss:ID="FareHeader"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="微軟正黑體" ss:Size="10" ss:Bold="1"/>${B}</Style>`+
-    `<Style ss:ID="FareCell"><Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="微軟正黑體" ss:Size="10"/>${B}</Style>`+
-    `<Style ss:ID="FareDate"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="微軟正黑體" ss:Size="10"/>${B}</Style>`+
-    `<Style ss:ID="FareNum"><Alignment ss:Horizontal="Right" ss:Vertical="Center"/><Font ss:FontName="微軟正黑體" ss:Size="10"/>${B}</Style>`;
+    `<Style ss:ID="FareHeader"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="微軟正黑體" ss:Size="14" ss:Bold="1"/>${B}</Style>`+
+    `<Style ss:ID="FareCell"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="微軟正黑體" ss:Size="14"/>${B}</Style>`+
+    `<Style ss:ID="FareDate"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="微軟正黑體" ss:Size="14"/>${B}</Style>`+
+    `<Style ss:ID="FareNum"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="微軟正黑體" ss:Size="14"/>${B}</Style>`;
   const opts='<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">'+
     '<PageSetup><Layout x:Orientation="Portrait" xmlns:x="urn:schemas-microsoft-com:office:excel"/>'+
     '<PageMargins x:Bottom="0.37" x:Left="0.3" x:Right="0.3" x:Top="0.61" xmlns:x="urn:schemas-microsoft-com:office:excel"/></PageSetup>'+
@@ -1725,6 +1725,8 @@ if(GAS_URL){
 const MI = (function(){
   const LS = 'bei12b_mileage_v1';
   const PLATE='NAS-9666', PURPOSE='巡店';
+  // 依 2026-06 公司正式報銷表 A/B 欄
+  const COST_DEPT='北一二區直營部', COST_OWNER='盧蔚榮';
   const SINGLE_NOTE='單店，不計油料里程';
   const LEG_NOTE='同日多店依到店時間逐段加總';
 
@@ -1789,7 +1791,7 @@ const MI = (function(){
     ['2026-06-15','台北三創/台北永吉/台北酒泉',14.4],
     ['2026-06-16','台北酒泉/台北萬大',6.6],
     ['2026-06-18','台北大稻埕/台北六張犁',7.7],
-    ['2026-06-22','台北永吉/台北復興南',6.5],
+    ['2026-06-22','台北大稻埕/台北復興南',6.5],
     ['2026-06-23','台北酒泉/台北萬大',6.6],
     ['2026-06-24','台北大稻埕/台北永吉',7.2],
     ['2026-06-30','台北三創/台北通化',3.6]
@@ -2121,14 +2123,17 @@ const MI = (function(){
                    '事由及\n洽訪目標','油料補助\n里程數(KM)','車號','備註'];
   const HEAD_DETAIL=['日期','起點','迄點','騎車距離(KM)','巡店順序','距離來源','驗證狀態'];
   const VERIFY_TEXT={verified:'已驗證',observed:'歷史觀測',manual:'人工確認'};
+  // 正式報銷表日期格式為 2026/6/3（斜線、月日不補零）
+  const fareDate=d=>{const [y,m,dd]=d.split('-');return `${y}/${+m}/${+dd}`;};
 
   // 只有實際產生里程的日子才進正式報銷表；單店 0 KM 日不列入（與公司報銷表一致）
   function billable(plans){ return plans.filter(p=>p.km!=null && p.km>0); }
 
-  function buildSheets(month){
-    const all=monthPlans(month), plans=billable(all);
+  // plansOverride：可直接餵入既有的每日結果（例如以正式報銷表路線產檔／對帳）
+  function buildSheets(month, plansOverride){
+    const all=plansOverride||monthPlans(month), plans=billable(all);
     const s=store();
-    const dept=s.costDept||'', owner=s.costOwner||'';
+    const dept=s.costDept||COST_DEPT, owner=s.costOwner||COST_OWNER;
     const fare=[HEAD_FARE.map(h=>excelCell(h,'FareHeader'))];
     const detail=[[excelCell(month.replace('-','').replace(/^20/,'Y')+' 月車資距離計算明細','FareTitle')],
                   HEAD_DETAIL.map(h=>excelCell(h,'FareHeader'))];
@@ -2137,13 +2142,13 @@ const MI = (function(){
       tot+=p.km;
       // 油料工作表只填當日加總里程；備註依公司格式留白
       fare.push([excelCell(dept,'FareCell'),excelCell(owner,'FareCell'),
-                 excelCell(p.date,'FareDate'),excelCell(p.date,'FareDate'),
+                 excelCell(fareDate(p.date),'FareDate'),excelCell(fareDate(p.date),'FareDate'),
                  excelCell(p.nodes.map(n=>n.name).join('/'),'FareCell'),
                  excelCell(PURPOSE,'FareCell'),excelCell(p.km,'FareNum'),
                  excelCell(PLATE,'FareCell'),excelCell('','FareCell')]);
       // 逐段計算全部放在距離計算明細
       p.legs.forEach((L,i)=>{
-        detail.push([excelCell(p.date,'FareDate'),excelCell(L.from,'FareCell'),excelCell(L.to,'FareCell'),
+        detail.push([excelCell(fareDate(p.date),'FareDate'),excelCell(L.from,'FareCell'),excelCell(L.to,'FareCell'),
                      L.km==null?excelCell('','FareNum'):excelCell(L.km,'FareNum'),
                      excelCell('第 '+(i+1)+' 段','FareDate'),
                      excelCell(L.km==null?'（待查，無歷史同路線範例）':(L.source||''),'FareCell'),
@@ -2173,8 +2178,7 @@ const MI = (function(){
       (rc?`<dt>對帳正式報銷表</dt><dd>${rc.match?'✅ 相符':'⚠ 不符（'+rc.off.days+' 天 / '+km1(rc.off.km)+' KM）'}</dd>`:'');
     const warn=document.getElementById('miDlgWarn'), act=document.getElementById('miDlgAct');
     warn.innerHTML='';
-    if(!s.costDept||!s.costOwner)
-      warn.innerHTML+=`<div class="mi-note"><b>成本歸屬部門／成本歸屬者尚未填寫</b>，匯出後這兩欄會留白，需人工補。點下方「填寫成本歸屬」可先設定。</div>`;
+    warn.innerHTML+=`<div class="mi-note">成本歸屬部門：<b>${esc2(s.costDept||COST_DEPT)}</b>　成本歸屬者：<b>${esc2(s.costOwner||COST_OWNER)}</b>（可用下方按鈕修改）</div>`;
     if(rc&&!rc.match)
       warn.innerHTML+=`<div class="mi-note bad"><b>⚠ 與正式報銷表不符</b>，請先於上方對帳區確認差異再匯出。</div>`;
     if(c.missingTail.length&&!rc){
@@ -2187,17 +2191,22 @@ const MI = (function(){
                     `<button class="mi-btn primary" type="button" disabled>匯出正式報銷檔</button>`;
     }else{
       act.innerHTML=`<button class="mi-btn ghost" type="button" onclick="MI.dlgClose()">取消</button>`+
-                    `<button class="mi-btn ghost" type="button" onclick="MI.setCost()">填寫成本歸屬</button>`+
+                    `<button class="mi-btn ghost" type="button" onclick="MI.setCost()">修改成本歸屬</button>`+
                     `<button class="mi-btn primary" type="button" onclick="MI.doExport(false)">匯出正式報銷檔</button>`;
     }
     const d=document.getElementById('miExportDlg');
     if(d.showModal) d.showModal(); else d.setAttribute('open','');
   }
+  // 依正式報銷表基準的路線逐段計算並產檔（本機巡店明細不足時使用；來源仍逐段可追溯）
+  function officialPlans(month){
+    const off=OFFICIAL[month]; if(!off) return null;
+    return off.rows.map(([d,place])=>dayPlan(d, place.split('/').map((n,i)=>({name:n,time:'',key:String(100+i)}))));
+  }
   function dlgClose(){ const d=document.getElementById('miExportDlg'); if(d.close) d.close(); else d.removeAttribute('open'); }
   function setCost(){
     const s=store();
-    const dept=prompt('成本歸屬部門（依公司報銷表填寫）', s.costDept||''); if(dept===null) return;
-    const owner=prompt('成本歸屬者（依公司報銷表填寫）', s.costOwner||''); if(owner===null) return;
+    const dept=prompt('成本歸屬部門（依公司報銷表填寫）', s.costDept||COST_DEPT); if(dept===null) return;
+    const owner=prompt('成本歸屬者（依公司報銷表填寫）', s.costOwner||COST_OWNER); if(owner===null) return;
     s.costDept=dept.trim(); s.costOwner=owner.trim(); save(s);
     dlgClose(); exportConfirm();
   }
@@ -2216,7 +2225,7 @@ const MI = (function(){
 
   return {render,setMonth,setDate,step,today,addLegPrompt,setLegKm,removeNode,setCost,
           importPick,importFile,exportDetails,exportConfirm,doExport,dlgClose,
-          _reconcile:reconcile,_billable:billable,OFFICIAL,
+          _reconcile:reconcile,_billable:billable,_officialPlans:officialPlans,OFFICIAL,
           _days:days,_dayPlan:dayPlan,_monthPlans:monthPlans,_coverage:coverage,
           _buildSheets:buildSheets,_normalize:normalize,_legFor:legFor,
           _isOffice:isOffice,_store:store,NODES,DIST};
