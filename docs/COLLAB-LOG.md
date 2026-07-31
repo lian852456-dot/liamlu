@@ -13,6 +13,38 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-07-31 ｜ Claude（快速上傳去污染：從回復後的 main 重建乾淨分支，待 Liam 驗收）
+
+- **背景**：`claude/quick-report-upload-feature-elyajz` 是從事故 commit `62cbe1e` 分出去的，
+  base 內含 `bde4c6b`，其 `index.html` 仍帶著「請輸入已核准裝置的員工編號」。
+  直接合併會讓當天的全門市中斷事故完整重演。
+- **做了什麼**：**不用盲目 rebase**。從回復後的 `origin/main`（`adf7542`）開
+  `claude/quick-report-upload-clean`，先逐一盤點原分支 6 個 commit，確認它們
+  **完全沒有動 `index.html`／`kpi.html`／`patrol.html`**，污染風險只集中在 `gas/Code.gs`。
+  再以 `git diff 62cbe1e..42e3036` 隔離出「純上傳變更」（此區間已排除 `bde4c6b`），
+  只把這份差異套到新 base，新檔案（`report-upload.html`、3 份 SPEC/FILE-MAP/HANDOVER
+  文件、2 支測試）直接取自原分支。**原分支保留不刪、不改寫，作為備份。**
+  原分支的 `docs/COLLAB-LOG.md` 刻意不搬——它基於事故版，搬過來會蓋掉事故紀錄。
+- **結果**：`index.html`／`kpi.html`／`patrol.html` 與 main **diff 為 0 行**；
+  `gas/Code.gs` 只新增 5 處（doPost 4 條 `report_upload_*` 路由、`kpiCalcPublish` 與
+  `privateDashboardPublish` 各 6 行只登記版本、`kpiCalcAutoUpdate` 19 行排程防覆蓋、
+  檔尾 824 行上傳模組）。`doGet`／`readData`／`writeData`／`readPersonal`／`writePersonal`／
+  `privateDashboardAccess`／`kpiCalcAccess`／`privateDashboardIsTrustedEmployee`
+  **逐函式 md5 與 main 完全相同**。全 repo 掃不到 `ensureReportSession`／`protectedGasPost`／
+  `reportSessionRequired_`／`report_auth` 任一個。
+  測試：Node 契約 **78/78**、`report-upload.spec.js` **31/31**、`app.spec.js` **30/30**。
+- **經驗 / 給下一位的提醒**：
+  1. **上傳功能的授權與每日回報是分開的，請維持這樣。** `reportUploadAuthorize_()` 走的是
+     `DASHBOARD_ADMIN_SECRET` ＋ `REPORT_UPLOAD_ALLOWED_EMPLOYEES` 白名單
+     （未設定時退回 `DASHBOARD_TRUSTED_EMPLOYEE_ID`），**完全不碰 `DashboardUsers` 裝置名冊**。
+     它只保護「上傳與發布」這個管理動作，不是登入閘門。
+  2. **命名沒有衝突但很接近，改的時候看清楚**：上傳模組是 `reportUpload*`／`reportVersion*`，
+     事故那組是 `reportSession*`／`report*Payload_`。前者可留，後者不可回來。
+  3. **`tests/patrol.spec.js` 在這個容器裡本來就不穩定**。實測 `origin/main` 原始碼連跑兩次，
+     失敗集合分別是 {341,365,545,783} 與 {341,365,525,535,783,798}，每次都不同。
+     其中 341／365 是 headless_shell 不回傳 `download.suggestedFilename()` 的固定環境問題。
+     **判斷回歸請單獨重跑該測試，不要只看一次全量結果就下結論。**
+
 ## 2026-07-31 ｜ Claude（🚨 正式站全門市回報中斷事故：回復 bde4c6b 程式碼，保留事故文件）
 
 - **事故**：全門市開 `index.html` 即跳瀏覽器 prompt「請輸入已核准裝置的員工編號」，
