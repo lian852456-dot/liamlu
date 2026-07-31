@@ -1,0 +1,235 @@
+# 戰報快速更新 — 交接文件（給小榮）
+
+**建立** 2026-07-31（Claude）　**狀態** JSON 緊急更新雛形（測試版，未驗收、未部署）
+
+---
+
+## 1. 目前分支
+
+```
+claude/quick-report-upload-feature-elyajz
+```
+
+- **未建立 PR、未合併 main、未部署正式 GAS**（Liam 明確指示）。
+- 接手前先 `git fetch origin && git checkout claude/quick-report-upload-feature-elyajz && git pull`。
+
+## 2. 已完成項目
+
+| # | 項目 | 驗證方式 |
+|---|---|---|
+| 1 | 台獎 `.json` 緊急更新（上傳→驗證→預覽→確認→更新） | Playwright 情境 2 |
+| 2 | KPI `.xlsx` 上傳（**GAS 端**解析，重用 `kpiCalcParseReport`） | 契約測試；**未用真實日報驗證** |
+| 3 | 9 項檔案驗證（副檔名／大小／工作表／欄位／日期／區域／筆數／早於正式版／疑似錯報表） | 契約測試 12 項 |
+| 4 | 三種備份：原始檔、更新前正式資料、操作紀錄 | FILE-MAP §3 |
+| 5 | 失敗保護：驗證失敗不寫、階段失敗不留半套、讀回失敗自動還原 | Playwright 情境 5~13 |
+| 6 | 回復上一個成功版本 | Playwright 情境 15 |
+| 7 | 權限：員編白名單＋管理者密碼，前後端雙檢 | Playwright 情境 14 |
+| 8 | **防衝突：11:00 排程不覆蓋 10:55 手動上傳** | 契約行為測試 9 項 |
+| 9 | 測試版標示（頁面橫幅＋home.html 卡片） | Playwright 1 項 |
+
+**測試現況**：契約測試 46/46、Playwright 上傳情境 28/28、既有 Node 契約 20/20 全綠。
+
+## 3. 未完成項目
+
+| # | 缺口 | 阻塞原因 |
+|---|---|---|
+| 1 | 台獎 Excel 解析 | **無樣本、無欄位規格** |
+| 2 | 瀏覽器本機解析工作簿 | 需選定套件並自帶（不可用 CDN） |
+| 3 | 共用解析模組（離線版共用） | 尚未建立 |
+| 4 | `.xls` 支援 | 需先確認是否真的還有此格式 |
+| 5 | KPI 端到端真實驗證 | 只有 Liam 能執行 |
+| 6 | 「更新既有 Google Sheet」 | KPI／台獎正式資料不在試算表裡，需 Liam 定義要不要建 |
+| 7 | 工作簿盤點模式（只看工作表/欄位、不解析） | 建議作為小榮第一個任務 |
+
+## 4. 現有 JSON 架構
+
+### KPI（`north12b-kpicalc-private-latest.json`）
+
+```jsonc
+{
+  "meta":  { "period": "2026/07/01 ~ 07/31", "snapshotDay": 31,
+             "monthDays": 31, "month": "2026-07", "sourceFile": "0731.xlsx" },
+  "items": [ { "key": "5G銷售數", "short": "5G", "step": 1 } ],      // 25 項，順序同 KPICALC_ITEMS
+  "stores":[ { "code": "DNB01", "name": "通化", "official": 1.0234,
+               "items": { "5G銷售數": { "t": 目標, "a": 實績, "w": 權重 } },
+               "bonus": { "aqA":0,"aqT":0,"dnHiN":0,"dnHiD":0,"upN":0,"upD":0 } } ],
+  "persons":[{ "store": "DNB01", "role": "門市人員", "pname": "王O明",
+               "official": 0.98, "items": { ...同上... } }]
+}
+```
+
+產生者：`kpiCalcParseReport()`（`gas/Code.gs`）。
+**新 normalizer 必須逐欄輸出相同結構，否則 kpi.html 會壞。**
+
+### 台獎（`north12b-dashboard-private-latest.json`）
+
+```jsonc
+{ "kpiBattle": { "report_date": "2026-07-31", ... },
+  "awardsBattle": { "stores": [ { "store": "通化", "items": [...] } ] } }
+```
+
+產生者：**Codex 環境的 `update_phone_awards.py` / `build_github_pages_data.py`（不在本 repo）**。
+內部欄位除 `report_date` 與 `stores[].store` 外**皆未確認**——本次只驗證這兩者，其餘不碰。
+
+## 5. Excel 上傳缺口與建議方案
+
+### 5.1 repo 現況
+
+`grep -rni "sheetjs|xlsx|exceljs|papaparse"` → **repo 內沒有任何 Excel 解析套件**。
+`node_modules` 只有 `@playwright/*`。GAS 端則是靠 `Drive.Files.create()` 轉成
+Google 試算表再讀，不是 JS 套件。
+
+### 5.2 前端本機解析方案（建議）
+
+| 項目 | 建議 |
+|---|---|
+| 套件 | **SheetJS `xlsx`（社群版）** |
+| 授權 | **Apache-2.0**（社群版）。⚠️ 發布通道已從 npm 移至自架 CDN，取用方式需確認 |
+| 替代 | `exceljs`（MIT，僅 `.xlsx`，體積較大、API 較重） |
+| **不依賴外部 CDN** | 把 UMD build **vendor 進 repo**（例：`vendor/xlsx.full.min.js`），以 `<script src>` 相對路徑載入。**絕不可**指向任何外部網域——GitHub Pages 上等同引入第三方，且離線版會直接失效 |
+| `.xls` | SheetJS 社群版可讀 BIFF8 `.xls`；`exceljs` **不行**。若確定要支援 `.xls`，就只能選 SheetJS |
+| 體積 | `xlsx.full.min.js` 約 900KB。建議只在 report-upload.html 載入，不要進 index.html |
+
+> ⚠️ 決策點：**vendor 第三方程式碼進 repo 需要 Liam 同意**（repo 公開）。
+> 先問，不要自己決定。
+
+### 5.3 模組切分（Liam 要求三）
+
+```
+js/report/
+  report-file-reader.js        // 檔案 → {sheetNames, sheets:{name: rows[][]}}；不認得業務欄位
+  kpi-normalizer.js            // 工作簿 → KPI JSON（結構須等同 kpiCalcParseReport）
+  phone-awards-normalizer.js   // 工作簿 → 台獎 JSON（待樣本）
+  report-validator.js          // 9 項驗證，純函式，網站版與離線版共用
+```
+
+規則：**無副作用、不碰 DOM、不碰 network、不讀 localStorage**，
+以 UMD 或純函式匯出，讓離線版能直接 `require`／`<script>` 共用。
+**不要把解析塞進 `report-upload.html`。**
+
+### 5.4 原始 Excel 如何安全送往 Drive 備份
+
+目前作法（可沿用）：瀏覽器 `FileReader.readAsDataURL` → 取 base64 → POST 給 GAS →
+`Utilities.base64Decode` → `folder.createFile()`。
+注意：GAS `doPost` 有 payload 大小上限，base64 會膨脹約 1.37 倍。
+現行上限 `REPORT_UPLOAD_MAX_BYTES = 12MB`（解碼後），preview 另擋 `encoded.length > 12MB×1.4`。
+**若真實日報超過 12MB，需改為分塊上傳——請先量測實際檔案大小再決定。**
+
+### 5.5 Apps Script 接收方式
+
+已實作：`report_upload_preview` 收 `{kind, fileName, fileBase64}`。
+改成前端解析後，建議改收 `{kind, fileName, fileBase64, normalized}`，
+GAS 端**只驗證與寫入、不解析**，並在過渡期間比對
+`kpiCalcParseReport(rawFile)` 與 `normalized` 是否逐欄一致（見 SPEC §3 的一致性風險）。
+
+## 6. 需要的 KPI 樣本
+
+1. 一份真實 `MMDD.xlsx` 日報（**含** `上線數KPI_個人達成率_明細` 分頁的版本）。
+2. 一份 **不含** `_明細`、只有 `上線數KPI_個人達成率_店點` 的版本（如 `0728.xlsx`），用來驗回退路徑。
+3. 對應日期的 `north12b-kpicalc-private-latest.json`，作為 normalizer 的比對基準。
+4. 確認：`.xls` 格式是否真的還會出現？若否，直接不做。
+
+## 7. 需要的台獎樣本
+
+**目前狀態：完全沒有資訊。連工作表名稱都不知道。**
+
+1. 一份真實台獎 Excel 原始檔。
+2. 對應的 `phone-awards-battle-latest.json` 或 `north12b-dashboard-private-latest.json`。
+3. `awardsBattle` 的完整欄位說明（`stores[]` 底下有哪些欄位、`items[]` 結構、獎金欄位名稱）。
+4. `update_phone_awards.py` 的原始碼或其欄位對照邏輯（最有價值——可直接對照，不必反推）。
+
+**在拿到以上資料前，不得撰寫任何台獎欄位解析。**
+
+## 8. 欄位對照待辦
+
+| 待辦 | 依賴 |
+|---|---|
+| KPI 25 項加權欄位 → 工作簿欄位位置 | 已存在於 `kpiCalcBands`／`kpiCalcBandsPairs`，可直接移植 |
+| KPI `_店點` 版面的合併儲存格處理 | 已存在於 `kpiCalcBandsPairs`（**不可用 `c += 4`**） |
+| KPI 職稱回填 | `kpiCalcPrevRoles()` 沿用上一份 JSON |
+| 台獎全部欄位 | **完全未知，待樣本** |
+
+## 9. 11:00 排程覆蓋風險
+
+**已實作防護。** 規則詳見 `UPLOAD-QUICK-UPDATE-SPEC.md` §4。摘要：
+
+- 10:55 手動上傳 → 版本狀態記為 `manual-upload`。
+- 11:00 排程解析後，寫入前先問 `reportVersionDecide_()` → 命中 `manual-wins` → **略過、不寫、寄 ℹ️ 通知信**。
+- 隔天真正較新的日期照常更新，排程日常運作不受影響（有測試涵蓋）。
+- 回復後記為 `rollback`，同樣受保護。
+
+**殘留風險**：`REPORT_UPDATE_STATE` 是指令碼屬性，若被手動清空，防護會退回「首次寫入」而放行。
+可用 `reportVersionStatus()` 在 GAS 編輯器隨時查看目前狀態。
+
+## 10. 所有網站同步盤點
+
+見 `UPLOAD-QUICK-UPDATE-FILE-MAP.md` §2。**已確認會同步**：kpi.html、index.html 戰情頁籤。
+**未確認**：Liam AI 指揮室（頁面不存在）、`window.__*_BATTLE_DATA__` 本機回退、GitHub Pages 來源分支。
+
+## 11. 正式部署步驟（只有 Liam 能做）
+
+1. `git checkout main && git pull`，跑 FILE-MAP §6 的函式完整性檢查。
+2. 貼 `gas/Code.gs` 進 GAS 編輯器存檔。
+3. 確認左側「服務」已有 **Drive API**（缺了會報 `Drive is not defined`）。
+4. 設定指令碼屬性（§12）。
+5. **部署 → 管理部署作業 → ✏️ → 新版本 → 部署**（本次改了 `doPost`，非做不可）。
+6. 函式選單執行一次 `reportVersionStatus()` 確認版本狀態可讀寫。
+7. 開 `report-upload.html`，**先只按「① 檔案檢查與預覽」**，確認預覽數字正確再按確認。
+
+## 12. Apps Script Properties 設定
+
+| 屬性 | 必要性 | 值 |
+|---|---|---|
+| `REPORT_UPLOAD_ALLOWED_EMPLOYEES` | **本次新增，必設** | 逗號分隔員編白名單。不設則只有 `DASHBOARD_TRUSTED_EMPLOYEE_ID` 能用 |
+| `REPORT_UPDATE_STATE` | 自動建立 | 不要手動編輯；要重置才清空 |
+| `DASHBOARD_ADMIN_SECRET` | 既有 | 上傳頁的「管理者密碼」 |
+| `DASHBOARD_PRIVATE_FOLDER_ID` | 既有 | 私有 Drive 資料夾 |
+| `DASHBOARD_ROSTER_SHEET_ID` | 既有 | 稽核紀錄分頁寫在這裡 |
+| `KPICALC_SOURCE_FOLDER_ID` | 既有 | 11:00 排程來源 |
+
+## 13. 測試方式
+
+```bash
+npm install
+node --test tests/report-upload-contract.test.cjs        # 46 項
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/opt/pw-browsers/chromium \
+  npx playwright test tests/report-upload.spec.js        # 28 項
+```
+
+⚠️ `tests/patrol.spec.js` 有 2~5 項 **既有 flaky** 失敗，每次失敗項目不同，
+在未改動的 HEAD worktree 上重跑同樣會失敗。**與本功能無關，不要花時間追。**
+
+## 14. 回復方式
+
+- **畫面**：對應車道按「↩ 回復上一個成功版本」。
+- **手動**：私有 Drive 把 `backup-north12b-kpicalc-<時間>.json` 內容複製回
+  `north12b-kpicalc-private-latest.json`。
+- **程式碼回退**：本分支未合併 main，直接不合併即可；`gas/Code.gs` 回退需在 GAS
+  「管理部署作業」選回舊版本，**並注意時間觸發器跑的是編輯器 HEAD，不是部署版本**。
+
+## 15. 建議執行順序
+
+1. **先問 Liam 兩件事**（都會改變後續設計）：
+   a. 「Liam AI 指揮室」是指 home.html 還是要新建頁面？
+   b. vendor 第三方 Excel 套件進公開 repo 是否可接受？
+2. **拿樣本**（§6、§7）。沒有樣本的工作不要開始。
+3. **做工作簿盤點模式**：上傳 → 只列出 `sheetNames` 與前幾列，不做任何業務解析。
+   這一步不需樣本就能做，而且做完就能拿真實檔跑出欄位清單。
+4. 用盤點結果建 `report-file-reader` + `kpi-normalizer`，
+   **與 `kpiCalcParseReport` 逐欄比對到完全一致**才算完成。
+5. 一致後才討論「GAS 端是否改為只收標準化資料」（收斂為一套解析）。
+6. 台獎 normalizer 最後做，且必須先有 §7 的全部資料。
+7. 全部完成、Liam 驗收後，才拿掉「測試版」標示。
+
+## 16. 禁止修改區域
+
+| 區域 | 原因 |
+|---|---|
+| `kpiCalcParseReport()` 及其 helper（`kpiCalcBands*`／`kpiCalcNum`／`kpiCalcPct`／`kpiCalcParseMeta`） | 11:00 排程與上傳共用；改壞會同時弄壞兩條路 |
+| `kpiCalcAutoUpdate()` 的解析與 `KPICALC_LAST_IMPORT` 邏輯 | 本次只加了防衝突把關，其餘不要動 |
+| `privateDashboardPublish()` 改成硬擋 | 會打斷 Codex 每日管線，**需 Liam 決定** |
+| `index.html`／`kpi.html`／`patrol.html` 的既有資料流 | 本功能不應改動它們 |
+| `home.html` 放資料或登入 | CLAUDE.md 明文禁止 |
+| 備份檔名前綴 `backup-` | 改了會踩 `kpiCalcLatestDataFile()` 的坑，有測試守著 |
+| 既有 Google Sheet 結構（回報資料／巡店明細） | Liam 原則 2 |
+| OneDrive／M+ 相關流程 | 不得刪除（**註：repo 內實際上找不到任何 OneDrive 程式碼**） |

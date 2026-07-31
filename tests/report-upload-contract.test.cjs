@@ -34,14 +34,66 @@ test('KPI 上傳共用既有解析器，未新增第二套 xlsx 解析', () => {
   assert.doesNotMatch(preview, /getSheetByName|上線數KPI_|kpiCalcBands/);
 });
 
-test('既有自動化流程未被改動', () => {
+test('既有自動化流程的解析與匯入判斷維持原樣', () => {
   const auto = functionBody(code, 'kpiCalcAutoUpdate');
   assert.match(auto, /KPICALC_LAST_IMPORT/);
   assert.match(auto, /kpiCalcParseReport\(latest\.file\)/);
-  assert.doesNotMatch(auto, /reportUpload/);
-  for (const name of ['kpiCalcWatchdog', 'kpiCalcPublish', 'privateDashboardPublish']) {
-    assert.doesNotMatch(functionBody(code, name), /reportUpload/, `${name} 不應被上傳流程污染`);
+  assert.doesNotMatch(functionBody(code, 'kpiCalcWatchdog'), /reportUpload|reportVersion/,
+    '巡檢只負責通知，不應介入寫入判斷');
+});
+
+// ── 防衝突：11:00 排程不得覆蓋 10:55 的手動上傳 ─────────────
+test('排程寫入前必須先過版本判斷，且判斷在寫入之前', () => {
+  const auto = functionBody(code, 'kpiCalcAutoUpdate');
+  const decideAt = auto.indexOf('reportVersionDecide_');
+  const writeAt = auto.indexOf('setContent(text)');
+  assert.notEqual(decideAt, -1, '排程未接上版本判斷');
+  assert.ok(decideAt < writeAt, '必須先判斷再寫入');
+  assert.match(auto, /if \(!decision\.accept\)/);
+  assert.match(auto, /source: 'scheduled'/);
+});
+
+test('既有發佈入口只登記版本、不硬擋（避免打斷外部管線）', () => {
+  for (const name of ['kpiCalcPublish', 'privateDashboardPublish']) {
+    const body = functionBody(code, name);
+    assert.match(body, /reportVersionRecord_/, `${name} 應登記版本`);
+    assert.doesNotMatch(body, /reportVersionDecide_/, `${name} 不應硬擋`);
+    assert.match(body, /record-only/);
   }
+});
+
+test('版本狀態涵蓋指定的九個欄位', () => {
+  const body = functionBody(code, 'reportVersionRecord_');
+  for (const field of ['reportType', 'dataDate', 'source', 'uploadedAt', 'fileName',
+                       'fileHash', 'operator', 'versionId', 'updateStatus']) {
+    assert.match(body, new RegExp(field + ':'), `版本狀態缺少 ${field}`);
+  }
+});
+
+test('只有成功寫入才登記為正式版本', () => {
+  assert.match(functionBody(code, 'reportVersionRecord_'),
+    /if \(updateStatus === 'success'\) reportVersionSet_/);
+});
+
+test('source 四種來源都有定義', () => {
+  for (const src of ['scheduled', 'onedrive', 'manual-upload', 'rollback']) {
+    assert.ok(code.includes(`'${src}'`), `缺少 source: ${src}`);
+  }
+});
+
+test('回復後登記為 rollback 來源，排程不會用同日期舊檔蓋回去', () => {
+  const body = functionBody(code, 'reportUploadRollback');
+  assert.match(body, /source: 'rollback'/);
+  assert.match(body, /reportVersionRecord_/);
+});
+
+test('手動上傳被版本判斷擋下時不進入任何寫入階段', () => {
+  const commit = functionBody(code, 'reportUploadCommit');
+  const decideAt = commit.indexOf('reportVersionDecide_');
+  const rawAt = commit.indexOf("'raw_backup'");
+  assert.ok(decideAt !== -1 && decideAt < rawAt, '版本判斷必須在所有階段之前');
+  assert.match(commit, /result: 'blocked'/);
+  assert.match(commit, /needsForce: true/);
 });
 
 // ── 原則 6/7：KPI 與台獎分開、互不影響 ──────────────────────
@@ -285,4 +337,99 @@ test('KPI 資料日期由 month + snapshotDay 組出可比較字串', () => {
   assert.equal(V.reportUploadKpiDate_({ month: '2026-07', snapshotDay: 31 }), '2026-07-31');
   assert.equal(V.reportUploadKpiDate_({ month: '', snapshotDay: 5 }), '');
   assert.equal(V.reportUploadKpiDate_({ month: '2026-07', snapshotDay: 0 }), '');
+});
+
+// ── 防衝突判斷：實際執行 reportVersionDecide_ 驗證每條規則 ──
+function loadDecider() {
+  const src = `
+    const REPORT_VERSION_MANUAL_SOURCES = ['manual-upload', 'rollback'];
+    const REPORT_VERSION_AUTO_SOURCES = ['scheduled', 'onedrive'];
+    let __current = null;
+    function reportVersionGet_(kind) { return __current; }
+    function setCurrent(v) { __current = v; }
+    function reportVersionDecide_(${rawArgs('reportVersionDecide_')}) {${functionBody(code, 'reportVersionDecide_')}}
+    module.exports = { reportVersionDecide_, setCurrent };
+  `;
+  const sandbox = { module: { exports: {} }, console };
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox);
+  return sandbox.module.exports;
+}
+
+const D = loadDecider();
+
+const MANUAL_1055 = {
+  dataDate: '2026-07-31', source: 'manual-upload',
+  uploadedAt: '2026-07-31T10:55:00+08:00', fileHash: 'aaa'
+};
+
+test('11:00 排程不得覆蓋 10:55 的同日期手動上傳', () => {
+  D.setCurrent(MANUAL_1055);
+  const r = D.reportVersionDecide_('kpi', { dataDate: '2026-07-31', source: 'scheduled', fileHash: 'bbb' });
+  assert.equal(r.accept, false);
+  assert.equal(r.rule, 'manual-wins');
+  assert.match(r.reason, /10:55/);
+});
+
+test('隔天的新資料排程照樣可以更新', () => {
+  D.setCurrent(MANUAL_1055);
+  const r = D.reportVersionDecide_('kpi', { dataDate: '2026-08-01', source: 'scheduled', fileHash: 'bbb' });
+  assert.equal(r.accept, true);
+  assert.equal(r.rule, 'newer-date');
+});
+
+test('較舊日期一律拒絕，不分來源', () => {
+  D.setCurrent(MANUAL_1055);
+  for (const source of ['scheduled', 'onedrive', 'manual-upload', 'rollback']) {
+    const r = D.reportVersionDecide_('kpi', { dataDate: '2026-07-30', source, fileHash: 'bbb' });
+    assert.equal(r.accept, false, `${source} 不該接受舊日期`);
+    assert.equal(r.rule, 'older-date');
+  }
+});
+
+test('只有手動來源可以強制覆寫較舊日期', () => {
+  D.setCurrent(MANUAL_1055);
+  const manual = D.reportVersionDecide_('kpi', { dataDate: '2026-07-30', source: 'manual-upload', fileHash: 'b', force: true });
+  assert.equal(manual.accept, true);
+  assert.equal(manual.rule, 'forced-older');
+  // 排程即使誤帶 force 也不能靠 force 寫入舊日期
+  const scheduled = D.reportVersionDecide_('kpi', { dataDate: '2026-07-30', source: 'scheduled', fileHash: 'b', force: true });
+  assert.equal(scheduled.accept, false);
+});
+
+test('同一份檔案（雜湊相同）不重複寫入', () => {
+  D.setCurrent(MANUAL_1055);
+  const r = D.reportVersionDecide_('kpi', { dataDate: '2026-07-31', source: 'scheduled', fileHash: 'aaa' });
+  assert.equal(r.accept, false);
+  assert.equal(r.rule, 'same-hash');
+});
+
+test('rollback 之後排程不得用同日期的舊檔蓋回去', () => {
+  D.setCurrent({ dataDate: '2026-07-31', source: 'rollback', uploadedAt: '2026-07-31T13:00:00+08:00', fileHash: 'ccc' });
+  const r = D.reportVersionDecide_('kpi', { dataDate: '2026-07-31', source: 'scheduled', fileHash: 'ddd' });
+  assert.equal(r.accept, false);
+  assert.equal(r.rule, 'manual-wins');
+});
+
+test('手動上傳可以覆蓋同日期的排程版本（更正版）', () => {
+  D.setCurrent({ dataDate: '2026-07-31', source: 'scheduled', uploadedAt: '2026-07-31T11:51:00+08:00', fileHash: 'aaa' });
+  const r = D.reportVersionDecide_('kpi', { dataDate: '2026-07-31', source: 'manual-upload', fileHash: 'bbb' });
+  assert.equal(r.accept, true);
+  assert.equal(r.rule, 'same-date-replace');
+});
+
+test('沒有版本紀錄時視為首次寫入', () => {
+  D.setCurrent(null);
+  const r = D.reportVersionDecide_('kpi', { dataDate: '2026-07-31', source: 'scheduled', fileHash: 'a' });
+  assert.equal(r.accept, true);
+  assert.equal(r.rule, 'first-version');
+});
+
+test('排程連續兩天正常運作不受防衝突影響', () => {
+  D.setCurrent({ dataDate: '2026-07-30', source: 'scheduled', uploadedAt: '2026-07-30T11:51:00+08:00', fileHash: 'a' });
+  const day1 = D.reportVersionDecide_('kpi', { dataDate: '2026-07-31', source: 'scheduled', fileHash: 'b' });
+  assert.equal(day1.accept, true);
+  D.setCurrent({ dataDate: '2026-07-31', source: 'scheduled', uploadedAt: '2026-07-31T11:51:00+08:00', fileHash: 'b' });
+  const day2 = D.reportVersionDecide_('kpi', { dataDate: '2026-08-01', source: 'scheduled', fileHash: 'c' });
+  assert.equal(day2.accept, true);
 });

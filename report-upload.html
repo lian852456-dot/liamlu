@@ -77,19 +77,37 @@
   .confirmbar { margin-top:10px; padding:10px; border-radius:10px; background:#fff7ed; border:1px solid rgba(249,115,22,.35); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .confirmbar .t { font-size:.8rem; font-weight:700; color:var(--accent-bright); flex:1; min-width:200px; }
   .lastupd { font-size:.76rem; color:var(--text-muted); margin-top:6px; }
+  .badge-test { font-size:.6rem; font-weight:800; padding:2px 7px; border-radius:999px; background:var(--warn); color:#fff; vertical-align:middle; letter-spacing:.05em; }
+  .banner { border-left:5px solid var(--warn); background:#fffbeb; }
+  .banner h2 { color:#92400e; }
+  .forcebox { display:flex; align-items:center; gap:6px; font-size:.76rem; font-weight:700; color:var(--red); width:100%; }
+  .forcebox input { width:16px; height:16px; }
 </style>
 </head>
 <body>
 
 <div class="site-header">
   <div>
-    <h1>📤 戰報快速更新</h1>
-    <div class="sub">北一二B · M+／OneDrive 無法使用時的備援入口</div>
+    <h1>📤 戰報快速更新 <span class="badge-test">測試版</span></h1>
+    <div class="sub">北一二B · JSON 緊急更新雛形｜Excel 上傳尚未完成，請勿當成正式流程</div>
   </div>
   <a href="home.html">← 智慧營運中心</a>
 </div>
 
 <div class="wrap">
+
+  <div class="card banner">
+    <h2>⚠️ 這是測試版，目前能力範圍</h2>
+    <div class="note">
+      <strong>可用：</strong>台獎戰情快照 <code>.json</code> 的緊急更新、備份與回復；
+      KPI <code>.xlsx</code> 由 Apps Script 端呼叫既有 <code>kpiCalcParseReport()</code> 解析
+      —— <strong>此路徑尚未用真實日報驗證過</strong>。<br>
+      <strong>未完成：</strong>台獎 Excel 上傳（repo 內無解析器、無樣本）、
+      瀏覽器本機解析工作簿、<code>.xls</code> 支援、可與離線版共用的解析模組。<br>
+      <strong>未取得真實樣本前不會猜測欄位。</strong>需要的樣本清單見
+      <code>docs/UPLOAD-QUICK-UPDATE-HANDOVER.md</code>。
+    </div>
+  </div>
 
   <!-- ── 權限 ── -->
   <div class="card" id="authCard">
@@ -109,7 +127,11 @@
     <div class="card lane" id="lane-kpi">
       <h2>📊 KPI 戰報 <span class="tag">Excel（.xlsx）</span></h2>
       <div class="note">
-        使用與每日自動化<strong>完全相同</strong>的解析程式（GAS <code>kpiCalcParseReport</code>）。
+        解析在 <strong>Apps Script 端</strong>進行，呼叫與每日自動化<strong>同一支</strong>
+        <code>kpiCalcParseReport()</code>，未新增第二套解析邏輯。<br>
+        ⚠️ <strong>此路徑尚未用真實日報驗證過</strong>，且不是 Liam 要求的
+        「瀏覽器本機解析、可與離線版共用」架構——該模組尚未建立。
+        目前僅支援 <code>.xlsx</code>，<code>.xls</code> 未支援。<br>
         更新目標：私有 Drive 的 KPI 試算資料 → <strong>kpi.html</strong>。
       </div>
       <div class="lastupd" id="live-kpi">目前正式版本：讀取中…</div>
@@ -122,6 +144,10 @@
       <div id="preview-kpi"></div>
       <div class="confirmbar hidden" id="confirm-kpi">
         <div class="t">以上預覽正確嗎？按下確認才會覆蓋正式資料（會先自動備份上一版）。</div>
+        <label class="forcebox hidden" id="force-kpi">
+          <input type="checkbox" id="forcechk-kpi">
+          <span>強制覆寫（版本檢查判定不應覆蓋時才需要）</span>
+        </label>
         <button class="btn go" onclick="doCommit('kpi')">② 確認更新 KPI</button>
         <button class="btn" onclick="cancelPreview('kpi')">取消</button>
       </div>
@@ -132,7 +158,8 @@
     <div class="card lane award" id="lane-award">
       <h2>🏅 台獎戰報 <span class="tag">戰情快照（.json）</span></h2>
       <div class="note">
-        ⚠️ <strong>本階段台獎收 JSON、不收 Excel。</strong>repo 內目前沒有台獎 Excel 解析器可重用
+        ⚠️ <strong>本階段台獎收 JSON、不收 Excel（JSON 緊急更新雛形）。</strong>
+        repo 內目前沒有台獎 Excel 解析器可重用
         （台獎快照由 Codex 環境的 <code>update_phone_awards.py</code> 產生），
         依「不得複製出第二套台獎解析邏輯」原則，這裡不自行新寫一套。
         更新目標：私有 Drive 的戰情快照 → <strong>index.html 台獎戰情／智慧營運中心</strong>。
@@ -147,6 +174,10 @@
       <div id="preview-award"></div>
       <div class="confirmbar hidden" id="confirm-award">
         <div class="t">以上預覽正確嗎？按下確認才會覆蓋正式資料（會先自動備份上一版）。</div>
+        <label class="forcebox hidden" id="force-award">
+          <input type="checkbox" id="forcechk-award">
+          <span>強制覆寫（版本檢查判定不應覆蓋時才需要）</span>
+        </label>
         <button class="btn go" onclick="doCommit('award')">② 確認更新台獎</button>
         <button class="btn" onclick="cancelPreview('award')">取消</button>
       </div>
@@ -266,6 +297,10 @@ async function doPreview(kind) {
     }
     TOKENS[kind] = result.token;
     renderPreview(kind, result.preview);
+    const forceBox = el('force-' + kind);
+    const forceChk = el('forcechk-' + kind);
+    if (forceChk) forceChk.checked = false;
+    forceBox.classList.toggle('hidden', !result.needsForce);
     el('confirm-' + kind).classList.remove('hidden');
     setMsg('msg-' + kind, result.warnings
       ? '⚠️ 檢查通過，但有 ' + result.warnings + ' 項提醒，請確認後再更新。'
@@ -324,6 +359,7 @@ function renderPreview(kind, p) {
 function cancelPreview(kind) {
   TOKENS[kind] = '';
   el('confirm-' + kind).classList.add('hidden');
+  el('force-' + kind).classList.add('hidden');
   el('preview-' + kind).innerHTML = '';
   el('checks-' + kind).innerHTML = '';
   setMsg('msg-' + kind, '已取消，正式資料未更動。', '');
@@ -335,9 +371,20 @@ async function doCommit(kind) {
   el('confirm-' + kind).classList.add('hidden');
   setMsg('msg-' + kind, '更新中…', 'busy');
   try {
-    const result = await gasPost(auth({ action: 'report_upload_commit', token: TOKENS[kind] }));
-    TOKENS[kind] = '';
+    const forceChk = el('forcechk-' + kind);
+    const result = await gasPost(auth({
+      action: 'report_upload_commit', token: TOKENS[kind], force: !!(forceChk && forceChk.checked)
+    }));
     renderResult(kind, result);
+    if (result.result === 'blocked') {
+      // 版本衝突：token 還有效，勾選強制覆寫後可直接再送一次
+      el('force-' + kind).classList.remove('hidden');
+      el('confirm-' + kind).classList.remove('hidden');
+      setMsg('msg-' + kind, '⛔ 版本衝突，正式資料未更動：' + result.message +
+        '｜確定要覆蓋請勾選「強制覆寫」後再按一次確認。', 'bad');
+      return;
+    }
+    TOKENS[kind] = '';
     setMsg('msg-' + kind, result.result === 'ok'
       ? '✅ 更新完成（紀錄編號 ' + result.logId + '）'
       : '❌ 更新失敗：' + (result.message || '請看下方分項結果'), result.result === 'ok' ? 'ok' : 'bad');

@@ -62,14 +62,24 @@ function installGas(page, behaviour = {}) {
         ? { period: '2026/07/01 ~ 07/31', snapshotDay: 31, storeCount: 9, personCount: 62,
             stores: [{ code: 'DNB01', name: '通化', official: 1.0234 }], persons: [{ store: 'DNB01', pname: '王O明' }] }
         : { reportDate: '2026-07-31', storeCount: 9, stores: [{ name: '通化', bonus: 12000 }] };
+      const conflict = mode === 'conflict';
       return json({ status: 'ok', ok: true, kind, token: 'tok-' + kind,
-        checks: [ok('ok', '副檔名', 'a'), ok('ok', '資料筆數', '店點 9 家')],
-        preview, live: kind === 'kpi' ? KPI_LIVE : AWARD_LIVE, dataDate: '2026-07-31', warnings: 0 });
+        checks: [ok('ok', '副檔名', 'a'), ok('ok', '資料筆數', '店點 9 家')].concat(
+          conflict ? [ok('warn', '版本衝突檢查', '同日期已由 manual-upload 於 10:55 更新（可勾選強制覆寫）')] : []),
+        preview, live: kind === 'kpi' ? KPI_LIVE : AWARD_LIVE, dataDate: '2026-07-31',
+        needsForce: conflict, warnings: conflict ? 1 : 0 });
     }
 
     if (payload.action === 'report_upload_commit') {
       const which = payload.token === 'tok-kpi' ? 'kpi' : 'award';
       const m = behaviour[which] || 'success';
+      if (m === 'conflict' && !payload.force) {
+        return json({ status: 'ok', result: 'blocked', kind: which, logId: '', needsForce: true,
+          message: '同日期 2026-07-31 已由 manual-upload 於 10:55 更新，排程不覆蓋手動上傳的資料',
+          backupFile: '', live: state.live[which],
+          stages: [stage('version', '版本衝突檢查', 'fail', '同日期已由 manual-upload 更新'),
+                   stage('json', 'JSON／API', 'skip', '未執行，正式資料維持上一版')] });
+      }
       if (m === 'sheetfail' || m === 'drivefail' || m === 'jsonfail' || m === 'verifyfail') {
         const map = {
           drivefail: [stage('raw_backup', '原始檔備份', 'fail', 'Drive 寫入失敗'), stage('json', 'JSON／API', 'skip', '前一階段失敗，正式資料維持上一版'), stage('site', '網站', 'kept', '維持上一版')],
@@ -308,4 +318,60 @@ test('登入資訊不寫入 localStorage／sessionStorage', async ({ page }) => 
   }));
   expect(stored).not.toContain(SECRET);
   expect(stored).not.toContain(GOOD_EMP);
+});
+
+// ── 防衝突：版本判定與強制覆寫 ─────────────────────────────
+test('版本衝突時擋在 commit，正式資料維持上一版', async ({ page }) => {
+  await installGas(page, { kpi: 'conflict' });
+  await login(page);
+  await pickFile(page, 'kpi');
+  await page.click('#btn-check-kpi');
+  await expect(page.locator('#checks-kpi')).toContainText('版本衝突檢查');
+  await expect(page.locator('#force-kpi')).toBeVisible();
+  await page.click('#confirm-kpi .btn.go');
+  await expect(page.locator('#msg-kpi')).toContainText('版本衝突，正式資料未更動');
+  await expect(page.locator('#result-kpi')).toContainText('維持上一版');
+  await expect(page.locator('#live-kpi')).toContainText('2026-07-30');
+});
+
+test('勾選強制覆寫後可完成更新', async ({ page }) => {
+  await installGas(page, { kpi: 'conflict' });
+  await login(page);
+  await pickFile(page, 'kpi');
+  await page.click('#btn-check-kpi');
+  await page.click('#confirm-kpi .btn.go');
+  await expect(page.locator('#msg-kpi')).toContainText('版本衝突');
+  await page.check('#forcechk-kpi');
+  await page.click('#confirm-kpi .btn.go');
+  await expect(page.locator('#msg-kpi')).toContainText('更新完成');
+  await expect(page.locator('#live-kpi')).toContainText('2026-07-31');
+});
+
+test('沒有衝突時不顯示強制覆寫選項', async ({ page }) => {
+  await installGas(page);
+  await login(page);
+  await pickFile(page, 'kpi');
+  await page.click('#btn-check-kpi');
+  await expect(page.locator('#confirm-kpi')).toBeVisible();
+  await expect(page.locator('#force-kpi')).toBeHidden();
+});
+
+test('強制覆寫勾選狀態不會殘留到下一次預覽', async ({ page }) => {
+  await installGas(page, { kpi: 'conflict' });
+  await login(page);
+  await pickFile(page, 'kpi');
+  await page.click('#btn-check-kpi');
+  await page.check('#forcechk-kpi');
+  await page.click('#btn-check-kpi');
+  await expect(page.locator('#forcechk-kpi')).not.toBeChecked();
+});
+
+// ── 功能定位標示 ───────────────────────────────────────────
+test('頁面明確標示為測試版且未宣稱已完成 Excel 上傳', async ({ page }) => {
+  await installGas(page);
+  await page.goto(PAGE_URL);
+  await expect(page.locator('.badge-test')).toContainText('測試版');
+  await expect(page.locator('.banner')).toContainText('Excel 上傳');
+  await expect(page.locator('.banner')).toContainText('尚未用真實日報驗證過');
+  await expect(page.locator('#lane-award')).toContainText('不收 Excel');
 });

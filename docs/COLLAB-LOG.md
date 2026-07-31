@@ -13,6 +13,41 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-07-31 ｜ Claude（第二輪：需求校正、標記測試版、防排程覆蓋、小榮交接）
+
+- 做了什麼：Liam 檢查後指出原始需求是「Excel 上傳」，目前只是 JSON 雛形。依指示做四件事：
+  ①**功能定位改正**——`report-upload.html` 加測試版徽章與能力聲明橫幅、`home.html` 卡片標「🧪 測試版」，
+  文件全面改稱「JSON 緊急更新雛形」，不再宣稱完成 Excel 上傳。
+  ②**Excel 上傳規劃**——確認 repo 內**沒有任何 Excel 解析套件**，提出 SheetJS(Apache-2.0)／exceljs(MIT)
+  比較、vendor 進 repo 不用 CDN 的作法、四個共用模組切分（reader／kpi-normalizer／
+  phone-awards-normalizer／validator）、12MB 上限與 base64 膨脹 1.37 倍的量測待辦。
+  ③**防衝突實作**——新增 `REPORT_UPDATE_STATE` 版本狀態（九欄）與 `reportVersionDecide_()` 七條規則，
+  接進 `kpiCalcAutoUpdate`（排程寫入前把關）、`reportUploadCommit`（可強制覆寫）、
+  `reportUploadRollback`（記為 rollback 來源）。
+  ④**交接文件**——新增 `docs/UPLOAD-QUICK-UPDATE-HANDOVER.md`，重寫 SPEC 與 FILE-MAP。
+- 結果：契約測試 46/46、Playwright 上傳情境 28/28、既有 Node 契約 20/20 全綠。
+  **未建 PR、未合併 main、未部署正式 GAS**（依 Liam 指示）。
+- 經驗 / 給下一位的提醒：
+  1. **一個必要的事實更正**：Liam 說「目前只完成 JSON」——大方向對，但精確地說 **KPI 車道確實有
+     `.xlsx` 上傳並在 GAS 端呼叫既有 `kpiCalcParseReport()` 解析**（證據：`report-upload.html` 的
+     `accept=".xlsx"`、`gas/Code.gs` 的 `kpiCalcParseReport(rawFile)`）。真正的缺口是：
+     ⓐ從未用真實日報驗證、ⓑ**不是 Liam 要的「瀏覽器本機解析」架構**因此離線版無法共用、
+     ⓒ台獎徹底沒有 Excel 能力。所以對外表述為「Excel 上傳未完成」是正確的，但接手時
+     **不要以為 KPI 那條路完全不存在而重寫一遍**。
+  2. **11:00 覆蓋 10:55 的解法**：同日期時**不能只比時間戳**——排程時間必然晚於手動上傳，
+     只看時間會讓排程永遠勝出。實作改為「先比檔案雜湊、再比來源優先序（手動 > 排程）」。
+  3. **`kpiCalcPublish` 與 `privateDashboardPublish` 刻意只登記版本、不硬擋**，
+     因為後者是 Codex 每日管線的入口，硬擋會讓外部管線無預警失敗。要不要升級為硬擋是 Liam 的決定。
+  4. **未確認事項不要寫成已同步**：`window.__KPI_BATTLE_DATA__` / `__AWARDS_BATTLE_DATA__`
+     本機回退路徑（`index.html:2650,2774`，來源疑似已 gitignore 的 `private-config.js`）
+     無法從 repo 確認正式環境是否啟用；「Liam AI 指揮室」在 repo 中不存在；
+     `.github/workflows` 不存在（用 Pages 預設建置），來源分支無從證明。三者都標記未確認。
+  5. **台獎樣本仍然沒有**，連工作表名稱都不知道。HANDOVER §7 列出需要的四項資料，
+     其中最有價值的是 `update_phone_awards.py` 的原始碼或欄位對照邏輯——有它就不必反推。
+     **拿到之前不得撰寫任何台獎欄位解析。**
+  6. `tests/patrol.spec.js` 的 2~5 項失敗是**既有 flaky**，在未改動的 HEAD worktree 上重跑
+     同樣失敗且每次項目不同。與本功能無關，不要花時間追。
+
 ## 2026-07-31 ｜ Claude（戰報快速更新：網站上傳備援入口，第一階段，待 Liam 驗收）
 
 - 做了什麼：新增 `report-upload.html`（督導專用上傳頁）與 `gas/Code.gs` 尾端「戰報快速更新」整節

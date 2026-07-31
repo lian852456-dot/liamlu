@@ -1614,6 +1614,12 @@ function kpiCalcPublish(payload) {
     kpiCalcBrief(data) +
     '\n同仁重新登入 kpi.html 即可看到新累計數。\n' +
     '※ 收到這封信代表資料已更新成功；若某天既沒有自動更新信也沒有這封，就是當天沒更新。');
+  // 同上：kpi.html 督導發佈區是既有手動流程，只登記版本、不擋。
+  reportVersionRecord_('kpi', {
+    dataDate: reportUploadKpiDate_(meta), source: 'manual-upload',
+    fileHash: reportVersionHash_(text), fileName: String(meta.sourceFile || PRIVATE_KPICALC_FILE),
+    operator: 'kpi.html-publish'
+  }, 'success', { rule: 'record-only' });
   return { publishedAt: privateDashboardNow(), period: meta.period || '' };
 }
 
@@ -1745,11 +1751,30 @@ function kpiCalcAutoUpdate() {
 
     const data = kpiCalcParseReport(latest.file);
     const text = JSON.stringify(data);
+
+    // 防衝突：排程不得覆蓋較新的、或同日期已由網站手動上傳的資料。
+    // （例：10:55 手動上傳 0731 更正版，11:00 排程掃到舊的 0731.xlsx。）
+    const incoming = {
+      dataDate: reportUploadKpiDate_(data.meta), source: 'scheduled',
+      fileHash: reportVersionHash_(text), fileName: latest.file.getName(), operator: 'trigger'
+    };
+    const decision = reportVersionDecide_('kpi', incoming);
+    if (!decision.accept) {
+      props.setProperty('KPICALC_LAST_IMPORT', stamp);   // 記下已看過，避免每天重複判斷
+      reportVersionRecord_('kpi', incoming, 'skipped', { skipRule: decision.rule });
+      kpiCalcNotify('ℹ️ KPI試算資料未更新（' + latest.file.getName() + '｜' + decision.rule + '）',
+        '排程判斷不應覆蓋目前正式版本，已略過。\n原因：' + decision.reason +
+        '\n目前正式版本維持不變。\n\n若確定要用這份來源檔覆蓋，請在 GAS 執行 testKpiCalcAutoUpdate 前' +
+        '先確認，或改用網站「戰報快速更新」上傳（手動上傳可強制覆寫）。');
+      return { status: 'skipped', rule: decision.rule, file: latest.file.getName() };
+    }
+
     const folder = privateDashboardFolder();
     const existing = folder.getFilesByName(PRIVATE_KPICALC_FILE);
     if (existing.hasNext()) existing.next().setContent(text);
     else folder.createFile(Utilities.newBlob(text, 'application/json', PRIVATE_KPICALC_FILE));
     props.setProperty('KPICALC_LAST_IMPORT', stamp);
+    reportVersionRecord_('kpi', incoming, 'success', { rule: decision.rule });
     kpiCalcNotify('✅ KPI試算資料已更新（' + latest.file.getName() + '）',
       '來源：' + latest.file.getName() + '\n期間：' + data.meta.period +
       '\n店點 ' + data.stores.length + ' 家、人員 ' + data.persons.length + ' 位。\n' +
@@ -2189,6 +2214,12 @@ function privateDashboardPublish(payload) {
   } else {
     folder.createFile(blob);
   }
+  // 只登記版本、不擋。privateDashboardPublish 是 Codex 每日自動化的入口，
+  // 這裡若改成硬擋，外部管線會在無預警下失敗——要不要升級為硬擋是 Liam 的決定，見 SPEC §4。
+  reportVersionRecord_('award', {
+    dataDate: String(snapshot.kpiBattle.report_date || ''), source: 'external-publish',
+    fileHash: reportVersionHash_(text), fileName: PRIVATE_DASHBOARD_FILE, operator: 'external'
+  }, 'success', { rule: 'record-only' });
   return { publishedAt: privateDashboardNow(), reportDate: snapshot.kpiBattle.report_date || '' };
 }
 
@@ -2633,14 +2664,28 @@ function reportUploadPreview(payload) {
   // 通過驗證才寫暫存資料檔（正式檔仍未更動）
   const stagingName = 'upload-staging-' + kind + '-' + token + '.json';
   folder.createFile(Utilities.newBlob(JSON.stringify(data), 'application/json', stagingName));
+  const fileHash = reportVersionHash_(bytes);
   reportUploadCache_().put('rupload_' + token, JSON.stringify({
     kind: kind, employeeId: employeeId, fileName: fileName, dataDate: dataDate,
-    rawFileId: rawFile.getId(), stagingName: stagingName
+    rawFileId: rawFile.getId(), stagingName: stagingName, fileHash: fileHash
   }), REPORT_UPLOAD_STAGE_TTL_SECONDS);
+
+  // 先行預告版本判斷結果，讓使用者在按下確認前就知道會不會被擋、需不需要強制覆寫
+  const decision = reportVersionDecide_('kpi' === kind ? 'kpi' : 'award',
+    { dataDate: dataDate, source: 'manual-upload', fileHash: fileHash });
+  const current = reportVersionGet_(kind);
+  if (!decision.accept) {
+    checks.push(reportUploadCheck_('version', '版本衝突檢查',
+      decision.rule === 'same-hash' ? 'warn' : 'warn', decision.reason + '（可勾選強制覆寫）'));
+  } else {
+    checks.push(reportUploadCheck_('version', '版本衝突檢查', 'ok', decision.reason));
+  }
 
   return {
     ok: true, kind: kind, token: token, checks: checks, preview: preview,
-    live: live, dataDate: dataDate, targets: spec.targets,
+    live: live, dataDate: dataDate, targets: spec.targets, fileHash: fileHash,
+    version: { decision: decision, current: current },
+    needsForce: !decision.accept,
     warnings: checks.filter(function(c) { return c.level === 'warn'; }).length
   };
 }
@@ -2665,6 +2710,24 @@ function reportUploadCommit(payload) {
   let overall = 'ok';
   let backupName = '';
   let message = '';
+
+  // 版本衝突把關：手動上傳可由操作者勾選強制覆寫，但必須是明示的
+  const incoming = {
+    dataDate: staged.dataDate, source: 'manual-upload', fileHash: staged.fileHash,
+    fileName: staged.fileName, operator: employeeId, force: !!(payload || {}).force
+  };
+  const decision = reportVersionDecide_(kind, incoming);
+  if (!decision.accept) {
+    reportVersionRecord_(kind, incoming, 'skipped', { skipRule: decision.rule });
+    return {
+      result: 'blocked', kind: kind, logId: '', stages: [
+        reportUploadStage_('version', '版本衝突檢查', 'fail', decision.reason),
+        reportUploadStage_('json', 'JSON／API', 'skip', '未執行，正式資料維持上一版')
+      ],
+      backupFile: '', dataDate: staged.dataDate, needsForce: true,
+      message: decision.reason, live: reportUploadLiveInfo_(kind)
+    };
+  }
 
   function fail(stage, err) {
     overall = 'error';
@@ -2778,6 +2841,10 @@ function reportUploadCommit(payload) {
   reportUploadTrash_(reportUploadFileByName_(staged.stagingName));
   reportUploadCache_().remove('rupload_' + token);
 
+  // 只有整段成功才登記為正式版本；失敗時正式資料已還原，版本狀態不能動
+  reportVersionRecord_(kind, incoming, overall === 'ok' ? 'success' : 'failed',
+    { rule: decision.rule, versionBackup: backupName });
+
   if (overall === 'ok') {
     kpiCalcNotify('✅ ' + spec.label + '戰報快速更新成功（' + staged.fileName + '）',
       '操作者員編：' + employeeId + '\n資料日期：' + (staged.dataDate || '-') +
@@ -2833,6 +2900,15 @@ function reportUploadRollback(payload) {
   if (liveFile) liveFile.setContent(text);
   else folder.createFile(Utilities.newBlob(text, 'application/json', spec.liveFile));
 
+  // 回復後登記為 rollback 版本：排程之後不得用同日期的舊檔把它蓋回去
+  const restoredDate = kind === 'kpi'
+    ? reportUploadKpiDate_((parsed || {}).meta)
+    : String(((parsed || {}).kpiBattle || {}).report_date || '');
+  reportVersionRecord_(kind, {
+    dataDate: restoredDate, source: 'rollback', fileHash: reportVersionHash_(text),
+    fileName: target.getName(), operator: employeeId
+  }, 'success', { rule: 'rollback' });
+
   const stamp = reportUploadStamp_();
   try {
     const sheet = privateDashboardSheet(REPORT_UPLOAD_LOG_SHEET, REPORT_UPLOAD_LOG_HEADERS);
@@ -2844,4 +2920,137 @@ function reportUploadRollback(payload) {
   } catch (e) { console.log('report upload rollback log failed: ' + e); }
 
   return { restored: target.getName(), kind: kind, live: reportUploadLiveInfo_(kind) };
+}
+
+// ════════════════════════════════════════════════════════════════
+// 資料版本狀態與防衝突（2026-07-31 Liam 指示補上）
+//
+// 問題：11:00 排程與網站手動上傳是兩條互不知情的寫入路徑。
+// 若 10:55 手動上傳了 0731 資料，11:00 排程掃到來源資料夾的 0731.xlsx
+// 仍會照寫一次；若手動上傳的是更正後版本，就會被排程的舊檔覆蓋。
+//
+// 解法：每次寫入正式資料都登記一筆版本狀態（指令碼屬性 REPORT_UPDATE_STATE），
+// 任何寫入前先問 reportVersionDecide_() 能不能寫。
+//
+// 判斷規則（rule 值會寫進通知信與紀錄，方便事後追）：
+//   1. 資料日期較新                    → 一律接受
+//   2. 資料日期較舊                    → 拒絕（manual-upload 可帶 force 覆寫）
+//   3. 同日期 + 檔案雜湊相同            → 略過（同一份檔案，不必重寫）
+//   4. 同日期 + 目前版本來自 manual-upload／rollback + 新來源是 scheduled／onedrive
+//                                      → 拒絕（這就是 11:00 蓋掉 10:55 的情境）
+//   5. 同日期 + 其餘情形                → 接受（後到的視為更正版）
+// ════════════════════════════════════════════════════════════════
+
+const REPORT_VERSION_PROP = 'REPORT_UPDATE_STATE';
+const REPORT_VERSION_SOURCES = ['scheduled', 'onedrive', 'manual-upload', 'rollback', 'external-publish'];
+// 手動性質的來源：排程不得覆蓋這些來源的同日期資料
+const REPORT_VERSION_MANUAL_SOURCES = ['manual-upload', 'rollback'];
+const REPORT_VERSION_AUTO_SOURCES = ['scheduled', 'onedrive'];
+
+function reportVersionState_() {
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty(REPORT_VERSION_PROP);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return (parsed && typeof parsed === 'object') ? parsed : {};
+  } catch (e) {
+    console.log('report version state unreadable: ' + e);
+    return {};
+  }
+}
+
+function reportVersionGet_(kind) {
+  const state = reportVersionState_();
+  return state[kind] || null;
+}
+
+// 寫入版本狀態。永遠不讓這裡的失敗影響資料更新本身。
+function reportVersionSet_(kind, meta) {
+  try {
+    const state = reportVersionState_();
+    state[kind] = meta;
+    PropertiesService.getScriptProperties().setProperty(REPORT_VERSION_PROP, JSON.stringify(state));
+  } catch (e) {
+    console.log('report version state write failed: ' + e);
+  }
+}
+
+function reportVersionId_(kind, source) {
+  return [reportUploadStamp_(), kind, source, Utilities.getUuid().slice(0, 8)].join('-');
+}
+
+function reportVersionHash_(input) {
+  try {
+    const bytes = typeof input === 'string'
+      ? Utilities.newBlob(input).getBytes()
+      : input;
+    return Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, bytes)
+      .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
+  } catch (e) {
+    console.log('report version hash failed: ' + e);
+    return '';
+  }
+}
+
+// incoming: { dataDate, source, fileHash, fileName, operator, force }
+// 回傳 { accept, rule, reason }
+function reportVersionDecide_(kind, incoming) {
+  const current = reportVersionGet_(kind);
+  const source = String((incoming || {}).source || '');
+  const dataDate = String((incoming || {}).dataDate || '');
+  const fileHash = String((incoming || {}).fileHash || '');
+  const force = !!(incoming || {}).force;
+
+  if (!current || !current.dataDate) {
+    return { accept: true, rule: 'first-version', reason: '目前沒有版本紀錄，視為首次寫入' };
+  }
+  if (dataDate && dataDate > current.dataDate) {
+    return { accept: true, rule: 'newer-date', reason: '資料日期 ' + dataDate + ' 比目前 ' + current.dataDate + ' 新' };
+  }
+  if (dataDate && dataDate < current.dataDate) {
+    if (force && REPORT_VERSION_MANUAL_SOURCES.indexOf(source) !== -1) {
+      return { accept: true, rule: 'forced-older', reason: '操作者強制覆寫較舊資料 ' + dataDate };
+    }
+    return { accept: false, rule: 'older-date',
+      reason: '資料日期 ' + dataDate + ' 比目前正式版本 ' + current.dataDate + ' 舊，拒絕覆蓋' };
+  }
+  // 以下為同日期
+  if (fileHash && current.fileHash && fileHash === current.fileHash) {
+    return { accept: false, rule: 'same-hash',
+      reason: '與目前正式版本是同一個檔案（雜湊相同），不需重複寫入' };
+  }
+  if (REPORT_VERSION_AUTO_SOURCES.indexOf(source) !== -1 &&
+      REPORT_VERSION_MANUAL_SOURCES.indexOf(current.source) !== -1) {
+    if (force) {
+      return { accept: true, rule: 'forced-over-manual', reason: '強制覆寫手動版本' };
+    }
+    return { accept: false, rule: 'manual-wins',
+      reason: '同日期 ' + dataDate + ' 已由 ' + current.source + ' 於 ' +
+              (current.uploadedAt || '(未知時間)') + ' 更新，排程不覆蓋手動上傳的資料' };
+  }
+  return { accept: true, rule: 'same-date-replace',
+    reason: '同日期資料，後到的視為更正版本' };
+}
+
+// 統一的版本登記入口。updateStatus：success / skipped / failed
+function reportVersionRecord_(kind, incoming, updateStatus, extra) {
+  const meta = {
+    reportType: kind,
+    dataDate: String((incoming || {}).dataDate || ''),
+    source: String((incoming || {}).source || ''),
+    uploadedAt: privateDashboardNow(),
+    fileName: String((incoming || {}).fileName || ''),
+    fileHash: String((incoming || {}).fileHash || ''),
+    operator: String((incoming || {}).operator || ''),
+    versionId: reportVersionId_(kind, String((incoming || {}).source || 'unknown')),
+    updateStatus: updateStatus
+  };
+  if (extra) Object.keys(extra).forEach(function(k) { meta[k] = extra[k]; });
+  // 只有真正寫進正式資料才更新狀態，否則會把「被拒絕的版本」誤記成正式版本
+  if (updateStatus === 'success') reportVersionSet_(kind, meta);
+  return meta;
+}
+
+// 供 GAS 編輯器手動查詢目前兩邊的版本狀態
+function reportVersionStatus() {
+  return { state: reportVersionState_(), sources: REPORT_VERSION_SOURCES };
 }
