@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="robots" content="noindex, nofollow">
+<title>北一二B 戰報快速更新</title>
+<style>
+  :root {
+    --bg-deep:#f5f6f8; --bg-card:#fff; --bg-panel:#f0f2f5; --bg-row-alt:#f8f9fb;
+    --accent:#f97316; --accent-bright:#ea580c;
+    --cyan:#0891b2; --cyan-deep:#0e7490;
+    --green:#16a34a; --red:#dc2626; --warn:#d97706; --grey:#6b7280;
+    --text:#111827; --text-dim:#374151; --text-muted:#6b7280;
+    --border:rgba(0,0,0,.12); --border-dim:rgba(0,0,0,.07);
+    --radius:12px; --font:'Segoe UI','Noto Sans TC',sans-serif;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg-deep); color:var(--text); font-family:var(--font); font-size:16px; min-height:100vh; padding-bottom:60px; }
+
+  .site-header { background:#fff; border-bottom:3px solid var(--accent); padding:12px 16px; position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .site-header h1 { font-size:1.15rem; color:var(--accent-bright); }
+  .site-header .sub { font-size:.72rem; color:var(--text-muted); }
+  .site-header a { font-size:.75rem; color:var(--cyan-deep); font-weight:700; text-decoration:none; white-space:nowrap; }
+
+  .wrap { max-width:900px; margin:0 auto; padding:12px; }
+  .card { background:#fff; border:1px solid var(--border-dim); border-radius:var(--radius); padding:14px 16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+  .card h2 { font-size:1.02rem; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+  .note { font-size:.78rem; color:var(--text-muted); line-height:1.6; }
+  .fld { display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
+  .fld label { font-size:.76rem; color:var(--text-dim); font-weight:700; }
+  .fld input { padding:9px 10px; border:1px solid var(--border); border-radius:10px; font-size:.95rem; background:#fff; color:var(--text); }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > .fld { flex:1; min-width:180px; }
+
+  .btn { padding:9px 14px; border:1px solid var(--border); background:#fff; border-radius:10px; font-size:.88rem; font-weight:700; cursor:pointer; color:var(--text-dim); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.go { background:var(--green); border-color:var(--green); color:#fff; }
+  .btn.warn { color:var(--red); border-color:rgba(220,38,38,.4); }
+
+  .lane { border-top:4px solid var(--accent); }
+  .lane.award { border-top-color:var(--cyan); }
+  .lane h2 .tag { font-size:.68rem; font-weight:700; padding:2px 7px; border-radius:999px; background:var(--bg-panel); color:var(--text-muted); }
+
+  .msg { font-size:.8rem; margin-top:8px; line-height:1.6; }
+  .msg.ok { color:var(--green); } .msg.bad { color:var(--red); } .msg.busy { color:var(--text-muted); }
+
+  ul.checks { list-style:none; margin-top:8px; font-size:.8rem; }
+  ul.checks li { padding:5px 8px; border-radius:8px; margin-bottom:4px; display:flex; gap:8px; align-items:flex-start; background:var(--bg-row-alt); }
+  ul.checks li .ico { flex:none; font-weight:800; }
+  ul.checks li.ok .ico { color:var(--green); }
+  ul.checks li.warn { background:rgba(217,119,6,.08); } ul.checks li.warn .ico { color:var(--warn); }
+  ul.checks li.block { background:rgba(220,38,38,.08); } ul.checks li.block .ico { color:var(--red); }
+  ul.checks li .lbl { font-weight:700; flex:none; min-width:8.5em; }
+  ul.checks li .det { color:var(--text-dim); }
+
+  table.mini { width:100%; border-collapse:collapse; font-size:.8rem; margin-top:8px; }
+  table.mini th { background:var(--bg-panel); padding:6px; font-size:.72rem; color:var(--text-muted); text-align:left; white-space:nowrap; }
+  table.mini td { padding:6px; border-top:1px solid var(--border-dim); }
+  table.mini tr:nth-child(even) td { background:var(--bg-row-alt); }
+  .scroll { overflow-x:auto; }
+
+  .status { list-style:none; margin-top:8px; font-size:.82rem; }
+  .status li { display:flex; align-items:center; gap:8px; padding:7px 8px; border-top:1px solid var(--border-dim); }
+  .status li:first-child { border-top:none; }
+  .status li .lbl { flex:1; font-weight:700; color:var(--text-dim); }
+  .status li .det { flex:2; font-size:.74rem; color:var(--text-muted); }
+  .pill { flex:none; font-size:.72rem; font-weight:800; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .pill.ok { background:rgba(22,163,74,.12); color:var(--green); }
+  .pill.fail { background:rgba(220,38,38,.12); color:var(--red); }
+  .pill.skip { background:rgba(107,114,128,.14); color:var(--grey); }
+  .pill.kept { background:rgba(217,119,6,.12); color:var(--warn); }
+
+  .hidden { display:none !important; }
+  .confirmbar { margin-top:10px; padding:10px; border-radius:10px; background:#fff7ed; border:1px solid rgba(249,115,22,.35); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .confirmbar .t { font-size:.8rem; font-weight:700; color:var(--accent-bright); flex:1; min-width:200px; }
+  .lastupd { font-size:.76rem; color:var(--text-muted); margin-top:6px; }
+</style>
+</head>
+<body>
+
+<div class="site-header">
+  <div>
+    <h1>📤 戰報快速更新</h1>
+    <div class="sub">北一二B · M+／OneDrive 無法使用時的備援入口</div>
+  </div>
+  <a href="home.html">← 智慧營運中心</a>
+</div>
+
+<div class="wrap">
+
+  <!-- ── 權限 ── -->
+  <div class="card" id="authCard">
+    <h2>🔐 督導登入</h2>
+    <div class="note">此頁只開放指定督導帳號。前端與後端都會檢查權限，未授權員編一律拒絕。</div>
+    <div class="row" style="margin-top:10px">
+      <div class="fld"><label>員編</label><input type="text" id="authEmp" autocomplete="off" placeholder="例：A12345"></div>
+      <div class="fld"><label>管理者密碼</label><input type="password" id="authSecret" autocomplete="off"></div>
+    </div>
+    <button class="btn primary" id="authBtn" onclick="doLogin()">登入</button>
+    <div class="msg" id="authMsg"></div>
+  </div>
+
+  <div id="app" class="hidden">
+
+    <!-- ── KPI 車道 ── -->
+    <div class="card lane" id="lane-kpi">
+      <h2>📊 KPI 戰報 <span class="tag">Excel（.xlsx）</span></h2>
+      <div class="note">
+        使用與每日自動化<strong>完全相同</strong>的解析程式（GAS <code>kpiCalcParseReport</code>）。
+        更新目標：私有 Drive 的 KPI 試算資料 → <strong>kpi.html</strong>。
+      </div>
+      <div class="lastupd" id="live-kpi">目前正式版本：讀取中…</div>
+      <div class="fld" style="margin-top:10px"><label>選擇 KPI 日報 Excel</label>
+        <input type="file" id="file-kpi" accept=".xlsx"></div>
+      <button class="btn primary" id="btn-check-kpi" onclick="doPreview('kpi')">① 檔案檢查與預覽</button>
+      <button class="btn warn" onclick="doRollback('kpi')">↩ 回復上一個成功版本</button>
+      <div class="msg" id="msg-kpi"></div>
+      <div id="checks-kpi"></div>
+      <div id="preview-kpi"></div>
+      <div class="confirmbar hidden" id="confirm-kpi">
+        <div class="t">以上預覽正確嗎？按下確認才會覆蓋正式資料（會先自動備份上一版）。</div>
+        <button class="btn go" onclick="doCommit('kpi')">② 確認更新 KPI</button>
+        <button class="btn" onclick="cancelPreview('kpi')">取消</button>
+      </div>
+      <div id="result-kpi"></div>
+    </div>
+
+    <!-- ── 台獎車道 ── -->
+    <div class="card lane award" id="lane-award">
+      <h2>🏅 台獎戰報 <span class="tag">戰情快照（.json）</span></h2>
+      <div class="note">
+        ⚠️ <strong>本階段台獎收 JSON、不收 Excel。</strong>repo 內目前沒有台獎 Excel 解析器可重用
+        （台獎快照由 Codex 環境的 <code>update_phone_awards.py</code> 產生），
+        依「不得複製出第二套台獎解析邏輯」原則，這裡不自行新寫一套。
+        更新目標：私有 Drive 的戰情快照 → <strong>index.html 台獎戰情／智慧營運中心</strong>。
+      </div>
+      <div class="lastupd" id="live-award">目前正式版本：讀取中…</div>
+      <div class="fld" style="margin-top:10px"><label>選擇台獎戰情快照 JSON</label>
+        <input type="file" id="file-award" accept=".json,application/json"></div>
+      <button class="btn primary" id="btn-check-award" onclick="doPreview('award')">① 檔案檢查與預覽</button>
+      <button class="btn warn" onclick="doRollback('award')">↩ 回復上一個成功版本</button>
+      <div class="msg" id="msg-award"></div>
+      <div id="checks-award"></div>
+      <div id="preview-award"></div>
+      <div class="confirmbar hidden" id="confirm-award">
+        <div class="t">以上預覽正確嗎？按下確認才會覆蓋正式資料（會先自動備份上一版）。</div>
+        <button class="btn go" onclick="doCommit('award')">② 確認更新台獎</button>
+        <button class="btn" onclick="cancelPreview('award')">取消</button>
+      </div>
+      <div id="result-award"></div>
+    </div>
+
+    <!-- ── 最近更新紀錄 ── -->
+    <div class="card">
+      <h2>🧾 最近更新紀錄</h2>
+      <div class="note">每次操作都會記錄帳號、時間、檔名、資料日期與結果。</div>
+      <button class="btn" style="margin-top:8px" onclick="loadLog()">重新整理</button>
+      <div id="logBox" class="scroll"></div>
+    </div>
+
+    <div class="card">
+      <div class="note">
+        KPI 與台獎<strong>各自獨立</strong>：一邊失敗不會影響另一邊，也不會讓另一邊留下半套更新。<br>
+        驗證未通過時正式資料一個位元都不會被改寫；讀回驗證失敗會自動還原上一版。<br>
+        本頁是<strong>備援入口</strong>，既有的 11:00 自動更新與督導發佈區流程都保留、未被取代。
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
+const AUTH = { employeeId: '', adminSecret: '' };
+const TOKENS = { kpi: '', award: '' };
+
+async function gasPost(payload) {
+  const response = await fetch(DEFAULT_GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error('連線失敗（HTTP ' + response.status + '）');
+  const result = await response.json();
+  // Apps Script 無法自訂 HTTP status，一律看 JSON 的 status 欄位
+  if (!result || result.status !== 'ok') throw new Error((result && result.message) || '未知錯誤');
+  return result;
+}
+
+function el(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
+}
+function setMsg(id, text, cls) {
+  const node = el(id);
+  node.className = 'msg' + (cls ? ' ' + cls : '');
+  node.textContent = text;
+}
+
+// ── 登入（前端第一道；後端 reportUploadAuthorize_ 才是真的那道）──
+async function doLogin() {
+  const emp = String(el('authEmp').value || '').trim().toUpperCase();
+  const secret = String(el('authSecret').value || '');
+  if (!emp || !secret) { setMsg('authMsg', '請輸入員編與管理者密碼。', 'bad'); return; }
+  if (!/^[A-Z0-9]{5,12}$/.test(emp)) { setMsg('authMsg', '員編格式不正確。', 'bad'); return; }
+  el('authBtn').disabled = true;
+  setMsg('authMsg', '驗證中…', 'busy');
+  try {
+    AUTH.employeeId = emp; AUTH.adminSecret = secret;
+    const result = await gasPost(auth({ action: 'report_upload_log', limit: 20 }));
+    setMsg('authMsg', '✅ 已登入：' + emp, 'ok');
+    el('app').classList.remove('hidden');
+    el('authCard').classList.add('hidden');
+    renderLive(result.live);
+    renderLog(result.entries);
+  } catch (error) {
+    AUTH.employeeId = ''; AUTH.adminSecret = '';
+    setMsg('authMsg', '❌ ' + error.message, 'bad');
+  } finally {
+    el('authBtn').disabled = false;
+  }
+}
+
+function auth(payload) {
+  payload.employeeId = AUTH.employeeId;
+  payload.adminSecret = AUTH.adminSecret;
+  return payload;
+}
+
+function renderLive(live) {
+  ['kpi', 'award'].forEach(function(kind) {
+    const info = live && live[kind];
+    el('live-' + kind).textContent = info
+      ? '目前正式版本：' + info.label + '｜最後更新 ' + info.updatedAt
+      : '目前正式版本：尚無資料（首次發佈）';
+  });
+}
+
+// ── ① 檔案檢查與預覽 ──
+async function doPreview(kind) {
+  const input = el('file-' + kind);
+  const file = input.files && input.files[0];
+  el('result-' + kind).innerHTML = '';
+  el('confirm-' + kind).classList.add('hidden');
+  el('preview-' + kind).innerHTML = '';
+  el('checks-' + kind).innerHTML = '';
+  TOKENS[kind] = '';
+  if (!file) { setMsg('msg-' + kind, '請先選擇檔案。', 'bad'); return; }
+  el('btn-check-' + kind).disabled = true;
+  setMsg('msg-' + kind, '上傳與檢查中…（此步驟不會更動正式資料）', 'busy');
+  try {
+    const base64 = await fileToBase64(file);
+    const result = await gasPost(auth({
+      action: 'report_upload_preview', kind: kind, fileName: file.name, fileBase64: base64
+    }));
+    renderChecks(kind, result.checks);
+    if (result.live) el('live-' + kind).textContent =
+      '目前正式版本：' + result.live.label + '｜最後更新 ' + result.live.updatedAt;
+    if (!result.ok) {
+      setMsg('msg-' + kind, '❌ 驗證未通過，正式資料未更動。請修正後重新上傳。', 'bad');
+      return;
+    }
+    TOKENS[kind] = result.token;
+    renderPreview(kind, result.preview);
+    el('confirm-' + kind).classList.remove('hidden');
+    setMsg('msg-' + kind, result.warnings
+      ? '⚠️ 檢查通過，但有 ' + result.warnings + ' 項提醒，請確認後再更新。'
+      : '✅ 檢查全部通過，確認預覽後即可更新。', result.warnings ? '' : 'ok');
+  } catch (error) {
+    setMsg('msg-' + kind, '❌ ' + error.message, 'bad');
+  } finally {
+    el('btn-check-' + kind).disabled = false;
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise(function(resolve, reject) {
+    const reader = new FileReader();
+    reader.onerror = function() { reject(new Error('讀取檔案失敗')); };
+    reader.onload = function() {
+      const s = String(reader.result || '');
+      resolve(s.slice(s.indexOf(',') + 1));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderChecks(kind, checks) {
+  const icon = { ok: '✔', warn: '!', block: '✕' };
+  el('checks-' + kind).innerHTML = '<ul class="checks">' + (checks || []).map(function(c) {
+    return '<li class="' + esc(c.level) + '"><span class="ico">' + icon[c.level] + '</span>' +
+      '<span class="lbl">' + esc(c.label) + '</span><span class="det">' + esc(c.detail) + '</span></li>';
+  }).join('') + '</ul>';
+}
+
+function renderPreview(kind, p) {
+  if (!p) { el('preview-' + kind).innerHTML = ''; return; }
+  let html = '';
+  if (kind === 'kpi') {
+    html = '<div class="note" style="margin-top:10px"><strong>資料預覽</strong>｜期間 ' + esc(p.period) +
+      '（累計到第 ' + esc(p.snapshotDay) + ' 天）｜店點 ' + esc(p.storeCount) + ' 家｜人員 ' + esc(p.personCount) + ' 位</div>' +
+      '<div class="scroll"><table class="mini"><thead><tr><th>店代碼</th><th>門市</th><th>官方總達成率</th></tr></thead><tbody>' +
+      (p.stores || []).map(function(s) {
+        return '<tr><td>' + esc(s.code) + '</td><td>' + esc(s.name) + '</td><td>' +
+          esc((Number(s.official) * 100).toFixed(2)) + '%</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="note" style="margin-top:6px">個人資料抽樣前 8 筆：' +
+      (p.persons || []).map(function(x) { return esc(x.pname) + '(' + esc(x.store) + ')'; }).join('、') + '</div>';
+  } else {
+    html = '<div class="note" style="margin-top:10px"><strong>資料預覽</strong>｜資料日期 ' +
+      esc(p.reportDate) + '｜店點 ' + esc(p.storeCount) + ' 家</div>' +
+      '<div class="scroll"><table class="mini"><thead><tr><th>門市</th><th>獎金</th></tr></thead><tbody>' +
+      (p.stores || []).map(function(s) {
+        return '<tr><td>' + esc(s.name) + '</td><td>' + esc(s.bonus) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  el('preview-' + kind).innerHTML = html;
+}
+
+function cancelPreview(kind) {
+  TOKENS[kind] = '';
+  el('confirm-' + kind).classList.add('hidden');
+  el('preview-' + kind).innerHTML = '';
+  el('checks-' + kind).innerHTML = '';
+  setMsg('msg-' + kind, '已取消，正式資料未更動。', '');
+}
+
+// ── ② 確認更新 ──
+async function doCommit(kind) {
+  if (!TOKENS[kind]) { setMsg('msg-' + kind, '預覽已失效，請重新上傳。', 'bad'); return; }
+  el('confirm-' + kind).classList.add('hidden');
+  setMsg('msg-' + kind, '更新中…', 'busy');
+  try {
+    const result = await gasPost(auth({ action: 'report_upload_commit', token: TOKENS[kind] }));
+    TOKENS[kind] = '';
+    renderResult(kind, result);
+    setMsg('msg-' + kind, result.result === 'ok'
+      ? '✅ 更新完成（紀錄編號 ' + result.logId + '）'
+      : '❌ 更新失敗：' + (result.message || '請看下方分項結果'), result.result === 'ok' ? 'ok' : 'bad');
+    if (result.live) el('live-' + kind).textContent =
+      '目前正式版本：' + result.live.label + '｜最後更新 ' + result.live.updatedAt;
+    loadLog();
+  } catch (error) {
+    setMsg('msg-' + kind, '❌ ' + error.message + '（正式資料維持上一版）', 'bad');
+  }
+}
+
+function renderResult(kind, result) {
+  const word = { ok: '成功', fail: '失敗', skip: '未執行', kept: '維持上一版' };
+  el('result-' + kind).innerHTML =
+    '<ul class="status">' + (result.stages || []).map(function(s) {
+      return '<li><span class="lbl">' + esc(s.label) + '</span>' +
+        '<span class="pill ' + esc(s.status) + '">' + (word[s.status] || s.status) + '</span>' +
+        '<span class="det">' + esc(s.detail) + '</span></li>';
+    }).join('') + '</ul>' +
+    (result.backupFile ? '<div class="note" style="margin-top:6px">上一版備份：<code>' +
+      esc(result.backupFile) + '</code>（可用「回復上一個成功版本」還原）</div>' : '');
+}
+
+// ── 回復上一版 ──
+async function doRollback(kind) {
+  if (!confirm('確定要把「' + (kind === 'kpi' ? 'KPI' : '台獎') + '」正式資料回復到上一個成功版本？')) return;
+  setMsg('msg-' + kind, '回復中…', 'busy');
+  try {
+    const result = await gasPost(auth({ action: 'report_upload_rollback', kind: kind }));
+    setMsg('msg-' + kind, '✅ 已回復自備份：' + result.restored, 'ok');
+    if (result.live) el('live-' + kind).textContent =
+      '目前正式版本：' + result.live.label + '｜最後更新 ' + result.live.updatedAt;
+    loadLog();
+  } catch (error) {
+    setMsg('msg-' + kind, '❌ 回復失敗：' + error.message, 'bad');
+  }
+}
+
+// ── 更新紀錄 ──
+async function loadLog() {
+  try {
+    const result = await gasPost(auth({ action: 'report_upload_log', limit: 20 }));
+    renderLog(result.entries);
+    renderLive(result.live);
+  } catch (error) {
+    el('logBox').innerHTML = '<div class="msg bad">讀取紀錄失敗：' + esc(error.message) + '</div>';
+  }
+}
+
+function renderLog(entries) {
+  if (!entries || !entries.length) {
+    el('logBox').innerHTML = '<div class="note" style="margin-top:8px">目前沒有更新紀錄。</div>';
+    return;
+  }
+  el('logBox').innerHTML = '<table class="mini"><thead><tr>' +
+    '<th>時間</th><th>類型</th><th>操作者</th><th>檔名</th><th>資料日期</th><th>結果</th></tr></thead><tbody>' +
+    entries.map(function(e) {
+      return '<tr><td>' + esc(e.acted_at) + '</td><td>' + esc(e.kind === 'kpi' ? 'KPI' : '台獎') +
+        '</td><td>' + esc(e.employee_id) + '</td><td>' + esc(e.file_name) + '</td><td>' +
+        esc(e.data_date) + '</td><td>' + esc(e.result) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+</script>
+</body>
+</html>

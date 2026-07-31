@@ -13,6 +13,41 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-07-31 ｜ Claude（戰報快速更新：網站上傳備援入口，第一階段，待 Liam 驗收）
+
+- 做了什麼：新增 `report-upload.html`（督導專用上傳頁）與 `gas/Code.gs` 尾端「戰報快速更新」整節
+  （`reportUploadPreview` / `Commit` / `Log` / `Rollback` 四個 POST 端點），`home.html` 督導專區加一張連結卡片。
+  流程為「上傳→9 項驗證→預覽→確認→備份→更新→讀回驗證→分項結果」。
+  **KPI 一律呼叫既有的 `kpiCalcParseReport()`**，上傳流程內沒有任何自寫的 xlsx／欄位解析；
+  `kpiCalcAutoUpdate`、`kpiCalcWatchdog`、`kpiCalcPublish`、`privateDashboardPublish` 一行都沒改。
+  正式資料的改寫是 commit 的最後一步，前面任一步失敗即 skip；讀回驗證失敗會自動還原上一版。
+- 結果：**本機驗證通過，正式環境尚未驗證。** 契約測試 30/30、Playwright 上傳情境 23/23、
+  既有 Node 契約測試 20/20 全綠。驗收情境 1~15 全部有對應測試（10~13 以 route 模擬各階段失敗）。
+  `patrol.spec.js` 有 2~5 項失敗，但在**未改動的 HEAD worktree 上重跑同樣會失敗且每次失敗項目不同**，
+  確認為既有的 flaky 測試，與本次改動無關。
+- 經驗 / 給下一位的提醒：
+  1. **任務描述提到的 `docs/UPLOAD-QUICK-UPDATE-SPEC.md` 與 `-FILE-MAP.md` 在 repo、所有分支與
+     完整 git 歷史中都不存在**。這兩個檔是我依現有程式碼實況補寫的，內容標明了與任務描述不符之處，
+     請 Liam 校正後再當基準。
+  2. **repo 內沒有任何 OneDrive／M+ 程式碼**；KPI 自動化讀的是 Google Drive 資料夾的 `MMDD.xlsx`。
+     「與 OneDrive 共用同一套解析」實作為「共用 `kpiCalcParseReport()`」。
+  3. **repo 內沒有台獎 Excel 解析器可重用**（台獎快照是 Codex 環境的 `update_phone_awards.py` 產的，
+     不在本 repo）。依「不得複製出第二套台獎解析邏輯」原則，第一階段台獎車道**收 JSON 不收 Excel**，
+     沿用 `privateDashboardPublish` 同一組欄位判斷。要收 Excel 請先給樣本或把該腳本納入 repo，
+     接上同一個 preview 端點即可，前端與失敗保護不用改。
+  4. **踩到一個坑並修掉**：備份檔原本命名 `north12b-kpicalc-backup-…`，會落入
+     `kpiCalcLatestDataFile()` 的 `north12b-kpicalc-*.json` 搜尋範圍——「備份成功但寫入正式檔失敗」時，
+     備份會變成資料夾中最新的一份而被 kpi.html 當成正式資料。已改為 `backup-` 開頭並加測試守住。
+     **日後要改備份命名，請先看 `tests/report-upload-contract.test.cjs` 那條測試。**
+  5. **本次改了 `doPost`，貼碼後必須「部署 → 管理部署作業 → ✏️ → 新版本 → 部署」**，
+     只存檔會拿到 `unknown private dashboard action`。另需在指令碼屬性加
+     `REPORT_UPLOAD_ALLOWED_EMPLOYEES`，否則只有 `DASHBOARD_TRUSTED_EMPLOYEE_ID` 能用。
+  6. 已知限制：`kpiCalcAutoUpdate` 仍沒有防退版保護，若網站上傳了較新資料而來源資料夾只有較舊的
+     `MMDD.xlsx`，隔天 11:00 仍可能寫回舊資料。這是**既有行為**（手動發佈區同樣有），
+     本次刻意未動自動化。要修建議在 `kpiCalcAutoUpdate` 寫入前加日期比對。
+  7. 依 Liam 指示，**舊流程全部保留、新功能不是唯一資料入口**：11:00 自動更新、
+     kpi.html 督導發佈區、`private_publish` 都照舊可用。
+
 ## 2026-07-31 ｜ Codex（匿名讀寫 P0 資安修補與正式 GAS 部署）
 
 - 做了什麼：只針對本次確認的匿名讀寫與瀏覽器敏感資料風險做最小修補。
