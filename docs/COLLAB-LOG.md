@@ -35,9 +35,20 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
   **刻意保留** `docs/PATROL_SECURITY_REVIEW_20260731.md`、Codex 的事故當事人紀錄、
   Playwright 1.55.1 升級與 `playwright.config.js` 的可攜性修正。
   未 force-push、未改寫 git 歷史、未碰任何正式資料與核准紀錄。
-- **結果（前端已備妥，GAS 待 Liam 執行）**：Node 契約 12/12、Playwright 66/68。
+- **結果（已完成止血，正式站恢復）**：Node 契約 12/12、Playwright 66/68。
   那 2 個 fail（`patrol.spec.js:341/365`）**在事故版 62cbe1e 上跑也同樣 fail**，
   是 headless_shell 不回傳 `download.suggestedFilename()` 的環境問題，非回歸。
+  Liam 先完成 GAS「每日回報 Deployment」第 22 版 → 第 15 版切版並實測讀寫正常，
+  之後 `1799d58` 以 fast-forward 推上 main（`62cbe1e..1799d58`，未 force-push），
+  Pages run **`30620023862` 部署成功**（2026-07-31 09:28:43Z）。
+  巡店 Deployment 與七分頁 Deployment 依判斷**維持原狀未動**——
+  `bde4c6b` 未改動 `ptread/ptwrite/hread/hwrite/sread` 契約，`dadd286` 版 `patrol.html`
+  與第 22 版巡店 API 相容；七分頁專案無前端 API，回退只會白白拆掉與本事故無關的
+  公式注入防護。
+- **⚠️ 未爆彈：`claude/quick-report-upload-feature-elyajz` 是從事故 commit `62cbe1e`
+  分出去的**，因此**含有 `bde4c6b`，其 `index.html` 仍帶著那句 prompt**。
+  該分支目前未合入 main、不影響正式站，但**直接合併就會讓整起事故重演**。
+  接手前必須先 `git rebase --onto 1799d58 62cbe1e` 或改由新 main 重開分支。
 - **經驗 / 給下一位的提醒**：
   1. **本機 `origin/main` 會過期，只看本機 branch 會完全誤判事故版本。**
      這次一開始看到的 main 是 `857a536`，重新 `git fetch` 後才發現已被推到 `62cbe1e`。
