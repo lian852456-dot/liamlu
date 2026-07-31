@@ -191,7 +191,7 @@
       <div class="fld"><label>KPI 試算資料 JSON 檔</label><input type="file" id="pubFile" accept=".json,application/json"></div>
     </div>
     <div style="margin-top:8px"><button class="btn" onclick="kpiPublish()">📤 發佈到私有 Drive</button> <span id="pubMsg" style="font-size:.78rem;color:var(--text-muted)"></span></div>
-    <div class="advnote" style="margin-top:6px">受保護資料固定連線至正式 Apps Script；瀏覽器端不可改寫授權端點。</div>
+    <div class="advnote" style="margin-top:6px">Apps Script 服務網址預設與回報系統相同；如需覆蓋，請在瀏覽器主控台設定 localStorage 的 <code>bei12b_gas_url</code>。</div>
   </details>
 
   <div class="foot">
@@ -209,9 +209,7 @@ let DATA = null;
 
 // ── 授權（與 index.html 戰情頁籤共用同一套 GAS 私有戰情機制與裝置ID）──
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
-let _kpiEmployeeId = '';
-let _kpiReportToken = '';
-function gasUrl(){ return DEFAULT_GAS_URL; }
+function gasUrl(){ return localStorage.getItem('bei12b_gas_url') || DEFAULT_GAS_URL; }
 function deviceId(){
   const key = 'north12b_private_dashboard_device_id';
   let id = localStorage.getItem(key);
@@ -244,13 +242,12 @@ function lockStatus(msg, err){
 }
 function lockEmp(){ return String(document.getElementById('lockEmp').value || '').trim().toUpperCase(); }
 async function kpiLogin(){
-  const emp = lockEmp() || _kpiEmployeeId;
+  const emp = lockEmp() || localStorage.getItem('bei12b_kpi_emp') || '';
   if (!emp){ lockStatus('請先輸入員工編號。', true); return; }
   lockStatus('正在驗證這台裝置…');
   try {
     const result = await gasPost({ action: 'kpicalc_access', employeeId: emp, deviceId: deviceId() });
-    _kpiEmployeeId = emp;
-    _kpiReportToken = result.reportSession?.token || '';
+    localStorage.setItem('bei12b_kpi_emp', emp);
     DATA = result.data;
     window._profile = result.profile || null;
     document.getElementById('lockCard').style.display = 'none';
@@ -267,14 +264,14 @@ async function kpiRequestBinding(){
   lockStatus('正在送出申請…');
   try {
     const result = await gasPost({ action: 'private_request', employeeId: emp, bootstrapCode: code, deviceId: deviceId() });
-    _kpiEmployeeId = emp;
+    localStorage.setItem('bei12b_kpi_emp', emp);
     lockStatus(result.message || '已送出申請，督導收到通知後會核准。');
   } catch (error) {
     lockStatus(String(error.message || error), true);
   }
 }
 async function kpiCheckRequest(){
-  const emp = lockEmp() || _kpiEmployeeId;
+  const emp = lockEmp() || localStorage.getItem('bei12b_kpi_emp') || '';
   if (!emp){ lockStatus('請先輸入員工編號。', true); return; }
   lockStatus('查詢中…');
   try {
@@ -286,14 +283,8 @@ async function kpiCheckRequest(){
     lockStatus(String(error.message || error), true);
   }
 }
-async function kpiLogout(){
-  const token = _kpiReportToken;
-  _kpiReportToken = '';
-  _kpiEmployeeId = '';
-  DATA = null;
-  if (token) {
-    try { await gasPost({ action: 'report_logout', token }); } catch (error) {}
-  }
+function kpiLogout(){
+  localStorage.removeItem('bei12b_kpi_emp');
   location.reload();
 }
 async function kpiPublish(){
@@ -325,6 +316,7 @@ const isAnti = k => ANTI_SELF.has(k) || k === ANTI_NPOUT;
 
 const LS_KEY = 'bei12b_kpi_v1';
 let LS = {};
+try { LS = JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch(e) { LS = {}; }
 LS.entities = LS.entities || {};
 
 let tab = LS.tab || 'store';
@@ -581,7 +573,7 @@ function render(){
     <tbody>${rows}</tbody></table>`;
 }
 
-function save(){ /* 試算狀態含人名，僅保留在本頁記憶體。 */ }
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(LS)); }
 function saveAndRender(){ save(); render(); }
 function setCalcDay(v){ LS.calcDay = Number(v) || defaultCalcDay(); saveAndRender(); }
 function setMonthDays(v){ LS.monthDays = Number(v) || DATA.meta.monthDays; saveAndRender(); }
@@ -835,7 +827,12 @@ function initApp(){
 }
 
 (function boot(){
+  const emp = localStorage.getItem('bei12b_kpi_emp');
   document.getElementById('lockCard').style.display = '';
+  if (emp){
+    document.getElementById('lockEmp').value = emp;
+    kpiLogin();
+  }
 })();
 </script>
 </body>

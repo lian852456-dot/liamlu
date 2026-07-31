@@ -13,6 +13,44 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-07-31 ｜ Claude（🚨 正式站全門市回報中斷事故：回復 bde4c6b 程式碼，保留事故文件）
+
+- **事故**：全門市開 `index.html` 即跳瀏覽器 prompt「請輸入已核准裝置的員工編號」，
+  輸入員編也進不去；每日回報讀取與儲存全數失敗，當日回報資料有持續遺失風險。
+- **根因**：`bde4c6b`（Codex，07-31 01:03，已推 main 並部署 Pages run `30564346083`）
+  把每日回報綁進了**只給 KPI／台獎私有戰情用的 `DashboardUsers` 裝置核准名冊**。
+  `window.onload`（`index.html:2288`）→ `fetchDayData()` → `ensureReportSession('employee')`
+  → prompt。**門市同仁從來沒被登錄進那份名冊**，所以無人能通過。
+  疊加另兩項回歸：①`privateDashboardAccess` 與 `kpiCalcAccess` 兩處的
+  `privateDashboardIsTrustedEmployee()` 豁免被刪，信任員編換裝置即鎖死；
+  ②員編／session／`bei12b_kpi_emp`／`bei12b_shadow_*` 全改成純記憶體變數，
+  重新整理就登出、影子備份救援機制同時失效。
+- **範圍釐清**：**不是**資料遺失、**不是**路由錯誤、**不是** onclick 綁錯或載入順序問題，
+  也**與 `claude/quick-report-upload-feature-elyajz` 無關**（`42e3036` 未合入 main，已用
+  `merge-base --is-ancestor` 驗證）。`DashboardUsers`／`DashboardRequests` 兩張表
+  **完全沒被動過**——`bde4c6b` 只改比對條件，未改任何名冊寫入或刪除邏輯。
+- **做了什麼**：依 Liam 指示執行方案 B 止血。**只回復造成事故的程式碼檔案**至
+  `dadd286`（`bde4c6b` 的 parent，已驗證為事故前最後正常版）：
+  `index.html`、`kpi.html`、`gas/Code.gs`、`patrol.html` 與對應測試；
+  **刻意保留** `docs/PATROL_SECURITY_REVIEW_20260731.md`、Codex 的事故當事人紀錄、
+  Playwright 1.55.1 升級與 `playwright.config.js` 的可攜性修正。
+  未 force-push、未改寫 git 歷史、未碰任何正式資料與核准紀錄。
+- **結果（前端已備妥，GAS 待 Liam 執行）**：Node 契約 12/12、Playwright 66/68。
+  那 2 個 fail（`patrol.spec.js:341/365`）**在事故版 62cbe1e 上跑也同樣 fail**，
+  是 headless_shell 不回傳 `download.suggestedFilename()` 的環境問題，非回歸。
+- **經驗 / 給下一位的提醒**：
+  1. **本機 `origin/main` 會過期，只看本機 branch 會完全誤判事故版本。**
+     這次一開始看到的 main 是 `857a536`，重新 `git fetch` 後才發現已被推到 `62cbe1e`。
+     查正式站事故，第一步一定要先 fetch。
+  2. **每日回報與 KPI／台獎共用同一個 Deployment `AKfycbwf…onDIl4Mi`**
+     （`index.html` 與 `kpi.html` 都指它），巡店是另一個 `AKfycbznzo…Grghd-Mv`。
+     動其中一個的授權條件會同時影響兩個系統，改之前務必確認影響面。
+  3. **授權範圍不等於授權強度。** 把「少數人的裝置核准名冊」套到「全門市每天在用的路徑」，
+     就算每一行程式都正確、測試全綠、資安報告 0 高風險，結果仍是全站中斷。
+     新增授權時要先問「現在有多少人在這份名冊裡」，而不是只問「這樣夠不夠安全」。
+  4. GAS Deployment 版本回復**只需在原 Deployment ID 選回舊版，不要貼 `Code.gs`**——
+     貼碼就會重演 2026-07-25 的 `kpiCalc*` 無聲洗掉事故。
+
 ## 2026-07-31 ｜ Codex（匿名讀寫 P0 資安修補與正式 GAS 部署）
 
 - 做了什麼：只針對本次確認的匿名讀寫與瀏覽器敏感資料風險做最小修補。

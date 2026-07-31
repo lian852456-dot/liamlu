@@ -5,23 +5,13 @@ const FILE_URL = 'file://' + path.resolve(__dirname, '../index.html');
 
 // Mock GAS 回應（讓 fetch 不需要真正連線）
 async function mockGAS(page, { readData = {} } = {}) {
-  page.on('dialog', dialog => dialog.accept('TEST01'));
   await page.route('https://script.google.com/**', async route => {
     const url = route.request().url();
     const request = route.request();
     if (request.method() === 'POST') {
       const payload = JSON.parse(request.postData() || '{}');
-      if (payload.action === 'report_auth') {
-        await route.fulfill({ json: { status: 'ok', token: 'report-test-token', scope: payload.key ? 'supervisor' : 'employee', expiresIn: 1800 } });
-      } else if (payload.action === 'read') {
-        await route.fulfill({ json: { status: 'ok', data: readData } });
-      } else if (payload.action === 'private_access') {
-        await route.fulfill({ json: {
-          status: 'ok',
-          profile: { maskedName: '測＊員', store: '大稻埕', role: '業代' },
-          reportSession: { token: 'report-test-token', scope: 'employee', expiresIn: 1800 },
-          snapshot: { kpiBattle: KPI_BATTLE_FIXTURE, awardsBattle: AWARDS_BATTLE_FIXTURE }
-        } });
+      if (payload.action === 'private_access') {
+        await route.fulfill({ json: { status: 'ok', profile: { maskedName: '測＊員', store: '大稻埕', role: '業代' }, snapshot: { kpiBattle: KPI_BATTLE_FIXTURE, awardsBattle: AWARDS_BATTLE_FIXTURE } } });
       } else {
         await route.fulfill({ json: { status: 'ok' } });
       }
@@ -428,56 +418,5 @@ test.describe('個人追蹤 - 新增人員', () => {
     const name = await page.$eval('#personalName', el => el.value);
     expect(name).toBe('測試員工A');
     await expect(page.locator('#personalFormSection')).toBeVisible();
-  });
-});
-
-test.describe('資安邊界', () => {
-  test('受保護回報固定走正式 POST，不受 localStorage 端點覆寫影響', async ({ page }) => {
-    const protectedUrls = [];
-    await page.addInitScript(() => localStorage.setItem('bei12b_gas_url', 'https://example.invalid/collect'));
-    page.on('request', request => {
-      if (request.method() !== 'POST') return;
-      const payload = JSON.parse(request.postData() || '{}');
-      if (['report_auth', 'read', 'write', 'pread', 'pwrite'].includes(payload.action)) {
-        protectedUrls.push(request.url());
-      }
-    });
-    await mockGAS(page);
-    await page.goto(FILE_URL);
-    await expect.poll(() => protectedUrls.length).toBeGreaterThan(0);
-    expect(protectedUrls.every(url => url.startsWith('https://script.google.com/'))).toBe(true);
-  });
-
-  test('員編、個人回報與私有附件不寫入 localStorage 或 sessionStorage', async ({ page }) => {
-    await mockGAS(page);
-    await page.goto(FILE_URL);
-    await page.getByRole('button', { name: 'KPI戰情' }).click();
-    const lock = page.locator('#kpiBattleContent');
-    await lock.getByPlaceholder('輸入員工編號').fill('TEST01');
-    await lock.getByRole('button', { name: '以員編登入' }).click();
-    const stored = await page.evaluate(() => ({
-      local: JSON.stringify(localStorage),
-      session: JSON.stringify(sessionStorage),
-    }));
-    expect(stored.local).not.toContain('TEST01');
-    expect(stored.session).not.toContain('TEST01');
-    expect(stored.local).not.toContain('測＊員');
-    expect(stored.session).not.toContain('測＊員');
-  });
-
-  test('改善文字經 HTML escaping，不會執行注入內容', async ({ page }) => {
-    await mockGAS(page, {
-      readData: {
-        '萬大': {
-          store: '萬大', date: '2026-07-20', seg: 21,
-          zero_reason: '<img src=x onerror=\"window.__xss=1\">',
-        },
-      },
-    });
-    await page.goto(FILE_URL);
-    await page.locator('.tab-btn:has-text("彙整大盤")').click();
-    await page.getByRole('button', { name: '21:00' }).click();
-    await expect(page.locator('#storePersonalSection')).toContainText('<img src=x');
-    expect(await page.evaluate(() => window.__xss || 0)).toBe(0);
   });
 });

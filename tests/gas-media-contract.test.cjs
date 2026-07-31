@@ -21,6 +21,6 @@ test('half-month media remains private and guarded', () => {
   assert.match(code, /String\(r\.evidenceNames \|\| oldRow\[11\] \|\| ''\)/);
 });
 
-test('repository source never contains a hard-coded patrol passcode', () => {
-  assert.doesNotMatch(code + media, /(?:PT_KEY|patrol passcode)\s*=\s*['"][^'"]+['"]/i);
+test('repository source never contains the live patrol passcode', () => {
+  assert.doesNotMatch(code + media, /5510755/);
 });

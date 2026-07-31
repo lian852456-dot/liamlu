@@ -76,10 +76,48 @@ function doGet(e) {
     }
   }
 
-  // 回報資料含改善內容與個人資料，禁止使用 GET／JSONP 傳送憑證或寫入。
-  // Apps Script ContentService 無法自訂 HTTP status；以 code:403 提供等價拒絕語意。
-  if (['read', 'write', 'pread', 'pwrite'].includes(action)) {
-    return jsonResponse({ status: 'error', message: 'unauthorized', code: 403 }, cb);
+  if (action === 'write') {
+    try {
+      const payload = JSON.parse(decodeURIComponent(e.parameter.payload));
+      writeData(payload.date, payload.store, payload.seg, payload.data);
+      return jsonResponse({ status: 'ok' }, cb);
+    } catch(err) {
+      return jsonResponse({ status: 'error', message: err.message }, cb);
+    }
+  }
+
+  if (action === 'read') {
+    try {
+      const date = e.parameter.date;
+      const seg  = parseInt(e.parameter.seg);
+      const data = readData(date, seg);
+      return jsonResponse({ status: 'ok', data }, cb);
+    } catch(err) {
+      return jsonResponse({ status: 'error', message: err.message }, cb);
+    }
+  }
+
+  // ── 個人回報：寫入 ──
+  if (action === 'pwrite') {
+    try {
+      const payload = JSON.parse(decodeURIComponent(e.parameter.payload));
+      writePersonal(payload);
+      return jsonResponse({ status: 'ok' }, cb);
+    } catch(err) {
+      return jsonResponse({ status: 'error', message: err.message }, cb);
+    }
+  }
+
+  // ── 個人回報：讀取（某日某時段全部）──
+  if (action === 'pread') {
+    try {
+      const date = e.parameter.date;
+      const seg  = parseInt(e.parameter.seg);
+      const data = readPersonal(date, seg);
+      return jsonResponse({ status: 'ok', data }, cb);
+    } catch(err) {
+      return jsonResponse({ status: 'error', message: err.message }, cb);
+    }
   }
 
   // ── 巡店追蹤：寫入（patrol.html，JSONP）──
@@ -590,16 +628,6 @@ function weeklyHalfPeriodLabel(period) {
   return String(period || '') === 'H2' ? '下半月' : '上半月';
 }
 
-function weeklySafeCellText_(value) {
-  const text = String(value == null ? '' : value);
-  return /^[=+\-@]/.test(text) ? "'" + text : text;
-}
-
-function weeklySafeDriveUrl_(value) {
-  const text = String(value || '').trim();
-  return /^https:\/\/(?:drive|docs)\.google\.com\//i.test(text) ? text : '';
-}
-
 function weeklyReadHalfCheck() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheetName = '半月督導檢查';
@@ -670,12 +698,11 @@ function buildWeeklyHalfCheckTab(monthKey) {
     const items = media.length ? media : [null];
     items.forEach(item => {
       rows.push([
-        weeklySafeCellText_(r.date), weeklyHalfPeriodLabel(r.period), weeklySafeCellText_(r.store),
-        weeklySafeCellText_(r.inspector), Number(r.item || 0), PT_ITEM_TEXT[Number(r.item)] || '',
-        weeklyHalfResultLabel(r.result), weeklySafeCellText_(r.note), weeklySafeCellText_(r.improvement),
-        item ? weeklySafeCellText_(item.name || '附件') : '—',
-        item && weeklySafeDriveUrl_(item.viewUrl || item.previewUrl) ? '開啟私有附件' : '—',
-        weeklySafeCellText_(r.savedAt)
+        String(r.date || ''), weeklyHalfPeriodLabel(r.period), String(r.store || ''),
+        String(r.inspector || ''), Number(r.item || 0), PT_ITEM_TEXT[Number(r.item)] || '',
+        weeklyHalfResultLabel(r.result), String(r.note || ''), String(r.improvement || ''),
+        item ? String(item.name || '附件') : '—', item && (item.viewUrl || item.previewUrl) ? '開啟私有附件' : '—',
+        String(r.savedAt || '')
       ]);
       if (item) {
         const row = rows.length;
@@ -700,7 +727,7 @@ function formatWeeklyHalfCheckSheet(sheet, tab) {
 
   tab.mediaJobs.forEach(job => {
     const media = job.media;
-    const link = weeklySafeDriveUrl_(media.viewUrl || media.previewUrl);
+    const link = String(media.viewUrl || media.previewUrl || '');
     if (link) {
       const rich = SpreadsheetApp.newRichTextValue().setText('開啟私有附件').setLinkUrl(link).build();
       sheet.getRange(job.row, 11).setRichTextValue(rich);
@@ -1112,12 +1139,6 @@ function doPost(e) {
     let result;
     if (action === 'ptauth') result = ptAuthenticatePayload(payload);
     else if (action === 'ptlogout') result = ptLogoutPayload(payload);
-    else if (action === 'report_auth') result = reportAuthenticatePayload_(payload);
-    else if (action === 'report_logout') result = reportLogoutPayload_(payload);
-    else if (action === 'read') result = reportReadPayload_(payload);
-    else if (action === 'write') result = reportWritePayload_(payload);
-    else if (action === 'pread') result = reportPersonalReadPayload_(payload);
-    else if (action === 'pwrite') result = reportPersonalWritePayload_(payload);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
     else if (action === 'private_request') result = privateDashboardRequestBinding(payload);
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
@@ -1133,12 +1154,7 @@ function doPost(e) {
     else throw new Error('unknown private dashboard action');
     return jsonResponse({ status: 'ok', ...result });
   } catch (err) {
-    const message = err && err.message ? err.message : String(err);
-    return jsonResponse({
-      status: 'error',
-      message: message === 'unauthorized' ? 'unauthorized' : message,
-      ...(message === 'unauthorized' ? { code: 403 } : {})
-    });
+    return jsonResponse({ status: 'error', message: err && err.message ? err.message : String(err) });
   }
 }
 
@@ -1181,128 +1197,6 @@ function privateDashboardHash(value) {
     const normalized = byte < 0 ? byte + 256 : byte;
     return ('0' + normalized.toString(16)).slice(-2);
   }).join('');
-}
-
-const REPORT_SESSION_TTL_SECONDS = 1800;
-
-function reportUnauthorized_() {
-  throw new Error('unauthorized');
-}
-
-function reportSessionCacheKey_(token) {
-  return 'report_session:' + privateDashboardHash(String(token || ''));
-}
-
-function reportCreateEmployeeSession_(user) {
-  const token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
-  const session = {
-    scope: 'employee',
-    employeeId: String(user.employee_id || ''),
-    store: String(user.store || '')
-  };
-  CacheService.getScriptCache().put(
-    reportSessionCacheKey_(token),
-    JSON.stringify(session),
-    REPORT_SESSION_TTL_SECONDS
-  );
-  return { token: token, scope: session.scope, expiresIn: REPORT_SESSION_TTL_SECONDS };
-}
-
-function reportSessionRequired_(token, requiredScope) {
-  const clean = String(token || '').trim();
-  if (!/^[A-Za-z0-9-]{20,160}$/.test(clean)) reportUnauthorized_();
-  if (ptSessionAuthorized_(clean)) {
-    if (requiredScope && requiredScope !== 'supervisor') reportUnauthorized_();
-    return { scope: 'supervisor', employeeId: '', store: '' };
-  }
-  const raw = CacheService.getScriptCache().get(reportSessionCacheKey_(clean));
-  if (!raw) reportUnauthorized_();
-  let session;
-  try { session = JSON.parse(raw); } catch (error) { reportUnauthorized_(); }
-  if (!session || session.scope !== 'employee' || !session.employeeId) reportUnauthorized_();
-  if (requiredScope === 'supervisor') reportUnauthorized_();
-  CacheService.getScriptCache().put(
-    reportSessionCacheKey_(clean),
-    JSON.stringify(session),
-    REPORT_SESSION_TTL_SECONDS
-  );
-  return session;
-}
-
-function reportAuthenticatePayload_(payload) {
-  const body = payload || {};
-  if (String(body.token || '')) {
-    const session = reportSessionRequired_(body.token);
-    return { token: String(body.token), scope: session.scope, expiresIn: REPORT_SESSION_TTL_SECONDS };
-  }
-  if (String(body.key || '')) {
-    const patrol = ptAuthenticatePayload(body);
-    return { token: patrol.token, scope: 'supervisor', expiresIn: patrol.expiresIn };
-  }
-  const employeeId = privateDashboardCleanEmployeeId(body.employeeId);
-  const deviceId = privateDashboardCleanDeviceId(body.deviceId);
-  const lookup = privateDashboardUserByEmployeeId(employeeId);
-  if (!lookup.user || lookup.user.status !== 'active' || lookup.user.device_id !== deviceId) {
-    reportUnauthorized_();
-  }
-  return reportCreateEmployeeSession_(lookup.user);
-}
-
-function reportLogoutPayload_(payload) {
-  const token = String((payload || {}).token || '').trim();
-  if (token) {
-    CacheService.getScriptCache().remove(reportSessionCacheKey_(token));
-    CacheService.getScriptCache().remove(ptSessionCacheKey_(token));
-  }
-  return {};
-}
-
-function reportNormalizedStore_(value) {
-  return String(value || '')
-    .replace(/台灣大哥大數位生活/g, '')
-    .replace(/\s+/g, '')
-    .trim();
-}
-
-function reportStoreAllowed_(session, store) {
-  if (session.scope === 'supervisor') return true;
-  const expected = reportNormalizedStore_(session.store);
-  const actual = reportNormalizedStore_(store);
-  return Boolean(expected && actual && (expected === actual || expected.endsWith(actual) || actual.endsWith(expected)));
-}
-
-function reportReadPayload_(payload) {
-  const body = payload || {};
-  const session = reportSessionRequired_(body.token);
-  const data = readData(String(body.date || ''), parseInt(body.seg, 10));
-  if (session.scope === 'supervisor') return { data: data };
-  const filtered = {};
-  Object.keys(data || {}).forEach(function(store) {
-    if (reportStoreAllowed_(session, store)) filtered[store] = data[store];
-  });
-  return { data: filtered };
-}
-
-function reportWritePayload_(payload) {
-  const body = payload || {};
-  const session = reportSessionRequired_(body.token);
-  if (!reportStoreAllowed_(session, body.store)) reportUnauthorized_();
-  writeData(body.date, body.store, body.seg, body.data);
-  return {};
-}
-
-function reportPersonalReadPayload_(payload) {
-  const body = payload || {};
-  reportSessionRequired_(body.token, 'supervisor');
-  return { data: readPersonal(String(body.date || ''), parseInt(body.seg, 10)) };
-}
-
-function reportPersonalWritePayload_(payload) {
-  const body = payload || {};
-  const session = reportSessionRequired_(body.token);
-  if (!reportStoreAllowed_(session, body.store)) reportUnauthorized_();
-  writePersonal(body);
-  return {};
 }
 
 function privateDashboardAdminAuthorized(payload) {
@@ -1454,17 +1348,13 @@ function privateDashboardAccess(payload) {
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
   const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
   const lookup = privateDashboardUserByEmployeeId(employeeId);
-  if (!lookup.user || lookup.user.status !== 'active' || lookup.user.device_id !== deviceId) {
+  if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
     throw new Error('此員編尚未核准此裝置，請先申請並等待管理者核准');
   }
   lookup.user.last_login_at = privateDashboardNow();
   privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
   const snapshot = privateDashboardSnapshot();
-  return {
-    snapshot: snapshot,
-    profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role },
-    reportSession: reportCreateEmployeeSession_(lookup.user)
-  };
+  return { snapshot: snapshot, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role } };
 }
 
 function privateDashboardAdminRequests(payload) {
@@ -1552,7 +1442,7 @@ function kpiCalcAccess(payload) {
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
   const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
   const lookup = privateDashboardUserByEmployeeId(employeeId);
-  if (!lookup.user || lookup.user.status !== 'active' || lookup.user.device_id !== deviceId) {
+  if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
     throw new Error('此員編尚未核准此裝置，請先「首次申請綁定」並等待督導核准');
   }
   lookup.user.last_login_at = privateDashboardNow();
@@ -1561,16 +1451,7 @@ function kpiCalcAccess(payload) {
   if (!file) throw new Error('KPI 試算資料尚未發佈，請通知督導');
   const data = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!data || !data.meta || !data.stores || !data.persons) throw new Error('KPI 試算資料格式不完整');
-  return {
-    data: data,
-    profile: {
-      maskedName: lookup.user.masked_name,
-      store: lookup.user.store,
-      role: lookup.user.role,
-      isTrusted: privateDashboardIsTrustedEmployee(employeeId)
-    },
-    reportSession: reportCreateEmployeeSession_(lookup.user)
-  };
+  return { data: data, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role, isTrusted: privateDashboardIsTrustedEmployee(employeeId) } };
 }
 
 // 取私有資料夾中最新的一份 KPI 試算資料。
