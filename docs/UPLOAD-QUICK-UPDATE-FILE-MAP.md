@@ -1,6 +1,6 @@
 # 戰報快速更新：檔案地圖、同步盤點與備份說明
 
-**修訂** 2026-07-31 第二輪（需求校正）　**分支** `claude/quick-report-upload-feature-elyajz`
+**修訂** 2026-07-31 第二輪（需求校正）　**分支** `claude/report-data-freshness-hotfix`（基底：`claude/quick-report-upload-clean`）
 
 > 本檔所有「已串接」都附程式碼證據。**沒有證據的一律標記「未確認」**，不寫成已同步。
 

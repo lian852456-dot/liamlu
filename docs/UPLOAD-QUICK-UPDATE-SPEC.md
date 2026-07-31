@@ -1,7 +1,7 @@
 # 戰報快速更新 規格
 
 **建立** 2026-07-31（Claude）　**修訂** 2026-07-31 第二輪（需求校正）
-**狀態**：**JSON 緊急更新雛形（測試版，未驗收）**　**分支**：`claude/quick-report-upload-feature-elyajz`
+**狀態**：**JSON 緊急更新雛形（測試版，未驗收）**　**分支**：`claude/report-data-freshness-hotfix`（基底：去污染乾淨分支 `claude/quick-report-upload-clean`）
 
 > ⚠️ 本檔第一版是補寫的：Liam 任務描述要求先讀本檔與 FILE-MAP，但兩檔在 repo、
 > 所有分支與完整 git 歷史中都不存在。第二輪依 Liam 的需求校正重寫。

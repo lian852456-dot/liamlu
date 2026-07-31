@@ -7,11 +7,14 @@
 ## 1. 目前分支
 
 ```
-claude/quick-report-upload-feature-elyajz
+claude/report-data-freshness-hotfix     ← 現行開發分支（基底：claude/quick-report-upload-clean bc9301b，base main adf7542）
 ```
 
+- 舊分支 `claude/quick-report-upload-feature-elyajz` 含 bde4c6b 事故授權歷史，**已停用，不得再開發**。
+- 本分支由「去污染驗收」後的 `claude/quick-report-upload-clean` 建出，**不含任何 bde4c6b 授權內容**
+  （`reportSessionRequired_`／`report_auth`／`REPORT_SESSION_TTL` 全檔 0 次，有檢查證據）。
 - **未建立 PR、未合併 main、未部署正式 GAS**（Liam 明確指示）。
-- 接手前先 `git fetch origin && git checkout claude/quick-report-upload-feature-elyajz && git pull`。
+- 接手前先 `git fetch origin && git checkout claude/report-data-freshness-hotfix && git pull`。
 
 ## 2. 已完成項目
 
@@ -342,6 +345,52 @@ phone-awards-normalizer(storeWorkbook, personWorkbook, awardTierTable)
 | 與目前正式版本的差異 | 沿用 `reportVersionDecide_`，顯示 rule 與是否需強制覆寫 |
 | 是否可發布 | 無 `block` 級檢查且版本判定 accept 才顯示確認鍵 |
 
+## 7.9 🔍 2026-07-31「網站顯示舊資料」現場診斷（實查 Drive，Liam 已確認）
+
+**結論：不是程式壞掉，是當天來源檔沒上傳。** 查 KPI 來源資料夾
+`createdTime > 2026-07-30T12:00Z` → 空集合；最新來源仍是 07-30 上傳的
+`0730.xlsx` 與 `01-08-03`／`01-08-04`。07-30 的排程其實成功
+（KPI JSON mtime 07-30 11:51，`meta.sourceFile=0730.xlsx`，9 店／40 人／25 項齊全）。
+
+### 🚨 KPI 有兩條完全獨立的管線（最容易誤判的地方）
+
+```
+0730.xlsx ──(GAS 11:00 雲端排程)──▶ north12b-kpicalc-private-latest.json ──▶ kpi.html
+01-08-03/04 + Y26 ──(Liam 本機 Mac report-automation → private_publish)──▶
+    north12b-dashboard-private-latest.json ─┬─ kpiBattle   ──▶ index.html KPI戰情
+                                            └─ awardsBattle ──▶ index.html 台獎戰情
+```
+
+證據：正式快照的 `awardsBattle.source_files` 寫著
+`/Users/liamlu/Downloads/liam-agent/report-automation/input/google-drive/phone-awards/…`，
+`source_mode = "01-08-03/01-08-04 -> Y26 tabs -> screenshots"`、
+`visibility = "private-local-preview"`。
+**「KPI 更新了但 index.html 沒變」是正常現象——兩者不是同一份資料。**
+
+### 隨之確認的三件事
+
+1. **GAS 端零台獎自動化**，也**沒有任何巡檢**盯台獎沒更新（KPI 有 12:30 watchdog，台獎沒有）。
+2. **`Y26重點台獎手機.xlsx` 就是獎階表**：正式快照 `items[]` 帶
+   `next_label`／`next_threshold`／`incremental_award`／`monthly_award_max`／`units_needed`／
+   `gap`／`status`，全是兩份日報 Excel 沒有的欄位；每店恰 10 機款（45 選 10）。
+3. 排程只認 `/^(\d{4})\.xlsx$/`，`01-08-*`／`Y26` 放同資料夾**不會**被 KPI 排程誤讀。
+
+### 第二優先「綜合戰情一致化」方案比較（尚未實作，待 Liam 拍板）
+
+| 比較項 | 方案 A：index.html KPI 頁籤改讀 kpicalc JSON | 方案 B：KPI 發布後同步改寫 snapshot 的 kpiBattle |
+|---|---|---|
+| 權限安全 | `kpicalc_access` 與 `private_access` 同一名冊＋裝置綁定，等級相同 | 同左，但 GAS 需寫 snapshot |
+| 修改範圍 | 只改 index.html 前端（讀取＋渲染） | 改 GAS 寫入邏輯＋新部署 |
+| 依賴本機 Mac | **KPI 頁籤不再依賴**（台獎仍依賴，另案） | 仍要（snapshot 其餘欄位仍由 Mac 產） |
+| 需重新部署 | 只需 Pages；**GAS 不用**（kpicalc_access 已在第 15 版上線） | GAS 要新版本 |
+| 失敗保護 | 唯讀改動，可保留 snapshot 為回退 | 兩處寫入，出錯會產生「半份 snapshot」 |
+| 單一真相 | ✅ 兩頁讀同一份 KPI JSON | ❌ 產生第二份 KPI 副本，會漂移 |
+| 明日可完成 | 前端工作量中等（見下方限制），可行 | 不建議急做 |
+
+**建議：方案 A**。已知限制要先講：kpiBattle 的 `company_rank`／DOD（昨日變化）／加掛分
+**不存在**於 kpicalc JSON——方案 A 下該頁籤這幾欄要嘛拿掉、要嘛註明「以 kpi.html 為準」，
+不能無中生有。Liam 確認接受此取捨後再動工。
+
 ## 8. 欄位對照待辦
 
 | 待辦 | 依賴 |
@@ -369,21 +418,44 @@ phone-awards-normalizer(storeWorkbook, personWorkbook, awardTierTable)
 見 `UPLOAD-QUICK-UPDATE-FILE-MAP.md` §2。**已確認會同步**：kpi.html、index.html 戰情頁籤。
 **未確認**：Liam AI 指揮室（頁面不存在）、`window.__*_BATTLE_DATA__` 本機回退、GitHub Pages 來源分支。
 
-## 11. 正式部署步驟（只有 Liam 能做）
+## 11. 正式部署步驟（只有 Liam 能做）—— 獨立上傳 Deployment 版
 
-1. `git checkout main && git pull`，跑 FILE-MAP §6 的函式完整性檢查。
+**核心原則（2026-07-31 Liam 指示）：每日回報 Deployment 固定第 15 版不動。
+快速上傳走同一個 Apps Script 專案的「另一個新 Deployment」，兩者互不影響。**
+
+程式端已實作部署隔離閘 `reportUploadIsUploadDeployment_()`：
+當指令碼屬性 `REPORT_UPLOAD_DEPLOYMENT_URL` 等於「目前服務中 Deployment 的 /exec URL」時，
+該 Deployment 的 doPost **只放行** `report_upload_preview/commit/log/rollback` 四個路由，
+doGet 只回 `ping`（帶 `app:'report-upload'` 識別）——read/write/巡店/戰情一律拒絕。
+屬性未設定時隔離不啟用，主部署行為完全不變（安全預設）。
+
+1. 本分支驗收合併後，`git checkout main && git pull`，跑 FILE-MAP §6 函式完整性檢查
+   （新增三個要為 1：`reportUploadIsUploadDeployment_`、`REPORT_UPLOAD_ALLOWED_ACTIONS` 所在段、隔離測試通過）。
 2. 貼 `gas/Code.gs` 進 GAS 編輯器存檔。
-3. 確認左側「服務」已有 **Drive API**（缺了會報 `Drive is not defined`）。
-4. 設定指令碼屬性（§12）。
-5. **部署 → 管理部署作業 → ✏️ → 新版本 → 部署**（本次改了 `doPost`，非做不可）。
-6. 函式選單執行一次 `reportVersionStatus()` 確認版本狀態可讀寫。
-7. 開 `report-upload.html`，**先只按「① 檔案檢查與預覽」**，確認預覽數字正確再按確認。
+   ⚠️ **不要動「管理部署作業」裡的每日回報 Deployment——它停在第 15 版，貼碼存檔不影響它。**
+3. 確認左側「服務」已有 **Drive API**。
+4. 設定指令碼屬性（§12，含新的白名單與部署 URL 兩項——URL 先留空，第 6 步才有值）。
+5. **部署 → 新增部署作業 →（型別：Web 應用程式）→ 部署**：這會產生一個**全新的 Deployment ID 與 /exec URL**。
+   （是「新增部署作業」，不是去 ✏️ 編輯既有的每日回報部署！）
+6. 把第 5 步的 /exec URL 填進：
+   a. 指令碼屬性 `REPORT_UPLOAD_DEPLOYMENT_URL`（啟用後端路由隔離）；
+   b. `report-upload.html` 的 `UPLOAD_GAS_URL` 常數（取代 CHANGE_ME），commit → Pages 部署。
+7. 驗證隔離：瀏覽器開 `新URL?action=ping` 應回 `{"status":"ok","app":"report-upload"}`；
+   開 `新URL?action=read&date=...&seg=16` 應回 `route-not-available-on-upload-deployment`；
+   舊每日回報 URL 的 read/write 行為不變（仍是第 15 版）。
+8. 函式選單執行一次 `reportVersionStatus()` 確認版本狀態可讀寫。
+9. 開 `report-upload.html` 登入，**先只按「① 檔案檢查與預覽」**用真實日報驗證預覽數字，
+   正確後才按「② 確認發布」→ 重新登入 kpi.html 應立即看到新資料。
+
+**回滾**：出問題就把 `REPORT_UPLOAD_DEPLOYMENT_URL` 清空＋封存新 Deployment 即可，
+每日回報部署從頭到尾沒被動過。
 
 ## 12. Apps Script Properties 設定
 
 | 屬性 | 必要性 | 值 |
 |---|---|---|
 | `REPORT_UPLOAD_ALLOWED_EMPLOYEES` | **本次新增，必設** | 逗號分隔員編白名單。不設則只有 `DASHBOARD_TRUSTED_EMPLOYEE_ID` 能用 |
+| `REPORT_UPLOAD_DEPLOYMENT_URL` | **本次新增，必設** | 新上傳 Deployment 的 /exec URL；設定後該部署只服務上傳路由。未設定＝隔離未啟用 |
 | `REPORT_UPDATE_STATE` | 自動建立 | 不要手動編輯；要重置才清空 |
 | `DASHBOARD_ADMIN_SECRET` | 既有 | 上傳頁的「管理者密碼」 |
 | `DASHBOARD_PRIVATE_FOLDER_ID` | 既有 | 私有 Drive 資料夾 |

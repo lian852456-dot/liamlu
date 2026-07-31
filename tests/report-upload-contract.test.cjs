@@ -188,7 +188,7 @@ test('doPost 已掛上四個上傳 action', () => {
 
 // ── 前端 ────────────────────────────────────────────────────
 test('前端固定正式端點、走 POST、且自帶權限欄位', () => {
-  assert.match(page, /fetch\(DEFAULT_GAS_URL/);
+  assert.match(page, /fetch\(uploadGasUrl\(\)/);
   assert.match(page, /method: 'POST'/);
   assert.match(page, /result\.status !== 'ok'/);
   const authFn = functionBody(page, 'auth');
@@ -614,4 +614,62 @@ test('正式資料的寫入只發生在 commit 與 rollback', () => {
   }
   assert.doesNotMatch(functionBody(code, 'reportUploadPreview'), /setContent\(/);
   assert.doesNotMatch(functionBody(code, 'reportUploadLog'), /setContent\(/);
+});
+
+// ── 部署隔離：上傳走獨立 Deployment，每日回報固定第 15 版 ──
+test('doPost 在上傳部署模式只放行四個上傳路由，且判斷在所有路由之前', () => {
+  const doPost = functionBody(code, 'doPost');
+  const gateAt = doPost.indexOf('reportUploadIsUploadDeployment_()');
+  const firstRouteAt = doPost.indexOf("action === 'ptauth'");
+  assert.ok(gateAt !== -1, 'doPost 未接上部署隔離閘');
+  assert.ok(gateAt < firstRouteAt, '隔離判斷必須在任何路由之前');
+  assert.match(doPost, /route-not-available-on-upload-deployment/);
+  const list = code.match(/REPORT_UPLOAD_ALLOWED_ACTIONS = \[([^\]]+)\]/);
+  assert.ok(list, '缺少 REPORT_UPLOAD_ALLOWED_ACTIONS');
+  const actions = list[1].match(/'[^']+'/g).map(x => x.slice(1, -1));
+  assert.deepEqual(actions.sort(), ['report_upload_commit', 'report_upload_log',
+    'report_upload_preview', 'report_upload_rollback'].sort(), '白名單必須恰好是四個上傳路由');
+});
+
+test('doGet 在上傳部署模式只回 ping，其餘 GET 一律拒絕', () => {
+  const doGet = functionBody(code, 'doGet');
+  const gateAt = doGet.indexOf('reportUploadIsUploadDeployment_()');
+  const pingAt = doGet.indexOf("action === 'ping'");
+  assert.ok(gateAt !== -1 && gateAt < pingAt, '隔離判斷必須在一般 ping 之前');
+  assert.match(doGet, /app: 'report-upload'/);
+  assert.match(doGet, /route-not-available-on-upload-deployment/);
+});
+
+test('隔離判斷行為：未設定屬性不啟用、URL 相符才啟用、觸發器情境安全', () => {
+  const body = functionBody(code, 'reportUploadIsUploadDeployment_');
+  function run(propValue, getUrlImpl) {
+    const sandbox = {
+      module: { exports: {} }, console,
+      PropertiesService: { getScriptProperties: () => ({ getProperty: () => propValue }) },
+      ScriptApp: { getService: () => ({ getUrl: getUrlImpl }) },
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(`module.exports = function(){${body}};`, sandbox);
+    return sandbox.module.exports();
+  }
+  const URL = 'https://script.google.com/macros/s/UPLOAD/exec';
+  assert.equal(run(null, () => URL), false, '屬性未設定必須不啟用（主部署行為不變）');
+  assert.equal(run('', () => URL), false);
+  assert.equal(run(URL, () => URL), true, 'URL 相符必須啟用隔離');
+  assert.equal(run(URL, () => 'https://script.google.com/macros/s/DAILY/exec'), false, 'URL 不符不得啟用');
+  assert.equal(run(URL, () => { throw new Error('no web app'); }), false, '觸發器情境必須安全回 false');
+  assert.equal(run(URL, () => ''), false, 'getUrl 為空必須回 false');
+});
+
+test('前端使用獨立上傳端點，與每日回報端點分離且無瀏覽器覆寫', () => {
+  assert.match(page, /const UPLOAD_GAS_URL = 'https:\/\/script\.google\.com/);
+  assert.doesNotMatch(page, /DEFAULT_GAS_URL/, '上傳頁不得再引用每日回報端點');
+  assert.doesNotMatch(page, /localStorage|sessionStorage/, '端點與登入資訊都不得進瀏覽器儲存');
+  // 佔位字守門：未設定時登入直接被擋
+  const login = functionBody(page, 'doLogin');
+  assert.match(login, /CHANGE_ME/);
+  assert.match(login, /尚未設定上傳 Deployment/);
+  // 測試注入鉤只在 uploadGasUrl 讀取，不寫入
+  assert.equal((page.match(/__UPLOAD_GAS_URL_OVERRIDE__/g) || []).length, 2,
+    '__UPLOAD_GAS_URL_OVERRIDE__ 只應出現在註解與 uploadGasUrl 讀取處');
 });

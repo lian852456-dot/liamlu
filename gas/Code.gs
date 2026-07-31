@@ -46,6 +46,12 @@ function doGet(e) {
   const action = e.parameter.action;
   const cb = e.parameter.callback;
 
+  // 部署隔離：上傳專用 Deployment 只回應 ping（帶識別，供前端確認打對部署），其餘 GET 一律拒絕
+  if (reportUploadIsUploadDeployment_()) {
+    if (action === 'ping') return jsonResponse({ status: 'ok', app: 'report-upload' }, cb);
+    return jsonResponse({ status: 'error', message: 'route-not-available-on-upload-deployment' }, cb);
+  }
+
   if (action === 'ping') {
     return jsonResponse({ status: 'ok' }, cb);
   }
@@ -1136,6 +1142,10 @@ function doPost(e) {
   try {
     const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(payload.action || '');
+    // 部署隔離：上傳專用 Deployment 只放行四個上傳路由
+    if (reportUploadIsUploadDeployment_() && REPORT_UPLOAD_ALLOWED_ACTIONS.indexOf(action) === -1) {
+      throw new Error('route-not-available-on-upload-deployment');
+    }
     let result;
     if (action === 'ptauth') result = ptAuthenticatePayload(payload);
     else if (action === 'ptlogout') result = ptLogoutPayload(payload);
@@ -2231,6 +2241,28 @@ function checkSegAndNotify(seg) {
 //   - 左側「服務 +」需已加入 Drive API（kpiCalcParseReport 需要）
 //   - 改動了 doPost，必須「部署 → 管理部署作業 → ✏️ → 新版本 → 部署」
 // ════════════════════════════════════════════════════════════════
+
+// ── 部署隔離（2026-07-31 Liam 指示）──────────────────────────
+// 每日回報 Deployment 固定停在第 15 版（舊碼，本來就沒有上傳路由）；
+// 快速上傳改走「獨立的新 Web App Deployment」。兩個 Deployment 共用同一份專案，
+// 但新 Deployment 設定指令碼屬性 REPORT_UPLOAD_DEPLOYMENT_URL = 它自己的 /exec URL 後，
+// 就只服務 report_upload_* 四個路由——其餘 read/write/巡店/戰情一律拒絕，
+// 確保上傳功能的部署動作完全影響不到每日回報與其他系統。
+const REPORT_UPLOAD_ALLOWED_ACTIONS = [
+  'report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback'
+];
+
+function reportUploadIsUploadDeployment_() {
+  try {
+    const expected = String(PropertiesService.getScriptProperties()
+      .getProperty('REPORT_UPLOAD_DEPLOYMENT_URL') || '').trim();
+    if (!expected) return false;   // 未設定＝未啟用隔離，主部署行為完全不變
+    const current = String(ScriptApp.getService().getUrl() || '').trim();
+    return !!current && current === expected;
+  } catch (e) {
+    return false;   // 時間觸發器等非 Web App 情境沒有 getUrl()，一律視為非上傳部署
+  }
+}
 
 const REPORT_UPLOAD_LOG_SHEET = 'ReportUploadLog';
 const REPORT_UPLOAD_LOG_HEADERS = [

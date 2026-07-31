@@ -13,6 +13,40 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-07-31 ｜ Claude（分支校正＋資料鮮度診斷落檔＋獨立上傳 Deployment 隔離）
+
+- 做了什麼：依 Liam 指示停用舊分支 `claude/quick-report-upload-feature-elyajz`（含 bde4c6b
+  事故歷史），從去污染驗收的 `claude/quick-report-upload-clean`（bc9301b，base adf7542）建出
+  `claude/report-data-freshness-hotfix` 繼續。三件事：
+  ①把「網站顯示舊資料」現場診斷**重寫**進本分支文件（HANDOVER §7.9，只搬文件不搬舊分支程式碼）；
+  ②實作**部署隔離閘**：`reportUploadIsUploadDeployment_()` ＋指令碼屬性
+  `REPORT_UPLOAD_DEPLOYMENT_URL`——當請求由「上傳專用 Deployment」服務時，doPost 只放行
+  `report_upload_*` 四路由、doGet 只回 ping（帶 `app:'report-upload'` 識別），
+  其餘 read/write/巡店/戰情一律拒絕；屬性未設定＝隔離不啟用，主部署行為不變（安全預設）；
+  ③`report-upload.html` 改用獨立 `UPLOAD_GAS_URL` 常數（CHANGE_ME 佔位），
+  不再引用每日回報端點，佔位未填時登入直接被擋、零請求送出。
+- 結果：契約測試 70/70（新增 4 條：路由白名單恰為四個、doGet 隔離、隔離函式六情境行為、
+  前端端點分離）、Playwright 33/33（新增佔位守門＋卡片標示）。HANDOVER §11 改寫為
+  雙 Deployment 部署程序（含驗證與一鍵回滾）。**未建 PR、未合併、未部署。**
+- 經驗 / 給下一位的提醒：
+  1. **每日回報 Deployment 固定第 15 版**：貼新碼進編輯器不影響它；部署上傳功能時走
+     「部署 → **新增部署作業**」拿全新 /exec URL，**絕不要 ✏️ 編輯既有每日回報部署**。
+     回滾＝清空 `REPORT_UPLOAD_DEPLOYMENT_URL` ＋封存新部署，每日回報全程不受影響。
+  2. **隔離判斷靠 `ScriptApp.getService().getUrl()` 比對屬性**：時間觸發器沒有 getUrl，
+     函式以 try/catch 包住一律回 false，排程不受隔離影響（有行為測試）。
+  3. **上傳頁端點固定寫死、無任何瀏覽器儲存覆寫**（bde4c6b 事故後的資安基準）；
+     `window.__UPLOAD_GAS_URL_OVERRIDE__` 僅供 Playwright 在頁面載入前注入，正式頁不設。
+  4. 診斷結論（Liam 已確認）：kpi.html 與 index.html **不是同一正式資料來源**——
+     前者吃 GAS 排程產的 kpicalc JSON，後者吃 Liam 本機 Mac `report-automation` 產的
+     dashboard snapshot。7/31 未更新＝來源資料夾沒有 0731.xlsx ＋本機流程沒重跑，
+     不是程式壞掉。`Y26重點台獎手機.xlsx` 確認就是獎階表。
+  5. 綜合戰情一致化：建議**方案 A**（index.html KPI 頁籤改讀 kpicalc JSON，GAS 免部署、
+     不複製第二份真相），但 company_rank／DOD 欄位不存在於 kpicalc JSON，需 Liam 先接受取捨。
+     比較表在 HANDOVER §7.9。
+  6. 台獎雲端化仍缺：`Y26重點台獎手機.xlsx` 的獎階內容（工作表／欄位）、
+     `update_phone_awards.py` 原始碼（或欄位對照邏輯）、`difference` 規則確認。
+     拿到前不寫台獎解析器；本機發布流程照舊保留。
+
 ## 2026-07-31 ｜ Claude（快速上傳去污染：從回復後的 main 重建乾淨分支，待 Liam 驗收）
 
 - **背景**：`claude/quick-report-upload-feature-elyajz` 是從事故 commit `62cbe1e` 分出去的，

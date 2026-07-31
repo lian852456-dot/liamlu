@@ -118,7 +118,8 @@
   <!-- ── 權限 ── -->
   <div class="card" id="authCard">
     <h2>🔐 督導登入</h2>
-    <div class="note">此頁只開放指定督導帳號。前端與後端都會檢查權限，未授權員編一律拒絕。</div>
+    <div class="note">此頁只開放指定督導帳號。前端與後端都會檢查權限，未授權員編一律拒絕。<br>
+      本頁連線的是<strong>獨立上傳 Deployment</strong>，與每日回報部署（第 15 版）分離；上傳部署只服務上傳路由。</div>
     <div class="row" style="margin-top:10px">
       <div class="fld"><label>員編</label><input type="text" id="authEmp" autocomplete="off" placeholder="例：A12345"></div>
       <div class="fld"><label>管理者密碼</label><input type="password" id="authSecret" autocomplete="off"></div>
@@ -212,12 +213,18 @@
 </div>
 
 <script>
-const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
+// 快速上傳走「獨立上傳 Deployment」，與每日回報 Deployment（固定第 15 版）完全分離。
+// Liam 建立新 Deployment 後，把它的 /exec URL 填進下面常數再部署 Pages；
+// 含 CHANGE_ME 時登入會被擋下，避免誤打到每日回報部署。
+// 端點固定寫死、不提供任何瀏覽器端儲存覆寫（與受保護端點同一資安基準）；
+// window.__UPLOAD_GAS_URL_OVERRIDE__ 僅供自動化測試在頁面載入前注入，正式頁面不會設定它。
+const UPLOAD_GAS_URL = 'https://script.google.com/macros/s/CHANGE_ME_UPLOAD_DEPLOYMENT/exec';
+function uploadGasUrl() { return window.__UPLOAD_GAS_URL_OVERRIDE__ || UPLOAD_GAS_URL; }
 const AUTH = { employeeId: '', adminSecret: '' };
 const TOKENS = { kpi: '', award: '' };
 
 async function gasPost(payload) {
-  const response = await fetch(DEFAULT_GAS_URL, {
+  const response = await fetch(uploadGasUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(payload)
@@ -243,6 +250,10 @@ function setMsg(id, text, cls) {
 
 // ── 登入（前端第一道；後端 reportUploadAuthorize_ 才是真的那道）──
 async function doLogin() {
+  if (/CHANGE_ME/.test(uploadGasUrl())) {
+    setMsg('authMsg', '❌ 尚未設定上傳 Deployment 網址（UPLOAD_GAS_URL 仍是佔位字）。請先建立獨立上傳 Deployment 並填入網址。', 'bad');
+    return;
+  }
   const emp = String(el('authEmp').value || '').trim().toUpperCase();
   const secret = String(el('authSecret').value || '');
   if (!emp || !secret) { setMsg('authMsg', '請輸入員編與管理者密碼。', 'bad'); return; }

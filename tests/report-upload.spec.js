@@ -17,7 +17,12 @@ function ok(level, label, detail) { return { key: label, label, level, detail: d
 function stage(key, label, status, detail) { return { key, label, status, detail: detail || '' }; }
 
 // 依情境設定回應。behaviour[kind] 決定該車道的成敗。
-function installGas(page, behaviour = {}) {
+async function installGas(page, behaviour = {}) {
+  // 正式頁面的 UPLOAD_GAS_URL 是 CHANGE_ME 佔位字（等 Liam 建立獨立上傳 Deployment 後填入），
+  // 測試在頁面載入前注入測試端點，走與正式相同的 uploadGasUrl() 讀取路徑
+  await page.addInitScript(() => {
+    window.__UPLOAD_GAS_URL_OVERRIDE__ = 'https://script.google.com/macros/s/test-upload-deployment/exec';
+  });
   // live 會隨成功的 commit／rollback 改變，模擬後端每次都重新讀取正式資料
   const state = { calls: [], committed: [], live: { kpi: { ...KPI_LIVE }, award: { ...AWARD_LIVE } } };
   return page.route(GAS_PATTERN, async route => {
@@ -415,4 +420,24 @@ test('取消預覽會一併清掉日期面板', async ({ page }) => {
   await expect(page.locator('#dates-kpi')).toContainText('原始檔名');
   await page.click('#confirm-kpi .btn:not(.go)');
   await expect(page.locator('#dates-kpi')).toBeEmpty();
+});
+
+// ── 部署隔離：未設定上傳 Deployment 時的守門 ────────────────
+test('UPLOAD_GAS_URL 仍是佔位字時，登入被擋下且不發出任何請求', async ({ page }) => {
+  // 刻意不裝 installGas（不注入測試端點）——頁面走正式的 CHANGE_ME 佔位字
+  let requests = 0;
+  await page.route('https://script.google.com/**', route => { requests += 1; return route.abort(); });
+  await page.goto(PAGE_URL);
+  await page.fill('#authEmp', GOOD_EMP);
+  await page.fill('#authSecret', SECRET);
+  await page.click('#authBtn');
+  await expect(page.locator('#authMsg')).toContainText('尚未設定上傳 Deployment');
+  await expect(page.locator('#app')).toBeHidden();
+  expect(requests).toBe(0);
+});
+
+test('登入卡片明示本頁走獨立上傳 Deployment', async ({ page }) => {
+  await page.goto(PAGE_URL);
+  await expect(page.locator('#authCard')).toContainText('獨立上傳 Deployment');
+  await expect(page.locator('#authCard')).toContainText('第 15 版');
 });
