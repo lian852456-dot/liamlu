@@ -372,6 +372,6 @@ test('頁面明確標示為測試版且未宣稱已完成 Excel 上傳', async (
   await page.goto(PAGE_URL);
   await expect(page.locator('.badge-test')).toContainText('測試版');
   await expect(page.locator('.banner')).toContainText('Excel 上傳');
-  await expect(page.locator('.banner')).toContainText('尚未用真實日報驗證過');
+  await expect(page.locator('.banner')).toContainText('寫入／發佈端尚未在正式環境驗證過');
   await expect(page.locator('#lane-award')).toContainText('不收 Excel');
 });

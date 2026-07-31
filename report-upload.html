@@ -101,7 +101,7 @@
     <div class="note">
       <strong>可用：</strong>台獎戰情快照 <code>.json</code> 的緊急更新、備份與回復；
       KPI <code>.xlsx</code> 由 Apps Script 端呼叫既有 <code>kpiCalcParseReport()</code> 解析
-      —— <strong>此路徑尚未用真實日報驗證過</strong>。<br>
+      —— <strong>解析層已用真實日報驗證，但寫入／發佈端尚未在正式環境驗證過</strong>。<br>
       <strong>未完成：</strong>台獎 Excel 上傳（repo 內無解析器、無樣本）、
       瀏覽器本機解析工作簿、<code>.xls</code> 支援、可與離線版共用的解析模組。<br>
       <strong>未取得真實樣本前不會猜測欄位。</strong>需要的樣本清單見
@@ -129,8 +129,9 @@
       <div class="note">
         解析在 <strong>Apps Script 端</strong>進行，呼叫與每日自動化<strong>同一支</strong>
         <code>kpiCalcParseReport()</code>，未新增第二套解析邏輯。<br>
-        ⚠️ <strong>此路徑尚未用真實日報驗證過</strong>，且不是 Liam 要求的
-        「瀏覽器本機解析、可與離線版共用」架構——該模組尚未建立。
+        ⚠️ <strong>解析層已用真實日報驗證通過</strong>（9 店／40 人／25 項欄位齊全），
+        但<strong>寫入與發佈端尚未在正式環境驗證</strong>；
+        且這不是 Liam 要求的「瀏覽器本機解析、可與離線版共用」架構——該模組尚未建立。
         目前僅支援 <code>.xlsx</code>，<code>.xls</code> 未支援。<br>
         更新目標：私有 Drive 的 KPI 試算資料 → <strong>kpi.html</strong>。
       </div>
