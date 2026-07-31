@@ -13,6 +13,37 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-07-31 ｜ Claude（第六輪：現場診斷「網站顯示舊資料」——不是程式壞掉）
+
+- 做了什麼：實查 Drive 的兩份正式 JSON 與來源資料夾，回答「為何 KPI／台獎網站仍是舊資料」。
+  **沒有改任何程式、沒有動正式資料、沒有部署。** 完整診斷見 HANDOVER §7.9。
+- 結果：**根因是今天（07-31）的來源檔完全沒有上傳**。
+  查 `createdTime > 2026-07-30T12:00Z` 於 KPI 來源資料夾 → **空集合**。
+  兩份正式資料都停在 07-30，資料截止日都是 **07/29**，是目前可得的最新值。
+  07-30 的排程其實是**成功**的（`north12b-kpicalc-private-latest.json` mtime 07-30 **11:51**，
+  正是 CLAUDE.md 記載的實測時間；`meta.sourceFile = 0730.xlsx`、9 店 40 人 25 項齊全）。
+- 經驗 / 給下一位的提醒：
+  1. 🚨 **KPI 有兩條完全獨立的管線，這是最容易誤判的地方**：
+     `kpi.html` ← GAS 11:00 排程產的 `north12b-kpicalc-private-latest.json`；
+     `index.html` 的 **KPI戰情與台獎戰情都** ← `north12b-dashboard-private-latest.json`，
+     而後者是 **Liam 本機 Mac** 跑出來的。證據是快照裡的
+     `awardsBattle.source_files` 直接寫著
+     `/Users/liamlu/Downloads/liam-agent/report-automation/input/google-drive/phone-awards/…`，
+     `source_mode = "01-08-03/01-08-04 -> Y26 tabs -> screenshots"`。
+     **所以「KPI 更新了但 index.html 沒變」是正常的——它們不是同一份資料。**
+  2. **GAS 端沒有任何台獎自動化函式**，台獎只能靠本機流程 + `private_publish`。
+     而且**沒有任何巡檢會提醒台獎沒更新**（KPI 有 12:30 watchdog，台獎沒有）。
+     這是目前最大的監控盲點。
+  3. ✅ **`Y26重點台獎手機.xlsx` 確認就是獎階表**。正式快照的 `items[]` 帶
+     `next_label`／`next_threshold`／`incremental_award`／`monthly_award_max`／
+     `threshold_target`／`units_needed`／`gap`／`status`，全是兩份日報 Excel 沒有的欄位；
+     每店剛好 10 機款（45 選 10）。第五輪的推測得到證實。
+  4. **排程只認 `/^(\d{4})\.xlsx$/`**，所以 `01-08-03`／`01-08-04`／`Y26` 三個檔
+     放在同一個來源資料夾也**不會**被 KPI 排程誤讀——這點是安全的。
+  5. **挑檔用檔名數字、資料日期用報表內容**，兩者本來就不同步（0730.xlsx → 07/29）。
+  6. ⚠️ **本分支從未部署**。線上跑的仍是舊版，`reportVersionDecide_` 的防覆蓋保護**還沒生效**，
+     所以「手動發佈後被排程用舊檔覆蓋」的風險目前仍然存在。
+
 ## 2026-07-31 ｜ Claude（第五輪：台獎 Excel 結構盤點，未寫解析器）
 
 - 做了什麼：依 Liam 指示盤點 Drive 內既有的 `01-08-03`（店點）與 `01-08-04`（個人）

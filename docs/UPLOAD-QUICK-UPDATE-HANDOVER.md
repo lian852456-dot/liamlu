@@ -342,6 +342,91 @@ phone-awards-normalizer(storeWorkbook, personWorkbook, awardTierTable)
 | 與目前正式版本的差異 | 沿用 `reportVersionDecide_`，顯示 rule 與是否需強制覆寫 |
 | 是否可發布 | 無 `block` 級檢查且版本判定 accept 才顯示確認鍵 |
 
+## 7.9 🔍 2026-07-31「網站顯示舊資料」現場診斷（實查 Drive，非推測）
+
+### 結論先講：**這不是程式壞掉，是今天的來源檔沒上傳。**
+
+`parentId = 1zs4flck…`（KPI 來源資料夾）查詢
+`createdTime > 2026-07-30T12:00:00Z` → **回傳空集合**。
+也就是說 **2026-07-31 一整天沒有任何新來源檔進到資料夾**，
+最新的仍是 07-30 02:17~02:18 上傳的 `0730.xlsx` 與 `01-08-03`／`01-08-04`。
+
+### 兩份正式資料的實際狀態
+
+| 項目 | `north12b-kpicalc-private-latest.json` | `north12b-dashboard-private-latest.json` |
+|---|---|---|
+| 消費端 | **kpi.html** | **index.html** 的 🏆KPI戰情＋🏅台獎戰情 |
+| 讀取函式 | `kpiCalcAccess` → `kpiCalcLatestDataFile` | `privateDashboardAccess` → `privateDashboardSnapshot` |
+| Drive 最後更新 | **2026-07-30 11:51（台北）** | **2026-07-30 14:19（台北）** |
+| 資料日期 | `meta.period = 2026/07/01 ~ 07/29`、`sourceFile = 0730.xlsx` | `report_date = 2026-07-30`、`source_as_of_date = **2026-07-29**` |
+| 產生者 | **GAS `kpiCalcAutoUpdate`（雲端 11:00 觸發器）** | **Liam 本機 Mac 手動流程**（見下） |
+| 內容 | 9 店／40 人／25 項，職稱 40/40 齊全 | kpiBattle 9 店＋personal 31 人；awardsBattle 9 店×10 機款 |
+
+**兩邊的資料截止日其實一樣，都是 07/29。** kpi.html 的 11:51 正是 CLAUDE.md 記載的
+「`.atHour(11)` 無 `nearMinute`，實測落在 11:51」——**07-30 那天排程是成功的**。
+
+### 🚨 最重要的發現：index.html 的 KPI 戰情**不是** GAS 產的
+
+`awardsBattle.source_files` 直接寫出了來源路徑：
+
+```
+/Users/liamlu/Downloads/liam-agent/report-automation/input/google-drive/phone-awards/
+    01-08-03-(密)直營_手機競賽日報_店點達成率、排名及獎金.xlsx
+    01-08-04-(密)直營_手機競賽日報_個人達成率、排名及獎金.xlsx
+    Y26重點台獎手機.xlsx
+awardsBattle.source_mode = "01-08-03/01-08-04 -> Y26 tabs -> screenshots"
+visibility = "private-local-preview"
+```
+
+所以 **KPI 有兩條完全獨立的管線**：
+
+```
+0730.xlsx ─(GAS 11:00 雲端)→ north12b-kpicalc-private-latest.json ─→ kpi.html
+01-08-03/04 + Y26 ─(Liam 本機 Mac 手動)→ north12b-dashboard-private-latest.json
+                                          ├─ kpiBattle  ─→ index.html KPI戰情
+                                          └─ awardsBattle ─→ index.html 台獎戰情
+```
+
+**GAS 端完全沒有任何台獎自動化函式**（`grep` 全檔無台獎更新函式），
+台獎與 index.html KPI戰情**只能靠本機那條手動流程**產出後以 `private_publish` 發佈。
+這就是為什麼「KPI 更新了，index.html 還是舊的」——它們根本不是同一份資料。
+
+### 這也回答了 §7.6 的缺口
+
+`Y26重點台獎手機.xlsx` **確認就是獎階表**：正式快照的
+`items[]` 有 `next_label`／`next_threshold`／`incremental_award`／`monthly_award_max`／
+`threshold`／`threshold_target`／`units_needed`／`gap`／`status`，
+全部是兩份日報 Excel 沒有、只能由 Y26 表推出的欄位。每店剛好 **10 機款**（45 選 10）。
+
+### 明日排程實際會做什麼（以**目前線上部署的舊版**為準）
+
+| 項目 | 實況 |
+|---|---|
+| 執行時間 | `kpiCalcAutoUpdate` `.atHour(11)` **無 `nearMinute`** → 11:00~12:00 任意時間，實測 11:51；`kpiCalcWatchdog` 12:30 |
+| 搜尋資料夾 | `KPICALC_SOURCE_FOLDER_ID`（預設 `1zs4flck…`） |
+| 檔名規則 | **`/^(\d{4})\.xlsx$/`** —— 只認 `MMDD.xlsx`。`01-08-03`／`01-08-04`／`Y26` **一律掃不到** |
+| 挑檔依據 | **檔名數字**（`Number('0731')`）挑最大者 |
+| 資料日期依據 | **報表內容**（`meta.period`），非檔名 |
+| KPI 更新函式 | `kpiCalcAutoUpdate` → `kpiCalcParseReport` → 寫 `north12b-kpicalc-private-latest.json` |
+| 台獎更新函式 | **不存在** |
+| 成功後哪些網站變 | **只有 kpi.html**。index.html 兩個頁籤都不會變 |
+| 失敗是否保留上一版 | 會。解析丟例外 → `catch` → 寄 ❌ 信，**不寫入** |
+| 錯誤紀錄 | `kpiCalcNotify` 寄信（`DASHBOARD_NOTIFY_EMAIL`／`NOTIFY_EMAIL`）＋ `console.log` |
+| 舊蓋新的可能 | **目前線上版有此風險**：手動 `kpicalc_publish` 不會更新 `KPICALC_LAST_IMPORT`，排程可能用舊 `MMDD.xlsx` 覆蓋掉手動發佈。**本分支的 `reportVersionDecide_` 已修掉，但本分支尚未部署** |
+
+### 明日最可能失敗的位置
+
+1. **來源檔沒上傳**（今天就是這樣）→ 排程靜靜略過，12:30 巡檢寄「⚠️ 今日尚未上傳」。
+2. **台獎完全不會自己更新** —— 沒跑本機流程就永遠是舊的，且**沒有任何巡檢會提醒**。
+3. Drive API 進階服務若被移除 → `Drive is not defined`（07-30 成功過，目前應無此問題）。
+
+### 今晚的最小修復（只有 Liam 能做，且不需要動任何程式）
+
+1. 把今天的 `0731.xlsx` 上傳到 KPI 來源資料夾 → 明天 11:00 自動進 kpi.html；
+   想立刻生效就在 GAS 執行 `testKpiCalcAutoUpdate()`。
+2. 台獎／index.html 戰情：在本機跑 `report-automation` 那條流程，再 `private_publish`。
+   **這一步無法自動化，除非把該流程搬進 GAS 或雲端。**
+
 ## 8. 欄位對照待辦
 
 | 待辦 | 依賴 |
