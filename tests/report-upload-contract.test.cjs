@@ -223,7 +223,7 @@ function loadValidators() {
   const names = [
     'reportUploadCheck_', 'reportUploadValidateFile_', 'reportUploadDateChecks_',
     'reportUploadValidateKpi_', 'reportUploadValidateAward_', 'reportUploadBlocked_',
-    'reportUploadKpiDate_', 'reportUploadKind_', 'reportUploadStoreMatch_'
+    'reportUploadKpiDate_', 'reportUploadKind_', 'reportUploadStoreMatch_', 'reportUploadStoreBuckets_'
   ];
   let src = `
     const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
@@ -280,7 +280,8 @@ test('真實日報的店名寫法必須全部對得到 STORES（回歸：曾誤�
   // 報表是「台北酒泉」，STORES 是「酒泉」；三創是「台灣大哥大數位生活台北三創」對「台北三創」。
   // 舊版用精確比對 → 9 家全部落空 → 真實日報被 block。
   for (const name of REAL_STORE_NAMES) {
-    assert.ok(V.reportUploadStoreMatch_(name), `真實店名對不到：${name}`);
+    const r = V.reportUploadStoreMatch_(name);
+    assert.equal(r.status, 'matched', `真實店名對不到：${name} → ${JSON.stringify(r)}`);
   }
 });
 
@@ -293,7 +294,7 @@ test('真實 0730 店名組合可通過區域檢查', () => {
 
 test('其他區店名仍然要被擋下（放寬比對不能放行外區）', () => {
   for (const name of ['台北板橋', '桃園中壢', '新竹光復']) {
-    assert.equal(V.reportUploadStoreMatch_(name), '', `不該對到：${name}`);
+    assert.equal(V.reportUploadStoreMatch_(name).status, 'none', `不該對到：${name}`);
   }
   const stores = ['台北板橋', '桃園中壢', '新竹光復', '台中一中', '高雄左營']
     .map((n, i) => ({ code: 'DNB200' + i, name: n }));
@@ -466,4 +467,151 @@ test('排程連續兩天正常運作不受防衝突影響', () => {
   D.setCurrent({ dataDate: '2026-07-31', source: 'scheduled', uploadedAt: '2026-07-31T11:51:00+08:00', fileHash: 'b' });
   const day2 = D.reportVersionDecide_('kpi', { dataDate: '2026-08-01', source: 'scheduled', fileHash: 'c' });
   assert.equal(day2.accept, true);
+});
+
+// ── 五：店名比對逐項驗收（Liam 指定的六條）──────────────────
+test('指定店名逐一命中正確的 STORES 項目', () => {
+  const expect = {
+    '台北酒泉': '酒泉', '台北通化': '通化', '台灣大哥大數位生活台北三創': '台北三創',
+    '台北永吉': '永吉', '台北復興南': '復興南', '台北杭州南': '杭州南',
+    '台北萬大': '萬大', '台北大稻埕': '大稻埕', '台北六張犁': '六張犁',
+  };
+  for (const [raw, want] of Object.entries(expect)) {
+    const r = V.reportUploadStoreMatch_(raw);
+    assert.equal(r.status, 'matched', `${raw} 未命中`);
+    assert.equal(r.store, want, `${raw} 應命中 ${want}，實得 ${r.store}`);
+  }
+  assert.equal(Object.keys(expect).length, 9, '應涵蓋 9 家門市');
+});
+
+test('同時命中兩家時回傳 ambiguous-store-match，且不自行選擇', () => {
+  // 用一個同時包含兩個門市關鍵字的名稱模擬歧義
+  const r = V.reportUploadStoreMatch_('台北通化萬大門市');
+  assert.equal(r.status, 'ambiguous-store-match');
+  assert.equal(r.store, '', '歧義時不得自行選一家');
+  // vm sandbox 的陣列跨 realm，deepStrictEqual 會因原型不同而失敗，改比字串
+  assert.equal(Array.from(r.candidates).sort().join('/'), ['通化', '萬大'].sort().join('/'));
+});
+
+test('完全相等可消解包含比對造成的歧義', () => {
+  const r = V.reportUploadStoreMatch_('通化');
+  assert.equal(r.status, 'matched');
+  assert.equal(r.store, '通化');
+});
+
+test('歧義店名會讓區域檢查 block，訊息含 ambiguous-store-match', () => {
+  const stores = [{ code: 'DNB1', name: '台北通化萬大門市' }].concat(
+    REAL_STORE_NAMES.slice(0, 5).map((n, i) => ({ code: 'DNB9' + i, name: n })));
+  const region = V.reportUploadValidateKpi_(kpiData({ stores }), null).find(c => c.key === 'region');
+  assert.equal(region.level, 'block');
+  assert.match(region.detail, /ambiguous-store-match/);
+});
+
+test('buckets 會把命中／未命中／歧義分開', () => {
+  const b = V.reportUploadStoreBuckets_(['台北酒泉', '桃園中壢', '台北通化萬大門市']);
+  assert.equal(Array.from(b.matched).join(','), '台北酒泉');
+  assert.equal(Array.from(b.none).join(','), '桃園中壢');
+  assert.equal(b.ambiguous.length, 1);
+  assert.match(b.ambiguous[0], /通化/);
+});
+
+// ── 四：Drive 暫存檔加固 ────────────────────────────────────
+test('暫存檔使用固定前綴', () => {
+  assert.match(code, /REPORT_UPLOAD_TEMP_PREFIX = 'report-upload-temp-'/);
+  assert.match(code, /REPORT_UPLOAD_STAGING_PREFIX = 'report-upload-staging-'/);
+  const preview = functionBody(code, 'reportUploadPreview');
+  assert.doesNotMatch(preview, /'upload-tmp-'|'upload-staging-'/, '不應殘留舊前綴');
+  assert.match(preview, /REPORT_UPLOAD_TEMP_PREFIX \+ token/);
+});
+
+test('暫存檔建在私有戰情資料夾，不進 KPI 來源資料夾', () => {
+  const preview = functionBody(code, 'reportUploadPreview');
+  assert.match(preview, /const folder = privateDashboardFolder\(\)/);
+  assert.doesNotMatch(preview, /KPICALC_SOURCE_FOLDER_ID/, '暫存檔不得寫入排程來源資料夾');
+  assert.doesNotMatch(functionBody(code, 'reportUploadCleanupTemp'), /KPICALC_SOURCE_FOLDER_ID/);
+});
+
+test('preview 以 try/finally 保證清理，只有成功暫存才保留原始檔', () => {
+  const preview = functionBody(code, 'reportUploadPreview');
+  assert.match(preview, /let keepRaw = false;/);
+  assert.match(preview, /keepRaw = true;/);
+  assert.match(preview, /\} finally \{\s*if \(!keepRaw\) reportUploadTrash_\(rawFile\);\s*\}/);
+});
+
+test('解析失敗也會走到 finally 清理（catch 內不再自行 trash）', () => {
+  const preview = functionBody(code, 'reportUploadPreview');
+  const catchAt = preview.indexOf('} catch (err) {');
+  const finallyAt = preview.indexOf('} finally {');
+  assert.ok(catchAt !== -1 && finallyAt > catchAt);
+  const catchBody = preview.slice(catchAt, finallyAt);
+  assert.doesNotMatch(catchBody, /reportUploadTrash_/, 'catch 不該自行清理，交給 finally');
+  assert.match(catchBody, /檔案解析/);
+});
+
+test('排程的檔名樣式掃不到暫存檔', () => {
+  const pattern = /^(\d{4})\.xlsx$/;   // kpiCalcAutoUpdate 使用的樣式
+  assert.match(functionBody(code, 'kpiCalcAutoUpdate'), /\^\(\\d\{4\}\)\\\.xlsx\$/);
+  for (const n of ['report-upload-temp-abc123-0730.xlsx',
+                   'report-upload-staging-kpi-abc123.json',
+                   'backup-north12b-kpicalc-20260731-120000.json']) {
+    assert.ok(!pattern.test(n), `排程不該掃到 ${n}`);
+  }
+  assert.ok(pattern.test('0730.xlsx'), '正常日報仍要被掃到');
+});
+
+test('可清理異常中斷留下的舊暫存檔，且只清固定前綴', () => {
+  const body = functionBody(code, 'reportUploadCleanupTemp');
+  assert.match(body, /REPORT_UPLOAD_TEMP_PREFIX/);
+  assert.match(body, /REPORT_UPLOAD_STAGING_PREFIX/);
+  assert.match(body, /getLastUpdated\(\)\.getTime\(\) > cutoff/);
+  assert.match(body, /setTrashed\(true\)/);
+  assert.match(functionBody(code, 'reportUploadPreview'), /reportUploadCleanupTemp\(\)/);
+});
+
+test('暫存檔錯誤紀錄只寫 fileId，不寫檔名或業績內容', () => {
+  const trash = functionBody(code, 'reportUploadTrash_');
+  assert.match(trash, /fileId=/);
+  assert.doesNotMatch(trash, /getName\(\)/, '錯誤紀錄不得帶檔名');
+  const cleanup = functionBody(code, 'reportUploadCleanupTemp');
+  assert.match(cleanup, /fileIds: removed/);
+  assert.doesNotMatch(cleanup, /console\.log\([^)]*getName/);
+});
+
+// ── 二：預覽日期四項 ────────────────────────────────────────
+test('preview 回傳檔名、上傳時間與是否晚於正式版本', () => {
+  const body = functionBody(code, 'reportUploadPreview');
+  assert.match(body, /const uploadedAt = privateDashboardNow\(\)/);
+  assert.match(body, /fileName: fileName, uploadedAt: uploadedAt/);
+  assert.match(body, /newerThanLive:/);
+});
+
+test('前端日期面板同時顯示四項並說明檔名與資料日期的差異', () => {
+  const fn = functionBody(page, 'renderDates');
+  for (const label of ['原始檔名', '報表資料日期', '上傳時間', '是否晚於正式版本']) {
+    assert.ok(fn.includes(label), `日期面板缺少：${label}`);
+  }
+  assert.match(fn, /報表產出日/);
+  assert.match(fn, /統計截止日/);
+  assert.match(fn, /不用檔名推算/);
+});
+
+// ── 三：預覽不得更新任何正式資料 ────────────────────────────
+test('preview 不寫正式 JSON、不寫版本屬性、不發佈', () => {
+  const body = functionBody(code, 'reportUploadPreview');
+  for (const sink of ['reportVersionRecord_', 'reportVersionSet_', 'setProperty',
+                      'kpiCalcPublish', 'privateDashboardPublish', 'MailApp']) {
+    assert.ok(!body.includes(sink), `preview 不得呼叫 ${sink}`);
+  }
+  // 只允許讀版本狀態來做預告，不允許寫
+  assert.match(body, /reportVersionDecide_/);
+  assert.match(body, /reportVersionGet_/);
+});
+
+test('正式資料的寫入只發生在 commit 與 rollback', () => {
+  const writers = ['reportUploadCommit', 'reportUploadRollback'];
+  for (const name of writers) {
+    assert.match(functionBody(code, name), /setContent\(/, `${name} 應該是寫入者`);
+  }
+  assert.doesNotMatch(functionBody(code, 'reportUploadPreview'), /setContent\(/);
+  assert.doesNotMatch(functionBody(code, 'reportUploadLog'), /setContent\(/);
 });

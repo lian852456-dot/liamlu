@@ -2357,6 +2357,12 @@ const REPORT_UPLOAD_LOG_HEADERS = [
   'acted_at', 'result', 'stages', 'backup_file', 'message'
 ];
 const REPORT_UPLOAD_MAX_BYTES = 12 * 1024 * 1024;
+// Drive 暫存檔固定前綴。兩者都建立在「私有戰情資料夾」，
+// **絕不進入 KPI 來源資料夾（KPICALC_SOURCE_FOLDER_ID）**，
+// 且不符合排程的 /^\d{4}\.xlsx$/ 命名，因此 kpiCalcAutoUpdate 掃不到。
+const REPORT_UPLOAD_TEMP_PREFIX = 'report-upload-temp-';
+const REPORT_UPLOAD_STAGING_PREFIX = 'report-upload-staging-';
+const REPORT_UPLOAD_TEMP_MAX_AGE_HOURS = 6;
 const REPORT_UPLOAD_STAGE_TTL_SECONDS = 1800;
 const REPORT_UPLOAD_KINDS = {
   kpi: {
@@ -2414,9 +2420,39 @@ function reportUploadFileByName_(name) {
   return files.hasNext() ? files.next() : null;
 }
 
+// 清理暫存檔。錯誤紀錄只寫檔案 ID，不寫檔名或任何業績內容。
 function reportUploadTrash_(file) {
   if (!file) return;
-  try { file.setTrashed(true); } catch (e) { console.log('report upload cleanup failed: ' + e); }
+  let id = '(unknown)';
+  try { id = file.getId(); } catch (e) {}
+  try { file.setTrashed(true); } catch (e) {
+    console.log('report upload temp cleanup failed, fileId=' + id);
+  }
+}
+
+// 清掉異常中斷（例如執行逾時）留下的舊暫存檔。
+// 只掃私有戰情資料夾，只刪符合固定前綴且超過保留時數的檔案。
+// 可由 GAS 編輯器手動執行，也在每次 preview 開頭順手跑一次。
+function reportUploadCleanupTemp(maxAgeHours) {
+  const hours = Number(maxAgeHours) > 0 ? Number(maxAgeHours) : REPORT_UPLOAD_TEMP_MAX_AGE_HOURS;
+  const cutoff = Date.now() - hours * 3600 * 1000;
+  const removed = [];
+  try {
+    const files = privateDashboardFolder().getFiles();
+    while (files.hasNext()) {
+      const f = files.next();
+      const name = f.getName();
+      if (name.indexOf(REPORT_UPLOAD_TEMP_PREFIX) !== 0 &&
+          name.indexOf(REPORT_UPLOAD_STAGING_PREFIX) !== 0) continue;
+      if (f.getLastUpdated().getTime() > cutoff) continue;
+      const id = f.getId();
+      try { f.setTrashed(true); removed.push(id); }
+      catch (e) { console.log('report upload orphan cleanup failed, fileId=' + id); }
+    }
+  } catch (e) {
+    console.log('report upload orphan scan failed: ' + (e && e.message ? e.message : e));
+  }
+  return { removed: removed.length, fileIds: removed, olderThanHours: hours };
 }
 
 // 目前正式資料的「資料日期」，用來擋比正式版本更舊的檔案。
@@ -2489,14 +2525,36 @@ function reportUploadValidateFile_(kind, fileName, byteLength) {
 // 三創更是「台灣大哥大數位生活台北三創」，而 STORES 是「酒泉」「通化」「台北三創」。
 // 原本的 indexOf 精確比對會讓 9 家全部對不到 → 真實日報被誤判為「其他區資料」而擋下。
 // 改為雙向包含比對後 9/9 命中。
+// 回傳 { status, store, candidates }：
+//   matched            —— 唯一命中，store 為對應的 STORES 名稱
+//   none               —— 完全沒命中（外區店名走這裡）
+//   ambiguous-store-match —— 同時命中兩家以上，**不自行選擇**，交由呼叫端擋下
+// 完全相等視為最強訊號，可用來消解包含比對造成的歧義。
 function reportUploadStoreMatch_(name) {
   const clean = String(name || '').trim();
-  if (!clean) return '';
+  if (!clean) return { status: 'none', store: '', candidates: [] };
+  const hits = [];
   for (let i = 0; i < STORES.length; i++) {
     const s = STORES[i];
-    if (clean === s || clean.indexOf(s) !== -1 || s.indexOf(clean) !== -1) return s;
+    if (clean === s || clean.indexOf(s) !== -1 || s.indexOf(clean) !== -1) hits.push(s);
   }
-  return '';
+  if (!hits.length) return { status: 'none', store: '', candidates: [] };
+  if (hits.length === 1) return { status: 'matched', store: hits[0], candidates: hits };
+  const exact = hits.filter(function(s) { return s === clean; });
+  if (exact.length === 1) return { status: 'matched', store: exact[0], candidates: hits };
+  return { status: 'ambiguous-store-match', store: '', candidates: hits };
+}
+
+// 把一組店名分成命中／未命中／歧義三類
+function reportUploadStoreBuckets_(names) {
+  const matched = [], none = [], ambiguous = [];
+  (names || []).forEach(function(n) {
+    const r = reportUploadStoreMatch_(n);
+    if (r.status === 'matched') matched.push(n);
+    else if (r.status === 'ambiguous-store-match') ambiguous.push(n + ' → ' + r.candidates.join('／'));
+    else none.push(n);
+  });
+  return { matched: matched, none: none, ambiguous: ambiguous };
 }
 
 // 資料日期比對：新檔早於（或等於）正式版本時擋下／提醒。
@@ -2536,10 +2594,15 @@ function reportUploadValidateKpi_(data, live) {
 
   // 區域檢查：北一二B 的店代碼是 DNB 開頭，且店名應落在已知門市清單內。
   const badCode = stores.filter(function(s) { return !/^DNB/i.test(String(s.code || '')); });
-  const known = stores.filter(function(s) { return !!reportUploadStoreMatch_(s.name); });
+  const buckets = reportUploadStoreBuckets_(stores.map(function(s) { return s.name; }));
+  const known = buckets.matched;
   if (badCode.length) {
     checks.push(reportUploadCheck_('region', '區域或店點', 'block',
       '有 ' + badCode.length + ' 家店代碼不是 DNB 開頭，疑似非本區報表'));
+  } else if (buckets.ambiguous.length) {
+    // 同時命中兩家以上：不自行選擇，直接擋下請人確認
+    checks.push(reportUploadCheck_('region', '區域或店點', 'block',
+      'ambiguous-store-match：' + buckets.ambiguous.join('；') + '。請確認門市清單後再上傳'));
   } else if (!known.length) {
     checks.push(reportUploadCheck_('region', '區域或店點', 'block',
       '店名完全對不到北一二B 門市清單，疑似上傳其他區資料'));
@@ -2548,7 +2611,7 @@ function reportUploadValidateKpi_(data, live) {
       '只有 ' + known.length + ' 家對得到本區門市清單，請確認是否為完整報表'));
   } else {
     checks.push(reportUploadCheck_('region', '區域或店點', 'ok',
-      known.length + ' 家對到本區門市：' + known.map(function(s) { return s.name; }).join('、')));
+      known.length + ' 家對到本區門市：' + known.join('、')));
   }
 
   const countLevel = (stores.length >= 5 && persons.length >= 10) ? 'ok' : 'block';
@@ -2577,14 +2640,18 @@ function reportUploadValidateAward_(snapshot, live) {
   reportUploadDateChecks_(String(snapshot.kpiBattle.report_date || ''), live).forEach(function(c) { checks.push(c); });
 
   const rows = Array.isArray(snapshot.awardsBattle.stores) ? snapshot.awardsBattle.stores : [];
-  const known = rows.filter(function(r) { return !!reportUploadStoreMatch_(r.store); });
+  const buckets = reportUploadStoreBuckets_(rows.map(function(r) { return r.store; }));
+  const known = buckets.matched;
   if (!rows.length) {
     checks.push(reportUploadCheck_('region', '區域或店點', 'block', '台獎快照沒有任何店點資料'));
+  } else if (buckets.ambiguous.length) {
+    checks.push(reportUploadCheck_('region', '區域或店點', 'block',
+      'ambiguous-store-match：' + buckets.ambiguous.join('；') + '。請確認門市清單後再上傳'));
   } else if (!known.length) {
     checks.push(reportUploadCheck_('region', '區域或店點', 'block', '店名對不到北一二B 門市清單，疑似其他區資料'));
   } else {
     checks.push(reportUploadCheck_('region', '區域或店點', 'ok',
-      known.length + ' 家對到本區門市：' + known.map(function(r) { return r.store; }).join('、')));
+      known.length + ' 家對到本區門市：' + known.join('、')));
   }
   checks.push(reportUploadCheck_('count', '資料筆數', rows.length ? 'ok' : 'block', '店點 ' + rows.length + ' 家'));
   checks.push(reportUploadCheck_('mismatch', '是否可能上傳錯報表', 'ok', '已確認為台獎戰情快照格式'));
@@ -2611,13 +2678,20 @@ function reportUploadPreview(payload) {
     return { ok: false, kind: kind, checks: checks, live: reportUploadLiveInfo_(kind) };
   }
 
+  reportUploadCleanupTemp();   // 順手清掉異常中斷留下的舊暫存檔
+
   const live = reportUploadLiveInfo_(kind);
   const token = reportUploadToken_();
   const folder = privateDashboardFolder();
+  const uploadedAt = privateDashboardNow();
   let rawFile = null;
   let data = null;
   let dataDate = '';
   let preview = null;
+  let stagingName = '';
+  // keepRaw 只有在「驗證通過並成功寫入暫存資料檔」後才為 true；
+  // 其餘所有路徑（含丟例外）都會在 finally 把原始暫存檔移到垃圾桶。
+  let keepRaw = false;
 
   try {
     if (kind === 'kpi') {
@@ -2625,7 +2699,7 @@ function reportUploadPreview(payload) {
       // 這裡刻意不自寫任何 xlsx 解析，與 kpiCalcAutoUpdate 共用 kpiCalcParseReport。
       rawFile = folder.createFile(Utilities.newBlob(bytes,
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'upload-tmp-' + token + '-' + fileName));
+        REPORT_UPLOAD_TEMP_PREFIX + token + '-' + fileName));
       data = kpiCalcParseReport(rawFile);
       if (live) live.storeCount = null;
       checks = checks.concat(reportUploadValidateKpi_(data, live));
@@ -2649,10 +2723,11 @@ function reportUploadPreview(payload) {
         data = JSON.parse(text);
       } catch (parseError) {
         checks.push(reportUploadCheck_('parse', '檔案解析', 'block', 'JSON 解析失敗：' + parseError));
-        return { ok: false, kind: kind, checks: checks, live: live };
+        return { ok: false, kind: kind, checks: checks, live: live,
+                 fileName: fileName, uploadedAt: uploadedAt };
       }
       rawFile = folder.createFile(Utilities.newBlob(text, 'application/json',
-        'upload-tmp-' + token + '-' + fileName));
+        REPORT_UPLOAD_TEMP_PREFIX + token + '-' + fileName));
       checks = checks.concat(reportUploadValidateAward_(data, live));
       dataDate = String(((data || {}).kpiBattle || {}).report_date || '');
       const rows = Array.isArray(((data || {}).awardsBattle || {}).stores) ? data.awardsBattle.stores : [];
@@ -2664,21 +2739,24 @@ function reportUploadPreview(payload) {
         })
       };
     }
+    if (reportUploadBlocked_(checks).length) {
+      // 驗證失敗：正式資料一個位元都沒動；暫存檔由 finally 清掉
+      return { ok: false, kind: kind, checks: checks, live: live,
+               fileName: fileName, uploadedAt: uploadedAt };
+    }
+
+    // 通過驗證才寫暫存資料檔（正式檔仍未更動）
+    stagingName = REPORT_UPLOAD_STAGING_PREFIX + kind + '-' + token + '.json';
+    folder.createFile(Utilities.newBlob(JSON.stringify(data), 'application/json', stagingName));
+    keepRaw = true;   // 之後由 commit 改名保留為原始檔備份
   } catch (err) {
-    reportUploadTrash_(rawFile);
     checks.push(reportUploadCheck_('parse', '檔案解析', 'block',
       (err && err.message ? err.message : String(err))));
-    return { ok: false, kind: kind, checks: checks, live: live };
+    return { ok: false, kind: kind, checks: checks, live: live,
+             fileName: fileName, uploadedAt: uploadedAt };
+  } finally {
+    if (!keepRaw) reportUploadTrash_(rawFile);
   }
-
-  if (reportUploadBlocked_(checks).length) {
-    reportUploadTrash_(rawFile);   // 驗證失敗：暫存清掉，正式資料一個位元都沒動
-    return { ok: false, kind: kind, checks: checks, live: live };
-  }
-
-  // 通過驗證才寫暫存資料檔（正式檔仍未更動）
-  const stagingName = 'upload-staging-' + kind + '-' + token + '.json';
-  folder.createFile(Utilities.newBlob(JSON.stringify(data), 'application/json', stagingName));
   const fileHash = reportVersionHash_(bytes);
   reportUploadCache_().put('rupload_' + token, JSON.stringify({
     kind: kind, employeeId: employeeId, fileName: fileName, dataDate: dataDate,
@@ -2686,7 +2764,7 @@ function reportUploadPreview(payload) {
   }), REPORT_UPLOAD_STAGE_TTL_SECONDS);
 
   // 先行預告版本判斷結果，讓使用者在按下確認前就知道會不會被擋、需不需要強制覆寫
-  const decision = reportVersionDecide_('kpi' === kind ? 'kpi' : 'award',
+  const decision = reportVersionDecide_(kind,
     { dataDate: dataDate, source: 'manual-upload', fileHash: fileHash });
   const current = reportVersionGet_(kind);
   if (!decision.accept) {
@@ -2699,6 +2777,10 @@ function reportUploadPreview(payload) {
   return {
     ok: true, kind: kind, token: token, checks: checks, preview: preview,
     live: live, dataDate: dataDate, targets: spec.targets, fileHash: fileHash,
+    // 預覽畫面用：檔名代表「產出日」，dataDate 代表「統計截止日」，兩者本來就會差一天
+    fileName: fileName, uploadedAt: uploadedAt,
+    newerThanLive: (live && live.dataDate) ? (dataDate > live.dataDate)
+                                           : null,
     version: { decision: decision, current: current },
     needsForce: !decision.accept,
     warnings: checks.filter(function(c) { return c.level === 'warn'; }).length

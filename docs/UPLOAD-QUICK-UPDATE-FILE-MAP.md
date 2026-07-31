@@ -13,8 +13,8 @@
 | `gas/Code.gs` | 修改 | `doPost` 加 4 個分支；尾端追加「戰報快速更新」與「資料版本狀態與防衝突」兩節；`kpiCalcAutoUpdate` 加防衝突把關；`kpiCalcPublish`／`privateDashboardPublish` 加版本登記（不擋） |
 | `home.html` | 修改 | 督導專區卡片，**已標示 🧪 測試版** |
 | `report-upload.html` | 新增 | 上傳頁（**已標示測試版＋能力聲明橫幅**） |
-| `tests/report-upload-contract.test.cjs` | 新增 | 46 項契約＋行為測試 |
-| `tests/report-upload.spec.js` | 新增 | 28 項端到端情境 |
+| `tests/report-upload-contract.test.cjs` | 新增 | 66 項契約＋行為測試 |
+| `tests/report-upload.spec.js` | 新增 | 31 項端到端情境 |
 | `docs/UPLOAD-QUICK-UPDATE-SPEC.md` | 新增 | 規格 |
 | `docs/UPLOAD-QUICK-UPDATE-FILE-MAP.md` | 新增 | 本檔 |
 | `docs/UPLOAD-QUICK-UPDATE-HANDOVER.md` | 新增 | 小榮交接 |
@@ -169,8 +169,8 @@
 
 | 檔名 | 生命週期 |
 |---|---|
-| `upload-tmp-<token>-<檔名>` | 預覽期間；驗證失敗即刪，commit 時改名保留 |
-| `upload-staging-<kind>-<token>.json` | 預覽→commit 之間；commit 後刪除 |
+| `report-upload-temp-<token>-<檔名>` | 預覽期間；**try/finally 保證清理**，commit 時改名保留 |
+| `report-upload-staging-<kind>-<token>.json` | 預覽→commit 之間；commit 後刪除 |
 | `kpi-raw-<時間>-<檔名>`／`award-raw-<時間>-<檔名>` | 永久（原始檔備份） |
 | `backup-north12b-kpicalc-<時間>.json`／`backup-north12b-dashboard-<時間>.json` | 永久（可回復） |
 | `north12b-kpicalc-private-latest.json`／`north12b-dashboard-private-latest.json` | 正式資料 |
@@ -179,6 +179,18 @@
 `north12b-kpicalc-*.json`。若備份也符合這個樣式，當「備份成功但寫入正式檔失敗」時，
 備份會成為最新的一份而**被 kpi.html 當成正式資料**。
 `tests/report-upload-contract.test.cjs` 有一條測試專門守住，改名前先看它。
+
+## 4.5 Drive 暫存檔加固（2026-07-31）
+
+| # | 要求 | 實作 |
+|---|---|---|
+| 1 | 固定前綴 | `REPORT_UPLOAD_TEMP_PREFIX = 'report-upload-temp-'`、`REPORT_UPLOAD_STAGING_PREFIX = 'report-upload-staging-'` |
+| 2 | 不進正式 KPI 來源資料夾 | 一律建在 `privateDashboardFolder()`；`reportUploadPreview` 與 `reportUploadCleanupTemp` 皆**未出現** `KPICALC_SOURCE_FOLDER_ID`（有測試把關） |
+| 3 | try/finally 保證清理 | `keepRaw` 旗標＋`finally { if (!keepRaw) reportUploadTrash_(rawFile); }`，只有「驗證通過且暫存資料檔寫入成功」才保留 |
+| 4 | 解析失敗也移垃圾桶 | `catch` 不再自行清理，一律落到 `finally`；驗證 block 的 early return 也走 `finally` |
+| 5 | 排程掃不到 | `kpiCalcAutoUpdate` 只認 `/^(\d{4})\.xlsx$/`，暫存檔名不符；且位於不同資料夾。兩層保護，有測試 |
+| 6 | 清理異常殘留 | `reportUploadCleanupTemp(maxAgeHours)`，預設清 6 小時前的殘留；每次 preview 開頭順手跑一次，也可在 GAS 手動執行 |
+| 7 | 錯誤紀錄只寫 ID | `reportUploadTrash_` 記 `fileId=<id>`，**不寫檔名、不寫任何業績內容**；`reportUploadCleanupTemp` 只回傳 `fileIds` |
 
 ## 5. GAS 端點
 
@@ -189,8 +201,10 @@
 | `report_upload_log` | `reportUploadLog` | 最近紀錄＋兩邊目前正式版本 |
 | `report_upload_rollback` | `reportUploadRollback` | 回復上一個成功版本 |
 
+另有兩個**非網頁端點**，供 GAS 編輯器手動執行：
+`reportVersionStatus()`（查版本狀態）、`reportUploadCleanupTemp(hours)`（清殘留暫存檔）。
+
 四者皆 POST，皆先過 `reportUploadAuthorize_()`。
-另有 `reportVersionStatus()` 供 GAS 編輯器手動查版本狀態（非網頁端點）。
 
 ## 6. 部署前檢查（CLAUDE.md 鐵則）
 
@@ -202,7 +216,8 @@ for f in kpiCalcAutoUpdate testKpiCalcAutoUpdate setupKpiCalcAutoUpdate \
          checkSegAndNotify checkAwareAndNotify sendWeeklyPatrolReport \
          kpiCalcParseReport reportUploadPreview reportUploadCommit \
          reportUploadLog reportUploadRollback reportUploadAuthorize_ \
-         reportVersionDecide_ reportVersionRecord_ reportVersionStatus; do
+         reportVersionDecide_ reportVersionRecord_ reportVersionStatus \
+         reportUploadStoreMatch_ reportUploadStoreBuckets_ reportUploadCleanupTemp; do
   printf "%-26s %s\n" "$f" "$(grep -c "function $f" gas/Code.gs)"
 done   # 全部要是 1
 grep -c "action === 'ptread'\|action === 'hread'\|half_media_upload" gas/Code.gs  # 要 3

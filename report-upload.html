@@ -82,6 +82,12 @@
   .banner h2 { color:#92400e; }
   .forcebox { display:flex; align-items:center; gap:6px; font-size:.76rem; font-weight:700; color:var(--red); width:100%; }
   .forcebox input { width:16px; height:16px; }
+  .datebox { margin-top:10px; border:1px solid var(--border-dim); border-radius:10px; overflow:hidden; }
+  .datebox .dt { display:flex; gap:8px; padding:7px 10px; font-size:.8rem; border-top:1px solid var(--border-dim); }
+  .datebox .dt:first-child { border-top:none; }
+  .datebox .dt .k { flex:none; min-width:9em; font-weight:700; color:var(--text-dim); }
+  .datebox .dt .v { color:var(--text); font-variant-numeric:tabular-nums; }
+  .datebox .hint { padding:7px 10px; font-size:.72rem; color:var(--text-muted); background:var(--bg-row-alt); line-height:1.6; }
 </style>
 </head>
 <body>
@@ -141,6 +147,7 @@
       <button class="btn primary" id="btn-check-kpi" onclick="doPreview('kpi')">① 檔案檢查與預覽</button>
       <button class="btn warn" onclick="doRollback('kpi')">↩ 回復上一個成功版本</button>
       <div class="msg" id="msg-kpi"></div>
+      <div id="dates-kpi"></div>
       <div id="checks-kpi"></div>
       <div id="preview-kpi"></div>
       <div class="confirmbar hidden" id="confirm-kpi">
@@ -171,6 +178,7 @@
       <button class="btn primary" id="btn-check-award" onclick="doPreview('award')">① 檔案檢查與預覽</button>
       <button class="btn warn" onclick="doRollback('award')">↩ 回復上一個成功版本</button>
       <div class="msg" id="msg-award"></div>
+      <div id="dates-award"></div>
       <div id="checks-award"></div>
       <div id="preview-award"></div>
       <div class="confirmbar hidden" id="confirm-award">
@@ -280,6 +288,7 @@ async function doPreview(kind) {
   el('confirm-' + kind).classList.add('hidden');
   el('preview-' + kind).innerHTML = '';
   el('checks-' + kind).innerHTML = '';
+  el('dates-' + kind).innerHTML = '';
   TOKENS[kind] = '';
   if (!file) { setMsg('msg-' + kind, '請先選擇檔案。', 'bad'); return; }
   el('btn-check-' + kind).disabled = true;
@@ -289,6 +298,7 @@ async function doPreview(kind) {
     const result = await gasPost(auth({
       action: 'report_upload_preview', kind: kind, fileName: file.name, fileBase64: base64
     }));
+    renderDates(kind, result);
     renderChecks(kind, result.checks);
     if (result.live) el('live-' + kind).textContent =
       '目前正式版本：' + result.live.label + '｜最後更新 ' + result.live.updatedAt;
@@ -323,6 +333,28 @@ function fileToBase64(file) {
     };
     reader.readAsDataURL(file);
   });
+}
+
+// 檔名代表「報表產出日」，內容代表「統計截止日」，兩者本來就差一天。
+// 四項同時顯示，避免使用者誤以為日期讀錯。
+function renderDates(kind, r) {
+  const live = r.live;
+  let verdict, cls;
+  if (!r.dataDate) { verdict = '無法判讀資料日期'; cls = 'bad'; }
+  else if (!live || !live.dataDate) { verdict = '目前沒有正式版本可比較（視為首次發佈）'; cls = ''; }
+  else if (r.dataDate > live.dataDate) { verdict = '✅ 晚於目前正式版本（' + live.dataDate + '）'; cls = 'ok'; }
+  else if (r.dataDate === live.dataDate) { verdict = '⚠️ 與目前正式版本同一天（' + live.dataDate + '）'; cls = ''; }
+  else { verdict = '⛔ 早於目前正式版本（' + live.dataDate + '）'; cls = 'bad'; }
+  el('dates-' + kind).innerHTML =
+    '<div class="datebox">' +
+      '<div class="dt"><span class="k">原始檔名</span><span class="v">' + esc(r.fileName || '(未提供)') + '</span></div>' +
+      '<div class="dt"><span class="k">報表資料日期</span><span class="v">' + esc(r.dataDate || '(讀不到)') + '</span></div>' +
+      '<div class="dt"><span class="k">上傳時間</span><span class="v">' + esc(r.uploadedAt || '') + '</span></div>' +
+      '<div class="dt"><span class="k">是否晚於正式版本</span><span class="v ' + cls + '">' + esc(verdict) + '</span></div>' +
+      '<div class="hint">檔名是<strong>報表產出日</strong>，資料日期是<strong>統計截止日</strong>，' +
+        '兩者相差一天屬正常（例：0730.xlsx 的資料到 07/29）。' +
+        '版本比較一律以<strong>資料日期</strong>為準，不用檔名推算。</div>' +
+    '</div>';
 }
 
 function renderChecks(kind, checks) {
@@ -363,6 +395,7 @@ function cancelPreview(kind) {
   el('force-' + kind).classList.add('hidden');
   el('preview-' + kind).innerHTML = '';
   el('checks-' + kind).innerHTML = '';
+  el('dates-' + kind).innerHTML = '';
   setMsg('msg-' + kind, '已取消，正式資料未更動。', '');
 }
 

@@ -48,6 +48,7 @@ function installGas(page, behaviour = {}) {
       }
       if (mode === 'olddate') {
         return json({ status: 'ok', ok: false, kind, live: KPI_LIVE,
+          fileName: payload.fileName, uploadedAt: '2026-08-01T09:15:00+08:00', dataDate: '2026-07-28',
           checks: [ok('ok', '副檔名', 'a.xlsx'), ok('block', '是否早於正式版本', '上傳資料 2026-07-28 比正式版本 2026-07-30 舊，拒絕覆蓋')] });
       }
       if (mode === 'wrongregion') {
@@ -67,7 +68,8 @@ function installGas(page, behaviour = {}) {
         checks: [ok('ok', '副檔名', 'a'), ok('ok', '資料筆數', '店點 9 家')].concat(
           conflict ? [ok('warn', '版本衝突檢查', '同日期已由 manual-upload 於 10:55 更新（可勾選強制覆寫）')] : []),
         preview, live: kind === 'kpi' ? KPI_LIVE : AWARD_LIVE, dataDate: '2026-07-31',
-        needsForce: conflict, warnings: conflict ? 1 : 0 });
+        fileName: payload.fileName, uploadedAt: '2026-08-01T09:15:00+08:00',
+        newerThanLive: true, needsForce: conflict, warnings: conflict ? 1 : 0 });
     }
 
     if (payload.action === 'report_upload_commit') {
@@ -374,4 +376,43 @@ test('頁面明確標示為測試版且未宣稱已完成 Excel 上傳', async (
   await expect(page.locator('.banner')).toContainText('Excel 上傳');
   await expect(page.locator('.banner')).toContainText('寫入／發佈端尚未在正式環境驗證過');
   await expect(page.locator('#lane-award')).toContainText('不收 Excel');
+});
+
+// ── 預覽日期四項顯示 ───────────────────────────────────────
+test('預覽同時顯示檔名、資料日期、上傳時間與是否晚於正式版本', async ({ page }) => {
+  await installGas(page);
+  await login(page);
+  await pickFile(page, 'kpi', '0730.xlsx');
+  await page.click('#btn-check-kpi');
+  const box = page.locator('#dates-kpi');
+  await expect(box).toContainText('原始檔名');
+  await expect(box).toContainText('0730.xlsx');
+  await expect(box).toContainText('報表資料日期');
+  await expect(box).toContainText('2026-07-31');
+  await expect(box).toContainText('上傳時間');
+  await expect(box).toContainText('2026-08-01T09:15:00+08:00');
+  await expect(box).toContainText('晚於目前正式版本');
+  // 說明文字避免使用者以為日期讀錯
+  await expect(box).toContainText('報表產出日');
+  await expect(box).toContainText('統計截止日');
+});
+
+test('資料日期較舊時，日期面板明確標示早於正式版本', async ({ page }) => {
+  await installGas(page, { kpi: 'olddate' });
+  await login(page);
+  await pickFile(page, 'kpi', '0728.xlsx');
+  await page.click('#btn-check-kpi');
+  await expect(page.locator('#dates-kpi')).toContainText('0728.xlsx');
+  await expect(page.locator('#dates-kpi')).toContainText('早於目前正式版本');
+  await expect(page.locator('#confirm-kpi')).toBeHidden();
+});
+
+test('取消預覽會一併清掉日期面板', async ({ page }) => {
+  await installGas(page);
+  await login(page);
+  await pickFile(page, 'kpi', '0730.xlsx');
+  await page.click('#btn-check-kpi');
+  await expect(page.locator('#dates-kpi')).toContainText('原始檔名');
+  await page.click('#confirm-kpi .btn:not(.go)');
+  await expect(page.locator('#dates-kpi')).toBeEmpty();
 });
