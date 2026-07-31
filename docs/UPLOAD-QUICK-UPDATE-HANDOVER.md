@@ -387,9 +387,58 @@ phone-awards-normalizer(storeWorkbook, personWorkbook, awardTierTable)
 | 單一真相 | ✅ 兩頁讀同一份 KPI JSON | ❌ 產生第二份 KPI 副本，會漂移 |
 | 明日可完成 | 前端工作量中等（見下方限制），可行 | 不建議急做 |
 
-**建議：方案 A**。已知限制要先講：kpiBattle 的 `company_rank`／DOD（昨日變化）／加掛分
-**不存在**於 kpicalc JSON——方案 A 下該頁籤這幾欄要嘛拿掉、要嘛註明「以 kpi.html 為準」，
-不能無中生有。Liam 確認接受此取捨後再動工。
+**✅ 2026-07-31 Liam 拍板：方案 A，已實作。** kpicalc JSON 定為 **KPI 唯一正式資料來源**；
+dashboard snapshot 僅保留給台獎頁籤與舊版回復。缺少欄位（company_rank／DOD／加掛分／
+個人排名／個人台獎／保險搭售率）畫面一律顯示「**尚未同步**」或隱藏（DOD 直接不出現），
+**不得沿用 snapshot 舊數字**——有 Playwright 反向斷言把關。
+來源說明列同時顯示：資料日期／區間／來源檔／更新時間（尚未同步＋讀取時間）／來源標示
+「與 kpi.html 同一份」。後續由 parser 擴充從同一份 Excel 補 company_rank／DOD／加權分，
+不建立第二份 KPI 正式資料。
+
+實作位置：`index.html` 的 `kpicalcToKpiBattleView()` 轉接層＋`kpiPendingCell()`；
+登入時台獎先渲染、kpicalc 失敗只影響 KPI 頁籤。測試：`tests/kpi-battle-source.test.cjs`
+11 條（含轉接層實際執行，驗證不發明數字）＋ `tests/app.spec.js` KPI 戰情段落改寫。
+
+## 7.10 ✅ 正式驗收清單（等 Liam 建立新 Deployment 後執行）
+
+### A. 部署前置（Liam 操作，§11 有逐步說明）
+
+- [ ] GAS 貼上 main 合併後的 `Code.gs`（**先跑 FILE-MAP §6 函式完整性檢查**）
+- [ ] 「部署 → **新增部署作業**」建立上傳專用 Web App → 取得新 /exec URL
+- [ ] 指令碼屬性：`REPORT_UPLOAD_DEPLOYMENT_URL` ＝ 新 URL、`REPORT_UPLOAD_ALLOWED_EMPLOYEES` ＝ 員編白名單
+- [ ] `report-upload.html` 的 `UPLOAD_GAS_URL` 填入新 URL（取代 CHANGE_ME）→ Pages 部署
+- [ ] 每日回報 Deployment **確認仍為第 15 版、全程未被編輯**
+
+### B. 隔離驗證
+
+- [ ] `新URL?action=ping` → `{"status":"ok","app":"report-upload"}`
+- [ ] `新URL?action=read&date=...&seg=16` → `route-not-available-on-upload-deployment`
+- [ ] 舊每日回報 URL 的 `?action=ping` 與門市回報照常（第 15 版行為不變）
+
+### C. 真實 KPI 檔驗收（Liam 指定十項）
+
+- [ ] 1. 上傳當日 `MMDD.xlsx` 按「① 檔案檢查與預覽」→ 私有 Drive 的正式 JSON **mtime 不變**（預覽不改正式資料）
+- [ ] 2. 預覽的「報表資料日期」＝檔內期間截止日（檔名日期減一天屬正常，畫面有說明）
+- [ ] 3. 預覽顯示店點 **9** 家、人員約 **40** 位、25 項欄位齊全
+- [ ] 4. 按「② 確認發布」→ `north12b-kpicalc-private-latest.json` 更新（mtime／內容）
+- [ ] 5. kpi.html 重新登入 → 顯示新資料日期
+- [ ] 6. index.html KPI 戰情重新登入 → 顯示**相同**資料日期與來源檔（方案 A 同一份）
+- [ ] 7. index.html 缺少欄位顯示「尚未同步」，**沒有任何舊 snapshot 數字**
+- [ ] 8. 上傳錯誤檔（如台獎 01-08-03）→ 被擋在預覽，正式 JSON 不變
+- [ ] 9. 按「↩ 回復上一個成功版本」→ kpi.html 回到前一份資料
+- [ ] 10. 全程結束後：門市每日回報（index.html 回報頁）讀寫照常、巡店照常
+
+### D. 台獎資料到齊後的接續順序（本輪不動工）
+
+前置檔案（缺一不可，**拿到前不寫台獎解析器**）：
+`update_phone_awards.py`（或欄位對照邏輯）→ 真實每日台獎 Excel（01-08-03／01-08-04 當日版）
+→ 正確台獎 JSON（同日 `north12b-dashboard-private-latest.json`）→ `Y26重點台獎手機.xlsx` 獎階內容。
+
+1. 用 update_phone_awards.py 對照 §7.3 盤點，確認每個 awardsBattle 欄位的計算來源（不反推）。
+2. 以同一天的「兩份 Excel＋Y26＋正確 JSON」做黃金樣本：解析器輸出必須逐欄重現正確 JSON。
+3. 依 §7.7 規格實作 `phone-awards-normalizer`（獎階一律由 Y26 表注入，不內建常數）。
+4. 台獎預覽（§7.8 十二項資訊）→ Liam 驗收數字 → 才接上發布。
+5. 過渡期間：**既有的台獎 JSON 上傳（安全預覽／發布）保留為人工備援**，本機 Mac 流程照舊。
 
 ## 8. 欄位對照待辦
 

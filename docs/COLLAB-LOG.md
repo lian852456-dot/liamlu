@@ -13,6 +13,33 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-07-31 ｜ Claude（方案 A 實作：index.html KPI 戰情改讀 kpicalc 唯一正式來源）
+
+- 做了什麼：依 Liam 拍板實作方案 A。`index.html` KPI 戰情頁籤登入後改打 `kpicalc_access`
+  （與 kpi.html 完全同一份受保護 JSON、同一個第 15 版主部署，**GAS 零改動、零新部署**），
+  新增 `kpicalcToKpiBattleView()` 轉接層餵給既有渲染器；`_kpiBattleData` 不再吃
+  `snapshot.kpiBattle`，KPI 頁籤的本機快照回退移除（台獎頁籤與其回退**完全未動**，
+  snapshot 降為台獎來源＋舊版回復）。另補齊正式驗收清單（HANDOVER §7.10）。
+- 結果：新契約測試 `kpi-battle-source.test.cjs` 11/11（含轉接層實際執行）、
+  `app.spec.js` KPI 戰情段落改寫後 31/31、上傳 33/33、契約 70/70。
+  **未建 PR、未合併、未部署**；等 Liam 建立上傳 Deployment 後照 §7.10 驗收。
+- 經驗 / 給下一位的提醒：
+  1. **缺少欄位的鐵則**：company_rank／DOD／加掛分／個人排名／個人台獎／保險搭售率
+     不在 kpicalc JSON——畫面一律「尚未同步」（`kpiPendingCell()`）或不出現（DOD），
+     **絕不混入 snapshot 舊數字**。Playwright 有反向斷言（加掛 13.36、整體 105.5%、
+     DOD 字樣、val-gold 排名節點 = 0）。要補這些欄位的正道是擴充 `kpiCalcParseReport`
+     從同一份 Excel 讀，不是把 snapshot 接回來。
+  2. **轉接層只搬運與加總，不發明數字**：店點總達成率直接取 `official`；
+     整體核心項＝各店 a/t 純加總；整體總達成率需加權、無法由 kpicalc 推得 → null（尚未同步）；
+     進度差由同一組 meta（snapshotDay/monthDays）換算。有逐條行為測試。
+  3. **updatedAt 目前拿不到**：第 15 版 `kpicalc_access` 回應沒有檔案 mtime，
+     來源列顯示「更新時間 尚未同步（讀取於 <本機時間>）」。想補它要等主部署未來升版時
+     在 kpiCalcAccess 回應加 `updatedAt`，不值得為此動第 15 版。
+  4. **登入順序刻意台獎先渲染**、kpicalc 包獨立 try——kpicalc 失敗只影響 KPI 頁籤，
+     訊息寫明「台獎頁籤不受影響」。
+  5. 測試小坑之前也踩過一次：契約測試用 `doesNotMatch` 禁字時，**程式註解裡的
+     識別字也算命中**——註解請改寫成不含禁字的說法，不要放寬測試。
+
 ## 2026-07-31 ｜ Claude（分支校正＋資料鮮度診斷落檔＋獨立上傳 Deployment 隔離）
 
 - 做了什麼：依 Liam 指示停用舊分支 `claude/quick-report-upload-feature-elyajz`（含 bde4c6b

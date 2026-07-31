@@ -19,7 +19,11 @@
 | `docs/UPLOAD-QUICK-UPDATE-FILE-MAP.md` | 新增 | 本檔 |
 | `docs/UPLOAD-QUICK-UPDATE-HANDOVER.md` | 新增 | 小榮交接 |
 
-**未改動**：`index.html`、`kpi.html`、`kpitry.html`、`patrol.html`、`patrol-guide.html`。
+| `index.html` | 修改（2026-07-31 方案 A） | KPI 戰情頁籤改讀 kpicalc JSON：登入加打 `kpicalc_access`、新增 `kpicalcToKpiBattleView()` 轉接層、缺少欄位顯示「尚未同步」、移除 KPI 本機快照回退（台獎回退保留） |
+| `tests/kpi-battle-source.test.cjs` | 新增 | 方案 A 契約＋轉接層行為測試（11 條） |
+
+**未改動**：`kpi.html`、`kpitry.html`、`patrol.html`、`patrol-guide.html`；
+`index.html` 的每日回報／台獎頁籤／裝置核准（DashboardUsers）流程未動。
 
 ## 2. 同步對象盤點（Liam 要求五）
 
@@ -105,7 +109,7 @@
 
 | 頁面 | `kpicalc_access` | `private_access` | 結論 |
 |---|---|---|---|
-| `index.html` | 0 | 1 | 讀台獎／KPI戰情快照 ✅ |
+| `index.html` | **1（方案 A，2026-07-31）** | 1 | KPI 戰情改讀 kpicalc；台獎仍讀 snapshot ✅ |
 | `kpi.html` | 1 | 0 | 讀 KPI 試算資料 ✅ |
 | `kpitry.html` | 0 | 0 | 公開試算，**無資料來源**，不受影響 |
 | `home.html` | 0 | 0 | 純導覽，不受影響 |
@@ -122,8 +126,8 @@
 
 | 檔案 | 消費者 | KPI 車道 | 台獎車道 |
 |---|---|---|---|
-| `north12b-kpicalc-private-latest.json` | kpi.html | ✅ 更新 | 維持上一版 |
-| `north12b-dashboard-private-latest.json` | index.html 戰情 | 維持上一版 | ✅ 更新 |
+| `north12b-kpicalc-private-latest.json` | kpi.html ＋ **index.html KPI 戰情（方案 A）** | ✅ 更新 | 維持上一版 |
+| `north12b-dashboard-private-latest.json` | index.html **台獎**戰情（＋舊版回復） | 維持上一版 | ✅ 更新 |
 
 ### 2.9 Apps Script Properties
 

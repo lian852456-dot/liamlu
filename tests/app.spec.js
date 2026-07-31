@@ -12,6 +12,8 @@ async function mockGAS(page, { readData = {} } = {}) {
       const payload = JSON.parse(request.postData() || '{}');
       if (payload.action === 'private_access') {
         await route.fulfill({ json: { status: 'ok', profile: { maskedName: '測＊員', store: '大稻埕', role: '業代' }, snapshot: { kpiBattle: KPI_BATTLE_FIXTURE, awardsBattle: AWARDS_BATTLE_FIXTURE } } });
+      } else if (payload.action === 'kpicalc_access') {
+        await route.fulfill({ json: { status: 'ok', data: KPICALC_FIXTURE, profile: { maskedName: '測＊員', store: '大稻埕', role: '業代' } } });
       } else {
         await route.fulfill({ json: { status: 'ok' } });
       }
@@ -96,8 +98,45 @@ const AWARDS_BATTLE_FIXTURE = {
   ],
 };
 
-async function mockKpiBattle(page) {
-  await page.addInitScript(data => { window.__KPI_BATTLE_DATA__ = data; }, KPI_BATTLE_FIXTURE);
+// 方案 A（2026-07-31）：KPI 戰情頁籤唯一正式來源是 kpicalc JSON（與 kpi.html 同一份）。
+// KPI_BATTLE_FIXTURE（snapshot 形狀）保留給「舊數字不得出現」的反向斷言用。
+const KPICALC_FIXTURE = {
+  meta: { period: '2026/07/01 ~ 07/29', snapshotDay: 29, monthDays: 31, month: '2026-07', sourceFile: '0730.xlsx' },
+  items: [
+    { key: 'AQ V+D 999 (含)以上', short: 'AQ V+D≧999', step: 1 },
+    { key: 'AQ V+D 1399 (含)以上', short: 'AQ V+D≧1399', step: 1 },
+    { key: '好速案銷售點數', short: '好速案點數', step: 0.25 },
+    { key: 'RT V+D 1399 (含)以上', short: 'RT V+D≧1399', step: 1 },
+    { key: 'RT V+D 999 (含)以上', short: 'RT V+D≧999', step: 1 },
+    { key: '配件及其他營收', short: '配件及其他營收', step: 1 },
+  ],
+  stores: [
+    { code: 'DNB10284', name: '台北大稻埕', official: 1.1035, items: {
+        'AQ V+D 999 (含)以上': { a: 11, t: 16, w: 0.03 }, 'AQ V+D 1399 (含)以上': { a: 6, t: 8, w: 0.02 },
+        '好速案銷售點數': { a: 12, t: 18, w: 0.04 }, 'RT V+D 1399 (含)以上': { a: 20, t: 33, w: 0.05 },
+        'RT V+D 999 (含)以上': { a: 25, t: 40, w: 0.03 }, '配件及其他營收': { a: 90000, t: 100000, w: 0.02 } } },
+    { code: 'DNB10174', name: '台北通化', official: 0.9821, items: {
+        'AQ V+D 999 (含)以上': { a: 9, t: 12, w: 0.03 }, 'AQ V+D 1399 (含)以上': { a: 4, t: 6, w: 0.02 },
+        '好速案銷售點數': { a: 8, t: 15, w: 0.04 }, 'RT V+D 1399 (含)以上': { a: 15, t: 28, w: 0.05 },
+        'RT V+D 999 (含)以上': { a: 18, t: 30, w: 0.03 }, '配件及其他營收': { a: 70000, t: 90000, w: 0.02 } } },
+  ],
+  persons: [
+    { store: 'DNB10284', role: '業務代表(I)', pname: '測＊員', official: 1.056, items: {
+        'AQ V+D 999 (含)以上': { a: 4, t: 3, w: 0.03 }, 'AQ V+D 1399 (含)以上': { a: 2, t: 2, w: 0.02 },
+        '好速案銷售點數': { a: 2, t: 3, w: 0.04 }, 'RT V+D 1399 (含)以上': { a: 3, t: 2, w: 0.05 },
+        'RT V+D 999 (含)以上': { a: 4, t: 5, w: 0.03 }, '配件及其他營收': { a: 9000, t: 10000, w: 0.02 } } },
+    { store: 'DNB10174', role: '店長', pname: '測＊二', official: 0.91, items: {
+        'AQ V+D 999 (含)以上': { a: 2, t: 3, w: 0.03 }, 'AQ V+D 1399 (含)以上': { a: 1, t: 2, w: 0.02 },
+        '好速案銷售點數': { a: 1, t: 3, w: 0.04 }, 'RT V+D 1399 (含)以上': { a: 2, t: 2, w: 0.05 },
+        'RT V+D 999 (含)以上': { a: 3, t: 5, w: 0.03 }, '配件及其他營收': { a: 8000, t: 10000, w: 0.02 } } },
+  ],
+};
+
+async function kpiBattleLogin(page) {
+  await page.goto(FILE_URL);
+  await page.getByRole('button', { name: /KPI戰情/ }).click();
+  await page.locator('#kpiBattleContent input[placeholder="輸入員工編號"]').fill('1234567');
+  await page.getByRole('button', { name: '以員編登入' }).click();
 }
 
 async function mockAwardsBattle(page) {
@@ -294,53 +333,65 @@ test.describe('KPI 戰情', () => {
     await expect(page.locator('#kpiBattleContent')).not.toContainText('大稻埕');
   });
 
-  test('核准裝置只需輸入員編即可讀取私有戰情', async ({ page }) => {
+  test('核准裝置只需輸入員編即可讀取私有戰情（方案 A：kpicalc 來源）', async ({ page }) => {
     await mockGAS(page);
-    await page.goto(FILE_URL);
-    await page.getByRole('button', { name: /KPI戰情/ }).click();
-    await page.locator('#kpiBattleContent input[placeholder="輸入員工編號"]').fill('1234567');
-    await page.getByRole('button', { name: '以員編登入' }).click();
-    await expect(page.locator('#kpiBattleContent')).toContainText('大稻埕');
+    await kpiBattleLogin(page);
+    await expect(page.locator('#kpiBattleContent')).toContainText('台北大稻埕');
     await expect(page.locator('#kpiBattleContent')).toContainText('KPI總達成');
   });
 
-  test('店點總覽顯示正式 KPI 核心欄位', async ({ page }) => {
+  test('店點總覽顯示 kpicalc 最新欄位，來源列標明資料日期與來源檔', async ({ page }) => {
     await mockGAS(page);
-    await mockKpiBattle(page);
-    await page.goto(FILE_URL);
-    await page.locator('.tab-btn:has-text("KPI戰情")').click();
+    await kpiBattleLogin(page);
     await expect(page.locator('#panel-kpi-battle')).toBeVisible();
-    await expect(page.locator('#kpiBattleContent')).toContainText('大稻埕');
+    await expect(page.locator('#kpiBattleContent')).toContainText('台北大稻埕');
     await expect(page.locator('#kpiBattleContent')).toContainText('A999');
     await expect(page.locator('#kpiBattleContent')).toContainText('R1399');
-    await expect(page.locator('#kpiBattleContent')).toContainText('較昨日');
-    await expect(page.locator('#kpiBattleSourceNote')).toContainText('尚差或超前');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('kpi.html 同一份');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('資料日期 2026-07-29');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('來源檔 0730.xlsx');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('更新時間 尚未同步');
   });
 
-  test('北一二B整體列置頂，且可查看整體 KPI 明細', async ({ page }) => {
+  test('缺少欄位顯示尚未同步，且不得出現 snapshot 舊數字', async ({ page }) => {
     await mockGAS(page);
-    await mockKpiBattle(page);
-    await page.goto(FILE_URL);
-    await page.locator('.tab-btn:has-text("KPI戰情")').click();
+    await kpiBattleLogin(page);
+    // 公司排名／加掛分／整體 KPI：kpicalc 沒有 → 尚未同步
+    await expect(page.locator('#kpiBattleContent')).toContainText('尚未同步');
+    const text = await page.locator('#kpiBattleContent').textContent();
+    // snapshot fixture 的舊數字一個都不准出現：加掛 13.36、整體 105.5%、DOD 字樣
+    for (const stale of ['13.36', '105.5%', '105.4', 'DOD']) {
+      expect(text, `snapshot 舊數字 ${stale} 不得出現`).not.toContain(stale);
+    }
+    // 公司排名欄只在有排名值時才會產生 val-gold 節點——kpicalc 沒排名，必須為 0
+    await expect(page.locator('#kpiBattleContent .val-gold')).toHaveCount(0);
+    // kpicalc 的最新店點總達成率必須出現（110.4% = 1.1035）
+    await expect(page.locator('#kpiBattleContent')).toContainText('110.3%');
+  });
+
+  test('北一二B整體列置頂（逐項加總），且可查看整體 KPI 明細', async ({ page }) => {
+    await mockGAS(page);
+    await kpiBattleLogin(page);
     await expect(page.locator('#kpiBattleContent tbody tr').first()).toContainText('北一二B整體');
     await page.selectOption('#kpiBattleStoreSelect', '北一二B整體');
     await expect(page.locator('#kpiBattleContent')).toContainText('好速案銷售點數');
+    // 整體 A999 = 11+9=20、目標 16+12=28 → 71.4%（純加總，非發明數字）
+    await expect(page.locator('#kpiBattleContent')).toContainText('71.4%');
   });
 
   test('可切換至個績排名且顯示遮罩姓名', async ({ page }) => {
     await mockGAS(page);
-    await mockKpiBattle(page);
-    await page.goto(FILE_URL);
-    await page.locator('.tab-btn:has-text("KPI戰情")').click();
+    await kpiBattleLogin(page);
     await page.locator('#kpiBattlePersonalBtn').click();
     await expect(page.locator('#kpiBattleContent')).toContainText('測＊員');
     await expect(page.locator('#kpiBattleContent')).toContainText('總達成率');
     await expect(page.locator('#kpiBattleContent')).toContainText('個人台獎');
-    await expect(page.locator('#kpiBattleContent')).toContainText('實際獎金');
-    await expect(page.locator('#kpiBattleContent')).toContainText('推估獎金');
     await expect(page.locator('#kpiBattleContent')).toContainText('特維');
     await expect(page.locator('#kpiBattleContent')).toContainText('保險搭售率');
-    await expect(page.locator('#kpiBattleContent')).toContainText('DOD');
+    // 方案 A：個人排名／台獎／保險搭售率不在 kpicalc → 尚未同步，不得出現舊獎金數字
+    await expect(page.locator('#kpiBattleContent')).toContainText('尚未同步');
+    await expect(page.locator('#kpiBattleContent')).not.toContainText('實際獎金');
+    await expect(page.locator('#kpiBattleContent')).not.toContainText('$1,800');
     const headers = await page.locator('#kpiBattleContent thead th').allTextContents();
     expect(headers.indexOf('保險搭售率')).toBe(headers.indexOf('個人台獎') + 1);
     expect(headers.indexOf('R999')).toBe(headers.indexOf('R1399') + 1);
