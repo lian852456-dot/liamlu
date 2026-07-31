@@ -2484,6 +2484,21 @@ function reportUploadValidateFile_(kind, fileName, byteLength) {
   return checks;
 }
 
+// 門市名比對：報表的店名與 STORES 清單寫法不同，不能用精確比對。
+// 2026-07-31 以真實 0730.xlsx 實測：報表為「台北酒泉」「台北通化」等帶「台北」前綴，
+// 三創更是「台灣大哥大數位生活台北三創」，而 STORES 是「酒泉」「通化」「台北三創」。
+// 原本的 indexOf 精確比對會讓 9 家全部對不到 → 真實日報被誤判為「其他區資料」而擋下。
+// 改為雙向包含比對後 9/9 命中。
+function reportUploadStoreMatch_(name) {
+  const clean = String(name || '').trim();
+  if (!clean) return '';
+  for (let i = 0; i < STORES.length; i++) {
+    const s = STORES[i];
+    if (clean === s || clean.indexOf(s) !== -1 || s.indexOf(clean) !== -1) return s;
+  }
+  return '';
+}
+
 // 資料日期比對：新檔早於（或等於）正式版本時擋下／提醒。
 function reportUploadDateChecks_(incomingDate, live) {
   const checks = [];
@@ -2521,7 +2536,7 @@ function reportUploadValidateKpi_(data, live) {
 
   // 區域檢查：北一二B 的店代碼是 DNB 開頭，且店名應落在已知門市清單內。
   const badCode = stores.filter(function(s) { return !/^DNB/i.test(String(s.code || '')); });
-  const known = stores.filter(function(s) { return STORES.indexOf(String(s.name || '')) !== -1; });
+  const known = stores.filter(function(s) { return !!reportUploadStoreMatch_(s.name); });
   if (badCode.length) {
     checks.push(reportUploadCheck_('region', '區域或店點', 'block',
       '有 ' + badCode.length + ' 家店代碼不是 DNB 開頭，疑似非本區報表'));
@@ -2562,7 +2577,7 @@ function reportUploadValidateAward_(snapshot, live) {
   reportUploadDateChecks_(String(snapshot.kpiBattle.report_date || ''), live).forEach(function(c) { checks.push(c); });
 
   const rows = Array.isArray(snapshot.awardsBattle.stores) ? snapshot.awardsBattle.stores : [];
-  const known = rows.filter(function(r) { return STORES.indexOf(String(r.store || '')) !== -1; });
+  const known = rows.filter(function(r) { return !!reportUploadStoreMatch_(r.store); });
   if (!rows.length) {
     checks.push(reportUploadCheck_('region', '區域或店點', 'block', '台獎快照沒有任何店點資料'));
   } else if (!known.length) {

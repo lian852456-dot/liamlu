@@ -223,7 +223,7 @@ function loadValidators() {
   const names = [
     'reportUploadCheck_', 'reportUploadValidateFile_', 'reportUploadDateChecks_',
     'reportUploadValidateKpi_', 'reportUploadValidateAward_', 'reportUploadBlocked_',
-    'reportUploadKpiDate_', 'reportUploadKind_'
+    'reportUploadKpiDate_', 'reportUploadKind_', 'reportUploadStoreMatch_'
   ];
   let src = `
     const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
@@ -270,6 +270,40 @@ test('舊日期會被擋下、同日期只提醒（情境 7：上傳舊日期）
 
 test('首次發佈（無正式資料）視為可放行的提醒', () => {
   assert.equal(V.reportUploadDateChecks_('2026-07-31', null).find(c => c.key === 'newer').level, 'warn');
+});
+
+// 2026-07-31 以真實 0730.xlsx 實測到的店名寫法（僅店名，不含任何業績數字）
+const REAL_STORE_NAMES = ['台北酒泉', '台北永吉', '台北復興南', '台北杭州南', '台北萬大',
+  '台北通化', '台北大稻埕', '台灣大哥大數位生活台北三創', '台北六張犁'];
+
+test('真實日報的店名寫法必須全部對得到 STORES（回歸：曾誤判為其他區）', () => {
+  // 報表是「台北酒泉」，STORES 是「酒泉」；三創是「台灣大哥大數位生活台北三創」對「台北三創」。
+  // 舊版用精確比對 → 9 家全部落空 → 真實日報被 block。
+  for (const name of REAL_STORE_NAMES) {
+    assert.ok(V.reportUploadStoreMatch_(name), `真實店名對不到：${name}`);
+  }
+});
+
+test('真實 0730 店名組合可通過區域檢查', () => {
+  const stores = REAL_STORE_NAMES.map((n, i) => ({ code: 'DNB1000' + i, name: n }));
+  const checks = V.reportUploadValidateKpi_(kpiData({ stores }), { dataDate: '2026-07-28' });
+  assert.equal(checks.find(c => c.key === 'region').level, 'ok');
+  assert.equal(V.reportUploadBlocked_(checks).length, 0);
+});
+
+test('其他區店名仍然要被擋下（放寬比對不能放行外區）', () => {
+  for (const name of ['台北板橋', '桃園中壢', '新竹光復']) {
+    assert.equal(V.reportUploadStoreMatch_(name), '', `不該對到：${name}`);
+  }
+  const stores = ['台北板橋', '桃園中壢', '新竹光復', '台中一中', '高雄左營']
+    .map((n, i) => ({ code: 'DNB200' + i, name: n }));
+  assert.equal(V.reportUploadValidateKpi_(kpiData({ stores }), null).find(c => c.key === 'region').level, 'block');
+});
+
+test('台獎快照也適用同一套店名比對', () => {
+  const snapshot = { kpiBattle: { report_date: '2026-07-31' },
+                     awardsBattle: { stores: REAL_STORE_NAMES.map(n => ({ store: n })) } };
+  assert.equal(V.reportUploadValidateAward_(snapshot, null).find(c => c.key === 'region').level, 'ok');
 });
 
 function kpiData(overrides) {

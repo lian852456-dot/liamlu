@@ -19,14 +19,15 @@ Liam 說「目前完成的是 JSON 快速更新雛形」——大方向正確，
 
 | 車道 | 檔案型別 | 解析方式 | 狀態 |
 |---|---|---|---|
-| KPI | `.xlsx` | **Apps Script 端**呼叫既有 `kpiCalcParseReport()` | 程式已接通，**未用真實日報驗證過** |
+| KPI | `.xlsx` | **Apps Script 端**呼叫既有 `kpiCalcParseReport()` | **解析層已用真實 0730.xlsx 驗證通過**；寫入／發佈端仍未驗 |
 | 台獎 | `.json` | `JSON.parse` + 快照結構檢查 | 雛形可用，**完全沒有 Excel 能力** |
 
 證據：`report-upload.html:134` 的 `accept=".xlsx"`；`gas/Code.gs` 的
 `data = kpiCalcParseReport(rawFile)`。
 
 所以 KPI 的 Excel 路徑**不是不存在**，而是：
-1. 從未用真實日報跑過（雲端 Claude 無法呼叫 GAS，只有 Liam 能驗）；
+1. ~~從未用真實日報跑過~~ → **2026-07-31 已用真實 `0730.xlsx` 驗證解析層通過**（HANDOVER §6）；
+   但**寫入／發佈端**仍未驗（雲端 Claude 無法呼叫 GAS，只有 Liam 能驗）。
 2. **不是 Liam 要的架構**——需求是「瀏覽器本機讀取工作簿」，目前是伺服器端解析；
 3. 因此**無法與未來離線版共用**，這是真正的缺口。
 
@@ -50,7 +51,7 @@ Liam 說「目前完成的是 JSON 快速更新雛形」——大方向正確，
 | 瀏覽器本機解析 | 目前 KPI 在 GAS 端解析，離線版無法共用 |
 | 共用解析模組 | `report-file-reader` / `kpi-normalizer` / `phone-awards-normalizer` / `report-validator` 皆未建立 |
 | `.xls` 支援 | 未支援。需先確認實際是否仍有 `.xls` 來源 |
-| 真實樣本驗證 | KPI 伺服器端路徑從未跑過真實日報 |
+| 真實樣本驗證 | KPI `_店點` 路徑已用 0730.xlsx 驗證；**`_明細` 主路徑與台獎仍無樣本** |
 | 工作簿盤點能力 | 「先上傳、只看工作表與欄位、不解析」的盤點模式尚未做 |
 
 ## 3. 兩者之間需要增加的轉換層
@@ -133,15 +134,17 @@ Liam 說「目前完成的是 JSON 快速更新雛形」——大方向正確，
 
 見 `UPLOAD-QUICK-UPDATE-HANDOVER.md` §需要的樣本。摘要：
 
-- **KPI**：一份真實 `MMDD.xlsx` 日報（含 `_明細` 與只有 `_店點` 的兩種版本各一）。
+- **KPI**：`_店點` 版本已由 `0730.xlsx` 驗證完成；**仍缺含 `_明細` 的版本**（`detail` 主路徑未驗）。
 - **台獎**：完全沒有樣本，連工作表名稱都不知道。需要 1 份真實台獎 Excel
   ＋一份對應的 `phone-awards-battle-latest.json`（用來反推欄位對照）。
 - **`.xls`**：需確認實際是否仍有此格式來源；若無，不做。
 
 ## 6. 已知限制
 
-1. **正式環境完全未驗證。** proxy 封鎖 `script.google.com`，只有 Liam 能貼碼／部署。
-   所有測試皆為本機契約測試（46 項）與 Playwright route 模擬（28 項）。
+1. **寫入／發佈端仍未在正式環境驗證。** proxy 封鎖 `script.google.com`，只有 Liam 能貼碼／部署。
+   測試為本機契約測試（50 項）與 Playwright route 模擬（28 項）。
+   **解析層例外**：2026-07-31 已用真實 `0730.xlsx` 逐項驗證（見 HANDOVER §6），
+   並因此修掉一個會擋下真實日報的店名比對 BUG。
 2. **「更新既有 Google Sheet」目前是 `未執行`**：KPI 與台獎的正式資料都不在既有試算表裡，
    而是私有 Drive 的 JSON。詳見 FILE-MAP §同步盤點。
 3. 台獎 Excel（§2）。
