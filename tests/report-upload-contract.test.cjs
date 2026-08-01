@@ -726,6 +726,8 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
     assert.match(htmlPage, new RegExp(id), `前端缺少 ${id}`);
   }
   assert.match(htmlPage, /awardPreviewBtn.*disabled/);
+  assert.match(htmlPage, /id="awardUiVersion"[^>]*>[^<]*v33/);
+  assert.match(htmlPage, /award preview guard state/);
   assert.match(htmlPage, /awardUploadState\.storeStatus === 'completed'/);
   assert.match(htmlPage, /awardUploadState\.personalStatus === 'completed'/);
   assert.match(htmlPage, /awardUploadState\.storeFileId.*awardUploadState\.personalFileId/);

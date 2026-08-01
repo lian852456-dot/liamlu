@@ -3297,7 +3297,8 @@ function reportAwardPairCreateJob(payload) {
     return row.record_type === 'job' && row.upload_session_id === sessionId &&
       ['queued', 'running', 'completed'].indexOf(row.status) !== -1;
   })[0];
-  if (existing) return { ok: true, previewJobId: existing.job_id, stage: existing.stage, status: existing.status, reused: true };
+  if (existing) return { ok: true, previewJobId: existing.job_id, stage: existing.stage, status: existing.status, reused: true,
+    storeFileId: session.store_file_id, personalFileId: session.personal_file_id };
   const now = reportAwardPairNow_();
   const job = { record_type: 'job', job_id: reportUploadToken_(), upload_session_id: sessionId,
     store_file_id: session.store_file_id, store_file_name: session.store_file_name, store_hash: session.store_hash, store_size: session.store_size,

@@ -28,6 +28,7 @@
     <section class="hero">
       <h1>戰報快速更新</h1>
       <p>獨立 Apps Script Deployment ・同源上傳與發布 ・不經 GitHub Pages 跨網域 POST</p>
+      <p id="awardUiVersion" class="small" style="color:#d5f5ff">台獎雙檔預覽前端：v33・單一狀態來源・可恢復暫存檔</p>
     </section>
 
     <section id="authCard" class="card">
@@ -311,7 +312,16 @@
       const button = $('awardPreviewBtn');
       const storeId = awardUploadState.storeFileId; const personalId = awardUploadState.personalFileId;
       console.log('award preview create request File IDs', { storeFileId: storeId, personalFileId: personalId });
-      if (!storeId || !personalId || awardUploadState.storeStatus !== 'completed' || awardUploadState.personalStatus !== 'completed') return message('awardMessage', '請先完成店點檔與個人檔上傳。', 'bad');
+      console.log('award preview guard state', JSON.stringify({
+        uploadSessionId: awardUploadState.uploadSessionId,
+        storeFileId: storeId,
+        personalFileId: personalId,
+        storeStatus: awardUploadState.storeStatus,
+        personalStatus: awardUploadState.personalStatus
+      }));
+      if (!storeId || !personalId || awardUploadState.storeStatus !== 'completed' || awardUploadState.personalStatus !== 'completed') {
+        return message('awardMessage', '請先完成店點檔與個人檔上傳。（目前狀態：店點 ' + awardUploadState.storeStatus + '、個人 ' + awardUploadState.personalStatus + '）', 'bad');
+      }
       if (awardPolling) return;
       setBusy(button, true, '建立任務中…'); message('awardMessage', '兩份檔案已完成上傳，正在建立預覽任務；不會更新正式台獎資料。');
       try {
