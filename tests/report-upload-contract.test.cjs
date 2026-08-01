@@ -688,3 +688,17 @@ test('同源 HtmlService 僅使用 google.script.run，且四個上傳呼叫都�
   assert.doesNotMatch(htmlPage, /fetch\(|https:\/\/script\.google\.com|REPORT_UPLOAD_ALLOWED_EMPLOYEES|DASHBOARD_ADMIN_SECRET/);
   assert.doesNotMatch(htmlPage, /localStorage|sessionStorage/);
 });
+
+test('所有前端頁面不含實際白名單員編、管理密碼值或 Script Property', () => {
+  const frontends = [page, htmlPage, home];
+  for (const source of frontends) {
+    assert.doesNotMatch(source, /5510755/, '前端不得包含實際白名單員編');
+    assert.doesNotMatch(source, /REPORT_UPLOAD_ALLOWED_EMPLOYEES|DASHBOARD_ADMIN_SECRET/,
+      '前端不得包含 Script Property 名稱或值');
+  }
+  const passwordInputs = htmlPage.match(/<input[^>]*type="password"[^>]*>/g) || [];
+  assert.ok(passwordInputs.length > 0, '同源頁應保留使用者輸入的密碼欄位');
+  for (const input of passwordInputs) {
+    assert.doesNotMatch(input, /\svalue\s*=/i, '密碼欄位不得提供硬編碼預設值');
+  }
+});
