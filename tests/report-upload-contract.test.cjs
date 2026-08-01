@@ -741,8 +741,8 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
   assert.match(htmlPage, /id="deploymentVersion"/);
   assert.match(htmlPage, /id="buildCommit"/);
   assert.match(htmlPage, /id="buildTime"/);
-  assert.match(code, /deploymentVersion: '36'/);
-  assert.match(code, /buildCommit: 'bc03b8bdbb8c589aed5dd7c8781b18e93c9ab90a'/);
+  assert.match(code, /deploymentVersion: '37'/);
+  assert.match(code, /buildCommit: '1c6c57debbfdde0cc541c132ab68d0c585a30187'/);
   assert.match(htmlPage, /award preview guard state/);
   assert.match(htmlPage, /awardUploadState\.storeStatus === 'completed'/);
   assert.match(htmlPage, /awardUploadState\.personalStatus === 'completed'/);
