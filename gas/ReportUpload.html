@@ -117,11 +117,11 @@
     const auth = { employeeId: '', adminSecret: '' };
     let previewToken = '';
     let awardPreviewJobId = '';
-    let awardUploadSessionId = '';
-    let storeFileId = '';
-    let personalFileId = '';
     let awardPolling = false;
-    const awardUploadState = { store: 'not-uploaded', person: 'not-uploaded' };
+    const awardUploadState = {
+      uploadSessionId: '', storeFileId: '', personalFileId: '',
+      storeStatus: 'not-uploaded', personalStatus: 'not-uploaded'
+    };
     const $ = id => document.getElementById(id);
     const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     function message(id, text, tone) { const node = $(id); node.textContent = text; node.className = 'message ' + (tone || ''); }
@@ -148,13 +148,13 @@
       $('awardChecks').innerHTML = '<table class="checks"><thead><tr><th>檢查</th><th>結果</th><th>說明</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
     function updateAwardPreviewButton() {
-      const ready = !!storeFileId && !!personalFileId && awardUploadState.store === 'completed' && awardUploadState.person === 'completed' && !awardPolling;
+      const ready = !!awardUploadState.storeFileId && !!awardUploadState.personalFileId && awardUploadState.storeStatus === 'completed' && awardUploadState.personalStatus === 'completed' && !awardPolling;
       $('awardPreviewBtn').disabled = !ready;
-      $('awardPersonUploadBtn').disabled = !$('awardPersonFile').files[0] || !storeFileId || awardUploadState.person === 'uploading' || awardUploadState.person === 'completed' || awardPolling;
-      $('awardStoreUploadBtn').disabled = !$('awardStoreFile').files[0] || awardUploadState.store === 'uploading' || awardUploadState.store === 'completed' || awardPolling;
+      $('awardPersonUploadBtn').disabled = !$('awardPersonFile').files[0] || !awardUploadState.storeFileId || awardUploadState.personalStatus === 'uploading' || awardUploadState.personalStatus === 'completed' || awardPolling;
+      $('awardStoreUploadBtn').disabled = !$('awardStoreFile').files[0] || awardUploadState.storeStatus === 'uploading' || awardUploadState.storeStatus === 'completed' || awardPolling;
     }
     function setAwardUploadState(role, state, meta) {
-      awardUploadState[role] = state;
+      awardUploadState[role === 'store' ? 'storeStatus' : 'personalStatus'] = state;
       const label = role === 'store' ? 'awardStoreUploadState' : 'awardPersonUploadState';
       const metaId = role === 'store' ? 'awardStoreUploadMeta' : 'awardPersonUploadMeta';
       const labels = { 'not-uploaded': '尚未上傳', selected: '尚未上傳（已選檔）', uploading: '上傳中…', completed: '上傳完成', failed: '上傳失敗' };
@@ -165,11 +165,11 @@
     }
     function resetAwardUpload(role, reason) {
       if (role === 'store') {
-        storeFileId = ''; awardUploadSessionId = ''; personalFileId = '';
+        awardUploadState.storeFileId = ''; awardUploadState.uploadSessionId = ''; awardUploadState.personalFileId = '';
         setAwardUploadState('store', $('awardStoreFile').files[0] ? 'selected' : 'not-uploaded', reason || '');
         setAwardUploadState('person', $('awardPersonFile').files[0] ? 'selected' : 'not-uploaded', '需重新上傳個人檔');
       } else {
-        personalFileId = '';
+        awardUploadState.personalFileId = '';
         setAwardUploadState('person', $('awardPersonFile').files[0] ? 'selected' : 'not-uploaded', reason || '');
       }
       awardPreviewJobId = ''; $('awardClearBtn').disabled = true; updateAwardPreviewButton();
@@ -178,19 +178,22 @@
       const isStore = role === 'store';
       const file = $(isStore ? 'awardStoreFile' : 'awardPersonFile').files[0];
       if (!file) return message('awardMessage', '請先選擇 ' + (isStore ? '店點' : '個人') + '檔。', 'bad');
-      if (!isStore && !storeFileId) return message('awardMessage', '請先完成店點檔上傳。', 'bad');
+      if (!isStore && !awardUploadState.storeFileId) return message('awardMessage', '請先完成店點檔上傳。', 'bad');
       setAwardUploadState(role, 'uploading', '正在讀取檔案並計算 SHA-256…');
       try {
         const result = await call(isStore ? 'report_award_pair_upload_store' : 'report_award_pair_upload_personal', payload({
-          uploadSessionId: awardUploadSessionId,
+          uploadSessionId: awardUploadState.uploadSessionId,
           file: { fileName: file.name, mimeType: file.type, fileBase64: await readFileBase64(file) }
         }));
-        if (isStore) { awardUploadSessionId = result.uploadSessionId; storeFileId = result.fileId; }
-        else personalFileId = result.fileId;
-        setAwardUploadState(role, 'completed', '檔名：' + result.fileName + '｜大小：' + result.size + ' bytes｜SHA-256：' + result.hash + '｜' + (isStore ? 'storeFileId：' : 'personalFileId：') + result.fileId);
+        console.log('award upload success response', result);
+        if (isStore) { awardUploadState.uploadSessionId = result.uploadSessionId || ''; awardUploadState.storeFileId = result.storeFileId || result.fileId || ''; }
+        else awardUploadState.personalFileId = result.personalFileId || result.fileId || '';
+        const id = isStore ? awardUploadState.storeFileId : awardUploadState.personalFileId;
+        if (!id) throw new Error((isStore ? '店點' : '個人') + '上傳回應缺少 File ID');
+        setAwardUploadState(role, 'completed', '檔名：' + result.fileName + '｜大小：' + result.size + ' bytes｜SHA-256：' + result.hash + '｜' + (isStore ? 'storeFileId：' : 'personalFileId：') + id);
         message('awardMessage', (isStore ? '店點檔' : '個人檔') + '上傳完成。', 'ok');
       } catch (error) {
-        if (isStore) { storeFileId = ''; awardUploadSessionId = ''; } else personalFileId = '';
+        if (isStore) { awardUploadState.storeFileId = ''; awardUploadState.uploadSessionId = ''; } else awardUploadState.personalFileId = '';
         setAwardUploadState(role, 'failed', error.message);
         message('awardMessage', error.message, 'bad');
       }
@@ -291,11 +294,13 @@
     $('awardPersonUploadBtn').addEventListener('click', () => uploadAwardFile('person'));
     $('awardPreviewBtn').addEventListener('click', async () => {
       const button = $('awardPreviewBtn');
-      if (!storeFileId || !personalFileId || awardUploadState.store !== 'completed' || awardUploadState.person !== 'completed') return message('awardMessage', '請先完成店點檔與個人檔上傳。', 'bad');
+      const storeId = awardUploadState.storeFileId; const personalId = awardUploadState.personalFileId;
+      console.log('award preview create request File IDs', { storeFileId: storeId, personalFileId: personalId });
+      if (!storeId || !personalId || awardUploadState.storeStatus !== 'completed' || awardUploadState.personalStatus !== 'completed') return message('awardMessage', '請先完成店點檔與個人檔上傳。', 'bad');
       if (awardPolling) return;
       setBusy(button, true, '建立任務中…'); message('awardMessage', '兩份檔案已完成上傳，正在建立預覽任務；不會更新正式台獎資料。');
       try {
-        const job = await call('report_award_pair_create_job', payload({ uploadSessionId: awardUploadSessionId, storeFileId: storeFileId, personalFileId: personalFileId }));
+        const job = await call('report_award_pair_create_job', payload({ uploadSessionId: awardUploadState.uploadSessionId, storeFileId: storeId, personalFileId: personalId }));
         awardPreviewJobId = job.previewJobId; awardPolling = false; $('awardClearBtn').disabled = true;
         message('awardMessage', '預覽任務已建立（queued），正在分階段驗證與解析…', 'warn');
         window.setTimeout(pollAwardJob, 2000);

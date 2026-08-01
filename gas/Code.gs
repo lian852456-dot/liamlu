@@ -3200,6 +3200,29 @@ function reportAwardPairSession_(sessionId) {
   })[0] || null;
 }
 
+function reportAwardPairTempFile_(fileId, role) {
+  const id = String(fileId || '').trim();
+  if (!id) throw new Error('缺少 ' + role + ' 暫存 File ID');
+  const file = DriveApp.getFileById(id);
+  if (file.isTrashed()) throw new Error(role + ' 暫存檔已清除');
+  const expectedFolderId = privateDashboardFolder().getId();
+  const parents = file.getParents(); let belongs = false;
+  while (parents.hasNext()) if (parents.next().getId() === expectedFolderId) { belongs = true; break; }
+  if (!belongs || file.getName().indexOf(REPORT_AWARD_PAIR_TEMP_PREFIX) !== 0 || file.getName().indexOf('-' + role + '-') === -1) {
+    throw new Error(role + ' File ID 不是本次私人台獎暫存檔');
+  }
+  if (file.getLastUpdated().getTime() < Date.now() - REPORT_AWARD_PAIR_STAGE_TTL_SECONDS * 1000) {
+    throw new Error(role + ' 暫存檔已逾期，請重新上傳');
+  }
+  return file;
+}
+
+function reportAwardPairSessionByFiles_(storeFileId, personalFileId) {
+  return reportAwardPairRows_().filter(function(row) {
+    return row.record_type === 'session' && row.store_file_id === storeFileId && row.personal_file_id === personalFileId && row.status === 'active';
+  })[0] || null;
+}
+
 function reportAwardPairJob_(jobId) {
   return reportAwardPairRows_().filter(function(row) {
     return row.record_type === 'job' && row.job_id === jobId;
@@ -3223,8 +3246,11 @@ function reportAwardPairUpload(payload, role) {
   const nameKey = role + '_file_name';
   const sizeKey = role + '_size';
   if (session[idKey] && session[hashKey] === fileIn.hash) {
-    return { ok: true, uploadSessionId: sessionId, fileId: session[idKey], fileName: session[nameKey],
+    const reused = { ok: true, uploadSessionId: sessionId, fileId: session[idKey], fileName: session[nameKey],
       size: Number(session[sizeKey] || 0), hash: fileIn.hash, reused: true, message: expected.label + ' 已使用同一暫存檔。' };
+    reused[role === 'store' ? 'storeFileId' : 'personalFileId'] = session[idKey];
+    console.log('award upload success role=' + role + ' response=' + JSON.stringify(reused));
+    return reused;
   }
   if (session[idKey] && session[hashKey] !== fileIn.hash) reportUploadTrash_(DriveApp.getFileById(session[idKey]));
   const folder = privateDashboardFolder();
@@ -3237,15 +3263,35 @@ function reportAwardPairUpload(payload, role) {
   session[idKey] = raw.getId(); session[hashKey] = fileIn.hash; session[nameKey] = fileIn.fileName;
   session[sizeKey] = String(fileIn.bytes.length); session.stage = 'uploaded-' + role; session.status = 'active';
   reportAwardPairLog_(session, session.stage, 'active', session.started_at);
-  return { ok: true, uploadSessionId: sessionId, fileId: raw.getId(), fileName: fileIn.fileName,
+  const response = { ok: true, uploadSessionId: sessionId, fileId: raw.getId(), fileName: fileIn.fileName,
     size: fileIn.bytes.length, hash: fileIn.hash, reused: !!existing, message: expected.label + ' 已安全暫存，等待建立預覽任務。' };
+  response[role === 'store' ? 'storeFileId' : 'personalFileId'] = raw.getId();
+  console.log('award upload success role=' + role + ' response=' + JSON.stringify(response));
+  return response;
 }
 
 function reportAwardPairCreateJob(payload) {
   reportUploadAuthorize_(payload);
-  const sessionId = String((payload || {}).uploadSessionId || '');
-  const session = reportAwardPairSession_(sessionId);
+  const input = payload || {};
+  let sessionId = String(input.uploadSessionId || '');
+  let session = sessionId ? reportAwardPairSession_(sessionId) : null;
+  const requestedStoreId = String(input.storeFileId || '').trim();
+  const requestedPersonalId = String(input.personalFileId || '').trim();
+  if (!session && requestedStoreId && requestedPersonalId) session = reportAwardPairSessionByFiles_(requestedStoreId, requestedPersonalId);
+  if (!session && requestedStoreId && requestedPersonalId) {
+    const storeFile = reportAwardPairTempFile_(requestedStoreId, 'store');
+    const personalFile = reportAwardPairTempFile_(requestedPersonalId, 'person');
+    sessionId = reportUploadToken_();
+    session = { record_type: 'session', upload_session_id: sessionId, store_file_id: storeFile.getId(),
+      store_file_name: storeFile.getName(), store_hash: reportAwardPairHash_(storeFile.getBlob().getBytes()), store_size: String(storeFile.getSize()),
+      personal_file_id: personalFile.getId(), personal_file_name: personalFile.getName(), personal_hash: reportAwardPairHash_(personalFile.getBlob().getBytes()), personal_size: String(personalFile.getSize()),
+      stage: 'uploaded-person', status: 'active', started_at: reportAwardPairNow_(), cleanup_after: '' };
+    reportAwardPairLog_(session, 'uploaded-person', 'active', session.started_at);
+  }
   if (!session || !session.store_file_id || !session.personal_file_id) throw new Error('請先完成兩份檔案上傳。');
+  reportAwardPairTempFile_(session.store_file_id, 'store');
+  reportAwardPairTempFile_(session.personal_file_id, 'person');
+  console.log('award preview create request storeFileId=' + session.store_file_id + ' personalFileId=' + session.personal_file_id);
   const existing = reportAwardPairRows_().filter(function(row) {
     return row.record_type === 'job' && row.upload_session_id === sessionId &&
       ['queued', 'running', 'completed'].indexOf(row.status) !== -1;
@@ -3257,7 +3303,8 @@ function reportAwardPairCreateJob(payload) {
     personal_file_id: session.personal_file_id, personal_file_name: session.personal_file_name, personal_hash: session.personal_hash, personal_size: session.personal_size,
     stage: 'queued', status: 'queued', started_at: now, cleanup_after: new Date(Date.now() + REPORT_AWARD_PAIR_JOB_TTL_HOURS * 3600 * 1000).toISOString() };
   reportAwardPairLog_(job, 'queued', 'queued', now);
-  return { ok: true, previewJobId: job.job_id, stage: 'queued', status: 'queued', reused: false };
+  return { ok: true, previewJobId: job.job_id, stage: 'queued', status: 'queued', reused: false,
+    storeFileId: session.store_file_id, personalFileId: session.personal_file_id };
 }
 
 function reportAwardPairStageResult_(job) {

@@ -726,13 +726,22 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
     assert.match(htmlPage, new RegExp(id), `前端缺少 ${id}`);
   }
   assert.match(htmlPage, /awardPreviewBtn.*disabled/);
-  assert.match(htmlPage, /awardUploadState\.store === 'completed'/);
-  assert.match(htmlPage, /awardUploadState\.person === 'completed'/);
-  assert.match(htmlPage, /storeFileId.*personalFileId/);
-  assert.match(htmlPage, /storeFileId = ''; awardUploadSessionId = ''; personalFileId = ''/);
-  assert.match(htmlPage, /if \(isStore\) \{ storeFileId = ''; awardUploadSessionId = ''; \} else personalFileId = ''/);
+  assert.match(htmlPage, /awardUploadState\.storeStatus === 'completed'/);
+  assert.match(htmlPage, /awardUploadState\.personalStatus === 'completed'/);
+  assert.match(htmlPage, /awardUploadState\.storeFileId.*awardUploadState\.personalFileId/);
+  assert.match(htmlPage, /awardUploadState\.storeFileId = ''; awardUploadState\.uploadSessionId = ''; awardUploadState\.personalFileId = ''/);
+  assert.match(htmlPage, /if \(isStore\) \{ awardUploadState\.storeFileId = ''; awardUploadState\.uploadSessionId = ''; \} else awardUploadState\.personalFileId = ''/);
   assert.match(htmlPage, /setAwardUploadState\(role, 'uploading'/);
   assert.match(htmlPage, /setAwardUploadState\(role, 'failed'/);
+  assert.match(htmlPage, /console\.log\('award upload success response', result\)/);
+  assert.match(htmlPage, /console\.log\('award preview create request File IDs'/);
+  assert.match(htmlPage, /storeFileId: storeId, personalFileId: personalId/);
+  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairTempFile_\(session\.store_file_id, 'store'\)/);
+  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairTempFile_\(session\.personal_file_id, 'person'\)/);
+  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /input\.storeFileId/);
+  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /input\.personalFileId/);
+  assert.match(functionBody(code, 'reportAwardPairTempFile_'), /getParents\(\)/);
+  assert.match(functionBody(code, 'reportAwardPairTempFile_'), /getLastUpdated\(\)\.getTime\(\)/);
   assert.doesNotMatch(code, /report_award_pair_commit|report_award_pair_publish/);
   assert.doesNotMatch(htmlPage, /report_award_pair_preview/);
   assert.match(htmlPage, /window\.setTimeout\(pollAwardJob, 2000\)/);
