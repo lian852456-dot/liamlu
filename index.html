@@ -2381,9 +2381,71 @@ function switchTab(name) {
 // KPI BATTLE — official daily report, protected by employee ID + approved device
 // ════════════════════════════════════
 let _kpiBattleData = null;
+
+// ═══ 方案 A 轉接層：kpicalc JSON → KPI 戰情視圖 ═══
+// 原則（2026-07-31 Liam 拍板）：kpicalc 有的欄位顯示最新值；沒有的欄位（公司排名、
+// DOD 昨日變化、加掛分、個人排名／台獎／保險搭售率）一律「尚未同步」或隱藏，
+// 不得沿用 dashboard snapshot 的舊數字。所有數字都直接來自 kpicalc JSON 或其逐項加總，
+// 不發明任何新數字；整體總達成率無法由 kpicalc 推得（需加權），因此也是尚未同步。
+const KPI_BATTLE_CORE_KEYS = { a999: 'AQ V+D 999 (含)以上', a1399: 'AQ V+D 1399 (含)以上', haosu: '好速案銷售點數', r1399: 'RT V+D 1399 (含)以上' };
+const KPI_BATTLE_PERSONAL_KEYS = { A999: 'AQ V+D 999 (含)以上', A1399: 'AQ V+D 1399 (含)以上', '好速': '好速案銷售點數', R1399: 'RT V+D 1399 (含)以上', R999: 'RT V+D 999 (含)以上', RT: 'RT上線點數', '特維': '特殊維繫用戶續約數', '配件': '配件及其他營收', '包膜': '包膜與保貼營收' };
+
+function kpiPendingCell() { return '<span class="kpi-sub" style="font-weight:800;color:var(--text-muted)">尚未同步</span>'; }
+
+function kpicalcMetric(entry, meta) {
+  if (!entry) return null;
+  const actual = Number(entry.a) || 0;
+  const target = Number(entry.t) || 0;
+  // 依統計截止日換算應達進度（同 meta 推得，非新數字）；無目標時不給達成率
+  const expected = (target > 0 && Number(meta.monthDays) > 0) ? target * Number(meta.snapshotDay) / Number(meta.monthDays) : null;
+  return { actual, target, rate: target > 0 ? actual / target : null, daily_gap: expected == null ? null : actual - expected };
+}
+
+function kpicalcToKpiBattleView(data, fetchedAt) {
+  const meta = (data && data.meta) || {};
+  const dataDate = (/^\d{4}-\d{2}$/.test(meta.month || '') && meta.snapshotDay)
+    ? `${meta.month}-${String(meta.snapshotDay).padStart(2, '0')}` : '';
+  const codeName = {};
+  (data.stores || []).forEach(s => { codeName[s.code] = s.name; });
+  const metricsOf = itemsObj => {
+    const out = {};
+    (data.items || []).forEach(it => { const m = kpicalcMetric((itemsObj || {})[it.key], meta); if (m) out[it.key] = m; });
+    return out;
+  };
+  const coreOf = metrics => {
+    const core = {};
+    Object.entries(KPI_BATTLE_CORE_KEYS).forEach(([short, key]) => { core[short] = metrics[key] || null; });
+    return core;
+  };
+  const stores = (data.stores || []).map(s => {
+    const metrics = metricsOf(s.items);
+    return { store: s.name, overall_kpi: s.official, company_rank: null, addon_score: null, core: coreOf(metrics), metrics };
+  });
+  // 整體＝各店逐項加總（純加總，非發明數字）
+  const aggItems = {};
+  (data.items || []).forEach(it => {
+    let a = 0, t = 0, seen = false;
+    (data.stores || []).forEach(s => { const e = (s.items || {})[it.key]; if (e) { a += Number(e.a) || 0; t += Number(e.t) || 0; seen = true; } });
+    if (seen) aggItems[it.key] = kpicalcMetric({ a, t }, meta);
+  });
+  const personal = (data.persons || []).map(p => {
+    const metrics = {};
+    Object.entries(KPI_BATTLE_PERSONAL_KEYS).forEach(([short, key]) => { metrics[short] = kpicalcMetric((p.items || {})[key], meta); });
+    return { store: codeName[p.store] || p.store, category: p.role || '—', role: p.role || '', name: p.pname,
+             overall_rate: p.official, overall_rate_dod: null, rank: null, rank_dod: null,
+             insurance_attach_rate: null, phone_award_actual: null, phone_award_projected: null, metrics };
+  });
+  return {
+    source: 'kpicalc', fetchedAt: fetchedAt || '', source_file: meta.sourceFile || '',
+    report_date: dataDate, source_date_range: meta.period || '', source_as_of_date: dataDate, previous_report_date: null,
+    aggregate: { store: '北一二B整體', overall_kpi: null, company_rank: null, addon_score: null, core: coreOf(aggItems), metrics: aggItems },
+    stores, personal
+  };
+}
 let _kpiBattleView = 'stores';
 let _privateDashboardProfile = null;
 let _privateDashboardAdminSecret = '';
+let _awardsBattleUnavailableReason = '';
 
 function privateDashboardDeviceId() {
   const key = 'north12b_private_dashboard_device_id';
@@ -2426,6 +2488,7 @@ async function privateDashboardPost(payload) {
 
 function privateDashboardLockMarkup(kind) {
   const title = kind === 'awards' ? '台獎戰情受保護' : 'KPI 戰情受保護';
+  const uploadEntry = kind === 'kpi' ? `<a class="secondary" href="https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec" target="_blank" rel="noopener">戰報快速更新</a>` : '';
   return `<div class="card private-lock">
     <h3>🔐 ${title}</h3>
     <p>僅限北一二B在職同仁使用。姓名維持遮罩，KPI、排名與獎金不會出現在公開 GitHub 頁面。</p>
@@ -2438,6 +2501,7 @@ function privateDashboardLockMarkup(kind) {
       <button class="secondary" onclick="privateDashboardRequestBinding()">首次申請綁定</button>
       <button class="secondary" onclick="privateDashboardCheckRequest()">查看核准結果</button>
       <button class="secondary" onclick="privateDashboardOpenAdmin()">管理者核准</button>
+      ${uploadEntry}
     </div>
     <div class="private-lock-status">首次使用：輸入員編＋啟用碼提出申請；管理者核准後，該員編只綁定這一台手機或電腦。往後僅輸入員編登入。</div>
     <div class="private-admin" id="privateAdminPanel" style="display:none;"></div>
@@ -2470,11 +2534,31 @@ async function privateDashboardLogin() {
   try {
     const result = await privateDashboardPost({ action: 'private_access', employeeId, deviceId: privateDashboardDeviceId() });
     sessionStorage.setItem('north12b_private_dashboard_employee_id', employeeId);
-    _kpiBattleData = result.snapshot.kpiBattle;
-    _awardsBattleData = result.snapshot.awardsBattle;
     _privateDashboardProfile = result.profile || null;
-    renderKpiBattle();
-    renderAwardsBattle();
+    try {
+      const kpiResult = await privateDashboardPost({ action: 'kpicalc_access', employeeId, deviceId: privateDashboardDeviceId() });
+      _kpiBattleData = kpicalcToKpiBattleView(kpiResult.data, new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }));
+      renderKpiBattle();
+      const awards = result.snapshot && result.snapshot.awardsBattle;
+      const awardsDate = String((awards || {}).report_date || '');
+      if (awards && awardsDate === _kpiBattleData.report_date) {
+        _awardsBattleData = awards;
+        _awardsBattleUnavailableReason = '';
+        renderAwardsBattle();
+      } else {
+        _awardsBattleData = null;
+        _awardsBattleUnavailableReason = awardsDate
+          ? `台獎資料日期 ${awardsDate} 與 KPI 資料日期 ${_kpiBattleData.report_date || '—'} 不一致`
+          : '尚未取得與目前 KPI 同日期的台獎資料';
+        renderAwardsBattleUnavailable();
+      }
+    } catch (kpiError) {
+      const note = document.getElementById('kpiBattleSourceNote');
+      if (note) note.textContent = `KPI 資料載入失敗：${kpiError.message}`;
+      _awardsBattleData = null;
+      _awardsBattleUnavailableReason = 'KPI 正式資料尚未讀回，因此不顯示可能過期的台獎資料';
+      renderAwardsBattleUnavailable();
+    }
   } catch (error) {
     privateDashboardSetStatus(error.message, true);
   }
@@ -2613,11 +2697,8 @@ function kpiBattleAwardCell(row) {
 
 async function loadKpiBattle() {
   if (_kpiBattleData) { renderKpiBattle(); return; }
-  if (window.__KPI_BATTLE_DATA__) {
-    _kpiBattleData = window.__KPI_BATTLE_DATA__;
-    renderKpiBattle();
-    return;
-  }
+  // 2026-07-31 方案 A：KPI 頁籤的本機快照回退已移除——那是 snapshot 形狀的舊資料，
+  // 不得再與 kpicalc 正式來源混用（台獎頁籤的本機回退不受影響）。
   const note = document.getElementById('kpiBattleSourceNote');
   if (note) note.textContent = '需通過員編與已核准裝置驗證後，才會由私有 Google Drive 載入資料。';
   renderPrivateDashboardLock();
@@ -2634,7 +2715,7 @@ function renderKpiBattle() {
   if (!_kpiBattleData) return;
   const note = document.getElementById('kpiBattleSourceNote');
   if (note) {
-    note.textContent = `資料至 ${_kpiBattleData.report_date || '—'}｜區間 ${_kpiBattleData.source_date_range || '—'}｜進度截至 ${_kpiBattleData.source_as_of_date || '—'}｜明細：實績／月目標／尚差或超前｜較昨日對照 ${_kpiBattleData.previous_report_date || '無前日資料'}｜個資僅供本機受保護預覽`;
+    note.textContent = `KPI 唯一正式來源：與 kpi.html 同一份受保護 kpicalc 正式 JSON｜資料日期 ${_kpiBattleData.report_date || '—'}｜區間 ${_kpiBattleData.source_date_range || '—'}｜來源檔 ${_kpiBattleData.source_file || '—'}｜更新時間 尚未同步（讀取於 ${_kpiBattleData.fetchedAt || '—'}）｜發布狀態：正式 JSON 已發布｜明細：實績／月目標／尚差或超前｜公司排名・昨日變化・加掛分尚未同步｜個資僅供受保護預覽`;
   }
   const content = document.getElementById('kpiBattleContent');
   if (!content) return;
@@ -2648,15 +2729,15 @@ function renderKpiBattleStores() {
   const selected = rows.find(row => row.store === document.getElementById('kpiBattleStoreSelect')?.value) || rows[0];
   return `
     <div class="summary-grid">
-      <div class="summary-card"><div class="sc-label">北一二B KPI</div><div class="sc-val ${kpiBattleTone(aggregate.overall_kpi)}">${kpiBattlePercent(aggregate.overall_kpi)}</div><div class="sc-sub">${kpiBattleDod(aggregate.overall_kpi_dod) || '整體達成率'}</div></div>
-      <div class="summary-card"><div class="sc-label">公司排名</div><div class="sc-val" style="color:var(--gold)">${aggregate.company_rank ?? '—'}</div><div class="sc-sub">${kpiBattleRankDod(aggregate.company_rank_dod) || '北一二B整體'}</div></div>
-      <div class="summary-card"><div class="sc-label">加掛得分</div><div class="sc-val" style="color:var(--purple)">${kpiBattleNumber(aggregate.addon_score)}</div><div class="sc-sub">${aggregate.addon_score_dod == null ? '整體得分' : `DOD ${aggregate.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(aggregate.addon_score_dod)} 分`}</div></div>
+      <div class="summary-card"><div class="sc-label">北一二B KPI</div><div class="sc-val ${kpiBattleTone(aggregate.overall_kpi)}">${aggregate.overall_kpi == null ? kpiPendingCell() : kpiBattlePercent(aggregate.overall_kpi)}</div><div class="sc-sub">${kpiBattleDod(aggregate.overall_kpi_dod) || '整體達成率'}</div></div>
+      <div class="summary-card"><div class="sc-label">公司排名</div><div class="sc-val" style="color:var(--gold)">${aggregate.company_rank ?? kpiPendingCell()}</div><div class="sc-sub">${kpiBattleRankDod(aggregate.company_rank_dod) || '北一二B整體'}</div></div>
+      <div class="summary-card"><div class="sc-label">加掛得分</div><div class="sc-val" style="color:var(--purple)">${aggregate.addon_score == null ? kpiPendingCell() : kpiBattleNumber(aggregate.addon_score)}</div><div class="sc-sub">${aggregate.addon_score_dod == null ? '整體得分' : `DOD ${aggregate.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(aggregate.addon_score_dod)} 分`}</div></div>
       <div class="summary-card"><div class="sc-label">KPI未達100%</div><div class="sc-val" style="color:var(--red)">${stores.filter(row => Number(row.overall_kpi) < 1).length}</div><div class="sc-sub">間門市</div></div>
     </div>
     <div class="section-divider">北一二B／店點 KPI 排名</div>
     <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
       <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th><th>加掛</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
-      <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${row.store}</td><td><span class="val-gold">${row.company_rank ?? '—'}</span>${kpiBattleRankDod(row.company_rank_dod)}</td><td>${kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${kpiBattleNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleMetricCell(row.core?.a999)}</td><td>${kpiBattleMetricCell(row.core?.a1399)}</td><td>${kpiBattleMetricCell(row.core?.haosu)}</td><td>${kpiBattleMetricCell(row.core?.r1399)}</td></tr>`).join('')}</tbody>
+      <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${row.store}</td><td>${row.company_rank == null ? kpiPendingCell() : `<span class="val-gold">${row.company_rank}</span>`}${kpiBattleRankDod(row.company_rank_dod)}</td><td>${row.overall_kpi == null ? kpiPendingCell() : kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${row.addon_score == null ? kpiPendingCell() : kpiBattleNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleMetricCell(row.core?.a999)}</td><td>${kpiBattleMetricCell(row.core?.a1399)}</td><td>${kpiBattleMetricCell(row.core?.haosu)}</td><td>${kpiBattleMetricCell(row.core?.r1399)}</td></tr>`).join('')}</tbody>
     </table></div></div>
     <div class="section-divider">各項 KPI 達成</div>
     <div class="card">
@@ -2681,7 +2762,7 @@ function renderKpiBattlePersonal() {
     </div></div>
     <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
       <thead><tr><th style="text-align:left">店點</th><th>職類</th><th>姓名</th><th>總達成率</th><th>KPI排名</th><th>個人台獎</th><th>保險搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th><th>R999</th><th>RT</th><th>特維</th><th>配件</th><th>包膜</th></tr></thead>
-      <tbody>${rows.map(row => `<tr><td class="store-name">${row.store}</td><td>${row.role || '—'}</td><td>${row.name}</td><td>${kpiBattleRate(row.overall_rate, row.overall_rate_dod)}</td><td>${row.rank ?? '—'}${kpiBattleRankDod(row.rank_dod)}</td><td>${kpiBattleAwardCell(row)}</td><td><span class="kpi-rate rate-only">${kpiBattlePercent(row.insurance_attach_rate)}</span><span class="kpi-sub">個人搭售率</span></td><td>${kpiBattleMetricCell(row.metrics?.A999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.A1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.好速, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.RT, false)}</td><td>${kpiBattleMetricCell(row.metrics?.特維, false)}</td><td>${kpiBattleMetricCell(row.metrics?.配件, false)}</td><td>${kpiBattleMetricCell(row.metrics?.包膜, false)}</td></tr>`).join('') || '<tr><td colspan="16" class="val-dim">目前篩選條件沒有資料</td></tr>'}</tbody>
+      <tbody>${rows.map(row => `<tr><td class="store-name">${row.store}</td><td>${row.role || '—'}</td><td>${row.name}</td><td>${kpiBattleRate(row.overall_rate, row.overall_rate_dod)}</td><td>${row.rank ?? kpiPendingCell()}${kpiBattleRankDod(row.rank_dod)}</td><td>${row.phone_award_actual == null && row.phone_award_projected == null ? kpiPendingCell() : kpiBattleAwardCell(row)}</td><td>${row.insurance_attach_rate == null ? kpiPendingCell() : `<span class="kpi-rate rate-only">${kpiBattlePercent(row.insurance_attach_rate)}</span><span class="kpi-sub">個人搭售率</span>`}</td><td>${kpiBattleMetricCell(row.metrics?.A999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.A1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.好速, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.RT, false)}</td><td>${kpiBattleMetricCell(row.metrics?.特維, false)}</td><td>${kpiBattleMetricCell(row.metrics?.配件, false)}</td><td>${kpiBattleMetricCell(row.metrics?.包膜, false)}</td></tr>`).join('') || '<tr><td colspan="16" class="val-dim">目前篩選條件沒有資料</td></tr>'}</tbody>
     </table></div></div>`;
 }
 
@@ -2736,6 +2817,7 @@ function renderAwardUnit(row, district = false) {
 
 async function loadAwardsBattle() {
   if (_awardsBattleData) { renderAwardsBattle(); return; }
+  if (_awardsBattleUnavailableReason) { renderAwardsBattleUnavailable(); return; }
   if (window.__AWARDS_BATTLE_DATA__) {
     _awardsBattleData = window.__AWARDS_BATTLE_DATA__;
     renderAwardsBattle();
@@ -2772,6 +2854,14 @@ function renderAwardsBattle() {
     <div class="section-divider">門市 10 台機款篩選</div>
     <div class="card"><div class="award-store-selector"><label>選擇門市<select id="awardsStoreSelect" onchange="renderAwardsBattle()">${stores.map(row => `<option value="${row.store}" ${row.store === selectedStore?.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label><span class="kpi-battle-note">差異數＝實際數－50%目標台數（無條件進位）</span></div><div class="award-model-grid">${(selectedStore?.items || []).map(renderAwardModel).join('')}</div></div>`;
 
+}
+
+function renderAwardsBattleUnavailable() {
+  const note = document.getElementById('awardsBattleSourceNote');
+  if (note) note.textContent = '台獎尚未同步：不使用舊 dashboard snapshot 的數字。';
+  const content = document.getElementById('awardsBattleContent');
+  if (!content) return;
+  content.innerHTML = `<div class="card private-lock"><h3>台獎尚未同步</h3><p>${_awardsBattleUnavailableReason || '尚未取得與目前 KPI 同日期的台獎資料。'}</p><p class="kpi-battle-note">KPI 已使用最新正式 JSON；台獎會在同日期正式資料完成後另行顯示。</p></div>`;
 }
 
 // ════════════════════════════════════

@@ -13,6 +13,99 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-07-31 ｜ Claude（方案 A 實作：index.html KPI 戰情改讀 kpicalc 唯一正式來源）
+
+- 做了什麼：依 Liam 拍板實作方案 A。`index.html` KPI 戰情頁籤登入後改打 `kpicalc_access`
+  （與 kpi.html 完全同一份受保護 JSON、同一個第 15 版主部署，**GAS 零改動、零新部署**），
+  新增 `kpicalcToKpiBattleView()` 轉接層餵給既有渲染器；`_kpiBattleData` 不再吃
+  `snapshot.kpiBattle`，KPI 頁籤的本機快照回退移除（台獎頁籤與其回退**完全未動**，
+  snapshot 降為台獎來源＋舊版回復）。另補齊正式驗收清單（HANDOVER §7.10）。
+- 結果：新契約測試 `kpi-battle-source.test.cjs` 11/11（含轉接層實際執行）、
+  `app.spec.js` KPI 戰情段落改寫後 31/31、上傳 33/33、契約 70/70。
+  **未建 PR、未合併、未部署**；等 Liam 建立上傳 Deployment 後照 §7.10 驗收。
+- 經驗 / 給下一位的提醒：
+  1. **缺少欄位的鐵則**：company_rank／DOD／加掛分／個人排名／個人台獎／保險搭售率
+     不在 kpicalc JSON——畫面一律「尚未同步」（`kpiPendingCell()`）或不出現（DOD），
+     **絕不混入 snapshot 舊數字**。Playwright 有反向斷言（加掛 13.36、整體 105.5%、
+     DOD 字樣、val-gold 排名節點 = 0）。要補這些欄位的正道是擴充 `kpiCalcParseReport`
+     從同一份 Excel 讀，不是把 snapshot 接回來。
+  2. **轉接層只搬運與加總，不發明數字**：店點總達成率直接取 `official`；
+     整體核心項＝各店 a/t 純加總；整體總達成率需加權、無法由 kpicalc 推得 → null（尚未同步）；
+     進度差由同一組 meta（snapshotDay/monthDays）換算。有逐條行為測試。
+  3. **updatedAt 目前拿不到**：第 15 版 `kpicalc_access` 回應沒有檔案 mtime，
+     來源列顯示「更新時間 尚未同步（讀取於 <本機時間>）」。想補它要等主部署未來升版時
+     在 kpiCalcAccess 回應加 `updatedAt`，不值得為此動第 15 版。
+  4. **登入順序刻意台獎先渲染**、kpicalc 包獨立 try——kpicalc 失敗只影響 KPI 頁籤，
+     訊息寫明「台獎頁籤不受影響」。
+  5. 測試小坑之前也踩過一次：契約測試用 `doesNotMatch` 禁字時，**程式註解裡的
+     識別字也算命中**——註解請改寫成不含禁字的說法，不要放寬測試。
+
+## 2026-07-31 ｜ Claude（分支校正＋資料鮮度診斷落檔＋獨立上傳 Deployment 隔離）
+
+- 做了什麼：依 Liam 指示停用舊分支 `claude/quick-report-upload-feature-elyajz`（含 bde4c6b
+  事故歷史），從去污染驗收的 `claude/quick-report-upload-clean`（bc9301b，base adf7542）建出
+  `claude/report-data-freshness-hotfix` 繼續。三件事：
+  ①把「網站顯示舊資料」現場診斷**重寫**進本分支文件（HANDOVER §7.9，只搬文件不搬舊分支程式碼）；
+  ②實作**部署隔離閘**：`reportUploadIsUploadDeployment_()` ＋指令碼屬性
+  `REPORT_UPLOAD_DEPLOYMENT_URL`——當請求由「上傳專用 Deployment」服務時，doPost 只放行
+  `report_upload_*` 四路由、doGet 只回 ping（帶 `app:'report-upload'` 識別），
+  其餘 read/write/巡店/戰情一律拒絕；屬性未設定＝隔離不啟用，主部署行為不變（安全預設）；
+  ③`report-upload.html` 改用獨立 `UPLOAD_GAS_URL` 常數（CHANGE_ME 佔位），
+  不再引用每日回報端點，佔位未填時登入直接被擋、零請求送出。
+- 結果：契約測試 70/70（新增 4 條：路由白名單恰為四個、doGet 隔離、隔離函式六情境行為、
+  前端端點分離）、Playwright 33/33（新增佔位守門＋卡片標示）。HANDOVER §11 改寫為
+  雙 Deployment 部署程序（含驗證與一鍵回滾）。**未建 PR、未合併、未部署。**
+- 經驗 / 給下一位的提醒：
+  1. **每日回報 Deployment 固定第 15 版**：貼新碼進編輯器不影響它；部署上傳功能時走
+     「部署 → **新增部署作業**」拿全新 /exec URL，**絕不要 ✏️ 編輯既有每日回報部署**。
+     回滾＝清空 `REPORT_UPLOAD_DEPLOYMENT_URL` ＋封存新部署，每日回報全程不受影響。
+  2. **隔離判斷靠 `ScriptApp.getService().getUrl()` 比對屬性**：時間觸發器沒有 getUrl，
+     函式以 try/catch 包住一律回 false，排程不受隔離影響（有行為測試）。
+  3. **上傳頁端點固定寫死、無任何瀏覽器儲存覆寫**（bde4c6b 事故後的資安基準）；
+     `window.__UPLOAD_GAS_URL_OVERRIDE__` 僅供 Playwright 在頁面載入前注入，正式頁不設。
+  4. 診斷結論（Liam 已確認）：kpi.html 與 index.html **不是同一正式資料來源**——
+     前者吃 GAS 排程產的 kpicalc JSON，後者吃 Liam 本機 Mac `report-automation` 產的
+     dashboard snapshot。7/31 未更新＝來源資料夾沒有 0731.xlsx ＋本機流程沒重跑，
+     不是程式壞掉。`Y26重點台獎手機.xlsx` 確認就是獎階表。
+  5. 綜合戰情一致化：建議**方案 A**（index.html KPI 頁籤改讀 kpicalc JSON，GAS 免部署、
+     不複製第二份真相），但 company_rank／DOD 欄位不存在於 kpicalc JSON，需 Liam 先接受取捨。
+     比較表在 HANDOVER §7.9。
+  6. 台獎雲端化仍缺：`Y26重點台獎手機.xlsx` 的獎階內容（工作表／欄位）、
+     `update_phone_awards.py` 原始碼（或欄位對照邏輯）、`difference` 規則確認。
+     拿到前不寫台獎解析器；本機發布流程照舊保留。
+
+## 2026-07-31 ｜ Claude（快速上傳去污染：從回復後的 main 重建乾淨分支，待 Liam 驗收）
+
+- **背景**：`claude/quick-report-upload-feature-elyajz` 是從事故 commit `62cbe1e` 分出去的，
+  base 內含 `bde4c6b`，其 `index.html` 仍帶著「請輸入已核准裝置的員工編號」。
+  直接合併會讓當天的全門市中斷事故完整重演。
+- **做了什麼**：**不用盲目 rebase**。從回復後的 `origin/main`（`adf7542`）開
+  `claude/quick-report-upload-clean`，先逐一盤點原分支 6 個 commit，確認它們
+  **完全沒有動 `index.html`／`kpi.html`／`patrol.html`**，污染風險只集中在 `gas/Code.gs`。
+  再以 `git diff 62cbe1e..42e3036` 隔離出「純上傳變更」（此區間已排除 `bde4c6b`），
+  只把這份差異套到新 base，新檔案（`report-upload.html`、3 份 SPEC/FILE-MAP/HANDOVER
+  文件、2 支測試）直接取自原分支。**原分支保留不刪、不改寫，作為備份。**
+  原分支的 `docs/COLLAB-LOG.md` 刻意不搬——它基於事故版，搬過來會蓋掉事故紀錄。
+- **結果**：`index.html`／`kpi.html`／`patrol.html` 與 main **diff 為 0 行**；
+  `gas/Code.gs` 只新增 5 處（doPost 4 條 `report_upload_*` 路由、`kpiCalcPublish` 與
+  `privateDashboardPublish` 各 6 行只登記版本、`kpiCalcAutoUpdate` 19 行排程防覆蓋、
+  檔尾 824 行上傳模組）。`doGet`／`readData`／`writeData`／`readPersonal`／`writePersonal`／
+  `privateDashboardAccess`／`kpiCalcAccess`／`privateDashboardIsTrustedEmployee`
+  **逐函式 md5 與 main 完全相同**。全 repo 掃不到 `ensureReportSession`／`protectedGasPost`／
+  `reportSessionRequired_`／`report_auth` 任一個。
+  測試：Node 契約 **78/78**、`report-upload.spec.js` **31/31**、`app.spec.js` **30/30**。
+- **經驗 / 給下一位的提醒**：
+  1. **上傳功能的授權與每日回報是分開的，請維持這樣。** `reportUploadAuthorize_()` 走的是
+     `DASHBOARD_ADMIN_SECRET` ＋ `REPORT_UPLOAD_ALLOWED_EMPLOYEES` 白名單
+     （未設定時退回 `DASHBOARD_TRUSTED_EMPLOYEE_ID`），**完全不碰 `DashboardUsers` 裝置名冊**。
+     它只保護「上傳與發布」這個管理動作，不是登入閘門。
+  2. **命名沒有衝突但很接近，改的時候看清楚**：上傳模組是 `reportUpload*`／`reportVersion*`，
+     事故那組是 `reportSession*`／`report*Payload_`。前者可留，後者不可回來。
+  3. **`tests/patrol.spec.js` 在這個容器裡本來就不穩定**。實測 `origin/main` 原始碼連跑兩次，
+     失敗集合分別是 {341,365,545,783} 與 {341,365,525,535,783,798}，每次都不同。
+     其中 341／365 是 headless_shell 不回傳 `download.suggestedFilename()` 的固定環境問題。
+     **判斷回歸請單獨重跑該測試，不要只看一次全量結果就下結論。**
+
 ## 2026-07-31 ｜ Claude（🚨 正式站全門市回報中斷事故：回復 bde4c6b 程式碼，保留事故文件）
 
 - **事故**：全門市開 `index.html` 即跳瀏覽器 prompt「請輸入已核准裝置的員工編號」，
