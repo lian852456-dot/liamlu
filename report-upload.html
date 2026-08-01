@@ -218,7 +218,7 @@
 // 含 CHANGE_ME 時登入會被擋下，避免誤打到每日回報部署。
 // 端點固定寫死、不提供任何瀏覽器端儲存覆寫（與受保護端點同一資安基準）；
 // window.__UPLOAD_GAS_URL_OVERRIDE__ 僅供自動化測試在頁面載入前注入，正式頁面不會設定它。
-const UPLOAD_GAS_URL = 'https://script.google.com/macros/s/CHANGE_ME_UPLOAD_DEPLOYMENT/exec';
+const UPLOAD_GAS_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
 function uploadGasUrl() { return window.__UPLOAD_GAS_URL_OVERRIDE__ || UPLOAD_GAS_URL; }
 const AUTH = { employeeId: '', adminSecret: '' };
 const TOKENS = { kpi: '', award: '' };

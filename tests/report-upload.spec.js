@@ -424,8 +424,11 @@ test('取消預覽會一併清掉日期面板', async ({ page }) => {
 
 // ── 部署隔離：未設定上傳 Deployment 時的守門 ────────────────
 test('UPLOAD_GAS_URL 仍是佔位字時，登入被擋下且不發出任何請求', async ({ page }) => {
-  // 刻意不裝 installGas（不注入測試端點）——頁面走正式的 CHANGE_ME 佔位字
+  // 正式頁面已設定專屬端點；這裡刻意注入佔位字，驗證設定遺漏時仍會在送出前阻擋。
   let requests = 0;
+  await page.addInitScript(() => {
+    window.__UPLOAD_GAS_URL_OVERRIDE__ = 'CHANGE_ME_UPLOAD_DEPLOYMENT';
+  });
   await page.route('https://script.google.com/**', route => { requests += 1; return route.abort(); });
   await page.goto(PAGE_URL);
   await page.fill('#authEmp', GOOD_EMP);
