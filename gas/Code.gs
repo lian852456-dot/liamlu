@@ -2256,9 +2256,43 @@ const REPORT_UPLOAD_ALLOWED_ACTIONS = [
 
 // 上傳頁與上傳 API 同屬新 Deployment，使用 google.script.run 直接呼叫這四個包裝函式。
 // 不從 GitHub Pages fetch，不需要 CORS／preflight，也不把任何設定值注入 HTML。
+// Build 資訊僅含版本／commit／時間，方便確認瀏覽器沒有沿用舊版頁面；不含任何授權資料。
+const REPORT_UPLOAD_BUILD_PROPERTIES = {
+  deploymentVersion: 'REPORT_UPLOAD_BUILD_DEPLOYMENT_VERSION',
+  buildCommit: 'REPORT_UPLOAD_BUILD_COMMIT',
+  buildTime: 'REPORT_UPLOAD_BUILD_TIME'
+};
+
+function reportUploadBuildInfo_() {
+  const props = PropertiesService.getScriptProperties();
+  return {
+    deploymentVersion: String(props.getProperty(REPORT_UPLOAD_BUILD_PROPERTIES.deploymentVersion) || '未標記'),
+    buildCommit: String(props.getProperty(REPORT_UPLOAD_BUILD_PROPERTIES.buildCommit) || '未標記'),
+    buildTime: String(props.getProperty(REPORT_UPLOAD_BUILD_PROPERTIES.buildTime) || '未標記')
+  };
+}
+
+// 只供 clasp Execution API 於部署時寫入；尾端底線使其不會成為 google.script.run 公開函式。
+function reportUploadSetBuildInfo_(buildCommit, buildTime, deploymentVersion) {
+  const commit = String(buildCommit || '').trim();
+  const time = String(buildTime || '').trim();
+  const version = String(deploymentVersion || '').trim();
+  if (!/^[0-9a-f]{7,64}$/i.test(commit)) throw new Error('buildCommit 格式不正確');
+  if (!/^\d+$/.test(version)) throw new Error('deploymentVersion 格式不正確');
+  if (isNaN(new Date(time).getTime())) throw new Error('buildTime 格式不正確');
+  const props = PropertiesService.getScriptProperties();
+  props.setProperties({
+    REPORT_UPLOAD_BUILD_DEPLOYMENT_VERSION: version,
+    REPORT_UPLOAD_BUILD_COMMIT: commit,
+    REPORT_UPLOAD_BUILD_TIME: time
+  }, false);
+  return reportUploadBuildInfo_();
+}
+
 function reportUploadHtmlService_() {
-  return HtmlService.createHtmlOutputFromFile('ReportUpload')
-    .setTitle('北一二B 戰報快速更新');
+  const template = HtmlService.createTemplateFromFile('ReportUpload');
+  template.buildInfo = reportUploadBuildInfo_();
+  return template.evaluate().setTitle('北一二B 戰報快速更新');
 }
 
 function report_upload_preview(payload) { return reportUploadPreview(payload); }
@@ -3218,6 +3252,83 @@ function reportAwardPairTempFile_(fileId, role) {
   return file;
 }
 
+// 解析入口的唯一檔案契約：只讀 camelCase 的 storeFileId／personalFileId。
+// 不回傳原始 Excel、授權資料或任何 Script Property。
+function reportAwardPairInputDiagnostics_(payload) {
+  const input = payload || {};
+  const diagnostic = {
+    storeFileIdReceived: !!String(input.storeFileId || '').trim(),
+    personalFileIdReceived: !!String(input.personalFileId || '').trim(),
+    storeFileExists: false, personalFileExists: false,
+    storeFileAllowed: false, personalFileAllowed: false,
+    storeFileNotExpired: false, personalFileNotExpired: false,
+    storeError: '', personalError: ''
+  };
+  function inspect(id, role, prefix) {
+    const fileId = String(id || '').trim();
+    if (!fileId) return null;
+    try {
+      DriveApp.getFileById(fileId);
+      diagnostic[prefix + 'FileExists'] = true;
+    } catch (e) {
+      diagnostic[prefix + 'Error'] = role + ' File ID 不存在或無法讀取';
+      return null;
+    }
+    try {
+      const file = reportAwardPairTempFile_(fileId, role);
+      diagnostic[prefix + 'FileAllowed'] = true;
+      diagnostic[prefix + 'FileNotExpired'] = true;
+      return file;
+    } catch (e) {
+      diagnostic[prefix + 'Error'] = e && e.message ? e.message : String(e);
+      return null;
+    }
+  }
+  diagnostic._storeFile = inspect(input.storeFileId, 'store', 'store');
+  diagnostic._personalFile = inspect(input.personalFileId, 'person', 'personal');
+  diagnostic.ready = !!diagnostic._storeFile && !!diagnostic._personalFile;
+  return diagnostic;
+}
+
+function reportAwardPairPublicDiagnostics_(diagnostic) {
+  return {
+    storeFileIdReceived: diagnostic.storeFileIdReceived,
+    personalFileIdReceived: diagnostic.personalFileIdReceived,
+    storeFileExists: diagnostic.storeFileExists,
+    personalFileExists: diagnostic.personalFileExists,
+    storeFileAllowed: diagnostic.storeFileAllowed,
+    personalFileAllowed: diagnostic.personalFileAllowed,
+    storeFileNotExpired: diagnostic.storeFileNotExpired,
+    personalFileNotExpired: diagnostic.personalFileNotExpired,
+    storeError: diagnostic.storeError || '',
+    personalError: diagnostic.personalError || ''
+  };
+}
+
+// 只供 clasp Execution API 對指定暫存檔做只讀 probe；不建立 job、不寫正式 JSON。
+function reportAwardPairDirectProbe_(storeFileId, personalFileId) {
+  const diagnostic = reportAwardPairInputDiagnostics_({ storeFileId: storeFileId, personalFileId: personalFileId });
+  const result = reportAwardPairPublicDiagnostics_(diagnostic);
+  result.storeXlsxValid = false; result.personalXlsxValid = false;
+  result.storeParseStarted = false; result.personalParseStarted = false;
+  if (diagnostic._storeFile) {
+    try {
+      const store = reportAwardPairReadFile_(diagnostic._storeFile.getId(), REPORT_AWARD_PAIR_FILES.store);
+      result.storeXlsxValid = true; result.storeParseStarted = true;
+      result.storeSummary = { sheetNames: store.sheetNames, dataDate: store.dataDate, rowCount: store.rowCount, storeCount: store.storeCount, headersOk: store.headersOk };
+    } catch (e) { result.storeError = e && e.message ? e.message : String(e); }
+  }
+  if (diagnostic._personalFile) {
+    try {
+      const person = reportAwardPairReadFile_(diagnostic._personalFile.getId(), REPORT_AWARD_PAIR_FILES.person);
+      result.personalXlsxValid = true; result.personalParseStarted = true;
+      result.personalSummary = { sheetNames: person.sheetNames, dataDate: person.dataDate, personCount: person.personCount, headersOk: person.headersOk };
+    } catch (e) { result.personalError = e && e.message ? e.message : String(e); }
+  }
+  result.canStartPreview = result.storeParseStarted && result.personalParseStarted;
+  return result;
+}
+
 function reportAwardPairSessionByFiles_(storeFileId, personalFileId) {
   return reportAwardPairRows_().filter(function(row) {
     return row.record_type === 'session' && row.store_file_id === storeFileId && row.personal_file_id === personalFileId && row.status === 'active';
@@ -3274,31 +3385,35 @@ function reportAwardPairUpload(payload, role) {
 function reportAwardPairCreateJob(payload) {
   reportUploadAuthorize_(payload);
   const input = payload || {};
-  let sessionId = String(input.uploadSessionId || '');
-  let session = sessionId ? reportAwardPairSession_(sessionId) : null;
   const requestedStoreId = String(input.storeFileId || '').trim();
   const requestedPersonalId = String(input.personalFileId || '').trim();
-  if (!session && requestedStoreId && requestedPersonalId) session = reportAwardPairSessionByFiles_(requestedStoreId, requestedPersonalId);
-  if (!session && requestedStoreId && requestedPersonalId) {
-    const storeFile = reportAwardPairTempFile_(requestedStoreId, 'store');
-    const personalFile = reportAwardPairTempFile_(requestedPersonalId, 'person');
-    sessionId = reportUploadToken_();
+  const diagnostic = reportAwardPairInputDiagnostics_({ storeFileId: requestedStoreId, personalFileId: requestedPersonalId });
+  const publicDiagnostic = reportAwardPairPublicDiagnostics_(diagnostic);
+  if (!diagnostic.ready) {
+    return { ok: false, message: '台獎暫存檔驗證未通過，尚未建立預覽任務。', diagnostics: publicDiagnostic,
+      storeFileIdReceived: publicDiagnostic.storeFileIdReceived, personalFileIdReceived: publicDiagnostic.personalFileIdReceived,
+      storeFileExists: publicDiagnostic.storeFileExists, personalFileExists: publicDiagnostic.personalFileExists };
+  }
+  let session = reportAwardPairSessionByFiles_(requestedStoreId, requestedPersonalId);
+  let sessionId = session ? session.upload_session_id : reportUploadToken_();
+  if (!session) {
+    const storeFile = diagnostic._storeFile;
+    const personalFile = diagnostic._personalFile;
     session = { record_type: 'session', upload_session_id: sessionId, store_file_id: storeFile.getId(),
       store_file_name: storeFile.getName(), store_hash: reportAwardPairHash_(storeFile.getBlob().getBytes()), store_size: String(storeFile.getSize()),
       personal_file_id: personalFile.getId(), personal_file_name: personalFile.getName(), personal_hash: reportAwardPairHash_(personalFile.getBlob().getBytes()), personal_size: String(personalFile.getSize()),
       stage: 'uploaded-person', status: 'active', started_at: reportAwardPairNow_(), cleanup_after: '' };
     reportAwardPairLog_(session, 'uploaded-person', 'active', session.started_at);
   }
-  if (!session || !session.store_file_id || !session.personal_file_id) throw new Error('請先完成兩份檔案上傳。');
-  reportAwardPairTempFile_(session.store_file_id, 'store');
-  reportAwardPairTempFile_(session.personal_file_id, 'person');
+  // session 只供 job/log 保存；解析檔案來源完全由本次 payload 的兩個 File ID 決定。
+  session.store_file_id = requestedStoreId; session.personal_file_id = requestedPersonalId;
   console.log('award preview create request storeFileId=' + session.store_file_id + ' personalFileId=' + session.personal_file_id);
   const existing = reportAwardPairRows_().filter(function(row) {
     return row.record_type === 'job' && row.upload_session_id === sessionId &&
       ['queued', 'running', 'completed'].indexOf(row.status) !== -1;
   })[0];
   if (existing) return { ok: true, previewJobId: existing.job_id, stage: existing.stage, status: existing.status, reused: true,
-    storeFileId: session.store_file_id, personalFileId: session.personal_file_id };
+    storeFileId: requestedStoreId, personalFileId: requestedPersonalId, diagnostics: publicDiagnostic };
   const now = reportAwardPairNow_();
   const job = { record_type: 'job', job_id: reportUploadToken_(), upload_session_id: sessionId,
     store_file_id: session.store_file_id, store_file_name: session.store_file_name, store_hash: session.store_hash, store_size: session.store_size,
@@ -3306,7 +3421,7 @@ function reportAwardPairCreateJob(payload) {
     stage: 'queued', status: 'queued', started_at: now, cleanup_after: new Date(Date.now() + REPORT_AWARD_PAIR_JOB_TTL_HOURS * 3600 * 1000).toISOString() };
   reportAwardPairLog_(job, 'queued', 'queued', now);
   return { ok: true, previewJobId: job.job_id, stage: 'queued', status: 'queued', reused: false,
-    storeFileId: session.store_file_id, personalFileId: session.personal_file_id };
+    storeFileId: requestedStoreId, personalFileId: requestedPersonalId, diagnostics: publicDiagnostic };
 }
 
 function reportAwardPairRecoverLatest(payload) {

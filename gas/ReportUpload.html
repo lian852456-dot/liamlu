@@ -28,7 +28,8 @@
     <section class="hero">
       <h1>戰報快速更新</h1>
       <p>獨立 Apps Script Deployment ・同源上傳與發布 ・不經 GitHub Pages 跨網域 POST</p>
-      <p id="awardUiVersion" class="small" style="color:#d5f5ff">台獎雙檔預覽前端：v33・單一狀態來源・可恢復暫存檔</p>
+      <p id="awardUiVersion" class="small" style="color:#d5f5ff">台獎雙檔預覽前端：單一 File ID 契約・可恢復暫存檔</p>
+      <div class="small" style="color:#d5f5ff">deploymentVersion：<b id="deploymentVersion"><?= buildInfo.deploymentVersion ?></b> ｜ buildCommit：<b id="buildCommit"><?= buildInfo.buildCommit ?></b> ｜ buildTime：<b id="buildTime"><?= buildInfo.buildTime ?></b></div>
     </section>
 
     <section id="authCard" class="card">
@@ -100,6 +101,8 @@
           <button id="awardCleanupBtn" class="secondary" type="button">清理逾期暫存</button>
         </div>
         <div id="awardMessage" class="message hidden" role="status"></div>
+        <pre id="awardPayloadDiagnostic" class="small" aria-live="polite">尚未建立解析 payload。</pre>
+        <pre id="awardServerDiagnostic" class="small hidden" aria-live="polite"></pre>
         <div id="awardPreviewPanel" class="hidden">
           <div class="meta">
             <div class="metric"><span>資料日期</span><b id="awardDataDate">—</b></div>
@@ -147,6 +150,20 @@
     function renderAwardChecks(checks) {
       const rows = (checks || []).map(check => '<tr class="' + esc(check.level) + '"><td>' + esc(check.label) + '</td><td>' + esc(check.level === 'ok' ? '通過' : check.level === 'warn' ? '提醒' : '阻擋') + '</td><td>' + esc(check.detail) + '</td></tr>').join('');
       $('awardChecks').innerHTML = '<table class="checks"><thead><tr><th>檢查</th><th>結果</th><th>說明</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+    function renderAwardPayloadDiagnostic(previewPayload) {
+      const diagnostic = {
+        storeFileId: previewPayload.storeFileId,
+        personalFileId: previewPayload.personalFileId,
+        storeUploaded: !!previewPayload.storeFileId,
+        personalUploaded: !!previewPayload.personalFileId
+      };
+      $('awardPayloadDiagnostic').textContent = JSON.stringify(diagnostic, null, 2);
+    }
+    function renderAwardServerDiagnostic(diagnostic) {
+      if (!diagnostic) { $('awardServerDiagnostic').classList.add('hidden'); return; }
+      $('awardServerDiagnostic').textContent = JSON.stringify(diagnostic, null, 2);
+      $('awardServerDiagnostic').classList.remove('hidden');
     }
     function updateAwardPreviewButton() {
       const ready = !!awardUploadState.storeFileId && !!awardUploadState.personalFileId && awardUploadState.storeStatus === 'completed' && awardUploadState.personalStatus === 'completed' && !awardPolling;
@@ -310,22 +327,32 @@
     $('awardPersonUploadBtn').addEventListener('click', () => uploadAwardFile('person'));
     $('awardPreviewBtn').addEventListener('click', async () => {
       const button = $('awardPreviewBtn');
-      const storeId = awardUploadState.storeFileId; const personalId = awardUploadState.personalFileId;
-      console.log('award preview create request File IDs', { storeFileId: storeId, personalFileId: personalId });
+      const previewPayload = {
+        storeFileId: awardUploadState.storeFileId,
+        personalFileId: awardUploadState.personalFileId
+      };
+      renderAwardPayloadDiagnostic(previewPayload);
+      console.log('award preview create request File IDs', previewPayload);
       console.log('award preview guard state', JSON.stringify({
         uploadSessionId: awardUploadState.uploadSessionId,
-        storeFileId: storeId,
-        personalFileId: personalId,
+        storeFileId: previewPayload.storeFileId,
+        personalFileId: previewPayload.personalFileId,
         storeStatus: awardUploadState.storeStatus,
         personalStatus: awardUploadState.personalStatus
       }));
-      if (!storeId || !personalId || awardUploadState.storeStatus !== 'completed' || awardUploadState.personalStatus !== 'completed') {
+      if (!previewPayload.storeFileId || !previewPayload.personalFileId || awardUploadState.storeStatus !== 'completed' || awardUploadState.personalStatus !== 'completed') {
         return message('awardMessage', '請先完成店點檔與個人檔上傳。（目前狀態：店點 ' + awardUploadState.storeStatus + '、個人 ' + awardUploadState.personalStatus + '）', 'bad');
       }
       if (awardPolling) return;
       setBusy(button, true, '建立任務中…'); message('awardMessage', '兩份檔案已完成上傳，正在建立預覽任務；不會更新正式台獎資料。');
       try {
-        const job = await call('report_award_pair_create_job', payload({ uploadSessionId: awardUploadState.uploadSessionId, storeFileId: storeId, personalFileId: personalId }));
+        const job = await call('report_award_pair_create_job', payload(previewPayload));
+        renderAwardServerDiagnostic(job.diagnostics || null);
+        if (!job.ok) {
+          message('awardMessage', job.message || '台獎暫存檔驗證未通過。', 'bad');
+          setBusy(button, false, '解析預覽'); updateAwardPreviewButton();
+          return;
+        }
         awardPreviewJobId = job.previewJobId; awardPolling = false; $('awardClearBtn').disabled = true;
         message('awardMessage', '預覽任務已建立（queued），正在分階段驗證與解析…', 'warn');
         window.setTimeout(pollAwardJob, 2000);

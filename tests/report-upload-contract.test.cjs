@@ -713,7 +713,7 @@ test('GitHub Pages 模板不含正式端點，正式頁改走同源 HtmlService'
 });
 
 test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上傳與輪詢', () => {
-  assert.match(functionBody(code, 'reportUploadHtmlService_'), /createHtmlOutputFromFile\('ReportUpload'\)/);
+  assert.match(functionBody(code, 'reportUploadHtmlService_'), /createTemplateFromFile\('ReportUpload'\)/);
   for (const name of ['report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback']) {
     assert.match(code, new RegExp(`function ${name}\\(payload\\)`));
     assert.match(htmlPage, new RegExp(`call\\('${name}'`));
@@ -726,7 +726,9 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
     assert.match(htmlPage, new RegExp(id), `前端缺少 ${id}`);
   }
   assert.match(htmlPage, /awardPreviewBtn.*disabled/);
-  assert.match(htmlPage, /id="awardUiVersion"[^>]*>[^<]*v33/);
+  assert.match(htmlPage, /id="deploymentVersion"/);
+  assert.match(htmlPage, /id="buildCommit"/);
+  assert.match(htmlPage, /id="buildTime"/);
   assert.match(htmlPage, /award preview guard state/);
   assert.match(htmlPage, /awardUploadState\.storeStatus === 'completed'/);
   assert.match(htmlPage, /awardUploadState\.personalStatus === 'completed'/);
@@ -739,15 +741,19 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
   assert.match(htmlPage, /console\.log\('award preview create request File IDs'/);
   assert.match(htmlPage, /recoverLatestAwardUpload/);
   assert.match(htmlPage, /call\('report_award_pair_recover_latest'/);
-  assert.match(htmlPage, /storeFileId: storeId, personalFileId: personalId/);
-  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairTempFile_\(session\.store_file_id, 'store'\)/);
-  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairTempFile_\(session\.personal_file_id, 'person'\)/);
+  assert.match(htmlPage, /const previewPayload = \{\s*storeFileId: awardUploadState\.storeFileId,\s*personalFileId: awardUploadState\.personalFileId/);
+  assert.match(htmlPage, /renderAwardPayloadDiagnostic\(previewPayload\)/);
+  assert.match(htmlPage, /payload\(previewPayload\)/);
+  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairInputDiagnostics_\(\{ storeFileId: requestedStoreId, personalFileId: requestedPersonalId \}\)/);
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /input\.storeFileId/);
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /input\.personalFileId/);
   assert.match(functionBody(code, 'reportAwardPairTempFile_'), /getParents\(\)/);
   assert.match(functionBody(code, 'reportAwardPairTempFile_'), /getLastUpdated\(\)\.getTime\(\)/);
   assert.match(functionBody(code, 'reportAwardPairRecoverLatest'), /reportAwardPairTempFile_\(session\.store_file_id, 'store'\)/);
   assert.match(functionBody(code, 'reportAwardPairRecoverLatest'), /reportAwardPairTempFile_\(session\.personal_file_id, 'person'\)/);
+  assert.doesNotMatch(functionBody(code, 'reportAwardPairCreateJob'), /input\.uploadSessionId/);
+  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairInputDiagnostics_/);
+  assert.match(functionBody(code, 'reportAwardPairDirectProbe_'), /reportAwardPairReadFile_/);
   assert.doesNotMatch(code, /report_award_pair_commit|report_award_pair_publish/);
   assert.doesNotMatch(htmlPage, /report_award_pair_preview/);
   assert.match(htmlPage, /window\.setTimeout\(pollAwardJob, 2000\)/);
