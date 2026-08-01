@@ -156,8 +156,8 @@ test('稽核紀錄寫在私有名冊試算表的新分頁，未改既有 Sheet �
 });
 
 // ── 五：權限（前端與後端都檢查）─────────────────────────────
-test('四個上傳端點在做任何事之前都先授權', () => {
-  for (const name of ['reportUploadPreview', 'reportUploadCommit', 'reportUploadLog', 'reportUploadRollback']) {
+test('所有上傳端點在做任何事之前都先授權', () => {
+  for (const name of ['reportUploadPreview', 'reportUploadCommit', 'reportUploadLog', 'reportUploadRollback', 'reportAwardPairUpload', 'reportAwardPairCreateJob', 'reportAwardPairJobStatus', 'reportAwardPairClear', 'reportAwardPairDailyCleanup']) {
     const body = functionBody(code, name);
     const authAt = body.indexOf('reportUploadAuthorize_');
     assert.notEqual(authAt, -1, `${name} 未授權`);
@@ -180,11 +180,12 @@ test('commit 會確認預覽與確認是同一位操作者', () => {
   assert.match(functionBody(code, 'reportUploadCommit'), /staged\.employeeId !== employeeId/);
 });
 
-test('doPost 已掛上四個上傳 action', () => {
+test('doPost 維持只掛上四個既有 KPI 上傳 action；台獎雙檔只走同源 google.script.run', () => {
   const doPost = functionBody(code, 'doPost');
   for (const action of ['report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback']) {
     assert.match(doPost, new RegExp(`action === '${action}'`));
   }
+  assert.doesNotMatch(doPost, /report_award_pair_/);
 });
 
 // ── 前端 ────────────────────────────────────────────────────
@@ -374,6 +375,38 @@ test('KPI 資料日期由 month + snapshotDay 組出可比較字串', () => {
   assert.equal(V.reportUploadKpiDate_({ month: '2026-07', snapshotDay: 31 }), '2026-07-31');
   assert.equal(V.reportUploadKpiDate_({ month: '', snapshotDay: 5 }), '');
   assert.equal(V.reportUploadKpiDate_({ month: '2026-07', snapshotDay: 0 }), '');
+});
+
+test('台獎來源期間優先取區間結束日，支援右端省略年份', () => {
+  const body = functionBody(code, 'reportAwardPairRangeDate_');
+  const sandbox = { module: { exports: {} } };
+  vm.createContext(sandbox);
+  vm.runInContext(`module.exports = function(rows){${body}};`, sandbox);
+  const date = sandbox.module.exports([{ cells: { H6: '2026/07/01 ~ 07/29' } }]);
+  assert.equal(date, '2026-07-29');
+});
+
+test('台獎雙檔 MIME 正規化後仍必須通過 XLSX ZIP 安全結構檢查', () => {
+  assert.match(code, /REPORT_AWARD_PAIR_ALLOWED_MIMES = \[/);
+  for (const mime of [
+    'application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet',
+    'application\/zip', 'application\/octet-stream'
+  ]) assert.match(code, new RegExp(`'${mime}'`));
+  const zipCheck = functionBody(code, 'reportAwardPairZipFiles_');
+  assert.match(zipCheck, /bytes\[0\] !== 80/);
+  assert.match(zipCheck, /bytes\[1\] !== 75/);
+  assert.match(zipCheck, /bytes\[2\] !== 3/);
+  assert.match(zipCheck, /bytes\[3\] !== 4/);
+  assert.match(zipCheck, /Utilities\.newBlob\(bytes, 'application\/zip'/);
+  assert.match(zipCheck, /\[Content_Types\]\.xml/);
+  assert.match(zipCheck, /xl\/workbook\.xml/);
+  assert.match(zipCheck, /REPORT_AWARD_PAIR_MAX_UNZIPPED_BYTES/);
+  const decode = functionBody(code, 'reportAwardPairDecode_');
+  assert.match(decode, /REPORT_AWARD_PAIR_ALLOWED_MIMES\.indexOf\(mimeType\)/);
+  assert.match(decode, /reportAwardPairZipFiles_\(bytes\)/);
+  assert.match(functionBody(code, 'reportAwardPairUpload'), /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/);
+  assert.match(htmlPage, /mimeType: storeFile\.type/);
+  assert.match(htmlPage, /mimeType: personFile\.type/);
 });
 
 // ── 防衝突判斷：實際執行 reportVersionDecide_ 驗證每條規則 ──
@@ -619,7 +652,7 @@ test('正式資料的寫入只發生在 commit 與 rollback', () => {
 });
 
 // ── 部署隔離：上傳走獨立 Deployment，每日回報固定第 15 版 ──
-test('doPost 在上傳部署模式只放行四個上傳路由，且判斷在所有路由之前', () => {
+test('doPost 在上傳部署模式只放行四個既有 KPI 上傳路由，且判斷在所有路由之前', () => {
   const doPost = functionBody(code, 'doPost');
   const gateAt = doPost.indexOf('reportUploadIsUploadDeployment_()');
   const firstRouteAt = doPost.indexOf("action === 'ptauth'");
@@ -630,7 +663,7 @@ test('doPost 在上傳部署模式只放行四個上傳路由，且判斷在所�
   assert.ok(list, '缺少 REPORT_UPLOAD_ALLOWED_ACTIONS');
   const actions = list[1].match(/'[^']+'/g).map(x => x.slice(1, -1));
   assert.deepEqual(actions.sort(), ['report_upload_commit', 'report_upload_log',
-    'report_upload_preview', 'report_upload_rollback'].sort(), '白名單必須恰好是四個上傳路由');
+    'report_upload_preview', 'report_upload_rollback'].sort(), '白名單必須恰好是四個既有 KPI 上傳路由');
 });
 
 test('doGet 在上傳部署模式回 ping／同源頁面，其餘 JSON GET 一律拒絕', () => {
@@ -678,15 +711,44 @@ test('GitHub Pages 模板不含正式端點，正式頁改走同源 HtmlService'
     '__UPLOAD_GAS_URL_OVERRIDE__ 只應出現在註解與 uploadGasUrl 讀取處');
 });
 
-test('同源 HtmlService 僅使用 google.script.run，且四個上傳呼叫都有包裝函式', () => {
+test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上傳與輪詢', () => {
   assert.match(functionBody(code, 'reportUploadHtmlService_'), /createHtmlOutputFromFile\('ReportUpload'\)/);
   for (const name of ['report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback']) {
     assert.match(code, new RegExp(`function ${name}\\(payload\\)`));
     assert.match(htmlPage, new RegExp(`call\\('${name}'`));
   }
+  for (const name of ['report_award_pair_upload_store', 'report_award_pair_upload_personal', 'report_award_pair_create_job', 'report_award_pair_job_status', 'report_award_pair_clear']) {
+    assert.match(code, new RegExp(`function ${name}\\(payload\\)`));
+    assert.match(htmlPage, new RegExp(`call\\('${name}'`));
+  }
+  assert.doesNotMatch(code, /report_award_pair_commit|report_award_pair_publish/);
+  assert.doesNotMatch(htmlPage, /report_award_pair_preview/);
+  assert.match(htmlPage, /window\.setTimeout\(pollAwardJob, 2000\)/);
+  assert.match(htmlPage, /window\.setTimeout\(pollAwardJob, 3000\)/);
   assert.match(htmlPage, /google\.script\.run/);
   assert.doesNotMatch(htmlPage, /fetch\(|https:\/\/script\.google\.com|REPORT_UPLOAD_ALLOWED_EMPLOYEES|DASHBOARD_ADMIN_SECRET/);
   assert.doesNotMatch(htmlPage, /localStorage|sessionStorage/);
+});
+
+test('台獎雙檔分段 job 會記錄階段、雜湊與安全到期清理，不會建立 Trigger 或發布正式資料', () => {
+  const upload = functionBody(code, 'reportAwardPairUpload');
+  const status = functionBody(code, 'reportAwardPairJobStatus');
+  const cleanup = functionBody(code, 'reportAwardPairDailyCleanup');
+  assert.match(upload, /reportAwardPairDecode_\(.*true\)/);
+  assert.match(functionBody(code, 'reportAwardPairDecode_'), /reportAwardPairHash_/);
+  assert.match(status, /validating-store/);
+  assert.match(status, /validating-personal/);
+  assert.match(status, /parsing-store/);
+  assert.match(status, /parsing-personal/);
+  assert.match(status, /comparing/);
+  assert.match(status, /completed/);
+  assert.match(status, /failed/);
+  assert.match(code, /previewJobId/);
+  assert.match(code, /durationMs/);
+  assert.match(cleanup, /\['completed', 'failed'\]/);
+  assert.doesNotMatch(code, /report_award_pair_(?:commit|publish)/);
+  assert.doesNotMatch(functionBody(code, 'reportAwardPairJobStatus'), /privateDashboardPublish|SpreadsheetApp|MailApp|GmailApp/);
+  assert.doesNotMatch(functionBody(code, 'reportAwardPairDailyCleanup'), /ScriptApp\.newTrigger/);
 });
 
 test('所有前端頁面不含實際白名單員編、管理密碼值或 Script Property', () => {

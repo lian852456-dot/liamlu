@@ -75,12 +75,40 @@
         <p class="small">發布會先備份正式 JSON；讀回驗證失敗時，伺服器會自動還原上一版。</p>
         <div id="log"></div>
       </section>
+
+      <section class="card">
+        <h2>台獎雙檔測試上傳</h2>
+        <p class="small">僅供暫存上傳、結構解析與日期一致性預覽。兩份原始 Excel 只暫存於私人 Drive；本階段沒有發布按鈕，不會更新台獎 JSON、網站、Mail、回報區或試算表。</p>
+        <div class="grid">
+          <label>檔案一：01-08-03.xlsx（店點）<input id="awardStoreFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+          <label>檔案二：01-08-04.xlsx（個人）<input id="awardPersonFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+        </div>
+        <div class="actions">
+          <button id="awardPreviewBtn" type="button">解析預覽</button>
+          <button id="awardClearBtn" class="secondary" type="button" disabled>清除暫存檔</button>
+          <button id="awardCleanupBtn" class="secondary" type="button">清理逾期暫存</button>
+        </div>
+        <div id="awardMessage" class="message hidden" role="status"></div>
+        <div id="awardPreviewPanel" class="hidden">
+          <div class="meta">
+            <div class="metric"><span>資料日期</span><b id="awardDataDate">—</b></div>
+            <div class="metric"><span>門市</span><b id="awardStoreCount">—</b></div>
+            <div class="metric"><span>人員</span><b id="awardPersonCount">—</b></div>
+            <div class="metric"><span>上傳時間</span><b id="awardUploadedAt">—</b></div>
+          </div>
+          <div id="awardFiles" class="small"></div>
+          <div id="awardChecks"></div>
+        </div>
+      </section>
     </section>
   </main>
 
   <script>
     const auth = { employeeId: '', adminSecret: '' };
     let previewToken = '';
+    let awardPreviewJobId = '';
+    let awardUploadSessionId = '';
+    let awardPolling = false;
     const $ = id => document.getElementById(id);
     const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     function message(id, text, tone) { const node = $(id); node.textContent = text; node.className = 'message ' + (tone || ''); }
@@ -101,6 +129,10 @@
     function renderChecks(checks) {
       const rows = (checks || []).map(check => '<tr class="' + esc(check.level) + '"><td>' + esc(check.label) + '</td><td>' + esc(check.level === 'ok' ? '通過' : check.level === 'warn' ? '提醒' : '阻擋') + '</td><td>' + esc(check.detail) + '</td></tr>').join('');
       $('checks').innerHTML = '<table class="checks"><thead><tr><th>檢查</th><th>結果</th><th>說明</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+    function renderAwardChecks(checks) {
+      const rows = (checks || []).map(check => '<tr class="' + esc(check.level) + '"><td>' + esc(check.label) + '</td><td>' + esc(check.level === 'ok' ? '通過' : check.level === 'warn' ? '提醒' : '阻擋') + '</td><td>' + esc(check.detail) + '</td></tr>').join('');
+      $('awardChecks').innerHTML = '<table class="checks"><thead><tr><th>檢查</th><th>結果</th><th>說明</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
     function renderLog(entries) {
       const rows = (entries || []).map(entry => '<tr><td>' + esc(entry.acted_at) + '</td><td>' + esc(entry.kind) + '</td><td>' + esc(entry.file_name) + '</td><td>' + esc(entry.data_date) + '</td><td>' + esc(entry.result) + '</td></tr>').join('');
@@ -159,6 +191,65 @@
       try { const result = await call('report_upload_rollback', payload({ kind:'kpi' })); renderLive(result.live); await refreshLog(); message('kpiMessage', '已回復：' + result.restored, 'ok'); }
       catch (error) { message('kpiMessage', error.message, 'bad'); }
       finally { setBusy(button, false, '回復上一版'); }
+    });
+    function renderAwardPreview(result) {
+      const preview = result.preview || {};
+      renderAwardChecks(result.checks || preview.checks || []); $('awardPreviewPanel').classList.remove('hidden');
+      $('awardDataDate').textContent = preview.dataDate || '—';
+      $('awardStoreCount').textContent = preview.storeCount == null ? '—' : preview.storeCount + ' 家';
+      $('awardPersonCount').textContent = preview.personCount == null ? '—' : preview.personCount + ' 人';
+      $('awardUploadedAt').textContent = preview.uploadedAt || '—';
+      $('awardFiles').textContent = (preview.files || []).map(file => '原始檔：' + file.fileName).join('｜');
+    }
+    async function pollAwardJob() {
+      if (!awardPreviewJobId || awardPolling) return;
+      awardPolling = true;
+      try {
+        const result = await call('report_award_pair_job_status', payload({ previewJobId: awardPreviewJobId }));
+        message('awardMessage', '預覽進度：' + result.stage + (result.errorMessage ? '｜' + result.errorMessage : ''), result.status === 'failed' ? 'bad' : 'warn');
+        if (result.status === 'completed') {
+          renderAwardPreview(result); $('awardClearBtn').disabled = false; awardPolling = false;
+          setBusy($('awardPreviewBtn'), false, '解析預覽');
+          message('awardMessage', '雙檔預覽完成；僅暫存於私人 Drive，尚未更新任何正式台獎資料。', 'ok');
+          return;
+        }
+        if (result.status === 'failed') {
+          $('awardClearBtn').disabled = false; awardPolling = false; setBusy($('awardPreviewBtn'), false, '解析預覽');
+          return;
+        }
+        awardPolling = false; window.setTimeout(pollAwardJob, 3000);
+      } catch (error) {
+        awardPolling = false; setBusy($('awardPreviewBtn'), false, '解析預覽');
+        message('awardMessage', error.message, 'bad');
+      }
+    }
+    $('awardPreviewBtn').addEventListener('click', async () => {
+      const storeFile = $('awardStoreFile').files[0]; const personFile = $('awardPersonFile').files[0]; const button = $('awardPreviewBtn');
+      if (!storeFile || !personFile) return message('awardMessage', '請同時選擇 01-08-03.xlsx 與 01-08-04.xlsx。', 'bad');
+      if (awardPolling) return;
+      setBusy(button, true, '上傳中…'); message('awardMessage', '正在分段上傳至私人 Drive 暫存；不會更新正式台獎資料。');
+      try {
+        const store = await call('report_award_pair_upload_store', payload({ file: { fileName: storeFile.name, mimeType: storeFile.type, fileBase64: await readFileBase64(storeFile) } }));
+        awardUploadSessionId = store.uploadSessionId;
+        message('awardMessage', '店點檔已暫存，正在上傳個人檔…');
+        const person = await call('report_award_pair_upload_personal', payload({ uploadSessionId: awardUploadSessionId, file: { fileName: personFile.name, mimeType: personFile.type, fileBase64: await readFileBase64(personFile) } }));
+        const job = await call('report_award_pair_create_job', payload({ uploadSessionId: person.uploadSessionId }));
+        awardPreviewJobId = job.previewJobId; awardPolling = false; $('awardClearBtn').disabled = true;
+        message('awardMessage', '預覽任務已建立（queued），正在分階段驗證與解析…', 'warn');
+        window.setTimeout(pollAwardJob, 2000);
+      } catch (error) { awardPreviewJobId = ''; $('awardClearBtn').disabled = true; message('awardMessage', error.message, 'bad'); setBusy(button, false, '解析預覽'); }
+    });
+    $('awardClearBtn').addEventListener('click', async () => {
+      if (!awardPreviewJobId) return; const button = $('awardClearBtn'); setBusy(button, true, '清除中…');
+      try { const result = await call('report_award_pair_clear', payload({ previewJobId: awardPreviewJobId })); awardPreviewJobId = ''; $('awardClearBtn').disabled = true; message('awardMessage', result.message, 'ok'); }
+      catch (error) { message('awardMessage', error.message, 'bad'); }
+      finally { setBusy(button, false, '清除暫存檔'); }
+    });
+    $('awardCleanupBtn').addEventListener('click', async () => {
+      const button = $('awardCleanupBtn'); setBusy(button, true, '清理中…');
+      try { const result = await call('report_award_pair_daily_cleanup', payload({})); message('awardMessage', result.message, 'ok'); }
+      catch (error) { message('awardMessage', error.message, 'bad'); }
+      finally { setBusy(button, false, '清理逾期暫存'); }
     });
   </script>
 </body>

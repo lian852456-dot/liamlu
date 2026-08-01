@@ -2265,6 +2265,13 @@ function report_upload_preview(payload) { return reportUploadPreview(payload); }
 function report_upload_commit(payload) { return reportUploadCommit(payload); }
 function report_upload_log(payload) { return reportUploadLog(payload); }
 function report_upload_rollback(payload) { return reportUploadRollback(payload); }
+// 台獎雙檔目前只有「暫存與預覽」；刻意沒有 commit／publish 包裝函式。
+function report_award_pair_upload_store(payload) { return reportAwardPairUpload(payload, 'store'); }
+function report_award_pair_upload_personal(payload) { return reportAwardPairUpload(payload, 'person'); }
+function report_award_pair_create_job(payload) { return reportAwardPairCreateJob(payload); }
+function report_award_pair_job_status(payload) { return reportAwardPairJobStatus(payload); }
+function report_award_pair_clear(payload) { return reportAwardPairClear(payload); }
+function report_award_pair_daily_cleanup(payload) { return reportAwardPairDailyCleanup(payload); }
 
 function reportUploadIsUploadDeployment_() {
   try {
@@ -2944,6 +2951,412 @@ function reportUploadRollback(payload) {
   } catch (e) { console.log('report upload rollback log failed: ' + e); }
 
   return { restored: target.getName(), kind: kind, live: reportUploadLiveInfo_(kind) };
+}
+
+// ════════════════════════════════════════════════════════════════
+// 台獎雙檔測試上傳（階段一：僅暫存、解析與預覽）
+//
+// 此區刻意不呼叫 privateDashboardPublish、reportUploadCommit、SpreadsheetApp
+// 寫入或任何 Mail／Trigger 程式。原始 XLSX 僅落在 privateDashboardFolder()，
+// 成功預覽最多保留六小時；任何解析失敗一律立即丟入垃圾桶。
+// ════════════════════════════════════════════════════════════════
+const REPORT_AWARD_PAIR_TEMP_PREFIX = 'report-award-pair-temp-';
+const REPORT_AWARD_PAIR_STAGE_TTL_SECONDS = 1800;
+const REPORT_AWARD_PAIR_JOB_TTL_HOURS = 6;
+const REPORT_AWARD_PAIR_JOB_SHEET = 'ReportUploadJobs';
+const REPORT_AWARD_PAIR_JOB_HEADERS = [
+  'record_type', 'job_id', 'upload_session_id', 'store_file_id', 'store_file_name', 'store_hash', 'store_size',
+  'personal_file_id', 'personal_file_name', 'personal_hash', 'personal_size', 'stage', 'started_at', 'finished_at',
+  'duration_ms', 'status', 'error_message', 'store_json', 'personal_json', 'preview_json', 'cleanup_after'
+];
+const REPORT_AWARD_PAIR_MAX_BYTES = 12 * 1024 * 1024;
+const REPORT_AWARD_PAIR_MAX_UNZIPPED_BYTES = 64 * 1024 * 1024;
+const REPORT_AWARD_PAIR_MAX_ZIP_ENTRIES = 500;
+const REPORT_AWARD_PAIR_ALLOWED_MIMES = [
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip', 'application/octet-stream'
+];
+const REPORT_AWARD_PAIR_FILES = {
+  store: { token: '01-08-03', label: '檔案一（店點）', sheet: '上線數KPI_店點達成率_明細' },
+  person: { token: '01-08-04', label: '檔案二（個人）', sheet: '手機競賽_個人達成率' }
+};
+
+function reportAwardPairCheck_(key, label, level, detail) {
+  return reportUploadCheck_(key, label, level, detail);
+}
+
+function reportAwardPairCellText_(cell) {
+  if (!cell) return '';
+  const type = String(cell.getAttribute('t') || '');
+  const is = cell.getChild('is', cell.getNamespace());
+  if (is) {
+    const t = is.getChild('t', is.getNamespace());
+    return t ? t.getText() : '';
+  }
+  const v = cell.getChild('v', cell.getNamespace());
+  return v ? v.getText() : '';
+}
+
+function reportAwardPairZipFiles_(bytes) {
+  if (!bytes || bytes.length < 4 || bytes[0] !== 80 || bytes[1] !== 75 ||
+      bytes[2] !== 3 || bytes[3] !== 4) {
+    throw new Error('檔案不是有效 XLSX ZIP（缺少 PK\\x03\\x04 signature）');
+  }
+  // Utilities.unzip 要求輸入 Blob 的 content type 是 application/zip；
+  // 瀏覽器傳來的 Excel MIME 不可直接拿來呼叫 unzip。
+  const files = Utilities.unzip(Utilities.newBlob(bytes, 'application/zip', 'upload.zip'));
+  if (files.length > REPORT_AWARD_PAIR_MAX_ZIP_ENTRIES) {
+    throw new Error('XLSX ZIP 內容過多，拒絕可能的壓縮炸彈');
+  }
+  let expanded = 0;
+  files.forEach(function(file) {
+    expanded += file.getBytes().length;
+    if (expanded > REPORT_AWARD_PAIR_MAX_UNZIPPED_BYTES) {
+      throw new Error('XLSX 解壓後內容超過安全上限');
+    }
+  });
+  const names = files.map(function(file) { return file.getName(); });
+  if (names.indexOf('[Content_Types].xml') === -1 || names.indexOf('xl/workbook.xml') === -1) {
+    throw new Error('ZIP 不是合法 XLSX（缺少 [Content_Types].xml 或 xl/workbook.xml）');
+  }
+  return files;
+}
+
+// 讀取 XLSX 的 XML，僅取出結構驗證所需的儲存格值；不轉檔、不建立 Google Sheet。
+function reportAwardPairReadXlsx_(bytes) {
+  const files = reportAwardPairZipFiles_(bytes);
+  const byName = {};
+  files.forEach(function(f) { byName[f.getName()] = f.getDataAsString('UTF-8'); });
+  if (!byName['xl/workbook.xml']) throw new Error('不是可讀取的 XLSX（缺少 workbook.xml）');
+  const ns = XmlService.getNamespace('http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+  const workbook = XmlService.parse(byName['xl/workbook.xml']).getRootElement();
+  const sheetsEl = workbook.getChild('sheets', ns);
+  const sheetEls = sheetsEl ? sheetsEl.getChildren('sheet', ns) : [];
+  if (!sheetEls.length) throw new Error('XLSX 沒有工作表');
+  const sheetNames = sheetEls.map(function(s) { return s.getAttribute('name').getValue(); });
+  // 本階段的公司來源檔每份僅一張表。若日後多表，仍只讀第一張來驗證名稱與結構。
+  const sheetXmlName = 'xl/worksheets/sheet1.xml';
+  if (!byName[sheetXmlName]) throw new Error('XLSX 缺少第一張工作表內容');
+  const root = XmlService.parse(byName[sheetXmlName]).getRootElement();
+  const dataEl = root.getChild('sheetData', ns);
+  const rows = [];
+  (dataEl ? dataEl.getChildren('row', ns) : []).forEach(function(rowEl) {
+    const rowNo = Number(rowEl.getAttribute('r').getValue());
+    const cells = {};
+    rowEl.getChildren('c', ns).forEach(function(cell) {
+      const ref = String(cell.getAttribute('r').getValue());
+      cells[ref.replace(/\d+/g, '')] = reportAwardPairCellText_(cell);
+    });
+    rows.push({ row: rowNo, cells: cells });
+  });
+  return { sheetNames: sheetNames, rows: rows };
+}
+
+function reportAwardPairRangeDate_(rows) {
+  const all = (rows || []).map(function(r) {
+    const c = r.cells || {};
+    return Object.keys(c).map(function(k) { return c[k]; }).join(' ');
+  }).join(' ');
+  // 公司來源的期間格式通常是「2026/07/01 ~ 07/29」；結束日不一定重複年份，
+  // 因此必須優先取區間的右端，而不是只找第一個完整日期。
+  const range = all.match(/(20\d{2})\s*[\/-]\s*(\d{1,2})\s*[\/-]\s*(\d{1,2})\s*~\s*(?:(20\d{2})\s*[\/-]\s*)?(\d{1,2})\s*[\/-]\s*(\d{1,2})/);
+  if (range) {
+    return (range[4] || range[1]) + '-' + ('0' + range[5]).slice(-2) + '-' + ('0' + range[6]).slice(-2);
+  }
+  const matches = all.match(/20\d{2}\s*[\/-]\s*\d{1,2}\s*[\/-]\s*(\d{1,2})/g) || [];
+  if (!matches.length) return '';
+  const last = matches[matches.length - 1].match(/(20\d{2})\s*[\/-]\s*(\d{1,2})\s*[\/-]\s*(\d{1,2})/);
+  return last ? last[1] + '-' + ('0' + last[2]).slice(-2) + '-' + ('0' + last[3]).slice(-2) : '';
+}
+
+function reportAwardPairHasHeaders_(rows, required) {
+  const text = (rows || []).slice(0, 18).map(function(r) {
+    return Object.keys(r.cells || {}).map(function(k) { return r.cells[k]; }).join(' ');
+  }).join(' ');
+  return required.every(function(value) { return text.indexOf(value) !== -1; });
+}
+
+function reportAwardPairStores_(names) {
+  const unique = [];
+  (names || []).forEach(function(name) { if (name && unique.indexOf(name) === -1) unique.push(name); });
+  return reportUploadStoreBuckets_(unique);
+}
+
+function reportAwardPairAnalyzeStore_(xlsx) {
+  const rows = xlsx.rows;
+  const dataRows = rows.filter(function(r) {
+    const c = r.cells || {};
+    return c.F === '北一二B' && /^DNB/i.test(String(c.G || '')) && !!c.I;
+  });
+  const stores = dataRows.map(function(r) { return r.cells.I; });
+  return {
+    sheetNames: xlsx.sheetNames, dataDate: reportAwardPairRangeDate_(rows),
+    stores: stores, storeCount: reportAwardPairStores_(stores).matched.length,
+    rowCount: dataRows.length,
+    headersOk: reportAwardPairHasHeaders_(rows, ['手機競賽', '實際數', '目標數', '達成率'])
+  };
+}
+
+function reportAwardPairAnalyzePerson_(xlsx) {
+  const rows = xlsx.rows;
+  const dataRows = rows.filter(function(r) {
+    const c = r.cells || {};
+    return c.B === '北一二B' && /^DNB/i.test(String(c.C || '')) && !!c.D && !!c.F && !!c.G;
+  });
+  const stores = dataRows.map(function(r) { return r.cells.D; });
+  return {
+    sheetNames: xlsx.sheetNames, dataDate: reportAwardPairRangeDate_(rows),
+    stores: stores, personCount: dataRows.length,
+    headersOk: reportAwardPairHasHeaders_(rows, ['手機競賽', '實際數', '店目標數', '達成率'])
+  };
+}
+
+function reportAwardPairValidate_(store, person) {
+  const checks = [];
+  checks.push(reportAwardPairCheck_('sheets', '工作表名稱',
+    store.sheetNames.indexOf(REPORT_AWARD_PAIR_FILES.store.sheet) !== -1 &&
+    person.sheetNames.indexOf(REPORT_AWARD_PAIR_FILES.person.sheet) !== -1 ? 'ok' : 'block',
+    '店點：' + store.sheetNames.join('、') + '；個人：' + person.sheetNames.join('、')));
+  checks.push(reportAwardPairCheck_('fields', '必要欄位', store.headersOk && person.headersOk ? 'ok' : 'block',
+    store.headersOk && person.headersOk ? '期間、手機競賽、實際數、目標數／店目標數、達成率皆存在' : '缺少必要欄位'));
+  const sameDate = !!store.dataDate && store.dataDate === person.dataDate;
+  checks.push(reportAwardPairCheck_('date', '資料日期一致性', sameDate ? 'ok' : 'block',
+    '店點：' + (store.dataDate || '讀不到') + '；個人：' + (person.dataDate || '讀不到')));
+  const buckets = reportAwardPairStores_(store.stores.concat(person.stores));
+  const known = buckets.matched;
+  checks.push(reportAwardPairCheck_('stores', '店點驗證',
+    buckets.none.length || buckets.ambiguous.length || known.length < 5 ? 'block' : 'ok',
+    buckets.none.length ? '未命中：' + buckets.none.join('、') :
+      buckets.ambiguous.length ? '歧義：' + buckets.ambiguous.join('；') : known.length + ' 家命中：' + known.join('、')));
+  checks.push(reportAwardPairCheck_('records', '資料筆數',
+    store.rowCount >= 5 && person.personCount >= 10 ? 'ok' : 'block',
+    '店點列 ' + store.rowCount + ' 筆；人員列 ' + person.personCount + ' 筆'));
+  return checks;
+}
+
+function reportAwardPairHash_(bytes) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes).map(function(byte) {
+    return ('0' + (byte < 0 ? byte + 256 : byte).toString(16)).slice(-2);
+  }).join('');
+}
+
+function reportAwardPairDecode_(file, expected, shallowOnly) {
+  const fileName = String((file || {}).fileName || '');
+  const base64 = String((file || {}).fileBase64 || '');
+  const mimeType = String((file || {}).mimeType || 'application/octet-stream').toLowerCase().split(';')[0].trim();
+  if (!base64) throw new Error(expected.label + ' 沒有收到檔案內容');
+  if (base64.length > REPORT_AWARD_PAIR_MAX_BYTES * 1.4) throw new Error(expected.label + ' 檔案超過 12 MB 上限');
+  if (fileName.toLowerCase().slice(-5) !== '.xlsx') throw new Error(expected.label + ' 必須是 .xlsx 檔');
+  if (fileName.indexOf(expected.token) === -1) throw new Error(expected.label + ' 檔名必須包含 ' + expected.token);
+  if (REPORT_AWARD_PAIR_ALLOWED_MIMES.indexOf(mimeType) === -1) {
+    throw new Error(expected.label + ' MIME 不受支援：' + mimeType);
+  }
+  const bytes = Utilities.base64Decode(base64);
+  if (!bytes || bytes.length < 4 || bytes[0] !== 80 || bytes[1] !== 75 || bytes[2] !== 3 || bytes[3] !== 4) {
+    throw new Error(expected.label + ' 不是有效 XLSX ZIP（缺少 PK\\x03\\x04 signature）');
+  }
+  // MIME 只作輸入分類；完整 ZIP/XLSX 結構驗證在 job 的 validating-* 階段進行，
+  // 上傳請求只做快速 signature 檢查，避免把兩本工作簿塞進同一個 Web App 回應期限。
+  if (!shallowOnly) reportAwardPairZipFiles_(bytes);
+  return { fileName: fileName, bytes: bytes, mimeType: mimeType, hash: reportAwardPairHash_(bytes) };
+}
+
+function reportAwardPairJobSheet_() {
+  return privateDashboardSheet(REPORT_AWARD_PAIR_JOB_SHEET, REPORT_AWARD_PAIR_JOB_HEADERS);
+}
+
+function reportAwardPairRows_() {
+  return privateDashboardRows(reportAwardPairJobSheet_(), REPORT_AWARD_PAIR_JOB_HEADERS);
+}
+
+function reportAwardPairWrite_(item) {
+  const sheet = reportAwardPairJobSheet_();
+  const row = item._row || sheet.getLastRow() + 1;
+  privateDashboardWriteObject(sheet, REPORT_AWARD_PAIR_JOB_HEADERS, row, item);
+  return item;
+}
+
+function reportAwardPairNow_() { return privateDashboardNow(); }
+
+function reportAwardPairLog_(item, stage, status, startedAt, errorMessage) {
+  const now = reportAwardPairNow_();
+  item.stage = stage;
+  item.status = status;
+  item.started_at = startedAt || item.started_at || now;
+  item.finished_at = now;
+  item.duration_ms = String(Date.now() - new Date(item.started_at).getTime());
+  item.error_message = errorMessage || '';
+  reportAwardPairWrite_(item);
+  console.log(JSON.stringify({ previewJobId: item.job_id || '', fileId: item.store_file_id || item.personal_file_id || '',
+    filename: item.store_file_name || item.personal_file_name || '', hash: item.store_hash || item.personal_hash || '',
+    stage: stage, startedAt: item.started_at, finishedAt: item.finished_at, durationMs: item.duration_ms,
+    status: status, errorMessage: item.error_message }));
+  return item;
+}
+
+function reportAwardPairSession_(sessionId) {
+  return reportAwardPairRows_().filter(function(row) {
+    return row.record_type === 'session' && row.upload_session_id === sessionId;
+  })[0] || null;
+}
+
+function reportAwardPairJob_(jobId) {
+  return reportAwardPairRows_().filter(function(row) {
+    return row.record_type === 'job' && row.job_id === jobId;
+  })[0] || null;
+}
+
+function reportAwardPairUpload(payload, role) {
+  reportUploadAuthorize_(payload);
+  const expected = REPORT_AWARD_PAIR_FILES[role];
+  if (!expected) throw new Error('未知的台獎檔案角色');
+  const fileIn = reportAwardPairDecode_((payload || {}).file, expected, true);
+  const requestedSession = String((payload || {}).uploadSessionId || '');
+  const sessionId = requestedSession || reportUploadToken_();
+  let session = reportAwardPairSession_(sessionId);
+  if (!session) {
+    session = { record_type: 'session', upload_session_id: sessionId, stage: 'uploading-' + role,
+      status: 'active', started_at: reportAwardPairNow_(), cleanup_after: '' };
+  }
+  const idKey = role + '_file_id';
+  const hashKey = role + '_hash';
+  const nameKey = role + '_file_name';
+  const sizeKey = role + '_size';
+  if (session[idKey] && session[hashKey] === fileIn.hash) {
+    return { ok: true, uploadSessionId: sessionId, fileId: session[idKey], fileName: session[nameKey],
+      size: Number(session[sizeKey] || 0), hash: fileIn.hash, reused: true, message: expected.label + ' 已使用同一暫存檔。' };
+  }
+  if (session[idKey] && session[hashKey] !== fileIn.hash) reportUploadTrash_(DriveApp.getFileById(session[idKey]));
+  const folder = privateDashboardFolder();
+  const existing = reportAwardPairRows_().filter(function(row) {
+    return row.record_type === 'session' && row[hashKey] === fileIn.hash && row[idKey] && row.status === 'active';
+  })[0];
+  const raw = existing ? DriveApp.getFileById(existing[idKey]) : folder.createFile(Utilities.newBlob(fileIn.bytes,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      REPORT_AWARD_PAIR_TEMP_PREFIX + fileIn.hash + '-' + role + '-' + fileIn.fileName));
+  session[idKey] = raw.getId(); session[hashKey] = fileIn.hash; session[nameKey] = fileIn.fileName;
+  session[sizeKey] = String(fileIn.bytes.length); session.stage = 'uploaded-' + role; session.status = 'active';
+  reportAwardPairLog_(session, session.stage, 'active', session.started_at);
+  return { ok: true, uploadSessionId: sessionId, fileId: raw.getId(), fileName: fileIn.fileName,
+    size: fileIn.bytes.length, hash: fileIn.hash, reused: !!existing, message: expected.label + ' 已安全暫存，等待建立預覽任務。' };
+}
+
+function reportAwardPairCreateJob(payload) {
+  reportUploadAuthorize_(payload);
+  const sessionId = String((payload || {}).uploadSessionId || '');
+  const session = reportAwardPairSession_(sessionId);
+  if (!session || !session.store_file_id || !session.personal_file_id) throw new Error('請先完成兩份檔案上傳。');
+  const existing = reportAwardPairRows_().filter(function(row) {
+    return row.record_type === 'job' && row.upload_session_id === sessionId &&
+      ['queued', 'running', 'completed'].indexOf(row.status) !== -1;
+  })[0];
+  if (existing) return { ok: true, previewJobId: existing.job_id, stage: existing.stage, status: existing.status, reused: true };
+  const now = reportAwardPairNow_();
+  const job = { record_type: 'job', job_id: reportUploadToken_(), upload_session_id: sessionId,
+    store_file_id: session.store_file_id, store_file_name: session.store_file_name, store_hash: session.store_hash, store_size: session.store_size,
+    personal_file_id: session.personal_file_id, personal_file_name: session.personal_file_name, personal_hash: session.personal_hash, personal_size: session.personal_size,
+    stage: 'queued', status: 'queued', started_at: now, cleanup_after: new Date(Date.now() + REPORT_AWARD_PAIR_JOB_TTL_HOURS * 3600 * 1000).toISOString() };
+  reportAwardPairLog_(job, 'queued', 'queued', now);
+  return { ok: true, previewJobId: job.job_id, stage: 'queued', status: 'queued', reused: false };
+}
+
+function reportAwardPairStageResult_(job) {
+  return { ok: job.status === 'completed', previewJobId: job.job_id, stage: job.stage, status: job.status,
+    errorMessage: job.error_message || '', preview: job.preview_json ? JSON.parse(job.preview_json) : null,
+    checks: job.preview_json ? JSON.parse(job.preview_json).checks : [] };
+}
+
+function reportAwardPairReadFile_(fileId, expected, expectedHash) {
+  const file = DriveApp.getFileById(fileId);
+  const bytes = file.getBlob().getBytes();
+  // 再次確認 Drive 暫存內容與上傳時的雜湊相符，再進行完整 XLSX ZIP 結構驗證。
+  if (expectedHash && reportAwardPairHash_(bytes) !== expectedHash) throw new Error(expected.label + ' 暫存檔雜湊不一致，已拒絕解析');
+  const xlsx = reportAwardPairReadXlsx_(bytes);
+  return expected === REPORT_AWARD_PAIR_FILES.store ? reportAwardPairAnalyzeStore_(xlsx) : reportAwardPairAnalyzePerson_(xlsx);
+}
+
+function reportAwardPairJobStatus(payload) {
+  reportUploadAuthorize_(payload);
+  const job = reportAwardPairJob_(String((payload || {}).previewJobId || ''));
+  if (!job) throw new Error('找不到台獎預覽任務。');
+  if (job.status === 'completed' || job.status === 'failed' || job.status === 'cleaned') return reportAwardPairStageResult_(job);
+  const started = reportAwardPairNow_();
+  try {
+    if (job.stage === 'queued') reportAwardPairLog_(job, 'validating-store', 'running', started);
+    else if (job.stage === 'validating-store') {
+      const store = reportAwardPairReadFile_(job.store_file_id, REPORT_AWARD_PAIR_FILES.store, job.store_hash);
+      job.store_json = JSON.stringify(store); reportAwardPairLog_(job, 'parsing-store', 'running', started);
+    } else if (job.stage === 'parsing-store') reportAwardPairLog_(job, 'validating-personal', 'running', started);
+    else if (job.stage === 'validating-personal') {
+      const person = reportAwardPairReadFile_(job.personal_file_id, REPORT_AWARD_PAIR_FILES.person, job.personal_hash);
+      job.personal_json = JSON.stringify(person); reportAwardPairLog_(job, 'parsing-personal', 'running', started);
+    } else if (job.stage === 'parsing-personal') reportAwardPairLog_(job, 'comparing', 'running', started);
+    else if (job.stage === 'comparing') {
+      const store = JSON.parse(job.store_json || '{}'), person = JSON.parse(job.personal_json || '{}');
+      const checks = reportAwardPairValidate_(store, person);
+      if (reportUploadBlocked_(checks).length) throw new Error(checks.filter(function(c) { return c.level === 'block'; }).map(function(c) { return c.label + '：' + c.detail; }).join('；'));
+      job.preview_json = JSON.stringify({ dataDate: store.dataDate, storeCount: store.storeCount, personCount: person.personCount,
+        storeRows: store.rowCount, storeNames: reportAwardPairStores_(store.stores).matched, checks: checks,
+        files: [{ fileName: job.store_file_name, uploadedAt: job.started_at }, { fileName: job.personal_file_name, uploadedAt: job.started_at }] });
+      reportAwardPairLog_(job, 'completed', 'completed', started);
+    }
+  } catch (err) {
+    reportAwardPairLog_(job, job.stage || 'failed', 'failed', started, err && err.message ? err.message : String(err));
+    reportAwardPairClearFiles_(job);
+  }
+  return reportAwardPairStageResult_(job);
+}
+
+function reportAwardPairClearFiles_(job) {
+  let cleared = 0;
+  [job.store_file_id, job.personal_file_id].forEach(function(id) {
+    if (!id) return;
+    try { DriveApp.getFileById(id).setTrashed(true); cleared++; } catch (e) { console.log('award pair cleanup failed, fileId=' + id); }
+  });
+  const session = job.upload_session_id ? reportAwardPairSession_(job.upload_session_id) : null;
+  if (session) { session.status = 'cleaned'; session.stage = 'cleaned'; reportAwardPairWrite_(session); }
+  return cleared;
+}
+
+function reportAwardPairClear(payload) {
+  reportUploadAuthorize_(payload);
+  const job = reportAwardPairJob_(String((payload || {}).previewJobId || ''));
+  if (!job) return { ok: true, cleared: 0, message: '沒有可清除的台獎暫存檔。' };
+  if (['queued', 'running'].indexOf(job.status) !== -1) throw new Error('預覽任務仍在進行，不能清除暫存檔。');
+  const cleared = reportAwardPairClearFiles_(job);
+  reportAwardPairLog_(job, 'cleaned', 'cleaned', reportAwardPairNow_());
+  return { ok: true, cleared: cleared, message: '已清除 ' + cleared + ' 份台獎暫存檔；正式台獎資料未變更。' };
+}
+
+function reportAwardPairDailyCleanup(payload) {
+  reportUploadAuthorize_(payload || {});
+  const now = Date.now(); let cleared = 0;
+  const activeIds = {};
+  reportAwardPairRows_().filter(function(job) {
+    return job.record_type === 'job' && ['queued', 'running'].indexOf(job.status) !== -1;
+  }).forEach(function(job) { activeIds[job.store_file_id] = true; activeIds[job.personal_file_id] = true; });
+  reportAwardPairRows_().filter(function(job) {
+    return job.record_type === 'job' && ['completed', 'failed'].indexOf(job.status) !== -1 &&
+      job.cleanup_after && new Date(job.cleanup_after).getTime() <= now;
+  }).forEach(function(job) {
+    cleared += reportAwardPairClearFiles_(job);
+    reportAwardPairLog_(job, 'cleaned', 'cleaned', reportAwardPairNow_());
+  });
+  // v27 單次同步預覽遺留的檔案沒有 job row。只刪除超過舊暫存 TTL、且沒有 active job
+  // 引用的固定前綴檔案；不掃正式 JSON、備份或其他資料夾內容。
+  const legacyCutoff = now - REPORT_AWARD_PAIR_STAGE_TTL_SECONDS * 1000;
+  const files = privateDashboardFolder().getFiles();
+  while (files.hasNext()) {
+    const file = files.next();
+    if (file.getName().indexOf(REPORT_AWARD_PAIR_TEMP_PREFIX) !== 0 || file.getLastUpdated().getTime() > legacyCutoff || activeIds[file.getId()]) continue;
+    try {
+      const token = (file.getName().match(/^report-award-pair-temp-([a-f0-9]{32})-/) || [])[1] || 'legacy';
+      const log = { record_type: 'cleanup', job_id: 'legacy-' + token, stage: 'legacy-orphan-cleanup', status: 'cleaned',
+        store_file_id: file.getId(), store_file_name: file.getName(), started_at: reportAwardPairNow_() };
+      file.setTrashed(true); cleared++; reportAwardPairLog_(log, 'legacy-orphan-cleanup', 'cleaned', log.started_at);
+    } catch (e) { console.log('award pair legacy orphan cleanup failed, fileId=' + file.getId()); }
+  }
+  return { ok: true, cleared: cleared, message: '已清除到期且沒有 active job 引用的台獎暫存檔。' };
 }
 
 // ════════════════════════════════════════════════════════════════
