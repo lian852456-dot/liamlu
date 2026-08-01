@@ -434,7 +434,7 @@ test('UPLOAD_GAS_URL 仍是佔位字時，登入被擋下且不發出任何請�
   await page.fill('#authEmp', GOOD_EMP);
   await page.fill('#authSecret', SECRET);
   await page.click('#authBtn');
-  await expect(page.locator('#authMsg')).toContainText('尚未設定上傳 Deployment');
+  await expect(page.locator('#authMsg')).toContainText('僅供開發模板');
   await expect(page.locator('#app')).toBeHidden();
   expect(requests).toBe(0);
 });

@@ -8,6 +8,7 @@ const vm = require('node:vm');
 const root = path.join(__dirname, '..');
 const code = fs.readFileSync(path.join(root, 'gas/Code.gs'), 'utf8');
 const page = fs.readFileSync(path.join(root, 'report-upload.html'), 'utf8');
+const htmlPage = fs.readFileSync(path.join(root, 'gas/ReportUpload.html'), 'utf8');
 const home = fs.readFileSync(path.join(root, 'home.html'), 'utf8');
 
 function functionBody(source, name) {
@@ -187,7 +188,8 @@ test('doPost 已掛上四個上傳 action', () => {
 });
 
 // ── 前端 ────────────────────────────────────────────────────
-test('前端固定正式端點、走 POST、且自帶權限欄位', () => {
+test('開發模板只允許測試覆寫端點，且自帶權限欄位', () => {
+  assert.match(page, /const UPLOAD_GAS_URL = ''/);
   assert.match(page, /fetch\(uploadGasUrl\(\)/);
   assert.match(page, /method: 'POST'/);
   assert.match(page, /result\.status !== 'ok'/);
@@ -213,9 +215,9 @@ test('狀態顯示涵蓋成功／失敗／未執行／維持上一版四種', ()
   assert.match(page, /ok: '成功', fail: '失敗', skip: '未執行', kept: '維持上一版'/);
 });
 
-test('智慧營運中心新增戰報快速更新入口，且本身仍不含資料或密碼', () => {
-  assert.match(home, /href="report-upload\.html"/);
-  assert.doesNotMatch(home, /adminSecret|employeeId|script\.google\.com/);
+test('智慧營運中心入口直接開啟獨立 Apps Script，且本身仍不含資料或密碼', () => {
+  assert.match(home, /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
+  assert.doesNotMatch(home, /adminSecret|employeeId|REPORT_UPLOAD_ALLOWED_EMPLOYEES|DASHBOARD_ADMIN_SECRET/);
 });
 
 // ── 純函式行為測試（把驗證函式抽出來實際跑）────────────────
@@ -631,12 +633,13 @@ test('doPost 在上傳部署模式只放行四個上傳路由，且判斷在所�
     'report_upload_preview', 'report_upload_rollback'].sort(), '白名單必須恰好是四個上傳路由');
 });
 
-test('doGet 在上傳部署模式只回 ping，其餘 GET 一律拒絕', () => {
+test('doGet 在上傳部署模式回 ping／同源頁面，其餘 JSON GET 一律拒絕', () => {
   const doGet = functionBody(code, 'doGet');
   const gateAt = doGet.indexOf('reportUploadIsUploadDeployment_()');
   const pingAt = doGet.indexOf("action === 'ping'");
   assert.ok(gateAt !== -1 && gateAt < pingAt, '隔離判斷必須在一般 ping 之前');
   assert.match(doGet, /app: 'report-upload'/);
+  assert.match(doGet, /reportUploadHtmlService_\(\)/);
   assert.match(doGet, /route-not-available-on-upload-deployment/);
 });
 
@@ -661,15 +664,27 @@ test('隔離判斷行為：未設定屬性不啟用、URL 相符才啟用、觸�
   assert.equal(run(URL, () => ''), false, 'getUrl 為空必須回 false');
 });
 
-test('前端使用獨立上傳端點，與每日回報端點分離且無瀏覽器覆寫', () => {
-  assert.match(page, /const UPLOAD_GAS_URL = 'https:\/\/script\.google\.com/);
+test('GitHub Pages 模板不含正式端點，正式頁改走同源 HtmlService', () => {
+  assert.match(page, /const UPLOAD_GAS_URL = ''/);
+  assert.doesNotMatch(page, /https:\/\/script\.google\.com/);
   assert.doesNotMatch(page, /DEFAULT_GAS_URL/, '上傳頁不得再引用每日回報端點');
   assert.doesNotMatch(page, /localStorage|sessionStorage/, '端點與登入資訊都不得進瀏覽器儲存');
   // 佔位字守門：未設定時登入直接被擋
   const login = functionBody(page, 'doLogin');
   assert.match(login, /CHANGE_ME/);
-  assert.match(login, /尚未設定上傳 Deployment/);
+  assert.match(login, /僅供開發模板/);
   // 測試注入鉤只在 uploadGasUrl 讀取，不寫入
   assert.equal((page.match(/__UPLOAD_GAS_URL_OVERRIDE__/g) || []).length, 2,
     '__UPLOAD_GAS_URL_OVERRIDE__ 只應出現在註解與 uploadGasUrl 讀取處');
+});
+
+test('同源 HtmlService 僅使用 google.script.run，且四個上傳呼叫都有包裝函式', () => {
+  assert.match(functionBody(code, 'reportUploadHtmlService_'), /createHtmlOutputFromFile\('ReportUpload'\)/);
+  for (const name of ['report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback']) {
+    assert.match(code, new RegExp(`function ${name}\\(payload\\)`));
+    assert.match(htmlPage, new RegExp(`call\\('${name}'`));
+  }
+  assert.match(htmlPage, /google\.script\.run/);
+  assert.doesNotMatch(htmlPage, /fetch\(|https:\/\/script\.google\.com|REPORT_UPLOAD_ALLOWED_EMPLOYEES|DASHBOARD_ADMIN_SECRET/);
+  assert.doesNotMatch(htmlPage, /localStorage|sessionStorage/);
 });

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>戰報快速更新</title>
+  <style>
+    :root { color-scheme: light; --ink:#12304a; --muted:#617387; --line:#d9e3eb; --bg:#f4f8fb; --navy:#09395f; --cyan:#0b9ec5; --ok:#087d59; --warn:#a65d00; --bad:#bb2639; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 system-ui,-apple-system,"Microsoft JhengHei",sans-serif; }
+    main { width:min(960px,calc(100% - 32px)); margin:32px auto 56px; } h1 { margin:0; font-size:28px; } h2 { margin:0 0 12px; font-size:19px; }
+    .hero { background:linear-gradient(135deg,var(--navy),#0b6c9a); color:#fff; border-radius:18px; padding:26px; box-shadow:0 12px 30px #09395f24; }
+    .hero p { margin:8px 0 0; color:#d5f5ff; } .card { margin-top:18px; background:#fff; border:1px solid var(--line); border-radius:15px; padding:20px; box-shadow:0 5px 18px #12304a0d; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; } label { display:grid; gap:6px; color:var(--muted); font-weight:700; }
+    input { width:100%; min-height:42px; border:1px solid #b8c9d7; border-radius:9px; padding:9px 11px; font:inherit; }
+    button { appearance:none; border:0; border-radius:9px; background:var(--navy); color:#fff; padding:10px 14px; font:inherit; font-weight:800; cursor:pointer; }
+    button.secondary { background:#e7f1f7; color:var(--navy); } button.warn { background:#a65d00; } button:disabled { opacity:.55; cursor:not-allowed; }
+    .actions { display:flex; gap:9px; flex-wrap:wrap; margin-top:14px; } .hidden { display:none !important; }
+    .notice,.message { margin-top:12px; padding:10px 12px; border-radius:9px; background:#eef6fb; color:#24516d; } .message.ok { background:#e7f7ef; color:var(--ok); } .message.warn { background:#fff4df; color:var(--warn); } .message.bad { background:#fff0f1; color:var(--bad); }
+    .meta { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; } .metric { padding:11px; background:#f4f8fb; border-radius:9px; } .metric b { display:block; font-size:18px; color:var(--navy); }
+    table { width:100%; border-collapse:collapse; margin-top:12px; } th,td { padding:8px; text-align:left; border-bottom:1px solid var(--line); } th { color:var(--muted); font-size:13px; } .checks .ok { color:var(--ok); } .checks .warn { color:var(--warn); } .checks .block,.checks .bad { color:var(--bad); }
+    .confirm { display:flex; gap:8px; align-items:flex-start; margin-top:14px; color:var(--muted); } .confirm input { width:auto; min-height:auto; margin-top:5px; }
+    .small { color:var(--muted); font-size:13px; } code { background:#edf3f7; border-radius:4px; padding:1px 4px; } @media (max-width:680px) { .grid,.meta { grid-template-columns:1fr; } main { width:min(100% - 20px,960px); margin-top:10px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <h1>戰報快速更新</h1>
+      <p>獨立 Apps Script Deployment ・同源上傳與發布 ・不經 GitHub Pages 跨網域 POST</p>
+    </section>
+
+    <section id="authCard" class="card">
+      <h2>督導驗證</h2>
+      <p class="small">帳號與管理者密碼只在本次同源呼叫中使用，不會寫入 HTML、瀏覽器儲存或 Script Properties。</p>
+      <div class="grid">
+        <label>員編 <input id="employeeId" autocomplete="username" placeholder="例：5510755"></label>
+        <label>管理者密碼 <input id="adminSecret" type="password" autocomplete="current-password"></label>
+      </div>
+      <div class="actions"><button id="loginBtn" type="button">登入並讀取目前版本</button></div>
+      <div id="authMessage" class="message hidden" role="status"></div>
+    </section>
+
+    <section id="app" class="hidden">
+      <section class="card">
+        <h2>KPI Excel</h2>
+        <p class="small">預覽只建立受控暫存與檢查資料；在你勾選確認並發布前，不會改寫正式 JSON。</p>
+        <label>選擇 KPI 日報 Excel（.xlsx） <input id="kpiFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+        <div class="actions">
+          <button id="previewBtn" type="button">檔案預覽</button>
+          <button id="refreshBtn" class="secondary" type="button">重新整理更新紀錄</button>
+        </div>
+        <div id="kpiMessage" class="message hidden" role="status"></div>
+        <div id="liveInfo" class="notice">目前正式版本讀取中…</div>
+        <div id="previewPanel" class="hidden">
+          <div class="meta">
+            <div class="metric"><span>原始檔名</span><b id="fileName">—</b></div>
+            <div class="metric"><span>資料日期</span><b id="dataDate">—</b></div>
+            <div class="metric"><span>門市</span><b id="storeCount">—</b></div>
+            <div class="metric"><span>人員 / KPI</span><b id="peopleAndItems">—</b></div>
+          </div>
+          <div id="checks"></div>
+          <label class="confirm"><input id="confirmPublish" type="checkbox">我已確認檔名、資料日期、店數、人數與 KPI 項目，且知悉同日期發布會先備份目前正式 JSON。</label>
+          <label id="forceWrap" class="confirm hidden"><input id="forcePublish" type="checkbox" disabled>同日期或內容相同的版本，仍確認強制覆寫。</label>
+          <div class="actions">
+            <button id="publishBtn" type="button" disabled>確認發布</button>
+            <button id="rollbackBtn" class="warn" type="button">回復上一版</button>
+          </div>
+        </div>
+        <div id="result"></div>
+      </section>
+
+      <section class="card">
+        <h2>更新紀錄</h2>
+        <p class="small">發布會先備份正式 JSON；讀回驗證失敗時，伺服器會自動還原上一版。</p>
+        <div id="log"></div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const auth = { employeeId: '', adminSecret: '' };
+    let previewToken = '';
+    const $ = id => document.getElementById(id);
+    const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    function message(id, text, tone) { const node = $(id); node.textContent = text; node.className = 'message ' + (tone || ''); }
+    function call(name, payload) {
+      return new Promise((resolve, reject) => {
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(error => reject(new Error(error && error.message ? error.message : String(error))))[name](payload);
+      });
+    }
+    function payload(extra) { return Object.assign({ employeeId: auth.employeeId, adminSecret: auth.adminSecret }, extra || {}); }
+    function setBusy(button, busy, label) { button.disabled = busy; if (label) button.textContent = label; }
+    function updatePublishButton() {
+      const forceRequired = !$('forceWrap').classList.contains('hidden');
+      $('publishBtn').disabled = !previewToken || !$('confirmPublish').checked || (forceRequired && !$('forcePublish').checked);
+    }
+    function renderLive(live) {
+      $('liveInfo').textContent = live ? '目前正式版本：' + (live.label || '—') + '｜資料日期 ' + (live.dataDate || '—') + '｜最後更新 ' + (live.updatedAt || '—') : '目前尚無正式 KPI JSON。';
+    }
+    function renderChecks(checks) {
+      const rows = (checks || []).map(check => '<tr class="' + esc(check.level) + '"><td>' + esc(check.label) + '</td><td>' + esc(check.level === 'ok' ? '通過' : check.level === 'warn' ? '提醒' : '阻擋') + '</td><td>' + esc(check.detail) + '</td></tr>').join('');
+      $('checks').innerHTML = '<table class="checks"><thead><tr><th>檢查</th><th>結果</th><th>說明</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+    function renderLog(entries) {
+      const rows = (entries || []).map(entry => '<tr><td>' + esc(entry.acted_at) + '</td><td>' + esc(entry.kind) + '</td><td>' + esc(entry.file_name) + '</td><td>' + esc(entry.data_date) + '</td><td>' + esc(entry.result) + '</td></tr>').join('');
+      $('log').innerHTML = rows ? '<table><thead><tr><th>時間</th><th>類型</th><th>檔案</th><th>資料日期</th><th>結果</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<p class="small">目前沒有更新紀錄。</p>';
+    }
+    function readFileBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onerror = () => reject(new Error('檔案讀取失敗')); reader.onload = () => resolve(String(reader.result).split(',')[1] || ''); reader.readAsDataURL(file); }); }
+    async function refreshLog() {
+      const result = await call('report_upload_log', payload({ limit: 20 }));
+      renderLive(result.live && result.live.kpi ? result.live.kpi : result.live);
+      renderLog(result.entries);
+      return result;
+    }
+    $('loginBtn').addEventListener('click', async () => {
+      const button = $('loginBtn'); auth.employeeId = $('employeeId').value.trim().toUpperCase(); auth.adminSecret = $('adminSecret').value;
+      if (!auth.employeeId || !auth.adminSecret) return message('authMessage', '請輸入員編與管理者密碼。', 'bad');
+      setBusy(button, true, '驗證中…'); message('authMessage', '正在讀取目前版本…');
+      try { await refreshLog(); $('authCard').classList.add('hidden'); $('app').classList.remove('hidden'); }
+      catch (error) { message('authMessage', error.message, 'bad'); }
+      finally { setBusy(button, false, '登入並讀取目前版本'); }
+    });
+    $('refreshBtn').addEventListener('click', async () => { try { await refreshLog(); } catch (error) { message('kpiMessage', error.message, 'bad'); } });
+    $('previewBtn').addEventListener('click', async () => {
+      const file = $('kpiFile').files[0]; const button = $('previewBtn');
+      if (!file) return message('kpiMessage', '請先選擇 0730.xlsx 等 KPI Excel。', 'bad');
+      setBusy(button, true, '預覽中…'); message('kpiMessage', '正在上傳並檢查；此步驟不會修改正式 JSON。');
+      try {
+        const result = await call('report_upload_preview', payload({ kind:'kpi', fileName:file.name, fileBase64:await readFileBase64(file) }));
+        renderLive(result.live); renderChecks(result.checks); $('previewPanel').classList.remove('hidden');
+        $('fileName').textContent = result.fileName || file.name; $('dataDate').textContent = result.dataDate || '—';
+        $('storeCount').textContent = (result.preview && result.preview.storeCount != null ? result.preview.storeCount : '—') + ' 家';
+        $('peopleAndItems').textContent = (result.preview && result.preview.personCount != null ? result.preview.personCount : '—') + ' 人 / 25 項';
+        previewToken = result.ok ? result.token : '';
+        $('confirmPublish').checked = false;
+        const needsForce = Boolean(result.needsForce);
+        $('forceWrap').classList.toggle('hidden', !needsForce);
+        $('forcePublish').checked = false;
+        $('forcePublish').disabled = !needsForce || !previewToken;
+        updatePublishButton();
+        message('kpiMessage', result.ok ? '預覽完成，請核對後再確認發布。' : '預覽未通過，正式 JSON 未變更。', result.ok ? 'ok' : 'bad');
+      } catch (error) { previewToken = ''; $('forceWrap').classList.add('hidden'); updatePublishButton(); message('kpiMessage', error.message, 'bad'); }
+      finally { setBusy(button, false, '檔案預覽'); }
+    });
+    $('confirmPublish').addEventListener('change', updatePublishButton);
+    $('forcePublish').addEventListener('change', updatePublishButton);
+    $('publishBtn').addEventListener('click', async () => {
+      if (!previewToken || !$('confirmPublish').checked) return; const button = $('publishBtn');
+      if (!window.confirm('確定發布此預覽版本？伺服器會先備份目前正式 JSON。')) return;
+      setBusy(button, true, '發布中…'); message('kpiMessage', '正在備份、發布並讀回驗證…');
+      try { const result = await call('report_upload_commit', payload({ token:previewToken, force:$('forcePublish').checked })); $('result').innerHTML = '<div class="notice">' + esc(result.message || result.result || '已完成') + '</div>'; renderLive(result.live); previewToken = ''; $('confirmPublish').checked = false; $('forcePublish').checked = false; $('forceWrap').classList.add('hidden'); updatePublishButton(); await refreshLog(); message('kpiMessage', result.result === 'ok' ? '發布完成。' : (result.message || '發布未完成，正式資料維持上一版。'), result.result === 'ok' ? 'ok' : 'warn'); }
+      catch (error) { message('kpiMessage', error.message, 'bad'); }
+      finally { setBusy(button, false, '確認發布'); }
+    });
+    $('rollbackBtn').addEventListener('click', async () => {
+      if (!window.confirm('確定回復 KPI 正式資料到上一個成功版本？')) return; const button = $('rollbackBtn');
+      setBusy(button, true, '回復中…');
+      try { const result = await call('report_upload_rollback', payload({ kind:'kpi' })); renderLive(result.live); await refreshLog(); message('kpiMessage', '已回復：' + result.restored, 'ok'); }
+      catch (error) { message('kpiMessage', error.message, 'bad'); }
+      finally { setBusy(button, false, '回復上一版'); }
+    });
+  </script>
+</body>
+</html>

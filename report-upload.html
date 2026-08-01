@@ -213,17 +213,16 @@
 </div>
 
 <script>
-// 快速上傳走「獨立上傳 Deployment」，與每日回報 Deployment（固定第 15 版）完全分離。
-// Liam 建立新 Deployment 後，把它的 /exec URL 填進下面常數再部署 Pages；
-// 含 CHANGE_ME 時登入會被擋下，避免誤打到每日回報部署。
-// 端點固定寫死、不提供任何瀏覽器端儲存覆寫（與受保護端點同一資安基準）；
-// window.__UPLOAD_GAS_URL_OVERRIDE__ 僅供自動化測試在頁面載入前注入，正式頁面不會設定它。
-const UPLOAD_GAS_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
+// 此檔只保留為開發／視覺模板；正式入口改為 home.html 直接開啟 Apps Script HtmlService。
+// GitHub Pages 絕不直接對正式上傳 Deployment 發送 POST。
+// window.__UPLOAD_GAS_URL_OVERRIDE__ 僅供隔離測試注入；正式頁面永遠沒有端點。
+const UPLOAD_GAS_URL = '';
 function uploadGasUrl() { return window.__UPLOAD_GAS_URL_OVERRIDE__ || UPLOAD_GAS_URL; }
 const AUTH = { employeeId: '', adminSecret: '' };
 const TOKENS = { kpi: '', award: '' };
 
 async function gasPost(payload) {
+  if (!uploadGasUrl()) throw new Error('此 GitHub Pages 頁面僅供開發模板，請從智慧營運中心開啟同源上傳頁。');
   const response = await fetch(uploadGasUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -250,8 +249,8 @@ function setMsg(id, text, cls) {
 
 // ── 登入（前端第一道；後端 reportUploadAuthorize_ 才是真的那道）──
 async function doLogin() {
-  if (/CHANGE_ME/.test(uploadGasUrl())) {
-    setMsg('authMsg', '❌ 尚未設定上傳 Deployment 網址（UPLOAD_GAS_URL 仍是佔位字）。請先建立獨立上傳 Deployment 並填入網址。', 'bad');
+  if (!uploadGasUrl() || /CHANGE_ME/.test(uploadGasUrl())) {
+    setMsg('authMsg', '❌ 此 GitHub Pages 頁面僅供開發模板。請從智慧營運中心開啟同源 Apps Script 上傳頁。', 'bad');
     return;
   }
   const emp = String(el('authEmp').value || '').trim().toUpperCase();

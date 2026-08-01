@@ -46,9 +46,11 @@ function doGet(e) {
   const action = e.parameter.action;
   const cb = e.parameter.callback;
 
-  // 部署隔離：上傳專用 Deployment 只回應 ping（帶識別，供前端確認打對部署），其餘 GET 一律拒絕
+  // 部署隔離：上傳專用 Deployment 只回應 ping／同源 HtmlService，
+  // 其餘 JSON GET（包括每日回報 read）一律拒絕。
   if (reportUploadIsUploadDeployment_()) {
     if (action === 'ping') return jsonResponse({ status: 'ok', app: 'report-upload' }, cb);
+    if (!action) return reportUploadHtmlService_();
     return jsonResponse({ status: 'error', message: 'route-not-available-on-upload-deployment' }, cb);
   }
 
@@ -2251,6 +2253,18 @@ function checkSegAndNotify(seg) {
 const REPORT_UPLOAD_ALLOWED_ACTIONS = [
   'report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback'
 ];
+
+// 上傳頁與上傳 API 同屬新 Deployment，使用 google.script.run 直接呼叫這四個包裝函式。
+// 不從 GitHub Pages fetch，不需要 CORS／preflight，也不把任何設定值注入 HTML。
+function reportUploadHtmlService_() {
+  return HtmlService.createHtmlOutputFromFile('ReportUpload')
+    .setTitle('北一二B 戰報快速更新');
+}
+
+function report_upload_preview(payload) { return reportUploadPreview(payload); }
+function report_upload_commit(payload) { return reportUploadCommit(payload); }
+function report_upload_log(payload) { return reportUploadLog(payload); }
+function report_upload_rollback(payload) { return reportUploadRollback(payload); }
 
 function reportUploadIsUploadDeployment_() {
   try {
