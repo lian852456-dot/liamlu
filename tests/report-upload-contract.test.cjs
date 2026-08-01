@@ -405,8 +405,9 @@ test('台獎雙檔 MIME 正規化後仍必須通過 XLSX ZIP 安全結構檢查'
   assert.match(decode, /REPORT_AWARD_PAIR_ALLOWED_MIMES\.indexOf\(mimeType\)/);
   assert.match(decode, /reportAwardPairZipFiles_\(bytes\)/);
   assert.match(functionBody(code, 'reportAwardPairUpload'), /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/);
-  assert.match(htmlPage, /mimeType: storeFile\.type/);
-  assert.match(htmlPage, /mimeType: personFile\.type/);
+  assert.match(htmlPage, /mimeType: file\.type/);
+  assert.equal((htmlPage.match(/mimeType: file\.type/g) || []).length, 1,
+    '兩個上傳角色應共用同一個受控 MIME 欄位');
 });
 
 // ── 防衝突判斷：實際執行 reportVersionDecide_ 驗證每條規則 ──
@@ -719,8 +720,19 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
   }
   for (const name of ['report_award_pair_upload_store', 'report_award_pair_upload_personal', 'report_award_pair_create_job', 'report_award_pair_job_status', 'report_award_pair_clear']) {
     assert.match(code, new RegExp(`function ${name}\\(payload\\)`));
-    assert.match(htmlPage, new RegExp(`call\\('${name}'`));
+    assert.match(htmlPage, new RegExp(name));
   }
+  for (const id of ['awardStoreUploadBtn', 'awardPersonUploadBtn', 'awardStoreUploadState', 'awardPersonUploadState', 'storeFileId', 'personalFileId']) {
+    assert.match(htmlPage, new RegExp(id), `前端缺少 ${id}`);
+  }
+  assert.match(htmlPage, /awardPreviewBtn.*disabled/);
+  assert.match(htmlPage, /awardUploadState\.store === 'completed'/);
+  assert.match(htmlPage, /awardUploadState\.person === 'completed'/);
+  assert.match(htmlPage, /storeFileId.*personalFileId/);
+  assert.match(htmlPage, /storeFileId = ''; awardUploadSessionId = ''; personalFileId = ''/);
+  assert.match(htmlPage, /if \(isStore\) \{ storeFileId = ''; awardUploadSessionId = ''; \} else personalFileId = ''/);
+  assert.match(htmlPage, /setAwardUploadState\(role, 'uploading'/);
+  assert.match(htmlPage, /setAwardUploadState\(role, 'failed'/);
   assert.doesNotMatch(code, /report_award_pair_commit|report_award_pair_publish/);
   assert.doesNotMatch(htmlPage, /report_award_pair_preview/);
   assert.match(htmlPage, /window\.setTimeout\(pollAwardJob, 2000\)/);
