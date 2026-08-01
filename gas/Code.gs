@@ -3034,34 +3034,73 @@ function reportAwardPairZipFiles_(bytes) {
   return files;
 }
 
-// 讀取 XLSX 的 XML，僅取出結構驗證所需的儲存格值；不轉檔、不建立 Google Sheet。
-function reportAwardPairReadXlsx_(bytes) {
-  const files = reportAwardPairZipFiles_(bytes);
-  const byName = {};
-  files.forEach(function(f) { byName[f.getName()] = f.getDataAsString('UTF-8'); });
-  if (!byName['xl/workbook.xml']) throw new Error('不是可讀取的 XLSX（缺少 workbook.xml）');
-  const ns = XmlService.getNamespace('http://schemas.openxmlformats.org/spreadsheetml/2006/main');
-  const workbook = XmlService.parse(byName['xl/workbook.xml']).getRootElement();
-  const sheetsEl = workbook.getChild('sheets', ns);
-  const sheetEls = sheetsEl ? sheetsEl.getChildren('sheet', ns) : [];
-  if (!sheetEls.length) throw new Error('XLSX 沒有工作表');
-  const sheetNames = sheetEls.map(function(s) { return s.getAttribute('name').getValue(); });
-  // 本階段的公司來源檔每份僅一張表。若日後多表，仍只讀第一張來驗證名稱與結構。
-  const sheetXmlName = 'xl/worksheets/sheet1.xml';
-  if (!byName[sheetXmlName]) throw new Error('XLSX 缺少第一張工作表內容');
-  const root = XmlService.parse(byName[sheetXmlName]).getRootElement();
-  const dataEl = root.getChild('sheetData', ns);
+// XML 工作表可能含大量樣式、共用字串或其他非預覽資料。預覽不需要建立完整
+// XmlService DOM，只需讀取日期／標題與角色判斷的欄位；這可避免單一輪詢逾時。
+function reportAwardPairXmlText_(text) {
+  return String(text || '').replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+}
+
+function reportAwardPairXmlAttribute_(tag, name) {
+  const match = String(tag || '').match(new RegExp('\\b' + name + '="([^"]*)"'));
+  return match ? reportAwardPairXmlText_(match[1]) : '';
+}
+
+function reportAwardPairXmlCellText_(cellXml) {
+  const inline = String(cellXml || '').match(/<is(?:\s[^>]*)?>([\s\S]*?)<\/is>/);
+  if (inline) return reportAwardPairXmlText_(inline[1]);
+  const value = String(cellXml || '').match(/<v(?:\s[^>]*)?>([\s\S]*?)<\/v>/);
+  return value ? reportAwardPairXmlText_(value[1]) : '';
+}
+
+function reportAwardPairXmlRows_(sheetXml, requiredColumns) {
   const rows = [];
-  (dataEl ? dataEl.getChildren('row', ns) : []).forEach(function(rowEl) {
-    const rowNo = Number(rowEl.getAttribute('r').getValue());
+  const wanted = requiredColumns || {};
+  const rowMatcher = /<row\b([^>]*)>([\s\S]*?)<\/row>/g;
+  let rowMatch;
+  while ((rowMatch = rowMatcher.exec(String(sheetXml || ''))) !== null) {
+    const rowNo = Number(reportAwardPairXmlAttribute_(rowMatch[1], 'r') || 0);
     const cells = {};
-    rowEl.getChildren('c', ns).forEach(function(cell) {
-      const ref = String(cell.getAttribute('r').getValue());
-      cells[ref.replace(/\d+/g, '')] = reportAwardPairCellText_(cell);
-    });
-    rows.push({ row: rowNo, cells: cells });
+    const includeAll = rowNo > 0 && rowNo <= 18;
+    const cellMatcher = /<c\b([^>]*)>([\s\S]*?)<\/c>/g;
+    let cellMatch;
+    while ((cellMatch = cellMatcher.exec(rowMatch[2])) !== null) {
+      const ref = reportAwardPairXmlAttribute_(cellMatch[1], 'r');
+      const column = ref.replace(/\d+/g, '');
+      if (includeAll || wanted[column]) cells[column] = reportAwardPairXmlCellText_(cellMatch[2]);
+    }
+    // 標題／日期列，以及有預覽所需欄位的資料列才保存，避免把整份工作簿留在記憶體。
+    if (includeAll || Object.keys(cells).length) rows.push({ row: rowNo, cells: cells });
+  }
+  return rows;
+}
+
+// 讀取 XLSX 的必要 XML；不轉檔、不建立 Google Sheet，也不把 ZIP 內每一個檔案轉成字串。
+function reportAwardPairReadXlsx_(bytes, expected) {
+  const files = reportAwardPairZipFiles_(bytes);
+  let workbookBlob = null;
+  let sheetBlob = null;
+  files.forEach(function(file) {
+    if (file.getName() === 'xl/workbook.xml') workbookBlob = file;
+    // 本階段的公司來源檔每份僅一張表；仍只讀第一張來驗證名稱與結構。
+    if (file.getName() === 'xl/worksheets/sheet1.xml') sheetBlob = file;
   });
-  return { sheetNames: sheetNames, rows: rows };
+  if (!workbookBlob) throw new Error('不是可讀取的 XLSX（缺少 workbook.xml）');
+  if (!sheetBlob) throw new Error('XLSX 缺少第一張工作表內容');
+  const workbookXml = workbookBlob.getDataAsString('UTF-8');
+  const sheetXml = sheetBlob.getDataAsString('UTF-8');
+  const sheetNames = [];
+  const sheetMatcher = /<sheet\b([^>]*)\/?>(?:<\/sheet>)?/g;
+  let sheetMatch;
+  while ((sheetMatch = sheetMatcher.exec(workbookXml)) !== null) {
+    const name = reportAwardPairXmlAttribute_(sheetMatch[1], 'name');
+    if (name) sheetNames.push(name);
+  }
+  if (!sheetNames.length) throw new Error('XLSX 沒有工作表');
+  const columns = expected === REPORT_AWARD_PAIR_FILES.store ?
+    { F: true, G: true, I: true } : { B: true, C: true, D: true, F: true, G: true };
+  return { sheetNames: sheetNames, rows: reportAwardPairXmlRows_(sheetXml, columns) };
 }
 
 function reportAwardPairRangeDate_(rows) {
@@ -3503,7 +3542,7 @@ function reportAwardPairReadFile_(fileId, expected, expectedHash) {
   const bytes = file.getBlob().getBytes();
   // 再次確認 Drive 暫存內容與上傳時的雜湊相符，再進行完整 XLSX ZIP 結構驗證。
   if (expectedHash && reportAwardPairHash_(bytes) !== expectedHash) throw new Error(expected.label + ' 暫存檔雜湊不一致，已拒絕解析');
-  const xlsx = reportAwardPairReadXlsx_(bytes);
+  const xlsx = reportAwardPairReadXlsx_(bytes, expected);
   return expected === REPORT_AWARD_PAIR_FILES.store ? reportAwardPairAnalyzeStore_(xlsx) : reportAwardPairAnalyzePerson_(xlsx);
 }
 

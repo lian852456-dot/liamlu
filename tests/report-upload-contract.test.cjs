@@ -410,6 +410,18 @@ test('台獎雙檔 MIME 正規化後仍必須通過 XLSX ZIP 安全結構檢查'
     '兩個上傳角色應共用同一個受控 MIME 欄位');
 });
 
+test('台獎輪詢解析只讀必要 XML 與必要欄位，避免完整工作簿 DOM 造成 Web App 逾時', () => {
+  const reader = functionBody(code, 'reportAwardPairReadXlsx_');
+  const rowsReader = functionBody(code, 'reportAwardPairXmlRows_');
+  assert.match(reader, /workbookBlob\.getDataAsString\('UTF-8'\)/);
+  assert.match(reader, /sheetBlob\.getDataAsString\('UTF-8'\)/);
+  assert.doesNotMatch(reader, /byName\[/);
+  assert.doesNotMatch(reader, /XmlService\.parse/);
+  assert.match(rowsReader, /rowNo > 0 && rowNo <= 18/);
+  assert.match(rowsReader, /wanted\[column\]/);
+  assert.match(functionBody(code, 'reportAwardPairReadFile_'), /reportAwardPairReadXlsx_\(bytes, expected\)/);
+});
+
 // ── 防衝突判斷：實際執行 reportVersionDecide_ 驗證每條規則 ──
 function loadDecider() {
   const src = `
