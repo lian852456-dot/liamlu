@@ -2445,6 +2445,7 @@ function kpicalcToKpiBattleView(data, fetchedAt) {
 let _kpiBattleView = 'stores';
 let _privateDashboardProfile = null;
 let _privateDashboardAdminSecret = '';
+let _awardsBattleUnavailableReason = '';
 
 function privateDashboardDeviceId() {
   const key = 'north12b_private_dashboard_device_id';
@@ -2487,6 +2488,7 @@ async function privateDashboardPost(payload) {
 
 function privateDashboardLockMarkup(kind) {
   const title = kind === 'awards' ? '台獎戰情受保護' : 'KPI 戰情受保護';
+  const uploadEntry = kind === 'kpi' ? `<a class="secondary" href="https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec" target="_blank" rel="noopener">戰報快速更新</a>` : '';
   return `<div class="card private-lock">
     <h3>🔐 ${title}</h3>
     <p>僅限北一二B在職同仁使用。姓名維持遮罩，KPI、排名與獎金不會出現在公開 GitHub 頁面。</p>
@@ -2499,6 +2501,7 @@ function privateDashboardLockMarkup(kind) {
       <button class="secondary" onclick="privateDashboardRequestBinding()">首次申請綁定</button>
       <button class="secondary" onclick="privateDashboardCheckRequest()">查看核准結果</button>
       <button class="secondary" onclick="privateDashboardOpenAdmin()">管理者核准</button>
+      ${uploadEntry}
     </div>
     <div class="private-lock-status">首次使用：輸入員編＋啟用碼提出申請；管理者核准後，該員編只綁定這一台手機或電腦。往後僅輸入員編登入。</div>
     <div class="private-admin" id="privateAdminPanel" style="display:none;"></div>
@@ -2531,19 +2534,30 @@ async function privateDashboardLogin() {
   try {
     const result = await privateDashboardPost({ action: 'private_access', employeeId, deviceId: privateDashboardDeviceId() });
     sessionStorage.setItem('north12b_private_dashboard_employee_id', employeeId);
-    // 方案 A（2026-07-31 Liam 拍板）：KPI 戰情頁籤不再讀 dashboard snapshot 的 kpiBattle，
-    // 改讀與 kpi.html 完全同一份受保護 kpicalc JSON——KPI 唯一正式資料來源。
-    // snapshot 僅供台獎頁籤與舊版回復使用。
-    _awardsBattleData = result.snapshot.awardsBattle;
     _privateDashboardProfile = result.profile || null;
-    renderAwardsBattle();
     try {
       const kpiResult = await privateDashboardPost({ action: 'kpicalc_access', employeeId, deviceId: privateDashboardDeviceId() });
       _kpiBattleData = kpicalcToKpiBattleView(kpiResult.data, new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }));
       renderKpiBattle();
+      const awards = result.snapshot && result.snapshot.awardsBattle;
+      const awardsDate = String((awards || {}).report_date || '');
+      if (awards && awardsDate === _kpiBattleData.report_date) {
+        _awardsBattleData = awards;
+        _awardsBattleUnavailableReason = '';
+        renderAwardsBattle();
+      } else {
+        _awardsBattleData = null;
+        _awardsBattleUnavailableReason = awardsDate
+          ? `台獎資料日期 ${awardsDate} 與 KPI 資料日期 ${_kpiBattleData.report_date || '—'} 不一致`
+          : '尚未取得與目前 KPI 同日期的台獎資料';
+        renderAwardsBattleUnavailable();
+      }
     } catch (kpiError) {
       const note = document.getElementById('kpiBattleSourceNote');
-      if (note) note.textContent = `KPI 資料載入失敗：${kpiError.message}（台獎頁籤不受影響）`;
+      if (note) note.textContent = `KPI 資料載入失敗：${kpiError.message}`;
+      _awardsBattleData = null;
+      _awardsBattleUnavailableReason = 'KPI 正式資料尚未讀回，因此不顯示可能過期的台獎資料';
+      renderAwardsBattleUnavailable();
     }
   } catch (error) {
     privateDashboardSetStatus(error.message, true);
@@ -2701,7 +2715,7 @@ function renderKpiBattle() {
   if (!_kpiBattleData) return;
   const note = document.getElementById('kpiBattleSourceNote');
   if (note) {
-    note.textContent = `KPI 唯一正式來源：與 kpi.html 同一份受保護 kpicalc 資料｜資料日期 ${_kpiBattleData.report_date || '—'}｜區間 ${_kpiBattleData.source_date_range || '—'}｜來源檔 ${_kpiBattleData.source_file || '—'}｜更新時間 尚未同步（讀取於 ${_kpiBattleData.fetchedAt || '—'}）｜明細：實績／月目標／尚差或超前｜公司排名・昨日變化・加掛分尚未同步｜個資僅供受保護預覽`;
+    note.textContent = `KPI 唯一正式來源：與 kpi.html 同一份受保護 kpicalc 正式 JSON｜資料日期 ${_kpiBattleData.report_date || '—'}｜區間 ${_kpiBattleData.source_date_range || '—'}｜來源檔 ${_kpiBattleData.source_file || '—'}｜更新時間 尚未同步（讀取於 ${_kpiBattleData.fetchedAt || '—'}）｜發布狀態：正式 JSON 已發布｜明細：實績／月目標／尚差或超前｜公司排名・昨日變化・加掛分尚未同步｜個資僅供受保護預覽`;
   }
   const content = document.getElementById('kpiBattleContent');
   if (!content) return;
@@ -2803,6 +2817,7 @@ function renderAwardUnit(row, district = false) {
 
 async function loadAwardsBattle() {
   if (_awardsBattleData) { renderAwardsBattle(); return; }
+  if (_awardsBattleUnavailableReason) { renderAwardsBattleUnavailable(); return; }
   if (window.__AWARDS_BATTLE_DATA__) {
     _awardsBattleData = window.__AWARDS_BATTLE_DATA__;
     renderAwardsBattle();
@@ -2839,6 +2854,14 @@ function renderAwardsBattle() {
     <div class="section-divider">門市 10 台機款篩選</div>
     <div class="card"><div class="award-store-selector"><label>選擇門市<select id="awardsStoreSelect" onchange="renderAwardsBattle()">${stores.map(row => `<option value="${row.store}" ${row.store === selectedStore?.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label><span class="kpi-battle-note">差異數＝實際數－50%目標台數（無條件進位）</span></div><div class="award-model-grid">${(selectedStore?.items || []).map(renderAwardModel).join('')}</div></div>`;
 
+}
+
+function renderAwardsBattleUnavailable() {
+  const note = document.getElementById('awardsBattleSourceNote');
+  if (note) note.textContent = '台獎尚未同步：不使用舊 dashboard snapshot 的數字。';
+  const content = document.getElementById('awardsBattleContent');
+  if (!content) return;
+  content.innerHTML = `<div class="card private-lock"><h3>台獎尚未同步</h3><p>${_awardsBattleUnavailableReason || '尚未取得與目前 KPI 同日期的台獎資料。'}</p><p class="kpi-battle-note">KPI 已使用最新正式 JSON；台獎會在同日期正式資料完成後另行顯示。</p></div>`;
 }
 
 // ════════════════════════════════════

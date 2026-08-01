@@ -27,8 +27,8 @@ test('登入後 KPI 頁籤改打 kpicalc_access，不再吃 snapshot.kpiBattle',
   assert.match(login, /kpicalcToKpiBattleView\(/);
   assert.doesNotMatch(login, /_kpiBattleData = result\.snapshot\.kpiBattle/,
     'KPI 頁籤不得再讀 dashboard snapshot');
-  // 台獎照舊吃 snapshot（snapshot 保留給台獎與舊版回復）
-  assert.match(login, /_awardsBattleData = result\.snapshot\.awardsBattle/);
+  // 台獎 snapshot 僅可在與 KPI 同日期時使用。
+  assert.match(login, /const awards = result\.snapshot && result\.snapshot\.awardsBattle/);
 });
 
 test('KPI 頁籤的 snapshot 形狀本機回退已移除，台獎回退保留', () => {
@@ -36,18 +36,19 @@ test('KPI 頁籤的 snapshot 形狀本機回退已移除，台獎回退保留', 
   assert.match(functionBody(html, 'loadAwardsBattle'), /__AWARDS_BATTLE_DATA__/);
 });
 
-test('kpicalc 載入失敗只影響 KPI 頁籤，台獎先渲染', () => {
+test('台獎只在與 KPI 同日期時才渲染，避免舊 snapshot 混入', () => {
   const login = functionBody(html, 'privateDashboardLogin');
-  const awardsAt = login.indexOf('renderAwardsBattle()');
   const kpiFetchAt = login.indexOf("action: 'kpicalc_access'");
-  assert.ok(awardsAt !== -1 && kpiFetchAt !== -1 && awardsAt < kpiFetchAt,
-    '台獎必須先渲染，kpicalc 失敗才不會拖垮它');
-  assert.match(login, /台獎頁籤不受影響/);
+  const awardsAt = login.indexOf('renderAwardsBattle()');
+  assert.ok(awardsAt !== -1 && kpiFetchAt !== -1 && awardsAt > kpiFetchAt,
+    '須先取得 KPI 資料日期，才可判斷台獎 snapshot 是否同日');
+  assert.match(login, /awardsDate === _kpiBattleData\.report_date/);
+  assert.match(login, /renderAwardsBattleUnavailable\(\)/);
 });
 
-test('來源說明列同時標明 資料日期／來源檔／更新時間尚未同步／與 kpi.html 同一份', () => {
+test('來源說明列同時標明 資料日期／來源檔／更新時間尚未同步／發布狀態／與 kpi.html 同一份', () => {
   const render = functionBody(html, 'renderKpiBattle');
-  for (const label of ['kpi.html 同一份', '資料日期', '來源檔', '更新時間 尚未同步', '讀取於']) {
+  for (const label of ['kpi.html 同一份', '資料日期', '來源檔', '更新時間 尚未同步', '發布狀態：正式 JSON 已發布', '讀取於']) {
     assert.ok(render.includes(label), `來源說明列缺少：${label}`);
   }
 });
@@ -65,8 +66,19 @@ test('缺少欄位以尚未同步呈現：排名／加掛／整體KPI／個人�
   assert.match(personal, /row\.insurance_attach_rate == null \? kpiPendingCell\(\)/);
 });
 
-test('index.html 不引用上傳部署端點（kpicalc_access 走既有第 15 版主部署）', () => {
+test('上鎖 KPI 區只放靜態上傳入口，不會對上傳 Deployment 發送請求', () => {
+  const lock = functionBody(html, 'privateDashboardLockMarkup');
+  assert.match(lock, /戰報快速更新/);
+  assert.match(lock, /target="_blank"/);
+  assert.match(lock, /rel="noopener"/);
+  assert.doesNotMatch(lock, /fetch\(/);
   assert.doesNotMatch(html, /UPLOAD_GAS_URL/);
+});
+
+test('台獎不同日期時明示尚未同步，不顯示舊 snapshot 數字', () => {
+  const unavailable = functionBody(html, 'renderAwardsBattleUnavailable');
+  assert.match(unavailable, /台獎尚未同步/);
+  assert.match(unavailable, /不使用舊 dashboard snapshot 的數字/);
 });
 
 // ── 轉接層行為：實際執行，驗證「不發明數字」──────────────────
