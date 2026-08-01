@@ -3231,25 +3231,69 @@ function reportAwardPairTempFile_(fileId, role) {
 
 // 解析入口的唯一檔案契約：只讀 camelCase 的 storeFileId／personalFileId。
 // 不回傳原始 Excel、授權資料或任何 Script Property。
-function reportAwardPairInputDiagnostics_(payload) {
+function reportAwardPairKnownHash_(fileId, role) {
+  const idKey = role + '_file_id';
+  const hashKey = role + '_hash';
+  const row = reportAwardPairRows_().filter(function(item) {
+    return item.record_type === 'session' && item.status === 'active' && item[idKey] === fileId && item[hashKey];
+  })[0];
+  return row ? String(row[hashKey] || '') : '';
+}
+
+// 只有同一份 active session 的雜湊、資料夾、角色與 TTL 都通過時，才允許復原誤清除的暫存檔。
+function reportAwardPairRestoreTrashedTempFile_(fileId, role, expectedHash) {
+  const id = String(fileId || '').trim();
+  if (!id || !expectedHash) return null;
+  const file = DriveApp.getFileById(id);
+  if (!file.isTrashed()) return file;
+  const expectedFolderId = privateDashboardFolder().getId();
+  const parents = file.getParents(); let belongs = false;
+  while (parents.hasNext()) if (parents.next().getId() === expectedFolderId) { belongs = true; break; }
+  if (!belongs || file.getName().indexOf(REPORT_AWARD_PAIR_TEMP_PREFIX) !== 0 || file.getName().indexOf('-' + role + '-') === -1) return null;
+  if (file.getLastUpdated().getTime() < Date.now() - REPORT_AWARD_PAIR_STAGE_TTL_SECONDS * 1000) return null;
+  if (file.getSize() > REPORT_AWARD_PAIR_MAX_BYTES || reportAwardPairHash_(file.getBlob().getBytes()) !== expectedHash) return null;
+  file.setTrashed(false);
+  try {
+    const restored = reportAwardPairTempFile_(id, role);
+    console.log('award temp restored role=' + role + ' fileId=' + id);
+    return restored;
+  } catch (e) {
+    file.setTrashed(true);
+    throw e;
+  }
+}
+
+function reportAwardPairInputDiagnostics_(payload, options) {
   const input = payload || {};
+  const opts = options || {};
   const diagnostic = {
     storeFileIdReceived: !!String(input.storeFileId || '').trim(),
     personalFileIdReceived: !!String(input.personalFileId || '').trim(),
     storeFileExists: false, personalFileExists: false,
     storeFileAllowed: false, personalFileAllowed: false,
     storeFileNotExpired: false, personalFileNotExpired: false,
+    storeFileRestored: false, personalFileRestored: false,
     storeError: '', personalError: ''
   };
   function inspect(id, role, prefix) {
     const fileId = String(id || '').trim();
     if (!fileId) return null;
+    let file;
     try {
-      DriveApp.getFileById(fileId);
+      file = DriveApp.getFileById(fileId);
       diagnostic[prefix + 'FileExists'] = true;
     } catch (e) {
       diagnostic[prefix + 'Error'] = role + ' File ID 不存在或無法讀取';
       return null;
+    }
+    if (file.isTrashed() && opts.restoreTrashed) {
+      try {
+        file = reportAwardPairRestoreTrashedTempFile_(fileId, role, reportAwardPairKnownHash_(fileId, role));
+        if (file) diagnostic[prefix + 'FileRestored'] = true;
+      } catch (e) {
+        diagnostic[prefix + 'Error'] = e && e.message ? e.message : String(e);
+        return null;
+      }
     }
     try {
       const file = reportAwardPairTempFile_(fileId, role);
@@ -3277,6 +3321,8 @@ function reportAwardPairPublicDiagnostics_(diagnostic) {
     personalFileAllowed: diagnostic.personalFileAllowed,
     storeFileNotExpired: diagnostic.storeFileNotExpired,
     personalFileNotExpired: diagnostic.personalFileNotExpired,
+    storeFileRestored: diagnostic.storeFileRestored,
+    personalFileRestored: diagnostic.personalFileRestored,
     storeError: diagnostic.storeError || '',
     personalError: diagnostic.personalError || ''
   };
@@ -3335,28 +3381,52 @@ function reportAwardPairUpload(payload, role) {
   const nameKey = role + '_file_name';
   const sizeKey = role + '_size';
   if (session[idKey] && session[hashKey] === fileIn.hash) {
-    const reused = { ok: true, uploadSessionId: sessionId, fileId: session[idKey], fileName: session[nameKey],
-      size: Number(session[sizeKey] || 0), hash: fileIn.hash, reused: true, message: expected.label + ' 已使用同一暫存檔。' };
-    reused[role === 'store' ? 'storeFileId' : 'personalFileId'] = session[idKey];
-    console.log('award upload success role=' + role + ' response=' + JSON.stringify(reused));
-    return reused;
+    const reusable = reportAwardPairReusableTempFile_(session[idKey], role, fileIn.hash);
+    if (reusable) {
+      const reused = { ok: true, uploadSessionId: sessionId, fileId: reusable.getId(), fileName: session[nameKey],
+        size: Number(session[sizeKey] || 0), hash: fileIn.hash, reused: true, message: expected.label + ' 已使用同一暫存檔。' };
+      reused[role === 'store' ? 'storeFileId' : 'personalFileId'] = reusable.getId();
+      console.log('award upload success role=' + role + ' response=' + JSON.stringify(reused));
+      return reused;
+    }
+    session[idKey] = ''; session[hashKey] = ''; session[nameKey] = ''; session[sizeKey] = '';
   }
-  if (session[idKey] && session[hashKey] !== fileIn.hash) reportUploadTrash_(DriveApp.getFileById(session[idKey]));
+  if (session[idKey] && session[hashKey] !== fileIn.hash) {
+    try { reportUploadTrash_(DriveApp.getFileById(session[idKey])); } catch (e) { console.log('award prior temp unavailable role=' + role); }
+  }
   const folder = privateDashboardFolder();
-  const existing = reportAwardPairRows_().filter(function(row) {
+  const candidates = reportAwardPairRows_().filter(function(row) {
     return row.record_type === 'session' && row[hashKey] === fileIn.hash && row[idKey] && row.status === 'active';
-  })[0];
-  const raw = existing ? DriveApp.getFileById(existing[idKey]) : folder.createFile(Utilities.newBlob(fileIn.bytes,
+  });
+  let reusableExisting = null;
+  for (let i = 0; i < candidates.length && !reusableExisting; i++) {
+    reusableExisting = reportAwardPairReusableTempFile_(candidates[i][idKey], role, fileIn.hash);
+  }
+  const raw = reusableExisting || folder.createFile(Utilities.newBlob(fileIn.bytes,
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       REPORT_AWARD_PAIR_TEMP_PREFIX + fileIn.hash + '-' + role + '-' + fileIn.fileName));
   session[idKey] = raw.getId(); session[hashKey] = fileIn.hash; session[nameKey] = fileIn.fileName;
   session[sizeKey] = String(fileIn.bytes.length); session.stage = 'uploaded-' + role; session.status = 'active';
   reportAwardPairLog_(session, session.stage, 'active', session.started_at);
   const response = { ok: true, uploadSessionId: sessionId, fileId: raw.getId(), fileName: fileIn.fileName,
-    size: fileIn.bytes.length, hash: fileIn.hash, reused: !!existing, message: expected.label + ' 已安全暫存，等待建立預覽任務。' };
+    size: fileIn.bytes.length, hash: fileIn.hash, reused: !!reusableExisting, message: expected.label + ' 已安全暫存，等待建立預覽任務。' };
   response[role === 'store' ? 'storeFileId' : 'personalFileId'] = raw.getId();
   console.log('award upload success role=' + role + ' response=' + JSON.stringify(response));
   return response;
+}
+
+function reportAwardPairReusableTempFile_(fileId, role, expectedHash) {
+  try {
+    let file = DriveApp.getFileById(String(fileId || '').trim());
+    if (file.isTrashed()) file = reportAwardPairRestoreTrashedTempFile_(fileId, role, expectedHash);
+    if (!file) return null;
+    const valid = reportAwardPairTempFile_(file.getId(), role);
+    if (expectedHash && reportAwardPairHash_(valid.getBlob().getBytes()) !== expectedHash) return null;
+    return valid;
+  } catch (e) {
+    console.log('award temp not reusable role=' + role + ' fileId=' + String(fileId || '') + ' error=' + (e && e.message ? e.message : String(e)));
+    return null;
+  }
 }
 
 function reportAwardPairCreateJob(payload) {
@@ -3364,7 +3434,7 @@ function reportAwardPairCreateJob(payload) {
   const input = payload || {};
   const requestedStoreId = String(input.storeFileId || '').trim();
   const requestedPersonalId = String(input.personalFileId || '').trim();
-  const diagnostic = reportAwardPairInputDiagnostics_({ storeFileId: requestedStoreId, personalFileId: requestedPersonalId });
+  const diagnostic = reportAwardPairInputDiagnostics_({ storeFileId: requestedStoreId, personalFileId: requestedPersonalId }, { restoreTrashed: true });
   const publicDiagnostic = reportAwardPairPublicDiagnostics_(diagnostic);
   if (!diagnostic.ready) {
     return { ok: false, message: '台獎暫存檔驗證未通過，尚未建立預覽任務。', diagnostics: publicDiagnostic,

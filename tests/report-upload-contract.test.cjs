@@ -749,7 +749,7 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
   assert.match(htmlPage, /personalUploaded: !!previewPayload\.personalFileId/);
   assert.match(htmlPage, /renderAwardServerDiagnostic\(job\.diagnostics \|\| null\)/);
   assert.match(htmlPage, /payload\(previewPayload\)/);
-  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairInputDiagnostics_\(\{ storeFileId: requestedStoreId, personalFileId: requestedPersonalId \}\)/);
+  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairInputDiagnostics_\(\{ storeFileId: requestedStoreId, personalFileId: requestedPersonalId \}, \{ restoreTrashed: true \}\)/);
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /input\.storeFileId/);
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /input\.personalFileId/);
   assert.match(functionBody(code, 'reportAwardPairTempFile_'), /getParents\(\)/);
@@ -758,6 +758,7 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
   assert.match(functionBody(code, 'reportAwardPairRecoverLatest'), /reportAwardPairTempFile_\(session\.personal_file_id, 'person'\)/);
   assert.doesNotMatch(functionBody(code, 'reportAwardPairCreateJob'), /input\.uploadSessionId/);
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairInputDiagnostics_/);
+  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /restoreTrashed: true/);
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /storeFileIdReceived: publicDiagnostic\.storeFileIdReceived/);
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /personalFileExists: publicDiagnostic\.personalFileExists/);
   assert.match(functionBody(code, 'reportAwardPairDirectProbe_'), /reportAwardPairReadFile_/);
@@ -775,6 +776,9 @@ test('台獎雙檔分段 job 會記錄階段、雜湊與安全到期清理，不
   const status = functionBody(code, 'reportAwardPairJobStatus');
   const cleanup = functionBody(code, 'reportAwardPairDailyCleanup');
   assert.match(upload, /reportAwardPairDecode_\(.*true\)/);
+  assert.match(upload, /reportAwardPairReusableTempFile_/);
+  assert.match(functionBody(code, 'reportAwardPairRestoreTrashedTempFile_'), /file\.setTrashed\(false\)/);
+  assert.match(functionBody(code, 'reportAwardPairRestoreTrashedTempFile_'), /reportAwardPairHash_\(file\.getBlob\(\)\.getBytes\(\)\) !== expectedHash/);
   assert.match(functionBody(code, 'reportAwardPairDecode_'), /reportAwardPairHash_/);
   assert.match(status, /validating-store/);
   assert.match(status, /validating-personal/);
