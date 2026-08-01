@@ -729,6 +729,8 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
   assert.match(htmlPage, /id="deploymentVersion"/);
   assert.match(htmlPage, /id="buildCommit"/);
   assert.match(htmlPage, /id="buildTime"/);
+  assert.match(code, /deploymentVersion: '34'/);
+  assert.match(code, /buildCommit: '9d31789d09a92d06ecd3dde34754f1ed1f9f339e'/);
   assert.match(htmlPage, /award preview guard state/);
   assert.match(htmlPage, /awardUploadState\.storeStatus === 'completed'/);
   assert.match(htmlPage, /awardUploadState\.personalStatus === 'completed'/);
@@ -743,6 +745,9 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
   assert.match(htmlPage, /call\('report_award_pair_recover_latest'/);
   assert.match(htmlPage, /const previewPayload = \{\s*storeFileId: awardUploadState\.storeFileId,\s*personalFileId: awardUploadState\.personalFileId/);
   assert.match(htmlPage, /renderAwardPayloadDiagnostic\(previewPayload\)/);
+  assert.match(htmlPage, /storeUploaded: !!previewPayload\.storeFileId/);
+  assert.match(htmlPage, /personalUploaded: !!previewPayload\.personalFileId/);
+  assert.match(htmlPage, /renderAwardServerDiagnostic\(job\.diagnostics \|\| null\)/);
   assert.match(htmlPage, /payload\(previewPayload\)/);
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairInputDiagnostics_\(\{ storeFileId: requestedStoreId, personalFileId: requestedPersonalId \}\)/);
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /input\.storeFileId/);
@@ -753,6 +758,8 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
   assert.match(functionBody(code, 'reportAwardPairRecoverLatest'), /reportAwardPairTempFile_\(session\.personal_file_id, 'person'\)/);
   assert.doesNotMatch(functionBody(code, 'reportAwardPairCreateJob'), /input\.uploadSessionId/);
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairInputDiagnostics_/);
+  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /storeFileIdReceived: publicDiagnostic\.storeFileIdReceived/);
+  assert.match(functionBody(code, 'reportAwardPairCreateJob'), /personalFileExists: publicDiagnostic\.personalFileExists/);
   assert.match(functionBody(code, 'reportAwardPairDirectProbe_'), /reportAwardPairReadFile_/);
   assert.doesNotMatch(code, /report_award_pair_commit|report_award_pair_publish/);
   assert.doesNotMatch(htmlPage, /report_award_pair_preview/);

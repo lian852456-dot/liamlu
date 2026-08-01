@@ -2257,37 +2257,14 @@ const REPORT_UPLOAD_ALLOWED_ACTIONS = [
 // 上傳頁與上傳 API 同屬新 Deployment，使用 google.script.run 直接呼叫這四個包裝函式。
 // 不從 GitHub Pages fetch，不需要 CORS／preflight，也不把任何設定值注入 HTML。
 // Build 資訊僅含版本／commit／時間，方便確認瀏覽器沒有沿用舊版頁面；不含任何授權資料。
-const REPORT_UPLOAD_BUILD_PROPERTIES = {
-  deploymentVersion: 'REPORT_UPLOAD_BUILD_DEPLOYMENT_VERSION',
-  buildCommit: 'REPORT_UPLOAD_BUILD_COMMIT',
-  buildTime: 'REPORT_UPLOAD_BUILD_TIME'
+// buildCommit 指向本次 File ID 契約修正 commit；不以 Script Properties 保存或注入設定值。
+const REPORT_UPLOAD_BUILD_INFO = {
+  deploymentVersion: '34',
+  buildCommit: '9d31789d09a92d06ecd3dde34754f1ed1f9f339e',
+  buildTime: '2026-08-02T01:29:50+08:00'
 };
 
-function reportUploadBuildInfo_() {
-  const props = PropertiesService.getScriptProperties();
-  return {
-    deploymentVersion: String(props.getProperty(REPORT_UPLOAD_BUILD_PROPERTIES.deploymentVersion) || '未標記'),
-    buildCommit: String(props.getProperty(REPORT_UPLOAD_BUILD_PROPERTIES.buildCommit) || '未標記'),
-    buildTime: String(props.getProperty(REPORT_UPLOAD_BUILD_PROPERTIES.buildTime) || '未標記')
-  };
-}
-
-// 只供 clasp Execution API 於部署時寫入；尾端底線使其不會成為 google.script.run 公開函式。
-function reportUploadSetBuildInfo_(buildCommit, buildTime, deploymentVersion) {
-  const commit = String(buildCommit || '').trim();
-  const time = String(buildTime || '').trim();
-  const version = String(deploymentVersion || '').trim();
-  if (!/^[0-9a-f]{7,64}$/i.test(commit)) throw new Error('buildCommit 格式不正確');
-  if (!/^\d+$/.test(version)) throw new Error('deploymentVersion 格式不正確');
-  if (isNaN(new Date(time).getTime())) throw new Error('buildTime 格式不正確');
-  const props = PropertiesService.getScriptProperties();
-  props.setProperties({
-    REPORT_UPLOAD_BUILD_DEPLOYMENT_VERSION: version,
-    REPORT_UPLOAD_BUILD_COMMIT: commit,
-    REPORT_UPLOAD_BUILD_TIME: time
-  }, false);
-  return reportUploadBuildInfo_();
-}
+function reportUploadBuildInfo_() { return REPORT_UPLOAD_BUILD_INFO; }
 
 function reportUploadHtmlService_() {
   const template = HtmlService.createTemplateFromFile('ReportUpload');
