@@ -174,6 +174,17 @@
       }
       awardPreviewJobId = ''; $('awardClearBtn').disabled = true; updateAwardPreviewButton();
     }
+    async function recoverLatestAwardUpload() {
+      const result = await call('report_award_pair_recover_latest', payload({}));
+      if (!result.ok) return result;
+      console.log('award recovery response', result);
+      awardUploadState.uploadSessionId = result.uploadSessionId || '';
+      awardUploadState.storeFileId = result.storeFileId || '';
+      awardUploadState.personalFileId = result.personalFileId || '';
+      setAwardUploadState('store', 'completed', '已恢復：' + result.storeFileName + '｜大小：' + result.storeSize + ' bytes｜SHA-256：' + result.storeHash + '｜storeFileId：' + result.storeFileId);
+      setAwardUploadState('person', 'completed', '已恢復：' + result.personalFileName + '｜大小：' + result.personalSize + ' bytes｜SHA-256：' + result.personalHash + '｜personalFileId：' + result.personalFileId);
+      return result;
+    }
     async function uploadAwardFile(role) {
       const isStore = role === 'store';
       const file = $(isStore ? 'awardStoreFile' : 'awardPersonFile').files[0];
@@ -214,7 +225,11 @@
       const button = $('loginBtn'); auth.employeeId = $('employeeId').value.trim().toUpperCase(); auth.adminSecret = $('adminSecret').value;
       if (!auth.employeeId || !auth.adminSecret) return message('authMessage', '請輸入員編與管理者密碼。', 'bad');
       setBusy(button, true, '驗證中…'); message('authMessage', '正在讀取目前版本…');
-      try { await refreshLog(); $('authCard').classList.add('hidden'); $('app').classList.remove('hidden'); }
+      try {
+        await refreshLog(); $('authCard').classList.add('hidden'); $('app').classList.remove('hidden');
+        const recovered = await recoverLatestAwardUpload();
+        if (recovered.ok) message('awardMessage', recovered.message + ' 可直接建立預覽任務。', 'ok');
+      }
       catch (error) { message('authMessage', error.message, 'bad'); }
       finally { setBusy(button, false, '登入並讀取目前版本'); }
     });

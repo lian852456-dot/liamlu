@@ -157,7 +157,7 @@ test('稽核紀錄寫在私有名冊試算表的新分頁，未改既有 Sheet �
 
 // ── 五：權限（前端與後端都檢查）─────────────────────────────
 test('所有上傳端點在做任何事之前都先授權', () => {
-  for (const name of ['reportUploadPreview', 'reportUploadCommit', 'reportUploadLog', 'reportUploadRollback', 'reportAwardPairUpload', 'reportAwardPairCreateJob', 'reportAwardPairJobStatus', 'reportAwardPairClear', 'reportAwardPairDailyCleanup']) {
+  for (const name of ['reportUploadPreview', 'reportUploadCommit', 'reportUploadLog', 'reportUploadRollback', 'reportAwardPairUpload', 'reportAwardPairCreateJob', 'reportAwardPairJobStatus', 'reportAwardPairRecoverLatest', 'reportAwardPairClear', 'reportAwardPairDailyCleanup']) {
     const body = functionBody(code, name);
     const authAt = body.indexOf('reportUploadAuthorize_');
     assert.notEqual(authAt, -1, `${name} 未授權`);
@@ -718,7 +718,7 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
     assert.match(code, new RegExp(`function ${name}\\(payload\\)`));
     assert.match(htmlPage, new RegExp(`call\\('${name}'`));
   }
-  for (const name of ['report_award_pair_upload_store', 'report_award_pair_upload_personal', 'report_award_pair_create_job', 'report_award_pair_job_status', 'report_award_pair_clear']) {
+  for (const name of ['report_award_pair_upload_store', 'report_award_pair_upload_personal', 'report_award_pair_create_job', 'report_award_pair_job_status', 'report_award_pair_recover_latest', 'report_award_pair_clear']) {
     assert.match(code, new RegExp(`function ${name}\\(payload\\)`));
     assert.match(htmlPage, new RegExp(name));
   }
@@ -735,6 +735,8 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
   assert.match(htmlPage, /setAwardUploadState\(role, 'failed'/);
   assert.match(htmlPage, /console\.log\('award upload success response', result\)/);
   assert.match(htmlPage, /console\.log\('award preview create request File IDs'/);
+  assert.match(htmlPage, /recoverLatestAwardUpload/);
+  assert.match(htmlPage, /call\('report_award_pair_recover_latest'/);
   assert.match(htmlPage, /storeFileId: storeId, personalFileId: personalId/);
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairTempFile_\(session\.store_file_id, 'store'\)/);
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /reportAwardPairTempFile_\(session\.personal_file_id, 'person'\)/);
@@ -742,6 +744,8 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
   assert.match(functionBody(code, 'reportAwardPairCreateJob'), /input\.personalFileId/);
   assert.match(functionBody(code, 'reportAwardPairTempFile_'), /getParents\(\)/);
   assert.match(functionBody(code, 'reportAwardPairTempFile_'), /getLastUpdated\(\)\.getTime\(\)/);
+  assert.match(functionBody(code, 'reportAwardPairRecoverLatest'), /reportAwardPairTempFile_\(session\.store_file_id, 'store'\)/);
+  assert.match(functionBody(code, 'reportAwardPairRecoverLatest'), /reportAwardPairTempFile_\(session\.personal_file_id, 'person'\)/);
   assert.doesNotMatch(code, /report_award_pair_commit|report_award_pair_publish/);
   assert.doesNotMatch(htmlPage, /report_award_pair_preview/);
   assert.match(htmlPage, /window\.setTimeout\(pollAwardJob, 2000\)/);

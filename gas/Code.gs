@@ -2270,6 +2270,7 @@ function report_award_pair_upload_store(payload) { return reportAwardPairUpload(
 function report_award_pair_upload_personal(payload) { return reportAwardPairUpload(payload, 'person'); }
 function report_award_pair_create_job(payload) { return reportAwardPairCreateJob(payload); }
 function report_award_pair_job_status(payload) { return reportAwardPairJobStatus(payload); }
+function report_award_pair_recover_latest(payload) { return reportAwardPairRecoverLatest(payload); }
 function report_award_pair_clear(payload) { return reportAwardPairClear(payload); }
 function report_award_pair_daily_cleanup(payload) { return reportAwardPairDailyCleanup(payload); }
 
@@ -3305,6 +3306,27 @@ function reportAwardPairCreateJob(payload) {
   reportAwardPairLog_(job, 'queued', 'queued', now);
   return { ok: true, previewJobId: job.job_id, stage: 'queued', status: 'queued', reused: false,
     storeFileId: session.store_file_id, personalFileId: session.personal_file_id };
+}
+
+function reportAwardPairRecoverLatest(payload) {
+  reportUploadAuthorize_(payload);
+  const sessions = reportAwardPairRows_().filter(function(row) {
+    return row.record_type === 'session' && row.status === 'active' && row.store_file_id && row.personal_file_id;
+  }).sort(function(a, b) { return String(b.started_at).localeCompare(String(a.started_at)); });
+  for (let i = 0; i < sessions.length; i++) {
+    const session = sessions[i];
+    try {
+      const store = reportAwardPairTempFile_(session.store_file_id, 'store');
+      const personal = reportAwardPairTempFile_(session.personal_file_id, 'person');
+      return { ok: true, uploadSessionId: session.upload_session_id,
+        storeFileId: store.getId(), personalFileId: personal.getId(),
+        storeFileName: session.store_file_name, personalFileName: session.personal_file_name,
+        storeHash: session.store_hash, personalHash: session.personal_hash,
+        storeSize: session.store_size, personalSize: session.personal_size,
+        uploadedAt: session.started_at, message: '已恢復最近一組未逾期台獎暫存檔。' };
+    } catch (e) { console.log('award recovery skipped session=' + session.upload_session_id + ': ' + e.message); }
+  }
+  return { ok: false, message: '目前沒有可恢復的未逾期台獎暫存檔。' };
 }
 
 function reportAwardPairStageResult_(job) {
