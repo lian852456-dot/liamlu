@@ -300,6 +300,48 @@
       $('awardUploadedAt').textContent = preview.uploadedAt || '—';
       $('awardFiles').textContent = (preview.files || []).map(file => '原始檔：' + file.fileName).join('｜');
     }
+    function awardEvidenceFields(detail, patterns) {
+      return (detail && Array.isArray(detail.relatedFields) ? detail.relatedFields : []).filter(field => {
+        const text = typeof field === 'string' ? field : JSON.stringify(field || {});
+        return patterns.some(pattern => text.indexOf(pattern) !== -1);
+      });
+    }
+    function buildPhoneAwardsPreview(store, person, files) {
+      const storeDate = store.dataDate || '';
+      const personDate = person.dataDate || '';
+      const sameDate = !!storeDate && storeDate === personDate;
+      const blocking = [
+        '尚未完成與既有台獎黃金樣本逐欄比對',
+        '預覽階段禁止寫入正式台獎 JSON',
+        '8 月台獎金額、門檻、特殊規則與生效期間尚未確認'
+      ];
+      if (!sameDate) blocking.unshift('店點檔與個人檔資料日期不一致');
+      return {
+        schemaVersion: 'phone-awards-v1',
+        reportDate: sameDate ? storeDate : { store: storeDate, person: personDate },
+        sourceFiles: files.map(file => ({ role: file.role, fileName: file.fileName, size: file.size, sha256: file.hash })),
+        updatedAt: new Date().toISOString(),
+        versionId: 'preview-' + String(awardPreviewJobId || ''),
+        stores: { count: Number(store.storeCount || 0), names: store.identifiableStores || [], unmatchedOrAmbiguous: store.unmatchedOrAmbiguous || [] },
+        employees: { count: Number(person.personCount || 0), names: person.identifiablePersons || [], identifierColumns: person.personIdentifierColumns || [] },
+        rankings: { status: 'evidence-only', fields: awardEvidenceFields(store, ['排名']).concat(awardEvidenceFields(person, ['排名'])) },
+        achievementRates: { status: 'evidence-only', fields: awardEvidenceFields(store, ['達成率']).concat(awardEvidenceFields(person, ['達成率'])) },
+        awardAmounts: { status: 'evidence-only', fields: awardEvidenceFields(store, ['獎金']).concat(awardEvidenceFields(person, ['獎金'])) },
+        models: { status: 'evidence-only', fields: awardEvidenceFields(store, ['上線數', '空機數', '機款']).concat(awardEvidenceFields(person, ['上線數', '空機數', '機款'])) },
+        validation: {
+          sameDate: sameDate,
+          storeSheets: store.sheetNames || [], personSheets: person.sheetNames || [],
+          selectedStoreSheet: store.selectedSheet || '', selectedPersonSheet: person.selectedSheet || '',
+          storeRows: Number(store.rowCount || 0), personRows: Number(person.rowCount || 0),
+          duplicateRecords: (store.duplicateRecords || []).concat(person.duplicateRecords || []),
+          blankRows: (store.blankRows || []).concat(person.blankRows || []),
+          unmatchedOrAmbiguous: (store.unmatchedOrAmbiguous || []).concat(person.unmatchedOrAmbiguous || [])
+        },
+        publishable: false,
+        publishBlockingReasons: blocking,
+        formalDataChanged: false
+      };
+    }
     async function loadAwardStructurePreview() {
       const files = {};
       for (const role of ['store', 'person']) {
@@ -307,19 +349,10 @@
       }
       const store = files.store.structure || {};
       const person = files.person.structure || {};
-      const standardized = {
-        format: 'report-award-pair-structure-v1',
-        previewJobId: awardPreviewJobId,
-        dataDate: { store: store.dataDate || '', person: person.dataDate || '', same: !!store.dataDate && store.dataDate === person.dataDate },
-        files: {
-          store: { fileName: files.store.fileName, size: files.store.size, hash: files.store.hash },
-          person: { fileName: files.person.fileName, size: files.person.size, hash: files.person.hash }
-        },
-        store: store,
-        person: person,
-        formalDataChanged: false,
-        publishable: false
-      };
+      const standardized = buildPhoneAwardsPreview(store, person, [
+        { role: 'store', fileName: files.store.fileName, size: files.store.size, hash: files.store.hash },
+        { role: 'person', fileName: files.person.fileName, size: files.person.size, hash: files.person.hash }
+      ]);
       $('awardStructurePreview').textContent = JSON.stringify(standardized, null, 2);
       $('awardStructurePreview').classList.remove('hidden');
       return standardized;
