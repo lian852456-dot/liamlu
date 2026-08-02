@@ -1679,6 +1679,10 @@
     </div>
     <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;padding:0 2px;">填寫今日各機款銷售筆數（0可不填）｜<span style="color:#22c55e;">●</span> 50%達成獎金 <span style="color:#ff6600;">●</span> 100%達成獎金</div>
 
+    <div id="awardModelsV1Grid" class="form-grid" aria-label="8月台獎13組機款"></div>
+    <div id="awardModelsV1Status" style="font-size:11px;color:var(--text-dim);margin:6px 2px 10px;">資料契約：award-models-v1｜缺少項目保留空值，0 與空值分開記錄</div>
+
+    <div id="legacyAwardInputs" style="display:none;" aria-hidden="true">
     <!-- KPI 高SD - 黃底 -->
     <div style="font-size:11px;font-weight:700;color:#b8860b;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);border-radius:6px;padding:4px 10px;margin-bottom:6px;">⭐ KPI 高SD</div>
     <div class="form-grid">
@@ -1737,6 +1741,8 @@
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_y21" placeholder="0" step="1">
       </div>
+    </div>
+
     </div>
 
     <!-- 儲存 -->
@@ -2074,6 +2080,25 @@ const KPI_THRESHOLDS = {
   rt_pts: 80, special_renew: 80, premium_renew: 80, rt999: 80, rt1399: 80, haosu: 80
 };
 
+// 8 月中央台獎契約（畫面簡稱僅為顯示；儲存一律使用 modelId）。
+const AWARD_MODELS_SCHEMA = 'award-models-v1';
+const AWARD_MODEL_DEFINITIONS = [
+  { modelId:'pixel-10-family', shortName:'Pixel10系列' },
+  { modelId:'razr-fold', shortName:'moto razr fold' },
+  { modelId:'s26u-zfold8-family', shortName:'S26U／Z Fold8／Z Fold8U' },
+  { modelId:'sharp-r11', shortName:'R11' },
+  { modelId:'vivo-x300-v70fe', shortName:'X300 ＆ V70 FE' },
+  { modelId:'pixel-11-pro-family', shortName:'Pixel 11 Pro／11 XL／11 Fold' },
+  { modelId:'s26-zflip8-family', shortName:'S26／S26+／Z Flip8' },
+  { modelId:'pixel-11', shortName:'Pixel11' },
+  { modelId:'oppo-r16f', shortName:'R16F' },
+  { modelId:'samsung-a57', shortName:'A57' },
+  { modelId:'oppo-a6x', shortName:'A6x 6G／128G' },
+  { modelId:'samsung-a27-a17', shortName:'A27 ＆ A17' },
+  { modelId:'vivo-y21', shortName:'vivo Y21' }
+];
+const AWARD_MODEL_IDS = AWARD_MODEL_DEFINITIONS.map(item => item.modelId);
+
 let currentSeg = 16;
 let sumSeg = 16;
 let pbSeg = 16;
@@ -2116,6 +2141,14 @@ function mergeDayData(remoteData, localData) {
     }
     const record = { ...merged[store] };
     Object.entries(localRecord || {}).forEach(([key, value]) => {
+      if (key === 'awardModels' && value && typeof value === 'object') {
+        record.awardModels = { ...(record.awardModels || {}), ...value };
+        return;
+      }
+      if (key === 'awardModelsMeta' || key === 'unmappedLegacyFields') {
+        if (value !== null && value !== undefined) record[key] = value;
+        return;
+      }
       if (!key.startsWith('tw_')) return;
       if (value !== null && value !== undefined && value !== '') record[key] = value;
     });
@@ -2254,6 +2287,7 @@ function showToast(msg) {
 // ════════════════════════════════════
 window.onload = async () => {
   const td = today();
+  renderAwardModelInputs();
   document.getElementById('fillDate').value = td;
   document.getElementById('playbackDate').value = td;
   document.getElementById('todayBadge').textContent = '📅 ' + td;
@@ -2898,11 +2932,47 @@ const FIELDS = [
   'special_renew','premium_renew','rt999','rt1399','haosu',
   'early_renew','rt_close_num','rt_close_den','rt_close_pct',
   'insurance_num','insurance_den','insurance_pct',
-  'device_num','device_den','device_ratio',
-  'tw_pixel10','tw_s26u','tw_sharpr11','tw_vivo','tw_s26','tw_reno16f',
-  'tw_sony1','tw_oppoa6x','tw_a27','tw_y21'
+  'device_num','device_den','device_ratio'
 ];
 
+function renderAwardModelInputs(values) {
+  const grid = document.getElementById('awardModelsV1Grid');
+  if (!grid) return;
+  const current = values || {};
+  grid.innerHTML = AWARD_MODEL_DEFINITIONS.map(item => `
+    <div class="kpi-input-wrap" data-award-model-id="${item.modelId}">
+      <label>${item.shortName}</label>
+      <span class="ki-icon">📱</span>
+      <input type="number" id="f_award_${item.modelId}" placeholder="0" min="0" step="1" inputmode="numeric">
+    </div>`).join('');
+  AWARD_MODEL_IDS.forEach(id => {
+    const el = document.getElementById('f_award_' + id);
+    if (el) el.value = current[id] === null || current[id] === undefined ? '' : current[id];
+  });
+}
+
+function getAwardModelsFormData() {
+  const awardModels = {};
+  AWARD_MODEL_IDS.forEach(id => {
+    const el = document.getElementById('f_award_' + id);
+    awardModels[id] = !el || el.value === '' ? null : Number(el.value);
+  });
+  return awardModels;
+}
+
+function setAwardModelsFormData(awardModels) {
+  const values = awardModels && typeof awardModels === 'object' ? awardModels : {};
+  AWARD_MODEL_IDS.forEach(id => {
+    const el = document.getElementById('f_award_' + id);
+    if (el) el.value = values[id] === null || values[id] === undefined ? '' : values[id];
+  });
+}
+
+function reportValue(record, key) {
+  if (!record) return null;
+  if (key.indexOf('awardModels.') === 0) return record.awardModels ? record.awardModels[key.slice('awardModels.'.length)] : null;
+  return record[key];
+}
 
 function getFormData() {
   const obj = {};
@@ -2910,6 +2980,7 @@ function getFormData() {
     const el = document.getElementById('f_' + f);
     obj[f] = el ? (el.value !== '' ? parseFloat(el.value) : null) : null;
   });
+  obj.awardModels = getAwardModelsFormData();
   return obj;
 }
 
@@ -2938,6 +3009,7 @@ function clearForm() {
     const el = document.getElementById('f_' + f);
     if (el) el.value = '';
   });
+  setAwardModelsFormData({});
 }
 
 // ════════════════════════════════════
@@ -3088,16 +3160,7 @@ async function renderSummary() {
 
   // Table 3: 台獎手機
   const cols3 = [
-    {key:'tw_pixel10',    label:'Pixel 10系列',      isRaw:true},
-    {key:'tw_s26u',       label:'S26 Ultra',          isRaw:true},
-    {key:'tw_sharpr11',   label:'SHARP R11',          isRaw:true},
-    {key:'tw_vivo',       label:'vivo X300系列',      isRaw:true},
-    {key:'tw_s26',        label:'S26/S26+/A57',       isRaw:true},
-    {key:'tw_reno16f',    label:'Reno16 F',           isRaw:true},
-    {key:'tw_sony1',      label:'moto razr fold',     isRaw:true},
-    {key:'tw_oppoa6x',    label:'OPPO A6x',           isRaw:true},
-    {key:'tw_a27',        label:'A27 & A17',          isRaw:true},
-    {key:'tw_y21',        label:'Y21/Redmi Note 15 Pro', isRaw:true},
+    ...AWARD_MODEL_DEFINITIONS.map(item => ({key:'awardModels.' + item.modelId, label:item.shortName, isRaw:true}))
   ];
   renderSummaryTable('summaryTable3', date, sumSeg, cols3);
 
@@ -3392,16 +3455,19 @@ function renderSummaryTable(tableId, date, seg, cols) {
     if (c.isRank || c.isDelta || c.isScore) return `<td style="color:var(--text-dim);">—</td>`;
     if (c.isRaw) {
       const sum = STORES.reduce((acc, s) => {
-        const v = parseFloat(dayCache[s]?.[c.key]);
+        const v = parseFloat(reportValue(dayCache[s], c.key));
         return acc + (isNaN(v) ? 0 : v);
       }, 0);
-      const hasAny = STORES.some(s => dayCache[s] && dayCache[s][c.key] != null && dayCache[s][c.key] !== '');
+      const hasAny = STORES.some(s => {
+        const v = reportValue(dayCache[s], c.key);
+        return v != null && v !== '';
+      });
       return hasAny
         ? `<td style="color:var(--accent-bright);font-weight:700;">${sum % 1 === 0 ? sum : sum.toFixed(1)}</td>`
         : `<td class="val-dim">—</td>`;
     }
     // percentage: average of stores that have data
-    const vals = STORES.map(s => parseFloat(dayCache[s]?.[c.key])).filter(v => !isNaN(v));
+    const vals = STORES.map(s => parseFloat(reportValue(dayCache[s], c.key))).filter(v => !isNaN(v));
     if (!vals.length) return `<td class="val-dim">—</td>`;
     const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
     const cls = cellColorClass(avg, c.th);
@@ -3417,7 +3483,7 @@ function renderSummaryTable(tableId, date, seg, cols) {
     const isNew = NEW_STORES.includes(s) && date < '2026-06-25';
     const cells = cols.map(c => {
       if (!d) return `<td class="val-dim">—</td>`;
-      const v = d[c.key];
+      const v = reportValue(d, c.key);
       if (c.isDelta) return `<td>${delta(v)}</td>`;
       if (c.isRank) {
         const vc = (v !== '' && v != null && v !== 0) ? `<span class="val-gold">${v}</span>` : '—';
@@ -3531,16 +3597,7 @@ async function renderPlayback() {
   renderSummaryTable('pbTable1', date, pbSeg, cols1);
   renderSummaryTable('pbTable2', date, pbSeg, cols2);
   const colsTw = [
-    {key:'tw_pixel10',    label:'Pixel 10系列',      isRaw:true},
-    {key:'tw_s26u',       label:'S26 Ultra',          isRaw:true},
-    {key:'tw_sharpr11',   label:'SHARP R11',          isRaw:true},
-    {key:'tw_vivo',       label:'vivo X300系列',      isRaw:true},
-    {key:'tw_s26',        label:'S26/S26+/A57',       isRaw:true},
-    {key:'tw_reno16f',    label:'Reno16 F',           isRaw:true},
-    {key:'tw_sony1',      label:'moto razr fold',     isRaw:true},
-    {key:'tw_oppoa6x',    label:'OPPO A6x',           isRaw:true},
-    {key:'tw_a27',        label:'A27 & A17',          isRaw:true},
-    {key:'tw_y21',        label:'Y21/Redmi Note 15 Pro', isRaw:true},
+    ...AWARD_MODEL_DEFINITIONS.map(item => ({key:'awardModels.' + item.modelId, label:item.shortName, isRaw:true}))
   ];
   renderSummaryTable('pbTable3', date, pbSeg, colsTw);
   renderStorePersonalDetail(date, pbSeg, dayCache, 'pbStorePersonalSection');
@@ -3784,6 +3841,7 @@ function selectStore(store) {
       const el = document.getElementById('f_' + f);
       if (el) el.value = data ? (data[f] ?? '') : '';
     });
+    setAwardModelsFormData(data && data.awardModels ? data.awardModels : {});
     updateFilledSummary(data);
   });
 
@@ -3878,6 +3936,7 @@ function clearForm() {
     const el = document.getElementById('f_' + f);
     if (el) { el.value = ''; el.style.borderColor = ''; el.style.boxShadow = ''; }
   });
+  setAwardModelsFormData({});
   document.getElementById('filledSummary').classList.remove('show');
   showToast('🗑️ 已清除');
 }

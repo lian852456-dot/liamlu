@@ -22,6 +22,171 @@ const FIELDS = [
 
 const SPREADSHEET_ID = '10MqzAWOPc4UPE-g5ZZPNZG3tYAndKW-DApLuuhIpQWA';
 
+// 8 月台獎回報相容層：新資料只寫入獨立工作表，不拆寫既有 tw_* 欄位。
+const REPORT_AWARD_MODELS_SHEET = 'ReportAwardModels';
+const REPORT_AWARD_MODELS_HEADERS = ['date','seg','store','award_models_json','schemaVersion','versionId','savedAt'];
+const REPORT_AWARD_MODELS_SCHEMA = 'award-models-v1';
+const REPORT_AWARD_MODEL_IDS = [
+  'pixel-10-family', 'razr-fold', 's26u-zfold8-family', 'sharp-r11',
+  'vivo-x300-v70fe', 'pixel-11-pro-family', 's26-zflip8-family',
+  'pixel-11', 'oppo-r16f', 'samsung-a57', 'oppo-a6x',
+  'samsung-a27-a17', 'vivo-y21'
+];
+const REPORT_AWARD_SAFE_LEGACY_MAP = {
+  tw_pixel10: 'pixel-10-family',
+  tw_sharpr11: 'sharp-r11',
+  tw_reno16f: 'oppo-r16f',
+  tw_oppoa6x: 'oppo-a6x',
+  tw_a27: 'samsung-a27-a17'
+};
+const REPORT_AWARD_UNMAPPED_LEGACY = [
+  'tw_s26u','tw_vivo','tw_s26','tw_pixel10fold','tw_findx9s',
+  'tw_sony1','tw_poketomo','tw_y21','tw_myfirst'
+];
+
+function getReportAwardModelsSheet_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sh = ss.getSheetByName(REPORT_AWARD_MODELS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(REPORT_AWARD_MODELS_SHEET);
+  }
+  if (sh.getLastRow() === 0) {
+    sh.getRange(1, 1, 1, REPORT_AWARD_MODELS_HEADERS.length).setValues([REPORT_AWARD_MODELS_HEADERS]);
+    sh.setFrozenRows(1);
+  } else {
+    const headers = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), REPORT_AWARD_MODELS_HEADERS.length)).getValues()[0];
+    if (REPORT_AWARD_MODELS_HEADERS.some((h, i) => headers[i] !== h)) {
+      throw new Error('ReportAwardModels 標題列不符合 award-models-v1 契約');
+    }
+  }
+  return sh;
+}
+
+function normalizeReportAwardModels_(input) {
+  if (input == null || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('awardModels 必須是物件');
+  }
+  const keys = Object.keys(input);
+  const unknown = keys.filter(k => REPORT_AWARD_MODEL_IDS.indexOf(k) === -1);
+  if (unknown.length) throw new Error('未知 modelId：' + unknown.join('、'));
+  const out = {};
+  REPORT_AWARD_MODEL_IDS.forEach(id => {
+    const value = Object.prototype.hasOwnProperty.call(input, id) ? input[id] : null;
+    if (value === null || value === '') {
+      out[id] = null;
+      return;
+    }
+    const number = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(number) || number < 0) throw new Error('modelId ' + id + ' 的數值無效');
+    out[id] = number;
+  });
+  return out;
+}
+
+// JSON.parse 會把重複 key 靜默折疊；在進入 JSON.parse 前先檢查 awardModels 物件的 key。
+function assertNoDuplicateReportAwardModelIds_(jsonText) {
+  const match = String(jsonText || '').match(/"awardModels"\s*:\s*\{([^{}]*)\}/);
+  if (!match) return;
+  const seen = {};
+  const keyPattern = /"((?:\\.|[^"\\])*)"\s*:/g;
+  let item;
+  while ((item = keyPattern.exec(match[1])) !== null) {
+    const key = item[1];
+    if (seen[key]) throw new Error('重複 modelId：' + key);
+    seen[key] = true;
+  }
+}
+
+function reportAwardVersionId_() {
+  return REPORT_AWARD_MODELS_SCHEMA + '-' + new Date().getTime() + '-' + Math.random().toString(36).slice(2, 8);
+}
+
+function writeReportAwardModels_(date, store, seg, awardModels, versionId) {
+  const sh = getReportAwardModelsSheet_();
+  const normalized = normalizeReportAwardModels_(awardModels);
+  const values = sh.getDataRange().getValues();
+  let rowIdx = -1;
+  for (let i = 1; i < values.length; i++) {
+    if (toDateStr(values[i][0]) === String(date) && String(values[i][1]) === String(seg) && String(values[i][2]) === String(store)) {
+      rowIdx = i + 1;
+      break;
+    }
+  }
+  const row = [String(date), String(seg), String(store), JSON.stringify(normalized), REPORT_AWARD_MODELS_SCHEMA, String(versionId || reportAwardVersionId_()), new Date().toISOString()];
+  if (rowIdx > 0) sh.getRange(rowIdx, 1, 1, row.length).setValues([row]);
+  else sh.appendRow(row);
+  return { schemaVersion: REPORT_AWARD_MODELS_SCHEMA, versionId: row[5], savedAt: row[6], awardModels: normalized };
+}
+
+function readReportAwardModels_(date, seg) {
+  const sh = getReportAwardModelsSheet_();
+  const values = sh.getDataRange().getValues();
+  const display = sh.getDataRange().getDisplayValues();
+  const result = {};
+  for (let i = 1; i < values.length; i++) {
+    if (toDateStr(values[i][0]) !== String(date) || String(values[i][1]) !== String(seg)) continue;
+    let awardModels = null;
+    try { awardModels = normalizeReportAwardModels_(JSON.parse(String(values[i][3] || '{}'))); } catch (err) { throw new Error('ReportAwardModels 資料無效：' + err.message); }
+    result[String(values[i][2])] = {
+      awardModels,
+      schemaVersion: String(values[i][4] || ''),
+      versionId: String(values[i][5] || ''),
+      savedAt: display[i][6] || String(values[i][6] || '')
+    };
+  }
+  return result;
+}
+
+function mapLegacyAwardModels_(record) {
+  const awardModels = {};
+  REPORT_AWARD_MODEL_IDS.forEach(id => { awardModels[id] = null; });
+  const unmappedLegacyFields = [];
+  Object.keys(REPORT_AWARD_SAFE_LEGACY_MAP).forEach(key => {
+    const value = record && record[key];
+    if (value !== null && value !== undefined && value !== '') awardModels[REPORT_AWARD_SAFE_LEGACY_MAP[key]] = value;
+  });
+  REPORT_AWARD_UNMAPPED_LEGACY.forEach(key => {
+    const value = record && record[key];
+    if (value !== null && value !== undefined && value !== '') unmappedLegacyFields.push(key);
+  });
+  return { awardModels, unmappedLegacyFields };
+}
+
+function attachReportAwardModels_(result, date, seg) {
+  const fresh = readReportAwardModels_(date, seg);
+  Object.keys(result || {}).forEach(store => {
+    if (fresh[store]) {
+      result[store].awardModels = fresh[store].awardModels;
+      result[store].awardModelsMeta = {
+        schemaVersion: fresh[store].schemaVersion,
+        versionId: fresh[store].versionId,
+        savedAt: fresh[store].savedAt,
+        source: REPORT_AWARD_MODELS_SHEET
+      };
+      result[store].unmappedLegacyFields = [];
+    } else {
+      const mapped = mapLegacyAwardModels_(result[store]);
+      result[store].awardModels = mapped.awardModels;
+      result[store].unmappedLegacyFields = mapped.unmappedLegacyFields;
+    }
+  });
+  Object.keys(fresh).forEach(store => {
+    if (result[store]) return;
+    result[store] = {
+      date: String(date), store, seg,
+      awardModels: fresh[store].awardModels,
+      awardModelsMeta: {
+        schemaVersion: fresh[store].schemaVersion,
+        versionId: fresh[store].versionId,
+        savedAt: fresh[store].savedAt,
+        source: REPORT_AWARD_MODELS_SHEET
+      },
+      unmappedLegacyFields: []
+    };
+  });
+  return result;
+}
+
 function getSheet() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   let sh = ss.getSheetByName(SHEET_NAME);
@@ -86,8 +251,22 @@ function doGet(e) {
 
   if (action === 'write') {
     try {
-      const payload = JSON.parse(decodeURIComponent(e.parameter.payload));
-      writeData(payload.date, payload.store, payload.seg, payload.data);
+      const rawPayload = decodeURIComponent(e.parameter.payload);
+      assertNoDuplicateReportAwardModelIds_(rawPayload);
+      const payload = JSON.parse(rawPayload);
+      const data = payload.data || {};
+      if (data.awardModels !== undefined) {
+        const normalizedAwardModels = normalizeReportAwardModels_(data.awardModels);
+        // 新契約資料不得回寫 legacy tw_*；其餘既有 KPI 欄位仍維持 v15 寫入方式。
+        const legacyData = {};
+        Object.keys(data).forEach(key => {
+          if (key !== 'awardModels' && key.indexOf('tw_') !== 0) legacyData[key] = data[key];
+        });
+        writeData(payload.date, payload.store, payload.seg, legacyData);
+        const saved = writeReportAwardModels_(payload.date, payload.store, payload.seg, normalizedAwardModels, payload.versionId);
+        return jsonResponse({ status: 'ok', schemaVersion: saved.schemaVersion, versionId: saved.versionId, savedAt: saved.savedAt }, cb);
+      }
+      writeData(payload.date, payload.store, payload.seg, data);
       return jsonResponse({ status: 'ok' }, cb);
     } catch(err) {
       return jsonResponse({ status: 'error', message: err.message }, cb);
@@ -1104,7 +1283,7 @@ function readData(date, seg) {
       result[store] = obj;
     }
   }
-  return result;
+  return attachReportAwardModels_(result, date, seg);
 }
 
 function jsonResponse(obj, callback) {
