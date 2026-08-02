@@ -2260,8 +2260,8 @@ const REPORT_UPLOAD_ALLOWED_ACTIONS = [
 // buildCommit 指向本次唯讀結構解析修正 commit；不以 Script Properties 保存或注入設定值。
 const REPORT_UPLOAD_BUILD_INFO = {
   deploymentVersion: '38',
-  buildCommit: '2bf54bf8c0dec3379ad71535b7b935036e90a373',
-  buildTime: '2026-08-02T09:41:16+08:00'
+  buildCommit: '686c9b1a62bb605f0db06099dfb895f69ef792a9',
+  buildTime: '2026-08-02T09:42:32+08:00'
 };
 
 function reportUploadBuildInfo_() { return REPORT_UPLOAD_BUILD_INFO; }
