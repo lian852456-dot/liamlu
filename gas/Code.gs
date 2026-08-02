@@ -113,9 +113,44 @@ function writeReportAwardModels_(date, store, seg, awardModels, versionId) {
     }
   }
   const row = [String(date), String(seg), String(store), JSON.stringify(normalized), REPORT_AWARD_MODELS_SCHEMA, String(versionId || reportAwardVersionId_()), new Date().toISOString()];
-  if (rowIdx > 0) sh.getRange(rowIdx, 1, 1, row.length).setValues([row]);
-  else sh.appendRow(row);
-  return { schemaVersion: REPORT_AWARD_MODELS_SCHEMA, versionId: row[5], savedAt: row[6], awardModels: normalized };
+  let rowNumber;
+  if (rowIdx > 0) {
+    sh.getRange(rowIdx, 1, 1, row.length).setValues([row]);
+    rowNumber = rowIdx;
+  } else {
+    sh.appendRow(row);
+    rowNumber = sh.getLastRow();
+  }
+
+  // 寫入成功不能只代表 setValues/appendRow 沒拋錯；用同一個 Spreadsheet
+  // 與工作表立即讀回，避免前端只看到假成功或寫到錯誤的資料來源。
+  const readback = readReportAwardModels_(date, seg)[String(store)];
+  const readbackMatches = !!readback &&
+    JSON.stringify(readback.awardModels) === JSON.stringify(normalized) &&
+    String(readback.schemaVersion) === REPORT_AWARD_MODELS_SCHEMA &&
+    String(readback.versionId) === String(row[5]);
+  if (!readbackMatches) throw new Error('ReportAwardModels 寫入後讀回不一致');
+
+  return {
+    rowWritten: true,
+    spreadsheetId: SPREADSHEET_ID,
+    sheetName: REPORT_AWARD_MODELS_SHEET,
+    rowNumber,
+    date: String(date),
+    seg: String(seg),
+    store: String(store),
+    schemaVersion: REPORT_AWARD_MODELS_SCHEMA,
+    versionId: row[5],
+    savedAt: row[6],
+    awardModels: normalized,
+    readbackMatches,
+    readback: {
+      awardModels: readback.awardModels,
+      schemaVersion: readback.schemaVersion,
+      versionId: readback.versionId,
+      savedAt: readback.savedAt
+    }
+  };
 }
 
 function readReportAwardModels_(date, seg) {
@@ -264,7 +299,7 @@ function doGet(e) {
         });
         writeData(payload.date, payload.store, payload.seg, legacyData);
         const saved = writeReportAwardModels_(payload.date, payload.store, payload.seg, normalizedAwardModels, payload.versionId);
-        return jsonResponse({ status: 'ok', schemaVersion: saved.schemaVersion, versionId: saved.versionId, savedAt: saved.savedAt }, cb);
+        return jsonResponse({ status: 'ok', ...saved }, cb);
       }
       writeData(payload.date, payload.store, payload.seg, data);
       return jsonResponse({ status: 'ok' }, cb);
