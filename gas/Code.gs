@@ -3184,6 +3184,33 @@ function reportAwardPairDetailedRecords_(rows, expected) {
   });
 }
 
+function reportAwardPairDetailedPersonColumns_(headers) {
+  return (headers || []).filter(function(header) {
+    return /姓名|人員|員工|人名|工號|員編/i.test(header.name);
+  }).map(function(header) { return header.position; });
+}
+
+function reportAwardPairDetailedPersonNames_(records, headers) {
+  const columns = reportAwardPairDetailedPersonColumns_(headers);
+  const names = [];
+  (records || []).forEach(function(record) {
+    columns.forEach(function(column) {
+      const value = String((record.cells || {})[column] || '').trim();
+      if (value && names.indexOf(value) === -1 && !/^DNB/i.test(value) && value !== '北一二B') names.push(value);
+    });
+  });
+  return { columns: columns, names: names };
+}
+
+function reportAwardPairDetailedBlankRows_(rows, expected) {
+  return (rows || []).filter(function(row) {
+    if (row.row <= 18) return false;
+    const c = row.cells || {};
+    if (expected === REPORT_AWARD_PAIR_FILES.store) return c.F === '北一二B' && /^DNB/i.test(String(c.G || '')) && !c.I;
+    return c.B === '北一二B' && /^DNB/i.test(String(c.C || '')) && (!c.D || !c.F || !c.G);
+  }).map(function(row) { return row.row; });
+}
+
 // 結構解析只讀目前 job 參照的單一暫存檔；不寫入 ReportUploadJobs，也不接觸正式台獎資料。
 function reportAwardPairReadXlsxDetailed_(bytes, expected) {
   const files = reportAwardPairZipFiles_(bytes);
@@ -3228,6 +3255,7 @@ function reportAwardPairReadXlsxDetailed_(bytes, expected) {
   const records = reportAwardPairDetailedRecords_(selected.rows, expected);
   const names = records.map(function(record) { return record.store; }).filter(Boolean);
   const buckets = reportAwardPairStores_(names);
+  const person = reportAwardPairDetailedPersonNames_(records, selected.headers);
   const duplicateMap = {};
   names.forEach(function(name) { duplicateMap[name] = (duplicateMap[name] || 0) + 1; });
   const duplicates = Object.keys(duplicateMap).filter(function(name) { return duplicateMap[name] > 1; }).map(function(name) {
@@ -3237,9 +3265,14 @@ function reportAwardPairReadXlsxDetailed_(bytes, expected) {
       return { name: sheet.name, xmlPath: sheet.xmlPath, rowCount: sheet.rows.length, roleScore: sheet.roleScore,
         headers: sheet.headers, mergeRefs: sheet.mergeRefs, missingXml: sheet.missingXml };
     }), selectedSheet: selected.name, selectedXmlPath: selected.xmlPath, rows: selected.rows,
-    records: records, dataDate: reportAwardPairRangeDate_(selected.rows), storeNames: names,
-    stores: buckets, duplicateRecords: duplicates, relatedFields: reportAwardPairDetailedField_(selected.headers, selected.rows),
-    rowCount: records.length, headerCount: selected.headers.length, mergeCount: selected.mergeRefs.length,
+    identifiableStores: names.filter(function(name, index) { return names.indexOf(name) === index; }),
+    identifiablePersons: person.names, personIdentifierColumns: person.columns,
+    stores: buckets, duplicateRecords: duplicates, blankRows: reportAwardPairDetailedBlankRows_(selected.rows, expected),
+    relatedFields: reportAwardPairDetailedField_(selected.headers, selected.rows),
+    recordSamples: records.slice(0, 10).map(function(record) { return { row: record.row, store: record.store }; }),
+    rowCount: records.length, personCount: expected === REPORT_AWARD_PAIR_FILES.person ? records.length : 0,
+    storeCount: expected === REPORT_AWARD_PAIR_FILES.store ? buckets.matched.length : 0,
+    headerCount: selected.headers.length, mergeCount: selected.mergeRefs.length,
     unmatchedOrAmbiguous: buckets.none.concat(buckets.ambiguous) };
 }
 
