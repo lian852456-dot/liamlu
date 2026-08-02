@@ -2259,9 +2259,9 @@ const REPORT_UPLOAD_ALLOWED_ACTIONS = [
 // Build 資訊僅含版本／commit／時間，方便確認瀏覽器沒有沿用舊版頁面；不含任何授權資料。
 // buildCommit 指向本次唯讀結構解析修正 commit；不以 Script Properties 保存或注入設定值。
 const REPORT_UPLOAD_BUILD_INFO = {
-  deploymentVersion: '38',
-  buildCommit: '686c9b1a62bb605f0db06099dfb895f69ef792a9',
-  buildTime: '2026-08-02T09:42:32+08:00'
+  deploymentVersion: '39',
+  buildCommit: 'bce0207c196ec9bf7e0a50eba0acca8623d04f15',
+  buildTime: '2026-08-02T10:12:00+08:00'
 };
 
 function reportUploadBuildInfo_() { return REPORT_UPLOAD_BUILD_INFO; }
