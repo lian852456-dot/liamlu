@@ -2106,11 +2106,14 @@ let pbSeg = 16;
 // ════════════════════════════════════
 // GOOGLE SHEETS 設定
 // ════════════════════════════════════
-const LEGACY_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
-const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
+// 每日回報正式 Web App。戰報快速更新是另一個獨立 Deployment，不能被回報頁使用。
+const DAILY_REPORT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
+const LEGACY_GAS_URL = DAILY_REPORT_GAS_URL;
+const DEFAULT_GAS_URL = DAILY_REPORT_GAS_URL;
 const savedGasUrl = localStorage.getItem('bei12b_gas_url');
-let GAS_URL = !savedGasUrl || savedGasUrl === LEGACY_GAS_URL ? DEFAULT_GAS_URL : savedGasUrl;
-if (savedGasUrl === LEGACY_GAS_URL) localStorage.setItem('bei12b_gas_url', DEFAULT_GAS_URL);
+// 正式頁只允許每日回報端點；清除舊的測試／快速上傳端點，避免資料只落在 local shadow。
+let GAS_URL = savedGasUrl === DAILY_REPORT_GAS_URL ? savedGasUrl : DEFAULT_GAS_URL;
+if (savedGasUrl !== GAS_URL) localStorage.setItem('bei12b_gas_url', GAS_URL);
 
 // 記憶體快取（避免重複拉資料）
 const _cache = {};
@@ -2176,6 +2179,25 @@ async function getData(date, store, seg) {
   return (_cache[ck] && _cache[ck][store]) ? _cache[ck][store] : null;
 }
 
+function requestGasJson(url) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const cbName = 'gasCallback_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      delete window[cbName];
+      script.remove();
+      fn(value);
+    };
+    window[cbName] = result => finish(resolve, result);
+    script.onerror = () => finish(reject, new Error('Apps Script JSONP 連線失敗'));
+    script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + encodeURIComponent(cbName);
+    document.head.appendChild(script);
+  });
+}
+
 // ── 拉取整天所有門市資料存入快取
 async function fetchDayData(date, seg) {
   const ck = cacheKey(date, seg);
@@ -2183,8 +2205,8 @@ async function fetchDayData(date, seg) {
   if (!GAS_URL) { _cache[ck] = {}; return; }
   try {
     const url = `${GAS_URL}?action=read&date=${date}&seg=${seg}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    const json = await res.json();
+    const json = await requestGasJson(url);
+    if (!json || json.status !== 'ok') throw new Error((json && json.message) || '讀取失敗');
     _cache[ck] = mergeDayData(json.data || {}, localShadow);
   } catch(e) {
     console.error('fetchDayData error', e);
@@ -2198,57 +2220,27 @@ async function saveToStorage(date, store, seg, data) {
     showToast('⚠️ 尚未設定 Apps Script 網址');
     return false;
   }
+  // 先取得正式端點的可驗證回應；在伺服器讀回前，不寫 local shadow，也不顯示成功。
+  const payload = encodeURIComponent(JSON.stringify({ date, store, seg, data }));
+  const url = `${GAS_URL}?action=write&payload=${payload}`;
+  const result = await requestGasJson(url);
+  const readback = result && result.readback && result.readback.awardModels;
+  const modelsMatch = readback && AWARD_MODEL_IDS.every(id =>
+    Object.prototype.hasOwnProperty.call(readback, id) && readback[id] === data.awardModels[id]
+  );
+  const responseValid = result && result.status === 'ok' && result.rowWritten === true &&
+    typeof result.spreadsheetId === 'string' && result.spreadsheetId.length > 0 &&
+    result.sheetName === 'ReportAwardModels' &&
+    String(result.date) === String(date) && String(result.seg) === String(seg) &&
+    String(result.store) === String(store) && result.readbackMatches === true && modelsMatch;
+  if (!responseValid) throw new Error('ReportAwardModels 寫入回應未通過讀回驗證');
+
+  // 只有同一端點確認 rowWritten + readback 後，才更新本機 shadow/cache。
   writeLocalShadow(date, store, seg, data);
-  // 同時更新本地快取
   const ck = cacheKey(date, seg);
   if (!_cache[ck]) _cache[ck] = {};
   _cache[ck][store] = { ...data, date, store, seg };
-
-  // 用 GET + URL 參數 + no-cors 模式
-  const payload = encodeURIComponent(JSON.stringify({ date, store, seg, data }));
-  const url = `${GAS_URL}?action=write&payload=${payload}`;
-  
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    const cbName = 'gasCallback_' + Date.now();
-    window[cbName] = function(result) {
-      delete window[cbName];
-      document.head.removeChild(script);
-      resolve(result && result.status === 'ok');
-    };
-    script.onerror = function() {
-      delete window[cbName];
-      // 即使有 error 也嘗試用 fetch
-      fetch(url + '&callback=' + cbName)
-        .then(r => r.json())
-        .then(j => resolve(j.status === 'ok'))
-        .catch(() => {
-          // 最後嘗試：no-cors 送出（無法確認結果但資料會到）
-          fetch(url, { mode: 'no-cors' })
-            .then(() => resolve(true))
-            .catch(() => resolve(false));
-        });
-    };
-    // 先試 fetch
-    fetch(url)
-      .then(r => r.json())
-      .then(j => {
-        delete window[cbName];
-        resolve(j.status === 'ok');
-      })
-      .catch(() => {
-        // fetch 失敗，改用 no-cors
-        fetch(url, { mode: 'no-cors' })
-          .then(() => {
-            delete window[cbName];
-            resolve(true);
-          })
-          .catch(() => {
-            delete window[cbName];
-            resolve(false);
-          });
-      });
-  });
+  return true;
 }
 function pct(val) {
   if (val === null || val === undefined || val === '') return '—';
