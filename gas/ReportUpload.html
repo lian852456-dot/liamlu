@@ -112,6 +112,7 @@
           </div>
           <div id="awardFiles" class="small"></div>
           <div id="awardChecks"></div>
+          <pre id="awardStructurePreview" class="small hidden" aria-live="polite"></pre>
         </div>
       </section>
     </section>
@@ -299,6 +300,30 @@
       $('awardUploadedAt').textContent = preview.uploadedAt || '—';
       $('awardFiles').textContent = (preview.files || []).map(file => '原始檔：' + file.fileName).join('｜');
     }
+    async function loadAwardStructurePreview() {
+      const files = {};
+      for (const role of ['store', 'person']) {
+        files[role] = await call('report_award_pair_structure_file', payload({ previewJobId: awardPreviewJobId, role: role }));
+      }
+      const store = files.store.structure || {};
+      const person = files.person.structure || {};
+      const standardized = {
+        format: 'report-award-pair-structure-v1',
+        previewJobId: awardPreviewJobId,
+        dataDate: { store: store.dataDate || '', person: person.dataDate || '', same: !!store.dataDate && store.dataDate === person.dataDate },
+        files: {
+          store: { fileName: files.store.fileName, size: files.store.size, hash: files.store.hash },
+          person: { fileName: files.person.fileName, size: files.person.size, hash: files.person.hash }
+        },
+        store: store,
+        person: person,
+        formalDataChanged: false,
+        publishable: false
+      };
+      $('awardStructurePreview').textContent = JSON.stringify(standardized, null, 2);
+      $('awardStructurePreview').classList.remove('hidden');
+      return standardized;
+    }
     async function pollAwardJob() {
       if (!awardPreviewJobId || awardPolling) return;
       awardPolling = true;
@@ -308,7 +333,13 @@
         if (result.status === 'completed') {
           renderAwardPreview(result); $('awardClearBtn').disabled = false; awardPolling = false;
           setBusy($('awardPreviewBtn'), false, '解析預覽');
-          message('awardMessage', '雙檔預覽完成；僅暫存於私人 Drive，尚未更新任何正式台獎資料。', 'ok');
+          try {
+            message('awardMessage', '基本預覽完成，正在分別讀取店點／個人結構…', 'warn');
+            await loadAwardStructurePreview();
+            message('awardMessage', '雙檔結構預覽完成；僅讀取私人暫存檔，正式台獎資料未變更。', 'ok');
+          } catch (detailError) {
+            message('awardMessage', '基本預覽已完成；結構解析失敗：' + detailError.message, 'bad');
+          }
           return;
         }
         if (result.status === 'failed') {

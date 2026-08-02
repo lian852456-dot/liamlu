@@ -2281,6 +2281,7 @@ function report_award_pair_upload_store(payload) { return reportAwardPairUpload(
 function report_award_pair_upload_personal(payload) { return reportAwardPairUpload(payload, 'person'); }
 function report_award_pair_create_job(payload) { return reportAwardPairCreateJob(payload); }
 function report_award_pair_job_status(payload) { return reportAwardPairJobStatus(payload); }
+function report_award_pair_structure_file(payload) { return reportAwardPairStructureFile(payload); }
 function report_award_pair_recover_latest(payload) { return reportAwardPairRecoverLatest(payload); }
 function report_award_pair_clear(payload) { return reportAwardPairClear(payload); }
 function report_award_pair_daily_cleanup(payload) { return reportAwardPairDailyCleanup(payload); }
@@ -3047,14 +3048,18 @@ function reportAwardPairXmlAttribute_(tag, name) {
   return match ? reportAwardPairXmlText_(match[1]) : '';
 }
 
-function reportAwardPairXmlCellText_(cellXml) {
+function reportAwardPairXmlCellText_(cellXml, sharedStrings) {
+  const type = reportAwardPairXmlAttribute_(String(cellXml || ''), 't');
   const inline = String(cellXml || '').match(/<is(?:\s[^>]*)?>([\s\S]*?)<\/is>/);
   if (inline) return reportAwardPairXmlText_(inline[1]);
   const value = String(cellXml || '').match(/<v(?:\s[^>]*)?>([\s\S]*?)<\/v>/);
-  return value ? reportAwardPairXmlText_(value[1]) : '';
+  if (!value) return '';
+  const raw = reportAwardPairXmlText_(value[1]);
+  if (type === 's' && sharedStrings && sharedStrings[Number(raw)] != null) return sharedStrings[Number(raw)];
+  return raw;
 }
 
-function reportAwardPairXmlRows_(sheetXml, requiredColumns) {
+function reportAwardPairXmlRows_(sheetXml, requiredColumns, sharedStrings, includeAllRows) {
   const rows = [];
   const wanted = requiredColumns || {};
   const rowMatcher = /<row\b([^>]*)>([\s\S]*?)<\/row>/g;
@@ -3062,13 +3067,13 @@ function reportAwardPairXmlRows_(sheetXml, requiredColumns) {
   while ((rowMatch = rowMatcher.exec(String(sheetXml || ''))) !== null) {
     const rowNo = Number(reportAwardPairXmlAttribute_(rowMatch[1], 'r') || 0);
     const cells = {};
-    const includeAll = rowNo > 0 && rowNo <= 18;
+    const includeAll = includeAllRows || (rowNo > 0 && rowNo <= 18);
     const cellMatcher = /<c\b([^>]*)>([\s\S]*?)<\/c>/g;
     let cellMatch;
     while ((cellMatch = cellMatcher.exec(rowMatch[2])) !== null) {
       const ref = reportAwardPairXmlAttribute_(cellMatch[1], 'r');
       const column = ref.replace(/\d+/g, '');
-      if (includeAll || wanted[column]) cells[column] = reportAwardPairXmlCellText_(cellMatch[2]);
+      if (includeAll || wanted[column]) cells[column] = reportAwardPairXmlCellText_(cellMatch[2], sharedStrings);
     }
     // 標題／日期列，以及有預覽所需欄位的資料列才保存，避免把整份工作簿留在記憶體。
     if (includeAll || Object.keys(cells).length) rows.push({ row: rowNo, cells: cells });
@@ -3101,6 +3106,141 @@ function reportAwardPairReadXlsx_(bytes, expected) {
   const columns = expected === REPORT_AWARD_PAIR_FILES.store ?
     { F: true, G: true, I: true } : { B: true, C: true, D: true, F: true, G: true };
   return { sheetNames: sheetNames, rows: reportAwardPairXmlRows_(sheetXml, columns) };
+}
+
+function reportAwardPairSharedStrings_(xml) {
+  const values = [];
+  const matcher = /<si\b[^>]*>([\s\S]*?)<\/si>/g;
+  let match;
+  while ((match = matcher.exec(String(xml || ''))) !== null) {
+    const texts = [];
+    const textMatcher = /<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g;
+    let textMatch;
+    while ((textMatch = textMatcher.exec(match[1])) !== null) texts.push(reportAwardPairXmlText_(textMatch[1]));
+    values.push(texts.join(''));
+  }
+  return values;
+}
+
+function reportAwardPairSheetTarget_(target) {
+  const clean = String(target || '').replace(/^\/+/, '');
+  return clean.indexOf('xl/') === 0 ? clean : 'xl/' + clean;
+}
+
+function reportAwardPairDetailedHeaders_(rows) {
+  const labels = {};
+  (rows || []).filter(function(row) { return row.row > 0 && row.row <= 18; }).forEach(function(row) {
+    Object.keys(row.cells || {}).forEach(function(column) {
+      const value = String(row.cells[column] || '').trim();
+      if (!value) return;
+      labels[column] = labels[column] || [];
+      if (labels[column].indexOf(value) === -1) labels[column].push(value);
+    });
+  });
+  return Object.keys(labels).sort().map(function(column) {
+    return { position: column, name: labels[column].join(' / ') };
+  });
+}
+
+function reportAwardPairDetailedField_(headers, rows) {
+  const related = /獎金|排名|達成率|機款|手機|實際|目標|期間|日期|門市|店點|姓名|人員|員工|職稱|名次/i;
+  const sampleRows = (rows || []).filter(function(row) { return row.row > 18; });
+  return (headers || []).filter(function(header) { return related.test(header.name); }).map(function(header) {
+    const samples = [];
+    sampleRows.forEach(function(row) {
+      const value = String((row.cells || {})[header.position] || '').trim();
+      if (value && samples.indexOf(value) === -1 && samples.length < 5) samples.push(value);
+    });
+    return { position: header.position, name: header.name, samples: samples };
+  });
+}
+
+function reportAwardPairDetailedMergeRefs_(xml) {
+  const refs = [];
+  const matcher = /<mergeCell\b[^>]*\bref="([^"]+)"[^>]*\/?\s*>/g;
+  let match;
+  while ((match = matcher.exec(String(xml || ''))) !== null) refs.push(match[1]);
+  return refs;
+}
+
+function reportAwardPairDetailedRoleScore_(rows, expected) {
+  return (rows || []).filter(function(row) {
+    const c = row.cells || {};
+    if (expected === REPORT_AWARD_PAIR_FILES.store) return c.F === '北一二B' && /^DNB/i.test(String(c.G || '')) && !!c.I;
+    return c.B === '北一二B' && /^DNB/i.test(String(c.C || '')) && !!c.D && !!c.F && !!c.G;
+  }).length;
+}
+
+function reportAwardPairDetailedRecords_(rows, expected) {
+  const roleRows = (rows || []).filter(function(row) {
+    const c = row.cells || {};
+    if (expected === REPORT_AWARD_PAIR_FILES.store) return c.F === '北一二B' && /^DNB/i.test(String(c.G || '')) && !!c.I;
+    return c.B === '北一二B' && /^DNB/i.test(String(c.C || '')) && !!c.D && !!c.F && !!c.G;
+  });
+  return roleRows.map(function(row) {
+    const c = row.cells || {};
+    return { row: row.row, store: expected === REPORT_AWARD_PAIR_FILES.store ? String(c.I || '') : String(c.D || ''),
+      cells: c };
+  });
+}
+
+// 結構解析只讀目前 job 參照的單一暫存檔；不寫入 ReportUploadJobs，也不接觸正式台獎資料。
+function reportAwardPairReadXlsxDetailed_(bytes, expected) {
+  const files = reportAwardPairZipFiles_(bytes);
+  const byName = {};
+  files.forEach(function(file) {
+    const name = file.getName();
+    if (name === 'xl/workbook.xml' || name === 'xl/_rels/workbook.xml.rels' || name === 'xl/sharedStrings.xml' || /^xl\/worksheets\/sheet\d+\.xml$/.test(name)) {
+      byName[name] = file.getDataAsString('UTF-8');
+    }
+  });
+  if (!byName['xl/workbook.xml']) throw new Error('不是可讀取的 XLSX（缺少 workbook.xml）');
+  const relationships = {};
+  const relMatcher = /<Relationship\b([^>]*)\/?\s*>/g;
+  let relMatch;
+  while ((relMatch = relMatcher.exec(byName['xl/_rels/workbook.xml.rels'] || '')) !== null) {
+    const relId = reportAwardPairXmlAttribute_(relMatch[1], 'Id');
+    const target = reportAwardPairXmlAttribute_(relMatch[1], 'Target');
+    if (relId && target) relationships[relId] = reportAwardPairSheetTarget_(target);
+  }
+  const sheetDefs = [];
+  const sheetMatcher = /<sheet\b([^>]*)\/?>(?:<\/sheet>)?/g;
+  let sheetMatch;
+  while ((sheetMatch = sheetMatcher.exec(byName['xl/workbook.xml'])) !== null) {
+    const name = reportAwardPairXmlAttribute_(sheetMatch[1], 'name');
+    const relId = reportAwardPairXmlAttribute_(sheetMatch[1], 'r:id');
+    if (name) sheetDefs.push({ name: name, relId: relId });
+  }
+  if (!sheetDefs.length) throw new Error('XLSX 沒有工作表');
+  const sharedStrings = reportAwardPairSharedStrings_(byName['xl/sharedStrings.xml'] || '');
+  const sheets = sheetDefs.map(function(def, index) {
+    const xmlPath = relationships[def.relId] || ('xl/worksheets/sheet' + (index + 1) + '.xml');
+    const xml = byName[xmlPath] || '';
+    if (!xml) return { name: def.name, xmlPath: xmlPath, rows: [], headers: [], mergeRefs: [], roleScore: 0, missingXml: true };
+    const rows = reportAwardPairXmlRows_(xml, {}, sharedStrings, true);
+    return { name: def.name, xmlPath: xmlPath, rows: rows, headers: reportAwardPairDetailedHeaders_(rows),
+      mergeRefs: reportAwardPairDetailedMergeRefs_(xml), roleScore: reportAwardPairDetailedRoleScore_(rows, expected), missingXml: false };
+  });
+  let selected = sheets[0];
+  sheets.forEach(function(sheet) {
+    if (sheet.roleScore > selected.roleScore || (sheet.roleScore === selected.roleScore && sheet.name === expected.sheet)) selected = sheet;
+  });
+  const records = reportAwardPairDetailedRecords_(selected.rows, expected);
+  const names = records.map(function(record) { return record.store; }).filter(Boolean);
+  const buckets = reportAwardPairStores_(names);
+  const duplicateMap = {};
+  names.forEach(function(name) { duplicateMap[name] = (duplicateMap[name] || 0) + 1; });
+  const duplicates = Object.keys(duplicateMap).filter(function(name) { return duplicateMap[name] > 1; }).map(function(name) {
+    return { value: name, count: duplicateMap[name] };
+  });
+  return { sheetNames: sheets.map(function(sheet) { return sheet.name; }), sheets: sheets.map(function(sheet) {
+      return { name: sheet.name, xmlPath: sheet.xmlPath, rowCount: sheet.rows.length, roleScore: sheet.roleScore,
+        headers: sheet.headers, mergeRefs: sheet.mergeRefs, missingXml: sheet.missingXml };
+    }), selectedSheet: selected.name, selectedXmlPath: selected.xmlPath, rows: selected.rows,
+    records: records, dataDate: reportAwardPairRangeDate_(selected.rows), storeNames: names,
+    stores: buckets, duplicateRecords: duplicates, relatedFields: reportAwardPairDetailedField_(selected.headers, selected.rows),
+    rowCount: records.length, headerCount: selected.headers.length, mergeCount: selected.mergeRefs.length,
+    unmatchedOrAmbiguous: buckets.none.concat(buckets.ambiguous) };
 }
 
 function reportAwardPairRangeDate_(rows) {
@@ -3544,6 +3684,26 @@ function reportAwardPairReadFile_(fileId, expected, expectedHash) {
   if (expectedHash && reportAwardPairHash_(bytes) !== expectedHash) throw new Error(expected.label + ' 暫存檔雜湊不一致，已拒絕解析');
   const xlsx = reportAwardPairReadXlsx_(bytes, expected);
   return expected === REPORT_AWARD_PAIR_FILES.store ? reportAwardPairAnalyzeStore_(xlsx) : reportAwardPairAnalyzePerson_(xlsx);
+}
+
+function reportAwardPairStructureFile(payload) {
+  reportUploadAuthorize_(payload);
+  const input = payload || {};
+  const job = reportAwardPairJob_(String(input.previewJobId || '').trim());
+  if (!job) throw new Error('找不到台獎預覽任務。');
+  if (['completed', 'failed'].indexOf(job.status) === -1) throw new Error('台獎基本預覽尚未完成，不能進行結構解析。');
+  const role = String(input.role || '').trim();
+  const expected = REPORT_AWARD_PAIR_FILES[role];
+  if (!expected) throw new Error('結構解析角色只能是 store 或 person。');
+  const fileId = role === 'store' ? job.store_file_id : job.personal_file_id;
+  const expectedHash = role === 'store' ? job.store_hash : job.personal_hash;
+  const file = reportAwardPairTempFile_(fileId, role === 'store' ? 'store' : 'person');
+  const bytes = file.getBlob().getBytes();
+  const actualHash = reportAwardPairHash_(bytes);
+  if (expectedHash && expectedHash !== actualHash) throw new Error(expected.label + ' 暫存檔雜湊不一致，已拒絕結構解析。');
+  const detail = reportAwardPairReadXlsxDetailed_(bytes, expected);
+  return { ok: true, previewJobId: job.job_id, role: role, fileName: file.getName(), size: bytes.length,
+    hash: actualHash, structure: detail, formalDataChanged: false, publishable: false };
 }
 
 function reportAwardPairJobStatus(payload) {

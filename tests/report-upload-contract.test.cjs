@@ -157,7 +157,7 @@ test('稽核紀錄寫在私有名冊試算表的新分頁，未改既有 Sheet �
 
 // ── 五：權限（前端與後端都檢查）─────────────────────────────
 test('所有上傳端點在做任何事之前都先授權', () => {
-  for (const name of ['reportUploadPreview', 'reportUploadCommit', 'reportUploadLog', 'reportUploadRollback', 'reportAwardPairUpload', 'reportAwardPairCreateJob', 'reportAwardPairJobStatus', 'reportAwardPairRecoverLatest', 'reportAwardPairClear', 'reportAwardPairDailyCleanup']) {
+  for (const name of ['reportUploadPreview', 'reportUploadCommit', 'reportUploadLog', 'reportUploadRollback', 'reportAwardPairUpload', 'reportAwardPairCreateJob', 'reportAwardPairJobStatus', 'reportAwardPairStructureFile', 'reportAwardPairRecoverLatest', 'reportAwardPairClear', 'reportAwardPairDailyCleanup']) {
     const body = functionBody(code, name);
     const authAt = body.indexOf('reportUploadAuthorize_');
     assert.notEqual(authAt, -1, `${name} 未授權`);
@@ -730,7 +730,7 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
     assert.match(code, new RegExp(`function ${name}\\(payload\\)`));
     assert.match(htmlPage, new RegExp(`call\\('${name}'`));
   }
-  for (const name of ['report_award_pair_upload_store', 'report_award_pair_upload_personal', 'report_award_pair_create_job', 'report_award_pair_job_status', 'report_award_pair_recover_latest', 'report_award_pair_clear']) {
+  for (const name of ['report_award_pair_upload_store', 'report_award_pair_upload_personal', 'report_award_pair_create_job', 'report_award_pair_job_status', 'report_award_pair_structure_file', 'report_award_pair_recover_latest', 'report_award_pair_clear']) {
     assert.match(code, new RegExp(`function ${name}\\(payload\\)`));
     assert.match(htmlPage, new RegExp(name));
   }
@@ -746,6 +746,8 @@ test('同源 HtmlService 僅使用 google.script.run，台獎預覽採分段上�
   assert.match(htmlPage, /award preview guard state/);
   assert.match(htmlPage, /awardUploadState\.storeStatus === 'completed'/);
   assert.match(htmlPage, /awardUploadState\.personalStatus === 'completed'/);
+  assert.match(htmlPage, /loadAwardStructurePreview/);
+  assert.match(htmlPage, /report_award_pair_structure_file/);
   assert.match(htmlPage, /awardUploadState\.storeFileId.*awardUploadState\.personalFileId/);
   assert.match(htmlPage, /awardUploadState\.storeFileId = ''; awardUploadState\.uploadSessionId = ''; awardUploadState\.personalFileId = ''/);
   assert.match(htmlPage, /if \(isStore\) \{ awardUploadState\.storeFileId = ''; awardUploadState\.uploadSessionId = ''; \} else awardUploadState\.personalFileId = ''/);
@@ -805,6 +807,21 @@ test('台獎雙檔分段 job 會記錄階段、雜湊與安全到期清理，不
   assert.doesNotMatch(code, /report_award_pair_(?:commit|publish)/);
   assert.doesNotMatch(functionBody(code, 'reportAwardPairJobStatus'), /privateDashboardPublish|SpreadsheetApp|MailApp|GmailApp/);
   assert.doesNotMatch(functionBody(code, 'reportAwardPairDailyCleanup'), /ScriptApp\.newTrigger/);
+});
+
+test('台獎結構解析按角色分檔、只讀暫存檔且回傳標準化欄位，不寫正式資料', () => {
+  const structure = functionBody(code, 'reportAwardPairStructureFile');
+  assert.match(structure, /reportUploadAuthorize_\(payload\)/);
+  assert.match(structure, /reportAwardPairTempFile_/);
+  assert.match(structure, /reportAwardPairReadXlsxDetailed_/);
+  assert.match(structure, /formalDataChanged: false/);
+  assert.match(structure, /publishable: false/);
+  assert.doesNotMatch(structure, /reportUploadCommit|privateDashboardPublish|SpreadsheetApp|MailApp|GmailApp/);
+  assert.match(functionBody(code, 'reportAwardPairReadXlsxDetailed_'), /sheetNames/);
+  assert.match(functionBody(code, 'reportAwardPairReadXlsxDetailed_'), /mergeRefs/);
+  assert.match(functionBody(code, 'reportAwardPairReadXlsxDetailed_'), /relatedFields/);
+  assert.match(functionBody(code, 'reportAwardPairReadXlsxDetailed_'), /unmatchedOrAmbiguous/);
+  assert.match(functionBody(code, 'reportAwardPairReadXlsxDetailed_'), /duplicateRecords/);
 });
 
 test('所有前端頁面不含實際白名單員編、管理密碼值或 Script Property', () => {
