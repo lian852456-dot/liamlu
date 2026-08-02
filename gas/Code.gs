@@ -2257,11 +2257,11 @@ const REPORT_UPLOAD_ALLOWED_ACTIONS = [
 // 上傳頁與上傳 API 同屬新 Deployment，使用 google.script.run 直接呼叫這四個包裝函式。
 // 不從 GitHub Pages fetch，不需要 CORS／preflight，也不把任何設定值注入 HTML。
 // Build 資訊僅含版本／commit／時間，方便確認瀏覽器沒有沿用舊版頁面；不含任何授權資料。
-// buildCommit 指向本次分段解析效能修正 commit；不以 Script Properties 保存或注入設定值。
+// buildCommit 指向本次唯讀結構解析修正 commit；不以 Script Properties 保存或注入設定值。
 const REPORT_UPLOAD_BUILD_INFO = {
-  deploymentVersion: '37',
-  buildCommit: '1c6c57debbfdde0cc541c132ab68d0c585a30187',
-  buildTime: '2026-08-02T02:10:19+08:00'
+  deploymentVersion: '38',
+  buildCommit: '2bf54bf8c0dec3379ad71535b7b935036e90a373',
+  buildTime: '2026-08-02T09:41:16+08:00'
 };
 
 function reportUploadBuildInfo_() { return REPORT_UPLOAD_BUILD_INFO; }
