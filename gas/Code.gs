@@ -289,20 +289,7 @@ function doGet(e) {
       const rawPayload = decodeURIComponent(e.parameter.payload);
       assertNoDuplicateReportAwardModelIds_(rawPayload);
       const payload = JSON.parse(rawPayload);
-      const data = payload.data || {};
-      if (data.awardModels !== undefined) {
-        const normalizedAwardModels = normalizeReportAwardModels_(data.awardModels);
-        // 新契約資料不得回寫 legacy tw_*；其餘既有 KPI 欄位仍維持 v15 寫入方式。
-        const legacyData = {};
-        Object.keys(data).forEach(key => {
-          if (key !== 'awardModels' && key.indexOf('tw_') !== 0) legacyData[key] = data[key];
-        });
-        writeData(payload.date, payload.store, payload.seg, legacyData);
-        const saved = writeReportAwardModels_(payload.date, payload.store, payload.seg, normalizedAwardModels, payload.versionId);
-        return jsonResponse({ status: 'ok', ...saved }, cb);
-      }
-      writeData(payload.date, payload.store, payload.seg, data);
-      return jsonResponse({ status: 'ok' }, cb);
+      return jsonResponse(reportWritePayload_(payload), cb);
     } catch(err) {
       return jsonResponse({ status: 'error', message: err.message }, cb);
     }
@@ -323,8 +310,7 @@ function doGet(e) {
   if (action === 'pwrite') {
     try {
       const payload = JSON.parse(decodeURIComponent(e.parameter.payload));
-      writePersonal(payload);
-      return jsonResponse({ status: 'ok' }, cb);
+      return jsonResponse(personalWritePayload_(payload), cb);
     } catch(err) {
       return jsonResponse({ status: 'error', message: err.message }, cb);
     }
@@ -335,8 +321,7 @@ function doGet(e) {
     try {
       const date = e.parameter.date;
       const seg  = parseInt(e.parameter.seg);
-      const data = readPersonal(date, seg);
-      return jsonResponse({ status: 'ok', data }, cb);
+      return jsonResponse(personalReadPayload_({ date, seg }), cb);
     } catch(err) {
       return jsonResponse({ status: 'error', message: err.message }, cb);
     }
@@ -1387,18 +1372,53 @@ function privateDashboardPostResponse(body, e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function privateDashboardParsePostPayload(e) {
+function privateDashboardPostRawPayload(e) {
   const formPayload = e && e.parameter && e.parameter.payload;
-  const raw = formPayload != null
+  return formPayload != null
     ? formPayload
     : ((e && e.postData && e.postData.contents) || '{}');
-  return JSON.parse(raw || '{}');
+}
+
+function privateDashboardParsePostPayload(e) {
+  return JSON.parse(privateDashboardPostRawPayload(e) || '{}');
+}
+
+function reportWritePayload_(payload) {
+  const data = payload.data || {};
+  if (data.awardModels !== undefined) {
+    const normalizedAwardModels = normalizeReportAwardModels_(data.awardModels);
+    // 新契約資料不得回寫 legacy tw_*；其餘既有 KPI 欄位仍維持 v15 寫入方式。
+    const legacyData = {};
+    Object.keys(data).forEach(key => {
+      if (key !== 'awardModels' && key.indexOf('tw_') !== 0) legacyData[key] = data[key];
+    });
+    writeData(payload.date, payload.store, payload.seg, legacyData);
+    const saved = writeReportAwardModels_(payload.date, payload.store, payload.seg, normalizedAwardModels, payload.versionId);
+    return { status: 'ok', ...saved };
+  }
+  writeData(payload.date, payload.store, payload.seg, data);
+  return { status: 'ok' };
+}
+
+function reportReadPayload_(payload) {
+  return { status: 'ok', data: readData(payload.date, parseInt(payload.seg, 10)) };
+}
+
+function personalWritePayload_(payload) {
+  writePersonal(payload);
+  return { status: 'ok' };
+}
+
+function personalReadPayload_(payload) {
+  return { status: 'ok', data: readPersonal(payload.date, parseInt(payload.seg, 10)) };
 }
 
 function doPost(e) {
   try {
+    const rawPayload = privateDashboardPostRawPayload(e);
     const payload = privateDashboardParsePostPayload(e);
     const action = String(payload.action || '');
+    if (action === 'write') assertNoDuplicateReportAwardModelIds_(rawPayload);
     // 部署隔離：上傳專用 Deployment 只放行四個上傳路由
     if (reportUploadIsUploadDeployment_() && REPORT_UPLOAD_ALLOWED_ACTIONS.indexOf(action) === -1) {
       throw new Error('route-not-available-on-upload-deployment');
@@ -1418,6 +1438,10 @@ function doPost(e) {
     else if (action === 'private_publish') result = privateDashboardPublish(payload);
     else if (action === 'kpicalc_access') result = kpiCalcAccess(payload);
     else if (action === 'kpicalc_publish') result = kpiCalcPublish(payload);
+    else if (action === 'read') result = reportReadPayload_(payload);
+    else if (action === 'write') result = reportWritePayload_(payload);
+    else if (action === 'pwrite') result = personalWritePayload_(payload);
+    else if (action === 'pread') result = personalReadPayload_(payload);
     else if (action === 'report_upload_preview') result = reportUploadPreview(payload);
     else if (action === 'report_upload_commit') result = reportUploadCommit(payload);
     else if (action === 'report_upload_log') result = reportUploadLog(payload);
