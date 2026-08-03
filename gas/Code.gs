@@ -1338,7 +1338,7 @@ function jsonResponse(obj, callback) {
 // 請先在「專案設定 > 指令碼屬性」設定：
 // - DASHBOARD_PRIVATE_FOLDER_ID：私有 Google Drive 資料夾 ID
 // - DASHBOARD_ADMIN_SECRET：僅區主管持有的強密碼
-// - DASHBOARD_BOOTSTRAP_CODE：首次綁定碼（目前為 0935）
+// - DASHBOARD_BOOTSTRAP_CODE：首次綁定碼（只存在 Script Properties，不寫入程式碼）
 // 然後在 Apps Script 編輯器手動執行一次 setupPrivateDashboard()。
 // ════════════════════════════════════
 
@@ -1354,9 +1354,50 @@ const PRIVATE_DASHBOARD_REQUEST_HEADERS = [
   'approved_at', 'approved_by', 'replaced_device_id'
 ];
 
+const PRIVATE_DASHBOARD_POST_MESSAGE_TYPE = 'north12b-gas-response-v1';
+const PRIVATE_DASHBOARD_PRODUCTION_ORIGIN = 'https://lian852456-dot.github.io';
+
+function privateDashboardPostIsIframeTransport(e) {
+  return String((e && e.parameter && e.parameter.transport) || '') === 'iframe';
+}
+
+function privateDashboardPostOrigin(e) {
+  const requested = String((e && e.parameter && e.parameter.origin) || '');
+  const allowed = [
+    PRIVATE_DASHBOARD_PRODUCTION_ORIGIN,
+    'http://localhost:4173',
+    'http://127.0.0.1:4173',
+    'null'
+  ];
+  return allowed.indexOf(requested) >= 0 ? requested : PRIVATE_DASHBOARD_PRODUCTION_ORIGIN;
+}
+
+function privateDashboardPostResponse(body, e) {
+  if (!privateDashboardPostIsIframeTransport(e)) return jsonResponse(body);
+  const message = JSON.stringify({
+    type: PRIVATE_DASHBOARD_POST_MESSAGE_TYPE,
+    requestId: String((e && e.parameter && e.parameter.requestId) || ''),
+    body: body
+  }).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+  const targetOrigin = JSON.stringify(privateDashboardPostOrigin(e));
+  const html = '<!doctype html><meta charset="utf-8"><script>' +
+    'window.parent.postMessage(' + message + ',' + targetOrigin + ');' +
+    '</script>';
+  return HtmlService.createHtmlOutput(html)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function privateDashboardParsePostPayload(e) {
+  const formPayload = e && e.parameter && e.parameter.payload;
+  const raw = formPayload != null
+    ? formPayload
+    : ((e && e.postData && e.postData.contents) || '{}');
+  return JSON.parse(raw || '{}');
+}
+
 function doPost(e) {
   try {
-    const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const payload = privateDashboardParsePostPayload(e);
     const action = String(payload.action || '');
     // 部署隔離：上傳專用 Deployment 只放行四個上傳路由
     if (reportUploadIsUploadDeployment_() && REPORT_UPLOAD_ALLOWED_ACTIONS.indexOf(action) === -1) {
@@ -1382,9 +1423,9 @@ function doPost(e) {
     else if (action === 'report_upload_log') result = reportUploadLog(payload);
     else if (action === 'report_upload_rollback') result = reportUploadRollback(payload);
     else throw new Error('unknown private dashboard action');
-    return jsonResponse({ status: 'ok', ...result });
+    return privateDashboardPostResponse({ status: 'ok', ...result }, e);
   } catch (err) {
-    return jsonResponse({ status: 'error', message: err && err.message ? err.message : String(err) });
+    return privateDashboardPostResponse({ status: 'error', message: err && err.message ? err.message : String(err) }, e);
   }
 }
 
