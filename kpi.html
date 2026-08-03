@@ -223,17 +223,77 @@ function deviceId(){
   localStorage.setItem(key, id);
   return id;
 }
+
+const KPI_ALLOWED_MESSAGE_ORIGINS = new Set([
+  'https://script.google.com',
+  'https://script.googleusercontent.com'
+]);
+
 async function gasPost(payload){
-  const response = await fetch(gasUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload),
-    cache: 'no-store',
+  const gasEndpoint = gasUrl();
+  if (!gasEndpoint) throw new Error('尚未設定 Apps Script 服務網址');
+  return new Promise((resolve, reject) => {
+    const requestId = `kpi_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    let endpoint;
+    try {
+      endpoint = new URL(gasEndpoint, window.location.href);
+      endpoint.searchParams.set('transport', 'iframe');
+      endpoint.searchParams.set('requestId', requestId);
+      endpoint.searchParams.set('origin', window.location.origin || 'null');
+    } catch (error) {
+      reject(new Error('Apps Script 服務網址格式錯誤'));
+      return;
+    }
+    const frame = document.createElement('iframe');
+    const form = document.createElement('form');
+    const field = document.createElement('textarea');
+    const frameName = `kpi_dashboard_${requestId}`;
+    let finished = false;
+    const cleanup = () => {
+      window.removeEventListener('message', onMessage);
+      clearTimeout(timeoutId);
+      frame.remove();
+      form.remove();
+    };
+    const finish = (error, body) => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      if (error) reject(error);
+      else resolve(body);
+    };
+    const onMessage = event => {
+      const message = event.data;
+      if (!KPI_ALLOWED_MESSAGE_ORIGINS.has(event.origin) ||
+          event.source !== frame.contentWindow || !message ||
+          message.type !== 'north12b-gas-response-v1' || message.requestId !== requestId) return;
+      const body = message.body;
+      if (!body || body.status !== 'ok') {
+        finish(new Error((body && body.message) || '服務回應失敗'));
+        return;
+      }
+      finish(null, body);
+    };
+    const timeoutId = setTimeout(() => finish(new Error('服務連線逾時，請稍後再試。')), 30000);
+    frame.name = frameName;
+    frame.title = 'KPI dashboard transport';
+    frame.style.display = 'none';
+    form.method = 'POST';
+    form.action = endpoint.toString();
+    form.target = frameName;
+    form.enctype = 'application/x-www-form-urlencoded';
+    form.style.display = 'none';
+    field.name = 'payload';
+    field.value = JSON.stringify(payload);
+    form.appendChild(field);
+    window.addEventListener('message', onMessage);
+    document.body.append(frame, form);
+    try {
+      form.submit();
+    } catch (error) {
+      finish(new Error('服務連線失敗，請稍後再試。'));
+    }
   });
-  if (!response.ok) throw new Error(`服務連線失敗（HTTP ${response.status}）`);
-  const body = await response.json();
-  if (!body || body.status !== 'ok') throw new Error((body && body.message) || '服務回應失敗');
-  return body;
 }
 function lockStatus(msg, err){
   const el = document.getElementById('lockStatus');
