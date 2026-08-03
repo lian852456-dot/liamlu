@@ -1365,8 +1365,10 @@ function privateDashboardPostResponse(body, e) {
     body: body
   }).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
   const targetOrigin = JSON.stringify(privateDashboardPostOrigin(e));
+  // Apps Script wraps HtmlService output in a nested sandbox iframe. The
+  // top-level caller is the GitHub Pages page that submitted the form.
   const html = '<!doctype html><meta charset="utf-8"><script>' +
-    'window.parent.postMessage(' + message + ',' + targetOrigin + ');' +
+    'window.top.postMessage(' + message + ',' + targetOrigin + ');' +
     '</script>';
   return HtmlService.createHtmlOutput(html)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
