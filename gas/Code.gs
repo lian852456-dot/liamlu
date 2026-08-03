@@ -289,20 +289,7 @@ function doGet(e) {
       const rawPayload = decodeURIComponent(e.parameter.payload);
       assertNoDuplicateReportAwardModelIds_(rawPayload);
       const payload = JSON.parse(rawPayload);
-      const data = payload.data || {};
-      if (data.awardModels !== undefined) {
-        const normalizedAwardModels = normalizeReportAwardModels_(data.awardModels);
-        // 新契約資料不得回寫 legacy tw_*；其餘既有 KPI 欄位仍維持 v15 寫入方式。
-        const legacyData = {};
-        Object.keys(data).forEach(key => {
-          if (key !== 'awardModels' && key.indexOf('tw_') !== 0) legacyData[key] = data[key];
-        });
-        writeData(payload.date, payload.store, payload.seg, legacyData);
-        const saved = writeReportAwardModels_(payload.date, payload.store, payload.seg, normalizedAwardModels, payload.versionId);
-        return jsonResponse({ status: 'ok', ...saved }, cb);
-      }
-      writeData(payload.date, payload.store, payload.seg, data);
-      return jsonResponse({ status: 'ok' }, cb);
+      return jsonResponse(reportWritePayload_(payload), cb);
     } catch(err) {
       return jsonResponse({ status: 'error', message: err.message }, cb);
     }
@@ -323,8 +310,7 @@ function doGet(e) {
   if (action === 'pwrite') {
     try {
       const payload = JSON.parse(decodeURIComponent(e.parameter.payload));
-      writePersonal(payload);
-      return jsonResponse({ status: 'ok' }, cb);
+      return jsonResponse(personalWritePayload_(payload), cb);
     } catch(err) {
       return jsonResponse({ status: 'error', message: err.message }, cb);
     }
@@ -335,8 +321,7 @@ function doGet(e) {
     try {
       const date = e.parameter.date;
       const seg  = parseInt(e.parameter.seg);
-      const data = readPersonal(date, seg);
-      return jsonResponse({ status: 'ok', data }, cb);
+      return jsonResponse(personalReadPayload_({ date, seg }), cb);
     } catch(err) {
       return jsonResponse({ status: 'error', message: err.message }, cb);
     }
@@ -1338,7 +1323,7 @@ function jsonResponse(obj, callback) {
 // 請先在「專案設定 > 指令碼屬性」設定：
 // - DASHBOARD_PRIVATE_FOLDER_ID：私有 Google Drive 資料夾 ID
 // - DASHBOARD_ADMIN_SECRET：僅區主管持有的強密碼
-// - DASHBOARD_BOOTSTRAP_CODE：首次綁定碼（目前為 0935）
+// - DASHBOARD_BOOTSTRAP_CODE：首次綁定碼（只存在 Script Properties，不寫入程式碼）
 // 然後在 Apps Script 編輯器手動執行一次 setupPrivateDashboard()。
 // ════════════════════════════════════
 
@@ -1354,10 +1339,86 @@ const PRIVATE_DASHBOARD_REQUEST_HEADERS = [
   'approved_at', 'approved_by', 'replaced_device_id'
 ];
 
+const PRIVATE_DASHBOARD_POST_MESSAGE_TYPE = 'north12b-gas-response-v1';
+const PRIVATE_DASHBOARD_PRODUCTION_ORIGIN = 'https://lian852456-dot.github.io';
+
+function privateDashboardPostIsIframeTransport(e) {
+  return String((e && e.parameter && e.parameter.transport) || '') === 'iframe';
+}
+
+function privateDashboardPostOrigin(e) {
+  const requested = String((e && e.parameter && e.parameter.origin) || '');
+  const allowed = [
+    PRIVATE_DASHBOARD_PRODUCTION_ORIGIN,
+    'http://localhost:4173',
+    'http://127.0.0.1:4173',
+    'null'
+  ];
+  return allowed.indexOf(requested) >= 0 ? requested : PRIVATE_DASHBOARD_PRODUCTION_ORIGIN;
+}
+
+function privateDashboardPostResponse(body, e) {
+  if (!privateDashboardPostIsIframeTransport(e)) return jsonResponse(body);
+  const message = JSON.stringify({
+    type: PRIVATE_DASHBOARD_POST_MESSAGE_TYPE,
+    requestId: String((e && e.parameter && e.parameter.requestId) || ''),
+    body: body
+  }).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+  const targetOrigin = JSON.stringify(privateDashboardPostOrigin(e));
+  const html = '<!doctype html><meta charset="utf-8"><script>' +
+    'window.parent.postMessage(' + message + ',' + targetOrigin + ');' +
+    '</script>';
+  return HtmlService.createHtmlOutput(html)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function privateDashboardPostRawPayload(e) {
+  const formPayload = e && e.parameter && e.parameter.payload;
+  return formPayload != null
+    ? formPayload
+    : ((e && e.postData && e.postData.contents) || '{}');
+}
+
+function privateDashboardParsePostPayload(e) {
+  return JSON.parse(privateDashboardPostRawPayload(e) || '{}');
+}
+
+function reportWritePayload_(payload) {
+  const data = payload.data || {};
+  if (data.awardModels !== undefined) {
+    const normalizedAwardModels = normalizeReportAwardModels_(data.awardModels);
+    // 新契約資料不得回寫 legacy tw_*；其餘既有 KPI 欄位仍維持 v15 寫入方式。
+    const legacyData = {};
+    Object.keys(data).forEach(key => {
+      if (key !== 'awardModels' && key.indexOf('tw_') !== 0) legacyData[key] = data[key];
+    });
+    writeData(payload.date, payload.store, payload.seg, legacyData);
+    const saved = writeReportAwardModels_(payload.date, payload.store, payload.seg, normalizedAwardModels, payload.versionId);
+    return { status: 'ok', ...saved };
+  }
+  writeData(payload.date, payload.store, payload.seg, data);
+  return { status: 'ok' };
+}
+
+function reportReadPayload_(payload) {
+  return { status: 'ok', data: readData(payload.date, parseInt(payload.seg, 10)) };
+}
+
+function personalWritePayload_(payload) {
+  writePersonal(payload);
+  return { status: 'ok' };
+}
+
+function personalReadPayload_(payload) {
+  return { status: 'ok', data: readPersonal(payload.date, parseInt(payload.seg, 10)) };
+}
+
 function doPost(e) {
   try {
-    const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const rawPayload = privateDashboardPostRawPayload(e);
+    const payload = privateDashboardParsePostPayload(e);
     const action = String(payload.action || '');
+    if (action === 'write') assertNoDuplicateReportAwardModelIds_(rawPayload);
     // 部署隔離：上傳專用 Deployment 只放行四個上傳路由
     if (reportUploadIsUploadDeployment_() && REPORT_UPLOAD_ALLOWED_ACTIONS.indexOf(action) === -1) {
       throw new Error('route-not-available-on-upload-deployment');
@@ -1377,14 +1438,18 @@ function doPost(e) {
     else if (action === 'private_publish') result = privateDashboardPublish(payload);
     else if (action === 'kpicalc_access') result = kpiCalcAccess(payload);
     else if (action === 'kpicalc_publish') result = kpiCalcPublish(payload);
+    else if (action === 'read') result = reportReadPayload_(payload);
+    else if (action === 'write') result = reportWritePayload_(payload);
+    else if (action === 'pwrite') result = personalWritePayload_(payload);
+    else if (action === 'pread') result = personalReadPayload_(payload);
     else if (action === 'report_upload_preview') result = reportUploadPreview(payload);
     else if (action === 'report_upload_commit') result = reportUploadCommit(payload);
     else if (action === 'report_upload_log') result = reportUploadLog(payload);
     else if (action === 'report_upload_rollback') result = reportUploadRollback(payload);
     else throw new Error('unknown private dashboard action');
-    return jsonResponse({ status: 'ok', ...result });
+    return privateDashboardPostResponse({ status: 'ok', ...result }, e);
   } catch (err) {
-    return jsonResponse({ status: 'error', message: err && err.message ? err.message : String(err) });
+    return privateDashboardPostResponse({ status: 'error', message: err && err.message ? err.message : String(err) }, e);
   }
 }
 
