@@ -1436,6 +1436,7 @@ function doPost(e) {
     else if (action === 'private_admin_approve') result = privateDashboardAdminApprove(payload);
     else if (action === 'private_admin_revoke') result = privateDashboardAdminRevoke(payload);
     else if (action === 'private_admin_set_trusted_employee') result = privateDashboardAdminSetTrustedEmployee(payload);
+    else if (action === 'private_admin_snapshot_status') result = privateDashboardAdminSnapshotStatus(payload);
     else if (action === 'private_sync_roster') result = privateDashboardSyncRoster(payload);
     else if (action === 'private_publish') result = privateDashboardPublish(payload);
     else if (action === 'kpicalc_access') result = kpiCalcAccess(payload);
@@ -1725,6 +1726,29 @@ function privateDashboardAdminSetTrustedEmployee(payload) {
     props.setProperty('DASHBOARD_NOTIFY_EMAIL', notificationEmail);
   }
   return { trustedEmployeeId: employeeId };
+}
+
+function privateDashboardAdminSnapshotStatus(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const files = privateDashboardFolder().getFilesByName(PRIVATE_DASHBOARD_FILE);
+  if (!files.hasNext()) throw new Error('私有戰情快照不存在');
+  const file = files.next();
+  const snapshot = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
+  const owner = file.getOwner();
+  return {
+    fileName: file.getName(),
+    fileId: file.getId(),
+    ownerEmail: owner ? owner.getEmail() : '',
+    sharingAccess: String(file.getSharingAccess()),
+    sharingPermission: String(file.getSharingPermission()),
+    lastUpdated: Utilities.formatDate(file.getLastUpdated(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX"),
+    publishedAt: snapshot.publishedAt || '',
+    kpiReportDate: snapshot.kpiBattle.report_date || '',
+    awardsReportDate: snapshot.awardsBattle.report_date || '',
+    phoneItems: snapshot.awardsBattle.phone_items || 0,
+    storeRows: snapshot.awardsBattle.store_rows || 0
+  };
 }
 
 // ════════════════════════════════════
