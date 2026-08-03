@@ -2495,6 +2495,17 @@ const PRIVATE_DASHBOARD_ALLOWED_MESSAGE_ORIGINS = new Set([
   'https://script.google.com',
   'https://script.googleusercontent.com'
 ]);
+function privateDashboardAllowedGasMessageOrigin(origin) {
+  if (typeof origin !== 'string' || !origin) return false;
+  try {
+    const parsed = new URL(origin);
+    return parsed.protocol === 'https:' && !parsed.port &&
+      (PRIVATE_DASHBOARD_ALLOWED_MESSAGE_ORIGINS.has(parsed.origin) ||
+       parsed.hostname.endsWith('.script.googleusercontent.com'));
+  } catch (error) {
+    return false;
+  }
+}
 
 async function privateDashboardPost(payload) {
   if (!GAS_URL) throw new Error('尚未設定 Apps Script 服務網址');
@@ -2531,7 +2542,7 @@ async function privateDashboardPost(payload) {
     };
     const onMessage = event => {
       const message = event.data;
-      if (!PRIVATE_DASHBOARD_ALLOWED_MESSAGE_ORIGINS.has(event.origin) ||
+      if (!privateDashboardAllowedGasMessageOrigin(event.origin) ||
           event.source !== frame.contentWindow || !message ||
           message.type !== 'north12b-gas-response-v1' || message.requestId !== requestId) return;
       const body = message.body;
