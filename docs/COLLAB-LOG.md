@@ -13,6 +13,22 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-03 ｜ Claude（home.html 新增「店務檢查」入口卡片）
+
+- 做了什麼：只在 `home.html` 同仁大廳的 `nav.board` 末端新增一張卡片，連到外部獨立網站
+  `https://twm-store-inspection.liamlu245.chatgpt.site/`，`target="_blank"` +
+  `rel="noopener noreferrer"` 另開分頁。沿用既有 `.card` / `.stamp` / `.tag` / `.go` 結構與
+  cyan 配色，**沒有新增任何 CSS、沒有 JS、沒有動 GAS／API／資料流／其他卡片**。
+- 結果：成功。Playwright 實測桌機 1280 與手機 390 皆正常（同仁大廳 4 張卡＝桌機 2×2、
+  手機單欄，`body.scrollWidth === clientWidth` 無橫向溢出）。純前端連結，無需重新部署 GAS。
+- 經驗 / 給下一位的提醒：
+  1. Liam 原話是「同仁大廳的**店務管理區**」，但頁面目前只有「同仁大廳／督導專區」兩區，
+     沒有店務管理區；為了不動既有卡片與版面，**放在同仁大廳最後一張**而非另開新分區。
+     若之後真的要拆分區，再一起規劃。
+  2. 這是本頁第一個 `target="_blank"` 的外部站連結（戰報快速更新那張 GAS 連結是同分頁），
+     所以「開啟 →」改成「另開分頁 →」以示區別——其他卡片文案完全沒動。
+  3. 店務檢查是**獨立網站、獨立權限**，home.html 依舊是純導覽頁：不要把它的登入或資料搬進來。
+
 ## 2026-07-31 ｜ Claude（方案 A 實作：index.html KPI 戰情改讀 kpicalc 唯一正式來源）
 
 - 做了什麼：依 Liam 拍板實作方案 A。`index.html` KPI 戰情頁籤登入後改打 `kpicalc_access`
