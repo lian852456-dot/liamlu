@@ -2543,7 +2543,7 @@ async function privateDashboardPost(payload) {
     const onMessage = event => {
       const message = event.data;
       if (!privateDashboardAllowedGasMessageOrigin(event.origin) ||
-          event.source !== frame.contentWindow || !message ||
+          !event.source || !message ||
           message.type !== 'north12b-gas-response-v1' || message.requestId !== requestId) return;
       const body = message.body;
       if (!body || body.status !== 'ok') {
