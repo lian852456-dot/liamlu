@@ -234,7 +234,7 @@ function kpiAllowedGasMessageOrigin(origin) {
     const parsed = new URL(origin);
     return parsed.protocol === 'https:' && !parsed.port &&
       (KPI_ALLOWED_MESSAGE_ORIGINS.has(parsed.origin) ||
-       parsed.hostname.endsWith('.script.googleusercontent.com'));
+       parsed.hostname.endsWith('-script.googleusercontent.com'));
   } catch (error) {
     return false;
   }
