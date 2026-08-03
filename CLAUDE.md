@@ -25,6 +25,9 @@
 資料存「巡店明細」工作表，API 為 `?action=ptread`（fetch GET 讀全部）與
 `?action=ptwrite&payload=...`（JSONP 寫入，前端每 10 筆分批送避免網址過長；
 GAS 端以 fillTime+store+item 為唯一鍵去重，content 欄不上傳、由題號 ITEM_TEXT 還原）。
+每月班表另有 `?action=sread`（讀）與 doPost `action=swrite`（寫，前端每 400 列一批，
+第一批帶 `replace` 清該月舊資料、最後一批帶 `finalize` 更新「班表版本」）——
+**門市／公司電腦連得到 GAS 但不一定連得到 docs.google.com，所以班表更新一定要保留這條不開試算表的路。**
 **讀寫需通行碼（2026-07-29 恢復）**：`ptAuthorized()` 曾在 2026-07-23～07-29 之間固定
 `return true`（免密碼，圖方便，Codex 當時的記錄有標註「未取得 Liam 明確指示前不得自行改回」——
 這次是 Liam 本人在 07-29 明確要求恢復，不是 AI 自行決定），2026-07-29 起**改回真的檢查**
