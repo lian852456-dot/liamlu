@@ -13,6 +13,34 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-03 ｜ Claude（8 月班表正式上線 + 修「版本月份被自動轉日期」根因）
+
+- **完成**：情報站 8 月班表已上線。因門市電腦連不到 docs.google.com，改用「一次性 `.gs`
+  灌進『班表明細』」（複製 7 月的做法：離線整理成 12 欄、一次寫入，不動 Code.gs、不部署）。
+  正式站已驗證：班表明細 2790 列（7月1426＋8月1364）、8 月 9 門市、王姵文 31 列、7 月原封不動。
+- **🕳️ 踩到坑（已修根因）**：一次性腳本用 `setValues` 寫入時，Google Sheets 把
+  「版本月份 2026-08」「日期 2026-08-01」「日 1」**自動轉成 Date／數字**。後果：`readSchedule`
+  以 `String(版本月份)==='2026-08'` 比對，對 Date 物件永遠 false → 情報站選 8 月讀不到。
+  這正是 CLAUDE.md 早記過的坑（台獎事件 #2），但巡店／半月當初有做 `setNumberFormat('@')`
+  防護、**班表這張表漏了**。
+  - **止血**：另發 `fixAugustScheduleTypes`（偵測版本月份為 Date 的連續 8 月列，
+    `setNumberFormat('@')` 後改回文字 `2026-08`／`2026-08-01`／`1`；只動 8 月、7 月不碰）。已驗證。
+  - **修根因（本次 commit）**：`scheduleSheetForWrite_` 每次寫入都 `getRange('A:L').setNumberFormat('@')`，
+    `scheduleUpsertVersion_` 也對版本表 `'A:I'` 做同樣保護；補 2 條 node 測試（共 13/13 綠）。
+    下個月走 `swrite` 匯入功能就不會再重演。
+- **另一半的『沒成功』其實不是資料問題**：小榮同日的新部署（main 已 +13 commits、Code.gs +1193 行）
+  把 `sread` 從「免密碼」改成 `if(!ptAuthorized(e)) throw 'unauthorized'`。門市端舊 token 失效 →
+  情報站顯示 unauthorized。**重新登入即解**（資料與格式都是好的）。這是小榮 PR 的行為改變，非本次班表工作造成。
+- **給下一位的提醒**：
+  1. **任何寫進試算表、長得像日期／數字的字串（YYYY-MM、YYYY-MM-DD、純數字），寫之前一定先
+     `setNumberFormat('@')`**。這是本專案第 N 次因此吃虧，巡店/半月/回報都有防、別漏。
+  2. 查「班表沒顯示」先分兩層：資料在不在（讀試算表）vs 顯示卡在哪（授權／格式）。這次是
+     資料在、格式錯 + 授權失效兩件事疊加，分開處理才不會誤判成「匯入失敗」。
+  3. 我的分支 `claude/info-station-monthly-schedule-nhgr4j` 仍以事故前舊 main 為基準，
+     **尚未 rebase 到含小榮 13 個 commit 的新 main**；合併前務必先 rebase，否則會洗掉他的 +1193 行。
+
+---
+
 ## 2026-08-03 ｜ Claude（情報站新增「班表匯入」：不開試算表也能更新每月班表）
 
 - **起因**：8 月班表資料備好後，Liam 回報**公司電腦連不到外網**，開不了 docs.google.com，

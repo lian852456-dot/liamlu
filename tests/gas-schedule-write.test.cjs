@@ -18,8 +18,11 @@ function makeSheet(rows) {
   const sheet = {
     rows,
     deleted: [],
+    numberFormats: [],     // 記錄 setNumberFormat 呼叫（驗證有鎖純文字）
     getLastRow: () => rows.length,
+    // 支援兩種形式：getRange(row,col,numRows,numCols) 與 getRange('A:L')。
     getRange(row, col, numRows = 1, numCols = 1) {
+      const a1 = typeof row === 'string' ? row : null;
       return {
         getValues() {
           const out = [];
@@ -35,6 +38,11 @@ function makeSheet(rows) {
             while (rows.length <= target) rows.push([]);
             line.forEach((cell, c) => { rows[target][col - 1 + c] = cell; });
           });
+          return this;
+        },
+        setNumberFormat(fmt) {
+          sheet.numberFormats.push({ range: a1 || `${row},${col}`, fmt });
+          return this;
         },
       };
     },
@@ -152,6 +160,26 @@ test('writeSchedule 的 replace 讓重跑同一個月不會變成兩份', () => 
   assert.equal(result.written, 1);
   const names = sheet.rows.slice(1).map(r => r[5]);
   assert.deepEqual(names, ['七月', '新'], '七月資料必須原封不動');
+});
+
+test('writeSchedule 把班表明細整欄鎖成純文字（防 2026-08 被自動轉成日期）', () => {
+  // 這正是 2026-08-03 正式站踩到的坑：版本月份寫進去被 Sheets 轉成 Date，
+  // 導致 readSchedule 的 String(版本月份)==='2026-08' 永遠 false。
+  const sheet = makeSheet([HEADERS.slice()]);
+  const ctx = loadSchedule({ sheet });
+  ctx.writeSchedule({ month: '2026-08', rows: [detailRow('2026-08', '酒泉', 1, 'A')] });
+  const locked = sheet.numberFormats.some(f => f.range === 'A:L' && f.fmt === '@');
+  assert.ok(locked, '班表明細必須整欄 setNumberFormat("@")');
+});
+
+test('scheduleUpsertVersion_ 也鎖純文字（月份 2026-08 不被轉日期）', () => {
+  const sheet = makeSheet([HEADERS.slice()]);
+  const versionSheet = makeSheet([['版本ID', '月份', '匯入時間', '來源位置',
+                                   '來源檔數', '門市數', '班表明細數', '狀態', '備註']]);
+  const ctx = loadSchedule({ sheet, versionSheet });
+  ctx.writeSchedule({ month: '2026-08', finalize: true, rows: [detailRow('2026-08', '酒泉', 1, 'A')] });
+  assert.ok(versionSheet.numberFormats.some(f => f.range === 'A:I' && f.fmt === '@'),
+            '班表版本必須整欄 setNumberFormat("@")');
 });
 
 test('writeSchedule 蓋掉用戶端送來的匯入時間', () => {

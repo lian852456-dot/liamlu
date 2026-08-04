@@ -546,11 +546,14 @@ function scheduleSheetForWrite_(ss) {
   if (!sh) {
     sh = ss.insertSheet(SCHEDULE_SHEET);
     sh.getRange(1, 1, 1, SCHEDULE_HEADERS.length).setValues([SCHEDULE_HEADERS]);
-    return sh;
-  }
-  if (sh.getLastRow() === 0) {
+  } else if (sh.getLastRow() === 0) {
     sh.getRange(1, 1, 1, SCHEDULE_HEADERS.length).setValues([SCHEDULE_HEADERS]);
   }
+  // 全欄鎖純文字，避免「版本月份 2026-08」「日期 2026-08-01」「日 1」被試算表
+  // 自動轉成 Date／數字（與巡店、半月同款保護）。每次寫入都設，不只建表時，
+  // 因為 班表明細 可能是先前不含此保護時就已存在。※若漏了這步，readSchedule 的
+  // String(版本月份)==='2026-08' 會永遠 false（見 CLAUDE.md 踩過的坑）。
+  sh.getRange('A:L').setNumberFormat('@');
   return sh;
 }
 
@@ -581,6 +584,8 @@ function scheduleUpsertVersion_(ss, info) {
     sh = ss.insertSheet(SCHEDULE_VERSION_SHEET);
     sh.getRange(1, 1, 1, SCHEDULE_VERSION_HEADERS.length).setValues([SCHEDULE_VERSION_HEADERS]);
   }
+  // 同理鎖純文字，避免「月份 2026-08」被自動轉成日期。
+  sh.getRange('A:I').setNumberFormat('@');
   const row = [
     'SCH-' + info.month + '-001', info.month, info.importedAt, info.source,
     info.sourceCount, info.storeCount, info.rowCount, '已匯入', info.note || ''
