@@ -1316,6 +1316,111 @@
     background: #ffffff; border: 1.5px solid #e5e7eb;
     border-radius: 14px; padding: 20px; width: 100%; max-width: 340px;
   }
+
+  /* ── Visual readability preview: KPI / awards only, no data contract changes ── */
+  .brand-lockup { display:flex; align-items:center; gap:12px; min-width:0; }
+  .brand-mark { width:48px; height:48px; border-radius:8px; overflow:hidden; flex:0 0 48px; border:1px solid #fed7aa; background:#fff; }
+  .brand-mark img { width:100%; height:100%; object-fit:cover; display:block; }
+  .site-title { font-size:22px; font-weight:900; letter-spacing:0; }
+  .site-subtitle { margin-top:2px; font-size:15px; color:var(--text-muted); letter-spacing:0; }
+  .date-badge { min-height:34px; padding:7px 12px; font-size:15px; font-weight:800; border-radius:7px; }
+  .tab-btn { min-height:48px; padding:13px 18px; font-size:16px; font-weight:800; }
+  #panel-kpi-battle, #panel-awards-battle { max-width:1640px; margin:0 auto; }
+  #panel-kpi-battle .card, #panel-awards-battle .card { border-radius:8px; padding:22px 24px; margin-bottom:20px; box-shadow:0 1px 5px rgba(17,24,39,.07); }
+  #panel-kpi-battle .card-title, #panel-awards-battle .card-title { font-size:21px; text-transform:none; letter-spacing:0; margin-bottom:18px; padding-bottom:12px; }
+  #panel-kpi-battle .kpi-battle-toolbar { align-items:flex-start; gap:16px; }
+  #panel-kpi-battle .kpi-battle-toggle button { min-height:42px; padding:9px 16px; border-radius:7px; font-size:16px; font-weight:900; }
+  .kpi-source-metadata { display:grid; grid-template-columns:repeat(3,minmax(150px,1fr)); gap:8px; width:min(760px,100%); }
+  .kpi-source-item { min-width:0; padding:9px 11px; border:1px solid #e5e7eb; border-radius:7px; background:#fafafa; }
+  .kpi-source-item strong { display:block; color:var(--text-dim); font-size:15px; font-weight:900; }
+  .kpi-source-item span { display:block; margin-top:2px; color:var(--text); font-size:16px; font-weight:800; overflow-wrap:anywhere; }
+  .kpi-source-item.status { border-color:#bbf7d0; background:#f0fdf4; }
+  .kpi-source-item.status span { color:var(--green); }
+  #panel-kpi-battle .summary-grid, #panel-awards-battle .summary-grid { gap:14px; }
+  #panel-kpi-battle .summary-card, #panel-awards-battle .summary-card { min-height:132px; padding:18px; border-radius:8px; }
+  #panel-kpi-battle .sc-label, #panel-awards-battle .sc-label { font-size:16px; font-weight:900; }
+  #panel-kpi-battle .sc-val, #panel-awards-battle .sc-val { margin-top:8px; font-size:32px; line-height:1; font-weight:900; }
+  #panel-kpi-battle .sc-sub, #panel-awards-battle .sc-sub { margin-top:8px; font-size:15px; font-weight:800; }
+  #panel-kpi-battle .section-divider, #panel-awards-battle .section-divider { margin:28px 0 14px; font-size:16px; text-transform:none; letter-spacing:0; }
+  #panel-kpi-battle .table-wrap { margin:0 -10px; }
+  #panel-kpi-battle table { min-width:1230px; font-size:16px; }
+  #panel-kpi-battle thead th { padding:15px 14px; font-size:17px; font-weight:900; }
+  #panel-kpi-battle tbody td { padding:16px 14px; font-size:16px; font-weight:750; line-height:1.45; }
+  #panel-kpi-battle .store-name { font-size:17px; font-weight:900; }
+  #panel-kpi-battle .kpi-rate { font-size:21px; font-weight:900; }
+  #panel-kpi-battle .kpi-sub, #panel-kpi-battle .kpi-dod, #panel-kpi-battle .kpi-award-meta { margin-top:5px; font-size:15px; line-height:1.45; font-weight:750; }
+  #panel-kpi-battle .kpi-award-val { font-size:23px; line-height:1.15; }
+  #panel-kpi-battle .kpi-metric-grid { gap:14px; }
+  #panel-kpi-battle .kpi-metric-card { border-radius:8px; padding:16px; }
+  #panel-kpi-battle .kpi-metric-card .label { min-height:0; font-size:17px; }
+  #panel-kpi-battle .kpi-metric-card .value { font-size:27px; }
+  #panel-kpi-battle .kpi-battle-filter { gap:14px; margin:4px 0; }
+  #panel-kpi-battle .kpi-battle-filter label { display:grid; gap:6px; font-size:16px; font-weight:900; }
+  #panel-kpi-battle .kpi-battle-filter select { min-height:46px; margin:0; padding:9px 12px; border-radius:7px; font-size:17px; font-weight:800; }
+  #panel-kpi-battle .kpi-battle-note { font-size:16px; font-weight:750; }
+  #panel-awards-battle .awards-hero { border-color:#c4b5fd; background:#fcfaff; }
+  #panel-awards-battle .awards-battle-note { font-size:16px; line-height:1.65; }
+  .award-role-indicator { display:inline-flex; align-items:center; min-height:30px; margin-top:8px; padding:5px 9px; border-radius:6px; background:#f5f3ff; color:#6d28d9; font-size:15px; font-weight:900; }
+  .award-role-indicator.district { background:#fff7ed; color:var(--accent-bright); }
+  #panel-awards-battle .award-store-grid { gap:16px; }
+  #panel-awards-battle .award-store-card { border-radius:8px; padding:18px; }
+  #panel-awards-battle .award-store-name { font-size:22px; }
+  #panel-awards-battle .award-store-rank { font-size:16px; line-height:1.55; }
+  #panel-awards-battle .award-store-values { gap:12px; margin:16px 0; }
+  #panel-awards-battle .award-value { padding:13px; border-radius:7px; }
+  #panel-awards-battle .award-value .label { font-size:15px; }
+  #panel-awards-battle .award-value .number { margin-top:6px; font-size:26px; }
+  #panel-awards-battle .award-priority-grid { gap:12px; }
+  #panel-awards-battle .award-priority-card { border-radius:8px; padding:15px; }
+  #panel-awards-battle .award-priority-title { font-size:19px; }
+  #panel-awards-battle .award-priority-action { font-size:17px; }
+  #panel-awards-battle .award-priority-sub { font-size:15px; }
+  #panel-awards-battle .award-metric { padding:10px; border-radius:7px; font-size:14px; }
+  #panel-awards-battle .award-metric strong { margin-top:4px; font-size:19px; }
+  #panel-awards-battle .award-store-selector { gap:12px; }
+  #panel-awards-battle .award-store-selector label { font-size:16px; }
+  #panel-awards-battle .award-store-selector select { min-height:48px; font-size:17px; border-radius:7px; }
+  #panel-awards-battle .award-model-grid { gap:12px; }
+  #panel-awards-battle .award-model { border-radius:8px; padding:13px; }
+  #panel-awards-battle .award-model-name { min-height:0; font-size:16px; }
+  #panel-awards-battle .award-model-rate { font-size:24px; }
+  #panel-awards-battle .award-model-sub, #panel-awards-battle .award-model-next { font-size:15px; line-height:1.45; }
+  .award-model-tiers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
+  .award-model-tier { padding:9px; border:1px solid #ddd6fe; border-radius:7px; color:#6d28d9; background:#faf5ff; font-size:13px; font-weight:800; }
+  .award-model-tier strong { display:block; margin-top:3px; color:#5b21b6; font-size:19px; font-weight:900; }
+  @media (max-width: 700px) {
+    body { font-size:18px; }
+    .site-header { padding:11px 14px; }
+    .brand-mark { width:46px; height:46px; flex-basis:46px; }
+    .site-title { font-size:20px; }
+    .site-subtitle { font-size:15px; }
+    .header-right { width:100%; justify-content:space-between; }
+    .date-badge { min-height:38px; font-size:15px; }
+    .tab-btn { min-height:52px; padding:13px 15px; font-size:17px; }
+    #panel-kpi-battle, #panel-awards-battle { padding:16px 12px; }
+    #panel-kpi-battle .card, #panel-awards-battle .card { padding:18px 16px; margin-bottom:16px; }
+    #panel-kpi-battle .card-title, #panel-awards-battle .card-title { font-size:21px; }
+    .kpi-source-metadata { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .kpi-source-item strong { font-size:15px; }
+    .kpi-source-item span { font-size:16px; }
+    #panel-kpi-battle .summary-grid, #panel-awards-battle .summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    #panel-kpi-battle .summary-card, #panel-awards-battle .summary-card { min-height:126px; padding:15px; }
+    #panel-kpi-battle .sc-label, #panel-awards-battle .sc-label { font-size:16px; }
+    #panel-kpi-battle .sc-val, #panel-awards-battle .sc-val { font-size:29px; }
+    #panel-kpi-battle table { min-width:1230px; font-size:17px; }
+    #panel-kpi-battle thead th { padding:15px 13px; font-size:17px; }
+    #panel-kpi-battle tbody td { padding:17px 13px; font-size:17px; }
+    #panel-kpi-battle .kpi-rate { font-size:22px; }
+    #panel-kpi-battle .kpi-sub, #panel-kpi-battle .kpi-dod, #panel-kpi-battle .kpi-award-meta { font-size:15px; }
+    #panel-kpi-battle .kpi-battle-filter select { min-height:50px; font-size:18px; }
+    #panel-awards-battle .award-store-name { font-size:21px; }
+    #panel-awards-battle .award-value .number { font-size:26px; }
+    #panel-awards-battle .award-priority-title { font-size:19px; }
+    #panel-awards-battle .award-model-grid { grid-template-columns:1fr; }
+    #panel-awards-battle .award-model-name { font-size:17px; }
+    #panel-awards-battle .award-model-rate { font-size:26px; }
+    .award-model-tier strong { font-size:21px; }
+  }
 </style>
 </head>
 <body>
@@ -1324,36 +1429,11 @@
 
 <!-- HEADER -->
 <header class="site-header">
-  <div style="display:flex;align-items:center;gap:12px;">
-    <!-- 大可鴨 SVG -->
-    <div style="width:44px;height:44px;flex-shrink:0;">
-      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-        <!-- 身體 -->
-        <ellipse cx="50" cy="65" rx="28" ry="24" fill="#ff6600"/>
-        <!-- 頭 -->
-        <circle cx="50" cy="36" r="20" fill="#ff6600"/>
-        <!-- 臉白色 -->
-        <ellipse cx="53" cy="40" rx="13" ry="11" fill="#fff"/>
-        <!-- 眼睛 -->
-        <circle cx="46" cy="32" r="4" fill="#fff"/>
-        <circle cx="46" cy="32" r="2.5" fill="#111"/>
-        <circle cx="47" cy="31" r="0.8" fill="#fff"/>
-        <!-- 嘴巴/嘴喙 -->
-        <ellipse cx="61" cy="40" rx="10" ry="6" fill="#ffaa00"/>
-        <!-- 翅膀左 -->
-        <ellipse cx="24" cy="68" rx="10" ry="16" fill="#e55a00" transform="rotate(-15 24 68)"/>
-        <!-- 翅膀右 -->
-        <ellipse cx="76" cy="68" rx="10" ry="16" fill="#e55a00" transform="rotate(15 76 68)"/>
-        <!-- 腳 -->
-        <ellipse cx="40" cy="87" rx="8" ry="4" fill="#ffaa00" transform="rotate(-10 40 87)"/>
-        <ellipse cx="60" cy="87" rx="8" ry="4" fill="#ffaa00" transform="rotate(10 60 87)"/>
-        <!-- 頭髮/頂毛 -->
-        <path d="M44 18 Q50 8 56 18 Q53 14 50 16 Q47 14 44 18Z" fill="#e55a00"/>
-      </svg>
-    </div>
+  <div class="brand-lockup">
+    <div class="brand-mark"><img src="assets/north12b-captain.png" alt="北一二B 戰報小隊長"></div>
     <div>
       <div class="site-title">北一二<span>B</span> 每日回報</div>
-      <div style="font-size:11px;color:var(--text-muted);letter-spacing:1px;">Taiwan Mobile · 台灣大哥大</div>
+      <div class="site-subtitle">Taiwan Mobile · 台灣大哥大</div>
     </div>
   </div>
   <div class="header-right">
@@ -2435,6 +2515,17 @@ function kpiBattleSourceDateRange(value) {
   return normalized || '—';
 }
 
+function kpiBattleSourceMetadata(data, supplement) {
+  const items = [
+    ['戰報日期', data.report_date || '—'],
+    ['資料統計至', data.data_as_of_date || data.source_as_of_date || '—'],
+    ['來源檔', data.source_file || '—'],
+    ['統計區間', kpiBattleSourceDateRange(data.source_date_range)],
+    ['同步狀態', supplement],
+  ];
+  return `<div class="kpi-source-metadata">${items.map(([label, value], index) => `<div class="kpi-source-item${index === 4 ? ' status' : ''}"><strong>${label}</strong><span> ${value}</span></div>`).join('')}</div>`;
+}
+
 function kpiBattleStoreKey(value) {
   return String(value || '').replace(/^台灣大哥大數位生活台北/, '').replace(/^台北/, '').replace(/\s+/g, '').trim();
 }
@@ -2824,7 +2915,7 @@ function renderKpiBattle() {
   const note = document.getElementById('kpiBattleSourceNote');
   if (note) {
     const supplement = _kpiBattleData.supplement_synced ? '同次正式快照已同步排名、加掛、個人台獎與保險' : '補充欄位尚未同步（來源或日期不一致）';
-    note.textContent = `KPI 實績來源：與 kpi.html 同一份受保護 kpicalc 正式 JSON｜戰報日期 ${_kpiBattleData.report_date || '—'}｜資料統計至 ${_kpiBattleData.data_as_of_date || _kpiBattleData.source_as_of_date || '—'}｜來源檔 ${_kpiBattleData.source_file || '—'}｜區間 ${kpiBattleSourceDateRange(_kpiBattleData.source_date_range)}｜${supplement}｜讀取於 ${_kpiBattleData.fetchedAt || '—'}｜個資僅供受保護預覽`;
+    note.innerHTML = kpiBattleSourceMetadata(_kpiBattleData, supplement);
   }
   const content = document.getElementById('kpiBattleContent');
   if (!content) return;
@@ -2871,8 +2962,8 @@ function renderKpiBattlePersonal() {
       <span class="kpi-battle-note">共 ${rows.length} 人｜姓名已遮罩</span>
     </div></div>
     <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
-      <thead><tr><th style="text-align:left">店點</th><th>職類</th><th>姓名</th><th>總達成率</th><th>KPI排名</th><th>個人台獎</th><th>保險搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th><th>R999</th><th>RT</th><th>特維</th><th>配件</th><th>包膜</th></tr></thead>
-      <tbody>${rows.map(row => `<tr><td class="store-name">${row.store}</td><td>${row.role || '—'}</td><td>${row.name}</td><td>${kpiBattleRate(row.overall_rate, row.overall_rate_dod)}</td><td>${row.rank ?? kpiPendingCell()}${kpiBattleRankDod(row.rank_dod)}</td><td>${row.phone_award_actual == null && row.phone_award_projected == null ? kpiPendingCell() : kpiBattleAwardCell(row)}</td><td>${row.insurance_attach_rate == null ? kpiPendingCell() : `<span class="kpi-rate rate-only">${kpiBattlePercent(row.insurance_attach_rate)}</span><span class="kpi-sub">個人搭售率</span>`}</td><td>${kpiBattleMetricCell(row.metrics?.A999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.A1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.好速, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.RT, false)}</td><td>${kpiBattleMetricCell(row.metrics?.特維, false)}</td><td>${kpiBattleMetricCell(row.metrics?.配件, false)}</td><td>${kpiBattleMetricCell(row.metrics?.包膜, false)}</td></tr>`).join('') || '<tr><td colspan="16" class="val-dim">目前篩選條件沒有資料</td></tr>'}</tbody>
+      <thead><tr><th style="text-align:left">姓名</th><th>總達成率</th><th>KPI排名</th><th>個人台獎</th><th>保險搭售率</th><th>店點</th><th>職類</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th><th>R999</th><th>RT</th><th>特維</th><th>配件</th><th>包膜</th></tr></thead>
+      <tbody>${rows.map(row => `<tr><td class="store-name">${row.name}</td><td>${kpiBattleRate(row.overall_rate, row.overall_rate_dod)}</td><td>${row.rank ?? kpiPendingCell()}${kpiBattleRankDod(row.rank_dod)}</td><td>${row.phone_award_actual == null && row.phone_award_projected == null ? kpiPendingCell() : kpiBattleAwardCell(row)}</td><td>${row.insurance_attach_rate == null ? kpiPendingCell() : `<span class="kpi-rate rate-only">${kpiBattlePercent(row.insurance_attach_rate)}</span><span class="kpi-sub">個人搭售率</span>`}</td><td>${row.store}</td><td>${row.role || '—'}</td><td>${kpiBattleMetricCell(row.metrics?.A999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.A1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.好速, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.RT, false)}</td><td>${kpiBattleMetricCell(row.metrics?.特維, false)}</td><td>${kpiBattleMetricCell(row.metrics?.配件, false)}</td><td>${kpiBattleMetricCell(row.metrics?.包膜, false)}</td></tr>`).join('') || '<tr><td colspan="16" class="val-dim">目前篩選條件沒有資料</td></tr>'}</tbody>
     </table></div></div>`;
 }
 
@@ -2924,6 +3015,7 @@ function renderAwardModel(item, district = false) {
 function renderAwardUnit(row, district = false) {
   const award = row?.award || {};
   return `<div class="award-store-card"><div class="award-store-head"><div class="award-store-name">${district ? '🏢 ' : ''}${row?.store || '—'}</div><div class="award-store-rank">排名 ${award.rank ?? '—'}<br>${award.award === 'Y' ? '✅ 可領獎' : '⚠️ 未領獎'}</div></div>
+    <div class="award-role-indicator${district ? ' district' : ''}">${district ? '督導獎金角色｜北一二B 80%／100%' : '店長獎金角色｜店點 50%／100%'}</div>
     <div class="award-store-values"><div class="award-value"><div class="label">實際金額</div><div class="number">${awardMoney(award.actual_total)}</div></div><div class="award-value"><div class="label">推估金額</div><div class="number">${awardMoney(award.projected)}</div></div></div>
     <div class="award-priority-grid">${(row?.priorities || []).map(renderAwardPriority).join('') || '<span class="val-dim">沒有符合優先順位的機款</span>'}</div>
   </div>`;
@@ -2971,7 +3063,7 @@ function renderAwardsBattle() {
     <div class="section-divider">督導區及各店台獎（依實際獎金排序）</div>
     <div class="award-store-grid">${renderAwardUnit(data.overall || { store: '北一二B整體', award: supervisor, priorities: [] }, true)}${stores.map(row => renderAwardUnit(row)).join('')}</div>
     <div class="section-divider">北一二B／門市 ${phoneItems} 款機款篩選</div>
-    <div class="card"><div class="award-store-selector"><label>選擇北一二B／門市<select id="awardsStoreSelect" onchange="renderAwardsBattle()"><option value="北一二B整體" ${selectedDistrict ? 'selected' : ''}>🏢 北一二B整體</option>${stores.map(row => `<option value="${row.store}" ${row.store === selectedUnit?.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label><span class="kpi-battle-note">${selectedDistrict ? '北一二B差異數＝實際數－80%目標台數（無條件進位）｜顯示北一二B 80%／100%獎金' : '店點差異數＝實際數－50%目標台數（無條件進位）｜顯示店點 50%／100%獎金'}</span></div><div class="award-model-grid">${(selectedUnit?.items || []).map(item => renderAwardModel(item, selectedDistrict)).join('')}</div></div>`;
+    <div class="card"><div class="award-store-selector"><label>選擇北一二B／門市<select id="awardsStoreSelect" onchange="renderAwardsBattle()"><option value="北一二B整體" ${selectedDistrict ? 'selected' : ''}>🏢 北一二B整體</option>${stores.map(row => `<option value="${row.store}" ${row.store === selectedUnit?.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label><span class="kpi-battle-note">${selectedDistrict ? '北一二B差異數＝實際數－80%目標台數（無條件進位）' : '店點差異數＝實際數－50%目標台數（無條件進位）'}</span></div><div class="award-role-indicator${selectedDistrict ? ' district' : ''}">${selectedDistrict ? '目前檢視：督導獎金角色｜北一二B 80%／100%' : '目前檢視：店長獎金角色｜店點 50%／100%'}</div><div class="award-model-grid">${(selectedUnit?.items || []).map(item => renderAwardModel(item, selectedDistrict)).join('')}</div></div>`;
 
 }
 

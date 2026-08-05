@@ -34,10 +34,12 @@ test('台獎僅以 KPI 戰報日期比對，不得使用資料截止日', () => 
   assert.match(login, /renderAwardsBattleUnavailable\(\)/);
 });
 
-test('來源說明分開顯示戰報日期、資料截止日與來源檔', () => {
+test('來源說明以資訊格分開顯示戰報日期、資料截止日與來源檔', () => {
   const render = functionBody(html, 'renderKpiBattle');
-  for (const label of ['戰報日期', '資料統計至', '來源檔', 'kpicalc', '讀取於']) {
-    assert.ok(render.includes(label), `來源說明列缺少：${label}`);
+  const metadata = functionBody(html, 'kpiBattleSourceMetadata');
+  assert.match(render, /note\.innerHTML = kpiBattleSourceMetadata/);
+  for (const label of ['戰報日期', '資料統計至', '來源檔', '統計區間', '同步狀態']) {
+    assert.ok(metadata.includes(label), `來源資訊格缺少：${label}`);
   }
 });
 
@@ -72,13 +74,10 @@ test('快照合併硬性要求截止日與來源檔一致', () => {
   assert.doesNotMatch(functionBody(html, 'loadKpiBattle'), /__KPI_BATTLE_DATA__/);
 });
 
-test('private_publish 修正只允許落在該函式，巡店保護區不得變更', () => {
+test('純前端預覽不得變更 GAS 或巡店保護區', () => {
   const changed = execFileSync('git', ['diff', '--name-only', 'origin/main', '--', 'gas/Code.gs', 'patrol.html'], { cwd: root, encoding: 'utf8' })
     .trim().split('\n').filter(Boolean);
-  assert.deepEqual(changed, ['gas/Code.gs']);
-  const diff = execFileSync('git', ['diff', 'origin/main', '--', 'gas/Code.gs'], { cwd: root, encoding: 'utf8' });
-  assert.match(diff, /snapshot\.publishedAt = publishedAt/);
-  assert.doesNotMatch(diff, /^[+-].*(ptread|ptwrite|hread|hwrite|sread|kpiCalcAccess|reportUpload)/m);
+  assert.deepEqual(changed, []);
   const gas = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8');
   assert.match(gas, /action === 'private_publish'/);
   assert.match(gas, /action === 'ptread'/);
