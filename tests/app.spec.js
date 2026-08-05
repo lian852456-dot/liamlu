@@ -360,6 +360,7 @@ test.describe('KPI 戰情', () => {
     await expect(page.locator('#kpiBattleSourceNote')).toContainText('戰報日期 2026-08-05');
     await expect(page.locator('#kpiBattleSourceNote')).toContainText('資料統計至 2026-08-04');
     await expect(page.locator('#kpiBattleSourceNote')).toContainText('來源檔 0805.xlsx');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('區間 2026/08/01～08/04');
     await expect(page.locator('#kpiBattleSourceNote')).toContainText('同次正式快照已同步');
   });
 

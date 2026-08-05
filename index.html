@@ -2427,6 +2427,11 @@ function kpiBattleSourceFile(value) {
   return String(value || '').split(/[\\/]/).pop().trim().toLowerCase();
 }
 
+function kpiBattleSourceDateRange(value) {
+  const normalized = String(value || '').trim().replace(/\s*[~～]\s*/g, '～');
+  return normalized || '—';
+}
+
 function kpiBattleStoreKey(value) {
   return String(value || '').replace(/^台灣大哥大數位生活台北/, '').replace(/^台北/, '').replace(/\s+/g, '').trim();
 }
@@ -2811,7 +2816,7 @@ function renderKpiBattle() {
   const note = document.getElementById('kpiBattleSourceNote');
   if (note) {
     const supplement = _kpiBattleData.supplement_synced ? '同次正式快照已同步排名、加掛、個人台獎與保險' : '補充欄位尚未同步（來源或日期不一致）';
-    note.textContent = `KPI 實績來源：與 kpi.html 同一份受保護 kpicalc 正式 JSON｜戰報日期 ${_kpiBattleData.report_date || '—'}｜資料統計至 ${_kpiBattleData.data_as_of_date || _kpiBattleData.source_as_of_date || '—'}｜來源檔 ${_kpiBattleData.source_file || '—'}｜區間 ${_kpiBattleData.source_date_range || '—'}｜${supplement}｜讀取於 ${_kpiBattleData.fetchedAt || '—'}｜個資僅供受保護預覽`;
+    note.textContent = `KPI 實績來源：與 kpi.html 同一份受保護 kpicalc 正式 JSON｜戰報日期 ${_kpiBattleData.report_date || '—'}｜資料統計至 ${_kpiBattleData.data_as_of_date || _kpiBattleData.source_as_of_date || '—'}｜來源檔 ${_kpiBattleData.source_file || '—'}｜區間 ${kpiBattleSourceDateRange(_kpiBattleData.source_date_range)}｜${supplement}｜讀取於 ${_kpiBattleData.fetchedAt || '—'}｜個資僅供受保護預覽`;
   }
   const content = document.getElementById('kpiBattleContent');
   if (!content) return;
