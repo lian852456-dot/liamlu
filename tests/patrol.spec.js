@@ -155,7 +155,18 @@ async function openAndUnlock(page, answer = PT_KEY) {
 const PAGE_URL = 'file://' + path.resolve(__dirname, '../patrol.html');
 
 function pasteLine(d, store, code, item, result, reason) {
-  return `2026/7/${d} 16:43\t2026/7/${d} 16:00\t2026/7/${d} 18:00\t北一二B\t${code}\t${store}\t測試督導\t${item}\t內容\t${result}\t${reason}`;
+  const { line } = currentMonthFixture(d, store, code, item, result, reason);
+  return line;
+}
+
+function currentMonthFixture(day, store, code, item, result, reason) {
+  const month = new Date().toISOString().slice(0, 7);
+  const [year, monthNumber] = month.split('-').map(Number);
+  return {
+    line: `${year}/${monthNumber}/${day} 16:43\t${year}/${monthNumber}/${day} 16:00\t${year}/${monthNumber}/${day} 18:00\t北一二B\t${code}\t${store}\t測試督導\t${item}\t內容\t${result}\t${reason}`,
+    month,
+    fillDate: `${year}/${monthNumber}/${day}`,
+  };
 }
 
 test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; cloudConfig = null; mediaUploads = []; failPtwrite = false; });
@@ -367,7 +378,8 @@ test('知悉宣導提醒：題19-33只看總進度與20日前完成狀態', asyn
   const tonghua = table.locator('tr', { hasText: '通化' });
   await expect(tonghua).toContainText('15/15');
   await expect(tonghua).toContainText('✓ 已完成');
-  await expect(tonghua).toContainText('7/5');
+  const expectedDate = currentMonthFixture(5, '台北通化', 'DNB10059', 19, 'v', '').fillDate.replace(/^\d{4}\//, '');
+  await expect(tonghua).toContainText(expectedDate);
   const jiuquan = table.locator('tr', { hasText: '酒泉' });
   await expect(jiuquan).toContainText('1/15');
   await expect(jiuquan).toContainText(/剩 \d+ 天|⚠ 逾期/);
@@ -525,12 +537,13 @@ test('督導檢查大盤直接採計貼上巡店紀錄的上下半月、月盤�
 });
 
 test('巡店異常明細只計入檢查至少 10 項且到店至少 5 次的門市', async ({ page }) => {
+  const fixture = currentMonthFixture(1, '台北通化', 'DNB10059', 1, 'v', '');
   const rows = (store, code, days) => days.flatMap((day, index) => Array.from({ length: 10 }, (_, item) => ({
-    fillTime: `2026/7/${day} 16:43`, arriveTime: `2026/7/${day} 16:00`, leaveTime: `2026/7/${day} 18:00`, district: '北一二B',
-    code, store, inspector: '測試督導', item: item + 2, result: 'v', reason: '', month: '2026-07',
+    fillTime: `${fixture.fillDate.replace(/\/1$/, `/${day}`)} 16:43`, arriveTime: `${fixture.fillDate.replace(/\/1$/, `/${day}`)} 16:00`, leaveTime: `${fixture.fillDate.replace(/\/1$/, `/${day}`)} 18:00`, district: '北一二B',
+    code, store, inspector: '測試督導', item: item + 2, result: 'v', reason: '', month: fixture.month,
   })).concat(index === days.length - 1 ? [{
-    fillTime: `2026/7/${day} 16:43`, arriveTime: `2026/7/${day} 16:00`, leaveTime: `2026/7/${day} 18:00`, district: '北一二B',
-    code, store, inspector: '測試督導', item: 12, result: '', reason: '展示機異常', month: '2026-07',
+    fillTime: `${fixture.fillDate.replace(/\/1$/, `/${day}`)} 16:43`, arriveTime: `${fixture.fillDate.replace(/\/1$/, `/${day}`)} 16:00`, leaveTime: `${fixture.fillDate.replace(/\/1$/, `/${day}`)} 18:00`, district: '北一二B',
+    code, store, inspector: '測試督導', item: 12, result: '', reason: '展示機異常', month: fixture.month,
   }] : []));
   cloudRows = [
     ...rows('台北通化', 'DNB10059', [2, 5, 10, 16, 20]),
@@ -591,12 +604,14 @@ function juneDetails() {
   return rows;
 }
 async function openMileage(page, details) {
+  const rows = details || juneDetails();
+  cloudRows = rows;
   await stubGas(page);
   await openAndUnlock(page);
-  await page.evaluate(rows => { rawDetails = rows; currentMonth = '2026-06'; rows.forEach(r => {
+  await page.evaluate(rows => { rawDetails = rows; currentMonth = '2026-06'; const monthInput = document.getElementById('monthInput'); if (monthInput) monthInput.value = '2026-06'; rows.forEach(r => {
     const s = r.store; if (!records[s]) records[s] = { code: r.code, entries: [] };
     records[s].entries.push({ month: r.month, date: r.arriveTime.split(' ')[0], half: 1, item: r.item, result: r.result });
-  }); render(); }, details || juneDetails());
+  }); render(); }, rows);
   await page.click('.secure-tab[data-view="mileage"]');
   await expect(page.locator('#mileageView')).toHaveClass(/active/);
   await page.evaluate(() => MI.setMonth('2026-06'));

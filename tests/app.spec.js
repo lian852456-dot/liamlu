@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 
 const FILE_URL = 'file://' + path.resolve(__dirname, '../index.html');
+const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
 // Mock GAS 回應（讓 fetch 不需要真正連線）
 async function mockGAS(page, { readData = {} } = {}) {
@@ -14,6 +15,8 @@ async function mockGAS(page, { readData = {} } = {}) {
         await route.fulfill({ json: { status: 'ok', profile: { maskedName: '測＊員', store: '大稻埕', role: '業代' }, snapshot: { kpiBattle: KPI_BATTLE_FIXTURE, awardsBattle: AWARDS_BATTLE_FIXTURE } } });
       } else if (payload.action === 'kpicalc_access') {
         await route.fulfill({ json: { status: 'ok', data: KPICALC_FIXTURE, profile: { maskedName: '測＊員', store: '大稻埕', role: '業代' } } });
+      } else if (payload.action === 'read') {
+        await route.fulfill({ json: { status: 'ok', data: readData } });
       } else {
         await route.fulfill({ json: { status: 'ok' } });
       }
@@ -233,13 +236,14 @@ test.describe('填報頁籤 - 時段切換', () => {
 });
 
 test.describe('填報頁籤 - 表單輸入', () => {
-  test('台獎填報維持 10 款且只保留 moto', async ({ page }) => {
+  test('台獎填報使用 award-models-v1 的 13 款正式欄位', async ({ page }) => {
     await mockGAS(page);
     await page.goto(FILE_URL);
     await page.locator('.store-card[data-store="通化"]').click();
-    await expect(page.locator('#f_tw_sony1')).toBeVisible();
-    await expect(page.locator('label').filter({ hasText: 'moto razr fold' })).toBeVisible();
-    await expect(page.locator('#f_tw_pixel10fold, #f_tw_findx9s, #f_tw_poketomo, #f_tw_myfirst')).toHaveCount(0);
+    await expect(page.locator('#awardModelsV1Grid [data-award-model-id]')).toHaveCount(13);
+    await expect(page.locator('#f_award_razr-fold')).toBeVisible();
+    await expect(page.locator('#awardModelsV1Grid label').filter({ hasText: 'moto razr fold' })).toBeVisible();
+    await expect(page.locator('#f_tw_sony1')).toBeHidden();
   });
 
   test('KPI 欄位可以輸入數值', async ({ page }) => {
@@ -304,7 +308,7 @@ test.describe('頁籤切換', () => {
   test('彙整大盤顯示 GAS 回傳的純時間，不顯示 1899 基準日', async ({ page }) => {
     await mockGAS(page, {
       readData: {
-        '萬大': { store: '萬大', date: '2026-07-20', seg: 16, savedAt: '下午 3:42:26' },
+        '萬大': { store: '萬大', date: TODAY_ISO, seg: 16, savedAt: '下午 3:42:26' },
       },
     });
     await page.goto(FILE_URL);

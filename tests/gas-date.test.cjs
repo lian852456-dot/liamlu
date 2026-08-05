@@ -10,6 +10,7 @@ const end = source.indexOf('function jsonResponse', start);
 const dateFunctions = source.slice(start, end);
 
 test('readData 保留 savedAt 的試算表顯示時間，不回傳 1899-12-30', () => {
+  assert.match(source, /function attachReportAwardModels_/);
   const values = [
     ['date', 'store', 'seg', 'savedAt'],
     [new Date('2026-07-20T00:00:00Z'), '萬大', 16, new Date('1899-12-30T15:42:26Z')],
@@ -36,6 +37,9 @@ test('readData 保留 savedAt 的試算表顯示時間，不回傳 1899-12-30', 
           };
         },
       };
+    },
+    attachReportAwardModels_(result) {
+      return result;
     },
   };
   vm.runInNewContext(dateFunctions, context);
