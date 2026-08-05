@@ -1679,6 +1679,10 @@
     </div>
     <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;padding:0 2px;">填寫今日各機款銷售筆數（0可不填）｜<span style="color:#22c55e;">●</span> 50%達成獎金 <span style="color:#ff6600;">●</span> 100%達成獎金</div>
 
+    <div id="awardModelsV1Grid" class="form-grid" aria-label="8月台獎13組機款"></div>
+    <div id="awardModelsV1Status" style="font-size:11px;color:var(--text-dim);margin:6px 2px 10px;">資料契約：award-models-v1｜缺少項目保留空值，0 與空值分開記錄</div>
+
+    <div id="legacyAwardInputs" style="display:none;" aria-hidden="true">
     <!-- KPI 高SD - 黃底 -->
     <div style="font-size:11px;font-weight:700;color:#b8860b;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);border-radius:6px;padding:4px 10px;margin-bottom:6px;">⭐ KPI 高SD</div>
     <div class="form-grid">
@@ -1737,6 +1741,8 @@
         <span class="ki-icon">📱</span>
         <input type="number" id="f_tw_y21" placeholder="0" step="1">
       </div>
+    </div>
+
     </div>
 
     <!-- 儲存 -->
@@ -2074,6 +2080,25 @@ const KPI_THRESHOLDS = {
   rt_pts: 80, special_renew: 80, premium_renew: 80, rt999: 80, rt1399: 80, haosu: 80
 };
 
+// 8 月中央台獎契約（畫面簡稱僅為顯示；儲存一律使用 modelId）。
+const AWARD_MODELS_SCHEMA = 'award-models-v1';
+const AWARD_MODEL_DEFINITIONS = [
+  { modelId:'pixel-10-family', shortName:'Pixel10系列' },
+  { modelId:'razr-fold', shortName:'moto razr fold' },
+  { modelId:'s26u-zfold8-family', shortName:'S26U／Z Fold8／Z Fold8U' },
+  { modelId:'sharp-r11', shortName:'R11' },
+  { modelId:'vivo-x300-v70fe', shortName:'X300 ＆ V70 FE' },
+  { modelId:'pixel-11-pro-family', shortName:'Pixel 11 Pro／11 XL／11 Fold' },
+  { modelId:'s26-zflip8-family', shortName:'S26／S26+／Z Flip8' },
+  { modelId:'pixel-11', shortName:'Pixel11' },
+  { modelId:'oppo-r16f', shortName:'R16F' },
+  { modelId:'samsung-a57', shortName:'A57' },
+  { modelId:'oppo-a6x', shortName:'A6x 6G／128G' },
+  { modelId:'samsung-a27-a17', shortName:'A27 ＆ A17' },
+  { modelId:'vivo-y21', shortName:'vivo Y21' }
+];
+const AWARD_MODEL_IDS = AWARD_MODEL_DEFINITIONS.map(item => item.modelId);
+
 let currentSeg = 16;
 let sumSeg = 16;
 let pbSeg = 16;
@@ -2081,11 +2106,14 @@ let pbSeg = 16;
 // ════════════════════════════════════
 // GOOGLE SHEETS 設定
 // ════════════════════════════════════
-const LEGACY_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
-const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
+// 每日回報正式 Web App。戰報快速更新是另一個獨立 Deployment，不能被回報頁使用。
+const DAILY_REPORT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
+const LEGACY_GAS_URL = DAILY_REPORT_GAS_URL;
+const DEFAULT_GAS_URL = DAILY_REPORT_GAS_URL;
 const savedGasUrl = localStorage.getItem('bei12b_gas_url');
-let GAS_URL = !savedGasUrl || savedGasUrl === LEGACY_GAS_URL ? DEFAULT_GAS_URL : savedGasUrl;
-if (savedGasUrl === LEGACY_GAS_URL) localStorage.setItem('bei12b_gas_url', DEFAULT_GAS_URL);
+// 正式頁只允許每日回報端點；清除舊的測試／快速上傳端點，避免資料只落在 local shadow。
+let GAS_URL = savedGasUrl === DAILY_REPORT_GAS_URL ? savedGasUrl : DEFAULT_GAS_URL;
+if (savedGasUrl !== GAS_URL) localStorage.setItem('bei12b_gas_url', GAS_URL);
 
 // 記憶體快取（避免重複拉資料）
 const _cache = {};
@@ -2116,6 +2144,14 @@ function mergeDayData(remoteData, localData) {
     }
     const record = { ...merged[store] };
     Object.entries(localRecord || {}).forEach(([key, value]) => {
+      if (key === 'awardModels' && value && typeof value === 'object') {
+        record.awardModels = { ...(record.awardModels || {}), ...value };
+        return;
+      }
+      if (key === 'awardModelsMeta' || key === 'unmappedLegacyFields') {
+        if (value !== null && value !== undefined) record[key] = value;
+        return;
+      }
       if (!key.startsWith('tw_')) return;
       if (value !== null && value !== undefined && value !== '') record[key] = value;
     });
@@ -2144,14 +2180,28 @@ async function getData(date, store, seg) {
 }
 
 // ── 拉取整天所有門市資料存入快取
+// 舊呼叫介面保留給既有頁面相容；實際傳輸已改為表單 POST + iframe postMessage，
+// 不再把回報資料或登入資料放入 URL，也不依賴 JSONP。
+async function requestGasJson(url) {
+  const endpoint = new URL(url, window.location.href);
+  const payload = {};
+  endpoint.searchParams.forEach((value, key) => {
+    if (key === 'payload') return;
+    payload[key] = key === 'seg' ? parseInt(value, 10) : value;
+  });
+  if (endpoint.searchParams.has('payload')) {
+    Object.assign(payload, JSON.parse(endpoint.searchParams.get('payload')));
+  }
+  return privateDashboardPost(payload);
+}
+
 async function fetchDayData(date, seg) {
   const ck = cacheKey(date, seg);
   const localShadow = readLocalShadow(date, seg);
   if (!GAS_URL) { _cache[ck] = {}; return; }
   try {
-    const url = `${GAS_URL}?action=read&date=${date}&seg=${seg}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    const json = await res.json();
+    const json = await privateDashboardPost({ action: 'read', date, seg });
+    if (!json || json.status !== 'ok') throw new Error((json && json.message) || '讀取失敗');
     _cache[ck] = mergeDayData(json.data || {}, localShadow);
   } catch(e) {
     console.error('fetchDayData error', e);
@@ -2165,57 +2215,25 @@ async function saveToStorage(date, store, seg, data) {
     showToast('⚠️ 尚未設定 Apps Script 網址');
     return false;
   }
+  // 先取得正式端點的可驗證回應；在伺服器讀回前，不寫 local shadow，也不顯示成功。
+  const result = await privateDashboardPost({ action: 'write', date, store, seg, data });
+  const readback = result && result.readback && result.readback.awardModels;
+  const modelsMatch = readback && AWARD_MODEL_IDS.every(id =>
+    Object.prototype.hasOwnProperty.call(readback, id) && readback[id] === data.awardModels[id]
+  );
+  const responseValid = result && result.status === 'ok' && result.rowWritten === true &&
+    typeof result.spreadsheetId === 'string' && result.spreadsheetId.length > 0 &&
+    result.sheetName === 'ReportAwardModels' &&
+    String(result.date) === String(date) && String(result.seg) === String(seg) &&
+    String(result.store) === String(store) && result.readbackMatches === true && modelsMatch;
+  if (!responseValid) throw new Error('ReportAwardModels 寫入回應未通過讀回驗證');
+
+  // 只有同一端點確認 rowWritten + readback 後，才更新本機 shadow/cache。
   writeLocalShadow(date, store, seg, data);
-  // 同時更新本地快取
   const ck = cacheKey(date, seg);
   if (!_cache[ck]) _cache[ck] = {};
   _cache[ck][store] = { ...data, date, store, seg };
-
-  // 用 GET + URL 參數 + no-cors 模式
-  const payload = encodeURIComponent(JSON.stringify({ date, store, seg, data }));
-  const url = `${GAS_URL}?action=write&payload=${payload}`;
-  
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    const cbName = 'gasCallback_' + Date.now();
-    window[cbName] = function(result) {
-      delete window[cbName];
-      document.head.removeChild(script);
-      resolve(result && result.status === 'ok');
-    };
-    script.onerror = function() {
-      delete window[cbName];
-      // 即使有 error 也嘗試用 fetch
-      fetch(url + '&callback=' + cbName)
-        .then(r => r.json())
-        .then(j => resolve(j.status === 'ok'))
-        .catch(() => {
-          // 最後嘗試：no-cors 送出（無法確認結果但資料會到）
-          fetch(url, { mode: 'no-cors' })
-            .then(() => resolve(true))
-            .catch(() => resolve(false));
-        });
-    };
-    // 先試 fetch
-    fetch(url)
-      .then(r => r.json())
-      .then(j => {
-        delete window[cbName];
-        resolve(j.status === 'ok');
-      })
-      .catch(() => {
-        // fetch 失敗，改用 no-cors
-        fetch(url, { mode: 'no-cors' })
-          .then(() => {
-            delete window[cbName];
-            resolve(true);
-          })
-          .catch(() => {
-            delete window[cbName];
-            resolve(false);
-          });
-      });
-  });
+  return true;
 }
 function pct(val) {
   if (val === null || val === undefined || val === '') return '—';
@@ -2254,6 +2272,7 @@ function showToast(msg) {
 // ════════════════════════════════════
 window.onload = async () => {
   const td = today();
+  renderAwardModelInputs();
   document.getElementById('fillDate').value = td;
   document.getElementById('playbackDate').value = td;
   document.getElementById('todayBadge').textContent = '📅 ' + td;
@@ -2381,9 +2400,71 @@ function switchTab(name) {
 // KPI BATTLE — official daily report, protected by employee ID + approved device
 // ════════════════════════════════════
 let _kpiBattleData = null;
+
+// ═══ 方案 A 轉接層：kpicalc JSON → KPI 戰情視圖 ═══
+// 原則（2026-07-31 Liam 拍板）：kpicalc 有的欄位顯示最新值；沒有的欄位（公司排名、
+// DOD 昨日變化、加掛分、個人排名／台獎／保險搭售率）一律「尚未同步」或隱藏，
+// 不得沿用 dashboard snapshot 的舊數字。所有數字都直接來自 kpicalc JSON 或其逐項加總，
+// 不發明任何新數字；整體總達成率無法由 kpicalc 推得（需加權），因此也是尚未同步。
+const KPI_BATTLE_CORE_KEYS = { a999: 'AQ V+D 999 (含)以上', a1399: 'AQ V+D 1399 (含)以上', haosu: '好速案銷售點數', r1399: 'RT V+D 1399 (含)以上' };
+const KPI_BATTLE_PERSONAL_KEYS = { A999: 'AQ V+D 999 (含)以上', A1399: 'AQ V+D 1399 (含)以上', '好速': '好速案銷售點數', R1399: 'RT V+D 1399 (含)以上', R999: 'RT V+D 999 (含)以上', RT: 'RT上線點數', '特維': '特殊維繫用戶續約數', '配件': '配件及其他營收', '包膜': '包膜與保貼營收' };
+
+function kpiPendingCell() { return '<span class="kpi-sub" style="font-weight:800;color:var(--text-muted)">尚未同步</span>'; }
+
+function kpicalcMetric(entry, meta) {
+  if (!entry) return null;
+  const actual = Number(entry.a) || 0;
+  const target = Number(entry.t) || 0;
+  // 依統計截止日換算應達進度（同 meta 推得，非新數字）；無目標時不給達成率
+  const expected = (target > 0 && Number(meta.monthDays) > 0) ? target * Number(meta.snapshotDay) / Number(meta.monthDays) : null;
+  return { actual, target, rate: target > 0 ? actual / target : null, daily_gap: expected == null ? null : actual - expected };
+}
+
+function kpicalcToKpiBattleView(data, fetchedAt) {
+  const meta = (data && data.meta) || {};
+  const dataDate = (/^\d{4}-\d{2}$/.test(meta.month || '') && meta.snapshotDay)
+    ? `${meta.month}-${String(meta.snapshotDay).padStart(2, '0')}` : '';
+  const codeName = {};
+  (data.stores || []).forEach(s => { codeName[s.code] = s.name; });
+  const metricsOf = itemsObj => {
+    const out = {};
+    (data.items || []).forEach(it => { const m = kpicalcMetric((itemsObj || {})[it.key], meta); if (m) out[it.key] = m; });
+    return out;
+  };
+  const coreOf = metrics => {
+    const core = {};
+    Object.entries(KPI_BATTLE_CORE_KEYS).forEach(([short, key]) => { core[short] = metrics[key] || null; });
+    return core;
+  };
+  const stores = (data.stores || []).map(s => {
+    const metrics = metricsOf(s.items);
+    return { store: s.name, overall_kpi: s.official, company_rank: null, addon_score: null, core: coreOf(metrics), metrics };
+  });
+  // 整體＝各店逐項加總（純加總，非發明數字）
+  const aggItems = {};
+  (data.items || []).forEach(it => {
+    let a = 0, t = 0, seen = false;
+    (data.stores || []).forEach(s => { const e = (s.items || {})[it.key]; if (e) { a += Number(e.a) || 0; t += Number(e.t) || 0; seen = true; } });
+    if (seen) aggItems[it.key] = kpicalcMetric({ a, t }, meta);
+  });
+  const personal = (data.persons || []).map(p => {
+    const metrics = {};
+    Object.entries(KPI_BATTLE_PERSONAL_KEYS).forEach(([short, key]) => { metrics[short] = kpicalcMetric((p.items || {})[key], meta); });
+    return { store: codeName[p.store] || p.store, category: p.role || '—', role: p.role || '', name: p.pname,
+             overall_rate: p.official, overall_rate_dod: null, rank: null, rank_dod: null,
+             insurance_attach_rate: null, phone_award_actual: null, phone_award_projected: null, metrics };
+  });
+  return {
+    source: 'kpicalc', fetchedAt: fetchedAt || '', source_file: meta.sourceFile || '',
+    report_date: dataDate, source_date_range: meta.period || '', source_as_of_date: dataDate, previous_report_date: null,
+    aggregate: { store: '北一二B整體', overall_kpi: null, company_rank: null, addon_score: null, core: coreOf(aggItems), metrics: aggItems },
+    stores, personal
+  };
+}
 let _kpiBattleView = 'stores';
 let _privateDashboardProfile = null;
 let _privateDashboardAdminSecret = '';
+let _awardsBattleUnavailableReason = '';
 
 function privateDashboardDeviceId() {
   const key = 'north12b_private_dashboard_device_id';
@@ -2410,14 +2491,35 @@ function privateDashboardSetStatus(message, error = false) {
   });
 }
 
+const PRIVATE_DASHBOARD_ALLOWED_MESSAGE_ORIGINS = new Set([
+  'https://script.google.com',
+  'https://script.googleusercontent.com'
+]);
+function privateDashboardAllowedGasMessageOrigin(origin) {
+  if (typeof origin !== 'string' || !origin) return false;
+  try {
+    const parsed = new URL(origin);
+    return parsed.protocol === 'https:' && !parsed.port &&
+      (PRIVATE_DASHBOARD_ALLOWED_MESSAGE_ORIGINS.has(parsed.origin) ||
+       parsed.hostname.endsWith('-script.googleusercontent.com'));
+  } catch (error) {
+    return false;
+  }
+}
+
 async function privateDashboardPost(payload) {
   if (!GAS_URL) throw new Error('尚未設定 Apps Script 服務網址');
-  const response = await fetch(GAS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload),
-    cache: 'no-store',
-  });
+  let response;
+  try {
+    response = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    });
+  } catch (error) {
+    throw new Error('服務連線失敗，請稍後再試。');
+  }
   if (!response.ok) throw new Error(`服務連線失敗（HTTP ${response.status}）`);
   const body = await response.json();
   if (!body || body.status !== 'ok') throw new Error((body && body.message) || '服務回應失敗');
@@ -2426,6 +2528,7 @@ async function privateDashboardPost(payload) {
 
 function privateDashboardLockMarkup(kind) {
   const title = kind === 'awards' ? '台獎戰情受保護' : 'KPI 戰情受保護';
+  const uploadEntry = kind === 'kpi' ? `<a class="secondary" href="https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec" target="_blank" rel="noopener">戰報快速更新</a>` : '';
   return `<div class="card private-lock">
     <h3>🔐 ${title}</h3>
     <p>僅限北一二B在職同仁使用。姓名維持遮罩，KPI、排名與獎金不會出現在公開 GitHub 頁面。</p>
@@ -2438,6 +2541,7 @@ function privateDashboardLockMarkup(kind) {
       <button class="secondary" onclick="privateDashboardRequestBinding()">首次申請綁定</button>
       <button class="secondary" onclick="privateDashboardCheckRequest()">查看核准結果</button>
       <button class="secondary" onclick="privateDashboardOpenAdmin()">管理者核准</button>
+      ${uploadEntry}
     </div>
     <div class="private-lock-status">首次使用：輸入員編＋啟用碼提出申請；管理者核准後，該員編只綁定這一台手機或電腦。往後僅輸入員編登入。</div>
     <div class="private-admin" id="privateAdminPanel" style="display:none;"></div>
@@ -2470,11 +2574,31 @@ async function privateDashboardLogin() {
   try {
     const result = await privateDashboardPost({ action: 'private_access', employeeId, deviceId: privateDashboardDeviceId() });
     sessionStorage.setItem('north12b_private_dashboard_employee_id', employeeId);
-    _kpiBattleData = result.snapshot.kpiBattle;
-    _awardsBattleData = result.snapshot.awardsBattle;
     _privateDashboardProfile = result.profile || null;
-    renderKpiBattle();
-    renderAwardsBattle();
+    try {
+      const kpiResult = await privateDashboardPost({ action: 'kpicalc_access', employeeId, deviceId: privateDashboardDeviceId() });
+      _kpiBattleData = kpicalcToKpiBattleView(kpiResult.data, new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }));
+      renderKpiBattle();
+      const awards = result.snapshot && result.snapshot.awardsBattle;
+      const awardsDate = String((awards || {}).report_date || '');
+      if (awards && awardsDate === _kpiBattleData.report_date) {
+        _awardsBattleData = awards;
+        _awardsBattleUnavailableReason = '';
+        renderAwardsBattle();
+      } else {
+        _awardsBattleData = null;
+        _awardsBattleUnavailableReason = awardsDate
+          ? `台獎資料日期 ${awardsDate} 與 KPI 資料日期 ${_kpiBattleData.report_date || '—'} 不一致`
+          : '尚未取得與目前 KPI 同日期的台獎資料';
+        renderAwardsBattleUnavailable();
+      }
+    } catch (kpiError) {
+      const note = document.getElementById('kpiBattleSourceNote');
+      if (note) note.textContent = `KPI 資料載入失敗：${kpiError.message}`;
+      _awardsBattleData = null;
+      _awardsBattleUnavailableReason = 'KPI 正式資料尚未讀回，因此不顯示可能過期的台獎資料';
+      renderAwardsBattleUnavailable();
+    }
   } catch (error) {
     privateDashboardSetStatus(error.message, true);
   }
@@ -2613,11 +2737,8 @@ function kpiBattleAwardCell(row) {
 
 async function loadKpiBattle() {
   if (_kpiBattleData) { renderKpiBattle(); return; }
-  if (window.__KPI_BATTLE_DATA__) {
-    _kpiBattleData = window.__KPI_BATTLE_DATA__;
-    renderKpiBattle();
-    return;
-  }
+  // 2026-07-31 方案 A：KPI 頁籤的本機快照回退已移除——那是 snapshot 形狀的舊資料，
+  // 不得再與 kpicalc 正式來源混用（台獎頁籤的本機回退不受影響）。
   const note = document.getElementById('kpiBattleSourceNote');
   if (note) note.textContent = '需通過員編與已核准裝置驗證後，才會由私有 Google Drive 載入資料。';
   renderPrivateDashboardLock();
@@ -2634,7 +2755,7 @@ function renderKpiBattle() {
   if (!_kpiBattleData) return;
   const note = document.getElementById('kpiBattleSourceNote');
   if (note) {
-    note.textContent = `資料至 ${_kpiBattleData.report_date || '—'}｜區間 ${_kpiBattleData.source_date_range || '—'}｜進度截至 ${_kpiBattleData.source_as_of_date || '—'}｜明細：實績／月目標／尚差或超前｜較昨日對照 ${_kpiBattleData.previous_report_date || '無前日資料'}｜個資僅供本機受保護預覽`;
+    note.textContent = `KPI 唯一正式來源：與 kpi.html 同一份受保護 kpicalc 正式 JSON｜資料日期 ${_kpiBattleData.report_date || '—'}｜區間 ${_kpiBattleData.source_date_range || '—'}｜來源檔 ${_kpiBattleData.source_file || '—'}｜更新時間 尚未同步（讀取於 ${_kpiBattleData.fetchedAt || '—'}）｜發布狀態：正式 JSON 已發布｜明細：實績／月目標／尚差或超前｜公司排名・昨日變化・加掛分尚未同步｜個資僅供受保護預覽`;
   }
   const content = document.getElementById('kpiBattleContent');
   if (!content) return;
@@ -2648,15 +2769,15 @@ function renderKpiBattleStores() {
   const selected = rows.find(row => row.store === document.getElementById('kpiBattleStoreSelect')?.value) || rows[0];
   return `
     <div class="summary-grid">
-      <div class="summary-card"><div class="sc-label">北一二B KPI</div><div class="sc-val ${kpiBattleTone(aggregate.overall_kpi)}">${kpiBattlePercent(aggregate.overall_kpi)}</div><div class="sc-sub">${kpiBattleDod(aggregate.overall_kpi_dod) || '整體達成率'}</div></div>
-      <div class="summary-card"><div class="sc-label">公司排名</div><div class="sc-val" style="color:var(--gold)">${aggregate.company_rank ?? '—'}</div><div class="sc-sub">${kpiBattleRankDod(aggregate.company_rank_dod) || '北一二B整體'}</div></div>
-      <div class="summary-card"><div class="sc-label">加掛得分</div><div class="sc-val" style="color:var(--purple)">${kpiBattleNumber(aggregate.addon_score)}</div><div class="sc-sub">${aggregate.addon_score_dod == null ? '整體得分' : `DOD ${aggregate.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(aggregate.addon_score_dod)} 分`}</div></div>
+      <div class="summary-card"><div class="sc-label">北一二B KPI</div><div class="sc-val ${kpiBattleTone(aggregate.overall_kpi)}">${aggregate.overall_kpi == null ? kpiPendingCell() : kpiBattlePercent(aggregate.overall_kpi)}</div><div class="sc-sub">${kpiBattleDod(aggregate.overall_kpi_dod) || '整體達成率'}</div></div>
+      <div class="summary-card"><div class="sc-label">公司排名</div><div class="sc-val" style="color:var(--gold)">${aggregate.company_rank ?? kpiPendingCell()}</div><div class="sc-sub">${kpiBattleRankDod(aggregate.company_rank_dod) || '北一二B整體'}</div></div>
+      <div class="summary-card"><div class="sc-label">加掛得分</div><div class="sc-val" style="color:var(--purple)">${aggregate.addon_score == null ? kpiPendingCell() : kpiBattleNumber(aggregate.addon_score)}</div><div class="sc-sub">${aggregate.addon_score_dod == null ? '整體得分' : `DOD ${aggregate.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(aggregate.addon_score_dod)} 分`}</div></div>
       <div class="summary-card"><div class="sc-label">KPI未達100%</div><div class="sc-val" style="color:var(--red)">${stores.filter(row => Number(row.overall_kpi) < 1).length}</div><div class="sc-sub">間門市</div></div>
     </div>
     <div class="section-divider">北一二B／店點 KPI 排名</div>
     <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
       <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th><th>加掛</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
-      <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${row.store}</td><td><span class="val-gold">${row.company_rank ?? '—'}</span>${kpiBattleRankDod(row.company_rank_dod)}</td><td>${kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${kpiBattleNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleMetricCell(row.core?.a999)}</td><td>${kpiBattleMetricCell(row.core?.a1399)}</td><td>${kpiBattleMetricCell(row.core?.haosu)}</td><td>${kpiBattleMetricCell(row.core?.r1399)}</td></tr>`).join('')}</tbody>
+      <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${row.store}</td><td>${row.company_rank == null ? kpiPendingCell() : `<span class="val-gold">${row.company_rank}</span>`}${kpiBattleRankDod(row.company_rank_dod)}</td><td>${row.overall_kpi == null ? kpiPendingCell() : kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${row.addon_score == null ? kpiPendingCell() : kpiBattleNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleMetricCell(row.core?.a999)}</td><td>${kpiBattleMetricCell(row.core?.a1399)}</td><td>${kpiBattleMetricCell(row.core?.haosu)}</td><td>${kpiBattleMetricCell(row.core?.r1399)}</td></tr>`).join('')}</tbody>
     </table></div></div>
     <div class="section-divider">各項 KPI 達成</div>
     <div class="card">
@@ -2681,7 +2802,7 @@ function renderKpiBattlePersonal() {
     </div></div>
     <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
       <thead><tr><th style="text-align:left">店點</th><th>職類</th><th>姓名</th><th>總達成率</th><th>KPI排名</th><th>個人台獎</th><th>保險搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th><th>R999</th><th>RT</th><th>特維</th><th>配件</th><th>包膜</th></tr></thead>
-      <tbody>${rows.map(row => `<tr><td class="store-name">${row.store}</td><td>${row.role || '—'}</td><td>${row.name}</td><td>${kpiBattleRate(row.overall_rate, row.overall_rate_dod)}</td><td>${row.rank ?? '—'}${kpiBattleRankDod(row.rank_dod)}</td><td>${kpiBattleAwardCell(row)}</td><td><span class="kpi-rate rate-only">${kpiBattlePercent(row.insurance_attach_rate)}</span><span class="kpi-sub">個人搭售率</span></td><td>${kpiBattleMetricCell(row.metrics?.A999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.A1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.好速, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.RT, false)}</td><td>${kpiBattleMetricCell(row.metrics?.特維, false)}</td><td>${kpiBattleMetricCell(row.metrics?.配件, false)}</td><td>${kpiBattleMetricCell(row.metrics?.包膜, false)}</td></tr>`).join('') || '<tr><td colspan="16" class="val-dim">目前篩選條件沒有資料</td></tr>'}</tbody>
+      <tbody>${rows.map(row => `<tr><td class="store-name">${row.store}</td><td>${row.role || '—'}</td><td>${row.name}</td><td>${kpiBattleRate(row.overall_rate, row.overall_rate_dod)}</td><td>${row.rank ?? kpiPendingCell()}${kpiBattleRankDod(row.rank_dod)}</td><td>${row.phone_award_actual == null && row.phone_award_projected == null ? kpiPendingCell() : kpiBattleAwardCell(row)}</td><td>${row.insurance_attach_rate == null ? kpiPendingCell() : `<span class="kpi-rate rate-only">${kpiBattlePercent(row.insurance_attach_rate)}</span><span class="kpi-sub">個人搭售率</span>`}</td><td>${kpiBattleMetricCell(row.metrics?.A999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.A1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.好速, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.RT, false)}</td><td>${kpiBattleMetricCell(row.metrics?.特維, false)}</td><td>${kpiBattleMetricCell(row.metrics?.配件, false)}</td><td>${kpiBattleMetricCell(row.metrics?.包膜, false)}</td></tr>`).join('') || '<tr><td colspan="16" class="val-dim">目前篩選條件沒有資料</td></tr>'}</tbody>
     </table></div></div>`;
 }
 
@@ -2736,6 +2857,7 @@ function renderAwardUnit(row, district = false) {
 
 async function loadAwardsBattle() {
   if (_awardsBattleData) { renderAwardsBattle(); return; }
+  if (_awardsBattleUnavailableReason) { renderAwardsBattleUnavailable(); return; }
   if (window.__AWARDS_BATTLE_DATA__) {
     _awardsBattleData = window.__AWARDS_BATTLE_DATA__;
     renderAwardsBattle();
@@ -2774,6 +2896,14 @@ function renderAwardsBattle() {
 
 }
 
+function renderAwardsBattleUnavailable() {
+  const note = document.getElementById('awardsBattleSourceNote');
+  if (note) note.textContent = '台獎尚未同步：不使用舊 dashboard snapshot 的數字。';
+  const content = document.getElementById('awardsBattleContent');
+  if (!content) return;
+  content.innerHTML = `<div class="card private-lock"><h3>台獎尚未同步</h3><p>${_awardsBattleUnavailableReason || '尚未取得與目前 KPI 同日期的台獎資料。'}</p><p class="kpi-battle-note">KPI 已使用最新正式 JSON；台獎會在同日期正式資料完成後另行顯示。</p></div>`;
+}
+
 // ════════════════════════════════════
 // SEG TOGGLE (FILL)
 // ════════════════════════════════════
@@ -2808,11 +2938,47 @@ const FIELDS = [
   'special_renew','premium_renew','rt999','rt1399','haosu',
   'early_renew','rt_close_num','rt_close_den','rt_close_pct',
   'insurance_num','insurance_den','insurance_pct',
-  'device_num','device_den','device_ratio',
-  'tw_pixel10','tw_s26u','tw_sharpr11','tw_vivo','tw_s26','tw_reno16f',
-  'tw_sony1','tw_oppoa6x','tw_a27','tw_y21'
+  'device_num','device_den','device_ratio'
 ];
 
+function renderAwardModelInputs(values) {
+  const grid = document.getElementById('awardModelsV1Grid');
+  if (!grid) return;
+  const current = values || {};
+  grid.innerHTML = AWARD_MODEL_DEFINITIONS.map(item => `
+    <div class="kpi-input-wrap" data-award-model-id="${item.modelId}">
+      <label>${item.shortName}</label>
+      <span class="ki-icon">📱</span>
+      <input type="number" id="f_award_${item.modelId}" placeholder="0" min="0" step="1" inputmode="numeric">
+    </div>`).join('');
+  AWARD_MODEL_IDS.forEach(id => {
+    const el = document.getElementById('f_award_' + id);
+    if (el) el.value = current[id] === null || current[id] === undefined ? '' : current[id];
+  });
+}
+
+function getAwardModelsFormData() {
+  const awardModels = {};
+  AWARD_MODEL_IDS.forEach(id => {
+    const el = document.getElementById('f_award_' + id);
+    awardModels[id] = !el || el.value === '' ? null : Number(el.value);
+  });
+  return awardModels;
+}
+
+function setAwardModelsFormData(awardModels) {
+  const values = awardModels && typeof awardModels === 'object' ? awardModels : {};
+  AWARD_MODEL_IDS.forEach(id => {
+    const el = document.getElementById('f_award_' + id);
+    if (el) el.value = values[id] === null || values[id] === undefined ? '' : values[id];
+  });
+}
+
+function reportValue(record, key) {
+  if (!record) return null;
+  if (key.indexOf('awardModels.') === 0) return record.awardModels ? record.awardModels[key.slice('awardModels.'.length)] : null;
+  return record[key];
+}
 
 function getFormData() {
   const obj = {};
@@ -2820,6 +2986,7 @@ function getFormData() {
     const el = document.getElementById('f_' + f);
     obj[f] = el ? (el.value !== '' ? parseFloat(el.value) : null) : null;
   });
+  obj.awardModels = getAwardModelsFormData();
   return obj;
 }
 
@@ -2848,6 +3015,7 @@ function clearForm() {
     const el = document.getElementById('f_' + f);
     if (el) el.value = '';
   });
+  setAwardModelsFormData({});
 }
 
 // ════════════════════════════════════
@@ -2998,16 +3166,7 @@ async function renderSummary() {
 
   // Table 3: 台獎手機
   const cols3 = [
-    {key:'tw_pixel10',    label:'Pixel 10系列',      isRaw:true},
-    {key:'tw_s26u',       label:'S26 Ultra',          isRaw:true},
-    {key:'tw_sharpr11',   label:'SHARP R11',          isRaw:true},
-    {key:'tw_vivo',       label:'vivo X300系列',      isRaw:true},
-    {key:'tw_s26',        label:'S26/S26+/A57',       isRaw:true},
-    {key:'tw_reno16f',    label:'Reno16 F',           isRaw:true},
-    {key:'tw_sony1',      label:'moto razr fold',     isRaw:true},
-    {key:'tw_oppoa6x',    label:'OPPO A6x',           isRaw:true},
-    {key:'tw_a27',        label:'A27 & A17',          isRaw:true},
-    {key:'tw_y21',        label:'Y21/Redmi Note 15 Pro', isRaw:true},
+    ...AWARD_MODEL_DEFINITIONS.map(item => ({key:'awardModels.' + item.modelId, label:item.shortName, isRaw:true}))
   ];
   renderSummaryTable('summaryTable3', date, sumSeg, cols3);
 
@@ -3302,16 +3461,19 @@ function renderSummaryTable(tableId, date, seg, cols) {
     if (c.isRank || c.isDelta || c.isScore) return `<td style="color:var(--text-dim);">—</td>`;
     if (c.isRaw) {
       const sum = STORES.reduce((acc, s) => {
-        const v = parseFloat(dayCache[s]?.[c.key]);
+        const v = parseFloat(reportValue(dayCache[s], c.key));
         return acc + (isNaN(v) ? 0 : v);
       }, 0);
-      const hasAny = STORES.some(s => dayCache[s] && dayCache[s][c.key] != null && dayCache[s][c.key] !== '');
+      const hasAny = STORES.some(s => {
+        const v = reportValue(dayCache[s], c.key);
+        return v != null && v !== '';
+      });
       return hasAny
         ? `<td style="color:var(--accent-bright);font-weight:700;">${sum % 1 === 0 ? sum : sum.toFixed(1)}</td>`
         : `<td class="val-dim">—</td>`;
     }
     // percentage: average of stores that have data
-    const vals = STORES.map(s => parseFloat(dayCache[s]?.[c.key])).filter(v => !isNaN(v));
+    const vals = STORES.map(s => parseFloat(reportValue(dayCache[s], c.key))).filter(v => !isNaN(v));
     if (!vals.length) return `<td class="val-dim">—</td>`;
     const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
     const cls = cellColorClass(avg, c.th);
@@ -3327,7 +3489,7 @@ function renderSummaryTable(tableId, date, seg, cols) {
     const isNew = NEW_STORES.includes(s) && date < '2026-06-25';
     const cells = cols.map(c => {
       if (!d) return `<td class="val-dim">—</td>`;
-      const v = d[c.key];
+      const v = reportValue(d, c.key);
       if (c.isDelta) return `<td>${delta(v)}</td>`;
       if (c.isRank) {
         const vc = (v !== '' && v != null && v !== 0) ? `<span class="val-gold">${v}</span>` : '—';
@@ -3441,16 +3603,7 @@ async function renderPlayback() {
   renderSummaryTable('pbTable1', date, pbSeg, cols1);
   renderSummaryTable('pbTable2', date, pbSeg, cols2);
   const colsTw = [
-    {key:'tw_pixel10',    label:'Pixel 10系列',      isRaw:true},
-    {key:'tw_s26u',       label:'S26 Ultra',          isRaw:true},
-    {key:'tw_sharpr11',   label:'SHARP R11',          isRaw:true},
-    {key:'tw_vivo',       label:'vivo X300系列',      isRaw:true},
-    {key:'tw_s26',        label:'S26/S26+/A57',       isRaw:true},
-    {key:'tw_reno16f',    label:'Reno16 F',           isRaw:true},
-    {key:'tw_sony1',      label:'moto razr fold',     isRaw:true},
-    {key:'tw_oppoa6x',    label:'OPPO A6x',           isRaw:true},
-    {key:'tw_a27',        label:'A27 & A17',          isRaw:true},
-    {key:'tw_y21',        label:'Y21/Redmi Note 15 Pro', isRaw:true},
+    ...AWARD_MODEL_DEFINITIONS.map(item => ({key:'awardModels.' + item.modelId, label:item.shortName, isRaw:true}))
   ];
   renderSummaryTable('pbTable3', date, pbSeg, colsTw);
   renderStorePersonalDetail(date, pbSeg, dayCache, 'pbStorePersonalSection');
@@ -3485,8 +3638,7 @@ async function _getPersonalDay(date) {
     const recs = {};
     if (GAS_URL) {
       try {
-        const res = await fetch(`${GAS_URL}?action=pread&date=${date}&seg=${seg}`, { cache: 'no-store' });
-        const json = await res.json();
+        const json = await privateDashboardPost({ action: 'pread', date, seg });
         if (json.status !== 'ok') throw new Error(json.message || 'pread error');
         Object.entries(json.data || {}).forEach(([store, people]) => {
           Object.entries(people || {}).forEach(([name, rec]) => { recs[store + '|' + name] = rec; });
@@ -3694,6 +3846,7 @@ function selectStore(store) {
       const el = document.getElementById('f_' + f);
       if (el) el.value = data ? (data[f] ?? '') : '';
     });
+    setAwardModelsFormData(data && data.awardModels ? data.awardModels : {});
     updateFilledSummary(data);
   });
 
@@ -3788,6 +3941,7 @@ function clearForm() {
     const el = document.getElementById('f_' + f);
     if (el) { el.value = ''; el.style.borderColor = ''; el.style.boxShadow = ''; }
   });
+  setAwardModelsFormData({});
   document.getElementById('filledSummary').classList.remove('show');
   showToast('🗑️ 已清除');
 }
@@ -4516,25 +4670,12 @@ function _savePersonalRecord(store, name, date, seg, data, failed, extra) {
   _pushPersonalToCloud(store, name, date, seg, record);
 }
 
-// ── 個人回報上雲（JSONP，失敗不影響本機儲存）──
+// ── 個人回報上雲（失敗不影響本機儲存）──
 function _pushPersonalToCloud(store, name, date, seg, record) {
   if (!GAS_URL) return;
-  const payload = encodeURIComponent(JSON.stringify({ date, seg, store, name, record }));
-  const url = `${GAS_URL}?action=pwrite&payload=${payload}`;
-  const script = document.createElement('script');
-  const cbName = 'gasPCallback_' + Date.now();
-  window[cbName] = function() {
-    delete window[cbName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-  };
-  script.onerror = function() {
-    delete window[cbName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-    // 備援：no-cors 送出
-    fetch(url, { mode: 'no-cors' }).catch(()=>{});
-  };
-  script.src = url + '&callback=' + cbName;
-  document.head.appendChild(script);
+  privateDashboardPost({ action: 'pwrite', date, seg, store, name, record }).catch(error => {
+    console.error('_pushPersonalToCloud error', error);
+  });
 }
 
 // ── 從雲端抓某日某時段的個人回報 { store: { name: record } } ──
@@ -4543,8 +4684,7 @@ async function _fetchPersonalCloud(date, seg) {
   const ck = `${date}_${seg}`;
   if (!GAS_URL) return {};
   try {
-    const res = await fetch(`${GAS_URL}?action=pread&date=${date}&seg=${seg}`, { cache: 'no-store' });
-    const json = await res.json();
+    const json = await privateDashboardPost({ action: 'pread', date, seg });
     _pCloudCache[ck] = json.data || {};
   } catch(e) {
     console.error('_fetchPersonalCloud error', e);

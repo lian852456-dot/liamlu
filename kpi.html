@@ -223,13 +223,37 @@ function deviceId(){
   localStorage.setItem(key, id);
   return id;
 }
+
+const KPI_ALLOWED_MESSAGE_ORIGINS = new Set([
+  'https://script.google.com',
+  'https://script.googleusercontent.com'
+]);
+function kpiAllowedGasMessageOrigin(origin) {
+  if (typeof origin !== 'string' || !origin) return false;
+  try {
+    const parsed = new URL(origin);
+    return parsed.protocol === 'https:' && !parsed.port &&
+      (KPI_ALLOWED_MESSAGE_ORIGINS.has(parsed.origin) ||
+       parsed.hostname.endsWith('-script.googleusercontent.com'));
+  } catch (error) {
+    return false;
+  }
+}
+
 async function gasPost(payload){
-  const response = await fetch(gasUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload),
-    cache: 'no-store',
-  });
+  const gasEndpoint = gasUrl();
+  if (!gasEndpoint) throw new Error('尚未設定 Apps Script 服務網址');
+  let response;
+  try {
+    response = await fetch(gasEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    });
+  } catch (error) {
+    throw new Error('服務連線失敗，請稍後再試。');
+  }
   if (!response.ok) throw new Error(`服務連線失敗（HTTP ${response.status}）`);
   const body = await response.json();
   if (!body || body.status !== 'ok') throw new Error((body && body.message) || '服務回應失敗');

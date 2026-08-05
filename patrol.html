@@ -951,12 +951,24 @@ function parseData(){
   if(added>0){
     rawDetails = rawDetails.concat(newDetails);
     document.getElementById('pasteBox').value='';
-    render();
+
+    // 先報「已解析」，即使接下來看板渲染出錯，使用者也知道資料已收下、正在處理。
+    showMsg(cloudOn
+      ? `已解析 ${added} 筆，正在更新看板與同步雲端……`
+      : `已解析 ${added} 筆，正在更新看板……`, 'ok');
+
+    // 看板渲染失敗不可連累雲端同步——正式巡店資料一定要有機會送出。
+    let renderErr=null;
+    try{ render(); }
+    catch(err){ renderErr=err; console.error('Patrol render failed:', err); }
+
     if(cloudOn){
-      showMsg(`已解析 ${added} 筆，正在上傳雲端…`,'ok');
-      cloudWrite(newDetails);
+      // 雲端的成功／失敗訊息會覆蓋上面的「正在……」；render 出錯時一併回報。
+      cloudWrite(newDetails, renderErr);
+    } else if(renderErr){
+      showMsg(`資料已解析，但看板更新失敗：${renderErr.message||renderErr}`, 'err');
     } else {
-      showMsg(`已解析 ${added} 筆檢核紀錄，追蹤看板已更新`,'ok');
+      showMsg(`已解析 ${added} 筆檢核紀錄，追蹤看板已更新`, 'ok');
     }
   } else {
     showMsg('未解析到有效資料，請確認貼上的是明細表（Tab分隔）','err');
@@ -983,8 +995,17 @@ function rebuildFromRaw(){
 
 function showMsg(t,type){
   const msg=document.getElementById('parseMsg');
-  msg.textContent=t; msg.className='parse-msg '+type;
-  setTimeout(()=>{ if(type==='ok') msg.style.display='none'; },4000);
+  if(!msg) return;
+  clearTimeout(showMsg.timer);
+  // 清掉上次自動隱藏留下的 inline display:none，否則就算 class 換成 ok/err，
+  // 訊息仍被 inline 樣式蓋住看不到（正式站巡店看板「按了沒反應」的真正原因）。
+  msg.style.display='';
+  msg.textContent=t;
+  msg.className='parse-msg '+type;
+  if(type==='ok'){
+    showMsg.timer=setTimeout(()=>{ msg.style.display='none'; },8000);
+  }
+  // 錯誤訊息不自動消失，讓使用者一定看得到需要處理的狀況。
 }
 
 function clearAll(){
@@ -1430,8 +1451,12 @@ function cloudLoad(){
   }).catch(()=>showMsg('讀取雲端失敗','err'));
 }
 
-function cloudWrite(details){
-  if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN) return;
+function cloudWrite(details, renderErr){
+  if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN){
+    // 不能靜默返回——否則畫面停在「正在同步……」，使用者無從得知資料沒上傳。
+    showMsg('尚未連線或通行碼已失效，資料暫存於本頁看板、尚未上傳雲端；請重新登入後把明細整份重貼一次。','err');
+    return;
+  }
   // content 可由題號還原，不上傳以縮短網址（JSONP payload 走 query string，有長度限制故分批）
   const slim = details.map(d=>({
     fillTime:d.fillTime, arriveTime:d.arriveTime, leaveTime:d.leaveTime, district:d.district,
@@ -1465,7 +1490,12 @@ function cloudWrite(details){
   chain.then(()=>{
     // JSONP 已收到 ptwrite 成功回覆，保留目前解析出的明細。
     // 不在此時立刻重讀，避免 Apps Script 讀取落後寫入時，把剛貼上的資料覆蓋成舊資料。
-    showMsg(`已同步至雲端（新增 ${written} 筆，重複資料自動略過）`,'ok');
+    if(renderErr){
+      // 資料有進雲端，但本機看板沒畫出來——用紅字提醒且不自動消失，避免使用者以為完全失敗。
+      showMsg(`資料已同步雲端（新增 ${written} 筆），但看板更新失敗：${renderErr.message||renderErr}（重新整理即可還原看板）`,'err');
+    } else {
+      showMsg(`已同步至雲端（新增 ${written} 筆，重複資料自動略過）`,'ok');
+    }
   }).catch(err=>showMsg('雲端寫入失敗：'+err.message+'（資料仍在本頁看板，請重新整理後把完整明細整份重貼一次補齊）','err'));
 }
 

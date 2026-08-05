@@ -13,6 +13,13 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-04 ｜ Codex（正式 Apps Script v26 與直接 POST 傳輸修復）
+- 做了什麼：以遠端 `main` 的 `9f3e729` 為基準完成 Apps Script v26 部署，並將 `index.html`、`kpi.html` 的正式 GAS 請求從隱藏 iframe 改為直接 `fetch` POST；另加入管理者私有快照狀態讀回路由供發布驗證。
+- 結果（成功 / 失敗 / 進行中）：Apps Script v26 已成功更新，HTTP 200 / `status=ok` 已確認；iframe 在 Chrome 實測會逾時，直接 POST 修復待 GitHub Pages 建置後重新驗收。
+- 經驗 / 給下一位的提醒：Apps Script 端點可直接 POST 時，不能只以頁面 HTTP 200 判斷前端可用；必須實際驗證登入、回報寫入與快速更新流程，並以瀏覽器截圖及雲端讀回作為完成證據。
+
+---
+
 ## 2026-08-03 ｜ Claude（8 月班表正式上線 + 修「版本月份被自動轉日期」根因）
 
 - **完成**：情報站 8 月班表已上線。因門市電腦連不到 docs.google.com，改用「一次性 `.gs`

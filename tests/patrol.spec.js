@@ -12,6 +12,7 @@ let writeCalls;
 let ptReadCalls;
 let cloudConfig; // 模擬各區 GAS 回傳的 PT_STORES / PT_TITLE
 let mediaUploads;
+let failPtwrite; // 測試用：強制 ptwrite 回錯，模擬雲端寫入失敗
 
 function privateScheduleFixture() {
   const names = ['酒泉', '萬大', '大稻埕', '復興', '三創', '杭州', '永吉', '通化', '六張犁'];
@@ -93,7 +94,9 @@ async function stubGas(page) {
         : JSON.stringify({ status: 'error', message: 'unauthorized' });
     } else if (action === 'ptwrite') {
       writeCalls++;
-      if (!authed) {
+      if (failPtwrite) {
+        body = JSON.stringify({ status: 'error', message: '伺服器忙碌，請稍後再試' });
+      } else if (!authed) {
         body = JSON.stringify({ status: 'error', message: 'unauthorized' });
       } else {
         const rows = JSON.parse(url.searchParams.get('payload'));
@@ -155,7 +158,7 @@ function pasteLine(d, store, code, item, result, reason) {
   return `2026/7/${d} 16:43\t2026/7/${d} 16:00\t2026/7/${d} 18:00\t北一二B\t${code}\t${store}\t測試督導\t${item}\t內容\t${result}\t${reason}`;
 }
 
-test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; cloudConfig = null; mediaUploads = []; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; cloudConfig = null; mediaUploads = []; failPtwrite = false; });
 
 test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
   // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
@@ -211,6 +214,83 @@ test('重複貼上同一批資料，雲端自動去重', async ({ page }) => {
   await expect.poll(() => writeCalls).toBeGreaterThan(callsAfterFirst);
   await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
   expect(cloudRows.length).toBe(1);
+});
+
+// ── 解析狀態訊息與雲端同步防呆（2026-08-03 修 showMsg inline display:none 蓋住訊息）──
+test.describe('解析狀態訊息', () => {
+  test('訊息自動隱藏後，第二次解析仍看得到（防 inline display:none 蓋住）', async ({ page }) => {
+    await stubGas(page);
+    await openAndUnlock(page);
+    await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
+
+    await page.fill('#pasteBox', pasteLine(1, '台北通化', 'DNB10059', 1, 'v', ''));
+    await page.click('button.btn-primary');
+    await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+
+    // 模擬自動隱藏計時器把 inline display 設成 none 之後的狀態
+    await page.evaluate(() => { document.getElementById('parseMsg').style.display = 'none'; });
+    await expect(page.locator('#parseMsg')).toBeHidden();
+
+    // 第二批：修好前 inline none 會蓋住新訊息，這裡必須重新看得到
+    await page.fill('#pasteBox', pasteLine(2, '台北酒泉', 'DNB10062', 2, 'v', ''));
+    await page.click('button.btn-primary');
+    await expect(page.locator('#parseMsg')).toBeVisible();
+    await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+  });
+
+  test('新資料顯示新增筆數；重複貼上顯示新增 0 筆（不是沒反應）', async ({ page }) => {
+    await stubGas(page);
+    await openAndUnlock(page);
+    await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
+
+    const line = pasteLine(3, '台北永吉', 'DNB10082', 16, 'v', '');
+    await page.fill('#pasteBox', line);
+    await page.click('button.btn-primary');
+    await expect(page.locator('#parseMsg')).toHaveText(/新增 1 筆/);
+
+    await page.fill('#pasteBox', line);
+    await page.click('button.btn-primary');
+    await expect(page.locator('#parseMsg')).toBeVisible();
+    await expect(page.locator('#parseMsg')).toHaveText(/新增 0 筆/);
+  });
+
+  test('雲端寫入失敗時，紅色錯誤訊息保持顯示、不自動消失', async ({ page }) => {
+    await stubGas(page);
+    await openAndUnlock(page);
+    await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
+
+    failPtwrite = true;
+    await page.fill('#pasteBox', pasteLine(4, '台北萬大', 'DNB10063', 5, 'v', ''));
+    await page.click('button.btn-primary');
+    await expect(page.locator('#parseMsg')).toHaveText(/雲端寫入失敗/);
+    await expect(page.locator('#parseMsg')).toHaveClass(/err/);
+
+    // 錯誤訊息不會自動消失
+    await page.waitForTimeout(1200);
+    await expect(page.locator('#parseMsg')).toBeVisible();
+    await expect(page.locator('#parseMsg')).toHaveText(/雲端寫入失敗/);
+  });
+
+  test('看板渲染失敗時，仍會送出雲端且資料不靜默消失', async ({ page }) => {
+    await stubGas(page);
+    await openAndUnlock(page);
+    await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
+
+    // 讓看板渲染拋錯
+    await page.evaluate(() => { window.render = () => { throw new Error('render 壞了'); }; });
+
+    const before = writeCalls;
+    await page.fill('#pasteBox', pasteLine(6, '台北三創', 'DNB10064', 7, 'v', ''));
+    await page.click('button.btn-primary');
+
+    // render 拋錯仍呼叫 ptwrite，資料成功進雲端（不因畫面壞掉而遺失）
+    await expect.poll(() => writeCalls).toBeGreaterThan(before);
+    await expect.poll(() => cloudRows.length).toBe(1);
+
+    // 明確告知使用者：資料進了雲端、但看板沒畫出來（不是靜默消失）
+    await expect(page.locator('#parseMsg')).toHaveText(/看板更新失敗/);
+    await expect(page.locator('#parseMsg')).toBeVisible();
+  });
 });
 
 test('貼上明細後切到督導檢查大盤不會用舊雲端資料覆蓋', async ({ page }) => {
