@@ -218,6 +218,9 @@
   .award-model-rate { margin-top:4px; font-size:17px; font-weight:900; }
   .award-model-sub { display:block; margin-top:3px; color:var(--text-muted); font-size:11px; font-weight:700; }
   .award-model-next { display:block; margin-top:3px; color:#7c3aed; font-size:11px; font-weight:900; }
+  .award-model-tiers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; margin-top:8px; }
+  .award-model-tier { border-radius:6px; padding:6px; background:#f5f3ff; color:#5b21b6; font-size:10px; font-weight:800; }
+  .award-model-tier strong { display:block; margin-top:2px; color:#4c1d95; font-size:13px; }
   .award-store-selector { display:flex; align-items:end; gap:10px; flex-wrap:wrap; }
   .award-store-selector label { min-width:220px; color:var(--text-muted); font-size:12px; font-weight:900; }
   .award-store-selector select { width:100%; margin-top:5px; border:1px solid var(--border); border-radius:9px; padding:10px; background:#fff; color:var(--text); font-weight:800; }
@@ -2460,12 +2463,12 @@ function mergeKpiBattleSupplement(kpiData, snapshot) {
   copy.report_date = String(snapshot.report_date);
   copy.source_date_range = snapshot.source_date_range || copy.source_date_range;
   copy.aggregate = { ...copy.aggregate };
-  copyFields(copy.aggregate, aggregate, ['overall_kpi', 'overall_kpi_dod', 'company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod']);
+  copyFields(copy.aggregate, aggregate, ['overall_kpi', 'overall_kpi_dod', 'company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod', 'insurance_attach_rate']);
   const snapshotStores = new Map((snapshot.stores || []).map(row => [kpiBattleStoreKey(row.store), row]));
   copy.stores = copy.stores.map(row => {
     const source = snapshotStores.get(kpiBattleStoreKey(row.store));
     const merged = { ...row };
-    copyFields(merged, source, ['company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod']);
+    copyFields(merged, source, ['company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod', 'insurance_attach_rate']);
     return merged;
   });
   const snapshotPeople = new Map((snapshot.personal || []).map(row => [kpiBattlePersonKey(row), row]));
@@ -2495,7 +2498,7 @@ function kpicalcToKpiBattleView(data, fetchedAt) {
   };
   const stores = (data.stores || []).map(s => {
     const metrics = metricsOf(s.items);
-    return { store: s.name, overall_kpi: s.official, company_rank: null, addon_score: null, core: coreOf(metrics), metrics };
+    return { store: s.name, overall_kpi: s.official, company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(metrics), metrics };
   });
   // 整體＝各店逐項加總（純加總，非發明數字）
   const aggItems = {};
@@ -2515,7 +2518,7 @@ function kpicalcToKpiBattleView(data, fetchedAt) {
     source: 'kpicalc', fetchedAt: fetchedAt || '', source_file: meta.sourceFile || '',
     report_date: '', data_as_of_date: dataAsOfDate, source_as_of_date: dataAsOfDate,
     source_date_range: meta.period || '', previous_report_date: null,
-    aggregate: { store: '北一二B整體', overall_kpi: null, company_rank: null, addon_score: null, core: coreOf(aggItems), metrics: aggItems },
+    aggregate: { store: '北一二B整體', overall_kpi: null, company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(aggItems), metrics: aggItems },
     stores, personal
   };
 }
@@ -2795,6 +2798,11 @@ function kpiBattleAwardCell(row) {
   return `<span class="kpi-award-meta">實際獎金</span><span class="kpi-award-val">${awardMoney(row.phone_award_actual)}</span><span class="kpi-award-meta">推估獎金 ${awardMoney(row.phone_award_projected)}</span><span class="kpi-award-meta ${eligible ? '' : 'no'}">獎金排名 ${row.phone_award_rank ?? '—'}｜${eligible ? '可領獎' : '未領獎'}</span>`;
 }
 
+function kpiBattleInsuranceCell(row) {
+  if (row?.insurance_attach_rate == null) return kpiPendingCell();
+  return `<span class="kpi-rate rate-only">${kpiBattlePercent(row.insurance_attach_rate)}</span><span class="kpi-sub">實際搭售率</span>`;
+}
+
 async function loadKpiBattle() {
   if (_kpiBattleData) { renderKpiBattle(); return; }
   // 2026-07-31 方案 A：KPI 頁籤的本機快照回退已移除——那是 snapshot 形狀的舊資料，
@@ -2833,12 +2841,13 @@ function renderKpiBattleStores() {
       <div class="summary-card"><div class="sc-label">北一二B KPI</div><div class="sc-val ${kpiBattleTone(aggregate.overall_kpi)}">${aggregate.overall_kpi == null ? kpiPendingCell() : kpiBattlePercent(aggregate.overall_kpi)}</div><div class="sc-sub">${kpiBattleDod(aggregate.overall_kpi_dod) || '整體達成率'}</div></div>
       <div class="summary-card"><div class="sc-label">公司排名</div><div class="sc-val" style="color:var(--gold)">${aggregate.company_rank ?? kpiPendingCell()}</div><div class="sc-sub">${kpiBattleRankDod(aggregate.company_rank_dod) || '北一二B整體'}</div></div>
       <div class="summary-card"><div class="sc-label">加掛得分</div><div class="sc-val" style="color:var(--purple)">${aggregate.addon_score == null ? kpiPendingCell() : kpiBattleNumber(aggregate.addon_score)}</div><div class="sc-sub">${aggregate.addon_score_dod == null ? '整體得分' : `DOD ${aggregate.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(aggregate.addon_score_dod)} 分`}</div></div>
+      <div class="summary-card"><div class="sc-label">保險搭售率</div><div class="sc-val" style="color:#0f766e">${aggregate.insurance_attach_rate == null ? kpiPendingCell() : kpiBattlePercent(aggregate.insurance_attach_rate)}</div><div class="sc-sub">實際搭售率</div></div>
       <div class="summary-card"><div class="sc-label">KPI未達100%</div><div class="sc-val" style="color:var(--red)">${stores.filter(row => Number(row.overall_kpi) < 1).length}</div><div class="sc-sub">間門市</div></div>
     </div>
     <div class="section-divider">北一二B／店點 KPI 排名</div>
     <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
-      <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th><th>加掛</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
-      <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${row.store}</td><td>${row.company_rank == null ? kpiPendingCell() : `<span class="val-gold">${row.company_rank}</span>`}${kpiBattleRankDod(row.company_rank_dod)}</td><td>${row.overall_kpi == null ? kpiPendingCell() : kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${row.addon_score == null ? kpiPendingCell() : kpiBattleNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleMetricCell(row.core?.a999)}</td><td>${kpiBattleMetricCell(row.core?.a1399)}</td><td>${kpiBattleMetricCell(row.core?.haosu)}</td><td>${kpiBattleMetricCell(row.core?.r1399)}</td></tr>`).join('')}</tbody>
+      <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th><th>加掛</th><th>保險搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
+      <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${row.store}</td><td>${row.company_rank == null ? kpiPendingCell() : `<span class="val-gold">${row.company_rank}</span>`}${kpiBattleRankDod(row.company_rank_dod)}</td><td>${row.overall_kpi == null ? kpiPendingCell() : kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${row.addon_score == null ? kpiPendingCell() : kpiBattleNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${kpiBattleNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleInsuranceCell(row)}</td><td>${kpiBattleMetricCell(row.core?.a999)}</td><td>${kpiBattleMetricCell(row.core?.a1399)}</td><td>${kpiBattleMetricCell(row.core?.haosu)}</td><td>${kpiBattleMetricCell(row.core?.r1399)}</td></tr>`).join('')}</tbody>
     </table></div></div>
     <div class="section-divider">各項 KPI 達成</div>
     <div class="card">
@@ -2902,10 +2911,14 @@ function renderAwardPriority(item) {
   </div>`;
 }
 
-function renderAwardModel(item) {
+function renderAwardModel(item, district = false) {
   const difference = Number(item.difference);
   const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${kpiBattleNumber(difference)}` : '—';
-  return `<div class="award-model"><div class="award-model-name">${item.display_name}</div><div class="award-model-rate ${awardRateTone(item.rate)}">${kpiBattlePercent(item.rate)}</div><span class="award-model-sub">實際 ${kpiBattleNumber(item.actual)}｜目標 ${kpiBattleNumber(item.target)}</span><span class="award-model-sub">差異 ${differenceText}｜${item.next_label || '最高獎階'}</span><span class="award-model-next">會增加 ${awardMoney(item.incremental_award)}</span></div>`;
+  const levels = district
+    ? [{ label: '北一二B 80%獎金', amount: item.district_reward_80 }, { label: '北一二B 100%獎金', amount: item.district_reward_100 }]
+    : [{ label: '店點 50%獎金', amount: item.store_reward_50 }, { label: '店點 100%獎金', amount: item.store_reward_100 }];
+  const thresholdLabel = district ? '80%' : '50%';
+  return `<div class="award-model"><div class="award-model-name">${item.display_name}</div><div class="award-model-rate ${awardRateTone(item.rate)}">${kpiBattlePercent(item.rate)}</div><span class="award-model-sub">實際 ${kpiBattleNumber(item.actual)}｜目標 ${kpiBattleNumber(item.target)}</span><span class="award-model-sub">${thresholdLabel}差異 ${differenceText}｜${thresholdLabel}目標 ${kpiBattleNumber(item.threshold_target)}</span><div class="award-model-tiers">${levels.map(level => `<div class="award-model-tier">${level.label}<strong>${awardMoney(level.amount)}</strong></div>`).join('')}</div></div>`;
 }
 
 function renderAwardUnit(row, district = false) {
@@ -2938,7 +2951,10 @@ function renderAwardsBattle() {
   const storeRows = Number.isFinite(Number(data.store_rows)) ? Number(data.store_rows) : stores.length + 1;
   const eligibleStores = stores.filter(row => row.award?.award === 'Y').length;
   const selectedBefore = document.getElementById('awardsStoreSelect')?.value;
-  const selectedStore = stores.find(row => row.store === selectedBefore) || stores[0];
+  const selectedDistrict = !selectedBefore || selectedBefore === '北一二B整體';
+  const selectedUnit = selectedDistrict
+    ? (data.overall || { store: '北一二B整體', items: [] })
+    : (stores.find(row => row.store === selectedBefore) || data.overall || stores[0] || { store: '—', items: [] });
   const note = document.getElementById('awardsBattleSourceNote');
   if (note) note.textContent = `${phoneItems} 款重點機款｜${storeRows} 列店點與整體資料｜台獎戰報日期 ${data.report_date || '—'}｜前三台依本月最高台獎順位；達成率超過 100% 由下一順位遞補｜店點差異數以 50% 目標無條件進位計算｜資料僅供受保護預覽`;
   const content = document.getElementById('awardsBattleContent');
@@ -2954,8 +2970,8 @@ function renderAwardsBattle() {
     </div>
     <div class="section-divider">督導區及各店台獎（依實際獎金排序）</div>
     <div class="award-store-grid">${renderAwardUnit(data.overall || { store: '北一二B整體', award: supervisor, priorities: [] }, true)}${stores.map(row => renderAwardUnit(row)).join('')}</div>
-    <div class="section-divider">門市 ${phoneItems} 款機款篩選</div>
-    <div class="card"><div class="award-store-selector"><label>選擇門市<select id="awardsStoreSelect" onchange="renderAwardsBattle()">${stores.map(row => `<option value="${row.store}" ${row.store === selectedStore?.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label><span class="kpi-battle-note">差異數＝實際數－50%目標台數（無條件進位）</span></div><div class="award-model-grid">${(selectedStore?.items || []).map(renderAwardModel).join('')}</div></div>`;
+    <div class="section-divider">北一二B／門市 ${phoneItems} 款機款篩選</div>
+    <div class="card"><div class="award-store-selector"><label>選擇北一二B／門市<select id="awardsStoreSelect" onchange="renderAwardsBattle()"><option value="北一二B整體" ${selectedDistrict ? 'selected' : ''}>🏢 北一二B整體</option>${stores.map(row => `<option value="${row.store}" ${row.store === selectedUnit?.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label><span class="kpi-battle-note">${selectedDistrict ? '北一二B差異數＝實際數－80%目標台數（無條件進位）｜顯示北一二B 80%／100%獎金' : '店點差異數＝實際數－50%目標台數（無條件進位）｜顯示店點 50%／100%獎金'}</span></div><div class="award-model-grid">${(selectedUnit?.items || []).map(item => renderAwardModel(item, selectedDistrict)).join('')}</div></div>`;
 
 }
 

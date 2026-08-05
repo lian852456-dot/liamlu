@@ -38,7 +38,7 @@ const KPI_BATTLE_FIXTURE = {
   source_file: '0805.xlsx',
   source_date_range: '2026/08/01 ~ 08/04',
   aggregate: {
-    overall_kpi: 1.097, overall_kpi_dod: -0.1018, company_rank: 34, company_rank_dod: -9, addon_score: 12.35, addon_score_dod: -0.49,
+    overall_kpi: 1.097, overall_kpi_dod: -0.1018, company_rank: 34, company_rank_dod: -9, addon_score: 12.35, addon_score_dod: -0.49, insurance_attach_rate: 0.46154,
     core: {
       a999: { actual: 72, target: 80, daily_target: 38.7, daily_gap: 33.3, rate: 0.9, dod: 0.01 },
       a1399: { actual: 31, target: 40, daily_target: 19.4, daily_gap: 11.6, rate: 0.775, dod: 0.02 },
@@ -48,7 +48,7 @@ const KPI_BATTLE_FIXTURE = {
     metrics: { '好速案銷售點數': { actual: 46, target: 45, daily_target: 21.8, daily_gap: 24.2, rate: 1.0222, dod: 0.01 } },
   },
   stores: [{
-    store: '大稻埕', company_rank: 65, company_rank_dod: -3, overall_kpi: 1.2435, overall_kpi_dod: 0.056, addon_score: 13.57, addon_score_dod: 0.23,
+    store: '大稻埕', company_rank: 65, company_rank_dod: -3, overall_kpi: 1.2435, overall_kpi_dod: 0.056, addon_score: 13.57, addon_score_dod: 0.23, insurance_attach_rate: 0.54545,
     core: {
       a999: { actual: 10, target: 16, daily_target: 7.7, daily_gap: 2.3, rate: 1.2917, dod: 0.012 },
       a1399: { actual: 6, target: 8, daily_target: 3.9, daily_gap: 2.1, rate: 1.55, dod: -0.02 },
@@ -91,6 +91,8 @@ const AWARD_ITEMS = [
 ].map(([display_name, actual, target, rate, difference, incremental_award]) => ({
   display_name, actual, target, rate, difference, incremental_award,
   next_label: '下一獎階', threshold_target: Math.ceil(target * 0.5),
+  store_reward_50: incremental_award, store_reward_100: incremental_award * 2,
+  district_reward_80: incremental_award + 100, district_reward_100: incremental_award * 3,
 }));
 
 const AWARDS_BATTLE_FIXTURE = {
@@ -364,12 +366,15 @@ test.describe('KPI 戰情', () => {
     await expect(page.locator('#kpiBattleSourceNote')).toContainText('同次正式快照已同步');
   });
 
-  test('同次正式快照補入公司排名、整體 KPI、加掛與店點補充欄位', async ({ page }) => {
+  test('同次正式快照補入公司排名、整體 KPI、加掛、保險搭售率與店點補充欄位', async ({ page }) => {
     await mockGAS(page);
     await kpiBattleLogin(page);
     await expect(page.locator('#kpiBattleContent')).toContainText('109.7%');
     await expect(page.locator('#kpiBattleContent')).toContainText('34');
     await expect(page.locator('#kpiBattleContent')).toContainText('12.35');
+    await expect(page.locator('#kpiBattleContent')).toContainText('46.2%');
+    const headers = await page.locator('#kpiBattleContent thead th').allTextContents();
+    expect(headers.indexOf('保險搭售率')).toBe(headers.indexOf('加掛') + 1);
     await expect(page.locator('#kpiBattleContent .val-gold')).not.toHaveCount(0);
     // 店點總達成率仍由 kpicalc 正式 JSON 取得。
     await expect(page.locator('#kpiBattleContent')).toContainText('110.3%');
@@ -404,7 +409,7 @@ test.describe('KPI 戰情', () => {
 });
 
 test.describe('台獎戰情', () => {
-  test('督導六卡、店點實際獎金排序與 13 款篩選顯示正確', async ({ page }) => {
+  test('督導六卡、店點實際獎金排序與北一二B／門市 13 款篩選顯示正確', async ({ page }) => {
     await mockGAS(page);
     await mockAwardsBattle(page);
     await page.goto(FILE_URL);
@@ -418,12 +423,18 @@ test.describe('台獎戰情', () => {
     await expect(page.locator('#awardsBattleSourceNote')).toContainText('13 款重點機款');
     await expect(page.locator('#awardsBattleSourceNote')).toContainText('10 列店點與整體資料');
     await expect(page.locator('#awardsBattleSourceNote')).toContainText('台獎戰報日期 2026-08-05');
-    await expect(page.locator('#awardsBattleContent')).toContainText('門市 13 款機款篩選');
+    await expect(page.locator('#awardsBattleContent')).toContainText('北一二B／門市 13 款機款篩選');
     await expect(page.locator('.award-store-card').nth(1)).toContainText('通化');
-    await expect(page.locator('#awardsStoreSelect')).toHaveValue('通化');
+    await expect(page.locator('#awardsStoreSelect')).toHaveValue('北一二B整體');
+    await expect(page.locator('#awardsBattleContent')).toContainText('北一二B 80%獎金');
+    await expect(page.locator('#awardsBattleContent')).toContainText('北一二B 100%獎金');
+    await expect(page.locator('#awardsBattleContent')).toContainText('北一二B差異數＝實際數－80%目標台數');
     await expect(page.locator('#awardsBattleContent .award-model')).toHaveCount(13);
     await page.selectOption('#awardsStoreSelect', '酒泉');
     await expect(page.locator('#awardsStoreSelect')).toHaveValue('酒泉');
+    await expect(page.locator('#awardsBattleContent')).toContainText('店點 50%獎金');
+    await expect(page.locator('#awardsBattleContent')).toContainText('店點 100%獎金');
+    await expect(page.locator('#awardsBattleContent')).toContainText('店點差異數＝實際數－50%目標台數');
   });
 
   test('台獎戰報日期與 KPI 戰報日期不一致時必須阻擋', async ({ page }) => {

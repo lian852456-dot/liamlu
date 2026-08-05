@@ -7,6 +7,8 @@
 - 補值門檻必須同時通過：snapshot `report_date` 存在、snapshot 截止日等於 kpicalc 截止日、snapshot `source_file` 等於 kpicalc `meta.sourceFile`。任一項不符，顯示「尚未同步」，不得使用 localStorage、舊 snapshot 或舊附件。
 - KPI 與台獎是否同次發布只比較 `report_date`。不可因為 KPI 截止日較早而隱藏同日發布的台獎。
 - 本機快照建立器：`/Users/liamlu/Downloads/liam-agent/report-automation/work/build_github_pages_data.py` 必須輸出 `report_date`、`data_as_of_date`、`source_as_of_date`、`source_file`、`source_date_range`。2026-08-05 快照已驗證：公司排名 34、整體 KPI 1.097、加掛 12.35、9 店、41 人；台獎 13 款、10 列。
+- KPI 店績的「保險搭售率」是實際搭售率，取同日、同來源的 `supplemental_daily_report`；快照要同時含整體與九店 `insurance_attach_rate`，來源不一致時不得補舊值。畫面位置固定接在「加掛」後。
+- 台獎上方排序卡維持原規則。僅下方 13 款篩選器新增「北一二B整體」：選北一二B顯示每款督導 `80%／100%` 獎金，選店點顯示每款店長 `50%／100%` 獎金；兩者不可混算。
 - 本次只允許前端與本機 snapshot builder；不得修改或重新部署 `gas/Code.gs`、Apps Script、`patrol.html`、巡店、班表、半月檢查／媒體或快速上傳 Deployment。
 
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）+ Google Sheets。

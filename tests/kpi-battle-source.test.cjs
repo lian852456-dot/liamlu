@@ -46,6 +46,24 @@ test('加掛得分保留兩位小數，不得把 12.35 截成 12.3', () => {
   assert.match(body, /Math\.round\(number \* 100\) \/ 100/);
 });
 
+test('店績保險搭售率接在加掛後，且由同次快照補入', () => {
+  const render = functionBody(html, 'renderKpiBattleStores');
+  assert.match(render, /<th>加掛<\/th><th>保險搭售率<\/th>/);
+  assert.match(render, /kpiBattleInsuranceCell\(row\)/);
+  assert.match(functionBody(html, 'mergeKpiBattleSupplement'), /insurance_attach_rate/);
+});
+
+test('台獎篩選可選北一二B，北一二B顯示80%／100%，門市顯示50%／100%', () => {
+  const render = functionBody(html, 'renderAwardsBattle');
+  const model = functionBody(html, 'renderAwardModel');
+  assert.match(render, /option value="北一二B整體"/);
+  assert.match(render, /北一二B差異數＝實際數－80%目標台數/);
+  assert.match(render, /店點差異數＝實際數－50%目標台數/);
+  for (const field of ['district_reward_80', 'district_reward_100', 'store_reward_50', 'store_reward_100']) {
+    assert.match(model, new RegExp(field));
+  }
+});
+
 test('快照合併硬性要求截止日與來源檔一致', () => {
   const guard = functionBody(html, 'kpiBattleSupplementIsCurrent');
   for (const field of ['snapshot.report_date', 'data_as_of_date', 'snapshot.source_file']) {
@@ -102,8 +120,8 @@ test('同次正式快照補入 0805 戰報日、34 名、109.7%、12.35 與個�
   const base = A.kpicalcToKpiBattleView(SAMPLE, '');
   const snapshot = {
     report_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0805.xlsx', source_date_range: '2026/08/01 ~ 08/04',
-    aggregate: { overall_kpi: 1.097, company_rank: 34, addon_score: 12.35 },
-    stores: [{ store: '甲', company_rank: 20, addon_score: 14.2 }],
+    aggregate: { overall_kpi: 1.097, company_rank: 34, addon_score: 12.35, insurance_attach_rate: 0.46154 },
+    stores: [{ store: '甲', company_rank: 20, addon_score: 14.2, insurance_attach_rate: 0.54545 }],
     personal: [{ store: '甲', name: '甲＊一', rank: 49, insurance_attach_rate: 0.83333, phone_award_actual: 1495, phone_award_projected: 14720 }],
   };
   const view = A.mergeKpiBattleSupplement(base, snapshot);
@@ -113,7 +131,9 @@ test('同次正式快照補入 0805 戰報日、34 名、109.7%、12.35 與個�
   assert.equal(view.aggregate.company_rank, 34);
   assert.equal(view.aggregate.overall_kpi, 1.097);
   assert.equal(view.aggregate.addon_score, 12.35);
+  assert.equal(view.aggregate.insurance_attach_rate, 0.46154);
   assert.equal(view.stores[0].company_rank, 20);
+  assert.equal(view.stores[0].insurance_attach_rate, 0.54545);
   assert.equal(view.personal[0].rank, 49);
   assert.equal(view.personal[0].phone_award_actual, 1495);
   assert.equal(view.personal[0].insurance_attach_rate, 0.83333);
