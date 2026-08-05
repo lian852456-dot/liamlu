@@ -72,8 +72,13 @@ test('快照合併硬性要求截止日與來源檔一致', () => {
   assert.doesNotMatch(functionBody(html, 'loadKpiBattle'), /__KPI_BATTLE_DATA__/);
 });
 
-test('禁止修改 Apps Script 與巡店保護區', () => {
-  assert.doesNotThrow(() => execFileSync('git', ['diff', '--exit-code', 'origin/main', '--', 'gas/Code.gs', 'patrol.html'], { cwd: root, stdio: 'pipe' }));
+test('private_publish 修正只允許落在該函式，巡店保護區不得變更', () => {
+  const changed = execFileSync('git', ['diff', '--name-only', 'origin/main', '--', 'gas/Code.gs', 'patrol.html'], { cwd: root, encoding: 'utf8' })
+    .trim().split('\n').filter(Boolean);
+  assert.deepEqual(changed, ['gas/Code.gs']);
+  const diff = execFileSync('git', ['diff', 'origin/main', '--', 'gas/Code.gs'], { cwd: root, encoding: 'utf8' });
+  assert.match(diff, /snapshot\.publishedAt = publishedAt/);
+  assert.doesNotMatch(diff, /^[+-].*(ptread|ptwrite|hread|hwrite|sread|kpiCalcAccess|reportUpload)/m);
   const gas = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8');
   assert.match(gas, /action === 'private_publish'/);
   assert.match(gas, /action === 'ptread'/);

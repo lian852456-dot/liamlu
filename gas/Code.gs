@@ -2401,16 +2401,20 @@ function privateDashboardPublish(payload) {
   privateDashboardAdminAuthorized(payload);
   const encoded = String(payload.snapshotBase64 || '');
   if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('私有戰情快照缺少或過大');
-  const text = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
-  const snapshot = JSON.parse(text);
+  const decoded = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
+  const snapshot = JSON.parse(decoded);
   if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
+  const publishedAt = privateDashboardNow();
+  snapshot.publishedAt = publishedAt;
+  const text = JSON.stringify(snapshot);
   const folder = privateDashboardFolder();
   const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
-  const blob = Utilities.newBlob(text, 'application/json', PRIVATE_DASHBOARD_FILE);
+  let file;
   if (files.hasNext()) {
-    files.next().setContent(blob.getDataAsString('UTF-8'));
+    file = files.next();
+    file.setContent(text);
   } else {
-    folder.createFile(blob);
+    file = folder.createFile(Utilities.newBlob(text, 'application/json', PRIVATE_DASHBOARD_FILE));
   }
   // 只登記版本、不擋。privateDashboardPublish 是 Codex 每日自動化的入口，
   // 這裡若改成硬擋，外部管線會在無預警下失敗——要不要升級為硬擋是 Liam 的決定，見 SPEC §4。
@@ -2418,7 +2422,16 @@ function privateDashboardPublish(payload) {
     dataDate: String(snapshot.kpiBattle.report_date || ''), source: 'external-publish',
     fileHash: reportVersionHash_(text), fileName: PRIVATE_DASHBOARD_FILE, operator: 'external'
   }, 'success', { rule: 'record-only' });
-  return { publishedAt: privateDashboardNow(), reportDate: snapshot.kpiBattle.report_date || '' };
+  return {
+    publishedAt: publishedAt,
+    reportDate: snapshot.kpiBattle.report_date || '',
+    fileId: file.getId(),
+    lastUpdated: Utilities.formatDate(
+      file.getLastUpdated(),
+      'Asia/Taipei',
+      "yyyy-MM-dd'T'HH:mm:ssXXX"
+    )
+  };
 }
 
 // ════════════════════════════════════
