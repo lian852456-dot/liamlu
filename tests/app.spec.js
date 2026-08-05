@@ -4,16 +4,18 @@ const path = require('path');
 const FILE_URL = 'file://' + path.resolve(__dirname, '../index.html');
 
 // Mock GAS 回應（讓 fetch 不需要真正連線）
-async function mockGAS(page, { readData = {} } = {}) {
+async function mockGAS(page, { readData = {}, privateKpi = KPI_BATTLE_FIXTURE, privateAwards = AWARDS_BATTLE_FIXTURE } = {}) {
   await page.route('https://script.google.com/**', async route => {
     const url = route.request().url();
     const request = route.request();
     if (request.method() === 'POST') {
       const payload = JSON.parse(request.postData() || '{}');
       if (payload.action === 'private_access') {
-        await route.fulfill({ json: { status: 'ok', profile: { maskedName: '測＊員', store: '大稻埕', role: '業代' }, snapshot: { kpiBattle: KPI_BATTLE_FIXTURE, awardsBattle: AWARDS_BATTLE_FIXTURE } } });
+        await route.fulfill({ json: { status: 'ok', profile: { maskedName: '測＊員', store: '大稻埕', role: '業代' }, snapshot: { kpiBattle: privateKpi, awardsBattle: privateAwards } } });
       } else if (payload.action === 'kpicalc_access') {
         await route.fulfill({ json: { status: 'ok', data: KPICALC_FIXTURE, profile: { maskedName: '測＊員', store: '大稻埕', role: '業代' } } });
+      } else if (payload.action === 'read') {
+        await route.fulfill({ json: { status: 'ok', data: readData } });
       } else {
         await route.fulfill({ json: { status: 'ok' } });
       }
@@ -30,11 +32,13 @@ async function mockGAS(page, { readData = {} } = {}) {
 }
 
 const KPI_BATTLE_FIXTURE = {
-  report_date: '2026-07-16',
-  previous_report_date: '2026-07-15',
-  source_date_range: '2026/07/01 ~ 07/15',
+  report_date: '2026-08-05',
+  data_as_of_date: '2026-08-04',
+  source_as_of_date: '2026-08-04',
+  source_file: '0805.xlsx',
+  source_date_range: '2026/08/01 ~ 08/04',
   aggregate: {
-    overall_kpi: 1.0547, overall_kpi_dod: 0.009, company_rank: 27, company_rank_dod: 2, addon_score: 13.36, addon_score_dod: 0.09,
+    overall_kpi: 1.097, overall_kpi_dod: -0.1018, company_rank: 34, company_rank_dod: -9, addon_score: 12.35, addon_score_dod: -0.49,
     core: {
       a999: { actual: 72, target: 80, daily_target: 38.7, daily_gap: 33.3, rate: 0.9, dod: 0.01 },
       a1399: { actual: 31, target: 40, daily_target: 19.4, daily_gap: 11.6, rate: 0.775, dod: 0.02 },
@@ -81,12 +85,18 @@ const AWARD_ITEMS = [
   ['moto razr fold', 0, 2, 0, -1, 300],
   ['Samsung A27/A17', 2, 3, 0.6667, 0, 250],
   ['vivo Y21/Redmi Note 15 Pro', 1, 2, 0.5, 0, 100],
+  ['Google Pixel 11 Pro/XL/Fold', 1, 2, 0.5, 0, 90],
+  ['Samsung Z Flip8', 1, 2, 0.5, 0, 80],
+  ['vivo Y21', 1, 2, 0.5, 0, 70],
 ].map(([display_name, actual, target, rate, difference, incremental_award]) => ({
   display_name, actual, target, rate, difference, incremental_award,
   next_label: '下一獎階', threshold_target: Math.ceil(target * 0.5),
 }));
 
 const AWARDS_BATTLE_FIXTURE = {
+  report_date: '2026-08-05',
+  phone_items: 13,
+  store_rows: 10,
   supervisor: { actual_total: 2431, projected: 11260, rank: '22', award: 'Y' },
   overall: {
     store: '北一二B整體', award: { actual_total: 2431, projected: 11260, rank: '22', award: 'Y' },
@@ -101,7 +111,7 @@ const AWARDS_BATTLE_FIXTURE = {
 // 方案 A（2026-07-31）：KPI 戰情頁籤唯一正式來源是 kpicalc JSON（與 kpi.html 同一份）。
 // KPI_BATTLE_FIXTURE（snapshot 形狀）保留給「舊數字不得出現」的反向斷言用。
 const KPICALC_FIXTURE = {
-  meta: { period: '2026/07/01 ~ 07/29', snapshotDay: 29, monthDays: 31, month: '2026-07', sourceFile: '0730.xlsx' },
+  meta: { period: '2026/08/01 ~ 08/04', snapshotDay: 4, monthDays: 31, month: '2026-08', sourceFile: '0805.xlsx' },
   items: [
     { key: 'AQ V+D 999 (含)以上', short: 'AQ V+D≧999', step: 1 },
     { key: 'AQ V+D 1399 (含)以上', short: 'AQ V+D≧1399', step: 1 },
@@ -233,13 +243,13 @@ test.describe('填報頁籤 - 時段切換', () => {
 });
 
 test.describe('填報頁籤 - 表單輸入', () => {
-  test('台獎填報維持 10 款且只保留 moto', async ({ page }) => {
+  test('台獎填報顯示 13 組 canonical 機款，舊 tw 欄位維持隱藏', async ({ page }) => {
     await mockGAS(page);
     await page.goto(FILE_URL);
     await page.locator('.store-card[data-store="通化"]').click();
-    await expect(page.locator('#f_tw_sony1')).toBeVisible();
-    await expect(page.locator('label').filter({ hasText: 'moto razr fold' })).toBeVisible();
-    await expect(page.locator('#f_tw_pixel10fold, #f_tw_findx9s, #f_tw_poketomo, #f_tw_myfirst')).toHaveCount(0);
+    await expect(page.locator('#awardModelsV1Grid [data-award-model-id]')).toHaveCount(13);
+    await expect(page.locator('#f_award_razr-fold')).toBeVisible();
+    await expect(page.locator('#f_tw_sony1')).toBeHidden();
   });
 
   test('KPI 欄位可以輸入數值', async ({ page }) => {
@@ -340,32 +350,27 @@ test.describe('KPI 戰情', () => {
     await expect(page.locator('#kpiBattleContent')).toContainText('KPI總達成');
   });
 
-  test('店點總覽顯示 kpicalc 最新欄位，來源列標明資料日期與來源檔', async ({ page }) => {
+  test('0805 發布日與 0804 資料截止日分開顯示，來源列保留來源檔', async ({ page }) => {
     await mockGAS(page);
     await kpiBattleLogin(page);
     await expect(page.locator('#panel-kpi-battle')).toBeVisible();
     await expect(page.locator('#kpiBattleContent')).toContainText('台北大稻埕');
     await expect(page.locator('#kpiBattleContent')).toContainText('A999');
     await expect(page.locator('#kpiBattleContent')).toContainText('R1399');
-    await expect(page.locator('#kpiBattleSourceNote')).toContainText('kpi.html 同一份');
-    await expect(page.locator('#kpiBattleSourceNote')).toContainText('資料日期 2026-07-29');
-    await expect(page.locator('#kpiBattleSourceNote')).toContainText('來源檔 0730.xlsx');
-    await expect(page.locator('#kpiBattleSourceNote')).toContainText('更新時間 尚未同步');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('戰報日期 2026-08-05');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('資料統計至 2026-08-04');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('來源檔 0805.xlsx');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('同次正式快照已同步');
   });
 
-  test('缺少欄位顯示尚未同步，且不得出現 snapshot 舊數字', async ({ page }) => {
+  test('同次正式快照補入公司排名、整體 KPI、加掛與店點補充欄位', async ({ page }) => {
     await mockGAS(page);
     await kpiBattleLogin(page);
-    // 公司排名／加掛分／整體 KPI：kpicalc 沒有 → 尚未同步
-    await expect(page.locator('#kpiBattleContent')).toContainText('尚未同步');
-    const text = await page.locator('#kpiBattleContent').textContent();
-    // snapshot fixture 的舊數字一個都不准出現：加掛 13.36、整體 105.5%、DOD 字樣
-    for (const stale of ['13.36', '105.5%', '105.4', 'DOD']) {
-      expect(text, `snapshot 舊數字 ${stale} 不得出現`).not.toContain(stale);
-    }
-    // 公司排名欄只在有排名值時才會產生 val-gold 節點——kpicalc 沒排名，必須為 0
-    await expect(page.locator('#kpiBattleContent .val-gold')).toHaveCount(0);
-    // kpicalc 的最新店點總達成率必須出現（110.4% = 1.1035）
+    await expect(page.locator('#kpiBattleContent')).toContainText('109.7%');
+    await expect(page.locator('#kpiBattleContent')).toContainText('34');
+    await expect(page.locator('#kpiBattleContent')).toContainText('12.35');
+    await expect(page.locator('#kpiBattleContent .val-gold')).not.toHaveCount(0);
+    // 店點總達成率仍由 kpicalc 正式 JSON 取得。
     await expect(page.locator('#kpiBattleContent')).toContainText('110.3%');
   });
 
@@ -388,10 +393,9 @@ test.describe('KPI 戰情', () => {
     await expect(page.locator('#kpiBattleContent')).toContainText('個人台獎');
     await expect(page.locator('#kpiBattleContent')).toContainText('特維');
     await expect(page.locator('#kpiBattleContent')).toContainText('保險搭售率');
-    // 方案 A：個人排名／台獎／保險搭售率不在 kpicalc → 尚未同步，不得出現舊獎金數字
-    await expect(page.locator('#kpiBattleContent')).toContainText('尚未同步');
-    await expect(page.locator('#kpiBattleContent')).not.toContainText('實際獎金');
-    await expect(page.locator('#kpiBattleContent')).not.toContainText('$1,800');
+    await expect(page.locator('#kpiBattleContent')).toContainText('實際獎金');
+    await expect(page.locator('#kpiBattleContent')).toContainText('$1,800');
+    await expect(page.locator('#kpiBattleContent tbody tr').first()).not.toContainText('尚未同步');
     const headers = await page.locator('#kpiBattleContent thead th').allTextContents();
     expect(headers.indexOf('保險搭售率')).toBe(headers.indexOf('個人台獎') + 1);
     expect(headers.indexOf('R999')).toBe(headers.indexOf('R1399') + 1);
@@ -399,7 +403,7 @@ test.describe('KPI 戰情', () => {
 });
 
 test.describe('台獎戰情', () => {
-  test('督導六卡、店點實際獎金排序與 10 台篩選顯示正確', async ({ page }) => {
+  test('督導六卡、店點實際獎金排序與 13 款篩選顯示正確', async ({ page }) => {
     await mockGAS(page);
     await mockAwardsBattle(page);
     await page.goto(FILE_URL);
@@ -412,9 +416,17 @@ test.describe('台獎戰情', () => {
     await expect(page.locator('#awardsBattleContent')).toContainText('通化');
     await expect(page.locator('.award-store-card').nth(1)).toContainText('通化');
     await expect(page.locator('#awardsStoreSelect')).toHaveValue('通化');
-    await expect(page.locator('#awardsBattleContent .award-model')).toHaveCount(10);
+    await expect(page.locator('#awardsBattleContent .award-model')).toHaveCount(13);
     await page.selectOption('#awardsStoreSelect', '酒泉');
     await expect(page.locator('#awardsStoreSelect')).toHaveValue('酒泉');
+  });
+
+  test('台獎戰報日期與 KPI 戰報日期不一致時必須阻擋', async ({ page }) => {
+    await mockGAS(page, { privateAwards: { ...AWARDS_BATTLE_FIXTURE, report_date: '2026-08-04' } });
+    await kpiBattleLogin(page);
+    await page.getByRole('button', { name: /台獎戰情/ }).click();
+    await expect(page.locator('#awardsBattleContent')).toContainText('台獎尚未同步');
+    await expect(page.locator('#awardsBattleContent')).toContainText('2026-08-04');
   });
 });
 

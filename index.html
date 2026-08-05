@@ -2401,11 +2401,9 @@ function switchTab(name) {
 // ════════════════════════════════════
 let _kpiBattleData = null;
 
-// ═══ 方案 A 轉接層：kpicalc JSON → KPI 戰情視圖 ═══
-// 原則（2026-07-31 Liam 拍板）：kpicalc 有的欄位顯示最新值；沒有的欄位（公司排名、
-// DOD 昨日變化、加掛分、個人排名／台獎／保險搭售率）一律「尚未同步」或隱藏，
-// 不得沿用 dashboard snapshot 的舊數字。所有數字都直接來自 kpicalc JSON 或其逐項加總，
-// 不發明任何新數字；整體總達成率無法由 kpicalc 推得（需加權），因此也是尚未同步。
+// ═══ KPI 正式資料 + 同次發布快照轉接層 ═══
+// KPI 實績、目標、達成率與逐項指標固定取自 kpicalc；只有發布日、資料截止日、
+// 來源檔三者相符時，才由同次私有快照補入公司/個人排名、加掛、台獎、保險與 DOD。
 const KPI_BATTLE_CORE_KEYS = { a999: 'AQ V+D 999 (含)以上', a1399: 'AQ V+D 1399 (含)以上', haosu: '好速案銷售點數', r1399: 'RT V+D 1399 (含)以上' };
 const KPI_BATTLE_PERSONAL_KEYS = { A999: 'AQ V+D 999 (含)以上', A1399: 'AQ V+D 1399 (含)以上', '好速': '好速案銷售點數', R1399: 'RT V+D 1399 (含)以上', R999: 'RT V+D 999 (含)以上', RT: 'RT上線點數', '特維': '特殊維繫用戶續約數', '配件': '配件及其他營收', '包膜': '包膜與保貼營收' };
 
@@ -2420,10 +2418,64 @@ function kpicalcMetric(entry, meta) {
   return { actual, target, rate: target > 0 ? actual / target : null, daily_gap: expected == null ? null : actual - expected };
 }
 
+function kpiBattleDataAsOfDate(meta) {
+  return (/^\d{4}-\d{2}$/.test(meta.month || '') && meta.snapshotDay)
+    ? `${meta.month}-${String(meta.snapshotDay).padStart(2, '0')}` : '';
+}
+
+function kpiBattleSourceFile(value) {
+  return String(value || '').split(/[\\/]/).pop().trim().toLowerCase();
+}
+
+function kpiBattleStoreKey(value) {
+  return String(value || '').replace(/^台灣大哥大數位生活台北/, '').replace(/^台北/, '').replace(/\s+/g, '').trim();
+}
+
+function kpiBattlePersonKey(row) {
+  return `${kpiBattleStoreKey(row && row.store)}|${String((row && row.name) || '').replace(/[＊*]/g, '').trim()}`;
+}
+
+function kpiBattleSupplementIsCurrent(kpiData, snapshot) {
+  const snapshotDataAsOf = String((snapshot || {}).data_as_of_date || (snapshot || {}).source_as_of_date || '');
+  return Boolean(
+    snapshot && snapshot.report_date &&
+    snapshotDataAsOf === kpiData.data_as_of_date &&
+    kpiBattleSourceFile(snapshot.source_file) &&
+    kpiBattleSourceFile(snapshot.source_file) === kpiBattleSourceFile(kpiData.source_file)
+  );
+}
+
+function mergeKpiBattleSupplement(kpiData, snapshot) {
+  if (!kpiBattleSupplementIsCurrent(kpiData, snapshot)) return { ...kpiData, supplement_synced: false };
+  const copy = JSON.parse(JSON.stringify(kpiData));
+  const aggregate = snapshot.aggregate || {};
+  const copyFields = (target, source, fields) => fields.forEach(field => {
+    if (source && source[field] != null) target[field] = source[field];
+  });
+  copy.report_date = String(snapshot.report_date);
+  copy.source_date_range = snapshot.source_date_range || copy.source_date_range;
+  copy.aggregate = { ...copy.aggregate };
+  copyFields(copy.aggregate, aggregate, ['overall_kpi', 'overall_kpi_dod', 'company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod']);
+  const snapshotStores = new Map((snapshot.stores || []).map(row => [kpiBattleStoreKey(row.store), row]));
+  copy.stores = copy.stores.map(row => {
+    const source = snapshotStores.get(kpiBattleStoreKey(row.store));
+    const merged = { ...row };
+    copyFields(merged, source, ['company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod']);
+    return merged;
+  });
+  const snapshotPeople = new Map((snapshot.personal || []).map(row => [kpiBattlePersonKey(row), row]));
+  copy.personal = copy.personal.map(row => {
+    const source = snapshotPeople.get(kpiBattlePersonKey(row));
+    const merged = { ...row };
+    copyFields(merged, source, ['rank', 'rank_dod', 'insurance_attach_rate', 'phone_award_actual', 'phone_award_projected', 'phone_award_rank', 'phone_award_eligible']);
+    return merged;
+  });
+  return { ...copy, supplement_synced: true };
+}
+
 function kpicalcToKpiBattleView(data, fetchedAt) {
   const meta = (data && data.meta) || {};
-  const dataDate = (/^\d{4}-\d{2}$/.test(meta.month || '') && meta.snapshotDay)
-    ? `${meta.month}-${String(meta.snapshotDay).padStart(2, '0')}` : '';
+  const dataAsOfDate = kpiBattleDataAsOfDate(meta);
   const codeName = {};
   (data.stores || []).forEach(s => { codeName[s.code] = s.name; });
   const metricsOf = itemsObj => {
@@ -2456,7 +2508,8 @@ function kpicalcToKpiBattleView(data, fetchedAt) {
   });
   return {
     source: 'kpicalc', fetchedAt: fetchedAt || '', source_file: meta.sourceFile || '',
-    report_date: dataDate, source_date_range: meta.period || '', source_as_of_date: dataDate, previous_report_date: null,
+    report_date: '', data_as_of_date: dataAsOfDate, source_as_of_date: dataAsOfDate,
+    source_date_range: meta.period || '', previous_report_date: null,
     aggregate: { store: '北一二B整體', overall_kpi: null, company_rank: null, addon_score: null, core: coreOf(aggItems), metrics: aggItems },
     stores, personal
   };
@@ -2577,7 +2630,9 @@ async function privateDashboardLogin() {
     _privateDashboardProfile = result.profile || null;
     try {
       const kpiResult = await privateDashboardPost({ action: 'kpicalc_access', employeeId, deviceId: privateDashboardDeviceId() });
-      _kpiBattleData = kpicalcToKpiBattleView(kpiResult.data, new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }));
+      const kpiData = kpicalcToKpiBattleView(kpiResult.data, new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }));
+      const snapshotKpi = result.snapshot && result.snapshot.kpiBattle;
+      _kpiBattleData = mergeKpiBattleSupplement(kpiData, snapshotKpi);
       renderKpiBattle();
       const awards = result.snapshot && result.snapshot.awardsBattle;
       const awardsDate = String((awards || {}).report_date || '');
@@ -2588,7 +2643,7 @@ async function privateDashboardLogin() {
       } else {
         _awardsBattleData = null;
         _awardsBattleUnavailableReason = awardsDate
-          ? `台獎資料日期 ${awardsDate} 與 KPI 資料日期 ${_kpiBattleData.report_date || '—'} 不一致`
+          ? `台獎戰報日期 ${awardsDate} 與 KPI 戰報日期 ${_kpiBattleData.report_date || '—'} 不一致`
           : '尚未取得與目前 KPI 同日期的台獎資料';
         renderAwardsBattleUnavailable();
       }
@@ -2691,7 +2746,7 @@ function kpiBattleTone(value) {
 function kpiBattleNumber(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '—';
-  return number % 1 === 0 ? String(number) : number.toFixed(1);
+  return String(Math.round(number * 100) / 100);
 }
 
 function kpiBattleMetricCell(metric, includeDod = true) {
@@ -2755,7 +2810,8 @@ function renderKpiBattle() {
   if (!_kpiBattleData) return;
   const note = document.getElementById('kpiBattleSourceNote');
   if (note) {
-    note.textContent = `KPI 唯一正式來源：與 kpi.html 同一份受保護 kpicalc 正式 JSON｜資料日期 ${_kpiBattleData.report_date || '—'}｜區間 ${_kpiBattleData.source_date_range || '—'}｜來源檔 ${_kpiBattleData.source_file || '—'}｜更新時間 尚未同步（讀取於 ${_kpiBattleData.fetchedAt || '—'}）｜發布狀態：正式 JSON 已發布｜明細：實績／月目標／尚差或超前｜公司排名・昨日變化・加掛分尚未同步｜個資僅供受保護預覽`;
+    const supplement = _kpiBattleData.supplement_synced ? '同次正式快照已同步排名、加掛、個人台獎與保險' : '補充欄位尚未同步（來源或日期不一致）';
+    note.textContent = `KPI 實績來源：與 kpi.html 同一份受保護 kpicalc 正式 JSON｜戰報日期 ${_kpiBattleData.report_date || '—'}｜資料統計至 ${_kpiBattleData.data_as_of_date || _kpiBattleData.source_as_of_date || '—'}｜來源檔 ${_kpiBattleData.source_file || '—'}｜區間 ${_kpiBattleData.source_date_range || '—'}｜${supplement}｜讀取於 ${_kpiBattleData.fetchedAt || '—'}｜個資僅供受保護預覽`;
   }
   const content = document.getElementById('kpiBattleContent');
   if (!content) return;

@@ -13,6 +13,13 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-05 ｜ Codex（KPI／台獎日期契約與同次快照補值）
+- 做了什麼：修正 `index.html` 將 KPI 的「戰報發布日」與來源「資料截止日」混用的問題。`kpicalc_access` 仍是 KPI 實績、目標、店點總達成與指標的唯一來源；只有私有 snapshot 的 `report_date`、`data_as_of_date`／`source_as_of_date`、`source_file` 全部與 kpicalc 一致時，才補入公司／個人排名、DOD、加掛得分、個人台獎與保險搭售率。台獎一致性改比 `report_date`。本機 `build_github_pages_data.py` 也將快照補齊 `data_as_of_date` 與 `source_file`。
+- 結果（成功 / 失敗 / 進行中）：0805 契約資料已驗證為戰報日 `2026-08-05`、資料統計至 `2026-08-04`、來源檔 `0805.xlsx`、公司排名 `34`、整體 KPI `109.7%`、加掛 `12.35`、KPI `9` 店／`41` 人、台獎 `13` 款／`10` 列。前端與契約測試同時保護 `gas/Code.gs`、`patrol.html` 不得變更。
+- 經驗 / 給下一位的提醒：先前 2026-07-31 的「不得混入 snapshot」規則只適用於未驗證或舊快照。本契約以三項同次來源門檻取代它；任一項不符時必須維持「尚未同步」，不可回退到 localStorage 或舊 JSON，也不可拿 `data_as_of_date` 當 `report_date`。
+
+---
+
 ## 2026-08-04 ｜ Codex（正式 Apps Script v26 與直接 POST 傳輸修復）
 - 做了什麼：以遠端 `main` 的 `9f3e729` 為基準完成 Apps Script v26 部署，並將 `index.html`、`kpi.html` 的正式 GAS 請求從隱藏 iframe 改為直接 `fetch` POST；另加入管理者私有快照狀態讀回路由供發布驗證。
 - 結果（成功 / 失敗 / 進行中）：Apps Script v26 已成功更新，HTTP 200 / `status=ok` 已確認；iframe 在 Chrome 實測會逾時，直接 POST 修復待 GitHub Pages 建置後重新驗收。

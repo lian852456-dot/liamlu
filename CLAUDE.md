@@ -1,5 +1,14 @@
 # 北一二B 每日回報系統
 
+## 2026-08-05 固定 KPI／台獎日期契約
+
+- `report_date` 是每日戰報／網站發布日；`data_as_of_date`（相容讀取 `source_as_of_date`）是來源資料截止日，兩者不得互換。0805 範例：發布日 `2026-08-05`，截止日 `2026-08-04`，來源 `0805.xlsx`，區間 `2026/08/01 ~ 08/04`。
+- KPI 實績、目標、店點總達成率、核心與逐項 KPI 必須取 `kpicalc_access`。公司排名、DOD、加掛、個人排名、個人台獎與保險搭售率，只能從同一次私有 snapshot 補入。
+- 補值門檻必須同時通過：snapshot `report_date` 存在、snapshot 截止日等於 kpicalc 截止日、snapshot `source_file` 等於 kpicalc `meta.sourceFile`。任一項不符，顯示「尚未同步」，不得使用 localStorage、舊 snapshot 或舊附件。
+- KPI 與台獎是否同次發布只比較 `report_date`。不可因為 KPI 截止日較早而隱藏同日發布的台獎。
+- 本機快照建立器：`/Users/liamlu/Downloads/liam-agent/report-automation/work/build_github_pages_data.py` 必須輸出 `report_date`、`data_as_of_date`、`source_as_of_date`、`source_file`、`source_date_range`。2026-08-05 快照已驗證：公司排名 34、整體 KPI 1.097、加掛 12.35、9 店、41 人；台獎 13 款、10 列。
+- 本次只允許前端與本機 snapshot builder；不得修改或重新部署 `gas/Code.gs`、Apps Script、`patrol.html`、巡店、班表、半月檢查／媒體或快速上傳 Deployment。
+
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）+ Google Sheets。
 
 另有 `home.html`（**Liam 智慧管理中心**，導覽首頁，2026-07-29 新增）：給門市同仁跳轉用的入口頁，
