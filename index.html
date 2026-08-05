@@ -2929,11 +2929,13 @@ function renderAwardsBattle() {
   const data = _awardsBattleData;
   const supervisor = data.supervisor || {};
   const stores = data.stores || [];
+  const phoneItems = Number.isFinite(Number(data.phone_items)) ? Number(data.phone_items) : (data.overall?.items || []).length;
+  const storeRows = Number.isFinite(Number(data.store_rows)) ? Number(data.store_rows) : stores.length + 1;
   const eligibleStores = stores.filter(row => row.award?.award === 'Y').length;
   const selectedBefore = document.getElementById('awardsStoreSelect')?.value;
   const selectedStore = stores.find(row => row.store === selectedBefore) || stores[0];
   const note = document.getElementById('awardsBattleSourceNote');
-  if (note) note.textContent = `10 台重點機款｜前三台依本月最高台獎順位；達成率超過 100% 由下一順位遞補｜店點差異數以 50% 目標無條件進位計算｜資料僅供受保護預覽`;
+  if (note) note.textContent = `${phoneItems} 款重點機款｜${storeRows} 列店點與整體資料｜台獎戰報日期 ${data.report_date || '—'}｜前三台依本月最高台獎順位；達成率超過 100% 由下一順位遞補｜店點差異數以 50% 目標無條件進位計算｜資料僅供受保護預覽`;
   const content = document.getElementById('awardsBattleContent');
   if (!content) return;
   content.innerHTML = `
@@ -2947,7 +2949,7 @@ function renderAwardsBattle() {
     </div>
     <div class="section-divider">督導區及各店台獎（依實際獎金排序）</div>
     <div class="award-store-grid">${renderAwardUnit(data.overall || { store: '北一二B整體', award: supervisor, priorities: [] }, true)}${stores.map(row => renderAwardUnit(row)).join('')}</div>
-    <div class="section-divider">門市 10 台機款篩選</div>
+    <div class="section-divider">門市 ${phoneItems} 款機款篩選</div>
     <div class="card"><div class="award-store-selector"><label>選擇門市<select id="awardsStoreSelect" onchange="renderAwardsBattle()">${stores.map(row => `<option value="${row.store}" ${row.store === selectedStore?.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label><span class="kpi-battle-note">差異數＝實際數－50%目標台數（無條件進位）</span></div><div class="award-model-grid">${(selectedStore?.items || []).map(renderAwardModel).join('')}</div></div>`;
 
 }

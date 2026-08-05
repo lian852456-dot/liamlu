@@ -414,6 +414,10 @@ test.describe('台獎戰情', () => {
     await expect(page.locator('#awardsBattleContent')).toContainText('有領獎店');
     await expect(page.locator('#awardsBattleContent')).toContainText('會增加多少獎金');
     await expect(page.locator('#awardsBattleContent')).toContainText('通化');
+    await expect(page.locator('#awardsBattleSourceNote')).toContainText('13 款重點機款');
+    await expect(page.locator('#awardsBattleSourceNote')).toContainText('10 列店點與整體資料');
+    await expect(page.locator('#awardsBattleSourceNote')).toContainText('台獎戰報日期 2026-08-05');
+    await expect(page.locator('#awardsBattleContent')).toContainText('門市 13 款機款篩選');
     await expect(page.locator('.award-store-card').nth(1)).toContainText('通化');
     await expect(page.locator('#awardsStoreSelect')).toHaveValue('通化');
     await expect(page.locator('#awardsBattleContent .award-model')).toHaveCount(13);
