@@ -13,6 +13,24 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-05 ｜ Claude（班表更新 SOP 寫入 CLAUDE.md）
+- 做了什麼：依 Liam 要求，把每月班表更新的完整 SOP 寫進 `CLAUDE.md`——涵蓋來源 Drive
+  資料夾位置（folder ID）、9 店清單與排序、文字檔轉寫格式規範、`build_schedule_rows.py`
+  用法、匯入流程、已知的坑（版本月份 Date 轉換、圖檔編號不固定、人員異動）。
+- 結果（成功 / 失敗 / 進行中）：成功。SOP 已推送至 main。
+- 經驗 / 給下一位的提醒：
+  1. 班表圖片在 `02_班表原始檔_每月`（folder ID `1RCvU_gUSd8qKxLpTr-5D3olKv5kOPQgP`），
+     Liam 確認位置不會變。
+  2. 轉寫文字檔存 scratchpad（不進 repo，含個資）；TSV 同理——只交給 Liam，不 commit。
+  3. `scripts/build_schedule_rows.py` 目前只在分支
+     `claude/info-station-monthly-schedule-nhgr4j` 上，尚未合進 main。
+     下次要用之前，先把它 cherry-pick 或合進 main。
+  4. 匯入「班表明細」目前需 Liam 在 GAS 編輯器貼一次性腳本執行（AI 無法呼叫 GAS）。
+     分支上有 `swrite` action 可走 API 匯入，但分支遠落後 main（110 vs 159 函式），
+     合併前須先 rebase 到最新 main。
+
+---
+
 ## 2026-08-04 ｜ Codex（正式 Apps Script v26 與直接 POST 傳輸修復）
 - 做了什麼：以遠端 `main` 的 `9f3e729` 為基準完成 Apps Script v26 部署，並將 `index.html`、`kpi.html` 的正式 GAS 請求從隱藏 iframe 改為直接 `fetch` POST；另加入管理者私有快照狀態讀回路由供發布驗證。
 - 結果（成功 / 失敗 / 進行中）：Apps Script v26 已成功更新，HTTP 200 / `status=ok` 已確認；iframe 在 Chrome 實測會逾時，直接 POST 修復待 GitHub Pages 建置後重新驗收。
