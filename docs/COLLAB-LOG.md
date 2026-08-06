@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-06 ｜ Codex（Liam 情報站 App 1.0 安全盤點與 PWA 空殼）
+
+- 做了什麼：從最新 `origin/main` `31857ca` 建立 `liam-intel-app-baseline-2026-08-06` tag、可驗證 Git bundle／tar 備份，以及隔離 worktree 分支 `feature/liam-intel-app`。在分支中新增 `app.html`、manifest、Service Worker、離線頁、App icons、手機優先樣式與 App shell 契約／Playwright 測試；新頁只以原系統連結作為入口，未呼叫 GAS、Google Sheet、私有 Drive、D1 或 R2，也沒有寫入按鈕。
+- 結果：本機 Node 契約 3/3、375px Playwright 2/2 通過；確認五個固定頁籤、iPhone safe area、44px 觸控目標、無橫向溢出、督導「Liam AI 指揮室」靜態預覽與離線 fallback。`index.html`、`home.html`、`kpi.html`、`kpitry.html`、`patrol.html`、`gas/Code.gs` 均未改動。
+- 經驗 / 給下一位的提醒：此成果是未部署的 PWA 入口空殼，並不代表跨系統登入、KPI／台獎摘要、班表、公告、店務檢查或自動化狀態已串接。下一階段必須先定義最小只讀、已授權的摘要 adapter；不得把私有 JSON、名冊、員編、密碼、token 或既有 session 直接搬入 App。
+
 ## 2026-08-05 ｜ Codex（巡店單筆隔離寫入／清除驗收）
 
 - 做了什麼：在 Liam 已完成督導通行碼登入的正式 Liam 情報站，僅新增一筆 `巡店明細` 隔離紀錄：`2026/8/5 20:00`、台北通化、題號 33，檢查人員與未查原因均為 `驗收測試_20260805`。頁面回覆「已同步至雲端（新增 1 筆，重複資料自動略過）」；重新整理後雲端看板本月已巡店數由 3 顯示為 4，確認走正式讀回路徑。
