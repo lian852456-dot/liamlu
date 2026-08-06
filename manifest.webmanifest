@@ -1,0 +1,33 @@
+{
+  "id": "./app.html",
+  "name": "Liam 情報站 App",
+  "short_name": "Liam 情報站",
+  "description": "Liam 情報站 App 1.0：手機優先的營運整合入口。",
+  "start_url": "./app.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#091321",
+  "theme_color": "#091321",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "app-assets/liam-intel-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "app-assets/liam-intel-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "app-assets/liam-intel-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
