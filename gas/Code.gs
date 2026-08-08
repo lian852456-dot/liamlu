@@ -2199,12 +2199,20 @@ function kpiCalcParseReport(xlsxFile) {
       Math.min(236, personSheet.getLastColumn())).getValues();
 
     const meta = kpiCalcParseMeta(sv, xlsxFile.getName());
+    const aggregateBands = kpiCalcBands(sv[7], 8); // 北一二B整體：標題列 8、資料列 10
     const sBands = kpiCalcBands(sv[12], 8);   // 店點表：標題列 13、I 欄(9)起
     // 個人表：_明細 標題列 8、K 欄(11)起且固定 4 欄一段；
     // _店點 標題列 9／子標題列 10、D 欄(4)起，且合併儲存格會讓欄寬不固定，改逐段偵測
     const pBands = personLayout === 'detail'
       ? kpiCalcBands(pv[7], 10)
       : kpiCalcBandsPairs(pv[8], pv[9], 2);
+
+    // KPI 頁面的達成率直接沿用正式報表「進度達成率」，不由前端以實績／目標重算。
+    const aggregateRates = {};
+    KPICALC_ITEMS.forEach(function(it) {
+      const c = aggregateBands[it[0]];
+      aggregateRates[it[0]] = c === undefined ? null : kpiCalcReportRate(sv[9][c + 3]);
+    });
 
     const stores = [];
     for (let r = 14; r < sv.length; r++) {
@@ -2214,7 +2222,10 @@ function kpiCalcParseReport(xlsxFile) {
       KPICALC_ITEMS.forEach(function(it) {
         const c = sBands[it[0]];
         if (c === undefined) throw new Error('店點表缺少欄位：' + it[0]);
-        items[it[0]] = { t: kpiCalcNum(sv[r][c + 1]), a: kpiCalcNum(sv[r][c]), w: kpiCalcPct(sv[r][c + 2]) };
+        items[it[0]] = {
+          t: kpiCalcNum(sv[r][c + 1]), a: kpiCalcNum(sv[r][c]), w: kpiCalcPct(sv[r][c + 2]),
+          reportRate: kpiCalcReportRate(sv[r][c + 3])
+        };
       });
       const bx = {};
       const aq = sBands['TTL AQ上線數_加分項'];
@@ -2236,7 +2247,10 @@ function kpiCalcParseReport(xlsxFile) {
         KPICALC_ITEMS.forEach(function(it) {
           const c = pBands[it[0]];
           if (c === undefined) throw new Error('個人表缺少欄位：' + it[0]);
-          items[it[0]] = { t: kpiCalcNum(pv[r][c + 1]), a: kpiCalcNum(pv[r][c]), w: kpiCalcPct(pv[r][c + 2]) };
+          items[it[0]] = {
+            t: kpiCalcNum(pv[r][c + 1]), a: kpiCalcNum(pv[r][c]), w: kpiCalcPct(pv[r][c + 2]),
+            reportRate: kpiCalcReportRate(pv[r][c + 3])
+          };
         });
         persons.push({ store: code, role: String(pv[r][4] || ''), pname: String(pv[r][6] || ''),
                        official: kpiCalcNum(pv[r][9]), items: items });
@@ -2263,7 +2277,10 @@ function kpiCalcParseReport(xlsxFile) {
         KPICALC_ITEMS.forEach(function(it) {
           const b = pBands[it[0]];
           if (!b) throw new Error('個人表缺少欄位：' + it[0]);
-          items[it[0]] = { t: kpiCalcNum(pv[r][b.t]), a: kpiCalcNum(pv[r][b.a]), w: kpiCalcPct(pv[r][b.w]) };
+          items[it[0]] = {
+            t: kpiCalcNum(pv[r][b.t]), a: kpiCalcNum(pv[r][b.a]), w: kpiCalcPct(pv[r][b.w]),
+            reportRate: b.r === undefined ? null : kpiCalcReportRate(pv[r][b.r])
+          };
         });
         const role = roleMap[code + '|' + c1] || '';
         if (!role) noRole.push(curStore + '/' + c1);
@@ -2278,6 +2295,7 @@ function kpiCalcParseReport(xlsxFile) {
     return {
       meta: meta,
       items: KPICALC_ITEMS.map(function(it) { return { key: it[0], short: it[1], step: it[2] }; }),
+      aggregateRates: aggregateRates,
       stores: stores,
       persons: persons
     };
@@ -2312,6 +2330,7 @@ function kpiCalcBandsPairs(nameRow, subRow, startCol0) {
       if (s === '實際數') b.a = c;
       else if (s === '目標數') b.t = c;
       else if (s === '權重') b.w = c;
+      else if (s === '達成率' || s === '進度達成率') b.r = c;
     }
     if (b.a !== undefined && b.t !== undefined && b.w !== undefined) bands[name] = b;
   }
@@ -2350,6 +2369,13 @@ function kpiCalcPct(v) {
   const n = Number(s.replace(/[%,]/g, ''));
   if (isNaN(n)) return 0;
   return /%/.test(s) ? Math.round(n / 100 * 1e6) / 1e6 : Math.round(n * 1e6) / 1e6;
+}
+
+function kpiCalcReportRate(v) {
+  if (v === '' || v === null || v === undefined) return null;
+  const raw = String(v).trim().replace(/[%,]/g, '');
+  if (raw === '' || isNaN(Number(raw))) return null;
+  return kpiCalcPct(v);
 }
 
 function kpiCalcParseMeta(sv, fileName) {

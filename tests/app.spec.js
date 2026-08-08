@@ -122,25 +122,33 @@ const KPICALC_FIXTURE = {
     { key: 'RT V+D 999 (含)以上', short: 'RT V+D≧999', step: 1 },
     { key: '配件及其他營收', short: '配件及其他營收', step: 1 },
   ],
+  aggregateRates: {
+    'AQ V+D 999 (含)以上': 1.16,
+    'AQ V+D 1399 (含)以上': 0.95,
+    '好速案銷售點數': 0.88,
+    'RT V+D 1399 (含)以上': 0.91,
+    'RT V+D 999 (含)以上': 0.94,
+    '配件及其他營收': 0.86,
+  },
   stores: [
     { code: 'DNB10284', name: '台北大稻埕', official: 1.1035, items: {
-        'AQ V+D 999 (含)以上': { a: 11, t: 16, w: 0.03 }, 'AQ V+D 1399 (含)以上': { a: 6, t: 8, w: 0.02 },
-        '好速案銷售點數': { a: 12, t: 18, w: 0.04 }, 'RT V+D 1399 (含)以上': { a: 20, t: 33, w: 0.05 },
-        'RT V+D 999 (含)以上': { a: 25, t: 40, w: 0.03 }, '配件及其他營收': { a: 90000, t: 100000, w: 0.02 } } },
+        'AQ V+D 999 (含)以上': { a: 11, t: 16, w: 0.03, reportRate: 1.21 }, 'AQ V+D 1399 (含)以上': { a: 6, t: 8, w: 0.02, reportRate: 1.14 },
+        '好速案銷售點數': { a: 12, t: 18, w: 0.04, reportRate: 0.97 }, 'RT V+D 1399 (含)以上': { a: 20, t: 33, w: 0.05, reportRate: 1.08 },
+        'RT V+D 999 (含)以上': { a: 25, t: 40, w: 0.03, reportRate: 1.04 }, '配件及其他營收': { a: 90000, t: 100000, w: 0.02, reportRate: 0.90 } } },
     { code: 'DNB10174', name: '台北通化', official: 0.9821, items: {
-        'AQ V+D 999 (含)以上': { a: 9, t: 12, w: 0.03 }, 'AQ V+D 1399 (含)以上': { a: 4, t: 6, w: 0.02 },
-        '好速案銷售點數': { a: 8, t: 15, w: 0.04 }, 'RT V+D 1399 (含)以上': { a: 15, t: 28, w: 0.05 },
-        'RT V+D 999 (含)以上': { a: 18, t: 30, w: 0.03 }, '配件及其他營收': { a: 70000, t: 90000, w: 0.02 } } },
+        'AQ V+D 999 (含)以上': { a: 9, t: 12, w: 0.03, reportRate: 0.88 }, 'AQ V+D 1399 (含)以上': { a: 4, t: 6, w: 0.02, reportRate: 0.76 },
+        '好速案銷售點數': { a: 8, t: 15, w: 0.04, reportRate: 0.71 }, 'RT V+D 1399 (含)以上': { a: 15, t: 28, w: 0.05, reportRate: 0.69 },
+        'RT V+D 999 (含)以上': { a: 18, t: 30, w: 0.03, reportRate: 0.74 }, '配件及其他營收': { a: 70000, t: 90000, w: 0.02, reportRate: 0.82 } } },
   ],
   persons: [
     { store: 'DNB10284', role: '業務代表(I)', pname: '測＊員', official: 1.056, items: {
-        'AQ V+D 999 (含)以上': { a: 4, t: 3, w: 0.03 }, 'AQ V+D 1399 (含)以上': { a: 2, t: 2, w: 0.02 },
-        '好速案銷售點數': { a: 2, t: 3, w: 0.04 }, 'RT V+D 1399 (含)以上': { a: 3, t: 2, w: 0.05 },
-        'RT V+D 999 (含)以上': { a: 4, t: 5, w: 0.03 }, '配件及其他營收': { a: 9000, t: 10000, w: 0.02 } } },
+        'AQ V+D 999 (含)以上': { a: 4, t: 3, w: 0.03, reportRate: 1.33 }, 'AQ V+D 1399 (含)以上': { a: 2, t: 2, w: 0.02, reportRate: 1.00 },
+        '好速案銷售點數': { a: 2, t: 3, w: 0.04, reportRate: 0.67 }, 'RT V+D 1399 (含)以上': { a: 3, t: 2, w: 0.05, reportRate: 1.50 },
+        'RT V+D 999 (含)以上': { a: 4, t: 5, w: 0.03, reportRate: 0.80 }, '配件及其他營收': { a: 9000, t: 10000, w: 0.02, reportRate: 0.90 } } },
     { store: 'DNB10174', role: '店長', pname: '測＊二', official: 0.91, items: {
-        'AQ V+D 999 (含)以上': { a: 2, t: 3, w: 0.03 }, 'AQ V+D 1399 (含)以上': { a: 1, t: 2, w: 0.02 },
-        '好速案銷售點數': { a: 1, t: 3, w: 0.04 }, 'RT V+D 1399 (含)以上': { a: 2, t: 2, w: 0.05 },
-        'RT V+D 999 (含)以上': { a: 3, t: 5, w: 0.03 }, '配件及其他營收': { a: 8000, t: 10000, w: 0.02 } } },
+        'AQ V+D 999 (含)以上': { a: 2, t: 3, w: 0.03, reportRate: 0.67 }, 'AQ V+D 1399 (含)以上': { a: 1, t: 2, w: 0.02, reportRate: 0.50 },
+        '好速案銷售點數': { a: 1, t: 3, w: 0.04, reportRate: 0.33 }, 'RT V+D 1399 (含)以上': { a: 2, t: 2, w: 0.05, reportRate: 1.00 },
+        'RT V+D 999 (含)以上': { a: 3, t: 5, w: 0.03, reportRate: 0.60 }, '配件及其他營收': { a: 8000, t: 10000, w: 0.02, reportRate: 0.80 } } },
   ],
 };
 
@@ -386,8 +394,8 @@ test.describe('KPI 戰情', () => {
     await expect(page.locator('#kpiBattleContent tbody tr').first()).toContainText('北一二B整體');
     await page.selectOption('#kpiBattleStoreSelect', '北一二B整體');
     await expect(page.locator('#kpiBattleContent')).toContainText('好速案銷售點數');
-    // 整體 A999 = 11+9=20、目標 16+12=28 → 71.4%（純加總，非發明數字）
-    await expect(page.locator('#kpiBattleContent')).toContainText('71.4%');
+    // 整體 A999 實績與目標仍加總為 20 / 28，達成率直接使用正式報表欄位 116.0%。
+    await expect(page.locator('#kpiBattleContent')).toContainText('116.0%');
   });
 
   test('可切換至個績排名且顯示遮罩姓名', async ({ page }) => {

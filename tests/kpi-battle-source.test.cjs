@@ -20,6 +20,13 @@ function functionBody(source, name) {
   throw new Error(`unterminated ${name}`);
 }
 
+function lastFunctionBody(source, name) {
+  const marker = `function ${name}(`;
+  const start = source.lastIndexOf(marker);
+  assert.notEqual(start, -1, `missing ${name}`);
+  return functionBody(source.slice(start), name);
+}
+
 test('KPI 主資料取 kpicalc，快照只作條件式補充', () => {
   const login = functionBody(html, 'privateDashboardLogin');
   assert.match(login, /action: 'kpicalc_access'/);
@@ -74,13 +81,31 @@ test('快照合併硬性要求截止日與來源檔一致', () => {
   assert.doesNotMatch(functionBody(html, 'loadKpiBattle'), /__KPI_BATTLE_DATA__/);
 });
 
-test('純前端預覽不得變更 GAS 或巡店保護區', () => {
-  const changed = execFileSync('git', ['diff', '--name-only', 'origin/main', '--', 'gas/Code.gs', 'patrol.html'], { cwd: root, encoding: 'utf8' })
+test('正式達成率 mapping 不得變更巡店保護區', () => {
+  const changed = execFileSync('git', ['diff', '--name-only', 'origin/main', '--', 'patrol.html'], { cwd: root, encoding: 'utf8' })
     .trim().split('\n').filter(Boolean);
   assert.deepEqual(changed, []);
   const gas = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8');
+  const parser = functionBody(gas, 'kpiCalcParseReport');
+  assert.match(parser, /reportRate: kpiCalcReportRate/);
+  assert.match(parser, /aggregateRates: aggregateRates/);
   assert.match(gas, /action === 'private_publish'/);
   assert.match(gas, /action === 'ptread'/);
+});
+
+test('正式報表無百分比時保留空值，不得自行改成 0%', () => {
+  const gas = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8');
+  const src = [
+    `function kpiCalcPct(v) {${lastFunctionBody(gas, 'kpiCalcPct')}}`,
+    `function kpiCalcReportRate(v) {${functionBody(gas, 'kpiCalcReportRate')}}`,
+    'module.exports = kpiCalcReportRate;',
+  ].join('\n');
+  const sandbox = { module: { exports: {} }, String, Number, Math, isNaN };
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox);
+  assert.equal(sandbox.module.exports('-'), null);
+  assert.equal(sandbox.module.exports('104.20%'), 1.042);
+  assert.equal(sandbox.module.exports(1.042), 1.042);
 });
 
 function loadAdapter() {
@@ -103,12 +128,31 @@ function loadAdapter() {
 const SAMPLE = {
   meta: { period: '2026/08/01 ~ 08/04', snapshotDay: 4, monthDays: 31, month: '2026-08', sourceFile: '0805.xlsx' },
   items: [{ key: 'AQ V+D 999 (含)以上', short: 'A999', step: 1 }, { key: '好速案銷售點數', short: '好速', step: 0.25 }],
+  aggregateRates: { 'AQ V+D 999 (含)以上': 1.16, '好速案銷售點數': 0.88 },
   stores: [
-    { code: 'DNB1', name: '台北甲', official: 1.1, items: { 'AQ V+D 999 (含)以上': { a: 10, t: 16 }, '好速案銷售點數': { a: 5, t: 10 } } },
-    { code: 'DNB2', name: '台北乙', official: 0.9, items: { 'AQ V+D 999 (含)以上': { a: 6, t: 8 }, '好速案銷售點數': { a: 3, t: 5 } } },
+    { code: 'DNB1', name: '台北甲', official: 1.1, items: { 'AQ V+D 999 (含)以上': { a: 10, t: 16, reportRate: 1.21 }, '好速案銷售點數': { a: 5, t: 10, reportRate: 0.97 } } },
+    { code: 'DNB2', name: '台北乙', official: 0.9, items: { 'AQ V+D 999 (含)以上': { a: 6, t: 8, reportRate: 1.08 }, '好速案銷售點數': { a: 3, t: 5, reportRate: 0.79 } } },
   ],
-  persons: [{ store: 'DNB1', role: '店長', pname: '甲＊一', official: 1.05, items: { 'AQ V+D 999 (含)以上': { a: 4, t: 3 } } }],
+  persons: [{ store: 'DNB1', role: '店長', pname: '甲＊一', official: 1.05, items: { 'AQ V+D 999 (含)以上': { a: 4, t: 3, reportRate: 1.42 } } }],
 };
+
+test('各項達成率直接沿用正式報表欄位，實績／目標／差異不變', () => {
+  const view = loadAdapter().kpicalcToKpiBattleView(SAMPLE, '');
+  const storeMetric = view.stores[0].metrics['AQ V+D 999 (含)以上'];
+  assert.equal(storeMetric.rate, 1.21);
+  assert.equal(storeMetric.actual, 10);
+  assert.equal(storeMetric.target, 16);
+  assert.equal(storeMetric.daily_gap, 10 - (16 * 4 / 31));
+  assert.equal(view.personal[0].metrics.A999.rate, 1.42);
+  assert.equal(view.aggregate.metrics['AQ V+D 999 (含)以上'].rate, 1.16);
+  const missingAggregateRate = JSON.parse(JSON.stringify(SAMPLE));
+  delete missingAggregateRate.aggregateRates['好速案銷售點數'];
+  const missingView = loadAdapter().kpicalcToKpiBattleView(missingAggregateRate, '');
+  assert.equal(missingView.aggregate.metrics['好速案銷售點數'].rate, null);
+  assert.equal(missingView.aggregate.metrics['好速案銷售點數'].actual, 8);
+  assert.equal(missingView.aggregate.metrics['好速案銷售點數'].target, 15);
+  assert.match(functionBody(html, 'kpiBattleMetricCell'), /metric\.rate == null[^;]+kpiBattleTargetLine\(metric\)/);
+});
 
 test('0805.xlsx 統計至 0804，未合併快照時不可偽裝成 0805 戰報', () => {
   const view = loadAdapter().kpicalcToKpiBattleView(SAMPLE, '');
