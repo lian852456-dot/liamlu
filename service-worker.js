@@ -1,4 +1,4 @@
-const CACHE_NAME = 'liam-intel-app-shell-v1';
+const CACHE_NAME = 'liam-supervisor-pilot-v2';
 const SHELL = [
   './app.html',
   './app.css',

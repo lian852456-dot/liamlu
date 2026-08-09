@@ -1,5 +1,17 @@
 # Liam 情報站 App 1.0｜安全盤點與空殼建置
 
+## 2026-08-09｜Liam Supervisor Pilot 1.0 上線範圍（取代空殼階段）
+
+- 今日核心固定為 KPI、台獎、16:00／21:00 回報、班表、巡店；金牌、店務檢查、Viewer B、多人登入、推播、Face ID 與所有 App 內寫入均移至 Pilot 後 backlog。
+- KPI／台獎／回報不複製資料或登入，直接沿用 `index.html` 正式頁與 approved-device 邊界。
+- 班表／巡店前端 adapter 只重用既有 `ptauth` 30 分鐘短效 token，action allowlist 固定為 `sread`、`ptread`；通行碼不保存，回傳資料只留在記憶體且不進 Service Worker cache。
+- 班表顯示今日日期、九店人員／班別、出勤／休假、店點篩選、前一天／今天／後一天與完整班表入口。
+- 巡店顯示九店狀態、最近巡店日、本月到店、上下半月／月檢／雙月摘要、最近紀錄與既有看板／操作入口；adapter 失敗時明確 fallback，不阻擋原系統使用。
+- 本機證據：Node 契約 3/3、390×844 Playwright 3/3；本機 HTTP／Service Worker 讀取成功、console error 0、npm audit 0。
+- 尚未上調：正式部署、Liam approved-device 真資料頁讀回、班表／巡店各 3 店勾稽、iPhone Safari 與加入主畫面仍需後續 Gate 證據。
+
+> 下方 2026-08-06 內容保留作為空殼階段歷史；其中「不可直接重用 session」與第二階段 BFF 建議不再代表本次 Pilot 決策。2026-08-09 的做法是同源前端重用既有 `ptauth` 契約，不新增後端或登入架構。
+
 - 日期：2026-08-06
 - 基準：`origin/main` `31857ca`（開工前 tag：`liam-intel-app-baseline-2026-08-06`）
 - 範圍：只新增 PWA App 入口與 UI；未修改 GAS、Google Sheet、D1、R2、API、JSON 格式、資料來源、既有頁面或正式部署。
