@@ -1,8 +1,8 @@
 {
   "id": "./app.html",
-  "name": "Liam Supervisor Pilot 1.0",
+  "name": "Liam Supervisor App 1.1",
   "short_name": "Liam Supervisor",
-  "description": "Liam Supervisor Pilot 1.0：KPI、台獎、回報、班表與巡店的手機優先入口。",
+  "description": "Liam Supervisor App 1.1：KPI、台獎、回報、班表與巡店的手機優先唯讀戰情。",
   "start_url": "./app.html",
   "scope": "./",
   "display": "standalone",
