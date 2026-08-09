@@ -54,11 +54,12 @@ test('App runtime only calls the existing read and session actions', () => {
   }
   assert.match(code, /PREVIEW_MODE/);
   assert.match(code, /Preview 僅顯示展示資料，不呼叫正式端點/);
+  assert.match(code, /Preview／示意資料/);
 });
 
 test('Information architecture matches the App 1.1 acceptance surfaces', () => {
   const html = read('app.html');
-  for (const label of ['今日營運戰況','九店一覽','台獎總覽','戰情','每日回報','全區未過關彙整','巡店大盤','系統狀態']) {
+  for (const label of ['今日營運戰況','九店一覽','台獎總覽','戰情','每日回報','全區未過關彙整','九店完整班表','巡店大盤','系統狀態']) {
     assert.match(html, new RegExp(label));
   }
   assert.match(html, /data-battle-kind="kpi"/);
@@ -68,13 +69,16 @@ test('Information architecture matches the App 1.1 acceptance surfaces', () => {
   assert.match(html, /data-nav="home"/);
   assert.match(html, /data-nav="battle"/);
   assert.match(html, /data-nav="report"/);
+  assert.match(html, /data-view="schedule"/);
+  assert.match(html, /data-nav="schedule"/);
   assert.match(html, /data-nav="patrol"/);
-  assert.match(html, /data-nav="me"/);
+  assert.match(html, /data-profile-entry/);
+  assert.doesNotMatch(html, /<nav class="bottom-nav"[\s\S]*data-nav="me"/);
 });
 
 test('PWA cache is versioned for App 1.1 and includes local icon library', () => {
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-1-v4/);
+  assert.match(worker, /liam-supervisor-app-1-1-v5/);
   assert.match(worker, /app-data-contract\.js/);
   assert.match(worker, /app-preview-data\.js/);
   assert.match(worker, /app-assets\/lucide\.min\.js/);

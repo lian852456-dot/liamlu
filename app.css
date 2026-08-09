@@ -32,6 +32,14 @@ svg { width:1.1em; height:1.1em; fill:none; stroke:currentColor; stroke-width:1.
 
 .app-shell { width:min(100%,680px); min-height:100dvh; margin:0 auto; background:radial-gradient(circle at 88% -8%,rgba(31,106,163,.34),transparent 31%),linear-gradient(180deg,#06182b 0,#061526 55%,#04111f 100%); }
 .app-header { position:relative; display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:88px; padding:calc(14px + env(safe-area-inset-top)) 14px 13px; border-bottom:1px solid var(--line-soft); }
+.header-actions { display:flex; align-items:center; gap:7px; }
+.profile-entry { display:grid; place-items:center; flex:0 0 34px; width:34px; height:34px; padding:0; border:1px solid var(--line); border-radius:11px; color:var(--muted); background:#0a2238; }
+.profile-entry.active { color:var(--cyan); border-color:#4b92b3; box-shadow:inset 0 0 0 1px rgba(85,220,255,.18); }
+.preview-banner { display:flex; align-items:center; gap:9px; min-height:46px; padding:8px 13px; border-bottom:1px solid #987226; color:#ffe09a; background:linear-gradient(90deg,#3b2b0c,#211c12); }
+.preview-banner > svg { flex:0 0 20px; width:20px; height:20px; }
+.preview-banner span,.preview-banner strong,.preview-banner small { display:block; }
+.preview-banner strong { font-size:11px; letter-spacing:.02em; }
+.preview-banner small { margin-top:2px; color:#ddc98f; font-size:8px; line-height:1.35; }
 .brand { min-width:0; display:flex; align-items:center; gap:12px; }
 .brand-mark,.profile-mark { display:grid; place-items:center; flex:0 0 44px; width:44px; height:44px; border-radius:15px; color:#051222; background:linear-gradient(145deg,#55ddff 10%,#8288ff 73%); box-shadow:0 10px 28px rgba(62,177,255,.28); font-size:23px; font-weight:950; }
 .brand > span:last-child { min-width:0; }
@@ -196,6 +204,9 @@ svg { width:1.1em; height:1.1em; fill:none; stroke:currentColor; stroke-width:1.
   .brand strong { font-size:14px; }
   .brand small { margin-top:2px; font-size:9px; }
   .mode-pill { min-height:24px; padding:4px 7px; font-size:8px; }
+  .header-actions { gap:5px; }
+  .profile-entry { flex-basis:30px; width:30px; height:30px; border-radius:10px; }
+  .preview-banner { min-height:42px; padding-top:6px; padding-bottom:6px; }
   .app-main { padding-top:11px; padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
   .view-heading { margin-bottom:9px; }
   .compact-heading h1,.compact-heading p { font-size:21px; }

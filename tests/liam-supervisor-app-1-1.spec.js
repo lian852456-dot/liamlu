@@ -10,7 +10,8 @@ test('390x844 home gives the supervisor summary without horizontal overflow', as
   await page.route('https://script.google.com/**', route => { formalRequests += 1; return route.abort(); });
   await page.goto(FILE_URL);
   await expect(page).toHaveTitle('Liam Supervisor App 1.1');
-  await expect(page.locator('#dataMode')).toHaveText('展示資料');
+  await expect(page.locator('#dataMode')).toHaveText('Preview／示意資料');
+  await expect(page.locator('#previewBanner')).toContainText('非正式營運數據');
   await expect(page.locator('#operationsRows')).toContainText('16:00');
   await expect(page.locator('#operationsRows')).toContainText('21:00');
   await expect(page.locator('#kpiHero')).toContainText('113.1%');
@@ -20,7 +21,7 @@ test('390x844 home gives the supervisor summary without horizontal overflow', as
   expect(formalRequests).toBe(0);
 });
 
-test('store rows, battle modes, report rows and patrol dashboard are interactive', async ({ page }) => {
+test('store rows, battle modes, report rows, schedule and patrol dashboard are interactive', async ({ page }) => {
   await page.goto(FILE_URL);
   const secondStore = page.locator('.store-item').nth(1);
   await secondStore.locator('.store-row').click();
@@ -42,6 +43,11 @@ test('store rows, battle modes, report rows and patrol dashboard are interactive
   const firstReportStore = page.locator('.report-store').first();
   await firstReportStore.locator('button').click();
   await expect(firstReportStore).toHaveClass(/expanded/);
+
+  await page.locator('.bottom-nav [data-nav="schedule"]').click();
+  await expect(page.locator('[data-view="schedule"]')).toBeVisible();
+  await expect(page.locator('#scheduleList .schedule-store')).toHaveCount(9);
+  await expect(page.locator('[data-profile-entry]')).toBeVisible();
 
   await page.locator('.bottom-nav [data-nav="patrol"]').click();
   await expect(page.locator('[data-view="patrol"]')).toBeVisible();

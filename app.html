@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
-  <link rel="stylesheet" href="app.css?v=4">
+  <link rel="stylesheet" href="app.css?v=5">
   <title>Liam Supervisor App 1.1</title>
 </head>
 <body>
@@ -22,8 +22,10 @@
         <span class="brand-mark">L</span>
         <span><strong>Liam Supervisor App 1.1</strong><small><span id="appDate">—</span><i>·</i><span id="appUpdatedAt">尚未更新</span></small></span>
       </a>
-      <span id="dataMode" class="mode-pill" role="status">讀取中</span>
+      <div class="header-actions"><span id="dataMode" class="mode-pill" role="status">讀取中</span><button class="profile-entry" type="button" data-nav="me" data-profile-entry aria-label="開啟個人與系統設定"><i data-lucide="user-round-cog"></i></button></div>
     </header>
+
+    <aside id="previewBanner" class="preview-banner" hidden><i data-lucide="flask-conical"></i><span><strong>Preview／示意資料</strong><small>僅供 App 1.1 資訊架構與 UI 驗收，非正式營運數據</small></span></aside>
 
     <main class="app-main">
       <section data-view="home" aria-label="首頁">
@@ -71,6 +73,17 @@
         <a class="source-button" href="index.html">開啟完整每日回報系統 <i data-lucide="external-link"></i></a>
       </section>
 
+      <section data-view="schedule" hidden aria-label="班表">
+        <div class="view-heading"><div><p>DAILY SCHEDULE</p><h1>班表</h1></div><a class="icon-button" href="patrol.html" aria-label="開啟完整班表"><i data-lucide="external-link"></i></a></div>
+        <section class="panel schedule-panel" aria-labelledby="scheduleTitle">
+          <div class="panel-head"><div><h2 id="scheduleTitle">九店完整班表</h2><small id="scheduleSourceTime">尚未讀取</small></div></div>
+          <div class="date-control"><button type="button" data-date-step="-1">前一天</button><button type="button" data-date-today>今天</button><button type="button" data-date-step="1">後一天</button></div>
+          <div class="schedule-filters"><label>日期<input id="scheduleDate" type="date"></label><label>店點<select id="scheduleStoreFilter"><option value="">九店全部</option></select></label></div>
+          <div id="scheduleList" class="locked-state">請從右上角個人／設定入口解鎖，之後顯示九店人員、班別與上班／休假狀態。</div>
+          <a class="inline-link" href="patrol.html">前往完整班表 <i data-lucide="external-link"></i></a>
+        </section>
+      </section>
+
       <section data-view="patrol" hidden aria-label="巡店">
         <div class="view-heading"><div><p>PATROL OVERVIEW</p><h1>巡店大盤</h1></div><a class="icon-button" href="patrol.html" aria-label="開啟完整巡店系統"><i data-lucide="external-link"></i></a></div>
         <div id="patrolOverview"></div>
@@ -81,7 +94,7 @@
       </section>
 
       <section data-view="me" hidden aria-label="我的">
-        <div class="view-heading"><div><p>LIAM ONLY</p><h1>我的</h1></div><span class="mode-pill safe"><i data-lucide="shield-check"></i>唯讀</span></div>
+        <div class="view-heading"><div><p>LIAM ONLY</p><h1>個人與系統設定</h1></div><button class="icon-button" type="button" data-nav="home" aria-label="返回首頁"><i data-lucide="arrow-left"></i></button></div>
         <article class="profile-card"><span class="profile-mark">L</span><div><strong>Liam Supervisor</strong><small>App 1.1 · 行動戰情資訊重構</small></div><span id="viewerState" class="status-chip">未登入</span></article>
 
         <section class="panel access-panel" aria-labelledby="battleAccessTitle">
@@ -97,14 +110,6 @@
           <button id="patrolLogout" class="text-button danger-text" type="button" hidden>登出班表／巡店 session</button>
         </section>
 
-        <section class="panel schedule-panel" aria-labelledby="scheduleTitle">
-          <div class="panel-head"><div><h2 id="scheduleTitle">班表</h2><small id="scheduleSourceTime">尚未讀取</small></div></div>
-          <div class="date-control"><button type="button" data-date-step="-1">前一天</button><button type="button" data-date-today>今天</button><button type="button" data-date-step="1">後一天</button></div>
-          <div class="schedule-filters"><label>日期<input id="scheduleDate" type="date"></label><label>店點<select id="scheduleStoreFilter"><option value="">九店全部</option></select></label></div>
-          <div id="scheduleList" class="locked-state">解鎖後顯示九店人員、班別與上班／休假狀態。</div>
-          <a class="inline-link" href="patrol.html">前往完整班表 <i data-lucide="external-link"></i></a>
-        </section>
-
         <section class="panel system-panel" aria-labelledby="systemTitle"><div class="panel-head"><div><h2 id="systemTitle">系統狀態</h2><small>工程與安全資訊集中於此</small></div></div><div id="systemStatus"></div></section>
       </section>
     </main>
@@ -113,13 +118,13 @@
       <button data-nav="home" class="active" aria-current="page"><i data-lucide="house"></i><span>首頁</span></button>
       <button data-nav="battle"><i data-lucide="chart-no-axes-combined"></i><span>戰情</span></button>
       <button data-nav="report"><i data-lucide="send"></i><span>回報</span></button>
+      <button data-nav="schedule"><i data-lucide="calendar-days"></i><span>班表</span></button>
       <button data-nav="patrol"><i data-lucide="route"></i><span>巡店</span></button>
-      <button data-nav="me"><i data-lucide="user-round"></i><span>我的</span></button>
     </nav>
   </div>
   <script src="app-assets/lucide.min.js"></script>
-  <script src="app-data-contract.js?v=4"></script>
-  <script src="app-preview-data.js?v=4"></script>
-  <script src="app.js?v=4" defer></script>
+  <script src="app-data-contract.js?v=5"></script>
+  <script src="app-preview-data.js?v=5"></script>
+  <script src="app.js?v=5" defer></script>
 </body>
 </html>
