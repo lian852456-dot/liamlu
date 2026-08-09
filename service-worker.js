@@ -1,4 +1,4 @@
-const CACHE_NAME = 'liam-supervisor-pilot-v2';
+const CACHE_NAME = 'liam-supervisor-pilot-v3';
 const SHELL = [
   './app.html',
   './app.css',
