@@ -1,0 +1,140 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000000000000000000001 /* LiamSupervisorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* LiamSupervisorApp.swift */; };
+		A00000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* ContentView.swift */; };
+		A00000000000000000000003 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* AppConfig.swift */; };
+		A00000000000000000000004 /* NavigationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000004 /* NavigationPolicy.swift */; };
+		A00000000000000000000005 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000005 /* NetworkMonitor.swift */; };
+		A00000000000000000000006 /* SupervisorWebModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000006 /* SupervisorWebModel.swift */; };
+		A00000000000000000000007 /* SupervisorWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000007 /* SupervisorWebView.swift */; };
+		A00000000000000000000008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000009 /* Assets.xcassets */; };
+		A00000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000A /* PrivacyInfo.xcprivacy */; };
+		A0000000000000000000000A /* NavigationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000B /* NavigationPolicyTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C10000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D00000000000000000000001;
+			remoteInfo = LiamSupervisor;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		B00000000000000000000001 /* LiamSupervisorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiamSupervisorApp.swift; sourceTree = "<group>"; };
+		B00000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B00000000000000000000003 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		B00000000000000000000004 /* NavigationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationPolicy.swift; sourceTree = "<group>"; };
+		B00000000000000000000005 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
+		B00000000000000000000006 /* SupervisorWebModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorWebModel.swift; sourceTree = "<group>"; };
+		B00000000000000000000007 /* SupervisorWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorWebView.swift; sourceTree = "<group>"; };
+		B00000000000000000000008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B00000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B0000000000000000000000A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		B0000000000000000000000B /* NavigationPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationPolicyTests.swift; sourceTree = "<group>"; };
+		B0000000000000000000000C /* LiamSupervisor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LiamSupervisor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B0000000000000000000000D /* LiamSupervisorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LiamSupervisorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F00000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		F00000000000000000000004 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		C00000000000000000000001 = {
+			isa = PBXGroup;
+			children = (C00000000000000000000002 /* LiamSupervisor */, C00000000000000000000003 /* LiamSupervisorTests */, C00000000000000000000004 /* Products */);
+			sourceTree = "<group>";
+		};
+		C00000000000000000000002 /* LiamSupervisor */ = {
+			isa = PBXGroup;
+			children = (B00000000000000000000001, B00000000000000000000002, B00000000000000000000003, B00000000000000000000004, B00000000000000000000005, B00000000000000000000006, B00000000000000000000007, B00000000000000000000008, B00000000000000000000009, B0000000000000000000000A);
+			path = LiamSupervisor;
+			sourceTree = "<group>";
+		};
+		C00000000000000000000003 /* LiamSupervisorTests */ = {isa = PBXGroup; children = (B0000000000000000000000B); path = LiamSupervisorTests; sourceTree = "<group>"; };
+		C00000000000000000000004 /* Products */ = {isa = PBXGroup; children = (B0000000000000000000000C, B0000000000000000000000D); name = Products; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D00000000000000000000001 /* LiamSupervisor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H00000000000000000000002;
+			buildPhases = (F00000000000000000000002 /* Sources */, F00000000000000000000001 /* Frameworks */, F00000000000000000000003 /* Resources */);
+			buildRules = ();
+			dependencies = ();
+			name = LiamSupervisor;
+			productName = LiamSupervisor;
+			productReference = B0000000000000000000000C;
+			productType = "com.apple.product-type.application";
+		};
+		D00000000000000000000002 /* LiamSupervisorTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H00000000000000000000003;
+			buildPhases = (F00000000000000000000005 /* Sources */, F00000000000000000000004 /* Frameworks */, F00000000000000000000006 /* Resources */);
+			buildRules = ();
+			dependencies = (D10000000000000000000001 /* PBXTargetDependency */);
+			name = LiamSupervisorTests;
+			productName = LiamSupervisorTests;
+			productReference = B0000000000000000000000D;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1600; LastUpgradeCheck = 1600; TargetAttributes = {D00000000000000000000001 = {CreatedOnToolsVersion = 16.0; }; D00000000000000000000002 = {CreatedOnToolsVersion = 16.0; TestTargetID = D00000000000000000000001; }; }; };
+			buildConfigurationList = H00000000000000000000001;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base, "zh-Hant");
+			mainGroup = C00000000000000000000001;
+			productRefGroup = C00000000000000000000004;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (D00000000000000000000001, D00000000000000000000002);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		F00000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000008, A00000000000000000000009); runOnlyForDeploymentPostprocessing = 0; };
+		F00000000000000000000006 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F00000000000000000000002 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001, A00000000000000000000002, A00000000000000000000003, A00000000000000000000004, A00000000000000000000005, A00000000000000000000006, A00000000000000000000007); runOnlyForDeploymentPostprocessing = 0; };
+		F00000000000000000000005 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A0000000000000000000000A); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D10000000000000000000001 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = D00000000000000000000001 /* LiamSupervisor */; targetProxy = C10000000000000000000001 /* PBXContainerItemProxy */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		G00000000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_TESTABILITY = YES; GCC_C_LANGUAGE_STANDARD = gnu17; IPHONEOS_DEPLOYMENT_TARGET = 16.0; MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE; ONLY_ACTIVE_ARCH = YES; SDKROOT = iphoneos; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; }; name = Debug; };
+		G00000000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; ENABLE_NS_ASSERTIONS = NO; GCC_C_LANGUAGE_STANDARD = gnu17; IPHONEOS_DEPLOYMENT_TARGET = 16.0; MTL_ENABLE_DEBUG_INFO = NO; SDKROOT = iphoneos; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; VALIDATE_PRODUCT = YES; }; name = Release; };
+		G00000000000000000000003 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = LiamSupervisor/Info.plist; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.liamlu.liamsupervisor; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; }; name = Debug; };
+		G00000000000000000000004 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = LiamSupervisor/Info.plist; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.liamlu.liamsupervisor; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; }; name = Release; };
+		G00000000000000000000005 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.0; PRODUCT_BUNDLE_IDENTIFIER = com.liamlu.liamsupervisor.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LiamSupervisor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LiamSupervisor"; }; name = Debug; };
+		G00000000000000000000006 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.0; PRODUCT_BUNDLE_IDENTIFIER = com.liamlu.liamsupervisor.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LiamSupervisor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LiamSupervisor"; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		H00000000000000000000001 /* Build configuration list for PBXProject */ = {isa = XCConfigurationList; buildConfigurations = (G00000000000000000000001, G00000000000000000000002); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		H00000000000000000000002 /* Build configuration list for PBXNativeTarget */ = {isa = XCConfigurationList; buildConfigurations = (G00000000000000000000003, G00000000000000000000004); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		H00000000000000000000003 /* Build configuration list for PBXNativeTarget */ = {isa = XCConfigurationList; buildConfigurations = (G00000000000000000000005, G00000000000000000000006); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = E00000000000000000000001 /* Project object */;
+}
