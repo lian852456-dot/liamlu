@@ -314,7 +314,9 @@
     dom('#appUpdatedAt').textContent = `updatedAt ${formatTime(contract.generatedAt,'—')}`;
     const mode = dom('#dataMode');
     mode.className = `mode-pill${contract.mode === 'preview' ? ' preview':''}`;
-    mode.textContent = contract.mode === 'preview' ? '展示資料' : '正式唯讀';
+    mode.textContent = contract.mode === 'preview' ? 'Preview／示意資料' : '正式唯讀';
+    dom('#previewBanner').hidden = contract.mode !== 'preview';
+    document.body.classList.toggle('preview-mode',contract.mode === 'preview');
   }
 
   function renderOperations() {
@@ -453,7 +455,7 @@
     const date=dom('#scheduleDate').value||taipeiDate(); const filter=dom('#scheduleStoreFilter').value;
     const data=scheduleViewData&&scheduleViewData.date===date?scheduleViewData:(contract.scheduleToday.data&&contract.scheduleToday.data.date===date?contract.scheduleToday.data:null);
     dom('#scheduleSourceTime').textContent=`更新 ${formatTime(contract.scheduleToday.sourceUpdatedAt)}`;
-    if (!data||!Array.isArray(data.stores)) { dom('#scheduleList').className='locked-state'; dom('#scheduleList').innerHTML='解鎖後顯示九店人員、班別與上班／休假狀態。'; return; }
+    if (!data||!Array.isArray(data.stores)) { const locked=contract.scheduleToday.status==='unauthorized'; dom('#scheduleList').className=locked?'locked-state':'empty-state'; dom('#scheduleList').innerHTML=locked?'請從右上角個人／設定入口解鎖班表。':`${escapeHtml(date)} 尚無班表資料。`; return; }
     const rows=data.stores.filter(row=>!filter||row.store===filter);
     dom('#scheduleList').className='';
     dom('#scheduleList').innerHTML=rows.length?rows.map(row=>`<article class="schedule-store"><div class="schedule-store-head"><b>${escapeHtml(row.store)}</b><span>${row.working} 人上班 · ${row.off} 人休假</span></div>${(row.staff||[]).map(person=>`<div class="schedule-person ${person.working?'':'off'}"><span>${escapeHtml(person.name)} · ${escapeHtml(person.role||'—')}</span><i>${escapeHtml(person.status||'—')}</i></div>`).join('')}</article>`).join(''):`<div class="empty-state">${escapeHtml(date)} 尚無班表資料。</div>`;
@@ -543,6 +545,7 @@
     const input=dom('#scheduleDate'); const date=new Date(`${input.value||taipeiDate()}T00:00:00+08:00`); date.setDate(date.getDate()+days); input.value=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
     if (scheduleRaw && scheduleRaw.month===input.value.slice(0,7)) { scheduleViewData=adaptSchedule(scheduleRaw,input.value); renderSchedule(); }
     else if (patrolToken) loadPatrolData();
+    else renderSchedule();
   }
 
   all('[data-nav]').forEach(button=>button.addEventListener('click',event=>{ event.preventDefault(); setView(button.dataset.nav); }));
