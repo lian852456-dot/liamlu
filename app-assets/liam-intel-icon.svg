@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title>Liam 情報站</title>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#4dd7ff"/>
+      <stop offset="1" stop-color="#6966ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="#091321"/>
+  <rect x="42" y="42" width="428" height="428" rx="90" fill="url(#g)" opacity=".16"/>
+  <path fill="none" stroke="url(#g)" stroke-width="30" stroke-linecap="round" d="M130 142v228h215"/>
+  <path fill="none" stroke="#f2f7ff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" d="m189 314 59-72 47 43 83-104"/>
+  <circle cx="378" cy="181" r="20" fill="#ffcc66"/>
+</svg>
