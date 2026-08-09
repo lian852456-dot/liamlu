@@ -8,6 +8,18 @@
     source: source(label, href), data
   });
 
+  const previewKpiCatalog = [
+    ['主力資費','A999'],['主力資費','A1399'],['主力資費','好速'],['主力資費','R999'],['主力資費','R1399'],['主力資費','RT'],
+    ['續約與留存','續約率'],['續約與留存','續約升轉率'],['續約與留存','高資續約率'],['續約與留存','續約總量'],['續約與留存','合約留存率'],
+    ['寬頻與加值','固網'],['寬頻與加值','好速成長'],['寬頻與加值','數位生活'],['寬頻與加值','加值服務'],['寬頻與加值','影音服務'],
+    ['裝置與服務','手機銷售'],['裝置與服務','旗艦機'],['裝置與服務','5G'],['裝置與服務','保險'],['裝置與服務','配件'],
+    ['營運品質','NPS'],['營運品質','預約到店'],['營運品質','門號淨成長'],['營運品質','客訴改善']
+  ];
+  const previewFullKpis = (kpi, storeIndex = 0) => previewKpiCatalog.map(([category,label], index) => ({
+    key:`preview-${index+1}`, label, category,
+    rate:Number(Math.max(.42,kpi + ((index%7)-3)*.035 - Math.max(0,storeIndex)*.002).toFixed(3)), order:index
+  }));
+
   const stores = [
     ['永吉',1.286,12,.062,2,15.32], ['大稻埕',1.213,21,.039,1,13.48],
     ['通化',1.168,33,.016,2,11.86], ['台北三創',1.127,45,.009,0,10.24],
@@ -23,7 +35,8 @@
       R999: index === 0 ? 1.27 : Math.max(.6, kpi - .01),
       R1399: index === 0 ? 1.29 : Math.max(.57, kpi + .02),
       RT: index === 0 ? 1.15 : Math.max(.61, kpi - .06)
-    }
+    },
+    fullKpis:previewFullKpis(kpi,index)
   }));
 
   const makePerson = (name, failed = [], reason = '') => ({
@@ -89,7 +102,7 @@
   const contract = {
     version:C.VERSION, generatedAt:'2026-08-10T08:42:00+08:00', mode:'preview',
     todayOperations:state({ date:'2026-08-10', segments:[report1600,report2100] },'北一二B每日回報','index.html','2026-08-10T21:33:00+08:00'),
-    kpiSummary:state({ kpi:1.131, companyRank:29, companyRankTotal:578, kpiDod:.028, rankChange:1, addonScore:12.98, reportDate:'2026-08-10' },'正式 KPI 私有戰情','index.html'),
+    kpiSummary:state({ kpi:1.131, companyRank:29, companyRankTotal:578, kpiDod:.028, rankChange:1, addonScore:12.98, reportDate:'2026-08-10', fullKpis:previewFullKpis(1.131) },'正式 KPI 私有戰情','index.html'),
     kpiStores:state(stores,'正式 KPI 私有戰情','index.html'),
     awardSummary:state({ totalAmount:12980, winningStores:3, totalStores:9, reportDate:'2026-08-10' },'正式台獎私有戰情','index.html'),
     awardStores:state([
@@ -102,7 +115,7 @@
     reportFailures:state({ 16:failureData(report1600),21:failureData(report2100) },'正式個人回報','index.html','2026-08-10T21:33:00+08:00'),
     scheduleToday:state({ date:'2026-08-10',stores:scheduleRows },'既有班表 sread','patrol.html','2026-08-10T08:10:00+08:00'),
     patrolToday:state({ date:'2026-08-10',route:['永吉','大稻埕','通化'],completed:1,total:3,nextStop:'大稻埕',nextEta:'14:20',travel:[{from:'永吉',to:'大稻埕',minutes:24},{from:'大稻埕',to:'通化',minutes:31}] },'巡店唯讀路線 Preview','patrol.html','2026-08-10T08:00:00+08:00'),
-    patrolOverview:state({ visited:6,total:9,completionRate:6/9,unvisited:['杭州南','復興南','六張犁'],attention:['復興南','六張犁'],stores:patrolStores,recent:[{store:'永吉',date:'2026-08-09',result:'完成'},{store:'大稻埕',date:'2026-08-08',result:'完成'},{store:'復興南',date:'2026-08-03',result:'待追蹤：陳列缺失'}] },'既有巡店 ptread','patrol.html','2026-08-10T08:00:00+08:00')
+    patrolOverview:state({ visited:6,total:9,expected:9,remaining:3,completionRate:6/9,unvisited:['杭州南','復興南','六張犁'],attention:['復興南','六張犁'],attentionCount:2,statisticsPeriod:'2026-08-01～2026-08-31（Preview）',periodVerified:true,stores:patrolStores,recent:[{store:'永吉',date:'2026-08-09',result:'完成'},{store:'大稻埕',date:'2026-08-08',result:'完成'},{store:'復興南',date:'2026-08-03',result:'待追蹤：陳列缺失'}] },'既有巡店 ptread','patrol.html','2026-08-10T08:00:00+08:00')
   };
 
   scope.LiamSupervisorPreviewData = C.validateContract(contract);

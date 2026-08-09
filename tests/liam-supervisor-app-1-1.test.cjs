@@ -43,6 +43,10 @@ test('Preview contract is visibly synthetic and contains the complete mobile sum
   assert.equal(data.scheduleToday.data.stores.length, 9);
   assert.equal(data.scheduleToday.data.date, '2026-08-10');
   assert.equal(data.patrolOverview.data.total, 9);
+  assert.equal(data.kpiSummary.data.fullKpis.length, 25);
+  assert.equal(data.kpiStores.data.every(store => store.fullKpis.length === 25), true);
+  assert.equal(data.patrolOverview.data.statisticsPeriod, '2026-08-01～2026-08-31（Preview）');
+  assert.equal(data.patrolOverview.data.periodVerified, true);
 });
 
 test('App runtime only calls the existing read and session actions', () => {
@@ -55,6 +59,9 @@ test('App runtime only calls the existing read and session actions', () => {
   assert.match(code, /PREVIEW_MODE/);
   assert.match(code, /Preview 僅顯示展示資料，不呼叫正式端點/);
   assert.match(code, /Preview／示意資料/);
+  assert.match(code, /function fullKpiItems/);
+  assert.match(code, /function renderFullKpis/);
+  assert.match(code, /正式來源未提供可驗證的統計期間/);
 });
 
 test('Information architecture matches the App 1.1 acceptance surfaces', () => {
@@ -78,7 +85,7 @@ test('Information architecture matches the App 1.1 acceptance surfaces', () => {
 
 test('PWA cache is versioned for App 1.1 and includes local icon library', () => {
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-1-v5/);
+  assert.match(worker, /liam-supervisor-app-1-1-v6/);
   assert.match(worker, /app-data-contract\.js/);
   assert.match(worker, /app-preview-data\.js/);
   assert.match(worker, /app-assets\/lucide\.min\.js/);
