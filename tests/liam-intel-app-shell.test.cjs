@@ -39,6 +39,7 @@ test('PWA uses safe-area, standalone manifest, and app-only offline cache', () =
   const worker = read('service-worker.js');
   assert.match(html, /viewport-fit=cover/);
   assert.match(html, /apple-mobile-web-app-capable/);
+  assert.match(html, /name="mobile-web-app-capable" content="yes"/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /overflow-x:hidden/);
   assert.equal(manifest.display, 'standalone');
