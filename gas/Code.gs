@@ -1797,6 +1797,7 @@ function kpiCalcPublish(payload) {
   const text = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
   const data = JSON.parse(text);
   if (!data || !data.meta || !data.stores || !data.persons) throw new Error('KPI 試算資料格式不完整');
+  kpiCalcAssertRateCoverage_(data);
   const folder = privateDashboardFolder();
   const files = folder.getFilesByName(PRIVATE_KPICALC_FILE);
   const blob = Utilities.newBlob(text, 'application/json', PRIVATE_KPICALC_FILE);
@@ -1948,6 +1949,7 @@ function kpiCalcAutoUpdate() {
     if (props.getProperty('KPICALC_LAST_IMPORT') === stamp) return { status: 'up-to-date', file: latest.file.getName() };
 
     const data = kpiCalcParseReport(latest.file);
+    kpiCalcAssertRateCoverage_(data);
     const text = JSON.stringify(data);
 
     // 防衝突：排程不得覆蓋較新的、或同日期已由網站手動上傳的資料。
@@ -2376,6 +2378,83 @@ function kpiCalcReportRate(v) {
   const raw = String(v).trim().replace(/[%,]/g, '');
   if (raw === '' || isNaN(Number(raw))) return null;
   return kpiCalcPct(v);
+}
+
+const KPICALC_REQUIRED_RATE_KEYS = [
+  'AQ V+D 999 (含)以上', 'AQ V+D 1399 (含)以上', '好速案銷售點數',
+  'RT V+D 999 (含)以上', 'RT V+D 1399 (含)以上', 'RT上線點數'
+];
+
+function kpiCalcHasOwn_(obj, key) {
+  return !!obj && Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+// 正式 KPI 發布的達成率完整性 Gate。只驗證正式報表解析結果，不重算任何 KPI。
+// 所有項目都必須帶出欄位；關鍵 KPI 在整體與至少三店還必須是非空數值。
+function kpiCalcRateCoverage_(data) {
+  const items = Array.isArray(data && data.items) ? data.items : [];
+  const stores = Array.isArray(data && data.stores) ? data.stores : [];
+  const persons = Array.isArray(data && data.persons) ? data.persons : [];
+  const itemKeys = items.map(function(it) { return String((it || {}).key || ''); }).filter(Boolean);
+  const aggregateRates = data && data.aggregateRates;
+  const missingAggregateFields = itemKeys.filter(function(key) {
+    return !kpiCalcHasOwn_(aggregateRates, key);
+  });
+  let missingStoreFields = 0;
+  let missingPersonFields = 0;
+  stores.forEach(function(row) {
+    itemKeys.forEach(function(key) {
+      if (!kpiCalcHasOwn_((row || {}).items && row.items[key], 'reportRate')) missingStoreFields++;
+    });
+  });
+  persons.forEach(function(row) {
+    itemKeys.forEach(function(key) {
+      if (!kpiCalcHasOwn_((row || {}).items && row.items[key], 'reportRate')) missingPersonFields++;
+    });
+  });
+  const emptyAggregateKeys = KPICALC_REQUIRED_RATE_KEYS.filter(function(key) {
+    return !kpiCalcHasOwn_(aggregateRates, key) || aggregateRates[key] === null ||
+      aggregateRates[key] === '' || !isFinite(Number(aggregateRates[key]));
+  });
+  const sampledStores = stores.slice(0, 3);
+  const emptySampleRates = [];
+  sampledStores.forEach(function(row) {
+    KPICALC_REQUIRED_RATE_KEYS.forEach(function(key) {
+      const entry = (row || {}).items && row.items[key];
+      if (!entry || entry.reportRate === null || entry.reportRate === '' ||
+          entry.reportRate === undefined || !isFinite(Number(entry.reportRate))) {
+        emptySampleRates.push(String((row || {}).name || (row || {}).code || '?') + '/' + key);
+      }
+    });
+  });
+  return {
+    ok: itemKeys.length === 25 && stores.length >= 3 &&
+      missingAggregateFields.length === 0 && missingStoreFields === 0 && missingPersonFields === 0 &&
+      emptyAggregateKeys.length === 0 && emptySampleRates.length === 0,
+    itemCount: itemKeys.length,
+    sampledStores: sampledStores.map(function(row) { return String((row || {}).name || (row || {}).code || ''); }),
+    missingAggregateFields: missingAggregateFields,
+    missingStoreFields: missingStoreFields,
+    missingPersonFields: missingPersonFields,
+    emptyAggregateKeys: emptyAggregateKeys,
+    emptySampleRates: emptySampleRates
+  };
+}
+
+function kpiCalcAssertRateCoverage_(data) {
+  const coverage = kpiCalcRateCoverage_(data);
+  if (!coverage.ok) {
+    throw new Error('KPI 達成率資料不完整，拒絕發布：' + JSON.stringify({
+      itemCount: coverage.itemCount,
+      sampledStores: coverage.sampledStores,
+      missingAggregateFields: coverage.missingAggregateFields.length,
+      missingStoreFields: coverage.missingStoreFields,
+      missingPersonFields: coverage.missingPersonFields,
+      emptyAggregateKeys: coverage.emptyAggregateKeys,
+      emptySampleRates: coverage.emptySampleRates
+    }));
+  }
+  return coverage;
 }
 
 function kpiCalcParseMeta(sv, fileName) {
@@ -2859,6 +2938,11 @@ function reportUploadValidateKpi_(data, live) {
 
   checks.push(reportUploadCheck_('sheets', '工作表名稱', 'ok', '店點達成率＋個人達成率皆已讀到'));
   checks.push(reportUploadCheck_('fields', '必要欄位', 'ok', KPICALC_ITEMS.length + ' 項加權欄位齊全'));
+  const rateCoverage = kpiCalcRateCoverage_(data);
+  checks.push(reportUploadCheck_('rates', '達成率欄位', rateCoverage.ok ? 'ok' : 'block',
+    rateCoverage.ok
+      ? 'aggregateRates／reportRate 完整；已抽驗 ' + rateCoverage.sampledStores.length + ' 店關鍵 KPI'
+      : 'aggregateRates／reportRate 缺漏，拒絕發布'));
   checks.push(reportUploadCheck_('period', '資料期間', meta.period ? 'ok' : 'block', meta.period || '讀不到期間'));
 
   reportUploadDateChecks_(reportUploadKpiDate_(meta), live).forEach(function(c) { checks.push(c); });
@@ -3078,6 +3162,13 @@ function reportUploadCommit(payload) {
   let overall = 'ok';
   let backupName = '';
   let message = '';
+
+  // commit 前重新讀取 staging 並驗證，避免 preview 後的缺欄位資料進入正式檔。
+  if (kind === 'kpi') {
+    const stagedRateFile = reportUploadFileByName_(staged.stagingName);
+    if (!stagedRateFile) throw new Error('找不到暫存資料檔，請重新上傳');
+    kpiCalcAssertRateCoverage_(JSON.parse(stagedRateFile.getBlob().getDataAsString('UTF-8')));
+  }
 
   // 版本衝突把關：手動上傳可由操作者勾選強制覆寫，但必須是明示的
   const incoming = {

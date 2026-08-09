@@ -46,8 +46,10 @@ test('既有自動化流程的解析與匯入判斷維持原樣', () => {
 // ── 防衝突：11:00 排程不得覆蓋 10:55 的手動上傳 ─────────────
 test('排程寫入前必須先過版本判斷，且判斷在寫入之前', () => {
   const auto = functionBody(code, 'kpiCalcAutoUpdate');
+  const rateGateAt = auto.indexOf('kpiCalcAssertRateCoverage_');
   const decideAt = auto.indexOf('reportVersionDecide_');
   const writeAt = auto.indexOf('setContent(text)');
+  assert.ok(rateGateAt !== -1 && rateGateAt < decideAt, '達成率 Gate 必須在版本判斷與寫入之前');
   assert.notEqual(decideAt, -1, '排程未接上版本判斷');
   assert.ok(decideAt < writeAt, '必須先判斷再寫入');
   assert.match(auto, /if \(!decision\.accept\)/);
@@ -90,8 +92,10 @@ test('回復後登記為 rollback 來源，排程不會用同日期舊檔蓋回�
 
 test('手動上傳被版本判斷擋下時不進入任何寫入階段', () => {
   const commit = functionBody(code, 'reportUploadCommit');
+  const rateGateAt = commit.indexOf('kpiCalcAssertRateCoverage_');
   const decideAt = commit.indexOf('reportVersionDecide_');
   const rawAt = commit.indexOf("'raw_backup'");
+  assert.ok(rateGateAt !== -1 && rateGateAt < decideAt, 'commit 必須先重驗達成率欄位');
   assert.ok(decideAt !== -1 && decideAt < rawAt, '版本判斷必須在所有階段之前');
   assert.match(commit, /result: 'blocked'/);
   assert.match(commit, /needsForce: true/);
@@ -115,6 +119,12 @@ test('preview 在驗證失敗時清掉暫存且不觸碰正式檔', () => {
   assert.match(preview, /reportUploadTrash_\(rawFile\)/);
   // preview 不得寫入任何正式檔
   assert.doesNotMatch(preview, /liveFile|setContent/);
+});
+
+test('所有 KPI 正式寫入入口都在寫檔前驗證達成率完整性', () => {
+  assert.match(functionBody(code, 'kpiCalcPublish'), /kpiCalcAssertRateCoverage_\(data\)/);
+  assert.match(functionBody(code, 'kpiCalcAutoUpdate'), /kpiCalcAssertRateCoverage_\(data\)/);
+  assert.match(functionBody(code, 'reportUploadCommit'), /kpiCalcAssertRateCoverage_/);
 });
 
 test('commit 先備份正式資料才改寫，讀回失敗會自動還原', () => {
@@ -223,6 +233,7 @@ test('智慧營運中心入口直接開啟獨立 Apps Script，且本身仍不�
 // ── 純函式行為測試（把驗證函式抽出來實際跑）────────────────
 function loadValidators() {
   const names = [
+    'kpiCalcHasOwn_', 'kpiCalcRateCoverage_', 'kpiCalcAssertRateCoverage_',
     'reportUploadCheck_', 'reportUploadValidateFile_', 'reportUploadDateChecks_',
     'reportUploadValidateKpi_', 'reportUploadValidateAward_', 'reportUploadBlocked_',
     'reportUploadKpiDate_', 'reportUploadKind_', 'reportUploadStoreMatch_', 'reportUploadStoreBuckets_'
@@ -230,6 +241,10 @@ function loadValidators() {
   let src = `
     const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
     const KPICALC_ITEMS = new Array(25).fill(['x','x',1]);
+    const KPICALC_REQUIRED_RATE_KEYS = [
+      'AQ V+D 999 (含)以上','AQ V+D 1399 (含)以上','好速案銷售點數',
+      'RT V+D 999 (含)以上','RT V+D 1399 (含)以上','RT上線點數'
+    ];
     const REPORT_UPLOAD_MAX_BYTES = 12 * 1024 * 1024;
     const REPORT_UPLOAD_KINDS = { kpi: { ext: '.xlsx', label: 'KPI' }, award: { ext: '.json', label: '台獎' } };
   `;
@@ -310,12 +325,25 @@ test('台獎快照也適用同一套店名比對', () => {
 });
 
 function kpiData(overrides) {
+  const required = [
+    'AQ V+D 999 (含)以上', 'AQ V+D 1399 (含)以上', '好速案銷售點數',
+    'RT V+D 999 (含)以上', 'RT V+D 1399 (含)以上', 'RT上線點數',
+  ];
+  const keys = required.concat(Array.from({ length: 19 }, (_, i) => `KPI-${i + 1}`));
+  const rateItems = () => Object.fromEntries(keys.map((key, i) => [key, {
+    a: i + 1, t: i + 10, w: 0.01, reportRate: 1 + i / 100,
+  }]));
   const base = {
     meta: { period: '2026/07/01 ~ 07/31', month: '2026-07', snapshotDay: 31 },
-    stores: ['通化', '酒泉', '台北三創', '萬大', '六張犁'].map((n, i) => ({ code: 'DNB0' + i, name: n })),
-    persons: new Array(12).fill({})
+    items: keys.map(key => ({ key })),
+    aggregateRates: Object.fromEntries(keys.map((key, i) => [key, 1 + i / 100])),
+    stores: ['通化', '酒泉', '台北三創', '萬大', '六張犁'].map((n, i) => ({ code: 'DNB0' + i, name: n, items: rateItems() })),
+    persons: Array.from({ length: 12 }, () => ({ items: rateItems() }))
   };
-  return Object.assign(base, overrides || {});
+  const value = Object.assign(base, overrides || {});
+  value.stores = (value.stores || []).map(row => ({ ...row, items: row.items || rateItems() }));
+  value.persons = (value.persons || []).map(row => ({ ...row, items: row.items || rateItems() }));
+  return value;
 }
 
 test('正確 KPI 檔案通過全部驗證（情境 1）', () => {
@@ -323,6 +351,37 @@ test('正確 KPI 檔案通過全部驗證（情境 1）', () => {
   assert.equal(V.reportUploadBlocked_(checks).length, 0);
   assert.equal(checks.find(c => c.key === 'region').level, 'ok');
   assert.equal(checks.find(c => c.key === 'count').level, 'ok');
+  assert.equal(checks.find(c => c.key === 'rates').level, 'ok');
+});
+
+test('缺 aggregateRates 時必須 block，不得標記可發布', () => {
+  const value = kpiData();
+  delete value.aggregateRates;
+  const checks = V.reportUploadValidateKpi_(value, null);
+  assert.equal(checks.find(c => c.key === 'rates').level, 'block');
+  assert.ok(V.reportUploadBlocked_(checks).length >= 1);
+});
+
+test('任一 reportRate 欄位缺失時必須 block', () => {
+  const value = kpiData();
+  delete value.stores[0].items['KPI-1'].reportRate;
+  const coverage = V.kpiCalcRateCoverage_(value);
+  assert.equal(coverage.ok, false);
+  assert.equal(coverage.missingStoreFields, 1);
+  assert.throws(() => V.kpiCalcAssertRateCoverage_(value), /拒絕發布/);
+});
+
+test('整體與三店關鍵 KPI rate 必須非空', () => {
+  const aggregateMissing = kpiData();
+  aggregateMissing.aggregateRates['AQ V+D 999 (含)以上'] = null;
+  assert.equal(V.kpiCalcRateCoverage_(aggregateMissing).ok, false);
+
+  const storeMissing = kpiData();
+  storeMissing.stores[2].items['好速案銷售點數'].reportRate = null;
+  const coverage = V.kpiCalcRateCoverage_(storeMissing);
+  assert.equal(coverage.ok, false);
+  assert.equal(coverage.sampledStores.length, 3);
+  assert.equal(coverage.emptySampleRates.length, 1);
 });
 
 test('錯區域資料會被擋下（情境 8）', () => {
