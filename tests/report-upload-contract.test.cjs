@@ -101,6 +101,18 @@ test('手動上傳被版本判斷擋下時不進入任何寫入階段', () => {
   assert.match(commit, /needsForce: true/);
 });
 
+test('同雜湊缺 rate 修復必須限同來源同日期、完整 staged，且修復後不可重放', () => {
+  const helper = functionBody(code, 'reportUploadAllowSameHashRateRepair_');
+  assert.match(helper, /kind !== 'kpi'/);
+  assert.match(helper, /!force/);
+  assert.match(helper, /stagedCoverage\.ok && !liveCoverage\.ok/);
+  assert.match(helper, /reportUploadKpiDate_/);
+  assert.match(helper, /sourceFile/);
+  const commit = functionBody(code, 'reportUploadCommit');
+  assert.match(commit, /decision\.rule === 'same-hash' && allowSameHashRateRepair/);
+  assert.match(commit, /forced-rate-field-repair/);
+});
+
 // ── 原則 6/7：KPI 與台獎分開、互不影響 ──────────────────────
 test('KPI 與台獎為各自獨立的檔案與備份目標', () => {
   assert.match(code, /REPORT_UPLOAD_KINDS = \{/);

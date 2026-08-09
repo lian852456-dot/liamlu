@@ -3147,6 +3147,17 @@ function reportUploadStage_(key, label, status, detail) {
   return { key: key, label: label, status: status, detail: String(detail == null ? '' : detail) };
 }
 
+// 僅供「同一份來源已發布，但舊解析器漏掉 rate 欄位」的一次性修復。
+// 條件全部成立才放行；修復後 live 已具 rateCoverage，因此不可重放。
+function reportUploadAllowSameHashRateRepair_(kind, staged, stagedData, liveData, force) {
+  if (kind !== 'kpi' || !force || !stagedData || !liveData) return false;
+  const stagedCoverage = kpiCalcRateCoverage_(stagedData);
+  const liveCoverage = kpiCalcRateCoverage_(liveData);
+  return stagedCoverage.ok && !liveCoverage.ok &&
+    reportUploadKpiDate_((stagedData || {}).meta) === reportUploadKpiDate_((liveData || {}).meta) &&
+    String((staged || {}).fileName || '') === String(((liveData || {}).meta || {}).sourceFile || '');
+}
+
 function reportUploadCommit(payload) {
   const employeeId = reportUploadAuthorize_(payload);
   const token = String((payload || {}).token || '');
@@ -3162,12 +3173,21 @@ function reportUploadCommit(payload) {
   let overall = 'ok';
   let backupName = '';
   let message = '';
+  let stagedRateData = null;
+  let allowSameHashRateRepair = false;
 
   // commit 前重新讀取 staging 並驗證，避免 preview 後的缺欄位資料進入正式檔。
   if (kind === 'kpi') {
     const stagedRateFile = reportUploadFileByName_(staged.stagingName);
     if (!stagedRateFile) throw new Error('找不到暫存資料檔，請重新上傳');
-    kpiCalcAssertRateCoverage_(JSON.parse(stagedRateFile.getBlob().getDataAsString('UTF-8')));
+    stagedRateData = JSON.parse(stagedRateFile.getBlob().getDataAsString('UTF-8'));
+    kpiCalcAssertRateCoverage_(stagedRateData);
+    const currentRateFile = kpiCalcLatestDataFile();
+    const currentRateData = currentRateFile
+      ? JSON.parse(currentRateFile.getBlob().getDataAsString('UTF-8'))
+      : null;
+    allowSameHashRateRepair = reportUploadAllowSameHashRateRepair_(
+      kind, staged, stagedRateData, currentRateData, !!(payload || {}).force);
   }
 
   // 版本衝突把關：手動上傳可由操作者勾選強制覆寫，但必須是明示的
@@ -3175,7 +3195,14 @@ function reportUploadCommit(payload) {
     dataDate: staged.dataDate, source: 'manual-upload', fileHash: staged.fileHash,
     fileName: staged.fileName, operator: employeeId, force: !!(payload || {}).force
   };
-  const decision = reportVersionDecide_(kind, incoming);
+  let decision = reportVersionDecide_(kind, incoming);
+  if (!decision.accept && decision.rule === 'same-hash' && allowSameHashRateRepair) {
+    decision = {
+      accept: true,
+      rule: 'forced-rate-field-repair',
+      reason: '同來源同日期 KPI 缺少 rate 欄位，允許一次性完整欄位修復'
+    };
+  }
   if (!decision.accept) {
     reportVersionRecord_(kind, incoming, 'skipped', { skipRule: decision.rule });
     return {
