@@ -9,6 +9,11 @@
   const PATROL_TOKEN_KEY = 'bei12b_pt_session_token';
   const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
   const STORE_ALIASES = new Map([['三創','台北三創']]);
+  const KPI_CORE_KEYS = {
+    A999:'AQ V+D 999 (含)以上', A1399:'AQ V+D 1399 (含)以上', '好速':'好速案銷售點數',
+    R999:'RT V+D 999 (含)以上', R1399:'RT V+D 1399 (含)以上', RT:'RT上線點數'
+  };
+  const FAILURE_LABELS = { a999:'A999', a1399:'A1399', haosu:'好速', achieve:'R999', r1399:'R1399', insurance:'保險搭售率' };
   const READ_ACTIONS = new Set(['private_access','read','pread','kpicalc_access']);
   const PATROL_READ_ACTIONS = new Set(['sread','ptread']);
   const PREVIEW_MODE = new URLSearchParams(scope.location.search).get('preview') === '1';
@@ -70,10 +75,11 @@
   function statusModule(key, status = 'unauthorized', data = null, note = '') {
     const sources = {
       todayOperations:moduleSource('北一二B每日回報','index.html'),
-      kpiSummary:moduleSource('正式 KPI 私有戰情','index.html'), kpiStores:moduleSource('正式 KPI 私有戰情','index.html'),
+      kpiSummary:moduleSource('正式 KPI kpicalc','kpi.html'), kpiStores:moduleSource('正式 KPI kpicalc','kpi.html'), kpiFullMetrics:moduleSource('正式 KPI kpicalc','kpi.html'),
       awardSummary:moduleSource('正式台獎私有戰情','index.html'), awardStores:moduleSource('正式台獎私有戰情','index.html'), awardTop2Models:moduleSource('正式台獎私有戰情','index.html'),
       report1600:moduleSource('北一二B每日回報','index.html'), report2100:moduleSource('北一二B每日回報','index.html'), reportFailures:moduleSource('正式個人回報','index.html'),
-      scheduleToday:moduleSource('既有班表 sread','patrol.html'), patrolToday:moduleSource('巡店唯讀摘要','patrol.html'), patrolOverview:moduleSource('既有巡店 ptread','patrol.html')
+      scheduleToday:moduleSource('既有班表 sread','patrol.html'), scheduleByDate:moduleSource('既有班表 sread','patrol.html'),
+      patrolToday:moduleSource('巡店唯讀摘要','patrol.html'), patrolOverview:moduleSource('既有巡店 ptread','patrol.html'), patrolStores:moduleSource('既有巡店 ptread','patrol.html')
     };
     return C.moduleState({ status, updatedAt:'', sourceUpdatedAt:'', stale:false, source:sources[key], data, note });
   }
@@ -164,33 +170,66 @@
     })).sort((a,b) => a.order - b.order);
   }
 
-  function adaptKpi(snapshot) {
-    const kpi = snapshot && snapshot.kpiBattle || {};
-    const aggregate = kpi.aggregate || {};
-    const updatedAt = String(kpi.generated_at || snapshot && snapshot.publishedAt || '');
-    const storeRows = Array.isArray(kpi.stores) ? kpi.stores.map(row => ({
-      name:normalizeStore(row.store), kpi:numberOrNull(row.overall_kpi), rank:numberOrNull(row.company_rank),
-      kpiDod:numberOrNull(row.overall_kpi_dod), rankChange:numberOrNull(row.company_rank_dod), addon:numberOrNull(row.addon_score),
-      core:{
-        A999:metricFrom(row,['a999','A999','AQ V+D 999 (含)以上']),
-        A1399:metricFrom(row,['a1399','A1399','AQ V+D 1399 (含)以上']),
-        '好速':metricFrom(row,['haosu','好速','好速案銷售點數']),
-        R999:metricFrom(row,['r999','R999','RT V+D 999 (含)以上']),
-        R1399:metricFrom(row,['r1399','R1399','RT V+D 1399 (含)以上']),
-        RT:metricFrom(row,['rt','RT','RT上線點數'])
-      },
-      fullKpis:fullKpiItems(row)
-    })).filter(row => row.name) : [];
+  function kpiDataAsOfDate(data) {
+    const meta = data && data.meta || {};
+    return /^\d{4}-\d{2}$/.test(String(meta.month || '')) && meta.snapshotDay
+      ? `${meta.month}-${String(meta.snapshotDay).padStart(2,'0')}` : '';
+  }
+
+  function sourceFileName(value) { return String(value || '').split(/[\\/]/).pop().trim().toLowerCase(); }
+
+  function kpiSupplementIsCurrent(data, supplement) {
+    const dataAsOf = kpiDataAsOfDate(data);
+    const supplementAsOf = String(supplement && (supplement.data_as_of_date || supplement.source_as_of_date) || '');
+    return Boolean(dataAsOf && supplement && supplement.report_date && supplementAsOf === dataAsOf &&
+      sourceFileName(supplement.source_file) && sourceFileName(supplement.source_file) === sourceFileName(data && data.meta && data.meta.sourceFile));
+  }
+
+  function officialKpiRate(entry) {
+    const value = entry && typeof entry === 'object' ? entry.reportRate : null;
+    return numberOrNull(value);
+  }
+
+  function kpicalcMetricItems(data, rates) {
+    return (data && Array.isArray(data.items) ? data.items : []).map((item,index) => ({
+      key:String(item.key || ''), label:String(item.displayName || item.display_name || item.label || item.name || item.key || ''),
+      category:String(item.category || item.group || item.section || item.categoryName || '完整 KPI'),
+      rate:officialKpiRate(rates && rates[item.key]), order:numberOrNull(item.order) == null ? index : numberOrNull(item.order)
+    })).sort((a,b)=>a.order-b.order);
+  }
+
+  function adaptKpi(data, snapshot, readAt) {
+    const supplement = snapshot && snapshot.kpiBattle || {};
+    const aligned = kpiSupplementIsCurrent(data, supplement);
+    const sourceUpdatedAt = String(data && data.meta && (data.meta.updatedAt || data.meta.publishedAt) || (aligned && supplement.generated_at) || '');
+    const source = moduleSource('正式 KPI kpicalc','kpi.html');
+    const supplementStores = new Map((aligned && Array.isArray(supplement.stores) ? supplement.stores : []).map(row=>[normalizeStore(row.store),row]));
+    const storeRows = (data && Array.isArray(data.stores) ? data.stores : []).map(store => {
+      const supplementRow = supplementStores.get(normalizeStore(store.name)) || {};
+      const fullKpis = kpicalcMetricItems(data, store.items || {});
+      const rates = new Map(fullKpis.map(metric=>[metric.key,metric.rate]));
+      return {
+        name:normalizeStore(store.name), kpi:numberOrNull(store.official), rank:numberOrNull(supplementRow.company_rank),
+        kpiDod:numberOrNull(supplementRow.overall_kpi_dod), rankChange:numberOrNull(supplementRow.company_rank_dod), addon:numberOrNull(supplementRow.addon_score),
+        core:Object.fromEntries(Object.entries(KPI_CORE_KEYS).map(([short,key])=>[short,rates.has(key)?rates.get(key):null])), fullKpis
+      };
+    }).filter(row=>row.name);
+    const aggregate = aligned && supplement.aggregate || {};
+    const aggregateRates = data && data.aggregateRates || {};
+    const fullRegion = kpicalcMetricItems(data, Object.fromEntries(Object.keys(aggregateRates).map(key=>[key,{reportRate:aggregateRates[key]}])));
     const summaryData = {
-      kpi:numberOrNull(aggregate.overall_kpi), companyRank:numberOrNull(aggregate.company_rank),
-      companyRankTotal:numberOrNull(kpi.company_rank_total) || 578, kpiDod:numberOrNull(aggregate.overall_kpi_dod),
-      rankChange:numberOrNull(aggregate.company_rank_dod), addonScore:numberOrNull(aggregate.addon_score), reportDate:String(kpi.report_date || ''),
-      fullKpis:fullKpiItems(aggregate)
+      kpi:numberOrNull(aggregate.overall_kpi), companyRank:numberOrNull(aggregate.company_rank), companyRankTotal:numberOrNull(supplement.company_rank_total),
+      kpiDod:numberOrNull(aggregate.overall_kpi_dod), rankChange:numberOrNull(aggregate.company_rank_dod), addonScore:numberOrNull(aggregate.addon_score),
+      reportDate:aligned ? String(supplement.report_date || '') : '', fullKpis:fullRegion
     };
-    const usable = summaryData.kpi != null && summaryData.companyRank != null;
+    const completeMetrics = fullRegion.length === 25 && fullRegion.every(metric=>metric.rate != null) && storeRows.length === 9 && storeRows.every(row=>row.fullKpis.length === 25);
+    const base = { updatedAt:readAt, sourceUpdatedAt, stale:sourceUpdatedAt ? stale(sourceUpdatedAt) : false, source };
+    const summaryStatus = summaryData.kpi != null && summaryData.companyRank != null ? (completeMetrics?'ok':'partial') : 'partial';
+    const note = aligned ? (completeMetrics?'':'正式 kpicalc 未完整提供 9 店 × 25 項 rate') : 'kpicalc 與摘要日期／來源檔不一致，排名與 DOD 已 fail-closed';
     return {
-      summary:C.moduleState({ status:usable ? (storeRows.length === 9 ? 'ok':'partial') : 'no_data', updatedAt, sourceUpdatedAt:updatedAt, stale:stale(updatedAt), source:moduleSource('正式 KPI 私有戰情','index.html'), data:summaryData }),
-      stores:C.moduleState({ status:storeRows.length === 9 ? 'ok' : (storeRows.length ? 'partial':'no_data'), updatedAt, sourceUpdatedAt:updatedAt, stale:stale(updatedAt), source:moduleSource('正式 KPI 私有戰情','index.html'), data:storeRows, note:storeRows.length === 9 ? '' : `目前讀回 ${storeRows.length}/9 店` })
+      summary:C.moduleState({ ...base, status:summaryStatus, data:summaryData, note }),
+      stores:C.moduleState({ ...base, status:completeMetrics?'ok':(storeRows.length?'partial':'no_data'), data:storeRows, note }),
+      full:C.moduleState({ ...base, status:completeMetrics?'ok':(fullRegion.length?'partial':'no_data'), data:{ region:fullRegion, stores:Object.fromEntries(storeRows.map(row=>[row.name,row.fullKpis])) }, note })
     };
   }
 
@@ -200,9 +239,16 @@
     return Number.isFinite(number) ? number : null;
   }
 
-  function adaptAwards(snapshot) {
+  function adaptAwards(snapshot, expectedReportDate, readAt) {
     const awards = snapshot && snapshot.awardsBattle || {};
     const updatedAt = String(awards.generated_at || snapshot && snapshot.publishedAt || '');
+    const reportDate = String(awards.report_date || '');
+    const source = moduleSource('正式台獎私有戰情','index.html');
+    if (!expectedReportDate || reportDate !== expectedReportDate) {
+      const note = reportDate ? `台獎日期 ${reportDate} 與 KPI 日期 ${expectedReportDate || '—'} 不一致` : '正式台獎未提供可對齊的資料日期';
+      const missing = data => C.moduleState({ status:'no_data', updatedAt:readAt, sourceUpdatedAt:updatedAt, stale:updatedAt?stale(updatedAt):false, source, data, note });
+      return { summary:missing(null), stores:missing([]), top2:missing([]) };
+    }
     const sourceOverall = awards.overall || {};
     const overallAward = sourceOverall.award || awards.supervisor || {};
     const storeRows = Array.isArray(awards.stores) ? awards.stores.map(row => {
@@ -217,8 +263,8 @@
     })).filter(item => item.name && item.amount100 != null).sort((a,b) => b.amount100 - a.amount100).slice(0,2);
     const winningStores = storeRows.filter(row => row.eligible).length;
     const totalAmount = numberOrNull(overallAward.actual_total);
-    const summary = { totalAmount, winningStores, totalStores:9, reportDate:String(awards.report_date || '') };
-    const base = { updatedAt, sourceUpdatedAt:updatedAt, stale:stale(updatedAt), source:moduleSource('正式台獎私有戰情','index.html') };
+    const summary = { totalAmount, winningStores, totalStores:9, reportDate };
+    const base = { updatedAt:readAt, sourceUpdatedAt:updatedAt, stale:stale(updatedAt), source };
     return {
       summary:C.moduleState({ ...base, status:totalAmount != null ? 'ok':'no_data', data:summary }),
       stores:C.moduleState({ ...base, status:storeRows.length === 9 ? 'ok' : (storeRows.length ? 'partial':'no_data'), data:storeRows }),
@@ -228,7 +274,7 @@
 
   function personalRecord(raw) {
     const row = raw && raw.record ? raw.record : raw || {};
-    const failed = Array.isArray(row.failed) ? row.failed.map(String) : [];
+    const failed = Array.isArray(row.failed) ? row.failed.map(value => FAILURE_LABELS[String(value)] || String(value)) : [];
     const metrics = row.data || {};
     const extra = row.extra || {};
     return {
@@ -271,6 +317,7 @@
     const credential = { employeeId:id, deviceId:deviceId() };
     const requests = await Promise.allSettled([
       postReadOnly({ action:'private_access', ...credential }),
+      postReadOnly({ action:'kpicalc_access', ...credential }),
       postReadOnly({ action:'read', date:taipeiDate(), seg:16 }),
       postReadOnly({ action:'read', date:taipeiDate(), seg:21 }),
       postReadOnly({ action:'pread', date:taipeiDate(), seg:16 }),
@@ -279,11 +326,13 @@
     if (requests[0].status === 'rejected') throw requests[0].reason;
     const privateResult = requests[0].value;
     const snapshot = privateResult.snapshot || {};
-    const kpi = adaptKpi(snapshot);
-    const awards = adaptAwards(snapshot);
-    const report16 = adaptReport(16, requests[1].status === 'fulfilled' ? requests[1].value.data : {}, requests[3].status === 'fulfilled' ? requests[3].value.data : {});
-    const report21 = adaptReport(21, requests[2].status === 'fulfilled' ? requests[2].value.data : {}, requests[4].status === 'fulfilled' ? requests[4].value.data : {});
     const readAt = nowIso();
+    const kpi = requests[1].status === 'fulfilled'
+      ? adaptKpi(requests[1].value.data || {}, snapshot, readAt)
+      : { summary:statusModule('kpiSummary','error',null,'正式 kpicalc 讀取失敗'), stores:statusModule('kpiStores','error',[], '正式 kpicalc 讀取失敗'), full:statusModule('kpiFullMetrics','error',{region:[],stores:{}},'正式 kpicalc 讀取失敗') };
+    const awards = adaptAwards(snapshot, kpi.summary.data && kpi.summary.data.reportDate, readAt);
+    const report16 = adaptReport(16, requests[2].status === 'fulfilled' ? requests[2].value.data : {}, requests[4].status === 'fulfilled' ? requests[4].value.data : {});
+    const report21 = adaptReport(21, requests[3].status === 'fulfilled' ? requests[3].value.data : {}, requests[5].status === 'fulfilled' ? requests[5].value.data : {});
     const reportModule = (report, result) => C.moduleState({
       status:result.status === 'fulfilled' ? (report.completedStores === 9 ? 'ok' : 'partial') : 'error', updatedAt:readAt,
       sourceUpdatedAt:report.updatedAt, stale:false, source:moduleSource('北一二B每日回報','index.html'), data:report,
@@ -292,10 +341,10 @@
     contract = C.validateContract({
       ...contract, version:C.VERSION, generatedAt:readAt, mode:'formal',
       todayOperations:C.moduleState({ status:'ok', updatedAt:readAt, sourceUpdatedAt:report21.updatedAt || report16.updatedAt, stale:false, source:moduleSource('北一二B每日回報','index.html'), data:{ date:taipeiDate(), segments:[report16,report21] } }),
-      kpiSummary:kpi.summary, kpiStores:kpi.stores,
+      kpiSummary:kpi.summary, kpiStores:kpi.stores, kpiFullMetrics:kpi.full,
       awardSummary:awards.summary, awardStores:awards.stores, awardTop2Models:awards.top2,
-      report1600:reportModule(report16,requests[1]), report2100:reportModule(report21,requests[2]),
-      reportFailures:C.moduleState({ status:requests[3].status === 'fulfilled' || requests[4].status === 'fulfilled' ? 'ok':'error', updatedAt:readAt, sourceUpdatedAt:report21.updatedAt || report16.updatedAt, stale:false, source:moduleSource('正式個人回報','index.html'), data:{16:failureSummary(report16),21:failureSummary(report21)} })
+      report1600:reportModule(report16,requests[2]), report2100:reportModule(report21,requests[3]),
+      reportFailures:C.moduleState({ status:requests[4].status === 'fulfilled' || requests[5].status === 'fulfilled' ? 'ok':'error', updatedAt:readAt, sourceUpdatedAt:report21.updatedAt || report16.updatedAt, stale:false, source:moduleSource('正式個人回報','index.html'), data:{16:failureSummary(report16),21:failureSummary(report21)} })
     });
     scope.sessionStorage.setItem(EMPLOYEE_KEY,id);
     dom('#viewerState').textContent = privateResult.profile && privateResult.profile.maskedName ? privateResult.profile.maskedName : 'Approved';
@@ -494,7 +543,9 @@
 
   function renderSchedule() {
     const date=dom('#scheduleDate').value||taipeiDate(); const filter=dom('#scheduleStoreFilter').value;
-    const data=scheduleViewData&&scheduleViewData.date===date?scheduleViewData:(contract.scheduleToday.data&&contract.scheduleToday.data.date===date?contract.scheduleToday.data:null);
+    const byDate=contract.scheduleByDate.data;
+    const data=scheduleViewData&&scheduleViewData.date===date?scheduleViewData:
+      (byDate&&byDate.selectedDate===date?{date,stores:byDate.stores}:(contract.scheduleToday.data&&contract.scheduleToday.data.date===date?contract.scheduleToday.data:null));
     dom('#scheduleSourceTime').textContent=`更新 ${formatTime(contract.scheduleToday.sourceUpdatedAt)}`;
     if (!data||!Array.isArray(data.stores)) { const locked=contract.scheduleToday.status==='unauthorized'; dom('#scheduleList').className=locked?'locked-state':'empty-state'; dom('#scheduleList').innerHTML=locked?'請從右上角個人／設定入口解鎖班表。':`${escapeHtml(date)} 尚無班表資料。`; return; }
     const rows=data.stores.filter(row=>!filter||row.store===filter);
@@ -567,20 +618,23 @@
     const results=await Promise.allSettled([patrolRead('sread',{month}),patrolRead('ptread')]); const readAt=nowIso();
     if (results[0].status==='fulfilled') {
       scheduleRaw=results[0].value.schedule; scheduleViewData=adaptSchedule(scheduleRaw,date);
+      contract.scheduleByDate=C.moduleState({status:scheduleViewData.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有班表 sread','patrol.html'),data:{selectedDate:date,availableMonth:String(scheduleRaw&&scheduleRaw.month||month),stores:scheduleViewData.stores}});
       const today=taipeiDate();
       if (scheduleRaw&&scheduleRaw.month===today.slice(0,7)) {
         const todayData=adaptSchedule(scheduleRaw,today);
         contract.scheduleToday=C.moduleState({status:todayData.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有班表 sread','patrol.html'),data:todayData});
       }
       populateScheduleStores(scheduleViewData.stores.map(row=>row.store));
-    } else { scheduleRaw=null; scheduleViewData=null; contract.scheduleToday=statusModule('scheduleToday','error',null,results[0].reason.message); }
+    } else { scheduleRaw=null; scheduleViewData=null; contract.scheduleToday=statusModule('scheduleToday','error',null,results[0].reason.message); contract.scheduleByDate=statusModule('scheduleByDate','error',null,results[0].reason.message); }
     if (results[1].status==='fulfilled') {
       patrolRaw=results[1].value; const data=adaptPatrol(patrolRaw);
       contract.patrolOverview=C.moduleState({status:data.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data});
+      contract.patrolStores=C.moduleState({status:data.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data:data.stores});
       contract.patrolToday=C.moduleState({status:'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data:null,note:'現有正式來源未提供今日預定路線與移動時間'});
     } else {
       contract.patrolOverview=statusModule('patrolOverview','error',null,results[1].reason.message);
       contract.patrolToday=statusModule('patrolToday','error',null,results[1].reason.message);
+      contract.patrolStores=statusModule('patrolStores','error',[],results[1].reason.message);
     }
     contract.generatedAt=readAt; renderAll();
   }
@@ -605,7 +659,7 @@
 
   function shiftDate(days) {
     const input=dom('#scheduleDate'); const date=new Date(`${input.value||taipeiDate()}T00:00:00+08:00`); date.setDate(date.getDate()+days); input.value=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
-    if (scheduleRaw && scheduleRaw.month===input.value.slice(0,7)) { scheduleViewData=adaptSchedule(scheduleRaw,input.value); renderSchedule(); }
+    if (scheduleRaw && scheduleRaw.month===input.value.slice(0,7)) { scheduleViewData=adaptSchedule(scheduleRaw,input.value); contract.scheduleByDate=C.moduleState({status:scheduleViewData.stores.length?'ok':'no_data',updatedAt:nowIso(),sourceUpdatedAt:contract.scheduleToday.sourceUpdatedAt,stale:false,source:moduleSource('既有班表 sread','patrol.html'),data:{selectedDate:input.value,availableMonth:scheduleRaw.month,stores:scheduleViewData.stores}}); renderSchedule(); }
     else if (patrolToken) loadPatrolData();
     else renderSchedule();
   }
@@ -617,7 +671,7 @@
   all('[data-report-segment]').forEach(button=>button.addEventListener('click',()=>{ reportSegment=Number(button.dataset.reportSegment); all('[data-report-segment]').forEach(item=>item.classList.toggle('active',item===button)); renderReport(); }));
   dom('#privateAccessForm').addEventListener('submit',async event=>{ event.preventDefault(); const button=event.currentTarget.querySelector('button'); button.disabled=true; setMessage('#privateAccessMessage','正在以既有 Approved Device 讀取正式摘要…'); try { await loadFormalSummary(dom('#employeeId').value); } catch(error) { setMessage('#privateAccessMessage',error.message,'error'); } finally { button.disabled=false; } });
   dom('#patrolAccessForm').addEventListener('submit',async event=>{ event.preventDefault(); const button=event.currentTarget.querySelector('button'); button.disabled=true; try { await unlockPatrol(dom('#patrolPasscode').value); dom('#patrolPasscode').value=''; } catch(error) { setMessage('#patrolAccessMessage',error.message,'error'); } finally { button.disabled=false; } });
-  dom('#patrolLogout').addEventListener('click',()=>{ const token=patrolToken; patrolToken=''; scheduleRaw=null; scheduleViewData=null; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true; contract.scheduleToday=statusModule('scheduleToday'); contract.patrolToday=statusModule('patrolToday'); contract.patrolOverview=statusModule('patrolOverview'); renderAll(); if(token) postPatrolAuth({action:'ptlogout',token}).catch(()=>{}); });
+  dom('#patrolLogout').addEventListener('click',()=>{ const token=patrolToken; patrolToken=''; scheduleRaw=null; scheduleViewData=null; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true; contract.scheduleToday=statusModule('scheduleToday'); contract.scheduleByDate=statusModule('scheduleByDate'); contract.patrolToday=statusModule('patrolToday'); contract.patrolOverview=statusModule('patrolOverview'); contract.patrolStores=statusModule('patrolStores'); renderAll(); if(token) postPatrolAuth({action:'ptlogout',token}).catch(()=>{}); });
   all('[data-date-step]').forEach(button=>button.addEventListener('click',()=>shiftDate(Number(button.dataset.dateStep))));
   dom('[data-date-today]').addEventListener('click',()=>{ dom('#scheduleDate').value=taipeiDate(); if(patrolToken)loadPatrolData(); else renderSchedule(); });
   dom('#scheduleDate').addEventListener('change',()=>patrolToken?loadPatrolData():renderSchedule());
