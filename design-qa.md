@@ -4,7 +4,7 @@
 
 - Reference: `qa-assets/reference.png`
 - Primary viewport: `390 × 844`
-- Preview state: `app.html?preview=1&v=3`
+- Preview state: `app.html?preview=1&v=4`
 - Visual direction: selected dark navy Supervisor dashboard, cyan data emphasis, amber award emphasis, red exception priority, compact cards and expandable rows.
 
 ## Visual comparison
@@ -19,6 +19,7 @@
 
 - Bottom navigation: Home, Battle, Report, Patrol, My switch views.
 - Home: 16:00／21:00 attention buttons expand current operations; KPI store rows expand six primary KPI fields.
+- Home schedule: current date, nine-store working／off totals and three store rows are visible immediately; the control expands all nine stores and their shift summaries.
 - Battle: KPI／Award and Region／Store controls render the correct summaries; store selector works.
 - Report: 16:00／21:00 switch works; store rows expand individual formal failure content.
 - My: previous／today／next date controls and store filter work in Preview; formal mode retains existing authentication boundaries.
@@ -28,6 +29,7 @@
 
 - `window.innerWidth = 390`, `window.innerHeight = 844`.
 - Horizontal overflow: `0px` in Home, Battle KPI, Battle Award, Report, Patrol, and My.
+- Current-day schedule expanded rows: `9`; horizontal overflow remains `0px`.
 - Home uses compact cards and rows; no large horizontal table.
 - Warning and incomplete states precede normal information.
 - UI uses vendored Lucide icons; no handcrafted SVG, emoji icon, or CSS illustration.

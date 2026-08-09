@@ -20,6 +20,7 @@
   let battleScope = 'region';
   let patrolToken = scope.sessionStorage.getItem(PATROL_TOKEN_KEY) || '';
   let scheduleRaw = null;
+  let scheduleViewData = null;
   let patrolRaw = null;
 
   const dom = selector => document.querySelector(selector);
@@ -377,12 +378,16 @@
     const data = contract.scheduleToday.data;
     const node = dom('#scheduleHome');
     if (!data || !Array.isArray(data.stores) || !data.stores.length) {
-      node.innerHTML = `<span class="compact-icon"><i data-lucide="calendar-days"></i></span><div class="compact-copy"><h2 id="scheduleHomeTitle">今日班表</h2><p>${contract.scheduleToday.status==='unauthorized'?'至「我的」解鎖後顯示':'目前尚無班表摘要'}</p></div><span class="compact-next"><b>查看班表</b><small>${contract.scheduleToday.note||'唯讀'}</small></span>`;
+      node.innerHTML = `<div class="home-schedule-head"><span class="compact-icon"><i data-lucide="calendar-days"></i></span><div class="compact-copy"><h2 id="scheduleHomeTitle">今日班表</h2><p>${contract.scheduleToday.status==='unauthorized'?'至「我的」解鎖後顯示':'目前尚無班表摘要'}</p></div><span class="compact-next"><b>${formatDate(taipeiDate())}</b><small>${contract.scheduleToday.note||'唯讀'}</small></span></div>`;
       return;
     }
     const working = data.stores.reduce((sum,row)=>sum+Number(row.working||0),0);
     const off = data.stores.reduce((sum,row)=>sum+Number(row.off||0),0);
-    node.innerHTML = `<span class="compact-icon"><i data-lucide="calendar-days"></i></span><div class="compact-copy"><h2 id="scheduleHomeTitle">今日班表</h2><p>${data.stores.length} 店 · 上班 ${working} 人 · 休假 ${off} 人</p></div><span class="compact-next"><b>${formatDate(data.date)}</b><small>更新 ${formatTime(contract.scheduleToday.sourceUpdatedAt)}</small></span>`;
+    const rows = data.stores.map(row => {
+      const shifts = [...new Set((row.staff||[]).map(person=>person.status).filter(Boolean))];
+      return `<div class="home-schedule-row"><span><b>${escapeHtml(row.store)}</b><small>${escapeHtml(shifts.join(' · ')||'尚無班別')}</small></span><span class="positive">上班 ${row.working}</span><span>休假 ${row.off}</span></div>`;
+    }).join('');
+    node.innerHTML = `<div class="home-schedule-head"><span class="compact-icon"><i data-lucide="calendar-days"></i></span><div class="compact-copy"><h2 id="scheduleHomeTitle">今日班表</h2><p>${data.stores.length} 店 · 上班 ${working} 人 · 休假 ${off} 人</p></div><span class="compact-next"><b>${formatDate(data.date)}</b><small>更新 ${formatTime(contract.scheduleToday.sourceUpdatedAt)}</small></span></div><div class="home-schedule-list">${rows}</div><button class="home-schedule-toggle" type="button" data-toggle-home-schedule aria-expanded="false"><span>顯示九店當日班表</span><i data-lucide="chevron-down"></i></button>`;
   }
 
   function renderPatrolHome() {
@@ -445,7 +450,8 @@
   }
 
   function renderSchedule() {
-    const data=contract.scheduleToday.data; const date=dom('#scheduleDate').value||taipeiDate(); const filter=dom('#scheduleStoreFilter').value;
+    const date=dom('#scheduleDate').value||taipeiDate(); const filter=dom('#scheduleStoreFilter').value;
+    const data=scheduleViewData&&scheduleViewData.date===date?scheduleViewData:(contract.scheduleToday.data&&contract.scheduleToday.data.date===date?contract.scheduleToday.data:null);
     dom('#scheduleSourceTime').textContent=`更新 ${formatTime(contract.scheduleToday.sourceUpdatedAt)}`;
     if (!data||!Array.isArray(data.stores)) { dom('#scheduleList').className='locked-state'; dom('#scheduleList').innerHTML='解鎖後顯示九店人員、班別與上班／休假狀態。'; return; }
     const rows=data.stores.filter(row=>!filter||row.store===filter);
@@ -496,10 +502,14 @@
     const date=dom('#scheduleDate').value||taipeiDate(); const month=date.slice(0,7);
     const results=await Promise.allSettled([patrolRead('sread',{month}),patrolRead('ptread')]); const readAt=nowIso();
     if (results[0].status==='fulfilled') {
-      scheduleRaw=results[0].value.schedule; const data=adaptSchedule(scheduleRaw,date);
-      contract.scheduleToday=C.moduleState({status:data.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有班表 sread','patrol.html'),data});
-      populateScheduleStores(data.stores.map(row=>row.store));
-    } else contract.scheduleToday=statusModule('scheduleToday','error',null,results[0].reason.message);
+      scheduleRaw=results[0].value.schedule; scheduleViewData=adaptSchedule(scheduleRaw,date);
+      const today=taipeiDate();
+      if (scheduleRaw&&scheduleRaw.month===today.slice(0,7)) {
+        const todayData=adaptSchedule(scheduleRaw,today);
+        contract.scheduleToday=C.moduleState({status:todayData.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有班表 sread','patrol.html'),data:todayData});
+      }
+      populateScheduleStores(scheduleViewData.stores.map(row=>row.store));
+    } else { scheduleRaw=null; scheduleViewData=null; contract.scheduleToday=statusModule('scheduleToday','error',null,results[0].reason.message); }
     if (results[1].status==='fulfilled') {
       patrolRaw=results[1].value; const data=adaptPatrol(patrolRaw);
       contract.patrolOverview=C.moduleState({status:data.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data});
@@ -531,7 +541,7 @@
 
   function shiftDate(days) {
     const input=dom('#scheduleDate'); const date=new Date(`${input.value||taipeiDate()}T00:00:00+08:00`); date.setDate(date.getDate()+days); input.value=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
-    if (scheduleRaw && scheduleRaw.month===input.value.slice(0,7)) { contract.scheduleToday.data=adaptSchedule(scheduleRaw,input.value); renderSchedule(); renderScheduleHome(); }
+    if (scheduleRaw && scheduleRaw.month===input.value.slice(0,7)) { scheduleViewData=adaptSchedule(scheduleRaw,input.value); renderSchedule(); }
     else if (patrolToken) loadPatrolData();
   }
 
@@ -542,13 +552,14 @@
   all('[data-report-segment]').forEach(button=>button.addEventListener('click',()=>{ reportSegment=Number(button.dataset.reportSegment); all('[data-report-segment]').forEach(item=>item.classList.toggle('active',item===button)); renderReport(); }));
   dom('#privateAccessForm').addEventListener('submit',async event=>{ event.preventDefault(); const button=event.currentTarget.querySelector('button'); button.disabled=true; setMessage('#privateAccessMessage','正在以既有 Approved Device 讀取正式摘要…'); try { await loadFormalSummary(dom('#employeeId').value); } catch(error) { setMessage('#privateAccessMessage',error.message,'error'); } finally { button.disabled=false; } });
   dom('#patrolAccessForm').addEventListener('submit',async event=>{ event.preventDefault(); const button=event.currentTarget.querySelector('button'); button.disabled=true; try { await unlockPatrol(dom('#patrolPasscode').value); dom('#patrolPasscode').value=''; } catch(error) { setMessage('#patrolAccessMessage',error.message,'error'); } finally { button.disabled=false; } });
-  dom('#patrolLogout').addEventListener('click',()=>{ const token=patrolToken; patrolToken=''; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true; contract.scheduleToday=statusModule('scheduleToday'); contract.patrolToday=statusModule('patrolToday'); contract.patrolOverview=statusModule('patrolOverview'); renderAll(); if(token) postPatrolAuth({action:'ptlogout',token}).catch(()=>{}); });
+  dom('#patrolLogout').addEventListener('click',()=>{ const token=patrolToken; patrolToken=''; scheduleRaw=null; scheduleViewData=null; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true; contract.scheduleToday=statusModule('scheduleToday'); contract.patrolToday=statusModule('patrolToday'); contract.patrolOverview=statusModule('patrolOverview'); renderAll(); if(token) postPatrolAuth({action:'ptlogout',token}).catch(()=>{}); });
   all('[data-date-step]').forEach(button=>button.addEventListener('click',()=>shiftDate(Number(button.dataset.dateStep))));
   dom('[data-date-today]').addEventListener('click',()=>{ dom('#scheduleDate').value=taipeiDate(); if(patrolToken)loadPatrolData(); else renderSchedule(); });
   dom('#scheduleDate').addEventListener('change',()=>patrolToken?loadPatrolData():renderSchedule());
   dom('#scheduleStoreFilter').addEventListener('change',renderSchedule);
   all('[data-refresh]').forEach(button=>button.addEventListener('click',()=>{ if(PREVIEW_MODE)renderAll(); else { const id=scope.sessionStorage.getItem(EMPLOYEE_KEY); if(id)loadFormalSummary(id).catch(error=>setMessage('#privateAccessMessage',error.message,'error')); if(patrolToken)loadPatrolData(); } }));
   document.addEventListener('click',event=>{
+    const scheduleButton=event.target.closest('[data-toggle-home-schedule]'); if(scheduleButton){ const card=scheduleButton.closest('#scheduleHome'); const expanded=card.classList.toggle('expanded'); scheduleButton.setAttribute('aria-expanded',String(expanded)); scheduleButton.querySelector('span').textContent=expanded?'收合當日班表':'顯示九店當日班表'; return; }
     const operationButton=event.target.closest('[data-toggle-operation]'); if(operationButton){ const item=operationButton.closest('.operation-item'); item.classList.toggle('expanded'); operationButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
     const reportButton=event.target.closest('[data-open-report]'); if(reportButton){ reportSegment=Number(reportButton.dataset.openReport); all('[data-report-segment]').forEach(button=>button.classList.toggle('active',Number(button.dataset.reportSegment)===reportSegment)); setView('report'); renderReport(); return; }
     const awardLink=event.target.closest('[data-open-awards]'); if(awardLink){ event.preventDefault(); battleKind='award'; battleScope='region'; all('[data-battle-kind]').forEach(button=>button.classList.toggle('active',button.dataset.battleKind==='award')); all('[data-battle-scope]').forEach(button=>button.classList.toggle('active',button.dataset.battleScope==='region')); setView('battle'); renderBattle(); return; }
@@ -559,6 +570,7 @@
 
   dom('#scheduleDate').value=taipeiDate();
   if (PREVIEW_MODE) {
+    scheduleViewData=contract.scheduleToday.data;
     populateScheduleStores((contract.scheduleToday.data.stores||[]).map(row=>row.store));
     dom('#employeeId').disabled=true; dom('#privateAccessForm button').disabled=true; dom('#patrolPasscode').disabled=true; dom('#patrolAccessForm button').disabled=true;
     setMessage('#privateAccessMessage','Preview 僅顯示展示資料，不呼叫正式端點。'); setMessage('#patrolAccessMessage','Preview 不建立正式 session。'); dom('#viewerState').textContent='Preview';

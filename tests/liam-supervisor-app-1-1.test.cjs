@@ -40,6 +40,8 @@ test('Preview contract is visibly synthetic and contains the complete mobile sum
   assert.equal(data.awardTop2Models.data.length, 2);
   assert.equal(data.report1600.data.totalStores, 9);
   assert.equal(data.report2100.data.totalStores, 9);
+  assert.equal(data.scheduleToday.data.stores.length, 9);
+  assert.equal(data.scheduleToday.data.date, '2026-08-10');
   assert.equal(data.patrolOverview.data.total, 9);
 });
 
@@ -72,7 +74,7 @@ test('Information architecture matches the App 1.1 acceptance surfaces', () => {
 
 test('PWA cache is versioned for App 1.1 and includes local icon library', () => {
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-1-v3/);
+  assert.match(worker, /liam-supervisor-app-1-1-v4/);
   assert.match(worker, /app-data-contract\.js/);
   assert.match(worker, /app-preview-data\.js/);
   assert.match(worker, /app-assets\/lucide\.min\.js/);

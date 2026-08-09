@@ -123,7 +123,19 @@ svg { width:1.1em; height:1.1em; fill:none; stroke:currentColor; stroke-width:1.
 .home-top-models { display:grid; gap:5px; margin:7px 13px 0; padding-top:8px; border-top:1px solid var(--line-soft); }
 .home-top-model { display:grid; grid-template-columns:1fr .8fr 1fr; gap:6px; align-items:center; min-height:25px; color:var(--muted); font-size:9px; }.home-top-model b { color:var(--text); }.home-top-model span:nth-child(2) { color:var(--gold); text-align:center; }.home-top-model span:last-child { text-align:right; }
 
-.compact-section { display:flex; align-items:center; gap:10px; min-height:68px; padding:11px 13px; }
+.compact-section { min-height:68px; padding:11px 13px; }
+.home-schedule-head { display:flex; align-items:center; gap:10px; }
+.home-schedule-list { display:grid; margin-top:9px; border-top:1px solid var(--line-soft); }
+.home-schedule-row { display:grid; grid-template-columns:1fr 64px 58px; align-items:center; gap:6px; min-height:37px; border-bottom:1px solid var(--line-soft); font-size:10px; }
+.home-schedule-row:nth-child(n+4) { display:none; }
+.compact-section.expanded .home-schedule-row:nth-child(n) { display:grid; }
+.home-schedule-row > span:first-child { min-width:0; }
+.home-schedule-row b,.home-schedule-row small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.home-schedule-row small { margin-top:2px; color:var(--muted); font-size:8px; font-weight:500; }
+.home-schedule-row > span:nth-child(n+2) { color:var(--muted); text-align:right; }
+.home-schedule-toggle { display:flex; align-items:center; justify-content:center; gap:5px; width:100%; min-height:36px; padding:0; border:0; color:var(--cyan); background:transparent; font-size:10px; font-weight:800; }
+.home-schedule-toggle svg { transition:transform .18s ease; }
+.compact-section.expanded .home-schedule-toggle svg { transform:rotate(180deg); }
 .compact-icon { display:grid; place-items:center; flex:0 0 32px; width:32px; height:32px; border-radius:10px; color:var(--cyan); background:#0b2e4b; }
 .compact-copy { min-width:0; flex:1; }.compact-copy h2 { margin:0 0 4px; font-size:14px; }.compact-copy p { margin:0; overflow:hidden; color:var(--muted); font-size:11px; line-height:1.35; text-overflow:ellipsis; white-space:nowrap; }
 .compact-next { min-width:92px; text-align:right; }.compact-next b,.compact-next small { display:block; }.compact-next b { font-size:11px; }.compact-next small { margin-top:3px; color:var(--muted); font-size:9px; }
