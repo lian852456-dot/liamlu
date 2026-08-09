@@ -66,7 +66,13 @@
   const scheduleRows = [
     { store:'永吉', working:3, off:1, staff:[{name:'陳＊安',role:'店長',status:'早班',working:true},{name:'林＊恩',role:'業代',status:'晚班',working:true},{name:'王＊庭',role:'副店',status:'休假',working:false}] },
     { store:'大稻埕', working:4, off:0, staff:[{name:'吳＊哲',role:'店長',status:'早班',working:true},{name:'李＊真',role:'業代',status:'晚班',working:true}] },
-    { store:'通化', working:3, off:1, staff:[{name:'張＊維',role:'副店',status:'早班',working:true},{name:'黃＊鈞',role:'業代',status:'休假',working:false}] }
+    { store:'通化', working:3, off:1, staff:[{name:'張＊維',role:'副店',status:'早班',working:true},{name:'黃＊鈞',role:'業代',status:'休假',working:false}] },
+    { store:'台北三創', working:4, off:1, staff:[{name:'周＊宇',role:'店長',status:'早班',working:true},{name:'劉＊晴',role:'業代',status:'晚班',working:true},{name:'鄭＊翔',role:'業代',status:'休假',working:false}] },
+    { store:'酒泉', working:3, off:1, staff:[{name:'許＊文',role:'店長',status:'早班',working:true},{name:'蔡＊軒',role:'業代',status:'休假',working:false}] },
+    { store:'萬大', working:4, off:0, staff:[{name:'郭＊如',role:'店長',status:'早班',working:true},{name:'楊＊仁',role:'業代',status:'晚班',working:true}] },
+    { store:'杭州南', working:3, off:1, staff:[{name:'何＊偉',role:'副店',status:'早班',working:true},{name:'宋＊潔',role:'業代',status:'休假',working:false}] },
+    { store:'復興南', working:4, off:1, staff:[{name:'謝＊婷',role:'店長',status:'早班',working:true},{name:'高＊皓',role:'業代',status:'晚班',working:true},{name:'潘＊瑜',role:'業代',status:'休假',working:false}] },
+    { store:'六張犁', working:3, off:1, staff:[{name:'游＊凱',role:'店長',status:'早班',working:true},{name:'簡＊慈',role:'業代',status:'休假',working:false}] }
   ];
   const patrolStores = ['永吉','大稻埕','通化','台北三創','酒泉','萬大','杭州南','復興南','六張犁'].map((name,index) => ({
     name, lastVisit:`2026-08-${String(9-index).padStart(2,'0')}`, daysSince:index+1,
