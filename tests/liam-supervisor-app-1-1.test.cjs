@@ -15,12 +15,12 @@ function loadPreviewContract() {
   return { api:context.globalThis.LiamSupervisorContract, data:context.globalThis.LiamSupervisorPreviewData };
 }
 
-test('App 1.1 fixed contract contains all 12 requested modules and metadata', () => {
+test('App 1.1 fixed contract contains all 15 frozen modules and metadata', () => {
   const { api, data } = loadPreviewContract();
   assert.equal(api.validateContract(data), data);
   assert.deepEqual([...api.MODULE_KEYS], [
-    'todayOperations','kpiSummary','kpiStores','awardSummary','awardStores','awardTop2Models',
-    'report1600','report2100','reportFailures','scheduleToday','patrolToday','patrolOverview'
+    'todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models',
+    'report1600','report2100','reportFailures','scheduleToday','scheduleByDate','patrolToday','patrolOverview','patrolStores'
   ]);
   for (const key of api.MODULE_KEYS) {
     const module = data[key];
@@ -30,6 +30,7 @@ test('App 1.1 fixed contract contains all 12 requested modules and metadata', ()
     assert.equal(typeof module.stale, 'boolean');
     assert.ok(module.source.label);
     assert.ok(module.source.href);
+    assert.equal(module.sourceLink, module.source.href);
   }
 });
 
@@ -45,6 +46,10 @@ test('Preview contract is visibly synthetic and contains the complete mobile sum
   assert.equal(data.patrolOverview.data.total, 9);
   assert.equal(data.kpiSummary.data.fullKpis.length, 25);
   assert.equal(data.kpiStores.data.every(store => store.fullKpis.length === 25), true);
+  assert.equal(data.kpiFullMetrics.data.region.length, 25);
+  assert.equal(Object.keys(data.kpiFullMetrics.data.stores).length, 9);
+  assert.equal(data.scheduleByDate.data.selectedDate, '2026-08-10');
+  assert.equal(data.patrolStores.data.length, 9);
   assert.equal(data.patrolOverview.data.statisticsPeriod, '2026-08-01～2026-08-31（Preview）');
   assert.equal(data.patrolOverview.data.periodVerified, true);
 });
@@ -85,7 +90,7 @@ test('Information architecture matches the App 1.1 acceptance surfaces', () => {
 
 test('PWA cache is versioned for App 1.1 and includes local icon library', () => {
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-1-v6/);
+  assert.match(worker, /liam-supervisor-app-1-1-realdata-v1/);
   assert.match(worker, /app-data-contract\.js/);
   assert.match(worker, /app-preview-data\.js/);
   assert.match(worker, /app-assets\/lucide\.min\.js/);

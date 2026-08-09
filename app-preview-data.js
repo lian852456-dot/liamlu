@@ -104,6 +104,7 @@
     todayOperations:state({ date:'2026-08-10', segments:[report1600,report2100] },'北一二B每日回報','index.html','2026-08-10T21:33:00+08:00'),
     kpiSummary:state({ kpi:1.131, companyRank:29, companyRankTotal:578, kpiDod:.028, rankChange:1, addonScore:12.98, reportDate:'2026-08-10', fullKpis:previewFullKpis(1.131) },'正式 KPI 私有戰情','index.html'),
     kpiStores:state(stores,'正式 KPI 私有戰情','index.html'),
+    kpiFullMetrics:state({ region:previewFullKpis(1.131), stores:Object.fromEntries(stores.map(store=>[store.name,store.fullKpis])) },'正式 KPI kpicalc','kpi.html'),
     awardSummary:state({ totalAmount:12980, winningStores:3, totalStores:9, reportDate:'2026-08-10' },'正式台獎私有戰情','index.html'),
     awardStores:state([
       {name:'永吉',amount:5000,eligible:true,models:['A1399','R1399']},{name:'大稻埕',amount:3000,eligible:true,models:['好速']},{name:'通化',amount:2000,eligible:true,models:['R999']},
@@ -114,8 +115,10 @@
     report2100:state(report2100,'北一二B每日回報','index.html','2026-08-10T21:33:00+08:00'),
     reportFailures:state({ 16:failureData(report1600),21:failureData(report2100) },'正式個人回報','index.html','2026-08-10T21:33:00+08:00'),
     scheduleToday:state({ date:'2026-08-10',stores:scheduleRows },'既有班表 sread','patrol.html','2026-08-10T08:10:00+08:00'),
+    scheduleByDate:state({ selectedDate:'2026-08-10', availableMonth:'2026-08', stores:scheduleRows },'既有班表 sread','patrol.html','2026-08-10T08:10:00+08:00'),
     patrolToday:state({ date:'2026-08-10',route:['永吉','大稻埕','通化'],completed:1,total:3,nextStop:'大稻埕',nextEta:'14:20',travel:[{from:'永吉',to:'大稻埕',minutes:24},{from:'大稻埕',to:'通化',minutes:31}] },'巡店唯讀路線 Preview','patrol.html','2026-08-10T08:00:00+08:00'),
-    patrolOverview:state({ visited:6,total:9,expected:9,remaining:3,completionRate:6/9,unvisited:['杭州南','復興南','六張犁'],attention:['復興南','六張犁'],attentionCount:2,statisticsPeriod:'2026-08-01～2026-08-31（Preview）',periodVerified:true,stores:patrolStores,recent:[{store:'永吉',date:'2026-08-09',result:'完成'},{store:'大稻埕',date:'2026-08-08',result:'完成'},{store:'復興南',date:'2026-08-03',result:'待追蹤：陳列缺失'}] },'既有巡店 ptread','patrol.html','2026-08-10T08:00:00+08:00')
+    patrolOverview:state({ visited:6,total:9,expected:9,remaining:3,completionRate:6/9,unvisited:['杭州南','復興南','六張犁'],attention:['復興南','六張犁'],attentionCount:2,statisticsPeriod:'2026-08-01～2026-08-31（Preview）',periodVerified:true,stores:patrolStores,recent:[{store:'永吉',date:'2026-08-09',result:'完成'},{store:'大稻埕',date:'2026-08-08',result:'完成'},{store:'復興南',date:'2026-08-03',result:'待追蹤：陳列缺失'}] },'既有巡店 ptread','patrol.html','2026-08-10T08:00:00+08:00'),
+    patrolStores:state(patrolStores,'既有巡店 ptread','patrol.html','2026-08-10T08:00:00+08:00')
   };
 
   scope.LiamSupervisorPreviewData = C.validateContract(contract);

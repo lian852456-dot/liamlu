@@ -3,9 +3,9 @@
 
   const VERSION = 'liam-supervisor-app-1.1-contract-v1';
   const MODULE_KEYS = [
-    'todayOperations', 'kpiSummary', 'kpiStores', 'awardSummary', 'awardStores',
+    'todayOperations', 'kpiSummary', 'kpiStores', 'kpiFullMetrics', 'awardSummary', 'awardStores',
     'awardTop2Models', 'report1600', 'report2100', 'reportFailures',
-    'scheduleToday', 'patrolToday', 'patrolOverview'
+    'scheduleToday', 'scheduleByDate', 'patrolToday', 'patrolOverview', 'patrolStores'
   ];
   const STATUSES = new Set(['ok', 'partial', 'no_data', 'unauthorized', 'stale', 'error']);
 
@@ -26,6 +26,7 @@
     assert(typeof module.sourceUpdatedAt === 'string', `${key}.sourceUpdatedAt must be a string`);
     assert(typeof module.stale === 'boolean', `${key}.stale must be a boolean`);
     validateSource(module.source, key);
+    assert(typeof module.sourceLink === 'string' && module.sourceLink.trim(), `${key}.sourceLink is required`);
     assert(Object.prototype.hasOwnProperty.call(module, 'data'), `${key}.data is required`);
     return module;
   }
@@ -39,8 +40,8 @@
     return contract;
   }
 
-  function moduleState({ status = 'no_data', updatedAt = '', sourceUpdatedAt = '', stale = false, source, data = null, note = '' }) {
-    return { status, updatedAt, sourceUpdatedAt, stale, source, data, note };
+  function moduleState({ status = 'no_data', updatedAt = '', sourceUpdatedAt = '', stale = false, source, sourceLink = '', data = null, note = '' }) {
+    return { status, updatedAt, sourceUpdatedAt, stale, source, sourceLink:sourceLink || (source && source.href) || '', data, note };
   }
 
   const api = { VERSION, MODULE_KEYS, STATUSES, validateContract, validateModule, moduleState };

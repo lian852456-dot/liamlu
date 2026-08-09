@@ -17,6 +17,8 @@ App 1.1 以固定 contract 隔離正式來源與手機畫面。所有模組都�
 - `data`：模組資料；無資料時仍保留欄位並使用 `null`
 - `note`：選填，說明 partial、no_data 或來源限制
 
+> 本文件為 App 1.1 設計期說明；Native 1.0 使用的 frozen contract 以 `LIAM_SUPERVISOR_APP_DATA_CONTRACT_V1.md` 為準。
+
 ## 固定模組
 
 | 模組 | 主要資料 | 目前來源／adapter |
