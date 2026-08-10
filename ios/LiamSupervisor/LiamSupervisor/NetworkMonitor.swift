@@ -1,4 +1,5 @@
 import Network
+import Combine
 
 @MainActor
 final class NetworkMonitor: ObservableObject {
