@@ -3,135 +3,128 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#091321">
+  <meta name="theme-color" content="#07182a">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Liam Supervisor">
+  <meta name="robots" content="noindex,nofollow,noarchive">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
-  <link rel="stylesheet" href="app.css">
-  <title>Liam Supervisor Pilot 1.0</title>
+  <link rel="stylesheet" href="app.css?v=6">
+  <title>Liam Supervisor App 1.1</title>
 </head>
 <body>
   <div class="app-shell">
     <header class="app-header">
       <a class="brand" href="#home" data-nav="home" aria-label="Liam Supervisor 首頁">
         <span class="brand-mark">L</span>
-        <span><small>LIAM SUPERVISOR</small><strong>Pilot <em>1.0</em></strong></span>
+        <span><strong>Liam Supervisor App 1.1</strong><small><span id="appDate">—</span><i>·</i><span id="appUpdatedAt">尚未更新</span></small></span>
       </a>
-      <span id="connectionStatus" class="connection-pill" role="status"></span>
+      <div class="header-actions"><span id="dataMode" class="mode-pill" role="status">讀取中</span><button class="profile-entry" type="button" data-nav="me" data-profile-entry aria-label="開啟個人與系統設定"><i data-lucide="user-round-cog"></i></button></div>
     </header>
+
+    <aside id="previewBanner" class="preview-banner" hidden><i data-lucide="flask-conical"></i><span><strong>Preview／示意資料</strong><small>僅供 App 1.1 資訊架構與 UI 驗收，非正式營運數據</small></span></aside>
 
     <main class="app-main">
       <section data-view="home" aria-label="首頁">
-        <div class="page-heading">
-          <p class="eyebrow">FINISH · VERIFY · SHIP</p>
-          <h1>今晚開始，直接拿手機工作</h1>
-          <p id="todayLabel">Liam Supervisor Pilot 1.0</p>
+        <div class="view-heading compact-heading">
+          <div><p>北一二B</p><h1>今日營運戰況</h1></div>
+          <button class="icon-button" type="button" data-refresh aria-label="重新整理"><i data-lucide="refresh-cw"></i></button>
         </div>
 
-        <section class="hero-card" aria-labelledby="operationsTitle">
-          <div>
-            <p>1 · 今日營運狀態</p>
-            <h2 id="operationsTitle">正式工具已集中；敏感資料仍由原系統保護</h2>
-            <div class="hero-status-row">
-              <span class="status-tag success">Liam 專用</span>
-              <span id="patrolSessionStatus" class="status-tag neutral">班表／巡店尚未解鎖</span>
-            </div>
+        <section id="operationsCard" class="panel operations-panel" aria-labelledby="operationsTitle">
+          <h2 id="operationsTitle" class="sr-only">16:00 與 21:00 回報狀態</h2>
+          <div id="operationsRows" class="operations-rows"></div>
+        </section>
+
+        <section id="kpiHero" class="panel kpi-hero" aria-label="北一二B KPI 摘要"></section>
+
+        <section class="panel store-board" aria-labelledby="storeBoardTitle">
+          <div class="panel-head">
+            <div><h2 id="storeBoardTitle">九店一覽</h2><small>依 KPI 排序</small></div>
+            <span id="kpiStoreUpdated">—</span>
           </div>
-          <a class="round-action" href="index.html" aria-label="開啟正式營運頁">→</a>
+          <div class="store-table-head" aria-hidden="true"><span>店名</span><span>KPI %</span><span>公司排名</span><span>KPI DOD</span><span>排名變化</span><span>加減分</span></div>
+          <div id="homeStoreList" class="store-list"></div>
         </section>
 
-        <section id="secureReadGate" class="secure-gate" aria-labelledby="secureGateTitle">
-          <div>
-            <span class="eyebrow">EXISTING SECURE SESSION</span>
-            <h2 id="secureGateTitle">解鎖今日班表與巡店摘要</h2>
-            <p>沿用 Liam 情報站既有通行碼與 30 分鐘短效 session；通行碼不保存，App 只讀取 <code>sread</code>／<code>ptread</code>。</p>
-          </div>
-          <form id="patrolAuthForm" class="secure-form">
-            <label for="patrolPasscode">督導通行碼</label>
-            <div><input id="patrolPasscode" type="password" autocomplete="current-password" placeholder="輸入既有通行碼" required><button type="submit">解鎖</button></div>
-          </form>
-          <p id="secureGateMessage" class="secure-message" role="status">未驗證前不讀取班表、人名或巡店紀錄。</p>
-        </section>
+        <section id="awardHome" class="panel award-panel" aria-labelledby="awardHomeTitle"><h2 id="awardHomeTitle" class="sr-only">台獎總覽</h2></section>
 
-        <section class="pilot-module" aria-labelledby="kpiTitle">
-          <div class="module-index cyan">2</div>
-          <div><h2 id="kpiTitle">KPI</h2><p>正式 KPI、店績與個績；沿用既有 approved-device 登入與同次來源門檻。</p></div>
-          <a href="index.html" class="module-action">開啟正式 KPI →</a>
-        </section>
-
-        <section class="pilot-module" aria-labelledby="awardsTitle">
-          <div class="module-index gold">3</div>
-          <div><h2 id="awardsTitle">台獎</h2><p>正式台獎戰情與 13 款機型；不複製、不快取獎金資料。</p></div>
-          <a href="index.html" class="module-action">開啟正式台獎 →</a>
-        </section>
-
-        <section class="pilot-module" aria-labelledby="reportTitle">
-          <div class="module-index green">4</div>
-          <div><h2 id="reportTitle">16:00／21:00 回報</h2><p>沿用正式每日回報的兩個時段、欄位、通知與寫入流程。</p></div>
-          <a href="index.html" class="module-action">開啟今日回報 →</a>
-        </section>
-
-        <section class="section-block live-section" aria-labelledby="homeScheduleTitle">
-          <div class="section-heading"><div><span class="section-number">5</span><h2 id="homeScheduleTitle">今日班表</h2></div><span id="scheduleUpdatedAt">尚未讀取</span></div>
-          <div class="date-switcher" aria-label="班表日期切換">
-            <button type="button" data-date-step="-1">前一天</button>
-            <button type="button" data-date-today>今天</button>
-            <button type="button" data-date-step="1">後一天</button>
-          </div>
-          <div class="filter-row"><label>日期<input id="scheduleDate" type="date"></label><label>店點<select id="scheduleStoreFilter"><option value="">九店全部</option></select></label></div>
-          <div id="scheduleSummary" class="protected-placeholder">解鎖後顯示九店人員、班別與上班／休假狀態。</div>
-          <a class="inline-route" href="patrol.html">前往完整班表 →</a>
-        </section>
-
-        <section class="section-block live-section" aria-labelledby="homePatrolTitle">
-          <div class="section-heading"><div><span class="section-number">6</span><h2 id="homePatrolTitle">巡店提醒</h2></div><span id="patrolUpdatedAt">尚未讀取</span></div>
-          <div class="filter-row single"><label>店點<select id="patrolStoreFilter"><option value="">九店全部</option></select></label></div>
-          <div id="patrolSummary" class="protected-placeholder">解鎖後顯示最近巡店日期與待追蹤／異常摘要。</div>
-          <div class="entry-actions"><a href="patrol.html">完整巡店看板</a><a href="patrol.html">巡店操作頁</a></div>
-        </section>
+        <section id="scheduleHome" class="panel compact-section" aria-labelledby="scheduleHomeTitle"></section>
+        <section id="patrolHome" class="panel compact-section" aria-labelledby="patrolHomeTitle"></section>
       </section>
 
       <section data-view="battle" hidden aria-label="戰情">
-        <div class="page-heading"><p class="eyebrow">REAL DATA</p><h1>戰情</h1><p>正式 KPI 與台獎維持既有 approved-device 授權，不在公開 PWA 複製資料。</p></div>
-        <div class="route-stack">
-          <a class="route-card" href="index.html"><span class="icon-tile cyan">◈</span><span><b>KPI 戰情</b><small>正式 kpicalc ＋同次私有快照</small></span><i>↗</i></a>
-          <a class="route-card" href="index.html"><span class="icon-tile gold">✦</span><span><b>台獎戰情</b><small>正式日期與 13 款台獎來源</small></span><i>↗</i></a>
-        </div>
+        <div class="view-heading"><div><p>READ-ONLY SUMMARY</p><h1>戰情</h1></div><a class="icon-button" href="index.html" aria-label="開啟正式戰情網站"><i data-lucide="external-link"></i></a></div>
+        <div class="segment-control" role="tablist" aria-label="戰情類型"><button class="active" data-battle-kind="kpi" type="button">KPI</button><button data-battle-kind="award" type="button">台獎</button></div>
+        <div class="scope-control" role="tablist" aria-label="戰情範圍"><button class="active" data-battle-scope="region" type="button">北一二B</button><button data-battle-scope="store" type="button">店點</button></div>
+        <label id="battleStorePicker" class="select-field" hidden><span>選擇店點</span><select id="battleStoreSelect"></select></label>
+        <div id="battleContent"></div>
       </section>
 
       <section data-view="report" hidden aria-label="回報">
-        <div class="page-heading"><p class="eyebrow">DAILY REPORT</p><h1>回報</h1><p>只導向既有正式表單，不在 Pilot 建立第二套寫入。</p></div>
-        <div class="timeline-card"><span>16:00</span><div><b>第一時段回報</b><small>正式欄位與通知流程</small></div><a href="index.html">開啟 →</a></div>
-        <div class="timeline-card"><span>21:00</span><div><b>第二時段回報</b><small>同一正式資料流</small></div><a href="index.html">開啟 →</a></div>
+        <div class="view-heading"><div><p>DAILY OPERATIONS</p><h1>每日回報</h1></div><a class="icon-button" href="index.html" aria-label="開啟完整每日回報系統"><i data-lucide="external-link"></i></a></div>
+        <div class="segment-control report-segment" role="tablist" aria-label="回報時段"><button class="active" data-report-segment="16" type="button">16:00</button><button data-report-segment="21" type="button">21:00</button></div>
+        <div id="reportOverview"></div>
+        <section class="panel report-failure-panel"><div class="panel-head"><div><h2>全區未過關彙整</h2><small>沿用正式回報結果，不在 App 推算</small></div></div><div id="reportFailures"></div></section>
+        <section class="panel report-store-panel"><div class="panel-head"><div><h2>九店回報</h2><small>點店展開個人內容</small></div></div><div id="reportStoreList"></div></section>
+        <a class="source-button" href="index.html">開啟完整每日回報系統 <i data-lucide="external-link"></i></a>
+      </section>
+
+      <section data-view="schedule" hidden aria-label="班表">
+        <div class="view-heading"><div><p>DAILY SCHEDULE</p><h1>班表</h1></div><a class="icon-button" href="patrol.html" aria-label="開啟完整班表"><i data-lucide="external-link"></i></a></div>
+        <section class="panel schedule-panel" aria-labelledby="scheduleTitle">
+          <div class="panel-head"><div><h2 id="scheduleTitle">九店完整班表</h2><small id="scheduleSourceTime">尚未讀取</small></div></div>
+          <div class="date-control"><button type="button" data-date-step="-1">前一天</button><button type="button" data-date-today>今天</button><button type="button" data-date-step="1">後一天</button></div>
+          <div class="schedule-filters"><label>日期<input id="scheduleDate" type="date"></label><label>店點<select id="scheduleStoreFilter"><option value="">九店全部</option></select></label></div>
+          <div id="scheduleList" class="locked-state">請從右上角個人／設定入口解鎖，之後顯示九店人員、班別與上班／休假狀態。</div>
+          <a class="inline-link" href="patrol.html">前往完整班表 <i data-lucide="external-link"></i></a>
+        </section>
       </section>
 
       <section data-view="patrol" hidden aria-label="巡店">
-        <div class="page-heading"><p class="eyebrow">READ ONLY</p><h1>巡店</h1><p>App 只讀既有 <code>ptread</code>；巡店新增與修改仍回原系統。</p></div>
-        <div id="patrolDetail" class="protected-placeholder">請先回首頁解鎖既有 Liam 情報站 session。</div>
-        <div class="entry-actions stacked"><a href="patrol.html">前往完整巡店看板</a><a href="patrol.html">前往既有巡店操作頁</a></div>
+        <div class="view-heading"><div><p>PATROL OVERVIEW</p><h1>巡店大盤</h1></div><a class="icon-button" href="patrol.html" aria-label="開啟完整巡店系統"><i data-lucide="external-link"></i></a></div>
+        <div id="patrolOverview"></div>
+        <div id="patrolTodayDetail"></div>
+        <section class="panel"><div class="panel-head"><div><h2>店點狀況</h2><small>最近巡店與待追蹤</small></div></div><div id="patrolStoreList"></div></section>
+        <section class="panel"><div class="panel-head"><div><h2>最近巡店紀錄</h2><small>正式 ptread</small></div></div><div id="patrolRecentList"></div></section>
+        <div class="source-actions"><a href="patrol.html">完整巡店看板 <i data-lucide="external-link"></i></a><a href="patrol.html">巡店操作頁 <i data-lucide="external-link"></i></a></div>
       </section>
 
       <section data-view="me" hidden aria-label="我的">
-        <div class="page-heading"><p class="eyebrow">LIAM ONLY</p><h1>我的</h1><p>帳號、approved device 與 session 仍由各正式系統管理。</p></div>
-        <article class="profile-card"><span class="avatar">L</span><div><b>Liam Supervisor Pilot 1.0</b><small>單人、正式、唯讀整合</small></div><span class="status-tag success">Pilot</span></article>
-        <a class="command-card" href="#home" data-nav="home"><span class="icon-tile gold">▦</span><span><b>今日班表</b><small>回首頁直接查看九店人員與班別</small></span><i>→</i></a>
-        <a class="command-card" href="index.html"><span class="icon-tile cyan">✓</span><span><b>Liam Login／Approved Device</b><small>前往正式 KPI／台獎頁確認裝置狀態</small></span><i>↗</i></a>
-        <button id="patrolLogout" class="secondary-action" type="button" hidden>登出班表／巡店短效 session</button>
+        <div class="view-heading"><div><p>LIAM ONLY</p><h1>個人與系統設定</h1></div><button class="icon-button" type="button" data-nav="home" aria-label="返回首頁"><i data-lucide="arrow-left"></i></button></div>
+        <article class="profile-card"><span class="profile-mark">L</span><div><strong>Liam Supervisor</strong><small>App 1.1 · 行動戰情資訊重構</small></div><span id="viewerState" class="status-chip">未登入</span></article>
+
+        <section class="panel access-panel" aria-labelledby="battleAccessTitle">
+          <div class="panel-head"><div><h2 id="battleAccessTitle">KPI／台獎／回報</h2><small>沿用既有員編＋Approved Device</small></div></div>
+          <form id="privateAccessForm" class="access-form"><label>員工編號<input id="employeeId" autocomplete="username" inputmode="text" placeholder="輸入既有員編" required></label><button type="submit">讀取正式摘要</button></form>
+          <p id="privateAccessMessage" class="form-message">App 僅送出既有唯讀 action；不建立新登入架構。</p>
+        </section>
+
+        <section class="panel access-panel" aria-labelledby="patrolAccessTitle">
+          <div class="panel-head"><div><h2 id="patrolAccessTitle">班表／巡店</h2><small>沿用既有 30 分鐘短效 session</small></div></div>
+          <form id="patrolAccessForm" class="access-form"><label>督導通行碼<input id="patrolPasscode" type="password" autocomplete="current-password" placeholder="輸入既有通行碼" required></label><button type="submit">解鎖唯讀資料</button></form>
+          <p id="patrolAccessMessage" class="form-message">未驗證前不讀取班表、人名或巡店紀錄。</p>
+          <button id="patrolLogout" class="text-button danger-text" type="button" hidden>登出班表／巡店 session</button>
+        </section>
+
+        <section class="panel system-panel" aria-labelledby="systemTitle"><div class="panel-head"><div><h2 id="systemTitle">系統狀態</h2><small>工程與安全資訊集中於此</small></div></div><div id="systemStatus"></div></section>
       </section>
     </main>
 
     <nav class="bottom-nav" aria-label="主要導覽">
-      <button data-nav="home" class="active" aria-current="page"><span>⌂</span>首頁</button>
-      <button data-nav="battle"><span>◈</span>戰情</button>
-      <button data-nav="report"><span>↗</span>回報</button>
-      <button data-nav="patrol"><span>⌁</span>巡店</button>
-      <button data-nav="me"><span>◌</span>我的</button>
+      <button data-nav="home" class="active" aria-current="page"><i data-lucide="house"></i><span>首頁</span></button>
+      <button data-nav="battle"><i data-lucide="chart-no-axes-combined"></i><span>戰情</span></button>
+      <button data-nav="report"><i data-lucide="send"></i><span>回報</span></button>
+      <button data-nav="schedule"><i data-lucide="calendar-days"></i><span>班表</span></button>
+      <button data-nav="patrol"><i data-lucide="route"></i><span>巡店</span></button>
     </nav>
   </div>
-  <script src="app.js" defer></script>
+  <script src="app-assets/lucide.min.js"></script>
+  <script src="app-data-contract.js?v=6"></script>
+  <script src="app-preview-data.js?v=6"></script>
+  <script src="app.js?v=6" defer></script>
 </body>
 </html>
