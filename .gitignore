@@ -1,5 +1,7 @@
 node_modules/
 test-results/
+.DS_Store
+**/xcuserdata/
 
 # Never publish employee schedules, names, inspection records, or evidence.
 private-data/
