@@ -89,8 +89,11 @@ test('Information architecture matches the App 1.1 acceptance surfaces', () => {
 });
 
 test('PWA cache is versioned for App 1.1 and includes local icon library', () => {
+  const html = read('app.html');
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-1-realdata-v1/);
+  assert.match(worker, /liam-supervisor-app-1-1-realdata-v2/);
+  assert.match(html, /app\.css\?v=7/);
+  assert.match(html, /app\.js\?v=7/);
   assert.match(worker, /app-data-contract\.js/);
   assert.match(worker, /app-preview-data\.js/);
   assert.match(worker, /app-assets\/lucide\.min\.js/);
