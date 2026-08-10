@@ -54,11 +54,12 @@ test('Preview contract is visibly synthetic and contains the complete mobile sum
   assert.equal(data.patrolOverview.data.periodVerified, true);
 });
 
-test('App runtime only calls the existing read and session actions', () => {
+test('App runtime only calls existing read, device-approval and short-session actions', () => {
   const code = read('app.js');
   assert.match(code, /new Set\(\['private_access','read','pread','kpicalc_access'\]\)/);
+  assert.match(code, /new Set\(\['private_request','private_request_status'\]\)/);
   assert.match(code, /new Set\(\['sread','ptread'\]\)/);
-  for (const blocked of ["action:'write'", "action:'pwrite'", "action:'ptwrite'", "action:'private_request'", '.appendRow(', '.setValue(', '.setValues(', '.createFile(']) {
+  for (const blocked of ["action:'write'", "action:'pwrite'", "action:'ptwrite'", '.appendRow(', '.setValue(', '.setValues(', '.createFile(']) {
     assert.ok(!code.includes(blocked), `blocked write path found: ${blocked}`);
   }
   assert.match(code, /PREVIEW_MODE/);
@@ -91,9 +92,9 @@ test('Information architecture matches the App 1.1 acceptance surfaces', () => {
 test('PWA cache is versioned for App 1.1 and includes local icon library', () => {
   const html = read('app.html');
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-1-realdata-v2/);
-  assert.match(html, /app\.css\?v=7/);
-  assert.match(html, /app\.js\?v=7/);
+  assert.match(worker, /liam-supervisor-app-1-1-realdata-v3/);
+  assert.match(html, /app\.css\?v=8/);
+  assert.match(html, /app\.js\?v=8/);
   assert.match(worker, /app-data-contract\.js/);
   assert.match(worker, /app-preview-data\.js/);
   assert.match(worker, /app-assets\/lucide\.min\.js/);
