@@ -1,7 +1,7 @@
 # Liam Supervisor App Data Contract V1
 
-狀態：Frozen for Native 1.0  
-版本：`liam-supervisor-app-1.1-contract-v1`  
+狀態：Frozen for Native 1.0
+版本：`liam-supervisor-app-1.1-contract-v1`
 資料方向：正式來源 → 唯讀 adapter → App contract → Web／Native Shell
 
 本 contract 不新增正式資料來源、不改 KPI／台獎／回報判斷，也不提供任何寫入 action。正式欄位缺少、來源日期不一致或來源未授權時一律保留 `null`、`partial`、`no_data`、`unauthorized` 或 `error`，不得套用 Preview 數字。

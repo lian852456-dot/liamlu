@@ -12,7 +12,7 @@
 
 ## Automated evidence
 
-- Node contract／mapping／security regression：118/118 PASS。
+- Node contract／mapping／security regression：121/121 PASS。
 - App 1.1 Playwright 390×844 與互動 smoke：2/2 PASS。
 - `npm audit`：0 vulnerability。
 - KPI mapping test 確認 25 項只使用正式 `reportRate`，刻意放入不合理 actual 值也不影響顯示。

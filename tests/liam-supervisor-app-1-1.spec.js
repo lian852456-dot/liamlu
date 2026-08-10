@@ -46,6 +46,8 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
 
   await page.locator('.bottom-nav [data-nav="schedule"]').click();
   await expect(page.locator('[data-view="schedule"]')).toBeVisible();
+  await page.locator('#scheduleDate').fill('2026-08-10');
+  await page.locator('#scheduleDate').dispatchEvent('change');
   await expect(page.locator('#scheduleList .schedule-store')).toHaveCount(9);
   await expect(page.locator('[data-profile-entry]')).toBeVisible();
 
