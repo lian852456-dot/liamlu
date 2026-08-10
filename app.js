@@ -30,7 +30,7 @@
 
   const dom = selector => document.querySelector(selector);
   const all = selector => [...document.querySelectorAll(selector)];
-  const moduleSource = (label, href) => ({ label, href });
+  function moduleSource(label, href) { return { label, href }; }
 
   function escapeHtml(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[char]);
