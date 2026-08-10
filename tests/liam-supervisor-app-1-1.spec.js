@@ -10,9 +10,10 @@ test('formal mode boots without Preview data or JavaScript errors', async ({ pag
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(FORMAL_FILE_URL);
-  await expect(page.locator('#dataMode')).toHaveText('正式唯讀');
+  await expect(page.locator('#dataMode')).toHaveText('解鎖正式資料');
   await expect(page.locator('#previewBanner')).toBeHidden();
   await expect(page.locator('#viewerState')).toHaveText('未登入');
+  await expect(page.locator('#kpiHero')).toContainText('解鎖正式資料');
   expect(errors).toEqual([]);
 });
 
@@ -66,4 +67,81 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
   await expect(page.locator('[data-view="patrol"]')).toBeVisible();
   await expect(page.locator('#patrolOverview')).toContainText('6/9');
   await expect(page.locator('#patrolTodayDetail')).toContainText('下一站');
+});
+
+test('formal unlock is explicit and does not load summaries before Approved Device succeeds', async ({ page }) => {
+  const actions = [];
+  await page.route('https://script.google.com/**', async route => {
+    const payload = JSON.parse(route.request().postData() || '{}');
+    actions.push(payload.action);
+    await route.fulfill({ json:{ status:'error', message:'此員編尚未核准此裝置，請先「首次申請綁定」並等待督導核准' } });
+  });
+  await page.goto(FORMAL_FILE_URL);
+  await page.locator('#dataMode').click();
+  await expect(page.locator('[data-view="me"]')).toBeVisible();
+  await page.locator('#employeeId').fill('TEST01');
+  await page.locator('#privateAccessForm').getByRole('button').click();
+  await expect(page.locator('#dataMode')).toHaveText('裝置待核准');
+  await expect(page.locator('#privateDeviceStatus')).toHaveText('此 iPhone App 裝置待核准');
+  await expect(page.locator('#privateAccessMessage')).toContainText('此 iPhone App 裝置待核准');
+  expect(actions).toEqual(['private_access']);
+  const stored = await page.evaluate(() => ({ employee:localStorage.getItem('north12b_private_dashboard_employee_id'), device:Boolean(localStorage.getItem('north12b_private_dashboard_device_id')) }));
+  expect(stored).toEqual({ employee:'TEST01', device:true });
+  await page.locator('#privateLogout').click();
+  const afterLogout = await page.evaluate(() => ({ employee:localStorage.getItem('north12b_private_dashboard_employee_id'), device:Boolean(localStorage.getItem('north12b_private_dashboard_device_id')) }));
+  expect(afterLogout).toEqual({ employee:null, device:true });
+});
+
+test('existing device request flow clears the activation code and reports pending', async ({ page }) => {
+  let submittedCode = '';
+  await page.route('https://script.google.com/**', async route => {
+    const payload = JSON.parse(route.request().postData() || '{}');
+    if (payload.action === 'private_request') {
+      submittedCode = payload.bootstrapCode;
+      await route.fulfill({ json:{ status:'ok', requestStatus:'pending' } });
+      return;
+    }
+    await route.fulfill({ json:{ status:'ok', requestStatus:'pending' } });
+  });
+  await page.goto(FORMAL_FILE_URL + '#me');
+  await page.locator('#employeeId').fill('TEST01');
+  await page.locator('#privateBindingDetails').click();
+  await page.locator('#bootstrapCode').fill('654321');
+  await page.locator('#privateBindingForm').getByRole('button').click();
+  await expect(page.locator('#bootstrapCode')).toHaveValue('');
+  await expect(page.locator('#privateDeviceStatus')).toHaveText('此 iPhone App 裝置待核准');
+  expect(submittedCode).toBe('654321');
+  const storedValues = await page.evaluate(() => {
+    const values = storage => Array.from({ length:storage.length }, (_,index) => storage.getItem(storage.key(index)));
+    return [...values(localStorage), ...values(sessionStorage)];
+  });
+  expect(storedValues).not.toContain('654321');
+});
+
+test('patrol passcode exists only during submission and only the short token persists', async ({ page }) => {
+  let submittedPasscode = '';
+  await page.route('https://script.google.com/**', async route => {
+    const request = route.request();
+    if (request.method() === 'POST') {
+      const payload = JSON.parse(request.postData() || '{}');
+      submittedPasscode = payload.key || '';
+      await route.fulfill({ json:{ status:'ok', token:'short-lived-test-token' } });
+      return;
+    }
+    const action = new URL(request.url()).searchParams.get('action');
+    await route.fulfill({ json:action === 'sread' ? { status:'ok', schedule:{ month:'2026-08', stores:[] } } : { status:'ok', records:[] } });
+  });
+  await page.goto(FORMAL_FILE_URL + '#me');
+  await page.locator('#patrolPasscode').fill('test-passcode');
+  await page.locator('#patrolAccessForm').getByRole('button').click();
+  await expect(page.locator('#patrolPasscode')).toHaveValue('');
+  await expect(page.locator('#patrolAccessMessage')).toContainText('短效 session 已驗證');
+  expect(submittedPasscode).toBe('test-passcode');
+  const storage = await page.evaluate(() => {
+    const values = target => Array.from({ length:target.length }, (_,index) => target.getItem(target.key(index)));
+    return { local:values(localStorage), session:values(sessionStorage) };
+  });
+  expect(storage.local).not.toContain('test-passcode');
+  expect(storage.session).not.toContain('test-passcode');
+  expect(storage.session).toContain('short-lived-test-token');
 });

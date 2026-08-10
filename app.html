@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
-  <link rel="stylesheet" href="app.css?v=7">
+  <link rel="stylesheet" href="app.css?v=8">
   <title>Liam Supervisor App 1.1</title>
 </head>
 <body>
@@ -22,7 +22,7 @@
         <span class="brand-mark">L</span>
         <span><strong>Liam Supervisor App 1.1</strong><small><span id="appDate">—</span><i>·</i><span id="appUpdatedAt">尚未更新</span></small></span>
       </a>
-      <div class="header-actions"><span id="dataMode" class="mode-pill" role="status">讀取中</span><button class="profile-entry" type="button" data-nav="me" data-profile-entry aria-label="開啟個人與系統設定"><i data-lucide="user-round-cog"></i></button></div>
+      <div class="header-actions"><button id="dataMode" class="mode-pill" type="button" data-nav="me" aria-label="開啟正式資料解鎖">讀取中</button><button class="profile-entry" type="button" data-nav="me" data-profile-entry aria-label="開啟個人與系統設定"><i data-lucide="user-round-cog"></i></button></div>
     </header>
 
     <aside id="previewBanner" class="preview-banner" hidden><i data-lucide="flask-conical"></i><span><strong>Preview／示意資料</strong><small>僅供 App 1.1 資訊架構與 UI 驗收，非正式營運數據</small></span></aside>
@@ -99,8 +99,11 @@
 
         <section class="panel access-panel" aria-labelledby="battleAccessTitle">
           <div class="panel-head"><div><h2 id="battleAccessTitle">KPI／台獎／回報</h2><small>沿用既有員編＋Approved Device</small></div></div>
-          <form id="privateAccessForm" class="access-form"><label>員工編號<input id="employeeId" autocomplete="username" inputmode="text" placeholder="輸入既有員編" required></label><button type="submit">讀取正式摘要</button></form>
-          <p id="privateAccessMessage" class="form-message">App 僅送出既有唯讀 action；不建立新登入架構。</p>
+          <p id="privateDeviceStatus" class="device-status">尚未解鎖這台 iPhone App 裝置</p>
+          <form id="privateAccessForm" class="access-form"><label>員工編號<input id="employeeId" autocomplete="username" autocapitalize="characters" inputmode="text" placeholder="請本人輸入既有員編" required></label><button type="submit">解鎖正式資料</button></form>
+          <details id="privateBindingDetails" class="access-details"><summary>首次使用這台 iPhone App</summary><form id="privateBindingForm" class="access-form"><label>既有首次啟用碼<input id="bootstrapCode" type="password" autocomplete="one-time-code" inputmode="numeric" placeholder="只在送出當下使用" required></label><button type="submit">送出裝置申請</button></form><button id="privateStatusCheck" class="text-button" type="button">查看核准狀態</button><p>使用既有 private_request／Approved Device 流程；不複製 Safari 裝置、不繞過核准。</p></details>
+          <p id="privateAccessMessage" class="form-message">App 僅使用既有授權流程；未核准前不載入正式摘要。</p>
+          <button id="privateLogout" class="text-button danger-text" type="button" hidden>登出正式摘要</button>
         </section>
 
         <section class="panel access-panel" aria-labelledby="patrolAccessTitle">
@@ -123,8 +126,8 @@
     </nav>
   </div>
   <script src="app-assets/lucide.min.js"></script>
-  <script src="app-data-contract.js?v=7"></script>
-  <script src="app-preview-data.js?v=7"></script>
-  <script src="app.js?v=7" defer></script>
+  <script src="app-data-contract.js?v=8"></script>
+  <script src="app-preview-data.js?v=8"></script>
+  <script src="app.js?v=8" defer></script>
 </body>
 </html>
