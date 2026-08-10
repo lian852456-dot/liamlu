@@ -2,8 +2,19 @@ const { test, expect } = require('@playwright/test');
 const path = require('node:path');
 
 const FILE_URL = `file://${path.resolve(__dirname, '../app.html')}?preview=1`;
+const FORMAL_FILE_URL = `file://${path.resolve(__dirname, '../app.html')}`;
 
 test.use({ viewport:{ width:390, height:844 } });
+
+test('formal mode boots without Preview data or JavaScript errors', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(FORMAL_FILE_URL);
+  await expect(page.locator('#dataMode')).toHaveText('正式唯讀');
+  await expect(page.locator('#previewBanner')).toBeHidden();
+  await expect(page.locator('#viewerState')).toHaveText('未登入');
+  expect(errors).toEqual([]);
+});
 
 test('390x844 home gives the supervisor summary without horizontal overflow', async ({ page }) => {
   let formalRequests = 0;
