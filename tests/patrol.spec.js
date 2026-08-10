@@ -13,6 +13,8 @@ let ptReadCalls;
 let cloudConfig; // 模擬各區 GAS 回傳的 PT_STORES / PT_TITLE
 let mediaUploads;
 let failPtwrite; // 測試用：強制 ptwrite 回錯，模擬雲端寫入失敗
+let expireHalfWriteAt;
+let halfWriteCalls;
 
 function privateScheduleFixture() {
   const names = ['酒泉', '萬大', '大稻埕', '復興', '三創', '杭州', '永吉', '通化', '六張犁'];
@@ -116,7 +118,11 @@ async function stubGas(page) {
         ? JSON.stringify({ status: 'ok', rows: halfRows })
         : JSON.stringify({ status: 'error', message: 'unauthorized' });
     } else if (action === 'hwrite') {
-      if (!authed) {
+      halfWriteCalls++;
+      if (expireHalfWriteAt === halfWriteCalls) {
+        expireHalfWriteAt = null;
+        body = JSON.stringify({ status: 'error', message: 'unauthorized' });
+      } else if (!authed) {
         body = JSON.stringify({ status: 'error', message: 'unauthorized' });
       } else {
         const rows = JSON.parse(url.searchParams.get('payload'));
@@ -169,7 +175,7 @@ function currentMonthFixture(day, store, code, item, result, reason) {
   };
 }
 
-test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; cloudConfig = null; mediaUploads = []; failPtwrite = false; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; });
 
 test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
   // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
@@ -474,6 +480,41 @@ test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({
   const xml = await fs.readFile(await download.path(), 'utf8');
   expect(xml).toContain('照片影片附件');
   expect(xml).toContain('第 1–18 項');
+});
+
+test('半月同步 token 逾時時保留本機資料，重新驗證後只續傳一次', async ({ page }) => {
+  // 18 題依既有 URL 長度限制切成 3 個 hwrite；讓第 2 段失效，
+  // 驗證不會從頭重送已成功的第 1 段。
+  expireHalfWriteAt = 2;
+  await stubGas(page);
+  await openAndUnlock(page);
+  await page.locator('.secure-tab[data-view="half"]').click();
+  await page.locator('#halfInspector').fill('測試督導');
+  await page.locator('.half-result').first().selectOption('abnormal');
+  await page.locator('.half-note').first().fill('展示機未亮');
+  await page.locator('.half-improvement').first().fill('當日完成開機並拍照回存');
+
+  await page.getByRole('button', { name: '儲存並同步本期檢查' }).click();
+  await expect(page.locator('#patrolReauthModal')).toBeVisible();
+  await expect(page.locator('#patrolReauthModal')).toContainText('督導驗證已逾時，請重新驗證後繼續同步');
+  await expect(page.locator('#halfInspector')).toHaveValue('測試督導');
+  await expect(page.locator('.half-note').first()).toHaveValue('展示機未亮');
+  expect(await page.evaluate(() => sessionStorage.getItem('bei12b_pt_session_token'))).toBeNull();
+  expect(halfRows).toHaveLength(7);
+  expect(new Set(halfRows.map(row => `${row.checkId}|${row.item}`)).size).toBe(7);
+
+  await page.locator('#patrolReauthPasscode').fill(PT_KEY);
+  await page.getByRole('button', { name: '重新驗證並繼續同步' }).click();
+  await expect.poll(() => halfRows.length).toBe(18);
+  await expect(page.locator('#halfMsg')).toContainText('已同步雲端');
+  expect(halfWriteCalls).toBe(4); // 第 1 段成功 + 第 2 段失敗／續傳 + 第 3 段成功
+  expect(new Set(halfRows.map(row => `${row.checkId}|${row.item}`)).size).toBe(18);
+
+  await page.reload();
+  await expect(page.locator('#patrolAuthGate')).toBeHidden();
+  await page.locator('.secure-tab[data-view="half"]').click();
+  await expect(page.locator('#halfHistory')).toContainText('測試督導');
+  await expect(page.locator('#halfHistory')).toContainText('1 項異常');
 });
 
 test('加密頁籤：半月督導檢查可上傳照片影片並在歷史回放', async ({ page }) => {

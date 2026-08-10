@@ -361,6 +361,11 @@
   .half-media-modal-grid{clear:both;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;padding-top:10px}
   .half-media-modal-grid .half-media-card img,.half-media-modal-grid .half-media-card video,.half-media-modal-grid .half-media-card iframe{height:190px}
   .half-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+  .reauth-modal{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:24px;background:rgba(16,24,32,.62)}
+  .reauth-modal[hidden]{display:none}
+  .reauth-modal-card{width:min(440px,100%);background:#fff;border-radius:18px;padding:30px;box-shadow:0 24px 70px rgba(0,0,0,.32)}
+  .reauth-modal-card h2{margin:0 0 8px;color:#17212b;font-size:22px}
+  .reauth-modal-card p{margin:0 0 22px;color:#5f6b76;line-height:1.65}
   .half-history{overflow:auto}
   .half-history table{min-width:900px}
   .half-dashboard-list{display:grid;gap:10px}
@@ -418,6 +423,18 @@
   </section>
 </main>
 <div id="patrolAppHost"></div>
+<section id="patrolReauthModal" class="reauth-modal" role="dialog" aria-modal="true" aria-labelledby="patrolReauthTitle" hidden>
+  <div class="reauth-modal-card">
+    <h2 id="patrolReauthTitle">督導驗證已逾時</h2>
+    <p>請重新驗證後繼續同步。原本的本機資料會保留，驗證成功後會自動續傳一次。</p>
+    <form class="auth-gate-form" onsubmit="resumePatrolReauth(event)">
+      <label for="patrolReauthPasscode">督導通行碼</label>
+      <input id="patrolReauthPasscode" type="password" autocomplete="current-password" required>
+      <button id="patrolReauthSubmit" type="submit">重新驗證並繼續同步</button>
+    </form>
+    <div id="patrolReauthMessage" class="auth-gate-message" role="alert" aria-live="polite"></div>
+  </div>
+</section>
 <template id="patrolAppTemplate">
 <div class="wrap">
   <header>
@@ -650,10 +667,13 @@ let currentMonth = "";
 const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
 const PRIVATE_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
 const PT_SESSION_TOKEN_STORAGE = 'bei12b_pt_session_token';
+const PATROL_REAUTH_MESSAGE = '督導驗證已逾時，請重新驗證後繼續同步';
 let GAS_URL = PRIVATE_GAS_URL;
 let PT_KEY = '';
 let PT_TOKEN = sessionStorage.getItem(PT_SESSION_TOKEN_STORAGE) || '';
 let appMounted = false;
+let patrolReauthPending = null;
+let resolvePatrolReauth = null;
 
 function clearPatrolAuthState(){
   localStorage.removeItem('bei12b_pt_key');
@@ -684,14 +704,58 @@ function setPrivateAuthStatus(text, ok){
 function privateConfigMessage(){
   return '請輸入巡店通行碼；驗證成功前不會建立看板或讀取任何受保護資料。';
 }
+function patrolResponseUnauthorized(result){ return result?.status==='error' && result?.message==='unauthorized'; }
+function patrolErrorUnauthorized(error){ return String(error?.message||error||'')==='unauthorized'; }
+function patrolReauthFailure(){ return {status:'error',message:PATROL_REAUTH_MESSAGE,reauthFailed:true}; }
+function setPatrolReauthMessage(text){ const el=document.getElementById('patrolReauthMessage');if(el) el.textContent=text||''; }
+function openPatrolReauthModal(){
+  // 只移除失效的短效 session；本機草稿、表單與待送 payload 全數保留。
+  sessionStorage.removeItem(PT_SESSION_TOKEN_STORAGE);
+  PT_TOKEN='';
+  secureUnlocked=false;
+  const modal=document.getElementById('patrolReauthModal');if(modal) modal.hidden=false;
+  setPatrolReauthMessage(PATROL_REAUTH_MESSAGE);
+  const input=document.getElementById('patrolReauthPasscode');if(input) window.setTimeout(()=>input.focus(),0);
+}
+function waitForPatrolReauth(){
+  if(patrolReauthPending) return patrolReauthPending;
+  openPatrolReauthModal();
+  patrolReauthPending=new Promise(resolve=>{resolvePatrolReauth=resolve;});
+  return patrolReauthPending;
+}
+function finishPatrolReauth(success){
+  const modal=document.getElementById('patrolReauthModal');if(modal) modal.hidden=true;
+  const input=document.getElementById('patrolReauthPasscode');if(input) input.value='';
+  const resolve=resolvePatrolReauth;patrolReauthPending=null;resolvePatrolReauth=null;
+  if(resolve) resolve(Boolean(success));
+}
+async function resumePatrolReauth(event){
+  event?.preventDefault();
+  const input=document.getElementById('patrolReauthPasscode');const button=document.getElementById('patrolReauthSubmit');const key=String(input?.value||'').trim();
+  if(!key){setPatrolReauthMessage('請輸入督導通行碼');return;}
+  if(button) button.disabled=true;setPatrolReauthMessage('正在重新驗證…');
+  try{
+    const res=await privateAuthPost({action:'ptauth',key});const token=String(res?.token||'');
+    if(res?.status!=='ok'||!token) throw new Error('verification_failed');
+    PT_TOKEN=token;sessionStorage.setItem(PT_SESSION_TOKEN_STORAGE,PT_TOKEN);
+    privateAccount=privateAccount||{username:'通行碼已驗證'};secureUnlocked=true;finishPatrolReauth(true);
+  }catch{setPatrolReauthMessage('督導驗證未成功，請確認通行碼後再試');}
+  finally{if(button) button.disabled=false;}
+}
+async function patrolRequestWithReauth(request,retried=false){
+  let result;try{result=await request();}catch(error){if(!patrolErrorUnauthorized(error)) throw error;result={status:'error',message:'unauthorized'};}
+  if(!patrolResponseUnauthorized(result)) return result;
+  if(retried) return patrolReauthFailure();
+  const reauthed=await waitForPatrolReauth();
+  return reauthed?patrolRequestWithReauth(request,true):patrolReauthFailure();
+}
 function privateCloudCall(action, params={}){
-  if(action!=='pthealth' && (!secureUnlocked || !privateAccount || !PT_TOKEN)){
-    return Promise.resolve({status:'error',message:'unauthorized'});
-  }
-  const url = new URL(PRIVATE_GAS_URL);
-  url.searchParams.set('action', action);
-  Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
-  return fetch(url.toString(), {method:'GET', cache:'no-store'}).then(r=>r.json());
+  return patrolRequestWithReauth(()=>{
+    if(action!=='pthealth'&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized'};
+    const url=new URL(PRIVATE_GAS_URL);url.searchParams.set('action',action);Object.keys(params).forEach(k=>url.searchParams.set(k,params[k]));
+    if(action!=='pthealth') url.searchParams.set('token',PT_TOKEN);
+    return fetch(url.toString(),{method:'GET',cache:'no-store'}).then(r=>r.json());
+  });
 }
 async function privateHealthCheck(){
   const res=await privateCloudCall('pthealth');
@@ -714,20 +778,15 @@ function privateAuthPost(payload){
   }).then(r=>r.json());
 }
 function privateCloudCallJsonp(action, params={}){
-  if(!secureUnlocked || !privateAccount || !PT_TOKEN) return Promise.reject(new Error('unauthorized'));
-  return new Promise((resolve, reject)=>{
-    const cbName = 'privateCb_' + Date.now() + '_' + Math.floor(Math.random()*1e6);
-    const url = new URL(PRIVATE_GAS_URL);
-    url.searchParams.set('action', action);
-    Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
-    url.searchParams.set('callback', cbName);
-    const s = document.createElement('script');
-    const timer = setTimeout(()=>{ cleanup(); reject(new Error('連線逾時')); }, 30000);
-    function cleanup(){ clearTimeout(timer); delete window[cbName]; s.remove(); }
-    window[cbName] = res => { cleanup(); resolve(res); };
-    s.onerror = ()=>{ cleanup(); reject(new Error('網路錯誤')); };
-    s.src = url.toString();
-    document.body.appendChild(s);
+  return patrolRequestWithReauth(()=>{
+    if(!secureUnlocked||!privateAccount||!PT_TOKEN) return {status:'error',message:'unauthorized'};
+    return new Promise((resolve,reject)=>{
+      const cbName='privateCb_'+Date.now()+'_'+Math.floor(Math.random()*1e6);const url=new URL(PRIVATE_GAS_URL);
+      url.searchParams.set('action',action);Object.keys(params).forEach(k=>url.searchParams.set(k,params[k]));url.searchParams.set('token',PT_TOKEN);url.searchParams.set('callback',cbName);
+      const s=document.createElement('script');const timer=setTimeout(()=>{cleanup();reject(new Error('連線逾時'));},30000);
+      function cleanup(){clearTimeout(timer);delete window[cbName];s.remove();}
+      window[cbName]=res=>{cleanup();resolve(res);};s.onerror=()=>{cleanup();reject(new Error('網路錯誤'));};s.src=url.toString();document.body.appendChild(s);
+    });
   });
 }
 function setPatrolAuthMessage(text){
@@ -825,10 +884,10 @@ async function privateSignOut(){
   if(input) input.value='';
   if(token) privateAuthPost({action:'ptlogout',token}).catch(()=>{});
 }
-async function privateScheduleRequest(month){ return privateCloudCall('sread',{token:PT_TOKEN,month:month||''}); }
+async function privateScheduleRequest(month){ return privateCloudCall('sread',{month:month||''}); }
 async function privateInspectionRequest(action, rows){
-  if(action==='read') return privateCloudCall('hread',{token:PT_TOKEN});
-  return privateCloudCallJsonp('hwrite',{payload:JSON.stringify(rows||[]),token:PT_TOKEN});
+  if(action==='read') return privateCloudCall('hread');
+  return privateCloudCallJsonp('hwrite',{payload:JSON.stringify(rows||[])});
 }
 function halfMediaMimeType(file){
   const reported=String(file?.type||'').toLowerCase();
@@ -846,12 +905,15 @@ async function privateInspectionMediaUpload(file, context){
   if(!mimeType) throw new Error('僅支援照片或影片檔案');
   const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('讀取檔案失敗'));reader.onload=()=>resolve(String(reader.result||''));reader.readAsDataURL(file);});
   const base64=dataUrl.split(',')[1]||'';
-  let response;
-  try{response=await fetch(PRIVATE_GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'half_media_upload',token:PT_TOKEN,file:{name:file.name,type:mimeType,size:file.size,base64},context})});}
-  catch{throw new Error('無法連上私有上傳服務，請確認網路後再試');}
-  const raw=await response.text();let result;
-  try{result=JSON.parse(raw);}catch{throw new Error(response.ok?'上傳服務回應無法辨識，請稍後再試':`上傳服務暫時無法使用（${response.status}）`);}
-  if(!response.ok) throw new Error(result.message||'上傳服務暫時無法使用');
+  const result=await patrolRequestWithReauth(async()=>{
+    let response;
+    try{response=await fetch(PRIVATE_GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'half_media_upload',token:PT_TOKEN,file:{name:file.name,type:mimeType,size:file.size,base64},context})});}
+    catch{throw new Error('無法連上私有上傳服務，請確認網路後再試');}
+    const raw=await response.text();let payload;
+    try{payload=JSON.parse(raw);}catch{throw new Error(response.ok?'上傳服務回應無法辨識，請稍後再試':`上傳服務暫時無法使用（${response.status}）`);}
+    if(!response.ok) throw new Error(payload.message||'上傳服務暫時無法使用');
+    return payload;
+  });
   if(result.status!=='ok') throw new Error(result.message||'媒體上傳失敗');
   return result.media;
 }
@@ -1343,31 +1405,25 @@ function storeCardHTML(storeName){
 /* ---------- 雲端同步（Google Apps Script） ---------- */
 // 讀取用 fetch GET（GAS 對簡單 GET 沒有 CORS 問題，與 index.html 同作法）
 function cloudCall(action, params={}){
-  if(!['ping','pthealth'].includes(action) && (!secureUnlocked || !privateAccount || !PT_TOKEN)){
-    return Promise.resolve({status:'error',message:'unauthorized'});
-  }
-  const url = new URL(GAS_URL);
-  url.searchParams.set('action', action);
-  Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
-  return fetch(url.toString(), {method:'GET', cache:'no-store'}).then(r=>r.json());
+  return patrolRequestWithReauth(()=>{
+    if(!['ping','pthealth'].includes(action)&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized'};
+    const url=new URL(GAS_URL);url.searchParams.set('action',action);Object.keys(params).forEach(k=>url.searchParams.set(k,params[k]));
+    if(!['ping','pthealth'].includes(action)) url.searchParams.set('token',PT_TOKEN);
+    return fetch(url.toString(),{method:'GET',cache:'no-store'}).then(r=>r.json());
+  });
 }
 
 // 寫入走 JSONP（script tag + callback，與 index.html 同作法）
 function cloudCallJsonp(action, params={}){
-  if(!secureUnlocked || !privateAccount || !PT_TOKEN) return Promise.reject(new Error('unauthorized'));
-  return new Promise((resolve, reject)=>{
-    const cbName = 'ptCb_' + Date.now() + '_' + Math.floor(Math.random()*1e6);
-    const url = new URL(GAS_URL);
-    url.searchParams.set('action', action);
-    Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
-    url.searchParams.set('callback', cbName);
-    const s = document.createElement('script');
-    const timer = setTimeout(()=>{ cleanup(); reject(new Error('連線逾時')); }, 30000);
-    function cleanup(){ clearTimeout(timer); delete window[cbName]; s.remove(); }
-    window[cbName] = res => { cleanup(); resolve(res); };
-    s.onerror = ()=>{ cleanup(); reject(new Error('網路錯誤')); };
-    s.src = url.toString();
-    document.body.appendChild(s);
+  return patrolRequestWithReauth(()=>{
+    if(!secureUnlocked||!privateAccount||!PT_TOKEN) return {status:'error',message:'unauthorized'};
+    return new Promise((resolve,reject)=>{
+      const cbName='ptCb_'+Date.now()+'_'+Math.floor(Math.random()*1e6);const url=new URL(GAS_URL);
+      url.searchParams.set('action',action);Object.keys(params).forEach(k=>url.searchParams.set(k,params[k]));url.searchParams.set('token',PT_TOKEN);url.searchParams.set('callback',cbName);
+      const s=document.createElement('script');const timer=setTimeout(()=>{cleanup();reject(new Error('連線逾時'));},30000);
+      function cleanup(){clearTimeout(timer);delete window[cbName];s.remove();}
+      window[cbName]=res=>{cleanup();resolve(res);};s.onerror=()=>{cleanup();reject(new Error('網路錯誤'));};s.src=url.toString();document.body.appendChild(s);
+    });
   });
 }
 
@@ -1394,7 +1450,7 @@ function cloudConnect(){
 
 function cloudLoad(){
   if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN) return;
-  cloudCall('ptread', {token: PT_TOKEN}).then(res=>{
+  cloudCall('ptread').then(res=>{
     if(res.status==='ok'){
       // 套用各區自己的設定（GAS 的 PT_STORES / PT_TITLE），沒回傳就用預設
       if(Array.isArray(res.stores) && res.stores.length){
@@ -1410,8 +1466,8 @@ function cloudLoad(){
       rebuildFromRaw();
       render();
       showMsg(`雲端已載入 ${rawDetails.length} 筆明細`,'ok');
-    }else if(res.message==='unauthorized'){
-      privateSignOut();
+    }else if(res.reauthFailed){
+      showMsg(PATROL_REAUTH_MESSAGE,'err');
     }else{
       showMsg('讀取失敗：'+(res.message||''),'err');
     }
@@ -1442,13 +1498,13 @@ function cloudWrite(details, renderErr){
   if(part.length) chunks.push(part);
 
   // 每批失敗自動重試一次，避免一批網路閃斷讓後面全部沒送
-  const sendChunk = (c, attempt)=>cloudCallJsonp('ptwrite', {payload: JSON.stringify(c), token: PT_TOKEN})
+  const sendChunk = (c, attempt)=>cloudCallJsonp('ptwrite', {payload: JSON.stringify(c)})
     .then(res=>{
       if(res.status==='ok') return res.written||0;
-      throw new Error(res.message==='unauthorized' ? '通行碼錯誤' : (res.message||'寫入失敗'));
+      const error=new Error(res.message||'寫入失敗');error.reauthFailed=Boolean(res.reauthFailed);throw error;
     })
     .catch(err=>{
-      if(attempt < 1 && err.message !== '通行碼錯誤') return sendChunk(c, attempt+1);
+      if(attempt < 1 && !err.reauthFailed) return sendChunk(c, attempt+1);
       throw err;
     });
 
@@ -1463,7 +1519,7 @@ function cloudWrite(details, renderErr){
     } else {
       showMsg(`已同步至雲端（新增 ${written} 筆，重複資料自動略過）`,'ok');
     }
-  }).catch(err=>showMsg('雲端寫入失敗：'+err.message+'（資料仍在本頁看板，請重新整理後把完整明細整份重貼一次補齊）','err'));
+  }).catch(err=>showMsg(err?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端寫入失敗：${err.message}（資料仍在本頁看板，請重新整理後把完整明細整份重貼一次補齊）`,'err'));
 }
 
 function setCloudStatus(text, on){
@@ -1674,7 +1730,7 @@ async function loadHalfChecks(){
   try{
     const res=await privateInspectionRequest('read');
     if(res.status==='ok'){ mergeHalfRows((res.rows||[]).map(r=>({...r,item:Number(r.item)}))); renderHalfSummary(); renderHalfForm(); renderHalfHistory(); renderHalfDashboard(); }
-    else if(res.message==='unauthorized'){ secureUnlocked=false; privateAccount=null; showHalfMsg('巡店通行碼錯誤，私人檢查資料保持鎖定','err'); }
+    else if(res.reauthFailed){ showHalfMsg(`${PATROL_REAUTH_MESSAGE}；本機資料仍保留`,'err'); }
   }catch(err){ showHalfMsg('半月檢查雲端讀取失敗，先顯示本機資料','err'); }
 }
 function initHalfSelectors(){
@@ -1759,7 +1815,7 @@ function submitHalfCheck(){
   if(!privateAccount){showHalfMsg('已保留本機資料；尚未解鎖，未上傳雲端','err');return;}
   const chunks=[];let part=[];rows.forEach(r=>{part.push(r);if(encodeURIComponent(JSON.stringify(part)).length>3500){if(part.length>1){part.pop();chunks.push(part);part=[r];}else{chunks.push(part);part=[];}}});if(part.length)chunks.push(part);
   let chain=Promise.resolve(),written=0;chunks.forEach(chunk=>{chain=chain.then(()=>privateInspectionRequest('write',chunk)).then(res=>{if(res.status!=='ok')throw new Error(res.message||'寫入失敗');written+=Number(res.written||chunk.length||0);});});
-  chain.then(()=>{showHalfMsg(`已同步雲端（${written} 列）；照片／影片已連結至本期檢查，可從歷史紀錄預覽／回放`,'ok');loadHalfChecks();}).catch(err=>showHalfMsg('雲端同步失敗：'+err.message+'；本機資料仍保留','err'));
+  chain.then(async()=>{await loadHalfChecks();showHalfMsg(`已同步雲端（${written} 列）；照片／影片已連結至本期檢查，可從歷史紀錄預覽／回放`,'ok');}).catch(err=>showHalfMsg(err?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端同步失敗：${err.message}；本機資料仍保留`,'err'));
 }
 function renderHalfSummary(){
   const c=document.getElementById('halfSummary');if(!c)return;const active=activeHalfRows(halfChecks);const groups={};active.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const issues=active.filter(r=>r.result==='abnormal').length;const pending=Object.values(groups).filter(rows=>rows.some(r=>!r.result)).length;c.innerHTML=`<div class="half-stat"><strong>${Object.keys(groups).length}</strong><span>已建立本期檢查</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>缺失／異常項目</span></div><div class="half-stat"><strong>${pending}</strong><span>尚有待填本期</span></div>`;}
