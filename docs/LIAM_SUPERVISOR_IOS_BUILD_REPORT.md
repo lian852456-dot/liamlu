@@ -52,7 +52,7 @@ Therefore:
 - App 1.1 formal-origin deployment: PASS
 - App 1.1 version-pinned startup URL: PASS
 - Six-module post-deploy authenticated UI readback: WAITING for existing human unlock
-- Simulator/device build: WAITING for full Xcode readiness
+- Simulator/device build: WAITING for Simulator runtime and signing readiness
 - Physical install and OAuth/session smoke test: WAITING for Xcode signing and Liam's iPhone
 
 ## Security receipt
