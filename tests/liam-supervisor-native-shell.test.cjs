@@ -31,7 +31,7 @@ test('WebView uses the persistent default store without a JS credential bridge',
 test('navigation is allowlisted, external HTTPS leaves WebView, and unsafe schemes are blocked', () => {
   const config = read(`${nativeRoot}/LiamSupervisor/AppConfig.swift`);
   const policy = read(`${nativeRoot}/LiamSupervisor/NavigationPolicy.swift`);
-  assert.match(config, /https:\/\/lian852456-dot\.github\.io\/liamlu\/app\.html/);
+  assert.match(config, /https:\/\/lian852456-dot\.github\.io\/liamlu\/app\.html\?native=1&release=7458c0e/);
   assert.match(config, /accounts\.google\.com/);
   assert.match(policy, /guard scheme == "https"/);
   assert.match(policy, /host == AppConfig\.appHost \|\| AppConfig\.oauthHosts\.contains\(host\)/);

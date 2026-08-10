@@ -1,6 +1,6 @@
 # Liam Supervisor iOS App 1.0 Build Report
 
-狀態日期：2026-08-10
+狀態日期：2026-08-11
 
 ## Identity
 
@@ -10,7 +10,9 @@
 - Version/build: `1.0 (1)`
 - Deployment target: iOS 16.0
 - Orientation: iPhone portrait
-- Web origin: `https://lian852456-dot.github.io/liamlu/app.html`
+- Startup URL: `https://lian852456-dot.github.io/liamlu/app.html?native=1&release=7458c0e`
+- Web origin: `https://lian852456-dot.github.io`
+- Online App 1.1 commit: `7458c0e03a09b21502b87cf760052bbe366f0b73`
 
 ## Implemented
 
@@ -28,24 +30,29 @@
 - Project／plist／asset JSON parse: PASS
 - Swift syntax parse: PASS
 - Native static security tests: PASS
-- Web regression: PASS (123/123 Node tests; 2/2 Playwright 390x844 checks)
+- App 1.1 release regression: PASS (121/121 Node tests; 3/3 Playwright formal/390x844 checks)
+- Native startup URL regression: PASS (5/5 native-shell tests)
 - Codex Security canonical diff report: PASS — 17/17 review receipts, complete coverage, 0 reportable findings, unresolved High 0／Medium 0
 - Secret／WebView security scan: PASS — no embedded credential, JS bridge, ATS weakening, wildcard navigation or Cookie downgrade found
-- Navigation policy typecheck／smoke: BLOCKED by mismatched Command Line Tools SDK/compiler
-- Simulator build: WAITING — full Xcode is not installed
-- Device build/sign/install: WAITING — no Apple Development signing identity and no connected Xcode device workflow
+- Xcode toolchain: READY — Xcode 26.6 (`17F113`)
+- Unsigned simulator/device compile: WAITING — Xcode reports no available Simulator runtime while installation finishes; asset compilation stops before a complete build result
+- Device build/sign/install: WAITING — Keychain currently reports `0 valid identities found`
 
 The missing Xcode/signing state is environmental. No OAuth, Cookie, Session, Approved Device, GAS, Sheet or formal write setting was changed to work around it.
 
 ## Formal-origin gate
 
-The packaged shell currently points to `https://lian852456-dot.github.io/liamlu/app.html`. Read-only live inspection on 2026-08-10 shows that origin still serves **Liam Supervisor Pilot 1.0**, not the App 1.1 Real Data branch. App 1.1 remains isolated on `feature/liam-supervisor-app-1-1`; it was not merged to `main` or deployed without separate authorization.
+App 1.1 Real Data is deployed through GitHub Pages at merge commit `7458c0e03a09b21502b87cf760052bbe366f0b73`. The Pages deployment run `31411578181` completed successfully. Edge readback confirms the App 1.1 HTML, `v=7` assets and `liam-supervisor-app-1-1-realdata-v2` service-worker cache. The native shell uses the version-pinned startup URL above and no longer targets the Pilot 1.0 release.
+
+Live unauthenticated launch confirms `Liam Supervisor App 1.1` and `正式唯讀`. The formal six-module UI readback remains gated by the existing Approved Device / employee unlock and patrol short-lived session; no bypass or credential migration was introduced.
 
 Therefore:
 
 - Native shell/project readiness: PASS
-- App 1.1 formal-origin readiness: WAITING for explicit merge/deploy authorization
-- Simulator/device build: WAITING for full Xcode
+- App 1.1 formal-origin deployment: PASS
+- App 1.1 version-pinned startup URL: PASS
+- Six-module post-deploy authenticated UI readback: WAITING for existing human unlock
+- Simulator/device build: WAITING for full Xcode readiness
 - Physical install and OAuth/session smoke test: WAITING for Xcode signing and Liam's iPhone
 
 ## Security receipt
