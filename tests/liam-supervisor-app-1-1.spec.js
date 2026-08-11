@@ -78,6 +78,10 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
   await expect(page.locator('#battleContent')).toContainText('總人數');
   await expect(page.locator('#battleContent')).toContainText('AQ需關注店長');
   await expect(page.locator('#battleContent .personal-performance-item')).toHaveCount(3);
+  await expect(page.locator('#battleContent')).toContainText('店長店績');
+  await expect(page.locator('#battleContent .personal-performance-button')).toHaveCount(0);
+  await expect(page.locator('#battleContent')).not.toContainText('1326');
+  await page.locator('#personalRoleSelect').selectOption('副店');
   const firstPerson=page.locator('#battleContent .personal-performance-item').first();
   await firstPerson.locator('.personal-performance-button').click();
   await expect(firstPerson).toHaveClass(/expanded/);

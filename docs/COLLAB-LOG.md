@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-12 ｜ Codex（App 1.2 店長績效語意修正，待部署／實機驗收）
+
+- 做了什麼：從已部署個績區版本建立隔離分支 `hotfix/liam-supervisor-manager-semantics-20260812`，只修正「戰情 → 個績 → 北一二B → 職稱排名 → 店長」。店長列改以既有正式 `kpiStores` 顯示店 KPI、店公司排名、店 KPI DOD、店排名變化；AQ 仍只取店長 personal row 的正式 `AQ actual` 並提示距 10 點缺口。店長不再顯示或排序 personal `totalRate/rank/DOD/rankChange`，副店、其他業代與指標未達檢視維持原語意。
+- 結果（進行中）：Node 全套 141/141；App 1.2 Chromium 390×844 2/2，console error、橫向溢出、ellipsis 與觸控目標 assertions 均通過。以 2026-08-11 正式快照副本驗證 9 位店長全部精確對應 9 店、依店公司排名排序，AQ 關注 7 人、AQ 缺值 0；Preview 特意放入店長 personal rank `1326` 與 totalRate `0`，UI 防洩漏測試確認兩者不顯示。完整五頁 smoke 的功能 assertion 已走完，但仍有既有巡店 full-page screenshot timeout 與跨日 visit fixture 失敗，未在本輪越界修改巡店。
+- 經驗 / 給下一位的提醒：2026-08-12 Liam 已正式確認「店長沒有個人績效，店長看店績」；前一筆 2026-08-11 日誌要求忠實顯示店長 personal rank `1326` 的語意已被本次管理規則取代。此分支尚未合併／部署、未更新 Native release query、未完成 Liam 實機驗收，也未建立 final pilot tag。
+
 ## 2026-08-11 ｜ Codex（App 1.2 區個績職稱／未達檢視，待部署／實機驗收）
 
 - 做了什麼：從乾淨 `origin/main` 建立隔離分支 `hotfix/liam-supervisor-personal-area-20260811`，只調整「戰情 → 個績 → 北一二B」。正式 `category/role` 映射為店長／副店／其他業代；職稱排名依正式 `rank` 由小到大、空值置後；指標未達只列非店長的 A999／好速／R1399 正式 `rate < 100%`，空值不當 0。第四張摘要卡改為店長 AQ `actual < 10`，只作管理提示，不重算總績效、KPI 或排名。店點模式沿用既有資料語意與來源排序。

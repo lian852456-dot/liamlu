@@ -395,6 +395,23 @@
     });
   }
 
+  function managerStorePerformanceRows(people,stores) {
+    const storeByName=new Map((Array.isArray(stores)?stores:[]).map(store=>[normalizeStore(store.name),store]));
+    return (Array.isArray(people)?people:[]).filter(person=>person.roleGroup==='店長').map(person=>{
+      const store=storeByName.get(normalizeStore(person.store)) || null;
+      const aq=personalMetricByKey(person,'AQ');
+      const aqActual=aq&&aq.actual!=null?aq.actual:null;
+      return { person,store,aqActual,aqGap:aqActual==null?null:Math.max(0,10-aqActual) };
+    }).sort((a,b)=>{
+      const aRank=a.store&&a.store.rank!=null?a.store.rank:null;
+      const bRank=b.store&&b.store.rank!=null?b.store.rank:null;
+      if(aRank==null&&bRank==null) return 0;
+      if(aRank==null) return 1;
+      if(bRank==null) return -1;
+      return aRank-bRank;
+    });
+  }
+
   function personalUnderTargetByMetric(people,key) {
     const nonManagers=(Array.isArray(people)?people:[]).filter(person=>person.roleGroup!=='店長');
     const missing=nonManagers.filter(person=>{ const metric=personalMetricByKey(person,key); return !metric||metric.rate==null; });
@@ -423,10 +440,13 @@
         dailyTarget:numberOrNull(metric && metric.daily_target), dailyGap:numberOrNull(metric && metric.daily_gap), dod:numberOrNull(metric && metric.dod)
       }))
     })).filter(row => row.name && row.store);
-    const achieved = people.filter(row => row.totalRate != null && row.totalRate >= 1).length;
-    const underTarget = people.filter(row => row.totalRate != null && row.totalRate < 1).length;
+    const personalPeople=people.filter(row=>row.roleGroup!=='店長');
+    const achieved = personalPeople.filter(row => row.totalRate != null && row.totalRate >= 1).length;
+    const underTarget = personalPeople.filter(row => row.totalRate != null && row.totalRate < 1).length;
     const aqReview=personalAqReview(people);
-    const complete = people.length > 0 && people.every(row => row.totalRate != null && row.rank != null && row.dod != null && row.rankChange != null && row.metrics.length > 0);
+    const complete = people.length > 0 && people.every(row => row.roleGroup === '店長'
+      ? row.metrics.length > 0
+      : row.totalRate != null && row.rank != null && row.dod != null && row.rankChange != null && row.metrics.length > 0);
     const updatedAt = String(sourceData.generated_at || snapshot && snapshot.publishedAt || '');
     return C.moduleState({
       status:people.length ? (complete ? 'ok' : 'partial') : 'no_data', updatedAt:readAt, sourceUpdatedAt:updatedAt,
@@ -757,6 +777,15 @@
     </div></article>`;
   }
 
+  function managerStorePerformanceRow(row) {
+    const store=row.store||{};
+    return `<article class="personal-performance-item manager-store-performance"><div class="manager-store-row">
+      <span class="personal-primary"><b>${escapeHtml(row.person.name)}</b><small>${escapeHtml(row.person.store)} · 店長</small></span>
+      <span class="personal-rate ${personalMetricTone(store.kpi)}"><small>店 KPI</small><b>${fmtPct(store.kpi)}</b></span>
+      <span class="personal-priority"><small>公司排名 ${store.rank??'—'}</small><small class="${valueClass(store.kpiDod)}">店 KPI DOD ${fmtSignedPct(store.kpiDod)}</small><small class="${valueClass(store.rankChange)}">店排名變化 ${fmtSigned(store.rankChange)}</small><small class="${row.aqActual!=null&&row.aqActual<10?'negative':''}">AQ ${row.aqActual==null?'—':fmtNumber(row.aqActual)+' 點'}</small><small class="${row.aqGap>0?'negative':''}">缺 ${row.aqGap==null?'—':fmtNumber(row.aqGap)+' 點'}</small></span>
+    </div></article>`;
+  }
+
   function renderPersonalRegionControls() {
     const roleOptions=['店長','副店','其他業代'];
     const gapOptions=['A999','好速','R1399'];
@@ -786,14 +815,19 @@
       <article class="metric-card"><span>未達標人數</span><strong class="negative">${summary.underTarget??'—'}</strong><small>正式總達成率 &lt;100%</small></article>
       <article class="metric-card"><span>AQ需關注店長</span><strong class="${aqReview.attention.length?'negative':'positive'}">${aqReview.attention.length}</strong><small>AQ 點數 &lt; 10</small></article>
     </div>`;
-    let people=[]; let heading=''; let note=''; let empty=''; let rowOptions={regionRanking:true};
+    let people=[]; let managerRows=null; let heading=''; let note=''; let empty=''; let rowOptions={regionRanking:true};
     if(personalRegionView==='role') {
-      people=personalRankedByRole(allPeople,personalRole); heading=`${personalRole}正式排名`; note=`${people.length} 人 · 正式排名由前至後`; empty=`目前沒有${personalRole}正式個績。`;
+      if(personalRole==='店長') {
+        managerRows=managerStorePerformanceRows(allPeople,contract.kpiStores.data); heading='店長店績'; note=`${managerRows.length} 人 · 依店公司排名由前至後`; empty='目前沒有可對應的店長／店績資料。';
+      } else {
+        people=personalRankedByRole(allPeople,personalRole); heading=`${personalRole}正式排名`; note=`${people.length} 人 · 正式排名由前至後`; empty=`目前沒有${personalRole}正式個績。`;
+      }
     } else {
       const result=personalUnderTargetByMetric(allPeople,personalGapMetric); people=result.rows; heading=`${personalGapMetric} 未達`; note=`${people.length} 人 · 達成率由高到低`; empty=`非店長同仁 ${personalGapMetric} 全數達標`; rowOptions={focusMetric:personalGapMetric};
       if(result.missing.length) note+=` · ${result.missing.length} 人無正式資料（未列入）`;
     }
-    return `${summaryCards}${renderPersonalAqAttention(allPeople)}${renderPersonalRegionControls()}<section class="panel personal-performance-panel"><div class="panel-head"><div><h2>${escapeHtml(heading)}</h2><small>${escapeHtml(note)}</small></div></div><div class="personal-performance-list">${people.map(person=>personalPerformanceRow(person,rowOptions)).join('') || `<div class="empty-state">${escapeHtml(empty)}</div>`}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
+    const rows=managerRows?managerRows.map(managerStorePerformanceRow).join(''):people.map(person=>personalPerformanceRow(person,rowOptions)).join('');
+    return `${summaryCards}${renderPersonalAqAttention(allPeople)}${renderPersonalRegionControls()}<section class="panel personal-performance-panel"><div class="panel-head"><div><h2>${escapeHtml(heading)}</h2><small>${escapeHtml(note)}</small></div></div><div class="personal-performance-list">${rows || `<div class="empty-state">${escapeHtml(empty)}</div>`}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
   }
 
   function renderBattle() {

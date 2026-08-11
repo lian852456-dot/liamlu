@@ -40,11 +40,26 @@ test('App 1.2 personal area groups formal roles, filters under-target metrics an
   await expect(page.locator('#battleContent')).toContainText('AQ 點數 < 10');
   await expect(page.locator('.personal-aq-row')).toHaveCount(2);
   await expect(page.locator('.personal-management-note')).toContainText('App 只作提示，不重算正式總績效、KPI 或公司排名');
-  let ranks=await page.locator('.personal-performance-item .personal-priority small:nth-child(2)').allTextContents();
-  expect(ranks).toEqual(['正式排名 12','正式排名 33','正式排名 54']);
+  await expect(page.locator('#battleContent')).toContainText('店長店績');
+  expect(await page.locator('.personal-performance-item .personal-primary b').allTextContents()).toEqual(['同仁＊1','同仁＊4','同仁＊7']);
+  expect(await page.locator('.personal-performance-item .personal-rate b').allTextContents()).toEqual(['128.6%','112.7%','98.3%']);
+  await expect(page.locator('.personal-performance-item').first()).toContainText('公司排名 12');
+  await expect(page.locator('.personal-performance-item').first()).toContainText('店 KPI DOD +6.2pp');
+  await expect(page.locator('.personal-performance-item').first()).toContainText('店排名變化 ↑2');
+  await expect(page.locator('.personal-performance-item').first()).toContainText('AQ 12 點');
+  await expect(page.locator('.personal-performance-item').first()).toContainText('缺 0 點');
+  await expect(page.locator('.personal-performance-item').first()).not.toContainText('總績效');
+  await expect(page.locator('.personal-performance-item').first()).not.toContainText('0.0%');
+  await expect(page.locator('#battleContent')).not.toContainText('正式排名');
+  await expect(page.locator('#battleContent')).not.toContainText('1326');
+  await expect(page.locator('#battleContent .personal-performance-button')).toHaveCount(0);
+  await expect(page.locator('#battleContent .personal-metric-grid')).toHaveCount(0);
   await page.locator('#personalRoleSelect').selectOption('副店');
-  ranks=await page.locator('.personal-performance-item .personal-priority small:nth-child(2)').allTextContents();
+  let ranks=await page.locator('.personal-performance-item .personal-priority small:nth-child(2)').allTextContents();
   expect(ranks).toEqual(['正式排名 19','正式排名 40','正式排名 61']);
+  const deputy=page.locator('.personal-performance-item').first();
+  await deputy.locator('.personal-performance-button').click();
+  await expect(deputy.locator('.personal-metric-grid article')).toHaveCount(10);
   await page.locator('#personalRoleSelect').selectOption('其他業代');
   await expect(page.locator('#battleContent .personal-performance-item')).toHaveCount(3);
 
@@ -59,15 +74,6 @@ test('App 1.2 personal area groups formal roles, filters under-target metrics an
   await page.locator('#personalGapMetricSelect').selectOption('R1399');
   await expect(page.locator('#battleContent')).toContainText('R1399 未達');
 
-  await page.locator('[data-personal-view="role"]').click();
-  await page.locator('#personalRoleSelect').selectOption('店長');
-  const first=page.locator('.personal-performance-item').first();
-  await first.locator('.personal-performance-button').click();
-  await expect(first.locator('.personal-metric-grid article')).toHaveCount(10);
-  await expect(first).toContainText('A999');
-  await expect(first).toContainText('A1399');
-  await expect(first).toContainText('R999');
-  await expect(first).toContainText('R1399');
   await page.locator('[data-battle-scope="store"]').click();
   await expect(page.locator('.personal-region-controls')).toHaveCount(0);
   await expect(page.locator('#battleContent .personal-performance-item')).toHaveCount(1);

@@ -20,7 +20,7 @@ function body(name) {
 }
 
 function loadAdapters() {
-  const names = ['numberOrNull','normalizeStore','kpiDataAsOfDate','sourceFileName','kpiSupplementIsCurrent','officialKpiRate','kpicalcMetricItems','adaptKpi','adaptAwards','personalRecord','personalRoleGroup','personalMetricByKey','personalRankedByRole','personalUnderTargetByMetric','personalAqReview','adaptPersonalPerformance','adaptReport'];
+  const names = ['numberOrNull','normalizeStore','kpiDataAsOfDate','sourceFileName','kpiSupplementIsCurrent','officialKpiRate','kpicalcMetricItems','adaptKpi','adaptAwards','personalRecord','personalRoleGroup','personalMetricByKey','personalRankedByRole','managerStorePerformanceRows','personalUnderTargetByMetric','personalAqReview','adaptPersonalPerformance','adaptReport'];
   const script = `
     const STORE_ALIASES = new Map([['三創','台北三創']]);
     const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
@@ -29,8 +29,8 @@ function loadAdapters() {
     const C = { moduleState: value => ({ ...value, sourceLink:value.source.href }) };
     const moduleSource = (label,href) => ({label,href});
     const stale = () => false;
-    ${names.map(name=>`function ${name}(${({numberOrNull:'value',normalizeStore:'value',kpiDataAsOfDate:'data',sourceFileName:'value',kpiSupplementIsCurrent:'data, supplement',officialKpiRate:'entry',kpicalcMetricItems:'data, rates',adaptKpi:'data, snapshot, readAt',adaptAwards:'snapshot, expectedReportDate, readAt',personalRecord:'raw',personalRoleGroup:'source',personalMetricByKey:'person,key',personalRankedByRole:'people,roleGroup',personalUnderTargetByMetric:'people,key',personalAqReview:'people',adaptPersonalPerformance:'snapshot, readAt',adaptReport:'segment, storeData, personalData, formalSummary'})[name]}) {${body(name)}}`).join('\n')}
-    module.exports = { adaptKpi, adaptAwards, personalRecord, personalRoleGroup, personalMetricByKey, personalRankedByRole, personalUnderTargetByMetric, personalAqReview, adaptPersonalPerformance, adaptReport };
+    ${names.map(name=>`function ${name}(${({numberOrNull:'value',normalizeStore:'value',kpiDataAsOfDate:'data',sourceFileName:'value',kpiSupplementIsCurrent:'data, supplement',officialKpiRate:'entry',kpicalcMetricItems:'data, rates',adaptKpi:'data, snapshot, readAt',adaptAwards:'snapshot, expectedReportDate, readAt',personalRecord:'raw',personalRoleGroup:'source',personalMetricByKey:'person,key',personalRankedByRole:'people,roleGroup',managerStorePerformanceRows:'people,stores',personalUnderTargetByMetric:'people,key',personalAqReview:'people',adaptPersonalPerformance:'snapshot, readAt',adaptReport:'segment, storeData, personalData, formalSummary'})[name]}) {${body(name)}}`).join('\n')}
+    module.exports = { adaptKpi, adaptAwards, personalRecord, personalRoleGroup, personalMetricByKey, personalRankedByRole, managerStorePerformanceRows, personalUnderTargetByMetric, personalAqReview, adaptPersonalPerformance, adaptReport };
   `;
   const context = vm.createContext({ module:{exports:{}}, exports:{}, Map, Set, Object, Array, String, Number, Boolean, Math, Date, JSON });
   vm.runInContext(script, context);
@@ -156,7 +156,7 @@ test('Personal performance adapter maps formal fields and derives AQ attention o
   assert.equal(result.status, 'ok');
   assert.equal(result.data.summary.total, 1);
   assert.equal(result.data.summary.achieved, 0);
-  assert.equal(result.data.summary.underTarget, 1);
+  assert.equal(result.data.summary.underTarget, 0);
   assert.equal(result.data.summary.aqAttentionCount, 1);
   assert.equal(result.data.summary.aqMissingCount, 0);
   assert.equal(result.data.people[0].roleGroup, '店長');
@@ -183,6 +183,26 @@ test('Personal performance role ranking uses formal rank ascending with null las
     {name:'甲',roleGroup:'副店',rank:45},{name:'乙',roleGroup:'副店',rank:null},{name:'丙',roleGroup:'副店',rank:12},{name:'丁',roleGroup:'副店',rank:31},{name:'戊',roleGroup:'店長',rank:1}
   ];
   assert.deepEqual(Array.from(A.personalRankedByRole(people,'副店'),person=>person.name),['丙','丁','甲','乙']);
+});
+
+test('Manager performance joins formal store KPI and sorts by store company rank, never personal rank', () => {
+  const A=loadAdapters();
+  const manager=(name,store,personalRank,aqActual)=>({name,store,roleGroup:'店長',rank:personalRank,totalRate:0,dod:0,rankChange:0,metrics:[{key:'AQ',actual:aqActual}]});
+  const people=[manager('甲店長','酒泉',1,7),manager('乙店長','通化',1326,10),manager('丙店長','無對應店',2,null)];
+  const stores=[
+    {name:'酒泉',kpi:1.082,rank:41,kpiDod:-.012,rankChange:-3},
+    {name:'通化',kpi:1.207,rank:8,kpiDod:.025,rankChange:4}
+  ];
+  const rows=A.managerStorePerformanceRows(people,stores);
+  assert.deepEqual(Array.from(rows,row=>row.person.name),['乙店長','甲店長','丙店長']);
+  assert.deepEqual(JSON.parse(JSON.stringify(rows[0].store)),stores[1]);
+  assert.equal(rows[0].aqActual,10);
+  assert.equal(rows[0].aqGap,0);
+  assert.equal(rows[1].aqActual,7);
+  assert.equal(rows[1].aqGap,3);
+  assert.equal(rows[2].store,null);
+  assert.equal(rows[2].aqActual,null);
+  assert.equal(rows[2].aqGap,null);
 });
 
 test('Personal performance metric gap excludes managers, keeps only rate below one and sorts high to low', () => {
