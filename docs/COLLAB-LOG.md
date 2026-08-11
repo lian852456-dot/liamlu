@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-12 ｜ Codex（App 1.2 半月督導檢查 Formal Read，未部署）
+
+- 做了什麼：從已通過 UI Preview 的 `51ce311` 建立隔離分支，只把既有 ptauth 1800 秒短效 session 接到 `hread`。新增純 read model，依正式 H1／H2、九店與題 1–18 篩選；`ok/abnormal/na/blank` 分別顯示符合／異常／不適用／尚未填寫。九店只呈現透明的「18/18 已填」「n/18 已填」「尚未填」，不建立 backend completed flag；openVisit 仍只提示與預選。
+- 結果（進行中）：合成九店 fixture 的正式 read adapter、三種店況逐題 parity、未授權／逾時與 390×844 測試均通過；console error 0、橫向溢出 0、正式 write request 0。正式 `hwrite`、`half_media_upload`、GAS、Pages、Native 與既有 ptvisit／巡店 canonical 計算均未修改。正式線上 hread 唯讀抽驗與完整必要回歸完成後才可交付 review。
+- 經驗 / 給下一位的提醒：hread 不暴露 worksheet 的正式 completed 欄位，因此 App 的 18 題 completeness 必須持續命名為「填寫進度」。既有 ptvisit fixture 固定 2026-08-11，在 08-12 會被 today-only 規則排除；依任務邊界只記錄，不可藉本次半月 read 修正它。
+
 ## 2026-08-12 ｜ Codex（App 1.2 半月督導檢查 Discovery／UI Preview，未部署）
 
 - 做了什麼：從乾淨 `origin/main` 建立 `feature/liam-supervisor-half-month-preview-20260812`，只盤點正式 `patrol.html`／`gas/Code.gs` 的半月督導檢查資料、設計 read-only contract，並在 App 巡店頁加入第二層「巡店檢查／半月督導檢查」Preview。到店與半月檢查維持完全 opt-in；openVisit 只提示並預選店點，沒有自動開始、沒有呼叫 `hread`／`hwrite`／`half_media_upload`。

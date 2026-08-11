@@ -2,6 +2,7 @@
   'use strict';
 
   const C = scope.LiamSupervisorContract;
+  const H = scope.LiamHalfMonthCheckReadModel;
   const DAILY_REPORT_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
   const PATROL_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
   const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
@@ -16,7 +17,7 @@
   const FAILURE_LABELS = { a999:'A999', a1399:'A1399', haosu:'好速', achieve:'R999', r1399:'R1399', insurance:'保險搭售率' };
   const READ_ACTIONS = new Set(['private_access','read','pread','kpicalc_access']);
   const DEVICE_ACTIONS = new Set(['private_request','private_request_status']);
-  const PATROL_READ_ACTIONS = new Set(['sread','ptread','ptvisit_read']);
+  const PATROL_READ_ACTIONS = new Set(['sread','ptread','ptvisit_read','hread']);
   const PATROL_WRITE_ACTIONS = new Set(['ptvisit_write']);
   const PRIVATE_MODULE_KEYS = ['todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models','personalPerformance','report1600','report2100','reportFailures'];
   const PREVIEW_MODE = new URLSearchParams(scope.location.search).get('preview') === '1';
@@ -43,6 +44,10 @@
   let halfMonthPreviewAnswers = {};
   let halfMonthPreviewMessage = '';
   let halfMonthPreviewResult = null;
+  let halfMonthFormalRows = [];
+  let halfMonthReadState = 'idle';
+  let halfMonthReadMessage = '';
+  let halfMonthSelectedPeriod = H ? H.periodForDate(taipeiDate()) : '';
   let privateAccessStatus = PREVIEW_MODE ? 'preview' : 'unauthorized';
 
   const dom = selector => document.querySelector(selector);
@@ -918,18 +923,19 @@
   }
 
   function halfMonthData() {
-    return PREVIEW_MODE && scope.LiamSupervisorHalfMonthPreviewData
-      ? scope.LiamSupervisorHalfMonthPreviewData
-      : null;
+    if(PREVIEW_MODE) return scope.LiamSupervisorHalfMonthPreviewData||null;
+    if(!H||halfMonthReadState!=='ok') return null;
+    return H.adapt({rows:halfMonthFormalRows,stores:STORES,date:taipeiDate(),period:halfMonthSelectedPeriod,normalizeStore});
   }
 
   function halfMonthOpenVisit() {
     return latestOpenPatrolVisit() || (halfMonthData() && halfMonthData().openVisit) || null;
   }
 
-  function halfMonthStatus(status) {
-    return ({ completed:['已完成','positive','check-circle-2'], improvement:['待改善','gold-value','triangle-alert'], pending:['尚未檢查','negative','circle-dashed'] })[status]
-      || ['狀態未提供','','circle-help'];
+  function halfMonthStatus(store) {
+    if(!store||store.answeredItems===0) return ['尚未填','negative','circle-dashed'];
+    if(store.answeredItems<18) return [`${store.answeredItems}/18 已填`,'gold-value','loader-circle'];
+    return ['18/18 已填',store.abnormalCount?'gold-value':'positive',store.abnormalCount?'triangle-alert':'check-circle-2'];
   }
 
   function captureHalfMonthPreviewForm() {
@@ -938,11 +944,14 @@
     all('[data-half-preview-question]').forEach(card=>{
       const item=Number(card.dataset.halfPreviewQuestion);
       const current=halfMonthPreviewAnswers[item]||{};
+      const note=card.querySelector('[data-half-note]');
+      const improvement=card.querySelector('[data-half-improvement]');
+      const evidence=card.querySelector('[data-half-evidence]');
       halfMonthPreviewAnswers[item]={
         result:current.result||'',
-        note:card.querySelector('[data-half-note]')?.value||current.note||'',
-        improvement:card.querySelector('[data-half-improvement]')?.value||current.improvement||'',
-        evidence:card.querySelector('[data-half-evidence]')?.value||current.evidence||''
+        note:note?note.value:current.note||'',
+        improvement:improvement?improvement.value:current.improvement||'',
+        evidence:evidence?evidence.value:current.evidence||''
       };
     });
   }
@@ -953,24 +962,39 @@
     return {completed,total};
   }
 
+  function seedHalfMonthPreviewAnswers(data, storeName) {
+    const store=(data&&Array.isArray(data.stores)?data.stores:[]).find(row=>row.name===storeName);
+    halfMonthPreviewAnswers={};
+    (store&&Array.isArray(store.questions)?store.questions:[]).forEach(question=>{
+      halfMonthPreviewAnswers[question.item]={
+        result:question.result||'',
+        note:question.note||'',
+        improvement:question.improvement||'',
+        evidence:question.evidence||''
+      };
+    });
+  }
+
   function renderHalfMonthOverview(data) {
     const summary=data.summary||{};
     const open=halfMonthOpenVisit();
     const storeRows=(data.stores||[]).map(store=>{
-      const [label,className,icon]=halfMonthStatus(store.status);
-      return `<article class="half-preview-store"><div><strong>${escapeHtml(store.name)}</strong><small>${store.completedAt?`完成日 ${escapeHtml(formatDate(store.completedAt))}`:'本期尚無完成日'}</small></div><div class="half-preview-store-status ${className}"><i data-lucide="${icon}"></i><b>${label}</b>${store.abnormalCount==null?'':`<small>異常 ${store.abnormalCount} · 待改善 ${store.pendingImprovementCount||0}</small>`}</div></article>`;
+      const [label,className,icon]=halfMonthStatus(store);
+      return `<article class="half-preview-store"><div><strong>${escapeHtml(store.name)}</strong><small>${store.latestDate?`最近填寫 ${escapeHtml(formatDate(store.latestDate))}`:'本期尚無填寫資料'}</small></div><div class="half-preview-store-status ${className}"><i data-lucide="${icon}"></i><b>${label}</b><small>異常 ${store.abnormalCount||0}</small></div></article>`;
     }).join('');
-    return `<section class="preview-only-banner"><b>PREVIEW / 尚未寫入正式資料</b><span>本頁只驗證資訊架構；未呼叫 hwrite 或媒體上傳。</span></section>
+    const periodControl=PREVIEW_MODE?'':`<div class="segmented half-period-selector" role="group" aria-label="半月期別"><button type="button" class="${data.period.key==='H1'?'active':''}" data-half-period="H1" aria-pressed="${data.period.key==='H1'}">上半月</button><button type="button" class="${data.period.key==='H2'?'active':''}" data-half-period="H2" aria-pressed="${data.period.key==='H2'}">下半月</button></div>`;
+    const readBanner=PREVIEW_MODE?'<b>PREVIEW / 尚未寫入正式資料</b><span>本頁只驗證資訊架構；未呼叫 hwrite 或媒體上傳。</span>':'<b>FORMAL READ / 正式唯讀</b><span>資料來自 hread；填寫進度是 18 題完整度，不是 backend completed。</span>';
+    return `<section class="preview-only-banner">${readBanner}</section>
       ${open?`<section class="half-preview-location"><i data-lucide="map-pin"></i><div><span>目前在：</span><b>${escapeHtml(normalizeStore(open.store))}</b><small>到店不會自動開始檢查</small></div></section>`:''}
-      <section class="panel half-preview-period"><div class="panel-head"><div><h2>本期半月督導檢查</h2><small>${escapeHtml(data.source&&data.source.label||'正式 hread contract')}</small></div></div><strong>${escapeHtml(data.period&&data.period.label||'—')}</strong><span>${escapeHtml(data.period&&data.period.dateRange||'—')}</span></section>
+      <section class="panel half-preview-period"><div class="panel-head"><div><h2>本期半月督導檢查</h2><small>${escapeHtml(data.source&&data.source.label||'正式 hread contract')}</small></div></div><strong>${escapeHtml(data.period&&data.period.label||'—')}</strong><span>${escapeHtml(data.period&&data.period.dateRange||'—')}</span>${periodControl}</section>
       <section class="half-preview-summary" aria-label="本期半月檢查摘要">
-        <article><span>已檢查店數</span><b>${summary.completedStores==null?'—':`${summary.completedStores}/${summary.totalStores}`}</b></article>
-        <article><span>異常店數</span><b class="${summary.abnormalStores?'gold-value':''}">${summary.abnormalStores==null?'—':summary.abnormalStores}</b></article>
-        <article><span>缺失／異常項目</span><b class="${summary.abnormalItems?'negative':''}">${summary.abnormalItems==null?'—':summary.abnormalItems}</b></article>
-        <article><span>尚未檢查</span><b class="${summary.pendingStores?'negative':''}">${summary.pendingStores==null?'—':summary.pendingStores}</b></article>
+        <article><span>18/18 已填</span><b>${summary.filledStores==null?'—':`${summary.filledStores} / ${summary.totalStores}`}</b></article>
+        <article><span>有異常</span><b class="${summary.abnormalStores?'gold-value':''}">${summary.abnormalStores==null?'—':`${summary.abnormalStores} 店`}</b></article>
+        <article><span>異常項目</span><b class="${summary.abnormalItems?'negative':''}">${summary.abnormalItems==null?'—':summary.abnormalItems}</b></article>
+        <article><span>尚未填</span><b class="${summary.emptyStores?'negative':''}">${summary.emptyStores==null?'—':`${summary.emptyStores} 店`}</b></article>
       </section>
-      <section class="panel half-preview-stores"><div class="panel-head"><div><h2>九店本期狀態</h2><small>完成／異常／待改善皆沿用正式結果語意</small></div></div>${storeRows}</section>
-      <button class="half-preview-start" type="button" data-half-preview-action="start">+ 開始半月督導檢查</button>`;
+      <section class="panel half-preview-stores"><div class="panel-head"><div><h2>九店本期狀態</h2><small>顯示 18 題填寫進度，不代表 backend completed</small></div></div>${storeRows}</section>
+      <button class="half-preview-start" type="button" data-half-preview-action="start">+ 開始檢查 Preview</button>`;
   }
 
   function renderHalfMonthForm(data) {
@@ -980,14 +1004,17 @@
     const questions=(data.questions||[]).map(question=>{
       const answer=halfMonthPreviewAnswers[question.item]||{};
       const abnormal=answer.result==='abnormal';
+      const sourceOriginal=!abnormal&&(answer.note||answer.improvement||answer.evidence)?`<div class="half-formal-original"><b>正式來源原文</b>${answer.note?`<p>檢查紀錄：${escapeHtml(answer.note)}</p>`:''}${answer.improvement?`<p>改善說明：${escapeHtml(answer.improvement)}</p>`:''}${answer.evidence?`<p>佐證：${escapeHtml(answer.evidence)}</p>`:''}</div>`:'';
       return `<article class="half-preview-question ${abnormal?'issue':''}" data-half-preview-question="${question.item}">
         <div class="half-preview-question-head"><span>${String(question.item).padStart(2,'0')}</span><strong>${escapeHtml(question.title)}</strong></div>
+        <small class="half-preview-result-label">目前值：${escapeHtml(H&&H.RESULT_LABELS[answer.result||'']||'尚未填寫')}</small>
         <div class="half-preview-statuses" role="group" aria-label="第 ${question.item} 題狀態">${(data.statuses||[]).map(status=>`<button type="button" class="${answer.result===status.value?'active':''}" data-half-answer="${status.value}">${escapeHtml(status.label)}</button>`).join('')}</div>
         <div class="half-preview-abnormal" ${abnormal?'':'hidden'}>
           <label>缺失內容<textarea rows="2" data-half-note placeholder="原文記錄，不自動改寫">${escapeHtml(answer.note||'')}</textarea></label>
           <label>改善說明<textarea rows="2" data-half-improvement placeholder="改善做法／待追蹤事項">${escapeHtml(answer.improvement||'')}</textarea></label>
-          <label>佐證／Drive 連結<input type="url" data-half-evidence value="${escapeHtml(answer.evidence||'')}" placeholder="本輪不新增上傳"></label>
+          <label>佐證／Drive 連結（正式原文）<textarea rows="2" data-half-evidence placeholder="本輪不新增上傳">${escapeHtml(answer.evidence||'')}</textarea></label>
         </div>
+        ${sourceOriginal}
       </article>`;
     }).join('');
     const progress=halfMonthPreviewProgress(data);
@@ -995,13 +1022,13 @@
       ${open?`<section class="half-preview-location"><i data-lucide="map-pin"></i><div><span>目前在：</span><b>${escapeHtml(normalizeStore(open.store))}</b><small>店點僅預選，仍由 Liam 主動開始</small></div></section>`:''}
       <section class="panel half-preview-form-meta"><div class="panel-head"><div><h2>${escapeHtml(data.period.label)}</h2><small>${escapeHtml(data.period.dateRange)}</small></div></div><label>檢查店點<select id="halfMonthStore" required>${options}</select></label></section>
       <div class="half-preview-questions">${questions}</div>
-      <div class="half-preview-sticky"><div><b id="halfMonthProgress">已完成 ${progress.completed} / ${progress.total}</b><span id="halfMonthPreviewMessage">${escapeHtml(halfMonthPreviewMessage)}</span></div><button type="button" data-half-preview-action="draft">暫存</button><button type="button" data-half-preview-action="complete">完成檢查</button></div>`;
+      <div class="half-preview-sticky"><div><b id="halfMonthProgress">已填 ${progress.completed} / ${progress.total}</b><span id="halfMonthPreviewMessage">${escapeHtml(halfMonthPreviewMessage)}</span></div><button type="button" data-half-preview-action="draft">暫存</button><button type="button" data-half-preview-action="complete">完成 Preview</button></div>`;
   }
 
   function renderHalfMonthResult(data) {
     const result=halfMonthPreviewResult||{store:halfMonthPreviewStore,completed:0,total:data.questions.length,abnormal:[]};
     return `<section class="preview-only-banner"><b>PREVIEW / 尚未寫入正式資料</b><span>以下為本機結果畫面示意，不代表正式檢查已完成。</span></section>
-      <section class="panel half-preview-result"><i data-lucide="badge-check"></i><h2>${escapeHtml(result.store||'未選店點')}</h2><p>${escapeHtml(data.period.label)}</p><div class="half-preview-result-grid"><span><b>${result.completed}/${result.total}</b>完成</span><span><b class="${result.abnormal.length?'negative':'positive'}">${result.abnormal.length}</b>異常</span><span><b class="${result.abnormal.length?'gold-value':'positive'}">${result.abnormal.length}</b>待改善</span></div></section>
+      <section class="panel half-preview-result"><i data-lucide="badge-check"></i><h2>${escapeHtml(result.store||'未選店點')}</h2><p>${escapeHtml(data.period.label)}</p><div class="half-preview-result-grid"><span><b>${result.completed}/${result.total}</b>本機已填</span><span><b class="${result.abnormal.length?'negative':'positive'}">${result.abnormal.length}</b>異常</span><span><b class="${result.abnormal.length?'gold-value':'positive'}">${result.abnormal.length}</b>待改善</span></div></section>
       <section class="panel"><div class="panel-head"><div><h2>異常項目</h2><small>只顯示 Preview 中選為異常的題目</small></div></div><div class="half-preview-result-list">${result.abnormal.length?result.abnormal.map(row=>`<article><b>${String(row.item).padStart(2,'0')} ${escapeHtml(row.title)}</b><span>待改善</span>${row.improvement?`<p>${escapeHtml(row.improvement)}</p>`:''}</article>`).join(''):'<div class="empty-state">本次 Preview 無異常項目。</div>'}</div></section>
       <button class="half-preview-start secondary" type="button" data-half-preview-action="overview">返回本期大盤</button>`;
   }
@@ -1009,9 +1036,22 @@
   function renderHalfMonthCheck() {
     const container=dom('#halfMonthCheckPreview');
     if(!container) return;
+    if(!PREVIEW_MODE&&!patrolToken){
+      container.innerHTML=patrolUnlockState(halfMonthReadMessage||'請先解鎖班表／巡店');
+      refreshIcons();
+      return;
+    }
+    if(!PREVIEW_MODE&&halfMonthReadState==='loading'){
+      container.innerHTML='<section class="preview-only-banner"><b>FORMAL READ / 唯讀</b><span>正在透過既有短效 session 讀取 hread；不會呼叫正式 write。</span></section><div class="empty-state">正在讀取半月督導檢查…</div>';
+      return;
+    }
+    if(!PREVIEW_MODE&&halfMonthReadState==='error'){
+      container.innerHTML=`<section class="preview-only-banner"><b>FORMAL READ / 唯讀</b><span>hread 讀取失敗，沒有使用舊資料或猜測值。</span></section><div class="empty-state">${escapeHtml(halfMonthReadMessage||'正式半月資料讀取失敗。')}</div>`;
+      return;
+    }
     const data=halfMonthData();
     if(!data){
-      container.innerHTML='<section class="preview-only-banner"><b>DISCOVERY ONLY</b><span>正式 hread 尚未接入 App；本輪不讀取、不寫入正式半月檢查。</span></section><div class="empty-state">半月督導檢查目前僅提供 Preview contract。</div>';
+      container.innerHTML='<section class="preview-only-banner"><b>FORMAL READ / 唯讀</b><span>切換至本頁後才讀取 hread；不會呼叫正式 write。</span></section><div class="empty-state">準備讀取半月督導檢查。</div>';
       return;
     }
     container.innerHTML=halfMonthPreviewScreen==='form'?renderHalfMonthForm(data):halfMonthPreviewScreen==='result'?renderHalfMonthResult(data):renderHalfMonthOverview(data);
@@ -1028,6 +1068,31 @@
     dom('#patrolCheckContent').hidden=patrolCheckView!=='patrol';
     dom('#halfMonthCheckPreview').hidden=patrolCheckView!=='half-month';
     if(patrolCheckView==='half-month') renderHalfMonthCheck();
+  }
+
+  async function loadHalfMonthFormalRead() {
+    if(PREVIEW_MODE) return;
+    if(!patrolToken){
+      halfMonthReadState='unauthorized';
+      halfMonthReadMessage='請先解鎖班表／巡店';
+      renderHalfMonthCheck();
+      return;
+    }
+    halfMonthReadState='loading';
+    halfMonthReadMessage='';
+    renderHalfMonthCheck();
+    try{
+      const response=await patrolRead('hread');
+      if(!Array.isArray(response.rows)) throw new Error('正式 hread 未回傳 rows。');
+      halfMonthFormalRows=response.rows;
+      halfMonthReadState='ok';
+    }catch(error){
+      halfMonthFormalRows=[];
+      halfMonthReadMessage=String(error&&error.message||'正式半月資料讀取失敗。');
+      halfMonthReadState=/授權已逾時/.test(halfMonthReadMessage)?'unauthorized':'error';
+      if(halfMonthReadState==='unauthorized') setMessage('#patrolAccessMessage','班表／巡店授權已逾時，請重新驗證','error');
+    }
+    renderHalfMonthCheck();
   }
 
   function renderPatrolRuleBoards(overview) {
@@ -1244,9 +1309,9 @@
   dom('#privateStatusCheck').addEventListener('click',async event=>{ event.currentTarget.disabled=true; try { await checkDeviceBinding(dom('#employeeId').value); } catch(error) { setMessage('#privateAccessMessage',error.message,'error'); } finally { event.currentTarget.disabled=false; } });
   dom('#privateLogout').addEventListener('click',logoutPrivateSummary);
   dom('#patrolAccessForm').addEventListener('submit',async event=>{ event.preventDefault(); const button=event.currentTarget.querySelector('button'); const input=dom('#patrolPasscode'); const passcode=input.value; input.value=''; button.disabled=true; try { await unlockPatrol(passcode); } catch(error) { setMessage('#patrolAccessMessage',error.message,'error'); } finally { button.disabled=false; } });
-  dom('#patrolLogout').addEventListener('click',()=>{ const token=patrolToken; patrolToken=''; scheduleRaw=null; scheduleViewData=null; patrolVisitEvents=[]; patrolOpenVisit=null; patrolStaleOpenVisit=null; patrolVisitError=''; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true; contract.scheduleToday=statusModule('scheduleToday'); contract.scheduleByDate=statusModule('scheduleByDate'); contract.patrolToday=statusModule('patrolToday'); contract.patrolOverview=statusModule('patrolOverview'); contract.patrolStores=statusModule('patrolStores'); renderAll(); if(token) postPatrolAuth({action:'ptlogout',token}).catch(()=>{}); });
+  dom('#patrolLogout').addEventListener('click',()=>{ const token=patrolToken; patrolToken=''; scheduleRaw=null; scheduleViewData=null; patrolVisitEvents=[]; patrolOpenVisit=null; patrolStaleOpenVisit=null; patrolVisitError=''; halfMonthFormalRows=[]; halfMonthReadState='unauthorized'; halfMonthReadMessage='請先解鎖班表／巡店'; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true; contract.scheduleToday=statusModule('scheduleToday'); contract.scheduleByDate=statusModule('scheduleByDate'); contract.patrolToday=statusModule('patrolToday'); contract.patrolOverview=statusModule('patrolOverview'); contract.patrolStores=statusModule('patrolStores'); renderAll(); if(token) postPatrolAuth({action:'ptlogout',token}).catch(()=>{}); });
   all('[data-patrol-visit]').forEach(button=>button.addEventListener('click',()=>openPatrolVisitDialog(button.dataset.patrolVisit)));
-  all('[data-patrol-check-view]').forEach(button=>button.addEventListener('click',()=>setPatrolCheckView(button.dataset.patrolCheckView)));
+  all('[data-patrol-check-view]').forEach(button=>button.addEventListener('click',()=>{ setPatrolCheckView(button.dataset.patrolCheckView); if(button.dataset.patrolCheckView==='half-month')loadHalfMonthFormalRead(); }));
   dom('#patrolVisitClose').addEventListener('click',()=>dom('#patrolVisitDialog').close());
   dom('#patrolVisitStore').addEventListener('change',updatePatrolVisitSubmitState);
   dom('#patrolVisitForm').addEventListener('submit',event=>{ event.preventDefault(); submitPatrolVisit(event.currentTarget); });
@@ -1256,6 +1321,17 @@
   dom('#scheduleStoreFilter').addEventListener('change',renderSchedule);
   all('[data-refresh]').forEach(button=>button.addEventListener('click',()=>{ if(PREVIEW_MODE)renderAll(); else { const id=scope.localStorage.getItem(EMPLOYEE_KEY); if(id)loadFormalSummary(id).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); }); if(patrolToken)loadPatrolData(); } }));
   document.addEventListener('click',event=>{
+    const halfPeriodButton=event.target.closest('[data-half-period]');
+    if(halfPeriodButton){
+      halfMonthSelectedPeriod=halfPeriodButton.dataset.halfPeriod;
+      halfMonthPreviewScreen='overview';
+      halfMonthPreviewStore='';
+      halfMonthPreviewAnswers={};
+      halfMonthPreviewMessage='';
+      halfMonthPreviewResult=null;
+      renderHalfMonthCheck();
+      return;
+    }
     const halfAnswer=event.target.closest('[data-half-answer]');
     if(halfAnswer){
       const card=halfAnswer.closest('[data-half-preview-question]');
@@ -1274,7 +1350,7 @@
       if(!data) return;
       if(action==='start'){
         halfMonthPreviewStore=halfMonthOpenVisit()?normalizeStore(halfMonthOpenVisit().store):'';
-        halfMonthPreviewAnswers={};
+        seedHalfMonthPreviewAnswers(data,halfMonthPreviewStore);
         halfMonthPreviewMessage='';
         halfMonthPreviewResult=null;
         halfMonthPreviewScreen='form';
@@ -1309,6 +1385,13 @@
     const personalButton=event.target.closest('.personal-performance-button'); if(personalButton){ const item=personalButton.closest('.personal-performance-item'); item.classList.toggle('expanded'); personalButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
     const personalViewButton=event.target.closest('[data-personal-view]'); if(personalViewButton){ personalRegionView=personalViewButton.dataset.personalView; renderBattle(); return; }
     const reportStore=event.target.closest('.report-store-button'); if(reportStore){ const item=reportStore.closest('.report-store'); item.classList.toggle('expanded'); reportStore.setAttribute('aria-expanded',item.classList.contains('expanded')); }
+  });
+  document.addEventListener('change',event=>{
+    if(event.target.id!=='halfMonthStore') return;
+    halfMonthPreviewStore=event.target.value;
+    seedHalfMonthPreviewAnswers(halfMonthData(),halfMonthPreviewStore);
+    halfMonthPreviewMessage='已載入此店正式目前值；修改仍只存在本機 Preview。';
+    renderHalfMonthCheck();
   });
   scope.addEventListener('hashchange',()=>{ const name=location.hash.slice(1); if(all('[data-view]').some(view=>view.dataset.view===name))setView(name); });
 

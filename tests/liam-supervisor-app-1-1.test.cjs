@@ -62,7 +62,7 @@ test('App runtime keeps existing reads and allows only the isolated patrol visit
   const code = read('app.js');
   assert.match(code, /new Set\(\['private_access','read','pread','kpicalc_access'\]\)/);
   assert.match(code, /new Set\(\['private_request','private_request_status'\]\)/);
-  assert.match(code, /new Set\(\['sread','ptread','ptvisit_read'\]\)/);
+  assert.match(code, /new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
   assert.match(code, /new Set\(\['ptvisit_write'\]\)/);
   for (const blocked of ["action:'write'", "action:'pwrite'", "action:'ptwrite'", '.appendRow(', '.setValue(', '.setValues(', '.createFile(']) {
     assert.ok(!code.includes(blocked), `blocked write path found: ${blocked}`);

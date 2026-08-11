@@ -1,6 +1,6 @@
 # Half-month Supervisor Check Read Contract V1
 
-本契約是 Liam Supervisor App 1.2 的 read-only 設計稿。正式 runtime 尚未接線；本輪 UI 使用醒目標示的 Preview fixture，所有按鈕只改頁面記憶體。
+本契約是 Liam Supervisor App 1.2 的 formal read-only contract。正式 runtime 僅沿用既有 `ptauth` 1800 秒 token 呼叫 `hread`；表單按鈕仍只改頁面記憶體，不呼叫 `hwrite` 或 `half_media_upload`。
 
 ```json
 {
@@ -17,16 +17,16 @@
     "canonical": "patrol.html#halfPeriod"
   },
   "summary": {
-    "completedStores": 8,
+    "filledStores": 8,
     "totalStores": 9,
     "abnormalStores": 3,
     "abnormalItems": 5,
-    "pendingStores": 1
+    "emptyStores": 1
   },
   "stores": [{
     "name": "酒泉",
-    "status": "completed | improvement | pending | in_progress | unknown",
-    "completedAt": "YYYY-MM-DD or empty",
+    "fillState": "filled | in_progress | empty",
+    "latestDate": "YYYY-MM-DD or empty",
     "answeredItems": 18,
     "totalItems": 18,
     "abnormalCount": 2,
@@ -36,7 +36,7 @@
   "questions": [{
     "item": 1,
     "title": "督導駐點",
-    "result": "ok | abnormal | na | empty",
+    "result": "ok | abnormal | na | blank",
     "note": "formal original text",
     "improvement": "formal original text",
     "evidence": [{
@@ -52,12 +52,12 @@
 
 ## Mapping invariants
 
-1. period 必須由正式 `patrol.html` canonical rule 或未來 server read adapter 提供；App 不自行判斷日期區間。
+1. period 沿用正式 `patrol.html` canonical rule：1–15 日為 H1、16 日至月底為 H2；App read model 只實作同一規則，不建立另一套業務判定。
 2. 本期資料只接受同一 `month + period`，店點須命中正式九店清單。
-3. 僅採正式第 1–18 題；18 題皆有 `ok/abnormal/na` 才能標示 completed。
-4. 任一題 `abnormal` 的已完成店顯示 improvement；有資料但不足 18 題顯示 in_progress；完全無資料顯示 pending。
+3. 僅採正式第 1–18 題；`ok/abnormal/na` 都計入「已填」，blank 不計入。
+4. 18 題皆非 blank 顯示「18/18 已填」；1–17 題非 blank 顯示「n/18 已填」；18 題全 blank 顯示「尚未填」。這是透明 completeness，不是 backend completed 狀態。
 5. `abnormalItems` 是正式 rows 中該期 `result=abnormal` 的題數；不從文字推算。
 6. `createdAt` 不得由 `savedAt` 冒充。現有 hread 未暴露建立時間時保持 null。
-7. `draft/completed` worksheet 欄位尚未由 hread 暴露；正式接線前不得宣稱 App 使用該 canonical 欄位。
+7. `draft/completed` worksheet 欄位未由 hread 暴露；App 不建立或宣稱正式 completed flag。
 8. openVisit 只可用於店點預選與「目前在」提示，不會自動開始或建立半月檢查。
-9. Preview 的暫存／完成不得呼叫 `hwrite`、`half_media_upload` 或任何正式 endpoint。
+9. 正式 hread 值可載入手機 Preview 表單，但所有修改、暫存與完成只存在本地頁面記憶體，不得呼叫 `hwrite`、`half_media_upload` 或其他正式 write endpoint。

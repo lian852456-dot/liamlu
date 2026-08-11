@@ -31,9 +31,9 @@ test('preview mirrors the formal 18-item and result semantics', () => {
 });
 
 test('half-month preview is isolated from formal read and write actions', () => {
-  assert.match(app, /const PATROL_READ_ACTIONS = new Set\(\['sread','ptread','ptvisit_read'\]\)/);
+  assert.match(app, /const PATROL_READ_ACTIONS = new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
   assert.match(app, /const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write'\]\)/);
-  assert.doesNotMatch(app.match(/function renderHalfMonthOverview[\s\S]+?function renderPatrolRuleBoards/)?.[0] || '', /fetch\(|patrolRead\(|patrolVisitWrite\(|privateInspectionRequest\(|privateInspectionMediaUpload\(/);
+  assert.doesNotMatch(app.match(/function renderHalfMonthOverview[\s\S]+?async function loadHalfMonthFormalRead/)?.[0] || '', /fetch\(|patrolRead\(|patrolVisitWrite\(|privateInspectionRequest\(|privateInspectionMediaUpload\(/);
   assert.match(html, /data-patrol-check-view="patrol"/);
   assert.match(html, /data-patrol-check-view="half-month"/);
 });

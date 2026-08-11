@@ -107,16 +107,14 @@
     'iPhone手機盤點盤差登載','到店全盤作業（2月1次）'
   ].map((title,index)=>({ item:index+1,title }));
   const halfMonthStores = [
-    ['通化','completed','2026-08-04',0,0],['酒泉','improvement','2026-08-06',2,2],
-    ['台北三創','improvement','2026-08-07',1,1],['萬大','completed','2026-08-08',0,0],
-    ['六張犁','completed','2026-08-08',0,0],['復興南','improvement','2026-08-09',2,2],
-    ['永吉','completed','2026-08-09',0,0],['大稻埕','completed','2026-08-10',0,0],
-    ['杭州南','pending','',null,null]
-  ].map(([name,status,completedAt,abnormalCount,pendingImprovementCount])=>({name,status,completedAt,abnormalCount,pendingImprovementCount}));
+    ['杭州南',0,'',0],['六張犁',5,'2026-08-08',1],['酒泉',18,'2026-08-06',2],
+    ['台北三創',18,'2026-08-07',1],['復興南',18,'2026-08-09',2],['通化',18,'2026-08-04',0],
+    ['萬大',18,'2026-08-08',0],['永吉',18,'2026-08-09',0],['大稻埕',18,'2026-08-10',0]
+  ].map(([name,answeredItems,latestDate,abnormalCount])=>({name,answeredItems,totalItems:18,latestDate,abnormalCount,fillState:answeredItems===0?'empty':answeredItems===18?'filled':'in_progress',questions:halfMonthQuestions.map(question=>({...question,result:'',note:'',improvement:'',evidence:''}))}));
   const halfMonthPreview = {
     preview:true,
     period:{ key:'H1', month:'2026-08', label:'2026 年 8 月上半月', dateRange:'8/1–8/15' },
-    summary:{ completedStores:8,totalStores:9,abnormalStores:3,abnormalItems:5,pendingStores:1 },
+    summary:{ filledStores:7,totalStores:9,abnormalStores:4,abnormalItems:6,emptyStores:1 },
     stores:halfMonthStores,
     questions:halfMonthQuestions,
     statuses:[
