@@ -40,4 +40,30 @@ test('same ptread fixture yields canonical monthly patrol overview and item pari
   assert.equal(sanchuang.missingItems, 0);
   assert.equal(sanchuang.awareness.status, 'late');
   assert.equal(sanchuang.awareness.completedDay, 22);
+
+  assert.equal(result.item18Progress.completedStores, 2);
+  assert.equal(result.item18Progress.stores.find(store => store.name === '台北通化').current.date, '2026-07-31');
+  assert.equal(result.item18Progress.stores.find(store => store.name === '台北酒泉').current.done, false);
+  assert.equal(result.inventory.completedStores, 3);
+  assert.deepEqual(result.inventory.stores.find(store => store.name === '台北酒泉').items, { 14:true, 15:true, 16:true, 17:true });
+
+  assert.equal(result.visitCounts.find(store => store.name === '台北通化').count, 2);
+  assert.equal(result.visitCounts.find(store => store.name === '台北酒泉').count, 1);
+  assert.equal(result.visitCounts.find(store => store.name === '台北三創').count, 2);
+  assert.equal(result.sameDayMultipleVisitsDistinguishable, false);
+  assert.equal(result.recent.length, 5, '33 item rows aggregate to one store/date visit row');
+  assert.deepEqual(result.recent[0], { date:'2026-08-22', store:'台北三創', complete:true, missingItems:0, missingItemNumbers:[] });
+});
+
+test('visit count follows patrol.html unique arrival-date rule and never counts ptread rows', () => {
+  const rows = [
+    { store:'台北通化', code:'DNB10059', arriveTime:'2026/8/10 09:00', fillTime:'2026/8/10 12:00', month:'2026-08', item:14, result:'v' },
+    { store:'台北通化', code:'DNB10059', arriveTime:'2026/8/10 10:30', fillTime:'2026/8/10 12:01', month:'2026-08', item:15, result:'' },
+    { store:'台北通化', code:'DNB10059', arriveTime:'2026/8/11 09:00', fillTime:'2026/8/11 12:00', month:'2026-08', item:14, result:'v' }
+  ];
+  const result = model.visitSummary(rows, [fixture.stores[0]], '2026-08');
+  assert.equal(result.storeCounts[0].count, 2);
+  assert.equal(result.sameDayMultipleVisitsDistinguishable, false);
+  assert.equal(result.recent.length, 2);
+  assert.equal(result.recent.find(row => row.date === '2026-08-10').missingItems, 1);
 });

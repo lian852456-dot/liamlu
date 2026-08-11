@@ -42,12 +42,17 @@ test('public ping and pthealth disclose no protected data', { skip }, async () =
   }
 });
 
-for (const action of ['debug', 'ptread', 'sread', 'hread']) {
+for (const action of ['debug', 'ptread', 'ptvisit_read', 'sread', 'hread']) {
   test(`${action} rejects missing and incorrect credentials`, { skip }, async () => {
     assertUnauthorized(await get(action), `${action} missing credential`);
     assertUnauthorized(await get(action, { key: WRONG_KEY }), `${action} incorrect key`);
   });
 }
+
+test('ptvisit_write rejects missing and incorrect short-session tokens', { skip }, async () => {
+  assertUnauthorized(await post({ action:'ptvisit_write', visitAction:'arrival', store:'台北通化' }), 'ptvisit_write missing token');
+  assertUnauthorized(await post({ action:'ptvisit_write', token:WRONG_KEY, visitAction:'arrival', store:'台北通化' }), 'ptvisit_write incorrect token');
+});
 
 for (const action of ['ptwrite', 'hwrite']) {
   test(`${action} rejects before parsing or writing`, { skip }, async () => {

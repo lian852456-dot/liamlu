@@ -375,6 +375,41 @@ body { font-size:16px; }
 .patrol-rule-summary span { padding:7px 9px; border:1px solid var(--line-soft); border-radius:999px; color:var(--muted); background:#081d31; font-size:14px; }
 .patrol-rule-summary b { color:var(--text); font-variant-numeric:tabular-nums; }
 .patrol-store-row > span:last-child small { display:block; margin-top:4px; color:var(--muted); font-size:12px; line-height:1.35; }
+.patrol-visit-panel { margin-bottom:12px; }
+.patrol-visit-actions { display:grid; grid-template-columns:1fr 1fr; gap:9px; padding:0 13px 6px; }
+.patrol-visit-actions button,.patrol-visit-dialog button { min-height:44px; border:1px solid #2e7997; border-radius:12px; color:#061521; background:var(--cyan); font-size:16px; font-weight:900; }
+.patrol-visit-actions button:last-child { color:var(--cyan); background:#0a2a40; }
+.patrol-visit-actions button:disabled { opacity:.45; }
+.patrol-visit-today { padding:5px 13px 13px; }
+.patrol-visit-today h3 { margin:5px 0 8px; font-size:16px; }
+.patrol-visit-event { display:grid; grid-template-columns:54px 42px minmax(0,1fr); gap:8px; align-items:center; min-height:44px; border-bottom:1px solid var(--line-soft); font-size:14px; }
+.patrol-visit-event time { color:var(--cyan); font-variant-numeric:tabular-nums; }
+.patrol-visit-event small { grid-column:1/-1; padding:0 0 8px; color:var(--muted); font-size:14px; overflow-wrap:anywhere; }
+.patrol-visit-dialog { width:min(360px,calc(100vw - 28px)); padding:0; border:1px solid var(--line); border-radius:16px; color:var(--text); background:#071b2e; box-shadow:0 24px 70px #000b; }
+.patrol-visit-dialog::backdrop { background:#020811cc; }
+.patrol-visit-dialog form { display:grid; gap:13px; padding:15px; }
+.patrol-visit-dialog-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.patrol-visit-dialog h2 { margin:0; font-size:20px; }
+.patrol-visit-dialog #patrolVisitClose { width:44px; padding:0; color:var(--muted); background:#0a2a40; }
+.patrol-visit-dialog label { color:var(--muted); font-size:14px; font-weight:800; }
+.patrol-visit-dialog select,.patrol-visit-dialog textarea { width:100%; margin-top:6px; padding:10px 11px; border:1px solid var(--line); border-radius:11px; color:var(--text); background:#061728; font:inherit; font-size:16px; }
+.patrol-visit-dialog select { min-height:44px; }
+.patrol-visit-dialog textarea { resize:vertical; }
+.patrol-visit-dialog p,.patrol-count-note { margin:0; color:var(--muted); font-size:14px; line-height:1.45; }
+.patrol-rule-panel { margin-bottom:12px; }
+.patrol-rule-table { padding:0 13px 13px; }
+.patrol-rule-row { display:grid; align-items:center; min-height:46px; border-bottom:1px solid var(--line-soft); font-size:14px; font-variant-numeric:tabular-nums; }
+.patrol-rule-row.header { min-height:38px; color:var(--muted); font-size:13px; font-weight:800; }
+.patrol-rule-row span:not(:first-child) { text-align:center; }
+.patrol-item18-table .patrol-rule-row { grid-template-columns:minmax(80px,1.1fr) 48px 65px minmax(82px,1fr); }
+.patrol-inventory-table .patrol-rule-row { grid-template-columns:minmax(88px,1.3fr) repeat(4,minmax(42px,.6fr)); }
+.patrol-visit-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); padding:0 13px 9px; }
+.patrol-visit-counts div { min-width:0; padding:9px; border-right:1px solid var(--line-soft); border-bottom:1px solid var(--line-soft); }
+.patrol-visit-counts div:nth-child(3n) { border-right:0; }
+.patrol-visit-counts span,.patrol-visit-counts b { display:block; }
+.patrol-visit-counts span { min-height:38px; color:var(--muted); font-size:14px; line-height:1.3; }
+.patrol-visit-counts b { margin-top:4px; font-size:17px; font-variant-numeric:tabular-nums; }
+.patrol-count-note { padding:0 13px 13px; }
 
 @media (max-width:480px) {
   .brand strong { font-size:16px; }
@@ -397,4 +432,5 @@ body { font-size:16px; }
   .core-cell b { font-size:17px; }
   .award-row { font-size:14px; }
   .patrol-store-row { grid-template-columns:minmax(82px,1fr) minmax(82px,.9fr) minmax(52px,.6fr) minmax(100px,1.15fr); }
+  .patrol-rule-row { font-size:14px; }
 }

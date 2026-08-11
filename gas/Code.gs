@@ -359,6 +359,17 @@ function doGet(e) {
     }
   }
 
+  // ── 巡店到離店：讀取指定日期（獨立於巡店明細）──
+  if (action === 'ptvisit_read') {
+    try {
+      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      const state = patrolVisitState_(e.parameter.date || '');
+      return jsonResponse({ status: 'ok', events: state.events, openVisit: state.openVisit });
+    } catch(err) {
+      return jsonResponse({ status: 'error', message: err.message });
+    }
+  }
+
   // ── 督導半月檢查：寫入（patrol.html，JSONP）──
   if (action === 'hwrite') {
     const cb = e.parameter.callback;
@@ -563,6 +574,141 @@ function readPatrol() {
     rows.push(o);
   }
   return rows;
+}
+
+// ════════════════════════════════════
+// 巡店到離店紀錄（獨立 action／獨立工作表）
+// 不修改「巡店明細」schema，也不改 ptread／ptwrite 語意。
+// ════════════════════════════════════
+const PATROL_VISIT_SHEET = '巡店到離店紀錄';
+const PATROL_VISIT_HEADERS = ['serverTime','date','action','store','note','visitSessionId'];
+const PATROL_VISIT_NOTE_MAX = 200;
+const PATROL_VISIT_RAPID_SECONDS = 15;
+
+function patrolVisitNow_() {
+  return Utilities.formatDate(new Date(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
+}
+
+function patrolVisitDate_(dateValue) {
+  const date = String(dateValue || '').trim();
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('invalid visit date');
+  return date || Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd');
+}
+
+function patrolVisitStore_(value) {
+  const clean = String(value || '').replace(/\s+/g, '').trim();
+  const match = PT_STORES.find(function(store) {
+    const name = String(store.name || '').replace(/\s+/g, '');
+    return clean === name || clean === name.replace(/^台北/, '');
+  });
+  if (!match) throw new Error('invalid patrol store');
+  return String(match.name);
+}
+
+function patrolVisitPayload_(payload) {
+  const body = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+  const allowed = { action:true, token:true, visitAction:true, store:true, note:true };
+  Object.keys(body).forEach(function(key) {
+    if (!allowed[key]) throw new Error('unexpected patrol visit field');
+  });
+  if (!ptSessionAuthorized_(body.token)) throw new Error('unauthorized');
+  const visitAction = String(body.visitAction || '').trim();
+  if (visitAction !== 'arrival' && visitAction !== 'departure') throw new Error('invalid patrol visit action');
+  const note = String(body.note || '').trim();
+  if (Array.from(note).length > PATROL_VISIT_NOTE_MAX) throw new Error('patrol visit note is too long');
+  return { visitAction:visitAction, store:patrolVisitStore_(body.store), note:note };
+}
+
+function getPatrolVisitSheet_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sh = ss.getSheetByName(PATROL_VISIT_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(PATROL_VISIT_SHEET);
+    sh.appendRow(PATROL_VISIT_HEADERS);
+    sh.setFrozenRows(1);
+    sh.getRange('A:F').setNumberFormat('@');
+  }
+  return sh;
+}
+
+function patrolVisitRowsFromSheet_(sh) {
+  if (!sh || sh.getLastRow() < 2) return [];
+  const values = sh.getDataRange().getDisplayValues();
+  const headers = values[0];
+  return values.slice(1).map(function(row) {
+    const result = {};
+    headers.forEach(function(header, index) { result[header] = String(row[index] || ''); });
+    return result;
+  });
+}
+
+function readPatrolVisitEvents_(dateValue) {
+  const sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(PATROL_VISIT_SHEET);
+  const date = patrolVisitDate_(dateValue);
+  return patrolVisitRowsFromSheet_(sh).filter(function(row) { return row.date === date; });
+}
+
+function latestOpenPatrolVisit_(rows) {
+  const open = new Map();
+  rows.forEach(function(row) {
+    if (row.action === 'arrival') open.set(row.visitSessionId, row);
+    else if (row.action === 'departure') open.delete(row.visitSessionId);
+  });
+  const remaining = Array.from(open.values());
+  return remaining.length ? remaining[remaining.length - 1] : null;
+}
+
+function patrolVisitState_(dateValue) {
+  const sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(PATROL_VISIT_SHEET);
+  const rows = patrolVisitRowsFromSheet_(sh);
+  const date = patrolVisitDate_(dateValue);
+  return {
+    events:rows.filter(function(row) { return row.date === date; }),
+    openVisit:latestOpenPatrolVisit_(rows)
+  };
+}
+
+function patrolVisitRapidDuplicate_(rows, action, store, serverTime) {
+  const last = rows.length ? rows[rows.length - 1] : null;
+  if (!last || last.action !== action || last.store !== store) return false;
+  const previous = Date.parse(last.serverTime);
+  const current = Date.parse(serverTime);
+  return Number.isFinite(previous) && Number.isFinite(current) && current - previous < PATROL_VISIT_RAPID_SECONDS * 1000;
+}
+
+function writePatrolVisitEvent_(payload) {
+  const clean = patrolVisitPayload_(payload);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = getPatrolVisitSheet_();
+    const rows = patrolVisitRowsFromSheet_(sh);
+    const serverTime = patrolVisitNow_();
+    if (patrolVisitRapidDuplicate_(rows, clean.visitAction, clean.store, serverTime)) throw new Error('duplicate patrol visit action');
+    const open = latestOpenPatrolVisit_(rows);
+    let visitSessionId;
+    if (clean.visitAction === 'arrival') {
+      if (open) throw new Error('patrol visit already open');
+      visitSessionId = Utilities.getUuid();
+    } else {
+      if (!open) throw new Error('no open patrol visit');
+      if (open.store !== clean.store) throw new Error('departure store does not match open visit');
+      visitSessionId = open.visitSessionId;
+    }
+    const event = {
+      serverTime:serverTime,
+      date:serverTime.slice(0, 10),
+      action:clean.visitAction,
+      store:clean.store,
+      note:clean.note,
+      visitSessionId:visitSessionId
+    };
+    sh.appendRow(PATROL_VISIT_HEADERS.map(function(header) { return event[header] || ''; }));
+    const state = patrolVisitState_(event.date);
+    return { event:event, events:state.events, openVisit:state.openVisit };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ════════════════════════════════════
@@ -1428,6 +1574,7 @@ function doPost(e) {
     let result;
     if (action === 'ptauth') result = ptAuthenticatePayload(payload);
     else if (action === 'ptlogout') result = ptLogoutPayload(payload);
+    else if (action === 'ptvisit_write') result = writePatrolVisitEvent_(payload);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
     else if (action === 'private_request') result = privateDashboardRequestBinding(payload);
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);

@@ -7,7 +7,7 @@ const root = path.join(__dirname, '..');
 const code = fs.readFileSync(path.join(root, 'gas/Code.gs'), 'utf8');
 const media = fs.readFileSync(path.join(root, 'gas/HalfMedia.gs'), 'utf8');
 
-const protectedActions = ['debug', 'ptread', 'ptwrite', 'sread', 'hread', 'hwrite'];
+const protectedActions = ['debug', 'ptread', 'ptwrite', 'ptvisit_read', 'sread', 'hread', 'hwrite'];
 
 test('PT_KEY comes only from Script Properties and fails closed when absent', () => {
   assert.match(code, /getScriptProperties\(\)\.getProperty\('PT_KEY'\)/);
@@ -24,6 +24,12 @@ test('every protected patrol GET action checks ptAuthorized before data access',
     const firstDataAccess = branch[1].search(/JSON\.parse|SpreadsheetApp|readPatrol|writePatrol|readSchedule|readHalfCheck|writeHalfCheck/);
     assert.ok(firstDataAccess === -1 || authIndex < firstDataAccess, `${action} touches data before authorization`);
   }
+});
+
+test('patrol visit POST accepts only the existing short-lived patrol session', () => {
+  assert.match(code, /action === 'ptvisit_write'\) result = writePatrolVisitEvent_\(payload\)/);
+  assert.match(code, /function patrolVisitPayload_\(payload\)[\s\S]*ptSessionAuthorized_\(body\.token\)/);
+  assert.doesNotMatch(code, /function patrolVisitPayload_\(payload\)[\s\S]*?ptCredentialAuthorized_\(body\.key/);
 });
 
 test('public health actions expose no patrol data or credentials', () => {

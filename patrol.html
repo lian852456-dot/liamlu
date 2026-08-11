@@ -1762,8 +1762,7 @@ function dashboardRowMonth(row){
 }
 function dashboardRowHalf(row){ const found=String(row.fillTime||'').match(/\d{4}\/\d{1,2}\/(\d{1,2})/);return found&&Number(found[1])<=15?'H1':found?'H2':''; }
 function dashboardPatrolRows(store){ return rawDetails.filter(row=>(store.code&&String(row.code||'')===store.code)||dashboardStoreKey(row.store)===store.key); }
-function dashboardVisitDate(row){ const found=String(row.arriveTime||row.fillTime||'').match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);return found?`${found[1]}-${String(found[2]).padStart(2,'0')}-${String(found[3]).padStart(2,'0')}`:''; }
-function dashboardVisitCount(rows, month){ return new Set(rows.filter(row=>dashboardRowMonth(row)===month).map(dashboardVisitDate).filter(Boolean)).size; }
+function dashboardVisitCount(rows, month){ const first=rows[0]||{};return PatrolReadModel.visitSummary(rows,[{name:first.store||'',code:first.code||''}],month).storeCounts[0]?.count||0; }
 function dashboardCheckedItemCount(rows, month){ return new Set(rows.filter(row=>dashboardRowMonth(row)===month&&(String(row.result||'').toLowerCase()==='v'||/^na$/i.test(String(row.reason||'').trim()))).map(row=>Number(row.item)).filter(item=>item>=1&&item<=33)).size; }
 function dashboardProgress(rows, expected){
   const done=item=>rows.some(row=>Number(row.item)===item&&String(row.result||'').toLowerCase()==='v');

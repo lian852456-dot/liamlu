@@ -92,6 +92,50 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
   await expect(page.locator('#patrolOverview')).toContainText('本月已巡店數');
   await expect(page.locator('#patrolOverview')).toContainText('6');
   await expect(page.locator('#patrolTodayDetail')).toContainText('下一站');
+  await expect(page.locator('#patrolOverview')).toContainText('題 18 雙月全盤進度');
+  await expect(page.locator('#patrolOverview')).toContainText('題 14–17 每月盤點');
+  await expect(page.locator('#patrolOverview')).toContainText('本月各店巡店次數');
+  await expect(page.locator('#patrolRecentList .recent-row')).toHaveCount(3);
+  const patrolOverflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
+  expect(patrolOverflow).toBeLessThanOrEqual(0);
+  await page.screenshot({path:'test-output/liam-supervisor-patrol-minimal-390x844.png',fullPage:true});
+});
+
+test('isolated patrol visit flow records arrival and departure with one protected POST per tap', async ({ page }) => {
+  const events=[]; let writes=0;
+  await page.addInitScript(()=>sessionStorage.setItem('bei12b_pt_session_token','short-session-token'));
+  await page.route('https://script.google.com/**',async route=>{
+    const request=route.request();
+    if(request.method()==='POST') {
+      const payload=JSON.parse(request.postData()||'{}');
+      if(payload.action==='ptauth') return route.fulfill({json:{status:'ok',token:'short-session-token'}});
+      if(payload.action==='ptvisit_write') {
+        writes+=1;
+        const event={serverTime:writes===1?'2026-08-11T09:12:00+08:00':'2026-08-11T10:35:00+08:00',date:'2026-08-11',action:payload.visitAction,store:`台北${payload.store.replace(/^台北/,'')}`,note:payload.note,visitSessionId:'visit-1'};
+        events.push(event);
+        return route.fulfill({json:{status:'ok',event,events}});
+      }
+    }
+    const action=new URL(request.url()).searchParams.get('action');
+    if(action==='sread') return route.fulfill({json:{status:'ok',schedule:{month:'2026-08',stores:[]}}});
+    if(action==='ptread') return route.fulfill({json:{status:'ok',stores:['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'].map(name=>({name})),rows:[]}});
+    if(action==='ptvisit_read') return route.fulfill({json:{status:'ok',events}});
+    return route.fulfill({json:{status:'error',message:'unexpected action'}});
+  });
+  await page.goto(FORMAL_FILE_URL+'#patrol');
+  await expect(page.locator('#patrolArrivalButton')).toBeEnabled();
+  await page.locator('#patrolArrivalButton').click();
+  await page.locator('#patrolVisitStore').selectOption('酒泉');
+  await page.locator('#patrolVisitNote').fill('例行巡店');
+  await page.locator('#patrolVisitSubmit').dblclick();
+  await expect(page.locator('#patrolVisitToday .patrol-visit-event')).toHaveCount(1);
+  expect(writes).toBe(1);
+  await expect(page.locator('#patrolDepartureButton')).toBeEnabled();
+  await page.locator('#patrolDepartureButton').click();
+  await expect(page.locator('#patrolVisitStore')).toHaveValue('酒泉');
+  await page.locator('#patrolVisitSubmit').click();
+  await expect(page.locator('#patrolVisitToday .patrol-visit-event')).toHaveCount(2);
+  expect(writes).toBe(2);
 });
 
 test('formal unlock is explicit and does not load summaries before Approved Device succeeds', async ({ page }) => {

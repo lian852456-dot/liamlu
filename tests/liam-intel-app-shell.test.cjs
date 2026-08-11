@@ -22,12 +22,13 @@ test('App 1.1 retains the five required destinations and frozen home module orde
   assert.match(html, /data-profile-entry/);
 });
 
-test('Pilot uses only the existing patrol auth and read-only actions', () => {
+test('Pilot keeps existing patrol auth and isolates the sole arrival/departure write', () => {
   const js = read('app.js');
   assert.match(js, /action:'ptauth'/);
   assert.match(js, /patrolRead\('sread'/);
   assert.match(js, /patrolRead\('ptread'/);
-  assert.match(js, /new Set\(\['sread','ptread'\]\)/);
+  assert.match(js, /new Set\(\['sread','ptread','ptvisit_read'\]\)/);
+  assert.match(js, /new Set\(\['ptvisit_write'\]\)/);
   assert.doesNotMatch(js, /['"](?:ptwrite|hwrite|swrite|write)['"]/);
   assert.doesNotMatch(js, /document\.cookie|localStorage\.setItem\([^,]+,\s*(?:employeeId|token|secret)/);
   assert.match(js, /new Set\(\['private_access','read','pread','kpicalc_access'\]\)/);
@@ -47,7 +48,7 @@ test('PWA uses safe-area, standalone manifest, and app-only offline cache', () =
   assert.equal(manifest.display, 'standalone');
   assert.equal(manifest.orientation, 'portrait-primary');
   assert.match(worker, /offline\.html/);
-  assert.match(worker, /liam-supervisor-app-1-1-award-store-items-v5/);
+  assert.match(worker, /liam-supervisor-app-1-1-patrol-minimal-v1/);
   assert.match(worker, /event\.request\.method !== 'GET'/);
   assert.doesNotMatch(worker, /script\.google\.com/);
 });

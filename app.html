@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
-  <link rel="stylesheet" href="app.css?v=10">
+  <link rel="stylesheet" href="app.css?v=11">
   <title>Liam Supervisor App 1.1</title>
 </head>
 <body>
@@ -86,12 +86,29 @@
 
       <section data-view="patrol" hidden aria-label="巡店">
         <div class="view-heading"><div><p>PATROL OVERVIEW</p><h1>巡店大盤</h1></div><a class="icon-button" href="patrol.html" aria-label="開啟完整巡店系統"><i data-lucide="external-link"></i></a></div>
+        <section class="panel patrol-visit-panel" aria-labelledby="patrolVisitTitle">
+          <div class="panel-head"><div><h2 id="patrolVisitTitle">快速到店／離店</h2><small>唯一新增寫入 · 需既有巡店短效 session</small></div></div>
+          <div class="patrol-visit-actions"><button id="patrolArrivalButton" type="button" data-patrol-visit="arrival">到店</button><button id="patrolDepartureButton" type="button" data-patrol-visit="departure">離店</button></div>
+          <p id="patrolVisitMessage" class="form-message">解鎖班表／巡店後可使用。</p>
+          <div class="patrol-visit-today"><h3>今日到離店紀錄</h3><div id="patrolVisitToday"></div></div>
+        </section>
         <div id="patrolOverview"></div>
         <div id="patrolTodayDetail"></div>
         <section class="panel"><div class="panel-head"><div><h2>店點狀況</h2><small>最近巡店與待追蹤</small></div></div><div id="patrolStoreList"></div></section>
         <section class="panel"><div class="panel-head"><div><h2>最近巡店紀錄</h2><small>正式 ptread</small></div></div><div id="patrolRecentList"></div></section>
         <div class="source-actions"><a href="patrol.html">完整巡店看板 <i data-lucide="external-link"></i></a><a href="patrol.html">巡店操作頁 <i data-lucide="external-link"></i></a></div>
       </section>
+
+      <dialog id="patrolVisitDialog" class="patrol-visit-dialog">
+        <form id="patrolVisitForm">
+          <div class="patrol-visit-dialog-head"><h2 id="patrolVisitDialogTitle">巡店到店</h2><button id="patrolVisitClose" type="button" aria-label="關閉">×</button></div>
+          <input id="patrolVisitAction" type="hidden">
+          <label>店點<select id="patrolVisitStore" required></select></label>
+          <label>備註（選填，最多 200 字）<textarea id="patrolVisitNote" maxlength="200" rows="3"></textarea></label>
+          <p>時間以伺服器收到紀錄的時間為準。</p>
+          <button id="patrolVisitSubmit" type="submit">確認到店</button>
+        </form>
+      </dialog>
 
       <section data-view="me" hidden aria-label="我的">
         <div class="view-heading"><div><p>LIAM ONLY</p><h1>個人與系統設定</h1></div><button class="icon-button" type="button" data-nav="home" aria-label="返回首頁"><i data-lucide="arrow-left"></i></button></div>
@@ -127,8 +144,8 @@
   </div>
   <script src="app-assets/lucide.min.js"></script>
   <script src="app-data-contract.js?v=9"></script>
-  <script src="app-preview-data.js?v=10"></script>
-  <script src="patrol-read-model.js?v=10"></script>
-  <script src="app.js?v=10" defer></script>
+  <script src="app-preview-data.js?v=11"></script>
+  <script src="patrol-read-model.js?v=11"></script>
+  <script src="app.js?v=11" defer></script>
 </body>
 </html>

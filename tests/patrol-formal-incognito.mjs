@@ -21,6 +21,8 @@ const protectedActions = new Set([
   'debug',
   'ptread',
   'ptwrite',
+  'ptvisit_read',
+  'ptvisit_write',
   'sread',
   'hread',
   'hwrite',

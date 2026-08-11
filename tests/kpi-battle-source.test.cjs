@@ -81,10 +81,17 @@ test('快照合併硬性要求截止日與來源檔一致', () => {
   assert.doesNotMatch(functionBody(html, 'loadKpiBattle'), /__KPI_BATTLE_DATA__/);
 });
 
-test('正式達成率與巡店唯讀修正不得變更 GAS 保護區', () => {
-  const changed = execFileSync('git', ['diff', '--name-only', 'origin/main', '--', 'gas/Code.gs'], { cwd: root, encoding: 'utf8' })
-    .trim().split('\n').filter(Boolean);
-  assert.deepEqual(changed, []);
+test('正式達成率保護區不變，GAS 僅允許新增隔離巡店到離店 action', () => {
+  const gasDiff = execFileSync('git', ['diff', '--unified=0', 'origin/main', '--', 'gas/Code.gs'], { cwd: root, encoding: 'utf8' });
+  const removedLines = gasDiff.split('\n').filter((line) => line.startsWith('-') && !line.startsWith('---'));
+  assert.deepEqual(removedLines, []);
+  assert.match(gasDiff, /PATROL_VISIT_SHEET/);
+  assert.match(gasDiff, /ptvisit_read/);
+  assert.match(gasDiff, /ptvisit_write/);
+  assert.doesNotMatch(
+    gasDiff.split('\n').filter((line) => line.startsWith('+') && !line.startsWith('+++')).join('\n'),
+    /kpiCalc|award|dailyReport|schedule/i,
+  );
   const gas = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8');
   const parser = functionBody(gas, 'kpiCalcParseReport');
   assert.match(parser, /reportRate: kpiCalcReportRate/);

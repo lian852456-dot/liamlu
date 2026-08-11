@@ -5,7 +5,7 @@ const PAGE_URL = 'file://' + path.resolve(__dirname, '../patrol.html');
 const GAS_PATTERN = 'https://script.google.com/**';
 const VALID_KEY = 'correct-test-key';
 const SESSION_TOKEN = 'test-session-token';
-const PROTECTED_ACTIONS = new Set(['debug', 'ptread', 'ptwrite', 'sread', 'hread', 'hwrite']);
+const PROTECTED_ACTIONS = new Set(['debug', 'ptread', 'ptwrite', 'ptvisit_read', 'sread', 'hread', 'hwrite']);
 
 async function installAuthGas(page, options = {}) {
   const state = {

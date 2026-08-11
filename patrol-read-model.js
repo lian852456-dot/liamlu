@@ -100,6 +100,96 @@
     return match ? `${match[1]}-${pad(Number(match[2]))}-${pad(Number(match[3]))}` : '';
   }
 
+  function rowIsoDate(row) {
+    const value = String(row && (row.arriveTime || row.fillTime) || '');
+    const match = value.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+    return match ? `${match[1]}-${pad(Number(match[2]))}-${pad(Number(match[3]))}` : '';
+  }
+
+  function rowMonth(row) {
+    const explicit = String(row && row.month || '').slice(0, 7);
+    if (/^\d{4}-\d{2}$/.test(explicit)) return explicit;
+    return rowIsoDate(row).slice(0, 7);
+  }
+
+  function rowsForStore(rawRows, store, records) {
+    const recordName = findRecordStore(records, store);
+    if (!recordName) return [];
+    const code = String(store && store.code || '');
+    return (Array.isArray(rawRows) ? rawRows : []).filter(row =>
+      (code && String(row && row.code || '') === code) || String(row && row.store || '') === recordName
+    );
+  }
+
+  function visitSummary(rawRows, configuredStores, currentMonth) {
+    const rows = Array.isArray(rawRows) ? rawRows : [];
+    const stores = (Array.isArray(configuredStores) ? configuredStores : []).map(store => typeof store === 'string' ? { name:store } : store);
+    const records = rebuildFromRaw(rows);
+    const visits = [];
+    const storeCounts = stores.map(store => {
+      const grouped = new Map();
+      rowsForStore(rows, store, records).forEach(row => {
+        const date = rowIsoDate(row);
+        if (!date || rowMonth(row) !== currentMonth) return;
+        if (!grouped.has(date)) grouped.set(date, []);
+        grouped.get(date).push(row);
+      });
+      grouped.forEach((visitRows, date) => {
+        const byItem = new Map();
+        visitRows.forEach(row => {
+          const item = Number(row && row.item);
+          if (item >= 1 && item <= 33) byItem.set(item, String(row && row.result || '').toLowerCase());
+        });
+        const missing = [...byItem].filter(([item, result]) => ITEM_RULES[item].type !== 'station' && result !== 'v').map(([item]) => item);
+        visits.push({
+          date,
+          store:String(store.name || store.store || ''),
+          complete:byItem.size > 0 && missing.length === 0,
+          missingItems:missing.length,
+          missingItemNumbers:missing
+        });
+      });
+      return {
+        name:String(store.name || store.store || ''),
+        count:grouped.size,
+        basis:'unique-store-date',
+        sameDayMultipleVisitsDistinguishable:false
+      };
+    });
+    visits.sort((left, right) => right.date.localeCompare(left.date) || left.store.localeCompare(right.store));
+    return { storeCounts, recent:visits.slice(0, 10), basis:'unique-store-date', sameDayMultipleVisitsDistinguishable:false };
+  }
+
+  function inventoryProgress(records, configuredStores, currentMonth) {
+    const stores = (Array.isArray(configuredStores) ? configuredStores : []).map(store => typeof store === 'string' ? { name:store } : store);
+    const items = [14, 15, 16, 17];
+    const rows = stores.map(store => {
+      const recordName = findRecordStore(records, store);
+      const states = {};
+      items.forEach(item => { states[item] = Boolean(recordName && itemStatus(records, currentMonth, recordName, item).status === 'done'); });
+      return { name:String(store.name || store.store || ''), items:states, complete:items.every(item => states[item]) };
+    });
+    return { items, completedStores:rows.filter(row => row.complete).length, total:rows.length, stores:rows };
+  }
+
+  function item18Progress(records, configuredStores, currentMonth) {
+    const stores = (Array.isArray(configuredStores) ? configuredStores : []).map(store => typeof store === 'string' ? { name:store } : store);
+    const window = bimWindow(currentMonth);
+    const previousWindow = prevBimWindow(currentMonth);
+    const rows = stores.map(store => {
+      const recordName = findRecordStore(records, store);
+      const entries = recordName ? records[recordName].entries.filter(entry => entry.item === 18 && entry.result === 'v') : [];
+      const current = entries.find(entry => window.months.includes(entry.month));
+      const previous = entries.find(entry => previousWindow.months.includes(entry.month));
+      return {
+        name:String(store.name || store.store || ''),
+        current:{ done:Boolean(current), date:current ? entryIsoDate(current) : '' },
+        previous:{ done:Boolean(previous), date:previous ? entryIsoDate(previous) : '' }
+      };
+    });
+    return { window, previousWindow, completedStores:rows.filter(row => row.current.done).length, total:rows.length, stores:rows };
+  }
+
   function awarenessProgress(records, currentMonth, storeName, now) {
     const record = records && records[storeName];
     const completionDays = [];
@@ -159,25 +249,23 @@
     const totalMissingItems = visitedRecordNames.reduce((sum, name) => sum + storeSummary(records, currentMonth, name).miss, 0);
     const unvisited = storeRows.filter(store => !store.visited).map(store => store.name);
     const attention = storeRows.filter(store => store.status === 'attention').map(store => store.name);
-    const recent = rows.map(row => ({
-      store:String(row.store || ''),
-      date:(String(row.fillTime || '').match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/) || []).slice(1).length === 3
-        ? (() => { const match = String(row.fillTime).match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/); return `${match[1]}-${pad(Number(match[2]))}-${pad(Number(match[3]))}`; })()
-        : String(row.fillTime || ''),
-      result:String(row.result || '').toLowerCase() === 'v' ? '完成' : (String(row.reason || '').trim() || '待追蹤')
-    })).filter(row => row.date).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
+    const visits = visitSummary(rows, stores, currentMonth);
+    const inventory = inventoryProgress(records, stores, currentMonth);
+    const item18ProgressData = item18Progress(records, stores, currentMonth);
     return {
       currentMonth, statisticsPeriod:`${currentMonth.replace('-', ' 年 ')} 月`, periodVerified:true,
       visited, total:stores.length, expected:stores.length, remaining:unvisited.length,
       completionRate:stores.length ? visited / stores.length : 0,
       fullyDone, totalMissingItems, unvisited, attention, attentionCount:attention.length,
-      stores:storeRows, recent, records,
+      stores:storeRows, recent:visits.recent, visitCounts:visits.storeCounts,
+      visitCountBasis:visits.basis, sameDayMultipleVisitsDistinguishable:visits.sameDayMultipleVisitsDistinguishable,
+      inventory, item18Progress:item18ProgressData, records,
       item18Window:bimWindow(currentMonth), awarenessDeadlineDay:20
     };
   }
 
   return Object.freeze({
     ITEM_RULES, rebuildFromRaw, itemStatus, storeSummary, findRecordStore,
-    bimWindow, prevBimWindow, awarenessProgress, overview
+    bimWindow, prevBimWindow, awarenessProgress, visitSummary, inventoryProgress, item18Progress, overview
   });
 });

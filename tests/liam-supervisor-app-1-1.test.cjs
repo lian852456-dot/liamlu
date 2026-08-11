@@ -56,11 +56,12 @@ test('Preview contract is visibly synthetic and contains the complete mobile sum
   assert.equal(data.patrolOverview.data.periodVerified, true);
 });
 
-test('App runtime only calls existing read, device-approval and short-session actions', () => {
+test('App runtime keeps existing reads and allows only the isolated patrol visit write', () => {
   const code = read('app.js');
   assert.match(code, /new Set\(\['private_access','read','pread','kpicalc_access'\]\)/);
   assert.match(code, /new Set\(\['private_request','private_request_status'\]\)/);
-  assert.match(code, /new Set\(\['sread','ptread'\]\)/);
+  assert.match(code, /new Set\(\['sread','ptread','ptvisit_read'\]\)/);
+  assert.match(code, /new Set\(\['ptvisit_write'\]\)/);
   for (const blocked of ["action:'write'", "action:'pwrite'", "action:'ptwrite'", '.appendRow(', '.setValue(', '.setValues(', '.createFile(']) {
     assert.ok(!code.includes(blocked), `blocked write path found: ${blocked}`);
   }
@@ -111,11 +112,11 @@ test('device UI scope keeps nine awards, removes Top cards and renders complete 
 test('PWA cache is versioned for App 1.1 and includes local icon library', () => {
   const html = read('app.html');
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-1-award-store-items-v5/);
-  assert.match(html, /app\.css\?v=10/);
-  assert.match(html, /app-preview-data\.js\?v=10/);
-  assert.match(html, /app\.js\?v=10/);
-  assert.match(html, /patrol-read-model\.js\?v=10/);
+  assert.match(worker, /liam-supervisor-app-1-1-patrol-minimal-v1/);
+  assert.match(html, /app\.css\?v=11/);
+  assert.match(html, /app-preview-data\.js\?v=11/);
+  assert.match(html, /app\.js\?v=11/);
+  assert.match(html, /patrol-read-model\.js\?v=11/);
   assert.match(worker, /patrol-read-model\.js/);
   assert.match(worker, /app-data-contract\.js/);
   assert.match(worker, /app-preview-data\.js/);

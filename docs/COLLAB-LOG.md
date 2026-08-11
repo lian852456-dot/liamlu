@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-11 ｜ Codex（App 1.1 巡店最小修正，待部署／實機驗收）
+
+- 做了什麼：只動巡店。擴充既有 `patrol-read-model.js`，讓 App 與 `patrol.html` 共用題 14–17、題 18、不同到店日期計數與一次巡店一列的聚合；App 巡店頁新增雙月全盤、每月盤點、九店本月次數、最近 10 次，以及獨立快速到店／離店。GAS 只新增 `ptvisit_read`／`ptvisit_write` 與獨立工作表 `巡店到離店紀錄`，既有 `ptread`／`ptwrite`／`sread` 語意與 schema 不變。
+- 結果（進行中）：巡店 Node 契約與 Chromium/WebKit 390×844 回歸已通過；到離店驗證涵蓋短效 token、店點/action allowlist、server timestamp、額外欄位拒絕、open visit 配對與快速連點阻擋。尚未合併 main、尚未部署 GAS／Pages、尚未以 Liam iPhone 與正式資料驗收，因此不可宣稱正式完成。
+- 經驗 / 給下一位的提醒：正式 ptread 只能可靠識別「店點＋不同到店日期」，同店同日多次沒有 session ID，只能計一次並明示 fail-closed。新到離店 `visitSessionId` 只服務新獨立紀錄，不得回寫或改造巡店明細。
+
 ## 2026-08-11 ｜ Codex（App 1.1 台獎店點指定機款補齊）
 
 - 做了什麼：本輪只修正戰情 → 台獎 → 店點。店點模式直接映射正式台獎所選店的完整 `row.items`，保留來源已提供的機款名稱、達成率、實際、目標、50% 目標／差異、50%／100% 獎金與狀態；不再從全區 Top 2 推算，也不過濾、截斷或混入其他店機款。北一二B模式仍只列完整九店的店名、金額與領獎狀態。
