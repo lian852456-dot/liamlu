@@ -67,7 +67,8 @@ test('App runtime only calls existing read, device-approval and short-session ac
   assert.match(code, /Preview／示意資料/);
   assert.match(code, /function fullKpiItems/);
   assert.match(code, /function renderFullKpis/);
-  assert.match(code, /正式來源未提供可驗證的統計期間/);
+  assert.match(code, /PatrolReadModel\.overview\(rows, configured, currentMonth/);
+  assert.doesNotMatch(code, /summary\.periodStart|summary\.expectedCount/);
 });
 
 test('Information architecture matches the App 1.1 acceptance surfaces', () => {
@@ -89,12 +90,27 @@ test('Information architecture matches the App 1.1 acceptance surfaces', () => {
   assert.doesNotMatch(html, /<nav class="bottom-nav"[\s\S]*data-nav="me"/);
 });
 
+test('device UI scope keeps nine awards, removes Top cards and renders complete mobile KPI values', () => {
+  const code = read('app.js');
+  const css = read('app.css');
+  assert.doesNotMatch(code, /stores\.slice\(0,5\)/);
+  assert.doesNotMatch(code, /Top \$\{index\+1\}|區領獎總額|主要得獎機款|100% 獎勵機型/);
+  assert.match(code, /stores\.map\(row=>`<div class="award-row"/);
+  assert.match(code, /row\.eligible\?'領獎':'未領獎'/);
+  assert.match(css, /@media \(max-width:480px\)[\s\S]*\.store-row-primary/);
+  assert.match(css, /font-variant-numeric:tabular-nums/);
+  assert.doesNotMatch(css, /\.store-row[^{}]*\{[^}]*text-overflow:ellipsis/);
+  assert.match(css, /\.store-row \{ position:relative; display:block; min-height:96px/);
+});
+
 test('PWA cache is versioned for App 1.1 and includes local icon library', () => {
   const html = read('app.html');
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-1-realdata-v3/);
-  assert.match(html, /app\.css\?v=8/);
-  assert.match(html, /app\.js\?v=8/);
+  assert.match(worker, /liam-supervisor-app-1-1-device-data-ui-v4/);
+  assert.match(html, /app\.css\?v=9/);
+  assert.match(html, /app\.js\?v=9/);
+  assert.match(html, /patrol-read-model\.js\?v=9/);
+  assert.match(worker, /patrol-read-model\.js/);
   assert.match(worker, /app-data-contract\.js/);
   assert.match(worker, /app-preview-data\.js/);
   assert.match(worker, /app-assets\/lucide\.min\.js/);

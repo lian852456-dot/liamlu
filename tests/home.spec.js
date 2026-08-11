@@ -34,11 +34,10 @@ test('同仁大廳手機版維持單欄且文字未水平溢出，既有入口�
   expect(boxes[1].y).toBeGreaterThan(boxes[0].y);
   expect(boxes[2].y).toBeGreaterThan(boxes[1].y);
   expect(boxes[3].y).toBeGreaterThan(boxes[2].y);
-  await expect(page.locator('body')).toEvaluate(body => body.scrollWidth <= body.clientWidth);
+  expect(await page.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
 
   await expect(page.locator('.card')).toHaveCount(6);
-  await expect(page.locator(`.card:not([href="${STORE_INSPECTION_URL}"])`)).toEvaluateAll(
-    cards => cards.map(card => card.getAttribute('href')),
-    ORIGINAL_HREFS
-  );
+  expect(await page.locator(`.card:not([href="${STORE_INSPECTION_URL}"])`).evaluateAll(
+    cards => cards.map(card => card.getAttribute('href'))
+  )).toEqual(ORIGINAL_HREFS);
 });

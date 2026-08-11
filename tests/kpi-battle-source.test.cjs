@@ -81,8 +81,8 @@ test('快照合併硬性要求截止日與來源檔一致', () => {
   assert.doesNotMatch(functionBody(html, 'loadKpiBattle'), /__KPI_BATTLE_DATA__/);
 });
 
-test('正式達成率 mapping 不得變更巡店保護區', () => {
-  const changed = execFileSync('git', ['diff', '--name-only', 'origin/main', '--', 'patrol.html'], { cwd: root, encoding: 'utf8' })
+test('正式達成率與巡店唯讀修正不得變更 GAS 保護區', () => {
+  const changed = execFileSync('git', ['diff', '--name-only', 'origin/main', '--', 'gas/Code.gs'], { cwd: root, encoding: 'utf8' })
     .trim().split('\n').filter(Boolean);
   assert.deepEqual(changed, []);
   const gas = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8');

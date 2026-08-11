@@ -1,10 +1,10 @@
 const { test, expect } = require('@playwright/test');
 const path = require('node:path');
 
-const FILE_URL = `file://${path.resolve(__dirname, '../app.html')}?preview=1`;
-const FORMAL_FILE_URL = `file://${path.resolve(__dirname, '../app.html')}`;
+const FORMAL_FILE_URL = process.env.LIAM_APP_BASE_URL || `file://${path.resolve(__dirname, '../app.html')}`;
+const FILE_URL = `${FORMAL_FILE_URL}${FORMAL_FILE_URL.includes('?')?'&':'?'}preview=1`;
 
-test.use({ viewport:{ width:390, height:844 } });
+test.use({ viewport:{ width:390, height:844 }, serviceWorkers:'block' });
 
 test('formal mode boots without Preview data or JavaScript errors', async ({ page }) => {
   const errors = [];
@@ -28,6 +28,14 @@ test('390x844 home gives the supervisor summary without horizontal overflow', as
   await expect(page.locator('#operationsRows')).toContainText('21:00');
   await expect(page.locator('#kpiHero')).toContainText('113.1%');
   await expect(page.locator('.store-item')).toHaveCount(9);
+  await expect(page.locator('#awardHome .award-row:not(.header)')).toHaveCount(9);
+  await expect(page.locator('#awardHome')).not.toContainText('Top 1');
+  await expect(page.locator('#awardHome')).not.toContainText('Top 2');
+  await expect(page.locator('#awardHome')).not.toContainText('區領獎總額');
+  const kpiValues = await page.locator('.store-row .store-metric b').allTextContents();
+  expect(kpiValues.every(value => value && !value.includes('...'))).toBe(true);
+  const rowHeights = await page.locator('.store-row').evaluateAll(rows => rows.map(row => row.getBoundingClientRect().height));
+  expect(rowHeights.every(height => height >= 44)).toBe(true);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
   expect(formalRequests).toBe(0);
@@ -44,7 +52,9 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
   await expect(page.locator('[data-view="battle"]')).toBeVisible();
   await expect(page.locator('#battleContent')).toContainText('九店比較');
   await page.locator('[data-battle-kind="award"]').click();
-  await expect(page.locator('#battleContent')).toContainText('區領獎總額');
+  await expect(page.locator('#battleContent .award-battle-row:not(.header)')).toHaveCount(9);
+  await expect(page.locator('#battleContent')).not.toContainText('區領獎總額');
+  await expect(page.locator('#battleContent')).not.toContainText('Top 1');
   await page.locator('[data-battle-scope="store"]').click();
   await expect(page.locator('#battleStorePicker')).toBeVisible();
   await expect(page.locator('#battleContent')).toContainText('店領獎金額');
@@ -65,7 +75,8 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
 
   await page.locator('.bottom-nav [data-nav="patrol"]').click();
   await expect(page.locator('[data-view="patrol"]')).toBeVisible();
-  await expect(page.locator('#patrolOverview')).toContainText('6/9');
+  await expect(page.locator('#patrolOverview')).toContainText('本月已巡店數');
+  await expect(page.locator('#patrolOverview')).toContainText('6');
   await expect(page.locator('#patrolTodayDetail')).toContainText('下一站');
 });
 

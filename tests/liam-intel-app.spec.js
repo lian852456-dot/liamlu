@@ -2,14 +2,15 @@ const { test, expect } = require('@playwright/test');
 const path = require('node:path');
 
 const PAGE_URL = process.env.LIAM_PILOT_URL || ('file://' + path.resolve(__dirname, '../app.html'));
+const PREVIEW_URL = `${PAGE_URL}${PAGE_URL.includes('?') ? '&' : '?'}preview=1`;
 const stores = ['酒泉', '萬大', '大稻埕', '復興南', '三創', '杭州南', '永吉', '通化', '六張犁'];
 
 test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
 
-test('mobile Pilot has no horizontal overflow and exposes all five tabs', async ({ page }) => {
+test('mobile App 1.1 has no horizontal overflow and exposes all five tabs', async ({ page }) => {
   const consoleErrors = [];
   page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
-  await page.goto(PAGE_URL);
+  await page.goto(PREVIEW_URL);
   await expect(page.locator('.bottom-nav button')).toHaveCount(5);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   for (const button of await page.locator('.bottom-nav button').all()) {
@@ -17,9 +18,10 @@ test('mobile Pilot has no horizontal overflow and exposes all five tabs', async 
     expect(box.width).toBeGreaterThanOrEqual(44);
     expect(box.height).toBeGreaterThanOrEqual(44);
   }
-  await expect(page.getByRole('heading', { name: 'KPI' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '台獎' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '16:00／21:00 回報' })).toBeVisible();
+  await expect(page.locator('#operationsTitle')).toHaveText('16:00 與 21:00 回報狀態');
+  await expect(page.locator('#kpiHero')).toContainText('KPI DOD');
+  await expect(page.locator('#awardHome')).toContainText('台獎總覽');
+  await expect(page.locator('#awardHome .award-row:not(.header)')).toHaveCount(9);
   expect(consoleErrors).toEqual([]);
   await page.screenshot({ path: 'test-output/liam-supervisor-pilot-mobile.png', fullPage: true });
 });
@@ -55,33 +57,32 @@ test('existing short session renders real-shape schedule and patrol data read-on
   }, { stores });
 
   await page.goto(PAGE_URL);
-  await expect(page.getByText('班表／巡店 session 已驗證')).toBeVisible();
-  await expect(page.locator('.schedule-store')).toHaveCount(9);
-  await expect(page.locator('#patrolSummary .patrol-store')).toHaveCount(9);
-  await expect(page.getByText('同仁1')).toBeVisible();
-  await expect(page.getByText('休假1')).toBeVisible();
-  await expect(page.locator('#scheduleUpdatedAt')).toContainText('updatedAt');
-  await expect(page.locator('#patrolUpdatedAt')).toContainText('updatedAt');
+  await page.locator('[data-nav="schedule"]').last().click();
+  await expect(page.locator('#scheduleList .schedule-store')).toHaveCount(9);
+  await expect(page.locator('#scheduleSourceTime')).not.toHaveText('尚未讀取');
 
   await page.locator('#scheduleStoreFilter').selectOption('酒泉');
   await expect(page.locator('.schedule-store')).toHaveCount(1);
-  await page.locator('#patrolStoreFilter').selectOption('酒泉');
-  await expect(page.locator('#patrolSummary .patrol-store')).toHaveCount(1);
-
+  const initialDate = await page.locator('#scheduleDate').inputValue();
   await page.locator('[data-date-step="-1"]').click();
-  await expect(page.locator('#scheduleDate')).toHaveValue('2026-08-08');
+  const expectedPrevious = new Date(`${initialDate}T12:00:00Z`);
+  expectedPrevious.setUTCDate(expectedPrevious.getUTCDate() - 1);
+  await expect(page.locator('#scheduleDate')).toHaveValue(expectedPrevious.toISOString().slice(0, 10));
   await page.locator('[data-date-today]').click();
-  await expect(page.locator('#scheduleDate')).toHaveValue('2026-08-09');
+  await expect(page.locator('#scheduleDate')).toHaveValue(initialDate);
 
   await page.locator('[data-nav="patrol"]').last().click();
+  await expect(page.locator('#patrolStoreList .patrol-store-row')).toHaveCount(9);
+  await expect(page.locator('#patrolOverview')).toContainText('本月已巡店數');
   await expect(page.getByRole('heading', { name: '最近巡店紀錄' })).toBeVisible();
-  await expect(page.getByRole('link', { name: '前往完整巡店看板' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '完整巡店看板' })).toBeVisible();
 });
 
-test('my page exposes today schedule without extra architecture', async ({ page }) => {
+test('profile and settings moved outside bottom navigation', async ({ page }) => {
   await page.goto(PAGE_URL);
-  await page.locator('[data-nav="me"]').last().click();
-  await expect(page.getByRole('heading', { name: '我的' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /今日班表/ })).toBeVisible();
-  await expect(page.getByText('單人、正式、唯讀整合')).toBeVisible();
+  await expect(page.locator('.bottom-nav [data-nav="me"]')).toHaveCount(0);
+  await page.locator('[data-profile-entry]').click();
+  await expect(page.getByRole('heading', { name: '個人與系統設定' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '班表／巡店' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '系統狀態' })).toBeVisible();
 });

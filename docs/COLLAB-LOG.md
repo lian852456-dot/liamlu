@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-11 ｜ Codex（App 1.1 實機巡店／台獎／KPI 修正）
+
+- 做了什麼：只處理三個實機問題。巡店將 `patrol.html` 的 1–33 題、上下半月、題 18 固定雙月、題 19–33 每月 20 日前等純讀取計算抽成 `patrol-read-model.js`，正式巡店頁與 App 共用同一模型；台獎首頁與戰情改列完整九店、只顯示金額與「領獎／未領獎」，移除 Top 1／Top 2／機款欄，並拒絕把不同口徑的 aggregate `actual_total` 當區獎金；KPI 390px 店點列改成兩層排列，完整顯示 KPI、排名、DOD、排名變動與加減分。
+- 結果（成功 / 失敗 / 進行中）：完整 `npm test` 為 Playwright 120/120，Node 契約 124/124、巡店同 fixture parity 2/2、巡店逾時草稿並行回歸 5/5、Chromium 390×844 6/6、WebKit/Safari 等價回歸 7/7、npm audit 0；console error 0、horizontal overflow 0、九店 KPI 觸控列皆至少 44px。另修正正式巡店頁初始雲端讀回可能覆寫尚未送出的半月表單草稿競態，只調整 render 時序，不改驗證或寫入規則。未修改 `gas/Code.gs`、OAuth、Approved Device、`ptauth` 或任何寫入 action。正式 Pages 合併／讀回及 Liam Native 實機複驗仍須分開確認。
+- 經驗 / 給下一位的提醒：`ptread` 正式回應已有 rows 與 stores，不能再因缺少自訂 `summary/overview/period` 而讓月大盤整塊失效。台獎 aggregate `actual_total=179` 與店點千元金額不是可證明的同一幣別契約，前端不得相加或冒充區總額；來源未提供明確同口徑欄位時維持不顯示。
+
 ## 2026-08-09 ｜ Codex（Liam Supervisor Pilot 1.0 最小唯讀整合，待正式部署／實機驗收）
 
 - 做了什麼：以最新 `origin/main` `b2e4533` 重整既有 `feature/liam-intel-app`；首頁依今日 Gate 固定為營運狀態、KPI、台獎、16:00／21:00 回報、今日班表、巡店提醒。KPI／台獎／回報只連既有正式頁；班表／巡店只重用正式 `ptauth` 短效 session，allowlist 固定 `sread`／`ptread`，未修改 `index.html`、`patrol.html`、`gas/Code.gs`、Sheet schema 或任何寫入 action。

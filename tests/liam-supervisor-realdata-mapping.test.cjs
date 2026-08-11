@@ -80,12 +80,17 @@ test('KPI supplement mismatch fails closed instead of mixing rank and DOD', () =
   assert.match(result.summary.note, /fail-closed/);
 });
 
-test('Awards require aligned report date and Top 2 comes from official 100 percent reward fields', () => {
+test('Awards require aligned report date and reject aggregate actual_total as a district currency total', () => {
   const A = loadAdapters();
   const snapshot = { awardsBattle:{ report_date:'2026-08-10',generated_at:'2026-08-10T01:00:00+08:00',overall:{award:{actual_total:9000},items:[
     {display_name:'機款 A',district_reward_100:3000,rate:.8},{display_name:'機款 B',district_reward_100:7000,rate:.9},{display_name:'機款 C',district_reward_100:5000,rate:1}
   ]},stores:Array.from({length:9},(_,index)=>({store:`店 ${index+1}`,award:{actual_total:index,award:index<3?'Y':'N'},items:[]})) } };
   const pass = A.adaptAwards(snapshot, '2026-08-10', '2026-08-10T01:02:00+08:00');
+  assert.equal(pass.summary.status, 'ok');
+  assert.equal(pass.summary.data.totalAmount, null);
+  assert.equal(pass.summary.data.regionTotalAvailable, false);
+  assert.match(pass.summary.note, /不顯示 aggregate actual_total/);
+  assert.equal(pass.stores.data.length, 9);
   assert.deepEqual(Array.from(pass.top2.data, row=>row.name), ['機款 B','機款 C']);
   const blocked = A.adaptAwards(snapshot, '2026-08-09', '2026-08-10T01:02:00+08:00');
   assert.equal(blocked.summary.status, 'no_data');
