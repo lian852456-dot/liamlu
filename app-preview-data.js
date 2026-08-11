@@ -45,7 +45,7 @@
     reason, improvePlan: failed.length ? '鎖定兩位既有客戶，晚班前完成回訪。' : ''
   });
   const report = (segment, completed, missing, rows) => {
-    const storesWithMetrics = rows.map((row,index) => ({ ...row, metrics:row.reported ? {
+    const storesWithMetrics = rows.map((row,index) => ({ ...row, storeFeedback:{ reason:'',consult:'',method:'',plan:'',...(row.storeFeedback||{}) }, metrics:row.reported ? {
       A999:(index % 3) + 1, '好速':Number(((index % 4) * .5 + .5).toFixed(1)), R999:(index % 2) + 1, R1399:index % 3,
       '保險搭售率':Number((58+index*3.2).toFixed(1)), '設備案佔比':Number((52+index*2.7).toFixed(1))
     } : {} }));
@@ -57,7 +57,7 @@
   };
   const report1600 = report(16, 7, ['復興南','六張犁'], [
     { name:'永吉', reported:true, reportedAt:'16:03', people:[makePerson('陳＊安')] },
-    { name:'大稻埕', reported:true, reportedAt:'16:05', people:[makePerson('林＊恩',['好速'],'今日客流偏低，已完成跨店請益。')] },
+    { name:'大稻埕', reported:true, reportedAt:'16:05', storeFeedback:{reason:'16:00 示意零報原因',consult:'16:00 示意請益對象'}, people:[makePerson('林＊恩',['好速'],'今日客流偏低，已完成跨店請益。')] },
     { name:'通化', reported:true, reportedAt:'16:07', people:[makePerson('王＊庭')] },
     { name:'台北三創', reported:true, reportedAt:'16:10', people:[makePerson('吳＊哲')] },
     { name:'酒泉', reported:true, reportedAt:'16:12', people:[makePerson('張＊維')] },
@@ -69,7 +69,7 @@
   const report2100 = report(21, 5, ['酒泉','萬大','復興南','六張犁'], [
     { name:'永吉', reported:true, reportedAt:'21:05', people:[makePerson('陳＊安')] },
     { name:'大稻埕', reported:true, reportedAt:'21:11', people:[makePerson('林＊恩',['好速'],'續約客戶延後到店，已約明日上午。')] },
-    { name:'通化', reported:true, reportedAt:'21:18', people:[makePerson('王＊庭',['A999'],'高資方案客戶猶豫，已安排店長陪談。')] },
+    { name:'通化', reported:true, reportedAt:'21:18', storeFeedback:{reason:'21:00 示意零報原因',consult:'21:00 示意請益對象',method:'21:00 示意改善做法',plan:'21:00 示意明日計劃'}, people:[makePerson('王＊庭',['A999'],'高資方案客戶猶豫，已安排店長陪談。')] },
     { name:'台北三創', reported:true, reportedAt:'21:26', people:[makePerson('吳＊哲')] },
     { name:'杭州南', reported:true, reportedAt:'21:33', people:[makePerson('黃＊鈞')] },
     { name:'酒泉', reported:false, reportedAt:'', people:[] },

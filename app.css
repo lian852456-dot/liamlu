@@ -504,6 +504,16 @@ body { font-size:16px; }
 .report-store-operation-grid small,.report-store-operation-grid b { display:block; }
 .report-store-operation-grid small { color:var(--muted); font-size:14px; line-height:1.35; }
 .report-store-operation-grid b { margin-top:4px; font-size:17px; font-variant-numeric:tabular-nums; }
+.report-feedback-panel { padding-bottom:12px; }
+.report-feedback-list { display:grid; gap:8px; padding:0 13px; }
+.report-feedback-card { padding:11px; border:1px solid var(--line-soft); border-radius:12px; background:#092139; }
+.report-feedback-card h3,.report-store-feedback h3 { margin:0 0 9px; font-size:16px; }
+.report-store-feedback { padding:11px; border:1px solid var(--line-soft); border-radius:10px; background:#081f35; }
+.report-store-feedback.compact { padding:0; border:0; background:transparent; }
+.report-store-feedback > div + div { margin-top:9px; }
+.report-store-feedback b,.report-store-feedback p { display:block; margin:0; }
+.report-store-feedback b { color:var(--cyan); font-size:14px; }
+.report-store-feedback p { margin-top:3px; font-size:16px; line-height:1.55; overflow-wrap:anywhere; white-space:pre-wrap; }
 .personal-performance-panel { padding-bottom:6px; }
 .personal-performance-list { overflow:hidden; }
 .personal-performance-item { border-bottom:1px solid var(--line-soft); }

@@ -8,6 +8,7 @@
     'scheduleToday', 'scheduleByDate', 'patrolToday', 'patrolOverview', 'patrolStores'
   ];
   const STATUSES = new Set(['ok', 'partial', 'no_data', 'unauthorized', 'stale', 'error']);
+  const REPORT_FEEDBACK_FIELDS = ['reason','consult','method','plan'];
 
   function assert(condition, message) {
     if (!condition) throw new Error(`App 1.2 contract: ${message}`);
@@ -28,6 +29,12 @@
     validateSource(module.source, key);
     assert(typeof module.sourceLink === 'string' && module.sourceLink.trim(), `${key}.sourceLink is required`);
     assert(Object.prototype.hasOwnProperty.call(module, 'data'), `${key}.data is required`);
+    if ((key === 'report1600' || key === 'report2100') && module.data && Array.isArray(module.data.stores)) {
+      module.data.stores.forEach((store,index) => {
+        assert(store.storeFeedback && typeof store.storeFeedback === 'object', `${key}.data.stores[${index}].storeFeedback is required`);
+        REPORT_FEEDBACK_FIELDS.forEach(field => assert(typeof store.storeFeedback[field] === 'string', `${key}.data.stores[${index}].storeFeedback.${field} must be a string`));
+      });
+    }
     return module;
   }
 
@@ -44,7 +51,7 @@
     return { status, updatedAt, sourceUpdatedAt, stale, source, sourceLink:sourceLink || (source && source.href) || '', data, note };
   }
 
-  const api = { VERSION, MODULE_KEYS, STATUSES, validateContract, validateModule, moduleState };
+  const api = { VERSION, MODULE_KEYS, STATUSES, REPORT_FEEDBACK_FIELDS, validateContract, validateModule, moduleState };
   scope.LiamSupervisorContract = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-12 ｜ Codex（App 1.2 Daily Report 門市回覆正式部署候選）
+
+- 做了什麼：將獨立 hotfix `f4614d6` 以 cherry-pick 疊加在半月正式唯讀 release 之上，只保留 Daily Report 的 `zero_reason`、`zero_consult`、`zero_method`、`zero_plan` mapping、門市請益彙整、單店回覆、對應 contract/CSS/tests 與 cache bust。
+- 結果（部署前 Gate）：兩時段互不沿用，空欄位不顯示，原文只做 HTML escaping；KPI、台獎、個績、班表、巡店、ptvisit、auth、Approved Device、Native shell 與 GAS write semantics 無變更。正式部署與 21:00 readback 仍須以後續 Gate 為準。
+- 經驗 / 給下一位的提醒：正式 summary 未提供 canonical storeFeedback 時，唯一來源是同一 segment 的原始 `read.data[store].zero_*`；禁止跨時段帶值、推算或改寫原文。
+
 ## 2026-08-12 ｜ Codex（App 1.2 半月督導檢查 Formal Read，未部署）
 
 - 做了什麼：從已通過 UI Preview 的 `51ce311` 建立隔離分支，只把既有 ptauth 1800 秒短效 session 接到 `hread`。新增純 read model，依正式 H1／H2、九店與題 1–18 篩選；`ok/abnormal/na/blank` 分別顯示符合／異常／不適用／尚未填寫。九店只呈現透明的「18/18 已填」「n/18 已填」「尚未填」，不建立 backend completed flag；openVisit 仍只提示與預選。

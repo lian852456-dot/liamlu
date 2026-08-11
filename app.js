@@ -470,6 +470,18 @@
     });
   }
 
+  function reportStoreFeedback(report, summaryStore) {
+    const canonical = summaryStore && summaryStore.storeFeedback && typeof summaryStore.storeFeedback === 'object'
+      ? summaryStore.storeFeedback
+      : null;
+    return {
+      reason:String(canonical ? canonical.reason || '' : report && report.zero_reason || ''),
+      consult:String(canonical ? canonical.consult || '' : report && report.zero_consult || ''),
+      method:String(canonical ? canonical.method || '' : report && report.zero_method || ''),
+      plan:String(canonical ? canonical.plan || '' : report && report.zero_plan || '')
+    };
+  }
+
   function adaptReport(segment, storeData, personalData, formalSummary) {
     const summary = formalSummary && typeof formalSummary === 'object' ? formalSummary : null;
     const summaryStores = new Map((summary && Array.isArray(summary.stores) ? summary.stores : []).map(row => [normalizeStore(row.name), row]));
@@ -479,7 +491,14 @@
       const peopleSource = (personalData || {})[name] || {};
       const people = Object.entries(peopleSource).map(([personName,raw]) => ({ name:personName, ...personalRecord(raw) }));
       const metrics = summaryStore ? Object.fromEntries(Object.entries(summaryStore.metrics || {}).map(([key,metric]) => [key,numberOrNull(metric && metric.value)]).filter(([,value]) => value != null)) : {};
-      return { name, reported:summaryStore ? Boolean(summaryStore.reported) : Boolean(report), reportedAt:summaryStore ? String(summaryStore.reportedAt || '') : report ? String(report.savedAt || report.updatedAt || '') : '', metrics, people };
+      return {
+        name,
+        reported:summaryStore ? Boolean(summaryStore.reported) : Boolean(report),
+        reportedAt:summaryStore ? String(summaryStore.reportedAt || '') : report ? String(report.savedAt || report.updatedAt || '') : '',
+        metrics,
+        people,
+        storeFeedback:reportStoreFeedback(report,summaryStore)
+      };
     });
     const completed = summary && numberOrNull(summary.completedStores) != null ? Number(summary.completedStores) : stores.filter(store => store.reported).length;
     const missing = summary && Array.isArray(summary.missingStores) ? summary.missingStores.map(normalizeStore) : stores.filter(store => !store.reported).map(store => store.name);
@@ -874,17 +893,33 @@
 
   function activeReport() { return reportSegment===16?contract.report1600:contract.report2100; }
 
+  const REPORT_FEEDBACK_LABELS = [
+    ['reason','零報原因'],['consult','請益對象'],['method','改善做法'],['plan','明日計劃']
+  ];
+
+  function storeFeedbackEntries(feedback) {
+    return REPORT_FEEDBACK_LABELS.map(([key,label])=>({ key,label,value:String(feedback && feedback[key] || '') })).filter(item=>item.value);
+  }
+
+  function renderStoreFeedback(feedback, compact = false) {
+    const entries=storeFeedbackEntries(feedback);
+    if(!entries.length) return '';
+    return `<section class="report-store-feedback${compact?' compact':''}">${compact?'':'<h3>門市回覆</h3>'}${entries.map(item=>`<div><b>${escapeHtml(item.label)}</b><p>${escapeHtml(item.value)}</p></div>`).join('')}</section>`;
+  }
+
   function renderReport() {
     const module=activeReport(); const report=module.data; const failures=contract.reportFailures.data&&contract.reportFailures.data[reportSegment];
-    if (!report) { dom('#reportOverview').innerHTML=privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '解鎖後顯示 16:00／21:00 正式回報'); dom('#reportOperations').innerHTML=''; dom('#reportFailures').innerHTML=''; dom('#reportStoreList').innerHTML=''; return; }
+    if (!report) { dom('#reportOverview').innerHTML=privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '解鎖後顯示 16:00／21:00 正式回報'); dom('#reportOperations').innerHTML=''; dom('#reportFeedbackSummary').innerHTML=''; dom('#reportFailures').innerHTML=''; dom('#reportStoreList').innerHTML=''; return; }
     dom('#reportOverview').innerHTML=`<div class="report-summary"><article><span>完成店數</span><b class="${report.completedStores===9?'positive':''}">${report.completedStores}/9</b></article><article><span>尚未完成</span><b class="${report.missingStores.length?'negative':'positive'}">${report.missingStores.length}</b></article><article><span>最後更新</span><b>${escapeHtml(report.updatedAt||'—')}</b></article></div>${report.missingStores.length?`<p class="stale-note">尚未完成：${report.missingStores.map(escapeHtml).join('、')}</p>`:''}`;
     const summaryMetrics=report.summaryMetrics||{};
     dom('#reportOperations').innerHTML=report.summaryAvailable&&Object.keys(summaryMetrics).length?`<div class="report-operation-grid">${['A999','好速','R1399','R999','保險搭售率','設備案佔比'].filter(key=>summaryMetrics[key]).map(key=>`<article><span>${escapeHtml(key==='A999'?'A999 上線數':key==='好速'?'好速銷售點數':key==='R1399'?'R1399 上線數':key==='R999'?'R999 上線數':key)}</span><b>${formatOperationMetric(summaryMetrics[key])}</b></article>`).join('')}</div>`:`<div class="empty-state">${module.status==='no_data'?`尚未進入／尚無正式 ${report.segment}:00 回報`:'正式來源尚未提供營運摘要欄位；App 不自行計算。'}</div>`;
+    const feedbackStores=report.stores.filter(store=>storeFeedbackEntries(store.storeFeedback).length);
+    dom('#reportFeedbackSummary').innerHTML=feedbackStores.length?`<div class="report-feedback-list">${feedbackStores.map(store=>`<article class="report-feedback-card"><h3>🏪 ${escapeHtml(store.name)}</h3>${renderStoreFeedback(store.storeFeedback,true)}</article>`).join('')}</div>`:'<div class="empty-state">此時段目前沒有正式門市回覆。</div>';
     dom('#reportFailures').innerHTML=failures?`<div class="failure-summary"><div class="failure-grid"><div><span>未過關店數</span><b class="${failures.failedStoreCount?'negative':'positive'}">${failures.failedStoreCount}</b></div><div><span>未過關人數</span><b class="${failures.failedPeopleCount?'negative':'positive'}">${failures.failedPeopleCount}</b></div><div><span>未回報店點</span><b>${failures.missingStores.length}</b></div><div><span>各指標未過人數</span><b>${Object.entries(failures.byMetric||{}).map(([key,value])=>`${escapeHtml(key)} ${value}`).join(' · ')||'0'}</b></div></div><div class="tracking-list">${(failures.people||[]).map(person=>`<div class="tracking-item"><b>${escapeHtml(person.store)} · ${escapeHtml(person.name)}</b><br>${escapeHtml(person.failed.join('、')||'未過關')}｜${escapeHtml(person.reason||'尚未填寫原因')}</div>`).join('')||'<div class="empty-state">目前沒有正式未過關紀錄。</div>'}</div></div>`:'<div class="empty-state">尚無個人未過關資料。</div>';
     dom('#reportStoreList').innerHTML=report.stores.map(store=>{
       const failed=store.people.filter(person=>person.status==='fail').length;
       const status=!store.reported?'未回報':failed?'未過關':store.people.length?'過關':'已回報';
-      return `<article class="report-store"><button class="report-store-button" type="button" aria-expanded="false"><span>${escapeHtml(store.name)}</span><span class="${store.reported?'positive':'negative'}">${store.reported?'已回報':'未回報'}</span><span class="${status==='未過關'?'negative':status==='過關'?'positive':''}">${status}</span><span>${escapeHtml(store.reportedAt||'—')}</span><i data-lucide="chevron-down"></i></button><div class="report-person-list"><div class="report-store-operation-grid">${['A999','好速','R1399','R999','保險搭售率','設備案佔比'].filter(key=>store.metrics&&store.metrics[key]!=null).map(key=>`<span><small>${escapeHtml(key)}</small><b>${key.includes('率')||key.includes('佔比')?`${fmtNumber(store.metrics[key],1)}%`:fmtNumber(store.metrics[key],key==='好速'?2:1)}</b></span>`).join('') || '<div class="empty-state">此店正式來源尚無營運數字。</div>'}</div>${store.people.length?store.people.map(person=>`<article class="person-card"><div class="person-head"><b>${escapeHtml(person.name)}</b><span class="${person.status==='fail'?'fail':''}">${person.status==='fail'?'未過關':'過關'}</span></div><div class="person-metrics">${Object.entries(person.metrics||{}).map(([key,value])=>`<span>${key} ${value==null?'—':fmtNumber(value)}</span>`).join('')}</div>${person.status==='fail'?`<p class="person-note">未過關：${escapeHtml(person.failed.join('、'))}<br>原因：${escapeHtml(person.reason||'尚未填寫原因')}<br>改善計畫：${escapeHtml(person.improvePlan||'尚未填寫改善計畫')}</p>`:''}</article>`).join(''):'<div class="empty-state">尚無正式個人回報。</div>'}</div></article>`;
+      return `<article class="report-store"><button class="report-store-button" type="button" aria-expanded="false"><span>${escapeHtml(store.name)}</span><span class="${store.reported?'positive':'negative'}">${store.reported?'已回報':'未回報'}</span><span class="${status==='未過關'?'negative':status==='過關'?'positive':''}">${status}</span><span>${escapeHtml(store.reportedAt||'—')}</span><i data-lucide="chevron-down"></i></button><div class="report-person-list"><div class="report-store-operation-grid">${['A999','好速','R1399','R999','保險搭售率','設備案佔比'].filter(key=>store.metrics&&store.metrics[key]!=null).map(key=>`<span><small>${escapeHtml(key)}</small><b>${key.includes('率')||key.includes('佔比')?`${fmtNumber(store.metrics[key],1)}%`:fmtNumber(store.metrics[key],key==='好速'?2:1)}</b></span>`).join('') || '<div class="empty-state">此店正式來源尚無營運數字。</div>'}</div>${renderStoreFeedback(store.storeFeedback)}${store.people.length?store.people.map(person=>`<article class="person-card"><div class="person-head"><b>${escapeHtml(person.name)}</b><span class="${person.status==='fail'?'fail':''}">${person.status==='fail'?'未過關':'過關'}</span></div><div class="person-metrics">${Object.entries(person.metrics||{}).map(([key,value])=>`<span>${key} ${value==null?'—':fmtNumber(value)}</span>`).join('')}</div>${person.status==='fail'?`<p class="person-note">未過關：${escapeHtml(person.failed.join('、'))}<br>原因：${escapeHtml(person.reason||'尚未填寫原因')}<br>改善計畫：${escapeHtml(person.improvePlan||'尚未填寫改善計畫')}</p>`:''}</article>`).join(''):'<div class="empty-state">尚無正式個人回報。</div>'}</div></article>`;
     }).join('');
     refreshIcons();
   }

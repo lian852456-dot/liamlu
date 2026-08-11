@@ -20,7 +20,7 @@ function body(name) {
 }
 
 function loadAdapters() {
-  const names = ['numberOrNull','normalizeStore','kpiDataAsOfDate','sourceFileName','kpiSupplementIsCurrent','officialKpiRate','kpicalcMetricItems','adaptKpi','adaptAwards','personalRecord','personalRoleGroup','personalMetricByKey','personalRankedByRole','managerStorePerformanceRows','personalUnderTargetByMetric','personalAqReview','adaptPersonalPerformance','adaptReport'];
+  const names = ['numberOrNull','normalizeStore','kpiDataAsOfDate','sourceFileName','kpiSupplementIsCurrent','officialKpiRate','kpicalcMetricItems','adaptKpi','adaptAwards','personalRecord','personalRoleGroup','personalMetricByKey','personalRankedByRole','managerStorePerformanceRows','personalUnderTargetByMetric','personalAqReview','adaptPersonalPerformance','reportStoreFeedback','adaptReport'];
   const script = `
     const STORE_ALIASES = new Map([['三創','台北三創']]);
     const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
@@ -29,8 +29,8 @@ function loadAdapters() {
     const C = { moduleState: value => ({ ...value, sourceLink:value.source.href }) };
     const moduleSource = (label,href) => ({label,href});
     const stale = () => false;
-    ${names.map(name=>`function ${name}(${({numberOrNull:'value',normalizeStore:'value',kpiDataAsOfDate:'data',sourceFileName:'value',kpiSupplementIsCurrent:'data, supplement',officialKpiRate:'entry',kpicalcMetricItems:'data, rates',adaptKpi:'data, snapshot, readAt',adaptAwards:'snapshot, expectedReportDate, readAt',personalRecord:'raw',personalRoleGroup:'source',personalMetricByKey:'person,key',personalRankedByRole:'people,roleGroup',managerStorePerformanceRows:'people,stores',personalUnderTargetByMetric:'people,key',personalAqReview:'people',adaptPersonalPerformance:'snapshot, readAt',adaptReport:'segment, storeData, personalData, formalSummary'})[name]}) {${body(name)}}`).join('\n')}
-    module.exports = { adaptKpi, adaptAwards, personalRecord, personalRoleGroup, personalMetricByKey, personalRankedByRole, managerStorePerformanceRows, personalUnderTargetByMetric, personalAqReview, adaptPersonalPerformance, adaptReport };
+    ${names.map(name=>`function ${name}(${({numberOrNull:'value',normalizeStore:'value',kpiDataAsOfDate:'data',sourceFileName:'value',kpiSupplementIsCurrent:'data, supplement',officialKpiRate:'entry',kpicalcMetricItems:'data, rates',adaptKpi:'data, snapshot, readAt',adaptAwards:'snapshot, expectedReportDate, readAt',personalRecord:'raw',personalRoleGroup:'source',personalMetricByKey:'person,key',personalRankedByRole:'people,roleGroup',managerStorePerformanceRows:'people,stores',personalUnderTargetByMetric:'people,key',personalAqReview:'people',adaptPersonalPerformance:'snapshot, readAt',reportStoreFeedback:'report, summaryStore',adaptReport:'segment, storeData, personalData, formalSummary'})[name]}) {${body(name)}}`).join('\n')}
+    module.exports = { adaptKpi, adaptAwards, personalRecord, personalRoleGroup, personalMetricByKey, personalRankedByRole, managerStorePerformanceRows, personalUnderTargetByMetric, personalAqReview, adaptPersonalPerformance, reportStoreFeedback, adaptReport };
   `;
   const context = vm.createContext({ module:{exports:{}}, exports:{}, Map, Set, Object, Array, String, Number, Boolean, Math, Date, JSON });
   vm.runInContext(script, context);
@@ -144,6 +144,30 @@ test('Daily report adapter passes through the formal summary and never recalcula
   const blocked = A.adaptReport(16, { 通化:{ aq999:999 } }, {}, null);
   assert.equal(blocked.summaryAvailable, false);
   assert.deepEqual(Object.keys(blocked.summaryMetrics), []);
+});
+
+test('Daily report adapter preserves each segment formal store feedback verbatim and prefers a canonical summary field when present', () => {
+  const A = loadAdapters();
+  const formalSummary = {
+    semantics:'formal-index-summary-v1',completedStores:1,totalStores:9,missingStores:[],updatedAt:'21:33',metrics:{},
+    stores:[{name:'通化',reported:true,reportedAt:'21:33',metrics:{}}]
+  };
+  const raw = {
+    通化:{
+      zero_reason:'原文 <零報>\n第二行',zero_consult:'酒泉／李XX',zero_method:'改善做法原文',zero_plan:'明日計劃原文'
+    }
+  };
+  const report21 = A.adaptReport(21,raw,{},formalSummary);
+  assert.deepEqual(JSON.parse(JSON.stringify(report21.stores.find(store=>store.name==='通化').storeFeedback)),{
+    reason:'原文 <零報>\n第二行',consult:'酒泉／李XX',method:'改善做法原文',plan:'明日計劃原文'
+  });
+  const report16 = A.adaptReport(16,{}, {}, formalSummary);
+  assert.deepEqual(JSON.parse(JSON.stringify(report16.stores.find(store=>store.name==='通化').storeFeedback)),{
+    reason:'',consult:'',method:'',plan:''
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(A.reportStoreFeedback(raw.通化,{storeFeedback:{reason:'canonical reason',consult:'canonical consult',method:'canonical method',plan:'canonical plan'}}))),{
+    reason:'canonical reason',consult:'canonical consult',method:'canonical method',plan:'canonical plan'
+  });
 });
 
 test('Personal performance adapter maps formal fields and derives AQ attention only from manager AQ actual', () => {

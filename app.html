@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
-  <link rel="stylesheet" href="app.css?v=16">
+  <link rel="stylesheet" href="app.css?v=17">
   <title>Liam Supervisor App 1.2</title>
 </head>
 <body>
@@ -69,6 +69,7 @@
         <div class="segment-control report-segment" role="tablist" aria-label="回報時段"><button class="active" data-report-segment="16" type="button">16:00</button><button data-report-segment="21" type="button">21:00</button></div>
         <div id="reportOverview"></div>
         <section class="panel report-operations-panel"><div class="panel-head"><div><h2>全區營運摘要</h2><small>正式來源欄位，App 不重算</small></div></div><div id="reportOperations"></div></section>
+        <section class="panel report-feedback-panel"><div class="panel-head"><div><h2>門市請益彙整</h2><small>只顯示此時段正式來源原文</small></div></div><div id="reportFeedbackSummary"></div></section>
         <section class="panel report-failure-panel"><div class="panel-head"><div><h2>全區未過關彙整</h2><small>沿用正式回報結果，不在 App 推算</small></div></div><div id="reportFailures"></div></section>
         <section class="panel report-store-panel"><div class="panel-head"><div><h2>九店回報</h2><small>點店展開個人內容</small></div></div><div id="reportStoreList"></div></section>
         <a class="source-button" href="index.html">開啟完整每日回報系統 <i data-lucide="external-link"></i></a>
@@ -152,10 +153,10 @@
     </nav>
   </div>
   <script src="app-assets/lucide.min.js"></script>
-  <script src="app-data-contract.js?v=12"></script>
-  <script src="app-preview-data.js?v=15"></script>
+  <script src="app-data-contract.js?v=13"></script>
+  <script src="app-preview-data.js?v=16"></script>
   <script src="patrol-read-model.js?v=11"></script>
   <script src="half-month-check-read-model.js?v=2"></script>
-  <script src="app.js?v=16" defer></script>
+  <script src="app.js?v=17" defer></script>
 </body>
 </html>
