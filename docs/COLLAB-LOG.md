@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-11 ｜ Codex（App 1.2 個績＋每日回報摘要，待部署／21:00 live data）
+
+- 做了什麼：從乾淨 `origin/main` 建立 `feature/liam-supervisor-app-1-2`。每日回報新增既有 GAS `read` 的唯讀 `formal-index-summary-v1` adapter，直接提供完成／缺店、更新時間、A999、好速、R1399、R999、保險搭售率與設備案佔比；App 只直通顯示，不從店列重算。戰情新增「個績」，沿用 Approved Device 保護下的 `private_access.snapshot.kpiBattle.personal`，顯示正式總績效、排名、DOD、排名變化與現有 10 項個人 KPI；正式來源沒有的「需要關注」與個人 25 項保持 `—`／不顯示。
+- 結果（進行中）：全 Node 134/134、App 1.2 Chromium 390×844 2/2、npm audit 0；橫向溢出 0、可見數字無 ellipsis、相關 touch target ≥44px、console error 0。18:06 後正式 16:00 readback 為 9/9，A999 3、好速 2、R1399 6、R999 13、保險 50.5%、設備案 52.2%、更新 18:06:51；21:00 仍為 0/9，Gate 維持 `WAITING-LIVE-DATA`。尚未部署 GAS／GitHub Pages，不能把本機 mapping 當正式 App PASS。
+- 經驗 / 給下一位的提醒：正式 16:00 資料會由 partial 變成 complete，測試保留 8/9 partial fixture，但 App 絕不可硬編當下數字。21:00 若正式欄位較少，adapter 必須省略欄位，不能把缺欄位變成 0 或帶入 16:00。KPI、台獎、班表、巡店、auth、Approved Device 與 Native shell 本輪未改。
+
 ## 2026-08-11 ｜ Codex（App 1.1 巡店最小修正，待部署／實機驗收）
 
 - 做了什麼：只動巡店。擴充既有 `patrol-read-model.js`，讓 App 與 `patrol.html` 共用題 14–17、題 18、不同到店日期計數與一次巡店一列的聚合；App 巡店頁新增雙月全盤、每月盤點、九店本月次數、最近 10 次，以及獨立快速到店／離店。GAS 只新增 `ptvisit_read`／`ptvisit_write` 與獨立工作表 `巡店到離店紀錄`，既有 `ptread`／`ptwrite`／`sread` 語意與 schema 不變。

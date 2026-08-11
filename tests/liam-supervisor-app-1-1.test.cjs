@@ -15,11 +15,11 @@ function loadPreviewContract() {
   return { api:context.globalThis.LiamSupervisorContract, data:context.globalThis.LiamSupervisorPreviewData };
 }
 
-test('App 1.1 fixed contract contains all 15 frozen modules and metadata', () => {
+test('App 1.2 contract adds personal performance without removing frozen modules', () => {
   const { api, data } = loadPreviewContract();
   assert.equal(api.validateContract(data), data);
   assert.deepEqual([...api.MODULE_KEYS], [
-    'todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models',
+    'todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models','personalPerformance',
     'report1600','report2100','reportFailures','scheduleToday','scheduleByDate','patrolToday','patrolOverview','patrolStores'
   ]);
   for (const key of api.MODULE_KEYS) {
@@ -43,6 +43,8 @@ test('Preview contract is visibly synthetic and contains the complete mobile sum
   assert.equal(data.awardStores.data.every(store => store.items.length === 3), true);
   assert.equal(data.report1600.data.totalStores, 9);
   assert.equal(data.report2100.data.totalStores, 9);
+  assert.equal(data.personalPerformance.data.people.length, 9);
+  assert.equal(data.personalPerformance.data.people.every(person => person.metrics.length === 10), true);
   assert.equal(data.scheduleToday.data.stores.length, 9);
   assert.equal(data.scheduleToday.data.date, '2026-08-10');
   assert.equal(data.patrolOverview.data.total, 9);
@@ -74,13 +76,14 @@ test('App runtime keeps existing reads and allows only the isolated patrol visit
   assert.doesNotMatch(code, /summary\.periodStart|summary\.expectedCount/);
 });
 
-test('Information architecture matches the App 1.1 acceptance surfaces', () => {
+test('Information architecture matches the App 1.2 acceptance surfaces', () => {
   const html = read('app.html');
-  for (const label of ['今日營運戰況','九店一覽','台獎總覽','戰情','每日回報','全區未過關彙整','九店完整班表','巡店大盤','系統狀態']) {
+  for (const label of ['今日營運戰況','九店一覽','台獎總覽','戰情','每日回報','全區營運摘要','全區未過關彙整','九店完整班表','巡店大盤','系統狀態']) {
     assert.match(html, new RegExp(label));
   }
   assert.match(html, /data-battle-kind="kpi"/);
   assert.match(html, /data-battle-kind="award"/);
+  assert.match(html, /data-battle-kind="personal"/);
   assert.match(html, /data-report-segment="16"/);
   assert.match(html, /data-report-segment="21"/);
   assert.match(html, /data-nav="home"/);
@@ -109,13 +112,13 @@ test('device UI scope keeps nine awards, removes Top cards and renders complete 
   assert.match(css, /\.store-row \{ position:relative; display:block; min-height:96px/);
 });
 
-test('PWA cache is versioned for App 1.1 and includes local icon library', () => {
+test('PWA cache is versioned for App 1.2 and includes local icon library', () => {
   const html = read('app.html');
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-1-patrol-minimal-v1/);
-  assert.match(html, /app\.css\?v=11/);
-  assert.match(html, /app-preview-data\.js\?v=11/);
-  assert.match(html, /app\.js\?v=11/);
+  assert.match(worker, /liam-supervisor-app-1-2-personal-report-v1/);
+  assert.match(html, /app\.css\?v=12/);
+  assert.match(html, /app-preview-data\.js\?v=12/);
+  assert.match(html, /app\.js\?v=12/);
   assert.match(html, /patrol-read-model\.js\?v=11/);
   assert.match(worker, /patrol-read-model\.js/);
   assert.match(worker, /app-data-contract\.js/);

@@ -21,7 +21,7 @@ test('390x844 home gives the supervisor summary without horizontal overflow', as
   let formalRequests = 0;
   await page.route('https://script.google.com/**', route => { formalRequests += 1; return route.abort(); });
   await page.goto(FILE_URL);
-  await expect(page).toHaveTitle('Liam Supervisor App 1.1');
+  await expect(page).toHaveTitle('Liam Supervisor App 1.2');
   await expect(page.locator('#dataMode')).toHaveText('Preview／示意資料');
   await expect(page.locator('#previewBanner')).toContainText('非正式營運數據');
   await expect(page.locator('#operationsRows')).toContainText('16:00');
@@ -73,9 +73,23 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
     await expect(page.locator('#battleContent')).toContainText(`${store} 指定機款 A`);
   }
 
+  await page.locator('[data-battle-kind="personal"]').click();
+  await page.locator('[data-battle-scope="region"]').click();
+  await expect(page.locator('#battleContent')).toContainText('總人數');
+  await expect(page.locator('#battleContent .personal-performance-item')).toHaveCount(9);
+  const firstPerson=page.locator('#battleContent .personal-performance-item').first();
+  await firstPerson.locator('.personal-performance-button').click();
+  await expect(firstPerson).toHaveClass(/expanded/);
+  await expect(firstPerson.locator('.personal-metric-grid article')).toHaveCount(10);
+  await expect(page.locator('#battleContent')).toContainText('需要關注人數—正式來源未定義');
+
   await page.locator('.bottom-nav [data-nav="report"]').click();
+  await expect(page.locator('#reportOperations')).toContainText('A999 上線數');
+  await expect(page.locator('#reportOperations')).toContainText('12');
+  await expect(page.locator('#reportOperations')).toContainText('保險搭售率');
   await page.locator('[data-report-segment="21"]').click();
   await expect(page.locator('#reportOverview')).toContainText('5/9');
+  await expect(page.locator('#reportOperations')).toContainText('19');
   const firstReportStore = page.locator('.report-store').first();
   await firstReportStore.locator('button').click();
   await expect(firstReportStore).toHaveClass(/expanded/);

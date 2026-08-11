@@ -18,7 +18,7 @@
   const DEVICE_ACTIONS = new Set(['private_request','private_request_status']);
   const PATROL_READ_ACTIONS = new Set(['sread','ptread','ptvisit_read']);
   const PATROL_WRITE_ACTIONS = new Set(['ptvisit_write']);
-  const PRIVATE_MODULE_KEYS = ['todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models','report1600','report2100','reportFailures'];
+  const PRIVATE_MODULE_KEYS = ['todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models','personalPerformance','report1600','report2100','reportFailures'];
   const PREVIEW_MODE = new URLSearchParams(scope.location.search).get('preview') === '1';
   const STALE_MS = 30 * 60 * 60 * 1000;
 
@@ -84,6 +84,7 @@
       todayOperations:moduleSource('北一二B每日回報','index.html'),
       kpiSummary:moduleSource('正式 KPI kpicalc','kpi.html'), kpiStores:moduleSource('正式 KPI kpicalc','kpi.html'), kpiFullMetrics:moduleSource('正式 KPI kpicalc','kpi.html'),
       awardSummary:moduleSource('正式台獎私有戰情','index.html'), awardStores:moduleSource('正式台獎私有戰情','index.html'), awardTop2Models:moduleSource('正式台獎私有戰情','index.html'),
+      personalPerformance:moduleSource('正式 KPI 個績快照','index.html'),
       report1600:moduleSource('北一二B每日回報','index.html'), report2100:moduleSource('北一二B每日回報','index.html'), reportFailures:moduleSource('正式個人回報','index.html'),
       scheduleToday:moduleSource('既有班表 sread','patrol.html'), scheduleByDate:moduleSource('既有班表 sread','patrol.html'),
       patrolToday:moduleSource('巡店唯讀摘要','patrol.html'), patrolOverview:moduleSource('既有巡店 ptread','patrol.html'), patrolStores:moduleSource('既有巡店 ptread','patrol.html')
@@ -111,7 +112,7 @@
   }
 
   async function postReadOnly(payload) {
-    if (!READ_ACTIONS.has(payload.action)) throw new Error('App 1.1 僅允許既有唯讀 action。');
+    if (!READ_ACTIONS.has(payload.action)) throw new Error('App 1.2 僅允許既有唯讀 action。');
     const response = await fetch(DAILY_REPORT_API, {
       method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body:JSON.stringify(payload), cache:'no-store', credentials:'omit'
@@ -154,6 +155,7 @@
     contract.kpiFullMetrics = statusModule('kpiFullMetrics',status,{region:[],stores:{}},note);
     contract.awardStores = statusModule('awardStores',status,[],note);
     contract.awardTop2Models = statusModule('awardTop2Models',status,[],note);
+    contract.personalPerformance = statusModule('personalPerformance',status,{ summary:null, people:[] },note);
     contract.generatedAt = nowIso();
   }
 
@@ -166,7 +168,7 @@
   }
 
   async function patrolRead(action, params = {}) {
-    if (!PATROL_READ_ACTIONS.has(action)) throw new Error('App 1.1 僅允許既有班表／巡店讀取與獨立到離店讀取。');
+    if (!PATROL_READ_ACTIONS.has(action)) throw new Error('App 1.2 僅允許既有班表／巡店讀取與獨立到離店讀取。');
     if (!patrolToken) throw new Error('班表／巡店 session 尚未驗證。');
     const url = new URL(PATROL_API);
     url.searchParams.set('action', action);
@@ -367,23 +369,49 @@
     };
   }
 
-  function adaptReport(segment, storeData, personalData) {
+  function adaptPersonalPerformance(snapshot, readAt) {
+    const sourceData = snapshot && snapshot.kpiBattle || {};
+    const rows = Array.isArray(sourceData.personal) ? sourceData.personal : [];
+    const people = rows.map(row => ({
+      name:String(row.name || ''), store:normalizeStore(row.store), role:String(row.role || ''), category:String(row.category || ''),
+      totalRate:numberOrNull(row.overall_rate), rank:numberOrNull(row.rank), dod:numberOrNull(row.overall_rate_dod), rankChange:numberOrNull(row.rank_dod),
+      metrics:Object.entries(row.metrics || {}).map(([key,metric]) => ({
+        key:String(key), rate:numberOrNull(metric && metric.rate), actual:numberOrNull(metric && metric.actual), target:numberOrNull(metric && metric.target),
+        dailyTarget:numberOrNull(metric && metric.daily_target), dailyGap:numberOrNull(metric && metric.daily_gap), dod:numberOrNull(metric && metric.dod)
+      }))
+    })).filter(row => row.name && row.store);
+    const achieved = people.filter(row => row.totalRate != null && row.totalRate >= 1).length;
+    const underTarget = people.filter(row => row.totalRate != null && row.totalRate < 1).length;
+    const complete = people.length > 0 && people.every(row => row.totalRate != null && row.rank != null && row.dod != null && row.rankChange != null && row.metrics.length > 0);
+    const updatedAt = String(sourceData.generated_at || snapshot && snapshot.publishedAt || '');
+    return C.moduleState({
+      status:people.length ? (complete ? 'ok' : 'partial') : 'no_data', updatedAt:readAt, sourceUpdatedAt:updatedAt,
+      stale:updatedAt ? stale(updatedAt) : false, source:moduleSource('正式 KPI 個績快照','index.html'),
+      data:{
+        summary:{ total:people.length, achieved, underTarget, attention:null, attentionAvailable:false, reportDate:String(sourceData.report_date || ''), sourceAsOfDate:String(sourceData.source_as_of_date || '') },
+        people
+      },
+      note:people.length ? '正式來源未定義「需要關注」欄位；App 顯示為 —，不自行建立評分。正式來源目前提供 10 項個人 KPI，未提供個人 25 項。' : '正式來源尚無個績資料。'
+    });
+  }
+
+  function adaptReport(segment, storeData, personalData, formalSummary) {
+    const summary = formalSummary && typeof formalSummary === 'object' ? formalSummary : null;
+    const summaryStores = new Map((summary && Array.isArray(summary.stores) ? summary.stores : []).map(row => [normalizeStore(row.name), row]));
     const stores = STORES.map(name => {
       const report = (storeData || {})[name] || (storeData || {})[normalizeStore(name)] || null;
+      const summaryStore = summaryStores.get(normalizeStore(name)) || null;
       const peopleSource = (personalData || {})[name] || {};
       const people = Object.entries(peopleSource).map(([personName,raw]) => ({ name:personName, ...personalRecord(raw) }));
-      const metrics = report ? {
-        A999:numberOrNull(report.aq999), A1399:numberOrNull(report.aq1399), '好速':numberOrNull(report.haosu),
-        R999:numberOrNull(report.rt999), R1399:numberOrNull(report.rt1399)
-      } : {};
-      return { name, reported:Boolean(report), reportedAt:report ? String(report.savedAt || report.updatedAt || '') : '', metrics, people };
+      const metrics = summaryStore ? Object.fromEntries(Object.entries(summaryStore.metrics || {}).map(([key,metric]) => [key,numberOrNull(metric && metric.value)]).filter(([,value]) => value != null)) : {};
+      return { name, reported:summaryStore ? Boolean(summaryStore.reported) : Boolean(report), reportedAt:summaryStore ? String(summaryStore.reportedAt || '') : report ? String(report.savedAt || report.updatedAt || '') : '', metrics, people };
     });
-    const completed = stores.filter(store => store.reported).length;
-    const missing = stores.filter(store => !store.reported).map(store => store.name);
-    const sourceTimes = stores.map(store => store.reportedAt).filter(Boolean).sort();
-    const totals = {};
-    stores.forEach(store => Object.entries(store.metrics).forEach(([key,value]) => { if (value != null) totals[key] = (totals[key] || 0) + value; }));
-    return { segment, completedStores:completed, totalStores:9, missingStores:missing, updatedAt:sourceTimes.at(-1) || '', totals, stores };
+    const completed = summary && numberOrNull(summary.completedStores) != null ? Number(summary.completedStores) : stores.filter(store => store.reported).length;
+    const missing = summary && Array.isArray(summary.missingStores) ? summary.missingStores.map(normalizeStore) : stores.filter(store => !store.reported).map(store => store.name);
+    const summaryMetrics = summary ? Object.fromEntries(Object.entries(summary.metrics || {}).map(([key,metric]) => [key,{
+      value:numberOrNull(metric && metric.value), unit:String(metric && metric.unit || ''), sourceField:String(metric && metric.sourceField || ''), aggregation:String(metric && metric.aggregation || '')
+    }]).filter(([,metric]) => metric.value != null)) : {};
+    return { segment, completedStores:completed, totalStores:summary && numberOrNull(summary.totalStores) != null ? Number(summary.totalStores) : 9, missingStores:missing, updatedAt:summary ? String(summary.updatedAt || '') : '', summaryAvailable:Boolean(summary && summary.semantics === 'formal-index-summary-v1'), summaryMetrics, stores };
   }
 
   function failureSummary(report) {
@@ -423,18 +451,20 @@
       ? adaptKpi(requests[0].value.data || {}, snapshot, readAt)
       : { summary:statusModule('kpiSummary','error',null,'正式 kpicalc 讀取失敗'), stores:statusModule('kpiStores','error',[], '正式 kpicalc 讀取失敗'), full:statusModule('kpiFullMetrics','error',{region:[],stores:{}},'正式 kpicalc 讀取失敗') };
     const awards = adaptAwards(snapshot, kpi.summary.data && kpi.summary.data.reportDate, readAt);
-    const report16 = adaptReport(16, requests[1].status === 'fulfilled' ? requests[1].value.data : {}, requests[3].status === 'fulfilled' ? requests[3].value.data : {});
-    const report21 = adaptReport(21, requests[2].status === 'fulfilled' ? requests[2].value.data : {}, requests[4].status === 'fulfilled' ? requests[4].value.data : {});
+    const personalPerformance = adaptPersonalPerformance(snapshot, readAt);
+    const report16 = adaptReport(16, requests[1].status === 'fulfilled' ? requests[1].value.data : {}, requests[3].status === 'fulfilled' ? requests[3].value.data : {}, requests[1].status === 'fulfilled' ? requests[1].value.summary : null);
+    const report21 = adaptReport(21, requests[2].status === 'fulfilled' ? requests[2].value.data : {}, requests[4].status === 'fulfilled' ? requests[4].value.data : {}, requests[2].status === 'fulfilled' ? requests[2].value.summary : null);
     const reportModule = (report, result) => C.moduleState({
-      status:result.status === 'fulfilled' ? (report.completedStores === 9 ? 'ok' : 'partial') : 'error', updatedAt:readAt,
+      status:result.status === 'fulfilled' ? (report.completedStores === 0 ? 'no_data' : report.completedStores === 9 && report.summaryAvailable ? 'ok' : 'partial') : 'error', updatedAt:readAt,
       sourceUpdatedAt:report.updatedAt, stale:false, source:moduleSource('北一二B每日回報','index.html'), data:report,
-      note:result.status === 'fulfilled' ? '' : '正式回報來源讀取失敗'
+      note:result.status !== 'fulfilled' ? '正式回報來源讀取失敗' : !report.summaryAvailable ? '正式來源尚未提供 report summary adapter；營運摘要 fail-closed。' : report.completedStores === 0 ? `尚未進入／尚無正式 ${report.segment}:00 回報` : ''
     });
     contract = C.validateContract({
       ...contract, version:C.VERSION, generatedAt:readAt, mode:'formal',
       todayOperations:C.moduleState({ status:'ok', updatedAt:readAt, sourceUpdatedAt:report21.updatedAt || report16.updatedAt, stale:false, source:moduleSource('北一二B每日回報','index.html'), data:{ date:taipeiDate(), segments:[report16,report21] } }),
       kpiSummary:kpi.summary, kpiStores:kpi.stores, kpiFullMetrics:kpi.full,
       awardSummary:awards.summary, awardStores:awards.stores, awardTop2Models:awards.top2,
+      personalPerformance,
       report1600:reportModule(report16,requests[1]), report2100:reportModule(report21,requests[2]),
       reportFailures:C.moduleState({ status:requests[3].status === 'fulfilled' || requests[4].status === 'fulfilled' ? 'ok':'error', updatedAt:readAt, sourceUpdatedAt:report21.updatedAt || report16.updatedAt, stale:false, source:moduleSource('正式個人回報','index.html'), data:{16:failureSummary(report16),21:failureSummary(report21)} })
     });
@@ -570,7 +600,7 @@
     dom('#operationsRows').innerHTML = rows.length ? rows.map(segment => {
       const failures = contract.reportFailures.data && contract.reportFailures.data[segment.segment] || {};
       const missing = segment.missingStores ? segment.missingStores.length : Math.max(0,9-segment.completedStores);
-      const totals = segment.totals || {};
+      const summaryMetrics = segment.summaryMetrics || {};
       const failingPeople = failures.people || [];
       return `<article class="operation-item"><div class="operation-row">
         <span class="operation-time">${escapeHtml(segment.segment)}:00</span>
@@ -579,9 +609,10 @@
         <span class="operation-metric"><span>未過店</span><b class="${failures.failedStoreCount?'bad':'good'}">${failures.failedStoreCount || 0}</b></span>
         <span class="operation-metric"><span>未過人</span><b class="${failures.failedPeopleCount?'bad':'good'}">${failures.failedPeopleCount || 0}</b></span>
         <button class="attention-button" type="button" data-toggle-operation="${segment.segment}" aria-label="展開 ${segment.segment}:00 戰況"><i data-lucide="triangle-alert"></i></button>
-      </div><div class="operation-detail"><div class="operation-detail-summary">${['A999','A1399','好速','R999','R1399'].map(key=>`<span>${key} ${fmtNumber(totals[key],1)}</span>`).join('')}</div>
+      </div><div class="operation-detail"><div class="operation-detail-summary">${['A999','好速','R999','R1399'].filter(key=>summaryMetrics[key]).map(key=>`<span>${key} ${formatOperationMetric(summaryMetrics[key])}</span>`).join('') || '<span>正式營運摘要尚無資料</span>'}</div>
+        <div class="operation-detail-summary operation-detail-percent">${['保險搭售率','設備案佔比'].filter(key=>summaryMetrics[key]).map(key=>`<span>${key==='保險搭售率'?'保險':'設備案'} ${formatOperationMetric(summaryMetrics[key])}</span>`).join('')}</div>
         <p>${segment.missingStores.length?`未回報：${segment.missingStores.map(escapeHtml).join('、')}`:'九店已完成回報'}${failingPeople.length?`｜未過關：${failingPeople.slice(0,3).map(person=>`${escapeHtml(person.store)} ${escapeHtml(person.name)}（${escapeHtml(person.failed.join('、'))}）`).join('、')}`:'｜目前無正式未過關紀錄'}</p>
-        <div>${segment.stores.filter(store=>store.reported).map(store=>`<div class="operation-store-mini"><span>${escapeHtml(store.name)}</span>${['A999','A1399','好速','R999','R1399'].map(key=>`<span>${fmtNumber(store.metrics&&store.metrics[key],1)}</span>`).join('')}</div>`).join('')}</div>
+        <div>${segment.stores.filter(store=>store.reported).map(store=>`<div class="operation-store-mini"><span>${escapeHtml(store.name)}</span>${['A999','好速','R999','R1399'].map(key=>`<span>${store.metrics&&store.metrics[key]!=null?fmtNumber(store.metrics[key],1):'—'}</span>`).join('')}</div>`).join('')}</div>
       </div></article>`;
     }).join('') : privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '正式回報摘要尚未解鎖');
   }
@@ -655,6 +686,48 @@
     node.innerHTML = `<span class="compact-icon"><i data-lucide="route"></i></span><div class="compact-copy"><h2 id="patrolHomeTitle">今日巡店</h2><p>${data.route.map(escapeHtml).join(' → ')}</p></div><span class="compact-next"><b>下一站：${escapeHtml(data.nextStop||'—')}</b><small>${data.nextEta?`預計 ${escapeHtml(data.nextEta)} 到達`:''}</small></span>`;
   }
 
+  function formatOperationMetric(metric) {
+    if (!metric || metric.value == null) return '—';
+    return metric.unit === 'percent' ? `${fmtNumber(metric.value,1)}%` : fmtNumber(metric.value,metric.unit === 'points' ? 2 : 1);
+  }
+
+  function personalMetricTone(rate) { return rate == null ? '' : rate < 1 ? 'negative' : 'positive'; }
+
+  function personalPriorityMetrics(person) {
+    const core = ['A999','A1399','好速','R999','R1399','RT'];
+    const metrics = (person.metrics || []).filter(metric => core.includes(metric.key));
+    return [...metrics.filter(metric => metric.rate != null && metric.rate < 1), ...metrics.filter(metric => metric.rate == null || metric.rate >= 1)].slice(0,2);
+  }
+
+  function personalPerformanceRow(person) {
+    const priorities = personalPriorityMetrics(person);
+    return `<article class="personal-performance-item"><button class="personal-performance-button" type="button" aria-expanded="false">
+      <span class="personal-primary"><b>${escapeHtml(person.name)}</b><small>${escapeHtml(person.store)} · ${escapeHtml(person.role || person.category)}</small></span>
+      <span class="personal-rate ${personalMetricTone(person.totalRate)}"><small>總績效</small><b>${fmtPct(person.totalRate)}</b></span>
+      <span class="personal-priority">${priorities.map(metric=>`<small class="${personalMetricTone(metric.rate)}">${escapeHtml(metric.key)} ${fmtPct(metric.rate)}</small>`).join('') || '<small>正式來源無主力指標</small>'}</span>
+      <i data-lucide="chevron-down"></i>
+    </button><div class="personal-performance-detail">
+      <div class="personal-performance-stats"><span>排名 <b>${person.rank??'—'}</b></span><span>DOD <b class="${valueClass(person.dod)}">${fmtSignedPct(person.dod)}</b></span><span>排名變化 <b class="${valueClass(person.rankChange)}">${fmtSigned(person.rankChange)}</b></span></div>
+      <div class="personal-metric-grid">${(person.metrics||[]).map(metric=>`<article><span>${escapeHtml(metric.key)}</span><b class="${personalMetricTone(metric.rate)}">${fmtPct(metric.rate)}</b><small>${metric.actual==null&&metric.target==null?'正式來源未提供實績／目標':`實績 ${fmtNumber(metric.actual)} / 目標 ${fmtNumber(metric.target)}`}${metric.dod==null?'':` · DOD ${fmtSignedPct(metric.dod)}`}</small></article>`).join('')}</div>
+    </div></article>`;
+  }
+
+  function renderPersonalPerformance(selected) {
+    const module = contract.personalPerformance;
+    const data = module.data || {};
+    const summary = data.summary || {};
+    const allPeople = Array.isArray(data.people) ? data.people : [];
+    const people = battleScope === 'store' ? allPeople.filter(person => person.store === selected) : allPeople;
+    if (!allPeople.length) return '<div class="empty-state">正式來源目前沒有個績資料。</div>';
+    const summaryCards = battleScope === 'region' ? `<div class="metric-card-grid personal-summary-grid">
+      <article class="metric-card"><span>總人數</span><strong>${summary.total??'—'}</strong><small>正式個績快照</small></article>
+      <article class="metric-card"><span>達標人數</span><strong class="positive">${summary.achieved??'—'}</strong><small>正式總達成率 ≥100%</small></article>
+      <article class="metric-card"><span>未達標人數</span><strong class="negative">${summary.underTarget??'—'}</strong><small>正式總達成率 &lt;100%</small></article>
+      <article class="metric-card"><span>需要關注人數</span><strong>${summary.attentionAvailable?summary.attention:'—'}</strong><small>${summary.attentionAvailable?'正式來源':'正式來源未定義'}</small></article>
+    </div>` : `<div class="award-selected-store"><span>店點個績</span><strong>${escapeHtml(selected)}</strong></div>`;
+    return `${summaryCards}<section class="panel personal-performance-panel"><div class="panel-head"><div><h2>${battleScope==='region'?'全區人員':'店點人員'}</h2><small>${people.length} 人 · 維持正式來源排序</small></div></div><div class="personal-performance-list">${people.map(personalPerformanceRow).join('') || '<div class="empty-state">此店正式來源目前沒有個績人員。</div>'}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
+  }
+
   function renderBattle() {
     const content = dom('#battleContent');
     if (contract.kpiSummary.status === 'unauthorized') {
@@ -664,6 +737,7 @@
     const stores = Array.isArray(contract.kpiStores.data)?contract.kpiStores.data:[];
     const awardStores = Array.isArray(contract.awardStores.data)?contract.awardStores.data:[];
     const select = dom('#battleStoreSelect');
+    dom('.scope-control').classList.toggle('personal-scope-control',battleKind==='personal');
     if (!select.options.length) select.innerHTML = STORES.map(name=>`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
     dom('#battleStorePicker').hidden = battleScope !== 'store';
     const selected = select.value || STORES[0];
@@ -675,13 +749,13 @@
     } else if (battleKind === 'kpi') {
       const row=stores.find(item=>item.name===selected);
       content.innerHTML = row ? `<div class="metric-card-grid"><article class="metric-card"><span>店 KPI</span><strong class="cyan-value">${fmtPct(row.kpi)}</strong><small>${escapeHtml(row.name)}</small></article><article class="metric-card"><span>公司排名</span><strong class="gold-value">${row.rank??'—'}</strong><small>${fmtSigned(row.rankChange)}</small></article><article class="metric-card"><span>KPI DOD</span><strong class="${valueClass(row.kpiDod)}">${fmtSignedPct(row.kpiDod)}</strong><small>正式快照</small></article><article class="metric-card"><span>加減分</span><strong>${fmtNumber(row.addon)}</strong><small>正式快照</small></article></div><section class="panel"><div class="panel-head"><div><h2>六項主要 KPI</h2><small>${escapeHtml(row.name)}</small></div></div><div class="core-grid">${Object.entries(row.core||{}).map(([key,value])=>`<div class="core-cell"><span>${key}</span><b class="${value!=null&&value<1?'negative':''}">${fmtPct(value)}</b></div>`).join('')}</div></section>${renderFullKpis(row.fullKpis,row.name)}<a class="source-button" href="index.html">開啟正式 KPI 網站 <i data-lucide="external-link"></i></a>` : '<div class="empty-state">尚無此店 KPI 摘要。</div>';
-    } else if (battleScope === 'region') {
+    } else if (battleKind === 'award' && battleScope === 'region') {
       const a=contract.awardSummary.data||{};
       content.innerHTML=`<div class="metric-card-grid"><article class="metric-card"><span>領獎店數</span><strong>${a.winningStores??'—'}/9</strong><small>正式台獎判定</small></article><article class="metric-card"><span>未領獎店數</span><strong>${a.winningStores==null?'—':Math.max(0,9-a.winningStores)}</strong><small>九店完整顯示</small></article></div><div class="battle-list award-battle-list"><div class="battle-list-row award-battle-row header"><span>店點</span><span>金額</span><span>狀態</span></div>${awardStores.map(row=>`<div class="battle-list-row award-battle-row"><span>${escapeHtml(row.name)}</span><span>${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</span><span class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</span></div>`).join('')}</div>`;
-    } else {
+    } else if (battleKind === 'award') {
       const row=awardStores.find(item=>item.name===selected);
       content.innerHTML=row?`<div class="award-selected-store"><span>店點</span><strong>${escapeHtml(row.name)}</strong></div><div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>正式台獎金額</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div>${renderAwardStoreItems(row)}<a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
-    }
+    } else content.innerHTML = renderPersonalPerformance(selected);
     refreshIcons();
   }
 
@@ -689,13 +763,15 @@
 
   function renderReport() {
     const module=activeReport(); const report=module.data; const failures=contract.reportFailures.data&&contract.reportFailures.data[reportSegment];
-    if (!report) { dom('#reportOverview').innerHTML=privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '解鎖後顯示 16:00／21:00 正式回報'); dom('#reportFailures').innerHTML=''; dom('#reportStoreList').innerHTML=''; return; }
+    if (!report) { dom('#reportOverview').innerHTML=privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '解鎖後顯示 16:00／21:00 正式回報'); dom('#reportOperations').innerHTML=''; dom('#reportFailures').innerHTML=''; dom('#reportStoreList').innerHTML=''; return; }
     dom('#reportOverview').innerHTML=`<div class="report-summary"><article><span>完成店數</span><b class="${report.completedStores===9?'positive':''}">${report.completedStores}/9</b></article><article><span>尚未完成</span><b class="${report.missingStores.length?'negative':'positive'}">${report.missingStores.length}</b></article><article><span>最後更新</span><b>${escapeHtml(report.updatedAt||'—')}</b></article></div>${report.missingStores.length?`<p class="stale-note">尚未完成：${report.missingStores.map(escapeHtml).join('、')}</p>`:''}`;
+    const summaryMetrics=report.summaryMetrics||{};
+    dom('#reportOperations').innerHTML=report.summaryAvailable&&Object.keys(summaryMetrics).length?`<div class="report-operation-grid">${['A999','好速','R1399','R999','保險搭售率','設備案佔比'].filter(key=>summaryMetrics[key]).map(key=>`<article><span>${escapeHtml(key==='A999'?'A999 上線數':key==='好速'?'好速銷售點數':key==='R1399'?'R1399 上線數':key==='R999'?'R999 上線數':key)}</span><b>${formatOperationMetric(summaryMetrics[key])}</b></article>`).join('')}</div>`:`<div class="empty-state">${module.status==='no_data'?`尚未進入／尚無正式 ${report.segment}:00 回報`:'正式來源尚未提供營運摘要欄位；App 不自行計算。'}</div>`;
     dom('#reportFailures').innerHTML=failures?`<div class="failure-summary"><div class="failure-grid"><div><span>未過關店數</span><b class="${failures.failedStoreCount?'negative':'positive'}">${failures.failedStoreCount}</b></div><div><span>未過關人數</span><b class="${failures.failedPeopleCount?'negative':'positive'}">${failures.failedPeopleCount}</b></div><div><span>未回報店點</span><b>${failures.missingStores.length}</b></div><div><span>各指標未過人數</span><b>${Object.entries(failures.byMetric||{}).map(([key,value])=>`${escapeHtml(key)} ${value}`).join(' · ')||'0'}</b></div></div><div class="tracking-list">${(failures.people||[]).map(person=>`<div class="tracking-item"><b>${escapeHtml(person.store)} · ${escapeHtml(person.name)}</b><br>${escapeHtml(person.failed.join('、')||'未過關')}｜${escapeHtml(person.reason||'尚未填寫原因')}</div>`).join('')||'<div class="empty-state">目前沒有正式未過關紀錄。</div>'}</div></div>`:'<div class="empty-state">尚無個人未過關資料。</div>';
     dom('#reportStoreList').innerHTML=report.stores.map(store=>{
       const failed=store.people.filter(person=>person.status==='fail').length;
       const status=!store.reported?'未回報':failed?'未過關':store.people.length?'過關':'已回報';
-      return `<article class="report-store"><button class="report-store-button" type="button" aria-expanded="false"><span>${escapeHtml(store.name)}</span><span class="${store.reported?'positive':'negative'}">${store.reported?'已回報':'未回報'}</span><span class="${status==='未過關'?'negative':status==='過關'?'positive':''}">${status}</span><span>${escapeHtml(store.reportedAt||'—')}</span><i data-lucide="chevron-down"></i></button><div class="report-person-list">${store.people.length?store.people.map(person=>`<article class="person-card"><div class="person-head"><b>${escapeHtml(person.name)}</b><span class="${person.status==='fail'?'fail':''}">${person.status==='fail'?'未過關':'過關'}</span></div><div class="person-metrics">${Object.entries(person.metrics||{}).map(([key,value])=>`<span>${key} ${value==null?'—':fmtNumber(value)}</span>`).join('')}</div>${person.status==='fail'?`<p class="person-note">未過關：${escapeHtml(person.failed.join('、'))}<br>${escapeHtml(person.reason||'尚未填寫原因')}<br>${escapeHtml(person.improvePlan||'尚未填寫改善計畫')}</p>`:''}</article>`).join(''):'<div class="empty-state">尚無正式個人回報。</div>'}</div></article>`;
+      return `<article class="report-store"><button class="report-store-button" type="button" aria-expanded="false"><span>${escapeHtml(store.name)}</span><span class="${store.reported?'positive':'negative'}">${store.reported?'已回報':'未回報'}</span><span class="${status==='未過關'?'negative':status==='過關'?'positive':''}">${status}</span><span>${escapeHtml(store.reportedAt||'—')}</span><i data-lucide="chevron-down"></i></button><div class="report-person-list"><div class="report-store-operation-grid">${['A999','好速','R1399','R999','保險搭售率','設備案佔比'].filter(key=>store.metrics&&store.metrics[key]!=null).map(key=>`<span><small>${escapeHtml(key)}</small><b>${key.includes('率')||key.includes('佔比')?`${fmtNumber(store.metrics[key],1)}%`:fmtNumber(store.metrics[key],key==='好速'?2:1)}</b></span>`).join('') || '<div class="empty-state">此店正式來源尚無營運數字。</div>'}</div>${store.people.length?store.people.map(person=>`<article class="person-card"><div class="person-head"><b>${escapeHtml(person.name)}</b><span class="${person.status==='fail'?'fail':''}">${person.status==='fail'?'未過關':'過關'}</span></div><div class="person-metrics">${Object.entries(person.metrics||{}).map(([key,value])=>`<span>${key} ${value==null?'—':fmtNumber(value)}</span>`).join('')}</div>${person.status==='fail'?`<p class="person-note">未過關：${escapeHtml(person.failed.join('、'))}<br>原因：${escapeHtml(person.reason||'尚未填寫原因')}<br>改善計畫：${escapeHtml(person.improvePlan||'尚未填寫改善計畫')}</p>`:''}</article>`).join(''):'<div class="empty-state">尚無正式個人回報。</div>'}</div></article>`;
     }).join('');
     refreshIcons();
   }
@@ -928,6 +1004,7 @@
     const reportButton=event.target.closest('[data-open-report]'); if(reportButton){ reportSegment=Number(reportButton.dataset.openReport); all('[data-report-segment]').forEach(button=>button.classList.toggle('active',Number(button.dataset.reportSegment)===reportSegment)); setView('report'); renderReport(); return; }
     const awardLink=event.target.closest('[data-open-awards]'); if(awardLink){ event.preventDefault(); battleKind='award'; battleScope='region'; all('[data-battle-kind]').forEach(button=>button.classList.toggle('active',button.dataset.battleKind==='award')); all('[data-battle-scope]').forEach(button=>button.classList.toggle('active',button.dataset.battleScope==='region')); setView('battle'); renderBattle(); return; }
     const storeButton=event.target.closest('.store-row'); if(storeButton){ const item=storeButton.closest('.store-item'); item.classList.toggle('expanded'); storeButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
+    const personalButton=event.target.closest('.personal-performance-button'); if(personalButton){ const item=personalButton.closest('.personal-performance-item'); item.classList.toggle('expanded'); personalButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
     const reportStore=event.target.closest('.report-store-button'); if(reportStore){ const item=reportStore.closest('.report-store'); item.classList.toggle('expanded'); reportStore.setAttribute('aria-expanded',item.classList.contains('expanded')); }
   });
   scope.addEventListener('hashchange',()=>{ const name=location.hash.slice(1); if(all('[data-view]').some(view=>view.dataset.view===name))setView(name); });

@@ -81,16 +81,18 @@ test('快照合併硬性要求截止日與來源檔一致', () => {
   assert.doesNotMatch(functionBody(html, 'loadKpiBattle'), /__KPI_BATTLE_DATA__/);
 });
 
-test('正式達成率保護區不變，GAS 僅允許新增隔離巡店到離店 action', () => {
+test('正式達成率保護區不變，GAS 本輪僅新增每日回報唯讀摘要', () => {
   const gasDiff = execFileSync('git', ['diff', '--unified=0', 'origin/main', '--', 'gas/Code.gs'], { cwd: root, encoding: 'utf8' });
   const removedLines = gasDiff.split('\n').filter((line) => line.startsWith('-') && !line.startsWith('---'));
-  assert.deepEqual(removedLines, []);
-  assert.match(gasDiff, /PATROL_VISIT_SHEET/);
-  assert.match(gasDiff, /ptvisit_read/);
-  assert.match(gasDiff, /ptvisit_write/);
+  assert.deepEqual(removedLines, [
+    "-      return jsonResponse({ status: 'ok', data }, cb);",
+    "-  return { status: 'ok', data: readData(payload.date, parseInt(payload.seg, 10)) };",
+  ]);
+  assert.match(gasDiff, /reportSummaryFromData_/);
+  assert.match(gasDiff, /formal-index-summary-v1/);
   assert.doesNotMatch(
     gasDiff.split('\n').filter((line) => line.startsWith('+') && !line.startsWith('+++')).join('\n'),
-    /kpiCalc|award|dailyReport|schedule/i,
+    /kpiCalc|award|schedule|ptauth|ptvisit|private_access|reportWritePayload_\s*\{/i,
   );
   const gas = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8');
   const parser = functionBody(gas, 'kpiCalcParseReport');
@@ -98,6 +100,7 @@ test('正式達成率保護區不變，GAS 僅允許新增隔離巡店到離店 
   assert.match(parser, /aggregateRates: aggregateRates/);
   assert.match(gas, /action === 'private_publish'/);
   assert.match(gas, /action === 'ptread'/);
+  assert.match(gas, /action === 'ptvisit_write'/);
 });
 
 test('正式報表無百分比時保留空值，不得自行改成 0%', () => {
