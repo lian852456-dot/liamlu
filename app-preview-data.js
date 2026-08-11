@@ -46,12 +46,14 @@
   });
   const report = (segment, completed, missing, rows) => {
     const storesWithMetrics = rows.map((row,index) => ({ ...row, metrics:row.reported ? {
-      A999:(index % 3) + 1, A1399:index % 2, '好速':Number(((index % 4) * .5 + .5).toFixed(1)), R999:(index % 2) + 1, R1399:index % 3
+      A999:(index % 3) + 1, '好速':Number(((index % 4) * .5 + .5).toFixed(1)), R999:(index % 2) + 1, R1399:index % 3,
+      '保險搭售率':Number((58+index*3.2).toFixed(1)), '設備案佔比':Number((52+index*2.7).toFixed(1))
     } : {} }));
-    const totals = {};
-    storesWithMetrics.forEach(store => Object.entries(store.metrics).forEach(([key,value]) => { totals[key] = (totals[key] || 0) + Number(value || 0); }));
+    const summaryMetrics = segment===16
+      ? { A999:{value:12,unit:'count'},'好速':{value:8.5,unit:'points'},R1399:{value:7,unit:'count'},R999:{value:11,unit:'count'},'保險搭售率':{value:67.4,unit:'percent'},'設備案佔比':{value:61.2,unit:'percent'} }
+      : { A999:{value:19,unit:'count'},'好速':{value:13,unit:'points'},R1399:{value:11,unit:'count'},R999:{value:18,unit:'count'},'保險搭售率':{value:70.1,unit:'percent'},'設備案佔比':{value:64.8,unit:'percent'} };
     return { segment, completedStores: completed, totalStores: 9, missingStores: missing,
-      updatedAt: segment === 16 ? '16:21' : '21:33', totals, stores: storesWithMetrics };
+      updatedAt: segment === 16 ? '16:21' : '21:33', summaryAvailable:true, summaryMetrics, stores: storesWithMetrics };
   };
   const report1600 = report(16, 7, ['復興南','六張犁'], [
     { name:'永吉', reported:true, reportedAt:'16:03', people:[makePerson('陳＊安')] },
@@ -108,6 +110,12 @@
     { name:`${store} 指定機款 B`, actual:index+1, target:index+5, rate:[.2,.333,.429,.5,.556,.6,.636,.667,.692][index], difference:null, thresholdTarget:null, reward50:null, reward100:1800+index*100, status:'' },
     { name:`${store} 指定機款 C`, actual:null, target:null, rate:null, difference:null, thresholdTarget:null, reward50:null, reward100:null, status:'' }
   ];
+  const personalMetricNames=['AQ','A999','A1399','RT','R999','R1399','好速','特維','配件','包膜'];
+  const previewPeople=stores.slice(0,9).map((store,index)=>({
+    name:`同仁＊${index+1}`,store:store.name,role:index%3===0?'店長':index%3===1?'副店長':'業務代表',category:index%3===0?'店長':index%3===1?'副店':'業代',
+    totalRate:Number((1.12-index*.045).toFixed(3)),rank:12+index*7,dod:Number((.028-index*.009).toFixed(3)),rankChange:2-index,
+    metrics:personalMetricNames.map((key,metricIndex)=>({key,rate:Number((1.18-index*.035-metricIndex*.018).toFixed(3)),actual:12-index,target:10,dailyTarget:1,dailyGap:index%2,dod:Number((.02-metricIndex*.004).toFixed(3))}))
+  }));
 
   const contract = {
     version:C.VERSION, generatedAt:'2026-08-10T08:42:00+08:00', mode:'preview',
@@ -121,6 +129,7 @@
       ...['台北三創','酒泉','萬大','杭州南','復興南','六張犁'].map((name,index) => ({name,amount:0,eligible:false,items:previewAwardItems(name,index+3)}))
     ],'正式台獎私有戰情','index.html'),
     awardTop2Models:state([{name:'A1399',amount100:6800,progress:.82,status:'接近領獎'},{name:'R1399',amount100:5200,progress:.76,status:'追蹤中'}],'正式台獎私有戰情','index.html'),
+    personalPerformance:state({ summary:{total:previewPeople.length,achieved:previewPeople.filter(row=>row.totalRate>=1).length,underTarget:previewPeople.filter(row=>row.totalRate<1).length,attention:null,attentionAvailable:false,reportDate:'2026-08-10',sourceAsOfDate:'2026-08-09'},people:previewPeople },'正式 KPI 個績快照','index.html'),
     report1600:state(report1600,'北一二B每日回報','index.html','2026-08-10T16:21:00+08:00'),
     report2100:state(report2100,'北一二B每日回報','index.html','2026-08-10T21:33:00+08:00'),
     reportFailures:state({ 16:failureData(report1600),21:failureData(report2100) },'正式個人回報','index.html','2026-08-10T21:33:00+08:00'),

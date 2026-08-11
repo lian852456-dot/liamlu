@@ -12,20 +12,20 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
-  <link rel="stylesheet" href="app.css?v=11">
-  <title>Liam Supervisor App 1.1</title>
+  <link rel="stylesheet" href="app.css?v=12">
+  <title>Liam Supervisor App 1.2</title>
 </head>
 <body>
   <div class="app-shell">
     <header class="app-header">
       <a class="brand" href="#home" data-nav="home" aria-label="Liam Supervisor 首頁">
         <span class="brand-mark">L</span>
-        <span><strong>Liam Supervisor App 1.1</strong><small><span id="appDate">—</span><i>·</i><span id="appUpdatedAt">尚未更新</span></small></span>
+        <span><strong>Liam Supervisor App 1.2</strong><small><span id="appDate">—</span><i>·</i><span id="appUpdatedAt">尚未更新</span></small></span>
       </a>
       <div class="header-actions"><button id="dataMode" class="mode-pill" type="button" data-nav="me" aria-label="開啟正式資料解鎖">讀取中</button><button class="profile-entry" type="button" data-nav="me" data-profile-entry aria-label="開啟個人與系統設定"><i data-lucide="user-round-cog"></i></button></div>
     </header>
 
-    <aside id="previewBanner" class="preview-banner" hidden><i data-lucide="flask-conical"></i><span><strong>Preview／示意資料</strong><small>僅供 App 1.1 資訊架構與 UI 驗收，非正式營運數據</small></span></aside>
+    <aside id="previewBanner" class="preview-banner" hidden><i data-lucide="flask-conical"></i><span><strong>Preview／示意資料</strong><small>僅供 App 1.2 資訊架構與 UI 驗收，非正式營運數據</small></span></aside>
 
     <main class="app-main">
       <section data-view="home" aria-label="首頁">
@@ -58,7 +58,7 @@
 
       <section data-view="battle" hidden aria-label="戰情">
         <div class="view-heading"><div><p>READ-ONLY SUMMARY</p><h1>戰情</h1></div><a class="icon-button" href="index.html" aria-label="開啟正式戰情網站"><i data-lucide="external-link"></i></a></div>
-        <div class="segment-control" role="tablist" aria-label="戰情類型"><button class="active" data-battle-kind="kpi" type="button">KPI</button><button data-battle-kind="award" type="button">台獎</button></div>
+        <div class="segment-control battle-kind-control" role="tablist" aria-label="戰情類型"><button class="active" data-battle-kind="kpi" type="button">KPI</button><button data-battle-kind="award" type="button">台獎</button><button data-battle-kind="personal" type="button">個績</button></div>
         <div class="scope-control" role="tablist" aria-label="戰情範圍"><button class="active" data-battle-scope="region" type="button">北一二B</button><button data-battle-scope="store" type="button">店點</button></div>
         <label id="battleStorePicker" class="select-field" hidden><span>選擇店點</span><select id="battleStoreSelect"></select></label>
         <div id="battleContent"></div>
@@ -68,6 +68,7 @@
         <div class="view-heading"><div><p>DAILY OPERATIONS</p><h1>每日回報</h1></div><a class="icon-button" href="index.html" aria-label="開啟完整每日回報系統"><i data-lucide="external-link"></i></a></div>
         <div class="segment-control report-segment" role="tablist" aria-label="回報時段"><button class="active" data-report-segment="16" type="button">16:00</button><button data-report-segment="21" type="button">21:00</button></div>
         <div id="reportOverview"></div>
+        <section class="panel report-operations-panel"><div class="panel-head"><div><h2>全區營運摘要</h2><small>正式來源欄位，App 不重算</small></div></div><div id="reportOperations"></div></section>
         <section class="panel report-failure-panel"><div class="panel-head"><div><h2>全區未過關彙整</h2><small>沿用正式回報結果，不在 App 推算</small></div></div><div id="reportFailures"></div></section>
         <section class="panel report-store-panel"><div class="panel-head"><div><h2>九店回報</h2><small>點店展開個人內容</small></div></div><div id="reportStoreList"></div></section>
         <a class="source-button" href="index.html">開啟完整每日回報系統 <i data-lucide="external-link"></i></a>
@@ -112,7 +113,7 @@
 
       <section data-view="me" hidden aria-label="我的">
         <div class="view-heading"><div><p>LIAM ONLY</p><h1>個人與系統設定</h1></div><button class="icon-button" type="button" data-nav="home" aria-label="返回首頁"><i data-lucide="arrow-left"></i></button></div>
-        <article class="profile-card"><span class="profile-mark">L</span><div><strong>Liam Supervisor</strong><small>App 1.1 · 行動戰情資訊重構</small></div><span id="viewerState" class="status-chip">未登入</span></article>
+        <article class="profile-card"><span class="profile-mark">L</span><div><strong>Liam Supervisor</strong><small>App 1.2 · 個績與每日回報摘要</small></div><span id="viewerState" class="status-chip">未登入</span></article>
 
         <section class="panel access-panel" aria-labelledby="battleAccessTitle">
           <div class="panel-head"><div><h2 id="battleAccessTitle">KPI／台獎／回報</h2><small>沿用既有員編＋Approved Device</small></div></div>
@@ -143,9 +144,9 @@
     </nav>
   </div>
   <script src="app-assets/lucide.min.js"></script>
-  <script src="app-data-contract.js?v=9"></script>
-  <script src="app-preview-data.js?v=11"></script>
+  <script src="app-data-contract.js?v=12"></script>
+  <script src="app-preview-data.js?v=12"></script>
   <script src="patrol-read-model.js?v=11"></script>
-  <script src="app.js?v=11" defer></script>
+  <script src="app.js?v=12" defer></script>
 </body>
 </html>

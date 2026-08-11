@@ -20,16 +20,17 @@ function body(name) {
 }
 
 function loadAdapters() {
-  const names = ['numberOrNull','normalizeStore','kpiDataAsOfDate','sourceFileName','kpiSupplementIsCurrent','officialKpiRate','kpicalcMetricItems','adaptKpi','adaptAwards','personalRecord'];
+  const names = ['numberOrNull','normalizeStore','kpiDataAsOfDate','sourceFileName','kpiSupplementIsCurrent','officialKpiRate','kpicalcMetricItems','adaptKpi','adaptAwards','personalRecord','adaptPersonalPerformance','adaptReport'];
   const script = `
     const STORE_ALIASES = new Map([['三創','台北三創']]);
+    const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
     const KPI_CORE_KEYS = { A999:'AQ V+D 999 (含)以上', A1399:'AQ V+D 1399 (含)以上', '好速':'好速案銷售點數', R999:'RT V+D 999 (含)以上', R1399:'RT V+D 1399 (含)以上', RT:'RT上線點數' };
     const FAILURE_LABELS = { a999:'A999', a1399:'A1399', haosu:'好速', achieve:'R999', r1399:'R1399', insurance:'保險搭售率' };
     const C = { moduleState: value => ({ ...value, sourceLink:value.source.href }) };
     const moduleSource = (label,href) => ({label,href});
     const stale = () => false;
-    ${names.map(name=>`function ${name}(${({numberOrNull:'value',normalizeStore:'value',kpiDataAsOfDate:'data',sourceFileName:'value',kpiSupplementIsCurrent:'data, supplement',officialKpiRate:'entry',kpicalcMetricItems:'data, rates',adaptKpi:'data, snapshot, readAt',adaptAwards:'snapshot, expectedReportDate, readAt',personalRecord:'raw'})[name]}) {${body(name)}}`).join('\n')}
-    module.exports = { adaptKpi, adaptAwards, personalRecord };
+    ${names.map(name=>`function ${name}(${({numberOrNull:'value',normalizeStore:'value',kpiDataAsOfDate:'data',sourceFileName:'value',kpiSupplementIsCurrent:'data, supplement',officialKpiRate:'entry',kpicalcMetricItems:'data, rates',adaptKpi:'data, snapshot, readAt',adaptAwards:'snapshot, expectedReportDate, readAt',personalRecord:'raw',adaptPersonalPerformance:'snapshot, readAt',adaptReport:'segment, storeData, personalData, formalSummary'})[name]}) {${body(name)}}`).join('\n')}
+    module.exports = { adaptKpi, adaptAwards, personalRecord, adaptPersonalPerformance, adaptReport };
   `;
   const context = vm.createContext({ module:{exports:{}}, exports:{}, Map, Set, Object, Array, String, Number, Boolean, Math, Date, JSON });
   vm.runInContext(script, context);
@@ -115,4 +116,51 @@ test('Daily report failure codes are labels from the formal result, not re-evalu
   assert.deepEqual(Array.from(person.failed), ['A999','好速','保險搭售率']);
   assert.equal(person.reason, '正式原因');
   assert.equal(person.status, 'fail');
+});
+
+test('Daily report adapter passes through the formal summary and never recalculates from store rows', () => {
+  const A = loadAdapters();
+  const formalSummary = {
+    semantics:'formal-index-summary-v1', completedStores:8, totalStores:9, missingStores:['萬大'], updatedAt:'17:17:33',
+    metrics:{
+      A999:{value:2,unit:'count',sourceField:'aq999',aggregation:'sum'},
+      '好速':{value:2,unit:'points',sourceField:'haosu',aggregation:'sum'},
+      R1399:{value:5,unit:'count',sourceField:'rt1399',aggregation:'sum'},
+      R999:{value:11,unit:'count',sourceField:'rt999',aggregation:'sum'},
+      '保險搭售率':{value:64.6,unit:'percent',sourceField:'insurance_pct',aggregation:'average'},
+      '設備案佔比':{value:59,unit:'percent',sourceField:'device_ratio',aggregation:'average'}
+    },
+    stores:[{name:'通化',reported:true,reportedAt:'17:17:33',metrics:{A999:{value:1},'保險搭售率':{value:62.5}}}]
+  };
+  const result = A.adaptReport(16, { 通化:{ aq999:999, insurance_pct:999, savedAt:'01:00' } }, {}, formalSummary);
+  assert.equal(result.summaryAvailable, true);
+  assert.equal(result.completedStores, 8);
+  assert.deepEqual(Array.from(result.missingStores), ['萬大']);
+  assert.equal(result.updatedAt, '17:17:33');
+  assert.equal(result.summaryMetrics.A999.value, 2);
+  assert.equal(result.summaryMetrics['保險搭售率'].value, 64.6);
+  assert.equal(result.stores.find(store=>store.name==='通化').metrics.A999, 1);
+  assert.notEqual(result.summaryMetrics.A999.value, 999);
+  const blocked = A.adaptReport(16, { 通化:{ aq999:999 } }, {}, null);
+  assert.equal(blocked.summaryAvailable, false);
+  assert.deepEqual(Object.keys(blocked.summaryMetrics), []);
+});
+
+test('Personal performance adapter maps only formal person fields and fails closed for attention and 25 KPI', () => {
+  const A = loadAdapters();
+  const metrics = Object.fromEntries(['AQ','A999','A1399','RT','R999','R1399','好速','特維','配件','包膜'].map((key,index)=>[key,{rate:1.1-index*.01,actual:index+1,target:index+2,daily_target:1,daily_gap:0,dod:.01}]));
+  const snapshot = { publishedAt:'2026-08-11T09:54:24+08:00', kpiBattle:{ report_date:'2026-08-11',source_as_of_date:'2026-08-10',generated_at:'2026-08-11T09:54:24+08:00',personal:[
+    {name:'測試同仁',store:'酒泉',role:'店長',category:'店長',overall_rate:.912,rank:7,overall_rate_dod:-.015,rank_dod:-2,metrics}
+  ] } };
+  const result = A.adaptPersonalPerformance(snapshot, '2026-08-11T10:00:00+08:00');
+  assert.equal(result.status, 'ok');
+  assert.equal(result.data.summary.total, 1);
+  assert.equal(result.data.summary.achieved, 0);
+  assert.equal(result.data.summary.underTarget, 1);
+  assert.equal(result.data.summary.attention, null);
+  assert.equal(result.data.summary.attentionAvailable, false);
+  assert.equal(result.data.people[0].metrics.length, 10);
+  assert.equal(result.data.people[0].totalRate, .912);
+  assert.equal(result.data.people[0].metrics.find(metric=>metric.key==='A1399').rate, 1.08);
+  assert.match(result.note, /未提供個人 25 項/);
 });

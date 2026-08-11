@@ -300,7 +300,7 @@ function doGet(e) {
       const date = e.parameter.date;
       const seg  = parseInt(e.parameter.seg);
       const data = readData(date, seg);
-      return jsonResponse({ status: 'ok', data }, cb);
+      return jsonResponse({ status: 'ok', data, summary: reportSummaryFromData_(data, date, seg) }, cb);
     } catch(err) {
       return jsonResponse({ status: 'error', message: err.message }, cb);
     }
@@ -1548,8 +1548,69 @@ function reportWritePayload_(payload) {
   return { status: 'ok' };
 }
 
+function reportSummaryNumber_(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return isFinite(number) ? number : null;
+}
+
+function reportSummaryClock_(value) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  const zh = text.match(/^(上午|下午)\s*(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (zh) {
+    let hour = Number(zh[2]) % 12;
+    if (zh[1] === '下午') hour += 12;
+    return { seconds:hour * 3600 + Number(zh[3]) * 60 + Number(zh[4] || 0), text:String(hour).padStart(2, '0') + ':' + zh[3] + ':' + String(zh[4] || '00').padStart(2, '0') };
+  }
+  const plain = text.match(/(?:^|T|\s)(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!plain) return null;
+  const hour = Number(plain[1]);
+  return { seconds:hour * 3600 + Number(plain[2]) * 60 + Number(plain[3] || 0), text:String(hour).padStart(2, '0') + ':' + plain[2] + ':' + String(plain[3] || '00').padStart(2, '0') };
+}
+
+function reportSummaryFromData_(data, date, seg) {
+  const source = data && typeof data === 'object' ? data : {};
+  const definitions = [
+    { key:'A999', sourceField:'aq999', unit:'count', aggregation:'sum' },
+    { key:'好速', sourceField:'haosu', unit:'points', aggregation:'sum' },
+    { key:'R1399', sourceField:'rt1399', unit:'count', aggregation:'sum' },
+    { key:'R999', sourceField:'rt999', unit:'count', aggregation:'sum' },
+    { key:'保險搭售率', sourceField:'insurance_pct', unit:'percent', aggregation:'average' },
+    { key:'設備案佔比', sourceField:'device_ratio', unit:'percent', aggregation:'average' }
+  ];
+  const stores = STORES.map(function(store) {
+    const row = source[store] || null;
+    const metrics = {};
+    if (row) definitions.forEach(function(definition) {
+      const value = reportSummaryNumber_(row[definition.sourceField]);
+      if (value !== null) metrics[definition.key] = { value:value, unit:definition.unit, sourceField:definition.sourceField };
+    });
+    return { name:store, reported:Boolean(row), reportedAt:row ? String(row.savedAt || row.updatedAt || '') : '', metrics:metrics };
+  });
+  const reportedRows = STORES.map(function(store) { return source[store] || null; }).filter(Boolean);
+  const metrics = {};
+  if (reportedRows.length) definitions.forEach(function(definition) {
+    const values = reportedRows.map(function(row) { return reportSummaryNumber_(row[definition.sourceField]); }).filter(function(value) { return value !== null; });
+    if (!values.length) return;
+    const value = definition.aggregation === 'average'
+      ? Number((values.reduce(function(sum, item) { return sum + item; }, 0) / values.length).toFixed(1))
+      : values.reduce(function(sum, item) { return sum + item; }, 0);
+    metrics[definition.key] = { value:value, unit:definition.unit, sourceField:definition.sourceField, aggregation:definition.aggregation };
+  });
+  const latest = stores.map(function(store) { return reportSummaryClock_(store.reportedAt); }).filter(Boolean).sort(function(a, b) { return a.seconds - b.seconds; }).pop();
+  return {
+    date:String(date || ''), segment:Number(seg), completedStores:stores.filter(function(store) { return store.reported; }).length,
+    totalStores:STORES.length, missingStores:stores.filter(function(store) { return !store.reported; }).map(function(store) { return store.name; }),
+    updatedAt:latest ? latest.text : '', metrics:metrics, stores:stores,
+    semantics:'formal-index-summary-v1'
+  };
+}
+
 function reportReadPayload_(payload) {
-  return { status: 'ok', data: readData(payload.date, parseInt(payload.seg, 10)) };
+  const seg = parseInt(payload.seg, 10);
+  const data = readData(payload.date, seg);
+  return { status: 'ok', data:data, summary:reportSummaryFromData_(data, payload.date, seg) };
 }
 
 function personalWritePayload_(payload) {
