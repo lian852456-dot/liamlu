@@ -81,19 +81,10 @@ test('快照合併硬性要求截止日與來源檔一致', () => {
   assert.doesNotMatch(functionBody(html, 'loadKpiBattle'), /__KPI_BATTLE_DATA__/);
 });
 
-test('正式達成率保護區不變，GAS 本輪僅新增每日回報唯讀摘要', () => {
+test('正式達成率保護區不變，GAS ptvisit hotfix 不修改 KPI／台獎／班表／正式回報寫入', () => {
   const gasDiff = execFileSync('git', ['diff', '--unified=0', 'origin/main', '--', 'gas/Code.gs'], { cwd: root, encoding: 'utf8' });
-  const removedLines = gasDiff.split('\n').filter((line) => line.startsWith('-') && !line.startsWith('---'));
-  assert.deepEqual(removedLines, [
-    "-      return jsonResponse({ status: 'ok', data }, cb);",
-    "-  return { status: 'ok', data: readData(payload.date, parseInt(payload.seg, 10)) };",
-  ]);
-  assert.match(gasDiff, /reportSummaryFromData_/);
-  assert.match(gasDiff, /formal-index-summary-v1/);
-  assert.doesNotMatch(
-    gasDiff.split('\n').filter((line) => line.startsWith('+') && !line.startsWith('+++')).join('\n'),
-    /kpiCalc|award|schedule|ptauth|ptvisit|private_access|reportWritePayload_\s*\{/i,
-  );
+  const changedLines = gasDiff.split('\n').filter((line) => /^[+-]/.test(line) && !/^(?:---|\+\+\+)/.test(line)).join('\n');
+  assert.doesNotMatch(changedLines, /kpiCalc|award|schedule|private_access|reportWritePayload_\s*\{/i);
   const gas = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8');
   const parser = functionBody(gas, 'kpiCalcParseReport');
   assert.match(parser, /reportRate: kpiCalcReportRate/);
