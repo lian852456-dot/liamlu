@@ -7,6 +7,8 @@ enum NavigationDisposition: Equatable {
 }
 
 enum NavigationPolicy {
+    private static let appPath = "/liamlu/app.html"
+
     static func disposition(for url: URL) -> NavigationDisposition {
         if url.scheme == "about" && url.absoluteString == "about:blank" {
             return .webView
@@ -24,7 +26,11 @@ enum NavigationPolicy {
             return .blocked
         }
 
-        if host == AppConfig.appHost || AppConfig.oauthHosts.contains(host) {
+        if host == AppConfig.appHost {
+            return url.path == appPath ? .webView : .externalBrowser
+        }
+
+        if AppConfig.oauthHosts.contains(host) {
             return .webView
         }
 

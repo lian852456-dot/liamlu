@@ -13,13 +13,23 @@ struct SupervisorWebView: UIViewRepresentable {
         let webView = model.webView
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
-        model.loadInitialURLIfNeeded()
+        Task { @MainActor in
+            await Task.yield()
+            model.loadInitialURLIfNeeded()
+        }
         return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {}
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        private enum ModelUpdate {
+            case loading
+            case finished
+            case error(String)
+            case processTerminated
+        }
+
         private let model: SupervisorWebModel
 
         init(model: SupervisorWebModel) {
@@ -40,18 +50,16 @@ struct SupervisorWebView: UIViewRepresentable {
                 presentExternal(url)
             case .blocked:
                 decisionHandler(.cancel)
-                model.errorMessage = "已阻擋不安全或不受信任的連結。"
+                schedule(.error("已阻擋不安全或不受信任的連結。"))
             }
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-            model.isLoading = true
-            model.errorMessage = nil
+            schedule(.loading)
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            model.isLoading = false
-            model.errorMessage = nil
+            schedule(.finished)
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -63,8 +71,7 @@ struct SupervisorWebView: UIViewRepresentable {
         }
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-            model.errorMessage = "App 內容程序已重新啟動，請重新載入。"
-            model.isLoading = false
+            schedule(.processTerminated)
         }
 
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
@@ -75,17 +82,37 @@ struct SupervisorWebView: UIViewRepresentable {
                 case .externalBrowser:
                     presentExternal(url)
                 case .blocked:
-                    model.errorMessage = "已阻擋不安全或不受信任的連結。"
+                    schedule(.error("已阻擋不安全或不受信任的連結。"))
                 }
             }
             return nil
         }
 
         private func show(_ error: Error) {
-            model.isLoading = false
             let nsError = error as NSError
             if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled { return }
-            model.errorMessage = "無法連線到 Liam 情報站。請確認網路後重試。"
+            schedule(.error("無法連線到 Liam 情報站。請確認網路後重試。"))
+        }
+
+        private func schedule(_ update: ModelUpdate) {
+            Task { @MainActor [weak model] in
+                await Task.yield()
+                guard let model else { return }
+                switch update {
+                case .loading:
+                    model.isLoading = true
+                    model.errorMessage = nil
+                case .finished:
+                    model.isLoading = false
+                    model.errorMessage = nil
+                case .error(let message):
+                    model.isLoading = false
+                    model.errorMessage = message
+                case .processTerminated:
+                    model.isLoading = false
+                    model.errorMessage = "App 內容程序已重新啟動，請重新載入。"
+                }
+            }
         }
 
         private func presentExternal(_ url: URL) {

@@ -1,7 +1,7 @@
 # Liam Supervisor iOS 1.0 Final Security Review
 
 日期：2026-08-11  
-狀態：程式差異審查完成；真人 Approved Device／正式資料 smoke test 留待安裝後執行。
+狀態：`Final Security Gate = PASS`；真人 Approved Device／正式資料 smoke test 留待安裝後執行。
 
 ## Scope
 
@@ -29,6 +29,24 @@
 - 班表／巡店只保存既有短效 session token；逾時會清除 token 並要求重新驗證。
 - 未授權時重設正式摘要模組並顯示解鎖 CTA，不把空白 KPI 當成成功。
 - Service Worker 更新至 `realdata-v3`，只處理同 origin 靜態資產，不快取跨 origin GAS 回應。
+
+## Native Incremental Diff Scan
+
+`c575641..5711b05` 不是線性文件差異：兩個 commit 位於不同分支，merge-base 為 Pilot baseline。可驗證的文件封存範圍是 `5711b05^..5711b05`，該 commit 僅新增本文件，沒有安全相關程式變更。
+
+其後尚未提交的 Native 安全相關程式差異，依 Liam 指示只做新增 diff 掃描，不重跑 App 1.1 全量掃描：
+
+- Scan ID：`scan_liam_supervisor_ios_incremental_20260811`
+- Snapshot：`codex-security-snapshot/v1:sha256:0e089efbe4d6fc96c333992849aba9afd986b8d1e77085d43f3a9fe118059a89`
+- Sealed canonical manifest SHA-256：`dad25aa68448a03b69884fb2a05997a67b58179cf82c7a962d02961c03f62e1a`
+- Coverage：`5/5` Native source/test surfaces，有完整 completion receipts。
+- Reviewed：`AppConfig.swift`、`NavigationPolicy.swift`、`SupervisorWebView.swift`、`NavigationPolicyTests.swift`、`NavigationPolicySmoke.swift`。
+- Candidate findings：`0`
+- Unresolved High：`0`
+- Unresolved Medium：`0`
+- Reportable credential leak：`0`
+
+官方本機 finalizer 已產生 sealed canonical `scan-manifest.json`、`coverage.json`、`findings.json` 與 deterministic `report.md`。failed workbench completion 不再重試，也不作為本 Gate 的阻擋條件。
 
 ## Native Shell Review
 
