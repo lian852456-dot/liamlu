@@ -103,6 +103,12 @@
     return { segment:segmentData.segment, failedStoreCount:new Set(failingPeople.map(item => item.store)).size, failedPeopleCount:failingPeople.length, missingStores:segmentData.missingStores, byMetric, people:failingPeople };
   };
 
+  const previewAwardItems = (store,index) => [
+    { name:`${store} 指定機款 A`, actual:index+2, target:index+4, rate:[.5,.6,.667,.714,.75,.778,.8,.818,.833][index], difference:index-2, thresholdTarget:index+2, reward50:1200+index*100, reward100:2400+index*200, status:index<3?'Y':'N' },
+    { name:`${store} 指定機款 B`, actual:index+1, target:index+5, rate:[.2,.333,.429,.5,.556,.6,.636,.667,.692][index], difference:null, thresholdTarget:null, reward50:null, reward100:1800+index*100, status:'' },
+    { name:`${store} 指定機款 C`, actual:null, target:null, rate:null, difference:null, thresholdTarget:null, reward50:null, reward100:null, status:'' }
+  ];
+
   const contract = {
     version:C.VERSION, generatedAt:'2026-08-10T08:42:00+08:00', mode:'preview',
     todayOperations:state({ date:'2026-08-10', segments:[report1600,report2100] },'北一二B每日回報','index.html','2026-08-10T21:33:00+08:00'),
@@ -111,8 +117,8 @@
     kpiFullMetrics:state({ region:previewFullKpis(1.131), stores:Object.fromEntries(stores.map(store=>[store.name,store.fullKpis])) },'正式 KPI kpicalc','kpi.html'),
     awardSummary:state({ totalAmount:null, regionTotalAvailable:false, winningStores:3, totalStores:9, reportDate:'2026-08-10' },'正式台獎私有戰情','index.html'),
     awardStores:state([
-      {name:'永吉',amount:5000,eligible:true,models:['A1399','R1399']},{name:'大稻埕',amount:3000,eligible:true,models:['好速']},{name:'通化',amount:2000,eligible:true,models:['R999']},
-      ...['台北三創','酒泉','萬大','杭州南','復興南','六張犁'].map(name => ({name,amount:0,eligible:false,models:[]}))
+      {name:'永吉',amount:5000,eligible:true,items:previewAwardItems('永吉',0)},{name:'大稻埕',amount:3000,eligible:true,items:previewAwardItems('大稻埕',1)},{name:'通化',amount:2000,eligible:true,items:previewAwardItems('通化',2)},
+      ...['台北三創','酒泉','萬大','杭州南','復興南','六張犁'].map((name,index) => ({name,amount:0,eligible:false,items:previewAwardItems(name,index+3)}))
     ],'正式台獎私有戰情','index.html'),
     awardTop2Models:state([{name:'A1399',amount100:6800,progress:.82,status:'接近領獎'},{name:'R1399',amount100:5200,progress:.76,status:'追蹤中'}],'正式台獎私有戰情','index.html'),
     report1600:state(report1600,'北一二B每日回報','index.html','2026-08-10T16:21:00+08:00'),

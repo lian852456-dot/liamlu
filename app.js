@@ -300,8 +300,16 @@
     const overallAward = sourceOverall.award || awards.supervisor || {};
     const storeRows = Array.isArray(awards.stores) ? awards.stores.map(row => {
       const award = row.award || {};
-      const models = (row.items || []).filter(item => String(item.award || item.eligible || '').toUpperCase() === 'Y').slice(0,3).map(item => item.display_name || item.name).filter(Boolean);
-      return { name:normalizeStore(row.store), amount:numberOrNull(award.actual_total) || 0, eligible:String(award.award || '').toUpperCase() === 'Y', models };
+      // Formal index.html renders the selected store's own row.items without Top2 filtering.
+      // Preserve only fields that the formal award snapshot actually supplied; never recalculate them.
+      const items = (Array.isArray(row.items) ? row.items : []).map(item => ({
+        name:String(item && (item.display_name || item.name) || ''),
+        actual:numberOrNull(item && item.actual), target:numberOrNull(item && item.target), rate:numberOrNull(item && item.rate),
+        difference:numberOrNull(item && item.difference), thresholdTarget:numberOrNull(item && item.threshold_target),
+        reward50:numberOrNull(item && item.store_reward_50), reward100:numberOrNull(item && item.store_reward_100),
+        status:item && item.award != null ? String(item.award) : item && item.status != null ? String(item.status) : item && item.eligible != null ? String(item.eligible) : ''
+      })).filter(item => item.name);
+      return { name:normalizeStore(row.store), amount:numberOrNull(award.actual_total) || 0, eligible:String(award.award || '').toUpperCase() === 'Y', items };
     }).filter(row => row.name) : [];
     const models = Array.isArray(sourceOverall.items) ? sourceOverall.items : [];
     const top2 = models.map(item => ({
@@ -487,6 +495,29 @@
     return `<section class="panel full-kpi-panel"><div class="panel-head"><div><h2>完整 KPI</h2><small>${escapeHtml(contextLabel)} · ${rows.length} 項</small></div></div><div class="full-kpi-groups">${[...groups.entries()].map(([category,metrics])=>`<section class="kpi-category"><h3>${escapeHtml(category)}</h3><div class="full-kpi-grid">${metrics.map(metric=>`<article class="full-kpi-item"><span>${escapeHtml(metric.label||metric.key)}</span><b class="${metric.rate!=null&&metric.rate<1?'negative':'positive'}">${fmtPct(metric.rate)}</b></article>`).join('')}</div></section>`).join('')}</div></section>`;
   }
 
+  function awardItemStatusText(value) {
+    const normalized=String(value == null?'':value).trim();
+    if (!normalized) return '';
+    if (/^(Y|TRUE)$/i.test(normalized)) return '領獎';
+    if (/^(N|FALSE)$/i.test(normalized)) return '未領獎';
+    return normalized;
+  }
+
+  function renderAwardStoreItems(row) {
+    const items=Array.isArray(row&&row.items)?row.items:[];
+    if (!items.length) return `<section class="panel award-store-items"><div class="panel-head"><div><h2>指定機款</h2><small>${escapeHtml(row&&row.name||'—')}</small></div></div><div class="empty-state">正式來源未提供此店指定機款。</div></section>`;
+    return `<section class="panel award-store-items"><div class="panel-head"><div><h2>指定機款</h2><small>${escapeHtml(row.name)} · ${items.length} 款</small></div></div><div class="award-store-item-list">${items.map(item=>{
+      const status=awardItemStatusText(item.status);
+      const metrics=[
+        item.rate==null?null:['達成率',fmtPct(item.rate)], item.actual==null?null:['實際',fmtNumber(item.actual)],
+        item.target==null?null:['目標',fmtNumber(item.target)], item.thresholdTarget==null?null:['50% 目標',fmtNumber(item.thresholdTarget)],
+        item.difference==null?null:['50% 差異',`${item.difference>0?'+':''}${fmtNumber(item.difference)}`],
+        item.reward50==null?null:['50% 獎金',`$${fmtNumber(item.reward50,0)}`], item.reward100==null?null:['100% 獎金',`$${fmtNumber(item.reward100,0)}`]
+      ].filter(Boolean);
+      return `<article class="award-store-item"><div class="award-store-item-head"><strong>${escapeHtml(item.name)}</strong>${status?`<span class="award-store-item-status ${/未領獎/i.test(status)?'no':''}">${escapeHtml(status)}</span>`:''}</div>${metrics.length?`<div class="award-store-item-metrics">${metrics.map(([label,value])=>`<span><small>${label}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>`:''}</article>`;
+    }).join('')}</div></section>`;
+  }
+
   function setView(name) {
     all('[data-view]').forEach(view => { view.hidden = view.dataset.view !== name; });
     all('[data-nav]').forEach(button => {
@@ -625,7 +656,7 @@
       content.innerHTML=`<div class="metric-card-grid"><article class="metric-card"><span>領獎店數</span><strong>${a.winningStores??'—'}/9</strong><small>正式台獎判定</small></article><article class="metric-card"><span>未領獎店數</span><strong>${a.winningStores==null?'—':Math.max(0,9-a.winningStores)}</strong><small>九店完整顯示</small></article></div><div class="battle-list award-battle-list"><div class="battle-list-row award-battle-row header"><span>店點</span><span>金額</span><span>狀態</span></div>${awardStores.map(row=>`<div class="battle-list-row award-battle-row"><span>${escapeHtml(row.name)}</span><span>${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</span><span class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</span></div>`).join('')}</div>`;
     } else {
       const row=awardStores.find(item=>item.name===selected);
-      content.innerHTML=row?`<div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>${escapeHtml(row.name)}</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div><a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
+      content.innerHTML=row?`<div class="award-selected-store"><span>店點</span><strong>${escapeHtml(row.name)}</strong></div><div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>正式台獎金額</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div>${renderAwardStoreItems(row)}<a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
     }
     refreshIcons();
   }

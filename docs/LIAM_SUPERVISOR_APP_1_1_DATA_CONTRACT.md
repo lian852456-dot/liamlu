@@ -27,8 +27,8 @@ App 1.1 以固定 contract 隔離正式來源與手機畫面。所有模組都�
 | `kpiSummary` | 區 KPI、公司排名、KPI DOD、排名變化、加減分 | 既有 `private_access` 正式私有快照 |
 | `kpiStores` | 九店 KPI、排名、DOD、排名變化、加減分、六項 KPI rate | 同上；僅讀正式 `reportRate`／`rate` |
 | `awardSummary` | 區領獎總額、領獎店數 | 既有正式台獎私有快照 |
-| `awardStores` | 九店金額、領獎狀態、主要得獎機款 | 同上 |
-| `awardTop2Models` | 依正式 100% 獎金欄位排序的 Top 2 | 唯讀 adapter 排序，不改台獎公式 |
+| `awardStores` | 九店金額、領獎狀態；每店 `items[]` 直接映射該店正式指定機款 | 同上 |
+| `awardTop2Models` | 相容保留欄位；App 1.1 區／店點畫面均不顯示 | 同上 |
 | `report1600` | 16:00 九店回報、時間、上線摘要 | 既有 `read`／`pread` |
 | `report2100` | 21:00 九店回報、時間、上線摘要 | 既有 `read`／`pread` |
 | `reportFailures` | 未過關店／人／指標及個人正式回報內容 | 直接使用正式 `failed[]`，不推算 |
@@ -53,3 +53,4 @@ App 1.1 以固定 contract 隔離正式來源與手機畫面。所有模組都�
 - 班表／巡店只允許既有 `sread`、`ptread`；session 建立與登出沿用 `ptauth`、`ptlogout`。
 - Preview 必須帶 `?preview=1`，使用本機明確標示的展示資料，且不呼叫正式 endpoint。
 - App 不提供 `write`、`pwrite`、`ptwrite`、Sheet/GAS 寫入或前端 KPI／台獎／未過關重算。
+- 店點指定機款只能讀取所選店自己的 `row.items`，不得取用全區 Top 2、跨店合併或補算缺少欄位。

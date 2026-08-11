@@ -28,8 +28,8 @@
 | `kpiStores` | 九店摘要、六項主 KPI、各店 25 項 rate | `kpicalc_access` |
 | `kpiFullMetrics` | `region[25]`, `stores{店名:[25]}` | `aggregateRates` + 各店 `reportRate` |
 | `awardSummary` | 區金額、領獎店數、資料日 | 同日正式台獎私有摘要 |
-| `awardStores` | 九店金額、領獎狀態、主要領獎機款 | 同上 |
-| `awardTop2Models` | 正式 100% 獎金排序 Top 2 | 同上 |
+| `awardStores` | 九店金額、領獎狀態；每店 `items[]` 為該店正式指定機款及來源已提供欄位 | 同上 |
+| `awardTop2Models` | 相容保留的正式摘要欄位；App 1.1 區／店點畫面均不顯示 | 同上 |
 | `report1600` | 九店回報、時間、店點上線摘要 | `read(seg=16)` + `pread(seg=16)` |
 | `report2100` | 九店回報、時間、店點上線摘要 | `read(seg=21)` + `pread(seg=21)` |
 | `reportFailures` | 缺店、未過關店／人／指標、正式回報內容 | 正式 `failed[]` + `extra` |
@@ -45,6 +45,7 @@
 2. KPI 摘要補充只有在 `data_as_of_date` 與 `source_file` 同時對齊時才可合併排名、DOD、加減分。
 3. 九店或 25 項不完整時為 `partial`；來源不一致時補充欄位 fail-closed。
 4. 台獎 `report_date` 必須與 KPI `report_date` 一致，否則整個台獎摘要為 `no_data`。
+5. 店點指定機款只可直接映射該店 `row.items`；不得用區 Top 2 推算、跨店合併、前端計算或人工補值。
 
 ## Schedule／Patrol hard gates
 

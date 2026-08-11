@@ -58,6 +58,20 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
   await page.locator('[data-battle-scope="store"]').click();
   await expect(page.locator('#battleStorePicker')).toBeVisible();
   await expect(page.locator('#battleContent')).toContainText('店領獎金額');
+  await expect(page.locator('#battleContent')).toContainText('指定機款');
+  await expect(page.locator('#battleContent .award-store-item')).toHaveCount(3);
+  await expect(page.locator('#battleContent')).toContainText('通化 指定機款 A');
+  await page.locator('#battleStoreSelect').selectOption('酒泉');
+  await expect(page.locator('#battleContent .award-selected-store')).toContainText('酒泉');
+  await expect(page.locator('#battleContent')).toContainText('酒泉 指定機款 C');
+  await expect(page.locator('#battleContent')).not.toContainText('通化 指定機款 A');
+  const awardStoreOptions=await page.locator('#battleStoreSelect option').allTextContents();
+  expect(awardStoreOptions).toHaveLength(9);
+  for (const store of awardStoreOptions) {
+    await page.locator('#battleStoreSelect').selectOption({ label:store });
+    await expect(page.locator('#battleContent .award-selected-store')).toContainText(store);
+    await expect(page.locator('#battleContent')).toContainText(`${store} 指定機款 A`);
+  }
 
   await page.locator('.bottom-nav [data-nav="report"]').click();
   await page.locator('[data-report-segment="21"]').click();
