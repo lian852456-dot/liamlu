@@ -584,6 +584,7 @@ const PATROL_VISIT_SHEET = '巡店到離店紀錄';
 const PATROL_VISIT_HEADERS = ['serverTime','date','action','store','note','visitSessionId'];
 const PATROL_VISIT_NOTE_MAX = 200;
 const PATROL_VISIT_RAPID_SECONDS = 15;
+const PATROL_VISIT_TEST_NOTE_PREFIX = 'DEPLOY_TEST_';
 
 function patrolVisitNow_() {
   return Utilities.formatDate(new Date(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
@@ -642,10 +643,20 @@ function patrolVisitRowsFromSheet_(sh) {
   });
 }
 
+function patrolVisitIsTestRecord_(row) {
+  return String((row && row.note) || '').trim().indexOf(PATROL_VISIT_TEST_NOTE_PREFIX) === 0;
+}
+
+function patrolVisitSort_(rows) {
+  return rows.slice().sort(function(a, b) { return String(a.serverTime || '').localeCompare(String(b.serverTime || '')); });
+}
+
 function readPatrolVisitEvents_(dateValue) {
   const sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(PATROL_VISIT_SHEET);
   const date = patrolVisitDate_(dateValue);
-  return patrolVisitRowsFromSheet_(sh).filter(function(row) { return row.date === date; });
+  return patrolVisitSort_(patrolVisitRowsFromSheet_(sh).filter(function(row) {
+    return row.date === date && !patrolVisitIsTestRecord_(row);
+  }));
 }
 
 function latestOpenPatrolVisit_(rows) {
@@ -660,11 +671,14 @@ function latestOpenPatrolVisit_(rows) {
 
 function patrolVisitState_(dateValue) {
   const sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(PATROL_VISIT_SHEET);
-  const rows = patrolVisitRowsFromSheet_(sh);
+  const rows = patrolVisitSort_(patrolVisitRowsFromSheet_(sh).filter(function(row) { return !patrolVisitIsTestRecord_(row); }));
   const date = patrolVisitDate_(dateValue);
+  const todayRows = rows.filter(function(row) { return row.date === date; });
+  const openAcrossHistory = latestOpenPatrolVisit_(rows);
   return {
-    events:rows.filter(function(row) { return row.date === date; }),
-    openVisit:latestOpenPatrolVisit_(rows)
+    events:todayRows,
+    openVisit:latestOpenPatrolVisit_(todayRows),
+    staleOpenVisit:openAcrossHistory && openAcrossHistory.date !== date ? openAcrossHistory : null
   };
 }
 
@@ -684,8 +698,12 @@ function writePatrolVisitEvent_(payload) {
     const sh = getPatrolVisitSheet_();
     const rows = patrolVisitRowsFromSheet_(sh);
     const serverTime = patrolVisitNow_();
-    if (patrolVisitRapidDuplicate_(rows, clean.visitAction, clean.store, serverTime)) throw new Error('duplicate patrol visit action');
-    const open = latestOpenPatrolVisit_(rows);
+    const testWrite = clean.note.indexOf(PATROL_VISIT_TEST_NOTE_PREFIX) === 0;
+    const scopedRows = patrolVisitSort_(rows.filter(function(row) { return patrolVisitIsTestRecord_(row) === testWrite; }));
+    const today = serverTime.slice(0, 10);
+    const todayRows = scopedRows.filter(function(row) { return row.date === today; });
+    if (patrolVisitRapidDuplicate_(todayRows, clean.visitAction, clean.store, serverTime)) throw new Error('duplicate patrol visit action');
+    const open = latestOpenPatrolVisit_(todayRows);
     let visitSessionId;
     if (clean.visitAction === 'arrival') {
       if (open) throw new Error('patrol visit already open');
@@ -703,9 +721,10 @@ function writePatrolVisitEvent_(payload) {
       note:clean.note,
       visitSessionId:visitSessionId
     };
+    const worksheetRow = sh.getLastRow() + 1;
     sh.appendRow(PATROL_VISIT_HEADERS.map(function(header) { return event[header] || ''; }));
     const state = patrolVisitState_(event.date);
-    return { event:event, events:state.events, openVisit:state.openVisit };
+    return { event:event, events:state.events, openVisit:state.openVisit, staleOpenVisit:state.staleOpenVisit, worksheetRow:worksheetRow };
   } finally {
     lock.releaseLock();
   }

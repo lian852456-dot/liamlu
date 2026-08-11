@@ -32,6 +32,7 @@
   let patrolRaw = null;
   let patrolVisitEvents = [];
   let patrolOpenVisit = null;
+  let patrolStaleOpenVisit = null;
   let patrolVisitError = '';
   let privateAccessStatus = PREVIEW_MODE ? 'preview' : 'unauthorized';
 
@@ -787,6 +788,14 @@
     return rows.at(-1)||null;
   }
 
+  function isFormalPatrolVisit(event, date = taipeiDate()) {
+    return Boolean(event && event.date === date && !/^DEPLOY_TEST_/i.test(String(event.note || '').trim()));
+  }
+
+  function formalPatrolVisitEvents(events) {
+    return (Array.isArray(events)?events:[]).filter(event=>isFormalPatrolVisit(event)).sort((a,b)=>String(a.serverTime||'').localeCompare(String(b.serverTime||'')));
+  }
+
   function renderPatrolVisits() {
     const open=latestOpenPatrolVisit();
     const enabled=Boolean(patrolToken&&!PREVIEW_MODE&&!patrolVisitError);
@@ -796,6 +805,7 @@
     else if(!patrolToken) setMessage('#patrolVisitMessage','解鎖班表／巡店後可使用。');
     else if(patrolVisitError) setMessage('#patrolVisitMessage',patrolVisitError,'error');
     else if(open) setMessage('#patrolVisitMessage',`目前在 ${normalizeStore(open.store)}，可記錄離店。`,'success');
+    else if(patrolStaleOpenVisit) setMessage('#patrolVisitMessage',`異常：${normalizeStore(patrolStaleOpenVisit.store)} 有跨日未離店紀錄；不會自動延續到今天。`,'error');
     else setMessage('#patrolVisitMessage','目前沒有尚未離店的巡店紀錄。');
     dom('#patrolVisitToday').innerHTML=patrolVisitEvents.length?patrolVisitEvents.map(event=>`<div class="patrol-visit-event"><time>${escapeHtml(formatTime(event.serverTime))}</time><b>${event.action==='arrival'?'到店':'離店'}</b><span>${escapeHtml(normalizeStore(event.store))}</span>${event.note?`<small>${escapeHtml(event.note)}</small>`:''}</div>`).join(''):'<div class="empty-state">今日尚無到離店紀錄。</div>';
   }
@@ -905,51 +915,73 @@
       if(expired)setMessage('#patrolAccessMessage','班表／巡店授權已逾時，請重新驗證','error');
     }
     if(results[2].status==='fulfilled') {
-      patrolVisitEvents=Array.isArray(results[2].value.events)?results[2].value.events:[];
-      patrolOpenVisit=results[2].value.openVisit||latestOpenPatrolVisit(patrolVisitEvents);
+      patrolVisitEvents=formalPatrolVisitEvents(results[2].value.events);
+      patrolOpenVisit=isFormalPatrolVisit(results[2].value.openVisit)?results[2].value.openVisit:latestOpenPatrolVisit(patrolVisitEvents);
+      patrolStaleOpenVisit=results[2].value.staleOpenVisit||null;
       patrolVisitError='';
     } else {
       patrolVisitEvents=[];
       patrolOpenVisit=null;
+      patrolStaleOpenVisit=null;
       patrolVisitError=/授權已逾時/.test(results[2].reason.message)?'班表／巡店授權已逾時，請重新驗證':'到離店服務尚未可用；巡店唯讀大盤不受影響。';
     }
     contract.generatedAt=readAt; renderAll();
   }
 
-  function populatePatrolVisitStores(names) {
-    const select=dom('#patrolVisitStore'); const current=select.value;
-    select.innerHTML=names.map(name=>`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
-    if(names.includes(current)) select.value=current;
+  function populatePatrolVisitStores(names, selected = '') {
+    const select=dom('#patrolVisitStore');
+    select.innerHTML='<option value="" disabled>請選擇店點</option>'+names.map(name=>`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+    select.value=names.includes(selected)?selected:'';
+  }
+
+  function updatePatrolVisitSubmitState() {
+    const departure=dom('#patrolVisitAction').value==='departure';
+    const open=latestOpenPatrolVisit();
+    dom('#patrolVisitSubmit').disabled=departure?!open:!dom('#patrolVisitStore').value;
+  }
+
+  function validatePatrolVisitWriteResult(result, action, submittedStore, openVisit) {
+    const event=result&&result.event;
+    if(!event||event.action!==action||!event.serverTime||!event.visitSessionId) throw new Error('伺服器未回傳完整到離店寫入結果。');
+    if(normalizeStore(event.store)!==normalizeStore(submittedStore)) throw new Error('伺服器回傳店點與送出店點不一致，未顯示成功。');
+    if(action==='departure'&&(!openVisit||event.visitSessionId!==openVisit.visitSessionId)) throw new Error('離店紀錄未綁定目前到店 session，未顯示成功。');
+    return event;
   }
 
   function openPatrolVisitDialog(action) {
     if(!patrolToken||PREVIEW_MODE||patrolVisitError) return;
     const overview=contract.patrolOverview.data;
     const stores=overview&&Array.isArray(overview.stores)?overview.stores.map(row=>row.name):STORES;
-    populatePatrolVisitStores(stores);
     const open=latestOpenPatrolVisit();
     const departure=action==='departure';
+    populatePatrolVisitStores(stores,departure&&open?normalizeStore(open.store):'');
     dom('#patrolVisitAction').value=action;
     dom('#patrolVisitDialogTitle').textContent=departure?'巡店離店':'巡店到店';
     dom('#patrolVisitSubmit').textContent=departure?'確認離店':'確認到店';
     dom('#patrolVisitStore').disabled=departure;
-    if(departure&&open) dom('#patrolVisitStore').value=normalizeStore(open.store);
+    dom('#patrolVisitCurrentStore').hidden=!departure;
+    dom('#patrolVisitCurrentStore').textContent=departure&&open?`目前在：${normalizeStore(open.store)}`:'';
     dom('#patrolVisitNote').value='';
+    updatePatrolVisitSubmitState();
     dom('#patrolVisitDialog').showModal();
   }
 
   async function submitPatrolVisit(form) {
-    const button=dom('#patrolVisitSubmit'); const action=dom('#patrolVisitAction').value;
+    const button=dom('#patrolVisitSubmit'); const action=dom('#patrolVisitAction').value; const store=dom('#patrolVisitStore').value; const open=latestOpenPatrolVisit();
+    if(!store) { setMessage('#patrolVisitMessage','請先明確選擇店點。','error'); updatePatrolVisitSubmitState(); return; }
     button.disabled=true;
     try {
-      const result=await patrolVisitWrite(action,dom('#patrolVisitStore').value,dom('#patrolVisitNote').value);
-      patrolVisitEvents=Array.isArray(result.events)?result.events:patrolVisitEvents.concat(result.event||[]);
+      const result=await patrolVisitWrite(action,store,dom('#patrolVisitNote').value);
+      const event=validatePatrolVisitWriteResult(result,action,store,open);
+      patrolVisitEvents=formalPatrolVisitEvents(Array.isArray(result.events)?result.events:patrolVisitEvents.concat(event));
       patrolOpenVisit=result.openVisit||null;
+      patrolStaleOpenVisit=result.staleOpenVisit||null;
       patrolVisitError=''; dom('#patrolVisitDialog').close(); renderPatrolVisits();
+      setMessage('#patrolVisitMessage',`✅ 已記錄\n${formatTime(event.serverTime)} ${event.action==='arrival'?'到店':'離店'}｜${normalizeStore(event.store)}`,'success');
     } catch(error) {
       dom('#patrolVisitDialog').close(); setMessage('#patrolVisitMessage',error.message,'error');
       if(/授權已逾時/.test(error.message)) setView('me');
-    } finally { button.disabled=false; }
+    } finally { updatePatrolVisitSubmitState(); }
   }
 
   function populateScheduleStores(names) {
@@ -987,9 +1019,10 @@
   dom('#privateStatusCheck').addEventListener('click',async event=>{ event.currentTarget.disabled=true; try { await checkDeviceBinding(dom('#employeeId').value); } catch(error) { setMessage('#privateAccessMessage',error.message,'error'); } finally { event.currentTarget.disabled=false; } });
   dom('#privateLogout').addEventListener('click',logoutPrivateSummary);
   dom('#patrolAccessForm').addEventListener('submit',async event=>{ event.preventDefault(); const button=event.currentTarget.querySelector('button'); const input=dom('#patrolPasscode'); const passcode=input.value; input.value=''; button.disabled=true; try { await unlockPatrol(passcode); } catch(error) { setMessage('#patrolAccessMessage',error.message,'error'); } finally { button.disabled=false; } });
-  dom('#patrolLogout').addEventListener('click',()=>{ const token=patrolToken; patrolToken=''; scheduleRaw=null; scheduleViewData=null; patrolVisitEvents=[]; patrolOpenVisit=null; patrolVisitError=''; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true; contract.scheduleToday=statusModule('scheduleToday'); contract.scheduleByDate=statusModule('scheduleByDate'); contract.patrolToday=statusModule('patrolToday'); contract.patrolOverview=statusModule('patrolOverview'); contract.patrolStores=statusModule('patrolStores'); renderAll(); if(token) postPatrolAuth({action:'ptlogout',token}).catch(()=>{}); });
+  dom('#patrolLogout').addEventListener('click',()=>{ const token=patrolToken; patrolToken=''; scheduleRaw=null; scheduleViewData=null; patrolVisitEvents=[]; patrolOpenVisit=null; patrolStaleOpenVisit=null; patrolVisitError=''; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true; contract.scheduleToday=statusModule('scheduleToday'); contract.scheduleByDate=statusModule('scheduleByDate'); contract.patrolToday=statusModule('patrolToday'); contract.patrolOverview=statusModule('patrolOverview'); contract.patrolStores=statusModule('patrolStores'); renderAll(); if(token) postPatrolAuth({action:'ptlogout',token}).catch(()=>{}); });
   all('[data-patrol-visit]').forEach(button=>button.addEventListener('click',()=>openPatrolVisitDialog(button.dataset.patrolVisit)));
   dom('#patrolVisitClose').addEventListener('click',()=>dom('#patrolVisitDialog').close());
+  dom('#patrolVisitStore').addEventListener('change',updatePatrolVisitSubmitState);
   dom('#patrolVisitForm').addEventListener('submit',event=>{ event.preventDefault(); submitPatrolVisit(event.currentTarget); });
   all('[data-date-step]').forEach(button=>button.addEventListener('click',()=>shiftDate(Number(button.dataset.dateStep))));
   dom('[data-date-today]').addEventListener('click',()=>{ dom('#scheduleDate').value=taipeiDate(); if(patrolToken)loadPatrolData(); else renderSchedule(); });

@@ -116,7 +116,10 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
 });
 
 test('isolated patrol visit flow records arrival and departure with one protected POST per tap', async ({ page }) => {
-  const events=[]; let writes=0;
+  const events=[
+    {serverTime:'2026-08-11T14:57:50+08:00',date:'2026-08-11',action:'arrival',store:'台北通化',note:'DEPLOY_TEST_20260811T145733',visitSessionId:'deploy-test'},
+    {serverTime:'2026-08-11T14:57:53+08:00',date:'2026-08-11',action:'departure',store:'台北通化',note:'DEPLOY_TEST_20260811T145733',visitSessionId:'deploy-test'}
+  ]; let writes=0; const submittedStores=[];
   await page.addInitScript(()=>sessionStorage.setItem('bei12b_pt_session_token','short-session-token'));
   await page.route('https://script.google.com/**',async route=>{
     const request=route.request();
@@ -124,10 +127,10 @@ test('isolated patrol visit flow records arrival and departure with one protecte
       const payload=JSON.parse(request.postData()||'{}');
       if(payload.action==='ptauth') return route.fulfill({json:{status:'ok',token:'short-session-token'}});
       if(payload.action==='ptvisit_write') {
-        writes+=1;
+        writes+=1; submittedStores.push(payload.store);
         const event={serverTime:writes===1?'2026-08-11T09:12:00+08:00':'2026-08-11T10:35:00+08:00',date:'2026-08-11',action:payload.visitAction,store:`台北${payload.store.replace(/^台北/,'')}`,note:payload.note,visitSessionId:'visit-1'};
         events.push(event);
-        return route.fulfill({json:{status:'ok',event,events}});
+        return route.fulfill({json:{status:'ok',event,events,openVisit:payload.visitAction==='arrival'?event:null}});
       }
     }
     const action=new URL(request.url()).searchParams.get('action');
@@ -138,18 +141,60 @@ test('isolated patrol visit flow records arrival and departure with one protecte
   });
   await page.goto(FORMAL_FILE_URL+'#patrol');
   await expect(page.locator('#patrolArrivalButton')).toBeEnabled();
+  await expect(page.locator('#patrolVisitToday .patrol-visit-event')).toHaveCount(0);
   await page.locator('#patrolArrivalButton').click();
+  await expect(page.locator('#patrolVisitStore')).toHaveValue('');
+  await expect(page.locator('#patrolVisitSubmit')).toBeDisabled();
+  expect(await page.locator('#patrolVisitStore').evaluate(select=>select.checkValidity())).toBe(false);
+  expect(writes).toBe(0);
+  const storeOptions=await page.locator('#patrolVisitStore option').allTextContents();
+  expect(storeOptions).toEqual(['請選擇店點','通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南']);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  expect(await page.locator('#patrolVisitSubmit').evaluate(button=>button.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
   await page.locator('#patrolVisitStore').selectOption('酒泉');
+  await expect(page.locator('#patrolVisitSubmit')).toBeEnabled();
   await page.locator('#patrolVisitNote').fill('例行巡店');
   await page.locator('#patrolVisitSubmit').dblclick();
   await expect(page.locator('#patrolVisitToday .patrol-visit-event')).toHaveCount(1);
+  await expect(page.locator('#patrolVisitMessage')).toContainText('09:12 到店｜酒泉');
   expect(writes).toBe(1);
   await expect(page.locator('#patrolDepartureButton')).toBeEnabled();
   await page.locator('#patrolDepartureButton').click();
+  await expect(page.locator('#patrolVisitCurrentStore')).toHaveText('目前在：酒泉');
   await expect(page.locator('#patrolVisitStore')).toHaveValue('酒泉');
   await page.locator('#patrolVisitSubmit').click();
   await expect(page.locator('#patrolVisitToday .patrol-visit-event')).toHaveCount(2);
+  await expect(page.locator('#patrolVisitMessage')).toContainText('10:35 離店｜酒泉');
   expect(writes).toBe(2);
+  expect(submittedStores).toEqual(['酒泉','酒泉']);
+  const displayed=await page.locator('#patrolVisitToday .patrol-visit-event').allTextContents();
+  expect(displayed.join('\n')).not.toContain('DEPLOY_TEST');
+});
+
+test('patrol visit UI fails closed when server response store differs from explicit selection', async ({ page }) => {
+  await page.addInitScript(()=>sessionStorage.setItem('bei12b_pt_session_token','short-session-token'));
+  await page.route('https://script.google.com/**',async route=>{
+    const request=route.request();
+    if(request.method()==='POST') {
+      const payload=JSON.parse(request.postData()||'{}');
+      if(payload.action==='ptauth') return route.fulfill({json:{status:'ok',token:'short-session-token'}});
+      if(payload.action==='ptvisit_write') return route.fulfill({json:{status:'ok',event:{serverTime:'2026-08-11T12:00:00+08:00',date:'2026-08-11',action:'arrival',store:'台北通化',note:'',visitSessionId:'mismatch'}}});
+    }
+    const action=new URL(request.url()).searchParams.get('action');
+    if(action==='sread') return route.fulfill({json:{status:'ok',schedule:{month:'2026-08',stores:[]}}});
+    if(action==='ptread') return route.fulfill({json:{status:'ok',stores:['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'].map(name=>({name})),rows:[]}});
+    if(action==='ptvisit_read') return route.fulfill({json:{status:'ok',events:[]}});
+    return route.fulfill({json:{status:'error',message:'unexpected action'}});
+  });
+  await page.goto(FORMAL_FILE_URL+'#patrol');
+  await expect(page.locator('#patrolArrivalButton')).toBeEnabled();
+  await expect(page.locator('#patrolOverview')).toContainText('本月巡店大盤進度');
+  await page.locator('#patrolArrivalButton').click();
+  await expect(page.locator('#patrolVisitDialog')).toBeVisible();
+  await page.locator('#patrolVisitStore').selectOption('酒泉');
+  await page.locator('#patrolVisitSubmit').click();
+  await expect(page.locator('#patrolVisitMessage')).toContainText('伺服器回傳店點與送出店點不一致');
+  await expect(page.locator('#patrolVisitToday .patrol-visit-event')).toHaveCount(0);
 });
 
 test('formal unlock is explicit and does not load summaries before Approved Device succeeds', async ({ page }) => {

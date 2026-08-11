@@ -396,6 +396,9 @@ body { font-size:16px; }
 .patrol-visit-dialog select { min-height:44px; }
 .patrol-visit-dialog textarea { resize:vertical; }
 .patrol-visit-dialog p,.patrol-count-note { margin:0; color:var(--muted); font-size:14px; line-height:1.45; }
+.patrol-visit-dialog .patrol-visit-current-store { padding:10px 11px; border:1px solid var(--line); border-radius:11px; color:var(--text); background:#061728; font-size:16px; font-weight:900; }
+.patrol-visit-dialog button:disabled { opacity:.45; }
+#patrolVisitMessage { white-space:pre-line; }
 .patrol-rule-panel { margin-bottom:12px; }
 .patrol-rule-table { padding:0 13px 13px; }
 .patrol-rule-row { display:grid; align-items:center; min-height:46px; border-bottom:1px solid var(--line-soft); font-size:14px; font-variant-numeric:tabular-nums; }

@@ -104,10 +104,11 @@
         <form id="patrolVisitForm">
           <div class="patrol-visit-dialog-head"><h2 id="patrolVisitDialogTitle">巡店到店</h2><button id="patrolVisitClose" type="button" aria-label="關閉">×</button></div>
           <input id="patrolVisitAction" type="hidden">
-          <label>店點<select id="patrolVisitStore" required></select></label>
+          <label>店點<select id="patrolVisitStore" required><option value="" disabled selected>請選擇店點</option></select></label>
+          <p id="patrolVisitCurrentStore" class="patrol-visit-current-store" hidden></p>
           <label>備註（選填，最多 200 字）<textarea id="patrolVisitNote" maxlength="200" rows="3"></textarea></label>
           <p>時間以伺服器收到紀錄的時間為準。</p>
-          <button id="patrolVisitSubmit" type="submit">確認到店</button>
+          <button id="patrolVisitSubmit" type="submit" disabled>確認到店</button>
         </form>
       </dialog>
 
