@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-1-device-data-ui-v4';
+const CACHE_NAME = 'liam-supervisor-app-1-1-award-store-items-v5';
 const SHELL = [
   './app.html',
   './app.css',

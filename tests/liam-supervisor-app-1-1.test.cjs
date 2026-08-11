@@ -39,6 +39,8 @@ test('Preview contract is visibly synthetic and contains the complete mobile sum
   assert.equal(data.mode, 'preview');
   assert.equal(data.kpiStores.data.length, 9);
   assert.equal(data.awardTop2Models.data.length, 2);
+  assert.equal(data.awardStores.data.length, 9);
+  assert.equal(data.awardStores.data.every(store => store.items.length === 3), true);
   assert.equal(data.report1600.data.totalStores, 9);
   assert.equal(data.report2100.data.totalStores, 9);
   assert.equal(data.scheduleToday.data.stores.length, 9);
@@ -97,6 +99,9 @@ test('device UI scope keeps nine awards, removes Top cards and renders complete 
   assert.doesNotMatch(code, /Top \$\{index\+1\}|區領獎總額|主要得獎機款|100% 獎勵機型/);
   assert.match(code, /stores\.map\(row=>`<div class="award-row"/);
   assert.match(code, /row\.eligible\?'領獎':'未領獎'/);
+  assert.match(code, /Array\.isArray\(row\.items\)/);
+  assert.match(code, /renderAwardStoreItems\(row\)/);
+  assert.doesNotMatch(code, /row\.items[^\n]*filter\([^\n]*award/);
   assert.match(css, /@media \(max-width:480px\)[\s\S]*\.store-row-primary/);
   assert.match(css, /font-variant-numeric:tabular-nums/);
   assert.doesNotMatch(css, /\.store-row[^{}]*\{[^}]*text-overflow:ellipsis/);
@@ -106,10 +111,11 @@ test('device UI scope keeps nine awards, removes Top cards and renders complete 
 test('PWA cache is versioned for App 1.1 and includes local icon library', () => {
   const html = read('app.html');
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-1-device-data-ui-v4/);
-  assert.match(html, /app\.css\?v=9/);
-  assert.match(html, /app\.js\?v=9/);
-  assert.match(html, /patrol-read-model\.js\?v=9/);
+  assert.match(worker, /liam-supervisor-app-1-1-award-store-items-v5/);
+  assert.match(html, /app\.css\?v=10/);
+  assert.match(html, /app-preview-data\.js\?v=10/);
+  assert.match(html, /app\.js\?v=10/);
+  assert.match(html, /patrol-read-model\.js\?v=10/);
   assert.match(worker, /patrol-read-model\.js/);
   assert.match(worker, /app-data-contract\.js/);
   assert.match(worker, /app-preview-data\.js/);

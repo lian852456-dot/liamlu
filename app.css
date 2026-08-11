@@ -355,6 +355,21 @@ body { font-size:16px; }
 .award-row { grid-template-columns:minmax(0,1.25fr) minmax(88px,.8fr) minmax(76px,.7fr); }
 .award-summary { grid-template-columns:1.15fr 1fr 1fr; }
 .award-battle-row { grid-template-columns:minmax(0,1.3fr) minmax(90px,.8fr) minmax(78px,.7fr); }
+.award-selected-store { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:54px; margin-bottom:10px; padding:10px 13px; border:1px solid var(--line); border-radius:14px; background:#092038; }
+.award-selected-store span { color:var(--muted); font-size:14px; }
+.award-selected-store strong { font-size:18px; }
+.award-store-items { margin-bottom:12px; }
+.award-store-item-list { display:grid; gap:8px; padding:0 13px 13px; }
+.award-store-item { min-width:0; padding:12px; border:1px solid var(--line-soft); border-radius:12px; background:#071b2e; }
+.award-store-item-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.award-store-item-head strong { min-width:0; font-size:16px; line-height:1.4; overflow-wrap:anywhere; }
+.award-store-item-status { flex:0 0 auto; padding:4px 8px; border:1px solid #278c76; border-radius:999px; color:var(--green); background:#0c403a; font-size:13px; font-weight:800; }
+.award-store-item-status.no { border-color:#704653; color:#e0bdc7; background:#382632; }
+.award-store-item-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin-top:10px; }
+.award-store-item-metrics span { min-width:0; padding:8px 9px; border-radius:9px; background:#0b2944; }
+.award-store-item-metrics small,.award-store-item-metrics b { display:block; }
+.award-store-item-metrics small { color:var(--muted); font-size:13px; }
+.award-store-item-metrics b { margin-top:3px; font-size:16px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
 .patrol-kpis-four { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .patrol-rule-summary { display:flex; flex-wrap:wrap; gap:7px; margin:0 13px 12px; }
 .patrol-rule-summary span { padding:7px 9px; border:1px solid var(--line-soft); border-radius:999px; color:var(--muted); background:#081d31; font-size:14px; }

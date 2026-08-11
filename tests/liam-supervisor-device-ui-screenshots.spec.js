@@ -34,6 +34,10 @@ test('capture scoped device UI and verify every view has no console or horizonta
   await page.locator('[data-battle-kind="award"]').click();
   await noOverflow();
   await page.locator('[data-view="battle"]').screenshot({ path:path.join(OUTPUT, 'battle-awards-nine-stores-390x844.png') });
+  await page.locator('[data-battle-scope="store"]').click();
+  await page.locator('#battleStoreSelect').selectOption('酒泉');
+  await noOverflow();
+  await page.locator('[data-view="battle"]').screenshot({ path:path.join(OUTPUT, 'battle-award-store-items-390x844.png') });
 
   await page.locator('.bottom-nav [data-nav="patrol"]').click();
   await noOverflow();
