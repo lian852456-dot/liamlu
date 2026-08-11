@@ -27,7 +27,7 @@ test('Pilot keeps existing patrol auth and isolates the sole arrival/departure w
   assert.match(js, /action:'ptauth'/);
   assert.match(js, /patrolRead\('sread'/);
   assert.match(js, /patrolRead\('ptread'/);
-  assert.match(js, /new Set\(\['sread','ptread','ptvisit_read'\]\)/);
+  assert.match(js, /new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
   assert.match(js, /new Set\(\['ptvisit_write'\]\)/);
   assert.doesNotMatch(js, /['"](?:ptwrite|hwrite|swrite|write)['"]/);
   assert.doesNotMatch(js, /document\.cookie|localStorage\.setItem\([^,]+,\s*(?:employeeId|token|secret)/);

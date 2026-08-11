@@ -62,7 +62,7 @@ test('App runtime keeps existing reads and allows only the isolated patrol visit
   const code = read('app.js');
   assert.match(code, /new Set\(\['private_access','read','pread','kpicalc_access'\]\)/);
   assert.match(code, /new Set\(\['private_request','private_request_status'\]\)/);
-  assert.match(code, /new Set\(\['sread','ptread','ptvisit_read'\]\)/);
+  assert.match(code, /new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
   assert.match(code, /new Set\(\['ptvisit_write'\]\)/);
   for (const blocked of ["action:'write'", "action:'pwrite'", "action:'ptwrite'", '.appendRow(', '.setValue(', '.setValues(', '.createFile(']) {
     assert.ok(!code.includes(blocked), `blocked write path found: ${blocked}`);
@@ -78,7 +78,7 @@ test('App runtime keeps existing reads and allows only the isolated patrol visit
 
 test('Information architecture matches the App 1.2 acceptance surfaces', () => {
   const html = read('app.html');
-  for (const label of ['今日營運戰況','九店一覽','台獎總覽','戰情','每日回報','全區營運摘要','全區未過關彙整','九店完整班表','巡店大盤','系統狀態']) {
+  for (const label of ['今日營運戰況','九店一覽','台獎總覽','戰情','每日回報','全區營運摘要','全區未過關彙整','九店完整班表','巡店檢查','系統狀態']) {
     assert.match(html, new RegExp(label));
   }
   assert.match(html, /data-battle-kind="kpi"/);
