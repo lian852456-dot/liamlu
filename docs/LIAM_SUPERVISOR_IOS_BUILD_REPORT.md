@@ -10,9 +10,9 @@
 - Version/build: `1.0 (1)`
 - Deployment target: iOS 16.0
 - Orientation: iPhone portrait
-- Startup URL: `https://lian852456-dot.github.io/liamlu/app.html?native=1&release=949b9a3`
+- Startup URL: `https://lian852456-dot.github.io/liamlu/app.html?native=1&release=0fa45c6`
 - Web origin: `https://lian852456-dot.github.io`
-- Online App 1.1 commit: `949b9a3e745951efa5178dfe970decd00f09359a`
+- Online App 1.1 commit: `0fa45c66d206963cd85dd0ec3b3f80dbf48dabd0`
 
 ## Implemented
 
@@ -30,7 +30,7 @@
 - Project／plist／asset JSON parse: PASS
 - Swift syntax parse: PASS
 - Native static security tests: PASS
-- App 1.1 release regression: PASS (121/121 Node tests; 3/3 Playwright formal/390x844 checks)
+- App 1.1 release regression: PASS (124/124 Node contracts; 120/120 complete Playwright; deployed Chromium 7/7 and WebKit 7/7)
 - Native startup URL regression: PASS (5/5 native-shell tests)
 - Codex Security canonical diff reports: PASS — sealed App 1.1 Web report plus sealed `5/5` Native incremental receipts, 0 reportable findings, unresolved High 0／Medium 0
 - Secret／WebView security scan: PASS — no embedded credential, JS bridge, ATS weakening, wildcard navigation or Cookie downgrade found
@@ -39,26 +39,27 @@
 - Generic iOS device-architecture compile: PASS — signing settings untouched
 - Physical device signing/build/install/launch baseline: PASS — previously completed by Liam with the existing Personal Team profile
 
-The missing Xcode/signing state is environmental. No OAuth, Cookie, Session, Approved Device, GAS, Sheet or formal write setting was changed to work around it.
+No OAuth, Cookie, Session, Approved Device, GAS, Sheet, formal write, Signing, Bundle ID or Deployment Target setting was changed for this release-query update.
 
 ## Formal-origin gate
 
-App 1.1 Native unlock release is deployed through GitHub Pages at merge commit `949b9a3e745951efa5178dfe970decd00f09359a`. The Pages deployment run `31443650810` completed successfully. Edge readback confirms the App 1.1 HTML, `v=8` assets and `liam-supervisor-app-1-1-realdata-v3` service-worker cache. The native shell uses the version-pinned startup URL above and does not target the Pilot 1.0 release.
+App 1.1 device UI/data release is deployed through GitHub Pages at merge commit `0fa45c66d206963cd85dd0ec3b3f80dbf48dabd0` (PR #43). Edge readback confirms the App 1.1 HTML, `v=9` assets, shared `patrol-read-model.js` and `liam-supervisor-app-1-1-device-data-ui-v4` service-worker cache. The native shell uses the version-pinned startup URL above and does not target the Pilot 1.0 release.
 
 Live unauthenticated launch confirms `Liam Supervisor App 1.1` and `正式唯讀`. The formal six-module UI readback remains gated by the existing Approved Device / employee unlock and patrol short-lived session; no bypass or credential migration was introduced.
 
-Final RC readback at `?native=1&release=949b9a3` confirms App 1.1, `v=8` assets, no Preview marker, an explicit `解鎖正式資料` CTA, no horizontal overflow and zero browser console errors. Unauthenticated output is intentionally locked; credentialed KPI／台獎／回報 and ptauth schedule／patrol readback remain `waiting-user` until Liam enters the existing credentials in the installed App.
+Final device-retest readback at `?native=1&release=0fa45c6` confirms App 1.1, `v=9` assets, no Preview marker and an explicit `解鎖正式資料` CTA. Deployed Chromium and WebKit 390×844 checks both passed 7/7 with no horizontal overflow and zero browser console errors. Unauthenticated output is intentionally locked; credentialed KPI／台獎／回報 and ptauth schedule／patrol readback remain `waiting-user` until Liam enters the existing credentials in the installed App.
 
 ## RC regression evidence
 
 - Native Node contracts: `5/5 PASS`
 - Navigation policy Swift smoke: `PASS`
 - XCTest on iPhone 17 Pro / iOS 26.5 simulator: `3/3 PASS`
-- Simulator build: `PASS`
+- Simulator build: `PASS` — iPhone 17 / iOS 26.5
 - Generic iOS device architecture compile with signing untouched: `PASS`
-- Simulator install／launch／force-quit reopen: `PASS`
+- Simulator install／launch: `PASS`; binary readback contains the version-pinned `release=0fa45c6` startup URL
 - SwiftUI runtime warning `Publishing changes from within view updates is not allowed`: `0`
-- Launch and reopen screenshots: `/private/tmp/liam-supervisor-rc-runtime.png`, `/private/tmp/liam-supervisor-rc-reopen.png`
+- Native XCTest navigation policy: `3/3 PASS`
+- Current launch screenshot: `/private/tmp/liam-supervisor-native-0fa45c6.png`
 
 Physical iPhone install is not re-declared by this RC run. Existing Personal Team signing and the prior physical-device build/install/launch remain unchanged; the next physical action is Liam's Xcode Run and in-App credential entry.
 
