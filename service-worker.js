@@ -1,11 +1,12 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-1-realdata-v3';
+const CACHE_NAME = 'liam-supervisor-app-1-1-device-data-ui-v4';
 const SHELL = [
   './app.html',
   './app.css',
   './app.js',
   './app-data-contract.js',
   './app-preview-data.js',
+  './patrol-read-model.js',
   './manifest.webmanifest',
   './offline.html',
   './app-assets/lucide.min.js',

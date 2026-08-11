@@ -309,11 +309,14 @@
       progress:numberOrNull(item.rate), status:String(item.award || item.status || '')
     })).filter(item => item.name && item.amount100 != null).sort((a,b) => b.amount100 - a.amount100).slice(0,2);
     const winningStores = storeRows.filter(row => row.eligible).length;
-    const totalAmount = numberOrNull(overallAward.actual_total);
-    const summary = { totalAmount, winningStores, totalStores:9, reportDate };
+    // overallAward.actual_total is not the same currency contract as store award.actual_total
+    // (the formal snapshot currently exposes count-scale 179 beside store amounts in the thousands).
+    // Fail closed until the source publishes an explicit same-unit district amount field.
+    const totalAmount = numberOrNull(overallAward.district_award_amount != null ? overallAward.district_award_amount : overallAward.region_award_amount);
+    const summary = { totalAmount, regionTotalAvailable:totalAmount != null, winningStores, totalStores:9, reportDate };
     const base = { updatedAt:readAt, sourceUpdatedAt:updatedAt, stale:stale(updatedAt), source };
     return {
-      summary:C.moduleState({ ...base, status:totalAmount != null ? 'ok':'no_data', data:summary }),
+      summary:C.moduleState({ ...base, status:storeRows.length === 9 ? 'ok':(storeRows.length?'partial':'no_data'), data:summary, note:totalAmount == null?'正式來源未提供與九店獎勵金額同口徑的區總額；App 不顯示 aggregate actual_total。':'' }),
       stores:C.moduleState({ ...base, status:storeRows.length === 9 ? 'ok' : (storeRows.length ? 'partial':'no_data'), data:storeRows }),
       top2:C.moduleState({ ...base, status:top2.length === 2 ? 'ok' : (top2.length ? 'partial':'no_data'), data:top2, note:top2.length < 2 ? '正式資料缺少足夠的 100% 獎金欄位' : '' })
     };
@@ -545,10 +548,10 @@
     const warn = row.kpi != null && row.kpi < 1;
     const core = row.core || {};
     return `<article class="store-item${index===0?' expanded':''}"><button class="store-row" type="button" aria-expanded="${index===0?'true':'false'}">
-      <span class="store-name">${warn?`<i data-lucide="${row.kpi<.8?'triangle-alert':'circle-alert'}" class="store-alert ${row.kpi<.8?'critical':''}"></i>`:`<span class="store-rank">${index+1}</span>`}${escapeHtml(row.name)}</span>
-      <span class="store-kpi ${row.kpi<.8?'negative':''}">${fmtPct(row.kpi)}</span><span class="store-company">${row.rank??'—'}</span>
-      <span class="${valueClass(row.kpiDod)}">${fmtSignedPct(row.kpiDod)}</span><span class="${valueClass(row.rankChange)}">${fmtSigned(row.rankChange)}</span>
-      <span class="${valueClass(row.addon)}">${fmtNumber(row.addon)}</span><i data-lucide="chevron-down" class="row-chevron"></i>
+      <span class="store-row-line store-row-primary"><span class="store-name">${warn?`<i data-lucide="${row.kpi<.8?'triangle-alert':'circle-alert'}" class="store-alert ${row.kpi<.8?'critical':''}"></i>`:`<span class="store-rank">${index+1}</span>`}${escapeHtml(row.name)}</span>
+      <span class="store-metric store-kpi ${row.kpi<.8?'negative':''}"><small>KPI</small><b>${fmtPct(row.kpi)}</b></span><span class="store-metric store-company"><small>公司排名</small><b>${row.rank??'—'}</b></span></span>
+      <span class="store-row-line store-row-secondary"><span class="store-metric store-dod ${valueClass(row.kpiDod)}"><small>KPI DOD</small><b>${fmtSignedPct(row.kpiDod)}</b></span><span class="store-metric store-rank-change ${valueClass(row.rankChange)}"><small>排名變動</small><b>${fmtSigned(row.rankChange)}</b></span>
+      <span class="store-metric store-addon ${valueClass(row.addon)}"><small>加減分</small><b>${fmtNumber(row.addon)}</b></span></span><i data-lucide="chevron-down" class="row-chevron"></i>
     </button><div class="store-detail"><div class="core-grid">${['A999','A1399','好速','R999','R1399','RT'].map(key => `<div class="core-cell"><span>${key}</span><b class="${core[key]!=null&&core[key]<1?'negative':''}">${fmtPct(core[key])}</b></div>`).join('')}</div><a class="detail-link" href="index.html">查看完整 KPI <i data-lucide="arrow-right"></i></a></div></article>`;
   }
 
@@ -560,15 +563,14 @@
 
   function renderAwardsHome() {
     if (contract.awardSummary.status === 'unauthorized') {
-      dom('#awardHome').innerHTML = `<h2 id="awardHomeTitle" class="sr-only">台獎總覽</h2>${privateUnlockState('台獎與 Top 2 尚未解鎖')}`;
+      dom('#awardHome').innerHTML = `<h2 id="awardHomeTitle" class="sr-only">台獎總覽</h2>${privateUnlockState('台獎九店摘要尚未解鎖')}`;
       return;
     }
     const summary = contract.awardSummary.data || {};
     const stores = Array.isArray(contract.awardStores.data) ? contract.awardStores.data : [];
-    const top = Array.isArray(contract.awardTop2Models.data) ? contract.awardTop2Models.data : [];
-    dom('#awardHome').innerHTML = `<div class="award-summary"><h2 id="awardHomeTitle">台獎總覽</h2><span>領獎總額 <b>$${fmtNumber(summary.totalAmount,0)}</b></span><span>領獎店數 <b>${summary.winningStores??'—'}<small> / 9</small></b></span></div>
-      <div class="award-list"><div class="award-row header"><span>店名</span><span>獎勵金額</span><span>狀態</span><span>100% 獎勵機型</span></div>${stores.slice(0,5).map(row=>`<div class="award-row"><span>${escapeHtml(row.name)}</span><span class="award-amount">${row.amount?'$'+fmtNumber(row.amount,0):'—'}</span><span><i class="award-tag ${row.eligible?'':'no'}">${row.eligible?'已符合':'未達標'}</i></span><span class="top-models">${(row.models||[]).slice(0,2).map(model=>`<i class="award-tag">${escapeHtml(model)}</i>`).join('')||'—'}</span></div>`).join('')}</div>
-      <div class="home-top-models">${top.map((model,index)=>`<div class="home-top-model"><b>Top ${index+1} · ${escapeHtml(model.name)}</b><span>100% $${fmtNumber(model.amount100,0)}</span><span>${fmtPct(model.progress)} · ${escapeHtml(model.status||'—')}</span></div>`).join('')||'<span>正式資料尚未提供 Top 2 欄位。</span>'}</div>
+    const losingStores=summary.winningStores==null?'—':Math.max(0,Number(summary.totalStores||9)-Number(summary.winningStores));
+    dom('#awardHome').innerHTML = `<div class="award-summary"><h2 id="awardHomeTitle">台獎總覽</h2><span>領獎店數 <b>${summary.winningStores??'—'}<small> / 9</small></b></span><span>未領獎店數 <b>${losingStores}</b></span></div>
+      <div class="award-list"><div class="award-row header"><span>店名</span><span>獎勵金額</span><span>狀態</span></div>${stores.map(row=>`<div class="award-row"><span>${escapeHtml(row.name)}</span><span class="award-amount">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</span><span><i class="award-tag ${row.eligible?'':'no'}">${row.eligible?'領獎':'未領獎'}</i></span></div>`).join('')}</div>
       <a class="award-link" href="#battle" data-open-awards>查看完整台獎摘要 <i data-lucide="arrow-right"></i></a>`;
   }
 
@@ -619,11 +621,11 @@
       const row=stores.find(item=>item.name===selected);
       content.innerHTML = row ? `<div class="metric-card-grid"><article class="metric-card"><span>店 KPI</span><strong class="cyan-value">${fmtPct(row.kpi)}</strong><small>${escapeHtml(row.name)}</small></article><article class="metric-card"><span>公司排名</span><strong class="gold-value">${row.rank??'—'}</strong><small>${fmtSigned(row.rankChange)}</small></article><article class="metric-card"><span>KPI DOD</span><strong class="${valueClass(row.kpiDod)}">${fmtSignedPct(row.kpiDod)}</strong><small>正式快照</small></article><article class="metric-card"><span>加減分</span><strong>${fmtNumber(row.addon)}</strong><small>正式快照</small></article></div><section class="panel"><div class="panel-head"><div><h2>六項主要 KPI</h2><small>${escapeHtml(row.name)}</small></div></div><div class="core-grid">${Object.entries(row.core||{}).map(([key,value])=>`<div class="core-cell"><span>${key}</span><b class="${value!=null&&value<1?'negative':''}">${fmtPct(value)}</b></div>`).join('')}</div></section>${renderFullKpis(row.fullKpis,row.name)}<a class="source-button" href="index.html">開啟正式 KPI 網站 <i data-lucide="external-link"></i></a>` : '<div class="empty-state">尚無此店 KPI 摘要。</div>';
     } else if (battleScope === 'region') {
-      const a=contract.awardSummary.data||{}; const top=contract.awardTop2Models.data||[];
-      content.innerHTML=`<div class="metric-card-grid"><article class="metric-card"><span>區領獎總額</span><strong class="gold-value">$${fmtNumber(a.totalAmount,0)}</strong><small>正式台獎</small></article><article class="metric-card"><span>領獎店數</span><strong>${a.winningStores??'—'}/9</strong><small>未領獎 ${9-(a.winningStores||0)} 店</small></article></div><div class="battle-list"><div class="battle-list-row header"><span>店點</span><span>金額</span><span>狀態</span><span>機款</span><span></span></div>${awardStores.map(row=>`<div class="battle-list-row"><span>${escapeHtml(row.name)}</span><span>${row.amount?'$'+fmtNumber(row.amount,0):'—'}</span><span class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</span><span>${(row.models||[]).length}</span><span></span></div>`).join('')}</div>${top.map((model,index)=>`<article class="top-model-card"><h3>Top ${index+1} · ${escapeHtml(model.name)}</h3><p>100% 獎金 $${fmtNumber(model.amount100,0)} · 目前進度 ${fmtPct(model.progress)} · ${escapeHtml(model.status||'')}</p></article>`).join('')}`;
+      const a=contract.awardSummary.data||{};
+      content.innerHTML=`<div class="metric-card-grid"><article class="metric-card"><span>領獎店數</span><strong>${a.winningStores??'—'}/9</strong><small>正式台獎判定</small></article><article class="metric-card"><span>未領獎店數</span><strong>${a.winningStores==null?'—':Math.max(0,9-a.winningStores)}</strong><small>九店完整顯示</small></article></div><div class="battle-list award-battle-list"><div class="battle-list-row award-battle-row header"><span>店點</span><span>金額</span><span>狀態</span></div>${awardStores.map(row=>`<div class="battle-list-row award-battle-row"><span>${escapeHtml(row.name)}</span><span>${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</span><span class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</span></div>`).join('')}</div>`;
     } else {
       const row=awardStores.find(item=>item.name===selected);
-      content.innerHTML=row?`<div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">$${fmtNumber(row.amount,0)}</strong><small>${escapeHtml(row.name)}</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'已領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div><section class="panel"><div class="panel-head"><div><h2>主要得獎機款</h2><small>正式台獎資料</small></div></div><div class="award-list">${(row.models||[]).length?row.models.map(name=>`<div class="award-row"><span>${escapeHtml(name)}</span><span></span><span class="positive">已符合</span><span></span></div>`).join(''):'<div class="empty-state">目前無得獎機款。</div>'}</div><a class="detail-link" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a></section>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
+      content.innerHTML=row?`<div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>${escapeHtml(row.name)}</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div><a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
     }
     refreshIcons();
   }
@@ -653,11 +655,11 @@
       const unvisitedBlock=Array.isArray(overview.unvisited)&&overview.unvisited.length
         ? `<div class="patrol-unvisited"><b>未巡店點</b><p>${overview.unvisited.map(escapeHtml).join('、')}</p></div>`
         : `<div class="patrol-unvisited"><b>未巡店點</b><p>${overview.periodVerified?'無':'等待正式期間資料'}</p></div>`;
-      const verificationNote=overview.periodVerified?'':'<p class="stale-note">正式來源未提供可驗證的統計期間與完整進度，本頁不自行假定月份或補算。</p>';
-      dom('#patrolOverview').innerHTML=`<section class="panel patrol-progress-panel"><div class="panel-head"><div><h2>本月／本期巡店大盤進度</h2><small>${escapeHtml(overview.statisticsPeriod||'正式來源未提供統計期間')}</small></div></div><div class="patrol-progress-hero"><div><span>完成率</span><strong class="${rate!=null&&rate<1?'gold-value':'positive'}">${fmtPct(rate)}</strong></div><div class="patrol-progress-track" role="progressbar" aria-label="巡店完成率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${rate==null?0:Math.round(progressWidth)}"><i style="width:${progressWidth}%"></i></div></div><div class="patrol-kpis"><article><span>已完成 / 應完成</span><b class="positive">${completed==null?'—':completed}/${expected==null?'—':expected}</b></article><article><span>剩餘數</span><b class="${remaining?'negative':'positive'}">${remaining==null?'—':remaining}</b></article><article><span>需關注數</span><b class="${attentionCount?'negative':'positive'}">${attentionCount}</b></article></div>${unvisitedBlock}${verificationNote}</section>`;
+      const verificationNote=overview.periodVerified?'':'<p class="stale-note">巡店純讀取規則無法建立本月大盤，本頁已 fail-closed。</p>';
+      dom('#patrolOverview').innerHTML=`<section class="panel patrol-progress-panel"><div class="panel-head"><div><h2>本月巡店大盤進度</h2><small>${escapeHtml(overview.statisticsPeriod||'—')}</small></div></div><div class="patrol-progress-hero"><div><span>本月巡店率</span><strong class="${rate!=null&&rate<1?'gold-value':'positive'}">${fmtPct(rate)}</strong></div><div class="patrol-progress-track" role="progressbar" aria-label="本月巡店率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${rate==null?0:Math.round(progressWidth)}"><i style="width:${progressWidth}%"></i></div></div><div class="patrol-kpis patrol-kpis-four"><article><span>本月已巡店數</span><b class="positive">${completed==null?'—':completed}</b></article><article><span>全項完成店數</span><b class="positive">${overview.fullyDone==null?'—':overview.fullyDone}</b></article><article><span>尚缺檢核項次</span><b class="${overview.totalMissingItems?'negative':'positive'}">${overview.totalMissingItems==null?'—':overview.totalMissingItems}</b></article><article><span>尚未巡店數</span><b class="${remaining?'negative':'positive'}">${remaining==null?'—':remaining}</b></article></div><div class="patrol-rule-summary"><span>需關注店 <b class="${attentionCount?'negative':'positive'}">${attentionCount}</b></span><span>題 18 週期 <b>${escapeHtml(overview.item18Window&&overview.item18Window.label||'—')}</b></span><span>題 19–33 <b>每月 20 日前</b></span></div>${unvisitedBlock}${verificationNote}</section>`;
     } else dom('#patrolOverview').innerHTML=contract.patrolOverview.status==='unauthorized'?patrolUnlockState('解鎖後顯示巡店大盤'):'<div class="empty-state">正式來源目前沒有巡店大盤。</div>';
     dom('#patrolTodayDetail').innerHTML=today&&today.route&&today.route.length?`<section class="patrol-today-card"><h2>今日巡店</h2><div class="route-line"><b>${today.route.map(escapeHtml).join(' → ')}</b></div><div class="route-line">已完成 ${today.completed}/${today.total} · 下一站 ${escapeHtml(today.nextStop||'—')} · ${escapeHtml(today.nextEta||'—')}</div></section>`:`<section class="patrol-today-card"><h2>今日巡店</h2><div class="route-line">${escapeHtml(contract.patrolToday.note||'今日無排定巡店')}</div></section>`;
-    dom('#patrolStoreList').innerHTML=overview&&overview.stores?overview.stores.map(row=>`<div class="patrol-store-row"><span>${escapeHtml(row.name)}</span><span>${escapeHtml(row.lastVisit||'—')}</span><span>${row.daysSince==null?'—':row.daysSince+' 天'}</span><span class="${row.status==='attention'?'negative':'positive'}">${escapeHtml(row.result||row.status)}</span></div>`).join(''):'<div class="empty-state">尚無店點巡店摘要。</div>';
+    dom('#patrolStoreList').innerHTML=overview&&overview.stores?overview.stores.map(row=>`<div class="patrol-store-row"><span>${escapeHtml(row.name)}</span><span>${escapeHtml(row.lastVisit||'—')}</span><span>${row.daysSince==null?'—':row.daysSince+' 天'}</span><span class="${row.status==='attention'||row.status==='pending'?'negative':'positive'}">${escapeHtml(row.result||row.status)}<small>題18 ${row.item18&&row.item18.status==='done'?'完成':'未完成'} · 題19–33 ${row.awareness?row.awareness.count:0}/15</small></span></div>`).join(''):'<div class="empty-state">尚無店點巡店摘要。</div>';
     dom('#patrolRecentList').innerHTML=overview&&overview.recent?overview.recent.map(row=>`<div class="recent-row"><span>${escapeHtml(row.store)}</span><span>${escapeHtml(row.date||'—')}</span><span class="${String(row.result).includes('待')?'negative':'positive'}">${escapeHtml(row.result||'—')}</span></div>`).join(''):'<div class="empty-state">尚無最近巡店紀錄。</div>';
   }
 
@@ -693,44 +695,18 @@
     return { date, stores:rows };
   }
 
-  function patrolVisitDate(row) {
-    const match=String(row.arriveTime||row.fillTime||'').match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-    return match?`${match[1]}-${String(match[2]).padStart(2,'0')}-${String(match[3]).padStart(2,'0')}`:'';
-  }
-
-  function adaptPatrol(raw) {
-    const rows=raw&&raw.rows||[]; const configured=raw&&raw.config&&raw.config.stores||STORES.map(name=>({name}));
-    const summary=raw&&((raw.summary&&typeof raw.summary==='object'&&raw.summary)||(raw.overview&&typeof raw.overview==='object'&&raw.overview))||{};
-    const period=raw&&((raw.period&&typeof raw.period==='object'&&raw.period)||(raw.config&&raw.config.period&&typeof raw.config.period==='object'&&raw.config.period))||{};
-    const periodStart=String(period.startDate||period.start||summary.periodStart||summary.startDate||'').slice(0,10);
-    const periodEnd=String(period.endDate||period.end||summary.periodEnd||summary.endDate||'').slice(0,10);
-    const hasBoundaries=/^\d{4}-\d{2}-\d{2}$/.test(periodStart)&&/^\d{4}-\d{2}-\d{2}$/.test(periodEnd);
-    const statisticsPeriod=String(period.label||period.name||summary.statisticsPeriod||summary.periodLabel||(hasBoundaries?`${periodStart}～${periodEnd}`:''));
-    const officialCompleted=numberOrNull(summary.completed!=null?summary.completed:summary.completedCount);
-    const officialExpected=numberOrNull(summary.expected!=null?summary.expected:summary.expectedCount);
-    const officialRemaining=numberOrNull(summary.remaining!=null?summary.remaining:summary.remainingCount);
-    const officialRate=numberOrNull(summary.completionRate!=null?summary.completionRate:summary.rate);
-    const officialUnvisited=Array.isArray(summary.unvisited)?summary.unvisited:Array.isArray(summary.missingStores)?summary.missingStores:null;
-    const officialAttention=Array.isArray(summary.attention)?summary.attention:Array.isArray(summary.attentionStores)?summary.attentionStores:null;
-    const stores=configured.map(item=>{
-      const name=String(item.name||item.store||''); const matching=rows.filter(row=>normalizeStore(row.store)===normalizeStore(name));
-      const dates=matching.map(patrolVisitDate).filter(Boolean).sort(); const lastVisit=dates.at(-1)||'';
-      const visited=hasBoundaries&&dates.some(date=>date>=periodStart&&date<=periodEnd);
-      const followUps=matching.filter(row=>String(row.result||'').toLowerCase()!=='v'&&String(row.reason||'').trim()&&!/^na$/i.test(String(row.reason||'').trim())).length;
-      const daysSince=lastVisit?Math.max(0,Math.floor((Date.now()-Date.parse(`${lastVisit}T00:00:00+08:00`))/86400000)):null;
-      const officiallyUnvisited=officialUnvisited&&officialUnvisited.map(normalizeStore).includes(normalizeStore(name));
-      const status=followUps?'attention':visited?'complete':(hasBoundaries||officiallyUnvisited)?'pending':'unknown';
-      return { name, lastVisit, daysSince, status, followUps, result:followUps?`待追蹤 ${followUps}`:visited?'完成':status==='pending'?'本期未巡':'待正式期間' };
-    });
-    const derivedVisited=hasBoundaries?stores.filter(row=>row.status==='complete'||row.status==='attention').length:null;
-    const visited=officialCompleted!=null?officialCompleted:derivedVisited;
-    const expected=officialExpected!=null?officialExpected:(hasBoundaries?stores.length:null);
-    const remaining=officialRemaining!=null?officialRemaining:(visited!=null&&expected!=null?Math.max(0,expected-visited):null);
-    const completionRate=officialRate!=null?officialRate:(visited!=null&&expected?visited/expected:null);
-    const unvisited=officialUnvisited?officialUnvisited.map(normalizeStore):(hasBoundaries?stores.filter(row=>row.status==='pending').map(row=>row.name):[]);
-    const attention=officialAttention?officialAttention.map(normalizeStore):stores.filter(row=>row.status==='attention').map(row=>row.name);
-    const recent=rows.slice().sort((a,b)=>String(b.fillTime||'').localeCompare(String(a.fillTime||''))).slice(0,8).map(row=>({store:row.store,date:patrolVisitDate(row)||row.fillTime,result:String(row.result||'').toLowerCase()==='v'?'完成':(String(row.reason||'').trim()||'待追蹤')}));
-    return { visited,total:expected,expected,remaining,completionRate,unvisited,attention,attentionCount:numberOrNull(summary.attentionCount)??attention.length,statisticsPeriod,periodVerified:Boolean(statisticsPeriod&&visited!=null&&expected!=null),stores,recent };
+  function adaptPatrol(raw, currentMonth) {
+    if (!scope.PatrolReadModel || !/^\d{4}-\d{2}$/.test(String(currentMonth || ''))) throw new Error('巡店共用唯讀計算模組無法使用。');
+    const rows=raw&&Array.isArray(raw.rows)?raw.rows:[];
+    const configured=raw&&Array.isArray(raw.stores)&&raw.stores.length?raw.stores:
+      raw&&raw.config&&Array.isArray(raw.config.stores)&&raw.config.stores.length?raw.config.stores:
+      STORES.map(name=>({name}));
+    const data=scope.PatrolReadModel.overview(rows, configured, currentMonth, new Date());
+    data.stores=data.stores.map(row=>({ ...row, name:normalizeStore(row.name) }));
+    data.unvisited=data.unvisited.map(normalizeStore);
+    data.attention=data.attention.map(normalizeStore);
+    data.recent=data.recent.map(row=>({ ...row, store:normalizeStore(row.store) }));
+    return data;
   }
 
   async function loadPatrolData() {
@@ -747,7 +723,7 @@
       populateScheduleStores(scheduleViewData.stores.map(row=>row.store));
     } else { const expired=/授權已逾時/.test(results[0].reason.message); scheduleRaw=null; scheduleViewData=null; contract.scheduleToday=statusModule('scheduleToday',expired?'unauthorized':'error',null,results[0].reason.message); contract.scheduleByDate=statusModule('scheduleByDate',expired?'unauthorized':'error',null,results[0].reason.message); if(expired)setMessage('#patrolAccessMessage','班表／巡店授權已逾時，請重新驗證','error'); }
     if (results[1].status==='fulfilled') {
-      patrolRaw=results[1].value; const data=adaptPatrol(patrolRaw);
+      patrolRaw=results[1].value; const data=adaptPatrol(patrolRaw,month);
       contract.patrolOverview=C.moduleState({status:data.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data});
       contract.patrolStores=C.moduleState({status:data.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data:data.stores});
       contract.patrolToday=C.moduleState({status:'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data:null,note:'現有正式來源未提供今日預定路線與移動時間'});

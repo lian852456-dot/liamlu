@@ -593,6 +593,7 @@
 </div>
 </template>
 
+<script src="patrol-read-model.js?v=9"></script>
 <script>
 /* ---------- 檢核規則設定 ---------- */
 // 預設門市清單（北一二B）。連上雲端後會改用 GAS 回傳的本區清單，
@@ -609,16 +610,8 @@ let STORES = [
   {code:"DNB10146", name:"台北杭州南"},
 ];
 
-// 題號頻率分類
-// type: 'station'(駐點,任一店na或v都算), 'twice'(上下月各1次), 'monthly'(每月至少1次), 'bimonthly'(2月1次)
-const ITEM_RULES = {};
-for(let i=1;i<=33;i++){
-  if(i===1) ITEM_RULES[i]={type:'station', label:'駐點'};
-  else if(i>=2 && i<=13) ITEM_RULES[i]={type:'twice', label:'上下月各1次'};
-  else if(i>=14 && i<=17) ITEM_RULES[i]={type:'monthly', label:'每月1次'};
-  else if(i===18) ITEM_RULES[i]={type:'bimonthly', label:'2月1次'};
-  else ITEM_RULES[i]={type:'monthly', label:'每月1次'};
-}
+// 題號頻率與純讀取計算由巡店正式頁與 Supervisor App 共用，避免兩套規則漂移。
+const ITEM_RULES = PatrolReadModel.ITEM_RULES;
 
 // 題目短描述（用於顯示）
 const ITEM_TEXT = {
@@ -1006,20 +999,7 @@ function parseData(){
 
 // 從 rawDetails 重建 records（雲端載入後用）
 function rebuildFromRaw(){
-  records = {};
-  rawDetails.forEach(it=>{
-    const dm = String(it.fillTime).match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-    if(!dm) return;
-    const d=+dm[3];
-    const half = d<=15?'H1':'H2';
-    const store=it.store, code=it.code;
-    if(!records[store]) records[store]={code, entries:[]};
-    if(code && !records[store].code) records[store].code=code;
-    records[store].entries.push({
-      month: it.month || `${dm[1]}-${String(+dm[2]).padStart(2,'0')}`,
-      date:`${dm[1]}/${+dm[2]}/${d}`, half, item:+it.item, result:it.result
-    });
-  });
+  records = PatrolReadModel.rebuildFromRaw(rawDetails);
 }
 
 function showMsg(t,type){
@@ -1078,49 +1058,12 @@ function importData(e){
 /* ---------- 完成度判定 ---------- */
 // 回傳某店某題在當月的狀態: {status:'done'|'miss'|'na-only', detail}
 function itemStatus(storeName, itemNo){
-  const rec = records[storeName];
-  const rule = ITEM_RULES[itemNo];
-  if(!rec) return {status:'miss'};
-
-  const monthEntries = rec.entries.filter(e=>e.month===currentMonth && e.item===itemNo);
-  if(monthEntries.length===0) return {status:'miss'};
-
-  const hasV = monthEntries.some(e=>e.result==='v');
-  const naOnly = monthEntries.every(e=>e.result==='na');
-
-  if(rule.type==='station'){
-    // 駐點：只要當月該店有出現紀錄（v或na皆可）即算完成
-    return {status:'done'};
-  }
-  if(rule.type==='twice'){
-    // 上下月各1次
-    const h1 = monthEntries.some(e=>e.half==='H1' && e.result==='v');
-    const h2 = monthEntries.some(e=>e.half==='H2' && e.result==='v');
-    if(h1 && h2) return {status:'done'};
-    if(h1 || h2) return {status:'miss', detail: h1?'缺下半月':'缺上半月'};
-    return {status:'miss', detail:'上下半月皆缺'};
-  }
-  if(rule.type==='monthly'){
-    return hasV ? {status:'done'} : {status:'miss'};
-  }
-  if(rule.type==='bimonthly'){
-    // 2月1次：固定週期 1-2、3-4、5-6、7-8、9-10、11-12 月，週期內任一月有v即算
-    const win = bimWindow(currentMonth);
-    const hasVbi = rec.entries.some(e=>win.months.includes(e.month)&&e.item===itemNo&&e.result==='v');
-    return hasVbi ? {status:'done'} : {status:'miss', detail:`本期(${win.label})未完成`};
-  }
-  return {status:'miss'};
+  return PatrolReadModel.itemStatus(records, currentMonth, storeName, itemNo);
 }
 
 /* ---------- 統計某店完成度 ---------- */
 function storeSummary(storeName){
-  let done=0, miss=0, missItems=[];
-  for(let i=1;i<=33;i++){
-    const s=itemStatus(storeName,i);
-    if(s.status==='done') done++;
-    else { miss++; missItems.push({no:i, detail:s.detail}); }
-  }
-  return {done, miss, total:33, missItems, pct:Math.round(done/33*100)};
+  return PatrolReadModel.storeSummary(records, currentMonth, storeName);
 }
 
 /* ---------- 渲染 ---------- */
@@ -1139,23 +1082,15 @@ const INV_LABELS = {14:'銷毀文件', 15:'維修機盤點', 16:'現金盤點', 
 
 // 官方九店 ↔ 貼上資料的店名對應（店名寫法可能不同，用代碼或關鍵字比對）
 function findRecordStore(st){
-  return Object.keys(records).find(vs=>
-    (st.code && records[vs].code===st.code) ||
-    vs.includes(st.name.replace('台北','')) || st.name.includes(vs)
-  ) || null;
+  return PatrolReadModel.findRecordStore(records, st);
 }
 
 // 題18固定雙月週期：1-2、3-4、5-6、7-8、9-10、11-12
 function bimWindow(mk){
-  const [y,m] = mk.split('-').map(Number);
-  const s = (m%2===1) ? m : m-1; // 週期起始月（奇數月）
-  const pad = n=>String(n).padStart(2,'0');
-  return { months:[`${y}-${pad(s)}`, `${y}-${pad(s+1)}`], label:`${s}–${s+1}月` };
+  return PatrolReadModel.bimWindow(mk);
 }
 function prevBimWindow(mk){
-  const [y,m] = mk.split('-').map(Number);
-  const s = (m%2===1) ? m : m-1;
-  return s===1 ? bimWindow(`${y-1}-11`) : bimWindow(`${y}-${String(s-2).padStart(2,'0')}`);
+  return PatrolReadModel.prevBimWindow(mk);
 }
 
 function renderInvPanels(){
@@ -1202,18 +1137,10 @@ function renderInvPanels(){
   let doneAware = 0, rowsC = '';
   STORES.forEach(st=>{
     const rs = findRecordStore(st);
-    let cnt = 0, doneDay = 0;
-    AWARE_ITEMS.forEach(it=>{
-      const days = (rs ? records[rs].entries : [])
-        .filter(e=>e.month===currentMonth && e.item===it && e.result==='v')
-        .map(e=>+e.date.split('/')[2]);
-      if(days.length){
-        cnt++;
-        const first = Math.min.apply(null, days); // 該題最早完成日
-        if(first > doneDay) doneDay = first;      // 全部完成日＝最晚補齊那題的日期
-      }
-    });
-    const all = cnt===AWARE_ITEMS.length;
+    const aware = PatrolReadModel.awarenessProgress(records, currentMonth, rs, today);
+    const cnt = aware.count;
+    const doneDay = aware.completedDay || 0;
+    const all = aware.all;
     if(all) doneAware++;
     let stateCell;
     if(all){
@@ -1301,31 +1228,20 @@ function renderTicker(){
 
 function renderOverview(){
   const ov=document.getElementById('overview');
-  const visitedStores = Object.keys(records).filter(s=>
-    records[s].entries.some(e=>e.month===currentMonth));
-
-  let totalDone=0, totalMiss=0;
-  visitedStores.forEach(s=>{
-    const sm=storeSummary(s);
-    totalDone+=sm.done; totalMiss+=sm.miss;
-  });
-  const fullyDone = visitedStores.filter(s=>storeSummary(s).miss===0).length;
-  const notVisited = STORES.filter(st=>
-    !visitedStores.some(vs=>vs.includes(st.name.replace('台北',''))||st.name.includes(vs))
-  ).length;
+  const model = PatrolReadModel.overview(rawDetails, STORES, currentMonth, new Date());
 
   ov.innerHTML=`
-    <div class="stat"><div class="num">${visitedStores.length}</div><div class="lbl">本月已巡店數</div></div>
-    <div class="stat"><div class="num good">${fullyDone}</div><div class="lbl">全項完成店數</div></div>
-    <div class="stat"><div class="num ${totalMiss>0?'warn':''}">${totalMiss}</div><div class="lbl">尚缺檢核項次</div></div>
-    <div class="stat"><div class="num ${notVisited>0?'warn':''}">${notVisited}</div><div class="lbl">尚未巡店數</div></div>
+    <div class="stat"><div class="num">${model.visited}</div><div class="lbl">本月已巡店數</div></div>
+    <div class="stat"><div class="num good">${model.fullyDone}</div><div class="lbl">全項完成店數</div></div>
+    <div class="stat"><div class="num ${model.totalMissingItems>0?'warn':''}">${model.totalMissingItems}</div><div class="lbl">尚缺檢核項次</div></div>
+    <div class="stat"><div class="num ${model.remaining>0?'warn':''}">${model.remaining}</div><div class="lbl">尚未巡店數</div></div>
   `;
 }
 
 function renderStores(){
   const c=document.getElementById('content');
-  const visitedStores = Object.keys(records).filter(s=>
-    records[s].entries.some(e=>e.month===currentMonth))
+  const model = PatrolReadModel.overview(rawDetails, STORES, currentMonth, new Date());
+  const visitedStores = model.stores.filter(store=>store.visited).map(store=>store.recordName)
     .sort((a,b)=>storeSummary(a).miss - storeSummary(b).miss ? storeSummary(b).miss-storeSummary(a).miss : 0);
 
   if(visitedStores.length===0){
@@ -1350,9 +1266,7 @@ function renderStores(){
   }
 
   // 未巡店提醒
-  const notVisited = STORES.filter(st=>
-    !visitedStores.some(vs=>vs.includes(st.name.replace('台北',''))||st.name.includes(vs)||(records[vs]&&records[vs].code===st.code))
-  );
+  const notVisited = model.stores.filter(store=>!store.visited).map(store=>({code:store.code,name:store.name}));
   if(notVisited.length>0){
     html+=`<div class="section-title">本月尚未巡店 <span class="badge">${notVisited.length} 店</span></div>`;
     html+=`<div class="store-card"><div class="store-body" style="display:block;border-top:none;padding-top:14px">`;
@@ -1724,12 +1638,28 @@ function mergeHalfRows(rows){
 function loadHalfLocal(){ if(!secureUnlocked || !privateAccount) return;try{const rows=JSON.parse(sessionStorage.getItem('bei12b_half_checks')||'[]');if(Array.isArray(rows)) halfChecks=rows;}catch{halfChecks=[];} }
 function halfPeriod(date){ return Number((date||'').slice(-2))<=15?'H1':'H2'; }
 function halfPeriodLabel(p){ return p==='H1'?'上半月（1–15日）':'下半月（16日–月底）'; }
+function halfFormIsDirty(){
+  const inspector=document.getElementById('halfInspector');
+  if(inspector&&inspector.value.trim()) return true;
+  return Array.from(document.querySelectorAll('.half-item')).some(box=>
+    box.querySelector('.half-result')?.value ||
+    box.querySelector('.half-note')?.value.trim() ||
+    box.querySelector('.half-improvement')?.value.trim() ||
+    box.querySelector('.half-evidence-link')?.value.trim()
+  );
+}
 async function loadHalfChecks(){
   loadHalfLocal(); renderHalfSummary(); renderHalfForm(); renderHalfHistory(); renderHalfDashboard();
   if(!privateAccount) return;
   try{
     const res=await privateInspectionRequest('read');
-    if(res.status==='ok'){ mergeHalfRows((res.rows||[]).map(r=>({...r,item:Number(r.item)}))); renderHalfSummary(); renderHalfForm(); renderHalfHistory(); renderHalfDashboard(); }
+    if(res.status==='ok'){
+      const preserveDraft=halfFormIsDirty();
+      mergeHalfRows((res.rows||[]).map(r=>({...r,item:Number(r.item)})));
+      renderHalfSummary();
+      if(!preserveDraft) renderHalfForm();
+      renderHalfHistory(); renderHalfDashboard();
+    }
     else if(res.reauthFailed){ showHalfMsg(`${PATROL_REAUTH_MESSAGE}；本機資料仍保留`,'err'); }
   }catch(err){ showHalfMsg('半月檢查雲端讀取失敗，先顯示本機資料','err'); }
 }
