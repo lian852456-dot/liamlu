@@ -16,7 +16,7 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 ## 2026-08-12 ｜ Codex（App 1.2 半月督導檢查 Formal Read，未部署）
 
 - 做了什麼：從已通過 UI Preview 的 `51ce311` 建立隔離分支，只把既有 ptauth 1800 秒短效 session 接到 `hread`。新增純 read model，依正式 H1／H2、九店與題 1–18 篩選；`ok/abnormal/na/blank` 分別顯示符合／異常／不適用／尚未填寫。九店只呈現透明的「18/18 已填」「n/18 已填」「尚未填」，不建立 backend completed flag；openVisit 仍只提示與預選。
-- 結果（進行中）：合成九店 fixture 的正式 read adapter、三種店況逐題 parity、未授權／逾時與 390×844 測試均通過；console error 0、橫向溢出 0、正式 write request 0。正式 `hwrite`、`half_media_upload`、GAS、Pages、Native 與既有 ptvisit／巡店 canonical 計算均未修改。正式線上 hread 唯讀抽驗與完整必要回歸完成後才可交付 review。
+- 結果（成功，待 Liam review）：合成 fixture、未授權／逾時與 390×844 測試均通過；console error 0、橫向溢出 0、正式 write request 0。Liam 解鎖後正式 hread 讀回 2026-08 H1 為 1 店 18/18、4 店填寫中、4 店尚未填，有異常 1 店／1 項；大稻埕 18/18 無異常、歷史 H2 復興南 18/18 有異常、酒泉 7/18 三種店況的 item/status/原文/media/period/store/date 全欄 parity 通過。正式 `hwrite`、`half_media_upload`、GAS、Pages、Native 與既有 ptvisit／巡店 canonical 計算均未修改。
 - 經驗 / 給下一位的提醒：hread 不暴露 worksheet 的正式 completed 欄位，因此 App 的 18 題 completeness 必須持續命名為「填寫進度」。既有 ptvisit fixture 固定 2026-08-11，在 08-12 會被 today-only 規則排除；依任務邊界只記錄，不可藉本次半月 read 修正它。
 
 ## 2026-08-12 ｜ Codex（App 1.2 半月督導檢查 Discovery／UI Preview，未部署）

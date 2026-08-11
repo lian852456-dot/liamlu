@@ -32,7 +32,22 @@
 
 ## Live formal readback
 
-正式線上 hread 抽驗僅記錄去識別摘要與逐題相等結果；不將 token、通行碼、督導姓名、原始缺失文字或私有媒體 URL 寫入本文件。若既有短效 session 未解鎖或已逾時，狀態保持 waiting-user，不以 fixture 冒充正式讀回。
+2026-08-12 使用 Liam 本人在正式 App UI 完成的既有班表／巡店短效 session，切換正式 `patrol.html` 半月督導檢查頁並等待 hread 完成後讀回。App read model 對同一批正式 H1 資料產出：
+
+- 當期：2026-08 H1（8/1–8/15）
+- 18/18 已填：1/9
+- 有異常：1 店
+- 異常項目：1
+- 尚未填：4 店
+- 其餘 4 店為填寫中：2/18、7/18、12/18、14/18
+
+三店逐題 parity：
+
+- 大稻埕（2026-08 H1）：18/18、無異常。
+- 復興南（2026-07 H2 歷史期）：18/18、2 項異常。
+- 酒泉（2026-08 H1）：7/18、未完整。
+
+上述正式樣本共 73 個題目 rows；App mapping 與正式頁的 item、status、note、improvement、evidence/media、period、store、date 全欄相等。驗證只回報去識別摘要與 equality boolean；未將 token、通行碼、督導姓名、原始缺失文字或私有媒體 URL 寫入文件。
 
 ## Zero-write evidence
 
