@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-12 ｜ Codex（App 1.2 半月督導檢查 Discovery／UI Preview，未部署）
+
+- 做了什麼：從乾淨 `origin/main` 建立 `feature/liam-supervisor-half-month-preview-20260812`，只盤點正式 `patrol.html`／`gas/Code.gs` 的半月督導檢查資料、設計 read-only contract，並在 App 巡店頁加入第二層「巡店檢查／半月督導檢查」Preview。到店與半月檢查維持完全 opt-in；openVisit 只提示並預選店點，沒有自動開始、沒有呼叫 `hread`／`hwrite`／`half_media_upload`。
+- 結果（進行中）：確認正式期別規則為 `H1=1–15 日`、`H2=16 日–月底`，固定 18 題，狀態為 `ok/abnormal/na/blank`；正式資料由 `hread` 回讀「半月督導檢查」worksheet，`hwrite` 與媒體上傳仍維持既有 ptauth 1800 秒短效 token。Preview Node／contract 15/15、390×844 App/Preview 10/10、既有 `patrol.html` 36/36；console error 0、橫向溢出 0、觸控目標至少 44px。未部署 GAS／Pages／Native，也沒有正式 write。
+- 經驗 / 給下一位的提醒：現行 `hread` 不回傳 worksheet 的獨立建立時間與填寫狀態，且讀函式會透過 `getHalfCheckSheet()` 在缺表時建表；本輪只記錄，未改 GAS。App 正式接線前必須先決定 read adapter 是否補足 canonical status，並保持 Preview fail-closed。另有既有 App ptvisit 測試把日期固定為 2026-08-11，於 08-12 會被正式「只顯示台北當日」規則排除；本輪未越界修改 ptvisit fixture。
+
 ## 2026-08-12 ｜ Codex（App 1.2 店長績效語意修正，待部署／實機驗收）
 
 - 做了什麼：從已部署個績區版本建立隔離分支 `hotfix/liam-supervisor-manager-semantics-20260812`，只修正「戰情 → 個績 → 北一二B → 職稱排名 → 店長」。店長列改以既有正式 `kpiStores` 顯示店 KPI、店公司排名、店 KPI DOD、店排名變化；AQ 仍只取店長 personal row 的正式 `AQ actual` 並提示距 10 點缺口。店長不再顯示或排序 personal `totalRate/rank/DOD/rankChange`，副店、其他業代與指標未達檢視維持原語意。

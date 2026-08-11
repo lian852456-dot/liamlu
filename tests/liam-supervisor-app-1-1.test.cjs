@@ -78,7 +78,7 @@ test('App runtime keeps existing reads and allows only the isolated patrol visit
 
 test('Information architecture matches the App 1.2 acceptance surfaces', () => {
   const html = read('app.html');
-  for (const label of ['今日營運戰況','九店一覽','台獎總覽','戰情','每日回報','全區營運摘要','全區未過關彙整','九店完整班表','巡店大盤','系統狀態']) {
+  for (const label of ['今日營運戰況','九店一覽','台獎總覽','戰情','每日回報','全區營運摘要','全區未過關彙整','九店完整班表','巡店檢查','系統狀態']) {
     assert.match(html, new RegExp(label));
   }
   assert.match(html, /data-battle-kind="kpi"/);

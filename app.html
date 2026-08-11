@@ -86,18 +86,25 @@
       </section>
 
       <section data-view="patrol" hidden aria-label="巡店">
-        <div class="view-heading"><div><p>PATROL OVERVIEW</p><h1>巡店大盤</h1></div><a class="icon-button" href="patrol.html" aria-label="開啟完整巡店系統"><i data-lucide="external-link"></i></a></div>
+        <div class="view-heading"><div><p>PATROL &amp; CHECK</p><h1>巡店檢查</h1></div><a class="icon-button" href="patrol.html" aria-label="開啟完整巡店系統"><i data-lucide="external-link"></i></a></div>
         <section class="panel patrol-visit-panel" aria-labelledby="patrolVisitTitle">
           <div class="panel-head"><div><h2 id="patrolVisitTitle">快速到店／離店</h2><small>唯一新增寫入 · 需既有巡店短效 session</small></div></div>
           <div class="patrol-visit-actions"><button id="patrolArrivalButton" type="button" data-patrol-visit="arrival">到店</button><button id="patrolDepartureButton" type="button" data-patrol-visit="departure">離店</button></div>
           <p id="patrolVisitMessage" class="form-message">解鎖班表／巡店後可使用。</p>
           <div class="patrol-visit-today"><h3>今日到離店紀錄</h3><div id="patrolVisitToday"></div></div>
         </section>
-        <div id="patrolOverview"></div>
-        <div id="patrolTodayDetail"></div>
-        <section class="panel"><div class="panel-head"><div><h2>店點狀況</h2><small>最近巡店與待追蹤</small></div></div><div id="patrolStoreList"></div></section>
-        <section class="panel"><div class="panel-head"><div><h2>最近巡店紀錄</h2><small>正式 ptread</small></div></div><div id="patrolRecentList"></div></section>
-        <div class="source-actions"><a href="patrol.html">完整巡店看板 <i data-lucide="external-link"></i></a><a href="patrol.html">巡店操作頁 <i data-lucide="external-link"></i></a></div>
+        <div class="segmented patrol-check-selector" role="group" aria-label="巡店檢查類型">
+          <button class="active" type="button" data-patrol-check-view="patrol" aria-pressed="true">巡店檢查</button>
+          <button type="button" data-patrol-check-view="half-month" aria-pressed="false">半月督導檢查</button>
+        </div>
+        <div id="patrolCheckContent">
+          <div id="patrolOverview"></div>
+          <div id="patrolTodayDetail"></div>
+          <section class="panel"><div class="panel-head"><div><h2>店點狀況</h2><small>最近巡店與待追蹤</small></div></div><div id="patrolStoreList"></div></section>
+          <section class="panel"><div class="panel-head"><div><h2>最近巡店紀錄</h2><small>正式 ptread</small></div></div><div id="patrolRecentList"></div></section>
+          <div class="source-actions"><a href="patrol.html">完整巡店看板 <i data-lucide="external-link"></i></a><a href="patrol.html">巡店操作頁 <i data-lucide="external-link"></i></a></div>
+        </div>
+        <div id="halfMonthCheckPreview" hidden></div>
       </section>
 
       <dialog id="patrolVisitDialog" class="patrol-visit-dialog">

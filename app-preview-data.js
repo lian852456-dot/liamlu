@@ -98,6 +98,37 @@
     awareness:{count:index < 4 ? 15 : index < 6 ? 12-index : 0,total:15,all:index < 4}
   }));
 
+  const halfMonthQuestions = [
+    '督導駐點','店格陳列／展機防盜／回收桶上鎖','中島展示機無不當資訊且開機恆亮',
+    '前後場整潔、公佈欄符合規範','有價商品櫃是否上鎖','電腦記事本／資料夾mail個資檢查',
+    '申裝書3日回送、無不當留存個資','同仁服裝儀容與服務態度','出勤與班表一致並載休息時間',
+    '人員面談及輔導','門市安全（禁菸／禁火源）','監控設備運作正常','店務日誌與督導簽名',
+    '待銷毀文件打包歸檔上鎖','待回送／未結案維修機盤點','保全金零找金現金盤點',
+    'iPhone手機盤點盤差登載','到店全盤作業（2月1次）'
+  ].map((title,index)=>({ item:index+1,title }));
+  const halfMonthStores = [
+    ['通化','completed','2026-08-04',0,0],['酒泉','improvement','2026-08-06',2,2],
+    ['台北三創','improvement','2026-08-07',1,1],['萬大','completed','2026-08-08',0,0],
+    ['六張犁','completed','2026-08-08',0,0],['復興南','improvement','2026-08-09',2,2],
+    ['永吉','completed','2026-08-09',0,0],['大稻埕','completed','2026-08-10',0,0],
+    ['杭州南','pending','',null,null]
+  ].map(([name,status,completedAt,abnormalCount,pendingImprovementCount])=>({name,status,completedAt,abnormalCount,pendingImprovementCount}));
+  const halfMonthPreview = {
+    preview:true,
+    period:{ key:'H1', month:'2026-08', label:'2026 年 8 月上半月', dateRange:'8/1–8/15' },
+    summary:{ completedStores:8,totalStores:9,abnormalStores:3,abnormalItems:5,pendingStores:1 },
+    stores:halfMonthStores,
+    questions:halfMonthQuestions,
+    statuses:[
+      { value:'ok',label:'符合' },
+      { value:'abnormal',label:'缺失／異常' },
+      { value:'na',label:'不適用' }
+    ],
+    openVisit:{ store:'酒泉', serverTime:'2026-08-12T09:12:00+08:00', visitSessionId:'preview-open-visit' },
+    source:{ label:'正式 hread contract（Preview fixture）', href:'patrol.html' },
+    sourceUpdatedAt:'2026-08-12T09:20:00+08:00'
+  };
+
   const failureData = (segmentData) => {
     const failingPeople = segmentData.stores.flatMap(store => store.people.filter(person => person.status === 'fail').map(person => ({ store:store.name, ...person })));
     const byMetric = {};
@@ -142,4 +173,5 @@
   };
 
   scope.LiamSupervisorPreviewData = C.validateContract(contract);
+  scope.LiamSupervisorHalfMonthPreviewData = halfMonthPreview;
 })(window);
