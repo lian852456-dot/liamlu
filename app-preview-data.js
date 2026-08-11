@@ -112,7 +112,7 @@
   ];
   const personalMetricNames=['AQ','A999','A1399','RT','R999','R1399','好速','特維','配件','包膜'];
   const previewPeople=stores.slice(0,9).map((store,index)=>({
-    name:`同仁＊${index+1}`,store:store.name,role:index%3===0?'店長':index%3===1?'副店長':'業務代表',category:index%3===0?'店長':index%3===1?'副店':'業代',
+    name:`同仁＊${index+1}`,store:store.name,role:index%3===0?'店長':index%3===1?'副店長':'業務代表',category:index%3===0?'店長':index%3===1?'副店':'業代',roleGroup:index%3===0?'店長':index%3===1?'副店':'其他業代',
     totalRate:Number((1.12-index*.045).toFixed(3)),rank:12+index*7,dod:Number((.028-index*.009).toFixed(3)),rankChange:2-index,
     metrics:personalMetricNames.map((key,metricIndex)=>({key,rate:Number((1.18-index*.035-metricIndex*.018).toFixed(3)),actual:12-index,target:10,dailyTarget:1,dailyGap:index%2,dod:Number((.02-metricIndex*.004).toFixed(3))}))
   }));
@@ -129,7 +129,7 @@
       ...['台北三創','酒泉','萬大','杭州南','復興南','六張犁'].map((name,index) => ({name,amount:0,eligible:false,items:previewAwardItems(name,index+3)}))
     ],'正式台獎私有戰情','index.html'),
     awardTop2Models:state([{name:'A1399',amount100:6800,progress:.82,status:'接近領獎'},{name:'R1399',amount100:5200,progress:.76,status:'追蹤中'}],'正式台獎私有戰情','index.html'),
-    personalPerformance:state({ summary:{total:previewPeople.length,achieved:previewPeople.filter(row=>row.totalRate>=1).length,underTarget:previewPeople.filter(row=>row.totalRate<1).length,attention:null,attentionAvailable:false,reportDate:'2026-08-10',sourceAsOfDate:'2026-08-09'},people:previewPeople },'正式 KPI 個績快照','index.html'),
+    personalPerformance:state({ summary:{total:previewPeople.length,achieved:previewPeople.filter(row=>row.totalRate>=1).length,underTarget:previewPeople.filter(row=>row.totalRate<1).length,aqAttentionCount:2,aqMissingCount:0,reportDate:'2026-08-10',sourceAsOfDate:'2026-08-09'},people:previewPeople },'正式 KPI 個績快照','index.html'),
     report1600:state(report1600,'北一二B每日回報','index.html','2026-08-10T16:21:00+08:00'),
     report2100:state(report2100,'北一二B每日回報','index.html','2026-08-10T21:33:00+08:00'),
     reportFailures:state({ 16:failureData(report1600),21:failureData(report2100) },'正式個人回報','index.html','2026-08-10T21:33:00+08:00'),

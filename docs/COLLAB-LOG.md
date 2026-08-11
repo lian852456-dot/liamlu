@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-11 ｜ Codex（App 1.2 區個績職稱／未達檢視，待部署／實機驗收）
+
+- 做了什麼：從乾淨 `origin/main` 建立隔離分支 `hotfix/liam-supervisor-personal-area-20260811`，只調整「戰情 → 個績 → 北一二B」。正式 `category/role` 映射為店長／副店／其他業代；職稱排名依正式 `rank` 由小到大、空值置後；指標未達只列非店長的 A999／好速／R1399 正式 `rate < 100%`，空值不當 0。第四張摘要卡改為店長 AQ `actual < 10`，只作管理提示，不重算總績效、KPI 或排名。店點模式沿用既有資料語意與來源排序。
+- 結果（進行中）：Node 全套 140/140；390×844 個績專項、五頁籤互動、console、無 ellipsis／橫向溢出與 44px 觸控 assertion 均通過。完整 Playwright 10 項中 9 項通過，唯一失敗為既有巡店 full-page screenshot 在所有功能 assertion 通過後逾時。以 2026-08-11 已 `published-verified` 的正式快照副本做 source→adapter Gate：40 人＝店長 9／副店 11／其他業代 20，三項未達與 AQ 規則皆通過，另抽 5 人逐欄 exact match。
+- 經驗 / 給下一位的提醒：正式來源目前 9 位店長的 `rank` 都是 1326，App 必須忠實顯示，不得以總達成率自行替換。此分支未包含 Daily Report 門市回覆 hotfix `f4614d6`，也未部署或完成 Liam 實機驗收；KPI、台獎、回報、班表、巡店、auth、Approved Device 與 Native 均未修改。
+
 ## 2026-08-11 ｜ Codex（App 1.2 個績＋每日回報摘要，待部署／21:00 live data）
 
 - 做了什麼：從乾淨 `origin/main` 建立 `feature/liam-supervisor-app-1-2`。每日回報新增既有 GAS `read` 的唯讀 `formal-index-summary-v1` adapter，直接提供完成／缺店、更新時間、A999、好速、R1399、R999、保險搭售率與設備案佔比；App 只直通顯示，不從店列重算。戰情新增「個績」，沿用 Approved Device 保護下的 `private_access.snapshot.kpiBattle.personal`，顯示正式總績效、排名、DOD、排名變化與現有 10 項個人 KPI；正式來源沒有的「需要關注」與個人 25 項保持 `—`／不顯示。

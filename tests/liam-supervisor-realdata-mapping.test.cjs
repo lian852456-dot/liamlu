@@ -20,7 +20,7 @@ function body(name) {
 }
 
 function loadAdapters() {
-  const names = ['numberOrNull','normalizeStore','kpiDataAsOfDate','sourceFileName','kpiSupplementIsCurrent','officialKpiRate','kpicalcMetricItems','adaptKpi','adaptAwards','personalRecord','adaptPersonalPerformance','adaptReport'];
+  const names = ['numberOrNull','normalizeStore','kpiDataAsOfDate','sourceFileName','kpiSupplementIsCurrent','officialKpiRate','kpicalcMetricItems','adaptKpi','adaptAwards','personalRecord','personalRoleGroup','personalMetricByKey','personalRankedByRole','personalUnderTargetByMetric','personalAqReview','adaptPersonalPerformance','adaptReport'];
   const script = `
     const STORE_ALIASES = new Map([['三創','台北三創']]);
     const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
@@ -29,8 +29,8 @@ function loadAdapters() {
     const C = { moduleState: value => ({ ...value, sourceLink:value.source.href }) };
     const moduleSource = (label,href) => ({label,href});
     const stale = () => false;
-    ${names.map(name=>`function ${name}(${({numberOrNull:'value',normalizeStore:'value',kpiDataAsOfDate:'data',sourceFileName:'value',kpiSupplementIsCurrent:'data, supplement',officialKpiRate:'entry',kpicalcMetricItems:'data, rates',adaptKpi:'data, snapshot, readAt',adaptAwards:'snapshot, expectedReportDate, readAt',personalRecord:'raw',adaptPersonalPerformance:'snapshot, readAt',adaptReport:'segment, storeData, personalData, formalSummary'})[name]}) {${body(name)}}`).join('\n')}
-    module.exports = { adaptKpi, adaptAwards, personalRecord, adaptPersonalPerformance, adaptReport };
+    ${names.map(name=>`function ${name}(${({numberOrNull:'value',normalizeStore:'value',kpiDataAsOfDate:'data',sourceFileName:'value',kpiSupplementIsCurrent:'data, supplement',officialKpiRate:'entry',kpicalcMetricItems:'data, rates',adaptKpi:'data, snapshot, readAt',adaptAwards:'snapshot, expectedReportDate, readAt',personalRecord:'raw',personalRoleGroup:'source',personalMetricByKey:'person,key',personalRankedByRole:'people,roleGroup',personalUnderTargetByMetric:'people,key',personalAqReview:'people',adaptPersonalPerformance:'snapshot, readAt',adaptReport:'segment, storeData, personalData, formalSummary'})[name]}) {${body(name)}}`).join('\n')}
+    module.exports = { adaptKpi, adaptAwards, personalRecord, personalRoleGroup, personalMetricByKey, personalRankedByRole, personalUnderTargetByMetric, personalAqReview, adaptPersonalPerformance, adaptReport };
   `;
   const context = vm.createContext({ module:{exports:{}}, exports:{}, Map, Set, Object, Array, String, Number, Boolean, Math, Date, JSON });
   vm.runInContext(script, context);
@@ -146,7 +146,7 @@ test('Daily report adapter passes through the formal summary and never recalcula
   assert.deepEqual(Object.keys(blocked.summaryMetrics), []);
 });
 
-test('Personal performance adapter maps only formal person fields and fails closed for attention and 25 KPI', () => {
+test('Personal performance adapter maps formal fields and derives AQ attention only from manager AQ actual', () => {
   const A = loadAdapters();
   const metrics = Object.fromEntries(['AQ','A999','A1399','RT','R999','R1399','好速','特維','配件','包膜'].map((key,index)=>[key,{rate:1.1-index*.01,actual:index+1,target:index+2,daily_target:1,daily_gap:0,dod:.01}]));
   const snapshot = { publishedAt:'2026-08-11T09:54:24+08:00', kpiBattle:{ report_date:'2026-08-11',source_as_of_date:'2026-08-10',generated_at:'2026-08-11T09:54:24+08:00',personal:[
@@ -157,10 +157,48 @@ test('Personal performance adapter maps only formal person fields and fails clos
   assert.equal(result.data.summary.total, 1);
   assert.equal(result.data.summary.achieved, 0);
   assert.equal(result.data.summary.underTarget, 1);
-  assert.equal(result.data.summary.attention, null);
-  assert.equal(result.data.summary.attentionAvailable, false);
+  assert.equal(result.data.summary.aqAttentionCount, 1);
+  assert.equal(result.data.summary.aqMissingCount, 0);
+  assert.equal(result.data.people[0].roleGroup, '店長');
   assert.equal(result.data.people[0].metrics.length, 10);
   assert.equal(result.data.people[0].totalRate, .912);
   assert.equal(result.data.people[0].metrics.find(metric=>metric.key==='A1399').rate, 1.08);
+  assert.match(result.note, /不修改正式總績效/);
   assert.match(result.note, /未提供個人 25 項/);
+});
+
+test('Personal performance area groups by formal category or role without guessing from name or store', () => {
+  const A=loadAdapters();
+  assert.equal(A.personalRoleGroup({category:'店長',role:'業務代表(I)'}),'店長');
+  assert.equal(A.personalRoleGroup({category:'副店',role:'店長'}),'副店');
+  assert.equal(A.personalRoleGroup({category:'業代',role:'副店長'}),'其他業代');
+  assert.equal(A.personalRoleGroup({role:'代理店長'}),'店長');
+  assert.equal(A.personalRoleGroup({role:'副店長'}),'副店');
+  assert.equal(A.personalRoleGroup({name:'店長字樣',store:'店長門市',role:'銷售人員'}),'其他業代');
+});
+
+test('Personal performance role ranking uses formal rank ascending with null last', () => {
+  const A=loadAdapters();
+  const people=[
+    {name:'甲',roleGroup:'副店',rank:45},{name:'乙',roleGroup:'副店',rank:null},{name:'丙',roleGroup:'副店',rank:12},{name:'丁',roleGroup:'副店',rank:31},{name:'戊',roleGroup:'店長',rank:1}
+  ];
+  assert.deepEqual(Array.from(A.personalRankedByRole(people,'副店'),person=>person.name),['丙','丁','甲','乙']);
+});
+
+test('Personal performance metric gap excludes managers, keeps only rate below one and sorts high to low', () => {
+  const A=loadAdapters();
+  const person=(name,roleGroup,rate)=>({name,roleGroup,metrics:[{key:'A999',rate,actual:1}]});
+  const result=A.personalUnderTargetByMetric([
+    person('店長','店長',.5),person('達標','副店',1),person('高','副店',.962),person('中','其他業代',.845),person('低','其他業代',.613),person('缺值','副店',null)
+  ],'A999');
+  assert.deepEqual(Array.from(result.rows,row=>row.name),['高','中','低']);
+  assert.deepEqual(Array.from(result.missing,row=>row.name),['缺值']);
+});
+
+test('Personal performance AQ attention uses actual below ten and keeps null separate', () => {
+  const A=loadAdapters();
+  const manager=(name,actual,rate=.5)=>({name,roleGroup:'店長',metrics:[{key:'AQ',actual,rate}]});
+  const result=A.personalAqReview([manager('八點',8,1.5),manager('十點',10,.2),manager('缺值',null,0),{name:'業代',roleGroup:'其他業代',metrics:[{key:'AQ',actual:1,rate:.1}]}]);
+  assert.deepEqual(Array.from(result.attention,row=>({name:row.person.name,actual:row.actual,gap:row.gap})),[{name:'八點',actual:8,gap:2}]);
+  assert.deepEqual(Array.from(result.missing,row=>row.name),['缺值']);
 });

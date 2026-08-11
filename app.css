@@ -458,6 +458,21 @@ body { font-size:16px; }
 .personal-metric-grid b { margin-top:5px; font-size:18px; font-variant-numeric:tabular-nums; }
 .personal-metric-grid small { margin-top:5px; color:var(--dim); font-size:13px; line-height:1.4; overflow-wrap:anywhere; }
 .personal-source-note { margin:0 0 12px; padding:10px 12px; border:1px solid var(--line-soft); border-radius:10px; color:var(--muted); background:#081d31; font-size:14px; line-height:1.5; }
+.personal-region-controls { margin-bottom:12px; padding:12px; border:1px solid var(--line); border-radius:14px; background:#081f35; }
+.personal-region-controls > span,.personal-filter-field > span { display:block; margin-bottom:7px; color:var(--muted); font-size:14px; font-weight:800; }
+.personal-view-control { width:100%; margin-bottom:10px; }
+.personal-view-control button { min-height:44px; }
+.personal-filter-field select { width:100%; min-height:44px; padding:0 12px; border:1px solid var(--line); border-radius:10px; color:var(--text); background:#061728; font-size:16px; }
+.personal-aq-panel { padding-bottom:12px; }
+.personal-aq-list { overflow:hidden; border-top:1px solid var(--line-soft); border-bottom:1px solid var(--line-soft); }
+.personal-aq-row { display:grid; grid-template-columns:minmax(110px,1fr) minmax(62px,.55fr) minmax(72px,.65fr); align-items:center; gap:8px; min-height:58px; padding:8px 13px; border-bottom:1px solid var(--line-soft); font-size:15px; font-variant-numeric:tabular-nums; }
+.personal-aq-row:last-child { border-bottom:0; }
+.personal-aq-row span { min-width:0; overflow-wrap:anywhere; }
+.personal-aq-row b,.personal-aq-row small { display:block; }
+.personal-aq-row small { margin-top:3px; color:var(--muted); font-size:14px; }
+.personal-aq-missing,.personal-management-note { margin:10px 13px 0; font-size:14px; line-height:1.5; }
+.personal-aq-missing { color:var(--gold); }
+.personal-management-note { color:var(--muted); }
 
 @media (max-width:480px) {
   .brand strong { font-size:16px; }

@@ -26,6 +26,9 @@
   let reportSegment = 16;
   let battleKind = 'kpi';
   let battleScope = 'region';
+  let personalRegionView = 'role';
+  let personalRole = '店長';
+  let personalGapMetric = 'A999';
   let patrolToken = scope.sessionStorage.getItem(PATROL_TOKEN_KEY) || '';
   let scheduleRaw = null;
   let scheduleViewData = null;
@@ -370,11 +373,50 @@
     };
   }
 
+  function personalRoleGroup(source) {
+    const category=String(source && source.category || '').trim();
+    const role=String(source && source.role || '').trim();
+    if(category) return category==='店長'?'店長':category==='副店'?'副店':'其他業代';
+    if(/副店/.test(role)) return '副店';
+    if(/店長/.test(role)) return '店長';
+    return '其他業代';
+  }
+
+  function personalMetricByKey(person,key) {
+    return (person && Array.isArray(person.metrics) ? person.metrics : []).find(metric=>metric.key===key) || null;
+  }
+
+  function personalRankedByRole(people,roleGroup) {
+    return (Array.isArray(people)?people:[]).filter(person=>person.roleGroup===roleGroup).slice().sort((a,b)=>{
+      if(a.rank==null&&b.rank==null) return 0;
+      if(a.rank==null) return 1;
+      if(b.rank==null) return -1;
+      return a.rank-b.rank;
+    });
+  }
+
+  function personalUnderTargetByMetric(people,key) {
+    const nonManagers=(Array.isArray(people)?people:[]).filter(person=>person.roleGroup!=='店長');
+    const missing=nonManagers.filter(person=>{ const metric=personalMetricByKey(person,key); return !metric||metric.rate==null; });
+    const rows=nonManagers.filter(person=>{ const metric=personalMetricByKey(person,key); return metric&&metric.rate!=null&&metric.rate<1; })
+      .slice().sort((a,b)=>personalMetricByKey(b,key).rate-personalMetricByKey(a,key).rate);
+    return { rows,missing };
+  }
+
+  function personalAqReview(people) {
+    const managers=(Array.isArray(people)?people:[]).filter(person=>person.roleGroup==='店長');
+    const missing=managers.filter(person=>{ const metric=personalMetricByKey(person,'AQ'); return !metric||metric.actual==null; });
+    const attention=managers.filter(person=>{ const metric=personalMetricByKey(person,'AQ'); return metric&&metric.actual!=null&&metric.actual<10; })
+      .map(person=>({ person,actual:personalMetricByKey(person,'AQ').actual,gap:Math.max(0,10-personalMetricByKey(person,'AQ').actual) }));
+    return { attention,missing };
+  }
+
   function adaptPersonalPerformance(snapshot, readAt) {
     const sourceData = snapshot && snapshot.kpiBattle || {};
     const rows = Array.isArray(sourceData.personal) ? sourceData.personal : [];
     const people = rows.map(row => ({
       name:String(row.name || ''), store:normalizeStore(row.store), role:String(row.role || ''), category:String(row.category || ''),
+      roleGroup:personalRoleGroup(row),
       totalRate:numberOrNull(row.overall_rate), rank:numberOrNull(row.rank), dod:numberOrNull(row.overall_rate_dod), rankChange:numberOrNull(row.rank_dod),
       metrics:Object.entries(row.metrics || {}).map(([key,metric]) => ({
         key:String(key), rate:numberOrNull(metric && metric.rate), actual:numberOrNull(metric && metric.actual), target:numberOrNull(metric && metric.target),
@@ -383,16 +425,17 @@
     })).filter(row => row.name && row.store);
     const achieved = people.filter(row => row.totalRate != null && row.totalRate >= 1).length;
     const underTarget = people.filter(row => row.totalRate != null && row.totalRate < 1).length;
+    const aqReview=personalAqReview(people);
     const complete = people.length > 0 && people.every(row => row.totalRate != null && row.rank != null && row.dod != null && row.rankChange != null && row.metrics.length > 0);
     const updatedAt = String(sourceData.generated_at || snapshot && snapshot.publishedAt || '');
     return C.moduleState({
       status:people.length ? (complete ? 'ok' : 'partial') : 'no_data', updatedAt:readAt, sourceUpdatedAt:updatedAt,
       stale:updatedAt ? stale(updatedAt) : false, source:moduleSource('正式 KPI 個績快照','index.html'),
       data:{
-        summary:{ total:people.length, achieved, underTarget, attention:null, attentionAvailable:false, reportDate:String(sourceData.report_date || ''), sourceAsOfDate:String(sourceData.source_as_of_date || '') },
+        summary:{ total:people.length, achieved, underTarget, aqAttentionCount:aqReview.attention.length, aqMissingCount:aqReview.missing.length, reportDate:String(sourceData.report_date || ''), sourceAsOfDate:String(sourceData.source_as_of_date || '') },
         people
       },
-      note:people.length ? '正式來源未定義「需要關注」欄位；App 顯示為 —，不自行建立評分。正式來源目前提供 10 項個人 KPI，未提供個人 25 項。' : '正式來源尚無個績資料。'
+      note:people.length ? 'AQ需關注店長只依管理規則顯示 AQ actual < 10；不修改正式總績效、KPI 或公司排名。正式來源目前提供 10 項個人 KPI，未提供個人 25 項。' : '正式來源尚無個績資料。'
     });
   }
 
@@ -700,12 +743,13 @@
     return [...metrics.filter(metric => metric.rate != null && metric.rate < 1), ...metrics.filter(metric => metric.rate == null || metric.rate >= 1)].slice(0,2);
   }
 
-  function personalPerformanceRow(person) {
+  function personalPerformanceRow(person,options = {}) {
     const priorities = personalPriorityMetrics(person);
+    const focusMetric=options.focusMetric?personalMetricByKey(person,options.focusMetric):null;
     return `<article class="personal-performance-item"><button class="personal-performance-button" type="button" aria-expanded="false">
       <span class="personal-primary"><b>${escapeHtml(person.name)}</b><small>${escapeHtml(person.store)} · ${escapeHtml(person.role || person.category)}</small></span>
-      <span class="personal-rate ${personalMetricTone(person.totalRate)}"><small>總績效</small><b>${fmtPct(person.totalRate)}</b></span>
-      <span class="personal-priority">${priorities.map(metric=>`<small class="${personalMetricTone(metric.rate)}">${escapeHtml(metric.key)} ${fmtPct(metric.rate)}</small>`).join('') || '<small>正式來源無主力指標</small>'}</span>
+      <span class="personal-rate ${personalMetricTone(focusMetric?focusMetric.rate:person.totalRate)}"><small>${focusMetric?escapeHtml(options.focusMetric):'總績效'}</small><b>${fmtPct(focusMetric?focusMetric.rate:person.totalRate)}</b></span>
+      <span class="personal-priority">${options.regionRanking?`<small>職稱 ${escapeHtml(person.role || person.category)}</small><small>正式排名 ${person.rank??'—'}</small><small class="${valueClass(person.dod)}">DOD ${fmtSignedPct(person.dod)}</small><small class="${valueClass(person.rankChange)}">排名變化 ${fmtSigned(person.rankChange)}</small>`:priorities.map(metric=>`<small class="${personalMetricTone(metric.rate)}">${escapeHtml(metric.key)} ${fmtPct(metric.rate)}</small>`).join('') || '<small>正式來源無主力指標</small>'}</span>
       <i data-lucide="chevron-down"></i>
     </button><div class="personal-performance-detail">
       <div class="personal-performance-stats"><span>排名 <b>${person.rank??'—'}</b></span><span>DOD <b class="${valueClass(person.dod)}">${fmtSignedPct(person.dod)}</b></span><span>排名變化 <b class="${valueClass(person.rankChange)}">${fmtSigned(person.rankChange)}</b></span></div>
@@ -713,20 +757,43 @@
     </div></article>`;
   }
 
+  function renderPersonalRegionControls() {
+    const roleOptions=['店長','副店','其他業代'];
+    const gapOptions=['A999','好速','R1399'];
+    return `<section class="personal-region-controls" aria-label="全區個績檢視"><span>檢視</span><div class="segment-control personal-view-control"><button class="${personalRegionView==='role'?'active':''}" data-personal-view="role" type="button">職稱排名</button><button class="${personalRegionView==='gap'?'active':''}" data-personal-view="gap" type="button">指標未達</button></div>${personalRegionView==='role'?`<label class="personal-filter-field"><span>職稱</span><select id="personalRoleSelect">${roleOptions.map(value=>`<option value="${value}"${value===personalRole?' selected':''}>${value}</option>`).join('')}</select></label>`:`<label class="personal-filter-field"><span>指標未達</span><select id="personalGapMetricSelect">${gapOptions.map(value=>`<option value="${value}"${value===personalGapMetric?' selected':''}>${value}</option>`).join('')}</select></label>`}</section>`;
+  }
+
+  function renderPersonalAqAttention(allPeople) {
+    const review=personalAqReview(allPeople);
+    const rows=review.attention.map(item=>`<div class="personal-aq-row"><span><b>${escapeHtml(item.person.name)}</b><small>${escapeHtml(item.person.store)}</small></span><span>${fmtNumber(item.actual)} 點</span><span class="negative">缺 ${fmtNumber(item.gap)} 點</span></div>`).join('');
+    return `<section class="panel personal-aq-panel"><div class="panel-head"><div><h2>AQ 店長關注明細</h2><small>店長 AQ actual 低於 10 點</small></div></div><div class="personal-aq-list">${rows||'<div class="empty-state">目前沒有 AQ 低於 10 點的店長。</div>'}</div>${review.missing.length?`<p class="personal-aq-missing">AQ 正式資料缺少：${review.missing.length} 人；未當作 0 點。</p>`:''}<p class="personal-management-note">店長 AQ 低於 10 點，每少 1 點依管理辦法影響 KPI 達成率 1%。App 只作提示，不重算正式總績效、KPI 或公司排名。</p></section>`;
+  }
+
   function renderPersonalPerformance(selected) {
     const module = contract.personalPerformance;
     const data = module.data || {};
     const summary = data.summary || {};
     const allPeople = Array.isArray(data.people) ? data.people : [];
-    const people = battleScope === 'store' ? allPeople.filter(person => person.store === selected) : allPeople;
     if (!allPeople.length) return '<div class="empty-state">正式來源目前沒有個績資料。</div>';
-    const summaryCards = battleScope === 'region' ? `<div class="metric-card-grid personal-summary-grid">
+    if(battleScope==='store') {
+      const storePeople=allPeople.filter(person=>person.store===selected);
+      return `<div class="award-selected-store"><span>店點個績</span><strong>${escapeHtml(selected)}</strong></div><section class="panel personal-performance-panel"><div class="panel-head"><div><h2>店點人員</h2><small>${storePeople.length} 人 · 維持正式來源排序</small></div></div><div class="personal-performance-list">${storePeople.map(person=>personalPerformanceRow(person)).join('') || '<div class="empty-state">此店正式來源目前沒有個績人員。</div>'}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
+    }
+    const aqReview=personalAqReview(allPeople);
+    const summaryCards = `<div class="metric-card-grid personal-summary-grid">
       <article class="metric-card"><span>總人數</span><strong>${summary.total??'—'}</strong><small>正式個績快照</small></article>
       <article class="metric-card"><span>達標人數</span><strong class="positive">${summary.achieved??'—'}</strong><small>正式總達成率 ≥100%</small></article>
       <article class="metric-card"><span>未達標人數</span><strong class="negative">${summary.underTarget??'—'}</strong><small>正式總達成率 &lt;100%</small></article>
-      <article class="metric-card"><span>需要關注人數</span><strong>${summary.attentionAvailable?summary.attention:'—'}</strong><small>${summary.attentionAvailable?'正式來源':'正式來源未定義'}</small></article>
-    </div>` : `<div class="award-selected-store"><span>店點個績</span><strong>${escapeHtml(selected)}</strong></div>`;
-    return `${summaryCards}<section class="panel personal-performance-panel"><div class="panel-head"><div><h2>${battleScope==='region'?'全區人員':'店點人員'}</h2><small>${people.length} 人 · 維持正式來源排序</small></div></div><div class="personal-performance-list">${people.map(personalPerformanceRow).join('') || '<div class="empty-state">此店正式來源目前沒有個績人員。</div>'}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
+      <article class="metric-card"><span>AQ需關注店長</span><strong class="${aqReview.attention.length?'negative':'positive'}">${aqReview.attention.length}</strong><small>AQ 點數 &lt; 10</small></article>
+    </div>`;
+    let people=[]; let heading=''; let note=''; let empty=''; let rowOptions={regionRanking:true};
+    if(personalRegionView==='role') {
+      people=personalRankedByRole(allPeople,personalRole); heading=`${personalRole}正式排名`; note=`${people.length} 人 · 正式排名由前至後`; empty=`目前沒有${personalRole}正式個績。`;
+    } else {
+      const result=personalUnderTargetByMetric(allPeople,personalGapMetric); people=result.rows; heading=`${personalGapMetric} 未達`; note=`${people.length} 人 · 達成率由高到低`; empty=`非店長同仁 ${personalGapMetric} 全數達標`; rowOptions={focusMetric:personalGapMetric};
+      if(result.missing.length) note+=` · ${result.missing.length} 人無正式資料（未列入）`;
+    }
+    return `${summaryCards}${renderPersonalAqAttention(allPeople)}${renderPersonalRegionControls()}<section class="panel personal-performance-panel"><div class="panel-head"><div><h2>${escapeHtml(heading)}</h2><small>${escapeHtml(note)}</small></div></div><div class="personal-performance-list">${people.map(person=>personalPerformanceRow(person,rowOptions)).join('') || `<div class="empty-state">${escapeHtml(empty)}</div>`}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
   }
 
   function renderBattle() {
@@ -1013,6 +1080,10 @@
   all('[data-battle-kind]').forEach(button=>button.addEventListener('click',()=>{ battleKind=button.dataset.battleKind; all('[data-battle-kind]').forEach(item=>item.classList.toggle('active',item===button)); renderBattle(); }));
   all('[data-battle-scope]').forEach(button=>button.addEventListener('click',()=>{ battleScope=button.dataset.battleScope; all('[data-battle-scope]').forEach(item=>item.classList.toggle('active',item===button)); renderBattle(); }));
   dom('#battleStoreSelect').addEventListener('change',renderBattle);
+  dom('#battleContent').addEventListener('change',event=>{
+    if(event.target.id==='personalRoleSelect'){ personalRole=event.target.value; renderBattle(); }
+    if(event.target.id==='personalGapMetricSelect'){ personalGapMetric=event.target.value; renderBattle(); }
+  });
   all('[data-report-segment]').forEach(button=>button.addEventListener('click',()=>{ reportSegment=Number(button.dataset.reportSegment); all('[data-report-segment]').forEach(item=>item.classList.toggle('active',item===button)); renderReport(); }));
   dom('#privateAccessForm').addEventListener('submit',async event=>{ event.preventDefault(); const button=event.currentTarget.querySelector('button'); button.disabled=true; setMessage('#privateAccessMessage','正在以既有 Approved Device 讀取正式摘要…'); try { await loadFormalSummary(dom('#employeeId').value); } catch(error) { if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); } finally { button.disabled=false; } });
   dom('#privateBindingForm').addEventListener('submit',async event=>{ event.preventDefault(); const button=event.currentTarget.querySelector('button'); const input=dom('#bootstrapCode'); const code=input.value; input.value=''; button.disabled=true; try { await requestDeviceBinding(dom('#employeeId').value,code); } catch(error) { setMessage('#privateAccessMessage',error.message,'error'); } finally { button.disabled=false; } });
@@ -1038,6 +1109,7 @@
     const awardLink=event.target.closest('[data-open-awards]'); if(awardLink){ event.preventDefault(); battleKind='award'; battleScope='region'; all('[data-battle-kind]').forEach(button=>button.classList.toggle('active',button.dataset.battleKind==='award')); all('[data-battle-scope]').forEach(button=>button.classList.toggle('active',button.dataset.battleScope==='region')); setView('battle'); renderBattle(); return; }
     const storeButton=event.target.closest('.store-row'); if(storeButton){ const item=storeButton.closest('.store-item'); item.classList.toggle('expanded'); storeButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
     const personalButton=event.target.closest('.personal-performance-button'); if(personalButton){ const item=personalButton.closest('.personal-performance-item'); item.classList.toggle('expanded'); personalButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
+    const personalViewButton=event.target.closest('[data-personal-view]'); if(personalViewButton){ personalRegionView=personalViewButton.dataset.personalView; renderBattle(); return; }
     const reportStore=event.target.closest('.report-store-button'); if(reportStore){ const item=reportStore.closest('.report-store'); item.classList.toggle('expanded'); reportStore.setAttribute('aria-expanded',item.classList.contains('expanded')); }
   });
   scope.addEventListener('hashchange',()=>{ const name=location.hash.slice(1); if(all('[data-view]').some(view=>view.dataset.view===name))setView(name); });

@@ -76,12 +76,13 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
   await page.locator('[data-battle-kind="personal"]').click();
   await page.locator('[data-battle-scope="region"]').click();
   await expect(page.locator('#battleContent')).toContainText('總人數');
-  await expect(page.locator('#battleContent .personal-performance-item')).toHaveCount(9);
+  await expect(page.locator('#battleContent')).toContainText('AQ需關注店長');
+  await expect(page.locator('#battleContent .personal-performance-item')).toHaveCount(3);
   const firstPerson=page.locator('#battleContent .personal-performance-item').first();
   await firstPerson.locator('.personal-performance-button').click();
   await expect(firstPerson).toHaveClass(/expanded/);
   await expect(firstPerson.locator('.personal-metric-grid article')).toHaveCount(10);
-  await expect(page.locator('#battleContent')).toContainText('需要關注人數—正式來源未定義');
+  await expect(page.locator('#battleContent')).toContainText('AQ 店長關注明細');
 
   await page.locator('.bottom-nav [data-nav="report"]').click();
   await expect(page.locator('#reportOperations')).toContainText('A999 上線數');

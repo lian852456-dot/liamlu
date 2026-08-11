@@ -29,12 +29,38 @@ test('App 1.2 daily report shows the formal summary layout without mobile overfl
   expect(errors).toEqual([]);
 });
 
-test('App 1.2 personal performance uses two-level rows and ten formal metrics',async({page})=>{
+test('App 1.2 personal area groups formal roles, filters under-target metrics and keeps ten metric details',async({page})=>{
   const errors=[]; page.on('pageerror',error=>errors.push(error.message));
   await page.goto(`${BASE}#battle`);
   await page.locator('[data-battle-kind="personal"]').click();
-  await expect(page.locator('#battleContent .personal-performance-item')).toHaveCount(9);
-  await expect(page.locator('#battleContent')).toContainText('需要關注人數—正式來源未定義');
+  await expect(page.locator('[data-personal-view="role"]')).toHaveClass(/active/);
+  await expect(page.locator('#personalRoleSelect')).toHaveValue('店長');
+  await expect(page.locator('#battleContent .personal-performance-item')).toHaveCount(3);
+  await expect(page.locator('#battleContent')).toContainText('AQ需關注店長');
+  await expect(page.locator('#battleContent')).toContainText('AQ 點數 < 10');
+  await expect(page.locator('.personal-aq-row')).toHaveCount(2);
+  await expect(page.locator('.personal-management-note')).toContainText('App 只作提示，不重算正式總績效、KPI 或公司排名');
+  let ranks=await page.locator('.personal-performance-item .personal-priority small:nth-child(2)').allTextContents();
+  expect(ranks).toEqual(['正式排名 12','正式排名 33','正式排名 54']);
+  await page.locator('#personalRoleSelect').selectOption('副店');
+  ranks=await page.locator('.personal-performance-item .personal-priority small:nth-child(2)').allTextContents();
+  expect(ranks).toEqual(['正式排名 19','正式排名 40','正式排名 61']);
+  await page.locator('#personalRoleSelect').selectOption('其他業代');
+  await expect(page.locator('#battleContent .personal-performance-item')).toHaveCount(3);
+
+  await page.locator('[data-personal-view="gap"]').click();
+  await expect(page.locator('#personalGapMetricSelect')).toHaveValue('A999');
+  await expect(page.locator('#battleContent .personal-performance-item')).toHaveCount(3);
+  const a999Rates=await page.locator('.personal-performance-item .personal-rate b').allTextContents();
+  expect(a999Rates).toEqual(['98.7%','91.7%','88.2%']);
+  expect(await page.locator('.personal-performance-item .personal-primary b').allTextContents()).toEqual(['同仁＊6','同仁＊8','同仁＊9']);
+  await page.locator('#personalGapMetricSelect').selectOption('好速');
+  await expect(page.locator('#battleContent')).toContainText('好速 未達');
+  await page.locator('#personalGapMetricSelect').selectOption('R1399');
+  await expect(page.locator('#battleContent')).toContainText('R1399 未達');
+
+  await page.locator('[data-personal-view="role"]').click();
+  await page.locator('#personalRoleSelect').selectOption('店長');
   const first=page.locator('.personal-performance-item').first();
   await first.locator('.personal-performance-button').click();
   await expect(first.locator('.personal-metric-grid article')).toHaveCount(10);
@@ -42,6 +68,9 @@ test('App 1.2 personal performance uses two-level rows and ten formal metrics',a
   await expect(first).toContainText('A1399');
   await expect(first).toContainText('R999');
   await expect(first).toContainText('R1399');
+  await page.locator('[data-battle-scope="store"]').click();
+  await expect(page.locator('.personal-region-controls')).toHaveCount(0);
+  await expect(page.locator('#battleContent .personal-performance-item')).toHaveCount(1);
   await expectMobileSafe(page);
   expect(errors).toEqual([]);
 });
