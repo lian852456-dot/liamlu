@@ -32,11 +32,12 @@
 - Native static security tests: PASS
 - App 1.1 release regression: PASS (121/121 Node tests; 3/3 Playwright formal/390x844 checks)
 - Native startup URL regression: PASS (5/5 native-shell tests)
-- Codex Security canonical diff report: PASS — 17/17 review receipts, complete coverage, 0 reportable findings, unresolved High 0／Medium 0
+- Codex Security canonical diff reports: PASS — sealed App 1.1 Web report plus sealed `5/5` Native incremental receipts, 0 reportable findings, unresolved High 0／Medium 0
 - Secret／WebView security scan: PASS — no embedded credential, JS bridge, ATS weakening, wildcard navigation or Cookie downgrade found
 - Xcode toolchain: READY — Xcode 26.6 (`17F113`)
-- Unsigned simulator/device compile: WAITING — Xcode reports no available Simulator runtime while installation finishes; asset compilation stops before a complete build result
-- Device build/sign/install: WAITING — Keychain currently reports `0 valid identities found`
+- Simulator build and XCTest: PASS — iPhone 17 Pro / iOS 26.5, `3/3` tests
+- Generic iOS device-architecture compile: PASS — signing settings untouched
+- Physical device signing/build/install/launch baseline: PASS — previously completed by Liam with the existing Personal Team profile
 
 The missing Xcode/signing state is environmental. No OAuth, Cookie, Session, Approved Device, GAS, Sheet or formal write setting was changed to work around it.
 
@@ -67,13 +68,13 @@ Therefore:
 - App 1.1 formal-origin deployment: PASS
 - App 1.1 version-pinned startup URL: PASS
 - Six-module post-deploy authenticated UI readback: WAITING for existing human unlock
-- Simulator/device build: WAITING for Simulator runtime and signing readiness
-- Physical install and OAuth/session smoke test: WAITING for Xcode signing and Liam's iPhone
+- Simulator/device compile: PASS
+- Physical reinstall and authenticated OAuth/session smoke test: `waiting-user` for Liam's Xcode Run and in-App credentials
 
 ## Security receipt
 
-- Scan ID: `0e72c62c-463e-4bd3-81d1-33a39adb87ab`
-- Exact range: `df34f4b8b9f5a08a99eaf843cb7355e7c58c3736..03742f411589830e40a27b9ca32a7b3c503ee275`
-- Snapshot: `codex-security-snapshot/v1:sha256:cbe18566220e21476de67015acd7f3a20f2f02ed48216b72836c35838b6c7e06`
-- Final report: `/private/var/folders/7v/m5cj1k393jzcgqm965q213nh0000gn/T/codex-security-scans-2qO3HX/liam-supervisor-ios-app-1-0/03742f411589830e40a27b9ca32a7b3c503ee275_20260809T181256Z_q9rtrlln/report.md`
-- Finalizer note: the workbench range-mode completion binding omitted the required `snapshotDigest`; the same scan's canonical artifacts were repaired with the deterministic diff digest above and sealed by the plugin's `finalize_scan_contract.py`.
+- Permanent report: `docs/security/LIAM_SUPERVISOR_IOS_1_0_FINAL_SECURITY_REVIEW.md`
+- App 1.1 Web snapshot: `codex-security-snapshot/v1:sha256:0430846078b17af13b6fb99f8ab23f283d6d4ba86ee20c98162bc02b61c90d7e`
+- Native incremental snapshot: `codex-security-snapshot/v1:sha256:0e089efbe4d6fc96c333992849aba9afd986b8d1e77085d43f3a9fe118059a89`
+- Native sealed canonical manifest SHA-256: `dad25aa68448a03b69884fb2a05997a67b58179cf82c7a962d02961c03f62e1a`
+- failed workbench completion was not retried; the official local finalizer's sealed canonical report is the final evidence.
