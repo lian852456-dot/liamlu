@@ -57,7 +57,7 @@ test('three-store item parity preserves status, text, media, period and store',(
 test('runtime uses existing hread and hwrite only, without media upload',()=>{
   assert.match(app,/const PATROL_READ_ACTIONS = new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
   assert.match(app,/const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write','hwrite'\]\)/);
-  assert.match(app,/async function halfMonthWriteRows\(rows\)/);
+  assert.match(app,/async function halfMonthWriteRows\(rows, mode = 'draft'\)/);
   assert.doesNotMatch(app,/patrolRead\(['"]half_media_upload['"]/);
 });
 

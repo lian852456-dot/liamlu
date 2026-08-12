@@ -7,13 +7,28 @@ const TOKEN='formal-write-short-token';
 test.use({viewport:{width:390,height:844},serviceWorkers:'block'});
 
 async function install(page,{mismatch=false}={}){
-  const state={rows:fixture.rows.map(row=>({...row})),writes:[],hreads:0,media:0};
+  const state={rows:fixture.rows.map(row=>({...row})),writes:[],writeRequests:[],hreads:0,media:0};
   await page.route('https://script.google.com/**',async route=>{
     const request=route.request();
     if(request.method()==='POST'){
       const payload=JSON.parse(request.postData()||'{}');
       if(payload.action==='ptauth') return route.fulfill({json:{status:'ok',token:TOKEN,expiresIn:1800}});
       if(payload.action==='ptlogout') return route.fulfill({json:{status:'ok'}});
+      if(payload.action==='half_media_upload'){ state.media+=1; return route.fulfill({json:{status:'error',message:'forbidden'}}); }
+      if(payload.action==='hwrite'){
+        const requestUrl=new URL(request.url());
+        const incoming=payload.rows||[];
+        state.writeRequests.push({method:request.method(),url:request.url(),payload});
+        state.writes.push(incoming.map(row=>({...row})));
+        for(const row of incoming){
+          const index=state.rows.findIndex(current=>current.month===row.month&&current.period===row.period&&current.store===row.store&&Number(current.item)===Number(row.item));
+          const next={...row,savedAt:'2026-08-12T10:00:00+08:00'};
+          if(index>=0) state.rows[index]=next; else state.rows.push(next);
+        }
+        expect(requestUrl.searchParams.has('token')).toBe(false);
+        expect(requestUrl.searchParams.has('payload')).toBe(false);
+        return route.fulfill({json:{status:'ok',written:incoming.length}});
+      }
       return route.fulfill({json:{status:'error',message:'unexpected POST'}});
     }
     const url=new URL(request.url());
@@ -27,17 +42,7 @@ async function install(page,{mismatch=false}={}){
       if(mismatch&&state.writes.length) rows.find(row=>row.store==='六張犁'&&Number(row.item)===6).improvement='server mismatch';
       return route.fulfill({json:{status:'ok',rows}});
     }
-    if(action==='hwrite'){
-      const incoming=JSON.parse(url.searchParams.get('payload')||'[]');
-      const callback=url.searchParams.get('callback')||'';
-      state.writes.push(incoming.map(row=>({...row})));
-      for(const row of incoming){
-        const index=state.rows.findIndex(current=>current.month===row.month&&current.period===row.period&&current.store===row.store&&Number(current.item)===Number(row.item));
-        const next={...row,savedAt:'2026-08-12T10:00:00+08:00'};
-        if(index>=0) state.rows[index]=next; else state.rows.push(next);
-      }
-      return route.fulfill({contentType:'application/javascript',body:`${callback}(${JSON.stringify({status:'ok',written:incoming.length})});`});
-    }
+    if(action==='hwrite') return route.fulfill({json:{status:'error',message:'hwrite GET forbidden'}});
     if(action==='half_media_upload'){ state.media+=1; return route.fulfill({json:{status:'error',message:'forbidden'}}); }
     return route.fulfill({json:{status:'error',message:`unexpected ${action}`}});
   });
@@ -67,10 +72,12 @@ test('openVisit only preselects and explicit save writes then verifies hread par
   await page.locator('[data-half-preview-question="6"] [data-half-improvement]').fill('正式改善方式');
   await page.locator('[data-half-preview-action="save"]').click();
   await expect(page.locator('#halfMonthPreviewMessage')).toContainText('已儲存，並完成正式 hread 逐欄核對');
-  expect(state.writes.length).toBeGreaterThan(0);
+  expect(state.writes).toHaveLength(1);
+  expect(state.writeRequests).toHaveLength(1);
+  expect(state.writeRequests[0]).toMatchObject({method:'POST',payload:{action:'hwrite',token:TOKEN,mode:'draft'}});
   expect(state.hreads).toBe(2);
   expect(state.media).toBe(0);
-  const written=state.writes.flat();
+  const written=state.writes[0];
   expect(written).toHaveLength(18);
   expect(written.find(row=>row.item===6)).toMatchObject({store:'六張犁',period:'H1',result:'abnormal',note:'正式異常原文',improvement:'正式改善方式'});
   const metrics=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,short:Array.from(document.querySelectorAll('[data-view="patrol"] button')).filter(button=>button.getBoundingClientRect().width>0&&button.getBoundingClientRect().height<44).map(button=>button.textContent.trim())}));

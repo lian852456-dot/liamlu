@@ -92,8 +92,13 @@ test('formal App wires only existing hwrite and keeps media upload disabled', ()
   assert.match(app, /PREVIEW \/ 尚未寫入正式資料/);
   assert.match(app, /已填 \$\{progress\.completed\} \/ \$\{progress\.total\}/);
   assert.match(app, /const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write','hwrite'\]\)/);
-  assert.match(app, /async function halfMonthWriteRows\(rows\)/);
+  const writer=app.match(/async function halfMonthWriteRows\(rows, mode = 'draft'\) \{[\s\S]*?\n  \}/)?.[0]||'';
+  assert.match(writer, /method:'POST'/);
+  assert.match(writer, /body:JSON\.stringify\(\{ action, token:patrolToken, mode, rows \}\)/);
+  assert.doesNotMatch(writer, /URL\(|searchParams|callbackName|createElement\('script'\)/);
+  assert.doesNotMatch(app, /halfMonthWriteChunks/);
   assert.match(app, /const readback=await patrolRead\('hread'\)/);
   assert.doesNotMatch(app, /half_media_upload/);
-  assert.match(gas, /function writeHalfCheck\(rows\)/);
+  assert.match(gas, /function writeHalfCheck\(rows, options\)/);
+  assert.match(gas, /else if \(action === 'hwrite'\) result = writeHalfCheckPostPayload_\(payload, e\)/);
 });

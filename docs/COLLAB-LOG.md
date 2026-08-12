@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-12 ｜ Codex（半月 hwrite Security Review 修復，未部署）
+
+- 做了什麼：依獨立 diff review，將 App 專用 hwrite 從 JSONP query 改為單次 POST body；移除 client URL chunk。新增 doPost hwrite route，沿用 ptauth token，server 先完整驗證 rows，再於 ScriptLock 內依 period/store/item 更新。App POST 拒絕非異常狀態的 note/improvement、evidence/media 與任意 extra field；既有 patrol.html JSONP hwrite 保持相容。
+- 結果：POST URL 不含 token/payload，且 server 會拒絕 query token/payload；18 題單一 request、完整驗證先於寫入、unauthorized fail-closed、ScriptLock 競態保護、write→hread parity、跨店／跨期隔離與 390×844 測試已通過。Node 172/172、半月正式讀取與 hwrite Playwright 7/7；正式 hwrite 與 half_media_upload request 仍為 0，未 merge、未部署。
+- 經驗 / 給下一位的提醒：既有 patrol.html 仍有不同的 legacy note/media semantics，不可用 App strict allowlist 直接破壞；App POST 與 legacy JSONP 必須維持分離的驗證選項。
+
 ## 2026-08-12 ｜ Codex（App 1.2 半月督導檢查 hwrite Predeploy，未部署）
 
 - 做了什麼：在獨立 `feature/liam-supervisor-half-month-hwrite-integration` 分支，沿用既有 ptauth 1800 秒 token、`hwrite`、`hread` 與 H1/H2 規則，完成 18 題文字進度的明確 opt-in 儲存。到店只預選店點；只有 Liam 按「+ 開始半月督導檢查」、選店並按「儲存目前進度」才會寫入。每次 `hwrite` 後必須重新 `hread`，逐欄比對 period/store/item/status/note/improvement；不一致即顯示失敗。最近填寫日期只顯示可靠的 `YYYY/M/D`，不再產生 `0:00`。

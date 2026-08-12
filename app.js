@@ -233,25 +233,15 @@
     return body;
   }
 
-  async function halfMonthWriteRows(rows) {
+  async function halfMonthWriteRows(rows, mode = 'draft') {
     const action = 'hwrite';
     if (!PATROL_WRITE_ACTIONS.has(action)) throw new Error('不允許的半月檢查寫入 action。');
     if (!patrolToken) throw new Error('班表／巡店 session 尚未驗證。');
-    const body = await new Promise((resolve,reject)=>{
-      const callbackName=`liamHalfWrite_${Date.now()}_${Math.floor(Math.random()*1e6)}`;
-      const url=new URL(PATROL_API);
-      url.searchParams.set('action',action);
-      url.searchParams.set('token',patrolToken);
-      url.searchParams.set('payload',JSON.stringify(rows));
-      url.searchParams.set('callback',callbackName);
-      const script=scope.document.createElement('script');
-      const timer=scope.setTimeout(()=>{ cleanup(); reject(new Error('半月督導檢查寫入連線逾時。')); },30000);
-      function cleanup(){ scope.clearTimeout(timer); delete scope[callbackName]; script.remove(); }
-      scope[callbackName]=response=>{ cleanup(); resolve(response); };
-      script.onerror=()=>{ cleanup(); reject(new Error('半月督導檢查寫入網路錯誤。')); };
-      script.src=url.toString();
-      scope.document.body.appendChild(script);
+    const response = await fetch(PATROL_API, {
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, cache:'no-store', credentials:'omit',
+      body:JSON.stringify({ action, token:patrolToken, mode, rows })
     });
+    const body = await response.json();
     if (!body || body.status !== 'ok') {
       const message=(body&&body.message)||'半月督導檢查寫入失敗。';
       if (/unauthorized|session|授權|逾時|失效/i.test(message)) {
@@ -1058,18 +1048,6 @@
     return `hm_${random}`;
   }
 
-  function halfMonthWriteChunks(rows) {
-    const chunks=[];
-    let current=[];
-    (rows||[]).forEach(row=>{
-      const candidate=current.concat(row);
-      if(current.length&&encodeURIComponent(JSON.stringify(candidate)).length>3000){ chunks.push(current); current=[row]; }
-      else current=candidate;
-    });
-    if(current.length) chunks.push(current);
-    return chunks;
-  }
-
   async function saveHalfMonthFormalProgress(data) {
     if(PREVIEW_MODE||halfMonthWriteInFlight) return;
     captureHalfMonthPreviewForm();
@@ -1100,7 +1078,7 @@
     halfMonthPreviewMessage='正在儲存並執行正式 hread 核對…';
     renderHalfMonthCheck();
     try{
-      for(const chunk of halfMonthWriteChunks(rows)) await halfMonthWriteRows(chunk);
+      await halfMonthWriteRows(rows,'draft');
       const readback=await patrolRead('hread');
       const parity=HW.verifyReadback(payload,readback.rows,normalizeStore);
       if(!parity.ok){

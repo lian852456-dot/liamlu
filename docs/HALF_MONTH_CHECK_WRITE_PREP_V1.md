@@ -37,7 +37,7 @@ App 已具備 18 題 card flow：`符合 / 異常 / 不適用 / 清除（尚未�
 }
 ```
 
-禁止欄位：`token`、通行碼、client `savedAt`、任意 extra field、媒體 blob、任意 Drive URL。App payload 不含 token 或通行碼；網路層沿用既有 `hwrite` JSONP transport，沒有新增或放寬 auth transport，且不得把完整 request URL 寫入 log。
+禁止欄位：通行碼、client `savedAt`、任意 extra field、媒體 blob、任意 Drive URL。App 專用 `hwrite` 使用單次 POST，短效 token 與 18 題 rows 只存在 JSON body；URL query 不含 token、note、improvement 或 payload。既有 `patrol.html` JSONP hwrite 保持相容，未在本輪重構。
 
 ## Validation
 
@@ -51,6 +51,8 @@ App 已具備 18 題 card flow：`符合 / 異常 / 不適用 / 清除（尚未�
 8. ok / na 不得攜帶新異常欄位；由 client 明確送空字串清除已被使用者改掉的異常內容。
 9. `note`、`improvement` 各上限 1000 字；不接受任意欄位。
 10. Server 必須先驗證既有短效 token，再解析／驗證 payload，未授權 fail-closed。
+11. App POST 的 `result != abnormal` 時，`note` 與 `improvement` 必須都是空字串；App POST 不接受 `evidenceNames`、media 或其他附件 mutation。
+12. App 一次送出完整 rows；server 必須在任何 worksheet 操作前完成全部 rows validation，再於 ScriptLock 內依 business key 更新。
 
 純函式契約位於 `half-month-check-write-prep.js`；本 Predeploy 分支已由 `app.html` 載入，正式 main 尚未部署。
 
@@ -66,7 +68,7 @@ App 已具備 18 題 card flow：`符合 / 異常 / 不適用 / 清除（尚未�
 ## Idempotency / update semantics
 
 1. Client 每次明確送出建立 `operationId`，但既有 `hwrite` row contract 不儲存 operationId。
-2. Server 以既有 business key `period + store + item` 更新同一列；重複儲存不新增重複題目。
+2. Server 以既有 business key `period + store + item` 更新同一列；ScriptLock 將競態寫入序列化，重複儲存不新增重複題目。
 3. 本機整合測試已驗證重複儲存後仍為同一組 18 個 business keys，且不影響其他門市或另一半月。
 4. 每次寫入後都重新 `hread`，逐欄比對 `period / store / item / result / note / improvement`；不一致即顯示失敗。
 5. 本輪不新增 receipt worksheet、schema 或新 backend action。若未來需要網路層 exact-once receipt，必須另案設計，不得在本次最小整合中偷偷擴充 schema。
@@ -95,11 +97,13 @@ App 已具備 18 題 card flow：`符合 / 異常 / 不適用 / 清除（尚未�
 - deterministic adapter / business-key update semantics
 - token、passcode、savedAt、media 不進 payload
 - App 只在明確按「儲存目前進度」後呼叫既有 `hwrite`
+- App `hwrite` 使用單次 POST body；token／payload／note／improvement 不在 URL
+- 18 題不得切成多個 client chunks；完整驗證在任何 worksheet 寫入前完成
 - `hwrite` 成功後必須完成正式 `hread` 逐欄核對才顯示「已儲存」
 - `half_media_upload` request = 0
 - GAS 只新增既有 `hwrite` row 的 strict validation、canonical store/date 與可靠日期輸出；未改 worksheet schema
-- Node full suite：165/165 PASS
-- Half-month hwrite Playwright：3/3 PASS（390×844、readback mismatch、重複儲存／隔離）
+- Node full suite：172/172 PASS
+- Half-month formal read + hwrite Playwright：7/7 PASS（單次 POST、URL 無 token/payload、390×844、readback mismatch、重複儲存／隔離）
 - 選定五頁籤回歸：17/18 PASS；唯一失敗為既有 `2026-08-11` ptvisit fixture 在 8/12 today-only 規則下被排除，依範圍不修改 ptvisit
 - `npm audit --audit-level=moderate`：0 vulnerabilities
 - 正式 `hwrite`／`half_media_upload` request：0
