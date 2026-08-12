@@ -771,40 +771,125 @@ function halfResultToClient(result) {
   return ({ '符合':'ok', '缺失／異常':'abnormal', '不適用':'na' })[String(result || '')] || '';
 }
 
-function writeHalfCheck(rows) {
-  const sh = getHalfCheckSheet();
-  const data = sh.getDataRange().getValues();
-  const existing = {};
-  for (let i = 1; i < data.length; i++) existing[halfCheckKey(data[i])] = i + 1;
-  let written = 0;
-  (rows || []).forEach(r => {
-    const month = String(r.month || String(r.date || '').slice(0, 7));
-    const period = `${month}-${String(r.period || '')}`;
-    const itemNo = Number(r.item || 0);
-    const key = [period, String(r.store || ''), itemNo].join('|');
-    const oldRow = existing[key] ? data[existing[key] - 1] : [];
-    const now = String(r.savedAt || new Date().toISOString());
-    const itemText = oldRow[5] || String(itemNo);
-    const row = [
-      String(r.checkId || `${r.date}|${r.store}|${r.period}`), period, String(r.date || ''),
-      String(r.store || ''), String(r.inspector || ''), String(itemText), halfResultToSheet(r.result),
-      String(r.note || ''), String(r.improvement || ''), String(oldRow[9] || ''),
-      String(r.result === 'abnormal' ? '待改善' : (oldRow[10] || '')),
-      // 不允許晚到的空白表單同步覆蓋既有私有 Drive 附件連結。
-      String(r.evidenceNames || oldRow[11] || ''), String(oldRow[12] || now), now,
-      String(oldRow[14] || ''), String(r.result ? '已完成' : '填寫中')
-    ];
-    if (existing[key]) {
-      sh.getRange(existing[key], 1, 1, HALF_CHECK_HEADERS.length).setValues([row]);
-      data[existing[key] - 1] = row;
-    } else {
-      sh.getRange(sh.getLastRow() + 1, 1, 1, HALF_CHECK_HEADERS.length).setValues([row]);
-      existing[key] = sh.getLastRow();
-      data.push(row);
-    }
-    written++;
+const HALF_WRITE_FIELDS = ['checkId','date','period','month','store','inspector','item','result','note','improvement','evidenceNames','savedAt'];
+const HALF_APP_WRITE_FIELDS = ['checkId','date','period','month','store','inspector','item','result','note','improvement'];
+const HALF_APP_POST_FIELDS = ['action','token','mode','rows'];
+
+function halfCheckCanonicalStore_(value) {
+  const clean = String(value || '').replace(/^台灣大哥大數位生活/, '').replace(/^台北/, '').replace(/\s+/g, '').trim();
+  const match = PT_STORES.find(store => String(store.name || '').replace(/^台北/, '').replace(/\s+/g, '') === clean);
+  if (!match) throw new Error('invalid store');
+  return String(match.name || '').replace(/^台北/, '');
+}
+
+function halfCheckValidDate_(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  return date.getUTCFullYear() === Number(match[1]) && date.getUTCMonth() === Number(match[2]) - 1 && date.getUTCDate() === Number(match[3]);
+}
+
+function validateHalfWriteRows_(rows, options) {
+  const config = options || {};
+  const strictApp = config.strictApp === true;
+  const mode = String(config.mode || 'legacy');
+  if (strictApp && ['draft','complete'].indexOf(mode) < 0) throw new Error('invalid mode');
+  if (!Array.isArray(rows) || !rows.length || rows.length > 18) throw new Error('invalid rows');
+  const seen = {};
+  const cleanRows = rows.map(raw => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('invalid row');
+    const allowedFields = strictApp ? HALF_APP_WRITE_FIELDS : HALF_WRITE_FIELDS;
+    Object.keys(raw).forEach(key => { if (allowedFields.indexOf(key) < 0) throw new Error('extra field'); });
+    const date = String(raw.date || '');
+    if (!halfCheckValidDate_(date)) throw new Error('invalid date');
+    const month = String(raw.month || '');
+    if (month !== date.slice(0, 7)) throw new Error('invalid month');
+    const period = String(raw.period || '');
+    const expectedPeriod = Number(date.slice(-2)) <= 15 ? 'H1' : 'H2';
+    if (period !== expectedPeriod) throw new Error('invalid period');
+    const store = halfCheckCanonicalStore_(raw.store);
+    const item = Number(raw.item);
+    if (!Number.isInteger(item) || item < 1 || item > 18) throw new Error('invalid item');
+    if (seen[item]) throw new Error('duplicate item');
+    seen[item] = true;
+    const result = String(raw.result || '');
+    if (['','ok','abnormal','na'].indexOf(result) < 0) throw new Error('invalid status');
+    const inspector = String(raw.inspector || '').trim();
+    if (!inspector || inspector.length > 80) throw new Error('invalid inspector');
+    const note = String(raw.note || '').trim();
+    const improvement = String(raw.improvement || '').trim();
+    if (note.length > 1000 || improvement.length > 1000) throw new Error('text too long');
+    if (strictApp && result !== 'abnormal' && (note || improvement)) throw new Error('non-abnormal text not allowed');
+    if (strictApp && mode === 'complete' && result === 'abnormal' && (!note || !improvement)) throw new Error('abnormal detail required');
+    const evidenceNames = strictApp ? '' : String(raw.evidenceNames || '');
+    if (evidenceNames.length > 20000) throw new Error('evidence too long');
+    const rawStore = String(raw.store || '');
+    const suppliedCheckId = String(raw.checkId || '');
+    const allowedCheckIds = [`${date}|${rawStore}|${period}`, `${date}|${store}|${period}`];
+    if (suppliedCheckId && allowedCheckIds.indexOf(suppliedCheckId) < 0) throw new Error('invalid checkId');
+    return { checkId:`${date}|${store}|${period}`, date, period, month, store, inspector, item, result, note, improvement, evidenceNames };
   });
-  return written;
+  if (strictApp && mode === 'complete') {
+    if (cleanRows.length !== 18 || cleanRows.some(row => !row.result)) throw new Error('complete requires 18 answered items');
+    const itemNumbers = cleanRows.map(row => row.item).sort((a, b) => a - b);
+    if (!itemNumbers.every((item, index) => item === index + 1)) throw new Error('complete requires items 1-18');
+  }
+  return cleanRows;
+}
+
+function writeHalfCheck(rows, options) {
+  // 所有 rows 必須先完整驗證；鎖內不再執行可能造成中途拒絕的 payload validation。
+  const cleanRows = validateHalfWriteRows_(rows, options);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = getHalfCheckSheet();
+    const data = sh.getDataRange().getValues();
+    const existing = {};
+    for (let i = 1; i < data.length; i++) existing[halfCheckKey(data[i])] = i + 1;
+    let written = 0;
+    cleanRows.forEach(r => {
+      const month = String(r.month || String(r.date || '').slice(0, 7));
+      const period = `${month}-${String(r.period || '')}`;
+      const itemNo = Number(r.item || 0);
+      const key = [period, String(r.store || ''), itemNo].join('|');
+      const oldRow = existing[key] ? data[existing[key] - 1] : [];
+      const now = new Date().toISOString();
+      const itemText = oldRow[5] || String(itemNo);
+      const row = [
+        String(r.checkId || `${r.date}|${r.store}|${r.period}`), period, String(r.date || ''),
+        String(r.store || ''), String(r.inspector || ''), String(itemText), halfResultToSheet(r.result),
+        String(r.note || ''), String(r.improvement || ''), String(oldRow[9] || ''),
+        String(r.result === 'abnormal' ? '待改善' : (oldRow[10] || '')),
+        // App POST 不接受附件欄位；既有 patrol.html JSONP 仍可沿用原附件保留語意。
+        String(r.evidenceNames || oldRow[11] || ''), String(oldRow[12] || now), now,
+        String(oldRow[14] || ''), String(r.result ? '已完成' : '填寫中')
+      ];
+      if (existing[key]) {
+        sh.getRange(existing[key], 1, 1, HALF_CHECK_HEADERS.length).setValues([row]);
+        data[existing[key] - 1] = row;
+      } else {
+        sh.getRange(sh.getLastRow() + 1, 1, 1, HALF_CHECK_HEADERS.length).setValues([row]);
+        existing[key] = sh.getLastRow();
+        data.push(row);
+      }
+      written++;
+    });
+    return written;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function writeHalfCheckPostPayload_(payload, e) {
+  const body = payload || {};
+  const query = e && e.parameter ? e.parameter : {};
+  if (query.token != null || query.payload != null) throw new Error('hwrite body required');
+  if (!ptCredentialAuthorized_('', body.token)) throw new Error('unauthorized');
+  Object.keys(body).forEach(key => { if (HALF_APP_POST_FIELDS.indexOf(key) < 0) throw new Error('extra field'); });
+  if (String(body.action || '') !== 'hwrite') throw new Error('invalid action');
+  const mode = String(body.mode || 'draft');
+  return { written:writeHalfCheck(body.rows, { strictApp:true, mode:mode }) };
 }
 
 function readHalfCheck() {
@@ -814,7 +899,10 @@ function readHalfCheck() {
   const headers = data[0];
   return data.slice(1).map(row => {
     const o = {};
-    headers.forEach((h, idx) => o[h] = row[idx] instanceof Date ? patrolTimeStr(row[idx]) : row[idx]);
+    headers.forEach((h, idx) => {
+      if (!(row[idx] instanceof Date)) o[h] = row[idx];
+      else o[h] = h === '檢查日期' ? Utilities.formatDate(row[idx], 'Asia/Taipei', 'yyyy-MM-dd') : patrolTimeStr(row[idx]);
+    });
     const periodText = String(o['檢查期別'] || '');
     return {
       checkId: String(o['檢查ID'] || ''),
@@ -1655,6 +1743,7 @@ function doPost(e) {
     if (action === 'ptauth') result = ptAuthenticatePayload(payload);
     else if (action === 'ptlogout') result = ptLogoutPayload(payload);
     else if (action === 'ptvisit_write') result = writePatrolVisitEvent_(payload);
+    else if (action === 'hwrite') result = writeHalfCheckPostPayload_(payload, e);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
     else if (action === 'private_request') result = privateDashboardRequestBinding(payload);
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);

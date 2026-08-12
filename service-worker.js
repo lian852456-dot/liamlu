@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-2-half-month-report-feedback-v1';
+const CACHE_NAME = 'liam-supervisor-app-1-2-half-month-hwrite-security-v2';
 const SHELL = [
   './app.html',
   './app.css',
@@ -8,6 +8,7 @@ const SHELL = [
   './app-preview-data.js',
   './patrol-read-model.js',
   './half-month-check-read-model.js',
+  './half-month-check-write-prep.js',
   './manifest.webmanifest',
   './offline.html',
   './app-assets/lucide.min.js',

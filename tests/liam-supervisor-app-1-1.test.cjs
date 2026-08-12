@@ -58,12 +58,13 @@ test('Preview contract is visibly synthetic and contains the complete mobile sum
   assert.equal(data.patrolOverview.data.periodVerified, true);
 });
 
-test('App runtime keeps existing reads and allows only the isolated patrol visit write', () => {
+test('App runtime keeps existing reads and allows only isolated patrol visit and half-month text writes', () => {
   const code = read('app.js');
   assert.match(code, /new Set\(\['private_access','read','pread','kpicalc_access'\]\)/);
   assert.match(code, /new Set\(\['private_request','private_request_status'\]\)/);
   assert.match(code, /new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
-  assert.match(code, /new Set\(\['ptvisit_write'\]\)/);
+  assert.match(code, /new Set\(\['ptvisit_write','hwrite'\]\)/);
+  assert.doesNotMatch(code, /half_media_upload/);
   for (const blocked of ["action:'write'", "action:'pwrite'", "action:'ptwrite'", '.appendRow(', '.setValue(', '.setValues(', '.createFile(']) {
     assert.ok(!code.includes(blocked), `blocked write path found: ${blocked}`);
   }
@@ -115,15 +116,17 @@ test('device UI scope keeps nine awards, removes Top cards and renders complete 
 test('PWA cache is versioned for App 1.2 and includes local icon library', () => {
   const html = read('app.html');
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-2-half-month-report-feedback-v1/);
+  assert.match(worker, /liam-supervisor-app-1-2-half-month-hwrite-security-v2/);
   assert.match(html, /app\.css\?v=17/);
   assert.match(html, /app-data-contract\.js\?v=13/);
   assert.match(html, /app-preview-data\.js\?v=16/);
   assert.match(html, /half-month-check-read-model\.js\?v=2/);
-  assert.match(html, /app\.js\?v=17/);
+  assert.match(html, /half-month-check-write-prep\.js\?v=1/);
+  assert.match(html, /app\.js\?v=19/);
   assert.match(html, /patrol-read-model\.js\?v=11/);
   assert.match(worker, /patrol-read-model\.js/);
   assert.match(worker, /half-month-check-read-model\.js/);
+  assert.match(worker, /half-month-check-write-prep\.js/);
   assert.match(worker, /app-data-contract\.js/);
   assert.match(worker, /app-preview-data\.js/);
   assert.match(worker, /app-assets\/lucide\.min\.js/);
