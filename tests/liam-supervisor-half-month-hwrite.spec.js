@@ -33,7 +33,8 @@ test('recovery keeps formal hread available while hwrite and media remain unreac
   await expect(page.locator('.half-preview-store')).toHaveCount(9);
   await page.locator('[data-half-preview-action="start"]').click();
   await expect(page.locator('[data-half-preview-action="save"]')).toHaveCount(0);
-  await expect(page.locator('#halfMonthCheckPreview')).toContainText('PREVIEW / 尚未寫入正式資料');
+  await expect(page.locator('#halfMonthCheckPreview')).toContainText('FORMAL READ / 正式唯讀');
+  await expect(page.locator('[data-half-answer]').first()).toBeDisabled();
   expect(writes).toEqual([]);
   const layout = await page.evaluate(() => ({
     overflow:document.documentElement.scrollWidth - document.documentElement.clientWidth,

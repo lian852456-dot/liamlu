@@ -6,7 +6,7 @@ const TOKEN = 'read-recovery-timeout-token';
 
 test.use({ viewport:{ width:390, height:844 }, serviceWorkers:'block' });
 
-test('hread never leaves WKWebView loading indefinitely', async ({ page }) => {
+test('hread Google HTML 404 is retried once then fails closed', async ({ page }) => {
   const errors = [];
   const writes = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -20,10 +20,7 @@ test('hread never leaves WKWebView loading indefinitely', async ({ page }) => {
       return route.fulfill({ json:{ status:'error', message:'unexpected POST' } });
     }
     const action = new URL(request.url()).searchParams.get('action');
-    if (action === 'hread') {
-      await new Promise(resolve => setTimeout(resolve, 5_000));
-      return route.fulfill({ json:{ status:'ok', rows:[] } });
-    }
+    if (action === 'hread') return route.fulfill({ status:404, contentType:'text/html', body:'<!doctype html><title>Not Found</title>' });
     if (action === 'sread') return route.fulfill({ json:{ status:'ok', schedule:{ month:'2026-08', stores:[] } } });
     if (action === 'ptread') return route.fulfill({ json:{ status:'ok', stores:[], rows:[] } });
     if (action === 'ptvisit_read') return route.fulfill({ json:{ status:'ok', events:[], openVisit:null } });
@@ -33,8 +30,8 @@ test('hread never leaves WKWebView loading indefinitely', async ({ page }) => {
   await page.goto(FORMAL_URL);
   const started = Date.now();
   await page.locator('[data-patrol-check-view="half-month"]').click();
-  await expect(page.locator('#halfMonthCheckPreview')).toContainText('半月督導檢查讀取逾時（3 秒）', { timeout:4_500 });
-  expect(Date.now() - started).toBeLessThan(4_500);
+  await expect(page.locator('#halfMonthCheckPreview')).toContainText('正式資料服務暫時回傳 HTTP 404', { timeout:4_000 });
+  expect(Date.now() - started).toBeLessThan(4_000);
   await expect(page.locator('#halfMonthCheckPreview')).not.toContainText('正在讀取半月督導檢查…');
   const layout = await page.evaluate(() => ({
     overflow:document.documentElement.scrollWidth - document.documentElement.clientWidth,
