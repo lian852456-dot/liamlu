@@ -3,7 +3,7 @@
 
   const C = scope.LiamSupervisorContract;
   const H = scope.LiamHalfMonthCheckReadModel;
-  const DAILY_REPORT_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
+  const DAILY_REPORT_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
   const PATROL_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
   const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
   const DEVICE_KEY = 'north12b_private_dashboard_device_id';
@@ -117,6 +117,21 @@
     if (scope.lucide && typeof scope.lucide.createIcons === 'function') scope.lucide.createIcons({ attrs: { 'aria-hidden':'true' } });
   }
 
+  async function fetchJsonWithTimeout(input, options, timeoutMs, timeoutMessage) {
+    const controller = new AbortController();
+    const timer = scope.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(input, { ...options, signal:controller.signal });
+      const body = await response.json();
+      return { response, body };
+    } catch (error) {
+      if (error && error.name === 'AbortError') throw new Error(timeoutMessage);
+      throw error;
+    } finally {
+      scope.clearTimeout(timer);
+    }
+  }
+
   function deviceId() {
     let value = scope.localStorage.getItem(DEVICE_KEY);
     if (value) return value;
@@ -128,24 +143,22 @@
 
   async function postReadOnly(payload) {
     if (!READ_ACTIONS.has(payload.action)) throw new Error('App 1.2 僅允許既有唯讀 action。');
-    const response = await fetch(DAILY_REPORT_API, {
+    const { response, body } = await fetchJsonWithTimeout(DAILY_REPORT_API, {
       method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body:JSON.stringify(payload), cache:'no-store', credentials:'omit'
-    });
+    }, 8_000, '正式摘要連線逾時，請稍後重新整理。');
     if (!response.ok) throw new Error(`正式摘要連線失敗（HTTP ${response.status}）`);
-    const body = await response.json();
     if (!body || body.status !== 'ok') throw new Error((body && body.message) || '正式摘要讀取失敗。');
     return body;
   }
 
   async function postDeviceAccess(payload) {
     if (!DEVICE_ACTIONS.has(payload.action)) throw new Error('不允許的裝置授權 action。');
-    const response = await fetch(DAILY_REPORT_API, {
+    const { response, body } = await fetchJsonWithTimeout(DAILY_REPORT_API, {
       method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body:JSON.stringify(payload), cache:'no-store', credentials:'omit'
-    });
+    }, 8_000, '裝置授權連線逾時，請稍後重新整理。');
     if (!response.ok) throw new Error(`裝置授權連線失敗（HTTP ${response.status}）`);
-    const body = await response.json();
     if (!body || body.status !== 'ok') throw new Error((body && body.message) || '裝置授權失敗。');
     return body;
   }
@@ -176,8 +189,9 @@
 
   async function postPatrolAuth(payload) {
     if (!['ptauth','ptlogout'].includes(payload.action)) throw new Error('不允許的 session action。');
-    const response = await fetch(PATROL_API, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload), cache:'no-store' });
-    const body = await response.json();
+    const { body } = await fetchJsonWithTimeout(PATROL_API, {
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload), cache:'no-store'
+    }, 8_000, '班表／巡店驗證逾時，請稍後重試。');
     if (!body || body.status !== 'ok') throw new Error((body && body.message) || '班表／巡店驗證失敗。');
     return body;
   }
@@ -185,12 +199,16 @@
   async function patrolRead(action, params = {}) {
     if (!PATROL_READ_ACTIONS.has(action)) throw new Error('App 1.2 僅允許既有班表／巡店讀取與獨立到離店讀取。');
     if (!patrolToken) throw new Error('班表／巡店 session 尚未驗證。');
-    const url = new URL(PATROL_API);
-    url.searchParams.set('action', action);
-    url.searchParams.set('token', patrolToken);
-    Object.entries(params).forEach(([key,value]) => { if (value) url.searchParams.set(key,value); });
-    const response = await fetch(url, { method:'GET', cache:'no-store' });
-    const body = await response.json();
+    const query = [['action',action],['token',patrolToken]];
+    Object.entries(params).forEach(([key,value]) => {
+      if (value !== '' && value != null) query.push([key,String(value)]);
+    });
+    const url = `${PATROL_API}?${query.map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&')}`;
+    const timeoutMs = action === 'hread' ? 3_000 : 8_000;
+    const timeoutMessage = action === 'hread'
+      ? '半月督導檢查讀取逾時（3 秒），請稍後重新整理。'
+      : '班表／巡店讀取逾時，請稍後重新整理。';
+    const { body } = await fetchJsonWithTimeout(url, { method:'GET', cache:'no-store' }, timeoutMs, timeoutMessage);
     if (!body || body.status !== 'ok') {
       const message = (body && body.message) || '班表／巡店讀取失敗。';
       if (/unauthorized|session|授權|逾時|失效/i.test(message)) {
