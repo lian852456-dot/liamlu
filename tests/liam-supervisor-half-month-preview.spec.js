@@ -53,7 +53,8 @@ test('half-month preview is opt-in, preselects an open visit and never calls for
   await expect(issue.locator('.half-preview-abnormal')).toBeVisible();
   await issue.locator('[data-half-note]').fill('展示設備未依規定陳列');
   await issue.locator('[data-half-improvement]').fill('今日完成調整並回傳佐證');
-  await issue.locator('[data-half-evidence]').fill('https://drive.google.com/file/d/preview-only/view');
+  await expect(issue.locator('[data-half-evidence]')).toBeEditable({editable:false});
+  await expect(issue.locator('[data-half-evidence]')).toHaveValue('');
   await issue.scrollIntoViewIfNeeded();
   await page.screenshot({path:'test-output/half-month-05-abnormal-expanded-390x844.png'});
 
