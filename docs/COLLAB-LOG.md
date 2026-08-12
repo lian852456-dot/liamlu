@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-12 ｜ Codex（App 1.2 半月督導檢查 hwrite Predeploy，未部署）
+
+- 做了什麼：在獨立 `feature/liam-supervisor-half-month-hwrite-integration` 分支，沿用既有 ptauth 1800 秒 token、`hwrite`、`hread` 與 H1/H2 規則，完成 18 題文字進度的明確 opt-in 儲存。到店只預選店點；只有 Liam 按「+ 開始半月督導檢查」、選店並按「儲存目前進度」才會寫入。每次 `hwrite` 後必須重新 `hread`，逐欄比對 period/store/item/status/note/improvement；不一致即顯示失敗。最近填寫日期只顯示可靠的 `YYYY/M/D`，不再產生 `0:00`。
+- 結果（Predeploy Gate 通過，待 Liam review）：GAS 對既有 hwrite row 增加 auth-before-parse、九店／日期／期別／題號／狀態／extra field 嚴格驗證，business key 重複儲存不新增重複題目，且保留既有附件。Node 165/165、半月 hwrite Playwright 3/3、npm audit 0 vulnerabilities；正式 `hwrite` 與 `half_media_upload` request 均為 0，未部署 GAS／Pages。
+- 經驗 / 給下一位的提醒：backend 沒有 completed flag，18/18 只能叫「18/18 已填」。媒體仍為唯讀且 `half_media_upload=0`。選定五頁籤回歸唯一未過是既有 2026-08-11 ptvisit fixture 在 8/12 today-only 規則下被排除；本輪依範圍不修改 ptvisit。
+
 ## 2026-08-12 ｜ Codex（App 1.2 Daily Report 門市回覆正式部署候選）
 
 - 做了什麼：將獨立 hotfix `f4614d6` 以 cherry-pick 疊加在半月正式唯讀 release 之上，只保留 Daily Report 的 `zero_reason`、`zero_consult`、`zero_method`、`zero_plan` mapping、門市請益彙整、單店回覆、對應 contract/CSS/tests 與 cache bust。

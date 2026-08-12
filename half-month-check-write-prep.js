@@ -121,6 +121,31 @@
     });
   }
 
+  function verifyReadback(raw, readRows, normalizeStore) {
+    const expected = toExistingHwriteRows(raw);
+    const normalize = typeof normalizeStore === 'function' ? normalizeStore : value => String(value || '');
+    const source = Array.isArray(readRows) ? readRows : [];
+    const mismatches = [];
+    expected.forEach(row => {
+      const found = source.find(candidate =>
+        String(candidate.month || '') === row.month &&
+        String(candidate.period || '') === row.period &&
+        normalize(candidate.store) === normalize(row.store) &&
+        Number(candidate.item) === row.item
+      );
+      if (!found) {
+        mismatches.push({ item:row.item, field:'row', expected:'present', actual:'missing' });
+        return;
+      }
+      for (const field of ['period','store','item','result','note','improvement']) {
+        const actual = field === 'store' ? normalize(found[field]) : field === 'item' ? Number(found[field]) : String(found[field] || '');
+        const wanted = field === 'store' ? normalize(row[field]) : field === 'item' ? Number(row[field]) : String(row[field] || '');
+        if (actual !== wanted) mismatches.push({ item:row.item, field, expected:wanted, actual });
+      }
+    });
+    return { ok:mismatches.length === 0, mismatches };
+  }
+
   return Object.freeze({
     SCHEMA_VERSION,
     TOTAL_ITEMS,
@@ -131,6 +156,7 @@
     canonicalPeriod,
     validateEnvelope,
     toExistingHwriteRows,
-    canonicalIdempotencyMaterial
+    canonicalIdempotencyMaterial,
+    verifyReadback
   });
 });

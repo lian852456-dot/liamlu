@@ -76,11 +76,24 @@ test('existing hwrite row adapter is deterministic and does not accept client ti
   assert.equal(prep.canonicalIdempotencyMaterial(payload), prep.canonicalIdempotencyMaterial({ ...payload, items: payload.items.slice().reverse() }));
 });
 
-test('current App remains preview-only and this prep does not alter GAS write implementation', () => {
+test('write readback parity checks period, store, item, status, note and improvement', () => {
+  const payload = complete();
+  payload.items[2] = { item:3, result:'abnormal', note:'正式原文', improvement:'正式改善' };
+  const rows = prep.toExistingHwriteRows(payload);
+  assert.equal(prep.verifyReadback(payload, rows).ok, true);
+  const mismatch = rows.map(row => ({ ...row }));
+  mismatch[2].improvement = '不一致';
+  const result = prep.verifyReadback(payload, mismatch);
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.mismatches[0], { item:3, field:'improvement', expected:'正式改善', actual:'不一致' });
+});
+
+test('formal App wires only existing hwrite and keeps media upload disabled', () => {
   assert.match(app, /PREVIEW \/ 尚未寫入正式資料/);
   assert.match(app, /已填 \$\{progress\.completed\} \/ \$\{progress\.total\}/);
-  assert.match(app, /const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write'\]\)/);
-  assert.doesNotMatch(app, /patrolRead\(['"]hwrite['"]/);
+  assert.match(app, /const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write','hwrite'\]\)/);
+  assert.match(app, /async function halfMonthWriteRows\(rows\)/);
+  assert.match(app, /const readback=await patrolRead\('hread'\)/);
   assert.doesNotMatch(app, /half_media_upload/);
   assert.match(gas, /function writeHalfCheck\(rows\)/);
 });

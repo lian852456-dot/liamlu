@@ -2,17 +2,17 @@
 
 ## 狀態與邊界
 
-- 狀態：`PREVIEW / DESIGN ONLY`
-- 分支：`feature/liam-supervisor-half-month-write-prep`
+- 狀態：`PREDEPLOY / FORMAL TEXT WRITE INTEGRATION`
+- 分支：`feature/liam-supervisor-half-month-hwrite-integration`
 - 正式寫入：`NO`
 - 正式部署：`NO`
-- 本文件只凍結未來最小 `hwrite` 接線的 payload、驗證、更新、冪等與 rollback 要求；不得據此宣稱正式寫入已可用。
+- 本分支已完成既有 `hwrite` 的最小接線、server-side strict validation、寫後 `hread` 逐欄核對與本機測試；尚未部署，不得據此宣稱正式寫入已可用。
 - 既有 `ptauth` 1800 秒 token、`hread`、worksheet「半月督導檢查」與 H1/H2 canonical 規則維持不變；不建立新 auth。
 - `half_media_upload` 不在本階段，媒體／Drive 僅保留 UI placeholder，不呼叫上傳。
 
 ## 手機 Preview 現況
 
-目前 App 已具備 18 題 card flow：`符合 / 異常 / 不適用`，只有「異常」展開異常說明、改善方式與媒體／Drive placeholder；底部顯示「已填 n / 18」。Preview 暫存／完成只存在頁面記憶體，正式 request 次數必須維持 0。
+App 已具備 18 題 card flow：`符合 / 異常 / 不適用 / 清除（尚未填寫）`，只有「異常」展開異常說明與改善方式；媒體／Drive 欄位維持唯讀。Liam 必須明確按「+ 開始半月督導檢查」、選店並按「儲存目前進度」才會寫入；到店狀態只預選店點，不會自動開始或自動寫入。
 
 ## V1 payload schema
 
@@ -37,7 +37,7 @@
 }
 ```
 
-禁止欄位：`token`、通行碼、client `savedAt`、任意 extra field、媒體 blob、任意 Drive URL。Token 必須在既有 auth transport 中獨立傳送，不進 payload、URL log 或 audit material。
+禁止欄位：`token`、通行碼、client `savedAt`、任意 extra field、媒體 blob、任意 Drive URL。App payload 不含 token 或通行碼；網路層沿用既有 `hwrite` JSONP transport，沒有新增或放寬 auth transport，且不得把完整 request URL 寫入 log。
 
 ## Validation
 
@@ -52,7 +52,7 @@
 9. `note`、`improvement` 各上限 1000 字；不接受任意欄位。
 10. Server 必須先驗證既有短效 token，再解析／驗證 payload，未授權 fail-closed。
 
-純函式契約位於 `half-month-check-write-prep.js`；目前不由 `app.html` 載入，因此不會改變正式 runtime。
+純函式契約位於 `half-month-check-write-prep.js`；本 Predeploy 分支已由 `app.html` 載入，正式 main 尚未部署。
 
 ## Update semantics
 
@@ -63,14 +63,13 @@
 - 媒體欄位不由此 action 新增。既有正式附件保留語意必須在實作前以 fixture 驗證，不能用空 payload 覆蓋。
 - `draft` 只更新 payload 中明確出現的題目；`complete` 是 18 題原子檢核後才允許逐題 update。
 
-## Idempotency strategy（部署前必要，尚未實作）
+## Idempotency / update semantics
 
-1. Client 每次明確送出建立 `operationId`；重試沿用同一 ID。
-2. Server 以 `operationId + canonical payload SHA-256` 建立短效 receipt。
-3. 相同 operationId + 相同 digest：回原 receipt，不重寫 worksheet。
-4. 相同 operationId + 不同 digest：固定拒絕 `idempotency_conflict`。
-5. Business key 仍防止重複 row，但不足以避免重試改動更新時間，因此正式部署前必須完成 receipt gate。
-6. Audit 僅記 operationId 的去識別 digest、狀態、題數與 server time；不得記 token、通行碼、原文、姓名或媒體連結。
+1. Client 每次明確送出建立 `operationId`，但既有 `hwrite` row contract 不儲存 operationId。
+2. Server 以既有 business key `period + store + item` 更新同一列；重複儲存不新增重複題目。
+3. 本機整合測試已驗證重複儲存後仍為同一組 18 個 business keys，且不影響其他門市或另一半月。
+4. 每次寫入後都重新 `hread`，逐欄比對 `period / store / item / result / note / improvement`；不一致即顯示失敗。
+5. 本輪不新增 receipt worksheet、schema 或新 backend action。若未來需要網路層 exact-once receipt，必須另案設計，不得在本次最小整合中偷偷擴充 schema。
 
 ## Token / authorization
 
@@ -85,19 +84,26 @@
 2. Deploy 前記錄前一 GAS deployment ID、Pages commit、worksheet row count 與非敏感 schema hash。
 3. 任一 auth／validation／idempotency Gate 失敗：Pages 回退前一 release、GAS 流量切回前一 deployment。
 4. 不刪除、不重建「半月督導檢查」worksheet；不修改既有巡店明細與班表。
-5. 若已寫入部分 rows，只能依 operation receipt 精確列出影響 business keys，經 Liam 另行授權後處理；不得批次猜測回復。
+5. 若已寫入部分 rows，只能依該次 response、寫後 readback 與明確 business keys 列出影響範圍，經 Liam 另行授權後處理；不得批次猜測回復。
 
-## Mocked Gate
+## Predeploy Gate
 
 - strict schema / unknown-field rejection
 - canonical H1/H2、九店、題 1–18 allowlist
-- draft partial / complete 18 題 validation
+- draft 18 題（包含 blank）validation
 - abnormal 說明與改善方式
-- deterministic adapter / idempotency material
+- deterministic adapter / business-key update semantics
 - token、passcode、savedAt、media 不進 payload
-- App runtime 仍無 `hwrite`／`half_media_upload`
-- GAS source 本分支零 diff
+- App 只在明確按「儲存目前進度」後呼叫既有 `hwrite`
+- `hwrite` 成功後必須完成正式 `hread` 逐欄核對才顯示「已儲存」
+- `half_media_upload` request = 0
+- GAS 只新增既有 `hwrite` row 的 strict validation、canonical store/date 與可靠日期輸出；未改 worksheet schema
+- Node full suite：165/165 PASS
+- Half-month hwrite Playwright：3/3 PASS（390×844、readback mismatch、重複儲存／隔離）
+- 選定五頁籤回歸：17/18 PASS；唯一失敗為既有 `2026-08-11` ptvisit fixture 在 8/12 today-only 規則下被排除，依範圍不修改 ptvisit
+- `npm audit --audit-level=moderate`：0 vulnerabilities
+- 正式 `hwrite`／`half_media_upload` request：0
 
-## 下一個正式 Gate（不在本輪）
+## 下一個正式 Gate
 
-只有 Liam 另行授權後，才可在獨立實作分支新增 server-side strict validation、receipt idempotency、mock integration、TEST deployment 與真人驗收。完成以前不得 merge main、不得部署 GAS／Pages、不得呼叫正式 `hwrite` 或 `half_media_upload`。
+等待 Liam review 本 Predeploy diff。未取得另行部署授權前，不得 merge main、不得部署 GAS／Pages、不得呼叫正式 `hwrite` 或 `half_media_upload`；文字寫入實機 PASS 前，媒體上傳仍維持 0。

@@ -22,14 +22,15 @@ test('App 1.1 retains the five required destinations and frozen home module orde
   assert.match(html, /data-profile-entry/);
 });
 
-test('Pilot keeps existing patrol auth and isolates the sole arrival/departure write', () => {
+test('Pilot keeps existing patrol auth and isolates only arrival/departure plus half-month text writes', () => {
   const js = read('app.js');
   assert.match(js, /action:'ptauth'/);
   assert.match(js, /patrolRead\('sread'/);
   assert.match(js, /patrolRead\('ptread'/);
   assert.match(js, /new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
-  assert.match(js, /new Set\(\['ptvisit_write'\]\)/);
-  assert.doesNotMatch(js, /['"](?:ptwrite|hwrite|swrite|write)['"]/);
+  assert.match(js, /new Set\(\['ptvisit_write','hwrite'\]\)/);
+  assert.doesNotMatch(js, /['"](?:ptwrite|swrite|write)['"]/);
+  assert.doesNotMatch(js, /half_media_upload/);
   assert.doesNotMatch(js, /document\.cookie|localStorage\.setItem\([^,]+,\s*(?:employeeId|token|secret)/);
   assert.match(js, /new Set\(\['private_access','read','pread','kpicalc_access'\]\)/);
   assert.doesNotMatch(read('app.html'), /金牌|店務檢查|推播|Face ID|離線寫入/);
@@ -48,8 +49,9 @@ test('PWA uses safe-area, standalone manifest, and app-only offline cache', () =
   assert.equal(manifest.display, 'standalone');
   assert.equal(manifest.orientation, 'portrait-primary');
   assert.match(worker, /offline\.html/);
-  assert.match(worker, /liam-supervisor-app-1-2-half-month-report-feedback-v1/);
+  assert.match(worker, /liam-supervisor-app-1-2-half-month-hwrite-predeploy-v1/);
   assert.match(worker, /half-month-check-read-model\.js/);
+  assert.match(worker, /half-month-check-write-prep\.js/);
   assert.match(worker, /event\.request\.method !== 'GET'/);
   assert.doesNotMatch(worker, /script\.google\.com/);
 });
