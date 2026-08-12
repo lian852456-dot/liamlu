@@ -3,8 +3,11 @@
 
   const C = scope.LiamSupervisorContract;
   const H = scope.LiamHalfMonthCheckReadModel;
-  const DAILY_REPORT_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
+  const DAILY_REPORT_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
   const PATROL_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
+  const PRIVATE_TIMEOUT_MS = 20_000;
+  const PATROL_TIMEOUT_MS = Object.freeze({ sread:30_000, ptread:60_000, hread:90_000, ptvisit_read:30_000 });
+  const RETRY_DELAY_MS = 1_000;
   const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
   const DEVICE_KEY = 'north12b_private_dashboard_device_id';
   const PATROL_TOKEN_KEY = 'bei12b_pt_session_token';
@@ -123,19 +126,57 @@
     if (scope.lucide && typeof scope.lucide.createIcons === 'function') scope.lucide.createIcons({ attrs: { 'aria-hidden':'true' } });
   }
 
-  async function fetchJsonWithTimeout(input, options, timeoutMs, timeoutMessage) {
+  class ReadTransportError extends Error {
+    constructor(kind, message, retryable = false, status = 0) {
+      super(message);
+      this.name = 'ReadTransportError';
+      this.kind = kind;
+      this.retryable = retryable;
+      this.status = status;
+    }
+  }
+
+  async function fetchJsonAttempt(input, options, timeoutMs, timeoutMessage) {
     const controller = new AbortController();
     const timer = scope.setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetch(input, { ...options, signal:controller.signal });
-      const body = await response.json();
+      const text = await response.text();
+      let body;
+      try {
+        body = JSON.parse(text);
+      } catch (_) {
+        const googleHtml404 = response.status === 404 && /(?:text\/html|<!doctype html|<html)/i.test(`${response.headers.get('content-type') || ''}\n${text.slice(0,200)}`);
+        throw new ReadTransportError(googleHtml404 ? 'google-html-404' : 'non-json', googleHtml404 ? '正式資料服務暫時回傳 HTTP 404。' : '正式資料服務回傳無法解析的內容。', googleHtml404, response.status);
+      }
+      if (!response.ok) throw new ReadTransportError('http', `正式資料服務連線失敗（HTTP ${response.status}）`, false, response.status);
       return { response, body };
     } catch (error) {
-      if (error && error.name === 'AbortError') throw new Error(timeoutMessage);
+      if (error && error.name === 'AbortError') throw new ReadTransportError('timeout', timeoutMessage, true);
+      if (error instanceof ReadTransportError) throw error;
+      if (error instanceof TypeError) throw new ReadTransportError('network', '正式資料服務網路連線失敗。', true);
       throw error;
     } finally {
       scope.clearTimeout(timer);
     }
+  }
+
+  async function fetchJsonWithRecovery(input, options, timeoutMs, timeoutMessage) {
+    let lastError;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await fetchJsonAttempt(input, options, timeoutMs, timeoutMessage);
+      } catch (error) {
+        lastError = error;
+        if (!error || !error.retryable || attempt === 1) throw error;
+        await new Promise(resolve => scope.setTimeout(resolve, RETRY_DELAY_MS));
+      }
+    }
+    throw lastError;
+  }
+
+  function readErrorNote(error, label = '正式資料') {
+    return error && error.kind === 'timeout' ? `${label}讀取逾時` : `${label}讀取失敗`;
   }
 
   function deviceId() {
@@ -149,22 +190,20 @@
 
   async function postReadOnly(payload) {
     if (!READ_ACTIONS.has(payload.action)) throw new Error('App 1.2 僅允許既有唯讀 action。');
-    const { response, body } = await fetchJsonWithTimeout(DAILY_REPORT_API, {
+    const { body } = await fetchJsonWithRecovery(DAILY_REPORT_API, {
       method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body:JSON.stringify(payload), cache:'no-store', credentials:'omit'
-    }, 8_000, '正式摘要連線逾時，請稍後重新整理。');
-    if (!response.ok) throw new Error(`正式摘要連線失敗（HTTP ${response.status}）`);
+    }, PRIVATE_TIMEOUT_MS, '正式資料讀取逾時，請稍後重試。');
     if (!body || body.status !== 'ok') throw new Error((body && body.message) || '正式摘要讀取失敗。');
     return body;
   }
 
   async function postDeviceAccess(payload) {
     if (!DEVICE_ACTIONS.has(payload.action)) throw new Error('不允許的裝置授權 action。');
-    const { response, body } = await fetchJsonWithTimeout(DAILY_REPORT_API, {
+    const { body } = await fetchJsonWithRecovery(DAILY_REPORT_API, {
       method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body:JSON.stringify(payload), cache:'no-store', credentials:'omit'
-    }, 8_000, '裝置授權連線逾時，請稍後重新整理。');
-    if (!response.ok) throw new Error(`裝置授權連線失敗（HTTP ${response.status}）`);
+    }, PRIVATE_TIMEOUT_MS, '裝置授權讀取逾時，請稍後重試。');
     if (!body || body.status !== 'ok') throw new Error((body && body.message) || '裝置授權失敗。');
     return body;
   }
@@ -179,25 +218,46 @@
     state.className = `device-status${status === 'approved' ? ' approved' : status === 'pending' ? ' pending' : ''}`;
     state.textContent = status === 'approved' ? '此 iPhone App 裝置已核准'
       : status === 'pending' ? '此 iPhone App 裝置待核准'
+      : status === 'error' ? '正式資料讀取失敗'
       : '尚未解鎖這台 iPhone App 裝置';
     if (message) setMessage('#privateAccessMessage',message,status === 'approved' ? 'success' : status === 'pending' ? '' : 'error');
   }
 
   function resetPrivateSummary(status = 'unauthorized', note = '') {
     PRIVATE_MODULE_KEYS.forEach(key => { contract[key] = statusModule(key,status,null,note); });
-    contract.kpiStores = statusModule('kpiStores',status,[],note);
-    contract.kpiFullMetrics = statusModule('kpiFullMetrics',status,{region:[],stores:{}},note);
-    contract.awardStores = statusModule('awardStores',status,[],note);
-    contract.awardTop2Models = statusModule('awardTop2Models',status,[],note);
-    contract.personalPerformance = statusModule('personalPerformance',status,{ summary:null, people:[] },note);
+    if (status === 'unauthorized') {
+      contract.kpiStores = statusModule('kpiStores',status,[],note);
+      contract.kpiFullMetrics = statusModule('kpiFullMetrics',status,{region:[],stores:{}},note);
+      contract.awardStores = statusModule('awardStores',status,[],note);
+      contract.awardTop2Models = statusModule('awardTop2Models',status,[],note);
+      contract.personalPerformance = statusModule('personalPerformance',status,{ summary:null, people:[] },note);
+    }
     contract.generatedAt = nowIso();
+  }
+
+  function privateLoadingModule(key, label) {
+    const current=contract[key];
+    if(current&&current.data!=null) return C.moduleState({...current,status:'stale',stale:true,note:`上次成功資料 · ${formatTime(current.updatedAt)} · ${label}讀取中`});
+    return statusModule(key,'stale',null,`${label}讀取中`);
+  }
+
+  function privateFailureModule(key, error, label) {
+    const current=contract[key];
+    const note=readErrorNote(error,label);
+    if(current&&current.data!=null) return C.moduleState({...current,status:'stale',stale:true,note:`上次成功資料 · ${formatTime(current.updatedAt)} · ${note}`});
+    return statusModule(key,'error',null,note);
+  }
+
+  function failPrivateSummary(error) {
+    PRIVATE_MODULE_KEYS.forEach(key=>{ contract[key]=privateFailureModule(key,error,'正式資料'); });
+    contract.generatedAt=nowIso();
   }
 
   async function postPatrolAuth(payload) {
     if (!['ptauth','ptlogout'].includes(payload.action)) throw new Error('不允許的 session action。');
-    const { body } = await fetchJsonWithTimeout(PATROL_API, {
+    const { body } = await fetchJsonWithRecovery(PATROL_API, {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload), cache:'no-store'
-    }, 8_000, '班表／巡店驗證逾時，請稍後重試。');
+    }, 30_000, '班表／巡店驗證逾時，請稍後重試。');
     if (!body || body.status !== 'ok') throw new Error((body && body.message) || '班表／巡店驗證失敗。');
     return body;
   }
@@ -210,11 +270,12 @@
       if (value !== '' && value != null) query.push([key,String(value)]);
     });
     const url = `${PATROL_API}?${query.map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&')}`;
-    const timeoutMs = action === 'hread' ? 3_000 : 8_000;
-    const timeoutMessage = action === 'hread'
-      ? '半月督導檢查讀取逾時（3 秒），請稍後重新整理。'
-      : '班表／巡店讀取逾時，請稍後重新整理。';
-    const { body } = await fetchJsonWithTimeout(url, { method:'GET', cache:'no-store' }, timeoutMs, timeoutMessage);
+    const timeoutMs = PATROL_TIMEOUT_MS[action];
+    const timeoutMessage = action === 'hread' ? '半月督導檢查讀取逾時，請點擊重試。'
+      : action === 'ptread' ? '巡店讀取逾時，請點擊重試。'
+      : action === 'sread' ? '班表讀取逾時，請點擊重試。'
+      : '今日到離店紀錄讀取逾時，請點擊重試。';
+    const { body } = await fetchJsonWithRecovery(url, { method:'GET', cache:'no-store' }, timeoutMs, timeoutMessage);
     if (!body || body.status !== 'ok') {
       const message = (body && body.message) || '班表／巡店讀取失敗。';
       if (/unauthorized|session|授權|逾時|失效/i.test(message)) {
@@ -549,48 +610,80 @@
       privateResult = await postReadOnly({ action:'private_access', ...credential });
     } catch (error) {
       const pending = privateAccessPending(error && error.message);
-      resetPrivateSummary('unauthorized',pending ? '此 iPhone App 裝置待核准' : '正式資料尚未解鎖');
-      setPrivateAccessState(pending ? 'pending' : 'unauthorized',pending ? '此 iPhone App 裝置待核准。核准後按「查看核准狀態」。' : String(error.message || error));
-      dom('#viewerState').textContent = pending ? '待核准' : '未登入';
+      const transportFailure = error instanceof ReadTransportError;
+      const state = pending ? 'unauthorized' : transportFailure ? 'error' : 'unauthorized';
+      const note = pending ? '此 iPhone App 裝置待核准' : transportFailure ? readErrorNote(error) : '正式資料尚未解鎖';
+      if(transportFailure) failPrivateSummary(error); else resetPrivateSummary(state,note);
+      setPrivateAccessState(pending ? 'pending' : transportFailure ? 'error' : 'unauthorized',pending ? '此 iPhone App 裝置待核准。核准後按「查看核准狀態」。' : String(error.message || error));
+      dom('#viewerState').textContent = pending ? '待核准' : transportFailure ? '讀取失敗' : '未登入';
       dom('#privateLogout').hidden = false;
       renderAll();
       throw error;
     }
-    const requests = await Promise.allSettled([
-      postReadOnly({ action:'kpicalc_access', ...credential }),
-      postReadOnly({ action:'read', date:taipeiDate(), seg:16 }),
-      postReadOnly({ action:'read', date:taipeiDate(), seg:21 }),
-      postReadOnly({ action:'pread', date:taipeiDate(), seg:16 }),
-      postReadOnly({ action:'pread', date:taipeiDate(), seg:21 })
-    ]);
     const snapshot = privateResult.snapshot || {};
     const readAt = nowIso();
-    const kpi = requests[0].status === 'fulfilled'
-      ? adaptKpi(requests[0].value.data || {}, snapshot, readAt)
-      : { summary:statusModule('kpiSummary','error',null,'正式 kpicalc 讀取失敗'), stores:statusModule('kpiStores','error',[], '正式 kpicalc 讀取失敗'), full:statusModule('kpiFullMetrics','error',{region:[],stores:{}},'正式 kpicalc 讀取失敗') };
-    const awards = adaptAwards(snapshot, kpi.summary.data && kpi.summary.data.reportDate, readAt);
+    const awards = adaptAwards(snapshot, String(snapshot.kpiBattle&&snapshot.kpiBattle.report_date||''), readAt);
     const personalPerformance = adaptPersonalPerformance(snapshot, readAt);
-    const report16 = adaptReport(16, requests[1].status === 'fulfilled' ? requests[1].value.data : {}, requests[3].status === 'fulfilled' ? requests[3].value.data : {}, requests[1].status === 'fulfilled' ? requests[1].value.summary : null);
-    const report21 = adaptReport(21, requests[2].status === 'fulfilled' ? requests[2].value.data : {}, requests[4].status === 'fulfilled' ? requests[4].value.data : {}, requests[2].status === 'fulfilled' ? requests[2].value.summary : null);
-    const reportModule = (report, result) => C.moduleState({
-      status:result.status === 'fulfilled' ? (report.completedStores === 0 ? 'no_data' : report.completedStores === 9 && report.summaryAvailable ? 'ok' : 'partial') : 'error', updatedAt:readAt,
-      sourceUpdatedAt:report.updatedAt, stale:false, source:moduleSource('北一二B每日回報','index.html'), data:report,
-      note:result.status !== 'fulfilled' ? '正式回報來源讀取失敗' : !report.summaryAvailable ? '正式來源尚未提供 report summary adapter；營運摘要 fail-closed。' : report.completedStores === 0 ? `尚未進入／尚無正式 ${report.segment}:00 回報` : ''
-    });
     contract = C.validateContract({
       ...contract, version:C.VERSION, generatedAt:readAt, mode:'formal',
-      todayOperations:C.moduleState({ status:'ok', updatedAt:readAt, sourceUpdatedAt:report21.updatedAt || report16.updatedAt, stale:false, source:moduleSource('北一二B每日回報','index.html'), data:{ date:taipeiDate(), segments:[report16,report21] } }),
-      kpiSummary:kpi.summary, kpiStores:kpi.stores, kpiFullMetrics:kpi.full,
+      todayOperations:privateLoadingModule('todayOperations','正式回報資料'),
+      kpiSummary:privateLoadingModule('kpiSummary','正式 KPI 資料'), kpiStores:privateLoadingModule('kpiStores','正式 KPI 資料'), kpiFullMetrics:privateLoadingModule('kpiFullMetrics','正式 KPI 資料'),
       awardSummary:awards.summary, awardStores:awards.stores, awardTop2Models:awards.top2,
       personalPerformance,
-      report1600:reportModule(report16,requests[1]), report2100:reportModule(report21,requests[2]),
-      reportFailures:C.moduleState({ status:requests[3].status === 'fulfilled' || requests[4].status === 'fulfilled' ? 'ok':'error', updatedAt:readAt, sourceUpdatedAt:report21.updatedAt || report16.updatedAt, stale:false, source:moduleSource('正式個人回報','index.html'), data:{16:failureSummary(report16),21:failureSummary(report21)} })
+      report1600:privateLoadingModule('report1600','16:00 正式回報'), report2100:privateLoadingModule('report2100','21:00 正式回報'),
+      reportFailures:privateLoadingModule('reportFailures','正式個人回報')
     });
     privateAccessStatus = 'approved';
     dom('#viewerState').textContent = privateResult.profile && privateResult.profile.maskedName ? privateResult.profile.maskedName : 'Approved';
     dom('#privateLogout').hidden = false;
-    setPrivateAccessState('approved','已由既有 Approved Device 讀回正式唯讀摘要。');
+    setPrivateAccessState('approved','Approved Device 已確認；各正式唯讀模組正在獨立載入。');
     renderAll();
+
+    const reportRows={16:null,21:null};
+    const failureRows={};
+    const updateOperations=()=>{
+      const segments=[reportRows[16],reportRows[21]].filter(Boolean);
+      const pending=[contract.report1600,contract.report2100].some(module=>module.status==='stale');
+      const failed=[contract.report1600,contract.report2100].some(module=>module.status==='error');
+      const status=segments.length?(pending||failed?'partial':'ok'):(pending?'stale':'error');
+      contract.todayOperations=C.moduleState({status,updatedAt:nowIso(),sourceUpdatedAt:segments.map(row=>row.updatedAt).filter(Boolean).at(-1)||'',stale:false,source:moduleSource('北一二B每日回報','index.html'),data:segments.length?{date:taipeiDate(),segments}:null,note:pending?'正式回報資料讀取中':failed?'部分正式回報讀取失敗':''});
+      const failureValues=Object.values(failureRows);
+      contract.reportFailures=C.moduleState({status:pending?'stale':failureValues.some(row=>row.unavailable)?'partial':failureValues.length?'ok':'error',updatedAt:nowIso(),sourceUpdatedAt:'',stale:false,source:moduleSource('正式個人回報','index.html'),data:failureValues.length?failureRows:null,note:failureValues.some(row=>row.unavailable)?'部分個人回報讀取失敗':pending?'正式個人回報讀取中':''});
+      contract.generatedAt=nowIso();
+      renderAll();
+    };
+
+    const kpiTask=postReadOnly({action:'kpicalc_access',...credential}).then(result=>{
+      const kpi=adaptKpi(result.data||{},snapshot,nowIso());
+      contract.kpiSummary=kpi.summary; contract.kpiStores=kpi.stores; contract.kpiFullMetrics=kpi.full;
+      contract.generatedAt=nowIso(); renderAll();
+    }).catch(error=>{
+      const note=readErrorNote(error,'正式 KPI');
+      contract.kpiSummary=privateFailureModule('kpiSummary',error,'正式 KPI'); contract.kpiStores=privateFailureModule('kpiStores',error,'正式 KPI'); contract.kpiFullMetrics=privateFailureModule('kpiFullMetrics',error,'正式 KPI');
+      contract.generatedAt=nowIso(); renderAll();
+    });
+
+    const reportTask=async segment=>{
+      const key=segment===16?'report1600':'report2100';
+      try{
+        const [reportResult,peopleResult]=await Promise.allSettled([
+          postReadOnly({action:'read',date:taipeiDate(),seg:segment,...credential}),
+          postReadOnly({action:'pread',date:taipeiDate(),seg:segment,...credential})
+        ]);
+        if(reportResult.status==='rejected') throw reportResult.reason;
+        const report=adaptReport(segment,reportResult.value.data,peopleResult.status==='fulfilled'?peopleResult.value.data:{},reportResult.value.summary);
+        reportRows[segment]=report;
+        contract[key]=C.moduleState({status:report.completedStores===0?'no_data':report.completedStores===9&&report.summaryAvailable?'ok':'partial',updatedAt:nowIso(),sourceUpdatedAt:report.updatedAt,stale:false,source:moduleSource('北一二B每日回報','index.html'),data:report,note:!report.summaryAvailable?'正式來源尚未提供 report summary adapter；營運摘要 fail-closed。':report.completedStores===0?`尚未進入／尚無正式 ${segment}:00 回報`:''});
+        failureRows[segment]=peopleResult.status==='fulfilled'?failureSummary(report):{unavailable:true,failedStoreCount:null,failedPeopleCount:null,missingStores:report.missingStores,byMetric:null,people:null};
+      }catch(error){
+        reportRows[segment]=null;
+        contract[key]=privateFailureModule(key,error,`${segment}:00 正式回報`);
+        failureRows[segment]={unavailable:true,failedStoreCount:null,failedPeopleCount:null,missingStores:[],byMetric:null,people:null};
+      }
+      updateOperations();
+    };
+    await Promise.allSettled([kpiTask,reportTask(16),reportTask(21)]);
+    setPrivateAccessState('approved','已由既有 Approved Device 完成正式唯讀模組載入。');
   }
 
   async function requestDeviceBinding(employeeId, bootstrapCode) {
@@ -654,6 +747,9 @@
   function patrolUnlockState(message = '解鎖後顯示班表／巡店') {
     return `<div class="unlock-state"><span>${escapeHtml(message)}</span><button class="unlock-cta" type="button" data-unlock-patrol>班表／巡店解鎖</button></div>`;
   }
+  function staleBanner(module) {
+    return module&&module.status==='stale'?`<p class="stale-note">${escapeHtml(module.note||'上次成功資料')}</p>`:'';
+  }
 
   function renderFullKpis(items, contextLabel) {
     const rows = Array.isArray(items) ? items : [];
@@ -708,14 +804,14 @@
     dom('#appUpdatedAt').textContent = `updatedAt ${formatTime(contract.generatedAt,'—')}`;
     const mode = dom('#dataMode');
     mode.className = `mode-pill${contract.mode === 'preview' ? ' preview' : privateAccessStatus === 'approved' ? ' safe' : privateAccessStatus === 'pending' ? ' pending' : ' locked'}`;
-    mode.textContent = contract.mode === 'preview' ? 'Preview／示意資料' : privateAccessStatus === 'approved' ? '正式唯讀' : privateAccessStatus === 'pending' ? '裝置待核准' : '解鎖正式資料';
+    mode.textContent = contract.mode === 'preview' ? 'Preview／示意資料' : privateAccessStatus === 'approved' ? '正式唯讀' : privateAccessStatus === 'pending' ? '裝置待核准' : privateAccessStatus === 'error' ? '正式資料讀取失敗' : '解鎖正式資料';
     dom('#previewBanner').hidden = contract.mode !== 'preview';
     document.body.classList.toggle('preview-mode',contract.mode === 'preview');
   }
 
   function renderOperations() {
     const rows = contract.todayOperations.data && contract.todayOperations.data.segments || [];
-    dom('#operationsRows').innerHTML = rows.length ? rows.map(segment => {
+    dom('#operationsRows').innerHTML = rows.length ? staleBanner(contract.todayOperations)+rows.map(segment => {
       const failures = contract.reportFailures.data && contract.reportFailures.data[segment.segment] || {};
       const missing = segment.missingStores ? segment.missingStores.length : Math.max(0,9-segment.completedStores);
       const summaryMetrics = segment.summaryMetrics || {};
@@ -724,24 +820,27 @@
         <span class="operation-time">${escapeHtml(segment.segment)}:00</span>
         <span class="operation-metric"><span>已回報</span><b class="${segment.completedStores===9?'good':'warn'}">${segment.completedStores}/9</b></span>
         <span class="operation-metric"><span>缺店</span><b class="${missing?'warn':'good'}">${missing}</b></span>
-        <span class="operation-metric"><span>未過店</span><b class="${failures.failedStoreCount?'bad':'good'}">${failures.failedStoreCount || 0}</b></span>
-        <span class="operation-metric"><span>未過人</span><b class="${failures.failedPeopleCount?'bad':'good'}">${failures.failedPeopleCount || 0}</b></span>
+        <span class="operation-metric"><span>未過店</span><b class="${failures.unavailable?'warn':failures.failedStoreCount?'bad':'good'}">${failures.unavailable?'—':failures.failedStoreCount || 0}</b></span>
+        <span class="operation-metric"><span>未過人</span><b class="${failures.unavailable?'warn':failures.failedPeopleCount?'bad':'good'}">${failures.unavailable?'—':failures.failedPeopleCount || 0}</b></span>
         <button class="attention-button" type="button" data-toggle-operation="${segment.segment}" aria-label="展開 ${segment.segment}:00 戰況"><i data-lucide="triangle-alert"></i></button>
       </div><div class="operation-detail"><div class="operation-detail-summary">${['A999','好速','R999','R1399'].filter(key=>summaryMetrics[key]).map(key=>`<span>${key} ${formatOperationMetric(summaryMetrics[key])}</span>`).join('') || '<span>正式營運摘要尚無資料</span>'}</div>
         <div class="operation-detail-summary operation-detail-percent">${['保險搭售率','設備案佔比'].filter(key=>summaryMetrics[key]).map(key=>`<span>${key==='保險搭售率'?'保險':'設備案'} ${formatOperationMetric(summaryMetrics[key])}</span>`).join('')}</div>
         <p>${segment.missingStores.length?`未回報：${segment.missingStores.map(escapeHtml).join('、')}`:'九店已完成回報'}${failingPeople.length?`｜未過關：${failingPeople.slice(0,3).map(person=>`${escapeHtml(person.store)} ${escapeHtml(person.name)}（${escapeHtml(person.failed.join('、'))}）`).join('、')}`:'｜目前無正式未過關紀錄'}</p>
         <div>${segment.stores.filter(store=>store.reported).map(store=>`<div class="operation-store-mini"><span>${escapeHtml(store.name)}</span>${['A999','好速','R999','R1399'].map(key=>`<span>${store.metrics&&store.metrics[key]!=null?fmtNumber(store.metrics[key],1):'—'}</span>`).join('')}</div>`).join('')}</div>
       </div></article>`;
-    }).join('') : privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '正式回報摘要尚未解鎖');
+    }).join('') : contract.todayOperations.status==='unauthorized'
+      ? privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '正式回報摘要尚未解鎖')
+      : `<div class="empty-state">${escapeHtml(contract.todayOperations.note||'正式回報讀取失敗')}</div>`;
   }
 
   function renderKpiHero() {
-    if (contract.kpiSummary.status === 'unauthorized') {
-      dom('#kpiHero').innerHTML = privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : 'KPI／台獎／回報尚未解鎖');
+    if (!contract.kpiSummary.data) {
+      const message=contract.kpiSummary.status==='unauthorized'?(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : 'KPI／台獎／回報尚未解鎖'):(contract.kpiSummary.note||'正式 KPI 讀取失敗');
+      dom('#kpiHero').innerHTML = contract.kpiSummary.status==='unauthorized'?privateUnlockState(message):`<div class="empty-state">${escapeHtml(message)}</div>`;
       return;
     }
     const data = contract.kpiSummary.data || {};
-    dom('#kpiHero').innerHTML = `<div class="kpi-stat"><span>KPI</span><strong class="cyan-value">${fmtPct(data.kpi)}</strong><div class="mini-progress"><i style="width:${Math.min(100,Math.max(0,Number(data.kpi||0)*100))}%"></i></div></div>
+    dom('#kpiHero').innerHTML = `${staleBanner(contract.kpiSummary)}<div class="kpi-stat"><span>KPI</span><strong class="cyan-value">${fmtPct(data.kpi)}</strong><div class="mini-progress"><i style="width:${Math.min(100,Math.max(0,Number(data.kpi||0)*100))}%"></i></div></div>
       <div class="kpi-stat"><span>公司排名</span><strong class="gold-value">${data.companyRank == null?'—':escapeHtml(data.companyRank)}</strong><small>/ ${data.companyRankTotal || '—'}</small></div>
       <div class="kpi-stat"><span>KPI DOD</span><strong class="${valueClass(data.kpiDod)}">${fmtSignedPct(data.kpiDod)}</strong></div>
       <div class="kpi-stat"><span>排名變動</span><strong class="${valueClass(data.rankChange)}">${fmtSigned(data.rankChange)}</strong></div>
@@ -762,18 +861,18 @@
   function renderStores() {
     const rows = Array.isArray(contract.kpiStores.data) ? contract.kpiStores.data.slice().sort((a,b)=>(b.kpi??-1)-(a.kpi??-1)) : [];
     dom('#kpiStoreUpdated').textContent = `更新 ${formatTime(contract.kpiStores.sourceUpdatedAt)}`;
-    dom('#homeStoreList').innerHTML = rows.length ? rows.map(storeRow).join('') : contract.kpiStores.status === 'unauthorized' ? privateUnlockState('Approved Device 核准後顯示九店摘要') : '<div class="empty-state">正式來源目前沒有九店摘要。</div>';
+    dom('#homeStoreList').innerHTML = rows.length ? staleBanner(contract.kpiStores)+rows.map(storeRow).join('') : contract.kpiStores.status === 'unauthorized' ? privateUnlockState('Approved Device 核准後顯示九店摘要') : `<div class="empty-state">${escapeHtml(contract.kpiStores.status==='error'?(contract.kpiStores.note||'正式 KPI 讀取失敗'):'正式來源目前沒有九店摘要。')}</div>`;
   }
 
   function renderAwardsHome() {
-    if (contract.awardSummary.status === 'unauthorized') {
-      dom('#awardHome').innerHTML = `<h2 id="awardHomeTitle" class="sr-only">台獎總覽</h2>${privateUnlockState('台獎九店摘要尚未解鎖')}`;
+    if (!contract.awardSummary.data) {
+      dom('#awardHome').innerHTML = `<h2 id="awardHomeTitle" class="sr-only">台獎總覽</h2>${contract.awardSummary.status==='unauthorized'?privateUnlockState('台獎九店摘要尚未解鎖'):`<div class="empty-state">${escapeHtml(contract.awardSummary.note||'正式台獎讀取失敗')}</div>`}`;
       return;
     }
     const summary = contract.awardSummary.data || {};
     const stores = Array.isArray(contract.awardStores.data) ? contract.awardStores.data : [];
     const losingStores=summary.winningStores==null?'—':Math.max(0,Number(summary.totalStores||9)-Number(summary.winningStores));
-    dom('#awardHome').innerHTML = `<div class="award-summary"><h2 id="awardHomeTitle">台獎總覽</h2><span>領獎店數 <b>${summary.winningStores??'—'}<small> / 9</small></b></span><span>未領獎店數 <b>${losingStores}</b></span></div>
+    dom('#awardHome').innerHTML = `${staleBanner(contract.awardSummary)}<div class="award-summary"><h2 id="awardHomeTitle">台獎總覽</h2><span>領獎店數 <b>${summary.winningStores??'—'}<small> / 9</small></b></span><span>未領獎店數 <b>${losingStores}</b></span></div>
       <div class="award-list"><div class="award-row header"><span>店名</span><span>獎勵金額</span><span>狀態</span></div>${stores.map(row=>`<div class="award-row"><span>${escapeHtml(row.name)}</span><span class="award-amount">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</span><span><i class="award-tag ${row.eligible?'':'no'}">${row.eligible?'領獎':'未領獎'}</i></span></div>`).join('')}</div>
       <a class="award-link" href="#battle" data-open-awards>查看完整台獎摘要 <i data-lucide="arrow-right"></i></a>`;
   }
@@ -782,7 +881,8 @@
     const data = contract.scheduleToday.data;
     const node = dom('#scheduleHome');
     if (!data || !Array.isArray(data.stores) || !data.stores.length) {
-      node.innerHTML = `<div class="home-schedule-head"><span class="compact-icon"><i data-lucide="calendar-days"></i></span><div class="compact-copy"><h2 id="scheduleHomeTitle">今日班表</h2><p>${contract.scheduleToday.status==='unauthorized'?'班表／巡店尚未解鎖':'目前尚無班表摘要'}</p></div><span class="compact-next"><b>${formatDate(taipeiDate())}</b><small>${contract.scheduleToday.note||'唯讀'}</small></span></div>${contract.scheduleToday.status==='unauthorized'?patrolUnlockState('使用既有 30 分鐘短效授權'):''}`;
+      const message=contract.scheduleToday.status==='unauthorized'?'班表／巡店尚未解鎖':contract.scheduleToday.status==='error'?(contract.scheduleToday.note||'正式班表讀取失敗'):'目前尚無班表摘要';
+      node.innerHTML = `<div class="home-schedule-head"><span class="compact-icon"><i data-lucide="calendar-days"></i></span><div class="compact-copy"><h2 id="scheduleHomeTitle">今日班表</h2><p>${escapeHtml(message)}</p></div><span class="compact-next"><b>${formatDate(taipeiDate())}</b><small>${contract.scheduleToday.note||'唯讀'}</small></span></div>${contract.scheduleToday.status==='unauthorized'?patrolUnlockState('使用既有 30 分鐘短效授權'):''}`;
       return;
     }
     const working = data.stores.reduce((sum,row)=>sum+Number(row.working||0),0);
@@ -791,14 +891,15 @@
       const shifts = [...new Set((row.staff||[]).map(person=>person.status).filter(Boolean))];
       return `<div class="home-schedule-row"><span><b>${escapeHtml(row.store)}</b><small>${escapeHtml(shifts.join(' · ')||'尚無班別')}</small></span><span class="positive">上班 ${row.working}</span><span>休假 ${row.off}</span></div>`;
     }).join('');
-    node.innerHTML = `<div class="home-schedule-head"><span class="compact-icon"><i data-lucide="calendar-days"></i></span><div class="compact-copy"><h2 id="scheduleHomeTitle">今日班表</h2><p>${data.stores.length} 店 · 上班 ${working} 人 · 休假 ${off} 人</p></div><span class="compact-next"><b>${formatDate(data.date)}</b><small>更新 ${formatTime(contract.scheduleToday.sourceUpdatedAt)}</small></span></div><div class="home-schedule-list">${rows}</div><button class="home-schedule-toggle" type="button" data-toggle-home-schedule aria-expanded="false"><span>顯示九店當日班表</span><i data-lucide="chevron-down"></i></button>`;
+    node.innerHTML = `${contract.scheduleToday.status==='stale'?`<p class="stale-note">${escapeHtml(contract.scheduleToday.note)}</p>`:''}<div class="home-schedule-head"><span class="compact-icon"><i data-lucide="calendar-days"></i></span><div class="compact-copy"><h2 id="scheduleHomeTitle">今日班表</h2><p>${data.stores.length} 店 · 上班 ${working} 人 · 休假 ${off} 人</p></div><span class="compact-next"><b>${formatDate(data.date)}</b><small>更新 ${formatTime(contract.scheduleToday.sourceUpdatedAt)}</small></span></div><div class="home-schedule-list">${rows}</div><button class="home-schedule-toggle" type="button" data-toggle-home-schedule aria-expanded="false"><span>顯示九店當日班表</span><i data-lucide="chevron-down"></i></button>`;
   }
 
   function renderPatrolHome() {
     const data = contract.patrolToday.data;
     const node = dom('#patrolHome');
     if (!data || !Array.isArray(data.route) || !data.route.length) {
-      node.innerHTML = `<span class="compact-icon"><i data-lucide="route"></i></span><div class="compact-copy"><h2 id="patrolHomeTitle">今日巡店</h2><p>${contract.patrolToday.note || '今日無排定巡店'}</p></div><span class="compact-next"><b>${contract.patrolToday.status==='unauthorized'?'需解鎖':'今日無排定'}</b><small>不自行推測路線</small></span>${contract.patrolToday.status==='unauthorized'?patrolUnlockState('使用既有 30 分鐘短效授權'):''}`;
+      const message=contract.patrolToday.status==='error'?(contract.patrolToday.note||'正式巡店讀取失敗'):(contract.patrolToday.note || '今日無排定巡店');
+      node.innerHTML = `<span class="compact-icon"><i data-lucide="route"></i></span><div class="compact-copy"><h2 id="patrolHomeTitle">今日巡店</h2><p>${escapeHtml(message)}</p></div><span class="compact-next"><b>${contract.patrolToday.status==='unauthorized'?'需解鎖':contract.patrolToday.status==='error'?'讀取失敗':'今日無排定'}</b><small>不自行推測路線</small></span>${contract.patrolToday.status==='unauthorized'?patrolUnlockState('使用既有 30 分鐘短效授權'):''}`;
       return;
     }
     node.innerHTML = `<span class="compact-icon"><i data-lucide="route"></i></span><div class="compact-copy"><h2 id="patrolHomeTitle">今日巡店</h2><p>${data.route.map(escapeHtml).join(' → ')}</p></div><span class="compact-next"><b>下一站：${escapeHtml(data.nextStop||'—')}</b><small>${data.nextEta?`預計 ${escapeHtml(data.nextEta)} 到達`:''}</small></span>`;
@@ -890,6 +991,18 @@
       content.innerHTML = privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '解鎖後顯示 KPI／台獎正式摘要');
       return;
     }
+    if (battleKind === 'kpi' && !contract.kpiSummary.data) {
+      content.innerHTML=`<div class="empty-state">${escapeHtml(contract.kpiSummary.note||'正式 KPI 讀取失敗')}</div>`;
+      return;
+    }
+    if (battleKind === 'award' && !contract.awardSummary.data) {
+      content.innerHTML=`<div class="empty-state">${escapeHtml(contract.awardSummary.note||'正式台獎讀取失敗')}</div>`;
+      return;
+    }
+    if (battleKind === 'personal' && !contract.personalPerformance.data) {
+      content.innerHTML=`<div class="empty-state">${escapeHtml(contract.personalPerformance.note||'正式個績讀取失敗')}</div>`;
+      return;
+    }
     const stores = Array.isArray(contract.kpiStores.data)?contract.kpiStores.data:[];
     const awardStores = Array.isArray(contract.awardStores.data)?contract.awardStores.data:[];
     const select = dom('#battleStoreSelect');
@@ -912,6 +1025,8 @@
       const row=awardStores.find(item=>item.name===selected);
       content.innerHTML=row?`<div class="award-selected-store"><span>店點</span><strong>${escapeHtml(row.name)}</strong></div><div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>正式台獎金額</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div>${renderAwardStoreItems(row)}<a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
     } else content.innerHTML = renderPersonalPerformance(selected);
+    const battleModule=battleKind==='kpi'?contract.kpiSummary:battleKind==='award'?contract.awardSummary:contract.personalPerformance;
+    if(battleModule.status==='stale') content.insertAdjacentHTML('afterbegin',staleBanner(battleModule));
     refreshIcons();
   }
 
@@ -933,13 +1048,13 @@
 
   function renderReport() {
     const module=activeReport(); const report=module.data; const failures=contract.reportFailures.data&&contract.reportFailures.data[reportSegment];
-    if (!report) { dom('#reportOverview').innerHTML=privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '解鎖後顯示 16:00／21:00 正式回報'); dom('#reportOperations').innerHTML=''; dom('#reportFeedbackSummary').innerHTML=''; dom('#reportFailures').innerHTML=''; dom('#reportStoreList').innerHTML=''; return; }
-    dom('#reportOverview').innerHTML=`<div class="report-summary"><article><span>完成店數</span><b class="${report.completedStores===9?'positive':''}">${report.completedStores}/9</b></article><article><span>尚未完成</span><b class="${report.missingStores.length?'negative':'positive'}">${report.missingStores.length}</b></article><article><span>最後更新</span><b>${escapeHtml(report.updatedAt||'—')}</b></article></div>${report.missingStores.length?`<p class="stale-note">尚未完成：${report.missingStores.map(escapeHtml).join('、')}</p>`:''}`;
+    if (!report) { const message=module.status==='unauthorized'?(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '解鎖後顯示 16:00／21:00 正式回報'):(module.note||'正式回報讀取失敗'); dom('#reportOverview').innerHTML=module.status==='unauthorized'?privateUnlockState(message):`<div class="empty-state">${escapeHtml(message)}</div>`; dom('#reportOperations').innerHTML=''; dom('#reportFeedbackSummary').innerHTML=''; dom('#reportFailures').innerHTML=''; dom('#reportStoreList').innerHTML=''; return; }
+    dom('#reportOverview').innerHTML=`${staleBanner(module)}<div class="report-summary"><article><span>完成店數</span><b class="${report.completedStores===9?'positive':''}">${report.completedStores}/9</b></article><article><span>尚未完成</span><b class="${report.missingStores.length?'negative':'positive'}">${report.missingStores.length}</b></article><article><span>最後更新</span><b>${escapeHtml(report.updatedAt||'—')}</b></article></div>${report.missingStores.length?`<p class="stale-note">尚未完成：${report.missingStores.map(escapeHtml).join('、')}</p>`:''}`;
     const summaryMetrics=report.summaryMetrics||{};
     dom('#reportOperations').innerHTML=report.summaryAvailable&&Object.keys(summaryMetrics).length?`<div class="report-operation-grid">${['A999','好速','R1399','R999','保險搭售率','設備案佔比'].filter(key=>summaryMetrics[key]).map(key=>`<article><span>${escapeHtml(key==='A999'?'A999 上線數':key==='好速'?'好速銷售點數':key==='R1399'?'R1399 上線數':key==='R999'?'R999 上線數':key)}</span><b>${formatOperationMetric(summaryMetrics[key])}</b></article>`).join('')}</div>`:`<div class="empty-state">${module.status==='no_data'?`尚未進入／尚無正式 ${report.segment}:00 回報`:'正式來源尚未提供營運摘要欄位；App 不自行計算。'}</div>`;
     const feedbackStores=report.stores.filter(store=>storeFeedbackEntries(store.storeFeedback).length);
     dom('#reportFeedbackSummary').innerHTML=feedbackStores.length?`<div class="report-feedback-list">${feedbackStores.map(store=>`<article class="report-feedback-card"><h3>🏪 ${escapeHtml(store.name)}</h3>${renderStoreFeedback(store.storeFeedback,true)}</article>`).join('')}</div>`:'<div class="empty-state">此時段目前沒有正式門市回覆。</div>';
-    dom('#reportFailures').innerHTML=failures?`<div class="failure-summary"><div class="failure-grid"><div><span>未過關店數</span><b class="${failures.failedStoreCount?'negative':'positive'}">${failures.failedStoreCount}</b></div><div><span>未過關人數</span><b class="${failures.failedPeopleCount?'negative':'positive'}">${failures.failedPeopleCount}</b></div><div><span>未回報店點</span><b>${failures.missingStores.length}</b></div><div><span>各指標未過人數</span><b>${Object.entries(failures.byMetric||{}).map(([key,value])=>`${escapeHtml(key)} ${value}`).join(' · ')||'0'}</b></div></div><div class="tracking-list">${(failures.people||[]).map(person=>`<div class="tracking-item"><b>${escapeHtml(person.store)} · ${escapeHtml(person.name)}</b><br>${escapeHtml(person.failed.join('、')||'未過關')}｜${escapeHtml(person.reason||'尚未填寫原因')}</div>`).join('')||'<div class="empty-state">目前沒有正式未過關紀錄。</div>'}</div></div>`:'<div class="empty-state">尚無個人未過關資料。</div>';
+    dom('#reportFailures').innerHTML=failures&&!failures.unavailable?`<div class="failure-summary"><div class="failure-grid"><div><span>未過關店數</span><b class="${failures.failedStoreCount?'negative':'positive'}">${failures.failedStoreCount}</b></div><div><span>未過關人數</span><b class="${failures.failedPeopleCount?'negative':'positive'}">${failures.failedPeopleCount}</b></div><div><span>未回報店點</span><b>${failures.missingStores.length}</b></div><div><span>各指標未過人數</span><b>${Object.entries(failures.byMetric||{}).map(([key,value])=>`${escapeHtml(key)} ${value}`).join(' · ')||'0'}</b></div></div><div class="tracking-list">${(failures.people||[]).map(person=>`<div class="tracking-item"><b>${escapeHtml(person.store)} · ${escapeHtml(person.name)}</b><br>${escapeHtml(person.failed.join('、')||'未過關')}｜${escapeHtml(person.reason||'尚未填寫原因')}</div>`).join('')||'<div class="empty-state">目前沒有正式未過關紀錄。</div>'}</div></div>`:`<div class="empty-state">${failures&&failures.unavailable?'正式個人回報讀取失敗':'尚無個人未過關資料。'}</div>`;
     dom('#reportStoreList').innerHTML=report.stores.map(store=>{
       const failed=store.people.filter(person=>person.status==='fail').length;
       const status=!store.reported?'未回報':failed?'未過關':store.people.length?'過關':'已回報';
@@ -983,7 +1098,7 @@
 
   function halfMonthData() {
     if(PREVIEW_MODE) return scope.LiamSupervisorHalfMonthPreviewData||null;
-    if(!H||halfMonthReadState!=='ok') return null;
+    if(!H||!['ok','stale'].includes(halfMonthReadState)) return null;
     return H.adapt({rows:halfMonthFormalRows,stores:STORES,date:taipeiDate(),period:halfMonthSelectedPeriod,normalizeStore});
   }
 
@@ -1042,7 +1157,7 @@
       return `<article class="half-preview-store"><div><strong>${escapeHtml(store.name)}</strong><small>${store.latestDate?`最近填寫 ${escapeHtml(formatReliableDateOnly(store.latestDate))}`:'本期尚無填寫資料'}</small></div><div class="half-preview-store-status ${className}"><i data-lucide="${icon}"></i><b>${label}</b><small>異常 ${store.abnormalCount||0}</small></div></article>`;
     }).join('');
     const periodControl=PREVIEW_MODE?'':`<div class="segmented half-period-selector" role="group" aria-label="半月期別"><button type="button" class="${data.period.key==='H1'?'active':''}" data-half-period="H1" aria-pressed="${data.period.key==='H1'}">上半月</button><button type="button" class="${data.period.key==='H2'?'active':''}" data-half-period="H2" aria-pressed="${data.period.key==='H2'}">下半月</button></div>`;
-    const readBanner=PREVIEW_MODE?'<b>PREVIEW / 尚未寫入正式資料</b><span>本頁只驗證資訊架構；未呼叫 hwrite 或媒體上傳。</span>':'<b>FORMAL READ / 正式唯讀</b><span>資料來自 hread；填寫進度是 18 題完整度，不是 backend completed。</span>';
+    const readBanner=PREVIEW_MODE?'<b>PREVIEW / 尚未寫入正式資料</b><span>本頁只驗證資訊架構；不會寫入正式資料或上傳媒體。</span>':'<b>FORMAL READ / 正式唯讀</b><span>資料來自 hread；填寫進度是 18 題完整度，不是 backend completed。</span>';
     return `<section class="preview-only-banner">${readBanner}</section>
       ${open?`<section class="half-preview-location"><i data-lucide="map-pin"></i><div><span>目前在：</span><b>${escapeHtml(normalizeStore(open.store))}</b><small>到店不會自動開始檢查</small></div></section>`:''}
       <section class="panel half-preview-period"><div class="panel-head"><div><h2>本期半月督導檢查</h2><small>${escapeHtml(data.source&&data.source.label||'正式 hread contract')}</small></div></div><strong>${escapeHtml(data.period&&data.period.label||'—')}</strong><span>${escapeHtml(data.period&&data.period.dateRange||'—')}</span>${periodControl}</section>
@@ -1053,7 +1168,7 @@
         <article><span>尚未填</span><b class="${summary.emptyStores?'negative':''}">${summary.emptyStores==null?'—':`${summary.emptyStores} 店`}</b></article>
       </section>
       <section class="panel half-preview-stores"><div class="panel-head"><div><h2>九店本期狀態</h2><small>顯示 18 題填寫進度，不代表 backend completed</small></div></div>${storeRows}</section>
-      <button class="half-preview-start" type="button" data-half-preview-action="start">+ 開始檢查 Preview</button>`;
+      <button class="half-preview-start" type="button" data-half-preview-action="start">${PREVIEW_MODE?'+ 開始檢查 Preview':'查看半月檢查內容'}</button>`;
   }
 
   function renderHalfMonthForm(data) {
@@ -1068,21 +1183,21 @@
       return `<article class="half-preview-question ${abnormal?'issue':''}" data-half-preview-question="${question.item}">
         <div class="half-preview-question-head"><span>${String(question.item).padStart(2,'0')}</span><strong>${escapeHtml(question.title)}</strong></div>
         <small class="half-preview-result-label">目前值：${escapeHtml(H&&H.RESULT_LABELS[answer.result||'']||'尚未填寫')}</small>
-        <div class="half-preview-statuses" role="group" aria-label="第 ${question.item} 題狀態">${formStatuses.map(status=>`<button type="button" class="${answer.result===status.value?'active':''}" data-half-answer="${status.value}">${escapeHtml(status.label)}</button>`).join('')}</div>
+        <div class="half-preview-statuses" role="group" aria-label="第 ${question.item} 題狀態">${formStatuses.map(status=>`<button type="button" class="${answer.result===status.value?'active':''}" data-half-answer="${status.value}" ${PREVIEW_MODE?'':'disabled'}>${escapeHtml(status.label)}</button>`).join('')}</div>
         <div class="half-preview-abnormal" ${abnormal?'':'hidden'}>
-          <label>缺失內容<textarea rows="2" data-half-note placeholder="原文記錄，不自動改寫">${escapeHtml(answer.note||'')}</textarea></label>
-          <label>改善說明<textarea rows="2" data-half-improvement placeholder="改善做法／待追蹤事項">${escapeHtml(answer.improvement||'')}</textarea></label>
+          <label>缺失內容<textarea rows="2" data-half-note placeholder="原文記錄，不自動改寫" ${PREVIEW_MODE?'':'readonly'}>${escapeHtml(answer.note||'')}</textarea></label>
+          <label>改善說明<textarea rows="2" data-half-improvement placeholder="改善做法／待追蹤事項" ${PREVIEW_MODE?'':'readonly'}>${escapeHtml(answer.improvement||'')}</textarea></label>
           <label>佐證／Drive 連結（本輪唯讀）<textarea rows="2" data-half-evidence readonly>${escapeHtml(answer.evidence||'')}</textarea></label>
         </div>
         ${sourceOriginal}
       </article>`;
     }).join('');
     const progress=halfMonthPreviewProgress(data);
-    return `<section class="preview-only-banner"><b>PREVIEW / 尚未寫入正式資料</b><span>暫存與完成只存在此頁記憶體，不會呼叫正式 write。</span></section>
+    return `<section class="preview-only-banner"><b>${PREVIEW_MODE?'PREVIEW / 尚未寫入正式資料':'FORMAL READ / 正式唯讀'}</b><span>${PREVIEW_MODE?'暫存與完成只存在此頁記憶體，不會寫入正式資料。':'本頁僅顯示正式現值，所有修改與儲存操作均已停用。'}</span></section>
       ${open?`<section class="half-preview-location"><i data-lucide="map-pin"></i><div><span>目前在：</span><b>${escapeHtml(normalizeStore(open.store))}</b><small>店點僅預選，仍由 Liam 主動開始</small></div></section>`:''}
       <section class="panel half-preview-form-meta"><div class="panel-head"><div><h2>${escapeHtml(data.period.label)}</h2><small>${escapeHtml(data.period.dateRange)}</small></div></div><label>檢查店點<select id="halfMonthStore" required>${options}</select></label></section>
       <div class="half-preview-questions">${questions}</div>
-      <div class="half-preview-sticky"><div><b id="halfMonthProgress">已填 ${progress.completed} / ${progress.total}</b><span id="halfMonthPreviewMessage">${escapeHtml(halfMonthPreviewMessage)}</span></div><button type="button" data-half-preview-action="draft">暫存</button><button type="button" data-half-preview-action="complete">完成 Preview</button></div>`;
+      <div class="half-preview-sticky"><div><b id="halfMonthProgress">已填 ${progress.completed} / ${progress.total}</b><span id="halfMonthPreviewMessage">${escapeHtml(halfMonthPreviewMessage)}</span></div>${PREVIEW_MODE?'<button type="button" data-half-preview-action="draft">暫存</button><button type="button" data-half-preview-action="complete">完成 Preview</button>':''}</div>`;
   }
 
   function renderHalfMonthResult(data) {
@@ -1114,7 +1229,8 @@
       container.innerHTML='<section class="preview-only-banner"><b>FORMAL READ / 唯讀</b><span>切換至本頁後才讀取 hread；不會呼叫正式 write。</span></section><div class="empty-state">準備讀取半月督導檢查。</div>';
       return;
     }
-    container.innerHTML=halfMonthPreviewScreen==='form'?renderHalfMonthForm(data):halfMonthPreviewScreen==='result'?renderHalfMonthResult(data):renderHalfMonthOverview(data);
+    const content=halfMonthPreviewScreen==='form'?renderHalfMonthForm(data):halfMonthPreviewScreen==='result'?renderHalfMonthResult(data):renderHalfMonthOverview(data);
+    container.innerHTML=`${halfMonthReadState==='stale'?`<p class="stale-note">${escapeHtml(halfMonthReadMessage)}</p>`:''}${content}`;
     refreshIcons();
   }
 
@@ -1147,9 +1263,11 @@
       halfMonthFormalRows=response.rows;
       halfMonthReadState='ok';
     }catch(error){
-      halfMonthFormalRows=[];
       halfMonthReadMessage=String(error&&error.message||'正式半月資料讀取失敗。');
-      halfMonthReadState=/授權已逾時/.test(halfMonthReadMessage)?'unauthorized':'error';
+      const unauthorized=/授權已逾時/.test(halfMonthReadMessage);
+      halfMonthReadState=unauthorized?'unauthorized':halfMonthFormalRows.length?'stale':'error';
+      if(halfMonthReadState==='stale') halfMonthReadMessage=`上次成功資料 · ${halfMonthReadMessage}`;
+      else if(halfMonthReadState!=='unauthorized') halfMonthFormalRows=[];
       if(halfMonthReadState==='unauthorized') setMessage('#patrolAccessMessage','班表／巡店授權已逾時，請重新驗證','error');
     }
     renderHalfMonthCheck();
@@ -1178,11 +1296,11 @@
         ? `<div class="patrol-unvisited"><b>未巡店點</b><p>${overview.unvisited.map(escapeHtml).join('、')}</p></div>`
         : `<div class="patrol-unvisited"><b>未巡店點</b><p>${overview.periodVerified?'無':'等待正式期間資料'}</p></div>`;
       const verificationNote=overview.periodVerified?'':'<p class="stale-note">巡店純讀取規則無法建立本月大盤，本頁已 fail-closed。</p>';
-      dom('#patrolOverview').innerHTML=`<section class="panel patrol-progress-panel"><div class="panel-head"><div><h2>本月巡店大盤進度</h2><small>${escapeHtml(overview.statisticsPeriod||'—')}</small></div></div><div class="patrol-progress-hero"><div><span>本月巡店率</span><strong class="${rate!=null&&rate<1?'gold-value':'positive'}">${fmtPct(rate)}</strong></div><div class="patrol-progress-track" role="progressbar" aria-label="本月巡店率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${rate==null?0:Math.round(progressWidth)}"><i style="width:${progressWidth}%"></i></div></div><div class="patrol-kpis patrol-kpis-four"><article><span>本月已巡店數</span><b class="positive">${completed==null?'—':completed}</b></article><article><span>全項完成店數</span><b class="positive">${overview.fullyDone==null?'—':overview.fullyDone}</b></article><article><span>尚缺檢核項次</span><b class="${overview.totalMissingItems?'negative':'positive'}">${overview.totalMissingItems==null?'—':overview.totalMissingItems}</b></article><article><span>尚未巡店數</span><b class="${remaining?'negative':'positive'}">${remaining==null?'—':remaining}</b></article></div><div class="patrol-rule-summary"><span>需關注店 <b class="${attentionCount?'negative':'positive'}">${attentionCount}</b></span><span>題 18 週期 <b>${escapeHtml(overview.item18Window&&overview.item18Window.label||'—')}</b></span><span>題 19–33 <b>每月 20 日前</b></span></div>${unvisitedBlock}${verificationNote}</section>${renderPatrolRuleBoards(overview)}`;
-    } else dom('#patrolOverview').innerHTML=contract.patrolOverview.status==='unauthorized'?patrolUnlockState('解鎖後顯示巡店大盤'):'<div class="empty-state">正式來源目前沒有巡店大盤。</div>';
+      dom('#patrolOverview').innerHTML=`${contract.patrolOverview.status==='stale'?`<p class="stale-note">${escapeHtml(contract.patrolOverview.note)}</p>`:''}<section class="panel patrol-progress-panel"><div class="panel-head"><div><h2>本月巡店大盤進度</h2><small>${escapeHtml(overview.statisticsPeriod||'—')}</small></div></div><div class="patrol-progress-hero"><div><span>本月巡店率</span><strong class="${rate!=null&&rate<1?'gold-value':'positive'}">${fmtPct(rate)}</strong></div><div class="patrol-progress-track" role="progressbar" aria-label="本月巡店率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${rate==null?0:Math.round(progressWidth)}"><i style="width:${progressWidth}%"></i></div></div><div class="patrol-kpis patrol-kpis-four"><article><span>本月已巡店數</span><b class="positive">${completed==null?'—':completed}</b></article><article><span>全項完成店數</span><b class="positive">${overview.fullyDone==null?'—':overview.fullyDone}</b></article><article><span>尚缺檢核項次</span><b class="${overview.totalMissingItems?'negative':'positive'}">${overview.totalMissingItems==null?'—':overview.totalMissingItems}</b></article><article><span>尚未巡店數</span><b class="${remaining?'negative':'positive'}">${remaining==null?'—':remaining}</b></article></div><div class="patrol-rule-summary"><span>需關注店 <b class="${attentionCount?'negative':'positive'}">${attentionCount}</b></span><span>題 18 週期 <b>${escapeHtml(overview.item18Window&&overview.item18Window.label||'—')}</b></span><span>題 19–33 <b>每月 20 日前</b></span></div>${unvisitedBlock}${verificationNote}</section>${renderPatrolRuleBoards(overview)}`;
+    } else dom('#patrolOverview').innerHTML=contract.patrolOverview.status==='unauthorized'?patrolUnlockState('解鎖後顯示巡店大盤'):`<div class="empty-state">${escapeHtml(contract.patrolOverview.status==='error'?(contract.patrolOverview.note||'正式巡店讀取失敗'):'正式來源目前沒有巡店大盤。')}</div>`;
     dom('#patrolTodayDetail').innerHTML=today&&today.route&&today.route.length?`<section class="patrol-today-card"><h2>今日巡店</h2><div class="route-line"><b>${today.route.map(escapeHtml).join(' → ')}</b></div><div class="route-line">已完成 ${today.completed}/${today.total} · 下一站 ${escapeHtml(today.nextStop||'—')} · ${escapeHtml(today.nextEta||'—')}</div></section>`:`<section class="patrol-today-card"><h2>今日巡店</h2><div class="route-line">${escapeHtml(contract.patrolToday.note||'今日無排定巡店')}</div></section>`;
-    dom('#patrolStoreList').innerHTML=overview&&overview.stores?overview.stores.map(row=>`<div class="patrol-store-row"><span>${escapeHtml(row.name)}</span><span>${escapeHtml(row.lastVisit||'—')}</span><span>${row.daysSince==null?'—':row.daysSince+' 天'}</span><span class="${row.status==='attention'||row.status==='pending'?'negative':'positive'}">${escapeHtml(row.result||row.status)}<small>題18 ${row.item18&&row.item18.status==='done'?'完成':'未完成'} · 題19–33 ${row.awareness?row.awareness.count:0}/15</small></span></div>`).join(''):'<div class="empty-state">尚無店點巡店摘要。</div>';
-    dom('#patrolRecentList').innerHTML=overview&&overview.recent&&overview.recent.length?overview.recent.map(row=>`<div class="recent-row"><span>${escapeHtml(formatDate(row.date))}</span><span>${escapeHtml(row.store)}</span><span class="${row.complete?'positive':'negative'}">${row.complete?'完成':`待補 ${row.missingItems} 項`}</span></div>`).join(''):'<div class="empty-state">尚無最近巡店紀錄。</div>';
+    dom('#patrolStoreList').innerHTML=overview&&overview.stores?overview.stores.map(row=>`<div class="patrol-store-row"><span>${escapeHtml(row.name)}</span><span>${escapeHtml(row.lastVisit||'—')}</span><span>${row.daysSince==null?'—':row.daysSince+' 天'}</span><span class="${row.status==='attention'||row.status==='pending'?'negative':'positive'}">${escapeHtml(row.result||row.status)}<small>題18 ${row.item18&&row.item18.status==='done'?'完成':'未完成'} · 題19–33 ${row.awareness?row.awareness.count:0}/15</small></span></div>`).join(''):`<div class="empty-state">${escapeHtml(contract.patrolStores.status==='error'?(contract.patrolStores.note||'正式巡店讀取失敗'):'尚無店點巡店摘要。')}</div>`;
+    dom('#patrolRecentList').innerHTML=overview&&overview.recent&&overview.recent.length?overview.recent.map(row=>`<div class="recent-row"><span>${escapeHtml(formatDate(row.date))}</span><span>${escapeHtml(row.store)}</span><span class="${row.complete?'positive':'negative'}">${row.complete?'完成':`待補 ${row.missingItems} 項`}</span></div>`).join(''):`<div class="empty-state">${escapeHtml(contract.patrolOverview.status==='error'?(contract.patrolOverview.note||'正式巡店讀取失敗'):'尚無最近巡店紀錄。')}</div>`;
     setPatrolCheckView(patrolCheckView);
   }
 
@@ -1192,10 +1310,10 @@
     const data=scheduleViewData&&scheduleViewData.date===date?scheduleViewData:
       (byDate&&byDate.selectedDate===date?{date,stores:byDate.stores}:(contract.scheduleToday.data&&contract.scheduleToday.data.date===date?contract.scheduleToday.data:null));
     dom('#scheduleSourceTime').textContent=`更新 ${formatTime(contract.scheduleToday.sourceUpdatedAt)}`;
-    if (!data||!Array.isArray(data.stores)) { const locked=contract.scheduleToday.status==='unauthorized'; dom('#scheduleList').className=locked?'locked-state':'empty-state'; dom('#scheduleList').innerHTML=locked?patrolUnlockState('解鎖後顯示九店人員、班別與上班／休假'): `${escapeHtml(date)} 尚無班表資料。`; return; }
+    if (!data||!Array.isArray(data.stores)) { const locked=contract.scheduleToday.status==='unauthorized'; dom('#scheduleList').className=locked?'locked-state':'empty-state'; dom('#scheduleList').innerHTML=locked?patrolUnlockState('解鎖後顯示九店人員、班別與上班／休假'):escapeHtml(contract.scheduleByDate.status==='error'?(contract.scheduleByDate.note||'正式班表讀取失敗'):`${date} 尚無班表資料。`); return; }
     const rows=data.stores.filter(row=>!filter||row.store===filter);
     dom('#scheduleList').className='';
-    dom('#scheduleList').innerHTML=rows.length?rows.map(row=>`<article class="schedule-store"><div class="schedule-store-head"><b>${escapeHtml(row.store)}</b><span>${row.working} 人上班 · ${row.off} 人休假</span></div>${(row.staff||[]).map(person=>`<div class="schedule-person ${person.working?'':'off'}"><span>${escapeHtml(person.name)} · ${escapeHtml(person.role||'—')}</span><i>${escapeHtml(person.status||'—')}</i></div>`).join('')}</article>`).join(''):`<div class="empty-state">${escapeHtml(date)} 尚無班表資料。</div>`;
+    dom('#scheduleList').innerHTML=`${contract.scheduleByDate.status==='stale'?`<p class="stale-note">${escapeHtml(contract.scheduleByDate.note)}</p>`:''}${rows.length?rows.map(row=>`<article class="schedule-store"><div class="schedule-store-head"><b>${escapeHtml(row.store)}</b><span>${row.working} 人上班 · ${row.off} 人休假</span></div>${(row.staff||[]).map(person=>`<div class="schedule-person ${person.working?'':'off'}"><span>${escapeHtml(person.name)} · ${escapeHtml(person.role||'—')}</span><i>${escapeHtml(person.status||'—')}</i></div>`).join('')}</article>`).join(''):`<div class="empty-state">${escapeHtml(date)} 尚無班表資料。</div>`}`;
   }
 
   function renderSystemStatus() {
@@ -1237,9 +1355,25 @@
 
   async function loadPatrolData() {
     const date=dom('#scheduleDate').value||taipeiDate(); const month=date.slice(0,7);
-    const results=await Promise.allSettled([patrolRead('sread',{month}),patrolRead('ptread'),patrolRead('ptvisit_read',{date:taipeiDate()})]); const readAt=nowIso();
-    if (results[0].status==='fulfilled') {
-      scheduleRaw=results[0].value.schedule; scheduleViewData=adaptSchedule(scheduleRaw,date);
+    const previousScheduleToday=contract.scheduleToday;
+    const previousScheduleByDate=contract.scheduleByDate;
+    const previousPatrolOverview=contract.patrolOverview;
+    const previousPatrolStores=contract.patrolStores;
+    const previousPatrolToday=contract.patrolToday;
+    const previousVisitEvents=patrolVisitEvents.slice();
+    const previousOpenVisit=patrolOpenVisit;
+    const markLoading=(module,label)=>C.moduleState({ ...module, status:'stale', stale:Boolean(module.data), note:module.data?`上次成功資料 · ${formatTime(module.updatedAt)} · 正在更新`:`${label}資料讀取中` });
+    contract.scheduleToday=markLoading(previousScheduleToday,'班表');
+    contract.scheduleByDate=markLoading(previousScheduleByDate,'班表');
+    contract.patrolOverview=markLoading(previousPatrolOverview,'巡店');
+    contract.patrolStores=markLoading(previousPatrolStores,'巡店');
+    contract.patrolToday=markLoading(previousPatrolToday,'巡店');
+    patrolVisitError='今日到離店紀錄讀取中';
+    renderAll();
+
+    const scheduleTask=patrolRead('sread',{month}).then(result=>{
+      const readAt=nowIso();
+      scheduleRaw=result.schedule; scheduleViewData=adaptSchedule(scheduleRaw,date);
       contract.scheduleByDate=C.moduleState({status:scheduleViewData.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有班表 sread','patrol.html'),data:{selectedDate:date,availableMonth:String(scheduleRaw&&scheduleRaw.month||month),stores:scheduleViewData.stores}});
       const today=taipeiDate();
       if (scheduleRaw&&scheduleRaw.month===today.slice(0,7)) {
@@ -1247,31 +1381,46 @@
         contract.scheduleToday=C.moduleState({status:todayData.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有班表 sread','patrol.html'),data:todayData});
       }
       populateScheduleStores(scheduleViewData.stores.map(row=>row.store));
-    } else { const expired=/授權已逾時/.test(results[0].reason.message); scheduleRaw=null; scheduleViewData=null; contract.scheduleToday=statusModule('scheduleToday',expired?'unauthorized':'error',null,results[0].reason.message); contract.scheduleByDate=statusModule('scheduleByDate',expired?'unauthorized':'error',null,results[0].reason.message); if(expired)setMessage('#patrolAccessMessage','班表／巡店授權已逾時，請重新驗證','error'); }
-    if (results[1].status==='fulfilled') {
-      patrolRaw=results[1].value; const data=adaptPatrol(patrolRaw,month);
+      contract.generatedAt=readAt;
+      renderAll();
+    }).catch(error=>{
+      const expired=/授權已逾時/.test(error.message);
+      const note=String(error.message||readErrorNote(error,'正式班表'));
+      if(!expired&&previousScheduleToday.data){ contract.scheduleToday=C.moduleState({...previousScheduleToday,status:'stale',stale:true,note:`上次成功資料 · ${formatTime(previousScheduleToday.updatedAt)} · ${note}`}); contract.scheduleByDate=C.moduleState({...previousScheduleByDate,status:'stale',stale:true,note:`上次成功資料 · ${formatTime(previousScheduleByDate.updatedAt)} · ${note}`}); }
+      else { scheduleRaw=null; scheduleViewData=null; contract.scheduleToday=statusModule('scheduleToday',expired?'unauthorized':'error',null,note); contract.scheduleByDate=statusModule('scheduleByDate',expired?'unauthorized':'error',null,note); }
+      if(expired)setMessage('#patrolAccessMessage','班表／巡店授權已逾時，請重新驗證','error');
+      renderAll();
+    });
+
+    const patrolTask=patrolRead('ptread').then(result=>{
+      const readAt=nowIso();
+      patrolRaw=result; const data=adaptPatrol(patrolRaw,month);
       contract.patrolOverview=C.moduleState({status:data.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data});
       contract.patrolStores=C.moduleState({status:data.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data:data.stores});
       contract.patrolToday=C.moduleState({status:'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data:null,note:'現有正式來源未提供今日預定路線與移動時間'});
-    } else {
-      const expired=/授權已逾時/.test(results[1].reason.message);
-      contract.patrolOverview=statusModule('patrolOverview',expired?'unauthorized':'error',null,results[1].reason.message);
-      contract.patrolToday=statusModule('patrolToday',expired?'unauthorized':'error',null,results[1].reason.message);
-      contract.patrolStores=statusModule('patrolStores',expired?'unauthorized':'error',[],results[1].reason.message);
+      contract.generatedAt=readAt;
+      renderAll();
+    }).catch(error=>{
+      const expired=/授權已逾時/.test(error.message);
+      const note=String(error.message||readErrorNote(error,'正式巡店'));
+      if(!expired&&previousPatrolOverview.data){ contract.patrolOverview=C.moduleState({...previousPatrolOverview,status:'stale',stale:true,note:`上次成功資料 · ${formatTime(previousPatrolOverview.updatedAt)} · ${note}`}); contract.patrolStores=C.moduleState({...previousPatrolStores,status:'stale',stale:true,note:`上次成功資料 · ${formatTime(previousPatrolStores.updatedAt)} · ${note}`}); contract.patrolToday=C.moduleState({...previousPatrolToday,status:'stale',stale:Boolean(previousPatrolToday.data),note:`上次成功資料 · ${formatTime(previousPatrolToday.updatedAt)} · ${note}`}); }
+      else { contract.patrolOverview=statusModule('patrolOverview',expired?'unauthorized':'error',null,note); contract.patrolToday=statusModule('patrolToday',expired?'unauthorized':'error',null,note); contract.patrolStores=statusModule('patrolStores',expired?'unauthorized':'error',null,note); }
       if(expired)setMessage('#patrolAccessMessage','班表／巡店授權已逾時，請重新驗證','error');
-    }
-    if(results[2].status==='fulfilled') {
-      patrolVisitEvents=formalPatrolVisitEvents(results[2].value.events);
-      patrolOpenVisit=isFormalPatrolVisit(results[2].value.openVisit)?results[2].value.openVisit:latestOpenPatrolVisit(patrolVisitEvents);
-      patrolStaleOpenVisit=results[2].value.staleOpenVisit||null;
+      renderAll();
+    });
+
+    const visitTask=patrolRead('ptvisit_read',{date:taipeiDate()}).then(result=>{
+      patrolVisitEvents=formalPatrolVisitEvents(result.events);
+      patrolOpenVisit=isFormalPatrolVisit(result.openVisit)?result.openVisit:latestOpenPatrolVisit(patrolVisitEvents);
+      patrolStaleOpenVisit=result.staleOpenVisit||null;
       patrolVisitError='';
-    } else {
-      patrolVisitEvents=[];
-      patrolOpenVisit=null;
-      patrolStaleOpenVisit=null;
-      patrolVisitError=/授權已逾時/.test(results[2].reason.message)?'班表／巡店授權已逾時，請重新驗證':'到離店服務尚未可用；巡店唯讀大盤不受影響。';
-    }
-    contract.generatedAt=readAt; renderAll();
+      renderPatrolVisits();
+    }).catch(error=>{
+      if(previousVisitEvents.length){ patrolVisitEvents=previousVisitEvents; patrolOpenVisit=previousOpenVisit; patrolVisitError=`上次成功資料 · ${String(error.message||'今日到離店紀錄讀取失敗')}`; }
+      else { patrolVisitEvents=[]; patrolOpenVisit=null; patrolStaleOpenVisit=null; patrolVisitError=/授權已逾時/.test(error.message)?'班表／巡店授權已逾時，請重新驗證':String(error.message||'今日到離店紀錄讀取失敗'); }
+      renderPatrolVisits();
+    });
+    return Promise.allSettled([scheduleTask,patrolTask,visitTask]);
   }
 
   function populatePatrolVisitStores(names, selected = '') {
@@ -1394,6 +1543,7 @@
     }
     const halfAnswer=event.target.closest('[data-half-answer]');
     if(halfAnswer){
+      if(!PREVIEW_MODE) return;
       const card=halfAnswer.closest('[data-half-preview-question]');
       if(!card) return;
       captureHalfMonthPreviewForm();
@@ -1415,9 +1565,11 @@
         halfMonthPreviewResult=null;
         halfMonthPreviewScreen='form';
       }else if(action==='draft'){
+        if(!PREVIEW_MODE) return;
         captureHalfMonthPreviewForm();
         halfMonthPreviewMessage='已暫存於 Preview 記憶體；正式資料仍為 0 次寫入。';
       }else if(action==='complete'){
+        if(!PREVIEW_MODE) return;
         captureHalfMonthPreviewForm();
         const progress=halfMonthPreviewProgress(data);
         if(!halfMonthPreviewStore){ halfMonthPreviewMessage='請先選擇店點。'; }
@@ -1450,7 +1602,7 @@
     if(event.target.id!=='halfMonthStore') return;
     halfMonthPreviewStore=event.target.value;
     seedHalfMonthPreviewAnswers(halfMonthData(),halfMonthPreviewStore);
-    halfMonthPreviewMessage=PREVIEW_MODE?'已載入此店 Preview 值；修改只存在本機。':'已載入此店正式目前值；按「儲存目前進度」前不會寫入。';
+    halfMonthPreviewMessage=PREVIEW_MODE?'已載入此店 Preview 值；修改只存在本機。':'已載入此店正式目前值；目前為唯讀。';
     renderHalfMonthCheck();
   });
   scope.addEventListener('hashchange',()=>{ const name=location.hash.slice(1); if(all('[data-view]').some(view=>view.dataset.view===name))setView(name); });

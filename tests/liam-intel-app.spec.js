@@ -47,11 +47,13 @@ test('existing short session renders real-shape schedule and patrol data read-on
       fillTime: `2026/8/${index + 1} 10:00`, arriveTime: `2026/8/${index + 1} 10:00`, store,
       code: String(index + 1), item: 2, result: index === 0 ? '' : 'v', reason: index === 0 ? '待追蹤' : '', month: '2026-08', savedAt: `2026/8/${index + 1} 11:00`
     }));
+    const response = body => ({ ok:true, status:200, headers:{ get:()=>'application/json' }, text:async()=>JSON.stringify(body) });
     window.fetch = async (input, options = {}) => {
-      if (options.method === 'POST') return { json: async () => ({ status: 'ok', token: 'renewed-short-token' }) };
+      if (options.method === 'POST') return response({ status: 'ok', token: 'renewed-short-token' });
       const url = String(input);
-      if (url.includes('action=sread')) return { json: async () => ({ status: 'ok', schedule: { month: '2026-08', rocMonth: '民國115年08月', stores: scheduleStores } }) };
-      if (url.includes('action=ptread')) return { json: async () => ({ status: 'ok', stores: stores.map((name, index) => ({ name, code: String(index + 1) })), rows: patrolRows }) };
+      if (url.includes('action=sread')) return response({ status: 'ok', schedule: { month: '2026-08', rocMonth: '民國115年08月', stores: scheduleStores } });
+      if (url.includes('action=ptread')) return response({ status: 'ok', stores: stores.map((name, index) => ({ name, code: String(index + 1) })), rows: patrolRows });
+      if (url.includes('action=ptvisit_read')) return response({ status:'ok', events:[], openVisit:null });
       throw new Error(`unexpected request ${url}`);
     };
   }, { stores });

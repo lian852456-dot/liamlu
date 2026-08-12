@@ -135,6 +135,7 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
 });
 
 test('isolated patrol visit flow records arrival and departure with one protected POST per tap', async ({ page }) => {
+  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   const events=[
     {serverTime:'2026-08-11T14:57:50+08:00',date:'2026-08-11',action:'arrival',store:'台北通化',note:'DEPLOY_TEST_20260811T145733',visitSessionId:'deploy-test'},
     {serverTime:'2026-08-11T14:57:53+08:00',date:'2026-08-11',action:'departure',store:'台北通化',note:'DEPLOY_TEST_20260811T145733',visitSessionId:'deploy-test'}
@@ -147,7 +148,7 @@ test('isolated patrol visit flow records arrival and departure with one protecte
       if(payload.action==='ptauth') return route.fulfill({json:{status:'ok',token:'short-session-token'}});
       if(payload.action==='ptvisit_write') {
         writes+=1; submittedStores.push(payload.store);
-        const event={serverTime:writes===1?'2026-08-11T09:12:00+08:00':'2026-08-11T10:35:00+08:00',date:'2026-08-11',action:payload.visitAction,store:`台北${payload.store.replace(/^台北/,'')}`,note:payload.note,visitSessionId:'visit-1'};
+        const event={serverTime:`${today}T${writes===1?'09:12:00':'10:35:00'}+08:00`,date:today,action:payload.visitAction,store:`台北${payload.store.replace(/^台北/,'')}`,note:payload.note,visitSessionId:'visit-1'};
         events.push(event);
         return route.fulfill({json:{status:'ok',event,events,openVisit:payload.visitAction==='arrival'?event:null}});
       }
