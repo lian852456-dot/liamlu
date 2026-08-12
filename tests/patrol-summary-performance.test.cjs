@@ -22,6 +22,8 @@ test('ptsummary is authenticated, month-scoped, cached briefly and never returns
   assert.match(gas, /CacheService\.getScriptCache\(\)/);
   assert.match(gas, /if \(cached\) return JSON\.parse\(cached\)/);
   assert.match(gas, /if \(serialized\.length < 95000\) cache\.put/);
+  assert.match(gas, /sheet\.getRange\(lastRow, 12\)\.getValue\(\)/);
+  assert.doesNotMatch(gas, /sheet\.getRange\(2, 12, lastRow - 1, 1\)/);
 });
 
 test('ptdetail is an authenticated bounded lazy read', () => {

@@ -651,16 +651,9 @@ function patrolSummaryFillIsoDate_(row) {
 
 function patrolSummarySourceMeta_(sheet) {
   const lastRow = sheet.getLastRow();
-  const savedValues = lastRow > 1 ? sheet.getRange(2, 12, lastRow - 1, 1).getValues() : [];
-  let latestValue = '';
-  let latestEpoch = -1;
-  savedValues.forEach(function(row) {
-    const value = row[0];
-    const text = patrolTimeStr(value);
-    const epoch = value instanceof Date ? value.getTime() : Date.parse(text.replace(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/, '$1-$2-$3'));
-    if (Number.isFinite(epoch) && epoch > latestEpoch) { latestEpoch = epoch; latestValue = text; }
-    else if (latestEpoch < 0 && text) latestValue = text;
-  });
+  // 巡店正式寫入只會 append；以最後資料列的 server savedAt 作 source version。
+  // cache hit 不可再為了版本判定掃描 1,475+ 列，否則輕量摘要仍會被 transport latency 吃掉。
+  const latestValue = lastRow > 1 ? patrolTimeStr(sheet.getRange(lastRow, 12).getValue()) : '';
   return {
     sourceVersion:String(lastRow) + ':' + latestValue,
     sourceUpdatedAt:latestValue,
