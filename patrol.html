@@ -1391,6 +1391,7 @@ function cloudCall(action, params={}){
     if(!['ping','pthealth'].includes(action)&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized'};
     const query=[['action',action]];Object.keys(params).forEach(key=>query.push([key,String(params[key])]));
     if(!['ping','pthealth'].includes(action)) query.push(['token',PT_TOKEN]);
+    if(action==='ptsummary'||action==='ptdetail') query.push(['_r',String(Date.now())]);
     const url=GAS_URL+'?'+query.map(pair=>encodeURIComponent(pair[0])+'='+encodeURIComponent(pair[1])).join('&');
     const timeoutMs=action==='ptsummary'?20000:action==='ptdetail'?30000:0;
     const controller=timeoutMs?new AbortController():null;

@@ -269,6 +269,7 @@
     Object.entries(params).forEach(([key,value]) => {
       if (value !== '' && value != null) query.push([key,String(value)]);
     });
+    if (action === 'ptsummary' || action === 'ptdetail') query.push(['_r',String(Date.now())]);
     const url = `${PATROL_API}?${query.map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&')}`;
     const timeoutMs = PATROL_TIMEOUT_MS[action];
     const timeoutMessage = action === 'hread' ? '半月督導檢查讀取逾時，請點擊重試。'

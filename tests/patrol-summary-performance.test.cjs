@@ -40,10 +40,12 @@ test('App and patrol.html load ptsummary for dashboards and fail closed on trans
   const app = read('app.js');
   const patrol = read('patrol.html');
   assert.match(app, /patrolRead\('ptsummary',\{month\}\)/);
+  assert.match(app, /action === 'ptsummary' \|\| action === 'ptdetail'.*Date\.now\(\)/);
   assert.doesNotMatch(app, /patrolRead\('ptread'/);
   assert.match(app, /巡店資料讀取逾時/);
   assert.match(app, /data-retry-patrol/);
   assert.match(patrol, /cloudCall\('ptsummary',\{month:currentMonth\}\)/);
+  assert.match(patrol, /action==='ptsummary'\|\|action==='ptdetail'.*Date\.now\(\)/);
   assert.doesNotMatch(patrol, /cloudCall\('ptread'\)/);
   assert.match(patrol, /patrolSummaryUnavailableHTML/);
   assert.match(patrol, /上次成功資料/);
