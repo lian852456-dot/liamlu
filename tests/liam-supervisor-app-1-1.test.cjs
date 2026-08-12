@@ -58,12 +58,13 @@ test('Preview contract is visibly synthetic and contains the complete mobile sum
   assert.equal(data.patrolOverview.data.periodVerified, true);
 });
 
-test('App runtime keeps existing reads and allows only the isolated patrol visit write', () => {
+test('App runtime keeps existing reads and allows only isolated patrol visit and half-month text writes', () => {
   const code = read('app.js');
   assert.match(code, /new Set\(\['private_access','read','pread','kpicalc_access'\]\)/);
   assert.match(code, /new Set\(\['private_request','private_request_status'\]\)/);
   assert.match(code, /new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
-  assert.match(code, /new Set\(\['ptvisit_write'\]\)/);
+  assert.match(code, /new Set\(\['ptvisit_write','hwrite'\]\)/);
+  assert.doesNotMatch(code, /half_media_upload/);
   for (const blocked of ["action:'write'", "action:'pwrite'", "action:'ptwrite'", '.appendRow(', '.setValue(', '.setValues(', '.createFile(']) {
     assert.ok(!code.includes(blocked), `blocked write path found: ${blocked}`);
   }
@@ -124,6 +125,7 @@ test('PWA cache is versioned for App 1.2 and includes local icon library', () =>
   assert.match(html, /patrol-read-model\.js\?v=11/);
   assert.match(worker, /patrol-read-model\.js/);
   assert.match(worker, /half-month-check-read-model\.js/);
+  assert.match(worker, /half-month-check-write-prep\.js/);
   assert.match(worker, /app-data-contract\.js/);
   assert.match(worker, /app-preview-data\.js/);
   assert.match(worker, /app-assets\/lucide\.min\.js/);

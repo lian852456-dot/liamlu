@@ -54,9 +54,16 @@ test('three-store item parity preserves status, text, media, period and store',(
   assert.equal(data.period.key,'H1');
 });
 
-test('runtime allowlist adds only hread and keeps formal write unavailable',()=>{
+test('runtime uses existing hread and hwrite only, without media upload',()=>{
   assert.match(app,/const PATROL_READ_ACTIONS = new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
-  assert.match(app,/const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write'\]\)/);
-  assert.doesNotMatch(app,/patrolRead\(['"]hwrite['"]/);
+  assert.match(app,/const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write','hwrite'\]\)/);
+  assert.match(app,/async function halfMonthWriteRows\(rows, mode = 'draft'\)/);
   assert.doesNotMatch(app,/patrolRead\(['"]half_media_upload['"]/);
+});
+
+test('formal recent date is date-only and never fabricates midnight',()=>{
+  assert.match(app,/function formatReliableDateOnly\(value, fallback = '—'\)/);
+  const halfOverview=app.match(/function renderHalfMonthOverview[\s\S]+?function renderHalfMonthForm/)?.[0]||'';
+  assert.match(halfOverview,/formatReliableDateOnly\(store\.latestDate\)/);
+  assert.doesNotMatch(halfOverview,/0:00/);
 });
