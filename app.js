@@ -6,7 +6,7 @@
   const DAILY_REPORT_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
   const PATROL_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
   const PRIVATE_TIMEOUT_MS = 20_000;
-  const PATROL_TIMEOUT_MS = Object.freeze({ sread:30_000, ptread:60_000, hread:90_000, ptvisit_read:30_000 });
+  const PATROL_TIMEOUT_MS = Object.freeze({ sread:30_000, ptsummary:20_000, ptdetail:30_000, hread:90_000, ptvisit_read:30_000 });
   const RETRY_DELAY_MS = 1_000;
   const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
   const DEVICE_KEY = 'north12b_private_dashboard_device_id';
@@ -20,7 +20,7 @@
   const FAILURE_LABELS = { a999:'A999', a1399:'A1399', haosu:'好速', achieve:'R999', r1399:'R1399', insurance:'保險搭售率' };
   const READ_ACTIONS = new Set(['private_access','read','pread','kpicalc_access']);
   const DEVICE_ACTIONS = new Set(['private_request','private_request_status']);
-  const PATROL_READ_ACTIONS = new Set(['sread','ptread','ptvisit_read','hread']);
+  const PATROL_READ_ACTIONS = new Set(['sread','ptsummary','ptdetail','ptvisit_read','hread']);
   const PATROL_WRITE_ACTIONS = new Set(['ptvisit_write']);
   const PRIVATE_MODULE_KEYS = ['todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models','personalPerformance','report1600','report2100','reportFailures'];
   const PREVIEW_MODE = new URLSearchParams(scope.location.search).get('preview') === '1';
@@ -111,7 +111,7 @@
       personalPerformance:moduleSource('正式 KPI 個績快照','index.html'),
       report1600:moduleSource('北一二B每日回報','index.html'), report2100:moduleSource('北一二B每日回報','index.html'), reportFailures:moduleSource('正式個人回報','index.html'),
       scheduleToday:moduleSource('既有班表 sread','patrol.html'), scheduleByDate:moduleSource('既有班表 sread','patrol.html'),
-      patrolToday:moduleSource('巡店唯讀摘要','patrol.html'), patrolOverview:moduleSource('既有巡店 ptread','patrol.html'), patrolStores:moduleSource('既有巡店 ptread','patrol.html')
+      patrolToday:moduleSource('巡店唯讀摘要','patrol.html'), patrolOverview:moduleSource('巡店 ptsummary','patrol.html'), patrolStores:moduleSource('巡店 ptsummary','patrol.html')
     };
     return C.moduleState({ status, updatedAt:'', sourceUpdatedAt:'', stale:false, source:sources[key], data, note });
   }
@@ -272,7 +272,7 @@
     const url = `${PATROL_API}?${query.map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&')}`;
     const timeoutMs = PATROL_TIMEOUT_MS[action];
     const timeoutMessage = action === 'hread' ? '半月督導檢查讀取逾時，請點擊重試。'
-      : action === 'ptread' ? '巡店讀取逾時，請點擊重試。'
+      : action === 'ptsummary' || action === 'ptdetail' ? '巡店資料讀取逾時'
       : action === 'sread' ? '班表讀取逾時，請點擊重試。'
       : '今日到離店紀錄讀取逾時，請點擊重試。';
     const { body } = await fetchJsonWithRecovery(url, { method:'GET', cache:'no-store' }, timeoutMs, timeoutMessage);
@@ -1297,7 +1297,7 @@
         : `<div class="patrol-unvisited"><b>未巡店點</b><p>${overview.periodVerified?'無':'等待正式期間資料'}</p></div>`;
       const verificationNote=overview.periodVerified?'':'<p class="stale-note">巡店純讀取規則無法建立本月大盤，本頁已 fail-closed。</p>';
       dom('#patrolOverview').innerHTML=`${contract.patrolOverview.status==='stale'?`<p class="stale-note">${escapeHtml(contract.patrolOverview.note)}</p>`:''}<section class="panel patrol-progress-panel"><div class="panel-head"><div><h2>本月巡店大盤進度</h2><small>${escapeHtml(overview.statisticsPeriod||'—')}</small></div></div><div class="patrol-progress-hero"><div><span>本月巡店率</span><strong class="${rate!=null&&rate<1?'gold-value':'positive'}">${fmtPct(rate)}</strong></div><div class="patrol-progress-track" role="progressbar" aria-label="本月巡店率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${rate==null?0:Math.round(progressWidth)}"><i style="width:${progressWidth}%"></i></div></div><div class="patrol-kpis patrol-kpis-four"><article><span>本月已巡店數</span><b class="positive">${completed==null?'—':completed}</b></article><article><span>全項完成店數</span><b class="positive">${overview.fullyDone==null?'—':overview.fullyDone}</b></article><article><span>尚缺檢核項次</span><b class="${overview.totalMissingItems?'negative':'positive'}">${overview.totalMissingItems==null?'—':overview.totalMissingItems}</b></article><article><span>尚未巡店數</span><b class="${remaining?'negative':'positive'}">${remaining==null?'—':remaining}</b></article></div><div class="patrol-rule-summary"><span>需關注店 <b class="${attentionCount?'negative':'positive'}">${attentionCount}</b></span><span>題 18 週期 <b>${escapeHtml(overview.item18Window&&overview.item18Window.label||'—')}</b></span><span>題 19–33 <b>每月 20 日前</b></span></div>${unvisitedBlock}${verificationNote}</section>${renderPatrolRuleBoards(overview)}`;
-    } else dom('#patrolOverview').innerHTML=contract.patrolOverview.status==='unauthorized'?patrolUnlockState('解鎖後顯示巡店大盤'):`<div class="empty-state">${escapeHtml(contract.patrolOverview.status==='error'?(contract.patrolOverview.note||'正式巡店讀取失敗'):'正式來源目前沒有巡店大盤。')}</div>`;
+    } else dom('#patrolOverview').innerHTML=contract.patrolOverview.status==='unauthorized'?patrolUnlockState('解鎖後顯示巡店大盤'):`<div class="empty-state patrol-read-failure"><b>${escapeHtml(contract.patrolOverview.note||'巡店資料讀取失敗')}</b><button class="secondary-button" type="button" data-retry-patrol>重新整理</button></div>`;
     dom('#patrolTodayDetail').innerHTML=today&&today.route&&today.route.length?`<section class="patrol-today-card"><h2>今日巡店</h2><div class="route-line"><b>${today.route.map(escapeHtml).join(' → ')}</b></div><div class="route-line">已完成 ${today.completed}/${today.total} · 下一站 ${escapeHtml(today.nextStop||'—')} · ${escapeHtml(today.nextEta||'—')}</div></section>`:`<section class="patrol-today-card"><h2>今日巡店</h2><div class="route-line">${escapeHtml(contract.patrolToday.note||'今日無排定巡店')}</div></section>`;
     dom('#patrolStoreList').innerHTML=overview&&overview.stores?overview.stores.map(row=>`<div class="patrol-store-row"><span>${escapeHtml(row.name)}</span><span>${escapeHtml(row.lastVisit||'—')}</span><span>${row.daysSince==null?'—':row.daysSince+' 天'}</span><span class="${row.status==='attention'||row.status==='pending'?'negative':'positive'}">${escapeHtml(row.result||row.status)}<small>題18 ${row.item18&&row.item18.status==='done'?'完成':'未完成'} · 題19–33 ${row.awareness?row.awareness.count:0}/15</small></span></div>`).join(''):`<div class="empty-state">${escapeHtml(contract.patrolStores.status==='error'?(contract.patrolStores.note||'正式巡店讀取失敗'):'尚無店點巡店摘要。')}</div>`;
     dom('#patrolRecentList').innerHTML=overview&&overview.recent&&overview.recent.length?overview.recent.map(row=>`<div class="recent-row"><span>${escapeHtml(formatDate(row.date))}</span><span>${escapeHtml(row.store)}</span><span class="${row.complete?'positive':'negative'}">${row.complete?'完成':`待補 ${row.missingItems} 項`}</span></div>`).join(''):`<div class="empty-state">${escapeHtml(contract.patrolOverview.status==='error'?(contract.patrolOverview.note||'正式巡店讀取失敗'):'尚無最近巡店紀錄。')}</div>`;
@@ -1336,13 +1336,24 @@
     return { date, stores:rows };
   }
 
-  function adaptPatrol(raw, currentMonth) {
-    if (!scope.PatrolReadModel || !/^\d{4}-\d{2}$/.test(String(currentMonth || ''))) throw new Error('巡店共用唯讀計算模組無法使用。');
-    const rows=raw&&Array.isArray(raw.rows)?raw.rows:[];
-    const configured=raw&&Array.isArray(raw.stores)&&raw.stores.length?raw.stores:
-      raw&&raw.config&&Array.isArray(raw.config.stores)&&raw.config.stores.length?raw.config.stores:
-      STORES.map(name=>({name}));
-    const data=scope.PatrolReadModel.overview(rows, configured, currentMonth, new Date());
+  function adaptPatrolSummary(raw, currentMonth) {
+    const summary=raw&&raw.summary;
+    if(!summary||summary.month!==currentMonth||!summary.periodVerified) throw new Error('巡店摘要月份或正式期間無法驗證。');
+    if(!Array.isArray(summary.stores)||!Array.isArray(summary.unvisitedStores)||!Array.isArray(summary.attentionStores)) throw new Error('巡店摘要缺少九店狀態。');
+    const data={
+      currentMonth:summary.month, statisticsPeriod:String(summary.statisticsPeriod||''), periodVerified:true,
+      visited:numberOrNull(summary.visitedStores), total:numberOrNull(summary.totalStores), expected:numberOrNull(summary.totalStores),
+      remaining:summary.unvisitedStores.length, completionRate:numberOrNull(summary.completionRate),
+      fullyDone:numberOrNull(summary.fullyDoneStores), totalMissingItems:numberOrNull(summary.totalMissingItems),
+      unvisited:summary.unvisitedStores.slice(), attention:summary.attentionStores.slice(), attentionCount:summary.attentionStores.length,
+      item18Progress:summary.item18||null, inventory:summary.inventory14to17||null, items19to33:summary.items19to33||null,
+      item18Window:summary.item18&&summary.item18.window||null, awarenessDeadlineDay:summary.items19to33&&summary.items19to33.deadlineDay||20,
+      visitCounts:Array.isArray(summary.visitCounts)?summary.visitCounts.map(row=>({ ...row, name:row.store })):[],
+      recent:Array.isArray(summary.recentVisits)?summary.recentVisits:[], stores:summary.stores,
+      visitCountBasis:summary.visitCountBasis, sameDayMultipleVisitsDistinguishable:Boolean(summary.sameDayMultipleVisitsDistinguishable),
+      sourceVersion:String(summary.sourceVersion||''), sourceUpdatedAt:String(summary.sourceUpdatedAt||''), generatedAt:String(summary.generatedAt||'')
+    };
+    if(data.total!==STORES.length||data.stores.length!==STORES.length) throw new Error('巡店摘要不是完整九店資料。');
     data.stores=data.stores.map(row=>({ ...row, name:normalizeStore(row.name) }));
     data.unvisited=data.unvisited.map(normalizeStore);
     data.attention=data.attention.map(normalizeStore);
@@ -1392,12 +1403,12 @@
       renderAll();
     });
 
-    const patrolTask=patrolRead('ptread').then(result=>{
+    const patrolTask=patrolRead('ptsummary',{month}).then(result=>{
       const readAt=nowIso();
-      patrolRaw=result; const data=adaptPatrol(patrolRaw,month);
-      contract.patrolOverview=C.moduleState({status:data.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data});
-      contract.patrolStores=C.moduleState({status:data.stores.length?'ok':'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data:data.stores});
-      contract.patrolToday=C.moduleState({status:'no_data',updatedAt:readAt,sourceUpdatedAt:readAt,stale:false,source:moduleSource('既有巡店 ptread','patrol.html'),data:null,note:'現有正式來源未提供今日預定路線與移動時間'});
+      patrolRaw=result; const data=adaptPatrolSummary(patrolRaw,month); const sourceUpdatedAt=data.sourceUpdatedAt||readAt;
+      contract.patrolOverview=C.moduleState({status:'ok',updatedAt:readAt,sourceUpdatedAt,stale:false,source:moduleSource('巡店 ptsummary','patrol.html'),data});
+      contract.patrolStores=C.moduleState({status:'ok',updatedAt:readAt,sourceUpdatedAt,stale:false,source:moduleSource('巡店 ptsummary','patrol.html'),data:data.stores});
+      contract.patrolToday=C.moduleState({status:'no_data',updatedAt:readAt,sourceUpdatedAt,stale:false,source:moduleSource('巡店 ptsummary','patrol.html'),data:null,note:'現有正式來源未提供今日預定路線與移動時間'});
       contract.generatedAt=readAt;
       renderAll();
     }).catch(error=>{
@@ -1530,6 +1541,12 @@
   dom('#scheduleStoreFilter').addEventListener('change',renderSchedule);
   all('[data-refresh]').forEach(button=>button.addEventListener('click',()=>{ if(PREVIEW_MODE)renderAll(); else { const id=scope.localStorage.getItem(EMPLOYEE_KEY); if(id)loadFormalSummary(id).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); }); if(patrolToken)loadPatrolData(); } }));
   document.addEventListener('click',event=>{
+    const patrolRetry=event.target.closest('[data-retry-patrol]');
+    if(patrolRetry){
+      if(patrolToken) loadPatrolData();
+      else setMessage('#patrolAccessMessage','請先解鎖班表／巡店','error');
+      return;
+    }
     const halfPeriodButton=event.target.closest('[data-half-period]');
     if(halfPeriodButton){
       halfMonthSelectedPeriod=halfPeriodButton.dataset.halfPeriod;

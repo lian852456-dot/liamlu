@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const path = require('node:path');
+const { patrolSummaryResponse } = require('./fixtures/patrol-summary-response.cjs');
 
 const FORMAL_FILE_URL = process.env.LIAM_APP_BASE_URL || `file://${path.resolve(__dirname, '../app.html')}`;
 const FILE_URL = `${FORMAL_FILE_URL}${FORMAL_FILE_URL.includes('?')?'&':'?'}preview=1`;
@@ -155,7 +156,7 @@ test('isolated patrol visit flow records arrival and departure with one protecte
     }
     const action=new URL(request.url()).searchParams.get('action');
     if(action==='sread') return route.fulfill({json:{status:'ok',schedule:{month:'2026-08',stores:[]}}});
-    if(action==='ptread') return route.fulfill({json:{status:'ok',stores:['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'].map(name=>({name})),rows:[]}});
+    if(action==='ptsummary') return route.fulfill({json:patrolSummaryResponse('2026-08')});
     if(action==='ptvisit_read') return route.fulfill({json:{status:'ok',events}});
     return route.fulfill({json:{status:'error',message:'unexpected action'}});
   });
@@ -202,7 +203,7 @@ test('patrol visit UI fails closed when server response store differs from expli
     }
     const action=new URL(request.url()).searchParams.get('action');
     if(action==='sread') return route.fulfill({json:{status:'ok',schedule:{month:'2026-08',stores:[]}}});
-    if(action==='ptread') return route.fulfill({json:{status:'ok',stores:['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'].map(name=>({name})),rows:[]}});
+    if(action==='ptsummary') return route.fulfill({json:patrolSummaryResponse('2026-08')});
     if(action==='ptvisit_read') return route.fulfill({json:{status:'ok',events:[]}});
     return route.fulfill({json:{status:'error',message:'unexpected action'}});
   });

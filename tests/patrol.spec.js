@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs/promises');
+const { stores:defaultPatrolStores, patrolSummaryResponse } = require('./fixtures/patrol-summary-response.cjs');
 
 // 模擬 GAS 後端：每日回報、巡店、班表與半月督導檢查（含通行碼驗證）
 // 驗證「電腦貼上 → 上雲 → 另一裝置載入」的跨裝置同步流程
@@ -89,11 +90,13 @@ async function stubGas(page) {
       body = JSON.stringify({ status: 'ok' });
     } else if (action === 'pthealth') {
       body = JSON.stringify({ status: 'ok', configured: true, contract: 'patrol-auth-v3' });
-    } else if (action === 'ptread') {
+    } else if (action === 'ptsummary') {
       ptReadCalls++;
-      body = authed
-        ? JSON.stringify({ status: 'ok', rows: cloudRows, ...(cloudConfig || {}) })
-        : JSON.stringify({ status: 'error', message: 'unauthorized' });
+      const configured=(cloudConfig&&cloudConfig.stores)||defaultPatrolStores;
+      const month=url.searchParams.get('month')||'2026-08';
+      const summary=patrolSummaryResponse(month,cloudRows,new Date(`${month}-13T12:00:00+08:00`),configured);
+      summary.title=(cloudConfig&&cloudConfig.title)||summary.title;
+      body = authed ? JSON.stringify(summary) : JSON.stringify({ status: 'error', message: 'unauthorized' });
     } else if (action === 'ptwrite') {
       writeCalls++;
       if (failPtwrite) {
@@ -199,7 +202,7 @@ test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', as
   await stubGas(mobile);
   await openAndUnlock(mobile);
   await expect(mobile.locator('#cloudStatus')).toHaveText(/已連線/);
-  await expect(mobile.locator('#parseMsg')).toHaveText(/雲端已載入 3 筆明細/);
+  await expect(mobile.locator('#parseMsg')).toHaveText(/巡店摘要已更新 · 2\/9 店/);
   await expect(mobile.locator('#content')).toContainText('台北通化');
   await expect(mobile.locator('#content')).toContainText('台北酒泉');
 
@@ -317,7 +320,7 @@ test('貼上明細後切到督導檢查大盤不會用舊雲端資料覆蓋', as
   ];
   await stubGas(page);
   await openAndUnlock(page);
-  await expect(page.locator('#parseMsg')).toHaveText(/雲端已載入 1 筆明細/);
+  await expect(page.locator('#parseMsg')).toHaveText(/巡店摘要已更新 · 0\/9 店/);
 
   await page.fill('#pasteBox', pasteLine(5, '台北通化', 'DNB10059', 14, 'v', ''));
   await page.click('button.btn-primary');
@@ -325,7 +328,7 @@ test('貼上明細後切到督導檢查大盤不會用舊雲端資料覆蓋', as
   const readsBeforeSwitch = ptReadCalls;
 
   await page.click('[data-view="halfDashboard"]');
-  await expect(page.locator('#halfDashboardView')).toContainText('目前已載入 2 筆巡店明細');
+  await expect(page.locator('#halfDashboardView')).toContainText('目前已載入 1 筆巡店明細');
   await expect(page.locator('#halfDashboardView')).toContainText('台北通化');
   expect(ptReadCalls).toBe(readsBeforeSwitch);
 });
@@ -566,7 +569,7 @@ test('督導檢查大盤直接採計貼上巡店紀錄的上下半月、月盤�
   await page.locator('#halfDashboardMonth').press('Tab');
   const dashboard = page.locator('#halfDashboardView');
   await expect(dashboard).toBeVisible();
-  await expect(dashboard).toContainText('資料來源：目前已載入 33 筆巡店明細');
+  await expect(dashboard).toContainText('資料來源：正式輕量巡店摘要');
   await expect(dashboard).toContainText('7–8月雙月全盤・題 18');
   await expect(dashboard).toContainText('巡店異常明細（檢查≥10項、到店≥5次）');
   const tonghua = dashboard.locator('.half-dashboard-store', { hasText: '台北通化' });

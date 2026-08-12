@@ -222,6 +222,70 @@
     return Number.isFinite(end) && Number.isFinite(current) ? Math.max(0, Math.floor((current - end) / 86400000)) : null;
   }
 
+  function dashboardProgress(rows, expectedItems) {
+    const source = Array.isArray(rows) ? rows : [];
+    const done = item => source.some(row => Number(row && row.item) === item && String(row && row.result || '').toLowerCase() === 'v');
+    const abnormal = item => !done(item) && source.some(row => {
+      const reason = String(row && row.reason || '').trim();
+      return Number(row && row.item) === item && reason && !/^na$/i.test(reason);
+    });
+    const completed = expectedItems.filter(done).length;
+    const issues = expectedItems.filter(abnormal).length;
+    const missing = expectedItems.length - completed;
+    return {
+      completed, total:expectedItems.length, missing, issues,
+      status:issues ? 'issue' : missing ? 'miss' : 'done'
+    };
+  }
+
+  // Existing patrol.html dashboard semantics, represented as a compact server-ready contract.
+  function halfDashboardSummary(rawRows, configuredStores, currentMonth) {
+    const rows = Array.isArray(rawRows) ? rawRows : [];
+    const stores = (Array.isArray(configuredStores) ? configuredStores : []).map(store => typeof store === 'string' ? { name:store } : store);
+    const records = rebuildFromRaw(rows);
+    const visits = visitSummary(rows, stores, currentMonth);
+    const visitCount = new Map(visits.storeCounts.map(row => [row.name, row.count]));
+    const window = bimWindow(currentMonth);
+    const twiceItems = Array.from({ length:12 }, (_, index) => index + 2);
+    const monthlyItems = [14, 15, 16, 17];
+    const storeRows = stores.map(store => {
+      const storeName = String(store.name || store.store || '');
+      const sourceRows = rowsForStore(rows, store, records);
+      const monthRows = sourceRows.filter(row => rowMonth(row) === currentMonth);
+      const h1Rows = monthRows.filter(row => {
+        const match = String(row && row.fillTime || '').match(/\d{4}\/\d{1,2}\/(\d{1,2})/);
+        return match && Number(match[1]) <= 15;
+      });
+      const h2Rows = monthRows.filter(row => {
+        const match = String(row && row.fillTime || '').match(/\d{4}\/\d{1,2}\/(\d{1,2})/);
+        return match && Number(match[1]) > 15;
+      });
+      const checkedItems = new Set(monthRows.filter(row => {
+        const reason = String(row && row.reason || '').trim();
+        return String(row && row.result || '').toLowerCase() === 'v' || /^na$/i.test(reason);
+      }).map(row => Number(row && row.item)).filter(item => item >= 1 && item <= 33)).size;
+      return {
+        store:storeName,
+        h1:dashboardProgress(h1Rows, twiceItems),
+        h2:dashboardProgress(h2Rows, twiceItems),
+        inventory14to17:dashboardProgress(monthRows, monthlyItems),
+        item18:dashboardProgress(sourceRows.filter(row => window.months.includes(rowMonth(row))), [18]),
+        visitCount:visitCount.get(storeName) || 0,
+        checkedItems,
+        eligibleForIssues:checkedItems >= 10 && (visitCount.get(storeName) || 0) > 4
+      };
+    });
+    const completed = key => storeRows.filter(store => store[key].status === 'done').length;
+    const abnormalItems = storeRows.filter(store => store.eligibleForIssues).reduce((sum, store) =>
+      sum + store.h1.issues + store.h2.issues + store.inventory14to17.issues + store.item18.issues, 0);
+    return {
+      month:currentMonth, window,
+      completedH1Stores:completed('h1'), completedH2Stores:completed('h2'),
+      completedInventoryStores:completed('inventory14to17'), completedItem18Stores:completed('item18'),
+      abnormalItems, stores:storeRows
+    };
+  }
+
   function overview(rawRows, configuredStores, currentMonth, now) {
     const rows = Array.isArray(rawRows) ? rawRows : [];
     const stores = (Array.isArray(configuredStores) ? configuredStores : []).map(store => typeof store === 'string' ? { name:store } : store);
@@ -264,8 +328,64 @@
     };
   }
 
+  // Stable read-only transport contract shared by the App, patrol.html and GAS parity tests.
+  // All business calculations remain in overview(); this function only renames/shapes fields.
+  function summaryContract(rawRows, configuredStores, currentMonth, now, metadata) {
+    const model = overview(rawRows, configuredStores, currentMonth, now);
+    const meta = metadata && typeof metadata === 'object' ? metadata : {};
+    const awarenessStores = model.stores.map(store => ({
+      store:store.name,
+      count:store.awareness.count,
+      total:store.awareness.total,
+      completedDay:store.awareness.completedDay,
+      status:store.awareness.status,
+      daysLeft:store.awareness.daysLeft
+    }));
+    return {
+      month:model.currentMonth,
+      statisticsPeriod:model.statisticsPeriod,
+      periodVerified:model.periodVerified,
+      totalStores:model.total,
+      visitedStores:model.visited,
+      unvisitedStores:model.unvisited.slice(),
+      completionRate:model.completionRate,
+      fullyDoneStores:model.fullyDone,
+      totalMissingItems:model.totalMissingItems,
+      attentionStores:model.attention.slice(),
+      item18:{
+        window:model.item18Progress.window,
+        previousWindow:model.item18Progress.previousWindow,
+        completedStores:model.item18Progress.completedStores,
+        total:model.item18Progress.total,
+        stores:model.item18Progress.stores
+      },
+      inventory14to17:model.inventory,
+      items19to33:{
+        deadlineDay:model.awarenessDeadlineDay,
+        completedStores:awarenessStores.filter(store => store.count === store.total).length,
+        total:model.total,
+        stores:awarenessStores
+      },
+      halfDashboard:halfDashboardSummary(rawRows, configuredStores, currentMonth),
+      visitCounts:model.visitCounts.map(row => ({
+        store:row.name,
+        count:row.count,
+        basis:row.basis,
+        sameDayMultipleVisitsDistinguishable:row.sameDayMultipleVisitsDistinguishable
+      })),
+      recentVisits:model.recent,
+      stores:model.stores,
+      visitCountBasis:model.visitCountBasis,
+      sameDayMultipleVisitsDistinguishable:model.sameDayMultipleVisitsDistinguishable,
+      sourceVersion:String(meta.sourceVersion || ''),
+      sourceUpdatedAt:String(meta.sourceUpdatedAt || ''),
+      generatedAt:String(meta.generatedAt || '')
+    };
+  }
+
   return Object.freeze({
     ITEM_RULES, rebuildFromRaw, itemStatus, storeSummary, findRecordStore,
-    bimWindow, prevBimWindow, awarenessProgress, visitSummary, inventoryProgress, item18Progress, overview
+    bimWindow, prevBimWindow, awarenessProgress, visitSummary, inventoryProgress, item18Progress,
+    dashboardProgress, halfDashboardSummary, overview, summaryContract
   });
 });

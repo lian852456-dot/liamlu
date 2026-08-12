@@ -359,6 +359,32 @@ function doGet(e) {
     }
   }
 
+  // ── 巡店追蹤：手機／大盤輕量摘要（不回傳全部巡店明細）──
+  if (action === 'ptsummary') {
+    try {
+      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      const month = patrolSummaryMonth_(e.parameter.month);
+      return jsonResponse({ status:'ok', summary:readPatrolSummary_(month), stores:PT_STORES, title:PT_TITLE });
+    } catch(err) {
+      return jsonResponse({ status:'error', message:err.message });
+    }
+  }
+
+  // ── 巡店追蹤：按月／店點延遲讀取明細；大盤不得呼叫 ──
+  if (action === 'ptdetail') {
+    try {
+      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      return jsonResponse(readPatrolDetail_({
+        month:patrolSummaryMonth_(e.parameter.month),
+        store:e.parameter.store,
+        page:e.parameter.page,
+        limit:e.parameter.limit
+      }));
+    } catch(err) {
+      return jsonResponse({ status:'error', message:err.message });
+    }
+  }
+
   // ── 巡店到離店：讀取指定日期（獨立於巡店明細）──
   if (action === 'ptvisit_read') {
     try {
@@ -560,7 +586,10 @@ function writePatrol(rows) {
 }
 
 function readPatrol() {
-  const sh = getPatrolSheet();
+  return readPatrolFromSheet_(getPatrolSheet());
+}
+
+function readPatrolFromSheet_(sh) {
   const data = sh.getDataRange().getValues();
   const headers = data[0];
   const rows = [];
@@ -574,6 +603,286 @@ function readPatrol() {
     rows.push(o);
   }
   return rows;
+}
+
+// 摘要／分頁明細只讀既有巡店 schema 的 A:L，避免將工作表其他格式化欄位載入記憶體。
+// raw ptread 仍保留原本 readPatrolFromSheet_ 語意，兩者互不影響。
+function readPatrolContractColumns_(sh) {
+  const lastRow = sh.getLastRow();
+  if (lastRow < 1) return [];
+  const data = sh.getRange(1, 1, lastRow, PATROL_HEADERS.length).getValues();
+  const headers = data[0];
+  const rows = [];
+  for (let i = 1; i < data.length; i++) {
+    const item = {};
+    headers.forEach(function(header, index) {
+      let value = data[i][index];
+      if (value instanceof Date) value = patrolTimeStr(value);
+      item[header] = value;
+    });
+    rows.push(item);
+  }
+  return rows;
+}
+
+const PATROL_SUMMARY_CACHE_SECONDS = 120;
+const PATROL_DETAIL_MAX_LIMIT = 100;
+
+function patrolSummaryMonth_(value) {
+  const month = String(value || '').trim();
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('invalid patrol month');
+  return month;
+}
+
+function patrolSummaryNow_() {
+  return new Date(Utilities.formatDate(new Date(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX"));
+}
+
+function patrolSummaryIsoDate_(row) {
+  const text = String(row && (row.arriveTime || row.fillTime) || '');
+  const match = text.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  return match ? match[1] + '-' + ('0' + Number(match[2])).slice(-2) + '-' + ('0' + Number(match[3])).slice(-2) : '';
+}
+
+function patrolSummaryFillIsoDate_(row) {
+  const match = String(row && row.fillTime || '').match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  return match ? match[1] + '-' + ('0' + Number(match[2])).slice(-2) + '-' + ('0' + Number(match[3])).slice(-2) : '';
+}
+
+function patrolSummarySourceMeta_(sheet) {
+  const lastRow = sheet.getLastRow();
+  const savedValues = lastRow > 1 ? sheet.getRange(2, 12, lastRow - 1, 1).getValues() : [];
+  let latestValue = '';
+  let latestEpoch = -1;
+  savedValues.forEach(function(row) {
+    const value = row[0];
+    const text = patrolTimeStr(value);
+    const epoch = value instanceof Date ? value.getTime() : Date.parse(text.replace(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/, '$1-$2-$3'));
+    if (Number.isFinite(epoch) && epoch > latestEpoch) { latestEpoch = epoch; latestValue = text; }
+    else if (latestEpoch < 0 && text) latestValue = text;
+  });
+  return {
+    sourceVersion:String(lastRow) + ':' + latestValue,
+    sourceUpdatedAt:latestValue,
+    lastRow:lastRow
+  };
+}
+
+function patrolSummaryPreviousWindow_(monthKey) {
+  const parts = monthKey.split('-');
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const start = month % 2 === 1 ? month : month - 1;
+  const previousMonth = start === 1 ? 11 : start - 2;
+  const previousYear = start === 1 ? year - 1 : year;
+  const key = previousYear + '-' + ('0' + previousMonth).slice(-2);
+  return { months:ptWinMonths(key), label:previousMonth + '–' + (previousMonth + 1) + '月' };
+}
+
+function patrolSummaryDaysSince_(dateValue, now) {
+  if (!dateValue) return null;
+  const end = Date.parse(String(dateValue) + 'T00:00:00+08:00');
+  return Number.isFinite(end) ? Math.max(0, Math.floor((now.getTime() - end) / 86400000)) : null;
+}
+
+function patrolSummaryAwareness_(rows, month, now) {
+  let count = 0;
+  const completionDays = [];
+  for (let item = 19; item <= 33; item++) {
+    const days = rows.filter(function(row) {
+      return String(row.month) === month && Number(row.item) === item && String(row.result).toLowerCase() === 'v';
+    }).map(function(row) { return ptDayOf(row.fillTime); }).filter(Number.isFinite);
+    if (days.length) { count++; completionDays.push(Math.min.apply(null, days)); }
+  }
+  const all = count === 15;
+  const completedDay = all ? Math.max.apply(null, completionDays) : null;
+  const realMonth = Utilities.formatDate(now, 'Asia/Taipei', 'yyyy-MM');
+  const daysLeft = 20 - Number(Utilities.formatDate(now, 'Asia/Taipei', 'd'));
+  let status = 'not_complete';
+  if (all) status = completedDay <= 20 ? 'complete' : 'late';
+  else if (month === realMonth) status = daysLeft >= 0 ? 'due' : 'overdue';
+  return { count:count, total:15, all:all, completedDay:completedDay, status:status, daysLeft:month === realMonth ? daysLeft : null };
+}
+
+function patrolSummaryItem18State_(rows, months) {
+  const row = rows.find(function(item) {
+    return Number(item.item) === 18 && String(item.result).toLowerCase() === 'v' && months.indexOf(String(item.month)) !== -1;
+  });
+  return { done:Boolean(row), date:row ? patrolSummaryFillIsoDate_(row) : '' };
+}
+
+function patrolSummaryDashboardProgress_(rows, expectedItems) {
+  const done = function(item) {
+    return rows.some(function(row) { return Number(row.item) === item && String(row.result).toLowerCase() === 'v'; });
+  };
+  const abnormal = function(item) {
+    return !done(item) && rows.some(function(row) {
+      const reason = String(row.reason || '').trim();
+      return Number(row.item) === item && reason && !/^na$/i.test(reason);
+    });
+  };
+  const completed = expectedItems.filter(done).length;
+  const issues = expectedItems.filter(abnormal).length;
+  const missing = expectedItems.length - completed;
+  return { completed:completed, total:expectedItems.length, missing:missing, issues:issues, status:issues ? 'issue' : missing ? 'miss' : 'done' };
+}
+
+function patrolSummaryHalfDashboard_(allRows, month) {
+  const windowMonths = ptWinMonths(month);
+  const window = { months:windowMonths, label:Number(windowMonths[0].slice(5)) + '–' + Number(windowMonths[1].slice(5)) + '月' };
+  const twiceItems = []; for (let item = 2; item <= 13; item++) twiceItems.push(item);
+  const monthlyItems = [14,15,16,17];
+  const stores = PT_STORES.map(function(store) {
+    const rows = ptStoreRows(allRows, store);
+    const monthRows = rows.filter(function(row) { return String(row.month || '').slice(0, 7) === month; });
+    const h1Rows = monthRows.filter(function(row) { return ptDayOf(row.fillTime) <= 15; });
+    const h2Rows = monthRows.filter(function(row) { return ptDayOf(row.fillTime) > 15; });
+    const dates = {};
+    monthRows.forEach(function(row) { const date = patrolSummaryIsoDate_(row); if (date) dates[date] = true; });
+    const checked = {};
+    monthRows.forEach(function(row) {
+      const reason = String(row.reason || '').trim();
+      const item = Number(row.item);
+      if (item >= 1 && item <= 33 && (String(row.result).toLowerCase() === 'v' || /^na$/i.test(reason))) checked[item] = true;
+    });
+    const visitCount = Object.keys(dates).length;
+    const checkedItems = Object.keys(checked).length;
+    return {
+      store:String(store.name),
+      h1:patrolSummaryDashboardProgress_(h1Rows, twiceItems),
+      h2:patrolSummaryDashboardProgress_(h2Rows, twiceItems),
+      inventory14to17:patrolSummaryDashboardProgress_(monthRows, monthlyItems),
+      item18:patrolSummaryDashboardProgress_(rows.filter(function(row) { return windowMonths.indexOf(String(row.month || '').slice(0, 7)) !== -1; }), [18]),
+      visitCount:visitCount, checkedItems:checkedItems,
+      eligibleForIssues:checkedItems >= 10 && visitCount > 4
+    };
+  });
+  const completed = function(key) { return stores.filter(function(store) { return store[key].status === 'done'; }).length; };
+  const abnormalItems = stores.filter(function(store) { return store.eligibleForIssues; }).reduce(function(sum, store) {
+    return sum + store.h1.issues + store.h2.issues + store.inventory14to17.issues + store.item18.issues;
+  }, 0);
+  return {
+    month:month, window:window,
+    completedH1Stores:completed('h1'), completedH2Stores:completed('h2'),
+    completedInventoryStores:completed('inventory14to17'), completedItem18Stores:completed('item18'),
+    abnormalItems:abnormalItems, stores:stores
+  };
+}
+
+function patrolSummaryContract_(allRows, month, now, meta) {
+  allRows = (Array.isArray(allRows) ? allRows : []).map(function(row) {
+    if (/^\d{4}-\d{2}$/.test(String(row && row.month || '').slice(0, 7))) return row;
+    const copy = Object.assign({}, row);
+    copy.month = patrolSummaryFillIsoDate_(row).slice(0, 7);
+    return copy;
+  });
+  const windowMonths = ptWinMonths(month);
+  const item18Window = { months:windowMonths, label:Number(windowMonths[0].slice(5)) + '–' + Number(windowMonths[1].slice(5)) + '月' };
+  const previousWindow = patrolSummaryPreviousWindow_(month);
+  const storeRows = PT_STORES.map(function(store) {
+    const rows = ptStoreRows(allRows, store);
+    const recordName = rows.length ? String(rows[0].store || '') : null;
+    const visited = rows.some(function(row) { return String(row.month) === month; });
+    const missingItemNumbers = [];
+    for (let item = 1; item <= 33; item++) if (!ptItemDone(rows, item, month)) missingItemNumbers.push(item);
+    const dates = rows.map(patrolSummaryFillIsoDate_).filter(Boolean).sort();
+    const lastVisit = dates.length ? dates[dates.length - 1] : '';
+    const awareness = rows.length ? patrolSummaryAwareness_(rows, month, now) : { count:0, total:15, all:false, completedDay:null, status:'not_complete', daysLeft:null };
+    const item18Current = patrolSummaryItem18State_(rows, item18Window.months);
+    return {
+      name:String(store.name), code:String(store.code || ''), recordName:recordName, visited:visited,
+      done:33 - missingItemNumbers.length, missingItems:missingItemNumbers.length,
+      missingItemNumbers:missingItemNumbers, lastVisit:lastVisit,
+      daysSince:patrolSummaryDaysSince_(lastVisit, now),
+      status:visited ? (missingItemNumbers.length ? 'attention' : 'complete') : 'pending',
+      result:visited ? (missingItemNumbers.length ? '缺 ' + missingItemNumbers.length + ' 項' : '全項完成') : '本月未巡',
+      item18:item18Current.done ? { status:'done' } : { status:'miss', detail:'本期(' + item18Window.label + ')未完成' },
+      awareness:awareness
+    };
+  });
+
+  const inventoryStores = PT_STORES.map(function(store) {
+    const rows = ptStoreRows(allRows, store);
+    const items = {};
+    [14,15,16,17].forEach(function(item) { items[item] = ptItemDone(rows, item, month); });
+    return { name:String(store.name), items:items, complete:[14,15,16,17].every(function(item) { return items[item]; }) };
+  });
+  const item18Stores = PT_STORES.map(function(store) {
+    const rows = ptStoreRows(allRows, store);
+    return {
+      name:String(store.name),
+      current:patrolSummaryItem18State_(rows, item18Window.months),
+      previous:patrolSummaryItem18State_(rows, previousWindow.months)
+    };
+  });
+  const groupedVisits = [];
+  const visitCounts = PT_STORES.map(function(store) {
+    const groups = {};
+    ptStoreRows(allRows, store).forEach(function(row) {
+      const date = patrolSummaryIsoDate_(row);
+      const rowMonth = /^\d{4}-\d{2}$/.test(String(row.month || '').slice(0, 7)) ? String(row.month).slice(0, 7) : date.slice(0, 7);
+      if (!date || rowMonth !== month) return;
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(row);
+    });
+    Object.keys(groups).forEach(function(date) {
+      const byItem = {};
+      groups[date].forEach(function(row) { const item = Number(row.item); if (item >= 1 && item <= 33) byItem[item] = String(row.result || '').toLowerCase(); });
+      const missing = Object.keys(byItem).map(Number).filter(function(item) { return item !== 1 && byItem[item] !== 'v'; });
+      groupedVisits.push({ date:date, store:String(store.name), complete:Object.keys(byItem).length > 0 && missing.length === 0, missingItems:missing.length, missingItemNumbers:missing });
+    });
+    return { store:String(store.name), count:Object.keys(groups).length, basis:'unique-store-date', sameDayMultipleVisitsDistinguishable:false };
+  });
+  groupedVisits.sort(function(left, right) { return right.date.localeCompare(left.date) || left.store.localeCompare(right.store); });
+  const visitedStores = storeRows.filter(function(store) { return store.visited; }).length;
+  const attentionStores = storeRows.filter(function(store) { return store.status === 'attention'; }).map(function(store) { return store.name; });
+  const unvisitedStores = storeRows.filter(function(store) { return !store.visited; }).map(function(store) { return store.name; });
+  const awarenessStores = storeRows.map(function(store) {
+    return { store:store.name, count:store.awareness.count, total:store.awareness.total, completedDay:store.awareness.completedDay, status:store.awareness.status, daysLeft:store.awareness.daysLeft };
+  });
+  return {
+    month:month, statisticsPeriod:month.replace('-', ' 年 ') + ' 月', periodVerified:true,
+    totalStores:PT_STORES.length, visitedStores:visitedStores, unvisitedStores:unvisitedStores,
+    completionRate:PT_STORES.length ? visitedStores / PT_STORES.length : 0,
+    fullyDoneStores:storeRows.filter(function(store) { return store.visited && store.missingItems === 0; }).length,
+    totalMissingItems:storeRows.filter(function(store) { return store.visited; }).reduce(function(sum, store) { return sum + store.missingItems; }, 0),
+    attentionStores:attentionStores,
+    item18:{ window:item18Window, previousWindow:previousWindow, completedStores:item18Stores.filter(function(store) { return store.current.done; }).length, total:PT_STORES.length, stores:item18Stores },
+    inventory14to17:{ items:[14,15,16,17], completedStores:inventoryStores.filter(function(store) { return store.complete; }).length, total:PT_STORES.length, stores:inventoryStores },
+    items19to33:{ deadlineDay:20, completedStores:awarenessStores.filter(function(store) { return store.count === store.total; }).length, total:PT_STORES.length, stores:awarenessStores },
+    halfDashboard:patrolSummaryHalfDashboard_(allRows, month),
+    visitCounts:visitCounts, recentVisits:groupedVisits.slice(0, 10), stores:storeRows,
+    visitCountBasis:'unique-store-date', sameDayMultipleVisitsDistinguishable:false,
+    sourceVersion:String(meta.sourceVersion || ''), sourceUpdatedAt:String(meta.sourceUpdatedAt || ''),
+    generatedAt:Utilities.formatDate(now, 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX")
+  };
+}
+
+function readPatrolSummary_(month) {
+  const sheet = getPatrolSheet();
+  const meta = patrolSummarySourceMeta_(sheet);
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'ptsummary:' + month + ':' + Utilities.base64EncodeWebSafe(meta.sourceVersion).slice(0, 80);
+  const cached = cache.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+  const summary = patrolSummaryContract_(readPatrolContractColumns_(sheet), month, patrolSummaryNow_(), meta);
+  const serialized = JSON.stringify(summary);
+  if (serialized.length < 95000) cache.put(cacheKey, serialized, PATROL_SUMMARY_CACHE_SECONDS);
+  return summary;
+}
+
+function readPatrolDetail_(options) {
+  const store = patrolVisitStore_(options.store);
+  const page = Number(options.page || 1);
+  const requestedLimit = Number(options.limit || 50);
+  if (!Number.isInteger(page) || page < 1) throw new Error('invalid patrol detail page');
+  if (!Number.isInteger(requestedLimit) || requestedLimit < 1) throw new Error('invalid patrol detail limit');
+  const limit = Math.min(PATROL_DETAIL_MAX_LIMIT, requestedLimit);
+  const all = ptStoreRows(readPatrolContractColumns_(getPatrolSheet()), { name:store, code:(PT_STORES.find(function(item) { return item.name === store; }) || {}).code || '' })
+    .filter(function(row) { return String(row.month || '').slice(0, 7) === options.month; })
+    .sort(function(left, right) { return patrolSummaryIsoDate_(right).localeCompare(patrolSummaryIsoDate_(left)) || Number(left.item) - Number(right.item); });
+  const start = (page - 1) * limit;
+  return { status:'ok', month:options.month, store:store, page:page, limit:limit, totalRows:all.length, rows:all.slice(start, start + limit) };
 }
 
 // ════════════════════════════════════

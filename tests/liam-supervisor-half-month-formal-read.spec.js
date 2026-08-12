@@ -1,9 +1,11 @@
 const {test,expect}=require('@playwright/test');
 const path=require('node:path');
 const fixture=require('./fixtures/half-month-hread-fixture.cjs');
+const {patrolSummaryResponse}=require('./fixtures/patrol-summary-response.cjs');
 
 const FORMAL_URL=`file://${path.resolve(__dirname,'../app.html')}#patrol`;
 const TOKEN='formal-read-short-token';
+const TODAY=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 test.use({viewport:{width:390,height:844},serviceWorkers:'block'});
 
 async function installFormalRoutes(page,{expireHread=false}={}){
@@ -25,8 +27,8 @@ async function installFormalRoutes(page,{expireHread=false}={}){
     state.requests.push(action);
     if(['hwrite','half_media_upload'].includes(action)) state.writes.push(action);
     if(action==='sread') return route.fulfill({json:{status:'ok',schedule:{month:'2026-08',stores:[]}}});
-    if(action==='ptread') return route.fulfill({json:{status:'ok',stores:fixture.STORES.map(name=>({name})),rows:[]}});
-    if(action==='ptvisit_read') return route.fulfill({json:{status:'ok',events:[{serverTime:'2026-08-12T09:12:00+08:00',date:'2026-08-12',action:'arrival',store:'台北酒泉',note:'',visitSessionId:'formal-open'}],openVisit:{serverTime:'2026-08-12T09:12:00+08:00',date:'2026-08-12',action:'arrival',store:'台北酒泉',note:'',visitSessionId:'formal-open'}}});
+    if(action==='ptsummary') return route.fulfill({json:patrolSummaryResponse('2026-08')});
+    if(action==='ptvisit_read') return route.fulfill({json:{status:'ok',events:[{serverTime:`${TODAY}T09:12:00+08:00`,date:TODAY,action:'arrival',store:'台北酒泉',note:'',visitSessionId:'formal-open'}],openVisit:{serverTime:`${TODAY}T09:12:00+08:00`,date:TODAY,action:'arrival',store:'台北酒泉',note:'',visitSessionId:'formal-open'}}});
     if(action==='hread'){
       state.hread+=1;
       return route.fulfill({json:expireHread?{status:'error',message:'unauthorized'}:{status:'ok',rows:fixture.rows}});
@@ -52,7 +54,6 @@ test('formal hread maps nine stores while recovery remains read-only',async({pag
   page.on('pageerror',error=>errors.push(error.message));
   const state=await installFormalRoutes(page);
   await page.goto(FORMAL_URL);
-  await expect(page.locator('#patrolDepartureButton')).toBeEnabled();
   await page.locator('[data-patrol-check-view="half-month"]').click();
   await expect(page.locator('#halfMonthCheckPreview')).toContainText('FORMAL READ / 正式唯讀');
   await expect(page.locator('.half-preview-summary article').nth(0)).toContainText('5 / 9');

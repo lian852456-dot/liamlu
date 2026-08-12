@@ -19,7 +19,7 @@ const browser = await chromium.launch({
 
 const protectedActions = new Set([
   'debug',
-  'ptread',
+  'ptsummary',
   'ptwrite',
   'ptvisit_read',
   'ptvisit_write',
@@ -133,7 +133,7 @@ try {
     await page.waitForFunction(() =>
       document.querySelector('#cloudStatus')?.textContent.includes('已連線')
     );
-    await waitForRequestAction(requests, 'ptread');
+    await waitForRequestAction(requests, 'ptsummary');
 
     await page.getByRole('button', { name: '每月班表' }).click();
     await page.waitForFunction(() =>
@@ -160,7 +160,7 @@ try {
       halfTab: Boolean(document.querySelector('[data-view="half"]'))
     }));
     const authRequest = requests.find(item => item.action === 'ptauth');
-    const protectedReads = requests.filter(item => ['ptread', 'sread', 'hread'].includes(item.action));
+    const protectedReads = requests.filter(item => ['ptsummary', 'sread', 'hread'].includes(item.action));
     assert.equal(unlocked.gateHidden, true);
     assert.ok(unlocked.appChildren > 0);
     assert.equal(unlocked.sessionToken, true);
@@ -170,7 +170,7 @@ try {
     assert.equal(authRequest?.hasToken, false);
     assert.deepEqual(
       [...new Set(protectedReads.map(item => item.action))].sort(),
-      ['hread', 'ptread', 'sread']
+      ['hread', 'ptsummary', 'sread']
     );
     assert.equal(protectedReads.every(item => item.hasToken && !item.hasKey), true);
 

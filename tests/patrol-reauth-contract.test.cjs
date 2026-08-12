@@ -25,7 +25,7 @@ test('expired patrol session only clears its session token and preserves local s
 test('all patrol transport helpers share one reauthentication wrapper and refresh PT_TOKEN for retries', () => {
   for (const helper of ['privateCloudCall', 'privateCloudCallJsonp', 'cloudCall', 'cloudCallJsonp']) {
     assert.match(functionBody(helper), /patrolRequestWithReauth\(/, `${helper} bypasses shared reauth`);
-    assert.match(functionBody(helper), /url\.searchParams\.set\('token',PT_TOKEN\)/, `${helper} can retain a stale token`);
+    assert.match(functionBody(helper), /(?:url\.searchParams\.set\('token',PT_TOKEN\)|query\.push\(\['token',PT_TOKEN\]\))/, `${helper} can retain a stale token`);
   }
   assert.match(functionBody('privateInspectionMediaUpload'), /patrolRequestWithReauth\(/);
 });

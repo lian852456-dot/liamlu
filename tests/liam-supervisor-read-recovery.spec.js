@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const path = require('node:path');
+const { patrolSummaryResponse } = require('./fixtures/patrol-summary-response.cjs');
 
 const FORMAL_URL = `file://${path.resolve(__dirname, '../app.html')}#patrol`;
 const TOKEN = 'read-recovery-timeout-token';
@@ -22,7 +23,7 @@ test('hread Google HTML 404 is retried once then fails closed', async ({ page })
     const action = new URL(request.url()).searchParams.get('action');
     if (action === 'hread') return route.fulfill({ status:404, contentType:'text/html', body:'<!doctype html><title>Not Found</title>' });
     if (action === 'sread') return route.fulfill({ json:{ status:'ok', schedule:{ month:'2026-08', stores:[] } } });
-    if (action === 'ptread') return route.fulfill({ json:{ status:'ok', stores:[], rows:[] } });
+    if (action === 'ptsummary') return route.fulfill({ json:patrolSummaryResponse('2026-08') });
     if (action === 'ptvisit_read') return route.fulfill({ json:{ status:'ok', events:[], openVisit:null } });
     return route.fulfill({ json:{ status:'error', message:'unexpected action' } });
   });

@@ -24,9 +24,10 @@ test('WKWebView read transport uses encoded string URL and independent bounded t
   assert.match(read, /encodeURIComponent\(key\)/);
   assert.match(read, /encodeURIComponent\(value\)/);
   assert.match(app, /PRIVATE_TIMEOUT_MS = 20_000/);
-  assert.match(app, /sread:30_000, ptread:60_000, hread:90_000, ptvisit_read:30_000/);
+  assert.match(app, /sread:30_000, ptsummary:20_000, ptdetail:30_000, hread:90_000, ptvisit_read:30_000/);
+  assert.doesNotMatch(app, /patrolRead\('ptread'/);
   assert.match(read, /const timeoutMs = PATROL_TIMEOUT_MS\[action\]/);
-  assert.match(read, /巡店讀取逾時，請點擊重試/);
+  assert.match(read, /巡店資料讀取逾時/);
 });
 
 test('only retryable transport failures receive one bounded retry', () => {
@@ -49,8 +50,8 @@ test('transport failures fail closed and do not become zero-shaped formal data',
 });
 
 test('recovery release is cache-busted and formal half-month write remains disabled', () => {
-  assert.match(html, /app\.js\?v=read-recovery-2/);
-  assert.match(sw, /liam-supervisor-app-1-2-read-recovery-v2/);
+  assert.match(html, /app\.js\?v=patrol-summary-1/);
+  assert.match(sw, /liam-supervisor-app-1-2-patrol-summary-v1/);
   assert.doesNotMatch(app, /PATROL_WRITE_ACTIONS = new Set\(\[[^\]]*hwrite/);
   assert.doesNotMatch(app, /halfMonthWriteRows|patrolRead\(['"]hwrite|half_media_upload/);
   assert.match(app, /if\(!PREVIEW_MODE\) return/);

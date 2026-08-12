@@ -42,7 +42,7 @@ test('public ping and pthealth disclose no protected data', { skip }, async () =
   }
 });
 
-for (const action of ['debug', 'ptread', 'ptvisit_read', 'sread', 'hread']) {
+for (const action of ['debug', 'ptread', 'ptsummary', 'ptdetail', 'ptvisit_read', 'sread', 'hread']) {
   test(`${action} rejects missing and incorrect credentials`, { skip }, async () => {
     assertUnauthorized(await get(action), `${action} missing credential`);
     assertUnauthorized(await get(action, { key: WRONG_KEY }), `${action} incorrect key`);

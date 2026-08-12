@@ -62,7 +62,7 @@ test('App recovery runtime keeps existing reads and disables half-month writes',
   const code = read('app.js');
   assert.match(code, /new Set\(\['private_access','read','pread','kpicalc_access'\]\)/);
   assert.match(code, /new Set\(\['private_request','private_request_status'\]\)/);
-  assert.match(code, /new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
+  assert.match(code, /new Set\(\['sread','ptsummary','ptdetail','ptvisit_read','hread'\]\)/);
   assert.match(code, /new Set\(\['ptvisit_write'\]\)/);
   assert.doesNotMatch(code, /new Set\(\['ptvisit_write','hwrite'\]\)/);
   assert.doesNotMatch(code, /half_media_upload/);
@@ -74,7 +74,8 @@ test('App recovery runtime keeps existing reads and disables half-month writes',
   assert.match(code, /Preview／示意資料/);
   assert.match(code, /function fullKpiItems/);
   assert.match(code, /function renderFullKpis/);
-  assert.match(code, /PatrolReadModel\.overview\(rows, configured, currentMonth/);
+  assert.match(code, /function adaptPatrolSummary\(raw, currentMonth\)/);
+  assert.match(code, /patrolRead\('ptsummary',\{month\}\)/);
   assert.doesNotMatch(code, /summary\.periodStart|summary\.expectedCount/);
 });
 
@@ -117,13 +118,13 @@ test('device UI scope keeps nine awards, removes Top cards and renders complete 
 test('PWA cache is versioned for App 1.2 and includes local icon library', () => {
   const html = read('app.html');
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-2-read-recovery-v2/);
-  assert.match(html, /app\.css\?v=17/);
+  assert.match(worker, /liam-supervisor-app-1-2-patrol-summary-v1/);
+  assert.match(html, /app\.css\?v=18/);
   assert.match(html, /app-data-contract\.js\?v=13/);
   assert.match(html, /app-preview-data\.js\?v=16/);
   assert.match(html, /half-month-check-read-model\.js\?v=2/);
-  assert.match(html, /app\.js\?v=read-recovery-2/);
-  assert.match(html, /patrol-read-model\.js\?v=11/);
+  assert.match(html, /app\.js\?v=patrol-summary-1/);
+  assert.match(html, /patrol-read-model\.js\?v=12/);
   assert.match(worker, /patrol-read-model\.js/);
   assert.match(worker, /half-month-check-read-model\.js/);
   assert.match(worker, /half-month-check-write-prep\.js/);

@@ -197,6 +197,7 @@ svg { width:1.1em; height:1.1em; fill:none; stroke:currentColor; stroke-width:1.
 .system-row { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:42px; margin:0 13px; border-bottom:1px solid var(--line-soft); font-size:10px; }.system-row:last-child { border-bottom:0; }.system-row span { color:var(--muted); }.system-row b { color:var(--green); }
 
 .empty-state,.error-state { padding:18px 14px; color:var(--muted); font-size:11px; line-height:1.6; text-align:center; }.error-state { color:#ff9c97; }.stale-note { margin:0 0 10px; padding:9px 11px; border:1px solid #7c652c; border-radius:10px; color:#ffd571; background:#2b2413; font-size:9px; }
+.patrol-read-failure{display:grid;justify-items:center;gap:12px}.patrol-read-failure .secondary-button{min-height:44px;padding:0 18px;border:1px solid var(--cyan);border-radius:12px;background:transparent;color:var(--cyan);font:inherit;font-weight:800}
 
 .bottom-nav { position:fixed; z-index:20; bottom:0; left:50%; transform:translateX(-50%); width:min(100%,680px); display:grid; grid-template-columns:repeat(5,1fr); min-height:74px; padding:6px 8px calc(7px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); background:rgba(5,20,35,.94); backdrop-filter:blur(18px); }
 .bottom-nav button { min-width:48px; min-height:55px; padding:4px 2px; border:0; border-radius:14px; color:#839ab5; background:transparent; font-size:10px; font-weight:750; }

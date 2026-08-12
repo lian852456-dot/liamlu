@@ -7,7 +7,7 @@ const root = path.join(__dirname, '..');
 const code = fs.readFileSync(path.join(root, 'gas/Code.gs'), 'utf8');
 const media = fs.readFileSync(path.join(root, 'gas/HalfMedia.gs'), 'utf8');
 
-const protectedActions = ['debug', 'ptread', 'ptwrite', 'ptvisit_read', 'sread', 'hread', 'hwrite'];
+const protectedActions = ['debug', 'ptread', 'ptsummary', 'ptdetail', 'ptwrite', 'ptvisit_read', 'sread', 'hread', 'hwrite'];
 
 test('PT_KEY comes only from Script Properties and fails closed when absent', () => {
   assert.match(code, /getScriptProperties\(\)\.getProperty\('PT_KEY'\)/);

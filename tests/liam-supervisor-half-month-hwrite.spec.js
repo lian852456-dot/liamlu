@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('node:path');
 const fixture = require('./fixtures/half-month-hread-fixture.cjs');
+const { patrolSummaryResponse } = require('./fixtures/patrol-summary-response.cjs');
 
 const APP_URL = `file://${path.resolve(__dirname, '../app.html')}#patrol`;
 const TOKEN = 'formal-read-recovery-token';
@@ -20,7 +21,7 @@ test('recovery keeps formal hread available while hwrite and media remain unreac
     }
     const action = new URL(request.url()).searchParams.get('action') || '';
     if (action === 'sread') return route.fulfill({ json:{ status:'ok', schedule:{ month:'2026-08', stores:[] } } });
-    if (action === 'ptread') return route.fulfill({ json:{ status:'ok', stores:fixture.STORES.map(name => ({ name })), rows:[] } });
+    if (action === 'ptsummary') return route.fulfill({ json:patrolSummaryResponse('2026-08') });
     if (action === 'ptvisit_read') return route.fulfill({ json:{ status:'ok', events:[], openVisit:null } });
     if (action === 'hread') return route.fulfill({ json:{ status:'ok', rows:fixture.rows } });
     if (action === 'hwrite' || action === 'half_media_upload') writes.push(action);

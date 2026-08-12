@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const path = require('node:path');
+const { patrolSummaryResponse } = require('./fixtures/patrol-summary-response.cjs');
 
 const PAGE_URL = process.env.LIAM_PILOT_URL || ('file://' + path.resolve(__dirname, '../app.html'));
 const PREVIEW_URL = `${PAGE_URL}${PAGE_URL.includes('?') ? '&' : '?'}preview=1`;
@@ -27,7 +28,13 @@ test('mobile App 1.1 has no horizontal overflow and exposes all five tabs', asyn
 });
 
 test('existing short session renders real-shape schedule and patrol data read-only', async ({ page }) => {
-  await page.addInitScript(({ stores }) => {
+  const patrolRows = stores.map((store, index) => ({
+    fillTime: `2026/8/${index + 1} 10:00`, arriveTime: `2026/8/${index + 1} 10:00`, store,
+    code: String(index + 1), item: 2, result: index === 0 ? '' : 'v', reason: index === 0 ? '待追蹤' : '', month: '2026-08', savedAt: `2026/8/${index + 1} 11:00`
+  }));
+  const configuredStores=stores.map((name,index)=>({name,code:String(index+1)}));
+  const patrolSummary=patrolSummaryResponse('2026-08',patrolRows,new Date('2026-08-09T12:00:00+08:00'),configuredStores);
+  await page.addInitScript(({ stores, patrolSummary }) => {
     sessionStorage.setItem('bei12b_pt_session_token', 'test-short-token');
     const scheduleStores = stores.map((store, index) => ({
       store,
@@ -43,20 +50,16 @@ test('existing short session renders real-shape schedule and patrol data read-on
         workingStaff: [{ name: `同仁${index + 1}`, role: index === 0 ? '店長' : '業代', status: 'A班', working: true }]
       }]
     }));
-    const patrolRows = stores.map((store, index) => ({
-      fillTime: `2026/8/${index + 1} 10:00`, arriveTime: `2026/8/${index + 1} 10:00`, store,
-      code: String(index + 1), item: 2, result: index === 0 ? '' : 'v', reason: index === 0 ? '待追蹤' : '', month: '2026-08', savedAt: `2026/8/${index + 1} 11:00`
-    }));
     const response = body => ({ ok:true, status:200, headers:{ get:()=>'application/json' }, text:async()=>JSON.stringify(body) });
     window.fetch = async (input, options = {}) => {
       if (options.method === 'POST') return response({ status: 'ok', token: 'renewed-short-token' });
       const url = String(input);
       if (url.includes('action=sread')) return response({ status: 'ok', schedule: { month: '2026-08', rocMonth: '民國115年08月', stores: scheduleStores } });
-      if (url.includes('action=ptread')) return response({ status: 'ok', stores: stores.map((name, index) => ({ name, code: String(index + 1) })), rows: patrolRows });
+      if (url.includes('action=ptsummary')) return response(patrolSummary);
       if (url.includes('action=ptvisit_read')) return response({ status:'ok', events:[], openVisit:null });
       throw new Error(`unexpected request ${url}`);
     };
-  }, { stores });
+  }, { stores, patrolSummary });
 
   await page.goto(PAGE_URL);
   await page.locator('[data-nav="schedule"]').last().click();

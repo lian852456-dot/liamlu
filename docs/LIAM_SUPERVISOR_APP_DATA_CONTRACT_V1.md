@@ -35,9 +35,9 @@
 | `reportFailures` | 缺店、未過關店／人／指標、正式回報內容 | 正式 `failed[]` + `extra` |
 | `scheduleToday` | 今日九店人員、班別、上班／休假 | `sread` |
 | `scheduleByDate` | `selectedDate`, `availableMonth`, 九店班表 | `sread` |
-| `patrolToday` | 今日路線、順序、完成、下一站、移動資訊 | `ptread`；來源缺欄位時 `no_data` |
-| `patrolOverview` | 正式期間、完成／應完成、剩餘、未巡、關注、最近紀錄 | `ptread` |
-| `patrolStores` | 最近巡店日、距今天數、狀態、待追蹤數 | `ptread` |
+| `patrolToday` | 今日路線、順序、完成、下一站、移動資訊 | `ptsummary`；正式來源缺欄位時 `no_data` |
+| `patrolOverview` | 正式期間、完成／應完成、剩餘、未巡、關注、最近紀錄 | month-scoped `ptsummary` |
+| `patrolStores` | 最近巡店日、距今天數、狀態、待追蹤數 | month-scoped `ptsummary` |
 
 ## KPI hard gates
 
@@ -49,8 +49,9 @@
 
 ## Schedule／Patrol hard gates
 
-- 只接受既有短效 session 後的 `sread`、`ptread`。
-- `patrolOverview` 只有正式來源提供期間與 completed／expected 時才可顯示進度。
+- 只接受既有短效 session 後的 `sread`、`ptsummary`、`ptdetail`、`ptvisit_read`、`hread`。
+- `patrolOverview` 只接受 `status=ok` 且月份、九店、正式期間完整的 `ptsummary`；timeout、非 JSON 或 transport error 必須是 `timeout/error + data=null`，不得轉成 `0/9`。
+- 巡店大盤不得預載 raw `ptread`；只有使用者點選單店完整巡店紀錄時，才以 `ptdetail(month, store, page, limit)` 分頁讀取，單次上限 100 rows。
 - 正式來源沒有今日路線、順序、移動欄位時，`patrolToday.status=no_data`；不得自行假定本月 9 店或計算路線。
 
 ## Native consumption

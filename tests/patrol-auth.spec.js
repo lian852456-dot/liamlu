@@ -1,11 +1,12 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
+const { patrolSummaryResponse } = require('./fixtures/patrol-summary-response.cjs');
 
 const PAGE_URL = 'file://' + path.resolve(__dirname, '../patrol.html');
 const GAS_PATTERN = 'https://script.google.com/**';
 const VALID_KEY = 'correct-test-key';
 const SESSION_TOKEN = 'test-session-token';
-const PROTECTED_ACTIONS = new Set(['debug', 'ptread', 'ptwrite', 'ptvisit_read', 'sread', 'hread', 'hwrite']);
+const PROTECTED_ACTIONS = new Set(['debug', 'ptread', 'ptsummary', 'ptdetail', 'ptwrite', 'ptvisit_read', 'sread', 'hread', 'hwrite']);
 
 async function installAuthGas(page, options = {}) {
   const state = {
@@ -55,13 +56,8 @@ async function installAuthGas(page, options = {}) {
       state.protectedCalls.push({ action, valid });
       if (!valid) {
         result = { status: 'error', message: 'unauthorized' };
-      } else if (action === 'ptread') {
-        result = {
-          status: 'ok',
-          rows: [],
-          stores: [{ code: 'DNB10059', name: '台北通化' }],
-          title: '北一二B區 · 33 項檢核追蹤',
-        };
+      } else if (action === 'ptsummary') {
+        result = patrolSummaryResponse(url.searchParams.get('month') || '2026-08');
       } else if (action === 'sread') {
         result = { status: 'ok', schedule: { month: '2026-07', stores: [] } };
       } else if (action === 'hread') {
@@ -156,7 +152,7 @@ test('正確密碼取得後端 token 後才建立看板並載入資料', async (
   await expect(page.locator('#mileageView')).toHaveCount(1);
   await expect(page.locator('#patrolAppHost #content')).toBeVisible();
   await expect(page.locator('#patrolAppHost #invPanels')).toContainText('通化');
-  await expect.poll(() => state.protectedCalls.filter(call => call.action === 'ptread').length).toBe(1);
+  await expect.poll(() => state.protectedCalls.filter(call => call.action === 'ptsummary').length).toBe(1);
   expect(state.protectedCalls.every(call => call.valid)).toBe(true);
   const storage = await page.evaluate(() => ({
     localKey: localStorage.getItem('bei12b_pt_key'),

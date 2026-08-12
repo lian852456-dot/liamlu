@@ -26,8 +26,9 @@ test('Recovery keeps existing patrol auth and disables half-month writes', () =>
   const js = read('app.js');
   assert.match(js, /action:'ptauth'/);
   assert.match(js, /patrolRead\('sread'/);
-  assert.match(js, /patrolRead\('ptread'/);
-  assert.match(js, /new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
+  assert.match(js, /patrolRead\('ptsummary',\{month\}\)/);
+  assert.match(js, /new Set\(\['sread','ptsummary','ptdetail','ptvisit_read','hread'\]\)/);
+  assert.doesNotMatch(js, /patrolRead\('ptread'/);
   assert.match(js, /new Set\(\['ptvisit_write'\]\)/);
   assert.doesNotMatch(js, /new Set\(\['ptvisit_write','hwrite'\]\)/);
   assert.doesNotMatch(js, /['"](?:ptwrite|swrite|write)['"]/);
@@ -50,7 +51,7 @@ test('PWA uses safe-area, standalone manifest, and app-only offline cache', () =
   assert.equal(manifest.display, 'standalone');
   assert.equal(manifest.orientation, 'portrait-primary');
   assert.match(worker, /offline\.html/);
-  assert.match(worker, /liam-supervisor-app-1-2-read-recovery-v2/);
+  assert.match(worker, /liam-supervisor-app-1-2-patrol-summary-v1/);
   assert.match(worker, /half-month-check-read-model\.js/);
   assert.match(worker, /half-month-check-write-prep\.js/);
   assert.match(worker, /event\.request\.method !== 'GET'/);

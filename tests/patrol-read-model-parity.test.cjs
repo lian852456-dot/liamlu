@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 const model = require('../patrol-read-model.js');
 const fixture = require('./fixtures/patrol-ptread-parity.cjs');
 
@@ -17,7 +18,59 @@ test('patrol.html and App delegate patrol calculations to the same read-only mod
   assert.match(patrolHtml, /PatrolReadModel\.storeSummary\(records, currentMonth, storeName\)/);
   assert.match(patrolHtml, /PatrolReadModel\.bimWindow\(mk\)/);
   assert.match(patrolHtml, /PatrolReadModel\.overview\(rawDetails, STORES, currentMonth/);
-  assert.match(appJs, /PatrolReadModel\.overview\(rows, configured, currentMonth/);
+  assert.match(appJs, /function adaptPatrolSummary\(raw, currentMonth\)/);
+  assert.match(appJs, /patrolRead\('ptsummary',\{month\}\)/);
+  assert.doesNotMatch(appJs, /patrolRead\('ptread'/);
+});
+
+function functionSource(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `${name} must exist`);
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') depth -= 1;
+    if (depth === 0) return source.slice(start, index + 1);
+  }
+  throw new Error(`unterminated ${name}`);
+}
+
+function gasSummary(rows, stores, month, now) {
+  const gas = fs.readFileSync(path.join(root, 'gas/Code.gs'), 'utf8');
+  const names = [
+    'ptWinMonths','ptDayOf','ptItemDone','ptStoreRows','patrolSummaryIsoDate_',
+    'patrolSummaryFillIsoDate_','patrolSummaryPreviousWindow_','patrolSummaryDaysSince_',
+    'patrolSummaryAwareness_','patrolSummaryItem18State_','patrolSummaryDashboardProgress_',
+    'patrolSummaryHalfDashboard_','patrolSummaryContract_'
+  ];
+  const context = {
+    PT_STORES:stores,
+    rows,
+    month,
+    now,
+    Utilities:{
+      formatDate(value, _timezone, pattern) {
+        const date = new Date(value);
+        const parts = new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false }).formatToParts(date);
+        const get = type => parts.find(part => part.type === type).value;
+        if (pattern === 'yyyy-MM') return `${get('year')}-${get('month')}`;
+        if (pattern === 'd') return String(Number(get('day')));
+        return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}+08:00`;
+      }
+    },
+    result:null
+  };
+  vm.createContext(context);
+  vm.runInContext(`${names.map(name => functionSource(gas, name)).join('\n')}\nresult=patrolSummaryContract_(rows,month,now,{sourceVersion:'',sourceUpdatedAt:''});`, context);
+  return JSON.parse(JSON.stringify(context.result));
+}
+
+test('GAS ptsummary contract matches the canonical patrol model field-for-field', () => {
+  const expected = model.summaryContract(fixture.rows, fixture.stores, fixture.currentMonth, fixture.now, {});
+  const actual = gasSummary(fixture.rows, fixture.stores, fixture.currentMonth, fixture.now);
+  expected.generatedAt = actual.generatedAt;
+  assert.deepEqual(actual, expected);
 });
 
 test('same ptread fixture yields canonical monthly patrol overview and item parity', () => {

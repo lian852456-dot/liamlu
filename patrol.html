@@ -100,6 +100,7 @@
   .overview{
     display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:18px;
   }
+  .summary-stale-note{grid-column:1/-1;padding:10px 12px;border:1px solid #f1c36d;border-radius:10px;background:#fff7df;color:#7a5200;font-size:13px;font-weight:700}
   .stat{
     background:var(--card);border-radius:12px;padding:16px;border:1px solid var(--line);
   }
@@ -532,7 +533,7 @@
       <h2>督導巡店檢查大盤</h2>
       <p class="hint">資料直接採用「貼上巡店紀錄」及其雲端同步明細，依原本巡店規則拆出上、下半月、每月檢查一次項目與雙月全盤。</p>
       <div class="secure-toolbar">
-        <label>檢視月份<input id="halfDashboardMonth" type="month" onchange="renderHalfDashboard()"></label>
+        <label>檢視月份<input id="halfDashboardMonth" type="month" onchange="selectPatrolSummaryMonth(this.value)"></label>
       </div>
     </div>
     <div class="secure-card">
@@ -593,7 +594,7 @@
 </div>
 </template>
 
-<script src="patrol-read-model.js?v=9"></script>
+<script src="patrol-read-model.js?v=10"></script>
 <script>
 /* ---------- 檢核規則設定 ---------- */
 // 預設門市清單（北一二B）。連上雲端後會改用 GAS 回傳的本區清單，
@@ -656,6 +657,10 @@ let records = {};
 // rawDetails: 完整明細陣列，供上傳雲端與匯出（每筆一列）
 let rawDetails = [];
 let currentMonth = "";
+let patrolSummary = null;
+let patrolSummaryState = 'loading';
+let patrolSummaryMessage = '巡店資料讀取中';
+let patrolSummaryVerifiedAt = '';
 // 巡店所有資料 action 固定走同一個正式受保護部署。
 const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
 const PRIVATE_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
@@ -917,7 +922,7 @@ function initMonth(){
   const mi = document.getElementById('monthInput');
   mi.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   currentMonth = mi.value;
-  mi.addEventListener('change', e=>{ currentMonth=e.target.value; render(); });
+  mi.addEventListener('change', e=>{ currentMonth=e.target.value; if(cloudOn) cloudLoad(); else render(); });
 }
 
 /* ---------- 解析貼上資料 ---------- */
@@ -972,6 +977,7 @@ function parseData(){
 
   if(added>0){
     rawDetails = rawDetails.concat(newDetails);
+    patrolSummaryState='local';
     document.getElementById('pasteBox').value='';
 
     // 先報「已解析」，即使接下來看板渲染出錯，使用者也知道資料已收下、正在處理。
@@ -1043,7 +1049,7 @@ function importData(e){
   reader.onload=ev=>{
     try{
       const data=JSON.parse(ev.target.result);
-      if(Array.isArray(data)){ rawDetails=data; rebuildFromRaw(); }
+      if(Array.isArray(data)){ rawDetails=data; patrolSummaryState='local'; rebuildFromRaw(); }
       else { records=data; } // 相容舊格式
       render();
       showMsg('已匯入存檔','ok');
@@ -1076,6 +1082,32 @@ function render(){
   renderHalfDashboard();
 }
 
+function patrolSummaryUnavailableHTML(){
+  const previous=patrolSummary ? `<p class="hint">上次成功資料 · ${patrolSummaryVerifiedAt || '時間未知'}</p>` : '';
+  return `<div class="empty-state"><div class="big">⚠️</div><b>${patrolSummaryMessage || '巡店資料讀取逾時'}</b>${previous}<br><button class="btn-cloud" type="button" onclick="cloudLoad()">重新整理</button></div>`;
+}
+
+function summaryStoreCardHTML(store){
+  const missing=Array.isArray(store.missingItemNumbers)?store.missingItemNumbers:[];
+  const pillClass=store.missingItems===0?'done':(store.visited?'partial':'none');
+  const pillText=!store.visited?'本月未巡':store.missingItems===0?'完成':`缺 ${store.missingItems} 項`;
+  const body=store.missingItems===0
+    ? '<div class="all-done">✓ 本月 33 項檢核全數完成</div>'
+    : `<div class="miss-group"><h4>尚未完成項目</h4>${missing.map(item=>`<div class="item miss"><div class="no">${item}</div><div class="txt">${ITEM_TEXT[item]||''}</div><span class="tag">${ITEM_RULES[item].label}</span></div>`).join('')}</div>`;
+  return `<div class="store-card" onclick="this.classList.toggle('open')"><div class="store-head"><div class="left"><div><div class="store-name">${store.name}</div><div class="store-code">${store.code||''}</div></div></div><div class="right"><div class="bar"><span style="width:${Math.round((Number(store.done)||0)/33*100)}%;background:${store.missingItems===0?'var(--ok)':'var(--tw-orange)'}"></span></div><div class="pill ${pillClass}">${pillText}</div><div class="chevron">▶</div></div></div><div class="store-body" onclick="event.stopPropagation()">${body}<button class="btn-cloud ghost patrol-detail-load" type="button" data-store="${store.name}" onclick="loadPatrolDetail(this)">查看完整巡店紀錄</button><div class="patrol-lazy-detail"></div></div></div>`;
+}
+
+async function loadPatrolDetail(button){
+  const target=button.parentElement.querySelector('.patrol-lazy-detail');
+  button.disabled=true;target.textContent='正在讀取該店本月明細…';
+  try{
+    const result=await cloudCall('ptdetail',{month:currentMonth,store:button.dataset.store,page:1,limit:100});
+    if(!result||result.status!=='ok'||!Array.isArray(result.rows)) throw new Error(result&&result.message||'巡店明細讀取失敗');
+    target.innerHTML=result.rows.length?`<div class="inv-wrap"><table class="inv-table"><tr><th>日期</th><th>題號</th><th>結果</th><th>原因</th></tr>${result.rows.map(row=>`<tr><td>${esc(row.fillTime||'—')}</td><td>${esc(row.item)}</td><td>${esc(row.result||'—')}</td><td>${esc(row.reason||'—')}</td></tr>`).join('')}</table></div>${result.totalRows>result.rows.length?`<p class="hint">僅顯示前 ${result.rows.length} / ${result.totalRows} 筆</p>`:''}`:'<p class="hint">本月無該店明細</p>';
+  }catch(error){ target.textContent=String(error&&error.message||'巡店明細讀取失敗'); }
+  finally{ button.disabled=false; }
+}
+
 /* ---------- 盤點提醒框（題14-17每月1次、題18兩個月1次） ---------- */
 const INV_ITEMS = [14,15,16,17];
 const INV_LABELS = {14:'銷毀文件', 15:'維修機盤點', 16:'現金盤點', 17:'iPhone盤點'};
@@ -1095,6 +1127,17 @@ function prevBimWindow(mk){
 
 function renderInvPanels(){
   const c = document.getElementById('invPanels');
+  if(patrolSummaryState!=='local'){
+    if(!patrolSummary){ c.innerHTML=patrolSummaryUnavailableHTML(); return; }
+    const inventory=patrolSummary.inventory14to17;
+    const item18=patrolSummary.item18;
+    const awareness=patrolSummary.items19to33;
+    c.innerHTML=`
+      <div class="panel"><h2>每月盤點提醒（題 14–17）<span class="inv-badge ${inventory.completedStores===inventory.total?'ok':''}">${inventory.completedStores}/${inventory.total} 店完成</span></h2><div class="inv-wrap"><table class="inv-table"><tr><th style="text-align:left">店點</th>${inventory.items.map(item=>`<th>${item}.${INV_LABELS[item]}</th>`).join('')}</tr>${inventory.stores.map(row=>`<tr><td class="store">${row.name.replace('台北','')}</td>${inventory.items.map(item=>`<td class="${row.items[item]?'inv-ok':'inv-miss'}">${row.items[item]?'✓':'✗'}</td>`).join('')}</tr>`).join('')}</table></div></div>
+      <div class="panel"><h2>到店全盤提醒（題 18・本期 ${item18.window.label}）<span class="inv-badge ${item18.completedStores===item18.total?'ok':''}">${item18.completedStores}/${item18.total} 店完成</span></h2><div class="inv-wrap"><table class="inv-table"><tr><th style="text-align:left">店點</th><th>本期</th><th>完成日</th><th>上期 ${item18.previousWindow.label}</th></tr>${item18.stores.map(row=>`<tr><td class="store">${row.name.replace('台北','')}</td><td class="${row.current.done?'inv-ok':'inv-miss'}">${row.current.done?'✓ 已完成':'✗ 未完成'}</td><td class="inv-last">${row.current.date||'—'}</td><td class="inv-last">${row.previous.done?'✓ '+row.previous.date:'✗'}</td></tr>`).join('')}</table></div></div>
+      <div class="panel"><h2>知悉宣導提醒（題 19–33・每月20日前）<span class="inv-badge ${awareness.completedStores===awareness.total?'ok':''}">${awareness.completedStores}/${awareness.total} 店完成</span></h2><div class="inv-wrap"><table class="inv-table"><tr><th style="text-align:left">店點</th><th>進度</th><th>狀態</th><th>完成日</th></tr>${awareness.stores.map(row=>`<tr><td class="store">${row.store.replace('台北','')}</td><td><div class="inv-prog"><div class="bar"><span style="width:${Math.round(row.count/row.total*100)}%;background:${row.count===row.total?'var(--ok)':'var(--tw-orange)'}"></span></div><span class="num">${row.count}/${row.total}</span></div></td><td class="${row.count===row.total?'inv-ok':'inv-miss'}">${row.count===row.total?'✓ 已完成':'✗ 未完成'}</td><td class="inv-last">${row.completedDay||'—'}</td></tr>`).join('')}</table></div></div>`;
+    return;
+  }
   const [cy,cm] = currentMonth.split('-');
   const win = bimWindow(currentMonth);
   const pwin = prevBimWindow(currentMonth);
@@ -1189,6 +1232,17 @@ function renderInvPanels(){
 function renderTicker(){
   const ticker=document.getElementById('ticker');
   const track=document.getElementById('tickerText');
+  if(patrolSummaryState!=='local'){
+    if(!patrolSummary){ ticker.style.display='none'; return; }
+    const items=[];
+    if(patrolSummary.unvisitedStores.length) items.push(`⚠ 本月尚未巡店：${patrolSummary.unvisitedStores.join('、')}`);
+    patrolSummary.stores.filter(store=>store.status==='attention').sort((a,b)=>b.missingItems-a.missingItems).slice(0,3).forEach(store=>items.push(`${store.name} 尚缺 ${store.missingItems} 項待補`));
+    ticker.style.display='flex';
+    ticker.classList.toggle('clear',items.length===0);
+    const line=items.length?items.map(text=>`<span>${text}</span>`).join('<span class="sep">•</span>'):'<span>✓ 本月所有已巡店點皆完成檢核，狀態良好</span>';
+    track.innerHTML=line;
+    return;
+  }
   const visitedStores = Object.keys(records).filter(s=>
     records[s].entries.some(e=>e.month===currentMonth));
 
@@ -1228,6 +1282,12 @@ function renderTicker(){
 
 function renderOverview(){
   const ov=document.getElementById('overview');
+  if(patrolSummaryState!=='local'){
+    if(!patrolSummary){ ov.innerHTML=patrolSummaryUnavailableHTML(); return; }
+    const stale=patrolSummaryState==='stale'?`<div class="summary-stale-note">上次成功資料 · ${patrolSummaryVerifiedAt || '時間未知'} · ${patrolSummaryMessage}</div>`:'';
+    ov.innerHTML=`${stale}<div class="stat"><div class="num">${patrolSummary.visitedStores}</div><div class="lbl">本月已巡店數</div></div><div class="stat"><div class="num good">${patrolSummary.fullyDoneStores}</div><div class="lbl">全項完成店數</div></div><div class="stat"><div class="num ${patrolSummary.totalMissingItems>0?'warn':''}">${patrolSummary.totalMissingItems}</div><div class="lbl">尚缺檢核項次</div></div><div class="stat"><div class="num ${patrolSummary.unvisitedStores.length?'warn':''}">${patrolSummary.unvisitedStores.length}</div><div class="lbl">尚未巡店數</div></div>`;
+    return;
+  }
   const model = PatrolReadModel.overview(rawDetails, STORES, currentMonth, new Date());
 
   ov.innerHTML=`
@@ -1240,6 +1300,14 @@ function renderOverview(){
 
 function renderStores(){
   const c=document.getElementById('content');
+  if(patrolSummaryState!=='local'){
+    if(!patrolSummary){ c.innerHTML=patrolSummaryUnavailableHTML(); return; }
+    const attention=patrolSummary.stores.filter(store=>store.status==='attention').sort((a,b)=>b.missingItems-a.missingItems);
+    const done=patrolSummary.stores.filter(store=>store.status==='complete');
+    const pending=patrolSummary.stores.filter(store=>store.status==='pending');
+    c.innerHTML=(attention.length?`<div class="section-title">待補完成 <span class="badge">${attention.length} 店</span></div>${attention.map(summaryStoreCardHTML).join('')}`:'')+(done.length?`<div class="section-title">本月已完成 <span class="badge">${done.length} 店</span></div>${done.map(summaryStoreCardHTML).join('')}`:'')+(pending.length?`<div class="section-title">本月尚未巡店 <span class="badge">${pending.length} 店</span></div>${pending.map(summaryStoreCardHTML).join('')}`:'');
+    return;
+  }
   const model = PatrolReadModel.overview(rawDetails, STORES, currentMonth, new Date());
   const visitedStores = model.stores.filter(store=>store.visited).map(store=>store.recordName)
     .sort((a,b)=>storeSummary(a).miss - storeSummary(b).miss ? storeSummary(b).miss-storeSummary(a).miss : 0);
@@ -1321,9 +1389,17 @@ function storeCardHTML(storeName){
 function cloudCall(action, params={}){
   return patrolRequestWithReauth(()=>{
     if(!['ping','pthealth'].includes(action)&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized'};
-    const url=new URL(GAS_URL);url.searchParams.set('action',action);Object.keys(params).forEach(k=>url.searchParams.set(k,params[k]));
-    if(!['ping','pthealth'].includes(action)) url.searchParams.set('token',PT_TOKEN);
-    return fetch(url.toString(),{method:'GET',cache:'no-store'}).then(r=>r.json());
+    const query=[['action',action]];Object.keys(params).forEach(key=>query.push([key,String(params[key])]));
+    if(!['ping','pthealth'].includes(action)) query.push(['token',PT_TOKEN]);
+    const url=GAS_URL+'?'+query.map(pair=>encodeURIComponent(pair[0])+'='+encodeURIComponent(pair[1])).join('&');
+    const timeoutMs=action==='ptsummary'?20000:action==='ptdetail'?30000:0;
+    const controller=timeoutMs?new AbortController():null;
+    const timer=controller?setTimeout(()=>controller.abort(),timeoutMs):null;
+    return fetch(url,{method:'GET',cache:'no-store',signal:controller?controller.signal:undefined}).then(async response=>{
+      const text=await response.text();
+      if(!response.ok) throw new Error('HTTP '+response.status);
+      try{return JSON.parse(text);}catch(_){throw new Error('巡店服務回傳非 JSON');}
+    }).catch(error=>{ if(error&&error.name==='AbortError') throw new Error('巡店資料讀取逾時'); throw error; }).finally(()=>{if(timer)clearTimeout(timer);});
   });
 }
 
@@ -1364,28 +1440,34 @@ function cloudConnect(){
 
 function cloudLoad(){
   if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN) return;
-  cloudCall('ptread').then(res=>{
+  patrolSummaryState=patrolSummary?'stale':'loading';
+  patrolSummaryMessage=patrolSummary?`上次成功資料 · ${patrolSummaryVerifiedAt} · 正在更新`:'巡店資料讀取中';
+  render();
+  cloudCall('ptsummary',{month:currentMonth}).then(res=>{
     if(res.status==='ok'){
       // 套用各區自己的設定（GAS 的 PT_STORES / PT_TITLE），沒回傳就用預設
       if(Array.isArray(res.stores) && res.stores.length){
         STORES = res.stores.map(s=>({code:String(s.code||''), name:String(s.name||'')}));
       }
       if(res.title) document.getElementById('subTitle').textContent = res.title;
-      rawDetails = (res.rows||[]).map(r=>({
-        fillTime:String(r.fillTime||''), arriveTime:String(r.arriveTime||''), leaveTime:String(r.leaveTime||''),
-        district:String(r.district||''), code:String(r.code||''), store:String(r.store||''), inspector:String(r.inspector||''),
-        item:+r.item, content:ITEM_TEXT[+r.item]||'', result:String(r.result||'').toLowerCase(),
-        reason:String(r.reason||''), month:String(r.month||'')
-      }));
-      rebuildFromRaw();
+      if(!res.summary||res.summary.month!==currentMonth||!Array.isArray(res.summary.stores)||res.summary.stores.length!==STORES.length) throw new Error('巡店摘要月份或九店 contract 不完整');
+      patrolSummary=res.summary;
+      patrolSummaryState='ok';
+      patrolSummaryMessage='';
+      patrolSummaryVerifiedAt=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
       render();
-      showMsg(`雲端已載入 ${rawDetails.length} 筆明細`,'ok');
+      showMsg(`巡店摘要已更新 · ${patrolSummary.visitedStores}/${patrolSummary.totalStores} 店`,'ok');
     }else if(res.reauthFailed){
       showMsg(PATROL_REAUTH_MESSAGE,'err');
     }else{
-      showMsg('讀取失敗：'+(res.message||''),'err');
+      throw new Error(res.message||'巡店摘要讀取失敗');
     }
-  }).catch(()=>showMsg('讀取雲端失敗','err'));
+  }).catch(error=>{
+    patrolSummaryState=patrolSummary?'stale':'error';
+    patrolSummaryMessage=String(error&&error.message||'巡店資料讀取失敗');
+    render();
+    showMsg(patrolSummaryMessage,'err');
+  });
 }
 
 function cloudWrite(details, renderErr){
@@ -1772,10 +1854,31 @@ function dashboardProgress(rows, expected){
   return {className,text,detail:`${completed}/${expected.length}`,issues};
 }
 function dashboardBiWindow(month){ const [year,number]=month.split('-').map(Number);const start=number%2?number:number-1;return {start:`${year}-${String(start).padStart(2,'0')}`,end:`${year}-${String(start+1).padStart(2,'0')}`,label:`${start}–${start+1}月雙月全盤`}; }
+function selectPatrolSummaryMonth(month){
+  if(!/^\d{4}-\d{2}$/.test(String(month||''))) return;
+  currentMonth=month;
+  const input=document.getElementById('monthInput');if(input)input.value=month;
+  if(cloudOn) cloudLoad(); else render();
+}
 function dashboardStateHtml(label,state){ return `<div class="half-dashboard-state ${state.className}"><span class="label">${esc(label)}</span><strong>${esc(state.text)}</strong><small>${esc(state.detail)}</small></div>`; }
+function dashboardSummaryState(state){
+  const source=state||{completed:0,total:0,missing:0,issues:0,status:'miss'};
+  const text=source.status==='done'?'完成':source.issues?`缺 ${source.missing} 項・${source.issues} 異常`:source.completed?`缺 ${source.missing} 項`:'尚未開始';
+  return {className:source.status==='issue'?'issue':source.status==='done'?'done':'miss',text,detail:`${source.completed}/${source.total}`};
+}
 function renderHalfDashboard(){
   const content=document.getElementById('halfDashboardContent');const summary=document.getElementById('halfDashboardSummary');const monthInput=document.getElementById('halfDashboardMonth');if(!content||!summary||!monthInput)return;
-  if(!monthInput.value) monthInput.value=currentMonth||new Date().toISOString().slice(0,7);const month=monthInput.value;const window=dashboardBiWindow(month);const twiceItems=Array.from({length:12},(_,i)=>i+2);const monthlyItems=[14,15,16,17];const stores=dashboardStoreList();
+  if(!monthInput.value) monthInput.value=currentMonth||new Date().toISOString().slice(0,7);const month=monthInput.value;
+  if(patrolSummaryState!=='local'){
+    const dashboard=patrolSummary&&patrolSummary.halfDashboard;
+    if(!dashboard||dashboard.month!==month){summary.innerHTML='';content.innerHTML=patrolSummaryUnavailableHTML();return;}
+    const windowLabel=(dashboard.window&&dashboard.window.label)||dashboardBiWindow(month).label;
+    summary.innerHTML=`<div class="half-stat"><strong>${dashboard.completedH1Stores}/${dashboard.stores.length}</strong><span>上半月完成門市</span></div><div class="half-stat"><strong>${dashboard.completedH2Stores}/${dashboard.stores.length}</strong><span>下半月完成門市</span></div><div class="half-stat"><strong>${dashboard.completedInventoryStores}/${dashboard.stores.length}</strong><span>每月檢查一次項目完成門市</span></div><div class="half-stat"><strong>${dashboard.completedItem18Stores}/${dashboard.stores.length}</strong><span>${esc(windowLabel)}雙月全盤完成門市</span></div><div class="half-stat"><strong class="${dashboard.abnormalItems?'status-issue':''}">${dashboard.abnormalItems}</strong><span>巡店異常明細（檢查≥10項、到店≥5次）</span></div>`;
+    const stale=patrolSummaryState==='stale'?`<p class="summary-stale-note">上次成功資料 · ${esc(patrolSummaryVerifiedAt||'時間未知')} · ${esc(patrolSummaryMessage)}</p>`:'';
+    content.innerHTML=`${stale}<p class="secure-note">資料來源：正式輕量巡店摘要。大盤不載入全部巡店明細。</p>`+dashboard.stores.map(store=>`<article class="half-dashboard-store"><div class="half-dashboard-store-head"><strong>${esc(store.store)}</strong><span>本月到店 ${store.visitCount} 次</span></div><div class="half-dashboard-states">${dashboardStateHtml('上半月・題 2–13',dashboardSummaryState(store.h1))}${dashboardStateHtml('下半月・題 2–13',dashboardSummaryState(store.h2))}${dashboardStateHtml('每月檢查一次項目・題 14–17',dashboardSummaryState(store.inventory14to17))}${dashboardStateHtml(windowLabel+'雙月全盤・題 18',dashboardSummaryState(store.item18))}</div></article>`).join('');
+    return;
+  }
+  const window=dashboardBiWindow(month);const twiceItems=Array.from({length:12},(_,i)=>i+2);const monthlyItems=[14,15,16,17];const stores=dashboardStoreList();
   const cards=stores.map(store=>{const rows=dashboardPatrolRows(store);const h1=dashboardProgress(rows.filter(row=>dashboardRowMonth(row)===month&&dashboardRowHalf(row)==='H1'),twiceItems);const h2=dashboardProgress(rows.filter(row=>dashboardRowMonth(row)===month&&dashboardRowHalf(row)==='H2'),twiceItems);const monthly=dashboardProgress(rows.filter(row=>dashboardRowMonth(row)===month),monthlyItems);const bi=dashboardProgress(rows.filter(row=>[window.start,window.end].includes(dashboardRowMonth(row))),[18]);const visits=dashboardVisitCount(rows,month);const checkedItems=dashboardCheckedItemCount(rows,month);return {store,h1,h2,monthly,bi,visits,checkedItems,eligibleForIssues:checkedItems>=10&&visits>4};});
   const done=key=>cards.filter(card=>card[key].className==='done').length;const eligible=cards.filter(card=>card.eligibleForIssues);const issues=eligible.reduce((sum,card)=>sum+card.h1.issues+card.h2.issues+card.monthly.issues+card.bi.issues,0);
   summary.innerHTML=`<div class="half-stat"><strong>${done('h1')}/${cards.length}</strong><span>上半月完成門市</span></div><div class="half-stat"><strong>${done('h2')}/${cards.length}</strong><span>下半月完成門市</span></div><div class="half-stat"><strong>${done('monthly')}/${cards.length}</strong><span>每月檢查一次項目完成門市</span></div><div class="half-stat"><strong>${done('bi')}/${cards.length}</strong><span>${esc(window.label)}完成門市</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>巡店異常明細（檢查≥10項、到店≥5次）</span></div>`;
