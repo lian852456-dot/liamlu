@@ -88,17 +88,12 @@ test('write readback parity checks period, store, item, status, note and improve
   assert.deepEqual(result.mismatches[0], { item:3, field:'improvement', expected:'正式改善', actual:'不一致' });
 });
 
-test('formal App wires only existing hwrite and keeps media upload disabled', () => {
+test('recovery App leaves the hwrite prep contract dormant and keeps formal UI read-only', () => {
   assert.match(app, /PREVIEW \/ 尚未寫入正式資料/);
   assert.match(app, /已填 \$\{progress\.completed\} \/ \$\{progress\.total\}/);
-  assert.match(app, /const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write','hwrite'\]\)/);
-  const writer=app.match(/async function halfMonthWriteRows\(rows, mode = 'draft'\) \{[\s\S]*?\n  \}/)?.[0]||'';
-  assert.match(writer, /method:'POST'/);
-  assert.match(writer, /body:JSON\.stringify\(\{ action, token:patrolToken, mode, rows \}\)/);
-  assert.doesNotMatch(writer, /URL\(|searchParams|callbackName|createElement\('script'\)/);
-  assert.doesNotMatch(app, /halfMonthWriteChunks/);
-  assert.match(app, /const readback=await patrolRead\('hread'\)/);
-  assert.doesNotMatch(app, /half_media_upload/);
+  assert.match(app, /const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write'\]\)/);
+  assert.doesNotMatch(app, /halfMonthWriteRows|halfMonthWriteChunks|patrolRead\('hwrite'\)|half_media_upload/);
+  assert.match(app, /FORMAL READ \/ 正式唯讀/);
   assert.match(gas, /function writeHalfCheck\(rows, options\)/);
   assert.match(gas, /else if \(action === 'hwrite'\) result = writeHalfCheckPostPayload_\(payload, e\)/);
 });

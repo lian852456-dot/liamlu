@@ -47,14 +47,14 @@ async function mobileAssertions(page){
   expect(state.ellipsis).toEqual([]);
 }
 
-test('formal hread maps nine stores and never writes before explicit save',async({page})=>{
+test('formal hread maps nine stores while recovery remains read-only',async({page})=>{
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   const state=await installFormalRoutes(page);
   await page.goto(FORMAL_URL);
   await expect(page.locator('#patrolDepartureButton')).toBeEnabled();
   await page.locator('[data-patrol-check-view="half-month"]').click();
-  await expect(page.locator('#halfMonthCheckPreview')).toContainText('FORMAL / 正式文字資料');
+  await expect(page.locator('#halfMonthCheckPreview')).toContainText('FORMAL READ / 正式唯讀');
   await expect(page.locator('.half-preview-summary article').nth(0)).toContainText('5 / 9');
   await expect(page.locator('.half-preview-summary article').nth(1)).toContainText('3 店');
   await expect(page.locator('.half-preview-summary article').nth(2)).toContainText('4');
@@ -89,7 +89,8 @@ test('formal hread maps nine stores and never writes before explicit save',async
   await expect(page.locator('#halfMonthProgress')).toContainText('5 / 18');
   await expect(page.locator('[data-half-preview-question="6"] .half-preview-result-label')).toContainText('尚未填寫');
   await page.locator('[data-half-preview-question="1"] [data-half-answer="ok"]').click();
-  await expect(page.locator('[data-half-preview-action="save"]')).toContainText('儲存目前進度');
+  await expect(page.locator('[data-half-preview-action="save"]')).toHaveCount(0);
+  await expect(page.locator('.preview-only-banner')).toContainText('PREVIEW / 尚未寫入正式資料');
   await page.locator('.half-preview-form-meta').scrollIntoViewIfNeeded();
   await page.screenshot({path:'test-output/half-month-formal-05-incomplete-store-390x844.png'});
 

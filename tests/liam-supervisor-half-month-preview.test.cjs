@@ -30,9 +30,10 @@ test('preview mirrors the formal 18-item and result semantics', () => {
   assert.match(sourceMatrix, /第 1–18 題/);
 });
 
-test('half-month preview renderer is isolated while formal mode uses only existing hwrite', () => {
+test('half-month preview renderer is isolated and recovery formal mode stays read-only', () => {
   assert.match(app, /const PATROL_READ_ACTIONS = new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
-  assert.match(app, /const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write','hwrite'\]\)/);
+  assert.match(app, /const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write'\]\)/);
+  assert.doesNotMatch(app, /halfMonthWriteRows|data-half-preview-action="save"|half_media_upload/);
   assert.doesNotMatch(app.match(/function renderHalfMonthOverview[\s\S]+?async function loadHalfMonthFormalRead/)?.[0] || '', /fetch\(|patrolRead\(|patrolVisitWrite\(|privateInspectionRequest\(|privateInspectionMediaUpload\(/);
   assert.match(html, /data-patrol-check-view="patrol"/);
   assert.match(html, /data-patrol-check-view="half-month"/);

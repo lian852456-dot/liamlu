@@ -18,7 +18,7 @@
   const READ_ACTIONS = new Set(['private_access','read','pread','kpicalc_access']);
   const DEVICE_ACTIONS = new Set(['private_request','private_request_status']);
   const PATROL_READ_ACTIONS = new Set(['sread','ptread','ptvisit_read','hread']);
-  const PATROL_WRITE_ACTIONS = new Set(['ptvisit_write','hwrite']);
+  const PATROL_WRITE_ACTIONS = new Set(['ptvisit_write']);
   const PRIVATE_MODULE_KEYS = ['todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models','personalPerformance','report1600','report2100','reportFailures'];
   const PREVIEW_MODE = new URLSearchParams(scope.location.search).get('preview') === '1';
   const STALE_MS = 30 * 60 * 60 * 1000;
@@ -42,13 +42,11 @@
   let halfMonthPreviewScreen = 'overview';
   let halfMonthPreviewStore = '';
   let halfMonthPreviewAnswers = {};
-  let halfMonthPreviewInspector = '';
   let halfMonthPreviewMessage = '';
   let halfMonthPreviewResult = null;
   let halfMonthFormalRows = [];
   let halfMonthReadState = 'idle';
   let halfMonthReadMessage = '';
-  let halfMonthWriteInFlight = false;
   let halfMonthSelectedPeriod = H ? H.periodForDate(taipeiDate()) : '';
   let privateAccessStatus = PREVIEW_MODE ? 'preview' : 'unauthorized';
 
@@ -241,26 +239,6 @@
     const body = await response.json();
     if (!body || body.status !== 'ok') {
       const message=(body&&body.message)||'到離店寫入失敗。';
-      if (/unauthorized|session|授權|逾時|失效/i.test(message)) {
-        patrolToken=''; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true;
-        throw new Error('班表／巡店授權已逾時，請重新驗證');
-      }
-      throw new Error(message);
-    }
-    return body;
-  }
-
-  async function halfMonthWriteRows(rows, mode = 'draft') {
-    const action = 'hwrite';
-    if (!PATROL_WRITE_ACTIONS.has(action)) throw new Error('不允許的半月檢查寫入 action。');
-    if (!patrolToken) throw new Error('班表／巡店 session 尚未驗證。');
-    const response = await fetch(PATROL_API, {
-      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, cache:'no-store', credentials:'omit',
-      body:JSON.stringify({ action, token:patrolToken, mode, rows })
-    });
-    const body = await response.json();
-    if (!body || body.status !== 'ok') {
-      const message=(body&&body.message)||'半月督導檢查寫入失敗。';
       if (/unauthorized|session|授權|逾時|失效/i.test(message)) {
         patrolToken=''; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true;
         throw new Error('班表／巡店授權已逾時，請重新驗證');
@@ -1022,8 +1000,6 @@
   function captureHalfMonthPreviewForm() {
     const store=dom('#halfMonthStore');
     if(store) halfMonthPreviewStore=store.value;
-    const inspector=dom('#halfMonthInspector');
-    if(inspector) halfMonthPreviewInspector=inspector.value;
     all('[data-half-preview-question]').forEach(card=>{
       const item=Number(card.dataset.halfPreviewQuestion);
       const current=halfMonthPreviewAnswers[item]||{};
@@ -1048,9 +1024,7 @@
   function seedHalfMonthPreviewAnswers(data, storeName) {
     const store=(data&&Array.isArray(data.stores)?data.stores:[]).find(row=>row.name===storeName);
     halfMonthPreviewAnswers={};
-    halfMonthPreviewInspector='';
     (store&&Array.isArray(store.questions)?store.questions:[]).forEach(question=>{
-      if(!halfMonthPreviewInspector&&question.inspector) halfMonthPreviewInspector=question.inspector;
       halfMonthPreviewAnswers[question.item]={
         result:question.result||'',
         note:question.note||'',
@@ -1058,60 +1032,6 @@
         evidence:question.evidence||''
       };
     });
-  }
-
-  function halfMonthOperationId() {
-    const random=scope.crypto&&scope.crypto.randomUUID?scope.crypto.randomUUID().replace(/-/g,''):String(Date.now());
-    return `hm_${random}`;
-  }
-
-  async function saveHalfMonthFormalProgress(data) {
-    if(PREVIEW_MODE||halfMonthWriteInFlight) return;
-    captureHalfMonthPreviewForm();
-    if(!HW){ halfMonthPreviewMessage='正式寫入 contract 未載入，已停止。'; renderHalfMonthCheck(); return; }
-    if(!halfMonthPreviewStore){ halfMonthPreviewMessage='請先選擇店點。'; renderHalfMonthCheck(); return; }
-    if(!String(halfMonthPreviewInspector||'').trim()){ halfMonthPreviewMessage='請填寫督導姓名。'; renderHalfMonthCheck(); return; }
-    if(!H||data.period.key!==H.periodForDate(taipeiDate())){ halfMonthPreviewMessage='歷史期別僅供唯讀。'; renderHalfMonthCheck(); return; }
-    const payload={
-      schemaVersion:HW.SCHEMA_VERSION,
-      operationId:halfMonthOperationId(),
-      mode:'draft',
-      date:taipeiDate(),
-      month:taipeiDate().slice(0,7),
-      period:data.period.key,
-      store:halfMonthPreviewStore,
-      inspector:halfMonthPreviewInspector,
-      items:(data.questions||[]).map(question=>({
-        item:question.item,
-        result:halfMonthPreviewAnswers[question.item]?.result||'',
-        note:halfMonthPreviewAnswers[question.item]?.result==='abnormal'?(halfMonthPreviewAnswers[question.item]?.note||''):'',
-        improvement:halfMonthPreviewAnswers[question.item]?.result==='abnormal'?(halfMonthPreviewAnswers[question.item]?.improvement||''):''
-      }))
-    };
-    let rows;
-    try { rows=HW.toExistingHwriteRows(payload); }
-    catch(error){ halfMonthPreviewMessage=String(error&&error.message||'半月檢查內容驗證失敗。'); renderHalfMonthCheck(); return; }
-    halfMonthWriteInFlight=true;
-    halfMonthPreviewMessage='正在儲存並執行正式 hread 核對…';
-    renderHalfMonthCheck();
-    try{
-      await halfMonthWriteRows(rows,'draft');
-      const readback=await patrolRead('hread');
-      const parity=HW.verifyReadback(payload,readback.rows,normalizeStore);
-      if(!parity.ok){
-        const first=parity.mismatches[0]||{};
-        throw new Error(`寫後讀回不一致（第 ${first.item||'—'} 題 ${first.field||'資料'}）`);
-      }
-      halfMonthFormalRows=Array.isArray(readback.rows)?readback.rows:[];
-      halfMonthReadState='ok';
-      seedHalfMonthPreviewAnswers(halfMonthData(),halfMonthPreviewStore);
-      halfMonthPreviewMessage='已儲存，並完成正式 hread 逐欄核對。';
-    }catch(error){
-      halfMonthPreviewMessage=`儲存失敗：${String(error&&error.message||'正式寫入或讀回核對失敗。')}`;
-    }finally{
-      halfMonthWriteInFlight=false;
-      renderHalfMonthCheck();
-    }
   }
 
   function renderHalfMonthOverview(data) {
@@ -1122,11 +1042,7 @@
       return `<article class="half-preview-store"><div><strong>${escapeHtml(store.name)}</strong><small>${store.latestDate?`最近填寫 ${escapeHtml(formatReliableDateOnly(store.latestDate))}`:'本期尚無填寫資料'}</small></div><div class="half-preview-store-status ${className}"><i data-lucide="${icon}"></i><b>${label}</b><small>異常 ${store.abnormalCount||0}</small></div></article>`;
     }).join('');
     const periodControl=PREVIEW_MODE?'':`<div class="segmented half-period-selector" role="group" aria-label="半月期別"><button type="button" class="${data.period.key==='H1'?'active':''}" data-half-period="H1" aria-pressed="${data.period.key==='H1'}">上半月</button><button type="button" class="${data.period.key==='H2'?'active':''}" data-half-period="H2" aria-pressed="${data.period.key==='H2'}">下半月</button></div>`;
-    const readBanner=PREVIEW_MODE?'<b>PREVIEW / 尚未寫入正式資料</b><span>本頁只驗證資訊架構；未呼叫 hwrite 或媒體上傳。</span>':'<b>FORMAL / 正式文字資料</b><span>沿用 ptauth、hread 與 hwrite；填寫進度不是 backend completed，媒體上傳仍停用。</span>';
-    const currentPeriod=H&&data.period&&data.period.key===H.periodForDate(taipeiDate());
-    const startButton=PREVIEW_MODE||currentPeriod
-      ? `<button class="half-preview-start" type="button" data-half-preview-action="start">+ 開始半月督導檢查</button>`
-      : '<button class="half-preview-start" type="button" disabled>歷史期別僅供唯讀</button>';
+    const readBanner=PREVIEW_MODE?'<b>PREVIEW / 尚未寫入正式資料</b><span>本頁只驗證資訊架構；未呼叫 hwrite 或媒體上傳。</span>':'<b>FORMAL READ / 正式唯讀</b><span>資料來自 hread；填寫進度是 18 題完整度，不是 backend completed。</span>';
     return `<section class="preview-only-banner">${readBanner}</section>
       ${open?`<section class="half-preview-location"><i data-lucide="map-pin"></i><div><span>目前在：</span><b>${escapeHtml(normalizeStore(open.store))}</b><small>到店不會自動開始檢查</small></div></section>`:''}
       <section class="panel half-preview-period"><div class="panel-head"><div><h2>本期半月督導檢查</h2><small>${escapeHtml(data.source&&data.source.label||'正式 hread contract')}</small></div></div><strong>${escapeHtml(data.period&&data.period.label||'—')}</strong><span>${escapeHtml(data.period&&data.period.dateRange||'—')}</span>${periodControl}</section>
@@ -1137,14 +1053,14 @@
         <article><span>尚未填</span><b class="${summary.emptyStores?'negative':''}">${summary.emptyStores==null?'—':`${summary.emptyStores} 店`}</b></article>
       </section>
       <section class="panel half-preview-stores"><div class="panel-head"><div><h2>九店本期狀態</h2><small>顯示 18 題填寫進度，不代表 backend completed</small></div></div>${storeRows}</section>
-      ${startButton}`;
+      <button class="half-preview-start" type="button" data-half-preview-action="start">+ 開始檢查 Preview</button>`;
   }
 
   function renderHalfMonthForm(data) {
     const open=halfMonthOpenVisit();
     if(!halfMonthPreviewStore && open) halfMonthPreviewStore=normalizeStore(open.store);
     const options=[`<option value="" disabled ${halfMonthPreviewStore?'':'selected'}>請選擇店點</option>`].concat(STORES.map(store=>`<option value="${escapeHtml(store)}" ${halfMonthPreviewStore===store?'selected':''}>${escapeHtml(store)}</option>`)).join('');
-    const formStatuses=PREVIEW_MODE?(data.statuses||[]):(data.statuses||[]).concat({value:'',label:'清除／尚未填寫'});
+    const formStatuses=data.statuses||[];
     const questions=(data.questions||[]).map(question=>{
       const answer=halfMonthPreviewAnswers[question.item]||{};
       const abnormal=answer.result==='abnormal';
@@ -1162,17 +1078,11 @@
       </article>`;
     }).join('');
     const progress=halfMonthPreviewProgress(data);
-    const banner=PREVIEW_MODE
-      ? '<b>PREVIEW / 尚未寫入正式資料</b><span>暫存與完成只存在此頁記憶體，不會呼叫正式 write。</span>'
-      : '<b>FORMAL / 正式文字寫入</b><span>儲存後必須完成 hread 逐欄核對才會顯示已儲存；媒體上傳未啟用。</span>';
-    const actions=PREVIEW_MODE
-      ? '<button type="button" data-half-preview-action="draft">暫存</button><button type="button" data-half-preview-action="complete">完成 Preview</button>'
-      : `<button type="button" data-half-preview-action="save" ${halfMonthWriteInFlight?'disabled':''}>${halfMonthWriteInFlight?'儲存核對中…':'儲存目前進度'}</button>`;
-    return `<section class="preview-only-banner">${banner}</section>
+    return `<section class="preview-only-banner"><b>PREVIEW / 尚未寫入正式資料</b><span>暫存與完成只存在此頁記憶體，不會呼叫正式 write。</span></section>
       ${open?`<section class="half-preview-location"><i data-lucide="map-pin"></i><div><span>目前在：</span><b>${escapeHtml(normalizeStore(open.store))}</b><small>店點僅預選，仍由 Liam 主動開始</small></div></section>`:''}
-      <section class="panel half-preview-form-meta"><div class="panel-head"><div><h2>${escapeHtml(data.period.label)}</h2><small>${escapeHtml(data.period.dateRange)}</small></div></div><label>檢查店點<select id="halfMonthStore" required>${options}</select></label><label>督導<input id="halfMonthInspector" maxlength="80" autocomplete="name" value="${escapeHtml(halfMonthPreviewInspector)}" required></label></section>
+      <section class="panel half-preview-form-meta"><div class="panel-head"><div><h2>${escapeHtml(data.period.label)}</h2><small>${escapeHtml(data.period.dateRange)}</small></div></div><label>檢查店點<select id="halfMonthStore" required>${options}</select></label></section>
       <div class="half-preview-questions">${questions}</div>
-      <div class="half-preview-sticky"><div><b id="halfMonthProgress">已填 ${progress.completed} / ${progress.total}</b><span id="halfMonthPreviewMessage">${escapeHtml(halfMonthPreviewMessage)}</span></div>${actions}</div>`;
+      <div class="half-preview-sticky"><div><b id="halfMonthProgress">已填 ${progress.completed} / ${progress.total}</b><span id="halfMonthPreviewMessage">${escapeHtml(halfMonthPreviewMessage)}</span></div><button type="button" data-half-preview-action="draft">暫存</button><button type="button" data-half-preview-action="complete">完成 Preview</button></div>`;
   }
 
   function renderHalfMonthResult(data) {
@@ -1518,9 +1428,6 @@
           halfMonthPreviewScreen='result';
           halfMonthPreviewMessage='';
         }
-      }else if(action==='save'){
-        saveHalfMonthFormalProgress(data);
-        return;
       }else if(action==='overview'){
         halfMonthPreviewScreen='overview';
         halfMonthPreviewMessage='';

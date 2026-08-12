@@ -54,10 +54,11 @@ test('three-store item parity preserves status, text, media, period and store',(
   assert.equal(data.period.key,'H1');
 });
 
-test('runtime uses existing hread and hwrite only, without media upload',()=>{
+test('recovery runtime keeps hread and disables formal half-month writes',()=>{
   assert.match(app,/const PATROL_READ_ACTIONS = new Set\(\['sread','ptread','ptvisit_read','hread'\]\)/);
-  assert.match(app,/const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write','hwrite'\]\)/);
-  assert.match(app,/async function halfMonthWriteRows\(rows, mode = 'draft'\)/);
+  assert.match(app,/const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write'\]\)/);
+  assert.doesNotMatch(app,/async function halfMonthWriteRows\(/);
+  assert.doesNotMatch(app,/patrolRead\(['"]hwrite['"]/);
   assert.doesNotMatch(app,/patrolRead\(['"]half_media_upload['"]/);
 });
 
