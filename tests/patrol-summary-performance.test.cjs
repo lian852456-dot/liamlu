@@ -24,6 +24,8 @@ test('ptsummary is authenticated, month-scoped, cached briefly and never returns
   assert.match(gas, /if \(serialized\.length < 95000\) cache\.put/);
   assert.match(gas, /sheet\.getRange\(lastRow, 12\)\.getValue\(\)/);
   assert.doesNotMatch(gas, /sheet\.getRange\(2, 12, lastRow - 1, 1\)/);
+  assert.match(gas, /function ptSummaryPostPayload_\(payload\)[\s\S]*ptSessionAuthorized_\(body\.token\)/);
+  assert.match(gas, /action === 'ptsummary'\) result = ptSummaryPostPayload_\(payload\)/);
 });
 
 test('ptdetail is an authenticated bounded lazy read', () => {
@@ -40,12 +42,14 @@ test('App and patrol.html load ptsummary for dashboards and fail closed on trans
   const app = read('app.js');
   const patrol = read('patrol.html');
   assert.match(app, /patrolRead\('ptsummary',\{month\}\)/);
-  assert.match(app, /action === 'ptsummary' \|\| action === 'ptdetail'.*Date\.now\(\)/);
+  assert.match(app, /action === 'ptsummary' \|\| action === 'ptdetail'[\s\S]*method:'POST'/);
+  assert.match(app, /body:JSON\.stringify\(\{ action, token:patrolToken, \.\.\.params \}\)/);
   assert.doesNotMatch(app, /patrolRead\('ptread'/);
   assert.match(app, /巡店資料讀取逾時/);
   assert.match(app, /data-retry-patrol/);
   assert.match(patrol, /cloudCall\('ptsummary',\{month:currentMonth\}\)/);
-  assert.match(patrol, /action==='ptsummary'\|\|action==='ptdetail'.*Date\.now\(\)/);
+  assert.match(patrol, /action==='ptsummary'\|\|action==='ptdetail'[\s\S]*method:'POST'/);
+  assert.match(patrol, /JSON\.stringify\(\{action,token:PT_TOKEN,\.\.\.params\}\)/);
   assert.doesNotMatch(patrol, /cloudCall\('ptread'\)/);
   assert.match(patrol, /patrolSummaryUnavailableHTML/);
   assert.match(patrol, /上次成功資料/);

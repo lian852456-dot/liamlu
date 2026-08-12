@@ -515,6 +515,24 @@ function ptLogoutPayload(payload) {
   return {};
 }
 
+function ptSummaryPostPayload_(payload) {
+  const body = payload || {};
+  if (!ptSessionAuthorized_(body.token)) throw new Error('unauthorized');
+  const month = patrolSummaryMonth_(body.month);
+  return { summary:readPatrolSummary_(month), stores:PT_STORES, title:PT_TITLE };
+}
+
+function ptDetailPostPayload_(payload) {
+  const body = payload || {};
+  if (!ptSessionAuthorized_(body.token)) throw new Error('unauthorized');
+  return readPatrolDetail_({
+    month:patrolSummaryMonth_(body.month),
+    store:body.store,
+    page:body.page,
+    limit:body.limit
+  });
+}
+
 const PATROL_SHEET = '巡店明細';
 const PATROL_HEADERS = ['fillTime','arriveTime','leaveTime','district','code','store','inspector','item','result','reason','month','savedAt'];
 
@@ -2044,6 +2062,8 @@ function doPost(e) {
     let result;
     if (action === 'ptauth') result = ptAuthenticatePayload(payload);
     else if (action === 'ptlogout') result = ptLogoutPayload(payload);
+    else if (action === 'ptsummary') result = ptSummaryPostPayload_(payload);
+    else if (action === 'ptdetail') result = ptDetailPostPayload_(payload);
     else if (action === 'ptvisit_write') result = writePatrolVisitEvent_(payload);
     else if (action === 'hwrite') result = writeHalfCheckPostPayload_(payload, e);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);

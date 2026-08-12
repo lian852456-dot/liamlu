@@ -265,17 +265,24 @@
   async function patrolRead(action, params = {}) {
     if (!PATROL_READ_ACTIONS.has(action)) throw new Error('App 1.2 僅允許既有班表／巡店讀取與獨立到離店讀取。');
     if (!patrolToken) throw new Error('班表／巡店 session 尚未驗證。');
-    const query = [['action',action],['token',patrolToken]];
-    Object.entries(params).forEach(([key,value]) => {
-      if (value !== '' && value != null) query.push([key,String(value)]);
-    });
-    if (action === 'ptsummary' || action === 'ptdetail') query.push(['_r',String(Date.now())]);
-    const url = `${PATROL_API}?${query.map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&')}`;
     const timeoutMs = PATROL_TIMEOUT_MS[action];
     const timeoutMessage = action === 'hread' ? '半月督導檢查讀取逾時，請點擊重試。'
       : action === 'ptsummary' || action === 'ptdetail' ? '巡店資料讀取逾時'
       : action === 'sread' ? '班表讀取逾時，請點擊重試。'
       : '今日到離店紀錄讀取逾時，請點擊重試。';
+    if (action === 'ptsummary' || action === 'ptdetail') {
+      const { body } = await fetchJsonWithRecovery(PATROL_API, {
+        method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({ action, token:patrolToken, ...params }), cache:'no-store'
+      }, timeoutMs, timeoutMessage);
+      if (!body || body.status !== 'ok') throw new Error((body && body.message) || '巡店資料讀取失敗。');
+      return body;
+    }
+    const query = [['action',action],['token',patrolToken]];
+    Object.entries(params).forEach(([key,value]) => {
+      if (value !== '' && value != null) query.push([key,String(value)]);
+    });
+    const url = `${PATROL_API}?${query.map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&')}`;
     const { body } = await fetchJsonWithRecovery(url, { method:'GET', cache:'no-store' }, timeoutMs, timeoutMessage);
     if (!body || body.status !== 'ok') {
       const message = (body && body.message) || '班表／巡店讀取失敗。';

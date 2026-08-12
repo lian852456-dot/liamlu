@@ -147,6 +147,7 @@ test('isolated patrol visit flow records arrival and departure with one protecte
     if(request.method()==='POST') {
       const payload=JSON.parse(request.postData()||'{}');
       if(payload.action==='ptauth') return route.fulfill({json:{status:'ok',token:'short-session-token'}});
+      if(payload.action==='ptsummary') return route.fulfill({json:patrolSummaryResponse(payload.month||'2026-08')});
       if(payload.action==='ptvisit_write') {
         writes+=1; submittedStores.push(payload.store);
         const event={serverTime:`${today}T${writes===1?'09:12:00':'10:35:00'}+08:00`,date:today,action:payload.visitAction,store:`台北${payload.store.replace(/^台北/,'')}`,note:payload.note,visitSessionId:'visit-1'};
@@ -199,6 +200,7 @@ test('patrol visit UI fails closed when server response store differs from expli
     if(request.method()==='POST') {
       const payload=JSON.parse(request.postData()||'{}');
       if(payload.action==='ptauth') return route.fulfill({json:{status:'ok',token:'short-session-token'}});
+      if(payload.action==='ptsummary') return route.fulfill({json:patrolSummaryResponse(payload.month||'2026-08')});
       if(payload.action==='ptvisit_write') return route.fulfill({json:{status:'ok',event:{serverTime:'2026-08-11T12:00:00+08:00',date:'2026-08-11',action:'arrival',store:'台北通化',note:'',visitSessionId:'mismatch'}}});
     }
     const action=new URL(request.url()).searchParams.get('action');
@@ -273,8 +275,8 @@ test('patrol passcode exists only during submission and only the short token per
     const request = route.request();
     if (request.method() === 'POST') {
       const payload = JSON.parse(request.postData() || '{}');
-      submittedPasscode = payload.key || '';
-      await route.fulfill({ json:{ status:'ok', token:'short-lived-test-token' } });
+      if (payload.action === 'ptauth') submittedPasscode = payload.key || '';
+      await route.fulfill({ json:payload.action === 'ptsummary' ? patrolSummaryResponse(payload.month || '2026-08') : { status:'ok', token:'short-lived-test-token' } });
       return;
     }
     const action = new URL(request.url()).searchParams.get('action');

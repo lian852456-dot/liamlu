@@ -15,7 +15,7 @@ test('private summary and patrol reads use separate formal deployments', () => {
   assert.match(app, /postReadOnly[\s\S]*fetchJsonWithRecovery\(DAILY_REPORT_API/);
   assert.match(app, /postDeviceAccess[\s\S]*fetchJsonWithRecovery\(DAILY_REPORT_API/);
   assert.match(app, /postPatrolAuth[\s\S]*fetchJsonWithRecovery\(PATROL_API/);
-  assert.match(app, /async function patrolRead[\s\S]*`\$\{PATROL_API\}\?\$\{/);
+  assert.match(app, /async function patrolRead[\s\S]*method:'POST'[\s\S]*`\$\{PATROL_API\}\?\$\{/);
 });
 
 test('WKWebView read transport uses encoded string URL and independent bounded timeouts', () => {
@@ -23,6 +23,7 @@ test('WKWebView read transport uses encoded string URL and independent bounded t
   assert.doesNotMatch(read, /new URL\(|URLSearchParams/);
   assert.match(read, /encodeURIComponent\(key\)/);
   assert.match(read, /encodeURIComponent\(value\)/);
+  assert.match(read, /action === 'ptsummary' \|\| action === 'ptdetail'[\s\S]*body:JSON\.stringify/);
   assert.match(app, /PRIVATE_TIMEOUT_MS = 20_000/);
   assert.match(app, /sread:30_000, ptsummary:20_000, ptdetail:30_000, hread:90_000, ptvisit_read:30_000/);
   assert.doesNotMatch(app, /patrolRead\('ptread'/);

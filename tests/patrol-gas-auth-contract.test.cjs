@@ -32,6 +32,13 @@ test('patrol visit POST accepts only the existing short-lived patrol session', (
   assert.doesNotMatch(code, /function patrolVisitPayload_\(payload\)[\s\S]*?ptCredentialAuthorized_\(body\.key/);
 });
 
+test('summary and detail POST reads accept only the existing short-lived patrol session', () => {
+  assert.match(code, /function ptSummaryPostPayload_\(payload\)[\s\S]*ptSessionAuthorized_\(body\.token\)/);
+  assert.match(code, /function ptDetailPostPayload_\(payload\)[\s\S]*ptSessionAuthorized_\(body\.token\)/);
+  assert.doesNotMatch(code, /function ptSummaryPostPayload_\(payload\)[\s\S]*?ptCredentialAuthorized_\(body\.key/);
+  assert.doesNotMatch(code, /function ptDetailPostPayload_\(payload\)[\s\S]*?ptCredentialAuthorized_\(body\.key/);
+});
+
 test('public health actions expose no patrol data or credentials', () => {
   const ping = code.match(/if \(action === 'ping'\) \{([\s\S]*?)\n  \}/);
   const health = code.match(/if \(action === 'pthealth'\) \{([\s\S]*?)\n  \}/);

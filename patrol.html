@@ -1389,11 +1389,19 @@ function storeCardHTML(storeName){
 function cloudCall(action, params={}){
   return patrolRequestWithReauth(()=>{
     if(!['ping','pthealth'].includes(action)&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized'};
+    const timeoutMs=action==='ptsummary'?20000:action==='ptdetail'?30000:0;
+    if(action==='ptsummary'||action==='ptdetail'){
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),timeoutMs);
+      return fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:PT_TOKEN,...params}),cache:'no-store',signal:controller.signal}).then(async response=>{
+        const text=await response.text();
+        if(!response.ok) throw new Error('HTTP '+response.status);
+        try{return JSON.parse(text);}catch(_){throw new Error('巡店服務回傳非 JSON');}
+      }).catch(error=>{if(error&&error.name==='AbortError') throw new Error('巡店資料讀取逾時');throw error;}).finally(()=>clearTimeout(timer));
+    }
     const query=[['action',action]];Object.keys(params).forEach(key=>query.push([key,String(params[key])]));
     if(!['ping','pthealth'].includes(action)) query.push(['token',PT_TOKEN]);
-    if(action==='ptsummary'||action==='ptdetail') query.push(['_r',String(Date.now())]);
     const url=GAS_URL+'?'+query.map(pair=>encodeURIComponent(pair[0])+'='+encodeURIComponent(pair[1])).join('&');
-    const timeoutMs=action==='ptsummary'?20000:action==='ptdetail'?30000:0;
     const controller=timeoutMs?new AbortController():null;
     const timer=controller?setTimeout(()=>controller.abort(),timeoutMs):null;
     return fetch(url,{method:'GET',cache:'no-store',signal:controller?controller.signal:undefined}).then(async response=>{

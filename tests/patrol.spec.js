@@ -64,6 +64,17 @@ async function stubGas(page) {
       if (payload.action === 'ptlogout') {
         return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'ok' }) });
       }
+      if (payload.action === 'ptsummary') {
+        ptReadCalls++;
+        const configured=(cloudConfig&&cloudConfig.stores)||defaultPatrolStores;
+        const month=payload.month||'2026-08';
+        const summary=patrolSummaryResponse(month,cloudRows,new Date(`${month}-13T12:00:00+08:00`),configured);
+        summary.title=(cloudConfig&&cloudConfig.title)||summary.title;
+        return route.fulfill({ contentType:'application/json', body:JSON.stringify(payload.token===PT_TOKEN ? summary : {status:'error',message:'unauthorized'}) });
+      }
+      if (payload.action === 'ptdetail') {
+        return route.fulfill({ contentType:'application/json', body:JSON.stringify(payload.token===PT_TOKEN ? {status:'ok',rows:[],totalRows:0,page:1,limit:50} : {status:'error',message:'unauthorized'}) });
+      }
       if (payload.action === 'half_media_upload') {
         const authed = payload.token === PT_TOKEN;
         if (!authed) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'error', message: 'unauthorized' }) });

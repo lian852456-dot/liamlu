@@ -32,6 +32,14 @@ async function installAuthGas(page, options = {}) {
       if (payload.action === 'ptlogout') {
         return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'ok' }) });
       }
+      if (payload.action === 'ptsummary' || payload.action === 'ptdetail') {
+        const valid = payload.token === SESSION_TOKEN;
+        state.protectedCalls.push({ action:payload.action, valid });
+        const result = !valid ? { status:'error', message:'unauthorized' }
+          : payload.action === 'ptsummary' ? patrolSummaryResponse(payload.month || '2026-08')
+          : { status:'ok', rows:[], totalRows:0, page:1, limit:50 };
+        return route.fulfill({ contentType:'application/json', body:JSON.stringify(result) });
+      }
       if (payload.action === 'half_media_upload') {
         const valid = payload.token === SESSION_TOKEN;
         return route.fulfill({

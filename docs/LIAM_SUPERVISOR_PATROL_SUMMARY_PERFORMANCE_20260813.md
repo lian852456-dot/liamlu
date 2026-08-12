@@ -56,3 +56,14 @@
 4. Response 小於 100 KB（目標小於 50 KB），median 小於 5 秒、P95 小於 15 秒。
 5. 正式 2026-08 `ptsummary` 與 297-row canonical fixture 逐欄一致。
 6. `hwrite enabled = NO`、`half_media_upload = 0`。
+
+## Formal verification — GAS v53
+
+- 正式 deployment：v53；v50、v51、v52 保留為 rollback。
+- Transport：App 與 `patrol.html` 的 `ptsummary`／`ptdetail` 使用 `text/plain` POST body；token、月份與店點不進 URL。既有 GET read route 保留相容，其他 action 語意不變。
+- 未授權 POST：HTTP 200、`status=error`、`message=unauthorized`，未碰資料。
+- 正式 response：13,459 bytes；2026-08 為 9 店、已巡 7、未巡 2、題 18 完成 8 店、題 14–17 完成 7 店。
+- Chromium 最終組：5/5 HTTP 200、JSON 5/5、retry 0、timeout 0、404 0；median 1,894 ms、P95 2,885 ms。
+- WebKit：5/5 HTTP 200、JSON 5/5、retry 0、timeout 0、404 0；median 3,411 ms、P95 5,789 ms。
+- Node full suite：183/183 PASS。
+- Chromium scoped regression：54/56 functional PASS；另 2 項只在 `page.screenshot()` 等待字型時達到工具 timeout，所有前置功能與 390×844 overflow assertion 已通過。
