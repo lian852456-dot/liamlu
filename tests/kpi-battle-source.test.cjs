@@ -75,7 +75,7 @@ test('台獎篩選可選北一二B，北一二B顯示80%／100%，門市顯示50
 
 test('快照合併硬性要求截止日與來源檔一致', () => {
   const guard = functionBody(html, 'kpiBattleSupplementIsCurrent');
-  for (const field of ['snapshot.report_date', 'data_as_of_date', 'snapshot.source_file']) {
+  for (const field of ['reportSource', 'data_as_of_date', 'source_file']) {
     assert.ok(guard.includes(field), `缺少快照合併門檻：${field}`);
   }
   assert.doesNotMatch(functionBody(html, 'loadKpiBattle'), /__KPI_BATTLE_DATA__/);
@@ -114,10 +114,10 @@ function loadAdapter() {
     html.match(/const KPI_BATTLE_CORE_KEYS = \{[^\n]+\n/)[0],
     html.match(/const KPI_BATTLE_PERSONAL_KEYS = \{[^\n]+\n/)[0],
   ];
-  const names = ['kpicalcMetric', 'kpiBattleDataAsOfDate', 'kpiBattleSourceFile', 'kpiBattleStoreKey', 'kpiBattlePersonKey', 'kpiBattleSupplementIsCurrent', 'mergeKpiBattleSupplement', 'kpicalcToKpiBattleView'];
+  const names = ['kpicalcMetric', 'kpiBattleDataAsOfDate', 'kpiBattleSourceFile', 'kpiBattleReportSourceFile', 'kpiBattleStoreKey', 'kpiBattlePersonKey', 'kpiBattleSupplementIsCurrent', 'mergeKpiBattleSupplement', 'kpicalcToKpiBattleView'];
   const src = [
     ...constants,
-    ...names.map(name => `function ${name}(${name === 'kpicalcMetric' ? 'entry, meta' : name === 'kpiBattleDataAsOfDate' ? 'meta' : name === 'kpiBattleSourceFile' || name === 'kpiBattleStoreKey' ? 'value' : name === 'kpiBattlePersonKey' ? 'row' : name === 'kpiBattleSupplementIsCurrent' || name === 'mergeKpiBattleSupplement' ? 'kpiData, snapshot' : 'data, fetchedAt'}) {${functionBody(html, name)}}`),
+    ...names.map(name => `function ${name}(${name === 'kpicalcMetric' ? 'entry, meta' : name === 'kpiBattleDataAsOfDate' ? 'meta' : name === 'kpiBattleReportSourceFile' ? 'reportDate' : name === 'kpiBattleSourceFile' || name === 'kpiBattleStoreKey' ? 'value' : name === 'kpiBattlePersonKey' ? 'row' : name === 'kpiBattleSupplementIsCurrent' || name === 'mergeKpiBattleSupplement' ? 'kpiData, snapshot' : 'data, fetchedAt'}) {${functionBody(html, name)}}`),
     'module.exports = { kpicalcToKpiBattleView, mergeKpiBattleSupplement, kpiBattleSupplementIsCurrent };',
   ].join('\n');
   const sandbox = { module: { exports: {} }, console, Map, JSON, String, Number, Boolean, Object, Array };
@@ -188,6 +188,26 @@ test('同次正式快照補入 0805 戰報日、34 名、109.7%、12.35 與個�
   assert.equal(view.personal[0].insurance_attach_rate, 0.83333);
 });
 
+test('受控 upload temporary filename 使用 canonical 0805.xlsx 合併，且頁面只顯示 canonical source', () => {
+  const A = loadAdapter();
+  const staged = JSON.parse(JSON.stringify(SAMPLE));
+  staged.meta.sourceFile = `report-upload-temp-${'a'.repeat(32)}-0805.xlsx`;
+  const base = A.kpicalcToKpiBattleView(staged, '');
+  assert.equal(base.source_file, '0805.xlsx');
+  const snapshot = {
+    report_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0805.xlsx',
+    aggregate: { overall_kpi: 1.097, company_rank: 34, overall_kpi_dod: -0.0142, company_rank_dod: -1, addon_score: 13.09 },
+    stores: [], personal: [],
+  };
+  const merged = A.mergeKpiBattleSupplement(base, snapshot);
+  assert.equal(merged.supplement_synced, true);
+  assert.equal(merged.report_date, '2026-08-05');
+  assert.equal(merged.aggregate.company_rank, 34);
+  assert.equal(merged.aggregate.overall_kpi_dod, -0.0142);
+  assert.equal(merged.aggregate.company_rank_dod, -1);
+  assert.equal(merged.aggregate.addon_score, 13.09);
+});
+
 test('0805 正式契約可保有 9 店、41 人與 13 款／10 列台獎計數', () => {
   const A = loadAdapter();
   const fixture = {
@@ -214,4 +234,22 @@ test('過期截止日或不同來源檔快照不得混入補充欄位', () => {
     assert.equal(merged.supplement_synced, false);
     assert.equal(merged.aggregate.company_rank, null);
   }
+});
+
+test('report date、canonical source 或不受控 temporary filename 矛盾時仍 fail-closed', () => {
+  const A = loadAdapter();
+  const staged = JSON.parse(JSON.stringify(SAMPLE));
+  staged.meta.sourceFile = `report-upload-temp-${'b'.repeat(64)}-0805.xlsx`;
+  const base = A.kpicalcToKpiBattleView(staged, '');
+  for (const snapshot of [
+    { report_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0804.xlsx' },
+    { report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0805.xlsx' },
+  ]) {
+    assert.equal(A.mergeKpiBattleSupplement(base, { ...snapshot, aggregate: { company_rank: 1 }, stores: [], personal: [] }).supplement_synced, false);
+  }
+  const uncontrolled = JSON.parse(JSON.stringify(SAMPLE));
+  uncontrolled.meta.sourceFile = 'report-upload-temp-token-0805.xlsx';
+  assert.equal(A.mergeKpiBattleSupplement(A.kpicalcToKpiBattleView(uncontrolled, ''), {
+    report_date:'2026-08-05', data_as_of_date:'2026-08-04', source_file:'0805.xlsx', aggregate:{company_rank:1}, stores:[], personal:[],
+  }).supplement_synced, false);
 });

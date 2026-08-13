@@ -2509,7 +2509,14 @@ function kpiBattleDataAsOfDate(meta) {
 }
 
 function kpiBattleSourceFile(value) {
-  return String(value || '').split(/[\\/]/).pop().trim().toLowerCase();
+  const raw = String(value || '').split(/[\\/]/).pop().trim().toLowerCase();
+  const staged = raw.match(/^report-upload-temp-[a-f0-9]{32,64}-(\d{4}\.xlsx)$/i);
+  return staged ? staged[1].toLowerCase() : raw;
+}
+
+function kpiBattleReportSourceFile(reportDate) {
+  const match = String(reportDate || '').match(/^\d{4}-(\d{2})-(\d{2})$/);
+  return match ? `${match[1]}${match[2]}.xlsx` : '';
 }
 
 function kpiBattleSourceDateRange(value) {
@@ -2538,11 +2545,13 @@ function kpiBattlePersonKey(row) {
 
 function kpiBattleSupplementIsCurrent(kpiData, snapshot) {
   const snapshotDataAsOf = String((snapshot || {}).data_as_of_date || (snapshot || {}).source_as_of_date || '');
+  const snapshotSource = kpiBattleSourceFile((snapshot || {}).source_file);
+  const reportSource = kpiBattleReportSourceFile((snapshot || {}).report_date);
   return Boolean(
-    snapshot && snapshot.report_date &&
+    snapshot && reportSource &&
     snapshotDataAsOf === kpiData.data_as_of_date &&
-    kpiBattleSourceFile(snapshot.source_file) &&
-    kpiBattleSourceFile(snapshot.source_file) === kpiBattleSourceFile(kpiData.source_file)
+    snapshotSource && snapshotSource === reportSource &&
+    snapshotSource === kpiBattleSourceFile(kpiData.source_file)
   );
 }
 
@@ -2609,7 +2618,7 @@ function kpicalcToKpiBattleView(data, fetchedAt) {
              insurance_attach_rate: null, phone_award_actual: null, phone_award_projected: null, metrics };
   });
   return {
-    source: 'kpicalc', fetchedAt: fetchedAt || '', source_file: meta.sourceFile || '',
+    source: 'kpicalc', fetchedAt: fetchedAt || '', source_file: kpiBattleSourceFile(meta.sourceFile),
     report_date: '', data_as_of_date: dataAsOfDate, source_as_of_date: dataAsOfDate,
     source_date_range: meta.period || '', previous_report_date: null,
     aggregate: { store: '北一二B整體', overall_kpi: null, company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(aggItems), metrics: aggItems },

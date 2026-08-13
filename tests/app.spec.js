@@ -113,7 +113,7 @@ const AWARDS_BATTLE_FIXTURE = {
 // 方案 A（2026-07-31）：KPI 戰情頁籤唯一正式來源是 kpicalc JSON（與 kpi.html 同一份）。
 // KPI_BATTLE_FIXTURE（snapshot 形狀）保留給「舊數字不得出現」的反向斷言用。
 const KPICALC_FIXTURE = {
-  meta: { period: '2026/08/01 ~ 08/04', snapshotDay: 4, monthDays: 31, month: '2026-08', sourceFile: '0805.xlsx' },
+  meta: { period: '2026/08/01 ~ 08/04', snapshotDay: 4, monthDays: 31, month: '2026-08', sourceFile: 'report-upload-temp-a71b372c443449d5b05e6d8a226130b6-0805.xlsx' },
   items: [
     { key: 'AQ V+D 999 (含)以上', short: 'AQ V+D≧999', step: 1 },
     { key: 'AQ V+D 1399 (含)以上', short: 'AQ V+D≧1399', step: 1 },

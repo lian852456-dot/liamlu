@@ -357,13 +357,25 @@
       ? `${meta.month}-${String(meta.snapshotDay).padStart(2,'0')}` : '';
   }
 
-  function sourceFileName(value) { return String(value || '').split(/[\\/]/).pop().trim().toLowerCase(); }
+  function sourceFileName(value) {
+    const raw = String(value || '').split(/[\\/]/).pop().trim().toLowerCase();
+    const staged = raw.match(/^report-upload-temp-[a-f0-9]{32,64}-(\d{4}\.xlsx)$/i);
+    return staged ? staged[1].toLowerCase() : raw;
+  }
+
+  function kpiReportSourceFile(reportDate) {
+    const match = String(reportDate || '').match(/^\d{4}-(\d{2})-(\d{2})$/);
+    return match ? `${match[1]}${match[2]}.xlsx` : '';
+  }
 
   function kpiSupplementIsCurrent(data, supplement) {
     const dataAsOf = kpiDataAsOfDate(data);
     const supplementAsOf = String(supplement && (supplement.data_as_of_date || supplement.source_as_of_date) || '');
-    return Boolean(dataAsOf && supplement && supplement.report_date && supplementAsOf === dataAsOf &&
-      sourceFileName(supplement.source_file) && sourceFileName(supplement.source_file) === sourceFileName(data && data.meta && data.meta.sourceFile));
+    const supplementSource = sourceFileName(supplement && supplement.source_file);
+    const reportSource = kpiReportSourceFile(supplement && supplement.report_date);
+    return Boolean(dataAsOf && supplement && reportSource && supplementAsOf === dataAsOf &&
+      supplementSource && supplementSource === reportSource &&
+      supplementSource === sourceFileName(data && data.meta && data.meta.sourceFile));
   }
 
   function officialKpiRate(entry) {
