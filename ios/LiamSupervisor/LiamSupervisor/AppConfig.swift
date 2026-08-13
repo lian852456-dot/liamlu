@@ -1,7 +1,7 @@
 import Foundation
 
 enum AppConfig {
-    static let appURL = URL(string: "https://lian852456-dot.github.io/liamlu/app.html?native=1&release=ef85a66")!
+    static let appURL = URL(string: "https://lian852456-dot.github.io/liamlu/app.html?native=1&release=c218843")!
     static let appHost = "lian852456-dot.github.io"
 
     // Only top-level OAuth navigation hosts needed by the existing Google sign-in flow.
