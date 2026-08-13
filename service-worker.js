@@ -29,6 +29,10 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) return;
+  if (requestUrl.pathname.endsWith('/app-runtime-config.json')) {
+    event.respondWith(fetch(event.request, { cache:'no-store' }));
+    return;
+  }
   if (requestUrl.pathname.endsWith('/app.html')) {
     event.respondWith(fetch(event.request, { cache:'no-store' }).catch(() => caches.match('./app.html')));
     return;

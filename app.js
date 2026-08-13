@@ -3,8 +3,12 @@
 
   const C = scope.LiamSupervisorContract;
   const H = scope.LiamHalfMonthCheckReadModel;
-  const DAILY_REPORT_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
-  const PATROL_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
+  const BUNDLED_RUNTIME_CONFIG = Object.freeze({
+    configVersion:'recovery-stable-2026-08-13',
+    privateApi:'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec',
+    patrolApi:'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec'
+  });
+  const RUNTIME_CONFIG_KEYS = Object.freeze(['configVersion','privateApi','patrolApi']);
   const PRIVATE_TIMEOUT_MS = 20_000;
   const PATROL_TIMEOUT_MS = Object.freeze({ sread:30_000, ptsummary:20_000, ptdetail:30_000, hread:90_000, ptvisit_read:30_000 });
   const RETRY_DELAY_MS = 1_000;
@@ -28,6 +32,7 @@
   const STALE_MS = 30 * 60 * 60 * 1000;
 
   let contract = PREVIEW_MODE ? C.validateContract(scope.LiamSupervisorPreviewData) : emptyFormalContract();
+  let runtimeConfig = { ...BUNDLED_RUNTIME_CONFIG };
   let reportSegment = 16;
   let battleKind = 'kpi';
   let battleScope = 'region';
@@ -67,6 +72,40 @@
   }
 
   function nowIso() { return new Date().toISOString(); }
+
+  function runtimeEndpointAllowed(value) {
+    try {
+      const url = new URL(String(value || ''));
+      return url.protocol === 'https:'
+        && url.hostname === 'script.google.com'
+        && /^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url.pathname)
+        && !url.search
+        && !url.hash;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function validateRuntimeConfig(candidate) {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) throw new Error('runtime config 格式不正確');
+    const keys = Object.keys(candidate).sort();
+    if (keys.length !== RUNTIME_CONFIG_KEYS.length || keys.some((key,index) => key !== [...RUNTIME_CONFIG_KEYS].sort()[index])) throw new Error('runtime config 含未允許欄位');
+    if (!String(candidate.configVersion || '').trim()) throw new Error('runtime config 缺少版本');
+    if (!runtimeEndpointAllowed(candidate.privateApi) || !runtimeEndpointAllowed(candidate.patrolApi)) throw new Error('runtime config endpoint 不在允許範圍');
+    return { configVersion:String(candidate.configVersion), privateApi:String(candidate.privateApi), patrolApi:String(candidate.patrolApi) };
+  }
+
+  async function loadRuntimeConfig() {
+    if (PREVIEW_MODE) return runtimeConfig;
+    try {
+      const response = await fetch(`./app-runtime-config.json?ts=${Date.now()}`, { method:'GET', cache:'no-store', credentials:'omit' });
+      if (!response.ok) throw new Error(`runtime config HTTP ${response.status}`);
+      runtimeConfig = validateRuntimeConfig(await response.json());
+    } catch (_) {
+      runtimeConfig = { ...BUNDLED_RUNTIME_CONFIG };
+    }
+    return runtimeConfig;
+  }
 
   function formatTime(value, fallback = '—') {
     if (!value) return fallback;
@@ -191,7 +230,7 @@
 
   async function postReadOnly(payload) {
     if (!READ_ACTIONS.has(payload.action)) throw new Error('App 1.2 僅允許既有唯讀 action。');
-    const { body } = await fetchJsonWithRecovery(DAILY_REPORT_API, {
+    const { body } = await fetchJsonWithRecovery(runtimeConfig.privateApi, {
       method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body:JSON.stringify(payload), cache:'no-store', credentials:'omit'
     }, PRIVATE_TIMEOUT_MS, '正式資料讀取逾時，請稍後重試。');
@@ -201,7 +240,7 @@
 
   async function postDeviceAccess(payload) {
     if (!DEVICE_ACTIONS.has(payload.action)) throw new Error('不允許的裝置授權 action。');
-    const { body } = await fetchJsonWithRecovery(DAILY_REPORT_API, {
+    const { body } = await fetchJsonWithRecovery(runtimeConfig.privateApi, {
       method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body:JSON.stringify(payload), cache:'no-store', credentials:'omit'
     }, PRIVATE_TIMEOUT_MS, '裝置授權讀取逾時，請稍後重試。');
@@ -256,7 +295,7 @@
 
   async function postPatrolAuth(payload) {
     if (!['ptauth','ptauth_device','ptlogout'].includes(payload.action)) throw new Error('不允許的 session action。');
-    const { body } = await fetchJsonWithRecovery(PATROL_API, {
+    const { body } = await fetchJsonWithRecovery(runtimeConfig.patrolApi, {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload), cache:'no-store'
     }, 30_000, '班表／巡店驗證逾時，請稍後重試。');
     if (!body || body.status !== 'ok') throw new Error((body && body.message) || '班表／巡店驗證失敗。');
@@ -272,7 +311,7 @@
       : action === 'sread' ? '班表讀取逾時，請點擊重試。'
       : '今日到離店紀錄讀取逾時，請點擊重試。';
     if (action === 'ptsummary' || action === 'ptdetail') {
-      const { body } = await fetchJsonWithRecovery(PATROL_API, {
+      const { body } = await fetchJsonWithRecovery(runtimeConfig.patrolApi, {
         method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
         body:JSON.stringify({ action, token:patrolToken, ...params }), cache:'no-store'
       }, timeoutMs, timeoutMessage);
@@ -283,7 +322,7 @@
     Object.entries(params).forEach(([key,value]) => {
       if (value !== '' && value != null) query.push([key,String(value)]);
     });
-    const url = `${PATROL_API}?${query.map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&')}`;
+    const url = `${runtimeConfig.patrolApi}?${query.map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&')}`;
     const { body } = await fetchJsonWithRecovery(url, { method:'GET', cache:'no-store' }, timeoutMs, timeoutMessage);
     if (!body || body.status !== 'ok') {
       const message = (body && body.message) || '班表／巡店讀取失敗。';
@@ -302,7 +341,7 @@
     const action = 'ptvisit_write';
     if (!PATROL_WRITE_ACTIONS.has(action)) throw new Error('不允許的巡店寫入 action。');
     if (!patrolToken) throw new Error('班表／巡店 session 尚未驗證。');
-    const response = await fetch(PATROL_API, {
+    const response = await fetch(runtimeConfig.patrolApi, {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, cache:'no-store', credentials:'omit',
       body:JSON.stringify({ action, token:patrolToken, visitAction, store, note:String(note || '') })
     });
@@ -1577,7 +1616,7 @@
   dom('[data-date-today]').addEventListener('click',()=>{ dom('#scheduleDate').value=taipeiDate(); if(patrolToken)loadPatrolData(); else renderSchedule(); });
   dom('#scheduleDate').addEventListener('change',()=>patrolToken?loadPatrolData():renderSchedule());
   dom('#scheduleStoreFilter').addEventListener('change',renderSchedule);
-  all('[data-refresh]').forEach(button=>button.addEventListener('click',()=>{ if(PREVIEW_MODE)renderAll(); else { const id=scope.localStorage.getItem(EMPLOYEE_KEY); if(id)loadFormalSummary(id).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); }); if(patrolToken)loadPatrolData(); } }));
+  all('[data-refresh]').forEach(button=>button.addEventListener('click',async()=>{ if(PREVIEW_MODE){ renderAll(); return; } await loadRuntimeConfig(); const id=scope.localStorage.getItem(EMPLOYEE_KEY); if(id)loadFormalSummary(id).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); }); if(patrolToken&&!NATIVE_MODE)loadPatrolData(); }));
   document.addEventListener('click',event=>{
     const patrolRetry=event.target.closest('[data-retry-patrol]');
     if(patrolRetry){
@@ -1663,19 +1702,26 @@
   scope.addEventListener('hashchange',()=>{ const name=location.hash.slice(1); if(all('[data-view]').some(view=>view.dataset.view===name))setView(name); });
 
   dom('#scheduleDate').value=taipeiDate();
-  if (PREVIEW_MODE) {
-    scheduleViewData=contract.scheduleToday.data;
-    populateScheduleStores((contract.scheduleToday.data.stores||[]).map(row=>row.store));
-    dom('#employeeId').disabled=true; dom('#privateAccessForm button').disabled=true; dom('#patrolPasscode').disabled=true; dom('#patrolAccessForm button').disabled=true;
-    setMessage('#privateAccessMessage','Preview 僅顯示展示資料，不呼叫正式端點。'); setMessage('#patrolAccessMessage','Preview 不建立正式 session。'); dom('#viewerState').textContent='Preview';
-  } else {
+  const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
+
+  async function initializeRuntime() {
+    if (PREVIEW_MODE) {
+      scheduleViewData=contract.scheduleToday.data;
+      populateScheduleStores((contract.scheduleToday.data.stores||[]).map(row=>row.store));
+      dom('#employeeId').disabled=true; dom('#privateAccessForm button').disabled=true; dom('#patrolPasscode').disabled=true; dom('#patrolAccessForm button').disabled=true;
+      setMessage('#privateAccessMessage','Preview 僅顯示展示資料，不呼叫正式端點。'); setMessage('#patrolAccessMessage','Preview 不建立正式 session。'); dom('#viewerState').textContent='Preview';
+      renderAll();
+      return;
+    }
+    await loadRuntimeConfig();
     const stored=scope.localStorage.getItem(EMPLOYEE_KEY)||''; dom('#employeeId').value=stored;
     setPrivateAccessState('unauthorized');
     if(NATIVE_MODE){ clearPatrolSession('等待 Approved Device 自動驗證。'); dom('#patrolAccessForm').hidden=true; }
     if(stored) loadFormalSummary(stored).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); });
     if(!NATIVE_MODE) restorePatrol();
+    renderAll();
   }
-  const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
+  initializeRuntime().catch(error=>setMessage('#privateAccessMessage',String(error&&error.message||error),'error'));
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js',{scope:'./'}).catch(()=>{}));
 })(window);
