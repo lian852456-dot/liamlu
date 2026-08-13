@@ -19,11 +19,12 @@
   };
   const FAILURE_LABELS = { a999:'A999', a1399:'A1399', haosu:'好速', achieve:'R999', r1399:'R1399', insurance:'保險搭售率' };
   const READ_ACTIONS = new Set(['private_access','read','pread','kpicalc_access']);
-  const DEVICE_ACTIONS = new Set(['private_request','private_request_status']);
+  const DEVICE_ACTIONS = new Set(['private_request','private_request_status','private_patrol_assertion']);
   const PATROL_READ_ACTIONS = new Set(['sread','ptsummary','ptdetail','ptvisit_read','hread']);
   const PATROL_WRITE_ACTIONS = new Set(['ptvisit_write']);
   const PRIVATE_MODULE_KEYS = ['todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models','personalPerformance','report1600','report2100','reportFailures'];
   const PREVIEW_MODE = new URLSearchParams(scope.location.search).get('preview') === '1';
+  const NATIVE_MODE = new URLSearchParams(scope.location.search).get('native') === '1';
   const STALE_MS = 30 * 60 * 60 * 1000;
 
   let contract = PREVIEW_MODE ? C.validateContract(scope.LiamSupervisorPreviewData) : emptyFormalContract();
@@ -254,7 +255,7 @@
   }
 
   async function postPatrolAuth(payload) {
-    if (!['ptauth','ptlogout'].includes(payload.action)) throw new Error('不允許的 session action。');
+    if (!['ptauth','ptauth_device','ptlogout'].includes(payload.action)) throw new Error('不允許的 session action。');
     const { body } = await fetchJsonWithRecovery(PATROL_API, {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload), cache:'no-store'
     }, 30_000, '班表／巡店驗證逾時，請稍後重試。');
@@ -613,6 +614,7 @@
     if (!id) throw new Error('請輸入既有員工編號。');
     const credential = { employeeId:id, deviceId:deviceId() };
     scope.localStorage.setItem(EMPLOYEE_KEY,id);
+    if (NATIVE_MODE) clearPatrolSession('正在驗證 Approved Device…');
     let privateResult;
     try {
       privateResult = await postReadOnly({ action:'private_access', ...credential });
@@ -625,6 +627,7 @@
       setPrivateAccessState(pending ? 'pending' : transportFailure ? 'error' : 'unauthorized',pending ? '此 iPhone App 裝置待核准。核准後按「查看核准狀態」。' : String(error.message || error));
       dom('#viewerState').textContent = pending ? '待核准' : transportFailure ? '讀取失敗' : '未登入';
       dom('#privateLogout').hidden = false;
+      if (NATIVE_MODE) clearPatrolSession('Approved Device 驗證失敗，班表／巡店尚未解鎖。');
       renderAll();
       throw error;
     }
@@ -646,6 +649,10 @@
     dom('#privateLogout').hidden = false;
     setPrivateAccessState('approved','Approved Device 已確認；各正式唯讀模組正在獨立載入。');
     renderAll();
+    if (NATIVE_MODE) autoUnlockPatrolWithApprovedDevice(credential).catch(error => {
+      clearPatrolSession(String(error && error.message || 'Approved Device 無法取得巡店 session。'));
+      renderAll();
+    });
 
     const reportRows={16:null,21:null};
     const failureRows={};
@@ -735,6 +742,7 @@
     dom('#employeeId').value = '';
     dom('#viewerState').textContent = '未登入';
     dom('#privateLogout').hidden = true;
+    if (NATIVE_MODE) clearPatrolSession('已登出；班表／巡店 session 已清除。');
     renderAll();
   }
 
@@ -1510,6 +1518,28 @@
     scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken); setMessage('#patrolAccessMessage','短效 session 已驗證，正在讀取班表／巡店。','success'); dom('#patrolLogout').hidden=false; await loadPatrolData();
   }
 
+  function clearPatrolSession(message = '') {
+    patrolToken='';
+    scope.sessionStorage.removeItem(PATROL_TOKEN_KEY);
+    dom('#patrolLogout').hidden=true;
+    if (message) setMessage('#patrolAccessMessage',message,/失敗|無法|清除/.test(message)?'error':'');
+  }
+
+  async function autoUnlockPatrolWithApprovedDevice(credential) {
+    if (!NATIVE_MODE || PREVIEW_MODE) return;
+    setMessage('#patrolAccessMessage','正在以 Approved Device 自動驗證班表／巡店…');
+    const assertionResult=await postDeviceAccess({action:'private_patrol_assertion',...credential});
+    const assertion=String(assertionResult.assertion||'');
+    if (!assertion) throw new Error('Approved Device 未取得短效巡店驗證。');
+    const result=await postPatrolAuth({action:'ptauth_device',assertion,...credential});
+    patrolToken=String(result.token||'');
+    if (!patrolToken) throw new Error('正式服務未簽發短效巡店 session。');
+    scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken);
+    dom('#patrolLogout').hidden=false;
+    setMessage('#patrolAccessMessage','Approved Device 已自動驗證，正在讀取班表／巡店。','success');
+    await loadPatrolData();
+  }
+
   async function restorePatrol() {
     if (!patrolToken||PREVIEW_MODE) return;
     try { const result=await postPatrolAuth({action:'ptauth',token:patrolToken}); patrolToken=String(result.token||''); if(!patrolToken) throw new Error('session 已失效'); scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken); dom('#patrolLogout').hidden=false; await loadPatrolData(); }
@@ -1613,7 +1643,7 @@
       return;
     }
     const privateUnlock=event.target.closest('[data-unlock-private]'); if(privateUnlock){ setView('me'); dom('#employeeId').focus(); return; }
-    const patrolUnlock=event.target.closest('[data-unlock-patrol]'); if(patrolUnlock){ setView('me'); dom('#patrolPasscode').focus(); return; }
+    const patrolUnlock=event.target.closest('[data-unlock-patrol]'); if(patrolUnlock){ setView('me'); if(NATIVE_MODE)setMessage('#patrolAccessMessage','請先完成 Approved Device 驗證，App 將自動解鎖班表／巡店。'); else dom('#patrolPasscode').focus(); return; }
     const scheduleButton=event.target.closest('[data-toggle-home-schedule]'); if(scheduleButton){ const card=scheduleButton.closest('#scheduleHome'); const expanded=card.classList.toggle('expanded'); scheduleButton.setAttribute('aria-expanded',String(expanded)); scheduleButton.querySelector('span').textContent=expanded?'收合當日班表':'顯示九店當日班表'; return; }
     const operationButton=event.target.closest('[data-toggle-operation]'); if(operationButton){ const item=operationButton.closest('.operation-item'); item.classList.toggle('expanded'); operationButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
     const reportButton=event.target.closest('[data-open-report]'); if(reportButton){ reportSegment=Number(reportButton.dataset.openReport); all('[data-report-segment]').forEach(button=>button.classList.toggle('active',Number(button.dataset.reportSegment)===reportSegment)); setView('report'); renderReport(); return; }
@@ -1641,8 +1671,9 @@
   } else {
     const stored=scope.localStorage.getItem(EMPLOYEE_KEY)||''; dom('#employeeId').value=stored;
     setPrivateAccessState('unauthorized');
+    if(NATIVE_MODE){ clearPatrolSession('等待 Approved Device 自動驗證。'); dom('#patrolAccessForm').hidden=true; }
     if(stored) loadFormalSummary(stored).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); });
-    restorePatrol();
+    if(!NATIVE_MODE) restorePatrol();
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 

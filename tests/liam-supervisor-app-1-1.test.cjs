@@ -61,7 +61,7 @@ test('Preview contract is visibly synthetic and contains the complete mobile sum
 test('App recovery runtime keeps existing reads and disables half-month writes', () => {
   const code = read('app.js');
   assert.match(code, /new Set\(\['private_access','read','pread','kpicalc_access'\]\)/);
-  assert.match(code, /new Set\(\['private_request','private_request_status'\]\)/);
+  assert.match(code, /new Set\(\['private_request','private_request_status','private_patrol_assertion'\]\)/);
   assert.match(code, /new Set\(\['sread','ptsummary','ptdetail','ptvisit_read','hread'\]\)/);
   assert.match(code, /new Set\(\['ptvisit_write'\]\)/);
   assert.doesNotMatch(code, /new Set\(\['ptvisit_write','hwrite'\]\)/);
