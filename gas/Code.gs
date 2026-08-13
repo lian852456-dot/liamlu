@@ -449,9 +449,6 @@ function doGet(e) {
 // 驗證成功後簽發短效 token；巡店、班表、半月檢查與私有媒體共用同一授權邊界。
 // ════════════════════════════════════
 const PATROL_SESSION_TTL_SECONDS = 1800;
-const PATROL_DEVICE_ASSERTION_TTL_SECONDS = 60;
-const PATROL_DEVICE_ASSERTION_AUDIENCE = 'liam-supervisor-patrol';
-const PATROL_DEVICE_ASSERTION_SECRET_PROPERTY = 'PATROL_DEVICE_ASSERTION_SECRET';
 
 // ── 分享給其他督導時，每人自建試算表與 GAS 部署，改這兩個設定即可 ──
 // （網頁 patrol.html 大家共用，會自動抓各自 GAS 回傳的標題與門市清單）
@@ -484,12 +481,6 @@ function ptSessionAuthorized_(token) {
   return CacheService.getScriptCache().get(ptSessionCacheKey_(clean)) === 'ok';
 }
 
-function ptMintSession_() {
-  const token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
-  CacheService.getScriptCache().put(ptSessionCacheKey_(token), 'ok', PATROL_SESSION_TTL_SECONDS);
-  return { token: token, expiresIn: PATROL_SESSION_TTL_SECONDS };
-}
-
 function ptCredentialAuthorized_(key, token) {
   const configuredKey = ptConfiguredKey_();
   if (!configuredKey) return false;
@@ -513,71 +504,9 @@ function ptAuthenticatePayload(payload) {
   }
 
   if (!ptCredentialAuthorized_(body.key, '')) throw new Error('unauthorized');
-  return ptMintSession_();
-}
-
-function patrolDeviceAssertionSecret_() {
-  const value = PropertiesService.getScriptProperties().getProperty(PATROL_DEVICE_ASSERTION_SECRET_PROPERTY);
-  const secret = String(value || '').trim();
-  if (secret.length < 32 || /^CHANGE_ME/i.test(secret)) throw new Error('device assertion is not configured');
-  return secret;
-}
-
-function patrolDeviceBase64Url_(value) {
-  return Utilities.base64EncodeWebSafe(value, Utilities.Charset.UTF_8).replace(/=+$/g, '');
-}
-
-function patrolDeviceSign_(encodedClaims) {
-  const signature = Utilities.computeHmacSha256Signature(String(encodedClaims), patrolDeviceAssertionSecret_());
-  return Utilities.base64EncodeWebSafe(signature).replace(/=+$/g, '');
-}
-
-function patrolDeviceConstantTimeEqual_(left, right) {
-  const a = String(left || '');
-  const b = String(right || '');
-  let difference = a.length ^ b.length;
-  const length = Math.max(a.length, b.length);
-  for (let index = 0; index < length; index++) {
-    difference |= (a.charCodeAt(index % Math.max(1, a.length)) || 0) ^ (b.charCodeAt(index % Math.max(1, b.length)) || 0);
-  }
-  return difference === 0;
-}
-
-function patrolDeviceAssertionClaims_(assertion) {
-  const parts = String(assertion || '').split('.');
-  if (parts.length !== 2 || !parts[0] || !parts[1]) throw new Error('invalid device assertion');
-  if (!patrolDeviceConstantTimeEqual_(parts[1], patrolDeviceSign_(parts[0]))) throw new Error('invalid device assertion');
-  let claims;
-  try {
-    claims = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString('UTF-8'));
-  } catch (_) {
-    throw new Error('invalid device assertion');
-  }
-  return claims;
-}
-
-function ptAuthenticateDevicePayload(payload) {
-  const body = payload || {};
-  const employeeId = privateDashboardCleanEmployeeId(body.employeeId);
-  const deviceId = privateDashboardCleanDeviceId(body.deviceId);
-  const claims = patrolDeviceAssertionClaims_(body.assertion);
-  const now = Math.floor(Date.now() / 1000);
-  if (claims.v !== 1 || claims.aud !== PATROL_DEVICE_ASSERTION_AUDIENCE) throw new Error('invalid device assertion');
-  if (!Number.isFinite(Number(claims.iat)) || !Number.isFinite(Number(claims.exp)) || Number(claims.iat) > now + 5 || Number(claims.exp) < now || Number(claims.exp) - Number(claims.iat) > PATROL_DEVICE_ASSERTION_TTL_SECONDS) throw new Error('expired device assertion');
-  if (String(claims.employeeId || '') !== employeeId || String(claims.deviceId || '') !== deviceId) throw new Error('device assertion mismatch');
-  const nonce = String(claims.nonce || '');
-  if (!/^[A-Za-z0-9-]{20,80}$/.test(nonce)) throw new Error('invalid device assertion');
-  const replayKey = 'patrol_device_assertion_used:' + privateDashboardHash(nonce);
-  const cache = CacheService.getScriptCache();
-  const lock = LockService.getScriptLock();
-  lock.waitLock(5000);
-  try {
-    if (cache.get(replayKey)) throw new Error('device assertion replayed');
-    cache.put(replayKey, 'used', PATROL_DEVICE_ASSERTION_TTL_SECONDS);
-  } finally {
-    lock.releaseLock();
-  }
-  return ptMintSession_();
+  const token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
+  CacheService.getScriptCache().put(ptSessionCacheKey_(token), 'ok', PATROL_SESSION_TTL_SECONDS);
+  return { token: token, expiresIn: PATROL_SESSION_TTL_SECONDS };
 }
 
 function ptLogoutPayload(payload) {
@@ -2132,7 +2061,6 @@ function doPost(e) {
     }
     let result;
     if (action === 'ptauth') result = ptAuthenticatePayload(payload);
-    else if (action === 'ptauth_device') result = ptAuthenticateDevicePayload(payload);
     else if (action === 'ptlogout') result = ptLogoutPayload(payload);
     else if (action === 'ptsummary') result = ptSummaryPostPayload_(payload);
     else if (action === 'ptdetail') result = ptDetailPostPayload_(payload);
@@ -2142,7 +2070,6 @@ function doPost(e) {
     else if (action === 'private_request') result = privateDashboardRequestBinding(payload);
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
     else if (action === 'private_access') result = privateDashboardAccess(payload);
-    else if (action === 'private_patrol_assertion') result = privateDashboardPatrolAssertion(payload);
     else if (action === 'private_admin_requests') result = privateDashboardAdminRequests(payload);
     else if (action === 'private_admin_approve') result = privateDashboardAdminApprove(payload);
     else if (action === 'private_admin_revoke') result = privateDashboardAdminRevoke(payload);
@@ -2364,30 +2291,6 @@ function privateDashboardAccess(payload) {
   privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
   const snapshot = privateDashboardSnapshot();
   return { snapshot: snapshot, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role } };
-}
-
-function privateDashboardPatrolAssertion(payload) {
-  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
-  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
-  const lookup = privateDashboardUserByEmployeeId(employeeId);
-  // App-only bridge requires the exact current Approved Device binding. The
-  // trusted-employee convenience path used by the dashboard is intentionally
-  // not accepted here.
-  if (!lookup.user || lookup.user.status !== 'active' || lookup.user.device_id !== deviceId) {
-    throw new Error('此員編尚未核准此裝置');
-  }
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const claims = {
-    v: 1,
-    aud: PATROL_DEVICE_ASSERTION_AUDIENCE,
-    employeeId: employeeId,
-    deviceId: deviceId,
-    iat: issuedAt,
-    exp: issuedAt + PATROL_DEVICE_ASSERTION_TTL_SECONDS,
-    nonce: Utilities.getUuid()
-  };
-  const encodedClaims = patrolDeviceBase64Url_(JSON.stringify(claims));
-  return { assertion: encodedClaims + '.' + patrolDeviceSign_(encodedClaims), expiresIn: PATROL_DEVICE_ASSERTION_TTL_SECONDS };
 }
 
 function privateDashboardAdminRequests(payload) {

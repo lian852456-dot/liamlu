@@ -3,13 +3,8 @@
 
   const C = scope.LiamSupervisorContract;
   const H = scope.LiamHalfMonthCheckReadModel;
-  const Y = scope.LiamYesterdayFollowUpModel;
-  const BUNDLED_RUNTIME_CONFIG = Object.freeze({
-    configVersion:'recovery-stable-2026-08-13',
-    privateApi:'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec',
-    patrolApi:'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec'
-  });
-  const RUNTIME_CONFIG_KEYS = Object.freeze(['configVersion','privateApi','patrolApi']);
+  const DAILY_REPORT_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
+  const PATROL_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
   const PRIVATE_TIMEOUT_MS = 20_000;
   const PATROL_TIMEOUT_MS = Object.freeze({ sread:30_000, ptsummary:20_000, ptdetail:30_000, hread:90_000, ptvisit_read:30_000 });
   const RETRY_DELAY_MS = 1_000;
@@ -24,16 +19,14 @@
   };
   const FAILURE_LABELS = { a999:'A999', a1399:'A1399', haosu:'好速', achieve:'R999', r1399:'R1399', insurance:'保險搭售率' };
   const READ_ACTIONS = new Set(['private_access','read','pread','kpicalc_access']);
-  const DEVICE_ACTIONS = new Set(['private_request','private_request_status','private_patrol_assertion']);
+  const DEVICE_ACTIONS = new Set(['private_request','private_request_status']);
   const PATROL_READ_ACTIONS = new Set(['sread','ptsummary','ptdetail','ptvisit_read','hread']);
   const PATROL_WRITE_ACTIONS = new Set(['ptvisit_write']);
-  const PRIVATE_MODULE_KEYS = ['todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models','personalPerformance','report1600','report2100','reportFailures','yesterdayFollowUp'];
+  const PRIVATE_MODULE_KEYS = ['todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models','personalPerformance','report1600','report2100','reportFailures'];
   const PREVIEW_MODE = new URLSearchParams(scope.location.search).get('preview') === '1';
-  const NATIVE_MODE = new URLSearchParams(scope.location.search).get('native') === '1';
   const STALE_MS = 30 * 60 * 60 * 1000;
 
   let contract = PREVIEW_MODE ? C.validateContract(scope.LiamSupervisorPreviewData) : emptyFormalContract();
-  let runtimeConfig = { ...BUNDLED_RUNTIME_CONFIG };
   let reportSegment = 16;
   let battleKind = 'kpi';
   let battleScope = 'region';
@@ -72,47 +65,7 @@
     return new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
   }
 
-  function taipeiDateOffset(days) {
-    const anchor = new Date(`${taipeiDate()}T12:00:00+08:00`);
-    anchor.setTime(anchor.getTime() + Number(days || 0) * 86400000);
-    return new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit' }).format(anchor);
-  }
-
   function nowIso() { return new Date().toISOString(); }
-
-  function runtimeEndpointAllowed(value) {
-    try {
-      const url = new URL(String(value || ''));
-      return url.protocol === 'https:'
-        && url.hostname === 'script.google.com'
-        && /^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url.pathname)
-        && !url.search
-        && !url.hash;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function validateRuntimeConfig(candidate) {
-    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) throw new Error('runtime config 格式不正確');
-    const keys = Object.keys(candidate).sort();
-    if (keys.length !== RUNTIME_CONFIG_KEYS.length || keys.some((key,index) => key !== [...RUNTIME_CONFIG_KEYS].sort()[index])) throw new Error('runtime config 含未允許欄位');
-    if (!String(candidate.configVersion || '').trim()) throw new Error('runtime config 缺少版本');
-    if (!runtimeEndpointAllowed(candidate.privateApi) || !runtimeEndpointAllowed(candidate.patrolApi)) throw new Error('runtime config endpoint 不在允許範圍');
-    return { configVersion:String(candidate.configVersion), privateApi:String(candidate.privateApi), patrolApi:String(candidate.patrolApi) };
-  }
-
-  async function loadRuntimeConfig() {
-    if (PREVIEW_MODE) return runtimeConfig;
-    try {
-      const response = await fetch(`./app-runtime-config.json?ts=${Date.now()}`, { method:'GET', cache:'no-store', credentials:'omit' });
-      if (!response.ok) throw new Error(`runtime config HTTP ${response.status}`);
-      runtimeConfig = validateRuntimeConfig(await response.json());
-    } catch (_) {
-      runtimeConfig = { ...BUNDLED_RUNTIME_CONFIG };
-    }
-    return runtimeConfig;
-  }
 
   function formatTime(value, fallback = '—') {
     if (!value) return fallback;
@@ -157,7 +110,6 @@
       awardSummary:moduleSource('正式台獎私有戰情','index.html'), awardStores:moduleSource('正式台獎私有戰情','index.html'), awardTop2Models:moduleSource('正式台獎私有戰情','index.html'),
       personalPerformance:moduleSource('正式 KPI 個績快照','index.html'),
       report1600:moduleSource('北一二B每日回報','index.html'), report2100:moduleSource('北一二B每日回報','index.html'), reportFailures:moduleSource('正式個人回報','index.html'),
-      yesterdayFollowUp:moduleSource('昨日 21:00 正式每日回報','index.html'),
       scheduleToday:moduleSource('既有班表 sread','patrol.html'), scheduleByDate:moduleSource('既有班表 sread','patrol.html'),
       patrolToday:moduleSource('巡店唯讀摘要','patrol.html'), patrolOverview:moduleSource('巡店 ptsummary','patrol.html'), patrolStores:moduleSource('巡店 ptsummary','patrol.html')
     };
@@ -237,8 +189,8 @@
   }
 
   async function postReadOnly(payload) {
-    if (!READ_ACTIONS.has(payload.action)) throw new Error('App 1.3 僅允許既有唯讀 action。');
-    const { body } = await fetchJsonWithRecovery(runtimeConfig.privateApi, {
+    if (!READ_ACTIONS.has(payload.action)) throw new Error('App 1.2 僅允許既有唯讀 action。');
+    const { body } = await fetchJsonWithRecovery(DAILY_REPORT_API, {
       method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body:JSON.stringify(payload), cache:'no-store', credentials:'omit'
     }, PRIVATE_TIMEOUT_MS, '正式資料讀取逾時，請稍後重試。');
@@ -248,7 +200,7 @@
 
   async function postDeviceAccess(payload) {
     if (!DEVICE_ACTIONS.has(payload.action)) throw new Error('不允許的裝置授權 action。');
-    const { body } = await fetchJsonWithRecovery(runtimeConfig.privateApi, {
+    const { body } = await fetchJsonWithRecovery(DAILY_REPORT_API, {
       method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body:JSON.stringify(payload), cache:'no-store', credentials:'omit'
     }, PRIVATE_TIMEOUT_MS, '裝置授權讀取逾時，請稍後重試。');
@@ -302,8 +254,8 @@
   }
 
   async function postPatrolAuth(payload) {
-    if (!['ptauth','ptauth_device','ptlogout'].includes(payload.action)) throw new Error('不允許的 session action。');
-    const { body } = await fetchJsonWithRecovery(runtimeConfig.patrolApi, {
+    if (!['ptauth','ptlogout'].includes(payload.action)) throw new Error('不允許的 session action。');
+    const { body } = await fetchJsonWithRecovery(PATROL_API, {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload), cache:'no-store'
     }, 30_000, '班表／巡店驗證逾時，請稍後重試。');
     if (!body || body.status !== 'ok') throw new Error((body && body.message) || '班表／巡店驗證失敗。');
@@ -311,7 +263,7 @@
   }
 
   async function patrolRead(action, params = {}) {
-    if (!PATROL_READ_ACTIONS.has(action)) throw new Error('App 1.3 僅允許既有班表／巡店讀取與獨立到離店讀取。');
+    if (!PATROL_READ_ACTIONS.has(action)) throw new Error('App 1.2 僅允許既有班表／巡店讀取與獨立到離店讀取。');
     if (!patrolToken) throw new Error('班表／巡店 session 尚未驗證。');
     const timeoutMs = PATROL_TIMEOUT_MS[action];
     const timeoutMessage = action === 'hread' ? '半月督導檢查讀取逾時，請點擊重試。'
@@ -319,7 +271,7 @@
       : action === 'sread' ? '班表讀取逾時，請點擊重試。'
       : '今日到離店紀錄讀取逾時，請點擊重試。';
     if (action === 'ptsummary' || action === 'ptdetail') {
-      const { body } = await fetchJsonWithRecovery(runtimeConfig.patrolApi, {
+      const { body } = await fetchJsonWithRecovery(PATROL_API, {
         method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
         body:JSON.stringify({ action, token:patrolToken, ...params }), cache:'no-store'
       }, timeoutMs, timeoutMessage);
@@ -330,7 +282,7 @@
     Object.entries(params).forEach(([key,value]) => {
       if (value !== '' && value != null) query.push([key,String(value)]);
     });
-    const url = `${runtimeConfig.patrolApi}?${query.map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&')}`;
+    const url = `${PATROL_API}?${query.map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&')}`;
     const { body } = await fetchJsonWithRecovery(url, { method:'GET', cache:'no-store' }, timeoutMs, timeoutMessage);
     if (!body || body.status !== 'ok') {
       const message = (body && body.message) || '班表／巡店讀取失敗。';
@@ -349,7 +301,7 @@
     const action = 'ptvisit_write';
     if (!PATROL_WRITE_ACTIONS.has(action)) throw new Error('不允許的巡店寫入 action。');
     if (!patrolToken) throw new Error('班表／巡店 session 尚未驗證。');
-    const response = await fetch(runtimeConfig.patrolApi, {
+    const response = await fetch(PATROL_API, {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, cache:'no-store', credentials:'omit',
       body:JSON.stringify({ action, token:patrolToken, visitAction, store, note:String(note || '') })
     });
@@ -564,15 +516,6 @@
     });
   }
 
-  function personalStoreViewRows(people,stores,selectedStore) {
-    const selected=normalizeStore(selectedStore);
-    const storePeople=(Array.isArray(people)?people:[]).filter(person=>normalizeStore(person.store)===selected);
-    return {
-      managers:managerStorePerformanceRows(storePeople,stores),
-      staff:storePeople.filter(person=>person.roleGroup!=='店長')
-    };
-  }
-
   function personalUnderTargetByMetric(people,key) {
     const nonManagers=(Array.isArray(people)?people:[]).filter(person=>person.roleGroup!=='店長');
     const missing=nonManagers.filter(person=>{ const metric=personalMetricByKey(person,key); return !metric||metric.rate==null; });
@@ -670,7 +613,6 @@
     if (!id) throw new Error('請輸入既有員工編號。');
     const credential = { employeeId:id, deviceId:deviceId() };
     scope.localStorage.setItem(EMPLOYEE_KEY,id);
-    if (NATIVE_MODE) clearPatrolSession('正在驗證 Approved Device…');
     let privateResult;
     try {
       privateResult = await postReadOnly({ action:'private_access', ...credential });
@@ -683,7 +625,6 @@
       setPrivateAccessState(pending ? 'pending' : transportFailure ? 'error' : 'unauthorized',pending ? '此 iPhone App 裝置待核准。核准後按「查看核准狀態」。' : String(error.message || error));
       dom('#viewerState').textContent = pending ? '待核准' : transportFailure ? '讀取失敗' : '未登入';
       dom('#privateLogout').hidden = false;
-      if (NATIVE_MODE) clearPatrolSession('Approved Device 驗證失敗，班表／巡店尚未解鎖。');
       renderAll();
       throw error;
     }
@@ -698,19 +639,13 @@
       awardSummary:awards.summary, awardStores:awards.stores, awardTop2Models:awards.top2,
       personalPerformance,
       report1600:privateLoadingModule('report1600','16:00 正式回報'), report2100:privateLoadingModule('report2100','21:00 正式回報'),
-      reportFailures:privateLoadingModule('reportFailures','正式個人回報'),
-      yesterdayFollowUp:privateLoadingModule('yesterdayFollowUp','昨日 21:00 待追蹤')
+      reportFailures:privateLoadingModule('reportFailures','正式個人回報')
     });
     privateAccessStatus = 'approved';
     dom('#viewerState').textContent = privateResult.profile && privateResult.profile.maskedName ? privateResult.profile.maskedName : 'Approved';
     dom('#privateLogout').hidden = false;
     setPrivateAccessState('approved','Approved Device 已確認；各正式唯讀模組正在獨立載入。');
     renderAll();
-    if (NATIVE_MODE) autoUnlockPatrolWithApprovedDevice(credential).catch(error => {
-      clearPatrolSession(String(error && error.message || 'Approved Device 無法取得巡店 session。'));
-      renderAll();
-    });
-    loadYesterdayFollowUp(credential);
 
     const reportRows={16:null,21:null};
     const failureRows={};
@@ -759,29 +694,6 @@
     setPrivateAccessState('approved','已由既有 Approved Device 完成正式唯讀模組載入。');
   }
 
-  async function loadYesterdayFollowUp(credential) {
-    const date=taipeiDateOffset(-1);
-    try {
-      const [reportResult,peopleResult]=await Promise.allSettled([
-        postReadOnly({action:'read',date,seg:21,...credential}),
-        postReadOnly({action:'pread',date,seg:21,...credential})
-      ]);
-      if(reportResult.status==='rejected') throw reportResult.reason;
-      const report=adaptReport(21,reportResult.value.data,peopleResult.status==='fulfilled'?peopleResult.value.data:{},reportResult.value.summary);
-      const followUp=Y.adapt({date,report});
-      const available=followUp.formalDataAvailable;
-      contract.yesterdayFollowUp=C.moduleState({
-        status:available?(peopleResult.status==='fulfilled'?'ok':'partial'):'no_data',updatedAt:nowIso(),sourceUpdatedAt:report.updatedAt,stale:false,
-        source:moduleSource('昨日 21:00 正式每日回報','index.html'),data:followUp,
-        note:available?(peopleResult.status==='fulfilled'?'':'昨日個人回報讀取失敗；未顯示推算內容。'):'昨日 21:00 無正式資料'
-      });
-    } catch(error) {
-      contract.yesterdayFollowUp=privateFailureModule('yesterdayFollowUp',error,'昨日 21:00');
-    }
-    contract.generatedAt=nowIso();
-    renderAll();
-  }
-
   async function requestDeviceBinding(employeeId, bootstrapCode) {
     const id = String(employeeId || '').trim();
     const code = String(bootstrapCode || '').trim();
@@ -823,7 +735,6 @@
     dom('#employeeId').value = '';
     dom('#viewerState').textContent = '未登入';
     dom('#privateLogout').hidden = true;
-    if (NATIVE_MODE) clearPatrolSession('已登出；班表／巡店 session 已清除。');
     renderAll();
   }
 
@@ -928,28 +839,6 @@
     }).join('') : contract.todayOperations.status==='unauthorized'
       ? privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '正式回報摘要尚未解鎖')
       : `<div class="empty-state">${escapeHtml(contract.todayOperations.note||'正式回報讀取失敗')}</div>`;
-  }
-
-  function renderYesterdayFollowUp() {
-    const module=contract.yesterdayFollowUp;
-    const data=module&&module.data;
-    const home=dom('#yesterdayFollowUpHome');
-    const detail=dom('#yesterdayFollowUp');
-    if(!data){
-      if(home) home.hidden=true;
-      if(detail) detail.innerHTML=`<div class="empty-state">${escapeHtml(module&&module.note||'昨日 21:00 正式資料讀取中')}</div>`;
-      return;
-    }
-    if(home){
-      home.hidden=false;
-      home.innerHTML=`<button type="button" data-open-yesterday-followup><span><small>${escapeHtml(data.date)} · 21:00</small><b>昨日待追蹤</b></span><strong class="${data.trackingStoreCount?'negative':'positive'}">${data.trackingStoreCount} 店</strong><i data-lucide="chevron-right"></i></button>`;
-    }
-    if(!detail) return;
-    if(!data.formalDataAvailable){ detail.innerHTML='<div class="empty-state">昨日 21:00 無正式資料</div>'; return; }
-    detail.innerHTML=`${staleBanner(module)}<div class="yesterday-summary">
-      <article><span>未過關店數</span><b>${data.failedStoreCount}</b></article><article><span>未過關人數</span><b>${data.failedPeopleCount}</b></article>
-      <article><span>有請益店數</span><b>${data.feedbackStoreCount}</b></article><article><span>需要追蹤店數</span><b>${data.trackingStoreCount}</b></article>
-    </div>${data.stores.length?`<div class="yesterday-store-list">${data.stores.map(store=>`<article class="yesterday-store-card"><h3>${escapeHtml(store.name)}</h3>${store.failedMetrics.length?`<p><b>未過關</b>${escapeHtml(store.failedMetrics.join('、'))}</p>`:''}${store.failedPeople.length?`<div class="yesterday-people">${store.failedPeople.map(person=>`<p><b>${escapeHtml(person.name)}</b>${escapeHtml(person.failed.join('、'))}</p>`).join('')}</div>`:''}${renderStoreFeedback(store.storeFeedback,true)}</article>`).join('')}</div>`:'<div class="empty-state">昨日 21:00 無需追蹤店點。</div>'}`;
   }
 
   function renderKpiHero() {
@@ -1079,10 +968,8 @@
     const allPeople = Array.isArray(data.people) ? data.people : [];
     if (!allPeople.length) return '<div class="empty-state">正式來源目前沒有個績資料。</div>';
     if(battleScope==='store') {
-      const storeView=personalStoreViewRows(allPeople,contract.kpiStores.data,selected);
-      const managerCards=storeView.managers.map(managerStorePerformanceRow).join('');
-      const staffRows=storeView.staff.map(person=>personalPerformanceRow(person)).join('');
-      return `<div class="award-selected-store"><span>店點個績</span><strong>${escapeHtml(selected)}</strong></div><section class="panel personal-performance-panel manager-store-panel"><div class="panel-head"><div><h2>店長管理資訊</h2><small>店績來自正式 kpiStores · AQ 來自個人 AQ actual</small></div></div><div class="personal-performance-list">${managerCards || '<div class="empty-state">此店正式來源目前沒有店長管理資料。</div>'}</div></section><section class="panel personal-performance-panel"><div class="panel-head"><div><h2>店點人員</h2><small>${storeView.staff.length} 人 · 副店／其他業代正式個績</small></div></div><div class="personal-performance-list">${staffRows || '<div class="empty-state">此店正式來源目前沒有副店／業代個績。</div>'}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
+      const storePeople=allPeople.filter(person=>person.store===selected);
+      return `<div class="award-selected-store"><span>店點個績</span><strong>${escapeHtml(selected)}</strong></div><section class="panel personal-performance-panel"><div class="panel-head"><div><h2>店點人員</h2><small>${storePeople.length} 人 · 維持正式來源排序</small></div></div><div class="personal-performance-list">${storePeople.map(person=>personalPerformanceRow(person)).join('') || '<div class="empty-state">此店正式來源目前沒有個績人員。</div>'}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
     }
     const aqReview=personalAqReview(allPeople);
     const summaryCards = `<div class="metric-card-grid personal-summary-grid">
@@ -1443,7 +1330,7 @@
   }
 
   function renderAll() {
-    renderHeader(); renderOperations(); renderYesterdayFollowUp(); renderKpiHero(); renderStores(); renderAwardsHome(); renderScheduleHome(); renderPatrolHome();
+    renderHeader(); renderOperations(); renderKpiHero(); renderStores(); renderAwardsHome(); renderScheduleHome(); renderPatrolHome();
     renderBattle(); renderReport(); renderPatrol(); renderSchedule(); renderSystemStatus(); refreshIcons();
   }
 
@@ -1623,28 +1510,6 @@
     scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken); setMessage('#patrolAccessMessage','短效 session 已驗證，正在讀取班表／巡店。','success'); dom('#patrolLogout').hidden=false; await loadPatrolData();
   }
 
-  function clearPatrolSession(message = '') {
-    patrolToken='';
-    scope.sessionStorage.removeItem(PATROL_TOKEN_KEY);
-    dom('#patrolLogout').hidden=true;
-    if (message) setMessage('#patrolAccessMessage',message,/失敗|無法|清除/.test(message)?'error':'');
-  }
-
-  async function autoUnlockPatrolWithApprovedDevice(credential) {
-    if (!NATIVE_MODE || PREVIEW_MODE) return;
-    setMessage('#patrolAccessMessage','正在以 Approved Device 自動驗證班表／巡店…');
-    const assertionResult=await postDeviceAccess({action:'private_patrol_assertion',...credential});
-    const assertion=String(assertionResult.assertion||'');
-    if (!assertion) throw new Error('Approved Device 未取得短效巡店驗證。');
-    const result=await postPatrolAuth({action:'ptauth_device',assertion,...credential});
-    patrolToken=String(result.token||'');
-    if (!patrolToken) throw new Error('正式服務未簽發短效巡店 session。');
-    scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken);
-    dom('#patrolLogout').hidden=false;
-    setMessage('#patrolAccessMessage','Approved Device 已自動驗證，正在讀取班表／巡店。','success');
-    await loadPatrolData();
-  }
-
   async function restorePatrol() {
     if (!patrolToken||PREVIEW_MODE) return;
     try { const result=await postPatrolAuth({action:'ptauth',token:patrolToken}); patrolToken=String(result.token||''); if(!patrolToken) throw new Error('session 已失效'); scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken); dom('#patrolLogout').hidden=false; await loadPatrolData(); }
@@ -1682,7 +1547,7 @@
   dom('[data-date-today]').addEventListener('click',()=>{ dom('#scheduleDate').value=taipeiDate(); if(patrolToken)loadPatrolData(); else renderSchedule(); });
   dom('#scheduleDate').addEventListener('change',()=>patrolToken?loadPatrolData():renderSchedule());
   dom('#scheduleStoreFilter').addEventListener('change',renderSchedule);
-  all('[data-refresh]').forEach(button=>button.addEventListener('click',async()=>{ if(PREVIEW_MODE){ renderAll(); return; } await loadRuntimeConfig(); const id=scope.localStorage.getItem(EMPLOYEE_KEY); if(id)loadFormalSummary(id).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); }); if(patrolToken&&!NATIVE_MODE)loadPatrolData(); }));
+  all('[data-refresh]').forEach(button=>button.addEventListener('click',()=>{ if(PREVIEW_MODE)renderAll(); else { const id=scope.localStorage.getItem(EMPLOYEE_KEY); if(id)loadFormalSummary(id).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); }); if(patrolToken)loadPatrolData(); } }));
   document.addEventListener('click',event=>{
     const patrolRetry=event.target.closest('[data-retry-patrol]');
     if(patrolRetry){
@@ -1748,11 +1613,10 @@
       return;
     }
     const privateUnlock=event.target.closest('[data-unlock-private]'); if(privateUnlock){ setView('me'); dom('#employeeId').focus(); return; }
-    const patrolUnlock=event.target.closest('[data-unlock-patrol]'); if(patrolUnlock){ setView('me'); if(NATIVE_MODE)setMessage('#patrolAccessMessage','請先完成 Approved Device 驗證，App 將自動解鎖班表／巡店。'); else dom('#patrolPasscode').focus(); return; }
+    const patrolUnlock=event.target.closest('[data-unlock-patrol]'); if(patrolUnlock){ setView('me'); dom('#patrolPasscode').focus(); return; }
     const scheduleButton=event.target.closest('[data-toggle-home-schedule]'); if(scheduleButton){ const card=scheduleButton.closest('#scheduleHome'); const expanded=card.classList.toggle('expanded'); scheduleButton.setAttribute('aria-expanded',String(expanded)); scheduleButton.querySelector('span').textContent=expanded?'收合當日班表':'顯示九店當日班表'; return; }
     const operationButton=event.target.closest('[data-toggle-operation]'); if(operationButton){ const item=operationButton.closest('.operation-item'); item.classList.toggle('expanded'); operationButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
     const reportButton=event.target.closest('[data-open-report]'); if(reportButton){ reportSegment=Number(reportButton.dataset.openReport); all('[data-report-segment]').forEach(button=>button.classList.toggle('active',Number(button.dataset.reportSegment)===reportSegment)); setView('report'); renderReport(); return; }
-    const yesterdayButton=event.target.closest('[data-open-yesterday-followup]'); if(yesterdayButton){ setView('report'); renderYesterdayFollowUp(); scope.setTimeout(()=>dom('#yesterdayFollowUpPanel').scrollIntoView({block:'start',behavior:'smooth'}),0); return; }
     const awardLink=event.target.closest('[data-open-awards]'); if(awardLink){ event.preventDefault(); battleKind='award'; battleScope='region'; all('[data-battle-kind]').forEach(button=>button.classList.toggle('active',button.dataset.battleKind==='award')); all('[data-battle-scope]').forEach(button=>button.classList.toggle('active',button.dataset.battleScope==='region')); setView('battle'); renderBattle(); return; }
     const storeButton=event.target.closest('.store-row'); if(storeButton){ const item=storeButton.closest('.store-item'); item.classList.toggle('expanded'); storeButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
     const personalButton=event.target.closest('.personal-performance-button'); if(personalButton){ const item=personalButton.closest('.personal-performance-item'); item.classList.toggle('expanded'); personalButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
@@ -1769,26 +1633,18 @@
   scope.addEventListener('hashchange',()=>{ const name=location.hash.slice(1); if(all('[data-view]').some(view=>view.dataset.view===name))setView(name); });
 
   dom('#scheduleDate').value=taipeiDate();
-  const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
-
-  async function initializeRuntime() {
-    if (PREVIEW_MODE) {
-      scheduleViewData=contract.scheduleToday.data;
-      populateScheduleStores((contract.scheduleToday.data.stores||[]).map(row=>row.store));
-      dom('#employeeId').disabled=true; dom('#privateAccessForm button').disabled=true; dom('#patrolPasscode').disabled=true; dom('#patrolAccessForm button').disabled=true;
-      setMessage('#privateAccessMessage','Preview 僅顯示展示資料，不呼叫正式端點。'); setMessage('#patrolAccessMessage','Preview 不建立正式 session。'); dom('#viewerState').textContent='Preview';
-      renderAll();
-      return;
-    }
-    await loadRuntimeConfig();
+  if (PREVIEW_MODE) {
+    scheduleViewData=contract.scheduleToday.data;
+    populateScheduleStores((contract.scheduleToday.data.stores||[]).map(row=>row.store));
+    dom('#employeeId').disabled=true; dom('#privateAccessForm button').disabled=true; dom('#patrolPasscode').disabled=true; dom('#patrolAccessForm button').disabled=true;
+    setMessage('#privateAccessMessage','Preview 僅顯示展示資料，不呼叫正式端點。'); setMessage('#patrolAccessMessage','Preview 不建立正式 session。'); dom('#viewerState').textContent='Preview';
+  } else {
     const stored=scope.localStorage.getItem(EMPLOYEE_KEY)||''; dom('#employeeId').value=stored;
     setPrivateAccessState('unauthorized');
-    if(NATIVE_MODE){ clearPatrolSession('等待 Approved Device 自動驗證。'); dom('#patrolAccessForm').hidden=true; }
     if(stored) loadFormalSummary(stored).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); });
-    if(!NATIVE_MODE) restorePatrol();
-    renderAll();
+    restorePatrol();
   }
-  initializeRuntime().catch(error=>setMessage('#privateAccessMessage',String(error&&error.message||error),'error'));
+  const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js',{scope:'./'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=emergency-rollback-20260813-1',{scope:'./'}).catch(()=>{}));
 })(window);

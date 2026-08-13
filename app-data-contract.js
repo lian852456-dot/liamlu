@@ -1,10 +1,10 @@
 (function attachSupervisorContract(scope) {
   'use strict';
 
-  const VERSION = 'liam-supervisor-app-1.3-contract-v1';
+  const VERSION = 'liam-supervisor-app-1.2-contract-v1';
   const MODULE_KEYS = [
     'todayOperations', 'kpiSummary', 'kpiStores', 'kpiFullMetrics', 'awardSummary', 'awardStores',
-    'awardTop2Models', 'personalPerformance', 'report1600', 'report2100', 'reportFailures', 'yesterdayFollowUp',
+    'awardTop2Models', 'personalPerformance', 'report1600', 'report2100', 'reportFailures',
     'scheduleToday', 'scheduleByDate', 'patrolToday', 'patrolOverview', 'patrolStores'
   ];
   const STATUSES = new Set(['ok', 'partial', 'no_data', 'unauthorized', 'stale', 'error']);
