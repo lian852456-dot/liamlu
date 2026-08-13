@@ -20,7 +20,7 @@ test('App 1.2 contract adds personal performance without removing frozen modules
   assert.equal(api.validateContract(data), data);
   assert.deepEqual([...api.MODULE_KEYS], [
     'todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models','personalPerformance',
-    'report1600','report2100','reportFailures','scheduleToday','scheduleByDate','patrolToday','patrolOverview','patrolStores'
+    'report1600','report2100','reportFailures','yesterdayFollowUp','scheduleToday','scheduleByDate','patrolToday','patrolOverview','patrolStores'
   ]);
   for (const key of api.MODULE_KEYS) {
     const module = data[key];
@@ -81,7 +81,7 @@ test('App recovery runtime keeps existing reads and disables half-month writes',
 
 test('Information architecture matches the App 1.2 acceptance surfaces', () => {
   const html = read('app.html');
-  for (const label of ['今日營運戰況','九店一覽','台獎總覽','戰情','每日回報','全區營運摘要','門市請益彙整','全區未過關彙整','九店完整班表','巡店檢查','系統狀態']) {
+  for (const label of ['今日營運戰況','九店一覽','台獎總覽','戰情','每日回報','昨日待追蹤','全區營運摘要','門市請益彙整','全區未過關彙整','九店完整班表','巡店檢查','系統狀態']) {
     assert.match(html, new RegExp(label));
   }
   assert.match(html, /data-battle-kind="kpi"/);

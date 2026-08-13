@@ -3,6 +3,7 @@
 
   const C = scope.LiamSupervisorContract;
   const H = scope.LiamHalfMonthCheckReadModel;
+  const Y = scope.LiamYesterdayFollowUpModel;
   const BUNDLED_RUNTIME_CONFIG = Object.freeze({
     configVersion:'recovery-stable-2026-08-13',
     privateApi:'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec',
@@ -26,7 +27,7 @@
   const DEVICE_ACTIONS = new Set(['private_request','private_request_status','private_patrol_assertion']);
   const PATROL_READ_ACTIONS = new Set(['sread','ptsummary','ptdetail','ptvisit_read','hread']);
   const PATROL_WRITE_ACTIONS = new Set(['ptvisit_write']);
-  const PRIVATE_MODULE_KEYS = ['todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models','personalPerformance','report1600','report2100','reportFailures'];
+  const PRIVATE_MODULE_KEYS = ['todayOperations','kpiSummary','kpiStores','kpiFullMetrics','awardSummary','awardStores','awardTop2Models','personalPerformance','report1600','report2100','reportFailures','yesterdayFollowUp'];
   const PREVIEW_MODE = new URLSearchParams(scope.location.search).get('preview') === '1';
   const NATIVE_MODE = new URLSearchParams(scope.location.search).get('native') === '1';
   const STALE_MS = 30 * 60 * 60 * 1000;
@@ -69,6 +70,12 @@
 
   function taipeiDate() {
     return new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
+  }
+
+  function taipeiDateOffset(days) {
+    const anchor = new Date(`${taipeiDate()}T12:00:00+08:00`);
+    anchor.setTime(anchor.getTime() + Number(days || 0) * 86400000);
+    return new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit' }).format(anchor);
   }
 
   function nowIso() { return new Date().toISOString(); }
@@ -150,6 +157,7 @@
       awardSummary:moduleSource('正式台獎私有戰情','index.html'), awardStores:moduleSource('正式台獎私有戰情','index.html'), awardTop2Models:moduleSource('正式台獎私有戰情','index.html'),
       personalPerformance:moduleSource('正式 KPI 個績快照','index.html'),
       report1600:moduleSource('北一二B每日回報','index.html'), report2100:moduleSource('北一二B每日回報','index.html'), reportFailures:moduleSource('正式個人回報','index.html'),
+      yesterdayFollowUp:moduleSource('昨日 21:00 正式每日回報','index.html'),
       scheduleToday:moduleSource('既有班表 sread','patrol.html'), scheduleByDate:moduleSource('既有班表 sread','patrol.html'),
       patrolToday:moduleSource('巡店唯讀摘要','patrol.html'), patrolOverview:moduleSource('巡店 ptsummary','patrol.html'), patrolStores:moduleSource('巡店 ptsummary','patrol.html')
     };
@@ -681,7 +689,8 @@
       awardSummary:awards.summary, awardStores:awards.stores, awardTop2Models:awards.top2,
       personalPerformance,
       report1600:privateLoadingModule('report1600','16:00 正式回報'), report2100:privateLoadingModule('report2100','21:00 正式回報'),
-      reportFailures:privateLoadingModule('reportFailures','正式個人回報')
+      reportFailures:privateLoadingModule('reportFailures','正式個人回報'),
+      yesterdayFollowUp:privateLoadingModule('yesterdayFollowUp','昨日 21:00 待追蹤')
     });
     privateAccessStatus = 'approved';
     dom('#viewerState').textContent = privateResult.profile && privateResult.profile.maskedName ? privateResult.profile.maskedName : 'Approved';
@@ -692,6 +701,7 @@
       clearPatrolSession(String(error && error.message || 'Approved Device 無法取得巡店 session。'));
       renderAll();
     });
+    loadYesterdayFollowUp(credential);
 
     const reportRows={16:null,21:null};
     const failureRows={};
@@ -738,6 +748,29 @@
     };
     await Promise.allSettled([kpiTask,reportTask(16),reportTask(21)]);
     setPrivateAccessState('approved','已由既有 Approved Device 完成正式唯讀模組載入。');
+  }
+
+  async function loadYesterdayFollowUp(credential) {
+    const date=taipeiDateOffset(-1);
+    try {
+      const [reportResult,peopleResult]=await Promise.allSettled([
+        postReadOnly({action:'read',date,seg:21,...credential}),
+        postReadOnly({action:'pread',date,seg:21,...credential})
+      ]);
+      if(reportResult.status==='rejected') throw reportResult.reason;
+      const report=adaptReport(21,reportResult.value.data,peopleResult.status==='fulfilled'?peopleResult.value.data:{},reportResult.value.summary);
+      const followUp=Y.adapt({date,report});
+      const available=followUp.formalDataAvailable;
+      contract.yesterdayFollowUp=C.moduleState({
+        status:available?(peopleResult.status==='fulfilled'?'ok':'partial'):'no_data',updatedAt:nowIso(),sourceUpdatedAt:report.updatedAt,stale:false,
+        source:moduleSource('昨日 21:00 正式每日回報','index.html'),data:followUp,
+        note:available?(peopleResult.status==='fulfilled'?'':'昨日個人回報讀取失敗；未顯示推算內容。'):'昨日 21:00 無正式資料'
+      });
+    } catch(error) {
+      contract.yesterdayFollowUp=privateFailureModule('yesterdayFollowUp',error,'昨日 21:00');
+    }
+    contract.generatedAt=nowIso();
+    renderAll();
   }
 
   async function requestDeviceBinding(employeeId, bootstrapCode) {
@@ -886,6 +919,28 @@
     }).join('') : contract.todayOperations.status==='unauthorized'
       ? privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '正式回報摘要尚未解鎖')
       : `<div class="empty-state">${escapeHtml(contract.todayOperations.note||'正式回報讀取失敗')}</div>`;
+  }
+
+  function renderYesterdayFollowUp() {
+    const module=contract.yesterdayFollowUp;
+    const data=module&&module.data;
+    const home=dom('#yesterdayFollowUpHome');
+    const detail=dom('#yesterdayFollowUp');
+    if(!data){
+      if(home) home.hidden=true;
+      if(detail) detail.innerHTML=`<div class="empty-state">${escapeHtml(module&&module.note||'昨日 21:00 正式資料讀取中')}</div>`;
+      return;
+    }
+    if(home){
+      home.hidden=false;
+      home.innerHTML=`<button type="button" data-open-yesterday-followup><span><small>${escapeHtml(data.date)} · 21:00</small><b>昨日待追蹤</b></span><strong class="${data.trackingStoreCount?'negative':'positive'}">${data.trackingStoreCount} 店</strong><i data-lucide="chevron-right"></i></button>`;
+    }
+    if(!detail) return;
+    if(!data.formalDataAvailable){ detail.innerHTML='<div class="empty-state">昨日 21:00 無正式資料</div>'; return; }
+    detail.innerHTML=`${staleBanner(module)}<div class="yesterday-summary">
+      <article><span>未過關店數</span><b>${data.failedStoreCount}</b></article><article><span>未過關人數</span><b>${data.failedPeopleCount}</b></article>
+      <article><span>有請益店數</span><b>${data.feedbackStoreCount}</b></article><article><span>需要追蹤店數</span><b>${data.trackingStoreCount}</b></article>
+    </div>${data.stores.length?`<div class="yesterday-store-list">${data.stores.map(store=>`<article class="yesterday-store-card"><h3>${escapeHtml(store.name)}</h3>${store.failedMetrics.length?`<p><b>未過關</b>${escapeHtml(store.failedMetrics.join('、'))}</p>`:''}${store.failedPeople.length?`<div class="yesterday-people">${store.failedPeople.map(person=>`<p><b>${escapeHtml(person.name)}</b>${escapeHtml(person.failed.join('、'))}</p>`).join('')}</div>`:''}${renderStoreFeedback(store.storeFeedback,true)}</article>`).join('')}</div>`:'<div class="empty-state">昨日 21:00 無需追蹤店點。</div>'}`;
   }
 
   function renderKpiHero() {
@@ -1377,7 +1432,7 @@
   }
 
   function renderAll() {
-    renderHeader(); renderOperations(); renderKpiHero(); renderStores(); renderAwardsHome(); renderScheduleHome(); renderPatrolHome();
+    renderHeader(); renderOperations(); renderYesterdayFollowUp(); renderKpiHero(); renderStores(); renderAwardsHome(); renderScheduleHome(); renderPatrolHome();
     renderBattle(); renderReport(); renderPatrol(); renderSchedule(); renderSystemStatus(); refreshIcons();
   }
 
@@ -1686,6 +1741,7 @@
     const scheduleButton=event.target.closest('[data-toggle-home-schedule]'); if(scheduleButton){ const card=scheduleButton.closest('#scheduleHome'); const expanded=card.classList.toggle('expanded'); scheduleButton.setAttribute('aria-expanded',String(expanded)); scheduleButton.querySelector('span').textContent=expanded?'收合當日班表':'顯示九店當日班表'; return; }
     const operationButton=event.target.closest('[data-toggle-operation]'); if(operationButton){ const item=operationButton.closest('.operation-item'); item.classList.toggle('expanded'); operationButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
     const reportButton=event.target.closest('[data-open-report]'); if(reportButton){ reportSegment=Number(reportButton.dataset.openReport); all('[data-report-segment]').forEach(button=>button.classList.toggle('active',Number(button.dataset.reportSegment)===reportSegment)); setView('report'); renderReport(); return; }
+    const yesterdayButton=event.target.closest('[data-open-yesterday-followup]'); if(yesterdayButton){ setView('report'); renderYesterdayFollowUp(); scope.setTimeout(()=>dom('#yesterdayFollowUpPanel').scrollIntoView({block:'start',behavior:'smooth'}),0); return; }
     const awardLink=event.target.closest('[data-open-awards]'); if(awardLink){ event.preventDefault(); battleKind='award'; battleScope='region'; all('[data-battle-kind]').forEach(button=>button.classList.toggle('active',button.dataset.battleKind==='award')); all('[data-battle-scope]').forEach(button=>button.classList.toggle('active',button.dataset.battleScope==='region')); setView('battle'); renderBattle(); return; }
     const storeButton=event.target.closest('.store-row'); if(storeButton){ const item=storeButton.closest('.store-item'); item.classList.toggle('expanded'); storeButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
     const personalButton=event.target.closest('.personal-performance-button'); if(personalButton){ const item=personalButton.closest('.personal-performance-item'); item.classList.toggle('expanded'); personalButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }

@@ -163,6 +163,7 @@
     report1600:state(report1600,'北一二B每日回報','index.html','2026-08-10T16:21:00+08:00'),
     report2100:state(report2100,'北一二B每日回報','index.html','2026-08-10T21:33:00+08:00'),
     reportFailures:state({ 16:failureData(report1600),21:failureData(report2100) },'正式個人回報','index.html','2026-08-10T21:33:00+08:00'),
+    yesterdayFollowUp:state({ date:'2026-08-09',segment:21,formalDataAvailable:true,failedStoreCount:1,failedPeopleCount:1,feedbackStoreCount:1,trackingStoreCount:1,stores:[{name:'通化',failedPeople:[{name:'王＊庭',failed:['A999'],reason:'正式原文示意',improvePlan:'正式改善計畫示意'}],failedMetrics:['A999'],storeFeedback:{reason:'昨日零報原因示意',consult:'昨日請益對象示意',method:'昨日改善做法示意',plan:'昨日明日計劃示意'},hasFailure:true,hasFeedback:true}] },'昨日 21:00 正式每日回報','index.html','2026-08-09T21:30:00+08:00'),
     scheduleToday:state({ date:'2026-08-10',stores:scheduleRows },'既有班表 sread','patrol.html','2026-08-10T08:10:00+08:00'),
     scheduleByDate:state({ selectedDate:'2026-08-10', availableMonth:'2026-08', stores:scheduleRows },'既有班表 sread','patrol.html','2026-08-10T08:10:00+08:00'),
     patrolToday:state({ date:'2026-08-10',route:['永吉','大稻埕','通化'],completed:1,total:3,nextStop:'大稻埕',nextEta:'14:20',travel:[{from:'永吉',to:'大稻埕',minutes:24},{from:'大稻埕',to:'通化',minutes:31}] },'巡店唯讀路線 Preview','patrol.html','2026-08-10T08:00:00+08:00'),
