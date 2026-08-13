@@ -564,6 +564,15 @@
     });
   }
 
+  function personalStoreViewRows(people,stores,selectedStore) {
+    const selected=normalizeStore(selectedStore);
+    const storePeople=(Array.isArray(people)?people:[]).filter(person=>normalizeStore(person.store)===selected);
+    return {
+      managers:managerStorePerformanceRows(storePeople,stores),
+      staff:storePeople.filter(person=>person.roleGroup!=='店長')
+    };
+  }
+
   function personalUnderTargetByMetric(people,key) {
     const nonManagers=(Array.isArray(people)?people:[]).filter(person=>person.roleGroup!=='店長');
     const missing=nonManagers.filter(person=>{ const metric=personalMetricByKey(person,key); return !metric||metric.rate==null; });
@@ -1070,8 +1079,10 @@
     const allPeople = Array.isArray(data.people) ? data.people : [];
     if (!allPeople.length) return '<div class="empty-state">正式來源目前沒有個績資料。</div>';
     if(battleScope==='store') {
-      const storePeople=allPeople.filter(person=>person.store===selected);
-      return `<div class="award-selected-store"><span>店點個績</span><strong>${escapeHtml(selected)}</strong></div><section class="panel personal-performance-panel"><div class="panel-head"><div><h2>店點人員</h2><small>${storePeople.length} 人 · 維持正式來源排序</small></div></div><div class="personal-performance-list">${storePeople.map(person=>personalPerformanceRow(person)).join('') || '<div class="empty-state">此店正式來源目前沒有個績人員。</div>'}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
+      const storeView=personalStoreViewRows(allPeople,contract.kpiStores.data,selected);
+      const managerCards=storeView.managers.map(managerStorePerformanceRow).join('');
+      const staffRows=storeView.staff.map(person=>personalPerformanceRow(person)).join('');
+      return `<div class="award-selected-store"><span>店點個績</span><strong>${escapeHtml(selected)}</strong></div><section class="panel personal-performance-panel manager-store-panel"><div class="panel-head"><div><h2>店長管理資訊</h2><small>店績來自正式 kpiStores · AQ 來自個人 AQ actual</small></div></div><div class="personal-performance-list">${managerCards || '<div class="empty-state">此店正式來源目前沒有店長管理資料。</div>'}</div></section><section class="panel personal-performance-panel"><div class="panel-head"><div><h2>店點人員</h2><small>${storeView.staff.length} 人 · 副店／其他業代正式個績</small></div></div><div class="personal-performance-list">${staffRows || '<div class="empty-state">此店正式來源目前沒有副店／業代個績。</div>'}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
     }
     const aqReview=personalAqReview(allPeople);
     const summaryCards = `<div class="metric-card-grid personal-summary-grid">
