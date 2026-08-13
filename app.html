@@ -12,20 +12,20 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
-  <link rel="stylesheet" href="app.css?v=18">
-  <title>Liam Supervisor App 1.2</title>
+  <link rel="stylesheet" href="app.css?v=19">
+  <title>Liam Supervisor App 1.3</title>
 </head>
 <body>
   <div class="app-shell">
     <header class="app-header">
       <a class="brand" href="#home" data-nav="home" aria-label="Liam Supervisor 首頁">
         <span class="brand-mark">L</span>
-        <span><strong>Liam Supervisor App 1.2</strong><small><span id="appDate">—</span><i>·</i><span id="appUpdatedAt">尚未更新</span></small></span>
+        <span><strong>Liam Supervisor App 1.3</strong><small><span id="appDate">—</span><i>·</i><span id="appUpdatedAt">尚未更新</span></small></span>
       </a>
       <div class="header-actions"><button id="dataMode" class="mode-pill" type="button" data-nav="me" aria-label="開啟正式資料解鎖">讀取中</button><button class="profile-entry" type="button" data-nav="me" data-profile-entry aria-label="開啟個人與系統設定"><i data-lucide="user-round-cog"></i></button></div>
     </header>
 
-    <aside id="previewBanner" class="preview-banner" hidden><i data-lucide="flask-conical"></i><span><strong>Preview／示意資料</strong><small>僅供 App 1.2 資訊架構與 UI 驗收，非正式營運數據</small></span></aside>
+    <aside id="previewBanner" class="preview-banner" hidden><i data-lucide="flask-conical"></i><span><strong>Preview／示意資料</strong><small>僅供 App 1.3 資訊架構與 UI 驗收，非正式營運數據</small></span></aside>
 
     <main class="app-main">
       <section data-view="home" aria-label="首頁">
@@ -124,7 +124,7 @@
 
       <section data-view="me" hidden aria-label="我的">
         <div class="view-heading"><div><p>LIAM ONLY</p><h1>個人與系統設定</h1></div><button class="icon-button" type="button" data-nav="home" aria-label="返回首頁"><i data-lucide="arrow-left"></i></button></div>
-        <article class="profile-card"><span class="profile-mark">L</span><div><strong>Liam Supervisor</strong><small>App 1.2 · 個績與每日回報摘要</small></div><span id="viewerState" class="status-chip">未登入</span></article>
+        <article class="profile-card"><span class="profile-mark">L</span><div><strong>Liam Supervisor</strong><small>App 1.3 · Recovery Stable 改善</small></div><span id="viewerState" class="status-chip">未登入</span></article>
 
         <section class="panel access-panel" aria-labelledby="battleAccessTitle">
           <div class="panel-head"><div><h2 id="battleAccessTitle">KPI／台獎／回報</h2><small>沿用既有員編＋Approved Device</small></div></div>
@@ -155,11 +155,11 @@
     </nav>
   </div>
   <script src="app-assets/lucide.min.js"></script>
-  <script src="app-data-contract.js?v=13"></script>
-  <script src="app-preview-data.js?v=16"></script>
+  <script src="app-data-contract.js?v=14"></script>
+  <script src="app-preview-data.js?v=17"></script>
   <script src="patrol-read-model.js?v=12"></script>
   <script src="half-month-check-read-model.js?v=2"></script>
   <script src="yesterday-follow-up-model.js?v=1"></script>
-  <script src="app.js?v=patrol-summary-1" defer></script>
+  <script src="app.js?v=app-1-3-1" defer></script>
 </body>
 </html>

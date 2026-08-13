@@ -359,6 +359,7 @@ body { font-size:16px; }
 .award-selected-store { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:54px; margin-bottom:10px; padding:10px 13px; border:1px solid var(--line); border-radius:14px; background:#092038; }
 .award-selected-store span { color:var(--muted); font-size:14px; }
 .award-selected-store strong { font-size:18px; }
+#battleStoreSelect { min-height:44px; height:44px; }
 .award-store-items { margin-bottom:12px; }
 .award-store-item-list { display:grid; gap:8px; padding:0 13px 13px; }
 .award-store-item { min-width:0; padding:12px; border:1px solid var(--line-soft); border-radius:12px; background:#071b2e; }

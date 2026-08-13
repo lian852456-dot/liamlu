@@ -1,7 +1,7 @@
 # Liam Supervisor App Data Contract V1
 
-狀態：Frozen for Native 1.0
-版本：`liam-supervisor-app-1.1-contract-v1`
+狀態：App 1.3 Recovery Stable extension
+版本：`liam-supervisor-app-1.3-contract-v1`
 資料方向：正式來源 → 唯讀 adapter → App contract → Web／Native Shell
 
 本 contract 不新增正式資料來源、不改 KPI／台獎／回報判斷，也不提供任何寫入 action。正式欄位缺少、來源日期不一致或來源未授權時一律保留 `null`、`partial`、`no_data`、`unauthorized` 或 `error`，不得套用 Preview 數字。
@@ -30,9 +30,11 @@
 | `awardSummary` | 區金額、領獎店數、資料日 | 同日正式台獎私有摘要 |
 | `awardStores` | 九店金額、領獎狀態；每店 `items[]` 為該店正式指定機款及來源已提供欄位 | 同上 |
 | `awardTop2Models` | 相容保留的正式摘要欄位；App 1.1 區／店點畫面均不顯示 | 同上 |
+| `personalPerformance` | 正式個績；店長只以店績＋AQ actual 呈現，副店／業代維持個人績效 | `private_access.snapshot.kpiBattle.personal` + `kpiStores` |
 | `report1600` | 九店回報、時間、店點上線摘要 | `read(seg=16)` + `pread(seg=16)` |
 | `report2100` | 九店回報、時間、店點上線摘要 | `read(seg=21)` + `pread(seg=21)` |
 | `reportFailures` | 缺店、未過關店／人／指標、正式回報內容 | 正式 `failed[]` + `extra` |
+| `yesterdayFollowUp` | 台北昨日 21:00 未過關店／人與四欄門市請益原文；與今日資料獨立載入 | `read(yesterday, seg=21)` + `pread(yesterday, seg=21)` |
 | `scheduleToday` | 今日九店人員、班別、上班／休假 | `sread` |
 | `scheduleByDate` | `selectedDate`, `availableMonth`, 九店班表 | `sread` |
 | `patrolToday` | 今日路線、順序、完成、下一站、移動資訊 | `ptsummary`；正式來源缺欄位時 `no_data` |
@@ -56,4 +58,6 @@
 
 ## Native consumption
 
-Native 1.0 不建立第二套資料 mapping。SwiftUI／WKWebView shell 只載入這套 App 1.1 contract 的既有 Web UI，保留 HttpOnly Cookie、Approved Device 與既有 session 邊界。
+Native 1.0 不建立第二套資料 mapping。SwiftUI／WKWebView shell 只載入這套 App contract 的既有 Web UI，保留 HttpOnly Cookie、Approved Device 與既有 session 邊界。Native cold launch 由 private backend 對目前員編＋Device ID 重新驗證後簽發 60 秒單次 assertion，再由 patrol backend mint 原有 1800 秒 session；App 不保存督導通行碼，也不相信 client 傳入的 approved 狀態。一般 `patrol.html` 仍維持既有通行碼流程。
+
+API endpoint 由同源 `app-runtime-config.json` 提供，僅接受固定 Google Apps Script HTTPS 格式。設定在 cold launch／Refresh 以 no-store 讀取，非法設定回退 bundled known-good endpoints。

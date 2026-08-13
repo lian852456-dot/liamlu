@@ -12,10 +12,10 @@ const privateEndpoint = 'AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nK
 test('private summary and patrol reads use separate formal deployments', () => {
   assert.equal((app.match(new RegExp(privateEndpoint, 'g')) || []).length, 1);
   assert.equal((app.match(new RegExp(patrolEndpoint, 'g')) || []).length, 1);
-  assert.match(app, /postReadOnly[\s\S]*fetchJsonWithRecovery\(DAILY_REPORT_API/);
-  assert.match(app, /postDeviceAccess[\s\S]*fetchJsonWithRecovery\(DAILY_REPORT_API/);
-  assert.match(app, /postPatrolAuth[\s\S]*fetchJsonWithRecovery\(PATROL_API/);
-  assert.match(app, /async function patrolRead[\s\S]*method:'POST'[\s\S]*`\$\{PATROL_API\}\?\$\{/);
+  assert.match(app, /postReadOnly[\s\S]*fetchJsonWithRecovery\(runtimeConfig\.privateApi/);
+  assert.match(app, /postDeviceAccess[\s\S]*fetchJsonWithRecovery\(runtimeConfig\.privateApi/);
+  assert.match(app, /postPatrolAuth[\s\S]*fetchJsonWithRecovery\(runtimeConfig\.patrolApi/);
+  assert.match(app, /async function patrolRead[\s\S]*method:'POST'[\s\S]*`\$\{runtimeConfig\.patrolApi\}\?\$\{/);
 });
 
 test('WKWebView read transport uses encoded string URL and independent bounded timeouts', () => {
@@ -51,8 +51,8 @@ test('transport failures fail closed and do not become zero-shaped formal data',
 });
 
 test('recovery release is cache-busted and formal half-month write remains disabled', () => {
-  assert.match(html, /app\.js\?v=patrol-summary-1/);
-  assert.match(sw, /liam-supervisor-app-1-2-patrol-summary-v1/);
+  assert.match(html, /app\.js\?v=app-1-3-1/);
+  assert.match(sw, /liam-supervisor-app-1-3-v1/);
   assert.doesNotMatch(app, /PATROL_WRITE_ACTIONS = new Set\(\[[^\]]*hwrite/);
   assert.doesNotMatch(app, /halfMonthWriteRows|patrolRead\(['"]hwrite|half_media_upload/);
   assert.match(app, /if\(!PREVIEW_MODE\) return/);

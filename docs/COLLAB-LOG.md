@@ -11,6 +11,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 長期性的坑（會一再影響開發的）除了記在這裡，也請同步進 `CLAUDE.md` 的「踩過的坑」章節。
 
+## 2026-08-13 ｜ Codex（Liam Supervisor App 1.3 Phase 1，待正式部署／實機驗收）
+
+- 做了什麼：在 Recovery Stable `94070e0` 建立四個隔離 commit：Native Approved Device 的 server-verified patrol session bridge、同源 allowlisted runtime config、昨日 21:00 待追蹤、店點店長店績＋AQ 語意。網站 patrol.html 原通行碼路徑保留；hwrite 與 half_media_upload 持續停用。
+- 安全邊界：device assertion 60 秒、一次性、HMAC 驗證、nonce replay cache、員編／Device ID 精確綁定；trusted employee 旁路不適用於 patrol bridge。Runtime config 只允許 `configVersion/privateApi/patrolApi` 與固定 `script.google.com/macros/s/.../exec`。
+- 狀態：程式與 scoped tests 完成後仍須 full regression、正式雙 GAS 設定／部署、Pages readback、WebKit／Native 與 Liam 實機驗收；在這些證據完成前不得標記 Device PASS，也不得開始 Phase 2 媒體上傳。
+
 ---
 
 ## 2026-08-12 ｜ Codex（半月 hwrite Security Review 修復，未部署）

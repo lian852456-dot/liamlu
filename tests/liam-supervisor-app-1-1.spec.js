@@ -22,7 +22,7 @@ test('390x844 home gives the supervisor summary without horizontal overflow', as
   let formalRequests = 0;
   await page.route('https://script.google.com/**', route => { formalRequests += 1; return route.abort(); });
   await page.goto(FILE_URL);
-  await expect(page).toHaveTitle('Liam Supervisor App 1.2');
+  await expect(page).toHaveTitle('Liam Supervisor App 1.3');
   await expect(page.locator('#dataMode')).toHaveText('Preview／示意資料');
   await expect(page.locator('#previewBanner')).toContainText('非正式營運數據');
   await expect(page.locator('#operationsRows')).toContainText('16:00');

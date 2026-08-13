@@ -237,7 +237,7 @@
   }
 
   async function postReadOnly(payload) {
-    if (!READ_ACTIONS.has(payload.action)) throw new Error('App 1.2 僅允許既有唯讀 action。');
+    if (!READ_ACTIONS.has(payload.action)) throw new Error('App 1.3 僅允許既有唯讀 action。');
     const { body } = await fetchJsonWithRecovery(runtimeConfig.privateApi, {
       method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body:JSON.stringify(payload), cache:'no-store', credentials:'omit'
@@ -311,7 +311,7 @@
   }
 
   async function patrolRead(action, params = {}) {
-    if (!PATROL_READ_ACTIONS.has(action)) throw new Error('App 1.2 僅允許既有班表／巡店讀取與獨立到離店讀取。');
+    if (!PATROL_READ_ACTIONS.has(action)) throw new Error('App 1.3 僅允許既有班表／巡店讀取與獨立到離店讀取。');
     if (!patrolToken) throw new Error('班表／巡店 session 尚未驗證。');
     const timeoutMs = PATROL_TIMEOUT_MS[action];
     const timeoutMessage = action === 'hread' ? '半月督導檢查讀取逾時，請點擊重試。'
