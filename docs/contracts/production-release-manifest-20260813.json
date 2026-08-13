@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "recovery-stable-20260813-1",
+  "immutable": true,
+  "web": {
+    "commit": "6f2b42d9c91ff9c6c573e6767525f93105b6a059",
+    "semanticBaseline": "94070e0becd289287dae76fb461d719a898cb8d5",
+    "assetQuery": "emergency-rollback-20260813-1",
+    "serviceWorkerCache": "liam-supervisor-app-1-2-emergency-rollback-20260813-v1"
+  },
+  "privateGas": { "version": 29 },
+  "patrolGas": { "version": 53 },
+  "native": {
+    "commit": "4777746cd0daa9808eccf4260d8b161dfe53e7ac",
+    "startupUrl": "https://lian852456-dot.github.io/liamlu/app.html?native=1&release=c218843",
+    "bundleId": "com.liamlu.liamsupervisor"
+  },
+  "runtimeConfig": { "enabled": false, "version": null },
+  "featureFlags": {
+    "autoDeviceAuth": false,
+    "yesterdayFollowUp": false,
+    "managerStoreSemantics": false,
+    "halfMonthWrite": false,
+    "halfMonthMedia": false
+  },
+  "writes": {
+    "hwrite": false,
+    "halfMediaUpload": false
+  }
+}

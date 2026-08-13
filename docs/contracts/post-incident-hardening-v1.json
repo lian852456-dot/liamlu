@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "approvedDevice": {
+    "canonicalFunction": "isApprovedDevice(employeeId, deviceId)",
+    "authority": "private-approved-device-registry",
+    "failClosed": true,
+    "clientApprovalTrusted": false,
+    "requiredPairBinding": true
+  },
+  "legacyActions": {
+    "private": ["private_access", "read", "pread", "kpicalc_access"],
+    "patrol": ["ptauth", "sread", "ptsummary", "ptvisit_read", "hread"]
+  },
+  "legacyProductionSurfaces": [
+    "kpiWebsite",
+    "awardWebsite",
+    "dailyReportWebsite",
+    "patrolWebsite",
+    "scheduleWebsite",
+    "ptvisit",
+    "halfMonthRead"
+  ],
+  "healthModules": [
+    "privateApi",
+    "kpiSnapshot",
+    "awardSnapshot",
+    "dailyReport",
+    "schedule",
+    "patrolSummary",
+    "ptvisit",
+    "halfMonthRead"
+  ],
+  "deploymentStates": [
+    "PREPARED",
+    "A_BACKEND_DARK_DEPLOYED",
+    "B_LEGACY_SMOKE_PASSED",
+    "C_NEW_ROUTE_SMOKE_PASSED",
+    "D_PAGES_DEPLOYED",
+    "E_CANARY_DEVICE_PASSED",
+    "F_ONE_FLAG_ENABLED",
+    "G_LIAM_DEVICE_ACCEPTED",
+    "RELEASED"
+  ],
+  "canaryOrder": [
+    "managerStoreSemantics",
+    "yesterdayFollowUp",
+    "runtimeConfigInfrastructure",
+    "autoDeviceAuth"
+  ]
+}
