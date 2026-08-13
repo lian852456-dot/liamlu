@@ -302,7 +302,17 @@
   .secure-btn{border:none;border-radius:8px;background:var(--tw-orange);color:#fff;font-weight:800;padding:9px 14px;cursor:pointer;font-family:inherit}
   .secure-btn.secondary{background:#f0f0f0;color:#555}
   .secure-btn:hover{filter:brightness(.95)}
+  .secure-btn:disabled{background:#d8d8d8;color:#8a8a8a;cursor:not-allowed;filter:none}
   .secure-note{font-size:12px;color:var(--muted);margin-top:10px}
+  .sched-import textarea{width:100%;margin-top:10px;padding:9px;border:1px solid var(--line);border-radius:8px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;resize:vertical}
+  .sched-import-report{margin-top:10px;font-size:12.5px;line-height:1.7}
+  .sched-import-report:empty{display:none}
+  .sched-import-report .ok{color:#177245;font-weight:700}
+  .sched-import-report .err{color:#b3261e;font-weight:700}
+  .sched-import-report ul{margin:6px 0 0 18px}
+  .sched-import-report table{border-collapse:collapse;margin-top:8px;font-size:12.5px}
+  .sched-import-report th,.sched-import-report td{border:1px solid var(--line);padding:3px 9px;text-align:left}
   .secure-table-wrap{overflow:auto;border:1px solid var(--line);border-radius:9px}
   .secure-table{width:100%;border-collapse:collapse;min-width:720px;font-size:13px}
   .secure-table th,.secure-table td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}
@@ -498,9 +508,32 @@
         <label>檢視方式<select id="scheduleMode" onchange="renderSchedule()"><option value="day">每日</option><option value="week">每週</option><option value="month">每月</option></select></label>
         <label>日期<input id="scheduleDate" type="date" onchange="renderSchedule()"></label>
         <button class="secure-btn" onclick="exportScheduleExcel()">匯出 Excel</button>
+        <button class="secure-btn" onclick="toggleScheduleImport()">班表匯入</button>
         <span id="scheduleStatus" class="secure-note"></span>
       </div>
     </div>
+
+    <!-- 班表匯入：門市電腦連得到 GAS 但不一定連得到 docs.google.com，
+         所以每月更新班表必須有一條不用開試算表的路。 -->
+    <div class="secure-card sched-import" id="scheduleImportPanel" hidden>
+      <h3>班表匯入</h3>
+      <p class="hint">
+        貼上或選擇每月班表資料（Tab 或逗號分隔，12 欄，可含標題列）。
+        匯入會<strong>先清掉該月份既有資料再寫入</strong>，所以重跑同一個月不會變成兩份，
+        其他月份不受影響。
+      </p>
+      <div class="secure-toolbar">
+        <label>匯入月份<input id="schImpMonth" type="month"></label>
+        <label>選擇檔案<input id="schImpFile" type="file" accept=".tsv,.csv,.txt,text/plain" onchange="scheduleImportPickFile(this)"></label>
+        <button class="secure-btn" onclick="scheduleImportPreview()">檢查資料</button>
+        <button class="secure-btn" id="schImpSend" onclick="scheduleImportSend()" disabled>確認匯入</button>
+      </div>
+      <textarea id="schImpText" rows="6" spellcheck="false"
+                placeholder="在此貼上班表資料，或用上方「選擇檔案」載入&#10;例：2026-08&#9;酒泉&#9;2026-08-01&#9;1&#9;六&#9;賴秋雯&#9;店長&#9;全&#9;是&#9;是"
+                oninput="scheduleImportReset()"></textarea>
+      <div id="schImpReport" class="sched-import-report"></div>
+    </div>
+
     <div id="scheduleContent"></div>
   </section>
 
@@ -1608,6 +1641,168 @@ async function loadSchedule(force){
     document.getElementById('scheduleContent').innerHTML=`<div class="secure-lock"><div class="big">⚠️</div>${esc(err.message)}</div>`;
   }
 }
+/* ---------- 班表匯入 ----------
+   門市／公司電腦連得到 GAS，但不一定連得到 docs.google.com，
+   所以每月更新班表不能只有「開試算表貼上」一條路。
+   前端只負責解析＋驗證＋分批送；出勤與值班主管沿用來源資料，不在這裡重算。 */
+const SCH_IMPORT_COLS = ['版本月份','門市','日期','日','週','同仁','職務','班別','出勤','值班主管','來源檔','匯入時間'];
+const SCH_IMPORT_BATCH = 400;
+let schImportRows = null;
+
+function toggleScheduleImport(){
+  const panel=document.getElementById('scheduleImportPanel');
+  panel.hidden=!panel.hidden;
+  if(!panel.hidden){
+    const monthEl=document.getElementById('schImpMonth');
+    if(!monthEl.value) monthEl.value=(scheduleData&&scheduleData.month)||new Date().toISOString().slice(0,7);
+  }
+}
+
+function scheduleImportReset(){
+  schImportRows=null;
+  document.getElementById('schImpSend').disabled=true;
+  document.getElementById('schImpReport').innerHTML='';
+}
+
+function scheduleImportPickFile(input){
+  const file=input.files&&input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onerror=()=>{ document.getElementById('schImpReport').innerHTML='<p class="err">讀取檔案失敗</p>'; };
+  reader.onload=()=>{ document.getElementById('schImpText').value=String(reader.result||''); scheduleImportReset(); };
+  reader.readAsText(file,'utf-8');
+}
+
+// Tab 優先；整份都沒有 Tab 才退回逗號，避免把姓名裡的分隔誤判。
+function scheduleImportSplit(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim()!=='');
+  const sep=lines.some(l=>l.indexOf('\t')>=0)?'\t':',';
+  return lines.map(l=>l.split(sep).map(c=>c.trim()));
+}
+
+function scheduleImportParse(){
+  const month=document.getElementById('schImpMonth').value;
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month||'')) throw new Error('請先選擇匯入月份');
+  const text=document.getElementById('schImpText').value||'';
+  if(!text.trim()) throw new Error('請先貼上資料或選擇檔案');
+
+  let rows=scheduleImportSplit(text);
+  if(rows[0] && rows[0][0]===SCH_IMPORT_COLS[0]) rows=rows.slice(1);   // 容許帶標題列
+  if(!rows.length) throw new Error('沒有可匯入的資料列');
+
+  const problems=[];
+  const parsed=rows.map((cells,i)=>{
+    const n=i+1;
+    if(cells.length<10) problems.push(`第 ${n} 列只有 ${cells.length} 欄，至少需 10 欄`);
+    else{
+      if(cells[0]!==month) problems.push(`第 ${n} 列的版本月份是「${cells[0]}」，與匯入月份 ${month} 不符`);
+      if(!cells[1]) problems.push(`第 ${n} 列缺門市`);
+      if(!cells[5]) problems.push(`第 ${n} 列缺同仁`);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(cells[2]||'')) problems.push(`第 ${n} 列日期格式不正確：「${cells[2]||''}」`);
+      else if(cells[2].slice(0,7)!==month) problems.push(`第 ${n} 列日期 ${cells[2]} 不屬於 ${month}`);
+    }
+    const row=SCH_IMPORT_COLS.map((_,c)=>cells[c]==null?'':String(cells[c]));
+    return row;
+  });
+  if(problems.length) { const e=new Error('資料有問題'); e.problems=problems; throw e; }
+
+  const seen={};
+  parsed.forEach((r,i)=>{
+    const k=r[1]+'|'+r[2]+'|'+r[5];
+    if(seen[k]!=null) problems.push(`第 ${i+1} 列與第 ${seen[k]+1} 列重複（同門市、同日期、同人）`);
+    else seen[k]=i;
+  });
+  if(problems.length) { const e=new Error('資料有問題'); e.problems=problems; throw e; }
+
+  return { month, rows: parsed };
+}
+
+function scheduleImportSummary(month,rows){
+  const stores={}, dates={};
+  rows.forEach(r=>{
+    const s=stores[r[1]]||(stores[r[1]]={people:{},days:{},work:0});
+    s.people[r[5]]=true; s.days[r[2]]=true;
+    if(r[8]==='是') s.work++;
+    dates[r[2]]=true;
+  });
+  const names=Object.keys(stores).sort();
+  const dayList=Object.keys(dates).sort();
+  const tbody=names.map(n=>{
+    const s=stores[n];
+    return `<tr><td>${esc(n)}</td><td>${Object.keys(s.people).length}</td><td>${Object.keys(s.days).length}</td><td>${s.work}</td></tr>`;
+  }).join('');
+  return `<p class="ok">✓ 檢查通過：${rows.length} 列・${names.length} 間門市・${dayList[0]} ～ ${dayList[dayList.length-1]}</p>
+    <table><thead><tr><th>門市</th><th>人數</th><th>天數</th><th>出勤人日</th></tr></thead><tbody>${tbody}</tbody></table>
+    <p class="hint" style="margin-top:8px">按「確認匯入」會先清掉 ${esc(month)} 的既有資料再寫入。</p>`;
+}
+
+function scheduleImportPreview(){
+  const report=document.getElementById('schImpReport');
+  try{
+    const { month, rows }=scheduleImportParse();
+    schImportRows=rows;
+    document.getElementById('schImpSend').disabled=false;
+    report.innerHTML=scheduleImportSummary(month,rows);
+  }catch(err){
+    scheduleImportReset();
+    const list=(err.problems||[]).slice(0,20).map(p=>`<li>${esc(p)}</li>`).join('');
+    const more=(err.problems||[]).length>20?`<li>…另有 ${err.problems.length-20} 項</li>`:'';
+    report.innerHTML=`<p class="err">✗ ${esc(err.message)}</p>${list?`<ul>${list}${more}</ul>`:''}`;
+  }
+}
+
+async function scheduleImportPost(body){
+  let res;
+  try{
+    res=await fetch(PRIVATE_GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'swrite',token:PT_TOKEN,...body})});
+  }catch{ throw new Error('無法連上班表服務，請確認網路後再試'); }
+  const raw=await res.text();
+  let out;
+  try{ out=JSON.parse(raw); }
+  catch{ throw new Error(res.ok?'班表服務回應無法辨識':`班表服務暫時無法使用（${res.status}）`); }
+  if(!res.ok || out.status!=='ok') throw new Error(out.message||'寫入失敗');
+  return out;
+}
+
+async function scheduleImportSend(){
+  if(!schImportRows||!schImportRows.length){ scheduleImportPreview(); return; }
+  const month=document.getElementById('schImpMonth').value;
+  const rows=schImportRows;
+  const btn=document.getElementById('schImpSend');
+  const report=document.getElementById('schImpReport');
+  const batches=Math.ceil(rows.length/SCH_IMPORT_BATCH);
+  btn.disabled=true;
+  try{
+    let written=0, removed=0, last=null;
+    for(let i=0;i<batches;i++){
+      report.innerHTML=`<p>匯入中… 第 ${i+1}/${batches} 批（已寫入 ${written} / ${rows.length} 列）</p>`;
+      last=await scheduleImportPost({
+        month,
+        rows: rows.slice(i*SCH_IMPORT_BATCH,(i+1)*SCH_IMPORT_BATCH),
+        replace: i===0,                 // 只有第一批清掉舊資料
+        finalize: i===batches-1,        // 最後一批才寫版本列
+        source: `patrol.html 班表匯入 ${month}`
+      });
+      written+=last.written||0;
+      removed+=last.removed||0;
+    }
+    report.innerHTML=`<p class="ok">✓ 匯入完成：寫入 ${written} 列`
+      +(removed?`（清掉舊的 ${removed} 列）`:'')
+      +(last&&last.total!=null?`，${esc(month)} 目前共 ${last.total} 列・${last.storeCount} 間門市`:'')+'</p>';
+    schImportRows=null;
+    document.getElementById('schImpText').value='';
+    const monthEl=document.getElementById('scheduleMonth');
+    if(monthEl) monthEl.value=month;
+    scheduleData=null;
+    await loadSchedule(true);           // 立刻讀回來，讓畫面就是驗收結果
+  }catch(err){
+    report.innerHTML=`<p class="err">✗ ${esc(err.message)}</p>`
+      +'<p class="hint">已寫入的批次會留在試算表；修正後重新匯入同月份會先清空再寫，不會重複。</p>';
+    btn.disabled=false;
+  }
+}
+
 function scheduleDay(store,date){ return (store.days||[]).find(d=>d.date===date); }
 function dateObj(date){ const [y,m,d]=date.split('-').map(Number); return new Date(Date.UTC(y,m-1,d)); }
 function dateIso(d){ return d.toISOString().slice(0,10); }

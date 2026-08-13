@@ -1372,6 +1372,157 @@ function scheduleDateString(value) {
   return String(value || '').slice(0, 10);
 }
 
+// ════════════════════════════════════
+// 每月班表：匯入（patrol.html「班表匯入」→ doPost action=swrite）
+//
+// 為什麼要有這個：門市／公司電腦連得到 GAS，但不一定連得到 docs.google.com，
+// 所以每月更新班表不能只有「開試算表貼上」一條路。前端分批 POST，
+// 第一批帶 replace 清掉該月舊資料（重跑不會變兩份），最後一批帶 finalize 寫版本列。
+// ════════════════════════════════════
+const SCHEDULE_HEADERS = ['版本月份', '門市', '日期', '日', '週', '同仁',
+                          '職務', '班別', '出勤', '值班主管', '來源檔', '匯入時間'];
+const SCHEDULE_VERSION_SHEET = '班表版本';
+const SCHEDULE_VERSION_HEADERS = ['版本ID', '月份', '匯入時間', '來源位置', '來源檔數',
+                                  '門市數', '班表明細數', '狀態', '備註'];
+
+// 匯入內容來自使用者貼上的文字，開頭是 = + - @ 會被試算表當公式執行。
+// 一律前置單引號使其保持文字。
+function scheduleSafeCell_(value) {
+  const text = String(value == null ? '' : value).trim();
+  return /^[=+\-@]/.test(text) ? "'" + text : text;
+}
+
+function scheduleSheetForWrite_(ss) {
+  let sh = findNamedSheet(ss, SCHEDULE_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(SCHEDULE_SHEET);
+    sh.getRange(1, 1, 1, SCHEDULE_HEADERS.length).setValues([SCHEDULE_HEADERS]);
+  } else if (sh.getLastRow() === 0) {
+    sh.getRange(1, 1, 1, SCHEDULE_HEADERS.length).setValues([SCHEDULE_HEADERS]);
+  }
+  // 全欄鎖純文字，避免「版本月份 2026-08」「日期 2026-08-01」「日 1」被試算表
+  // 自動轉成 Date／數字（與巡店、半月同款保護）。每次寫入都設，不只建表時，
+  // 因為 班表明細 可能是先前不含此保護時就已存在。※若漏了這步，readSchedule 的
+  // String(版本月份)==='2026-08' 會永遠 false（見 CLAUDE.md 踩過的坑）。
+  sh.getRange('A:L').setNumberFormat('@');
+  return sh;
+}
+
+// 刪掉指定月份的既有明細。由下往上刪，避免刪除後列號位移。
+function scheduleRemoveMonth_(sh, month) {
+  const last = sh.getLastRow();
+  if (last < 2) return 0;
+  const values = sh.getRange(2, 1, last - 1, 1).getValues();
+  let removed = 0;
+  let runEnd = -1;
+  for (let i = values.length - 1; i >= -1; i--) {
+    const hit = i >= 0 && String(values[i][0] || '').trim() === month;
+    if (hit && runEnd < 0) runEnd = i;
+    if (!hit && runEnd >= 0) {
+      const startRow = i + 3;            // i 是不符的那列，往下一列才是要刪的開頭
+      const count = runEnd - i;
+      sh.deleteRows(startRow, count);
+      removed += count;
+      runEnd = -1;
+    }
+  }
+  return removed;
+}
+
+function scheduleUpsertVersion_(ss, info) {
+  let sh = findNamedSheet(ss, SCHEDULE_VERSION_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(SCHEDULE_VERSION_SHEET);
+    sh.getRange(1, 1, 1, SCHEDULE_VERSION_HEADERS.length).setValues([SCHEDULE_VERSION_HEADERS]);
+  }
+  // 同理鎖純文字，避免「月份 2026-08」被自動轉成日期。
+  sh.getRange('A:I').setNumberFormat('@');
+  const row = [
+    'SCH-' + info.month + '-001', info.month, info.importedAt, info.source,
+    info.sourceCount, info.storeCount, info.rowCount, '已匯入', info.note || ''
+  ].map(scheduleSafeCell_);
+
+  const last = sh.getLastRow();
+  if (last >= 2) {
+    const months = sh.getRange(2, 2, last - 1, 1).getValues();
+    for (let i = 0; i < months.length; i++) {
+      if (String(months[i][0] || '').trim() === info.month) {
+        sh.getRange(i + 2, 1, 1, row.length).setValues([row]);
+        return 'updated';
+      }
+    }
+  }
+  sh.getRange(sh.getLastRow() + 1, 1, 1, row.length).setValues([row]);
+  return 'inserted';
+}
+
+function writeSchedule(payload) {
+  const body = payload || {};
+  if (!ptCredentialAuthorized_(body.key, body.token)) throw new Error('unauthorized');
+
+  const month = String(body.month || '').trim();
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('月份格式須為 YYYY-MM');
+
+  const rows = body.rows;
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error('沒有可寫入的資料');
+  if (rows.length > 800) throw new Error('單批上限 800 列，請分批送出');
+
+  const importedAt = new Date().toISOString();
+  const prepared = rows.map((row, index) => {
+    if (!Array.isArray(row) || row.length < 10) {
+      throw new Error('第 ' + (index + 1) + ' 列欄位不足（需 10 欄以上）');
+    }
+    if (String(row[0] || '').trim() !== month) {
+      throw new Error('第 ' + (index + 1) + ' 列的版本月份與本次匯入月份不符');
+    }
+    if (!String(row[1] || '').trim()) throw new Error('第 ' + (index + 1) + ' 列缺門市');
+    if (!String(row[5] || '').trim()) throw new Error('第 ' + (index + 1) + ' 列缺同仁');
+    const out = SCHEDULE_HEADERS.map((_, i) => scheduleSafeCell_(row[i]));
+    out[10] = out[10] || String(body.source || '');
+    out[11] = importedAt;                 // 匯入時間一律由伺服器蓋，不採用戶端值
+    return out;
+  });
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sh = scheduleSheetForWrite_(ss);
+    const removed = body.replace === true ? scheduleRemoveMonth_(sh, month) : 0;
+    sh.getRange(sh.getLastRow() + 1, 1, prepared.length, SCHEDULE_HEADERS.length)
+      .setValues(prepared);
+
+    const result = { written: prepared.length, removed: removed, month: month };
+
+    if (body.finalize === true) {
+      const last = sh.getLastRow();
+      const all = last >= 2 ? sh.getRange(2, 1, last - 1, 2).getValues() : [];
+      const stores = {};
+      let total = 0;
+      all.forEach(r => {
+        if (String(r[0] || '').trim() !== month) return;
+        total++;
+        stores[String(r[1] || '').trim()] = true;
+      });
+      const storeCount = Object.keys(stores).length;
+      result.total = total;
+      result.storeCount = storeCount;
+      result.version = scheduleUpsertVersion_(ss, {
+        month: month,
+        importedAt: importedAt,
+        source: String(body.source || 'patrol.html 班表匯入'),
+        sourceCount: storeCount,
+        storeCount: storeCount,
+        rowCount: total,
+        note: String(body.note || '由 Liam情報站「班表匯入」寫入。')
+      });
+    }
+    return result;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // 每週一巡店週報（Email 夾 Excel）
 //
 // 啟用方式（只需做一次）：
@@ -2139,6 +2290,7 @@ function doPost(e) {
     else if (action === 'ptvisit_write') result = writePatrolVisitEvent_(payload);
     else if (action === 'hwrite') result = writeHalfCheckPostPayload_(payload, e);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
+    else if (action === 'swrite') result = writeSchedule(payload);
     else if (action === 'private_request') result = privateDashboardRequestBinding(payload);
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
     else if (action === 'private_access') result = privateDashboardAccess(payload);

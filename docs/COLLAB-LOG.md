@@ -123,6 +123,24 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-05 ｜ Claude（班表更新 SOP 寫入 CLAUDE.md）
+- 做了什麼：依 Liam 要求，把每月班表更新的完整 SOP 寫進 `CLAUDE.md`——涵蓋來源 Drive
+  資料夾位置（folder ID）、9 店清單與排序、文字檔轉寫格式規範、`build_schedule_rows.py`
+  用法、匯入流程、已知的坑（版本月份 Date 轉換、圖檔編號不固定、人員異動）。
+- 結果（成功 / 失敗 / 進行中）：成功。SOP 已推送至 main。
+- 經驗 / 給下一位的提醒：
+  1. 班表圖片在 `02_班表原始檔_每月`（folder ID `1RCvU_gUSd8qKxLpTr-5D3olKv5kOPQgP`），
+     Liam 確認位置不會變。
+  2. 轉寫文字檔存 scratchpad（不進 repo，含個資）；TSV 同理——只交給 Liam，不 commit。
+  3. `scripts/build_schedule_rows.py` 目前只在分支
+     `claude/info-station-monthly-schedule-nhgr4j` 上，尚未合進 main。
+     下次要用之前，先把它 cherry-pick 或合進 main。
+  4. 匯入「班表明細」目前需 Liam 在 GAS 編輯器貼一次性腳本執行（AI 無法呼叫 GAS）。
+     分支上有 `swrite` action 可走 API 匯入，但分支遠落後 main（110 vs 159 函式），
+     合併前須先 rebase 到最新 main。
+
+---
+
 ## 2026-08-04 ｜ Codex（正式 Apps Script v26 與直接 POST 傳輸修復）
 - 做了什麼：以遠端 `main` 的 `9f3e729` 為基準完成 Apps Script v26 部署，並將 `index.html`、`kpi.html` 的正式 GAS 請求從隱藏 iframe 改為直接 `fetch` POST；另加入管理者私有快照狀態讀回路由供發布驗證。
 - 結果（成功 / 失敗 / 進行中）：Apps Script v26 已成功更新，HTTP 200 / `status=ok` 已確認；iframe 在 Chrome 實測會逾時，直接 POST 修復待 GitHub Pages 建置後重新驗收。
@@ -130,98 +148,106 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
-## 2026-07-31 ｜ Claude（方案 A 實作：index.html KPI 戰情改讀 kpicalc 唯一正式來源）
+## 2026-08-03 ｜ Claude（8 月班表正式上線 + 修「版本月份被自動轉日期」根因）
 
-- 做了什麼：依 Liam 拍板實作方案 A。`index.html` KPI 戰情頁籤登入後改打 `kpicalc_access`
-  （與 kpi.html 完全同一份受保護 JSON、同一個第 15 版主部署，**GAS 零改動、零新部署**），
-  新增 `kpicalcToKpiBattleView()` 轉接層餵給既有渲染器；`_kpiBattleData` 不再吃
-  `snapshot.kpiBattle`，KPI 頁籤的本機快照回退移除（台獎頁籤與其回退**完全未動**，
-  snapshot 降為台獎來源＋舊版回復）。另補齊正式驗收清單（HANDOVER §7.10）。
-- 結果：新契約測試 `kpi-battle-source.test.cjs` 11/11（含轉接層實際執行）、
-  `app.spec.js` KPI 戰情段落改寫後 31/31、上傳 33/33、契約 70/70。
-  **未建 PR、未合併、未部署**；等 Liam 建立上傳 Deployment 後照 §7.10 驗收。
-- 經驗 / 給下一位的提醒：
-  1. **缺少欄位的鐵則**：company_rank／DOD／加掛分／個人排名／個人台獎／保險搭售率
-     不在 kpicalc JSON——畫面一律「尚未同步」（`kpiPendingCell()`）或不出現（DOD），
-     **絕不混入 snapshot 舊數字**。Playwright 有反向斷言（加掛 13.36、整體 105.5%、
-     DOD 字樣、val-gold 排名節點 = 0）。要補這些欄位的正道是擴充 `kpiCalcParseReport`
-     從同一份 Excel 讀，不是把 snapshot 接回來。
-  2. **轉接層只搬運與加總，不發明數字**：店點總達成率直接取 `official`；
-     整體核心項＝各店 a/t 純加總；整體總達成率需加權、無法由 kpicalc 推得 → null（尚未同步）；
-     進度差由同一組 meta（snapshotDay/monthDays）換算。有逐條行為測試。
-  3. **updatedAt 目前拿不到**：第 15 版 `kpicalc_access` 回應沒有檔案 mtime，
-     來源列顯示「更新時間 尚未同步（讀取於 <本機時間>）」。想補它要等主部署未來升版時
-     在 kpiCalcAccess 回應加 `updatedAt`，不值得為此動第 15 版。
-  4. **登入順序刻意台獎先渲染**、kpicalc 包獨立 try——kpicalc 失敗只影響 KPI 頁籤，
-     訊息寫明「台獎頁籤不受影響」。
-  5. 測試小坑之前也踩過一次：契約測試用 `doesNotMatch` 禁字時，**程式註解裡的
-     識別字也算命中**——註解請改寫成不含禁字的說法，不要放寬測試。
+- **完成**：情報站 8 月班表已上線。因門市電腦連不到 docs.google.com，改用「一次性 `.gs`
+  灌進『班表明細』」（複製 7 月的做法：離線整理成 12 欄、一次寫入，不動 Code.gs、不部署）。
+  正式站已驗證：班表明細 2790 列（7月1426＋8月1364）、8 月 9 門市、王姵文 31 列、7 月原封不動。
+- **🕳️ 踩到坑（已修根因）**：一次性腳本用 `setValues` 寫入時，Google Sheets 把
+  「版本月份 2026-08」「日期 2026-08-01」「日 1」**自動轉成 Date／數字**。後果：`readSchedule`
+  以 `String(版本月份)==='2026-08'` 比對，對 Date 物件永遠 false → 情報站選 8 月讀不到。
+  這正是 CLAUDE.md 早記過的坑（台獎事件 #2），但巡店／半月當初有做 `setNumberFormat('@')`
+  防護、**班表這張表漏了**。
+  - **止血**：另發 `fixAugustScheduleTypes`（偵測版本月份為 Date 的連續 8 月列，
+    `setNumberFormat('@')` 後改回文字 `2026-08`／`2026-08-01`／`1`；只動 8 月、7 月不碰）。已驗證。
+  - **修根因（本次 commit）**：`scheduleSheetForWrite_` 每次寫入都 `getRange('A:L').setNumberFormat('@')`，
+    `scheduleUpsertVersion_` 也對版本表 `'A:I'` 做同樣保護；補 2 條 node 測試（共 13/13 綠）。
+    下個月走 `swrite` 匯入功能就不會再重演。
+- **另一半的『沒成功』其實不是資料問題**：小榮同日的新部署（main 已 +13 commits、Code.gs +1193 行）
+  把 `sread` 從「免密碼」改成 `if(!ptAuthorized(e)) throw 'unauthorized'`。門市端舊 token 失效 →
+  情報站顯示 unauthorized。**重新登入即解**（資料與格式都是好的）。這是小榮 PR 的行為改變，非本次班表工作造成。
+- **給下一位的提醒**：
+  1. **任何寫進試算表、長得像日期／數字的字串（YYYY-MM、YYYY-MM-DD、純數字），寫之前一定先
+     `setNumberFormat('@')`**。這是本專案第 N 次因此吃虧，巡店/半月/回報都有防、別漏。
+  2. 查「班表沒顯示」先分兩層：資料在不在（讀試算表）vs 顯示卡在哪（授權／格式）。這次是
+     資料在、格式錯 + 授權失效兩件事疊加，分開處理才不會誤判成「匯入失敗」。
+  3. 我的分支 `claude/info-station-monthly-schedule-nhgr4j` 仍以事故前舊 main 為基準，
+     **尚未 rebase 到含小榮 13 個 commit 的新 main**；合併前務必先 rebase，否則會洗掉他的 +1193 行。
 
-## 2026-07-31 ｜ Claude（分支校正＋資料鮮度診斷落檔＋獨立上傳 Deployment 隔離）
+---
 
-- 做了什麼：依 Liam 指示停用舊分支 `claude/quick-report-upload-feature-elyajz`（含 bde4c6b
-  事故歷史），從去污染驗收的 `claude/quick-report-upload-clean`（bc9301b，base adf7542）建出
-  `claude/report-data-freshness-hotfix` 繼續。三件事：
-  ①把「網站顯示舊資料」現場診斷**重寫**進本分支文件（HANDOVER §7.9，只搬文件不搬舊分支程式碼）；
-  ②實作**部署隔離閘**：`reportUploadIsUploadDeployment_()` ＋指令碼屬性
-  `REPORT_UPLOAD_DEPLOYMENT_URL`——當請求由「上傳專用 Deployment」服務時，doPost 只放行
-  `report_upload_*` 四路由、doGet 只回 ping（帶 `app:'report-upload'` 識別），
-  其餘 read/write/巡店/戰情一律拒絕；屬性未設定＝隔離不啟用，主部署行為不變（安全預設）；
-  ③`report-upload.html` 改用獨立 `UPLOAD_GAS_URL` 常數（CHANGE_ME 佔位），
-  不再引用每日回報端點，佔位未填時登入直接被擋、零請求送出。
-- 結果：契約測試 70/70（新增 4 條：路由白名單恰為四個、doGet 隔離、隔離函式六情境行為、
-  前端端點分離）、Playwright 33/33（新增佔位守門＋卡片標示）。HANDOVER §11 改寫為
-  雙 Deployment 部署程序（含驗證與一鍵回滾）。**未建 PR、未合併、未部署。**
-- 經驗 / 給下一位的提醒：
-  1. **每日回報 Deployment 固定第 15 版**：貼新碼進編輯器不影響它；部署上傳功能時走
-     「部署 → **新增部署作業**」拿全新 /exec URL，**絕不要 ✏️ 編輯既有每日回報部署**。
-     回滾＝清空 `REPORT_UPLOAD_DEPLOYMENT_URL` ＋封存新部署，每日回報全程不受影響。
-  2. **隔離判斷靠 `ScriptApp.getService().getUrl()` 比對屬性**：時間觸發器沒有 getUrl，
-     函式以 try/catch 包住一律回 false，排程不受隔離影響（有行為測試）。
-  3. **上傳頁端點固定寫死、無任何瀏覽器儲存覆寫**（bde4c6b 事故後的資安基準）；
-     `window.__UPLOAD_GAS_URL_OVERRIDE__` 僅供 Playwright 在頁面載入前注入，正式頁不設。
-  4. 診斷結論（Liam 已確認）：kpi.html 與 index.html **不是同一正式資料來源**——
-     前者吃 GAS 排程產的 kpicalc JSON，後者吃 Liam 本機 Mac `report-automation` 產的
-     dashboard snapshot。7/31 未更新＝來源資料夾沒有 0731.xlsx ＋本機流程沒重跑，
-     不是程式壞掉。`Y26重點台獎手機.xlsx` 確認就是獎階表。
-  5. 綜合戰情一致化：建議**方案 A**（index.html KPI 頁籤改讀 kpicalc JSON，GAS 免部署、
-     不複製第二份真相），但 company_rank／DOD 欄位不存在於 kpicalc JSON，需 Liam 先接受取捨。
-     比較表在 HANDOVER §7.9。
-  6. 台獎雲端化仍缺：`Y26重點台獎手機.xlsx` 的獎階內容（工作表／欄位）、
-     `update_phone_awards.py` 原始碼（或欄位對照邏輯）、`difference` 規則確認。
-     拿到前不寫台獎解析器；本機發布流程照舊保留。
+## 2026-08-03 ｜ Claude（情報站新增「班表匯入」：不開試算表也能更新每月班表）
 
-## 2026-07-31 ｜ Claude（快速上傳去污染：從回復後的 main 重建乾淨分支，待 Liam 驗收）
+- **起因**：8 月班表資料備好後，Liam 回報**公司電腦連不到外網**，開不了 docs.google.com，
+  於是「把 TSV 貼進班表明細」這條路整條斷掉。但情報站本身連得到 GAS（畫面顯示已連線、
+  7 月班表讀得出來），所以正解是**在情報站裡補一個匯入區**，而不是想辦法把人弄進試算表。
+- **做了什麼**：
+  - `gas/Code.gs` 新增 `writeSchedule()` 與 doPost `action=swrite`，授權沿用
+    `ptCredentialAuthorized_(key, token)`，與巡店／半月媒體同一道邊界。
+  - `patrol.html`「每月班表」分頁新增「班表匯入」面板：貼上或選檔 → 檢查資料 → 確認匯入，
+    每 400 列一批送出，匯入完自動重讀班表，畫面即驗收結果。
+- **協定設計（重點）**：
+  - **第一批帶 `replace`**：先刪掉該月份既有明細再寫。所以**重跑同一個月不會變成兩份**，
+    修正資料重匯是安全的。其他月份完全不動。
+  - **最後一批帶 `finalize`**：由伺服器**自己數**實際列數與門市數再寫「班表版本」，
+    不採信前端回報的數字；同月份重匯是更新那一列而非長出第二列。
+  - `匯入時間` 一律由伺服器蓋掉，忽略用戶端送來的值。
+  - 匯入內容是使用者貼上的文字，開頭 `=` `+` `-` `@` 會被試算表當公式執行，
+    一律前置單引號（`scheduleSafeCell_`）。
+- **測試**：`tests/gas-schedule-write.test.cjs` 11 項（含刪除區段的列號位移、跨月份混入、
+  未授權、超量批次、版本列 upsert）＋ `tests/patrol-schedule-import.spec.js` 7 項端對端
+  （含重跑不重複、不動其他月份、中途失敗可重試）。**全數通過。**
+- **⚠️ 寫測試時自己踩的坑**：`scheduleRemoveMonth_` 由下往上刪的列號我一開始在**測試裡**算錯
+  （以為刪 (6,2)，實際是 (5,2)）——是測試預期錯、實作對。不連續區段必須分段刪且由下往上，
+  順序反了就會刪到別的月份，這段動之前務必先跑那支測試。
+- **Playwright 現況（給下一位，別誤判）**：`patrol.spec.js` 在這個環境本來就有失敗，
+  **基準版 origin/main 跑同樣範圍失敗 10 項、含本次改動失敗 8 項**，且是基準的子集，
+  次次執行還會浮動。其中 `:341` 的原因是 headless_shell 的
+  `download.suggestedFilename()` 回傳 `"download"`（07-31 那則已記載），**不是班表功能壞掉**。
+  判斷有無回歸請「先跑基準再比對」，不要看到紅字就回退。
+- **待 Liam 執行**：`gas/Code.gs` 貼進 GAS 編輯器 → 存檔 → **部署→管理部署作業→編輯→新版本→部署**
+  （動到 `doPost`，一定要重新部署，否則前端會收到 `unknown private dashboard action`）。
+  貼之前請照 CLAUDE.md 的鐵則自我驗證關鍵函式都在。
 
-- **背景**：`claude/quick-report-upload-feature-elyajz` 是從事故 commit `62cbe1e` 分出去的，
-  base 內含 `bde4c6b`，其 `index.html` 仍帶著「請輸入已核准裝置的員工編號」。
-  直接合併會讓當天的全門市中斷事故完整重演。
-- **做了什麼**：**不用盲目 rebase**。從回復後的 `origin/main`（`adf7542`）開
-  `claude/quick-report-upload-clean`，先逐一盤點原分支 6 個 commit，確認它們
-  **完全沒有動 `index.html`／`kpi.html`／`patrol.html`**，污染風險只集中在 `gas/Code.gs`。
-  再以 `git diff 62cbe1e..42e3036` 隔離出「純上傳變更」（此區間已排除 `bde4c6b`），
-  只把這份差異套到新 base，新檔案（`report-upload.html`、3 份 SPEC/FILE-MAP/HANDOVER
-  文件、2 支測試）直接取自原分支。**原分支保留不刪、不改寫，作為備份。**
-  原分支的 `docs/COLLAB-LOG.md` 刻意不搬——它基於事故版，搬過來會蓋掉事故紀錄。
-- **結果**：`index.html`／`kpi.html`／`patrol.html` 與 main **diff 為 0 行**；
-  `gas/Code.gs` 只新增 5 處（doPost 4 條 `report_upload_*` 路由、`kpiCalcPublish` 與
-  `privateDashboardPublish` 各 6 行只登記版本、`kpiCalcAutoUpdate` 19 行排程防覆蓋、
-  檔尾 824 行上傳模組）。`doGet`／`readData`／`writeData`／`readPersonal`／`writePersonal`／
-  `privateDashboardAccess`／`kpiCalcAccess`／`privateDashboardIsTrustedEmployee`
-  **逐函式 md5 與 main 完全相同**。全 repo 掃不到 `ensureReportSession`／`protectedGasPost`／
-  `reportSessionRequired_`／`report_auth` 任一個。
-  測試：Node 契約 **78/78**、`report-upload.spec.js` **31/31**、`app.spec.js` **30/30**。
-- **經驗 / 給下一位的提醒**：
-  1. **上傳功能的授權與每日回報是分開的，請維持這樣。** `reportUploadAuthorize_()` 走的是
-     `DASHBOARD_ADMIN_SECRET` ＋ `REPORT_UPLOAD_ALLOWED_EMPLOYEES` 白名單
-     （未設定時退回 `DASHBOARD_TRUSTED_EMPLOYEE_ID`），**完全不碰 `DashboardUsers` 裝置名冊**。
-     它只保護「上傳與發布」這個管理動作，不是登入閘門。
-  2. **命名沒有衝突但很接近，改的時候看清楚**：上傳模組是 `reportUpload*`／`reportVersion*`，
-     事故那組是 `reportSession*`／`report*Payload_`。前者可留，後者不可回來。
-  3. **`tests/patrol.spec.js` 在這個容器裡本來就不穩定**。實測 `origin/main` 原始碼連跑兩次，
-     失敗集合分別是 {341,365,545,783} 與 {341,365,525,535,783,798}，每次都不同。
-     其中 341／365 是 headless_shell 不回傳 `download.suggestedFilename()` 的固定環境問題。
-     **判斷回歸請單獨重跑該測試，不要只看一次全量結果就下結論。**
+---
+
+## 2026-08-03 ｜ Claude（Liam情報站 8 月班表：從圖片建檔匯入 `班表明細`）
+
+- **背景**：情報站「每月班表」線上只有 2026-07。8 月班表因含個資不便傳檔，Liam 改放
+  9 張門市班表圖片於 Drive `02_班表原始檔_每月`（`IMG_0091`~`IMG_0099`）。
+  既有的 `scripts/build_schedule_data.py` 只吃同步下來的 `.xls`，這條路走不通。
+- **關鍵作法：不靠 OCR 猜，改用「既有資料反推規則 + 來源表自帶檢核欄對帳」**
+  1. 先把試算表匯出 xlsx 讀 `班表明細` 7 月 1426 筆，反推兩條規則，**驗證 0 例外**：
+     - `出勤` = 否 if 班別為空或以 `V` 結尾，否則 是
+     - `值班主管` = 是 if 職務 ∈ {店長, 代理店長, 副店長} **且** 出勤=是
+     → 代表只需從圖片讀「班別格」，其餘 4 欄可決定性產生。
+  2. **姓名一律採用 7 月既有寫法**，不採 OCR。低解析度下 琪/璞、㮀/楠、恪/格
+     根本分不出來，但這些人多數是延續在職，7 月資料就是權威來源。
+  3. 每張圖右側有「各班別人數／上班人數／休假人數」欄，逐日對帳。
+     實際抓到一處誤讀（某店 8/4 的 `晚1` 被讀成 `晚2`），靠檢核欄修正。
+- **踩到的坑（記給下一位）**：
+  - **來源班表的 `開會/上課` 會被它自己的公式重複計數**。杭州 8/11 顯示「上班人數 6」
+    但全店只有 5 人；通化 8/11 同樣現象。是來源檔 COUNTIF 同時命中「開會」與「上課」，
+    **不是**我們讀錯。這兩列請以「全」欄為準。
+  - 圖片的表格幾何 9 張完全一致（日列 y243–925、每列 22px），先偵測橫線再切段
+    比目測分帶可靠得多；整張直接讀必定出錯。
+  - 圖上有電話與到職日，**一律不匯入**（`班表明細` 也沒有這些欄位）。
+- **結果**：產生 1364 列。**列數獨立驗算吻合**：7 月 1426 − 31（三創 11→10 人）
+  − 31（通化 6→5 人）= 1364。出勤/值班主管規則自檢 0 例外。
+  「無值班主管」的日子 8 月 11 天、7 月 6 天，屬常態排班結果，非匯入造成。
+- **人員異動（Liam 於 2026-08-03 確認無誤）**：
+  三創少 1 位工讀生；通化少 2 人、增 1 位銷售人員，該員即 7 月復興的銷售人員（確認為調店）；
+  復興新增 1 位業務代表——**7 月名冊沒有此人，OCR 中間字不可靠，姓名由 Liam 直接指定**。
+  這是本次唯一無法用既有資料交叉驗證的欄位，下次遇到新人一樣要問，不要自行判讀。
+- **交付與限制**：Claude **無法寫入既有試算表儲存格**（Drive 連接器只能讀取與新建檔案），
+  最後貼上「班表明細」與「班表版本」兩步必須由 Liam 執行。班表資料含全區同仁姓名，
+  **不進 repo**（repo 公開）；本次只提交轉檔工具 `scripts/build_schedule_rows.py`，
+  該檔不含任何個資，且已驗證輸出與交付檔位元組相同。
+- **順帶發現（未動）**：`gas/Code.gs:184` 註解寫「每月班表：現行資料端點免密碼」，
+  `sread` 走的就是那條，但班表含全區同仁姓名與出勤。與 07-29 恢復通行碼的意圖是否一致，
+  待 Liam 確認後再處理。
+
+---
 
 ## 2026-07-31 ｜ Claude（🚨 正式站全門市回報中斷事故：回復 bde4c6b 程式碼，保留事故文件）
 
