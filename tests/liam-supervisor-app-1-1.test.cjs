@@ -81,7 +81,7 @@ test('App recovery runtime keeps existing reads and disables half-month writes',
 
 test('Information architecture matches the App 1.2 acceptance surfaces', () => {
   const html = read('app.html');
-  for (const label of ['今日營運戰況','九店一覽','台獎總覽','戰情','每日回報','全區營運摘要','門市請益彙整','全區未過關彙整','九店完整班表','巡店檢查','系統狀態']) {
+  for (const label of ['今日營運戰況','九店一覽','台獎總覽','戰情','每日回報','昨日待追蹤','全區營運摘要','門市請益彙整','全區未過關彙整','九店完整班表','巡店檢查','系統狀態']) {
     assert.match(html, new RegExp(label));
   }
   assert.match(html, /data-battle-kind="kpi"/);
@@ -118,15 +118,17 @@ test('device UI scope keeps nine awards, removes Top cards and renders complete 
 test('PWA cache is versioned for App 1.2 and includes local icon library', () => {
   const html = read('app.html');
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-2-manager-semantics-phase1-20260814-v1/);
-  assert.match(html, /app\.css\?v=manager-semantics-phase1-20260814-1/);
+  assert.match(worker, /liam-supervisor-app-1-2-yesterday-follow-up-phase2-20260814-v1/);
+  assert.match(html, /app\.css\?v=yesterday-follow-up-phase2-20260814-1/);
   assert.match(html, /app-data-contract\.js\?v=emergency-rollback-20260813-1/);
   assert.match(html, /app-preview-data\.js\?v=emergency-rollback-20260813-1/);
   assert.match(html, /half-month-check-read-model\.js\?v=2/);
-  assert.match(html, /app\.js\?v=manager-semantics-phase1-20260814-1/);
+  assert.match(html, /yesterday-follow-up-model\.js\?v=yesterday-follow-up-phase2-20260814-1/);
+  assert.match(html, /app\.js\?v=yesterday-follow-up-phase2-20260814-1/);
   assert.match(html, /patrol-read-model\.js\?v=12/);
   assert.match(worker, /patrol-read-model\.js/);
   assert.match(worker, /half-month-check-read-model\.js/);
+  assert.match(worker, /yesterday-follow-up-model\.js/);
   assert.match(worker, /half-month-check-write-prep\.js/);
   assert.match(worker, /app-data-contract\.js/);
   assert.match(worker, /app-preview-data\.js/);

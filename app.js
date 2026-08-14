@@ -3,6 +3,7 @@
 
   const C = scope.LiamSupervisorContract;
   const H = scope.LiamHalfMonthCheckReadModel;
+  const Y = scope.LiamYesterdayFollowUpModel;
   const DAILY_REPORT_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
   const PATROL_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
   const PRIVATE_TIMEOUT_MS = 20_000;
@@ -27,6 +28,12 @@
   const STALE_MS = 30 * 60 * 60 * 1000;
 
   let contract = PREVIEW_MODE ? C.validateContract(scope.LiamSupervisorPreviewData) : emptyFormalContract();
+  let yesterdayFollowUpModule = PREVIEW_MODE && Y ? C.moduleState({
+    status:'ok', updatedAt:contract.report2100.updatedAt, sourceUpdatedAt:contract.report2100.sourceUpdatedAt, stale:false,
+    source:moduleSource('昨日 21:00 正式每日回報','index.html'),
+    data:Y.adapt({date:taipeiDateOffset(-1),report:contract.report2100.data}),
+    note:'Preview／示意資料'
+  }) : statusModule('yesterdayFollowUp');
   let reportSegment = 16;
   let battleKind = 'kpi';
   let battleScope = 'region';
@@ -63,6 +70,12 @@
 
   function taipeiDate() {
     return new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
+  }
+
+  function taipeiDateOffset(days) {
+    const anchor = new Date(`${taipeiDate()}T12:00:00+08:00`);
+    anchor.setTime(anchor.getTime() + Number(days || 0) * 86400000);
+    return new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit' }).format(anchor);
   }
 
   function nowIso() { return new Date().toISOString(); }
@@ -110,6 +123,7 @@
       awardSummary:moduleSource('正式台獎私有戰情','index.html'), awardStores:moduleSource('正式台獎私有戰情','index.html'), awardTop2Models:moduleSource('正式台獎私有戰情','index.html'),
       personalPerformance:moduleSource('正式 KPI 個績快照','index.html'),
       report1600:moduleSource('北一二B每日回報','index.html'), report2100:moduleSource('北一二B每日回報','index.html'), reportFailures:moduleSource('正式個人回報','index.html'),
+      yesterdayFollowUp:moduleSource('昨日 21:00 正式每日回報','index.html'),
       scheduleToday:moduleSource('既有班表 sread','patrol.html'), scheduleByDate:moduleSource('既有班表 sread','patrol.html'),
       patrolToday:moduleSource('巡店唯讀摘要','patrol.html'), patrolOverview:moduleSource('巡店 ptsummary','patrol.html'), patrolStores:moduleSource('巡店 ptsummary','patrol.html')
     };
@@ -225,6 +239,7 @@
 
   function resetPrivateSummary(status = 'unauthorized', note = '') {
     PRIVATE_MODULE_KEYS.forEach(key => { contract[key] = statusModule(key,status,null,note); });
+    yesterdayFollowUpModule=statusModule('yesterdayFollowUp',status,null,note);
     if (status === 'unauthorized') {
       contract.kpiStores = statusModule('kpiStores',status,[],note);
       contract.kpiFullMetrics = statusModule('kpiFullMetrics',status,{region:[],stores:{}},note);
@@ -248,8 +263,22 @@
     return statusModule(key,'error',null,note);
   }
 
+  function yesterdayLoadingModule() {
+    const current=yesterdayFollowUpModule;
+    if(current&&current.data!=null) return C.moduleState({...current,status:'stale',stale:true,note:`上次成功資料 · ${formatTime(current.updatedAt)} · 昨日 21:00 正式資料讀取中`});
+    return statusModule('yesterdayFollowUp','stale',null,'昨日 21:00 正式資料讀取中');
+  }
+
+  function yesterdayFailureModule(error) {
+    const current=yesterdayFollowUpModule;
+    const note=readErrorNote(error,'昨日 21:00 正式資料');
+    if(current&&current.data!=null) return C.moduleState({...current,status:'stale',stale:true,note:`上次成功資料 · ${formatTime(current.updatedAt)} · ${note}`});
+    return statusModule('yesterdayFollowUp','error',null,note);
+  }
+
   function failPrivateSummary(error) {
     PRIVATE_MODULE_KEYS.forEach(key=>{ contract[key]=privateFailureModule(key,error,'正式資料'); });
+    yesterdayFollowUpModule=yesterdayFailureModule(error);
     contract.generatedAt=nowIso();
   }
 
@@ -662,11 +691,13 @@
       report1600:privateLoadingModule('report1600','16:00 正式回報'), report2100:privateLoadingModule('report2100','21:00 正式回報'),
       reportFailures:privateLoadingModule('reportFailures','正式個人回報')
     });
+    yesterdayFollowUpModule=yesterdayLoadingModule();
     privateAccessStatus = 'approved';
     dom('#viewerState').textContent = privateResult.profile && privateResult.profile.maskedName ? privateResult.profile.maskedName : 'Approved';
     dom('#privateLogout').hidden = false;
     setPrivateAccessState('approved','Approved Device 已確認；各正式唯讀模組正在獨立載入。');
     renderAll();
+    loadYesterdayFollowUp(credential);
 
     const reportRows={16:null,21:null};
     const failureRows={};
@@ -713,6 +744,27 @@
     };
     await Promise.allSettled([kpiTask,reportTask(16),reportTask(21)]);
     setPrivateAccessState('approved','已由既有 Approved Device 完成正式唯讀模組載入。');
+  }
+
+  async function loadYesterdayFollowUp(credential) {
+    const date=taipeiDateOffset(-1);
+    try {
+      const [reportResult,peopleResult]=await Promise.all([
+        postReadOnly({action:'read',date,seg:21,...credential}),
+        postReadOnly({action:'pread',date,seg:21,...credential})
+      ]);
+      const report=adaptReport(21,reportResult.data,peopleResult.data,reportResult.summary);
+      const data=Y.adapt({date,report});
+      yesterdayFollowUpModule=C.moduleState({
+        status:data.formalDataAvailable?'ok':'no_data',updatedAt:nowIso(),sourceUpdatedAt:report.updatedAt,stale:false,
+        source:moduleSource('昨日 21:00 正式每日回報','index.html'),data,
+        note:data.formalDataAvailable?'':'昨日 21:00 尚無正式資料'
+      });
+    } catch(error) {
+      yesterdayFollowUpModule=yesterdayFailureModule(error);
+    }
+    contract.generatedAt=nowIso();
+    renderAll();
   }
 
   async function requestDeviceBinding(employeeId, bootstrapCode) {
@@ -860,6 +912,40 @@
     }).join('') : contract.todayOperations.status==='unauthorized'
       ? privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '正式回報摘要尚未解鎖')
       : `<div class="empty-state">${escapeHtml(contract.todayOperations.note||'正式回報讀取失敗')}</div>`;
+  }
+
+  const YESTERDAY_FEEDBACK_LABELS = [
+    ['reason','零報原因'],['consult','請益對象'],['method','改善做法'],['plan','明日計畫／後續追蹤']
+  ];
+
+  function renderYesterdayFeedback(feedback) {
+    const entries=YESTERDAY_FEEDBACK_LABELS
+      .map(([key,label])=>({label,value:String(feedback&&feedback[key]||'')}))
+      .filter(entry=>entry.value);
+    return entries.length?`<div class="yesterday-feedback">${entries.map(entry=>`<div><b>${escapeHtml(entry.label)}</b><p>${escapeHtml(entry.value)}</p></div>`).join('')}</div>`:'';
+  }
+
+  function renderYesterdayFollowUp() {
+    const module=yesterdayFollowUpModule;
+    const data=module&&module.data;
+    const home=dom('#yesterdayFollowUpHome');
+    const detail=dom('#yesterdayFollowUp');
+    if(!data||!data.formalDataAvailable) {
+      if(home) home.hidden=true;
+      if(detail) detail.innerHTML=`<div class="empty-state">${escapeHtml(data&&!data.formalDataAvailable?'昨日 21:00 尚無正式資料':module&&module.note||'昨日 21:00 正式資料讀取中')}</div>`;
+      return;
+    }
+    if(home) {
+      home.hidden=false;
+      home.innerHTML=`<button type="button" data-open-yesterday-followup><span><small>${escapeHtml(data.date)} · 21:00</small><b>昨日待追蹤</b></span><strong class="${data.trackingStoreCount?'negative':'positive'}">${data.trackingStoreCount} 店</strong><i data-lucide="chevron-right"></i></button>`;
+    }
+    if(!detail) return;
+    detail.innerHTML=`${staleBanner(module)}<div class="yesterday-summary">
+      <article><span>未過關店數</span><b>${data.failedStoreCount}</b></article>
+      <article><span>未過關人數</span><b>${data.failedPeopleCount}</b></article>
+      <article><span>有請益店數</span><b>${data.consultStoreCount}</b></article>
+      <article><span>需要追蹤店數</span><b>${data.trackingStoreCount}</b></article>
+    </div>${data.stores.length?`<div class="yesterday-store-list">${data.stores.map(store=>`<article class="yesterday-store-card"><h3>${escapeHtml(store.name)}</h3>${store.failedMetrics.length?`<p><b>未過關項目</b>${escapeHtml(store.failedMetrics.join('、'))}</p>`:''}${store.failedPeople.map(person=>`<div class="yesterday-person"><p><b>${escapeHtml(person.name)}</b>${escapeHtml(person.failed.join('、')||'正式未過關')}</p>${person.reason?`<p><b>未過原因</b>${escapeHtml(person.reason)}</p>`:''}${person.improvePlan?`<p><b>個人後續追蹤</b>${escapeHtml(person.improvePlan)}</p>`:''}</div>`).join('')}${renderYesterdayFeedback(store.storeFeedback)}</article>`).join('')}</div>`:'<div class="empty-state">昨日 21:00 無需追蹤店點。</div>'}`;
   }
 
   function renderKpiHero() {
@@ -1353,7 +1439,7 @@
   }
 
   function renderAll() {
-    renderHeader(); renderOperations(); renderKpiHero(); renderStores(); renderAwardsHome(); renderScheduleHome(); renderPatrolHome();
+    renderHeader(); renderOperations(); renderYesterdayFollowUp(); renderKpiHero(); renderStores(); renderAwardsHome(); renderScheduleHome(); renderPatrolHome();
     renderBattle(); renderReport(); renderPatrol(); renderSchedule(); renderSystemStatus(); refreshIcons();
   }
 
@@ -1640,6 +1726,7 @@
     const scheduleButton=event.target.closest('[data-toggle-home-schedule]'); if(scheduleButton){ const card=scheduleButton.closest('#scheduleHome'); const expanded=card.classList.toggle('expanded'); scheduleButton.setAttribute('aria-expanded',String(expanded)); scheduleButton.querySelector('span').textContent=expanded?'收合當日班表':'顯示九店當日班表'; return; }
     const operationButton=event.target.closest('[data-toggle-operation]'); if(operationButton){ const item=operationButton.closest('.operation-item'); item.classList.toggle('expanded'); operationButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
     const reportButton=event.target.closest('[data-open-report]'); if(reportButton){ reportSegment=Number(reportButton.dataset.openReport); all('[data-report-segment]').forEach(button=>button.classList.toggle('active',Number(button.dataset.reportSegment)===reportSegment)); setView('report'); renderReport(); return; }
+    const yesterdayButton=event.target.closest('[data-open-yesterday-followup]'); if(yesterdayButton){ setView('report'); renderYesterdayFollowUp(); scope.setTimeout(()=>dom('#yesterdayFollowUpPanel').scrollIntoView({block:'start',behavior:'smooth'}),0); return; }
     const awardLink=event.target.closest('[data-open-awards]'); if(awardLink){ event.preventDefault(); battleKind='award'; battleScope='region'; all('[data-battle-kind]').forEach(button=>button.classList.toggle('active',button.dataset.battleKind==='award')); all('[data-battle-scope]').forEach(button=>button.classList.toggle('active',button.dataset.battleScope==='region')); setView('battle'); renderBattle(); return; }
     const storeButton=event.target.closest('.store-row'); if(storeButton){ const item=storeButton.closest('.store-item'); item.classList.toggle('expanded'); storeButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
     const personalButton=event.target.closest('.personal-performance-button'); if(personalButton){ const item=personalButton.closest('.personal-performance-item'); item.classList.toggle('expanded'); personalButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
@@ -1669,5 +1756,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=emergency-rollback-20260813-1',{scope:'./'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=yesterday-follow-up-phase2-20260814-1',{scope:'./'}).catch(()=>{}));
 })(window);

@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
-  <link rel="stylesheet" href="app.css?v=manager-semantics-phase1-20260814-1">
+  <link rel="stylesheet" href="app.css?v=yesterday-follow-up-phase2-20260814-1">
   <title>Liam Supervisor App 1.2</title>
 </head>
 <body>
@@ -38,6 +38,7 @@
           <h2 id="operationsTitle" class="sr-only">16:00 與 21:00 回報狀態</h2>
           <div id="operationsRows" class="operations-rows"></div>
         </section>
+        <section id="yesterdayFollowUpHome" class="panel yesterday-follow-up-home" hidden></section>
 
         <section id="kpiHero" class="panel kpi-hero" aria-label="北一二B KPI 摘要"></section>
 
@@ -67,6 +68,7 @@
       <section data-view="report" hidden aria-label="回報">
         <div class="view-heading"><div><p>DAILY OPERATIONS</p><h1>每日回報</h1></div><a class="icon-button" href="index.html" aria-label="開啟完整每日回報系統"><i data-lucide="external-link"></i></a></div>
         <div class="segment-control report-segment" role="tablist" aria-label="回報時段"><button class="active" data-report-segment="16" type="button">16:00</button><button data-report-segment="21" type="button">21:00</button></div>
+        <section id="yesterdayFollowUpPanel" class="panel yesterday-follow-up-panel"><div class="panel-head"><div><h2>昨日待追蹤</h2><small>台北昨日 · 僅讀正式 21:00</small></div></div><div id="yesterdayFollowUp"></div></section>
         <div id="reportOverview"></div>
         <section class="panel report-operations-panel"><div class="panel-head"><div><h2>全區營運摘要</h2><small>正式來源欄位，App 不重算</small></div></div><div id="reportOperations"></div></section>
         <section class="panel report-feedback-panel"><div class="panel-head"><div><h2>門市請益彙整</h2><small>只顯示此時段正式來源原文</small></div></div><div id="reportFeedbackSummary"></div></section>
@@ -157,6 +159,7 @@
   <script src="app-preview-data.js?v=emergency-rollback-20260813-1"></script>
   <script src="patrol-read-model.js?v=12"></script>
   <script src="half-month-check-read-model.js?v=2"></script>
-  <script src="app.js?v=manager-semantics-phase1-20260814-1" defer></script>
+  <script src="yesterday-follow-up-model.js?v=yesterday-follow-up-phase2-20260814-1"></script>
+  <script src="app.js?v=yesterday-follow-up-phase2-20260814-1" defer></script>
 </body>
 </html>
