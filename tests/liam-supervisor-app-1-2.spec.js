@@ -75,8 +75,16 @@ test('App 1.2 personal area groups formal roles, filters under-target metrics an
   await expect(page.locator('#battleContent')).toContainText('R1399 未達');
 
   await page.locator('[data-battle-scope="store"]').click();
+  await page.locator('#battleStoreSelect').selectOption('永吉');
   await expect(page.locator('.personal-region-controls')).toHaveCount(0);
-  await expect(page.locator('#battleContent .personal-performance-item')).toHaveCount(1);
+  await expect(page.locator('#battleContent')).toContainText('店長管理資訊');
+  await expect(page.locator('.manager-store-performance')).toHaveCount(1);
+  await expect(page.locator('.manager-store-performance')).toContainText('店 KPI');
+  await expect(page.locator('.manager-store-performance')).toContainText('AQ');
+  await expect(page.locator('.manager-store-performance')).not.toContainText('總績效');
+  await expect(page.locator('.manager-store-performance')).not.toContainText('0.0%');
+  await expect(page.locator('.personal-performance-panel').nth(1)).toContainText('副店／其他業代正式個績');
+  await expect(page.locator('.personal-performance-panel').nth(1).locator('.manager-store-performance')).toHaveCount(0);
   await expectMobileSafe(page);
   expect(errors).toEqual([]);
 });

@@ -521,6 +521,7 @@ body { font-size:16px; }
 .personal-performance-item:last-child { border-bottom:0; }
 .personal-performance-button { position:relative; display:grid; grid-template-columns:minmax(108px,1fr) minmax(76px,.68fr); gap:7px 10px; width:100%; min-height:92px; padding:10px 38px 10px 13px; border:0; color:var(--text); background:transparent; text-align:left; }
 .manager-store-row { display:grid; grid-template-columns:minmax(108px,1fr) minmax(76px,.68fr); gap:7px 10px; min-height:92px; padding:10px 13px; }
+.manager-store-panel { margin-bottom:12px; }
 .personal-performance-button > svg { position:absolute; top:50%; right:11px; width:20px; height:20px; margin-top:-10px; color:var(--muted); transition:transform .18s ease; }
 .personal-performance-item.expanded .personal-performance-button > svg { transform:rotate(180deg); }
 .personal-primary,.personal-rate { min-width:0; }

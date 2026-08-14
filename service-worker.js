@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-2-canonical-source-identity-20260814-v1';
+const CACHE_NAME = 'liam-supervisor-app-1-2-manager-semantics-phase1-20260814-v1';
 const SHELL = [
   './app.html',
   './app.css',
