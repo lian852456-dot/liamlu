@@ -69,7 +69,24 @@ test('yesterday loading is independent from current 16:00 and 21:00 report tasks
   assert.doesNotMatch(app,/await loadYesterdayFollowUp\(credential\)/);
   assert.match(html,/id="yesterdayFollowUpHome"/);
   assert.match(html,/id="yesterdayFollowUpPanel"/);
-  assert.match(html,/僅讀正式 21:00/);
+  assert.match(html,/昨日正式 21:00/);
+});
+
+test('today report controls and yesterday follow-up are separate visual sections', () => {
+  const todayStart=html.indexOf('id="reportTodaySection"');
+  const yesterdayStart=html.indexOf('id="yesterdayFollowUpPanel"');
+  assert.ok(todayStart > -1);
+  assert.ok(yesterdayStart > todayStart);
+  const todayMarkup=html.slice(todayStart,yesterdayStart);
+  for(const id of ['reportOverview','reportOperations','reportFeedbackSummary','reportFailures','reportStoreList']) {
+    assert.match(todayMarkup,new RegExp(`id="${id}"`));
+  }
+  assert.doesNotMatch(todayMarkup,/id="yesterdayFollowUp"/);
+  assert.match(html,/id="reportTodayTitle">今日回報/);
+  assert.match(html,/昨日正式 21:00 · 不受今日時段切換影響/);
+  const binding=app.split('\n').find(line=>line.includes("all('[data-report-segment]')")&&line.includes('addEventListener')) || '';
+  assert.match(binding,/renderReport\(\)/);
+  assert.doesNotMatch(binding,/renderYesterdayFollowUp/);
 });
 
 test('feature remains read-only and does not add backend or native behavior', () => {

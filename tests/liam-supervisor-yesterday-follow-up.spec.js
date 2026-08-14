@@ -22,6 +22,15 @@ test('yesterday follow-up renders formal 21:00 fields without mobile overflow',a
   await expect(page.locator('#yesterdayFollowUp')).toContainText('21:00 示意改善做法');
   await expect(page.locator('#yesterdayFollowUp')).toContainText('21:00 示意明日計劃');
   await expect(page.locator('#yesterdayFollowUp')).toContainText('個人後續追蹤');
+  const yesterdayBefore=await page.locator('#yesterdayFollowUp').innerText();
+  await page.locator('[data-report-segment="16"]').click();
+  await expect(page.locator('[data-report-segment="16"]')).toHaveClass(/active/);
+  expect(await page.locator('#yesterdayFollowUp').innerText()).toBe(yesterdayBefore);
+  await page.locator('[data-report-segment="21"]').click();
+  await expect(page.locator('[data-report-segment="21"]')).toHaveClass(/active/);
+  expect(await page.locator('#yesterdayFollowUp').innerText()).toBe(yesterdayBefore);
+  await expect(page.locator('#reportTodaySection')).toContainText('今日回報');
+  await expect(page.locator('#yesterdayFollowUpPanel')).toContainText('昨日正式 21:00');
   const mobile=await page.evaluate(()=>({
     overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
     shortTargets:Array.from(document.querySelectorAll('[data-view]:not([hidden]) button')).filter(node=>node.getBoundingClientRect().height<44).map(node=>node.textContent.trim()),

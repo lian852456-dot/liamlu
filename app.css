@@ -506,6 +506,14 @@ body { font-size:16px; }
 .report-store-operation-grid small { color:var(--muted); font-size:14px; line-height:1.35; }
 .report-store-operation-grid b { margin-top:4px; font-size:17px; font-variant-numeric:tabular-nums; }
 .report-feedback-panel { padding-bottom:12px; }
+.report-day-section { margin-bottom:16px; }
+.report-day-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; padding:13px; border:1px solid #27718e; border-radius:14px; background:linear-gradient(135deg,#0b2c47,#092139); }
+.report-day-heading h2,.report-day-heading small { display:block; margin:0; }
+.report-day-heading h2 { font-size:21px; }
+.report-day-heading small { margin-top:4px; color:var(--muted); font-size:14px; line-height:1.4; }
+.report-day-badge { flex:0 0 auto; padding:5px 8px; border:1px solid #42c9ed66; border-radius:999px; color:var(--cyan); background:#071c2d; font-size:12px; font-weight:900; letter-spacing:.08em; }
+.report-day-badge.yesterday { border-color:#ffc44d66; color:var(--gold); }
+.report-today-section > .report-segment { margin-bottom:12px; }
 .report-feedback-list { display:grid; gap:8px; padding:0 13px; }
 .report-feedback-card { padding:11px; border:1px solid var(--line-soft); border-radius:12px; background:#092139; }
 .report-feedback-card h3,.report-store-feedback h3 { margin:0 0 9px; font-size:16px; }
@@ -521,7 +529,7 @@ body { font-size:16px; }
 .yesterday-follow-up-home span small { color:var(--muted); font-size:14px; }
 .yesterday-follow-up-home span b { margin-top:3px; font-size:17px; }
 .yesterday-follow-up-home strong { font-size:20px; font-variant-numeric:tabular-nums; }
-.yesterday-follow-up-panel { margin-bottom:12px; padding-bottom:12px; scroll-margin-top:86px; }
+.yesterday-follow-up-panel { margin:0 0 12px; padding-bottom:12px; border-color:#8a713d; background:linear-gradient(180deg,#13243a,#081b2e); scroll-margin-top:86px; }
 .yesterday-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:0 13px 12px; }
 .yesterday-summary article { min-width:0; min-height:78px; padding:10px; border:1px solid var(--line-soft); border-radius:11px; background:#092139; }
 .yesterday-summary span,.yesterday-summary b { display:block; }

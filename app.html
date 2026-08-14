@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
-  <link rel="stylesheet" href="app.css?v=yesterday-follow-up-phase2-20260814-1">
+  <link rel="stylesheet" href="app.css?v=daily-report-separation-phase2-1-20260814-1">
   <title>Liam Supervisor App 1.2</title>
 </head>
 <body>
@@ -67,14 +67,17 @@
 
       <section data-view="report" hidden aria-label="回報">
         <div class="view-heading"><div><p>DAILY OPERATIONS</p><h1>每日回報</h1></div><a class="icon-button" href="index.html" aria-label="開啟完整每日回報系統"><i data-lucide="external-link"></i></a></div>
-        <div class="segment-control report-segment" role="tablist" aria-label="回報時段"><button class="active" data-report-segment="16" type="button">16:00</button><button data-report-segment="21" type="button">21:00</button></div>
-        <section id="yesterdayFollowUpPanel" class="panel yesterday-follow-up-panel"><div class="panel-head"><div><h2>昨日待追蹤</h2><small>台北昨日 · 僅讀正式 21:00</small></div></div><div id="yesterdayFollowUp"></div></section>
-        <div id="reportOverview"></div>
-        <section class="panel report-operations-panel"><div class="panel-head"><div><h2>全區營運摘要</h2><small>正式來源欄位，App 不重算</small></div></div><div id="reportOperations"></div></section>
-        <section class="panel report-feedback-panel"><div class="panel-head"><div><h2>門市請益彙整</h2><small>只顯示此時段正式來源原文</small></div></div><div id="reportFeedbackSummary"></div></section>
-        <section class="panel report-failure-panel"><div class="panel-head"><div><h2>全區未過關彙整</h2><small>沿用正式回報結果，不在 App 推算</small></div></div><div id="reportFailures"></div></section>
-        <section class="panel report-store-panel"><div class="panel-head"><div><h2>九店回報</h2><small>點店展開個人內容</small></div></div><div id="reportStoreList"></div></section>
-        <a class="source-button" href="index.html">開啟完整每日回報系統 <i data-lucide="external-link"></i></a>
+        <section id="reportTodaySection" class="report-day-section report-today-section" aria-labelledby="reportTodayTitle">
+          <header class="report-day-heading"><div><h2 id="reportTodayTitle">今日回報</h2><small>台北今日 · 時段切換只影響今日資料</small></div><span class="report-day-badge">TODAY</span></header>
+          <div class="segment-control report-segment" role="tablist" aria-label="今日回報時段"><button class="active" data-report-segment="16" type="button">16:00</button><button data-report-segment="21" type="button">21:00</button></div>
+          <div id="reportOverview"></div>
+          <section class="panel report-operations-panel"><div class="panel-head"><div><h2>全區營運摘要</h2><small>今日正式來源欄位，App 不重算</small></div></div><div id="reportOperations"></div></section>
+          <section class="panel report-feedback-panel"><div class="panel-head"><div><h2>今日門市請益彙整</h2><small>只顯示所選今日時段正式來源原文</small></div></div><div id="reportFeedbackSummary"></div></section>
+          <section class="panel report-failure-panel"><div class="panel-head"><div><h2>今日全區未過關彙整</h2><small>沿用所選今日時段正式回報結果</small></div></div><div id="reportFailures"></div></section>
+          <section class="panel report-store-panel"><div class="panel-head"><div><h2>今日九店回報</h2><small>點店展開今日個人內容</small></div></div><div id="reportStoreList"></div></section>
+          <a class="source-button" href="index.html">開啟完整每日回報系統 <i data-lucide="external-link"></i></a>
+        </section>
+        <section id="yesterdayFollowUpPanel" class="panel yesterday-follow-up-panel" aria-labelledby="yesterdayFollowUpTitle"><div class="panel-head"><div><h2 id="yesterdayFollowUpTitle">昨日待追蹤</h2><small>昨日正式 21:00 · 不受今日時段切換影響</small></div><span class="report-day-badge yesterday">YESTERDAY</span></div><div id="yesterdayFollowUp"></div></section>
       </section>
 
       <section data-view="schedule" hidden aria-label="班表">
@@ -160,6 +163,6 @@
   <script src="patrol-read-model.js?v=12"></script>
   <script src="half-month-check-read-model.js?v=2"></script>
   <script src="yesterday-follow-up-model.js?v=yesterday-follow-up-phase2-20260814-1"></script>
-  <script src="app.js?v=yesterday-follow-up-phase2-20260814-1" defer></script>
+  <script src="app.js?v=daily-report-separation-phase2-1-20260814-1" defer></script>
 </body>
 </html>
