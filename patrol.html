@@ -134,6 +134,8 @@
   .parse-msg{font-size:13px;margin-top:10px;padding:8px 12px;border-radius:8px;display:none}
   .parse-msg.ok{background:var(--ok-bg);color:var(--ok);display:block}
   .parse-msg.err{background:var(--miss-bg);color:var(--miss);display:block}
+  .patrol-paste-preview{margin-top:10px;padding:10px 12px;border:1px solid #b8d9ff;border-radius:8px;background:#f1f7ff;color:#174b75;font-size:13px;line-height:1.55}
+  .patrol-paste-preview strong{display:block;font-size:14px}
 
   /* Store cards */
   .section-title{font-size:16px;font-weight:800;margin:22px 0 12px;color:var(--tw-black);display:flex;align-items:center;gap:10px}
@@ -484,6 +486,7 @@
       <button class="btn-ghost" onclick="clearAll()">清空全部資料</button>
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
     </div>
+    <div class="patrol-paste-preview" id="patrolPastePreview" hidden></div>
     <div class="parse-msg" id="parseMsg"></div>
   </div>
 
@@ -654,7 +657,8 @@ const ITEM_TEXT = {
 /* ---------- 資料儲存（記憶體） ---------- */
 // records: { "storeName": { code, entries:[{date, half, item, result}] } }
 let records = {};
-// rawDetails: 完整明細陣列，供上傳雲端與匯出（每筆一列）
+// rawDetails: 本頁貼上／匯入的去重候選明細，供上傳、匯出與里程預覽。
+// 正式巡店大盤只以 patrolSummary（ptsummary）為準，不得以這個局部批次取代。
 let rawDetails = [];
 let currentMonth = "";
 let patrolSummary = null;
@@ -925,6 +929,60 @@ function initMonth(){
   mi.addEventListener('change', e=>{ currentMonth=e.target.value; if(cloudOn) cloudLoad(); else render(); });
 }
 
+function normalizePatrolCandidateTime(value){
+  const text=String(value||'').trim();
+  const match=text.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})(?:[T\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if(!match) return text.replace(/\s+/g,' ');
+  const date=`${match[1]}/${Number(match[2])}/${Number(match[3])}`;
+  if(match[4]==null) return date;
+  const time=`${String(Number(match[4])).padStart(2,'0')}:${String(Number(match[5])).padStart(2,'0')}`;
+  return match[6]==null?`${date} ${time}`:`${date} ${time}:${String(Number(match[6])).padStart(2,'0')}`;
+}
+
+function normalizePatrolCandidateStoreText(value){
+  return String(value||'').trim().replace(/\s+/g,'').replace(/^台灣大哥大數位生活/,'').replace(/^台北/,'');
+}
+
+function canonicalPatrolCandidateStore(row){
+  const code=String(row&&row.code||'').trim();
+  const store=String(row&&row.store||'').trim();
+  const byCode=code&&STORES.find(item=>String(item.code||'').trim()===code);
+  if(byCode) return String(byCode.name||'').trim();
+  const storeKey=normalizePatrolCandidateStoreText(store);
+  const byName=STORES.find(item=>normalizePatrolCandidateStoreText(item.name)===storeKey);
+  return byName?String(byName.name||'').trim():(storeKey||code);
+}
+
+function patrolCandidateKey(row){
+  const item=Number(row&&row.item);
+  const itemKey=Number.isFinite(item)?String(item):String(row&&row.item||'').trim();
+  return [normalizePatrolCandidateTime(row&&row.fillTime),canonicalPatrolCandidateStore(row),itemKey].join('|');
+}
+
+function mergePatrolCandidates(rows){
+  const index=new Map();
+  const merged=rawDetails.slice();
+  merged.forEach((row,i)=>index.set(patrolCandidateKey(row),i));
+  const addedRows=[];const writeRows=[];let duplicates=0;
+  (rows||[]).forEach(row=>{
+    const key=patrolCandidateKey(row);
+    if(index.has(key)){
+      duplicates++;
+      return;
+    }
+    index.set(key,merged.length);merged.push(row);addedRows.push(row);writeRows.push(row);
+  });
+  rawDetails=merged;
+  rebuildFromRaw();
+  return {addedRows,writeRows,duplicates,total:rawDetails.length};
+}
+
+function showPatrolPastePreview(label,result){
+  const preview=document.getElementById('patrolPastePreview');if(!preview)return;
+  preview.hidden=false;
+  preview.innerHTML=`<strong>${label}：${result.addedRows.length} 筆</strong>本頁去重候選共 ${result.total} 筆${result.duplicates?`・略過重複 ${result.duplicates} 筆`:''}<br>正式摘要仍以雲端 ptsummary 為準。`;
+}
+
 /* ---------- 解析貼上資料 ---------- */
 function parseData(){
   const raw = document.getElementById('pasteBox').value;
@@ -962,11 +1020,6 @@ function parseData(){
     if(result==='v') cell='v';
     else if(reason==='na') cell='na';
 
-    // 供看板判定用的精簡結構
-    if(!records[store]) records[store]={code, entries:[]};
-    if(code && !records[store].code) records[store].code=code;
-    records[store].entries.push({month:monthKey, date:`${y}/${mo}/${d}`, half, item:itemNo, result:cell});
-
     // 供雲端與匯出用的完整明細
     newDetails.push({
       fillTime, arriveTime, leaveTime, district, code, store, inspector,
@@ -976,9 +1029,9 @@ function parseData(){
   });
 
   if(added>0){
-    rawDetails = rawDetails.concat(newDetails);
-    patrolSummaryState='local';
+    const mergeResult=mergePatrolCandidates(newDetails);
     document.getElementById('pasteBox').value='';
+    showPatrolPastePreview('本次貼上',mergeResult);
 
     // 先報「已解析」，即使接下來看板渲染出錯，使用者也知道資料已收下、正在處理。
     showMsg(cloudOn
@@ -990,13 +1043,15 @@ function parseData(){
     try{ render(); }
     catch(err){ renderErr=err; console.error('Patrol render failed:', err); }
 
-    if(cloudOn){
+    if(cloudOn && mergeResult.writeRows.length){
       // 雲端的成功／失敗訊息會覆蓋上面的「正在……」；render 出錯時一併回報。
-      cloudWrite(newDetails, renderErr);
+      cloudWrite(mergeResult.writeRows, renderErr);
+    } else if(cloudOn) {
+      showMsg(`本次貼上沒有新候選（新增 0 筆，略過重複 ${mergeResult.duplicates} 筆）；正式摘要維持不變`, 'ok');
     } else if(renderErr){
       showMsg(`資料已解析，但看板更新失敗：${renderErr.message||renderErr}`, 'err');
     } else {
-      showMsg(`已解析 ${added} 筆檢核紀錄，追蹤看板已更新`, 'ok');
+      showMsg(`已解析 ${added} 筆檢核紀錄；本頁候選已更新，正式摘要維持不變`, 'ok');
     }
   } else {
     showMsg('未解析到有效資料，請確認貼上的是明細表（Tab分隔）','err');
@@ -1025,7 +1080,9 @@ function showMsg(t,type){
 
 function clearAll(){
   if(confirm('確定清空所有已貼上的巡店紀錄？（雲端資料不受影響，重新載入即可還原）')){
-    records={}; rawDetails=[]; render();
+    records={}; rawDetails=[];
+    const preview=document.getElementById('patrolPastePreview');if(preview){preview.hidden=true;preview.textContent='';}
+    render();
     showMsg('已清空本地資料','ok');
   }
 }
@@ -1049,10 +1106,13 @@ function importData(e){
   reader.onload=ev=>{
     try{
       const data=JSON.parse(ev.target.result);
-      if(Array.isArray(data)){ rawDetails=data; patrolSummaryState='local'; rebuildFromRaw(); }
+      if(Array.isArray(data)){
+        const mergeResult=mergePatrolCandidates(data);
+        showPatrolPastePreview('本次匯入',mergeResult);
+      }
       else { records=data; } // 相容舊格式
       render();
-      showMsg('已匯入存檔','ok');
+      showMsg('已匯入本頁候選；正式摘要維持不變','ok');
     }catch(err){
       showMsg('匯入失敗，檔案格式不正確','err');
     }
@@ -1447,12 +1507,15 @@ function cloudConnect(){
   });
 }
 
-function cloudLoad(){
-  if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN) return;
+function cloudLoad(options={}){
+  if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN) return Promise.resolve(false);
+  const afterWrite=Boolean(options.afterWrite);
+  const writeMessage=String(options.writeMessage||'資料已同步雲端');
+  const priorRenderError=options.renderErr||null;
   patrolSummaryState=patrolSummary?'stale':'loading';
   patrolSummaryMessage=patrolSummary?`上次成功資料 · ${patrolSummaryVerifiedAt} · 正在更新`:'巡店資料讀取中';
-  render();
-  cloudCall('ptsummary',{month:currentMonth}).then(res=>{
+  try{render();}catch(error){console.error('Patrol render failed:',error);}
+  return cloudCall('ptsummary',{month:currentMonth}).then(res=>{
     if(res.status==='ok'){
       // 套用各區自己的設定（GAS 的 PT_STORES / PT_TITLE），沒回傳就用預設
       if(Array.isArray(res.stores) && res.stores.length){
@@ -1464,18 +1527,26 @@ function cloudLoad(){
       patrolSummaryState='ok';
       patrolSummaryMessage='';
       patrolSummaryVerifiedAt=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-      render();
-      showMsg(`巡店摘要已更新 · ${patrolSummary.visitedStores}/${patrolSummary.totalStores} 店`,'ok');
+      let renderError=priorRenderError;
+      try{render();}catch(error){renderError=renderError||error;console.error('Patrol render failed:',error);}
+      if(renderError){
+        showMsg(`${afterWrite?writeMessage+'；':''}正式摘要已更新，但看板更新失敗：${renderError.message||renderError}`,'err');
+      }else{
+        showMsg(afterWrite?`${writeMessage}；正式摘要已更新 · ${patrolSummary.visitedStores}/${patrolSummary.totalStores} 店`:`巡店摘要已更新 · ${patrolSummary.visitedStores}/${patrolSummary.totalStores} 店`,'ok');
+      }
+      return true;
     }else if(res.reauthFailed){
       showMsg(PATROL_REAUTH_MESSAGE,'err');
+      return false;
     }else{
       throw new Error(res.message||'巡店摘要讀取失敗');
     }
   }).catch(error=>{
     patrolSummaryState=patrolSummary?'stale':'error';
     patrolSummaryMessage=String(error&&error.message||'巡店資料讀取失敗');
-    render();
-    showMsg(patrolSummaryMessage,'err');
+    try{render();}catch(renderError){console.error('Patrol render failed:',renderError);}
+    showMsg(afterWrite?`${writeMessage}，但正式摘要更新失敗：${patrolSummaryMessage}；保留上次成功正式摘要`:patrolSummaryMessage,'err');
+    return false;
   });
 }
 
@@ -1516,15 +1587,11 @@ function cloudWrite(details, renderErr){
   let written = 0, chain = Promise.resolve();
   chunks.forEach(c=>{ chain = chain.then(()=>sendChunk(c, 0)).then(n=>{ written += n; }); });
   chain.then(()=>{
-    // JSONP 已收到 ptwrite 成功回覆，保留目前解析出的明細。
-    // 不在此時立刻重讀，避免 Apps Script 讀取落後寫入時，把剛貼上的資料覆蓋成舊資料。
-    if(renderErr){
-      // 資料有進雲端，但本機看板沒畫出來——用紅字提醒且不自動消失，避免使用者以為完全失敗。
-      showMsg(`資料已同步雲端（新增 ${written} 筆），但看板更新失敗：${renderErr.message||renderErr}（重新整理即可還原看板）`,'err');
-    } else {
-      showMsg(`已同步至雲端（新增 ${written} 筆，重複資料自動略過）`,'ok');
-    }
-  }).catch(err=>showMsg(err?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端寫入失敗：${err.message}（資料仍在本頁看板，請重新整理後把完整明細整份重貼一次補齊）`,'err'));
+    // 本頁候選只供寫入與預覽；正式大盤必須重新讀取 server ptsummary，絕不以局部批次重算。
+    const writeMessage=`已同步至雲端（新增 ${written} 筆，重複資料自動略過）`;
+    showMsg(`${writeMessage}；正在更新正式摘要……`,'ok');
+    return cloudLoad({afterWrite:true,writeMessage,renderErr});
+  }).catch(err=>showMsg(err?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端寫入失敗：${err.message}；本頁候選仍保留，正式摘要維持上次成功資料`,'err'));
 }
 
 function setCloudStatus(text, on){

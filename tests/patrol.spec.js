@@ -189,6 +189,26 @@ function currentMonthFixture(day, store, code, item, result, reason) {
   };
 }
 
+function item18EightStoreRows() {
+  return [
+    ['2026/7/6 15:44', '台北大稻埕', 'DNB10284'],
+    ['2026/7/13 18:27', '台北三創', 'DNB10307'],
+    ['2026/7/14 18:28', '台北萬大', 'DNB10xxx_wanda'],
+    ['2026/7/16 19:24', '台北酒泉', 'DNB10062'],
+    ['2026/7/27 17:51', '台北六張犁', 'DNB10440'],
+    ['2026/8/4 18:14', '台北復興南', 'DNB10094'],
+    ['2026/8/5 19:33', '台北杭州南', 'DNB10146'],
+    ['2026/8/10 17:30', '台北永吉', 'DNB10082'],
+  ].map(([fillTime, store, code]) => ({
+    fillTime, arriveTime:fillTime, leaveTime:fillTime, district:'北一二B', code, store,
+    inspector:'測試督導', item:18, result:'v', reason:'', month:fillTime.startsWith('2026/7/')?'2026-07':'2026-08',
+  }));
+}
+
+function item18Panel(page) {
+  return page.locator('#invPanels .panel').filter({ hasText:'到店全盤提醒' });
+}
+
 test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; });
 
 test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
@@ -242,9 +262,11 @@ test('重複貼上同一批資料，雲端自動去重', async ({ page }) => {
 
   await page.fill('#pasteBox', line);
   await page.click('button.btn-primary');
-  await expect.poll(() => writeCalls).toBeGreaterThan(callsAfterFirst);
-  await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+  await expect(page.locator('#parseMsg')).toHaveText(/沒有新候選/);
+  expect(writeCalls).toBe(callsAfterFirst);
   expect(cloudRows.length).toBe(1);
+  await expect(page.locator('#patrolPastePreview')).toContainText('本次貼上：0 筆');
+  await expect(page.locator('#patrolPastePreview')).toContainText('本頁去重候選共 1 筆');
 });
 
 // ── 解析狀態訊息與雲端同步防呆（2026-08-03 修 showMsg inline display:none 蓋住訊息）──
@@ -324,24 +346,116 @@ test.describe('解析狀態訊息', () => {
   });
 });
 
-test('貼上明細後切到督導檢查大盤不會用舊雲端資料覆蓋', async ({ page }) => {
-  // 雲端原先只有酒泉的一筆；通化是這次剛貼上的新明細。
-  cloudRows = [
-    { fillTime: '2026/7/1 16:43', arriveTime: '2026/7/1 16:00', leaveTime: '2026/7/1 18:00', district: '北一二B', code: 'DNB10062', store: '台北酒泉', inspector: '測試督導', item: 14, result: 'v', reason: '', month: '2026-07' },
-  ];
+test('貼上明細後切到督導檢查大盤仍使用 fresh ptsummary', async ({ page }) => {
+  cloudRows = item18EightStoreRows();
   await stubGas(page);
   await openAndUnlock(page);
-  await expect(page.locator('#parseMsg')).toHaveText(/巡店摘要已更新 · 0\/9 店/);
+  await expect(item18Panel(page)).toContainText('8/9 店完成');
 
-  await page.fill('#pasteBox', pasteLine(5, '台北通化', 'DNB10059', 14, 'v', ''));
+  const julyOnly = item18EightStoreRows().slice(0, 3).map(row =>
+    `${row.fillTime}\t${row.arriveTime}\t${row.leaveTime}\t${row.district}\t${row.code}\t${row.store}\t${row.inspector}\t18\t內容\tv\t`
+  ).join('\n');
+  await page.fill('#pasteBox', julyOnly);
   await page.click('button.btn-primary');
   await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+  await expect(item18Panel(page)).toContainText('8/9 店完成');
+  await expect(page.locator('#patrolPastePreview')).toContainText('本次貼上：3 筆');
   const readsBeforeSwitch = ptReadCalls;
 
   await page.click('[data-view="halfDashboard"]');
-  await expect(page.locator('#halfDashboardView')).toContainText('目前已載入 1 筆巡店明細');
-  await expect(page.locator('#halfDashboardView')).toContainText('台北通化');
+  await expect(page.locator('#halfDashboardView')).toContainText('資料來源：正式輕量巡店摘要');
+  await expect(page.locator('#halfDashboardView')).toContainText('7–8月雙月全盤');
   expect(ptReadCalls).toBe(readsBeforeSwitch);
+});
+
+test.describe('巡店貼上正式摘要來源回歸', () => {
+  test('正式 8/9 時貼上只有 3 店的局部批次仍維持 8/9', async ({ page }) => {
+    cloudRows = item18EightStoreRows();
+    await stubGas(page);
+    await openAndUnlock(page);
+    await expect(item18Panel(page)).toContainText('8/9 店完成');
+
+    const batch = item18EightStoreRows().slice(0, 3).map(row =>
+      `${row.fillTime}\t${row.arriveTime}\t${row.leaveTime}\t${row.district}\t${row.code}\t${row.store}\t${row.inspector}\t18\t內容\tv\t`
+    ).join('\n');
+    await page.fill('#pasteBox', batch);
+    await page.click('button.btn-primary');
+
+    await expect(page.locator('#parseMsg')).toHaveText(/正式摘要已更新/);
+    await expect(item18Panel(page)).toContainText('8/9 店完成');
+    const state = await page.evaluate(() => ({ summary:patrolSummary.item18.completedStores, local:rawDetails.length, source:patrolSummaryState }));
+    expect(state).toEqual({ summary:8, local:3, source:'ok' });
+  });
+
+  test('成功寫入後只以 fresh ptsummary 將 7/9 更新為 8/9', async ({ page }) => {
+    cloudRows = item18EightStoreRows().slice(0, 7);
+    await stubGas(page);
+    await openAndUnlock(page);
+    await expect(item18Panel(page)).toContainText('7/9 店完成');
+    const readsBefore = ptReadCalls;
+
+    const row = item18EightStoreRows()[7];
+    await page.fill('#pasteBox', `${row.fillTime}\t${row.arriveTime}\t${row.leaveTime}\t${row.district}\t${row.code}\t${row.store}\t${row.inspector}\t18\t內容\tv\t`);
+    await page.click('button.btn-primary');
+
+    await expect(page.locator('#parseMsg')).toHaveText(/正式摘要已更新/);
+    await expect(item18Panel(page)).toContainText('8/9 店完成');
+    expect(ptReadCalls).toBeGreaterThan(readsBefore);
+  });
+
+  test('寫入失敗時保留 last-good 8/9，不顯示局部摘要', async ({ page }) => {
+    cloudRows = item18EightStoreRows();
+    await stubGas(page);
+    await openAndUnlock(page);
+    await expect(item18Panel(page)).toContainText('8/9 店完成');
+    failPtwrite = true;
+
+    await page.fill('#pasteBox', pasteLine(12, '台北通化', 'DNB10059', 14, 'v', ''));
+    await page.click('button.btn-primary');
+
+    await expect(page.locator('#parseMsg')).toHaveText(/雲端寫入失敗/);
+    await expect(item18Panel(page)).toContainText('8/9 店完成');
+    expect(await page.evaluate(() => patrolSummary.item18.completedStores)).toBe(8);
+  });
+
+  test('ptsummary refresh 失敗時保留 last-good 並明示正式摘要更新失敗', async ({ page }) => {
+    cloudRows = item18EightStoreRows();
+    await stubGas(page);
+    await openAndUnlock(page);
+    await expect(item18Panel(page)).toContainText('8/9 店完成');
+    await page.evaluate(() => {
+      const original=window.cloudCall;
+      window.cloudCall=(action,params)=>action==='ptsummary'
+        ? Promise.reject(new Error('巡店資料讀取逾時'))
+        : original(action,params);
+    });
+
+    await page.fill('#pasteBox', pasteLine(13, '台北通化', 'DNB10059', 15, 'v', ''));
+    await page.click('button.btn-primary');
+
+    await expect(page.locator('#parseMsg')).toHaveText(/正式摘要更新失敗/);
+    await expect(page.locator('#parseMsg')).toHaveText(/保留上次成功正式摘要/);
+    await expect(item18Panel(page)).toContainText('8/9 店完成');
+    expect(await page.evaluate(() => ({count:patrolSummary.item18.completedStores,state:patrolSummaryState}))).toEqual({count:8,state:'stale'});
+  });
+
+  test('沒有 rawDetails 的 ptsummary 頁面匯入局部檔案仍維持正式 8/9', async ({ page }) => {
+    cloudRows = item18EightStoreRows();
+    await stubGas(page);
+    await openAndUnlock(page);
+    expect(await page.evaluate(() => rawDetails.length)).toBe(0);
+    await expect(item18Panel(page)).toContainText('8/9 店完成');
+
+    const partial=item18EightStoreRows().slice(0,3);
+    await page.locator('#importFile').setInputFiles({
+      name:'patrol-partial.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(partial)),
+    });
+
+    await expect(page.locator('#patrolPastePreview')).toContainText('本次匯入：3 筆');
+    await expect(item18Panel(page)).toContainText('8/9 店完成');
+    expect(await page.evaluate(() => ({local:rawDetails.length,state:patrolSummaryState}))).toEqual({local:3,state:'ok'});
+    expect(writeCalls).toBe(0);
+  });
 });
 
 test('盤點提醒框：題14-17每月與題18兩個月獨立顯示進度', async ({ page }) => {
@@ -376,7 +490,8 @@ test('盤點提醒框：題14-17每月與題18兩個月獨立顯示進度', asyn
   // 三創 6/20 是上一期（5–6月）→ 本期未完成，但上期紀錄看得到
   const sanchuang = table18.locator('tr', { hasText: '三創' });
   await expect(sanchuang).toContainText('✗ 未完成');
-  await expect(sanchuang).toContainText('✓ 2026/6/20');
+  // 寫入後正式大盤改以 ptsummary readback 為準；canonical 日期格式是 ISO。
+  await expect(sanchuang).toContainText('✓ 2026-06-20');
 });
 
 test('知悉宣導提醒：題19-33只看總進度與20日前完成狀態', async ({ page }) => {
@@ -398,11 +513,13 @@ test('知悉宣導提醒：題19-33只看總進度與20日前完成狀態', asyn
   const tonghua = table.locator('tr', { hasText: '通化' });
   await expect(tonghua).toContainText('15/15');
   await expect(tonghua).toContainText('✓ 已完成');
-  const expectedDate = currentMonthFixture(5, '台北通化', 'DNB10059', 19, 'v', '').fillDate.replace(/^\d{4}\//, '');
-  await expect(tonghua).toContainText(expectedDate);
+  // ptsummary 的知悉宣導契約只回 completedDay，不以局部貼上列重建日期字串。
+  await expect(tonghua).toContainText('5');
   const jiuquan = table.locator('tr', { hasText: '酒泉' });
   await expect(jiuquan).toContainText('1/15');
-  await expect(jiuquan).toContainText(/剩 \d+ 天|⚠ 逾期/);
+  // 正式 ptsummary 表格顯示 canonical 未完成狀態；不再以局部貼上批次重算倒數。
+  await expect(jiuquan).toContainText('✗ 未完成');
+  await expect(jiuquan).toContainText('—');
 });
 
 test('其他督導：GAS 回傳自己的標題與門市清單，看板跟著切換', async ({ page }) => {
