@@ -2,6 +2,12 @@
 
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）＋ Google Sheets。
 
+## 智慧營運中心 Phase 1A（未部署）
+
+- `kpi-battle.html` 是 KPI 戰情的獨立入口殼層；它在同源載入 `index.html` 的既有 KPI 面板，因此沿用同一套員編／核准裝置權限、資料來源、計算與 fail-closed 行為，不建立第二套公式、API 或快取。
+- `home.html` 同仁大廳以「KPI 戰情」為第一順位入口；原 `index.html` KPI 戰情與每日回報、`kpi.html`、`kpitry.html`、店務檢查連結均保留。
+- Phase 1A 只完成隔離分支、本機測試與畫面比對；未合併、未部署，也不代表 Liam 已正式驗收。
+
 ## 功能頁籤
 
 - `📝 填報（店長）`：門市每日回報；台獎填報欄位已更新為目前協作的 10 台機款。

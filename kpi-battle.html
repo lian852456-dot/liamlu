@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="robots" content="noindex, nofollow">
+<title>KPI 戰情｜北一二B 智慧營運中心</title>
+<!--
+  Phase 1A 僅建立獨立入口殼層。
+  KPI 畫面、權限、資料來源與計算全部由同源 index.html 的既有 KPI 戰情提供；
+  本頁不得新增公式、API、資料快取、localStorage 補值或第二套登入。
+-->
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #1f2937;
+    --ink-soft: #667085;
+    --paper: #f3f5f8;
+    --raised: #ffffff;
+    --line: #dfe3e8;
+    --orange: #f56a00;
+    --orange-dark: #b94e00;
+  }
+  * { box-sizing: border-box; }
+  html, body { width: 100%; min-width: 0; min-height: 100%; margin: 0; }
+  body {
+    min-height: 100dvh;
+    overflow: hidden;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Microsoft YaHei', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    width: 100%;
+    min-width: 0;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  .shell-header {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: max(14px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 14px max(20px, env(safe-area-inset-left));
+    background: var(--raised);
+    border-bottom: 1px solid var(--line);
+  }
+  .title-group { min-width: 0; }
+  .eyebrow {
+    margin: 0 0 3px;
+    color: var(--orange-dark);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .04em;
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(21px, 4vw, 28px);
+    line-height: 1.2;
+    letter-spacing: -.01em;
+  }
+  .subtitle {
+    margin: 5px 0 0;
+    color: var(--ink-soft);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .home-link {
+    flex: 0 0 auto;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 9px 14px;
+    border: 1px solid #f3c39f;
+    border-radius: 10px;
+    background: #fff8f2;
+    color: var(--orange-dark);
+    font-size: 14px;
+    font-weight: 800;
+    text-decoration: none;
+  }
+  .home-link:focus-visible { outline: 3px solid rgba(245,106,0,.28); outline-offset: 2px; }
+  .frame-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+  }
+  iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    border: 0;
+    background: #f8fafc;
+  }
+  .fallback {
+    display: none;
+    position: absolute;
+    inset: 18px;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--raised);
+    color: var(--ink-soft);
+    text-align: center;
+    line-height: 1.7;
+  }
+  .fallback a { color: var(--orange-dark); font-weight: 800; }
+  .page.frame-error iframe { display: none; }
+  .page.frame-error .fallback { display: flex; }
+  @media (max-width: 520px) {
+    .shell-header { align-items: flex-start; gap: 10px; padding-bottom: 12px; }
+    .subtitle { font-size: 12px; }
+    .home-link { padding-inline: 11px; white-space: nowrap; }
+  }
+</style>
+</head>
+<body>
+<main class="page" id="standalonePage">
+  <header class="shell-header">
+    <div class="title-group">
+      <p class="eyebrow">北一二B 智慧營運中心</p>
+      <h1>KPI 戰情</h1>
+      <p class="subtitle">沿用每日回報既有正式資料、權限與計算邏輯</p>
+    </div>
+    <a class="home-link" href="home.html" aria-label="返回智慧營運中心">返回大廳</a>
+  </header>
+
+  <section class="frame-wrap" aria-label="KPI 戰情內容">
+    <iframe id="kpiBattleFrame" src="index.html" title="北一二B KPI 戰情"></iframe>
+    <div class="fallback" id="frameFallback" role="alert">
+      <p>目前無法載入獨立 KPI 戰情。請改由<a href="index.html">每日回報內的 KPI 戰情</a>進入；權限與資料規則完全相同。</p>
+    </div>
+  </section>
+</main>
+
+<script>
+  const frame = document.getElementById('kpiBattleFrame');
+  const page = document.getElementById('standalonePage');
+
+  function failClosed() {
+    page.classList.add('frame-error');
+  }
+
+  frame.addEventListener('load', () => {
+    try {
+      const frameDocument = frame.contentDocument;
+      if (!frameDocument) throw new Error('KPI frame unavailable');
+
+      const kpiButton = Array.from(frameDocument.querySelectorAll('.tab-btn'))
+        .find(button => button.getAttribute('onclick') === "switchTab('kpi-battle')");
+      if (!kpiButton) throw new Error('KPI entry unavailable');
+
+      const standaloneStyle = frameDocument.createElement('style');
+      standaloneStyle.dataset.phase1aKpiStandalone = 'true';
+      standaloneStyle.textContent = `
+        html, body { min-width: 0 !important; }
+        body { background: #f3f5f8 !important; }
+        .site-header, #marqueeBar, .tab-bar { display: none !important; }
+        #panel-kpi-battle { max-width: 1640px; min-width: 0; padding-top: 16px; }
+        #panel-kpi-battle .card:first-child { margin-top: 0; }
+        @media (max-width: 520px) {
+          #panel-kpi-battle { padding: 10px 8px 18px !important; }
+          #panel-kpi-battle .card { padding-left: 13px !important; padding-right: 13px !important; }
+        }
+      `;
+      frameDocument.head.appendChild(standaloneStyle);
+      kpiButton.click();
+      frame.dataset.ready = 'true';
+    } catch (error) {
+      failClosed();
+    }
+  });
+
+  frame.addEventListener('error', failClosed);
+</script>
+</body>
+</html>
