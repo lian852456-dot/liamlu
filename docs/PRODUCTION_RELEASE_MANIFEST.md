@@ -2,9 +2,9 @@
 
 狀態：**IMMUTABLE / LIAM DEVICE ACCEPTED / STABLE BASELINE**
 
-Release ID：`stable-baseline-20260814-daily-report-separation`
+Release ID：`stable-baseline-20260815-patrol-paste-summary`
 
-凍結日期：2026-08-14（Asia/Taipei）
+凍結日期：2026-08-16（Asia/Taipei）
 
 這份 manifest 記錄 Liam iPhone 已正式接受的完整 production 組合。未來任何版本變更都必須建立新的完整 release manifest；不得把其中一層單獨替換後繼續沿用本次 PASS。
 
@@ -12,10 +12,11 @@ Release ID：`stable-baseline-20260814-daily-report-separation`
 
 | 層級 | 固定版本／設定 | 驗收狀態 |
 |---|---|---|
-| Accepted frontend baseline | `76d524519770144e12e884c5c931a865f86ba40a` | Liam iPhone Phase 2.1 acceptance **PASS** |
-| Web / Pages | `76d524519770144e12e884c5c931a865f86ba40a` | GitHub Pages deployment run `31771430919` success |
-| Pages release query | `daily-report-separation-phase2-1-20260814-1` | `app.css`、`app.js` 與 Service Worker registration 一致 |
-| Service Worker cache | `liam-supervisor-app-1-2-daily-report-separation-phase2-1-20260814-v1` | 新舊 cache 可明確區分 |
+| Accepted frontend baseline | `bf8018c90e416eb7e210a38abcac792307b2595b` | Phase 2.1 accepted baseline + patrol paste-summary recovery freeze |
+| Patrol paste function commit | `5203267fd60d3e38ab36ab6e3f3a6f071195c136` | canonical `ptsummary` remains authoritative; paste is preview/dedup only |
+| Web / Pages | `bf8018c90e416eb7e210a38abcac792307b2595b` | GitHub Pages deployed; no-cache asset readback and live read-only smoke **PASS** |
+| Pages release query | `patrol-paste-summary-20260815-1` | `patrol.html` and Service Worker registration use the frozen release query |
+| Service Worker cache | `liam-supervisor-app-1-2-patrol-paste-summary-20260815-v1` | new cache is distinct from the prior accepted baseline |
 | Private GAS | v29 | **FROZEN / UNCHANGED** |
 | Patrol GAS | v53 | **FROZEN / UNCHANGED** |
 | Native App | Existing Liam Supervisor App 1.2 shell | Native shell、Signing、Bundle ID 均未修改 |
@@ -49,6 +50,15 @@ Release ID：`stable-baseline-20260814-daily-report-separation`
 - Liam iPhone 實機切換今日 `21:00` 後，昨日摘要 `0 / 0 / 6 / 6` 與正式原文保持不變。
 - Liam iPhone acceptance：**PASS**。
 
+### Patrol Paste Summary Recovery
+
+- Formal patrol summary remains the server `ptsummary`; a pasted batch is never allowed to replace or recompute the canonical dashboard.
+- Paste preview and client dedupe are isolated from cloud writes.
+- Formal item 18 summary stayed `8/9` before paste, after preview paste, and after duplicate preview paste.
+- Duplicate preview returned `0` new rows and did not change the canonical summary.
+- Existing App patrol read remained `ptsummary = 8/9`.
+- Patrol GAS remained v53; production writes and Sheet changes were `0`.
+
 ## 永久回歸測試
 
 以下測試是本 baseline 的不可移除保護：
@@ -64,18 +74,21 @@ Release ID：`stable-baseline-20260814-daily-report-separation`
 | today and yesterday are separate visual regions | `tests/liam-supervisor-yesterday-follow-up.test.cjs` |
 | 390×844 no overflow and console error 0 | `tests/liam-supervisor-yesterday-follow-up.spec.js` |
 | KPI canonical source identity | `tests/kpi-battle-source.test.cjs`、`tests/liam-supervisor-realdata-mapping.test.cjs` |
+| pasted rows cannot replace canonical patrol summary | `tests/patrol-paste-summary-source.test.cjs` |
+| duplicate paste does not duplicate local candidates | `tests/patrol-paste-summary-source.test.cjs` |
 
 任何後續 release 若刪除、放寬或跳過上述測試，不得沿用此 baseline 的 PASS。
 
 ## Freeze
 
-本次 freeze 只新增本 manifest 文件：
+本次 baseline freeze 只在已部署的 patrol paste-summary recovery 上新增本 manifest 文件：
 
 - Production data writes：`0`
 - Sheet modified：`NO`
 - GAS changed：`NO`
 - Native changed：`NO`
-- Product code changed：`NO`
+- Product code after accepted Phase 2.1：patrol-only commits `5203267`、`bf8018c`
+- Unrelated product code changed：`NO`
 - Existing regression tests：保留且未移除
 
 下列項目明確不在本 release，且本次不得啟動：
