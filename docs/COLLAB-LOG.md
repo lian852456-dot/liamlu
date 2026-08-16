@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-17 ｜ Liam／Codex（Phase 1A.2 正式驗收封存／CLOSED）
+
+- 做了什麼：封存 Phase 1A／1A.2 正式上線與 Liam 實機驗收證據。正式 `main` 為 `a43ba42688125e68021ad1548e47ce1ca151e6b9`，PR #55 已合併；GitHub Pages run #31957333235 的 build／deploy／status report 全部成功。Liam iPhone Safari smoke `5/5 PASS`：KPI standalone 可顯示員編／核准裝置登入，登入後店點總覽與個績排名均有正式資料，新舊 KPI 的日期、整體 KPI 與主要排名一致，返回大廳正常。
+- 結果（正式驗收完成／CLOSED）：KPI standalone 店點總覽、個績排名、新舊 KPI 關鍵值與返回大廳均通過正式實機驗收。App／Native／GAS／`kpi.html`／JSON／巡店／班表 Freeze 無異常；rollback tag `rollback/phase1a2-pre-merge-20260816-d12068f` 保留，不刪除。
+- 經驗 / 給下一位的提醒：Phase 1A（含 1A.2）至此正式 CLOSED。本次只做文件封存，沒有修改產品程式、沒有重新部署，也沒有進入 Phase 1B；任何後續工作都必須由 Liam 另行明確授權。
+
 ## 2026-08-16 ｜ Codex（Phase 1A.2：KPI Standalone 共用控制器，未部署）
 
 - 做了什麼：從最新 `origin/main` `d12068f91185ac86117b414595700ca91ab2b43e` 建立隔離分支 `feature/phase1a2-kpi-controller-shared`。將 Approved Device／員編、`private_access → kpicalc_access`、KPI adapter、同次快照 supplement merge、店績／個績 renderer 與 fail-closed 抽到唯一 `kpi-battle-controller.js`；`index.html` 與 `kpi-battle.html` 均掛載同一 controller，standalone 不再以 iframe 遙控 index。沒有新增 KPI 公式、API、JSON、快取、登入或 localStorage KPI fallback。
