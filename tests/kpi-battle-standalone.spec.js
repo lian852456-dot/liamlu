@@ -16,7 +16,11 @@ test.beforeAll(async () => {
       response.writeHead(404).end('Not found');
       return;
     }
-    const type = target.endsWith('.html') ? 'text/html; charset=utf-8' : 'application/octet-stream';
+    const type = target.endsWith('.html')
+      ? 'text/html; charset=utf-8'
+      : target.endsWith('.js')
+        ? 'text/javascript; charset=utf-8'
+        : 'application/octet-stream';
     response.writeHead(200, { 'Content-Type': type });
     fs.createReadStream(target).pipe(response);
   });
@@ -145,23 +149,21 @@ test('獨立頁與原 KPI 戰情維持同一權限行為，失敗時不吃 local
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/kpi-battle.html`);
 
-  const frame = page.frameLocator('#kpiBattleFrame');
-  await expect(page.locator('#kpiBattleFrame')).toHaveAttribute('data-ready', 'true');
-  await expect(frame.locator('#panel-kpi-battle')).toBeVisible();
-  await expect(frame.locator('#kpiBattleContent')).toContainText('KPI 戰情受保護');
-  await expect(frame.locator('#kpiBattleContent')).not.toContainText('999.0%');
+  await expect(page.locator('#panel-kpi-battle')).toHaveAttribute('data-ready', 'true');
+  await expect(page.locator('#panel-kpi-battle')).toBeVisible();
+  await expect(page.locator('#kpiBattleContent')).toContainText('KPI 戰情受保護');
+  await expect(page.locator('#kpiBattleContent')).not.toContainText('999.0%');
 
-  await frame.locator('#kpiBattleContent input[placeholder="輸入員工編號"]').fill('1234567');
-  await frame.locator('#kpiBattleContent').getByRole('button', { name: '以員編登入' }).click();
-  await expect(frame.locator('#kpiBattleContent .private-lock-status')).toContainText('裝置尚未核准');
+  await page.locator('#kpiBattleContent input[placeholder="輸入員工編號"]').fill('1234567');
+  await page.locator('#kpiBattleContent').getByRole('button', { name: '以員編登入' }).click();
+  await expect(page.locator('#kpiBattleContent .private-lock-status')).toContainText('裝置尚未核准');
   expect(actions.filter(action => action === 'private_access')).toHaveLength(1);
   expect(actions.filter(action => action === 'kpicalc_access')).toHaveLength(0);
 
   expect(await page.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
-  expect(await frame.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
 });
 
-test('Safari 不提供全域 event 時仍會啟動既有 KPI 正式載入流程', async ({ page }) => {
+test('Safari 不提供全域 event 時共用 controller 仍會啟動既有 KPI 正式載入流程', async ({ page }) => {
   const actions = await mockKpi(page);
   await page.addInitScript(() => {
     Object.defineProperty(window, 'event', {
@@ -172,20 +174,18 @@ test('Safari 不提供全域 event 時仍會啟動既有 KPI 正式載入流程'
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/kpi-battle.html`);
 
-  const frame = page.frameLocator('#kpiBattleFrame');
-  await expect(page.locator('#kpiBattleFrame')).toHaveAttribute('data-ready', 'true');
-  await expect(frame.locator('#panel-kpi-battle')).toBeVisible();
-  await expect(frame.locator('#kpiBattleContent')).toContainText('KPI 戰情受保護');
+  await expect(page.locator('#panel-kpi-battle')).toHaveAttribute('data-ready', 'true');
+  await expect(page.locator('#panel-kpi-battle')).toBeVisible();
+  await expect(page.locator('#kpiBattleContent')).toContainText('KPI 戰情受保護');
 
-  await loginKpi(frame);
-  await expect(frame.locator('#kpiBattleContent tbody tr')).toHaveCount(10);
-  await frame.getByRole('button', { name: '個績排名' }).click();
-  await expect(frame.locator('#kpiBattleContent tbody tr')).toHaveCount(1);
-  await expect(frame.locator('#kpiBattleContent')).toContainText('測＊員');
+  await loginKpi(page);
+  await expect(page.locator('#kpiBattleContent tbody tr')).toHaveCount(10);
+  await page.getByRole('button', { name: '個績排名' }).click();
+  await expect(page.locator('#kpiBattleContent tbody tr')).toHaveCount(1);
+  await expect(page.locator('#kpiBattleContent')).toContainText('測＊員');
   expect(actions.filter(action => ['private_access', 'kpicalc_access'].includes(action))).toEqual(['private_access', 'kpicalc_access']);
 
   expect(await page.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
-  expect(await frame.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
   await page.locator('.home-link').click();
   await expect(page).toHaveURL(`${baseUrl}/home.html`);
   await expect(page.getByRole('heading', { name: '同仁大廳' })).toBeVisible();
@@ -203,12 +203,11 @@ test('新舊 KPI 畫面逐區同值：日期、來源、整體、9 店、排名�
   await loginKpi(oldPage);
 
   await newPage.goto(`${baseUrl}/kpi-battle.html`);
-  await expect(newPage.locator('#kpiBattleFrame')).toHaveAttribute('data-ready', 'true');
-  const frame = newPage.frameLocator('#kpiBattleFrame');
-  await loginKpi(frame);
+  await expect(newPage.locator('#panel-kpi-battle')).toHaveAttribute('data-ready', 'true');
+  await loginKpi(newPage);
 
   await oldPage.selectOption('#kpiBattleStoreSelect', '北一二B整體');
-  await frame.locator('#kpiBattleStoreSelect').selectOption('北一二B整體');
+  await newPage.locator('#kpiBattleStoreSelect').selectOption('北一二B整體');
 
   const selectors = [
     '#kpiBattleSourceNote',
@@ -218,18 +217,18 @@ test('新舊 KPI 畫面逐區同值：日期、來源、整體、9 店、排名�
   ];
   for (const selector of selectors) {
     expect(normalize(await oldPage.locator(selector).textContent())).toBe(
-      normalize(await frame.locator(selector).textContent())
+      normalize(await newPage.locator(selector).textContent())
     );
   }
 
   await expect(oldPage.locator('#kpiBattleContent tbody tr')).toHaveCount(10);
-  await expect(frame.locator('#kpiBattleContent tbody tr')).toHaveCount(10);
+  await expect(newPage.locator('#kpiBattleContent tbody tr')).toHaveCount(10);
   await expect(oldPage.locator('#kpiBattleContent .kpi-metric-card')).toHaveCount(25);
-  await expect(frame.locator('#kpiBattleContent .kpi-metric-card')).toHaveCount(25);
+  await expect(newPage.locator('#kpiBattleContent .kpi-metric-card')).toHaveCount(25);
 
   for (const expected of ['109.2%', '29', '12.89', '48.0%', '較昨日下降 0.9pp', 'DOD ↑ 1名']) {
     await expect(oldPage.locator('#kpiBattleContent')).toContainText(expected);
-    await expect(frame.locator('#kpiBattleContent')).toContainText(expected);
+    await expect(newPage.locator('#kpiBattleContent')).toContainText(expected);
   }
 
   expect(oldActions.filter(action => ['private_access', 'kpicalc_access'].includes(action))).toEqual(['private_access', 'kpicalc_access']);
@@ -245,16 +244,12 @@ test('新舊 KPI 畫面逐區同值：日期、來源、整體、9 店、排名�
       banner.style.cssText = 'padding:10px 16px;background:#fff3cd;color:#7c4a03;font:800 14px system-ui;text-align:center;border-bottom:1px solid #f3c86b';
       document.body.prepend(banner);
     }, evidenceLabel);
-    await newPage.locator('.frame-wrap').evaluate((element, label) => {
+    await newPage.locator('#panel-kpi-battle').evaluate((element, label) => {
       const banner = document.createElement('div');
       banner.textContent = label;
       banner.style.cssText = 'padding:10px 16px;background:#fff3cd;color:#7c4a03;font:800 14px system-ui;text-align:center;border-bottom:1px solid #f3c86b';
       element.before(banner);
     }, evidenceLabel);
-    const frameHeight = await frame.locator('html').evaluate(element => element.scrollHeight);
-    await newPage.locator('#kpiBattleFrame').evaluate((element, height) => {
-      element.style.height = `${height}px`;
-    }, frameHeight);
     await oldPage.screenshot({
       path: path.join(screenshotDir, '2026-08-16_Phase1A_原index_KPI_本機合約比對.png'),
       fullPage: true,
@@ -268,16 +263,14 @@ test('新舊 KPI 畫面逐區同值：日期、來源、整體、9 店、排名�
   await context.close();
 });
 
-test('390px 新 KPI 獨立頁與內嵌戰情均無頁面級水平溢出', async ({ page }) => {
+test('390px 新 KPI 獨立頁無頁面級水平溢出', async ({ page }) => {
   await mockKpi(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/kpi-battle.html`);
-  await expect(page.locator('#kpiBattleFrame')).toHaveAttribute('data-ready', 'true');
-  const frame = page.frameLocator('#kpiBattleFrame');
-  await loginKpi(frame);
+  await expect(page.locator('#panel-kpi-battle')).toHaveAttribute('data-ready', 'true');
+  await loginKpi(page);
 
   expect(await page.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
-  expect(await frame.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
   await expect(page.locator('.home-link')).toBeVisible();
 });
 

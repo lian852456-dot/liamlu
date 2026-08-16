@@ -7,6 +7,8 @@ const { execFileSync } = require('node:child_process');
 
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const controllerSource = fs.readFileSync(path.join(root, 'kpi-battle-controller.js'), 'utf8');
+const controller = require('../kpi-battle-controller.js');
 
 function functionBody(source, name) {
   const start = source.indexOf(`function ${name}(`);
@@ -28,22 +30,26 @@ function lastFunctionBody(source, name) {
 }
 
 test('KPI 主資料取 kpicalc，快照只作條件式補充', () => {
-  const login = functionBody(html, 'privateDashboardLogin');
+  const login = functionBody(controllerSource, 'login');
+  assert.match(login, /action: 'private_access'/);
   assert.match(login, /action: 'kpicalc_access'/);
   assert.match(login, /mergeKpiBattleSupplement\(kpiData, snapshotKpi\)/);
-  assert.doesNotMatch(login, /_kpiBattleData = result\.snapshot\.kpiBattle/);
+  assert.doesNotMatch(login, /state\.data = result\.snapshot\.kpiBattle/);
 });
 
 test('台獎僅以 KPI 戰報日期比對，不得使用資料截止日', () => {
-  const login = functionBody(html, 'privateDashboardLogin');
-  assert.match(login, /awardsDate === _kpiBattleData\.report_date/);
-  assert.doesNotMatch(login, /awardsDate === _kpiBattleData\.data_as_of_date/);
-  assert.match(login, /renderAwardsBattleUnavailable\(\)/);
+  const hookStart = html.indexOf('function handleKpiLoaded');
+  const hookEnd = html.indexOf('function handleKpiLoadError', hookStart);
+  assert.ok(hookStart >= 0 && hookEnd > hookStart);
+  const hook = html.slice(hookStart, hookEnd);
+  assert.match(hook, /awardsDate === data\.report_date/);
+  assert.doesNotMatch(hook, /awardsDate === data\.data_as_of_date/);
+  assert.match(hook, /renderAwardsBattleUnavailable\(\)/);
 });
 
 test('來源說明以資訊格分開顯示戰報日期、資料截止日與來源檔', () => {
-  const render = functionBody(html, 'renderKpiBattle');
-  const metadata = functionBody(html, 'kpiBattleSourceMetadata');
+  const render = functionBody(controllerSource, 'render');
+  const metadata = functionBody(controllerSource, 'kpiBattleSourceMetadata');
   assert.match(render, /note\.innerHTML = kpiBattleSourceMetadata/);
   for (const label of ['戰報日期', '資料統計至', '來源檔', '統計區間', '同步狀態']) {
     assert.ok(metadata.includes(label), `來源資訊格缺少：${label}`);
@@ -51,15 +57,15 @@ test('來源說明以資訊格分開顯示戰報日期、資料截止日與來�
 });
 
 test('加掛得分保留兩位小數，不得把 12.35 截成 12.3', () => {
-  const body = functionBody(html, 'kpiBattleNumber');
+  const body = functionBody(controllerSource, 'formatNumber');
   assert.match(body, /Math\.round\(number \* 100\) \/ 100/);
 });
 
 test('店績保險搭售率接在加掛後，且由同次快照補入', () => {
-  const render = functionBody(html, 'renderKpiBattleStores');
+  const render = functionBody(controllerSource, 'renderStores');
   assert.match(render, /<th>加掛<\/th><th>保險搭售率<\/th>/);
   assert.match(render, /kpiBattleInsuranceCell\(row\)/);
-  assert.match(functionBody(html, 'mergeKpiBattleSupplement'), /insurance_attach_rate/);
+  assert.match(functionBody(controllerSource, 'mergeKpiBattleSupplement'), /insurance_attach_rate/);
 });
 
 test('台獎篩選可選北一二B，北一二B顯示80%／100%，門市顯示50%／100%', () => {
@@ -74,11 +80,11 @@ test('台獎篩選可選北一二B，北一二B顯示80%／100%，門市顯示50
 });
 
 test('快照合併硬性要求截止日與來源檔一致', () => {
-  const guard = functionBody(html, 'kpiBattleSupplementIsCurrent');
+  const guard = functionBody(controllerSource, 'kpiBattleSupplementIsCurrent');
   for (const field of ['reportSource', 'data_as_of_date', 'source_file']) {
     assert.ok(guard.includes(field), `缺少快照合併門檻：${field}`);
   }
-  assert.doesNotMatch(functionBody(html, 'loadKpiBattle'), /__KPI_BATTLE_DATA__/);
+  assert.doesNotMatch(functionBody(controllerSource, 'load'), /__KPI_BATTLE_DATA__/);
 });
 
 test('正式達成率保護區不變，GAS ptvisit hotfix 不修改 KPI／台獎／班表／正式回報寫入', () => {
@@ -110,20 +116,7 @@ test('正式報表無百分比時保留空值，不得自行改成 0%', () => {
 });
 
 function loadAdapter() {
-  const constants = [
-    html.match(/const KPI_BATTLE_CORE_KEYS = \{[^\n]+\n/)[0],
-    html.match(/const KPI_BATTLE_PERSONAL_KEYS = \{[^\n]+\n/)[0],
-  ];
-  const names = ['kpicalcMetric', 'kpiBattleDataAsOfDate', 'kpiBattleSourceFile', 'kpiBattleReportSourceFile', 'kpiBattleStoreKey', 'kpiBattlePersonKey', 'kpiBattleSupplementIsCurrent', 'mergeKpiBattleSupplement', 'kpicalcToKpiBattleView'];
-  const src = [
-    ...constants,
-    ...names.map(name => `function ${name}(${name === 'kpicalcMetric' ? 'entry, meta' : name === 'kpiBattleDataAsOfDate' ? 'meta' : name === 'kpiBattleReportSourceFile' ? 'reportDate' : name === 'kpiBattleSourceFile' || name === 'kpiBattleStoreKey' ? 'value' : name === 'kpiBattlePersonKey' ? 'row' : name === 'kpiBattleSupplementIsCurrent' || name === 'mergeKpiBattleSupplement' ? 'kpiData, snapshot' : 'data, fetchedAt'}) {${functionBody(html, name)}}`),
-    'module.exports = { kpicalcToKpiBattleView, mergeKpiBattleSupplement, kpiBattleSupplementIsCurrent };',
-  ].join('\n');
-  const sandbox = { module: { exports: {} }, console, Map, JSON, String, Number, Boolean, Object, Array };
-  vm.createContext(sandbox);
-  vm.runInContext(src, sandbox);
-  return sandbox.module.exports;
+  return controller;
 }
 
 const SAMPLE = {
@@ -152,7 +145,7 @@ test('各項達成率直接沿用正式報表欄位，實績／目標／差異�
   assert.equal(missingView.aggregate.metrics['好速案銷售點數'].rate, null);
   assert.equal(missingView.aggregate.metrics['好速案銷售點數'].actual, 8);
   assert.equal(missingView.aggregate.metrics['好速案銷售點數'].target, 15);
-  assert.match(functionBody(html, 'kpiBattleMetricCell'), /metric\.rate == null[^;]+kpiBattleTargetLine\(metric\)/);
+  assert.match(functionBody(controllerSource, 'kpiBattleMetricCell'), /metric\.rate == null[^;]+kpiBattleTargetLine\(metric\)/);
 });
 
 test('0805.xlsx 統計至 0804，未合併快照時不可偽裝成 0805 戰報', () => {

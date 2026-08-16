@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-16 ｜ Codex（Phase 1A.2：KPI Standalone 共用控制器，未部署）
+
+- 做了什麼：從最新 `origin/main` `d12068f91185ac86117b414595700ca91ab2b43e` 建立隔離分支 `feature/phase1a2-kpi-controller-shared`。將 Approved Device／員編、`private_access → kpicalc_access`、KPI adapter、同次快照 supplement merge、店績／個績 renderer 與 fail-closed 抽到唯一 `kpi-battle-controller.js`；`index.html` 與 `kpi-battle.html` 均掛載同一 controller，standalone 不再以 iframe 遙控 index。沒有新增 KPI 公式、API、JSON、快取、登入或 localStorage KPI fallback。
+- 結果（本機完成，未部署）：Node `205/205`；KPI standalone Chromium `5/5`、WebKit `5/5`，包含新舊日期／來源／整體／9 店／排名／DOD／加掛／保險／25 項 exact match、未授權 fail-closed、action 次序與 390px 無頁面級溢出；App／index Chromium regression（排除已證實 main 基線失敗）`52/52`。完整 Chromium 為 `143/144`，唯一失敗 `liam-supervisor-half-month-formal-read` 的既有 `5 / 9` 斷言已在乾淨同 SHA main 重現，非本次變更。
+- 經驗 / 給下一位的提醒：本輪 App、Native/iOS、`gas/Code.gs`、`kpi.html`、正式 JSON/schema、Mail、Trigger、巡店、班表與回報邏輯均 0 diff；不得為了清除既有半月測試基線而越界修改 App。尚未推送、未建立 PR、未部署 Pages/GAS、未做正式資料 readback 或 Liam Safari smoke，也未進入 Phase 1B。
+
 ## 2026-08-16 ｜ Codex（智慧營運中心 Phase 1A：KPI 戰情獨立入口，未部署）
 
 - 做了什麼：最初由 `origin/main` `fa40375` 建立隔離分支 `feature/ops-center-kpi-battle-standalone`；正式驗收前再 fetch，確認最新 main 為 `d8edb5557126c81418de305f11164373edfccc47`，並將原 commit `c2011d9` 無衝突 rebase 為 patch-equivalent `76422dc`。新增 `kpi-battle.html` 同源殼層，直接載入並切換到原 `index.html` 的既有 KPI 面板；`home.html` 同仁大廳新增第一順位「KPI 戰情」，原 KPI 與其他入口保留。

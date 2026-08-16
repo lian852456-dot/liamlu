@@ -9,69 +9,56 @@
 <meta name="robots" content="noindex, nofollow">
 <title>KPI 戰情｜北一二B 智慧營運中心</title>
 <!--
-  Phase 1A 僅建立獨立入口殼層。
-  KPI 畫面、權限、資料來源與計算全部由同源 index.html 的既有 KPI 戰情提供；
-  本頁不得新增公式、API、資料快取、localStorage 補值或第二套登入。
+  Phase 1A.2 standalone 直接掛載共用 KPI controller。
+  權限、Approved Device、正式資料來源、adapter、補值與 renderer 均只存在
+  kpi-battle-controller.js；本頁不得新增公式、API、JSON、資料快取或 fallback。
 -->
 <style>
   :root {
     color-scheme: light;
-    --ink: #1f2937;
-    --ink-soft: #667085;
-    --paper: #f3f5f8;
-    --raised: #ffffff;
-    --line: #dfe3e8;
-    --orange: #f56a00;
-    --orange-dark: #b94e00;
+    --bg-deep: #f5f6f8;
+    --bg-card: #ffffff;
+    --bg-row-alt: #f8f9fb;
+    --accent: #f97316;
+    --accent-bright: #ea580c;
+    --gold: #d97706;
+    --green: #16a34a;
+    --red: #dc2626;
+    --warn: #d97706;
+    --purple: #7c3aed;
+    --text: #111827;
+    --text-dim: #374151;
+    --text-muted: #6b7280;
+    --border: rgba(0,0,0,.12);
+    --border-dim: rgba(0,0,0,.07);
+    --font: 'Microsoft YaHei', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
   html, body { width: 100%; min-width: 0; min-height: 100%; margin: 0; }
   body {
     min-height: 100dvh;
-    overflow: hidden;
-    background: var(--paper);
-    color: var(--ink);
-    font-family: 'Microsoft YaHei', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
+    overflow-x: hidden;
+    background: var(--bg-deep);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 17px;
     -webkit-font-smoothing: antialiased;
   }
-  .page {
-    width: 100%;
-    min-width: 0;
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-  }
+  button, input, select { font: inherit; }
   .shell-header {
-    flex: 0 0 auto;
     min-width: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 18px;
     padding: max(14px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 14px max(20px, env(safe-area-inset-left));
-    background: var(--raised);
-    border-bottom: 1px solid var(--line);
+    background: #fff;
+    border-bottom: 1px solid #dfe3e8;
   }
   .title-group { min-width: 0; }
-  .eyebrow {
-    margin: 0 0 3px;
-    color: var(--orange-dark);
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: .04em;
-  }
-  h1 {
-    margin: 0;
-    font-size: clamp(21px, 4vw, 28px);
-    line-height: 1.2;
-    letter-spacing: -.01em;
-  }
-  .subtitle {
-    margin: 5px 0 0;
-    color: var(--ink-soft);
-    font-size: 13px;
-    line-height: 1.45;
-  }
+  .eyebrow { margin: 0 0 3px; color: #b94e00; font-size: 12px; font-weight: 800; letter-spacing: .04em; }
+  h1 { margin: 0; font-size: clamp(21px, 4vw, 28px); line-height: 1.2; letter-spacing: -.01em; }
+  .subtitle { margin: 5px 0 0; color: #667085; font-size: 13px; line-height: 1.45; }
   .home-link {
     flex: 0 0 auto;
     min-height: 44px;
@@ -82,122 +69,174 @@
     border: 1px solid #f3c39f;
     border-radius: 10px;
     background: #fff8f2;
-    color: var(--orange-dark);
+    color: #b94e00;
     font-size: 14px;
     font-weight: 800;
     text-decoration: none;
   }
   .home-link:focus-visible { outline: 3px solid rgba(245,106,0,.28); outline-offset: 2px; }
-  .frame-wrap {
-    flex: 1 1 auto;
-    min-width: 0;
-    min-height: 0;
-    position: relative;
-  }
-  iframe {
-    display: block;
+  #panel-kpi-battle {
     width: 100%;
-    height: 100%;
+    max-width: 1640px;
     min-width: 0;
-    border: 0;
-    background: #f8fafc;
+    margin: 0 auto;
+    padding: 16px 12px max(24px, env(safe-area-inset-bottom));
   }
-  .fallback {
-    display: none;
-    position: absolute;
-    inset: 18px;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    background: var(--raised);
-    color: var(--ink-soft);
-    text-align: center;
-    line-height: 1.7;
+  .card {
+    min-width: 0;
+    margin-bottom: 20px;
+    padding: 22px 24px;
+    border: 1px solid var(--border-dim);
+    border-radius: 8px;
+    background: var(--bg-card);
+    box-shadow: 0 1px 5px rgba(17,24,39,.07);
   }
-  .fallback a { color: var(--orange-dark); font-weight: 800; }
-  .page.frame-error iframe { display: none; }
-  .page.frame-error .fallback { display: flex; }
-  @media (max-width: 520px) {
+  .card-title { margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--border-dim); font-size: 21px; font-weight: 900; }
+  .dot { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: var(--accent); }
+  .kpi-battle-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .kpi-battle-toggle { display: flex; gap: 6px; flex-wrap: wrap; }
+  .kpi-battle-toggle button {
+    min-height: 42px;
+    padding: 9px 16px;
+    border: 1px solid #fed7aa;
+    border-radius: 7px;
+    background: #fff7ed;
+    color: var(--accent-bright);
+    font-size: 16px;
+    font-weight: 900;
+    cursor: pointer;
+  }
+  .kpi-battle-toggle button.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .kpi-battle-note { color: var(--text-muted); font-size: 16px; font-weight: 750; line-height: 1.6; }
+  .kpi-source-metadata { display: grid; grid-template-columns: repeat(3,minmax(150px,1fr)); gap: 8px; width: min(760px,100%); }
+  .kpi-source-item { min-width: 0; padding: 9px 11px; border: 1px solid #e5e7eb; border-radius: 7px; background: #fafafa; }
+  .kpi-source-item strong { display: block; color: var(--text-dim); font-size: 15px; font-weight: 900; }
+  .kpi-source-item span { display: block; margin-top: 2px; color: var(--text); font-size: 16px; font-weight: 800; overflow-wrap: anywhere; }
+  .kpi-source-item.status { border-color: #bbf7d0; background: #f0fdf4; }
+  .kpi-source-item.status span { color: var(--green); }
+  .private-lock { max-width: 620px; margin: 0 auto; text-align: left; }
+  .private-lock h3 { margin: 0 0 8px; color: var(--text); font-size: 20px; font-weight: 900; }
+  .private-lock p { color: var(--text-muted); font-size: 14px; font-weight: 700; line-height: 1.7; }
+  .private-lock-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .private-lock-form input { min-width: 0; border: 1px solid #d1d5db; border-radius: 9px; padding: 11px 12px; color: var(--text); font-size: 15px; font-weight: 800; }
+  .private-lock-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .private-lock-actions button,
+  .private-lock-actions a.secondary { display: inline-flex; align-items: center; border-radius: 9px; padding: 11px 14px; font-size: 14px; font-weight: 900; cursor: pointer; text-decoration: none; }
+  .private-lock-actions button { border: 0; background: var(--accent); color: #fff; }
+  .private-lock-actions button.secondary,
+  .private-lock-actions a.secondary { border: 1px solid #d1d5db; background: #f3f4f6; color: var(--text); }
+  .private-lock-status { min-height: 22px; margin-top: 12px; color: var(--text-muted); font-size: 13px; font-weight: 800; line-height: 1.6; }
+  .private-admin { margin-top: 18px; border-top: 1px solid var(--border-dim); padding-top: 14px; }
+  .private-admin-list { display: grid; gap: 8px; margin-top: 10px; }
+  .private-admin-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid var(--border-dim); border-radius: 9px; font-size: 13px; font-weight: 800; }
+  .private-admin-item button { border: 0; border-radius: 7px; padding: 7px 10px; background: #166534; color: #fff; font-size: 12px; font-weight: 900; cursor: pointer; }
+  .kpi-empty { padding: 22px; border: 1px dashed #d1d5db; border-radius: 12px; background: #f9fafb; color: var(--text-muted); text-align: center; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(140px,1fr)); gap: 14px; margin-bottom: 16px; }
+  .summary-card { min-height: 132px; padding: 18px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .sc-label { color: var(--text-muted); font-size: 16px; font-weight: 900; }
+  .sc-val { margin-top: 8px; color: var(--accent); font-size: 32px; line-height: 1; font-weight: 900; }
+  .sc-sub { margin-top: 8px; color: var(--text-muted); font-size: 15px; font-weight: 800; }
+  .section-divider { display: flex; align-items: center; gap: 10px; margin: 28px 0 14px; color: var(--text-muted); font-size: 16px; font-weight: 700; }
+  .section-divider::before, .section-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-dim); }
+  .table-wrap { max-width: 100%; margin: 0 -10px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; min-width: 1230px; border-collapse: collapse; font-size: 16px; }
+  thead th { padding: 15px 14px; border-bottom: 2px solid var(--accent); background: #fff7ed; color: var(--accent-bright); font-size: 17px; font-weight: 900; text-align: center; white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--border-dim); }
+  tbody tr:nth-child(even) { background: var(--bg-row-alt); }
+  tbody td { padding: 16px 14px; font-size: 16px; font-weight: 750; line-height: 1.45; text-align: center; white-space: nowrap; }
+  td.store-name { padding-left: 14px; color: var(--text); font-size: 17px; font-weight: 900; text-align: left; }
+  .val-dim { color: var(--text-muted); }
+  .val-gold { color: var(--gold); font-weight: 700; }
+  .kpi-rate { font-size: 21px; font-weight: 900; }
+  .kpi-rate.good { color: var(--green); }
+  .kpi-rate.warn { color: var(--warn); }
+  .kpi-rate.bad { color: var(--red); }
+  .kpi-rate.rate-only { color: #6d28d9; }
+  .kpi-sub, .kpi-dod, .kpi-award-meta { display: block; margin-top: 5px; color: var(--text-muted); font-size: 15px; line-height: 1.45; font-weight: 750; }
+  .kpi-dod.up, .kpi-gap.up { color: var(--green); }
+  .kpi-dod.down, .kpi-gap.down { color: var(--red); }
+  .kpi-gap { font-weight: 800; }
+  .kpi-award-val { display: block; color: #7c3aed; font-size: 23px; line-height: 1.15; font-weight: 900; }
+  .kpi-award-meta.no { color: var(--red); }
+  .kpi-battle-filter { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 4px 0; }
+  .kpi-battle-filter label { display: grid; gap: 6px; color: var(--text-dim); font-size: 16px; font-weight: 900; }
+  .kpi-battle-filter select { min-height: 46px; margin: 0; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 7px; background: #fff; color: var(--text); font-size: 17px; font-weight: 800; }
+  .kpi-metric-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 14px; }
+  .kpi-metric-card { padding: 16px; border: 1px solid var(--border-dim); border-radius: 8px; background: #fff; }
+  .kpi-metric-card .label { color: var(--text-dim); font-size: 17px; font-weight: 900; }
+  .kpi-metric-card .value { margin-top: 6px; font-size: 27px; font-weight: 900; }
+  .standalone-error { border-color: #fecaca; background: #fff7f7; }
+  @media (max-width: 700px) {
+    body { font-size: 18px; }
     .shell-header { align-items: flex-start; gap: 10px; padding-bottom: 12px; }
     .subtitle { font-size: 12px; }
     .home-link { padding-inline: 11px; white-space: nowrap; }
+    #panel-kpi-battle { padding: 10px 8px max(18px, env(safe-area-inset-bottom)); }
+    .card { padding: 18px 16px; margin-bottom: 16px; }
+    .private-lock-form { grid-template-columns: 1fr; }
+    .private-lock h3 { font-size: 19px; }
+    .kpi-source-metadata { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .summary-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+    .summary-card { min-height: 126px; padding: 15px; }
+    .sc-val { font-size: 29px; }
+    table { font-size: 17px; }
+    thead th { padding: 15px 13px; font-size: 17px; }
+    tbody td { padding: 17px 13px; font-size: 17px; }
+    .kpi-rate { font-size: 22px; }
+    .kpi-battle-filter select { min-height: 50px; font-size: 18px; }
   }
 </style>
 </head>
 <body>
-<main class="page" id="standalonePage">
-  <header class="shell-header">
-    <div class="title-group">
-      <p class="eyebrow">北一二B 智慧營運中心</p>
-      <h1>KPI 戰情</h1>
-      <p class="subtitle">沿用每日回報既有正式資料、權限與計算邏輯</p>
-    </div>
-    <a class="home-link" href="home.html" aria-label="返回智慧營運中心">返回大廳</a>
-  </header>
+<header class="shell-header">
+  <div class="title-group">
+    <p class="eyebrow">北一二B 智慧營運中心</p>
+    <h1>KPI 戰情</h1>
+    <p class="subtitle">沿用每日回報既有正式資料、權限與計算邏輯</p>
+  </div>
+  <a class="home-link" href="home.html" aria-label="返回智慧營運中心">返回大廳</a>
+</header>
 
-  <section class="frame-wrap" aria-label="KPI 戰情內容">
-    <iframe id="kpiBattleFrame" src="index.html" title="北一二B KPI 戰情"></iframe>
-    <div class="fallback" id="frameFallback" role="alert">
-      <p>目前無法載入獨立 KPI 戰情。請改由<a href="index.html">每日回報內的 KPI 戰情</a>進入；權限與資料規則完全相同。</p>
+<main id="panel-kpi-battle" aria-label="KPI 戰情內容">
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>🏆 KPI戰情 · 正式每日戰報</div>
+    <div class="kpi-battle-toolbar">
+      <div class="kpi-battle-toggle">
+        <button id="kpiBattleStoreBtn" class="active" data-kpi-battle-view="stores">店點總覽</button>
+        <button id="kpiBattlePersonalBtn" data-kpi-battle-view="personal">個績排名</button>
+      </div>
+      <div class="kpi-battle-note" id="kpiBattleSourceNote">讀取受保護資料中…</div>
     </div>
-  </section>
+  </div>
+  <div id="kpiBattleContent"><div class="kpi-empty">讀取 KPI 戰情資料中…</div></div>
+  <noscript><div class="card private-lock standalone-error"><h3>KPI 戰情暫時無法載入</h3><p>瀏覽器未啟用 JavaScript，因此不顯示任何 KPI 數值。請返回<a href="index.html">每日回報內的 KPI 戰情</a>。</p></div></noscript>
 </main>
 
+<script src="kpi-battle-controller.js"></script>
 <script>
-  const frame = document.getElementById('kpiBattleFrame');
-  const page = document.getElementById('standalonePage');
+  const panel = document.getElementById('panel-kpi-battle');
 
-  function failClosed() {
-    page.classList.add('frame-error');
+  function failClosed(message) {
+    panel.classList.add('standalone-failed');
+    const note = document.getElementById('kpiBattleSourceNote');
+    if (note) note.textContent = message || 'KPI 戰情目前無法載入。';
+    const content = document.getElementById('kpiBattleContent');
+    if (content) content.innerHTML = '<div class="card private-lock standalone-error"><h3>KPI 戰情暫時無法載入</h3><p>未取得正式授權資料，因此不顯示任何 KPI 數值。請返回<a href="index.html">每日回報內的 KPI 戰情</a>。</p></div>';
   }
 
-  frame.addEventListener('load', async () => {
-    try {
-      const frameWindow = frame.contentWindow;
-      const frameDocument = frame.contentDocument;
-      if (!frameWindow || !frameDocument) throw new Error('KPI frame unavailable');
-
-      const kpiButton = Array.from(frameDocument.querySelectorAll('.tab-btn'))
-        .find(button => button.getAttribute('onclick') === "switchTab('kpi-battle')");
-      const kpiPanel = frameDocument.getElementById('panel-kpi-battle');
-      if (!kpiButton || !kpiPanel || typeof frameWindow.loadKpiBattle !== 'function') {
-        throw new Error('KPI entry unavailable');
-      }
-
-      const standaloneStyle = frameDocument.createElement('style');
-      standaloneStyle.dataset.phase1aKpiStandalone = 'true';
-      standaloneStyle.textContent = `
-        html, body { min-width: 0 !important; }
-        body { background: #f3f5f8 !important; }
-        .site-header, #marqueeBar, .tab-bar { display: none !important; }
-        #panel-kpi-battle { max-width: 1640px; min-width: 0; padding-top: 16px; }
-        #panel-kpi-battle .card:first-child { margin-top: 0; }
-        @media (max-width: 520px) {
-          #panel-kpi-battle { padding: 10px 8px 18px !important; }
-          #panel-kpi-battle .card { padding-left: 13px !important; padding-right: 13px !important; }
-        }
-      `;
-      frameDocument.head.appendChild(standaloneStyle);
-
-      // Safari 不保證程式化 click 會提供 index.html 的舊式全域 event。
-      // 直接啟用既有面板並呼叫既有 loader，避免複製權限、資料或計算邏輯。
-      frameDocument.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
-      frameDocument.querySelectorAll('.tab-btn').forEach(button => button.classList.remove('active'));
-      kpiPanel.classList.add('active');
-      kpiButton.classList.add('active');
-      await frameWindow.loadKpiBattle();
-
-      const kpiContent = frameDocument.getElementById('kpiBattleContent');
-      if (!kpiContent || !kpiContent.children.length) throw new Error('KPI content unavailable');
-      frame.dataset.ready = 'true';
-    } catch (error) {
-      failClosed();
-    }
-  });
-
-  frame.addEventListener('error', failClosed);
+  try {
+    if (!window.KpiBattleController) throw new Error('KPI controller unavailable');
+    let GAS_URL = KpiBattleController.resolveGasUrl(localStorage);
+    window.kpiBattleController = KpiBattleController.create({
+      window,
+      document,
+      getGasUrl: () => GAS_URL,
+    });
+    window.kpiBattleController.load();
+    panel.dataset.ready = 'true';
+  } catch (error) {
+    failClosed('KPI 戰情控制器載入失敗。');
+  }
 </script>
 </body>
 </html>
