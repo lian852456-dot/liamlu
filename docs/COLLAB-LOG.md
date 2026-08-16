@@ -15,9 +15,9 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ## 2026-08-16 ｜ Codex（智慧營運中心 Phase 1A：KPI 戰情獨立入口，未部署）
 
-- 做了什麼：從最新 `origin/main` `fa40375` 建立隔離分支 `feature/ops-center-kpi-battle-standalone`。新增 `kpi-battle.html` 同源殼層，直接載入並切換到原 `index.html` 的既有 KPI 面板；沒有複製權限、資料存取、公式或 localStorage fallback。`home.html` 同仁大廳新增第一順位「KPI 戰情」，其餘既有入口只因排序位移，連結與功能不變；原 `index.html` KPI 仍保留。
-- 結果（本機完成，待 Liam 正式驗收）：新舊 KPI 合約比對確認戰報日期、資料截止日、來源檔、北一二B整體、9 店、公司排名、DOD、加掛、保險搭售率與 25 項 KPI 明細逐區文字完全相同；權限 action 序列同為 `private_access → kpicalc_access`，未授權時不讀舊 localStorage 且維持 fail-closed。Node `204/204`、Phase 1A／原 index／`kpi.html`／App 1.1／App 1.2 聚焦 Playwright `48/48`，390px 無水平溢出。完整 Playwright 為 `141/142`；唯一失敗的半月督導 fixture 在乾淨 `origin/main` 也以相同 `5 / 9` 對 `18/18 已填0 / 9` 失敗，屬既有基線且依 App Freeze 未修改。
-- 經驗 / 給下一位的提醒：Phase 1A 刻意使用同源殼層共享既有正式邏輯，`index.html`、`kpi.html`、App Freeze 檔案與 `gas/Code.gs` diff 均應為 0。尚未 merge、未部署、未做正式 HTTPS／核准裝置／Liam 驗收；下一步只能由 Liam 決定是否進入正式驗收，不得順手處理台獎、App、GAS、PR 或其他 backlog。
+- 做了什麼：最初由 `origin/main` `fa40375` 建立隔離分支 `feature/ops-center-kpi-battle-standalone`；正式驗收前再 fetch，確認最新 main 為 `d8edb5557126c81418de305f11164373edfccc47`，並將原 commit `c2011d9` 無衝突 rebase 為 patch-equivalent `76422dc`。新增 `kpi-battle.html` 同源殼層，直接載入並切換到原 `index.html` 的既有 KPI 面板；`home.html` 同仁大廳新增第一順位「KPI 戰情」，原 KPI 與其他入口保留。
+- 結果（Draft PR #53，待 Liam 正式驗收）：同步後 Node `204/204`；Phase 1A exact match、原 index、`kpi.html`、App 1.2 與 390px 聚焦 Playwright `40/40`。新舊日期、來源、北一二B整體、9 店、公司排名、DOD、加掛、保險搭售率與 25 項 KPI 逐區完全相同；權限 action 同為 `private_access → kpicalc_access`，未授權維持 fail-closed。遠端 Draft PR base 為指定 main、merge state `CLEAN`。
+- 經驗 / 給下一位的提醒：`range-diff` 證明 rebase 前後 Phase 1A patch 等價；最新 main 新增的 `.github/workflows/publisher-shadow-preflight.yml` 與分支 blob 完全相同。`index.html`、`kpi.html`、App Freeze 檔案與 `gas/Code.gs` diff 均為 0。尚未 merge、未部署、未做正式 HTTPS／核准裝置／Liam 驗收；不得進入 Phase 1B 或順手處理台獎、回報拆分、App、GAS 或其他 backlog。
 
 ## 2026-08-12 ｜ Codex（半月 hwrite Security Review 修復，未部署）
 
