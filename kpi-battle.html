@@ -153,14 +153,18 @@
     page.classList.add('frame-error');
   }
 
-  frame.addEventListener('load', () => {
+  frame.addEventListener('load', async () => {
     try {
+      const frameWindow = frame.contentWindow;
       const frameDocument = frame.contentDocument;
-      if (!frameDocument) throw new Error('KPI frame unavailable');
+      if (!frameWindow || !frameDocument) throw new Error('KPI frame unavailable');
 
       const kpiButton = Array.from(frameDocument.querySelectorAll('.tab-btn'))
         .find(button => button.getAttribute('onclick') === "switchTab('kpi-battle')");
-      if (!kpiButton) throw new Error('KPI entry unavailable');
+      const kpiPanel = frameDocument.getElementById('panel-kpi-battle');
+      if (!kpiButton || !kpiPanel || typeof frameWindow.loadKpiBattle !== 'function') {
+        throw new Error('KPI entry unavailable');
+      }
 
       const standaloneStyle = frameDocument.createElement('style');
       standaloneStyle.dataset.phase1aKpiStandalone = 'true';
@@ -176,7 +180,17 @@
         }
       `;
       frameDocument.head.appendChild(standaloneStyle);
-      kpiButton.click();
+
+      // Safari 不保證程式化 click 會提供 index.html 的舊式全域 event。
+      // 直接啟用既有面板並呼叫既有 loader，避免複製權限、資料或計算邏輯。
+      frameDocument.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+      frameDocument.querySelectorAll('.tab-btn').forEach(button => button.classList.remove('active'));
+      kpiPanel.classList.add('active');
+      kpiButton.classList.add('active');
+      await frameWindow.loadKpiBattle();
+
+      const kpiContent = frameDocument.getElementById('kpiBattleContent');
+      if (!kpiContent || !kpiContent.children.length) throw new Error('KPI content unavailable');
       frame.dataset.ready = 'true';
     } catch (error) {
       failClosed();

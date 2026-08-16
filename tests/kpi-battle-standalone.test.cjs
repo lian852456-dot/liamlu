@@ -10,7 +10,8 @@ const home = fs.readFileSync(path.join(root, 'home.html'), 'utf8');
 test('獨立頁只承載原 index KPI 面板，不複製資料、權限或計算邏輯', () => {
   assert.match(standalone, /<iframe[^>]+src="index\.html"/);
   assert.match(standalone, /switchTab\('kpi-battle'\)/);
-  assert.match(standalone, /kpiButton\.click\(\)/);
+  assert.match(standalone, /frameWindow\.loadKpiBattle\(\)/);
+  assert.doesNotMatch(standalone, /kpiButton\.click\(\)/);
   assert.doesNotMatch(standalone, /kpicalc_access|private_access|private_request|private_admin_approve/);
   assert.doesNotMatch(standalone, /function\s+(?:kpicalcMetric|kpicalcToKpiBattleView|mergeKpiBattleSupplement|renderKpiBattle)/);
   assert.doesNotMatch(standalone, /localStorage\.(?:getItem|setItem)/);
