@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-16 ｜ Codex（智慧營運中心 Phase 1A：KPI 戰情獨立入口，未部署）
+
+- 做了什麼：最初由 `origin/main` `fa40375` 建立隔離分支 `feature/ops-center-kpi-battle-standalone`；正式驗收前再 fetch，確認最新 main 為 `d8edb5557126c81418de305f11164373edfccc47`，並將原 commit `c2011d9` 無衝突 rebase 為 patch-equivalent `76422dc`。新增 `kpi-battle.html` 同源殼層，直接載入並切換到原 `index.html` 的既有 KPI 面板；`home.html` 同仁大廳新增第一順位「KPI 戰情」，原 KPI 與其他入口保留。
+- 結果（Draft PR #53，待 Liam 正式驗收）：同步後 Node `204/204`；Phase 1A exact match、原 index、`kpi.html`、App 1.2 與 390px 聚焦 Playwright `40/40`。新舊日期、來源、北一二B整體、9 店、公司排名、DOD、加掛、保險搭售率與 25 項 KPI 逐區完全相同；權限 action 同為 `private_access → kpicalc_access`，未授權維持 fail-closed。遠端 Draft PR base 為指定 main、merge state `CLEAN`。
+- 經驗 / 給下一位的提醒：`range-diff` 證明 rebase 前後 Phase 1A patch 等價；最新 main 新增的 `.github/workflows/publisher-shadow-preflight.yml` 與分支 blob 完全相同。`index.html`、`kpi.html`、App Freeze 檔案與 `gas/Code.gs` diff 均為 0。尚未 merge、未部署、未做正式 HTTPS／核准裝置／Liam 驗收；不得進入 Phase 1B 或順手處理台獎、回報拆分、App、GAS 或其他 backlog。
+
 ## 2026-08-12 ｜ Codex（半月 hwrite Security Review 修復，未部署）
 
 - 做了什麼：依獨立 diff review，將 App 專用 hwrite 從 JSONP query 改為單次 POST body；移除 client URL chunk。新增 doPost hwrite route，沿用 ptauth token，server 先完整驗證 rows，再於 ScriptLock 內依 period/store/item 更新。App POST 拒絕非異常狀態的 note/improvement、evidence/media 與任意 extra field；既有 patrol.html JSONP hwrite 保持相容。
