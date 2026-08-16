@@ -2150,6 +2150,7 @@
 
 
 <script src="kpi-battle-controller.js"></script>
+<script src="awards-battle-controller.js"></script>
 <script>
 // ════════════════════════════════════
 // CONFIG
@@ -2483,9 +2484,7 @@ function switchTab(name) {
 // ════════════════════════════════════
 // KPI BATTLE — official daily report, protected by employee ID + approved device
 // ════════════════════════════════════
-// KPI BATTLE — shared controller; index keeps only its awards integration hooks.
-let _awardsBattleData = null;
-let _awardsBattleUnavailableReason = '';
+// KPI／台獎戰情共用既有 Approved Device 與正式資料驗證流程。
 
 const PRIVATE_DASHBOARD_ALLOWED_MESSAGE_ORIGINS = new Set([
   'https://script.google.com',
@@ -2523,32 +2522,24 @@ async function privateDashboardPost(payload) {
 }
 
 function handleKpiLoaded({ result, data }) {
-  const awards = result.snapshot && result.snapshot.awardsBattle;
-  const awardsDate = String((awards || {}).report_date || '');
-  if (awards && awardsDate === data.report_date) {
-    _awardsBattleData = awards;
-    _awardsBattleUnavailableReason = '';
-    renderAwardsBattle();
-  } else {
-    _awardsBattleData = null;
-    _awardsBattleUnavailableReason = awardsDate
-      ? `台獎戰報日期 ${awardsDate} 與 KPI 戰報日期 ${data.report_date || '—'} 不一致`
-      : '尚未取得與目前 KPI 同日期的台獎資料';
-    renderAwardsBattleUnavailable();
-  }
+  awardsBattleController.acceptKpiResult({ result, data });
 }
 
 function handleKpiLoadError() {
-  _awardsBattleData = null;
-  _awardsBattleUnavailableReason = 'KPI 正式資料尚未讀回，因此不顯示可能過期的台獎資料';
-  renderAwardsBattleUnavailable();
+  awardsBattleController.handleKpiLoadError();
 }
+
+const awardsBattleController = AwardsBattleController.create({
+  window,
+  document,
+  renderLock: () => kpiBattleController.renderLock(),
+});
 
 const kpiBattleController = KpiBattleController.create({
   window,
   document,
   getGasUrl: () => GAS_URL,
-  getAwardsData: () => _awardsBattleData,
+  getAwardsData: () => awardsBattleController.getData(),
   onKpiLoaded: handleKpiLoaded,
   onKpiLoadError: handleKpiLoadError,
   post: privateDashboardPost,
@@ -2558,115 +2549,16 @@ function renderPrivateDashboardLock() {
   return kpiBattleController.renderLock();
 }
 
-function kpiBattlePercent(value) {
-  return KpiBattleController.formatPercent(value);
-}
-
-function kpiBattleNumber(value) {
-  return KpiBattleController.formatNumber(value);
-}
-
-
-function awardMoney(value) {
-  return KpiBattleController.formatMoney(value);
-}
-
-function awardRateTone(value) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return '';
-  if (number >= 1) return 'good';
-  if (number >= 0.5) return 'warn';
-  return 'bad';
-}
-
-function renderAwardPriority(item) {
-  if (!item) return '';
-  const difference = Number(item.difference);
-  const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${kpiBattleNumber(difference)}` : '—';
-  return `<div class="award-priority-card">
-    <div class="award-priority-title">${item.display_name}</div>
-    <div class="award-priority-action">${item.next_label || '已達最高獎階'}</div>
-    <div class="award-priority-metrics">
-      <div class="award-metric">實際數<strong>${kpiBattleNumber(item.actual)}</strong></div>
-      <div class="award-metric">目標數<strong>${kpiBattleNumber(item.target)}</strong></div>
-      <div class="award-metric">達成率<strong class="${awardRateTone(item.rate)}">${kpiBattlePercent(item.rate)}</strong></div>
-      <div class="award-metric">差異數<strong class="${difference < 0 ? 'bad' : 'good'}">${differenceText}</strong></div>
-      <div class="award-metric wide">會增加多少獎金<strong>${awardMoney(item.incremental_award)}</strong></div>
-    </div>
-  </div>`;
-}
-
-function renderAwardModel(item, district = false) {
-  const difference = Number(item.difference);
-  const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${kpiBattleNumber(difference)}` : '—';
-  const levels = district
-    ? [{ label: '北一二B 80%獎金', amount: item.district_reward_80 }, { label: '北一二B 100%獎金', amount: item.district_reward_100 }]
-    : [{ label: '店點 50%獎金', amount: item.store_reward_50 }, { label: '店點 100%獎金', amount: item.store_reward_100 }];
-  const thresholdLabel = district ? '80%' : '50%';
-  return `<div class="award-model"><div class="award-model-name">${item.display_name}</div><div class="award-model-rate ${awardRateTone(item.rate)}">${kpiBattlePercent(item.rate)}</div><span class="award-model-sub">實際 ${kpiBattleNumber(item.actual)}｜目標 ${kpiBattleNumber(item.target)}</span><span class="award-model-sub">${thresholdLabel}差異 ${differenceText}｜${thresholdLabel}目標 ${kpiBattleNumber(item.threshold_target)}</span><div class="award-model-tiers">${levels.map(level => `<div class="award-model-tier">${level.label}<strong>${awardMoney(level.amount)}</strong></div>`).join('')}</div></div>`;
-}
-
-function renderAwardUnit(row, district = false) {
-  const award = row?.award || {};
-  return `<div class="award-store-card"><div class="award-store-head"><div class="award-store-name">${district ? '🏢 ' : ''}${row?.store || '—'}</div><div class="award-store-rank">排名 ${award.rank ?? '—'}<br>${award.award === 'Y' ? '✅ 可領獎' : '⚠️ 未領獎'}</div></div>
-    <div class="award-role-indicator${district ? ' district' : ''}">${district ? '督導獎金角色｜北一二B 80%／100%' : '店長獎金角色｜店點 50%／100%'}</div>
-    <div class="award-store-values"><div class="award-value"><div class="label">實際金額</div><div class="number">${awardMoney(award.actual_total)}</div></div><div class="award-value"><div class="label">推估金額</div><div class="number">${awardMoney(award.projected)}</div></div></div>
-    <div class="award-priority-grid">${(row?.priorities || []).map(renderAwardPriority).join('') || '<span class="val-dim">沒有符合優先順位的機款</span>'}</div>
-  </div>`;
-}
-
 async function loadAwardsBattle() {
-  if (_awardsBattleData) { renderAwardsBattle(); return; }
-  if (_awardsBattleUnavailableReason) { renderAwardsBattleUnavailable(); return; }
-  if (window.__AWARDS_BATTLE_DATA__) {
-    _awardsBattleData = window.__AWARDS_BATTLE_DATA__;
-    renderAwardsBattle();
-    return;
-  }
-  const note = document.getElementById('awardsBattleSourceNote');
-  if (note) note.textContent = '需通過員編與已核准裝置驗證後，才會由私有 Google Drive 載入資料。';
-  renderPrivateDashboardLock();
+  awardsBattleController.load();
 }
 
 function renderAwardsBattle() {
-  if (!_awardsBattleData) return;
-  const data = _awardsBattleData;
-  const supervisor = data.supervisor || {};
-  const stores = data.stores || [];
-  const phoneItems = Number.isFinite(Number(data.phone_items)) ? Number(data.phone_items) : (data.overall?.items || []).length;
-  const storeRows = Number.isFinite(Number(data.store_rows)) ? Number(data.store_rows) : stores.length + 1;
-  const eligibleStores = stores.filter(row => row.award?.award === 'Y').length;
-  const selectedBefore = document.getElementById('awardsStoreSelect')?.value;
-  const selectedDistrict = !selectedBefore || selectedBefore === '北一二B整體';
-  const selectedUnit = selectedDistrict
-    ? (data.overall || { store: '北一二B整體', items: [] })
-    : (stores.find(row => row.store === selectedBefore) || data.overall || stores[0] || { store: '—', items: [] });
-  const note = document.getElementById('awardsBattleSourceNote');
-  if (note) note.textContent = `${phoneItems} 款重點機款｜${storeRows} 列店點與整體資料｜台獎戰報日期 ${data.report_date || '—'}｜前三台依本月最高台獎順位；達成率超過 100% 由下一順位遞補｜店點差異數以 50% 目標無條件進位計算｜資料僅供受保護預覽`;
-  const content = document.getElementById('awardsBattleContent');
-  if (!content) return;
-  content.innerHTML = `
-    <div class="summary-grid">
-      <div class="summary-card"><div class="sc-label">督導區實際獎金</div><div class="sc-val" style="color:#6d28d9">${awardMoney(supervisor.actual_total)}</div><div class="sc-sub">公司實際獎金</div></div>
-      <div class="summary-card"><div class="sc-label">督導區推估獎金</div><div class="sc-val" style="color:var(--accent)">${awardMoney(supervisor.projected)}</div><div class="sc-sub">依目前進度推估</div></div>
-      <div class="summary-card"><div class="sc-label">督導區排名</div><div class="sc-val" style="color:var(--gold)">${supervisor.rank ?? '—'}</div><div class="sc-sub">公司獎金排名</div></div>
-      <div class="summary-card"><div class="sc-label">是否領獎</div><div class="sc-val" style="color:${supervisor.award === 'Y' ? 'var(--green)' : 'var(--red)'}">${supervisor.award === 'Y' ? '有' : '無'}</div><div class="sc-sub">督導區資格</div></div>
-      <div class="summary-card"><div class="sc-label">有領獎店</div><div class="sc-val" style="color:var(--green)">${eligibleStores}</div><div class="sc-sub">家門市</div></div>
-      <div class="summary-card"><div class="sc-label">未領獎店</div><div class="sc-val" style="color:var(--red)">${stores.length - eligibleStores}</div><div class="sc-sub">家門市</div></div>
-    </div>
-    <div class="section-divider">督導區及各店台獎（依實際獎金排序）</div>
-    <div class="award-store-grid">${renderAwardUnit(data.overall || { store: '北一二B整體', award: supervisor, priorities: [] }, true)}${stores.map(row => renderAwardUnit(row)).join('')}</div>
-    <div class="section-divider">北一二B／門市 ${phoneItems} 款機款篩選</div>
-    <div class="card"><div class="award-store-selector"><label>選擇北一二B／門市<select id="awardsStoreSelect" onchange="renderAwardsBattle()"><option value="北一二B整體" ${selectedDistrict ? 'selected' : ''}>🏢 北一二B整體</option>${stores.map(row => `<option value="${row.store}" ${row.store === selectedUnit?.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label><span class="kpi-battle-note">${selectedDistrict ? '北一二B差異數＝實際數－80%目標台數（無條件進位）' : '店點差異數＝實際數－50%目標台數（無條件進位）'}</span></div><div class="award-role-indicator${selectedDistrict ? ' district' : ''}">${selectedDistrict ? '目前檢視：督導獎金角色｜北一二B 80%／100%' : '目前檢視：店長獎金角色｜店點 50%／100%'}</div><div class="award-model-grid">${(selectedUnit?.items || []).map(item => renderAwardModel(item, selectedDistrict)).join('')}</div></div>`;
-
+  awardsBattleController.render();
 }
 
 function renderAwardsBattleUnavailable() {
-  const note = document.getElementById('awardsBattleSourceNote');
-  if (note) note.textContent = '台獎尚未同步：不使用舊 dashboard snapshot 的數字。';
-  const content = document.getElementById('awardsBattleContent');
-  if (!content) return;
-  content.innerHTML = `<div class="card private-lock"><h3>台獎尚未同步</h3><p>${_awardsBattleUnavailableReason || '尚未取得與目前 KPI 同日期的台獎資料。'}</p><p class="kpi-battle-note">KPI 已使用最新正式 JSON；台獎會在同日期正式資料完成後另行顯示。</p></div>`;
+  awardsBattleController.renderUnavailable();
 }
 
 // ════════════════════════════════════

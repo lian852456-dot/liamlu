@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-17 ｜ Codex（Phase 1B：台獎戰情獨立化，implementation complete / awaiting Liam acceptance）
+
+- 做了什麼：從正式 `origin/main` `a43ba42688125e68021ad1548e47ce1ca151e6b9` 建立隔離分支 `feature/phase1b-awards-battle-standalone`。新增 `awards-battle-controller.js` 與 `awards-battle.html`；原 `index.html` 與 standalone 共用同一台獎 controller，standalone 直接沿用既有 KPI controller 的 Approved Device／員編、`private_access → kpicalc_access`、同次正式 `snapshot.awardsBattle` 與 fail-closed。已移除 standalone iframe、程式化 click、`window.event` 與 DOM 遙控；沒有第二套 API、公式、JSON、快取、登入或 localStorage 台獎 fallback。原 index 台獎保留，`home.html` 順序為 KPI 第一、台獎第二。
+- 結果（implementation complete / awaiting Liam acceptance）：Node `211/211`；台獎 standalone Chromium `5/5`、WebKit `5/5`，涵蓋 Approved Device、action 次序、未授權 fail-closed、日期／13 款／9 店完整性、原 index 與 standalone 九店逐店 exact match、390px 與返回大廳；原 index／KPI／App 聚焦 Chromium `54/54`，KPI WebKit `5/5`。完整 Chromium 為 `147/149`，兩個失敗已在乾淨同 SHA `origin/main` 以相同訊息重現：半月檢查既有 `5 / 9` 斷言，以及巡店里程入口 fixture 的九店 contract；均不屬 Phase 1B diff。
+- 經驗 / 給下一位的提醒：App、Native/iOS、`gas/Code.gs`、`kpi-battle-controller.js`、`kpi.html`、正式 KPI／台獎 JSON/schema、Mail、Trigger、巡店、半月檢查、班表與回報邏輯均 0 diff。只可建立遠端分支與 Draft PR；未 Ready、未合併、未部署 Pages/GAS、未建立 rollback tag、未做正式資料 readback 或 Liam iPhone Safari smoke。下一步只等待 Liam 驗收決策，不得自行擴大到其他階段。
+
 ## 2026-08-16 ｜ Codex（Phase 1A.2：KPI Standalone 共用控制器，未部署）
 
 - 做了什麼：從最新 `origin/main` `d12068f91185ac86117b414595700ca91ab2b43e` 建立隔離分支 `feature/phase1a2-kpi-controller-shared`。將 Approved Device／員編、`private_access → kpicalc_access`、KPI adapter、同次快照 supplement merge、店績／個績 renderer 與 fail-closed 抽到唯一 `kpi-battle-controller.js`；`index.html` 與 `kpi-battle.html` 均掛載同一 controller，standalone 不再以 iframe 遙控 index。沒有新增 KPI 公式、API、JSON、快取、登入或 localStorage KPI fallback。
