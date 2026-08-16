@@ -161,6 +161,36 @@ test('獨立頁與原 KPI 戰情維持同一權限行為，失敗時不吃 local
   expect(await frame.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
 });
 
+test('Safari 不提供全域 event 時仍會啟動既有 KPI 正式載入流程', async ({ page }) => {
+  const actions = await mockKpi(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'event', {
+      configurable: false,
+      get: () => undefined,
+    });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${baseUrl}/kpi-battle.html`);
+
+  const frame = page.frameLocator('#kpiBattleFrame');
+  await expect(page.locator('#kpiBattleFrame')).toHaveAttribute('data-ready', 'true');
+  await expect(frame.locator('#panel-kpi-battle')).toBeVisible();
+  await expect(frame.locator('#kpiBattleContent')).toContainText('KPI 戰情受保護');
+
+  await loginKpi(frame);
+  await expect(frame.locator('#kpiBattleContent tbody tr')).toHaveCount(10);
+  await frame.getByRole('button', { name: '個績排名' }).click();
+  await expect(frame.locator('#kpiBattleContent tbody tr')).toHaveCount(1);
+  await expect(frame.locator('#kpiBattleContent')).toContainText('測＊員');
+  expect(actions.filter(action => ['private_access', 'kpicalc_access'].includes(action))).toEqual(['private_access', 'kpicalc_access']);
+
+  expect(await page.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
+  expect(await frame.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
+  await page.locator('.home-link').click();
+  await expect(page).toHaveURL(`${baseUrl}/home.html`);
+  await expect(page.getByRole('heading', { name: '同仁大廳' })).toBeVisible();
+});
+
 test('新舊 KPI 畫面逐區同值：日期、來源、整體、9 店、排名、DOD、加掛、保險與 25 項明細', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const oldPage = await context.newPage();
