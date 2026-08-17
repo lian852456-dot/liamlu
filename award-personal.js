@@ -96,12 +96,11 @@
   }
   function sortedRows(rows) {
     const filtered = (Array.isArray(rows) ? rows : []).filter(row => storeFilter === 'all' || row.store === storeFilter);
-    const leaderboardRanks = new Map(filtered.slice().sort((a,b) => compareNullableAmount(a,b,'desc')).map((row,index) => [row,index + 1]));
     return filtered.slice().sort((a,b) => {
       if (sortMode === 'amount-asc') return compareNullableAmount(a,b,'asc');
       if (sortMode === 'name') return a.name.localeCompare(b.name,'zh-Hant') || tieBreak(a,b);
       return compareNullableAmount(a,b,'desc');
-    }).map(row => ({ ...row, leaderboardRank:leaderboardRanks.get(row) }));
+    });
   }
 
   async function privateEndpoint() {
@@ -167,14 +166,14 @@
   }
 
   function personCard(row) {
-    const visibleRank = row.leaderboardRank;
-    const medal = visibleRank === 1 ? '🥇' : visibleRank === 2 ? '🥈' : visibleRank === 3 ? '🥉' : String(visibleRank);
+    const formalRank = row.rank;
+    const medal = formalRank === 1 ? '🥇' : formalRank === 2 ? '🥈' : formalRank === 3 ? '🥉' : formalRank == null ? '—' : String(formalRank);
     const eligibility = row.eligible === 'Y' ? '<span class="award-person-status yes">領獎</span>' : row.eligible === 'N' ? '<span class="award-person-status no">未領獎</span>' : '<span class="award-person-status pending">尚未同步</span>';
     const syncClass = row.amount == null ? ' unsynced' : '';
     return `<article class="award-person-row${syncClass}">
-      <div class="award-person-order" aria-label="台獎排行榜第 ${visibleRank} 名">${medal}</div>
+      <div class="award-person-order" aria-label="${formalRank==null?'台獎排名尚未同步':`台獎排名第 ${formalRank} 名`}">${medal}</div>
       <div class="award-person-main"><div class="award-person-name"><strong>${escapeHtml(row.name)}</strong>${eligibility}</div><small>${escapeHtml(row.store)} · ${row.role?escapeHtml(row.role):'職稱／類別尚未同步'}</small></div>
-      <div class="award-person-money"><strong>${escapeHtml(money(row.amount))}</strong><small>推估 ${escapeHtml(money(row.projected))} · 正式排名 ${row.rank==null?'尚未同步':`#${escapeHtml(row.rank)}`}</small></div>
+      <div class="award-person-money"><strong>${escapeHtml(money(row.amount))}</strong><small>推估 ${escapeHtml(money(row.projected))} · 台獎排名 ${row.rank==null?'尚未同步':`#${escapeHtml(row.rank)}`}</small></div>
     </article>`;
   }
 
@@ -196,7 +195,7 @@
       <section class="panel award-person-panel"><div class="panel-head"><div><h2>個人台獎</h2><small>${escapeHtml(label)} · ${rows.length} 人</small></div><span>${escapeHtml(data.reportDate || '—')}</span></div>
         <div class="award-person-list">${rows.length ? rows.map(personCard).join('') : '<div class="empty-state">目前篩選條件沒有個人台獎資料。</div>'}</div>
       </section>
-      <p class="award-person-note">金額、推估、正式排名與領獎狀態皆沿用正式私有快照；App 只做篩選與排序，不重算台獎。</p>
+      <p class="award-person-note">金額、推估、台獎排名與領獎狀態皆沿用正式私有快照；App 只做篩選與排序，不重算台獎。</p>
       <a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>
     </div>`;
     renderGuard = false;

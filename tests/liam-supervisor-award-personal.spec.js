@@ -70,7 +70,7 @@ test('390x844 personal award leaderboard supports formal values, filters, sorts,
   await expect(page.locator('#awardPersonSortSelect')).toHaveValue('amount-desc');
   await expect(page.locator('#awardPersonStoreSelect option')).toHaveText(['全部店點',...STORES]);
   await expect(page.locator('.award-person-row')).toHaveCount(5);
-  await expect(page.locator('.award-person-order')).toHaveText(['🥇','🥈','🥉','4','5']);
+  await expect(page.locator('.award-person-order')).toHaveText(['🥇','🥈','🥉','18','—']);
   await expect(page.locator('.award-person-row').nth(3)).toContainText('$0');
   await expect(page.locator('.award-person-row').nth(4)).toContainText('尚未同步');
   await expect(page.locator('.award-person-list')).toContainText('台北三創');
@@ -82,13 +82,14 @@ test('390x844 personal award leaderboard supports formal values, filters, sorts,
   await page.locator('#awardPersonSortSelect').selectOption('amount-asc');
   await expect(page.locator('.award-person-row').first()).toContainText('$0');
   await expect(page.locator('.award-person-row').last()).toContainText('尚未同步');
+  await expect(page.locator('.award-person-row').first().locator('.award-person-order')).toHaveText('18');
   await expect(page.locator('.award-person-row').filter({hasText:'安＊一'}).locator('.award-person-order')).toHaveText('🥇');
   await page.locator('#awardPersonSortSelect').selectOption('name');
   const nameOrder=await page.locator('.award-person-name strong').allTextContents();
   const expectedNameOrder=await page.evaluate(names=>names.slice().sort((a,b)=>a.localeCompare(b,'zh-Hant')),nameOrder);
   expect(nameOrder).toEqual(expectedNameOrder);
   await page.locator('#awardPersonSortSelect').selectOption('amount-desc');
-  await expect(page.locator('.award-person-order')).toHaveText(['🥇','🥈','🥉','4','5']);
+  await expect(page.locator('.award-person-order')).toHaveText(['🥇','🥈','🥉','18','—']);
   await page.evaluate(()=>window.scrollTo(0,0));
 
   const layout=await page.evaluate(()=>({

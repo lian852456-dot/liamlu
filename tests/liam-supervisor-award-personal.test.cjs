@@ -57,6 +57,7 @@ test('personal award extension is read-only and loaded without changing core app
   assert.doesNotMatch(featureSource, /localStorage\.setItem/);
   assert.match(featureSource, /App 只做篩選與排序，不重算台獎/);
   assert.match(featureSource, /推估 \$\{escapeHtml\(money\(row\.projected\)\)\}/);
-  assert.match(featureSource, /正式排名 \$\{row\.rank==null\?'尚未同步'/);
+  assert.match(featureSource, /台獎排名 \$\{row\.rank==null\?'尚未同步'/);
+  assert.doesNotMatch(featureSource, /leaderboardRanks/);
   assert.match(featureSource, /award-person-status pending/);
 });
