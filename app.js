@@ -4,6 +4,7 @@
   const C = scope.LiamSupervisorContract;
   const H = scope.LiamHalfMonthCheckReadModel;
   const Y = scope.LiamYesterdayFollowUpModel;
+  const P = scope.PatrolReadModel;
   const DAILY_REPORT_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
   const PATROL_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
   const PRIVATE_TIMEOUT_MS = 20_000;
@@ -1405,15 +1406,18 @@
     const overview=contract.patrolOverview.data; const today=contract.patrolToday.data;
     renderPatrolVisits();
     if (overview) {
-      const completed=numberOrNull(overview.visited); const expected=numberOrNull(overview.expected != null ? overview.expected : overview.total);
-      const remaining=numberOrNull(overview.remaining); const rate=numberOrNull(overview.completionRate);
+      const cycle=P&&P.halfMonthProgress?P.halfMonthProgress(overview,taipeiDate()):{verified:false};
+      const completed=cycle.verified?cycle.currentCompleted:null; const expected=cycle.verified?cycle.total:null;
+      const remaining=cycle.verified?cycle.currentRemaining:null; const rate=cycle.verified?cycle.currentRate:null;
       const attentionCount=numberOrNull(overview.attentionCount) ?? (Array.isArray(overview.attention)?overview.attention.length:0);
       const progressWidth=rate==null?0:Math.min(100,Math.max(0,rate*100));
-      const unvisitedBlock=Array.isArray(overview.unvisited)&&overview.unvisited.length
-        ? `<div class="patrol-unvisited"><b>未巡店點</b><p>${overview.unvisited.map(escapeHtml).join('、')}</p></div>`
-        : `<div class="patrol-unvisited"><b>未巡店點</b><p>${overview.periodVerified?'無':'等待正式期間資料'}</p></div>`;
-      const verificationNote=overview.periodVerified?'':'<p class="stale-note">巡店純讀取規則無法建立本月大盤，本頁已 fail-closed。</p>';
-      dom('#patrolOverview').innerHTML=`${contract.patrolOverview.status==='stale'?`<p class="stale-note">${escapeHtml(contract.patrolOverview.note)}</p>`:''}<section class="panel patrol-progress-panel"><div class="panel-head"><div><h2>本月巡店大盤進度</h2><small>${escapeHtml(overview.statisticsPeriod||'—')}</small></div></div><div class="patrol-progress-hero"><div><span>本月巡店率</span><strong class="${rate!=null&&rate<1?'gold-value':'positive'}">${fmtPct(rate)}</strong></div><div class="patrol-progress-track" role="progressbar" aria-label="本月巡店率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${rate==null?0:Math.round(progressWidth)}"><i style="width:${progressWidth}%"></i></div></div><div class="patrol-kpis patrol-kpis-four"><article><span>本月已巡店數</span><b class="positive">${completed==null?'—':completed}</b></article><article><span>全項完成店數</span><b class="positive">${overview.fullyDone==null?'—':overview.fullyDone}</b></article><article><span>尚缺檢核項次</span><b class="${overview.totalMissingItems?'negative':'positive'}">${overview.totalMissingItems==null?'—':overview.totalMissingItems}</b></article><article><span>尚未巡店數</span><b class="${remaining?'negative':'positive'}">${remaining==null?'—':remaining}</b></article></div><div class="patrol-rule-summary"><span>需關注店 <b class="${attentionCount?'negative':'positive'}">${attentionCount}</b></span><span>題 18 週期 <b>${escapeHtml(overview.item18Window&&overview.item18Window.label||'—')}</b></span><span>題 19–33 <b>每月 20 日前</b></span></div>${unvisitedBlock}${verificationNote}</section>${renderPatrolRuleBoards(overview)}`;
+      const unvisitedBlock=cycle.verified&&cycle.currentUnvisited.length
+        ? `<div class="patrol-unvisited"><b>本期未巡店點</b><p>${cycle.currentUnvisited.map(escapeHtml).join('、')}</p></div>`
+        : `<div class="patrol-unvisited"><b>本期未巡店點</b><p>${cycle.verified?'無':'等待可驗證的半月巡店摘要'}</p></div>`;
+      const verificationNote=cycle.verified?'':'<p class="stale-note">巡店摘要缺少可驗證的上下半月店點進度，本頁已 fail-closed，不沿用本月數字。</p>';
+      const cycleLabel=cycle.verified?cycle.period.label:'本期';
+      const doubleRound=cycle.verified?`<section class="patrol-double-round" aria-label="本月雙輪進度"><h3>本月雙輪進度</h3><div><span>上半月</span><b class="${cycle.h1Completed===cycle.total?'positive':cycle.period.half==='H1'?'cyan-value':''}">${cycle.h1Completed===cycle.total?'✅':cycle.period.half==='H1'?'🔵':'○'} ${cycle.h1Completed} / ${cycle.total}</b></div><div><span>下半月</span><b class="${cycle.h2Completed===cycle.total?'positive':cycle.period.half==='H2'?'cyan-value':''}">${cycle.h2Completed===cycle.total?'✅':cycle.period.half==='H2'?'🔵':'○'} ${cycle.h2Completed} / ${cycle.total}</b></div><div class="total"><span>整月</span><b>${cycle.wholeCompleted} / ${cycle.wholeTotal}</b></div></section>`:'';
+      dom('#patrolOverview').innerHTML=`${contract.patrolOverview.status==='stale'?`<p class="stale-note">${escapeHtml(contract.patrolOverview.note)}</p>`:''}<section class="panel patrol-progress-panel"><div class="panel-head"><div><h2>本期巡店進度</h2><small>${escapeHtml(cycle.verified?cycle.period.subtitle:'半月期別待驗證')}</small></div></div><div class="patrol-progress-hero"><div><span>${escapeHtml(cycleLabel)}巡店率</span><strong class="${rate!=null&&rate<1?'gold-value':'positive'}">${fmtPct(rate)}</strong></div><div class="patrol-progress-track" role="progressbar" aria-label="${escapeHtml(cycleLabel)}巡店率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${rate==null?0:Math.round(progressWidth)}"><i style="width:${progressWidth}%"></i></div><p>已完成 ${completed==null?'—':completed} / ${expected==null?'—':expected} 店</p></div><div class="patrol-kpis patrol-kpis-four"><article><span>本期已巡店數</span><b class="positive">${completed==null?'—':completed}</b></article><article><span>本期未巡店數</span><b class="${remaining?'negative':'positive'}">${remaining==null?'—':remaining}</b></article><article><span>本期全項完成店數</span><b class="positive">${cycle.verified?cycle.currentFullyDone:'—'}</b></article><article><span>尚缺檢核項次</span><b class="${cycle.verified&&cycle.currentMissingItems?'negative':'positive'}">${cycle.verified?cycle.currentMissingItems:'—'}</b></article></div>${doubleRound}<div class="patrol-rule-summary"><span>本期檢核 <b>題 2–13</b></span><span>月檢需關注店 <b class="${attentionCount?'negative':'positive'}">${attentionCount}</b></span><span>題 18 週期 <b>${escapeHtml(overview.item18Window&&overview.item18Window.label||'—')}</b></span><span>題 19–33 <b>每月 20 日前</b></span></div>${unvisitedBlock}${verificationNote}</section>${renderPatrolRuleBoards(overview)}`;
     } else dom('#patrolOverview').innerHTML=contract.patrolOverview.status==='unauthorized'?patrolUnlockState('解鎖後顯示巡店大盤'):`<div class="empty-state patrol-read-failure"><b>${escapeHtml(contract.patrolOverview.note||'巡店資料讀取失敗')}</b><button class="secondary-button" type="button" data-retry-patrol>重新整理</button></div>`;
     dom('#patrolTodayDetail').innerHTML=today&&today.route&&today.route.length?`<section class="patrol-today-card"><h2>今日巡店</h2><div class="route-line"><b>${today.route.map(escapeHtml).join(' → ')}</b></div><div class="route-line">已完成 ${today.completed}/${today.total} · 下一站 ${escapeHtml(today.nextStop||'—')} · ${escapeHtml(today.nextEta||'—')}</div></section>`:`<section class="patrol-today-card"><h2>今日巡店</h2><div class="route-line">${escapeHtml(contract.patrolToday.note||'今日無排定巡店')}</div></section>`;
     dom('#patrolStoreList').innerHTML=overview&&overview.stores?overview.stores.map(row=>`<div class="patrol-store-row"><span>${escapeHtml(row.name)}</span><span>${escapeHtml(row.lastVisit||'—')}</span><span>${row.daysSince==null?'—':row.daysSince+' 天'}</span><span class="${row.status==='attention'||row.status==='pending'?'negative':'positive'}">${escapeHtml(row.result||row.status)}<small>題18 ${row.item18&&row.item18.status==='done'?'完成':'未完成'} · 題19–33 ${row.awareness?row.awareness.count:0}/15</small></span></div>`).join(''):`<div class="empty-state">${escapeHtml(contract.patrolStores.status==='error'?(contract.patrolStores.note||'正式巡店讀取失敗'):'尚無店點巡店摘要。')}</div>`;
@@ -1464,6 +1468,7 @@
       fullyDone:numberOrNull(summary.fullyDoneStores), totalMissingItems:numberOrNull(summary.totalMissingItems),
       unvisited:summary.unvisitedStores.slice(), attention:summary.attentionStores.slice(), attentionCount:summary.attentionStores.length,
       item18Progress:summary.item18||null, inventory:summary.inventory14to17||null, items19to33:summary.items19to33||null,
+      halfDashboard:summary.halfDashboard||null,
       item18Window:summary.item18&&summary.item18.window||null, awarenessDeadlineDay:summary.items19to33&&summary.items19to33.deadlineDay||20,
       visitCounts:Array.isArray(summary.visitCounts)?summary.visitCounts.map(row=>({ ...row, name:row.store })):[],
       recent:Array.isArray(summary.recentVisits)?summary.recentVisits:[], stores:summary.stores,
@@ -1478,6 +1483,8 @@
     data.visitCounts=(data.visitCounts||[]).map(row=>({ ...row, name:normalizeStore(row.name) }));
     if(data.inventory) data.inventory.stores=data.inventory.stores.map(row=>({ ...row, name:normalizeStore(row.name) }));
     if(data.item18Progress) data.item18Progress.stores=data.item18Progress.stores.map(row=>({ ...row, name:normalizeStore(row.name) }));
+    if(data.items19to33) data.items19to33.stores=data.items19to33.stores.map(row=>({ ...row, store:normalizeStore(row.store) }));
+    if(data.halfDashboard) data.halfDashboard.stores=data.halfDashboard.stores.map(row=>({ ...row, store:normalizeStore(row.store) }));
     return data;
   }
 

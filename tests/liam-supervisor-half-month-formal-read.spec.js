@@ -55,6 +55,7 @@ test('formal hread maps nine stores while recovery remains read-only',async({pag
   const state=await installFormalRoutes(page);
   await page.goto(FORMAL_URL);
   await page.locator('[data-patrol-check-view="half-month"]').click();
+  await page.locator('[data-half-period="H1"]').click();
   await expect(page.locator('#halfMonthCheckPreview')).toContainText('FORMAL READ / 正式唯讀');
   await expect(page.locator('.half-preview-summary article').nth(0)).toContainText('5 / 9');
   await expect(page.locator('.half-preview-summary article').nth(1)).toContainText('3 店');

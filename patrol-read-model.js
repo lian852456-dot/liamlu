@@ -286,6 +286,121 @@
     };
   }
 
+  function halfMonthPeriod(dateValue) {
+    const match = String(dateValue || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    if (!year || month < 1 || month > 12 || day < 1 || day > lastDay) return null;
+    const half = day <= 15 ? 'H1' : 'H2';
+    const startDay = half === 'H1' ? 1 : 16;
+    const endDay = half === 'H1' ? 15 : lastDay;
+    return {
+      date:`${year}-${pad(month)}-${pad(day)}`,
+      month:`${year}-${pad(month)}`,
+      year,
+      monthNumber:month,
+      half,
+      label:half === 'H1' ? '上半月' : '下半月',
+      startDay,
+      endDay,
+      subtitle:`${year} 年 ${pad(month)} 月｜${half === 'H1' ? '上半月' : '下半月'} ${month}/${startDay}–${month}/${endDay}`
+    };
+  }
+
+  function halfMonthProgress(summary, dateValue) {
+    const source = summary && typeof summary === 'object' ? summary : {};
+    const period = halfMonthPeriod(dateValue);
+    const sourceMonth = String(source.currentMonth || source.month || '');
+    const stores = Array.isArray(source.stores) ? source.stores : [];
+    const dashboard = source.halfDashboard && Array.isArray(source.halfDashboard.stores)
+      ? source.halfDashboard.stores : [];
+    const total = Number(source.totalStores != null ? source.totalStores : (source.total != null ? source.total : stores.length));
+    if (!period || source.periodVerified !== true || sourceMonth !== period.month || !Number.isInteger(total) || total < 1 || stores.length !== total || dashboard.length !== total) {
+      return { verified:false, period, reason:'half-month patrol summary is incomplete' };
+    }
+
+    const names = stores.map(store => String(store && (store.name || store.store) || ''));
+    if (names.some(name => !name) || new Set(names).size !== total) {
+      return { verified:false, period, reason:'half-month patrol stores are incomplete' };
+    }
+    const knownNames = new Set(names);
+    const completedByHalf = { H1:new Set(), H2:new Set() };
+
+    const dashboardByStore = new Map();
+    dashboard.forEach(store => {
+      const name = String(store && (store.store || store.name) || '');
+      dashboardByStore.set(name, store);
+      ['H1', 'H2'].forEach(half => {
+        const state = store && store[half.toLowerCase()];
+        const hasInspectionEvidence = state && (
+          state.status === 'done' || Number(state.completed || 0) > 0 || Number(state.issues || 0) > 0
+        );
+        if (knownNames.has(name) && hasInspectionEvidence) completedByHalf[half].add(name);
+      });
+    });
+    if (dashboardByStore.size !== total || names.some(name => !dashboardByStore.has(name))) {
+      return { verified:false, period, reason:'half-month patrol dashboard stores do not align' };
+    }
+
+    const currentKey = period.half.toLowerCase();
+    const currentStates = names.map(name => dashboardByStore.get(name)[currentKey]);
+    if (currentStates.some(state => !state || !Number.isFinite(Number(state.missing)))) {
+      return { verified:false, period, reason:'half-month patrol item progress is incomplete' };
+    }
+    const inventorySource = source.inventory14to17 || source.inventory;
+    const item18Source = source.item18 || source.item18Progress;
+    const awarenessSource = source.items19to33;
+    const inventoryRows = inventorySource && Array.isArray(inventorySource.stores) ? inventorySource.stores : [];
+    const item18Rows = item18Source && Array.isArray(item18Source.stores) ? item18Source.stores : [];
+    const awarenessRows = awarenessSource && Array.isArray(awarenessSource.stores) ? awarenessSource.stores : [];
+    const rowMap = (rows, key) => new Map(rows.map(row => [String(row && (row[key] || row.name || row.store) || ''), row]));
+    const inventoryByStore = rowMap(inventoryRows, 'name');
+    const item18ByStore = rowMap(item18Rows, 'name');
+    const awarenessByStore = rowMap(awarenessRows, 'store');
+    if ([inventoryByStore, item18ByStore, awarenessByStore].some(map => map.size !== total || names.some(name => !map.has(name)))) {
+      return { verified:false, period, reason:'active-cycle patrol rules do not align' };
+    }
+    const currentVisited = completedByHalf[period.half];
+    const h1Completed = completedByHalf.H1.size;
+    const h2Completed = completedByHalf.H2.size;
+    const currentCompleted = currentVisited.size;
+    const activeMissingByStore = names.map(name => {
+      const halfState = dashboardByStore.get(name)[currentKey];
+      const inventory = inventoryByStore.get(name);
+      const item18 = item18ByStore.get(name);
+      const awareness = awarenessByStore.get(name);
+      const inventoryItems = inventory && inventory.items || {};
+      const inventoryMissing = [14, 15, 16, 17].filter(item => inventoryItems[item] !== true).length;
+      const awarenessTotal = Number(awareness && awareness.total);
+      const awarenessCount = Number(awareness && awareness.count);
+      if (!Number.isFinite(awarenessTotal) || !Number.isFinite(awarenessCount)) return null;
+      return (currentVisited.has(name) ? 0 : 1) + Number(halfState.missing) + inventoryMissing + (item18 && item18.current && item18.current.done ? 0 : 1) + Math.max(0, awarenessTotal - awarenessCount);
+    });
+    if (activeMissingByStore.some(value => value == null || !Number.isFinite(value))) {
+      return { verified:false, period, reason:'active-cycle patrol item progress is incomplete' };
+    }
+    const currentFullyDone = activeMissingByStore.filter(value => value === 0).length;
+    const currentMissingItems = activeMissingByStore.reduce((sum, value) => sum + value, 0);
+    return {
+      verified:true,
+      period,
+      total,
+      currentCompleted,
+      currentRemaining:Math.max(0, total - currentCompleted),
+      currentRate:currentCompleted / total,
+      currentFullyDone,
+      currentMissingItems,
+      currentUnvisited:names.filter(name => !currentVisited.has(name)),
+      h1Completed,
+      h2Completed,
+      wholeCompleted:h1Completed + h2Completed,
+      wholeTotal:total * 2
+    };
+  }
+
   function overview(rawRows, configuredStores, currentMonth, now) {
     const rows = Array.isArray(rawRows) ? rawRows : [];
     const stores = (Array.isArray(configuredStores) ? configuredStores : []).map(store => typeof store === 'string' ? { name:store } : store);
@@ -386,6 +501,6 @@
   return Object.freeze({
     ITEM_RULES, rebuildFromRaw, itemStatus, storeSummary, findRecordStore,
     bimWindow, prevBimWindow, awarenessProgress, visitSummary, inventoryProgress, item18Progress,
-    dashboardProgress, halfDashboardSummary, overview, summaryContract
+    dashboardProgress, halfDashboardSummary, halfMonthPeriod, halfMonthProgress, overview, summaryContract
   });
 });

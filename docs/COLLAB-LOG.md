@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-17 ｜ Codex（巡店上下半月雙輪進度，未部署）
+
+- 做了什麼：只調整 Liam Supervisor App 「巡店」頁進度顯示；以既有 `ptsummary.halfDashboard` 的巡店檢查紀錄分開 H1（1–15 日）與 H2（16 日至月底），本期以 9 店為分母，另顯示上半月、下半月與整月 18 店次。保留題 14–33 原周期，並維持 `ptvisit_read/write` 到店／離店 session 與巡店完成統計分離。
+- 結果（成功／未部署）：8/15、8/16、8/17、同店重複巡店與只按到店等 boundary 測試通過；Node `196/196`，Playwright `133/133`，390×844 無橫向溢出。未新增欄位，未修改 Sheet、GAS API、PT_TOKEN、reauth、hwrite、半月督導檢查或正式資料；未部署、未實機驗收。
+- 經驗／給下一位的提醒：進度完成來源必須是既有巡店檢查摘要，不可以 `ptvisit` 到店 session 、本月最後到店日或「去過幾間不同門市」代替。
+
 ## 2026-08-17 ｜ Codex（Phase 1B：台獎戰情獨立化，implementation complete / awaiting Liam acceptance）
 
 - 做了什麼：從正式 `origin/main` `a43ba42688125e68021ad1548e47ce1ca151e6b9` 建立隔離分支 `feature/phase1b-awards-battle-standalone`。新增 `awards-battle-controller.js` 與 `awards-battle.html`；原 `index.html` 與 standalone 共用同一台獎 controller，standalone 直接沿用既有 KPI controller 的 Approved Device／員編、`private_access → kpicalc_access`、同次正式 `snapshot.awardsBattle` 與 fail-closed。已移除 standalone iframe、程式化 click、`window.event` 與 DOM 遙控；沒有第二套 API、公式、JSON、快取、登入或 localStorage 台獎 fallback。原 index 台獎保留，`home.html` 順序為 KPI 第一、台獎第二。
