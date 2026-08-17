@@ -54,10 +54,11 @@
   .private-admin-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid var(--border-dim); border-radius:9px; font-size:13px; font-weight:800; }
   .private-admin-item button { padding:7px 10px; border:0; border-radius:7px; background:#166534; color:#fff; font-size:12px; font-weight:900; cursor:pointer; }
   .summary-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:14px; margin-bottom:16px; }
-  .summary-card { min-width:0; min-height:132px; padding:18px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.06); }
-  .sc-label { color:var(--text-muted); font-size:16px; font-weight:900; }
+  .summary-card { display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:0; min-height:132px; padding:18px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .sc-label { display:flex; align-items:center; justify-content:center; min-height:2.4em; color:var(--text-muted); font-size:16px; font-weight:900; }
   .sc-val { margin-top:8px; font-size:32px; line-height:1; font-weight:900; overflow-wrap:anywhere; }
-  .sc-sub { margin-top:8px; color:var(--text-muted); font-size:15px; font-weight:800; }
+  .sc-sub { display:flex; align-items:center; justify-content:center; min-height:2.4em; margin-top:8px; color:var(--text-muted); font-size:15px; font-weight:800; }
+  .award-summary-money { white-space:nowrap; word-break:keep-all; overflow-wrap:normal; font-size:27px; line-height:1; }
   .section-divider { display:flex; align-items:center; gap:10px; margin:28px 0 14px; color:var(--text-muted); font-size:16px; font-weight:700; }
   .section-divider::before, .section-divider::after { content:''; flex:1; min-width:8px; height:1px; background:var(--border-dim); }
   .award-store-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(285px,100%),1fr)); gap:16px; }

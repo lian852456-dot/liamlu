@@ -24,6 +24,13 @@
     return KpiBattleController.formatMoney(value);
   }
 
+  function displayStoreName(value) {
+    const name = String(value || '').trim();
+    return name === '台灣大哥大台北三創' || name === '台灣大哥大數位生活台北三創'
+      ? '台北三創'
+      : name;
+  }
+
   function awardRateTone(value) {
     const number = Number(value);
     if (!Number.isFinite(number)) return '';
@@ -96,7 +103,7 @@
 
   function renderAwardUnit(row, district) {
     const award = (row && row.award) || {};
-    return `<div class="award-store-card"><div class="award-store-head"><div class="award-store-name">${district ? '🏢 ' : ''}${(row && row.store) || '—'}</div><div class="award-store-rank">排名 ${award.rank ?? '—'}<br>${award.award === 'Y' ? '✅ 可領獎' : '⚠️ 未領獎'}</div></div>
+    return `<div class="award-store-card"><div class="award-store-head"><div class="award-store-name">${district ? '🏢 ' : ''}${displayStoreName(row && row.store) || '—'}</div><div class="award-store-rank">排名 ${award.rank ?? '—'}<br>${award.award === 'Y' ? '✅ 可領獎' : '⚠️ 未領獎'}</div></div>
       <div class="award-role-indicator${district ? ' district' : ''}">${district ? '督導獎金角色｜北一二B 80%／100%' : '店長獎金角色｜店點 50%／100%'}</div>
       <div class="award-store-values"><div class="award-value"><div class="label">實際金額</div><div class="number">${formatMoney(award.actual_total)}</div></div><div class="award-value"><div class="label">推估金額</div><div class="number">${formatMoney(award.projected)}</div></div></div>
       <div class="award-priority-grid">${((row && row.priorities) || []).map(renderAwardPriority).join('') || '<span class="val-dim">沒有符合優先順位的機款</span>'}</div>
@@ -138,8 +145,8 @@
       if (!content) return;
       content.innerHTML = `
         <div class="summary-grid">
-          <div class="summary-card"><div class="sc-label">督導區實際獎金</div><div class="sc-val" style="color:#6d28d9">${formatMoney(supervisor.actual_total)}</div><div class="sc-sub">公司實際獎金</div></div>
-          <div class="summary-card"><div class="sc-label">督導區推估獎金</div><div class="sc-val" style="color:var(--accent)">${formatMoney(supervisor.projected)}</div><div class="sc-sub">依目前進度推估</div></div>
+          <div class="summary-card"><div class="sc-label">督導區實際獎金</div><div class="sc-val award-summary-money" style="color:#6d28d9">${formatMoney(supervisor.actual_total)}</div><div class="sc-sub">公司實際獎金</div></div>
+          <div class="summary-card"><div class="sc-label">督導區推估獎金</div><div class="sc-val award-summary-money" style="color:var(--accent)">${formatMoney(supervisor.projected)}</div><div class="sc-sub">依目前進度推估</div></div>
           <div class="summary-card"><div class="sc-label">督導區排名</div><div class="sc-val" style="color:var(--gold)">${supervisor.rank ?? '—'}</div><div class="sc-sub">公司獎金排名</div></div>
           <div class="summary-card"><div class="sc-label">是否領獎</div><div class="sc-val" style="color:${supervisor.award === 'Y' ? 'var(--green)' : 'var(--red)'}">${supervisor.award === 'Y' ? '有' : '無'}</div><div class="sc-sub">督導區資格</div></div>
           <div class="summary-card"><div class="sc-label">有領獎店</div><div class="sc-val" style="color:var(--green)">${eligibleStores}</div><div class="sc-sub">家門市</div></div>
@@ -148,7 +155,7 @@
         <div class="section-divider">督導區及各店台獎（依實際獎金排序）</div>
         <div class="award-store-grid">${renderAwardUnit(data.overall, true)}${stores.map(row => renderAwardUnit(row, false)).join('')}</div>
         <div class="section-divider">北一二B／門市 ${phoneItems} 款機款篩選</div>
-        <div class="card"><div class="award-store-selector"><label>選擇北一二B／門市<select id="awardsStoreSelect"><option value="北一二B整體" ${selectedDistrict ? 'selected' : ''}>🏢 北一二B整體</option>${stores.map(row => `<option value="${row.store}" ${row.store === selectedUnit.store ? 'selected' : ''}>${row.store}</option>`).join('')}</select></label><span class="kpi-battle-note">${selectedDistrict ? '北一二B差異數＝實際數－80%目標台數（無條件進位）' : '店點差異數＝實際數－50%目標台數（無條件進位）'}</span></div><div class="award-role-indicator${selectedDistrict ? ' district' : ''}">${selectedDistrict ? '目前檢視：督導獎金角色｜北一二B 80%／100%' : '目前檢視：店長獎金角色｜店點 50%／100%'}</div><div class="award-model-grid">${selectedUnit.items.map(item => renderAwardModel(item, selectedDistrict)).join('')}</div></div>`;
+        <div class="card"><div class="award-store-selector"><label>選擇北一二B／門市<select id="awardsStoreSelect"><option value="北一二B整體" ${selectedDistrict ? 'selected' : ''}>🏢 北一二B整體</option>${stores.map(row => `<option value="${row.store}" ${row.store === selectedUnit.store ? 'selected' : ''}>${displayStoreName(row.store)}</option>`).join('')}</select></label><span class="kpi-battle-note">${selectedDistrict ? '北一二B差異數＝實際數－80%目標台數（無條件進位）' : '店點差異數＝實際數－50%目標台數（無條件進位）'}</span></div><div class="award-role-indicator${selectedDistrict ? ' district' : ''}">${selectedDistrict ? '目前檢視：督導獎金角色｜北一二B 80%／100%' : '目前檢視：店長獎金角色｜店點 50%／100%'}</div><div class="award-model-grid">${selectedUnit.items.map(item => renderAwardModel(item, selectedDistrict)).join('')}</div></div>`;
     }
 
     function acceptKpiResult(payload) {
@@ -218,6 +225,7 @@
     EXPECTED_STORES,
     create,
     validateAwardsBattle,
+    displayStoreName,
     renderAwardPriority,
     renderAwardModel,
     renderAwardUnit,

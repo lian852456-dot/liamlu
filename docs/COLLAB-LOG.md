@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-18 ｜ Codex（台獎摘要金額單行與三創顯示名稱，未部署）
+
+- 做了什麼：由最新 `origin/main` `b23a101` 建立隔離分支 `fix/awards-ui-store-label-20260818`。台獎摘要的「督導區實際／推估獎金」共用 `award-summary-money`，固定 `nowrap`、`keep-all`、`line-height:1` 並將金額字級調為 27px；六張摘要卡片只在台獎面板內補齊置中與等高規則。KPI／台獎共用 controller 新增純顯示層 `displayStoreName()`，只把 `台灣大哥大台北三創` 與 `台灣大哥大數位生活台北三創` 顯示為 `台北三創`。
+- 結果（本機完成，未部署）：Node contract `216/216`、兩個 controller syntax、`git diff --check` 通過；本機正式 renderer 驗證 `$11,784` 為單行、六卡同高、三創選單文字／卡片文字為 `台北三創`，但 `option value` 仍是原始完整名稱，13 款篩選後數量與金額不變，console error `0`。前後截圖在 `docs/screenshots/awards-ui-20260818/`。
+- 經驗 / 給下一位的提醒：本次未修改 `row.store`、`kpiBattleStoreKey()`、巡店 alias、GAS、正式 JSON/schema、資料計算、排序或統計；也未推送、PR、Pages/GAS 部署、正式資料 readback 或 Liam 實機驗收。後續若發布，需另走 release gate，不能把本機畫面證據當成正式上線。
+
 ## 2026-08-17 ｜ Codex（巡店上下半月雙輪進度，未部署）
 
 - 做了什麼：只調整 Liam Supervisor App 「巡店」頁進度顯示；以既有 `ptsummary.halfDashboard` 的巡店檢查紀錄分開 H1（1–15 日）與 H2（16 日至月底），本期以 9 店為分母，另顯示上半月、下半月與整月 18 店次。保留題 14–33 原周期，並維持 `ptvisit_read/write` 到店／離店 session 與巡店完成統計分離。
