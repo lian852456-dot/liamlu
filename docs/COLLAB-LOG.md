@@ -11,6 +11,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 長期性的坑（會一再影響開發的）除了記在這裡，也請同步進 `CLAUDE.md` 的「踩過的坑」章節。
 
+## 2026-08-17 ｜ Codex（Liam Supervisor 個人台獎排行榜隔離 UAT，待 Liam iPhone 驗收）
+
+- 做了什麼：接續 Draft PR #57 既有 `award-personal.js` / `award-personal.css` extension，以最小變更補齊固定九店篩選順序、排行名次與顯示排序分離、`$0` / null 語意、未知領獎狀態、日期不一致 fail-closed 文案與 390×844 觸控尺寸；沒有改寫 App 核心、KPI／店點台獎計算或正式資料。
+- 結果：個人台獎 contract `3/3`、Node regression `200/200`、App 聚焦 Chromium `16/16`、個人台獎 WebKit `3/3`；390×844 實測 `overflow=0`、`scrollX=0`、console error `0`，一屏可見多位同仁。完整 Chromium `138/139`，唯一失敗為既有半月正式唯讀 `5 / 9` 舊期待，已在乾淨基準 `c218843` 重現，非本 PR regression。
+- 經驗 / 給下一位的提醒：App 僅能搬運 `kpiBattle.personal` 的 `phone_award_actual` / `phone_award_projected` / `phone_award_rank` / `phone_award_eligible`，不可重算或用 localStorage／公開 JSON fallback。PR 維持 Draft，未合併、未部署；Approved Device 正式 iPhone 畫面仍需 Liam 驗收。
+
 ## 2026-08-13 ｜ Codex（Liam Supervisor App 1.3 Phase 1，待正式部署／實機驗收）
 
 - 做了什麼：在 Recovery Stable `94070e0` 建立四個隔離 commit：Native Approved Device 的 server-verified patrol session bridge、同源 allowlisted runtime config、昨日 21:00 待追蹤、店點店長店績＋AQ 語意。網站 patrol.html 原通行碼路徑保留；hwrite 與 half_media_upload 持續停用。

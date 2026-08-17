@@ -1,0 +1,164 @@
+.scope-control.award-person-enabled {
+  width:100%;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+}
+.scope-control.award-person-enabled button {
+  min-height:44px;
+}
+
+.award-person-controls {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin-bottom:12px;
+}
+.award-person-controls label {
+  min-width:0;
+  color:var(--muted);
+  font-size:14px;
+  font-weight:800;
+}
+.award-person-controls label > span {
+  display:block;
+  margin-bottom:5px;
+}
+.award-person-controls select {
+  width:100%;
+  min-height:44px;
+  padding:0 11px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  color:var(--text);
+  background:#061728;
+  font-size:16px;
+  font-weight:750;
+}
+
+.award-person-panel {
+  overflow:hidden;
+}
+.award-person-list {
+  display:grid;
+}
+.award-person-row {
+  display:grid;
+  grid-template-columns:40px minmax(0,1fr) minmax(112px,.75fr);
+  align-items:center;
+  gap:9px;
+  min-height:74px;
+  padding:10px 13px;
+  border-bottom:1px solid var(--line-soft);
+}
+.award-person-row:last-child {
+  border-bottom:0;
+}
+.award-person-row.unsynced {
+  opacity:.72;
+}
+.award-person-order {
+  display:grid;
+  place-items:center;
+  width:34px;
+  height:34px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  color:var(--gold);
+  background:#0c2943;
+  font-size:14px;
+  font-weight:900;
+}
+.award-person-main,
+.award-person-money {
+  min-width:0;
+}
+.award-person-name {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+}
+.award-person-name strong {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:16px;
+}
+.award-person-main small,
+.award-person-money small {
+  display:block;
+  margin-top:4px;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.35;
+}
+.award-person-money {
+  text-align:right;
+}
+.award-person-money strong {
+  display:block;
+  color:var(--gold);
+  font-size:20px;
+  letter-spacing:-.03em;
+}
+.award-person-row.unsynced .award-person-money strong {
+  color:var(--muted);
+  font-size:13px;
+}
+.award-person-status {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  min-height:22px;
+  padding:2px 7px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  font-size:10px;
+  font-weight:850;
+}
+.award-person-status.yes {
+  border-color:#26765c;
+  color:#77ecaf;
+  background:#103124;
+}
+.award-person-status.no {
+  border-color:#574555;
+  color:#b7a9b7;
+  background:#2a2431;
+}
+.award-person-status.pending {
+  border-color:#4a5a67;
+  color:var(--muted);
+  background:#142231;
+}
+.award-person-note {
+  margin:2px 3px 12px;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.55;
+}
+.award-person-state .empty-state {
+  min-height:100px;
+}
+
+@media (max-width:430px) {
+  .award-person-row {
+    grid-template-columns:36px minmax(0,1fr) minmax(106px,.8fr);
+    gap:7px;
+    padding:10px;
+  }
+  .award-person-order {
+    width:32px;
+    height:32px;
+  }
+  .award-person-name strong {
+    font-size:15px;
+  }
+  .award-person-money strong {
+    font-size:18px;
+  }
+  .award-person-main small,
+  .award-person-money small {
+    font-size:11px;
+  }
+}

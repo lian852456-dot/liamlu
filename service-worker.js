@@ -1,11 +1,13 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-3-v1';
+const CACHE_NAME = 'liam-supervisor-app-1-3-v2';
 const SHELL = [
   './app.html',
   './app.css',
   './app.js',
   './app-data-contract.js',
   './app-preview-data.js',
+  './award-personal.js?v=1',
+  './award-personal.css?v=1',
   './patrol-read-model.js',
   './half-month-check-read-model.js',
   './yesterday-follow-up-model.js',
