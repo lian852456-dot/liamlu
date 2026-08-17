@@ -4,7 +4,7 @@
   const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
   const DEVICE_KEY = 'north12b_private_dashboard_device_id';
   const DEFAULT_PRIVATE_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
-  const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
+  const STORES = ['酒泉','永吉','復興南','杭州南','萬大','通化','大稻埕','台北三創','六張犁'];
   const STORE_ALIASES = new Map([['三創','台北三創']]);
   const REQUEST_TIMEOUT_MS = 20000;
 
@@ -22,7 +22,7 @@
     return String(value == null ? '' : value).replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[char]);
   }
   function numberOrNull(value) {
-    if (value === null || value === undefined || value === '') return null;
+    if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return null;
     const number = Number(value);
     return Number.isFinite(number) ? number : null;
   }
@@ -65,7 +65,7 @@
     const kpiDate = String(kpi.report_date || '');
     const awardDate = String(awards.report_date || '');
     if (!kpiDate || !awardDate || kpiDate !== awardDate) {
-      return { rows:[], reportDate:awardDate || kpiDate, aligned:false, note:awardDate && kpiDate ? `台獎日期 ${awardDate} 與 KPI 日期 ${kpiDate} 不一致` : '正式個人台獎尚未提供可對齊的資料日期' };
+      return { rows:[], reportDate:awardDate || kpiDate, aligned:false, note:awardDate && kpiDate ? `台獎日期與 KPI 日期不一致（台獎 ${awardDate}／KPI ${kpiDate}）` : '正式個人台獎尚未提供可對齊的資料日期' };
     }
     const rows = (Array.isArray(kpi.personal) ? kpi.personal : []).map(row => ({
       name:String(row && row.name || ''),
@@ -96,11 +96,12 @@
   }
   function sortedRows(rows) {
     const filtered = (Array.isArray(rows) ? rows : []).filter(row => storeFilter === 'all' || row.store === storeFilter);
+    const leaderboardRanks = new Map(filtered.slice().sort((a,b) => compareNullableAmount(a,b,'desc')).map((row,index) => [row,index + 1]));
     return filtered.slice().sort((a,b) => {
       if (sortMode === 'amount-asc') return compareNullableAmount(a,b,'asc');
       if (sortMode === 'name') return a.name.localeCompare(b.name,'zh-Hant') || tieBreak(a,b);
       return compareNullableAmount(a,b,'desc');
-    });
+    }).map(row => ({ ...row, leaderboardRank:leaderboardRanks.get(row) }));
   }
 
   async function privateEndpoint() {
@@ -158,24 +159,22 @@
     }
   }
 
-  function controls(rows) {
-    const available = new Set((Array.isArray(rows) ? rows : []).map(row => row.store));
-    const storeOptions = STORES.filter(name => available.has(name));
+  function controls() {
     return `<section class="award-person-controls" aria-label="個人台獎篩選">
-      <label><span>店點</span><select id="awardPersonStoreSelect"><option value="all" ${storeFilter==='all'?'selected':''}>全部店點</option>${storeOptions.map(name=>`<option value="${escapeHtml(name)}" ${storeFilter===name?'selected':''}>${escapeHtml(name)}</option>`).join('')}</select></label>
+      <label><span>店點</span><select id="awardPersonStoreSelect"><option value="all" ${storeFilter==='all'?'selected':''}>全部店點</option>${STORES.map(name=>`<option value="${escapeHtml(name)}" ${storeFilter===name?'selected':''}>${escapeHtml(name)}</option>`).join('')}</select></label>
       <label><span>排序</span><select id="awardPersonSortSelect"><option value="amount-desc" ${sortMode==='amount-desc'?'selected':''}>台獎高 → 低</option><option value="amount-asc" ${sortMode==='amount-asc'?'selected':''}>台獎低 → 高</option><option value="name" ${sortMode==='name'?'selected':''}>姓名</option></select></label>
     </section>`;
   }
 
-  function personCard(row, index) {
-    const visibleRank = index + 1;
+  function personCard(row) {
+    const visibleRank = row.leaderboardRank;
     const medal = visibleRank === 1 ? '🥇' : visibleRank === 2 ? '🥈' : visibleRank === 3 ? '🥉' : String(visibleRank);
-    const eligibility = row.eligible === 'Y' ? '<span class="award-person-status yes">領獎</span>' : row.eligible === 'N' ? '<span class="award-person-status no">未領獎</span>' : '';
+    const eligibility = row.eligible === 'Y' ? '<span class="award-person-status yes">領獎</span>' : row.eligible === 'N' ? '<span class="award-person-status no">未領獎</span>' : '<span class="award-person-status pending">尚未同步</span>';
     const syncClass = row.amount == null ? ' unsynced' : '';
     return `<article class="award-person-row${syncClass}">
-      <div class="award-person-order" aria-label="目前排序序位 ${visibleRank}">${medal}</div>
-      <div class="award-person-main"><div class="award-person-name"><strong>${escapeHtml(row.name)}</strong>${eligibility}</div><small>${escapeHtml(row.store)}${row.role?` · ${escapeHtml(row.role)}`:''}</small></div>
-      <div class="award-person-money"><strong>${escapeHtml(money(row.amount))}</strong><small>${row.projected==null?'推估 —':`推估 ${escapeHtml(money(row.projected))}`}${row.rank==null?'':` · 正式排名 #${escapeHtml(row.rank)}`}</small></div>
+      <div class="award-person-order" aria-label="台獎排行榜第 ${visibleRank} 名">${medal}</div>
+      <div class="award-person-main"><div class="award-person-name"><strong>${escapeHtml(row.name)}</strong>${eligibility}</div><small>${escapeHtml(row.store)} · ${row.role?escapeHtml(row.role):'職稱／類別尚未同步'}</small></div>
+      <div class="award-person-money"><strong>${escapeHtml(money(row.amount))}</strong><small>推估 ${escapeHtml(money(row.projected))} · 正式排名 ${row.rank==null?'尚未同步':`#${escapeHtml(row.rank)}`}</small></div>
     </article>`;
   }
 
@@ -193,7 +192,7 @@
     const label = storeFilter === 'all' ? '全部店點' : storeFilter;
     renderGuard = true;
     content.innerHTML = `<div data-award-personal-root>
-      ${controls(data.rows)}
+      ${controls()}
       <section class="panel award-person-panel"><div class="panel-head"><div><h2>個人台獎</h2><small>${escapeHtml(label)} · ${rows.length} 人</small></div><span>${escapeHtml(data.reportDate || '—')}</span></div>
         <div class="award-person-list">${rows.length ? rows.map(personCard).join('') : '<div class="empty-state">目前篩選條件沒有個人台獎資料。</div>'}</div>
       </section>

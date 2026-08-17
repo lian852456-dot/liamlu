@@ -27,10 +27,12 @@ test('personal award adapter keeps formal values and requires same report date',
   assert.deepEqual(result.rows[0], { name:'王＊明', store:'台北三創', role:'業代', amount:8200, projected:9600, rank:2, eligible:'Y' });
   assert.equal(result.rows[1].amount, 0, 'formal zero award must stay visible as zero');
   assert.equal(result.rows[2].amount, null, 'missing award must stay unsynced, not be invented as zero');
+  assert.equal(feature.numberOrNull('   '), null, 'blank formal values must not become zero');
 
   const mismatched = feature.personalAwardRows({ ...snapshot, awardsBattle:{ report_date:'2026-08-16' } });
   assert.equal(mismatched.aligned, false);
   assert.deepEqual(mismatched.rows, []);
+  assert.match(mismatched.note, /台獎日期與 KPI 日期不一致/);
 });
 
 test('feature supplies all-store and store filters with award descending as default', () => {
@@ -39,6 +41,8 @@ test('feature supplies all-store and store filters with award descending as defa
   assert.match(featureSource, /全部店點/);
   assert.match(featureSource, /台獎高 → 低/);
   assert.match(featureSource, /台獎低 → 高/);
+  assert.match(featureSource, /\['酒泉','永吉','復興南','杭州南','萬大','通化','大稻埕','台北三創','六張犁'\]/);
+  assert.doesNotMatch(featureSource, /available\.has/);
   assert.match(featureSource, /storeFilter === 'all' \|\| row\.store === storeFilter/);
   assert.match(featureSource, /return compareNullableAmount\(a,b,'desc'\)/);
   assert.match(featureSource, /if \(av == null\) return 1/);
@@ -52,4 +56,7 @@ test('personal award extension is read-only and loaded without changing core app
   assert.doesNotMatch(featureSource, /action:'(?:write|pwrite|ptwrite|hwrite|half_media_upload)'/);
   assert.doesNotMatch(featureSource, /localStorage\.setItem/);
   assert.match(featureSource, /App 只做篩選與排序，不重算台獎/);
+  assert.match(featureSource, /推估 \$\{escapeHtml\(money\(row\.projected\)\)\}/);
+  assert.match(featureSource, /正式排名 \$\{row\.rank==null\?'尚未同步'/);
+  assert.match(featureSource, /award-person-status pending/);
 });

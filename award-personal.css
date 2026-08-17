@@ -2,6 +2,9 @@
   width:100%;
   grid-template-columns:repeat(3,minmax(0,1fr));
 }
+.scope-control.award-person-enabled button {
+  min-height:44px;
+}
 
 .award-person-controls {
   display:grid;
@@ -123,6 +126,11 @@
   color:#b7a9b7;
   background:#2a2431;
 }
+.award-person-status.pending {
+  border-color:#4a5a67;
+  color:var(--muted);
+  background:#142231;
+}
 .award-person-note {
   margin:2px 3px 12px;
   color:var(--muted);
@@ -151,6 +159,6 @@
   }
   .award-person-main small,
   .award-person-money small {
-    font-size:10px;
+    font-size:11px;
   }
 }

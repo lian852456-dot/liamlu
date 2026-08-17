@@ -118,7 +118,7 @@ test('device UI scope keeps nine awards, removes Top cards and renders complete 
 test('PWA cache is versioned for App 1.2 and includes local icon library', () => {
   const html = read('app.html');
   const worker = read('service-worker.js');
-  assert.match(worker, /liam-supervisor-app-1-3-v1/);
+  assert.match(worker, /liam-supervisor-app-1-3-v2/);
   assert.match(html, /app\.css\?v=19/);
   assert.match(html, /app-data-contract\.js\?v=14/);
   assert.match(html, /app-preview-data\.js\?v=17/);
