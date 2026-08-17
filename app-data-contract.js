@@ -53,5 +53,25 @@
 
   const api = { VERSION, MODULE_KEYS, STATUSES, REPORT_FEEDBACK_FIELDS, validateContract, validateModule, moduleState };
   scope.LiamSupervisorContract = api;
+
+  // Optional UI extension kept outside the core App runtime so the existing KPI, store award,
+  // personal performance, patrol and write paths remain untouched.
+  if (typeof document !== 'undefined' && document.head) {
+    if (!document.querySelector('link[data-award-person-feature]')) {
+      const style = document.createElement('link');
+      style.rel = 'stylesheet';
+      style.href = 'award-personal.css?v=1';
+      style.dataset.awardPersonFeature = '1';
+      document.head.appendChild(style);
+    }
+    if (!document.querySelector('script[data-award-person-feature]')) {
+      const script = document.createElement('script');
+      script.src = 'award-personal.js?v=1';
+      script.async = false;
+      script.dataset.awardPersonFeature = '1';
+      document.head.appendChild(script);
+    }
+  }
+
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
