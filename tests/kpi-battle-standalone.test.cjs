@@ -46,6 +46,7 @@ test('同仁大廳第一張卡為 KPI 戰情，原入口仍保留原連結', () 
   const hrefs = Array.from(staff.matchAll(/<a class="card" href="([^"]+)"/g), match => match[1]);
   assert.deepEqual(hrefs, [
     'kpi-battle.html',
+    'awards-battle.html',
     'index.html',
     'kpi.html',
     'kpitry.html',

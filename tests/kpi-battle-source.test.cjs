@@ -6,8 +6,8 @@ const vm = require('node:vm');
 const { execFileSync } = require('node:child_process');
 
 const root = path.join(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const controllerSource = fs.readFileSync(path.join(root, 'kpi-battle-controller.js'), 'utf8');
+const awardsControllerSource = fs.readFileSync(path.join(root, 'awards-battle-controller.js'), 'utf8');
 const controller = require('../kpi-battle-controller.js');
 
 function functionBody(source, name) {
@@ -38,13 +38,10 @@ test('KPI 主資料取 kpicalc，快照只作條件式補充', () => {
 });
 
 test('台獎僅以 KPI 戰報日期比對，不得使用資料截止日', () => {
-  const hookStart = html.indexOf('function handleKpiLoaded');
-  const hookEnd = html.indexOf('function handleKpiLoadError', hookStart);
-  assert.ok(hookStart >= 0 && hookEnd > hookStart);
-  const hook = html.slice(hookStart, hookEnd);
-  assert.match(hook, /awardsDate === data\.report_date/);
-  assert.doesNotMatch(hook, /awardsDate === data\.data_as_of_date/);
-  assert.match(hook, /renderAwardsBattleUnavailable\(\)/);
+  const guard = functionBody(awardsControllerSource, 'validateAwardsBattle');
+  assert.match(guard, /awardsDate !== kpiDate/);
+  assert.doesNotMatch(guard, /data_as_of_date|source_as_of_date/);
+  assert.match(functionBody(awardsControllerSource, 'acceptKpiResult'), /renderUnavailable\(\)/);
 });
 
 test('來源說明以資訊格分開顯示戰報日期、資料截止日與來源檔', () => {
@@ -69,8 +66,8 @@ test('店績保險搭售率接在加掛後，且由同次快照補入', () => {
 });
 
 test('台獎篩選可選北一二B，北一二B顯示80%／100%，門市顯示50%／100%', () => {
-  const render = functionBody(html, 'renderAwardsBattle');
-  const model = functionBody(html, 'renderAwardModel');
+  const render = functionBody(awardsControllerSource, 'render');
+  const model = functionBody(awardsControllerSource, 'renderAwardModel');
   assert.match(render, /option value="北一二B整體"/);
   assert.match(render, /北一二B差異數＝實際數－80%目標台數/);
   assert.match(render, /店點差異數＝實際數－50%目標台數/);

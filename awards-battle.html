@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="robots" content="noindex, nofollow">
+<title>台獎戰情｜北一二B 智慧營運中心</title>
+<!--
+  Phase 1B standalone 直接掛載既有 KPI auth gate 與唯一台獎 controller。
+  本頁不得新增 API、公式、JSON、資料快取、localStorage 台獎 fallback 或 iframe。
+-->
+<style>
+  :root {
+    color-scheme: light;
+    --bg-deep:#f5f6f8; --bg-card:#fff; --accent:#f97316; --accent-bright:#ea580c;
+    --gold:#d97706; --green:#16a34a; --red:#dc2626; --purple:#7c3aed;
+    --text:#111827; --text-dim:#374151; --text-muted:#6b7280;
+    --border:rgba(0,0,0,.12); --border-dim:rgba(0,0,0,.07);
+    --font:'Microsoft YaHei','Noto Sans TC','PingFang TC','Microsoft JhengHei',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html, body { width:100%; min-width:0; min-height:100%; margin:0; }
+  body { min-height:100dvh; overflow-x:hidden; background:var(--bg-deep); color:var(--text); font-family:var(--font); -webkit-font-smoothing:antialiased; }
+  button, input, select { font:inherit; }
+  .shell-header { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:max(14px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) 14px max(20px,env(safe-area-inset-left)); border-bottom:1px solid #dfe3e8; background:#fff; }
+  .title-group { min-width:0; }
+  .eyebrow { margin:0 0 3px; color:#6d28d9; font-size:12px; font-weight:800; letter-spacing:.04em; }
+  h1 { margin:0; font-size:clamp(21px,4vw,28px); line-height:1.2; }
+  .subtitle { margin:5px 0 0; color:#667085; font-size:13px; line-height:1.45; }
+  .home-link { flex:0 0 auto; min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:9px 14px; border:1px solid #ddd6fe; border-radius:10px; background:#faf5ff; color:#6d28d9; font-size:14px; font-weight:800; text-decoration:none; }
+  .home-link:focus-visible { outline:3px solid rgba(124,58,237,.22); outline-offset:2px; }
+  #panel-awards-battle { width:100%; max-width:1640px; min-width:0; margin:0 auto; padding:16px 12px max(24px,env(safe-area-inset-bottom)); }
+  .card { min-width:0; margin-bottom:20px; padding:22px 24px; border:1px solid var(--border-dim); border-radius:8px; background:var(--bg-card); box-shadow:0 1px 5px rgba(17,24,39,.07); }
+  .awards-hero { border:2px solid #c4b5fd; background:#fcfaff; }
+  .card-title { margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--border-dim); color:#6d28d9; font-size:21px; font-weight:900; }
+  .dot { display:inline-block; width:8px; height:8px; margin-right:7px; border-radius:50%; background:#7c3aed; }
+  .awards-battle-note, .kpi-battle-note { color:var(--text-muted); font-size:16px; font-weight:750; line-height:1.65; }
+  .kpi-empty { padding:22px; border:1px dashed #d1d5db; border-radius:12px; background:#f9fafb; color:var(--text-muted); text-align:center; }
+  .private-lock { max-width:620px; margin:0 auto; text-align:left; }
+  .private-lock h3 { margin:0 0 8px; color:var(--text); font-size:20px; font-weight:900; }
+  .private-lock p { color:var(--text-muted); font-size:14px; font-weight:700; line-height:1.7; }
+  .private-lock-form { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  .private-lock-form input { min-width:0; padding:11px 12px; border:1px solid #d1d5db; border-radius:9px; color:var(--text); font-size:15px; font-weight:800; }
+  .private-lock-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .private-lock-actions button, .private-lock-actions a.secondary { display:inline-flex; align-items:center; padding:11px 14px; border-radius:9px; font-size:14px; font-weight:900; cursor:pointer; text-decoration:none; }
+  .private-lock-actions button { border:0; background:var(--accent); color:#fff; }
+  .private-lock-actions button.secondary, .private-lock-actions a.secondary { border:1px solid #d1d5db; background:#f3f4f6; color:var(--text); }
+  .private-lock-status { min-height:22px; margin-top:12px; color:var(--text-muted); font-size:13px; font-weight:800; line-height:1.6; }
+  .private-admin { margin-top:18px; padding-top:14px; border-top:1px solid var(--border-dim); }
+  .private-admin-list { display:grid; gap:8px; margin-top:10px; }
+  .private-admin-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid var(--border-dim); border-radius:9px; font-size:13px; font-weight:800; }
+  .private-admin-item button { padding:7px 10px; border:0; border-radius:7px; background:#166534; color:#fff; font-size:12px; font-weight:900; cursor:pointer; }
+  .summary-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:14px; margin-bottom:16px; }
+  .summary-card { min-width:0; min-height:132px; padding:18px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .sc-label { color:var(--text-muted); font-size:16px; font-weight:900; }
+  .sc-val { margin-top:8px; font-size:32px; line-height:1; font-weight:900; overflow-wrap:anywhere; }
+  .sc-sub { margin-top:8px; color:var(--text-muted); font-size:15px; font-weight:800; }
+  .section-divider { display:flex; align-items:center; gap:10px; margin:28px 0 14px; color:var(--text-muted); font-size:16px; font-weight:700; }
+  .section-divider::before, .section-divider::after { content:''; flex:1; min-width:8px; height:1px; background:var(--border-dim); }
+  .award-store-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(285px,100%),1fr)); gap:16px; }
+  .award-store-card { min-width:0; padding:18px; border:1px solid var(--border-dim); border-radius:8px; background:#fff; }
+  .award-store-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .award-store-name { min-width:0; font-size:22px; font-weight:900; overflow-wrap:anywhere; }
+  .award-store-rank { flex:0 0 auto; color:#7c3aed; font-size:16px; font-weight:900; line-height:1.55; white-space:nowrap; }
+  .award-role-indicator { display:inline-flex; align-items:center; min-height:30px; max-width:100%; margin-top:8px; padding:5px 9px; border-radius:6px; background:#f5f3ff; color:#6d28d9; font-size:15px; font-weight:900; overflow-wrap:anywhere; }
+  .award-role-indicator.district { background:#fff7ed; color:var(--accent-bright); }
+  .award-store-values { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:16px 0; }
+  .award-value { min-width:0; padding:13px; border-radius:7px; background:#f5f3ff; }
+  .award-value .label { color:var(--text-dim); font-size:15px; font-weight:800; }
+  .award-value .number { margin-top:6px; color:#6d28d9; font-size:26px; font-weight:900; overflow-wrap:anywhere; }
+  .award-priority-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr)); gap:12px; }
+  .award-priority-card { min-width:0; padding:15px; border:1px solid #ddd6fe; border-radius:8px; background:#fff; }
+  .award-priority-title { color:var(--text); font-size:19px; font-weight:900; line-height:1.35; overflow-wrap:anywhere; }
+  .award-priority-action { margin-top:6px; color:#7c3aed; font-size:17px; font-weight:900; }
+  .award-priority-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; margin-top:9px; }
+  .award-metric { min-width:0; padding:10px; border-radius:7px; background:#f8fafc; color:var(--text-muted); font-size:14px; font-weight:800; }
+  .award-metric strong { display:block; margin-top:4px; color:var(--text); font-size:19px; overflow-wrap:anywhere; }
+  .award-metric.wide { grid-column:1 / -1; }
+  .award-store-selector { display:flex; align-items:end; gap:12px; flex-wrap:wrap; }
+  .award-store-selector label { min-width:min(220px,100%); color:var(--text-muted); font-size:16px; font-weight:900; }
+  .award-store-selector select { width:100%; min-height:48px; margin-top:5px; padding:10px; border:1px solid var(--border); border-radius:7px; background:#fff; color:var(--text); font-size:17px; font-weight:800; }
+  .award-model-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:10px; }
+  .award-model { min-width:0; padding:13px; border:1px solid var(--border-dim); border-radius:8px; }
+  .award-model-name { color:var(--text); font-size:16px; font-weight:900; overflow-wrap:anywhere; }
+  .award-model-rate { margin-top:4px; font-size:24px; font-weight:900; }
+  .award-model-sub { display:block; margin-top:3px; color:var(--text-muted); font-size:15px; font-weight:700; line-height:1.45; }
+  .award-model-tiers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
+  .award-model-tier { min-width:0; padding:9px; border:1px solid #ddd6fe; border-radius:7px; background:#faf5ff; color:#6d28d9; font-size:13px; font-weight:800; }
+  .award-model-tier strong { display:block; margin-top:3px; color:#5b21b6; font-size:19px; font-weight:900; overflow-wrap:anywhere; }
+  .good { color:var(--green); } .warn { color:var(--gold); } .bad { color:var(--red); } .val-dim { color:var(--text-muted); }
+  .standalone-error { border-color:#fecaca; background:#fff7f7; }
+  @media (max-width:700px) {
+    body { font-size:18px; }
+    .shell-header { align-items:flex-start; gap:10px; padding-bottom:12px; }
+    .subtitle { font-size:12px; }
+    .home-link { padding-inline:11px; white-space:nowrap; }
+    #panel-awards-battle { padding:10px 8px max(18px,env(safe-area-inset-bottom)); }
+    .card { padding:18px 16px; margin-bottom:16px; }
+    .private-lock-form { grid-template-columns:1fr; }
+    .summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .summary-card { min-height:126px; padding:15px 10px; }
+    .sc-val { font-size:29px; }
+    .award-store-name { font-size:21px; }
+    .award-value .number { font-size:24px; }
+    .award-model-grid { grid-template-columns:1fr; }
+    .award-model-name { font-size:17px; }
+    .award-model-rate { font-size:26px; }
+    .award-model-tier strong { font-size:21px; }
+  }
+</style>
+</head>
+<body>
+<header class="shell-header">
+  <div class="title-group">
+    <p class="eyebrow">北一二B 智慧營運中心</p>
+    <h1>台獎戰情</h1>
+    <p class="subtitle">沿用每日回報既有正式權限、快照與台獎呈現邏輯</p>
+  </div>
+  <a class="home-link" href="home.html" aria-label="返回智慧營運中心">返回大廳</a>
+</header>
+
+<main id="panel-awards-battle" aria-label="台獎戰情內容">
+  <div class="card awards-hero">
+    <div class="card-title"><span class="dot"></span>🏅 台獎戰情 · 督導優先補量</div>
+    <div class="awards-battle-note" id="awardsBattleSourceNote">讀取受保護獎金資料中…</div>
+  </div>
+  <div id="awardsBattleContent"><div class="kpi-empty">讀取台獎戰情資料中…</div></div>
+  <noscript><div class="card private-lock standalone-error"><h3>台獎戰情暫時無法載入</h3><p>瀏覽器未啟用 JavaScript，因此不顯示任何台獎數值。請返回<a href="index.html">每日回報內的台獎戰情</a>。</p></div></noscript>
+</main>
+
+<script src="kpi-battle-controller.js"></script>
+<script src="awards-battle-controller.js"></script>
+<script>
+  const panel = document.getElementById('panel-awards-battle');
+
+  function failClosed(message) {
+    panel.classList.add('standalone-failed');
+    const note = document.getElementById('awardsBattleSourceNote');
+    if (note) note.textContent = message || '台獎戰情目前無法載入。';
+    const content = document.getElementById('awardsBattleContent');
+    if (content) content.innerHTML = '<div class="card private-lock standalone-error"><h3>台獎戰情暫時無法載入</h3><p>未取得正式授權資料，因此不顯示任何台獎數值。請返回<a href="index.html">每日回報內的台獎戰情</a>。</p></div>';
+  }
+
+  try {
+    if (!window.KpiBattleController || !window.AwardsBattleController) throw new Error('battle controller unavailable');
+    let GAS_URL = KpiBattleController.resolveGasUrl(localStorage);
+    let authController;
+    const awardsBattleController = AwardsBattleController.create({
+      window,
+      document,
+      renderLock: () => authController.renderLock(),
+    });
+    authController = KpiBattleController.create({
+      window,
+      document,
+      getGasUrl: () => GAS_URL,
+      getAwardsData: () => awardsBattleController.getData(),
+      onKpiLoaded: payload => awardsBattleController.acceptKpiResult(payload),
+      onKpiLoadError: () => awardsBattleController.handleKpiLoadError(),
+    });
+    window.awardsBattleController = awardsBattleController;
+    window.awardsBattleAuthController = authController;
+    awardsBattleController.load();
+    panel.dataset.ready = 'true';
+  } catch (error) {
+    failClosed('台獎戰情控制器載入失敗。');
+  }
+</script>
+</body>
+</html>

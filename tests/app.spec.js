@@ -104,10 +104,17 @@ const AWARDS_BATTLE_FIXTURE = {
     store: '北一二B整體', award: { actual_total: 2431, projected: 11260, rank: '22', award: 'Y' },
     priorities: AWARD_ITEMS.slice(0, 3), items: AWARD_ITEMS,
   },
-  stores: [
-    { store: '通化', award: { actual_total: 11465, projected: 14860, rank: '18', award: 'Y' }, priorities: AWARD_ITEMS.slice(0, 3), items: AWARD_ITEMS },
-    { store: '酒泉', award: { actual_total: 8645, projected: 11460, rank: '189', award: 'N' }, priorities: AWARD_ITEMS.slice(1, 4), items: AWARD_ITEMS },
-  ],
+  stores: ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'].map((store, index) => ({
+    store,
+    award: {
+      actual_total: 11465 - index * 820,
+      projected: 14860 - index * 710,
+      rank: String(18 + index * 11),
+      award: index < 4 ? 'Y' : 'N',
+    },
+    priorities: AWARD_ITEMS.slice(index % 3, index % 3 + 3),
+    items: AWARD_ITEMS,
+  })),
 };
 
 // 方案 A（2026-07-31）：KPI 戰情頁籤唯一正式來源是 kpicalc JSON（與 kpi.html 同一份）。
@@ -159,8 +166,11 @@ async function kpiBattleLogin(page) {
   await page.getByRole('button', { name: '以員編登入' }).click();
 }
 
-async function mockAwardsBattle(page) {
-  await page.addInitScript(data => { window.__AWARDS_BATTLE_DATA__ = data; }, AWARDS_BATTLE_FIXTURE);
+async function awardsBattleLogin(page) {
+  await page.goto(FILE_URL);
+  await page.getByRole('button', { name: /台獎戰情/ }).click();
+  await page.locator('#awardsBattleContent input[placeholder="輸入員工編號"]').fill('1234567');
+  await page.locator('#awardsBattleContent').getByRole('button', { name: '以員編登入' }).click();
 }
 
 test.describe('頁面載入', () => {
@@ -419,9 +429,7 @@ test.describe('KPI 戰情', () => {
 test.describe('台獎戰情', () => {
   test('督導六卡、店點實際獎金排序與北一二B／門市 13 款篩選顯示正確', async ({ page }) => {
     await mockGAS(page);
-    await mockAwardsBattle(page);
-    await page.goto(FILE_URL);
-    await page.locator('.tab-btn:has-text("台獎戰情")').click();
+    await awardsBattleLogin(page);
     await expect(page.locator('#panel-awards-battle')).toBeVisible();
     await expect(page.locator('#awardsBattleContent')).toContainText('督導區實際獎金');
     await expect(page.locator('#awardsBattleContent')).toContainText('督導區推估獎金');
