@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-17 ｜ Codex（Phase 1B 正式驗收封存／CLOSED）
+
+- 做了什麼：依 Liam 正式實機回報封存 Phase 1B。PR #56 已合併至正式 `main` `a00fa945cd4e8721d340ccead2c4ed376b3b5b10`；GitHub Pages run #31982162119 的 Build／Deploy／Report Status 全部 `SUCCESS`。本次只更新文件，不修改產品程式、不重新部署，也不進入下一階段。
+- 結果（正式驗收完成／CLOSED）：Liam iPhone Safari smoke `9/9 PASS`；大廳第二順位「台獎戰情」、員編／核准裝置登入、北一二B整體正式台獎、九店切換、13 款機型、實際／推估獎金、排名、達成率、下一階／缺口、新舊台獎關鍵數值、返回大廳與 390px 均正常，無異常。
+- 經驗 / 給下一位的提醒：App、Native/iOS、GAS、`kpi-battle-controller.js`、巡店、班表與每日回報 Freeze 無異常。annotated rollback tag `rollback/phase1b-pre-merge-20260817-a43ba426` 必須保留，其 target 為 `a43ba42688125e68021ad1548e47ce1ca151e6b9`。Phase 1B 已標記 `CLOSED`；任何下一階段都須由 Liam 另行明確指示。
+
 ## 2026-08-17 ｜ Codex（Phase 1B：台獎戰情獨立化，implementation complete / awaiting Liam acceptance）
 
 - 做了什麼：從正式 `origin/main` `a43ba42688125e68021ad1548e47ce1ca151e6b9` 建立隔離分支 `feature/phase1b-awards-battle-standalone`。新增 `awards-battle-controller.js` 與 `awards-battle.html`；原 `index.html` 與 standalone 共用同一台獎 controller，standalone 直接沿用既有 KPI controller 的 Approved Device／員編、`private_access → kpicalc_access`、同次正式 `snapshot.awardsBattle` 與 fail-closed。已移除 standalone iframe、程式化 click、`window.event` 與 DOM 遙控；沒有第二套 API、公式、JSON、快取、登入或 localStorage 台獎 fallback。原 index 台獎保留，`home.html` 順序為 KPI 第一、台獎第二。
