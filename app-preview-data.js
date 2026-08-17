@@ -146,6 +146,18 @@
     metrics:personalMetricNames.map((key,metricIndex)=>({key,rate:Number((1.18-index*.035-metricIndex*.018).toFixed(3)),actual:12-index,target:10,dailyTarget:1,dailyGap:index%2,dod:Number((.02-metricIndex*.004).toFixed(3))}))
   }));
   const previewPersonalPeople=previewPeople.filter(row=>row.roleGroup!=='店長');
+  const previewHalfDashboard={
+    month:'2026-08',
+    stores:patrolStores.map((store,index)=>({
+      store:store.name,
+      h1:index<4?{completed:12,total:12,missing:0,issues:0,status:'done'}:index<6?{completed:10,total:12,missing:2,issues:0,status:'miss'}:{completed:0,total:12,missing:12,issues:0,status:'miss'},
+      h2:{completed:0,total:12,missing:12,issues:0,status:'miss'}
+    }))
+  };
+  const previewAwareness={
+    deadlineDay:20,
+    stores:patrolStores.map((store,index)=>({store:store.name,count:index<4?15:index<6?13:0,total:15}))
+  };
 
   const contract = {
     version:C.VERSION, generatedAt:'2026-08-10T08:42:00+08:00', mode:'preview',
@@ -166,7 +178,7 @@
     scheduleToday:state({ date:'2026-08-10',stores:scheduleRows },'既有班表 sread','patrol.html','2026-08-10T08:10:00+08:00'),
     scheduleByDate:state({ selectedDate:'2026-08-10', availableMonth:'2026-08', stores:scheduleRows },'既有班表 sread','patrol.html','2026-08-10T08:10:00+08:00'),
     patrolToday:state({ date:'2026-08-10',route:['永吉','大稻埕','通化'],completed:1,total:3,nextStop:'大稻埕',nextEta:'14:20',travel:[{from:'永吉',to:'大稻埕',minutes:24},{from:'大稻埕',to:'通化',minutes:31}] },'巡店唯讀路線 Preview','patrol.html','2026-08-10T08:00:00+08:00'),
-    patrolOverview:state({ visited:6,total:9,expected:9,remaining:3,completionRate:6/9,fullyDone:4,totalMissingItems:5,unvisited:['杭州南','復興南','六張犁'],attention:['酒泉','萬大'],attentionCount:2,item18Window:{months:['2026-07','2026-08'],label:'7–8月'},statisticsPeriod:'2026-08-01～2026-08-31（Preview）',periodVerified:true,stores:patrolStores,visitCounts:patrolStores.map((store,index)=>({name:store.name,count:index<6?index%3+1:0,basis:'unique-store-date',sameDayMultipleVisitsDistinguishable:false})),inventory:{items:[14,15,16,17],completedStores:4,total:9,stores:patrolStores.map((store,index)=>({name:store.name,complete:index<4,items:{14:index<7,15:index<6,16:index<5,17:index<4}}))},item18Progress:{window:{months:['2026-07','2026-08'],label:'7–8月'},previousWindow:{months:['2026-05','2026-06'],label:'5–6月'},completedStores:8,total:9,stores:patrolStores.map((store,index)=>({name:store.name,current:{done:index<8,date:index<8?'2026-08-0'+(index+1):''},previous:{done:index!==7,date:index!==7?'2026-06-18':''}}))},recent:[{store:'永吉',date:'2026-08-09',complete:true,missingItems:0},{store:'大稻埕',date:'2026-08-08',complete:true,missingItems:0},{store:'復興南',date:'2026-08-03',complete:false,missingItems:2}] },'既有巡店 ptread','patrol.html','2026-08-10T08:00:00+08:00'),
+    patrolOverview:state({ currentMonth:'2026-08',visited:6,total:9,expected:9,remaining:3,completionRate:6/9,fullyDone:4,totalMissingItems:5,unvisited:['杭州南','復興南','六張犁'],attention:['酒泉','萬大'],attentionCount:2,item18Window:{months:['2026-07','2026-08'],label:'7–8月'},statisticsPeriod:'2026-08-01～2026-08-31（Preview）',periodVerified:true,stores:patrolStores,halfDashboard:previewHalfDashboard,items19to33:previewAwareness,visitCounts:patrolStores.map((store,index)=>({name:store.name,count:index<6?index%3+1:0,basis:'unique-store-date',sameDayMultipleVisitsDistinguishable:false})),inventory:{items:[14,15,16,17],completedStores:4,total:9,stores:patrolStores.map((store,index)=>({name:store.name,complete:index<4,items:{14:index<7,15:index<6,16:index<5,17:index<4}}))},item18Progress:{window:{months:['2026-07','2026-08'],label:'7–8月'},previousWindow:{months:['2026-05','2026-06'],label:'5–6月'},completedStores:8,total:9,stores:patrolStores.map((store,index)=>({name:store.name,current:{done:index<8,date:index<8?'2026-08-0'+(index+1):''},previous:{done:index!==7,date:index!==7?'2026-06-18':''}}))},recent:[{store:'永吉',date:'2026-08-09',complete:true,missingItems:0},{store:'大稻埕',date:'2026-08-08',complete:true,missingItems:0},{store:'復興南',date:'2026-08-03',complete:false,missingItems:2}] },'既有巡店 ptread','patrol.html','2026-08-10T08:00:00+08:00'),
     patrolStores:state(patrolStores,'既有巡店 ptread','patrol.html','2026-08-10T08:00:00+08:00')
   };
 

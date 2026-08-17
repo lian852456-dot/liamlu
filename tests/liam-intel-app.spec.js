@@ -82,7 +82,7 @@ test('existing short session renders real-shape schedule and patrol data read-on
 
   await page.locator('[data-nav="patrol"]').last().click();
   await expect(page.locator('#patrolStoreList .patrol-store-row')).toHaveCount(9);
-  await expect(page.locator('#patrolOverview')).toContainText('本月已巡店數');
+  await expect(page.locator('#patrolOverview')).toContainText('本期已巡店數');
   await expect(page.getByRole('heading', { name: '最近巡店紀錄' })).toBeVisible();
   await expect(page.getByRole('link', { name: '完整巡店看板' })).toBeVisible();
 });

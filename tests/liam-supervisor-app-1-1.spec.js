@@ -43,6 +43,7 @@ test('390x844 home gives the supervisor summary without horizontal overflow', as
 });
 
 test('store rows, battle modes, report rows, schedule and patrol dashboard are interactive', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-08-17T04:00:00.000Z'));
   await page.goto(FILE_URL);
   const secondStore = page.locator('.store-item').nth(1);
   await secondStore.locator('.store-row').click();
@@ -123,8 +124,16 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
 
   await page.locator('.bottom-nav [data-nav="patrol"]').click();
   await expect(page.locator('[data-view="patrol"]')).toBeVisible();
-  await expect(page.locator('#patrolOverview')).toContainText('本月已巡店數');
-  await expect(page.locator('#patrolOverview')).toContainText('6');
+  await expect(page.locator('#patrolOverview')).toContainText('本期巡店進度');
+  await expect(page.locator('#patrolOverview')).toContainText('2026 年 08 月｜下半月 8/16–8/31');
+  await expect(page.locator('#patrolOverview')).toContainText('下半月巡店率');
+  await expect(page.locator('#patrolOverview')).toContainText('0.0%');
+  await expect(page.locator('#patrolOverview')).toContainText('本期已巡店數');
+  await expect(page.locator('#patrolOverview')).toContainText('本月雙輪進度');
+  await expect(page.locator('.patrol-double-round')).toContainText('上半月');
+  await expect(page.locator('.patrol-double-round')).toContainText('6 / 9');
+  await expect(page.locator('.patrol-double-round')).toContainText('0 / 9');
+  await expect(page.locator('.patrol-double-round')).toContainText('6 / 18');
   await expect(page.locator('#patrolTodayDetail')).toContainText('下一站');
   await expect(page.locator('#patrolOverview')).toContainText('題 18 雙月全盤進度');
   await expect(page.locator('#patrolOverview')).toContainText('題 14–17 每月盤點');
@@ -163,6 +172,7 @@ test('isolated patrol visit flow records arrival and departure with one protecte
   });
   await page.goto(FORMAL_FILE_URL+'#patrol');
   await expect(page.locator('#patrolArrivalButton')).toBeEnabled();
+  await expect(page.locator('.patrol-kpis article', { hasText:'本期已巡店數' }).locator('b')).toHaveText('0');
   await expect(page.locator('#patrolVisitToday .patrol-visit-event')).toHaveCount(0);
   await page.locator('#patrolArrivalButton').click();
   await expect(page.locator('#patrolVisitStore')).toHaveValue('');
@@ -179,6 +189,7 @@ test('isolated patrol visit flow records arrival and departure with one protecte
   await page.locator('#patrolVisitSubmit').dblclick();
   await expect(page.locator('#patrolVisitToday .patrol-visit-event')).toHaveCount(1);
   await expect(page.locator('#patrolVisitMessage')).toContainText('09:12 到店｜酒泉');
+  await expect(page.locator('.patrol-kpis article', { hasText:'本期已巡店數' }).locator('b')).toHaveText('0');
   expect(writes).toBe(1);
   await expect(page.locator('#patrolDepartureButton')).toBeEnabled();
   await page.locator('#patrolDepartureButton').click();
@@ -211,7 +222,7 @@ test('patrol visit UI fails closed when server response store differs from expli
   });
   await page.goto(FORMAL_FILE_URL+'#patrol');
   await expect(page.locator('#patrolArrivalButton')).toBeEnabled();
-  await expect(page.locator('#patrolOverview')).toContainText('本月巡店大盤進度');
+  await expect(page.locator('#patrolOverview')).toContainText('本期巡店進度');
   await page.locator('#patrolArrivalButton').click();
   await expect(page.locator('#patrolVisitDialog')).toBeVisible();
   await page.locator('#patrolVisitStore').selectOption('酒泉');

@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-17 ｜ Codex（巡店上下半月雙輪進度，未部署）
+
+- 做了什麼：只調整 Liam Supervisor App 「巡店」頁進度顯示；以既有 `ptsummary.halfDashboard` 的巡店檢查紀錄分開 H1（1–15 日）與 H2（16 日至月底），本期以 9 店為分母，另顯示上半月、下半月與整月 18 店次。保留題 14–33 原周期，並維持 `ptvisit_read/write` 到店／離店 session 與巡店完成統計分離。
+- 結果（成功／未部署）：8/15、8/16、8/17、同店重複巡店與只按到店等 boundary 測試通過；Node `196/196`，Playwright `133/133`，390×844 無橫向溢出。未新增欄位，未修改 Sheet、GAS API、PT_TOKEN、reauth、hwrite、半月督導檢查或正式資料；未部署、未實機驗收。
+- 經驗／給下一位的提醒：進度完成來源必須是既有巡店檢查摘要，不可以 `ptvisit` 到店 session 、本月最後到店日或「去過幾間不同門市」代替。
+
 ## 2026-08-12 ｜ Codex（半月 hwrite Security Review 修復，未部署）
 
 - 做了什麼：依獨立 diff review，將 App 專用 hwrite 從 JSONP query 改為單次 POST body；移除 client URL chunk。新增 doPost hwrite route，沿用 ptauth token，server 先完整驗證 rows，再於 ScriptLock 內依 period/store/item 更新。App POST 拒絕非異常狀態的 note/improvement、evidence/media 與任意 extra field；既有 patrol.html JSONP hwrite 保持相容。

@@ -124,7 +124,7 @@ test('PWA cache is versioned for App 1.2 and includes local icon library', () =>
   assert.match(html, /app-preview-data\.js\?v=emergency-rollback-20260813-1/);
   assert.match(html, /half-month-check-read-model\.js\?v=2/);
   assert.match(html, /app\.js\?v=emergency-rollback-20260813-1/);
-  assert.match(html, /patrol-read-model\.js\?v=12/);
+  assert.match(html, /patrol-read-model\.js\?v=13/);
   assert.match(worker, /patrol-read-model\.js/);
   assert.match(worker, /half-month-check-read-model\.js/);
   assert.match(worker, /half-month-check-write-prep\.js/);
