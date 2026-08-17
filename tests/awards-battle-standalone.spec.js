@@ -149,6 +149,44 @@ test('standalone 沿用 Approved Device 登入與 private_access → kpicalc_acc
   expect(actions.filter(action => ['private_access', 'kpicalc_access'].includes(action))).toEqual(['private_access', 'kpicalc_access']);
 });
 
+test('推估獎金固定單行且三創只縮短顯示，不改篩選 value', async ({ page }) => {
+  const awards = awardsFixture();
+  awards.supervisor.projected = 11784;
+  awards.overall.award.projected = 11784;
+  awards.stores[2] = { ...awards.stores[2], store: '台灣大哥大台北三創' };
+  await mockFormal(page, { awards });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openAwards(page, 'awards-battle.html');
+  await loginAwards(page);
+
+  const money = page.locator('.award-summary-money').nth(1);
+  await expect(money).toHaveText('$11,784');
+  const moneyLayout = await money.evaluate(element => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    return {
+      whiteSpace: getComputedStyle(element).whiteSpace,
+      lines: new Set([...range.getClientRects()].map(rect => Math.round(rect.top))).size,
+      fits: element.scrollWidth <= element.clientWidth,
+    };
+  });
+  expect(moneyLayout).toEqual({ whiteSpace: 'nowrap', lines: 1, fits: true });
+
+  const firstRowCards = page.locator('.summary-card').first().or(page.locator('.summary-card').nth(1));
+  const cardBoxes = await firstRowCards.evaluateAll(cards => cards.map(card => {
+    const rect = card.getBoundingClientRect();
+    return { top: Math.round(rect.top), height: Math.round(rect.height) };
+  }));
+  expect(cardBoxes[0]).toEqual(cardBoxes[1]);
+
+  const sanchuang = page.locator('#awardsStoreSelect option[value="台灣大哥大台北三創"]');
+  await expect(sanchuang).toHaveText('台北三創');
+  await expect(page.locator('#awardsBattleContent')).not.toContainText('台灣大哥大台北三創');
+  await page.selectOption('#awardsStoreSelect', '台灣大哥大台北三創');
+  await expect(page.locator('#awardsStoreSelect')).toHaveValue('台灣大哥大台北三創');
+  await expect(page.locator('#awardsStoreSelect option:checked')).toHaveText('台北三創');
+});
+
 test('未授權與 KPI 讀取失敗均 fail-closed，不使用 localStorage 舊台獎', async ({ page }) => {
   const actions = await mockFormal(page, { accessError: '裝置尚未核准' });
   await page.addInitScript(() => localStorage.setItem('phone-awards-battle-latest', JSON.stringify({ actual_total: 999999 })));

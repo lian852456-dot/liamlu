@@ -10,6 +10,7 @@ const controllerSource = fs.readFileSync(path.join(root, 'awards-battle-controll
 const kpiControllerSource = fs.readFileSync(path.join(root, 'kpi-battle-controller.js'), 'utf8');
 const home = fs.readFileSync(path.join(root, 'home.html'), 'utf8');
 const controller = require('../awards-battle-controller.js');
+const kpiController = require('../kpi-battle-controller.js');
 
 function awardItems(seed = 0) {
   return Array.from({ length: 13 }, (_, index) => ({
@@ -93,6 +94,22 @@ test('renderer 保留正式獎金、達成率、threshold、next target 與 unlo
   const source = `${controller.renderAwardPriority(fixture().overall.priorities[0])}\n${controller.renderAwardModel(fixture().overall.items[0], true)}`;
   for (const expected of ['實際數', '目標數', '達成率', '差異數', '會增加多少獎金', '再 1 台解鎖', '80%目標', '北一二B 80%獎金', '北一二B 100%獎金']) {
     assert.match(source, new RegExp(expected));
+  }
+});
+
+test('三創名稱只在顯示層縮短，獎金摘要金額固定單行', () => {
+  for (const api of [controller, kpiController]) {
+    assert.equal(api.displayStoreName('台灣大哥大台北三創'), '台北三創');
+    assert.equal(api.displayStoreName('台灣大哥大數位生活台北三創'), '台北三創');
+    assert.equal(api.displayStoreName('台北通化'), '台北通化');
+  }
+  assert.match(controllerSource, /value="\$\{row\.store\}"/);
+  assert.match(controllerSource, /displayStoreName\(row\.store\)/);
+  assert.equal((controllerSource.match(/award-summary-money/g) || []).length, 2);
+  for (const page of [index, standalone]) {
+    assert.match(page, /white-space:nowrap/);
+    assert.match(page, /word-break:keep-all/);
+    assert.match(page, /overflow-wrap:normal/);
   }
 });
 

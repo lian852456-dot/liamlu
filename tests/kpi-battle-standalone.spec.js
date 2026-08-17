@@ -180,6 +180,12 @@ test('Safari 不提供全域 event 時共用 controller 仍會啟動既有 KPI �
 
   await loginKpi(page);
   await expect(page.locator('#kpiBattleContent tbody tr')).toHaveCount(10);
+  const sanchuangOption = page.locator('#kpiBattleStoreSelect option[value="台灣大哥大數位生活台北三創"]');
+  await expect(sanchuangOption).toHaveText('台北三創');
+  await expect(page.locator('#kpiBattleContent')).not.toContainText('台灣大哥大數位生活台北三創');
+  await page.selectOption('#kpiBattleStoreSelect', '台灣大哥大數位生活台北三創');
+  await expect(page.locator('#kpiBattleStoreSelect')).toHaveValue('台灣大哥大數位生活台北三創');
+  await expect(page.locator('#kpiBattleStoreSelect option:checked')).toHaveText('台北三創');
   await page.getByRole('button', { name: '個績排名' }).click();
   await expect(page.locator('#kpiBattleContent tbody tr')).toHaveCount(1);
   await expect(page.locator('#kpiBattleContent')).toContainText('測＊員');
