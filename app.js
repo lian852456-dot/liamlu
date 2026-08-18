@@ -473,6 +473,7 @@
       return { summary:missing(null), stores:missing([]), top2:missing([]) };
     }
     const sourceOverall = awards.overall || {};
+    const supervisorAward = awards.supervisor || {};
     const overallAward = sourceOverall.award || awards.supervisor || {};
     const storeRows = Array.isArray(awards.stores) ? awards.stores.map(row => {
       const award = row.award || {};
@@ -497,7 +498,14 @@
     // (the formal snapshot currently exposes count-scale 179 beside store amounts in the thousands).
     // Fail closed until the source publishes an explicit same-unit district amount field.
     const totalAmount = numberOrNull(overallAward.district_award_amount != null ? overallAward.district_award_amount : overallAward.region_award_amount);
-    const summary = { totalAmount, regionTotalAvailable:totalAmount != null, winningStores, totalStores:9, reportDate };
+    const supervisorEligibility = String(supervisorAward.award || '').trim().toUpperCase();
+    const summary = {
+      totalAmount, regionTotalAvailable:totalAmount != null,
+      areaActualAward:numberOrNull(supervisorAward.actual_total),
+      areaCompanyRank:numberOrNull(supervisorAward.rank),
+      areaEligible:supervisorEligibility === 'Y' ? true : supervisorEligibility === 'N' ? false : null,
+      winningStores, totalStores:9, reportDate
+    };
     const base = { updatedAt:readAt, sourceUpdatedAt:updatedAt, stale:stale(updatedAt), source };
     return {
       summary:C.moduleState({ ...base, status:storeRows.length === 9 ? 'ok':(storeRows.length?'partial':'no_data'), data:summary, note:totalAmount == null?'正式來源未提供與九店獎勵金額同口徑的區總額；App 不顯示 aggregate actual_total。':'' }),
@@ -1138,7 +1146,9 @@
       content.innerHTML = row ? `<div class="metric-card-grid"><article class="metric-card"><span>店 KPI</span><strong class="cyan-value">${fmtPct(row.kpi)}</strong><small>${escapeHtml(row.name)}</small></article><article class="metric-card"><span>公司排名</span><strong class="gold-value">${row.rank??'—'}</strong><small>${fmtSigned(row.rankChange)}</small></article><article class="metric-card"><span>KPI DOD</span><strong class="${valueClass(row.kpiDod)}">${fmtSignedPct(row.kpiDod)}</strong><small>正式快照</small></article><article class="metric-card"><span>加減分</span><strong>${fmtNumber(row.addon)}</strong><small>正式快照</small></article></div><section class="panel"><div class="panel-head"><div><h2>六項主要 KPI</h2><small>${escapeHtml(row.name)}</small></div></div><div class="core-grid">${Object.entries(row.core||{}).map(([key,value])=>`<div class="core-cell"><span>${key}</span><b class="${value!=null&&value<1?'negative':''}">${fmtPct(value)}</b></div>`).join('')}</div></section>${renderFullKpis(row.fullKpis,row.name)}<a class="source-button" href="index.html">開啟正式 KPI 網站 <i data-lucide="external-link"></i></a>` : '<div class="empty-state">尚無此店 KPI 摘要。</div>';
     } else if (battleKind === 'award' && battleScope === 'region') {
       const a=contract.awardSummary.data||{};
-      content.innerHTML=`<div class="metric-card-grid"><article class="metric-card"><span>領獎店數</span><strong>${a.winningStores??'—'}/9</strong><small>正式台獎判定</small></article><article class="metric-card"><span>未領獎店數</span><strong>${a.winningStores==null?'—':Math.max(0,9-a.winningStores)}</strong><small>九店完整顯示</small></article></div><div class="battle-list award-battle-list"><div class="battle-list-row award-battle-row header"><span>店點</span><span>金額</span><span>狀態</span></div>${awardStores.map(row=>`<div class="battle-list-row award-battle-row"><span>${escapeHtml(row.name)}</span><span>${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</span><span class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</span></div>`).join('')}</div>`;
+      const areaEligibility=a.areaEligible===true?'領獎':a.areaEligible===false?'未領獎':'尚未同步';
+      const areaEligibilityClass=a.areaEligible===true?'positive':a.areaEligible===false?'neutral-value':'gold-value';
+      content.innerHTML=`<section class="panel award-area-summary"><div class="panel-head"><div><h2>督導區台獎摘要</h2></div></div><div class="metric-card-grid"><article class="metric-card"><span>督導區實際獎金</span><strong class="gold-value">${a.areaActualAward==null?'—':'$'+fmtNumber(a.areaActualAward,0)}</strong><small>正式區域級欄位</small></article><article class="metric-card"><span>公司排名</span><strong>${a.areaCompanyRank==null?'—':fmtNumber(a.areaCompanyRank,0)}</strong><small>正式區域級欄位</small></article><article class="metric-card"><span>領獎資格</span><strong class="${areaEligibilityClass}">${areaEligibility}</strong><small>正式台獎判定</small></article></div></section><div class="metric-card-grid"><article class="metric-card"><span>領獎店數</span><strong>${a.winningStores??'—'}/9</strong><small>正式台獎判定</small></article><article class="metric-card"><span>未領獎店數</span><strong>${a.winningStores==null?'—':Math.max(0,9-a.winningStores)}</strong><small>九店完整顯示</small></article></div><div class="battle-list award-battle-list"><div class="battle-list-row award-battle-row header"><span>店點</span><span>金額</span><span>狀態</span></div>${awardStores.map(row=>`<div class="battle-list-row award-battle-row"><span>${escapeHtml(row.name)}</span><span>${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</span><span class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</span></div>`).join('')}</div>`;
     } else if (battleKind === 'award') {
       const row=awardStores.find(item=>item.name===selected);
       content.innerHTML=row?`<div class="award-selected-store"><span>店點</span><strong>${escapeHtml(row.name)}</strong></div><div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>正式台獎金額</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div>${renderAwardStoreItems(row)}<a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
@@ -1763,5 +1773,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=patrol-paste-summary-20260815-1',{scope:'./'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=area-award-summary-20260818-1',{scope:'./'}).catch(()=>{}));
 })(window);
