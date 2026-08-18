@@ -54,11 +54,17 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
   await expect(page.locator('[data-view="battle"]')).toBeVisible();
   await expect(page.locator('#battleContent')).toContainText('九店比較');
   await page.locator('[data-battle-kind="award"]').click();
+  await expect(page.locator('#battleContent')).toContainText('督導區台獎摘要');
+  await expect(page.locator('#battleContent')).toContainText('督導區實際獎金');
+  await expect(page.locator('#battleContent')).toContainText('公司排名');
+  await expect(page.locator('#battleContent')).toContainText('領獎資格');
+  await expect(page.locator('#battleContent')).toContainText('尚未同步');
   await expect(page.locator('#battleContent .award-battle-row:not(.header)')).toHaveCount(9);
   await expect(page.locator('#battleContent')).not.toContainText('區領獎總額');
   await expect(page.locator('#battleContent')).not.toContainText('Top 1');
   await page.locator('[data-battle-scope="store"]').click();
   await expect(page.locator('#battleStorePicker')).toBeVisible();
+  await expect(page.locator('#battleContent')).not.toContainText('督導區台獎摘要');
   await expect(page.locator('#battleContent')).toContainText('店領獎金額');
   await expect(page.locator('#battleContent')).toContainText('指定機款');
   await expect(page.locator('#battleContent .award-store-item')).toHaveCount(3);
@@ -252,6 +258,66 @@ test('formal unlock is explicit and does not load summaries before Approved Devi
   await page.locator('#privateLogout').click();
   const afterLogout = await page.evaluate(() => ({ employee:localStorage.getItem('north12b_private_dashboard_employee_id'), device:Boolean(localStorage.getItem('north12b_private_dashboard_device_id')) }));
   expect(afterLogout).toEqual({ employee:null, device:true });
+});
+
+test('formal area award summary renders supervisor fields and fails closed when a field is absent', async ({ page }) => {
+  const consoleErrors=[];
+  page.on('pageerror',error=>consoleErrors.push(error.message));
+  page.on('console',message=>{
+    if(message.type()!=='error') return;
+    const text=message.text();
+    const fileOriginCorsNoise=FORMAL_FILE_URL.startsWith('file:') && text.includes('Origin null is not allowed by Access-Control-Allow-Origin');
+    if(!fileOriginCorsNoise && !(FORMAL_FILE_URL.startsWith('file:') && text.includes('Failed to load resource: Origin null is not allowed'))) consoleErrors.push(text);
+  });
+  let supervisor={actual_total:9234,rank:21,award:'Y'};
+  const storeNames=['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
+  await page.addInitScript(() => {
+    localStorage.setItem('north12b_private_dashboard_employee_id','TEST01');
+    localStorage.setItem('north12b_private_dashboard_device_id','approved-device');
+  });
+  await page.route('https://script.google.com/**',async route=>{
+    const payload=JSON.parse(route.request().postData()||'{}');
+    if(payload.action==='private_access') {
+      return route.fulfill({json:{status:'ok',profile:{maskedName:'測＊員'},snapshot:{
+        kpiBattle:{report_date:'2026-08-10',source_file:'0810.xlsx',data_as_of_date:'2026-08-09',aggregate:{},stores:[]},
+        awardsBattle:{report_date:'2026-08-10',generated_at:'2026-08-10T08:00:00+08:00',supervisor:{...supervisor},overall:{award:{actual_total:99999},items:[]},stores:storeNames.map((store,index)=>({store,award:{actual_total:1000+index,award:index<4?'Y':'N'},items:[]}))}
+      }}});
+    }
+    if(payload.action==='kpicalc_access') return route.fulfill({json:{status:'ok',data:{meta:{month:'2026-08',snapshotDay:9,sourceFile:'0810.xlsx'},items:[],aggregateRates:{},stores:[]}}});
+    if(payload.action==='read') return route.fulfill({json:{status:'ok',data:{},summary:{semantics:'formal-index-summary-v1',completedStores:0,totalStores:9,missingStores:storeNames,updatedAt:''}}});
+    if(payload.action==='pread') return route.fulfill({json:{status:'ok',data:{}}});
+    return route.fulfill({json:{status:'error',message:'unexpected action'}});
+  });
+
+  let opened=false;
+  const openAreaAwards=async()=>{
+    if(opened) await page.reload();
+    else { await page.goto(FORMAL_FILE_URL+'#battle'); opened=true; }
+    await expect(page.locator('#dataMode')).toHaveText('正式唯讀');
+    await page.locator('[data-battle-kind="award"]').click();
+    await expect(page.locator('#battleContent .award-area-summary')).toBeVisible();
+  };
+  await openAreaAwards();
+  await expect(page.locator('#battleContent .award-area-summary')).toContainText('$9,234');
+  await expect(page.locator('#battleContent .award-area-summary')).toContainText('21');
+  await expect(page.locator('#battleContent .award-area-summary')).toContainText('領獎');
+  await expect(page.locator('#battleContent .award-battle-row:not(.header)')).toHaveCount(9);
+
+  supervisor={actual_total:9234,rank:21,award:'N'};
+  await openAreaAwards();
+  await expect(page.locator('#battleContent .award-area-summary')).toContainText('未領獎');
+
+  supervisor={};
+  await openAreaAwards();
+  const failClosed=page.locator('#battleContent .award-area-summary');
+  await expect(failClosed).toContainText('督導區實際獎金—');
+  await expect(failClosed).toContainText('公司排名—');
+  await expect(failClosed).toContainText('尚未同步');
+  await expect(failClosed).not.toContainText('$0');
+  await page.locator('[data-battle-scope="store"]').click();
+  await expect(page.locator('#battleContent .award-area-summary')).toHaveCount(0);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  expect(consoleErrors).toEqual([]);
 });
 
 test('existing device request flow clears the activation code and reports pending', async ({ page }) => {

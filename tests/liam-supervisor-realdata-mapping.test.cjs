@@ -122,13 +122,16 @@ test('Awards preserve each store own complete row.items and reject aggregate act
     difference:index-6, threshold_target:index+1, store_reward_50:1000+index, store_reward_100:2000+index,
     award:index===0?'Y':''
   }));
-  const snapshot = { awardsBattle:{ report_date:'2026-08-10',generated_at:'2026-08-10T01:00:00+08:00',overall:{award:{actual_total:9000},items:[
+  const snapshot = { awardsBattle:{ report_date:'2026-08-10',generated_at:'2026-08-10T01:00:00+08:00',supervisor:{actual_total:9234,rank:21,award:'Y'},overall:{award:{actual_total:9000},items:[
     {display_name:'機款 A',district_reward_100:3000,rate:.8},{display_name:'機款 B',district_reward_100:7000,rate:.9},{display_name:'機款 C',district_reward_100:5000,rate:1}
   ]},stores:Array.from({length:9},(_,index)=>({store:`店 ${index+1}`,award:{actual_total:index,award:index<3?'Y':'N'},items:index===0?storeItems:[{display_name:`店 ${index+1} 唯一機款`}]})) } };
   const pass = A.adaptAwards(snapshot, '2026-08-10', '2026-08-10T01:02:00+08:00');
   assert.equal(pass.summary.status, 'ok');
   assert.equal(pass.summary.data.totalAmount, null);
   assert.equal(pass.summary.data.regionTotalAvailable, false);
+  assert.equal(pass.summary.data.areaActualAward, 9234);
+  assert.equal(pass.summary.data.areaCompanyRank, 21);
+  assert.equal(pass.summary.data.areaEligible, true);
   assert.match(pass.summary.note, /不顯示 aggregate actual_total/);
   assert.equal(pass.stores.data.length, 9);
   assert.equal(pass.stores.data[0].items.length, 13);
@@ -139,6 +142,13 @@ test('Awards preserve each store own complete row.items and reject aggregate act
   assert.equal(pass.stores.data[1].items[0].name, '店 2 唯一機款');
   assert.ok(!pass.stores.data[1].items.some(item=>item.name.startsWith('店 1 ')));
   assert.deepEqual(Array.from(pass.top2.data, row=>row.name), ['機款 B','機款 C']);
+  snapshot.awardsBattle.supervisor.award='N';
+  assert.equal(A.adaptAwards(snapshot, '2026-08-10', '2026-08-10T01:02:00+08:00').summary.data.areaEligible, false);
+  snapshot.awardsBattle.supervisor={};
+  const missingSupervisor=A.adaptAwards(snapshot, '2026-08-10', '2026-08-10T01:02:00+08:00').summary.data;
+  assert.equal(missingSupervisor.areaActualAward, null);
+  assert.equal(missingSupervisor.areaCompanyRank, null);
+  assert.equal(missingSupervisor.areaEligible, null);
   const blocked = A.adaptAwards(snapshot, '2026-08-09', '2026-08-10T01:02:00+08:00');
   assert.equal(blocked.summary.status, 'no_data');
   assert.match(blocked.summary.note, /不一致/);
