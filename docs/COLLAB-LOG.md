@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-19 ｜ Codex（戰報快速更新正式 ingest P0，Draft PR／未部署）
+
+- 做了什麼：從 `origin/main` `6564a68abb5a9a5fc845c61e25e70f7ebc675412` 建立隔離分支 `feature/report-upload-official-ingest-p0`。先完成 root dependency map，再把 GAS KPI 自動排程拆成 source discovery 與唯一 `processKpiSourceFile_()`；quick upload 改為 private staging、內容日期預檢、canonical `MMDD.xlsx` promotion、exact-file processor、hash readback、same-date archive、ScriptLock、run id、audit log 與 failure recovery。原 quick upload 直接覆寫 KPI JSON／直接台獎 JSON 路徑已移除；UI 改為四階段流程，外部台獎／Mail／private publisher 未完成時只顯示「尚未完成」。
+- 結果（本機完成，未部署）：KPI scheduler 與 quick upload 已完全共用同一 parser／processor／正式 source folder／KPI JSON publisher；Node contract `226/226`，既有 report-upload Chromium `33/33`，focused KPI／台獎／App 回歸另有測試紀錄。未修改 KPI／台獎公式、App UI、Native/iOS、巡店、班表或每日回報。完整台獎與 Outlook Mail 的正式處理仍在 Mac `report-automation`，本輪只建立可稽核 job handoff，未複製計算器或 Mail template。
+- 經驗 / 給下一位的提醒：公司 KPI Excel 本身不足以產生台獎；正式台獎需要 01-08-03、01-08-04 與 Y26／active config。完整 UAT 前仍要實作 external job consumer 與同一工作階段的台獎原始檔 ingest，並以 Outlook `寄件備份`、private publish、網站／App 同日 readback 關閉 job。此分支不得自行部署 GAS／Pages，也不能把 KPI import 通知冒充每日正式戰報 Mail。
+
 ## 2026-08-18 ｜ Codex（台獎摘要金額單行與三創顯示名稱，未部署）
 
 - 做了什麼：由最新 `origin/main` `b23a101` 建立隔離分支 `fix/awards-ui-store-label-20260818`。台獎摘要的「督導區實際／推估獎金」共用 `award-summary-money`，固定 `nowrap`、`keep-all`、`line-height:1` 並將金額字級調為 27px；六張摘要卡片只在台獎面板內補齊置中與等高規則。KPI／台獎共用 controller 新增純顯示層 `displayStoreName()`，只把 `台灣大哥大台北三創` 與 `台灣大哥大數位生活台北三創` 顯示為 `台北三創`。

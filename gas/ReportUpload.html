@@ -21,13 +21,18 @@
     table { width:100%; border-collapse:collapse; margin-top:12px; } th,td { padding:8px; text-align:left; border-bottom:1px solid var(--line); } th { color:var(--muted); font-size:13px; } .checks .ok { color:var(--ok); } .checks .warn { color:var(--warn); } .checks .block,.checks .bad { color:var(--bad); }
     .confirm { display:flex; gap:8px; align-items:flex-start; margin-top:14px; color:var(--muted); } .confirm input { width:auto; min-height:auto; margin-top:5px; }
     .small { color:var(--muted); font-size:13px; } code { background:#edf3f7; border-radius:4px; padding:1px 4px; } @media (max-width:680px) { .grid,.meta { grid-template-columns:1fr; } main { width:min(100% - 20px,960px); margin-top:10px; } }
+    .steps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:18px; }
+    .step { padding:10px 12px; border:1px solid #ffffff55; border-radius:10px; background:#ffffff12; font-weight:800; }
+    .chain td:first-child { font-weight:800; } .chain .wait { color:var(--warn); } .chain .fail { color:var(--bad); }
+    @media (max-width:680px) { .steps { grid-template-columns:1fr 1fr; } }
   </style>
 </head>
 <body>
   <main>
     <section class="hero">
       <h1>戰報快速更新</h1>
-      <p>獨立 Apps Script Deployment ・同源上傳與發布 ・不經 GitHub Pages 跨網域 POST</p>
+      <p>正式資料第二入口：Private staging → canonical source → 同一正式 processor</p>
+      <div class="steps"><div class="step">1 上傳報表</div><div class="step">2 預檢</div><div class="step">3 正式更新</div><div class="step">4 全鏈驗證</div></div>
     </section>
 
     <section id="authCard" class="card">
@@ -43,8 +48,8 @@
 
     <section id="app" class="hidden">
       <section class="card">
-        <h2>KPI Excel</h2>
-        <p class="small">預覽只建立受控暫存與檢查資料；在你勾選確認並發布前，不會改寫正式 JSON。</p>
+        <h2>Step 1–2｜上傳 KPI 原始報表並預檢</h2>
+        <p class="small">檔案先進私人 staging；日期與正式檔名由報表內容推導。預檢通過前不會進入 KPICALC_SOURCE_FOLDER_ID。</p>
         <label>選擇 KPI 日報 Excel（.xlsx） <input id="kpiFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
         <div class="actions">
           <button id="previewBtn" type="button">檔案預覽</button>
@@ -55,24 +60,24 @@
         <div id="previewPanel" class="hidden">
           <div class="meta">
             <div class="metric"><span>原始檔名</span><b id="fileName">—</b></div>
-            <div class="metric"><span>資料日期</span><b id="dataDate">—</b></div>
+            <div class="metric"><span>正式戰報日</span><b id="dataDate">—</b></div>
             <div class="metric"><span>門市</span><b id="storeCount">—</b></div>
             <div class="metric"><span>人員 / KPI</span><b id="peopleAndItems">—</b></div>
           </div>
           <div id="checks"></div>
-          <label class="confirm"><input id="confirmPublish" type="checkbox">我已確認檔名、資料日期、店數、人數與 KPI 項目，且知悉同日期發布會先備份目前正式 JSON。</label>
-          <label id="forceWrap" class="confirm hidden"><input id="forcePublish" type="checkbox" disabled>同日期或內容相同的版本，仍確認強制覆寫。</label>
+          <label class="confirm"><input id="confirmPublish" type="checkbox">我已確認報表日期、九店、人數與 25 項 KPI 預檢結果，並同意執行正式 source promotion。</label>
+          <label id="forceWrap" class="confirm hidden"><input id="confirmCorrection" type="checkbox" disabled>這是同日期、不同 hash 的修正版；同意先封存上一份 canonical source，再處理這一份。</label>
           <div class="actions">
-            <button id="publishBtn" type="button" disabled>確認發布</button>
-            <button id="rollbackBtn" class="warn" type="button">回復上一版</button>
+            <button id="publishBtn" type="button" disabled>Step 3｜執行正式更新</button>
+            <button id="rollbackBtn" class="warn" type="button">回復上一份正式來源</button>
           </div>
         </div>
         <div id="result"></div>
       </section>
 
       <section class="card">
-        <h2>更新紀錄</h2>
-        <p class="small">發布會先備份正式 JSON；讀回驗證失敗時，伺服器會自動還原上一版。</p>
+        <h2>Step 4｜全鏈驗證與更新紀錄</h2>
+        <p class="small">只有來源、正式資料、KPI／台獎戰情、Supervisor App、完整 Mail 與 readback 全部 PASS，才會顯示「戰報正式更新完成」。</p>
         <div id="log"></div>
       </section>
     </section>
@@ -93,7 +98,7 @@
     function setBusy(button, busy, label) { button.disabled = busy; if (label) button.textContent = label; }
     function updatePublishButton() {
       const forceRequired = !$('forceWrap').classList.contains('hidden');
-      $('publishBtn').disabled = !previewToken || !$('confirmPublish').checked || (forceRequired && !$('forcePublish').checked);
+      $('publishBtn').disabled = !previewToken || !$('confirmPublish').checked || (forceRequired && !$('confirmCorrection').checked);
     }
     function renderLive(live) {
       $('liveInfo').textContent = live ? '目前正式版本：' + (live.label || '—') + '｜資料日期 ' + (live.dataDate || '—') + '｜最後更新 ' + (live.updatedAt || '—') : '目前尚無正式 KPI JSON。';
@@ -105,6 +110,11 @@
     function renderLog(entries) {
       const rows = (entries || []).map(entry => '<tr><td>' + esc(entry.acted_at) + '</td><td>' + esc(entry.kind) + '</td><td>' + esc(entry.file_name) + '</td><td>' + esc(entry.data_date) + '</td><td>' + esc(entry.result) + '</td></tr>').join('');
       $('log').innerHTML = rows ? '<table><thead><tr><th>時間</th><th>類型</th><th>檔案</th><th>資料日期</th><th>結果</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<p class="small">目前沒有更新紀錄。</p>';
+    }
+    function renderStages(result) {
+      const rows = (result.stages || []).map(stage => '<tr class="' + esc(stage.status) + '"><td>' + esc(stage.label) + '</td><td>' + esc(stage.status === 'ok' ? '✅ PASS' : stage.status === 'wait' ? '⏳ 等待' : stage.status === 'kept' ? '維持上一版' : stage.status === 'skip' ? '未執行' : '❌ FAIL') + '</td><td>' + esc(stage.detail) + '</td></tr>').join('');
+      const headline = result.result === 'ok' ? '✅ 戰報正式更新完成' : result.result === 'partial' ? '⚠️ 尚未完成' : '❌ 正式更新失敗';
+      $('result').innerHTML = '<div class="notice"><strong>' + headline + '</strong><br>' + esc(result.message || '') + '<br><span class="small">Run ID：' + esc(result.runId || '—') + '</span></div><table class="chain"><thead><tr><th>階段</th><th>狀態</th><th>說明</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
     function readFileBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onerror = () => reject(new Error('檔案讀取失敗')); reader.onload = () => resolve(String(reader.result).split(',')[1] || ''); reader.readAsDataURL(file); }); }
     async function refreshLog() {
@@ -134,24 +144,24 @@
         $('peopleAndItems').textContent = (result.preview && result.preview.personCount != null ? result.preview.personCount : '—') + ' 人 / 25 項';
         previewToken = result.ok ? result.token : '';
         $('confirmPublish').checked = false;
-        const needsForce = Boolean(result.needsForce);
+        const needsForce = Boolean(result.needsCorrectionConfirmation);
         $('forceWrap').classList.toggle('hidden', !needsForce);
-        $('forcePublish').checked = false;
-        $('forcePublish').disabled = !needsForce || !previewToken;
+        $('confirmCorrection').checked = false;
+        $('confirmCorrection').disabled = !needsForce || !previewToken;
         updatePublishButton();
         message('kpiMessage', result.ok ? '預覽完成，請核對後再確認發布。' : '預覽未通過，正式 JSON 未變更。', result.ok ? 'ok' : 'bad');
       } catch (error) { previewToken = ''; $('forceWrap').classList.add('hidden'); updatePublishButton(); message('kpiMessage', error.message, 'bad'); }
       finally { setBusy(button, false, '檔案預覽'); }
     });
     $('confirmPublish').addEventListener('change', updatePublishButton);
-    $('forcePublish').addEventListener('change', updatePublishButton);
+    $('confirmCorrection').addEventListener('change', updatePublishButton);
     $('publishBtn').addEventListener('click', async () => {
       if (!previewToken || !$('confirmPublish').checked) return; const button = $('publishBtn');
-      if (!window.confirm('確定發布此預覽版本？伺服器會先備份目前正式 JSON。')) return;
-      setBusy(button, true, '發布中…'); message('kpiMessage', '正在備份、發布並讀回驗證…');
-      try { const result = await call('report_upload_commit', payload({ token:previewToken, force:$('forcePublish').checked })); $('result').innerHTML = '<div class="notice">' + esc(result.message || result.result || '已完成') + '</div>'; renderLive(result.live); previewToken = ''; $('confirmPublish').checked = false; $('forcePublish').checked = false; $('forceWrap').classList.add('hidden'); updatePublishButton(); await refreshLog(); message('kpiMessage', result.result === 'ok' ? '發布完成。' : (result.message || '發布未完成，正式資料維持上一版。'), result.result === 'ok' ? 'ok' : 'warn'); }
+      if (!window.confirm('確定把這份原始報表 promotion 到正式來源並立即執行正式 KPI processor？')) return;
+      setBusy(button, true, '正式更新中…'); message('kpiMessage', '正在 promotion、exact-file import、讀回並檢查下游鏈路…');
+      try { const result = await call('report_upload_commit', payload({ token:previewToken, confirmCorrection:$('confirmCorrection').checked })); renderStages(result); renderLive(result.live); previewToken = ''; $('confirmPublish').checked = false; $('confirmCorrection').checked = false; $('forceWrap').classList.add('hidden'); updatePublishButton(); await refreshLog(); message('kpiMessage', result.result === 'ok' ? '戰報正式更新完成。' : (result.message || '尚未完成。'), result.result === 'ok' ? 'ok' : result.result === 'partial' ? 'warn' : 'bad'); }
       catch (error) { message('kpiMessage', error.message, 'bad'); }
-      finally { setBusy(button, false, '確認發布'); }
+      finally { setBusy(button, false, 'Step 3｜執行正式更新'); }
     });
     $('rollbackBtn').addEventListener('click', async () => {
       if (!window.confirm('確定回復 KPI 正式資料到上一個成功版本？')) return; const button = $('rollbackBtn');

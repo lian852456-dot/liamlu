@@ -84,11 +84,24 @@ test('快照合併硬性要求截止日與來源檔一致', () => {
   assert.doesNotMatch(functionBody(controllerSource, 'load'), /__KPI_BATTLE_DATA__/);
 });
 
-test('正式達成率保護區不變，GAS ptvisit hotfix 不修改 KPI／台獎／班表／正式回報寫入', () => {
+test('正式達成率保護區不變，P0 ingest 僅重構 KPI 輸入編排，不修改公式／台獎／班表／正式回報寫入', () => {
   const gasDiff = execFileSync('git', ['diff', '--unified=0', 'origin/main', '--', 'gas/Code.gs'], { cwd: root, encoding: 'utf8' });
   const changedLines = gasDiff.split('\n').filter((line) => /^[+-]/.test(line) && !/^(?:---|\+\+\+)/.test(line)).join('\n');
-  assert.doesNotMatch(changedLines, /kpiCalc|award|schedule|private_access|reportWritePayload_\s*\{/i);
+  assert.ok(changedLines.includes('processKpiSourceFile_'), 'P0 必須實際建立共用 KPI processor');
   const gas = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8');
+  const baselineGas = execFileSync('git', ['show', 'origin/main:gas/Code.gs'], { cwd: root, encoding: 'utf8' });
+  for (const protectedFunction of [
+    'kpiCalcParseReport', 'kpiCalcReportRate', 'kpiCalcPct',
+    'normalizeReportAwardModels_', 'writeReportAwardModels_', 'readReportAwardModels_',
+    'mapLegacyAwardModels_', 'attachReportAwardModels_',
+    'scheduleDateString', 'reportWritePayload_',
+  ]) {
+    assert.equal(
+      functionBody(gas, protectedFunction),
+      functionBody(baselineGas, protectedFunction),
+      `不得修改正式 KPI 計算函式：${protectedFunction}`,
+    );
+  }
   const parser = functionBody(gas, 'kpiCalcParseReport');
   assert.match(parser, /reportRate: kpiCalcReportRate/);
   assert.match(parser, /aggregateRates: aggregateRates/);
