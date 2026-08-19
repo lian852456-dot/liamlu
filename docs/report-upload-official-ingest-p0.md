@@ -1,6 +1,6 @@
 # 戰報快速更新正式 ingest P0
 
-狀態：Draft PR 候選；本機實作與測試完成，**未部署、未做正式資料寫入、未達完整 UAT**。
+狀態：Draft PR；程式與本機測試完成，**未部署、未寄正式 Mail、未修改正式資料、未合併**。
 
 ## Root dependency map
 
@@ -9,130 +9,144 @@
 ```text
 OneDrive（同日優先）／Google Drive（備援）
   ├─ KPI 公司日報 MMDD.xlsx
-  │    ├─ Mac daily automation：產生主力 KPI／加掛／個績附件與 Mail payload
-  │    └─ GAS KPICALC_SOURCE_FOLDER_ID
-  │         └─ kpiCalcAutoUpdate()
-  │              ├─ findLatestKpiSourceFile_()
-  │              └─ processKpiSourceFile_(exact file, scheduled context)
-  │                   ├─ 唯一 parser：kpiCalcParseReport()
-  │                   ├─ PRIVATE_KPICALC_FILE
-  │                   ├─ kpicalc_access（kpi.html／KPI standalone／index KPI）
-  │                   └─ KPI import 通知
   ├─ 01-08-03 店點台獎 Excel
   ├─ 01-08-04 個人台獎 Excel
-  └─ Y26重點台獎手機.xlsx／active award config
-       └─ update_phone_awards.py
-            └─ 台獎 Excel、圖片、phone_awards_update_summary.json
-
+  └─ Y26／active award config
+       ↓
 run_daily_north12b_report.mjs
-  → update_phone_awards.py
-  → prepare_send_payloads.mjs
-  → Outlook 每日戰報 Mail + 台獎 Mail
-  → 寄件備份 direct-attachment 驗證
-  → build_github_pages_data.py
-  → publish_private_dashboard_with_keychain.sh
-  → privateDashboard KPI supplement + awardsBattle snapshot
-  → private readback（日期、來源、筆數、權限）
-  → Supervisor App（既有 private_access + kpicalc_access）
+→ update_phone_awards.py
+→ prepare_send_payloads.mjs
+→ Outlook 每日戰報 + 台獎 Mail
+→ Outlook 寄件備份附件驗證
+→ build_github_pages_data.py
+→ publish_formal_website_with_keychain.sh
+→ kpicalc_access + private_access + private_admin_snapshot_status readback
+→ Website / Supervisor App 日期對齊
+```
+
+GAS KPI 排程是同一正式資料引擎的另一個入口：
+
+```text
+KPICALC_SOURCE_FOLDER_ID（Folder ID，不依路徑）
+→ findLatestKpiSourceFile_()
+→ processKpiSourceFile_(exact file, scheduled context)
+→ kpiCalcParseReport()
+→ PRIVATE_KPICALC_FILE
 ```
 
 ### 舊 quick upload 根因
 
-舊 `report_upload_preview → report_upload_commit` 雖共用 `kpiCalcParseReport()`，commit 卻把 staging JSON 直接寫入 `PRIVATE_KPICALC_FILE`，沒有先 promotion 原始 Excel 到 `KPICALC_SOURCE_FOLDER_ID`，也沒有走 scheduler 的正式 import 編排。它只更新 `kpicalc_access` 主資料，不會執行 Mac automation 的附件、台獎、privateDashboard supplement／awards snapshot、Outlook 正式 Mail 與 readback，因此會出現 `kpi.html` 已更新，但 index／Supervisor App／台獎／Mail 不完整同步。
+舊 quick upload 自己解析、自己建立 staging JSON，再直接改 `PRIVATE_KPICALC_FILE`；沒有 promotion 原始 Excel、沒有呼叫排程相同的 exact-file processor，也沒有執行 Mac 的台獎、正式 Mail、private snapshot 與 readback。因此會出現 KPI 頁更新、index／App／台獎／Mail 不完整同步。這是資料流分叉，不是 App refresh 問題。
 
-不能在舊 commit 後硬補 App refresh；根因是兩條寫入路徑，不是前端快取。
-
-## P0 新 quick upload 路徑
+## 新 quick upload 路徑
 
 ```text
-ReportUpload.html
-  → report_upload_preview
-  → Private staging（scheduler 掃不到）
-  → 唯一 parser 預檢（內容日期、九店、人數、25 KPI、區域）
-  → 由內容推導 report date 與 MMDD.xlsx
-  → ScriptLock promotion gate
-       ├─ older date：拒絕
-       ├─ same hash：冪等，不重複發布／寄信
-       └─ same date correction：明確確認、archive previous source
-  → 既有 KPICALC_SOURCE_FOLDER_ID（hash readback）
-  → processKpiSourceFile_(剛 promotion 的 exact file, quick context)
-       ├─ 同一 kpiCalcParseReport()
-       ├─ 同一 PRIVATE_KPICALC_FILE
-       ├─ 即時 readback
-       └─ KPI import 通知（與完整戰報 Mail 明確區分）
-  → report-official-ingest-job-<runId>.json
-       └─ 交給既有 Mac formal pipeline consumer
-  → KPI／台獎 snapshot、Supervisor App、正式 Mail、寄件備份、private readback
+同一 ReportUpload session
+  ├─ KPI 日報
+  ├─ 01-08-03 店點台獎
+  └─ 01-08-04 個人台獎
+       ↓
+private staging（scheduler 掃不到）
+→ Excel 工作表／內容日期／DNB 九店／人數預檢
+→ 系統產生 canonical filename
+→ ScriptLock promotion gate
+→ 既有 KPICALC_SOURCE_FOLDER_ID（File ID + SHA-256 readback）
+→ KPI：processKpiSourceFile_(that exact File)
+→ 台獎：不在 GAS 計算，只交給既有 update_phone_awards.py
+→ report-official-ingest-job-<runId>.json
+→ Mac consumer 逐 stage 執行既有正式 pipeline
+→ 同一 job 回寫／UI 每 5 秒 polling／重新登入 resume
 ```
 
-若 promotion 後 import 失敗，新檔會改成 `failed-kpi-source-*`，避開 scheduler 的 `MMDD.xlsx` 掃描；若是同日更正版，上一份 canonical source 會恢復。每次 run 記錄 operator、hash、時間、canonical file、previous file、processing status 與各階段狀態。
+台獎 canonical name 固定以前綴 `01-08-03-`／`01-08-04-` 開頭；KPI 維持 `MMDD.xlsx`。scheduler 只掃 `MMDD.xlsx`，不會把 staging 或台獎檔誤當 KPI。Drive 搬資料夾後仍以 ID 存取；`KPICALC_SOURCE_FOLDER_ID`、`DASHBOARD_PRIVATE_FOLDER_ID`、`DASHBOARD_ROSTER_SHEET_ID`、`SPREADSHEET_ID` 契約都未改。
 
-## 真正資料來源與單一處理邊界
+## Job schema / state machine
 
-| 產物 | 真正來源 | 正式處理器／publisher |
-|---|---|---|
-| KPI 主資料 | 公司 KPI 日報 `MMDD.xlsx` | GAS `processKpiSourceFile_()` → `kpiCalcParseReport()` → `PRIVATE_KPICALC_FILE` |
-| KPI battle supplement | 公司 KPI 日報加上外部 daily automation 產物 | `build_github_pages_data.py` + 既有 private publisher |
-| awards battle | `01-08-03` 店點、`01-08-04` 個人、Y26／active award config | `update_phone_awards.py` + `build_github_pages_data.py` + 既有 private publisher |
-| Supervisor App KPI／台獎 | `kpicalc_access` + 同日 `private_access` snapshot | 既有 App adapter／controller；本 P0 不改 App UI |
-| KPI import 通知 | KPI processor 結果 | GAS `kpiCalcNotify()` |
-| 每日正式戰報 Mail | daily report attachments + 台獎 attachments | `prepare_send_payloads.mjs` + Outlook；`寄件備份` readback 是必要 gate |
+Job schema v2 的 queue 狀態與業務狀態分開：
 
-公司 KPI Excel **不足以單獨產生正式台獎 snapshot**。P0 不猜台獎、不在 GAS 複製 `update_phone_awards.py`，而是讓同一 report-update session 的 handoff 宣告 `awardStore`、`awardPerson` 為必要輸入。
+- 缺台獎來源：`status=waiting-input`, `state=waiting-input`；禁止完整 Mail。
+- 三檔齊全：`status=waiting-external-pipeline`, `state=ready`；consumer 只消費這個 queue status。
+- claim 後依序：`processing → kpi-ok → awards-ok → mail-sent → private-published → readback-ok → completed`。
+- 任一 stage 失敗：`failed`，保留 `retryable` 與 error；不得 completed。
 
-## External processor interface
+每個 stage 都有 `startedAt`、`finishedAt`、`detail`、`error`、`retryable`。必要 stage：
 
-GAS 在 private dashboard folder 寫入 `report-official-ingest-job-<runId>.json`：
+1. source files
+2. KPI formal
+3. KPI battle
+4. awards formal
+5. awards battle
+6. Supervisor App
+7. daily Mail
+8. awards Mail
+9. Sent Items readback
+10. private publish
+11. private readback
+12. website readback
 
-```json
-{
-  "schemaVersion": 1,
-  "runId": "quick-...",
-  "status": "waiting-external-pipeline",
-  "operator": "masked-authorized-employee",
-  "reportDate": "2026-08-19",
-  "sourceDataDate": "2026-08-18",
-  "canonicalFile": "0819.xlsx",
-  "sourceFileId": "drive-file-id",
-  "sourceHash": "md5",
-  "requiredInputs": { "kpi": true, "awardStore": true, "awardPerson": true },
-  "processor": "existing-report-automation",
-  "stages": []
-}
+server-side completion gate 同時要求：KPI 正式 readback 同日、台獎 13 款／9 店、兩封 Outlook message ID、寄件備份附件驗證、private KPI／awards 同日、Supervisor App 對齊、website readback PASS。consumer 不能直接指定 completed。
+
+## 受保護 job API
+
+以下 route 都先走既有 `privateDashboardAdminAuthorized` + 員編白名單：
+
+- `report_upload_job_status`：UI 唯讀 sanitized 狀態，不回 operator、File ID、hash 或 private 內容。
+- `report_upload_job_claim`：ScriptLock 原子 claim，只接受 `waiting-external-pipeline/ready`。
+- `report_upload_job_source`：依 job 中 exact File ID 分段下載，要求 claimId，consumer 再驗 SHA-256。
+- `report_upload_job_update`：只允許 allowlisted stage/evidence；完成狀態由 server gate 推導。
+
+## Mac consumer
+
+consumer 位於非 Git 的既有 automation workspace：
+
+- `report-automation/work/report_official_ingest_consumer.mjs`
+- `report-automation/work/consume_report_official_ingest_with_keychain.sh`
+- `report-automation/work/report_official_ingest_consumer.test.mjs`
+
+它不重寫 KPI、台獎或 Mail template。三份 exact Drive File ID 下載並驗 hash 後，只編排：
+
+```text
+run_daily_north12b_report.mjs
+→ update_phone_awards.py（新增 exact 01-08-03/04 env override；公式不變）
+→ prepare_send_payloads.mjs
+→ REPORT_OUTLOOK_BRIDGE_COMMAND（既有 Outlook connector host）
+→ Sent Items receipt
+→ build_github_pages_data.py
+→ publish_formal_website_with_keychain.sh
+→ formal manifest / private / website readback
 ```
 
-待補的 consumer 必須以 `runId + sourceHash` 作 idempotency key，取得／等待該 session 的 01-08-03、01-08-04，呼叫既有 `run_daily_north12b_report.mjs` 鏈，並把 Outlook `寄件備份`、private publish 與 App readback 結果回寫同一 job。它不得另做 KPI／台獎公式或 Mail template。
+`idempotencyKey = runId + ':' + KPI sourceHash`。Mail receipt 在 bridge 成功後先以 mode 0600 落地，再回寫 job；retry 若 job evidence 或本機 receipt 已證明兩封 Mail 和附件 readback，即跳過 bridge，只從未完成 stage 繼續。preflight 重新產生 manifest 後，consumer 會把已驗證的 message IDs／附件回執補回 manifest，避免 private publish retry 抹掉寄件證據。
 
-## 完成語意與恢復策略
+### Outlook bridge 邊界
 
-- GAS 完成 source promotion、KPI import、PRIVATE_KPICALC_FILE readback 後，只能顯示 `⚠️ 尚未完成`。
-- `KPI 戰情`、`台獎戰情`、`Supervisor App`、`每日正式戰報 Mail`、`全鏈 Readback` 全部由正式結果證明後，才可顯示 `✅ 戰報正式更新完成`。
-- duplicate hash 不重寫正式 JSON、不重寄 KPI import mail，也不可重新啟動同一外部 job。
-- older date 永遠拒絕；same-date correction 必須人工勾選並先 archive。
-- scheduler 與 quick upload 共用 ScriptLock 和 `processKpiSourceFile_()`，避免雙跑。
-- failure after promotion 會移出 canonical pattern，保留 retry／人工恢復證據。
+目前正式 Outlook 寄件是 Codex Outlook connector capability，不是 repo 內 Node API。consumer 因此要求 `REPORT_OUTLOOK_BRIDGE_COMMAND` 指向既有 connector host adapter；adapter 輸入既有 `prepare_send_payloads` payload，輸出兩封 message ID、各自附件名單與 `sentItemsAttachmentsVerified=true` 的 receipt。未設定時 consumer fail closed，絕不假裝寄件或另寫 SMTP／Mail template。
 
-## Test matrix
+## Freeze / source of truth
 
-| 情境 | 本機證據 |
+| 產物 | 唯一正式來源／處理器 |
 |---|---|
-| scheduler 舊路徑 | discovery → exact-file shared processor 契約 |
-| quick upload | staging → preview → promotion → exact import → readback 契約 |
-| duplicate | same hash idempotent、mail skipped |
-| same-date correction | explicit confirm + previous archive metadata |
-| older date | manual／scheduler 即使 force 也拒絕 |
-| invalid Excel | preview finally 清理，永不 promotion |
-| concurrency | scheduler／quick 共用 ScriptLock |
-| post-promotion failure | failed prefix + previous canonical restore |
-| KPI website／App regression | Node 全套與 focused Playwright |
-| scheduler regression | trigger／watchdog 函式唯一性與舊 upload UI Playwright |
+| KPI 主資料 | KPI Excel → `processKpiSourceFile_` → `kpiCalcParseReport` → `PRIVATE_KPICALC_FILE` |
+| KPI battle | 既有 daily output → `build_github_pages_data.py` → private publisher |
+| awards | 01-08-03 + 01-08-04 + Y26/active config → `update_phone_awards.py` |
+| Mail | `prepare_send_payloads.mjs` 既有 payload → Outlook connector |
+| Supervisor App | 既有 `kpicalc_access` + `private_access`，本 P0 不改 App UI |
+
+未修改 KPI 公式、台獎規則、App UI、Native/iOS、巡店、班表、16/21 回報、昨日追蹤或金牌。
+
+## Test evidence
+
+- Git worktree Node contracts：232/232 PASS。
+- consumer + formal publisher/private transport/retry：23/23 PASS。
+- 台獎 active config／13 款／preflight 回歸：12/12 PASS。
+- GAS source syntax、Python compile：PASS。
+- 未執行任何 GAS deploy、正式寄件、正式資料 promotion 或 private publish。
 
 ## UAT gate
 
-目前可做 code review 與隔離環境 KPI ingest UAT 準備，但**尚不可做完整正式 UAT／上線**。必須先完成：
+程式邏輯與可測試 interface 已完成，但目前仍是 **UAT environment ready、不是正式 UAT Ready**。正式 UAT 前尚需：
 
-1. 外部 Mac job consumer，且以同一 run id 回寫各階段；
-2. quick update session 內安全上傳／解析 01-08-03 與 01-08-04（沿用既有 source folder／processor）；
-3. upload deployment 新版本（另行授權）；
-4. 用非正式測試檔驗證 source archive／rollback／concurrency；
-5. 正式 UAT 時完成 Outlook `寄件備份`、private Drive、網站與 Supervisor App 同日 readback。
+1. 由現有 Codex automation host 提供可執行的 `REPORT_OUTLOOK_BRIDGE_COMMAND`（不可另寫第二套寄件）。
+2. 另行授權後部署 upload GAS 新版本。
+3. 以隔離測試檔驗證三檔 promotion、claim、完整 readback 與 retry。
+4. Liam 正式 UAT 驗證網站、App、兩封寄件備份與 private readback。

@@ -13,11 +13,11 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
-## 2026-08-19 ｜ Codex（戰報快速更新正式 ingest P0，Draft PR／未部署）
+## 2026-08-19 ｜ Codex（戰報快速更新一鍵閉環 P0，Draft PR #60／未部署）
 
-- 做了什麼：從 `origin/main` `6564a68abb5a9a5fc845c61e25e70f7ebc675412` 建立隔離分支 `feature/report-upload-official-ingest-p0`。先完成 root dependency map，再把 GAS KPI 自動排程拆成 source discovery 與唯一 `processKpiSourceFile_()`；quick upload 改為 private staging、內容日期預檢、canonical `MMDD.xlsx` promotion、exact-file processor、hash readback、same-date archive、ScriptLock、run id、audit log 與 failure recovery。原 quick upload 直接覆寫 KPI JSON／直接台獎 JSON 路徑已移除；UI 改為四階段流程，外部台獎／Mail／private publisher 未完成時只顯示「尚未完成」。
-- 結果（本機完成，未部署）：KPI scheduler 與 quick upload 已完全共用同一 parser／processor／正式 source folder／KPI JSON publisher；Node contract `226/226`，既有 report-upload Chromium `33/33`，focused KPI／台獎／App 回歸另有測試紀錄。未修改 KPI／台獎公式、App UI、Native/iOS、巡店、班表或每日回報。完整台獎與 Outlook Mail 的正式處理仍在 Mac `report-automation`，本輪只建立可稽核 job handoff，未複製計算器或 Mail template。
-- 經驗 / 給下一位的提醒：公司 KPI Excel 本身不足以產生台獎；正式台獎需要 01-08-03、01-08-04 與 Y26／active config。完整 UAT 前仍要實作 external job consumer 與同一工作階段的台獎原始檔 ingest，並以 Outlook `寄件備份`、private publish、網站／App 同日 readback 關閉 job。此分支不得自行部署 GAS／Pages，也不能把 KPI import 通知冒充每日正式戰報 Mail。
+- 做了什麼：延續 `feature/report-upload-official-ingest-p0`，同一 session 已可預檢／promotion KPI、01-08-03 店點台獎、01-08-04 個人台獎三份 Excel；KPI 仍立即呼叫 scheduler 共用的唯一 `processKpiSourceFile_()`，台獎不在 GAS 計算。新增 schema v2 job state machine、ScriptLock claim、exact File ID 分段下載、allowlisted stage/evidence 回寫、server completion gate、受督導保護的 sanitized status endpoint，以及 Step 4 每 5 秒 polling／由 Run ID resume。既有非 Git `report-automation` 新增 consumer，只編排 daily runner、台獎 processor、preflight、Outlook bridge、GitHub Pages data、private publisher 與正式 readback。
+- 結果（本機完成，未部署）：Git worktree Node contract `232/232`；consumer／publisher／transport／retry `23/23`；台獎 active config／13 款／preflight 回歸 `12/12`；GAS syntax 與 Python compile PASS。Mail 防重寄使用 `runId + sourceHash`、job evidence 與 mode 0600 receipt；private publish 失敗後 retry 不再寄信。未部署 GAS、未 promotion 正式來源、未寄正式 Mail、未發布 private data、未合併 PR #60。
+- 經驗 / 給下一位的提醒：目前正式 Outlook 寄送是 Codex Outlook connector，不是 Node API；consumer 已定義 `REPORT_OUTLOOK_BRIDGE_COMMAND` receipt contract，但 connector host adapter 尚未落地，因此只能判定 UAT environment ready，不能宣稱正式 UAT Ready。正式 UAT 前還需部署 upload GAS、接上既有 connector bridge，並以三份隔離測試檔完成兩封 `寄件備份`、private KPI／台獎、網站與 Supervisor App 同日 readback。
 
 ## 2026-08-18 ｜ Codex（台獎摘要金額單行與三創顯示名稱，未部署）
 

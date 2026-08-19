@@ -2055,7 +2055,7 @@ function doPost(e) {
     const payload = privateDashboardParsePostPayload(e);
     const action = String(payload.action || '');
     if (action === 'write') assertNoDuplicateReportAwardModelIds_(rawPayload);
-    // 部署隔離：上傳專用 Deployment 只放行四個上傳路由
+    // 部署隔離：上傳專用 Deployment 只放行戰報 ingest／job 路由
     if (reportUploadIsUploadDeployment_() && REPORT_UPLOAD_ALLOWED_ACTIONS.indexOf(action) === -1) {
       throw new Error('route-not-available-on-upload-deployment');
     }
@@ -2087,6 +2087,10 @@ function doPost(e) {
     else if (action === 'report_upload_commit') result = reportUploadCommit(payload);
     else if (action === 'report_upload_log') result = reportUploadLog(payload);
     else if (action === 'report_upload_rollback') result = reportUploadRollback(payload);
+    else if (action === 'report_upload_job_status') result = reportUploadJobStatus(payload);
+    else if (action === 'report_upload_job_claim') result = reportUploadJobClaim(payload);
+    else if (action === 'report_upload_job_source') result = reportUploadJobSource(payload);
+    else if (action === 'report_upload_job_update') result = reportUploadJobUpdate(payload);
     else throw new Error('unknown private dashboard action');
     return privateDashboardPostResponse({ status: 'ok', ...result }, e);
   } catch (err) {
@@ -3349,13 +3353,15 @@ function checkSegAndNotify(seg) {
 // 每日回報 Deployment 固定停在第 15 版（舊碼，本來就沒有上傳路由）；
 // 快速上傳改走「獨立的新 Web App Deployment」。兩個 Deployment 共用同一份專案，
 // 但新 Deployment 設定指令碼屬性 REPORT_UPLOAD_DEPLOYMENT_URL = 它自己的 /exec URL 後，
-// 就只服務 report_upload_* 四個路由——其餘 read/write/巡店/戰情一律拒絕，
+// 就只服務 report_upload_* ingest／job 路由——其餘 read/write/巡店/戰情一律拒絕，
 // 確保上傳功能的部署動作完全影響不到每日回報與其他系統。
 const REPORT_UPLOAD_ALLOWED_ACTIONS = [
-  'report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback'
+  'report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback',
+  'report_upload_job_status', 'report_upload_job_claim', 'report_upload_job_source',
+  'report_upload_job_update'
 ];
 
-// 上傳頁與上傳 API 同屬新 Deployment，使用 google.script.run 直接呼叫這四個包裝函式。
+// 上傳頁與上傳 API 同屬新 Deployment；UI 用 google.script.run，Mac consumer 用同源 POST action。
 // 不從 GitHub Pages fetch，不需要 CORS／preflight，也不把任何設定值注入 HTML。
 function reportUploadHtmlService_() {
   return HtmlService.createHtmlOutputFromFile('ReportUpload')
@@ -3366,6 +3372,10 @@ function report_upload_preview(payload) { return reportUploadPreview(payload); }
 function report_upload_commit(payload) { return reportUploadCommit(payload); }
 function report_upload_log(payload) { return reportUploadLog(payload); }
 function report_upload_rollback(payload) { return reportUploadRollback(payload); }
+function report_upload_job_status(payload) { return reportUploadJobStatus(payload); }
+function report_upload_job_claim(payload) { return reportUploadJobClaim(payload); }
+function report_upload_job_source(payload) { return reportUploadJobSource(payload); }
+function report_upload_job_update(payload) { return reportUploadJobUpdate(payload); }
 
 function reportUploadIsUploadDeployment_() {
   try {
@@ -3394,6 +3404,8 @@ const REPORT_UPLOAD_STAGING_PREFIX = 'report-upload-staging-';
 const REPORT_UPLOAD_JOB_PREFIX = 'report-official-ingest-job-';
 const REPORT_UPLOAD_SOURCE_ARCHIVE_PREFIX = 'archive-kpi-source-';
 const REPORT_UPLOAD_SOURCE_FAILED_PREFIX = 'failed-kpi-source-';
+const REPORT_UPLOAD_AWARD_ARCHIVE_PREFIX = 'archive-award-source-';
+const REPORT_UPLOAD_AWARD_FAILED_PREFIX = 'failed-award-source-';
 const REPORT_UPLOAD_TEMP_MAX_AGE_HOURS = 6;
 const REPORT_UPLOAD_STAGE_TTL_SECONDS = 1800;
 const REPORT_UPLOAD_KINDS = {
@@ -3408,12 +3420,22 @@ const REPORT_UPLOAD_KINDS = {
     rawPrefix: 'kpi-raw-',
     // KPI 正式資料供 kpi.html 使用；index.html 戰情頁籤走另一份快照。
     targets: { site: 'KPI 網站（kpi.html）', ops: '智慧營運中心（index.html 戰情）' }
+  },
+  'award-store': {
+    label: '01-08-03 店點台獎', ext: '.xlsx', rawPrefix: 'award-store-raw-',
+    sheet: '上線數KPI_店點達成率_明細', canonicalPrefix: '01-08-03-',
+    targets: { site: '台獎戰情', ops: '既有 update_phone_awards.py' }
+  },
+  'award-person': {
+    label: '01-08-04 個人台獎', ext: '.xlsx', rawPrefix: 'award-person-raw-',
+    sheet: '手機競賽_個人達成率', canonicalPrefix: '01-08-04-',
+    targets: { site: '台獎戰情', ops: '既有 update_phone_awards.py' }
   }
 };
 
 function reportUploadKind_(value) {
   const kind = String(value || '').trim();
-  if (!REPORT_UPLOAD_KINDS[kind]) throw new Error('目前正式入口僅支援 KPI 原始 Excel；台獎需等待 01-08-03／01-08-04 正式來源接線');
+  if (!REPORT_UPLOAD_KINDS[kind]) throw new Error('不支援的戰報來源類型');
   return kind;
 }
 
@@ -3518,6 +3540,64 @@ function reportUploadKpiDate_(meta) {
   const day = Number((meta || {}).snapshotDay || 0);
   if (!/^\d{4}-\d{2}$/.test(month) || !day) return '';
   return month + '-' + ('0' + day).slice(-2);
+}
+
+// 台獎 Excel 在 GAS 只做格式／日期／北一二B 範圍預檢；正式 13 款與獎金計算
+// 仍只由既有 Mac update_phone_awards.py 執行，避免出現第二套公式。
+function reportUploadInspectAwardSource_(xlsxFile, kind) {
+  const spec = REPORT_UPLOAD_KINDS[kind];
+  const converted = Drive.Files.create(
+    { name: 'report-award-tmp-' + xlsxFile.getName(), mimeType: 'application/vnd.google-apps.spreadsheet' },
+    xlsxFile.getBlob()
+  );
+  try {
+    const ss = SpreadsheetApp.openById(converted.id);
+    const sheet = ss.getSheetByName(spec.sheet);
+    if (!sheet) throw new Error('找不到「' + spec.sheet + '」工作表');
+    const rows = Math.min(180, Math.max(1, sheet.getLastRow()));
+    const cols = Math.min(80, Math.max(1, sheet.getLastColumn()));
+    const values = sheet.getRange(1, 1, rows, cols).getDisplayValues();
+    let period = '';
+    const codes = {};
+    let personRows = 0;
+    values.forEach(function(row) {
+      const joined = row.join(' ');
+      if (!period) {
+        const hit = joined.match(/(20\d{2})[\/-](\d{1,2})[\/-](\d{1,2})\s*[~～至-]\s*(20\d{2})[\/-](\d{1,2})[\/-](\d{1,2})/);
+        if (hit) period = hit[1] + '-' + ('0' + hit[2]).slice(-2) + '-' + ('0' + hit[3]).slice(-2) + '~' +
+          hit[4] + '-' + ('0' + hit[5]).slice(-2) + '-' + ('0' + hit[6]).slice(-2);
+      }
+      row.forEach(function(cell) {
+        const code = String(cell || '').trim().toUpperCase();
+        if (/^DNB\d+/.test(code)) { codes[code.match(/^DNB\d+/)[0]] = true; personRows += 1; }
+      });
+    });
+    if (!period) throw new Error('台獎報表內容讀不到資料期間');
+    const end = period.split('~')[1];
+    const parts = end.split('-').map(Number);
+    const reportDate = Utilities.formatDate(new Date(parts[0], parts[1] - 1, parts[2] + 1), 'Asia/Taipei', 'yyyy-MM-dd');
+    const compact = reportDate.replace(/-/g, '');
+    return {
+      reportDate: reportDate, sourceDataDate: end, period: period,
+      sheet: spec.sheet, storeCount: Object.keys(codes).length,
+      personCount: kind === 'award-person' ? personRows : null,
+      canonicalName: spec.canonicalPrefix + compact + '.xlsx'
+    };
+  } finally {
+    try { DriveApp.getFileById(converted.id).setTrashed(true); } catch (e) { console.log('award preview tmp cleanup failed: ' + e); }
+  }
+}
+
+function reportUploadValidateAwardSource_(preview, live) {
+  const checks = [];
+  checks.push(reportUploadCheck_('sheets', '工作表名稱', preview.sheet ? 'ok' : 'block', preview.sheet || '找不到必要工作表'));
+  checks.push(reportUploadCheck_('period', '資料期間', preview.period ? 'ok' : 'block', preview.period || '讀不到期間'));
+  checks.push(reportUploadCheck_('region', '北一二B 店點', preview.storeCount === 9 ? 'ok' : 'block',
+    'DNB 門市 ' + preview.storeCount + ' 家（正式門檻 9 家）'));
+  if (preview.personCount != null) checks.push(reportUploadCheck_('count', '個人資料列', preview.personCount >= 9 ? 'ok' : 'block', preview.personCount + ' 筆 DNB 資料'));
+  reportUploadDateChecks_(preview.reportDate, live).forEach(function(c) { checks.push(c); });
+  checks.push(reportUploadCheck_('canonical', '正式檔名', 'ok', preview.canonicalName));
+  return checks;
 }
 
 // ── 檔案驗證 ──────────────────────────────────────────────
@@ -3751,26 +3831,15 @@ function reportUploadPreview(payload) {
         })
       };
     } else {
-      const text = Utilities.newBlob(bytes).getDataAsString('UTF-8');
-      try {
-        data = JSON.parse(text);
-      } catch (parseError) {
-        checks.push(reportUploadCheck_('parse', '檔案解析', 'block', 'JSON 解析失敗：' + parseError));
-        return { ok: false, kind: kind, checks: checks, live: live,
-                 fileName: fileName, uploadedAt: uploadedAt };
-      }
-      rawFile = folder.createFile(Utilities.newBlob(text, 'application/json',
+      rawFile = folder.createFile(Utilities.newBlob(bytes,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         REPORT_UPLOAD_TEMP_PREFIX + token + '-' + fileName));
-      checks = checks.concat(reportUploadValidateAward_(data, live));
-      dataDate = String(((data || {}).kpiBattle || {}).report_date || '');
-      const rows = Array.isArray(((data || {}).awardsBattle || {}).stores) ? data.awardsBattle.stores : [];
-      preview = {
-        reportDate: dataDate,
-        storeCount: rows.length,
-        stores: rows.slice(0, 12).map(function(r) {
-          return { name: String(r.store || ''), bonus: r.bonus == null ? '' : r.bonus };
-        })
-      };
+      preview = reportUploadInspectAwardSource_(rawFile, kind);
+      dataDate = preview.reportDate;
+      checks = checks.concat(reportUploadValidateAwardSource_(preview, live));
+      data = { kind: kind, reportDate: dataDate, sourceDataDate: preview.sourceDataDate,
+        period: preview.period, canonicalName: preview.canonicalName,
+        storeCount: preview.storeCount, personCount: preview.personCount };
     }
     if (reportUploadBlocked_(checks).length) {
       // 驗證失敗：正式資料一個位元都沒動；暫存檔由 finally 清掉
@@ -3794,13 +3863,15 @@ function reportUploadPreview(payload) {
   reportUploadCache_().put('rupload_' + token, JSON.stringify({
     kind: kind, employeeId: employeeId, fileName: fileName, dataDate: dataDate,
     rawFileId: rawFile.getId(), stagingName: stagingName, fileHash: fileHash,
-    canonicalName: preview && preview.canonicalName ? preview.canonicalName : ''
+    canonicalName: preview && preview.canonicalName ? preview.canonicalName : '',
+    sourceDataDate: preview && preview.sourceDataDate ? preview.sourceDataDate : ''
   }), REPORT_UPLOAD_STAGE_TTL_SECONDS);
 
   // 先行預告版本判斷結果，讓使用者在按下確認前就知道會不會被擋、需不需要強制覆寫
-  const decision = reportVersionDecide_(kind,
-    { dataDate: dataDate, source: 'manual-upload', fileHash: fileHash });
-  const current = reportVersionGet_(kind);
+  const decision = kind === 'kpi' ? reportVersionDecide_(kind,
+    { dataDate: dataDate, source: 'manual-upload', fileHash: fileHash })
+    : { accept: true, rule: 'source-ingest', reason: '台獎原始檔只 promotion，正式計算由外部同一 pipeline 執行' };
+  const current = kind === 'kpi' ? reportVersionGet_(kind) : null;
   if (!decision.accept) {
     checks.push(reportUploadCheck_('version', '版本衝突檢查', 'warn',
       decision.rule === 'same-hash' ? decision.reason : decision.reason + '（同日修正版需明確確認；舊日期永不放行）'));
@@ -3828,169 +3899,413 @@ function reportUploadStage_(key, label, status, detail) {
   return { key: key, label: label, status: status, detail: String(detail == null ? '' : detail) };
 }
 
-function reportUploadOfficialChainStatus_(reportDate, canonicalFile, importMail) {
-  const stages = [];
-  let kpiBattleReady = false;
-  let awardsReady = false;
-  try {
-    const snapshot = privateDashboardSnapshot();
-    const kpi = snapshot.kpiBattle || {};
-    const awards = snapshot.awardsBattle || {};
-    kpiBattleReady = String(kpi.report_date || '') === reportDate &&
-      String(kpi.source_file || '') === canonicalFile;
-    awardsReady = String(awards.report_date || '') === reportDate &&
-      Number(awards.phone_items || 0) > 0 && Number(awards.store_rows || 0) === 10;
-  } catch (e) {
-    console.log('official chain snapshot readback pending: ' + e);
+const REPORT_UPLOAD_JOB_STAGE_LABELS = {
+  source_files: '來源檔', kpi_formal: 'KPI 正式資料', kpi_battle: 'KPI 戰情',
+  awards_formal: '台獎正式資料', awards_battle: '台獎戰情', supervisor_app: 'Supervisor App',
+  daily_mail: '每日戰報 Mail', awards_mail: '台獎 Mail', sent_items: '寄件備份 Readback',
+  private_publish: 'Private Publish', private_readback: 'Private Readback', website_readback: 'Website Readback'
+};
+
+function reportUploadJobStageState_(status, detail) {
+  return { status: status || 'wait', startedAt: '', finishedAt: '', detail: detail || '', error: '', retryable: false };
+}
+
+function reportUploadNewJob_(runId, employeeId, reportDate) {
+  const stages = {};
+  Object.keys(REPORT_UPLOAD_JOB_STAGE_LABELS).forEach(function(key) {
+    stages[key] = reportUploadJobStageState_('wait', '等待前一階段');
+  });
+  stages.source_files.detail = '等待 KPI、01-08-03、01-08-04 三份原始檔';
+  return {
+    schemaVersion: 2, runId: runId, status: 'waiting-input', state: 'waiting-input',
+    createdAt: privateDashboardNow(), updatedAt: privateDashboardNow(), operator: employeeId,
+    reportDate: reportDate || '', idempotencyKey: '', processor: 'existing-report-automation',
+    inputs: { kpi: null, awardStore: null, awardPerson: null }, stages: stages,
+    evidence: {}, retryable: false, lastError: ''
+  };
+}
+
+function reportUploadJobFile_(runId) {
+  const clean = String(runId || '').trim();
+  if (!/^quick-\d{8}-\d{6}-[0-9a-f-]{8}$/i.test(clean)) throw new Error('runId 格式無效');
+  return reportUploadFileByName_(REPORT_UPLOAD_JOB_PREFIX + clean + '.json');
+}
+
+function reportUploadReadJob_(runId) {
+  const file = reportUploadJobFile_(runId);
+  if (!file) throw new Error('找不到指定的戰報更新工作階段');
+  const job = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if (!job || job.runId !== runId) throw new Error('job readback 不一致');
+  return { file: file, job: job };
+}
+
+function reportUploadWriteJob_(file, job) {
+  job.updatedAt = privateDashboardNow();
+  const text = JSON.stringify(job);
+  if (file) file.setContent(text);
+  else file = privateDashboardFolder().createFile(Utilities.newBlob(text, 'application/json',
+    REPORT_UPLOAD_JOB_PREFIX + job.runId + '.json'));
+  const readback = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if (readback.runId !== job.runId || readback.updatedAt !== job.updatedAt) throw new Error('job write readback 失敗');
+  return file;
+}
+
+function reportUploadMissingInputs_(job) {
+  const missing = [];
+  if (!job.inputs.kpi) missing.push('KPI 日報');
+  if (!job.inputs.awardStore) missing.push('01-08-03 店點台獎');
+  if (!job.inputs.awardPerson) missing.push('01-08-04 個人台獎');
+  return missing;
+}
+
+function reportUploadFindJobBySourceHash_(sourceHash) {
+  const wanted = String(sourceHash || '');
+  if (!wanted) return null;
+  const files = privateDashboardFolder().getFiles();
+  let latest = null;
+  while (files.hasNext()) {
+    const file = files.next();
+    if (file.getName().indexOf(REPORT_UPLOAD_JOB_PREFIX) !== 0) continue;
+    try {
+      const job = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+      if (!job.inputs || !job.inputs.kpi || job.inputs.kpi.sourceHash !== wanted) continue;
+      if (!latest || String(job.createdAt || '') > String(latest.job.createdAt || '')) latest = { file: file, job: job };
+    } catch (e) {}
   }
-  stages.push(reportUploadStage_('kpi_battle', 'KPI 戰情', kpiBattleReady ? 'ok' : 'wait',
-    kpiBattleReady ? '同日／同 source privateDashboard snapshot readback PASS' : '等待既有 Mac build_github_pages_data.py 與 private publisher'));
-  stages.push(reportUploadStage_('awards_battle', '台獎戰情', awardsReady ? 'ok' : 'wait',
-    awardsReady ? '同日台獎 snapshot readback PASS' : '等待 01-08-03／01-08-04 與既有 update_phone_awards.py'));
-  stages.push(reportUploadStage_('supervisor_app', 'Supervisor App', kpiBattleReady && awardsReady ? 'ok' : 'wait',
-    kpiBattleReady && awardsReady ? 'App 的既有 private_access／kpicalc_access 正式來源已同日' : '等待 KPI supplement 與台獎 snapshot 同日對齊'));
-  stages.push(reportUploadStage_('import_mail', 'KPI import 通知',
-    importMail && importMail.status === 'sent' ? 'ok' : 'wait',
-    importMail ? importMail.status + (importMail.reason ? '：' + importMail.reason : '') : '未執行'));
-  stages.push(reportUploadStage_('mail', '每日正式戰報 Mail', 'wait',
-    'GAS 不執行 Outlook 正式附件信；等待既有 prepare_send_payloads + 寄件備份驗證'));
-  stages.push(reportUploadStage_('readback', '全鏈 Readback', 'wait',
-    'KPI JSON 已讀回；完整 Mail、private snapshot、App 同日 gate 尚待外部正式 pipeline'));
-  // 完整 Mail／private publisher 在外部 automation；GAS 本身永遠不能單獨宣告全鏈完成。
-  return { complete: false, stages: stages };
+  return latest;
+}
+
+function reportUploadDiscardStaged_(stagedByInput) {
+  Object.keys(stagedByInput || {}).forEach(function(key) {
+    const staged = stagedByInput[key];
+    reportUploadTrash_(reportUploadFileByName_(staged.stagingName));
+    try { reportUploadTrash_(DriveApp.getFileById(staged.rawFileId)); } catch (e) {}
+    reportUploadCache_().remove('rupload_' + staged.token);
+  });
+}
+
+function reportUploadCompletionGate_(job) {
+  const e = job.evidence || {};
+  const mail = e.mail || {}, privateRb = e.privateReadback || {};
+  const requiredStages = Object.keys(REPORT_UPLOAD_JOB_STAGE_LABELS);
+  const stagesPass = requiredStages.every(function(key) { return job.stages[key] && job.stages[key].status === 'ok'; });
+  const passed = stagesPass &&
+    e.kpiFormalReadback && e.kpiFormalReadback.passed === true && e.kpiFormalReadback.reportDate === job.reportDate &&
+    e.awards && e.awards.passed === true && Number(e.awards.phoneItems) === 13 && Number(e.awards.storeCount) === 9 &&
+    mail.daily && mail.daily.sent === true && !!mail.daily.messageId &&
+    mail.awards && mail.awards.sent === true && !!mail.awards.messageId && mail.sentItemsAttachmentsVerified === true &&
+    privateRb.kpiPassed === true && privateRb.awardsPassed === true && privateRb.reportDate === job.reportDate &&
+    e.supervisor && e.supervisor.aligned === true && e.website && e.website.passed === true;
+  return { complete: !!passed, missing: passed ? [] : requiredStages.filter(function(key) {
+    return !job.stages[key] || job.stages[key].status !== 'ok';
+  }) };
+}
+
+function reportUploadOfficialChainStatus_(job) {
+  const gate = reportUploadCompletionGate_(job);
+  return { complete: gate.complete, state: job.state, status: job.status, missing: gate.missing };
+}
+
+function reportUploadSanitizeJob_(job) {
+  const inputs = {};
+  Object.keys(job.inputs || {}).forEach(function(key) {
+    const input = job.inputs[key];
+    inputs[key] = input ? { present: true, canonicalName: input.canonicalName, reportDate: input.reportDate } : { present: false };
+  });
+  return {
+    schemaVersion: job.schemaVersion, runId: job.runId, status: job.status, state: job.state,
+    reportDate: job.reportDate, createdAt: job.createdAt, updatedAt: job.updatedAt,
+    inputs: inputs, missingInputs: reportUploadMissingInputs_(job), stages: job.stages,
+    complete: reportUploadCompletionGate_(job).complete, retryable: !!job.retryable,
+    lastError: job.lastError || ''
+  };
+}
+
+function reportUploadPromoteSource_(staged, options, runId) {
+  const rawFile = DriveApp.getFileById(staged.rawFileId);
+  const rawHash = kpiCalcSourceHash_(rawFile);
+  if (rawHash !== staged.fileHash) throw new Error(staged.kind + ' staging hash 已改變，拒絕 promotion');
+  if (staged.kind === 'kpi' && !/^\d{4}\.xlsx$/.test(staged.canonicalName || '')) throw new Error('KPI canonical filename 無效');
+  if (staged.kind !== 'kpi' && !/^01-08-0[34]-\d{8}\.xlsx$/.test(staged.canonicalName || '')) throw new Error('台獎 canonical filename 無效');
+  const folder = kpiCalcSourceFolder_();
+  const matches = folder.getFilesByName(staged.canonicalName);
+  let current = null;
+  while (matches.hasNext()) {
+    const candidate = matches.next();
+    if (!current || candidate.getLastUpdated() > current.getLastUpdated()) current = candidate;
+  }
+  if (current && kpiCalcSourceHash_(current) === rawHash) {
+    return { file: current, duplicate: true, archived: null, previous: '' };
+  }
+  let archived = null;
+  let previous = '';
+  if (current) {
+    if (!options.confirmCorrection) throw new Error(staged.kind + ' 同日來源已存在且 hash 不同；必須明確確認修正版');
+    const oldHash = kpiCalcSourceHash_(current);
+    previous = current.getName() + ':' + oldHash;
+    const prefix = staged.kind === 'kpi' ? REPORT_UPLOAD_SOURCE_ARCHIVE_PREFIX : REPORT_UPLOAD_AWARD_ARCHIVE_PREFIX;
+    current.setName(prefix + staged.canonicalName.replace('.xlsx', '') + '-' + reportUploadStamp_() + '-' + oldHash.slice(0, 8) + '.xlsx');
+    archived = current;
+  }
+  try {
+    const promoted = rawFile.makeCopy(staged.canonicalName, folder);
+    if (kpiCalcSourceHash_(promoted) !== rawHash) throw new Error('promotion 後 Drive hash readback 不一致');
+    return { file: promoted, duplicate: false, archived: archived, previous: previous };
+  } catch (error) {
+    if (archived) archived.setName(staged.canonicalName);
+    throw error;
+  }
 }
 
 function reportUploadCommit(payload) {
   const employeeId = reportUploadAuthorize_(payload);
-  const token = String((payload || {}).token || '');
-  const cached = token ? reportUploadCache_().get('rupload_' + token) : null;
-  if (!cached) throw new Error('預覽已逾時或不存在，請重新上傳檔案');
-  const staged = JSON.parse(cached);
-  if (staged.employeeId !== employeeId) throw new Error('預覽與確認的操作者不一致');
-  const kind = reportUploadKind_(staged.kind);
-  if (kind !== 'kpi') throw new Error('目前只允許 KPI 原始 Excel 進入正式來源流程');
-  const runId = 'quick-' + reportUploadStamp_() + '-' + Utilities.getUuid().slice(0, 8);
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(30000)) {
-    return { result: 'blocked', runId: runId, kind: kind,
-      stages: [reportUploadStage_('concurrency', '並行處理鎖', 'fail', 'scheduler 或另一個 quick upload 正在處理，請稍後重試')],
-      message: '目前有另一個正式 import 正在執行；本次未 promotion、未寄信、未發布。' };
+  const tokenMap = Object.assign({}, (payload || {}).tokens || {});
+  if ((payload || {}).token && !tokenMap.kpi) tokenMap.kpi = String(payload.token);
+  const stagedByInput = {};
+  const map = { kpi: 'kpi', awardStore: 'award-store', awardPerson: 'award-person' };
+  Object.keys(map).forEach(function(inputKey) {
+    const token = String(tokenMap[inputKey] || '');
+    if (!token) return;
+    const cached = reportUploadCache_().get('rupload_' + token);
+    if (!cached) throw new Error(map[inputKey] + ' 預覽已逾時或不存在，請重新上傳');
+    const staged = JSON.parse(cached);
+    if (staged.employeeId !== employeeId || staged.kind !== map[inputKey]) throw new Error(inputKey + ' 預覽與操作者／類型不一致');
+    staged.token = token;
+    stagedByInput[inputKey] = staged;
+  });
+  let requestedRunId = String((payload || {}).runId || '');
+  let duplicateHolder = null;
+  if (!requestedRunId && stagedByInput.kpi) {
+    duplicateHolder = reportUploadFindJobBySourceHash_(stagedByInput.kpi.fileHash);
+    if (duplicateHolder) requestedRunId = duplicateHolder.job.runId;
   }
-  const stages = [];
-  let result = 'partial';
-  let message = '';
-  let promotedFile = null;
-  let archivedFile = null;
-  let archivedOriginalName = '';
-  let previousSource = '';
+  const runId = requestedRunId || ('quick-' + reportUploadStamp_() + '-' + Utilities.getUuid().slice(0, 8));
+  if (!requestedRunId && !stagedByInput.kpi) throw new Error('新工作階段必須包含 KPI 日報');
+  if (!Object.keys(stagedByInput).length) throw new Error('沒有可提交的已預檢來源');
+  if (duplicateHolder && ['processing','completed'].indexOf(duplicateHolder.job.status) !== -1) {
+    reportUploadDiscardStaged_(stagedByInput);
+    const duplicateSafe = reportUploadSanitizeJob_(duplicateHolder.job);
+    duplicateSafe.result = 'duplicate';
+    duplicateSafe.message = '相同 KPI sourceHash 已有 job ' + duplicateHolder.job.runId + '；未建立新 job、未重複寄信／發布';
+    duplicateSafe.live = reportUploadLiveInfo_('kpi');
+    return duplicateSafe;
+  }
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return { result: 'blocked', runId: runId, state: 'waiting-input',
+    stages: [reportUploadStage_('concurrency', '並行處理鎖', 'fail', 'scheduler、consumer 或另一個 quick upload 正在處理')],
+    message: '目前有另一個正式 processor 執行中；本次未 promotion。' };
+
+  let holder = null;
+  let job = null;
+  const promoted = [];
   let processing = null;
-  let jobFile = null;
   try {
-    const rawFile = DriveApp.getFileById(staged.rawFileId);
-    const rawHash = kpiCalcSourceHash_(rawFile);
-    if (rawHash !== staged.fileHash) throw new Error('staging 原始檔 hash 已改變，拒絕 promotion');
-    if (!/^\d{4}\.xlsx$/.test(staged.canonicalName || '')) throw new Error('canonical filename 無效');
-    stages.push(reportUploadStage_('staging', 'Private staging', 'ok', 'run ' + runId + '｜hash ' + rawHash.slice(0, 12)));
-
-    const sourceFolder = kpiCalcSourceFolder_();
-    const sameName = sourceFolder.getFilesByName(staged.canonicalName);
-    let currentSource = null;
-    while (sameName.hasNext()) {
-      const candidate = sameName.next();
-      if (!currentSource || candidate.getLastUpdated() > currentSource.getLastUpdated()) currentSource = candidate;
+    if (requestedRunId) {
+      holder = reportUploadReadJob_(runId);
+      job = holder.job;
+      if (job.operator !== employeeId) throw new Error('此 runId 不屬於目前操作者');
+      if (['processing','completed'].indexOf(job.status) !== -1) throw new Error('此 job 已開始處理，不能再更換來源');
+    } else {
+      job = reportUploadNewJob_(runId, employeeId, '');
     }
-    if (currentSource) {
-      const currentHash = kpiCalcSourceHash_(currentSource);
-      if (currentHash === rawHash) {
-        processing = processKpiSourceFile_(currentSource, {
-          lockHeld: true, source: 'manual-upload', operator: employeeId,
-          runId: runId, expectedHash: rawHash, confirmCorrection: false
+    const dates = [job.reportDate].filter(Boolean);
+    Object.keys(stagedByInput).forEach(function(key) { dates.push(stagedByInput[key].dataDate); });
+    if (dates.some(function(d) { return d !== dates[0]; })) throw new Error('三份來源的內容日期不一致，拒絕建立正式工作階段');
+    job.reportDate = dates[0];
+
+    Object.keys(stagedByInput).forEach(function(inputKey) {
+      const staged = stagedByInput[inputKey];
+      const promotion = reportUploadPromoteSource_(staged, { confirmCorrection: !!(payload || {}).confirmCorrection }, runId);
+      promoted.push({ inputKey: inputKey, staged: staged, promotion: promotion });
+      job.inputs[inputKey] = {
+        kind: staged.kind, fileId: promotion.file.getId(), sourceHash: staged.fileHash,
+        canonicalName: staged.canonicalName, reportDate: staged.dataDate,
+        sourceDataDate: staged.sourceDataDate || '', promotedAt: privateDashboardNow(),
+        correction: !!promotion.archived, previous: promotion.previous || '', operator: employeeId
+      };
+      if (inputKey === 'kpi') {
+        processing = processKpiSourceFile_(promotion.file, {
+          lockHeld: true, source: 'manual-upload', operator: employeeId, runId: runId,
+          expectedHash: staged.fileHash, confirmCorrection: !!(payload || {}).confirmCorrection, throwOnError: true
         });
-        stages.push(reportUploadStage_('source', '來源檔', 'ok', staged.canonicalName + ' 已存在且 hash 相同；未重複 promotion'));
-      } else {
-        if (!(payload || {}).confirmCorrection) throw new Error('同日期正式來源已存在且 hash 不同；必須明確確認為修正版');
-        previousSource = currentSource.getName() + ':' + currentHash;
-        archivedOriginalName = currentSource.getName();
-        currentSource.setName(REPORT_UPLOAD_SOURCE_ARCHIVE_PREFIX + staged.canonicalName.replace('.xlsx', '') + '-' + reportUploadStamp_() + '-' + currentHash.slice(0, 8) + '.xlsx');
-        archivedFile = currentSource;
+        if (['updated','duplicate'].indexOf(processing.status) === -1) throw new Error(processing.message || 'KPI 正式 import 未完成');
+        job.stages.kpi_formal = {
+          status: 'ok', startedAt: processing.startedAt || privateDashboardNow(), finishedAt: privateDashboardNow(),
+          detail: 'exact file import 與 PRIVATE_KPICALC_FILE readback PASS', error: '', retryable: false
+        };
+        job.evidence.kpiFormalReadback = { passed: true, reportDate: processing.reportDate || job.reportDate,
+          sourceHash: staged.fileHash };
       }
-    }
-    if (!processing) {
-      promotedFile = rawFile.makeCopy(staged.canonicalName, sourceFolder);
-      const promotedHash = kpiCalcSourceHash_(promotedFile);
-      if (promotedHash !== rawHash) throw new Error('promotion 後 Drive readback hash 不一致');
-      stages.push(reportUploadStage_('source', '來源檔', 'ok', staged.canonicalName + '｜hash readback PASS'));
-      processing = processKpiSourceFile_(promotedFile, {
-        lockHeld: true, source: 'manual-upload', operator: employeeId,
-        runId: runId, expectedHash: rawHash, confirmCorrection: !!(payload || {}).confirmCorrection,
-        throwOnError: true
-      });
-    }
-
-    if (processing.status !== 'updated' && processing.status !== 'duplicate') {
-      throw new Error(processing.message || ('正式 import 未完成：' + processing.status));
-    }
-    stages.push(reportUploadStage_('formal_data', '正式資料', 'ok',
-      processing.status === 'duplicate' ? '同 hash 冪等略過，未重複發布／寄信' : 'exact file import 與 PRIVATE_KPICALC_FILE readback PASS'));
-
-    const dashboard = reportUploadOfficialChainStatus_(processing.reportDate || staged.dataDate,
-      staged.canonicalName, processing.mail);
-    Array.prototype.push.apply(stages, dashboard.stages);
-    result = dashboard.complete ? 'ok' : 'partial';
-    message = dashboard.complete ? '戰報正式更新完成' : '尚未完成：外部正式台獎／Mail／private snapshot pipeline 尚待執行';
-
-    const job = {
-      schemaVersion: 1, runId: runId, status: dashboard.complete ? 'completed' : 'waiting-external-pipeline',
-      createdAt: privateDashboardNow(), operator: employeeId,
-      reportDate: processing.reportDate || staged.dataDate, sourceDataDate: processing.dataDate || '',
-      canonicalFile: staged.canonicalName, sourceFileId: (promotedFile || currentSource).getId(), sourceHash: staged.fileHash,
-      requiredInputs: { kpi: true, awardStore: true, awardPerson: true },
-      processor: 'existing-report-automation', stages: stages
+    });
+    const missing = reportUploadMissingInputs_(job);
+    job.stages.source_files = {
+      status: missing.length ? 'wait' : 'ok', startedAt: job.createdAt,
+      finishedAt: missing.length ? '' : privateDashboardNow(),
+      detail: missing.length ? ('等待：' + missing.join('、')) : '三份 canonical source File ID／hash readback PASS',
+      error: '', retryable: false
     };
-    jobFile = privateDashboardFolder().createFile(Utilities.newBlob(JSON.stringify(job), 'application/json',
-      REPORT_UPLOAD_JOB_PREFIX + runId + '.json'));
-    stages.push(reportUploadStage_('handoff', '正式 pipeline handoff', 'ok', jobFile.getName()));
-  } catch (err) {
-    result = 'error';
-    message = err && err.message ? err.message : String(err);
-    stages.push(reportUploadStage_('failure', '失敗／恢復', 'fail', message));
-    try {
-      if (promotedFile) promotedFile.setName(REPORT_UPLOAD_SOURCE_FAILED_PREFIX + runId + '-' + staged.canonicalName);
-      if (archivedFile && archivedOriginalName) archivedFile.setName(archivedOriginalName);
-      stages.push(reportUploadStage_('source_restore', '來源回復', 'ok', archivedFile
-        ? '上一版 canonical source 已恢復'
-        : (promotedFile ? '失敗檔已移出 scheduler 掃描範圍' : '正式來源未變更')));
-    } catch (restoreError) {
-      stages.push(reportUploadStage_('source_restore', '來源回復', 'fail', restoreError && restoreError.message ? restoreError.message : String(restoreError)));
+    job.idempotencyKey = job.inputs.kpi ? (job.runId + ':' + job.inputs.kpi.sourceHash) : '';
+    job.status = missing.length ? 'waiting-input' : 'waiting-external-pipeline';
+    job.state = missing.length ? 'waiting-input' : 'ready';
+    job.retryable = false;
+    job.lastError = '';
+    holder = { file: reportUploadWriteJob_(holder && holder.file, job), job: job };
+  } catch (error) {
+    if (job) {
+      promoted.slice().reverse().forEach(function(entry) {
+        try {
+          if (!entry.promotion.duplicate) {
+            const failedPrefix = entry.staged.kind === 'kpi' ? REPORT_UPLOAD_SOURCE_FAILED_PREFIX : REPORT_UPLOAD_AWARD_FAILED_PREFIX;
+            entry.promotion.file.setName(failedPrefix + runId + '-' + entry.staged.canonicalName);
+            if (entry.promotion.archived) entry.promotion.archived.setName(entry.staged.canonicalName);
+          }
+          job.inputs[entry.inputKey] = null;
+        } catch (restoreError) {
+          console.log('report source recovery failed, runId=' + runId + ': ' + restoreError);
+        }
+      });
+      job.status = 'failed'; job.state = 'failed'; job.retryable = true;
+      job.lastError = error && error.message ? error.message : String(error);
+      try { reportUploadWriteJob_(holder && holder.file, job); } catch (writeError) { console.log('failed job write error: ' + writeError); }
     }
+    throw error;
   } finally {
     lock.releaseLock();
   }
 
-  const logId = runId + '-kpi';
+  reportUploadDiscardStaged_(stagedByInput);
+  const missing = reportUploadMissingInputs_(job);
+  const result = missing.length ? 'partial' : 'queued';
+  const message = missing.length ? ('⚠️ 尚未完成；等待 ' + missing.join('、') + '，不會寄完整 Mail')
+    : '三份來源已 promotion；等待既有 Mac 正式 pipeline 消費此 job';
+  const logId = runId + '-ingest-' + reportUploadStamp_();
   try {
     const sheet = privateDashboardSheet(REPORT_UPLOAD_LOG_SHEET, REPORT_UPLOAD_LOG_HEADERS);
     privateDashboardWriteObject(sheet, REPORT_UPLOAD_LOG_HEADERS, sheet.getLastRow() + 1, {
-      log_id: logId, kind: kind, employee_id: employeeId, file_name: staged.fileName,
-      data_date: staged.dataDate, acted_at: privateDashboardNow(), result: result,
-      stages: stages.map(function(stage) { return stage.key + ':' + stage.status; }).join(','),
-      backup_file: archivedFile ? archivedFile.getName() : '', message: message,
-      run_id: runId, source_hash: staged.fileHash, canonical_file: staged.canonicalName,
-      previous_file: previousSource, processing_status: processing ? processing.status : 'not-started'
+      log_id: logId, kind: 'official-ingest', employee_id: employeeId,
+      file_name: Object.keys(stagedByInput).map(function(k) { return stagedByInput[k].canonicalName; }).join(','),
+      data_date: job.reportDate, acted_at: privateDashboardNow(), result: result,
+      stages: 'source_files:' + job.stages.source_files.status + ',kpi_formal:' + job.stages.kpi_formal.status,
+      backup_file: '', message: message, run_id: runId,
+      source_hash: job.inputs.kpi ? job.inputs.kpi.sourceHash : '',
+      canonical_file: job.inputs.kpi ? job.inputs.kpi.canonicalName : '', previous_file: '',
+      processing_status: job.status
     });
-    stages.push(reportUploadStage_('log', '更新紀錄', 'ok', logId));
-  } catch (logError) {
-    stages.push(reportUploadStage_('log', '更新紀錄', 'fail', logError && logError.message ? logError.message : String(logError)));
-    if (result === 'ok') result = 'partial';
-  }
+  } catch (e) { console.log('report upload audit log failed: ' + e); }
+  const safe = reportUploadSanitizeJob_(job);
+  safe.result = result; safe.message = message; safe.logId = logId;
+  safe.live = reportUploadLiveInfo_('kpi');
+  return safe;
+}
 
-  reportUploadTrash_(reportUploadFileByName_(staged.stagingName));
-  reportUploadTrash_(DriveApp.getFileById(staged.rawFileId));
-  reportUploadCache_().remove('rupload_' + token);
-  return { result: result, kind: kind, runId: runId, logId: logId, stages: stages,
-    sourceFile: staged.canonicalName, sourceHash: staged.fileHash,
-    backupFile: archivedFile ? archivedFile.getName() : '', dataDate: staged.dataDate,
-    message: message, live: reportUploadLiveInfo_(kind) };
+function reportUploadJobStatus(payload) {
+  reportUploadAuthorize_(payload);
+  return reportUploadSanitizeJob_(reportUploadReadJob_(String((payload || {}).runId || '')).job);
+}
+
+function reportUploadJobClaim(payload) {
+  reportUploadAuthorize_(payload);
+  const runId = String((payload || {}).runId || '');
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) throw new Error('job claim lock busy');
+  try {
+    const holder = reportUploadReadJob_(runId);
+    const job = holder.job;
+    if (job.status !== 'waiting-external-pipeline' || job.state !== 'ready') {
+      throw new Error('job-not-ready:' + job.status + '/' + job.state);
+    }
+    if (reportUploadMissingInputs_(job).length) throw new Error('job inputs incomplete');
+    job.status = 'processing'; job.state = 'processing';
+    job.claimId = reportUploadToken_();
+    job.claimedAt = privateDashboardNow();
+    job.retryable = true;
+    reportUploadWriteJob_(holder.file, job);
+    return job; // 僅授權 consumer 可拿 File ID/hash；公開 UI 只走 sanitized status。
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function reportUploadJobSource(payload) {
+  reportUploadAuthorize_(payload);
+  const holder = reportUploadReadJob_(String((payload || {}).runId || ''));
+  const job = holder.job;
+  const key = String((payload || {}).input || '');
+  if (['kpi','awardStore','awardPerson'].indexOf(key) === -1 || !job.inputs[key]) throw new Error('job source input 無效');
+  if (String((payload || {}).claimId || '') !== String(job.claimId || '')) throw new Error('job claim 不一致');
+  const file = DriveApp.getFileById(job.inputs[key].fileId);
+  const bytes = file.getBlob().getBytes();
+  const offset = Math.max(0, Number((payload || {}).offset || 0));
+  const requested = Math.max(1, Math.min(512 * 1024, Number((payload || {}).limit || 512 * 1024)));
+  const end = Math.min(bytes.length, offset + requested);
+  const chunk = bytes.slice(offset, end);
+  return { runId: job.runId, input: key, offset: offset, nextOffset: end, totalBytes: bytes.length,
+    done: end >= bytes.length, canonicalName: job.inputs[key].canonicalName,
+    sourceHash: job.inputs[key].sourceHash, base64: Utilities.base64Encode(chunk) };
+}
+
+function reportUploadMergeEvidence_(job, patch) {
+  const allowed = ['kpiFormalReadback','awards','mail','privateReadback','supervisor','website'];
+  const incoming = patch && typeof patch === 'object' ? patch : {};
+  allowed.forEach(function(key) {
+    if (!Object.prototype.hasOwnProperty.call(incoming, key)) return;
+    if (!incoming[key] || typeof incoming[key] !== 'object' || Array.isArray(incoming[key])) throw new Error('evidence 格式無效：' + key);
+    job.evidence[key] = Object.assign({}, job.evidence[key] || {}, incoming[key]);
+  });
+}
+
+function reportUploadJobUpdate(payload) {
+  reportUploadAuthorize_(payload);
+  const runId = String((payload || {}).runId || '');
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) throw new Error('job update lock busy');
+  try {
+    const holder = reportUploadReadJob_(runId);
+    const job = holder.job;
+    if ((payload || {}).retry === true) {
+      if (job.status !== 'failed' || !job.retryable || reportUploadMissingInputs_(job).length) throw new Error('job 不符合 retry 條件');
+      job.status = 'waiting-external-pipeline'; job.state = 'ready'; job.lastError = '';
+      reportUploadWriteJob_(holder.file, job);
+      return reportUploadSanitizeJob_(job);
+    }
+    if (String((payload || {}).claimId || '') !== String(job.claimId || '')) throw new Error('job claim 不一致');
+    if (job.status === 'completed') return reportUploadSanitizeJob_(job);
+    const key = String((payload || {}).stage || '');
+    if (!REPORT_UPLOAD_JOB_STAGE_LABELS[key]) throw new Error('不允許的 job stage');
+    const nextStatus = String((payload || {}).stageStatus || '');
+    if (['running','ok','fail','wait','skip'].indexOf(nextStatus) === -1) throw new Error('不允許的 stage status');
+    const prior = job.stages[key] || reportUploadJobStageState_('wait', '');
+    const now = privateDashboardNow();
+    job.stages[key] = {
+      status: nextStatus, startedAt: prior.startedAt || now,
+      finishedAt: (nextStatus === 'ok' || nextStatus === 'fail' || nextStatus === 'skip') ? now : '',
+      detail: String((payload || {}).detail || ''), error: nextStatus === 'fail' ? String((payload || {}).error || 'stage failed') : '',
+      retryable: nextStatus === 'fail' ? !!(payload || {}).retryable : false
+    };
+    reportUploadMergeEvidence_(job, (payload || {}).evidence);
+    if (nextStatus === 'fail') {
+      job.status = 'failed'; job.state = 'failed'; job.retryable = !!(payload || {}).retryable;
+      job.lastError = job.stages[key].error;
+    } else {
+      const gate = reportUploadCompletionGate_(job);
+      if (gate.complete) { job.status = 'completed'; job.state = 'completed'; job.retryable = false; }
+      else if (job.stages.private_readback.status === 'ok' && job.stages.website_readback.status === 'ok' && job.stages.supervisor_app.status === 'ok') {
+        job.status = 'readback-ok'; job.state = 'readback-ok';
+      } else if (job.stages.private_publish.status === 'ok') {
+        job.status = 'private-published'; job.state = 'private-published';
+      } else if (job.stages.daily_mail.status === 'ok' && job.stages.awards_mail.status === 'ok' && job.stages.sent_items.status === 'ok') {
+        job.status = 'mail-sent'; job.state = 'mail-sent';
+      } else if (job.stages.awards_formal.status === 'ok' && job.stages.awards_battle.status === 'ok') {
+        job.status = 'awards-ok'; job.state = 'awards-ok';
+      } else if (job.stages.kpi_formal.status === 'ok' && job.stages.kpi_battle.status === 'ok') {
+        job.status = 'kpi-ok'; job.state = 'kpi-ok';
+      } else { job.status = 'processing'; job.state = 'processing'; }
+    }
+    reportUploadWriteJob_(holder.file, job);
+    return reportUploadSanitizeJob_(job);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ── 更新紀錄與回復上一版 ──────────────────────────────────
@@ -4006,14 +4321,14 @@ function reportUploadLog(payload) {
     if (file.getName().indexOf(REPORT_UPLOAD_JOB_PREFIX) !== 0) continue;
     try {
       const job = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
-      jobs.push(job);
+      jobs.push(reportUploadSanitizeJob_(job));
     } catch (e) { console.log('report upload job unreadable, fileId=' + file.getId()); }
   }
   jobs.sort(function(a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
   return {
     entries: rows.slice(-limit).reverse(),
     jobs: jobs.slice(0, limit),
-    live: { kpi: reportUploadLiveInfo_('kpi'), award: reportUploadLiveInfo_('award') }
+    live: { kpi: reportUploadLiveInfo_('kpi'), award: reportUploadLiveInfo_('award-store') }
   };
 }
 

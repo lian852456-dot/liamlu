@@ -95,22 +95,24 @@ test('回復後登記為 rollback 來源，排程不會用同日期舊檔蓋回�
 });
 
 test('同日修正版未明確確認前不進入 promotion', () => {
-  const commit = functionBody(code, 'reportUploadCommit');
-  const confirmAt = commit.indexOf('confirmCorrection');
-  const promoteAt = commit.indexOf('makeCopy');
+  const promote = functionBody(code, 'reportUploadPromoteSource_');
+  const confirmAt = promote.indexOf('confirmCorrection');
+  const promoteAt = promote.indexOf('makeCopy');
   assert.ok(confirmAt !== -1 && confirmAt < promoteAt, '修正版確認必須早於 promotion');
-  assert.match(commit, /同日期正式來源已存在且 hash 不同/);
+  assert.match(promote, /同日來源已存在且 hash 不同/);
 });
 
-// ── 原則 6/7：KPI 與台獎分開、互不影響 ──────────────────────
-test('正式快速入口只接受 KPI 原始 Excel，不直接發布台獎 JSON', () => {
+// ── 原則 6/7：三份原始 Excel 同 session；台獎公式仍只在外部正式流程 ──
+test('正式快速入口接受 KPI／01-08-03／01-08-04 原始 Excel，不直接發布台獎 JSON', () => {
   assert.match(code, /REPORT_UPLOAD_KINDS = \{/);
   assert.match(code, /liveFile: PRIVATE_KPICALC_FILE/);
   const kinds = code.slice(code.indexOf('const REPORT_UPLOAD_KINDS'), code.indexOf('function reportUploadKind_'));
-  assert.doesNotMatch(kinds, /award:/);
+  assert.match(kinds, /'award-store'/);
+  assert.match(kinds, /'award-person'/);
+  assert.doesNotMatch(kinds, /ext: '\.json'/);
   const commit = functionBody(code, 'reportUploadCommit');
-  assert.match(commit, /kind !== 'kpi'/);
   assert.doesNotMatch(commit, /PRIVATE_DASHBOARD_FILE|privateDashboardPublish/);
+  assert.doesNotMatch(functionBody(code, 'reportUploadInspectAwardSource_'), /獎金|MANAGER_AWARD_RULES|VISIBLE_STORE_ITEMS/);
 });
 
 // ── 原則 8：驗證失敗不得覆蓋正式資料 ────────────────────────
@@ -129,9 +131,9 @@ test('processor 先保留正式 JSON 才改寫，讀回失敗會自動還原', (
   assert.ok(backupAt !== -1 && writeAt !== -1);
   assert.ok(backupAt < writeAt, '必須先保留上一版再改寫正式 JSON');
   assert.match(processor, /liveFile\.setContent\(previousText\)/);
-  const commit = functionBody(code, 'reportUploadCommit');
-  assert.match(commit, /REPORT_UPLOAD_SOURCE_ARCHIVE_PREFIX/);
-  assert.match(commit, /archivedFile\.setName\(archivedOriginalName\)/);
+  const promote = functionBody(code, 'reportUploadPromoteSource_');
+  assert.match(promote, /REPORT_UPLOAD_SOURCE_ARCHIVE_PREFIX/);
+  assert.match(promote, /archived\.setName\(staged\.canonicalName\)/);
 });
 
 test('備份檔名不得符合 kpiCalcLatestDataFile 的搜尋樣式', () => {
@@ -238,7 +240,7 @@ function loadValidators() {
     const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
     const KPICALC_ITEMS = new Array(25).fill(['x','x',1]);
     const REPORT_UPLOAD_MAX_BYTES = 12 * 1024 * 1024;
-    const REPORT_UPLOAD_KINDS = { kpi: { ext: '.xlsx', label: 'KPI' }, award: { ext: '.json', label: '台獎' } };
+    const REPORT_UPLOAD_KINDS = { kpi: { ext: '.xlsx', label: 'KPI' }, 'award-store': { ext: '.xlsx', label: '店點台獎' }, 'award-person': { ext: '.xlsx', label: '個人台獎' } };
   `;
   for (const n of names) src += `function ${n}(${''}` + rawArgs(n) + `) {${functionBody(code, n)}}\n`;
   src += 'module.exports = { ' + names.join(', ') + ' };';
@@ -371,9 +373,10 @@ test('台獎錯區域資料會被擋下（情境 8）', () => {
 });
 
 test('未知報表類型直接拒絕', () => {
-  assert.throws(() => V.reportUploadKind_('patrol'), /僅支援/);
+  assert.throws(() => V.reportUploadKind_('patrol'), /不支援/);
   assert.equal(V.reportUploadKind_('kpi'), 'kpi');
-  assert.equal(V.reportUploadKind_('award'), 'award');
+  assert.equal(V.reportUploadKind_('award-store'), 'award-store');
+  assert.equal(V.reportUploadKind_('award-person'), 'award-person');
 });
 
 test('KPI 資料日期由 month + snapshotDay 組出可比較字串', () => {
@@ -617,7 +620,7 @@ test('preview 不寫正式 JSON、不寫版本屬性、不發佈', () => {
 
 test('正式 KPI JSON 只由單一 processor 寫入，commit 只 promotion 原始檔', () => {
   assert.match(functionBody(code, 'processKpiSourceFile_'), /setContent\(text\)/);
-  assert.match(functionBody(code, 'reportUploadCommit'), /makeCopy\(staged\.canonicalName, sourceFolder\)/);
+  assert.match(functionBody(code, 'reportUploadPromoteSource_'), /makeCopy\(staged\.canonicalName, folder\)/);
   assert.doesNotMatch(functionBody(code, 'reportUploadCommit'), /setContent\(/);
   assert.doesNotMatch(functionBody(code, 'reportUploadRollback'), /setContent\(/);
   assert.doesNotMatch(functionBody(code, 'reportUploadPreview'), /setContent\(/);
@@ -625,7 +628,7 @@ test('正式 KPI JSON 只由單一 processor 寫入，commit 只 promotion 原�
 });
 
 // ── 部署隔離：上傳走獨立 Deployment，每日回報固定第 15 版 ──
-test('doPost 在上傳部署模式只放行四個上傳路由，且判斷在所有路由之前', () => {
+test('doPost 在上傳部署模式只放行 ingest 與 job 路由，且判斷在所有路由之前', () => {
   const doPost = functionBody(code, 'doPost');
   const gateAt = doPost.indexOf('reportUploadIsUploadDeployment_()');
   const firstRouteAt = doPost.indexOf("action === 'ptauth'");
@@ -636,7 +639,8 @@ test('doPost 在上傳部署模式只放行四個上傳路由，且判斷在所�
   assert.ok(list, '缺少 REPORT_UPLOAD_ALLOWED_ACTIONS');
   const actions = list[1].match(/'[^']+'/g).map(x => x.slice(1, -1));
   assert.deepEqual(actions.sort(), ['report_upload_commit', 'report_upload_log',
-    'report_upload_preview', 'report_upload_rollback'].sort(), '白名單必須恰好是四個上傳路由');
+    'report_upload_preview', 'report_upload_rollback', 'report_upload_job_status',
+    'report_upload_job_claim', 'report_upload_job_source', 'report_upload_job_update'].sort());
 });
 
 test('doGet 在上傳部署模式回 ping／同源頁面，其餘 JSON GET 一律拒絕', () => {
@@ -712,7 +716,7 @@ test('所有前端頁面不含實際白名單員編、管理密碼值或 Script 
 // ── P0 正式 source ingest / 全鏈狀態契約 ─────────────────────
 test('scheduler 舊路徑與 quick upload 新路徑完全共用 processKpiSourceFile_', () => {
   assert.match(functionBody(code, 'kpiCalcAutoUpdate'), /processKpiSourceFile_\(latest\.file/);
-  assert.match(functionBody(code, 'reportUploadCommit'), /processKpiSourceFile_\((promotedFile|currentSource)/);
+  assert.match(functionBody(code, 'reportUploadCommit'), /processKpiSourceFile_\(promotion\.file/);
   assert.equal((code.match(/function processKpiSourceFile_\(/g) || []).length, 1);
   assert.equal((code.match(/function kpiCalcParseReport\(/g) || []).length, 1);
 });
@@ -722,9 +726,11 @@ test('quick upload 先 staging，PASS 後才 promotion 到既有正式來源資�
   const commit = functionBody(code, 'reportUploadCommit');
   assert.match(preview, /privateDashboardFolder\(\)/);
   assert.doesNotMatch(preview, /kpiCalcSourceFolder_|KPICALC_SOURCE_FOLDER_ID/);
-  assert.match(commit, /kpiCalcSourceFolder_\(\)/);
-  assert.match(commit, /makeCopy\(staged\.canonicalName, sourceFolder\)/);
-  assert.match(commit, /promotedHash !== rawHash/);
+  assert.match(commit, /reportUploadPromoteSource_/);
+  const promote = functionBody(code, 'reportUploadPromoteSource_');
+  assert.match(promote, /kpiCalcSourceFolder_\(\)/);
+  assert.match(promote, /makeCopy\(staged\.canonicalName, folder\)/);
+  assert.match(promote, /kpiCalcSourceHash_\(promoted\) !== rawHash/);
 });
 
 test('canonical filename 由報表內容日期推導，不接受使用者手輸入', () => {
@@ -743,13 +749,18 @@ test('duplicate hash 冪等略過，且不重複發布或寄信', () => {
   assert.ok(duplicateAt < processor.indexOf('kpiCalcParseReport(file)'));
   assert.ok(duplicateAt < processor.indexOf("kpiCalcNotify('✅"));
   assert.match(processor, /reason: 'idempotent-duplicate'/);
+  const commit = functionBody(code, 'reportUploadCommit');
+  assert.match(commit, /reportUploadFindJobBySourceHash_/);
+  assert.match(commit, /未建立新 job、未重複寄信／發布/);
+  assert.match(commit, /\['processing','completed'\]/);
 });
 
 test('same-date correction 先 archive 舊 canonical 並留下 operator/hash/time', () => {
   const commit = functionBody(code, 'reportUploadCommit');
+  const promote = functionBody(code, 'reportUploadPromoteSource_');
   assert.match(commit, /confirmCorrection/);
-  assert.match(commit, /REPORT_UPLOAD_SOURCE_ARCHIVE_PREFIX/);
-  assert.match(commit, /currentHash\.slice\(0, 8\)/);
+  assert.match(promote, /REPORT_UPLOAD_SOURCE_ARCHIVE_PREFIX/);
+  assert.match(promote, /oldHash\.slice\(0, 8\)/);
   for (const field of ['employee_id', 'source_hash', 'previous_file', 'acted_at']) {
     assert.match(commit, new RegExp(field + ':'));
   }
@@ -768,16 +779,20 @@ test('scheduler 與 quick upload 都使用 ScriptLock，避免雙跑', () => {
 test('promotion 後失敗會移出 scheduler 掃描範圍並恢復前一 canonical source', () => {
   const commit = functionBody(code, 'reportUploadCommit');
   assert.match(commit, /REPORT_UPLOAD_SOURCE_FAILED_PREFIX/);
-  assert.match(commit, /archivedFile\.setName\(archivedOriginalName\)/);
-  assert.match(commit, /source_restore/);
+  assert.match(commit, /REPORT_UPLOAD_AWARD_FAILED_PREFIX/);
+  assert.match(commit, /entry\.promotion\.archived\.setName\(entry\.staged\.canonicalName\)/);
+  assert.match(commit, /job\.inputs\[entry\.inputKey\] = null/);
+  assert.match(functionBody(code, 'reportUploadJobUpdate'), /retryable/);
 });
 
 test('KPI quick upload 不冒充完整戰報 Mail 或 battle/App 全鏈完成', () => {
   const chain = functionBody(code, 'reportUploadOfficialChainStatus_');
-  assert.match(chain, /prepare_send_payloads/);
-  assert.match(chain, /update_phone_awards/);
-  assert.match(chain, /Supervisor App/);
-  assert.match(chain, /return \{ complete: false/);
+  assert.match(chain, /reportUploadCompletionGate_/);
+  const gate = functionBody(code, 'reportUploadCompletionGate_');
+  assert.match(gate, /phoneItems\) === 13/);
+  assert.match(gate, /storeCount\) === 9/);
+  assert.match(gate, /sentItemsAttachmentsVerified === true/);
+  assert.match(gate, /supervisor.*aligned === true/);
   assert.match(htmlPage, /⚠️ 尚未完成/);
   assert.match(htmlPage, /✅ 戰報正式更新完成/);
 });
@@ -787,8 +802,62 @@ test('處理 run id、逐階段 audit 與 external formal-pipeline handoff 皆�
   assert.match(code, /REPORT_UPLOAD_JOB_PREFIX = 'report-official-ingest-job-'/);
   assert.match(commit, /runId/);
   assert.match(commit, /waiting-external-pipeline/);
-  assert.match(commit, /requiredInputs: \{ kpi: true, awardStore: true, awardPerson: true \}/);
+  assert.match(functionBody(code, 'reportUploadNewJob_'), /inputs: \{ kpi: null, awardStore: null, awardPerson: null \}/);
+  assert.match(code, /state: 'waiting-input'/);
+  assert.match(commit, /state = missing\.length \? 'waiting-input' : 'ready'/);
   assert.match(functionBody(code, 'reportUploadLog'), /jobs:/);
+});
+
+test('job state machine 與每階段稽核欄位完整', () => {
+  for (const state of ['waiting-input', 'ready', 'processing', 'kpi-ok', 'awards-ok',
+    'mail-sent', 'private-published', 'readback-ok', 'completed', 'failed']) {
+    assert.ok(code.includes(`'${state}'`), `缺少 job state ${state}`);
+  }
+  const stage = functionBody(code, 'reportUploadJobStageState_');
+  for (const field of ['startedAt', 'finishedAt', 'detail', 'error', 'retryable']) assert.match(stage, new RegExp(field + ':'));
+});
+
+test('completed 必須通過 KPI、13 款九店、兩封 Mail、App、Private 與 website readback', () => {
+  const gate = functionBody(code, 'reportUploadCompletionGate_');
+  for (const evidence of ['kpiFormalReadback', 'phoneItems', 'storeCount', 'daily', 'awards',
+    'sentItemsAttachmentsVerified', 'privateReadback', 'supervisor', 'website']) assert.match(gate, new RegExp(evidence));
+  assert.match(functionBody(code, 'reportUploadJobUpdate'), /gate\.complete/);
+  assert.doesNotMatch(functionBody(code, 'reportUploadOfficialChainStatus_'), /complete: false/);
+});
+
+test('job status 為督導保護的 sanitized read-only endpoint', () => {
+  const status = functionBody(code, 'reportUploadJobStatus');
+  assert.ok(status.indexOf('reportUploadAuthorize_') < status.indexOf('reportUploadReadJob_'));
+  assert.match(status, /reportUploadSanitizeJob_/);
+  const sanitize = functionBody(code, 'reportUploadSanitizeJob_');
+  assert.doesNotMatch(sanitize, /operator:|fileId:|sourceHash:/);
+});
+
+test('consumer claim 與 exact source download 都受 ScriptLock／claimId／File ID 保護', () => {
+  const claim = functionBody(code, 'reportUploadJobClaim');
+  assert.match(claim, /status !== 'waiting-external-pipeline'/);
+  assert.match(claim, /LockService\.getScriptLock/);
+  const source = functionBody(code, 'reportUploadJobSource');
+  assert.match(source, /job\.inputs\[key\]\.fileId/);
+  assert.match(source, /claimId/);
+  assert.match(source, /sourceHash/);
+});
+
+test('Step 4 每五秒 polling 且可從更新紀錄 resume runId', () => {
+  assert.match(htmlPage, /report_upload_job_status/);
+  assert.match(htmlPage, /setTimeout\(\(\)=>pollJob\(runId\),5000\)/);
+  assert.match(htmlPage, /data-run=/);
+  for (const label of ['來源檔', 'KPI 正式資料', 'KPI 戰情', '台獎戰情', 'Supervisor App',
+    '每日戰報 Mail', '台獎 Mail', '寄件備份 Readback', 'Private Readback']) assert.ok(htmlPage.includes(label), label);
+});
+
+test('三份來源共用同一工作階段且未改成路徑尋址契約', () => {
+  for (const id of ['kpiFile', 'awardStoreFile', 'awardPersonFile']) assert.ok(htmlPage.includes(`id="${id}"`));
+  const commit = functionBody(code, 'reportUploadCommit');
+  assert.match(commit, /三份來源的內容日期不一致/);
+  assert.match(commit, /reportUploadMissingInputs_/);
+  assert.match(code, /kpiCalcSourceFolder_\(\)/);
+  assert.doesNotMatch(code.slice(code.indexOf('const REPORT_UPLOAD_KINDS'), code.indexOf('function reportUploadKind_')), /\/Users\//);
 });
 
 test('Freeze：既有 trigger/watchdog 與巡店/回報關鍵函式仍各只有一份', () => {
