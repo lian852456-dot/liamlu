@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-19 ｜ Codex（P0 最後 Gate：Outlook Bridge／consumer 版本化／CI，未部署）
+
+- 做了什麼：把 official ingest consumer、private transport、Keychain wrapper 與正式 `REPORT_OUTLOOK_BRIDGE_COMMAND` 納入 `tools/report-automation/`。Bridge 直接使用 `prepare_send_payloads.mjs` 的 body／附件，透過 ephemeral read-only Codex host 呼叫既有 Microsoft Outlook connector，兩封信都必須以真實 Sent Items message ID 與 exact attachment metadata readback 才成立；SMTP、假 ID、Mail template 重寫均 fail closed。
+- 結果（本機／CI Gate，未部署）：新增 dry-run 與 A–G bridge/idempotency contracts、receipt/job evidence 防重寄、runtime/secrets `.gitignore`，以及 Node contracts、GAS/consumer syntax、focused Playwright、diff check 的 PR CI。沒有寄正式 Mail、沒有 promotion／private publish、沒有部署 GAS、沒有合併 PR #60。
+- 經驗 / 給下一位的提醒：目前 `prepare_send_payloads.mjs` 正式 daily payload 依 2026-08-18 AQ 高資暫停契約為 8 個附件，Bridge 不自行硬編碼 8/9，而是逐檔 exact-match 當次 payload；台獎仍為當次 payload 的 6 檔。正式 UAT 需另行授權執行，UAT Ready 不等於 UAT Passed。
+
 ## 2026-08-19 ｜ Codex（戰報快速更新一鍵閉環 P0，Draft PR #60／未部署）
 
 - 做了什麼：延續 `feature/report-upload-official-ingest-p0`，同一 session 已可預檢／promotion KPI、01-08-03 店點台獎、01-08-04 個人台獎三份 Excel；KPI 仍立即呼叫 scheduler 共用的唯一 `processKpiSourceFile_()`，台獎不在 GAS 計算。新增 schema v2 job state machine、ScriptLock claim、exact File ID 分段下載、allowlisted stage/evidence 回寫、server completion gate、受督導保護的 sanitized status endpoint，以及 Step 4 每 5 秒 polling／由 Run ID resume。既有非 Git `report-automation` 新增 consumer，只編排 daily runner、台獎 processor、preflight、Outlook bridge、GitHub Pages data、private publisher 與正式 readback。

@@ -97,11 +97,15 @@ server-side completion gate 同時要求：KPI 正式 readback 同日、台獎 1
 
 ## Mac consumer
 
-consumer 位於非 Git 的既有 automation workspace：
+consumer 與 Outlook host adapter 已納入 Git：
 
-- `report-automation/work/report_official_ingest_consumer.mjs`
-- `report-automation/work/consume_report_official_ingest_with_keychain.sh`
-- `report-automation/work/report_official_ingest_consumer.test.mjs`
+- `tools/report-automation/report_official_ingest_consumer.mjs`
+- `tools/report-automation/consume_report_official_ingest_with_keychain.sh`
+- `tools/report-automation/outlook_bridge_host_adapter.mjs`
+- `tools/report-automation/outlook_bridge_host_adapter.sh`
+- `tools/report-automation/*.test.mjs`
+
+正式 KPI／台獎／網站 processor 仍留在既有 Mac `report-automation/work`；consumer 透過 runtime `REPORT_AUTOMATION_DIR` 呼叫，不複製公式、Y26 config、Mail template 或正式 publisher。Git 內沒有硬編碼本機絕對路徑。
 
 它不重寫 KPI、台獎或 Mail template。三份 exact Drive File ID 下載並驗 hash 後，只編排：
 
@@ -120,7 +124,9 @@ run_daily_north12b_report.mjs
 
 ### Outlook bridge 邊界
 
-目前正式 Outlook 寄件是 Codex Outlook connector capability，不是 repo 內 Node API。consumer 因此要求 `REPORT_OUTLOOK_BRIDGE_COMMAND` 指向既有 connector host adapter；adapter 輸入既有 `prepare_send_payloads` payload，輸出兩封 message ID、各自附件名單與 `sentItemsAttachmentsVerified=true` 的 receipt。未設定時 consumer fail closed，絕不假裝寄件或另寫 SMTP／Mail template。
+正式 adapter 已實作為 `outlook_bridge_host_adapter.sh`。它直接讀取既有 `prepare_send_payloads.mjs` payload，以 ephemeral、read-only Codex host session 呼叫已安裝的 Microsoft Outlook connector；禁止 SMTP、本地 Graph token、browser automation、假 message ID 或改寫 Mail template。每封信寄送前先找同一 `requestedAt`／idempotency request 的 exact Sent Items match，寄送後再讀真實 message ID 與附件 metadata。兩封信或任一附件 readback 不完整即 non-zero／fail closed。
+
+dry-run 只驗 payload/body/hash/附件 contract，不啟動 Codex 或 Outlook。正式模式另要求 `REPORT_OUTLOOK_BRIDGE_ALLOW_SEND=YES`，避免誤觸。Keychain／connector authorization、mode 0600 receipts、runtime state 與 local paths 均不進 Git；`tools/report-automation/.gitignore` 明確排除。
 
 ## Freeze / source of truth
 
@@ -136,17 +142,11 @@ run_daily_north12b_report.mjs
 
 ## Test evidence
 
-- Git worktree Node contracts：232/232 PASS。
-- consumer + formal publisher/private transport/retry：23/23 PASS。
-- 台獎 active config／13 款／preflight 回歸：12/12 PASS。
-- GAS source syntax、Python compile：PASS。
+- Git worktree Node／consumer／bridge contracts：由 CI 與本機 gate 執行。
+- Bridge A–G：兩封成功、第二封失敗、附件 mismatch、private retry、不見 receipt 但 job evidence 完整、evidence 不完整、duplicate idempotency。
+- GAS／consumer syntax、focused Playwright 與 `git diff --check` 已納入 `.github/workflows/report-official-ingest-p0.yml`。
 - 未執行任何 GAS deploy、正式寄件、正式資料 promotion 或 private publish。
 
 ## UAT gate
 
-程式邏輯與可測試 interface 已完成，但目前仍是 **UAT environment ready、不是正式 UAT Ready**。正式 UAT 前尚需：
-
-1. 由現有 Codex automation host 提供可執行的 `REPORT_OUTLOOK_BRIDGE_COMMAND`（不可另寫第二套寄件）。
-2. 另行授權後部署 upload GAS 新版本。
-3. 以隔離測試檔驗證三檔 promotion、claim、完整 readback 與 retry。
-4. Liam 正式 UAT 驗證網站、App、兩封寄件備份與 private readback。
+程式、host adapter、版本化 rollback baseline 與無副作用 CI 齊備後可進入正式 UAT。這不代表正式 UAT 已通過；另行授權後仍需部署 upload GAS，並以隔離測試檔驗證三檔 promotion、兩封 Outlook 寄件備份、private readback、網站與 App 日期對齊。

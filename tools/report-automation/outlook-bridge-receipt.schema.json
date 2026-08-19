@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "idempotencyKey",
+    "dailyReportMessageId",
+    "awardsMessageId",
+    "dailyAttachments",
+    "awardsAttachments",
+    "sentItemsAttachmentsVerified",
+    "sentAt",
+    "error"
+  ],
+  "properties": {
+    "status": { "type": "string", "enum": ["completed", "failed"] },
+    "idempotencyKey": { "type": "string" },
+    "dailyReportMessageId": { "type": ["string", "null"] },
+    "awardsMessageId": { "type": ["string", "null"] },
+    "dailyAttachments": { "type": "array", "items": { "type": "string" } },
+    "awardsAttachments": { "type": "array", "items": { "type": "string" } },
+    "sentItemsAttachmentsVerified": { "type": "boolean" },
+    "sentAt": { "type": ["string", "null"] },
+    "error": { "type": ["string", "null"] }
+  }
+}

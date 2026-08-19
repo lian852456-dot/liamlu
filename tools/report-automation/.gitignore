@@ -1,0 +1,21 @@
+# Runtime-only inputs, state, and receipts
+runtime/
+state/
+receipts/
+*.mail-request.json
+*.mail-receipt.json
+*.outlook-host-attempt.json
+
+# Credentials and local configuration never belong in Git
+.env
+.env.*
+*.secret
+*.secrets
+*.token
+*.key
+*.pem
+
+# Local machine paths and generated interpreter state
+local-paths.*
+__pycache__/
+*.pyc
