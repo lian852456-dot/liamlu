@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
-  <link rel="stylesheet" href="app.css?v=area-award-summary-20260818-1">
+  <link rel="stylesheet" href="app.css?v=personal-award-main-20260819-1">
   <title>Liam Supervisor App 1.2</title>
 </head>
 <body>
@@ -60,7 +60,7 @@
       <section data-view="battle" hidden aria-label="戰情">
         <div class="view-heading"><div><p>READ-ONLY SUMMARY</p><h1>戰情</h1></div><a class="icon-button" href="index.html" aria-label="開啟正式戰情網站"><i data-lucide="external-link"></i></a></div>
         <div class="segment-control battle-kind-control" role="tablist" aria-label="戰情類型"><button class="active" data-battle-kind="kpi" type="button">KPI</button><button data-battle-kind="award" type="button">台獎</button><button data-battle-kind="personal" type="button">個績</button></div>
-        <div class="scope-control" role="tablist" aria-label="戰情範圍"><button class="active" data-battle-scope="region" type="button">北一二B</button><button data-battle-scope="store" type="button">店點</button></div>
+        <div class="scope-control" role="tablist" aria-label="戰情範圍"><button class="active" data-battle-scope="region" type="button">北一二B</button><button data-battle-scope="store" type="button">店點</button><button data-battle-scope="personal" type="button" hidden>個人</button></div>
         <label id="battleStorePicker" class="select-field" hidden><span>選擇店點</span><select id="battleStoreSelect"></select></label>
         <div id="battleContent"></div>
       </section>
@@ -163,6 +163,7 @@
   <script src="patrol-read-model.js?v=13"></script>
   <script src="half-month-check-read-model.js?v=2"></script>
   <script src="yesterday-follow-up-model.js?v=yesterday-follow-up-phase2-20260814-1"></script>
-  <script src="app.js?v=area-award-summary-20260818-1" defer></script>
+  <script src="award-personal-model.js?v=personal-award-main-20260819-1"></script>
+  <script src="app.js?v=personal-award-main-20260819-1" defer></script>
 </body>
 </html>
