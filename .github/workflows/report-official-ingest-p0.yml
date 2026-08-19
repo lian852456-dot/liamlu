@@ -1,0 +1,70 @@
+name: Report official ingest P0
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/report-official-ingest-p0.yml'
+      - 'gas/Code.gs'
+      - 'gas/ReportUpload.html'
+      - 'tests/**'
+      - 'tools/report-automation/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Node and consumer contract tests
+        run: node --test tests/*.test.cjs tools/report-automation/*.test.mjs
+
+      - name: GAS syntax
+
+        run: node --check < gas/Code.gs
+
+      - name: Consumer syntax
+
+        run: |
+          node --check tools/report-automation/report_official_ingest_consumer.mjs
+          node --check tools/report-automation/outlook_bridge_host_adapter.mjs
+          zsh -n tools/report-automation/consume_report_official_ingest_with_keychain.sh
+          zsh -n tools/report-automation/outlook_bridge_host_adapter.sh
+
+      - name: Install focused Playwright browser
+
+        run: npx playwright install --with-deps chromium
+
+      - name: Focused report smoke
+        run: >-
+          npx playwright test
+          tests/report-upload.spec.js
+          tests/kpi-battle-standalone.spec.js
+          tests/awards-battle-standalone.spec.js
+          tests/liam-supervisor-app-1-1.spec.js
+          --config=playwright.config.js
+
+      - name: Diff whitespace check
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git diff --check "${{ github.event.pull_request.base.sha }}"
+          else
+            git diff --check HEAD^
+          fi
