@@ -630,3 +630,37 @@ body { font-size:16px; }
   .report-store-button span { min-width:0; overflow-wrap:anywhere; }
   .personal-performance-button { min-height:96px; }
 }
+
+/* App 1.2 formal personal award ranking; reuses the existing battle surface. */
+.scope-control.award-scope-control { width:100%; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.scope-control.award-scope-control button { min-height:44px; }
+.award-person-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:10px; }
+.award-person-controls label { min-width:0; color:var(--muted); font-size:14px; font-weight:800; }
+.award-person-controls label > span { display:block; margin-bottom:5px; }
+.award-person-controls select { width:100%; min-height:44px; padding:0 10px; border:1px solid var(--line); border-radius:11px; color:var(--text); background:#061728; font-size:16px; font-weight:750; }
+.award-person-panel { overflow:hidden; }
+.award-person-list { display:grid; }
+.award-person-row { display:grid; grid-template-columns:36px minmax(0,1fr) minmax(112px,.78fr); align-items:center; gap:8px; min-height:68px; padding:8px 11px; border-bottom:1px solid var(--line-soft); }
+.award-person-row:last-child { border-bottom:0; }
+.award-person-row.unsynced { opacity:.76; }
+.award-person-rank { display:grid; place-items:center; width:32px; height:32px; border:1px solid var(--line); border-radius:10px; color:var(--gold); background:#0c2943; font-size:14px; font-weight:900; }
+.award-person-main,.award-person-money { min-width:0; }
+.award-person-name { display:flex; align-items:center; gap:5px; min-width:0; }
+.award-person-name strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; }
+.award-person-main small,.award-person-money small { display:block; margin-top:3px; color:var(--muted); font-size:11px; line-height:1.3; overflow-wrap:anywhere; }
+.award-person-money { text-align:right; font-variant-numeric:tabular-nums; }
+.award-person-money strong { display:block; color:var(--gold); font-size:18px; line-height:1.15; white-space:nowrap; }
+.award-person-row.unsynced .award-person-money strong { color:var(--muted); font-size:12px; white-space:normal; }
+.award-person-status { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; min-height:20px; padding:2px 6px; border:1px solid var(--line); border-radius:999px; font-size:10px; font-weight:850; }
+.award-person-status.yes { border-color:#26765c; color:#77ecaf; background:#103124; }
+.award-person-status.no { border-color:#574555; color:#b7a9b7; background:#2a2431; }
+.award-person-status.pending { border-color:#4a5a67; color:var(--muted); background:#142231; }
+.award-person-note { margin:4px 3px 12px; color:var(--muted); font-size:12px; line-height:1.5; }
+.award-person-state .empty-state { min-height:100px; }
+
+@media (max-width:380px) {
+  .award-person-row { grid-template-columns:34px minmax(0,1fr) minmax(104px,.78fr); gap:6px; padding-left:8px; padding-right:8px; }
+  .award-person-rank { width:30px; height:30px; }
+  .award-person-name strong { font-size:14px; }
+  .award-person-money strong { font-size:17px; }
+}

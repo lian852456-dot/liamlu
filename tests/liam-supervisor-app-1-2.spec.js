@@ -8,7 +8,7 @@ async function expectMobileSafe(page) {
   const result=await page.evaluate(()=>({
     overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
     ellipsis:Array.from(document.querySelectorAll('[data-view]:not([hidden]) *')).filter(node=>node instanceof HTMLElement&&getComputedStyle(node).textOverflow==='ellipsis'&&node.scrollWidth>node.clientWidth).map(node=>node.textContent.trim()),
-    shortTargets:Array.from(document.querySelectorAll('[data-view]:not([hidden]) button')).filter(node=>node.getBoundingClientRect().height<44).map(node=>node.textContent.trim())
+    shortTargets:Array.from(document.querySelectorAll('[data-view]:not([hidden]) button:not([hidden])')).filter(node=>node.getBoundingClientRect().height<44).map(node=>node.textContent.trim())
   }));
   expect(result.overflow).toBeLessThanOrEqual(0);
   expect(result.ellipsis).toEqual([]);

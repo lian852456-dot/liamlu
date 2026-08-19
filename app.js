@@ -2,6 +2,7 @@
   'use strict';
 
   const C = scope.LiamSupervisorContract;
+  const A = scope.LiamAwardPersonalModel;
   const H = scope.LiamHalfMonthCheckReadModel;
   const Y = scope.LiamYesterdayFollowUpModel;
   const P = scope.PatrolReadModel;
@@ -38,6 +39,9 @@
   let reportSegment = 16;
   let battleKind = 'kpi';
   let battleScope = 'region';
+  let personalAwardStore = 'all';
+  let personalAwardSort = 'amount-desc';
+  let personalAwardModule = statusModule('personalAwards');
   let personalRegionView = 'role';
   let personalRole = '店長';
   let personalGapMetric = 'A999';
@@ -121,7 +125,7 @@
     const sources = {
       todayOperations:moduleSource('北一二B每日回報','index.html'),
       kpiSummary:moduleSource('正式 KPI kpicalc','kpi.html'), kpiStores:moduleSource('正式 KPI kpicalc','kpi.html'), kpiFullMetrics:moduleSource('正式 KPI kpicalc','kpi.html'),
-      awardSummary:moduleSource('正式台獎私有戰情','index.html'), awardStores:moduleSource('正式台獎私有戰情','index.html'), awardTop2Models:moduleSource('正式台獎私有戰情','index.html'),
+      awardSummary:moduleSource('正式台獎私有戰情','index.html'), awardStores:moduleSource('正式台獎私有戰情','index.html'), awardTop2Models:moduleSource('正式台獎私有戰情','index.html'), personalAwards:moduleSource('正式 KPI 個人台獎快照','index.html'),
       personalPerformance:moduleSource('正式 KPI 個績快照','index.html'),
       report1600:moduleSource('北一二B每日回報','index.html'), report2100:moduleSource('北一二B每日回報','index.html'), reportFailures:moduleSource('正式個人回報','index.html'),
       yesterdayFollowUp:moduleSource('昨日 21:00 正式每日回報','index.html'),
@@ -240,6 +244,7 @@
 
   function resetPrivateSummary(status = 'unauthorized', note = '') {
     PRIVATE_MODULE_KEYS.forEach(key => { contract[key] = statusModule(key,status,null,note); });
+    personalAwardModule=statusModule('personalAwards',status,null,note);
     yesterdayFollowUpModule=statusModule('yesterdayFollowUp',status,null,note);
     if (status === 'unauthorized') {
       contract.kpiStores = statusModule('kpiStores',status,[],note);
@@ -279,6 +284,7 @@
 
   function failPrivateSummary(error) {
     PRIVATE_MODULE_KEYS.forEach(key=>{ contract[key]=privateFailureModule(key,error,'正式資料'); });
+    personalAwardModule=privateFailureModule('personalAwards',error,'正式個人台獎');
     yesterdayFollowUpModule=yesterdayFailureModule(error);
     contract.generatedAt=nowIso();
   }
@@ -514,6 +520,21 @@
     };
   }
 
+  function adaptPersonalAwards(snapshot, readAt) {
+    const adapted=A.adaptSnapshot(snapshot,normalizeStore);
+    const kpi=snapshot&&snapshot.kpiBattle||{};
+    const updatedAt=String(kpi.generated_at || snapshot&&snapshot.publishedAt || '');
+    return C.moduleState({
+      status:adapted.status,
+      updatedAt:readAt,
+      sourceUpdatedAt:updatedAt,
+      stale:updatedAt?stale(updatedAt):false,
+      source:moduleSource('正式 KPI 個人台獎快照','index.html'),
+      data:adapted.status==='ok'?{ reportDate:adapted.reportDate, rows:adapted.rows }:null,
+      note:adapted.note
+    });
+  }
+
   function personalRecord(raw) {
     const row = raw && raw.record ? raw.record : raw || {};
     const failed = Array.isArray(row.failed) ? row.failed.map(value => FAILURE_LABELS[String(value)] || String(value)) : [];
@@ -690,6 +711,7 @@
     const snapshot = privateResult.snapshot || {};
     const readAt = nowIso();
     const awards = adaptAwards(snapshot, String(snapshot.kpiBattle&&snapshot.kpiBattle.report_date||''), readAt);
+    personalAwardModule = adaptPersonalAwards(snapshot,readAt);
     const personalPerformance = adaptPersonalPerformance(snapshot, readAt);
     contract = C.validateContract({
       ...contract, version:C.VERSION, generatedAt:readAt, mode:'formal',
@@ -1111,8 +1133,51 @@
     return `${summaryCards}${renderPersonalAqAttention(allPeople)}${renderPersonalRegionControls()}<section class="panel personal-performance-panel"><div class="panel-head"><div><h2>${escapeHtml(heading)}</h2><small>${escapeHtml(note)}</small></div></div><div class="personal-performance-list">${rows || `<div class="empty-state">${escapeHtml(empty)}</div>`}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
   }
 
+  function personalAwardMoney(value) {
+    return value == null ? '尚未同步' : `$${fmtNumber(value,0)}`;
+  }
+
+  function renderPersonalAwardRow(row) {
+    const role=row.category || row.role || '職稱／類別尚未同步';
+    const rank=A.rankLabel(row.rank);
+    const eligibility=row.eligible==='Y'
+      ? '<span class="award-person-status yes">領獎</span>'
+      : row.eligible==='N'
+        ? '<span class="award-person-status no">未領獎</span>'
+        : '<span class="award-person-status pending">尚未同步</span>';
+    return `<article class="award-person-row${row.actual==null?' unsynced':''}">
+      <div class="award-person-rank" aria-label="${row.rank==null?'台獎排名尚未同步':`台獎排名第 ${escapeHtml(row.rank)} 名`}">${escapeHtml(rank)}</div>
+      <div class="award-person-main"><div class="award-person-name"><strong>${escapeHtml(row.name)}</strong>${eligibility}</div><small>${escapeHtml(row.store)} · ${escapeHtml(role)}</small></div>
+      <div class="award-person-money"><strong>${escapeHtml(personalAwardMoney(row.actual))}</strong><small>推估 ${escapeHtml(personalAwardMoney(row.projected))}</small><small>台獎排名 ${row.rank==null?'尚未同步':`#${escapeHtml(row.rank)}`}</small></div>
+    </article>`;
+  }
+
+  function renderPersonalAwards() {
+    const data=personalAwardModule.data;
+    if(!data) return `<div data-award-personal-root class="award-person-state"><div class="empty-state">${escapeHtml(personalAwardModule.note||'正式個人台獎尚未同步')}</div></div>`;
+    const rows=A.selectRows(data.rows,personalAwardStore,personalAwardSort);
+    const storeOptions=[`<option value="all"${personalAwardStore==='all'?' selected':''}>全部店點</option>`,...A.STORES.map(name=>`<option value="${escapeHtml(name)}"${personalAwardStore===name?' selected':''}>${escapeHtml(name)}</option>`)].join('');
+    const selectedStore=personalAwardStore==='all'?'全部店點':personalAwardStore;
+    return `<div data-award-personal-root>
+      <section class="award-person-controls" aria-label="個人台獎篩選">
+        <label><span>店點</span><select id="awardPersonStoreSelect">${storeOptions}</select></label>
+        <label><span>排序</span><select id="awardPersonSortSelect"><option value="amount-desc"${personalAwardSort==='amount-desc'?' selected':''}>台獎高 → 低</option><option value="amount-asc"${personalAwardSort==='amount-asc'?' selected':''}>台獎低 → 高</option><option value="name"${personalAwardSort==='name'?' selected':''}>姓名</option></select></label>
+      </section>
+      <section class="panel award-person-panel"><div class="panel-head"><div><h2>個人台獎</h2><small>${escapeHtml(selectedStore)} · ${rows.length} 人</small></div><span>${escapeHtml(data.reportDate||'—')}</span></div><div class="award-person-list">${rows.length?rows.map(renderPersonalAwardRow).join(''):'<div class="empty-state">目前篩選條件沒有個人台獎資料。</div>'}</div></section>
+      <p class="award-person-note">金額、推估、台獎排名與領獎狀態皆沿用正式私有快照；App 只做篩選與排序，不重算台獎。</p>
+      <a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>
+    </div>`;
+  }
+
   function renderBattle() {
     const content = dom('#battleContent');
+    const scopeControl=dom('.scope-control');
+    const personalScopeButton=dom('[data-battle-scope="personal"]');
+    if(battleKind!=='award'&&battleScope==='personal') battleScope='region';
+    personalScopeButton.hidden=battleKind!=='award';
+    scopeControl.classList.toggle('award-scope-control',battleKind==='award');
+    scopeControl.classList.toggle('personal-scope-control',battleKind==='personal');
+    all('[data-battle-scope]').forEach(button=>button.classList.toggle('active',button.dataset.battleScope===battleScope));
     if (contract.kpiSummary.status === 'unauthorized') {
       content.innerHTML = privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '解鎖後顯示 KPI／台獎正式摘要');
       return;
@@ -1121,7 +1186,7 @@
       content.innerHTML=`<div class="empty-state">${escapeHtml(contract.kpiSummary.note||'正式 KPI 讀取失敗')}</div>`;
       return;
     }
-    if (battleKind === 'award' && !contract.awardSummary.data) {
+    if (battleKind === 'award' && battleScope !== 'personal' && !contract.awardSummary.data) {
       content.innerHTML=`<div class="empty-state">${escapeHtml(contract.awardSummary.note||'正式台獎讀取失敗')}</div>`;
       return;
     }
@@ -1132,7 +1197,6 @@
     const stores = Array.isArray(contract.kpiStores.data)?contract.kpiStores.data:[];
     const awardStores = Array.isArray(contract.awardStores.data)?contract.awardStores.data:[];
     const select = dom('#battleStoreSelect');
-    dom('.scope-control').classList.toggle('personal-scope-control',battleKind==='personal');
     if (!select.options.length) select.innerHTML = STORES.map(name=>`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
     dom('#battleStorePicker').hidden = battleScope !== 'store';
     const selected = select.value || STORES[0];
@@ -1149,11 +1213,13 @@
       const areaEligibility=a.areaEligible===true?'領獎':a.areaEligible===false?'未領獎':'尚未同步';
       const areaEligibilityClass=a.areaEligible===true?'positive':a.areaEligible===false?'neutral-value':'gold-value';
       content.innerHTML=`<section class="panel award-area-summary"><div class="panel-head"><div><h2>督導區台獎摘要</h2></div></div><div class="metric-card-grid"><article class="metric-card"><span>督導區實際獎金</span><strong class="gold-value">${a.areaActualAward==null?'—':'$'+fmtNumber(a.areaActualAward,0)}</strong><small>正式區域級欄位</small></article><article class="metric-card"><span>公司排名</span><strong>${a.areaCompanyRank==null?'—':fmtNumber(a.areaCompanyRank,0)}</strong><small>正式區域級欄位</small></article><article class="metric-card"><span>領獎資格</span><strong class="${areaEligibilityClass}">${areaEligibility}</strong><small>正式台獎判定</small></article></div></section><div class="metric-card-grid"><article class="metric-card"><span>領獎店數</span><strong>${a.winningStores??'—'}/9</strong><small>正式台獎判定</small></article><article class="metric-card"><span>未領獎店數</span><strong>${a.winningStores==null?'—':Math.max(0,9-a.winningStores)}</strong><small>九店完整顯示</small></article></div><div class="battle-list award-battle-list"><div class="battle-list-row award-battle-row header"><span>店點</span><span>金額</span><span>狀態</span></div>${awardStores.map(row=>`<div class="battle-list-row award-battle-row"><span>${escapeHtml(row.name)}</span><span>${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</span><span class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</span></div>`).join('')}</div>`;
-    } else if (battleKind === 'award') {
+    } else if (battleKind === 'award' && battleScope === 'store') {
       const row=awardStores.find(item=>item.name===selected);
       content.innerHTML=row?`<div class="award-selected-store"><span>店點</span><strong>${escapeHtml(row.name)}</strong></div><div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>正式台獎金額</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div>${renderAwardStoreItems(row)}<a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
+    } else if (battleKind === 'award') {
+      content.innerHTML=renderPersonalAwards();
     } else content.innerHTML = renderPersonalPerformance(selected);
-    const battleModule=battleKind==='kpi'?contract.kpiSummary:battleKind==='award'?contract.awardSummary:contract.personalPerformance;
+    const battleModule=battleKind==='kpi'?contract.kpiSummary:battleKind==='award'&&battleScope==='personal'?personalAwardModule:battleKind==='award'?contract.awardSummary:contract.personalPerformance;
     if(battleModule.status==='stale') content.insertAdjacentHTML('afterbegin',staleBanner(battleModule));
     refreshIcons();
   }
@@ -1650,12 +1716,14 @@
   }
 
   all('[data-nav]').forEach(button=>button.addEventListener('click',event=>{ event.preventDefault(); setView(button.dataset.nav); }));
-  all('[data-battle-kind]').forEach(button=>button.addEventListener('click',()=>{ battleKind=button.dataset.battleKind; all('[data-battle-kind]').forEach(item=>item.classList.toggle('active',item===button)); renderBattle(); }));
+  all('[data-battle-kind]').forEach(button=>button.addEventListener('click',()=>{ battleKind=button.dataset.battleKind; if(battleKind!=='award'&&battleScope==='personal')battleScope='region'; all('[data-battle-kind]').forEach(item=>item.classList.toggle('active',item===button)); renderBattle(); }));
   all('[data-battle-scope]').forEach(button=>button.addEventListener('click',()=>{ battleScope=button.dataset.battleScope; all('[data-battle-scope]').forEach(item=>item.classList.toggle('active',item===button)); renderBattle(); }));
   dom('#battleStoreSelect').addEventListener('change',renderBattle);
   dom('#battleContent').addEventListener('change',event=>{
     if(event.target.id==='personalRoleSelect'){ personalRole=event.target.value; renderBattle(); }
     if(event.target.id==='personalGapMetricSelect'){ personalGapMetric=event.target.value; renderBattle(); }
+    if(event.target.id==='awardPersonStoreSelect'){ personalAwardStore=event.target.value; renderBattle(); }
+    if(event.target.id==='awardPersonSortSelect'){ personalAwardSort=event.target.value; renderBattle(); }
   });
   all('[data-report-segment]').forEach(button=>button.addEventListener('click',()=>{ reportSegment=Number(button.dataset.reportSegment); all('[data-report-segment]').forEach(item=>item.classList.toggle('active',item===button)); renderReport(); }));
   dom('#privateAccessForm').addEventListener('submit',async event=>{ event.preventDefault(); const button=event.currentTarget.querySelector('button'); button.disabled=true; setMessage('#privateAccessMessage','正在以既有 Approved Device 讀取正式摘要…'); try { await loadFormalSummary(dom('#employeeId').value); } catch(error) { if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); } finally { button.disabled=false; } });
@@ -1773,5 +1841,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=area-award-summary-20260818-1',{scope:'./'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=personal-award-main-20260819-1',{scope:'./'}).catch(()=>{}));
 })(window);
