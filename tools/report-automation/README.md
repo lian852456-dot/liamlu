@@ -54,5 +54,5 @@ The Keychain service remains `North12BPrivateDashboardAdminSecret`. Receipts and
 node --test tools/report-automation/*.test.mjs
 node --check tools/report-automation/report_official_ingest_consumer.mjs
 node --check tools/report-automation/outlook_bridge_host_adapter.mjs
-zsh -n tools/report-automation/*.sh
+bash -n tools/report-automation/*.sh
 ```
