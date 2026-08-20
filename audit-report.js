@@ -11,7 +11,7 @@ const MAX_DIMENSION=2048;
 const JPEG_QUALITY=.9;
 const STATUS_LABELS={missing:'未回報',draft:'未回報',submitted:'已回報待檢查',rework:'待補件',approved:'驗收完成'};
 
-const state={config:null,draft:null,server:null,submitting:false,mode:'store',ptToken:sessionStorage.getItem(PT_TOKEN_KEY)||'',overview:null,reauthPromise:null,reauthResolve:null,photoViewer:{photos:[],index:0}};
+const state={config:null,draft:null,server:null,submitting:false,mode:'store',ptToken:sessionStorage.getItem(PT_TOKEN_KEY)||'',overview:null,reauthPromise:null,reauthResolve:null,photoViewer:{photos:[],index:0,returnFocus:null}};
 
 function uid(prefix){
   const bytes=new Uint8Array(18);crypto.getRandomValues(bytes);
@@ -125,7 +125,7 @@ function renderItemPhotos(itemId){
   const grid=section.querySelector('.photo-grid');grid.replaceChildren();
   photos.forEach((photo,index)=>{
     const tile=document.createElement('div');tile.className='photo-tile';const img=document.createElement('img');img.alt=`第 ${index+1} 張照片`;img.src=photo.objectUrl||photo.server?.private_url||'';tile.appendChild(img);
-    const preview=document.createElement('button');preview.type='button';preview.className='preview-button';preview.setAttribute('aria-label',`放大預覽第 ${index+1} 張照片`);preview.addEventListener('click',()=>openPhotoViewer(photos,index));tile.appendChild(preview);
+    const preview=document.createElement('button');preview.type='button';preview.className='preview-button';preview.setAttribute('aria-label',`放大預覽第 ${index+1} 張照片`);preview.addEventListener('click',()=>openPhotoViewer(photos,index,preview));tile.appendChild(preview);
     if(!photo.locked&&!state.submitting){const del=document.createElement('button');del.type='button';del.className='delete-button';del.textContent='×';del.setAttribute('aria-label',`刪除第 ${index+1} 張照片`);del.addEventListener('click',()=>removePhoto(itemId,photo.id));tile.appendChild(del);}
     const badge=document.createElement('span');badge.className=`photo-state ${photo.status||''}`;badge.textContent=photo.status==='uploaded'?'已上傳':photo.status==='failed'?'上傳失敗':'待上傳';tile.appendChild(badge);grid.appendChild(tile);
   });
@@ -210,13 +210,17 @@ async function restoreOwnSubmission(){
   try{const result=await api({action:'audit_status',submission_id:state.draft.submission_id,edit_token:state.draft.edit_token});applyServerStatus(result);}catch(error){if(!/找不到本次回報/.test(error.message))message(error.message,'error');}
 }
 
-function openPhotoViewer(photos,index){
-  state.photoViewer={photos,index};renderPhotoViewer();document.getElementById('photoDialog').showModal();
+function openPhotoViewer(photos,index,returnFocus=document.activeElement){
+  state.photoViewer={photos,index,returnFocus};renderPhotoViewer();document.getElementById('photoDialog').showModal();document.getElementById('closePhotoDialog').focus();
 }
 
 function renderPhotoViewer(){
-  const {photos,index}=state.photoViewer;const photo=photos[index];if(!photo)return;document.getElementById('dialogImage').src=photo.objectUrl||photo.server?.private_url||photo.private_url||'';document.getElementById('dialogCaption').textContent=`第 ${index+1}／${photos.length} 張｜${photo.name||photo.photo_name||''}`;document.getElementById('previousPhoto').disabled=index===0;document.getElementById('nextPhoto').disabled=index===photos.length-1;
+  const {photos,index}=state.photoViewer;const photo=photos[index];if(!photo)return;const image=document.getElementById('dialogImage');image.src=photo.objectUrl||photo.server?.private_url||photo.private_url||'';image.alt=photo.alt||`稽核照片預覽：${photo.name||photo.photo_name||`第 ${index+1} 張`}`;document.getElementById('dialogCaption').textContent=`第 ${index+1}／${photos.length} 張｜${photo.name||photo.photo_name||''}`;const single=photos.length===1;const previous=document.getElementById('previousPhoto');const next=document.getElementById('nextPhoto');previous.hidden=single;next.hidden=single;previous.disabled=index===0;next.disabled=index===photos.length-1;
 }
+
+function openQualityReminder(event){openPhotoViewer([{name:'品質管理重點提醒',objectUrl:'assets/audit/quality-management-reminder.png',alt:'品質管理重點提醒：SGS行前清潔及稽核檢查事項'}],0,event.currentTarget);}
+
+function showQualityReminderFallback(){const image=document.getElementById('qualityReminderImage');const fallback=document.getElementById('qualityReminderFallback');const button=document.getElementById('qualityReminderButton');image.hidden=true;fallback.hidden=false;button.disabled=true;button.setAttribute('aria-disabled','true');}
 
 function switchMode(){
   state.mode=state.mode==='store'?'supervisor':'store';document.getElementById('storeView').hidden=state.mode!=='store';document.getElementById('supervisorView').hidden=state.mode!=='supervisor';document.getElementById('modeSwitch').textContent=state.mode==='store'?'督導驗收':'返回門市填報';if(state.mode==='supervisor')restoreSupervisor();
@@ -278,7 +282,7 @@ async function openReview(submissionId,focusItemId){
 
 function renderReviewDetail(detail,focusItemId){
   document.getElementById('reviewDetail').innerHTML=`<h2>${escapeHtml(detail.store_name)}｜督導驗收</h2><p>檢查人員：${escapeHtml(detail.inspector_name)}｜首次回報：${escapeHtml(detail.submitted_at||'—')}｜最後更新：${escapeHtml(detail.updated_at||'—')}</p>`+detail.items.map(item=>`<section class="review-section" data-review-item="${escapeHtml(item.item_id)}"><h3>${escapeHtml(item.item_name)} <span class="status-chip ${escapeHtml(item.status)}">${escapeHtml(STATUS_LABELS[item.status]||item.status)}</span></h3><p>備註：${escapeHtml(item.note||'—')}</p><div class="photo-grid">${(item.photos||[]).map((photo,index)=>`<button type="button" class="photo-tile supervisor-photo" data-item-id="${escapeHtml(item.item_id)}" data-photo-index="${index}"><img src="${escapeHtml(photo.private_url)}" alt="${escapeHtml(item.item_name)}第 ${index+1} 張"><span class="photo-state uploaded">revision ${photo.revision}</span></button>`).join('')}</div>${item.reviewer_comment?`<p class="return-reason">退回原因：${escapeHtml(item.reviewer_comment)}</p>`:''}<label class="review-comment"><span>退回原因</span><textarea rows="2" maxlength="300" placeholder="選擇退回補件時必填"></textarea></label><div class="review-actions"><button type="button" class="approve-button" data-decision="approve">通過</button><button type="button" class="return-button" data-decision="return">退回補件</button></div></section>`).join('')+`<div class="timeline"><h3>時間軸</h3>${(detail.timeline||[]).map(event=>`<div class="timeline-entry">${escapeHtml(event.created_at)}｜${escapeHtml(event.item_name||'整筆')}｜${escapeHtml(event.event_type)}${event.comment?`｜${escapeHtml(event.comment)}`:''}</div>`).join('')}</div>`;
-  document.querySelectorAll('.supervisor-photo').forEach(button=>button.addEventListener('click',()=>{const item=detail.items.find(row=>row.item_id===button.dataset.itemId);openPhotoViewer(item.photos.map(photo=>({name:photo.photo_name,server:photo})),Number(button.dataset.photoIndex));}));
+  document.querySelectorAll('.supervisor-photo').forEach(button=>button.addEventListener('click',()=>{const item=detail.items.find(row=>row.item_id===button.dataset.itemId);openPhotoViewer(item.photos.map(photo=>({name:photo.photo_name,server:photo})),Number(button.dataset.photoIndex),button);}));
   document.querySelectorAll('[data-review-item] [data-decision]').forEach(button=>button.addEventListener('click',()=>reviewItem(detail,button.closest('[data-review-item]'),button.dataset.decision)));
   if(focusItemId)document.querySelector(`[data-review-item="${focusItemId}"]`)?.scrollIntoView({block:'start'});
 }
@@ -299,7 +303,7 @@ async function logoutSupervisor(){const token=state.ptToken;clearSupervisorAuth(
 function bindEvents(){
   document.getElementById('modeSwitch').addEventListener('click',switchMode);document.getElementById('auditForm').addEventListener('submit',submitReport);document.getElementById('storeSelect').addEventListener('change',event=>{state.draft.store_id=event.target.value;saveDraft();updateCompletion();});document.getElementById('inspectorName').addEventListener('input',event=>{state.draft.inspector_name=event.target.value;saveDraft();updateCompletion();});
   document.getElementById('supervisorLoginForm').addEventListener('submit',supervisorLogin);document.getElementById('reauthForm').addEventListener('submit',reauthenticate);document.getElementById('statusFilter').addEventListener('change',renderOverview);document.getElementById('storeFilter').addEventListener('change',renderOverview);document.getElementById('copyPendingButton').addEventListener('click',copyPending);document.getElementById('supervisorLogoutButton').addEventListener('click',logoutSupervisor);
-  document.getElementById('closePhotoDialog').addEventListener('click',()=>document.getElementById('photoDialog').close());document.getElementById('previousPhoto').addEventListener('click',()=>{state.photoViewer.index=Math.max(0,state.photoViewer.index-1);renderPhotoViewer();});document.getElementById('nextPhoto').addEventListener('click',()=>{state.photoViewer.index=Math.min(state.photoViewer.photos.length-1,state.photoViewer.index+1);renderPhotoViewer();});
+  const photoDialog=document.getElementById('photoDialog');document.getElementById('qualityReminderButton').addEventListener('click',openQualityReminder);document.getElementById('qualityReminderImage').addEventListener('error',showQualityReminderFallback);document.getElementById('closePhotoDialog').addEventListener('click',()=>photoDialog.close());photoDialog.addEventListener('close',()=>{const target=state.photoViewer.returnFocus;state.photoViewer.returnFocus=null;if(target?.isConnected)requestAnimationFrame(()=>target.focus());});document.getElementById('previousPhoto').addEventListener('click',()=>{state.photoViewer.index=Math.max(0,state.photoViewer.index-1);renderPhotoViewer();});document.getElementById('nextPhoto').addEventListener('click',()=>{state.photoViewer.index=Math.min(state.photoViewer.photos.length-1,state.photoViewer.index+1);renderPhotoViewer();});
 }
 
 async function boot(){

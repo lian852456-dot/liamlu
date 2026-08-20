@@ -3,7 +3,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
-const FORMAL_FILE_URL = process.env.LIAM_APP_BASE_URL || `file://${path.join(ROOT, 'app.html')}`;
+const FORMAL_FILE_URL = process.env.LIAM_APP_BASE_URL || (process.env.TEST_BASE_URL
+  ? new URL('app.html',process.env.TEST_BASE_URL).href
+  : `file://${path.join(ROOT, 'app.html')}`);
 const FILE_URL = `${FORMAL_FILE_URL}${FORMAL_FILE_URL.includes('?')?'&':'?'}preview=1`;
 const OUTPUT = path.join(ROOT, 'artifacts', 'liam-supervisor-app-1-1-device-ui');
 

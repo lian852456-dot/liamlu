@@ -50,6 +50,22 @@ async function addPhoto(page,itemIndex,name='photo.png'){
   await page.locator('.audit-item').nth(itemIndex).locator('.photo-input').setInputFiles({name,mimeType:'image/png',buffer:PNG});
 }
 
+test('store-only quality reminder is ordered correctly, responsive and keyboard accessible',async({page})=>{
+  await mockApi(page);await page.setViewportSize({width:390,height:844});await page.goto(PAGE_URL);const card=page.locator('#qualityReminderCard');const button=page.locator('#qualityReminderButton');
+  await expect(card).toBeVisible();await expect(page.locator('#qualityReminderImage')).toHaveAttribute('src','assets/audit/quality-management-reminder.png');await expect(page.locator('#qualityReminderImage')).toHaveAttribute('alt','品質管理重點提醒：SGS行前清潔及稽核檢查事項');await expect(page.locator('#qualityReminderFallback')).toBeHidden();
+  expect(await page.evaluate(()=>{const hero=document.querySelector('.hero');const card=document.querySelector('#qualityReminderCard');const heading=document.querySelector('#storeView .section-heading');const basic=document.querySelector('.basic-card');return Boolean(hero.compareDocumentPosition(card)&Node.DOCUMENT_POSITION_FOLLOWING)&&Boolean(card.compareDocumentPosition(heading)&Node.DOCUMENT_POSITION_FOLLOWING)&&Boolean(card.compareDocumentPosition(basic)&Node.DOCUMENT_POSITION_FOLLOWING);})).toBe(true);
+  expect(await page.locator('#qualityReminderImage').evaluate(image=>({width:image.naturalWidth,height:image.naturalHeight}))).toEqual({width:932,height:526});expect(await page.locator('body').evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+  await card.evaluate(element=>element.scrollIntoView({block:'start'}));if(process.env.UPDATE_AUDIT_SCREENSHOTS==='1')await page.screenshot({path:path.resolve(__dirname,'../docs/screenshots/audit-report-20260820/audit-report-mobile-390x844.png')});
+  await page.locator('#modeSwitch').click();await expect(page.locator('#storeView')).toBeHidden();await expect(card).toBeHidden();await page.locator('#modeSwitch').click();await expect(card).toBeVisible();
+  await button.click();await expect(page.locator('#photoDialog')).toBeVisible();await expect(page.locator('#previousPhoto')).toBeHidden();await expect(page.locator('#nextPhoto')).toBeHidden();await expect(page.locator('#closePhotoDialog')).toBeFocused();await page.locator('#closePhotoDialog').click();await expect(button).toBeFocused();
+  await button.press('Enter');await expect(page.locator('#photoDialog')).toBeVisible();await page.keyboard.press('Escape');await expect(page.locator('#photoDialog')).toBeHidden();await expect(button).toBeFocused();await button.press('Space');await expect(page.locator('#photoDialog')).toBeVisible();await page.locator('#closePhotoDialog').click();
+  await page.setViewportSize({width:1280,height:900});await card.evaluate(element=>element.scrollIntoView({block:'start'}));if(process.env.UPDATE_AUDIT_SCREENSHOTS==='1')await page.screenshot({path:path.resolve(__dirname,'../docs/screenshots/audit-report-20260820/audit-report-quality-reminder-desktop.png')});
+});
+
+test('quality reminder image failure shows a clear fallback instead of an empty frame',async({page})=>{
+  await mockApi(page);await page.goto(PAGE_URL);await page.locator('#qualityReminderImage').evaluate(image=>{image.src='assets/audit/missing-quality-reminder.png';});await expect(page.locator('#qualityReminderFallback')).toBeVisible();await expect(page.locator('#qualityReminderButton')).toBeDisabled();
+});
+
 test('nine canonical stores, required fields, multi-add, delete, preview and ten-photo limit',async({page})=>{
   await mockApi(page);await page.setViewportSize({width:390,height:844});await page.goto(PAGE_URL);
   expect(await page.locator('#storeSelect option').allTextContents()).toEqual(['請選擇店點',...STORES.map(s=>s.store_name)]);
@@ -57,7 +73,6 @@ test('nine canonical stores, required fields, multi-add, delete, preview and ten
   await expect(page.locator('#submitButton')).toBeDisabled();await expect(page.locator('#missingText')).toContainText('門市店點');
   await page.selectOption('#storeSelect','DNB10062');await page.fill('#inspectorName','   ');await expect(page.locator('#submitButton')).toBeDisabled();
   await page.fill('#inspectorName',' 測試人員 ');await addPhoto(page,0,'one.png');await addPhoto(page,0,'two.png');await expect(page.locator('.audit-item').first().locator('.photo-tile')).toHaveCount(2);
-  if(process.env.UPDATE_AUDIT_SCREENSHOTS==='1')await page.screenshot({path:path.resolve(__dirname,'../docs/screenshots/audit-report-20260820/audit-report-mobile-390x844.png'),fullPage:true});
   await page.locator('.audit-item').first().locator('.preview-button').first().click();await expect(page.locator('#photoDialog')).toBeVisible();await expect(page.locator('#dialogCaption')).toContainText('第 1／2 張');await page.locator('#closePhotoDialog').click();
   await page.locator('.audit-item').first().locator('.delete-button').first().click();await expect(page.locator('.audit-item').first().locator('.photo-tile')).toHaveCount(1);
   const eleven=Array.from({length:10},(_,i)=>({name:`extra-${i}.png`,mimeType:'image/png',buffer:PNG}));await page.locator('.audit-item').first().locator('.photo-input').setInputFiles(eleven);await expect(page.locator('#globalMessage')).toContainText('單項最多 10 張');await expect(page.locator('.audit-item').first().locator('.photo-tile')).toHaveCount(1);

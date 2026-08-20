@@ -24,6 +24,20 @@ test('public entry and mobile form expose the exact isolated audit contract', ()
   assert.doesNotMatch(html + js + css, /PT_KEY\s*=|CHANGE_ME|employee[_ -]?name|photo_file_id\s*:/i);
 });
 
+test('quality reminder uses a local PNG asset inside store view before the basic form', () => {
+  const assetPath=path.join(root,'assets/audit/quality-management-reminder.png');
+  const asset=fs.readFileSync(assetPath);
+  assert.equal(asset.subarray(1,4).toString(),'PNG');
+  assert.equal(asset.readUInt32BE(16),932);
+  assert.equal(asset.readUInt32BE(20),526);
+  assert.match(html, /id="storeView"[\s\S]*id="qualityReminderCard"[\s\S]*id="storeViewTitle"[\s\S]*id="basicTitle"/);
+  assert.match(html, /src="assets\/audit\/quality-management-reminder\.png"/);
+  assert.match(html, /alt="品質管理重點提醒：SGS行前清潔及稽核檢查事項"/);
+  assert.doesNotMatch(html, /src="data:image[^\"]*quality-management-reminder/i);
+  assert.match(css, /\.quality-reminder-button img\{[^}]*width:100%;height:auto;object-fit:contain/);
+  assert.match(js, /photos\.length===1[\s\S]*previous\.hidden=single;next\.hidden=single/);
+});
+
 test('backend keeps batch, submission, photo and timeline sheets separate from patrol and half-month rows', () => {
   for (const name of ['稽核批次', '稽核回報提交', '稽核回報', '稽核回報紀錄']) assert.match(gas, new RegExp(name));
   for (const field of ['batch_id','submission_id','store_id','store_name','inspector_name','item_id','item_name','photo_file_id','private_url','note','status','reviewer_comment','submitted_at','reviewed_at','updated_at','revision']) assert.match(gas, new RegExp(`['"]${field}['"]`));

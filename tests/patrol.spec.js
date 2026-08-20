@@ -780,7 +780,7 @@ async function openMileage(page, details) {
   cloudRows = rows;
   await stubGas(page);
   await openAndUnlock(page);
-  await page.evaluate(rows => { rawDetails = rows; currentMonth = '2026-06'; const monthInput = document.getElementById('monthInput'); if (monthInput) monthInput.value = '2026-06'; rows.forEach(r => {
+  await page.evaluate(rows => { rawDetails = rows; rows.forEach(r => {
     const s = r.store; if (!records[s]) records[s] = { code: r.code, entries: [] };
     records[s].entries.push({ month: r.month, date: r.arriveTime.split(' ')[0], half: 1, item: r.item, result: r.result });
   }); render(); }, rows);
