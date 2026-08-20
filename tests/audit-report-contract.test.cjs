@@ -23,6 +23,10 @@ test('public entry and mobile form expose the exact isolated audit contract', ()
   assert.match(js, /indexedDB\.open\(DB_NAME,1\)/);
   assert.match(css, /@media\(max-width:400px\)/);
   assert.doesNotMatch(html + js + css, /PT_KEY\s*=|CHANGE_ME|employee[_ -]?name|photo_file_id\s*:/i);
+  assert.match(html, /id="storeEmployeeId"[^>]*autocomplete="username"/);
+  assert.match(html, /id="storeSelect"[^>]*disabled/);
+  assert.match(html, /id="inspectorName"[^>]*readonly/);
+  assert.doesNotMatch(html + js, /storeSubmitCode|批次回報碼|驗證回報碼/);
 });
 
 test('quality reminder uses a local PNG asset inside store view before the basic form', () => {
@@ -48,10 +52,18 @@ test('backend keeps batch, submission, photo and timeline sheets separate from p
   assert.doesNotMatch(executable, /half_media_upload|writeHalfCheck|writePatrol|巡店明細|半月督導檢查/);
 });
 
+test('setup keeps the formal audit batch inactive until a separate UAT gate enables it', () => {
+  assert.match(gas, /AUDIT_INITIAL_BATCH\s*=\s*\{[\s\S]*?active:\s*false/);
+  assert.match(gas, /active:\s*AUDIT_INITIAL_BATCH\.active\s*\?\s*'TRUE'\s*:\s*'FALSE'/);
+});
+
 test('store routes require a short audit token and supervisor routes require existing PT session', () => {
-  assert.match(gas, /AUDIT_REPORT_SUBMIT_CODE/);
+  assert.doesNotMatch(gas, /AUDIT_REPORT_SUBMIT_CODE/);
   assert.match(gas, /AUDIT_STORE_SESSION_TTL_SECONDS\s*=\s*1800/);
   assert.match(gas, /scope:\s*'audit-submit'/);
+  assert.match(gas, /auth_source:\s*'approved-device'/);
+  assert.match(gas, /function auditApprovedDeviceProfile_[\s\S]*privateDashboardUserByEmployeeId/);
+  assert.doesNotMatch(gas, /privateDashboardAccess\(|privateDashboardSnapshot\(/);
   assert.match(gas, /function auditOwnSubmission_[\s\S]*edit_token[\s\S]*edit_token_hash/);
   for (const fn of ['auditStart','auditUploadPhotoUnlocked_','auditDeletePhoto','auditSubmit','auditOwnStatus']) {
     const body = gas.match(new RegExp(`function ${fn}\\(payload\\) \\{([\\s\\S]*?)\\n\\}`));
@@ -92,7 +104,13 @@ class Spreadsheet {
 function harness() {
   const spreadsheet = new Spreadsheet();
   const cache = new Map();
-  const properties = new Map([['AUDIT_REPORT_SUBMIT_CODE','test-submit-code'],['AUDIT_REPORT_FOLDER_ID','audit-root']]);
+  const properties = new Map([['AUDIT_REPORT_FOLDER_ID','audit-root']]);
+  const users = new Map([
+    ['EMP001',{_row:2,employee_id:'EMP001',masked_name:'測＊員',store:'酒泉',role:'業代',status:'active',device_id:'approved-device-0001'}],
+    ['EMP002',{_row:3,employee_id:'EMP002',masked_name:'永＊員',store:'台北永吉',role:'店長',status:'active',device_id:'approved-device-0002'}],
+    ['EMP003',{_row:4,employee_id:'EMP003',masked_name:'另＊員',store:'台灣大哥大數位生活台北酒泉',role:'業代',status:'active',device_id:'approved-device-0003'}],
+    ['EMP004',{_row:5,employee_id:'EMP004',masked_name:'停＊員',store:'酒泉',role:'業代',status:'inactive',device_id:'approved-device-0004'}]
+  ]);
   const files = new Map();
   class MockFile {
     constructor(id,blob){this.id=id;this.blob=blob;this.trashed=false;}
@@ -126,6 +144,9 @@ function harness() {
       newBlob:(bytes,mimeType,name)=>({getBytes:()=>Array.from(bytes),getContentType:()=>mimeType,getName:()=>name})
     },
     privateDashboardHash(value){return crypto.createHash('sha256').update(String(value)).digest('hex');},
+    privateDashboardCleanEmployeeId(value){const id=String(value||'').trim().toUpperCase();if(!/^[A-Z0-9]{5,12}$/.test(id))throw new Error('員編格式不正確');return id;},
+    privateDashboardCleanDeviceId(value){const id=String(value||'').trim();if(!/^[A-Za-z0-9_-]{16,128}$/.test(id))throw new Error('裝置識別不正確');return id;},
+    privateDashboardUserByEmployeeId(employeeId){return {sheet:{},user:users.get(employeeId)||null};},
     ptSessionAuthorized_(token){return token==='pt-valid-token-1234567890';},
     PropertiesService:{getScriptProperties:()=>({getProperty:key=>properties.get(key)||'',setProperty:(key,value)=>properties.set(key,value)})},
     DriveApp:{getFolderById:id=>{if(id!=='audit-root')throw new Error('unknown folder');return rootFolder;},getFileById:id=>{const file=files.get(id);if(!file)throw new Error('unknown file');return file;}},
@@ -143,8 +164,8 @@ function harness() {
   return { context, spreadsheet, cache, files };
 }
 
-function authorize(context,base,code='test-submit-code') {
-  return context.auditSubmitAuth({batch_id:base.batch_id,store_id:base.store_id,submission_id:base.submission_id,code}).token;
+function authorize(context,base,employeeId='EMP001',deviceId='approved-device-0001') {
+  return context.auditSubmitAuth({batch_id:base.batch_id,submission_id:base.submission_id,employeeId,deviceId}).token;
 }
 
 function withStoreToken(base,storeToken) { return {...base,store_token:storeToken}; }
@@ -164,9 +185,35 @@ test('audit config exposes the nine canonical store ids without patrol legacy pl
   assert.doesNotMatch(JSON.stringify(stores), /xxx|DNB10059/);
 });
 
+test('Approved Device exchange returns only a roster-bound audit token and ignores forged profile fields', () => {
+  const {context}=harness();
+  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_profile_1234567890123',edit_token:'edit_profile_123456789012345678901'};
+  const auth=context.auditSubmitAuth({
+    batch_id:base.batch_id,submission_id:base.submission_id,
+    employeeId:'emp001',deviceId:'approved-device-0001',
+    store_id:'DNB10082',inspector_name:'偽造姓名',code:'0935'
+  });
+  assert.deepEqual(Object.keys(auth).sort(),['expiresIn','profile','token']);
+  assert.deepEqual({...auth.profile},{store_id:'DNB10062',store_name:'台北酒泉',inspector_name:'測＊員'});
+  assert.equal(auth.expiresIn,1800);
+  assert.doesNotMatch(JSON.stringify(auth),/snapshot|kpi|awards|employee_id|device_id|role/i);
+  const started=context.auditStart({...base,store_token:auth.token});
+  assert.equal(started.store_id,'DNB10062');
+  assert.equal(started.inspector_name,'測＊員');
+});
+
+test('audit token remains bound to the Approved Device employee even within the same store', () => {
+  const {context}=harness();
+  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_employee_12345678901',edit_token:'edit_employee_1234567890123456789'};
+  const first=authorize(context,base);
+  context.auditStart(withStoreToken(base,first));
+  const other=authorize(context,base,'EMP003','approved-device-0003');
+  assert.throws(()=>context.auditOwnStatus({...base,store_token:other}),/unauthorized/);
+});
+
 test('same submission id and repeated submit stay idempotent without duplicate rows or events', () => {
   const { context, spreadsheet } = harness();
-  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_12345678901234567890',edit_token:'edit_12345678901234567890123456789012',store_id:'DNB10062',inspector_name:' 測試人員 '};
+  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_12345678901234567890',edit_token:'edit_12345678901234567890123456789012',store_id:'DNB10062',inspector_name:'測＊員'};
   const storeToken=authorize(context,base);context.auditStart(withStoreToken(base,storeToken));context.auditStart(withStoreToken(base,storeToken));
   assert.equal(spreadsheet.getSheetByName('稽核回報提交').getLastRow()-1,1);
   assert.equal(spreadsheet.getSheetByName('稽核回報紀錄').getLastRow()-1,1);
@@ -181,7 +228,7 @@ test('same submission id and repeated submit stay idempotent without duplicate r
 
 test('returning one item unlocks only that item and preserves original rows plus reason timeline', () => {
   const { context, spreadsheet }=harness();
-  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_12345678901234567890',edit_token:'edit_12345678901234567890123456789012',store_id:'DNB10062',inspector_name:'測試人員'};
+  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_12345678901234567890',edit_token:'edit_12345678901234567890123456789012',store_id:'DNB10062',inspector_name:'測＊員'};
   const storeToken=authorize(context,base);context.auditStart(withStoreToken(base,storeToken));seedThreePhotos(context);
   context.auditSubmit({submission_id:base.submission_id,edit_token:base.edit_token,store_token:storeToken,notes:{}});
   context.auditReview({token:'pt-valid-token-1234567890',submission_id:base.submission_id,item_id:'op_zone',decision:'return',comment:'請補拍死角'});
@@ -192,11 +239,12 @@ test('returning one item unlocks only that item and preserves original rows plus
   assert.equal(spreadsheet.getSheetByName('稽核回報').getLastRow()-1,3,'original photo rows remain');
 });
 
-test('anonymous, wrong code and expired store token cannot mutate or read a submission', () => {
+test('anonymous, unapproved device, inactive employee and expired audit token cannot mutate or read a submission', () => {
   const {context,cache}=harness();
-  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_anon_1234567890123456',edit_token:'edit_anon_123456789012345678901234',store_id:'DNB10062',inspector_name:'測試人員'};
+  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_anon_1234567890123456',edit_token:'edit_anon_123456789012345678901234',store_id:'DNB10062',inspector_name:'測＊員'};
   assert.doesNotMatch(JSON.stringify(context.auditPublicConfig()),/submit_code|store_token|edit_token|folder_id|drive_id/i);
-  assert.throws(()=>context.auditSubmitAuth({...base,code:'wrong-code'}),/unauthorized/);
+  assert.throws(()=>context.auditSubmitAuth({...base,employeeId:'EMP001',deviceId:'unapproved-device-01'}),/尚未核准/);
+  assert.throws(()=>context.auditSubmitAuth({...base,employeeId:'EMP004',deviceId:'approved-device-0004'}),/尚未核准/);
   assert.throws(()=>context.auditStart(base),/unauthorized/);
   const storeToken=authorize(context,base);context.auditStart(withStoreToken(base,storeToken));
   for(const action of [
@@ -212,9 +260,9 @@ test('anonymous, wrong code and expired store token cannot mutate or read a subm
 
 test('store token and edit token cannot cross stores, submissions or private photos', () => {
   const {context}=harness();
-  const a={batch_id:'audit-cleaning-202608',submission_id:'submission_store_a_12345678901234',edit_token:'edit_store_a_1234567890123456789012',store_id:'DNB10062',inspector_name:'A'};
-  const b={batch_id:'audit-cleaning-202608',submission_id:'submission_store_b_12345678901234',edit_token:'edit_store_b_1234567890123456789012',store_id:'DNB10082',inspector_name:'B'};
-  const tokenA=authorize(context,a);const tokenB=authorize(context,b);context.auditStart(withStoreToken(a,tokenA));context.auditStart(withStoreToken(b,tokenB));
+  const a={batch_id:'audit-cleaning-202608',submission_id:'submission_store_a_12345678901234',edit_token:'edit_store_a_1234567890123456789012',store_id:'DNB10062',inspector_name:'測＊員'};
+  const b={batch_id:'audit-cleaning-202608',submission_id:'submission_store_b_12345678901234',edit_token:'edit_store_b_1234567890123456789012',store_id:'DNB10082',inspector_name:'永＊員'};
+  const tokenA=authorize(context,a);const tokenB=authorize(context,b,'EMP002','approved-device-0002');context.auditStart(withStoreToken(a,tokenA));context.auditStart(withStoreToken(b,tokenB));
   const uploaded=context.auditUploadPhoto({...withStoreToken(a,tokenA),item_id:'island_display',client_photo_id:'client_store_a_123456789',note:'',file:{name:'a.png',type:'image/png',base64:PNG.toString('base64')}});
   assert.deepEqual(Object.keys(uploaded.photo).sort(),['client_photo_id','photo_name','revision','status']);
   assert.throws(()=>context.auditOwnStatus({...b,submission_id:a.submission_id,edit_token:a.edit_token,store_token:tokenB}),/unauthorized/);
@@ -224,7 +272,7 @@ test('store token and edit token cannot cross stores, submissions or private pho
 
 test('supervisor reads a private Drive blob only through protected photo action', () => {
   const {context}=harness();
-  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_photo_123456789012345',edit_token:'edit_photo_12345678901234567890123',store_id:'DNB10062',inspector_name:'測試人員'};
+  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_photo_123456789012345',edit_token:'edit_photo_12345678901234567890123',store_id:'DNB10062',inspector_name:'測＊員'};
   const storeToken=authorize(context,base);context.auditStart(withStoreToken(base,storeToken));
   context.auditUploadPhoto({...withStoreToken(base,storeToken),item_id:'island_display',client_photo_id:'client_photo_secure_123456',note:'',file:{name:'private.png',type:'image/png',base64:PNG.toString('base64')}});
   assert.throws(()=>context.auditPhotoRead({submission_id:base.submission_id,client_photo_id:'client_photo_secure_123456'}),/unauthorized/);
@@ -236,7 +284,7 @@ test('supervisor reads a private Drive blob only through protected photo action'
 
 test('supervisor cancellation preserves evidence and allows a fresh submission for the store', () => {
   const {context,spreadsheet}=harness();
-  const oldBase={batch_id:'audit-cleaning-202608',submission_id:'submission_cancel_12345678901234',edit_token:'edit_cancel_1234567890123456789012',store_id:'DNB10062',inspector_name:'測試人員'};
+  const oldBase={batch_id:'audit-cleaning-202608',submission_id:'submission_cancel_12345678901234',edit_token:'edit_cancel_1234567890123456789012',store_id:'DNB10062',inspector_name:'測＊員'};
   const oldToken=authorize(context,oldBase);context.auditStart(withStoreToken(oldBase,oldToken));
   context.auditUploadPhoto({...withStoreToken(oldBase,oldToken),item_id:'island_display',client_photo_id:'client_cancel_1234567890',note:'',file:{name:'kept.png',type:'image/png',base64:PNG.toString('base64')}});
   const cancelled=context.auditCancel({token:'pt-valid-token-1234567890',submission_id:oldBase.submission_id,comment:'裝置草稿遺失'});

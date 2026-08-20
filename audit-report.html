@@ -52,26 +52,26 @@
             <div class="field-grid">
               <label>
                 <span>門市店點 <b aria-hidden="true">＊</b></span>
-                <select id="storeSelect" required>
-                  <option value="">請選擇店點</option>
+                <select id="storeSelect" aria-readonly="true" disabled required>
+                  <option value="">由核准裝置名冊帶入</option>
                 </select>
               </label>
               <label>
                 <span>檢查人員姓名 <b aria-hidden="true">＊</b></span>
-                <input id="inspectorName" type="text" maxlength="40" autocomplete="name" placeholder="請輸入姓名" required>
+                <input id="inspectorName" type="text" maxlength="40" placeholder="由員編帶入名冊姓名" readonly required>
               </label>
             </div>
             <p class="time-note">回報日期與時間將由系統以 Asia/Taipei 自動記錄，門市無法修改。</p>
             <div class="store-auth-panel" aria-labelledby="storeAuthTitle">
               <div>
                 <strong id="storeAuthTitle">門市回報授權</strong>
-                <p>回報碼只用來換取本次門市、此次 submission 專用的短效 token，不會儲存在本機。</p>
+                <p>使用既有員編與 Approved Device 換取本次 submission 專用的短效 audit-only token；不會開放 KPI 或全區資料。</p>
               </div>
               <label>
-                <span>批次回報碼</span>
-                <input id="storeSubmitCode" type="password" autocomplete="off" placeholder="請輸入回報碼">
+                <span>員工編號</span>
+                <input id="storeEmployeeId" type="text" autocomplete="username" autocapitalize="characters" spellcheck="false" placeholder="請輸入既有員編">
               </label>
-              <button id="storeAuthButton" class="secondary-button" type="button">驗證回報碼</button>
+              <button id="storeAuthButton" class="secondary-button" type="button">驗證核准裝置</button>
               <p id="storeAuthMessage" class="inline-message" role="status" aria-live="polite">尚未取得回報授權</p>
             </div>
           </div>

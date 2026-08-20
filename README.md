@@ -2,16 +2,16 @@
 
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）＋ Google Sheets。
 
-## 稽核回報專區（未部署）
+## 稽核回報專區
 
 - `audit-report.html` 是九店手機優先的環境清潔回報與督導逐項驗收頁；入口位於 `home.html`。
 - `gas/AuditReport.gs` 使用獨立的批次、提交、照片與 append-only 時間軸模型；只在 `gas/Code.gs` 增加隔離的 `audit_*` POST dispatch，不改巡店、半月檢查、每日回報、KPI、台獎或班表資料列。
-- 門市先以只存在 GAS Script Properties 的 `AUDIT_REPORT_SUBMIT_CODE` 換取 30 分鐘、綁定批次／門市／`submission_id` 的稽核專用 token；`audit_start`、上傳、刪除、送出與狀態讀取還會再核對 `submission_id + edit token`。回報碼不寫入 repo 或瀏覽器儲存。
+- 門市以既有員編＋Approved Device 驗證，後端只讀取該員編的啟用名冊與裝置綁定，換取 30 分鐘、綁定員編雜湊／批次／門市／`submission_id` 的 audit-only token；不回傳或沿用 KPI／全區私有戰情權限。店點依名冊固定，檢查人員由名冊姓名顯示值帶入；`audit_start`、上傳、刪除、送出與狀態讀取還會再核對 `submission_id + edit token`。
 - 私有照片只可經 `audit_photo_read` 讀取：督導驗證既有 PT token，門市驗證稽核 token 與 submission ownership；GAS 讀取 Drive Blob 後回傳 MIME＋base64，前端只建立暫時 Blob URL 並釋放，不取得 Drive URL／file ID。
 - 督導可取消／重設遺失草稿或 edit token 的舊回報；舊照片與 append-only 事件保留為 `cancelled`，該店才能建立新的 submission。
 - 門市填報頁在批次資訊後提供品質管理整理提醒原圖，可點擊或以鍵盤開啟單張全螢幕預覽；督導模式不顯示此圖卡。
 - 九店稽核值使用既有正式 canonical ID；其中萬大為 `DNB10168`、通化為 `DNB10174`，不沿用巡店相容層的 provisional／legacy code。介面仍統一顯示「台北三創」。
-- 受控部署已完成 Script Property 手動 gate、四個 Sheet 與私有照片資料夾初始化；首次 v59 smoke 發現舊巡店 code 被誤帶入稽核後已立即把正式 deployment 指回 v58、停用 UAT 批次並修正。Pages 尚未發布，九店尚未開放；部署交接見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
+- PR #62 已合併；本次 Approved Device audit-only follow-up 僅製作最小 PR，未部署 GAS／Pages，也未啟用正式批次。部署與 UAT gate 見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
 
 ## 智慧營運中心 Phase 1A（未部署）
 

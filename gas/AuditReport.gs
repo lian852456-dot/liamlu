@@ -7,10 +7,10 @@
 // - 稽核回報：一張照片一列
 // - 稽核回報紀錄：append-only 時間軸
 //
-// GitHub Pages 不持有 PT_KEY 或回報碼。門市先以 Script Property 中的
-// AUDIT_REPORT_SUBMIT_CODE 換取綁定批次／門市／submission 的短效 token，
-// 後續仍須同時通過 submission_id + edit token ownership；九店總覽、
-// 照片明細、覆核與取消只接受既有 PT_TOKEN。
+// GitHub Pages 不持有 PT_KEY 或其他後端秘密。門市以既有員編＋Approved
+// Device 換取綁定批次／門市／submission／員編雜湊的短效 audit-only token，
+// 不直接取得私有戰情全區資料；後續仍須同時通過 submission_id + edit token
+// ownership。九店總覽、照片明細、覆核與取消只接受既有 PT_TOKEN。
 // ════════════════════════════════════
 
 const AUDIT_BATCH_SHEET = '稽核批次';
@@ -22,7 +22,7 @@ const AUDIT_INITIAL_BATCH = {
   batch_name: '稽核前環境清潔確認',
   starts_on: '2026-08-20',
   due_on: '2026-08-31',
-  active: true
+  active: false
 };
 const AUDIT_MAX_PHOTOS_PER_ITEM = 10;
 const AUDIT_MAX_PHOTO_BYTES = 10 * 1024 * 1024;
@@ -49,7 +49,7 @@ const AUDIT_CANONICAL_STORE_IDS = {
 const AUDIT_BATCH_FIELDS = ['batch_id','batch_name','starts_on','due_on','active','created_at','updated_at'];
 const AUDIT_SUBMISSION_FIELDS = [
   'batch_id','batch_name','submission_id','store_id','store_name','inspector_name',
-  'edit_token_hash','status','submitted_at','reviewed_at','updated_at','revision','created_at'
+  'auth_employee_hash','edit_token_hash','status','submitted_at','reviewed_at','updated_at','revision','created_at'
 ];
 const AUDIT_PHOTO_FIELDS = [
   'batch_id','batch_name','submission_id','store_id','store_name','inspector_name',
@@ -126,7 +126,7 @@ function setupAuditReportStorage() {
       batch_name: AUDIT_INITIAL_BATCH.batch_name,
       starts_on: AUDIT_INITIAL_BATCH.starts_on,
       due_on: AUDIT_INITIAL_BATCH.due_on,
-      active: 'TRUE',
+      active: AUDIT_INITIAL_BATCH.active ? 'TRUE' : 'FALSE',
       created_at: now,
       updated_at: now
     });
@@ -153,6 +153,35 @@ function auditStore_(storeId) {
   })[0];
   if (!store) throw new Error('門市店點不正確');
   return store;
+}
+
+function auditRosterStore_(value) {
+  const raw = String(value || '').replace(/\s+/g, '').trim();
+  const clean = raw.replace(/^台灣大哥大(?:數位生活)?/, '').replace(/^台北/, '');
+  const store = auditStores_().filter(function(row) {
+    const name = String(row.store_name || '').replace(/\s+/g, '').replace(/^台北/, '');
+    return raw === row.store_id || clean === name;
+  })[0];
+  if (!store) throw new Error('此員編的名冊店點不在稽核九店範圍內');
+  return store;
+}
+
+function auditApprovedDeviceProfile_(payload) {
+  const body = payload || {};
+  const employeeId = privateDashboardCleanEmployeeId(body.employeeId);
+  const deviceId = privateDashboardCleanDeviceId(body.deviceId);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  if (!lookup.user || lookup.user.status !== 'active' || lookup.user.device_id !== deviceId) {
+    throw new Error('此員編尚未核准此裝置，請先使用既有流程申請並等待管理者核准');
+  }
+  const store = auditRosterStore_(lookup.user.store);
+  const inspector = auditCleanInspector_(lookup.user.masked_name);
+  return {
+    employee_id: employeeId,
+    employee_id_hash: privateDashboardHash(employeeId),
+    store: store,
+    inspector_name: inspector
+  };
 }
 
 function auditItem_(itemId) {
@@ -233,37 +262,46 @@ function auditStoreSession_(payload) {
   if (!raw) throw new Error('unauthorized');
   let session;
   try { session = JSON.parse(raw); } catch (err) { throw new Error('unauthorized'); }
-  if (!session || session.scope !== 'audit-submit') throw new Error('unauthorized');
+  if (!session || session.scope !== 'audit-submit' || session.auth_source !== 'approved-device') throw new Error('unauthorized');
   if (session.submission_id !== auditSubmissionId_(body.submission_id)) throw new Error('unauthorized');
   return session;
 }
 
 function auditAssertStoreSession_(session, submission) {
   if (!session || !submission || session.submission_id !== submission.submission_id ||
-      session.store_id !== submission.store_id || session.batch_id !== submission.batch_id) {
+      session.store_id !== submission.store_id || session.batch_id !== submission.batch_id ||
+      session.employee_id_hash !== submission.auth_employee_hash) {
     throw new Error('unauthorized');
   }
 }
 
 function auditSubmitAuth(payload) {
   const body = payload || {};
-  const expected = String(PropertiesService.getScriptProperties().getProperty('AUDIT_REPORT_SUBMIT_CODE') || '');
-  if (!expected) throw new Error('稽核回報碼尚未設定');
-  const supplied = String(body.code || '');
-  if (!supplied || privateDashboardHash(supplied) !== privateDashboardHash(expected)) throw new Error('unauthorized');
   const batch = auditActiveBatch_();
   if (String(body.batch_id || '') !== batch.batch_id) throw new Error('稽核批次已更新，請重新整理');
-  const store = auditStore_(body.store_id);
+  const profile = auditApprovedDeviceProfile_(body);
+  const store = profile.store;
   const submissionId = auditSubmissionId_(body.submission_id);
   const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
   CacheService.getScriptCache().put(auditStoreSessionCacheKey_(token), JSON.stringify({
     scope: 'audit-submit',
+    auth_source: 'approved-device',
     batch_id: batch.batch_id,
     store_id: store.store_id,
     submission_id: submissionId,
+    employee_id_hash: profile.employee_id_hash,
+    inspector_name: profile.inspector_name,
     issued_at: auditNow_()
   }), AUDIT_STORE_SESSION_TTL_SECONDS);
-  return { token:token, expiresIn:AUDIT_STORE_SESSION_TTL_SECONDS };
+  return {
+    token: token,
+    expiresIn: AUDIT_STORE_SESSION_TTL_SECONDS,
+    profile: {
+      store_id: store.store_id,
+      store_name: store.store_name,
+      inspector_name: profile.inspector_name
+    }
+  };
 }
 
 function auditSubmissionSheets_() {
@@ -300,10 +338,12 @@ function auditStart(payload) {
   const batch = auditActiveBatch_();
   if (String(body.batch_id || '') !== batch.batch_id) throw new Error('稽核批次已更新，請重新整理');
   const submissionId = auditSubmissionId_(body.submission_id);
-  const store = auditStore_(body.store_id);
-  const inspector = auditCleanInspector_(body.inspector_name);
+  const store = auditStore_(storeSession.store_id);
+  const inspector = auditCleanInspector_(storeSession.inspector_name);
   const tokenHash = auditTokenHash_(body.edit_token);
-  if (storeSession.batch_id !== batch.batch_id || storeSession.store_id !== store.store_id || storeSession.submission_id !== submissionId) throw new Error('unauthorized');
+  if (storeSession.batch_id !== batch.batch_id || storeSession.submission_id !== submissionId) throw new Error('unauthorized');
+  if (body.store_id && auditStore_(body.store_id).store_id !== store.store_id) throw new Error('unauthorized');
+  if (body.inspector_name && auditCleanInspector_(body.inspector_name) !== inspector) throw new Error('unauthorized');
   const sheets = auditSubmissionSheets_();
   const now = auditNow_();
   const lock = LockService.getScriptLock();
@@ -314,6 +354,7 @@ function auditStart(payload) {
     if (sameId) {
       if (sameId.edit_token_hash !== tokenHash) throw new Error('submission_id 已存在');
       if (sameId.batch_id !== batch.batch_id || sameId.store_id !== store.store_id) throw new Error('回報識別與門市不一致');
+      if (sameId.auth_employee_hash !== storeSession.employee_id_hash) throw new Error('unauthorized');
       if (sameId.status === 'cancelled') throw new Error('本次回報已取消，請建立新的回報');
       auditUpdateRow_(sheets.submissions, sameId._row, { inspector_name: inspector, updated_at: now });
       return auditOwnStatus_({ submission_id: submissionId, edit_token: body.edit_token });
@@ -329,6 +370,7 @@ function auditStart(payload) {
       store_id: store.store_id,
       store_name: store.store_name,
       inspector_name: inspector,
+      auth_employee_hash: storeSession.employee_id_hash,
       edit_token_hash: tokenHash,
       status: 'draft',
       submitted_at: '',
@@ -635,9 +677,10 @@ function auditOwnStatus_(payload) {
 function auditOwnStatus(payload) {
   const body = payload || {};
   const storeSession = auditStoreSession_(body);
-  const detail = auditOwnStatus_(body);
-  auditAssertStoreSession_(storeSession, detail);
-  return detail;
+  const sheets = auditSubmissionSheets_();
+  const submission = auditOwnSubmission_(sheets.submissions, body);
+  auditAssertStoreSession_(storeSession, submission);
+  return auditBuildDetail_(submission, sheets.photos, sheets.events, true);
 }
 
 function auditSupervisorAuthorized_(payload) {

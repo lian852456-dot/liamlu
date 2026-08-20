@@ -5,6 +5,8 @@ const GAS_URL='https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfW
 const DRAFT_KEY='bei12b_audit_draft_v1';
 const PT_TOKEN_KEY='bei12b_pt_session_token';
 const STORE_SESSION_KEY='bei12b_audit_store_session';
+const EMPLOYEE_ID_KEY='north12b_private_dashboard_employee_id';
+const DEVICE_ID_KEY='north12b_private_dashboard_device_id';
 const DB_NAME='bei12b-audit-drafts';
 const DB_STORE='photos';
 const MAX_PHOTOS=10;
@@ -29,17 +31,19 @@ function loadDraft(){
   state.draft.notes=state.draft.notes||{};state.draft.items=state.draft.items||{};Object.values(state.draft.items).forEach(item=>(item.photos||[]).forEach(photo=>{photo.objectUrl='';photo.privateObjectUrl=false;}));
 }
 
-function loadStoreSession(){try{const value=JSON.parse(sessionStorage.getItem(STORE_SESSION_KEY)||'null');state.storeSession=value&&value.token?value:null;}catch{state.storeSession=null;}if(state.storeSession&&(state.storeSession.submission_id!==state.draft.submission_id||state.storeSession.store_id!==state.draft.store_id))clearStoreSession();}
+function approvedDeviceId(){let value=localStorage.getItem(DEVICE_ID_KEY);if(value)return value;if(crypto.randomUUID)value=crypto.randomUUID().replace(/-/g,'');else{const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);value=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');}localStorage.setItem(DEVICE_ID_KEY,value);return value;}
 
-function hasStoreSession(){return Boolean(state.storeSession&&state.storeSession.token&&state.storeSession.submission_id===state.draft.submission_id&&state.storeSession.store_id===state.draft.store_id&&state.storeSession.batch_id===state.draft.batch_id);}
+function loadStoreSession(){try{const value=JSON.parse(sessionStorage.getItem(STORE_SESSION_KEY)||'null');state.storeSession=value&&value.token&&value.auth_source==='approved-device'?value:null;}catch{state.storeSession=null;}if(state.storeSession&&(state.storeSession.submission_id!==state.draft.submission_id||state.storeSession.store_id!==state.draft.store_id))clearStoreSession();}
 
-function renderStoreAuth(text){const panel=document.querySelector('.store-auth-panel');const status=document.getElementById('storeAuthMessage');if(!panel||!status)return;const ready=hasStoreSession();panel.classList.toggle('authorized',ready);status.textContent=text||(ready?'本次門市回報已取得短效授權':'尚未取得回報授權');document.getElementById('storeAuthButton').textContent=ready?'重新驗證回報碼':'驗證回報碼';}
+function hasStoreSession(){return Boolean(state.storeSession&&state.storeSession.token&&state.storeSession.auth_source==='approved-device'&&state.storeSession.submission_id===state.draft.submission_id&&state.storeSession.store_id===state.draft.store_id&&state.storeSession.batch_id===state.draft.batch_id);}
+
+function renderStoreAuth(text){const panel=document.querySelector('.store-auth-panel');const status=document.getElementById('storeAuthMessage');if(!panel||!status)return;const ready=hasStoreSession();panel.classList.toggle('authorized',ready);status.textContent=text||(ready?'本次門市回報已取得短效 audit-only 授權':'尚未取得回報授權');document.getElementById('storeAuthButton').textContent=ready?'重新驗證核准裝置':'驗證核准裝置';}
 
 function clearStoreSession(text){state.storeSession=null;sessionStorage.removeItem(STORE_SESSION_KEY);renderStoreAuth(text);if(state.config)updateCompletion();}
 
-async function storeAuthorize(){const codeInput=document.getElementById('storeSubmitCode');const button=document.getElementById('storeAuthButton');const code=codeInput.value;if(!state.draft.store_id){renderStoreAuth('請先選擇門市店點');document.getElementById('storeSelect').focus();return;}if(!code){renderStoreAuth('請輸入批次回報碼');codeInput.focus();return;}button.disabled=true;renderStoreAuth('正在驗證回報碼…');try{const result=await api({action:'audit_submit_auth',batch_id:state.config.batch.batch_id,store_id:state.draft.store_id,submission_id:state.draft.submission_id,code});state.storeSession={token:result.token,batch_id:state.config.batch.batch_id,store_id:state.draft.store_id,submission_id:state.draft.submission_id};sessionStorage.setItem(STORE_SESSION_KEY,JSON.stringify(state.storeSession));codeInput.value='';renderStoreAuth('回報授權成功；此 token 僅限本次門市回報使用');updateCompletion();await restoreOwnSubmission();}catch(error){clearStoreSession(error.unauthorized?'回報碼錯誤，請重新輸入':error.message);}finally{codeInput.value='';button.disabled=false;}}
+async function storeAuthorize(){const employeeInput=document.getElementById('storeEmployeeId');const button=document.getElementById('storeAuthButton');const employeeId=employeeInput.value.trim().toUpperCase();if(!employeeId){renderStoreAuth('請輸入既有員編');employeeInput.focus();return;}button.disabled=true;renderStoreAuth('正在驗證員編與核准裝置…');try{const result=await api({action:'audit_submit_auth',batch_id:state.config.batch.batch_id,submission_id:state.draft.submission_id,employeeId,deviceId:approvedDeviceId()});const profile=result.profile||{};const store=storeById(profile.store_id);if(!result.token||!store||profile.store_name!==store.store_name||!String(profile.inspector_name||'').trim())throw new Error('名冊授權回應不完整，請聯絡督導');const hasPhotos=Object.values(state.draft.items||{}).some(item=>(item.photos||[]).some(photo=>!photo.deleted));if(state.draft.store_id&&state.draft.store_id!==profile.store_id&&hasPhotos)throw new Error('本機草稿屬於不同店點，照片已保留；請使用原核准裝置或請督導取消重設');state.draft.store_id=profile.store_id;state.draft.inspector_name=profile.inspector_name;document.getElementById('storeSelect').value=profile.store_id;document.getElementById('inspectorName').value=profile.inspector_name;saveDraft();state.storeSession={token:result.token,auth_source:'approved-device',batch_id:state.config.batch.batch_id,store_id:profile.store_id,submission_id:state.draft.submission_id};sessionStorage.setItem(EMPLOYEE_ID_KEY,employeeId);sessionStorage.setItem(STORE_SESSION_KEY,JSON.stringify(state.storeSession));renderStoreAuth(`核准裝置驗證成功：${store.store_name}｜${profile.inspector_name}`);updateCompletion();await restoreOwnSubmission();}catch(error){clearStoreSession(error.unauthorized?'此員編尚未核准此裝置，請先使用既有申請流程':error.message);}finally{button.disabled=false;}}
 
-async function storeCall(payload){if(!hasStoreSession()){const error=new Error('請先驗證批次回報碼');error.unauthorized=true;throw error;}try{return await api({...payload,store_token:state.storeSession.token});}catch(error){if(error.unauthorized){clearStoreSession('回報授權已過期，草稿與待送照片均已保留，請重新驗證');throw new Error('回報授權已過期，請重新驗證批次回報碼');}throw error;}}
+async function storeCall(payload){if(!hasStoreSession()){const error=new Error('請先使用既有員編驗證核准裝置');error.unauthorized=true;throw error;}try{return await api({...payload,store_token:state.storeSession.token});}catch(error){if(error.unauthorized){clearStoreSession('audit-only 授權已過期，草稿與待送照片均已保留，請重新驗證核准裝置');throw new Error('回報授權已過期，請重新驗證核准裝置');}throw error;}}
 
 function saveDraft(){
   state.draft.updated_at=new Date().toISOString();
@@ -82,11 +86,12 @@ function renderConfig(){
   const {batch,stores}=state.config;
   document.getElementById('batchMeta').textContent=`${batch.batch_name}｜${batch.starts_on} 至 ${batch.due_on}`;
   const storeSelect=document.getElementById('storeSelect');
-  storeSelect.innerHTML='<option value="">請選擇店點</option>'+stores.map(store=>`<option value="${escapeHtml(store.store_id)}">${escapeHtml(store.store_name)}</option>`).join('');
+  storeSelect.innerHTML='<option value="">由核准裝置名冊帶入</option>'+stores.map(store=>`<option value="${escapeHtml(store.store_id)}">${escapeHtml(store.store_name)}</option>`).join('');
   document.getElementById('storeFilter').innerHTML='<option value="">全部店點</option>'+stores.map(store=>`<option value="${escapeHtml(store.store_id)}">${escapeHtml(store.store_name)}</option>`).join('');
   state.draft.batch_id=batch.batch_id;
   storeSelect.value=state.draft.store_id||'';
   document.getElementById('inspectorName').value=state.draft.inspector_name||'';
+  document.getElementById('storeEmployeeId').value=sessionStorage.getItem(EMPLOYEE_ID_KEY)||'';
   renderStoreAuth();renderItems();saveDraft();
 }
 
@@ -180,7 +185,7 @@ async function compressPhoto(file){
 }
 
 async function ensureSubmission(){
-  return storeCall({action:'audit_start',batch_id:state.config.batch.batch_id,submission_id:state.draft.submission_id,edit_token:state.draft.edit_token,store_id:state.draft.store_id,inspector_name:String(state.draft.inspector_name||'').trim()});
+  return storeCall({action:'audit_start',batch_id:state.config.batch.batch_id,submission_id:state.draft.submission_id,edit_token:state.draft.edit_token});
 }
 
 async function uploadPending(){
@@ -224,14 +229,14 @@ function renderServerState(){
   document.getElementById('completionSummary').innerHTML=`<dt>門市</dt><dd>${escapeHtml(store?.store_name||server.store_name)}</dd><dt>檢查人員</dt><dd>${escapeHtml(server.inspector_name)}</dd><dt>首次回報時間</dt><dd>${escapeHtml(server.submitted_at||'尚未正式送出')}</dd><dt>照片</dt><dd>${escapeHtml(counts)}</dd>`;
   renderTimeline(server.timeline||[]);renderItems();document.getElementById('newSubmissionButton').hidden=server.submission_status!=='cancelled';
   if(server.submission_status==='rework'){document.getElementById('auditForm').hidden=false;message('督導已退回指定項目；只需補件紅色項目，原照片與退回原因均已保留。','error');}
-  if(server.submission_status==='cancelled')message('督導已取消舊回報並保留證據；請建立新的回報後重新驗證回報碼。','error');
+  if(server.submission_status==='cancelled')message('督導已取消舊回報並保留證據；請建立新的回報後重新驗證核准裝置。','error');
 }
 
 function renderTimeline(entries){
   const labels={created:'建立草稿',submitted:'首次送出',returned:'退回補件',resubmitted:'補件送出',approved:'項目通過',cancelled:'督導取消／重設'};document.getElementById('timeline').innerHTML='<h3>處理時間軸</h3>'+entries.map(entry=>`<div class="timeline-entry"><strong>${escapeHtml(labels[entry.event_type]||entry.event_type)}</strong> ${escapeHtml(entry.item_name||'')}<br><small>${escapeHtml(entry.created_at)}${entry.comment?`・${escapeHtml(entry.comment)}`:''}</small></div>`).join('');
 }
 
-async function resetCancelledSubmission(){const photos=Object.values(state.draft.items||{}).flatMap(item=>item.photos||[]);revokeDraftPhotos(photos);for(const photo of photos)await dbDelete(blobKey(photo.id)).catch(()=>{});clearStoreSession();state.server=null;state.draft=blankDraft();state.draft.batch_id=state.config.batch.batch_id;localStorage.removeItem(DRAFT_KEY);document.getElementById('auditForm').hidden=false;document.getElementById('completionCard').hidden=true;document.getElementById('newSubmissionButton').hidden=true;renderConfig();renderStoreAuth('請選擇門市並重新驗證批次回報碼');message('已建立新的本機回報草稿；舊回報證據仍保留在後端。','success');}
+async function resetCancelledSubmission(){const photos=Object.values(state.draft.items||{}).flatMap(item=>item.photos||[]);revokeDraftPhotos(photos);for(const photo of photos)await dbDelete(blobKey(photo.id)).catch(()=>{});clearStoreSession();state.server=null;state.draft=blankDraft();state.draft.batch_id=state.config.batch.batch_id;localStorage.removeItem(DRAFT_KEY);document.getElementById('auditForm').hidden=false;document.getElementById('completionCard').hidden=true;document.getElementById('newSubmissionButton').hidden=true;renderConfig();renderStoreAuth('請以既有員編重新驗證核准裝置');message('已建立新的本機回報草稿；舊回報證據仍保留在後端。','success');}
 
 async function restoreOwnSubmission(){
   if(!hasStoreSession())return;try{const result=await storeCall({action:'audit_status',submission_id:state.draft.submission_id,edit_token:state.draft.edit_token});applyServerStatus(result);}catch(error){if(!/找不到本次回報/.test(error.message))message(error.message,'error');}
@@ -334,8 +339,8 @@ async function copyPending(){
 async function logoutSupervisor(){const token=state.ptToken;if(state.reviewDetail)revokePrivatePhotos(state.reviewDetail.items.flatMap(item=>item.photos||[]));state.reviewDetail=null;clearSupervisorAuth();showSupervisorGate();state.overview=null;document.getElementById('overviewGrid').replaceChildren();if(token)api({action:'ptlogout',token}).catch(()=>{});}
 
 function bindEvents(){
-  document.getElementById('modeSwitch').addEventListener('click',switchMode);document.getElementById('auditForm').addEventListener('submit',submitReport);document.getElementById('storeSelect').addEventListener('change',event=>{if(state.draft.store_id!==event.target.value)clearStoreSession('店點已變更，請重新驗證批次回報碼');state.draft.store_id=event.target.value;saveDraft();renderStoreAuth();updateCompletion();});document.getElementById('inspectorName').addEventListener('input',event=>{state.draft.inspector_name=event.target.value;saveDraft();updateCompletion();});
-  document.getElementById('storeAuthButton').addEventListener('click',storeAuthorize);document.getElementById('storeSubmitCode').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();storeAuthorize();}});document.getElementById('newSubmissionButton').addEventListener('click',resetCancelledSubmission);
+  document.getElementById('modeSwitch').addEventListener('click',switchMode);document.getElementById('auditForm').addEventListener('submit',submitReport);
+  document.getElementById('storeAuthButton').addEventListener('click',storeAuthorize);document.getElementById('storeEmployeeId').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();storeAuthorize();}});document.getElementById('newSubmissionButton').addEventListener('click',resetCancelledSubmission);
   document.getElementById('supervisorLoginForm').addEventListener('submit',supervisorLogin);document.getElementById('reauthForm').addEventListener('submit',reauthenticate);document.getElementById('statusFilter').addEventListener('change',renderOverview);document.getElementById('storeFilter').addEventListener('change',renderOverview);document.getElementById('copyPendingButton').addEventListener('click',copyPending);document.getElementById('supervisorLogoutButton').addEventListener('click',logoutSupervisor);
   const photoDialog=document.getElementById('photoDialog');document.getElementById('qualityReminderButton').addEventListener('click',openQualityReminder);document.getElementById('qualityReminderImage').addEventListener('error',showQualityReminderFallback);document.getElementById('closePhotoDialog').addEventListener('click',()=>photoDialog.close());photoDialog.addEventListener('close',()=>{const target=state.photoViewer.returnFocus;state.photoViewer.returnFocus=null;if(target?.isConnected)requestAnimationFrame(()=>target.focus());});document.getElementById('previousPhoto').addEventListener('click',()=>{state.photoViewer.index=Math.max(0,state.photoViewer.index-1);renderPhotoViewer();});document.getElementById('nextPhoto').addEventListener('click',()=>{state.photoViewer.index=Math.min(state.photoViewer.photos.length-1,state.photoViewer.index+1);renderPhotoViewer();});
 }
