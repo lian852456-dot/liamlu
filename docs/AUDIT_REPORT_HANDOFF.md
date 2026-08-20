@@ -1,6 +1,6 @@
 # 北一二B 稽核回報專區交接
 
-狀態：Draft PR #62（原功能 head `66fe51a`、品質提醒圖 `32dd952`，本次安全修正以 PR 最新 head 為準）；程式與本機測試完成，尚未部署 GitHub Pages、GAS、建立正式 Sheet／Drive 資料，亦尚未完成 Liam 驗收。
+狀態：Draft PR #62，受控部署／UAT 進行中。Liam 已完成 `AUDIT_REPORT_SUBMIT_CODE` 手動 gate 與 `setupAuditReportStorage()`；四個 Sheet 及私有照片資料夾已建立。首次 GAS v59 smoke 發現稽核沿用巡店 provisional／legacy code，已立即將正式 deployment rollback 至 v58、停用 UAT 批次並保留證據。canonical 修正與完整本機回歸已完成；GitHub Pages 尚未發布，九店尚未開放，正式驗收仍未完成。
 
 ## 範圍與資料流
 
@@ -17,6 +17,8 @@
 督導端 `audit_cancel` 沿用 PT token，前端有二次確認。取消只把 submission 設為 `cancelled` 並 append `cancelled` 事件，不刪 Sheet row、照片或歷史；overview 將該店重新顯示為未回報，門市可用新的 submission 回報。這也是裝置草稿或 edit token 遺失時的復原方式。
 
 `gas/AuditReport.gs` 是獨立模型，不寫入巡店、巡店到離店、半月督導檢查、每日回報、KPI、台獎或班表分頁。`gas/Code.gs` 只增加十二個隔離 `audit_*` `doPost` action dispatch；既有 action 合約不變。照片資料夾依「批次／店點／項目」建立，檔案不設公開分享。
+
+九店稽核 store value 使用正式 canonical ID：酒泉 `DNB10062`、永吉 `DNB10082`、復興南 `DNB10094`、杭州南 `DNB10146`、萬大 `DNB10168`、通化 `DNB10174`、大稻埕 `DNB10284`、三創 `DNB10307`、六張犁 `DNB10440`。`PT_STORES` 仍只用來驗證既有店名存在；稽核不採用其中萬大的 provisional code 或通化的 legacy code，也不修改巡店既有合約。
 
 ## Sheet 與 Drive 規劃
 
@@ -44,12 +46,13 @@
 
 ## 本機驗證
 
-- Node contract：`227/227`
-- 完整 Chromium Playwright：`160/160`
-- 完整 WebKit Playwright（Safari 等價）：`160/160`
+- Node contract：`234/234`
+- 完整 Chromium Playwright：`162/162`
+- 完整 WebKit Playwright（Safari 等價）：`162/162`
 - 390×844 無橫向 overflow；多圖、分次加入、刪除／預覽、10 張限制、部分失敗重試、冪等、own-submission scope、PT auth／逾時重驗、單項補件與逐項覆核皆有自動測試。
 - 提醒圖卡測試涵蓋 DOM 順序、門市／督導顯隱、非 base64 路徑、圖片尺寸、載入失敗 fallback、點擊／Enter／Space、單張導覽隱藏、關閉／ESC／焦點回復與手機 overflow。完整 WebKit 回歸另把兩支既有 Supervisor App 測試改用 `TEST_BASE_URL`，並修正里程 fixture 不再覆寫巡店正式月份；產品碼與正式資料流未改。
 - 安全案例涵蓋匿名開始／上傳／刪除／送出／讀取拒絕、錯誤回報碼、過期 token、跨門市 token／edit token 越權拒絕、PT 保護的私有 Blob 讀取、DOM/API 無 Drive view URL／file ID，以及取消後證據保留與新 submission。
+- canonical 回歸另固定檢查九店 ID，拒絕 `xxx` placeholder 與通化 legacy `DNB10059`；正式 smoke 必須讀回萬大 `DNB10168`、通化 `DNB10174` 才可繼續。
 - 截圖：`docs/screenshots/audit-report-20260820/audit-report-mobile-390x844.png`、`audit-report-quality-reminder-desktop.png`、`audit-report-supervisor-desktop.png`。截圖無正式姓名、正式照片或正式資料。
 
 ## 未來獲准後的部署步驟

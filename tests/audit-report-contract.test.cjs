@@ -153,6 +153,17 @@ function seedThreePhotos(context) {
   vm.runInContext(`(function(){const s=auditRows_(auditSpreadsheet_().getSheetByName(AUDIT_SUBMISSION_SHEET),AUDIT_SUBMISSION_FIELDS)[0];AUDIT_ITEMS.forEach(function(item,index){auditAppend_(auditSpreadsheet_().getSheetByName(AUDIT_PHOTO_SHEET),AUDIT_PHOTO_FIELDS,{batch_id:s.batch_id,batch_name:s.batch_name,submission_id:s.submission_id,store_id:s.store_id,store_name:s.store_name,inspector_name:s.inspector_name,item_id:item.item_id,item_name:item.item_name,photo_file_id:'seed-file-'+index,private_url:'',photo_name:'photo-'+index,client_photo_id:'client_photo_1234567890'+index,note:'',status:'draft',reviewer_comment:'',submitted_at:'',reviewed_at:'',updated_at:auditNow_(),revision:1,created_at:auditNow_()});});})();`,context);
 }
 
+test('audit config exposes the nine canonical store ids without patrol legacy placeholders', () => {
+  const { context } = harness();
+  const stores = Array.from(context.auditPublicConfig().stores, store => [store.store_id, store.store_name]);
+  assert.deepEqual(stores, [
+    ['DNB10062','台北酒泉'],['DNB10082','台北永吉'],['DNB10094','台北復興南'],
+    ['DNB10146','台北杭州南'],['DNB10168','台北萬大'],['DNB10174','台北通化'],
+    ['DNB10284','台北大稻埕'],['DNB10307','台北三創'],['DNB10440','台北六張犁']
+  ]);
+  assert.doesNotMatch(JSON.stringify(stores), /xxx|DNB10059/);
+});
+
 test('same submission id and repeated submit stay idempotent without duplicate rows or events', () => {
   const { context, spreadsheet } = harness();
   const base={batch_id:'audit-cleaning-202608',submission_id:'submission_12345678901234567890',edit_token:'edit_12345678901234567890123456789012',store_id:'DNB10062',inspector_name:' 測試人員 '};

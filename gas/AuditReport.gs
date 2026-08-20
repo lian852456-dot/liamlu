@@ -34,6 +34,18 @@ const AUDIT_ITEMS = [
   { item_id: 'counter_seating', item_name: '櫃台電腦後方／客戶座位區清潔' }
 ];
 
+const AUDIT_CANONICAL_STORE_IDS = {
+  '台北酒泉': 'DNB10062',
+  '台北永吉': 'DNB10082',
+  '台北復興南': 'DNB10094',
+  '台北杭州南': 'DNB10146',
+  '台北萬大': 'DNB10168',
+  '台北通化': 'DNB10174',
+  '台北大稻埕': 'DNB10284',
+  '台北三創': 'DNB10307',
+  '台北六張犁': 'DNB10440'
+};
+
 const AUDIT_BATCH_FIELDS = ['batch_id','batch_name','starts_on','due_on','active','created_at','updated_at'];
 const AUDIT_SUBMISSION_FIELDS = [
   'batch_id','batch_name','submission_id','store_id','store_name','inspector_name',
@@ -128,7 +140,9 @@ function auditStores_() {
   return order.map(function(name) {
     const store = PT_STORES.filter(function(row) { return row.name === name; })[0];
     if (!store) throw new Error('稽核店點尚未對應既有 PT_STORES：' + name);
-    return { store_id: store.code, store_name: store.name };
+    const canonicalId = AUDIT_CANONICAL_STORE_IDS[name];
+    if (!canonicalId) throw new Error('稽核店點尚未設定 canonical ID：' + name);
+    return { store_id: canonicalId, store_name: store.name };
   });
 }
 

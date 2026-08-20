@@ -5,7 +5,7 @@ const PAGE_URL=process.env.TEST_BASE_URL
   ? new URL('audit-report.html',process.env.TEST_BASE_URL).href
   : 'file://'+path.resolve(__dirname,'../audit-report.html');
 const STORES=[
-  ['DNB10062','台北酒泉'],['DNB10082','台北永吉'],['DNB10094','台北復興南'],['DNB10146','台北杭州南'],['DNB10xxx_wanda','台北萬大'],['DNB10059','台北通化'],['DNB10284','台北大稻埕'],['DNB10307','台北三創'],['DNB10440','台北六張犁']
+  ['DNB10062','台北酒泉'],['DNB10082','台北永吉'],['DNB10094','台北復興南'],['DNB10146','台北杭州南'],['DNB10168','台北萬大'],['DNB10174','台北通化'],['DNB10284','台北大稻埕'],['DNB10307','台北三創'],['DNB10440','台北六張犁']
 ].map(([store_id,store_name])=>({store_id,store_name}));
 const ITEMS=[
   {item_id:'island_display',item_name:'中島、展示機環境清潔'},

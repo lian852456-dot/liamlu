@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-21 ｜ Codex（稽核回報受控部署 canonical blocker 與 rollback）
+
+- 做了什麼：PR #62 已合入最新正式 main `0693468` 並保留 PR #63／#64；Liam 完成 `AUDIT_REPORT_SUBMIT_CODE` 手動 gate 與 `setupAuditReportStorage()`。初始化建立四個稽核 Sheet 與私有 `04_稽核回報_照片`，先建立 UAT 批次。GAS v59 部署後的 `audit_config` smoke 發現萬大仍回 provisional `DNB10xxx_wanda`、通化仍回 legacy `DNB10059`，因此沒有把 PR 轉 Ready、沒有合併或發布 Pages，立即把既有 deployment 指回 v58並停用 UAT 批次。其後只在 `AuditReport.gs` 固定既有正式 canonical ID（萬大 `DNB10168`、通化 `DNB10174` 等九店），不修改 `PT_STORES`、`patrol.html` 或巡店資料流。
+- 結果（進行中）：rollback tag `rollback/audit-cleaning-predeploy-20260820-v2` 指向部署前 main；照片資料夾讀回 `shared=false` 且只有 owner 權限，四個稽核資料分頁尚無 submission／照片／事件資料。修正後 Node `234/234`、完整 Chromium `162/162`、完整 WebKit `162/162`、指定 Patrol/Auth/稽核安全案例 `30/30` 通過；PR #62 尚待新 commit push、重新部署固定版本及正式 UAT。
+- 經驗 / 給下一位的提醒：稽核不能直接把巡店相容層 `PT_STORES.code` 當 canonical value；正式 UAT 前一定要讀回 `audit_config` 的九店 ID，看到 placeholder 或 legacy code 必須立即 rollback。v59 是已封存的失敗 smoke 版本，不可再指向正式 deployment；後續從修正後 PR head 建立新版本。未完成 iPhone／督導正式 UAT 前不得開放九店。
+
 ## 2026-08-20 ｜ Codex（北一二B 稽核回報專區，未部署）
 
 - 做了什麼：從最新 `origin/main` `6564a68` 建立隔離分支 `feature/audit-cleaning-report-20260820`。在 `home.html` 新增稽核入口，新增手機優先 `audit-report.html/css/js` 與隔離 `gas/AuditReport.gs`；九店 canonical value 直接由既有 `PT_STORES` 解析。門市草稿以 localStorage + IndexedDB 保存，逐張壓縮／上傳／失敗重試，只有寫入後讀回一致才完成；督導總覽、逐項通過／退回與逾時重驗沿用既有 PT token。其後在同一 Draft PR #62 追加「整理方向」圖卡；本次再補 `AUDIT_REPORT_SUBMIT_CODE` 換發的 30 分鐘 submission-bound token、PT／ownership 保護的 `audit_photo_read`、Blob URL 生命週期，以及保留照片／事件的督導 `audit_cancel` 復原流程。

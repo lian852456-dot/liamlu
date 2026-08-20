@@ -10,7 +10,8 @@
 - 私有照片只可經 `audit_photo_read` 讀取：督導驗證既有 PT token，門市驗證稽核 token 與 submission ownership；GAS 讀取 Drive Blob 後回傳 MIME＋base64，前端只建立暫時 Blob URL 並釋放，不取得 Drive URL／file ID。
 - 督導可取消／重設遺失草稿或 edit token 的舊回報；舊照片與 append-only 事件保留為 `cancelled`，該店才能建立新的 submission。
 - 門市填報頁在批次資訊後提供品質管理整理提醒原圖，可點擊或以鍵盤開啟單張全螢幕預覽；督導模式不顯示此圖卡。
-- 本階段只完成程式、本機測試與 Draft PR。Sheet／Drive 初始化、GAS 新版本、Pages 發布、正式 readback 與 Liam 驗收均待後續明確核准；部署交接見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
+- 九店稽核值使用既有正式 canonical ID；其中萬大為 `DNB10168`、通化為 `DNB10174`，不沿用巡店相容層的 provisional／legacy code。介面仍統一顯示「台北三創」。
+- 受控部署已完成 Script Property 手動 gate、四個 Sheet 與私有照片資料夾初始化；首次 v59 smoke 發現舊巡店 code 被誤帶入稽核後已立即把正式 deployment 指回 v58、停用 UAT 批次並修正。Pages 尚未發布，九店尚未開放；部署交接見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
 
 ## 智慧營運中心 Phase 1A（未部署）
 
