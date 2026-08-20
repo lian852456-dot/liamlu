@@ -2,7 +2,9 @@ const { test, expect } = require('@playwright/test');
 const path = require('node:path');
 const { patrolSummaryResponse } = require('./fixtures/patrol-summary-response.cjs');
 
-const PAGE_URL = process.env.LIAM_PILOT_URL || ('file://' + path.resolve(__dirname, '../app.html'));
+const PAGE_URL = process.env.LIAM_PILOT_URL || (process.env.TEST_BASE_URL
+  ? new URL('app.html',process.env.TEST_BASE_URL).href
+  : 'file://' + path.resolve(__dirname, '../app.html'));
 const PREVIEW_URL = `${PAGE_URL}${PAGE_URL.includes('?') ? '&' : '?'}preview=1`;
 const stores = ['酒泉', '萬大', '大稻埕', '復興南', '三創', '杭州南', '永吉', '通化', '六張犁'];
 

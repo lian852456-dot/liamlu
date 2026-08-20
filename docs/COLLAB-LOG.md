@@ -13,6 +13,18 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-21 ｜ Codex（稽核回報受控部署 canonical blocker 與 rollback）
+
+- 做了什麼：PR #62 已合入最新正式 main `0693468` 並保留 PR #63／#64；Liam 完成 `AUDIT_REPORT_SUBMIT_CODE` 手動 gate 與 `setupAuditReportStorage()`。初始化建立四個稽核 Sheet 與私有 `04_稽核回報_照片`，先建立 UAT 批次。GAS v59 部署後的 `audit_config` smoke 發現萬大仍回 provisional `DNB10xxx_wanda`、通化仍回 legacy `DNB10059`，因此沒有把 PR 轉 Ready、沒有合併或發布 Pages，立即把既有 deployment 指回 v58並停用 UAT 批次。其後只在 `AuditReport.gs` 固定既有正式 canonical ID（萬大 `DNB10168`、通化 `DNB10174` 等九店），不修改 `PT_STORES`、`patrol.html` 或巡店資料流。
+- 結果（進行中）：rollback tag `rollback/audit-cleaning-predeploy-20260820-v2` 指向部署前 main；照片資料夾讀回 `shared=false` 且只有 owner 權限，四個稽核資料分頁尚無 submission／照片／事件資料。修正後 Node `234/234`、完整 Chromium `162/162`、完整 WebKit `162/162`、指定 Patrol/Auth/稽核安全案例 `30/30` 通過；PR #62 尚待新 commit push、重新部署固定版本及正式 UAT。
+- 經驗 / 給下一位的提醒：稽核不能直接把巡店相容層 `PT_STORES.code` 當 canonical value；正式 UAT 前一定要讀回 `audit_config` 的九店 ID，看到 placeholder 或 legacy code 必須立即 rollback。v59 是已封存的失敗 smoke 版本，不可再指向正式 deployment；後續從修正後 PR head 建立新版本。未完成 iPhone／督導正式 UAT 前不得開放九店。
+
+## 2026-08-20 ｜ Codex（北一二B 稽核回報專區，未部署）
+
+- 做了什麼：從最新 `origin/main` `6564a68` 建立隔離分支 `feature/audit-cleaning-report-20260820`。在 `home.html` 新增稽核入口，新增手機優先 `audit-report.html/css/js` 與隔離 `gas/AuditReport.gs`；九店 canonical value 直接由既有 `PT_STORES` 解析。門市草稿以 localStorage + IndexedDB 保存，逐張壓縮／上傳／失敗重試，只有寫入後讀回一致才完成；督導總覽、逐項通過／退回與逾時重驗沿用既有 PT token。其後在同一 Draft PR #62 追加「整理方向」圖卡；本次再補 `AUDIT_REPORT_SUBMIT_CODE` 換發的 30 分鐘 submission-bound token、PT／ownership 保護的 `audit_photo_read`、Blob URL 生命週期，以及保留照片／事件的督導 `audit_cancel` 復原流程。
+- 結果（Draft PR #62／未部署）：照片 metadata API 已移除 Drive URL／file ID，Drive 維持 private；匿名、錯誤／過期 token、跨門市越權、PT 私有照片讀取、取消保留證據與重新回報均通過。追加素材位於 `assets/audit/quality-management-reminder.png`；收到的附件實檔為 932×526 JPEG，未裁切／縮放／改字，只轉為 932×526 lossless PNG。Node `227/227`、完整 Chromium `160/160`、完整 WebKit `160/160`、GAS／JS syntax、diff check 與 390×844 overflow 通過；既有截圖位於 `docs/screenshots/audit-report-20260820/`。`gas/Code.gs` 只增加隔離 `audit_*` dispatch；`index.html`、`patrol.html`、`HalfMedia.gs` 及 KPI／台獎／每日回報／巡店／班表／半月資料流均未改。
+- 經驗 / 給下一位的提醒：本輪不部署 Pages／GAS、不建立正式 Sheet 或照片、不等於 Liam 驗收。GAS 存檔不是部署；後續須從屆時最新 main 只套本次增量、新建 GAS version，先設定 `AUDIT_REPORT_SUBMIT_CODE`、記錄 rollback tag／舊 deployment version，再做正式私有權限、跨帳號照片 readback 與 iPhone Safari UAT。首批截止日暫定 `2026-08-31`，部署前由 Liam 確認。
+
 ## 2026-08-20 ｜ Codex（ptsummary 最近巡店紀錄 NA 判定 hotfix，未部署）
 
 - 做了什麼：由最新 `origin/main` 的 PR #63 merge commit `bbaf045` 建立獨立分支 `hotfix/ptsummary-na-20260820`，只調整正式 `ptsummary.recentVisits` 與其唯讀 parity model 的單題已檢查判定；`result=v`、`result=na`、`reason=na` 視為已檢查，空白與真正缺失原因仍維持待補。沒有修改 `ptwrite`、Sheet schema、正式 66 筆巡店資料或其他巡店週期規則。

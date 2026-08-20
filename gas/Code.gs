@@ -2072,6 +2072,18 @@ function doPost(e) {
     else if (action === 'ptvisit_write') result = writePatrolVisitEvent_(payload);
     else if (action === 'hwrite') result = writeHalfCheckPostPayload_(payload, e);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
+    else if (action === 'audit_config') result = auditPublicConfig();
+    else if (action === 'audit_submit_auth') result = auditSubmitAuth(payload);
+    else if (action === 'audit_start') result = auditStart(payload);
+    else if (action === 'audit_upload') result = auditUploadPhoto(payload);
+    else if (action === 'audit_photo_delete') result = auditDeletePhoto(payload);
+    else if (action === 'audit_submit') result = auditSubmit(payload);
+    else if (action === 'audit_status') result = auditOwnStatus(payload);
+    else if (action === 'audit_overview') result = auditOverview(payload);
+    else if (action === 'audit_detail') result = auditDetail(payload);
+    else if (action === 'audit_photo_read') result = auditPhotoRead(payload);
+    else if (action === 'audit_review') result = auditReview(payload);
+    else if (action === 'audit_cancel') result = auditCancel(payload);
     else if (action === 'private_request') result = privateDashboardRequestBinding(payload);
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
     else if (action === 'private_access') result = privateDashboardAccess(payload);
