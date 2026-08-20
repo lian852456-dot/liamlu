@@ -62,6 +62,18 @@
               </label>
             </div>
             <p class="time-note">回報日期與時間將由系統以 Asia/Taipei 自動記錄，門市無法修改。</p>
+            <div class="store-auth-panel" aria-labelledby="storeAuthTitle">
+              <div>
+                <strong id="storeAuthTitle">門市回報授權</strong>
+                <p>回報碼只用來換取本次門市、此次 submission 專用的短效 token，不會儲存在本機。</p>
+              </div>
+              <label>
+                <span>批次回報碼</span>
+                <input id="storeSubmitCode" type="password" autocomplete="off" placeholder="請輸入回報碼">
+              </label>
+              <button id="storeAuthButton" class="secondary-button" type="button">驗證回報碼</button>
+              <p id="storeAuthMessage" class="inline-message" role="status" aria-live="polite">尚未取得回報授權</p>
+            </div>
           </div>
         </section>
 
@@ -81,6 +93,7 @@
         <h2 id="completionTitle">回報完成</h2>
         <dl id="completionSummary"></dl>
         <div id="timeline" class="timeline"></div>
+        <button id="newSubmissionButton" class="secondary-button" type="button" hidden>建立新的回報</button>
       </section>
     </section>
 
@@ -112,6 +125,7 @@
           <button id="copyPendingButton" class="secondary-button" type="button">複製未回報／待補件名單</button>
           <button id="supervisorLogoutButton" class="text-button" type="button">登出</button>
         </section>
+        <p id="supervisorActionMessage" class="message" role="status" aria-live="polite" hidden></p>
         <div class="legend" aria-label="狀態圖例"><span class="missing">未回報</span><span class="submitted">已回報待檢查</span><span class="rework">待補件</span><span class="approved">驗收完成</span></div>
         <div id="overviewGrid" class="overview-grid" aria-live="polite"></div>
       </div>

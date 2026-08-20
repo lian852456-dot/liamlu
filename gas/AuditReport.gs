@@ -7,8 +7,10 @@
 // - 稽核回報：一張照片一列
 // - 稽核回報紀錄：append-only 時間軸
 //
-// GitHub Pages 不持有 PT_KEY。門市只能憑 submission_id + edit token
-// 讀寫自己的提交；九店總覽、照片明細與覆核只接受既有 PT_TOKEN。
+// GitHub Pages 不持有 PT_KEY 或回報碼。門市先以 Script Property 中的
+// AUDIT_REPORT_SUBMIT_CODE 換取綁定批次／門市／submission 的短效 token，
+// 後續仍須同時通過 submission_id + edit token ownership；九店總覽、
+// 照片明細、覆核與取消只接受既有 PT_TOKEN。
 // ════════════════════════════════════
 
 const AUDIT_BATCH_SHEET = '稽核批次';
@@ -24,6 +26,7 @@ const AUDIT_INITIAL_BATCH = {
 };
 const AUDIT_MAX_PHOTOS_PER_ITEM = 10;
 const AUDIT_MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const AUDIT_STORE_SESSION_TTL_SECONDS = 1800;
 
 const AUDIT_ITEMS = [
   { item_id: 'island_display', item_name: '中島、展示機環境清潔' },
@@ -202,6 +205,53 @@ function auditClientPhotoId_(value) {
   return clean;
 }
 
+function auditStoreSessionCacheKey_(token) {
+  const clean = String(token || '').trim();
+  if (!/^[A-Za-z0-9_-]{32,160}$/.test(clean)) throw new Error('unauthorized');
+  return 'audit_store_session:' + privateDashboardHash(clean).slice(0, 48);
+}
+
+function auditStoreSession_(payload) {
+  const body = payload || {};
+  const token = String(body.store_token || '').trim();
+  if (!token) throw new Error('unauthorized');
+  const raw = CacheService.getScriptCache().get(auditStoreSessionCacheKey_(token));
+  if (!raw) throw new Error('unauthorized');
+  let session;
+  try { session = JSON.parse(raw); } catch (err) { throw new Error('unauthorized'); }
+  if (!session || session.scope !== 'audit-submit') throw new Error('unauthorized');
+  if (session.submission_id !== auditSubmissionId_(body.submission_id)) throw new Error('unauthorized');
+  return session;
+}
+
+function auditAssertStoreSession_(session, submission) {
+  if (!session || !submission || session.submission_id !== submission.submission_id ||
+      session.store_id !== submission.store_id || session.batch_id !== submission.batch_id) {
+    throw new Error('unauthorized');
+  }
+}
+
+function auditSubmitAuth(payload) {
+  const body = payload || {};
+  const expected = String(PropertiesService.getScriptProperties().getProperty('AUDIT_REPORT_SUBMIT_CODE') || '');
+  if (!expected) throw new Error('稽核回報碼尚未設定');
+  const supplied = String(body.code || '');
+  if (!supplied || privateDashboardHash(supplied) !== privateDashboardHash(expected)) throw new Error('unauthorized');
+  const batch = auditActiveBatch_();
+  if (String(body.batch_id || '') !== batch.batch_id) throw new Error('稽核批次已更新，請重新整理');
+  const store = auditStore_(body.store_id);
+  const submissionId = auditSubmissionId_(body.submission_id);
+  const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  CacheService.getScriptCache().put(auditStoreSessionCacheKey_(token), JSON.stringify({
+    scope: 'audit-submit',
+    batch_id: batch.batch_id,
+    store_id: store.store_id,
+    submission_id: submissionId,
+    issued_at: auditNow_()
+  }), AUDIT_STORE_SESSION_TTL_SECONDS);
+  return { token:token, expiresIn:AUDIT_STORE_SESSION_TTL_SECONDS };
+}
+
 function auditSubmissionSheets_() {
   return {
     submissions: auditEnsureSheet_(AUDIT_SUBMISSION_SHEET, AUDIT_SUBMISSION_FIELDS),
@@ -232,12 +282,14 @@ function auditAppendEventOnce_(sheet, value) {
 
 function auditStart(payload) {
   const body = payload || {};
+  const storeSession = auditStoreSession_(body);
   const batch = auditActiveBatch_();
   if (String(body.batch_id || '') !== batch.batch_id) throw new Error('稽核批次已更新，請重新整理');
   const submissionId = auditSubmissionId_(body.submission_id);
   const store = auditStore_(body.store_id);
   const inspector = auditCleanInspector_(body.inspector_name);
   const tokenHash = auditTokenHash_(body.edit_token);
+  if (storeSession.batch_id !== batch.batch_id || storeSession.store_id !== store.store_id || storeSession.submission_id !== submissionId) throw new Error('unauthorized');
   const sheets = auditSubmissionSheets_();
   const now = auditNow_();
   const lock = LockService.getScriptLock();
@@ -248,6 +300,7 @@ function auditStart(payload) {
     if (sameId) {
       if (sameId.edit_token_hash !== tokenHash) throw new Error('submission_id 已存在');
       if (sameId.batch_id !== batch.batch_id || sameId.store_id !== store.store_id) throw new Error('回報識別與門市不一致');
+      if (sameId.status === 'cancelled') throw new Error('本次回報已取消，請建立新的回報');
       auditUpdateRow_(sheets.submissions, sameId._row, { inspector_name: inspector, updated_at: now });
       return auditOwnStatus_({ submission_id: submissionId, edit_token: body.edit_token });
     }
@@ -336,8 +389,10 @@ function auditUploadPhoto(payload) {
 
 function auditUploadPhotoUnlocked_(payload) {
   const body = payload || {};
+  const storeSession = auditStoreSession_(body);
   const sheets = auditSubmissionSheets_();
   const submission = auditOwnSubmission_(sheets.submissions, body);
+  auditAssertStoreSession_(storeSession, submission);
   if (['approved','cancelled'].indexOf(submission.status) >= 0) throw new Error('本次回報已關閉，不能再上傳照片');
   const item = auditItem_(body.item_id);
   const allowedItems = auditReturnedItemIds_(sheets.events, submission.submission_id);
@@ -372,7 +427,7 @@ function auditUploadPhotoUnlocked_(payload) {
     item_id: item.item_id,
     item_name: item.item_name,
     photo_file_id: driveFile.getId(),
-    private_url: 'https://drive.google.com/file/d/' + driveFile.getId() + '/view',
+    private_url: '',
     photo_name: driveFile.getName(),
     client_photo_id: clientPhotoId,
     note: auditCleanNote_(body.note),
@@ -391,8 +446,10 @@ function auditUploadPhotoUnlocked_(payload) {
 
 function auditDeletePhoto(payload) {
   const body = payload || {};
+  const storeSession = auditStoreSession_(body);
   const sheets = auditSubmissionSheets_();
   const submission = auditOwnSubmission_(sheets.submissions, body);
+  auditAssertStoreSession_(storeSession, submission);
   if (['draft','rework'].indexOf(submission.status) === -1) throw new Error('目前狀態不能刪除照片');
   const clientPhotoId = auditClientPhotoId_(body.client_photo_id);
   const row = auditRows_(sheets.photos, AUDIT_PHOTO_FIELDS).filter(function(photo) {
@@ -417,11 +474,13 @@ function auditReturnedItemIds_(eventSheet, submissionId) {
 
 function auditSubmit(payload) {
   const body = payload || {};
+  const storeSession = auditStoreSession_(body);
   const sheets = auditSubmissionSheets_();
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
     const submission = auditOwnSubmission_(sheets.submissions, body);
+    auditAssertStoreSession_(storeSession, submission);
     const isRework = submission.status === 'rework';
     if (submission.status === 'approved' || submission.status === 'submitted') {
       const previous = auditOwnStatus_(body);
@@ -494,8 +553,6 @@ function auditSubmit(payload) {
 function auditPhotoForClient_(row) {
   return {
     client_photo_id: row.client_photo_id,
-    photo_file_id: row.photo_file_id,
-    private_url: row.private_url,
     photo_name: row.photo_name,
     revision: Number(row.revision || 1),
     status: row.status
@@ -562,7 +619,11 @@ function auditOwnStatus_(payload) {
 }
 
 function auditOwnStatus(payload) {
-  return auditOwnStatus_(payload || {});
+  const body = payload || {};
+  const storeSession = auditStoreSession_(body);
+  const detail = auditOwnStatus_(body);
+  auditAssertStoreSession_(storeSession, detail);
+  return detail;
 }
 
 function auditSupervisorAuthorized_(payload) {
@@ -614,6 +675,70 @@ function auditDetail(payload) {
   const submission = auditFindSubmission_(sheets.submissions, auditSubmissionId_((payload || {}).submission_id));
   if (!submission) throw new Error('找不到稽核回報');
   return auditBuildDetail_(submission, sheets.photos, sheets.events, true);
+}
+
+function auditPhotoRead(payload) {
+  const body = payload || {};
+  const sheets = auditSubmissionSheets_();
+  const submissionId = auditSubmissionId_(body.submission_id);
+  const submission = auditFindSubmission_(sheets.submissions, submissionId);
+  if (!submission) throw new Error('找不到稽核回報');
+  if (!ptSessionAuthorized_(String(body.token || ''))) {
+    const storeSession = auditStoreSession_(body);
+    const owned = auditOwnSubmission_(sheets.submissions, body);
+    auditAssertStoreSession_(storeSession, owned);
+  }
+  const clientPhotoId = auditClientPhotoId_(body.client_photo_id);
+  const photo = auditRows_(sheets.photos, AUDIT_PHOTO_FIELDS).filter(function(row) {
+    return row.submission_id === submissionId && row.client_photo_id === clientPhotoId && row.status !== 'deleted';
+  })[0];
+  if (!photo) throw new Error('找不到照片');
+  const blob = DriveApp.getFileById(photo.photo_file_id).getBlob();
+  const mimeType = String(blob.getContentType() || '').toLowerCase();
+  if (!/^image\//.test(mimeType)) throw new Error('照片格式不正確');
+  return {
+    client_photo_id: photo.client_photo_id,
+    photo_name: photo.photo_name,
+    mime_type: mimeType,
+    base64: Utilities.base64Encode(blob.getBytes())
+  };
+}
+
+function auditCancel(payload) {
+  auditSupervisorAuthorized_(payload);
+  const body = payload || {};
+  const sheets = auditSubmissionSheets_();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const submission = auditFindSubmission_(sheets.submissions, auditSubmissionId_(body.submission_id));
+    if (!submission) throw new Error('找不到稽核回報');
+    if (submission.status === 'cancelled') return auditBuildDetail_(submission, sheets.photos, sheets.events, true);
+    const now = auditNow_();
+    const comment = auditCleanNote_(body.comment) || '督導取消並開放門市重新回報';
+    auditUpdateRow_(sheets.submissions, submission._row, { status:'cancelled', updated_at:now });
+    auditAppendEventOnce_(sheets.events, {
+      event_id: Utilities.getUuid(),
+      event_key: 'cancelled:' + submission.submission_id,
+      batch_id: submission.batch_id,
+      submission_id: submission.submission_id,
+      store_id: submission.store_id,
+      store_name: submission.store_name,
+      item_id: '',
+      item_name: '',
+      event_type: 'cancelled',
+      status: 'cancelled',
+      comment: comment,
+      actor: 'supervisor',
+      revision: Number(submission.revision || 1),
+      created_at: now
+    });
+    SpreadsheetApp.flush();
+    const cancelled = auditFindSubmission_(sheets.submissions, submission.submission_id);
+    return auditBuildDetail_(cancelled, sheets.photos, sheets.events, true);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function auditReview(payload) {

@@ -6,7 +6,9 @@
 
 - `audit-report.html` 是九店手機優先的環境清潔回報與督導逐項驗收頁；入口位於 `home.html`。
 - `gas/AuditReport.gs` 使用獨立的批次、提交、照片與 append-only 時間軸模型；只在 `gas/Code.gs` 增加隔離的 `audit_*` POST dispatch，不改巡店、半月檢查、每日回報、KPI、台獎或班表資料列。
-- 門市只能以 `submission_id + edit token` 讀寫自己的提交；督導總覽與覆核沿用既有 PT token／重新驗證，不把 `PT_KEY` 放進公開前端。
+- 門市先以只存在 GAS Script Properties 的 `AUDIT_REPORT_SUBMIT_CODE` 換取 30 分鐘、綁定批次／門市／`submission_id` 的稽核專用 token；`audit_start`、上傳、刪除、送出與狀態讀取還會再核對 `submission_id + edit token`。回報碼不寫入 repo 或瀏覽器儲存。
+- 私有照片只可經 `audit_photo_read` 讀取：督導驗證既有 PT token，門市驗證稽核 token 與 submission ownership；GAS 讀取 Drive Blob 後回傳 MIME＋base64，前端只建立暫時 Blob URL 並釋放，不取得 Drive URL／file ID。
+- 督導可取消／重設遺失草稿或 edit token 的舊回報；舊照片與 append-only 事件保留為 `cancelled`，該店才能建立新的 submission。
 - 門市填報頁在批次資訊後提供品質管理整理提醒原圖，可點擊或以鍵盤開啟單張全螢幕預覽；督導模式不顯示此圖卡。
 - 本階段只完成程式、本機測試與 Draft PR。Sheet／Drive 初始化、GAS 新版本、Pages 發布、正式 readback 與 Liam 驗收均待後續明確核准；部署交接見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
 

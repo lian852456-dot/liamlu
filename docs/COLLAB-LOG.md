@@ -15,9 +15,9 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ## 2026-08-20 ｜ Codex（北一二B 稽核回報專區，未部署）
 
-- 做了什麼：從最新 `origin/main` `6564a68` 建立隔離分支 `feature/audit-cleaning-report-20260820`。在 `home.html` 新增稽核入口，新增手機優先 `audit-report.html/css/js` 與隔離 `gas/AuditReport.gs`；九店 canonical value 直接由既有 `PT_STORES` 解析。門市草稿以 localStorage + IndexedDB 保存，逐張壓縮／上傳／失敗重試，只有寫入後讀回一致才完成；督導總覽、逐項通過／退回與逾時重驗沿用既有 PT token。其後在同一 Draft PR #62 追加門市專用「整理方向」圖卡與原圖放大預覽；單張預覽隱藏導覽鍵，支援鍵盤、ESC、Safari 焦點回復及載入失敗替代訊息。
-- 結果（Draft PR #62／未部署）：新增四個獨立 Sheet schema、私有 Drive「批次／店點／項目」規劃與 `submission_id + edit token + client_photo_id + event_key` 冪等保護。追加素材位於 `assets/audit/quality-management-reminder.png`；收到的附件實檔為 932×526 JPEG，未裁切／縮放／改字，只轉為 932×526 lossless PNG。Node `222/222`、完整 Chromium `158/158`、完整 WebKit `158/158`、GAS／JS syntax、diff check 與 390×844 overflow 通過；新版手機與桌面圖卡截圖位於 `docs/screenshots/audit-report-20260820/`。為完成整套 WebKit，只調整既有測試使用 HTTP `TEST_BASE_URL`，並隔離里程 fixture 與巡店正式月份，未改產品資料流。`gas/Code.gs` 只增加 `audit_*` dispatch；`index.html`、`patrol.html`、`HalfMedia.gs` 及 KPI／台獎／每日回報／巡店／班表／半月資料流均未改。
-- 經驗 / 給下一位的提醒：本輪不部署 Pages／GAS、不建立正式 Sheet 或照片、不等於 Liam 驗收。GAS 存檔不是部署；後續須從屆時最新 main 只套本次增量、新建 GAS version，先記錄 rollback tag／舊 deployment version，再做正式私有權限與 iPhone Safari readback。首批截止日暫定 `2026-08-31`，部署前由 Liam 確認。
+- 做了什麼：從最新 `origin/main` `6564a68` 建立隔離分支 `feature/audit-cleaning-report-20260820`。在 `home.html` 新增稽核入口，新增手機優先 `audit-report.html/css/js` 與隔離 `gas/AuditReport.gs`；九店 canonical value 直接由既有 `PT_STORES` 解析。門市草稿以 localStorage + IndexedDB 保存，逐張壓縮／上傳／失敗重試，只有寫入後讀回一致才完成；督導總覽、逐項通過／退回與逾時重驗沿用既有 PT token。其後在同一 Draft PR #62 追加「整理方向」圖卡；本次再補 `AUDIT_REPORT_SUBMIT_CODE` 換發的 30 分鐘 submission-bound token、PT／ownership 保護的 `audit_photo_read`、Blob URL 生命週期，以及保留照片／事件的督導 `audit_cancel` 復原流程。
+- 結果（Draft PR #62／未部署）：照片 metadata API 已移除 Drive URL／file ID，Drive 維持 private；匿名、錯誤／過期 token、跨門市越權、PT 私有照片讀取、取消保留證據與重新回報均通過。追加素材位於 `assets/audit/quality-management-reminder.png`；收到的附件實檔為 932×526 JPEG，未裁切／縮放／改字，只轉為 932×526 lossless PNG。Node `227/227`、完整 Chromium `160/160`、完整 WebKit `160/160`、GAS／JS syntax、diff check 與 390×844 overflow 通過；既有截圖位於 `docs/screenshots/audit-report-20260820/`。`gas/Code.gs` 只增加隔離 `audit_*` dispatch；`index.html`、`patrol.html`、`HalfMedia.gs` 及 KPI／台獎／每日回報／巡店／班表／半月資料流均未改。
+- 經驗 / 給下一位的提醒：本輪不部署 Pages／GAS、不建立正式 Sheet 或照片、不等於 Liam 驗收。GAS 存檔不是部署；後續須從屆時最新 main 只套本次增量、新建 GAS version，先設定 `AUDIT_REPORT_SUBMIT_CODE`、記錄 rollback tag／舊 deployment version，再做正式私有權限、跨帳號照片 readback 與 iPhone Safari UAT。首批截止日暫定 `2026-08-31`，部署前由 Liam 確認。
 
 ## 2026-08-18 ｜ Codex（台獎摘要金額單行與三創顯示名稱，未部署）
 
