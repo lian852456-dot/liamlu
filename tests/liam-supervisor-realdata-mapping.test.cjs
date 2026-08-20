@@ -70,6 +70,18 @@ test('KPI adapter uses all 25 official reportRate fields without calculating fro
   assert.notEqual(result.stores.data[0].fullKpis[0].rate, 999999);
 });
 
+test('KPI adapter preserves a formal zero ranking change', () => {
+  const A = loadAdapters();
+  const snapshot = snapshotFixture();
+  snapshot.kpiBattle.aggregate.company_rank_dod = 0;
+  snapshot.kpiBattle.stores[0].company_rank_dod = 0;
+
+  const result = A.adaptKpi(kpiFixture(), snapshot, '2026-08-10T01:02:00+08:00');
+
+  assert.equal(result.summary.data.rankChange, 0);
+  assert.equal(result.stores.data[0].rankChange, 0);
+});
+
 test('KPI supplement mismatch fails closed instead of mixing rank and DOD', () => {
   const A = loadAdapters();
   const snapshot = snapshotFixture();

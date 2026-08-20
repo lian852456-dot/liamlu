@@ -828,7 +828,7 @@
 
   function fmtPct(value) { return value == null ? '—' : `${(Number(value) * 100).toFixed(1)}%`; }
   function fmtSignedPct(value) { if (value == null) return '—'; const n=Number(value)*100; return `${n>0?'+':''}${n.toFixed(1)}pp`; }
-  function fmtSigned(value) { if (value == null) return '—'; const n=Number(value); return n===0?'—':`${n>0?'↑':'↓'}${Math.abs(n)}`; }
+  function fmtSigned(value) { if (value == null) return '—'; const n=Number(value); return n===0?'0':`${n>0?'↑':'↓'}${Math.abs(n)}`; }
   function fmtNumber(value, digits=2) { if (value == null) return '—'; return Number(value).toLocaleString('zh-TW',{maximumFractionDigits:digits}); }
   function valueClass(value) { if (value == null || Number(value)===0) return 'neutral-value'; return Number(value)>0?'positive':'negative'; }
   function privateUnlockState(message = '解鎖後顯示正式資料') {
