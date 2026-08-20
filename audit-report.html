@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>北一二B 稽核回報專區</title>
+  <link rel="stylesheet" href="audit-report.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="back-link" href="home.html" aria-label="返回智慧營運中心">← 返回大廳</a>
+    <button id="modeSwitch" class="mode-switch" type="button">督導驗收</button>
+  </header>
+
+  <main class="page-shell">
+    <section class="hero" aria-labelledby="pageTitle">
+      <p class="eyebrow">門市填報・稽核前確認</p>
+      <h1 id="pageTitle">稽核回報專區</h1>
+      <p>上傳環境清潔照片，查看補件狀態。照片只寫入私有 Drive，不會放進公開 GitHub。</p>
+      <div id="batchMeta" class="batch-meta" aria-live="polite">正在取得稽核批次…</div>
+    </section>
+
+    <section id="storeView" aria-labelledby="storeViewTitle">
+      <div class="section-heading">
+        <div>
+          <span class="step-label">STORE REPORT</span>
+          <h2 id="storeViewTitle">門市環境清潔回報</h2>
+        </div>
+        <span id="draftState" class="save-state">草稿將自動保存</span>
+      </div>
+
+      <div id="globalMessage" class="message" role="status" aria-live="polite" hidden></div>
+
+      <form id="auditForm" novalidate>
+        <section class="paper-card basic-card" aria-labelledby="basicTitle">
+          <div class="card-number">01</div>
+          <div class="card-content">
+            <h3 id="basicTitle">基本資料</h3>
+            <div class="field-grid">
+              <label>
+                <span>門市店點 <b aria-hidden="true">＊</b></span>
+                <select id="storeSelect" required>
+                  <option value="">請選擇店點</option>
+                </select>
+              </label>
+              <label>
+                <span>檢查人員姓名 <b aria-hidden="true">＊</b></span>
+                <input id="inspectorName" type="text" maxlength="40" autocomplete="name" placeholder="請輸入姓名" required>
+              </label>
+            </div>
+            <p class="time-note">回報日期與時間將由系統以 Asia/Taipei 自動記錄，門市無法修改。</p>
+          </div>
+        </section>
+
+        <div id="itemList" class="item-list" aria-live="polite"></div>
+
+        <section class="submit-panel">
+          <div>
+            <strong id="completionText">尚未完成 3 個項目</strong>
+            <p id="missingText">每個項目至少需要 1 張照片。</p>
+          </div>
+          <button id="submitButton" class="primary-button" type="submit">上傳並送出回報</button>
+        </section>
+      </form>
+
+      <section id="completionCard" class="paper-card completion-card" hidden aria-labelledby="completionTitle">
+        <div class="completion-mark">✓</div>
+        <h2 id="completionTitle">回報完成</h2>
+        <dl id="completionSummary"></dl>
+        <div id="timeline" class="timeline"></div>
+      </section>
+    </section>
+
+    <section id="supervisorView" hidden aria-labelledby="supervisorTitle">
+      <div class="section-heading">
+        <div>
+          <span class="step-label">SUPERVISOR REVIEW</span>
+          <h2 id="supervisorTitle">督導驗收</h2>
+        </div>
+      </div>
+
+      <section id="supervisorGate" class="paper-card auth-card">
+        <h3>使用既有督導驗證</h3>
+        <p>沿用 Liam 情報站的 PT_TOKEN／短效 session，不建立第二組密碼。</p>
+        <form id="supervisorLoginForm">
+          <label>
+            <span>督導通行碼</span>
+            <input id="supervisorPasscode" type="password" autocomplete="current-password" required>
+          </label>
+          <button id="supervisorLoginButton" class="primary-button" type="submit">驗證並進入</button>
+        </form>
+        <p id="supervisorAuthMessage" class="inline-message" role="status"></p>
+      </section>
+
+      <div id="supervisorWorkspace" hidden>
+        <section class="review-toolbar paper-card">
+          <label><span>狀態</span><select id="statusFilter"><option value="">全部狀態</option><option value="missing">未回報</option><option value="submitted">已回報待檢查</option><option value="rework">待補件</option><option value="approved">驗收完成</option></select></label>
+          <label><span>店點</span><select id="storeFilter"><option value="">全部店點</option></select></label>
+          <button id="copyPendingButton" class="secondary-button" type="button">複製未回報／待補件名單</button>
+          <button id="supervisorLogoutButton" class="text-button" type="button">登出</button>
+        </section>
+        <div class="legend" aria-label="狀態圖例"><span class="missing">未回報</span><span class="submitted">已回報待檢查</span><span class="rework">待補件</span><span class="approved">驗收完成</span></div>
+        <div id="overviewGrid" class="overview-grid" aria-live="polite"></div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="photoDialog" class="photo-dialog">
+    <button id="closePhotoDialog" class="dialog-close" type="button" aria-label="關閉照片預覽">×</button>
+    <button id="previousPhoto" class="photo-nav prev" type="button" aria-label="上一張照片">‹</button>
+    <figure><img id="dialogImage" alt="稽核照片預覽"><figcaption id="dialogCaption"></figcaption></figure>
+    <button id="nextPhoto" class="photo-nav next" type="button" aria-label="下一張照片">›</button>
+  </dialog>
+
+  <dialog id="reviewDialog" class="review-dialog">
+    <form method="dialog" id="reviewForm">
+      <button class="dialog-close" value="cancel" aria-label="關閉驗收視窗">×</button>
+      <div id="reviewDetail"></div>
+    </form>
+  </dialog>
+
+  <div id="reauthModal" class="reauth-modal" hidden>
+    <form id="reauthForm" class="paper-card" role="dialog" aria-modal="true" aria-labelledby="reauthTitle">
+      <h2 id="reauthTitle">督導驗證已逾時</h2>
+      <p>請重新驗證後繼續。門市草稿、備註及待送照片不會被清除。</p>
+      <label><span>督導通行碼</span><input id="reauthPasscode" type="password" autocomplete="current-password" required></label>
+      <button id="reauthButton" class="primary-button" type="submit">重新驗證</button>
+      <p id="reauthMessage" class="inline-message" role="status"></p>
+    </form>
+  </div>
+
+  <template id="itemTemplate">
+    <section class="paper-card audit-item">
+      <div class="card-number"></div>
+      <div class="card-content">
+        <div class="item-title-row"><h3></h3><span class="item-status">未完成</span></div>
+        <div class="return-reason" hidden></div>
+        <label class="upload-zone">
+          <input class="photo-input" type="file" accept="image/*" multiple>
+          <span class="upload-icon">＋</span>
+          <strong>拍照或從相簿選擇</strong>
+          <small>可多選、分次加入；單項最多 10 張</small>
+        </label>
+        <div class="photo-count">0／10 張</div>
+        <div class="photo-grid"></div>
+        <label class="note-field"><span>簡短備註（選填）</span><textarea class="item-note" maxlength="300" rows="2" placeholder="例如：已移除展示機底座灰塵"></textarea></label>
+      </div>
+    </section>
+  </template>
+
+  <script src="audit-report.js" defer></script>
+</body>
+</html>
