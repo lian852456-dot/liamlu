@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-20 ｜ Codex（ptsummary 最近巡店紀錄 NA 判定 hotfix，未部署）
+
+- 做了什麼：由最新 `origin/main` 的 PR #63 merge commit `bbaf045` 建立獨立分支 `hotfix/ptsummary-na-20260820`，只調整正式 `ptsummary.recentVisits` 與其唯讀 parity model 的單題已檢查判定；`result=v`、`result=na`、`reason=na` 視為已檢查，空白與真正缺失原因仍維持待補。沒有修改 `ptwrite`、Sheet schema、正式 66 筆巡店資料或其他巡店週期規則。
+- 結果：程式與本機測試完成，尚未合併或部署。專項 Node `16/16`、完整 Node `222/222`、巡店與 auth Playwright `50/50` 通過；三創 `13 v + 20 na` 與含兩種 NA 的六張犁均為 `complete=true / missingItems=0`，空白及真正缺失 fixture 仍為 `complete=false / missingItems=2`。
+- 經驗 / 給下一位的提醒：Apps Script editor HEAD 已含尚未部署的 `AuditReport.gs`／`audit_*` dispatch，不能直接從 editor HEAD 建立巡店 GAS 新版本。先保持 Draft PR，確認未混入稽核 PR #62；後續只能另行安排由乾淨 `main` 準備的最小 GAS hotfix 部署。本次未部署 GAS／Pages，也未寫入或修改正式資料。
+
 ## 2026-08-20 ｜ Codex（巡店貼上日期／NA 緊急防呆，Draft PR、未部署）
 
 - 做了什麼：由最新 `origin/main` `cd3faf1` 建立獨立分支 `hotfix/patrol-paste-20260820`。`patrol.html` 的貼上 parser 改為先完整驗證整批，再一次更新候選；任一列「填表時間」為 `####` 或無法解析時整批拒絕，保留文字框與既有 `rawDetails`，且不呼叫 `cloudWrite`。未使用到店時間替代填表時間。`na` 同時相容「是否合格」欄與舊版原因欄，空白／`na` 原因正規化為 `reason:'na'`，真正的非 NA 原因文字保留。
