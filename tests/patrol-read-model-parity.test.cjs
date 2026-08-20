@@ -120,3 +120,37 @@ test('visit count follows patrol.html unique arrival-date rule and never counts 
   assert.equal(result.recent.length, 2);
   assert.equal(result.recent.find(row => row.date === '2026-08-10').missingItems, 1);
 });
+
+test('ptsummary recent visits count v, result na and reason na as checked without hiding real gaps', () => {
+  const rows = [];
+  const add = (store, item, result, reason = '') => rows.push({
+    store,
+    code:fixture.stores.find(candidate => candidate.name === store).code,
+    item,
+    fillTime:'2026/8/20 12:00',
+    month:'2026-08',
+    result,
+    reason
+  });
+
+  for (let item = 1; item <= 33; item += 1) {
+    add('台北三創', item, item <= 13 ? 'v' : 'na');
+    if (item <= 10) add('台北六張犁', item, 'v');
+    else if (item <= 20) add('台北六張犁', item, 'na');
+    else add('台北六張犁', item, '', 'na');
+    add('台北酒泉', item, item <= 31 ? 'v' : '', item === 33 ? '貨架未整理' : '');
+  }
+
+  const canonical = model.summaryContract(rows, fixture.stores, '2026-08', fixture.now, {});
+  const formalGas = gasSummary(rows, fixture.stores, '2026-08', fixture.now);
+  [canonical, formalGas].forEach(summary => {
+    const sanchuang = summary.recentVisits.find(visit => visit.store === '台北三創');
+    const liuzhangli = summary.recentVisits.find(visit => visit.store === '台北六張犁');
+    const jiuquan = summary.recentVisits.find(visit => visit.store === '台北酒泉');
+    assert.deepEqual(sanchuang, { date:'2026-08-20', store:'台北三創', complete:true, missingItems:0, missingItemNumbers:[] });
+    assert.deepEqual(liuzhangli, { date:'2026-08-20', store:'台北六張犁', complete:true, missingItems:0, missingItemNumbers:[] });
+    assert.equal(jiuquan.complete, false);
+    assert.equal(jiuquan.missingItems, 2);
+    assert.deepEqual(jiuquan.missingItemNumbers, [32, 33]);
+  });
+});

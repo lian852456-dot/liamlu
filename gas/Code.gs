@@ -838,8 +838,13 @@ function patrolSummaryContract_(allRows, month, now, meta) {
     });
     Object.keys(groups).forEach(function(date) {
       const byItem = {};
-      groups[date].forEach(function(row) { const item = Number(row.item); if (item >= 1 && item <= 33) byItem[item] = String(row.result || '').toLowerCase(); });
-      const missing = Object.keys(byItem).map(Number).filter(function(item) { return item !== 1 && byItem[item] !== 'v'; });
+      groups[date].forEach(function(row) {
+        const item = Number(row.item);
+        const result = String(row.result || '').trim().toLowerCase();
+        const reason = String(row.reason || '').trim();
+        if (item >= 1 && item <= 33) byItem[item] = byItem[item] === true || result === 'v' || result === 'na' || /^na$/i.test(reason);
+      });
+      const missing = Object.keys(byItem).map(Number).filter(function(item) { return item !== 1 && byItem[item] !== true; });
       groupedVisits.push({ date:date, store:String(store.name), complete:Object.keys(byItem).length > 0 && missing.length === 0, missingItems:missing.length, missingItemNumbers:missing });
     });
     return { store:String(store.name), count:Object.keys(groups).length, basis:'unique-store-date', sameDayMultipleVisitsDistinguishable:false };
