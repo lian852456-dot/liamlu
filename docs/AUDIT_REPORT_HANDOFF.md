@@ -1,10 +1,10 @@
 # 北一二B 稽核回報專區交接
 
-狀態：程式與本機測試階段；尚未部署 GitHub Pages、GAS、建立正式 Sheet／Drive 資料，亦尚未完成 Liam 驗收。
+狀態：commit `db9c54d`、Draft PR #62；程式與本機測試完成，尚未部署 GitHub Pages、GAS、建立正式 Sheet／Drive 資料，亦尚未完成 Liam 驗收。
 
 ## 範圍與資料流
 
-`home.html` 的「稽核回報專區」連到 `audit-report.html`。門市端由 `audit-report.js` 將草稿中繼資料存於 `localStorage`、照片 Blob 存於 IndexedDB；上傳前最長邊縮至 2048 px、JPEG quality 0.9，逐張呼叫獨立 `audit_*` POST 路由。只有所有必要照片成功、`audit_submit` 寫入並讀回一致後，才顯示「回報完成」。失敗照片維持 failed，下一次只重試未成功的 `client_photo_id`。
+`home.html` 的「稽核回報專區」連到 `audit-report.html`。門市端由 `audit-report.js` 將草稿中繼資料存於 `localStorage`、照片 bytes 以 ArrayBuffer 存於 IndexedDB；上傳前最長邊縮至 2048 px、JPEG quality 0.9，逐張呼叫獨立 `audit_*` POST 路由。只有所有必要照片成功、`audit_submit` 寫入並讀回一致後，才顯示「回報完成」。失敗照片維持 failed，下一次只重試未成功的 `client_photo_id`。
 
 門市只持有隨機 `submission_id` 與隨機 edit token；Sheet 僅保存 token SHA-256，不保存明文。`audit_status`、`audit_upload`、`audit_photo_delete`、`audit_submit` 都同時核對兩者，所以不能列出其他門市。督導端的 `audit_overview`、`audit_detail`、`audit_review` 沿用既有 `ptauth` 產生的 30 分鐘 PT token 與重新驗證流程；公開 HTML／JavaScript 不含 `PT_KEY`。
 
@@ -31,6 +31,14 @@
         ├── op_zone_OP 商品、專區清潔/
         └── counter_seating_櫃台電腦後方／客戶座位區清潔/
 ```
+
+## 本機驗證
+
+- Node contract：`221/221`
+- 完整 Chromium Playwright：`156/156`
+- 稽核專區＋首頁 WebKit（Safari 等價）：`7/7`
+- 390×844 無橫向 overflow；多圖、分次加入、刪除／預覽、10 張限制、部分失敗重試、冪等、own-submission scope、PT auth／逾時重驗、單項補件與逐項覆核皆有自動測試。
+- 合成資料截圖：`docs/screenshots/audit-report-20260820/`。截圖無正式姓名、正式照片或正式資料。
 
 ## 未來獲准後的部署步驟
 
