@@ -138,9 +138,11 @@
         const byItem = new Map();
         visitRows.forEach(row => {
           const item = Number(row && row.item);
-          if (item >= 1 && item <= 33) byItem.set(item, String(row && row.result || '').toLowerCase());
+          const result = String(row && row.result || '').trim().toLowerCase();
+          const reason = String(row && row.reason || '').trim();
+          if (item >= 1 && item <= 33) byItem.set(item, byItem.get(item) === true || result === 'v' || result === 'na' || /^na$/i.test(reason));
         });
-        const missing = [...byItem].filter(([item, result]) => ITEM_RULES[item].type !== 'station' && result !== 'v').map(([item]) => item);
+        const missing = [...byItem].filter(([item, checked]) => ITEM_RULES[item].type !== 'station' && checked !== true).map(([item]) => item);
         visits.push({
           date,
           store:String(store.name || store.store || ''),

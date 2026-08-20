@@ -19,6 +19,18 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 - 結果（Draft PR #62／未部署）：照片 metadata API 已移除 Drive URL／file ID，Drive 維持 private；匿名、錯誤／過期 token、跨門市越權、PT 私有照片讀取、取消保留證據與重新回報均通過。追加素材位於 `assets/audit/quality-management-reminder.png`；收到的附件實檔為 932×526 JPEG，未裁切／縮放／改字，只轉為 932×526 lossless PNG。Node `227/227`、完整 Chromium `160/160`、完整 WebKit `160/160`、GAS／JS syntax、diff check 與 390×844 overflow 通過；既有截圖位於 `docs/screenshots/audit-report-20260820/`。`gas/Code.gs` 只增加隔離 `audit_*` dispatch；`index.html`、`patrol.html`、`HalfMedia.gs` 及 KPI／台獎／每日回報／巡店／班表／半月資料流均未改。
 - 經驗 / 給下一位的提醒：本輪不部署 Pages／GAS、不建立正式 Sheet 或照片、不等於 Liam 驗收。GAS 存檔不是部署；後續須從屆時最新 main 只套本次增量、新建 GAS version，先設定 `AUDIT_REPORT_SUBMIT_CODE`、記錄 rollback tag／舊 deployment version，再做正式私有權限、跨帳號照片 readback 與 iPhone Safari UAT。首批截止日暫定 `2026-08-31`，部署前由 Liam 確認。
 
+## 2026-08-20 ｜ Codex（ptsummary 最近巡店紀錄 NA 判定 hotfix，未部署）
+
+- 做了什麼：由最新 `origin/main` 的 PR #63 merge commit `bbaf045` 建立獨立分支 `hotfix/ptsummary-na-20260820`，只調整正式 `ptsummary.recentVisits` 與其唯讀 parity model 的單題已檢查判定；`result=v`、`result=na`、`reason=na` 視為已檢查，空白與真正缺失原因仍維持待補。沒有修改 `ptwrite`、Sheet schema、正式 66 筆巡店資料或其他巡店週期規則。
+- 結果：程式與本機測試完成，尚未合併或部署。專項 Node `16/16`、完整 Node `222/222`、巡店與 auth Playwright `50/50` 通過；三創 `13 v + 20 na` 與含兩種 NA 的六張犁均為 `complete=true / missingItems=0`，空白及真正缺失 fixture 仍為 `complete=false / missingItems=2`。
+- 經驗 / 給下一位的提醒：Apps Script editor HEAD 已含尚未部署的 `AuditReport.gs`／`audit_*` dispatch，不能直接從 editor HEAD 建立巡店 GAS 新版本。先保持 Draft PR，確認未混入稽核 PR #62；後續只能另行安排由乾淨 `main` 準備的最小 GAS hotfix 部署。本次未部署 GAS／Pages，也未寫入或修改正式資料。
+
+## 2026-08-20 ｜ Codex（巡店貼上日期／NA 緊急防呆，Draft PR、未部署）
+
+- 做了什麼：由最新 `origin/main` `cd3faf1` 建立獨立分支 `hotfix/patrol-paste-20260820`。`patrol.html` 的貼上 parser 改為先完整驗證整批，再一次更新候選；任一列「填表時間」為 `####` 或無法解析時整批拒絕，保留文字框與既有 `rawDetails`，且不呼叫 `cloudWrite`。未使用到店時間替代填表時間。`na` 同時相容「是否合格」欄與舊版原因欄，空白／`na` 原因正規化為 `reason:'na'`，真正的非 NA 原因文字保留。
+- 結果：成功（本機程式／測試）。新增 8/20 的 66 筆 fixture，三創 33 筆、六張犁 33 筆；Node `221/221`、完整巡店 Playwright `43/43` 通過，涵蓋整批拒絕、零 cloud write、`rawDetails` 不變、貼上內容保留、新舊 NA、去重、正式摘要、班表、半月、媒體 mock 與里程回歸。
+- 經驗 / 給下一位的提醒：Excel 顯示 `########` 不是可推導的日期值；不可用到店時間補造填表時間，否則會改變 `fillTime + store + item` 去重身分。此 hotfix 未修改 `gas/Code.gs`、Sheet schema、`gas/HalfMedia.gs`、正式 Sheet 資料、PR #62，也未合併或部署 Pages／GAS。
+
 ## 2026-08-18 ｜ Codex（台獎摘要金額單行與三創顯示名稱，未部署）
 
 - 做了什麼：由最新 `origin/main` `b23a101` 建立隔離分支 `fix/awards-ui-store-label-20260818`。台獎摘要的「督導區實際／推估獎金」共用 `award-summary-money`，固定 `nowrap`、`keep-all`、`line-height:1` 並將金額字級調為 27px；六張摘要卡片只在台獎面板內補齊置中與等高規則。KPI／台獎共用 controller 新增純顯示層 `displayStoreName()`，只把 `台灣大哥大台北三創` 與 `台灣大哥大數位生活台北三創` 顯示為 `台北三創`。

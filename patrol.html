@@ -983,50 +983,71 @@ function showPatrolPastePreview(label,result){
   preview.innerHTML=`<strong>${label}：${result.addedRows.length} 筆</strong>本頁去重候選共 ${result.total} 筆${result.duplicates?`・略過重複 ${result.duplicates} 筆`:''}<br>正式摘要仍以雲端 ptsummary 為準。`;
 }
 
+const PATROL_FILL_TIME_PARSE_ERROR="填表時間欄顯示 ####，請回原 Excel 加寬『填表時間』欄，確認顯示日期時間後再貼上。";
+
+function parsePatrolPasteText(raw){
+  const newDetails=[];
+  const lines=String(raw||'').split(/\r?\n/);
+  for(let index=0;index<lines.length;index++){
+    const line=lines[index];
+    if(!line.trim()) continue;
+    const cols=line.split('\t');
+    const firstCell=(cols[0]||'').trim();
+    if(firstCell==='填表時間') continue;
+    if(cols.length<8) return {rows:[],error:`第 ${index+1} 列欄位不足，請確認貼上的是完整巡店明細。`};
+
+    // 欄位: 0填表 1到店 2離店 3區處 4代碼 5店點 6人員 7題號 8內容 9合格 10原因
+    const fillTime=firstCell;
+    const dm=fillTime.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+    if(!dm) return {rows:[],error:PATROL_FILL_TIME_PARSE_ERROR};
+    const y=Number(dm[1]),mo=Number(dm[2]),d=Number(dm[3]);
+    const parsedDate=new Date(Date.UTC(y,mo-1,d));
+    if(parsedDate.getUTCFullYear()!==y||parsedDate.getUTCMonth()!==mo-1||parsedDate.getUTCDate()!==d){
+      return {rows:[],error:PATROL_FILL_TIME_PARSE_ERROR};
+    }
+
+    const itemNo=parseInt((cols[7]||'').trim(),10);
+    if(!itemNo||itemNo<1||itemNo>33){
+      return {rows:[],error:`第 ${index+1} 列題號無法辨識，請確認題號為 1 至 33。`};
+    }
+
+    const resultText=(cols[9]||'').trim();
+    const reasonText=(cols[10]||'').trim();
+    const resultKey=resultText.toLowerCase();
+    const reasonKey=reasonText.toLowerCase();
+    let result='';
+    if(resultKey==='v') result='v';
+    else if(resultKey==='na'||reasonKey==='na') result='na';
+    const reason=result==='na'&&(!reasonText||reasonKey==='na')?'na':reasonText;
+
+    newDetails.push({
+      fillTime,
+      arriveTime:(cols[1]||'').trim(),
+      leaveTime:(cols[2]||'').trim(),
+      district:(cols[3]||'').trim(),
+      code:(cols[4]||'').trim(),
+      store:(cols[5]||'').trim(),
+      inspector:(cols[6]||'').trim(),
+      item:itemNo,
+      content:(cols[8]||'').trim(),
+      result,
+      reason,
+      month:`${y}-${String(mo).padStart(2,'0')}`
+    });
+  }
+  return {rows:newDetails,error:''};
+}
+
 /* ---------- 解析貼上資料 ---------- */
 function parseData(){
   const raw = document.getElementById('pasteBox').value;
-  const msg = document.getElementById('parseMsg');
   if(!raw.trim()){ showMsg('請先貼上資料','err'); return; }
 
-  const lines = raw.split('\n');
-  let added=0;
-  const newDetails=[]; // 這次解析出的完整明細
-
-  lines.forEach(line=>{
-    const cols = line.split('\t');
-    if(cols.length < 8) { return; }
-    // 欄位: 0填表 1到店 2離店 3區處 4代碼 5店點 6人員 7題號 8內容 9合格 10原因
-    const fillTime = (cols[0]||'').trim();
-    const arriveTime = (cols[1]||'').trim();
-    const leaveTime = (cols[2]||'').trim();
-    const district = (cols[3]||'').trim();
-    const code = (cols[4]||'').trim();
-    const store = (cols[5]||'').trim();
-    const inspector = (cols[6]||'').trim();
-    const itemNo = parseInt((cols[7]||'').trim(),10);
-    const content = (cols[8]||'').trim();
-    const result = (cols[9]||'').trim().toLowerCase(); // v 或空
-    const reason = (cols[10]||'').trim().toLowerCase(); // na 或空
-
-    if(!itemNo || itemNo<1 || itemNo>33) return;
-    const dm = fillTime.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-    if(!dm) return;
-    const y=+dm[1], mo=+dm[2], d=+dm[3];
-    const monthKey = `${y}-${String(mo).padStart(2,'0')}`;
-    const half = d<=15 ? 'H1' : 'H2';
-
-    let cell = '';
-    if(result==='v') cell='v';
-    else if(reason==='na') cell='na';
-
-    // 供雲端與匯出用的完整明細
-    newDetails.push({
-      fillTime, arriveTime, leaveTime, district, code, store, inspector,
-      item:itemNo, content, result: cell, reason:(cols[10]||'').trim(), month:monthKey
-    });
-    added++;
-  });
+  // 先驗證整批，確認全部列都可解析後才更新 rawDetails、清空文字框或呼叫 cloudWrite。
+  const parsed=parsePatrolPasteText(raw);
+  if(parsed.error){ showMsg(parsed.error,'err'); return; }
+  const newDetails=parsed.rows;
+  const added=newDetails.length;
 
   if(added>0){
     const mergeResult=mergePatrolCandidates(newDetails);
