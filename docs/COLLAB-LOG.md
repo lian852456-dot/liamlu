@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-20 ｜ Codex（巡店貼上日期／NA 緊急防呆，Draft PR、未部署）
+
+- 做了什麼：由最新 `origin/main` `cd3faf1` 建立獨立分支 `hotfix/patrol-paste-20260820`。`patrol.html` 的貼上 parser 改為先完整驗證整批，再一次更新候選；任一列「填表時間」為 `####` 或無法解析時整批拒絕，保留文字框與既有 `rawDetails`，且不呼叫 `cloudWrite`。未使用到店時間替代填表時間。`na` 同時相容「是否合格」欄與舊版原因欄，空白／`na` 原因正規化為 `reason:'na'`，真正的非 NA 原因文字保留。
+- 結果：成功（本機程式／測試）。新增 8/20 的 66 筆 fixture，三創 33 筆、六張犁 33 筆；Node `221/221`、完整巡店 Playwright `43/43` 通過，涵蓋整批拒絕、零 cloud write、`rawDetails` 不變、貼上內容保留、新舊 NA、去重、正式摘要、班表、半月、媒體 mock 與里程回歸。
+- 經驗 / 給下一位的提醒：Excel 顯示 `########` 不是可推導的日期值；不可用到店時間補造填表時間，否則會改變 `fillTime + store + item` 去重身分。此 hotfix 未修改 `gas/Code.gs`、Sheet schema、`gas/HalfMedia.gs`、正式 Sheet 資料、PR #62，也未合併或部署 Pages／GAS。
+
 ## 2026-08-18 ｜ Codex（台獎摘要金額單行與三創顯示名稱，未部署）
 
 - 做了什麼：由最新 `origin/main` `b23a101` 建立隔離分支 `fix/awards-ui-store-label-20260818`。台獎摘要的「督導區實際／推估獎金」共用 `award-summary-money`，固定 `nowrap`、`keep-all`、`line-height:1` 並將金額字級調為 27px；六張摘要卡片只在台獎面板內補齊置中與等高規則。KPI／台獎共用 controller 新增純顯示層 `displayStoreName()`，只把 `台灣大哥大台北三創` 與 `台灣大哥大數位生活台北三創` 顯示為 `台北三創`。

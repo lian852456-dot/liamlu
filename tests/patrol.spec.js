@@ -189,6 +189,16 @@ function currentMonthFixture(day, store, code, item, result, reason) {
   };
 }
 
+function august20PasteBatch() {
+  const header = '填表時間\t到店時間\t離店時間\t區處別\t營業點代碼\t檢查店點\t檢查人員\t題號\t檢查內容\t是否合格\t未查／不合格原因';
+  const lines = [header];
+  for (let item = 1; item <= 33; item++) {
+    lines.push(`2026/8/20 16:43\t2026/8/20 16:00\t2026/8/20 18:00\t北一二B\tDNB10307\t台北三創\t測試督導\t${item}\t檢查內容\t${item <= 2 ? 'na' : 'v'}\t${item === 2 ? '原始非 NA 原因' : ''}`);
+    lines.push(`2026/8/20 17:43\t2026/8/20 17:00\t2026/8/20 19:00\t北一二B\tDNB10440\t台北六張犁\t測試督導\t${item}\t檢查內容\t${item === 1 ? '' : 'v'}\t${item === 1 ? 'na' : ''}`);
+  }
+  return lines.join('\n');
+}
+
 function item18EightStoreRows() {
   return [
     ['2026/7/6 15:44', '台北大稻埕', 'DNB10284'],
@@ -210,6 +220,70 @@ function item18Panel(page) {
 }
 
 test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; });
+
+test('填表時間為 ######## 時整批拒絕，不寫雲端、不改 rawDetails、不清除貼上內容', async ({ page }) => {
+  await stubGas(page);
+  await openAndUnlock(page);
+  await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
+
+  await page.evaluate(() => {
+    rawDetails = [{
+      fillTime:'2026/8/19 16:43', arriveTime:'2026/8/19 16:00', leaveTime:'2026/8/19 18:00',
+      district:'北一二B', code:'DNB10059', store:'台北通化', inspector:'既有督導', item:1,
+      content:'既有內容', result:'v', reason:'', month:'2026-08',
+    }];
+    rebuildFromRaw();
+  });
+  const beforeRaw = await page.evaluate(() => JSON.stringify(rawDetails));
+  const beforeWrites = writeCalls;
+  const pasted = [
+    '2026/8/20 16:43\t2026/8/20 16:00\t2026/8/20 18:00\t北一二B\tDNB10307\t台北三創\t測試督導\t1\t檢查內容\tv\t',
+    '########\t2026/8/20 17:00\t2026/8/20 19:00\t北一二B\tDNB10440\t台北六張犁\t測試督導\t1\t檢查內容\tv\t',
+  ].join('\n');
+
+  await page.fill('#pasteBox', pasted);
+  await page.getByRole('button', { name:'解析並更新' }).click();
+
+  await expect(page.locator('#parseMsg')).toHaveText("填表時間欄顯示 ####，請回原 Excel 加寬『填表時間』欄，確認顯示日期時間後再貼上。");
+  expect(writeCalls).toBe(beforeWrites);
+  expect(await page.evaluate(() => JSON.stringify(rawDetails))).toBe(beforeRaw);
+  await expect(page.locator('#pasteBox')).toHaveValue(pasted);
+  expect(cloudRows).toEqual([]);
+});
+
+test('有效 8/20 資料完整解析 66 筆，三創與六張犁各 33 筆並相容新舊 NA', async ({ page }) => {
+  await stubGas(page);
+  await openAndUnlock(page);
+  await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
+
+  await page.fill('#pasteBox', august20PasteBatch());
+  await page.getByRole('button', { name:'解析並更新' }).click();
+  await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+  await expect.poll(() => cloudRows.length).toBe(66);
+
+  const state = await page.evaluate(() => {
+    const find = (store, item) => rawDetails.find(row => row.store === store && row.item === item);
+    const newNa = find('台北三創', 1);
+    const oldNa = find('台北六張犁', 1);
+    const preserved = find('台北三創', 2);
+    return {
+      total:rawDetails.length,
+      sanchuang:rawDetails.filter(row => row.store === '台北三創').length,
+      liuzhangli:rawDetails.filter(row => row.store === '台北六張犁').length,
+      newNa:{result:newNa.result,reason:newNa.reason},
+      oldNa:{result:oldNa.result,reason:oldNa.reason},
+      preserved:{result:preserved.result,reason:preserved.reason},
+    };
+  });
+  expect(state).toEqual({
+    total:66,
+    sanchuang:33,
+    liuzhangli:33,
+    newNa:{result:'na',reason:'na'},
+    oldNa:{result:'na',reason:'na'},
+    preserved:{result:'na',reason:'原始非 NA 原因'},
+  });
+});
 
 test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
   // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
