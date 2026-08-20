@@ -1,6 +1,6 @@
 # 北一二B 稽核回報專區交接
 
-狀態：PR #62 已合併。2026-08-21 follow-up 改採既有員編＋Approved Device 換發窄權限 audit-only token，取消批次回報碼；目前只完成隔離分支程式與本機驗證，尚未部署本次 GAS／Pages，也未啟用正式批次。既有四個 Sheet 與私有照片資料夾保留；首次 v59 canonical smoke 的失敗證據與 rollback 紀錄仍保留。
+狀態：PR #62 已合併。2026-08-21 follow-up 改採既有員編＋Approved Device 換發窄權限 audit-only token，取消批次回報碼；目前只完成 Draft PR #65 的隔離分支程式與本機驗證，尚未部署本次 GAS／Pages，也未啟用正式批次。正式 Sheet 已讀回確認 `audit-cleaning-202608-uat` 與 `audit-cleaning-202608` 均為 `active=FALSE`；既有四個 Sheet 與私有照片資料夾保留，首次 v59 canonical smoke 的失敗證據與 rollback 紀錄仍保留。
 
 ## 範圍與資料流
 
@@ -8,9 +8,9 @@
 
 門市填報模式在批次資訊後、基本資料前顯示「拍照前請先依此方向整理」圖卡，讀取公開素材 `assets/audit/quality-management-reminder.png`；督導模式會隨 `#storeView` 隱藏。圖卡沿用共用 `#photoDialog`，支援滑鼠、Enter、Space、關閉按鈕與 ESC，單張時不顯示左右切換並在關閉後還原觸發按鈕焦點；圖片失敗時顯示明確替代訊息。收到的附件實檔為 932×526 JPEG，轉為 932×526 lossless PNG 時未裁切、縮放、改字或重新製圖。
 
-門市輸入既有員編，前端沿用既有 `north12b_private_dashboard_device_id` Approved Device 識別；`audit_submit_auth` 在 GAS 端直接核對啟用名冊與該員編綁定的核准裝置，不呼叫 `privateDashboardAccess`／`privateDashboardSnapshot`，也不取得 KPI 或全區快照。驗證成功只回傳名冊綁定的店點、名冊姓名顯示值與 30 分鐘短效 token；token scope 固定為 `audit-submit`，並綁定 `employee_id_hash + batch_id + store_id + submission_id`。員編只留在該分頁 `sessionStorage`，不寫入稽核草稿、Sheet 或 API 回應。
+門市輸入既有員編，前端沿用既有 `north12b_private_dashboard_device_id` Approved Device 識別；`audit_submit_auth` 在 GAS 端直接核對啟用名冊與該員編綁定的核准裝置，不呼叫 `privateDashboardAccess`／`privateDashboardSnapshot`，也不取得 KPI 或全區快照。驗證成功只回傳名冊綁定店點、安全遮罩 `masked_name` 與 30 分鐘短效 token；遮罩名只顯示為「名冊辨識：王＊明」提示，不會填入或寫成正式 `inspector_name`。token scope 固定為 `audit-submit`，並綁定 `employee_id_hash + batch_id + store_id + submission_id`，不綁姓名。員編可持久化供下次開頁自動帶入；audit token 只存在 `sessionStorage`，關閉頁面後必須重新驗證，且不寫入稽核草稿、Sheet 或 API 回應。
 
-後續 `audit_start`、`audit_upload`、`audit_photo_delete`、`audit_submit`、`audit_status` 都驗證上述 audit-only token，並繼續核對 `submission_id + edit token` ownership。`audit_start` 忽略前端自填身分並使用 token 內的名冊店點／姓名；提交列保存不可逆的員編 SHA-256 雜湊，舊回報碼 token 或缺少員編綁定的 submission 一律 fail closed。此流程只重用「員編屬於啟用名冊且裝置 ID 完全相符」的判定，不直接沿用 Approved Device 的全區授權結果。
+後續 `audit_start`、`audit_upload`、`audit_photo_delete`、`audit_submit`、`audit_status` 都驗證上述 audit-only token，並繼續核對 `submission_id + edit token` ownership。店點一律使用 token 內的名冊店點；`audit_start` 接收門市必填的實際 `inspector_name`，後端去除控制字元與前後空白、拒絕空值及超過 40 字，再寫入 submission、photo 與 append-only timeline。提交列保存不可逆的員編 SHA-256 雜湊，舊回報碼 token 或缺少員編綁定的 submission 一律 fail closed。此流程只重用「員編屬於啟用名冊且裝置 ID 完全相符」的判定，不直接沿用 Approved Device 的全區授權結果。
 
 照片 metadata API 只回傳 `client_photo_id, photo_name, revision, status`，不回傳 `photo_file_id`、`private_url` 或可直接存取的 Drive URL。`audit_photo_read` 在 GAS 端先驗證：督導必須持有既有 PT token；門市必須同時持有綁定該 submission 的短效 token 與 edit token。驗證後才讀取私有 Drive Blob，回傳 `mime_type + base64`；前端轉成 Blob/Object URL 顯示，換頁、重畫、刪除、登出或卸載時 revoke。Drive 檔案不開啟連結分享。
 
@@ -27,7 +27,7 @@
 - `稽核批次`：`batch_id, batch_name, starts_on, due_on, active, created_at, updated_at`
 - `稽核回報提交`：`batch_id, batch_name, submission_id, store_id, store_name, inspector_name, auth_employee_hash, edit_token_hash, status, submitted_at, reviewed_at, updated_at, revision, created_at`
 - `稽核回報`：`batch_id, batch_name, submission_id, store_id, store_name, inspector_name, item_id, item_name, photo_file_id, private_url, photo_name, client_photo_id, note, status, reviewer_comment, submitted_at, reviewed_at, updated_at, revision, created_at`
-- `稽核回報紀錄`：`event_id, event_key, batch_id, submission_id, store_id, store_name, item_id, item_name, event_type, status, comment, actor, revision, created_at`
+- `稽核回報紀錄`：`event_id, event_key, batch_id, submission_id, store_id, store_name, inspector_name, item_id, item_name, event_type, status, comment, actor, revision, created_at`
 
 預設批次為 `audit-cleaning-202608`／「稽核前環境清潔確認」，暫定 `2026-08-20` 至 `2026-08-31`。部署前 Liam 應確認截止日；之後只需在 `稽核批次` 新增一列並確保恰有一列 `active=TRUE`，不必改程式。
 
@@ -46,12 +46,12 @@
 
 ## 本機驗證
 
-- Node contract：`237/237`；其中稽核 Approved Device／audit-only 專項 `15/15`
-- 完整 Chromium Playwright：`162/162`
-- 稽核 WebKit Playwright（Safari 等價）：`9/9`；完整 WebKit 本次為 `161/162`，唯一失敗是既有 `patrol.spec.js` 里程入口 fixture 與初始 `ptsummary` 的非同步競態。本分支對 `patrol.html`、`patrol-read-model.js` 與 `tests/patrol.spec.js` diff 均為 0；同一案例在本次第一次完整 WebKit 曾通過，產品 follow-up 不擴張修改巡店測試。
+- Node contract：`238/238`；原有稽核 Approved Device／audit-only 安全案例 `15/15` 全數保留，新增實際姓名落地案例後稽核專項為 `16/16`。
+- 稽核 Chromium `11/11`、稽核 WebKit（Safari 等價）`11/11`；指定稽核＋Patrol/Auth Chromium 回歸 `60/60`。
+- 完整 Chromium 最新一輪 `159/163`：4 個既有 Liam Supervisor App／半月案例只在 `page.screenshot`／`locator.screenshot` 等待穩定時逾時，功能斷言未失敗；其中 3 個後續獨立重跑已通過，`liam-supervisor-device-ui-screenshots.spec.js` 即使放寬 90 秒仍卡在既有 `.store-board` 截圖。完整 WebKit `161/163`，兩個既有 Liam Supervisor App 案例因 `file://` origin 的 CORS console error 失敗。上述檔案與產品碼均不在本次 diff；不得把這些結果記成全綠。
 - 390×844 無橫向 overflow；多圖、分次加入、刪除／預覽、10 張限制、部分失敗重試、冪等、own-submission scope、PT auth／逾時重驗、單項補件與逐項覆核皆有自動測試。
 - 提醒圖卡測試涵蓋 DOM 順序、門市／督導顯隱、非 base64 路徑、圖片尺寸、載入失敗 fallback、點擊／Enter／Space、單張導覽隱藏、關閉／ESC／焦點回復與手機 overflow。
-- 安全案例涵蓋匿名開始／上傳／刪除／送出／讀取拒絕、未知／未核准／停用員編裝置、過期 token、偽造店點／姓名、同店不同員編與跨門市 token／edit token 越權拒絕；並驗證不呼叫全區 snapshot/access、API 僅回安全 profile、PT 保護的私有 Blob 讀取、DOM/API 無 Drive view URL／file ID，以及取消後證據保留與新 submission。
+- 安全案例涵蓋匿名開始／上傳／刪除／送出／讀取拒絕、未知／未核准／停用員編裝置、過期 token、偽造店點、同店不同員編與跨門市 token／edit token 越權拒絕；並驗證遮罩名不會成為正式姓名、實際姓名必填且正確寫入 submission／photo／timeline、員編跨頁保留但 token 不持久化、不呼叫全區 snapshot/access、API 僅回安全 profile、PT 保護的私有 Blob 讀取、DOM/API 無 Drive view URL／file ID，以及取消後證據保留與新 submission。
 - canonical 回歸另固定檢查九店 ID，拒絕 `xxx` placeholder 與通化 legacy `DNB10059`；正式 smoke 必須讀回萬大 `DNB10168`、通化 `DNB10174` 才可繼續。
 - 截圖：`docs/screenshots/audit-report-20260820/audit-report-mobile-390x844.png`、`audit-report-quality-reminder-desktop.png`、`audit-report-supervisor-desktop.png`。截圖無正式姓名、正式照片或正式資料。
 
@@ -61,7 +61,7 @@
 2. 在合併／部署前，以當下正式 main 建立 annotated rollback tag，例如 `rollback/audit-cleaning-predeploy-20260820`，並記錄現行 GitHub Pages commit、GAS deployment ID／version。
 3. 在既有 Apps Script 專案新增 `AuditReport.gs`，把 repo 最新 `gas/AuditReport.gs` 內容存入；對 `Code.gs` 只套用本 PR 的十二條 dispatch，絕不以舊整檔覆蓋。保留最新 `HalfMedia.gs` 與其他檔案。
 4. 確認既有 Approved Device 名冊設定與 `DASHBOARD_ROSTER_SHEET_ID` 可用，且 Script Properties 已有 `PT_KEY`、`DASHBOARD_PRIVATE_FOLDER_ID`；不再需要 `AUDIT_REPORT_SUBMIT_CODE`。如要用另一個私有根目錄，再設定 `AUDIT_REPORT_FOLDER_ID`。所有秘密只在 Script Properties，不貼入 repo、HTML、JavaScript 或文件。
-5. 手動執行 `setupAuditReportStorage()` 一次，核對四個分頁、批次日期、私有資料夾與 `active=TRUE`；這一步只是初始化，不是部署。
+5. 手動執行 `setupAuditReportStorage()` 一次，核對四個分頁、批次日期與私有資料夾；在正式啟用 gate 前，UAT 與正式批次都必須維持 `active=FALSE`。這一步只是初始化，不是部署。
 6. 「部署 → 管理部署作業 → 編輯 → 新版本」建立 GAS 新版本。記錄新 version；GAS 存檔不算部署。
 7. 以測試批次做門市三項送出、單項退回、補件、三項通過；核對 Sheet、Drive 私有權限、冪等重送、PT token 過期重驗與讀回。
 8. 合併／發布 GitHub Pages 後，以 iPhone Safari 390×844 與桌面 Chrome 做正式 smoke；確認後才把狀態提升為已部署／已驗收。
@@ -70,7 +70,7 @@ Rollback：Pages 回到上述 rollback tag 對應 commit；GAS 在「管理部�
 
 ## 安全與限制
 
-- 前端無 `PT_KEY`、Drive ID／URL、正式員工名單、正式照片或正式資料；員編不寫入草稿或後端資料列。
+- 前端無 `PT_KEY`、Drive ID／URL、正式員工名單、正式照片或正式資料；員編只作本機自動帶入，不寫入稽核草稿或後端資料列，audit token 只留在分頁 session。
 - 短效稽核 token 綁定 `employee hash + batch + store + submission`，只允許稽核門市 action；`submission_id + edit token`、`client_photo_id`、事件 `event_key` 與 Script Lock 共同避免越權與重複提交、照片及覆核事件。
 - 單項最多 10 張，server 再驗證 image MIME 與壓縮後 10 MB 上限。
 - 正式批次維持未啟用；本 follow-up PR 不建立正式資料、不部署，也不代表使用者驗收。

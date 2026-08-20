@@ -6,7 +6,7 @@
 
 - `audit-report.html` 是九店手機優先的環境清潔回報與督導逐項驗收頁；入口位於 `home.html`。
 - `gas/AuditReport.gs` 使用獨立的批次、提交、照片與 append-only 時間軸模型；只在 `gas/Code.gs` 增加隔離的 `audit_*` POST dispatch，不改巡店、半月檢查、每日回報、KPI、台獎或班表資料列。
-- 門市以既有員編＋Approved Device 驗證，後端只讀取該員編的啟用名冊與裝置綁定，換取 30 分鐘、綁定員編雜湊／批次／門市／`submission_id` 的 audit-only token；不回傳或沿用 KPI／全區私有戰情權限。店點依名冊固定，檢查人員由名冊姓名顯示值帶入；`audit_start`、上傳、刪除、送出與狀態讀取還會再核對 `submission_id + edit token`。
+- 門市以既有員編＋Approved Device 驗證，後端只讀取該員編的啟用名冊與裝置綁定，換取 30 分鐘、綁定員編雜湊／批次／門市／`submission_id` 的 audit-only token；不回傳或沿用 KPI／全區私有戰情權限。店點依名冊固定，遮罩姓名只作「名冊辨識」提示；實際檢查人員姓名仍由門市必填，經後端清理與長度驗證後寫入正式紀錄，不綁入 token。員編可在下次開頁自動帶入，audit token 只保留於該分頁 session；`audit_start`、上傳、刪除、送出與狀態讀取還會再核對 `submission_id + edit token`。
 - 私有照片只可經 `audit_photo_read` 讀取：督導驗證既有 PT token，門市驗證稽核 token 與 submission ownership；GAS 讀取 Drive Blob 後回傳 MIME＋base64，前端只建立暫時 Blob URL 並釋放，不取得 Drive URL／file ID。
 - 督導可取消／重設遺失草稿或 edit token 的舊回報；舊照片與 append-only 事件保留為 `cancelled`，該店才能建立新的 submission。
 - 門市填報頁在批次資訊後提供品質管理整理提醒原圖，可點擊或以鍵盤開啟單張全螢幕預覽；督導模式不顯示此圖卡。

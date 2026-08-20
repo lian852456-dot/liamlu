@@ -25,7 +25,12 @@ test('public entry and mobile form expose the exact isolated audit contract', ()
   assert.doesNotMatch(html + js + css, /PT_KEY\s*=|CHANGE_ME|employee[_ -]?name|photo_file_id\s*:/i);
   assert.match(html, /id="storeEmployeeId"[^>]*autocomplete="username"/);
   assert.match(html, /id="storeSelect"[^>]*disabled/);
-  assert.match(html, /id="inspectorName"[^>]*readonly/);
+  assert.match(html, /id="inspectorName"[^>]*placeholder="請輸入實際檢查人員姓名"[^>]*required/);
+  assert.doesNotMatch(html, /id="inspectorName"[^>]*readonly/);
+  assert.match(js, /localStorage\.setItem\(EMPLOYEE_ID_KEY,employeeId\)/);
+  assert.match(js, /sessionStorage\.setItem\(STORE_SESSION_KEY/);
+  assert.doesNotMatch(js, /localStorage\.setItem\(STORE_SESSION_KEY/);
+  assert.doesNotMatch(js, /state\.draft\.inspector_name\s*=\s*profile\.masked_name/);
   assert.doesNotMatch(html + js, /storeSubmitCode|批次回報碼|驗證回報碼/);
 });
 
@@ -186,7 +191,7 @@ test('audit config exposes the nine canonical store ids without patrol legacy pl
 });
 
 test('Approved Device exchange returns only a roster-bound audit token and ignores forged profile fields', () => {
-  const {context}=harness();
+  const {context,cache}=harness();
   const base={batch_id:'audit-cleaning-202608',submission_id:'submission_profile_1234567890123',edit_token:'edit_profile_123456789012345678901'};
   const auth=context.auditSubmitAuth({
     batch_id:base.batch_id,submission_id:base.submission_id,
@@ -194,26 +199,47 @@ test('Approved Device exchange returns only a roster-bound audit token and ignor
     store_id:'DNB10082',inspector_name:'偽造姓名',code:'0935'
   });
   assert.deepEqual(Object.keys(auth).sort(),['expiresIn','profile','token']);
-  assert.deepEqual({...auth.profile},{store_id:'DNB10062',store_name:'台北酒泉',inspector_name:'測＊員'});
+  assert.deepEqual({...auth.profile},{store_id:'DNB10062',store_name:'台北酒泉',masked_name:'測＊員'});
   assert.equal(auth.expiresIn,1800);
   assert.doesNotMatch(JSON.stringify(auth),/snapshot|kpi|awards|employee_id|device_id|role/i);
-  const started=context.auditStart({...base,store_token:auth.token});
+  assert.doesNotMatch([...cache.values()].join('\n'),/測＊員|masked_name|inspector_name/);
+  const started=context.auditStart({...base,inspector_name:'王小明',store_token:auth.token});
   assert.equal(started.store_id,'DNB10062');
-  assert.equal(started.inspector_name,'測＊員');
+  assert.equal(started.inspector_name,'王小明');
 });
 
 test('audit token remains bound to the Approved Device employee even within the same store', () => {
   const {context}=harness();
-  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_employee_12345678901',edit_token:'edit_employee_1234567890123456789'};
+  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_employee_12345678901',edit_token:'edit_employee_1234567890123456789',inspector_name:'王小明'};
   const first=authorize(context,base);
   context.auditStart(withStoreToken(base,first));
   const other=authorize(context,base,'EMP003','approved-device-0003');
   assert.throws(()=>context.auditOwnStatus({...base,store_token:other}),/unauthorized/);
 });
 
+test('masked roster name never becomes formal inspector and actual name is cleaned into submission, photos and timeline', () => {
+  const {context,spreadsheet}=harness();
+  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_actual_name_123456789',edit_token:'edit_actual_name_123456789012345678'};
+  const storeToken=authorize(context,base);
+  assert.throws(()=>context.auditStart(withStoreToken(base,storeToken)),/請填寫檢查人員姓名/);
+  assert.throws(()=>context.auditStart(withStoreToken({...base,inspector_name:'測＊員'},storeToken)),/不可使用遮罩姓名/);
+  const actual={...base,inspector_name:'  王小明  '};
+  const started=context.auditStart(withStoreToken(actual,storeToken));
+  assert.equal(started.inspector_name,'王小明');
+  context.auditUploadPhoto({...withStoreToken(actual,storeToken),item_id:'island_display',client_photo_id:'client_actual_name_123456',note:'',file:{name:'actual.png',type:'image/png',base64:PNG.toString('base64')}});
+  const rows=(sheet)=>{const [headers,...values]=sheet.data;return values.map(row=>Object.fromEntries(headers.map((header,index)=>[header,row[index]??''])));};
+  const submission=rows(spreadsheet.getSheetByName('稽核回報提交'))[0];
+  const photo=rows(spreadsheet.getSheetByName('稽核回報'))[0];
+  const event=rows(spreadsheet.getSheetByName('稽核回報紀錄'))[0];
+  assert.equal(submission.inspector_name,'王小明');
+  assert.equal(photo.inspector_name,'王小明');
+  assert.equal(event.inspector_name,'王小明');
+  assert.doesNotMatch(JSON.stringify({submission,photo,event}),/測＊員/);
+});
+
 test('same submission id and repeated submit stay idempotent without duplicate rows or events', () => {
   const { context, spreadsheet } = harness();
-  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_12345678901234567890',edit_token:'edit_12345678901234567890123456789012',store_id:'DNB10062',inspector_name:'測＊員'};
+  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_12345678901234567890',edit_token:'edit_12345678901234567890123456789012',store_id:'DNB10062',inspector_name:'王小明'};
   const storeToken=authorize(context,base);context.auditStart(withStoreToken(base,storeToken));context.auditStart(withStoreToken(base,storeToken));
   assert.equal(spreadsheet.getSheetByName('稽核回報提交').getLastRow()-1,1);
   assert.equal(spreadsheet.getSheetByName('稽核回報紀錄').getLastRow()-1,1);
@@ -228,7 +254,7 @@ test('same submission id and repeated submit stay idempotent without duplicate r
 
 test('returning one item unlocks only that item and preserves original rows plus reason timeline', () => {
   const { context, spreadsheet }=harness();
-  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_12345678901234567890',edit_token:'edit_12345678901234567890123456789012',store_id:'DNB10062',inspector_name:'測＊員'};
+  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_12345678901234567890',edit_token:'edit_12345678901234567890123456789012',store_id:'DNB10062',inspector_name:'王小明'};
   const storeToken=authorize(context,base);context.auditStart(withStoreToken(base,storeToken));seedThreePhotos(context);
   context.auditSubmit({submission_id:base.submission_id,edit_token:base.edit_token,store_token:storeToken,notes:{}});
   context.auditReview({token:'pt-valid-token-1234567890',submission_id:base.submission_id,item_id:'op_zone',decision:'return',comment:'請補拍死角'});
@@ -241,7 +267,7 @@ test('returning one item unlocks only that item and preserves original rows plus
 
 test('anonymous, unapproved device, inactive employee and expired audit token cannot mutate or read a submission', () => {
   const {context,cache}=harness();
-  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_anon_1234567890123456',edit_token:'edit_anon_123456789012345678901234',store_id:'DNB10062',inspector_name:'測＊員'};
+  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_anon_1234567890123456',edit_token:'edit_anon_123456789012345678901234',store_id:'DNB10062',inspector_name:'王小明'};
   assert.doesNotMatch(JSON.stringify(context.auditPublicConfig()),/submit_code|store_token|edit_token|folder_id|drive_id/i);
   assert.throws(()=>context.auditSubmitAuth({...base,employeeId:'EMP001',deviceId:'unapproved-device-01'}),/尚未核准/);
   assert.throws(()=>context.auditSubmitAuth({...base,employeeId:'EMP004',deviceId:'approved-device-0004'}),/尚未核准/);
@@ -260,8 +286,8 @@ test('anonymous, unapproved device, inactive employee and expired audit token ca
 
 test('store token and edit token cannot cross stores, submissions or private photos', () => {
   const {context}=harness();
-  const a={batch_id:'audit-cleaning-202608',submission_id:'submission_store_a_12345678901234',edit_token:'edit_store_a_1234567890123456789012',store_id:'DNB10062',inspector_name:'測＊員'};
-  const b={batch_id:'audit-cleaning-202608',submission_id:'submission_store_b_12345678901234',edit_token:'edit_store_b_1234567890123456789012',store_id:'DNB10082',inspector_name:'永＊員'};
+  const a={batch_id:'audit-cleaning-202608',submission_id:'submission_store_a_12345678901234',edit_token:'edit_store_a_1234567890123456789012',store_id:'DNB10062',inspector_name:'王小明'};
+  const b={batch_id:'audit-cleaning-202608',submission_id:'submission_store_b_12345678901234',edit_token:'edit_store_b_1234567890123456789012',store_id:'DNB10082',inspector_name:'李小華'};
   const tokenA=authorize(context,a);const tokenB=authorize(context,b,'EMP002','approved-device-0002');context.auditStart(withStoreToken(a,tokenA));context.auditStart(withStoreToken(b,tokenB));
   const uploaded=context.auditUploadPhoto({...withStoreToken(a,tokenA),item_id:'island_display',client_photo_id:'client_store_a_123456789',note:'',file:{name:'a.png',type:'image/png',base64:PNG.toString('base64')}});
   assert.deepEqual(Object.keys(uploaded.photo).sort(),['client_photo_id','photo_name','revision','status']);
@@ -272,7 +298,7 @@ test('store token and edit token cannot cross stores, submissions or private pho
 
 test('supervisor reads a private Drive blob only through protected photo action', () => {
   const {context}=harness();
-  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_photo_123456789012345',edit_token:'edit_photo_12345678901234567890123',store_id:'DNB10062',inspector_name:'測＊員'};
+  const base={batch_id:'audit-cleaning-202608',submission_id:'submission_photo_123456789012345',edit_token:'edit_photo_12345678901234567890123',store_id:'DNB10062',inspector_name:'王小明'};
   const storeToken=authorize(context,base);context.auditStart(withStoreToken(base,storeToken));
   context.auditUploadPhoto({...withStoreToken(base,storeToken),item_id:'island_display',client_photo_id:'client_photo_secure_123456',note:'',file:{name:'private.png',type:'image/png',base64:PNG.toString('base64')}});
   assert.throws(()=>context.auditPhotoRead({submission_id:base.submission_id,client_photo_id:'client_photo_secure_123456'}),/unauthorized/);
@@ -284,7 +310,7 @@ test('supervisor reads a private Drive blob only through protected photo action'
 
 test('supervisor cancellation preserves evidence and allows a fresh submission for the store', () => {
   const {context,spreadsheet}=harness();
-  const oldBase={batch_id:'audit-cleaning-202608',submission_id:'submission_cancel_12345678901234',edit_token:'edit_cancel_1234567890123456789012',store_id:'DNB10062',inspector_name:'測＊員'};
+  const oldBase={batch_id:'audit-cleaning-202608',submission_id:'submission_cancel_12345678901234',edit_token:'edit_cancel_1234567890123456789012',store_id:'DNB10062',inspector_name:'王小明'};
   const oldToken=authorize(context,oldBase);context.auditStart(withStoreToken(oldBase,oldToken));
   context.auditUploadPhoto({...withStoreToken(oldBase,oldToken),item_id:'island_display',client_photo_id:'client_cancel_1234567890',note:'',file:{name:'kept.png',type:'image/png',base64:PNG.toString('base64')}});
   const cancelled=context.auditCancel({token:'pt-valid-token-1234567890',submission_id:oldBase.submission_id,comment:'裝置草稿遺失'});

@@ -57,7 +57,7 @@ const AUDIT_PHOTO_FIELDS = [
   'note','status','reviewer_comment','submitted_at','reviewed_at','updated_at','revision','created_at'
 ];
 const AUDIT_EVENT_FIELDS = [
-  'event_id','event_key','batch_id','submission_id','store_id','store_name','item_id','item_name',
+  'event_id','event_key','batch_id','submission_id','store_id','store_name','inspector_name','item_id','item_name',
   'event_type','status','comment','actor','revision','created_at'
 ];
 
@@ -175,12 +175,12 @@ function auditApprovedDeviceProfile_(payload) {
     throw new Error('此員編尚未核准此裝置，請先使用既有流程申請並等待管理者核准');
   }
   const store = auditRosterStore_(lookup.user.store);
-  const inspector = auditCleanInspector_(lookup.user.masked_name);
+  const maskedName = auditCleanMaskedName_(lookup.user.masked_name);
   return {
     employee_id: employeeId,
     employee_id_hash: privateDashboardHash(employeeId),
     store: store,
-    inspector_name: inspector
+    masked_name: maskedName
   };
 }
 
@@ -220,7 +220,14 @@ function auditPublicConfig() {
 function auditCleanInspector_(value) {
   const clean = String(value || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
   if (!clean) throw new Error('請填寫檢查人員姓名');
+  if (/[*＊]/.test(clean)) throw new Error('請輸入實際檢查人員姓名，不可使用遮罩姓名');
   if (clean.length > 40) throw new Error('檢查人員姓名最多 40 字');
+  return clean;
+}
+
+function auditCleanMaskedName_(value) {
+  const clean = String(value || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
+  if (!clean || clean.length > 40) throw new Error('名冊授權資料不完整，請聯絡督導');
   return clean;
 }
 
@@ -290,7 +297,6 @@ function auditSubmitAuth(payload) {
     store_id: store.store_id,
     submission_id: submissionId,
     employee_id_hash: profile.employee_id_hash,
-    inspector_name: profile.inspector_name,
     issued_at: auditNow_()
   }), AUDIT_STORE_SESSION_TTL_SECONDS);
   return {
@@ -299,7 +305,7 @@ function auditSubmitAuth(payload) {
     profile: {
       store_id: store.store_id,
       store_name: store.store_name,
-      inspector_name: profile.inspector_name
+      masked_name: profile.masked_name
     }
   };
 }
@@ -339,11 +345,10 @@ function auditStart(payload) {
   if (String(body.batch_id || '') !== batch.batch_id) throw new Error('稽核批次已更新，請重新整理');
   const submissionId = auditSubmissionId_(body.submission_id);
   const store = auditStore_(storeSession.store_id);
-  const inspector = auditCleanInspector_(storeSession.inspector_name);
+  const inspector = auditCleanInspector_(body.inspector_name);
   const tokenHash = auditTokenHash_(body.edit_token);
   if (storeSession.batch_id !== batch.batch_id || storeSession.submission_id !== submissionId) throw new Error('unauthorized');
   if (body.store_id && auditStore_(body.store_id).store_id !== store.store_id) throw new Error('unauthorized');
-  if (body.inspector_name && auditCleanInspector_(body.inspector_name) !== inspector) throw new Error('unauthorized');
   const sheets = auditSubmissionSheets_();
   const now = auditNow_();
   const lock = LockService.getScriptLock();
@@ -356,7 +361,8 @@ function auditStart(payload) {
       if (sameId.batch_id !== batch.batch_id || sameId.store_id !== store.store_id) throw new Error('回報識別與門市不一致');
       if (sameId.auth_employee_hash !== storeSession.employee_id_hash) throw new Error('unauthorized');
       if (sameId.status === 'cancelled') throw new Error('本次回報已取消，請建立新的回報');
-      auditUpdateRow_(sheets.submissions, sameId._row, { inspector_name: inspector, updated_at: now });
+      if (sameId.inspector_name !== inspector) throw new Error('本次回報的檢查人員姓名與原紀錄不一致');
+      auditUpdateRow_(sheets.submissions, sameId._row, { updated_at: now });
       return auditOwnStatus_({ submission_id: submissionId, edit_token: body.edit_token });
     }
     const occupied = submissions.filter(function(row) {
@@ -386,6 +392,7 @@ function auditStart(payload) {
       submission_id: submissionId,
       store_id: store.store_id,
       store_name: store.store_name,
+      inspector_name: inspector,
       item_id: '',
       item_name: '',
       event_type: 'created',
@@ -578,6 +585,7 @@ function auditSubmit(payload) {
         submission_id: submission.submission_id,
         store_id: submission.store_id,
         store_name: submission.store_name,
+        inspector_name: submission.inspector_name,
         item_id: itemId,
         item_name: auditItem_(itemId).item_name,
         event_type: isRework ? 'resubmitted' : 'submitted',
@@ -625,6 +633,7 @@ function auditTimeline_(eventSheet, submissionId) {
         status: row.status,
         comment: row.comment,
         actor: row.actor,
+        inspector_name: row.inspector_name,
         revision: Number(row.revision || 1),
         created_at: row.created_at
       };
@@ -781,6 +790,7 @@ function auditCancel(payload) {
       submission_id: submission.submission_id,
       store_id: submission.store_id,
       store_name: submission.store_name,
+      inspector_name: submission.inspector_name,
       item_id: '',
       item_name: '',
       event_type: 'cancelled',
@@ -840,6 +850,7 @@ function auditReviewUnlocked_(payload) {
     submission_id: submission.submission_id,
     store_id: submission.store_id,
     store_name: submission.store_name,
+    inspector_name: submission.inspector_name,
     item_id: item.item_id,
     item_name: item.item_name,
     event_type: decision === 'approve' ? 'approved' : 'returned',
