@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>北一二B 稽核回報專區</title>
-  <link rel="stylesheet" href="audit-report.css?v=20260821-pr67">
+  <link rel="stylesheet" href="audit-report.css?v=20260821-self-report">
 </head>
 <body>
   <header class="topbar">
@@ -52,45 +52,21 @@
             <div class="field-grid">
               <label>
                 <span>門市店點 <b aria-hidden="true">＊</b></span>
-                <select id="storeSelect" aria-readonly="true" disabled required>
-                  <option value="">由核准裝置名冊帶入</option>
+                <select id="storeSelect" aria-readonly="false" required>
+                  <option value="">請選擇門市</option>
                 </select>
               </label>
               <label>
                 <span>檢查人員姓名 <b aria-hidden="true">＊</b></span>
                 <input id="inspectorName" type="text" maxlength="40" autocomplete="name" placeholder="請輸入實際檢查人員姓名" required>
               </label>
+              <label>
+                <span>員工編號 <b aria-hidden="true">＊</b></span>
+                <input id="storeEmployeeId" type="text" maxlength="20" autocomplete="username" autocapitalize="characters" spellcheck="false" placeholder="請輸入本人員編" required>
+              </label>
             </div>
+            <p class="time-note">暫行簡化填報：目前不需驗證核准裝置，請自行選擇門市並據實填寫姓名與員編。</p>
             <p class="time-note">回報日期與時間將由系統以 Asia/Taipei 自動記錄，門市無法修改。</p>
-            <div class="store-auth-panel" aria-labelledby="storeAuthTitle">
-              <div>
-                <strong id="storeAuthTitle">門市回報授權</strong>
-                <p>使用既有員編與 Approved Device 換取本次 submission 專用的短效 audit-only token；不會開放 KPI 或全區資料。</p>
-              </div>
-              <label>
-                <span>員工編號</span>
-                <input id="storeEmployeeId" type="text" autocomplete="username" autocapitalize="characters" spellcheck="false" placeholder="請輸入既有員編">
-              </label>
-              <button id="storeAuthButton" class="secondary-button" type="button">驗證核准裝置</button>
-              <p id="storeAuthMessage" class="inline-message" role="status" aria-live="polite">尚未取得回報授權</p>
-            </div>
-          </div>
-        </section>
-
-        <section id="rosterProbeCard" class="paper-card roster-probe-card" aria-labelledby="rosterProbeTitle" hidden>
-          <div class="card-number">UAT</div>
-          <div class="card-content">
-            <p class="reminder-label">督導測試</p>
-            <h3 id="rosterProbeTitle">員編名冊測試</h3>
-            <p>只讀取名冊狀態、店點映射與是否已有 Approved Device；不會重綁裝置、更新登入時間或換發該同仁 token。</p>
-            <div class="roster-probe-controls">
-              <label>
-                <span>測試員工編號</span>
-                <input id="rosterProbeEmployeeId" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="輸入欲核對的同仁員編">
-              </label>
-              <button id="rosterProbeButton" class="secondary-button" type="button">檢查名冊映射</button>
-            </div>
-            <p id="rosterProbeResult" class="inline-message roster-probe-result" role="status" aria-live="polite"></p>
           </div>
         </section>
 
@@ -124,7 +100,7 @@
 
       <section id="supervisorGate" class="paper-card auth-card">
         <h3>使用既有督導驗證</h3>
-        <p>沿用 Liam 情報站的 PT_TOKEN／短效 session，不建立第二組密碼。</p>
+        <p>督導驗收仍沿用既有 PT_TOKEN／短效 session，門市簡化填報不會開放督導權限。</p>
         <form id="supervisorLoginForm">
           <label>
             <span>督導通行碼</span>
@@ -166,7 +142,7 @@
   <div id="reauthModal" class="reauth-modal" hidden>
     <form id="reauthForm" class="paper-card" role="dialog" aria-modal="true" aria-labelledby="reauthTitle">
       <h2 id="reauthTitle">督導驗證已逾時</h2>
-      <p>請重新驗證後繼續。門市草稿、備註及待送照片不會被清除。</p>
+      <p>請重新驗證後繼續。門市回報資料不會被清除。</p>
       <label><span>督導通行碼</span><input id="reauthPasscode" type="password" autocomplete="current-password" required></label>
       <button id="reauthButton" class="primary-button" type="submit">重新驗證</button>
       <p id="reauthMessage" class="inline-message" role="status"></p>
@@ -192,6 +168,8 @@
     </section>
   </template>
 
-  <script src="audit-report.js?v=20260821-pr67" defer></script>
+  <script src="audit-report.js?v=20260821-self-report" defer></script>
+  <script src="audit-report-submit.js?v=20260821-self-report" defer></script>
+  <script src="audit-report-supervisor.js?v=20260821-self-report" defer></script>
 </body>
 </html>
