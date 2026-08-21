@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-21 ｜ Codex（稽核 UAT 名冊 probe／Safari 私有照片恢復，PR #67 deployment candidate）
+
+- 做了什麼：從 PR #66 合併後正式 `main` 建立隔離分支 `hotfix/audit-uat-roster-probe-photo-restore-20260821`。新增僅限 active `*-uat` 且既有 Trusted Employee audit session 的 `audit_roster_probe`，只回傳存在性、啟用狀態、遮罩名、名冊店點、九店映射及是否已有 Approved Device；不修改裝置綁定或 `last_login_at`，不回傳 employee hash／device ID，不換發受測同仁 token，也不讀 private snapshot／KPI／台獎。前端只有具該 UAT 權限時才顯示「員編名冊測試」，正式批次與一般員工都 fail closed。
+- 結果（本機完成／待受控部署與 Liam UAT）：`ensurePrivatePhoto` 改為 async 並在所有路徑固定回 Promise，維持 `audit_photo_read → base64 → Blob URL` 私有照片合約；JS／CSS 加 PR #67 release query，root-scope Service Worker 同步 bump cache namespace，稽核 HTML 改為 network-first。Node `242/242`、完整 Chromium `168/168`、稽核 WebKit `15/15`；15 張 server photos 在 reload、重新驗證、`audit_status` 恢復後可載入縮圖與放大，Blob URL 在離頁釋放，console 無 `.then is not a function`。完整 WebKit 的 file／HTTP 環境結果與一個既有 Patrol fixture 差異另記於正式交接，不把它誤報為本 PR 全綠。
+- 經驗 / 給下一位的提醒：正式批次必須繼續 `active=FALSE`，UAT 批次維持唯一 `active=TRUE`。部署只能從正式 GAS 最新版本最小更新 `AuditReport.gs` 並確認 `Code.gs` 十三條 audit dispatch，不得覆蓋 HalfMedia、ReportUpload、巡店 PR #63／#64 或其他正式函式。部署後先由 Liam 用真實 Trusted Employee 身分逐一 probe 名冊，再重開三創 UAT submission 驗證 15 張照片；完成退回／補件／通過／cancel 前不可啟用正式批次或通知九店。
+
 ## 2026-08-21 ｜ Codex（稽核 Approved Device audit-only follow-up，未部署）
 
 - 做了什麼：從 PR #62 合併後的最新 `main` `5eddf26` 建立隔離分支 `fix/audit-approved-device-token-20260821`。取消門市批次回報碼，改由既有員編＋Approved Device 驗證後換發 30 分鐘 audit-only token；token 綁定員編雜湊、批次、名冊店點與 submission，店點不可自選。依 Liam 最新決策，名冊遮罩名只顯示「名冊辨識」提示，實際檢查人員姓名恢復必填文字欄位，由 `audit_start` 後端清理、長度驗證並寫入 submission／photo／timeline；姓名不綁 token。員編可持久化自動帶入，audit token 僅存分頁 session。後端只核對啟用名冊與裝置綁定，不呼叫私有戰情 access／snapshot，不把 Approved Device 的全區權限帶入稽核。

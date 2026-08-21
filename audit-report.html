@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>北一二B 稽核回報專區</title>
-  <link rel="stylesheet" href="audit-report.css">
+  <link rel="stylesheet" href="audit-report.css?v=20260821-pr67">
 </head>
 <body>
   <header class="topbar">
@@ -74,6 +74,23 @@
               <button id="storeAuthButton" class="secondary-button" type="button">驗證核准裝置</button>
               <p id="storeAuthMessage" class="inline-message" role="status" aria-live="polite">尚未取得回報授權</p>
             </div>
+          </div>
+        </section>
+
+        <section id="rosterProbeCard" class="paper-card roster-probe-card" aria-labelledby="rosterProbeTitle" hidden>
+          <div class="card-number">UAT</div>
+          <div class="card-content">
+            <p class="reminder-label">督導測試</p>
+            <h3 id="rosterProbeTitle">員編名冊測試</h3>
+            <p>只讀取名冊狀態、店點映射與是否已有 Approved Device；不會重綁裝置、更新登入時間或換發該同仁 token。</p>
+            <div class="roster-probe-controls">
+              <label>
+                <span>測試員工編號</span>
+                <input id="rosterProbeEmployeeId" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="輸入欲核對的同仁員編">
+              </label>
+              <button id="rosterProbeButton" class="secondary-button" type="button">檢查名冊映射</button>
+            </div>
+            <p id="rosterProbeResult" class="inline-message roster-probe-result" role="status" aria-live="polite"></p>
           </div>
         </section>
 
@@ -175,6 +192,6 @@
     </section>
   </template>
 
-  <script src="audit-report.js" defer></script>
+  <script src="audit-report.js?v=20260821-pr67" defer></script>
 </body>
 </html>

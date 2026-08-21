@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-2-rank-change-zero-20260820-v1';
+const CACHE_NAME = 'liam-supervisor-app-1-2-audit-pr67-20260821-v1';
 const SHELL = [
   './app.html',
   './app.css',
@@ -32,6 +32,13 @@ self.addEventListener('fetch', event => {
   if (requestUrl.origin !== self.location.origin) return;
   if (requestUrl.pathname.endsWith('/app.html')) {
     event.respondWith(fetch(event.request, { cache:'no-store' }).catch(() => caches.match('./app.html')));
+    return;
+  }
+  if (requestUrl.pathname.endsWith('/audit-report.html')) {
+    event.respondWith(fetch(event.request, { cache:'no-store' }).then(response => {
+      if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
+      return response;
+    }).catch(() => caches.match(event.request).then(cached => cached || caches.match('./offline.html'))));
     return;
   }
   event.respondWith(
