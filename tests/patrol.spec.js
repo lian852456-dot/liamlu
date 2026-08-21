@@ -939,6 +939,81 @@ test('reload 與登出再登入後仍由 ptdetail 恢復 8 月里程，月份不
   expect(ptDetailCalls.filter(call=>call.store==='台北三創'&&call.page===2).length).toBe(3);
 });
 
+test('7 月與 8 月分開載入，不互相污染', async ({page})=>{
+  cloudRows=[
+    {arriveTime:'2026/7/31 10:00',month:'2026-07',code:'DNB10307',store:'台北三創',item:'1'},
+    {arriveTime:'2026/7/31 15:00',month:'2026-07',code:'DNB10440',store:'台北六張犁',item:'1'},
+    {arriveTime:'2026/8/1 10:00',month:'2026-08',code:'DNB10307',store:'台北三創',item:'1'},
+    {arriveTime:'2026/8/1 15:00',month:'2026-08',code:'DNB10440',store:'台北六張犁',item:'1'}
+  ];
+  await stubGas(page); await openAndUnlock(page);
+  await page.evaluate(()=>{currentMonth='2026-08';});
+  await page.click('.secure-tab[data-view="mileage"]');
+  await expect(page.locator('#miCoverage')).not.toContainText('載入中');
+  await page.evaluate(()=>MI.setMonth('2026-07'));
+  const result=await page.evaluate(()=>({
+    july:MI._monthPlans('2026-07').map(plan=>plan.date),
+    august:MI._monthPlans('2026-08').map(plan=>plan.date)
+  }));
+  expect(result.july).toEqual(['2026-07-31']);
+  expect(result.august).toEqual(['2026-08-01']);
+});
+
+test('同筆正式明細重讀不會重複累加', async ({page})=>{
+  await openAugustMileage(page);
+  await page.evaluate(()=>MI._hydrateMonth('2026-08',true));
+  await page.evaluate(()=>MI._hydrateMonth('2026-08',true));
+  const result=await page.evaluate(()=>({health:MI._health('2026-08'),plan:MI._monthPlans('2026-08')[0]}));
+  expect(result.health.mileageDetails).toBe(2);
+  expect(result.plan.nodes).toHaveLength(2);
+  expect(result.plan.km).toBe(4.5);
+});
+
+test('無巡店月份維持正常 0 KM 並標示 MILEAGE_NO_PATROL', async ({page})=>{
+  await openAugustMileage(page);
+  await page.evaluate(()=>MI.setMonth('2026-09'));
+  await expect(page.locator('#miCoverage')).toContainText('MILEAGE_NO_PATROL');
+  await expect(page.locator('#miCoverage')).toContainText('真的沒有巡店');
+  await expect(page.locator('#miStats .mi-card').nth(2)).toContainText('0KM');
+  const report=await page.evaluate(()=>MI._health('2026-09'));
+  expect(report).toMatchObject({patrolRows:0,mileageDetails:0,abnormal:false});
+});
+
+test('有巡店來源但日期無法解析時顯示一致性異常與 reason code', async ({page})=>{
+  cloudRows=[{arriveTime:'not-a-date',fillTime:'also-invalid',month:'2026-08',code:'DNB10307',store:'台北三創',item:'1'}];
+  await stubGas(page); await openAndUnlock(page);
+  await page.evaluate(()=>{currentMonth='2026-08';});
+  await page.click('.secure-tab[data-view="mileage"]');
+  await expect(page.locator('#miCoverage')).toContainText('巡店已有 1 筆，但里程同步為 0 筆');
+  await expect(page.locator('#miCoverage')).toContainText('MILEAGE_DATE_PARSE_ERROR');
+  await expect(page.locator('#miCoverage')).toContainText('MILEAGE_SOURCE_MISSING');
+});
+
+test('無法辨識店點時顯示 MILEAGE_STORE_MAPPING_ERROR', async ({page})=>{
+  cloudRows=[{arriveTime:'2026/8/2 10:00',month:'2026-08',code:'UNKNOWN',store:'台北三創臨時點',item:'1'}];
+  await stubGas(page); await openAndUnlock(page);
+  await page.evaluate(()=>{currentMonth='2026-08';});
+  await page.click('.secure-tab[data-view="mileage"]');
+  await expect(page.locator('#miCoverage')).toContainText('MILEAGE_STORE_MAPPING_ERROR');
+  const report=await page.evaluate(()=>MI._health('2026-08'));
+  expect(report.issues.some(issue=>issue.code==='MILEAGE_STORE_MAPPING_ERROR')).toBe(true);
+});
+
+test('timezone 跨日依 Asia/Taipei 歸入正確月份', async ({page})=>{
+  cloudRows=[
+    {arriveTime:'2026-07-31T16:30:00Z',month:'2026-08',code:'DNB10307',store:'台北三創',item:'1'},
+    {arriveTime:'2026-07-31T17:30:00Z',month:'2026-08',code:'DNB10440',store:'台北六張犁',item:'1'}
+  ];
+  await stubGas(page); await openAndUnlock(page);
+  await page.evaluate(()=>{currentMonth='2026-08';});
+  await page.click('.secure-tab[data-view="mileage"]');
+  await expect(page.locator('#miCoverage')).not.toContainText('正在從正式巡店明細載入');
+  await expect(page.locator('#miDate')).toHaveValue('2026-08-01');
+  const plan=await page.evaluate(()=>MI._monthPlans('2026-08')[0]);
+  expect(plan.date).toBe('2026-08-01');
+  expect(plan.km).toBe(4.5);
+});
+
 test('里程頁籤可正常開啟，且不影響原有頁籤', async ({ page }) => {
   await openMileage(page);
   await expect(page.locator('#miStats .mi-card')).toHaveCount(4);

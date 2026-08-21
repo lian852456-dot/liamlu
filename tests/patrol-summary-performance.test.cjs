@@ -36,6 +36,19 @@ test('ptdetail is an authenticated bounded lazy read', () => {
   assert.match(gas, /PATROL_DETAIL_MAX_LIMIT\s*=\s*100/);
   assert.match(gas, /Math\.min\(PATROL_DETAIL_MAX_LIMIT/);
   assert.match(gas, /patrolVisitStore_\(options\.store\)/);
+  assert.match(gas, /function patrolSummaryRowMonth_\(row\)/);
+  assert.match(gas, /filter\(function\(row\) \{ return patrolSummaryRowMonth_\(row\) === options\.month; \}\)/);
+  assert.match(gas, /normalized\.month = patrolSummaryRowMonth_\(row\)/);
+});
+
+test('mileage exposes explicit health reason codes and zero-detail consistency gate', () => {
+  const patrol = read('patrol.html');
+  ['MILEAGE_NO_PATROL','MILEAGE_SOURCE_MISSING','MILEAGE_DATE_PARSE_ERROR',
+   'MILEAGE_STORE_MAPPING_ERROR','MILEAGE_CLOUD_READ_ERROR','MILEAGE_API_ERROR',
+   'MILEAGE_AUTH_ERROR','MILEAGE_DATA_FORMAT_ERROR','MILEAGE_CALC_ERROR'].forEach(code=>assert.match(patrol,new RegExp(code)));
+  assert.match(patrol, /source\.length===0[\s\S]*ERROR\.NO_PATROL/);
+  assert.match(patrol, /else if\(visitCount===0\)[\s\S]*ERROR\.SOURCE_MISSING/);
+  assert.match(patrol, /console\[report\.abnormal\?'warn':'info'\]\('MILEAGE_HEALTH',report\)/);
 });
 
 test('App and patrol.html load ptsummary for dashboards and fail closed on transport errors', () => {
