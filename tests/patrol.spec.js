@@ -97,20 +97,23 @@ async function stubGas(page) {
           return route.fulfill({ contentType:'application/json', body:JSON.stringify({status:'error',message:'unauthorized'}) });
         }
         const month=String(payload.month||'');
-        const pageNumber=Number(payload.page||1);
-        const limit=Math.min(500,Number(payload.limit||500));
-        const rows=cloudRows.filter(row=>String(row.month||'').slice(0,7)===month).map(row=>({
-          fillTime:String(row.fillTime||''),arriveTime:String(row.arriveTime||''),
-          code:String(row.code||''),store:String(row.store||''),month
-        }));
-        const totalPages=Math.max(1,Math.ceil(rows.length/limit));
-        const start=(pageNumber-1)*limit;
-        ptMileageCalls.push({month,page:pageNumber,limit});
+        const raw=cloudRows.filter(row=>String(row.month||'').slice(0,7)===month);
+        const byVisit=new Map();
+        raw.forEach((row,index)=>{
+          const arriveTime=String(row.arriveTime||row.fillTime||'');
+          const date=(arriveTime.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/)||[]).slice(1).map((value,i)=>i?String(value).padStart(2,'0'):value).join('-');
+          const store=String(row.store||''); const code=String(row.code||'');
+          const key=date&&store?`${date}|${code||store}`:`invalid:${index}`;
+          const value={fillTime:String(row.fillTime||''),arriveTime,code,store,month};
+          if(!byVisit.has(key)||value.arriveTime<byVisit.get(key).arriveTime) byVisit.set(key,value);
+        });
+        const visits=[...byVisit.values()].sort((a,b)=>a.arriveTime.localeCompare(b.arriveTime)||a.store.localeCompare(b.store));
+        ptMileageCalls.push({month});
         if(ptMileageDelayMs) await new Promise(resolve=>setTimeout(resolve,ptMileageDelayMs));
         return route.fulfill({contentType:'application/json',body:JSON.stringify({
-          status:'ok',contract:'patrol-mileage-month-v1',fields:['fillTime','arriveTime','code','store','month'],
-          month,page:pageNumber,limit,totalRows:rows.length,totalPages,rows:rows.slice(start,start+limit),
-          diagnostics:{sourceRows:cloudRows.length,matchedRows:rows.length,sheetScans:pageNumber===1?1:0,serverDurationMs:12}
+          status:'ok',contract:'patrol-mileage-visits-v2',fields:['fillTime','arriveTime','code','store','month'],
+          month,page:1,limit:279,totalVisits:visits.length,totalPages:1,visits,
+          diagnostics:{sourceRows:cloudRows.length,matchedRows:raw.length,uniqueVisits:visits.length,sheetScans:1,serverDurationMs:12}
         })});
       }
       if (payload.action === 'half_media_upload') {
@@ -282,7 +285,10 @@ test('填表時間為 ######## 時整批拒絕，不寫雲端、不改 rawDetail
   await page.fill('#pasteBox', pasted);
   await page.getByRole('button', { name:'解析並更新' }).click();
 
-  await expect(page.locator('#parseMsg')).toHaveText("填表時間欄顯示 ####，請回原 Excel 加寬『填表時間』欄，確認顯示日期時間後再貼上。");
+  await expect(page.locator('#parseMsg')).toContainText('第 2 列');
+  await expect(page.locator('#parseMsg')).toContainText('店點「台北六張犁」');
+  await expect(page.locator('#parseMsg')).toContainText('欄位「填表時間」');
+  await expect(page.locator('#parseMsg')).toContainText('值為「########」');
   expect(writeCalls).toBe(beforeWrites);
   expect(await page.evaluate(() => JSON.stringify(rawDetails))).toBe(beforeRaw);
   await expect(page.locator('#pasteBox')).toHaveValue(pasted);
@@ -913,6 +919,26 @@ function august20PagedDetails() {
   return rows;
 }
 
+function august18VisitRawRows() {
+  const codes={
+    '台北酒泉':'DNB10062','台北大稻埕':'DNB10284','台北三創':'DNB10307','台北萬大':'DNB10168',
+    '台北六張犁':'DNB10440','台北復興南':'DNB10094','台北杭州南':'DNB10146',
+  };
+  const routes=[
+    ['2026/8/3',['台北酒泉','台北大稻埕','台北萬大']],
+    ['2026/8/4',['台北三創','台北酒泉','台北大稻埕']],
+    ['2026/8/5',['台北三創','台北酒泉','台北大稻埕']],
+    ['2026/8/6',['台北三創','台北酒泉','台北大稻埕']],
+    ['2026/8/7',['台北三創','台北六張犁']],
+    ['2026/8/8',['台北三創','台北復興南']],
+    ['2026/8/9',['台北杭州南','台北六張犁']],
+  ];
+  return routes.flatMap(([date,stores])=>stores.flatMap((store,index)=>Array.from({length:33},(_,item)=>({
+    fillTime:`${date} 08:${String(item).padStart(2,'0')}`,arriveTime:`${date} ${String(9+index).padStart(2,'0')}:00`,leaveTime:'',district:'北一二B',
+    code:codes[store],store,inspector:'測試督導',item:String(item+1),content:'',result:'v',reason:'',month:'2026-08'
+  }))));
+}
+
 async function openAugustMileage(page) {
   cloudRows=august20PagedDetails();
   await stubGas(page);
@@ -937,9 +963,27 @@ test('里程由單一月份級 request 恢復，8/20 顯示 2 店／4.5 KM', asy
   expect(state.rawCount).toBe(0);
   expect(state.plan.nodes.map(node=>node.name)).toEqual(['台北三創','台北六張犁']);
   expect(state.plan.km).toBe(4.5);
-  expect(ptMileageCalls).toEqual([{month:'2026-08',page:1,limit:500}]);
+  expect(ptMileageCalls).toEqual([{month:'2026-08'}]);
   expect(ptDetailCalls).toHaveLength(0);
   expect(elapsedMs).toBeLessThan(10000);
+});
+
+test('594 題 raw rows 經月份級 visits contract 顯示 18 visits／37.8 KM／7 個報銷出差日', async ({page})=>{
+  cloudRows=august18VisitRawRows();
+  expect(cloudRows).toHaveLength(594);
+  await stubGas(page); await openAndUnlock(page);
+  await page.evaluate(()=>{currentMonth='2026-08';});
+  await page.click('.secure-tab[data-view="mileage"]');
+  await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取/);
+  await expect(page.locator('#miCoverage')).toContainText('報銷出差日 7 天');
+  await expect(page.locator('#miCoverage')).toContainText('37.8 KM');
+  const result=await page.evaluate(()=>{
+    const plans=MI._monthPlans('2026-08');
+    const bill=plans.filter(plan=>plan.km!=null&&plan.km>0);
+    return {health:MI._health('2026-08'),days:plans.length,billDays:bill.length,km:Math.round(bill.reduce((sum,plan)=>sum+plan.km,0)*10)/10};
+  });
+  expect(result).toMatchObject({health:{patrolRows:18,mileageDetails:18,abnormal:false},days:7,billDays:7,km:37.8});
+  expect(ptMileageCalls).toEqual([{month:'2026-08'}]);
 });
 
 test('月份讀取超過 10 秒門檻會顯示卡點與 MILEAGE_LOAD_SLOW，完成後不會無限 loading', async ({page})=>{
@@ -957,10 +1001,10 @@ test('月份讀取超過 10 秒門檻會顯示卡點與 MILEAGE_LOAD_SLOW，完�
   });
   await page.click('.secure-tab[data-view="mileage"]');
   await expect(page.locator('#miCoverage')).toContainText('MILEAGE_LOAD_SLOW');
-  await expect(page.locator('#miCoverage')).toContainText('正在讀取第 1 頁');
+  await expect(page.locator('#miCoverage')).toContainText('正在載入 2026-08：讀取月份巡店事件');
   await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取/);
   await expect(page.locator('#miStats .mi-card').nth(1)).toContainText('4.5KM');
-  expect(ptMileageCalls.map(call=>call.page)).toEqual([1,2]);
+  expect(ptMileageCalls).toEqual([{month:'2026-08'}]);
 });
 
 test('reload 與登出再登入後仍由月份級明細恢復 8 月里程，月份不跳回 6 月', async ({page})=>{

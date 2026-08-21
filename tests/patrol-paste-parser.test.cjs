@@ -23,7 +23,11 @@ test('填表時間為 ######## 時整批拒絕，不回傳任何部分資料', (
     `########\t2026/8/20 16:00\t2026/8/20 18:00\t北一二B\tDNB10440\t台北六張犁\t測試督導\t1\t檢查內容\tv\t`,
   ].join('\n');
   const parsed = parsePatrolPasteText(text);
-  assert.equal(parsed.error, PATROL_FILL_TIME_PARSE_ERROR);
+  assert.match(parsed.error, /第 2 列/);
+  assert.match(parsed.error, /店點「台北六張犁」/);
+  assert.match(parsed.error, /欄位「填表時間」/);
+  assert.match(parsed.error, /值為「########」/);
+  assert.match(parsed.error, new RegExp(PATROL_FILL_TIME_PARSE_ERROR));
   assert.deepEqual(Array.from(parsed.rows), []);
 });
 
@@ -53,6 +57,6 @@ test('8/20 的 66 筆資料完整解析，兩店各 33 筆並相容新舊 NA', (
 
 test('無效題號不再靜默略過，整批回傳明確錯誤', () => {
   const parsed = parsePatrolPasteText([row('台北三創', 'DNB10307', 1), row('台北六張犁', 'DNB10440', 34)].join('\n'));
-  assert.match(parsed.error, /第 2 列題號無法辨識/);
+  assert.match(parsed.error, /第 2 列.*店點「台北六張犁」.*欄位「題號」.*值為「34」.*無法辨識/);
   assert.deepEqual(Array.from(parsed.rows), []);
 });

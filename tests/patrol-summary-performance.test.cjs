@@ -41,21 +41,26 @@ test('ptdetail is an authenticated bounded lazy read', () => {
   assert.match(gas, /normalized\.month = patrolSummaryRowMonth_\(row\)/);
 });
 
-test('ptmileage is a month-scoped lightweight contract with one Sheet scan per snapshot', () => {
+test('ptmileage is a month-scoped single-page visits contract with one Sheet scan per request', () => {
   const gas = read('gas/Code.gs');
   const patrol = read('patrol.html');
   assert.match(gas, /function ptMileageMonthPostPayload_\(payload\)[\s\S]*ptRequireSession_\(body\.token, 'ptmileage'\)/);
   assert.match(gas, /action === 'ptmileage'\) result = ptMileageMonthPostPayload_\(payload\)/);
   assert.match(gas, /PATROL_MILEAGE_FIELDS = \['fillTime','arriveTime','code','store','month'\]/);
-  assert.match(gas, /PATROL_MILEAGE_MAX_LIMIT = 500/);
+  assert.match(gas, /PATROL_MILEAGE_MAX_VISITS = 279/);
   const monthRead = gas.match(/function readPatrolMileageMonth_\(options\) \{([\s\S]*?)\n\}/);
   assert.ok(monthRead);
   assert.equal((monthRead[1].match(/readPatrolContractColumns_\(sheet\)/g) || []).length, 1);
   assert.match(monthRead[1], /patrolSummaryRowMonth_\(row\) === month/);
+  assert.match(monthRead[1], /patrolMileageVisits_\(matchedRows, month\)/);
+  assert.match(monthRead[1], /contract:'patrol-mileage-visits-v2'/);
+  assert.match(monthRead[1], /totalVisits:visits\.length/);
+  assert.match(monthRead[1], /totalPages:1/);
+  assert.match(monthRead[1], /visits:visits/);
   assert.doesNotMatch(monthRead[1], /ptStoreRows\(/);
-  assert.match(patrol, /cloudCall\('ptmileage',\{month,page,limit\}\)/);
+  assert.match(patrol, /cloudCall\('ptmileage',\{month\}\)/);
   assert.doesNotMatch(patrol, /for\(const storeName of stores\)/);
-  assert.match(patrol, /正在讀取第 \$\{page\}\/\$\{totalPages\} 頁/);
+  assert.match(patrol, /正在載入 \$\{month\}：讀取月份巡店事件/);
   assert.match(patrol, /MILEAGE_LOAD_SLOW/);
   assert.match(patrol, /MILEAGE_LOAD_TIMEOUT/);
 });
