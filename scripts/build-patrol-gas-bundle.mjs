@@ -14,6 +14,20 @@ function range(source, start, end) {
   return source.slice(from, to).trim();
 }
 
+function functionBlock(source, name) {
+  const marker = `function ${name}(`;
+  const from = source.indexOf(marker);
+  if (from < 0) throw new Error(`Patrol bundle dependency missing from source: ${name}`);
+  const open = source.indexOf('{', from);
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') depth -= 1;
+    if (depth === 0) return source.slice(from, index + 1).trim();
+  }
+  throw new Error(`Patrol bundle dependency is unterminated: ${name}`);
+}
+
 const responseHelpers = String.raw`
 const SPREADSHEET_ID = '10MqzAWOPc4UPE-g5ZZPNZG3tYAndKW-DApLuuhIpQWA';
 
@@ -138,11 +152,15 @@ function doPost(e) {
 `;
 
 const source = fs.readFileSync(sourcePath, 'utf8');
+const patrolDependencyClosure = [
+  'ptWinMonths'
+].map(name => functionBlock(source, name));
 const patrolCode = [
   responseHelpers.trim(),
   range(source, 'const PATROL_SESSION_TTL_SECONDS', 'const PATROL_VISIT_SHEET'),
   range(source, 'const PATROL_VISIT_SHEET', 'const HALF_CHECK_SHEET'),
-  range(source, 'const HALF_CHECK_SHEET', 'const PT_ITEM_TEXT')
+  range(source, 'const HALF_CHECK_SHEET', 'const PT_ITEM_TEXT'),
+  ...patrolDependencyClosure
 ].join('\n\n')
   .replace("const PATROL_AUTH_DEPLOYMENT = 'patrol-auth-stateless-20260821';", "const PATROL_AUTH_DEPLOYMENT = 'patrol-isolated-v1';");
 

@@ -1247,3 +1247,11 @@ function scheduleDateString(value) {
 // 想立即試寄：函式選單選「testWeeklyReport」執行。
 // 注意：時間觸發器跑最新存檔程式碼，不需重新部署。
 // ════════════════════════════════════
+
+function ptWinMonths(monthKey) {
+  const p = monthKey.split('-');
+  const y = Number(p[0]), m = Number(p[1]);
+  const s = (m % 2 === 1) ? m : m - 1;
+  const pad = n => ('0' + n).slice(-2);
+  return [y + '-' + pad(s), y + '-' + pad(s + 1)];
+}
