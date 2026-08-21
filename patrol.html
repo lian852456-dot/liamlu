@@ -662,10 +662,11 @@ let patrolSummary = null;
 let patrolSummaryState = 'loading';
 let patrolSummaryMessage = '巡店資料讀取中';
 let patrolSummaryVerifiedAt = '';
-// 巡店所有資料 action 固定走同一個正式受保護部署。
-const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
-const PRIVATE_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
-const PT_SESSION_TOKEN_STORAGE = 'bei12b_pt_session_token';
+// Patrol 只走獨立部署；Audit v67 不共用這個端點或 session。
+const PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbxqBtW2yQw_u4qqJ9Knz6CK34hAiunaa6lIQu4pMa8Ff2voJZCWKEh8MXTJ6qAoGTax/exec';
+const DEFAULT_PATROL_GAS_URL = PATROL_GAS_URL;
+const PRIVATE_GAS_URL = PATROL_GAS_URL;
+const PT_SESSION_TOKEN_STORAGE = 'bei12b_patrol_session_token_v2';
 const PATROL_REAUTH_MESSAGE = '督導驗證已逾時，請重新驗證後繼續同步';
 const PATROL_SESSION_CONTRACT = 'patrol-session-v2';
 const PATROL_REAUTH_REASONS = new Set(['AUTH_SESSION_EXPIRED','AUTH_SESSION_REVOKED']);
