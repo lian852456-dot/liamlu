@@ -657,9 +657,22 @@ function patrolSummaryNow_() {
 }
 
 function patrolSummaryIsoDate_(row) {
-  const text = String(row && (row.arriveTime || row.fillTime) || '');
-  const match = text.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-  return match ? match[1] + '-' + ('0' + Number(match[2])).slice(-2) + '-' + ('0' + Number(match[3])).slice(-2) : '';
+  const values = [row && row.arriveTime, row && row.fillTime];
+  for (let i = 0; i < values.length; i++) {
+    const text = String(values[i] || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(text)) {
+      const parsed = new Date(text);
+      if (!isNaN(parsed.getTime())) return Utilities.formatDate(parsed, 'Asia/Taipei', 'yyyy-MM-dd');
+    }
+    const match = text.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+    if (match) return match[1] + '-' + ('0' + Number(match[2])).slice(-2) + '-' + ('0' + Number(match[3])).slice(-2);
+  }
+  return '';
+}
+
+function patrolSummaryRowMonth_(row) {
+  const explicit = String(row && row.month || '').slice(0, 7);
+  return /^\d{4}-\d{2}$/.test(explicit) ? explicit : patrolSummaryIsoDate_(row).slice(0, 7);
 }
 
 function patrolSummaryFillIsoDate_(row) {
@@ -831,7 +844,7 @@ function patrolSummaryContract_(allRows, month, now, meta) {
     const groups = {};
     ptStoreRows(allRows, store).forEach(function(row) {
       const date = patrolSummaryIsoDate_(row);
-      const rowMonth = /^\d{4}-\d{2}$/.test(String(row.month || '').slice(0, 7)) ? String(row.month).slice(0, 7) : date.slice(0, 7);
+      const rowMonth = patrolSummaryRowMonth_(row);
       if (!date || rowMonth !== month) return;
       if (!groups[date]) groups[date] = [];
       groups[date].push(row);
@@ -895,7 +908,8 @@ function readPatrolDetail_(options) {
   if (!Number.isInteger(requestedLimit) || requestedLimit < 1) throw new Error('invalid patrol detail limit');
   const limit = Math.min(PATROL_DETAIL_MAX_LIMIT, requestedLimit);
   const all = ptStoreRows(readPatrolContractColumns_(getPatrolSheet()), { name:store, code:(PT_STORES.find(function(item) { return item.name === store; }) || {}).code || '' })
-    .filter(function(row) { return String(row.month || '').slice(0, 7) === options.month; })
+    .filter(function(row) { return patrolSummaryRowMonth_(row) === options.month; })
+    .map(function(row) { const normalized = Object.assign({}, row); normalized.month = patrolSummaryRowMonth_(row); return normalized; })
     .sort(function(left, right) { return patrolSummaryIsoDate_(right).localeCompare(patrolSummaryIsoDate_(left)) || Number(left.item) - Number(right.item); });
   const start = (page - 1) * limit;
   return { status:'ok', month:options.month, store:store, page:page, limit:limit, totalRows:all.length, rows:all.slice(start, start + limit) };

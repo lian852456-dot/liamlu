@@ -13,6 +13,13 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-21 ｜ Codex（每日移動里程根因修復＋異常偵測，Draft PR #68／待正式部署）
+
+- Root Cause：里程頁只掃本頁 `rawDetails`，reload／登出後候選明細被清空；固定 Y2606 對帳資料又會讓預設月份回到六月。另有第二層契約落差：看板 `ptsummary` 會由到店時間 fallback 月份，但 `ptdetail` 只看 `row.month`，所以月份欄缺漏時會「看板有、里程 API 0 筆」。8/4 同步修正未動里程來源，沒有涵蓋此問題。
+- 修正：里程登入後以既有 PT 短效 token，按月份、九店、每頁 100 筆完整讀取 `ptdetail`；`ptsummary`／`ptdetail` 共用 `patrolSummaryRowMonth_()` 並回傳 canonical month，既有 8/1 起資料自動讀回，不寫回 Sheet。前端依日期＋canonical store 去重，同日同店多題／重讀只算一次；月份按 Asia/Taipei 解析。service-worker cache 已換版，避免正式手機保留舊 `patrol.html`。
+- 異常偵測：新增來源列／去重店次／里程日一致性檢查；來源列 > 0 且里程明細 = 0 直接顯示 `⚠ 巡店已有 X 筆，但里程同步為 0 筆`。畫面與 console 記錄 `MILEAGE_NO_PATROL`、`MILEAGE_SOURCE_MISSING`、`MILEAGE_DATE_PARSE_ERROR`、`MILEAGE_STORE_MAPPING_ERROR`、`MILEAGE_CLOUD_READ_ERROR`、`MILEAGE_API_ERROR`、`MILEAGE_AUTH_ERROR`、`MILEAGE_DATA_FORMAT_ERROR`、`MILEAGE_CALC_ERROR`；異常時停用正式匯出。
+- 驗證（未部署）：8/20 fixture 透過三創 101 筆跨兩頁＋六張犁 1 筆驗證為 2 店／4.5 KM，且 `rawDetails=0`；新增 7/8 月隔離、重讀去重、真無資料 0 KM、來源不一致、未知店點、timezone 跨日測試皆通過。Node `243/243`；完整 Chromium 功能 `171/176`，5 個逾時都停在與本次無關的 screenshot 寫檔，單 worker 重跑其中 2 個恢復，剩 3 個仍為 screenshot timeout；里程 24/24 全通過。正式 GAS／Pages 尚未部署，正式 8 月回補筆數、總里程與 iPhone readback 仍待 release 後確認。
+
 ## 2026-08-21 ｜ Codex（稽核 UAT 名冊 probe／Safari 私有照片恢復，PR #67 deployment candidate）
 
 - 做了什麼：從 PR #66 合併後正式 `main` 建立隔離分支 `hotfix/audit-uat-roster-probe-photo-restore-20260821`。新增僅限 active `*-uat` 且既有 Trusted Employee audit session 的 `audit_roster_probe`，只回傳存在性、啟用狀態、遮罩名、名冊店點、九店映射及是否已有 Approved Device；不修改裝置綁定或 `last_login_at`，不回傳 employee hash／device ID，不換發受測同仁 token，也不讀 private snapshot／KPI／台獎。前端只有具該 UAT 權限時才顯示「員編名冊測試」，正式批次與一般員工都 fail closed。

@@ -39,7 +39,7 @@ function functionSource(source, name) {
 function gasSummary(rows, stores, month, now) {
   const gas = fs.readFileSync(path.join(root, 'gas/Code.gs'), 'utf8');
   const names = [
-    'ptWinMonths','ptDayOf','ptItemDone','ptStoreRows','patrolSummaryIsoDate_',
+    'ptWinMonths','ptDayOf','ptItemDone','ptStoreRows','patrolSummaryIsoDate_','patrolSummaryRowMonth_',
     'patrolSummaryFillIsoDate_','patrolSummaryPreviousWindow_','patrolSummaryDaysSince_',
     'patrolSummaryAwareness_','patrolSummaryItem18State_','patrolSummaryDashboardProgress_',
     'patrolSummaryHalfDashboard_','patrolSummaryContract_'

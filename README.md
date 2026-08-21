@@ -2,6 +2,15 @@
 
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）＋ Google Sheets。
 
+## 每日移動里程
+
+- `patrol.html` 的里程頁在督導驗證後，直接使用既有受保護 `ptdetail`，依目前月份、北一二B九店與每頁 100 筆完整分頁讀回；不需要貼上巡店資料、匯入 JSON，也不新增第二套 GAS API。
+- 里程只從本次成功讀回的正式明細推導；載入中、token 逾時、月份／店點／分頁 contract 不一致或筆數未讀完整時一律 fail closed，不以 `rawDetails`、舊月份或空資料代替。
+- 登出會清除本頁正式明細快取；reload 或重新登入後會重新讀取 `ptdetail`。預設月份沿用正式巡店頁目前月份，無值時才依 Asia/Taipei 當月決定，不再因硬編碼六月對帳基準跳回六月。
+- `ptsummary` 與 `ptdetail` 共用 `patrolSummaryRowMonth_()`：有效 `row.month` 優先，否則由到店／填表時間依 Asia/Taipei 補成 canonical `YYYY-MM`。因此 8/1 起既有列不需重填，也不會因月份欄缺漏只出現在看板、不出現在里程。
+- 健康檢查會比較正式巡店來源列、去重後店次與里程日；「巡店來源 > 0、里程明細 = 0」視為異常並 fail closed。畫面與 console 會留下 `MILEAGE_NO_PATROL`、`MILEAGE_SOURCE_MISSING`、`MILEAGE_DATE_PARSE_ERROR`、`MILEAGE_STORE_MAPPING_ERROR`、`MILEAGE_CLOUD_READ_ERROR`、`MILEAGE_API_ERROR`、`MILEAGE_AUTH_ERROR`、`MILEAGE_DATA_FORMAT_ERROR`、`MILEAGE_CALC_ERROR`，不再把所有情況顯示成正常 0 KM。
+- 六月受控對帳仍固定為 11 天／74.5 KM；正式雲端資料不足的三天只依既有受控基準補入，不改寫巡店 Sheet。`gas/Code.gs` 只調整既有 read-only `ptdetail` 的月份 fallback／canonical 回傳，不改寫巡店 Sheet、schema 或任何 write action。
+
 ## 稽核回報專區
 
 - `audit-report.html` 是九店手機優先的環境清潔回報與督導逐項驗收頁；入口位於 `home.html`。

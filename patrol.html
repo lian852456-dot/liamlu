@@ -549,12 +549,9 @@
   <section id="mileageView" class="secure-view" aria-label="每日移動里程">
     <div class="secure-card">
       <h2>每日移動里程</h2>
-      <p class="hint">由「貼上巡店紀錄」及雲端明細推導：同日多店依<b>到店時間</b>逐段加總，同店重複只取最早一筆。距離取自受控版車資對照表，未知路段一律留白標「待查」，不填 0、不猜測、不平均拆分。</p>
+      <p class="hint">登入後直接讀取正式巡店雲端明細：同日多店依<b>到店時間</b>逐段加總，同店重複只取最早一筆，不需貼上資料或匯入 JSON。距離取自受控版車資對照表，未知路段一律留白標「待查」，不填 0、不猜測、不平均拆分。</p>
       <div class="secure-toolbar">
         <label>檢視月份<input id="miMonth" type="month" onchange="MI.setMonth(this.value)"></label>
-        <button class="mi-btn ghost" type="button" onclick="MI.importPick()">📂 匯入巡店明細</button>
-        <button class="mi-btn ghost" type="button" onclick="MI.exportDetails()">💾 匯出明細存檔</button>
-        <input id="miImportFile" type="file" accept=".json,.csv,.txt" hidden onchange="MI.importFile(this)">
       </div>
     </div>
 
@@ -657,7 +654,7 @@ const ITEM_TEXT = {
 /* ---------- 資料儲存（記憶體） ---------- */
 // records: { "storeName": { code, entries:[{date, half, item, result}] } }
 let records = {};
-// rawDetails: 本頁貼上／匯入的去重候選明細，供上傳、匯出與里程預覽。
+// rawDetails: 本頁貼上／匯入的去重候選明細，供巡店候選資料上傳與匯出；里程不讀此變數。
 // 正式巡店大盤只以 patrolSummary（ptsummary）為準，不得以這個局部批次取代。
 let rawDetails = [];
 let currentMonth = "";
@@ -880,6 +877,7 @@ async function privateSignOut(){
   const token=PT_TOKEN;
   clearPatrolAuthState();
   records={};rawDetails=[];scheduleData=null;halfChecks=[];cloudOn=false;activePatrolView=null;
+  MI.clear();
   unmountPatrolApp();
   setPatrolAuthMessage('已登出；請重新驗證後再進入');
   const input=document.getElementById('patrolPasscode');
@@ -1653,8 +1651,8 @@ async function switchPatrolView(view){
   document.querySelectorAll('.secure-view').forEach(el=>el.classList.remove('active'));
   if(view==='mileage'){
     document.getElementById('mileageView').classList.add('active');
-    // 只重繪目前已解析的 rawDetails，不另觸發 ptread（避免背景寫入未完成時被舊資料覆蓋）
-    MI.render();
+    // 里程只讀正式 ptdetail；不使用貼上候選 rawDetails，也不新增第二套 GAS action。
+    MI.open(currentMonth);
     return;
   }
   if(view==='schedule'){
@@ -2008,7 +2006,7 @@ restorePatrolSession();
 
 /* =========================================================================
    每日移動里程（獨立模組）
-   - 資料來源：既有 rawDetails（唯讀，不改寫原始巡店紀錄）
+   - 資料來源：既有受保護 ptdetail（月／九店／分頁），不依賴 rawDetails
    - 人工調整只存 localStorage:bei12b_mileage_v1，與 GAS 完全脫鉤
    - 匯出沿用 excelXml()/downloadExcel()，格式比照受控版 Y2606月車資.xls
    ========================================================================= */
@@ -2087,7 +2085,110 @@ const MI = (function(){
     ['2026-06-30','台北三創/台北通化',3.6]
   ]}};
 
-  let state={date:'', month:''};
+  const ERROR={
+    NO_PATROL:'MILEAGE_NO_PATROL', SOURCE_MISSING:'MILEAGE_SOURCE_MISSING',
+    DATE_PARSE:'MILEAGE_DATE_PARSE_ERROR', STORE_MAPPING:'MILEAGE_STORE_MAPPING_ERROR',
+    CLOUD_READ:'MILEAGE_CLOUD_READ_ERROR', API:'MILEAGE_API_ERROR', AUTH:'MILEAGE_AUTH_ERROR',
+    DATA_FORMAT:'MILEAGE_DATA_FORMAT_ERROR', CALC:'MILEAGE_CALC_ERROR'
+  };
+  let state={date:'', month:'', loading:false, error:null};
+  let serverRowsByMonth={};
+  let loadedMonths={};
+  let loadGeneration=0;
+
+  function canonicalMonth(value){
+    const month=String(value||'').trim();
+    return /^\d{4}-(0[1-9]|1[0-2])$/.test(month)?month:'';
+  }
+
+  function taipeiCurrentMonth(){
+    const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).formatToParts(new Date());
+    const year=parts.find(part=>part.type==='year');
+    const month=parts.find(part=>part.type==='month');
+    return year&&month?year.value+'-'+month.value:'';
+  }
+
+  function mileageError(code, message, detail){
+    const error=new Error(message);
+    error.code=code;
+    error.detail=detail||null;
+    return error;
+  }
+
+  function classifyReadError(error){
+    if(error&&error.code) return error;
+    const message=String(error&&error.message||'巡店明細讀取失敗');
+    if(/unauthorized|token|驗證|權限|401|403/i.test(message)) return mileageError(ERROR.AUTH,message);
+    if(/network|fetch|連線|讀取|timeout|逾時/i.test(message)) return mileageError(ERROR.CLOUD_READ,message);
+    return mileageError(ERROR.API,message);
+  }
+
+  async function loadStoreMonth(month, storeName){
+    const rows=[];
+    const limit=100;
+    let page=1;
+    let totalRows=null;
+    do{
+      const response=await cloudCall('ptdetail',{month,store:storeName,page,limit});
+      if(!response || typeof response!=='object') throw mileageError(ERROR.API,'巡店明細 API 未回傳 JSON object');
+      if(response.status!=='ok') throw classifyReadError(new Error(response.message||'巡店明細 API 回傳失敗'));
+      if(response.month!==month || response.store!==storeName || Number(response.page)!==page || !Array.isArray(response.rows)){
+        throw mileageError(ERROR.DATA_FORMAT,'巡店明細月份、店點或分頁 contract 不完整');
+      }
+      const reportedTotal=Number(response.totalRows);
+      if(!Number.isInteger(reportedTotal) || reportedTotal<0) throw mileageError(ERROR.DATA_FORMAT,'巡店明細筆數 contract 不完整');
+      if(totalRows===null) totalRows=reportedTotal;
+      else if(totalRows!==reportedTotal) throw mileageError(ERROR.API,'巡店明細分頁期間資料已變更，請重新載入');
+      if(response.rows.some(row=>!row||typeof row!=='object'||Array.isArray(row)))
+        throw mileageError(ERROR.DATA_FORMAT,'巡店明細包含非 object 資料列');
+      rows.push(...response.rows);
+      if(response.rows.length===0 && rows.length<totalRows) throw mileageError(ERROR.API,'巡店明細分頁未前進');
+      page+=1;
+    }while(rows.length<totalRows);
+    if(rows.length!==totalRows) throw mileageError(ERROR.API,'巡店明細分頁讀回筆數不一致');
+    return rows;
+  }
+
+  async function hydrateMonth(value, force){
+    const month=canonicalMonth(value);
+    if(!month) throw mileageError(ERROR.DATE_PARSE,'巡店月份格式錯誤');
+    if(loadedMonths[month] && !force) return serverRowsByMonth[month]||[];
+    const wasLoaded=Boolean(loadedMonths[month]);
+    if(!secureUnlocked || !privateAccount || !PT_TOKEN) throw mileageError(ERROR.AUTH,'請先完成督導驗證');
+    const stores=STORES.map(store=>String(store.name||'')).filter(Boolean);
+    if(stores.length!==9 || new Set(stores).size!==9) throw mileageError(ERROR.DATA_FORMAT,'巡店九店 contract 不完整');
+    const generation=++loadGeneration;
+    state.loading=true; state.error=null;
+    render();
+    try{
+      const next=[];
+      // 逐店讀取，避免 token 過期時多個平行請求同時觸發重新驗證。
+      for(const storeName of stores) next.push(...await loadStoreMonth(month,storeName));
+      serverRowsByMonth[month]=next;
+      loadedMonths[month]=true;
+      const report=health(month);
+      console[report.abnormal?'warn':'info']('MILEAGE_HEALTH',report);
+      if(generation===loadGeneration){
+        if(!wasLoaded) state.date='';
+        state.loading=false; state.error=null; render();
+      }
+      return next;
+    }catch(error){
+      if(generation===loadGeneration){
+        state.loading=false;
+        state.error=classifyReadError(error);
+        console.error('MILEAGE_HEALTH', {month,code:state.error.code,reason:state.error.message});
+        render();
+      }
+      throw error;
+    }
+  }
+
+  function clear(){
+    loadGeneration+=1;
+    serverRowsByMonth={}; loadedMonths={};
+    state={date:'',month:'',loading:false,error:null};
+  }
 
   /* ---------- 人工資料層（localStorage，不觸碰 GAS／原始明細） ---------- */
   function store(){
@@ -2109,7 +2210,7 @@ const MI = (function(){
     for(const n of allNodes()){
       if(s && (n.name===s || (n.aliases||[]).includes(s))) return n.name;
     }
-    return s || (c?('<未知代碼 '+c+'>'):'');
+    return null;
   }
 
   /* ---------- 距離查詢 ---------- */
@@ -2121,21 +2222,52 @@ const MI = (function(){
   const VERIFY_LABEL={verified:['已驗證','ok'],observed:['歷史觀測','hist'],
                       manual:['人工確認','manual'],official:['正式受控','ok']};
 
-  /* ---------- 由 rawDetails 推導每日路線 ---------- */
+  /* ---------- 由正式 ptdetail 推導每日路線 ---------- */
   function parseArrive(s){
-    const m=String(s||'').trim().match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/);
+    const text=String(s||'').trim();
+    if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(text)){
+      const date=new Date(text); if(!Number.isFinite(date.getTime())) return null;
+      const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date);
+      const get=type=>(parts.find(part=>part.type===type)||{}).value||'';
+      return {date:`${get('year')}-${get('month')}-${get('day')}`,time:`${get('hour')}:${get('minute')}`,key:`${get('hour')}${get('minute')}`};
+    }
+    const m=text.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})[ T](\d{1,2}):(\d{2})/);
     if(!m) return null;
+    const year=Number(m[1]),month=Number(m[2]),day=Number(m[3]),hour=Number(m[4]),minute=Number(m[5]);
+    const check=new Date(Date.UTC(year,month-1,day));
+    if(check.getUTCFullYear()!==year||check.getUTCMonth()!==month-1||check.getUTCDate()!==day||hour>23||minute>59) return null;
     const p=n=>String(n).padStart(2,'0');
-    return {date:`${m[1]}-${p(m[2])}-${p(m[3])}`, time:`${p(m[4])}:${m[5]}`, key:`${m[4].padStart(2,'0')}${m[5]}`};
+    return {date:`${year}-${p(month)}-${p(day)}`, time:`${p(hour)}:${p(minute)}`, key:`${p(hour)}${p(minute)}`};
+  }
+  function parsedMonth(month){
+    const by={}, issues=[];
+    (serverRowsByMonth[month]||[]).forEach((r,index)=>{
+      if(!r||typeof r!=='object'||Array.isArray(r)){
+        issues.push({code:ERROR.DATA_FORMAT,reason:`第 ${index+1} 列不是 object`}); return;
+      }
+      const rowMonth=canonicalMonth(r.month);
+      if(!rowMonth || rowMonth!==month){
+        issues.push({code:ERROR.DATE_PARSE,reason:`第 ${index+1} 列 month「${String(r.month||'')}」與 ${month} 不符`}); return;
+      }
+      const t=parseArrive(r.arriveTime);
+      if(!t || t.date.slice(0,7)!==month){
+        issues.push({code:ERROR.DATE_PARSE,reason:`第 ${index+1} 列到店時間「${String(r.arriveTime||'')}」無法解析為 ${month}`}); return;
+      }
+      const name=normalize(r.code,r.store);
+      if(!name){
+        issues.push({code:ERROR.STORE_MAPPING,reason:`第 ${index+1} 列店點無法匹配：${String(r.store||r.code||'空白')}`}); return;
+      }
+      (by[t.date]=by[t.date]||{});
+      // 同日同店的多題明細只代表一次巡店；保留最早到店時間，避免重複累加。
+      if(!by[t.date][name]||t.key<by[t.date][name].key) by[t.date][name]={name,time:t.time,key:t.key,code:r.code||''};
+    });
+    return {by,issues};
   }
   function days(){
     const by={};
-    (rawDetails||[]).forEach(r=>{
-      const t=parseArrive(r.arriveTime); if(!t) return;
-      const name=normalize(r.code, r.store); if(!name) return;
-      (by[t.date]=by[t.date]||{});
-      // 同店重複只取最早一筆到店時間
-      if(!by[t.date][name] || t.key < by[t.date][name].key) by[t.date][name]={name,time:t.time,key:t.key,code:r.code||''};
+    Object.keys(serverRowsByMonth).forEach(month=>{
+      const parsed=parsedMonth(month).by;
+      Object.keys(parsed).forEach(date=>{by[date]=Object.assign(by[date]||{},parsed[date]);});
     });
     const out={};
     Object.keys(by).sort().forEach(d=>{
@@ -2211,6 +2343,24 @@ const MI = (function(){
     return out;
   }
 
+  function health(month){
+    const source=serverRowsByMonth[month]||[];
+    const parsed=parsedMonth(month);
+    const visitCount=Object.values(parsed.by).reduce((sum,stores)=>sum+Object.keys(stores).length,0);
+    const issues=parsed.issues.slice();
+    const plans=monthPlans(month);
+    const todos=[]; plans.forEach(plan=>plan.todo.forEach(route=>todos.push(route)));
+    if(source.length===0) issues.push({code:ERROR.NO_PATROL,reason:`${month} 本月真的沒有巡店`});
+    else if(visitCount===0) issues.push({code:ERROR.SOURCE_MISSING,reason:`巡店已有 ${source.length} 筆，但里程同步為 0 筆`});
+    if(todos.length) issues.push({code:ERROR.STORE_MAPPING,reason:`${todos.length} 段店點無法匹配距離表：${todos.join('、')}`});
+    const calcFailed=plans.filter(plan=>plan.km!=null&&(!Number.isFinite(plan.km)||plan.km<0));
+    if(calcFailed.length) issues.push({code:ERROR.CALC,reason:`${calcFailed.length} 天距離計算結果無效`});
+    const unique=[];
+    issues.forEach(issue=>{if(!unique.some(item=>item.code===issue.code&&item.reason===issue.reason)) unique.push(issue);});
+    const abnormal=unique.some(issue=>issue.code!==ERROR.NO_PATROL);
+    return {month,patrolRows:source.length,mileageDetails:visitCount,plans:plans.length,abnormal,issues:unique};
+  }
+
   /* ---------- 資料涵蓋範圍 ---------- */
   function coverage(month){
     const D=days(), have=Object.keys(D).filter(d=>d.slice(0,7)===month).sort();
@@ -2229,7 +2379,7 @@ const MI = (function(){
 
   function ensureState(){
     const D=days(), all=Object.keys(D).sort();
-    if(!state.month) state.month=(all.length?all[all.length-1].slice(0,7):new Date().toISOString().slice(0,7));
+    if(!state.month) state.month=canonicalMonth(currentMonth)||taipeiCurrentMonth();
     const inM=all.filter(d=>d.slice(0,7)===state.month);
     if(!state.date || state.date.slice(0,7)!==state.month) state.date=inM.length?inM[inM.length-1]:state.month+'-01';
     const mEl=document.getElementById('miMonth'), dEl=document.getElementById('miDate');
@@ -2240,7 +2390,16 @@ const MI = (function(){
   function render(){
     if(!document.getElementById('miStats')) return;
     ensureState();
-    renderCoverage(); renderStats(); renderAlerts(); renderTimeline(); renderSummary();
+    renderCoverage();
+    if(state.loading||state.error){
+      const label=state.loading?'正式 ptdetail 載入中':'正式 ptdetail 尚未完成讀回';
+      document.getElementById('miStats').innerHTML=`<div class="mi-card"><div class="k">里程資料</div><div class="v">—</div><div class="s">${esc2(label)}</div></div>`;
+      document.getElementById('miAlerts').innerHTML='';
+      document.getElementById('miTimeline').innerHTML=`<div class="mi-empty">${esc2(label)}</div>`;
+      document.getElementById('miSummary').innerHTML=`<tr><td class="mi-empty">${esc2(label)}</td></tr>`;
+      return;
+    }
+    renderStats(); renderAlerts(); renderTimeline(); renderSummary();
   }
 
   // 與正式公司報銷表對帳
@@ -2262,9 +2421,20 @@ const MI = (function(){
 
   function renderCoverage(){
     const el=document.getElementById('miCoverage'), rc=reconcile(state.month);
-    const all=monthPlans(state.month), bill=billable(all);
-    if(!all.length){ el.innerHTML=`<div class="mi-note">目前沒有 ${esc2(state.month)} 的巡店明細。請先在「巡店看板」貼上紀錄，或用上方「匯入巡店明細」載入存檔。</div>`; return; }
-    let h='';
+    if(state.loading){ el.innerHTML=`<div class="mi-note">正在從正式巡店明細載入 ${esc2(state.month)}（九店／分頁）…</div>`; return; }
+    if(state.error){ el.innerHTML=`<div class="mi-note bad"><b>${esc2(state.error.code||ERROR.API)}</b>：${esc2(state.error.message||state.error)}<br>未以 rawDetails、舊月份或空資料代替。</div>`; return; }
+    const report=health(state.month), all=monthPlans(state.month), bill=billable(all);
+    if(!all.length){
+      if(report.abnormal){
+        el.innerHTML=`<div class="mi-note bad"><b>⚠ ${ERROR.SOURCE_MISSING}</b>：巡店已有 ${report.patrolRows} 筆，但里程同步為 ${report.mileageDetails} 筆。<ul>`+
+          report.issues.map(issue=>`<li><b>${esc2(issue.code)}</b>：${esc2(issue.reason)}</li>`).join('')+'</ul></div>';
+      }else{
+        el.innerHTML=`<div class="mi-note"><b>${ERROR.NO_PATROL}</b>：正式 ptdetail 確認 ${esc2(state.month)} 本月真的沒有巡店，里程維持 0 KM。</div>`;
+      }
+      return;
+    }
+    let h=report.issues.filter(issue=>issue.code!==ERROR.NO_PATROL).map(issue=>
+      `<div class="mi-note bad"><b>⚠ ${esc2(issue.code)}</b>：${esc2(issue.reason)}</div>`).join('');
     if(rc){
       const hit=rc.rows.filter(r=>r.ok).length, kmhit=rc.rows.filter(r=>r.kmOk).length;
       const done=rc.match;
@@ -2353,7 +2523,16 @@ const MI = (function(){
   }
 
   /* ---------- 日期／月份切換 ---------- */
-  function setMonth(v){ if(!v) return; state.month=v; state.date=''; render(); }
+  function open(v){
+    const month=canonicalMonth(v)||canonicalMonth(currentMonth)||taipeiCurrentMonth();
+    state.month=month; state.date=''; state.loading=!loadedMonths[month]; state.error=null; render();
+    return hydrateMonth(month,false).catch(error=>{console.error('Mileage hydration failed:',error);return false;});
+  }
+  function setMonth(v){
+    const month=canonicalMonth(v); if(!month) return Promise.resolve(false);
+    state.month=month; state.date=''; state.loading=!loadedMonths[month]; state.error=null; render();
+    return hydrateMonth(month,false).catch(error=>{console.error('Mileage hydration failed:',error);return false;});
+  }
   function setDate(v){ if(!v) return; state.date=v; state.month=v.slice(0,7); render(); }
   function step(n){ const d=new Date(state.date+'T00:00:00'); d.setDate(d.getDate()+n); setDate(d.toISOString().slice(0,10)); }
   function today(){ setDate(new Date().toISOString().slice(0,10)); }
@@ -2481,6 +2660,7 @@ const MI = (function(){
 
   function exportConfirm(){
     const {plans,all,total}=buildSheets(state.month);
+    const healthReport=health(state.month);
     const todo=all.reduce((a,p)=>a+p.todo.length,0);
     const bad=all.filter(p=>p.km==null).length;
     const c=coverage(state.month), rc=reconcile(state.month), s=store();
@@ -2502,6 +2682,13 @@ const MI = (function(){
     }
     if(todo>0){
       warn.innerHTML+=`<div class="mi-note bad"><b>⚠ 有 ${todo} 段未知路段</b>，里程留空未填 0。<br>為避免報銷金額錯誤，<b>已停用正式匯出</b>；如需檢視可匯出測試版（檔名標示未完成，不可用於報銷）。</div>`;
+      act.innerHTML=`<button class="mi-btn ghost" type="button" onclick="MI.dlgClose()">取消</button>`+
+                    `<button class="mi-btn" type="button" onclick="MI.doExport(true)">匯出測試版</button>`+
+                      `<button class="mi-btn primary" type="button" disabled>匯出正式報銷檔</button>`;
+    }else if(healthReport.abnormal){
+      warn.innerHTML+=`<div class="mi-note bad"><b>⚠ 里程資料健康檢查未通過</b><ul>`+
+        healthReport.issues.map(issue=>`<li><b>${esc2(issue.code)}</b>：${esc2(issue.reason)}</li>`).join('')+
+        `</ul>正式匯出已停用，避免把異常資料當成 0 KM。</div>`;
       act.innerHTML=`<button class="mi-btn ghost" type="button" onclick="MI.dlgClose()">取消</button>`+
                     `<button class="mi-btn" type="button" onclick="MI.doExport(true)">匯出測試版</button>`+
                     `<button class="mi-btn primary" type="button" disabled>匯出正式報銷檔</button>`;
@@ -2539,12 +2726,13 @@ const MI = (function(){
     dlgClose(); render();
   }
 
-  return {render,setMonth,setDate,step,today,addLegPrompt,setLegKm,removeNode,setCost,
+  return {render,open,clear,setMonth,setDate,step,today,addLegPrompt,setLegKm,removeNode,setCost,
           importPick,importFile,exportDetails,exportConfirm,doExport,dlgClose,
           _reconcile:reconcile,_billable:billable,_officialPlans:officialPlans,OFFICIAL,
           _days:days,_dayPlan:dayPlan,_monthPlans:monthPlans,_coverage:coverage,
           _buildSheets:buildSheets,_normalize:normalize,_legFor:legFor,
-          _isOffice:isOffice,_store:store,NODES,DIST};
+          _isOffice:isOffice,_store:store,_hydrateMonth:hydrateMonth,_health:health,
+          _parseArrive:parseArrive,ERROR,NODES,DIST};
 })();
 
 </script>
