@@ -15,13 +15,12 @@
 
 - `audit-report.html` 是九店手機優先的環境清潔回報與督導逐項驗收頁；入口位於 `home.html`。
 - `gas/AuditReport.gs` 使用獨立的批次、提交、照片與 append-only 時間軸模型；只在 `gas/Code.gs` 增加隔離的 `audit_*` POST dispatch，不改巡店、半月檢查、每日回報、KPI、台獎或班表資料列。
-- 門市以既有員編＋Approved Device 驗證，後端只讀取該員編的啟用名冊與裝置綁定，換取 30 分鐘、綁定員編雜湊／批次／門市／`submission_id` 的 audit-only token；不回傳或沿用 KPI／全區私有戰情權限。店點依名冊固定，遮罩姓名只作「名冊辨識」提示；實際檢查人員姓名仍由門市必填，經後端清理與長度驗證後寫入正式紀錄，不綁入 token。員編可在下次開頁自動帶入，audit token 只保留於該分頁 session；`audit_start`、上傳、刪除、送出與狀態讀取還會再核對 `submission_id + edit token`。
-- 私有照片只可經 `audit_photo_read` 讀取：督導驗證既有 PT token，門市驗證稽核 token 與 submission ownership；GAS 讀取 Drive Blob 後回傳 MIME＋base64，前端只建立暫時 Blob URL 並釋放，不取得 Drive URL／file ID。
+- 門市自助回報必填九店店點、實際檢查人員姓名與本人員編；員編只做格式清理與正式紀錄，不查名冊或核准裝置。`audit_start` 建立後，店點／姓名／員編不可靜默切換；後續上傳、刪除、送出、狀態與門市照片讀取均核對目前 active batch、canonical store、`submission_id + edit token`。
+- 私有照片只可經 `audit_photo_read` 讀取：督導驗證既有 PT token，門市驗證自己的 submission ownership；GAS 讀取 Drive Blob 後回傳 MIME＋base64，前端只建立暫時 Blob URL並釋放，不取得 Drive URL／file ID。
 - 督導可取消／重設遺失草稿或 edit token 的舊回報；舊照片與 append-only 事件保留為 `cancelled`，該店才能建立新的 submission。
 - 門市填報頁在批次資訊後提供品質管理整理提醒原圖，可點擊或以鍵盤開啟單張全螢幕預覽；督導模式不顯示此圖卡。
 - 九店稽核值使用既有正式 canonical ID；其中萬大為 `DNB10168`、通化為 `DNB10174`，不沿用巡店相容層的 provisional／legacy code。介面仍統一顯示「台北三創」。
-- UAT 批次另提供 Trusted Employee 專用、唯讀的「員編名冊測試」：只回傳啟用狀態、遮罩姓名、名冊店點、九店映射結果與是否已有 Approved Device，不修改裝置綁定、`last_login_at` 或換發受測同仁 token。正式批次與一般員工不具此入口／API 權限。
-- 私有照片重新載入統一走永遠回傳 Promise 的 `ensurePrivatePhoto()`；照片仍只由 `audit_photo_read` 讀成暫時 Blob URL，頁面卸載時釋放。正式批次維持關閉，部署與 Liam UAT gate 見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
+- 私有照片重新載入統一走永遠回傳 Promise 的 `ensurePrivatePhoto()`；照片仍只由 `audit_photo_read` 讀成暫時 Blob URL，頁面卸載時釋放。部署與 Liam iPhone UAT gate 見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
 
 ## 智慧營運中心 Phase 1A（未部署）
 
