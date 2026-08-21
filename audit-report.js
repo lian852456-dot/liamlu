@@ -3,8 +3,8 @@
 const GAS_URL='https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
 const DRAFT_KEY='bei12b_audit_draft_v1';
 const PT_TOKEN_KEY='bei12b_pt_session_token';
-const OLD_STORE_SESSION_KEY='bei12b_audit_store_session';
 const EMPLOYEE_ID_KEY='bei12b_audit_employee_id';
+const LEGACY_EMPLOYEE_ID_KEY='north12b_private_dashboard_employee_id';
 const DB_NAME='bei12b-audit-drafts';
 const DB_STORE='photos';
 const MAX_PHOTOS=10;
@@ -44,19 +44,22 @@ function blankDraft(){
 function loadDraft(){
   try{
     const value=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');
-    state.draft=value&&value.submission_id&&value.edit_token?value:blankDraft();
+    state.draft=value&&typeof value==='object'
+      ?{...blankDraft(),...value,submission_id:value.submission_id||uid('submission'),edit_token:value.edit_token||uid('edit')}
+      :blankDraft();
   }catch{
     state.draft=blankDraft();
   }
   if(/[*＊]/.test(String(state.draft.inspector_name||'')))state.draft.inspector_name='';
-  state.draft.employee_id=String(state.draft.employee_id||localStorage.getItem(EMPLOYEE_ID_KEY)||'').trim().toUpperCase();
+  state.draft.employee_id=String(
+    state.draft.employee_id||localStorage.getItem(EMPLOYEE_ID_KEY)||sessionStorage.getItem(LEGACY_EMPLOYEE_ID_KEY)||''
+  ).trim().toUpperCase();
   state.draft.notes=state.draft.notes||{};
   state.draft.items=state.draft.items||{};
   Object.values(state.draft.items).forEach(item=>(item.photos||[]).forEach(photo=>{
     photo.objectUrl='';
     photo.privateObjectUrl=false;
   }));
-  sessionStorage.removeItem(OLD_STORE_SESSION_KEY);
 }
 
 function saveDraft(){
@@ -112,6 +115,41 @@ async function dbDelete(key){
 }
 
 function blobKey(photoId){return `${state.draft.submission_id}|${photoId}`;}
+
+async function migrateDraftBatch(nextBatchId){
+  const previousBatchId=String(state.draft.batch_id||'');
+  if(!previousBatchId||previousBatchId===nextBatchId){
+    state.draft.batch_id=nextBatchId;
+    return;
+  }
+  const previousSubmissionId=state.draft.submission_id;
+  const nextSubmissionId=uid('submission');
+  const photos=Object.values(state.draft.items||{}).flatMap(item=>item.photos||[]);
+  for(const photo of photos){
+    if(photo.deleted)continue;
+    const stored=await dbGet(`${previousSubmissionId}|${photo.id}`).catch(()=>null);
+    if(stored?.bytes){
+      await dbPut(`${nextSubmissionId}|${photo.id}`,stored);
+      photo.server=null;
+      photo.status='pending';
+      photo.error='';
+      photo.locked=false;
+      photo.migrationMissing=false;
+    }else{
+      photo.server=null;
+      photo.status='failed';
+      photo.error='舊批次照片檔案無法重新上傳，請刪除此張後重新選取';
+      photo.locked=false;
+      photo.migrationMissing=true;
+    }
+  }
+  state.server=null;
+  state.draft.batch_id=nextBatchId;
+  state.draft.submission_id=nextSubmissionId;
+  state.draft.edit_token=uid('edit');
+  saveDraft();
+  message('已保留舊草稿資料並切換至目前批次；若照片顯示需重新選取，請只補該張。','success');
+}
 
 async function api(payload){
   let response;
@@ -346,10 +384,16 @@ function renderItemPhotos(itemId){
     img.alt=`第 ${index+1} 張照片`;
     if(photo.objectUrl){img.src=photo.objectUrl;tile.appendChild(img);}
     else if(photo.server)loadTilePhoto(tile,img,photo,'store',state.draft.submission_id);
-    else tile.appendChild(img);
+    else if(photo.migrationMissing){
+      const fallback=document.createElement('span');
+      fallback.className='photo-loading';
+      fallback.textContent='需重新選取此張照片';
+      tile.appendChild(fallback);
+    }else tile.appendChild(img);
     const preview=document.createElement('button');
     preview.type='button';
     preview.className='preview-button';
+    preview.disabled=Boolean(photo.migrationMissing);
     preview.setAttribute('aria-label',`放大預覽第 ${index+1} 張照片`);
     preview.addEventListener('click',async()=>{
       try{
@@ -369,13 +413,14 @@ function renderItemPhotos(itemId){
     }
     const badge=document.createElement('span');
     badge.className=`photo-state ${photo.status||''}`;
-    badge.textContent=photo.status==='uploaded'?'已上傳':photo.status==='failed'?'上傳失敗':photo.status==='uploading'?'上傳中':'待上傳';
+    badge.textContent=photo.migrationMissing?'需重新選取':photo.status==='uploaded'?'已上傳':photo.status==='failed'?'上傳失敗':photo.status==='uploading'?'上傳中':'待上傳';
     tile.appendChild(badge);
     grid.appendChild(tile);
   });
   const status=section.querySelector('.item-status');
-  const ready=photos.length>0;
-  status.textContent=ready?`${photos.length} 張`:'未完成';
+  const usable=photos.filter(photo=>!photo.migrationMissing);
+  const ready=usable.length>0;
+  status.textContent=ready?`${usable.length} 張`:'未完成';
   status.className=`item-status ${ready?'ready':''}`;
 }
 
@@ -386,11 +431,13 @@ function requiredItemIds(){
 
 function validation(){
   const errors=[];
-  if(!state.draft.store_id)errors.push('門市店點');
+  if(!state.draft.store_id||!storeById(state.draft.store_id))errors.push('門市店點');
   if(!String(state.draft.inspector_name||'').trim())errors.push('檢查人員姓名');
-  if(!String(state.draft.employee_id||'').trim())errors.push('員工編號');
+  const employeeId=String(state.draft.employee_id||'').trim().toUpperCase();
+  if(!employeeId)errors.push('員工編號');
+  else if(!/^[A-Z0-9_-]{4,20}$/.test(employeeId))errors.push('員工編號格式（4–20 碼英數字）');
   requiredItemIds().forEach(itemId=>{
-    if(!itemPhotos(itemId).length)errors.push(state.config.items.find(item=>item.item_id===itemId).item_name);
+    if(!itemPhotos(itemId).some(photo=>!photo.migrationMissing))errors.push(state.config.items.find(item=>item.item_id===itemId).item_name);
   });
   return errors;
 }
@@ -398,7 +445,7 @@ function validation(){
 function updateCompletion(){
   if(!state.config)return;
   const missing=validation();
-  const itemsMissing=requiredItemIds().filter(itemId=>!itemPhotos(itemId).length);
+  const itemsMissing=requiredItemIds().filter(itemId=>!itemPhotos(itemId).some(photo=>!photo.migrationMissing));
   const completion=document.getElementById('completionText');
   const detail=document.getElementById('missingText');
   completion.textContent=itemsMissing.length?`尚未完成 ${itemsMissing.length} 個項目`:(missing.length?'基本資料尚未完成':'三項照片已備妥');

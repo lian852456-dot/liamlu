@@ -14,7 +14,7 @@ function ensureSubmission(){
 async function uploadPending(){
   const targets=[];
   requiredItemIds().forEach(itemId=>itemPhotos(itemId)
-    .filter(photo=>photo.status!=='uploaded'&&!photo.server)
+    .filter(photo=>photo.status!=='uploaded'&&!photo.server&&!photo.migrationMissing)
     .forEach(photo=>targets.push({itemId,photo})));
   const failures=[];
   for(let index=0;index<targets.length;index++){
@@ -149,14 +149,54 @@ function renderServerState(){
     `<dt>員工編號</dt><dd>${escapeHtml(server.employee_id||state.draft.employee_id||'—')}</dd>`+
     `<dt>首次回報時間</dt><dd>${escapeHtml(server.submitted_at||'尚未正式送出')}</dd>`+
     `<dt>照片</dt><dd>${escapeHtml(counts)}</dd>`;
+  renderCompletionPhotos(server);
   renderTimeline(server.timeline||[]);
-  renderItems();
+  if(closed)document.getElementById('itemList').replaceChildren();
+  else renderItems();
   document.getElementById('newSubmissionButton').hidden=server.submission_status!=='cancelled';
   if(server.submission_status==='rework'){
     document.getElementById('auditForm').hidden=false;
     message('督導已退回指定項目；只需補件紅色項目，原照片與退回原因均已保留。','error');
   }
   if(server.submission_status==='cancelled')message('督導已取消舊回報並保留證據；請建立新的回報重新填寫。','error');
+}
+
+function renderCompletionPhotos(server){
+  const container=document.getElementById('completionPhotos');
+  container.replaceChildren();
+  server.items.forEach(item=>{
+    const local=itemState(item.item_id);
+    const photos=(item.photos||[]).map(meta=>local.photos.find(row=>row.id===meta.client_photo_id)||{
+      id:meta.client_photo_id,name:meta.photo_name,status:'uploaded',server:meta,objectUrl:'',locked:true
+    });
+    if(!photos.length)return;
+    const section=document.createElement('section');
+    section.className='completion-photo-section';
+    const heading=document.createElement('h3');
+    heading.textContent=`${item.item_name}｜${photos.length} 張`;
+    section.appendChild(heading);
+    const grid=document.createElement('div');
+    grid.className='photo-grid';
+    photos.forEach((photo,index)=>{
+      const button=document.createElement('button');
+      button.type='button';
+      button.className='photo-tile';
+      button.setAttribute('aria-label',`放大查看${item.item_name}第 ${index+1} 張`);
+      const image=document.createElement('img');
+      image.alt=`${item.item_name}第 ${index+1} 張`;
+      if(photo.objectUrl){image.src=photo.objectUrl;button.appendChild(image);}
+      else loadTilePhoto(button,image,photo,'store',server.submission_id);
+      button.addEventListener('click',async()=>{
+        try{
+          await Promise.all(photos.map(row=>ensurePrivatePhoto(row,'store',server.submission_id)));
+          openPhotoViewer(photos,index,button);
+        }catch(error){message(error.message,'error');}
+      });
+      grid.appendChild(button);
+    });
+    section.appendChild(grid);
+    container.appendChild(section);
+  });
 }
 
 function renderTimeline(entries){

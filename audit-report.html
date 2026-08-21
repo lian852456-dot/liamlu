@@ -62,10 +62,10 @@
               </label>
               <label>
                 <span>員工編號 <b aria-hidden="true">＊</b></span>
-                <input id="storeEmployeeId" type="text" maxlength="20" autocomplete="username" autocapitalize="characters" spellcheck="false" placeholder="請輸入本人員編" required>
+                <input id="storeEmployeeId" type="text" minlength="4" maxlength="20" pattern="[A-Za-z0-9_-]{4,20}" autocomplete="username" autocapitalize="characters" spellcheck="false" placeholder="請輸入本人員編" required>
               </label>
             </div>
-            <p class="time-note">暫行簡化填報：目前不需驗證核准裝置，請自行選擇門市並據實填寫姓名與員編。</p>
+            <p class="time-note">請自行選擇門市，並據實填寫實際檢查人員姓名與本人員編。</p>
             <p class="time-note">回報日期與時間將由系統以 Asia/Taipei 自動記錄，門市無法修改。</p>
           </div>
         </section>
@@ -85,6 +85,7 @@
         <div class="completion-mark">✓</div>
         <h2 id="completionTitle">回報完成</h2>
         <dl id="completionSummary"></dl>
+        <div id="completionPhotos" class="completion-photos" aria-label="已回報照片"></div>
         <div id="timeline" class="timeline"></div>
         <button id="newSubmissionButton" class="secondary-button" type="button" hidden>建立新的回報</button>
       </section>

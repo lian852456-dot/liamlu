@@ -13,6 +13,13 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-21 ｜ Codex（P0 稽核門市自助回報簡化，Draft PR #72）
+
+- Root Cause：正式門市頁仍依賴 Approved Device／名冊店點與 30 分鐘 audit-only session，現場 token 過期或裝置不符即無法繼續；前端另在 active batch 改變時直接建立空白草稿，會讓既有店點、姓名、備註與照片清單從畫面消失。
+- 修正：門市改為自行選九店、填實際姓名與員編；首次 `audit_start` 後以 active batch、canonical store、`submission_id + edit_token` 驗證後續 upload/delete/submit/status/photo read。督導 overview/detail/photo/review/cancel 仍只接受 PT session，Drive 照片仍為 private 且 API 不回 file ID／URL。舊草稿採無損 migration，IndexedDB bytes 複製到新 submission key，不清 Safari storage。
+- 驗證：完整 Node `243/243`；稽核 contract `12/12`；稽核 Chromium `9/9`；稽核 WebKit `9/9`。完整 Chromium `172/173`、完整 WebKit `170/173`；三個非全綠案例（半月逾時文案一案、WebKit `file://` CORS console 兩案）均在乾淨 `origin/main` `4f0baab52d2254c4b322b8a53a611973468db1f3` 以相同訊息重現。本 PR 對 `patrol.html`、`patrol-read-model.js`、`tests/patrol.spec.js` 與該半月測試皆 0 diff，依 Freeze 未越界修改。
+- 狀態：程式與測試仍在同一 Draft PR #72 收斂中；尚未合併、部署或完成 Liam iPhone 實機驗收。正式完成前仍須 Pages／GAS 受控部署、API readback 與 Liam iPhone 三創三項送出。
+
 ## 2026-08-21 ｜ Codex（每日移動里程根因修復＋異常偵測，Draft PR #68／待正式部署）
 
 - Root Cause：里程頁只掃本頁 `rawDetails`，reload／登出後候選明細被清空；固定 Y2606 對帳資料又會讓預設月份回到六月。另有第二層契約落差：看板 `ptsummary` 會由到店時間 fallback 月份，但 `ptdetail` 只看 `row.month`，所以月份欄缺漏時會「看板有、里程 API 0 筆」。8/4 同步修正未動里程來源，沒有涵蓋此問題。

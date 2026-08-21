@@ -75,6 +75,7 @@ function auditUploadPhotoUnlocked_(payload) {
     store_id: submission.store_id,
     store_name: submission.store_name,
     inspector_name: submission.inspector_name,
+    employee_id: submission.employee_id || '',
     item_id: item.item_id,
     item_name: item.item_name,
     photo_file_id: driveFile.getId(),
@@ -170,6 +171,7 @@ function auditSubmit(payload) {
         store_id: submission.store_id,
         store_name: submission.store_name,
         inspector_name: submission.inspector_name,
+        employee_id: submission.employee_id || '',
         item_id: itemId,
         item_name: auditItem_(itemId).item_name,
         event_type: isRework ? 'resubmitted' : 'submitted',
@@ -218,6 +220,7 @@ function auditTimeline_(eventSheet, submissionId) {
         comment: row.comment,
         actor: row.actor,
         inspector_name: row.inspector_name,
+        employee_id: row.employee_id || '',
         revision: Number(row.revision || 1),
         created_at: row.created_at
       };

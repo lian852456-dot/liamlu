@@ -187,6 +187,7 @@ async function cancelSubmission(detail){
   try{
     const cancelled=await supervisorCall({action:'audit_cancel',submission_id:detail.submission_id,comment:'督導取消並開放門市重新回報'});
     renderReviewDetail(cancelled);
+    if(state.draft?.submission_id===cancelled.submission_id)applyServerStatus(cancelled);
     await loadOverview();
     setSupervisorActionMessage(`${detail.store_name} 舊回報已取消並保留證據，門市現在可重新回報。`);
   }catch(error){
@@ -282,10 +283,7 @@ async function boot(){
   try{
     state.config=await api({action:'audit_config'});
     if(state.config.contract!==CONTRACT)throw new Error('稽核服務尚未切換為簡化填報版，請稍後重新整理');
-    if(state.draft.batch_id&&state.draft.batch_id!==state.config.batch.batch_id){
-      state.draft=blankDraft();
-    }
-    state.draft.batch_id=state.config.batch.batch_id;
+    await migrateDraftBatch(state.config.batch.batch_id);
     renderConfig();
     await hydratePhotoUrls();
     renderItems();

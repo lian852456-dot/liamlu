@@ -2,8 +2,7 @@
 // 北一二B 稽核回報專區
 //
 // 暫行自助填報模式（2026-08-21）：
-// - 門市端不再要求 Approved Device／員編名冊驗證／短效 audit-only session。
-// - 同仁自行選擇九店店點並輸入本人姓名、員編。
+// - 門市端不要求裝置或名冊驗證，同仁自行選擇九店並輸入本人姓名、員編。
 // - submission_id + edit token 仍作為該草稿／回報的 possession key，避免他人直接修改。
 // - 督導九店總覽、照片明細、覆核與取消仍只接受既有 PT_TOKEN。
 // - 照片仍只存私有 Drive，不暴露 file ID／Drive URL。
@@ -52,11 +51,11 @@ const AUDIT_SUBMISSION_FIELDS = [
 const AUDIT_PHOTO_FIELDS = [
   'batch_id','batch_name','submission_id','store_id','store_name','inspector_name',
   'item_id','item_name','photo_file_id','private_url','photo_name','client_photo_id',
-  'note','status','reviewer_comment','submitted_at','reviewed_at','updated_at','revision','created_at'
+  'note','status','reviewer_comment','submitted_at','reviewed_at','updated_at','revision','created_at','employee_id'
 ];
 const AUDIT_EVENT_FIELDS = [
   'event_id','event_key','batch_id','submission_id','store_id','store_name','inspector_name','item_id','item_name',
-  'event_type','status','comment','actor','revision','created_at'
+  'event_type','status','comment','actor','revision','created_at','employee_id'
 ];
 
 function auditNow_() {
@@ -234,15 +233,6 @@ function auditClientPhotoId_(value) {
   return clean;
 }
 
-// 舊版端點保留明確錯誤，避免舊 Safari cache 仍顯示「核准裝置」流程。
-function auditSubmitAuth() {
-  throw new Error('門市核准裝置驗證已取消，請重新整理稽核頁面後直接選店填報');
-}
-
-function auditRosterProbe() {
-  throw new Error('員編名冊驗證已暫停；目前採自行填報模式');
-}
-
 function auditSubmissionSheets_() {
   return {
     submissions: auditEnsureSheet_(AUDIT_SUBMISSION_SHEET, AUDIT_SUBMISSION_FIELDS),
@@ -260,6 +250,12 @@ function auditOwnSubmission_(sheet, payload) {
   const expectedHash = auditTokenHash_((payload || {}).edit_token);
   const submission = auditFindSubmission_(sheet, submissionId);
   if (!submission || submission.edit_token_hash !== expectedHash) throw new Error('找不到本次回報或草稿識別已失效');
+  const batch = auditActiveBatch_();
+  if (submission.batch_id !== batch.batch_id) throw new Error('本次回報不屬於目前啟用批次');
+  const canonicalStore = auditStore_(submission.store_id);
+  if (submission.store_id !== canonicalStore.store_id || submission.store_name !== canonicalStore.store_name) {
+    throw new Error('本次回報的門市資料不正確');
+  }
   return submission;
 }
 
@@ -279,7 +275,6 @@ function auditStart(payload) {
   const store = auditStore_(body.store_id);
   const inspector = auditCleanInspector_(body.inspector_name);
   const employeeId = auditCleanEmployeeId_(body.employee_id);
-  const employeeHash = auditHash_(employeeId);
   const tokenHash = auditTokenHash_(body.edit_token);
   const sheets = auditSubmissionSheets_();
   const now = auditNow_();
@@ -296,7 +291,6 @@ function auditStart(payload) {
       if (sameId.employee_id && sameId.employee_id !== employeeId) throw new Error('本次回報的員工編號與原紀錄不一致');
       const patch = { updated_at: now };
       if (!sameId.employee_id) patch.employee_id = employeeId;
-      if (!sameId.auth_employee_hash) patch.auth_employee_hash = employeeHash;
       if (!sameId.inspector_name) patch.inspector_name = inspector;
       auditUpdateRow_(sheets.submissions, sameId._row, patch);
       return auditOwnStatus_({ submission_id: submissionId, edit_token: body.edit_token });
@@ -313,7 +307,7 @@ function auditStart(payload) {
       store_name: store.store_name,
       inspector_name: inspector,
       employee_id: employeeId,
-      auth_employee_hash: employeeHash,
+      auth_employee_hash: '',
       edit_token_hash: tokenHash,
       status: 'draft',
       submitted_at: '',
@@ -330,11 +324,12 @@ function auditStart(payload) {
       store_id: store.store_id,
       store_name: store.store_name,
       inspector_name: inspector,
+      employee_id: employeeId,
       item_id: '',
       item_name: '',
       event_type: 'created',
       status: 'draft',
-      comment: '自行填報｜員編 ' + employeeId,
+      comment: '自行填報',
       actor: 'store',
       revision: 1,
       created_at: now
