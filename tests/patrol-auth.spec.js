@@ -25,8 +25,8 @@ async function installAuthGas(page, options = {}) {
         return route.fulfill({
           contentType: 'application/json',
           body: JSON.stringify(valid
-            ? { status: 'ok', token: SESSION_TOKEN, expiresIn: 1800 }
-            : { status: 'error', message: 'unauthorized' }),
+            ? { status: 'ok', token: SESSION_TOKEN, expiresIn: 1800, sessionContract:'patrol-session-v2' }
+            : { status: 'error', message: 'unauthorized', reason:'AUTH_CREDENTIAL_INVALID' }),
         });
       }
       if (payload.action === 'ptlogout') {
@@ -35,7 +35,7 @@ async function installAuthGas(page, options = {}) {
       if (payload.action === 'ptsummary' || payload.action === 'ptdetail') {
         const valid = payload.token === SESSION_TOKEN;
         state.protectedCalls.push({ action:payload.action, valid });
-        const result = !valid ? { status:'error', message:'unauthorized' }
+        const result = !valid ? { status:'error', message:'unauthorized', reason:'AUTH_TOKEN_INVALID' }
           : payload.action === 'ptsummary' ? patrolSummaryResponse(payload.month || '2026-08')
           : { status:'ok', rows:[], totalRows:0, page:1, limit:50 };
         return route.fulfill({ contentType:'application/json', body:JSON.stringify(result) });
@@ -46,7 +46,7 @@ async function installAuthGas(page, options = {}) {
           contentType: 'application/json',
           body: JSON.stringify(valid
             ? { status: 'ok', media: { id: 'm1', name: 'm1.jpg', mimeType: 'image/jpeg' } }
-            : { status: 'error', message: 'unauthorized' }),
+            : { status: 'error', message: 'unauthorized', reason:'AUTH_TOKEN_INVALID' }),
         });
       }
     }
@@ -59,11 +59,11 @@ async function installAuthGas(page, options = {}) {
     if (action === 'ping') {
       result = { status: 'ok' };
     } else if (action === 'pthealth') {
-      result = { status: 'ok', configured: state.configured, contract: 'patrol-auth-v3' };
+      result = { status: 'ok', configured: state.configured, contract: 'patrol-auth-v3', sessionContract:'patrol-session-v2', authDeployment:'test' };
     } else if (PROTECTED_ACTIONS.has(action)) {
       state.protectedCalls.push({ action, valid });
       if (!valid) {
-        result = { status: 'error', message: 'unauthorized' };
+        result = { status: 'error', message: 'unauthorized', reason:'AUTH_TOKEN_INVALID' };
       } else if (action === 'ptsummary') {
         result = patrolSummaryResponse(url.searchParams.get('month') || '2026-08');
       } else if (action === 'sread') {
@@ -167,6 +167,50 @@ test('正確密碼取得後端 token 後才建立看板並載入資料', async (
     sessionToken: sessionStorage.getItem('bei12b_pt_session_token'),
   }));
   expect(storage).toEqual({ localKey: null, sessionToken: SESSION_TOKEN });
+});
+
+test('API timeout 與 deployment mismatch 都保留 session 且不開啟重新驗證', async ({ page }) => {
+  await installAuthGas(page);
+  await page.goto(PAGE_URL);
+  await unlock(page, VALID_KEY);
+
+  const result = await page.evaluate(async () => {
+    const timeout = await patrolRequestWithReauth(() => Promise.reject(new Error('巡店資料讀取逾時')))
+      .then(() => '').catch(error => error.message);
+    const mismatch = await patrolRequestWithReauth(() => Promise.resolve({status:'error',message:'unauthorized',reason:'AUTH_DEPLOYMENT_MISMATCH'}));
+    return {
+      timeout,
+      mismatch,
+      token:sessionStorage.getItem('bei12b_pt_session_token'),
+      modalHidden:document.getElementById('patrolReauthModal').hidden
+    };
+  });
+  expect(result.timeout).toBe('巡店資料讀取逾時');
+  expect(result.mismatch.message).toContain('正式部署版本不相容');
+  expect(result.token).toBe(SESSION_TOKEN);
+  expect(result.modalHidden).toBe(true);
+});
+
+test('多個同時過期 request 共用 single-flight reauth 且各只重播一次', async ({ page }) => {
+  const state=await installAuthGas(page);
+  await page.goto(PAGE_URL);
+  await unlock(page, VALID_KEY);
+  await page.evaluate(() => {
+    let firstCalls=0;let secondCalls=0;
+    window.__reauthCounts=()=>({firstCalls,secondCalls});
+    window.__reauthPromise=Promise.all([
+      patrolRequestWithReauth(() => Promise.resolve(++firstCalls===1?{status:'error',message:'unauthorized',reason:'AUTH_SESSION_EXPIRED'}:{status:'ok'})),
+      patrolRequestWithReauth(() => Promise.resolve(++secondCalls===1?{status:'error',message:'unauthorized',reason:'AUTH_SESSION_EXPIRED'}:{status:'ok'}))
+    ]);
+  });
+  await expect(page.locator('#patrolReauthModal')).toBeVisible();
+  await page.locator('#patrolReauthPasscode').fill(VALID_KEY);
+  await page.getByRole('button',{name:'重新驗證並繼續同步'}).click();
+  await expect(page.locator('#patrolReauthModal')).toBeHidden();
+  expect(await page.evaluate(() => window.__reauthPromise.then(results => ({results,counts:window.__reauthCounts()})))).toEqual({
+    results:[{status:'ok'},{status:'ok'}],counts:{firstCalls:2,secondCalls:2}
+  });
+  expect(state.authCalls).toBe(2);
 });
 
 test('登出立即移除督導 DOM 與 session，重新載入後再次鎖定', async ({ page }) => {

@@ -14,7 +14,7 @@ test('ptsummary is authenticated, month-scoped, cached briefly and never returns
   const gas = read('gas/Code.gs');
   const branch = gas.match(/if \(action === 'ptsummary'\) \{([\s\S]*?)\n  \}/);
   assert.ok(branch);
-  assert.match(branch[1], /ptAuthorized\(e\)/);
+  assert.match(branch[1], /ptRequireSession_\(e\.parameter\.token, action\)/);
   assert.match(branch[1], /patrolSummaryMonth_\(e\.parameter\.month\)/);
   assert.match(branch[1], /readPatrolSummary_\(month\)/);
   assert.doesNotMatch(branch[1], /rows\s*:/);
@@ -24,7 +24,7 @@ test('ptsummary is authenticated, month-scoped, cached briefly and never returns
   assert.match(gas, /if \(serialized\.length < 95000\) cache\.put/);
   assert.match(gas, /sheet\.getRange\(lastRow, 12\)\.getValue\(\)/);
   assert.doesNotMatch(gas, /sheet\.getRange\(2, 12, lastRow - 1, 1\)/);
-  assert.match(gas, /function ptSummaryPostPayload_\(payload\)[\s\S]*ptSessionAuthorized_\(body\.token\)/);
+  assert.match(gas, /function ptSummaryPostPayload_\(payload\)[\s\S]*ptRequireSession_\(body\.token, 'ptsummary'\)/);
   assert.match(gas, /action === 'ptsummary'\) result = ptSummaryPostPayload_\(payload\)/);
 });
 
@@ -32,7 +32,7 @@ test('ptdetail is an authenticated bounded lazy read', () => {
   const gas = read('gas/Code.gs');
   const branch = gas.match(/if \(action === 'ptdetail'\) \{([\s\S]*?)\n  \}/);
   assert.ok(branch);
-  assert.match(branch[1], /ptAuthorized\(e\)/);
+  assert.match(branch[1], /ptRequireSession_\(e\.parameter\.token, action\)/);
   assert.match(gas, /PATROL_DETAIL_MAX_LIMIT\s*=\s*100/);
   assert.match(gas, /Math\.min\(PATROL_DETAIL_MAX_LIMIT/);
   assert.match(gas, /patrolVisitStore_\(options\.store\)/);

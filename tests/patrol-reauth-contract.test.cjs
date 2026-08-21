@@ -30,9 +30,19 @@ test('all patrol transport helpers share one reauthentication wrapper and refres
   assert.match(functionBody('privateInspectionMediaUpload'), /patrolRequestWithReauth\(/);
 });
 
-test('an unauthorized response permits exactly one replay after reauthentication', () => {
+test('only explicit expiry or revocation permits exactly one replay after reauthentication', () => {
   const body = functionBody('patrolRequestWithReauth');
+  assert.match(patrol, /new Set\(\['AUTH_SESSION_EXPIRED','AUTH_SESSION_REVOKED'\]\)/);
+  assert.match(body, /patrolShouldReauth/);
   assert.match(body, /if\(retried\) return patrolReauthFailure\(\)/);
   assert.match(body, /patrolRequestWithReauth\(request,true\)/);
   assert.doesNotMatch(body, /patrolRequestWithReauth\(request,false\)/);
+});
+
+test('network and non-expiry auth errors preserve the current session', () => {
+  const wrapper = functionBody('patrolRequestWithReauth');
+  assert.match(wrapper, /if\(!patrolShouldReauth\(error\)\) throw error/);
+  assert.match(wrapper, /if\(!patrolShouldReauth\(result\)\)/);
+  assert.doesNotMatch(wrapper, /clearPatrolAuthState/);
+  assert.match(patrol, /AUTH_DEPLOYMENT_MISMATCH:'巡店 session 與目前正式部署版本不相容'/);
 });
