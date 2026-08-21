@@ -1024,6 +1024,12 @@ function showPatrolPastePreview(label,result){
 
 const PATROL_FILL_TIME_PARSE_ERROR="填表時間欄顯示 ####，請回原 Excel 加寬『填表時間』欄，確認顯示日期時間後再貼上。";
 
+function patrolPasteCellError(rowNumber, cols, field, value, guidance){
+  const store=String((cols||[])[5]||'').trim()||'未辨識店點';
+  const raw=String(value==null?'':value).trim()||'（空白）';
+  return `第 ${rowNumber} 列・店點「${store}」・欄位「${field}」的值為「${raw}」：${guidance}`;
+}
+
 function parsePatrolPasteText(raw){
   const newDetails=[];
   const lines=String(raw||'').split(/\r?\n/);
@@ -1033,21 +1039,22 @@ function parsePatrolPasteText(raw){
     const cols=line.split('\t');
     const firstCell=(cols[0]||'').trim();
     if(firstCell==='填表時間') continue;
-    if(cols.length<8) return {rows:[],error:`第 ${index+1} 列欄位不足，請確認貼上的是完整巡店明細。`};
+    if(cols.length<8) return {rows:[],error:patrolPasteCellError(index+1,cols,'巡店明細',cols.join('\t'),'欄位不足，請確認貼上的是完整巡店明細。')};
 
     // 欄位: 0填表 1到店 2離店 3區處 4代碼 5店點 6人員 7題號 8內容 9合格 10原因
     const fillTime=firstCell;
     const dm=fillTime.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-    if(!dm) return {rows:[],error:PATROL_FILL_TIME_PARSE_ERROR};
+    if(/^#{4,}$/.test(fillTime)) return {rows:[],error:patrolPasteCellError(index+1,cols,'填表時間',fillTime,PATROL_FILL_TIME_PARSE_ERROR)};
+    if(!dm) return {rows:[],error:patrolPasteCellError(index+1,cols,'填表時間',fillTime,'無法解析日期時間，請回原 Excel 確認欄位格式後再貼上。')};
     const y=Number(dm[1]),mo=Number(dm[2]),d=Number(dm[3]);
     const parsedDate=new Date(Date.UTC(y,mo-1,d));
     if(parsedDate.getUTCFullYear()!==y||parsedDate.getUTCMonth()!==mo-1||parsedDate.getUTCDate()!==d){
-      return {rows:[],error:PATROL_FILL_TIME_PARSE_ERROR};
+      return {rows:[],error:patrolPasteCellError(index+1,cols,'填表時間',fillTime,'日期無效，請回原 Excel 修正後再貼上。')};
     }
 
     const itemNo=parseInt((cols[7]||'').trim(),10);
     if(!itemNo||itemNo<1||itemNo>33){
-      return {rows:[],error:`第 ${index+1} 列題號無法辨識，請確認題號為 1 至 33。`};
+      return {rows:[],error:patrolPasteCellError(index+1,cols,'題號',cols[7],'無法辨識，請確認題號為 1 至 33。')};
     }
 
     const resultText=(cols[9]||'').trim();
@@ -2169,45 +2176,29 @@ const MI = (function(){
   }
 
   async function loadMonthDetails(month, onProgress){
-    const rows=[];
-    const limit=500;
-    let page=1;
-    let totalRows=null;
-    let totalPages=null;
-    let sheetScans=0;
-    do{
-      onProgress(page,totalPages);
-      const response=await cloudCall('ptmileage',{month,page,limit});
-      if(!response || typeof response!=='object') throw mileageError(ERROR.API,'巡店明細 API 未回傳 JSON object');
-      if(response.status!=='ok') {
-        const error=new Error(response.message||'巡店明細 API 回傳失敗');
-        error.authReason=patrolAuthReason(response);
-        throw classifyReadError(error);
-      }
-      if(response.contract!=='patrol-mileage-month-v1'||response.month!==month||Number(response.page)!==page||!Array.isArray(response.rows)){
-        throw mileageError(ERROR.DATA_FORMAT,'月份級里程明細 contract 不完整');
-      }
-      const fields=Array.isArray(response.fields)?response.fields:[];
-      if(['fillTime','arriveTime','code','store','month'].some(field=>!fields.includes(field)))
-        throw mileageError(ERROR.DATA_FORMAT,'月份級里程明細欄位 contract 不完整');
-      const reportedTotal=Number(response.totalRows);
-      if(!Number.isInteger(reportedTotal) || reportedTotal<0) throw mileageError(ERROR.DATA_FORMAT,'巡店明細筆數 contract 不完整');
-      const reportedPages=Number(response.totalPages);
-      if(!Number.isInteger(reportedPages)||reportedPages<1) throw mileageError(ERROR.DATA_FORMAT,'巡店明細總頁數 contract 不完整');
-      if(totalRows===null) totalRows=reportedTotal;
-      else if(totalRows!==reportedTotal) throw mileageError(ERROR.API,'巡店明細分頁期間資料已變更，請重新載入');
-      if(totalPages===null) totalPages=reportedPages;
-      else if(totalPages!==reportedPages) throw mileageError(ERROR.API,'巡店明細總頁數於讀取期間變更');
-      if(response.rows.some(row=>!row||typeof row!=='object'||Array.isArray(row)))
-        throw mileageError(ERROR.DATA_FORMAT,'巡店明細包含非 object 資料列');
-      sheetScans+=Number(response.diagnostics&&response.diagnostics.sheetScans||0);
-      rows.push(...response.rows);
-      if(response.rows.length===0 && rows.length<totalRows) throw mileageError(ERROR.API,'巡店明細分頁未前進');
-      page+=1;
-    }while(page<=totalPages);
-    if(rows.length!==totalRows) throw mileageError(ERROR.API,'巡店明細分頁讀回筆數不一致');
+    onProgress();
+    const response=await cloudCall('ptmileage',{month});
+    if(!response || typeof response!=='object') throw mileageError(ERROR.API,'巡店事件 API 未回傳 JSON object');
+    if(response.status!=='ok') {
+      const error=new Error(response.message||'巡店事件 API 回傳失敗');
+      error.authReason=patrolAuthReason(response);
+      throw classifyReadError(error);
+    }
+    if(response.contract!=='patrol-mileage-visits-v2'||response.month!==month||Number(response.page)!==1||!Array.isArray(response.visits)){
+      throw mileageError(ERROR.DATA_FORMAT,'月份級巡店事件 contract 不完整');
+    }
+    const fields=Array.isArray(response.fields)?response.fields:[];
+    if(['fillTime','arriveTime','code','store','month'].some(field=>!fields.includes(field)))
+      throw mileageError(ERROR.DATA_FORMAT,'月份級巡店事件欄位 contract 不完整');
+    const totalVisits=Number(response.totalVisits);
+    if(!Number.isInteger(totalVisits) || totalVisits<0 || totalVisits!==response.visits.length)
+      throw mileageError(ERROR.DATA_FORMAT,'巡店事件筆數 contract 不完整');
+    if(Number(response.totalPages)!==1) throw mileageError(ERROR.API,'月份級巡店事件不應分頁');
+    if(response.visits.some(visit=>!visit||typeof visit!=='object'||Array.isArray(visit)))
+      throw mileageError(ERROR.DATA_FORMAT,'巡店事件包含非 object 資料列');
+    const sheetScans=Number(response.diagnostics&&response.diagnostics.sheetScans||0);
     if(sheetScans>1) throw mileageError(ERROR.API,'月份級里程讀取重複掃描工作表',{sheetScans});
-    return rows;
+    return response.visits;
   }
 
   async function hydrateMonth(value, force){
@@ -2226,8 +2217,8 @@ const MI = (function(){
       console.warn('MILEAGE_HEALTH',{month,code:ERROR.LOAD_SLOW,reason:state.slow.reason,progress:state.progress});
     },LOAD_TARGET_MS);
     try{
-      const next=await loadMonthDetails(month,(page,totalPages)=>{
-        state.progress=totalPages?`正在讀取第 ${page}/${totalPages} 頁`:`正在讀取第 ${page} 頁`;
+      const next=await loadMonthDetails(month,()=>{
+        state.progress=`正在載入 ${month}：讀取月份巡店事件`;
         if(generation===loadGeneration) render();
       });
       serverRowsByMonth[month]=next;

@@ -477,7 +477,9 @@ function readPatrolContractColumns_(sh) {
 
 const PATROL_SUMMARY_CACHE_SECONDS = 120;
 const PATROL_DETAIL_MAX_LIMIT = 100;
-const PATROL_MILEAGE_MAX_LIMIT = 500;
+// 一個月份理論上最多 31 日 × 9 店 = 279 個巡店事件。里程 API 不得再
+// 回傳 33 題逐題 raw rows，也不需要以第二頁 cache 命中來維持正確性。
+const PATROL_MILEAGE_MAX_VISITS = 279;
 const PATROL_MILEAGE_CACHE_SECONDS = 120;
 const PATROL_MILEAGE_FIELDS = ['fillTime','arriveTime','code','store','month'];
 
@@ -764,23 +766,66 @@ function patrolMileageStore_(row) {
   return match ? String(match.name) : rawStore;
 }
 
-function patrolMileageCacheKey_(month, sourceVersion, page, limit) {
+function patrolMileageCacheKey_(month, sourceVersion) {
   const version = Utilities.base64EncodeWebSafe(String(sourceVersion || '')).slice(0, 80);
-  return ['ptmileage', month, version, page, limit].join(':');
+  return ['ptmileage-visits-v2', month, version].join(':');
+}
+
+function patrolMileageArriveSort_(row, date) {
+  const text = String(row && (row.arriveTime || row.fillTime) || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(text)) {
+    const parsed = new Date(text);
+    if (!isNaN(parsed.getTime())) return Utilities.formatDate(parsed, 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ss.SSS");
+  }
+  const match = text.match(/\d{4}[\/-]\d{1,2}[\/-]\d{1,2}[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (match && date) {
+    return date + 'T' + ('0' + Number(match[1])).slice(-2) + ':' + match[2] + ':' + (match[3] || '00');
+  }
+  // 缺少可比較的到店時間仍回傳，讓前端顯示日期解析異常；不可靜默排除。
+  return date ? date + 'T99:99:99' : 'invalid-time';
+}
+
+function patrolMileageVisits_(rows, month) {
+  const byVisit = {};
+  rows.forEach(function(row, sourceIndex) {
+    const date = patrolSummaryIsoDate_(row);
+    const store = patrolMileageStore_(row);
+    const arriveSort = patrolMileageArriveSort_(row, date);
+    // 無法取得日期或店點時不去重，保留原值給前端 reason code；正常事件才以日期＋店點去重。
+    const key = date && store ? date + '|' + store : 'invalid:' + sourceIndex;
+    const visit = {
+      fillTime:String(row.fillTime || ''), arriveTime:String(row.arriveTime || ''),
+      code:String(row.code || ''), store:store, month:month,
+      _date:date, _arriveSort:arriveSort
+    };
+    const current = byVisit[key];
+    if (!current || arriveSort < current._arriveSort) byVisit[key] = visit;
+  });
+  return Object.keys(byVisit).map(function(key) {
+    const visit = byVisit[key];
+    return {
+      fillTime:visit.fillTime, arriveTime:visit.arriveTime, code:visit.code,
+      store:visit.store, month:visit.month, _date:visit._date, _arriveSort:visit._arriveSort
+    };
+  }).sort(function(left, right) {
+    return String(left._date).localeCompare(String(right._date)) ||
+      String(left._arriveSort).localeCompare(String(right._arriveSort)) || String(left.store).localeCompare(String(right.store));
+  }).map(function(visit) {
+    return {fillTime:visit.fillTime, arriveTime:visit.arriveTime, code:visit.code, store:visit.store, month:visit.month};
+  });
 }
 
 function readPatrolMileageMonth_(options) {
   const startedAt = Date.now();
   const month = patrolSummaryMonth_(options.month);
   const page = Number(options.page || 1);
-  const requestedLimit = Number(options.limit || PATROL_MILEAGE_MAX_LIMIT);
   if (!Number.isInteger(page) || page < 1) throw new Error('invalid patrol mileage page');
-  if (!Number.isInteger(requestedLimit) || requestedLimit < 1) throw new Error('invalid patrol mileage limit');
-  const limit = Math.min(PATROL_MILEAGE_MAX_LIMIT, requestedLimit);
+  if (page !== 1) throw new Error('patrol mileage visits are single page');
+  const limit = PATROL_MILEAGE_MAX_VISITS;
   const sheet = getPatrolSheet();
   const meta = patrolSummarySourceMeta_(sheet);
   const cache = CacheService.getScriptCache();
-  const cacheKey = patrolMileageCacheKey_(month, meta.sourceVersion, page, limit);
+  const cacheKey = patrolMileageCacheKey_(month, meta.sourceVersion);
   const cached = cache.get(cacheKey);
   if (cached) {
     const result = JSON.parse(cached);
@@ -790,45 +835,24 @@ function readPatrolMileageMonth_(options) {
     return result;
   }
 
-  // 此 request 唯一一次完整 A:L scan；月份篩選、九店正規化與整體分頁都由同一份 snapshot 完成。
-  const rows = readPatrolContractColumns_(sheet)
-    .filter(function(row) { return patrolSummaryRowMonth_(row) === month; })
-    .map(function(row) {
-      return {
-        fillTime:String(row.fillTime || ''), arriveTime:String(row.arriveTime || ''),
-        code:String(row.code || ''), store:patrolMileageStore_(row), month:month
-      };
-    })
-    .sort(function(left, right) {
-      return patrolSummaryIsoDate_(left).localeCompare(patrolSummaryIsoDate_(right)) ||
-        String(left.arriveTime).localeCompare(String(right.arriveTime)) || String(left.store).localeCompare(String(right.store));
-    });
-  const totalRows = rows.length;
-  const totalPages = Math.max(1, Math.ceil(totalRows / limit));
-  if (page > totalPages) throw new Error('invalid patrol mileage page');
+  // 唯一一次完整 A:L scan：先月篩選，再正規化／日期＋店點去重。Cache miss 只會重算這次 response，
+  // 不會將 raw rows 分頁後要求前端以第二頁 cache hit 取得正確結果。
+  const matchedRows = readPatrolContractColumns_(sheet)
+    .filter(function(row) { return patrolSummaryRowMonth_(row) === month; });
+  const visits = patrolMileageVisits_(matchedRows, month);
   const generatedAt = Utilities.formatDate(new Date(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
   const diagnostics = {
-    sourceRows:Math.max(0, Number(meta.lastRow || 1) - 1), matchedRows:totalRows,
+    sourceRows:Math.max(0, Number(meta.lastRow || 1) - 1), matchedRows:matchedRows.length, uniqueVisits:visits.length,
     cacheHit:false, sheetScans:1, serverDurationMs:Date.now() - startedAt
   };
-  let requestedResult = null;
-  for (let currentPage = 1; currentPage <= totalPages; currentPage++) {
-    const start = (currentPage - 1) * limit;
-    const result = {
-      status:'ok', contract:'patrol-mileage-month-v1', fields:PATROL_MILEAGE_FIELDS.slice(),
-      month:month, page:currentPage, limit:limit, totalRows:totalRows, totalPages:totalPages,
-      rows:rows.slice(start, start + limit), sourceVersion:String(meta.sourceVersion || ''),
-      generatedAt:generatedAt, diagnostics:diagnostics
-    };
-    const serialized = JSON.stringify(result);
-    if (serialized.length < 95000) cache.put(
-      patrolMileageCacheKey_(month, meta.sourceVersion, currentPage, limit),
-      serialized,
-      PATROL_MILEAGE_CACHE_SECONDS
-    );
-    if (currentPage === page) requestedResult = result;
-  }
-  return requestedResult;
+  const result = {
+    status:'ok', contract:'patrol-mileage-visits-v2', fields:PATROL_MILEAGE_FIELDS.slice(),
+    month:month, page:1, limit:limit, totalVisits:visits.length, totalPages:1,
+    visits:visits, sourceVersion:String(meta.sourceVersion || ''), generatedAt:generatedAt, diagnostics:diagnostics
+  };
+  const serialized = JSON.stringify(result);
+  if (serialized.length < 95000) cache.put(cacheKey, serialized, PATROL_MILEAGE_CACHE_SECONDS);
+  return result;
 }
 
 // ════════════════════════════════════
