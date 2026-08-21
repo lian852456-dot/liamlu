@@ -68,6 +68,8 @@ test('store routes require a short audit token and supervisor routes require exi
   assert.match(gas, /scope:\s*'audit-submit'/);
   assert.match(gas, /auth_source:\s*'approved-device'/);
   assert.match(gas, /function auditApprovedDeviceProfile_[\s\S]*privateDashboardUserByEmployeeId/);
+  assert.match(gas, /!privateDashboardIsTrustedEmployee\(employeeId\)\s*&&\s*lookup\.user\.device_id\s*!==\s*deviceId/);
+  assert.match(gas, /function auditIsUatBatch_[\s\S]*\/-uat\$\/i/);
   assert.doesNotMatch(gas, /privateDashboardAccess\(|privateDashboardSnapshot\(/);
   assert.match(gas, /function auditOwnSubmission_[\s\S]*edit_token[\s\S]*edit_token_hash/);
   for (const fn of ['auditStart','auditUploadPhotoUnlocked_','auditDeletePhoto','auditSubmit','auditOwnStatus']) {
@@ -106,7 +108,8 @@ class Spreadsheet {
   insertSheet(name) { const sheet=new Sheet(name); this.sheets.set(name,sheet); return sheet; }
 }
 
-function harness() {
+function harness(options={}) {
+  const batchId=options.batchId||'audit-cleaning-202608';
   const spreadsheet = new Spreadsheet();
   const cache = new Map();
   const properties = new Map([['AUDIT_REPORT_FOLDER_ID','audit-root']]);
@@ -114,7 +117,8 @@ function harness() {
     ['EMP001',{_row:2,employee_id:'EMP001',masked_name:'測＊員',store:'酒泉',role:'業代',status:'active',device_id:'approved-device-0001'}],
     ['EMP002',{_row:3,employee_id:'EMP002',masked_name:'永＊員',store:'台北永吉',role:'店長',status:'active',device_id:'approved-device-0002'}],
     ['EMP003',{_row:4,employee_id:'EMP003',masked_name:'另＊員',store:'台灣大哥大數位生活台北酒泉',role:'業代',status:'active',device_id:'approved-device-0003'}],
-    ['EMP004',{_row:5,employee_id:'EMP004',masked_name:'停＊員',store:'酒泉',role:'業代',status:'inactive',device_id:'approved-device-0004'}]
+    ['EMP004',{_row:5,employee_id:'EMP004',masked_name:'停＊員',store:'酒泉',role:'業代',status:'inactive',device_id:'approved-device-0004'}],
+    ['EMP900',{_row:6,employee_id:'EMP900',masked_name:'盧＊榮',store:'北一二B',role:'督導',status:'active',device_id:'approved-device-0900'}]
   ]);
   const files = new Map();
   class MockFile {
@@ -152,6 +156,7 @@ function harness() {
     privateDashboardCleanEmployeeId(value){const id=String(value||'').trim().toUpperCase();if(!/^[A-Z0-9]{5,12}$/.test(id))throw new Error('員編格式不正確');return id;},
     privateDashboardCleanDeviceId(value){const id=String(value||'').trim();if(!/^[A-Za-z0-9_-]{16,128}$/.test(id))throw new Error('裝置識別不正確');return id;},
     privateDashboardUserByEmployeeId(employeeId){return {sheet:{},user:users.get(employeeId)||null};},
+    privateDashboardIsTrustedEmployee(employeeId){return employeeId==='EMP900';},
     ptSessionAuthorized_(token){return token==='pt-valid-token-1234567890';},
     PropertiesService:{getScriptProperties:()=>({getProperty:key=>properties.get(key)||'',setProperty:(key,value)=>properties.set(key,value)})},
     DriveApp:{getFolderById:id=>{if(id!=='audit-root')throw new Error('unknown folder');return rootFolder;},getFileById:id=>{const file=files.get(id);if(!file)throw new Error('unknown file');return file;}},
@@ -164,7 +169,7 @@ function harness() {
     auditEnsureSheet_(AUDIT_SUBMISSION_SHEET,AUDIT_SUBMISSION_FIELDS);
     auditEnsureSheet_(AUDIT_PHOTO_SHEET,AUDIT_PHOTO_FIELDS);
     auditEnsureSheet_(AUDIT_EVENT_SHEET,AUDIT_EVENT_FIELDS);
-    auditAppend_(auditSpreadsheet_().getSheetByName(AUDIT_BATCH_SHEET),AUDIT_BATCH_FIELDS,{batch_id:AUDIT_INITIAL_BATCH.batch_id,batch_name:AUDIT_INITIAL_BATCH.batch_name,starts_on:AUDIT_INITIAL_BATCH.starts_on,due_on:AUDIT_INITIAL_BATCH.due_on,active:'TRUE',created_at:auditNow_(),updated_at:auditNow_()});
+    auditAppend_(auditSpreadsheet_().getSheetByName(AUDIT_BATCH_SHEET),AUDIT_BATCH_FIELDS,{batch_id:${JSON.stringify(batchId)},batch_name:'測試批次',starts_on:AUDIT_INITIAL_BATCH.starts_on,due_on:AUDIT_INITIAL_BATCH.due_on,active:'TRUE',created_at:auditNow_(),updated_at:auditNow_()});
   `,context);
   return { context, spreadsheet, cache, files };
 }
@@ -206,6 +211,45 @@ test('Approved Device exchange returns only a roster-bound audit token and ignor
   const started=context.auditStart({...base,inspector_name:'王小明',store_token:auth.token});
   assert.equal(started.store_id,'DNB10062');
   assert.equal(started.inspector_name,'王小明');
+});
+
+test('trusted employee can select one UAT store from a different device and receives only a store-bound audit token', () => {
+  const batchId='audit-cleaning-202608-uat';
+  const {context,cache}=harness({batchId});
+  const base={batch_id:batchId,submission_id:'submission_trusted_uat_123456789',edit_token:'edit_trusted_uat_123456789012345678'};
+  const challenge=context.auditSubmitAuth({...base,employeeId:'EMP900',deviceId:'different-device-0900'});
+  assert.deepEqual(Object.keys(challenge).sort(),['profile','requires_uat_store']);
+  assert.equal(challenge.requires_uat_store,true);
+  assert.equal(challenge.profile.masked_name,'盧＊榮');
+  const auth=context.auditSubmitAuth({...base,employeeId:'EMP900',deviceId:'different-device-0900',uat_store_id:'DNB10082'});
+  assert.deepEqual({...auth.profile},{store_id:'DNB10082',store_name:'台北永吉',masked_name:'盧＊榮'});
+  const sessions=[...cache.values()].map(value=>JSON.parse(value)).filter(value=>value.scope==='audit-submit');
+  assert.equal(sessions.length,1);
+  assert.deepEqual({...sessions[0]}, {
+    scope:'audit-submit',auth_source:'approved-device',batch_id:batchId,store_id:'DNB10082',submission_id:base.submission_id,
+    employee_id_hash:context.privateDashboardHash('EMP900'),issued_at:'2026-08-20T14:30:00+08:00'
+  });
+  assert.equal(context.ptSessionAuthorized_(auth.token),false,'audit token must not become a supervisor/KPI session');
+  assert.doesNotMatch(JSON.stringify(auth),/snapshot|kpi|awards|employee_id|device_id|role/i);
+});
+
+test('trusted employee UAT store override is rejected for formal and every other non-UAT batch', () => {
+  for (const batchId of ['audit-cleaning-202608','audit-cleaning-preview-202609']) {
+    const {context}=harness({batchId});
+    assert.throws(()=>context.auditSubmitAuth({
+      batch_id:batchId,submission_id:`submission_non_uat_${batchId.replace(/[^a-z0-9]/gi,'')}`,
+      employeeId:'EMP900',deviceId:'different-device-0900',uat_store_id:'DNB10082'
+    }),/名冊店點不在稽核九店範圍內/);
+  }
+});
+
+test('ordinary employee still requires the approved device and remains locked to the roster store', () => {
+  const batchId='audit-cleaning-202608-uat';
+  const {context}=harness({batchId});
+  const base={batch_id:batchId,submission_id:'submission_regular_uat_123456789'};
+  assert.throws(()=>context.auditSubmitAuth({...base,employeeId:'EMP001',deviceId:'different-device-0001',uat_store_id:'DNB10082'}),/尚未核准/);
+  const auth=context.auditSubmitAuth({...base,employeeId:'EMP001',deviceId:'approved-device-0001',uat_store_id:'DNB10082'});
+  assert.deepEqual({...auth.profile},{store_id:'DNB10062',store_name:'台北酒泉',masked_name:'測＊員'});
 });
 
 test('audit token remains bound to the Approved Device employee even within the same store', () => {
