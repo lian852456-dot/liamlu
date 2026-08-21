@@ -2074,6 +2074,7 @@ function doPost(e) {
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
     else if (action === 'audit_config') result = auditPublicConfig();
     else if (action === 'audit_submit_auth') result = auditSubmitAuth(payload);
+    else if (action === 'audit_roster_probe') result = auditRosterProbe(payload);
     else if (action === 'audit_start') result = auditStart(payload);
     else if (action === 'audit_upload') result = auditUploadPhoto(payload);
     else if (action === 'audit_photo_delete') result = auditDeletePhoto(payload);

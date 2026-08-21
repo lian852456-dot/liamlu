@@ -190,7 +190,8 @@ function auditApprovedDeviceProfile_(payload, batch) {
     employee_id_hash: privateDashboardHash(employeeId),
     store: store,
     masked_name: maskedName,
-    requires_uat_store: trustedUat && !store
+    requires_uat_store: trustedUat && !store,
+    trusted_uat: trustedUat
   };
 }
 
@@ -313,16 +314,59 @@ function auditSubmitAuth(payload) {
     store_id: store.store_id,
     submission_id: submissionId,
     employee_id_hash: profile.employee_id_hash,
+    uat_roster_probe: profile.trusted_uat === true,
     issued_at: auditNow_()
   }), AUDIT_STORE_SESSION_TTL_SECONDS);
+  const responseProfile = {
+    store_id: store.store_id,
+    store_name: store.store_name,
+    masked_name: profile.masked_name
+  };
+  if (profile.trusted_uat === true) responseProfile.roster_probe_enabled = true;
   return {
     token: token,
     expiresIn: AUDIT_STORE_SESSION_TTL_SECONDS,
-    profile: {
-      store_id: store.store_id,
-      store_name: store.store_name,
-      masked_name: profile.masked_name
-    }
+    profile: responseProfile
+  };
+}
+
+function auditRosterProbeText_(value, maxLength) {
+  return String(value || '').replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, maxLength || 80);
+}
+
+function auditRosterProbe(payload) {
+  const body = payload || {};
+  const session = auditStoreSession_(body);
+  const batch = auditActiveBatch_();
+  if (!auditIsUatBatch_(batch.batch_id) || session.batch_id !== batch.batch_id || session.uat_roster_probe !== true) {
+    throw new Error('unauthorized');
+  }
+  const employeeId = privateDashboardCleanEmployeeId(body.roster_employee_id);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  if (!lookup.user) {
+    return {
+      exists: false,
+      roster_status: 'inactive',
+      masked_name: '',
+      roster_store: '',
+      audit_store_id: '',
+      audit_store_name: '',
+      store_mapping_ok: false,
+      approved_device_bound: false
+    };
+  }
+  const rosterStore = auditRosterProbeText_(lookup.user.store, 80);
+  let auditStore = null;
+  try { auditStore = auditRosterStore_(rosterStore); } catch (error) { auditStore = null; }
+  return {
+    exists: true,
+    roster_status: String(lookup.user.status || '').toLowerCase() === 'active' ? 'active' : 'inactive',
+    masked_name: auditRosterProbeText_(lookup.user.masked_name, 40),
+    roster_store: rosterStore,
+    audit_store_id: auditStore ? auditStore.store_id : '',
+    audit_store_name: auditStore ? auditStore.store_name : '',
+    store_mapping_ok: Boolean(auditStore),
+    approved_device_bound: Boolean(String(lookup.user.device_id || '').trim())
   };
 }
 

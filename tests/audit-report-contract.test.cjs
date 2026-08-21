@@ -12,6 +12,7 @@ const css = fs.readFileSync(path.join(root, 'audit-report.css'), 'utf8');
 const gas = fs.readFileSync(path.join(root, 'gas/AuditReport.gs'), 'utf8');
 const code = fs.readFileSync(path.join(root, 'gas/Code.gs'), 'utf8');
 const home = fs.readFileSync(path.join(root, 'home.html'), 'utf8');
+const worker = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4JcAAAAASUVORK5CYII=','base64');
 
 test('public entry and mobile form expose the exact isolated audit contract', () => {
@@ -30,6 +31,11 @@ test('public entry and mobile form expose the exact isolated audit contract', ()
   assert.match(js, /localStorage\.setItem\(EMPLOYEE_ID_KEY,employeeId\)/);
   assert.match(js, /sessionStorage\.setItem\(STORE_SESSION_KEY/);
   assert.doesNotMatch(js, /localStorage\.setItem\(STORE_SESSION_KEY/);
+  assert.match(html, /audit-report\.css\?v=20260821-pr67/);
+  assert.match(html, /audit-report\.js\?v=20260821-pr67/);
+  assert.match(js, /async function ensurePrivatePhoto\(/);
+  assert.match(worker, /liam-supervisor-app-1-2-audit-pr67-20260821-v1/);
+  assert.match(worker, /pathname\.endsWith\('\/audit-report\.html'\)[\s\S]*fetch\(event\.request, \{ cache:'no-store' \}\)/);
   assert.doesNotMatch(js, /state\.draft\.inspector_name\s*=\s*profile\.masked_name/);
   assert.doesNotMatch(html + js, /storeSubmitCode|批次回報碼|驗證回報碼/);
 });
@@ -84,6 +90,7 @@ test('store routes require a short audit token and supervisor routes require exi
   }
   assert.match(gas, /function auditSupervisorAuthorized_[\s\S]*ptSessionAuthorized_/);
   assert.match(code, /action === 'audit_overview'[\s\S]*auditOverview\(payload\)/);
+  assert.match(code, /action === 'audit_roster_probe'[\s\S]*auditRosterProbe\(payload\)/);
   assert.match(js, /sessionStorage\.getItem\(PT_TOKEN_KEY\)/);
   assert.match(js, /waitForReauth\(\)/);
 });
@@ -118,7 +125,8 @@ function harness(options={}) {
     ['EMP002',{_row:3,employee_id:'EMP002',masked_name:'永＊員',store:'台北永吉',role:'店長',status:'active',device_id:'approved-device-0002'}],
     ['EMP003',{_row:4,employee_id:'EMP003',masked_name:'另＊員',store:'台灣大哥大數位生活台北酒泉',role:'業代',status:'active',device_id:'approved-device-0003'}],
     ['EMP004',{_row:5,employee_id:'EMP004',masked_name:'停＊員',store:'酒泉',role:'業代',status:'inactive',device_id:'approved-device-0004'}],
-    ['EMP900',{_row:6,employee_id:'EMP900',masked_name:'盧＊榮',store:'北一二B',role:'督導',status:'active',device_id:'approved-device-0900'}]
+    ['EMP005',{_row:6,employee_id:'EMP005',masked_name:'外＊員',store:'外區門市',role:'業代',status:'active',device_id:''}],
+    ['EMP900',{_row:7,employee_id:'EMP900',masked_name:'盧＊榮',store:'北一二B',role:'督導',status:'active',device_id:'approved-device-0900'}]
   ]);
   const files = new Map();
   class MockFile {
@@ -222,15 +230,42 @@ test('trusted employee can select one UAT store from a different device and rece
   assert.equal(challenge.requires_uat_store,true);
   assert.equal(challenge.profile.masked_name,'盧＊榮');
   const auth=context.auditSubmitAuth({...base,employeeId:'EMP900',deviceId:'different-device-0900',uat_store_id:'DNB10082'});
-  assert.deepEqual({...auth.profile},{store_id:'DNB10082',store_name:'台北永吉',masked_name:'盧＊榮'});
+  assert.deepEqual({...auth.profile},{store_id:'DNB10082',store_name:'台北永吉',masked_name:'盧＊榮',roster_probe_enabled:true});
   const sessions=[...cache.values()].map(value=>JSON.parse(value)).filter(value=>value.scope==='audit-submit');
   assert.equal(sessions.length,1);
   assert.deepEqual({...sessions[0]}, {
     scope:'audit-submit',auth_source:'approved-device',batch_id:batchId,store_id:'DNB10082',submission_id:base.submission_id,
-    employee_id_hash:context.privateDashboardHash('EMP900'),issued_at:'2026-08-20T14:30:00+08:00'
+    employee_id_hash:context.privateDashboardHash('EMP900'),uat_roster_probe:true,issued_at:'2026-08-20T14:30:00+08:00'
   });
   assert.equal(context.ptSessionAuthorized_(auth.token),false,'audit token must not become a supervisor/KPI session');
   assert.doesNotMatch(JSON.stringify(auth),/snapshot|kpi|awards|employee_id|device_id|role/i);
+});
+
+test('trusted UAT roster probe is read-only, returns only safe mapping fields and never works outside its session', () => {
+  const batchId='audit-cleaning-202608-uat';
+  const {context,cache}=harness({batchId});
+  const base={batch_id:batchId,submission_id:'submission_roster_probe_123456789'};
+  const auth=context.auditSubmitAuth({...base,employeeId:'EMP900',deviceId:'different-device-0900',uat_store_id:'DNB10307'});
+  assert.equal(auth.profile.roster_probe_enabled,true);
+  const before=JSON.stringify(context.privateDashboardUserByEmployeeId('EMP002').user);
+  const mapped=context.auditRosterProbe({...base,store_token:auth.token,roster_employee_id:'EMP002'});
+  assert.deepEqual({...mapped},{exists:true,roster_status:'active',masked_name:'永＊員',roster_store:'台北永吉',audit_store_id:'DNB10082',audit_store_name:'台北永吉',store_mapping_ok:true,approved_device_bound:true});
+  assert.equal(JSON.stringify(context.privateDashboardUserByEmployeeId('EMP002').user),before,'probe must not update device binding or last_login_at');
+  const unmapped=context.auditRosterProbe({...base,store_token:auth.token,roster_employee_id:'EMP005'});
+  assert.deepEqual({...unmapped},{exists:true,roster_status:'active',masked_name:'外＊員',roster_store:'外區門市',audit_store_id:'',audit_store_name:'',store_mapping_ok:false,approved_device_bound:false});
+  assert.deepEqual({...context.auditRosterProbe({...base,store_token:auth.token,roster_employee_id:'EMP999'})},{exists:false,roster_status:'inactive',masked_name:'',roster_store:'',audit_store_id:'',audit_store_name:'',store_mapping_ok:false,approved_device_bound:false});
+  assert.doesNotMatch(JSON.stringify({mapped,unmapped}),/employee_id|employee_hash|device_id|last_login|snapshot|kpi|award/i);
+
+  const ordinaryBase={batch_id:batchId,submission_id:'submission_roster_ordinary_12345'};
+  const ordinary=context.auditSubmitAuth({...ordinaryBase,employeeId:'EMP001',deviceId:'approved-device-0001'});
+  assert.throws(()=>context.auditRosterProbe({...ordinaryBase,store_token:ordinary.token,roster_employee_id:'EMP002'}),/unauthorized/);
+
+  const formal=harness({batchId:'audit-cleaning-202608'});
+  const formalBase={batch_id:'audit-cleaning-202608',submission_id:'submission_formal_probe_1234567'};
+  const formalAuth=formal.context.auditSubmitAuth({...formalBase,employeeId:'EMP001',deviceId:'approved-device-0001'});
+  const key=formal.context.auditStoreSessionCacheKey_(formalAuth.token);
+  const forged=JSON.parse(formal.cache.get(key));forged.uat_roster_probe=true;formal.cache.set(key,JSON.stringify(forged));
+  assert.throws(()=>formal.context.auditRosterProbe({...formalBase,store_token:formalAuth.token,roster_employee_id:'EMP002'}),/unauthorized/);
 });
 
 test('trusted employee UAT store override is rejected for formal and every other non-UAT batch', () => {

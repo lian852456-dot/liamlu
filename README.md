@@ -11,7 +11,8 @@
 - 督導可取消／重設遺失草稿或 edit token 的舊回報；舊照片與 append-only 事件保留為 `cancelled`，該店才能建立新的 submission。
 - 門市填報頁在批次資訊後提供品質管理整理提醒原圖，可點擊或以鍵盤開啟單張全螢幕預覽；督導模式不顯示此圖卡。
 - 九店稽核值使用既有正式 canonical ID；其中萬大為 `DNB10168`、通化為 `DNB10174`，不沿用巡店相容層的 provisional／legacy code。介面仍統一顯示「台北三創」。
-- PR #62 已合併；本次 Approved Device audit-only follow-up 僅製作最小 PR，未部署 GAS／Pages，也未啟用正式批次。部署與 UAT gate 見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
+- UAT 批次另提供 Trusted Employee 專用、唯讀的「員編名冊測試」：只回傳啟用狀態、遮罩姓名、名冊店點、九店映射結果與是否已有 Approved Device，不修改裝置綁定、`last_login_at` 或換發受測同仁 token。正式批次與一般員工不具此入口／API 權限。
+- 私有照片重新載入統一走永遠回傳 Promise 的 `ensurePrivatePhoto()`；照片仍只由 `audit_photo_read` 讀成暫時 Blob URL，頁面卸載時釋放。正式批次維持關閉，部署與 Liam UAT gate 見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
 
 ## 智慧營運中心 Phase 1A（未部署）
 
