@@ -31,11 +31,14 @@ test('Patrol GAS bundle has only the Patrol route surface and own session audien
 
   assert.match(code, /const PATROL_AUTH_DEPLOYMENT = 'patrol-isolated-v1';/);
   assert.match(code, /const PATROL_SESSION_SIGNING_KEY_PROPERTY = 'PATROL_SESSION_SIGNING_KEY';/);
-  assert.equal(
-    functionBlock(code, 'ptWinMonths'),
-    functionBlock(fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8'), 'ptWinMonths'),
-    'the summary dependency must be generated directly from the main Patrol source',
-  );
+  const mainSource = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8');
+  ['ptWinMonths', 'ptDayOf', 'ptItemDone', 'ptStoreRows'].forEach(name => {
+    assert.equal(
+      functionBlock(code, name),
+      functionBlock(mainSource, name),
+      `${name} must be generated directly from the main Patrol source`,
+    );
+  });
   assert.match(code, /CacheService\.getScriptCache\(\)/);
   assert.match(code, /LockService\.getScriptLock\(\)/);
   [
