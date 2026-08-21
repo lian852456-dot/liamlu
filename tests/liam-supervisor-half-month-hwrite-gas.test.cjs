@@ -16,8 +16,8 @@ function row(overrides={}){
 
 test('hwrite authorizes before payload parse or worksheet access',()=>{
   const branch=(gas.match(/if \(action === 'hwrite'\) \{[\s\S]*?\n  \}/)||[])[0]||'';
-  assert.ok(branch.indexOf('ptAuthorized(e)')>=0);
-  assert.ok(branch.indexOf('ptAuthorized(e)')<branch.indexOf('JSON.parse'));
+  assert.ok(branch.indexOf('ptRequireSession_(e.parameter.token, action)')>=0);
+  assert.ok(branch.indexOf('ptRequireSession_(e.parameter.token, action)')<branch.indexOf('JSON.parse'));
   assert.ok(branch.indexOf('JSON.parse')<branch.indexOf('writeHalfCheck'));
 });
 
@@ -67,8 +67,8 @@ test('update key is isolated by period, store and item and preserves existing me
 test('App hwrite POST authorizes the body token and uses strict validation',()=>{
   const source=(gas.match(/function writeHalfCheckPostPayload_\(payload, e\) \{[\s\S]*?\n\}/)||[])[0]||'';
   assert.match(source,/query\.token != null \|\| query\.payload != null/);
-  assert.ok(source.indexOf("ptCredentialAuthorized_('', body.token)")>=0);
-  assert.ok(source.indexOf("ptCredentialAuthorized_('', body.token)")<source.indexOf('writeHalfCheck(body.rows'));
+  assert.ok(source.indexOf("ptRequireSession_(body.token, 'hwrite')")>=0);
+  assert.ok(source.indexOf("ptRequireSession_(body.token, 'hwrite')")<source.indexOf('writeHalfCheck(body.rows'));
   assert.match(source,/strictApp:true/);
   assert.match(gas,/else if \(action === 'hwrite'\) result = writeHalfCheckPostPayload_\(payload, e\)/);
 });
@@ -76,7 +76,7 @@ test('App hwrite POST authorizes the body token and uses strict validation',()=>
 test('unauthorized App POST is rejected before any write',()=>{
   const source=(gas.match(/function writeHalfCheckPostPayload_\(payload, e\) \{[\s\S]*?\n\}/)||[])[0]||'';
   let writes=0;
-  const handler=Function('ptCredentialAuthorized_','HALF_APP_POST_FIELDS','writeHalfCheck',`${source}; return writeHalfCheckPostPayload_;`)(()=>false,['action','token','mode','rows'],()=>{writes+=1;});
+  const handler=Function('ptRequireSession_','HALF_APP_POST_FIELDS','writeHalfCheck',`${source}; return writeHalfCheckPostPayload_;`)(()=>{throw new Error('unauthorized');},['action','token','mode','rows'],()=>{writes+=1;});
   assert.throws(()=>handler({action:'hwrite',token:'bad',mode:'draft',rows:[row()]},{parameter:{}}),/unauthorized/);
   assert.equal(writes,0);
 });
@@ -85,7 +85,7 @@ test('App POST rejects token or payload supplied in the URL query',()=>{
   const source=(gas.match(/function writeHalfCheckPostPayload_\(payload, e\) \{[\s\S]*?\n\}/)||[])[0]||'';
   let authorized=0;
   let writes=0;
-  const handler=Function('ptCredentialAuthorized_','HALF_APP_POST_FIELDS','writeHalfCheck',`${source}; return writeHalfCheckPostPayload_;`)(()=>{authorized+=1; return true;},['action','token','mode','rows'],()=>{writes+=1;});
+  const handler=Function('ptRequireSession_','HALF_APP_POST_FIELDS','writeHalfCheck',`${source}; return writeHalfCheckPostPayload_;`)(()=>{authorized+=1; return {};},['action','token','mode','rows'],()=>{writes+=1;});
   const body={action:'hwrite',token:'body-token',mode:'draft',rows:[row()]};
   assert.throws(()=>handler(body,{parameter:{token:'query-token'}}),/hwrite body required/);
   assert.throws(()=>handler(body,{parameter:{payload:'query-payload'}}),/hwrite body required/);

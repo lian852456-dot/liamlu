@@ -667,12 +667,24 @@ const DEFAULT_PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOz
 const PRIVATE_GAS_URL = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
 const PT_SESSION_TOKEN_STORAGE = 'bei12b_pt_session_token';
 const PATROL_REAUTH_MESSAGE = '督導驗證已逾時，請重新驗證後繼續同步';
+const PATROL_SESSION_CONTRACT = 'patrol-session-v2';
+const PATROL_REAUTH_REASONS = new Set(['AUTH_SESSION_EXPIRED','AUTH_SESSION_REVOKED']);
+const PATROL_AUTH_REASON_TEXT = {
+  AUTH_TOKEN_MISSING:'巡店請求未帶 session token',
+  AUTH_TOKEN_INVALID:'巡店 session token 格式或簽章無效',
+  AUTH_SESSION_NOT_FOUND:'巡店 session 無法在目前服務中辨識',
+  AUTH_SESSION_EXPIRED:'督導驗證已逾時，請重新驗證後繼續同步',
+  AUTH_SESSION_REVOKED:'督導驗證已撤銷，請重新驗證後繼續同步',
+  AUTH_DEPLOYMENT_MISMATCH:'巡店 session 與目前正式部署版本不相容',
+  AUTH_CREDENTIAL_INVALID:'巡店通行碼錯誤'
+};
 let GAS_URL = PRIVATE_GAS_URL;
 let PT_KEY = '';
 let PT_TOKEN = sessionStorage.getItem(PT_SESSION_TOKEN_STORAGE) || '';
 let appMounted = false;
 let patrolReauthPending = null;
 let resolvePatrolReauth = null;
+let patrolTimelineSequence = 0;
 
 function clearPatrolAuthState(){
   localStorage.removeItem('bei12b_pt_key');
@@ -703,22 +715,40 @@ function setPrivateAuthStatus(text, ok){
 function privateConfigMessage(){
   return '請輸入巡店通行碼；驗證成功前不會建立看板或讀取任何受保護資料。';
 }
-function patrolResponseUnauthorized(result){ return result?.status==='error' && result?.message==='unauthorized'; }
-function patrolErrorUnauthorized(error){ return String(error?.message||error||'')==='unauthorized'; }
+function patrolAuthReason(value){ return String(value?.reason||value?.auth?.reason||value?.authReason||''); }
+function patrolShouldReauth(value){ return PATROL_REAUTH_REASONS.has(patrolAuthReason(value)); }
+function patrolAuthReasonText(value){ const reason=patrolAuthReason(value);return PATROL_AUTH_REASON_TEXT[reason]||String(value?.message||value||'巡店服務授權失敗'); }
+function patrolTrace(action, phase, detail={}){
+  const safe={seq:detail.seq||++patrolTimelineSequence,action:String(action||''),phase:String(phase||''),tokenPresent:Boolean(PT_TOKEN),clientTime:new Date().toISOString()};
+  ['durationMs','status','reason','deployment','sessionContract'].forEach(key=>{if(detail[key]!=null)safe[key]=detail[key];});
+  console.info('PATROL_AUTH_TIMELINE',safe);
+  return safe.seq;
+}
+async function patrolTrackedRequest(action,request){
+  const started=performance.now();const seq=patrolTrace(action,'start');
+  try{
+    const result=await request();
+    patrolTrace(action,'response',{seq,durationMs:Math.round(performance.now()-started),status:result?.status||'',reason:patrolAuthReason(result),deployment:result?.auth?.deployment||result?.deployment||result?.authDeployment||'',sessionContract:result?.auth?.sessionContract||result?.sessionContract||''});
+    return result;
+  }catch(error){
+    patrolTrace(action,'error',{seq,durationMs:Math.round(performance.now()-started),status:'network-error',reason:patrolAuthReason(error)});
+    throw error;
+  }
+}
 function patrolReauthFailure(){ return {status:'error',message:PATROL_REAUTH_MESSAGE,reauthFailed:true}; }
 function setPatrolReauthMessage(text){ const el=document.getElementById('patrolReauthMessage');if(el) el.textContent=text||''; }
-function openPatrolReauthModal(){
+function openPatrolReauthModal(reason){
   // 只移除失效的短效 session；本機草稿、表單與待送 payload 全數保留。
   sessionStorage.removeItem(PT_SESSION_TOKEN_STORAGE);
   PT_TOKEN='';
   secureUnlocked=false;
   const modal=document.getElementById('patrolReauthModal');if(modal) modal.hidden=false;
-  setPatrolReauthMessage(PATROL_REAUTH_MESSAGE);
+  setPatrolReauthMessage(PATROL_AUTH_REASON_TEXT[reason]||PATROL_REAUTH_MESSAGE);
   const input=document.getElementById('patrolReauthPasscode');if(input) window.setTimeout(()=>input.focus(),0);
 }
-function waitForPatrolReauth(){
+function waitForPatrolReauth(reason){
   if(patrolReauthPending) return patrolReauthPending;
-  openPatrolReauthModal();
+  openPatrolReauthModal(reason);
   patrolReauthPending=new Promise(resolve=>{resolvePatrolReauth=resolve;});
   return patrolReauthPending;
 }
@@ -742,18 +772,21 @@ async function resumePatrolReauth(event){
   finally{if(button) button.disabled=false;}
 }
 async function patrolRequestWithReauth(request,retried=false){
-  let result;try{result=await request();}catch(error){if(!patrolErrorUnauthorized(error)) throw error;result={status:'error',message:'unauthorized'};}
-  if(!patrolResponseUnauthorized(result)) return result;
+  let result;try{result=await request();}catch(error){if(!patrolShouldReauth(error)) throw error;result={status:'error',message:'unauthorized',reason:patrolAuthReason(error)};}
+  if(!patrolShouldReauth(result)){
+    if(result?.status==='error'&&result?.message==='unauthorized') return {...result,message:patrolAuthReasonText(result)};
+    return result;
+  }
   if(retried) return patrolReauthFailure();
-  const reauthed=await waitForPatrolReauth();
+  const reauthed=await waitForPatrolReauth(patrolAuthReason(result));
   return reauthed?patrolRequestWithReauth(request,true):patrolReauthFailure();
 }
 function privateCloudCall(action, params={}){
   return patrolRequestWithReauth(()=>{
-    if(action!=='pthealth'&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized'};
+    if(action!=='pthealth'&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
     const url=new URL(PRIVATE_GAS_URL);url.searchParams.set('action',action);Object.keys(params).forEach(k=>url.searchParams.set(k,params[k]));
     if(action!=='pthealth') url.searchParams.set('token',PT_TOKEN);
-    return fetch(url.toString(),{method:'GET',cache:'no-store'}).then(r=>r.json());
+    return patrolTrackedRequest(action,()=>fetch(url.toString(),{method:'GET',cache:'no-store'}).then(r=>r.json()));
   });
 }
 async function privateHealthCheck(){
@@ -761,24 +794,27 @@ async function privateHealthCheck(){
   if(res?.status!=='ok') throw new Error('patrol_contract_mismatch');
   if(res.configured!==true) throw new Error('patrol_not_configured');
   if(res.contract!=='patrol-auth-v3') throw new Error('patrol_contract_mismatch');
+  if(res.sessionContract!==PATROL_SESSION_CONTRACT) throw new Error('patrol_contract_mismatch');
 }
 function privateAuthErrorText(err){
   const message=String(err?.message||err||'');
   if(message==='patrol_not_configured') return '管理者尚未完成安全設定，請先在 Apps Script Script Properties 設定 PT_KEY';
   if(message==='patrol_contract_mismatch') return '巡店服務版本不相容，請重新部署受保護服務後再試';
-  if(message==='unauthorized') return '巡店通行碼錯誤';
+  if(patrolAuthReason(err)) return patrolAuthReasonText(err);
+  if(message==='unauthorized') return '巡店服務未提供可追查的授權原因';
   return `解鎖失敗：${message||'未知錯誤'}`;
 }
 function privateAuthPost(payload){
-  return fetch(PRIVATE_GAS_URL,{
+  const action=String(payload?.action||'');
+  return patrolTrackedRequest(action,()=>fetch(PRIVATE_GAS_URL,{
     method:'POST',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
     body:JSON.stringify(payload||{})
-  }).then(r=>r.json());
+  }).then(r=>r.json()));
 }
 function privateCloudCallJsonp(action, params={}){
   return patrolRequestWithReauth(()=>{
-    if(!secureUnlocked||!privateAccount||!PT_TOKEN) return {status:'error',message:'unauthorized'};
+    if(!secureUnlocked||!privateAccount||!PT_TOKEN) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
     return new Promise((resolve,reject)=>{
       const cbName='privateCb_'+Date.now()+'_'+Math.floor(Math.random()*1e6);const url=new URL(PRIVATE_GAS_URL);
       url.searchParams.set('action',action);Object.keys(params).forEach(k=>url.searchParams.set(k,params[k]));url.searchParams.set('token',PT_TOKEN);url.searchParams.set('callback',cbName);
@@ -802,7 +838,7 @@ async function privateSignIn(passcode){
   try{
     await privateHealthCheck();
     const res=await privateAuthPost({action:'ptauth',key:PT_KEY});
-    if(res.status!=='ok') throw new Error(res.message||'通行碼錯誤');
+    if(res.status!=='ok') { const error=new Error(patrolAuthReasonText(res));error.authReason=patrolAuthReason(res);throw error; }
     PT_TOKEN=String(res.token||'');
     if(!PT_TOKEN) throw new Error('patrol_contract_mismatch');
     sessionStorage.setItem(PT_SESSION_TOKEN_STORAGE,PT_TOKEN);
@@ -810,7 +846,6 @@ async function privateSignIn(passcode){
     secureUnlocked=true;
     return true;
   }catch(err){
-    clearPatrolAuthState();
     const errorText=privateAuthErrorText(err);
     setPatrolAuthMessage(errorText+'；資料仍保持鎖定');
     const input=document.getElementById('patrolPasscode');
@@ -825,16 +860,21 @@ async function restorePatrolSession(){
   try{
     await privateHealthCheck();
     const res=await privateAuthPost({action:'ptauth',token:PT_TOKEN});
-    if(res.status!=='ok' || !res.token) throw new Error('unauthorized');
+    if(res.status!=='ok' || !res.token) { const error=new Error(patrolAuthReasonText(res));error.authReason=patrolAuthReason(res);throw error; }
     PT_TOKEN=String(res.token);
     sessionStorage.setItem(PT_SESSION_TOKEN_STORAGE,PT_TOKEN);
     privateAccount={username:'短效 session 已驗證'};
     secureUnlocked=true;
     mountPatrolApp();
     return true;
-  }catch{
-    clearPatrolAuthState();
-    setPatrolAuthMessage('session 已失效，請重新輸入督導通行碼');
+  }catch(error){
+    if(patrolShouldReauth(error)){
+      clearPatrolAuthState();
+      setPatrolAuthMessage(patrolAuthReasonText(error));
+    }else{
+      secureUnlocked=false;privateAccount=null;
+      setPatrolAuthMessage(`session 保留，恢復失敗：${patrolAuthReasonText(error)}`);
+    }
     return false;
   }
 }
@@ -1467,41 +1507,41 @@ function storeCardHTML(storeName){
 // 讀取用 fetch GET（GAS 對簡單 GET 沒有 CORS 問題，與 index.html 同作法）
 function cloudCall(action, params={}){
   return patrolRequestWithReauth(()=>{
-    if(!['ping','pthealth'].includes(action)&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized'};
+    if(!['ping','pthealth'].includes(action)&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
     const timeoutMs=action==='ptsummary'?20000:action==='ptdetail'?30000:0;
     if(action==='ptsummary'||action==='ptdetail'){
       const controller=new AbortController();
       const timer=setTimeout(()=>controller.abort(),timeoutMs);
-      return fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:PT_TOKEN,...params}),cache:'no-store',signal:controller.signal}).then(async response=>{
+      return patrolTrackedRequest(action,()=>fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:PT_TOKEN,...params}),cache:'no-store',signal:controller.signal}).then(async response=>{
         const text=await response.text();
         if(!response.ok) throw new Error('HTTP '+response.status);
         try{return JSON.parse(text);}catch(_){throw new Error('巡店服務回傳非 JSON');}
-      }).catch(error=>{if(error&&error.name==='AbortError') throw new Error('巡店資料讀取逾時');throw error;}).finally(()=>clearTimeout(timer));
+      }).catch(error=>{if(error&&error.name==='AbortError') throw new Error('巡店資料讀取逾時');throw error;}).finally(()=>clearTimeout(timer)));
     }
     const query=[['action',action]];Object.keys(params).forEach(key=>query.push([key,String(params[key])]));
     if(!['ping','pthealth'].includes(action)) query.push(['token',PT_TOKEN]);
     const url=GAS_URL+'?'+query.map(pair=>encodeURIComponent(pair[0])+'='+encodeURIComponent(pair[1])).join('&');
     const controller=timeoutMs?new AbortController():null;
     const timer=controller?setTimeout(()=>controller.abort(),timeoutMs):null;
-    return fetch(url,{method:'GET',cache:'no-store',signal:controller?controller.signal:undefined}).then(async response=>{
+    return patrolTrackedRequest(action,()=>fetch(url,{method:'GET',cache:'no-store',signal:controller?controller.signal:undefined}).then(async response=>{
       const text=await response.text();
       if(!response.ok) throw new Error('HTTP '+response.status);
       try{return JSON.parse(text);}catch(_){throw new Error('巡店服務回傳非 JSON');}
-    }).catch(error=>{ if(error&&error.name==='AbortError') throw new Error('巡店資料讀取逾時'); throw error; }).finally(()=>{if(timer)clearTimeout(timer);});
+    }).catch(error=>{ if(error&&error.name==='AbortError') throw new Error('巡店資料讀取逾時'); throw error; }).finally(()=>{if(timer)clearTimeout(timer);}));
   });
 }
 
 // 寫入走 JSONP（script tag + callback，與 index.html 同作法）
 function cloudCallJsonp(action, params={}){
   return patrolRequestWithReauth(()=>{
-    if(!secureUnlocked||!privateAccount||!PT_TOKEN) return {status:'error',message:'unauthorized'};
-    return new Promise((resolve,reject)=>{
+    if(!secureUnlocked||!privateAccount||!PT_TOKEN) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
+    return patrolTrackedRequest(action,()=>new Promise((resolve,reject)=>{
       const cbName='ptCb_'+Date.now()+'_'+Math.floor(Math.random()*1e6);const url=new URL(GAS_URL);
       url.searchParams.set('action',action);Object.keys(params).forEach(k=>url.searchParams.set(k,params[k]));url.searchParams.set('token',PT_TOKEN);url.searchParams.set('callback',cbName);
       const s=document.createElement('script');const timer=setTimeout(()=>{cleanup();reject(new Error('連線逾時'));},30000);
       function cleanup(){clearTimeout(timer);delete window[cbName];s.remove();}
       window[cbName]=res=>{cleanup();resolve(res);};s.onerror=()=>{cleanup();reject(new Error('網路錯誤'));};s.src=url.toString();document.body.appendChild(s);
-    });
+    }));
   });
 }
 
@@ -2118,7 +2158,8 @@ const MI = (function(){
   function classifyReadError(error){
     if(error&&error.code) return error;
     const message=String(error&&error.message||'巡店明細讀取失敗');
-    if(/unauthorized|token|驗證|權限|401|403/i.test(message)) return mileageError(ERROR.AUTH,message);
+    const reason=patrolAuthReason(error);
+    if(reason || /unauthorized|token|驗證|權限|401|403/i.test(message)) return mileageError(ERROR.AUTH,reason?patrolAuthReasonText(error):message,{reason});
     if(/network|fetch|連線|讀取|timeout|逾時/i.test(message)) return mileageError(ERROR.CLOUD_READ,message);
     return mileageError(ERROR.API,message);
   }
@@ -2131,7 +2172,11 @@ const MI = (function(){
     do{
       const response=await cloudCall('ptdetail',{month,store:storeName,page,limit});
       if(!response || typeof response!=='object') throw mileageError(ERROR.API,'巡店明細 API 未回傳 JSON object');
-      if(response.status!=='ok') throw classifyReadError(new Error(response.message||'巡店明細 API 回傳失敗'));
+      if(response.status!=='ok') {
+        const error=new Error(response.message||'巡店明細 API 回傳失敗');
+        error.authReason=patrolAuthReason(response);
+        throw classifyReadError(error);
+      }
       if(response.month!==month || response.store!==storeName || Number(response.page)!==page || !Array.isArray(response.rows)){
         throw mileageError(ERROR.DATA_FORMAT,'巡店明細月份、店點或分頁 contract 不完整');
       }

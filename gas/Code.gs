@@ -262,13 +262,15 @@ function doGet(e) {
     return jsonResponse({
       status: 'ok',
       configured: Boolean(ptConfiguredKey_()),
-      contract: 'patrol-auth-v3'
+      contract: 'patrol-auth-v3',
+      sessionContract: PATROL_SESSION_CONTRACT,
+      authDeployment: PATROL_AUTH_DEPLOYMENT
     }, cb);
   }
 
   if (action === 'debug') {
     try {
-      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      ptRequireSession_(e.parameter.token, action);
       const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       const sheets = ss.getSheets().map(s => ({
         name: s.getName(),
@@ -280,7 +282,7 @@ function doGet(e) {
       const sample = sh && sh.getLastRow() > 1 ? sh.getRange(2,1,1,sh.getLastColumn()).getValues()[0] : [];
       return jsonResponse({ status:'ok', sheets, headers, sample }, cb);
     } catch(err) {
-      return jsonResponse({ status:'error', message: err.message }, cb);
+      return jsonResponse(ptRouteErrorPayload_(err, action, e.parameter.token), cb);
     }
   }
 
@@ -331,7 +333,7 @@ function doGet(e) {
   if (action === 'ptwrite') {
     const cb = e.parameter.callback;
     try {
-      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      ptRequireSession_(e.parameter.token, action);
       const rows = JSON.parse(e.parameter.payload);
       const res = writePatrol(rows);
       const out = { status: 'ok', written: res.written, updated: res.updated };
@@ -342,38 +344,38 @@ function doGet(e) {
       return jsonResponse(out);
     } catch(err) {
       if (cb) {
-        return ContentService.createTextOutput(cb + '(' + JSON.stringify({ status: 'error', message: err.message }) + ')')
+        return ContentService.createTextOutput(cb + '(' + JSON.stringify(ptRouteErrorPayload_(err, action, e.parameter.token)) + ')')
           .setMimeType(ContentService.MimeType.JAVASCRIPT);
       }
-      return jsonResponse({ status: 'error', message: err.message });
+      return jsonResponse(ptRouteErrorPayload_(err, action, e.parameter.token));
     }
   }
 
   // ── 巡店追蹤：讀取全部明細＋本區設定（patrol.html；現行資料端點免密碼）──
   if (action === 'ptread') {
     try {
-      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      ptRequireSession_(e.parameter.token, action);
       return jsonResponse({ status: 'ok', rows: readPatrol(), stores: PT_STORES, title: PT_TITLE });
     } catch(err) {
-      return jsonResponse({ status: 'error', message: err.message });
+      return jsonResponse(ptRouteErrorPayload_(err, action, e.parameter.token));
     }
   }
 
   // ── 巡店追蹤：手機／大盤輕量摘要（不回傳全部巡店明細）──
   if (action === 'ptsummary') {
     try {
-      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      ptRequireSession_(e.parameter.token, action);
       const month = patrolSummaryMonth_(e.parameter.month);
       return jsonResponse({ status:'ok', summary:readPatrolSummary_(month), stores:PT_STORES, title:PT_TITLE });
     } catch(err) {
-      return jsonResponse({ status:'error', message:err.message });
+      return jsonResponse(ptRouteErrorPayload_(err, action, e.parameter.token));
     }
   }
 
   // ── 巡店追蹤：按月／店點延遲讀取明細；大盤不得呼叫 ──
   if (action === 'ptdetail') {
     try {
-      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      ptRequireSession_(e.parameter.token, action);
       return jsonResponse(readPatrolDetail_({
         month:patrolSummaryMonth_(e.parameter.month),
         store:e.parameter.store,
@@ -381,18 +383,18 @@ function doGet(e) {
         limit:e.parameter.limit
       }));
     } catch(err) {
-      return jsonResponse({ status:'error', message:err.message });
+      return jsonResponse(ptRouteErrorPayload_(err, action, e.parameter.token));
     }
   }
 
   // ── 巡店到離店：讀取指定日期（獨立於巡店明細）──
   if (action === 'ptvisit_read') {
     try {
-      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      ptRequireSession_(e.parameter.token, action);
       const state = patrolVisitState_(e.parameter.date || '');
       return jsonResponse({ status: 'ok', events: state.events, openVisit: state.openVisit });
     } catch(err) {
-      return jsonResponse({ status: 'error', message: err.message });
+      return jsonResponse(ptRouteErrorPayload_(err, action, e.parameter.token));
     }
   }
 
@@ -400,7 +402,7 @@ function doGet(e) {
   if (action === 'hwrite') {
     const cb = e.parameter.callback;
     try {
-      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      ptRequireSession_(e.parameter.token, action);
       const rows = JSON.parse(e.parameter.payload);
       const written = writeHalfCheck(rows);
       const body = { status: 'ok', written: written };
@@ -408,7 +410,7 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JAVASCRIPT);
       return jsonResponse(body);
     } catch(err) {
-      const body = { status: 'error', message: err.message };
+      const body = ptRouteErrorPayload_(err, action, e.parameter.token);
       if (cb) return ContentService.createTextOutput(cb + '(' + JSON.stringify(body) + ')')
         .setMimeType(ContentService.MimeType.JAVASCRIPT);
       return jsonResponse(body);
@@ -418,20 +420,20 @@ function doGet(e) {
   // ── 督導半月檢查：讀取（patrol.html；現行資料端點免密碼）──
   if (action === 'hread') {
     try {
-      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      ptRequireSession_(e.parameter.token, action);
       return jsonResponse({ status: 'ok', rows: readHalfCheck() });
     } catch(err) {
-      return jsonResponse({ status: 'error', message: err.message });
+      return jsonResponse(ptRouteErrorPayload_(err, action, e.parameter.token));
     }
   }
 
   // ── 每月班表：讀取指定月份（patrol.html；現行資料端點免密碼）──
   if (action === 'sread') {
     try {
-      if (!ptAuthorized(e)) throw new Error('unauthorized');
+      ptRequireSession_(e.parameter.token, action);
       return jsonResponse({ status: 'ok', schedule: readSchedule(e.parameter.month || '') });
     } catch(err) {
-      return jsonResponse({ status: 'error', message: err.message });
+      return jsonResponse(ptRouteErrorPayload_(err, action, e.parameter.token));
     }
   }
 
@@ -449,6 +451,10 @@ function doGet(e) {
 // 驗證成功後簽發短效 token；巡店、班表、半月檢查與私有媒體共用同一授權邊界。
 // ════════════════════════════════════
 const PATROL_SESSION_TTL_SECONDS = 1800;
+const PATROL_SESSION_CONTRACT = 'patrol-session-v2';
+const PATROL_AUTH_DEPLOYMENT = 'patrol-auth-stateless-20260821';
+const PATROL_SESSION_SIGNING_KEY_PROPERTY = 'PATROL_SESSION_SIGNING_KEY';
+const PATROL_SESSION_REVOKED_PREFIX = 'PATROL_SESSION_REVOKED_';
 
 // ── 分享給其他督導時，每人自建試算表與 GAS 部署，改這兩個設定即可 ──
 // （網頁 patrol.html 大家共用，會自動抓各自 GAS 回傳的標題與門市清單）
@@ -472,13 +478,146 @@ function ptConfiguredKey_() {
 }
 
 function ptSessionCacheKey_(token) {
-  return 'patrol_session:' + String(token || '');
+  return 'patrol_session:' + ptHashHex_(String(token || '')).slice(0, 40);
+}
+
+function ptHashHex_(value) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value || '')).map(function(byte) {
+    const normalized = byte < 0 ? byte + 256 : byte;
+    return ('0' + normalized.toString(16)).slice(-2);
+  }).join('');
+}
+
+function ptBase64UrlEncode_(bytes) {
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/g, '');
+}
+
+function ptBase64UrlDecodeText_(value) {
+  return Utilities.newBlob(Utilities.base64DecodeWebSafe(String(value || ''))).getDataAsString('UTF-8');
+}
+
+function ptSessionNowSeconds_() {
+  return Math.floor(Date.now() / 1000);
+}
+
+function ptSessionSigningKey_() {
+  const props = PropertiesService.getScriptProperties();
+  let key = String(props.getProperty(PATROL_SESSION_SIGNING_KEY_PROPERTY) || '');
+  if (key) return key;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    key = String(props.getProperty(PATROL_SESSION_SIGNING_KEY_PROPERTY) || '');
+    if (!key) {
+      key = [Utilities.getUuid(), Utilities.getUuid(), Utilities.getUuid()].join('');
+      props.setProperty(PATROL_SESSION_SIGNING_KEY_PROPERTY, key);
+    }
+    return key;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function ptConstantTimeEqual_(left, right) {
+  const a = String(left || '');
+  const b = String(right || '');
+  let diff = a.length ^ b.length;
+  const length = Math.max(a.length, b.length);
+  for (let index = 0; index < length; index++) diff |= (a.charCodeAt(index) || 0) ^ (b.charCodeAt(index) || 0);
+  return diff === 0;
+}
+
+function ptAuthError_(reason) {
+  const error = new Error('unauthorized');
+  error.authReason = String(reason || 'AUTH_TOKEN_INVALID');
+  return error;
+}
+
+function ptAuthLog_(action, reason, tokenPresent, extra) {
+  const event = {
+    event:'PATROL_AUTH', action:String(action || ''), reason:String(reason || ''),
+    deployment:PATROL_AUTH_DEPLOYMENT, sessionContract:PATROL_SESSION_CONTRACT,
+    tokenPresent:Boolean(tokenPresent), serverTime:new Date().toISOString()
+  };
+  Object.keys(extra || {}).forEach(function(key) { event[key] = extra[key]; });
+  Logger.log(JSON.stringify(event));
+}
+
+function ptAuthErrorPayload_(error, action, token) {
+  const reason = String(error && error.authReason || 'AUTH_TOKEN_INVALID');
+  const tokenPresent = Boolean(String(token || '').trim());
+  ptAuthLog_(action, reason, tokenPresent);
+  return {
+    status:'error', message:'unauthorized', reason:reason,
+    auth:{
+      reason:reason, action:String(action || ''), deployment:PATROL_AUTH_DEPLOYMENT,
+      sessionContract:PATROL_SESSION_CONTRACT, tokenPresent:tokenPresent,
+      serverTime:new Date().toISOString()
+    }
+  };
+}
+
+function ptRouteErrorPayload_(error, action, token) {
+  if (error && error.authReason) return ptAuthErrorPayload_(error, action, token);
+  return {status:'error', message:error && error.message ? error.message : String(error)};
+}
+
+function ptSessionSignature_(payloadPart) {
+  return ptBase64UrlEncode_(Utilities.computeHmacSha256Signature(String(payloadPart || ''), ptSessionSigningKey_()));
+}
+
+function ptIssueSession_() {
+  const now = ptSessionNowSeconds_();
+  const claims = {v:2, aud:PATROL_AUTH_DEPLOYMENT, iat:now, exp:now + PATROL_SESSION_TTL_SECONDS, jti:Utilities.getUuid()};
+  const payloadPart = ptBase64UrlEncode_(Utilities.newBlob(JSON.stringify(claims), 'application/json').getBytes());
+  const token = payloadPart + '.' + ptSessionSignature_(payloadPart);
+  CacheService.getScriptCache().put(ptSessionCacheKey_(token), String(claims.exp), PATROL_SESSION_TTL_SECONDS);
+  return {token:token, claims:claims};
+}
+
+function ptSessionRevocationKey_(jti) {
+  return PATROL_SESSION_REVOKED_PREFIX + ptHashHex_(String(jti || '')).slice(0, 40);
+}
+
+function ptVerifySession_(token, action) {
+  const clean = String(token || '').trim();
+  if (!clean) throw ptAuthError_('AUTH_TOKEN_MISSING');
+  const parts = clean.split('.');
+  if (parts.length !== 2) {
+    if (/^[A-Za-z0-9-]{20,160}$/.test(clean)) {
+      if (CacheService.getScriptCache().get(ptSessionCacheKey_(clean)) === 'ok') {
+        throw ptAuthError_('AUTH_DEPLOYMENT_MISMATCH');
+      }
+      throw ptAuthError_('AUTH_SESSION_NOT_FOUND');
+    }
+    throw ptAuthError_('AUTH_TOKEN_INVALID');
+  }
+  if (!/^[A-Za-z0-9_-]+$/.test(parts[0]) || !/^[A-Za-z0-9_-]+$/.test(parts[1])) throw ptAuthError_('AUTH_TOKEN_INVALID');
+  if (!ptConstantTimeEqual_(parts[1], ptSessionSignature_(parts[0]))) throw ptAuthError_('AUTH_TOKEN_INVALID');
+  let claims;
+  try { claims = JSON.parse(ptBase64UrlDecodeText_(parts[0])); }
+  catch (error) { throw ptAuthError_('AUTH_TOKEN_INVALID'); }
+  if (!claims || claims.v !== 2 || !claims.jti || !Number.isFinite(Number(claims.exp))) throw ptAuthError_('AUTH_TOKEN_INVALID');
+  if (String(claims.aud || '') !== PATROL_AUTH_DEPLOYMENT) throw ptAuthError_('AUTH_DEPLOYMENT_MISMATCH');
+  const now = ptSessionNowSeconds_();
+  if (Number(claims.exp) <= now) throw ptAuthError_('AUTH_SESSION_EXPIRED');
+  const revokedUntil = Number(PropertiesService.getScriptProperties().getProperty(ptSessionRevocationKey_(claims.jti)) || 0);
+  if (revokedUntil >= now) throw ptAuthError_('AUTH_SESSION_REVOKED');
+  const cache = CacheService.getScriptCache();
+  if (!cache.get(ptSessionCacheKey_(clean))) {
+    ptAuthLog_(action, 'AUTH_CACHE_MISS', true);
+    cache.put(ptSessionCacheKey_(clean), String(claims.exp), Math.max(1, Math.min(PATROL_SESSION_TTL_SECONDS, Number(claims.exp) - now)));
+  }
+  return claims;
+}
+
+function ptRequireSession_(token, action) {
+  return ptVerifySession_(token, action);
 }
 
 function ptSessionAuthorized_(token) {
-  const clean = String(token || '').trim();
-  if (!/^[A-Za-z0-9-]{20,160}$/.test(clean)) return false;
-  return CacheService.getScriptCache().get(ptSessionCacheKey_(clean)) === 'ok';
+  try { ptRequireSession_(token, 'legacy-auth-check'); return true; }
+  catch (error) { return false; }
 }
 
 function ptCredentialAuthorized_(key, token) {
@@ -495,36 +634,50 @@ function ptAuthorized(e) {
 
 function ptAuthenticatePayload(payload) {
   const body = payload || {};
-  if (!ptConfiguredKey_()) throw new Error('unauthorized');
+  if (!ptConfiguredKey_()) throw ptAuthError_('AUTH_TOKEN_INVALID');
 
   const existingToken = String(body.token || '').trim();
-  if (ptSessionAuthorized_(existingToken)) {
-    CacheService.getScriptCache().put(ptSessionCacheKey_(existingToken), 'ok', PATROL_SESSION_TTL_SECONDS);
-    return { token: existingToken, expiresIn: PATROL_SESSION_TTL_SECONDS };
+  if (existingToken) {
+    const claims = ptRequireSession_(existingToken, 'ptauth');
+    return {
+      token:existingToken, expiresIn:Math.max(0, Number(claims.exp) - ptSessionNowSeconds_()),
+      expiresAt:Number(claims.exp), deployment:PATROL_AUTH_DEPLOYMENT, sessionContract:PATROL_SESSION_CONTRACT
+    };
   }
 
-  if (!ptCredentialAuthorized_(body.key, '')) throw new Error('unauthorized');
-  const token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
-  CacheService.getScriptCache().put(ptSessionCacheKey_(token), 'ok', PATROL_SESSION_TTL_SECONDS);
-  return { token: token, expiresIn: PATROL_SESSION_TTL_SECONDS };
+  if (String(body.key || '') !== ptConfiguredKey_()) throw ptAuthError_('AUTH_CREDENTIAL_INVALID');
+  const issued = ptIssueSession_();
+  ptAuthLog_('ptauth', 'AUTH_SESSION_ISSUED', false, {sessionIssued:true, expiresAt:issued.claims.exp});
+  return {
+    token:issued.token, expiresIn:PATROL_SESSION_TTL_SECONDS, expiresAt:issued.claims.exp,
+    deployment:PATROL_AUTH_DEPLOYMENT, sessionContract:PATROL_SESSION_CONTRACT
+  };
 }
 
 function ptLogoutPayload(payload) {
   const token = String((payload || {}).token || '').trim();
-  if (token) CacheService.getScriptCache().remove(ptSessionCacheKey_(token));
+  if (token) {
+    try {
+      const claims = ptRequireSession_(token, 'ptlogout');
+      PropertiesService.getScriptProperties().setProperty(ptSessionRevocationKey_(claims.jti), String(claims.exp));
+    } catch (error) {
+      if (error.authReason !== 'AUTH_SESSION_EXPIRED') throw error;
+    }
+    CacheService.getScriptCache().remove(ptSessionCacheKey_(token));
+  }
   return {};
 }
 
 function ptSummaryPostPayload_(payload) {
   const body = payload || {};
-  if (!ptSessionAuthorized_(body.token)) throw new Error('unauthorized');
+  ptRequireSession_(body.token, 'ptsummary');
   const month = patrolSummaryMonth_(body.month);
   return { summary:readPatrolSummary_(month), stores:PT_STORES, title:PT_TITLE };
 }
 
 function ptDetailPostPayload_(payload) {
   const body = payload || {};
-  if (!ptSessionAuthorized_(body.token)) throw new Error('unauthorized');
+  ptRequireSession_(body.token, 'ptdetail');
   return readPatrolDetail_({
     month:patrolSummaryMonth_(body.month),
     store:body.store,
@@ -951,7 +1104,7 @@ function patrolVisitPayload_(payload) {
   Object.keys(body).forEach(function(key) {
     if (!allowed[key]) throw new Error('unexpected patrol visit field');
   });
-  if (!ptSessionAuthorized_(body.token)) throw new Error('unauthorized');
+  ptRequireSession_(body.token, 'ptvisit_write');
   const visitAction = String(body.visitAction || '').trim();
   if (visitAction !== 'arrival' && visitAction !== 'departure') throw new Error('invalid patrol visit action');
   const note = String(body.note || '').trim();
@@ -1224,7 +1377,7 @@ function writeHalfCheckPostPayload_(payload, e) {
   const body = payload || {};
   const query = e && e.parameter ? e.parameter : {};
   if (query.token != null || query.payload != null) throw new Error('hwrite body required');
-  if (!ptCredentialAuthorized_('', body.token)) throw new Error('unauthorized');
+  ptRequireSession_(body.token, 'hwrite');
   Object.keys(body).forEach(key => { if (HALF_APP_POST_FIELDS.indexOf(key) < 0) throw new Error('extra field'); });
   if (String(body.action || '') !== 'hwrite') throw new Error('invalid action');
   const mode = String(body.mode || 'draft');
@@ -2069,10 +2222,12 @@ function personalReadPayload_(payload) {
 }
 
 function doPost(e) {
+  let action = '';
+  let payload = {};
   try {
     const rawPayload = privateDashboardPostRawPayload(e);
-    const payload = privateDashboardParsePostPayload(e);
-    const action = String(payload.action || '');
+    payload = privateDashboardParsePostPayload(e);
+    action = String(payload.action || '');
     if (action === 'write') assertNoDuplicateReportAwardModelIds_(rawPayload);
     // 部署隔離：上傳專用 Deployment 只放行四個上傳路由
     if (reportUploadIsUploadDeployment_() && REPORT_UPLOAD_ALLOWED_ACTIONS.indexOf(action) === -1) {
@@ -2122,7 +2277,11 @@ function doPost(e) {
     else throw new Error('unknown private dashboard action');
     return privateDashboardPostResponse({ status: 'ok', ...result }, e);
   } catch (err) {
-    return privateDashboardPostResponse({ status: 'error', message: err && err.message ? err.message : String(err) }, e);
+    const patrolActions = ['ptauth','ptlogout','ptsummary','ptdetail','ptvisit_write','hwrite','half_media_upload'];
+    const response = patrolActions.indexOf(action) >= 0
+      ? ptRouteErrorPayload_(err, action, payload && payload.token)
+      : { status: 'error', message: err && err.message ? err.message : String(err) };
+    return privateDashboardPostResponse(response, e);
   }
 }
 

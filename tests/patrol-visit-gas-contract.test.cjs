@@ -37,7 +37,7 @@ function loadVisitHarness() {
       {code:'DNB10440',name:'台北六張犁'},
       {code:'DNB10307',name:'台北三創'}
     ],
-    ptSessionAuthorized_: token => token === 'valid-short-token',
+    ptRequireSession_: token => { if (token !== 'valid-short-token') throw new Error('unauthorized'); return {jti:'test'}; },
     SpreadsheetApp:{ openById:() => spreadsheet },
     LockService:{ getScriptLock:() => ({ waitLock:() => {}, releaseLock:() => {} }) },
     Utilities:{
@@ -58,11 +58,11 @@ function loadVisitHarness() {
 }
 
 test('patrol visit actions are isolated, token protected and do not alter existing endpoints', () => {
-  assert.match(code, /action === 'ptvisit_read'[\s\S]*?ptAuthorized\(e\)[\s\S]*?readPatrolVisitEvents_/);
+  assert.match(code, /action === 'ptvisit_read'[\s\S]*?ptRequireSession_\(e\.parameter\.token, action\)[\s\S]*?patrolVisitState_/);
   assert.match(code, /action === 'ptvisit_write'\) result = writePatrolVisitEvent_\(payload\)/);
   assert.match(code, /PATROL_VISIT_SHEET = '巡店到離店紀錄'/);
   assert.match(code, /PATROL_VISIT_HEADERS = \['serverTime','date','action','store','note','visitSessionId'\]/);
-  assert.match(code, /ptSessionAuthorized_\(body\.token\)/);
+  assert.match(code, /ptRequireSession_\(body\.token, 'ptvisit_write'\)/);
   assert.doesNotMatch(code, /Logger\.(?:log|info|warn)\([^\n]*(?:token|PT_KEY|passcode)/i);
 });
 

@@ -283,12 +283,35 @@
     contract.generatedAt=nowIso();
   }
 
+  const PATROL_REAUTH_REASONS = new Set(['AUTH_SESSION_EXPIRED','AUTH_SESSION_REVOKED']);
+  const PATROL_AUTH_REASON_TEXT = {
+    AUTH_TOKEN_MISSING:'班表／巡店請求未帶 session token',
+    AUTH_TOKEN_INVALID:'班表／巡店 session token 無效',
+    AUTH_SESSION_NOT_FOUND:'班表／巡店 session 無法辨識',
+    AUTH_SESSION_EXPIRED:'班表／巡店授權已逾時，請重新驗證',
+    AUTH_SESSION_REVOKED:'班表／巡店授權已撤銷，請重新驗證',
+    AUTH_DEPLOYMENT_MISMATCH:'班表／巡店 session 與正式部署版本不相容',
+    AUTH_CREDENTIAL_INVALID:'班表／巡店通行碼錯誤'
+  };
+
+  function patrolApiReason(body) { return String(body&&((body.auth&&body.auth.reason)||body.reason)||''); }
+  function patrolApiError(body, fallback) {
+    const reason=patrolApiReason(body); const error=new Error(PATROL_AUTH_REASON_TEXT[reason]||(body&&body.message)||fallback);
+    error.authReason=reason; return error;
+  }
+  function patrolApiNeedsReauth(error) { return PATROL_REAUTH_REASONS.has(String(error&&error.authReason||'')); }
+  function clearExpiredPatrolSession(error) {
+    if(!patrolApiNeedsReauth(error)) return false;
+    patrolToken=''; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true;
+    return true;
+  }
+
   async function postPatrolAuth(payload) {
     if (!['ptauth','ptlogout'].includes(payload.action)) throw new Error('不允許的 session action。');
     const { body } = await fetchJsonWithRecovery(PATROL_API, {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload), cache:'no-store'
     }, 30_000, '班表／巡店驗證逾時，請稍後重試。');
-    if (!body || body.status !== 'ok') throw new Error((body && body.message) || '班表／巡店驗證失敗。');
+    if (!body || body.status !== 'ok') throw patrolApiError(body,'班表／巡店驗證失敗。');
     return body;
   }
 
@@ -305,7 +328,9 @@
         method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
         body:JSON.stringify({ action, token:patrolToken, ...params }), cache:'no-store'
       }, timeoutMs, timeoutMessage);
-      if (!body || body.status !== 'ok') throw new Error((body && body.message) || '巡店資料讀取失敗。');
+      if (!body || body.status !== 'ok') {
+        const error=patrolApiError(body,'巡店資料讀取失敗。');clearExpiredPatrolSession(error);throw error;
+      }
       return body;
     }
     const query = [['action',action],['token',patrolToken]];
@@ -315,14 +340,7 @@
     const url = `${PATROL_API}?${query.map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&')}`;
     const { body } = await fetchJsonWithRecovery(url, { method:'GET', cache:'no-store' }, timeoutMs, timeoutMessage);
     if (!body || body.status !== 'ok') {
-      const message = (body && body.message) || '班表／巡店讀取失敗。';
-      if (/unauthorized|session|授權|逾時|失效/i.test(message)) {
-        patrolToken='';
-        scope.sessionStorage.removeItem(PATROL_TOKEN_KEY);
-        dom('#patrolLogout').hidden=true;
-        throw new Error('班表／巡店授權已逾時，請重新驗證');
-      }
-      throw new Error(message);
+      const error=patrolApiError(body,'班表／巡店讀取失敗。');clearExpiredPatrolSession(error);throw error;
     }
     return body;
   }
@@ -337,12 +355,7 @@
     });
     const body = await response.json();
     if (!body || body.status !== 'ok') {
-      const message=(body&&body.message)||'到離店寫入失敗。';
-      if (/unauthorized|session|授權|逾時|失效/i.test(message)) {
-        patrolToken=''; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true;
-        throw new Error('班表／巡店授權已逾時，請重新驗證');
-      }
-      throw new Error(message);
+      const error=patrolApiError(body,'到離店寫入失敗。');clearExpiredPatrolSession(error);throw error;
     }
     return body;
   }
@@ -1639,7 +1652,10 @@
   async function restorePatrol() {
     if (!patrolToken||PREVIEW_MODE) return;
     try { const result=await postPatrolAuth({action:'ptauth',token:patrolToken}); patrolToken=String(result.token||''); if(!patrolToken) throw new Error('session 已失效'); scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken); dom('#patrolLogout').hidden=false; await loadPatrolData(); }
-    catch (_) { patrolToken=''; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); setMessage('#patrolAccessMessage','班表／巡店授權已逾時，請重新驗證','error'); }
+    catch (error) {
+      if(clearExpiredPatrolSession(error)) setMessage('#patrolAccessMessage',error.message,'error');
+      else setMessage('#patrolAccessMessage',`session 保留，恢復失敗：${String(error.message||error)}`,'error');
+    }
   }
 
   function shiftDate(days) {

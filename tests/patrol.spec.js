@@ -58,8 +58,8 @@ async function stubGas(page) {
         return route.fulfill({
           contentType: 'application/json',
           body: JSON.stringify(authed
-            ? { status: 'ok', token: PT_TOKEN, expiresIn: 1800 }
-            : { status: 'error', message: 'unauthorized' }),
+            ? { status: 'ok', token: PT_TOKEN, expiresIn: 1800, sessionContract:'patrol-session-v2' }
+            : { status: 'error', message: 'unauthorized', reason:'AUTH_CREDENTIAL_INVALID' }),
         });
       }
       if (payload.action === 'ptlogout') {
@@ -115,7 +115,7 @@ async function stubGas(page) {
     if (action === 'ping') {
       body = JSON.stringify({ status: 'ok' });
     } else if (action === 'pthealth') {
-      body = JSON.stringify({ status: 'ok', configured: true, contract: 'patrol-auth-v3' });
+      body = JSON.stringify({ status: 'ok', configured: true, contract: 'patrol-auth-v3', sessionContract:'patrol-session-v2', authDeployment:'test' });
     } else if (action === 'ptsummary') {
       ptReadCalls++;
       const configured=(cloudConfig&&cloudConfig.stores)||defaultPatrolStores;
@@ -128,7 +128,7 @@ async function stubGas(page) {
       if (failPtwrite) {
         body = JSON.stringify({ status: 'error', message: '伺服器忙碌，請稍後再試' });
       } else if (!authed) {
-        body = JSON.stringify({ status: 'error', message: 'unauthorized' });
+        body = JSON.stringify({ status: 'error', message: 'unauthorized', reason:'AUTH_SESSION_EXPIRED' });
       } else {
         const rows = JSON.parse(url.searchParams.get('payload'));
         const seen = new Set(cloudRows.map(r => `${r.fillTime}|${r.store}|${r.item}`));
@@ -150,7 +150,7 @@ async function stubGas(page) {
       halfWriteCalls++;
       if (expireHalfWriteAt === halfWriteCalls) {
         expireHalfWriteAt = null;
-        body = JSON.stringify({ status: 'error', message: 'unauthorized' });
+        body = JSON.stringify({ status: 'error', message: 'unauthorized', reason:'AUTH_SESSION_EXPIRED' });
       } else if (!authed) {
         body = JSON.stringify({ status: 'error', message: 'unauthorized' });
       } else {
