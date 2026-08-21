@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-21 ｜ Codex（稽核 Approved Device audit-only follow-up，未部署）
+
+- 做了什麼：從 PR #62 合併後的最新 `main` `5eddf26` 建立隔離分支 `fix/audit-approved-device-token-20260821`。取消門市批次回報碼，改由既有員編＋Approved Device 驗證後換發 30 分鐘 audit-only token；token 綁定員編雜湊、批次、名冊店點與 submission，店點不可自選。依 Liam 最新決策，名冊遮罩名只顯示「名冊辨識」提示，實際檢查人員姓名恢復必填文字欄位，由 `audit_start` 後端清理、長度驗證並寫入 submission／photo／timeline；姓名不綁 token。員編可持久化自動帶入，audit token 僅存分頁 session。後端只核對啟用名冊與裝置綁定，不呼叫私有戰情 access／snapshot，不把 Approved Device 的全區權限帶入稽核。
+- 結果（本機完成／未部署）：正式 Sheet 已讀回確認 UAT `audit-cleaning-202608-uat` 與正式 `audit-cleaning-202608` 都是 `active=FALSE`。門市後續開始、上傳、刪除、送出、狀態與照片讀取仍需 audit token，並疊加既有 `submission_id + edit token` ownership；提交列保留不可逆 `auth_employee_hash`，舊回報碼 token 與缺少員編綁定的舊 submission fail closed。Node `238/238`、稽核合約 `16/16`（既有 15 案全保留）、稽核 Chromium `11/11`、稽核 WebKit `11/11`、指定稽核＋Patrol/Auth `60/60`。完整 Chromium 最新為 `159/163`，4 案只卡既有截圖等待穩定，其中 3 案獨立重跑通過；完整 WebKit `161/163`，2 案為既有 file-origin CORS console error。`gas/Code.gs`、巡店、半月、KPI、台獎與其他正式資料流無變更；本次未部署 GAS／Pages，正式批次未啟用。
+- 經驗 / 給下一位的提醒：Approved Device 在本流程只作身分與單一裝置證明，不能直接重用可讀全區資料的授權回應；`masked_name` 也不能當成正式填報人。正式部署前須確認 `DASHBOARD_ROSTER_SHEET_ID` 與名冊店點 canonical value，並先以 UAT submission 驗證實際姓名落地、同店不同員編、跨店、token 過期與督導取消復原；本 follow-up 未獲准部署或開放九店。
+
 ## 2026-08-21 ｜ Codex（稽核回報受控部署 canonical blocker 與 rollback）
 
 - 做了什麼：PR #62 已合入最新正式 main `0693468` 並保留 PR #63／#64；Liam 完成 `AUDIT_REPORT_SUBMIT_CODE` 手動 gate 與 `setupAuditReportStorage()`。初始化建立四個稽核 Sheet 與私有 `04_稽核回報_照片`，先建立 UAT 批次。GAS v59 部署後的 `audit_config` smoke 發現萬大仍回 provisional `DNB10xxx_wanda`、通化仍回 legacy `DNB10059`，因此沒有把 PR 轉 Ready、沒有合併或發布 Pages，立即把既有 deployment 指回 v58並停用 UAT 批次。其後只在 `AuditReport.gs` 固定既有正式 canonical ID（萬大 `DNB10168`、通化 `DNB10174` 等九店），不修改 `PT_STORES`、`patrol.html` 或巡店資料流。
