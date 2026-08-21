@@ -276,3 +276,10 @@ test('frontend photo lifecycle uses private Blob/Object URLs and preserves Index
   assert.doesNotMatch(html + js + submitJs + supervisorJs, /drive\.google\.com\/file\/d\/|photo_file_id|private_url/);
   assert.match(html, /accept="image\/\*" multiple/); assert.match(js, /MAX_PHOTOS=10/);
 });
+
+test('audit frontend uses the existing iframe postMessage transport instead of cross-origin fetch', () => {
+  assert.match(js, /transport','iframe'/);
+  assert.match(js, /north12b-gas-response-v1/);
+  assert.match(js, /allowedGasMessageOrigin/);
+  assert.doesNotMatch(js, /fetch\(GAS_URL/);
+});

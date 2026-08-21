@@ -11,6 +11,8 @@ const MAX_PHOTOS=10;
 const MAX_DIMENSION=2048;
 const JPEG_QUALITY=.9;
 const CONTRACT='audit-cleaning-v2-self-report';
+const GAS_MESSAGE_TYPE='north12b-gas-response-v1';
+const GAS_MESSAGE_ORIGINS=new Set(['https://script.google.com','https://script.googleusercontent.com']);
 const STATUS_LABELS={missing:'未回報',draft:'未回報',submitted:'已回報待檢查',rework:'待補件',approved:'驗收完成',cancelled:'已取消'};
 
 const state={
@@ -151,27 +153,75 @@ async function migrateDraftBatch(nextBatchId){
   message('已保留舊草稿資料並切換至目前批次；若照片顯示需重新選取，請只補該張。','success');
 }
 
-async function api(payload){
-  let response;
+function allowedGasMessageOrigin(origin){
+  if(typeof origin!=='string'||!origin)return false;
   try{
-    response=await fetch(GAS_URL,{
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify(payload),
-      cache:'no-store'
-    });
-  }catch{
-    throw new Error('無法連上稽核服務，請確認網路後再試');
-  }
-  const raw=await response.text();
-  let result;
-  try{result=JSON.parse(raw);}catch{throw new Error('稽核服務回應無法辨識，請稍後再試');}
-  if(!response.ok||result.status!=='ok'){
-    const error=new Error(result.message||`服務暫時無法使用（${response.status}）`);
-    error.unauthorized=result.message==='unauthorized';
-    throw error;
-  }
-  return result;
+    const parsed=new URL(origin);
+    return parsed.protocol==='https:'&&!parsed.port&&(
+      GAS_MESSAGE_ORIGINS.has(parsed.origin)||parsed.hostname.endsWith('-script.googleusercontent.com')
+    );
+  }catch{return false;}
+}
+
+async function api(payload){
+  return new Promise((resolve,reject)=>{
+    const requestId=uid('audit_request');
+    let endpoint;
+    try{
+      endpoint=new URL(GAS_URL,window.location.href);
+      endpoint.searchParams.set('transport','iframe');
+      endpoint.searchParams.set('requestId',requestId);
+      endpoint.searchParams.set('origin',window.location.origin||'null');
+    }catch{
+      reject(new Error('稽核服務網址格式錯誤'));
+      return;
+    }
+    const frame=document.createElement('iframe');
+    const form=document.createElement('form');
+    const field=document.createElement('textarea');
+    const frameName=`audit_transport_${requestId}`;
+    let finished=false;
+    const cleanup=()=>{
+      window.removeEventListener('message',onMessage);
+      window.clearTimeout(timeoutId);
+      frame.remove();
+      form.remove();
+    };
+    const finish=(error,result)=>{
+      if(finished)return;
+      finished=true;
+      cleanup();
+      if(error)reject(error);else resolve(result);
+    };
+    const onMessage=event=>{
+      const message=event.data;
+      if(!allowedGasMessageOrigin(event.origin)||!event.source||!message||message.type!==GAS_MESSAGE_TYPE||message.requestId!==requestId)return;
+      const result=message.body;
+      if(!result||result.status!=='ok'){
+        const error=new Error(result?.message||'稽核服務回應失敗');
+        error.unauthorized=result?.message==='unauthorized';
+        finish(error);
+        return;
+      }
+      finish(null,result);
+    };
+    const timeoutId=window.setTimeout(()=>finish(new Error('稽核服務連線逾時，請稍後再試')),30000);
+    frame.name=frameName;
+    frame.title='稽核服務傳輸';
+    frame.hidden=true;
+    form.method='POST';
+    form.action=endpoint.toString();
+    form.target=frameName;
+    form.enctype='application/x-www-form-urlencoded';
+    form.acceptCharset='UTF-8';
+    form.hidden=true;
+    field.name='payload';
+    field.value=JSON.stringify(payload);
+    form.appendChild(field);
+    window.addEventListener('message',onMessage);
+    document.body.append(frame,form);
+    try{form.submit();}catch{finish(new Error('無法連上稽核服務，請確認網路後再試'));}
+  });
 }
 
 function storeCall(payload){return api(payload);}

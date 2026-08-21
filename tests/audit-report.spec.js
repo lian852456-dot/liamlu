@@ -39,7 +39,10 @@ async function mockApi(page, options = {}) {
   let ownedSubmission = current?.submission_id || '';
   let ownedEditToken = options.editToken || 'edit_test_123456789012345678901234';
   await page.route('https://script.google.com/**', async route => {
-    const payload = JSON.parse(route.request().postData() || '{}');
+    const requestUrl = new URL(route.request().url());
+    const postData = route.request().postData() || '';
+    const params = new URLSearchParams(postData);
+    const payload = JSON.parse(params.get('payload') || postData || '{}');
     calls.push(payload);
     let body;
     const batchId = options.uatBatch ? 'audit-cleaning-202608-uat' : 'audit-cleaning-202608';
@@ -106,7 +109,10 @@ async function mockApi(page, options = {}) {
       current = detail({ ...current, submission_status: 'cancelled', timeline: [...(current?.timeline || []), { event_type: 'cancelled', item_id: '', item_name: '', status: 'cancelled', comment: payload.comment, created_at: '2026-08-21T15:30:00+08:00' }] }); body = current;
     } else if (payload.action === 'ptlogout') body = { status: 'ok' };
     else body = { status: 'error', message: 'unknown' };
-    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+    const requestId = requestUrl.searchParams.get('requestId') || '';
+    const message = JSON.stringify({ type: 'north12b-gas-response-v1', requestId, body })
+      .replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+    await route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: `<!doctype html><meta charset="utf-8"><script>top.postMessage(${message},'*');<\/script>` });
   });
   return { calls, uploads };
 }
@@ -134,6 +140,7 @@ test('quality reminder remains store-only, responsive and keyboard accessible', 
 
 test('self-report form exposes nine editable stores, required identity fields, multi-add, delete, preview and ten-photo limit', async ({ page }) => {
   await mockApi(page); await page.setViewportSize({ width: 390, height: 844 }); await page.goto(PAGE_URL);
+  await expect(page.locator('#storeSelect option')).toHaveCount(10);
   expect(await page.locator('#storeSelect option').allTextContents()).toEqual(['請選擇門市', ...STORES.map(store => store.store_name)]);
   expect(await page.locator('#storeSelect option').evaluateAll(options => options.slice(1).map(option => [option.value, option.textContent]))).toEqual(STORES.map(store => [store.store_id, store.store_name]));
   await expect(page.locator('#storeSelect')).toBeEnabled(); await expect(page.locator('#inspectorName')).toHaveAttribute('required', ''); await expect(page.locator('#storeEmployeeId')).toHaveAttribute('required', ''); await expect(page.locator('#submitButton')).toBeDisabled();
@@ -147,10 +154,11 @@ test('self-report form exposes nine editable stores, required identity fields, m
 test('batch migration keeps basic fields, IndexedDB bytes and photos while rotating submission/edit ownership', async ({ page }) => {
   const oldSubmission = 'submission_old_batch_123456789012345'; const oldEdit = 'edit_old_batch_123456789012345678901234'; const photoId = 'photo_old_batch_1234567890';
   await page.addInitScript(({ oldSubmission, oldEdit, photoId }) => {
+    if (window.top !== window) return;
     localStorage.setItem('bei12b_audit_draft_v1', JSON.stringify({ batch_id: 'audit-cleaning-202607', store_id: 'DNB10307', inspector_name: '王小明', employee_id: 'EMP1234', submission_id: oldSubmission, edit_token: oldEdit, notes: { island_display: '已整線' }, items: { island_display: { photos: [{ id: photoId, name: 'old.png', type: 'image/png', size: 1, lastModified: 1, fingerprint: 'old-fingerprint', status: 'pending', server: null }] } } }));
     window.__auditMigrationSeedReady = new Promise(resolve => { const request = indexedDB.open('bei12b-audit-drafts', 1); request.onupgradeneeded = () => request.result.createObjectStore('photos'); request.onsuccess = () => { const db = request.result; const tx = db.transaction('photos', 'readwrite'); tx.objectStore('photos').put({ bytes: [1, 2, 3], type: 'image/png', name: 'old.png' }, `${oldSubmission}|${photoId}`); tx.oncomplete = () => { db.close(); resolve(true); }; }; });
   }, { oldSubmission, oldEdit, photoId });
-  await mockApi(page, { waitForSeed: true }); await page.goto(PAGE_URL); await expect(page.locator('#storeSelect')).toHaveValue('DNB10307'); await expect(page.locator('#inspectorName')).toHaveValue('王小明'); await expect(page.locator('#storeEmployeeId')).toHaveValue('EMP1234'); await expect(page.locator('.audit-item').first().locator('.photo-tile')).toHaveCount(1); await expect(page.locator('.audit-item').first().locator('.photo-state')).toContainText('待上傳');
+  await mockApi(page, { waitForSeed: true }); await page.goto(PAGE_URL); await expect(page.locator('#storeSelect option')).toHaveCount(10); await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bei12b_audit_draft_v1')).batch_id)).toBe('audit-cleaning-202608'); await expect(page.locator('#storeSelect')).toHaveValue('DNB10307'); await expect(page.locator('#inspectorName')).toHaveValue('王小明'); await expect(page.locator('#storeEmployeeId')).toHaveValue('EMP1234'); await expect(page.locator('.audit-item').first().locator('.photo-tile')).toHaveCount(1); await expect(page.locator('.audit-item').first().locator('.photo-state')).toContainText('待上傳');
   const migrated = await page.evaluate(({ oldSubmission, oldEdit, photoId }) => new Promise(resolve => { const draft = JSON.parse(localStorage.getItem('bei12b_audit_draft_v1')); const request = indexedDB.open('bei12b-audit-drafts', 1); request.onsuccess = () => { const db = request.result; const tx = db.transaction('photos', 'readonly'); const keys = tx.objectStore('photos').getAllKeys(); keys.onsuccess = () => { resolve({ draft, keys: keys.result, oldBytesKey: `${oldSubmission}|${photoId}`, oldEdit }); db.close(); }; }; }), { oldSubmission, oldEdit, photoId });
   expect(migrated.draft.batch_id).toBe('audit-cleaning-202608'); expect(migrated.draft.submission_id).not.toBe(oldSubmission); expect(migrated.draft.edit_token).not.toBe(oldEdit); expect(migrated.draft.notes.island_display).toBe('已整線'); expect(migrated.keys).toContain(migrated.oldBytesKey); expect(migrated.keys.some(key => String(key).endsWith(`|${photoId}`) && key !== migrated.oldBytesKey)).toBe(true);
 });
@@ -172,8 +180,8 @@ test('reload restores fifteen protected server photos as Blob URLs without Promi
   const submissionId = 'submission_server_photos_123456789012345'; const editToken = 'edit_server_photos_123456789012345678901234';
   const items = ITEMS.map(item => ({ ...item, status: 'submitted', reviewer_comment: '', note: '', photo_count: 5, photos: Array.from({ length: 5 }, (_, index) => ({ client_photo_id: `server_${item.item_id}_${index}_123456`, photo_name: `${item.item_id}-${index}.png`, revision: 1, status: 'submitted' })) }));
   const initial = detail({ submission_id: submissionId, items });
-  await page.addInitScript(({ submissionId, editToken }) => { localStorage.setItem('bei12b_audit_draft_v1', JSON.stringify({ batch_id: 'audit-cleaning-202608', store_id: 'DNB10307', inspector_name: '王小明', employee_id: 'EMP1234', submission_id: submissionId, edit_token: editToken, notes: {}, items: {} })); }, { submissionId, editToken });
-  await page.addInitScript(() => { const create = URL.createObjectURL.bind(URL); const revoke = URL.revokeObjectURL.bind(URL); window.__created = []; window.__revoked = []; URL.createObjectURL = blob => { const url = create(blob); window.__created.push(url); return url; }; URL.revokeObjectURL = url => { window.__revoked.push(url); return revoke(url); }; });
+  await page.addInitScript(({ submissionId, editToken }) => { if (window.top !== window) return; localStorage.setItem('bei12b_audit_draft_v1', JSON.stringify({ batch_id: 'audit-cleaning-202608', store_id: 'DNB10307', inspector_name: '王小明', employee_id: 'EMP1234', submission_id: submissionId, edit_token: editToken, notes: {}, items: {} })); }, { submissionId, editToken });
+  await page.addInitScript(() => { if (window.top !== window) return; const create = URL.createObjectURL.bind(URL); const revoke = URL.revokeObjectURL.bind(URL); window.__created = []; window.__revoked = []; URL.createObjectURL = blob => { const url = create(blob); window.__created.push(url); return url; }; URL.revokeObjectURL = url => { window.__revoked.push(url); return revoke(url); }; });
   const consoleErrors = []; page.on('console', entry => { if (entry.type() === 'error') consoleErrors.push(entry.text()); }); const mock = await mockApi(page, { initialStatus: initial, editToken }); await page.goto(PAGE_URL);
   await expect(page.locator('#completionPhotos .photo-tile img')).toHaveCount(15); await expect(page.locator('#completionPhotos .photo-tile img').first()).toHaveAttribute('src', /^blob:/); expect(mock.calls.filter(call => call.action === 'audit_photo_read')).toHaveLength(15);
   await page.locator('#completionPhotos .photo-tile').first().click(); await expect(page.locator('#photoDialog')).toBeVisible(); await expect(page.locator('#dialogImage')).toHaveAttribute('src', /^blob:/); await page.locator('#closePhotoDialog').click();
@@ -183,7 +191,7 @@ test('reload restores fifteen protected server photos as Blob URLs without Promi
 test('rework unlocks only the returned item and resubmits one new photo', async ({ page }) => {
   const submissionId = 'submission_rework_ui_123456789012345'; const editToken = 'edit_rework_ui_123456789012345678901234';
   const initial = detail({ submission_id: submissionId, submission_status: 'rework', revision: 2, items: ITEMS.map(item => ({ ...item, status: item.item_id === 'op_zone' ? 'rework' : 'approved', reviewer_comment: item.item_id === 'op_zone' ? '請補拍死角' : '', note: '原備註', photo_count: 1, photos: [{ client_photo_id: `server_${item.item_id}_123456`, photo_name: 'original.png', revision: 1, status: item.item_id === 'op_zone' ? 'rework' : 'approved' }] })) });
-  await page.addInitScript(({ submissionId, editToken }) => localStorage.setItem('bei12b_audit_draft_v1', JSON.stringify({ batch_id: 'audit-cleaning-202608', store_id: 'DNB10307', inspector_name: '王小明', employee_id: 'EMP1234', submission_id: submissionId, edit_token: editToken, notes: {}, items: {} })), { submissionId, editToken }); const mock = await mockApi(page, { initialStatus: initial, editToken }); await page.goto(PAGE_URL);
+  await page.addInitScript(({ submissionId, editToken }) => { if (window.top !== window) return; localStorage.setItem('bei12b_audit_draft_v1', JSON.stringify({ batch_id: 'audit-cleaning-202608', store_id: 'DNB10307', inspector_name: '王小明', employee_id: 'EMP1234', submission_id: submissionId, edit_token: editToken, notes: {}, items: {} })); }, { submissionId, editToken }); const mock = await mockApi(page, { initialStatus: initial, editToken }); await page.goto(PAGE_URL);
   await expect(page.locator('.return-reason:not([hidden])')).toContainText('請補拍死角'); await expect(page.locator('.photo-input').nth(0)).toBeDisabled(); await expect(page.locator('.photo-input').nth(1)).toBeEnabled(); await expect(page.locator('.photo-input').nth(2)).toBeDisabled(); await addPhoto(page, 1, 'rework.png'); await page.locator('#submitButton').click(); await expect(page.locator('#completionTitle')).toHaveText('回報完成'); expect(mock.calls.filter(call => call.action === 'audit_upload').map(call => call.item_id)).toEqual(['op_zone']);
 });
 
@@ -196,6 +204,6 @@ test('supervisor overview remains PT protected and can review a private photo wi
 
 test('supervisor cancel preserves evidence and exposes a fresh store submission path', async ({ page }) => {
   const initial = detail(); const editToken = 'edit_test_123456789012345678901234';
-  await page.addInitScript(({ initial, editToken }) => localStorage.setItem('bei12b_audit_draft_v1', JSON.stringify({ batch_id: initial.batch_id, store_id: initial.store_id, inspector_name: initial.inspector_name, employee_id: initial.employee_id, submission_id: initial.submission_id, edit_token: editToken, notes: {}, items: {} })), { initial, editToken });
+  await page.addInitScript(({ initial, editToken }) => { if (window.top !== window) return; localStorage.setItem('bei12b_audit_draft_v1', JSON.stringify({ batch_id: initial.batch_id, store_id: initial.store_id, inspector_name: initial.inspector_name, employee_id: initial.employee_id, submission_id: initial.submission_id, edit_token: editToken, notes: {}, items: {} })); }, { initial, editToken });
   const mock = await mockApi(page, { initialStatus: initial, editToken }); await page.goto(PAGE_URL); await page.locator('#modeSwitch').click(); await page.fill('#supervisorPasscode', 'correct-pass'); await page.locator('#supervisorLoginButton').click(); await page.locator('.review-item-button:not([disabled])').first().click(); await expect(page.locator('#reviewDialog')).toBeVisible(); page.once('dialog', dialog => dialog.accept()); await page.locator('.cancel-submission-button').click(); await expect(page.locator('#reviewDetail')).toContainText('此回報已取消'); expect(mock.calls.some(call => call.action === 'audit_cancel')).toBe(true); await page.locator('#reviewForm .dialog-close').click(); await page.locator('#modeSwitch').click(); await expect(page.locator('#storeView')).toBeVisible(); await expect(page.locator('#newSubmissionButton')).toBeVisible();
 });
