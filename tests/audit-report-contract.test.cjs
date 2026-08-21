@@ -34,7 +34,7 @@ test('public entry and mobile form expose the exact isolated audit contract', ()
   assert.match(html, /audit-report\.css\?v=20260821-pr67/);
   assert.match(html, /audit-report\.js\?v=20260821-pr67/);
   assert.match(js, /async function ensurePrivatePhoto\(/);
-  assert.match(worker, /liam-supervisor-app-1-2-mileage-health-20260821-v1/);
+  assert.match(worker, /liam-supervisor-app-1-2-patrol-mileage-month-batch-20260821-v1/);
   assert.match(worker, /pathname\.endsWith\('\/audit-report\.html'\)[\s\S]*fetch\(event\.request, \{ cache:'no-store' \}\)/);
   assert.doesNotMatch(js, /state\.draft\.inspector_name\s*=\s*profile\.masked_name/);
   assert.doesNotMatch(html + js, /storeSubmitCode|批次回報碼|驗證回報碼/);

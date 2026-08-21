@@ -1508,8 +1508,8 @@ function storeCardHTML(storeName){
 function cloudCall(action, params={}){
   return patrolRequestWithReauth(()=>{
     if(!['ping','pthealth'].includes(action)&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
-    const timeoutMs=action==='ptsummary'?20000:action==='ptdetail'?30000:0;
-    if(action==='ptsummary'||action==='ptdetail'){
+    const timeoutMs=action==='ptsummary'?20000:(action==='ptdetail'||action==='ptmileage')?30000:0;
+    if(action==='ptsummary'||action==='ptdetail'||action==='ptmileage'){
       const controller=new AbortController();
       const timer=setTimeout(()=>controller.abort(),timeoutMs);
       return patrolTrackedRequest(action,()=>fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:PT_TOKEN,...params}),cache:'no-store',signal:controller.signal}).then(async response=>{
@@ -1691,7 +1691,7 @@ async function switchPatrolView(view){
   document.querySelectorAll('.secure-view').forEach(el=>el.classList.remove('active'));
   if(view==='mileage'){
     document.getElementById('mileageView').classList.add('active');
-    // 里程只讀正式 ptdetail；不使用貼上候選 rawDetails，也不新增第二套 GAS action。
+    // 里程只讀正式月份級 ptmileage；不使用貼上候選 rawDetails，也不逐店重掃工作表。
     MI.open(currentMonth);
     return;
   }
@@ -2046,7 +2046,7 @@ restorePatrolSession();
 
 /* =========================================================================
    每日移動里程（獨立模組）
-   - 資料來源：既有受保護 ptdetail（月／九店／分頁），不依賴 rawDetails
+   - 資料來源：受保護 ptmileage（一次月份讀取／整體分頁），不依賴 rawDetails
    - 人工調整只存 localStorage:bei12b_mileage_v1，與 GAS 完全脫鉤
    - 匯出沿用 excelXml()/downloadExcel()，格式比照受控版 Y2606月車資.xls
    ========================================================================= */
@@ -2129,9 +2129,11 @@ const MI = (function(){
     NO_PATROL:'MILEAGE_NO_PATROL', SOURCE_MISSING:'MILEAGE_SOURCE_MISSING',
     DATE_PARSE:'MILEAGE_DATE_PARSE_ERROR', STORE_MAPPING:'MILEAGE_STORE_MAPPING_ERROR',
     CLOUD_READ:'MILEAGE_CLOUD_READ_ERROR', API:'MILEAGE_API_ERROR', AUTH:'MILEAGE_AUTH_ERROR',
-    DATA_FORMAT:'MILEAGE_DATA_FORMAT_ERROR', CALC:'MILEAGE_CALC_ERROR'
+    DATA_FORMAT:'MILEAGE_DATA_FORMAT_ERROR', CALC:'MILEAGE_CALC_ERROR',
+    LOAD_SLOW:'MILEAGE_LOAD_SLOW', LOAD_TIMEOUT:'MILEAGE_LOAD_TIMEOUT'
   };
-  let state={date:'', month:'', loading:false, error:null};
+  const LOAD_TARGET_MS=10000;
+  let state={date:'', month:'', loading:false, error:null, progress:'', slow:null};
   let serverRowsByMonth={};
   let loadedMonths={};
   let loadGeneration=0;
@@ -2160,37 +2162,50 @@ const MI = (function(){
     const message=String(error&&error.message||'巡店明細讀取失敗');
     const reason=patrolAuthReason(error);
     if(reason || /unauthorized|token|驗證|權限|401|403/i.test(message)) return mileageError(ERROR.AUTH,reason?patrolAuthReasonText(error):message,{reason});
-    if(/network|fetch|連線|讀取|timeout|逾時/i.test(message)) return mileageError(ERROR.CLOUD_READ,message);
+    if(/timeout|逾時/i.test(message)) return mileageError(ERROR.LOAD_TIMEOUT,message);
+    if(/network|fetch|連線|讀取/i.test(message)) return mileageError(ERROR.CLOUD_READ,message);
     return mileageError(ERROR.API,message);
   }
 
-  async function loadStoreMonth(month, storeName){
+  async function loadMonthDetails(month, onProgress){
     const rows=[];
-    const limit=100;
+    const limit=500;
     let page=1;
     let totalRows=null;
+    let totalPages=null;
+    let sheetScans=0;
     do{
-      const response=await cloudCall('ptdetail',{month,store:storeName,page,limit});
+      onProgress(page,totalPages);
+      const response=await cloudCall('ptmileage',{month,page,limit});
       if(!response || typeof response!=='object') throw mileageError(ERROR.API,'巡店明細 API 未回傳 JSON object');
       if(response.status!=='ok') {
         const error=new Error(response.message||'巡店明細 API 回傳失敗');
         error.authReason=patrolAuthReason(response);
         throw classifyReadError(error);
       }
-      if(response.month!==month || response.store!==storeName || Number(response.page)!==page || !Array.isArray(response.rows)){
-        throw mileageError(ERROR.DATA_FORMAT,'巡店明細月份、店點或分頁 contract 不完整');
+      if(response.contract!=='patrol-mileage-month-v1'||response.month!==month||Number(response.page)!==page||!Array.isArray(response.rows)){
+        throw mileageError(ERROR.DATA_FORMAT,'月份級里程明細 contract 不完整');
       }
+      const fields=Array.isArray(response.fields)?response.fields:[];
+      if(['fillTime','arriveTime','code','store','month'].some(field=>!fields.includes(field)))
+        throw mileageError(ERROR.DATA_FORMAT,'月份級里程明細欄位 contract 不完整');
       const reportedTotal=Number(response.totalRows);
       if(!Number.isInteger(reportedTotal) || reportedTotal<0) throw mileageError(ERROR.DATA_FORMAT,'巡店明細筆數 contract 不完整');
+      const reportedPages=Number(response.totalPages);
+      if(!Number.isInteger(reportedPages)||reportedPages<1) throw mileageError(ERROR.DATA_FORMAT,'巡店明細總頁數 contract 不完整');
       if(totalRows===null) totalRows=reportedTotal;
       else if(totalRows!==reportedTotal) throw mileageError(ERROR.API,'巡店明細分頁期間資料已變更，請重新載入');
+      if(totalPages===null) totalPages=reportedPages;
+      else if(totalPages!==reportedPages) throw mileageError(ERROR.API,'巡店明細總頁數於讀取期間變更');
       if(response.rows.some(row=>!row||typeof row!=='object'||Array.isArray(row)))
         throw mileageError(ERROR.DATA_FORMAT,'巡店明細包含非 object 資料列');
+      sheetScans+=Number(response.diagnostics&&response.diagnostics.sheetScans||0);
       rows.push(...response.rows);
       if(response.rows.length===0 && rows.length<totalRows) throw mileageError(ERROR.API,'巡店明細分頁未前進');
       page+=1;
-    }while(rows.length<totalRows);
+    }while(page<=totalPages);
     if(rows.length!==totalRows) throw mileageError(ERROR.API,'巡店明細分頁讀回筆數不一致');
+    if(sheetScans>1) throw mileageError(ERROR.API,'月份級里程讀取重複掃描工作表',{sheetScans});
     return rows;
   }
 
@@ -2200,39 +2215,46 @@ const MI = (function(){
     if(loadedMonths[month] && !force) return serverRowsByMonth[month]||[];
     const wasLoaded=Boolean(loadedMonths[month]);
     if(!secureUnlocked || !privateAccount || !PT_TOKEN) throw mileageError(ERROR.AUTH,'請先完成督導驗證');
-    const stores=STORES.map(store=>String(store.name||'')).filter(Boolean);
-    if(stores.length!==9 || new Set(stores).size!==9) throw mileageError(ERROR.DATA_FORMAT,'巡店九店 contract 不完整');
     const generation=++loadGeneration;
-    state.loading=true; state.error=null;
+    state.loading=true; state.error=null; state.slow=null; state.progress=`正在載入 ${month}：準備月份明細`;
     render();
+    const slowTimer=setTimeout(()=>{
+      if(generation!==loadGeneration||!state.loading)return;
+      state.slow={code:ERROR.LOAD_SLOW,reason:`${month} 月份明細讀取已超過 10 秒`,progress:state.progress};
+      render();
+      console.warn('MILEAGE_HEALTH',{month,code:ERROR.LOAD_SLOW,reason:state.slow.reason,progress:state.progress});
+    },LOAD_TARGET_MS);
     try{
-      const next=[];
-      // 逐店讀取，避免 token 過期時多個平行請求同時觸發重新驗證。
-      for(const storeName of stores) next.push(...await loadStoreMonth(month,storeName));
+      const next=await loadMonthDetails(month,(page,totalPages)=>{
+        state.progress=totalPages?`正在讀取第 ${page}/${totalPages} 頁`:`正在讀取第 ${page} 頁`;
+        if(generation===loadGeneration) render();
+      });
       serverRowsByMonth[month]=next;
       loadedMonths[month]=true;
       const report=health(month);
       console[report.abnormal?'warn':'info']('MILEAGE_HEALTH',report);
       if(generation===loadGeneration){
         if(!wasLoaded) state.date='';
-        state.loading=false; state.error=null; render();
+        state.loading=false; state.error=null; state.slow=null; state.progress=''; render();
       }
       return next;
     }catch(error){
       if(generation===loadGeneration){
         state.loading=false;
-        state.error=classifyReadError(error);
+        state.error=classifyReadError(error); state.slow=null;
         console.error('MILEAGE_HEALTH', {month,code:state.error.code,reason:state.error.message});
         render();
       }
       throw error;
+    }finally{
+      clearTimeout(slowTimer);
     }
   }
 
   function clear(){
     loadGeneration+=1;
     serverRowsByMonth={}; loadedMonths={};
-    state={date:'',month:'',loading:false,error:null};
+    state={date:'',month:'',loading:false,error:null,progress:'',slow:null};
   }
 
   /* ---------- 人工資料層（localStorage，不觸碰 GAS／原始明細） ---------- */
@@ -2267,7 +2289,7 @@ const MI = (function(){
   const VERIFY_LABEL={verified:['已驗證','ok'],observed:['歷史觀測','hist'],
                       manual:['人工確認','manual'],official:['正式受控','ok']};
 
-  /* ---------- 由正式 ptdetail 推導每日路線 ---------- */
+  /* ---------- 由正式月份級里程明細推導每日路線 ---------- */
   function parseArrive(s){
     const text=String(s||'').trim();
     if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(text)){
@@ -2437,7 +2459,7 @@ const MI = (function(){
     ensureState();
     renderCoverage();
     if(state.loading||state.error){
-      const label=state.loading?'正式 ptdetail 載入中':'正式 ptdetail 尚未完成讀回';
+      const label=state.loading?(state.progress||`正在載入 ${state.month}`):'正式月份明細尚未完成讀回';
       document.getElementById('miStats').innerHTML=`<div class="mi-card"><div class="k">里程資料</div><div class="v">—</div><div class="s">${esc2(label)}</div></div>`;
       document.getElementById('miAlerts').innerHTML='';
       document.getElementById('miTimeline').innerHTML=`<div class="mi-empty">${esc2(label)}</div>`;
@@ -2466,7 +2488,11 @@ const MI = (function(){
 
   function renderCoverage(){
     const el=document.getElementById('miCoverage'), rc=reconcile(state.month);
-    if(state.loading){ el.innerHTML=`<div class="mi-note">正在從正式巡店明細載入 ${esc2(state.month)}（九店／分頁）…</div>`; return; }
+    if(state.loading){
+      const slow=state.slow?`<br><b>⚠ ${ERROR.LOAD_SLOW}</b>：${esc2(state.slow.reason)}；卡點：${esc2(state.slow.progress||state.progress)}`:'';
+      el.innerHTML=`<div class="mi-note${state.slow?' bad':''}">${esc2(state.progress||`正在載入 ${state.month}`)}…${slow}</div>`;
+      return;
+    }
     if(state.error){ el.innerHTML=`<div class="mi-note bad"><b>${esc2(state.error.code||ERROR.API)}</b>：${esc2(state.error.message||state.error)}<br>未以 rawDetails、舊月份或空資料代替。</div>`; return; }
     const report=health(state.month), all=monthPlans(state.month), bill=billable(all);
     if(!all.length){
@@ -2474,7 +2500,7 @@ const MI = (function(){
         el.innerHTML=`<div class="mi-note bad"><b>⚠ ${ERROR.SOURCE_MISSING}</b>：巡店已有 ${report.patrolRows} 筆，但里程同步為 ${report.mileageDetails} 筆。<ul>`+
           report.issues.map(issue=>`<li><b>${esc2(issue.code)}</b>：${esc2(issue.reason)}</li>`).join('')+'</ul></div>';
       }else{
-        el.innerHTML=`<div class="mi-note"><b>${ERROR.NO_PATROL}</b>：正式 ptdetail 確認 ${esc2(state.month)} 本月真的沒有巡店，里程維持 0 KM。</div>`;
+        el.innerHTML=`<div class="mi-note"><b>${ERROR.NO_PATROL}</b>：正式月份明細確認 ${esc2(state.month)} 本月真的沒有巡店，里程維持 0 KM。</div>`;
       }
       return;
     }

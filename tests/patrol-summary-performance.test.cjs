@@ -41,11 +41,31 @@ test('ptdetail is an authenticated bounded lazy read', () => {
   assert.match(gas, /normalized\.month = patrolSummaryRowMonth_\(row\)/);
 });
 
+test('ptmileage is a month-scoped lightweight contract with one Sheet scan per snapshot', () => {
+  const gas = read('gas/Code.gs');
+  const patrol = read('patrol.html');
+  assert.match(gas, /function ptMileageMonthPostPayload_\(payload\)[\s\S]*ptRequireSession_\(body\.token, 'ptmileage'\)/);
+  assert.match(gas, /action === 'ptmileage'\) result = ptMileageMonthPostPayload_\(payload\)/);
+  assert.match(gas, /PATROL_MILEAGE_FIELDS = \['fillTime','arriveTime','code','store','month'\]/);
+  assert.match(gas, /PATROL_MILEAGE_MAX_LIMIT = 500/);
+  const monthRead = gas.match(/function readPatrolMileageMonth_\(options\) \{([\s\S]*?)\n\}/);
+  assert.ok(monthRead);
+  assert.equal((monthRead[1].match(/readPatrolContractColumns_\(sheet\)/g) || []).length, 1);
+  assert.match(monthRead[1], /patrolSummaryRowMonth_\(row\) === month/);
+  assert.doesNotMatch(monthRead[1], /ptStoreRows\(/);
+  assert.match(patrol, /cloudCall\('ptmileage',\{month,page,limit\}\)/);
+  assert.doesNotMatch(patrol, /for\(const storeName of stores\)/);
+  assert.match(patrol, /正在讀取第 \$\{page\}\/\$\{totalPages\} 頁/);
+  assert.match(patrol, /MILEAGE_LOAD_SLOW/);
+  assert.match(patrol, /MILEAGE_LOAD_TIMEOUT/);
+});
+
 test('mileage exposes explicit health reason codes and zero-detail consistency gate', () => {
   const patrol = read('patrol.html');
   ['MILEAGE_NO_PATROL','MILEAGE_SOURCE_MISSING','MILEAGE_DATE_PARSE_ERROR',
    'MILEAGE_STORE_MAPPING_ERROR','MILEAGE_CLOUD_READ_ERROR','MILEAGE_API_ERROR',
-   'MILEAGE_AUTH_ERROR','MILEAGE_DATA_FORMAT_ERROR','MILEAGE_CALC_ERROR'].forEach(code=>assert.match(patrol,new RegExp(code)));
+   'MILEAGE_AUTH_ERROR','MILEAGE_DATA_FORMAT_ERROR','MILEAGE_CALC_ERROR',
+   'MILEAGE_LOAD_SLOW','MILEAGE_LOAD_TIMEOUT'].forEach(code=>assert.match(patrol,new RegExp(code)));
   assert.match(patrol, /source\.length===0[\s\S]*ERROR\.NO_PATROL/);
   assert.match(patrol, /else if\(visitCount===0\)[\s\S]*ERROR\.SOURCE_MISSING/);
   assert.match(patrol, /console\[report\.abnormal\?'warn':'info'\]\('MILEAGE_HEALTH',report\)/);
@@ -61,7 +81,7 @@ test('App and patrol.html load ptsummary for dashboards and fail closed on trans
   assert.match(app, /巡店資料讀取逾時/);
   assert.match(app, /data-retry-patrol/);
   assert.match(patrol, /cloudCall\('ptsummary',\{month:currentMonth\}\)/);
-  assert.match(patrol, /action==='ptsummary'\|\|action==='ptdetail'[\s\S]*method:'POST'/);
+  assert.match(patrol, /action==='ptsummary'\|\|action==='ptdetail'\|\|action==='ptmileage'[\s\S]*method:'POST'/);
   assert.match(patrol, /JSON\.stringify\(\{action,token:PT_TOKEN,\.\.\.params\}\)/);
   assert.doesNotMatch(patrol, /cloudCall\('ptread'\)/);
   assert.match(patrol, /patrolSummaryUnavailableHTML/);
