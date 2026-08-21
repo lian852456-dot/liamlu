@@ -166,21 +166,31 @@ function auditRosterStore_(value) {
   return store;
 }
 
-function auditApprovedDeviceProfile_(payload) {
+function auditIsUatBatch_(batchId) {
+  return /-uat$/i.test(String(batchId || '').trim());
+}
+
+function auditApprovedDeviceProfile_(payload, batch) {
   const body = payload || {};
   const employeeId = privateDashboardCleanEmployeeId(body.employeeId);
   const deviceId = privateDashboardCleanDeviceId(body.deviceId);
   const lookup = privateDashboardUserByEmployeeId(employeeId);
-  if (!lookup.user || lookup.user.status !== 'active' || lookup.user.device_id !== deviceId) {
+  if (!lookup.user || lookup.user.status !== 'active' ||
+      (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
     throw new Error('此員編尚未核准此裝置，請先使用既有流程申請並等待管理者核准');
   }
-  const store = auditRosterStore_(lookup.user.store);
+  const trustedUat = privateDashboardIsTrustedEmployee(employeeId) && auditIsUatBatch_(batch && batch.batch_id);
+  const requestedStoreId = String(body.uat_store_id || '').trim();
+  const store = trustedUat && requestedStoreId ? auditStore_(requestedStoreId)
+    : trustedUat ? null
+    : auditRosterStore_(lookup.user.store);
   const maskedName = auditCleanMaskedName_(lookup.user.masked_name);
   return {
     employee_id: employeeId,
     employee_id_hash: privateDashboardHash(employeeId),
     store: store,
-    masked_name: maskedName
+    masked_name: maskedName,
+    requires_uat_store: trustedUat && !store
   };
 }
 
@@ -286,7 +296,13 @@ function auditSubmitAuth(payload) {
   const body = payload || {};
   const batch = auditActiveBatch_();
   if (String(body.batch_id || '') !== batch.batch_id) throw new Error('稽核批次已更新，請重新整理');
-  const profile = auditApprovedDeviceProfile_(body);
+  const profile = auditApprovedDeviceProfile_(body, batch);
+  if (profile.requires_uat_store) {
+    return {
+      requires_uat_store: true,
+      profile: { masked_name: profile.masked_name }
+    };
+  }
   const store = profile.store;
   const submissionId = auditSubmissionId_(body.submission_id);
   const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');

@@ -20,12 +20,17 @@ function ownStatus(overrides={}){
 
 async function mockApi(page,options={}){
   const calls=[];const uploads=new Map();let failOnce=Boolean(options.failOnce);let overviewExpired=Boolean(options.overviewExpired);let authed=false;let currentStatus=options.initialStatus||null;let expireStoreToken=Boolean(options.expireStoreToken);
+  const batchId=options.uatBatch?'audit-cleaning-202608-uat':'audit-cleaning-202608';
   const storeAuthorized=payload=>payload.store_token===`store-token-${payload.submission_id}`;
   const supervisorAuthorized=payload=>authed||payload.token==='valid-token';
   await page.route('https://script.google.com/**',async route=>{
     const payload=JSON.parse(route.request().postData()||'{}');calls.push(payload);let body;
-    if(payload.action==='audit_config')body={status:'ok',contract:'audit-cleaning-v1',batch:{batch_id:'audit-cleaning-202608',batch_name:'稽核前環境清潔確認',starts_on:'2026-08-20',due_on:'2026-08-31',active:true},stores:STORES,items:ITEMS,maxPhotosPerItem:10};
-    else if(payload.action==='audit_submit_auth')body=payload.employeeId==='EMP001'&&/^[A-Za-z0-9_-]{16,128}$/.test(payload.deviceId||'')?{status:'ok',token:`store-token-${payload.submission_id}`,expiresIn:1800,profile:{store_id:'DNB10062',store_name:'台北酒泉',masked_name:'測＊員'}}:{status:'error',message:'unauthorized'};
+    if(payload.action==='audit_config')body={status:'ok',contract:'audit-cleaning-v1',batch:{batch_id:batchId,batch_name:options.uatBatch?'稽核回報正式 UAT':'稽核前環境清潔確認',starts_on:'2026-08-20',due_on:'2026-08-31',active:true},stores:STORES,items:ITEMS,maxPhotosPerItem:10};
+    else if(payload.action==='audit_submit_auth'){
+      if(payload.employeeId==='EMP900'&&options.uatBatch&&!payload.uat_store_id)body={status:'ok',requires_uat_store:true,profile:{masked_name:'盧＊榮'}};
+      else if(payload.employeeId==='EMP900'&&options.uatBatch&&STORES.some(store=>store.store_id===payload.uat_store_id)){const store=STORES.find(row=>row.store_id===payload.uat_store_id);body={status:'ok',token:`store-token-${payload.submission_id}`,expiresIn:1800,profile:{...store,masked_name:'盧＊榮'}};}
+      else body=payload.employeeId==='EMP001'&&/^[A-Za-z0-9_-]{16,128}$/.test(payload.deviceId||'')?{status:'ok',token:`store-token-${payload.submission_id}`,expiresIn:1800,profile:{store_id:'DNB10062',store_name:'台北酒泉',masked_name:'測＊員'}}:{status:'error',message:'unauthorized'};
+    }
     else if(['audit_status','audit_start','audit_upload','audit_photo_delete','audit_submit'].includes(payload.action)&&(!storeAuthorized(payload)||expireStoreToken)){expireStoreToken=false;body={status:'error',message:'unauthorized'};}
     else if(payload.action==='audit_status')body=currentStatus&&currentStatus.submission_id===payload.submission_id?currentStatus:{status:'error',message:'找不到本次回報或驗證已失效'};
     else if(payload.action==='audit_start'){currentStatus=ownStatus({submission_id:payload.submission_id,inspector_name:String(payload.inspector_name||'').trim(),submission_status:'draft',submitted_at:'',items:ITEMS.map(item=>({...item,status:'draft',reviewer_comment:'',note:'',photo_count:0,photos:[]}))});body=currentStatus;}
@@ -87,6 +92,32 @@ test('nine canonical stores, required fields, multi-add, delete, preview and ten
   await page.locator('.audit-item').first().locator('.delete-button').first().click();await expect(page.locator('.audit-item').first().locator('.photo-tile')).toHaveCount(1);
   const eleven=Array.from({length:10},(_,i)=>({name:`extra-${i}.png`,mimeType:'image/png',buffer:PNG}));await page.locator('.audit-item').first().locator('.photo-input').setInputFiles(eleven);await expect(page.locator('#globalMessage')).toContainText('單項最多 10 張');await expect(page.locator('.audit-item').first().locator('.photo-tile')).toHaveCount(1);
   expect(await page.locator('body').evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+});
+
+test('trusted supervisor can select one store only after UAT identity parity succeeds',async({page})=>{
+  const mock=await mockApi(page,{uatBatch:true});await page.goto(PAGE_URL);
+  await expect(page.locator('#storeSelect')).toBeDisabled();
+  await authorizeStore(page,'EMP900');
+  await expect(page.locator('#storeAuthMessage')).toContainText('UAT 督導身分已驗證');
+  await expect(page.locator('#storeSelect')).toBeEnabled();
+  await expect(page.locator('#storeSelect option').first()).toHaveText('請選擇 UAT 店點');
+  await page.locator('#storeSelect').selectOption('DNB10082');
+  await page.locator('#storeAuthButton').click();
+  await expect(page.locator('#storeAuthMessage')).toContainText('核准裝置驗證成功：台北永吉｜名冊辨識：盧＊榮');
+  await expect(page.locator('#storeSelect')).toHaveValue('DNB10082');
+  await expect(page.locator('#storeSelect')).toBeDisabled();
+  const authCalls=mock.calls.filter(call=>call.action==='audit_submit_auth');
+  expect(authCalls).toHaveLength(2);
+  expect(authCalls[0].uat_store_id).toBe('');
+  expect(authCalls[1].uat_store_id).toBe('DNB10082');
+  expect(mock.calls.some(call=>call.action==='private_access'||call.action==='kpicalc_access')).toBe(false);
+});
+
+test('ordinary employee cannot use the UAT selector and stays on the roster store',async({page})=>{
+  const mock=await mockApi(page,{uatBatch:true});await page.goto(PAGE_URL);await authorizeStore(page,'EMP001');
+  await expect(page.locator('#storeSelect')).toHaveValue('DNB10062');
+  await expect(page.locator('#storeSelect')).toBeDisabled();
+  expect(mock.calls.find(call=>call.action==='audit_submit_auth').uat_store_id).toBe('');
 });
 
 test('partial upload failure preserves successes and retries only the failed photo before readback success',async({page})=>{
