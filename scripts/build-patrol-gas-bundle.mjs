@@ -153,7 +153,12 @@ function doPost(e) {
 
 const source = fs.readFileSync(sourcePath, 'utf8');
 const patrolDependencyClosure = [
-  'ptWinMonths'
+  // patrolSummaryContract_ and patrolSummaryHalfDashboard_ use these legacy
+  // helpers, which intentionally live outside the main Patrol source ranges.
+  'ptWinMonths',
+  'ptDayOf',
+  'ptItemDone',
+  'ptStoreRows'
 ].map(name => functionBlock(source, name));
 const patrolCode = [
   responseHelpers.trim(),

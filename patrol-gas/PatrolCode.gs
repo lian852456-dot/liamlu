@@ -1255,3 +1255,34 @@ function ptWinMonths(monthKey) {
   const pad = n => ('0' + n).slice(-2);
   return [y + '-' + pad(s), y + '-' + pad(s + 1)];
 }
+
+function ptDayOf(fillTime) {
+  const m = String(fillTime).match(/\d{4}\/\d{1,2}\/(\d{1,2})/);
+  return m ? Number(m[1]) : 0;
+}
+
+function ptItemDone(storeRows, item, monthKey) {
+  const isV = r => String(r.result).toLowerCase() === 'v';
+  if (item === 18) {
+    const winM = ptWinMonths(monthKey);
+    return storeRows.some(r => Number(r.item) === 18 && isV(r) && winM.indexOf(String(r.month)) !== -1);
+  }
+  const mRows = storeRows.filter(r => Number(r.item) === item && String(r.month) === monthKey);
+  if (item === 1) return mRows.length > 0; // 駐點：當月有紀錄即可（v或na）
+  if (item >= 2 && item <= 13) {           // 上下半月各1次
+    const h1 = mRows.some(r => isV(r) && ptDayOf(r.fillTime) <= 15);
+    const h2 = mRows.some(r => isV(r) && ptDayOf(r.fillTime) > 15);
+    return h1 && h2;
+  }
+  return mRows.some(isV);                  // 每月至少1次
+}
+
+function ptStoreRows(all, st) {
+  const key = st.name.replace('台北', '');
+  return all.filter(r => {
+    const rs = String(r.store || '');
+    if (!rs) return false;
+    if (st.code && String(r.code || '') === st.code) return true;
+    return rs.indexOf(key) !== -1 || st.name.indexOf(rs) !== -1;
+  });
+}
