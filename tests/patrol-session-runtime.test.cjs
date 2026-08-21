@@ -52,6 +52,7 @@ function runtime() {
   context.patrolSummaryMonth_ = month => String(month || '');
   context.readPatrolSummary_ = month => ({month, visitCount:18});
   context.readPatrolDetail_ = options => ({status:'ok', ...options, rows:[]});
+  context.readPatrolMileageMonth_ = options => ({status:'ok', ...options, rows:[]});
   return {context, properties, cache, logs, setNow:value => { now = value; }, getNow:() => now};
 }
 
@@ -70,6 +71,7 @@ test('signed session survives cache loss and immediately authorizes summary plus
   for (let index = 0; index < 9; index++) {
     assert.equal(env.context.ptDetailPostPayload_({token:auth.token, month:'2026-08', store:`store-${index}`, page:1, limit:100}).status, 'ok');
   }
+  assert.equal(env.context.ptMileageMonthPostPayload_({token:auth.token, month:'2026-08', page:1, limit:500}).status, 'ok');
   assert.ok(env.logs.some(line => line.includes('AUTH_CACHE_MISS')));
 });
 

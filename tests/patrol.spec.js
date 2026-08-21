@@ -12,6 +12,8 @@ let halfRows;
 let writeCalls;
 let ptReadCalls;
 let ptDetailCalls;
+let ptMileageCalls;
+let ptMileageDelayMs;
 let cloudConfig; // 模擬各區 GAS 回傳的 PT_STORES / PT_TITLE
 let mediaUploads;
 let failPtwrite; // 測試用：強制 ptwrite 回錯，模擬雲端寫入失敗
@@ -49,7 +51,7 @@ async function stubGas(page) {
   await page.addInitScript(schedule => {
     window.PATROL_LEGACY_GAS_URL = 'https://script.google.com/macros/s/test/exec';
   }, privateScheduleFixture());
-  await page.route('https://script.google.com/**', route => {
+  await page.route('https://script.google.com/**', async route => {
     const request = route.request();
     if (request.method() === 'POST') {
       const payload = JSON.parse(request.postData() || '{}');
@@ -89,6 +91,27 @@ async function stubGas(page) {
         return route.fulfill({ contentType:'application/json', body:JSON.stringify({
           status:'ok',month,store,page:pageNumber,limit,totalRows:rows.length,rows:rows.slice(start,start+limit)
         }) });
+      }
+      if (payload.action === 'ptmileage') {
+        if (payload.token !== PT_TOKEN) {
+          return route.fulfill({ contentType:'application/json', body:JSON.stringify({status:'error',message:'unauthorized'}) });
+        }
+        const month=String(payload.month||'');
+        const pageNumber=Number(payload.page||1);
+        const limit=Math.min(500,Number(payload.limit||500));
+        const rows=cloudRows.filter(row=>String(row.month||'').slice(0,7)===month).map(row=>({
+          fillTime:String(row.fillTime||''),arriveTime:String(row.arriveTime||''),
+          code:String(row.code||''),store:String(row.store||''),month
+        }));
+        const totalPages=Math.max(1,Math.ceil(rows.length/limit));
+        const start=(pageNumber-1)*limit;
+        ptMileageCalls.push({month,page:pageNumber,limit});
+        if(ptMileageDelayMs) await new Promise(resolve=>setTimeout(resolve,ptMileageDelayMs));
+        return route.fulfill({contentType:'application/json',body:JSON.stringify({
+          status:'ok',contract:'patrol-mileage-month-v1',fields:['fillTime','arriveTime','code','store','month'],
+          month,page:pageNumber,limit,totalRows:rows.length,totalPages,rows:rows.slice(start,start+limit),
+          diagnostics:{sourceRows:cloudRows.length,matchedRows:rows.length,sheetScans:pageNumber===1?1:0,serverDurationMs:12}
+        })});
       }
       if (payload.action === 'half_media_upload') {
         const authed = payload.token === PT_TOKEN;
@@ -234,7 +257,7 @@ function item18Panel(page) {
   return page.locator('#invPanels .panel').filter({ hasText:'到店全盤提醒' });
 }
 
-test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; });
 
 test('填表時間為 ######## 時整批拒絕，不寫雲端、不改 rawDetails、不清除貼上內容', async ({ page }) => {
   await stubGas(page);
@@ -873,7 +896,7 @@ async function openMileage(page, details) {
   await page.evaluate(() => { currentMonth = '2026-06'; const monthInput = document.getElementById('monthInput'); if (monthInput) monthInput.value = '2026-06'; });
   await page.click('.secure-tab[data-view="mileage"]');
   await expect(page.locator('#mileageView')).toHaveClass(/active/);
-  await expect(page.locator('#miCoverage')).not.toContainText('正在從正式巡店明細載入');
+  await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取/);
 }
 
 function august20PagedDetails() {
@@ -896,12 +919,14 @@ async function openAugustMileage(page) {
   await openAndUnlock(page);
   await expect.poll(()=>ptReadCalls).toBeGreaterThan(0);
   await page.evaluate(() => { currentMonth='2026-08'; const input=document.getElementById('monthInput'); if(input) input.value='2026-08'; });
+  const startedAt=Date.now();
   await page.click('.secure-tab[data-view="mileage"]');
-  await expect(page.locator('#miCoverage')).not.toContainText('正在從正式巡店明細載入');
+  await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取/);
+  return Date.now()-startedAt;
 }
 
-test('里程從正式 ptdetail 依月份、九店與分頁恢復，8/20 顯示 2 店／4.5 KM', async ({page})=>{
-  await openAugustMileage(page);
+test('里程由單一月份級 request 恢復，8/20 顯示 2 店／4.5 KM', async ({page})=>{
+  const elapsedMs=await openAugustMileage(page);
   await expect(page.locator('#mileageView')).toContainText('不需貼上資料或匯入 JSON');
   await expect(page.getByRole('button',{name:/匯入巡店明細|匯出明細存檔/})).toHaveCount(0);
   await expect(page.locator('#miMonth')).toHaveValue('2026-08');
@@ -912,17 +937,38 @@ test('里程從正式 ptdetail 依月份、九店與分頁恢復，8/20 顯示 2
   expect(state.rawCount).toBe(0);
   expect(state.plan.nodes.map(node=>node.name)).toEqual(['台北三創','台北六張犁']);
   expect(state.plan.km).toBe(4.5);
-  expect(new Set(ptDetailCalls.map(call=>call.store)).size).toBe(9);
-  expect(ptDetailCalls.filter(call=>call.store==='台北三創').map(call=>call.page)).toEqual([1,2]);
-  expect(ptDetailCalls.every(call=>call.month==='2026-08'&&call.limit===100)).toBe(true);
+  expect(ptMileageCalls).toEqual([{month:'2026-08',page:1,limit:500}]);
+  expect(ptDetailCalls).toHaveLength(0);
+  expect(elapsedMs).toBeLessThan(10000);
 });
 
-test('reload 與登出再登入後仍由 ptdetail 恢復 8 月里程，月份不跳回 6 月', async ({page})=>{
+test('月份讀取超過 10 秒門檻會顯示卡點與 MILEAGE_LOAD_SLOW，完成後不會無限 loading', async ({page})=>{
+  const base=august20PagedDetails();
+  cloudRows=base.concat(Array.from({length:399},(_,index)=>({
+    ...base[0], item:String(index+1000), fillTime:`2026/8/20 20:${String(index%60).padStart(2,'0')}`
+  })));
+  ptMileageDelayMs=120;
+  await stubGas(page);
+  await openAndUnlock(page);
+  await page.evaluate(()=>{
+    currentMonth='2026-08';
+    const nativeSetTimeout=window.setTimeout.bind(window);
+    window.setTimeout=(callback,delay,...args)=>nativeSetTimeout(callback,delay===10000?20:delay,...args);
+  });
+  await page.click('.secure-tab[data-view="mileage"]');
+  await expect(page.locator('#miCoverage')).toContainText('MILEAGE_LOAD_SLOW');
+  await expect(page.locator('#miCoverage')).toContainText('正在讀取第 1 頁');
+  await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取/);
+  await expect(page.locator('#miStats .mi-card').nth(1)).toContainText('4.5KM');
+  expect(ptMileageCalls.map(call=>call.page)).toEqual([1,2]);
+});
+
+test('reload 與登出再登入後仍由月份級明細恢復 8 月里程，月份不跳回 6 月', async ({page})=>{
   await openAugustMileage(page);
   await page.reload();
   await expect(page.locator('#patrolAuthGate')).toBeHidden();
   await page.click('.secure-tab[data-view="mileage"]');
-  await expect(page.locator('#miCoverage')).not.toContainText('正在從正式巡店明細載入');
+  await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取/);
   await expect(page.locator('#miMonth')).toHaveValue('2026-08');
   await expect(page.locator('#miStats .mi-card').nth(1)).toContainText('4.5KM');
 
@@ -932,11 +978,11 @@ test('reload 與登出再登入後仍由 ptdetail 恢復 8 月里程，月份不
   await page.getByRole('button',{name:'驗證並進入'}).click();
   await expect(page.locator('#patrolAuthGate')).toBeHidden();
   await page.click('.secure-tab[data-view="mileage"]');
-  await expect(page.locator('#miCoverage')).not.toContainText('正在從正式巡店明細載入');
+  await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取/);
   await expect(page.locator('#miMonth')).toHaveValue('2026-08');
   await expect(page.locator('#miStats .mi-card').nth(0)).toContainText('2店');
   await expect(page.locator('#miStats .mi-card').nth(1)).toContainText('4.5KM');
-  expect(ptDetailCalls.filter(call=>call.store==='台北三創'&&call.page===2).length).toBe(3);
+  expect(ptMileageCalls.filter(call=>call.month==='2026-08').length).toBe(3);
 });
 
 test('7 月與 8 月分開載入，不互相污染', async ({page})=>{
@@ -1007,7 +1053,7 @@ test('timezone 跨日依 Asia/Taipei 歸入正確月份', async ({page})=>{
   await stubGas(page); await openAndUnlock(page);
   await page.evaluate(()=>{currentMonth='2026-08';});
   await page.click('.secure-tab[data-view="mileage"]');
-  await expect(page.locator('#miCoverage')).not.toContainText('正在從正式巡店明細載入');
+  await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取/);
   await expect(page.locator('#miDate')).toHaveValue('2026-08-01');
   const plan=await page.evaluate(()=>MI._monthPlans('2026-08')[0]);
   expect(plan.date).toBe('2026-08-01');

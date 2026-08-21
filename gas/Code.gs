@@ -686,6 +686,16 @@ function ptDetailPostPayload_(payload) {
   });
 }
 
+function ptMileageMonthPostPayload_(payload) {
+  const body = payload || {};
+  ptRequireSession_(body.token, 'ptmileage');
+  return readPatrolMileageMonth_({
+    month:patrolSummaryMonth_(body.month),
+    page:body.page,
+    limit:body.limit
+  });
+}
+
 const PATROL_SHEET = '巡店明細';
 const PATROL_HEADERS = ['fillTime','arriveTime','leaveTime','district','code','store','inspector','item','result','reason','month','savedAt'];
 
@@ -798,6 +808,9 @@ function readPatrolContractColumns_(sh) {
 
 const PATROL_SUMMARY_CACHE_SECONDS = 120;
 const PATROL_DETAIL_MAX_LIMIT = 100;
+const PATROL_MILEAGE_MAX_LIMIT = 500;
+const PATROL_MILEAGE_CACHE_SECONDS = 120;
+const PATROL_MILEAGE_FIELDS = ['fillTime','arriveTime','code','store','month'];
 
 function patrolSummaryMonth_(value) {
   const month = String(value || '').trim();
@@ -1066,6 +1079,87 @@ function readPatrolDetail_(options) {
     .sort(function(left, right) { return patrolSummaryIsoDate_(right).localeCompare(patrolSummaryIsoDate_(left)) || Number(left.item) - Number(right.item); });
   const start = (page - 1) * limit;
   return { status:'ok', month:options.month, store:store, page:page, limit:limit, totalRows:all.length, rows:all.slice(start, start + limit) };
+}
+
+function patrolMileageStore_(row) {
+  const code = String(row && row.code || '').trim();
+  const rawStore = String(row && row.store || '').trim();
+  const match = PT_STORES.find(function(store) {
+    if (code && String(store.code || '') === code) return true;
+    const official = String(store.name || '').replace(/\s+/g, '');
+    const raw = rawStore.replace(/\s+/g, '');
+    const key = official.replace(/^台北/, '');
+    return raw && (raw === official || raw === key || raw.indexOf(key) !== -1 || official.indexOf(raw) !== -1);
+  });
+  // 無法正規化時保留原值，讓前端回報 MILEAGE_STORE_MAPPING_ERROR，不能靜默排除。
+  return match ? String(match.name) : rawStore;
+}
+
+function patrolMileageCacheKey_(month, sourceVersion, page, limit) {
+  const version = Utilities.base64EncodeWebSafe(String(sourceVersion || '')).slice(0, 80);
+  return ['ptmileage', month, version, page, limit].join(':');
+}
+
+function readPatrolMileageMonth_(options) {
+  const startedAt = Date.now();
+  const month = patrolSummaryMonth_(options.month);
+  const page = Number(options.page || 1);
+  const requestedLimit = Number(options.limit || PATROL_MILEAGE_MAX_LIMIT);
+  if (!Number.isInteger(page) || page < 1) throw new Error('invalid patrol mileage page');
+  if (!Number.isInteger(requestedLimit) || requestedLimit < 1) throw new Error('invalid patrol mileage limit');
+  const limit = Math.min(PATROL_MILEAGE_MAX_LIMIT, requestedLimit);
+  const sheet = getPatrolSheet();
+  const meta = patrolSummarySourceMeta_(sheet);
+  const cache = CacheService.getScriptCache();
+  const cacheKey = patrolMileageCacheKey_(month, meta.sourceVersion, page, limit);
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    const result = JSON.parse(cached);
+    result.diagnostics = Object.assign({}, result.diagnostics, {
+      cacheHit:true, sheetScans:0, serverDurationMs:Date.now() - startedAt
+    });
+    return result;
+  }
+
+  // 此 request 唯一一次完整 A:L scan；月份篩選、九店正規化與整體分頁都由同一份 snapshot 完成。
+  const rows = readPatrolContractColumns_(sheet)
+    .filter(function(row) { return patrolSummaryRowMonth_(row) === month; })
+    .map(function(row) {
+      return {
+        fillTime:String(row.fillTime || ''), arriveTime:String(row.arriveTime || ''),
+        code:String(row.code || ''), store:patrolMileageStore_(row), month:month
+      };
+    })
+    .sort(function(left, right) {
+      return patrolSummaryIsoDate_(left).localeCompare(patrolSummaryIsoDate_(right)) ||
+        String(left.arriveTime).localeCompare(String(right.arriveTime)) || String(left.store).localeCompare(String(right.store));
+    });
+  const totalRows = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / limit));
+  if (page > totalPages) throw new Error('invalid patrol mileage page');
+  const generatedAt = Utilities.formatDate(new Date(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
+  const diagnostics = {
+    sourceRows:Math.max(0, Number(meta.lastRow || 1) - 1), matchedRows:totalRows,
+    cacheHit:false, sheetScans:1, serverDurationMs:Date.now() - startedAt
+  };
+  let requestedResult = null;
+  for (let currentPage = 1; currentPage <= totalPages; currentPage++) {
+    const start = (currentPage - 1) * limit;
+    const result = {
+      status:'ok', contract:'patrol-mileage-month-v1', fields:PATROL_MILEAGE_FIELDS.slice(),
+      month:month, page:currentPage, limit:limit, totalRows:totalRows, totalPages:totalPages,
+      rows:rows.slice(start, start + limit), sourceVersion:String(meta.sourceVersion || ''),
+      generatedAt:generatedAt, diagnostics:diagnostics
+    };
+    const serialized = JSON.stringify(result);
+    if (serialized.length < 95000) cache.put(
+      patrolMileageCacheKey_(month, meta.sourceVersion, currentPage, limit),
+      serialized,
+      PATROL_MILEAGE_CACHE_SECONDS
+    );
+    if (currentPage === page) requestedResult = result;
+  }
+  return requestedResult;
 }
 
 // ════════════════════════════════════
@@ -2238,6 +2332,7 @@ function doPost(e) {
     else if (action === 'ptlogout') result = ptLogoutPayload(payload);
     else if (action === 'ptsummary') result = ptSummaryPostPayload_(payload);
     else if (action === 'ptdetail') result = ptDetailPostPayload_(payload);
+    else if (action === 'ptmileage') result = ptMileageMonthPostPayload_(payload);
     else if (action === 'ptvisit_write') result = writePatrolVisitEvent_(payload);
     else if (action === 'hwrite') result = writeHalfCheckPostPayload_(payload, e);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
@@ -2277,7 +2372,7 @@ function doPost(e) {
     else throw new Error('unknown private dashboard action');
     return privateDashboardPostResponse({ status: 'ok', ...result }, e);
   } catch (err) {
-    const patrolActions = ['ptauth','ptlogout','ptsummary','ptdetail','ptvisit_write','hwrite','half_media_upload'];
+    const patrolActions = ['ptauth','ptlogout','ptsummary','ptdetail','ptmileage','ptvisit_write','hwrite','half_media_upload'];
     const response = patrolActions.indexOf(action) >= 0
       ? ptRouteErrorPayload_(err, action, payload && payload.token)
       : { status: 'error', message: err && err.message ? err.message : String(err) };

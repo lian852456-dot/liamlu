@@ -54,6 +54,11 @@ test('ptvisit_write rejects missing and incorrect short-session tokens', { skip 
   assertUnauthorized(await post({ action:'ptvisit_write', token:WRONG_KEY, visitAction:'arrival', store:'台北通化' }), 'ptvisit_write incorrect token');
 });
 
+test('ptmileage rejects missing and incorrect short-session tokens', { skip }, async () => {
+  assertUnauthorized(await post({ action:'ptmileage', month:'2026-08', page:1, limit:500 }), 'ptmileage missing token');
+  assertUnauthorized(await post({ action:'ptmileage', token:WRONG_KEY, month:'2026-08', page:1, limit:500 }), 'ptmileage incorrect token');
+});
+
 for (const action of ['ptwrite', 'hwrite']) {
   test(`${action} rejects before parsing or writing`, { skip }, async () => {
     const invalidPayload = '{this-is-not-json';
