@@ -129,7 +129,7 @@ test('錯誤密碼連續兩次都鎖定，且不保存或讀取資料', async ({
 
   const storage = await page.evaluate(() => ({
     localKey: localStorage.getItem('bei12b_pt_key'),
-    sessionToken: sessionStorage.getItem('bei12b_pt_session_token'),
+    sessionToken: sessionStorage.getItem('bei12b_patrol_session_token_v2'),
     legacyEndpoint: localStorage.getItem('bei12b_pt_key_endpoint'),
   }));
   expect(storage).toEqual({ localKey: null, sessionToken: null, legacyEndpoint: null });
@@ -164,7 +164,7 @@ test('正確密碼取得後端 token 後才建立看板並載入資料', async (
   expect(state.protectedCalls.every(call => call.valid)).toBe(true);
   const storage = await page.evaluate(() => ({
     localKey: localStorage.getItem('bei12b_pt_key'),
-    sessionToken: sessionStorage.getItem('bei12b_pt_session_token'),
+    sessionToken: sessionStorage.getItem('bei12b_patrol_session_token_v2'),
   }));
   expect(storage).toEqual({ localKey: null, sessionToken: SESSION_TOKEN });
 });
@@ -181,7 +181,7 @@ test('API timeout 與 deployment mismatch 都保留 session 且不開啟重新�
     return {
       timeout,
       mismatch,
-      token:sessionStorage.getItem('bei12b_pt_session_token'),
+      token:sessionStorage.getItem('bei12b_patrol_session_token_v2'),
       modalHidden:document.getElementById('patrolReauthModal').hidden
     };
   });
@@ -223,7 +223,7 @@ test('登出立即移除督導 DOM 與 session，重新載入後再次鎖定', a
   await expect(page.locator('#patrolAuthGate')).toBeVisible();
   await expect(page.locator('#patrolAppHost')).toBeEmpty();
   await expect(page.locator('#mileageView')).toHaveCount(0);
-  expect(await page.evaluate(() => sessionStorage.getItem('bei12b_pt_session_token'))).toBeNull();
+  expect(await page.evaluate(() => sessionStorage.getItem('bei12b_patrol_session_token_v2'))).toBeNull();
   await page.reload();
   await expect(page.locator('#patrolAuthGate')).toBeVisible();
   await expect(page.locator('#patrolAppHost')).toBeEmpty();

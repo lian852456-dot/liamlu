@@ -42,7 +42,16 @@ test('public ping and pthealth disclose no protected data', { skip }, async () =
   }
 });
 
-for (const action of ['debug', 'ptread', 'ptsummary', 'ptdetail', 'ptvisit_read', 'sread', 'hread']) {
+test('debug is absent from the isolated Patrol route surface', { skip }, async () => {
+  for (const result of [await get('debug'), await get('debug', { key: WRONG_KEY })]) {
+    assert.deepEqual(
+      { status: result.status, message: result.message },
+      { status: 'error', message: 'unknown patrol action' },
+    );
+  }
+});
+
+for (const action of ['ptread', 'ptsummary', 'ptdetail', 'ptvisit_read', 'sread', 'hread']) {
   test(`${action} rejects missing and incorrect credentials`, { skip }, async () => {
     assertUnauthorized(await get(action), `${action} missing credential`);
     assertUnauthorized(await get(action, { key: WRONG_KEY }), `${action} incorrect key`);

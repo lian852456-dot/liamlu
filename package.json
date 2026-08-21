@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build:patrol-gas": "node scripts/build-patrol-gas-bundle.mjs",
     "test": "playwright test --config=playwright.config.js"
   },
   "repository": {

@@ -156,7 +156,7 @@ test('isolated patrol visit flow records arrival and departure with one protecte
     {serverTime:'2026-08-11T14:57:50+08:00',date:'2026-08-11',action:'arrival',store:'台北通化',note:'DEPLOY_TEST_20260811T145733',visitSessionId:'deploy-test'},
     {serverTime:'2026-08-11T14:57:53+08:00',date:'2026-08-11',action:'departure',store:'台北通化',note:'DEPLOY_TEST_20260811T145733',visitSessionId:'deploy-test'}
   ]; let writes=0; const submittedStores=[];
-  await page.addInitScript(()=>sessionStorage.setItem('bei12b_pt_session_token','short-session-token'));
+  await page.addInitScript(()=>sessionStorage.setItem('bei12b_patrol_session_token_v2','short-session-token'));
   await page.route('https://script.google.com/**',async route=>{
     const request=route.request();
     if(request.method()==='POST') {
@@ -211,7 +211,7 @@ test('isolated patrol visit flow records arrival and departure with one protecte
 });
 
 test('patrol visit UI fails closed when server response store differs from explicit selection', async ({ page }) => {
-  await page.addInitScript(()=>sessionStorage.setItem('bei12b_pt_session_token','short-session-token'));
+  await page.addInitScript(()=>sessionStorage.setItem('bei12b_patrol_session_token_v2','short-session-token'));
   await page.route('https://script.google.com/**',async route=>{
     const request=route.request();
     if(request.method()==='POST') {
