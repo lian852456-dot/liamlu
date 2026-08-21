@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-21 ｜ Codex（每日移動里程正式 ptdetail 雲端還原 hotfix，待 PR／未部署）
+
+- 做了什麼：從最新 `origin/main` `283eaaf` 建立隔離分支 `hotfix/mileage-cloud-hydration-20260821`。根因是里程頁只掃本頁 `rawDetails`，reload／登出後候選明細被清空，頁面只剩 Y2606 硬編碼正式基準，`ensureState()` 因而把月份選回六月。修正後登入即以既有 PT 短效 token 呼叫 `ptdetail`，按月份、九店、每頁 100 筆讀到 `totalRows` 完整一致後才渲染；沒有新增 GAS action、Sheet 或第二套資料來源。
+- 結果（本機程式完成／未部署）：8/20 fixture 透過三創 101 筆跨兩頁＋六張犁 1 筆驗證為 2 店／4.5 KM，`rawDetails=0`；reload、登出再登入都維持 8 月並重新讀回。六月 11 天／74.5 KM、巡店貼上 `########` 整批拒絕、NA、Auth、半月、KPI、台獎與稽核回歸維持通過。Node `242/242`、完整 Chromium `170/170`、巡店/Auth WebKit `52/52`；完整 WebKit `168/170`，兩個失敗皆為 Liam Supervisor file-origin CORS console error，已在未修改基準 worktree 以相同訊息重現，非本次差異。
+- 經驗 / 給下一位的提醒：里程正式來源是 `ptdetail`，`rawDetails` 只屬巡店貼上候選，兩者不可混用。正式明細未全數讀回時須 fail closed；不能顯示舊快取、六月基準或 0 值假成功。本次 `gas/Code.gs`、`patrol-read-model.js`、巡店寫入、班表、半月、KPI、台獎、稽核資料流均 0 diff；Pages 尚未合併／部署，正式 iPhone 8 月 readback 截圖仍待 release 授權後取得。
+
 ## 2026-08-21 ｜ Codex（稽核 UAT 名冊 probe／Safari 私有照片恢復，PR #67 deployment candidate）
 
 - 做了什麼：從 PR #66 合併後正式 `main` 建立隔離分支 `hotfix/audit-uat-roster-probe-photo-restore-20260821`。新增僅限 active `*-uat` 且既有 Trusted Employee audit session 的 `audit_roster_probe`，只回傳存在性、啟用狀態、遮罩名、名冊店點、九店映射及是否已有 Approved Device；不修改裝置綁定或 `last_login_at`，不回傳 employee hash／device ID，不換發受測同仁 token，也不讀 private snapshot／KPI／台獎。前端只有具該 UAT 權限時才顯示「員編名冊測試」，正式批次與一般員工都 fail closed。

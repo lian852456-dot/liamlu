@@ -2,6 +2,13 @@
 
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）＋ Google Sheets。
 
+## 每日移動里程
+
+- `patrol.html` 的里程頁在督導驗證後，直接使用既有受保護 `ptdetail`，依目前月份、北一二B九店與每頁 100 筆完整分頁讀回；不需要貼上巡店資料、匯入 JSON，也不新增第二套 GAS API。
+- 里程只從本次成功讀回的正式明細推導；載入中、token 逾時、月份／店點／分頁 contract 不一致或筆數未讀完整時一律 fail closed，不以 `rawDetails`、舊月份或空資料代替。
+- 登出會清除本頁正式明細快取；reload 或重新登入後會重新讀取 `ptdetail`。預設月份沿用正式巡店頁目前月份，無值時才依 Asia/Taipei 當月決定，不再因硬編碼六月對帳基準跳回六月。
+- 六月受控對帳仍固定為 11 天／74.5 KM；正式雲端資料不足的三天只依既有受控基準補入，不改寫巡店 Sheet。此次修正只改前端與測試，`gas/Code.gs` 及正式資料 0 diff。
+
 ## 稽核回報專區
 
 - `audit-report.html` 是九店手機優先的環境清潔回報與督導逐項驗收頁；入口位於 `home.html`。
