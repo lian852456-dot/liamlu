@@ -1,0 +1,94 @@
+--- a/publish_formal_website_data.mjs
++++ b/publish_formal_website_data.mjs
+@@ -22,6 +22,26 @@
+ 
+ function fail(message) {
+   throw new Error(`formal website publish blocked: ${message}`);
++}
++
++export async function withBoundedReadbackRetry(readback, {
++  attempts = 3,
++  delayMs = 5000,
++  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
++  onRetry = () => {},
++} = {}) {
++  let lastError;
++  for (let attempt = 1; attempt <= attempts; attempt += 1) {
++    try {
++      return await readback();
++    } catch (error) {
++      lastError = error;
++      if (attempt === attempts) throw error;
++      onRetry(error, attempt, attempts);
++      await sleep(delayMs);
++    }
++  }
++  throw lastError;
+ }
+ 
+ function basename(value) {
+@@ -455,7 +475,15 @@
+         PRIVATE_DASHBOARD_SKIP_ROSTER_SYNC: '1',
+       });
+     }
+-    const publication = await formalReadback(expected);
++    const publication = await withBoundedReadbackRetry(
++      () => formalReadback(expected),
++      {
++        onRetry: (error, attempt, attempts) => {
++          const message = error instanceof Error ? error.message : String(error);
++          console.error(`formal readback not ready (${attempt}/${attempts}); retrying: ${message}`);
++        },
++      },
++    );
+     await writeManifest(publication, {
+       mode: verifyOnly ? 'verify-only' : 'publish-and-verify',
+       dataCutoffDate,
+--- a/formal_website_publish_gate.test.mjs
++++ b/formal_website_publish_gate.test.mjs
+@@ -6,6 +6,7 @@
+   validateDualFormalReadback,
+   validateKpiRateReadback,
+   validateKpiSupplementReadback,
++  withBoundedReadbackRetry,
+ } from './publish_formal_website_data.mjs';
+ import { allowSameDateRateRepair, hasKpiRateCoverage } from './publish_kpicalc_report.mjs';
+ 
+@@ -291,3 +292,37 @@
+     expectedDate: '2026-08-08',
+   }), false);
+ });
++
++test('正式 readback 短暫不同步時有限重試，最終仍以精確驗證結果為準', async () => {
++  let calls = 0;
++  const retries = [];
++  const result = await withBoundedReadbackRetry(async () => {
++    calls += 1;
++    if (calls < 3) throw new Error('snapshot propagation pending');
++    return { result: 'published-verified' };
++  }, {
++    attempts: 3,
++    delayMs: 0,
++    sleep: async () => {},
++    onRetry: (_error, attempt) => retries.push(attempt),
++  });
++  assert.deepEqual(result, { result: 'published-verified' });
++  assert.equal(calls, 3);
++  assert.deepEqual(retries, [1, 2]);
++});
++
++test('正式 readback 重試用盡後仍 fail-closed', async () => {
++  let calls = 0;
++  await assert.rejects(
++    withBoundedReadbackRetry(async () => {
++      calls += 1;
++      throw new Error('formal snapshot mismatch');
++    }, {
++      attempts: 3,
++      delayMs: 0,
++      sleep: async () => {},
++    }),
++    /formal snapshot mismatch/,
++  );
++  assert.equal(calls, 3);
++});
