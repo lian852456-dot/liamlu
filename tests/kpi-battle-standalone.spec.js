@@ -73,7 +73,7 @@ const KPICALC_FIXTURE = {
 };
 
 const SNAPSHOT_FIXTURE = {
-  report_date: '2026-08-15',
+  report_date: '2026-08-14',
   data_as_of_date: '2026-08-14',
   source_as_of_date: '2026-08-14',
   source_file: '0815.xlsx',
@@ -138,7 +138,7 @@ async function loginKpi(root) {
   const content = root.locator('#kpiBattleContent');
   await content.locator('input[placeholder="輸入員工編號"]').fill('1234567');
   await content.getByRole('button', { name: '以員編登入' }).click();
-  await expect(root.locator('#kpiBattleSourceNote')).toContainText('戰報日期 2026-08-15');
+  await expect(root.locator('#kpiBattleSourceNote')).toContainText('戰報日期 2026-08-14');
 }
 
 test('獨立頁與原 KPI 戰情維持同一權限行為，失敗時不吃 localStorage 舊值', async ({ page }) => {

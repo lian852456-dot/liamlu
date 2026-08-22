@@ -209,7 +209,7 @@ test('0805 正式契約可保有 9 店、41 人與 13 款／10 列台獎計數',
   const base = A.kpicalcToKpiBattleView(fixture, '');
   assert.equal(base.stores.length, 9);
   assert.equal(base.personal.length, 41);
-  const awards = { report_date: '2026-08-05', phone_items: 13, store_rows: 10 };
+  const awards = { report_date: '2026-08-04', phone_items: 13, store_rows: 10 };
   assert.equal(awards.phone_items, 13);
   assert.equal(awards.store_rows, 10);
 });

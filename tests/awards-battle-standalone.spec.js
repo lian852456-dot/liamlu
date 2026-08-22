@@ -50,7 +50,7 @@ function awardItems(seed = 0) {
 
 function awardsFixture() {
   return {
-    report_date: '2026-08-16',
+    report_date: '2026-08-15',
     phone_items: 13,
     store_rows: 10,
     supervisor: { actual_total: 9234, projected: 12888, rank: 21, award: 'Y' },
@@ -83,7 +83,7 @@ const KPICALC = {
 };
 
 const KPI_SNAPSHOT = {
-  report_date: '2026-08-16',
+  report_date: '2026-08-15',
   data_as_of_date: '2026-08-15',
   source_as_of_date: '2026-08-15',
   source_file: '0816.xlsx',
@@ -128,7 +128,7 @@ async function loginAwards(page) {
   const content = page.locator('#awardsBattleContent');
   await content.locator('input[placeholder="輸入員工編號"]').fill('1234567');
   await content.getByRole('button', { name: '以員編登入' }).click();
-  await expect(page.locator('#awardsBattleSourceNote')).toContainText('台獎戰報日期 2026-08-16');
+  await expect(page.locator('#awardsBattleSourceNote')).toContainText('台獎戰報日期 2026-08-15');
 }
 
 function normalize(value) {
@@ -241,14 +241,14 @@ test('原 index 與 standalone 9 店逐店 exact match', async ({ browser }) => 
 });
 
 test('日期不一致或缺店時不渲染任何正式台獎數值', async ({ page }) => {
-  const wrongDate = { ...awardsFixture(), report_date: '2026-08-15' };
+  const wrongDate = { ...awardsFixture(), report_date: '2026-08-14' };
   await mockFormal(page, { awards: wrongDate });
   await openAwards(page, 'awards-battle.html');
   const content = page.locator('#awardsBattleContent');
   await content.locator('input[placeholder="輸入員工編號"]').fill('1234567');
   await content.getByRole('button', { name: '以員編登入' }).click();
   await expect(content).toContainText('台獎尚未同步');
-  await expect(content).toContainText('2026-08-15');
+  await expect(content).toContainText('2026-08-14');
   await expect(content).not.toContainText('$9,234');
 
   const second = await page.context().newPage();
