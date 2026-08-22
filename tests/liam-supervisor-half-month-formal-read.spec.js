@@ -10,7 +10,7 @@ test.use({viewport:{width:390,height:844},serviceWorkers:'block'});
 
 async function installFormalRoutes(page,{expireHread=false}={}){
   const state={hread:0,writes:[],requests:[]};
-  await page.addInitScript(token=>sessionStorage.setItem('bei12b_pt_session_token',token),TOKEN);
+  await page.addInitScript(token=>sessionStorage.setItem('bei12b_patrol_session_token_v2',token),TOKEN);
   await page.route('https://script.google.com/**',async route=>{
     const request=route.request();
     let action='';

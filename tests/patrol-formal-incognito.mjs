@@ -78,7 +78,7 @@ async function lockedState(page) {
       localStorage.getItem('PT_KEY') ||
       localStorage.getItem('bei12b_pt_key') ||
       localStorage.getItem('patrol_pt_key'),
-    sessionToken: sessionStorage.getItem('bei12b_pt_session_token')
+    sessionToken: sessionStorage.getItem('bei12b_patrol_session_token_v2')
   }));
 }
 
@@ -150,7 +150,7 @@ try {
     const unlocked = await page.evaluate(() => ({
       gateHidden: getComputedStyle(document.querySelector('#patrolAuthGate')).display === 'none',
       appChildren: document.querySelector('#patrolAppHost').childElementCount,
-      sessionToken: Boolean(sessionStorage.getItem('bei12b_pt_session_token')),
+      sessionToken: Boolean(sessionStorage.getItem('bei12b_patrol_session_token_v2')),
       legacyLocalKey:
         localStorage.getItem('PT_KEY') ||
         localStorage.getItem('bei12b_pt_key') ||

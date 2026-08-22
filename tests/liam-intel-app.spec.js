@@ -37,7 +37,7 @@ test('existing short session renders real-shape schedule and patrol data read-on
   const configuredStores=stores.map((name,index)=>({name,code:String(index+1)}));
   const patrolSummary=patrolSummaryResponse('2026-08',patrolRows,new Date('2026-08-09T12:00:00+08:00'),configuredStores);
   await page.addInitScript(({ stores, patrolSummary }) => {
-    sessionStorage.setItem('bei12b_pt_session_token', 'test-short-token');
+    sessionStorage.setItem('bei12b_patrol_session_token_v2', 'test-short-token');
     const scheduleStores = stores.map((store, index) => ({
       store,
       title: store,

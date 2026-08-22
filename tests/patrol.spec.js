@@ -742,7 +742,7 @@ test('半月同步 token 逾時時保留本機資料，重新驗證後只續傳�
   await expect(page.locator('#patrolReauthModal')).toContainText('督導驗證已逾時，請重新驗證後繼續同步');
   await expect(page.locator('#halfInspector')).toHaveValue('測試督導');
   await expect(page.locator('.half-note').first()).toHaveValue('展示機未亮');
-  expect(await page.evaluate(() => sessionStorage.getItem('bei12b_pt_session_token'))).toBeNull();
+  expect(await page.evaluate(() => sessionStorage.getItem('bei12b_patrol_session_token_v2'))).toBeNull();
   expect(halfRows).toHaveLength(7);
   expect(new Set(halfRows.map(row => `${row.checkId}|${row.item}`)).size).toBe(7);
 
