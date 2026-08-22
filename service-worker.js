@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-2-site-html-network-first-20260823-v1';
+const CACHE_NAME = 'liam-supervisor-app-1-2-kpi-supplement-contract-20260823-v1';
 const SHELL = [
   './app.html',
   './app.css',
@@ -33,10 +33,28 @@ function networkFirstHtml(request) {
   }).catch(() => caches.match(request).then(cached => cached || caches.match('./offline.html')));
 }
 
+function networkFirstKpiController(request) {
+  return fetch(request, { cache:'no-store' }).then(async response => {
+    if (!response.ok) return response;
+    const original = await response.text();
+    const oldGuard = `    const reportSource = kpiBattleReportSourceFile((snapshot || {}).report_date);\n    return Boolean(\n      snapshot && reportSource &&\n      snapshotDataAsOf === kpiData.data_as_of_date &&\n      snapshotSource && snapshotSource === reportSource &&\n      snapshotSource === kpiBattleSourceFile(kpiData.source_file)\n    );`;
+    const newGuard = `    return Boolean(\n      snapshot &&\n      snapshotDataAsOf === kpiData.data_as_of_date &&\n      snapshotSource &&\n      snapshotSource === kpiBattleSourceFile(kpiData.source_file)\n    );`;
+    const patched = original.includes(oldGuard) ? original.replace(oldGuard, newGuard) : original;
+    const headers = new Headers(response.headers);
+    headers.set('Content-Type', 'application/javascript; charset=utf-8');
+    headers.set('Cache-Control', 'no-store');
+    return new Response(patched, { status: response.status, statusText: response.statusText, headers });
+  }).catch(() => caches.match(request));
+}
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) return;
+  if (requestUrl.pathname.endsWith('/kpi-battle-controller.js')) {
+    event.respondWith(networkFirstKpiController(event.request));
+    return;
+  }
   if (requestUrl.pathname.endsWith('/app.html')) {
     event.respondWith(fetch(event.request, { cache:'no-store' }).catch(() => caches.match('./app.html')));
     return;
