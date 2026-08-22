@@ -97,7 +97,7 @@ async function stubGas(page) {
           status:'ok',month,store,page:pageNumber,limit,totalRows:rows.length,rows:rows.slice(start,start+limit)
         }) });
       }
-      if (payload.action === 'ptmileage') {
+      if (payload.action === 'ptmileage' || payload.action === 'ptmileage2') {
         if (payload.token !== PT_TOKEN) {
           return route.fulfill({ contentType:'application/json', body:JSON.stringify({status:'error',message:'unauthorized'}) });
         }
@@ -115,7 +115,7 @@ async function stubGas(page) {
         const visits=[...byVisit.values()].sort((a,b)=>a.arriveTime.localeCompare(b.arriveTime)||a.store.localeCompare(b.store));
         ptMileageCalls.push({month});
         if(ptMileageDelayMs) await new Promise(resolve=>setTimeout(resolve,ptMileageDelayMs));
-        if(ptMileageContract==='patrol-mileage-month-v1'){
+        if(payload.action==='ptmileage' || ptMileageContract==='patrol-mileage-month-v1'){
           return route.fulfill({contentType:'application/json',body:JSON.stringify({
             status:'ok',contract:'patrol-mileage-month-v1',fields:['fillTime','arriveTime','code','store','month'],
             month,page:1,limit:500,totalRows:raw.length,totalPages:Math.max(1,Math.ceil(raw.length/500)),rows:raw.slice(0,500),
@@ -1093,14 +1093,14 @@ test('594 題 raw rows 經月份級 visits contract 顯示 18 visits／37.8 KM�
   expect(ptMileageCalls).toEqual([{month:'2026-08'}]);
 });
 
-test('2026/07 唯讀診斷依序比對 summary、九店 ptdetail、ptmileage，1,179 rows 不寫入來源', async ({page})=>{
+test('2026/07 唯讀診斷依序比對 summary、九店 ptdetail、ptmileage2，1,179 rows 不寫入來源', async ({page})=>{
   cloudRows=july1179RawRows();
   expect(cloudRows).toHaveLength(1179);
   await stubGas(page); await openAndUnlock(page);
   const beforeWrites=writeCalls;
   const report=await page.evaluate(()=>MI._runDiagnostic('2026-07'));
   expect(report).toMatchObject({
-    contract:'patrol-mileage-read-diagnostic-v1',month:'2026-07',mode:'read-only',status:'ok',
+    contract:'patrol-mileage-read-diagnostic-v2',month:'2026-07',mode:'read-only',status:'ok',
     summary:{status:'ok',visitCount:9,visitedStores:9},ptdetailRows:1179,ptdetailVisits:9,
     mileage:{status:'ok',contract:'patrol-mileage-visits-v2',totalVisits:9,matchedRows:1179,sheetScans:1},firstBreak:null
   });
@@ -1111,13 +1111,13 @@ test('2026/07 唯讀診斷依序比對 summary、九店 ptdetail、ptmileage，1
   expect(ptMileageCalls).toEqual([{month:'2026-07'}]);
 });
 
-test('2026/07 ptdetail 有資料而 live 型別仍是 v1 時，唯讀診斷明確停在 ptmileage contract', async ({page})=>{
+test('2026/07 ptdetail 有資料而 ptmlieage2 錯回 v1 時，唯讀診斷明確停在 contract', async ({page})=>{
   cloudRows=july1179RawRows();
   ptMileageContract='patrol-mileage-month-v1';
   await stubGas(page); await openAndUnlock(page);
   const report=await page.evaluate(()=>MI._runDiagnostic('2026-07'));
   expect(report).toMatchObject({ptdetailRows:1179,ptdetailVisits:9,mileage:{status:'ok',contract:'patrol-mileage-month-v1'},status:'error'});
-  expect(report.firstBreak).toMatchObject({action:'ptmileage',code:'MILEAGE_DATA_FORMAT_ERROR'});
+  expect(report.firstBreak).toMatchObject({action:'ptmileage2',code:'MILEAGE_DATA_FORMAT_ERROR'});
   expect(report.firstBreak.message).toContain('ptdetail 有 1179 筆');
   expect(writeCalls).toBe(0);
 });

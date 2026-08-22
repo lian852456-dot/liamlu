@@ -38,15 +38,16 @@ function runtime(rows) {
     ['台北復興南','DNB10094'], ['台北萬大','DNB10168'], ['台北通化','DNB10174'], ['台北永吉','DNB10082'], ['台北杭州南','DNB10146'],
   ].map(([name, code]) => ({name, code}));
   const source = [
-    'patrolMileageStore_', 'patrolMileageCacheKey_', 'patrolMileageArriveSort_', 'patrolMileageVisits_', 'readPatrolMileageMonth_'
+    'patrolMileageStore_', 'patrolMileageCacheKey_', 'patrolMileageV2CacheKey_',
+    'patrolMileageArriveSort_', 'patrolMileageVisits_', 'readPatrolMileageMonth_', 'readPatrolMileageMonthV2_'
   ].map(functionSource).join('\n');
   const read = Function(
-    'PT_STORES','PATROL_MILEAGE_MAX_VISITS','PATROL_MILEAGE_FIELDS','PATROL_MILEAGE_CACHE_SECONDS',
+    'PT_STORES','PATROL_MILEAGE_MAX_LIMIT','PATROL_MILEAGE_MAX_VISITS','PATROL_MILEAGE_FIELDS','PATROL_MILEAGE_CACHE_SECONDS',
     'patrolSummaryMonth_','getPatrolSheet','patrolSummarySourceMeta_','CacheService','Utilities',
     'readPatrolContractColumns_','patrolSummaryRowMonth_','patrolSummaryIsoDate_',
-    `${source}; return readPatrolMileageMonth_;`
+    `${source}; return {legacy:readPatrolMileageMonth_, visits:readPatrolMileageMonthV2_};`
   )(
-    PT_STORES, 279, ['fillTime','arriveTime','code','store','month'], 120,
+    PT_STORES, 500, 279, ['fillTime','arriveTime','code','store','month'], 120,
     value => { const month = String(value || ''); if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('invalid patrol month'); return month; },
     () => ({}),
     () => ({sourceVersion:'fixture:594',lastRow:rows.length + 1}),
@@ -56,7 +57,7 @@ function runtime(rows) {
     row => String(row.month || '').slice(0, 7),
     row => taipeiDate(row.arriveTime || row.fillTime)
   );
-  return {read, scans:() => scans, clearCache:() => values.clear()};
+  return {read:read.visits, readLegacy:read.legacy, scans:() => scans, clearCache:() => values.clear()};
 }
 
 const storeCode = {
@@ -112,6 +113,22 @@ test('594 raw rows produce one single-scan response of 18 unique August visits',
   const cacheMiss = env.read({month:'2026-08'});
   assert.equal(env.scans(), 2);
   assert.deepEqual(cacheMiss.visits, first.visits, 'cache miss changes speed only, never visit correctness');
+});
+
+test('legacy ptmlieage retains the v1 paged rows contract alongside v2', () => {
+  const rows = augustRawRows();
+  const env = runtime(rows);
+  const first = env.readLegacy({month:'2026-08', page:1});
+  const second = env.readLegacy({month:'2026-08', page:2});
+
+  assert.equal(first.contract, 'patrol-mileage-month-v1');
+  assert.equal(first.totalRows, 594);
+  assert.equal(first.totalPages, 2);
+  assert.equal(first.rows.length, 500);
+  assert.equal(second.rows.length, 94);
+  assert.equal(env.scans(), 1, 'v1 page 2 uses the same generated snapshot cache');
+  assert.equal(second.diagnostics.sheetScans, 0);
+  assert.throws(() => env.readLegacy({month:'2026-08', page:3}), /invalid patrol mileage page/);
 });
 
 test('same day same store retains the earliest arriveTime and months do not contaminate each other', () => {

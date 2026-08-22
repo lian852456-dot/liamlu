@@ -264,7 +264,8 @@ function doGet(e) {
       configured: Boolean(ptConfiguredKey_()),
       contract: 'patrol-auth-v3',
       sessionContract: PATROL_SESSION_CONTRACT,
-      authDeployment: PATROL_AUTH_DEPLOYMENT
+      authDeployment: PATROL_AUTH_DEPLOYMENT,
+      mileageContracts: ['patrol-mileage-month-v1', 'patrol-mileage-visits-v2']
     }, cb);
   }
 
@@ -696,6 +697,15 @@ function ptMileageMonthPostPayload_(payload) {
   });
 }
 
+function ptMileage2MonthPostPayload_(payload) {
+  const body = payload || {};
+  ptRequireSession_(body.token, 'ptmileage2');
+  return readPatrolMileageMonthV2_({
+    month:patrolSummaryMonth_(body.month),
+    page:body.page
+  });
+}
+
 const PATROL_SHEET = '巡店明細';
 const PATROL_HEADERS = ['fillTime','arriveTime','leaveTime','district','code','store','inspector','item','result','reason','month','savedAt'];
 
@@ -808,6 +818,8 @@ function readPatrolContractColumns_(sh) {
 
 const PATROL_SUMMARY_CACHE_SECONDS = 120;
 const PATROL_DETAIL_MAX_LIMIT = 100;
+// v1 是已發布 Patrol 前端的永久相容 contract；不可改成 visits v2。
+const PATROL_MILEAGE_MAX_LIMIT = 500;
 // 一個月份理論上最多 31 日 × 9 店 = 279 個巡店事件。里程 API 不得再
 // 回傳 33 題逐題 raw rows，也不需要以第二頁 cache 命中來維持正確性。
 const PATROL_MILEAGE_MAX_VISITS = 279;
@@ -1097,9 +1109,78 @@ function patrolMileageStore_(row) {
   return match ? String(match.name) : rawStore;
 }
 
-function patrolMileageCacheKey_(month, sourceVersion) {
+function patrolMileageCacheKey_(month, sourceVersion, page, limit) {
+  const version = Utilities.base64EncodeWebSafe(String(sourceVersion || '')).slice(0, 80);
+  return ['ptmileage', month, version, page, limit].join(':');
+}
+
+function patrolMileageV2CacheKey_(month, sourceVersion) {
   const version = Utilities.base64EncodeWebSafe(String(sourceVersion || '')).slice(0, 80);
   return ['ptmileage-visits-v2', month, version].join(':');
+}
+
+// Legacy, published contract. Keep ptmlieage stable for existing Patrol pages
+// while ptmlieage2 rolls out the deduplicated visit shape independently.
+function readPatrolMileageMonth_(options) {
+  const startedAt = Date.now();
+  const month = patrolSummaryMonth_(options.month);
+  const page = Number(options.page || 1);
+  const requestedLimit = Number(options.limit || PATROL_MILEAGE_MAX_LIMIT);
+  if (!Number.isInteger(page) || page < 1) throw new Error('invalid patrol mileage page');
+  if (!Number.isInteger(requestedLimit) || requestedLimit < 1) throw new Error('invalid patrol mileage limit');
+  const limit = Math.min(PATROL_MILEAGE_MAX_LIMIT, requestedLimit);
+  const sheet = getPatrolSheet();
+  const meta = patrolSummarySourceMeta_(sheet);
+  const cache = CacheService.getScriptCache();
+  const cacheKey = patrolMileageCacheKey_(month, meta.sourceVersion, page, limit);
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    const result = JSON.parse(cached);
+    result.diagnostics = Object.assign({}, result.diagnostics, {
+      cacheHit:true, sheetScans:0, serverDurationMs:Date.now() - startedAt
+    });
+    return result;
+  }
+
+  // 每個 request 以單次 A:L scan 產生完整月份的 v1 分頁快照。
+  const rows = readPatrolContractColumns_(sheet)
+    .filter(function(row) { return patrolSummaryRowMonth_(row) === month; })
+    .map(function(row) {
+      return {
+        fillTime:String(row.fillTime || ''), arriveTime:String(row.arriveTime || ''),
+        code:String(row.code || ''), store:patrolMileageStore_(row), month:month
+      };
+    })
+    .sort(function(left, right) {
+      return patrolSummaryIsoDate_(left).localeCompare(patrolSummaryIsoDate_(right)) ||
+        String(left.arriveTime).localeCompare(String(right.arriveTime)) || String(left.store).localeCompare(String(right.store));
+    });
+  const totalRows = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / limit));
+  if (page > totalPages) throw new Error('invalid patrol mileage page');
+  const generatedAt = Utilities.formatDate(new Date(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
+  const diagnostics = {
+    sourceRows:Math.max(0, Number(meta.lastRow || 1) - 1), matchedRows:totalRows,
+    cacheHit:false, sheetScans:1, serverDurationMs:Date.now() - startedAt
+  };
+  let requestedResult = null;
+  for (let currentPage = 1; currentPage <= totalPages; currentPage++) {
+    const start = (currentPage - 1) * limit;
+    const result = {
+      status:'ok', contract:'patrol-mileage-month-v1', fields:PATROL_MILEAGE_FIELDS.slice(),
+      month:month, page:currentPage, limit:limit, totalRows:totalRows, totalPages:totalPages,
+      rows:rows.slice(start, start + limit), sourceVersion:String(meta.sourceVersion || ''),
+      generatedAt:generatedAt, diagnostics:diagnostics
+    };
+    const serialized = JSON.stringify(result);
+    if (serialized.length < 95000) cache.put(
+      patrolMileageCacheKey_(month, meta.sourceVersion, currentPage, limit),
+      serialized,
+      PATROL_MILEAGE_CACHE_SECONDS
+    );
+    if (currentPage === page) requestedResult = result;
+  }
+  return requestedResult;
 }
 
 function patrolMileageArriveSort_(row, date) {
@@ -1146,7 +1227,7 @@ function patrolMileageVisits_(rows, month) {
   });
 }
 
-function readPatrolMileageMonth_(options) {
+function readPatrolMileageMonthV2_(options) {
   const startedAt = Date.now();
   const month = patrolSummaryMonth_(options.month);
   const page = Number(options.page || 1);
@@ -1156,7 +1237,7 @@ function readPatrolMileageMonth_(options) {
   const sheet = getPatrolSheet();
   const meta = patrolSummarySourceMeta_(sheet);
   const cache = CacheService.getScriptCache();
-  const cacheKey = patrolMileageCacheKey_(month, meta.sourceVersion);
+  const cacheKey = patrolMileageV2CacheKey_(month, meta.sourceVersion);
   const cached = cache.get(cacheKey);
   if (cached) {
     const result = JSON.parse(cached);
@@ -2357,6 +2438,7 @@ function doPost(e) {
     else if (action === 'ptsummary') result = ptSummaryPostPayload_(payload);
     else if (action === 'ptdetail') result = ptDetailPostPayload_(payload);
     else if (action === 'ptmileage') result = ptMileageMonthPostPayload_(payload);
+    else if (action === 'ptmileage2') result = ptMileage2MonthPostPayload_(payload);
     else if (action === 'ptvisit_write') result = writePatrolVisitEvent_(payload);
     else if (action === 'hwrite') result = writeHalfCheckPostPayload_(payload, e);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
@@ -2394,7 +2476,7 @@ function doPost(e) {
     else throw new Error('unknown private dashboard action');
     return privateDashboardPostResponse({ status: 'ok', ...result }, e);
   } catch (err) {
-    const patrolActions = ['ptauth','ptlogout','ptsummary','ptdetail','ptmileage','ptvisit_write','hwrite','half_media_upload'];
+    const patrolActions = ['ptauth','ptlogout','ptsummary','ptdetail','ptmileage','ptmileage2','ptvisit_write','hwrite','half_media_upload'];
     const response = patrolActions.indexOf(action) >= 0
       ? ptRouteErrorPayload_(err, action, payload && payload.token)
       : { status: 'error', message: err && err.message ? err.message : String(err) };

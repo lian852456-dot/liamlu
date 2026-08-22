@@ -41,24 +41,35 @@ test('ptdetail is an authenticated bounded lazy read', () => {
   assert.match(gas, /normalized\.month = patrolSummaryRowMonth_\(row\)/);
 });
 
-test('ptmileage is a month-scoped single-page visits contract with one Sheet scan per request', () => {
+test('versioned mileage actions preserve v1 while ptmlieage2 provides single-page visits', () => {
   const gas = read('gas/Code.gs');
   const patrol = read('patrol.html');
   assert.match(gas, /function ptMileageMonthPostPayload_\(payload\)[\s\S]*ptRequireSession_\(body\.token, 'ptmileage'\)/);
   assert.match(gas, /action === 'ptmileage'\) result = ptMileageMonthPostPayload_\(payload\)/);
+  assert.match(gas, /function ptMileage2MonthPostPayload_\(payload\)[\s\S]*ptRequireSession_\(body\.token, 'ptmileage2'\)/);
+  assert.match(gas, /action === 'ptmileage2'\) result = ptMileage2MonthPostPayload_\(payload\)/);
+  assert.match(gas, /mileageContracts: \['patrol-mileage-month-v1', 'patrol-mileage-visits-v2'\]/);
   assert.match(gas, /PATROL_MILEAGE_FIELDS = \['fillTime','arriveTime','code','store','month'\]/);
+  assert.match(gas, /PATROL_MILEAGE_MAX_LIMIT = 500/);
   assert.match(gas, /PATROL_MILEAGE_MAX_VISITS = 279/);
-  const monthRead = gas.match(/function readPatrolMileageMonth_\(options\) \{([\s\S]*?)\n\}/);
-  assert.ok(monthRead);
-  assert.equal((monthRead[1].match(/readPatrolContractColumns_\(sheet\)/g) || []).length, 1);
-  assert.match(monthRead[1], /patrolSummaryRowMonth_\(row\) === month/);
-  assert.match(monthRead[1], /patrolMileageVisits_\(matchedRows, month\)/);
-  assert.match(monthRead[1], /contract:'patrol-mileage-visits-v2'/);
-  assert.match(monthRead[1], /totalVisits:visits\.length/);
-  assert.match(monthRead[1], /totalPages:1/);
-  assert.match(monthRead[1], /visits:visits/);
-  assert.doesNotMatch(monthRead[1], /ptStoreRows\(/);
-  assert.match(patrol, /cloudCall\('ptmileage',\{month\}\)/);
+  const legacyRead = gas.match(/function readPatrolMileageMonth_\(options\) \{([\s\S]*?)\n\}/);
+  assert.ok(legacyRead);
+  assert.equal((legacyRead[1].match(/readPatrolContractColumns_\(sheet\)/g) || []).length, 1);
+  assert.match(legacyRead[1], /contract:'patrol-mileage-month-v1'/);
+  assert.match(legacyRead[1], /totalRows:totalRows, totalPages:totalPages/);
+  assert.match(legacyRead[1], /rows:rows\.slice\(start, start \+ limit\)/);
+  const visitsRead = gas.match(/function readPatrolMileageMonthV2_\(options\) \{([\s\S]*?)\n\}/);
+  assert.ok(visitsRead);
+  assert.equal((visitsRead[1].match(/readPatrolContractColumns_\(sheet\)/g) || []).length, 1);
+  assert.match(visitsRead[1], /patrolSummaryRowMonth_\(row\) === month/);
+  assert.match(visitsRead[1], /patrolMileageVisits_\(matchedRows, month\)/);
+  assert.match(visitsRead[1], /contract:'patrol-mileage-visits-v2'/);
+  assert.match(visitsRead[1], /totalVisits:visits\.length/);
+  assert.match(visitsRead[1], /totalPages:1/);
+  assert.match(visitsRead[1], /visits:visits/);
+  assert.doesNotMatch(visitsRead[1], /ptStoreRows\(/);
+  assert.match(patrol, /cloudCall\('ptmileage2',\{month\}\)/);
+  assert.doesNotMatch(patrol, /cloudCall\('ptmileage',\{month\}\)/);
   assert.doesNotMatch(patrol, /for\(const storeName of stores\)/);
   assert.match(patrol, /正在載入 \$\{month\}：讀取月份巡店事件/);
   assert.match(patrol, /MILEAGE_LOAD_SLOW/);
@@ -75,10 +86,10 @@ test('mileage exposes explicit health reason codes and zero-detail consistency g
   assert.match(patrol, /sourceInfo\.type==='patrol'&&visitCount===0[\s\S]*ERROR\.SOURCE_MISSING/);
   assert.match(patrol, /sourceType:sourceInfo\.type/);
   assert.match(patrol, /type:'official-archive'/);
-  assert.match(patrol, /patrol-mileage-read-diagnostic-v1/);
+  assert.match(patrol, /patrol-mileage-read-diagnostic-v2/);
   assert.match(patrol, /cloudCall\('ptsummary',\{month\}\)/);
   assert.match(patrol, /cloudCall\('ptdetail',\{month,store,page,limit:100\}\)/);
-  assert.match(patrol, /cloudCall\('ptmileage',\{month\}\)/);
+  assert.match(patrol, /cloudCall\('ptmileage2',\{month\}\)/);
   assert.match(patrol, /console\[report\.abnormal\?'warn':'info'\]\('MILEAGE_HEALTH',report\)/);
 });
 
@@ -92,7 +103,7 @@ test('App and patrol.html load ptsummary for dashboards and fail closed on trans
   assert.match(app, /巡店資料讀取逾時/);
   assert.match(app, /data-retry-patrol/);
   assert.match(patrol, /cloudCall\('ptsummary',\{month:currentMonth\}\)/);
-  assert.match(patrol, /action==='ptsummary'\|\|action==='ptdetail'\|\|action==='ptmileage'[\s\S]*method:'POST'/);
+  assert.match(patrol, /action==='ptsummary'\|\|action==='ptdetail'\|\|action==='ptmileage'\|\|action==='ptmileage2'[\s\S]*method:'POST'/);
   assert.match(patrol, /JSON\.stringify\(\{action,token:PT_TOKEN,\.\.\.params\}\)/);
   assert.doesNotMatch(patrol, /cloudCall\('ptread'\)/);
   assert.match(patrol, /patrolSummaryUnavailableHTML/);

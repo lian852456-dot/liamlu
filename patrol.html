@@ -1565,8 +1565,8 @@ function storeCardHTML(storeName){
 function cloudCall(action, params={}){
   return patrolRequestWithReauth(()=>{
     if(!['ping','pthealth'].includes(action)&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
-    const timeoutMs=action==='ptsummary'?20000:(action==='ptdetail'||action==='ptmileage')?30000:0;
-    if(action==='ptsummary'||action==='ptdetail'||action==='ptmileage'){
+    const timeoutMs=action==='ptsummary'?20000:(action==='ptdetail'||action==='ptmileage'||action==='ptmileage2')?30000:0;
+    if(action==='ptsummary'||action==='ptdetail'||action==='ptmileage'||action==='ptmileage2'){
       const controller=new AbortController();
       const timer=setTimeout(()=>controller.abort(),timeoutMs);
       return patrolTrackedRequest(action,()=>fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:PT_TOKEN,...params}),cache:'no-store',signal:controller.signal}).then(async response=>{
@@ -2289,7 +2289,7 @@ const MI = (function(){
 
   async function loadMonthDetails(month, onProgress){
     onProgress();
-    const response=await cloudCall('ptmileage',{month});
+    const response=await cloudCall('ptmileage2',{month});
     if(!response || typeof response!=='object') throw mileageError(ERROR.API,'巡店事件 API 未回傳 JSON object');
     if(response.status!=='ok') {
       const error=new Error(response.message||'巡店事件 API 回傳失敗');
@@ -2600,12 +2600,12 @@ const MI = (function(){
     return {action:'ptsummary',status:'ok',visitCount,visitedStores:Number(summary.visitedStores)||0,storeCount:Array.isArray(response.stores)?response.stores.length:0,durationMs:0};
   }
   function diagnosticMileage(response, month, durationMs){
-    if(!response||typeof response!=='object'||response.status!=='ok') return diagnosticResponseFailure('ptmileage',response,{durationMs});
+    if(!response||typeof response!=='object'||response.status!=='ok') return diagnosticResponseFailure('ptmileage2',response,{durationMs});
     const diagnostics=response.diagnostics&&typeof response.diagnostics==='object'?response.diagnostics:{};
     const contract=String(response.contract||'');
     const visits=Array.isArray(response.visits)?response.visits:null;
     return {
-      action:'ptmileage',status:'ok',contract,month:String(response.month||''),
+      action:'ptmileage2',status:'ok',contract,month:String(response.month||''),
       visitCount:visits?visits.length:null,totalVisits:Number.isInteger(Number(response.totalVisits))?Number(response.totalVisits):null,
       rawRows:Array.isArray(response.rows)?response.rows.length:null,totalRows:Number.isInteger(Number(response.totalRows))?Number(response.totalRows):null,
       matchedRows:Number.isInteger(Number(diagnostics.matchedRows))?Number(diagnostics.matchedRows):null,
@@ -2615,7 +2615,7 @@ const MI = (function(){
   async function runDiagnostic(value){
     const month=canonicalMonth(value||state.month||currentMonth);
     if(!month) throw mileageError(ERROR.DATE_PARSE,'巡店月份格式錯誤');
-    const report={contract:'patrol-mileage-read-diagnostic-v1',month,mode:'read-only',startedAt:new Date().toISOString(),summary:null,details:[],ptdetailRows:0,ptdetailVisits:0,mileage:null,firstBreak:null,status:'running'};
+    const report={contract:'patrol-mileage-read-diagnostic-v2',month,mode:'read-only',startedAt:new Date().toISOString(),summary:null,details:[],ptdetailRows:0,ptdetailVisits:0,mileage:null,firstBreak:null,status:'running'};
     state.diagnostic=report; render();
     try{
       const summaryStartedAt=Date.now();
@@ -2639,14 +2639,14 @@ const MI = (function(){
         }
         const mileageStartedAt=Date.now();
         let mileageResponse;
-        try{ mileageResponse=await cloudCall('ptmileage',{month}); }
-        catch(error){ report.mileage=diagnosticFailure('ptmileage',error,{durationMs:Date.now()-mileageStartedAt}); }
+        try{ mileageResponse=await cloudCall('ptmileage2',{month}); }
+        catch(error){ report.mileage=diagnosticFailure('ptmileage2',error,{durationMs:Date.now()-mileageStartedAt}); }
         if(!report.mileage) report.mileage=diagnosticMileage(mileageResponse,month,Date.now()-mileageStartedAt);
         if(!report.firstBreak&&report.mileage.status!=='ok') report.firstBreak=report.mileage;
         if(!report.firstBreak&&report.ptdetailRows>0&&report.mileage.contract!=='patrol-mileage-visits-v2'){
-          report.firstBreak={action:'ptmileage',status:'error',code:ERROR.DATA_FORMAT,message:`ptdetail 有 ${report.ptdetailRows} 筆，但 ptmileage 回傳 ${report.mileage.contract||'未知'} contract`};
+          report.firstBreak={action:'ptmileage2',status:'error',code:ERROR.DATA_FORMAT,message:`ptdetail 有 ${report.ptdetailRows} 筆，但 ptmileage2 回傳 ${report.mileage.contract||'未知'} contract`};
         }else if(!report.firstBreak&&report.ptdetailRows>0&&Number(report.mileage.totalVisits||report.mileage.visitCount||0)===0){
-          report.firstBreak={action:'ptmileage',status:'error',code:ERROR.SOURCE_MISSING,message:`ptdetail 有 ${report.ptdetailRows} 筆／${report.ptdetailVisits} visits，但 ptmileage 為 0`};
+          report.firstBreak={action:'ptmileage2',status:'error',code:ERROR.SOURCE_MISSING,message:`ptdetail 有 ${report.ptdetailRows} 筆／${report.ptdetailVisits} visits，但 ptmileage2 為 0`};
         }
       }
     }catch(error){
