@@ -14,6 +14,7 @@ let ptReadCalls;
 let ptDetailCalls;
 let ptMileageCalls;
 let ptMileageDelayMs;
+let ptMileageContract;
 let cloudConfig; // 模擬各區 GAS 回傳的 PT_STORES / PT_TITLE
 let mediaUploads;
 let failPtwrite; // 測試用：強制 ptwrite 回錯，模擬雲端寫入失敗
@@ -114,6 +115,13 @@ async function stubGas(page) {
         const visits=[...byVisit.values()].sort((a,b)=>a.arriveTime.localeCompare(b.arriveTime)||a.store.localeCompare(b.store));
         ptMileageCalls.push({month});
         if(ptMileageDelayMs) await new Promise(resolve=>setTimeout(resolve,ptMileageDelayMs));
+        if(ptMileageContract==='patrol-mileage-month-v1'){
+          return route.fulfill({contentType:'application/json',body:JSON.stringify({
+            status:'ok',contract:'patrol-mileage-month-v1',fields:['fillTime','arriveTime','code','store','month'],
+            month,page:1,limit:500,totalRows:raw.length,totalPages:Math.max(1,Math.ceil(raw.length/500)),rows:raw.slice(0,500),
+            diagnostics:{sourceRows:cloudRows.length,matchedRows:raw.length,sheetScans:1,serverDurationMs:12}
+          })});
+        }
         return route.fulfill({contentType:'application/json',body:JSON.stringify({
           status:'ok',contract:'patrol-mileage-visits-v2',fields:['fillTime','arriveTime','code','store','month'],
           month,page:1,limit:279,totalVisits:visits.length,totalPages:1,visits,
@@ -271,7 +279,7 @@ function item18Panel(page) {
   return page.locator('#invPanels .panel').filter({ hasText:'到店全盤提醒' });
 }
 
-test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; omitPtdetailKeys = new Set(); omitPtdetailRow = false; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; ptMileageContract = 'patrol-mileage-visits-v2'; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; omitPtdetailKeys = new Set(); omitPtdetailRow = false; });
 
 test('填表時間為 ######## 時整批拒絕，不寫雲端、不改 rawDetails、不清除貼上內容', async ({ page }) => {
   await stubGas(page);
@@ -1025,6 +1033,19 @@ function august18VisitRawRows() {
   }))));
 }
 
+function july1179RawRows() {
+  const stores=[
+    ['DNB10062','台北酒泉'],['DNB10284','台北大稻埕'],['DNB10307','台北三創'],
+    ['DNB10168','台北萬大'],['DNB10440','台北六張犁'],['DNB10094','台北復興南'],
+    ['DNB10082','台北永吉'],['DNB10059','台北通化'],['DNB10146','台北杭州南']
+  ];
+  return stores.flatMap(([code,store],storeIndex)=>Array.from({length:131},(_,index)=>({
+    fillTime:`2026/7/${String(storeIndex+1).padStart(2,'0')} 08:${String(index%60).padStart(2,'0')}`,
+    arriveTime:`2026/7/${String(storeIndex+1).padStart(2,'0')} ${String(9+storeIndex%4).padStart(2,'0')}:00`,
+    leaveTime:'',district:'北一二B',code,store,inspector:'測試督導',item:String(index%33+1),content:'',result:'v',reason:'',month:'2026-07'
+  })));
+}
+
 async function openAugustMileage(page) {
   cloudRows=august20PagedDetails();
   await stubGas(page);
@@ -1070,6 +1091,63 @@ test('594 題 raw rows 經月份級 visits contract 顯示 18 visits／37.8 KM�
   });
   expect(result).toMatchObject({health:{patrolRows:18,mileageDetails:18,abnormal:false},days:7,billDays:7,km:37.8});
   expect(ptMileageCalls).toEqual([{month:'2026-08'}]);
+});
+
+test('2026/07 唯讀診斷依序比對 summary、九店 ptdetail、ptmileage，1,179 rows 不寫入來源', async ({page})=>{
+  cloudRows=july1179RawRows();
+  expect(cloudRows).toHaveLength(1179);
+  await stubGas(page); await openAndUnlock(page);
+  const beforeWrites=writeCalls;
+  const report=await page.evaluate(()=>MI._runDiagnostic('2026-07'));
+  expect(report).toMatchObject({
+    contract:'patrol-mileage-read-diagnostic-v1',month:'2026-07',mode:'read-only',status:'ok',
+    summary:{status:'ok',visitCount:9,visitedStores:9},ptdetailRows:1179,ptdetailVisits:9,
+    mileage:{status:'ok',contract:'patrol-mileage-visits-v2',totalVisits:9,matchedRows:1179,sheetScans:1},firstBreak:null
+  });
+  expect(report.details).toHaveLength(9);
+  report.details.forEach(detail=>expect(detail.pages.map(page=>page.rows)).toEqual([100,31]));
+  expect(writeCalls).toBe(beforeWrites);
+  expect(ptDetailCalls).toHaveLength(18);
+  expect(ptMileageCalls).toEqual([{month:'2026-07'}]);
+});
+
+test('2026/07 ptdetail 有資料而 live 型別仍是 v1 時，唯讀診斷明確停在 ptmileage contract', async ({page})=>{
+  cloudRows=july1179RawRows();
+  ptMileageContract='patrol-mileage-month-v1';
+  await stubGas(page); await openAndUnlock(page);
+  const report=await page.evaluate(()=>MI._runDiagnostic('2026-07'));
+  expect(report).toMatchObject({ptdetailRows:1179,ptdetailVisits:9,mileage:{status:'ok',contract:'patrol-mileage-month-v1'},status:'error'});
+  expect(report.firstBreak).toMatchObject({action:'ptmileage',code:'MILEAGE_DATA_FORMAT_ERROR'});
+  expect(report.firstBreak.message).toContain('ptdetail 有 1179 筆');
+  expect(writeCalls).toBe(0);
+});
+
+test('2026/06 沒有正式巡店來源時只讀 OFFICIAL archive，還原 11 日／74.5 KM 且不顯示無巡店', async ({page})=>{
+  await openMileage(page, []);
+  const result=await page.evaluate(()=>{
+    const plans=MI._monthPlans('2026-06'), bill=MI._billable(plans), health=MI._health('2026-06');
+    return {health,plans:plans.length,billDays:bill.length,km:Math.round(bill.reduce((sum,plan)=>sum+plan.km,0)*10)/10,rows:MI._buildSheets('2026-06').sheets[0].rows.length-1};
+  });
+  expect(result).toMatchObject({health:{sourceType:'official-archive',patrolRows:0,archiveRows:11,mileageDetails:11,abnormal:false},plans:11,billDays:11,km:74.5,rows:11});
+  await expect(page.locator('#miCoverage')).toContainText('資料來源：2026 年 6 月正式公司報銷表');
+  await expect(page.locator('#miCoverage')).not.toContainText('MILEAGE_NO_PATROL');
+  expect(writeCalls).toBe(0);
+});
+
+test('同月已有正式巡店資料時不混用 OFFICIAL archive', async ({page})=>{
+  await openMileage(page, juneDetails());
+  const result=await page.evaluate(()=>({
+    source:MI._monthSource('2026-06'),
+    dates:MI._monthPlans('2026-06').map(plan=>plan.date),
+    health:MI._health('2026-06')
+  }));
+  expect(result.source.type).toBe('patrol');
+  expect(result.health).toMatchObject({sourceType:'patrol',patrolRows:21,mileageDetails:21});
+  expect(result.dates).toContain('2026-06-01');
+  expect(result.dates).not.toContain('2026-06-23');
+  expect(result.dates).not.toContain('2026-06-24');
+  expect(result.dates).not.toContain('2026-06-30');
+  expect(writeCalls).toBe(0);
 });
 
 test('月份讀取超過 10 秒門檻會顯示卡點與 MILEAGE_LOAD_SLOW，完成後不會無限 loading', async ({page})=>{
@@ -1133,6 +1211,37 @@ test('7 月與 8 月分開載入，不互相污染', async ({page})=>{
   }));
   expect(result.july).toEqual(['2026-07-31']);
   expect(result.august).toEqual(['2026-08-01']);
+});
+
+test('6→7→8→7 切換與 reload 不混用 archive、7 月或 8 月的月份資料', async ({page})=>{
+  cloudRows=[
+    {fillTime:'2026/7/31 10:00',arriveTime:'2026/7/31 10:00',month:'2026-07',code:'DNB10307',store:'台北三創',item:'1'},
+    {fillTime:'2026/7/31 15:00',arriveTime:'2026/7/31 15:00',month:'2026-07',code:'DNB10440',store:'台北六張犁',item:'1'},
+    {fillTime:'2026/8/1 10:00',arriveTime:'2026/8/1 10:00',month:'2026-08',code:'DNB10307',store:'台北三創',item:'1'},
+    {fillTime:'2026/8/1 15:00',arriveTime:'2026/8/1 15:00',month:'2026-08',code:'DNB10440',store:'台北六張犁',item:'1'}
+  ];
+  await stubGas(page); await openAndUnlock(page);
+  await page.evaluate(()=>{currentMonth='2026-06';});
+  await page.click('.secure-tab[data-view="mileage"]');
+  await expect(page.locator('#miCoverage')).toContainText('2026 年 6 月正式公司報銷表');
+  await page.evaluate(()=>MI.setMonth('2026-07'));
+  await page.evaluate(()=>MI.setMonth('2026-08'));
+  await page.evaluate(()=>MI.setMonth('2026-07'));
+  const beforeReload=await page.evaluate(()=>({
+    june:MI._health('2026-06').sourceType,
+    july:MI._monthPlans('2026-07').map(plan=>plan.date),
+    august:MI._monthPlans('2026-08').map(plan=>plan.date)
+  }));
+  expect(beforeReload).toEqual({june:'official-archive',july:['2026-07-31'],august:['2026-08-01']});
+  await page.reload();
+  await expect(page.locator('#patrolAuthGate')).toBeHidden();
+  await page.evaluate(()=>MI.setMonth('2026-07'));
+  const afterReload=await page.evaluate(()=>({
+    june:MI._health('2026-06').sourceType,
+    july:MI._monthPlans('2026-07').map(plan=>plan.date)
+  }));
+  expect(afterReload).toEqual({june:'official-archive',july:['2026-07-31']});
+  expect(writeCalls).toBe(0);
 });
 
 test('同筆正式明細重讀不會重複累加', async ({page})=>{
@@ -1270,7 +1379,7 @@ test('1.5KM 路段為台北電信→台北復興南，且不存在萬大→復�
 });
 
 test('Excel 產出「油料」與「距離計算明細」兩張工作表，欄位順序與固定值正確', async ({ page }) => {
-  await openMileage(page);
+  await openMileage(page, []);
   const r = await page.evaluate(() => {
     const b = MI._buildSheets('2026-06');
     const val = c => (c && typeof c === 'object' && 'value' in c) ? c.value : c;
@@ -1312,12 +1421,12 @@ test('單店 0 KM 日不列入正式報銷表，但仍顯示於畫面', async ({
       fareDates: b.sheets[0].rows.slice(1).map(r => val(r[2])),
     };
   });
-  expect(r.allDays).toBe(15);                 // 12 個巡店日 + 3 個由正式報銷表補入
-  expect(r.billDays).toBe(11);                // 其中 11 天可報銷（＝正式報銷表天數）
+  expect(r.allDays).toBe(12);                 // 有正式巡店來源時只採巡店資料，不混入 archive
+  expect(r.billDays).toBe(8);
   expect(r.zeroDays).toEqual(['2026-06-01', '2026-06-02', '2026-06-08', '2026-06-10']);
   r.zeroDays.forEach(d => expect(r.fareDates).not.toContain(d));
   await expect(page.locator('#miSummary')).toContainText('不列入報銷');
-  await expect(page.locator('#miSummary')).toContainText('11 個報銷出差日');
+  await expect(page.locator('#miSummary')).toContainText('8 個報銷出差日');
 });
 
 test('與正式報銷表對帳：11 天／74.5 KM 為基準', async ({ page }) => {
@@ -1342,7 +1451,7 @@ test('與正式報銷表對帳：11 天／74.5 KM 為基準', async ({ page }) =
 });
 
 test('對帳面板顯示正式基準與差異，不再出現 18 天', async ({ page }) => {
-  await openMileage(page);
+  await openMileage(page, []);
   const cov = page.locator('#miCoverage');
   await expect(cov).toContainText('正式出差日：11 天');
   await expect(cov).toContainText('74.5 KM');
@@ -1380,7 +1489,7 @@ test('待查路段存在時不得產生正式報銷檔，只能匯出標示未�
 });
 
 test('無待查路段時可匯出正式報銷檔，檔名不帶測試標記', async ({ page }) => {
-  await openMileage(page);
+  await openMileage(page, []);
   await page.click('button:has-text("匯出公司報銷 Excel")');
   const dlg = page.locator('#miExportDlg');
   await expect(dlg).toContainText('出差日數');
@@ -1399,7 +1508,7 @@ test('無待查路段時可匯出正式報銷檔，檔名不帶測試標記', as
 });
 
 test('6/23、6/24、6/30 由正式報銷表補入且標為正式受控，不再視為缺漏', async ({ page }) => {
-  await openMileage(page);
+  await openMileage(page, []);
   const r = await page.evaluate(() => ['2026-06-23', '2026-06-24', '2026-06-30'].map(d => {
     const p = MI._dayPlan(d, MI._days()[d]);
     return { date: d, place: p.nodes.map(n => n.name).join('/'), km: p.km, official: !!p.official,
@@ -1419,7 +1528,7 @@ test('6/23、6/24、6/30 由正式報銷表補入且標為正式受控，不再�
 });
 
 test('Y2606 完整對帳：油料 11 列、合計 74.5 KM、備註留白', async ({ page }) => {
-  await openMileage(page);
+  await openMileage(page, []);
   const r = await page.evaluate(() => {
     const b = MI._buildSheets('2026-06');
     const v = c => (c && typeof c === 'object' && 'value' in c) ? c.value : c;
@@ -1447,7 +1556,7 @@ test('Y2606 完整對帳：油料 11 列、合計 74.5 KM、備註留白', async
 });
 
 test('人工修改只寫入里程資料層，不改寫原始巡店紀錄', async ({ page }) => {
-  await openMileage(page);
+  await openMileage(page, juneDetails());
   const before = await page.evaluate(() => JSON.stringify(rawDetails));
   await page.evaluate(() => MI.setLegKm('2026-06-03', '台北三創', '台北六張犁', 4.9, '實走修正'));
   const after = await page.evaluate(() => ({
@@ -1462,12 +1571,12 @@ test('人工修改只寫入里程資料層，不改寫原始巡店紀錄', async
 });
 
 test('資料涵蓋日期以正式報銷表為完整依據，未列於報銷表者不憑空出現', async ({ page }) => {
-  await openMileage(page);
+  await openMileage(page, []);
   const cov = await page.evaluate(() => MI._coverage('2026-06'));
-  expect(cov.first).toBe('2026-06-01');
-  // 涵蓋範圍含正式報銷表補入的 6/23、6/24、6/30
+  expect(cov.first).toBe('2026-06-03');
+  // 沒有正式巡店來源時，涵蓋範圍完全由正式報銷表 archive 提供。
   expect(cov.last).toBe('2026-06-30');
-  expect(cov.have).toHaveLength(15);         // 12 巡店日 + 3 正式報銷表補入
+  expect(cov.have).toHaveLength(11);
   // 有正式報銷表基準的月份不再列缺漏
   expect(cov.missingTail).toEqual([]);
   await expect(page.locator('#miCoverage')).toContainText('正式出差日：11 天');
@@ -1475,5 +1584,5 @@ test('資料涵蓋日期以正式報銷表為完整依據，未列於報銷表�
   const plans = await page.evaluate(() => MI._monthPlans('2026-06').map(p => p.date));
   expect(plans).toContain('2026-06-23');   // 由正式報銷表補入
   expect(plans).not.toContain('2026-06-25'); // 不在報銷表內者仍不憑空出現
-  expect(plans).toHaveLength(15);
+  expect(plans).toHaveLength(11);
 });
