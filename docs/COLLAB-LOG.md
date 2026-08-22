@@ -13,6 +13,13 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-22 ｜ Codex（戰報執行日／資料截止日分離，Draft PR）
+
+- Root Cause：Mac `report-automation` 以單一 `REPORT_DATE_ISO` 同時代表寄信日、manifest 日與網站 snapshot 日；`build_github_pages_data.py` 又讓台獎從 email body 檔名取日期。當 `0822.xlsx` 的資料範圍只到 8/21 時，正式 KPI parser 正確讀到 8/21，但 dashboard snapshot／readback 仍要求 8/22，因而被 fail-closed date gate 擋住。
+- 修正：實際非 Git runtime 明確分成 `report_run_date`／`mail_date` 與 `data_cutoff_date`。Builder 從 `source_date_range` 取得 cutoff，並接受顯式 `--report-run-date`／`--data-cutoff-date` 交叉驗證；KPI／台獎 `report_date` 與 KPI `data_as_of_date` 都改用 cutoff，來源檔仍保留 `0822.xlsx`。Consumer、publisher、Keychain wrapper 與 manifest/readback 全鏈傳遞兩個日期；任一缺少、無法解析、晚於 run date 或正式讀回不一致都維持 blocked。
+- 驗證（未發布）：Node 日期／正式 gate `20/20`；Python 日期契約與真實 8/22 本機產物 `3/3`。回歸案例確認寄信／檔名日 2026-08-22、資料截止日 2026-08-21 時，KPI／台獎 snapshot `report_date=2026-08-21`、KPI `data_as_of_date=2026-08-21`、`source_file=0822.xlsx`。未合併 PR、未部署 Pages／GAS、未執行正式私有資料發布或 readback。
+- Repo 邊界：`report-automation` 位於 Git repo 外；本 Draft PR 保存可審查／可 rollback 的 runtime patch 與契約文件。合併 PR 不等於部署或套用 runtime，正式發布仍須由既有 Keychain wrapper 完成雙路徑 readback。
+
 ## 2026-08-21 ｜ Codex（P0 稽核門市自助回報簡化，Draft PR #72）
 
 - Root Cause：正式門市頁仍依賴 Approved Device／名冊店點與 30 分鐘 audit-only session，現場 token 過期或裝置不符即無法繼續；前端另在 active batch 改變時直接建立空白草稿，會讓既有店點、姓名、備註與照片清單從畫面消失。

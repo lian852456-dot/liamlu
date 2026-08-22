@@ -1,0 +1,655 @@
+--- a/report-automation/work/build_github_pages_data.py
++++ b/report-automation/work/build_github_pages_data.py
+@@ -40,7 +40,6 @@
+ }
+ 
+ SOURCE_RE = re.compile(r"^(\d{4})\.xlsx$")
+-PHONE_DATE_RE = re.compile(r"email_body_phone_awards_(\d{4}-\d{2}-\d{2})\.txt$")
+ 
+ AWARD_STEPS = [
+     {"threshold": 0.50, "manager_tier": 0, "supervisor_tier": None, "label": "解鎖店長50%"},
+@@ -183,16 +182,11 @@
+     }
+ 
+ 
+-def latest_phone_date(outputs_dir: Path) -> str | None:
+-    dates = []
+-    for path in outputs_dir.glob("email_body_phone_awards_*.txt"):
+-        match = PHONE_DATE_RE.match(path.name)
+-        if match:
+-            dates.append(match.group(1))
+-    return max(dates) if dates else None
+-
+-
+-def extract_phone_awards(summary_path: Path, outputs_dir: Path) -> dict[str, Any]:
++def extract_phone_awards(
++    summary_path: Path,
++    report_run_date: str,
++    data_cutoff_date: str,
++) -> dict[str, Any]:
+     summary = json.loads(summary_path.read_text(encoding="utf-8"))
+     progress = summary.get("store_progress", [])
+     overall = next((row for row in progress if row.get("store") == "北一二B整體"), None)
+@@ -206,7 +200,8 @@
+ 
+     return {
+         "version": 1,
+-        "report_date": latest_phone_date(outputs_dir),
++        "report_date": data_cutoff_date,
++        "report_run_date": report_run_date,
+         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+         "source_mode": summary.get("source_mode"),
+         "source_files": summary.get("source_files", {}),
+@@ -317,11 +312,14 @@
+     return (-float(numeric(item.get("monthly_award_max")) or 0), str(item.get("display_name") or item.get("name") or ""))
+ 
+ 
+-def extract_phone_awards_battle(summary_path: Path) -> dict[str, Any]:
++def extract_phone_awards_battle(
++    summary_path: Path,
++    report_run_date: str,
++    data_cutoff_date: str,
++) -> dict[str, Any]:
+     """Private action view: actual/projected awards and fixed monthly phone priorities."""
+     summary = json.loads(summary_path.read_text(encoding="utf-8"))
+     rules = summary.get("award_rules", {})
+-    outputs_dir = summary_path.parent
+     awards_by_store = {
+         normalize_store(str(row.get("store", ""))): row
+         for row in summary.get("store_awards", [])
+@@ -355,7 +353,8 @@
+     return {
+         "version": 2,
+         "visibility": "private-local-preview",
+-        "report_date": latest_phone_date(outputs_dir),
++        "report_date": data_cutoff_date,
++        "report_run_date": report_run_date,
+         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+         "source_mode": summary.get("source_mode"),
+         "source_files": summary.get("source_files", {}),
+@@ -405,6 +404,49 @@
+         return fallback
+ 
+ 
++def resolve_date_contract(
++    report: dict[str, Any],
++    report_run_date_value: str | None = None,
++    data_cutoff_date_value: str | None = None,
++) -> tuple[date, date]:
++    """Separate mail/run date from the formal website data date, fail closed."""
++    report_run_text = str(report.get("report_date_iso") or "")
++    if not report_run_text:
++        raise RuntimeError("today_report_data.json 缺少 report_date_iso")
++    try:
++        report_run_date = date.fromisoformat(report_run_text)
++    except ValueError as exc:
++        raise RuntimeError(f"today_report_data.json report_date_iso 無效：{report_run_text}") from exc
++    if report_run_date_value:
++        try:
++            requested_run_date = date.fromisoformat(report_run_date_value)
++        except ValueError as exc:
++            raise RuntimeError(f"--report-run-date 無效：{report_run_date_value}") from exc
++        if requested_run_date != report_run_date:
++            raise RuntimeError(
++                f"report run date mismatch: expected {requested_run_date}, got {report_run_date}"
++            )
++
++    source_range = report.get("source_date_range")
++    if not re.findall(r"(?:(\d{4})[/-])?(\d{1,2})[/-](\d{1,2})", str(source_range or "")):
++        raise RuntimeError(f"無法從 source_date_range 取得資料截止日：{source_range}")
++    parsed_cutoff = source_as_of_date(source_range, report_run_date)
++    if data_cutoff_date_value:
++        try:
++            requested_cutoff = date.fromisoformat(data_cutoff_date_value)
++        except ValueError as exc:
++            raise RuntimeError(f"--data-cutoff-date 無效：{data_cutoff_date_value}") from exc
++        if requested_cutoff != parsed_cutoff:
++            raise RuntimeError(
++                f"data cutoff date mismatch: expected {requested_cutoff}, got {parsed_cutoff}"
++            )
++    if parsed_cutoff > report_run_date:
++        raise RuntimeError(
++            f"資料截止日 {parsed_cutoff} 不得晚於 report run date {report_run_date}"
++        )
++    return report_run_date, parsed_cutoff
++
++
+ def compact_metric(
+     value: dict[str, Any],
+     previous: dict[str, Any] | None = None,
+@@ -433,12 +475,17 @@
+     today_report_path: Path,
+     phone_summary_path: Path | None = None,
+     supplemental_summary_path: Path | None = None,
++    report_run_date_value: str | None = None,
++    data_cutoff_date_value: str | None = None,
+ ) -> dict[str, Any]:
+     """Build a private, latest-day supervisor view from the official report artifacts."""
+     report = json.loads(today_report_path.read_text(encoding="utf-8"))
+-    report_date = date.fromisoformat(str(report["report_date_iso"]))
+-    previous_date = report_date - timedelta(days=1)
+-    as_of_date = source_as_of_date(report.get("source_date_range"), report_date)
++    report_run_date, as_of_date = resolve_date_contract(
++        report,
++        report_run_date_value,
++        data_cutoff_date_value,
++    )
++    previous_date = as_of_date - timedelta(days=1)
+     previous_report_path = today_report_path.parent / f"report_data_{previous_date.isoformat()}.json"
+     previous_report = (
+         json.loads(previous_report_path.read_text(encoding="utf-8"))
+@@ -570,7 +617,8 @@
+     return {
+         "version": 1,
+         "visibility": "private-local-preview",
+-        "report_date": report.get("report_date_iso"),
++        "report_date": as_of_date.isoformat(),
++        "report_run_date": report_run_date.isoformat(),
+         "data_as_of_date": as_of_date.isoformat(),
+         "source_as_of_date": as_of_date.isoformat(),
+         "source_file": source_path.name,
+@@ -590,8 +638,21 @@
+     parser.add_argument("--site-data-dir", type=Path, default=Path("/Users/liamlu/Downloads/liam-agent/github-pages-liamlu/data"))
+     parser.add_argument("--today-report-path", type=Path, default=Path("/Users/liamlu/Downloads/liam-agent/report-automation/work/today_report_data.json"))
+     parser.add_argument("--private-kpi-output", type=Path, default=Path("/Users/liamlu/Downloads/liam-agent/github-pages-liamlu/private-data/kpi-battle-latest.json"))
++    parser.add_argument("--report-run-date", help="Mail/report execution date (YYYY-MM-DD)")
++    parser.add_argument("--data-cutoff-date", help="Formal KPI/awards data date (YYYY-MM-DD)")
+     args = parser.parse_args()
+ 
++    if not args.today_report_path.exists():
++        raise RuntimeError(f"today_report_data.json 不存在：{args.today_report_path}")
++    today_report = json.loads(args.today_report_path.read_text(encoding="utf-8"))
++    report_run_date, data_cutoff_date = resolve_date_contract(
++        today_report,
++        args.report_run_date,
++        args.data_cutoff_date,
++    )
++    report_run_date_iso = report_run_date.isoformat()
++    data_cutoff_date_iso = data_cutoff_date.isoformat()
++
+     args.site_data_dir.mkdir(parents=True, exist_ok=True)
+     momentum = extract_momentum(args.source_dir)
+     (args.site_data_dir / "daily-momentum.json").write_text(
+@@ -600,7 +661,11 @@
+ 
+     summary_path = args.outputs_dir / "phone_awards_update_summary.json"
+     if summary_path.exists():
+-        phone = extract_phone_awards(summary_path, args.outputs_dir)
++        phone = extract_phone_awards(
++            summary_path,
++            report_run_date_iso,
++            data_cutoff_date_iso,
++        )
+         (args.site_data_dir / "phone-awards-latest.json").write_text(
+             json.dumps(phone, ensure_ascii=False, indent=2), encoding="utf-8"
+         )
+@@ -608,7 +673,11 @@
+     phone_battle_written = False
+     if summary_path.exists():
+         args.private_kpi_output.parent.mkdir(parents=True, exist_ok=True)
+-        phone_battle = extract_phone_awards_battle(summary_path)
++        phone_battle = extract_phone_awards_battle(
++            summary_path,
++            report_run_date_iso,
++            data_cutoff_date_iso,
++        )
+         (args.private_kpi_output.parent / "phone-awards-battle-latest.json").write_text(
+             json.dumps(phone_battle, ensure_ascii=False, indent=2), encoding="utf-8"
+         )
+@@ -617,11 +686,13 @@
+     kpi_battle_written = False
+     if args.today_report_path.exists():
+         args.private_kpi_output.parent.mkdir(parents=True, exist_ok=True)
+-        supplemental_path = args.outputs_dir / f"supplemental_daily_report_{json.loads(args.today_report_path.read_text(encoding='utf-8')).get('report_date_iso', '')}.json"
++        supplemental_path = args.outputs_dir / f"supplemental_daily_report_{report_run_date_iso}.json"
+         kpi_battle = extract_kpi_battle(
+             args.today_report_path,
+             summary_path if summary_path.exists() else None,
+             supplemental_path if supplemental_path.exists() else None,
++            report_run_date_iso,
++            data_cutoff_date_iso,
+         )
+         args.private_kpi_output.write_text(
+             json.dumps(kpi_battle, ensure_ascii=False, indent=2), encoding="utf-8"
+@@ -632,6 +703,8 @@
+         "momentum_stores": len(momentum["stores"]),
+         "momentum_dates": len(momentum["latest_source_by_date"]),
+         "source_files": len(momentum["source_files"]),
++        "report_run_date": report_run_date_iso,
++        "data_cutoff_date": data_cutoff_date_iso,
+         "site_data_dir": str(args.site_data_dir),
+         "private_kpi_output": str(args.private_kpi_output) if kpi_battle_written else None,
+         "private_phone_awards_output": str(args.private_kpi_output.parent / "phone-awards-battle-latest.json") if phone_battle_written else None,
+--- a/report-automation/work/prepare_send_payloads.mjs
++++ b/report-automation/work/prepare_send_payloads.mjs
+@@ -26,6 +26,22 @@
+   if (!ok) throw new Error(`${name} failed${detail ? `: ${detail}` : ""}`);
+ }
+ 
++export function dataCutoffDateFromSourceRange(sourceDateRange, reportRunDate) {
++  const matches = [...String(sourceDateRange || "").matchAll(/(?:(\d{4})[/-])?(\d{1,2})[/-](\d{1,2})/g)];
++  if (!matches.length) throw new Error(`data cutoff date missing from source_date_range: ${sourceDateRange || ""}`);
++  const last = matches.at(-1);
++  const year = Number(last[1] || String(reportRunDate).slice(0, 4));
++  const month = Number(last[2]);
++  const day = Number(last[3]);
++  const value = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
++  const parsed = new Date(`${value}T00:00:00Z`);
++  if (Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== value) {
++    throw new Error(`invalid data cutoff date in source_date_range: ${sourceDateRange}`);
++  }
++  if (value > reportRunDate) throw new Error(`data cutoff date ${value} is after report run date ${reportRunDate}`);
++  return value;
++}
++
+ async function sha256(filePath) {
+   const content = await fs.readFile(filePath);
+   return createHash("sha256").update(content).digest("hex");
+@@ -290,10 +306,12 @@
+ }
+ 
+ const report = JSON.parse(await fs.readFile(path.join(workDir, "today_report_data.json"), "utf8"));
++const dataCutoffDate = dataCutoffDateFromSourceRange(report.source_date_range, reportDateIso);
+ const phoneSummary = JSON.parse(await fs.readFile(path.join(outputDir, "phone_awards_update_summary.json"), "utf8"));
+ const activeAwardConfig = await loadActiveAwardConfig();
+ await fs.mkdir(logsDir, { recursive: true });
+ recordCheck("today_report_data date", report.report_date_iso === reportDateIso, report.report_date_iso);
++recordCheck("data cutoff date", Boolean(dataCutoffDate), dataCutoffDate);
+ recordCheck("active award config month", activeAwardConfig.effectiveMonth === reportDateIso.slice(0, 7), activeAwardConfig.effectiveMonth);
+ recordCheck("phone item count", phoneSummary.phone_items === activeAwardConfig.expectedPhoneItems, `${phoneSummary.phone_items}/${activeAwardConfig.expectedPhoneItems}`);
+ recordCheck("store row count", phoneSummary.store_rows === activeAwardConfig.expectedStoreRows, `${phoneSummary.store_rows}/${activeAwardConfig.expectedStoreRows}`);
+@@ -424,6 +442,9 @@
+   configHash: activeAwardConfig._hash,
+   gitCommit: "not-a-git-repository",
+   reportDate: reportDateIso,
++  reportRunDate: reportDateIso,
++  mailDate: reportDateIso,
++  dataCutoffDate,
+   validation: Object.fromEntries(checks.map((check) => [check.name, { ok: check.ok, detail: check.detail }])),
+   mailSubjects: [payload.daily.subject, payload.phone_awards.subject],
+   mailIds: [],
+--- a/report-automation/work/publish_formal_website_data.mjs
++++ b/report-automation/work/publish_formal_website_data.mjs
+@@ -15,7 +15,7 @@
+ const uploadEndpoint = process.env.REPORT_UPLOAD_GAS_URL || '';
+ const employeeId = String(process.env.REPORT_UPLOAD_EMPLOYEE_ID || '').trim().toUpperCase();
+ const adminSecret = process.env.PRIVATE_DASHBOARD_ADMIN_SECRET || '';
+-const reportDate = process.env.REPORT_DATE_ISO || new Intl.DateTimeFormat('sv-SE', {
++const reportRunDate = process.env.REPORT_RUN_DATE_ISO || process.env.REPORT_DATE_ISO || new Intl.DateTimeFormat('sv-SE', {
+   timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+ }).format(new Date());
+ const verifyOnly = process.argv.includes('--verify-only');
+@@ -369,8 +369,11 @@
+ }
+ 
+ async function writeManifest(publication, details = {}) {
+-  const manifestPath = path.join(logsDir, `run-manifest-${reportDate.replaceAll('-', '')}.json`);
++  const manifestPath = path.join(logsDir, `run-manifest-${reportRunDate.replaceAll('-', '')}.json`);
+   const manifest = await readJson(manifestPath);
++  manifest.reportRunDate = reportRunDate;
++  manifest.mailDate = manifest.mailDate || reportRunDate;
++  manifest.dataCutoffDate = details.dataCutoffDate || manifest.dataCutoffDate || null;
+   manifest.websitePublication = { ...publication, ...details, checkedAt: new Date().toISOString() };
+   if (publication.result === 'published-verified') {
+     manifest.websiteResult = 'published-verified';
+@@ -390,23 +393,32 @@
+   if (!accessEndpoint || !dashboardEndpoint || !employeeId || !adminSecret) {
+     fail('formal access/dashboard endpoints, employee ID and Keychain administrator secret are required');
+   }
+-  const [today, kpiBattle, awardsBattle] = await Promise.all([
++  const manifestPath = path.join(logsDir, `run-manifest-${reportRunDate.replaceAll('-', '')}.json`);
++  const [today, kpiBattle, awardsBattle, manifest] = await Promise.all([
+     readJson(path.join(workDir, 'today_report_data.json')),
+     readJson(path.join(privateDataDir, 'kpi-battle-latest.json')),
+     readJson(path.join(privateDataDir, 'phone-awards-battle-latest.json')),
++    readJson(manifestPath),
+   ]);
++  const dataCutoffDate = String(process.env.REPORT_DATA_CUTOFF_DATE || manifest.dataCutoffDate || '');
++  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataCutoffDate)) {
++    fail('REPORT_DATA_CUTOFF_DATE or manifest.dataCutoffDate is required');
++  }
+   const expected = {
+-    reportDate,
+-    dataAsOfDate: String(kpiBattle.data_as_of_date || kpiBattle.source_as_of_date || ''),
++    reportDate: dataCutoffDate,
++    dataAsOfDate: dataCutoffDate,
+     sourceFile: basename(today.source_path || today.source_file),
+     phoneItems: Number(awardsBattle.phone_items),
+     storeRows: Number(awardsBattle.store_rows),
+     awardsBattle,
+     kpiBattle,
+   };
+-  assertEqual(String(today.report_date_iso || ''), reportDate, 'local report date');
+-  assertEqual(String(kpiBattle.report_date || ''), reportDate, 'local KPI snapshot date');
+-  assertEqual(String(awardsBattle.report_date || ''), reportDate, 'local awards snapshot date');
++  assertEqual(String(today.report_date_iso || ''), reportRunDate, 'local report run date');
++  assertEqual(String(kpiBattle.report_run_date || ''), reportRunDate, 'local KPI report run date');
++  assertEqual(String(awardsBattle.report_run_date || ''), reportRunDate, 'local awards report run date');
++  assertEqual(String(kpiBattle.report_date || ''), dataCutoffDate, 'local KPI data cutoff date');
++  assertEqual(String(awardsBattle.report_date || ''), dataCutoffDate, 'local awards data cutoff date');
++  assertEqual(String(kpiBattle.data_as_of_date || kpiBattle.source_as_of_date || ''), dataCutoffDate, 'local KPI data-as-of date');
+   assertEqual(basename(kpiBattle.source_file), expected.sourceFile, 'local KPI source file');
+ 
+   let kpicalcResult = null;
+@@ -446,13 +458,17 @@
+     const publication = await formalReadback(expected);
+     await writeManifest(publication, {
+       mode: verifyOnly ? 'verify-only' : 'publish-and-verify',
++      dataCutoffDate,
+       kpicalcPublishedAt: kpicalcResult && kpicalcResult.formal && kpicalcResult.formal.publishedAt || '',
+       snapshotPublishedAt: snapshotResult && snapshotResult.publishedAt || '',
+     });
+     console.log(JSON.stringify({ status: 'ok', publication, kpicalcResult, snapshotResult }, null, 2));
+   } catch (error) {
+     const message = error instanceof Error ? error.message : String(error);
+-    await writeManifest({ result: 'blocked', message }, { mode: verifyOnly ? 'verify-only' : 'publish-and-verify' }).catch(() => {});
++    await writeManifest({ result: 'blocked', message }, {
++      mode: verifyOnly ? 'verify-only' : 'publish-and-verify',
++      dataCutoffDate,
++    }).catch(() => {});
+     throw error;
+   }
+ }
+--- a/report-automation/work/publish_formal_website_with_keychain.sh
++++ b/report-automation/work/publish_formal_website_with_keychain.sh
+@@ -12,6 +12,23 @@
+ readonly KEYCHAIN_ACCOUNT="${PRIVATE_DASHBOARD_KEYCHAIN_ACCOUNT:-$USER}"
+ readonly KEYCHAIN_PATH="${PRIVATE_DASHBOARD_KEYCHAIN_PATH:-}"
+ 
++if [[ -z "${REPORT_RUN_DATE_ISO:-}" ]]; then
++  print -u2 "formal website publish blocked: REPORT_RUN_DATE_ISO is required."
++  exit 1
++fi
++if [[ -z "${REPORT_DATA_CUTOFF_DATE:-}" ]]; then
++  print -u2 "formal website publish blocked: REPORT_DATA_CUTOFF_DATE is required."
++  exit 1
++fi
++if [[ ! "$REPORT_RUN_DATE_ISO" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ || ! "$REPORT_DATA_CUTOFF_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
++  print -u2 "formal website publish blocked: report run/data cutoff dates must use YYYY-MM-DD."
++  exit 1
++fi
++if [[ "$REPORT_DATA_CUTOFF_DATE" > "$REPORT_RUN_DATE_ISO" ]]; then
++  print -u2 "formal website publish blocked: data cutoff date cannot be after report run date."
++  exit 1
++fi
++
+ if [[ -z "${REPORT_UPLOAD_EMPLOYEE_ID:-}" ]]; then
+   print -u2 "formal website publish blocked: REPORT_UPLOAD_EMPLOYEE_ID is required."
+   exit 1
+--- a/report-automation/work/report_official_ingest_consumer.mjs
++++ b/report-automation/work/report_official_ingest_consumer.mjs
+@@ -15,6 +15,20 @@
+ function invariant(ok, message) { if (!ok) throw new Error(message); }
+ function sha256(buffer) { return createHash('sha256').update(buffer).digest('hex'); }
+ 
++export function dataCutoffDateFromSourceRange(sourceDateRange, reportRunDate) {
++  const matches = [...String(sourceDateRange || '').matchAll(/(?:(\d{4})[/-])?(\d{1,2})[/-](\d{1,2})/g)];
++  invariant(matches.length > 0, 'data cutoff date missing from source_date_range');
++  const last = matches.at(-1);
++  const year = Number(last[1] || String(reportRunDate).slice(0, 4));
++  const month = Number(last[2]);
++  const day = Number(last[3]);
++  const value = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
++  const parsed = new Date(`${value}T00:00:00Z`);
++  invariant(!Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value, 'data cutoff date is invalid');
++  invariant(value <= reportRunDate, 'data cutoff date is after report run date');
++  return value;
++}
++
+ export function validateMailReceipt(receipt, idempotencyKey) {
+   invariant(receipt && receipt.idempotencyKey === idempotencyKey, 'mail receipt idempotency key mismatch');
+   invariant(receipt.daily && receipt.daily.sent === true && receipt.daily.messageId, 'daily Outlook receipt missing');
+@@ -132,6 +146,7 @@
+   const sourceDir = path.join(jobDir, 'sources');
+   await fs.mkdir(sourceDir, { recursive: true, mode: 0o700 });
+   let currentStage = 'source_files';
++  let dataCutoffDate = '';
+   try {
+     const exact = {};
+     for (const key of ['kpi', 'awardStore', 'awardPerson']) {
+@@ -146,6 +161,9 @@
+     await commandRunner(process.execPath, [path.join(workDir, 'run_daily_north12b_report.mjs')], {
+       env: { REPORT_SOURCE_DIR: historyDir, REPORT_DATE_ISO: job.reportDate, REPORT_RUN_ID: job.idempotencyKey },
+     });
++    const todayReport = await readJson(path.join(workDir, 'today_report_data.json'));
++    invariant(String(todayReport.report_date_iso || '') === job.reportDate, 'daily runner report run date mismatch');
++    dataCutoffDate = dataCutoffDateFromSourceRange(todayReport.source_date_range, job.reportDate);
+     await updateStage(api, job, currentStage, 'running', '既有 daily runner 完成；等待正式 battle build/readback');
+ 
+     currentStage = 'awards_formal';
+@@ -176,28 +194,40 @@
+     await updateStage(api, job, 'sent_items', 'ok', '寄件備份兩封附件名稱／數量 readback PASS', { evidence: mailEvidence });
+ 
+     currentStage = 'awards_battle';
+-    const build = await commandRunner(python, [path.join(workDir, 'build_github_pages_data.py'), '--source-dir', historyDir]);
++    const build = await commandRunner(python, [
++      path.join(workDir, 'build_github_pages_data.py'),
++      '--source-dir', historyDir,
++      '--report-run-date', job.reportDate,
++      '--data-cutoff-date', dataCutoffDate,
++    ]);
+     parseLastJson(build.stdout);
+     const kpiSnapshot = await readJson(path.join(projectRoot, 'github-pages-liamlu/private-data/kpi-battle-latest.json'));
+     const awardSnapshot = await readJson(path.join(projectRoot, 'github-pages-liamlu/private-data/phone-awards-battle-latest.json'));
+-    invariant(String(kpiSnapshot.report_date) === job.reportDate, 'KPI battle local readback date mismatch');
+-    invariant(String(awardSnapshot.report_date) === job.reportDate && Number(awardSnapshot.phone_items) === 13 && Number(awardSnapshot.store_rows) === 10, 'awards battle local readback mismatch');
++    invariant(String(kpiSnapshot.report_run_date) === job.reportDate, 'KPI battle local report run date mismatch');
++    invariant(String(kpiSnapshot.report_date) === dataCutoffDate, 'KPI battle local data cutoff date mismatch');
++    invariant(String(awardSnapshot.report_run_date) === job.reportDate, 'awards battle local report run date mismatch');
++    invariant(String(awardSnapshot.report_date) === dataCutoffDate && Number(awardSnapshot.phone_items) === 13 && Number(awardSnapshot.store_rows) === 10, 'awards battle local readback mismatch');
+     await updateStage(api, job, 'kpi_battle', 'ok', '既有 build_github_pages_data KPI snapshot PASS');
+     await updateStage(api, job, 'awards_battle', 'ok', '既有 build_github_pages_data 台獎 snapshot PASS');
+ 
+     currentStage = 'private_publish';
+     await updateStage(api, job, currentStage, 'running', '執行既有 private/formal publisher');
+     await commandRunner('/bin/zsh', [path.join(workDir, 'publish_formal_website_with_keychain.sh')], {
+-      env: { REPORT_DATE_ISO: job.reportDate, REPORT_RUN_ID: job.idempotencyKey },
++      env: {
++        REPORT_RUN_DATE_ISO: job.reportDate,
++        REPORT_DATA_CUTOFF_DATE: dataCutoffDate,
++        REPORT_RUN_ID: job.idempotencyKey,
++      },
+     });
+     await updateStage(api, job, currentStage, 'ok', '既有 private publisher 完成');
+     const manifest = await readJson(path.join(automationDir, `logs/run-manifest-${job.reportDate.replaceAll('-', '')}.json`));
+     invariant(manifest.websiteResult === 'published-verified' && manifest.datesAligned === true && manifest.sourcesAligned === true, 'formal website readback gate failed');
+     const publication = manifest.websitePublication || {};
+-    invariant(publication.reportDate === job.reportDate && Number(publication.dashboard && publication.dashboard.phoneItems) === 13 && Number(publication.dashboard && publication.dashboard.storeRows) === 10, 'private KPI/awards readback mismatch');
++    invariant(publication.reportDate === dataCutoffDate && publication.dataAsOfDate === dataCutoffDate && Number(publication.dashboard && publication.dashboard.phoneItems) === 13 && Number(publication.dashboard && publication.dashboard.storeRows) === 10, 'private KPI/awards readback mismatch');
+     const readbackEvidence = {
+-      privateReadback: { kpiPassed: true, awardsPassed: true, reportDate: job.reportDate },
+-      supervisor: { aligned: true, reportDate: job.reportDate }, website: { passed: true, reportDate: job.reportDate },
++      privateReadback: { kpiPassed: true, awardsPassed: true, reportRunDate: job.reportDate, reportDate: dataCutoffDate },
++      supervisor: { aligned: true, reportRunDate: job.reportDate, reportDate: dataCutoffDate },
++      website: { passed: true, reportRunDate: job.reportDate, reportDate: dataCutoffDate },
+     };
+     await updateStage(api, job, 'private_readback', 'ok', 'private KPI／台獎正式 readback PASS', { evidence: readbackEvidence });
+     await updateStage(api, job, 'supervisor_app', 'ok', 'Supervisor App 正式來源日期同日', { evidence: readbackEvidence });
+--- a/report-automation/work/formal_website_publish_gate.test.mjs
++++ b/report-automation/work/formal_website_publish_gate.test.mjs
+@@ -67,7 +67,7 @@
+     addon_score: 12 + index / 10,
+   });
+   const awardsBattle = {
+-    report_date: '2026-08-08', phone_items: 13, store_rows: 10,
++    report_date: '2026-08-07', report_run_date: '2026-08-08', phone_items: 13, store_rows: 10,
+     overall: { store: '北一二B整體', award: { rank: '30', projected: 1000 }, items: awardItems },
+     stores: Array.from({ length: 9 }, (_, index) => ({
+       store: index === 0 ? '酒泉' : `店${index + 1}`,
+@@ -85,7 +85,7 @@
+     },
+     snapshot: {
+       kpiBattle: {
+-        report_date: '2026-08-08', data_as_of_date: '2026-08-07', source_as_of_date: '2026-08-07', source_file: '0808.xlsx',
++        report_date: '2026-08-07', report_run_date: '2026-08-08', data_as_of_date: '2026-08-07', source_as_of_date: '2026-08-07', source_file: '0808.xlsx',
+         aggregate: { ...supplement(0), metrics: aggregateMetrics },
+         stores: stores.map((row, index) => ({
+           store: row.name,
+@@ -97,10 +97,10 @@
+     },
+     snapshotStatus: {
+       ownerEmail: 'lian852456@gmail.com', sharingAccess: 'PRIVATE',
+-      kpiReportDate: '2026-08-08', awardsReportDate: '2026-08-08',
++      kpiReportDate: '2026-08-07', awardsReportDate: '2026-08-07',
+     },
+     expected: {
+-      reportDate: '2026-08-08', dataAsOfDate: '2026-08-07', sourceFile: '0808.xlsx',
++      reportDate: '2026-08-07', dataAsOfDate: '2026-08-07', sourceFile: '0808.xlsx',
+       phoneItems: 13, storeRows: 10, awardsBattle: JSON.parse(JSON.stringify(awardsBattle)),
+     },
+   };
+@@ -116,6 +116,30 @@
+   assert.equal(result.kpicalc.rateVerification.aggregateSpotChecks.length, 6);
+   assert.equal(result.kpicalc.rateVerification.sampledStores.length, 3);
+   assert.equal(result.kpicalc.supplementVerification.stores, 9);
++});
++
++test('0822 檔名與寄信日不會覆蓋 0821 正式資料截止日', () => {
++  const value = fixture();
++  value.kpicalcData.meta.snapshotDay = 21;
++  value.kpicalcData.meta.sourceFile = '0822.xlsx';
++  value.snapshot.kpiBattle.report_date = '2026-08-21';
++  value.snapshot.kpiBattle.report_run_date = '2026-08-22';
++  value.snapshot.kpiBattle.data_as_of_date = '2026-08-21';
++  value.snapshot.kpiBattle.source_as_of_date = '2026-08-21';
++  value.snapshot.kpiBattle.source_file = '0822.xlsx';
++  value.snapshot.awardsBattle.report_date = '2026-08-21';
++  value.snapshot.awardsBattle.report_run_date = '2026-08-22';
++  value.snapshotStatus.kpiReportDate = '2026-08-21';
++  value.snapshotStatus.awardsReportDate = '2026-08-21';
++  value.expected.reportDate = '2026-08-21';
++  value.expected.dataAsOfDate = '2026-08-21';
++  value.expected.sourceFile = '0822.xlsx';
++  value.expected.awardsBattle = JSON.parse(JSON.stringify(value.snapshot.awardsBattle));
++  const result = validateDualFormalReadback(value);
++  assert.equal(result.reportDate, '2026-08-21');
++  assert.equal(result.dataAsOfDate, '2026-08-21');
++  assert.equal(result.sourceFile, '0822.xlsx');
++  assert.equal(result.datesAligned, true);
+ });
+ 
+ test('正式 KPI 已為同日完整來源時，pipeline 可跳過失效的快速上傳 deployment', () => {
+@@ -219,6 +243,8 @@
+     new URL('./publish_private_dashboard_snapshot.mjs', import.meta.url), 'utf8',
+   ));
+   assert.match(wrapper, /readonly DASHBOARD_GAS_URL="\$REPORT_ACCESS_GAS_URL_VALUE"/);
++  assert.match(wrapper, /REPORT_RUN_DATE_ISO is required/);
++  assert.match(wrapper, /REPORT_DATA_CUTOFF_DATE is required/);
+   assert.match(publisher, /PRIVATE_DASHBOARD_SKIP_ROSTER_SYNC: '1'/);
+   assert.match(snapshot, /private_admin_snapshot_status/);
+   assert.match(snapshot, /skipRosterSync \? 'skipped-out-of-scope' : 'synced'/);
+--- a/report-automation/work/report_official_ingest_consumer.test.mjs
++++ b/report-automation/work/report_official_ingest_consumer.test.mjs
+@@ -2,7 +2,12 @@
+ import assert from 'node:assert/strict';
+ import fs from 'node:fs';
+ import path from 'node:path';
+-import { consumeWaitingJobs, shouldSendMail, validateMailReceipt } from './report_official_ingest_consumer.mjs';
++import {
++  consumeWaitingJobs,
++  dataCutoffDateFromSourceRange,
++  shouldSendMail,
++  validateMailReceipt,
++} from './report_official_ingest_consumer.mjs';
+ 
+ const receipt = {
+   idempotencyKey: 'run:hash',
+@@ -23,6 +28,12 @@
+   assert.equal(shouldSendMail({ idempotencyKey: 'run:hash', evidence: { mail: receipt } }, null), false);
+ });
+ 
++test('report run/mail date and formal data cutoff date stay separate', () => {
++  assert.equal(dataCutoffDateFromSourceRange('2026/08/01 ~ 08/21', '2026-08-22'), '2026-08-21');
++  assert.throws(() => dataCutoffDateFromSourceRange('0822.xlsx', '2026-08-22'), /data cutoff date missing/);
++  assert.throws(() => dataCutoffDateFromSourceRange('2026/08/01 ~ 08/23', '2026-08-22'), /after report run date/);
++});
++
+ test('consumer only claims waiting-external-pipeline jobs', async () => {
+   const calls = [];
+   const api = async (action, payload) => {
+@@ -50,6 +61,10 @@
+   assert.match(code, /Number\(awardSummary\.store_rows\) === 10/);
+   assert.match(code, /manifest\.websiteResult === 'published-verified'/);
+   assert.match(code, /manifest\.datesAligned === true && manifest\.sourcesAligned === true/);
++  assert.match(code, /--report-run-date', job\.reportDate/);
++  assert.match(code, /--data-cutoff-date', dataCutoffDate/);
++  assert.match(code, /REPORT_RUN_DATE_ISO: job\.reportDate/);
++  assert.match(code, /REPORT_DATA_CUTOFF_DATE: dataCutoffDate/);
+   assert.match(code, /sha256\(content\) === expectedHash/);
+ });
+ 
+--- /dev/null
++++ b/report-automation/work/build_github_pages_data_date_contract_test.py
+@@ -0,0 +1,72 @@
++#!/usr/bin/env python3
++from __future__ import annotations
++
++import json
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++
++SCRIPT_DIR = Path(__file__).resolve().parent
++ACTUAL_WORK_DIR = Path("/Users/liamlu/Downloads/liam-agent/report-automation/work")
++PROJECT_ROOT = Path("/Users/liamlu/Downloads/liam-agent")
++sys.path.insert(0, str(ACTUAL_WORK_DIR))
++sys.path.insert(0, str(SCRIPT_DIR))
++
++from build_github_pages_data import resolve_date_contract  # noqa: E402
++
++
++class DateContractTest(unittest.TestCase):
++    def test_run_date_and_cutoff_date_are_separate(self) -> None:
++        report = {
++            "report_date_iso": "2026-08-22",
++            "source_date_range": "2026/08/01 ~ 08/21",
++        }
++        report_run_date, data_cutoff_date = resolve_date_contract(
++            report,
++            "2026-08-22",
++            "2026-08-21",
++        )
++        self.assertEqual(report_run_date.isoformat(), "2026-08-22")
++        self.assertEqual(data_cutoff_date.isoformat(), "2026-08-21")
++
++    def test_filename_is_not_accepted_as_formal_data_date(self) -> None:
++        with self.assertRaisesRegex(RuntimeError, "source_date_range"):
++            resolve_date_contract({
++                "report_date_iso": "2026-08-22",
++                "source_date_range": "0822.xlsx",
++            })
++
++    def test_current_0822_artifacts_build_0821_snapshots(self) -> None:
++        with tempfile.TemporaryDirectory() as temp_dir:
++            root = Path(temp_dir)
++            site_data = root / "data"
++            private_data = root / "private-data"
++            command = [
++                sys.executable,
++                str(SCRIPT_DIR / "build_github_pages_data.py"),
++                "--source-dir", str(PROJECT_ROOT / "report-automation/input/google-drive"),
++                "--outputs-dir", str(PROJECT_ROOT / "report-automation/outputs"),
++                "--site-data-dir", str(site_data),
++                "--today-report-path", str(ACTUAL_WORK_DIR / "today_report_data.json"),
++                "--private-kpi-output", str(private_data / "kpi-battle-latest.json"),
++                "--report-run-date", "2026-08-22",
++                "--data-cutoff-date", "2026-08-21",
++            ]
++            subprocess.run(command, check=True, capture_output=True, text=True)
++            kpi = json.loads((private_data / "kpi-battle-latest.json").read_text(encoding="utf-8"))
++            awards = json.loads((private_data / "phone-awards-battle-latest.json").read_text(encoding="utf-8"))
++            self.assertEqual(kpi["report_run_date"], "2026-08-22")
++            self.assertEqual(kpi["report_date"], "2026-08-21")
++            self.assertEqual(kpi["data_as_of_date"], "2026-08-21")
++            self.assertEqual(kpi["source_file"], "0822.xlsx")
++            self.assertEqual(awards["report_run_date"], "2026-08-22")
++            self.assertEqual(awards["report_date"], "2026-08-21")
++            self.assertEqual(awards["phone_items"], 13)
++            self.assertEqual(awards["store_rows"], 10)
++
++
++if __name__ == "__main__":
++    unittest.main()
