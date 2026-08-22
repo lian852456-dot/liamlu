@@ -185,6 +185,46 @@ function readbackKey(row){
   return [date,canonicalStore(row),String(Number(row?.item)||String(row?.item||'').trim()),fill].join('|');
 }
 function keyLabel(row){const fill=normalizeTime(row?.fillTime);const date=(fill.match(/^(\d{4}\/\d{1,2}\/\d{1,2})/)||[])[1]||fill;return `${date}｜${canonicalStore(row)}｜題${row?.item||''}｜${fill}`;}
+function rowContentKey(row){return [String(row?.result||'').trim().toLowerCase(),String(row?.reason||'').trim()].join('|');}
+function esc(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
+function dateLabel(row){const fill=normalizeTime(row?.fillTime);return (fill.match(/^(\d{4}\/\d{1,2}\/\d{1,2})/)||[])[1]||fill||'日期不明';}
+async function loadFormalRowsForPreflight(rows){
+  const groups=new Map();
+  rows.forEach(row=>{const month=rowMonth(row),store=canonicalStore(row);groups.set(`${month}|${store}`,{month,store});});
+  const sourceRows=[];
+  for(const group of groups.values()){
+    if(!group.month||!group.store)throw new Error('Server Preflight 缺少月份或店點，已封鎖寫入');
+    let page=1,totalRows=null,loaded=0;
+    for(;;){
+      const result=await protectedPost('ptdetail',{month:group.month,store:group.store,page,limit:PAGE_LIMIT});
+      if(result?.status!=='ok')throw new Error(`Server Preflight ptdetail 失敗：${authReasonText(result)}`);
+      if(!Array.isArray(result.rows))throw new Error('Server Preflight ptdetail 分頁 contract 不完整');
+      const reportedTotal=Number(result.totalRows);
+      if(!Number.isInteger(reportedTotal)||reportedTotal<0)throw new Error('Server Preflight ptdetail totalRows contract 不完整');
+      if(totalRows===null)totalRows=reportedTotal;
+      else if(totalRows!==reportedTotal)throw new Error('Server Preflight 期間正式資料筆數變更，已封鎖寫入');
+      sourceRows.push(...result.rows);loaded+=result.rows.length;
+      if(loaded===totalRows)break;
+      if(result.rows.length===0||loaded>totalRows)throw new Error('Server Preflight ptdetail 分頁讀回筆數不一致');
+      page++;if(page>100)throw new Error('Server Preflight ptdetail 頁數異常');
+    }
+  }
+  return sourceRows;
+}
+async function serverPreflight(rows){
+  const formalRows=await loadFormalRowsForPreflight(rows);
+  const formalByKey=new Map();
+  formalRows.forEach(row=>{const key=readbackKey(row);const list=formalByKey.get(key)||[];list.push(row);formalByKey.set(key,list);});
+  const additions=[],existingSame=[],differences=[];
+  rows.forEach(row=>{
+    const key=readbackKey(row);const formal=formalByKey.get(key)||[];
+    if(!formal.length){additions.push(row);return;}
+    if(formal.every(source=>rowContentKey(source)===rowContentKey(row))){existingSame.push(row);return;}
+    differences.push({input:row,formal});
+  });
+  if(additions.length+existingSame.length+differences.length!==rows.length)throw new Error('Server Preflight 分類不完整，已封鎖寫入');
+  return {formalRows,additions,existingSame,differences};
+}
 async function readback(rows,writtenRows){
   const expected=new Map();const groups=new Map();
   rows.forEach(row=>{expected.set(readbackKey(row),row);const month=rowMonth(row);const store=canonicalStore(row);groups.set(`${month}|${store}`,{month,store});});
@@ -231,9 +271,12 @@ async function writeAndReadback(rows){
   }
   return readback(rows,writtenRows);
 }
-function showPreview(candidate){
-  const stores=[...new Set(candidate.writeRows.map(canonicalStore).filter(Boolean))];const preview=$('preview');
-  preview.innerHTML=`<strong>預覽完成：${candidate.writeRows.length} 筆待寫入</strong>${candidate.duplicates?`（略過本次貼上內重複 ${candidate.duplicates} 筆）`:''}<ul><li>本次預計寫入店點：${stores.join('、')||'—'}</li><li>尚未寫入雲端。請確認後按「確認寫入雲端」。</li><li>成功條件：每個 date＋store＋item＋fillTime 都通過 <code>ptdetail</code> 分頁 readback。</li></ul>`;
+function showPreflightPreview(parsedRows,candidate,preflight){
+  const preview=$('preview');const missingByDateStore=new Map();
+  preflight.additions.forEach(row=>{const key=`${dateLabel(row)}|${canonicalStore(row)}`;missingByDateStore.set(key,(missingByDateStore.get(key)||0)+1);});
+  const missing=missingByDateStore.size?`<ul>${[...missingByDateStore].map(([key,count])=>{const [date,store]=key.split('|');return `<li>${esc(date)}｜${esc(store)}｜${count} 筆</li>`;}).join('')}</ul>`:'<p class="muted">無新增缺失列。</p>';
+  const differences=preflight.differences.length?`<ul>${preflight.differences.map(({input,formal})=>`<li>${esc(keyLabel(input))}<br>貼上值：result=${esc(input.result||'（空白）')}／reason=${esc(input.reason||'（空白）')}<br>正式值：${formal.map(row=>`result=${esc(row.result||'（空白）')}／reason=${esc(row.reason||'（空白）')}`).join('；')}</li>`).join('')}</ul>`:'<p class="muted">0 筆。</p>';
+  preview.innerHTML=`<strong>Server Preflight 已完成（唯讀 ptdetail 分頁）</strong><ul><li>解析：${parsedRows} 筆${candidate.duplicates?`（略過本次貼上內重複 ${candidate.duplicates} 筆）`:''}</li><li>正式已存在且內容相同：${preflight.existingSame.length} 筆</li><li>新增缺失：${preflight.additions.length} 筆</li><li>既有內容差異：${preflight.differences.length} 筆</li></ul><strong>新增缺失（日期／店點／筆數）</strong>${missing}<strong>既有內容差異</strong>${differences}`;
   preview.classList.remove('hidden');
 }
 async function refreshSummary(){
@@ -270,14 +313,25 @@ async function restore(){
     if(sessionToken)setNotice('authNotice',`UAT session 已保留；恢復失敗：${error?.message||'未知錯誤'}`,'err');
   }
 }
-function parse(){
-  const raw=$('pasteBox').value;if(!raw.trim()){setNotice('mainNotice','請先貼上原始 Excel 明細。','err');return;}
-  const result=parsePatrolText(raw);if(result.error){pendingWrite=null;$('confirmButton').classList.add('hidden');setNotice('mainNotice',result.error,'err');return;}
+async function parse(){
+  const raw=$('pasteBox').value;const parseButton=$('parseButton');const confirmButton=$('confirmButton');
+  pendingWrite=null;confirmButton.classList.add('hidden');$('preview').classList.add('hidden');
+  if(!raw.trim()){setNotice('mainNotice','請先貼上原始 Excel 明細。','err');return;}
+  const result=parsePatrolText(raw);if(result.error){setNotice('mainNotice',result.error,'err');return;}
   if(!result.rows.length){setNotice('mainNotice','未解析到有效明細，請確認貼上內容是 Tab 分隔資料。','err');return;}
-  if(failedRaw===raw){pendingWrite=null;$('confirmButton').classList.add('hidden');setNotice('mainNotice','這份原始資料已有未完成的雲端寫入／讀回驗證。原文已保留，請勿重複操作。','err');return;}
+  if(failedRaw===raw){setNotice('mainNotice','這份原始資料已有未完成的雲端寫入／讀回驗證。原文已保留，請勿重複操作。','err');return;}
   const candidate=prepare(result.rows);if(!candidate.writeRows.length){setNotice('mainNotice','本次貼上資料全部重複，未建立雲端寫入。','info');return;}
   const months=[...new Set(candidate.writeRows.map(rowMonth))];if(months.length===1)$('monthInput').value=months[0];
-  pendingWrite={raw,parsedRows:result.rows,candidate};showPreview(candidate);$('confirmButton').classList.remove('hidden');setNotice('mainNotice',`已解析 ${result.rows.length} 筆；請確認店點與筆數，再按「確認寫入雲端」。`,'ok');
+  parseButton.disabled=true;setNotice('mainNotice',`已解析 ${result.rows.length} 筆；正在以 ptdetail 分頁唯讀比對正式月份資料，完成前禁止寫入…`,'info');
+  try{
+    const preflight=await serverPreflight(candidate.writeRows);showPreflightPreview(result.rows.length,candidate,preflight);
+    if(preflight.differences.length>0){setNotice('mainNotice',`Server Preflight 發現 ${preflight.differences.length} 筆既有內容差異，已 fail-closed；本輪不允許寫入。`,'err');return;}
+    if(!preflight.additions.length){setNotice('mainNotice','Server Preflight 完成：沒有新增缺失列，本輪不建立雲端寫入。','info');return;}
+    pendingWrite={raw,parsedRows:result.rows,candidate:{...candidate,writeRows:preflight.additions},preflight};
+    confirmButton.textContent=`確認寫入雲端（僅 ${preflight.additions.length} 筆新增缺失）`;confirmButton.classList.remove('hidden');
+    setNotice('mainNotice',`Server Preflight PASS：正式已存在 ${preflight.existingSame.length} 筆，僅 ${preflight.additions.length} 筆新增缺失可寫入。`,'ok');
+  }catch(error){setNotice('mainNotice',`${error?.message||'Server Preflight 失敗'}；原始資料已保留，禁止寫入。`,'err');}
+  finally{parseButton.disabled=false;}
 }
 async function confirmWrite(){
   const pending=pendingWrite;if(!pending){setNotice('mainNotice','沒有待確認的雲端寫入資料，請先解析並預覽。','err');return;}
