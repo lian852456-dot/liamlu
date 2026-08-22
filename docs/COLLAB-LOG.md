@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-22 ｜ Codex（戰報日期契約正式發布＋readback 同步延遲修正）
+
+- 結果：PR #76 已合併；正式私有網站已發布並讀回 `reportDate/dataAsOfDate=2026-08-21`、來源 `0822.xlsx`，KPI 9 店／40 人／25 項，台獎 13 機款／10 列且逐值一致。Manifest 為 `published-verified`，日期與來源一致，owner 與 PRIVATE 權限正確。
+- 補強：首次發布後立即 readback 曾因 snapshot propagation delay 暫時不一致，閘門正確 blocked；數秒後逐值差異為 0。Publisher 改為最多三次、每次五秒的有限 readback retry，最後一次仍不一致就 fail-closed。新增「短暫不同步後通過」及「重試用盡仍 blocked」測試，相關 Node gate 22/22 通過。
+- 提醒：不得把一次發布 API 成功當完成；只認正式雙路 readback 與 manifest。有限重試僅吸收短暫同步延遲，不可移除或弱化精確比對。
+
 ## 2026-08-22 ｜ Codex（戰報執行日／資料截止日分離，Draft PR）
 
 - Root Cause：Mac `report-automation` 以單一 `REPORT_DATE_ISO` 同時代表寄信日、manifest 日與網站 snapshot 日；`build_github_pages_data.py` 又讓台獎從 email body 檔名取日期。當 `0822.xlsx` 的資料範圍只到 8/21 時，正式 KPI parser 正確讀到 8/21，但 dashboard snapshot／readback 仍要求 8/22，因而被 fail-closed date gate 擋住。
