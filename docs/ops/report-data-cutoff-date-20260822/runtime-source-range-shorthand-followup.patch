@@ -1,0 +1,173 @@
+diff --git a/report-automation/work/source_date_range.mjs b/report-automation/work/source_date_range.mjs
+new file mode 100644
+--- /dev/null
++++ b/report-automation/work/source_date_range.mjs
+@@ -0,0 +1,52 @@
++const SOURCE_DATE_RANGE = /^(\d{4})\/(\d{2})\/(\d{2})\s*(?:~|～)\s*(?:(\d{4})\/(\d{2})\/(\d{2})|(\d{2})\/(\d{2}))$/;
++
++function blocked(message) {
++  throw new Error(`source_date_range blocked: ${message}`);
++}
++
++function parseDate(year, month, day, label) {
++  const iso = `${year}-${month}-${day}`;
++  const parsed = new Date(`${iso}T00:00:00Z`);
++  if (Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== iso) {
++    blocked(`${label} is invalid: ${iso}`);
++  }
++  return iso;
++}
++
++function parseReportRunDate(reportRunDate) {
++  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(reportRunDate || '').trim());
++  if (!match) blocked(`report run date is invalid: ${String(reportRunDate || '')}`);
++  return parseDate(match[1], match[2], match[3], 'report run date');
++}
++
++export function dataCutoffDateFromSourceRange(sourceDateRange, reportRunDate) {
++  const raw = String(sourceDateRange || '').trim();
++  const match = SOURCE_DATE_RANGE.exec(raw);
++  if (!match) blocked(`format is unsupported: ${raw}`);
++
++  const startDate = parseDate(match[1], match[2], match[3], 'start date');
++  const endDate = match[4]
++    ? parseDate(match[4], match[5], match[6], 'end date')
++    : parseDate(match[1], match[7], match[8], 'end date');
++  if (endDate < startDate) blocked(`end date precedes start date: ${raw}`);
++
++  const runDate = parseReportRunDate(reportRunDate);
++  if (endDate > runDate) blocked(`end date is after report run date: ${endDate}`);
++  return endDate;
++}
++
++export function extractSourceDateRange(sheetValues, reportRunDate) {
++  for (const row of sheetValues) {
++    for (const value of row) {
++      if (typeof value !== 'string') continue;
++      const raw = value.trim();
++      try {
++        dataCutoffDateFromSourceRange(raw, reportRunDate);
++        return raw;
++      } catch {
++        // Keep scanning: non-range strings and invalid ranges are not source metadata.
++      }
++    }
++  }
++  return '';
++}
+diff --git a/report-automation/work/extract_today_report.mjs b/report-automation/work/extract_today_report.mjs
+--- a/report-automation/work/extract_today_report.mjs
++++ b/report-automation/work/extract_today_report.mjs
+@@ -1,4 +1,5 @@
+ import fs from "node:fs/promises";
+ import { FileBlob, SpreadsheetFile } from "@oai/artifact-tool";
+-
++import { extractSourceDateRange } from "./source_date_range.mjs";
++
+ const sourcePath = process.env.REPORT_SOURCE ?? "/Users/liamlu/Downloads/liam-agent/report-automation/input/0615.xlsx";
+@@ -133,15 +134,8 @@
+ function formatGeneratedDate(isoDate) {
+   const [year, month, day] = isoDate.split("-").map(Number);
+   return `${year}/${month}/${day}`;
+ }
+-
++
+ function extractDateRange(sheetValues) {
+-  for (const row of sheetValues.slice(0, 12)) {
+-    for (const value of row) {
+-      if (typeof value === "string" && /\d{4}\/\d{2}\/\d{2}\s*~\s*\d{2}\/\d{2}/.test(value)) {
+-        return value;
+-      }
+-    }
+-  }
+-  return "";
++  return extractSourceDateRange(sheetValues.slice(0, 12), reportDateIso);
+ }
+diff --git a/report-automation/work/report_official_ingest_consumer.mjs b/report-automation/work/report_official_ingest_consumer.mjs
+--- a/report-automation/work/report_official_ingest_consumer.mjs
++++ b/report-automation/work/report_official_ingest_consumer.mjs
+@@ -5,5 +5,8 @@
+ import path from 'node:path';
+ import { fileURLToPath } from 'node:url';
+ import { postPrivateDashboardJson } from './private_dashboard_transport.mjs';
+-
++import { dataCutoffDateFromSourceRange } from './source_date_range.mjs';
++
++export { dataCutoffDateFromSourceRange } from './source_date_range.mjs';
++
+ const workDir = path.dirname(fileURLToPath(import.meta.url));
+@@ -15,18 +18,4 @@
+ function invariant(ok, message) { if (!ok) throw new Error(message); }
+ function sha256(buffer) { return createHash('sha256').update(buffer).digest('hex'); }
+-
+-export function dataCutoffDateFromSourceRange(sourceDateRange, reportRunDate) {
+-  const matches = [...String(sourceDateRange || '').matchAll(/(?:(\d{4})[/-])?(\d{1,2})[/-](\d{1,2})/g)];
+-  invariant(matches.length > 0, 'data cutoff date missing from source_date_range');
+-  const last = matches.at(-1);
+-  const year = Number(last[1] || String(reportRunDate).slice(0, 4));
+-  const month = Number(last[2]);
+-  const day = Number(last[3]);
+-  const value = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+-  const parsed = new Date(`${value}T00:00:00Z`);
+-  invariant(!Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value, 'data cutoff date is invalid');
+-  invariant(value <= reportRunDate, 'data cutoff date is after report run date');
+-  return value;
+-}
+-
++
+ export function validateMailReceipt(receipt, idempotencyKey) {
+   invariant(receipt && receipt.idempotencyKey === idempotencyKey, 'mail receipt idempotency key mismatch');
+   invariant(receipt.daily && receipt.daily.sent === true && receipt.daily.messageId, 'daily Outlook receipt missing');
+diff --git a/report-automation/work/source_date_range.test.mjs b/report-automation/work/source_date_range.test.mjs
+new file mode 100644
+--- /dev/null
++++ b/report-automation/work/source_date_range.test.mjs
+@@ -0,0 +1,34 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import {
++  dataCutoffDateFromSourceRange,
++  extractSourceDateRange,
++} from './source_date_range.mjs';
++
++test('完整與月內簡寫 source_date_range 都以資料截止日為準', () => {
++  assert.equal(dataCutoffDateFromSourceRange('2026/08/01 ~ 2026/08/21', '2026-08-22'), '2026-08-21');
++  assert.equal(dataCutoffDateFromSourceRange('2026/08/01~08/21', '2026-08-22'), '2026-08-21');
++  assert.equal(dataCutoffDateFromSourceRange('2026/08/01 ～ 08/21', '2026-08-22'), '2026-08-21');
++  assert.equal(
++    extractSourceDateRange([['說明'], ['2026/08/01～08/21']], '2026-08-22'),
++    '2026/08/01～08/21',
++  );
++});
++
++test('檔名、空值、無效、逆序、跨年歧義與未來 source_date_range 都 fail-closed', () => {
++  for (const value of [
++    '0822.xlsx',
++    '',
++    '2026/08/01~08/32',
++    '2026/08/21~08/01',
++    '2026/12/31~01/01',
++    '2026/08/01~08/23',
++  ]) {
++    assert.throws(
++      () => dataCutoffDateFromSourceRange(value, '2026-08-22'),
++      /source_date_range blocked/,
++      value,
++    );
++  }
++  assert.equal(extractSourceDateRange([['0822.xlsx'], ['2026/08/21~08/01']], '2026-08-22'), '');
++});
+diff --git a/report-automation/work/report_official_ingest_consumer.test.mjs b/report-automation/work/report_official_ingest_consumer.test.mjs
+--- a/report-automation/work/report_official_ingest_consumer.test.mjs
++++ b/report-automation/work/report_official_ingest_consumer.test.mjs
+@@ -31,7 +31,8 @@
+ test('report run/mail date and formal data cutoff date stay separate', () => {
+   assert.equal(dataCutoffDateFromSourceRange('2026/08/01 ~ 08/21', '2026-08-22'), '2026-08-21');
+-  assert.throws(() => dataCutoffDateFromSourceRange('0822.xlsx', '2026-08-22'), /data cutoff date missing/);
++  assert.equal(dataCutoffDateFromSourceRange('2026/08/01～08/21', '2026-08-22'), '2026-08-21');
++  assert.throws(() => dataCutoffDateFromSourceRange('0822.xlsx', '2026-08-22'), /source_date_range blocked/);
+   assert.throws(() => dataCutoffDateFromSourceRange('2026/08/01 ~ 08/23', '2026-08-22'), /after report run date/);
+ });
+-
++
+ test('consumer only claims waiting-external-pipeline jobs', async () => {

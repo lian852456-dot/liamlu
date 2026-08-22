@@ -13,6 +13,19 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-23 ｜ Codex（source_date_range 月內簡寫 runtime follow-up，待正式發布）
+
+- Root Cause：8/22 runtime patch 的 downstream consumer 已有截止日處理，但 daily runner 上游
+  `extract_today_report.mjs` 仍只接受半形 `YYYY/MM/DD ~ MM/DD`。全形 `～` 或完整結束日期會被
+  擷取成空值，才在 consumer 出現 `source_date_range` lacks an end date；屬另一個舊解析器，
+  不可由 `0822.xlsx`、寄信日或系統日期補造截止日。
+- 修正：僅在 runtime 的實際擷取／consumer 路徑加入共用 strict parser。完整範圍、半形／全形月內
+  簡寫都以 `source_date_range` 最後一日為準，月內簡寫僅補起始年；檔名、空值、無效、逆序、跨年
+  歧義與晚於 run date 一律 fail-closed。KPI／台獎計算、Sheets、GAS、Pages、巡店及正式資料皆 0 變更。
+- 結果（本機完成／待正式發布）：Node 非寫入回歸 `24/24` 通過。正式契約保持
+  `report_run_date=2026-08-22`、`report_date=data_as_of_date=2026-08-21`、`source_file=0822.xlsx`。
+  runtime 位於 repo 外；此分支只保存可重現 patch、SHA-256、測試證據及必須先 reverse-check 的 rollback 指令。
+
 ## 2026-08-22 ｜ Codex（戰報日期契約正式發布＋readback 同步延遲修正）
 
 - 結果：PR #76 已合併；正式私有網站已發布並讀回 `reportDate/dataAsOfDate=2026-08-21`、來源 `0822.xlsx`，KPI 9 店／40 人／25 項，台獎 13 機款／10 列且逐值一致。Manifest 為 `published-verified`，日期與來源一致，owner 與 PRIVATE 權限正確。
