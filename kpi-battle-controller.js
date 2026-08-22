@@ -42,11 +42,6 @@
     return staged ? staged[1].toLowerCase() : raw;
   }
 
-  function kpiBattleReportSourceFile(reportDate) {
-    const match = String(reportDate || '').match(/^\d{4}-(\d{2})-(\d{2})$/);
-    return match ? `${match[1]}${match[2]}.xlsx` : '';
-  }
-
   function kpiBattleSourceDateRange(value) {
     const normalized = String(value || '').trim().replace(/\s*[~～]\s*/g, '～');
     return normalized || '—';
@@ -79,14 +74,16 @@
   }
 
   function kpiBattleSupplementIsCurrent(kpiData, snapshot) {
-    const snapshotDataAsOf = String((snapshot || {}).data_as_of_date || (snapshot || {}).source_as_of_date || '');
+    const snapshotReportDate = String((snapshot || {}).report_date || '');
+    const snapshotDataAsOf = String((snapshot || {}).data_as_of_date || '');
+    const kpiDataAsOf = String((kpiData || {}).data_as_of_date || '');
     const snapshotSource = kpiBattleSourceFile((snapshot || {}).source_file);
-    const reportSource = kpiBattleReportSourceFile((snapshot || {}).report_date);
+    const kpiDataSource = kpiBattleSourceFile((kpiData || {}).source_file);
     return Boolean(
-      snapshot && reportSource &&
-      snapshotDataAsOf === kpiData.data_as_of_date &&
-      snapshotSource && snapshotSource === reportSource &&
-      snapshotSource === kpiBattleSourceFile(kpiData.source_file)
+      snapshot && snapshotReportDate && snapshotDataAsOf && kpiDataAsOf && snapshotSource && kpiDataSource &&
+      snapshotReportDate === snapshotDataAsOf &&
+      snapshotDataAsOf === kpiDataAsOf &&
+      snapshotSource === kpiDataSource
     );
   }
 

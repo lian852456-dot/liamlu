@@ -76,11 +76,12 @@ test('台獎篩選可選北一二B，北一二B顯示80%／100%，門市顯示50
   }
 });
 
-test('快照合併硬性要求截止日與來源檔一致', () => {
+test('快照合併硬性要求快照日期、KPI 截止日與來源檔一致', () => {
   const guard = functionBody(controllerSource, 'kpiBattleSupplementIsCurrent');
-  for (const field of ['reportSource', 'data_as_of_date', 'source_file']) {
+  for (const field of ['snapshotReportDate', 'snapshotDataAsOf', 'kpiDataAsOf', 'source_file']) {
     assert.ok(guard.includes(field), `缺少快照合併門檻：${field}`);
   }
+  assert.doesNotMatch(guard, /kpiBattleReportSourceFile|reportSource/);
   assert.doesNotMatch(functionBody(controllerSource, 'load'), /__KPI_BATTLE_DATA__/);
 });
 
@@ -154,18 +155,18 @@ test('0805.xlsx 統計至 0804，未合併快照時不可偽裝成 0805 戰報',
   assert.equal(view.personal.length, 1);
 });
 
-test('同次正式快照補入 0805 戰報日、34 名、109.7%、12.35 與個人補充欄位', () => {
+test('同次正式快照補入 0804 資料日、34 名、109.7%、12.35 與個人補充欄位', () => {
   const A = loadAdapter();
   const base = A.kpicalcToKpiBattleView(SAMPLE, '');
   const snapshot = {
-    report_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0805.xlsx', source_date_range: '2026/08/01 ~ 08/04',
+    report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0805.xlsx', source_date_range: '2026/08/01 ~ 08/04',
     aggregate: { overall_kpi: 1.097, company_rank: 34, addon_score: 12.35, insurance_attach_rate: 0.46154 },
     stores: [{ store: '甲', company_rank: 20, addon_score: 14.2, insurance_attach_rate: 0.54545 }],
     personal: [{ store: '甲', name: '甲＊一', rank: 49, insurance_attach_rate: 0.83333, phone_award_actual: 1495, phone_award_projected: 14720 }],
   };
   const view = A.mergeKpiBattleSupplement(base, snapshot);
   assert.equal(view.supplement_synced, true);
-  assert.equal(view.report_date, '2026-08-05');
+  assert.equal(view.report_date, '2026-08-04');
   assert.equal(view.data_as_of_date, '2026-08-04');
   assert.equal(view.aggregate.company_rank, 34);
   assert.equal(view.aggregate.overall_kpi, 1.097);
@@ -185,13 +186,13 @@ test('受控 upload temporary filename 使用 canonical 0805.xlsx 合併，且�
   const base = A.kpicalcToKpiBattleView(staged, '');
   assert.equal(base.source_file, '0805.xlsx');
   const snapshot = {
-    report_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0805.xlsx',
+    report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0805.xlsx',
     aggregate: { overall_kpi: 1.097, company_rank: 34, overall_kpi_dod: -0.0142, company_rank_dod: -1, addon_score: 13.09 },
     stores: [], personal: [],
   };
   const merged = A.mergeKpiBattleSupplement(base, snapshot);
   assert.equal(merged.supplement_synced, true);
-  assert.equal(merged.report_date, '2026-08-05');
+  assert.equal(merged.report_date, '2026-08-04');
   assert.equal(merged.aggregate.company_rank, 34);
   assert.equal(merged.aggregate.overall_kpi_dod, -0.0142);
   assert.equal(merged.aggregate.company_rank_dod, -1);
@@ -217,8 +218,8 @@ test('過期截止日或不同來源檔快照不得混入補充欄位', () => {
   const A = loadAdapter();
   const base = A.kpicalcToKpiBattleView(SAMPLE, '');
   for (const snapshot of [
-    { report_date: '2026-08-05', data_as_of_date: '2026-08-03', source_file: '0805.xlsx' },
-    { report_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0804.xlsx' },
+    { report_date: '2026-08-03', data_as_of_date: '2026-08-03', source_file: '0805.xlsx' },
+    { report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0804.xlsx' },
   ]) {
     const merged = A.mergeKpiBattleSupplement(base, { ...snapshot, aggregate: { company_rank: 1 }, stores: [], personal: [] });
     assert.equal(merged.supplement_synced, false);
@@ -226,20 +227,45 @@ test('過期截止日或不同來源檔快照不得混入補充欄位', () => {
   }
 });
 
-test('report date、canonical source 或不受控 temporary filename 矛盾時仍 fail-closed', () => {
+test('快照報表日期、canonical source 或不受控 temporary filename 矛盾時仍 fail-closed', () => {
   const A = loadAdapter();
   const staged = JSON.parse(JSON.stringify(SAMPLE));
   staged.meta.sourceFile = `report-upload-temp-${'b'.repeat(64)}-0805.xlsx`;
   const base = A.kpicalcToKpiBattleView(staged, '');
   for (const snapshot of [
-    { report_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0804.xlsx' },
-    { report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0805.xlsx' },
+    { report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0804.xlsx' },
+    { report_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0805.xlsx' },
   ]) {
     assert.equal(A.mergeKpiBattleSupplement(base, { ...snapshot, aggregate: { company_rank: 1 }, stores: [], personal: [] }).supplement_synced, false);
   }
   const uncontrolled = JSON.parse(JSON.stringify(SAMPLE));
   uncontrolled.meta.sourceFile = 'report-upload-temp-token-0805.xlsx';
   assert.equal(A.mergeKpiBattleSupplement(A.kpicalcToKpiBattleView(uncontrolled, ''), {
-    report_date:'2026-08-05', data_as_of_date:'2026-08-04', source_file:'0805.xlsx', aggregate:{company_rank:1}, stores:[], personal:[],
+    report_date:'2026-08-04', data_as_of_date:'2026-08-04', source_file:'0805.xlsx', aggregate:{company_rank:1}, stores:[], personal:[],
   }).supplement_synced, false);
+});
+
+test('0822.xlsx 的 D+1 來源只接受同為 0821 的快照資料日，且保留受控 temporary filename canonical 化', () => {
+  const A = loadAdapter();
+  const staged = JSON.parse(JSON.stringify(SAMPLE));
+  staged.meta.period = '2026/08/01 ~ 08/21';
+  staged.meta.snapshotDay = 21;
+  staged.meta.sourceFile = `report-upload-temp-${'c'.repeat(64)}-0822.xlsx`;
+  const base = A.kpicalcToKpiBattleView(staged, '');
+  assert.equal(base.data_as_of_date, '2026-08-21');
+  assert.equal(base.source_file, '0822.xlsx');
+  const valid = { report_date: '2026-08-21', data_as_of_date: '2026-08-21', source_file: '0822.xlsx', aggregate: { company_rank: 28 }, stores: [], personal: [] };
+  assert.equal(A.mergeKpiBattleSupplement(base, valid).supplement_synced, true);
+  for (const snapshot of [
+    { report_date: '2026-08-22', data_as_of_date: '2026-08-21', source_file: '0822.xlsx' },
+    { report_date: '2026-08-21', data_as_of_date: '2026-08-21', source_file: '0821.xlsx' },
+    { report_date: '2026-08-20', data_as_of_date: '2026-08-20', source_file: '0822.xlsx' },
+    { report_date: '', data_as_of_date: '2026-08-21', source_file: '0822.xlsx' },
+    { report_date: '2026-08-21', data_as_of_date: '', source_file: '0822.xlsx' },
+    { report_date: '2026-08-21', data_as_of_date: '2026-08-21', source_file: '' },
+  ]) {
+    const merged = A.mergeKpiBattleSupplement(base, { ...snapshot, aggregate: { company_rank: 1 }, stores: [], personal: [] });
+    assert.equal(merged.supplement_synced, false);
+    assert.equal(merged.aggregate.company_rank, null);
+  }
 });
