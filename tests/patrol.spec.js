@@ -22,6 +22,7 @@ let expireHalfWriteAt;
 let halfWriteCalls;
 let omitPtdetailKeys;
 let omitPtdetailRow;
+let ptwritePayloads;
 
 function privateScheduleFixture() {
   const names = ['酒泉', '萬大', '大稻埕', '復興', '三創', '杭州', '永吉', '通化', '六張犁'];
@@ -169,6 +170,7 @@ async function stubGas(page) {
         body = JSON.stringify({ status: 'error', message: 'unauthorized', reason:'AUTH_SESSION_EXPIRED' });
       } else {
         const rows = JSON.parse(url.searchParams.get('payload'));
+        ptwritePayloads.push(rows);
         const seen = new Set(cloudRows.map(r => `${r.fillTime}|${r.store}|${r.item}`));
         let written = 0;
         rows.forEach(r => {
@@ -279,7 +281,7 @@ function item18Panel(page) {
   return page.locator('#invPanels .panel').filter({ hasText:'到店全盤提醒' });
 }
 
-test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; ptMileageContract = 'patrol-mileage-visits-v2'; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; omitPtdetailKeys = new Set(); omitPtdetailRow = false; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; ptMileageContract = 'patrol-mileage-visits-v2'; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; omitPtdetailKeys = new Set(); omitPtdetailRow = false; ptwritePayloads = []; });
 
 test('填表時間為 ######## 時整批拒絕，不寫雲端、不改 rawDetails、不清除貼上內容', async ({ page }) => {
   await stubGas(page);
@@ -348,7 +350,7 @@ test('有效 8/20 資料完整解析 66 筆，三創與六張犁各 33 筆並相
   });
 });
 
-test('解析預覽不寫雲端、不改 rawDetails；確認後才逐店讀回', async ({ page }) => {
+test('解析預覽先做 Server Preflight，不寫雲端、不改 rawDetails；確認後才逐店讀回', async ({ page }) => {
   await stubGas(page);
   await openAndUnlock(page);
   const pasted=[
@@ -358,12 +360,15 @@ test('解析預覽不寫雲端、不改 rawDetails；確認後才逐店讀回', 
   await page.fill('#pasteBox', pasted);
   await page.getByRole('button', { name:'解析並預覽' }).click();
 
+  await expect(page.locator('#patrolConfirmWriteBtn')).toBeVisible();
   expect(writeCalls).toBe(0);
-  expect(ptDetailCalls).toEqual([]);
+  expect(ptDetailCalls).toEqual(expect.arrayContaining([
+    expect.objectContaining({store:'台北通化',page:1,limit:100}),
+    expect.objectContaining({store:'台北酒泉',page:1,limit:100}),
+  ]));
   expect(await page.evaluate(() => rawDetails.length)).toBe(0);
   await expect(page.locator('#pasteBox')).toHaveValue(pasted);
   await expect(page.locator('#patrolPastePreview')).toContainText('本次預計寫入店點：台北通化、台北酒泉（2 筆）');
-  await expect(page.locator('#patrolConfirmWriteBtn')).toBeVisible();
 
   await page.getByRole('button', { name:'確認寫入雲端' }).click();
   await expect(page.locator('#parseMsg')).toContainText('雲端寫入與 readback 一致');
@@ -394,13 +399,40 @@ test('write 後 readback 缺 key 時不得顯示成功，保留原始貼上與�
   await expect(page.locator('#parseMsg')).toContainText('missing keys');
   expect(writeCalls).toBe(1);
   expect(cloudRows).toHaveLength(2);
-  expect(ptDetailCalls).toHaveLength(1);
+  expect(ptDetailCalls).toHaveLength(2);
   expect(await page.evaluate(() => rawDetails.length)).toBe(0);
   await expect(page.locator('#pasteBox')).toHaveValue(pasted);
   await expect(page.locator('#patrolConfirmWriteBtn')).toBeHidden();
 
   await page.getByRole('button', { name:'解析並預覽' }).click();
   await expect(page.locator('#parseMsg')).toContainText('禁止重複寫入');
+  expect(writeCalls).toBe(1);
+});
+
+test('Server Preflight 僅送新增缺失，既有內容差異 fail-closed', async ({ page }) => {
+  await stubGas(page);
+  await openAndUnlock(page);
+  const existing=pasteLine(6,'台北通化','DNB10059',1,'v','');
+  const addition=pasteLine(6,'台北通化','DNB10059',2,'v','');
+  const fixture=currentMonthFixture(6,'台北通化','DNB10059',1,'v','');
+  cloudRows=[{
+    fillTime:`${fixture.fillDate} 16:43`,arriveTime:`${fixture.fillDate} 16:00`,leaveTime:`${fixture.fillDate} 18:00`,
+    district:'北一二B',code:'DNB10059',store:'台北通化',inspector:'測試督導',item:1,content:'內容',result:'v',reason:'',month:fixture.month
+  }];
+  await page.fill('#pasteBox',[existing,addition].join('\n'));
+  await page.getByRole('button',{name:'解析並預覽'}).click();
+  await expect(page.locator('#patrolPastePreview')).toContainText('正式已存在且內容相同 1 筆');
+  await expect(page.locator('#patrolPastePreview')).toContainText('新增缺失 1 筆');
+  await page.getByRole('button',{name:'確認寫入雲端'}).click();
+  await expect(page.locator('#parseMsg')).toContainText('解析 2 筆／寫入 1 筆／讀回 1 筆');
+  expect(ptwritePayloads).toHaveLength(1);
+  expect(ptwritePayloads[0]).toHaveLength(1);
+  expect(ptwritePayloads[0][0].item).toBe(2);
+
+  await page.fill('#pasteBox',pasteLine(6,'台北通化','DNB10059',1,'na','na'));
+  await page.getByRole('button',{name:'解析並預覽'}).click();
+  await expect(page.locator('#parseMsg')).toContainText('既有內容差異');
+  await expect(page.locator('#patrolConfirmWriteBtn')).toBeHidden();
   expect(writeCalls).toBe(1);
 });
 
@@ -568,8 +600,9 @@ test('貼上明細後切到督導檢查大盤仍使用 fresh ptsummary', async (
     `${row.fillTime}\t${row.arriveTime}\t${row.leaveTime}\t${row.district}\t${row.code}\t${row.store}\t${row.inspector}\t18\t內容\tv\t`
   ).join('\n');
   await page.fill('#pasteBox', julyOnly);
-  await parseAndConfirm(page);
-  await expect(page.locator('#parseMsg')).toHaveText(/readback 一致/);
+  await page.getByRole('button',{name:'解析並預覽'}).click();
+  await expect(page.locator('#parseMsg')).toHaveText(/本輪沒有新增缺失/);
+  await expect(page.locator('#patrolConfirmWriteBtn')).toBeHidden();
   await expect(item18Panel(page)).toContainText('8/9 店完成');
   await expect(page.locator('#patrolPastePreview')).toContainText('本次貼上：3 筆');
   const readsBeforeSwitch = ptReadCalls;
@@ -591,12 +624,12 @@ test.describe('巡店貼上正式摘要來源回歸', () => {
       `${row.fillTime}\t${row.arriveTime}\t${row.leaveTime}\t${row.district}\t${row.code}\t${row.store}\t${row.inspector}\t18\t內容\tv\t`
     ).join('\n');
     await page.fill('#pasteBox', batch);
-    await parseAndConfirm(page);
+    await page.getByRole('button',{name:'解析並預覽'}).click();
 
-    await expect(page.locator('#parseMsg')).toHaveText(/正式摘要已更新/);
+    await expect(page.locator('#parseMsg')).toHaveText(/本輪沒有新增缺失/);
     await expect(item18Panel(page)).toContainText('8/9 店完成');
     const state = await page.evaluate(() => ({ summary:patrolSummary.item18.completedStores, local:rawDetails.length, source:patrolSummaryState }));
-    expect(state).toEqual({ summary:8, local:3, source:'ok' });
+    expect(state).toEqual({ summary:8, local:0, source:'ok' });
   });
 
   test('成功寫入後只以 fresh ptsummary 將 7/9 更新為 8/9', async ({ page }) => {
@@ -1033,6 +1066,19 @@ function august18VisitRawRows() {
   }))));
 }
 
+function august660RawRows() {
+  const rows=august18VisitRawRows();
+  ['台北三創','台北酒泉'].forEach((store,index)=>{
+    const code=store==='台北三創'?'DNB10307':'DNB10062';
+    for(let item=1;item<=33;item++) rows.push({
+      fillTime:`2026/8/21 08:${String(item).padStart(2,'0')}`,
+      arriveTime:`2026/8/21 ${String(9+index).padStart(2,'0')}:00`,leaveTime:'',district:'北一二B',
+      code,store,inspector:'測試督導',item:String(item),content:'',result:'v',reason:'',month:'2026-08'
+    });
+  });
+  return rows;
+}
+
 function july1179RawRows() {
   const stores=[
     ['DNB10062','台北酒泉'],['DNB10284','台北大稻埕'],['DNB10307','台北三創'],
@@ -1091,6 +1137,23 @@ test('594 題 raw rows 經月份級 visits contract 顯示 18 visits／37.8 KM�
   });
   expect(result).toMatchObject({health:{patrolRows:18,mileageDetails:18,abnormal:false},days:7,billDays:7,km:37.8});
   expect(ptMileageCalls).toEqual([{month:'2026-08'}]);
+});
+
+test('2026/08 正式 660 rows 以單一月份級 read 正常讀取，不受 500 rows 分頁影響', async ({page})=>{
+  cloudRows=august660RawRows();
+  expect(cloudRows).toHaveLength(660);
+  await stubGas(page); await openAndUnlock(page);
+  await page.evaluate(()=>{currentMonth='2026-08';});
+  await page.click('.secure-tab[data-view="mileage"]');
+  await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取|MILEAGE_API_ERROR/);
+  const report=await page.evaluate(()=>MI._runDiagnostic('2026-08'));
+  expect(report).toMatchObject({
+    status:'ok',ptdetailRows:660,
+    mileage:{status:'ok',contract:'patrol-mileage-visits-v2',matchedRows:660,sheetScans:1}
+  });
+  expect(report.firstBreak).toBeNull();
+  expect(ptMileageCalls).toEqual([{month:'2026-08'},{month:'2026-08'}]);
+  expect(writeCalls).toBe(0);
 });
 
 test('2026/07 唯讀診斷依序比對 summary、九店 ptdetail、ptmileage2，1,179 rows 不寫入來源', async ({page})=>{
@@ -1241,6 +1304,40 @@ test('6→7→8→7 切換與 reload 不混用 archive、7 月或 8 月的月份
     july:MI._monthPlans('2026-07').map(plan=>plan.date)
   }));
   expect(afterReload).toEqual({june:'official-archive',july:['2026-07-31']});
+  expect(writeCalls).toBe(0);
+});
+
+test('rolling six-month retention 只修剪 Mileage 工作資料，跨年與 cleanup failure 均 fail-open', async ({page})=>{
+  await stubGas(page); await openAndUnlock(page);
+  const result=await page.evaluate(()=>{
+    const key='bei12b_mileage_v1';
+    localStorage.setItem(key,JSON.stringify({
+      dayEdits:{'2026-03-01':{legs:[]},'2026-04-01':{legs:[]},'2026-09-01':{legs:[]}},
+      monthCache:{'2026-03':{stale:true},'2026-04':{live:true},'2026-09':{live:true}},
+      routeOverrides:{'2026-03|A':1,'2026-04|B':2},
+      manualLegs:[{date:'2026-03-01',km:1},{date:'2026-09-01',km:2}],
+      exportLog:[{month:'2026-03'},{month:'2026-09'}],
+      costOwner:'保留設定'
+    }));
+    const sep=MI._cleanupRetention('2026-09','2026-09');
+    const afterSep=JSON.parse(localStorage.getItem(key));
+    const oct=MI._retentionMonths('2026-10');
+    const crossYear=MI._retentionMonths('2027-02');
+    localStorage.setItem(key,'{broken');
+    const failed=MI._cleanupRetention('2026-09','2026-09');
+    return {sep,afterSep,oct,crossYear,failed,rawAfterFailure:localStorage.getItem(key)};
+  });
+  expect(result.sep.months).toEqual(['2026-04','2026-05','2026-06','2026-07','2026-08','2026-09']);
+  expect(result.afterSep.dayEdits).toEqual({'2026-04-01':{legs:[]},'2026-09-01':{legs:[]}});
+  expect(result.afterSep.monthCache).toEqual({'2026-04':{live:true},'2026-09':{live:true}});
+  expect(result.afterSep.routeOverrides).toEqual({'2026-04|B':2});
+  expect(result.afterSep.manualLegs).toEqual([{date:'2026-09-01',km:2}]);
+  expect(result.afterSep.exportLog).toEqual([{month:'2026-09'}]);
+  expect(result.afterSep.costOwner).toBe('保留設定');
+  expect(result.oct).toEqual(['2026-05','2026-06','2026-07','2026-08','2026-09','2026-10']);
+  expect(result.crossYear).toEqual(['2026-09','2026-10','2026-11','2026-12','2027-01','2027-02']);
+  expect(result.failed.cleanupFailed).toBe(true);
+  expect(result.rawAfterFailure).toBe('{broken');
   expect(writeCalls).toBe(0);
 });
 
