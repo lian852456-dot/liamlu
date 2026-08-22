@@ -46,8 +46,16 @@
 每日報表流程可用下列工作區腳本，把 OneDrive `TWM每日戰報` 的日期報表整理成網站資料；原始 Excel 不會被修改：
 
 ```bash
-python3 /Users/liamlu/Downloads/liam-agent/report-automation/work/build_github_pages_data.py
+python3 /Users/liamlu/Downloads/liam-agent/report-automation/work/build_github_pages_data.py \
+  --report-run-date YYYY-MM-DD \
+  --data-cutoff-date YYYY-MM-DD
 ```
+
+`report_run_date`／`mail_date` 是執行與寄信日；`data_cutoff_date` 是
+`today_report_data.json` 的 `source_date_range` 最後一日。KPI／台獎網站 snapshot 的
+`report_date` 與 KPI `data_as_of_date` 一律使用 `data_cutoff_date`，不得由
+`MMDD.xlsx`、郵件主旨或附件檔名推導。正式發布另須顯式傳入
+`REPORT_RUN_DATE_ISO` 與 `REPORT_DATA_CUTOFF_DATE`；任一缺少或不一致都 fail closed。
 
 輸出會更新：
 
