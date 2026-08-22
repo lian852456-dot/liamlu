@@ -1028,12 +1028,16 @@ function mergePatrolCandidates(rows){
   return result;
 }
 
-function showPatrolPastePreview(label,result){
+function showPatrolPastePreview(label,result,preflight){
   const preview=document.getElementById('patrolPastePreview');if(!preview)return;
-  const stores=[...new Set((result.writeRows||[]).map(canonicalPatrolCandidateStore).filter(Boolean))];
-  const storesText=stores.length?`<br>本次預計寫入店點：${stores.map(esc).join('、')}（${result.writeRows.length} 筆）`:'<br>本次沒有需要寫入的新增候選。';
+  const writeRows=preflight?preflight.additions:(result.writeRows||[]);
+  const stores=[...new Set(writeRows.map(canonicalPatrolCandidateStore).filter(Boolean))];
+  const storesText=stores.length?`<br>本次預計寫入店點：${stores.map(esc).join('、')}（${writeRows.length} 筆）`:'<br>本次沒有需要寫入的新增缺失。';
+  const preflightText=preflight
+    ? `<br><b>Server Preflight（唯讀 ptdetail 分頁）</b>：正式已存在且內容相同 ${preflight.existingSame.length} 筆／新增缺失 ${preflight.additions.length} 筆／既有內容差異 ${preflight.differences.length} 筆`
+    : '';
   preview.hidden=false;
-  preview.innerHTML=`<strong>${label}：${result.addedRows.length} 筆</strong>本頁去重候選共 ${result.total} 筆${result.duplicates?`・略過重複 ${result.duplicates} 筆`:''}${storesText}<br>正式摘要仍以雲端 ptsummary 為準。`;
+  preview.innerHTML=`<strong>${label}：${result.addedRows.length} 筆</strong>本頁去重候選共 ${result.total} 筆${result.duplicates?`・略過重複 ${result.duplicates} 筆`:''}${preflightText}${storesText}<br>正式摘要仍以雲端 ptsummary 為準。`;
 }
 
 const PATROL_FILL_TIME_PARSE_ERROR="填表時間欄顯示 ####，請回原 Excel 加寬『填表時間』欄，確認顯示日期時間後再貼上。";
@@ -1109,7 +1113,56 @@ function setPatrolWriteConfirmation(visible, disabled=false){
   button.disabled=Boolean(disabled);
 }
 
-function parseData(){
+function patrolCandidateContentKey(row){
+  return [String(row&&row.result||'').trim().toLowerCase(),String(row&&row.reason||'').trim()].join('|');
+}
+
+async function formalPatrolRowsForPreflight(rows){
+  const groups=new Map();
+  (rows||[]).forEach(row=>{
+    const month=patrolCandidateMonth(row),store=canonicalPatrolCandidateStore(row);
+    groups.set(`${month}|${store}`,{month,store});
+  });
+  const formalRows=[];
+  for(const group of groups.values()){
+    if(!group.month||!group.store) throw new Error('Server Preflight 缺少月份或店點，已封鎖寫入');
+    let page=1,totalRows=null,loaded=0;
+    for(;;){
+      const result=await cloudCall('ptdetail',{month:group.month,store:group.store,page,limit:100});
+      if(!result||result.status!=='ok') throw new Error(result&&result.message||'Server Preflight ptdetail 失敗');
+      if(!Array.isArray(result.rows)) throw new Error('Server Preflight ptdetail 分頁 contract 不完整');
+      const reportedTotal=Number(result.totalRows);
+      if(!Number.isInteger(reportedTotal)||reportedTotal<0) throw new Error('Server Preflight ptdetail totalRows contract 不完整');
+      if(totalRows===null) totalRows=reportedTotal;
+      else if(totalRows!==reportedTotal) throw new Error('Server Preflight 期間正式資料筆數變更，已封鎖寫入');
+      formalRows.push(...result.rows); loaded+=result.rows.length;
+      if(loaded===totalRows) break;
+      if(result.rows.length===0||loaded>totalRows) throw new Error('Server Preflight ptdetail 分頁讀回筆數不一致');
+      page+=1; if(page>100) throw new Error('Server Preflight ptdetail 頁數異常');
+    }
+  }
+  return formalRows;
+}
+
+async function patrolServerPreflight(rows){
+  const formalRows=await formalPatrolRowsForPreflight(rows);
+  const byKey=new Map();
+  formalRows.forEach(row=>{
+    const key=patrolReadbackKey(row),list=byKey.get(key)||[];
+    list.push(row);byKey.set(key,list);
+  });
+  const additions=[],existingSame=[],differences=[];
+  (rows||[]).forEach(row=>{
+    const formal=byKey.get(patrolReadbackKey(row))||[];
+    if(!formal.length){additions.push(row);return;}
+    if(formal.every(source=>patrolCandidateContentKey(source)===patrolCandidateContentKey(row))){existingSame.push(row);return;}
+    differences.push({input:row,formal});
+  });
+  if(additions.length+existingSame.length+differences.length!==(rows||[]).length) throw new Error('Server Preflight 分類不完整，已封鎖寫入');
+  return {formalRows,additions,existingSame,differences};
+}
+
+async function parseData(){
   const raw = document.getElementById('pasteBox').value;
   if(!raw.trim()){ showMsg('請先貼上資料','err'); return; }
 
@@ -1123,7 +1176,6 @@ function parseData(){
   }
 
   const candidate=preparePatrolCandidates(newDetails);
-  showPatrolPastePreview('本次貼上',candidate);
   if(failedPatrolWriteRaw===raw){
     pendingPatrolWrite=null;setPatrolWriteConfirmation(false);
     showMsg('此份原始資料已有未完成的雲端寫入／讀回驗證，已保留原文且禁止重複寫入；請先重新載入正式摘要並確認 missing keys。','err');
@@ -1131,12 +1183,43 @@ function parseData(){
   }
   if(!candidate.writeRows.length){
     pendingPatrolWrite=null;setPatrolWriteConfirmation(false);
+    showPatrolPastePreview('本次貼上',candidate);
     showMsg(`本次貼上沒有新候選（新增 0 筆，略過重複 ${candidate.duplicates} 筆）；正式摘要維持不變`,'ok');
     return;
   }
-  pendingPatrolWrite={raw,parsedRows:newDetails,candidate};
-  setPatrolWriteConfirmation(true);
-  showMsg(`已解析 ${newDetails.length} 筆；請確認本次預計寫入店點與筆數後，按「確認寫入雲端」。寫入成功必須逐鍵 readback 一致才會顯示同步成功。`,'ok');
+  if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN){
+    showPatrolPastePreview('本次貼上',candidate);
+    setPatrolWriteConfirmation(false);
+    showMsg('尚未連線；原始貼上資料已保留，必須完成督導驗證後才能執行 Server Preflight。','err');
+    return;
+  }
+  const parseButton=document.getElementById('patrolParseBtn');
+  if(parseButton) parseButton.disabled=true;
+  setPatrolWriteConfirmation(false);
+  showMsg(`已解析 ${newDetails.length} 筆；正在以 ptdetail 分頁比對正式資料，完成前禁止寫入……`,'ok');
+  try{
+    const preflight=await patrolServerPreflight(candidate.writeRows);
+    showPatrolPastePreview('本次貼上',candidate,preflight);
+    if(preflight.differences.length){
+      pendingPatrolWrite=null;
+      showMsg(`Server Preflight 發現 ${preflight.differences.length} 筆既有內容差異，已 fail-closed；本輪不允許寫入。`,'err');
+      return;
+    }
+    if(!preflight.additions.length){
+      pendingPatrolWrite=null;
+      showMsg(`Server Preflight 完成：正式已存在 ${preflight.existingSame.length} 筆，本輪沒有新增缺失，不建立雲端寫入。`,'ok');
+      return;
+    }
+    pendingPatrolWrite={raw,parsedRows:newDetails,candidate:preparePatrolCandidates(preflight.additions),preflight};
+    setPatrolWriteConfirmation(true);
+    showMsg(`Server Preflight PASS：正式已存在 ${preflight.existingSame.length} 筆，僅 ${preflight.additions.length} 筆新增缺失可寫入；寫入後仍須逐鍵 readback 一致。`,'ok');
+  }catch(error){
+    pendingPatrolWrite=null;
+    showPatrolPastePreview('本次貼上',candidate);
+    showMsg(`${error&&error.message||'Server Preflight 失敗'}；原始貼上資料已保留，禁止寫入。`,'err');
+  }finally{
+    if(parseButton) parseButton.disabled=false;
+  }
 }
 
 async function confirmPatrolCloudWrite(){
@@ -2253,6 +2336,7 @@ const MI = (function(){
     LOAD_SLOW:'MILEAGE_LOAD_SLOW', LOAD_TIMEOUT:'MILEAGE_LOAD_TIMEOUT'
   };
   const LOAD_TARGET_MS=10000;
+  const RETENTION_MONTHS=6;
   let state={date:'', month:'', loading:false, error:null, progress:'', slow:null, diagnostic:null};
   let serverRowsByMonth={};
   let loadedMonths={};
@@ -2268,6 +2352,85 @@ const MI = (function(){
     const year=parts.find(part=>part.type==='year');
     const month=parts.find(part=>part.type==='month');
     return year&&month?year.value+'-'+month.value:'';
+  }
+
+  function retentionMonths(anchor){
+    const month=canonicalMonth(anchor);
+    if(!month) return [];
+    const [year,number]=month.split('-').map(Number);
+    const out=[];
+    for(let offset=RETENTION_MONTHS-1;offset>=0;offset--){
+      const cursor=new Date(Date.UTC(year,number-1-offset,1));
+      out.push(`${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth()+1).padStart(2,'0')}`);
+    }
+    return out;
+  }
+
+  function scopedMonth(value){
+    const match=String(value||'').match(/^(\d{4})-(\d{2})(?:[-|]|$)/);
+    return match?canonicalMonth(`${match[1]}-${match[2]}`):'';
+  }
+
+  function pruneMonthObject(value,retained){
+    if(!value||typeof value!=='object'||Array.isArray(value)) return {value,changed:false};
+    let changed=false;const next={};
+    Object.keys(value).forEach(key=>{
+      const month=scopedMonth(key);
+      if(month&&!retained.has(month)){changed=true;return;}
+      next[key]=value[key];
+    });
+    return {value:next,changed};
+  }
+
+  function pruneScopedRows(value,retained){
+    if(!Array.isArray(value)) return {value,changed:false};
+    const next=value.filter(row=>{
+      const month=scopedMonth(row&&((row.month||row.date||row.key)||''));
+      return !month||retained.has(month);
+    });
+    return {value:next,changed:next.length!==value.length};
+  }
+
+  // Retention is intentionally limited to browser working data. It never calls GAS,
+  // changes a Patrol row, nor clears the entire localStorage value on any failure.
+  function cleanupRetention(anchor,protectMonth){
+    const base=canonicalMonth(anchor)||taipeiCurrentMonth();
+    const retained=new Set(retentionMonths(base));
+    const protectedCurrent=canonicalMonth(protectMonth)||canonicalMonth(state.month);
+    const memoryMonths=new Set(retained);
+    if(protectedCurrent) memoryMonths.add(protectedCurrent);
+    try{
+      const raw=localStorage.getItem(LS);
+      if(raw!=null){
+        const parsed=JSON.parse(raw);
+        if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)) throw new Error('mileage local state is not an object');
+        const next=Object.assign({},parsed);let changed=false;
+        const dayEdits=pruneMonthObject(next.dayEdits,retained);
+        if(dayEdits.changed){next.dayEdits=dayEdits.value;changed=true;}
+        ['monthCache','monthState','monthOverrides','routeOverrides'].forEach(field=>{
+          const value=next[field];
+          const pruned=Array.isArray(value)?pruneScopedRows(value,retained):pruneMonthObject(value,retained);
+          if(pruned.changed){next[field]=pruned.value;changed=true;}
+        });
+        ['manualLegs','exportLog'].forEach(field=>{
+          const pruned=pruneScopedRows(next[field],retained);
+          if(pruned.changed){next[field]=pruned.value;changed=true;}
+        });
+        if(changed) localStorage.setItem(LS,JSON.stringify(next));
+      }
+    }catch(error){
+      console.warn('MILEAGE_RETENTION_CLEANUP_FAILED',{month:base,reason:String(error&&error.message||error)});
+      // Fail open: leave browser state untouched and continue the mileage read.
+      // Do not trim in-memory months either: a failed cleanup must be a no-op.
+      return {months:[...retained].sort(),protectedMonth:protectedCurrent||'',cleanupFailed:true};
+    }
+    Object.keys(serverRowsByMonth).forEach(month=>{
+      if(!memoryMonths.has(month)) delete serverRowsByMonth[month];
+    });
+    Object.keys(loadedMonths).forEach(month=>{
+      if(!memoryMonths.has(month)) delete loadedMonths[month];
+    });
+    return {months:[...retained].sort(),protectedMonth:protectedCurrent||'',memoryMonths:[...memoryMonths].sort()};
   }
 
   function mileageError(code, message, detail){
@@ -2316,6 +2479,8 @@ const MI = (function(){
   async function hydrateMonth(value, force){
     const month=canonicalMonth(value);
     if(!month) throw mileageError(ERROR.DATE_PARSE,'巡店月份格式錯誤');
+    // Direct callers also get the retention guard; cleanup failures never block this read.
+    cleanupRetention(taipeiCurrentMonth(),month);
     if(loadedMonths[month] && !force) return serverRowsByMonth[month]||[];
     const wasLoaded=Boolean(loadedMonths[month]);
     if(!secureUnlocked || !privateAccount || !PT_TOKEN) throw mileageError(ERROR.AUTH,'請先完成督導驗證');
@@ -2850,11 +3015,13 @@ const MI = (function(){
   /* ---------- 日期／月份切換 ---------- */
   function open(v){
     const month=canonicalMonth(v)||canonicalMonth(currentMonth)||taipeiCurrentMonth();
+    cleanupRetention(taipeiCurrentMonth(),month);
     state.month=month; state.date=''; state.loading=!loadedMonths[month]; state.error=null; render();
     return hydrateMonth(month,false).catch(error=>{console.error('Mileage hydration failed:',error);return false;});
   }
   function setMonth(v){
     const month=canonicalMonth(v); if(!month) return Promise.resolve(false);
+    cleanupRetention(taipeiCurrentMonth(),month);
     state.month=month; state.date=''; state.loading=!loadedMonths[month]; state.error=null; render();
     return hydrateMonth(month,false).catch(error=>{console.error('Mileage hydration failed:',error);return false;});
   }
@@ -3057,7 +3224,8 @@ const MI = (function(){
           _days:days,_dayPlan:dayPlan,_monthPlans:monthPlans,_coverage:coverage,
           _buildSheets:buildSheets,_normalize:normalize,_legFor:legFor,
           _isOffice:isOffice,_store:store,_hydrateMonth:hydrateMonth,_health:health,
-          _parseArrive:parseArrive,_monthSource:monthSource,_runDiagnostic:runDiagnostic,ERROR,NODES,DIST};
+          _parseArrive:parseArrive,_monthSource:monthSource,_runDiagnostic:runDiagnostic,
+          _retentionMonths:retentionMonths,_cleanupRetention:cleanupRetention,ERROR,NODES,DIST};
 })();
 
 </script>
