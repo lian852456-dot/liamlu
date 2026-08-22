@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Patrol UAT 測試頁</title>
+  <style>
+    :root{--ink:#17202a;--muted:#5e6a75;--surface:#fff;--canvas:#f4f7fa;--orange:#f26b21;--orange-deep:#c94f0d;--line:#dce4ea;--ok:#137a46;--bad:#b42318;--warn:#8a4b00}
+    *{box-sizing:border-box} body{margin:0;background:var(--canvas);color:var(--ink);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}
+    main{width:min(880px,calc(100% - 28px));margin:28px auto 56px}.banner{border:2px solid #d97706;background:#fff7e8;color:#7c3e00;border-radius:12px;padding:12px 16px;font-weight:800;letter-spacing:.02em}
+    h1{margin:18px 0 4px;font-size:28px;line-height:1.25} .lede{margin:0;color:var(--muted)}.card{margin-top:18px;padding:20px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 2px 9px #1e2e3a0b}
+    h2{margin:0 0 10px;font-size:19px}.muted{color:var(--muted);font-size:14px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row > *{min-width:0}.spacer{flex:1}
+    label{display:block;font-weight:700;margin:14px 0 6px}input,textarea,button{font:inherit}input,textarea{width:100%;border:1px solid #b9c7d1;border-radius:9px;padding:10px 12px;background:#fff;color:var(--ink)}textarea{min-height:280px;resize:vertical;tab-size:4;white-space:pre;line-height:1.45}input[type="month"]{width:auto}
+    button{border:0;border-radius:9px;padding:10px 15px;font-weight:750;cursor:pointer;background:#e8eef2;color:var(--ink)}button.primary{background:var(--orange);color:#fff}button.primary:hover{background:var(--orange-deep)}button.danger{background:#fff0ee;color:var(--bad)}button:disabled{opacity:.55;cursor:not-allowed}
+    .status{display:inline-flex;align-items:center;gap:8px;font-weight:700}.dot{width:10px;height:10px;border-radius:50%;background:#94a3b8}.dot.ok{background:#22a06b}.dot.bad{background:#d92d20}.notice{display:none;margin-top:14px;padding:11px 13px;border-radius:9px;white-space:pre-wrap;word-break:break-word}.notice.show{display:block}.notice.ok{background:#ecfdf3;color:#05603a;border:1px solid #abefc6}.notice.err{background:#fef3f2;color:#8a1c13;border:1px solid #fecdca}.notice.info{background:#eff8ff;color:#175c99;border:1px solid #b2ddff}
+    .preview{margin-top:14px;padding:13px;border:1px solid #b2ddff;background:#eff8ff;border-radius:9px}.preview ul{margin:8px 0 0;padding-left:20px}.summary{margin-top:12px;padding:12px;border-radius:9px;background:#f7fafc;border:1px solid var(--line)}.summary dl{display:grid;grid-template-columns:max-content 1fr;gap:5px 13px;margin:0}.summary dt{font-weight:700}.summary dd{margin:0}
+    .hidden{display:none!important}.guard{font-size:13px;color:#6b3c06;margin:0}.foot{margin-top:18px;color:var(--muted);font-size:13px}@media(max-width:560px){main{width:min(100% - 22px,880px);margin-top:16px}.card{padding:16px}h1{font-size:24px}.row button{flex:1}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="banner">⚠ Patrol UAT 測試頁</div>
+  <h1>巡店貼上雲端寫入驗證</h1>
+  <p class="lede">僅供本次「貼上 → 解析並預覽 → 確認寫入雲端 → ptdetail 讀回 → ptsummary 刷新」驗收。</p>
+
+  <section class="card" id="authCard">
+    <h2>督導驗證</h2>
+    <p class="muted">本頁只使用獨立的 UAT 短效 session；不讀取或覆蓋正式巡店頁的 session。</p>
+    <label for="passcode">巡店通行碼</label>
+    <div class="row"><input id="passcode" type="password" autocomplete="one-time-code" inputmode="text" aria-label="巡店通行碼"><button class="primary" id="signInButton" type="button">驗證並開啟 UAT</button></div>
+    <p class="guard">通行碼只在本次驗證請求中使用，不會寫入瀏覽器儲存空間、頁面或 console。</p>
+    <div id="authNotice" class="notice" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="card hidden" id="uatCard">
+    <div class="row"><div class="status"><span id="statusDot" class="dot ok"></span><span id="statusText">已連線至 Patrol UAT</span></div><span class="spacer"></span><button id="signOutButton" class="danger" type="button">登出 UAT</button></div>
+    <label for="monthInput">看板月份</label>
+    <div class="row"><input id="monthInput" type="month" aria-label="看板月份"><button id="refreshSummaryButton" type="button">刷新 ptsummary</button></div>
+    <div id="summary" class="summary muted">尚未讀取正式巡店摘要。</div>
+    <div id="mainNotice" class="notice" role="status" aria-live="polite"></div>
+
+    <hr style="border:0;border-top:1px solid var(--line);margin:24px 0">
+    <h2>貼上巡店紀錄</h2>
+    <p class="muted">請貼上原始 Excel 的 Tab 分隔明細。若「填表時間」顯示 <code>####</code>，整批會 fail-closed，且不會發送任何雲端寫入。</p>
+    <label for="pasteBox">巡店明細</label>
+    <textarea id="pasteBox" spellcheck="false" placeholder="填表時間&#9;到店時間&#9;離店時間&#9;區處別&#9;營業點代碼&#9;檢查店點&#9;檢查人員&#9;題號&#9;檢查內容&#9;是否合格&#9;未查／不合格原因&#10;2026/8/21 16:43&#9;...&#9;...&#9;...&#9;DNB...&#9;台北通化&#9;...&#9;1&#9;...&#9;v&#9;"></textarea>
+    <div class="row" style="margin-top:12px"><button id="parseButton" class="primary" type="button">解析並預覽</button><button id="confirmButton" class="primary hidden" type="button">確認寫入雲端</button></div>
+    <div id="preview" class="preview hidden"></div>
+  </section>
+  <p class="foot">此頁沒有每日移動里程、班表、半月督導檢查或其他巡店功能，也不會註冊 Service Worker。</p>
+</main>
+
+<script>
+'use strict';
+
+// Patrol isolated GAS v7. This UAT page intentionally has a separate browser-session key.
+const PATROL_UAT_GAS_URL='https://script.google.com/macros/s/AKfycbxqBtW2yQw_u4qqJ9Knz6CK34hAiunaa6lIQu4pMa8Ff2voJZCWKEh8MXTJ6qAoGTax/exec';
+const UAT_SESSION_TOKEN_STORAGE='bei12b_patrol_uat_session_token_v1';
+const SESSION_CONTRACT='patrol-session-v2';
+const AUTH_DEPLOYMENT='patrol-isolated-v1';
+const PAGE_LIMIT=100;
+const STORES=[
+  {code:'DNB10059',name:'台北通化'}, {code:'DNB10062',name:'台北酒泉'},
+  {code:'DNB10307',name:'台北三創'}, {code:'DNB10xxx_wanda',name:'台北萬大'},
+  {code:'DNB10440',name:'台北六張犁'}, {code:'DNB10094',name:'台北復興南'},
+  {code:'DNB10082',name:'台北永吉'}, {code:'DNB10284',name:'台北大稻埕'},
+  {code:'DNB10146',name:'台北杭州南'}
+];
+
+let sessionToken=sessionStorage.getItem(UAT_SESSION_TOKEN_STORAGE)||'';
+let pendingWrite=null;
+let failedRaw='';
+const confirmedKeys=new Set();
+
+const $=id=>document.getElementById(id);
+function taipeiMonth(){
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).formatToParts(new Date());
+  const value=type=>parts.find(part=>part.type===type)?.value||'';
+  return `${value('year')}-${value('month')}`;
+}
+function setNotice(id,text,type='info'){
+  const el=$(id);el.textContent=text||'';el.className=`notice ${text?'show ':''}${type}`;
+}
+function setConnected(connected,text){
+  $('statusDot').className=`dot ${connected?'ok':'bad'}`;
+  $('statusText').textContent=text;
+}
+function authReasonText(result){
+  const reason=String(result?.reason||'');
+  const names={AUTH_TOKEN_MISSING:'未提供 Patrol UAT session',AUTH_TOKEN_INVALID:'Patrol UAT session 無效',AUTH_SESSION_NOT_FOUND:'Patrol UAT session 不存在',AUTH_SESSION_EXPIRED:'Patrol UAT session 已逾時',AUTH_SESSION_REVOKED:'Patrol UAT session 已撤銷',AUTH_DEPLOYMENT_MISMATCH:'Patrol UAT session deployment 不相符'};
+  return names[reason]||String(result?.message||'巡店服務回應異常');
+}
+function preserveOrClearSession(result){
+  const reason=String(result?.reason||'');
+  if(reason==='AUTH_SESSION_EXPIRED'||reason==='AUTH_SESSION_REVOKED'){
+    sessionToken='';sessionStorage.removeItem(UAT_SESSION_TOKEN_STORAGE);
+    $('uatCard').classList.add('hidden');$('authCard').classList.remove('hidden');
+  }
+}
+async function parseResponse(response){
+  const text=await response.text();
+  let body;
+  try{body=JSON.parse(text);}catch{throw new Error(response.ok?'巡店服務回傳非 JSON':'巡店服務 HTTP '+response.status);}
+  if(!response.ok) throw new Error(body?.message||`巡店服務 HTTP ${response.status}`);
+  return body;
+}
+async function post(action,params={}){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),30000);
+  try{return await parseResponse(await fetch(PATROL_UAT_GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...params}),cache:'no-store',signal:controller.signal}));}
+  catch(error){if(error?.name==='AbortError') throw new Error(`${action} 讀取逾時`);throw error;}
+  finally{clearTimeout(timeout);}
+}
+async function health(){
+  const url=new URL(PATROL_UAT_GAS_URL);url.searchParams.set('action','pthealth');
+  const result=await parseResponse(await fetch(url,{cache:'no-store'}));
+  if(result?.status!=='ok'||result.configured!==true||result.contract!=='patrol-auth-v3'||result.sessionContract!==SESSION_CONTRACT||result.authDeployment!==AUTH_DEPLOYMENT){
+    throw new Error('Patrol isolated GAS v7 contract 不相符');
+  }
+  return result;
+}
+function authResultOk(result){
+  return result?.status==='ok'&&typeof result.token==='string'&&result.token.length>0&&result.sessionContract===SESSION_CONTRACT&&result.deployment===AUTH_DEPLOYMENT;
+}
+async function protectedPost(action,params={}){
+  if(!sessionToken) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
+  const result=await post(action,{token:sessionToken,...params});
+  if(result?.status==='error') preserveOrClearSession(result);
+  return result;
+}
+function normalizeTime(value){
+  const text=String(value||'').trim();
+  const match=text.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})(?:[T\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if(!match)return text.replace(/\s+/g,' ');
+  const date=`${match[1]}/${Number(match[2])}/${Number(match[3])}`;
+  if(match[4]==null)return date;
+  const time=`${String(Number(match[4])).padStart(2,'0')}:${String(Number(match[5])).padStart(2,'0')}`;
+  return match[6]==null?`${date} ${time}`:`${date} ${time}:${String(Number(match[6])).padStart(2,'0')}`;
+}
+function storeText(value){return String(value||'').trim().replace(/\s+/g,'').replace(/^台灣大哥大數位生活/,'').replace(/^台北/,'');}
+function canonicalStore(row){
+  const code=String(row?.code||'').trim();const store=String(row?.store||'').trim();
+  const byCode=code&&STORES.find(entry=>entry.code===code);
+  if(byCode)return byCode.name;
+  const key=storeText(store);const byName=STORES.find(entry=>storeText(entry.name)===key);
+  return byName?byName.name:(store||code);
+}
+function cellError(row,cols,field,value,guidance){
+  const store=String(cols?.[5]||'').trim()||'未辨識店點';const raw=String(value??'').trim()||'（空白）';
+  return `第 ${row} 列｜店點：${store}｜欄位：${field}｜原始值：${raw}｜修正方式：${guidance}`;
+}
+function parsePatrolText(raw){
+  const rows=[];const lines=String(raw||'').split(/\r?\n/);
+  for(let index=0;index<lines.length;index++){
+    const line=lines[index];if(!line.trim())continue;
+    const cols=line.split('\t');const fillTime=String(cols[0]||'').trim();
+    if(fillTime==='填表時間')continue;
+    if(cols.length<8)return {rows:[],error:cellError(index+1,cols,'巡店明細',cols.join('\t'),'欄位不足，請確認貼上完整的 Excel 明細。')};
+    if(/^#{4,}$/.test(fillTime))return {rows:[],error:cellError(index+1,cols,'填表時間',fillTime,'請回原 Excel 加寬「填表時間」欄，確認完整日期時間後重新貼上。')};
+    const match=fillTime.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+    if(!match)return {rows:[],error:cellError(index+1,cols,'填表時間',fillTime,'無法解析日期時間，請回原 Excel 確認欄位格式後重新貼上。')};
+    const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]);const date=new Date(Date.UTC(year,month-1,day));
+    if(date.getUTCFullYear()!==year||date.getUTCMonth()!==month-1||date.getUTCDate()!==day)return {rows:[],error:cellError(index+1,cols,'填表時間',fillTime,'日期無效，請回原 Excel 修正後重新貼上。')};
+    const item=Number.parseInt(String(cols[7]||'').trim(),10);
+    if(!Number.isInteger(item)||item<1||item>33)return {rows:[],error:cellError(index+1,cols,'題號',cols[7],'題號必須是 1 至 33。')};
+    const resultText=String(cols[9]||'').trim();const reasonText=String(cols[10]||'').trim();const resultKey=resultText.toLowerCase();const reasonKey=reasonText.toLowerCase();
+    const result=resultKey==='v'?'v':(resultKey==='na'||reasonKey==='na'?'na':'');
+    rows.push({fillTime,arriveTime:String(cols[1]||'').trim(),leaveTime:String(cols[2]||'').trim(),district:String(cols[3]||'').trim(),code:String(cols[4]||'').trim(),store:String(cols[5]||'').trim(),inspector:String(cols[6]||'').trim(),item,result,reason:result==='na'&&(!reasonText||reasonKey==='na')?'na':reasonText,month:`${year}-${String(month).padStart(2,'0')}`});
+  }
+  return {rows,error:''};
+}
+function candidateKey(row){return [normalizeTime(row.fillTime),canonicalStore(row),String(row.item)].join('|');}
+function prepare(rows){
+  const seen=new Set(confirmedKeys);const writeRows=[];let duplicates=0;
+  rows.forEach(row=>{const key=candidateKey(row);if(seen.has(key)){duplicates++;return;}seen.add(key);writeRows.push(row);});
+  return {writeRows,duplicates};
+}
+function rowMonth(row){
+  const explicit=String(row?.month||'').match(/^\d{4}-\d{2}$/);if(explicit)return explicit[0];
+  const match=String(row?.fillTime||'').match(/^(\d{4})[\/-](\d{1,2})/);return match?`${match[1]}-${String(Number(match[2])).padStart(2,'0')}`:'';
+}
+function readbackKey(row){
+  const fill=normalizeTime(row?.fillTime);const date=(fill.match(/^(\d{4}\/\d{1,2}\/\d{1,2})/)||[])[1]||fill;
+  return [date,canonicalStore(row),String(Number(row?.item)||String(row?.item||'').trim()),fill].join('|');
+}
+function keyLabel(row){const fill=normalizeTime(row?.fillTime);const date=(fill.match(/^(\d{4}\/\d{1,2}\/\d{1,2})/)||[])[1]||fill;return `${date}｜${canonicalStore(row)}｜題${row?.item||''}｜${fill}`;}
+async function readback(rows,writtenRows){
+  const expected=new Map();const groups=new Map();
+  rows.forEach(row=>{expected.set(readbackKey(row),row);const month=rowMonth(row);const store=canonicalStore(row);groups.set(`${month}|${store}`,{month,store});});
+  const found=new Set();
+  try{
+    for(const group of groups.values()){
+      if(!group.month||!group.store)throw new Error('ptdetail readback 缺少月份或店點');
+      let page=1,totalRows=null;
+      for(;;){
+        const result=await protectedPost('ptdetail',{month:group.month,store:group.store,page,limit:PAGE_LIMIT});
+        if(result?.status!=='ok')throw new Error(`ptdetail readback 失敗：${authReasonText(result)}`);
+        if(!Array.isArray(result.rows))throw new Error('ptdetail 分頁 readback contract 不完整');
+        result.rows.forEach(row=>{const key=readbackKey(row);if(expected.has(key))found.add(key);});
+        const count=result.rows.length;const stated=Number(result.totalRows);if(Number.isInteger(stated)&&stated>=0)totalRows=stated;
+        if(count===0||count<PAGE_LIMIT||(totalRows!==null&&page*PAGE_LIMIT>=totalRows))break;
+        page++;if(page>100)throw new Error('ptdetail 分頁 readback 頁數異常');
+      }
+    }
+  }catch(error){
+    const missing=[...expected].filter(([key])=>!found.has(key)).map(([,row])=>keyLabel(row));
+    const failure=new Error(error?.message||'ptdetail readback 失敗');failure.report={parsedRows:rows.length,writtenRows,readbackRows:found.size,missing};throw failure;
+  }
+  const missing=[...expected].filter(([key])=>!found.has(key)).map(([,row])=>keyLabel(row));
+  if(missing.length){const failure=new Error('ptdetail readback 筆數或 key 不一致');failure.report={parsedRows:rows.length,writtenRows,readbackRows:found.size,missing};throw failure;}
+  return {parsedRows:rows.length,writtenRows,readbackRows:found.size};
+}
+function jsonpWrite(payload){
+  return new Promise((resolve,reject)=>{
+    const callback=`patrolUatCb_${Date.now()}_${Math.floor(Math.random()*1000000)}`;const url=new URL(PATROL_UAT_GAS_URL);
+    url.searchParams.set('action','ptwrite');url.searchParams.set('token',sessionToken);url.searchParams.set('payload',JSON.stringify(payload));url.searchParams.set('callback',callback);
+    const script=document.createElement('script');const timer=setTimeout(()=>{cleanup();reject(new Error('ptwrite 連線逾時'));},30000);
+    function cleanup(){clearTimeout(timer);delete window[callback];script.remove();}
+    window[callback]=result=>{cleanup();resolve(result);};script.onerror=()=>{cleanup();reject(new Error('ptwrite 網路錯誤'));};script.src=url.toString();document.head.appendChild(script);
+  });
+}
+async function writeAndReadback(rows){
+  const slim=rows.map(row=>({fillTime:row.fillTime,arriveTime:row.arriveTime,leaveTime:row.leaveTime,district:row.district,code:row.code,store:row.store,inspector:row.inspector,item:row.item,result:row.result,reason:row.reason,month:row.month}));
+  const chunks=[];let part=[];
+  slim.forEach(row=>{part.push(row);if(encodeURIComponent(JSON.stringify(part)).length>3500){if(part.length>1){part.pop();chunks.push(part);part=[row];}else{chunks.push(part);part=[];}}});if(part.length)chunks.push(part);
+  let writtenRows=0;
+  for(const chunk of chunks){
+    let response;try{response=await jsonpWrite(chunk);}catch(firstError){response=await jsonpWrite(chunk).catch(()=>{throw firstError;});}
+    if(response?.status!=='ok'){preserveOrClearSession(response);throw new Error(`ptwrite 失敗：${authReasonText(response)}`);}writtenRows+=Number(response.written||0);
+  }
+  return readback(rows,writtenRows);
+}
+function showPreview(candidate){
+  const stores=[...new Set(candidate.writeRows.map(canonicalStore).filter(Boolean))];const preview=$('preview');
+  preview.innerHTML=`<strong>預覽完成：${candidate.writeRows.length} 筆待寫入</strong>${candidate.duplicates?`（略過本次貼上內重複 ${candidate.duplicates} 筆）`:''}<ul><li>本次預計寫入店點：${stores.join('、')||'—'}</li><li>尚未寫入雲端。請確認後按「確認寫入雲端」。</li><li>成功條件：每個 date＋store＋item＋fillTime 都通過 <code>ptdetail</code> 分頁 readback。</li></ul>`;
+  preview.classList.remove('hidden');
+}
+async function refreshSummary(){
+  const month=$('monthInput').value;if(!/^\d{4}-\d{2}$/.test(month)){setNotice('mainNotice','請選擇合法 YYYY-MM 月份。','err');return false;}
+  setNotice('mainNotice',`正在刷新 ${month} 的 ptsummary…`,'info');
+  try{
+    const result=await protectedPost('ptsummary',{month});
+    if(result?.status!=='ok')throw new Error(`ptsummary 失敗：${authReasonText(result)}`);
+    const summary=result.summary||result;const count=summary.visitCount??summary.visits?.length??'—';const stores=Array.isArray(result.stores)?result.stores.length:(Array.isArray(summary.stores)?summary.stores.length:'—');
+    $('summary').innerHTML=`<dl><dt>月份</dt><dd>${month}</dd><dt>ptsummary</dt><dd>PASS</dd><dt>巡店事件／筆數</dt><dd>${count}</dd><dt>門市 contract</dt><dd>${stores}</dd></dl>`;
+    setNotice('mainNotice',`ptsummary 已刷新：${month}。`,'ok');return true;
+  }catch(error){setNotice('mainNotice',error?.message||'ptsummary 讀取失敗。','err');return false;}
+}
+async function signIn(){
+  const input=$('passcode');const passcode=String(input.value||'').trim();if(!passcode){setNotice('authNotice','請輸入巡店通行碼。','err');return;}
+  $('signInButton').disabled=true;setNotice('authNotice','正在驗證 Patrol isolated GAS v7…','info');
+  try{
+    await health();const result=await post('ptauth',{key:passcode});
+    if(!authResultOk(result))throw new Error(result?.status==='error'?authReasonText(result):'ptauth session contract 或 audience 不相符');
+    sessionToken=result.token;sessionStorage.setItem(UAT_SESSION_TOKEN_STORAGE,sessionToken);input.value='';
+    $('authCard').classList.add('hidden');$('uatCard').classList.remove('hidden');setConnected(true,'已連線至 Patrol UAT');
+    await refreshSummary();
+  }catch(error){input.value='';setNotice('authNotice',error?.message||'督導驗證失敗。','err');}
+  finally{$('signInButton').disabled=false;}
+}
+async function restore(){
+  $('monthInput').value=taipeiMonth();if(!sessionToken)return;
+  try{
+    await health();const result=await post('ptauth',{token:sessionToken});
+    if(!authResultOk(result)){preserveOrClearSession(result);throw new Error(authReasonText(result));}
+    sessionToken=result.token;sessionStorage.setItem(UAT_SESSION_TOKEN_STORAGE,sessionToken);$('authCard').classList.add('hidden');$('uatCard').classList.remove('hidden');setConnected(true,'已恢復 Patrol UAT session');await refreshSummary();
+  }catch(error){
+    // General API / network errors keep the UAT session. Only explicit expired or revoked clears it.
+    if(sessionToken)setNotice('authNotice',`UAT session 已保留；恢復失敗：${error?.message||'未知錯誤'}`,'err');
+  }
+}
+function parse(){
+  const raw=$('pasteBox').value;if(!raw.trim()){setNotice('mainNotice','請先貼上原始 Excel 明細。','err');return;}
+  const result=parsePatrolText(raw);if(result.error){pendingWrite=null;$('confirmButton').classList.add('hidden');setNotice('mainNotice',result.error,'err');return;}
+  if(!result.rows.length){setNotice('mainNotice','未解析到有效明細，請確認貼上內容是 Tab 分隔資料。','err');return;}
+  if(failedRaw===raw){pendingWrite=null;$('confirmButton').classList.add('hidden');setNotice('mainNotice','這份原始資料已有未完成的雲端寫入／讀回驗證。原文已保留，請勿重複操作。','err');return;}
+  const candidate=prepare(result.rows);if(!candidate.writeRows.length){setNotice('mainNotice','本次貼上資料全部重複，未建立雲端寫入。','info');return;}
+  const months=[...new Set(candidate.writeRows.map(rowMonth))];if(months.length===1)$('monthInput').value=months[0];
+  pendingWrite={raw,parsedRows:result.rows,candidate};showPreview(candidate);$('confirmButton').classList.remove('hidden');setNotice('mainNotice',`已解析 ${result.rows.length} 筆；請確認店點與筆數，再按「確認寫入雲端」。`,'ok');
+}
+async function confirmWrite(){
+  const pending=pendingWrite;if(!pending){setNotice('mainNotice','沒有待確認的雲端寫入資料，請先解析並預覽。','err');return;}
+  const button=$('confirmButton');button.disabled=true;setNotice('mainNotice',`正在寫入 ${pending.candidate.writeRows.length} 筆，並執行 ptdetail 分頁 readback…`,'info');
+  try{
+    const receipt=await writeAndReadback(pending.candidate.writeRows);pending.candidate.writeRows.forEach(row=>confirmedKeys.add(candidateKey(row)));$('pasteBox').value='';pendingWrite=null;failedRaw='';button.classList.add('hidden');$('preview').classList.add('hidden');
+    setNotice('mainNotice',`雲端寫入與 ptdetail readback 一致：解析 ${receipt.parsedRows} 筆／written ${receipt.writtenRows} 筆／readback ${receipt.readbackRows} 筆。正在刷新 ptsummary…`,'ok');await refreshSummary();
+  }catch(error){
+    failedRaw=pending.raw;const report=error?.report;
+    const detail=report?`解析 ${report.parsedRows} 筆／written ${report.writtenRows} 筆／readback ${report.readbackRows} 筆／missing keys：${report.missing.join('；')||'無法完成讀回驗證'}`:(error?.message||'未知錯誤');
+    setNotice('mainNotice',`雲端未完整寫入，已保留原始資料，請勿重複操作。${detail}`,'err');
+  }finally{button.disabled=false;}
+}
+function signOut(){sessionToken='';sessionStorage.removeItem(UAT_SESSION_TOKEN_STORAGE);pendingWrite=null;failedRaw='';$('pasteBox').value='';$('preview').classList.add('hidden');$('confirmButton').classList.add('hidden');$('uatCard').classList.add('hidden');$('authCard').classList.remove('hidden');setNotice('authNotice','已登出 Patrol UAT。','info');}
+
+$('signInButton').addEventListener('click',signIn);$('signOutButton').addEventListener('click',signOut);$('parseButton').addEventListener('click',parse);$('confirmButton').addEventListener('click',confirmWrite);$('refreshSummaryButton').addEventListener('click',refreshSummary);$('monthInput').addEventListener('change',refreshSummary);$('passcode').addEventListener('keydown',event=>{if(event.key==='Enter')signIn();});
+restore();
+</script>
+</body>
+</html>
