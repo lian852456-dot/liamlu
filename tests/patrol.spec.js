@@ -19,6 +19,8 @@ let mediaUploads;
 let failPtwrite; // 測試用：強制 ptwrite 回錯，模擬雲端寫入失敗
 let expireHalfWriteAt;
 let halfWriteCalls;
+let omitPtdetailKeys;
+let omitPtdetailRow;
 
 function privateScheduleFixture() {
   const names = ['酒泉', '萬大', '大稻埕', '復興', '三創', '杭州', '永吉', '通化', '六張犁'];
@@ -84,8 +86,10 @@ async function stubGas(page) {
         const pageNumber=Number(payload.page||1);
         const limit=Math.min(100,Number(payload.limit||50));
         const storeKey=store.replace(/^台北/,'');
-        const rows=cloudRows.filter(row=>String(row.month||'').slice(0,7)===month &&
-          (String(row.store||'')===store || String(row.store||'').includes(storeKey)));
+        const matchingRows=cloudRows.filter(row=>String(row.month||'').slice(0,7)===month &&
+          (String(row.store||'')===store || String(row.store||'').includes(storeKey)))
+          .filter(row=>!omitPtdetailKeys.has(`${row.fillTime}|${row.store}|${row.item}`));
+        const rows=omitPtdetailRow&&matchingRows.length?matchingRows.slice(0,-1):matchingRows;
         const start=(pageNumber-1)*limit;
         ptDetailCalls.push({month,store,page:pageNumber,limit});
         return route.fulfill({ contentType:'application/json', body:JSON.stringify({
@@ -213,6 +217,13 @@ async function openAndUnlock(page, answer = PT_KEY) {
   if (answer === PT_KEY) await expect(page.locator('#patrolAuthGate')).toBeHidden();
 }
 
+async function parseAndConfirm(page) {
+  await page.getByRole('button', { name:'解析並預覽' }).click();
+  await expect(page.locator('#patrolConfirmWriteBtn')).toBeVisible();
+  await page.getByRole('button', { name:'確認寫入雲端' }).click();
+  await expect(page.locator('#patrolConfirmWriteBtn')).toBeHidden();
+}
+
 const PAGE_URL = 'file://' + path.resolve(__dirname, '../patrol.html');
 
 function pasteLine(d, store, code, item, result, reason) {
@@ -260,7 +271,7 @@ function item18Panel(page) {
   return page.locator('#invPanels .panel').filter({ hasText:'到店全盤提醒' });
 }
 
-test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; omitPtdetailKeys = new Set(); omitPtdetailRow = false; });
 
 test('填表時間為 ######## 時整批拒絕，不寫雲端、不改 rawDetails、不清除貼上內容', async ({ page }) => {
   await stubGas(page);
@@ -283,12 +294,12 @@ test('填表時間為 ######## 時整批拒絕，不寫雲端、不改 rawDetail
   ].join('\n');
 
   await page.fill('#pasteBox', pasted);
-  await page.getByRole('button', { name:'解析並更新' }).click();
+  await page.getByRole('button', { name:'解析並預覽' }).click();
 
   await expect(page.locator('#parseMsg')).toContainText('第 2 列');
-  await expect(page.locator('#parseMsg')).toContainText('店點「台北六張犁」');
-  await expect(page.locator('#parseMsg')).toContainText('欄位「填表時間」');
-  await expect(page.locator('#parseMsg')).toContainText('值為「########」');
+  await expect(page.locator('#parseMsg')).toContainText('台北六張犁');
+  await expect(page.locator('#parseMsg')).toContainText('填表時間');
+  await expect(page.locator('#parseMsg')).toContainText('########');
   expect(writeCalls).toBe(beforeWrites);
   expect(await page.evaluate(() => JSON.stringify(rawDetails))).toBe(beforeRaw);
   await expect(page.locator('#pasteBox')).toHaveValue(pasted);
@@ -301,8 +312,8 @@ test('有效 8/20 資料完整解析 66 筆，三創與六張犁各 33 筆並相
   await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
 
   await page.fill('#pasteBox', august20PasteBatch());
-  await page.getByRole('button', { name:'解析並更新' }).click();
-  await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+  await parseAndConfirm(page);
+  await expect(page.locator('#parseMsg')).toHaveText(/readback 一致/);
   await expect.poll(() => cloudRows.length).toBe(66);
 
   const state = await page.evaluate(() => {
@@ -329,8 +340,83 @@ test('有效 8/20 資料完整解析 66 筆，三創與六張犁各 33 筆並相
   });
 });
 
-test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', async ({ browser }) => {
-  // ── 裝置一（電腦）：輸入通行碼、連線並貼上 ──
+test('解析預覽不寫雲端、不改 rawDetails；確認後才逐店讀回', async ({ page }) => {
+  await stubGas(page);
+  await openAndUnlock(page);
+  const pasted=[
+    pasteLine(7, '台北通化', 'DNB10059', 1, 'v', ''),
+    pasteLine(7, '台北酒泉', 'DNB10062', 2, 'v', ''),
+  ].join('\n');
+  await page.fill('#pasteBox', pasted);
+  await page.getByRole('button', { name:'解析並預覽' }).click();
+
+  expect(writeCalls).toBe(0);
+  expect(ptDetailCalls).toEqual([]);
+  expect(await page.evaluate(() => rawDetails.length)).toBe(0);
+  await expect(page.locator('#pasteBox')).toHaveValue(pasted);
+  await expect(page.locator('#patrolPastePreview')).toContainText('本次預計寫入店點：台北通化、台北酒泉（2 筆）');
+  await expect(page.locator('#patrolConfirmWriteBtn')).toBeVisible();
+
+  await page.getByRole('button', { name:'確認寫入雲端' }).click();
+  await expect(page.locator('#parseMsg')).toContainText('雲端寫入與 readback 一致');
+  expect(writeCalls).toBe(1);
+  expect(ptDetailCalls).toEqual(expect.arrayContaining([
+    expect.objectContaining({store:'台北通化',page:1,limit:100}),
+    expect.objectContaining({store:'台北酒泉',page:1,limit:100}),
+  ]));
+  expect(await page.evaluate(() => rawDetails.length)).toBe(2);
+  await expect(page.locator('#pasteBox')).toHaveValue('');
+});
+
+test('write 後 readback 缺 key 時不得顯示成功，保留原始貼上與本地資料', async ({ page }) => {
+  await stubGas(page);
+  await openAndUnlock(page);
+  const first=pasteLine(8, '台北通化', 'DNB10059', 1, 'v', '');
+  const second=pasteLine(8, '台北通化', 'DNB10059', 2, 'v', '');
+  const pasted=[first,second].join('\n');
+  await page.fill('#pasteBox', pasted);
+  await page.getByRole('button', { name:'解析並預覽' }).click();
+  omitPtdetailRow=true;
+  await page.getByRole('button', { name:'確認寫入雲端' }).click();
+
+  await expect(page.locator('#parseMsg')).toContainText('雲端未完整寫入，已保留原始資料，請勿重複操作');
+  await expect(page.locator('#parseMsg')).toContainText('解析 2 筆');
+  await expect(page.locator('#parseMsg')).toContainText('written 2 筆');
+  await expect(page.locator('#parseMsg')).toContainText('readback 1 筆');
+  await expect(page.locator('#parseMsg')).toContainText('missing keys');
+  expect(writeCalls).toBe(1);
+  expect(cloudRows).toHaveLength(2);
+  expect(ptDetailCalls).toHaveLength(1);
+  expect(await page.evaluate(() => rawDetails.length)).toBe(0);
+  await expect(page.locator('#pasteBox')).toHaveValue(pasted);
+  await expect(page.locator('#patrolConfirmWriteBtn')).toBeHidden();
+
+  await page.getByRole('button', { name:'解析並預覽' }).click();
+  await expect(page.locator('#parseMsg')).toContainText('禁止重複寫入');
+  expect(writeCalls).toBe(1);
+});
+
+test('readback 在同一店超過 100 列時完整走第二頁', async ({ page }) => {
+  await stubGas(page);
+  await openAndUnlock(page);
+  const month=new Date().toISOString().slice(0,7).split('-').map(Number);
+  const lines=[];
+  for(let visit=0;visit<4;visit++){
+    for(let item=1;item<=33;item++){
+      lines.push(`${month[0]}/${month[1]}/9 ${12+visit}:43\t${month[0]}/${month[1]}/9 ${12+visit}:00\t${month[0]}/${month[1]}/9 ${12+visit}:30\t北一二B\tDNB10059\t台北通化\t測試督導\t${item}\t內容\tv\t`);
+    }
+  }
+  await page.fill('#pasteBox', lines.join('\n'));
+  await parseAndConfirm(page);
+  await expect(page.locator('#parseMsg')).toContainText('解析 132 筆／寫入 132 筆／讀回 132 筆');
+  expect(ptDetailCalls).toEqual(expect.arrayContaining([
+    expect.objectContaining({store:'台北通化',page:1,limit:100}),
+    expect.objectContaining({store:'台北通化',page:2,limit:100}),
+  ]));
+});
+
+test('電腦確認寫入且 readback 一致後，另一裝置輸入通行碼看得到', async ({ browser }) => {
+  // ── 裝置一（電腦）：輸入通行碼、解析預覽、確認寫入 ──
   const desktop = await browser.newPage();
   await stubGas(desktop);
   await openAndUnlock(desktop);
@@ -342,8 +428,8 @@ test('電腦貼上後自動上雲，另一裝置輸入通行碼後看得到', as
     pasteLine(2, '台北酒泉', 'DNB10062', 15, 'v', ''),
   ].join('\n');
   await desktop.fill('#pasteBox', lines);
-  await desktop.click('button.btn-primary');
-  await expect(desktop.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+  await parseAndConfirm(desktop);
+  await expect(desktop.locator('#parseMsg')).toHaveText(/readback 一致/);
   expect(cloudRows.length).toBe(3);
 
   // ── 裝置二（手機）：全新頁面，輸入通行碼後直接看到雲端資料 ──
@@ -374,12 +460,12 @@ test('重複貼上同一批資料，雲端自動去重', async ({ page }) => {
 
   const line = pasteLine(3, '台北永吉', 'DNB10082', 16, 'v', '');
   await page.fill('#pasteBox', line);
-  await page.click('button.btn-primary');
+  await parseAndConfirm(page);
   await expect.poll(() => cloudRows.length).toBe(1);
   const callsAfterFirst = writeCalls;
 
   await page.fill('#pasteBox', line);
-  await page.click('button.btn-primary');
+  await page.getByRole('button', { name:'解析並預覽' }).click();
   await expect(page.locator('#parseMsg')).toHaveText(/沒有新候選/);
   expect(writeCalls).toBe(callsAfterFirst);
   expect(cloudRows.length).toBe(1);
@@ -395,8 +481,8 @@ test.describe('解析狀態訊息', () => {
     await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
 
     await page.fill('#pasteBox', pasteLine(1, '台北通化', 'DNB10059', 1, 'v', ''));
-    await page.click('button.btn-primary');
-    await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+    await parseAndConfirm(page);
+    await expect(page.locator('#parseMsg')).toHaveText(/readback 一致/);
 
     // 模擬自動隱藏計時器把 inline display 設成 none 之後的狀態
     await page.evaluate(() => { document.getElementById('parseMsg').style.display = 'none'; });
@@ -404,9 +490,9 @@ test.describe('解析狀態訊息', () => {
 
     // 第二批：修好前 inline none 會蓋住新訊息，這裡必須重新看得到
     await page.fill('#pasteBox', pasteLine(2, '台北酒泉', 'DNB10062', 2, 'v', ''));
-    await page.click('button.btn-primary');
+    await parseAndConfirm(page);
     await expect(page.locator('#parseMsg')).toBeVisible();
-    await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+    await expect(page.locator('#parseMsg')).toHaveText(/readback 一致/);
   });
 
   test('新資料顯示新增筆數；重複貼上顯示新增 0 筆（不是沒反應）', async ({ page }) => {
@@ -416,11 +502,11 @@ test.describe('解析狀態訊息', () => {
 
     const line = pasteLine(3, '台北永吉', 'DNB10082', 16, 'v', '');
     await page.fill('#pasteBox', line);
-    await page.click('button.btn-primary');
-    await expect(page.locator('#parseMsg')).toHaveText(/新增 1 筆/);
+    await parseAndConfirm(page);
+    await expect(page.locator('#parseMsg')).toHaveText(/解析 1 筆／寫入 1 筆／讀回 1 筆/);
 
     await page.fill('#pasteBox', line);
-    await page.click('button.btn-primary');
+    await page.getByRole('button', { name:'解析並預覽' }).click();
     await expect(page.locator('#parseMsg')).toBeVisible();
     await expect(page.locator('#parseMsg')).toHaveText(/新增 0 筆/);
   });
@@ -432,7 +518,7 @@ test.describe('解析狀態訊息', () => {
 
     failPtwrite = true;
     await page.fill('#pasteBox', pasteLine(4, '台北萬大', 'DNB10063', 5, 'v', ''));
-    await page.click('button.btn-primary');
+    await parseAndConfirm(page);
     await expect(page.locator('#parseMsg')).toHaveText(/雲端寫入失敗/);
     await expect(page.locator('#parseMsg')).toHaveClass(/err/);
 
@@ -452,7 +538,7 @@ test.describe('解析狀態訊息', () => {
 
     const before = writeCalls;
     await page.fill('#pasteBox', pasteLine(6, '台北三創', 'DNB10064', 7, 'v', ''));
-    await page.click('button.btn-primary');
+    await parseAndConfirm(page);
 
     // render 拋錯仍呼叫 ptwrite，資料成功進雲端（不因畫面壞掉而遺失）
     await expect.poll(() => writeCalls).toBeGreaterThan(before);
@@ -474,8 +560,8 @@ test('貼上明細後切到督導檢查大盤仍使用 fresh ptsummary', async (
     `${row.fillTime}\t${row.arriveTime}\t${row.leaveTime}\t${row.district}\t${row.code}\t${row.store}\t${row.inspector}\t18\t內容\tv\t`
   ).join('\n');
   await page.fill('#pasteBox', julyOnly);
-  await page.click('button.btn-primary');
-  await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+  await parseAndConfirm(page);
+  await expect(page.locator('#parseMsg')).toHaveText(/readback 一致/);
   await expect(item18Panel(page)).toContainText('8/9 店完成');
   await expect(page.locator('#patrolPastePreview')).toContainText('本次貼上：3 筆');
   const readsBeforeSwitch = ptReadCalls;
@@ -497,7 +583,7 @@ test.describe('巡店貼上正式摘要來源回歸', () => {
       `${row.fillTime}\t${row.arriveTime}\t${row.leaveTime}\t${row.district}\t${row.code}\t${row.store}\t${row.inspector}\t18\t內容\tv\t`
     ).join('\n');
     await page.fill('#pasteBox', batch);
-    await page.click('button.btn-primary');
+    await parseAndConfirm(page);
 
     await expect(page.locator('#parseMsg')).toHaveText(/正式摘要已更新/);
     await expect(item18Panel(page)).toContainText('8/9 店完成');
@@ -514,7 +600,7 @@ test.describe('巡店貼上正式摘要來源回歸', () => {
 
     const row = item18EightStoreRows()[7];
     await page.fill('#pasteBox', `${row.fillTime}\t${row.arriveTime}\t${row.leaveTime}\t${row.district}\t${row.code}\t${row.store}\t${row.inspector}\t18\t內容\tv\t`);
-    await page.click('button.btn-primary');
+    await parseAndConfirm(page);
 
     await expect(page.locator('#parseMsg')).toHaveText(/正式摘要已更新/);
     await expect(item18Panel(page)).toContainText('8/9 店完成');
@@ -529,7 +615,7 @@ test.describe('巡店貼上正式摘要來源回歸', () => {
     failPtwrite = true;
 
     await page.fill('#pasteBox', pasteLine(12, '台北通化', 'DNB10059', 14, 'v', ''));
-    await page.click('button.btn-primary');
+    await parseAndConfirm(page);
 
     await expect(page.locator('#parseMsg')).toHaveText(/雲端寫入失敗/);
     await expect(item18Panel(page)).toContainText('8/9 店完成');
@@ -549,7 +635,7 @@ test.describe('巡店貼上正式摘要來源回歸', () => {
     });
 
     await page.fill('#pasteBox', pasteLine(13, '台北通化', 'DNB10059', 15, 'v', ''));
-    await page.click('button.btn-primary');
+    await parseAndConfirm(page);
 
     await expect(page.locator('#parseMsg')).toHaveText(/正式摘要更新失敗/);
     await expect(page.locator('#parseMsg')).toHaveText(/保留上次成功正式摘要/);
@@ -593,8 +679,8 @@ test('盤點提醒框：題14-17每月與題18兩個月獨立顯示進度', asyn
     `2026/6/20 10:00\t2026/6/20 09:00\t2026/6/20 12:00\t北一二B\tDNB10307\t台北三創\t測試督導\t18\t內容\tv\t`,
   ].join('\n');
   await page.fill('#pasteBox', lines);
-  await page.click('button.btn-primary');
-  await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+  await parseAndConfirm(page);
+  await expect(page.locator('#parseMsg')).toHaveText(/readback 一致/);
 
   const panels = page.locator('#invPanels');
   // 每月盤點：只有通化 4 項全完成 → 1/9
@@ -622,8 +708,8 @@ test('知悉宣導提醒：題19-33只看總進度與20日前完成狀態', asyn
   for (let i = 19; i <= 33; i++) lines.push(pasteLine(5, '台北通化', 'DNB10059', i, 'v', ''));
   lines.push(pasteLine(6, '台北酒泉', 'DNB10062', 19, 'v', ''));
   await page.fill('#pasteBox', lines.join('\n'));
-  await page.click('button.btn-primary');
-  await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+  await parseAndConfirm(page);
+  await expect(page.locator('#parseMsg')).toHaveText(/readback 一致/);
 
   const panels = page.locator('#invPanels');
   await expect(panels).toContainText('知悉宣導提醒');
@@ -670,8 +756,8 @@ test('大量資料會分批上傳且全數送達', async ({ page }) => {
     lines.push(pasteLine((i % 28) + 1, '台北三創', 'DNB10307', (i % 33) + 1, 'v', ''));
   }
   await page.fill('#pasteBox', lines.join('\n'));
-  await page.click('button.btn-primary');
-  await expect(page.locator('#parseMsg')).toHaveText(/已同步至雲端/);
+  await parseAndConfirm(page);
+  await expect(page.locator('#parseMsg')).toHaveText(/readback 一致/);
   expect(cloudRows.length).toBe(25);
   expect(writeCalls).toBeGreaterThan(1); // 確實有分批
 });

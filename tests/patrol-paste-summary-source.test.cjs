@@ -16,30 +16,41 @@ function functionBody(name, nextName) {
 }
 
 test('paste and JSON import keep canonical ptsummary as the dashboard source', () => {
-  const parse = functionBody('parseData', 'rebuildFromRaw');
+  const parse = functionBody('parseData', 'confirmPatrolCloudWrite');
+  const confirm = functionBody('confirmPatrolCloudWrite', 'rebuildFromRaw');
   const imported = functionBody('importData', 'itemStatus');
   assert.doesNotMatch(parse, /patrolSummaryState\s*=\s*['"]local['"]/);
   assert.doesNotMatch(imported, /patrolSummaryState\s*=\s*['"]local['"]/);
-  assert.match(parse, /mergePatrolCandidates\(newDetails\)/);
+  assert.match(parse, /preparePatrolCandidates\(newDetails\)/);
+  assert.doesNotMatch(parse, /cloudWrite\(/);
+  assert.match(confirm, /cloudWrite\(pending\.candidate\.writeRows\)/);
+  assert.match(confirm, /commitPatrolCandidates\(pending\.candidate\)/);
   assert.match(imported, /mergePatrolCandidates\(data\)/);
   assert.match(patrol, /正式摘要仍以雲端 ptsummary 為準/);
 });
 
 test('client candidate identity normalizes datetime, store alias and item before dedupe', () => {
-  const key = functionBody('patrolCandidateKey', 'mergePatrolCandidates');
-  const merge = functionBody('mergePatrolCandidates', 'showPatrolPastePreview');
+  const key = functionBody('patrolCandidateKey', 'preparePatrolCandidates');
+  const prepare = functionBody('preparePatrolCandidates', 'commitPatrolCandidates');
+  const commit = functionBody('commitPatrolCandidates', 'mergePatrolCandidates');
   assert.match(key, /normalizePatrolCandidateTime/);
   assert.match(key, /canonicalPatrolCandidateStore/);
   assert.match(key, /Number\(row&&row\.item\)/);
-  assert.match(merge, /const index=new Map\(\)/);
-  assert.match(merge, /duplicates\+\+/);
-  assert.match(merge, /rawDetails=merged/);
+  assert.match(prepare, /const index=new Map\(\)/);
+  assert.match(prepare, /duplicates\+\+/);
+  assert.doesNotMatch(prepare, /rawDetails=/);
+  assert.match(commit, /rawDetails=/);
 });
 
-test('successful ptwrite reloads ptsummary and refresh failure retains last-good summary', () => {
+test('successful ptwrite requires keyed ptdetail readback before ptsummary refresh', () => {
   const write = functionBody('cloudWrite', 'setCloudStatus');
   const load = functionBody('cloudLoad', 'cloudWrite');
-  assert.match(write, /cloudLoad\(\{afterWrite:true,writeMessage,renderErr\}\)/);
+  const confirm = functionBody('confirmPatrolCloudWrite', 'rebuildFromRaw');
+  const readback = functionBody('readbackPatrolWriteRows', 'cloudWrite');
+  assert.match(write, /readbackPatrolWriteRows\(details,written\)/);
+  assert.match(readback, /cloudCall\('ptdetail'/);
+  assert.match(readback, /missingKeys/);
+  assert.match(confirm, /cloudLoad\(\{afterWrite:true,writeMessage,renderErr\}\)/);
   assert.match(load, /patrolSummaryState=patrolSummary\?'stale':'error'/);
   assert.match(load, /保留上次成功正式摘要/);
   assert.doesNotMatch(write, /patrolSummaryState\s*=\s*['"]local['"]/);

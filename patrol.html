@@ -480,7 +480,8 @@
     <p class="hint">貼上你的明細表（含表頭那幾行也沒關係，系統會自動略過）。可一次貼整月，或每次巡完一店就補貼，資料會累加並自動同步雲端——手機開同一網址就看得到。</p>
     <textarea id="pasteBox" placeholder="填表時間	到店時間	離店時間	區處別	營業點代碼	檢查店點	檢查人員	題號	檢查內容	是否合格	未查／不合格原因&#10;2026/7/1 16:43	...	1	督導駐點		na&#10;..."></textarea>
     <div class="btn-row">
-      <button class="btn-primary" onclick="parseData()">解析並更新</button>
+      <button class="btn-primary" id="patrolParseBtn" onclick="parseData()">解析並預覽</button>
+      <button class="btn-primary" id="patrolConfirmWriteBtn" type="button" onclick="confirmPatrolCloudWrite()" hidden>確認寫入雲端</button>
       <button class="btn-ghost" onclick="exportData()">匯出存檔</button>
       <button class="btn-ghost" onclick="document.getElementById('importFile').click()">匯入存檔</button>
       <button class="btn-ghost" onclick="clearAll()">清空全部資料</button>
@@ -998,7 +999,7 @@ function patrolCandidateKey(row){
   return [normalizePatrolCandidateTime(row&&row.fillTime),canonicalPatrolCandidateStore(row),itemKey].join('|');
 }
 
-function mergePatrolCandidates(rows){
+function preparePatrolCandidates(rows){
   const index=new Map();
   const merged=rawDetails.slice();
   merged.forEach((row,i)=>index.set(patrolCandidateKey(row),i));
@@ -1011,15 +1012,26 @@ function mergePatrolCandidates(rows){
     }
     index.set(key,merged.length);merged.push(row);addedRows.push(row);writeRows.push(row);
   });
-  rawDetails=merged;
+  return {merged,addedRows,writeRows,duplicates,total:merged.length};
+}
+
+function commitPatrolCandidates(result){
+  rawDetails=(result&&result.merged||rawDetails).slice();
   rebuildFromRaw();
-  return {addedRows,writeRows,duplicates,total:rawDetails.length};
+}
+
+function mergePatrolCandidates(rows){
+  const result=preparePatrolCandidates(rows);
+  commitPatrolCandidates(result);
+  return result;
 }
 
 function showPatrolPastePreview(label,result){
   const preview=document.getElementById('patrolPastePreview');if(!preview)return;
+  const stores=[...new Set((result.writeRows||[]).map(canonicalPatrolCandidateStore).filter(Boolean))];
+  const storesText=stores.length?`<br>本次預計寫入店點：${stores.map(esc).join('、')}（${result.writeRows.length} 筆）`:'<br>本次沒有需要寫入的新增候選。';
   preview.hidden=false;
-  preview.innerHTML=`<strong>${label}：${result.addedRows.length} 筆</strong>本頁去重候選共 ${result.total} 筆${result.duplicates?`・略過重複 ${result.duplicates} 筆`:''}<br>正式摘要仍以雲端 ptsummary 為準。`;
+  preview.innerHTML=`<strong>${label}：${result.addedRows.length} 筆</strong>本頁去重候選共 ${result.total} 筆${result.duplicates?`・略過重複 ${result.duplicates} 筆`:''}${storesText}<br>正式摘要仍以雲端 ptsummary 為準。`;
 }
 
 const PATROL_FILL_TIME_PARSE_ERROR="填表時間欄顯示 ####，請回原 Excel 加寬『填表時間』欄，確認顯示日期時間後再貼上。";
@@ -1027,7 +1039,7 @@ const PATROL_FILL_TIME_PARSE_ERROR="填表時間欄顯示 ####，請回原 Excel
 function patrolPasteCellError(rowNumber, cols, field, value, guidance){
   const store=String((cols||[])[5]||'').trim()||'未辨識店點';
   const raw=String(value==null?'':value).trim()||'（空白）';
-  return `第 ${rowNumber} 列・店點「${store}」・欄位「${field}」的值為「${raw}」：${guidance}`;
+  return `第 ${rowNumber} 列｜${store}｜${field}｜${raw}：${guidance}`;
 }
 
 function parsePatrolPasteText(raw){
@@ -1085,43 +1097,77 @@ function parsePatrolPasteText(raw){
 }
 
 /* ---------- 解析貼上資料 ---------- */
+let pendingPatrolWrite=null;
+let failedPatrolWriteRaw='';
+
+function setPatrolWriteConfirmation(visible, disabled=false){
+  const button=document.getElementById('patrolConfirmWriteBtn');
+  if(!button) return;
+  button.hidden=!visible;
+  button.disabled=Boolean(disabled);
+}
+
 function parseData(){
   const raw = document.getElementById('pasteBox').value;
   if(!raw.trim()){ showMsg('請先貼上資料','err'); return; }
 
-  // 先驗證整批，確認全部列都可解析後才更新 rawDetails、清空文字框或呼叫 cloudWrite。
+  // 先驗證整批。解析階段絕不可改 rawDetails、清空文字框或呼叫 cloudWrite。
   const parsed=parsePatrolPasteText(raw);
-  if(parsed.error){ showMsg(parsed.error,'err'); return; }
+  if(parsed.error){ pendingPatrolWrite=null;setPatrolWriteConfirmation(false);showMsg(parsed.error,'err'); return; }
   const newDetails=parsed.rows;
-  const added=newDetails.length;
-
-  if(added>0){
-    const mergeResult=mergePatrolCandidates(newDetails);
-    document.getElementById('pasteBox').value='';
-    showPatrolPastePreview('本次貼上',mergeResult);
-
-    // 先報「已解析」，即使接下來看板渲染出錯，使用者也知道資料已收下、正在處理。
-    showMsg(cloudOn
-      ? `已解析 ${added} 筆，正在更新看板與同步雲端……`
-      : `已解析 ${added} 筆，正在更新看板……`, 'ok');
-
-    // 看板渲染失敗不可連累雲端同步——正式巡店資料一定要有機會送出。
-    let renderErr=null;
-    try{ render(); }
-    catch(err){ renderErr=err; console.error('Patrol render failed:', err); }
-
-    if(cloudOn && mergeResult.writeRows.length){
-      // 雲端的成功／失敗訊息會覆蓋上面的「正在……」；render 出錯時一併回報。
-      cloudWrite(mergeResult.writeRows, renderErr);
-    } else if(cloudOn) {
-      showMsg(`本次貼上沒有新候選（新增 0 筆，略過重複 ${mergeResult.duplicates} 筆）；正式摘要維持不變`, 'ok');
-    } else if(renderErr){
-      showMsg(`資料已解析，但看板更新失敗：${renderErr.message||renderErr}`, 'err');
-    } else {
-      showMsg(`已解析 ${added} 筆檢核紀錄；本頁候選已更新，正式摘要維持不變`, 'ok');
-    }
-  } else {
+  if(!newDetails.length){
     showMsg('未解析到有效資料，請確認貼上的是明細表（Tab分隔）','err');
+    return;
+  }
+
+  const candidate=preparePatrolCandidates(newDetails);
+  showPatrolPastePreview('本次貼上',candidate);
+  if(failedPatrolWriteRaw===raw){
+    pendingPatrolWrite=null;setPatrolWriteConfirmation(false);
+    showMsg('此份原始資料已有未完成的雲端寫入／讀回驗證，已保留原文且禁止重複寫入；請先重新載入正式摘要並確認 missing keys。','err');
+    return;
+  }
+  if(!candidate.writeRows.length){
+    pendingPatrolWrite=null;setPatrolWriteConfirmation(false);
+    showMsg(`本次貼上沒有新候選（新增 0 筆，略過重複 ${candidate.duplicates} 筆）；正式摘要維持不變`,'ok');
+    return;
+  }
+  pendingPatrolWrite={raw,parsedRows:newDetails,candidate};
+  setPatrolWriteConfirmation(true);
+  showMsg(`已解析 ${newDetails.length} 筆；請確認本次預計寫入店點與筆數後，按「確認寫入雲端」。寫入成功必須逐鍵 readback 一致才會顯示同步成功。`,'ok');
+}
+
+async function confirmPatrolCloudWrite(){
+  const pending=pendingPatrolWrite;
+  if(!pending||!pending.candidate||!pending.candidate.writeRows.length){
+    showMsg('沒有待確認的雲端寫入資料，請先解析並預覽。','err');
+    return;
+  }
+  if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN){
+    showMsg('尚未連線或通行碼已失效；原始貼上資料已保留，尚未寫入雲端。','err');
+    return;
+  }
+  setPatrolWriteConfirmation(true,true);
+  showMsg(`正在寫入 ${pending.candidate.writeRows.length} 筆並逐鍵讀回驗證……`,'ok');
+  let renderErr=null;
+  try{ render(); }catch(error){renderErr=error;console.error('Patrol render failed:',error);}
+  try{
+    const receipt=await cloudWrite(pending.candidate.writeRows);
+    commitPatrolCandidates(pending.candidate);
+    document.getElementById('pasteBox').value='';
+    pendingPatrolWrite=null;
+    setPatrolWriteConfirmation(false);
+    const writeMessage=`雲端寫入與 readback 一致（解析 ${pending.parsedRows.length} 筆／寫入 ${receipt.writtenRows} 筆／讀回 ${receipt.readbackRows} 筆）`;
+    await cloudLoad({afterWrite:true,writeMessage,renderErr});
+  }catch(error){
+    setPatrolWriteConfirmation(false);
+    failedPatrolWriteRaw=pending.raw;
+    const report=error&&error.readbackReport;
+    if(report){
+      showMsg(`雲端未完整寫入，已保留原始資料，請勿重複操作。解析 ${report.parsedRows} 筆／written ${report.writtenRows} 筆／readback ${report.readbackRows} 筆／missing keys：${report.missingKeys.join('；')||'無法讀回驗證'}`,'err');
+    }else{
+      showMsg(error?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端寫入失敗：${error&&error.message||'未知錯誤'}；原始資料已保留，尚未顯示同步成功。`,'err');
+    }
   }
 }
 
@@ -1147,7 +1193,7 @@ function showMsg(t,type){
 
 function clearAll(){
   if(confirm('確定清空所有已貼上的巡店紀錄？（雲端資料不受影響，重新載入即可還原）')){
-    records={}; rawDetails=[];
+    records={}; rawDetails=[];pendingPatrolWrite=null;failedPatrolWriteRaw='';setPatrolWriteConfirmation(false);
     const preview=document.getElementById('patrolPastePreview');if(preview){preview.hidden=true;preview.textContent='';}
     render();
     showMsg('已清空本地資料','ok');
@@ -1173,6 +1219,7 @@ function importData(e){
   reader.onload=ev=>{
     try{
       const data=JSON.parse(ev.target.result);
+      pendingPatrolWrite=null;failedPatrolWriteRaw='';setPatrolWriteConfirmation(false);
       if(Array.isArray(data)){
         const mergeResult=mergePatrolCandidates(data);
         showPatrolPastePreview('本次匯入',mergeResult);
@@ -1617,11 +1664,79 @@ function cloudLoad(options={}){
   });
 }
 
-function cloudWrite(details, renderErr){
+function patrolCandidateMonth(row){
+  const explicit=String(row&&row.month||'').match(/^\d{4}-\d{2}$/);
+  if(explicit) return explicit[0];
+  const fill=String(row&&row.fillTime||'').match(/^(\d{4})[\/-](\d{1,2})/);
+  return fill?`${fill[1]}-${String(Number(fill[2])).padStart(2,'0')}`:'';
+}
+
+function patrolReadbackKey(row){
+  const fillTime=normalizePatrolCandidateTime(row&&row.fillTime);
+  const date=(fillTime.match(/^(\d{4}\/\d{1,2}\/\d{1,2})/)||[])[1]||fillTime;
+  const item=Number(row&&row.item);
+  const itemKey=Number.isFinite(item)?String(item):String(row&&row.item||'').trim();
+  return [date,canonicalPatrolCandidateStore(row),itemKey,fillTime].join('|');
+}
+
+function patrolReadbackKeyLabel(row){
+  const fillTime=normalizePatrolCandidateTime(row&&row.fillTime);
+  const date=(fillTime.match(/^(\d{4}\/\d{1,2}\/\d{1,2})/)||[])[1]||fillTime;
+  const item=Number(row&&row.item);
+  return `${date}｜${canonicalPatrolCandidateStore(row)}｜題${Number.isFinite(item)?item:String(row&&row.item||'').trim()}｜${fillTime}`;
+}
+
+async function readbackPatrolWriteRows(details, writtenRows){
+  const expected=new Map();
+  const groups=new Map();
+  (details||[]).forEach(row=>{
+    const key=patrolReadbackKey(row);
+    expected.set(key,row);
+    const month=patrolCandidateMonth(row);
+    const store=canonicalPatrolCandidateStore(row);
+    const groupKey=`${month}|${store}`;
+    if(!groups.has(groupKey)) groups.set(groupKey,{month,store});
+  });
+  const found=new Set();
+  try{
+    for(const group of groups.values()){
+      if(!group.month||!group.store) throw new Error('雲端讀回驗證缺少月份或店點');
+      let page=1;
+      let totalRows=null;
+      for(;;){
+        const result=await cloudCall('ptdetail',{month:group.month,store:group.store,page,limit:100});
+        if(!result||result.status!=='ok') throw new Error(result&&result.message||'雲端讀回驗證失敗');
+        if(!Array.isArray(result.rows)) throw new Error('雲端讀回 contract 不完整');
+        result.rows.forEach(row=>{
+          const key=patrolReadbackKey(row);
+          if(expected.has(key)) found.add(key);
+        });
+        const parsedTotal=Number(result.totalRows);
+        if(Number.isFinite(parsedTotal)&&parsedTotal>=0) totalRows=parsedTotal;
+        const pageRows=result.rows.length;
+        if(pageRows===0 || pageRows<100 || (totalRows!=null && page*100>=totalRows)) break;
+        page++;
+        if(page>100) throw new Error('雲端讀回頁數異常');
+      }
+    }
+  }catch(error){
+    const missing=[...expected.entries()].filter(([key])=>!found.has(key)).map(([,row])=>patrolReadbackKeyLabel(row));
+    const failure=new Error(error&&error.message||'雲端讀回驗證失敗');
+    failure.readbackReport={parsedRows:details.length,writtenRows,readbackRows:found.size,missingKeys:missing};
+    throw failure;
+  }
+  const missing=[...expected.entries()].filter(([key])=>!found.has(key)).map(([,row])=>patrolReadbackKeyLabel(row));
+  if(missing.length){
+    const failure=new Error('雲端讀回筆數或 key 不一致');
+    failure.readbackReport={parsedRows:details.length,writtenRows,readbackRows:found.size,missingKeys:missing};
+    throw failure;
+  }
+  return {parsedRows:details.length,writtenRows,readbackRows:found.size,missingKeys:[]};
+}
+
+function cloudWrite(details){
   if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN){
-    // 不能靜默返回——否則畫面停在「正在同步……」，使用者無從得知資料沒上傳。
-    showMsg('尚未連線或通行碼已失效，資料暫存於本頁看板、尚未上傳雲端；請重新登入後把明細整份重貼一次。','err');
-    return;
+    return Promise.reject(new Error('尚未連線或通行碼已失效'));
   }
   // content 可由題號還原，不上傳以縮短網址（JSONP payload 走 query string，有長度限制故分批）
   const slim = details.map(d=>({
@@ -1653,12 +1768,7 @@ function cloudWrite(details, renderErr){
 
   let written = 0, chain = Promise.resolve();
   chunks.forEach(c=>{ chain = chain.then(()=>sendChunk(c, 0)).then(n=>{ written += n; }); });
-  chain.then(()=>{
-    // 本頁候選只供寫入與預覽；正式大盤必須重新讀取 server ptsummary，絕不以局部批次重算。
-    const writeMessage=`已同步至雲端（新增 ${written} 筆，重複資料自動略過）`;
-    showMsg(`${writeMessage}；正在更新正式摘要……`,'ok');
-    return cloudLoad({afterWrite:true,writeMessage,renderErr});
-  }).catch(err=>showMsg(err?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端寫入失敗：${err.message}；本頁候選仍保留，正式摘要維持上次成功資料`,'err'));
+  return chain.then(()=>readbackPatrolWriteRows(details,written));
 }
 
 function setCloudStatus(text, on){
