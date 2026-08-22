@@ -41,6 +41,13 @@
     <div id="mainNotice" class="notice" role="status" aria-live="polite"></div>
 
     <hr style="border:0;border-top:1px solid var(--line);margin:24px 0">
+    <h2>唯讀資料診斷</h2>
+    <p class="muted">依序讀取 ptsummary、九店 ptdetail 全部分頁、舊版 ptmileage v1；只顯示筆數與 contract，不顯示巡店內容，也不會寫入資料。</p>
+    <div class="row"><button id="runReadonlyDiagnosticButton" type="button">執行月份唯讀診斷</button></div>
+    <div id="diagnosticNotice" class="notice" role="status" aria-live="polite"></div>
+    <div id="diagnostic" class="summary muted">尚未執行診斷。</div>
+
+    <hr style="border:0;border-top:1px solid var(--line);margin:24px 0">
     <h2>貼上巡店紀錄</h2>
     <p class="muted">請貼上原始 Excel 的 Tab 分隔明細。若「填表時間」顯示 <code>####</code>，整批會 fail-closed，且不會發送任何雲端寫入。</p>
     <label for="pasteBox">巡店明細</label>
@@ -290,6 +297,85 @@ async function refreshSummary(){
     setNotice('mainNotice',`ptsummary 已刷新：${month}。`,'ok');return true;
   }catch(error){setNotice('mainNotice',error?.message||'ptsummary 讀取失敗。','err');return false;}
 }
+function diagnosticReason(result,fallback='MILEAGE_API_ERROR'){
+  const reason=String(result?.reason||'').trim();
+  return reason||fallback;
+}
+function diagnosticBreak(action,result,fallback){
+  return {action,status:'error',reason:diagnosticReason(result,fallback)};
+}
+function renderReadonlyDiagnostic(report){
+  const summary=report.summary||{status:'not-run'};
+  const detailRows=report.details.map(detail=>`<tr><td>${esc(detail.store)}</td><td>${esc(detail.status)}</td><td>${detail.totalRows==null?'—':detail.totalRows}</td><td>${detail.pages==null?'—':detail.pages}</td></tr>`).join('');
+  const mileage=report.mileage||{status:'not-run'};
+  const first=report.firstBreak?`${esc(report.firstBreak.action)}／${esc(report.firstBreak.reason)}`:'無';
+  const conclusion=report.conclusion?`<p><strong>${esc(report.conclusion)}</strong></p>`:'';
+  $('diagnostic').innerHTML=`<dl><dt>月份</dt><dd>${esc(report.month)}</dd><dt>ptsummary</dt><dd>${esc(summary.status)}</dd><dt>ptdetail aggregate rows</dt><dd>${report.detailRows}</dd><dt>ptmileage contract</dt><dd>${esc(mileage.contract||'—')}</dd><dt>ptmileage totalRows</dt><dd>${mileage.totalRows==null?'—':mileage.totalRows}</dd><dt>ptmileage totalPages</dt><dd>${mileage.totalPages==null?'—':mileage.totalPages}</dd><dt>ptmileage sheetScans</dt><dd>${mileage.sheetScans==null?'—':mileage.sheetScans}</dd><dt>first breakpoint</dt><dd>${first}</dd></dl>${conclusion}<table style="width:100%;margin-top:14px;border-collapse:collapse"><thead><tr><th style="text-align:left">店點</th><th style="text-align:left">ptdetail</th><th style="text-align:right">totalRows</th><th style="text-align:right">頁數</th></tr></thead><tbody>${detailRows||'<tr><td colspan="4">尚未讀取</td></tr>'}</tbody></table>`;
+}
+async function readReadonlyDetail(month,store){
+  let page=1,totalRows=null,loaded=0,pages=0;
+  const failure=(result,reason)=>Object.assign(diagnosticBreak('ptdetail',result,reason),{store,pages});
+  for(;;){
+    let result;
+    try{result=await protectedPost('ptdetail',{month,store,page,limit:PAGE_LIMIT});}
+    catch{return failure(null,'MILEAGE_API_ERROR');}
+    if(result?.status!=='ok')return failure(result);
+    if(!Array.isArray(result.rows))return failure(null,'MILEAGE_DATA_FORMAT_ERROR');
+    const reportedTotal=Number(result.totalRows);
+    if(!Number.isInteger(reportedTotal)||reportedTotal<0)return failure(null,'MILEAGE_DATA_FORMAT_ERROR');
+    if(totalRows===null)totalRows=reportedTotal;
+    else if(totalRows!==reportedTotal)return failure(null,'MILEAGE_DATA_FORMAT_ERROR');
+    loaded+=result.rows.length;pages+=1;
+    if(loaded===totalRows)return {action:'ptdetail',status:'ok',store,totalRows,pages};
+    if(result.rows.length===0||loaded>totalRows||page>=100)return failure(null,'MILEAGE_DATA_FORMAT_ERROR');
+    page+=1;
+  }
+}
+async function runReadonlyDiagnostic(){
+  const month=$('monthInput').value;
+  if(!/^\d{4}-\d{2}$/.test(month)){setNotice('diagnosticNotice','請選擇合法 YYYY-MM 月份。','err');return;}
+  const button=$('runReadonlyDiagnosticButton');button.disabled=true;
+  const report={month,summary:null,details:[],detailRows:0,mileage:null,firstBreak:null,conclusion:''};
+  setNotice('diagnosticNotice',`正在讀取 ${month}：ptsummary…`,'info');
+  try{
+    let summary;
+    try{summary=await protectedPost('ptsummary',{month});}
+    catch{report.firstBreak=diagnosticBreak('ptsummary',null,'MILEAGE_API_ERROR');}
+    if(!report.firstBreak&&summary?.status!=='ok')report.firstBreak=diagnosticBreak('ptsummary',summary);
+    report.summary=report.firstBreak?{status:'error'}:{status:'ok'};
+    if(!report.firstBreak){
+      for(let index=0;index<STORES.length;index++){
+        setNotice('diagnosticNotice',`正在讀取 ${month}：ptdetail ${index+1}/${STORES.length} 店…`,'info');
+        const detail=await readReadonlyDetail(month,STORES[index].name);
+        report.details.push(detail);
+        if(detail.status!=='ok'){report.firstBreak=detail;break;}
+        report.detailRows+=detail.totalRows;
+      }
+    }
+    if(!report.firstBreak){
+      setNotice('diagnosticNotice',`正在讀取 ${month}：ptmileage v1…`,'info');
+      let mileage;
+      try{mileage=await protectedPost('ptmileage',{month,page:1,limit:500});}
+      catch{report.firstBreak=diagnosticBreak('ptmileage',null,'MILEAGE_API_ERROR');}
+      if(!report.firstBreak&&mileage?.status!=='ok')report.firstBreak=diagnosticBreak('ptmileage',mileage);
+      if(!report.firstBreak){
+        const diagnostics=mileage.diagnostics&&typeof mileage.diagnostics==='object'?mileage.diagnostics:{};
+        report.mileage={status:'ok',contract:String(mileage.contract||''),totalRows:Number.isInteger(Number(mileage.totalRows))?Number(mileage.totalRows):null,totalPages:Number.isInteger(Number(mileage.totalPages))?Number(mileage.totalPages):null,sheetScans:Number.isInteger(Number(diagnostics.sheetScans))?Number(diagnostics.sheetScans):null};
+        if(report.mileage.contract!=='patrol-mileage-month-v1'||report.mileage.totalRows===null||report.mileage.totalPages===null)report.firstBreak=diagnosticBreak('ptmileage',null,'MILEAGE_DATA_FORMAT_ERROR');
+        else if(report.detailRows>0&&report.mileage.totalRows===0)report.firstBreak=diagnosticBreak('ptmileage',null,'MILEAGE_SOURCE_MISSING');
+      }
+    }
+    if(!report.firstBreak&&month==='2026-07'&&report.detailRows>0&&report.mileage.totalRows>0){
+      report.conclusion='7 月資料未遺失：ptsummary、ptdetail 與 ptmileage v1 均可讀；不需重貼或重建正式資料。';
+    }else if(!report.firstBreak){
+      report.conclusion='本月唯讀資料鏈可正常讀取。';
+    }
+  }finally{
+    renderReadonlyDiagnostic(report);
+    setNotice('diagnosticNotice',report.firstBreak?`唯讀診斷停止：${report.firstBreak.action}／${report.firstBreak.reason}`:'唯讀診斷 PASS。',report.firstBreak?'err':'ok');
+    button.disabled=false;
+  }
+}
 async function signIn(){
   const input=$('passcode');const passcode=String(input.value||'').trim();if(!passcode){setNotice('authNotice','請輸入巡店通行碼。','err');return;}
   $('signInButton').disabled=true;setNotice('authNotice','正在驗證 Patrol isolated GAS v7…','info');
@@ -347,7 +433,7 @@ async function confirmWrite(){
 }
 function signOut(){sessionToken='';sessionStorage.removeItem(UAT_SESSION_TOKEN_STORAGE);pendingWrite=null;failedRaw='';$('pasteBox').value='';$('preview').classList.add('hidden');$('confirmButton').classList.add('hidden');$('uatCard').classList.add('hidden');$('authCard').classList.remove('hidden');setNotice('authNotice','已登出 Patrol UAT。','info');}
 
-$('signInButton').addEventListener('click',signIn);$('signOutButton').addEventListener('click',signOut);$('parseButton').addEventListener('click',parse);$('confirmButton').addEventListener('click',confirmWrite);$('refreshSummaryButton').addEventListener('click',refreshSummary);$('monthInput').addEventListener('change',refreshSummary);$('passcode').addEventListener('keydown',event=>{if(event.key==='Enter')signIn();});
+$('signInButton').addEventListener('click',signIn);$('signOutButton').addEventListener('click',signOut);$('parseButton').addEventListener('click',parse);$('confirmButton').addEventListener('click',confirmWrite);$('refreshSummaryButton').addEventListener('click',refreshSummary);$('runReadonlyDiagnosticButton').addEventListener('click',runReadonlyDiagnostic);$('monthInput').addEventListener('change',refreshSummary);$('passcode').addEventListener('keydown',event=>{if(event.key==='Enter')signIn();});
 restore();
 </script>
 </body>
