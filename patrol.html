@@ -480,7 +480,8 @@
     <p class="hint">貼上你的明細表（含表頭那幾行也沒關係，系統會自動略過）。可一次貼整月，或每次巡完一店就補貼，資料會累加並自動同步雲端——手機開同一網址就看得到。</p>
     <textarea id="pasteBox" placeholder="填表時間	到店時間	離店時間	區處別	營業點代碼	檢查店點	檢查人員	題號	檢查內容	是否合格	未查／不合格原因&#10;2026/7/1 16:43	...	1	督導駐點		na&#10;..."></textarea>
     <div class="btn-row">
-      <button class="btn-primary" onclick="parseData()">解析並更新</button>
+      <button class="btn-primary" id="patrolParseBtn" onclick="parseData()">解析並預覽</button>
+      <button class="btn-primary" id="patrolConfirmWriteBtn" type="button" onclick="confirmPatrolCloudWrite()" hidden>確認寫入雲端</button>
       <button class="btn-ghost" onclick="exportData()">匯出存檔</button>
       <button class="btn-ghost" onclick="document.getElementById('importFile').click()">匯入存檔</button>
       <button class="btn-ghost" onclick="clearAll()">清空全部資料</button>
@@ -552,10 +553,12 @@
       <p class="hint">登入後直接讀取正式巡店雲端明細：同日多店依<b>到店時間</b>逐段加總，同店重複只取最早一筆，不需貼上資料或匯入 JSON。距離取自受控版車資對照表，未知路段一律留白標「待查」，不填 0、不猜測、不平均拆分。</p>
       <div class="secure-toolbar">
         <label>檢視月份<input id="miMonth" type="month" onchange="MI.setMonth(this.value)"></label>
+        <button class="mi-btn ghost" type="button" onclick="MI.runDiagnostic()">唯讀資料診斷</button>
       </div>
     </div>
 
     <div id="miCoverage"></div>
+    <div id="miDiagnostic"></div>
     <div class="mi-stats" id="miStats"></div>
     <div id="miAlerts"></div>
 
@@ -998,7 +1001,7 @@ function patrolCandidateKey(row){
   return [normalizePatrolCandidateTime(row&&row.fillTime),canonicalPatrolCandidateStore(row),itemKey].join('|');
 }
 
-function mergePatrolCandidates(rows){
+function preparePatrolCandidates(rows){
   const index=new Map();
   const merged=rawDetails.slice();
   merged.forEach((row,i)=>index.set(patrolCandidateKey(row),i));
@@ -1011,18 +1014,39 @@ function mergePatrolCandidates(rows){
     }
     index.set(key,merged.length);merged.push(row);addedRows.push(row);writeRows.push(row);
   });
-  rawDetails=merged;
-  rebuildFromRaw();
-  return {addedRows,writeRows,duplicates,total:rawDetails.length};
+  return {merged,addedRows,writeRows,duplicates,total:merged.length};
 }
 
-function showPatrolPastePreview(label,result){
+function commitPatrolCandidates(result){
+  rawDetails=(result&&result.merged||rawDetails).slice();
+  rebuildFromRaw();
+}
+
+function mergePatrolCandidates(rows){
+  const result=preparePatrolCandidates(rows);
+  commitPatrolCandidates(result);
+  return result;
+}
+
+function showPatrolPastePreview(label,result,preflight){
   const preview=document.getElementById('patrolPastePreview');if(!preview)return;
+  const writeRows=preflight?preflight.additions:(result.writeRows||[]);
+  const stores=[...new Set(writeRows.map(canonicalPatrolCandidateStore).filter(Boolean))];
+  const storesText=stores.length?`<br>本次預計寫入店點：${stores.map(esc).join('、')}（${writeRows.length} 筆）`:'<br>本次沒有需要寫入的新增缺失。';
+  const preflightText=preflight
+    ? `<br><b>Server Preflight（唯讀 ptdetail 分頁）</b>：正式已存在且內容相同 ${preflight.existingSame.length} 筆／新增缺失 ${preflight.additions.length} 筆／既有內容差異 ${preflight.differences.length} 筆`
+    : '';
   preview.hidden=false;
-  preview.innerHTML=`<strong>${label}：${result.addedRows.length} 筆</strong>本頁去重候選共 ${result.total} 筆${result.duplicates?`・略過重複 ${result.duplicates} 筆`:''}<br>正式摘要仍以雲端 ptsummary 為準。`;
+  preview.innerHTML=`<strong>${label}：${result.addedRows.length} 筆</strong>本頁去重候選共 ${result.total} 筆${result.duplicates?`・略過重複 ${result.duplicates} 筆`:''}${preflightText}${storesText}<br>正式摘要仍以雲端 ptsummary 為準。`;
 }
 
 const PATROL_FILL_TIME_PARSE_ERROR="填表時間欄顯示 ####，請回原 Excel 加寬『填表時間』欄，確認顯示日期時間後再貼上。";
+
+function patrolPasteCellError(rowNumber, cols, field, value, guidance){
+  const store=String((cols||[])[5]||'').trim()||'未辨識店點';
+  const raw=String(value==null?'':value).trim()||'（空白）';
+  return `第 ${rowNumber} 列｜${store}｜${field}｜${raw}：${guidance}`;
+}
 
 function parsePatrolPasteText(raw){
   const newDetails=[];
@@ -1033,21 +1057,22 @@ function parsePatrolPasteText(raw){
     const cols=line.split('\t');
     const firstCell=(cols[0]||'').trim();
     if(firstCell==='填表時間') continue;
-    if(cols.length<8) return {rows:[],error:`第 ${index+1} 列欄位不足，請確認貼上的是完整巡店明細。`};
+    if(cols.length<8) return {rows:[],error:patrolPasteCellError(index+1,cols,'巡店明細',cols.join('\t'),'欄位不足，請確認貼上的是完整巡店明細。')};
 
     // 欄位: 0填表 1到店 2離店 3區處 4代碼 5店點 6人員 7題號 8內容 9合格 10原因
     const fillTime=firstCell;
     const dm=fillTime.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-    if(!dm) return {rows:[],error:PATROL_FILL_TIME_PARSE_ERROR};
+    if(/^#{4,}$/.test(fillTime)) return {rows:[],error:patrolPasteCellError(index+1,cols,'填表時間',fillTime,PATROL_FILL_TIME_PARSE_ERROR)};
+    if(!dm) return {rows:[],error:patrolPasteCellError(index+1,cols,'填表時間',fillTime,'無法解析日期時間，請回原 Excel 確認欄位格式後再貼上。')};
     const y=Number(dm[1]),mo=Number(dm[2]),d=Number(dm[3]);
     const parsedDate=new Date(Date.UTC(y,mo-1,d));
     if(parsedDate.getUTCFullYear()!==y||parsedDate.getUTCMonth()!==mo-1||parsedDate.getUTCDate()!==d){
-      return {rows:[],error:PATROL_FILL_TIME_PARSE_ERROR};
+      return {rows:[],error:patrolPasteCellError(index+1,cols,'填表時間',fillTime,'日期無效，請回原 Excel 修正後再貼上。')};
     }
 
     const itemNo=parseInt((cols[7]||'').trim(),10);
     if(!itemNo||itemNo<1||itemNo>33){
-      return {rows:[],error:`第 ${index+1} 列題號無法辨識，請確認題號為 1 至 33。`};
+      return {rows:[],error:patrolPasteCellError(index+1,cols,'題號',cols[7],'無法辨識，請確認題號為 1 至 33。')};
     }
 
     const resultText=(cols[9]||'').trim();
@@ -1078,43 +1103,156 @@ function parsePatrolPasteText(raw){
 }
 
 /* ---------- 解析貼上資料 ---------- */
-function parseData(){
+let pendingPatrolWrite=null;
+let failedPatrolWriteRaw='';
+
+function setPatrolWriteConfirmation(visible, disabled=false){
+  const button=document.getElementById('patrolConfirmWriteBtn');
+  if(!button) return;
+  button.hidden=!visible;
+  button.disabled=Boolean(disabled);
+}
+
+function patrolCandidateContentKey(row){
+  return [String(row&&row.result||'').trim().toLowerCase(),String(row&&row.reason||'').trim()].join('|');
+}
+
+async function formalPatrolRowsForPreflight(rows){
+  const groups=new Map();
+  (rows||[]).forEach(row=>{
+    const month=patrolCandidateMonth(row),store=canonicalPatrolCandidateStore(row);
+    groups.set(`${month}|${store}`,{month,store});
+  });
+  const formalRows=[];
+  for(const group of groups.values()){
+    if(!group.month||!group.store) throw new Error('Server Preflight 缺少月份或店點，已封鎖寫入');
+    let page=1,totalRows=null,loaded=0;
+    for(;;){
+      const result=await cloudCall('ptdetail',{month:group.month,store:group.store,page,limit:100});
+      if(!result||result.status!=='ok') throw new Error(result&&result.message||'Server Preflight ptdetail 失敗');
+      if(!Array.isArray(result.rows)) throw new Error('Server Preflight ptdetail 分頁 contract 不完整');
+      const reportedTotal=Number(result.totalRows);
+      if(!Number.isInteger(reportedTotal)||reportedTotal<0) throw new Error('Server Preflight ptdetail totalRows contract 不完整');
+      if(totalRows===null) totalRows=reportedTotal;
+      else if(totalRows!==reportedTotal) throw new Error('Server Preflight 期間正式資料筆數變更，已封鎖寫入');
+      formalRows.push(...result.rows); loaded+=result.rows.length;
+      if(loaded===totalRows) break;
+      if(result.rows.length===0||loaded>totalRows) throw new Error('Server Preflight ptdetail 分頁讀回筆數不一致');
+      page+=1; if(page>100) throw new Error('Server Preflight ptdetail 頁數異常');
+    }
+  }
+  return formalRows;
+}
+
+async function patrolServerPreflight(rows){
+  const formalRows=await formalPatrolRowsForPreflight(rows);
+  const byKey=new Map();
+  formalRows.forEach(row=>{
+    const key=patrolReadbackKey(row),list=byKey.get(key)||[];
+    list.push(row);byKey.set(key,list);
+  });
+  const additions=[],existingSame=[],differences=[];
+  (rows||[]).forEach(row=>{
+    const formal=byKey.get(patrolReadbackKey(row))||[];
+    if(!formal.length){additions.push(row);return;}
+    if(formal.every(source=>patrolCandidateContentKey(source)===patrolCandidateContentKey(row))){existingSame.push(row);return;}
+    differences.push({input:row,formal});
+  });
+  if(additions.length+existingSame.length+differences.length!==(rows||[]).length) throw new Error('Server Preflight 分類不完整，已封鎖寫入');
+  return {formalRows,additions,existingSame,differences};
+}
+
+async function parseData(){
   const raw = document.getElementById('pasteBox').value;
   if(!raw.trim()){ showMsg('請先貼上資料','err'); return; }
 
-  // 先驗證整批，確認全部列都可解析後才更新 rawDetails、清空文字框或呼叫 cloudWrite。
+  // 先驗證整批。解析階段絕不可改 rawDetails、清空文字框或呼叫 cloudWrite。
   const parsed=parsePatrolPasteText(raw);
-  if(parsed.error){ showMsg(parsed.error,'err'); return; }
+  if(parsed.error){ pendingPatrolWrite=null;setPatrolWriteConfirmation(false);showMsg(parsed.error,'err'); return; }
   const newDetails=parsed.rows;
-  const added=newDetails.length;
-
-  if(added>0){
-    const mergeResult=mergePatrolCandidates(newDetails);
-    document.getElementById('pasteBox').value='';
-    showPatrolPastePreview('本次貼上',mergeResult);
-
-    // 先報「已解析」，即使接下來看板渲染出錯，使用者也知道資料已收下、正在處理。
-    showMsg(cloudOn
-      ? `已解析 ${added} 筆，正在更新看板與同步雲端……`
-      : `已解析 ${added} 筆，正在更新看板……`, 'ok');
-
-    // 看板渲染失敗不可連累雲端同步——正式巡店資料一定要有機會送出。
-    let renderErr=null;
-    try{ render(); }
-    catch(err){ renderErr=err; console.error('Patrol render failed:', err); }
-
-    if(cloudOn && mergeResult.writeRows.length){
-      // 雲端的成功／失敗訊息會覆蓋上面的「正在……」；render 出錯時一併回報。
-      cloudWrite(mergeResult.writeRows, renderErr);
-    } else if(cloudOn) {
-      showMsg(`本次貼上沒有新候選（新增 0 筆，略過重複 ${mergeResult.duplicates} 筆）；正式摘要維持不變`, 'ok');
-    } else if(renderErr){
-      showMsg(`資料已解析，但看板更新失敗：${renderErr.message||renderErr}`, 'err');
-    } else {
-      showMsg(`已解析 ${added} 筆檢核紀錄；本頁候選已更新，正式摘要維持不變`, 'ok');
-    }
-  } else {
+  if(!newDetails.length){
     showMsg('未解析到有效資料，請確認貼上的是明細表（Tab分隔）','err');
+    return;
+  }
+
+  const candidate=preparePatrolCandidates(newDetails);
+  if(failedPatrolWriteRaw===raw){
+    pendingPatrolWrite=null;setPatrolWriteConfirmation(false);
+    showMsg('此份原始資料已有未完成的雲端寫入／讀回驗證，已保留原文且禁止重複寫入；請先重新載入正式摘要並確認 missing keys。','err');
+    return;
+  }
+  if(!candidate.writeRows.length){
+    pendingPatrolWrite=null;setPatrolWriteConfirmation(false);
+    showPatrolPastePreview('本次貼上',candidate);
+    showMsg(`本次貼上沒有新候選（新增 0 筆，略過重複 ${candidate.duplicates} 筆）；正式摘要維持不變`,'ok');
+    return;
+  }
+  if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN){
+    showPatrolPastePreview('本次貼上',candidate);
+    setPatrolWriteConfirmation(false);
+    showMsg('尚未連線；原始貼上資料已保留，必須完成督導驗證後才能執行 Server Preflight。','err');
+    return;
+  }
+  const parseButton=document.getElementById('patrolParseBtn');
+  if(parseButton) parseButton.disabled=true;
+  setPatrolWriteConfirmation(false);
+  showMsg(`已解析 ${newDetails.length} 筆；正在以 ptdetail 分頁比對正式資料，完成前禁止寫入……`,'ok');
+  try{
+    const preflight=await patrolServerPreflight(candidate.writeRows);
+    showPatrolPastePreview('本次貼上',candidate,preflight);
+    if(preflight.differences.length){
+      pendingPatrolWrite=null;
+      showMsg(`Server Preflight 發現 ${preflight.differences.length} 筆既有內容差異，已 fail-closed；本輪不允許寫入。`,'err');
+      return;
+    }
+    if(!preflight.additions.length){
+      pendingPatrolWrite=null;
+      showMsg(`Server Preflight 完成：正式已存在 ${preflight.existingSame.length} 筆，本輪沒有新增缺失，不建立雲端寫入。`,'ok');
+      return;
+    }
+    pendingPatrolWrite={raw,parsedRows:newDetails,candidate:preparePatrolCandidates(preflight.additions),preflight};
+    setPatrolWriteConfirmation(true);
+    showMsg(`Server Preflight PASS：正式已存在 ${preflight.existingSame.length} 筆，僅 ${preflight.additions.length} 筆新增缺失可寫入；寫入後仍須逐鍵 readback 一致。`,'ok');
+  }catch(error){
+    pendingPatrolWrite=null;
+    showPatrolPastePreview('本次貼上',candidate);
+    showMsg(`${error&&error.message||'Server Preflight 失敗'}；原始貼上資料已保留，禁止寫入。`,'err');
+  }finally{
+    if(parseButton) parseButton.disabled=false;
+  }
+}
+
+async function confirmPatrolCloudWrite(){
+  const pending=pendingPatrolWrite;
+  if(!pending||!pending.candidate||!pending.candidate.writeRows.length){
+    showMsg('沒有待確認的雲端寫入資料，請先解析並預覽。','err');
+    return;
+  }
+  if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN){
+    showMsg('尚未連線或通行碼已失效；原始貼上資料已保留，尚未寫入雲端。','err');
+    return;
+  }
+  setPatrolWriteConfirmation(true,true);
+  showMsg(`正在寫入 ${pending.candidate.writeRows.length} 筆並逐鍵讀回驗證……`,'ok');
+  let renderErr=null;
+  try{ render(); }catch(error){renderErr=error;console.error('Patrol render failed:',error);}
+  try{
+    const receipt=await cloudWrite(pending.candidate.writeRows);
+    commitPatrolCandidates(pending.candidate);
+    document.getElementById('pasteBox').value='';
+    pendingPatrolWrite=null;
+    setPatrolWriteConfirmation(false);
+    const writeMessage=`雲端寫入與 readback 一致（解析 ${pending.parsedRows.length} 筆／寫入 ${receipt.writtenRows} 筆／讀回 ${receipt.readbackRows} 筆）`;
+    await cloudLoad({afterWrite:true,writeMessage,renderErr});
+  }catch(error){
+    setPatrolWriteConfirmation(false);
+    failedPatrolWriteRaw=pending.raw;
+    const report=error&&error.readbackReport;
+    if(report){
+      showMsg(`雲端未完整寫入，已保留原始資料，請勿重複操作。解析 ${report.parsedRows} 筆／written ${report.writtenRows} 筆／readback ${report.readbackRows} 筆／missing keys：${report.missingKeys.join('；')||'無法讀回驗證'}`,'err');
+    }else{
+      showMsg(error?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端寫入失敗：${error&&error.message||'未知錯誤'}；原始資料已保留，尚未顯示同步成功。`,'err');
+    }
   }
 }
 
@@ -1140,7 +1278,7 @@ function showMsg(t,type){
 
 function clearAll(){
   if(confirm('確定清空所有已貼上的巡店紀錄？（雲端資料不受影響，重新載入即可還原）')){
-    records={}; rawDetails=[];
+    records={}; rawDetails=[];pendingPatrolWrite=null;failedPatrolWriteRaw='';setPatrolWriteConfirmation(false);
     const preview=document.getElementById('patrolPastePreview');if(preview){preview.hidden=true;preview.textContent='';}
     render();
     showMsg('已清空本地資料','ok');
@@ -1166,6 +1304,7 @@ function importData(e){
   reader.onload=ev=>{
     try{
       const data=JSON.parse(ev.target.result);
+      pendingPatrolWrite=null;failedPatrolWriteRaw='';setPatrolWriteConfirmation(false);
       if(Array.isArray(data)){
         const mergeResult=mergePatrolCandidates(data);
         showPatrolPastePreview('本次匯入',mergeResult);
@@ -1509,8 +1648,8 @@ function storeCardHTML(storeName){
 function cloudCall(action, params={}){
   return patrolRequestWithReauth(()=>{
     if(!['ping','pthealth'].includes(action)&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
-    const timeoutMs=action==='ptsummary'?20000:(action==='ptdetail'||action==='ptmileage')?30000:0;
-    if(action==='ptsummary'||action==='ptdetail'||action==='ptmileage'){
+    const timeoutMs=action==='ptsummary'?20000:(action==='ptdetail'||action==='ptmileage'||action==='ptmileage2')?30000:0;
+    if(action==='ptsummary'||action==='ptdetail'||action==='ptmileage'||action==='ptmileage2'){
       const controller=new AbortController();
       const timer=setTimeout(()=>controller.abort(),timeoutMs);
       return patrolTrackedRequest(action,()=>fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:PT_TOKEN,...params}),cache:'no-store',signal:controller.signal}).then(async response=>{
@@ -1610,11 +1749,79 @@ function cloudLoad(options={}){
   });
 }
 
-function cloudWrite(details, renderErr){
+function patrolCandidateMonth(row){
+  const explicit=String(row&&row.month||'').match(/^\d{4}-\d{2}$/);
+  if(explicit) return explicit[0];
+  const fill=String(row&&row.fillTime||'').match(/^(\d{4})[\/-](\d{1,2})/);
+  return fill?`${fill[1]}-${String(Number(fill[2])).padStart(2,'0')}`:'';
+}
+
+function patrolReadbackKey(row){
+  const fillTime=normalizePatrolCandidateTime(row&&row.fillTime);
+  const date=(fillTime.match(/^(\d{4}\/\d{1,2}\/\d{1,2})/)||[])[1]||fillTime;
+  const item=Number(row&&row.item);
+  const itemKey=Number.isFinite(item)?String(item):String(row&&row.item||'').trim();
+  return [date,canonicalPatrolCandidateStore(row),itemKey,fillTime].join('|');
+}
+
+function patrolReadbackKeyLabel(row){
+  const fillTime=normalizePatrolCandidateTime(row&&row.fillTime);
+  const date=(fillTime.match(/^(\d{4}\/\d{1,2}\/\d{1,2})/)||[])[1]||fillTime;
+  const item=Number(row&&row.item);
+  return `${date}｜${canonicalPatrolCandidateStore(row)}｜題${Number.isFinite(item)?item:String(row&&row.item||'').trim()}｜${fillTime}`;
+}
+
+async function readbackPatrolWriteRows(details, writtenRows){
+  const expected=new Map();
+  const groups=new Map();
+  (details||[]).forEach(row=>{
+    const key=patrolReadbackKey(row);
+    expected.set(key,row);
+    const month=patrolCandidateMonth(row);
+    const store=canonicalPatrolCandidateStore(row);
+    const groupKey=`${month}|${store}`;
+    if(!groups.has(groupKey)) groups.set(groupKey,{month,store});
+  });
+  const found=new Set();
+  try{
+    for(const group of groups.values()){
+      if(!group.month||!group.store) throw new Error('雲端讀回驗證缺少月份或店點');
+      let page=1;
+      let totalRows=null;
+      for(;;){
+        const result=await cloudCall('ptdetail',{month:group.month,store:group.store,page,limit:100});
+        if(!result||result.status!=='ok') throw new Error(result&&result.message||'雲端讀回驗證失敗');
+        if(!Array.isArray(result.rows)) throw new Error('雲端讀回 contract 不完整');
+        result.rows.forEach(row=>{
+          const key=patrolReadbackKey(row);
+          if(expected.has(key)) found.add(key);
+        });
+        const parsedTotal=Number(result.totalRows);
+        if(Number.isFinite(parsedTotal)&&parsedTotal>=0) totalRows=parsedTotal;
+        const pageRows=result.rows.length;
+        if(pageRows===0 || pageRows<100 || (totalRows!=null && page*100>=totalRows)) break;
+        page++;
+        if(page>100) throw new Error('雲端讀回頁數異常');
+      }
+    }
+  }catch(error){
+    const missing=[...expected.entries()].filter(([key])=>!found.has(key)).map(([,row])=>patrolReadbackKeyLabel(row));
+    const failure=new Error(error&&error.message||'雲端讀回驗證失敗');
+    failure.readbackReport={parsedRows:details.length,writtenRows,readbackRows:found.size,missingKeys:missing};
+    throw failure;
+  }
+  const missing=[...expected.entries()].filter(([key])=>!found.has(key)).map(([,row])=>patrolReadbackKeyLabel(row));
+  if(missing.length){
+    const failure=new Error('雲端讀回筆數或 key 不一致');
+    failure.readbackReport={parsedRows:details.length,writtenRows,readbackRows:found.size,missingKeys:missing};
+    throw failure;
+  }
+  return {parsedRows:details.length,writtenRows,readbackRows:found.size,missingKeys:[]};
+}
+
+function cloudWrite(details){
   if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN){
-    // 不能靜默返回——否則畫面停在「正在同步……」，使用者無從得知資料沒上傳。
-    showMsg('尚未連線或通行碼已失效，資料暫存於本頁看板、尚未上傳雲端；請重新登入後把明細整份重貼一次。','err');
-    return;
+    return Promise.reject(new Error('尚未連線或通行碼已失效'));
   }
   // content 可由題號還原，不上傳以縮短網址（JSONP payload 走 query string，有長度限制故分批）
   const slim = details.map(d=>({
@@ -1646,12 +1853,7 @@ function cloudWrite(details, renderErr){
 
   let written = 0, chain = Promise.resolve();
   chunks.forEach(c=>{ chain = chain.then(()=>sendChunk(c, 0)).then(n=>{ written += n; }); });
-  chain.then(()=>{
-    // 本頁候選只供寫入與預覽；正式大盤必須重新讀取 server ptsummary，絕不以局部批次重算。
-    const writeMessage=`已同步至雲端（新增 ${written} 筆，重複資料自動略過）`;
-    showMsg(`${writeMessage}；正在更新正式摘要……`,'ok');
-    return cloudLoad({afterWrite:true,writeMessage,renderErr});
-  }).catch(err=>showMsg(err?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端寫入失敗：${err.message}；本頁候選仍保留，正式摘要維持上次成功資料`,'err'));
+  return chain.then(()=>readbackPatrolWriteRows(details,written));
 }
 
 function setCloudStatus(text, on){
@@ -2134,7 +2336,8 @@ const MI = (function(){
     LOAD_SLOW:'MILEAGE_LOAD_SLOW', LOAD_TIMEOUT:'MILEAGE_LOAD_TIMEOUT'
   };
   const LOAD_TARGET_MS=10000;
-  let state={date:'', month:'', loading:false, error:null, progress:'', slow:null};
+  const RETENTION_MONTHS=6;
+  let state={date:'', month:'', loading:false, error:null, progress:'', slow:null, diagnostic:null};
   let serverRowsByMonth={};
   let loadedMonths={};
   let loadGeneration=0;
@@ -2149,6 +2352,85 @@ const MI = (function(){
     const year=parts.find(part=>part.type==='year');
     const month=parts.find(part=>part.type==='month');
     return year&&month?year.value+'-'+month.value:'';
+  }
+
+  function retentionMonths(anchor){
+    const month=canonicalMonth(anchor);
+    if(!month) return [];
+    const [year,number]=month.split('-').map(Number);
+    const out=[];
+    for(let offset=RETENTION_MONTHS-1;offset>=0;offset--){
+      const cursor=new Date(Date.UTC(year,number-1-offset,1));
+      out.push(`${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth()+1).padStart(2,'0')}`);
+    }
+    return out;
+  }
+
+  function scopedMonth(value){
+    const match=String(value||'').match(/^(\d{4})-(\d{2})(?:[-|]|$)/);
+    return match?canonicalMonth(`${match[1]}-${match[2]}`):'';
+  }
+
+  function pruneMonthObject(value,retained){
+    if(!value||typeof value!=='object'||Array.isArray(value)) return {value,changed:false};
+    let changed=false;const next={};
+    Object.keys(value).forEach(key=>{
+      const month=scopedMonth(key);
+      if(month&&!retained.has(month)){changed=true;return;}
+      next[key]=value[key];
+    });
+    return {value:next,changed};
+  }
+
+  function pruneScopedRows(value,retained){
+    if(!Array.isArray(value)) return {value,changed:false};
+    const next=value.filter(row=>{
+      const month=scopedMonth(row&&((row.month||row.date||row.key)||''));
+      return !month||retained.has(month);
+    });
+    return {value:next,changed:next.length!==value.length};
+  }
+
+  // Retention is intentionally limited to browser working data. It never calls GAS,
+  // changes a Patrol row, nor clears the entire localStorage value on any failure.
+  function cleanupRetention(anchor,protectMonth){
+    const base=canonicalMonth(anchor)||taipeiCurrentMonth();
+    const retained=new Set(retentionMonths(base));
+    const protectedCurrent=canonicalMonth(protectMonth)||canonicalMonth(state.month);
+    const memoryMonths=new Set(retained);
+    if(protectedCurrent) memoryMonths.add(protectedCurrent);
+    try{
+      const raw=localStorage.getItem(LS);
+      if(raw!=null){
+        const parsed=JSON.parse(raw);
+        if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)) throw new Error('mileage local state is not an object');
+        const next=Object.assign({},parsed);let changed=false;
+        const dayEdits=pruneMonthObject(next.dayEdits,retained);
+        if(dayEdits.changed){next.dayEdits=dayEdits.value;changed=true;}
+        ['monthCache','monthState','monthOverrides','routeOverrides'].forEach(field=>{
+          const value=next[field];
+          const pruned=Array.isArray(value)?pruneScopedRows(value,retained):pruneMonthObject(value,retained);
+          if(pruned.changed){next[field]=pruned.value;changed=true;}
+        });
+        ['manualLegs','exportLog'].forEach(field=>{
+          const pruned=pruneScopedRows(next[field],retained);
+          if(pruned.changed){next[field]=pruned.value;changed=true;}
+        });
+        if(changed) localStorage.setItem(LS,JSON.stringify(next));
+      }
+    }catch(error){
+      console.warn('MILEAGE_RETENTION_CLEANUP_FAILED',{month:base,reason:String(error&&error.message||error)});
+      // Fail open: leave browser state untouched and continue the mileage read.
+      // Do not trim in-memory months either: a failed cleanup must be a no-op.
+      return {months:[...retained].sort(),protectedMonth:protectedCurrent||'',cleanupFailed:true};
+    }
+    Object.keys(serverRowsByMonth).forEach(month=>{
+      if(!memoryMonths.has(month)) delete serverRowsByMonth[month];
+    });
+    Object.keys(loadedMonths).forEach(month=>{
+      if(!memoryMonths.has(month)) delete loadedMonths[month];
+    });
+    return {months:[...retained].sort(),protectedMonth:protectedCurrent||'',memoryMonths:[...memoryMonths].sort()};
   }
 
   function mileageError(code, message, detail){
@@ -2169,50 +2451,36 @@ const MI = (function(){
   }
 
   async function loadMonthDetails(month, onProgress){
-    const rows=[];
-    const limit=500;
-    let page=1;
-    let totalRows=null;
-    let totalPages=null;
-    let sheetScans=0;
-    do{
-      onProgress(page,totalPages);
-      const response=await cloudCall('ptmileage',{month,page,limit});
-      if(!response || typeof response!=='object') throw mileageError(ERROR.API,'巡店明細 API 未回傳 JSON object');
-      if(response.status!=='ok') {
-        const error=new Error(response.message||'巡店明細 API 回傳失敗');
-        error.authReason=patrolAuthReason(response);
-        throw classifyReadError(error);
-      }
-      if(response.contract!=='patrol-mileage-month-v1'||response.month!==month||Number(response.page)!==page||!Array.isArray(response.rows)){
-        throw mileageError(ERROR.DATA_FORMAT,'月份級里程明細 contract 不完整');
-      }
-      const fields=Array.isArray(response.fields)?response.fields:[];
-      if(['fillTime','arriveTime','code','store','month'].some(field=>!fields.includes(field)))
-        throw mileageError(ERROR.DATA_FORMAT,'月份級里程明細欄位 contract 不完整');
-      const reportedTotal=Number(response.totalRows);
-      if(!Number.isInteger(reportedTotal) || reportedTotal<0) throw mileageError(ERROR.DATA_FORMAT,'巡店明細筆數 contract 不完整');
-      const reportedPages=Number(response.totalPages);
-      if(!Number.isInteger(reportedPages)||reportedPages<1) throw mileageError(ERROR.DATA_FORMAT,'巡店明細總頁數 contract 不完整');
-      if(totalRows===null) totalRows=reportedTotal;
-      else if(totalRows!==reportedTotal) throw mileageError(ERROR.API,'巡店明細分頁期間資料已變更，請重新載入');
-      if(totalPages===null) totalPages=reportedPages;
-      else if(totalPages!==reportedPages) throw mileageError(ERROR.API,'巡店明細總頁數於讀取期間變更');
-      if(response.rows.some(row=>!row||typeof row!=='object'||Array.isArray(row)))
-        throw mileageError(ERROR.DATA_FORMAT,'巡店明細包含非 object 資料列');
-      sheetScans+=Number(response.diagnostics&&response.diagnostics.sheetScans||0);
-      rows.push(...response.rows);
-      if(response.rows.length===0 && rows.length<totalRows) throw mileageError(ERROR.API,'巡店明細分頁未前進');
-      page+=1;
-    }while(page<=totalPages);
-    if(rows.length!==totalRows) throw mileageError(ERROR.API,'巡店明細分頁讀回筆數不一致');
+    onProgress();
+    const response=await cloudCall('ptmileage2',{month});
+    if(!response || typeof response!=='object') throw mileageError(ERROR.API,'巡店事件 API 未回傳 JSON object');
+    if(response.status!=='ok') {
+      const error=new Error(response.message||'巡店事件 API 回傳失敗');
+      error.authReason=patrolAuthReason(response);
+      throw classifyReadError(error);
+    }
+    if(response.contract!=='patrol-mileage-visits-v2'||response.month!==month||Number(response.page)!==1||!Array.isArray(response.visits)){
+      throw mileageError(ERROR.DATA_FORMAT,'月份級巡店事件 contract 不完整');
+    }
+    const fields=Array.isArray(response.fields)?response.fields:[];
+    if(['fillTime','arriveTime','code','store','month'].some(field=>!fields.includes(field)))
+      throw mileageError(ERROR.DATA_FORMAT,'月份級巡店事件欄位 contract 不完整');
+    const totalVisits=Number(response.totalVisits);
+    if(!Number.isInteger(totalVisits) || totalVisits<0 || totalVisits!==response.visits.length)
+      throw mileageError(ERROR.DATA_FORMAT,'巡店事件筆數 contract 不完整');
+    if(Number(response.totalPages)!==1) throw mileageError(ERROR.API,'月份級巡店事件不應分頁');
+    if(response.visits.some(visit=>!visit||typeof visit!=='object'||Array.isArray(visit)))
+      throw mileageError(ERROR.DATA_FORMAT,'巡店事件包含非 object 資料列');
+    const sheetScans=Number(response.diagnostics&&response.diagnostics.sheetScans||0);
     if(sheetScans>1) throw mileageError(ERROR.API,'月份級里程讀取重複掃描工作表',{sheetScans});
-    return rows;
+    return response.visits;
   }
 
   async function hydrateMonth(value, force){
     const month=canonicalMonth(value);
     if(!month) throw mileageError(ERROR.DATE_PARSE,'巡店月份格式錯誤');
+    // Direct callers also get the retention guard; cleanup failures never block this read.
+    cleanupRetention(taipeiCurrentMonth(),month);
     if(loadedMonths[month] && !force) return serverRowsByMonth[month]||[];
     const wasLoaded=Boolean(loadedMonths[month]);
     if(!secureUnlocked || !privateAccount || !PT_TOKEN) throw mileageError(ERROR.AUTH,'請先完成督導驗證');
@@ -2226,8 +2494,8 @@ const MI = (function(){
       console.warn('MILEAGE_HEALTH',{month,code:ERROR.LOAD_SLOW,reason:state.slow.reason,progress:state.progress});
     },LOAD_TARGET_MS);
     try{
-      const next=await loadMonthDetails(month,(page,totalPages)=>{
-        state.progress=totalPages?`正在讀取第 ${page}/${totalPages} 頁`:`正在讀取第 ${page} 頁`;
+      const next=await loadMonthDetails(month,()=>{
+        state.progress=`正在載入 ${month}：讀取月份巡店事件`;
         if(generation===loadGeneration) render();
       });
       serverRowsByMonth[month]=next;
@@ -2255,7 +2523,7 @@ const MI = (function(){
   function clear(){
     loadGeneration+=1;
     serverRowsByMonth={}; loadedMonths={};
-    state={date:'',month:'',loading:false,error:null,progress:'',slow:null};
+    state={date:'',month:'',loading:false,error:null,progress:'',slow:null,diagnostic:null};
   }
 
   /* ---------- 人工資料層（localStorage，不觸碰 GAS／原始明細） ---------- */
@@ -2331,9 +2599,17 @@ const MI = (function(){
     });
     return {by,issues};
   }
+  function monthSource(month){
+    const patrolRows=serverRowsByMonth[month]||[];
+    if(patrolRows.length) return {type:'patrol',patrolRows:patrolRows.length,archive:null};
+    const archive=OFFICIAL[month]||null;
+    if(archive) return {type:'official-archive',patrolRows:0,archive};
+    return {type:'none',patrolRows:0,archive:null};
+  }
   function days(){
     const by={};
     Object.keys(serverRowsByMonth).forEach(month=>{
+      if(monthSource(month).type!=='patrol') return;
       const parsed=parsedMonth(month).by;
       Object.keys(parsed).forEach(date=>{by[date]=Object.assign(by[date]||{},parsed[date]);});
     });
@@ -2341,11 +2617,11 @@ const MI = (function(){
     Object.keys(by).sort().forEach(d=>{
       out[d]=Object.values(by[d]).sort((x,y)=>x.key.localeCompare(y.key));
     });
-    // 正式公司報銷表為該月的正式依據：巡店明細沒有的日子，直接採用報銷表的路線與順序。
-    // ptread 日後可作為到店時間／順序的交叉驗證，但不阻擋正式里程對帳。
+    // 來源優先序是月份級的，不能把巡店來源和公司正式報銷 archive 混算：
+    // 有正式巡店資料時只用 ptmileage；沒有時才採用既有 archive，且絕不回寫巡店資料。
     Object.keys(OFFICIAL).forEach(m=>{
+      if(monthSource(m).type!=='official-archive') return;
       OFFICIAL[m].rows.forEach(([d,place])=>{
-        if(out[d]&&out[d].length) return;              // 已有巡店明細者以明細為準
         out[d]=place.split('/').map((n,i)=>({name:n,time:'',key:String(100+i),code:'',official:true}));
       });
     });
@@ -2413,20 +2689,140 @@ const MI = (function(){
 
   function health(month){
     const source=serverRowsByMonth[month]||[];
+    const sourceInfo=monthSource(month);
     const parsed=parsedMonth(month);
     const visitCount=Object.values(parsed.by).reduce((sum,stores)=>sum+Object.keys(stores).length,0);
     const issues=parsed.issues.slice();
     const plans=monthPlans(month);
     const todos=[]; plans.forEach(plan=>plan.todo.forEach(route=>todos.push(route)));
-    if(source.length===0) issues.push({code:ERROR.NO_PATROL,reason:`${month} 本月真的沒有巡店`});
-    else if(visitCount===0) issues.push({code:ERROR.SOURCE_MISSING,reason:`巡店已有 ${source.length} 筆，但里程同步為 0 筆`});
+    const mileageDetails=sourceInfo.type==='official-archive' ? sourceInfo.archive.rows.length : visitCount;
+    if(sourceInfo.type==='none') issues.push({code:ERROR.NO_PATROL,reason:`${month} 本月真的沒有巡店，也沒有正式歷史車資`});
+    else if(sourceInfo.type==='patrol'&&visitCount===0) issues.push({code:ERROR.SOURCE_MISSING,reason:`巡店已有 ${source.length} 筆，但里程同步為 0 筆`});
     if(todos.length) issues.push({code:ERROR.STORE_MAPPING,reason:`${todos.length} 段店點無法匹配距離表：${todos.join('、')}`});
     const calcFailed=plans.filter(plan=>plan.km!=null&&(!Number.isFinite(plan.km)||plan.km<0));
     if(calcFailed.length) issues.push({code:ERROR.CALC,reason:`${calcFailed.length} 天距離計算結果無效`});
     const unique=[];
     issues.forEach(issue=>{if(!unique.some(item=>item.code===issue.code&&item.reason===issue.reason)) unique.push(issue);});
     const abnormal=unique.some(issue=>issue.code!==ERROR.NO_PATROL);
-    return {month,patrolRows:source.length,mileageDetails:visitCount,plans:plans.length,abnormal,issues:unique};
+    return {month,sourceType:sourceInfo.type,patrolRows:source.length,mileageDetails,archiveRows:sourceInfo.archive?sourceInfo.archive.rows.length:0,plans:plans.length,abnormal,issues:unique};
+  }
+
+  // 僅供故障定位：不改 state 的月份資料、不寫 Sheet，也不輸出 token。依序讀摘要、九店明細、月份里程，
+  // 讓「有來源但里程為 0」能明確指出首次斷點，而不是被畫面誤譯為沒有資料。
+  function diagnosticFailure(action, error, extra){
+    const classified=classifyReadError(error);
+    return Object.assign({action,status:'error',code:classified.code||ERROR.API,message:classified.message||String(error||'')},extra||{});
+  }
+  function diagnosticResponseFailure(action, response, extra){
+    const error=new Error(String(response&&response.message||`${action} 回傳錯誤`));
+    error.authReason=patrolAuthReason(response);
+    return diagnosticFailure(action,error,Object.assign({reason:patrolAuthReason(response)||''},extra||{}));
+  }
+  function diagnosticDetailVisits(rows, month){
+    const keys=new Set();
+    (rows||[]).forEach((row,index)=>{
+      const parsed=parseArrive(row&&row.arriveTime);
+      const store=normalize(row&&row.code,row&&row.store);
+      keys.add(parsed&&parsed.date.slice(0,7)===month&&store?`${parsed.date}|${store}`:`invalid:${index}`);
+    });
+    return keys.size;
+  }
+  async function diagnosticDetailStore(month, store){
+    const startedAt=Date.now(), rows=[], pages=[];
+    let totalRows=null, page=1;
+    try{
+      while(true){
+        const pageStartedAt=Date.now();
+        const response=await cloudCall('ptdetail',{month,store,page,limit:100});
+        const durationMs=Date.now()-pageStartedAt;
+        if(!response||typeof response!=='object'||response.status!=='ok') return diagnosticResponseFailure('ptdetail',response,{store,page,pages,durationMs:Date.now()-startedAt});
+        if(response.month!==month||String(response.store||'')!==String(store)||Number(response.page)!==page||!Array.isArray(response.rows)){
+          return {action:'ptdetail',status:'error',code:ERROR.DATA_FORMAT,message:'ptdetail 分頁 contract 不完整',store,page,pages,durationMs:Date.now()-startedAt};
+        }
+        const returnedTotal=Number(response.totalRows);
+        if(!Number.isInteger(returnedTotal)||returnedTotal<0) return {action:'ptdetail',status:'error',code:ERROR.DATA_FORMAT,message:'ptdetail totalRows contract 不完整',store,page,pages,durationMs:Date.now()-startedAt};
+        if(totalRows===null) totalRows=returnedTotal;
+        if(totalRows!==returnedTotal) return {action:'ptdetail',status:'error',code:ERROR.DATA_FORMAT,message:'ptdetail 各頁 totalRows 不一致',store,page,pages,durationMs:Date.now()-startedAt};
+        rows.push(...response.rows);
+        pages.push({page,rows:response.rows.length,durationMs});
+        if(rows.length>=totalRows) break;
+        if(response.rows.length===0||page>=Math.ceil(totalRows/100)+1){
+          return {action:'ptdetail',status:'error',code:ERROR.DATA_FORMAT,message:'ptdetail 分頁提早結束',store,page,pages,durationMs:Date.now()-startedAt};
+        }
+        page+=1;
+      }
+      if(rows.length!==totalRows) return {action:'ptdetail',status:'error',code:ERROR.DATA_FORMAT,message:'ptdetail row count 與 totalRows 不一致',store,page,pages,durationMs:Date.now()-startedAt};
+      return {action:'ptdetail',status:'ok',store,totalRows,visitCount:diagnosticDetailVisits(rows,month),pages,durationMs:Date.now()-startedAt};
+    }catch(error){
+      return diagnosticFailure('ptdetail',error,{store,page,pages,durationMs:Date.now()-startedAt});
+    }
+  }
+  function diagnosticSummary(response, month){
+    if(!response||typeof response!=='object'||response.status==='error') return diagnosticResponseFailure('ptsummary',response);
+    const summary=response.summary;
+    if(!summary||summary.month!==month||!Array.isArray(summary.visitCounts)) return {action:'ptsummary',status:'error',code:ERROR.DATA_FORMAT,message:'ptsummary visitCounts contract 不完整'};
+    const visitCount=summary.visitCounts.reduce((sum,item)=>sum+Math.max(0,Number(item&&item.count)||0),0);
+    return {action:'ptsummary',status:'ok',visitCount,visitedStores:Number(summary.visitedStores)||0,storeCount:Array.isArray(response.stores)?response.stores.length:0,durationMs:0};
+  }
+  function diagnosticMileage(response, month, durationMs){
+    if(!response||typeof response!=='object'||response.status!=='ok') return diagnosticResponseFailure('ptmileage2',response,{durationMs});
+    const diagnostics=response.diagnostics&&typeof response.diagnostics==='object'?response.diagnostics:{};
+    const contract=String(response.contract||'');
+    const visits=Array.isArray(response.visits)?response.visits:null;
+    return {
+      action:'ptmileage2',status:'ok',contract,month:String(response.month||''),
+      visitCount:visits?visits.length:null,totalVisits:Number.isInteger(Number(response.totalVisits))?Number(response.totalVisits):null,
+      rawRows:Array.isArray(response.rows)?response.rows.length:null,totalRows:Number.isInteger(Number(response.totalRows))?Number(response.totalRows):null,
+      matchedRows:Number.isInteger(Number(diagnostics.matchedRows))?Number(diagnostics.matchedRows):null,
+      sheetScans:Number.isInteger(Number(diagnostics.sheetScans))?Number(diagnostics.sheetScans):null,durationMs
+    };
+  }
+  async function runDiagnostic(value){
+    const month=canonicalMonth(value||state.month||currentMonth);
+    if(!month) throw mileageError(ERROR.DATE_PARSE,'巡店月份格式錯誤');
+    const report={contract:'patrol-mileage-read-diagnostic-v2',month,mode:'read-only',startedAt:new Date().toISOString(),summary:null,details:[],ptdetailRows:0,ptdetailVisits:0,mileage:null,firstBreak:null,status:'running'};
+    state.diagnostic=report; render();
+    try{
+      const summaryStartedAt=Date.now();
+      const summaryResponse=await cloudCall('ptsummary',{month});
+      report.summary=diagnosticSummary(summaryResponse,month);
+      report.summary.durationMs=Date.now()-summaryStartedAt;
+      if(report.summary.status!=='ok') {
+        report.firstBreak=report.summary;
+      }else{
+        const diagnosticStores=(Array.isArray(summaryResponse.stores)&&summaryResponse.stores.length?summaryResponse.stores:STORES)
+          .map(store=>String(store&&store.name||'')).filter(Boolean);
+        for(const store of diagnosticStores){
+          const detail=await diagnosticDetailStore(month,store);
+          report.details.push(detail);
+          if(detail.status==='ok'){
+            report.ptdetailRows+=detail.totalRows;
+            report.ptdetailVisits+=detail.visitCount;
+          }else if(!report.firstBreak){
+            report.firstBreak=detail;
+          }
+        }
+        const mileageStartedAt=Date.now();
+        let mileageResponse;
+        try{ mileageResponse=await cloudCall('ptmileage2',{month}); }
+        catch(error){ report.mileage=diagnosticFailure('ptmileage2',error,{durationMs:Date.now()-mileageStartedAt}); }
+        if(!report.mileage) report.mileage=diagnosticMileage(mileageResponse,month,Date.now()-mileageStartedAt);
+        if(!report.firstBreak&&report.mileage.status!=='ok') report.firstBreak=report.mileage;
+        if(!report.firstBreak&&report.ptdetailRows>0&&report.mileage.contract!=='patrol-mileage-visits-v2'){
+          report.firstBreak={action:'ptmileage2',status:'error',code:ERROR.DATA_FORMAT,message:`ptdetail 有 ${report.ptdetailRows} 筆，但 ptmileage2 回傳 ${report.mileage.contract||'未知'} contract`};
+        }else if(!report.firstBreak&&report.ptdetailRows>0&&Number(report.mileage.totalVisits||report.mileage.visitCount||0)===0){
+          report.firstBreak={action:'ptmileage2',status:'error',code:ERROR.SOURCE_MISSING,message:`ptdetail 有 ${report.ptdetailRows} 筆／${report.ptdetailVisits} visits，但 ptmileage2 為 0`};
+        }
+      }
+    }catch(error){
+      if(!report.firstBreak) report.firstBreak=diagnosticFailure('ptsummary',error);
+    }
+    report.status=report.firstBreak?'error':'ok';
+    report.finishedAt=new Date().toISOString();
+    state.diagnostic=report;
+    console[report.firstBreak?'warn':'info']('PATROL_MILEAGE_READ_DIAGNOSTIC',report);
+    render();
+    return report;
   }
 
   /* ---------- 資料涵蓋範圍 ---------- */
@@ -2459,6 +2855,7 @@ const MI = (function(){
     if(!document.getElementById('miStats')) return;
     ensureState();
     renderCoverage();
+    renderDiagnostic();
     if(state.loading||state.error){
       const label=state.loading?(state.progress||`正在載入 ${state.month}`):'正式月份明細尚未完成讀回';
       document.getElementById('miStats').innerHTML=`<div class="mi-card"><div class="k">里程資料</div><div class="v">—</div><div class="s">${esc2(label)}</div></div>`;
@@ -2468,6 +2865,24 @@ const MI = (function(){
       return;
     }
     renderStats(); renderAlerts(); renderTimeline(); renderSummary();
+  }
+
+  function renderDiagnostic(){
+    const el=document.getElementById('miDiagnostic'), report=state.diagnostic;
+    if(!el) return;
+    if(!report){ el.innerHTML=''; return; }
+    if(report.status==='running'){
+      el.innerHTML=`<div class="mi-note">正在執行 ${esc2(report.month)} 唯讀診斷：ptsummary → 各店 ptdetail → ptmileage…</div>`;
+      return;
+    }
+    const summary=report.summary||{}, mileage=report.mileage||{};
+    const details=(report.details||[]).map(detail=>`${esc2(detail.store||'—')}：${detail.status==='ok'?`${detail.totalRows} rows / ${detail.visitCount} visits / ${detail.pages.length} 頁`:`${esc2(detail.code||ERROR.API)}：${esc2(detail.message||'失敗')}`}`).join('<br>');
+    const breakText=report.firstBreak?`<br><b>首次斷點：${esc2(report.firstBreak.action)} · ${esc2(report.firstBreak.code||'ERROR')}</b>：${esc2(report.firstBreak.message||'')}`:'<br><b>✅ 三層唯讀讀取均完成</b>';
+    el.innerHTML=`<div class="mi-note${report.firstBreak?' bad':''}"><b>唯讀診斷 ${esc2(report.month)}</b>（不寫入巡店資料）<br>`+
+      `ptsummary：${summary.status==='ok'?`${summary.visitCount} visits / ${summary.visitedStores} 店`:`${esc2(summary.code||ERROR.API)}：${esc2(summary.message||'失敗')}`}<br>`+
+      `ptdetail：${report.ptdetailRows} rows / ${report.ptdetailVisits} visits<br>${details||'未執行'}<br>`+
+      `ptmileage：${mileage.status==='ok'?`${esc2(mileage.contract||'未知 contract')} / ${mileage.totalVisits??mileage.visitCount??'—'} visits / ${mileage.sheetScans??'—'} scans`:`${esc2(mileage.code||ERROR.API)}：${esc2(mileage.message||'失敗')}`}`+
+      breakText+'</div>';
   }
 
   // 與正式公司報銷表對帳
@@ -2507,6 +2922,9 @@ const MI = (function(){
     }
     let h=report.issues.filter(issue=>issue.code!==ERROR.NO_PATROL).map(issue=>
       `<div class="mi-note bad"><b>⚠ ${esc2(issue.code)}</b>：${esc2(issue.reason)}</div>`).join('');
+    if(report.sourceType==='official-archive'){
+      h+=`<div class="mi-note"><b>資料來源：2026 年 6 月正式公司報銷表</b>（本月無正式巡店明細；僅讀取既有正式歷史車資，未建立或寫入任何巡店資料）。</div>`;
+    }
     if(rc){
       const hit=rc.rows.filter(r=>r.ok).length, kmhit=rc.rows.filter(r=>r.kmOk).length;
       const done=rc.match;
@@ -2597,11 +3015,13 @@ const MI = (function(){
   /* ---------- 日期／月份切換 ---------- */
   function open(v){
     const month=canonicalMonth(v)||canonicalMonth(currentMonth)||taipeiCurrentMonth();
+    cleanupRetention(taipeiCurrentMonth(),month);
     state.month=month; state.date=''; state.loading=!loadedMonths[month]; state.error=null; render();
     return hydrateMonth(month,false).catch(error=>{console.error('Mileage hydration failed:',error);return false;});
   }
   function setMonth(v){
     const month=canonicalMonth(v); if(!month) return Promise.resolve(false);
+    cleanupRetention(taipeiCurrentMonth(),month);
     state.month=month; state.date=''; state.loading=!loadedMonths[month]; state.error=null; render();
     return hydrateMonth(month,false).catch(error=>{console.error('Mileage hydration failed:',error);return false;});
   }
@@ -2799,12 +3219,13 @@ const MI = (function(){
   }
 
   return {render,open,clear,setMonth,setDate,step,today,addLegPrompt,setLegKm,removeNode,setCost,
-          importPick,importFile,exportDetails,exportConfirm,doExport,dlgClose,
+          importPick,importFile,exportDetails,exportConfirm,doExport,dlgClose,runDiagnostic,
           _reconcile:reconcile,_billable:billable,_officialPlans:officialPlans,OFFICIAL,
           _days:days,_dayPlan:dayPlan,_monthPlans:monthPlans,_coverage:coverage,
           _buildSheets:buildSheets,_normalize:normalize,_legFor:legFor,
           _isOffice:isOffice,_store:store,_hydrateMonth:hydrateMonth,_health:health,
-          _parseArrive:parseArrive,ERROR,NODES,DIST};
+          _parseArrive:parseArrive,_monthSource:monthSource,_runDiagnostic:runDiagnostic,
+          _retentionMonths:retentionMonths,_cleanupRetention:cleanupRetention,ERROR,NODES,DIST};
 })();
 
 </script>
