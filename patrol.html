@@ -553,10 +553,12 @@
       <p class="hint">登入後直接讀取正式巡店雲端明細：同日多店依<b>到店時間</b>逐段加總，同店重複只取最早一筆，不需貼上資料或匯入 JSON。距離取自受控版車資對照表，未知路段一律留白標「待查」，不填 0、不猜測、不平均拆分。</p>
       <div class="secure-toolbar">
         <label>檢視月份<input id="miMonth" type="month" onchange="MI.setMonth(this.value)"></label>
+        <button class="mi-btn ghost" type="button" onclick="MI.runDiagnostic()">唯讀資料診斷</button>
       </div>
     </div>
 
     <div id="miCoverage"></div>
+    <div id="miDiagnostic"></div>
     <div class="mi-stats" id="miStats"></div>
     <div id="miAlerts"></div>
 
@@ -2251,7 +2253,7 @@ const MI = (function(){
     LOAD_SLOW:'MILEAGE_LOAD_SLOW', LOAD_TIMEOUT:'MILEAGE_LOAD_TIMEOUT'
   };
   const LOAD_TARGET_MS=10000;
-  let state={date:'', month:'', loading:false, error:null, progress:'', slow:null};
+  let state={date:'', month:'', loading:false, error:null, progress:'', slow:null, diagnostic:null};
   let serverRowsByMonth={};
   let loadedMonths={};
   let loadGeneration=0;
@@ -2356,7 +2358,7 @@ const MI = (function(){
   function clear(){
     loadGeneration+=1;
     serverRowsByMonth={}; loadedMonths={};
-    state={date:'',month:'',loading:false,error:null,progress:'',slow:null};
+    state={date:'',month:'',loading:false,error:null,progress:'',slow:null,diagnostic:null};
   }
 
   /* ---------- 人工資料層（localStorage，不觸碰 GAS／原始明細） ---------- */
@@ -2432,9 +2434,17 @@ const MI = (function(){
     });
     return {by,issues};
   }
+  function monthSource(month){
+    const patrolRows=serverRowsByMonth[month]||[];
+    if(patrolRows.length) return {type:'patrol',patrolRows:patrolRows.length,archive:null};
+    const archive=OFFICIAL[month]||null;
+    if(archive) return {type:'official-archive',patrolRows:0,archive};
+    return {type:'none',patrolRows:0,archive:null};
+  }
   function days(){
     const by={};
     Object.keys(serverRowsByMonth).forEach(month=>{
+      if(monthSource(month).type!=='patrol') return;
       const parsed=parsedMonth(month).by;
       Object.keys(parsed).forEach(date=>{by[date]=Object.assign(by[date]||{},parsed[date]);});
     });
@@ -2442,11 +2452,11 @@ const MI = (function(){
     Object.keys(by).sort().forEach(d=>{
       out[d]=Object.values(by[d]).sort((x,y)=>x.key.localeCompare(y.key));
     });
-    // 正式公司報銷表為該月的正式依據：巡店明細沒有的日子，直接採用報銷表的路線與順序。
-    // ptread 日後可作為到店時間／順序的交叉驗證，但不阻擋正式里程對帳。
+    // 來源優先序是月份級的，不能把巡店來源和公司正式報銷 archive 混算：
+    // 有正式巡店資料時只用 ptmileage；沒有時才採用既有 archive，且絕不回寫巡店資料。
     Object.keys(OFFICIAL).forEach(m=>{
+      if(monthSource(m).type!=='official-archive') return;
       OFFICIAL[m].rows.forEach(([d,place])=>{
-        if(out[d]&&out[d].length) return;              // 已有巡店明細者以明細為準
         out[d]=place.split('/').map((n,i)=>({name:n,time:'',key:String(100+i),code:'',official:true}));
       });
     });
@@ -2514,20 +2524,140 @@ const MI = (function(){
 
   function health(month){
     const source=serverRowsByMonth[month]||[];
+    const sourceInfo=monthSource(month);
     const parsed=parsedMonth(month);
     const visitCount=Object.values(parsed.by).reduce((sum,stores)=>sum+Object.keys(stores).length,0);
     const issues=parsed.issues.slice();
     const plans=monthPlans(month);
     const todos=[]; plans.forEach(plan=>plan.todo.forEach(route=>todos.push(route)));
-    if(source.length===0) issues.push({code:ERROR.NO_PATROL,reason:`${month} 本月真的沒有巡店`});
-    else if(visitCount===0) issues.push({code:ERROR.SOURCE_MISSING,reason:`巡店已有 ${source.length} 筆，但里程同步為 0 筆`});
+    const mileageDetails=sourceInfo.type==='official-archive' ? sourceInfo.archive.rows.length : visitCount;
+    if(sourceInfo.type==='none') issues.push({code:ERROR.NO_PATROL,reason:`${month} 本月真的沒有巡店，也沒有正式歷史車資`});
+    else if(sourceInfo.type==='patrol'&&visitCount===0) issues.push({code:ERROR.SOURCE_MISSING,reason:`巡店已有 ${source.length} 筆，但里程同步為 0 筆`});
     if(todos.length) issues.push({code:ERROR.STORE_MAPPING,reason:`${todos.length} 段店點無法匹配距離表：${todos.join('、')}`});
     const calcFailed=plans.filter(plan=>plan.km!=null&&(!Number.isFinite(plan.km)||plan.km<0));
     if(calcFailed.length) issues.push({code:ERROR.CALC,reason:`${calcFailed.length} 天距離計算結果無效`});
     const unique=[];
     issues.forEach(issue=>{if(!unique.some(item=>item.code===issue.code&&item.reason===issue.reason)) unique.push(issue);});
     const abnormal=unique.some(issue=>issue.code!==ERROR.NO_PATROL);
-    return {month,patrolRows:source.length,mileageDetails:visitCount,plans:plans.length,abnormal,issues:unique};
+    return {month,sourceType:sourceInfo.type,patrolRows:source.length,mileageDetails,archiveRows:sourceInfo.archive?sourceInfo.archive.rows.length:0,plans:plans.length,abnormal,issues:unique};
+  }
+
+  // 僅供故障定位：不改 state 的月份資料、不寫 Sheet，也不輸出 token。依序讀摘要、九店明細、月份里程，
+  // 讓「有來源但里程為 0」能明確指出首次斷點，而不是被畫面誤譯為沒有資料。
+  function diagnosticFailure(action, error, extra){
+    const classified=classifyReadError(error);
+    return Object.assign({action,status:'error',code:classified.code||ERROR.API,message:classified.message||String(error||'')},extra||{});
+  }
+  function diagnosticResponseFailure(action, response, extra){
+    const error=new Error(String(response&&response.message||`${action} 回傳錯誤`));
+    error.authReason=patrolAuthReason(response);
+    return diagnosticFailure(action,error,Object.assign({reason:patrolAuthReason(response)||''},extra||{}));
+  }
+  function diagnosticDetailVisits(rows, month){
+    const keys=new Set();
+    (rows||[]).forEach((row,index)=>{
+      const parsed=parseArrive(row&&row.arriveTime);
+      const store=normalize(row&&row.code,row&&row.store);
+      keys.add(parsed&&parsed.date.slice(0,7)===month&&store?`${parsed.date}|${store}`:`invalid:${index}`);
+    });
+    return keys.size;
+  }
+  async function diagnosticDetailStore(month, store){
+    const startedAt=Date.now(), rows=[], pages=[];
+    let totalRows=null, page=1;
+    try{
+      while(true){
+        const pageStartedAt=Date.now();
+        const response=await cloudCall('ptdetail',{month,store,page,limit:100});
+        const durationMs=Date.now()-pageStartedAt;
+        if(!response||typeof response!=='object'||response.status!=='ok') return diagnosticResponseFailure('ptdetail',response,{store,page,pages,durationMs:Date.now()-startedAt});
+        if(response.month!==month||String(response.store||'')!==String(store)||Number(response.page)!==page||!Array.isArray(response.rows)){
+          return {action:'ptdetail',status:'error',code:ERROR.DATA_FORMAT,message:'ptdetail 分頁 contract 不完整',store,page,pages,durationMs:Date.now()-startedAt};
+        }
+        const returnedTotal=Number(response.totalRows);
+        if(!Number.isInteger(returnedTotal)||returnedTotal<0) return {action:'ptdetail',status:'error',code:ERROR.DATA_FORMAT,message:'ptdetail totalRows contract 不完整',store,page,pages,durationMs:Date.now()-startedAt};
+        if(totalRows===null) totalRows=returnedTotal;
+        if(totalRows!==returnedTotal) return {action:'ptdetail',status:'error',code:ERROR.DATA_FORMAT,message:'ptdetail 各頁 totalRows 不一致',store,page,pages,durationMs:Date.now()-startedAt};
+        rows.push(...response.rows);
+        pages.push({page,rows:response.rows.length,durationMs});
+        if(rows.length>=totalRows) break;
+        if(response.rows.length===0||page>=Math.ceil(totalRows/100)+1){
+          return {action:'ptdetail',status:'error',code:ERROR.DATA_FORMAT,message:'ptdetail 分頁提早結束',store,page,pages,durationMs:Date.now()-startedAt};
+        }
+        page+=1;
+      }
+      if(rows.length!==totalRows) return {action:'ptdetail',status:'error',code:ERROR.DATA_FORMAT,message:'ptdetail row count 與 totalRows 不一致',store,page,pages,durationMs:Date.now()-startedAt};
+      return {action:'ptdetail',status:'ok',store,totalRows,visitCount:diagnosticDetailVisits(rows,month),pages,durationMs:Date.now()-startedAt};
+    }catch(error){
+      return diagnosticFailure('ptdetail',error,{store,page,pages,durationMs:Date.now()-startedAt});
+    }
+  }
+  function diagnosticSummary(response, month){
+    if(!response||typeof response!=='object'||response.status==='error') return diagnosticResponseFailure('ptsummary',response);
+    const summary=response.summary;
+    if(!summary||summary.month!==month||!Array.isArray(summary.visitCounts)) return {action:'ptsummary',status:'error',code:ERROR.DATA_FORMAT,message:'ptsummary visitCounts contract 不完整'};
+    const visitCount=summary.visitCounts.reduce((sum,item)=>sum+Math.max(0,Number(item&&item.count)||0),0);
+    return {action:'ptsummary',status:'ok',visitCount,visitedStores:Number(summary.visitedStores)||0,storeCount:Array.isArray(response.stores)?response.stores.length:0,durationMs:0};
+  }
+  function diagnosticMileage(response, month, durationMs){
+    if(!response||typeof response!=='object'||response.status!=='ok') return diagnosticResponseFailure('ptmileage',response,{durationMs});
+    const diagnostics=response.diagnostics&&typeof response.diagnostics==='object'?response.diagnostics:{};
+    const contract=String(response.contract||'');
+    const visits=Array.isArray(response.visits)?response.visits:null;
+    return {
+      action:'ptmileage',status:'ok',contract,month:String(response.month||''),
+      visitCount:visits?visits.length:null,totalVisits:Number.isInteger(Number(response.totalVisits))?Number(response.totalVisits):null,
+      rawRows:Array.isArray(response.rows)?response.rows.length:null,totalRows:Number.isInteger(Number(response.totalRows))?Number(response.totalRows):null,
+      matchedRows:Number.isInteger(Number(diagnostics.matchedRows))?Number(diagnostics.matchedRows):null,
+      sheetScans:Number.isInteger(Number(diagnostics.sheetScans))?Number(diagnostics.sheetScans):null,durationMs
+    };
+  }
+  async function runDiagnostic(value){
+    const month=canonicalMonth(value||state.month||currentMonth);
+    if(!month) throw mileageError(ERROR.DATE_PARSE,'巡店月份格式錯誤');
+    const report={contract:'patrol-mileage-read-diagnostic-v1',month,mode:'read-only',startedAt:new Date().toISOString(),summary:null,details:[],ptdetailRows:0,ptdetailVisits:0,mileage:null,firstBreak:null,status:'running'};
+    state.diagnostic=report; render();
+    try{
+      const summaryStartedAt=Date.now();
+      const summaryResponse=await cloudCall('ptsummary',{month});
+      report.summary=diagnosticSummary(summaryResponse,month);
+      report.summary.durationMs=Date.now()-summaryStartedAt;
+      if(report.summary.status!=='ok') {
+        report.firstBreak=report.summary;
+      }else{
+        const diagnosticStores=(Array.isArray(summaryResponse.stores)&&summaryResponse.stores.length?summaryResponse.stores:STORES)
+          .map(store=>String(store&&store.name||'')).filter(Boolean);
+        for(const store of diagnosticStores){
+          const detail=await diagnosticDetailStore(month,store);
+          report.details.push(detail);
+          if(detail.status==='ok'){
+            report.ptdetailRows+=detail.totalRows;
+            report.ptdetailVisits+=detail.visitCount;
+          }else if(!report.firstBreak){
+            report.firstBreak=detail;
+          }
+        }
+        const mileageStartedAt=Date.now();
+        let mileageResponse;
+        try{ mileageResponse=await cloudCall('ptmileage',{month}); }
+        catch(error){ report.mileage=diagnosticFailure('ptmileage',error,{durationMs:Date.now()-mileageStartedAt}); }
+        if(!report.mileage) report.mileage=diagnosticMileage(mileageResponse,month,Date.now()-mileageStartedAt);
+        if(!report.firstBreak&&report.mileage.status!=='ok') report.firstBreak=report.mileage;
+        if(!report.firstBreak&&report.ptdetailRows>0&&report.mileage.contract!=='patrol-mileage-visits-v2'){
+          report.firstBreak={action:'ptmileage',status:'error',code:ERROR.DATA_FORMAT,message:`ptdetail 有 ${report.ptdetailRows} 筆，但 ptmileage 回傳 ${report.mileage.contract||'未知'} contract`};
+        }else if(!report.firstBreak&&report.ptdetailRows>0&&Number(report.mileage.totalVisits||report.mileage.visitCount||0)===0){
+          report.firstBreak={action:'ptmileage',status:'error',code:ERROR.SOURCE_MISSING,message:`ptdetail 有 ${report.ptdetailRows} 筆／${report.ptdetailVisits} visits，但 ptmileage 為 0`};
+        }
+      }
+    }catch(error){
+      if(!report.firstBreak) report.firstBreak=diagnosticFailure('ptsummary',error);
+    }
+    report.status=report.firstBreak?'error':'ok';
+    report.finishedAt=new Date().toISOString();
+    state.diagnostic=report;
+    console[report.firstBreak?'warn':'info']('PATROL_MILEAGE_READ_DIAGNOSTIC',report);
+    render();
+    return report;
   }
 
   /* ---------- 資料涵蓋範圍 ---------- */
@@ -2560,6 +2690,7 @@ const MI = (function(){
     if(!document.getElementById('miStats')) return;
     ensureState();
     renderCoverage();
+    renderDiagnostic();
     if(state.loading||state.error){
       const label=state.loading?(state.progress||`正在載入 ${state.month}`):'正式月份明細尚未完成讀回';
       document.getElementById('miStats').innerHTML=`<div class="mi-card"><div class="k">里程資料</div><div class="v">—</div><div class="s">${esc2(label)}</div></div>`;
@@ -2569,6 +2700,24 @@ const MI = (function(){
       return;
     }
     renderStats(); renderAlerts(); renderTimeline(); renderSummary();
+  }
+
+  function renderDiagnostic(){
+    const el=document.getElementById('miDiagnostic'), report=state.diagnostic;
+    if(!el) return;
+    if(!report){ el.innerHTML=''; return; }
+    if(report.status==='running'){
+      el.innerHTML=`<div class="mi-note">正在執行 ${esc2(report.month)} 唯讀診斷：ptsummary → 各店 ptdetail → ptmileage…</div>`;
+      return;
+    }
+    const summary=report.summary||{}, mileage=report.mileage||{};
+    const details=(report.details||[]).map(detail=>`${esc2(detail.store||'—')}：${detail.status==='ok'?`${detail.totalRows} rows / ${detail.visitCount} visits / ${detail.pages.length} 頁`:`${esc2(detail.code||ERROR.API)}：${esc2(detail.message||'失敗')}`}`).join('<br>');
+    const breakText=report.firstBreak?`<br><b>首次斷點：${esc2(report.firstBreak.action)} · ${esc2(report.firstBreak.code||'ERROR')}</b>：${esc2(report.firstBreak.message||'')}`:'<br><b>✅ 三層唯讀讀取均完成</b>';
+    el.innerHTML=`<div class="mi-note${report.firstBreak?' bad':''}"><b>唯讀診斷 ${esc2(report.month)}</b>（不寫入巡店資料）<br>`+
+      `ptsummary：${summary.status==='ok'?`${summary.visitCount} visits / ${summary.visitedStores} 店`:`${esc2(summary.code||ERROR.API)}：${esc2(summary.message||'失敗')}`}<br>`+
+      `ptdetail：${report.ptdetailRows} rows / ${report.ptdetailVisits} visits<br>${details||'未執行'}<br>`+
+      `ptmileage：${mileage.status==='ok'?`${esc2(mileage.contract||'未知 contract')} / ${mileage.totalVisits??mileage.visitCount??'—'} visits / ${mileage.sheetScans??'—'} scans`:`${esc2(mileage.code||ERROR.API)}：${esc2(mileage.message||'失敗')}`}`+
+      breakText+'</div>';
   }
 
   // 與正式公司報銷表對帳
@@ -2608,6 +2757,9 @@ const MI = (function(){
     }
     let h=report.issues.filter(issue=>issue.code!==ERROR.NO_PATROL).map(issue=>
       `<div class="mi-note bad"><b>⚠ ${esc2(issue.code)}</b>：${esc2(issue.reason)}</div>`).join('');
+    if(report.sourceType==='official-archive'){
+      h+=`<div class="mi-note"><b>資料來源：2026 年 6 月正式公司報銷表</b>（本月無正式巡店明細；僅讀取既有正式歷史車資，未建立或寫入任何巡店資料）。</div>`;
+    }
     if(rc){
       const hit=rc.rows.filter(r=>r.ok).length, kmhit=rc.rows.filter(r=>r.kmOk).length;
       const done=rc.match;
@@ -2900,12 +3052,12 @@ const MI = (function(){
   }
 
   return {render,open,clear,setMonth,setDate,step,today,addLegPrompt,setLegKm,removeNode,setCost,
-          importPick,importFile,exportDetails,exportConfirm,doExport,dlgClose,
+          importPick,importFile,exportDetails,exportConfirm,doExport,dlgClose,runDiagnostic,
           _reconcile:reconcile,_billable:billable,_officialPlans:officialPlans,OFFICIAL,
           _days:days,_dayPlan:dayPlan,_monthPlans:monthPlans,_coverage:coverage,
           _buildSheets:buildSheets,_normalize:normalize,_legFor:legFor,
           _isOffice:isOffice,_store:store,_hydrateMonth:hydrateMonth,_health:health,
-          _parseArrive:parseArrive,ERROR,NODES,DIST};
+          _parseArrive:parseArrive,_monthSource:monthSource,_runDiagnostic:runDiagnostic,ERROR,NODES,DIST};
 })();
 
 </script>
