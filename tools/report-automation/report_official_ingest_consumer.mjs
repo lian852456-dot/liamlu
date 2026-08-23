@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { postPrivateDashboardJson } from './private_dashboard_transport.mjs';
 
 const toolDir = path.dirname(fileURLToPath(import.meta.url));
@@ -204,6 +204,7 @@ export async function processClaimedJob(job, deps = {}) {
   const sourceDir = path.join(jobDir, 'sources');
   await fs.mkdir(sourceDir, { recursive: true, mode: 0o700 });
   let currentStage = 'source_files';
+  let dataCutoffDate = '';
   try {
     const exact = {};
     for (const key of ['kpi', 'awardStore', 'awardPerson']) {
@@ -218,6 +219,11 @@ export async function processClaimedJob(job, deps = {}) {
       cwd: paths.automationDir,
       env: { REPORT_SOURCE_DIR: historyDir, REPORT_DATE_ISO: job.reportDate, REPORT_RUN_ID: job.idempotencyKey },
     });
+    const todayReport = await readJson(path.join(paths.workDir, 'today_report_data.json'));
+    invariant(String(todayReport.report_date_iso || '') === job.reportDate, 'daily runner report run date mismatch');
+    const sourceDateRangeModule = await import(pathToFileURL(path.join(paths.workDir, 'source_date_range.mjs')).href);
+    invariant(typeof sourceDateRangeModule.dataCutoffDateFromSourceRange === 'function', 'formal source-date parser is unavailable');
+    dataCutoffDate = sourceDateRangeModule.dataCutoffDateFromSourceRange(todayReport.source_date_range, job.reportDate);
     await updateStage(api, job, currentStage, 'running', '既有 daily runner 完成；等待正式 battle build/readback');
 
     currentStage = 'awards_formal';
@@ -262,12 +268,19 @@ export async function processClaimedJob(job, deps = {}) {
     await updateStage(api, job, 'sent_items', 'ok', '寄件備份兩封附件名稱／數量 readback PASS', { evidence: mailEvidence });
 
     currentStage = 'awards_battle';
-    const build = await commandRunner(python, [path.join(paths.workDir, 'build_github_pages_data.py'), '--source-dir', historyDir], { cwd: paths.automationDir });
+    const build = await commandRunner(python, [
+      path.join(paths.workDir, 'build_github_pages_data.py'),
+      '--source-dir', historyDir,
+      '--report-run-date', job.reportDate,
+      '--data-cutoff-date', dataCutoffDate,
+    ], { cwd: paths.automationDir });
     parseLastJson(build.stdout);
     const kpiSnapshot = await readJson(path.join(paths.websiteRepoDir, 'private-data/kpi-battle-latest.json'));
     const awardSnapshot = await readJson(path.join(paths.websiteRepoDir, 'private-data/phone-awards-battle-latest.json'));
-    invariant(String(kpiSnapshot.report_date) === job.reportDate, 'KPI battle local readback date mismatch');
-    invariant(String(awardSnapshot.report_date) === job.reportDate && Number(awardSnapshot.phone_items) === 13 && Number(awardSnapshot.store_rows) === 10, 'awards battle local readback mismatch');
+    invariant(String(kpiSnapshot.report_run_date) === job.reportDate, 'KPI battle local report run date mismatch');
+    invariant(String(kpiSnapshot.report_date) === dataCutoffDate, 'KPI battle local data cutoff date mismatch');
+    invariant(String(awardSnapshot.report_run_date) === job.reportDate, 'awards battle local report run date mismatch');
+    invariant(String(awardSnapshot.report_date) === dataCutoffDate && Number(awardSnapshot.phone_items) === 13 && Number(awardSnapshot.store_rows) === 10, 'awards battle local readback mismatch');
     await updateStage(api, job, 'kpi_battle', 'ok', '既有 build_github_pages_data KPI snapshot PASS');
     await updateStage(api, job, 'awards_battle', 'ok', '既有 build_github_pages_data 台獎 snapshot PASS');
 
@@ -275,17 +288,23 @@ export async function processClaimedJob(job, deps = {}) {
     await updateStage(api, job, currentStage, 'running', '執行既有 private/formal publisher');
     await commandRunner('/bin/zsh', [path.join(paths.workDir, 'publish_formal_website_with_keychain.sh')], {
       cwd: paths.automationDir,
-      env: { REPORT_DATE_ISO: job.reportDate, REPORT_RUN_ID: job.idempotencyKey },
+      env: {
+        REPORT_RUN_DATE_ISO: job.reportDate,
+        REPORT_DATA_CUTOFF_DATE: dataCutoffDate,
+        REPORT_RUN_ID: job.idempotencyKey,
+      },
     });
     await updateStage(api, job, currentStage, 'ok', '既有 private publisher 完成');
     const manifest = await readJson(path.join(paths.automationDir, `logs/run-manifest-${job.reportDate.replaceAll('-', '')}.json`));
     invariant(manifest.websiteResult === 'published-verified' && manifest.datesAligned === true && manifest.sourcesAligned === true, 'formal website readback gate failed');
     const publication = manifest.websitePublication || {};
-    invariant(publication.reportDate === job.reportDate && Number(publication.dashboard?.phoneItems) === 13 && Number(publication.dashboard?.storeRows) === 10, 'private KPI/awards readback mismatch');
+    invariant(publication.reportDate === dataCutoffDate && publication.dataAsOfDate === dataCutoffDate &&
+      Number(publication.dashboard?.phoneItems) === 13 && Number(publication.dashboard?.storeRows) === 10,
+    'private KPI/awards readback mismatch');
     const readbackEvidence = {
-      privateReadback: { kpiPassed: true, awardsPassed: true, reportDate: job.reportDate },
-      supervisor: { aligned: true, reportDate: job.reportDate },
-      website: { passed: true, reportDate: job.reportDate },
+      privateReadback: { kpiPassed: true, awardsPassed: true, reportRunDate: job.reportDate, reportDate: dataCutoffDate },
+      supervisor: { aligned: true, reportRunDate: job.reportDate, reportDate: dataCutoffDate },
+      website: { passed: true, reportRunDate: job.reportDate, reportDate: dataCutoffDate },
     };
     await updateStage(api, job, 'private_readback', 'ok', 'private KPI／台獎正式 readback PASS', { evidence: readbackEvidence });
     await updateStage(api, job, 'supervisor_app', 'ok', 'Supervisor App 正式來源日期同日', { evidence: readbackEvidence });

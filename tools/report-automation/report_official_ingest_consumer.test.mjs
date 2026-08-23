@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
 import { consumeWaitingJobs, shouldSendMail, validateMailReceipt } from './report_official_ingest_consumer.mjs';
 
 const receipt = {
@@ -73,4 +74,15 @@ test('consumer only claims waiting-external-pipeline jobs', async () => {
   const result = await consumeWaitingJobs({ api, processJob: async job => { claimed.push(job.runId); return { ok: true }; } });
   assert.deepEqual(claimed, ['ready']);
   assert.equal(result.processed, 1);
+});
+
+test('D+1 formal publish keeps report run date separate from source data cutoff', async () => {
+  const source = await fs.readFile(new URL('./report_official_ingest_consumer.mjs', import.meta.url), 'utf8');
+  assert.match(source, /source_date_range\.mjs/);
+  assert.match(source, /dataCutoffDateFromSourceRange\(todayReport\.source_date_range, job\.reportDate\)/);
+  assert.match(source, /'--report-run-date', job\.reportDate/);
+  assert.match(source, /'--data-cutoff-date', dataCutoffDate/);
+  assert.match(source, /REPORT_RUN_DATE_ISO: job\.reportDate/);
+  assert.match(source, /REPORT_DATA_CUTOFF_DATE: dataCutoffDate/);
+  assert.match(source, /publication\.reportDate === dataCutoffDate/);
 });
