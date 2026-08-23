@@ -20,7 +20,7 @@ function body(name) {
 }
 
 function loadAdapters() {
-  const names = ['numberOrNull','normalizeStore','kpiDataAsOfDate','sourceFileName','kpiReportSourceFile','kpiSupplementIsCurrent','officialKpiRate','kpicalcMetricItems','adaptKpi','adaptAwards','personalRecord','personalRoleGroup','personalMetricByKey','personalRankedByRole','managerStorePerformanceRows','personalStoreViewRows','personalUnderTargetByMetric','personalAqReview','adaptPersonalPerformance','reportStoreFeedback','adaptReport'];
+  const names = ['numberOrNull','normalizeStore','kpiDataAsOfDate','sourceFileName','kpiSupplementIsCurrent','officialKpiRate','kpicalcMetricItems','adaptKpi','adaptAwards','personalRecord','personalRoleGroup','personalMetricByKey','personalRankedByRole','managerStorePerformanceRows','personalStoreViewRows','personalUnderTargetByMetric','personalAqReview','adaptPersonalPerformance','reportStoreFeedback','adaptReport'];
   const script = `
     const STORE_ALIASES = new Map([['三創','台北三創']]);
     const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
@@ -29,7 +29,7 @@ function loadAdapters() {
     const C = { moduleState: value => ({ ...value, sourceLink:value.source.href }) };
     const moduleSource = (label,href) => ({label,href});
     const stale = () => false;
-    ${names.map(name=>`function ${name}(${({numberOrNull:'value',normalizeStore:'value',kpiDataAsOfDate:'data',sourceFileName:'value',kpiReportSourceFile:'reportDate',kpiSupplementIsCurrent:'data, supplement',officialKpiRate:'entry',kpicalcMetricItems:'data, rates',adaptKpi:'data, snapshot, readAt',adaptAwards:'snapshot, expectedReportDate, readAt',personalRecord:'raw',personalRoleGroup:'source',personalMetricByKey:'person,key',personalRankedByRole:'people,roleGroup',managerStorePerformanceRows:'people,stores',personalStoreViewRows:'people,stores,selectedStore',personalUnderTargetByMetric:'people,key',personalAqReview:'people',adaptPersonalPerformance:'snapshot, readAt',reportStoreFeedback:'report, summaryStore',adaptReport:'segment, storeData, personalData, formalSummary'})[name]}) {${body(name)}}`).join('\n')}
+    ${names.map(name=>`function ${name}(${({numberOrNull:'value',normalizeStore:'value',kpiDataAsOfDate:'data',sourceFileName:'value',kpiSupplementIsCurrent:'data, supplement',officialKpiRate:'entry',kpicalcMetricItems:'data, rates',adaptKpi:'data, snapshot, readAt',adaptAwards:'snapshot, expectedReportDate, readAt',personalRecord:'raw',personalRoleGroup:'source',personalMetricByKey:'person,key',personalRankedByRole:'people,roleGroup',managerStorePerformanceRows:'people,stores',personalStoreViewRows:'people,stores,selectedStore',personalUnderTargetByMetric:'people,key',personalAqReview:'people',adaptPersonalPerformance:'snapshot, readAt',reportStoreFeedback:'report, summaryStore',adaptReport:'segment, storeData, personalData, formalSummary'})[name]}) {${body(name)}}`).join('\n')}
     module.exports = { adaptKpi, adaptAwards, personalRecord, personalRoleGroup, personalMetricByKey, personalRankedByRole, managerStorePerformanceRows, personalStoreViewRows, personalUnderTargetByMetric, personalAqReview, adaptPersonalPerformance, reportStoreFeedback, adaptReport };
   `;
   const context = vm.createContext({ module:{exports:{}}, exports:{}, Map, Set, Object, Array, String, Number, Boolean, Math, Date, JSON });
@@ -51,7 +51,7 @@ function kpiFixture() {
 
 function snapshotFixture() {
   const names = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
-  return { kpiBattle:{ report_date:'2026-08-10',data_as_of_date:'2026-08-09',source_file:'0810.xlsx',generated_at:'2026-08-10T01:00:00+08:00',company_rank_total:578,
+  return { kpiBattle:{ report_date:'2026-08-09',data_as_of_date:'2026-08-09',source_file:'0810.xlsx',generated_at:'2026-08-10T01:00:00+08:00',company_rank_total:578,
     aggregate:{overall_kpi:1.131,company_rank:29,overall_kpi_dod:.028,company_rank_dod:1,addon_score:12.98},
     stores:names.map((store,index)=>({store,company_rank:30+index,overall_kpi_dod:.01,company_rank_dod:1,addon_score:10-index}))
   }};
@@ -100,15 +100,15 @@ test('受控 temporary filename 只解包 canonical source identity，變更暫�
     data.meta.sourceFile = `report-upload-temp-${token}-0810.xlsx`;
     const snapshot = snapshotFixture();
     snapshot.awardsBattle = {
-      report_date:'2026-08-10', overall:{award:{},items:[]},
+      report_date:'2026-08-09', overall:{award:{},items:[]},
       stores:Array.from({length:9},(_,index)=>({store:`店 ${index+1}`,award:{actual_total:index,award:index<3?'Y':'N'},items:[]})),
     };
     const result = A.adaptKpi(data, snapshot, '2026-08-10T01:02:00+08:00');
     assert.equal(result.summary.status, 'ok');
-    assert.equal(result.summary.data.reportDate, '2026-08-10');
+    assert.equal(result.summary.data.reportDate, '2026-08-09');
     assert.equal(result.summary.data.companyRank, 29);
     assert.equal(A.adaptAwards(snapshot, result.summary.data.reportDate, '2026-08-10T01:02:00+08:00').summary.status, 'ok');
-    assert.equal(A.adaptAwards(snapshot, '2026-08-09', '2026-08-10T01:02:00+08:00').summary.status, 'no_data');
+    assert.equal(A.adaptAwards(snapshot, '2026-08-08', '2026-08-10T01:02:00+08:00').summary.status, 'no_data');
   }
 });
 
@@ -120,11 +120,34 @@ test('真正 canonical source/report date 不一致時仍 fail-closed', () => {
   wrongCanonical.kpiBattle.source_file = '0809.xlsx';
   assert.equal(A.adaptKpi(data, wrongCanonical, '2026-08-10T01:02:00+08:00').summary.status, 'partial');
   const wrongReportDate = snapshotFixture();
-  wrongReportDate.kpiBattle.report_date = '2026-08-09';
+  wrongReportDate.kpiBattle.report_date = '2026-08-10';
   assert.equal(A.adaptKpi(data, wrongReportDate, '2026-08-10T01:02:00+08:00').summary.status, 'partial');
   const unknownTemporary = snapshotFixture();
   data.meta.sourceFile = 'report-upload-temp-token-0810.xlsx';
   assert.equal(A.adaptKpi(data, unknownTemporary, '2026-08-10T01:02:00+08:00').summary.status, 'partial');
+});
+
+test('0823.xlsx D+1 snapshot aligns by cutoff and canonical source without inferring filename from date', () => {
+  const A = loadAdapters();
+  const data = kpiFixture();
+  data.meta.snapshotDay = 22;
+  data.meta.sourceFile = `report-upload-temp-${'c'.repeat(64)}-0823.xlsx`;
+  const snapshot = snapshotFixture();
+  snapshot.kpiBattle.report_date = '2026-08-22';
+  snapshot.kpiBattle.data_as_of_date = '2026-08-22';
+  snapshot.kpiBattle.source_file = '0823.xlsx';
+
+  const result = A.adaptKpi(data, snapshot, '2026-08-23T20:46:00+08:00');
+
+  assert.equal(result.summary.status, 'ok');
+  assert.equal(result.summary.data.reportDate, '2026-08-22');
+  assert.equal(result.summary.data.kpi, 1.131);
+  assert.equal(result.summary.data.companyRank, 29);
+  assert.equal(result.summary.data.kpiDod, .028);
+  assert.equal(result.summary.data.rankChange, 1);
+  assert.equal(result.summary.data.addonScore, 12.98);
+  assert.equal(result.stores.data[0].rank, 30);
+  assert.doesNotMatch(body('kpiSupplementIsCurrent'), /kpiReportSourceFile|reportSource/);
 });
 
 test('Awards preserve each store own complete row.items and reject aggregate actual_total as a district currency total', () => {

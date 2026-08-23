@@ -13,6 +13,18 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-23 ｜ Codex（Liam Supervisor App D+1 KPI 補值 hotfix，未部署）
+
+- Root Cause：正式快照為截止 `2026-08-22`、來源 `0823.xlsx`；App 仍用 snapshot 日期推算
+  `0822.xlsx`，把有效 D+1 快照誤判為不同來源。`kpicalc_access` 的九店 KPI 可顯示，但公司排名、
+  區 KPI、DOD、排名變動與加減分被 fail-closed，與 iPhone 畫面一致。
+- 修正：App 改為比對 snapshot `report_date`／cutoff 與 `kpicalc` cutoff 同日，並直接比較雙方
+  canonical source basename；不再由日期推算附件檔名。同步更新 App／Service Worker release query
+  與 cache namespace，避免 iPhone 保留舊 artifact。另修正兩項測試使用的舊巡店 session key；
+  巡店 runtime、端點、GAS 與正式資料均未變更。
+- 結果（本機完成／未部署）：KPI mapping／source Node `35/35`、App Chromium `11/11` 通過；
+  `0823.xlsx`／cutoff `2026-08-22` 回歸可讀回區 KPI、公司排名、DOD、排名變動與加減分。
+
 ## 2026-08-23 ｜ Codex（台獎 snapshot source_file runtime follow-up，未發布）
 
 - Root Cause：台獎 snapshot builder 遺漏頂層 `source_file`，正式 readback 亦未把台獎來源納入同源 gate；

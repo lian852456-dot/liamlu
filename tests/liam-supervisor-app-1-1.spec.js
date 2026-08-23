@@ -156,7 +156,7 @@ test('isolated patrol visit flow records arrival and departure with one protecte
     {serverTime:'2026-08-11T14:57:50+08:00',date:'2026-08-11',action:'arrival',store:'台北通化',note:'DEPLOY_TEST_20260811T145733',visitSessionId:'deploy-test'},
     {serverTime:'2026-08-11T14:57:53+08:00',date:'2026-08-11',action:'departure',store:'台北通化',note:'DEPLOY_TEST_20260811T145733',visitSessionId:'deploy-test'}
   ]; let writes=0; const submittedStores=[];
-  await page.addInitScript(()=>sessionStorage.setItem('bei12b_patrol_session_token_v2','short-session-token'));
+  await page.addInitScript(()=>sessionStorage.setItem('bei12b_pt_session_token','short-session-token'));
   await page.route('https://script.google.com/**',async route=>{
     const request=route.request();
     if(request.method()==='POST') {
@@ -211,7 +211,7 @@ test('isolated patrol visit flow records arrival and departure with one protecte
 });
 
 test('patrol visit UI fails closed when server response store differs from explicit selection', async ({ page }) => {
-  await page.addInitScript(()=>sessionStorage.setItem('bei12b_patrol_session_token_v2','short-session-token'));
+  await page.addInitScript(()=>sessionStorage.setItem('bei12b_pt_session_token','short-session-token'));
   await page.route('https://script.google.com/**',async route=>{
     const request=route.request();
     if(request.method()==='POST') {
@@ -279,8 +279,8 @@ test('formal area award summary renders supervisor fields and fails closed when 
     const payload=JSON.parse(route.request().postData()||'{}');
     if(payload.action==='private_access') {
       return route.fulfill({json:{status:'ok',profile:{maskedName:'測＊員'},snapshot:{
-        kpiBattle:{report_date:'2026-08-10',source_file:'0810.xlsx',data_as_of_date:'2026-08-09',aggregate:{},stores:[]},
-        awardsBattle:{report_date:'2026-08-10',generated_at:'2026-08-10T08:00:00+08:00',supervisor:{...supervisor},overall:{award:{actual_total:99999},items:[]},stores:storeNames.map((store,index)=>({store,award:{actual_total:1000+index,award:index<4?'Y':'N'},items:[]}))}
+        kpiBattle:{report_date:'2026-08-09',source_file:'0810.xlsx',data_as_of_date:'2026-08-09',aggregate:{},stores:[]},
+        awardsBattle:{report_date:'2026-08-09',generated_at:'2026-08-10T08:00:00+08:00',supervisor:{...supervisor},overall:{award:{actual_total:99999},items:[]},stores:storeNames.map((store,index)=>({store,award:{actual_total:1000+index,award:index<4?'Y':'N'},items:[]}))}
       }}});
     }
     if(payload.action==='kpicalc_access') return route.fulfill({json:{status:'ok',data:{meta:{month:'2026-08',snapshotDay:9,sourceFile:'0810.xlsx'},items:[],aggregateRates:{},stores:[]}}});

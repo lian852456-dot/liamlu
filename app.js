@@ -406,19 +406,15 @@
     return staged ? staged[1].toLowerCase() : raw;
   }
 
-  function kpiReportSourceFile(reportDate) {
-    const match = String(reportDate || '').match(/^\d{4}-(\d{2})-(\d{2})$/);
-    return match ? `${match[1]}${match[2]}.xlsx` : '';
-  }
-
   function kpiSupplementIsCurrent(data, supplement) {
     const dataAsOf = kpiDataAsOfDate(data);
+    const supplementReportDate = String(supplement && supplement.report_date || '');
     const supplementAsOf = String(supplement && (supplement.data_as_of_date || supplement.source_as_of_date) || '');
     const supplementSource = sourceFileName(supplement && supplement.source_file);
-    const reportSource = kpiReportSourceFile(supplement && supplement.report_date);
-    return Boolean(dataAsOf && supplement && reportSource && supplementAsOf === dataAsOf &&
-      supplementSource && supplementSource === reportSource &&
-      supplementSource === sourceFileName(data && data.meta && data.meta.sourceFile));
+    const kpiSource = sourceFileName(data && data.meta && data.meta.sourceFile);
+    return Boolean(dataAsOf && supplement && supplementReportDate && supplementAsOf &&
+      supplementReportDate === supplementAsOf && supplementAsOf === dataAsOf &&
+      supplementSource && kpiSource && supplementSource === kpiSource);
   }
 
   function officialKpiRate(entry) {
@@ -1789,5 +1785,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=rank-change-zero-20260820-1',{scope:'./'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=app-kpi-dplus1-20260823-1',{scope:'./'}).catch(()=>{}));
 })(window);

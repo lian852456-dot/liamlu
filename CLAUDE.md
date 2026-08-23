@@ -1,5 +1,13 @@
 # 北一二B 每日回報系統
 
+## 2026-08-23 D+1 KPI 補值門檻（取代舊的檔名推算）
+
+- 現行正式 snapshot 的 `report_date`、`data_as_of_date` 與 `source_as_of_date` 都代表資料截止日；
+  來源附件可在次日收到，例如截止 `2026-08-22`、來源 `0823.xlsx`。
+- App／standalone controller 只比較三件事：snapshot 日期等於 `kpicalc` cutoff、snapshot
+  `source_file` 等於 `kpicalc.meta.sourceFile`、KPI 結構完整。絕對不可由日期推算 `MMDD.xlsx`；
+  否則會誤把有效 D+1 快照判成不同步，並隱藏公司排名、DOD、排名變動與加減分。
+
 ## 2026-08-05 固定 KPI／台獎日期契約
 
 - `report_date` 是每日戰報／網站發布日；`data_as_of_date`（相容讀取 `source_as_of_date`）是來源資料截止日，兩者不得互換。0805 範例：發布日 `2026-08-05`，截止日 `2026-08-04`，來源 `0805.xlsx`，區間 `2026/08/01 ~ 08/04`。
