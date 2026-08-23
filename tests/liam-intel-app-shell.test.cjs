@@ -49,11 +49,17 @@ test('PWA uses safe-area, standalone manifest, and app-only offline cache', () =
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /overflow-x:hidden/);
   assert.equal(manifest.display, 'standalone');
+  assert.deepEqual(manifest.display_override, ['standalone']);
+  assert.equal(manifest.prefer_related_applications, false);
   assert.equal(manifest.orientation, 'portrait-primary');
   assert.match(worker, /offline\.html/);
-  assert.match(worker, /liam-supervisor-app-1-2-patrol-mileage-month-batch-20260821-v1/);
+  assert.match(worker, /liam-supervisor-app-1-2-pwa-iphone-stable-20260824-v1/);
   assert.match(worker, /half-month-check-read-model\.js/);
   assert.match(worker, /half-month-check-write-prep\.js/);
+  assert.match(worker, /function networkFirstShellAsset/);
+  assert.match(worker, /caches\.match\(request, \{ ignoreSearch:true \}\)/);
   assert.match(worker, /event\.request\.method !== 'GET'/);
+  assert.match(read('app.js'), /updateViaCache:'none'/);
   assert.doesNotMatch(worker, /script\.google\.com/);
+  assert.doesNotMatch(worker, /private_access|private_request|employeeId|bootstrapCode|token/);
 });
