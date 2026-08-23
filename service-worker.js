@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-2-kpi-supplement-contract-20260823-v2';
+const CACHE_NAME = 'liam-supervisor-app-1-2-pwa-iphone-stable-20260824-v1';
 const SHELL = [
   './app.html',
   './app.css',
@@ -17,6 +17,7 @@ const SHELL = [
   './app-assets/liam-intel-icon-192.png',
   './app-assets/liam-intel-icon-512.png'
 ];
+const SHELL_PATHS = new Set(SHELL.map(path => path.replace(/^\.\//, '')));
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -31,6 +32,17 @@ function networkFirstHtml(request) {
     if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
     return response;
   }).catch(() => caches.match(request).then(cached => cached || caches.match('./offline.html')));
+}
+
+// iOS may preserve a versioned script URL while an updated app shell is
+// installing. Prefer the deployed asset while online, and only fall back to
+// the same versioned shell file when the device is offline. This cache never
+// contains private API responses or credentials.
+function networkFirstShellAsset(request) {
+  return fetch(request, { cache:'no-store' }).then(response => {
+    if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+    return response;
+  }).catch(() => caches.match(request, { ignoreSearch:true }));
 }
 
 function networkFirstKpiController(request) {
@@ -51,12 +63,14 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) return;
-  if (requestUrl.pathname.endsWith('/kpi-battle-controller.js')) {
-    event.respondWith(networkFirstKpiController(event.request));
+  const scopePath = new URL(self.registration.scope).pathname;
+  const relativePath = requestUrl.pathname.startsWith(scopePath) ? requestUrl.pathname.slice(scopePath.length) : '';
+  if (SHELL_PATHS.has(relativePath)) {
+    event.respondWith(networkFirstShellAsset(event.request));
     return;
   }
-  if (requestUrl.pathname.endsWith('/app.html')) {
-    event.respondWith(fetch(event.request, { cache:'no-store' }).catch(() => caches.match('./app.html')));
+  if (requestUrl.pathname.endsWith('/kpi-battle-controller.js')) {
+    event.respondWith(networkFirstKpiController(event.request));
     return;
   }
   if (requestUrl.pathname.endsWith('/audit-report.html')) {

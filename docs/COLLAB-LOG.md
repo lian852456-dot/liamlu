@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-24 ｜ Codex（Liam Supervisor 穩定 iPhone PWA 入口）
+
+- 做了什麼：從乾淨 `origin/main` `fc83f94` 建立隔離分支 `feature/liam-supervisor-pwa-iphone-stable-20260824`，提交 `96184ec`。PWA 固定以既有 `app.html` 為 Safari／加入主畫面入口；manifest 明確採 standalone 且不偏好原生 App，Service Worker 對同源 shell 採 online network-first、offline fallback，避免 iPhone 保留舊版版本化 asset。
+- 結果：Node 核心契約 `38/38`、390×844 Chromium 行動版 `11/11` 通過；測試涵蓋未核准 fail-closed、Approved Device、KPI／台獎／回報／班表／巡店互動。Service Worker 不快取 GAS/private API、credential 或正式資料。原生 iOS WKWebView／簽署、`gas/Code.gs`、private_access、Approved Device、資料契約與每日自動化皆 0 diff。
+- 經驗 / 給下一位的提醒：加入主畫面可能是獨立裝置儲存區；未核准時必須沿用 `private_request` 與人工核准，絕不可複製 Safari device ID 或免驗證。尚未合併／Pages 部署／正式資料 readback 或 Liam iPhone Safari 驗收；原生 App 僅保留回退。
+
 ## 2026-08-23 ｜ Codex（Liam Supervisor App D+1 KPI 補值 hotfix，未部署）
 
 - Root Cause：正式快照為截止 `2026-08-22`、來源 `0823.xlsx`；App 仍用 snapshot 日期推算
