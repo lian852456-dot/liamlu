@@ -66,3 +66,41 @@ cd /Users/liamlu/Downloads/liam-agent
 patch -R --dry-run -p1 < worktrees/report-runtime-source-range-20260823/docs/ops/report-data-cutoff-date-20260822/runtime-source-range-shorthand-followup.patch
 patch -R -p1 < worktrees/report-runtime-source-range-20260823/docs/ops/report-data-cutoff-date-20260822/runtime-source-range-shorthand-followup.patch
 ```
+
+## 2026-08-23 follow-up：台獎 snapshot source_file
+
+根因是 `build_github_pages_data.py` 只把 canonical `today_report_data.json` 來源寫入 KPI snapshot，
+建立台獎 snapshot 時遺漏頂層 `source_file`；正式 readback 也只比對 KPI 來源。這個 follow-up
+只從同次 canonical `source_path`／`source_file` 的 basename 填入 KPI 以外的兩份台獎輸出，且在
+local／正式台獎 readback 都要求它等於 KPI 的來源。不得由 report date、寄信日或系統日期推導；
+未提供有效 `.xlsx` 來源時在寫出前 blocked。
+
+[`runtime-awards-snapshot-source-file-followup.patch`](runtime-awards-snapshot-source-file-followup.patch)
+保留最小 runtime 差異。對 2026-08-22 的 canonical input，台獎 snapshot 必須為
+`report_run_date=2026-08-22`、`report_date=2026-08-21`、`source_file=0822.xlsx`；KPI 與台獎
+同源同日才能通過。空白／不同來源或日期不一致均 fail-closed，未修改 KPI／台獎計算、Sheets、
+GAS、Pages、巡店或正式資料。
+
+修改前 SHA-256：`build_github_pages_data.py`
+`0152656ad93decb5cbaa04ba80d8b7de2989e72d95e2183b4869c218d8c58f14`；
+`publish_formal_website_data.mjs`
+`e518bfd4608cb8b54e145ee8dd3ef26edda9a99f687910a328ed07750bcc4e0d`；
+`formal_website_publish_gate.test.mjs`
+`1ba36615b0a9cb3278c6063f8dbc29cf83f1abc423c34c0a6ef246d2c2ec8757`。
+修改後 SHA-256 分別為
+`fb3fc20da85a34f5799c7726f273293dc88b681300ea29bbbc215459901b8fbe`、
+`466cf77808aecd0837a950e83fc3a228fcf72b602b155b3655ccd8aed3e27b76`、
+`00c58116a46e13d6cd35b6e938d79dab5b636b22774bc317e065d6eb0b05073c`。
+
+非寫入測試只寫入臨時目錄：source-output Python fixture `1/1`、Python syntax compile、
+Node formal／ingest gate `24/24` 均通過。Python 的 optional Excel／image dependencies 未安裝，
+因此 source-output test 僅 stub 其未使用的 imports，實際驗證 builder 的 canonical-source helper
+與兩份台獎 JSON 暫存輸出；沒有讀取或改寫正式 XLSX／JSON。
+
+Rollback 必須先 reverse-check，且只反向套用此 patch：
+
+```sh
+cd /Users/liamlu/Downloads/liam-agent
+patch -R --dry-run -p1 < github-pages-liamlu/worktrees/awards-snapshot-source-file-20260823/docs/ops/report-data-cutoff-date-20260822/runtime-awards-snapshot-source-file-followup.patch
+patch -R -p1 < github-pages-liamlu/worktrees/awards-snapshot-source-file-20260823/docs/ops/report-data-cutoff-date-20260822/runtime-awards-snapshot-source-file-followup.patch
+```

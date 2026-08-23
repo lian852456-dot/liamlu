@@ -13,6 +13,16 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-23 ｜ Codex（台獎 snapshot source_file runtime follow-up，未發布）
+
+- Root Cause：台獎 snapshot builder 遺漏頂層 `source_file`，正式 readback 亦未把台獎來源納入同源 gate；
+  因而在 8/22 canonical input 下 KPI 有 `0822.xlsx`、台獎卻是空值。
+- 修正：台獎 public／private snapshot 僅取同次 `today_report_data.json` canonical source path 或 source file 的
+  `.xlsx` basename；缺值在任何輸出前 blocked。正式 publisher 現同時檢查 KPI／台獎 source file、report date
+  與逐值 snapshot，一方為空、不同檔名或日期不一致均 fail-closed。
+- 結果（本機完成／未發布）：暫存 JSON source-output `1/1`、Node formal／ingest `24/24` 與 Python syntax
+  compile 通過。未讀取／輸出員編、未發布私有 snapshot、未改 Sheets、GAS、Pages、KPI／台獎計算或巡店。
+
 ## 2026-08-23 ｜ Codex（source_date_range 月內簡寫 runtime follow-up，待正式發布）
 
 - Root Cause：8/22 runtime patch 的 downstream consumer 已有截止日處理，但 daily runner 上游

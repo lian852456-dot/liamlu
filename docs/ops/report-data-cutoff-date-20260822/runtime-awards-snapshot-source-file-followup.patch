@@ -1,0 +1,156 @@
+diff --git a/report-automation/work/build_github_pages_data.py b/report-automation/work/build_github_pages_data.py
+index 18f3531..85335f1 100644
+--- a/report-automation/work/build_github_pages_data.py
++++ b/report-automation/work/build_github_pages_data.py
+@@ -111,0 +112,8 @@ def source_files(source_dir: Path) -> list[tuple[tuple[int, int], Path]]:
++def canonical_input_source_file(report: dict[str, Any]) -> str:
++    raw = str(report.get("source_path") or report.get("source_file") or "").strip()
++    source_file = Path(raw.replace("\\", "/")).name
++    if not source_file or source_file in {".", ".."} or Path(source_file).suffix.lower() != ".xlsx":
++        raise RuntimeError("today_report_data.json 缺少 canonical source_path/source_file")
++    return source_file
++
++
+@@ -188,0 +197 @@ def extract_phone_awards(
++    source_file: str,
+@@ -205,0 +215 @@ def extract_phone_awards(
++        "source_file": source_file,
+@@ -318,0 +329 @@ def extract_phone_awards_battle(
++    source_file: str,
+@@ -358,0 +370 @@ def extract_phone_awards_battle(
++        "source_file": source_file,
+@@ -654,0 +667 @@ def main() -> None:
++    source_file = canonical_input_source_file(today_report)
+@@ -667,0 +681 @@ def main() -> None:
++            source_file,
+@@ -679,0 +694 @@ def main() -> None:
++            source_file,
+diff --git a/report-automation/work/build_github_pages_data_awards_source_test.py b/report-automation/work/build_github_pages_data_awards_source_test.py
+new file mode 100644
+index 0000000..f5776e9
+--- /dev/null
++++ b/report-automation/work/build_github_pages_data_awards_source_test.py
+@@ -0,0 +1,59 @@
++#!/usr/bin/env python3
++from __future__ import annotations
++
++import json
++import sys
++import tempfile
++import types
++import unittest
++from pathlib import Path
++
++sys.dont_write_bytecode = True
++
++WORK_DIR = Path(__file__).resolve().parent
++sys.path.insert(0, str(WORK_DIR))
++
++# This focused data-contract test does not read Excel or render images. Keep its
++# imports isolated from optional local runtime dependencies.
++openpyxl = types.ModuleType("openpyxl")
++openpyxl.load_workbook = lambda *args, **kwargs: None
++sys.modules.setdefault("openpyxl", openpyxl)
++pil = types.ModuleType("PIL")
++for name in ("Image", "ImageDraw", "ImageFont"):
++    module = types.ModuleType(f"PIL.{name}")
++    setattr(pil, name, module)
++    sys.modules.setdefault(f"PIL.{name}", module)
++sys.modules.setdefault("PIL", pil)
++
++from build_github_pages_data import (  # noqa: E402
++    canonical_input_source_file,
++    extract_phone_awards,
++    extract_phone_awards_battle,
++)
++
++
++class AwardsSourceFileTest(unittest.TestCase):
++    def test_temp_awards_outputs_keep_canonical_input_source_file(self) -> None:
++        with tempfile.TemporaryDirectory() as temp_dir:
++            root = Path(temp_dir)
++            summary_path = root / "phone_awards_update_summary.json"
++            summary_path.write_text(json.dumps({"store_progress": []}), encoding="utf-8")
++            source_file = canonical_input_source_file({
++                "source_path": "/private/input/0822.xlsx",
++                "source_file": "ignored.xlsx",
++            })
++            phone = extract_phone_awards(summary_path, "2026-08-22", "2026-08-21", source_file)
++            battle = extract_phone_awards_battle(summary_path, "2026-08-22", "2026-08-21", source_file)
++            output_path = root / "phone-awards-battle-latest.json"
++            output_path.write_text(json.dumps(battle), encoding="utf-8")
++
++            self.assertEqual(phone["source_file"], "0822.xlsx")
++            self.assertEqual(json.loads(output_path.read_text(encoding="utf-8"))["source_file"], "0822.xlsx")
++            with self.assertRaisesRegex(RuntimeError, "canonical source_path/source_file"):
++                canonical_input_source_file({})
++            with self.assertRaisesRegex(RuntimeError, "canonical source_path/source_file"):
++                canonical_input_source_file({"source_path": "/private/input"})
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/report-automation/work/build_github_pages_data_date_contract_test.py b/report-automation/work/build_github_pages_data_date_contract_test.py
+index a35fd14..27a24d3 100644
+--- a/report-automation/work/build_github_pages_data_date_contract_test.py
++++ b/report-automation/work/build_github_pages_data_date_contract_test.py
+@@ -18 +18 @@ sys.path.insert(0, str(SCRIPT_DIR))
+-from build_github_pages_data import resolve_date_contract  # noqa: E402
++from build_github_pages_data import canonical_input_source_file, resolve_date_contract  # noqa: E402
+@@ -41,0 +42,12 @@ class DateContractTest(unittest.TestCase):
++    def test_awards_source_file_uses_canonical_input_path_and_never_falls_back(self) -> None:
++        self.assertEqual(
++            canonical_input_source_file({
++                "source_path": "/private/input/0822.xlsx",
++                "source_file": "wrong.xlsx",
++            }),
++            "0822.xlsx",
++        )
++        self.assertEqual(canonical_input_source_file({"source_file": "0822.xlsx"}), "0822.xlsx")
++        with self.assertRaisesRegex(RuntimeError, "canonical source_path/source_file"):
++            canonical_input_source_file({})
++
+@@ -66,0 +79 @@ class DateContractTest(unittest.TestCase):
++            self.assertEqual(awards["source_file"], "0822.xlsx")
+diff --git a/report-automation/work/formal_website_publish_gate.test.mjs b/report-automation/work/formal_website_publish_gate.test.mjs
+index 5b51834..4cdc2b2 100644
+--- a/report-automation/work/formal_website_publish_gate.test.mjs
++++ b/report-automation/work/formal_website_publish_gate.test.mjs
+@@ -71 +71 @@ function fixture() {
+-    report_date: '2026-08-07', report_run_date: '2026-08-08', phone_items: 13, store_rows: 10,
++    report_date: '2026-08-07', report_run_date: '2026-08-08', source_file: '0808.xlsx', phone_items: 13, store_rows: 10,
+@@ -132,0 +133 @@ test('0822 檔名與寄信日不會覆蓋 0821 正式資料截止日', () => {
++  value.snapshot.awardsBattle.source_file = '0822.xlsx';
+@@ -145,0 +147,18 @@ test('0822 檔名與寄信日不會覆蓋 0821 正式資料截止日', () => {
++test('台獎快照缺少或使用不同來源檔時必須 blocked', () => {
++  for (const sourceFile of ['', '0807.xlsx']) {
++    const value = fixture();
++    value.snapshot.awardsBattle.source_file = sourceFile;
++    assert.throws(
++      () => validateDualFormalReadback(value),
++      /dashboard awards source file mismatch/,
++      sourceFile || 'empty source file',
++    );
++  }
++});
++
++test('台獎快照日期不一致時必須 blocked', () => {
++  const value = fixture();
++  value.snapshot.awardsBattle.report_date = '2026-08-06';
++  assert.throws(() => validateDualFormalReadback(value), /dashboard awards report date mismatch/);
++});
++
+diff --git a/report-automation/work/publish_formal_website_data.mjs b/report-automation/work/publish_formal_website_data.mjs
+index cf8f784..53e7e9a 100755
+--- a/report-automation/work/publish_formal_website_data.mjs
++++ b/report-automation/work/publish_formal_website_data.mjs
+@@ -234,0 +235 @@ export function validateAwardReadback(remoteAwards, expectedAwards) {
++  assertEqual(basename(remoteAwards.source_file), basename(expectedAwards.source_file), 'awards source file');
+@@ -279,0 +281 @@ export function validateDualFormalReadback({ kpicalcData, snapshot, snapshotStat
++  const awardsSource = basename(snapshot.awardsBattle.source_file);
+@@ -290,0 +293 @@ export function validateDualFormalReadback({ kpicalcData, snapshot, snapshotStat
++  assertEqual(awardsSource, expected.sourceFile, 'dashboard awards source file');
+@@ -291,0 +295 @@ export function validateDualFormalReadback({ kpicalcData, snapshot, snapshotStat
++  assertEqual(kpiSource, awardsSource, 'formal awards source alignment');
+@@ -442,0 +447 @@ async function main() {
++  assertEqual(basename(awardsBattle.source_file), expected.sourceFile, 'local awards source file');
