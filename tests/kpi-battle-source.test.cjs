@@ -85,11 +85,15 @@ test('快照合併硬性要求快照日期、KPI 截止日與來源檔一致', (
   assert.doesNotMatch(functionBody(controllerSource, 'load'), /__KPI_BATTLE_DATA__/);
 });
 
-test('正式達成率保護區不變，GAS ptvisit hotfix 不修改 KPI／台獎／班表／正式回報寫入', () => {
+test('component publish 不修改 Approved Device、登入、TTL、巡店、稽核或前端 freshness gate', () => {
   const gasDiff = execFileSync('git', ['diff', '--unified=0', 'origin/main', '--', 'gas/Code.gs'], { cwd: root, encoding: 'utf8' });
   const changedLines = gasDiff.split('\n').filter((line) => /^[+-]/.test(line) && !/^(?:---|\+\+\+)/.test(line)).join('\n');
-  assert.doesNotMatch(changedLines, /kpiCalc|award|schedule|private_access|reportWritePayload_\s*\{/i);
+  assert.doesNotMatch(changedLines, /ptvisit|patrol|audit|schedule|reportWritePayload_\s*\{|\bTTL\b|device_bound|bootstrapCode/i);
   const gas = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8');
+  const baselineGas = execFileSync('git', ['show', 'origin/main:gas/Code.gs'], { cwd: root, encoding: 'utf8' });
+  for (const name of ['privateDashboardAccess', 'privateDashboardRequestBinding', 'privateDashboardAdminApprove']) {
+    assert.equal(functionBody(gas, name), functionBody(baselineGas, name), `${name} 不得變更`);
+  }
   const parser = functionBody(gas, 'kpiCalcParseReport');
   assert.match(parser, /reportRate: kpiCalcReportRate/);
   assert.match(parser, /aggregateRates: aggregateRates/);
@@ -268,4 +272,26 @@ test('0822.xlsx 的 D+1 來源只接受同為 0821 的快照資料日，且保�
     assert.equal(merged.supplement_synced, false);
     assert.equal(merged.aggregate.company_rank, null);
   }
+});
+
+test('mixed freshness：0824 KPI supplement 可同步，8/22 awards 不參與 KPI gate', () => {
+  const A = loadAdapter();
+  const data = JSON.parse(JSON.stringify(SAMPLE));
+  data.meta.period = '2026/08/01 ~ 08/23';
+  data.meta.snapshotDay = 23;
+  data.meta.sourceFile = '0824.xlsx';
+  const base = A.kpicalcToKpiBattleView(data, '');
+  const supplement = {
+    report_date: '2026-08-23',
+    data_as_of_date: '2026-08-23',
+    source_as_of_date: '2026-08-23',
+    source_file: '0824.xlsx',
+    aggregate: { company_rank: 33, overall_kpi: 1.0351 },
+    stores: [],
+    personal: [],
+  };
+  const merged = A.mergeKpiBattleSupplement(base, supplement);
+  assert.equal(merged.supplement_synced, true);
+  assert.equal(merged.aggregate.company_rank, 33);
+  assert.equal(merged.aggregate.overall_kpi, 1.0351);
 });
