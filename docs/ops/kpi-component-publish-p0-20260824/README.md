@@ -52,6 +52,27 @@ Phase 2 後 SHA-256：
 - KPI-only real 0824 rebuild：`0824.xlsx`、cutoff `2026-08-23`、9 店、40 人、
   店長 9／副店 11／業代 20；awards written=`false`。
 
+## Formal deployment and component readback
+
+- PR #88 merge commit：`2bc0ef30347d760fc993a1b4b49e62b6d6c98a8f`。
+- 正式 Apps Script deployment：同一 deployment ID 由 v32 更新為 v33；v31、v32
+  版本均保留。v33 description：`P0 KPI component publish; stale awards remain blocked`。
+- 正式 editor head 在本次前另含 repo 尚未同步的巡店／snapshot backup 變更；部署候選因此是
+  現行 editor head 加上本次 KPI component 差異，沒有用 repo `Code.gs` 覆蓋或回退其他功能。
+  overlay 前 SHA-256：`1b283e8d49bf0272c0155e09528fee83e3ab19fb35250bc5a04697c17fc4ed31`；
+  v33 editor readback SHA-256：`0ad9cf10a36f2f304837747eaaf4c874071fe57e5f293de5e736aade5178bf21`，
+  與部署候選逐位元一致。
+- container before：publishedAt `2026-08-23T20:33:34+08:00`；KPI
+  `0823.xlsx`／cutoff `2026-08-22`／KPI `1.0472`／rank `29`；awards `2026-08-22`。
+- container after：publishedAt `2026-08-24T19:24:27+08:00`；
+  `components.kpi=fresh`、`0824.xlsx`、cutoff `2026-08-23`、run
+  `quick-20260824-125725-777574ab`；`components.awards=blocked`、data date
+  `2026-08-22`、reason `upstream-source-not-updated`。awards payload hash
+  `82fa30b2aca39d5531de3658f8f7d409` 在發布前後一致。
+- Google Drive independent readback：container owner `lian852456@gmail.com`、`shared=false`；
+  protected kpicalc 為 `0824.xlsx`、period `2026/08/01 ~ 08/23`、9 店／40 人／25 items；
+  container KPI supplement 為 9 店／40 人、overall KPI `1.0351`、company rank `33`。
+
 ## Rollback
 
 1. Apps Script deployment 可切回 v32；v32 不包含 component publish action。
