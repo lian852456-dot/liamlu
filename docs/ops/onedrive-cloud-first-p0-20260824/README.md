@@ -32,6 +32,13 @@
 
 結果：`BLOCKED`。目前執行環境沒有可用的 `North12BOneDriveGraphAccessToken`；local fallback 為 OFF。因尚未取得 Graph listing/download，沒有產生新台獎、沒有建立假的 8/24 snapshot、沒有發布 awards component，也沒有觸碰 KPI。
 
+## Commit and deployment
+
+- Implementation commit：`b5ab4b578e4dcc96ffd9948a8da3f7a44f0b6a33`；PR #90 merge commit：`548a1963536be486c2836350c83d95cbf04a6d71`。
+- 17X 正式 editor head 採 overlay 更新，沒有用 repo `Code.gs` 覆寫其他已上線功能。v33 before SHA-256：`0ad9cf10a36f2f304837747eaaf4c874071fe57e5f293de5e736aade5178bf21`；v34 candidate／editor readback SHA-256：`f9278d7bc9e0c71f92c64f4dec314004d5a528055ca029e68a2eac0ce4269483`，逐位元一致。
+- 同一正式 deployment 已由 v33 更新為 v34，說明 `P0 OneDrive Cloud-first + awards component publish`；v31、v32、v33 均保留 rollback。
+- v34 anonymous route readback 對 `private_publish_awards_component` 回 `管理者驗證失敗`，確認新 action 已部署且 authentication gate 仍生效；未帶管理者憑證、未寫入任何 snapshot。
+
 ## Rollback
 
 1. Apps Script deployment 切回本次部署前的 v33。
