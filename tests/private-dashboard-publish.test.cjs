@@ -220,11 +220,12 @@ test('KPI component source/date mismatch 仍 fail-closed，partial publish 不�
   assert.equal(state.text, initial);
 });
 
-function freshAwardsComponent(overrides = {}) {
+function freshAwardsComponent(overrides = {}, provider = 'onedrive-cloud') {
   const source = (kind, basename) => ({
-    provider: 'onedrive-cloud', driveItemId: `${kind}-item-id`, basename,
+    provider, driveItemId: `${kind}-item-id`, basename,
     canonical_basename: basename, lastModifiedDateTime: '2026-08-24T01:00:00Z',
-    eTag: `${kind}-etag-v2`, size: 2048, sha256: kind === 'store' ? 'a'.repeat(64) : 'b'.repeat(64),
+    ...(provider === 'onedrive-cloud' ? { eTag: `${kind}-etag-v2` } : { googleDriveFileId: `${kind}-item-id` }),
+    size: 2048, sha256: kind === 'store' ? 'a'.repeat(64) : 'b'.repeat(64),
     source_data_date: '2026-08-23', run_id: 'awards-cloud-20260824-test',
   });
   const items = Array.from({ length: 13 }, (_, index) => ({ name: `機款${index + 1}` }));
@@ -259,6 +260,25 @@ test('awards component-only publish 更新 fresh awards 並完整保留 KPI payl
   assert.equal(stored.components.awards.status, 'fresh');
   assert.equal(stored.components.awards.run_id, 'awards-cloud-20260824-test');
   assert.equal(result.reportDate, '2026-08-23');
+});
+
+test('awards component-only publish 接受 Google Drive immutable identity 且不偽造 eTag', () => {
+  const kpi = freshKpiComponent();
+  const initial = {
+    version: 1, kpiBattle: kpi, awardsBattle: { report_date: '2026-08-22' },
+    components: { kpi: { status: 'fresh' }, awards: { status: 'blocked' } },
+  };
+  const { state, context } = createHarness(JSON.stringify(initial), protectedKpi());
+  loadFunctions(context, ['privateDashboardValidateAwardsComponent_', 'privateDashboardPublishAwardsComponent']);
+  const result = context.privateDashboardPublishAwardsComponent({
+    awardsBattleBase64: encodedSnapshot(freshAwardsComponent({}, 'google-drive-cloud')),
+  });
+  const stored = JSON.parse(state.text);
+  assert.equal(stored.awardsBattle.source_files.store.provider, 'google-drive-cloud');
+  assert.equal(stored.awardsBattle.source_files.store.eTag, undefined);
+  assert.equal(stored.components.awards.provider, 'google-drive-cloud');
+  assert.deepEqual(stored.kpiBattle, kpi);
+  assert.equal(result.runId, 'awards-cloud-20260824-test');
 });
 
 test('awards cutoff/source identity mismatch 必須 fail-closed 且不得改 KPI/awards', () => {

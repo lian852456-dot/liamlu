@@ -3594,21 +3594,28 @@ function privateDashboardValidateAwardsComponent_(awardsBattle, kpiBattle) {
     person:'01-08-04-(密)直營_手機競賽日報_個人達成率、排名及獎金.xlsx'
   };
   let runId = '';
+  let provider = '';
   Object.keys(expectedNames).forEach(function(kind) {
     const source = (awardsBattle.source_files || {})[kind];
-    if (!source || source.provider !== 'onedrive-cloud' ||
+    const sourceProvider = String(source && source.provider || '');
+    if (!source || ['onedrive-cloud', 'google-drive-cloud'].indexOf(sourceProvider) < 0 ||
         String(source.basename || source.canonical_basename || '') !== expectedNames[kind] ||
-        !String(source.driveItemId || '') || !String(source.eTag || '') ||
+        !String(source.driveItemId || '') ||
+        (sourceProvider === 'onedrive-cloud' && !String(source.eTag || '')) ||
+        (sourceProvider === 'google-drive-cloud' &&
+          String(source.googleDriveFileId || source.driveItemId || '') !== String(source.driveItemId || '')) ||
         isNaN(Date.parse(String(source.lastModifiedDateTime || ''))) ||
         !isFinite(Number(source.size)) || Number(source.size) <= 0 ||
         !/^[a-f0-9]{64}$/i.test(String(source.sha256 || '')) ||
         String(source.source_data_date || '') !== cutoff || !String(source.run_id || '')) {
-      throw new Error('awards ' + kind + ' OneDrive cloud source identity 不完整');
+      throw new Error('awards ' + kind + ' cloud source identity 不完整');
     }
+    if (provider && provider !== sourceProvider) throw new Error('awards source pair provider 不一致');
+    provider = sourceProvider;
     if (runId && runId !== String(source.run_id)) throw new Error('awards source pair run_id 不一致');
     runId = String(source.run_id);
   });
-  return { cutoff:cutoff, runId:runId };
+  return { cutoff:cutoff, runId:runId, provider:provider };
 }
 
 // Awards component-only publish: replace awardsBattle after cloud identity,
@@ -3624,7 +3631,8 @@ function privateDashboardPublishAwardsComponent(payload) {
   const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
   if (!files.hasNext()) throw new Error('既有私有戰情快照不存在');
   const file = files.next();
-  const current = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  const currentText = file.getBlob().getDataAsString('UTF-8');
+  const current = JSON.parse(currentText);
   if (!current || !current.kpiBattle || !current.awardsBattle) throw new Error('既有私有戰情快照格式不完整');
   const identity = privateDashboardValidateAwardsComponent_(incomingAwards, current.kpiBattle);
   const kpiTextBefore = JSON.stringify(current.kpiBattle);
@@ -3635,7 +3643,7 @@ function privateDashboardPublishAwardsComponent(payload) {
   current.components = current.components && typeof current.components === 'object' ? current.components : {};
   current.components.awards = {
     status:'fresh', data_as_of_date:identity.cutoff, run_id:identity.runId,
-    provider:'onedrive-cloud', published_at:publishedAt, reason:''
+    provider:identity.provider, published_at:publishedAt, reason:''
   };
   try {
     file.setContent(JSON.stringify(current));
@@ -3649,7 +3657,7 @@ function privateDashboardPublishAwardsComponent(payload) {
     throw error;
   }
   reportVersionRecord_('awards', {
-    dataDate:identity.cutoff, source:'onedrive-cloud',
+    dataDate:identity.cutoff, source:identity.provider,
     fileHash:reportVersionHash_(JSON.stringify(incomingAwards)), fileName:'awardsBattle',
     operator:'external-component-publish'
   }, 'success', { rule:'component-record-only' });
