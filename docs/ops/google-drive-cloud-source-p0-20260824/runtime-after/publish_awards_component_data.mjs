@@ -17,6 +17,7 @@ const adminSecret = process.env.PRIVATE_DASHBOARD_ADMIN_SECRET || '';
 const reportRunDate = process.env.REPORT_RUN_DATE_ISO || process.env.REPORT_DATE_ISO || '';
 const dataCutoffDate = process.env.REPORT_DATA_CUTOFF_DATE || '';
 const awardsSummaryPath = process.env.PHONE_AWARDS_SUMMARY_PATH || '';
+const publicationManifestPath = process.env.REPORT_MANIFEST_PATH || '';
 
 function fail(message) {
   throw new Error(`awards component publish blocked: ${message}`);
@@ -109,7 +110,9 @@ export function validateAwardsComponentReadback({ beforeSnapshot, afterSnapshot,
 }
 
 async function writeManifest(publication, publishedAt) {
-  const file = path.join(logsDir, `run-manifest-${reportRunDate.replaceAll('-', '')}.json`);
+  const file = path.resolve(
+    publicationManifestPath || path.join(logsDir, `run-manifest-${reportRunDate.replaceAll('-', '')}.json`),
+  );
   const manifest = await readJson(file).catch(() => ({ runId: publication.runId, reportRunDate, dataCutoffDate }));
   manifest.websiteResult = 'awards-component-published-verified';
   manifest.snapshotPublishedAt = publishedAt || null;
