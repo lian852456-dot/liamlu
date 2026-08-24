@@ -2462,6 +2462,7 @@ function doPost(e) {
     else if (action === 'private_admin_set_trusted_employee') result = privateDashboardAdminSetTrustedEmployee(payload);
     else if (action === 'private_admin_snapshot_status') result = privateDashboardAdminSnapshotStatus(payload);
     else if (action === 'private_sync_roster') result = privateDashboardSyncRoster(payload);
+    else if (action === 'private_publish_kpi_component') result = privateDashboardPublishKpiComponent(payload);
     else if (action === 'private_publish') result = privateDashboardPublish(payload);
     else if (action === 'kpicalc_access') result = kpiCalcAccess(payload);
     else if (action === 'kpicalc_publish') result = kpiCalcPublish(payload);
@@ -2774,6 +2775,14 @@ function privateDashboardAdminSnapshotStatus(payload) {
     publishedAt: snapshot.publishedAt || '',
     kpiReportDate: snapshot.kpiBattle.report_date || '',
     awardsReportDate: snapshot.awardsBattle.report_date || '',
+    kpiComponentStatus: String((((snapshot.components || {}).kpi || {}).status) || ''),
+    kpiComponentRunId: String((((snapshot.components || {}).kpi || {}).run_id) || ''),
+    kpiComponentSourceFile: String((((snapshot.components || {}).kpi || {}).source_file) || ''),
+    kpiComponentDataAsOfDate: String((((snapshot.components || {}).kpi || {}).data_as_of_date) || ''),
+    awardsComponentStatus: String((((snapshot.components || {}).awards || {}).status) || ''),
+    awardsComponentReason: String((((snapshot.components || {}).awards || {}).reason) || ''),
+    awardsComponentDataAsOfDate: String((((snapshot.components || {}).awards || {}).data_as_of_date) || ''),
+    awardsPayloadHash: reportVersionHash_(JSON.stringify(snapshot.awardsBattle)),
     phoneItems: snapshot.awardsBattle.phone_items || 0,
     storeRows: snapshot.awardsBattle.store_rows || 0
   };
@@ -3448,6 +3457,114 @@ function privateDashboardSyncRoster(payload) {
     synced += 1;
   });
   return { synced: synced };
+}
+
+function privateDashboardCanonicalKpiSource_(value) {
+  const raw = String(value || '').replace(/\\/g, '/').split('/').pop();
+  const staged = raw.match(/^report-upload-temp-[a-f0-9]{32,64}-(\d{4}\.xlsx)$/i);
+  return staged ? staged[1] : raw;
+}
+
+function privateDashboardValidateKpiComponent_(kpiBattle, kpicalc) {
+  if (!kpiBattle || typeof kpiBattle !== 'object' || Array.isArray(kpiBattle)) {
+    throw new Error('KPI component 格式不完整');
+  }
+  if (!kpicalc || !kpicalc.meta) throw new Error('protected KPI 格式不完整');
+  const dataDate = reportUploadKpiDate_(kpicalc.meta);
+  const sourceFile = privateDashboardCanonicalKpiSource_(kpicalc.meta.sourceFile);
+  if (!dataDate || !sourceFile) throw new Error('protected KPI 日期或來源無效');
+  ['report_date', 'data_as_of_date', 'source_as_of_date'].forEach(function(field) {
+    if (String(kpiBattle[field] || '') !== dataDate) {
+      throw new Error('KPI component ' + field + ' 與 protected KPI 不一致');
+    }
+  });
+  if (privateDashboardCanonicalKpiSource_(kpiBattle.source_file) !== sourceFile) {
+    throw new Error('KPI component source_file 與 protected KPI 不一致');
+  }
+  if (!Array.isArray(kpicalc.stores) || kpicalc.stores.length !== 9 ||
+      !Array.isArray(kpicalc.persons) || kpicalc.persons.length !== 40 ||
+      !Array.isArray(kpicalc.items) || kpicalc.items.length !== 25) {
+    throw new Error('protected KPI 必須為 9 店／40 人／25 KPI items');
+  }
+  if (!Array.isArray(kpiBattle.stores) || kpiBattle.stores.length !== 9 ||
+      !Array.isArray(kpiBattle.personal) || kpiBattle.personal.length !== 40) {
+    throw new Error('KPI supplement 必須為九店與 40 人');
+  }
+  const rows = [kpiBattle.aggregate].concat(kpiBattle.stores);
+  const required = ['overall_kpi', 'company_rank', 'overall_kpi_dod', 'company_rank_dod', 'addon_score'];
+  rows.forEach(function(row) {
+    required.forEach(function(field) {
+      if (!row || row[field] === '' || row[field] === null || row[field] === undefined || !isFinite(Number(row[field]))) {
+        throw new Error('KPI supplement 欄位缺漏：' + field);
+      }
+    });
+  });
+  const runId = String(kpicalc.meta.processingRunId || kpiBattle.kpi_run_id || '').trim();
+  if (!runId || (kpiBattle.kpi_run_id && String(kpiBattle.kpi_run_id) !== runId)) {
+    throw new Error('KPI component run_id 與 protected KPI 不一致');
+  }
+  return { dataDate: dataDate, sourceFile: sourceFile, runId: runId };
+}
+
+// KPI 與台獎採 component-level 發布：只替換通過 protected KPI 對齊驗證的
+// kpiBattle；awardsBattle payload 原樣保留。container 的 publishedAt 只代表
+// 檔案寫入時間，consumer 必須繼續使用各 component 自己的日期與來源 gate。
+function privateDashboardPublishKpiComponent(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const encoded = String(payload.kpiBattleBase64 || '');
+  if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('KPI component 缺少或過大');
+  const decoded = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
+  const incomingKpi = JSON.parse(decoded);
+  const kpiFile = kpiCalcLatestDataFile();
+  if (!kpiFile) throw new Error('protected KPI 尚未發佈');
+  const kpicalc = JSON.parse(kpiFile.getBlob().getDataAsString('UTF-8'));
+  const identity = privateDashboardValidateKpiComponent_(incomingKpi, kpicalc);
+  const folder = privateDashboardFolder();
+  const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
+  if (!files.hasNext()) throw new Error('既有私有戰情快照不存在');
+  const file = files.next();
+  const current = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if (!current || !current.kpiBattle || !current.awardsBattle) throw new Error('既有私有戰情快照格式不完整');
+  const awardsTextBefore = JSON.stringify(current.awardsBattle);
+  const publishedAt = privateDashboardNow();
+  current.kpiBattle = incomingKpi;
+  current.publishedAt = publishedAt;
+  current.components = current.components && typeof current.components === 'object' ? current.components : {};
+  current.components.kpi = {
+    status: 'fresh',
+    data_as_of_date: identity.dataDate,
+    source_file: identity.sourceFile,
+    run_id: identity.runId,
+    published_at: publishedAt
+  };
+  const awardsDate = String(current.awardsBattle.data_as_of_date || current.awardsBattle.report_date || '');
+  current.components.awards = {
+    status: awardsDate === identity.dataDate ? 'fresh' : 'blocked',
+    data_as_of_date: awardsDate,
+    reason: awardsDate === identity.dataDate ? '' : 'upstream-source-not-updated'
+  };
+  const text = JSON.stringify(current);
+  file.setContent(text);
+  const stored = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if (JSON.stringify(stored.awardsBattle) !== awardsTextBefore) {
+    throw new Error('awardsBattle payload 在 KPI component 發布時遭修改');
+  }
+  reportVersionRecord_('kpi', {
+    dataDate: identity.dataDate, source: 'external-publish',
+    fileHash: reportVersionHash_(JSON.stringify(incomingKpi)), fileName: identity.sourceFile,
+    operator: 'external-component-publish'
+  }, 'success', { rule: 'component-record-only' });
+  return {
+    publishedAt: publishedAt,
+    reportDate: identity.dataDate,
+    sourceFile: identity.sourceFile,
+    runId: identity.runId,
+    awardsStatus: current.components.awards.status,
+    awardsReportDate: awardsDate,
+    awardsPayloadHash: reportVersionHash_(awardsTextBefore),
+    fileId: file.getId(),
+    lastUpdated: Utilities.formatDate(file.getLastUpdated(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX")
+  };
 }
 
 // 每日自動化在寄件成功後呼叫。快照僅存於私有 Drive，不經 GitHub。

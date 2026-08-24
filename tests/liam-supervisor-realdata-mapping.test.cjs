@@ -93,6 +93,26 @@ test('KPI supplement mismatch fails closed instead of mixing rank and DOD', () =
   assert.match(result.summary.note, /fail-closed/);
 });
 
+test('mixed freshness：App KPI aligned 完整顯示，舊 awards 維持 no_data', () => {
+  const A = loadAdapters();
+  const snapshot = snapshotFixture();
+  snapshot.awardsBattle = {
+    report_date: '2026-08-08',
+    data_as_of_date: '2026-08-08',
+    overall: { award: {}, items: [] },
+    stores: [],
+  };
+  snapshot.publishedAt = '2026-08-10T18:00:00+08:00';
+
+  const kpi = A.adaptKpi(kpiFixture(), snapshot, '2026-08-10T18:01:00+08:00');
+  const awards = A.adaptAwards(snapshot, kpi.summary.data.reportDate, '2026-08-10T18:01:00+08:00');
+
+  assert.equal(kpi.summary.status, 'ok');
+  assert.equal(kpi.summary.data.companyRank, 29);
+  assert.equal(awards.summary.status, 'no_data');
+  assert.match(awards.summary.note, /同步|日期/);
+});
+
 test('受控 temporary filename 只解包 canonical source identity，變更暫存 token 不影響 KPI/Award', () => {
   const A = loadAdapters();
   for (const token of ['a'.repeat(32), 'b'.repeat(64)]) {

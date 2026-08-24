@@ -54,8 +54,8 @@ test('排程寫入前必須先過版本判斷，且判斷在寫入之前', () =>
   assert.match(auto, /source: 'scheduled'/);
 });
 
-test('既有發佈入口只登記版本、不硬擋（避免打斷外部管線）', () => {
-  for (const name of ['kpiCalcPublish', 'privateDashboardPublish']) {
+test('既有發佈入口與 KPI component 發布只登記版本、不硬擋（避免打斷外部管線）', () => {
+  for (const name of ['kpiCalcPublish', 'privateDashboardPublish', 'privateDashboardPublishKpiComponent']) {
     const body = functionBody(code, name);
     assert.match(body, /reportVersionRecord_/, `${name} 應登記版本`);
     assert.doesNotMatch(body, /reportVersionDecide_/, `${name} 不應硬擋`);
