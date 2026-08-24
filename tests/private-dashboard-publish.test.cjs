@@ -8,7 +8,9 @@ const code = fs.readFileSync(path.join(__dirname, '..', 'gas/Code.gs'), 'utf8');
 
 test('POST router exposes authenticated KPI component publish action without changing private_access', () => {
   assert.match(code, /action === 'private_publish_kpi_component'.*privateDashboardPublishKpiComponent/s);
+  assert.match(code, /action === 'private_publish_awards_component'.*privateDashboardPublishAwardsComponent/s);
   assert.match(functionSource('privateDashboardPublishKpiComponent'), /privateDashboardAdminAuthorized\(payload\)/);
+  assert.match(functionSource('privateDashboardPublishAwardsComponent'), /privateDashboardAdminAuthorized\(payload\)/);
   assert.match(functionSource('privateDashboardAccess'), /privateDashboardSnapshot\(\)/);
 });
 
@@ -214,6 +216,63 @@ test('KPI component source/date mismatch 仍 fail-closed，partial publish 不�
       kpiBattleBase64: encodedSnapshot(freshKpiComponent({ source_file: '0823.xlsx' })),
     }),
     /source_file 與 protected KPI 不一致/,
+  );
+  assert.equal(state.text, initial);
+});
+
+function freshAwardsComponent(overrides = {}) {
+  const source = (kind, basename) => ({
+    provider: 'onedrive-cloud', driveItemId: `${kind}-item-id`, basename,
+    canonical_basename: basename, lastModifiedDateTime: '2026-08-24T01:00:00Z',
+    eTag: `${kind}-etag-v2`, size: 2048, sha256: kind === 'store' ? 'a'.repeat(64) : 'b'.repeat(64),
+    source_data_date: '2026-08-23', run_id: 'awards-cloud-20260824-test',
+  });
+  const items = Array.from({ length: 13 }, (_, index) => ({ name: `機款${index + 1}` }));
+  return {
+    report_date: '2026-08-23', report_run_date: '2026-08-24', data_as_of_date: '2026-08-23',
+    generated_at: '2026-08-24T20:00:00+08:00', phone_items: 13, store_rows: 10,
+    source_files: {
+      store: source('store', '01-08-03-(密)直營_手機競賽日報_店點達成率、排名及獎金.xlsx'),
+      person: source('person', '01-08-04-(密)直營_手機競賽日報_個人達成率、排名及獎金.xlsx'),
+    },
+    overall: { store: '北一二B整體', items },
+    stores: Array.from({ length: 9 }, (_, index) => ({ store: `店${index + 1}`, items })),
+    ...overrides,
+  };
+}
+
+test('awards component-only publish 更新 fresh awards 並完整保留 KPI payload/component', () => {
+  const kpi = freshKpiComponent();
+  const kpiMeta = { status: 'fresh', data_as_of_date: '2026-08-23', source_file: '0824.xlsx', run_id: kpi.kpi_run_id };
+  const initial = {
+    version: 1, publishedAt: '2026-08-24T19:24:27+08:00', kpiBattle: kpi,
+    awardsBattle: { report_date: '2026-08-22' }, components: { kpi: kpiMeta, awards: { status: 'blocked' } },
+  };
+  const { state, context } = createHarness(JSON.stringify(initial), protectedKpi());
+  loadFunctions(context, ['privateDashboardValidateAwardsComponent_', 'privateDashboardPublishAwardsComponent']);
+  const result = context.privateDashboardPublishAwardsComponent({ awardsBattleBase64: encodedSnapshot(freshAwardsComponent()) });
+  const stored = JSON.parse(state.text);
+  assert.deepEqual(stored.kpiBattle, kpi);
+  assert.deepEqual(stored.components.kpi, kpiMeta);
+  assert.equal(stored.awardsBattle.report_date, '2026-08-23');
+  assert.equal(stored.awardsBattle.source_files.store.provider, 'onedrive-cloud');
+  assert.equal(stored.components.awards.status, 'fresh');
+  assert.equal(stored.components.awards.run_id, 'awards-cloud-20260824-test');
+  assert.equal(result.reportDate, '2026-08-23');
+});
+
+test('awards cutoff/source identity mismatch 必須 fail-closed 且不得改 KPI/awards', () => {
+  const initial = JSON.stringify({
+    version: 1, kpiBattle: freshKpiComponent(), awardsBattle: { report_date: '2026-08-22' },
+    components: { kpi: { status: 'fresh' }, awards: { status: 'blocked' } },
+  });
+  const { state, context } = createHarness(initial, protectedKpi());
+  loadFunctions(context, ['privateDashboardValidateAwardsComponent_', 'privateDashboardPublishAwardsComponent']);
+  assert.throws(
+    () => context.privateDashboardPublishAwardsComponent({
+      awardsBattleBase64: encodedSnapshot(freshAwardsComponent({ report_date: '2026-08-22' })),
+    }),
+    /與 KPI cutoff 不一致/,
   );
   assert.equal(state.text, initial);
 });

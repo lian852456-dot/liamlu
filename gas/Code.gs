@@ -2463,6 +2463,7 @@ function doPost(e) {
     else if (action === 'private_admin_snapshot_status') result = privateDashboardAdminSnapshotStatus(payload);
     else if (action === 'private_sync_roster') result = privateDashboardSyncRoster(payload);
     else if (action === 'private_publish_kpi_component') result = privateDashboardPublishKpiComponent(payload);
+    else if (action === 'private_publish_awards_component') result = privateDashboardPublishAwardsComponent(payload);
     else if (action === 'private_publish') result = privateDashboardPublish(payload);
     else if (action === 'kpicalc_access') result = kpiCalcAccess(payload);
     else if (action === 'kpicalc_publish') result = kpiCalcPublish(payload);
@@ -2782,6 +2783,7 @@ function privateDashboardAdminSnapshotStatus(payload) {
     awardsComponentStatus: String((((snapshot.components || {}).awards || {}).status) || ''),
     awardsComponentReason: String((((snapshot.components || {}).awards || {}).reason) || ''),
     awardsComponentDataAsOfDate: String((((snapshot.components || {}).awards || {}).data_as_of_date) || ''),
+    kpiPayloadHash: reportVersionHash_(JSON.stringify(snapshot.kpiBattle)),
     awardsPayloadHash: reportVersionHash_(JSON.stringify(snapshot.awardsBattle)),
     phoneItems: snapshot.awardsBattle.phone_items || 0,
     storeRows: snapshot.awardsBattle.store_rows || 0
@@ -3523,7 +3525,8 @@ function privateDashboardPublishKpiComponent(payload) {
   const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
   if (!files.hasNext()) throw new Error('既有私有戰情快照不存在');
   const file = files.next();
-  const current = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  const currentText = file.getBlob().getDataAsString('UTF-8');
+  const current = JSON.parse(currentText);
   if (!current || !current.kpiBattle || !current.awardsBattle) throw new Error('既有私有戰情快照格式不完整');
   const awardsTextBefore = JSON.stringify(current.awardsBattle);
   const publishedAt = privateDashboardNow();
@@ -3564,6 +3567,98 @@ function privateDashboardPublishKpiComponent(payload) {
     awardsPayloadHash: reportVersionHash_(awardsTextBefore),
     fileId: file.getId(),
     lastUpdated: Utilities.formatDate(file.getLastUpdated(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX")
+  };
+}
+
+function privateDashboardValidateAwardsComponent_(awardsBattle, kpiBattle) {
+  if (!awardsBattle || typeof awardsBattle !== 'object' || Array.isArray(awardsBattle)) {
+    throw new Error('awards component 格式不完整');
+  }
+  if (!kpiBattle || typeof kpiBattle !== 'object' || Array.isArray(kpiBattle)) {
+    throw new Error('既有 KPI component 格式不完整');
+  }
+  const cutoff = String(kpiBattle.data_as_of_date || kpiBattle.source_as_of_date || kpiBattle.report_date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cutoff)) throw new Error('既有 KPI cutoff 無效');
+  ['report_date', 'data_as_of_date'].forEach(function(field) {
+    if (String(awardsBattle[field] || '') !== cutoff) {
+      throw new Error('awards component ' + field + ' 與 KPI cutoff 不一致');
+    }
+  });
+  if (Number(awardsBattle.phone_items) !== 13 || Number(awardsBattle.store_rows) !== 10 ||
+      !Array.isArray(awardsBattle.stores) || awardsBattle.stores.length !== 9 ||
+      !awardsBattle.overall || !Array.isArray(awardsBattle.overall.items) || awardsBattle.overall.items.length !== 13) {
+    throw new Error('awards component 必須為 13 機款／九店／10 列');
+  }
+  const expectedNames = {
+    store:'01-08-03-(密)直營_手機競賽日報_店點達成率、排名及獎金.xlsx',
+    person:'01-08-04-(密)直營_手機競賽日報_個人達成率、排名及獎金.xlsx'
+  };
+  let runId = '';
+  Object.keys(expectedNames).forEach(function(kind) {
+    const source = (awardsBattle.source_files || {})[kind];
+    if (!source || source.provider !== 'onedrive-cloud' ||
+        String(source.basename || source.canonical_basename || '') !== expectedNames[kind] ||
+        !String(source.driveItemId || '') || !String(source.eTag || '') ||
+        isNaN(Date.parse(String(source.lastModifiedDateTime || ''))) ||
+        !isFinite(Number(source.size)) || Number(source.size) <= 0 ||
+        !/^[a-f0-9]{64}$/i.test(String(source.sha256 || '')) ||
+        String(source.source_data_date || '') !== cutoff || !String(source.run_id || '')) {
+      throw new Error('awards ' + kind + ' OneDrive cloud source identity 不完整');
+    }
+    if (runId && runId !== String(source.run_id)) throw new Error('awards source pair run_id 不一致');
+    runId = String(source.run_id);
+  });
+  return { cutoff:cutoff, runId:runId };
+}
+
+// Awards component-only publish: replace awardsBattle after cloud identity,
+// pair cutoff and shape validation. KPI payload and its component metadata are
+// preserved byte-for-byte; top-level publishedAt is only the container write time.
+function privateDashboardPublishAwardsComponent(payload) {
+  privateDashboardAdminAuthorized(payload);
+  const encoded = String(payload.awardsBattleBase64 || '');
+  if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('awards component 缺少或過大');
+  const decoded = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
+  const incomingAwards = JSON.parse(decoded);
+  const folder = privateDashboardFolder();
+  const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
+  if (!files.hasNext()) throw new Error('既有私有戰情快照不存在');
+  const file = files.next();
+  const current = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if (!current || !current.kpiBattle || !current.awardsBattle) throw new Error('既有私有戰情快照格式不完整');
+  const identity = privateDashboardValidateAwardsComponent_(incomingAwards, current.kpiBattle);
+  const kpiTextBefore = JSON.stringify(current.kpiBattle);
+  const kpiComponentBefore = JSON.stringify((current.components || {}).kpi || null);
+  const publishedAt = privateDashboardNow();
+  current.awardsBattle = incomingAwards;
+  current.publishedAt = publishedAt;
+  current.components = current.components && typeof current.components === 'object' ? current.components : {};
+  current.components.awards = {
+    status:'fresh', data_as_of_date:identity.cutoff, run_id:identity.runId,
+    provider:'onedrive-cloud', published_at:publishedAt, reason:''
+  };
+  try {
+    file.setContent(JSON.stringify(current));
+    const stored = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+    if (JSON.stringify(stored.kpiBattle) !== kpiTextBefore ||
+        JSON.stringify((stored.components || {}).kpi || null) !== kpiComponentBefore) {
+      throw new Error('KPI component 在 awards component 發布時遭修改');
+    }
+  } catch (error) {
+    file.setContent(currentText);
+    throw error;
+  }
+  reportVersionRecord_('awards', {
+    dataDate:identity.cutoff, source:'onedrive-cloud',
+    fileHash:reportVersionHash_(JSON.stringify(incomingAwards)), fileName:'awardsBattle',
+    operator:'external-component-publish'
+  }, 'success', { rule:'component-record-only' });
+  return {
+    publishedAt:publishedAt, reportDate:identity.cutoff, runId:identity.runId,
+    kpiPayloadHash:reportVersionHash_(kpiTextBefore),
+    awardsPayloadHash:reportVersionHash_(JSON.stringify(incomingAwards)),
+    fileId:file.getId(),
+    lastUpdated:Utilities.formatDate(file.getLastUpdated(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX")
   };
 }
 
