@@ -1,0 +1,542 @@
+--- a/report-automation/work/update_phone_awards.py
++++ b/report-automation/work/update_phone_awards.py
+@@ -8,15 +8,23 @@
+ import shutil
+ import zipfile
+ from copy import deepcopy
++from datetime import datetime, timedelta, timezone
+ from pathlib import Path
+ from xml.etree import ElementTree as ET
+-from PIL import Image, ImageDraw, ImageFont
+
+ BASE = Path("/Users/liamlu/Downloads")
+ PROJECT_ROOT = Path("/Users/liamlu/Downloads/liam-agent")
+ OUT_DIR = Path("/Users/liamlu/Downloads/liam-agent/report-automation/outputs")
+ CONFIG_DIR = PROJECT_ROOT / "report-automation/config"
+ PHONE_INPUT_DIR = PROJECT_ROOT / "report-automation/input/google-drive/phone-awards"
++PHONE_AWARDS_ORIGIN_DIR = Path(os.environ.get(
++    "PHONE_AWARDS_ORIGIN_DIR",
++    "/Users/liamlu/Library/CloudStorage/OneDrive-個人/TWM每日戰報",
++)).expanduser()
++PHONE_AWARDS_LOG_DIR = Path(os.environ.get(
++    "PHONE_AWARDS_LOG_DIR",
++    str(PROJECT_ROOT / "report-automation/logs"),
++)).expanduser()
+ Y26_FALLBACK_SRC = BASE / "Y2606+%E9%87%8D%E9%BB%9E"
+ STORE_FALLBACK_SRC = BASE / "01-08-03-%28%E5%AF%86%29%E7%9B%B4%E7%87%9F_%E6%89%8B%E6%A9%9F%E7%AB%B6%E8%B3%BD%E6%97%A5%E5%A0%B1_%E5%BA%97%E9%BB%9E%E9%81%94%E6%88%90%E7%8E%87%E3%80%81%E6%8E%92%E5%90%8D%E5%8F%8A%E7%8D%8E%E9%87%91"
+ PERSON_FALLBACK_SRC = BASE / "01-08-04-%28%E5%AF%86%29%E7%9B%B4%E7%87%9F_%E6%89%8B%E6%A9%9F%E7%AB%B6%E8%B3%BD%E6%97%A5%E5%A0%B1_%E5%80%8B%E4%BA%BA%E9%81%94%E6%88%90%E7%8E%87%E3%80%81%E6%8E%92%E5%90%8D%E5%8F%8A%E7%8D%8E%E9%87%91"
+@@ -25,6 +33,7 @@
+ PERSON_SRC = PERSON_FALLBACK_SRC
+ EXACT_STORE_SOURCE = os.environ.get("PHONE_AWARDS_STORE_SOURCE", "").strip()
+ EXACT_PERSON_SOURCE = os.environ.get("PHONE_AWARDS_PERSON_SOURCE", "").strip()
++REPORT_RUN_DATE = os.environ.get("REPORT_DATE_ISO", "").strip()
+ VISIBLE_STORE_ITEMS = [
+     "Pixel10/10 Pro/10 Pro XL/10a",
+     "razrfold",
+@@ -706,26 +715,157 @@
+     return max(existing, key=lambda path: path.stat().st_mtime)
+
+
+-def resolve_source(prefix, fallback):
+-    drive_matches = []
+-    if PHONE_INPUT_DIR.exists():
+-        drive_matches.extend(PHONE_INPUT_DIR.glob(f"{prefix}*.xlsx"))
+-        drive_matches.extend(path for path in PHONE_INPUT_DIR.glob(f"{prefix}*") if path.is_dir())
+-    return newest_existing(drive_matches) or fallback
++AWARD_SOURCE_BASENAMES = {
++    "store": "01-08-03-(密)直營_手機競賽日報_店點達成率、排名及獎金.xlsx",
++    "person": "01-08-04-(密)直營_手機競賽日報_個人達成率、排名及獎金.xlsx",
++}
++TAIPEI = timezone(timedelta(hours=8))
+
+
+-def resolve_exact_or_formal_source(env_path, prefix, fallback):
+-    """Prefer the consumer-materialized exact File ID; keep legacy resolver unchanged otherwise."""
+-    if env_path:
+-        exact = Path(env_path)
+-        if not exact.exists():
++def required_report_run_date():
++    """Daily award artifacts have no safe date fallback: the runner must name its run."""
++    try:
++        return datetime.strptime(REPORT_RUN_DATE, "%Y-%m-%d").date()
++    except ValueError as exc:
++        raise RuntimeError("REPORT_DATE_ISO is required for 台獎來源 freshness gate") from exc
++
++
++def canonical_award_source_basename(path, kind):
++    """Normalize only Finder's duplicate counter, never infer a date from a filename."""
++    raw = Path(path).name
++    expected = AWARD_SOURCE_BASENAMES[kind]
++    stem, suffix = expected[:-5], expected[-5:]
++    duplicate = re.fullmatch(re.escape(stem) + r"\s+\d+" + re.escape(suffix), raw)
++    canonical = expected if duplicate else raw
++    if canonical != expected:
++        raise ValueError(
++            f"{kind} source canonical basename mismatch: expected {expected}, got {raw}"
++        )
++    return canonical
++
++
++def path_is_inside(path, directory):
++    try:
++        Path(path).resolve().relative_to(Path(directory).resolve())
++        return True
++    except ValueError:
++        return False
++
++
++def resolve_exact_or_fresh_source(env_path, prefix, kind):
++    """Accept an exact materialized source or today's original OneDrive source; never staging."""
++    if env_path:
++        exact = Path(env_path).expanduser().resolve()
++        if not exact.is_file():
+             raise FileNotFoundError(f"exact source not found: {exact}")
+-        if not exact.name.startswith(prefix):
+-            raise ValueError(f"exact source filename must start with {prefix}: {exact.name}")
+-        return exact
+-    return resolve_source(prefix, fallback)
++        if path_is_inside(exact, PHONE_INPUT_DIR):
++            raise ValueError(f"{kind} source points at canonical staging, not an immutable input: {exact}")
++        canonical_award_source_basename(exact, kind)
++        return exact, "exact-materialized"
++
++    if not PHONE_AWARDS_ORIGIN_DIR.is_dir():
++        raise FileNotFoundError(f"台獎原始來源目錄不存在：{PHONE_AWARDS_ORIGIN_DIR}")
++    candidates = [
++        path for path in PHONE_AWARDS_ORIGIN_DIR.glob(f"{prefix}*.xlsx")
++        if path.is_file()
++    ]
++    source = newest_existing(candidates)
++    if source is None:
++        raise FileNotFoundError(f"今日台獎來源尚未更新：缺少 {AWARD_SOURCE_BASENAMES[kind]}")
++    canonical_award_source_basename(source, kind)
++    return source.resolve(), "onedrive-original"
++
++
++def previous_award_source_hashes(report_run_date):
++    """Find the latest prior run with both source hashes; do not use an output artifact as evidence."""
++    if not PHONE_AWARDS_LOG_DIR.is_dir():
++        return None
++    candidates = []
++    for manifest_path in PHONE_AWARDS_LOG_DIR.glob("run-manifest-*.json"):
++        match = re.fullmatch(r"run-manifest-(\d{8})\.json", manifest_path.name)
++        if not match:
++            continue
++        try:
++            day = datetime.strptime(match.group(1), "%Y%m%d").date()
++            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
++        except (ValueError, json.JSONDecodeError):
++            continue
++        hashes = payload.get("sourceHashes") or {}
++        if day < report_run_date and hashes.get("store") and hashes.get("person"):
++            candidates.append((day, payload, hashes))
++    if not candidates:
++        return None
++    day, payload, hashes = max(candidates, key=lambda item: item[0])
++    return {
++        "report_run_date": day.isoformat(),
++        "run_id": str(payload.get("runId") or ""),
++        "store": str(hashes["store"]),
++        "person": str(hashes["person"]),
++    }
+
+
++def unchanged_source_exception():
++    """A reused SHA needs a human-verifiable, hash-bound exception; a filename never qualifies."""
++    reason = os.environ.get("REPORT_AWARDS_ALLOW_UNCHANGED_REASON", "").strip()
++    evidence_path = os.environ.get("REPORT_AWARDS_ALLOW_UNCHANGED_EVIDENCE_PATH", "").strip()
++    evidence_hash = os.environ.get("REPORT_AWARDS_ALLOW_UNCHANGED_EVIDENCE_SHA256", "").strip().lower()
++    if not any((reason, evidence_path, evidence_hash)):
++        return None
++    if not reason or not evidence_path or not re.fullmatch(r"[a-f0-9]{64}", evidence_hash):
++        raise RuntimeError("台獎來源 SHA 未變更時，必須提供 reason、evidence path 與 SHA-256")
++    evidence = Path(evidence_path).expanduser()
++    if not evidence.is_file() or file_sha256(evidence) != evidence_hash:
++        raise RuntimeError("台獎來源 SHA 未變更例外的 evidence SHA-256 無法驗證")
++    return {"reason": reason, "evidence_path": str(evidence.resolve()), "evidence_sha256": evidence_hash}
++
++
++def validate_fresh_award_sources(store_source, person_source, store_origin, person_origin):
++    report_run_date = required_report_run_date()
++    source_hashes = {"store": file_sha256(store_source), "person": file_sha256(person_source)}
++    run_id = os.environ.get("REPORT_RUN_ID", "").strip() or (
++        f"awards-{report_run_date.strftime('%Y%m%d')}-{source_hashes['store'][:12]}-{source_hashes['person'][:12]}"
++    )
++    identities = {}
++    for kind, source, origin in (
++        ("store", store_source, store_origin),
++        ("person", person_source, person_origin),
++    ):
++        stat = source.stat()
++        mtime = datetime.fromtimestamp(stat.st_mtime, TAIPEI)
++        if mtime.date() != report_run_date:
++            raise RuntimeError(
++                f"今日台獎來源尚未更新：{kind} 原始 mtime {mtime.date().isoformat()} 不等於 run date {report_run_date.isoformat()}"
++            )
++        identities[kind] = {
++            "basename": source.name,
++            "canonical_basename": canonical_award_source_basename(source, kind),
++            "absolute_path": str(source.resolve()),
++            "mtime": mtime.isoformat(timespec="seconds"),
++            "size": stat.st_size,
++            "sha256": source_hashes[kind],
++            "run_id": run_id,
++            "origin": origin,
++        }
++
++    previous = previous_award_source_hashes(report_run_date)
++    exception = None
++    if previous and previous["store"] == source_hashes["store"] and previous["person"] == source_hashes["person"]:
++        exception = unchanged_source_exception()
++        if not exception:
++            raise RuntimeError(
++                "今日台獎來源尚未更新：store/person SHA-256 與前次正式 run 完全相同；"
++                "不得以 staging mtime、檔名或舊 outputs 發布"
++            )
++    return {
++        "run_id": run_id,
++        "report_run_date": report_run_date.isoformat(),
++        "status": "fresh" if not exception else "unchanged-source-verified-exception",
++        "previous": previous,
++        "unchanged_exception": exception,
++        "source_identity": identities,
++    }
++
++
+ def resolve_y26_source():
+     drive_matches = []
+     if PHONE_INPUT_DIR.exists():
+@@ -1415,11 +1555,26 @@
+
+
+ def main():
+-    global STORE_SRC, PERSON_SRC, Y26_SRC, MANAGER_AWARD_RULES, SUPERVISOR_AWARD_RULES
+-    OUT_DIR.mkdir(parents=True, exist_ok=True)
++    global STORE_SRC, PERSON_SRC, Y26_SRC, MANAGER_AWARD_RULES, SUPERVISOR_AWARD_RULES, Image, ImageDraw, ImageFont
+     apply_award_config(load_active_award_config())
+-    store_source = resolve_exact_or_formal_source(EXACT_STORE_SOURCE, "01-08-03", STORE_FALLBACK_SRC)
+-    person_source = resolve_exact_or_formal_source(EXACT_PERSON_SOURCE, "01-08-04", PERSON_FALLBACK_SRC)
++    store_source, store_origin = resolve_exact_or_fresh_source(EXACT_STORE_SOURCE, "01-08-03", "store")
++    person_source, person_origin = resolve_exact_or_fresh_source(EXACT_PERSON_SOURCE, "01-08-04", "person")
++    freshness = validate_fresh_award_sources(store_source, person_source, store_origin, person_origin)
++    if os.environ.get("PHONE_AWARDS_VERIFY_SOURCE_ONLY") == "1":
++        print(json.dumps({
++            "status": freshness["status"],
++            "run_id": freshness["run_id"],
++            "report_run_date": freshness["report_run_date"],
++            "source_identity": freshness["source_identity"],
++        }, ensure_ascii=False))
++        return
++
++    # Keep the fail-closed source-only preflight usable in minimal runners.  PNG
++    # rendering remains mandatory for a real build, but must not be imported
++    # before we reject stale/missing inputs.
++    from PIL import Image, ImageDraw, ImageFont
++
++    OUT_DIR.mkdir(parents=True, exist_ok=True)
+     y26_source = resolve_y26_source()
+     STORE_SRC = unpack_or_copy_workbook(store_source, OUT_DIR / "01-08-03_phone_awards_source_package")
+     PERSON_SRC = unpack_or_copy_workbook(person_source, OUT_DIR / "01-08-04_phone_awards_source_package")
+@@ -1488,7 +1643,8 @@
+     write_progress_markdown(progress, progress_md, {k: v for k, v in progress_attachments.items() if v})
+
+     summary = {
+-        "run_id": os.environ.get("REPORT_RUN_ID"),
++        "run_id": freshness["run_id"],
++        "report_run_date": freshness["report_run_date"],
+         "config_version": ACTIVE_AWARD_CONFIG.get("configVersion") if ACTIVE_AWARD_CONFIG else "legacy-hardcoded",
+         "config_path": ACTIVE_AWARD_CONFIG.get("_path") if ACTIVE_AWARD_CONFIG else None,
+         "config_hash": ACTIVE_AWARD_CONFIG.get("_hash") if ACTIVE_AWARD_CONFIG else None,
+@@ -1507,11 +1663,17 @@
+             "y26": str(y26_source),
+         },
+         "source_hashes": {
+-            "store": file_sha256(store_source),
+-            "person": file_sha256(person_source),
++            "store": freshness["source_identity"]["store"]["sha256"],
++            "person": freshness["source_identity"]["person"]["sha256"],
+             "y26": file_sha256(y26_source) if y26_source.exists() else None,
+         },
+-        "source_mode": "01-08-03/01-08-04 -> Y26 tabs -> screenshots" if y26_xlsx else "01-08-03/01-08-04 fallback screenshots",
++        "source_identity": freshness["source_identity"],
++        "source_freshness": {
++            "status": freshness["status"],
++            "previous": freshness["previous"],
++            "unchanged_exception": freshness["unchanged_exception"],
++        },
++        "source_mode": "fresh 01-08-03/01-08-04 -> Y26 tabs -> screenshots" if y26_xlsx else "fresh 01-08-03/01-08-04 screenshots",
+         "store_rows": len(store_data),
+         "phone_items": len(store_groups),
+         "person_award_y_rows": sum(1 for p in people if p["award"] == "Y"),
+--- a/report-automation/work/prepare_send_payloads.mjs
++++ b/report-automation/work/prepare_send_payloads.mjs
+@@ -52,6 +52,69 @@
+   const configPath = path.join(configDir, active.activeConfig);
+   const config = JSON.parse(await fs.readFile(configPath, "utf8"));
+   return { ...config, _path: configPath, _hash: await sha256(configPath) };
++}
++
++const REQUIRED_AWARD_SOURCE_BASENAMES = Object.freeze({
++  store: "01-08-03-(密)直營_手機競賽日報_店點達成率、排名及獎金.xlsx",
++  person: "01-08-04-(密)直營_手機競賽日報_個人達成率、排名及獎金.xlsx",
++});
++
++function taipeiDateFromIso(value) {
++  const parsed = new Date(String(value || ""));
++  if (Number.isNaN(parsed.valueOf())) return "";
++  return new Intl.DateTimeFormat("sv-SE", {
++    timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit",
++  }).format(parsed);
++}
++
++export function validateAwardSourceFreshness(summary, expectedRunDate) {
++  const identity = summary?.source_identity;
++  if (!identity || typeof identity !== "object" || Array.isArray(identity)) {
++    throw new Error("今日台獎來源尚未更新：source_identity is missing");
++  }
++  const runId = String(summary?.run_id || "").trim();
++  if (!runId || String(summary?.report_run_date || "") !== expectedRunDate) {
++    throw new Error("今日台獎來源尚未更新：run_id/report_run_date is missing or mismatched");
++  }
++  const freshness = summary?.source_freshness || {};
++  if (!["fresh", "unchanged-source-verified-exception"].includes(freshness.status)) {
++    throw new Error("今日台獎來源尚未更新：freshness status is not verified");
++  }
++  const result = {};
++  for (const [kind, expectedBasename] of Object.entries(REQUIRED_AWARD_SOURCE_BASENAMES)) {
++    const entry = identity[kind];
++    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
++      throw new Error(`今日台獎來源尚未更新：${kind} source identity is missing`);
++    }
++    if (String(entry.canonical_basename || "") !== expectedBasename || !String(entry.basename || "").trim()) {
++      throw new Error(`今日台獎來源尚未更新：${kind} canonical basename is invalid`);
++    }
++    if (!/^[a-f0-9]{64}$/i.test(String(entry.sha256 || ""))) {
++      throw new Error(`今日台獎來源尚未更新：${kind} SHA-256 is missing`);
++    }
++    if (taipeiDateFromIso(entry.mtime) !== expectedRunDate) {
++      throw new Error(`今日台獎來源尚未更新：${kind} original mtime is not ${expectedRunDate}`);
++    }
++    if (String(entry.run_id || "") !== runId) {
++      throw new Error(`今日台獎來源尚未更新：${kind} run_id mismatch`);
++    }
++    if (!String(entry.absolute_path || "").trim() || /report-automation\/input\/google-drive\/phone-awards\//.test(String(entry.absolute_path))) {
++      throw new Error(`今日台獎來源尚未更新：${kind} points at mutable canonical staging`);
++    }
++    result[kind] = {
++      basename: String(entry.canonical_basename),
++      sha256: String(entry.sha256).toLowerCase(),
++      mtime: String(entry.mtime),
++      run_id: runId,
++    };
++  }
++  if (freshness.status === "unchanged-source-verified-exception") {
++    const exception = freshness.unchanged_exception;
++    if (!exception?.reason || !/^[a-f0-9]{64}$/i.test(String(exception.evidence_sha256 || ""))) {
++      throw new Error("今日台獎來源尚未更新：unchanged source exception is not verifiable");
++    }
++  }
++  return result;
+ }
+
+ function percent(value) {
+@@ -309,9 +372,11 @@
+ const dataCutoffDate = dataCutoffDateFromSourceRange(report.source_date_range, reportDateIso);
+ const phoneSummary = JSON.parse(await fs.readFile(path.join(outputDir, "phone_awards_update_summary.json"), "utf8"));
+ const activeAwardConfig = await loadActiveAwardConfig();
++const awardSourceIdentity = validateAwardSourceFreshness(phoneSummary, reportDateIso);
+ await fs.mkdir(logsDir, { recursive: true });
+ recordCheck("today_report_data date", report.report_date_iso === reportDateIso, report.report_date_iso);
+ recordCheck("data cutoff date", Boolean(dataCutoffDate), dataCutoffDate);
++recordCheck("award source freshness", Object.keys(awardSourceIdentity).length === 2, phoneSummary.source_freshness?.status || "missing");
+ recordCheck("active award config month", activeAwardConfig.effectiveMonth === reportDateIso.slice(0, 7), activeAwardConfig.effectiveMonth);
+ recordCheck("phone item count", phoneSummary.phone_items === activeAwardConfig.expectedPhoneItems, `${phoneSummary.phone_items}/${activeAwardConfig.expectedPhoneItems}`);
+ recordCheck("store row count", phoneSummary.store_rows === activeAwardConfig.expectedStoreRows, `${phoneSummary.store_rows}/${activeAwardConfig.expectedStoreRows}`);
+@@ -438,6 +503,7 @@
+     phoneSummary.source_files?.y26,
+   ].filter(Boolean),
+   sourceHashes: phoneSummary.source_hashes ?? {},
++  awardSourceIdentity,
+   configVersion: activeAwardConfig.configVersion,
+   configHash: activeAwardConfig._hash,
+   gitCommit: "not-a-git-repository",
+--- a/report-automation/work/build_github_pages_data.py
++++ b/report-automation/work/build_github_pages_data.py
+@@ -40,6 +40,10 @@
+ }
+
+ SOURCE_RE = re.compile(r"^(\d{4})\.xlsx$")
++REQUIRED_AWARD_SOURCE_BASENAMES = {
++    "store": "01-08-03-(密)直營_手機競賽日報_店點達成率、排名及獎金.xlsx",
++    "person": "01-08-04-(密)直營_手機競賽日報_個人達成率、排名及獎金.xlsx",
++}
+
+ AWARD_STEPS = [
+     {"threshold": 0.50, "manager_tier": 0, "supervisor_tier": None, "label": "解鎖店長50%"},
+@@ -190,13 +194,48 @@
+     }
+
+
++def validated_award_source_files(summary: dict[str, Any], report_run_date: str) -> dict[str, dict[str, str]]:
++    """Carry immutable per-report award evidence; a KPI filename is never an award source."""
++    identity = summary.get("source_identity")
++    if not isinstance(identity, dict):
++        raise RuntimeError("台獎 source_identity 缺少，禁止建立 snapshot")
++    run_id = str(summary.get("run_id") or "")
++    if not run_id or str(summary.get("report_run_date") or "") != report_run_date:
++        raise RuntimeError("台獎 run_id/report_run_date 不完整，禁止建立 snapshot")
++    freshness = summary.get("source_freshness") or {}
++    if freshness.get("status") not in {"fresh", "unchanged-source-verified-exception"}:
++        raise RuntimeError("台獎來源 freshness 未驗證，禁止建立 snapshot")
++
++    source_files: dict[str, dict[str, str]] = {}
++    for kind, expected_basename in REQUIRED_AWARD_SOURCE_BASENAMES.items():
++        entry = identity.get(kind)
++        if not isinstance(entry, dict):
++            raise RuntimeError(f"台獎 {kind} source identity 缺少")
++        basename = str(entry.get("canonical_basename") or "")
++        sha256 = str(entry.get("sha256") or "").lower()
++        mtime = str(entry.get("mtime") or "")
++        if basename != expected_basename:
++            raise RuntimeError(f"台獎 {kind} canonical basename 不符：{basename}")
++        if not re.fullmatch(r"[a-f0-9]{64}", sha256):
++            raise RuntimeError(f"台獎 {kind} SHA-256 缺少")
++        if not mtime or str(entry.get("run_id") or "") != run_id:
++            raise RuntimeError(f"台獎 {kind} mtime/run_id 缺少")
++        source_files[kind] = {
++            "basename": basename,
++            "sha256": sha256,
++            "mtime": mtime,
++            "run_id": run_id,
++        }
++    return source_files
++
++
+ def extract_phone_awards(
+     summary_path: Path,
+     report_run_date: str,
+     data_cutoff_date: str,
+-    source_file: str,
+ ) -> dict[str, Any]:
+     summary = json.loads(summary_path.read_text(encoding="utf-8"))
++    source_files = validated_award_source_files(summary, report_run_date)
+     progress = summary.get("store_progress", [])
+     overall = next((row for row in progress if row.get("store") == "北一二B整體"), None)
+     if overall is None and progress:
+@@ -211,10 +250,10 @@
+         "version": 1,
+         "report_date": data_cutoff_date,
+         "report_run_date": report_run_date,
+-        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+-        "source_file": source_file,
++        "data_as_of_date": data_cutoff_date,
++        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+         "source_mode": summary.get("source_mode"),
+-        "source_files": summary.get("source_files", {}),
++        "source_files": source_files,
+         "phone_items": summary.get("phone_items"),
+         "store_rows": summary.get("store_rows"),
+         "person_award_y_rows": summary.get("person_award_y_rows"),
+@@ -326,10 +365,10 @@
+     summary_path: Path,
+     report_run_date: str,
+     data_cutoff_date: str,
+-    source_file: str,
+ ) -> dict[str, Any]:
+     """Private action view: actual/projected awards and fixed monthly phone priorities."""
+     summary = json.loads(summary_path.read_text(encoding="utf-8"))
++    source_files = validated_award_source_files(summary, report_run_date)
+     rules = summary.get("award_rules", {})
+     awards_by_store = {
+         normalize_store(str(row.get("store", ""))): row
+@@ -366,10 +405,10 @@
+         "visibility": "private-local-preview",
+         "report_date": data_cutoff_date,
+         "report_run_date": report_run_date,
+-        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+-        "source_file": source_file,
++        "data_as_of_date": data_cutoff_date,
++        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+         "source_mode": summary.get("source_mode"),
+-        "source_files": summary.get("source_files", {}),
++        "source_files": source_files,
+         "phone_items": summary.get("phone_items"),
+         "store_rows": summary.get("store_rows"),
+         "supervisor": (overall or {}).get("award", {}),
+@@ -678,7 +717,6 @@
+             summary_path,
+             report_run_date_iso,
+             data_cutoff_date_iso,
+-            source_file,
+         )
+         (args.site_data_dir / "phone-awards-latest.json").write_text(
+             json.dumps(phone, ensure_ascii=False, indent=2), encoding="utf-8"
+@@ -691,7 +729,6 @@
+             summary_path,
+             report_run_date_iso,
+             data_cutoff_date_iso,
+-            source_file,
+         )
+         (args.private_kpi_output.parent / "phone-awards-battle-latest.json").write_text(
+             json.dumps(phone_battle, ensure_ascii=False, indent=2), encoding="utf-8"
+--- a/report-automation/work/publish_formal_website_data.mjs
++++ b/report-automation/work/publish_formal_website_data.mjs
+@@ -65,12 +65,27 @@
+   }
+   const canonical = {};
+   for (const [key, expectedBasename] of Object.entries(REQUIRED_AWARDS_SOURCE_BASENAMES)) {
+-    const source = basename(value[key]);
+-    if (!source) fail(`${label} ${key} source file is missing`);
++    const entry = value[key];
++    if (!entry || Array.isArray(entry) || typeof entry !== 'object') {
++      fail(`${label} ${key} source identity is missing`);
++    }
++    const source = String(entry.basename || '');
++    const sha256 = String(entry.sha256 || '').toLowerCase();
++    const mtime = String(entry.mtime || '');
++    const runId = String(entry.run_id || '');
+     if (source !== expectedBasename) {
+-      fail(`${label} ${key} source file mismatch: expected ${expectedBasename}, got ${source}`);
++      fail(`${label} ${key} source basename mismatch: expected ${expectedBasename}, got ${source}`);
+     }
+-    canonical[key] = source;
++    if (!/^[a-f0-9]{64}$/.test(sha256)) {
++      fail(`${label} ${key} source SHA-256 is missing`);
++    }
++    if (!mtime || Number.isNaN(Date.parse(mtime))) {
++      fail(`${label} ${key} source mtime is missing`);
++    }
++    if (!runId) {
++      fail(`${label} ${key} source run_id is missing`);
++    }
++    canonical[key] = { basename: source, sha256, mtime, run_id: runId };
+   }
+   return canonical;
+ }
+@@ -79,7 +94,9 @@
+   const actualCanonical = canonicalAwardsSourceFiles(actual, `${label} actual`);
+   const expectedCanonical = canonicalAwardsSourceFiles(expected, `${label} expected`);
+   for (const key of Object.keys(REQUIRED_AWARDS_SOURCE_BASENAMES)) {
+-    assertEqual(actualCanonical[key], expectedCanonical[key], `${label} ${key} source file`);
++    for (const field of ['basename', 'sha256', 'mtime', 'run_id']) {
++      assertEqual(actualCanonical[key][field], expectedCanonical[key][field], `${label} ${key} source ${field}`);
++    }
+   }
+   return actualCanonical;
+ }
+@@ -262,6 +279,7 @@
+ export function validateAwardReadback(remoteAwards, expectedAwards) {
+   if (!remoteAwards || !expectedAwards) fail('awards readback is incomplete');
+   assertEqual(String(remoteAwards.report_date || ''), String(expectedAwards.report_date || ''), 'awards report date');
++  assertEqual(String(remoteAwards.data_as_of_date || ''), String(expectedAwards.data_as_of_date || ''), 'awards data-as-of date');
+   const sourceFiles = assertAwardsSourceFilesEqual(
+     remoteAwards.source_files,
+     expectedAwards.source_files,
+@@ -320,6 +338,7 @@
+
+   assertEqual(kpiReportDate, expected.reportDate, 'dashboard KPI report date');
+   assertEqual(awardsReportDate, expected.reportDate, 'dashboard awards report date');
++  assertEqual(String(snapshot.awardsBattle.data_as_of_date || ''), expected.dataAsOfDate, 'dashboard awards data-as-of date');
+   assertEqual(kpicalcAsOf, expected.dataAsOfDate, 'kpicalc data date');
+   assertEqual(snapshotAsOf, expected.dataAsOfDate, 'dashboard data-as-of date');
+   assertEqual(kpiSource, expected.sourceFile, 'kpicalc source file');
