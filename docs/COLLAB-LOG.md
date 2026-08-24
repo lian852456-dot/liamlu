@@ -13,6 +13,13 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-24 ｜ Codex（KPI／台獎 freshness P0，台獎正式發布 blocked）
+
+- 做了什麼：建立獨立 `hotfix/kpi-awards-freshness-p0-20260824`，修正 KPI 版本日期只接受已解析 period end 與 snapshotDay 相同的有效日期；8/23 manual cutoff 8/22 不再誤擋 8/24 `0824.xlsx` cutoff 8/23。runtime 另加入 01-08-03／01-08-04 原始來源 identity gate（canonical basename、mtime、size、SHA-256、run_id），並使 private snapshot／正式 readback 比對兩份獨立台獎 source identity。
+- 結果（部分完成）：KPI contract 73/73、網站發布 gate／台獎 contract 25/25、Python 日期／來源／freshness 10/10 通過；8/24 真實台獎原始檔仍為 8/23 mtime 與相同 SHA-256，source-only preflight 已正確 fail-closed 為「今日台獎來源尚未更新」。沒有建立今日台獎 Mail、Website／App snapshot，沒有呼叫巡店。
+- 經驗 / 給下一位的提醒：canonical staging copy 的今日 mtime 不可當成原始新鮮度。需等待兩份真正更新的 01-08-03／01-08-04 原始檔，再以本 run 的雙 source identity 重建、發布並完成 Website 與 Supervisor App readback；在此之前不可宣稱 P0 結案。
+
+
 ## 2026-08-24 ｜ Codex（Liam Supervisor 穩定 iPhone PWA 入口）
 
 - 做了什麼：從乾淨 `origin/main` `fc83f94` 建立隔離分支 `feature/liam-supervisor-pwa-iphone-stable-20260824`，提交 `96184ec`。PWA 固定以既有 `app.html` 為 Safari／加入主畫面入口；manifest 明確採 standalone 且不偏好原生 App，Service Worker 對同源 shell 採 online network-first、offline fallback，避免 iPhone 保留舊版版本化 asset。

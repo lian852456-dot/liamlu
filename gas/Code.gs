@@ -3785,12 +3785,37 @@ function reportUploadLiveInfo_(kind) {
   }
 }
 
-// KPI meta 沒有單一日期欄位，用「月份-累計到第幾天」組出可比較的 yyyy-MM-dd。
+// KPI 的版本日期只能來自已解析的資料期間末日與 snapshotDay；不可使用
+// 檔名、寄件日或執行日。兩個來源同時存在卻不一致時 fail-closed，避免
+// 前一天的 manual-upload 被誤當成同日期版本。
 function reportUploadKpiDate_(meta) {
-  const month = String((meta || {}).month || '');
-  const day = Number((meta || {}).snapshotDay || 0);
-  if (!/^\d{4}-\d{2}$/.test(month) || !day) return '';
-  return month + '-' + ('0' + day).slice(-2);
+  const input = meta || {};
+  const month = String(input.month || '');
+  const day = Number(input.snapshotDay || 0);
+  const period = String(input.period || '');
+  const dateText = function(year, monthNum, dayNum) {
+    const y = Number(year), m = Number(monthNum), d = Number(dayNum);
+    const date = new Date(Date.UTC(y, m - 1, d));
+    if (!y || !m || !d || date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return '';
+    return y + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2);
+  };
+
+  let snapshotDate = '';
+  const monthMatch = month.match(/^(\d{4})-(\d{2})$/);
+  if (monthMatch && day) snapshotDate = dateText(monthMatch[1], monthMatch[2], day);
+
+  let periodDate = '';
+  const periodMatch = period.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})\s*[~～]\s*(?:(\d{4})\/)?(\d{1,2})\/(\d{1,2})$/);
+  if (periodMatch) {
+    const startDate = dateText(periodMatch[1], periodMatch[2], periodMatch[3]);
+    const endYear = periodMatch[4] || periodMatch[1];
+    const endDate = dateText(endYear, periodMatch[5], periodMatch[6]);
+    if (!startDate || !endDate || endDate < startDate) return '';
+    periodDate = endDate;
+  }
+
+  if (periodDate && snapshotDate && periodDate !== snapshotDate) return '';
+  return periodDate || snapshotDate;
 }
 
 // ── 檔案驗證 ──────────────────────────────────────────────

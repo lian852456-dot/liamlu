@@ -369,9 +369,18 @@ test('未知報表類型直接拒絕', () => {
   assert.equal(V.reportUploadKind_('award'), 'award');
 });
 
-test('KPI 資料日期由 month + snapshotDay 組出可比較字串', () => {
+test('KPI 資料日期由解析後期間末日與 snapshotDay 組出可比較字串', () => {
   assert.equal(V.reportUploadKpiDate_({ month: '2026-07', snapshotDay: 9 }), '2026-07-09');
   assert.equal(V.reportUploadKpiDate_({ month: '2026-07', snapshotDay: 31 }), '2026-07-31');
+  assert.equal(V.reportUploadKpiDate_({
+    sourceFile: '0824.xlsx', month: '2026-08', snapshotDay: 23, period: '2026/08/01 ~ 08/23'
+  }), '2026-08-23');
+  assert.equal(V.reportUploadKpiDate_({
+    sourceFile: '0824.xlsx', month: '2026-08', snapshotDay: 24, period: '2026/08/01 ~ 08/23'
+  }), '');
+  assert.equal(V.reportUploadKpiDate_({
+    sourceFile: '0824.xlsx', month: '2026-08', snapshotDay: 23, period: '2026/08/23 ~ 08/22'
+  }), '');
   assert.equal(V.reportUploadKpiDate_({ month: '', snapshotDay: 5 }), '');
   assert.equal(V.reportUploadKpiDate_({ month: '2026-07', snapshotDay: 0 }), '');
 });
@@ -411,6 +420,22 @@ test('11:00 排程不得覆蓋 10:55 的同日期手動上傳', () => {
 test('隔天的新資料排程照樣可以更新', () => {
   D.setCurrent(MANUAL_1055);
   const r = D.reportVersionDecide_('kpi', { dataDate: '2026-08-01', source: 'scheduled', fileHash: 'bbb' });
+  assert.equal(r.accept, true);
+  assert.equal(r.rule, 'newer-date');
+});
+
+test('8/23 manual upload 不得誤擋 8/24 的 0824.xlsx cutoff 8/23', () => {
+  D.setCurrent({
+    dataDate: '2026-08-22', source: 'manual-upload',
+    uploadedAt: '2026-08-23T11:00:00+08:00', fileHash: 'manual-0823'
+  });
+  const incomingDate = V.reportUploadKpiDate_({
+    sourceFile: '0824.xlsx', month: '2026-08', snapshotDay: 23, period: '2026/08/01 ~ 08/23'
+  });
+  const r = D.reportVersionDecide_('kpi', {
+    dataDate: incomingDate, source: 'scheduled', fileHash: 'scheduled-0824'
+  });
+  assert.equal(incomingDate, '2026-08-23');
   assert.equal(r.accept, true);
   assert.equal(r.rule, 'newer-date');
 });
