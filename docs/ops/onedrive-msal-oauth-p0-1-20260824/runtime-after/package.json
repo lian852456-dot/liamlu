@@ -1,0 +1,14 @@
+{
+  "name": "liam-agent-report-automation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:chrome": "node work/test_chrome_for_testing.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.59.1"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^5.6.0"
+  }
+}
