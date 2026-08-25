@@ -1,73 +1,156 @@
-# Patrol Lite 分享版
+# 督導巡店 Lite｜完全本機版
+
+## 狀態
+
+- 開發分支：`feature/patrol-lite-local-import-20260825`
+- PR：Draft PR #95
+- 尚未合併、尚未部署、尚未分享正式連結
+- 不修改 Liam 正式版 `patrol.html`
+- 不修改 Patrol GAS、Google Sheet、通行碼、正式巡店資料或任何自動化
 
 ## 目的
 
-提供其他督導使用的簡易巡店工具，只保留：
+提供其他督導一個極簡巡店工具，只保留：
 
-1. 本機巡店報表匯入
+1. 本機選擇巡店報表
 2. 33 項巡店看板
-3. 每日巡店路線與移動里程
+3. 每日巡店順序與移動里程
+4. 本機備份與還原
 
-不包含貼上巡店資料、半月檢查、班表、稽核、照片媒體、KPI 或其他 Liam 個人管理模組。
+分享版刻意不包含班表、半月督導檢查、稽核、照片、登入、雲端同步或 Liam 個人功能。
 
-## 資料流
+## 完全本機資料流
 
-`本機 XLSX / XLS / CSV / TSV → 瀏覽器本機解析 → Server Preflight → 使用者確認 → Patrol GAS → 各督導自己的 Google Sheet → Readback → 看板更新`
+```text
+督導電腦內的 XLSX / CSV / TSV
+        ↓
+瀏覽器在本機解析與預覽
+        ↓
+確認後寫入瀏覽器 IndexedDB
+        ↓
+巡店看板與移動里程在本機計算
+        ↓
+可匯出 JSON 備份或里程 CSV
+```
 
-來源檔不需要先放進 Google Drive。Google Sheet 只保留作為中央正式資料庫，讓同一位督導的手機、Mac 與其他裝置讀到一致資料。
+沒有以下連線：
 
-## 分享邊界
+- Liam 的 Google Sheet
+- Liam 的 Patrol GAS
+- Google Drive
+- 其他督導的資料庫
+- 外部 API
+- 外部分析或追蹤服務
+- Excel CDN 或遠端 JavaScript 套件
 
-- `patrol-lite.html` 可共用同一份公開前端。
-- 每位督導必須使用自己的 Google Sheet 與 Patrol GAS deployment。
-- 每位督導自行設定 `SPREADSHEET_ID`、`PT_TITLE`、`PT_STORES`。
-- `PT_KEY` 只存在該督導自己的 Apps Script Script Properties，不可寫進 GitHub。
-- 短效巡店 session 沿用現有 `patrol-session-v2` / `patrol-isolated-v1` 驗證。
-- 前端只在 localStorage 保存 GAS URL，不保存通行碼；session token 只放 sessionStorage。
+HTML 內建 Content Security Policy：`connect-src 'none'`，並且不包含 `fetch`、XHR、JSONP、GAS URL、Spreadsheet ID 或通行碼欄位。
 
-## 首次設定
+## 最簡單的分享方式
 
-1. 建立或複製巡店 Google Sheet，確保 Patrol GAS 有權存取。
-2. 以 `patrol-gas/PatrolCode.gs` 為後端基準，設定該督導自己的 `SPREADSHEET_ID`、`PT_TITLE`、`PT_STORES`。
-3. 在 Apps Script Script Properties 設定 `PT_KEY`。
-4. 部署 Web App，取得 `/exec` URL。
-5. 開啟 `patrol-lite.html`，在「連線設定」輸入 GAS URL 與通行碼登入。
-6. 選擇巡店報表，確認解析筆數、新增筆數、既有筆數與衝突數，再執行寫入。
+### 嚴格離線模式
 
-## 本機匯入安全規則
+將單一檔案 `patrol-lite.html` 傳給督導。督導把檔案存到自己的電腦，以 Chrome、Edge 或 Safari 開啟。
 
-- 支援 `.xlsx`、`.xls`、`.csv`、`.tsv`、`.txt`。
-- Excel 在瀏覽器本機以 SheetJS 解析；CSV/TSV 不依賴 SheetJS。
-- 必須能辨識填表時間、店點與題號 1 至 33。
-- 檔案內同一鍵值但內容不同時直接 blocked。
-- 上雲前先用 `ptdetail` 做既有資料 preflight。
-- 既有相同資料不重複寫入。
-- 既有同鍵但內容不同時直接 blocked，Lite 不提供覆蓋模式。
-- 新增資料寫入後必須再以 `ptdetail` readback；數量不一致不得宣稱完成。
+此模式開啟工具與處理資料都不需要連線。每位督導拿到的是相同程式檔，但資料只存在自己的瀏覽器。
 
-巡店唯一鍵沿用正式 Patrol 後端：`fillTime + store + item`。
+### 靜態網址模式
 
-## 巡店看板
+也可以把相同 HTML 放在一般靜態網站。資料仍只留在使用者裝置，但開啟頁面時會向網站主機下載 HTML，因此不屬於「零網路」模式。
 
-看板直接使用既有受保護 `ptsummary` contract，顯示：
+需要最嚴格隔離時，應採用檔案分享，不使用網站網址。
 
-- 本月巡店事件數
-- 完成店數
-- 待追蹤店數
-- 各店 33 項完成度
-- 缺少題號
-- 最近巡店日期
+## 支援檔案
 
-因此 Lite 不複製另一套巡店判斷規則。
+- `.xlsx`
+- `.csv`
+- `.tsv`
+- `.txt`
+- Patrol Lite `.json` 備份
+
+舊版 `.xls` 不支援，請先另存為 `.xlsx` 或 `.csv`。
+
+XLSX 由頁面內建的輕量解析器處理，不下載 SheetJS 或其他遠端程式。
+
+## 匯入安全流程
+
+選取報表後不會立即寫入。頁面會先顯示：
+
+- 有效資料筆數
+- 新增筆數
+- 完全相同筆數
+- 同鍵值內容更新筆數
+- 略過與格式錯誤提示
+- 涵蓋月份
+
+使用者按下「確認儲存到本機」後才會更新 IndexedDB。
+
+資料鍵值沿用正式巡店概念：
+
+```text
+填表時間 + 檢查店點 + 題號
+```
+
+同一檔案內若出現相同鍵值但內容不同，整批會停止，避免在本機無聲覆蓋。
+
+## 33 項看板規則
+
+| 題號 | 完成規則 |
+|---|---|
+| 1 | 當月有駐點紀錄 |
+| 2 至 13 | 上半月與下半月各有一次 `v` |
+| 14 至 17 | 當月有一次 `v` |
+| 18 | 奇偶月兩個月週期內有一次 `v` |
+| 19 至 33 | 當月有一次 `v` |
+
+門市清單與題目文字由匯入資料自動建立，不內建北一二B店點，也不會帶出 Liam 的門市資料。
 
 ## 移動里程
 
-Lite 使用 `ptmileage2` 的 `patrol-mileage-visits-v2` 事件資料，只自動整理日期與巡店順序。
+- 以填表日期分組
+- 同日以到店時間排序
+- 同一門市同日重複紀錄只取最早一筆
+- 單店日顯示 `0 KM（單店）`
+- 多店日依相鄰門市形成路段
+- 第一次遇到路段時，由督導輸入受控公里數
+- 之後同一路段在本機自動沿用
+- 未知路段保持「待查」，不得猜值或自動填 0
+- 可匯出當月里程 CSV
 
-其他督導的店點與距離不同，所以 Lite 不帶 Liam / 北一二B 的固定距離表。每個巡店日的公里數由使用者手動填入，僅存在該瀏覽器 localStorage，不回寫巡店 Google Sheet。
+路段距離採雙向共用，例如 A 到 B 與 B 到 A 使用同一筆本機距離。
 
-## 與 Liam 完整版的關係
+## 本機儲存與備份
 
-- `patrol.html`：Liam 的完整管理版，保留既有功能與資料契約。
-- `patrol-lite.html`：分享給其他督導的簡易版。
-- 兩者可使用相同 Patrol API contract，但其他督導不可共用 Liam 的 Sheet、GAS deployment 或 PT_KEY。
+主要資料存於瀏覽器 IndexedDB。若瀏覽器不支援，才降級至 localStorage。
+
+備份 JSON 包含：
+
+- 全部巡店資料
+- 本機路段距離表
+- Schema 與匯出時間
+
+使用者應定期匯出備份。清除瀏覽器資料、移除 App、重灌電腦或更換裝置，都可能讓本機紀錄消失。
+
+## 必須接受的限制
+
+1. 沒有跨裝置同步。電腦 A 與手機 B 是兩份獨立資料。
+2. 沒有主管端集中查詢。Liam 不會看到其他督導的資料。
+3. 沒有自動備份。督導需自行匯出 JSON。
+4. 直接開啟 HTML 在桌面 Chrome 或 Edge 最穩定。
+5. iPhone 對本機 HTML、檔案保存與瀏覽器儲存的行為較嚴格。若主要使用情境是 iPhone，後續可另做原生 App 或獨立離線 PWA，但不得接回 Liam 雲端。
+
+## 驗證
+
+本機已完成以下測試：
+
+- CSV 50 筆解析與預覽
+- XLSX 50 筆解析與預覽
+- 真正 Excel 日期儲存格 45 筆解析
+- 33 項完成度
+- 同日兩店路線排序
+- 未知路段維持待查
+- 輸入 3.5 KM 後立即重算
+- 重建頁面後仍讀回巡店資料與距離
+- JavaScript syntax check
+- 靜態隱私檢查：無 GAS、Google Sheet、外部 script、fetch 或 XHR
+
+這些測試只代表本機開發驗證，不代表正式部署或其他督導實機驗收。
