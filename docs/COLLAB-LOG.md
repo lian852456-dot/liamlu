@@ -13,6 +13,18 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-25 ｜ Codex（PR #97 follow-up：STORES gate／SheetJS 0.20.3／選檔後載入）
+
+- 做了什麼：在原分支追加 follow-up；本機 rows 先同時核對正式 `STORES` code/name，矛盾或任一未知整批封鎖，通過後正規化正式 code/store 才進 dedupe 與既有 Preflight。SheetJS 改為官方 0.20.3 full browser build；初始頁面不載入 parser／SheetJS，選檔後才各載入一次，失敗維持零 Preflight／零 `ptwrite`。
+- 測試：Patrol Node passed 96／failed 0／skipped 0；正式 Patrol＋Auth Chromium passed 81／failed 0／skipped 0；follow-up Chrome 8/0/0、WebKit 8/0/0。全站 Chromium total 193：passed 187／failed 6／skipped 0；6 個 failed 均在本分支零 diff 的 Supervisor App 班表／半月讀取範圍。
+- 邊界：PR #97 維持 Draft；沒有修改 GAS、schema、auth/session、里程或正式資料。正式寫入 UAT、正式 readback、合併、Pages／GAS 部署與 Liam 實機驗收均未執行。
+
+## 2026-08-25 ｜ Codex（正式 Patrol 本機選檔入口，Draft PR／未部署）
+
+- 做了什麼：從最新 `origin/main` `bda6e4a` 建立獨立 `feature/patrol-local-file-import-20260825`。只在正式 `patrol.html` 的「貼上巡店紀錄」區塊增加 `.xlsx/.xls/.csv/.tsv` 本機選檔；固定版 SheetJS 與 License 存在 repo，本機 parser 輸出既有十二欄後沿用正式 `patrolServerPreflight → pendingPatrolWrite → ptwrite → ptdetail readback → cloudLoad／MI.open`。
+- 結果（本機完成／待 UAT）：Patrol Node `91/91`、正式 Patrol＋auth Chromium `79/79`、本機選檔 Chromium `6/6`、WebKit `6/6` 通過。全站 Chromium `184/191`；本次曾影響的原貼上 readback 文案已恢復且精準重跑通過，剩餘 6 案在本分支零 diff 的 Supervisor App 班表／半月讀取範圍，序列重跑仍為既有失敗。
+- 邊界：PR #95 Lite 維持暫停；沒有搬入 Lite 程式。Patrol GAS、共用 GAS、schema、auth/session/token、里程模組、看板規則、班表、半月、大盤、媒體、稽核、JSON/localStorage 與頁籤／登入均零變更。未執行正式 GAS 寫入、正式 readback、Pages 部署或 Liam 真實檔案／iPhone UAT，不可宣稱正式完成或已上線。
+
 ## 2026-08-24 ｜ Codex（KPI／台獎 freshness P0，台獎正式發布 blocked）
 
 - 做了什麼：建立獨立 `hotfix/kpi-awards-freshness-p0-20260824`，修正 KPI 版本日期只接受已解析 period end 與 snapshotDay 相同的有效日期；8/23 manual cutoff 8/22 不再誤擋 8/24 `0824.xlsx` cutoff 8/23。runtime 另加入 01-08-03／01-08-04 原始來源 identity gate（canonical basename、mtime、size、SHA-256、run_id），並使 private snapshot／正式 readback 比對兩份獨立台獎 source identity。
