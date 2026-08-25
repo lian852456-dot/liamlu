@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#191919">
+<title>巡店報表本機上傳 · Liam情報站</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="patrol-local-import-core.js"></script>
+<link rel="stylesheet" href="patrol-import.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <h1>📂 巡店報表本機上傳</h1>
+    <p>檔案在這台裝置解析，確認後才將標準化巡店資料寫入現有看板。</p>
+    <div class="hero-actions">
+      <a class="btn dark" href="patrol.html">返回巡店系統</a>
+      <button class="btn dark" id="recheckSessionBtn" type="button">重新確認連線</button>
+    </div>
+  </header>
+
+  <section class="steps" aria-label="匯入流程">
+    <div class="step active" data-step="1"><b>1. 選擇檔案</b><span>本機解析</span></div>
+    <div class="step" data-step="2"><b>2. 雲端預檢</b><span>新增／重複／更新</span></div>
+    <div class="step" data-step="3"><b>3. 人工確認</b><span>不自動寫入</span></div>
+    <div class="step" data-step="4"><b>4. 寫入讀回</b><span>逐筆驗證</span></div>
+  </section>
+
+  <section class="panel" id="authPanel">
+    <h2>督導驗證</h2>
+    <p class="hint">會優先沿用巡店系統目前分頁的短效 session。若已逾時，只需重新輸入原通行碼。</p>
+    <div class="auth-row">
+      <input id="passcode" type="password" autocomplete="current-password" placeholder="巡店督導通行碼" aria-label="巡店督導通行碼">
+      <button class="btn primary" id="loginBtn" type="button">驗證並連線</button>
+    </div>
+    <div id="authStatus" class="status-line info"><span class="status-dot"></span><span>正在確認巡店連線狀態…</span></div>
+    <div class="privacy">通行碼不會儲存。短效 token 僅保留在目前瀏覽器分頁，沿用既有 Patrol session contract。</div>
+  </section>
+
+  <section class="panel">
+    <h2>選擇巡店報表</h2>
+    <p class="hint">支援 XLSX、XLS、CSV、TSV。系統會自動尋找巡店明細表頭與正確工作表，不需先上傳 Google Drive。</p>
+    <div class="upload-zone" id="uploadZone">
+      <button class="btn primary" id="chooseFileBtn" type="button">選擇本機巡店報表</button>
+      <input id="fileInput" type="file" accept=".xlsx,.xls,.csv,.tsv,.txt">
+      <div id="fileMeta" class="file-meta">尚未選擇檔案</div>
+    </div>
+    <div class="privacy">檔案原始內容不會直接送往伺服器。只有通過格式、店點與重複檢查的標準化列，才會在你按下確認後送出。</div>
+
+    <div id="parseMessage" class="message"></div>
+    <div id="preview" class="preview">
+      <div class="metrics">
+        <div class="metric"><strong id="metricParsed">0</strong><span>解析有效列</span></div>
+        <div class="metric new"><strong id="metricAdd">0</strong><span>新增</span></div>
+        <div class="metric update"><strong id="metricUpdate">0</strong><span>更新結果</span></div>
+        <div class="metric"><strong id="metricExisting">0</strong><span>雲端已存在</span></div>
+        <div class="metric block"><strong id="metricConflict">0</strong><span>衝突／封鎖</span></div>
+      </div>
+      <div id="previewSummary" class="summary"></div>
+      <div id="sampleRows" class="sample hidden"></div>
+      <div class="action-row">
+        <button class="btn primary" id="confirmBtn" type="button" disabled>確認寫入</button>
+        <button class="btn soft" id="cancelBtn" type="button">取消本次匯入</button>
+      </div>
+    </div>
+
+    <div id="writeProgress" class="progress">
+      <div class="progress-track"><span id="writeProgressBar"></span></div>
+      <div id="writeProgressLabel" class="progress-label"></div>
+    </div>
+    <div id="writeMessage" class="message"></div>
+  </section>
+
+  <section class="panel fallback">
+    <h2>備援方式仍保留</h2>
+    <p class="hint">原本「貼上巡店紀錄 → 解析預覽 → 確認寫入」完全不刪除。選檔異常、只補少量資料或臨時操作時，仍可回到 <a href="patrol.html">巡店系統</a> 使用貼上功能。</p>
+  </section>
+
+  <div class="footer">Liam情報站 · Patrol local import · fail-closed preflight</div>
+</div>
+
+<script src="patrol-import.js"></script>
+</body>
+</html>
