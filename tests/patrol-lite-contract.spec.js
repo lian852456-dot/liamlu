@@ -1,9 +1,18 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 const htmlPath = path.join(__dirname, '..', 'patrol-lite.html');
-const html = fs.readFileSync(htmlPath, 'utf8');
+const distributionHtml = fs.readFileSync(htmlPath, 'utf8');
+
+function expandedHtml() {
+  const match = distributionHtml.match(/const s='([A-Za-z0-9+/=]+)'/);
+  if (!match) return distributionHtml;
+  return zlib.gunzipSync(Buffer.from(match[1], 'base64')).toString('utf8');
+}
+
+const html = expandedHtml();
 
 function installOpaqueOriginStorage(page) {
   return page.evaluate(() => {
@@ -21,6 +30,8 @@ function installOpaqueOriginStorage(page) {
 }
 
 test('Patrol Lite has a fail-closed offline privacy boundary', async () => {
+  expect(distributionHtml).toContain("connect-src 'none'");
+  expect(distributionHtml).not.toContain('<script src=');
   expect(html).toContain("connect-src 'none'");
   expect(html).not.toContain('<script src=');
   expect(html).not.toContain('fetch(');
@@ -50,7 +61,8 @@ test('CSV import builds dashboard and mileage without a backend', async ({ page 
   fs.writeFileSync(csvPath, `\uFEFF${csv}`, 'utf8');
 
   await installOpaqueOriginStorage(page);
-  await page.setContent(html, { waitUntil: 'load' });
+  await page.setContent(distributionHtml, { waitUntil: 'load' });
+  await expect(page.locator('#localFile')).toHaveCount(1);
   await page.setInputFiles('#localFile', csvPath);
   await expect(page.locator('#importMsg')).toContainText('有效 50 筆');
   await page.click('#confirmImportBtn');
@@ -66,7 +78,7 @@ test('CSV import builds dashboard and mileage without a backend', async ({ page 
   await page.locator('[data-distance-key]').first().press('Tab');
   await expect(page.locator('#mileageRows')).toContainText('3.5 KM');
 
-  await page.setContent(html, { waitUntil: 'load' });
+  await page.setContent(distributionHtml, { waitUntil: 'load' });
   await page.click('[data-tab="mileage"]');
   await expect(page.locator('#mileageRows')).toContainText('測試甲店');
   await expect(page.locator('#mileageRows')).toContainText('3.5 KM');
