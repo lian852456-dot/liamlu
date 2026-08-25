@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#171717">
+<title>督導巡店 Lite</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f6f6f3;--card:#fff;--ink:#202020;--muted:#777;--line:#e7e7e3;--accent:#ff6900;--ok:#17844a;--warn:#c88712;--bad:#cf3e3e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
+button,input{font:inherit}.wrap{max-width:980px;margin:auto;padding:16px 14px 64px}.hero{background:#171717;color:#fff;border-radius:18px;padding:20px;margin-bottom:14px}.hero h1{font-size:22px;margin:0 0 4px}.hero p{margin:0;color:#bbb;font-size:13px}.topline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}.month{background:#292929;border:1px solid #444;color:#fff;border-radius:9px;padding:9px 10px}.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:750;cursor:pointer}.btn.primary{background:var(--accent);color:#fff}.btn.soft{background:#ececea;color:#333}.btn.dark{background:#333;color:#fff}.btn[disabled]{opacity:.45;cursor:not-allowed}.tabs{display:flex;gap:8px;margin:14px 0;position:sticky;top:0;z-index:5;background:rgba(246,246,243,.94);backdrop-filter:blur(8px);padding:8px 0}.tab{flex:1;background:#e9e9e6;border:0;border-radius:11px;padding:10px;font-weight:800}.tab.active{background:#171717;color:#fff}.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}.panel h2{font-size:16px;margin:0 0 7px}.hint{font-size:12.5px;color:var(--muted);line-height:1.6;margin:0 0 12px}.upload{border:1.5px dashed #c9c9c3;border-radius:14px;padding:18px;text-align:center;background:#fbfbf8}.upload input{display:none}.file-name{font-size:12px;color:var(--muted);margin-top:8px}.msg{display:none;margin-top:12px;border-radius:11px;padding:11px 12px;font-size:13px;line-height:1.55}.msg.show{display:block}.msg.ok{background:#eaf7ef;color:#116f3c}.msg.err{background:#fdecec;color:#a92d2d}.msg.info{background:#eef5ff;color:#235d92}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}.metric{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px}.metric b{display:block;font-size:23px}.metric span{font-size:11px;color:var(--muted)}.stores{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.store{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}.store-head{display:flex;justify-content:space-between;gap:8px}.store h3{margin:0;font-size:15px}.code{font-size:10px;color:var(--muted)}.pill{font-size:11px;border-radius:999px;padding:4px 9px;font-weight:800;white-space:nowrap}.pill.ok{background:#eaf7ef;color:var(--ok)}.pill.warn{background:#fff4dd;color:#9a6711}.pill.bad{background:#fdecec;color:var(--bad)}.progress{height:7px;border-radius:99px;background:#eee;overflow:hidden;margin:11px 0 8px}.progress span{display:block;height:100%;background:var(--accent)}.small{font-size:12px;color:var(--muted);line-height:1.55}.missing{margin-top:8px;font-size:12px;color:#555}.mileage-day{display:grid;grid-template-columns:110px 1fr 110px;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.mileage-day:last-child{border-bottom:0}.route{font-size:13px;line-height:1.6}.km{display:flex;align-items:center;gap:5px}.km input{width:78px;border:1px solid #ccc;border-radius:8px;padding:8px;text-align:right}.login{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}.login input{border:1px solid #ccc;border-radius:9px;padding:10px}.privacy{font-size:11px;color:#888;margin-top:9px}.hidden{display:none!important}.empty{padding:28px 10px;text-align:center;color:#888;font-size:13px}.preview-list{margin:8px 0 0;padding-left:18px;font-size:12px;line-height:1.6}.footer{text-align:center;color:#aaa;font-size:11px;margin-top:22px}@media(max-width:680px){.grid{grid-template-columns:repeat(2,1fr)}.stores{grid-template-columns:1fr}.login{grid-template-columns:1fr}.mileage-day{grid-template-columns:90px 1fr}.mileage-day .km{grid-column:2}.hero{border-radius:14px}.wrap{padding:10px 10px 50px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <h1 id="appTitle">督導巡店 Lite</h1>
+    <p>本機選檔更新巡店看板，只保留巡店與移動里程。</p>
+    <div class="topline">
+      <input id="monthPicker" class="month" type="month">
+      <button class="btn dark" id="refreshBtn">重新整理</button>
+      <button class="btn dark" id="settingsBtn">連線設定</button>
+    </div>
+  </section>
+
+  <section class="panel" id="connectPanel">
+    <h2>巡店資料連線</h2>
+    <p class="hint">每位督導使用自己的 Google Sheet 與 Patrol GAS。這個頁面本身可以共用，通行碼不會寫入網頁程式。</p>
+    <div class="login">
+      <input id="gasUrl" type="url" placeholder="Patrol GAS Web App URL">
+      <input id="accessKey" type="password" autocomplete="current-password" placeholder="巡店通行碼">
+      <button class="btn primary" id="loginBtn">登入</button>
+    </div>
+    <div id="connectMsg" class="msg"></div>
+    <div class="privacy">GAS URL 會保存在此瀏覽器；通行碼不保存。登入取得的短效 session 只留在目前分頁。</div>
+  </section>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="dashboard">巡店看板</button>
+    <button class="tab" data-tab="mileage">移動里程</button>
+  </nav>
+
+  <main id="dashboardTab">
+    <section class="panel">
+      <h2>📂 本機匯入巡店報表</h2>
+      <p class="hint">支援 XLSX / XLS / CSV / TSV。檔案先在瀏覽器本機解析，不會先上傳 Google Drive。完成預檢後才會送出標準化巡店資料。</p>
+      <div class="upload">
+        <button class="btn primary" id="chooseFileBtn">選擇巡店報表</button>
+        <input id="localFile" type="file" accept=".xlsx,.xls,.csv,.tsv,.txt">
+        <div id="fileName" class="file-name">尚未選擇檔案</div>
+      </div>
+      <div id="importMsg" class="msg"></div>
+      <div id="importPreview" class="msg info"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn primary" id="confirmImportBtn" disabled>確認寫入新資料</button>
+        <button class="btn soft" id="cancelImportBtn" disabled>取消</button>
+      </div>
+    </section>
+
+    <div id="metrics" class="grid"></div>
+    <div id="storeCards" class="stores"></div>
+  </main>
+
+  <main id="mileageTab" class="hidden">
+    <div id="mileageMetrics" class="grid"></div>
+    <section class="panel">
+      <h2>每日巡店路線與里程</h2>
+      <p class="hint">巡店順序由當月巡店紀錄自動整理。不同督導店點不同，因此 Lite 版的公里數採手動輸入，並只保存在目前裝置，不回寫巡店資料庫。</p>
+      <div id="mileageRows"></div>
+    </section>
+  </main>
+
+  <div class="footer">Patrol Lite · Local import / protected cloud data</div>
+</div>
+<script>
+(() => {
+'use strict';
+const STORAGE_URL='patrol_lite_gas_url_v1';
+const SESSION_KEY='patrol_lite_session_v1';
+const WRITE_CHUNK_ROWS=8;
+let gasUrl=normalizeGasUrl(localStorage.getItem(STORAGE_URL)||'');
+let token=sessionStorage.getItem(SESSION_KEY)||'';
+let currentSummary=null;
+let pendingImport=null;
+const $=id=>document.getElementById(id);
+const esc=value=>String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+const pad=n=>String(n).padStart(2,'0');
+const now=new Date();
+$('monthPicker').value=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+$('gasUrl').value=gasUrl;
+
+function normalizeGasUrl(value){return String(value||'').trim().replace(/[?#].*$/,'').replace(/\/$/,'');}
+function showMsg(id,text,type='info'){const el=$(id);el.textContent=text;el.className=`msg show ${type}`;}
+function hideMsg(id){const el=$(id);el.textContent='';el.className='msg';}
+function authError(payload){return payload&&payload.status==='error'&&(/^AUTH_/.test(String(payload.reason||''))||payload.message==='unauthorized');}
+function clearSession(){token='';sessionStorage.removeItem(SESSION_KEY);}
+function requireConnected(){if(!gasUrl||!token){showMsg('connectMsg','請先完成巡店資料連線。','err');$('connectPanel').scrollIntoView({behavior:'smooth'});return false;}return true;}
+
+async function postAction(action,params={},timeoutMs=30000){
+  if(!gasUrl) throw new Error('尚未設定 Patrol GAS URL');
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{
+    const response=await fetch(gasUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...params}),cache:'no-store',signal:controller.signal});
+    const text=await response.text();
+    let payload;try{payload=JSON.parse(text);}catch{throw new Error('巡店服務回應格式無法辨識');}
+    if(authError(payload)){clearSession();throw new Error('登入已失效，請重新輸入通行碼');}
+    return payload;
+  }catch(error){if(error&&error.name==='AbortError')throw new Error('巡店服務回應逾時，請稍後重試');throw error;}
+  finally{clearTimeout(timer);}
+}
+
+function jsonpAction(action,params={}){
+  return new Promise((resolve,reject)=>{
+    if(!gasUrl||!token){reject(new Error('尚未登入'));return;}
+    const callback=`patrolLite_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const script=document.createElement('script');
+    const timer=setTimeout(()=>finish(new Error('寫入逾時，請重新整理確認結果')),25000);
+    const finish=(error,value)=>{clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);};
+    window[callback]=payload=>{if(authError(payload)){clearSession();finish(new Error('登入已失效，請重新登入'));return;}finish(null,payload);};
+    const query=new URLSearchParams({action,token,callback});
+    Object.entries(params).forEach(([key,value])=>query.set(key,String(value)));
+    script.onerror=()=>finish(new Error('無法連上巡店寫入服務'));
+    script.src=`${gasUrl}?${query.toString()}`;
+    document.head.appendChild(script);
+  });
+}
+
+async function login(){
+  const url=normalizeGasUrl($('gasUrl').value);
+  const key=$('accessKey').value;
+  if(!/^https:\/\/script\.google\.com\/macros\/s\//.test(url)){showMsg('connectMsg','請輸入有效的 Google Apps Script Web App URL。','err');return;}
+  if(!key){showMsg('connectMsg','請輸入巡店通行碼。','err');return;}
+  gasUrl=url;localStorage.setItem(STORAGE_URL,gasUrl);
+  showMsg('connectMsg','正在驗證…','info');
+  try{
+    const result=await postAction('ptauth',{key},15000);
+    if(!result||result.status!=='ok'||!result.token) throw new Error(result&&result.message||'登入失敗');
+    token=String(result.token);sessionStorage.setItem(SESSION_KEY,token);$('accessKey').value='';
+    showMsg('connectMsg','連線成功，可以開始匯入巡店報表。','ok');
+    await refreshAll();
+  }catch(error){clearSession();showMsg('connectMsg',error.message||'登入失敗','err');}
+}
+
+async function refreshAll(){
+  if(!requireConnected())return;
+  const month=$('monthPicker').value;
+  if(!/^\d{4}-\d{2}$/.test(month))return;
+  try{
+    const [summaryResult,mileageResult]=await Promise.all([postAction('ptsummary',{token,month}),postAction('ptmileage2',{token,month})]);
+    if(summaryResult.status!=='ok')throw new Error(summaryResult.message||'巡店看板讀取失敗');
+    currentSummary=summaryResult.summary||{};
+    const title=String(summaryResult.title||'督導巡店');$('appTitle').textContent=`${title} · Lite`;
+    renderSummary(currentSummary,summaryResult.stores||[]);
+    if(mileageResult.status!=='ok')throw new Error(mileageResult.message||'里程資料讀取失敗');
+    renderMileage(mileageResult.visits||[],month);
+  }catch(error){showMsg('connectMsg',error.message||'資料讀取失敗','err');}
+}
+
+function renderSummary(summary,configuredStores){
+  const stores=Array.isArray(summary.stores)?summary.stores:[];
+  const visitTotal=(Array.isArray(summary.visitCounts)?summary.visitCounts:[]).reduce((sum,row)=>sum+(Number(row&&row.count)||0),0);
+  const complete=stores.filter(row=>row.status==='complete').length;
+  const attention=stores.filter(row=>row.status==='attention').length;
+  const pending=stores.filter(row=>row.status==='pending').length;
+  $('metrics').innerHTML=[['巡店店數',`${stores.length||configuredStores.length}`],['本月巡店',visitTotal],['已完成',complete],['待追蹤',attention+pending]].map(([label,value])=>`<div class="metric"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join('');
+  if(!stores.length){$('storeCards').innerHTML='<div class="panel empty">本月尚無巡店資料。</div>';return;}
+  $('storeCards').innerHTML=stores.map(row=>{
+    const done=Math.max(0,Number(row.done)||0),missing=Math.max(0,Number(row.missingItems)||0),pct=Math.round(done/33*100);
+    const cls=row.status==='complete'?'ok':row.status==='attention'?'warn':'bad';
+    const label=row.status==='complete'?'完成':row.status==='attention'?'待補':'未巡';
+    const missingNums=Array.isArray(row.missingItemNumbers)?row.missingItemNumbers:[];
+    return `<article class="store"><div class="store-head"><div><h3>${esc(row.name||'未命名店點')}</h3><div class="code">${esc(row.code||'')}</div></div><span class="pill ${cls}">${label}</span></div><div class="progress"><span style="width:${pct}%"></span></div><div class="small">${done}/33 項 · 最近巡店 ${esc(row.lastVisit||'尚無')}</div>${missing?`<div class="missing">缺 ${missing} 項：${esc(missingNums.join('、'))}</div>`:'<div class="missing" style="color:var(--ok)">本期檢核完成</div>'}</article>`;
+  }).join('');
+}
+
+function dateKey(value){const m=String(value||'').match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);return m?`${m[1]}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`:'';}
+function mileageStorageKey(month){let id='';try{id=btoa(unescape(encodeURIComponent(gasUrl))).replace(/[^a-z0-9]/gi,'').slice(0,28);}catch{id='default';}return `patrol_lite_mileage_v1:${id}:${month}`;}
+function readMileageEdits(month){try{return JSON.parse(localStorage.getItem(mileageStorageKey(month))||'{}')||{};}catch{return {};}}
+function renderMileage(visits,month){
+  const grouped=new Map();
+  (Array.isArray(visits)?visits:[]).forEach(visit=>{const day=dateKey(visit.arriveTime||visit.fillTime);if(!day)return;if(!grouped.has(day))grouped.set(day,[]);grouped.get(day).push(visit);});
+  const edits=readMileageEdits(month);let totalKm=0;Object.values(edits).forEach(value=>{const n=Number(value);if(Number.isFinite(n))totalKm+=n;});
+  $('mileageMetrics').innerHTML=[['巡店日',grouped.size],['巡店事件',visits.length],['已填里程',`${Math.round(totalKm*10)/10} km`],['月份',month]].map(([label,value])=>`<div class="metric"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join('');
+  const days=[...grouped.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+  if(!days.length){$('mileageRows').innerHTML='<div class="empty">本月尚無巡店路線。</div>';return;}
+  $('mileageRows').innerHTML=days.map(([day,rows])=>{
+    rows.sort((a,b)=>String(a.arriveTime||a.fillTime||'').localeCompare(String(b.arriveTime||b.fillTime||'')));
+    const route=rows.map(row=>row.store).filter(Boolean).filter((value,index,array)=>index===0||value!==array[index-1]);
+    return `<div class="mileage-day"><strong>${esc(day.slice(5).replace('-','/'))}</strong><div class="route">${esc(route.join(' → ')||'巡店')}</div><label class="km"><input data-mileage-day="${esc(day)}" inputmode="decimal" type="number" min="0" step="0.1" value="${esc(edits[day]??'')}" placeholder="0"> km</label></div>`;
+  }).join('');
+  document.querySelectorAll('[data-mileage-day]').forEach(input=>input.addEventListener('change',()=>{const state=readMileageEdits(month);const day=input.dataset.mileageDay;const value=String(input.value||'').trim();if(value==='')delete state[day];else state[day]=Math.max(0,Number(value)||0);localStorage.setItem(mileageStorageKey(month),JSON.stringify(state));renderMileage(visits,month);}));
+}
+
+function csvRows(text){
+  const rows=[];let row=[],cell='',quoted=false;const source=String(text||'');
+  for(let i=0;i<source.length;i++){
+    const ch=source[i];
+    if(quoted){if(ch==='"'&&source[i+1]==='"'){cell+='"';i++;}else if(ch==='"')quoted=false;else cell+=ch;continue;}
+    if(ch==='"'){quoted=true;continue;}
+    if(ch===','||ch==='\t'){row.push(cell);cell='';continue;}
+    if(ch==='\n'){row.push(cell);rows.push(row);row=[];cell='';continue;}
+    if(ch==='\r')continue;cell+=ch;
+  }
+  if(cell!==''||row.length){row.push(cell);rows.push(row);}return rows;
+}
+
+async function readLocalRows(file){
+  const ext=(file.name.split('.').pop()||'').toLowerCase();
+  if(['csv','tsv','txt'].includes(ext))return csvRows(await file.text());
+  if(!['xlsx','xls'].includes(ext))throw new Error('只支援 XLSX、XLS、CSV、TSV。');
+  if(!window.XLSX)throw new Error('Excel 解析元件載入失敗，請確認網路或先另存 CSV 再匯入。');
+  const buffer=await file.arrayBuffer();
+  const book=XLSX.read(buffer,{type:'array',cellDates:true});
+  const first=book.SheetNames[0];if(!first)throw new Error('Excel 找不到工作表。');
+  return XLSX.utils.sheet_to_json(book.Sheets[first],{header:1,raw:true,defval:''});
+}
+
+const ALIASES={
+  fillTime:['填表時間','填寫時間','時間戳記'],arriveTime:['到店時間','抵達時間'],leaveTime:['離店時間','離開時間'],district:['區處別','區處'],code:['營業點代碼','店點代碼','門市代碼'],store:['檢查店點','店點','門市','檢查門市'],inspector:['檢查人員','檢查者','督導'],item:['題號','題次','項次'],content:['檢查內容','內容'],result:['是否合格','合格','結果'],reason:['未查／不合格原因','未查/不合格原因','原因','備註']
+};
+function normHeader(value){return String(value||'').trim().replace(/\s+/g,'').toLowerCase();}
+function headerMap(rows){
+  for(let r=0;r<Math.min(rows.length,15);r++){
+    const normalized=(rows[r]||[]).map(normHeader),map={};let hits=0;
+    Object.entries(ALIASES).forEach(([field,names])=>{const index=normalized.findIndex(value=>names.some(name=>value===normHeader(name)));if(index>=0){map[field]=index;hits++;}});
+    if(hits>=5&&map.fillTime!==undefined&&map.store!==undefined&&map.item!==undefined)return {row:r,map};
+  }
+  return {row:-1,map:{fillTime:0,arriveTime:1,leaveTime:2,district:3,code:4,store:5,inspector:6,item:7,content:8,result:9,reason:10}};
+}
+function cell(row,index){return index===undefined?'':row[index];}
+function formatDateTime(value){
+  if(value instanceof Date&&!Number.isNaN(value.getTime()))return `${value.getFullYear()}/${value.getMonth()+1}/${value.getDate()} ${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`;
+  let text=String(value??'').trim();if(!text)return '';
+  text=text.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})/,(_,y,m,d)=>`${y}/${Number(m)}/${Number(d)}`);
+  const match=text.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);if(!match)return '';
+  return text;
+}
+function normalizeResult(resultValue,reasonValue){const result=String(resultValue??'').trim().toLowerCase(),reason=String(reasonValue??'').trim();if(result==='v')return {result:'v',reason};if(result==='na'||reason.toLowerCase()==='na')return {result:'na',reason:reason&&reason.toLowerCase()!=='na'?reason:'na'};return {result:'',reason};}
+function normalizeImportedRows(rows){
+  const source=Array.isArray(rows)?rows:[];const {row:headerRow,map}=headerMap(source);const output=[],errors=[];
+  for(let index=headerRow>=0?headerRow+1:0;index<source.length;index++){
+    const line=source[index]||[];if(!line.some(value=>String(value??'').trim()))continue;
+    const fillTime=formatDateTime(cell(line,map.fillTime));const store=String(cell(line,map.store)??'').trim();const item=Number.parseInt(String(cell(line,map.item)??'').trim(),10);
+    if(!fillTime){errors.push(`第 ${index+1} 列：填表時間無法辨識`);continue;}if(!store){errors.push(`第 ${index+1} 列：缺少檢查店點`);continue;}if(!Number.isInteger(item)||item<1||item>33){errors.push(`第 ${index+1} 列：題號需為 1 至 33`);continue;}
+    const match=fillTime.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);const normalized=normalizeResult(cell(line,map.result),cell(line,map.reason));
+    output.push({fillTime,arriveTime:formatDateTime(cell(line,map.arriveTime))||String(cell(line,map.arriveTime)??'').trim(),leaveTime:formatDateTime(cell(line,map.leaveTime))||String(cell(line,map.leaveTime)??'').trim(),district:String(cell(line,map.district)??'').trim(),code:String(cell(line,map.code)??'').trim(),store,inspector:String(cell(line,map.inspector)??'').trim(),item,content:String(cell(line,map.content)??'').trim(),result:normalized.result,reason:normalized.reason,month:`${match[1]}-${pad(Number(match[2]))}`});
+  }
+  if(errors.length)return {rows:[],errors};
+  const unique=new Map(),conflicts=[];
+  output.forEach(row=>{const key=importKey(row);if(!unique.has(key))unique.set(key,row);else if(!sameRow(unique.get(key),row))conflicts.push(key);});
+  if(conflicts.length)return {rows:[],errors:[`檔案內有 ${conflicts.length} 筆相同鍵值但內容不同，已封鎖匯入。`]};
+  return {rows:[...unique.values()],errors:[]};
+}
+function normalizedTime(value){return String(value||'').trim().replace(/^(\d{4})\/(0?\d{1,2})\/(0?\d{1,2})/,(_,y,m,d)=>`${y}/${Number(m)}/${Number(d)}`);}
+function importKey(row){return [normalizedTime(row.fillTime),String(row.store||'').trim(),Number(row.item)].join('|');}
+function compareText(value){return String(value??'').trim().replace(/\s+/g,' ');}
+function sameRow(a,b){return ['fillTime','arriveTime','leaveTime','district','code','store','inspector','result','reason'].every(field=>compareText(a&&a[field])===compareText(b&&b[field]))&&Number(a&&a.item)===Number(b&&b.item);}
+
+async function fetchDetail(month,store){
+  const all=[];let page=1,total=0;
+  do{const result=await postAction('ptdetail',{token,month,store,page,limit:100});if(result.status!=='ok')throw new Error(result.message||`無法讀取 ${store} 明細`);const rows=Array.isArray(result.rows)?result.rows:[];all.push(...rows);total=Number(result.totalRows)||rows.length;page++;if(page>20)throw new Error('巡店明細分頁超出預期');}while(all.length<total);
+  return all;
+}
+async function preflight(rows){
+  const groups=new Map();rows.forEach(row=>{const key=`${row.month}|${row.store}`;if(!groups.has(key))groups.set(key,{month:row.month,store:row.store,rows:[]});groups.get(key).rows.push(row);});
+  const additions=[],same=[],conflicts=[];
+  for(const group of groups.values()){
+    const existing=await fetchDetail(group.month,group.store);const byKey=new Map(existing.map(row=>[importKey(row),row]));
+    group.rows.forEach(row=>{const old=byKey.get(importKey(row));if(!old)additions.push(row);else if(sameRow(old,row))same.push(row);else conflicts.push({incoming:row,existing:old});});
+  }
+  return {additions,same,conflicts};
+}
+
+async function chooseFile(file){
+  if(!requireConnected())return;
+  pendingImport=null;$('confirmImportBtn').disabled=true;$('cancelImportBtn').disabled=true;hideMsg('importMsg');hideMsg('importPreview');$('fileName').textContent=file?file.name:'尚未選擇檔案';if(!file)return;
+  showMsg('importMsg','正在本機解析檔案並執行雲端預檢…','info');
+  try{
+    const rawRows=await readLocalRows(file);const parsed=normalizeImportedRows(rawRows);if(parsed.errors.length)throw new Error(parsed.errors.slice(0,4).join('；'));
+    if(!parsed.rows.length)throw new Error('檔案沒有可匯入的巡店資料。');
+    const check=await preflight(parsed.rows);pendingImport={fileName:file.name,rows:parsed.rows,...check};
+    const conflictNote=check.conflicts.length?`；衝突 ${check.conflicts.length} 筆，為避免覆蓋既有紀錄已封鎖寫入`:'';
+    showMsg('importMsg',`解析 ${parsed.rows.length} 筆完成：新增 ${check.additions.length}、已存在 ${check.same.length}${conflictNote}`,check.conflicts.length?'err':'ok');
+    const preview=$('importPreview');preview.className='msg show info';preview.innerHTML=`<strong>${esc(file.name)}</strong><ul class="preview-list"><li>有效資料：${parsed.rows.length} 筆</li><li>可新增：${check.additions.length} 筆</li><li>已存在且相同：${check.same.length} 筆</li><li>內容衝突：${check.conflicts.length} 筆</li></ul>`;
+    $('confirmImportBtn').disabled=check.conflicts.length>0||check.additions.length===0;$('cancelImportBtn').disabled=false;
+  }catch(error){pendingImport=null;showMsg('importMsg',error.message||'匯入失敗','err');}
+}
+
+async function writeRows(rows){
+  let written=0;
+  for(let index=0;index<rows.length;index+=WRITE_CHUNK_ROWS){const chunk=rows.slice(index,index+WRITE_CHUNK_ROWS);let result;for(let attempt=0;attempt<2;attempt++){try{result=await jsonpAction('ptwrite',{payload:JSON.stringify(chunk)});if(result&&result.status==='ok')break;}catch(error){if(attempt===1)throw error;}}if(!result||result.status!=='ok')throw new Error(result&&result.message||'寫入失敗');written+=Number(result.written||0);}
+  return written;
+}
+async function verifyRows(rows){
+  const groups=new Map();rows.forEach(row=>{const key=`${row.month}|${row.store}`;if(!groups.has(key))groups.set(key,{month:row.month,store:row.store,rows:[]});groups.get(key).rows.push(row);});
+  let found=0;for(const group of groups.values()){const current=await fetchDetail(group.month,group.store);const keys=new Set(current.map(importKey));group.rows.forEach(row=>{if(keys.has(importKey(row)))found++;});}return found;
+}
+async function confirmImport(){
+  if(!pendingImport||!pendingImport.additions.length)return;$('confirmImportBtn').disabled=true;$('cancelImportBtn').disabled=true;showMsg('importMsg',`正在寫入 ${pendingImport.additions.length} 筆並讀回驗證…`,'info');
+  try{const expected=pendingImport.additions.length;await writeRows(pendingImport.additions);const found=await verifyRows(pendingImport.additions);if(found!==expected)throw new Error(`讀回驗證不一致：預期 ${expected}，讀回 ${found}`);showMsg('importMsg',`更新完成：${expected} 筆新資料已寫入，讀回 ${found} 筆一致。`,'ok');pendingImport=null;$('importPreview').className='msg';$('localFile').value='';await refreshAll();}
+  catch(error){showMsg('importMsg',error.message||'寫入失敗，請重新整理確認','err');$('confirmImportBtn').disabled=false;$('cancelImportBtn').disabled=false;}
+}
+function cancelImport(){pendingImport=null;$('localFile').value='';$('fileName').textContent='尚未選擇檔案';hideMsg('importMsg');hideMsg('importPreview');$('confirmImportBtn').disabled=true;$('cancelImportBtn').disabled=true;}
+
+$('loginBtn').addEventListener('click',login);
+$('refreshBtn').addEventListener('click',refreshAll);
+$('settingsBtn').addEventListener('click',()=>{$('connectPanel').classList.toggle('hidden');if(!$('connectPanel').classList.contains('hidden'))$('connectPanel').scrollIntoView({behavior:'smooth'});});
+$('monthPicker').addEventListener('change',refreshAll);
+$('chooseFileBtn').addEventListener('click',()=>$('localFile').click());
+$('localFile').addEventListener('change',event=>chooseFile(event.target.files&&event.target.files[0]));
+$('confirmImportBtn').addEventListener('click',confirmImport);
+$('cancelImportBtn').addEventListener('click',cancelImport);
+document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(node=>node.classList.toggle('active',node===button));$('dashboardTab').classList.toggle('hidden',button.dataset.tab!=='dashboard');$('mileageTab').classList.toggle('hidden',button.dataset.tab!=='mileage');}));
+if(gasUrl&&token){$('connectPanel').classList.add('hidden');refreshAll();}
+})();
+</script>
+</body>
+</html>
