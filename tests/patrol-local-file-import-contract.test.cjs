@@ -62,7 +62,7 @@ test('本機匯入只保留正式十二欄，不包含檔案內容或公開資�
   ]);
   assert.doesNotMatch(importer, /download|createObjectURL|\.json['"]|private-data|data\//i);
   assert.match(importer, /arrayBuffer\(\)/);
-  assert.match(importer, /file\.text\(\)/);
+  assert.match(importer, /decode\(['"]big5['"], true\)/i);
 });
 
 test('本機資料先依正式 STORES 雙欄驗證與正規化，再進入 dedupe／Preflight', () => {

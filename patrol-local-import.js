@@ -33,7 +33,7 @@
     return text(value)
       .replace(/^\uFEFF/, '')
       .replace(/[\s　]+/g, '')
-      .replace(/／/g, '/')
+      .replace(/[／∕]/g, '/')
       .replace(/[：:]/g, '')
       .toLowerCase();
   }
@@ -345,6 +345,22 @@
     return { rows, delimiter:separator };
   }
 
+  function decodeDelimitedBytes(arrayBuffer) {
+    const bytes = arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer || 0);
+    const decode = (label, fatal) => new TextDecoder(label, { fatal:Boolean(fatal) }).decode(bytes);
+    if (bytes[0] === 0xFF && bytes[1] === 0xFE) return { text:decode('utf-16le'), encoding:'UTF-16LE' };
+    if (bytes[0] === 0xFE && bytes[1] === 0xFF) return { text:decode('utf-16be'), encoding:'UTF-16BE' };
+    try {
+      return { text:decode('utf-8', true), encoding:'UTF-8' };
+    } catch (_utf8Error) {
+      try {
+        return { text:decode('big5', true), encoding:'Big5' };
+      } catch (_big5Error) {
+        throw new Error('CSV／TSV 文字編碼無法辨識；只接受 UTF-8、UTF-16 或 Big5。');
+      }
+    }
+  }
+
   function workbookMatrices(arrayBuffer, XLSX) {
     if (!XLSX || typeof XLSX.read !== 'function') throw new Error('本機 Excel 解析元件未載入。');
     const workbook = XLSX.read(arrayBuffer, { type:'array', cellDates:true, raw:true });
@@ -378,8 +394,9 @@
     const extension = extensionOf(file.name);
     if (!SUPPORTED_EXTENSIONS.includes(extension)) throw new Error('只支援 .xlsx、.xls、.csv、.tsv。');
     if (extension === 'xlsx' || extension === 'xls') return { ...(parseWorkbook(await file.arrayBuffer(), XLSX)), fileName:file.name, extension };
-    const parsedText = parseDelimited(await file.text(), extension === 'tsv' ? '\t' : undefined);
-    return { ...parseMatrix(parsedText.rows), fileName:file.name, sheetName:extension.toUpperCase(), extension, delimiter:parsedText.delimiter };
+    const decoded = decodeDelimitedBytes(await file.arrayBuffer());
+    const parsedText = parseDelimited(decoded.text, extension === 'tsv' ? '\t' : undefined);
+    return { ...parseMatrix(parsedText.rows), fileName:file.name, sheetName:extension.toUpperCase(), extension, delimiter:parsedText.delimiter, encoding:decoded.encoding };
   }
 
   function escapeHtml(value) {
@@ -399,7 +416,7 @@
     status.hidden = false;
     status.className = `patrol-local-import-status${errorText || fileConflicts || serverConflicts || invalid ? ' bad' : ''}`;
     status.innerHTML = `<strong>${errorText ? '巡店報表解析封鎖' : '巡店報表解析完成'}</strong>` +
-      `檔案：${escapeHtml(state.fileName || '—')}<br>工作表：${escapeHtml(state.sheetName || '—')}<br>` +
+      `檔案：${escapeHtml(state.fileName || '—')}<br>工作表：${escapeHtml(state.sheetName || '—')}${state.encoding ? `<br>編碼：${escapeHtml(state.encoding)}` : ''}<br>` +
       `<div class="patrol-local-import-metrics">` +
       metric('原始資料', state.rawRowCount ?? 0) + metric('有效資料', state.validRowCount ?? 0) +
       metric('檔案內重複', state.duplicateCount ?? 0) + metric('預計新增', preflight ? additions : '—') +
@@ -464,6 +481,7 @@
           file,
           fileName:parsed.fileName,
           sheetName:parsed.sheetName,
+          encoding:parsed.encoding,
           rawRowCount:parsed.rawRowCount,
           validRowCount:parsed.validRowCount,
           duplicateCount:parsed.duplicateCount,
@@ -545,7 +563,7 @@
     VERSION, MAX_FILE_BYTES, SUPPORTED_EXTENSIONS, FIELDS, OUTPUT_FIELDS, HEADERS,
     normalizeHeader, normalizeDateTime, normalizeResult, detectHeader, parseMatrix,
     normalizeConfiguredStoreName, configuredStoreIndex, normalizeRowsToConfiguredStores,
-    detectDelimiter, parseDelimited, dedupeRows, defaultRowKey, comparableRow,
+    detectDelimiter, parseDelimited, decodeDelimitedBytes, dedupeRows, defaultRowKey, comparableRow,
     workbookMatrices, chooseWorkbookSheet, parseWorkbook, parseFile,
     prepareCandidates, renderBrowserStatus, createBrowserController
   });

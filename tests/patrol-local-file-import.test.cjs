@@ -26,6 +26,10 @@ function textFile(name, contents) {
   return { name, size:Buffer.byteLength(contents), text:async()=>contents, arrayBuffer:async()=>Buffer.from(contents) };
 }
 
+function binaryFile(name, contents) {
+  return { name, size:contents.length, arrayBuffer:async()=>contents };
+}
+
 function workbookFile(matrix, name = '巡店紀錄_20260825.xlsx', bookType = 'xlsx') {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['封面']]), '說明');
@@ -55,6 +59,16 @@ test('正常 CSV 解析', async () => {
   const parsed = await Parser.parseFile(textFile('巡店.csv', csv), XLSX);
   assert.equal(parsed.blocked, false);
   assert.equal(parsed.rows.length, 1);
+  assert.equal(parsed.rows[0].result, 'v');
+});
+
+test('正式 Big5 CSV 會先本機解碼再辨識巡店表頭', async () => {
+  const contents = Buffer.from('t/6+yai1qbGwT7/9qu0oqfqy06rtKQqz+KrtpOm0waFHMjAyNi8wOC8yNQoKvvexS7Wlr8WhRwq28artrsm2oSyo7Kmxrsm2oSzC96mxrsm2oSywz7NCp08swOe3fsJJpU69WCzAy6xkqbHCSSzAy6xkpEit+yzDRLi5LMDLrGSkuq5lLKxPp1+mWK7mLKW8rGSiQaSjpliu5q3spl0sCjIwMjYtMDgtMjUgMDk6MDUsMjAyNi0wOC0yNSAwOTowMCwyMDI2LTA4LTI1IDEwOjAwLKVfpECkR0IsRE5CMTAwODIspXilX6XDpk4stPq41bf+vsksMizAy6xkpLquZSxWLCw=', 'base64');
+  const parsed = await Parser.parseFile(binaryFile('正式巡店.csv', contents), XLSX);
+  assert.equal(parsed.blocked, false);
+  assert.equal(parsed.encoding, 'Big5');
+  assert.equal(parsed.rawRowCount, 1);
+  assert.equal(parsed.rows[0].store, '台北永吉');
   assert.equal(parsed.rows[0].result, 'v');
 });
 
