@@ -45,6 +45,8 @@
 
 HTML 內建 Content Security Policy：`connect-src 'none'`，並且不包含 `fetch`、XHR、JSONP、GAS URL、Spreadsheet ID 或通行碼欄位。
 
+儲存庫中的 `patrol-lite.html` 是單檔發行版：完整應用程式以 gzip 壓縮後內嵌於 HTML，啟動時只在本機記憶體解開；這不是網路下載，也不會建立外部連線。測試會先解開內容，再檢查隱私邊界與功能契約。
+
 ## 最簡單的分享方式
 
 ### 嚴格離線模式
