@@ -455,7 +455,7 @@ test('本機選檔後顯示檔名與預覽，尚未確認前不呼叫 ptwrite', 
   await openAndUnlock(page);
   expect(await page.evaluate(()=>({xlsx:Boolean(window.XLSX),parser:Boolean(window.PatrolLocalFileImport),dependencies:document.querySelectorAll('script[data-patrol-local-import-dependency]').length}))).toEqual({xlsx:false,parser:false,dependencies:0});
   const lines=[
-    pasteLine(7,'台北通化','DNB10059',1,'v',''),
+    pasteLine(7,'台北通化','DNB10174',1,'v',''),
     pasteLine(7,'台北酒泉','DNB10062',2,'v',''),
   ];
   await selectPatrolLocalCsv(page,'巡店紀錄_20260825.csv',lines);
@@ -477,7 +477,7 @@ test('本機選檔後顯示檔名與預覽，尚未確認前不呼叫 ptwrite', 
 test('本機選檔的 code／store 矛盾在 dedupe 與 Preflight 前整批封鎖', async ({ page }) => {
   await stubGas(page);
   await openAndUnlock(page);
-  await selectPatrolLocalCsv(page,'店碼矛盾.csv',[pasteLine(6,'台北酒泉','DNB10059',1,'v','')]);
+  await selectPatrolLocalCsv(page,'店碼矛盾.csv',[pasteLine(6,'台北酒泉','DNB10174',1,'v','')]);
 
   await expect(page.locator('#patrolLocalImportStatus')).toContainText('營業點代碼與店名矛盾');
   await expect(page.locator('#parseMsg')).toContainText('正式 STORES 雙欄驗證');
@@ -494,7 +494,7 @@ test('本機選檔遇到雲端衝突時不顯示確認寫入', async ({ page }) 
     fillTime:`${fixture.fillDate} 16:43`,arriveTime:`${fixture.fillDate} 16:00`,leaveTime:`${fixture.fillDate} 18:00`,
     district:'北一二B',code:'DNB10059',store:'台北通化',inspector:'測試督導',item:1,content:'內容',result:'v',reason:'',month:fixture.month
   }];
-  await selectPatrolLocalCsv(page,'有衝突.csv',[pasteLine(6,'台北通化','DNB10059',1,'na','na')]);
+  await selectPatrolLocalCsv(page,'有衝突.csv',[pasteLine(6,'台北通化','DNB10174',1,'na','na')]);
 
   await expect(page.locator('#patrolLocalImportStatus')).toContainText('衝突');
   await expect(page.locator('#parseMsg')).toContainText('雲端同鍵異內容');
@@ -506,22 +506,24 @@ test('本機選檔確認後才 ptwrite，readback 成功後刷新看板與移動
   await stubGas(page);
   await openAndUnlock(page);
   const lines=[
-    pasteLine(8,'通化','dnb10059',1,'v',''),
+    pasteLine(8,'通化','dnb10174',1,'v',''),
     pasteLine(8,'酒泉','dnb10062',2,'v',''),
+    pasteLine(8,'萬大','dnb10168',3,'v',''),
   ];
   await selectPatrolLocalCsv(page,'確認後寫入.csv',lines);
   expect(writeCalls).toBe(0);
   await page.getByRole('button',{name:'確認寫入雲端'}).click();
 
   await expect(page.locator('#parseMsg')).toContainText('本機檔案寫入與雲端讀回一致');
-  await expect(page.locator('#parseMsg')).toContainText('解析 2 筆／新增 2 筆／已存在 0 筆／讀回 2 筆');
+  await expect(page.locator('#parseMsg')).toContainText('解析 3 筆／新增 3 筆／已存在 0 筆／讀回 3 筆');
   await expect(page.locator('#patrolLocalImportStatus')).toBeHidden();
   await expect(page.locator('#content')).toContainText('台北通化');
   await expect(page.locator('#content')).toContainText('台北酒泉');
   expect(writeCalls).toBe(1);
   expect(ptwritePayloads[0].map(row=>({code:row.code,store:row.store}))).toEqual([
-    {code:'DNB10059',store:'台北通化'},
+    {code:'DNB10174',store:'台北通化'},
     {code:'DNB10062',store:'台北酒泉'},
+    {code:'DNB10168',store:'台北萬大'},
   ]);
   await expect.poll(()=>ptMileageCalls.length).toBeGreaterThan(0);
 });
@@ -530,7 +532,7 @@ test('本機解析元件動態載入失敗時 fail-closed 且零寫入', async (
   await page.route('**/assets/vendor/xlsx.full.min.js*', route=>route.abort());
   await stubGas(page);
   await openAndUnlock(page);
-  await selectPatrolLocalCsv(page,'載入失敗.csv',[pasteLine(8,'台北通化','DNB10059',1,'v','')]);
+  await selectPatrolLocalCsv(page,'載入失敗.csv',[pasteLine(8,'台北通化','DNB10174',1,'v','')]);
 
   await expect(page.locator('#patrolLocalImportStatus')).toContainText('本機解析元件');
   await expect(page.locator('#patrolLocalImportStatus')).toContainText('未呼叫 ptwrite');
@@ -544,8 +546,8 @@ test('本機選檔 readback 失敗時保留檔名、待寫資料與重新確認'
   await stubGas(page);
   await openAndUnlock(page);
   const lines=[
-    pasteLine(9,'台北通化','DNB10059',1,'v',''),
-    pasteLine(9,'台北通化','DNB10059',2,'v',''),
+    pasteLine(9,'台北通化','DNB10174',1,'v',''),
+    pasteLine(9,'台北通化','DNB10174',2,'v',''),
   ];
   await selectPatrolLocalCsv(page,'保留重試.csv',lines);
   omitPtdetailRow=true;

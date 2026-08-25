@@ -73,6 +73,17 @@ test('本機資料先依正式 STORES 雙欄驗證與正規化，再進入 dedup
   assert.match(importer, /code:byCode\.code, store:byCode\.name/);
 });
 
+test('本機匯入採正式九店代碼且不改動看板 STORES', () => {
+  const expected = [
+    ['三創','DNB10307'],['大稻埕','DNB10284'],['酒泉','DNB10062'],
+    ['六張犁','DNB10440'],['杭州南','DNB10146'],['通化','DNB10174'],
+    ['復興南','DNB10094'],['萬大','DNB10168'],['永吉','DNB10082']
+  ];
+  expected.forEach(([name,code])=>assert.match(patrol,new RegExp(`'${name}':'${code}'`)));
+  assert.match(patrol, /getStores:\(\)=>patrolLocalImportConfiguredStores\(\)/);
+  assert.match(patrol, /不改動看板／GAS 回傳的 STORES/);
+});
+
 test('初始 HTML 不載入 parser／SheetJS，選檔 loader 失敗維持零寫入', () => {
   assert.match(patrol, /async function handlePatrolLocalFileSelection\(event\)/);
   assert.match(patrol, /await loadPatrolLocalImportDependencies\(\)/);

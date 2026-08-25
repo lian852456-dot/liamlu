@@ -1126,6 +1126,25 @@ function parsePatrolPasteText(raw){
 /* ---------- 本機巡店報表入口（解析後沿用既有 Preflight／寫入／readback） ---------- */
 let patrolLocalFileController=null;
 let patrolLocalImportLoadPromise=null;
+// 本機匯入專用的北一二B正式店碼；不改動看板／GAS 回傳的 STORES。
+const PATROL_LOCAL_IMPORT_CANONICAL_CODES=Object.freeze({
+  '三創':'DNB10307',
+  '大稻埕':'DNB10284',
+  '酒泉':'DNB10062',
+  '六張犁':'DNB10440',
+  '杭州南':'DNB10146',
+  '通化':'DNB10174',
+  '復興南':'DNB10094',
+  '萬大':'DNB10168',
+  '永吉':'DNB10082'
+});
+function patrolLocalImportConfiguredStores(){
+  return STORES.map(store=>{
+    const name=String(store.name||'').trim();
+    const key=name.replace(/[\s　]+/g,'').replace(/^台灣大哥大數位生活/,'').replace(/^台北/,'');
+    return {code:PATROL_LOCAL_IMPORT_CANONICAL_CODES[key]||String(store.code||'').trim(),name};
+  });
+}
 function loadPatrolLocalScript(id,src,ready){
   if(ready()) return Promise.resolve();
   return new Promise((resolve,reject)=>{
@@ -1159,7 +1178,7 @@ function getPatrolLocalFileController(){
   if(!patrolLocalFileController) patrolLocalFileController=PatrolLocalFileImport.createBrowserController({
     document,
     getXlsx:()=>window.XLSX,
-    getStores:()=>STORES.map(store=>({code:String(store.code||''),name:String(store.name||'')})),
+    getStores:()=>patrolLocalImportConfiguredStores(),
     candidateKey:patrolCandidateKey,
     getRawDetails:()=>rawDetails,
     isReady:()=>Boolean(cloudOn&&secureUnlocked&&privateAccount&&PT_TOKEN),

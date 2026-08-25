@@ -7,7 +7,7 @@ const Parser = require('../patrol-local-import.js');
 
 const header = ['填表時間','到店時間','離店時間','區處別','營業點代碼','檢查店點','檢查人員','題號','檢查內容','是否合格','未查／不合格原因'];
 const formalStores = [
-  { code:'DNB10059', name:'台北通化' },
+  { code:'DNB10174', name:'台北通化' },
   { code:'DNB10062', name:'台北酒泉' },
   { code:'DNB10082', name:'台北永吉' },
 ];
@@ -167,7 +167,7 @@ test('同鍵不同內容封鎖整批', () => {
 });
 
 test('營業點代碼與店名矛盾時整批封鎖', () => {
-  const parsed = Parser.parseMatrix([header,row({code:'DNB10059',store:'台北酒泉'})]);
+  const parsed = Parser.parseMatrix([header,row({code:'DNB10174',store:'台北酒泉'})]);
   const validated = Parser.normalizeRowsToConfiguredStores(parsed.rows, formalStores);
   assert.equal(validated.blocked, true);
   assert.equal(validated.rows.length, 0);
@@ -190,10 +190,10 @@ test('未知營業點代碼或未知店名均整批封鎖', () => {
 });
 
 test('正式 STORES 驗證後 code 與 store 均正規化', () => {
-  const parsed = Parser.parseMatrix([header,row({code:'dnb10059',store:'通化'})]);
+  const parsed = Parser.parseMatrix([header,row({code:'dnb10174',store:'通化'})]);
   const validated = Parser.normalizeRowsToConfiguredStores(parsed.rows, formalStores);
   assert.equal(validated.blocked, false);
-  assert.equal(validated.rows[0].code, 'DNB10059');
+  assert.equal(validated.rows[0].code, 'DNB10174');
   assert.equal(validated.rows[0].store, '台北通化');
 });
 
