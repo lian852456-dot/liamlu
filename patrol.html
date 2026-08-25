@@ -136,6 +136,17 @@
   .parse-msg.err{background:var(--miss-bg);color:var(--miss);display:block}
   .patrol-paste-preview{margin-top:10px;padding:10px 12px;border:1px solid #b8d9ff;border-radius:8px;background:#f1f7ff;color:#174b75;font-size:13px;line-height:1.55}
   .patrol-paste-preview strong{display:block;font-size:14px}
+  .patrol-local-import{margin-top:12px;padding:12px;border:1px solid #d9d9d9;border-radius:10px;background:#fafafa}
+  .patrol-local-import .btn-row{margin-top:0;align-items:center}
+  .patrol-local-import-note{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+  .patrol-local-import-status{margin-top:10px;padding:10px 12px;border-radius:8px;background:#fff;border:1px solid var(--line);font-size:13px;line-height:1.65;overflow-wrap:anywhere}
+  .patrol-local-import-status[hidden]{display:none}
+  .patrol-local-import-status strong{display:block;font-size:14px;color:var(--ink)}
+  .patrol-local-import-status.bad{border-color:#efc4c4;background:var(--miss-bg);color:var(--miss)}
+  .patrol-local-import-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:8px}
+  .patrol-local-import-metric{border:1px solid var(--line);border-radius:7px;padding:7px;background:#fff;min-width:0}
+  .patrol-local-import-metric b{display:block;font-size:16px;color:var(--ink)}
+  .patrol-local-import-metric span{display:block;font-size:11px;color:var(--muted)}
 
   /* Store cards */
   .section-title{font-size:16px;font-weight:800;margin:22px 0 12px;color:var(--tw-black);display:flex;align-items:center;gap:10px}
@@ -210,6 +221,8 @@
   @media(max-width:560px){
     .store-head .right .bar{display:none}
     header h1{font-size:17px}
+    .patrol-local-import .btn-row>button{width:100%}
+    .patrol-local-import-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
   }
 
   /* ---------- 加密工作頁籤 ---------- */
@@ -479,6 +492,14 @@
     <h2>貼上巡店紀錄</h2>
     <p class="hint">貼上你的明細表（含表頭那幾行也沒關係，系統會自動略過）。可一次貼整月，或每次巡完一店就補貼，資料會累加並自動同步雲端——手機開同一網址就看得到。</p>
     <textarea id="pasteBox" placeholder="填表時間	到店時間	離店時間	區處別	營業點代碼	檢查店點	檢查人員	題號	檢查內容	是否合格	未查／不合格原因&#10;2026/7/1 16:43	...	1	督導駐點		na&#10;..."></textarea>
+    <div class="patrol-local-import" aria-label="本機巡店報表上傳">
+      <div class="btn-row">
+        <button class="btn-ghost" id="patrolLocalFileButton" type="button" onclick="document.getElementById('patrolLocalFileInput').click()">📂 選擇巡店報表</button>
+        <span class="patrol-local-import-note">支援 .xlsx、.xls、.csv、.tsv；原始檔只在本機瀏覽器解析。</span>
+        <input id="patrolLocalFileInput" type="file" accept=".xlsx,.xls,.csv,.tsv" hidden onchange="handlePatrolLocalFileSelection(event)">
+      </div>
+      <div class="patrol-local-import-status" id="patrolLocalImportStatus" role="status" aria-live="polite" hidden></div>
+    </div>
     <div class="btn-row">
       <button class="btn-primary" id="patrolParseBtn" onclick="parseData()">解析並預覽</button>
       <button class="btn-primary" id="patrolConfirmWriteBtn" type="button" onclick="confirmPatrolCloudWrite()" hidden>確認寫入雲端</button>
@@ -598,6 +619,8 @@
 </template>
 
 <script src="patrol-read-model.js?v=10"></script>
+<script src="assets/vendor/xlsx.full.min.js?v=0.18.5"></script>
+<script src="patrol-local-import.js?v=1"></script>
 <script>
 /* ---------- 檢核規則設定 ---------- */
 // 預設門市清單（北一二B）。連上雲端後會改用 GAS 回傳的本區清單，
@@ -1102,6 +1125,25 @@ function parsePatrolPasteText(raw){
   return {rows:newDetails,error:''};
 }
 
+/* ---------- 本機巡店報表入口（解析後沿用既有 Preflight／寫入／readback） ---------- */
+let patrolLocalFileController=null;
+function getPatrolLocalFileController(){
+  if(!patrolLocalFileController) patrolLocalFileController=PatrolLocalFileImport.createBrowserController({
+    document,
+    getXlsx:()=>window.XLSX,
+    candidateKey:patrolCandidateKey,
+    getRawDetails:()=>rawDetails,
+    isReady:()=>Boolean(cloudOn&&secureUnlocked&&privateAccount&&PT_TOKEN),
+    preflight:rows=>patrolServerPreflight(rows),
+    setPending:value=>{pendingPatrolWrite=value;},
+    setConfirmation:setPatrolWriteConfirmation,
+    showMessage:showMsg
+  });
+  return patrolLocalFileController;
+}
+function resetPatrolLocalFileSelection(options={}){ if(patrolLocalFileController) patrolLocalFileController.reset(options); }
+function handlePatrolLocalFileSelection(event){ return getPatrolLocalFileController().handleSelection(event); }
+
 /* ---------- 解析貼上資料 ---------- */
 let pendingPatrolWrite=null;
 let failedPatrolWriteRaw='';
@@ -1163,6 +1205,11 @@ async function patrolServerPreflight(rows){
 }
 
 async function parseData(){
+  if(pendingPatrolWrite&&pendingPatrolWrite.sourceType==='file'){
+    pendingPatrolWrite=null;
+    setPatrolWriteConfirmation(false);
+  }
+  resetPatrolLocalFileSelection();
   const raw = document.getElementById('pasteBox').value;
   if(!raw.trim()){ showMsg('請先貼上資料','err'); return; }
 
@@ -1224,6 +1271,7 @@ async function parseData(){
 
 async function confirmPatrolCloudWrite(){
   const pending=pendingPatrolWrite;
+  const isLocalFile=Boolean(pending&&pending.sourceType==='file');
   if(!pending||!pending.candidate||!pending.candidate.writeRows.length){
     showMsg('沒有待確認的雲端寫入資料，請先解析並預覽。','err');
     return;
@@ -1239,19 +1287,35 @@ async function confirmPatrolCloudWrite(){
   try{
     const receipt=await cloudWrite(pending.candidate.writeRows);
     commitPatrolCandidates(pending.candidate);
-    document.getElementById('pasteBox').value='';
-    pendingPatrolWrite=null;
-    setPatrolWriteConfirmation(false);
-    const writeMessage=`雲端寫入與 readback 一致（解析 ${pending.parsedRows.length} 筆／寫入 ${receipt.writtenRows} 筆／讀回 ${receipt.readbackRows} 筆）`;
-    await cloudLoad({afterWrite:true,writeMessage,renderErr});
+    if(isLocalFile){
+      const parsedRows=pending.localFile.validRowCount;
+      const additions=pending.preflight.additions.length;
+      const existing=pending.preflight.existingSame.length;
+      const writeMessage=`本機檔案寫入與雲端讀回一致（解析 ${parsedRows} 筆／新增 ${additions} 筆／已存在 ${existing} 筆／讀回 ${receipt.readbackRows} 筆）`;
+      pendingPatrolWrite=null;
+      setPatrolWriteConfirmation(false);
+      resetPatrolLocalFileSelection();
+      MI.clear();
+      await Promise.all([cloudLoad({afterWrite:true,writeMessage,renderErr}),MI.open(currentMonth)]);
+    }else{
+      document.getElementById('pasteBox').value='';
+      pendingPatrolWrite=null;
+      setPatrolWriteConfirmation(false);
+      const writeMessage=`雲端寫入與 readback 一致（解析 ${pending.parsedRows.length} 筆／寫入 ${receipt.writtenRows} 筆／讀回 ${receipt.readbackRows} 筆）`;
+      await cloudLoad({afterWrite:true,writeMessage,renderErr});
+    }
   }catch(error){
-    setPatrolWriteConfirmation(false);
-    failedPatrolWriteRaw=pending.raw;
+    if(isLocalFile) setPatrolWriteConfirmation(true,false);
+    else{
+      setPatrolWriteConfirmation(false);
+      failedPatrolWriteRaw=pending.raw;
+    }
     const report=error&&error.readbackReport;
     if(report){
-      showMsg(`雲端未完整寫入，已保留原始資料，請勿重複操作。解析 ${report.parsedRows} 筆／written ${report.writtenRows} 筆／readback ${report.readbackRows} 筆／missing keys：${report.missingKeys.join('；')||'無法讀回驗證'}`,'err');
+      if(isLocalFile) showMsg(`本機檔案與待確認狀態已保留。雲端未完整寫入／讀回：解析 ${report.parsedRows} 筆／written ${report.writtenRows} 筆／readback ${report.readbackRows} 筆／missing keys：${report.missingKeys.join('；')||'無法讀回驗證'}`,'err');
+      else showMsg(`雲端未完整寫入，已保留原始資料，請勿重複操作。解析 ${report.parsedRows} 筆／written ${report.writtenRows} 筆／readback ${report.readbackRows} 筆／missing keys：${report.missingKeys.join('；')||'無法讀回驗證'}`,'err');
     }else{
-      showMsg(error?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端寫入失敗：${error&&error.message||'未知錯誤'}；原始資料已保留，尚未顯示同步成功。`,'err');
+      showMsg(error?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端寫入失敗：${error&&error.message||'未知錯誤'}；${isLocalFile?'本機檔案與待確認狀態':'原始資料'}已保留，尚未顯示同步成功。`,'err');
     }
   }
 }
@@ -1279,6 +1343,7 @@ function showMsg(t,type){
 function clearAll(){
   if(confirm('確定清空所有已貼上的巡店紀錄？（雲端資料不受影響，重新載入即可還原）')){
     records={}; rawDetails=[];pendingPatrolWrite=null;failedPatrolWriteRaw='';setPatrolWriteConfirmation(false);
+    resetPatrolLocalFileSelection();
     const preview=document.getElementById('patrolPastePreview');if(preview){preview.hidden=true;preview.textContent='';}
     render();
     showMsg('已清空本地資料','ok');
@@ -1305,6 +1370,7 @@ function importData(e){
     try{
       const data=JSON.parse(ev.target.result);
       pendingPatrolWrite=null;failedPatrolWriteRaw='';setPatrolWriteConfirmation(false);
+      resetPatrolLocalFileSelection();
       if(Array.isArray(data)){
         const mergeResult=mergePatrolCandidates(data);
         showPatrolPastePreview('本次匯入',mergeResult);
