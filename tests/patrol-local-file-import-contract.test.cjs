@@ -35,12 +35,16 @@ test('原貼上文字框與 JSON 匯入／匯出入口完整保留', () => {
 });
 
 test('Excel 元件只從 repo 本機載入並保留授權', () => {
-  assert.match(patrol, /src="assets\/vendor\/xlsx\.full\.min\.js\?v=0\.18\.5"/);
-  assert.match(patrol, /src="patrol-local-import\.js\?v=1"/);
+  assert.doesNotMatch(patrol, /<script\s+src="assets\/vendor\/xlsx\.full\.min\.js/);
+  assert.doesNotMatch(patrol, /<script\s+src="patrol-local-import\.js/);
+  assert.match(patrol, /'patrolLocalImportParserScript','patrol-local-import\.js\?v=2'/);
+  assert.match(patrol, /'patrolLocalImportXlsxScript','assets\/vendor\/xlsx\.full\.min\.js\?v=0\.20\.3'/);
+  assert.match(patrol, /window\.XLSX\.version==='0\.20\.3'/);
   assert.doesNotMatch(patrol, /<script[^>]+https?:\/\/(?:cdn|unpkg|jsdelivr)/i);
   assert.doesNotMatch(importer, /https?:\/\//i);
   assert.ok(fs.existsSync(path.join(root, 'assets/vendor/LICENSE.sheetjs.txt')));
-  assert.equal(hashFile('assets/vendor/xlsx.full.min.js'), 'c9506197caf809a075b6dee1da0d36fb19da7158ffe8a88e7b0c96c5d8623c99');
+  assert.equal(hashFile('assets/vendor/xlsx.full.min.js'), 'cc015130aa8521e7f088f88898eba949ccdcbfb38df0bd129b44b7273c3a6f41');
+  assert.equal(require('../assets/vendor/xlsx.full.min.js').version, '0.20.3');
 });
 
 test('里程模組本體維持 base main 位元一致', () => {
@@ -59,4 +63,19 @@ test('本機匯入只保留正式十二欄，不包含檔案內容或公開資�
   assert.doesNotMatch(importer, /download|createObjectURL|\.json['"]|private-data|data\//i);
   assert.match(importer, /arrayBuffer\(\)/);
   assert.match(importer, /file\.text\(\)/);
+});
+
+test('本機資料先依正式 STORES 雙欄驗證與正規化，再進入 dedupe／Preflight', () => {
+  const storeGate = importer.indexOf('normalizeRowsToConfiguredStores(parsed.rows, configuredStores)');
+  const dedupe = importer.indexOf('dedupeRows(storeValidation.rows, services.candidateKey)');
+  const preflight = importer.indexOf('services.preflight(localState.parsedRows)');
+  assert.ok(storeGate >= 0 && dedupe > storeGate && preflight > dedupe);
+  assert.match(importer, /code:byCode\.code, store:byCode\.name/);
+});
+
+test('初始 HTML 不載入 parser／SheetJS，選檔 loader 失敗維持零寫入', () => {
+  assert.match(patrol, /async function handlePatrolLocalFileSelection\(event\)/);
+  assert.match(patrol, /await loadPatrolLocalImportDependencies\(\)/);
+  assert.match(patrol, /本機解析元件載入失敗[^`]*未呼叫 ptwrite/);
+  assert.equal((patrol.match(/loadPatrolLocalImportDependencies\(\)/g) || []).length, 2);
 });

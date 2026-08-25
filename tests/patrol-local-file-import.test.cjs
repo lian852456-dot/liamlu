@@ -6,6 +6,11 @@ const XLSX = require('../assets/vendor/xlsx.full.min.js');
 const Parser = require('../patrol-local-import.js');
 
 const header = ['填表時間','到店時間','離店時間','區處別','營業點代碼','檢查店點','檢查人員','題號','檢查內容','是否合格','未查／不合格原因'];
+const formalStores = [
+  { code:'DNB10059', name:'台北通化' },
+  { code:'DNB10062', name:'台北酒泉' },
+  { code:'DNB10082', name:'台北永吉' },
+];
 
 function row(overrides = {}) {
   const values = {
@@ -132,15 +137,50 @@ test('缺少必要表頭整批封鎖', () => {
 
 test('同鍵相同內容只保留一筆', () => {
   const parsed = Parser.parseMatrix([header,row(),row()]);
-  assert.equal(parsed.blocked, false);
-  assert.equal(parsed.rows.length, 1);
-  assert.equal(parsed.duplicateCount, 1);
+  const validated = Parser.normalizeRowsToConfiguredStores(parsed.rows, formalStores);
+  const deduped = Parser.dedupeRows(validated.rows);
+  assert.equal(validated.blocked, false);
+  assert.equal(deduped.rows.length, 1);
+  assert.equal(deduped.duplicateCount, 1);
 });
 
 test('同鍵不同內容封鎖整批', () => {
   const parsed = Parser.parseMatrix([header,row(),row({reason:'不同內容'})]);
-  assert.equal(parsed.blocked, true);
-  assert.equal(parsed.duplicateConflicts.length, 1);
+  const validated = Parser.normalizeRowsToConfiguredStores(parsed.rows, formalStores);
+  const deduped = Parser.dedupeRows(validated.rows);
+  assert.equal(validated.blocked, false);
+  assert.equal(deduped.conflicts.length, 1);
+});
+
+test('營業點代碼與店名矛盾時整批封鎖', () => {
+  const parsed = Parser.parseMatrix([header,row({code:'DNB10059',store:'台北酒泉'})]);
+  const validated = Parser.normalizeRowsToConfiguredStores(parsed.rows, formalStores);
+  assert.equal(validated.blocked, true);
+  assert.equal(validated.rows.length, 0);
+  assert.match(validated.errors.join(' '), /營業點代碼與店名矛盾/);
+});
+
+test('未知營業點代碼或未知店名均整批封鎖', () => {
+  const unknownCode = Parser.normalizeRowsToConfiguredStores(
+    Parser.parseMatrix([header,row({code:'UNKNOWN',store:'台北永吉'})]).rows,
+    formalStores
+  );
+  const unknownStore = Parser.normalizeRowsToConfiguredStores(
+    Parser.parseMatrix([header,row({code:'DNB10082',store:'台北不存在'})]).rows,
+    formalStores
+  );
+  assert.equal(unknownCode.blocked, true);
+  assert.match(unknownCode.errors.join(' '), /營業點代碼未知/);
+  assert.equal(unknownStore.blocked, true);
+  assert.match(unknownStore.errors.join(' '), /檢查店點未知/);
+});
+
+test('正式 STORES 驗證後 code 與 store 均正規化', () => {
+  const parsed = Parser.parseMatrix([header,row({code:'dnb10059',store:'通化'})]);
+  const validated = Parser.normalizeRowsToConfiguredStores(parsed.rows, formalStores);
+  assert.equal(validated.blocked, false);
+  assert.equal(validated.rows[0].code, 'DNB10059');
+  assert.equal(validated.rows[0].store, '台北通化');
 });
 
 test('完全空白檔案封鎖', async () => {

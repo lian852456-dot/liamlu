@@ -157,6 +157,54 @@
   function comparableRow(row) {
     return OUTPUT_FIELDS.map(field => field === 'item' ? String(Number(row && row[field])) : text(row && row[field])).join('\u001f');
   }
+  function normalizeConfiguredStoreName(value) {
+    return text(value).replace(/[\s　]+/g, '').replace(/^台灣大哥大數位生活/, '').replace(/^台北/, '');
+  }
+  function configuredStoreIndex(configuredStores) {
+    const entries = [];
+    const byCode = new Map();
+    const byName = new Map();
+    const errors = [];
+    (Array.isArray(configuredStores) ? configuredStores : []).forEach((source, index) => {
+      const code = text(source && source.code);
+      const name = text(source && source.name);
+      const codeKey = code.toUpperCase();
+      const nameKey = normalizeConfiguredStoreName(name);
+      if (!codeKey || !nameKey) {
+        errors.push(`正式 STORES 第 ${index + 1} 筆缺少營業點代碼或店名`);
+        return;
+      }
+      if (byCode.has(codeKey)) errors.push(`正式 STORES 營業點代碼重複：${code}`);
+      if (byName.has(nameKey)) errors.push(`正式 STORES 店名重複：${name}`);
+      const entry = Object.freeze({ code, name, codeKey, nameKey });
+      entries.push(entry);
+      byCode.set(codeKey, entry);
+      byName.set(nameKey, entry);
+    });
+    if (!entries.length) errors.push('正式 STORES 為空');
+    return { entries, byCode, byName, errors };
+  }
+  function normalizeRowsToConfiguredStores(rows, configuredStores) {
+    const index = configuredStoreIndex(configuredStores);
+    if (index.errors.length) return { rows:[], blocked:true, errors:index.errors, invalidCount:index.errors.length };
+    const normalized = [];
+    const errors = [];
+    (Array.isArray(rows) ? rows : []).forEach((row, rowIndex) => {
+      const code = text(row && row.code);
+      const store = text(row && row.store);
+      const byCode = index.byCode.get(code.toUpperCase());
+      const byName = index.byName.get(normalizeConfiguredStoreName(store));
+      if (!byCode) errors.push(`第 ${rowIndex + 1} 筆營業點代碼未知：${code || '（空白）'}`);
+      if (!byName) errors.push(`第 ${rowIndex + 1} 筆檢查店點未知：${store || '（空白）'}`);
+      if (byCode && byName && byCode !== byName) {
+        errors.push(`第 ${rowIndex + 1} 筆營業點代碼與店名矛盾：${code}／${store}`);
+      }
+      if (byCode && byName && byCode === byName) {
+        normalized.push(canonicalRow({ ...row, code:byCode.code, store:byCode.name }));
+      }
+    });
+    return { rows:errors.length ? [] : normalized, blocked:Boolean(errors.length), errors, invalidCount:errors.length };
+  }
   function dedupeRows(rows, keyResolver) {
     const byKey = new Map();
     const conflicts = [];
@@ -233,19 +281,17 @@
       const match = row.fillTime.match(/^(\d{4})\/(\d{1,2})\//);
       row.month = match ? `${match[1]}-${pad(Number(match[2]))}` : '';
     });
-    const deduped = dedupeRows(valid);
     const errors = invalidRows.slice(0, 20).map(entry => `第 ${entry.rowNumber} 列：${entry.reasons.join('、')}`);
     if (!candidates.length) errors.push('檔案內沒有巡店資料列。');
-    if (deduped.conflicts.length) errors.push(`檔案內有 ${deduped.conflicts.length} 筆同鍵異內容，整批已封鎖。`);
     return {
-      rows:deduped.rows,
+      rows:valid.map(canonicalRow),
       blocked:Boolean(errors.length),
       errors,
       invalidRows,
-      duplicateCount:deduped.duplicateCount,
-      duplicateConflicts:deduped.conflicts,
+      duplicateCount:0,
+      duplicateConflicts:[],
       rawRowCount:candidates.length,
-      validRowCount:deduped.rows.length,
+      validRowCount:valid.length,
       headerRow:detected.rowIndex,
       headerFields:detected.fields
     };
@@ -432,7 +478,16 @@
           if (input) input.value = '';
           return;
         }
-        const canonicalized = dedupeRows(parsed.rows, services.candidateKey);
+        const configuredStores = typeof services.getStores === 'function' ? services.getStores() : services.stores;
+        const storeValidation = normalizeRowsToConfiguredStores(parsed.rows, configuredStores);
+        if (storeValidation.blocked) {
+          localState.invalidCount += storeValidation.invalidCount;
+          renderBrowserStatus(documentRef, localState, null, storeValidation.errors.join('；'));
+          message('營業點代碼／店名未通過正式 STORES 雙欄驗證，整批禁止進入去重與 Server Preflight。', 'err');
+          if (input) input.value = '';
+          return;
+        }
+        const canonicalized = dedupeRows(storeValidation.rows, services.candidateKey);
         localState.parsedRows = canonicalized.rows;
         localState.validRowCount = canonicalized.rows.length;
         localState.duplicateCount += canonicalized.duplicateCount;
@@ -489,6 +544,7 @@
   return Object.freeze({
     VERSION, MAX_FILE_BYTES, SUPPORTED_EXTENSIONS, FIELDS, OUTPUT_FIELDS, HEADERS,
     normalizeHeader, normalizeDateTime, normalizeResult, detectHeader, parseMatrix,
+    normalizeConfiguredStoreName, configuredStoreIndex, normalizeRowsToConfiguredStores,
     detectDelimiter, parseDelimited, dedupeRows, defaultRowKey, comparableRow,
     workbookMatrices, chooseWorkbookSheet, parseWorkbook, parseFile,
     prepareCandidates, renderBrowserStatus, createBrowserController

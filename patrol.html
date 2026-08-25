@@ -619,8 +619,6 @@
 </template>
 
 <script src="patrol-read-model.js?v=10"></script>
-<script src="assets/vendor/xlsx.full.min.js?v=0.18.5"></script>
-<script src="patrol-local-import.js?v=1"></script>
 <script>
 /* ---------- 檢核規則設定 ---------- */
 // 預設門市清單（北一二B）。連上雲端後會改用 GAS 回傳的本區清單，
@@ -1127,10 +1125,41 @@ function parsePatrolPasteText(raw){
 
 /* ---------- 本機巡店報表入口（解析後沿用既有 Preflight／寫入／readback） ---------- */
 let patrolLocalFileController=null;
+let patrolLocalImportLoadPromise=null;
+function loadPatrolLocalScript(id,src,ready){
+  if(ready()) return Promise.resolve();
+  return new Promise((resolve,reject)=>{
+    let script=document.getElementById(id);
+    if(script) script.remove();
+    script=document.createElement('script');
+    script.id=id;
+    script.async=true;
+    script.src=src;
+    script.dataset.patrolLocalImportDependency='true';
+    script.onload=()=>{
+      if(ready()) resolve();
+      else{ script.remove();reject(new Error(`本機解析元件版本驗證失敗：${src}`)); }
+    };
+    script.onerror=()=>{ script.remove();reject(new Error(`無法載入本機解析元件：${src}`)); };
+    document.head.appendChild(script);
+  });
+}
+function loadPatrolLocalImportDependencies(){
+  if(window.PatrolLocalFileImport&&window.XLSX&&window.XLSX.version==='0.20.3') return Promise.resolve();
+  if(!patrolLocalImportLoadPromise){
+    patrolLocalImportLoadPromise=loadPatrolLocalScript(
+      'patrolLocalImportParserScript','patrol-local-import.js?v=2',()=>Boolean(window.PatrolLocalFileImport)
+    ).then(()=>loadPatrolLocalScript(
+      'patrolLocalImportXlsxScript','assets/vendor/xlsx.full.min.js?v=0.20.3',()=>Boolean(window.XLSX&&window.XLSX.version==='0.20.3')
+    )).catch(error=>{ patrolLocalImportLoadPromise=null;throw error; });
+  }
+  return patrolLocalImportLoadPromise;
+}
 function getPatrolLocalFileController(){
   if(!patrolLocalFileController) patrolLocalFileController=PatrolLocalFileImport.createBrowserController({
     document,
     getXlsx:()=>window.XLSX,
+    getStores:()=>STORES.map(store=>({code:String(store.code||''),name:String(store.name||'')})),
     candidateKey:patrolCandidateKey,
     getRawDetails:()=>rawDetails,
     isReady:()=>Boolean(cloudOn&&secureUnlocked&&privateAccount&&PT_TOKEN),
@@ -1142,7 +1171,26 @@ function getPatrolLocalFileController(){
   return patrolLocalFileController;
 }
 function resetPatrolLocalFileSelection(options={}){ if(patrolLocalFileController) patrolLocalFileController.reset(options); }
-function handlePatrolLocalFileSelection(event){ return getPatrolLocalFileController().handleSelection(event); }
+async function handlePatrolLocalFileSelection(event){
+  const input=event&&event.target;
+  const file=input&&input.files&&input.files[0];
+  if(!file) return;
+  pendingPatrolWrite=null;
+  setPatrolWriteConfirmation(false);
+  try{
+    await loadPatrolLocalImportDependencies();
+    return await getPatrolLocalFileController().handleSelection(event);
+  }catch(error){
+    const status=document.getElementById('patrolLocalImportStatus');
+    if(status){
+      status.hidden=false;
+      status.className='patrol-local-import-status bad';
+      status.textContent=`巡店報表解析封鎖\n檔案：${file.name}\n${error&&error.message||'本機解析元件載入失敗'}；未呼叫 ptwrite。`;
+    }
+    if(input) input.value='';
+    showMsg(`${error&&error.message||'本機解析元件載入失敗'}；整批已封鎖，未呼叫 ptwrite。`,'err');
+  }
+}
 
 /* ---------- 解析貼上資料 ---------- */
 let pendingPatrolWrite=null;

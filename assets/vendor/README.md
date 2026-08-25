@@ -1,10 +1,11 @@
 # SheetJS browser bundle
 
 - Package: `xlsx`
-- Version: `0.18.5`
-- Source: npm package `xlsx@0.18.5`, file `dist/xlsx.full.min.js`
-- npm tarball SHA-1: `16711b9113c848076b8a177022799ad356eba7d0`
-- Bundled file SHA-256: `c9506197caf809a075b6dee1da0d36fb19da7158ffe8a88e7b0c96c5d8623c99`
+- Version: `0.20.3`
+- Official source: `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`, file `package/dist/xlsx.full.min.js`
+- Official tarball SHA-256: `8dc73fc3b00203e72d176e85b50938627c7b086e607c682e8d3c22c02bb99fe8`
+- Bundled file SHA-256: `cc015130aa8521e7f088f88898eba949ccdcbfb38df0bd129b44b7273c3a6f41`
+- License file SHA-256: `4d2a38ac35cda06a555c84074a819d413339cd3691b822cae50f8f322fe01f64`
 - License: Apache-2.0; see `LICENSE.sheetjs.txt`
 
-The Patrol page loads this fixed local copy. It does not load SheetJS from a CDN at runtime.
+The Patrol page loads this fixed local copy only after the user selects a supported file. It does not load SheetJS from a CDN at runtime.

@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-25 ｜ Codex（PR #97 follow-up：STORES gate／SheetJS 0.20.3／選檔後載入）
+
+- 做了什麼：在原分支追加 follow-up；本機 rows 先同時核對正式 `STORES` code/name，矛盾或任一未知整批封鎖，通過後正規化正式 code/store 才進 dedupe 與既有 Preflight。SheetJS 改為官方 0.20.3 full browser build；初始頁面不載入 parser／SheetJS，選檔後才各載入一次，失敗維持零 Preflight／零 `ptwrite`。
+- 測試：Patrol Node passed 96／failed 0／skipped 0；正式 Patrol＋Auth Chromium passed 81／failed 0／skipped 0；follow-up Chrome 8/0/0、WebKit 8/0/0。全站 Chromium total 193：passed 187／failed 6／skipped 0；6 個 failed 均在本分支零 diff 的 Supervisor App 班表／半月讀取範圍。
+- 邊界：PR #97 維持 Draft；沒有修改 GAS、schema、auth/session、里程或正式資料。正式寫入 UAT、正式 readback、合併、Pages／GAS 部署與 Liam 實機驗收均未執行。
+
 ## 2026-08-25 ｜ Codex（正式 Patrol 本機選檔入口，Draft PR／未部署）
 
 - 做了什麼：從最新 `origin/main` `bda6e4a` 建立獨立 `feature/patrol-local-file-import-20260825`。只在正式 `patrol.html` 的「貼上巡店紀錄」區塊增加 `.xlsx/.xls/.csv/.tsv` 本機選檔；固定版 SheetJS 與 License 存在 repo，本機 parser 輸出既有十二欄後沿用正式 `patrolServerPreflight → pendingPatrolWrite → ptwrite → ptdetail readback → cloudLoad／MI.open`。
