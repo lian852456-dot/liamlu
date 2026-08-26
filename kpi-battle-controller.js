@@ -7,6 +7,9 @@
 
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
   const QUICK_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
+  const TRANSIENT_HTTP_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
+  const RETRYABLE_PRIVATE_ACTIONS = new Set(['private_access', 'kpicalc_access']);
+  const DEFAULT_RETRY_DELAYS_MS = [2000, 5000];
   const KPI_BATTLE_CORE_KEYS = { a999: 'AQ V+D 999 (含)以上', a1399: 'AQ V+D 1399 (含)以上', haosu: '好速案銷售點數', r1399: 'RT V+D 1399 (含)以上' };
   const KPI_BATTLE_PERSONAL_KEYS = { A999: 'AQ V+D 999 (含)以上', A1399: 'AQ V+D 1399 (含)以上', '好速': '好速案銷售點數', R1399: 'RT V+D 1399 (含)以上', R999: 'RT V+D 999 (含)以上', RT: 'RT上線點數', '特維': '特殊維繫用戶續約數', '配件': '配件及其他營收', '包膜': '包膜與保貼營收' };
 
@@ -15,6 +18,15 @@
     const gasUrl = savedGasUrl === DEFAULT_GAS_URL ? savedGasUrl : DEFAULT_GAS_URL;
     if (savedGasUrl !== gasUrl) storage.setItem('bei12b_gas_url', gasUrl);
     return gasUrl;
+  }
+
+  function diagnosticResponseUrl(value) {
+    try {
+      const parsed = new URL(String(value || ''));
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch (error) {
+      return '';
+    }
   }
 
   function kpiPendingCell() {
@@ -293,7 +305,11 @@
     const getAwardsData = typeof config.getAwardsData === 'function' ? config.getAwardsData : () => null;
     const onKpiLoaded = typeof config.onKpiLoaded === 'function' ? config.onKpiLoaded : () => {};
     const onKpiLoadError = typeof config.onKpiLoadError === 'function' ? config.onKpiLoadError : () => {};
-    const request = typeof config.post === 'function' ? config.post : post;
+    const transport = typeof config.post === 'function' ? config.post : post;
+    const retryDelaysMs = Array.isArray(config.retryDelaysMs) ? config.retryDelaysMs : DEFAULT_RETRY_DELAYS_MS;
+    const sleep = typeof config.sleep === 'function' ? config.sleep : delay => new Promise(resolve => win.setTimeout(resolve, delay));
+    const logger = config.logger || win.console || (typeof console !== 'undefined' ? console : null);
+    const request = payload => requestWithRetry(payload);
     const state = { data: null, view: 'stores', profile: null, adminSecret: '' };
 
     function privateDashboardDeviceId() {
@@ -333,12 +349,118 @@
           cache: 'no-store',
         });
       } catch (error) {
-        throw new Error('服務連線失敗，請稍後再試。');
+        const networkError = new Error('服務連線失敗，請稍後再試。');
+        networkError.kind = 'network';
+        networkError.exceptionType = String(error?.name || 'Error');
+        throw networkError;
       }
-      if (!response.ok) throw new Error(`服務連線失敗（HTTP ${response.status}）`);
-      const body = await response.json();
-      if (!body || body.status !== 'ok') throw new Error((body && body.message) || '服務回應失敗');
+      if (!response.ok) {
+        const httpError = new Error(`服務連線失敗（HTTP ${response.status}）`);
+        httpError.kind = 'http';
+        httpError.httpStatus = Number(response.status) || 0;
+        httpError.responseUrl = diagnosticResponseUrl(response.url || gasUrl);
+        httpError.responseRedirected = Boolean(response.redirected);
+        httpError.responseContentType = String(response.headers?.get?.('content-type') || '');
+        throw httpError;
+      }
+      let body;
+      try {
+        body = await response.json();
+      } catch (error) {
+        const responseError = new Error('服務回應格式無法辨識');
+        responseError.kind = 'response';
+        responseError.exceptionType = String(error?.name || 'Error');
+        throw responseError;
+      }
+      if (!body || body.status !== 'ok') {
+        const businessError = new Error((body && body.message) || '服務回應失敗');
+        businessError.kind = 'business';
+        throw businessError;
+      }
       return body;
+    }
+
+    function normalizeTransportError(error) {
+      if (error && error.kind) return error;
+      if (error && error.name === 'TypeError') {
+        const networkError = new Error('服務連線失敗，請稍後再試。');
+        networkError.kind = 'network';
+        networkError.exceptionType = 'TypeError';
+        return networkError;
+      }
+      return error;
+    }
+
+    function isTransientTransportError(error) {
+      return Boolean(error && (
+        error.kind === 'network' ||
+        (error.kind === 'http' && TRANSIENT_HTTP_STATUSES.has(Number(error.httpStatus)))
+      ));
+    }
+
+    function requestDiagnostic(error, payload, attempt, retrySucceeded) {
+      const gasUrl = diagnosticResponseUrl(getGasUrl());
+      const responseUrl = diagnosticResponseUrl(error?.responseUrl);
+      let failureTarget = 'original-exec';
+      if (error?.kind === 'network') failureTarget = 'network-exception';
+      else if (error?.responseRedirected || (responseUrl && responseUrl !== gasUrl)) failureTarget = 'redirect-target';
+      return {
+        timestamp: new Date().toISOString(),
+        action: String(payload?.action || 'unknown'),
+        attempt,
+        httpStatus: error?.kind === 'http' ? Number(error.httpStatus) || 0 : null,
+        responseUrl,
+        responseRedirected: Boolean(error?.responseRedirected),
+        responseContentType: String(error?.responseContentType || ''),
+        exceptionType: error?.kind === 'network' ? String(error.exceptionType || 'Error') : '',
+        retrySucceeded: Boolean(retrySucceeded),
+        failureTarget,
+      };
+    }
+
+    function finalTransportError(error) {
+      const detail = error.kind === 'http' ? `HTTP ${Number(error.httpStatus) || 0}` : '網路錯誤';
+      const finalError = new Error(`服務暫時無法連線（${detail}），請稍後再試。`);
+      finalError.kind = error.kind;
+      finalError.httpStatus = error.httpStatus || null;
+      finalError.failureTarget = error.failureTarget || '';
+      return finalError;
+    }
+
+    async function requestWithRetry(payload) {
+      const maxAttempts = retryDelaysMs.length + 1;
+      let lastDiagnostic = null;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+          const result = await transport(payload);
+          if (attempt > 1 && lastDiagnostic) {
+            logger?.info?.('[KPI Battle private request recovered after retry]', {
+              ...lastDiagnostic,
+              timestamp: new Date().toISOString(),
+              attempt,
+              retrySucceeded: true,
+            });
+          }
+          return result;
+        } catch (caught) {
+          const error = normalizeTransportError(caught);
+          if (!RETRYABLE_PRIVATE_ACTIONS.has(String(payload?.action || '')) || !isTransientTransportError(error)) throw error;
+          lastDiagnostic = requestDiagnostic(error, payload, attempt, false);
+          if (attempt >= maxAttempts) {
+            logger?.error?.('[KPI Battle private request failed after retries]', {
+              ...lastDiagnostic,
+              finalFailure: true,
+            });
+            const finalError = finalTransportError(error);
+            finalError.failureTarget = lastDiagnostic.failureTarget;
+            throw finalError;
+          }
+          logger?.warn?.('[KPI Battle private request transient failure]', lastDiagnostic);
+          privateDashboardSetStatus('服務暫時不穩定，正在重新連線…');
+          await sleep(Number(retryDelaysMs[attempt - 1]) || 0);
+        }
+      }
+      throw new Error('服務暫時無法連線，請稍後再試。');
     }
 
     function renderLock() {
@@ -456,6 +578,7 @@
           onKpiLoaded({ result, data: state.data, profile: state.profile });
         } catch (kpiError) {
           state.data = null;
+          privateDashboardSetStatus(kpiError.message, true);
           const note = doc.getElementById('kpiBattleSourceNote');
           if (note) note.textContent = `KPI 資料載入失敗：${kpiError.message}`;
           onKpiLoadError({ result, error: kpiError, profile: state.profile });
