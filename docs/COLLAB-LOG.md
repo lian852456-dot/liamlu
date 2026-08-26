@@ -13,6 +13,13 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-26 ｜ Codex（KPI 戰情間歇性 HTTP 404 診斷與有限重試 hotfix）
+
+- Root Cause：`Intermittent GAS HTTP 404, root cause not conclusively proven`。15:22 的 404 未留存可驗證 server／redirect trace；目前無敏感匿名探測連續三次皆為 `/exec` 重新導向一次後 HTTP 200，只能確認現行 endpoint 與 redirect chain 當下可用，不能回推先前 404 的確切責任層。
+- 做了什麼：從 `origin/main` `c67d6de` 建立獨立 `hotfix/kpi-http-retry-20260826`，rollback tag `rollback/kpi-http-retry-premerge-20260826-c67d6de` 已先推送。只在共用 `kpi-battle-controller.js` 對 `private_access`／`kpicalc_access` 的 HTTP 404、429、500、502、503、504 與 network exception 做最多三次 request（等待 2 秒、5 秒）；業務驗證、綁定申請與管理者核准不 retry。主站每日回報共用的 `privateDashboardPost()` 保持原樣。
+- 診斷／隱私：失敗紀錄只含 timestamp、action、attempt、HTTP status、去除 query/hash 的 response URL、redirected、Content-Type、exception type、retry success 與 original-exec／redirect-target／network-exception；不記員編、bootstrap code、device/session token、admin secret、POST body 或私有資料。
+- 結果（本機完成／待 PR 與正式驗收）：新增 retry 契約 `14/14`、全 Node 契約 `320/320`、KPI standalone／原 index／台獎／每日回報 Chromium `43/43` 通過；初次 Chromium 在受限沙箱因 macOS Mach port 權限 43/43 無法啟動，改在核准的非沙箱本機環境精準重跑後全數通過。沒有修改 GAS Deployment ID、Approved Device、員編規則、device fingerprint、session/TTL、綁定／核准流程、Drive 正式資料、KPI／台獎計算、每日回報 API、快速更新、巡店 GAS 或 Service Worker cache 策略。
+
 ## 2026-08-25 ｜ Codex（PR #97 follow-up：STORES gate／SheetJS 0.20.3／選檔後載入）
 
 - 做了什麼：在原分支追加 follow-up；本機 rows 先同時核對正式 `STORES` code/name，矛盾或任一未知整批封鎖，通過後正規化正式 code/store 才進 dedupe 與既有 Preflight。SheetJS 改為官方 0.20.3 full browser build；初始頁面不載入 parser／SheetJS，選檔後才各載入一次，失敗維持零 Preflight／零 `ptwrite`。
