@@ -15,7 +15,7 @@ private func showMessage(_ title: String, _ message: String, style: NSAlert.Styl
 }
 
 let app = NSApplication.shared
-app.setActivationPolicy(.accessory)
+app.setActivationPolicy(.regular)
 app.activate(ignoringOtherApps: true)
 
 let prompt = NSAlert()

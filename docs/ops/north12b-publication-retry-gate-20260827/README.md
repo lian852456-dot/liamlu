@@ -23,6 +23,14 @@ The incident repair reused the immutable verified artifacts and did not fetch or
 
 `runtime-after/` is the reviewable snapshot of the authoritative local automation files changed for this incident.
 
+## Verification
+
+- Publication, retry, completion-gate, credential-preflight, and fixture dry-run tests: 41/41 PASS.
+- Credential regression: persistent env PASS; missing/invalid identity is non-retryable and blocks source/build/send/publish/readback at 0 invocations; serialized evidence contains no credential value.
+- Google Drive and Outlook connector profile/auth checks: PASS (read-only; profile values suppressed).
+- Full repository Playwright regression: 187/193 PASS. The six failures are existing Patrol/half-month read fixtures outside this docs-only branch; this branch does not modify their product or test files.
+- Live clean-environment Keychain dry-run remains pending until the one-time secure Login Keychain entry is completed. Do not claim the 8/28 root cause closed before that result is PASS.
+
 ## Rollback
 
 Restore the corresponding runtime files from the pre-change backup or revert this commit's review snapshot, then remove the P0 preflight paragraph from automation `b-2`. If the identity Keychain item must be retired, delete only service `North12BReportUploadEmployeeId`; do not delete the administrator Keychain item. The 8/27 Drive content can be restored in place from the mode-0600 rollback copies under `report-automation/outputs/p0-rollback-20260827-before-publish/`; do not create replacement file IDs.
