@@ -1,6 +1,6 @@
 # 北一二B每日戰報與台獎固定報表契約
 
-更新日：2026-08-25
+更新日：2026-08-27
 
 本契約是 b-2 自動化的正式執行依據。每日程式、月設定工具、preflight 與交接文件都應以此為準；不得把固定報表結構只留在對話或單次重跑紀錄。
 
@@ -8,16 +8,28 @@
 
 排程入口為 `/Users/liamlu/.codex/automations/b-2/automation.toml`，每日 09:45 Asia/Taipei 執行，cwd 為 `/Users/liamlu/Downloads/liam-agent`。
 
+### P0 credential / environment preflight
+
+任何 cloud source、產報、寄信、publish 或 readback 之前，09:45 runtime 的第一個執行 gate 固定為：
+
+`/usr/bin/env -i HOME="$HOME" USER="$USER" PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" /bin/zsh /Users/liamlu/Downloads/liam-agent/report-automation/work/automation_environment_preflight_with_keychain.sh`
+
+- `REPORT_UPLOAD_EMPLOYEE_ID` 固定由 macOS Login Keychain service `North12BReportUploadEmployeeId` 在 runtime 載入，只存在於 preflight／publisher 子程序記憶體；不得寫入 automation TOML、prompt、Git、JSON/JSONL、manifest、stdout、argv 或 shell history。
+- preflight 驗證員編存在且符合 `^[A-Z0-9]{5,12}$`，並驗證 `North12BPrivateDashboardAdminSecret`、Node、curl 與固定 publish/readback endpoints；通過後才可用 read-only 操作確認 Google Drive／Outlook connector auth。
+- missing／invalid credential、Keychain 或 connector auth 失敗都屬 configuration failure，`retryable=false`，必須在 source/build/mail 前 fail-fast；不得套用 HTTP retry。此時 source、build、send、publish、readback invocation count 都必須是 0。
+- preflight log 只准記錄 PASS/BLOCKED、failure class、retryable 與檢查名稱，不得包含實際員編或任何 credential value。
+
 正式鏈路：
 
-1. 透過 Microsoft Graph 直接列出 OneDrive `TWM每日戰報` 雲端資料夾，精準選取同日 KPI 與兩份 canonical 台獎來源，下載 bytes 到 run-scoped staging 並驗證 SHA-256。Production auth 固定為 `ONEDRIVE_GRAPH_AUTH_MODE=renewable-oauth`，先以 MSAL silent acquire／refresh 從 macOS Keychain 取得短期 access token。
-2. `ONEDRIVE_GRAPH_AUTH_MODE=renewable-oauth REPORT_DATE_ISO=YYYY-MM-DD node report-automation/work/run_daily_north12b_report.mjs`；production 預設 `REPORT_SOURCE_MODE=onedrive-cloud`，KPI component 只要求自己的 canonical source/date gate，不被 stale awards 阻擋。
-3. 先執行 `ONEDRIVE_GRAPH_AUTH_MODE=renewable-oauth REPORT_DATE_ISO=YYYY-MM-DD REPORT_DATA_CUTOFF_DATE=YYYY-MM-DD node report-automation/work/preflight_onedrive_cloud_sources.mjs`。只有 KPI／店點／個人三份 Excel 截止日相同且兩份台獎 cloud version 都 fresh 時，才以同一 run manifest 執行 `python3.12 report-automation/work/update_phone_awards.py`。
-4. `REPORT_DATE_ISO=YYYY-MM-DD node report-automation/work/prepare_send_payloads.mjs`。
-5. Outlook 先寄每日戰報，再寄台獎信，兩封都必須查 `寄件備份`。
-6. 兩封都驗證完成後，先以獨立、best-effort 的 M+ 後送把當日 KPI 戰報 Excel、主力 KPI 圖、加掛項加減分圖、台獎圖片傳到 `滷蛋`；成功或失敗都只更新 `mplusDelivery` 狀態，不得改動郵件成功狀態，也不得成為網站 dependency。
-7. M+ 嘗試結束後一律繼續執行 `python3.12 report-automation/work/build_github_pages_data.py`。
-8. 最後才可執行 `zsh report-automation/work/publish_private_dashboard_with_keychain.sh` 與正式 readback；M+ 未登入、上傳失敗或待人工確認都不得阻擋此步驟。
+1. 先通過上述 credential/environment 與 connector auth preflight；未通過即 BLOCKED，不得讀 source 或寄信。
+2. 透過 Microsoft Graph 直接列出 OneDrive `TWM每日戰報` 雲端資料夾，精準選取同日 KPI 與兩份 canonical 台獎來源，下載 bytes 到 run-scoped staging 並驗證 SHA-256。Production auth 固定為 `ONEDRIVE_GRAPH_AUTH_MODE=renewable-oauth`，先以 MSAL silent acquire／refresh 從 macOS Keychain 取得短期 access token。
+3. `ONEDRIVE_GRAPH_AUTH_MODE=renewable-oauth REPORT_DATE_ISO=YYYY-MM-DD node report-automation/work/run_daily_north12b_report.mjs`；production 預設 `REPORT_SOURCE_MODE=onedrive-cloud`，KPI component 只要求自己的 canonical source/date gate，不被 stale awards 阻擋。
+4. 先執行 `ONEDRIVE_GRAPH_AUTH_MODE=renewable-oauth REPORT_DATE_ISO=YYYY-MM-DD REPORT_DATA_CUTOFF_DATE=YYYY-MM-DD node report-automation/work/preflight_onedrive_cloud_sources.mjs`。只有 KPI／店點／個人三份 Excel 截止日相同且兩份台獎 cloud version 都 fresh 時，才以同一 run manifest 執行 `python3.12 report-automation/work/update_phone_awards.py`。
+5. `REPORT_DATE_ISO=YYYY-MM-DD node report-automation/work/prepare_send_payloads.mjs`。
+6. Outlook 先寄每日戰報，再寄台獎信，兩封都必須查 `寄件備份`。
+7. 兩封都驗證完成後，先以獨立、best-effort 的 M+ 後送把當日 KPI 戰報 Excel、主力 KPI 圖、加掛項加減分圖、台獎圖片傳到 `滷蛋`；成功或失敗都只更新 `mplusDelivery` 狀態，不得改動郵件成功狀態，也不得成為網站 dependency。
+8. M+ 嘗試結束後一律繼續執行 `python3.12 report-automation/work/build_github_pages_data.py`。
+9. 最後才可執行 `zsh report-automation/work/publish_private_dashboard_with_keychain.sh` 與正式 readback；M+ 未登入、上傳失敗或待人工確認都不得阻擋此步驟。
 
 Graph OAuth 契約：
 

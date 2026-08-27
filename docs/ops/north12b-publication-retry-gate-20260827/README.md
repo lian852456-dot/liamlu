@@ -8,6 +8,11 @@ The incident repair reused the immutable verified artifacts and did not fetch or
 
 ## Runtime changes
 
+- P0 pre-mail credential/environment gate runs before cloud source, build, Outlook, publish, and readback.
+- The 09:45 runtime loads `REPORT_UPLOAD_EMPLOYEE_ID` from macOS Login Keychain service `North12BReportUploadEmployeeId`; the value is never stored in automation TOML, prompt, Git, JSON/JSONL, manifest, stdout, argv, or shell history.
+- Missing/invalid identity, Keychain, endpoint, runtime, or connector auth is a non-retryable configuration failure and exits with code 78 before source/build/mail.
+- Publication wrappers can load the same Keychain identity directly, so they no longer depend on an interactive shell export.
+- A clean-environment fixture uses the same Keychain wrapper and proves `env preflight → source → build → send gate → publish invoked → readback gate` without mail, network, or production writes.
 - Bounded retry for publish and Website/Supervisor readback only: attempts 1/2/3 with 2s and 5s waits.
 - Retry allowlist: 404, 429, 500, 502, 503, 504, network exception, timeout.
 - No retry for authentication/authorization, source date/hash/schema, single-sided awards, or business validation failures.
@@ -20,4 +25,4 @@ The incident repair reused the immutable verified artifacts and did not fetch or
 
 ## Rollback
 
-Restore the corresponding runtime files from the pre-change backup or revert this commit's review snapshot, then disable the new publication stage in the automation prompt. The 8/27 Drive content can be restored in place from the mode-0600 rollback copies under `report-automation/outputs/p0-rollback-20260827-before-publish/`; do not create replacement file IDs.
+Restore the corresponding runtime files from the pre-change backup or revert this commit's review snapshot, then remove the P0 preflight paragraph from automation `b-2`. If the identity Keychain item must be retired, delete only service `North12BReportUploadEmployeeId`; do not delete the administrator Keychain item. The 8/27 Drive content can be restored in place from the mode-0600 rollback copies under `report-automation/outputs/p0-rollback-20260827-before-publish/`; do not create replacement file IDs.
