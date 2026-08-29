@@ -1590,6 +1590,54 @@ test('未知路段不會被填成 0，且維持待查狀態', async ({ page }) =
   expect(r.todo).toEqual(['台北杭州南→台北通化']);
 });
 
+test('待查路段可在網站補登，8/27 通化至萬大顯示 7.4 KM', async ({ page }) => {
+  await page.setViewportSize({width:390,height:844});
+  const rows=[
+    {fillTime:'2026/8/27 12:00',arriveTime:'2026/8/27 10:00',leaveTime:'2026/8/27 12:00',district:'北一二B',code:'DNB10307',store:'台北三創',inspector:'測試督導',item:'1',content:'',result:'v',reason:'',month:'2026-08'},
+    {fillTime:'2026/8/27 16:00',arriveTime:'2026/8/27 14:00',leaveTime:'2026/8/27 16:00',district:'北一二B',code:'DNB10174',store:'台北通化',inspector:'測試督導',item:'1',content:'',result:'v',reason:'',month:'2026-08'},
+    {fillTime:'2026/8/27 19:00',arriveTime:'2026/8/27 17:00',leaveTime:'2026/8/27 19:00',district:'北一二B',code:'DNB10168',store:'台北萬大',inspector:'測試督導',item:'1',content:'',result:'v',reason:'',month:'2026-08'},
+  ];
+  await openMileage(page,rows);
+  await page.evaluate(()=>MI.setMonth('2026-08'));
+  await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取/);
+  await page.evaluate(()=>MI.setDate('2026-08-27'));
+
+  const plan=await page.evaluate(()=>MI._dayPlan('2026-08-27',MI._days()['2026-08-27']));
+  expect(plan.legs.map(leg=>leg.km)).toEqual([3.6,7.4]);
+  expect(plan.km).toBe(11);
+  await expect(page.locator('#miTimeline')).toContainText('7.4 KM');
+  await expect(page.locator('#miLegKm-1')).toHaveValue('7.4');
+  await expect(page.locator('#miLegKm-1').locator('xpath=following-sibling::button')).toHaveText('更新');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+});
+
+test('補登欄位只寫入里程資料層並解除待查', async ({ page }) => {
+  const rows=[
+    {fillTime:'2026/8/28 12:00',arriveTime:'2026/8/28 10:00',leaveTime:'2026/8/28 12:00',district:'北一二B',code:'DNB10146',store:'台北杭州南',inspector:'測試督導',item:'1',content:'',result:'v',reason:'',month:'2026-08'},
+    {fillTime:'2026/8/28 19:00',arriveTime:'2026/8/28 17:00',leaveTime:'2026/8/28 19:00',district:'北一二B',code:'DNB10174',store:'台北通化',inspector:'測試督導',item:'1',content:'',result:'v',reason:'',month:'2026-08'},
+  ];
+  await openMileage(page,rows);
+  await page.evaluate(()=>MI.setMonth('2026-08'));
+  await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取/);
+  await page.evaluate(()=>MI.setDate('2026-08-28'));
+  await expect(page.locator('#miTimeline')).toContainText('待查');
+  const beforeNodes=await page.evaluate(()=>MI._days()['2026-08-28'].map(node=>({name:node.name,time:node.time,code:node.code})));
+  await page.locator('#miLegKm-0').fill('7.1');
+  await page.locator('#miLegKm-0').locator('xpath=following-sibling::button').click();
+
+  const result=await page.evaluate(()=>({
+    plan:MI._dayPlan('2026-08-28',MI._days()['2026-08-28']),
+    saved:MI._store().dayEdits['2026-08-28'].legKm['台北杭州南|台北通化'],
+    nodes:MI._days()['2026-08-28'].map(node=>({name:node.name,time:node.time,code:node.code})),
+  }));
+  expect(result.plan.km).toBe(7.1);
+  expect(result.plan.todo).toEqual([]);
+  expect(result.saved).toMatchObject({km:7.1,note:'2026-08-28 實際里程／人工補登'});
+  expect(result.nodes).toEqual(beforeNodes);
+  await expect(page.locator('#miTimeline')).not.toContainText('待查');
+  await expect(page.locator('#miTimeline')).toContainText('人工確認');
+});
+
 test('三店以上不平均拆分：可拆段就逐段加總，不可拆就不猜', async ({ page }) => {
   await openMileage(page);
   const p = await page.evaluate(() => { const d = MI._days(); return MI._dayPlan('2026-06-15', d['2026-06-15']); });

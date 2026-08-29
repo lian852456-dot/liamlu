@@ -47,12 +47,12 @@ test('Excel 元件只從 repo 本機載入並保留授權', () => {
   assert.equal(require('../assets/vendor/xlsx.full.min.js').version, '0.20.3');
 });
 
-test('里程模組本體維持 base main 位元一致', () => {
+test('里程模組維持人工補登版受控基準', () => {
   const start = patrol.indexOf('const MI = (function(){');
   const end = patrol.lastIndexOf('</script>');
   assert.ok(start >= 0 && end > start);
   const hash = crypto.createHash('sha256').update(patrol.slice(start, end)).digest('hex');
-  assert.equal(hash, '5b0587dbe61a6d6fb12ba6ffa8ac770de8a79b226f8e4744fb04e288dd222414');
+  assert.equal(hash, 'fe06010a1269824c40fb852de27c9ee2159de53858d9fb30110833d29806a1b0');
 });
 
 test('本機匯入只保留正式十二欄，不包含檔案內容或公開資料寫入', () => {
