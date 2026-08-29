@@ -273,6 +273,11 @@
   .mi-leg-mid .km{font-size:14px;font-weight:800}
   .mi-leg-mid.todo{border-top-style:dashed}
   .mi-leg-mid.todo .km{color:var(--miss)}
+  .mi-leg-entry{display:flex;justify-content:center;align-items:center;gap:5px;margin-top:6px}
+  .mi-leg-entry input{width:72px;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;padding:6px 7px;background:#fff;color:var(--ink);font:inherit;font-size:16px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+  .mi-leg-entry input:focus{outline:2px solid var(--tw-orange-soft);border-color:var(--tw-orange)}
+  .mi-leg-entry .unit{font-size:10.5px;font-weight:800;color:var(--muted)}
+  .mi-leg-entry .mi-btn{padding:6px 8px;font-size:11.5px}
   .mi-car{position:absolute;top:-13px;left:0;font-size:13px;animation:miDrive 2.4s ease-in-out infinite}
   @keyframes miFade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
   @keyframes miDrive{0%{left:0}50%{left:calc(100% - 14px)}100%{left:0}}
@@ -416,6 +421,7 @@
     .mi-stats{grid-template-columns:repeat(2,1fr)}
     .mi-leg{grid-template-columns:1fr;gap:4px}
     .mi-leg-mid{padding:8px 0 8px 18px;border-left:2px dashed var(--line);border-top:0;margin-left:6px}
+    .mi-leg-entry{justify-content:flex-start}
     .mi-node-time{min-width:0}
     .mi-sum-wrap{overflow-x:auto}
     .half-item{grid-template-columns:1fr}
@@ -2425,6 +2431,7 @@ const MI = (function(){
     seg('台北大稻埕','台北復興南',6.5,'Y2606','2026-06-22','歷史同路線範例：Y2604 6.5','verified'),
     seg('台北大稻埕','台北永吉',7.2,'Y2606','2026-06-24','歷史同路線範例一致：Y2509/Y2602/Y2604 7.2','verified'),
     seg('台北三創','台北通化',  3.6,'Y2606','2026-06-30','歷史同路線範例中位數','verified'),
+    seg('台北通化','台北萬大',  7.4,'Y2608','2026-08-27','2026-08-27 實際里程／人工確認','manual'),
     // 歷史觀測：僅見於歷史月份，尚未進受控版
     seg('台北酒泉','台北復興南',8.2,'Y2605','2026-05-06','Y2605 月車資實際觀測','observed'),
     seg('台北酒泉','台北杭州南',5.7,'Y2605','2026-05-11','Y2605 月車資實際觀測','observed'),
@@ -3122,9 +3129,10 @@ const MI = (function(){
     if(nodes.length===1){ h+=`<div class="mi-leg">${nodeHtml(nodes[0],0)}<div class="mi-leg-mid"><div class="km">0</div>單店不計</div><div></div></div>`; }
     p.legs.forEach((L,i)=>{
       const vt=L.verify?VERIFY_LABEL[L.verify]:null;
+      const entry=`<div class="mi-leg-entry"><input id="miLegKm-${i}" type="number" inputmode="decimal" min="0.1" max="999" step="0.1" value="${L.km==null?'':km1(L.km)}" aria-label="${esc2(L.from)}至${esc2(L.to)}補登公里數" placeholder="公里"><span class="unit">KM</span><button class="mi-btn ${L.km==null?'primary':'ghost'}" type="button" onclick="MI.saveLegInput(${i})">${L.km==null?'補登':'更新'}</button></div>`;
       const mid=L.km==null
-        ? `<div class="mi-leg-mid todo"><span class="mi-car">🚗</span><div class="km">待查</div><span class="mi-tag todo">無範例</span><div class="mi-src">${esc2(L.source||'')}</div></div>`
-        : `<div class="mi-leg-mid"><span class="mi-car">🚗</span><div class="km">${km1(L.km)}<span style="font-size:10px"> KM</span></div><span class="mi-tag ${vt[1]}">${vt[0]}</span><div class="mi-src">${esc2(L.month||'')}${L.date?' · '+esc2(L.date):''}<br>${esc2(L.source||'')}</div></div>`;
+        ? `<div class="mi-leg-mid todo"><span class="mi-car">🚗</span><div class="km">待查</div><span class="mi-tag todo">無範例</span><div class="mi-src">${esc2(L.source||'')}</div>${entry}</div>`
+        : `<div class="mi-leg-mid"><span class="mi-car">🚗</span><div class="km">${km1(L.km)}<span style="font-size:10px"> KM</span></div><span class="mi-tag ${vt[1]}">${vt[0]}</span><div class="mi-src">${esc2(L.month||'')}${L.date?' · '+esc2(L.date):''}<br>${esc2(L.source||'')}</div>${entry}</div>`;
       h+=`<div class="mi-leg">${nodeHtml(nodes[i],i)}${mid}${nodeHtml(nodes[i+1],i+1)}</div>`;
     });
     el.innerHTML=h;
@@ -3176,11 +3184,26 @@ const MI = (function(){
     alert('已新增節點。系統不會推測距離——若該路段無歷史範例，會顯示「待查」，請用路段修改功能填入實際公里數。');
   }
   function setLegKm(date,from,to,km,note){
+    const value=Math.round(Number(km)*10)/10;
+    if(!Number.isFinite(value)||value<=0||value>999) throw new Error('里程須為 0.1 至 999 公里');
     const s=store();
     s.dayEdits[date]=s.dayEdits[date]||{};
     s.dayEdits[date].legKm=s.dayEdits[date].legKm||{};
-    s.dayEdits[date].legKm[from+'|'+to]={km:Number(km),note:note||'人工確認',at:new Date().toISOString(),prev:(legFor(from,to)||{}).km??null};
+    s.dayEdits[date].legKm[from+'|'+to]={km:value,note:note||'人工確認',at:new Date().toISOString(),prev:(legFor(from,to)||{}).km??null};
     save(s); render();
+  }
+  function saveLegInput(index){
+    const nodes=days()[state.date]||[];
+    const plan=nodes.length?dayPlan(state.date,nodes):null;
+    const leg=plan&&plan.legs[Number(index)];
+    const input=document.getElementById('miLegKm-'+Number(index));
+    if(!leg||!input) return;
+    const value=Math.round(Number(input.value)*10)/10;
+    if(!Number.isFinite(value)||value<=0||value>999){
+      alert('請輸入 0.1 至 999 公里的有效里程。'); input.focus(); return;
+    }
+    if(leg.km!=null&&Math.abs(Number(leg.km)-value)>0.0001&&!confirm(`確定將 ${leg.from}→${leg.to} 從 ${km1(leg.km)} KM 更新為 ${km1(value)} KM？`)) return;
+    setLegKm(state.date,leg.from,leg.to,value,`${state.date} 實際里程／人工補登`);
   }
   function removeNode(date,name){
     const s=store();
@@ -3351,7 +3374,7 @@ const MI = (function(){
     dlgClose(); render();
   }
 
-  return {render,open,clear,setMonth,setDate,step,today,addLegPrompt,setLegKm,removeNode,setCost,
+  return {render,open,clear,setMonth,setDate,step,today,addLegPrompt,setLegKm,saveLegInput,removeNode,setCost,
           importPick,importFile,exportDetails,exportConfirm,doExport,dlgClose,runDiagnostic,
           _reconcile:reconcile,_billable:billable,_officialPlans:officialPlans,OFFICIAL,
           _days:days,_dayPlan:dayPlan,_monthPlans:monthPlans,_coverage:coverage,
