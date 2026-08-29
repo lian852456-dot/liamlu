@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-29 ｜ Codex（每日移動里程人工補登欄位，待 PR／未部署）
+
+- 做了什麼：從最新 `origin/main` `1fdd4ff` 建立隔離分支 `feature/patrol-mileage-manual-entry-20260829`。`patrol.html` 每一段路線新增 0.1–999 KM 的補登／更新欄位；已知值更新前要求確認，寫入既有 `bei12b_mileage_v1.dayEdits[date].legKm`，不改原始巡店紀錄。另將 Liam 更正確認的 2026-08-27「台北通化→台北萬大」7.4 KM 加入人工確認距離，該日「台北三創→台北通化→台北萬大」計為 3.6 + 7.4 = 11.0 KM。
+- 結果（本機完成／未部署）：補登專項及待查／匯出 fail-closed／原始巡店隔離回歸 `5/5`、全 Node `320/320`、正式 Patrol＋Auth Chromium `83/83` 通過。正式 Pages、iPhone Safari、正式資料 readback 與 Liam 驗收尚未執行。
+- 經驗 / 給下一位的提醒：補登值仍是既有瀏覽器 localStorage 層，不新增 GAS route 或 Sheet schema；8/27 的 7.4 KM 則已寫入前端受控距離表，可跨裝置一致呈現。不得把補登誤作巡店資料回寫，也不得為此修改 PT auth/session/TTL、`ptmileage2` 或 GAS Deployment。
+
 ## 2026-08-26 ｜ Codex（KPI 戰情間歇性 HTTP 404 診斷與有限重試 hotfix）
 
 - Root Cause：`Intermittent GAS HTTP 404, root cause not conclusively proven`。15:22 的 404 未留存可驗證 server／redirect trace；目前無敏感匿名探測連續三次皆為 `/exec` 重新導向一次後 HTTP 200，只能確認現行 endpoint 與 redirect chain 當下可用，不能回推先前 404 的確切責任層。
