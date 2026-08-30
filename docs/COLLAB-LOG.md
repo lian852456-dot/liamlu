@@ -13,11 +13,11 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
-## 2026-08-30 ｜ Codex（行進間戰報 AQ／RT 本機解析，待真實檔 UAT／未部署）
+## 2026-08-30 ｜ Codex（行進間戰報 AQ／RT 本機解析，已部署／待真實檔 UAT）
 
 - 做了什麼：在 `home.html` 督導專區新增「行進間戰報」候選入口；新增獨立 `live-battle.html`，沿用既有 Approved Device 的 `private_access → kpicalc_access` 並要求 trusted 督導身分。頁面從正式 KPI 唯讀載入九店 AQ／RT 月目標，本機分開解析 AQ／RT CSV／TSV／XLSX／XLS（含 Big5／CP950），依正式店名／DNB code 彙整實績、達成率、缺口與群組貼文。
-- 結果（進行中／未部署）：Node 全站 `331/331` 通過；AQ／RT 選反、案件去重、點數／明細模式、九店缺目標與非督導皆 fail closed。Chromium 因執行環境 process singleton socket 權限無法啟動，WebKit runtime 未安裝；既有 Drive 報表資料夾也沒有 AQ.csv／RT.csv，所以尚缺 Liam 真實雙檔 Safari UAT。未合併、未部署 Pages、正式 GAS／資料寫入為 0。
-- 經驗 / 給下一位的提醒：AQ／RT 明細只存在頁面記憶體，不得改成上傳或留存；唯一網路流量是既有兩個唯讀 action。實績來自本次本機檔、目標來自正式 KPI，不可混入前日 actual。正式部署前必須用 Liam 真實 AQ、RT 各一份核對欄位、九店總數與公司既有「全國 (2)」結果；完整交接見 `docs/LIVE_BATTLE_AQRT_20260830.md`。
+- 結果（成功／已部署）：Node 全站 `331/331` 通過；AQ／RT 選反、案件去重、點數／明細模式、九店缺目標與非督導皆 fail closed。GitHub Pages run #33322556767 build／deploy 成功；正式 `home.html` 已讀回第三張入口卡，`live-battle.html` 與既有 App、KPI、台獎、巡店、稽核頁面皆回應 HTTP 200。Chromium 因執行環境 process singleton socket 權限無法啟動，WebKit runtime 未安裝；既有 Drive 報表資料夾也沒有 AQ.csv／RT.csv，所以尚缺 Liam 真實雙檔 Safari UAT。正式 GAS／P1／資料寫入為 0；部署前回復分支：`rollback/live-battle-aqrt-predeploy-20260830`。
+- 經驗 / 給下一位的提醒：AQ／RT 明細只存在頁面記憶體，不得改成上傳或留存；唯一網路流量是既有兩個唯讀 action。實績來自本次本機檔、目標來自正式 KPI，不可混入前日 actual。完整驗收前必須用 Liam 真實 AQ、RT 各一份核對欄位、九店總數與公司既有「全國 (2)」結果；完整交接見 `docs/LIVE_BATTLE_AQRT_20260830.md`。
 
 ## 2026-08-29 ｜ Codex（每日移動里程人工補登欄位，已上線）
 

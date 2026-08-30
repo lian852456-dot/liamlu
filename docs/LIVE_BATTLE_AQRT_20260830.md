@@ -2,10 +2,10 @@
 
 ## 狀態
 
-- 分支：`feature/live-battle-aqrt-20260830`
+- 正式提交：`63c93f2`
 - 基準：`origin/main` `0923a2f`
-- 目前是正式部署候選；未合併、未部署 GitHub Pages、未呼叫 GAS 寫入，也未以 Liam 的真實 AQ／RT 原始檔做 Safari UAT。
-- 正式入口預定放在 `home.html` 的「督導專區」，不取代「Liam 情報站」或「戰報快速更新」。
+- 已由 GitHub Pages run #33322556767 成功部署；未呼叫 GAS 寫入，也未以 Liam 的真實 AQ／RT 原始檔做 Safari UAT。
+- 正式入口已放在 `home.html` 的「督導專區」，不取代「Liam 情報站」或「戰報快速更新」。
 
 ## 使用流程
 
@@ -35,7 +35,7 @@
 - Node 全站契約：`331/331 PASS`。
 - 新增專項：九店名稱、DNB code、點數加總、明細計件、案件去重、Big5／CP950、AQ／RT 選反、正式 target 缺漏、九店缺口與群組文案全部通過。
 - Chromium E2E 已建立，但本次執行環境的瀏覽器程序因 `process_singleton socket Operation not permitted` 無法啟動；WebKit runtime 亦未安裝。因此不能把 Node PASS 當成 Safari 實機驗收。
-- Google Drive 既有「業績報表」資料夾目前只有 KPI／台獎 Excel，未找到 AQ.csv／RT.csv；正式上線前仍需 Liam 提供當日真實 AQ、RT 各一份做欄位與結果對帳。
+- Google Drive 既有「業績報表」資料夾目前只有 KPI／台獎 Excel，未找到 AQ.csv／RT.csv；功能雖已上線，仍需 Liam 提供當日真實 AQ、RT 各一份做欄位與結果對帳。
 
 ## 明確零變更
 
@@ -43,5 +43,5 @@
 
 ## 回退
 
-- 合併前：關閉候選 PR／刪除 feature branch，不影響正式站。
-- 若未來合併：revert 單一功能 commit，即可移除 `home.html` 新卡片、新頁、解析器與測試；不需操作 GAS 或任何正式資料。
+- 部署前完整回復分支：`rollback/live-battle-aqrt-predeploy-20260830`（`0923a2f`）。
+- Revert 功能提交即可移除 `home.html` 新卡片、新頁、解析器與測試；不需操作 GAS 或任何正式資料。
