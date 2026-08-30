@@ -52,8 +52,10 @@ test('同仁大廳手機版維持單欄且文字未水平溢出，既有入口�
   expect(boxes[4].y).toBeGreaterThan(boxes[3].y);
   expect(await page.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
 
-  await expect(page.locator('.card')).toHaveCount(9);
-  expect(await page.locator(`.card:not([href="kpi-battle.html"]):not([href="awards-battle.html"]):not([href="audit-report.html"]):not([href="${STORE_INSPECTION_URL}"])`).evaluateAll(
+  await expect(page.locator('.card')).toHaveCount(10);
+  await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(3);
+  await expect(page.locator('[aria-label="督導專區"] .card[href="live-battle.html"]')).toContainText('行進間戰報');
+  expect(await page.locator(`.card:not([href="kpi-battle.html"]):not([href="awards-battle.html"]):not([href="audit-report.html"]):not([href="live-battle.html"]):not([href="${STORE_INSPECTION_URL}"])`).evaluateAll(
     cards => cards.map(card => card.getAttribute('href'))
   )).toEqual(ORIGINAL_HREFS);
 });

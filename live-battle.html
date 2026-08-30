@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07182a">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>行進間戰報｜北一二B</title>
+  <link rel="stylesheet" href="live-battle.css?v=20260830-1">
+</head>
+<body>
+  <header class="topbar">
+    <a href="home.html" class="back-link" aria-label="返回智慧營運中心">← 返回</a>
+    <strong>北一二B 督導專區</strong>
+    <span class="local-pill">本機解析</span>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">LIVE AQ / RT PULSE</p>
+      <h1>行進間戰報</h1>
+      <p>載入正式九店目標，再選擇本機 AQ、RT 檔案，即時整理各店達成與群組提醒。</p>
+      <div class="privacy-note"><span>🔒</span><span>檔案只在這台裝置的瀏覽器記憶體解析，不上傳、不寫回 KPI，關閉頁面即清除。</span></div>
+    </section>
+
+    <section class="panel" aria-labelledby="targetTitle">
+      <div class="panel-heading">
+        <div><span class="step">STEP 1</span><h2 id="targetTitle">載入正式 AQ／RT 目標</h2></div>
+        <span id="targetBadge" class="status-badge">尚未載入</span>
+      </div>
+      <p class="helper">沿用既有 Approved Device；只有督導帳號可使用。目標僅唯讀，不修改正式資料。</p>
+      <div class="auth-row">
+        <label>員工編號<input id="employeeId" autocomplete="username" inputmode="numeric" placeholder="請輸入既有員編"></label>
+        <button id="loadTargetsBtn" type="button">驗證並載入目標</button>
+      </div>
+      <p id="targetMessage" class="message" role="status">請先載入本月九店正式目標。</p>
+      <div id="targetMeta" class="target-meta" hidden></div>
+    </section>
+
+    <section class="panel" aria-labelledby="filesTitle">
+      <div class="panel-heading">
+        <div><span class="step">STEP 2</span><h2 id="filesTitle">選擇 AQ 與 RT 原始檔</h2></div>
+        <span class="status-badge neutral">不會上傳</span>
+      </div>
+      <div class="upload-grid">
+        <label class="upload-card aq-card" for="aqFile">
+          <span class="upload-kind">AQ</span>
+          <strong>選擇 AQ 檔案</strong>
+          <small>支援 CSV／TSV／XLSX／XLS，含 Big5／CP950</small>
+          <input id="aqFile" type="file" accept=".csv,.tsv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          <span id="aqFileStatus" class="file-status">尚未選擇</span>
+        </label>
+        <label class="upload-card rt-card" for="rtFile">
+          <span class="upload-kind">RT</span>
+          <strong>選擇 RT 檔案</strong>
+          <small>支援 CSV／TSV／XLSX／XLS，含 Big5／CP950</small>
+          <input id="rtFile" type="file" accept=".csv,.tsv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          <span id="rtFileStatus" class="file-status">尚未選擇</span>
+        </label>
+      </div>
+      <div class="action-row">
+        <button id="analyzeBtn" type="button" disabled>產生九店戰報</button>
+        <button id="resetBtn" class="secondary" type="button">清除本機檔案</button>
+      </div>
+      <p id="fileMessage" class="message" role="status">AQ、RT 會分開辨識，選錯檔案會直接阻擋。</p>
+    </section>
+
+    <section id="results" class="results" hidden aria-labelledby="resultsTitle">
+      <section class="panel result-panel">
+        <div class="panel-heading">
+          <div><span class="step">STEP 3</span><h2 id="resultsTitle">目前進度與達成</h2></div>
+          <span id="generatedAt" class="generated-at">—</span>
+        </div>
+        <div id="regionSummary" class="summary-grid"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>店點</th><th>AQ 進度</th><th>AQ 達成</th><th>RT 進度</th><th>RT 達成</th><th>優先缺口</th></tr></thead>
+            <tbody id="storeRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel report-panel" aria-labelledby="reportTitle">
+        <div class="panel-heading">
+          <div><span class="step">GROUP READY</span><h2 id="reportTitle">群組戰報提醒</h2></div>
+        </div>
+        <textarea id="reportText" rows="15" readonly aria-label="可貼群組的戰報文字"></textarea>
+        <div class="copy-row"><button id="copyBtn" type="button">複製群組戰報</button><span id="copyStatus" role="status"></span></div>
+      </section>
+    </section>
+  </main>
+
+  <footer>內部管理輔助工具｜原始明細不會離開本機｜正式成績以公司報表為準</footer>
+  <script src="live-battle-core.js?v=20260830-1"></script>
+  <script src="live-battle.js?v=20260830-1" defer></script>
+</body>
+</html>

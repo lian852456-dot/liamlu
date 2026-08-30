@@ -23,6 +23,14 @@
 - 九店稽核值使用既有正式 canonical ID；其中萬大為 `DNB10168`、通化為 `DNB10174`，不沿用巡店相容層的 provisional／legacy code。介面仍統一顯示「台北三創」。
 - 私有照片重新載入統一走永遠回傳 Promise 的 `ensurePrivatePhoto()`；照片仍只由 `audit_photo_read` 讀成暫時 Blob URL，頁面卸載時釋放。部署與 Liam iPhone UAT gate 見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
 
+## 行進間戰報（待正式部署）
+
+- `home.html` 的督導專區新增 `live-battle.html` 入口，供上班期間以本機 AQ／RT 原始檔產生九店進度、達成率、缺口排序與可貼群組文字。
+- 頁面沿用既有 Approved Device 的 `private_access → kpicalc_access` 唯讀流程，並要求 `profile.isTrusted=true`；非督導核准裝置 fail closed。
+- 正式 KPI 只提供九店 AQ／RT 月目標；AQ／RT 實績只取本次本機檔案。原始檔不轉 base64、不呼叫上傳 action、不寫 localStorage／IndexedDB／Cookie，也不修改 KPI、台獎、每日回報或 GAS。
+- CSV／TSV 支援 UTF-8 與 Big5／CP950；XLSX／XLS 延用 repo 既有固定 SheetJS。AQ 與 RT 分開辨識，選反、缺少九店正式目標或完全找不到北一二B資料時都停止計算。
+- 部署範圍、測試與回退見 [`docs/LIVE_BATTLE_AQRT_20260830.md`](docs/LIVE_BATTLE_AQRT_20260830.md)。
+
 ## 智慧營運中心 Phase 1A（未部署）
 
 - `kpi-battle.html` 是 KPI 戰情的獨立入口殼層；它在同源載入 `index.html` 的既有 KPI 面板，因此沿用同一套員編／核准裝置權限、資料來源、計算與 fail-closed 行為，不建立第二套公式、API 或快取。

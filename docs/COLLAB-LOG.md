@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-08-30 ｜ Codex（行進間戰報 AQ／RT 本機解析，待真實檔 UAT／未部署）
+
+- 做了什麼：在 `home.html` 督導專區新增「行進間戰報」候選入口；新增獨立 `live-battle.html`，沿用既有 Approved Device 的 `private_access → kpicalc_access` 並要求 trusted 督導身分。頁面從正式 KPI 唯讀載入九店 AQ／RT 月目標，本機分開解析 AQ／RT CSV／TSV／XLSX／XLS（含 Big5／CP950），依正式店名／DNB code 彙整實績、達成率、缺口與群組貼文。
+- 結果（進行中／未部署）：Node 全站 `331/331` 通過；AQ／RT 選反、案件去重、點數／明細模式、九店缺目標與非督導皆 fail closed。Chromium 因執行環境 process singleton socket 權限無法啟動，WebKit runtime 未安裝；既有 Drive 報表資料夾也沒有 AQ.csv／RT.csv，所以尚缺 Liam 真實雙檔 Safari UAT。未合併、未部署 Pages、正式 GAS／資料寫入為 0。
+- 經驗 / 給下一位的提醒：AQ／RT 明細只存在頁面記憶體，不得改成上傳或留存；唯一網路流量是既有兩個唯讀 action。實績來自本次本機檔、目標來自正式 KPI，不可混入前日 actual。正式部署前必須用 Liam 真實 AQ、RT 各一份核對欄位、九店總數與公司既有「全國 (2)」結果；完整交接見 `docs/LIVE_BATTLE_AQRT_20260830.md`。
+
 ## 2026-08-29 ｜ Codex（每日移動里程人工補登欄位，已上線）
 
 - 做了什麼：PR #101 已以 squash 合併至正式 `main`，merge commit `87b2bc75a2a7d6ce1f153083ca34fe1ed837a34d`。正式 `patrol.html` 每一段路線新增 0.1–999 KM 的補登／更新欄位；已知值更新前要求確認，寫入既有 `bei12b_mileage_v1.dayEdits[date].legKm`，不改原始巡店紀錄。另將 Liam 更正確認的 2026-08-27「台北通化→台北萬大」7.4 KM 加入人工確認距離，該日「台北三創→台北通化→台北萬大」計為 3.6 + 7.4 = 11.0 KM。
