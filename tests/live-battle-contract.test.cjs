@@ -68,3 +68,26 @@ test('XLSX 使用既有固定 vendor，不新增 CDN 或套件', () => {
   assert.match(js, /assets\/vendor\/xlsx\.full\.min\.js/);
   assert.doesNotMatch(js, /https?:\/\/.*xlsx|cdn|unpkg|jsdelivr/);
 });
+
+test('分析完成後可分開下載四張本機產生的 PNG 戰報', () => {
+  const html = read('live-battle.html');
+  const js = read('live-battle.js');
+  for (const id of ['downloadSummaryBtn', 'downloadStoresBtn', 'downloadProductsBtn', 'downloadGiftsBtn']) {
+    assert.match(html, new RegExp(`id="${id}"`));
+    assert.match(js, new RegExp(`\\$\\('${id}'\\)\\.addEventListener\\('click'`));
+  }
+  for (const builder of ['createSummaryPng', 'createStoresPng', 'createProductsPng', 'createGiftsPng']) {
+    assert.match(js, new RegExp(`function ${builder}\\(`));
+  }
+  assert.match(js, /canvas\.toBlob\([\s\S]*'image\/png'/);
+  assert.match(js, /URL\.createObjectURL/);
+  assert.match(js, /link\.download = `行進間戰報_/);
+  assert.doesNotMatch(`${html}\n${js}`, /html2canvas|dom-to-image|cdnjs|unpkg|jsdelivr/i);
+});
+
+test('PNG 戰報由 Canvas 在本機生成，不新增 AQ／RT 上傳或留存', () => {
+  const files = ['live-battle.html', 'live-battle.js', 'live-battle-core.js'].map(read).join('\n');
+  assert.match(files, /document\.createElement\('canvas'\)/);
+  assert.doesNotMatch(files, /FileReader\.readAsDataURL|fetch\([^)]*(?:aq|rt|file)|XMLHttpRequest|navigator\.sendBeacon/i);
+  assert.doesNotMatch(files, /localStorage\.setItem\([^,]+,\s*(?:file|state\.(?:aq|rt)|JSON\.stringify\(state)/);
+});

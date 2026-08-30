@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#07182a">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>行進間戰報｜北一二B</title>
-  <link rel="stylesheet" href="live-battle.css?v=20260831-1">
+  <link rel="stylesheet" href="live-battle.css?v=20260831-2">
 </head>
 <body>
   <header class="topbar">
@@ -77,6 +77,10 @@
           <div><span class="step">STEP 3</span><h2 id="resultsTitle">五項目前進度與達成</h2></div>
           <span id="generatedAt" class="generated-at">—</span>
         </div>
+        <div class="image-actions" aria-label="下載戰報圖片">
+          <button id="downloadSummaryBtn" class="download-button" type="button">下載① 五項全區總覽 PNG</button>
+          <button id="downloadStoresBtn" class="download-button secondary-download" type="button">下載② 九店五項戰情 PNG</button>
+        </div>
         <p id="dynamicNotice" class="dynamic-notice"></p>
         <div id="regionSummary" class="summary-grid"></div>
         <div class="table-wrap">
@@ -92,6 +96,7 @@
           <div><span class="step">PRODUCT PULSE</span><h2 id="productsTitle">目前上線商品</h2></div>
           <span id="productCount" class="status-badge neutral">0 款</span>
         </div>
+        <div class="image-actions"><button id="downloadProductsBtn" class="download-button product-download" type="button">下載③ 上線商品 PNG</button></div>
         <p class="helper">依 AQ／RT 的實際「商品型號」動態呈現；沒有上線的機款不會佔欄位。</p>
         <div id="productEmpty" class="empty-state" hidden>原始檔未提供可辨識的商品型號。</div>
         <div id="productTableWrap" class="table-wrap product-table-wrap">
@@ -104,6 +109,7 @@
           <div><span class="step">GIFT CHECK</span><h2 id="giftTitle">KKBOX／MyVideo 漏搭提醒</h2></div>
           <span id="giftCount" class="status-badge">0 件</span>
         </div>
+        <div class="image-actions"><button id="downloadGiftsBtn" class="download-button gift-download" type="button">下載④ 影音漏搭 PNG</button></div>
         <p class="helper">5G 599 型（含）以上與提前續約皆適用；排除企客。只缺任一項也列為漏搭。</p>
         <div id="giftEmpty" class="empty-state">目前沒有辨識到符合資格的漏搭案件。</div>
         <div id="giftTableWrap" class="table-wrap" hidden>
@@ -122,7 +128,7 @@
   </main>
 
   <footer>內部管理輔助工具｜原始明細不會離開本機｜正式成績以公司報表為準</footer>
-  <script src="live-battle-core.js?v=20260831-1"></script>
-  <script src="live-battle.js?v=20260831-1" defer></script>
+  <script src="live-battle-core.js?v=20260831-2"></script>
+  <script src="live-battle.js?v=20260831-2" defer></script>
 </body>
 </html>

@@ -236,6 +236,249 @@
     $('giftRows').innerHTML = rows.map(item => `<tr class="gift-missing"><td><strong>${escapeHtml(item.store)}</strong></td><td>${escapeHtml(item.staff)}</td><td>${escapeHtml(item.caseId)}</td><td>5G ${displayCount(item.plan)}</td><td>${item.earlyRenewal ? '提前續約' : '一般續約'}</td><td><strong>${escapeHtml(item.missing.join('、'))}</strong></td></tr>`).join('');
   }
 
+  const EXPORT_COLORS = {
+    navy: '#07182a', blue: '#0b69a7', green: '#087a60', red: '#bd2d3a', amber: '#a55d00',
+    ink: '#132f46', muted: '#66798b', line: '#d7e2ea', paper: '#ffffff', bg: '#f3f7fa'
+  };
+
+  function roundedRect(ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + width, y, x + width, y + height, r);
+    ctx.arcTo(x + width, y + height, x, y + height, r);
+    ctx.arcTo(x, y + height, x, y, r);
+    ctx.arcTo(x, y, x + width, y, r);
+    ctx.closePath();
+  }
+
+  function exportSurface(width, height) {
+    const scale = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+    ctx.fillStyle = EXPORT_COLORS.bg;
+    ctx.fillRect(0, 0, width, height);
+    ctx.textBaseline = 'middle';
+    return { canvas, ctx };
+  }
+
+  function drawExportHeader(ctx, width, title, subtitle) {
+    const gradient = ctx.createLinearGradient(0, 0, width, 0);
+    gradient.addColorStop(0, EXPORT_COLORS.navy);
+    gradient.addColorStop(.68, '#0a4770');
+    gradient.addColorStop(1, '#0b8eb0');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, 132);
+    ctx.fillStyle = '#63d9ef'; ctx.font = '800 19px system-ui, "Microsoft JhengHei", sans-serif';
+    ctx.fillText('北一二B｜行進間戰報', 54, 34);
+    ctx.fillStyle = '#ffffff'; ctx.font = '900 36px system-ui, "Microsoft JhengHei", sans-serif';
+    ctx.fillText(title, 54, 76);
+    ctx.fillStyle = '#d8eff8'; ctx.font = '600 18px system-ui, "Microsoft JhengHei", sans-serif';
+    ctx.fillText(subtitle, 54, 112);
+  }
+
+  function drawExportFooter(ctx, width, height) {
+    ctx.strokeStyle = EXPORT_COLORS.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(48, height - 55); ctx.lineTo(width - 48, height - 55); ctx.stroke();
+    ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '500 16px system-ui, "Microsoft JhengHei", sans-serif';
+    ctx.fillText('本機 AQ／RT 即時解析｜原始檔未上傳｜正式成績以公司報表為準', 48, height - 28);
+  }
+
+  function drawCell(ctx, x, y, width, height, fill, stroke) {
+    ctx.fillStyle = fill || EXPORT_COLORS.paper; roundedRect(ctx, x, y, width, height, 10); ctx.fill();
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+  }
+
+  function truncateCanvasText(ctx, value, maxWidth) {
+    const textValue = String(value == null ? '' : value);
+    if (ctx.measureText(textValue).width <= maxWidth) return textValue;
+    let result = textValue;
+    while (result && ctx.measureText(`${result}…`).width > maxWidth) result = result.slice(0, -1);
+    return `${result}…`;
+  }
+
+  function wrapCanvasText(ctx, value, maxWidth, maxLines) {
+    const chars = Array.from(String(value == null ? '' : value));
+    const lines = [];
+    let line = '';
+    chars.forEach(char => {
+      if (lines.length >= maxLines) return;
+      const next = line + char;
+      if (line && ctx.measureText(next).width > maxWidth) { lines.push(line); line = char; }
+      else line = next;
+    });
+    if (line && lines.length < maxLines) lines.push(line);
+    if (lines.length === maxLines && chars.join('') !== lines.join('')) lines[maxLines - 1] = truncateCanvasText(ctx, `${lines[maxLines - 1]}…`, maxWidth);
+    return lines;
+  }
+
+  function exportTimeLabel() {
+    return new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+  }
+
+  function fileStamp() {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}${values.month}${values.day}_${values.hour}${values.minute}`;
+  }
+
+  function createSummaryPng(analysis) {
+    const width = 1500, height = 510;
+    const { canvas, ctx } = exportSurface(width, height);
+    drawExportHeader(ctx, width, '① 五項全區總覽', `${exportTimeLabel()} 產生｜目前上線 / 今日目標`);
+    const fills = ['#e8f5fd', '#eef0ff', '#e8f7f1', '#e9f8f4', '#fff5df'];
+    const inks = [EXPORT_COLORS.blue, '#6247a1', EXPORT_COLORS.green, '#087a60', EXPORT_COLORS.amber];
+    const gap = 18, margin = 48, cardWidth = (width - margin * 2 - gap * 4) / 5;
+    Core.METRIC_KEYS.forEach((key, index) => {
+      const metric = analysis.region.metrics[key];
+      const x = margin + index * (cardWidth + gap);
+      drawCell(ctx, x, 164, cardWidth, 244, fills[index], '#d7e2ea');
+      ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '800 20px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText(`全區 ${key}`, x + 22, 198);
+      ctx.fillStyle = inks[index]; ctx.font = '900 58px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText(displayCount(metric.actual), x + 22, 260);
+      ctx.fillStyle = EXPORT_COLORS.ink; ctx.font = '700 18px system-ui, "Microsoft JhengHei", sans-serif';
+      ctx.fillText(metric.todayGoal == null ? '尚未載入今日目標' : `今日目標 ${displayCount(metric.todayGoal)}`, x + 22, 318);
+      ctx.fillStyle = metric.todayGoal == null ? EXPORT_COLORS.muted : metric.gap > 0 ? EXPORT_COLORS.red : EXPORT_COLORS.green;
+      ctx.font = '900 21px system-ui, "Microsoft JhengHei", sans-serif';
+      ctx.fillText(metric.todayGoal == null ? '目前上線' : metric.gap > 0 ? `尚缺 ${displayCount(metric.gap)}` : '今日已達標', x + 22, 365);
+    });
+    drawExportFooter(ctx, width, height);
+    return canvas;
+  }
+
+  function createStoresPng(analysis) {
+    const width = 1700, rowHeight = 76, tableY = 188, height = tableY + 58 + analysis.stores.length * rowHeight + 80;
+    const { canvas, ctx } = exportSurface(width, height);
+    drawExportHeader(ctx, width, '② 九店五項戰情', `${exportTimeLabel()} 產生｜數字為目前上線 / 今日目標`);
+    const labels = ['店點', ...Core.METRIC_KEYS, '目前尚缺'];
+    const widths = [170, 205, 205, 205, 205, 205, 350];
+    let x = 52;
+    labels.forEach((label, index) => {
+      ctx.fillStyle = '#e9eff3'; ctx.fillRect(x, tableY, widths[index], 58);
+      ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '800 18px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText(label, x + 14, tableY + 29);
+      x += widths[index];
+    });
+    analysis.stores.forEach((store, rowIndex) => {
+      const y = tableY + 58 + rowIndex * rowHeight;
+      const gaps = Core.METRIC_KEYS.filter(key => store.metrics[key].gap > 0).map(key => `${key}缺${displayCount(store.metrics[key].gap)}`);
+      const values = [store.name, ...Core.METRIC_KEYS.map(key => {
+        const metric = store.metrics[key];
+        return metric.todayGoal == null ? displayCount(metric.actual) : `${displayCount(metric.actual)} / ${displayCount(metric.todayGoal)}`;
+      }), analysis.dynamic.available ? (gaps.join('、') || '今日已達標') : '尚未載入目標'];
+      x = 52;
+      values.forEach((value, index) => {
+        ctx.fillStyle = rowIndex % 2 ? '#f8fbfd' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
+        ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
+        ctx.fillStyle = index === values.length - 1 ? (gaps.length ? EXPORT_COLORS.red : EXPORT_COLORS.green) : EXPORT_COLORS.ink;
+        ctx.font = `${index === 0 || index === values.length - 1 ? '800' : '700'} ${index === values.length - 1 ? 16 : 19}px system-ui, "Microsoft JhengHei", sans-serif`;
+        const lines = wrapCanvasText(ctx, value, widths[index] - 24, 2);
+        lines.forEach((line, lineIndex) => ctx.fillText(line, x + 12, y + rowHeight / 2 + (lineIndex - (lines.length - 1) / 2) * 23));
+        x += widths[index];
+      });
+    });
+    drawExportFooter(ctx, width, height);
+    return canvas;
+  }
+
+  function createProductsPng(analysis) {
+    const models = analysis.productModels;
+    const width = 1800, rowHeight = 72, tableY = 188, rows = Math.max(1, models.length), height = tableY + 58 + rows * rowHeight + 80;
+    const { canvas, ctx } = exportSurface(width, height);
+    drawExportHeader(ctx, width, '③ 目前上線商品', `${exportTimeLabel()} 產生｜依本次 AQ／RT 實際商品型號`);
+    if (!models.length) {
+      drawCell(ctx, 52, tableY, width - 104, 130, '#ffffff', EXPORT_COLORS.line);
+      ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '700 24px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText('原始檔未提供可辨識的商品型號', 82, tableY + 65);
+      drawExportFooter(ctx, width, height); return canvas;
+    }
+    const modelWidth = 440, totalWidth = 110, storeWidth = (width - 104 - modelWidth - totalWidth) / Core.STORE_NAMES.length;
+    const labels = ['商品型號', '合計', ...Core.STORE_NAMES];
+    const widths = [modelWidth, totalWidth, ...Core.STORE_NAMES.map(() => storeWidth)];
+    let x = 52;
+    labels.forEach((label, index) => {
+      ctx.fillStyle = '#eee9f7'; ctx.fillRect(x, tableY, widths[index], 58);
+      ctx.fillStyle = index < 2 ? '#5d438d' : EXPORT_COLORS.muted; ctx.font = '800 17px system-ui, "Microsoft JhengHei", sans-serif';
+      ctx.fillText(truncateCanvasText(ctx, label, widths[index] - 16), x + 8, tableY + 29); x += widths[index];
+    });
+    models.forEach((model, rowIndex) => {
+      const y = tableY + 58 + rowIndex * rowHeight;
+      const storeValues = Core.STORE_NAMES.map(name => Number(analysis.products[name][model] || 0));
+      const values = [model, storeValues.reduce((total, value) => total + value, 0), ...storeValues];
+      x = 52;
+      values.forEach((value, index) => {
+        ctx.fillStyle = index > 1 && value ? '#e8f7f1' : rowIndex % 2 ? '#faf8fd' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
+        ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
+        ctx.fillStyle = index > 1 && value ? EXPORT_COLORS.green : EXPORT_COLORS.ink; ctx.font = `${index < 2 ? '800' : '700'} 18px system-ui, "Microsoft JhengHei", sans-serif`;
+        if (index === 0) {
+          const lines = wrapCanvasText(ctx, value, widths[index] - 22, 2);
+          lines.forEach((line, lineIndex) => ctx.fillText(line, x + 11, y + rowHeight / 2 + (lineIndex - (lines.length - 1) / 2) * 22));
+        } else ctx.fillText(String(value), x + widths[index] / 2 - ctx.measureText(String(value)).width / 2, y + rowHeight / 2);
+        x += widths[index];
+      });
+    });
+    drawExportFooter(ctx, width, height);
+    return canvas;
+  }
+
+  function createGiftsPng(analysis) {
+    const rows = analysis.giftAudit;
+    const width = 1600, rowHeight = 76, tableY = 188, count = Math.max(1, rows.length), height = tableY + 58 + count * rowHeight + 80;
+    const { canvas, ctx } = exportSurface(width, height);
+    drawExportHeader(ctx, width, '④ KKBOX／MyVideo 漏搭提醒', `${exportTimeLabel()} 產生｜5G 599 型含以上・提前續約適用・企客排除`);
+    if (!rows.length) {
+      drawCell(ctx, 52, tableY, width - 104, 130, '#e8f7f1', '#b9ddcf');
+      ctx.fillStyle = EXPORT_COLORS.green; ctx.font = '900 28px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText('目前沒有辨識到符合資格的漏搭案件', 82, tableY + 65);
+      drawExportFooter(ctx, width, height); return canvas;
+    }
+    const labels = ['店點', '承辦人', '遮罩門號／案件', '資費', '類型', '缺少項目'];
+    const widths = [170, 200, 260, 160, 210, 490];
+    let x = 52;
+    labels.forEach((label, index) => { ctx.fillStyle = '#fff0e6'; ctx.fillRect(x, tableY, widths[index], 58); ctx.fillStyle = EXPORT_COLORS.amber; ctx.font = '800 18px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText(label, x + 12, tableY + 29); x += widths[index]; });
+    rows.forEach((item, rowIndex) => {
+      const y = tableY + 58 + rowIndex * rowHeight;
+      const values = [item.store, item.staff, item.caseId, `5G ${displayCount(item.plan)}`, item.earlyRenewal ? '提前續約' : '一般續約', item.missing.join('、')];
+      x = 52;
+      values.forEach((value, index) => {
+        ctx.fillStyle = rowIndex % 2 ? '#fff8f9' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight); ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
+        ctx.fillStyle = index === values.length - 1 ? EXPORT_COLORS.red : EXPORT_COLORS.ink; ctx.font = `${index === 0 || index === values.length - 1 ? '800' : '650'} 19px system-ui, "Microsoft JhengHei", sans-serif`;
+        ctx.fillText(truncateCanvasText(ctx, value, widths[index] - 24), x + 12, y + rowHeight / 2); x += widths[index];
+      });
+    });
+    drawExportFooter(ctx, width, height);
+    return canvas;
+  }
+
+  function downloadCanvas(canvas, label) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('圖片產生失敗。')); return; }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url; link.download = `行進間戰報_${label}_${fileStamp()}.png`;
+        document.body.appendChild(link); link.click(); link.remove();
+        scope.setTimeout(() => URL.revokeObjectURL(url), 1500);
+        resolve();
+      }, 'image/png');
+    });
+  }
+
+  async function exportPng(kind, button) {
+    if (!state.analysis) return;
+    const original = button.textContent;
+    button.disabled = true; button.classList.add('is-busy'); button.textContent = '產生圖片中…';
+    try {
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+      const builders = { summary: [createSummaryPng, '五項全區總覽'], stores: [createStoresPng, '九店五項戰情'], products: [createProductsPng, '上線商品'], gifts: [createGiftsPng, '影音漏搭'] };
+      const [build, label] = builders[kind];
+      await downloadCanvas(build(state.analysis), label);
+      button.textContent = '已下載 PNG';
+      scope.setTimeout(() => { button.textContent = original; }, 1500);
+    } catch (error) {
+      button.textContent = '下載失敗，請再試一次';
+      scope.setTimeout(() => { button.textContent = original; }, 2500);
+    } finally { button.disabled = false; button.classList.remove('is-busy'); }
+  }
+
   function renderAnalysis() {
     state.analysis = Core.analyze(state.aq, state.rt, state.targets, { todayIso: taipeiTodayIso() });
     const a = state.analysis;
@@ -308,5 +551,9 @@
   $('resetBtn').addEventListener('click', resetFiles);
   $('copyBtn').addEventListener('click', copyReport);
   $('copyDiagnosticBtn').addEventListener('click', copyDiagnostics);
+  $('downloadSummaryBtn').addEventListener('click', event => exportPng('summary', event.currentTarget));
+  $('downloadStoresBtn').addEventListener('click', event => exportPng('stores', event.currentTarget));
+  $('downloadProductsBtn').addEventListener('click', event => exportPng('products', event.currentTarget));
+  $('downloadGiftsBtn').addEventListener('click', event => exportPng('gifts', event.currentTarget));
   $('employeeId').value = scope.localStorage.getItem(EMPLOYEE_KEY) || '';
 })(window);
