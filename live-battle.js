@@ -6,7 +6,7 @@
   const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
   const DEVICE_KEY = 'north12b_private_dashboard_device_id';
   const TIMEOUT_MS = 20_000;
-  const state = { targets: null, aq: null, rt: null, analysis: null };
+  const state = { targets: null, aq: null, rt: null, analysis: null, diagnostics: { aq: null, rt: null } };
   const $ = id => document.getElementById(id);
 
   function message(id, value, tone) {
@@ -53,7 +53,7 @@
 
   function formatTargetMeta(meta) {
     const cutoff = meta.month && meta.snapshotDay ? `${meta.month}-${String(meta.snapshotDay).padStart(2, '0')}` : '—';
-    $('targetMeta').innerHTML = `<span>資料截止 ${cutoff}</span><span>來源 ${escapeHtml(meta.sourceFile || '—')}</span><span>9 店 AQ／RT 目標已鎖定</span>`;
+    $('targetMeta').innerHTML = `<span>資料截止 ${cutoff}</span><span>來源 ${escapeHtml(meta.sourceFile || '—')}</span><span>依剩餘天數動態分配今日目標</span>`;
     $('targetMeta').hidden = false;
   }
 
@@ -72,7 +72,7 @@
     scope.localStorage.setItem(EMPLOYEE_KEY, employeeId);
     setTargetState('ok', '目標已載入');
     formatTargetMeta(state.targets.meta);
-    message('targetMessage', `已驗證 ${result.profile.maskedName || '督導'}，正式九店目標載入完成。`, 'ok');
+    message('targetMessage', `已驗證 ${result.profile.maskedName || '督導'}，正式九店目標載入完成；將追加今日動態目標。`, 'ok');
     updateAnalyzeButton();
   }
 
@@ -108,19 +108,52 @@
     return workbook.SheetNames.map(sheetName => ({ sheetName, matrix: XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: true, defval: '' }) }));
   }
 
+  function inspectFile(file, kind, matrices) {
+    return {
+      kind: kind.toUpperCase(),
+      fileName: file.name,
+      sheets: matrices.map(entry => ({ sheetName: entry.sheetName, ...Core.inspectMatrix(entry.matrix) }))
+    };
+  }
+
+  function diagnosticText() {
+    const lines = ['【行進間戰報｜安全辨識資訊】', '僅包含檔案結構、欄位名稱與業務分類值，不含姓名、門號或案件資料。'];
+    ['aq', 'rt'].forEach(kind => {
+      const diagnostic = state.diagnostics[kind];
+      if (!diagnostic) return;
+      lines.push('', `${diagnostic.kind}｜${diagnostic.fileName}`);
+      diagnostic.sheets.forEach(sheet => {
+        lines.push(`・${sheet.sheetName}：${sheet.rowCount} 列／${sheet.columnCount} 欄`);
+        lines.push(sheet.headers.length ? `  表頭候選：${sheet.headers.join('｜')}` : '  表頭候選：未辨識');
+        sheet.safeValues.forEach(group => lines.push(`  ${group.label}（${group.header}）：${group.values.length ? group.values.join('、') : '無值'}`));
+      });
+    });
+    return lines.join('\n');
+  }
+
+  function renderDiagnostics() {
+    const hasAny = Boolean(state.diagnostics.aq || state.diagnostics.rt);
+    $('diagnostics').hidden = !hasAny;
+    if (hasAny) $('diagnosticText').textContent = diagnosticText();
+  }
+
   async function parseFile(file, kind) {
-    if (!state.targets) throw new Error('請先載入正式 AQ／RT 目標。');
     const matrices = await matricesFromFile(file);
+    const diagnostic = inspectFile(file, kind, matrices);
     const candidates = [];
     const errors = [];
     matrices.forEach(entry => {
       try {
-        const result = Core.parseMatrix(entry.matrix, { kind, fileName: file.name, stores: state.targets.stores });
+        const result = Core.parseMatrix(entry.matrix, { kind, fileName: file.name, stores: state.targets && state.targets.stores });
         candidates.push({ ...result, sheetName: entry.sheetName });
       } catch (error) { errors.push(error.message); }
     });
-    if (!candidates.length) throw new Error(errors[0] || '找不到可辨識的北一二B資料。');
-    return candidates.sort((a, b) => b.meta.processedRows - a.meta.processedRows)[0];
+    if (!candidates.length) {
+      const error = new Error(errors[0] || '找不到可辨識的北一二B資料。');
+      error.diagnostic = diagnostic;
+      throw error;
+    }
+    return { result: candidates.sort((a, b) => b.meta.processedRows - a.meta.processedRows)[0], diagnostic };
   }
 
   function fileSummary(result) {
@@ -129,45 +162,68 @@
     return `${result.meta.fileName}｜${result.meta.processedRows} 筆｜${mode}${duplicate}`;
   }
 
-  async function handleFile(kind) {
+  async function handleFile(kind, options) {
+    const settings = options || {};
     const input = $(kind === 'aq' ? 'aqFile' : 'rtFile');
     const status = $(kind === 'aq' ? 'aqFileStatus' : 'rtFileStatus');
     const file = input.files[0];
     if (!file) return;
+    state[kind] = null;
+    updateAnalyzeButton();
     status.textContent = `${file.name}｜解析中…`;
     try {
-      state[kind] = await parseFile(file, kind);
+      const parsed = await parseFile(file, kind);
+      state[kind] = parsed.result;
+      state.diagnostics[kind] = parsed.diagnostic;
       status.textContent = fileSummary(state[kind]);
       message('fileMessage', `${kind.toUpperCase()} 已完成本機解析；${state[kind].meta.missingStores.length ? `目前無明細店點：${state[kind].meta.missingStores.join('、')}` : '九店皆有明細'}。`, 'ok');
     } catch (error) {
       state[kind] = null;
-      input.value = '';
-      status.textContent = '解析失敗';
-      message('fileMessage', error.message, 'bad');
+      state.diagnostics[kind] = error.diagnostic || null;
+      status.textContent = `${file.name}｜待確認欄位`;
+      message('fileMessage', `${error.message} 已保留安全辨識資訊；可載入正式目標補入店碼後重試。`, 'bad');
     }
+    renderDiagnostics();
     updateAnalyzeButton();
+    if (!settings.deferRender && state.aq && state.rt) renderAnalysis();
   }
 
-  function updateAnalyzeButton() { $('analyzeBtn').disabled = !(state.targets && state.aq && state.rt); }
-  function displayCount(value) { return Number.isInteger(value) ? String(value) : Number(value).toFixed(1); }
+  function updateAnalyzeButton() { $('analyzeBtn').disabled = !(state.aq && state.rt); }
+  function displayCount(value) { return value == null ? '—' : (Number.isInteger(value) ? String(value) : Number(value).toFixed(1)); }
   function displayRate(value) { return Core.percent(value); }
   function rateClass(value) { return value >= 1 ? 'good' : 'warn'; }
 
+  function taipeiTodayIso() {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  }
+
+  function summaryDetail(actual, target, gap) {
+    if (target == null) return '尚未載入今日目標';
+    const result = gap > 0 ? `尚缺 ${displayCount(gap)}` : (actual > target ? `超標 ${displayCount(actual - target)}` : '已達標');
+    return `${displayCount(actual)} / 今日 ${displayCount(target)}・${result}`;
+  }
+
   function renderAnalysis() {
-    state.analysis = Core.analyze(state.aq, state.rt, state.targets);
+    state.analysis = Core.analyze(state.aq, state.rt, state.targets, { todayIso: taipeiTodayIso() });
     const a = state.analysis;
     $('regionSummary').innerHTML = `
-      <article class="summary-card"><span>全區 AQ</span><strong>${displayRate(a.region.aqRate)}</strong><small>${displayCount(a.region.aqActual)} / ${displayCount(a.region.aqTarget)}${a.region.aqGap > 0 ? `・尚缺 ${displayCount(a.region.aqGap)}` : '・已達標'}</small></article>
-      <article class="summary-card rt"><span>全區 RT</span><strong>${displayRate(a.region.rtRate)}</strong><small>${displayCount(a.region.rtActual)} / ${displayCount(a.region.rtTarget)}${a.region.rtGap > 0 ? `・尚缺 ${displayCount(a.region.rtGap)}` : '・已達標'}</small></article>`;
+      <article class="summary-card"><span>全區 AQ 目前上線</span><strong>${displayCount(a.region.aqActual)}</strong><small>${summaryDetail(a.region.aqActual, a.region.aqTarget, a.region.aqGap)}</small></article>
+      <article class="summary-card rt"><span>全區 RT 目前上線</span><strong>${displayCount(a.region.rtActual)}</strong><small>${summaryDetail(a.region.rtActual, a.region.rtTarget, a.region.rtGap)}</small></article>`;
     const priorityNames = new Set(a.priority.slice(0, 4).map(store => store.name));
     $('storeRows').innerHTML = a.stores.map(store => {
       const aqGap = store.aqGap > 0 ? `AQ 缺 ${displayCount(store.aqGap)}` : '';
       const rtGap = store.rtGap > 0 ? `RT 缺 ${displayCount(store.rtGap)}` : '';
-      return `<tr class="${priorityNames.has(store.name) ? 'priority' : ''}"><td><strong>${escapeHtml(store.name)}</strong></td><td>${displayCount(store.aqActual)} / ${displayCount(store.aqTarget)}</td><td><span class="rate ${rateClass(store.aqRate)}">${displayRate(store.aqRate)}</span></td><td>${displayCount(store.rtActual)} / ${displayCount(store.rtTarget)}</td><td><span class="rate ${rateClass(store.rtRate)}">${displayRate(store.rtRate)}</span></td><td class="gap ${!aqGap && !rtGap ? 'done' : ''}">${aqGap || rtGap ? [aqGap, rtGap].filter(Boolean).join('、') : '已達標'}</td></tr>`;
+      const gapLabel = !a.dynamic.available ? '載入目標後顯示' : (aqGap || rtGap ? [aqGap, rtGap].filter(Boolean).join('、') : '今日已達標');
+      return `<tr class="${priorityNames.has(store.name) ? 'priority' : ''}"><td><strong>${escapeHtml(store.name)}</strong></td><td>${displayCount(store.aqActual)}</td><td>${displayCount(store.aqTodayGoal)}</td><td>${displayCount(store.rtActual)}</td><td>${displayCount(store.rtTodayGoal)}</td><td class="gap ${a.dynamic.available && !aqGap && !rtGap ? 'done' : ''}">${gapLabel}</td></tr>`;
     }).join('');
     const now = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
     $('generatedAt').textContent = `${now} 產生`;
     $('reportText').value = Core.composeMessage(a, { timeLabel: now });
+    $('dynamicNotice').textContent = a.dynamic.available
+      ? `今日目標依截至 ${a.dynamic.cutoff} 的正式累積實績，分配至剩餘 ${a.dynamic.remainingDays} 天。`
+      : a.dynamic.reason;
     $('results').hidden = false;
     $('copyStatus').textContent = '';
     scope.setTimeout(() => $('results').scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
@@ -183,18 +239,32 @@
   }
 
   function resetFiles() {
-    state.aq = null; state.rt = null; state.analysis = null;
+    state.aq = null; state.rt = null; state.analysis = null; state.diagnostics = { aq: null, rt: null };
     $('aqFile').value = ''; $('rtFile').value = '';
     $('aqFileStatus').textContent = '尚未選擇'; $('rtFileStatus').textContent = '尚未選擇';
-    $('results').hidden = true; updateAnalyzeButton();
+    $('results').hidden = true; $('diagnostics').hidden = true; updateAnalyzeButton();
     message('fileMessage', '已清除本機 AQ／RT 檔案；正式目標仍保留於此頁記憶體。');
+  }
+
+  async function copyDiagnostics() {
+    const value = diagnosticText();
+    try {
+      if (navigator.clipboard && scope.isSecureContext) await navigator.clipboard.writeText(value);
+      else { $('diagnosticText').focus(); document.getSelection().selectAllChildren($('diagnosticText')); document.execCommand('copy'); document.getSelection().removeAllRanges(); }
+      $('diagnosticCopyStatus').textContent = '已複製，可貼回對話或截圖。';
+    } catch (_) { $('diagnosticCopyStatus').textContent = '複製失敗，請直接截圖這個區塊。'; }
   }
 
   $('loadTargetsBtn').addEventListener('click', async () => {
     const button = $('loadTargetsBtn');
     button.disabled = true; button.textContent = '驗證中…'; setTargetState('', '讀取中');
     message('targetMessage', '正在驗證 Approved Device 並讀取正式九店目標…', 'busy');
-    try { await loadTargets(); }
+    try {
+      await loadTargets();
+      if ($('aqFile').files[0]) await handleFile('aq', { deferRender: true });
+      if ($('rtFile').files[0]) await handleFile('rt', { deferRender: true });
+      if (state.aq && state.rt) renderAnalysis();
+    }
     catch (error) { state.targets = null; setTargetState('bad', '載入失敗'); message('targetMessage', error.message, 'bad'); updateAnalyzeButton(); }
     finally { button.disabled = false; button.textContent = '驗證並載入目標'; }
   });
@@ -203,5 +273,6 @@
   $('analyzeBtn').addEventListener('click', renderAnalysis);
   $('resetBtn').addEventListener('click', resetFiles);
   $('copyBtn').addEventListener('click', copyReport);
+  $('copyDiagnosticBtn').addEventListener('click', copyDiagnostics);
   $('employeeId').value = scope.localStorage.getItem(EMPLOYEE_KEY) || '';
 })(window);

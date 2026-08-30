@@ -19,7 +19,7 @@ function kpiData() {
   };
 }
 
-test('督導載入正式目標後，本機雙檔產生九店戰報，不傳送檔案內容', async ({ page }) => {
+test('本機雙檔先產生預覽，督導再載入正式目標追加動態今日追缺', async ({ page }) => {
   const actions = [];
   await page.route('https://script.google.com/**', async route => {
     const payload = JSON.parse(route.request().postData() || '{}');
@@ -31,22 +31,24 @@ test('督導載入正式目標後，本機雙檔產生九店戰報，不傳送�
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(PAGE_URL);
-  await page.locator('#employeeId').fill('9000001');
-  await page.locator('#loadTargetsBtn').click();
-  await expect(page.locator('#targetBadge')).toHaveText('目標已載入');
 
   const aqRows = stores.flatMap((name, index) => Array.from({ length: index === 0 ? 1 : 12 }, (_, row) => `AQ新申裝,DNB${String(index + 1).padStart(3, '0')},A-${index}-${row},1`));
   const rtRows = stores.flatMap((name, index) => Array.from({ length: index === 0 ? 2 : 22 }, (_, row) => `RT續約,${name},R-${index}-${row},1`));
   await page.locator('#aqFile').setInputFiles({ name: 'AQ.csv', mimeType: 'text/csv', buffer: Buffer.from(['案件類型,營業點代碼,受理編號,上線點數', ...aqRows].join('\n')) });
-  await expect(page.locator('#aqFileStatus')).toContainText('AQ.csv');
+  await expect(page.locator('#aqFileStatus')).toContainText('待確認欄位');
   await page.locator('#rtFile').setInputFiles({ name: 'RT.csv', mimeType: 'text/csv', buffer: Buffer.from(['案件類型,門市,受理編號,上線點數', ...rtRows].join('\n')) });
   await expect(page.locator('#rtFileStatus')).toContainText('RT.csv');
+  await expect(page.locator('#diagnostics')).toBeVisible();
+
+  await page.locator('#employeeId').fill('9000001');
+  await page.locator('#loadTargetsBtn').click();
+  await expect(page.locator('#targetBadge')).toHaveText('目標已載入');
+  await expect(page.locator('#aqFileStatus')).toContainText('AQ.csv');
   await expect(page.locator('#analyzeBtn')).toBeEnabled();
-  await page.locator('#analyzeBtn').click();
 
   await expect(page.locator('#storeRows tr')).toHaveCount(9);
   await expect(page.locator('#reportText')).toHaveValue(/北一二B 行進間戰報/);
-  await expect(page.locator('#reportText')).toHaveValue(/通化｜AQ 1\/10/);
+  await expect(page.locator('#reportText')).toHaveValue(/通化｜AQ 1\/5/);
   expect(actions).toEqual(['private_access', 'kpicalc_access']);
   expect(await page.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
 });

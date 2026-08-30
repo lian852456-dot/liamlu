@@ -6,20 +6,23 @@
 - 基準：`origin/main` `0923a2f`
 - 已由 GitHub Pages run #33322556767 成功部署；未呼叫 GAS 寫入，也未以 Liam 的真實 AQ／RT 原始檔做 Safari UAT。
 - 正式入口已放在 `home.html` 的「督導專區」，不取代「Liam 情報站」或「戰報快速更新」。
+- 第二階段候選：`feature/live-battle-upload-first-dynamic-20260830`，改為先選檔、正式目標選用、動態今日追缺與安全辨識資訊；尚未重新部署。
 
 ## 使用流程
 
 1. 從智慧營運中心的督導專區進入「行進間戰報」。
-2. 以既有員編／Approved Device 驗證；後端 `kpicalc_access` 必須回傳 `profile.isTrusted=true`。
-3. 唯讀載入正式 KPI 的九店 `TTL AQ上線點數`、`RT上線點數` 月目標。
-4. 在本機分別選擇 AQ、RT 原始檔；支援 CSV、TSV、XLSX、XLS 與 Big5／CP950。
-5. 產出全區與九店實績／目標／達成率／尚缺數，排序前四個優先追進店點，生成可直接貼群組文字。
+2. 先在本機分別選擇 AQ、RT 原始檔；支援 CSV、TSV、XLSX、XLS 與 Big5／CP950，不需驗證即可先做本機辨識。
+3. 兩檔辨識完成即產出全區與九店目前上線預覽；辨識不足時顯示不含客戶資料的安全診斷，可複製或截圖回報。
+4. 若需要今日追缺，再以既有員編／Approved Device 驗證；`kpicalc_access` 必須回傳 `profile.isTrusted=true`。
+5. 唯讀載入九店 AQ／RT 月目標與截至昨日實績，依含今天的剩餘天數動態分配今日目標，追加目前尚缺與群組文字。
 
 ## 資料與權限邊界
 
 - AQ／RT 原始檔只存在頁面記憶體；不轉 base64、不送往 GAS、不寫 localStorage／sessionStorage／IndexedDB／Cookie，重新整理或關閉頁面即清除。
 - 唯一網路請求是既有唯讀 `private_access` 與 `kpicalc_access`；未新增 GAS action、Deployment、Sheet schema、Drive 檔案或 token。
-- 達成率只以「本次本機檔 actual ÷ 正式 KPI target」計算；不混入正式前日 actual，也不回寫正式 KPI。
+- 今日達成只以「本次本機檔 actual ÷ 動態今日目標」計算；正式前日 actual 只用來分配今日目標，不混入當日上線，也不回寫正式 KPI。
+- 今日動態目標以「月目標－截至昨日正式累積實績」除以含今天的剩餘天數後無條件進位；正式截止不是昨日即 fail closed。當日 actual 仍只取本次本機 AQ／RT 檔。
+- 安全診斷只取工作表列欄數、候選表頭，以及資費／方案、商品／機款、合約／促案代碼、企客標示等業務分類值；不取姓名、門號、案件編號或受理明細。
 - AQ／RT 檔案分開做檔名／內容證據檢查；疑似選反即 fail closed。
 - 只保留北一二B九店 canonical 名稱與正式 DNB code；其他區列忽略，不顯示任何個人明細、門號或案件編號。
 
@@ -32,8 +35,9 @@
 
 ## 驗證
 
-- Node 全站契約：`331/331 PASS`。
+- Node 全站契約：第二階段候選 `337/337 PASS`。
 - 新增專項：九店名稱、DNB code、點數加總、明細計件、案件去重、Big5／CP950、AQ／RT 選反、正式 target 缺漏、九店缺口與群組文案全部通過。
+- 第二階段新增：無目標先解析、店碼載入後自動重試、動態今日目標、昨日截止門檻、已完成目標為 0、安全診斷不含姓名／門號全部通過。
 - Chromium E2E 已建立，但本次執行環境的瀏覽器程序因 `process_singleton socket Operation not permitted` 無法啟動；WebKit runtime 亦未安裝。因此不能把 Node PASS 當成 Safari 實機驗收。
 - Google Drive 既有「業績報表」資料夾目前只有 KPI／台獎 Excel，未找到 AQ.csv／RT.csv；功能雖已上線，仍需 Liam 提供當日真實 AQ、RT 各一份做欄位與結果對帳。
 

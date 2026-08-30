@@ -66,19 +66,71 @@ test('AQ 與 RT 選反時 fail closed', () => {
   assert.throws(() => Core.parseMatrix([['門市'], ['通化']], { kind: 'rt', fileName: 'AQ.csv', stores: sourceStores }), /疑似 AQ/);
 });
 
-test('達成率只用正式 target 與本機檔 actual，產生九店缺口與群組文字', () => {
+test('動態今日目標只用正式月目標、截至昨日實績與剩餘天數', () => {
   const targets = Core.extractTargets(kpiFixture());
   const aq = { totals: Object.fromEntries(names.map((name, index) => [name, index === 0 ? 1 : 20])) };
   const rt = { totals: Object.fromEntries(names.map((name, index) => [name, index === 0 ? 2 : 40])) };
-  const analysis = Core.analyze(aq, rt, targets);
+  const analysis = Core.analyze(aq, rt, targets, { todayIso: '2026-08-30' });
   assert.equal(analysis.stores.length, 9);
   assert.equal(analysis.priority[0].name, '通化');
-  assert.equal(analysis.stores[0].aqGap, 9);
-  assert.equal(analysis.stores[0].rtGap, 18);
+  assert.equal(analysis.dynamic.remainingDays, 2);
+  assert.equal(analysis.stores[0].aqTodayGoal, 5);
+  assert.equal(analysis.stores[0].aqGap, 4);
+  assert.equal(analysis.stores[0].rtTodayGoal, 10);
+  assert.equal(analysis.stores[0].rtGap, 8);
   const message = Core.composeMessage(analysis, { timeLabel: '16:20' });
   assert.match(message, /行進間戰報｜16:20/);
-  assert.match(message, /通化｜AQ 1\/10/);
+  assert.match(message, /通化｜AQ 1\/5/);
   assert.match(message, /本機 AQ／RT 即時檔解析/);
+});
+
+test('AQ／RT 可先解析並產生目前上線預覽，不強制載入目標', () => {
+  const aq = { totals: Object.fromEntries(names.map((name, index) => [name, index + 1])) };
+  const rt = { totals: Object.fromEntries(names.map((name, index) => [name, index + 2])) };
+  const analysis = Core.analyze(aq, rt, null, { todayIso: '2026-08-30' });
+  assert.equal(analysis.dynamic.available, false);
+  assert.equal(analysis.region.aqActual, 45);
+  assert.equal(analysis.region.aqTarget, null);
+  assert.equal(analysis.priority.length, 0);
+  assert.match(Core.composeMessage(analysis, { timeLabel: '12:00' }), /AQ目前45（尚未載入今日目標）/);
+});
+
+test('正式 KPI 不是昨日截止時，不冒算動態今日目標', () => {
+  const targets = Core.extractTargets(kpiFixture());
+  const aq = { totals: Object.fromEntries(names.map(name => [name, 1])) };
+  const rt = { totals: Object.fromEntries(names.map(name => [name, 1])) };
+  const analysis = Core.analyze(aq, rt, targets, { todayIso: '2026-08-31' });
+  assert.equal(analysis.dynamic.available, false);
+  assert.match(analysis.dynamic.reason, /不是昨日/);
+  assert.equal(analysis.stores[0].aqTodayGoal, null);
+});
+
+test('月目標已完成時今日目標為零且不列入追缺', () => {
+  const fixture = kpiFixture();
+  fixture.stores.forEach(store => {
+    store.items[Core.AQ_KEY].a = store.items[Core.AQ_KEY].t;
+    store.items[Core.RT_KEY].a = store.items[Core.RT_KEY].t;
+  });
+  const targets = Core.extractTargets(fixture);
+  const aq = { totals: Object.fromEntries(names.map(name => [name, 0])) };
+  const rt = { totals: Object.fromEntries(names.map(name => [name, 0])) };
+  const analysis = Core.analyze(aq, rt, targets, { todayIso: '2026-08-30' });
+  assert.equal(analysis.stores[0].aqTodayGoal, 0);
+  assert.equal(analysis.stores[0].aqGap, 0);
+  assert.equal(analysis.priority.length, 0);
+});
+
+test('安全辨識資訊回傳結構、候選表頭與業務代碼，不回傳客戶姓名門號', () => {
+  const matrix = [
+    ['RT續約明細'],
+    ['店點', '承辦人', '門號', '資費', '合約代碼'],
+    ['萬大', '王小明', '0912345678', '599', 'SECRET-CODE']
+  ];
+  const inspection = Core.inspectMatrix(matrix);
+  assert.equal(inspection.headerRow, 1);
+  assert.deepEqual(inspection.headers, ['店點', '承辦人', '門號', '資費', '合約代碼']);
+  assert.match(JSON.stringify(inspection), /SECRET-CODE/);
+  assert.doesNotMatch(JSON.stringify(inspection), /王小明|0912345678/);
 });
 
 test('正式 KPI 缺店或缺 target 時拒絕冒算達成率', () => {

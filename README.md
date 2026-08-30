@@ -23,12 +23,12 @@
 - 九店稽核值使用既有正式 canonical ID；其中萬大為 `DNB10168`、通化為 `DNB10174`，不沿用巡店相容層的 provisional／legacy code。介面仍統一顯示「台北三創」。
 - 私有照片重新載入統一走永遠回傳 Promise 的 `ensurePrivatePhoto()`；照片仍只由 `audit_photo_read` 讀成暫時 Blob URL，頁面卸載時釋放。部署與 Liam iPhone UAT gate 見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
 
-## 行進間戰報（待正式部署）
+## 行進間戰報
 
-- `home.html` 的督導專區新增 `live-battle.html` 入口，供上班期間以本機 AQ／RT 原始檔產生九店進度、達成率、缺口排序與可貼群組文字。
-- 頁面沿用既有 Approved Device 的 `private_access → kpicalc_access` 唯讀流程，並要求 `profile.isTrusted=true`；非督導核准裝置 fail closed。
-- 正式 KPI 只提供九店 AQ／RT 月目標；AQ／RT 實績只取本次本機檔案。原始檔不轉 base64、不呼叫上傳 action、不寫 localStorage／IndexedDB／Cookie，也不修改 KPI、台獎、每日回報或 GAS。
-- CSV／TSV 支援 UTF-8 與 Big5／CP950；XLSX／XLS 延用 repo 既有固定 SheetJS。AQ 與 RT 分開辨識，選反、缺少九店正式目標或完全找不到北一二B資料時都停止計算。
+- `home.html` 的督導專區已有 `live-battle.html` 正式入口；AQ／RT 可先在公司電腦本機選檔，不必先載入目標，兩檔辨識完成即可產生九店目前上線預覽。
+- 正式目標是選用加值：沿用 Approved Device 的 `private_access → kpicalc_access` 唯讀流程並要求 `profile.isTrusted=true`，以「月目標－截至昨日累積實績」除以含今天的剩餘天數、無條件進位，追加今日動態目標與目前尚缺；正式截止不是昨日即停止冒算。
+- 原始檔不轉 base64、不呼叫上傳 action、不寫 localStorage／IndexedDB／Cookie。頁面提供安全辨識資訊，只列工作表結構、欄位名稱與資費／商品／合約代碼等業務分類值，不列姓名、門號或案件資料。
+- CSV／TSV 支援 UTF-8 與 Big5／CP950；XLSX／XLS 延用 repo 既有固定 SheetJS。若店碼需正式對照，載入目標後會自動以同一個本機 File 重新辨識，不需把原始檔送出公司電腦。
 - 部署範圍、測試與回退見 [`docs/LIVE_BATTLE_AQRT_20260830.md`](docs/LIVE_BATTLE_AQRT_20260830.md)。
 
 ## 智慧營運中心 Phase 1A（未部署）

@@ -14,12 +14,32 @@ test('智慧營運中心督導專區新增行進間戰報，既有兩入口保�
   assert.match(supervisor, /href="live-battle\.html"[\s\S]*行進間戰報/);
 });
 
-test('行進間戰報只讀 Approved Device 正式目標，且僅督導 isTrusted 可用', () => {
+test('行進間戰報可先選檔；正式目標維持唯讀選用且僅督導 isTrusted 可用', () => {
   const js = read('live-battle.js');
+  assert.doesNotMatch(js, /if \(!state\.targets\) throw new Error\('請先載入正式/);
+  assert.match(js, /disabled = !\(state\.aq && state\.rt\)/);
   assert.match(js, /action: 'private_access'/);
   assert.match(js, /action: 'kpicalc_access'/);
   assert.match(js, /profile\.isTrusted !== true/);
   assert.doesNotMatch(js, /report_upload|kpicalc_publish|private_admin|ptwrite|hwrite|fetch\([^)]*file/i);
+});
+
+test('辨識失敗保留本機檔並只顯示安全欄位診斷', () => {
+  const js = read('live-battle.js');
+  const html = read('live-battle.html');
+  assert.match(js, /Core\.inspectMatrix/);
+  assert.match(js, /僅包含檔案結構、欄位名稱與業務分類值，不含姓名、門號或案件資料/);
+  assert.doesNotMatch(js, /input\.value = ''[\s\S]{0,120}解析失敗/);
+  assert.match(html, /安全辨識資訊/);
+});
+
+test('今日目標採正式昨日實績與剩餘天數動態分配，且不阻擋檔案辨識', () => {
+  const core = read('live-battle-core.js');
+  const html = read('live-battle.html');
+  assert.match(core, /Math\.ceil\(Math\.max\(0, Number\(monthTarget\) - Number\(officialActual\)\) \/ Number\(remainingDays\)\)/);
+  assert.match(core, /不是昨日.*停止計算今日目標/);
+  assert.match(html, /STEP 2 · 選用/);
+  assert.match(html, /未載入也不影響檔案辨識/);
 });
 
 test('AQ／RT 明細不寫入 storage、IndexedDB、cookie 或正式後端', () => {

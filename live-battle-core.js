@@ -77,6 +77,48 @@
     return best.storeCol >= 0 ? best : { rowIndex: -1, storeCol: -1, pointsCol: -1, idCol: -1, score: 0 };
   }
 
+  function inspectMatrix(matrix) {
+    const rows = Array.isArray(matrix) ? matrix : [];
+    const genericHeaders = ['門市', '店點', '營業點', '區域', '督導區', '服務中心', '案件', '受理', '門號', '員工', '承辦', '資費', '合約', '商品', '機款', '方案'];
+    const safeEnumHeaders = [
+      { label: '合約／促案代碼', aliases: ['合約代碼', '促案代碼', '優惠代碼', '服務代碼', '產品代碼'] },
+      { label: '資費／方案', aliases: ['資費', '資費別', '月租', '月租費', '方案', '方案名稱', '資費方案'] },
+      { label: '商品／機款', aliases: ['商品名稱', '商品機型', '機款', '手機型號', '產品名稱', '上線商品'] },
+      { label: '企客標示', aliases: ['企客', '企客案', '企客標示', '客戶類型', '客群'] }
+    ];
+    let candidate = { rowIndex: -1, headers: [], score: -1 };
+    rows.slice(0, 40).forEach((row, rowIndex) => {
+      if (!Array.isArray(row)) return;
+      const headers = row.map(text).filter(Boolean).slice(0, 40);
+      const matches = headers.reduce((sum, value) => sum + (genericHeaders.some(alias => normalizeToken(value).includes(normalizeToken(alias))) ? 1 : 0), 0);
+      const score = matches * 100 + headers.length;
+      if (matches > 0 && score > candidate.score) candidate = { rowIndex, headers, score };
+    });
+    const safeValues = [];
+    if (candidate.rowIndex >= 0) {
+      const headerRow = rows[candidate.rowIndex] || [];
+      safeEnumHeaders.forEach(group => {
+        const column = headerRow.findIndex(value => group.aliases.some(alias => normalizeToken(value) === normalizeToken(alias)));
+        if (column < 0) return;
+        const values = [];
+        const seen = new Set();
+        rows.slice(candidate.rowIndex + 1).forEach(row => {
+          const value = text(Array.isArray(row) ? row[column] : '');
+          if (!value || value.length > 80 || seen.has(value) || values.length >= 80) return;
+          seen.add(value); values.push(value);
+        });
+        safeValues.push({ label: group.label, header: text(headerRow[column]), values });
+      });
+    }
+    return {
+      rowCount: rows.filter(row => Array.isArray(row) && row.some(value => text(value))).length,
+      columnCount: rows.reduce((max, row) => Math.max(max, Array.isArray(row) ? row.length : 0), 0),
+      headerRow: candidate.rowIndex,
+      headers: candidate.headers,
+      safeValues
+    };
+  }
+
   function numberOrNull(value) {
     if (typeof value === 'number') return Number.isFinite(value) ? value : null;
     let raw = text(value).replace(/,/g, '').replace(/[點件台]/g, '');
@@ -226,45 +268,81 @@
     };
   }
 
-  function rate(actual, target) { return target > 0 ? actual / target : null; }
-  function gap(actual, target) { return target > 0 ? Math.max(0, target - actual) : null; }
+  function dynamicContext(meta, todayIso) {
+    const month = text(meta && meta.month);
+    const snapshotDay = numberOrNull(meta && meta.snapshotDay);
+    const todayMatch = text(todayIso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const monthMatch = month.match(/^(\d{4})-(\d{2})$/);
+    if (!todayMatch || !monthMatch || !(snapshotDay >= 1)) return { available: false, reason: '正式目標缺少可比對的截止日期。' };
+    const todayUtc = new Date(Date.UTC(Number(todayMatch[1]), Number(todayMatch[2]) - 1, Number(todayMatch[3])));
+    todayUtc.setUTCDate(todayUtc.getUTCDate() - 1);
+    const expectedCutoff = `${todayUtc.getUTCFullYear()}-${String(todayUtc.getUTCMonth() + 1).padStart(2, '0')}-${String(todayUtc.getUTCDate()).padStart(2, '0')}`;
+    const cutoff = `${month}-${String(snapshotDay).padStart(2, '0')}`;
+    if (cutoff !== expectedCutoff) return { available: false, reason: `正式 KPI 截止 ${cutoff}，不是昨日 ${expectedCutoff}，已停止計算今日目標。`, cutoff, expectedCutoff };
+    const daysInMonth = new Date(Date.UTC(Number(monthMatch[1]), Number(monthMatch[2]), 0)).getUTCDate();
+    const remainingDays = daysInMonth - Number(snapshotDay);
+    if (!(remainingDays > 0)) return { available: false, reason: '正式 KPI 已無可分配的剩餘天數。', cutoff, expectedCutoff };
+    return { available: true, cutoff, expectedCutoff, remainingDays };
+  }
+
+  function dynamicDailyGoal(monthTarget, officialActual, remainingDays) {
+    if (!(monthTarget > 0) || officialActual == null || !(remainingDays > 0)) return null;
+    return Math.ceil(Math.max(0, Number(monthTarget) - Number(officialActual)) / Number(remainingDays));
+  }
+
+  function rate(actual, target) { return target == null ? null : (target === 0 ? 1 : actual / target); }
+  function gap(actual, target) { return target == null ? null : Math.max(0, target - actual); }
   function round(value, digits) {
     const power = 10 ** Number(digits || 0);
     return Math.round((Number(value) + Number.EPSILON) * power) / power;
   }
 
-  function analyze(aqResult, rtResult, targets) {
-    if (!aqResult || !rtResult || !targets) throw new Error('請先完成目標、AQ 與 RT 三項資料載入。');
-    const targetMap = new Map(targets.stores.map(store => [store.name, store]));
+  function analyze(aqResult, rtResult, targets, options) {
+    if (!aqResult || !rtResult) throw new Error('請先完成 AQ 與 RT 兩個檔案解析。');
+    const settings = options || {};
+    const targetMap = new Map(targets && Array.isArray(targets.stores) ? targets.stores.map(store => [store.name, store]) : []);
+    const dynamic = targets ? dynamicContext(targets.meta, settings.todayIso) : { available: false, reason: '尚未載入正式目標。' };
     const stores = STORE_NAMES.map(name => {
-      const target = targetMap.get(name);
+      const target = targetMap.get(name) || {};
       const aqActual = Number(aqResult.totals[name] || 0);
       const rtActual = Number(rtResult.totals[name] || 0);
-      const aqRate = rate(aqActual, target.aqTarget);
-      const rtRate = rate(rtActual, target.rtTarget);
+      const aqTodayGoal = dynamic.available ? dynamicDailyGoal(target.aqTarget, target.aqOfficialActual, dynamic.remainingDays) : null;
+      const rtTodayGoal = dynamic.available ? dynamicDailyGoal(target.rtTarget, target.rtOfficialActual, dynamic.remainingDays) : null;
+      const aqRate = rate(aqActual, aqTodayGoal);
+      const rtRate = rate(rtActual, rtTodayGoal);
       return {
-        name, aqActual, aqTarget: target.aqTarget, aqRate, aqGap: gap(aqActual, target.aqTarget),
-        rtActual, rtTarget: target.rtTarget, rtRate, rtGap: gap(rtActual, target.rtTarget),
-        combinedRate: (aqRate + rtRate) / 2
+        name, aqActual, aqTarget: target.aqTarget == null ? null : target.aqTarget,
+        aqOfficialActual: target.aqOfficialActual == null ? null : target.aqOfficialActual,
+        aqTodayGoal, aqRate, aqGap: gap(aqActual, aqTodayGoal),
+        rtActual, rtTarget: target.rtTarget == null ? null : target.rtTarget,
+        rtOfficialActual: target.rtOfficialActual == null ? null : target.rtOfficialActual,
+        rtTodayGoal, rtRate, rtGap: gap(rtActual, rtTodayGoal),
+        combinedRate: aqRate == null || rtRate == null ? null : (aqRate + rtRate) / 2
       };
     });
     const sum = (key) => stores.reduce((total, store) => total + Number(store[key] || 0), 0);
     const region = {
-      aqActual: sum('aqActual'), aqTarget: sum('aqTarget'), rtActual: sum('rtActual'), rtTarget: sum('rtTarget')
+      aqActual: sum('aqActual'), aqTarget: dynamic.available ? sum('aqTodayGoal') : null,
+      rtActual: sum('rtActual'), rtTarget: dynamic.available ? sum('rtTodayGoal') : null
     };
     region.aqRate = rate(region.aqActual, region.aqTarget);
     region.rtRate = rate(region.rtActual, region.rtTarget);
     region.aqGap = gap(region.aqActual, region.aqTarget);
     region.rtGap = gap(region.rtActual, region.rtTarget);
-    const priority = stores.filter(store => store.aqRate < 1 || store.rtRate < 1)
-      .slice().sort((a, b) => a.combinedRate - b.combinedRate || (b.aqGap + b.rtGap) - (a.aqGap + a.rtGap));
-    const leaders = stores.slice().sort((a, b) => b.combinedRate - a.combinedRate).slice(0, 2);
-    return { stores, region, priority, leaders };
+    const priority = dynamic.available
+      ? stores.filter(store => store.aqRate < 1 || store.rtRate < 1)
+        .slice().sort((a, b) => a.combinedRate - b.combinedRate || (b.aqGap + b.rtGap) - (a.aqGap + a.rtGap))
+      : [];
+    const leaders = stores.slice().sort((a, b) => dynamic.available
+      ? b.combinedRate - a.combinedRate
+      : (b.aqActual + b.rtActual) - (a.aqActual + a.rtActual)).slice(0, 2);
+    return { stores, region, priority, leaders, dynamic };
   }
 
   function percent(value) { return value == null ? '—' : `${round(value * 100, 1)}%`; }
   function count(value) { return Number.isInteger(value) ? String(value) : String(round(value, 1)); }
   function metricLine(label, actual, target, valueRate, valueGap) {
+    if (target == null) return `${label}目前${count(actual)}（尚未載入今日目標）`;
     return `${label} ${count(actual)}/${count(target)}（${percent(valueRate)}${valueGap > 0 ? `，缺${count(valueGap)}` : '，已達標'}）`;
   }
 
@@ -278,13 +356,16 @@
     const priorities = analysis.priority.slice(0, 4);
     if (priorities.length) {
       lines.push('', '🔴 優先追進');
-      priorities.forEach(store => lines.push(`・${store.name}｜${metricLine('AQ', store.aqActual, store.aqTarget, store.aqRate, store.aqGap)}；${metricLine('RT', store.rtActual, store.rtTarget, store.rtRate, store.rtGap)}`));
+      priorities.forEach(store => lines.push(`・${store.name}｜${metricLine('AQ', store.aqActual, store.aqTodayGoal, store.aqRate, store.aqGap)}；${metricLine('RT', store.rtActual, store.rtTodayGoal, store.rtRate, store.rtGap)}`));
     }
     const leaders = analysis.leaders.filter(store => store.aqActual > 0 || store.rtActual > 0);
-    if (leaders.length) lines.push('', `🟢 目前領先：${leaders.map(store => `${store.name}（AQ ${percent(store.aqRate)}／RT ${percent(store.rtRate)}）`).join('、')}`);
+    if (leaders.length) lines.push('', `🟢 目前領先：${leaders.map(store => analysis.dynamic.available
+      ? `${store.name}（AQ ${percent(store.aqRate)}／RT ${percent(store.rtRate)}）`
+      : `${store.name}（AQ ${count(store.aqActual)}／RT ${count(store.rtActual)}）`).join('、')}`);
+    if (!analysis.dynamic.available) lines.push('', `ℹ️ ${analysis.dynamic.reason}`);
     lines.push('', '請各店先補最大缺口，成交即回報；本訊息為本機 AQ／RT 即時檔解析，正式成績以公司報表為準。');
     return lines.join('\n');
   }
 
-  return { STORE_NAMES, AQ_KEY, RT_KEY, normalizeStore, buildStoreLookup, detectHeader, separatorFor, parseDelimited, decodeCsv, parseMatrix, extractTargets, analyze, composeMessage, percent };
+  return { STORE_NAMES, AQ_KEY, RT_KEY, normalizeStore, buildStoreLookup, detectHeader, inspectMatrix, separatorFor, parseDelimited, decodeCsv, parseMatrix, extractTargets, dynamicContext, dynamicDailyGoal, analyze, composeMessage, percent };
 });
