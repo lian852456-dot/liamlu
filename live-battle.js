@@ -72,7 +72,7 @@
     scope.localStorage.setItem(EMPLOYEE_KEY, employeeId);
     setTargetState('ok', '目標已載入');
     formatTargetMeta(state.targets.meta);
-    message('targetMessage', `已驗證 ${result.profile.maskedName || '督導'}，正式九店目標載入完成；將追加今日動態目標。`, 'ok');
+    message('targetMessage', `已驗證 ${result.profile.maskedName || '督導'}，五項正式目標載入完成；將追加今日動態目標。`, 'ok');
     updateAnalyzeButton();
   }
 
@@ -132,7 +132,7 @@
   }
 
   function renderDiagnostics() {
-    const hasAny = Boolean(state.diagnostics.aq || state.diagnostics.rt);
+    const hasAny = Boolean((state.diagnostics.aq && !state.aq) || (state.diagnostics.rt && !state.rt));
     $('diagnostics').hidden = !hasAny;
     if (hasAny) $('diagnosticText').textContent = diagnosticText();
   }
@@ -159,7 +159,9 @@
   function fileSummary(result) {
     const mode = result.meta.mode === 'points' ? '點數欄加總' : '明細列計件';
     const duplicate = result.meta.duplicateRows ? `，排除重複 ${result.meta.duplicateRows} 筆` : '';
-    return `${result.meta.fileName}｜${result.meta.processedRows} 筆｜${mode}${duplicate}`;
+    const relevant = result.kind === 'aq' ? ['A999', 'A1399', '好速'] : ['R999', 'R1399', '好速'];
+    const metricSummary = relevant.map(key => `${key} ${Core.STORE_NAMES.reduce((total, name) => total + Number(result.metrics && result.metrics[name] && result.metrics[name][key] || 0), 0)}`).join('／');
+    return `${result.meta.fileName}｜${result.meta.processedRows} 筆｜${metricSummary}｜${mode}${duplicate}`;
   }
 
   async function handleFile(kind, options) {
@@ -205,19 +207,50 @@
     return `${displayCount(actual)} / 今日 ${displayCount(target)}・${result}`;
   }
 
+  function metricCell(metric) {
+    const target = metric.todayGoal;
+    if (target == null) return `<strong>${displayCount(metric.actual)}</strong><small>目前上線</small>`;
+    const detail = metric.gap > 0 ? `缺 ${displayCount(metric.gap)}` : '達標';
+    return `<strong>${displayCount(metric.actual)}<span> / ${displayCount(target)}</span></strong><small class="${metric.gap > 0 ? 'negative' : 'positive'}">${detail}</small>`;
+  }
+
+  function renderProducts(analysis) {
+    const models = analysis.productModels;
+    $('productCount').textContent = `${models.length} 款`;
+    $('productEmpty').hidden = models.length > 0;
+    $('productTableWrap').hidden = models.length === 0;
+    if (!models.length) return;
+    $('productHead').innerHTML = `<th>店點</th>${models.map(model => `<th>${escapeHtml(model)}</th>`).join('')}<th>合計</th>`;
+    $('productRows').innerHTML = analysis.stores.map(store => {
+      const values = models.map(model => Number(analysis.products[store.name][model] || 0));
+      return `<tr><td><strong>${escapeHtml(store.name)}</strong></td>${values.map(value => `<td class="${value ? 'product-hit' : ''}">${displayCount(value)}</td>`).join('')}<td><strong>${displayCount(values.reduce((total, value) => total + value, 0))}</strong></td></tr>`;
+    }).join('');
+  }
+
+  function renderGiftAudit(analysis) {
+    const rows = analysis.giftAudit;
+    $('giftCount').textContent = `${rows.length} 件`;
+    $('giftCount').className = `status-badge${rows.length ? ' bad' : ' ok'}`;
+    $('giftEmpty').hidden = rows.length > 0;
+    $('giftTableWrap').hidden = rows.length === 0;
+    $('giftRows').innerHTML = rows.map(item => `<tr class="gift-missing"><td><strong>${escapeHtml(item.store)}</strong></td><td>${escapeHtml(item.staff)}</td><td>${escapeHtml(item.caseId)}</td><td>5G ${displayCount(item.plan)}</td><td>${item.earlyRenewal ? '提前續約' : '一般續約'}</td><td><strong>${escapeHtml(item.missing.join('、'))}</strong></td></tr>`).join('');
+  }
+
   function renderAnalysis() {
     state.analysis = Core.analyze(state.aq, state.rt, state.targets, { todayIso: taipeiTodayIso() });
     const a = state.analysis;
-    $('regionSummary').innerHTML = `
-      <article class="summary-card"><span>全區 AQ 目前上線</span><strong>${displayCount(a.region.aqActual)}</strong><small>${summaryDetail(a.region.aqActual, a.region.aqTarget, a.region.aqGap)}</small></article>
-      <article class="summary-card rt"><span>全區 RT 目前上線</span><strong>${displayCount(a.region.rtActual)}</strong><small>${summaryDetail(a.region.rtActual, a.region.rtTarget, a.region.rtGap)}</small></article>`;
+    $('regionSummary').innerHTML = Core.METRIC_KEYS.map((key, index) => {
+      const metric = a.region.metrics[key];
+      return `<article class="summary-card metric-${index}"><span>全區 ${escapeHtml(key)}</span><strong>${displayCount(metric.actual)}</strong><small>${summaryDetail(metric.actual, metric.todayGoal, metric.gap)}</small></article>`;
+    }).join('');
     const priorityNames = new Set(a.priority.slice(0, 4).map(store => store.name));
     $('storeRows').innerHTML = a.stores.map(store => {
-      const aqGap = store.aqGap > 0 ? `AQ 缺 ${displayCount(store.aqGap)}` : '';
-      const rtGap = store.rtGap > 0 ? `RT 缺 ${displayCount(store.rtGap)}` : '';
-      const gapLabel = !a.dynamic.available ? '載入目標後顯示' : (aqGap || rtGap ? [aqGap, rtGap].filter(Boolean).join('、') : '今日已達標');
-      return `<tr class="${priorityNames.has(store.name) ? 'priority' : ''}"><td><strong>${escapeHtml(store.name)}</strong></td><td>${displayCount(store.aqActual)}</td><td>${displayCount(store.aqTodayGoal)}</td><td>${displayCount(store.rtActual)}</td><td>${displayCount(store.rtTodayGoal)}</td><td class="gap ${a.dynamic.available && !aqGap && !rtGap ? 'done' : ''}">${gapLabel}</td></tr>`;
+      const gaps = Core.METRIC_KEYS.filter(key => store.metrics[key].gap > 0).map(key => `${key} 缺 ${displayCount(store.metrics[key].gap)}`);
+      const gapLabel = !a.dynamic.available ? '載入目標後顯示' : (gaps.length ? gaps.join('、') : '今日已達標');
+      return `<tr class="${priorityNames.has(store.name) ? 'priority' : ''}"><td><strong>${escapeHtml(store.name)}</strong></td>${Core.METRIC_KEYS.map(key => `<td class="metric-cell">${metricCell(store.metrics[key])}</td>`).join('')}<td class="gap ${a.dynamic.available && !gaps.length ? 'done' : ''}">${gapLabel}</td></tr>`;
     }).join('');
+    renderProducts(a);
+    renderGiftAudit(a);
     const now = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
     $('generatedAt').textContent = `${now} 產生`;
     $('reportText').value = Core.composeMessage(a, { timeLabel: now });
@@ -243,7 +276,8 @@
     $('aqFile').value = ''; $('rtFile').value = '';
     $('aqFileStatus').textContent = '尚未選擇'; $('rtFileStatus').textContent = '尚未選擇';
     $('results').hidden = true; $('diagnostics').hidden = true; updateAnalyzeButton();
-    message('fileMessage', '已清除本機 AQ／RT 檔案；正式目標仍保留於此頁記憶體。');
+    $('productRows').innerHTML = ''; $('giftRows').innerHTML = '';
+    message('fileMessage', '已清除本機兩份原始檔；正式目標仍保留於此頁記憶體。');
   }
 
   async function copyDiagnostics() {

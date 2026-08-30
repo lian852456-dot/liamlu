@@ -12,7 +12,12 @@ function kpiFixture() {
       ...store,
       items: {
         [Core.AQ_KEY]: { a: index, t: 10 + index, reportRate: .5 },
-        [Core.RT_KEY]: { a: index + 1, t: 20 + index, reportRate: .6 }
+        [Core.RT_KEY]: { a: index + 1, t: 20 + index, reportRate: .6 },
+        [Core.KPI_KEYS.A999]: { a: index, t: 10 + index },
+        [Core.KPI_KEYS.A1399]: { a: index, t: 6 + index },
+        [Core.KPI_KEYS.R999]: { a: index, t: 12 + index },
+        [Core.KPI_KEYS.R1399]: { a: index, t: 8 + index },
+        [Core.KPI_KEYS['好速']]: { a: index / 2, t: 4 + index }
       }
     }))
   };
@@ -53,6 +58,33 @@ test('RT 沒有點數欄時以唯一明細列計件', () => {
   assert.equal(result.meta.mode, 'rows');
 });
 
+test('實際 AQ／RT 欄位拆出五項、商品與影音漏搭，並遮罩案件識別', () => {
+  const aq = Core.parseMatrix([
+    ['案件類型', '店點', '門號', '變更資費', '商品型號', '專案代號'],
+    ['AQ新申裝', '通化', '0911111222', '5G 1399', 'Pixel 11 Pro', '一般專案'],
+    ['AQ新申裝', '酒泉', '0922222333', '5G 999', 'Galaxy S26', '好速500M']
+  ], { kind: 'aq', fileName: 'AQ.csv', stores: sourceStores });
+  assert.equal(aq.metrics.通化.A999, 1);
+  assert.equal(aq.metrics.通化.A1399, 1);
+  assert.equal(aq.metrics.酒泉.A999, 1);
+  assert.equal(aq.metrics.酒泉['好速'], 1);
+  assert.equal(aq.products.通化['Pixel 11 Pro'], 1);
+
+  const rt = Core.parseMatrix([
+    ['案件類型', '店點', '門號', '變更資費', '商品型號', '前台服務人員', '客戶分類', '合約編號', '專案代號'],
+    ['RT續約', '通化', '0912345678', '5G 1399', 'Pixel 11 Pro', '王小明', '一般戶', '主約', '提前續約'],
+    ['RT續約', '通化', '0912345678', '5G 1399', '', '王小明', '一般戶', 'KKBOX 3個月', '搭贈'],
+    ['RT續約', '酒泉', '0923456789', '5G 599', 'Galaxy A57', '李小華', '企客', '主約', '一般續約']
+  ], { kind: 'rt', fileName: 'RT.csv', stores: sourceStores });
+  assert.equal(rt.metrics.通化.R999, 1);
+  assert.equal(rt.metrics.通化.R1399, 1);
+  assert.equal(rt.products.通化['Pixel 11 Pro'], 1);
+  assert.equal(rt.giftAudit.length, 1);
+  assert.deepEqual(rt.giftAudit[0].missing, ['MyVideo']);
+  assert.equal(rt.giftAudit[0].caseId, '091***678');
+  assert.equal(rt.giftAudit[0].earlyRenewal, true);
+});
+
 test('Big5／CP950 CSV 可解碼並保留中文表頭與店名', () => {
   const bytes = Buffer.from('aaf9a5ab2ca457bd75c249bcc60ab371a4c62c320a', 'hex');
   const source = Core.decodeCsv(bytes);
@@ -68,8 +100,8 @@ test('AQ 與 RT 選反時 fail closed', () => {
 
 test('動態今日目標只用正式月目標、截至昨日實績與剩餘天數', () => {
   const targets = Core.extractTargets(kpiFixture());
-  const aq = { totals: Object.fromEntries(names.map((name, index) => [name, index === 0 ? 1 : 20])) };
-  const rt = { totals: Object.fromEntries(names.map((name, index) => [name, index === 0 ? 2 : 40])) };
+  const aq = { totals: Object.fromEntries(names.map((name, index) => [name, index === 0 ? 1 : 20])), metrics: Object.fromEntries(names.map((name, index) => [name, { A999: index === 0 ? 1 : 20, A1399: index === 0 ? 0 : 10, '好速': 0 }])) };
+  const rt = { totals: Object.fromEntries(names.map((name, index) => [name, index === 0 ? 2 : 40])), metrics: Object.fromEntries(names.map((name, index) => [name, { R999: index === 0 ? 2 : 20, R1399: index === 0 ? 0 : 10, '好速': 0 }])) };
   const analysis = Core.analyze(aq, rt, targets, { todayIso: '2026-08-30' });
   assert.equal(analysis.stores.length, 9);
   assert.equal(analysis.priority[0].name, '通化');
@@ -78,10 +110,12 @@ test('動態今日目標只用正式月目標、截至昨日實績與剩餘天�
   assert.equal(analysis.stores[0].aqGap, 4);
   assert.equal(analysis.stores[0].rtTodayGoal, 10);
   assert.equal(analysis.stores[0].rtGap, 8);
+  assert.equal(analysis.stores[0].metrics.A999.todayGoal, 5);
+  assert.equal(analysis.stores[0].metrics.A999.gap, 4);
   const message = Core.composeMessage(analysis, { timeLabel: '16:20' });
   assert.match(message, /行進間戰報｜16:20/);
-  assert.match(message, /通化｜AQ 1\/5/);
-  assert.match(message, /本機 AQ／RT 即時檔解析/);
+  assert.match(message, /通化｜A999缺4/);
+  assert.match(message, /本機原始檔即時解析/);
 });
 
 test('AQ／RT 可先解析並產生目前上線預覽，不強制載入目標', () => {
@@ -92,7 +126,7 @@ test('AQ／RT 可先解析並產生目前上線預覽，不強制載入目標', 
   assert.equal(analysis.region.aqActual, 45);
   assert.equal(analysis.region.aqTarget, null);
   assert.equal(analysis.priority.length, 0);
-  assert.match(Core.composeMessage(analysis, { timeLabel: '12:00' }), /AQ目前45（尚未載入今日目標）/);
+  assert.match(Core.composeMessage(analysis, { timeLabel: '12:00' }), /A999目前0（尚未載入今日目標）/);
 });
 
 test('正式 KPI 不是昨日截止時，不冒算動態今日目標', () => {
@@ -110,6 +144,7 @@ test('月目標已完成時今日目標為零且不列入追缺', () => {
   fixture.stores.forEach(store => {
     store.items[Core.AQ_KEY].a = store.items[Core.AQ_KEY].t;
     store.items[Core.RT_KEY].a = store.items[Core.RT_KEY].t;
+    Object.values(Core.KPI_KEYS).forEach(key => { store.items[key].a = store.items[key].t; });
   });
   const targets = Core.extractTargets(fixture);
   const aq = { totals: Object.fromEntries(names.map(name => [name, 0])) };

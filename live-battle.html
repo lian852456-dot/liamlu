@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#07182a">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>行進間戰報｜北一二B</title>
-  <link rel="stylesheet" href="live-battle.css?v=20260830-2">
+  <link rel="stylesheet" href="live-battle.css?v=20260831-1">
 </head>
 <body>
   <header class="topbar">
@@ -17,30 +17,30 @@
 
   <main>
     <section class="hero">
-      <p class="eyebrow">LIVE AQ / RT PULSE</p>
+      <p class="eyebrow">A999 / A1399 / R999 / R1399 / 好速</p>
       <h1>行進間戰報</h1>
-      <p>先選擇本機 AQ、RT 檔案產生即時進度；需要追缺時，再載入正式目標追加動態今日目標。</p>
+      <p>上傳本機 AQ、RT 原始檔，即時產生五項戰情、上線商品與影音漏搭提醒；需要追缺時，再載入正式目標。</p>
       <div class="privacy-note"><span>🔒</span><span>檔案只在這台裝置的瀏覽器記憶體解析，不上傳、不寫回 KPI，關閉頁面即清除。</span></div>
     </section>
 
     <section class="panel" aria-labelledby="filesTitle">
       <div class="panel-heading">
-        <div><span class="step">STEP 1</span><h2 id="filesTitle">先選擇 AQ 與 RT 原始檔</h2></div>
+        <div><span class="step">STEP 1</span><h2 id="filesTitle">上傳兩份原始檔</h2></div>
         <span class="status-badge neutral">不會上傳</span>
       </div>
-      <p class="helper">不必先載入目標。兩個檔案都辨識完成後，立即產生目前上線預覽。</p>
+      <p class="helper">不必先載入目標；兩個檔案辨識完成後，立即顯示 A999、A1399、R999、R1399、好速與商品明細。</p>
       <div class="upload-grid">
         <label class="upload-card aq-card" for="aqFile">
-          <span class="upload-kind">AQ</span>
+          <span class="upload-kind">A</span>
           <strong>選擇 AQ 檔案</strong>
-          <small>支援 CSV／TSV／XLSX／XLS，含 Big5／CP950</small>
+          <small>A999／A1399／好速／商品</small>
           <input id="aqFile" type="file" accept=".csv,.tsv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
           <span id="aqFileStatus" class="file-status">尚未選擇</span>
         </label>
         <label class="upload-card rt-card" for="rtFile">
-          <span class="upload-kind">RT</span>
+          <span class="upload-kind">R</span>
           <strong>選擇 RT 檔案</strong>
-          <small>支援 CSV／TSV／XLSX／XLS，含 Big5／CP950</small>
+          <small>R999／R1399／商品／影音漏搭</small>
           <input id="rtFile" type="file" accept=".csv,.tsv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
           <span id="rtFileStatus" class="file-status">尚未選擇</span>
         </label>
@@ -59,10 +59,10 @@
 
     <section class="panel optional-panel" aria-labelledby="targetTitle">
       <div class="panel-heading">
-        <div><span class="step">STEP 2 · 選用</span><h2 id="targetTitle">載入正式目標，追加今日追缺</h2></div>
+        <div><span class="step">STEP 2 · 選用</span><h2 id="targetTitle">載入五項正式目標，追加今日追缺</h2></div>
         <span id="targetBadge" class="status-badge">尚未載入</span>
       </div>
-      <p class="helper">沿用既有 Approved Device；依「月目標－截至昨日累積實績」除以含今天的剩餘天數，無條件進位。未載入也不影響檔案辨識。</p>
+      <p class="helper">讀取 A999、A1399、R999、R1399、好速；依「月目標－截至昨日累積實績」除以含今天的剩餘天數，無條件進位。未載入也不影響檔案辨識。</p>
       <div class="auth-row">
         <label>員工編號<input id="employeeId" autocomplete="username" inputmode="numeric" placeholder="請輸入既有員編"></label>
         <button id="loadTargetsBtn" type="button">驗證並載入目標</button>
@@ -74,16 +74,40 @@
     <section id="results" class="results" hidden aria-labelledby="resultsTitle">
       <section class="panel result-panel">
         <div class="panel-heading">
-          <div><span class="step">STEP 3</span><h2 id="resultsTitle">目前進度與達成</h2></div>
+          <div><span class="step">STEP 3</span><h2 id="resultsTitle">五項目前進度與達成</h2></div>
           <span id="generatedAt" class="generated-at">—</span>
         </div>
         <p id="dynamicNotice" class="dynamic-notice"></p>
         <div id="regionSummary" class="summary-grid"></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>店點</th><th>AQ目前上線</th><th>AQ今日目標</th><th>RT目前上線</th><th>RT今日目標</th><th>目前尚缺</th></tr></thead>
+            <thead><tr><th>店點</th><th>A999</th><th>A1399</th><th>R999</th><th>R1399</th><th>好速</th><th>目前尚缺</th></tr></thead>
             <tbody id="storeRows"></tbody>
           </table>
+        </div>
+      </section>
+
+      <section class="panel product-panel" aria-labelledby="productsTitle">
+        <div class="panel-heading">
+          <div><span class="step">PRODUCT PULSE</span><h2 id="productsTitle">目前上線商品</h2></div>
+          <span id="productCount" class="status-badge neutral">0 款</span>
+        </div>
+        <p class="helper">依 AQ／RT 的實際「商品型號」動態呈現；沒有上線的機款不會佔欄位。</p>
+        <div id="productEmpty" class="empty-state" hidden>原始檔未提供可辨識的商品型號。</div>
+        <div id="productTableWrap" class="table-wrap product-table-wrap">
+          <table><thead><tr id="productHead"></tr></thead><tbody id="productRows"></tbody></table>
+        </div>
+      </section>
+
+      <section class="panel gift-panel" aria-labelledby="giftTitle">
+        <div class="panel-heading">
+          <div><span class="step">GIFT CHECK</span><h2 id="giftTitle">KKBOX／MyVideo 漏搭提醒</h2></div>
+          <span id="giftCount" class="status-badge">0 件</span>
+        </div>
+        <p class="helper">5G 599 型（含）以上與提前續約皆適用；排除企客。只缺任一項也列為漏搭。</p>
+        <div id="giftEmpty" class="empty-state">目前沒有辨識到符合資格的漏搭案件。</div>
+        <div id="giftTableWrap" class="table-wrap" hidden>
+          <table><thead><tr><th>店點</th><th>承辦人</th><th>遮罩門號／案件</th><th>資費</th><th>類型</th><th>缺少項目</th></tr></thead><tbody id="giftRows"></tbody></table>
         </div>
       </section>
 
@@ -98,7 +122,7 @@
   </main>
 
   <footer>內部管理輔助工具｜原始明細不會離開本機｜正式成績以公司報表為準</footer>
-  <script src="live-battle-core.js?v=20260830-2"></script>
-  <script src="live-battle.js?v=20260830-2" defer></script>
+  <script src="live-battle-core.js?v=20260831-1"></script>
+  <script src="live-battle.js?v=20260831-1" defer></script>
 </body>
 </html>

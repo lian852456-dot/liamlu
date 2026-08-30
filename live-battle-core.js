@@ -8,9 +8,22 @@
   const STORE_NAMES = Object.freeze(['通化', '酒泉', '台北三創', '萬大', '六張犁', '復興南', '永吉', '大稻埕', '杭州南']);
   const AQ_KEY = 'TTL AQ上線點數';
   const RT_KEY = 'RT上線點數';
+  const METRIC_KEYS = Object.freeze(['A999', 'A1399', 'R999', 'R1399', '好速']);
+  const KPI_KEYS = Object.freeze({
+    A999: 'AQ V+D 999 (含)以上',
+    A1399: 'AQ V+D 1399 (含)以上',
+    R999: 'RT V+D 999 (含)以上',
+    R1399: 'RT V+D 1399 (含)以上',
+    '好速': '好速案銷售點數'
+  });
   const STORE_HEADERS = ['營業點代碼', '服務中心代碼', '門市代碼', '店點代碼', '店代碼', '營業點', '服務中心', '銷售門市', '門市', '店點', '店號'];
   const POINT_HEADERS = ['上線點數', '計件點數', '銷售點數', '實際點數', '貢獻點數', '點數', '件數', '數量'];
   const ID_HEADERS = ['受理編號', '申請書編號', '交易序號', '訂單編號', '案件編號', '用戶編號', '門號'];
+  const PLAN_HEADERS = ['變更資費', '異動後資費', '申辦資費', '新資費', '合約資費', '月租費', '資費方案', '方案名稱', '資費'];
+  const PRODUCT_HEADERS = ['商品型號', '商品名稱', '商品機型', '手機型號', '機款', '產品名稱', '上線商品'];
+  const STAFF_HEADERS = ['前台服務人員', '承辦人', '申辦人員', '服務人員', '員工姓名', '業代', '申辦業務'];
+  const ENTERPRISE_HEADERS = ['客戶分類', '企客標示', '客戶類型', '客群', '用戶標籤別', '專案資格'];
+  const BUSINESS_HEADERS = ['合約編號', '合約代碼', '專案代號', '促案代碼', '優惠代碼', '服務代碼', '產品代碼', '申辦業務', '方案名稱', '速率'];
 
   function text(value) { return String(value == null ? '' : value).trim(); }
   function normalizeToken(value) {
@@ -64,6 +77,23 @@
     return (Array.isArray(row) ? row : []).findIndex(value => headerMatch(value, aliases));
   }
 
+  function findPreferredColumn(row, aliases) {
+    const values = Array.isArray(row) ? row : [];
+    for (const alias of aliases) {
+      const index = values.findIndex(value => normalizeToken(value) === normalizeToken(alias));
+      if (index >= 0) return index;
+    }
+    return findColumn(values, aliases);
+  }
+
+  function matchingColumns(row, aliases) {
+    const result = [];
+    (Array.isArray(row) ? row : []).forEach((value, index) => {
+      if (headerMatch(value, aliases)) result.push(index);
+    });
+    return result;
+  }
+
   function detectHeader(matrix) {
     const rows = Array.isArray(matrix) ? matrix : [];
     let best = { rowIndex: -1, storeCol: -1, pointsCol: -1, idCol: -1, score: -1 };
@@ -81,10 +111,10 @@
     const rows = Array.isArray(matrix) ? matrix : [];
     const genericHeaders = ['門市', '店點', '營業點', '區域', '督導區', '服務中心', '案件', '受理', '門號', '員工', '承辦', '資費', '合約', '商品', '機款', '方案'];
     const safeEnumHeaders = [
-      { label: '合約／促案代碼', aliases: ['合約代碼', '促案代碼', '優惠代碼', '服務代碼', '產品代碼'] },
-      { label: '資費／方案', aliases: ['資費', '資費別', '月租', '月租費', '方案', '方案名稱', '資費方案'] },
-      { label: '商品／機款', aliases: ['商品名稱', '商品機型', '機款', '手機型號', '產品名稱', '上線商品'] },
-      { label: '企客標示', aliases: ['企客', '企客案', '企客標示', '客戶類型', '客群'] }
+      { label: '合約／促案代碼', aliases: ['合約代碼', '促案代碼', '專案代號', '優惠代碼', '服務代碼', '產品代碼'] },
+      { label: '資費／方案', aliases: ['變更資費', '異動後資費', '申辦資費', '資費', '資費別', '月租', '月租費', '方案', '方案名稱', '資費方案'] },
+      { label: '商品／機款', aliases: ['商品型號', '商品名稱', '商品機型', '機款', '手機型號', '產品名稱', '上線商品'] },
+      { label: '企客標示', aliases: ['客戶分類', '專案資格', '用戶標籤別', '企客', '企客案', '企客標示', '客戶類型', '客群'] }
     ];
     let candidate = { rowIndex: -1, headers: [], score: -1 };
     rows.slice(0, 40).forEach((row, rowIndex) => {
@@ -129,6 +159,59 @@
     if (!match) return null;
     const parsed = Number(match[0]);
     return Number.isFinite(parsed) ? (negative ? -Math.abs(parsed) : parsed) : null;
+  }
+
+  function planAmount(value) {
+    const raw = text(value).replace(/[０-９]/g, char => String(char.charCodeAt(0) - 0xFEE0)).replace(/,/g, '');
+    const values = (raw.match(/\d{3,4}/g) || []).map(Number).filter(value => value >= 199 && value <= 5000);
+    return values.length ? Math.max(...values) : null;
+  }
+
+  function maskIdentifier(value) {
+    const raw = text(value).replace(/\s+/g, '');
+    if (!raw) return '—';
+    if (/^\d{9,12}$/.test(raw)) return `${raw.slice(0, 3)}***${raw.slice(-3)}`;
+    if (raw.length <= 6) return `${raw.slice(0, 1)}***`;
+    return `${raw.slice(0, 3)}***${raw.slice(-3)}`;
+  }
+
+  function blankStoreMetrics() {
+    return Object.fromEntries(STORE_NAMES.map(name => [name, Object.fromEntries(METRIC_KEYS.map(key => [key, 0]))]));
+  }
+
+  function blankProducts() {
+    return Object.fromEntries(STORE_NAMES.map(name => [name, {}]));
+  }
+
+  function rowText(row, columns) {
+    return columns.map(column => text(row[column])).filter(Boolean).join('｜');
+  }
+
+  function isHaosuRow(row, headerRow) {
+    const source = normalizeToken(rowText(row, matchingColumns(headerRow, BUSINESS_HEADERS)));
+    return /好速|寬頻|固網|FTTH|FBB|光纖|(?:^|[^0-9])36M|(?:^|[^0-9])500M|(?:^|[^0-9])1G(?:[^A-Z0-9]|$)/.test(source);
+  }
+
+  function productName(value) {
+    const raw = text(value).replace(/\s+/g, ' ');
+    if (!raw || /^(?:-|—|無|NA|N\/A|NULL|空白)$/i.test(raw)) return '';
+    return raw.slice(0, 100);
+  }
+
+  function enterpriseRow(row, headerRow) {
+    const source = normalizeToken(rowText(row, matchingColumns(headerRow, ENTERPRISE_HEADERS)));
+    return /企客|企業客戶|企業方案|公司戶|大客戶/.test(source);
+  }
+
+  function fiveGRow(row, amount) {
+    const source = normalizeToken(row.join('｜'));
+    if (/4G/.test(source) && !/5G/.test(source)) return false;
+    return /5G/.test(source) || amount >= 599;
+  }
+
+  function giftFlags(rows) {
+    const source = normalizeToken(rows.flat().join('｜'));
+    return { kkbox: /KKBOX/.test(source), myVideo: /MYVIDEO/.test(source) };
   }
 
   function separatorFor(source, fileName) {
@@ -191,8 +274,15 @@
     validateKind(settings.kind, rows, settings.fileName);
     const lookup = buildStoreLookup(settings.stores);
     const header = detectHeader(rows);
+    const headerRow = header.rowIndex >= 0 ? rows[header.rowIndex] : [];
+    const planCol = findPreferredColumn(headerRow, PLAN_HEADERS);
+    const productCol = findPreferredColumn(headerRow, PRODUCT_HEADERS);
+    const staffCol = findPreferredColumn(headerRow, STAFF_HEADERS);
     const totals = Object.fromEntries(STORE_NAMES.map(name => [name, 0]));
+    const metrics = blankStoreMetrics();
+    const products = blankProducts();
     const seen = new Set();
+    const caseRows = new Map();
     let processedRows = 0;
     let duplicateRows = 0;
     let ignoredRows = 0;
@@ -210,23 +300,61 @@
       if (!store) { ignoredRows += 1; return; }
       const id = header.idCol >= 0 ? normalizeToken(row[header.idCol]) : '';
       const uniqueKey = id ? `${store}|${id}` : '';
+      const caseKey = uniqueKey || `${store}|ROW${offset}`;
+      if (!caseRows.has(caseKey)) caseRows.set(caseKey, { store, id: header.idCol >= 0 ? text(row[header.idCol]) : '', rows: [] });
+      caseRows.get(caseKey).rows.push(row);
       if (uniqueKey && seen.has(uniqueKey)) { duplicateRows += 1; return; }
       if (uniqueKey) seen.add(uniqueKey);
       const parsedPoints = header.pointsCol >= 0 ? numberOrNull(row[header.pointsCol]) : null;
       const points = parsedPoints == null ? 1 : parsedPoints;
       totals[store] += points;
+      const amount = planCol >= 0 ? planAmount(row[planCol]) : null;
+      if (String(settings.kind).toLowerCase() === 'aq') {
+        if (amount >= 999) metrics[store].A999 += 1;
+        if (amount >= 1399) metrics[store].A1399 += 1;
+      } else {
+        if (amount >= 999) metrics[store].R999 += 1;
+        if (amount >= 1399) metrics[store].R1399 += 1;
+      }
+      if (isHaosuRow(row, headerRow)) metrics[store]['好速'] += parsedPoints == null ? 1 : parsedPoints;
+      const product = productCol >= 0 ? productName(row[productCol]) : '';
+      if (product) products[store][product] = Number(products[store][product] || 0) + 1;
       processedRows += 1;
     });
+
+    const giftAudit = [];
+    if (String(settings.kind).toLowerCase() === 'rt') {
+      caseRows.forEach(group => {
+        const representative = group.rows[0] || [];
+        const amounts = group.rows.map(row => planCol >= 0 ? planAmount(row[planCol]) : null).filter(value => value != null);
+        const amount = amounts.length ? Math.max(...amounts) : null;
+        if (!(amount >= 599) || !group.rows.some(row => fiveGRow(row, amount)) || group.rows.some(row => enterpriseRow(row, headerRow))) return;
+        const gifts = giftFlags(group.rows);
+        const missing = [];
+        if (!gifts.kkbox) missing.push('KKBOX');
+        if (!gifts.myVideo) missing.push('MyVideo');
+        if (!missing.length) return;
+        giftAudit.push({
+          store: group.store,
+          staff: text(staffCol >= 0 ? representative[staffCol] : '') || '—',
+          caseId: maskIdentifier(group.id),
+          plan: amount,
+          earlyRenewal: /提前續約/.test(normalizeToken(group.rows.flat().join('｜'))),
+          missing
+        });
+      });
+    }
 
     const recognizedStores = STORE_NAMES.filter(name => totals[name] !== 0);
     if (!processedRows) throw new Error('找不到北一二B九店資料；請確認這是正確的 AQ／RT 原始檔。');
     return {
       kind: String(settings.kind).toLowerCase(),
-      totals,
+      totals, metrics, products, giftAudit,
       meta: {
         fileName: text(settings.fileName), headerRow: header.rowIndex,
         mode: header.pointsCol >= 0 ? 'points' : 'rows', processedRows, duplicateRows, ignoredRows,
-        recognizedStores, missingStores: STORE_NAMES.filter(name => !recognizedStores.includes(name))
+        recognizedStores, missingStores: STORE_NAMES.filter(name => !recognizedStores.includes(name)),
+        fields: { plan: planCol >= 0 ? text(headerRow[planCol]) : '', product: productCol >= 0 ? text(headerRow[productCol]) : '', staff: staffCol >= 0 ? text(headerRow[staffCol]) : '' }
       }
     };
   }
@@ -247,8 +375,16 @@
       const items = store && store.items || {};
       const aq = items[AQ_KEY];
       const rt = items[RT_KEY];
+      const metrics = Object.fromEntries(METRIC_KEYS.map(key => {
+        const item = items[KPI_KEYS[key]];
+        return [key, {
+          target: metricNumber(item, ['t', 'target', 'targetValue']),
+          officialActual: metricNumber(item, ['a', 'actual', 'actualValue'])
+        }];
+      }));
       return {
         name, code: text(store && store.code),
+        metrics,
         aqTarget: metricNumber(aq, ['t', 'target', 'targetValue']),
         rtTarget: metricNumber(rt, ['t', 'target', 'targetValue']),
         aqOfficialActual: metricNumber(aq, ['a', 'actual', 'actualValue']),
@@ -285,9 +421,10 @@
     return { available: true, cutoff, expectedCutoff, remainingDays };
   }
 
-  function dynamicDailyGoal(monthTarget, officialActual, remainingDays) {
+  function dynamicDailyGoal(monthTarget, officialActual, remainingDays, metricStep) {
+    const step = Number(metricStep) > 0 ? Number(metricStep) : 1;
     if (!(monthTarget > 0) || officialActual == null || !(remainingDays > 0)) return null;
-    return Math.ceil(Math.max(0, Number(monthTarget) - Number(officialActual)) / Number(remainingDays));
+    return Math.ceil((Math.max(0, Number(monthTarget) - Number(officialActual)) / Number(remainingDays)) / step) * step;
   }
 
   function rate(actual, target) { return target == null ? null : (target === 0 ? 1 : actual / target); }
@@ -304,6 +441,20 @@
     const dynamic = targets ? dynamicContext(targets.meta, settings.todayIso) : { available: false, reason: '尚未載入正式目標。' };
     const stores = STORE_NAMES.map(name => {
       const target = targetMap.get(name) || {};
+      const actualByMetric = Object.fromEntries(METRIC_KEYS.map(key => [key,
+        key.startsWith('A') ? Number(aqResult.metrics && aqResult.metrics[name] && aqResult.metrics[name][key] || 0)
+          : key.startsWith('R') ? Number(rtResult.metrics && rtResult.metrics[name] && rtResult.metrics[name][key] || 0)
+            : Number(aqResult.metrics && aqResult.metrics[name] && aqResult.metrics[name][key] || 0) + Number(rtResult.metrics && rtResult.metrics[name] && rtResult.metrics[name][key] || 0)
+      ]));
+      const metrics = Object.fromEntries(METRIC_KEYS.map(key => {
+        const metricTarget = target.metrics && target.metrics[key] || {};
+        const todayGoal = dynamic.available ? dynamicDailyGoal(metricTarget.target, metricTarget.officialActual, dynamic.remainingDays, key === '好速' ? .25 : 1) : null;
+        return [key, {
+          actual: actualByMetric[key], target: metricTarget.target == null ? null : metricTarget.target,
+          officialActual: metricTarget.officialActual == null ? null : metricTarget.officialActual,
+          todayGoal, rate: rate(actualByMetric[key], todayGoal), gap: gap(actualByMetric[key], todayGoal)
+        }];
+      }));
       const aqActual = Number(aqResult.totals[name] || 0);
       const rtActual = Number(rtResult.totals[name] || 0);
       const aqTodayGoal = dynamic.available ? dynamicDailyGoal(target.aqTarget, target.aqOfficialActual, dynamic.remainingDays) : null;
@@ -311,13 +462,16 @@
       const aqRate = rate(aqActual, aqTodayGoal);
       const rtRate = rate(rtActual, rtTodayGoal);
       return {
-        name, aqActual, aqTarget: target.aqTarget == null ? null : target.aqTarget,
+        name, metrics, aqActual, aqTarget: target.aqTarget == null ? null : target.aqTarget,
         aqOfficialActual: target.aqOfficialActual == null ? null : target.aqOfficialActual,
         aqTodayGoal, aqRate, aqGap: gap(aqActual, aqTodayGoal),
         rtActual, rtTarget: target.rtTarget == null ? null : target.rtTarget,
         rtOfficialActual: target.rtOfficialActual == null ? null : target.rtOfficialActual,
         rtTodayGoal, rtRate, rtGap: gap(rtActual, rtTodayGoal),
-        combinedRate: aqRate == null || rtRate == null ? null : (aqRate + rtRate) / 2
+        combinedRate: (() => {
+          const values = METRIC_KEYS.map(key => metrics[key].rate).filter(value => value != null);
+          return values.length ? values.reduce((total, value) => total + value, 0) / values.length : null;
+        })()
       };
     });
     const sum = (key) => stores.reduce((total, store) => total + Number(store[key] || 0), 0);
@@ -329,14 +483,29 @@
     region.rtRate = rate(region.rtActual, region.rtTarget);
     region.aqGap = gap(region.aqActual, region.aqTarget);
     region.rtGap = gap(region.rtActual, region.rtTarget);
+    region.metrics = Object.fromEntries(METRIC_KEYS.map(key => {
+      const actual = stores.reduce((total, store) => total + Number(store.metrics[key].actual || 0), 0);
+      const todayGoals = stores.map(store => store.metrics[key].todayGoal);
+      const todayGoal = dynamic.available && todayGoals.every(value => value != null) ? todayGoals.reduce((total, value) => total + Number(value), 0) : null;
+      return [key, { actual, todayGoal, rate: rate(actual, todayGoal), gap: gap(actual, todayGoal) }];
+    }));
     const priority = dynamic.available
-      ? stores.filter(store => store.aqRate < 1 || store.rtRate < 1)
-        .slice().sort((a, b) => a.combinedRate - b.combinedRate || (b.aqGap + b.rtGap) - (a.aqGap + a.rtGap))
+      ? stores.filter(store => METRIC_KEYS.some(key => store.metrics[key].rate != null && store.metrics[key].rate < 1))
+        .slice().sort((a, b) => (a.combinedRate ?? 99) - (b.combinedRate ?? 99))
       : [];
     const leaders = stores.slice().sort((a, b) => dynamic.available
-      ? b.combinedRate - a.combinedRate
-      : (b.aqActual + b.rtActual) - (a.aqActual + a.rtActual)).slice(0, 2);
-    return { stores, region, priority, leaders, dynamic };
+      ? (b.combinedRate ?? -1) - (a.combinedRate ?? -1)
+      : METRIC_KEYS.reduce((total, key) => total + b.metrics[key].actual - a.metrics[key].actual, 0)).slice(0, 2);
+    const products = Object.fromEntries(STORE_NAMES.map(name => {
+      const merged = {};
+      [aqResult.products && aqResult.products[name], rtResult.products && rtResult.products[name]].forEach(source => Object.entries(source || {}).forEach(([model, value]) => { merged[model] = Number(merged[model] || 0) + Number(value || 0); }));
+      return [name, merged];
+    }));
+    const productModels = Array.from(new Set(STORE_NAMES.flatMap(name => Object.keys(products[name])))).sort((a, b) => {
+      const total = model => STORE_NAMES.reduce((sum, name) => sum + Number(products[name][model] || 0), 0);
+      return total(b) - total(a) || a.localeCompare(b, 'zh-Hant');
+    });
+    return { stores, region, priority, leaders, dynamic, products, productModels, giftAudit: Array.isArray(rtResult.giftAudit) ? rtResult.giftAudit : [] };
   }
 
   function percent(value) { return value == null ? '—' : `${round(value * 100, 1)}%`; }
@@ -351,21 +520,29 @@
     const stamp = text(settings.timeLabel) || new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
     const lines = [
       `📣 北一二B 行進間戰報｜${stamp}`,
-      `全區 ${metricLine('AQ', analysis.region.aqActual, analysis.region.aqTarget, analysis.region.aqRate, analysis.region.aqGap)}；${metricLine('RT', analysis.region.rtActual, analysis.region.rtTarget, analysis.region.rtRate, analysis.region.rtGap)}`
+      `全區｜${METRIC_KEYS.map(key => {
+        const metric = analysis.region.metrics[key];
+        return metricLine(key, metric.actual, metric.todayGoal, metric.rate, metric.gap);
+      }).join('；')}`
     ];
     const priorities = analysis.priority.slice(0, 4);
     if (priorities.length) {
       lines.push('', '🔴 優先追進');
-      priorities.forEach(store => lines.push(`・${store.name}｜${metricLine('AQ', store.aqActual, store.aqTodayGoal, store.aqRate, store.aqGap)}；${metricLine('RT', store.rtActual, store.rtTodayGoal, store.rtRate, store.rtGap)}`));
+      priorities.forEach(store => {
+        const gaps = METRIC_KEYS.filter(key => store.metrics[key].gap > 0).map(key => `${key}缺${count(store.metrics[key].gap)}`);
+        lines.push(`・${store.name}｜${gaps.join('、') || '今日已達標'}`);
+      });
     }
-    const leaders = analysis.leaders.filter(store => store.aqActual > 0 || store.rtActual > 0);
+    const leaders = analysis.leaders.filter(store => METRIC_KEYS.some(key => store.metrics[key].actual > 0));
     if (leaders.length) lines.push('', `🟢 目前領先：${leaders.map(store => analysis.dynamic.available
-      ? `${store.name}（AQ ${percent(store.aqRate)}／RT ${percent(store.rtRate)}）`
-      : `${store.name}（AQ ${count(store.aqActual)}／RT ${count(store.rtActual)}）`).join('、')}`);
+      ? `${store.name}（五項均值 ${percent(store.combinedRate)}）`
+      : `${store.name}（${METRIC_KEYS.map(key => `${key} ${count(store.metrics[key].actual)}`).join('／')}）`).join('、')}`);
+    if (analysis.giftAudit.length) lines.push('', `🎁 KKBOX／MyVideo 漏搭 ${analysis.giftAudit.length} 件：${analysis.giftAudit.map(item => `${item.store} ${item.caseId}缺${item.missing.join('+')}`).join('；')}`);
+    if (analysis.productModels.length) lines.push('', `📱 今日上線商品：${analysis.productModels.slice(0, 8).map(model => `${model}×${STORE_NAMES.reduce((sum, name) => sum + Number(analysis.products[name][model] || 0), 0)}`).join('、')}`);
     if (!analysis.dynamic.available) lines.push('', `ℹ️ ${analysis.dynamic.reason}`);
-    lines.push('', '請各店先補最大缺口，成交即回報；本訊息為本機 AQ／RT 即時檔解析，正式成績以公司報表為準。');
+    lines.push('', '請各店先補最大缺口並確認影音搭贈；本訊息為本機原始檔即時解析，正式成績以公司報表為準。');
     return lines.join('\n');
   }
 
-  return { STORE_NAMES, AQ_KEY, RT_KEY, normalizeStore, buildStoreLookup, detectHeader, inspectMatrix, separatorFor, parseDelimited, decodeCsv, parseMatrix, extractTargets, dynamicContext, dynamicDailyGoal, analyze, composeMessage, percent };
+  return { STORE_NAMES, AQ_KEY, RT_KEY, METRIC_KEYS, KPI_KEYS, normalizeStore, buildStoreLookup, detectHeader, inspectMatrix, separatorFor, parseDelimited, decodeCsv, parseMatrix, extractTargets, dynamicContext, dynamicDailyGoal, analyze, composeMessage, percent, planAmount, maskIdentifier };
 });

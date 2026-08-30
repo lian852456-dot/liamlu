@@ -25,8 +25,9 @@
 
 ## 行進間戰報
 
-- `home.html` 的督導專區已有 `live-battle.html` 正式入口；AQ／RT 可先在公司電腦本機選檔，不必先載入目標，兩檔辨識完成即可產生九店目前上線預覽。
-- 正式目標是選用加值：沿用 Approved Device 的 `private_access → kpicalc_access` 唯讀流程並要求 `profile.isTrusted=true`，以「月目標－截至昨日累積實績」除以含今天的剩餘天數、無條件進位，追加今日動態目標與目前尚缺；正式截止不是昨日即停止冒算。
+- `home.html` 的督導專區已有 `live-battle.html` 正式入口；AQ／RT 可先在公司電腦本機選檔，不必先載入目標。候選版主畫面改以 A999、A1399、R999、R1399、好速呈現九店目前上線，並動態列出實際上線商品。
+- 正式目標是選用加值：沿用 Approved Device 的 `private_access → kpicalc_access` 唯讀流程並要求 `profile.isTrusted=true`，以五項各自的「月目標－截至昨日累積實績」除以含今天的剩餘天數、無條件進位，追加今日動態目標與目前尚缺；正式截止不是昨日即停止冒算。
+- RT 另依 5G 599 型（含）以上規則檢查 KKBOX 與 MyVideo；提前續約同樣適用，企客排除，只缺任一項也列為漏搭。明細只顯示店點、承辦人、遮罩門號／案件、資費與缺少項目。
 - 原始檔不轉 base64、不呼叫上傳 action、不寫 localStorage／IndexedDB／Cookie。頁面提供安全辨識資訊，只列工作表結構、欄位名稱與資費／商品／合約代碼等業務分類值，不列姓名、門號或案件資料。
 - CSV／TSV 支援 UTF-8 與 Big5／CP950；XLSX／XLS 延用 repo 既有固定 SheetJS。若店碼需正式對照，載入目標後會自動以同一個本機 File 重新辨識，不需把原始檔送出公司電腦。
 - 部署範圍、測試與回退見 [`docs/LIVE_BATTLE_AQRT_20260830.md`](docs/LIVE_BATTLE_AQRT_20260830.md)。

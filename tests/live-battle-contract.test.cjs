@@ -36,10 +36,24 @@ test('辨識失敗保留本機檔並只顯示安全欄位診斷', () => {
 test('今日目標採正式昨日實績與剩餘天數動態分配，且不阻擋檔案辨識', () => {
   const core = read('live-battle-core.js');
   const html = read('live-battle.html');
-  assert.match(core, /Math\.ceil\(Math\.max\(0, Number\(monthTarget\) - Number\(officialActual\)\) \/ Number\(remainingDays\)\)/);
+  assert.match(core, /Math\.ceil\(\(Math\.max\(0, Number\(monthTarget\) - Number\(officialActual\)\) \/ Number\(remainingDays\)\) \/ step\) \* step/);
   assert.match(core, /不是昨日.*停止計算今日目標/);
   assert.match(html, /STEP 2 · 選用/);
   assert.match(html, /未載入也不影響檔案辨識/);
+});
+
+test('戰報主畫面改以五項指標、實際商品與影音漏搭呈現', () => {
+  const core = read('live-battle-core.js');
+  const html = read('live-battle.html');
+  const js = read('live-battle.js');
+  for (const label of ['A999', 'A1399', 'R999', 'R1399', '好速']) assert.match(html, new RegExp(label));
+  assert.match(html, /目前上線商品/);
+  assert.match(html, /KKBOX／MyVideo 漏搭提醒/);
+  assert.match(core, /商品型號/);
+  assert.match(core, /提前續約/);
+  assert.match(core, /企客/);
+  assert.match(js, /renderProducts/);
+  assert.match(js, /renderGiftAudit/);
 });
 
 test('AQ／RT 明細不寫入 storage、IndexedDB、cookie 或正式後端', () => {
