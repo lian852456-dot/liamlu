@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#07182a">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>行進間戰報｜北一二B</title>
-  <link rel="stylesheet" href="live-battle.css?v=20260831-5">
+  <link rel="stylesheet" href="live-battle.css?v=20260831-7">
 </head>
 <body>
   <header class="topbar">
@@ -17,9 +17,9 @@
 
   <main>
     <section class="hero">
-      <p class="eyebrow">A999 / A1399 / R999 / R1399 / 好速</p>
+      <p class="eyebrow">AQ / RT / 好速完整資費戰情</p>
       <h1>行進間戰報</h1>
-      <p>上傳本機 AQ、RT 原始檔，即時產生北一二 A／B／C／D、九店七項戰情、上線商品與影音漏搭提醒；需要追缺時，再載入正式目標。</p>
+      <p>上傳本機 AQ、RT 原始檔，即時產生全國 AQ／RT 各部完整戰情、北一二B九店七項戰情、上線商品與影音漏搭提醒；需要追缺時，再載入正式目標。</p>
       <div class="privacy-note"><span>🔒</span><span>檔案只在這台裝置的瀏覽器記憶體解析，不上傳、不寫回 KPI，關閉頁面即清除。</span></div>
     </section>
 
@@ -28,7 +28,7 @@
         <div><span class="step">STEP 1</span><h2 id="filesTitle">上傳兩份原始檔</h2></div>
         <span class="status-badge neutral">不會上傳</span>
       </div>
-      <p class="helper">不必先載入目標；兩個檔案辨識完成後，立即顯示 A999、A1399、R999、R1399、好速與商品明細。</p>
+      <p class="helper">不必先載入目標；兩個檔案辨識完成後，立即顯示 AQ／RT 各資費、好速與商品明細。</p>
       <div class="upload-grid">
         <label class="upload-card aq-card" for="aqFile">
           <span class="upload-kind">A</span>
@@ -74,15 +74,15 @@
     <section id="results" class="results" hidden aria-labelledby="resultsTitle">
       <section class="panel result-panel">
         <div class="panel-heading">
-          <div><span class="step">STEP 3</span><h2 id="resultsTitle">AQ／RT 七項目前進度與達成</h2></div>
+          <div><span class="step">STEP 3</span><h2 id="resultsTitle">全國 AQ／RT／好速明細與北一二B今日達成</h2></div>
           <span id="generatedAt" class="generated-at">—</span>
         </div>
         <div class="image-actions" aria-label="下載戰報圖片">
-          <button id="downloadSummaryBtn" class="download-button" type="button">下載① 北一二 A／B／C／D 戰情 PNG</button>
+          <button id="downloadSummaryBtn" class="download-button" type="button">下載① 全國 AQ／RT 戰情 PNG</button>
           <button id="downloadStoresBtn" class="download-button secondary-download" type="button">下載③ 九店 AQ／RT 戰情 PNG</button>
         </div>
         <p id="dynamicNotice" class="dynamic-notice"></p>
-        <div id="regionSummary" class="summary-grid"></div>
+        <div id="regionSummary" class="region-detail-stack"></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>店點</th><th>AQ上線</th><th>A999</th><th>A1399</th><th>RT上線</th><th>R999</th><th>R1399</th><th>好速</th><th>今日差異</th></tr></thead>
@@ -128,7 +128,7 @@
   </main>
 
   <footer>內部管理輔助工具｜原始明細不會離開本機｜正式成績以公司報表為準</footer>
-  <script src="live-battle-core.js?v=20260831-5"></script>
-  <script src="live-battle.js?v=20260831-5" defer></script>
+  <script src="live-battle-core.js?v=20260831-7"></script>
+  <script src="live-battle.js?v=20260831-7" defer></script>
 </body>
 </html>

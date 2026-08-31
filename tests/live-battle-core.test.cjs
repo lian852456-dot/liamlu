@@ -33,18 +33,83 @@ test('九店名稱與台北前綴使用 canonical 名稱', () => {
 
 test('區域彙總工作表可補入 AQ A／B／C／D 數字', () => {
   const summary = Core.parseRegionSummary([
-    ['2026/8/31', '', '', '', '', ''],
-    ['區域', '長官', '合計', 'A999↑', 'A999↑佔比', 'A1399'],
-    ['北一二A', '翁長官', 25, 5, '20%', 1],
-    ['北一二B', '盧長官', 12, 3, '25%', 2],
-    ['北一二C', '虞長官', 25, 6, '24%', 3],
-    ['北一二D', '張長官', 33, 10, '30.3%', 4]
+    ['2026/8/31', '', '', '', '', '', '', '', '', '', '', ''],
+    ['區域', '長官', '合計', 'A999↑', 'A999↑佔比', '小A', 'A999', 'A1199', 'A1399', 'A1599', 'A1899', '2699', '好速'],
+    ['北一二A', '翁長官', 25, 5, '20%', 20, 4, 0, 1, 0, 0, 0, 2],
+    ['北一二B', '盧長官', 12, 3, '25%', 9, 1, 0, 2, 0, 0, 0, 1],
+    ['北一二C', '虞長官', 25, 6, '24%', 19, 3, 0, 3, 0, 0, 0, 0],
+    ['北一二D', '張長官', 33, 10, '30.3%', 23, 5, 1, 4, 0, 0, 0, 3]
   ], 'aq');
   assert.deepEqual(summary.recognizedRegions, ['A', 'B', 'C', 'D']);
   assert.equal(summary.regions.A.total, 25);
   assert.equal(summary.regions.B.metrics.A999, 3);
   assert.equal(summary.regions.C.metrics.A1399, 3);
   assert.equal(summary.regions.D.total, 33);
+  assert.equal(summary.regions.B.breakdown.up999, 3);
+  assert.equal(summary.regions.B.breakdown.small, 9);
+  assert.equal(summary.regions.B.breakdown.bands['999'], 1);
+  assert.equal(summary.regions.B.breakdown.bands['1399'], 2);
+  assert.equal(summary.regions.B.metrics['好速'], 1);
+});
+
+test('RT 區域彙總讀取完整資費帶、好速與提前續約', () => {
+  const summary = Core.parseRegionSummary([
+    ['部', '合計', 'R999↑', 'R999↑佔比', '小R', 'R999', 'R1199', 'R1399', 'R1599', 'R1899', 'R2699', '好速', '提前續約(不分資費)'],
+    ['北一二A', 39, 12, '30.77%', 27, 4, 0, 6, 2, 0, 0, 3, 5],
+    ['北一二B', 25, 4, '16%', 21, 1, 0, 3, 0, 0, 0, 2, 0],
+    ['北一二C', 22, 7, '31.82%', 15, 0, 1, 5, 1, 0, 0, 1, 1],
+    ['北一二D', 29, 6, '20.69%', 23, 2, 0, 4, 0, 0, 0, 4, 4]
+  ], 'rt');
+  assert.deepEqual(summary.recognizedRegions, ['A', 'B', 'C', 'D']);
+  assert.equal(summary.regions.B.breakdown.up999, 4);
+  assert.equal(summary.regions.B.breakdown.small, 21);
+  assert.equal(summary.regions.B.breakdown.bands['1399'], 3);
+  assert.equal(summary.regions.B.metrics['好速'], 2);
+  assert.equal(summary.regions.B.breakdown.earlyRenewal, 0);
+});
+
+test('全國 AQ／RT 彙總保留所有部別列、資費帶、好速與排名', () => {
+  const aq = Core.parseNationalSummary([
+    ['', '', '', '', '', '', '', '', '', '', '', '', 'RANK', ''],
+    ['部', '合計', 'A999↑', 'A999↑占比', '小A', 'A999', 'A1199', 'A1399', 'A1599', 'A1899', '2699', '好速', 'AQ', 'A999'],
+    ['', 200, 63, '31.5%', 137, 37, 4, 18, 1, 0, 0, 9, null, null],
+    ['北一一區', 2, 1, '50%', 1, 0, 0, 1, 0, 0, 0, 0, 34, 20],
+    ['北一二區', 5, 2, '40%', 3, 1, 0, 1, 0, 0, 0, 2, 17, 7],
+    ['北一二區', 6, 1, '16.7%', 5, 1, 0, 0, 0, 0, 0, 1, 10, 20],
+    ['桃竹一區', 4, 2, '50%', 2, 2, 0, 0, 0, 0, 0, 0, 22, 7],
+    ['中一區', 10, 2, '20%', 8, 0, 0, 2, 0, 0, 0, 1, 1, 7]
+  ], 'aq');
+  assert.equal(aq.processedRows, 5);
+  assert.equal(aq.rows[1].department, '北一二區');
+  assert.equal(aq.totalRow.department, '全國合計');
+  assert.equal(aq.totalRow.total, 200);
+  assert.equal(aq.totalRow.speed, 9);
+  assert.equal(aq.rows[1].bands['1399'], 1);
+  assert.equal(aq.rows[1].speed, 2);
+  assert.equal(aq.rows[1].ranks.total, 17);
+  assert.equal(aq.rows[1].ranks.up999, 7);
+  assert.equal(aq.rows[1].up999Rate, .4);
+
+  const rt = Core.parseNationalSummary([
+    ['部', '合計', 'R999↑', 'R999↑佔比', '小R', 'R999', 'R1199', 'R1399', 'R1599', 'R1899', 'R2699', '好速', '提前續約(不分資費)'],
+    ['北一一區', 39, 12, '30.77%', 27, 4, 0, 6, 2, 0, 0, 3, 5],
+    ['北一二區', 25, 4, '16%', 21, 1, 0, 3, 0, 0, 0, 2, 0],
+    ['北一二區', 22, 2, '9.09%', 20, 1, 0, 0, 1, 0, 0, 1, 1],
+    ['桃竹一區', 23, 9, '39.13%', 14, 6, 0, 2, 1, 0, 0, 5, 5],
+    ['中一區', 27, 9, '33.33%', 18, 5, 0, 4, 0, 0, 0, 2, 3]
+  ], 'rt');
+  assert.equal(rt.processedRows, 5);
+  assert.equal(rt.rows[1].bands['1399'], 3);
+  assert.equal(rt.rows[1].speed, 2);
+  assert.equal(rt.rows[1].earlyRenewal, 0);
+  assert.equal(Core.parseNationalSummary([
+    ['督導區', '店點名稱', '合計', 'A999↑', 'A1399', '2699'],
+    ['北一-A', '台北通化', 3, 1, 1, 0],
+    ['北一-B', '台北酒泉', 4, 2, 1, 0],
+    ['北一-C', '台北三創', 2, 1, 0, 0],
+    ['北一-D', '台北萬大', 5, 2, 1, 0],
+    ['北一-A', '台北永吉', 1, 0, 0, 0]
+  ], 'aq'), null);
 });
 
 test('AQ／RT 原始檔保留北一二 A／B／C／D 區域總數與七項戰情', () => {
@@ -58,6 +123,7 @@ test('AQ／RT 原始檔保留北一二 A／B／C／D 區域總數與七項戰情
   assert.equal(aq.regions.A.total, 1);
   assert.equal(aq.regions.A.metrics.A999, 1);
   assert.equal(aq.regions.A.metrics.A1399, 1);
+  assert.equal(aq.regions.A.breakdown.bands['1399'], 1);
   assert.equal(aq.regions.B.total, 2);
   assert.equal(aq.regions.B.metrics['好速'], 2);
   assert.equal(aq.regions.C.total, 3);
@@ -75,6 +141,10 @@ test('AQ／RT 原始檔保留北一二 A／B／C／D 區域總數與七項戰情
   assert.equal(analysis.regions.B.aqActual, 2);
   assert.equal(analysis.regions.B.rtActual, 1);
   assert.equal(analysis.regions.D.metrics.R1399, 1);
+  assert.equal(analysis.regions.B.aq.up999, 1);
+  assert.equal(analysis.regions.B.aq.up999Rate, .5);
+  assert.equal(analysis.regions.B.aq.speed, 2);
+  assert.equal(analysis.regions.D.rt.bands['1399'], 1);
 });
 
 test('AQ 依點數欄加總、依案件編號去重，且只留北一二B店點', () => {

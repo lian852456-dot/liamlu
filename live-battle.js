@@ -142,10 +142,13 @@
     const diagnostic = inspectFile(file, kind, matrices);
     const candidates = [];
     const regionCandidates = [];
+    const nationalCandidates = [];
     const errors = [];
     matrices.forEach(entry => {
       const regionSummary = Core.parseRegionSummary(entry.matrix, kind);
       if (regionSummary) regionCandidates.push(regionSummary);
+      const nationalSummary = Core.parseNationalSummary(entry.matrix, kind);
+      if (nationalSummary) nationalCandidates.push(nationalSummary);
       try {
         const result = Core.parseMatrix(entry.matrix, { kind, fileName: file.name, stores: state.targets && state.targets.stores });
         candidates.push({ ...result, sheetName: entry.sheetName });
@@ -157,11 +160,16 @@
       throw error;
     }
     const result = candidates.sort((a, b) => b.meta.processedRows - a.meta.processedRows)[0];
-    const regionSummary = regionCandidates.sort((a, b) => b.recognizedRegions.length - a.recognizedRegions.length || b.processedRows - a.processedRows)[0];
+    const regionSummary = regionCandidates.sort((a, b) => b.recognizedRegions.length - a.recognizedRegions.length || Number(b.detailScore || 0) - Number(a.detailScore || 0) || b.processedRows - a.processedRows)[0];
     if (regionSummary) {
       regionSummary.recognizedRegions.forEach(key => { result.regions[key] = regionSummary.regions[key]; });
       result.meta.recognizedRegions = Core.REGION_KEYS.filter(key => result.regions[key] && (result.regions[key].total !== 0 || regionSummary.recognizedRegions.includes(key)));
       result.meta.regionSource = 'summary-sheet';
+    }
+    const nationalSummary = nationalCandidates.sort((a, b) => b.processedRows - a.processedRows || Number(b.detailScore || 0) - Number(a.detailScore || 0))[0];
+    if (nationalSummary) {
+      result.nationalSummary = nationalSummary;
+      result.meta.nationalRows = nationalSummary.processedRows;
     }
     return { result, diagnostic };
   }
@@ -215,6 +223,59 @@
     if (target == null) return '尚未載入今日目標';
     const result = gap > 0 ? `尚缺 ${displayCount(gap)}` : (actual > target ? `超標 ${displayCount(actual - target)}` : '已達標');
     return `${displayCount(actual)} / 今日 ${displayCount(target)}・${result}`;
+  }
+
+  function regionDetailTable(kind, analysis) {
+    const isRt = kind === 'rt';
+    const prefix = isRt ? 'R' : 'A';
+    const detailKey = isRt ? 'rt' : 'aq';
+    const bands = isRt ? Core.RT_PLAN_BANDS : Core.AQ_PLAN_BANDS;
+    const labels = ['督導區', '合計', `${prefix}999↑`, `${prefix}999↑占比`, isRt ? '小R' : '小A', ...bands.map(key => key === '2699' && !isRt ? '2699' : `${prefix}${key}`), '好速', ...(isRt ? ['提前續約'] : [])];
+    const rows = Core.REGION_KEYS.map(key => {
+      const detail = analysis.regions[key][detailKey];
+      const values = [`北一二${key}`, detail.total, detail.up999, Core.percent(detail.up999Rate), detail.small, ...bands.map(band => detail.bands[band]), detail.speed, ...(isRt ? [detail.earlyRenewal] : [])];
+      return `<tr class="${key === 'B' ? 'is-home' : ''}">${values.map((value, index) => `<td>${index === 0 ? `<strong>${escapeHtml(value)}</strong>` : escapeHtml(typeof value === 'string' ? value : displayCount(value))}</td>`).join('')}</tr>`;
+    }).join('');
+    return `<section class="region-detail-block ${isRt ? 'rt-detail' : 'aq-detail'}"><div class="region-detail-title">${prefix === 'A' ? 'AQ' : 'RT'}</div><div class="table-wrap"><table class="region-detail-table"><thead><tr>${labels.map(label => `<th>${escapeHtml(label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div><p class="region-detail-note">${prefix}999↑占比＝${prefix}999↑ ÷ 合計；好速接在 2699 後方。</p></section>`;
+  }
+
+  function nationalHomeIndex(kind, analysis) {
+    const rows = analysis.national && analysis.national[kind] || [];
+    const detail = analysis.regions.B[kind];
+    const prefix = kind === 'rt' ? 'R' : 'A';
+    const candidates = rows.map((row, index) => ({ row, index })).filter(({ row }) => {
+      if (!normalizeForMatch(row.department).includes('北一二')) return false;
+      const checks = [row.total === detail.total, row.up999 === detail.up999];
+      ['999', '1399'].forEach(band => {
+        if (row.bands[band] != null) checks.push(row.bands[band] === detail.bands[band]);
+      });
+      return checks.every(Boolean);
+    });
+    return candidates.length === 1 ? candidates[0].index : -1;
+  }
+
+  function normalizeForMatch(value) {
+    return String(value == null ? '' : value).normalize('NFKC').replace(/[\s　_／/()（）【】\[\]：:・·.\-－]+/g, '').toUpperCase();
+  }
+
+  function nationalDetailTable(kind, analysis) {
+    const rows = analysis.national && analysis.national[kind] || [];
+    if (!rows.length) {
+      return `<section class="region-detail-block national-missing"><div class="region-detail-title">${kind === 'rt' ? 'RT' : 'AQ'} 全國戰情</div><p>這份原始檔未辨識到全國彙總表；下方僅顯示北一二 A／B／C／D，不能視為全國數字。</p>${regionDetailTable(kind, analysis)}</section>`;
+    }
+    const isRt = kind === 'rt';
+    const prefix = isRt ? 'R' : 'A';
+    const bands = isRt ? Core.RT_PLAN_BANDS : Core.AQ_PLAN_BANDS;
+    const showRanks = rows.some(row => row.ranks && (row.ranks.total != null || row.ranks.up999 != null));
+    const labels = ['部', '合計', `${prefix}999↑`, `${prefix}999↑占比`, isRt ? '小R' : '小A', ...bands.map(key => key === '2699' && !isRt ? '2699' : `${prefix}${key}`), '好速', ...(isRt ? ['提前續約'] : []), ...(showRanks ? [`RANK ${isRt ? 'RT' : 'AQ'}`, `RANK ${prefix}999`] : [])];
+    const homeIndex = nationalHomeIndex(kind, analysis);
+    const totalRow = analysis.nationalTotals && analysis.nationalTotals[kind];
+    const renderRow = (row, rowIndex, extraClass) => {
+      const values = [row.department, row.total, row.up999, Core.percent(row.up999Rate), row.small, ...bands.map(band => row.bands[band]), row.speed, ...(isRt ? [row.earlyRenewal] : []), ...(showRanks ? [row.ranks.total, row.ranks.up999] : [])];
+      return `<tr class="${[extraClass, rowIndex === homeIndex ? 'is-home' : ''].filter(Boolean).join(' ')}">${values.map((value, index) => `<td>${index === 0 ? `<strong>${escapeHtml(value)}</strong>` : escapeHtml(typeof value === 'string' ? value : displayCount(value))}</td>`).join('')}</tr>`;
+    };
+    const body = `${totalRow ? renderRow(totalRow, -1, 'is-national-total') : ''}${rows.map((row, rowIndex) => renderRow(row, rowIndex, '')).join('')}`;
+    return `<section class="region-detail-block ${isRt ? 'rt-detail' : 'aq-detail'}"><div class="region-detail-title">全國 ${isRt ? 'RT' : 'AQ'} 戰情｜${rows.length} 列</div><div class="table-wrap"><table class="region-detail-table national-detail-table"><thead><tr>${labels.map(label => `<th>${escapeHtml(label)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div><p class="region-detail-note">依原始全國彙總表順序呈現；好速固定接在 ${isRt ? 'R2699' : '2699'} 後。${homeIndex >= 0 ? '深藍列為北一二B。' : '若原表無法唯一對應北一二B，將不任意標色。'}</p></section>`;
   }
 
   function metricCell(metric) {
@@ -275,8 +336,8 @@
     ctx.closePath();
   }
 
-  function exportSurface(width, height) {
-    const scale = 2;
+  function exportSurface(width, height, requestedScale) {
+    const scale = requestedScale == null ? 2 : requestedScale;
     const canvas = document.createElement('canvas');
     canvas.width = width * scale;
     canvas.height = height * scale;
@@ -348,33 +409,74 @@
   }
 
   function createSummaryPng(analysis) {
-    const width = 1900, rowHeight = 92, tableY = 188, height = tableY + 62 + Core.REGION_KEYS.length * rowHeight + 80;
-    const { canvas, ctx } = exportSurface(width, height);
+    const aqRows = analysis.national && analysis.national.aq || [];
+    const rtRows = analysis.national && analysis.national.rt || [];
+    const rowHeight = 44, groupHeight = 42, headHeight = 54, tableY = 188;
+    const displayRows = (kind) => {
+      const rows = kind === 'rt' ? rtRows : aqRows;
+      if (rows.length) return rows;
+      return Core.REGION_KEYS.map(key => ({ department: `北一二${key}`, ...analysis.regions[key][kind], ranks: { total: null, up999: null } }));
+    };
+    const aqDisplayRows = displayRows('aq'), rtDisplayRows = displayRows('rt');
+    const blockHeight = (rows, hasTotal) => groupHeight + headHeight + (rows.length + (hasTotal ? 1 : 0)) * rowHeight;
+    const height = tableY + blockHeight(aqDisplayRows, analysis.nationalTotals && analysis.nationalTotals.aq) + blockHeight(rtDisplayRows, analysis.nationalTotals && analysis.nationalTotals.rt) + 24 + 80;
+    const width = 2020;
+    const { canvas, ctx } = exportSurface(width, height, 1);
     const targetNote = analysis.dynamic.available
       ? `北一二B目標已載入；各店今日差異請看第③張`
-      : '尚未載入今日目標｜本圖先顯示 AQ／RT 目前上線';
-    drawExportHeader(ctx, width, '① 北一二 A／B／C／D 戰情', `${exportTimeLabel()} 產生｜${targetNote}`);
-    const labels = ['督導區', 'AQ上線數', 'A999', 'A1399', 'RT上線數', 'R999', 'R1399', '好速'];
-    const widths = [230, 240, 210, 210, 240, 210, 210, 210];
-    let x = 52;
-    labels.forEach((label, index) => {
-      ctx.fillStyle = index === 0 ? '#dce9f1' : '#e9eff3'; ctx.fillRect(x, tableY, widths[index], 62);
-      ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '850 20px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText(label, x + 16, tableY + 31);
-      x += widths[index];
-    });
-    Core.REGION_KEYS.forEach((key, rowIndex) => {
-      const item = analysis.regions[key];
-      const values = [`北一二${key}`, item.aqActual, item.metrics.A999, item.metrics.A1399, item.rtActual, item.metrics.R999, item.metrics.R1399, item.metrics['好速']];
-      const y = tableY + 62 + rowIndex * rowHeight;
-      x = 52;
-      values.forEach((value, index) => {
-        ctx.fillStyle = index === 0 ? '#eef5f8' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
-        ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
-        ctx.fillStyle = index === 0 ? EXPORT_COLORS.navy : index < 4 ? EXPORT_COLORS.blue : index < 7 ? EXPORT_COLORS.green : EXPORT_COLORS.amber;
-        ctx.font = `${index === 0 ? '900 23' : '900 30'}px system-ui, "Microsoft JhengHei", sans-serif`;
-        ctx.fillText(String(value), x + 16, y + rowHeight / 2); x += widths[index];
+      : '尚未載入今日目標｜本圖先顯示 AQ／RT／好速完整資費明細';
+    drawExportHeader(ctx, width, '① 全國 AQ／RT 完整戰情', `${exportTimeLabel()} 產生｜${targetNote}`);
+
+    function drawRegionBlock(kind, startY) {
+      const isRt = kind === 'rt';
+      const prefix = isRt ? 'R' : 'A';
+      const detailKey = isRt ? 'rt' : 'aq';
+      const bands = isRt ? Core.RT_PLAN_BANDS : Core.AQ_PLAN_BANDS;
+      const sourceRows = isRt ? rtDisplayRows : aqDisplayRows;
+      const nationalRows = isRt ? rtRows : aqRows;
+      const nationalTotal = analysis.nationalTotals && analysis.nationalTotals[kind];
+      const canvasRows = nationalTotal ? [nationalTotal, ...sourceRows] : sourceRows;
+      const showRanks = nationalRows.some(row => row.ranks && (row.ranks.total != null || row.ranks.up999 != null));
+      const labels = ['部', '合計', `${prefix}999↑`, `${prefix}999↑占比`, isRt ? '小R' : '小A', ...bands.map(key => key === '2699' && !isRt ? '2699' : `${prefix}${key}`), '好速', ...(isRt ? ['提前續約'] : []), ...(showRanks ? [`RANK ${isRt ? 'RT' : 'AQ'}`, `RANK ${prefix}999`] : [])];
+      const widths = [170, 105, 120, 145, 100, ...bands.map(() => 105), 110, ...(isRt ? [140] : []), ...(showRanks ? [120, 125] : [])];
+      const tableWidth = widths.reduce((total, value) => total + value, 0);
+      const left = Math.round((width - tableWidth) / 2);
+      ctx.fillStyle = '#c9f6ca'; ctx.fillRect(left, startY, tableWidth, groupHeight);
+      ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(left, startY, tableWidth, groupHeight);
+      ctx.fillStyle = EXPORT_COLORS.navy; ctx.font = '950 22px system-ui, "Microsoft JhengHei", sans-serif';
+      ctx.fillText(`${nationalRows.length ? '全國 ' : '北一二 A／B／C／D（非全國）'}${isRt ? 'RT' : 'AQ'}`, width / 2 - 90, startY + 26);
+      let x = left;
+      labels.forEach((label, index) => {
+        ctx.fillStyle = index === 0 ? '#6d2ca5' : '#fff600'; ctx.fillRect(x, startY + groupHeight, widths[index], headHeight);
+        ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, startY + groupHeight, widths[index], headHeight);
+        ctx.fillStyle = index === 0 ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = '900 16px system-ui, "Microsoft JhengHei", sans-serif';
+        const labelWidth = ctx.measureText(label).width;
+        ctx.fillText(label, x + Math.max(8, (widths[index] - labelWidth) / 2), startY + groupHeight + 35);
+        x += widths[index];
       });
-    });
+      const homeIndex = nationalRows.length ? nationalHomeIndex(kind, analysis) : 1;
+      canvasRows.forEach((row, rowIndex) => {
+        const isTotal = Boolean(nationalTotal && rowIndex === 0);
+        const sourceIndex = rowIndex - (nationalTotal ? 1 : 0);
+        const detail = nationalRows.length ? row : analysis.regions[Core.REGION_KEYS[sourceIndex]][detailKey];
+        const values = [row.department, displayCount(detail.total), displayCount(detail.up999), Core.percent(detail.up999Rate), displayCount(detail.small), ...bands.map(band => displayCount(detail.bands[band])), displayCount(detail.speed), ...(isRt ? [displayCount(detail.earlyRenewal)] : []), ...(showRanks ? [displayCount(detail.ranks.total), displayCount(detail.ranks.up999)] : [])];
+        const y = startY + groupHeight + headHeight + rowIndex * rowHeight;
+        x = left;
+        values.forEach((value, index) => {
+          const home = !isTotal && sourceIndex === homeIndex;
+          ctx.fillStyle = isTotal ? '#777777' : home ? (index === 0 ? '#274f8d' : '#315a9d') : (index === 0 ? '#eef5f8' : sourceIndex % 2 ? '#fff8dd' : '#ffffff');
+          ctx.fillRect(x, y, widths[index], rowHeight);
+          ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
+          ctx.fillStyle = home || isTotal ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = `${index === 0 || home || isTotal ? '900' : '750'} 19px system-ui, "Microsoft JhengHei", sans-serif`;
+          const textWidth = ctx.measureText(String(value)).width;
+          ctx.fillText(String(value), x + Math.max(8, (widths[index] - textWidth) / 2), y + 43);
+          x += widths[index];
+        });
+      });
+    }
+
+    drawRegionBlock('aq', tableY);
+    drawRegionBlock('rt', tableY + blockHeight(aqDisplayRows, analysis.nationalTotals && analysis.nationalTotals.aq) + 24);
     drawExportFooter(ctx, width, height);
     return canvas;
   }
@@ -500,7 +602,7 @@
     button.disabled = true; button.classList.add('is-busy'); button.textContent = '產生圖片中…';
     try {
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
-      const builders = { summary: [createSummaryPng, '北一二ABCD戰情'], stores: [createStoresPng, '九店AQRT戰情'], products: [createProductsPng, '上線商品'], gifts: [createGiftsPng, '影音漏搭'] };
+      const builders = { summary: [createSummaryPng, '全國AQRT戰情'], stores: [createStoresPng, '九店AQRT戰情'], products: [createProductsPng, '上線商品'], gifts: [createGiftsPng, '影音漏搭'] };
       const [build, label] = builders[kind];
       await downloadCanvas(build(state.analysis), label);
       button.textContent = '已下載 PNG';
@@ -514,13 +616,7 @@
   function renderAnalysis() {
     state.analysis = Core.analyze(state.aq, state.rt, state.targets, { todayIso: taipeiTodayIso() });
     const a = state.analysis;
-    const summaryItems = [
-      ['AQ上線', { actual: a.region.aqActual, todayGoal: a.region.aqTarget, gap: a.region.aqGap }],
-      ['A999', a.region.metrics.A999], ['A1399', a.region.metrics.A1399],
-      ['RT上線', { actual: a.region.rtActual, todayGoal: a.region.rtTarget, gap: a.region.rtGap }],
-      ['R999', a.region.metrics.R999], ['R1399', a.region.metrics.R1399], ['好速', a.region.metrics['好速']]
-    ];
-    $('regionSummary').innerHTML = summaryItems.map(([label, metric], index) => `<article class="summary-card metric-${index}"><span>北一二B ${escapeHtml(label)}</span><strong>${displayCount(metric.actual)}</strong><small>${summaryDetail(metric.actual, metric.todayGoal, metric.gap)}</small></article>`).join('');
+    $('regionSummary').innerHTML = nationalDetailTable('aq', a) + nationalDetailTable('rt', a);
     const priorityNames = new Set(a.priority.slice(0, 4).map(store => store.name));
     $('storeRows').innerHTML = a.stores.map(store => {
       const gaps = storeGapEntries(store);

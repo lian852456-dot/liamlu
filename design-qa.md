@@ -1,42 +1,52 @@
 # 行進間戰報 Design QA
 
 - Source visual truth paths:
-  - `/workspace/scratch/3729926cc24f/upload/2a10f964-c536-410c-b375-87b31f090913.png`
-  - `/workspace/scratch/3729926cc24f/upload/4c3a026d-4d17-4627-a6c0-c5a5c298ec1d.png`
-- Implementation screenshot path: cloud-browser inline captures from `live-battle.html?qa=1` in this QA run (the browser capture filesystem is isolated from the checkout).
-- Viewport: 1330 × 936 CSS px, desktop, device scale 1.
-- Source pixels: 1011 × 642 and 899 × 603. Implementation capture: 1330 × 936. Density normalization: visual regions compared at displayed CSS size; no browser chrome or source-image padding was judged.
-- State: synthetic AQ／RT data loaded locally, formal target intentionally not loaded.
-
-**Full-view comparison evidence**
-
-- The generated first report visibly shows non-zero A／B／C／D values across AQ, A999, A1399, RT, R999 and R1399.
-- Product table keeps model names and zero cells on one white surface; every store/device cell above zero uses a deep-purple background with bold white text.
-- Gift table visibly shows only Chinese names such as `王克業`, without `DNB10146_5514709`.
-
-**Focused region comparison evidence**
-
-- Region export: A=5, B=11, C=6, D=10 for AQ in the browser-rendered Canvas; the zero-value regression is absent.
-- Product headers show `Pixel 11 Pro`, `Galaxy S26`, `iPhone 17 Pro` and `Pixel Buds 2a`; Google／Samsung／Apple brand labels and brand-only parentheses are absent.
-- Typography, spacing, table borders and semantic warning colors remain consistent with the existing dashboard; the requested device-count highlight is limited to positive store/product intersections.
+  - `/workspace/scratch/3729926cc24f/upload/6c6d5013-38bb-45aa-b4db-2fe3178f726b.png`
+  - `/workspace/scratch/3729926cc24f/upload/9f37b826-f80a-4e3c-88d6-b98ad0a388e5.png`
+- Implementation URL: local Sites preview for `live-battle.html`.
+- Implementation screenshot path: unavailable; the required cloud-browser runtime timed out during connection setup and could not be reset during this QA run.
+- Intended viewport: desktop 1365 × 900 CSS px, device scale 1.
+- Source pixels: AQ 1162 × 1165; RT 1136 × 1168.
+- State: nationwide AQ／RT fixture covers the nationwide total, repeated department rows, all six plan bands, 好速, RT 提前續約 and RANK.
 
 **Findings**
 
-- No actionable P0, P1 or P2 visual differences remain for the requested device-count highlighting.
-- Browser console contained no application errors; only browser-extension metadata errors unrelated to the page.
+- [P1] Browser-rendered comparison is unavailable.
+  - Location: STEP 3 nationwide AQ／RT detail tables and the first downloadable PNG.
+  - Evidence: both nationwide source images were opened at original resolution, but the implementation could not be captured because the required cloud-browser connection itself timed out.
+  - Impact: typography, horizontal scrolling, header density, nationwide total emphasis, unique 北一二B emphasis and Canvas export cannot be visually signed off from code or tests alone.
+  - Fix: reopen the local preview in a fresh cloud-browser session, load the nationwide fixture, capture both visible tables and first PNG state, then compare them together with the two source images.
 
-**Comparison history**
+**Code-level evidence (not a substitute for visual QA)**
 
-- Earlier: staff identifiers were visible, product brand prefixes remained, and the region export showed zero AQ values; the subsequent neutral product table made positive counts hard to scan.
-- Fix: retained name extraction, brand stripping and region normalization, then applied deep purple `#6741a5` with white text only when a store/product count is greater than zero.
-- Post-fix: browser capture shows 15 positive cells highlighted while zeros remain white; 344 automated tests pass.
+- The AQ table columns are: 部、合計、A999↑、A999↑占比、小A、A999、A1199、A1399、A1599、A1899、2699、好速、RANK AQ、RANK A999（RANK 依來源顯示）.
+- The RT table columns are: 部、合計、R999↑、R999↑占比、小R、R999、R1199、R1399、R1599、R1899、R2699、好速、提前續約、RANK RT、RANK R999（RANK 依來源顯示）.
+- 好速 is ordered immediately after 2699／R2699 in both the webpage renderer and first Canvas PNG.
+- The source's nationwide total row is retained with a dark gray background. 北一二B uses deep blue only when the nationwide row can be uniquely matched; otherwise no row is guessed.
+- 346 automated tests pass; tests include nationwide total and row parsing, full AQ／RT plan bands, RANK, 好速, 提前續約, store-table collision prevention, existing-system isolation, syntax and package audit.
+
+**Required fidelity surfaces**
+
+- Fonts and typography: not visually verified.
+- Spacing and layout rhythm: not visually verified.
+- Colors and visual tokens: implemented from the source palette but not visually verified.
+- Image quality and asset fidelity: no new raster assets are required; Canvas PNG output is not visually verified.
+- Copy and content: column order is contract-tested; visible wrapping and density are not visually verified.
+
+**Primary interactions tested**
+
+- Automated parser and renderer contracts pass.
+- Browser file selection and rendered-table inspection were attempted but blocked by the stalled cloud-browser session.
+- Browser console errors could not be checked for this build.
 
 **Implementation checklist**
 
-- [x] 承辦人只顯示姓名
-- [x] 商品名稱移除品牌且不分色
-- [x] 商品上線數大於 0 的格子以深紫底白字標註，0 維持白底
-- [x] AQ／RT A／B／C／D 區域彙總可讀取
-- [x] 既有頁面回歸與本機資料邊界通過
+- [x] AQ／RT nationwide total, department rows, six-band and RANK parser
+- [x] 好速 immediately after 2699／R2699
+- [x] RT 提前續約 column
+- [x] Nationwide webpage tables with explicit non-nationwide fallback
+- [x] First downloadable Canvas PNG updated
+- [x] 346 automated tests and zero package vulnerabilities
+- [ ] Fresh cloud-browser capture and combined source/implementation visual comparison
 
-final result: passed
+final result: blocked

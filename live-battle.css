@@ -70,6 +70,27 @@ input[type="text"],input:not([type]),#employeeId { width:100%; min-height:44px; 
 .summary-card.metric-1 { background:#eef0ff; }.summary-card.metric-2 { background:var(--green-soft); }.summary-card.metric-3 { background:#e9f8f4; }.summary-card.metric-4 { background:#fff5df; }
 .summary-card span { display:block; color:var(--muted); font-size:12px; font-weight:800; }.summary-card strong { display:block; margin-top:2px; color:var(--blue); font-size:27px; }.summary-card.rt strong { color:var(--green); }
 .summary-card small { color:var(--ink); }
+.region-detail-stack { display:grid; gap:16px; margin-top:16px; }
+.region-detail-block { overflow:hidden; border:1px solid #c9d8e2; border-radius:13px; background:#fff; }
+.region-detail-title { display:flex; align-items:center; justify-content:center; min-height:38px; padding:7px 12px; background:#c9f6ca; color:#123147; font-size:16px; font-weight:950; letter-spacing:.08em; }
+.region-detail-block .table-wrap { margin-top:0; border:0; border-radius:0; }
+.region-detail-table { min-width:1190px; }
+.region-detail-table th,.region-detail-table td { padding:9px 10px; border-right:1px solid #d4e0e7; text-align:center; }
+.region-detail-table th { background:#fff600; color:#142f43; font-size:12px; font-weight:900; }
+.region-detail-table th:first-child { background:#6d2ca5; color:#fff; }
+.region-detail-table td:first-child { background:#eef5f8; color:#17364d; font-weight:950; }
+.region-detail-table tr.is-home td { background:#315a9d; color:#fff; font-weight:900; }
+.region-detail-table tr.is-home td:first-child { background:#274f8d; }
+.region-detail-table tr.is-national-total td { background:#777; color:#fff; font-weight:900; }
+.region-detail-table td:last-child,.region-detail-table th:last-child { border-right:0; }
+.region-detail-note { margin:7px 12px 10px; color:var(--muted); font-size:11px; }
+.national-detail-table { min-width:1460px; }
+.national-detail-table thead th { position:sticky; top:0; z-index:2; }
+.national-detail-table th:first-child,.national-detail-table td:first-child { position:sticky; left:0; z-index:1; box-shadow:1px 0 0 #d4e0e7; }
+.national-detail-table th:first-child { z-index:3; }
+.national-missing { padding-bottom:12px; border-color:#d99a3d; background:#fffaf0; }
+.national-missing > p { margin:12px 14px; color:#8b5500; font-weight:800; }
+.national-missing .region-detail-block { margin:0 12px; }
 .table-wrap { overflow-x:auto; margin-top:17px; border:1px solid var(--line); border-radius:13px; }
 table { width:100%; min-width:760px; border-collapse:collapse; }
 th,td { padding:11px 12px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }

@@ -10,6 +10,8 @@
   const RT_KEY = 'RT上線點數';
   const REGION_KEYS = Object.freeze(['A', 'B', 'C', 'D']);
   const METRIC_KEYS = Object.freeze(['A999', 'A1399', 'R999', 'R1399', '好速']);
+  const AQ_PLAN_BANDS = Object.freeze(['999', '1199', '1399', '1599', '1899', '2699']);
+  const RT_PLAN_BANDS = Object.freeze(['999', '1199', '1399', '1599', '1899', '2699']);
   const KPI_KEYS = Object.freeze({
     A999: 'AQ V+D 999 (含)以上',
     A1399: 'AQ V+D 1399 (含)以上',
@@ -18,7 +20,7 @@
     '好速': '好速案銷售點數'
   });
   const STORE_HEADERS = ['營業點代碼', '服務中心代碼', '門市代碼', '店點代碼', '店代碼', '營業點', '服務中心', '銷售門市', '門市', '店點', '店號'];
-  const REGION_HEADERS = ['督導區', '督導區域', '區域', '營運區'];
+  const REGION_HEADERS = ['督導區', '督導區域', '區域', '營運區', '部'];
   const POINT_HEADERS = ['上線點數', '計件點數', '銷售點數', '實際點數', '貢獻點數', '點數', '件數', '數量'];
   const ID_HEADERS = ['受理編號', '申請書編號', '交易序號', '訂單編號', '案件編號', '用戶編號', '門號'];
   const PLAN_HEADERS = ['變更資費', '異動後資費', '申辦資費', '新資費', '合約資費', '月租費', '資費方案', '方案名稱', '資費'];
@@ -92,6 +94,11 @@
       if (index >= 0) return index;
     }
     return findColumn(values, aliases);
+  }
+
+  function findExactColumn(row, aliases) {
+    const wanted = aliases.map(normalizeToken);
+    return (Array.isArray(row) ? row : []).findIndex(value => wanted.includes(normalizeToken(value)));
   }
 
   function matchingColumns(row, aliases) {
@@ -191,10 +198,21 @@
     return Object.fromEntries(STORE_NAMES.map(name => [name, {}]));
   }
 
-  function blankRegions() {
+  function blankRegionBreakdown(kind) {
+    const bands = kind === 'rt' ? RT_PLAN_BANDS : AQ_PLAN_BANDS;
+    return {
+      up999: 0,
+      small: 0,
+      bands: Object.fromEntries(bands.map(key => [key, 0])),
+      earlyRenewal: 0
+    };
+  }
+
+  function blankRegions(kind) {
     return Object.fromEntries(REGION_KEYS.map(key => [key, {
       total: 0,
-      metrics: Object.fromEntries(METRIC_KEYS.map(metric => [metric, 0]))
+      metrics: Object.fromEntries(METRIC_KEYS.map(metric => [metric, 0])),
+      breakdown: blankRegionBreakdown(kind)
     }]));
   }
 
@@ -237,17 +255,23 @@
     const metricAliases = normalizedKind === 'aq'
       ? { A999: ['A999', 'AQ V+D 999'], A1399: ['A1399', 'AQ V+D 1399'], '好速': ['好速'] }
       : { R999: ['R999', 'RT V+D 999'], R1399: ['R1399', 'RT V+D 1399'], '好速': ['好速'] };
+    const bandKeys = normalizedKind === 'aq' ? AQ_PLAN_BANDS : RT_PLAN_BANDS;
+    const prefix = normalizedKind === 'aq' ? 'A' : 'R';
     let best = null;
     rows.slice(0, 40).forEach((row, rowIndex) => {
       const regionCol = findPreferredColumn(row, REGION_HEADERS);
       const totalCol = findPreferredColumn(row, totalAliases);
       if (regionCol < 0 || totalCol < 0) return;
       const metricCols = Object.fromEntries(Object.entries(metricAliases).map(([key, aliases]) => [key, findPreferredColumn(row, aliases)]));
-      const score = 10 + Object.values(metricCols).filter(index => index >= 0).length;
-      if (!best || score > best.score) best = { rowIndex, regionCol, totalCol, metricCols, score };
+      const upCol = findPreferredColumn(row, [`${prefix}999↑`, `${prefix}999以上`, `${prefix}999含以上`]);
+      const smallCol = findPreferredColumn(row, [normalizedKind === 'aq' ? '小A' : '小R']);
+      const bandCols = Object.fromEntries(bandKeys.map(key => [key, findPreferredColumn(row, key === '2699' ? [`${prefix}2699`, '2699'] : [`${prefix}${key}`])]));
+      const earlyRenewalCol = normalizedKind === 'rt' ? findPreferredColumn(row, ['提前續約(不分資費)', '提前續約']) : -1;
+      const score = 10 + Object.values(metricCols).filter(index => index >= 0).length + Object.values(bandCols).filter(index => index >= 0).length + (upCol >= 0 ? 2 : 0);
+      if (!best || score > best.score) best = { rowIndex, regionCol, totalCol, metricCols, upCol, smallCol, bandCols, earlyRenewalCol, score };
     });
     if (!best) return null;
-    const regions = blankRegions();
+    const regions = blankRegions(normalizedKind);
     const recognized = new Set();
     rows.slice(best.rowIndex + 1).forEach(row => {
       const region = normalizeRegion(row[best.regionCol]);
@@ -260,9 +284,99 @@
         const value = numberOrNull(row[column]);
         if (value != null) regions[region].metrics[key] = value;
       });
+      const upValue = best.upCol >= 0 ? numberOrNull(row[best.upCol]) : null;
+      regions[region].breakdown.up999 = upValue == null
+        ? Number(regions[region].metrics[`${prefix}999`] || 0)
+        : upValue;
+      if (upValue != null) regions[region].metrics[`${prefix}999`] = upValue;
+      Object.entries(best.bandCols).forEach(([key, column]) => {
+        if (column < 0) return;
+        const value = numberOrNull(row[column]);
+        if (value != null) regions[region].breakdown.bands[key] = value;
+      });
+      const smallValue = best.smallCol >= 0 ? numberOrNull(row[best.smallCol]) : null;
+      regions[region].breakdown.small = smallValue == null
+        ? Math.max(0, total - regions[region].breakdown.up999)
+        : smallValue;
+      if (best.earlyRenewalCol >= 0) {
+        const earlyValue = numberOrNull(row[best.earlyRenewalCol]);
+        if (earlyValue != null) regions[region].breakdown.earlyRenewal = earlyValue;
+      }
       recognized.add(region);
     });
-    return recognized.size ? { regions, recognizedRegions: REGION_KEYS.filter(key => recognized.has(key)), processedRows: recognized.size } : null;
+    return recognized.size ? { regions, recognizedRegions: REGION_KEYS.filter(key => recognized.has(key)), processedRows: recognized.size, detailScore: best.score } : null;
+  }
+
+  function parseNationalSummary(matrix, kind) {
+    const rows = Array.isArray(matrix) ? matrix : [];
+    const normalizedKind = String(kind || '').toLowerCase();
+    if (!['aq', 'rt'].includes(normalizedKind)) return null;
+    const isRt = normalizedKind === 'rt';
+    const prefix = isRt ? 'R' : 'A';
+    const bands = isRt ? RT_PLAN_BANDS : AQ_PLAN_BANDS;
+    const totalAliases = isRt ? ['RT上線數', 'RT上線點數', RT_KEY, '合計'] : ['AQ上線數', 'AQ上線點數', AQ_KEY, '合計'];
+    let best = null;
+    rows.slice(0, 40).forEach((row, rowIndex) => {
+      const departmentCol = findPreferredColumn(row, ['部', '營運部', '區部']);
+      const totalCol = findPreferredColumn(row, totalAliases);
+      if (departmentCol < 0 || totalCol < 0) return;
+      const up999Col = findPreferredColumn(row, [`${prefix}999↑`, `${prefix}999以上`, `${prefix}999含以上`]);
+      const up999RateCol = findPreferredColumn(row, [`${prefix}999↑占比`, `${prefix}999↑佔比`, `${prefix}999占比`, `${prefix}999佔比`]);
+      const smallCol = findPreferredColumn(row, [isRt ? '小R' : '小A']);
+      const bandCols = Object.fromEntries(bands.map(band => [band, findExactColumn(row, band === '2699' && !isRt ? ['2699', 'A2699'] : [`${prefix}${band}`])]));
+      const speedCol = findExactColumn(row, ['好速', '好速案']);
+      const earlyRenewalCol = isRt ? findPreferredColumn(row, ['提前續約(不分資費)', '提前續約']) : -1;
+      const previous = rows[rowIndex - 1] || [];
+      const rankGroupStart = previous.findIndex(value => /RANK|排名/.test(normalizeToken(value)));
+      let rankTotalCol = findExactColumn(row, [`RANK${isRt ? 'RT' : 'AQ'}`, `${isRt ? 'RT' : 'AQ'}RANK`, `${isRt ? 'RT' : 'AQ'}排名`]);
+      let rankUp999Col = findExactColumn(row, [`RANK${prefix}999`, `${prefix}999RANK`, `${prefix}999排名`]);
+      if (rankGroupStart >= 0) {
+        if (rankTotalCol < 0) rankTotalCol = row.findIndex((value, index) => index >= rankGroupStart && normalizeToken(value) === (isRt ? 'RT' : 'AQ'));
+        if (rankUp999Col < 0) rankUp999Col = row.findIndex((value, index) => index >= rankGroupStart && normalizeToken(value) === `${prefix}999`);
+      }
+      const detailColumns = [up999Col, up999RateCol, smallCol, speedCol, earlyRenewalCol, rankTotalCol, rankUp999Col, ...Object.values(bandCols)].filter(index => index >= 0).length;
+      const score = 20 + detailColumns;
+      if (!best || score > best.score) best = { rowIndex, departmentCol, totalCol, up999Col, up999RateCol, smallCol, bandCols, speedCol, earlyRenewalCol, rankTotalCol, rankUp999Col, score };
+    });
+    if (!best) return null;
+
+    const parsedRows = [];
+    let totalRow = null;
+    rows.slice(best.rowIndex + 1).forEach(row => {
+      const department = text(row[best.departmentCol]);
+      const total = numberOrNull(row[best.totalCol]);
+      if (total == null) return;
+      const up999 = best.up999Col >= 0 ? numberOrNull(row[best.up999Col]) : null;
+      const rateCell = best.up999RateCol >= 0 ? numberOrNull(row[best.up999RateCol]) : null;
+      const parsedRate = typeof row[best.up999RateCol] === 'number' && Number(row[best.up999RateCol]) <= 1
+        ? Number(row[best.up999RateCol])
+        : (rateCell == null ? null : rateCell / 100);
+      const bandValues = Object.fromEntries(bands.map(band => [band, best.bandCols[band] >= 0 ? numberOrNull(row[best.bandCols[band]]) : null]));
+      const normalizedUp999 = up999 == null ? bandValues['999'] : up999;
+      const parsed = {
+        department: department || '全國合計',
+        total,
+        up999: normalizedUp999,
+        up999Rate: normalizedUp999 != null && total > 0 ? normalizedUp999 / total : parsedRate,
+        small: best.smallCol >= 0 ? numberOrNull(row[best.smallCol]) : (normalizedUp999 == null ? null : Math.max(0, total - normalizedUp999)),
+        bands: bandValues,
+        speed: best.speedCol >= 0 ? numberOrNull(row[best.speedCol]) : null,
+        earlyRenewal: best.earlyRenewalCol >= 0 ? numberOrNull(row[best.earlyRenewalCol]) : null,
+        ranks: {
+          total: best.rankTotalCol >= 0 ? numberOrNull(row[best.rankTotalCol]) : null,
+          up999: best.rankUp999Col >= 0 ? numberOrNull(row[best.rankUp999Col]) : null
+        }
+      };
+      if (!department || /^(?:DS|全國|全國合計|總計|合計)$/i.test(normalizeToken(department))) {
+        if (!totalRow) totalRow = parsed;
+        return;
+      }
+      parsedRows.push(parsed);
+    });
+    const nationwide = parsedRows.length >= 5 || parsedRows.some(row => !normalizeRegion(row.department));
+    return nationwide && parsedRows.length
+      ? { rows: parsedRows, totalRow, processedRows: parsedRows.length, detailScore: best.score, hasSpeed: best.speedCol >= 0, hasRanks: best.rankTotalCol >= 0 || best.rankUp999Col >= 0 }
+      : null;
   }
 
   function enterpriseRow(row, headerRow) {
@@ -350,7 +464,7 @@
     const totals = Object.fromEntries(STORE_NAMES.map(name => [name, 0]));
     const metrics = blankStoreMetrics();
     const products = blankProducts();
-    const regions = blankRegions();
+    const regions = blankRegions(kind);
     const seen = new Set();
     const regionSeen = new Set();
     const caseRows = new Map();
@@ -387,6 +501,9 @@
           if (amount >= 999) regions[region].metrics.R999 += 1;
           if (amount >= 1399) regions[region].metrics.R1399 += 1;
         }
+        if (amount >= 999) regions[region].breakdown.up999 += 1;
+        if (amount != null && regions[region].breakdown.bands[String(amount)] != null) regions[region].breakdown.bands[String(amount)] += 1;
+        if (kind === 'rt' && /提前續約/.test(normalizeToken(row.join('｜')))) regions[region].breakdown.earlyRenewal += 1;
         if (haosu) regions[region].metrics['好速'] += parsedPoints == null ? 1 : parsedPoints;
         regionProcessedRows += 1;
       }
@@ -435,6 +552,9 @@
     }
 
     const recognizedStores = STORE_NAMES.filter(name => totals[name] !== 0);
+    REGION_KEYS.forEach(key => {
+      regions[key].breakdown.small = Math.max(0, Number(regions[key].total || 0) - Number(regions[key].breakdown.up999 || 0));
+    });
     if (!processedRows) throw new Error('找不到北一二B九店資料；請確認這是正確的 AQ／RT 原始檔。');
     return {
       kind,
@@ -535,6 +655,24 @@
     return Math.round((Number(value) + Number.EPSILON) * power) / power;
   }
 
+  function regionDetail(source, kind) {
+    const regionSource = source || { total: 0, metrics: {}, breakdown: {} };
+    const breakdown = regionSource.breakdown || {};
+    const prefix = kind === 'rt' ? 'R' : 'A';
+    const bandKeys = kind === 'rt' ? RT_PLAN_BANDS : AQ_PLAN_BANDS;
+    const total = Number(regionSource.total || 0);
+    const up999 = Number(breakdown.up999 != null ? breakdown.up999 : regionSource.metrics && regionSource.metrics[`${prefix}999`] || 0);
+    return {
+      total,
+      up999,
+      up999Rate: total > 0 ? up999 / total : null,
+      small: Number(breakdown.small != null ? breakdown.small : Math.max(0, total - up999)),
+      bands: Object.fromEntries(bandKeys.map(key => [key, Number(breakdown.bands && breakdown.bands[key] || 0)])),
+      speed: Number(regionSource.metrics && regionSource.metrics['好速'] || 0),
+      earlyRenewal: Number(breakdown.earlyRenewal || 0)
+    };
+  }
+
   function analyze(aqResult, rtResult, targets, options) {
     if (!aqResult || !rtResult) throw new Error('請先完成 AQ 與 RT 兩個檔案解析。');
     const settings = options || {};
@@ -612,6 +750,8 @@
       return [key, {
         aqActual: Number(aqRegion.total || 0),
         rtActual: Number(rtRegion.total || 0),
+        aq: regionDetail(aqRegion, 'aq'),
+        rt: regionDetail(rtRegion, 'rt'),
         metrics: {
           A999: Number(aqRegion.metrics && aqRegion.metrics.A999 || 0),
           A1399: Number(aqRegion.metrics && aqRegion.metrics.A1399 || 0),
@@ -621,7 +761,15 @@
         }
       }];
     }));
-    return { stores, region, regions, priority, leaders, dynamic, products, productModels, giftAudit: Array.isArray(rtResult.giftAudit) ? rtResult.giftAudit : [] };
+    const national = {
+      aq: aqResult.nationalSummary && Array.isArray(aqResult.nationalSummary.rows) ? aqResult.nationalSummary.rows : [],
+      rt: rtResult.nationalSummary && Array.isArray(rtResult.nationalSummary.rows) ? rtResult.nationalSummary.rows : []
+    };
+    const nationalTotals = {
+      aq: aqResult.nationalSummary && aqResult.nationalSummary.totalRow || null,
+      rt: rtResult.nationalSummary && rtResult.nationalSummary.totalRow || null
+    };
+    return { stores, region, regions, national, nationalTotals, priority, leaders, dynamic, products, productModels, giftAudit: Array.isArray(rtResult.giftAudit) ? rtResult.giftAudit : [] };
   }
 
   function percent(value) { return value == null ? '—' : `${round(value * 100, 1)}%`; }
@@ -674,5 +822,5 @@
     return lines.join('\n');
   }
 
-  return { STORE_NAMES, REGION_KEYS, AQ_KEY, RT_KEY, METRIC_KEYS, KPI_KEYS, normalizeStore, normalizeRegion, buildStoreLookup, detectHeader, inspectMatrix, separatorFor, parseDelimited, decodeCsv, parseRegionSummary, parseMatrix, extractTargets, dynamicContext, dynamicDailyGoal, analyze, composeMessage, percent, planAmount, maskIdentifier };
+  return { STORE_NAMES, REGION_KEYS, AQ_KEY, RT_KEY, METRIC_KEYS, AQ_PLAN_BANDS, RT_PLAN_BANDS, KPI_KEYS, normalizeStore, normalizeRegion, buildStoreLookup, detectHeader, inspectMatrix, separatorFor, parseDelimited, decodeCsv, parseRegionSummary, parseNationalSummary, parseMatrix, extractTargets, dynamicContext, dynamicDailyGoal, analyze, composeMessage, percent, planAmount, maskIdentifier };
 });
