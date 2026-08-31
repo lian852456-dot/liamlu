@@ -3,7 +3,7 @@
 - Source visual truth paths:
   - `/workspace/scratch/3729926cc24f/upload/9127525a-9be2-4198-a1c6-c7465a81e229.png`
   - `/workspace/scratch/3729926cc24f/upload/f317ef44-ff9d-46cf-b85a-615cfa7160ea.png`
-- Implementation URL: local candidate for `live-battle.html`; this patch is not deployed.
+- Implementation URL: `https://lian852456-dot.github.io/liamlu/live-battle.html`（已部署；正式 runtime 與候選 SHA-256 一致）。
 - Implementation screenshot path: unavailable; the required cloud-browser runtime timed out during connection setup and could not be reset during this QA run.
 - Intended viewport: desktop 1365 × 900 CSS px, device scale 1.
 - Source pixels: nine-store PNG 1466 × 904; supervisor AQ／RT PNG 974 × 415.
@@ -48,4 +48,4 @@
 
 final result: blocked
 
-Deployment note: this correction is a local candidate and has not been deployed. Cloud-browser connection timed out before a rendered capture could be produced; automated regression does not replace the missing browser-rendered comparison.
+Deployment note: Liam 已先授權「隔離檢查通過即可部署、不用再詢問」。GitHub Pages run `33388025723` 成功，正式 commit `6cf2c33` 已發布，四個 runtime 檔案 SHA-256 與候選一致；cloud-browser 仍連線逾時，因此 `final result` 維持 blocked，部署與自動化回歸不取代缺少的瀏覽器視覺比對。
