@@ -33,20 +33,23 @@ test('辨識失敗保留本機檔並只顯示安全欄位診斷', () => {
   assert.match(html, /安全辨識資訊/);
 });
 
-test('今日目標採正式昨日實績與剩餘天數動態分配，且不阻擋檔案辨識', () => {
+test('今日目標採最新正式實績與截止後剩餘天數動態分配，且不阻擋檔案辨識', () => {
   const core = read('live-battle-core.js');
   const html = read('live-battle.html');
   assert.match(core, /Math\.ceil\(\(Math\.max\(0, Number\(monthTarget\) - Number\(officialActual\)\) \/ Number\(remainingDays\)\) \/ step\) \* step/);
-  assert.match(core, /不是昨日.*停止計算今日目標/);
+  assert.match(core, /較昨日落後.*仍依該截止後剩餘/);
   assert.match(html, /STEP 2 · 選用/);
   assert.match(html, /未載入也不影響檔案辨識/);
 });
 
-test('戰報主畫面改以五項指標、實際商品與影音漏搭呈現', () => {
+test('戰報主畫面與下載圖呈現北一二四區、AQ／RT 七項、實際商品與影音漏搭', () => {
   const core = read('live-battle-core.js');
   const html = read('live-battle.html');
   const js = read('live-battle.js');
   for (const label of ['A999', 'A1399', 'R999', 'R1399', '好速']) assert.match(html, new RegExp(label));
+  assert.match(html, /北一二 A／B／C／D/);
+  assert.match(html, /AQ上線/);
+  assert.match(html, /RT上線/);
   assert.match(html, /目前上線商品/);
   assert.match(html, /KKBOX／MyVideo 漏搭提醒/);
   assert.match(core, /商品型號/);
@@ -82,6 +85,10 @@ test('分析完成後可分開下載四張本機產生的 PNG 戰報', () => {
   assert.match(js, /canvas\.toBlob\([\s\S]*'image\/png'/);
   assert.match(js, /URL\.createObjectURL/);
   assert.match(js, /link\.download = `行進間戰報_/);
+  assert.match(html, /下載① 北一二 A／B／C／D 戰情 PNG/);
+  assert.match(html, /下載② 上線商品 PNG/);
+  assert.match(html, /下載③ 九店 AQ／RT 戰情 PNG/);
+  assert.match(js, /index > 1 && value \? '#087a60'/);
   assert.doesNotMatch(`${html}\n${js}`, /html2canvas|dom-to-image|cdnjs|unpkg|jsdelivr/i);
 });
 

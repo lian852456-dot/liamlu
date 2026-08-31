@@ -8,6 +8,7 @@
   const STORE_NAMES = Object.freeze(['通化', '酒泉', '台北三創', '萬大', '六張犁', '復興南', '永吉', '大稻埕', '杭州南']);
   const AQ_KEY = 'TTL AQ上線點數';
   const RT_KEY = 'RT上線點數';
+  const REGION_KEYS = Object.freeze(['A', 'B', 'C', 'D']);
   const METRIC_KEYS = Object.freeze(['A999', 'A1399', 'R999', 'R1399', '好速']);
   const KPI_KEYS = Object.freeze({
     A999: 'AQ V+D 999 (含)以上',
@@ -17,6 +18,7 @@
     '好速': '好速案銷售點數'
   });
   const STORE_HEADERS = ['營業點代碼', '服務中心代碼', '門市代碼', '店點代碼', '店代碼', '營業點', '服務中心', '銷售門市', '門市', '店點', '店號'];
+  const REGION_HEADERS = ['督導區', '督導區域', '區域', '營運區'];
   const POINT_HEADERS = ['上線點數', '計件點數', '銷售點數', '實際點數', '貢獻點數', '點數', '件數', '數量'];
   const ID_HEADERS = ['受理編號', '申請書編號', '交易序號', '訂單編號', '案件編號', '用戶編號', '門號'];
   const PLAN_HEADERS = ['變更資費', '異動後資費', '申辦資費', '新資費', '合約資費', '月租費', '資費方案', '方案名稱', '資費'];
@@ -29,7 +31,7 @@
   function normalizeToken(value) {
     return text(value)
       .replace(/^\uFEFF/, '')
-      .replace(/[\s　_／/()（）【】\[\]：:・·.-]+/g, '')
+      .replace(/[\s　_／/()（）【】\[\]：:・·.\-－]+/g, '')
       .toUpperCase();
   }
 
@@ -40,6 +42,12 @@
       .replace(/服務中心|門市/g, '')
       .replace(/^台北/, '');
     return cleaned === '三創' ? '台北三創' : STORE_NAMES.find(name => normalizeToken(name).replace(/^台北/, '') === cleaned) || '';
+  }
+
+  function normalizeRegion(value) {
+    const token = normalizeToken(value);
+    const match = token.match(/北一二([ABCD])/);
+    return match ? match[1] : '';
   }
 
   function buildStoreLookup(stores) {
@@ -183,6 +191,13 @@
     return Object.fromEntries(STORE_NAMES.map(name => [name, {}]));
   }
 
+  function blankRegions() {
+    return Object.fromEntries(REGION_KEYS.map(key => [key, {
+      total: 0,
+      metrics: Object.fromEntries(METRIC_KEYS.map(metric => [metric, 0]))
+    }]));
+  }
+
   function rowText(row, columns) {
     return columns.map(column => text(row[column])).filter(Boolean).join('｜');
   }
@@ -278,12 +293,17 @@
     const planCol = findPreferredColumn(headerRow, PLAN_HEADERS);
     const productCol = findPreferredColumn(headerRow, PRODUCT_HEADERS);
     const staffCol = findPreferredColumn(headerRow, STAFF_HEADERS);
+    const regionCol = findPreferredColumn(headerRow, REGION_HEADERS);
+    const kind = String(settings.kind).toLowerCase();
     const totals = Object.fromEntries(STORE_NAMES.map(name => [name, 0]));
     const metrics = blankStoreMetrics();
     const products = blankProducts();
+    const regions = blankRegions();
     const seen = new Set();
+    const regionSeen = new Set();
     const caseRows = new Map();
     let processedRows = 0;
+    let regionProcessedRows = 0;
     let duplicateRows = 0;
     let ignoredRows = 0;
     const start = header.rowIndex >= 0 ? header.rowIndex + 1 : 0;
@@ -297,33 +317,49 @@
           if (store) break;
         }
       }
-      if (!store) { ignoredRows += 1; return; }
       const id = header.idCol >= 0 ? normalizeToken(row[header.idCol]) : '';
+      const region = regionCol >= 0 ? normalizeRegion(row[regionCol]) : (store ? 'B' : '');
+      const parsedPoints = header.pointsCol >= 0 ? numberOrNull(row[header.pointsCol]) : null;
+      const points = parsedPoints == null ? 1 : parsedPoints;
+      const amount = planCol >= 0 ? planAmount(row[planCol]) : null;
+      const haosu = isHaosuRow(row, headerRow);
+      const regionUniqueKey = id && region ? `${region}|${id}` : '';
+      if (region && (!regionUniqueKey || !regionSeen.has(regionUniqueKey))) {
+        if (regionUniqueKey) regionSeen.add(regionUniqueKey);
+        regions[region].total += points;
+        if (kind === 'aq') {
+          if (amount >= 999) regions[region].metrics.A999 += 1;
+          if (amount >= 1399) regions[region].metrics.A1399 += 1;
+        } else {
+          if (amount >= 999) regions[region].metrics.R999 += 1;
+          if (amount >= 1399) regions[region].metrics.R1399 += 1;
+        }
+        if (haosu) regions[region].metrics['好速'] += parsedPoints == null ? 1 : parsedPoints;
+        regionProcessedRows += 1;
+      }
+      if (!store) { ignoredRows += 1; return; }
       const uniqueKey = id ? `${store}|${id}` : '';
       const caseKey = uniqueKey || `${store}|ROW${offset}`;
       if (!caseRows.has(caseKey)) caseRows.set(caseKey, { store, id: header.idCol >= 0 ? text(row[header.idCol]) : '', rows: [] });
       caseRows.get(caseKey).rows.push(row);
       if (uniqueKey && seen.has(uniqueKey)) { duplicateRows += 1; return; }
       if (uniqueKey) seen.add(uniqueKey);
-      const parsedPoints = header.pointsCol >= 0 ? numberOrNull(row[header.pointsCol]) : null;
-      const points = parsedPoints == null ? 1 : parsedPoints;
       totals[store] += points;
-      const amount = planCol >= 0 ? planAmount(row[planCol]) : null;
-      if (String(settings.kind).toLowerCase() === 'aq') {
+      if (kind === 'aq') {
         if (amount >= 999) metrics[store].A999 += 1;
         if (amount >= 1399) metrics[store].A1399 += 1;
       } else {
         if (amount >= 999) metrics[store].R999 += 1;
         if (amount >= 1399) metrics[store].R1399 += 1;
       }
-      if (isHaosuRow(row, headerRow)) metrics[store]['好速'] += parsedPoints == null ? 1 : parsedPoints;
+      if (haosu) metrics[store]['好速'] += parsedPoints == null ? 1 : parsedPoints;
       const product = productCol >= 0 ? productName(row[productCol]) : '';
       if (product) products[store][product] = Number(products[store][product] || 0) + 1;
       processedRows += 1;
     });
 
     const giftAudit = [];
-    if (String(settings.kind).toLowerCase() === 'rt') {
+    if (kind === 'rt') {
       caseRows.forEach(group => {
         const representative = group.rows[0] || [];
         const amounts = group.rows.map(row => planCol >= 0 ? planAmount(row[planCol]) : null).filter(value => value != null);
@@ -348,13 +384,14 @@
     const recognizedStores = STORE_NAMES.filter(name => totals[name] !== 0);
     if (!processedRows) throw new Error('找不到北一二B九店資料；請確認這是正確的 AQ／RT 原始檔。');
     return {
-      kind: String(settings.kind).toLowerCase(),
-      totals, metrics, products, giftAudit,
+      kind,
+      totals, metrics, products, regions, giftAudit,
       meta: {
         fileName: text(settings.fileName), headerRow: header.rowIndex,
-        mode: header.pointsCol >= 0 ? 'points' : 'rows', processedRows, duplicateRows, ignoredRows,
+        mode: header.pointsCol >= 0 ? 'points' : 'rows', processedRows, regionProcessedRows, duplicateRows, ignoredRows,
         recognizedStores, missingStores: STORE_NAMES.filter(name => !recognizedStores.includes(name)),
-        fields: { plan: planCol >= 0 ? text(headerRow[planCol]) : '', product: productCol >= 0 ? text(headerRow[productCol]) : '', staff: staffCol >= 0 ? text(headerRow[staffCol]) : '' }
+        recognizedRegions: REGION_KEYS.filter(key => regions[key].total !== 0),
+        fields: { region: regionCol >= 0 ? text(headerRow[regionCol]) : '', plan: planCol >= 0 ? text(headerRow[planCol]) : '', product: productCol >= 0 ? text(headerRow[productCol]) : '', staff: staffCol >= 0 ? text(headerRow[staffCol]) : '' }
       }
     };
   }
@@ -393,6 +430,7 @@
     }).filter(store => STORE_NAMES.includes(store.name));
     if (stores.length !== STORE_NAMES.length) throw new Error(`正式 KPI 目標只讀到 ${stores.length}/9 店，已停止計算達成率。`);
     if (stores.some(store => !(store.aqTarget > 0) || !(store.rtTarget > 0))) throw new Error('正式 KPI 缺少部分 AQ／RT 目標，已停止計算達成率。');
+    if (stores.some(store => METRIC_KEYS.some(key => !(store.metrics[key].target > 0) || store.metrics[key].officialActual == null))) throw new Error('正式 KPI 缺少部分 A999／A1399／R999／R1399／好速目標或實績，已停止計算達成率。');
     return {
       stores,
       meta: {
@@ -414,11 +452,21 @@
     todayUtc.setUTCDate(todayUtc.getUTCDate() - 1);
     const expectedCutoff = `${todayUtc.getUTCFullYear()}-${String(todayUtc.getUTCMonth() + 1).padStart(2, '0')}-${String(todayUtc.getUTCDate()).padStart(2, '0')}`;
     const cutoff = `${month}-${String(snapshotDay).padStart(2, '0')}`;
-    if (cutoff !== expectedCutoff) return { available: false, reason: `正式 KPI 截止 ${cutoff}，不是昨日 ${expectedCutoff}，已停止計算今日目標。`, cutoff, expectedCutoff };
+    const todayMonth = `${todayMatch[1]}-${todayMatch[2]}`;
+    if (month !== todayMonth) return { available: false, reason: `正式 KPI 月份 ${month} 與今日 ${todayMonth} 不同，已停止計算今日目標。`, cutoff, expectedCutoff };
+    const cutoffUtc = new Date(`${cutoff}T00:00:00Z`);
+    const expectedCutoffUtc = new Date(`${expectedCutoff}T00:00:00Z`);
+    if (!Number.isFinite(cutoffUtc.getTime()) || cutoffUtc > expectedCutoffUtc) return { available: false, reason: `正式 KPI 截止 ${cutoff} 晚於可用截止 ${expectedCutoff}，已停止計算今日目標。`, cutoff, expectedCutoff };
+    const staleDays = Math.round((expectedCutoffUtc - cutoffUtc) / 86_400_000);
     const daysInMonth = new Date(Date.UTC(Number(monthMatch[1]), Number(monthMatch[2]), 0)).getUTCDate();
     const remainingDays = daysInMonth - Number(snapshotDay);
     if (!(remainingDays > 0)) return { available: false, reason: '正式 KPI 已無可分配的剩餘天數。', cutoff, expectedCutoff };
-    return { available: true, cutoff, expectedCutoff, remainingDays };
+    return {
+      available: true, cutoff, expectedCutoff, remainingDays, staleDays,
+      notice: staleDays > 0
+        ? `正式 KPI 截止 ${cutoff}，較昨日落後 ${staleDays} 天；仍依該截止後剩餘 ${remainingDays} 天分配今日目標。`
+        : `今日目標依截至 ${cutoff} 的正式累積實績，分配至剩餘 ${remainingDays} 天。`
+    };
   }
 
   function dynamicDailyGoal(monthTarget, officialActual, remainingDays, metricStep) {
@@ -469,7 +517,7 @@
         rtOfficialActual: target.rtOfficialActual == null ? null : target.rtOfficialActual,
         rtTodayGoal, rtRate, rtGap: gap(rtActual, rtTodayGoal),
         combinedRate: (() => {
-          const values = METRIC_KEYS.map(key => metrics[key].rate).filter(value => value != null);
+          const values = [aqRate, rtRate, ...METRIC_KEYS.map(key => metrics[key].rate)].filter(value => value != null);
           return values.length ? values.reduce((total, value) => total + value, 0) / values.length : null;
         })()
       };
@@ -490,7 +538,7 @@
       return [key, { actual, todayGoal, rate: rate(actual, todayGoal), gap: gap(actual, todayGoal) }];
     }));
     const priority = dynamic.available
-      ? stores.filter(store => METRIC_KEYS.some(key => store.metrics[key].rate != null && store.metrics[key].rate < 1))
+      ? stores.filter(store => (store.aqRate != null && store.aqRate < 1) || (store.rtRate != null && store.rtRate < 1) || METRIC_KEYS.some(key => store.metrics[key].rate != null && store.metrics[key].rate < 1))
         .slice().sort((a, b) => (a.combinedRate ?? 99) - (b.combinedRate ?? 99))
       : [];
     const leaders = stores.slice().sort((a, b) => dynamic.available
@@ -505,7 +553,22 @@
       const total = model => STORE_NAMES.reduce((sum, name) => sum + Number(products[name][model] || 0), 0);
       return total(b) - total(a) || a.localeCompare(b, 'zh-Hant');
     });
-    return { stores, region, priority, leaders, dynamic, products, productModels, giftAudit: Array.isArray(rtResult.giftAudit) ? rtResult.giftAudit : [] };
+    const regions = Object.fromEntries(REGION_KEYS.map(key => {
+      const aqRegion = aqResult.regions && aqResult.regions[key] || { total: key === 'B' ? region.aqActual : 0, metrics: {} };
+      const rtRegion = rtResult.regions && rtResult.regions[key] || { total: key === 'B' ? region.rtActual : 0, metrics: {} };
+      return [key, {
+        aqActual: Number(aqRegion.total || 0),
+        rtActual: Number(rtRegion.total || 0),
+        metrics: {
+          A999: Number(aqRegion.metrics && aqRegion.metrics.A999 || 0),
+          A1399: Number(aqRegion.metrics && aqRegion.metrics.A1399 || 0),
+          R999: Number(rtRegion.metrics && rtRegion.metrics.R999 || 0),
+          R1399: Number(rtRegion.metrics && rtRegion.metrics.R1399 || 0),
+          '好速': Number(aqRegion.metrics && aqRegion.metrics['好速'] || 0) + Number(rtRegion.metrics && rtRegion.metrics['好速'] || 0)
+        }
+      }];
+    }));
+    return { stores, region, regions, priority, leaders, dynamic, products, productModels, giftAudit: Array.isArray(rtResult.giftAudit) ? rtResult.giftAudit : [] };
   }
 
   function percent(value) { return value == null ? '—' : `${round(value * 100, 1)}%`; }
@@ -520,29 +583,43 @@
     const stamp = text(settings.timeLabel) || new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
     const lines = [
       `📣 北一二B 行進間戰報｜${stamp}`,
-      `全區｜${METRIC_KEYS.map(key => {
+      `全區｜${[
+        metricLine('AQ上線', analysis.region.aqActual, analysis.region.aqTarget, analysis.region.aqRate, analysis.region.aqGap),
+        ...['A999', 'A1399'].map(key => {
+          const metric = analysis.region.metrics[key];
+          return metricLine(key, metric.actual, metric.todayGoal, metric.rate, metric.gap);
+        }),
+        metricLine('RT上線', analysis.region.rtActual, analysis.region.rtTarget, analysis.region.rtRate, analysis.region.rtGap),
+        ...['R999', 'R1399', '好速'].map(key => {
         const metric = analysis.region.metrics[key];
         return metricLine(key, metric.actual, metric.todayGoal, metric.rate, metric.gap);
-      }).join('；')}`
+        })
+      ].join('；')}`
     ];
     const priorities = analysis.priority.slice(0, 4);
     if (priorities.length) {
       lines.push('', '🔴 優先追進');
       priorities.forEach(store => {
-        const gaps = METRIC_KEYS.filter(key => store.metrics[key].gap > 0).map(key => `${key}缺${count(store.metrics[key].gap)}`);
+        const gaps = [
+          ...(store.aqGap > 0 ? [`AQ上線缺${count(store.aqGap)}`] : []),
+          ...['A999', 'A1399'].filter(key => store.metrics[key].gap > 0).map(key => `${key}缺${count(store.metrics[key].gap)}`),
+          ...(store.rtGap > 0 ? [`RT上線缺${count(store.rtGap)}`] : []),
+          ...['R999', 'R1399', '好速'].filter(key => store.metrics[key].gap > 0).map(key => `${key}缺${count(store.metrics[key].gap)}`)
+        ];
         lines.push(`・${store.name}｜${gaps.join('、') || '今日已達標'}`);
       });
     }
     const leaders = analysis.leaders.filter(store => METRIC_KEYS.some(key => store.metrics[key].actual > 0));
     if (leaders.length) lines.push('', `🟢 目前領先：${leaders.map(store => analysis.dynamic.available
-      ? `${store.name}（五項均值 ${percent(store.combinedRate)}）`
+      ? `${store.name}（七項均值 ${percent(store.combinedRate)}）`
       : `${store.name}（${METRIC_KEYS.map(key => `${key} ${count(store.metrics[key].actual)}`).join('／')}）`).join('、')}`);
     if (analysis.giftAudit.length) lines.push('', `🎁 KKBOX／MyVideo 漏搭 ${analysis.giftAudit.length} 件：${analysis.giftAudit.map(item => `${item.store} ${item.caseId}缺${item.missing.join('+')}`).join('；')}`);
     if (analysis.productModels.length) lines.push('', `📱 今日上線商品：${analysis.productModels.slice(0, 8).map(model => `${model}×${STORE_NAMES.reduce((sum, name) => sum + Number(analysis.products[name][model] || 0), 0)}`).join('、')}`);
     if (!analysis.dynamic.available) lines.push('', `ℹ️ ${analysis.dynamic.reason}`);
+    else if (analysis.dynamic.staleDays > 0) lines.push('', `ℹ️ ${analysis.dynamic.notice}`);
     lines.push('', '請各店先補最大缺口並確認影音搭贈；本訊息為本機原始檔即時解析，正式成績以公司報表為準。');
     return lines.join('\n');
   }
 
-  return { STORE_NAMES, AQ_KEY, RT_KEY, METRIC_KEYS, KPI_KEYS, normalizeStore, buildStoreLookup, detectHeader, inspectMatrix, separatorFor, parseDelimited, decodeCsv, parseMatrix, extractTargets, dynamicContext, dynamicDailyGoal, analyze, composeMessage, percent, planAmount, maskIdentifier };
+  return { STORE_NAMES, REGION_KEYS, AQ_KEY, RT_KEY, METRIC_KEYS, KPI_KEYS, normalizeStore, normalizeRegion, buildStoreLookup, detectHeader, inspectMatrix, separatorFor, parseDelimited, decodeCsv, parseMatrix, extractTargets, dynamicContext, dynamicDailyGoal, analyze, composeMessage, percent, planAmount, maskIdentifier };
 });

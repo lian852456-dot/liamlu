@@ -72,7 +72,7 @@
     scope.localStorage.setItem(EMPLOYEE_KEY, employeeId);
     setTargetState('ok', '目標已載入');
     formatTargetMeta(state.targets.meta);
-    message('targetMessage', `已驗證 ${result.profile.maskedName || '督導'}，五項正式目標載入完成；將追加今日動態目標。`, 'ok');
+    message('targetMessage', `已驗證 ${result.profile.maskedName || '督導'}，AQ／RT 七項正式目標載入完成；將追加今日動態目標。`, 'ok');
     updateAnalyzeButton();
   }
 
@@ -214,6 +214,19 @@
     return `<strong>${displayCount(metric.actual)}<span> / ${displayCount(target)}</span></strong><small class="${metric.gap > 0 ? 'negative' : 'positive'}">${detail}</small>`;
   }
 
+  function storeMetricSequence(store) {
+    return [
+      ['AQ上線', { actual: store.aqActual, todayGoal: store.aqTodayGoal, gap: store.aqGap }],
+      ['A999', store.metrics.A999], ['A1399', store.metrics.A1399],
+      ['RT上線', { actual: store.rtActual, todayGoal: store.rtTodayGoal, gap: store.rtGap }],
+      ['R999', store.metrics.R999], ['R1399', store.metrics.R1399], ['好速', store.metrics['好速']]
+    ];
+  }
+
+  function storeGapEntries(store) {
+    return storeMetricSequence(store).filter(([, metric]) => metric.gap > 0).map(([label, metric]) => `${label}缺${displayCount(metric.gap)}`);
+  }
+
   function renderProducts(analysis) {
     const models = analysis.productModels;
     $('productCount').textContent = `${models.length} 款`;
@@ -325,34 +338,43 @@
   }
 
   function createSummaryPng(analysis) {
-    const width = 1500, height = 510;
+    const width = 1900, rowHeight = 92, tableY = 188, height = tableY + 62 + Core.REGION_KEYS.length * rowHeight + 80;
     const { canvas, ctx } = exportSurface(width, height);
-    drawExportHeader(ctx, width, '① 五項全區總覽', `${exportTimeLabel()} 產生｜目前上線 / 今日目標`);
-    const fills = ['#e8f5fd', '#eef0ff', '#e8f7f1', '#e9f8f4', '#fff5df'];
-    const inks = [EXPORT_COLORS.blue, '#6247a1', EXPORT_COLORS.green, '#087a60', EXPORT_COLORS.amber];
-    const gap = 18, margin = 48, cardWidth = (width - margin * 2 - gap * 4) / 5;
-    Core.METRIC_KEYS.forEach((key, index) => {
-      const metric = analysis.region.metrics[key];
-      const x = margin + index * (cardWidth + gap);
-      drawCell(ctx, x, 164, cardWidth, 244, fills[index], '#d7e2ea');
-      ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '800 20px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText(`全區 ${key}`, x + 22, 198);
-      ctx.fillStyle = inks[index]; ctx.font = '900 58px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText(displayCount(metric.actual), x + 22, 260);
-      ctx.fillStyle = EXPORT_COLORS.ink; ctx.font = '700 18px system-ui, "Microsoft JhengHei", sans-serif';
-      ctx.fillText(metric.todayGoal == null ? '尚未載入今日目標' : `今日目標 ${displayCount(metric.todayGoal)}`, x + 22, 318);
-      ctx.fillStyle = metric.todayGoal == null ? EXPORT_COLORS.muted : metric.gap > 0 ? EXPORT_COLORS.red : EXPORT_COLORS.green;
-      ctx.font = '900 21px system-ui, "Microsoft JhengHei", sans-serif';
-      ctx.fillText(metric.todayGoal == null ? '目前上線' : metric.gap > 0 ? `尚缺 ${displayCount(metric.gap)}` : '今日已達標', x + 22, 365);
+    const targetNote = analysis.dynamic.available
+      ? `北一二B目標已載入；各店今日差異請看第③張`
+      : '尚未載入今日目標｜本圖先顯示 AQ／RT 目前上線';
+    drawExportHeader(ctx, width, '① 北一二 A／B／C／D 戰情', `${exportTimeLabel()} 產生｜${targetNote}`);
+    const labels = ['督導區', 'AQ上線數', 'A999', 'A1399', 'RT上線數', 'R999', 'R1399', '好速'];
+    const widths = [230, 240, 210, 210, 240, 210, 210, 210];
+    let x = 52;
+    labels.forEach((label, index) => {
+      ctx.fillStyle = index === 0 ? '#dce9f1' : '#e9eff3'; ctx.fillRect(x, tableY, widths[index], 62);
+      ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '850 20px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText(label, x + 16, tableY + 31);
+      x += widths[index];
+    });
+    Core.REGION_KEYS.forEach((key, rowIndex) => {
+      const item = analysis.regions[key];
+      const values = [`北一二${key}`, item.aqActual, item.metrics.A999, item.metrics.A1399, item.rtActual, item.metrics.R999, item.metrics.R1399, item.metrics['好速']];
+      const y = tableY + 62 + rowIndex * rowHeight;
+      x = 52;
+      values.forEach((value, index) => {
+        ctx.fillStyle = index === 0 ? '#eef5f8' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
+        ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
+        ctx.fillStyle = index === 0 ? EXPORT_COLORS.navy : index < 4 ? EXPORT_COLORS.blue : index < 7 ? EXPORT_COLORS.green : EXPORT_COLORS.amber;
+        ctx.font = `${index === 0 ? '900 23' : '900 30'}px system-ui, "Microsoft JhengHei", sans-serif`;
+        ctx.fillText(String(value), x + 16, y + rowHeight / 2); x += widths[index];
+      });
     });
     drawExportFooter(ctx, width, height);
     return canvas;
   }
 
   function createStoresPng(analysis) {
-    const width = 1700, rowHeight = 76, tableY = 188, height = tableY + 58 + analysis.stores.length * rowHeight + 80;
+    const width = 1900, rowHeight = 96, tableY = 188, height = tableY + 58 + analysis.stores.length * rowHeight + 80;
     const { canvas, ctx } = exportSurface(width, height);
-    drawExportHeader(ctx, width, '② 九店五項戰情', `${exportTimeLabel()} 產生｜數字為目前上線 / 今日目標`);
-    const labels = ['店點', ...Core.METRIC_KEYS, '目前尚缺'];
-    const widths = [170, 205, 205, 205, 205, 205, 350];
+    drawExportHeader(ctx, width, '③ 九店 AQ／RT 戰情', `${exportTimeLabel()} 產生｜數字為目前上線 / 今日目標`);
+    const labels = ['店點', 'AQ上線', 'A999', 'A1399', 'RT上線', 'R999', 'R1399', '好速', '今日差異'];
+    const widths = [160, 150, 150, 150, 150, 150, 150, 150, 520];
     let x = 52;
     labels.forEach((label, index) => {
       ctx.fillStyle = '#e9eff3'; ctx.fillRect(x, tableY, widths[index], 58);
@@ -361,9 +383,8 @@
     });
     analysis.stores.forEach((store, rowIndex) => {
       const y = tableY + 58 + rowIndex * rowHeight;
-      const gaps = Core.METRIC_KEYS.filter(key => store.metrics[key].gap > 0).map(key => `${key}缺${displayCount(store.metrics[key].gap)}`);
-      const values = [store.name, ...Core.METRIC_KEYS.map(key => {
-        const metric = store.metrics[key];
+      const gaps = storeGapEntries(store);
+      const values = [store.name, ...storeMetricSequence(store).map(([, metric]) => {
         return metric.todayGoal == null ? displayCount(metric.actual) : `${displayCount(metric.actual)} / ${displayCount(metric.todayGoal)}`;
       }), analysis.dynamic.available ? (gaps.join('、') || '今日已達標') : '尚未載入目標'];
       x = 52;
@@ -372,7 +393,7 @@
         ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
         ctx.fillStyle = index === values.length - 1 ? (gaps.length ? EXPORT_COLORS.red : EXPORT_COLORS.green) : EXPORT_COLORS.ink;
         ctx.font = `${index === 0 || index === values.length - 1 ? '800' : '700'} ${index === values.length - 1 ? 16 : 19}px system-ui, "Microsoft JhengHei", sans-serif`;
-        const lines = wrapCanvasText(ctx, value, widths[index] - 24, 2);
+        const lines = wrapCanvasText(ctx, value, widths[index] - 24, index === values.length - 1 ? 3 : 2);
         lines.forEach((line, lineIndex) => ctx.fillText(line, x + 12, y + rowHeight / 2 + (lineIndex - (lines.length - 1) / 2) * 23));
         x += widths[index];
       });
@@ -385,7 +406,7 @@
     const models = analysis.productModels;
     const width = 1800, rowHeight = 72, tableY = 188, rows = Math.max(1, models.length), height = tableY + 58 + rows * rowHeight + 80;
     const { canvas, ctx } = exportSurface(width, height);
-    drawExportHeader(ctx, width, '③ 目前上線商品', `${exportTimeLabel()} 產生｜依本次 AQ／RT 實際商品型號`);
+    drawExportHeader(ctx, width, '② 目前上線商品', `${exportTimeLabel()} 產生｜依本次 AQ／RT 實際商品型號`);
     if (!models.length) {
       drawCell(ctx, 52, tableY, width - 104, 130, '#ffffff', EXPORT_COLORS.line);
       ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '700 24px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText('原始檔未提供可辨識的商品型號', 82, tableY + 65);
@@ -396,8 +417,8 @@
     const widths = [modelWidth, totalWidth, ...Core.STORE_NAMES.map(() => storeWidth)];
     let x = 52;
     labels.forEach((label, index) => {
-      ctx.fillStyle = '#eee9f7'; ctx.fillRect(x, tableY, widths[index], 58);
-      ctx.fillStyle = index < 2 ? '#5d438d' : EXPORT_COLORS.muted; ctx.font = '800 17px system-ui, "Microsoft JhengHei", sans-serif';
+      ctx.fillStyle = '#e9eff3'; ctx.fillRect(x, tableY, widths[index], 58);
+      ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '800 17px system-ui, "Microsoft JhengHei", sans-serif';
       ctx.fillText(truncateCanvasText(ctx, label, widths[index] - 16), x + 8, tableY + 29); x += widths[index];
     });
     models.forEach((model, rowIndex) => {
@@ -406,9 +427,9 @@
       const values = [model, storeValues.reduce((total, value) => total + value, 0), ...storeValues];
       x = 52;
       values.forEach((value, index) => {
-        ctx.fillStyle = index > 1 && value ? '#e8f7f1' : rowIndex % 2 ? '#faf8fd' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
+        ctx.fillStyle = index > 1 && value ? '#087a60' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
         ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
-        ctx.fillStyle = index > 1 && value ? EXPORT_COLORS.green : EXPORT_COLORS.ink; ctx.font = `${index < 2 ? '800' : '700'} 18px system-ui, "Microsoft JhengHei", sans-serif`;
+        ctx.fillStyle = index > 1 && value ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = `${index < 2 || value ? '900' : '700'} 18px system-ui, "Microsoft JhengHei", sans-serif`;
         if (index === 0) {
           const lines = wrapCanvasText(ctx, value, widths[index] - 22, 2);
           lines.forEach((line, lineIndex) => ctx.fillText(line, x + 11, y + rowHeight / 2 + (lineIndex - (lines.length - 1) / 2) * 22));
@@ -468,7 +489,7 @@
     button.disabled = true; button.classList.add('is-busy'); button.textContent = '產生圖片中…';
     try {
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
-      const builders = { summary: [createSummaryPng, '五項全區總覽'], stores: [createStoresPng, '九店五項戰情'], products: [createProductsPng, '上線商品'], gifts: [createGiftsPng, '影音漏搭'] };
+      const builders = { summary: [createSummaryPng, '北一二ABCD戰情'], stores: [createStoresPng, '九店AQRT戰情'], products: [createProductsPng, '上線商品'], gifts: [createGiftsPng, '影音漏搭'] };
       const [build, label] = builders[kind];
       await downloadCanvas(build(state.analysis), label);
       button.textContent = '已下載 PNG';
@@ -482,24 +503,26 @@
   function renderAnalysis() {
     state.analysis = Core.analyze(state.aq, state.rt, state.targets, { todayIso: taipeiTodayIso() });
     const a = state.analysis;
-    $('regionSummary').innerHTML = Core.METRIC_KEYS.map((key, index) => {
-      const metric = a.region.metrics[key];
-      return `<article class="summary-card metric-${index}"><span>全區 ${escapeHtml(key)}</span><strong>${displayCount(metric.actual)}</strong><small>${summaryDetail(metric.actual, metric.todayGoal, metric.gap)}</small></article>`;
-    }).join('');
+    const summaryItems = [
+      ['AQ上線', { actual: a.region.aqActual, todayGoal: a.region.aqTarget, gap: a.region.aqGap }],
+      ['A999', a.region.metrics.A999], ['A1399', a.region.metrics.A1399],
+      ['RT上線', { actual: a.region.rtActual, todayGoal: a.region.rtTarget, gap: a.region.rtGap }],
+      ['R999', a.region.metrics.R999], ['R1399', a.region.metrics.R1399], ['好速', a.region.metrics['好速']]
+    ];
+    $('regionSummary').innerHTML = summaryItems.map(([label, metric], index) => `<article class="summary-card metric-${index}"><span>北一二B ${escapeHtml(label)}</span><strong>${displayCount(metric.actual)}</strong><small>${summaryDetail(metric.actual, metric.todayGoal, metric.gap)}</small></article>`).join('');
     const priorityNames = new Set(a.priority.slice(0, 4).map(store => store.name));
     $('storeRows').innerHTML = a.stores.map(store => {
-      const gaps = Core.METRIC_KEYS.filter(key => store.metrics[key].gap > 0).map(key => `${key} 缺 ${displayCount(store.metrics[key].gap)}`);
+      const gaps = storeGapEntries(store);
       const gapLabel = !a.dynamic.available ? '載入目標後顯示' : (gaps.length ? gaps.join('、') : '今日已達標');
-      return `<tr class="${priorityNames.has(store.name) ? 'priority' : ''}"><td><strong>${escapeHtml(store.name)}</strong></td>${Core.METRIC_KEYS.map(key => `<td class="metric-cell">${metricCell(store.metrics[key])}</td>`).join('')}<td class="gap ${a.dynamic.available && !gaps.length ? 'done' : ''}">${gapLabel}</td></tr>`;
+      return `<tr class="${priorityNames.has(store.name) ? 'priority' : ''}"><td><strong>${escapeHtml(store.name)}</strong></td>${storeMetricSequence(store).map(([, metric]) => `<td class="metric-cell">${metricCell(metric)}</td>`).join('')}<td class="gap ${a.dynamic.available && !gaps.length ? 'done' : ''}">${gapLabel}</td></tr>`;
     }).join('');
     renderProducts(a);
     renderGiftAudit(a);
     const now = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
     $('generatedAt').textContent = `${now} 產生`;
     $('reportText').value = Core.composeMessage(a, { timeLabel: now });
-    $('dynamicNotice').textContent = a.dynamic.available
-      ? `今日目標依截至 ${a.dynamic.cutoff} 的正式累積實績，分配至剩餘 ${a.dynamic.remainingDays} 天。`
-      : a.dynamic.reason;
+    $('dynamicNotice').textContent = a.dynamic.available ? a.dynamic.notice : a.dynamic.reason;
+    $('dynamicNotice').className = `dynamic-notice${a.dynamic.available && a.dynamic.staleDays > 0 ? ' stale' : ''}`;
     $('results').hidden = false;
     $('copyStatus').textContent = '';
     scope.setTimeout(() => $('results').scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);

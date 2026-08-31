@@ -27,6 +27,37 @@ test('九店名稱與台北前綴使用 canonical 名稱', () => {
   assert.equal(Core.normalizeStore('台灣大哥大台北通化門市'), '通化');
   assert.equal(Core.normalizeStore('台北三創'), '台北三創');
   assert.equal(Core.normalizeStore('三創服務中心'), '台北三創');
+  assert.equal(Core.normalizeRegion('北一二－C'), 'C');
+});
+
+test('AQ／RT 原始檔保留北一二 A／B／C／D 區域總數與七項戰情', () => {
+  const aq = Core.parseMatrix([
+    ['案件類型', '督導區', '店點', '門號', '上線點數', '變更資費', '專案代號'],
+    ['AQ新申裝', '北一二A', '其他A店', '0911000001', 1, '5G 1399', '一般'],
+    ['AQ新申裝', '北一二B', '通化', '0911000002', 2, '5G 999', '好速500M'],
+    ['AQ新申裝', '北一二C', '其他C店', '0911000003', 3, '5G 599', '一般'],
+    ['AQ新申裝', '北一二D', '其他D店', '0911000004', 4, '5G 1399', '一般']
+  ], { kind: 'aq', fileName: 'AQ.csv', stores: sourceStores });
+  assert.equal(aq.regions.A.total, 1);
+  assert.equal(aq.regions.A.metrics.A999, 1);
+  assert.equal(aq.regions.A.metrics.A1399, 1);
+  assert.equal(aq.regions.B.total, 2);
+  assert.equal(aq.regions.B.metrics['好速'], 2);
+  assert.equal(aq.regions.C.total, 3);
+  assert.equal(aq.regions.D.total, 4);
+  assert.deepEqual(aq.meta.recognizedRegions, ['A', 'B', 'C', 'D']);
+
+  const rt = Core.parseMatrix([
+    ['案件類型', '督導區', '店點', '門號', '變更資費'],
+    ['RT續約', '北一二A', '其他A店', '0922000001', '5G 999'],
+    ['RT續約', '北一二B', '通化', '0922000002', '5G 1399'],
+    ['RT續約', '北一二C', '其他C店', '0922000003', '5G 599'],
+    ['RT續約', '北一二D', '其他D店', '0922000004', '5G 1399']
+  ], { kind: 'rt', fileName: 'RT.csv', stores: sourceStores });
+  const analysis = Core.analyze(aq, rt, null, { todayIso: '2026-08-31' });
+  assert.equal(analysis.regions.B.aqActual, 2);
+  assert.equal(analysis.regions.B.rtActual, 1);
+  assert.equal(analysis.regions.D.metrics.R1399, 1);
 });
 
 test('AQ 依點數欄加總、依案件編號去重，且只留北一二B店點', () => {
@@ -114,7 +145,7 @@ test('動態今日目標只用正式月目標、截至昨日實績與剩餘天�
   assert.equal(analysis.stores[0].metrics.A999.gap, 4);
   const message = Core.composeMessage(analysis, { timeLabel: '16:20' });
   assert.match(message, /行進間戰報｜16:20/);
-  assert.match(message, /通化｜A999缺4/);
+  assert.match(message, /通化｜AQ上線缺4、A999缺4/);
   assert.match(message, /本機原始檔即時解析/);
 });
 
@@ -129,14 +160,23 @@ test('AQ／RT 可先解析並產生目前上線預覽，不強制載入目標', 
   assert.match(Core.composeMessage(analysis, { timeLabel: '12:00' }), /A999目前0（尚未載入今日目標）/);
 });
 
-test('正式 KPI 不是昨日截止時，不冒算動態今日目標', () => {
+test('正式 KPI 較昨日落後一天時仍呈現差異並清楚提醒資料日', () => {
   const targets = Core.extractTargets(kpiFixture());
   const aq = { totals: Object.fromEntries(names.map(name => [name, 1])) };
   const rt = { totals: Object.fromEntries(names.map(name => [name, 1])) };
   const analysis = Core.analyze(aq, rt, targets, { todayIso: '2026-08-31' });
-  assert.equal(analysis.dynamic.available, false);
-  assert.match(analysis.dynamic.reason, /不是昨日/);
-  assert.equal(analysis.stores[0].aqTodayGoal, null);
+  assert.equal(analysis.dynamic.available, true);
+  assert.equal(analysis.dynamic.staleDays, 1);
+  assert.match(analysis.dynamic.notice, /較昨日落後 1 天/);
+  assert.equal(analysis.stores[0].aqTodayGoal, 5);
+  assert.equal(analysis.stores[0].aqGap, 4);
+});
+
+test('正式 KPI 月份不同或截止晚於昨日仍 fail closed', () => {
+  const targets = Core.extractTargets(kpiFixture());
+  assert.equal(Core.dynamicContext(targets.meta, '2026-09-01').available, false);
+  targets.meta.snapshotDay = 31;
+  assert.equal(Core.dynamicContext(targets.meta, '2026-08-30').available, false);
 });
 
 test('月目標已完成時今日目標為零且不列入追缺', () => {
@@ -175,4 +215,7 @@ test('正式 KPI 缺店或缺 target 時拒絕冒算達成率', () => {
   const missingTarget = kpiFixture();
   missingTarget.stores[0].items[Core.AQ_KEY].t = null;
   assert.throws(() => Core.extractTargets(missingTarget), /缺少部分 AQ／RT 目標/);
+  const missingMetric = kpiFixture();
+  missingMetric.stores[0].items[Core.KPI_KEYS.A999].t = null;
+  assert.throws(() => Core.extractTargets(missingMetric), /缺少部分 A999／A1399／R999／R1399／好速/);
 });

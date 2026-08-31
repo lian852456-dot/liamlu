@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#07182a">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>行進間戰報｜北一二B</title>
-  <link rel="stylesheet" href="live-battle.css?v=20260831-2">
+  <link rel="stylesheet" href="live-battle.css?v=20260831-3">
 </head>
 <body>
   <header class="topbar">
@@ -19,7 +19,7 @@
     <section class="hero">
       <p class="eyebrow">A999 / A1399 / R999 / R1399 / 好速</p>
       <h1>行進間戰報</h1>
-      <p>上傳本機 AQ、RT 原始檔，即時產生五項戰情、上線商品與影音漏搭提醒；需要追缺時，再載入正式目標。</p>
+      <p>上傳本機 AQ、RT 原始檔，即時產生北一二 A／B／C／D、九店七項戰情、上線商品與影音漏搭提醒；需要追缺時，再載入正式目標。</p>
       <div class="privacy-note"><span>🔒</span><span>檔案只在這台裝置的瀏覽器記憶體解析，不上傳、不寫回 KPI，關閉頁面即清除。</span></div>
     </section>
 
@@ -59,10 +59,10 @@
 
     <section class="panel optional-panel" aria-labelledby="targetTitle">
       <div class="panel-heading">
-        <div><span class="step">STEP 2 · 選用</span><h2 id="targetTitle">載入五項正式目標，追加今日追缺</h2></div>
+        <div><span class="step">STEP 2 · 選用</span><h2 id="targetTitle">載入 AQ／RT 七項正式目標，追加今日追缺</h2></div>
         <span id="targetBadge" class="status-badge">尚未載入</span>
       </div>
-      <p class="helper">讀取 A999、A1399、R999、R1399、好速；依「月目標－截至昨日累積實績」除以含今天的剩餘天數，無條件進位。未載入也不影響檔案辨識。</p>
+      <p class="helper">讀取 A999、A1399、R999、R1399、好速；依「月目標－正式截止累積實績」除以截止後剩餘天數，無條件進位。若資料較昨日舊會明確提醒，未載入也不影響檔案辨識。</p>
       <div class="auth-row">
         <label>員工編號<input id="employeeId" autocomplete="username" inputmode="numeric" placeholder="請輸入既有員編"></label>
         <button id="loadTargetsBtn" type="button">驗證並載入目標</button>
@@ -74,18 +74,18 @@
     <section id="results" class="results" hidden aria-labelledby="resultsTitle">
       <section class="panel result-panel">
         <div class="panel-heading">
-          <div><span class="step">STEP 3</span><h2 id="resultsTitle">五項目前進度與達成</h2></div>
+          <div><span class="step">STEP 3</span><h2 id="resultsTitle">AQ／RT 七項目前進度與達成</h2></div>
           <span id="generatedAt" class="generated-at">—</span>
         </div>
         <div class="image-actions" aria-label="下載戰報圖片">
-          <button id="downloadSummaryBtn" class="download-button" type="button">下載① 五項全區總覽 PNG</button>
-          <button id="downloadStoresBtn" class="download-button secondary-download" type="button">下載② 九店五項戰情 PNG</button>
+          <button id="downloadSummaryBtn" class="download-button" type="button">下載① 北一二 A／B／C／D 戰情 PNG</button>
+          <button id="downloadStoresBtn" class="download-button secondary-download" type="button">下載③ 九店 AQ／RT 戰情 PNG</button>
         </div>
         <p id="dynamicNotice" class="dynamic-notice"></p>
         <div id="regionSummary" class="summary-grid"></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>店點</th><th>A999</th><th>A1399</th><th>R999</th><th>R1399</th><th>好速</th><th>目前尚缺</th></tr></thead>
+            <thead><tr><th>店點</th><th>AQ上線</th><th>A999</th><th>A1399</th><th>RT上線</th><th>R999</th><th>R1399</th><th>好速</th><th>今日差異</th></tr></thead>
             <tbody id="storeRows"></tbody>
           </table>
         </div>
@@ -96,7 +96,7 @@
           <div><span class="step">PRODUCT PULSE</span><h2 id="productsTitle">目前上線商品</h2></div>
           <span id="productCount" class="status-badge neutral">0 款</span>
         </div>
-        <div class="image-actions"><button id="downloadProductsBtn" class="download-button product-download" type="button">下載③ 上線商品 PNG</button></div>
+        <div class="image-actions"><button id="downloadProductsBtn" class="download-button product-download" type="button">下載② 上線商品 PNG</button></div>
         <p class="helper">依 AQ／RT 的實際「商品型號」動態呈現；沒有上線的機款不會佔欄位。</p>
         <div id="productEmpty" class="empty-state" hidden>原始檔未提供可辨識的商品型號。</div>
         <div id="productTableWrap" class="table-wrap product-table-wrap">
@@ -128,7 +128,7 @@
   </main>
 
   <footer>內部管理輔助工具｜原始明細不會離開本機｜正式成績以公司報表為準</footer>
-  <script src="live-battle-core.js?v=20260831-2"></script>
-  <script src="live-battle.js?v=20260831-2" defer></script>
+  <script src="live-battle-core.js?v=20260831-3"></script>
+  <script src="live-battle.js?v=20260831-3" defer></script>
 </body>
 </html>
