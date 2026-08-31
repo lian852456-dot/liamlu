@@ -3,18 +3,19 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const PatrolQuestionVersions = require('../patrol-question-versions.js');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'patrol.html'), 'utf8');
 const start = html.indexOf('const PATROL_FILL_TIME_PARSE_ERROR');
 const end = html.indexOf('/* ---------- 解析貼上資料 ---------- */', start);
 assert.ok(start >= 0 && end > start, 'patrol paste parser source must remain extractable');
 
-const context = { api: null, Date };
+const context = { api: null, Date, PatrolQuestionVersions };
 vm.runInNewContext(`${html.slice(start, end)}\napi={PATROL_FILL_TIME_PARSE_ERROR,parsePatrolPasteText};`, context);
 const { PATROL_FILL_TIME_PARSE_ERROR, parsePatrolPasteText } = context.api;
 
-function row(store, code, item, result = 'v', reason = '') {
-  return `2026/8/20 16:43\t2026/8/20 16:00\t2026/8/20 18:00\t北一二B\t${code}\t${store}\t測試督導\t${item}\t檢查內容\t${result}\t${reason}`;
+function row(store, code, item, result = 'v', reason = '', date = '2026/8/20') {
+  return `${date} 16:43\t${date} 16:00\t${date} 18:00\t北一二B\t${code}\t${store}\t測試督導\t${item}\t檢查內容\t${result}\t${reason}`;
 }
 
 test('填表時間為 ######## 時整批拒絕，不回傳任何部分資料', () => {
@@ -56,4 +57,21 @@ test('無效題號不再靜默略過，整批回傳明確錯誤', () => {
   const parsed = parsePatrolPasteText([row('台北三創', 'DNB10307', 1), row('台北六張犁', 'DNB10440', 34)].join('\n'));
   assert.match(parsed.error, /第 2 列｜台北六張犁｜題號｜34：無法辨識/);
   assert.deepEqual(Array.from(parsed.rows), []);
+});
+
+test('9/1 起貼上資料只接受新版 1–25 題，8 月仍接受舊版第 33 題', () => {
+  const accepted = parsePatrolPasteText([
+    row('台北三創', 'DNB10307', 33, 'v', '', '2026/8/31'),
+    row('台北三創', 'DNB10307', 25, 'v', '', '2026/9/1'),
+  ].join('\n'));
+  assert.equal(accepted.error, '');
+  assert.deepEqual(Array.from(accepted.rows, value => [value.month, value.item]), [['2026-08', 33], ['2026-09', 25]]);
+
+  const rejected = parsePatrolPasteText([
+    row('台北三創', 'DNB10307', 33, 'v', '', '2026/8/31'),
+    row('台北三創', 'DNB10307', 26, 'v', '', '2026/9/1'),
+  ].join('\n'));
+  assert.match(rejected.error, /第 2 列｜台北三創｜題號｜26/);
+  assert.match(rejected.error, /題號為 1 至 25/);
+  assert.deepEqual(Array.from(rejected.rows), []);
 });

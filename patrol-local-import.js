@@ -1,9 +1,14 @@
 (function exposePatrolLocalFileImport(root, factory) {
-  const api = factory();
+  const questionVersions = typeof module === 'object' && module.exports
+    ? require('./patrol-question-versions.js')
+    : root && root.PatrolQuestionVersions;
+  const api = factory(questionVersions);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.PatrolLocalFileImport = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function buildPatrolLocalFileImport() {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function buildPatrolLocalFileImport(QuestionVersions) {
   'use strict';
+
+  if (!QuestionVersions) throw new Error('patrol_question_versions_missing');
 
   const VERSION = 'patrol-local-file-import-v1';
   const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -256,7 +261,10 @@
       if (text(arriveRaw) && !arriveTime) reasons.push('到店時間無法辨識');
       if (text(leaveRaw) && !leaveTime) reasons.push('離店時間無法辨識');
       if (!store) reasons.push('缺少檢查店點');
-      if (!/^\d+$/.test(itemRaw) || !Number.isInteger(item) || item < 1 || item > 33) reasons.push('題號需為 1 至 33');
+      const questionRow = { fillTime };
+      if (!/^\d+$/.test(itemRaw) || !QuestionVersions.itemAllowedForRow(questionRow, item)) {
+        reasons.push(`題號需為 ${QuestionVersions.itemRangeLabelForRow(questionRow)}`);
+      }
       if (reasons.length) {
         invalidRows.push({ rowNumber, reasons, values:Array.from(cells || []).map(text) });
         return;
@@ -284,7 +292,7 @@
     const errors = invalidRows.slice(0, 20).map(entry => `第 ${entry.rowNumber} 列：${entry.reasons.join('、')}`);
     if (!candidates.length) errors.push('檔案內沒有巡店資料列。');
     return {
-      rows:valid.map(canonicalRow),
+      rows:errors.length ? [] : valid.map(canonicalRow),
       blocked:Boolean(errors.length),
       errors,
       invalidRows,

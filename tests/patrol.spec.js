@@ -7,6 +7,7 @@ const { stores:defaultPatrolStores, patrolSummaryResponse } = require('./fixture
 // 驗證「電腦貼上 → 上雲 → 另一裝置載入」的跨裝置同步流程
 const PT_KEY = 'test123';
 const PT_TOKEN = 'test-session-token';
+const LEGACY_TEST_NOW = '2026-08-31T12:00:00+08:00';
 let cloudRows;
 let halfRows;
 let writeCalls;
@@ -52,9 +53,16 @@ function privateScheduleFixture() {
 }
 
 async function stubGas(page) {
-  await page.addInitScript(schedule => {
+  await page.addInitScript(({ schedule, nowIso }) => {
+    const NativeDate = Date;
+    const fixedTime = new NativeDate(nowIso).getTime();
+    class FixedDate extends NativeDate {
+      constructor(...args) { super(...(args.length ? args : [fixedTime])); }
+      static now() { return fixedTime; }
+    }
+    window.Date = FixedDate;
     window.PATROL_LEGACY_GAS_URL = 'https://script.google.com/macros/s/test/exec';
-  }, privateScheduleFixture());
+  }, { schedule:privateScheduleFixture(), nowIso:LEGACY_TEST_NOW });
   await page.route('https://script.google.com/**', async route => {
     const request = route.request();
     if (request.method() === 'POST') {
@@ -220,11 +228,19 @@ async function stubGas(page) {
   });
 }
 
-async function openAndUnlock(page, answer = PT_KEY) {
+async function openAndUnlock(page, answer = PT_KEY, month = '') {
   await page.goto(PAGE_URL);
   await page.locator('#patrolPasscode').fill(answer);
   await page.getByRole('button', { name: '驗證並進入' }).click();
-  if (answer === PT_KEY) await expect(page.locator('#patrolAuthGate')).toBeHidden();
+  if (answer === PT_KEY) {
+    await expect(page.locator('#patrolAuthGate')).toBeHidden();
+    if (month) {
+      await page.locator('#monthInput').evaluate((input, value) => {
+        input.value = value;
+        input.dispatchEvent(new Event('change', { bubbles:true }));
+      }, month);
+    }
+  }
 }
 
 async function parseAndConfirm(page) {
@@ -242,7 +258,7 @@ function pasteLine(d, store, code, item, result, reason) {
 }
 
 function currentMonthFixture(day, store, code, item, result, reason) {
-  const month = new Date().toISOString().slice(0, 7);
+  const month = LEGACY_TEST_NOW.slice(0, 7);
   const [year, monthNumber] = month.split('-').map(Number);
   return {
     line: `${year}/${monthNumber}/${day} 16:43\t${year}/${monthNumber}/${day} 16:00\t${year}/${monthNumber}/${day} 18:00\t北一二B\t${code}\t${store}\t測試督導\t${item}\t內容\t${result}\t${reason}`,
@@ -288,6 +304,14 @@ function item18EightStoreRows() {
   ].map(([fillTime, store, code]) => ({
     fillTime, arriveTime:fillTime, leaveTime:fillTime, district:'北一二B', code, store,
     inspector:'測試督導', item:18, result:'v', reason:'', month:fillTime.startsWith('2026/7/')?'2026-07':'2026-08',
+  }));
+}
+
+function versionedPatrolRows(month, store = '台北通化', code = 'DNB10059', items = []) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return items.map(item => ({
+    fillTime:`${year}/${monthNumber}/5 10:00`, arriveTime:`${year}/${monthNumber}/5 09:30`, leaveTime:`${year}/${monthNumber}/5 11:00`,
+    district:'北一二B', code, store, inspector:'測試督導', item, content:'版本測試', result:'v', reason:'', month,
   }));
 }
 
@@ -362,6 +386,78 @@ test('有效 8/20 資料完整解析 66 筆，三創與六張犁各 33 筆並相
     oldNa:{result:'na',reason:'na'},
     preserved:{result:'na',reason:'原始非 NA 原因'},
   });
+});
+
+test('2026/08 歷史月份維持原 33 題顯示與完成計算', async ({ page }) => {
+  cloudRows = [
+    ...versionedPatrolRows('2026-08', '台北通化', 'DNB10059', Array.from({length:33}, (_, index) => index + 1)),
+    ...versionedPatrolRows('2026-08', '台北通化', 'DNB10059', Array.from({length:12}, (_, index) => index + 2))
+      .map(row => ({...row, fillTime:'2026/8/20 10:00', arriveTime:'2026/8/20 09:30', leaveTime:'2026/8/20 11:00'})),
+  ];
+  await stubGas(page);
+  await openAndUnlock(page);
+  await page.locator('#monthInput').evaluate(input => {
+    input.value = '2026-08';
+    input.dispatchEvent(new Event('change', { bubbles:true }));
+  });
+
+  await expect(page.locator('#cloudStatus')).toHaveText(/已連線/);
+  await expect(page.locator('#subTitle')).toHaveText('北一二B區 · 33 項檢核追蹤');
+  await expect(page.locator('#sep25Dashboard')).toBeHidden();
+  await expect(page.locator('#overview')).toBeVisible();
+  await expect(page.locator('#overview')).toContainText('全項完成店數');
+  await expect(page.locator('#content')).toContainText('本月已完成');
+  await expect(page.locator('#content')).toContainText('台北通化');
+  await expect(page.locator('#invPanels')).toContainText('知悉宣導提醒（題 19–33・每月20日前）');
+});
+
+test('2026/09 起顯示三群新版 25 題並由 9–10 月共用第 10 題', async ({ page }) => {
+  cloudRows = [
+    ...versionedPatrolRows('2026-09', '台北通化', 'DNB10059', [1,2,3,4,5,6,7,8,9,...Array.from({length:15}, (_, index) => index + 11)]),
+    ...Array.from({length:101}, (_, index) => ({
+      ...versionedPatrolRows('2026-09', '台北通化', 'DNB10059', [1])[0],
+      fillTime:`2026/9/${String((index % 25) + 1)} 12:${String(index % 60).padStart(2, '0')}`,
+    })),
+    ...versionedPatrolRows('2026-10', '台北通化', 'DNB10059', [10]),
+  ];
+  await stubGas(page);
+  await openAndUnlock(page, PT_KEY, '2026-09');
+
+  await expect(page.locator('#sep25LoadState')).toContainText('正式 ptdetail 唯讀驗證完成');
+  await expect(page.locator('#subTitle')).toHaveText('北一二B區 · 新版 25 項檢核追蹤');
+  await expect(page.locator('#sep25Dashboard')).toBeVisible();
+  await expect(page.locator('#overview')).toBeHidden();
+  await expect(page.locator('#sep25GroupSummary')).toContainText('每月到店檢查・第 1–9 項');
+  await expect(page.locator('#sep25GroupSummary')).toContainText('到店全盤・第 10 項');
+  await expect(page.locator('#sep25GroupSummary')).toContainText('9–10月共用進度');
+  await expect(page.locator('#sep25GroupSummary')).toContainText('NCC 知悉宣導・第 11–25 項');
+  await expect(page.locator('#sep25Content')).toContainText('本月已完成');
+  await expect(page.locator('#sep25Content')).toContainText('本期新版 25 項檢核全數完成');
+  await expect(page.locator('#sep25Overview')).toContainText('25 項完成店數');
+  await expect(page.locator('#sep25Overview')).toContainText('8');
+  await page.locator('.sep25-catalog summary').click();
+  await expect(page.locator('#sep25QuestionCatalog .item')).toHaveCount(25);
+  await expect(page.locator('#sep25QuestionCatalog')).toContainText('督導打卡');
+  await expect(page.locator('#sep25QuestionCatalog')).toContainText('NCC每月宣導1次');
+  expect(ptDetailCalls).toEqual(expect.arrayContaining([
+    expect.objectContaining({month:'2026-09', store:'台北通化', page:1, limit:100}),
+    expect.objectContaining({month:'2026-09', store:'台北通化', page:2, limit:100}),
+    expect.objectContaining({month:'2026-10', store:'台北通化', page:1, limit:100}),
+  ]));
+});
+
+test('新版 25 題缺第 25 題時只計缺 1 項，NCC 為 14/15', async ({ page }) => {
+  cloudRows = versionedPatrolRows('2026-09', '台北通化', 'DNB10059', Array.from({length:24}, (_, index) => index + 1));
+  await stubGas(page);
+  await openAndUnlock(page, PT_KEY, '2026-09');
+
+  await expect(page.locator('#sep25LoadState')).toContainText('正式 ptdetail 唯讀驗證完成');
+  const card = page.locator('#sep25Content .store-card').filter({ hasText:'台北通化' });
+  await expect(card).toContainText('缺 1 項');
+  await card.click();
+  await expect(card).toContainText('14/15');
+  await expect(card).toContainText('25');
+  await expect(card).not.toContainText('26');
 });
 
 test('解析預覽先做 Server Preflight，不寫雲端、不改 rawDetails；確認後才逐店讀回', async ({ page }) => {
@@ -939,6 +1035,16 @@ test('其他督導：GAS 回傳自己的標題與門市清單，看板跟著切�
   await expect(panels).toContainText('夢時代');
   await expect(panels).toContainText('左營');
   await expect(panels).not.toContainText('通化'); // 不會出現北一二B 的店
+
+  await page.locator('#monthInput').evaluate(input => {
+    input.value = '2026-09';
+    input.dispatchEvent(new Event('change', { bubbles:true }));
+  });
+  await expect(page.locator('#sep25LoadState')).toContainText('正式 ptdetail 唯讀驗證完成');
+  await expect(page.locator('#subTitle')).toHaveText('南區A · 王督導 · 新版 25 項檢核追蹤');
+  await expect(page.locator('#sep25GroupSummary')).toContainText('0/2');
+  await expect(page.locator('#sep25Content')).toContainText('高雄夢時代');
+  await expect(page.locator('#sep25Content')).toContainText('高雄左營');
 });
 
 test('大量資料會分批上傳且全數送達', async ({ page }) => {

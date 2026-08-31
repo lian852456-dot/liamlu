@@ -130,6 +130,30 @@ test('題號大於 33 整批封鎖', () => {
   assert.equal(parsed.blocked, true);
 });
 
+test('跨 8／9 月本機檔案依每筆填表日期套用 33／25 題版本', () => {
+  const parsed = Parser.parseMatrix([
+    header,
+    row({fillTime:'2026/8/31 23:59:00', item:33}),
+    row({fillTime:'2026/9/1 00:01:00', item:25}),
+  ]);
+  assert.equal(parsed.blocked, false);
+  assert.deepEqual(parsed.rows.map(value => [value.month, value.item]), [
+    ['2026-08', 33],
+    ['2026-09', 25],
+  ]);
+});
+
+test('9/1 起本機檔案第 26 題整批封鎖且不回傳部分資料', () => {
+  const parsed = Parser.parseMatrix([
+    header,
+    row({fillTime:'2026/8/31 23:59:00', item:33}),
+    row({fillTime:'2026/9/1 00:01:00', item:26}),
+  ]);
+  assert.equal(parsed.blocked, true);
+  assert.equal(parsed.rows.length, 0);
+  assert.match(parsed.errors.join(' '), /題號需為 1 至 25/);
+});
+
 test('缺少填表時間整批封鎖', () => {
   const parsed = Parser.parseMatrix([header,row({fillTime:''})]);
   assert.equal(parsed.blocked, true);

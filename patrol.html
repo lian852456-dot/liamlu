@@ -148,6 +148,19 @@
   .patrol-local-import-metric b{display:block;font-size:16px;color:var(--ink)}
   .patrol-local-import-metric span{display:block;font-size:11px;color:var(--muted)}
 
+  /* 2026-09 起獨立 25 項巡店看板；舊 33 項 DOM 與樣式完整保留。 */
+  .sep25-dashboard[hidden],.legacy-patrol-block[hidden]{display:none}
+  .sep25-version-note{margin:0 0 12px;padding:10px 12px;border-radius:9px;background:#fff5ec;color:#8a4200;font-size:13px;line-height:1.6}
+  .sep25-groups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+  .sep25-group{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}
+  .sep25-group strong{display:block;font-size:19px;color:var(--tw-black)}
+  .sep25-group span{display:block;margin-top:3px;font-size:12px;color:var(--muted);line-height:1.45}
+  .sep25-group.warn strong{color:var(--miss)}
+  .sep25-catalog{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  .sep25-catalog summary{cursor:pointer;font-size:13px;font-weight:800;color:var(--tw-orange)}
+  .sep25-catalog .item{align-items:flex-start}
+  .sep25-source-note{font-size:12px;color:var(--muted);margin:8px 0 0}
+
   /* Store cards */
   .section-title{font-size:16px;font-weight:800;margin:22px 0 12px;color:var(--tw-black);display:flex;align-items:center;gap:10px}
   .section-title .badge{font-size:12px;font-weight:600;background:var(--tw-orange-soft);color:var(--tw-orange);padding:2px 10px;border-radius:20px}
@@ -223,6 +236,7 @@
     header h1{font-size:17px}
     .patrol-local-import .btn-row>button{width:100%}
     .patrol-local-import-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .sep25-groups{grid-template-columns:1fr}
   }
 
   /* ---------- 加密工作頁籤 ---------- */
@@ -485,14 +499,29 @@
     </div>
   </header>
 
-  <div class="ticker" id="ticker" style="display:none">
+  <div class="ticker legacy-patrol-block" id="ticker" style="display:none">
     <div class="tk-label">📢 提醒</div>
     <div class="tk-track"><div class="tk-move" id="tickerText"></div></div>
   </div>
 
-  <div class="overview" id="overview"></div>
+  <div class="overview legacy-patrol-block" id="overview"></div>
 
-  <div id="invPanels"></div>
+  <div class="legacy-patrol-block" id="invPanels"></div>
+
+  <section id="sep25Dashboard" class="sep25-dashboard" aria-label="2026年9月起新版25項巡店看板" hidden>
+    <div class="panel">
+      <h2>新版 25 項巡店看板</h2>
+      <p class="sep25-version-note">2026/09/01 起依新版題目計算：第 1–9 項每月執行 1 次、第 10 項固定雙月執行 1 次、第 11–25 項為 NCC 每月宣導。2026/08/31 前的 33 項歷史看板不受影響。</p>
+      <div id="sep25LoadState" class="sep25-source-note" role="status" aria-live="polite"></div>
+      <div id="sep25Overview" class="overview"></div>
+      <div id="sep25GroupSummary" class="sep25-groups"></div>
+      <details class="sep25-catalog">
+        <summary>查看新版 25 項題目與執行頻率</summary>
+        <div id="sep25QuestionCatalog"></div>
+      </details>
+    </div>
+    <div id="sep25Content"></div>
+  </section>
 
   <div class="panel" id="patrolInputPanel">
     <h2>貼上巡店紀錄</h2>
@@ -518,7 +547,7 @@
     <div class="parse-msg" id="parseMsg"></div>
   </div>
 
-  <div id="content"></div>
+  <div class="legacy-patrol-block" id="content"></div>
 
   <section id="scheduleView" class="secure-view" aria-label="每月班表">
     <div class="secure-card">
@@ -624,6 +653,7 @@
 </div>
 </template>
 
+<script src="patrol-question-versions.js?v=1"></script>
 <script src="patrol-read-model.js?v=10"></script>
 <script>
 /* ---------- 檢核規則設定 ---------- */
@@ -692,6 +722,9 @@ let patrolSummary = null;
 let patrolSummaryState = 'loading';
 let patrolSummaryMessage = '巡店資料讀取中';
 let patrolSummaryVerifiedAt = '';
+let patrolLegacyTitle = '北一二B區 · 33 項檢核追蹤';
+let sep25State = { month:'', status:'idle', rows:[], model:null, message:'', verifiedAt:'' };
+let sep25LoadSequence = 0;
 // Patrol 只走獨立部署；Audit v67 不共用這個端點或 session。
 const PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbxqBtW2yQw_u4qqJ9Knz6CK34hAiunaa6lIQu4pMa8Ff2voJZCWKEh8MXTJ6qAoGTax/exec';
 const DEFAULT_PATROL_GAS_URL = PATROL_GAS_URL;
@@ -948,6 +981,7 @@ async function privateSignOut(){
   const token=PT_TOKEN;
   clearPatrolAuthState();
   records={};rawDetails=[];scheduleData=null;halfChecks=[];cloudOn=false;activePatrolView=null;
+  sep25State={month:'',status:'idle',rows:[],model:null,message:'',verifiedAt:''};
   MI.clear();
   unmountPatrolApp();
   setPatrolAuthMessage('已登出；請重新驗證後再進入');
@@ -995,7 +1029,7 @@ function initMonth(){
   const mi = document.getElementById('monthInput');
   mi.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   currentMonth = mi.value;
-  mi.addEventListener('change', e=>{ currentMonth=e.target.value; if(cloudOn) cloudLoad(); else render(); });
+  mi.addEventListener('change', e=>{ currentMonth=e.target.value; updatePatrolQuestionVersionUi(); if(cloudOn) cloudLoad(); else render(); });
 }
 
 function normalizePatrolCandidateTime(value){
@@ -1098,8 +1132,9 @@ function parsePatrolPasteText(raw){
     }
 
     const itemNo=parseInt((cols[7]||'').trim(),10);
-    if(!itemNo||itemNo<1||itemNo>33){
-      return {rows:[],error:patrolPasteCellError(index+1,cols,'題號',cols[7],'無法辨識，請確認題號為 1 至 33。')};
+    const questionRow={fillTime};
+    if(!PatrolQuestionVersions.itemAllowedForRow(questionRow,itemNo)){
+      return {rows:[],error:patrolPasteCellError(index+1,cols,'題號',cols[7],`無法辨識，請確認題號為 ${PatrolQuestionVersions.itemRangeLabelForRow(questionRow)}。`)};
     }
 
     const resultText=(cols[9]||'').trim();
@@ -1173,7 +1208,7 @@ function loadPatrolLocalImportDependencies(){
   if(window.PatrolLocalFileImport&&window.XLSX&&window.XLSX.version==='0.20.3') return Promise.resolve();
   if(!patrolLocalImportLoadPromise){
     patrolLocalImportLoadPromise=loadPatrolLocalScript(
-      'patrolLocalImportParserScript','patrol-local-import.js?v=2',()=>Boolean(window.PatrolLocalFileImport)
+      'patrolLocalImportParserScript','patrol-local-import.js?v=3',()=>Boolean(window.PatrolLocalFileImport)
     ).then(()=>loadPatrolLocalScript(
       'patrolLocalImportXlsxScript','assets/vendor/xlsx.full.min.js?v=0.20.3',()=>Boolean(window.XLSX&&window.XLSX.version==='0.20.3')
     )).catch(error=>{ patrolLocalImportLoadPromise=null;throw error; });
@@ -1471,8 +1506,89 @@ function storeSummary(storeName){
 }
 
 /* ---------- 渲染 ---------- */
+function isSep25DashboardMonth(month=currentMonth){
+  return PatrolQuestionVersions.isSep25Month(month);
+}
+
+function sep25DashboardTitle(){
+  const base=String(patrolLegacyTitle||'').trim();
+  const versioned=base.replace(/33\s*項檢核追蹤/,'新版 25 項檢核追蹤');
+  return versioned!==base?versioned:`${base||'巡店看板'} · 新版 25 項檢核追蹤`;
+}
+
+function updatePatrolQuestionVersionUi(){
+  const useSep25=isSep25DashboardMonth();
+  document.querySelectorAll('.legacy-patrol-block').forEach(element=>{ element.hidden=useSep25; });
+  const dashboard=document.getElementById('sep25Dashboard');
+  if(dashboard) dashboard.hidden=!useSep25;
+  const title=document.getElementById('subTitle');
+  if(title) title.textContent=useSep25?sep25DashboardTitle():patrolLegacyTitle;
+}
+
+function sep25CatalogHTML(){
+  const groups=[
+    ['每月到店檢查（第 1–9 項）',PatrolQuestionVersions.SEP25_GROUPS.monthly],
+    ['到店全盤提醒（第 10 項・固定雙月）',PatrolQuestionVersions.SEP25_GROUPS.bimonthly],
+    ['NCC 知悉宣導（第 11–25 項・每月）',PatrolQuestionVersions.SEP25_GROUPS.ncc]
+  ];
+  return groups.map(([title,items])=>`<div class="miss-group"><h4>${esc(title)}</h4>${items.map(no=>{const item=PatrolQuestionVersions.SEP25_BY_NO[no];return `<div class="item"><div class="no">${no}</div><div class="txt">${esc(item.text)}</div><span class="tag">${esc(item.label)}</span></div>`;}).join('')}</div>`).join('');
+}
+
+function sep25GroupCard(label,completed,total,note){
+  const missing=total-completed;
+  return `<div class="sep25-group ${missing?'warn':''}"><strong>${completed}/${total}</strong><span>${esc(label)}${note?`<br>${esc(note)}`:''}</span></div>`;
+}
+
+function sep25StoreCardHTML(store){
+  const item10=store.bimonthly.missing?`未完成（${PatrolQuestionVersions.bimWindow(currentMonth).label}）`:'已完成';
+  const body=store.missingItems===0
+    ? '<div class="all-done">✓ 本期新版 25 項檢核全數完成</div>'
+    : `<div class="miss-group"><h4>尚未完成項目</h4>${store.missingItemNumbers.map(no=>{const item=PatrolQuestionVersions.SEP25_BY_NO[no];return `<div class="item miss"><div class="no">${no}</div><div class="txt">${esc(item.text)}</div><span class="tag">${esc(item.label)}</span></div>`;}).join('')}</div>`;
+  const groupDetail=`<div class="sep25-groups">${sep25GroupCard('每月到店檢查・第 1–9 項',store.monthly.completed,store.monthly.total,'每月執行 1 次')}${sep25GroupCard('到店全盤・第 10 項',store.bimonthly.completed,store.bimonthly.total,`${PatrolQuestionVersions.bimWindow(currentMonth).label} ${item10}`)}${sep25GroupCard('NCC 知悉宣導・第 11–25 項',store.ncc.completed,store.ncc.total,'每月宣導')}</div>`;
+  const pillClass=store.status==='complete'?'done':store.status==='attention'?'partial':'none';
+  const pillText=store.status==='pending'?'本月未巡':store.status==='complete'?'完成':`缺 ${store.missingItems} 項`;
+  return `<div class="store-card" onclick="this.classList.toggle('open')"><div class="store-head"><div class="left"><div><div class="store-name">${esc(store.name)}</div><div class="store-code">${esc(store.code)}</div></div></div><div class="right"><div class="bar"><span style="width:${store.pct}%;background:${store.missingItems===0?'var(--ok)':'var(--tw-orange)'}"></span></div><div class="pill ${pillClass}">${pillText}</div><div class="chevron">▶</div></div></div><div class="store-body" onclick="event.stopPropagation()">${groupDetail}${body}<button class="btn-cloud ghost patrol-detail-load" type="button" data-store="${esc(store.name)}" onclick="loadPatrolDetail(this)">查看完整巡店紀錄</button><div class="patrol-lazy-detail"></div></div></div>`;
+}
+
+function sep25ModelForRender(){
+  if(sep25State.month===currentMonth&&sep25State.model) return sep25State.model;
+  if(patrolSummaryState==='local') return PatrolQuestionVersions.overview(rawDetails,STORES,currentMonth);
+  return null;
+}
+
+function renderSep25Dashboard(){
+  const state=document.getElementById('sep25LoadState');
+  const overview=document.getElementById('sep25Overview');
+  const groups=document.getElementById('sep25GroupSummary');
+  const catalog=document.getElementById('sep25QuestionCatalog');
+  const content=document.getElementById('sep25Content');
+  if(!state||!overview||!groups||!catalog||!content)return;
+  catalog.innerHTML=sep25CatalogHTML();
+  const model=sep25ModelForRender();
+  const matched=sep25State.month===currentMonth?sep25State:null;
+  state.textContent=matched?.status==='loading'?'正在讀取新版 25 項正式巡店明細…':matched?.status==='error'?matched.message:model?`正式 ptdetail 唯讀驗證完成${matched?.verifiedAt?` · ${matched.verifiedAt}`:''}`:'新版 25 項資料尚未載入';
+  if(!model){
+    overview.innerHTML='';groups.innerHTML='';content.innerHTML=patrolSummaryUnavailableHTML();return;
+  }
+  overview.innerHTML=`<div class="stat"><div class="num">${model.visitedStores}</div><div class="lbl">本月已巡店數</div></div><div class="stat"><div class="num good">${model.fullyDoneStores}</div><div class="lbl">25 項完成店數</div></div><div class="stat"><div class="num ${model.totalMissingItems>0?'warn':''}">${model.totalMissingItems}</div><div class="lbl">尚缺檢核項次</div></div><div class="stat"><div class="num ${model.unvisitedStores.length?'warn':''}">${model.unvisitedStores.length}</div><div class="lbl">尚未巡店數</div></div>`;
+  const monthlyDone=model.stores.filter(store=>store.monthly.missing===0).length;
+  const bimonthlyDone=model.stores.filter(store=>store.bimonthly.missing===0).length;
+  const nccDone=model.stores.filter(store=>store.ncc.missing===0).length;
+  groups.innerHTML=sep25GroupCard('每月到店檢查・第 1–9 項',monthlyDone,model.totalStores,'每店每月完成')+sep25GroupCard('到店全盤・第 10 項',bimonthlyDone,model.totalStores,`${model.window.label}共用進度`)+sep25GroupCard('NCC 知悉宣導・第 11–25 項',nccDone,model.totalStores,'每店每月 15 項');
+  const attention=model.stores.filter(store=>store.status==='attention').sort((a,b)=>b.missingItems-a.missingItems);
+  const done=model.stores.filter(store=>store.status==='complete');
+  const pending=model.stores.filter(store=>store.status==='pending');
+  content.innerHTML=(attention.length?`<div class="section-title">待補完成 <span class="badge">${attention.length} 店</span></div>${attention.map(sep25StoreCardHTML).join('')}`:'')+(done.length?`<div class="section-title">本月已完成 <span class="badge">${done.length} 店</span></div>${done.map(sep25StoreCardHTML).join('')}`:'')+(pending.length?`<div class="section-title">本月尚未巡店 <span class="badge">${pending.length} 店</span></div>${pending.map(sep25StoreCardHTML).join('')}`:'');
+}
+
 function render(){
   if(!secureUnlocked || !privateAccount || !appMounted) return;
+  updatePatrolQuestionVersionUi();
+  if(isSep25DashboardMonth()){
+    renderSep25Dashboard();
+    renderHalfDashboard();
+    return;
+  }
   renderTicker();
   renderOverview();
   renderInvPanels();
@@ -1845,6 +1961,58 @@ function cloudConnect(){
   });
 }
 
+async function loadSep25DetailRows(month){
+  const months=PatrolQuestionVersions.bimWindow(month).months;
+  const tasks=STORES.flatMap(store=>months.map(value=>({month:value,store:store.name})));
+  const collected=[];
+  let nextTask=0;
+  async function loadTask(task){
+    let page=1,totalRows=null,loaded=0;
+    for(;;){
+      const result=await cloudCall('ptdetail',{month:task.month,store:task.store,page,limit:100});
+      if(!result||result.status!=='ok') throw new Error(result&&result.message||'新版 25 項 ptdetail 讀取失敗');
+      if(!Array.isArray(result.rows)) throw new Error('新版 25 項 ptdetail 分頁 contract 不完整');
+      const reportedTotal=Number(result.totalRows);
+      if(!Number.isInteger(reportedTotal)||reportedTotal<0) throw new Error('新版 25 項 ptdetail totalRows contract 不完整');
+      if(totalRows===null) totalRows=reportedTotal;
+      else if(totalRows!==reportedTotal) throw new Error('新版 25 項正式資料讀取期間筆數變更');
+      collected.push(...result.rows);loaded+=result.rows.length;
+      if(loaded===totalRows) return;
+      if(!result.rows.length||loaded>totalRows) throw new Error('新版 25 項 ptdetail 分頁筆數不一致');
+      page+=1;if(page>100) throw new Error('新版 25 項 ptdetail 頁數異常');
+    }
+  }
+  async function worker(){
+    for(;;){
+      const index=nextTask;nextTask+=1;
+      if(index>=tasks.length)return;
+      await loadTask(tasks[index]);
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(3,tasks.length)},()=>worker()));
+  return collected;
+}
+
+async function loadSep25FormalDashboard(month){
+  const sequence=++sep25LoadSequence;
+  const previous=sep25State.month===month?sep25State:null;
+  sep25State={month,status:'loading',rows:previous?.rows||[],model:previous?.model||null,message:'正在讀取新版 25 項正式巡店明細…',verifiedAt:previous?.verifiedAt||''};
+  render();
+  try{
+    const rows=await loadSep25DetailRows(month);
+    if(sequence!==sep25LoadSequence||currentMonth!==month)return false;
+    const model=PatrolQuestionVersions.overview(rows,STORES,month);
+    sep25State={month,status:'ok',rows,model,message:'',verifiedAt:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'})};
+    render();
+    return true;
+  }catch(error){
+    if(sequence!==sep25LoadSequence||currentMonth!==month)return false;
+    sep25State={month,status:'error',rows:[],model:null,message:String(error&&error.message||'新版 25 項正式資料讀取失敗'),verifiedAt:''};
+    render();
+    return false;
+  }
+}
+
 function cloudLoad(options={}){
   if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN) return Promise.resolve(false);
   const afterWrite=Boolean(options.afterWrite);
@@ -1852,25 +2020,38 @@ function cloudLoad(options={}){
   const priorRenderError=options.renderErr||null;
   patrolSummaryState=patrolSummary?'stale':'loading';
   patrolSummaryMessage=patrolSummary?`上次成功資料 · ${patrolSummaryVerifiedAt} · 正在更新`:'巡店資料讀取中';
+  if(isSep25DashboardMonth()){
+    const previous=sep25State.month===currentMonth?sep25State:null;
+    sep25State={month:currentMonth,status:'loading',rows:previous?.rows||[],model:previous?.model||null,message:'正在讀取新版 25 項正式巡店明細…',verifiedAt:previous?.verifiedAt||''};
+  }
   try{render();}catch(error){console.error('Patrol render failed:',error);}
-  return cloudCall('ptsummary',{month:currentMonth}).then(res=>{
+  return cloudCall('ptsummary',{month:currentMonth}).then(async res=>{
     if(res.status==='ok'){
       // 套用各區自己的設定（GAS 的 PT_STORES / PT_TITLE），沒回傳就用預設
       if(Array.isArray(res.stores) && res.stores.length){
         STORES = res.stores.map(s=>({code:String(s.code||''), name:String(s.name||'')}));
       }
-      if(res.title) document.getElementById('subTitle').textContent = res.title;
+      if(res.title) patrolLegacyTitle=String(res.title);
       if(!res.summary||res.summary.month!==currentMonth||!Array.isArray(res.summary.stores)||res.summary.stores.length!==STORES.length) throw new Error('巡店摘要月份或九店 contract 不完整');
       patrolSummary=res.summary;
       patrolSummaryState='ok';
       patrolSummaryMessage='';
       patrolSummaryVerifiedAt=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      if(isSep25DashboardMonth()){
+        const loaded=await loadSep25FormalDashboard(currentMonth);
+        if(!loaded){
+          const message=sep25State.message||'新版 25 項正式資料讀取失敗';
+          showMsg(afterWrite?`${writeMessage}，但${message}`:message,'err');
+          return false;
+        }
+      }
       let renderError=priorRenderError;
       try{render();}catch(error){renderError=renderError||error;console.error('Patrol render failed:',error);}
       if(renderError){
         showMsg(`${afterWrite?writeMessage+'；':''}正式摘要已更新，但看板更新失敗：${renderError.message||renderError}`,'err');
       }else{
-        showMsg(afterWrite?`${writeMessage}；正式摘要已更新 · ${patrolSummary.visitedStores}/${patrolSummary.totalStores} 店`:`巡店摘要已更新 · ${patrolSummary.visitedStores}/${patrolSummary.totalStores} 店`,'ok');
+        const progress=isSep25DashboardMonth()?`${sep25State.model.visitedStores}/${sep25State.model.totalStores} 店`:`${patrolSummary.visitedStores}/${patrolSummary.totalStores} 店`;
+        showMsg(afterWrite?`${writeMessage}；正式摘要已更新 · ${progress}`:`巡店摘要已更新 · ${progress}`,'ok');
       }
       return true;
     }else if(res.reauthFailed){
