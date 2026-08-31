@@ -102,6 +102,9 @@ test('分析完成後可分開下載四張本機產生的 PNG 戰報', () => {
   assert.match(js, /const hasDevice = index > 1 && Number\(value\) > 0/);
   assert.match(js, /hasDevice \? '#6741a5' : '#ffffff'/);
   assert.match(css, /\.product-hit \{ background:#6741a5; color:#fff; font-weight:950; \}/);
+  assert.match(css, /\.region-detail-table td\.metric-hit,\.metric-cell\.metric-hit \{ background:#d9f3e8;/);
+  assert.match(js, /Number\(metric\.actual\) > 0 \? 'metric-hit' : ''/);
+  assert.match(js, /hit \? \(home \? '#087a60' : '#d9f3e8'\)/);
   assert.match(html, /深紫色格代表該店有設備上線數/);
   assert.doesNotMatch(`${html}\n${js}`, /html2canvas|dom-to-image|cdnjs|unpkg|jsdelivr/i);
 });

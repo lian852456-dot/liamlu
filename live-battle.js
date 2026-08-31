@@ -234,7 +234,11 @@
     const rows = Core.REGION_KEYS.map(key => {
       const detail = analysis.regions[key][detailKey];
       const values = [`北一二${key}`, detail.total, detail.up999, Core.percent(detail.up999Rate), detail.small, ...bands.map(band => detail.bands[band]), detail.speed, ...(isRt ? [detail.earlyRenewal] : [])];
-      return `<tr class="${key === 'B' ? 'is-home' : ''}">${values.map((value, index) => `<td>${index === 0 ? `<strong>${escapeHtml(value)}</strong>` : escapeHtml(typeof value === 'string' ? value : displayCount(value))}</td>`).join('')}</tr>`;
+      return `<tr class="${key === 'B' ? 'is-home' : ''}">${values.map((value, index) => {
+        const isCount = index !== 0 && index !== 3;
+        const hit = isCount && Number(value) > 0;
+        return `<td class="${hit ? 'metric-hit' : ''}">${index === 0 ? `<strong>${escapeHtml(value)}</strong>` : escapeHtml(typeof value === 'string' ? value : displayCount(value))}</td>`;
+      }).join('')}</tr>`;
     }).join('');
     return `<section class="region-detail-block ${isRt ? 'rt-detail' : 'aq-detail'}"><div class="region-detail-title">${prefix === 'A' ? 'AQ' : 'RT'}</div><div class="table-wrap"><table class="region-detail-table"><thead><tr>${labels.map(label => `<th>${escapeHtml(label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div><p class="region-detail-note">${prefix}999↑占比＝${prefix}999↑ ÷ 合計；好速接在 2699 後方。</p></section>`;
   }
@@ -272,7 +276,12 @@
     const totalRow = analysis.nationalTotals && analysis.nationalTotals[kind];
     const renderRow = (row, rowIndex, extraClass) => {
       const values = [row.department, row.total, row.up999, Core.percent(row.up999Rate), row.small, ...bands.map(band => row.bands[band]), row.speed, ...(isRt ? [row.earlyRenewal] : []), ...(showRanks ? [row.ranks.total, row.ranks.up999] : [])];
-      return `<tr class="${[extraClass, rowIndex === homeIndex ? 'is-home' : ''].filter(Boolean).join(' ')}">${values.map((value, index) => `<td>${index === 0 ? `<strong>${escapeHtml(value)}</strong>` : escapeHtml(typeof value === 'string' ? value : displayCount(value))}</td>`).join('')}</tr>`;
+      const firstRankIndex = showRanks ? values.length - 2 : values.length;
+      return `<tr class="${[extraClass, rowIndex === homeIndex ? 'is-home' : ''].filter(Boolean).join(' ')}">${values.map((value, index) => {
+        const isCount = index !== 0 && index !== 3 && index < firstRankIndex;
+        const hit = !extraClass && isCount && Number(value) > 0;
+        return `<td class="${hit ? 'metric-hit' : ''}">${index === 0 ? `<strong>${escapeHtml(value)}</strong>` : escapeHtml(typeof value === 'string' ? value : displayCount(value))}</td>`;
+      }).join('')}</tr>`;
     };
     const body = `${totalRow ? renderRow(totalRow, -1, 'is-national-total') : ''}${rows.map((row, rowIndex) => renderRow(row, rowIndex, '')).join('')}`;
     return `<section class="region-detail-block ${isRt ? 'rt-detail' : 'aq-detail'}"><div class="region-detail-title">全國 ${isRt ? 'RT' : 'AQ'} 戰情｜${rows.length} 列</div><div class="table-wrap"><table class="region-detail-table national-detail-table"><thead><tr>${labels.map(label => `<th>${escapeHtml(label)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div><p class="region-detail-note">依原始全國彙總表順序呈現；好速固定接在 ${isRt ? 'R2699' : '2699'} 後。${homeIndex >= 0 ? '深藍列為北一二B。' : '若原表無法唯一對應北一二B，將不任意標色。'}</p></section>`;
@@ -464,7 +473,13 @@
         x = left;
         values.forEach((value, index) => {
           const home = !isTotal && sourceIndex === homeIndex;
-          ctx.fillStyle = isTotal ? '#777777' : home ? (index === 0 ? '#274f8d' : '#315a9d') : (index === 0 ? '#eef5f8' : sourceIndex % 2 ? '#fff8dd' : '#ffffff');
+          const firstRankIndex = showRanks ? values.length - 2 : values.length;
+          const isCount = index !== 0 && index !== 3 && index < firstRankIndex;
+          const hit = !isTotal && isCount && Number(value) > 0;
+          ctx.fillStyle = isTotal ? '#777777'
+            : hit ? (home ? '#087a60' : '#d9f3e8')
+              : home ? (index === 0 ? '#274f8d' : '#315a9d')
+                : (index === 0 ? '#eef5f8' : sourceIndex % 2 ? '#fff8dd' : '#ffffff');
           ctx.fillRect(x, y, widths[index], rowHeight);
           ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
           ctx.fillStyle = home || isTotal ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = `${index === 0 || home || isTotal ? '900' : '750'} 19px system-ui, "Microsoft JhengHei", sans-serif`;
@@ -500,8 +515,10 @@
         return metric.todayGoal == null ? displayCount(metric.actual) : `${displayCount(metric.actual)} / ${displayCount(metric.todayGoal)}`;
       }), analysis.dynamic.available ? (gaps.join('、') || '今日已達標') : '尚未載入目標'];
       x = 52;
+      const metricActuals = storeMetricSequence(store).map(([, metric]) => Number(metric.actual || 0));
       values.forEach((value, index) => {
-        ctx.fillStyle = rowIndex % 2 ? '#f8fbfd' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
+        const hit = index >= 1 && index <= metricActuals.length && metricActuals[index - 1] > 0;
+        ctx.fillStyle = hit ? '#d9f3e8' : (rowIndex % 2 ? '#f8fbfd' : '#ffffff'); ctx.fillRect(x, y, widths[index], rowHeight);
         ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
         ctx.fillStyle = index === values.length - 1 ? (gaps.length ? EXPORT_COLORS.red : EXPORT_COLORS.green) : EXPORT_COLORS.ink;
         ctx.font = `${index === 0 || index === values.length - 1 ? '800' : '700'} ${index === values.length - 1 ? 16 : 19}px system-ui, "Microsoft JhengHei", sans-serif`;
@@ -621,7 +638,7 @@
     $('storeRows').innerHTML = a.stores.map(store => {
       const gaps = storeGapEntries(store);
       const gapLabel = !a.dynamic.available ? '載入目標後顯示' : (gaps.length ? gaps.join('、') : '今日已達標');
-      return `<tr class="${priorityNames.has(store.name) ? 'priority' : ''}"><td><strong>${escapeHtml(store.name)}</strong></td>${storeMetricSequence(store).map(([, metric]) => `<td class="metric-cell">${metricCell(metric)}</td>`).join('')}<td class="gap ${a.dynamic.available && !gaps.length ? 'done' : ''}">${gapLabel}</td></tr>`;
+      return `<tr class="${priorityNames.has(store.name) ? 'priority' : ''}"><td><strong>${escapeHtml(store.name)}</strong></td>${storeMetricSequence(store).map(([, metric]) => `<td class="metric-cell ${Number(metric.actual) > 0 ? 'metric-hit' : ''}">${metricCell(metric)}</td>`).join('')}<td class="gap ${a.dynamic.available && !gaps.length ? 'done' : ''}">${gapLabel}</td></tr>`;
     }).join('');
     renderProducts(a);
     renderGiftAudit(a);

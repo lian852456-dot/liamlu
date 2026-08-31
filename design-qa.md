@@ -1,35 +1,34 @@
 # 行進間戰報 Design QA
 
 - Source visual truth paths:
-  - `/workspace/scratch/3729926cc24f/upload/6c6d5013-38bb-45aa-b4db-2fe3178f726b.png`
-  - `/workspace/scratch/3729926cc24f/upload/9f37b826-f80a-4e3c-88d6-b98ad0a388e5.png`
-- Implementation URL: `https://lian852456-dot.github.io/liamlu/live-battle.html`（已部署；正式 runtime 與本機候選 SHA-256 一致）。
+  - `/workspace/scratch/3729926cc24f/upload/9127525a-9be2-4198-a1c6-c7465a81e229.png`
+  - `/workspace/scratch/3729926cc24f/upload/f317ef44-ff9d-46cf-b85a-615cfa7160ea.png`
+- Implementation URL: local candidate for `live-battle.html`; this patch is not deployed.
 - Implementation screenshot path: unavailable; the required cloud-browser runtime timed out during connection setup and could not be reset during this QA run.
 - Intended viewport: desktop 1365 × 900 CSS px, device scale 1.
-- Source pixels: AQ 1162 × 1165; RT 1136 × 1168.
-- State: nationwide AQ／RT fixture covers the nationwide total, repeated department rows, all six plan bands, 好速, RT 提前續約 and RANK.
+- Source pixels: nine-store PNG 1466 × 904; supervisor AQ／RT PNG 974 × 415.
+- State: parsed AQ／RT report with nine-store metrics plus A／B／C／D supervisor detail; user requires every non-zero achievement to be visibly highlighted and the supervisor source collision corrected.
 
 **Findings**
 
 - [P1] Browser-rendered comparison is unavailable.
-  - Location: STEP 3 nationwide AQ／RT detail tables and the first downloadable PNG.
+  - Location: STEP 3 supervisor AQ／RT detail, nine-store table, and the first/third downloadable PNG.
   - Evidence: both nationwide source images were opened at original resolution, but the implementation could not be captured because the required cloud-browser connection itself timed out.
   - Impact: typography, horizontal scrolling, header density, nationwide total emphasis, unique 北一二B emphasis and Canvas export cannot be visually signed off from code or tests alone.
   - Fix: reopen the local preview in a fresh cloud-browser session, load the nationwide fixture, capture both visible tables and first PNG state, then compare them together with the two source images.
 
 **Code-level evidence (not a substitute for visual QA)**
 
-- The AQ table columns are: 部、合計、A999↑、A999↑占比、小A、A999、A1199、A1399、A1599、A1899、2699、好速、RANK AQ、RANK A999（RANK 依來源顯示）.
-- The RT table columns are: 部、合計、R999↑、R999↑占比、小R、R999、R1199、R1399、R1599、R1899、R2699、好速、提前續約、RANK RT、RANK R999（RANK 依來源顯示）.
-- 好速 is ordered immediately after 2699／R2699 in both the webpage renderer and first Canvas PNG.
-- The source's nationwide total row is retained with a dark gray background. 北一二B uses deep blue only when the nationwide row can be uniquely matched; otherwise no row is guessed.
-- 346 automated tests pass; tests include nationwide total and row parsing, full AQ／RT plan bands, RANK, 好速, 提前續約, store-table collision prevention, existing-system isolation, syntax and package audit.
+- A region-summary candidate is now rejected whenever its header also contains a store/location column; this prevents the last store row in each region from replacing the A／B／C／D summary.
+- Non-zero count cells receive `metric-hit`; light rows use `#d9f3e8`, while the 北一二B deep-blue row uses `#087a60`. Zero cells retain their original background. Rank cells are not treated as achievements.
+- The same hit logic is used in the first supervisor AQ／RT Canvas PNG and third nine-store Canvas PNG.
+- 347 automated tests pass; tests include the store-detail/region-summary collision, nationwide and regional parsing, full AQ／RT plan bands, existing-system isolation, syntax and package audit.
 
 **Required fidelity surfaces**
 
 - Fonts and typography: not visually verified.
 - Spacing and layout rhythm: not visually verified.
-- Colors and visual tokens: implemented from the source palette but not visually verified.
+- Colors and visual tokens: non-zero light green and 北一二B deep green are implemented but not visually verified.
 - Image quality and asset fidelity: no new raster assets are required; Canvas PNG output is not visually verified.
 - Copy and content: column order is contract-tested; visible wrapping and density are not visually verified.
 
@@ -41,14 +40,12 @@
 
 **Implementation checklist**
 
-- [x] AQ／RT nationwide total, department rows, six-band and RANK parser
-- [x] 好速 immediately after 2699／R2699
-- [x] RT 提前續約 column
-- [x] Nationwide webpage tables with explicit non-nationwide fallback
-- [x] First downloadable Canvas PNG updated
-- [x] 346 automated tests and zero package vulnerabilities
+- [x] Reject store-detail tables as A／B／C／D region summaries
+- [x] Highlight non-zero supervisor and nine-store metrics
+- [x] Apply matching colors to first and third Canvas PNG exports
+- [x] 347 automated tests and zero package vulnerabilities
 - [ ] Fresh cloud-browser capture and combined source/implementation visual comparison
 
 final result: blocked
 
-Deployment note: Liam was informed that visual QA was blocked and then explicitly instructed deployment. Automated `346/346` regression, zero-vulnerability audit, scoped-diff review, production SHA-256 parity and HTTP health checks passed; this does not replace the missing browser-rendered source comparison.
+Deployment note: this correction is a local candidate and has not been deployed. Cloud-browser connection timed out before a rendered capture could be produced; automated regression does not replace the missing browser-rendered comparison.

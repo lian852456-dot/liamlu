@@ -82,6 +82,10 @@ input[type="text"],input:not([type]),#employeeId { width:100%; min-height:44px; 
 .region-detail-table tr.is-home td { background:#315a9d; color:#fff; font-weight:900; }
 .region-detail-table tr.is-home td:first-child { background:#274f8d; }
 .region-detail-table tr.is-national-total td { background:#777; color:#fff; font-weight:900; }
+.region-detail-table td.metric-hit,.metric-cell.metric-hit { background:#d9f3e8; color:#075f4c; font-weight:950; }
+.region-detail-table tr.is-home td.metric-hit { background:#087a60; color:#fff; }
+.region-detail-table tr.is-home td.metric-hit strong { color:#fff; }
+.metric-cell.metric-hit strong { color:#075f4c; }
 .region-detail-table td:last-child,.region-detail-table th:last-child { border-right:0; }
 .region-detail-note { margin:7px 12px 10px; color:var(--muted); font-size:11px; }
 .national-detail-table { min-width:1460px; }

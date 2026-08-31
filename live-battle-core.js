@@ -261,7 +261,10 @@
     rows.slice(0, 40).forEach((row, rowIndex) => {
       const regionCol = findPreferredColumn(row, REGION_HEADERS);
       const totalCol = findPreferredColumn(row, totalAliases);
-      if (regionCol < 0 || totalCol < 0) return;
+      const storeCol = findPreferredColumn(row, STORE_HEADERS);
+      // 店點明細也會同時出現「督導區」與「合計」，但同一區有多家店，
+      // 不能把最後一家店誤當成該區彙總。真正的 A／B／C／D 彙總表不含店點欄。
+      if (regionCol < 0 || totalCol < 0 || storeCol >= 0) return;
       const metricCols = Object.fromEntries(Object.entries(metricAliases).map(([key, aliases]) => [key, findPreferredColumn(row, aliases)]));
       const upCol = findPreferredColumn(row, [`${prefix}999↑`, `${prefix}999以上`, `${prefix}999含以上`]);
       const smallCol = findPreferredColumn(row, [normalizedKind === 'aq' ? '小A' : '小R']);
