@@ -28,6 +28,23 @@ test('九店名稱與台北前綴使用 canonical 名稱', () => {
   assert.equal(Core.normalizeStore('台北三創'), '台北三創');
   assert.equal(Core.normalizeStore('三創服務中心'), '台北三創');
   assert.equal(Core.normalizeRegion('北一二－C'), 'C');
+  assert.equal(Core.normalizeRegion('北一二區Ａ'), 'A');
+});
+
+test('區域彙總工作表可補入 AQ A／B／C／D 數字', () => {
+  const summary = Core.parseRegionSummary([
+    ['2026/8/31', '', '', '', '', ''],
+    ['區域', '長官', '合計', 'A999↑', 'A999↑佔比', 'A1399'],
+    ['北一二A', '翁長官', 25, 5, '20%', 1],
+    ['北一二B', '盧長官', 12, 3, '25%', 2],
+    ['北一二C', '虞長官', 25, 6, '24%', 3],
+    ['北一二D', '張長官', 33, 10, '30.3%', 4]
+  ], 'aq');
+  assert.deepEqual(summary.recognizedRegions, ['A', 'B', 'C', 'D']);
+  assert.equal(summary.regions.A.total, 25);
+  assert.equal(summary.regions.B.metrics.A999, 3);
+  assert.equal(summary.regions.C.metrics.A1399, 3);
+  assert.equal(summary.regions.D.total, 33);
 });
 
 test('AQ／RT 原始檔保留北一二 A／B／C／D 區域總數與七項戰情', () => {
@@ -74,6 +91,7 @@ test('AQ 依點數欄加總、依案件編號去重，且只留北一二B店點'
   assert.equal(result.meta.processedRows, 2);
   assert.equal(result.meta.duplicateRows, 1);
   assert.equal(result.meta.mode, 'points');
+  assert.equal(result.regions.B.total, 3.5);
 });
 
 test('RT 沒有點數欄時以唯一明細列計件', () => {
@@ -92,19 +110,20 @@ test('RT 沒有點數欄時以唯一明細列計件', () => {
 test('實際 AQ／RT 欄位拆出五項、商品與影音漏搭，並遮罩案件識別', () => {
   const aq = Core.parseMatrix([
     ['案件類型', '店點', '門號', '變更資費', '商品型號', '專案代號'],
-    ['AQ新申裝', '通化', '0911111222', '5G 1399', 'Pixel 11 Pro', '一般專案'],
-    ['AQ新申裝', '酒泉', '0922222333', '5G 999', 'Galaxy S26', '好速500M']
+    ['AQ新申裝', '通化', '0911111222', '5G 1399', 'Google Pixel 11 Pro (Google)', '一般專案'],
+    ['AQ新申裝', '酒泉', '0922222333', '5G 999', 'SAMSUNG Galaxy S26 (台灣三星)', '好速500M']
   ], { kind: 'aq', fileName: 'AQ.csv', stores: sourceStores });
   assert.equal(aq.metrics.通化.A999, 1);
   assert.equal(aq.metrics.通化.A1399, 1);
   assert.equal(aq.metrics.酒泉.A999, 1);
   assert.equal(aq.metrics.酒泉['好速'], 1);
   assert.equal(aq.products.通化['Pixel 11 Pro'], 1);
+  assert.equal(aq.products.酒泉['Galaxy S26'], 1);
 
   const rt = Core.parseMatrix([
     ['案件類型', '店點', '門號', '變更資費', '商品型號', '前台服務人員', '客戶分類', '合約編號', '專案代號'],
-    ['RT續約', '通化', '0912345678', '5G 1399', 'Pixel 11 Pro', '王小明', '一般戶', '主約', '提前續約'],
-    ['RT續約', '通化', '0912345678', '5G 1399', '', '王小明', '一般戶', 'KKBOX 3個月', '搭贈'],
+    ['RT續約', '通化', '0912345678', '5G 1399', 'Pixel 11 Pro', 'DNB10146_5514709 王克業', '一般戶', '主約', '提前續約'],
+    ['RT續約', '通化', '0912345678', '5G 1399', '', 'DNB10146_5514709 王克業', '一般戶', 'KKBOX 3個月', '搭贈'],
     ['RT續約', '酒泉', '0923456789', '5G 599', 'Galaxy A57', '李小華', '企客', '主約', '一般續約']
   ], { kind: 'rt', fileName: 'RT.csv', stores: sourceStores });
   assert.equal(rt.metrics.通化.R999, 1);
@@ -114,6 +133,7 @@ test('實際 AQ／RT 欄位拆出五項、商品與影音漏搭，並遮罩案�
   assert.deepEqual(rt.giftAudit[0].missing, ['MyVideo']);
   assert.equal(rt.giftAudit[0].caseId, '091***678');
   assert.equal(rt.giftAudit[0].earlyRenewal, true);
+  assert.equal(rt.giftAudit[0].staff, '王克業');
 });
 
 test('Big5／CP950 CSV 可解碼並保留中文表頭與店名', () => {

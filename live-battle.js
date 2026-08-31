@@ -141,8 +141,11 @@
     const matrices = await matricesFromFile(file);
     const diagnostic = inspectFile(file, kind, matrices);
     const candidates = [];
+    const regionCandidates = [];
     const errors = [];
     matrices.forEach(entry => {
+      const regionSummary = Core.parseRegionSummary(entry.matrix, kind);
+      if (regionSummary) regionCandidates.push(regionSummary);
       try {
         const result = Core.parseMatrix(entry.matrix, { kind, fileName: file.name, stores: state.targets && state.targets.stores });
         candidates.push({ ...result, sheetName: entry.sheetName });
@@ -153,7 +156,14 @@
       error.diagnostic = diagnostic;
       throw error;
     }
-    return { result: candidates.sort((a, b) => b.meta.processedRows - a.meta.processedRows)[0], diagnostic };
+    const result = candidates.sort((a, b) => b.meta.processedRows - a.meta.processedRows)[0];
+    const regionSummary = regionCandidates.sort((a, b) => b.recognizedRegions.length - a.recognizedRegions.length || b.processedRows - a.processedRows)[0];
+    if (regionSummary) {
+      regionSummary.recognizedRegions.forEach(key => { result.regions[key] = regionSummary.regions[key]; });
+      result.meta.recognizedRegions = Core.REGION_KEYS.filter(key => result.regions[key] && (result.regions[key].total !== 0 || regionSummary.recognizedRegions.includes(key)));
+      result.meta.regionSource = 'summary-sheet';
+    }
+    return { result, diagnostic };
   }
 
   function fileSummary(result) {
@@ -236,7 +246,7 @@
     $('productHead').innerHTML = `<th>店點</th>${models.map(model => `<th>${escapeHtml(model)}</th>`).join('')}<th>合計</th>`;
     $('productRows').innerHTML = analysis.stores.map(store => {
       const values = models.map(model => Number(analysis.products[store.name][model] || 0));
-      return `<tr><td><strong>${escapeHtml(store.name)}</strong></td>${values.map(value => `<td class="${value ? 'product-hit' : ''}">${displayCount(value)}</td>`).join('')}<td><strong>${displayCount(values.reduce((total, value) => total + value, 0))}</strong></td></tr>`;
+      return `<tr><td><strong>${escapeHtml(store.name)}</strong></td>${values.map(value => `<td${value ? ' class="product-hit"' : ''}>${displayCount(value)}</td>`).join('')}<td><strong>${displayCount(values.reduce((total, value) => total + value, 0))}</strong></td></tr>`;
     }).join('');
   }
 
@@ -427,9 +437,9 @@
       const values = [model, storeValues.reduce((total, value) => total + value, 0), ...storeValues];
       x = 52;
       values.forEach((value, index) => {
-        ctx.fillStyle = index > 1 && value ? '#087a60' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
         ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
-        ctx.fillStyle = index > 1 && value ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = `${index < 2 || value ? '900' : '700'} 18px system-ui, "Microsoft JhengHei", sans-serif`;
+        ctx.fillStyle = EXPORT_COLORS.ink; ctx.font = `${index < 2 || value ? '900' : '700'} 18px system-ui, "Microsoft JhengHei", sans-serif`;
         if (index === 0) {
           const lines = wrapCanvasText(ctx, value, widths[index] - 22, 2);
           lines.forEach((line, lineIndex) => ctx.fillText(line, x + 11, y + rowHeight / 2 + (lineIndex - (lines.length - 1) / 2) * 22));

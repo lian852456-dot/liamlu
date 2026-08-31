@@ -75,6 +75,7 @@ test('XLSX 使用既有固定 vendor，不新增 CDN 或套件', () => {
 test('分析完成後可分開下載四張本機產生的 PNG 戰報', () => {
   const html = read('live-battle.html');
   const js = read('live-battle.js');
+  const css = read('live-battle.css');
   for (const id of ['downloadSummaryBtn', 'downloadStoresBtn', 'downloadProductsBtn', 'downloadGiftsBtn']) {
     assert.match(html, new RegExp(`id="${id}"`));
     assert.match(js, new RegExp(`\\$\\('${id}'\\)\\.addEventListener\\('click'`));
@@ -88,7 +89,8 @@ test('分析完成後可分開下載四張本機產生的 PNG 戰報', () => {
   assert.match(html, /下載① 北一二 A／B／C／D 戰情 PNG/);
   assert.match(html, /下載② 上線商品 PNG/);
   assert.match(html, /下載③ 九店 AQ／RT 戰情 PNG/);
-  assert.match(js, /index > 1 && value \? '#087a60'/);
+  assert.doesNotMatch(js, /index > 1 && value \? '#087a60'/);
+  assert.match(css, /\.product-hit \{ font-weight:950; \}/);
   assert.doesNotMatch(`${html}\n${js}`, /html2canvas|dom-to-image|cdnjs|unpkg|jsdelivr/i);
 });
 

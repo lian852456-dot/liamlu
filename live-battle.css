@@ -80,7 +80,7 @@ tbody tr:last-child td { border-bottom:0; } tbody tr.priority { background:var(-
 .gap { color:var(--red); font-weight:800; }.gap.done { color:var(--green); }
 .metric-cell strong { display:block; color:var(--ink); font-size:15px; }.metric-cell strong span { color:var(--muted); font-size:12px; font-weight:650; }.metric-cell small { display:block; margin-top:2px; font-size:11px; font-weight:800; }.positive { color:var(--green); }.negative { color:var(--red); }
 .product-panel { border-top:4px solid #6f55aa; }.gift-panel { border-top:4px solid #d2871c; }
-.product-table-wrap table { min-width:max(760px,100%); }.product-table-wrap th:not(:first-child),.product-table-wrap td:not(:first-child) { text-align:center; }.product-table-wrap th { max-width:150px; white-space:normal; line-height:1.25; }.product-table-wrap tbody tr { background:#fff; }.product-hit { background:#087a60; color:#fff; font-weight:950; }
+.product-table-wrap table { min-width:max(760px,100%); }.product-table-wrap th:not(:first-child),.product-table-wrap td:not(:first-child) { text-align:center; }.product-table-wrap th { max-width:150px; white-space:normal; line-height:1.25; }.product-table-wrap tbody tr { background:#fff; }.product-hit { font-weight:950; }
 .gift-missing { background:var(--red-soft); }.gift-missing td:last-child { color:var(--red); }
 .empty-state { margin-top:14px; padding:18px; border:1px dashed #bdcbd5; border-radius:12px; background:#f7fafc; color:var(--muted); text-align:center; }
 .report-panel { border-top:4px solid var(--green); }

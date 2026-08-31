@@ -29,7 +29,7 @@
 
   function text(value) { return String(value == null ? '' : value).trim(); }
   function normalizeToken(value) {
-    return text(value)
+    return text(value).normalize('NFKC')
       .replace(/^\uFEFF/, '')
       .replace(/[\s　_／/()（）【】\[\]：:・·.\-－]+/g, '')
       .toUpperCase();
@@ -46,8 +46,8 @@
 
   function normalizeRegion(value) {
     const token = normalizeToken(value);
-    const match = token.match(/北一二([ABCD])/);
-    return match ? match[1] : '';
+    const match = token.match(/北一二(?:區)?([ABCD])|北一二([ABCD])區/);
+    return match ? (match[1] || match[2]) : '';
   }
 
   function buildStoreLookup(stores) {
@@ -208,9 +208,61 @@
   }
 
   function productName(value) {
-    const raw = text(value).replace(/\s+/g, ' ');
+    const raw = text(value)
+      .replace(/\((?:台灣三星|三星|SAMSUNG|GOOGLE|APPLE|蘋果|OPPO|VIVO|小米|XIAOMI|REDMI|MOTOROLA|MOTO|REALME|ASUS|華為|HUAWEI)\)/gi, ' ')
+      .replace(/(?:台灣三星|三星|SAMSUNG|GOOGLE|APPLE|蘋果|OPPO|VIVO|小米|XIAOMI|REDMI|MOTOROLA|REALME|ASUS|華為|HUAWEI)(?=[\s_\-／/]|$)/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^[_\-／/\s]+|[_\-／/\s]+$/g, '')
+      .trim();
     if (!raw || /^(?:-|—|無|NA|N\/A|NULL|空白)$/i.test(raw)) return '';
     return raw.slice(0, 100);
+  }
+
+  function staffName(value) {
+    const raw = text(value).normalize('NFKC');
+    if (!raw) return '—';
+    const chineseName = raw.match(/([\u3400-\u9fff·]{2,10})\s*$/u);
+    if (chineseName) return chineseName[1];
+    const stripped = raw.replace(/^(?:DNB[A-Z0-9]+[_\s\-/]+)?[A-Z0-9]{5,}[_\s\-/]+/i, '').trim();
+    return stripped || raw;
+  }
+
+  function parseRegionSummary(matrix, kind) {
+    const rows = Array.isArray(matrix) ? matrix : [];
+    const normalizedKind = String(kind || '').toLowerCase();
+    if (!['aq', 'rt'].includes(normalizedKind)) return null;
+    const totalAliases = normalizedKind === 'aq'
+      ? ['AQ上線數', 'AQ上線點數', AQ_KEY, '合計']
+      : ['RT上線數', 'RT上線點數', RT_KEY, '合計'];
+    const metricAliases = normalizedKind === 'aq'
+      ? { A999: ['A999', 'AQ V+D 999'], A1399: ['A1399', 'AQ V+D 1399'], '好速': ['好速'] }
+      : { R999: ['R999', 'RT V+D 999'], R1399: ['R1399', 'RT V+D 1399'], '好速': ['好速'] };
+    let best = null;
+    rows.slice(0, 40).forEach((row, rowIndex) => {
+      const regionCol = findPreferredColumn(row, REGION_HEADERS);
+      const totalCol = findPreferredColumn(row, totalAliases);
+      if (regionCol < 0 || totalCol < 0) return;
+      const metricCols = Object.fromEntries(Object.entries(metricAliases).map(([key, aliases]) => [key, findPreferredColumn(row, aliases)]));
+      const score = 10 + Object.values(metricCols).filter(index => index >= 0).length;
+      if (!best || score > best.score) best = { rowIndex, regionCol, totalCol, metricCols, score };
+    });
+    if (!best) return null;
+    const regions = blankRegions();
+    const recognized = new Set();
+    rows.slice(best.rowIndex + 1).forEach(row => {
+      const region = normalizeRegion(row[best.regionCol]);
+      if (!region) return;
+      const total = numberOrNull(row[best.totalCol]);
+      if (total == null) return;
+      regions[region].total = total;
+      Object.entries(best.metricCols).forEach(([key, column]) => {
+        if (column < 0) return;
+        const value = numberOrNull(row[column]);
+        if (value != null) regions[region].metrics[key] = value;
+      });
+      recognized.add(region);
+    });
+    return recognized.size ? { regions, recognizedRegions: REGION_KEYS.filter(key => recognized.has(key)), processedRows: recognized.size } : null;
   }
 
   function enterpriseRow(row, headerRow) {
@@ -318,7 +370,8 @@
         }
       }
       const id = header.idCol >= 0 ? normalizeToken(row[header.idCol]) : '';
-      const region = regionCol >= 0 ? normalizeRegion(row[regionCol]) : (store ? 'B' : '');
+      let region = regionCol >= 0 ? normalizeRegion(row[regionCol]) : '';
+      if (!region) region = row.map(normalizeRegion).find(Boolean) || (store ? 'B' : '');
       const parsedPoints = header.pointsCol >= 0 ? numberOrNull(row[header.pointsCol]) : null;
       const points = parsedPoints == null ? 1 : parsedPoints;
       const amount = planCol >= 0 ? planAmount(row[planCol]) : null;
@@ -372,7 +425,7 @@
         if (!missing.length) return;
         giftAudit.push({
           store: group.store,
-          staff: text(staffCol >= 0 ? representative[staffCol] : '') || '—',
+          staff: staffName(staffCol >= 0 ? representative[staffCol] : ''),
           caseId: maskIdentifier(group.id),
           plan: amount,
           earlyRenewal: /提前續約/.test(normalizeToken(group.rows.flat().join('｜'))),
@@ -621,5 +674,5 @@
     return lines.join('\n');
   }
 
-  return { STORE_NAMES, REGION_KEYS, AQ_KEY, RT_KEY, METRIC_KEYS, KPI_KEYS, normalizeStore, normalizeRegion, buildStoreLookup, detectHeader, inspectMatrix, separatorFor, parseDelimited, decodeCsv, parseMatrix, extractTargets, dynamicContext, dynamicDailyGoal, analyze, composeMessage, percent, planAmount, maskIdentifier };
+  return { STORE_NAMES, REGION_KEYS, AQ_KEY, RT_KEY, METRIC_KEYS, KPI_KEYS, normalizeStore, normalizeRegion, buildStoreLookup, detectHeader, inspectMatrix, separatorFor, parseDelimited, decodeCsv, parseRegionSummary, parseMatrix, extractTargets, dynamicContext, dynamicDailyGoal, analyze, composeMessage, percent, planAmount, maskIdentifier };
 });
