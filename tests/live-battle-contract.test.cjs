@@ -89,8 +89,10 @@ test('分析完成後可分開下載四張本機產生的 PNG 戰報', () => {
   assert.match(html, /下載① 北一二 A／B／C／D 戰情 PNG/);
   assert.match(html, /下載② 上線商品 PNG/);
   assert.match(html, /下載③ 九店 AQ／RT 戰情 PNG/);
-  assert.doesNotMatch(js, /index > 1 && value \? '#087a60'/);
-  assert.match(css, /\.product-hit \{ font-weight:950; \}/);
+  assert.match(js, /const hasDevice = index > 1 && Number\(value\) > 0/);
+  assert.match(js, /hasDevice \? '#6741a5' : '#ffffff'/);
+  assert.match(css, /\.product-hit \{ background:#6741a5; color:#fff; font-weight:950; \}/);
+  assert.match(html, /深紫色格代表該店有設備上線數/);
   assert.doesNotMatch(`${html}\n${js}`, /html2canvas|dom-to-image|cdnjs|unpkg|jsdelivr/i);
 });
 

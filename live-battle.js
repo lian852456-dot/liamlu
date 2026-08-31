@@ -416,7 +416,7 @@
     const models = analysis.productModels;
     const width = 1800, rowHeight = 72, tableY = 188, rows = Math.max(1, models.length), height = tableY + 58 + rows * rowHeight + 80;
     const { canvas, ctx } = exportSurface(width, height);
-    drawExportHeader(ctx, width, '② 目前上線商品', `${exportTimeLabel()} 產生｜依本次 AQ／RT 實際商品型號`);
+    drawExportHeader(ctx, width, '② 目前上線商品', `${exportTimeLabel()} 產生｜深紫色格＝該店有設備上線數`);
     if (!models.length) {
       drawCell(ctx, 52, tableY, width - 104, 130, '#ffffff', EXPORT_COLORS.line);
       ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '700 24px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText('原始檔未提供可辨識的商品型號', 82, tableY + 65);
@@ -437,9 +437,10 @@
       const values = [model, storeValues.reduce((total, value) => total + value, 0), ...storeValues];
       x = 52;
       values.forEach((value, index) => {
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
+        const hasDevice = index > 1 && Number(value) > 0;
+        ctx.fillStyle = hasDevice ? '#6741a5' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
         ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
-        ctx.fillStyle = EXPORT_COLORS.ink; ctx.font = `${index < 2 || value ? '900' : '700'} 18px system-ui, "Microsoft JhengHei", sans-serif`;
+        ctx.fillStyle = hasDevice ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = `${index < 2 || value ? '900' : '700'} 18px system-ui, "Microsoft JhengHei", sans-serif`;
         if (index === 0) {
           const lines = wrapCanvasText(ctx, value, widths[index] - 22, 2);
           lines.forEach((line, lineIndex) => ctx.fillText(line, x + 11, y + rowHeight / 2 + (lineIndex - (lines.length - 1) / 2) * 22));
