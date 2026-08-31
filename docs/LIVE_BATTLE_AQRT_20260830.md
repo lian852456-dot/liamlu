@@ -8,6 +8,7 @@
 - 正式入口已放在 `home.html` 的「督導專區」，不取代「Liam 情報站」或「戰報快速更新」。
 - 第二階段候選：`feature/live-battle-upload-first-dynamic-20260830`，改為先選檔、正式目標選用、動態今日追缺與安全辨識資訊；尚未重新部署。
 - 第三階段候選：`feature/live-battle-metrics-products-gifts-20260831`，主畫面改為五項戰情、實際商品矩陣與影音漏搭；尚未部署。
+- 全國彙總版：正式 commit `12a015e`，已於 2026-08-31 部署；回退分支 `rollback/live-battle-national-predeploy-20260831`。必要 cloud-browser 視覺 QA 仍因連線逾時維持 blocked，正式部署是 Liam 在已知限制後明確指示執行。
 
 ## 使用流程
 

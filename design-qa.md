@@ -3,7 +3,7 @@
 - Source visual truth paths:
   - `/workspace/scratch/3729926cc24f/upload/6c6d5013-38bb-45aa-b4db-2fe3178f726b.png`
   - `/workspace/scratch/3729926cc24f/upload/9f37b826-f80a-4e3c-88d6-b98ad0a388e5.png`
-- Implementation URL: local Sites preview for `live-battle.html`.
+- Implementation URL: `https://lian852456-dot.github.io/liamlu/live-battle.html`（已部署；正式 runtime 與本機候選 SHA-256 一致）。
 - Implementation screenshot path: unavailable; the required cloud-browser runtime timed out during connection setup and could not be reset during this QA run.
 - Intended viewport: desktop 1365 × 900 CSS px, device scale 1.
 - Source pixels: AQ 1162 × 1165; RT 1136 × 1168.
@@ -50,3 +50,5 @@
 - [ ] Fresh cloud-browser capture and combined source/implementation visual comparison
 
 final result: blocked
+
+Deployment note: Liam was informed that visual QA was blocked and then explicitly instructed deployment. Automated `346/346` regression, zero-vulnerability audit, scoped-diff review, production SHA-256 parity and HTTP health checks passed; this does not replace the missing browser-rendered source comparison.
