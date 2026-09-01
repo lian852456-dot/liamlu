@@ -387,10 +387,9 @@
     return /企客|企業客戶|企業方案|公司戶|大客戶/.test(source);
   }
 
-  function fiveGRow(row, amount) {
-    const source = normalizeToken(row.join('｜'));
-    if (/4G/.test(source) && !/5G/.test(source)) return false;
-    return /5G/.test(source) || amount >= 599;
+  function fiveGPlan(value) {
+    const generations = normalizeToken(value).match(/[45]G/g) || [];
+    return generations.length > 0 && generations[generations.length - 1] === '5G';
   }
 
   function giftFlags(rows) {
@@ -537,7 +536,7 @@
         const representative = group.rows[0] || [];
         const amounts = group.rows.map(row => planCol >= 0 ? planAmount(row[planCol]) : null).filter(value => value != null);
         const amount = amounts.length ? Math.max(...amounts) : null;
-        if (!(amount >= 599) || !group.rows.some(row => fiveGRow(row, amount)) || group.rows.some(row => enterpriseRow(row, headerRow))) return;
+        if (!(amount >= 599) || !group.rows.some(row => planCol >= 0 && fiveGPlan(row[planCol])) || group.rows.some(row => enterpriseRow(row, headerRow))) return;
         const gifts = giftFlags(group.rows);
         const missing = [];
         if (!gifts.kkbox) missing.push('KKBOX');
