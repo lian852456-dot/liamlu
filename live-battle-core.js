@@ -222,7 +222,7 @@
 
   function isHaosuRow(row, headerRow) {
     const source = normalizeToken(rowText(row, matchingColumns(headerRow, BUSINESS_HEADERS)));
-    return /好速|寬頻|固網|FTTH|FBB|光纖|(?:^|[^0-9])36M|(?:^|[^0-9])500M|(?:^|[^0-9])1G(?:[^A-Z0-9]|$)/.test(source);
+    return /好速/.test(source);
   }
 
   function productName(value) {

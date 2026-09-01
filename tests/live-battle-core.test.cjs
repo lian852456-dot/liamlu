@@ -216,6 +216,35 @@ test('實際 AQ／RT 欄位拆出五項、商品與影音漏搭，並遮罩案�
   assert.equal(rt.giftAudit[0].staff, '王克業');
 });
 
+test('好速只計專案內容明確含好速的案件，不把一般寬頻或速率字樣誤算', () => {
+  const rt = Core.parseMatrix([
+    ['案件類型', '店點', '合約編號', '專案代號', '推薦人'],
+    ['RT續約', '大稻埕', 'HS-1', 'VL656 (5G好速成專案)1399H+家用寬頻300Mbps', '王一'],
+    ['RT續約', '杭州南', 'HS-2', 'VL014 (好速加掛案)家用寬頻1Gbps', '李二'],
+    ['RT續約', '杭州南', 'HS-3', 'VO792 (企客_5G)好速成月租1099+全光速家用寬頻300Mbps續約專案', '董三'],
+    ['RT續約', '酒泉', 'HS-4', 'VK919 (4G好速成專案)799H+家用寬頻60Mbps', '方四'],
+    ['RT續約', '酒泉', 'HS-5', 'VL014 (好速加掛案)家用寬頻1Gbps', '賴五'],
+    ['RT續約', '通化', 'HS-6', 'VL011 (好速加掛案)家用寬頻500Mbps', '郭六'],
+    ['RT續約', '台北三創', 'NO-1', '一般家用寬頻500Mbps', '陳七'],
+    ['RT續約', '萬大', 'NO-2', 'FTTH光纖1Gbps續約專案', '林八'],
+    ['RT續約', '復興南', 'NO-3', '固網FBB 36M專案', '張九'],
+    ['RT續約', '酒泉', 'NO-4', '家用寬頻1G加掛案', '吳十']
+  ], { kind: 'rt', fileName: 'RT.csv', stores: sourceStores });
+
+  assert.deepEqual(Object.fromEntries(sourceStores.map(store => [store.name, rt.metrics[store.name]['好速']])), {
+    通化: 1,
+    酒泉: 2,
+    台北三創: 0,
+    萬大: 0,
+    六張犁: 0,
+    復興南: 0,
+    永吉: 0,
+    大稻埕: 1,
+    杭州南: 2
+  });
+  assert.equal(rt.regions.B.metrics['好速'], 6);
+});
+
 test('Big5／CP950 CSV 可解碼並保留中文表頭與店名', () => {
   const bytes = Buffer.from('aaf9a5ab2ca457bd75c249bcc60ab371a4c62c320a', 'hex');
   const source = Core.decodeCsv(bytes);
