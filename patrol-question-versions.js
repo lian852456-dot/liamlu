@@ -9,6 +9,8 @@
   const EFFECTIVE_MONTH = '2026-09';
   const LEGACY_TOTAL = 33;
   const SEP25_TOTAL = 25;
+  const MONTHLY_VISIT_TARGET = 2;
+  const MIN_VISIT_GAP_DAYS = 7;
 
   const SEP25_ITEMS = Object.freeze([
     { no:1, group:'monthly', rule:'monthly', label:'每月執行1次', text:'督導打卡' },
@@ -51,6 +53,10 @@
     const match = raw.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
     return match ? `${match[1]}-${pad(Number(match[2]))}-${pad(Number(match[3]))}` : '';
   }
+  function rowVisitIsoDate(row) {
+    if (typeof row === 'string') return rowIsoDate(row);
+    return rowIsoDate(String(row && (row.arriveTime || row.fillTime || row.date) || ''));
+  }
   function rowMonth(row) {
     const explicit = typeof row === 'object' ? String(row && row.month || '').slice(0, 7) : '';
     if (/^\d{4}-\d{2}$/.test(explicit)) return explicit;
@@ -86,6 +92,40 @@
     const reason = String(row && row.reason || '').trim().toLowerCase();
     return result === 'v' || result === 'na' || reason === 'na';
   }
+  function addIsoDays(value, days) {
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return '';
+    const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    date.setUTCDate(date.getUTCDate() + Number(days || 0));
+    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+  }
+  function isoDayGap(first, second) {
+    const start = Date.parse(`${first}T00:00:00Z`);
+    const end = Date.parse(`${second}T00:00:00Z`);
+    return Number.isFinite(start) && Number.isFinite(end) ? Math.round((end - start) / 86400000) : 0;
+  }
+  function visitCadence(rows, store, month) {
+    const dates = [...new Set(rowsForStore(rows, store)
+      .filter(row => rowMonth(row) === month)
+      .map(rowVisitIsoDate)
+      .filter(Boolean))].sort();
+    const firstVisit = dates[0] || '';
+    const nextEligibleDate = firstVisit ? addIsoDays(firstVisit, MIN_VISIT_GAP_DAYS) : '';
+    const secondVisit = firstVisit ? (dates.find(date => isoDayGap(firstVisit, date) >= MIN_VISIT_GAP_DAYS) || '') : '';
+    const gapDays = secondVisit ? isoDayGap(firstVisit, secondVisit) : 0;
+    return {
+      target:MONTHLY_VISIT_TARGET,
+      minGapDays:MIN_VISIT_GAP_DAYS,
+      recordedVisits:dates.length,
+      qualifyingVisits:secondVisit ? MONTHLY_VISIT_TARGET : (firstVisit ? 1 : 0),
+      completed:Boolean(secondVisit),
+      firstVisit,
+      secondVisit,
+      nextEligibleDate,
+      gapDays,
+      dates
+    };
+  }
   function itemStatus(rows, month, itemNo) {
     const item = SEP25_BY_NO[itemNo];
     if (!item) return { status:'miss' };
@@ -105,17 +145,20 @@
   function storeSummary(rows, store, month) {
     const storeRows = rowsForStore(rows, store);
     const currentRows = storeRows.filter(row => rowMonth(row) === month);
+    const visits = visitCadence(rows, store, month);
     const monthly = groupProgress(storeRows, month, SEP25_GROUPS.monthly);
     const bimonthly = groupProgress(storeRows, month, SEP25_GROUPS.bimonthly);
     const ncc = groupProgress(storeRows, month, SEP25_GROUPS.ncc);
     const missingItemNumbers = [...monthly.missingItems, ...bimonthly.missingItems, ...ncc.missingItems];
     const done = SEP25_TOTAL - missingItemNumbers.length;
     const visited = currentRows.length > 0;
+    const questionsComplete = missingItemNumbers.length === 0;
     const dates = currentRows.map(rowIsoDate).filter(Boolean).sort();
     return {
       name:String(store && (store.name || store.store) || ''), code:String(store && store.code || ''), visited,
       done, missingItems:missingItemNumbers.length, missingItemNumbers, pct:Math.round(done / SEP25_TOTAL * 100),
-      status:visited ? (missingItemNumbers.length ? 'attention' : 'complete') : 'pending',
+      status:visited ? (questionsComplete && visits.completed ? 'complete' : 'attention') : 'pending',
+      questionsComplete, visits,
       lastVisit:dates.at(-1) || '', monthly, bimonthly, ncc
     };
   }
@@ -125,7 +168,9 @@
     const visited = stores.filter(store => store.visited);
     return {
       month, totalStores:stores.length, visitedStores:visited.length,
-      fullyDoneStores:visited.filter(store => store.missingItems === 0).length,
+      fullyDoneStores:visited.filter(store => store.status === 'complete').length,
+      questionCompleteStores:visited.filter(store => store.questionsComplete).length,
+      visitCadenceCompleteStores:visited.filter(store => store.visits.completed).length,
       totalMissingItems:visited.reduce((sum, store) => sum + store.missingItems, 0),
       unvisitedStores:stores.filter(store => !store.visited).map(store => store.name),
       stores, groups:SEP25_GROUPS, window:bimWindow(month), totalItems:SEP25_TOTAL
@@ -133,8 +178,9 @@
   }
 
   return Object.freeze({
-    EFFECTIVE_DATE, EFFECTIVE_MONTH, LEGACY_TOTAL, SEP25_TOTAL, SEP25_ITEMS, SEP25_BY_NO, SEP25_GROUPS,
-    rowIsoDate, rowMonth, isSep25Date, isSep25Month, totalForRow, itemAllowedForRow, itemRangeLabelForRow,
-    bimWindow, itemStatus, groupProgress, storeSummary, overview
+    EFFECTIVE_DATE, EFFECTIVE_MONTH, LEGACY_TOTAL, SEP25_TOTAL, MONTHLY_VISIT_TARGET, MIN_VISIT_GAP_DAYS,
+    SEP25_ITEMS, SEP25_BY_NO, SEP25_GROUPS,
+    rowIsoDate, rowVisitIsoDate, rowMonth, isSep25Date, isSep25Month, totalForRow, itemAllowedForRow, itemRangeLabelForRow,
+    bimWindow, itemStatus, groupProgress, visitCadence, storeSummary, overview
   });
 });

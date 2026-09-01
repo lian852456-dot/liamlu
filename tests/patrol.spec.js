@@ -295,7 +295,7 @@ function item18EightStoreRows() {
   return [
     ['2026/7/6 15:44', '台北大稻埕', 'DNB10284'],
     ['2026/7/13 18:27', '台北三創', 'DNB10307'],
-    ['2026/7/14 18:28', '台北萬大', 'DNB10xxx_wanda'],
+    ['2026/7/14 18:28', '台北萬大', 'DNB10168'],
     ['2026/7/16 19:24', '台北酒泉', 'DNB10062'],
     ['2026/7/27 17:51', '台北六張犁', 'DNB10440'],
     ['2026/8/4 18:14', '台北復興南', 'DNB10094'],
@@ -414,6 +414,7 @@ test('2026/08 歷史月份維持原 33 題顯示與完成計算', async ({ page 
 test('2026/09 起顯示三群新版 25 題並由 9–10 月共用第 10 題', async ({ page }) => {
   cloudRows = [
     ...versionedPatrolRows('2026-09', '台北通化', 'DNB10059', [1,2,3,4,5,6,7,8,9,...Array.from({length:15}, (_, index) => index + 11)]),
+    {...versionedPatrolRows('2026-09', '台北通化', 'DNB10059', [1])[0], fillTime:'2026/9/12 10:00', arriveTime:'2026/9/12 09:30', leaveTime:'2026/9/12 11:00'},
     ...Array.from({length:101}, (_, index) => ({
       ...versionedPatrolRows('2026-09', '台北通化', 'DNB10059', [1])[0],
       fillTime:`2026/9/${String((index % 25) + 1)} 12:${String(index % 60).padStart(2, '0')}`,
@@ -432,7 +433,8 @@ test('2026/09 起顯示三群新版 25 題並由 9–10 月共用第 10 題', as
   await expect(page.locator('#sep25GroupSummary')).toContainText('9–10月共用進度');
   await expect(page.locator('#sep25GroupSummary')).toContainText('NCC 知悉宣導・第 11–25 項');
   await expect(page.locator('#sep25Content')).toContainText('本月已完成');
-  await expect(page.locator('#sep25Content')).toContainText('本期新版 25 項檢核全數完成');
+  await expect(page.locator('#sep25Content')).toContainText('巡店完成');
+  await expect(page.locator('#sep25Content')).toContainText('相隔 7 天');
   await expect(page.locator('#sep25Overview')).toContainText('25 項完成店數');
   await expect(page.locator('#sep25Overview')).toContainText('8');
   await page.locator('.sep25-catalog summary').click();
@@ -456,8 +458,7 @@ test('新版 25 題缺第 25 題時只計缺 1 項，NCC 為 14/15', async ({ pa
   await expect(card).toContainText('缺 1 項');
   await card.click();
   await expect(card).toContainText('14/15');
-  await expect(card).toContainText('25');
-  await expect(card).not.toContainText('26');
+  await expect(card.locator('.miss-group .item .no')).toHaveText(['25']);
 });
 
 test('解析預覽先做 Server Preflight，不寫雲端、不改 rawDetails；確認後才逐店讀回', async ({ page }) => {
@@ -689,7 +690,7 @@ test('本機選檔按鈕在 iPhone 尺寸不溢出或遮住', async ({ page }) =
 test('readback 在同一店超過 100 列時完整走第二頁', async ({ page }) => {
   await stubGas(page);
   await openAndUnlock(page);
-  const month=new Date().toISOString().slice(0,7).split('-').map(Number);
+  const month=[2026,8];
   const lines=[];
   for(let visit=0;visit<4;visit++){
     for(let item=1;item<=33;item++){
@@ -1063,6 +1064,18 @@ test('大量資料會分批上傳且全數送達', async ({ page }) => {
   expect(writeCalls).toBeGreaterThan(1); // 確實有分批
 });
 
+test('新版 25 項看板只在巡店頁籤顯示，不滲入里程、班表、到店檢查與督導大盤', async ({ page }) => {
+  await stubGas(page);
+  await openAndUnlock(page, PT_KEY, '2026-09');
+  await expect(page.locator('#sep25Dashboard')).toBeVisible();
+  for (const view of ['mileage','schedule','half','halfDashboard']) {
+    await page.locator(`.secure-tab[data-view="${view}"]`).click();
+    await expect(page.locator('#sep25Dashboard')).toBeHidden();
+  }
+  await page.locator('.secure-tab[data-view="patrol"]').click();
+  await expect(page.locator('#sep25Dashboard')).toBeVisible();
+});
+
 test('公開頁面不載入班表副本，未連線或未輸入通行碼時保持鎖定', async ({ page }) => {
   await page.route('https://script.google.com/**', route => route.abort());
   await page.goto(PAGE_URL);
@@ -1096,7 +1109,7 @@ test('加密頁籤：每月班表可切換日週月檢視', async ({ page }) => 
   expect(xml).toContain('ss:StyleID="Vacation"');
 });
 
-test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({ page }) => {
+test('加密頁籤：督導到店檢查保留舊日期 18 題並可回填缺失', async ({ page }) => {
   await stubGas(page);
   await openAndUnlock(page);
   await page.locator('.secure-tab[data-view="half"]').click();
@@ -1112,10 +1125,25 @@ test('加密頁籤：半月督導檢查可回填缺失與改善說明', async ({
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '匯出 Excel' }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/半月督導檢查_.*\.xls/);
+  expect(download.suggestedFilename()).toMatch(/督導到店檢查_.*\.xls/);
   const xml = await fs.readFile(await download.path(), 'utf8');
   expect(xml).toContain('照片影片附件');
-  expect(xml).toContain('第 1–18 項');
+  expect(xml).toContain('2026/09 前第 1–18 題');
+});
+
+test('督導到店檢查自 2026/09 起改為新版第 1–9 題，舊日期仍為 18 題', async ({ page }) => {
+  await stubGas(page);
+  await openAndUnlock(page, PT_KEY, '2026-09');
+  await page.locator('.secure-tab[data-view="half"]').click();
+  await expect(page.getByRole('button', { name:'督導到店檢查' })).toHaveClass(/active/);
+  await page.locator('#halfDate').fill('2026-09-01');
+  await page.locator('#halfDate').dispatchEvent('change');
+  await expect(page.locator('.half-item')).toHaveCount(9);
+  await expect(page.locator('.half-item').first()).toContainText('督導打卡');
+  await page.locator('#halfDate').fill('2026-08-31');
+  await page.locator('#halfDate').dispatchEvent('change');
+  await expect(page.locator('.half-item')).toHaveCount(18);
+  await expect(page.locator('.half-item').last()).toContainText('到店全盤');
 });
 
 test('半月同步 token 逾時時保留本機資料，重新驗證後只續傳一次', async ({ page }) => {
@@ -1527,13 +1555,38 @@ test('7 月與 8 月分開載入，不互相污染', async ({page})=>{
   await page.evaluate(()=>{currentMonth='2026-08';});
   await page.click('.secure-tab[data-view="mileage"]');
   await expect(page.locator('#miCoverage')).not.toContainText('載入中');
-  await page.evaluate(()=>MI.setMonth('2026-07'));
+  await expect(page.locator('#miRecentMonths')).toContainText('2026/07');
+  await expect(page.locator('#miRecentMonths')).toContainText('2026/08');
+  await page.getByRole('button',{name:'2026/07'}).click();
+  await expect(page.locator('#miMonth')).toHaveValue('2026-07');
+  await expect(page.locator('#miDate')).toHaveValue('2026-07-31');
+  await page.getByRole('button',{name:'2026/08'}).click();
+  await expect(page.locator('#miMonth')).toHaveValue('2026-08');
+  await expect(page.locator('#miDate')).toHaveValue('2026-08-01');
   const result=await page.evaluate(()=>({
     july:MI._monthPlans('2026-07').map(plan=>plan.date),
     august:MI._monthPlans('2026-08').map(plan=>plan.date)
   }));
   expect(result.july).toEqual(['2026-07-31']);
   expect(result.august).toEqual(['2026-08-01']);
+});
+
+test('7、8 月里程歷史列缺到店時間時，以填表時間還原而不丟棄', async ({page})=>{
+  cloudRows=[
+    {fillTime:'2026/7/18 10:00',arriveTime:'',month:'2026-07',code:'DNB10307',store:'台北三創',item:'1'},
+    {fillTime:'2026/7/18 15:00',arriveTime:'',month:'2026-07',code:'DNB10440',store:'台北六張犁',item:'1'},
+    {fillTime:'2026/8/18 10:00',arriveTime:'',month:'2026-08',code:'DNB10307',store:'台北三創',item:'1'},
+    {fillTime:'2026/8/18 15:00',arriveTime:'',month:'2026-08',code:'DNB10440',store:'台北六張犁',item:'1'}
+  ];
+  await stubGas(page);await openAndUnlock(page);
+  await page.evaluate(()=>{currentMonth='2026-08';});
+  await page.locator('.secure-tab[data-view="mileage"]').click();
+  await page.getByRole('button',{name:'2026/07'}).click();
+  await expect(page.locator('#miDate')).toHaveValue('2026-07-18');
+  await expect(page.locator('#miStats .mi-card').first()).toContainText('2店');
+  await page.getByRole('button',{name:'2026/08'}).click();
+  await expect(page.locator('#miDate')).toHaveValue('2026-08-18');
+  await expect(page.locator('#miStats .mi-card').first()).toContainText('2店');
 });
 
 test('6→7→8→7 切換與 reload 不混用 archive、7 月或 8 月的月份資料', async ({page})=>{

@@ -4,7 +4,7 @@ const model = require('../../patrol-read-model.js');
 
 const stores = [
   { code:'DNB10059', name:'台北通化' }, { code:'DNB10062', name:'台北酒泉' },
-  { code:'DNB10307', name:'台北三創' }, { code:'DNB10xxx_wanda', name:'台北萬大' },
+  { code:'DNB10307', name:'台北三創' }, { code:'DNB10168', name:'台北萬大' },
   { code:'DNB10440', name:'台北六張犁' }, { code:'DNB10094', name:'台北復興南' },
   { code:'DNB10082', name:'台北永吉' }, { code:'DNB10284', name:'台北大稻埕' },
   { code:'DNB10146', name:'台北杭州南' }

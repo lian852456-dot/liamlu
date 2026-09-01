@@ -19,6 +19,44 @@ test('新版題目依圖片固定為 25 項與三個頻率群組', () => {
   assert.ok(Questions.SEP25_GROUPS.monthly.every(no => Questions.SEP25_BY_NO[no].rule === 'monthly'));
   assert.equal(Questions.SEP25_BY_NO[10].rule, 'bimonthly');
   assert.ok(Questions.SEP25_GROUPS.ncc.every(no => Questions.SEP25_BY_NO[no].rule === 'monthly'));
+  assert.equal(Questions.MONTHLY_VISIT_TARGET, 2);
+  assert.equal(Questions.MIN_VISIT_GAP_DAYS, 7);
+});
+
+test('每月兩次巡店須不同日期且至少相隔七天才完成', () => {
+  const store = { code:'DNB10168', name:'台北萬大' };
+  const row = date => ({ fillTime:`${date.replaceAll('-', '/')} 10:00`, month:'2026-09', code:store.code, store:store.name, item:1, result:'v' });
+  const sixDays = Questions.visitCadence([row('2026-09-01'), row('2026-09-07'), row('2026-09-07')], store, '2026-09');
+  assert.equal(sixDays.recordedVisits, 2, '同一天的多筆題目只算一次巡店');
+  assert.equal(sixDays.qualifyingVisits, 1);
+  assert.equal(sixDays.completed, false);
+  assert.equal(sixDays.nextEligibleDate, '2026-09-08');
+
+  const sevenDays = Questions.visitCadence([row('2026-09-01'), row('2026-09-08')], store, '2026-09');
+  assert.equal(sevenDays.qualifyingVisits, 2);
+  assert.equal(sevenDays.completed, true);
+  assert.equal(sevenDays.gapDays, 7);
+
+  const arrivalDateWins = Questions.visitCadence([
+    {...row('2026-09-02'), arriveTime:'2026/9/1 23:30'},
+    {...row('2026-09-09'), arriveTime:'2026/9/8 09:00'}
+  ], store, '2026-09');
+  assert.deepEqual(arrivalDateWins.dates, ['2026-09-01','2026-09-08']);
+  assert.equal(arrivalDateWins.completed, true, '巡店間隔以到店日期優先，不以稍後的填表日期取代');
+});
+
+test('新版店點完整完成需同時滿足 25 題與兩次相隔七天', () => {
+  const store = { code:'DNB10168', name:'台北萬大' };
+  const questions = Array.from({ length:25 }, (_, index) => ({
+    fillTime:'2026/9/1 10:00', month:'2026-09', code:store.code, store:store.name,
+    item:index + 1, result:'v'
+  }));
+  const oneVisit = Questions.storeSummary(questions, store, '2026-09');
+  assert.equal(oneVisit.questionsComplete, true);
+  assert.equal(oneVisit.status, 'attention');
+  const completed = Questions.storeSummary([...questions, {...questions[0], fillTime:'2026/9/8 10:00'}], store, '2026-09');
+  assert.equal(completed.visits.completed, true);
+  assert.equal(completed.status, 'complete');
 });
 
 test('圖片權威文字逐題鎖定且不覆蓋舊 ITEM_TEXT', () => {

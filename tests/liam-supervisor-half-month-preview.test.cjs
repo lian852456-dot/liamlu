@@ -21,8 +21,10 @@ test('half period canonical rule remains the formal patrol.html rule', () => {
   assert.doesNotMatch(app, /function halfPeriod\(/, 'App must not create a second period rule');
 });
 
-test('preview mirrors the formal 18-item and result semantics', () => {
-  assert.match(patrol, /const HALF_ITEMS = Array\.from\(\{length:18\}/);
+test('formal page uses 1–9 items from September while preview preserves legacy 18-item semantics', () => {
+  assert.match(patrol, /const LEGACY_HALF_ITEMS = Object\.freeze\(Array\.from\(\{length:18\}/);
+  assert.match(patrol, /const SUPERVISOR_VISIT_ITEMS = PatrolQuestionVersions\.SEP25_GROUPS\.monthly/);
+  assert.match(patrol, /function halfItemsForDate\(date\)/);
   for (const value of ["'ok'", "'abnormal'", "'na'"]) assert.match(preview, new RegExp(value));
   assert.match(preview, /const halfMonthQuestions = \[/);
   assert.match(preview, /'督導駐點'/);

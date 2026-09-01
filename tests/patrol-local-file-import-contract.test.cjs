@@ -12,10 +12,12 @@ const hashFile = file => crypto.createHash('sha256').update(fs.readFileSync(path
 const patrol = read('patrol.html');
 const importer = read('patrol-local-import.js');
 
-test('Patrol GAS、共用 GAS 與正式 read model 維持 base main 位元一致', () => {
-  assert.equal(hashFile('patrol-gas/PatrolCode.gs'), '8667d0fe01ef8b16989429a3cd99f0bb9a11fcaa27e62aa2ff726d489ccb9078');
-  assert.equal(hashFile('gas/Code.gs'), 'fe76e5192dc597843bd23156b3c228e286d75dc2f0623dab3f0224d6c536970b');
+test('Patrol GAS 同步萬大正式代碼，正式 read model 維持 base main 位元一致', () => {
+  assert.equal(hashFile('patrol-gas/PatrolCode.gs'), 'fbd0b5bad7dd6af6024dfb8816eea0c7418dbe012e5fc9494cae834fdeba4b52');
+  assert.equal(hashFile('gas/Code.gs'), '42dc3d9c38a2c632b135db296e9e721628c0e85eff77fe309234a3bac7b44461');
   assert.equal(hashFile('patrol-read-model.js'), '2476e6073280d714ed645d90e1cd6194efd196a821fab95dd6da3bdc510f9de1');
+  assert.match(read('gas/Code.gs'), /\{ code: 'DNB10168', name: '台北萬大' \}/);
+  assert.match(read('patrol-gas/PatrolCode.gs'), /\{ code: 'DNB10168', name: '台北萬大' \}/);
 });
 
 test('沒有新增 GAS route、Sheet schema、通行碼或 session 儲存', () => {
@@ -48,12 +50,16 @@ test('Excel 元件只從 repo 本機載入並保留授權', () => {
   assert.equal(require('../assets/vendor/xlsx.full.min.js').version, '0.20.3');
 });
 
-test('里程模組維持人工補登版受控基準', () => {
+test('里程模組保留人工補登，並支援歷史月份與填表時間 fallback', () => {
   const start = patrol.indexOf('const MI = (function(){');
   const end = patrol.lastIndexOf('</script>');
   assert.ok(start >= 0 && end > start);
-  const hash = crypto.createHash('sha256').update(patrol.slice(start, end)).digest('hex');
-  assert.equal(hash, 'fe06010a1269824c40fb852de27c9ee2159de53858d9fb30110833d29806a1b0');
+  const mileage = patrol.slice(start, end);
+  assert.match(mileage, /const visitTime=r\.arriveTime\|\|r\.fillTime/);
+  assert.match(mileage, /function renderRecentMonths\(\)/);
+  assert.match(mileage, /function saveLegInput\(index\)/);
+  assert.match(mileage, /dayEdits/);
+  assert.match(mileage, /cloudCall\('ptmileage2',\{month\}\)/);
 });
 
 test('本機匯入只保留正式十二欄，不包含檔案內容或公開資料寫入', () => {
