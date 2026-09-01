@@ -413,13 +413,12 @@ test('2026/08 歷史月份維持原 33 題顯示與完成計算', async ({ page 
 
 test('2026/09 起顯示三群新版 25 題並由 9–10 月共用第 10 題', async ({ page }) => {
   cloudRows = [
-    ...versionedPatrolRows('2026-09', '台北通化', 'DNB10059', [1,2,3,4,5,6,7,8,9,...Array.from({length:15}, (_, index) => index + 11)]),
+    ...versionedPatrolRows('2026-09', '台北通化', 'DNB10059', [1,2,3,4,5,6,7,8,9,10,...Array.from({length:15}, (_, index) => index + 11)]),
     {...versionedPatrolRows('2026-09', '台北通化', 'DNB10059', [1])[0], fillTime:'2026/9/12 10:00', arriveTime:'2026/9/12 09:30', leaveTime:'2026/9/12 11:00'},
     ...Array.from({length:101}, (_, index) => ({
       ...versionedPatrolRows('2026-09', '台北通化', 'DNB10059', [1])[0],
       fillTime:`2026/9/${String((index % 25) + 1)} 12:${String(index % 60).padStart(2, '0')}`,
     })),
-    ...versionedPatrolRows('2026-10', '台北通化', 'DNB10059', [10]),
   ];
   await stubGas(page);
   await openAndUnlock(page, PT_KEY, '2026-09');
@@ -444,8 +443,30 @@ test('2026/09 起顯示三群新版 25 題並由 9–10 月共用第 10 題', as
   expect(ptDetailCalls).toEqual(expect.arrayContaining([
     expect.objectContaining({month:'2026-09', store:'台北通化', page:1, limit:100}),
     expect.objectContaining({month:'2026-09', store:'台北通化', page:2, limit:100}),
-    expect.objectContaining({month:'2026-10', store:'台北通化', page:1, limit:100}),
   ]));
+  expect(ptDetailCalls.some(call => call.month === '2026-10')).toBe(false);
+  expect(new Set(ptDetailCalls.map(call => call.store))).toEqual(new Set(['台北通化']));
+});
+
+test('新版 25 項明細更新逾時時保留上次成功看板', async ({ page }) => {
+  cloudRows = versionedPatrolRows('2026-09', '台北通化', 'DNB10059', Array.from({length:25}, (_, index) => index + 1));
+  await stubGas(page);
+  await openAndUnlock(page, PT_KEY, '2026-09');
+  await expect(page.locator('#sep25LoadState')).toContainText('正式 ptdetail 唯讀驗證完成');
+  await expect(page.locator('#sep25Content')).toContainText('台北通化');
+
+  await page.evaluate(async () => {
+    const original=window.cloudCall;
+    window.cloudCall=(action,params)=>action==='ptdetail'
+      ? Promise.reject(new Error('巡店資料讀取逾時'))
+      : original(action,params);
+    await cloudLoad();
+  });
+
+  await expect(page.locator('#sep25LoadState')).toContainText('巡店資料讀取逾時；顯示上次成功資料');
+  await expect(page.locator('#sep25Content')).toContainText('台北通化');
+  expect(await page.evaluate(() => ({status:sep25State.status,hasModel:Boolean(sep25State.model),rowCount:sep25State.rows.length})))
+    .toMatchObject({status:'error',hasModel:true,rowCount:25});
 });
 
 test('新版 25 題缺第 25 題時只計缺 1 項，NCC 為 14/15', async ({ page }) => {

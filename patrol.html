@@ -1939,7 +1939,7 @@ function storeCardHTML(storeName){
 function cloudCall(action, params={}){
   return patrolRequestWithReauth(()=>{
     if(!['ping','pthealth'].includes(action)&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
-    const timeoutMs=action==='ptsummary'?20000:(action==='ptdetail'||action==='ptmileage'||action==='ptmileage2')?30000:0;
+    const timeoutMs=action==='ptsummary'?20000:action==='ptdetail'?60000:(action==='ptmileage'||action==='ptmileage2')?30000:0;
     if(action==='ptsummary'||action==='ptdetail'||action==='ptmileage'||action==='ptmileage2'){
       const controller=new AbortController();
       const timer=setTimeout(()=>controller.abort(),timeoutMs);
@@ -1997,9 +1997,17 @@ function cloudConnect(){
   });
 }
 
-async function loadSep25DetailRows(month){
-  const months=PatrolQuestionVersions.bimWindow(month).months;
-  const tasks=STORES.flatMap(store=>months.map(value=>({month:value,store:store.name})));
+async function loadSep25DetailRows(month,summary){
+  // 雙月題只需讀到目前選定月份；例如查 9 月時不應預讀尚未發生的 10 月。
+  const months=PatrolQuestionVersions.bimWindow(month).months.filter(value=>value<=month);
+  const summaryStores=Array.isArray(summary&&summary.stores)?summary.stores:[];
+  const hasVisitedContract=summaryStores.length===STORES.length&&summaryStores.every(store=>typeof store.visited==='boolean');
+  const normalized=value=>String(value||'').replace(/^台北/,'').replace(/\s+/g,'').trim();
+  const currentStores=hasVisitedContract?STORES.filter(store=>{
+    const matched=summaryStores.find(item=>(store.code&&String(item.code||'')===String(store.code))||normalized(item.name||item.store)===normalized(store.name));
+    return matched&&matched.visited;
+  }):STORES;
+  const tasks=months.flatMap(value=>(value===month?currentStores:STORES).map(store=>({month:value,store:store.name})));
   const collected=[];
   let nextTask=0;
   async function loadTask(task){
@@ -2035,7 +2043,7 @@ async function loadSep25FormalDashboard(month){
   sep25State={month,status:'loading',rows:previous?.rows||[],model:previous?.model||null,message:'正在讀取新版 25 項正式巡店明細…',verifiedAt:previous?.verifiedAt||''};
   render();
   try{
-    const rows=await loadSep25DetailRows(month);
+    const rows=await loadSep25DetailRows(month,patrolSummary);
     if(sequence!==sep25LoadSequence||currentMonth!==month)return false;
     const model=PatrolQuestionVersions.overview(rows,STORES,month);
     sep25State={month,status:'ok',rows,model,message:'',verifiedAt:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'})};
@@ -2043,7 +2051,9 @@ async function loadSep25FormalDashboard(month){
     return true;
   }catch(error){
     if(sequence!==sep25LoadSequence||currentMonth!==month)return false;
-    sep25State={month,status:'error',rows:[],model:null,message:String(error&&error.message||'新版 25 項正式資料讀取失敗'),verifiedAt:''};
+    const preserved=Boolean(previous&&previous.model);
+    const message=String(error&&error.message||'新版 25 項正式資料讀取失敗');
+    sep25State={month,status:'error',rows:previous?.rows||[],model:previous?.model||null,message:preserved?`${message}；顯示上次成功資料`:message,verifiedAt:previous?.verifiedAt||''};
     render();
     return false;
   }

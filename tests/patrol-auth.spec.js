@@ -158,8 +158,8 @@ test('正確密碼取得後端 token 後才建立看板並載入資料', async (
   await expect(page.locator('#patrolAuthGate')).toBeHidden();
   await expect(page.locator('#pasteBox')).toBeVisible();
   await expect(page.locator('#mileageView')).toHaveCount(1);
-  await expect(page.locator('#patrolAppHost #content')).toBeVisible();
-  await expect(page.locator('#patrolAppHost #invPanels')).toContainText('通化');
+  await expect(page.locator('#patrolAppHost #sep25Dashboard')).toBeVisible();
+  await expect(page.locator('#patrolAppHost #sep25Content')).toContainText('通化');
   await expect.poll(() => state.protectedCalls.filter(call => call.action === 'ptsummary').length).toBe(1);
   expect(state.protectedCalls.every(call => call.valid)).toBe(true);
   const storage = await page.evaluate(() => ({
