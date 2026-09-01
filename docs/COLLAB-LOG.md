@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-09-01 ｜ Codex（新版 25 項巡店看板讀取逾時修正已發布）
+
+- 做了什麼：根因為 9 月新版看板在 `ptsummary` 成功後，仍對九店同時讀取 9 月及尚未發生的 10 月 `ptdetail`，18 組查詢任一超過 30 秒便清空新版看板。前端現只讀雙月視窗中不晚於選定月份的資料；選定月份只讀 `ptsummary` 已標示有到店紀錄的門市，visited contract 不完整時才保守回退九店；`ptdetail` 單次等待上限調為 60 秒。重新整理失敗時保留上次成功 rows／model／驗證時間並明示「顯示上次成功資料」。
+- 結果（Pages 已發布／正式資料未讀寫）：Node `358/358`、Patrol Chromium `81/81`、針對性 4/4 與 9 月登入新版容器測試通過；全站 Chromium `193/204`，8 個更新前既有基準失敗持續存在，另外兩個並行 screenshot timeout 單線重跑通過，過期的 33 題登入斷言已改為 9 月新版容器並通過，沒有候選新增功能失敗。正式 commit `10894cfbe16a7b4a7f3547c6b625ef421250126a`，Pages run `33460159174` 的 build／status／deploy 全成功；線上與 repo `patrol.html` SHA-256 均為 `72500eb05aacbca8f50adbaaaf87ba6f770291bba86b396a666e6e85758bfd06`，home／patrol／app／index HTTP 200。
+- 經驗 / 給下一位的提醒：9 月查看 9–10 月雙月題時不可預讀 10 月；10 月查看時仍需納入 9 月資料。`ptsummary` 的 current-month visited 是縮小 `ptdetail` 查詢面的唯一依據，不可用 33 題完成率代算新版 25 題。本次未改 GAS、Sheet schema、session／權限或正式資料；回復分支 `rollback/patrol-sep25-timeout-predeploy-20260901` 指向 `d86d1f2`。Liam 重新整理後的登入實機確認仍須與靜態發布分開記錄。
+
 ## 2026-09-01 ｜ Codex（巡店五項回饋 Pages 已發布／Patrol GAS 待 Liam）
 
 - 做了什麼：萬大正式代碼統一為 `DNB10168`；新版 25 項加入每店每月 2 次且不同日期至少相隔 7 天的提醒、最早可完成日期與完成判定；新版看板只在巡店頁顯示；「半月督導檢查」改名「督導到店檢查」，9 月起採新版第 1–9 題、舊日期保留 18 題；里程新增近六個月快速切換與前後月，並以到店時間優先、填表時間 fallback 還原歷史列。
