@@ -63,11 +63,15 @@
         <h2>九店完成總覽</h2>
         <p id="sourceMeta" class="source-meta"></p>
       </div>
-      <label class="field compact-field">
-        <span>查看日期</span>
-        <input id="viewDate" type="date">
-      </label>
+      <div class="dashboard-actions">
+        <label class="field compact-field">
+          <span>查看日期</span>
+          <input id="viewDate" type="date">
+        </label>
+        <button class="primary-button copy-button" id="copyReminder" type="button">一鍵複製群組提醒</button>
+      </div>
     </div>
+    <p id="copyMessage" class="copy-message" role="status" aria-live="polite"></p>
 
     <div class="summary-grid" aria-label="完成摘要">
       <article><span>每日完成</span><strong id="dailyMetric">0 / 36</strong><small>九店 × 每日四項</small></article>

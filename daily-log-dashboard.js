@@ -183,6 +183,27 @@ function renderDashboard() {
   bindDetailButtons();
 }
 
+async function copyGroupReminder() {
+  if (!state.model || !state.snapshot) return;
+  const reminder = Core.buildGroupReminder(state.model, state.snapshot.unknownForms);
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(reminder);
+    copied = true;
+  } catch (_) {
+    const textarea = document.createElement('textarea');
+    textarea.value = reminder;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    copied = document.execCommand('copy');
+    textarea.remove();
+  }
+  $('copyMessage').textContent = copied ? '已複製，可直接貼到 LINE 群組。' : '瀏覽器未允許複製，請重新點擊或檢查剪貼簿權限。';
+}
+
 function renderFormDetail(form) {
   const dueText = form.dueDate ? `${form.dueLabel}（${form.dueDate}）` : form.dueLabel;
   const meta = [dueText, form.submittedAt ? `最後填寫 ${form.submittedAt}` : '', form.submitters && form.submitters.length ? `填寫人 ${form.submitters.join('、')}` : ''].filter(Boolean).join(' · ');
@@ -220,6 +241,7 @@ $('fileInput').addEventListener('change', event => parseFile(event.target.files 
 $('applyPreview').addEventListener('click', applyPending);
 $('clearSnapshot').addEventListener('click', clearSnapshot);
 $('viewDate').addEventListener('change', renderDashboard);
+$('copyReminder').addEventListener('click', copyGroupReminder);
 $('closeDialog').addEventListener('click', () => $('detailDialog').close());
 $('detailDialog').addEventListener('click', event => { if (event.target === $('detailDialog')) $('detailDialog').close(); });
 

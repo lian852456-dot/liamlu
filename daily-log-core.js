@@ -335,6 +335,53 @@
     };
   }
 
+  function buildGroupReminder(model, unknownForms) {
+    if (!model || !Array.isArray(model.stores) || !normalizeDate(model.date)) {
+      throw new Error('缺少可匯出的日誌儀表板資料。');
+    }
+    const cadenceLabels = { daily:'每日', weekly:'每週', monthly:'每月' };
+    const statusLabels = { pending:'未完成', missing:'缺資料', unknown:'待確認' };
+    const unknownByStore = new Map();
+    (Array.isArray(unknownForms) ? unknownForms : []).forEach(item => {
+      const store = canonicalStore(item && item.store) || text(item && item.store);
+      if (!store) return;
+      if (!unknownByStore.has(store)) unknownByStore.set(store, []);
+      unknownByStore.get(store).push(text(item.formName) || '未命名表單');
+    });
+
+    const storeLines = [];
+    model.stores.forEach(store => {
+      const groups = ['daily', 'weekly', 'monthly'].map(cadence => {
+        const forms = (store[ cadence ] || []).filter(form => form.isDue && form.status !== 'done');
+        if (!forms.length) return '';
+        const items = forms.map(form => `${form.shortLabel}（${statusLabels[form.status] || '待確認'}）`);
+        return `${cadenceLabels[cadence]}：${items.join('、')}`;
+      }).filter(Boolean);
+      const unknown = unknownByStore.get(store.store) || [];
+      if (unknown.length) groups.push(`未定義表單：${[...new Set(unknown)].join('、')}`);
+      if (groups.length) storeLines.push(`• ${store.store}｜${groups.join('｜')}`);
+    });
+
+    unknownByStore.forEach((forms, store) => {
+      if (model.stores.some(item => item.store === store)) return;
+      storeLines.push(`• ${store}｜未定義表單：${[...new Set(forms)].join('、')}`);
+    });
+
+    const dateLabel = model.date.replace(/-/g, '/');
+    const unknownCount = (Array.isArray(unknownForms) ? unknownForms : []).length;
+    const trackingCount = model.exceptionCount + unknownCount;
+    const lines = [
+      `📋 北一二B每日日誌提醒｜${dateLabel}`,
+      `📊 完成：每日 ${model.dailyDone}/${model.dailyExpected}｜每週 ${model.weeklyDone}/${model.weeklyExpected}｜每月 ${model.monthlyDone}/${model.monthlyExpected}`
+    ];
+    if (!storeLines.length) {
+      lines.push('✅ 今日已到期項目皆完成。');
+    } else {
+      lines.push(`⚠️ 需追蹤 ${trackingCount} 項，請以下門市完成／確認：`, ...storeLines, '完成後請於群組回覆，謝謝。');
+    }
+    return lines.join('\n');
+  }
+
   return {
     STORES,
     FIELD_ALIASES,
@@ -351,6 +398,7 @@
     summarizeForm,
     dueDateFor,
     withDueState,
-    buildDashboard
+    buildDashboard,
+    buildGroupReminder
   };
 });

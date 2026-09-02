@@ -92,6 +92,20 @@ test('到期判斷排除尚未到期的週表與月表', () => {
   assert.equal(Core.dueDateFor(Core.FORM_DEFINITIONS.find(item => item.id === 'environment-w1'), '2026-09-02'), '2026-09-06');
 });
 
+test('群組提醒只列已到期需追蹤項目並附完成摘要', () => {
+  const rows = [{
+    store:'台北酒泉', date:'2026-09-02', month:'2026-09', formId:'calendar',
+    status:'done', submittedAt:'2026-09-02 09:00', submitter:'A', section:'店務', itemText:'查看今日事項'
+  }];
+  const model = Core.buildDashboard(rows, '2026-09-02');
+  const reminder = Core.buildGroupReminder(model, [{ store:'台北酒泉', formName:'臨時測試表' }]);
+  assert.match(reminder, /📋 北一二B每日日誌提醒｜2026\/09\/02/);
+  assert.match(reminder, /完成：每日 1\/36｜每週 0\/36｜每月 0\/18/);
+  assert.match(reminder, /台北酒泉｜每日：營業前（缺資料）、營業中（缺資料）、打烊後（缺資料）｜每月：物品清點（缺資料）｜未定義表單：臨時測試表/);
+  assert.doesNotMatch(reminder, /第一週（未到期）/);
+  assert.match(reminder, /需追蹤 45 項/);
+});
+
 test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', () => {
   const root = path.resolve(__dirname, '..');
   const page = fs.readFileSync(path.join(root, 'daily-log-dashboard.html'), 'utf8');
@@ -108,6 +122,8 @@ test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', 
   assert.match(controller, /bei12b_daily_log_snapshot_v1/);
   assert.match(controller, /MAX_FILE_BYTES = 20 \* 1024 \* 1024/);
   assert.match(controller, /SUPPORTED_EXTENSIONS = new Set\(\['xlsx', 'xls', 'csv', 'tsv'\]\)/);
+  assert.match(page, /id="copyReminder"[^>]*>一鍵複製群組提醒</);
+  assert.match(controller, /Core\.buildGroupReminder/);
   assert.match(home, /href="daily-log-dashboard\.html"/);
   assert.match(home, />每日日誌檢查</);
 });
