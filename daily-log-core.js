@@ -353,10 +353,14 @@
   function summarizeForm(rows, definition) {
     const matches = (rows || []).filter(row => row.formId === definition.id);
     if (!matches.length) return { ...definition, status:'missing', doneItems:0, totalItems:0, rows:[] };
+    // SMS 打烊後匯出會同時帶出「未填寫的預設列」與「正式回填列」。
+    // 同一店／日期／表單只要已有填寫時間，就只採用正式回填列，避免預設列把完成狀態覆蓋掉。
+    const submittedRows = matches.filter(row => text(row.submittedAt));
+    const effectiveRows = submittedRows.length ? submittedRows : matches;
     // SMS 匯出可能在同一表單後夾入狀態空白的版面／彙總列。
     // 只以有明確處理狀態的明細判定，避免 23 筆「已完成」被一列空白誤判為未完成。
-    const evaluatedRows = matches.filter(row => !Object.prototype.hasOwnProperty.call(row, 'statusRaw') || text(row.statusRaw));
-    const statusRows = evaluatedRows.length ? evaluatedRows : matches;
+    const evaluatedRows = effectiveRows.filter(row => !Object.prototype.hasOwnProperty.call(row, 'statusRaw') || text(row.statusRaw));
+    const statusRows = evaluatedRows.length ? evaluatedRows : effectiveRows;
     const doneItems = statusRows.filter(row => row.status === 'done').length;
     const unknownItems = statusRows.filter(row => row.status === 'unknown').length;
     const status = doneItems === statusRows.length ? 'done' : unknownItems ? 'unknown' : 'pending';

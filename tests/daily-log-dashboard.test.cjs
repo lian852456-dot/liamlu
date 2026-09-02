@@ -99,6 +99,19 @@ test('表單後方的空白狀態列不會把全數完成誤判為未完成', ()
   assert.equal(closing.totalItems, 23);
 });
 
+test('有正式回填資料時忽略同表單未填寫的預設列', () => {
+  const definition = { id:'closing', label:'打烊後', cadence:'daily' };
+  const summary = Core.summarizeForm([
+    { formId:'closing', status:'pending', statusRaw:'未完成', submittedAt:'', itemText:'預設題目' },
+    { formId:'closing', status:'done', statusRaw:'已完成', submittedAt:'2026-09-02 21:20', itemText:'正式回填' }
+  ], definition);
+
+  assert.equal(summary.status, 'done');
+  assert.equal(summary.doneItems, 1);
+  assert.equal(summary.totalItems, 1);
+  assert.equal(summary.submittedAt, '2026-09-02 21:20');
+});
+
 test('到期判斷排除尚未到期的週表與月表', () => {
   const rows = [
     {
@@ -175,7 +188,7 @@ test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', 
   assert.doesNotMatch(page, /https?:\/\//);
   assert.match(page, /<input class="file-input" id="fileInput" type="file" accept="\.xlsx,\.xls,\.csv,\.tsv">/);
   assert.doesNotMatch(page, /id="chooseFile"/);
-  assert.match(page, /<script src="daily-log-dashboard\.js\?v=20260902-5"><\/script>/);
+  assert.match(page, /<script src="daily-log-dashboard\.js\?v=20260902-6"><\/script>/);
   assert.doesNotMatch(page, /type="module" src="daily-log-dashboard\.js"/);
   assert.match(page, /候選版 · 本機預覽/);
   assert.match(page, /尚未寫入雲端/);
@@ -187,7 +200,7 @@ test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', 
   assert.match(page, /id="calendarFileInput" type="file"/);
   assert.match(page, /店務行事曆 Excel/);
   assert.match(controller, /Core\.chooseBestCalendarSheet/);
-  assert.match(page, /daily-log-dashboard\.js\?v=20260902-5/);
+  assert.match(page, /daily-log-dashboard\.js\?v=20260902-6/);
   assert.match(home, /href="daily-log-dashboard\.html"/);
   assert.match(home, />每日日誌檢查</);
 });
