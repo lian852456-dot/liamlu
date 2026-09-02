@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-09-02 ｜ Codex（每日日誌 Pages 發布與正式網址選檔驗證）
+
+- 做了什麼：經 Liam 明確授權後，先建立 `rollback/daily-log-dashboard-predeploy-20260902` 指向發布前 `5812db7`，再將每日日誌候選版發布到 GitHub Pages；使用雲端 Chrome 由 `home.html` 同仁大廳實際點入 `daily-log-dashboard.html`，以不含真實資料的合成 `.xlsx` 操作原生檔案選擇器、解析並套用本機預覽。
+- 結果（Pages 已發布／本機資料模式）：正式網址成功辨識工作表 `每日日誌`、表頭第 1 列、5 列有效資料、1 間門市、5 種已確認表單、0 筆待確認，產生每日 `0/36`、每週 `3/36`、每月 `1/18` 及需追蹤 `44`；返回同仁大廳後入口存在且可再次開啟，`localStorage` 預覽仍可讀回。網站來源無 console error；瀏覽器擴充套件自身 metadata 錯誤與網站無關。正式發布 commit `7958054be0c715f7ba11b1fa20c2e9dac3be682a`。
+- 經驗 / 給下一位的提醒：原生 `.xlsx` 選檔流程已在實際 HTTPS 通過；CSV 合成檔曾因匯入版型未被 SheetJS 選為有效工作表，不可拿該結果否定 Excel 功能。此版本仍只在瀏覽器解析並寫入目前裝置 `localStorage`，沒有 GAS／Sheet／巡店資料寫入；真實去識別化 Excel、手機版與中央 read/write/readback 尚待後續確認。
+
 ## 2026-09-02 ｜ Codex（每日日誌本機 Excel 選檔修正）
 
 - 做了什麼：修正直接由本機／工作區開啟 `daily-log-dashboard.html` 時，頁面控制器使用 ES module 而遭 `file://` 安全限制阻擋，導致選檔無反應。控制器改為頁尾一般腳本；第二次依使用者回報再移除自訂按鈕與隱藏欄位，改成瀏覽器直接呈現的原生 `input type=file`，不再依賴程式轉按選檔。
