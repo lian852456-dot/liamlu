@@ -12,6 +12,7 @@
 
   const FIELD_ALIASES = Object.freeze({
     store: ['店點', '門市', '營業點', '檢查店點'],
+    checkDate: ['檢查年月日', '檢查日期', '資料日期', '作業日期'],
     submitter: ['填寫人員', '填表人員', '填寫者', '檢查人員'],
     submittedAt: ['填寫時間', '填表時間', '最後填寫日期', '完成時間'],
     formName: ['檢查項目', '表單名稱', '檢查表', '檢查表名稱'],
@@ -213,9 +214,11 @@
         unknownForms.push({ sourceRow:index + 1, store, formName:formRaw || '空白', itemText });
         continue;
       }
+      const checkDateRaw = Number.isInteger(detected.map.checkDate) ? source[detected.map.checkDate] : '';
       const submittedAtRaw = Number.isInteger(detected.map.submittedAt) ? source[detected.map.submittedAt] : '';
       const submittedAt = normalizeDateTime(submittedAtRaw, settings);
-      const date = normalizeDate(submittedAtRaw, settings) || normalizeDate(settings.asOfDate, settings);
+      // 打烊後可能在午夜後才填寫；統計歸屬應以報表的檢查日期為準。
+      const date = normalizeDate(checkDateRaw, settings) || normalizeDate(submittedAtRaw, settings) || normalizeDate(settings.asOfDate, settings);
       if (!date) {
         errors.push(`第 ${index + 1} 列無法判定資料日期；請在上傳前選擇資料基準日。`);
         continue;
