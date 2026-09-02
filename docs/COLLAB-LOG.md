@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-09-02 ｜ Codex（群組提醒與獨立店務行事曆上傳已發布）
+
+- 做了什麼：在每日日誌檢查新增「一鍵複製群組提醒」及文字預覽；提醒依查看日期列出三類完成度、已到期缺項與門市，排除未到期項目。依 Liam 提供的店務行事曆匯出格式新增第二個獨立選檔入口，辨識檢查日期、九店店名／DNB 代碼、檢查人員、填寫時間與處理狀態，再以店點＋日期覆蓋／合併日誌檔內的行事曆資料。同步為 CSS、核心與控制器加版本參數，避免 Pages 快取舊腳本導致按鈕無反應。
+- 結果（Pages 已發布／雙檔本機合併）：Node `369/369`、npm audit 0、JS syntax 與 diff check 通過。正式網址以合成日誌 `.xlsx` 5 列及同版型行事曆 `.xlsx` 9 列實測，合併後 14 列／9 店／0 待確認；行事曆完成 4 店使每日完成變為 `4/36`，需追蹤由 44 降為 40。群組提醒成功寫入剪貼簿且預覽文字一致，網站 console 無錯誤。正式 commit `4f6b549d87763a3681b55408bd8ca5dee2e57160`。
+- 經驗 / 給下一位的提醒：行事曆匯出會同時含多日期，儀表板只依「查看日期」取當日九店；獨立行事曆只覆蓋相同店點＋日期的 calendar 列，不影響營業前／中／後、每週或每月資料。兩檔仍只進目前瀏覽器與 `localStorage`，未寫 GAS／Sheet／巡店。回復分支 `rollback/daily-log-calendar-upload-predeploy-20260902` 指向 `ed45a608`；前一階段群組提醒回復分支為 `rollback/daily-log-group-reminder-predeploy-20260902`。
+
 ## 2026-09-02 ｜ Codex（每日日誌 Pages 發布與正式網址選檔驗證）
 
 - 做了什麼：經 Liam 明確授權後，先建立 `rollback/daily-log-dashboard-predeploy-20260902` 指向發布前 `5812db7`，再將每日日誌候選版發布到 GitHub Pages；使用雲端 Chrome 由 `home.html` 同仁大廳實際點入 `daily-log-dashboard.html`，以不含真實資料的合成 `.xlsx` 操作原生檔案選擇器、解析並套用本機預覽。
