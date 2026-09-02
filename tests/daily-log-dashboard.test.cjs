@@ -83,6 +83,22 @@ test('跨午夜填寫的打烊後檢查仍歸入檢查年月日', () => {
   assert.equal(Core.buildDashboard(result.rows, '2026-09-02').stores[0].daily.find(item => item.id === 'closing').status, 'done');
 });
 
+test('表單後方的空白狀態列不會把全數完成誤判為未完成', () => {
+  const rows = Array.from({ length:23 }, (_, index) => ({
+    store:'台北酒泉', date:'2026-09-02', month:'2026-09', formId:'closing',
+    status:'done', statusRaw:'已完成', submittedAt:'2026-09-03 00:18',
+    submitter:'王小明', section:'閉店作業', itemText:`完成項目 ${index + 1}`
+  }));
+  rows.push({
+    store:'台北酒泉', date:'2026-09-02', month:'2026-09', formId:'closing',
+    status:'pending', statusRaw:'', submittedAt:'', submitter:'', section:'', itemText:'彙總列'
+  });
+  const closing = Core.buildDashboard(rows, '2026-09-02').stores[0].daily.find(item => item.id === 'closing');
+  assert.equal(closing.status, 'done');
+  assert.equal(closing.doneItems, 23);
+  assert.equal(closing.totalItems, 23);
+});
+
 test('到期判斷排除尚未到期的週表與月表', () => {
   const rows = [
     {
@@ -159,7 +175,7 @@ test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', 
   assert.doesNotMatch(page, /https?:\/\//);
   assert.match(page, /<input class="file-input" id="fileInput" type="file" accept="\.xlsx,\.xls,\.csv,\.tsv">/);
   assert.doesNotMatch(page, /id="chooseFile"/);
-  assert.match(page, /<script src="daily-log-dashboard\.js\?v=20260902-4"><\/script>/);
+  assert.match(page, /<script src="daily-log-dashboard\.js\?v=20260902-5"><\/script>/);
   assert.doesNotMatch(page, /type="module" src="daily-log-dashboard\.js"/);
   assert.match(page, /候選版 · 本機預覽/);
   assert.match(page, /尚未寫入雲端/);
@@ -171,7 +187,7 @@ test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', 
   assert.match(page, /id="calendarFileInput" type="file"/);
   assert.match(page, /店務行事曆 Excel/);
   assert.match(controller, /Core\.chooseBestCalendarSheet/);
-  assert.match(page, /daily-log-dashboard\.js\?v=20260902-4/);
+  assert.match(page, /daily-log-dashboard\.js\?v=20260902-5/);
   assert.match(home, /href="daily-log-dashboard\.html"/);
   assert.match(home, />每日日誌檢查</);
 });

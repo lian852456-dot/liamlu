@@ -353,17 +353,21 @@
   function summarizeForm(rows, definition) {
     const matches = (rows || []).filter(row => row.formId === definition.id);
     if (!matches.length) return { ...definition, status:'missing', doneItems:0, totalItems:0, rows:[] };
-    const doneItems = matches.filter(row => row.status === 'done').length;
-    const unknownItems = matches.filter(row => row.status === 'unknown').length;
-    const status = doneItems === matches.length ? 'done' : unknownItems ? 'unknown' : 'pending';
+    // SMS 匯出可能在同一表單後夾入狀態空白的版面／彙總列。
+    // 只以有明確處理狀態的明細判定，避免 23 筆「已完成」被一列空白誤判為未完成。
+    const evaluatedRows = matches.filter(row => !Object.prototype.hasOwnProperty.call(row, 'statusRaw') || text(row.statusRaw));
+    const statusRows = evaluatedRows.length ? evaluatedRows : matches;
+    const doneItems = statusRows.filter(row => row.status === 'done').length;
+    const unknownItems = statusRows.filter(row => row.status === 'unknown').length;
+    const status = doneItems === statusRows.length ? 'done' : unknownItems ? 'unknown' : 'pending';
     return {
       ...definition,
       status,
       doneItems,
-      totalItems:matches.length,
-      rows:matches,
-      submittedAt:latest(matches.map(row => row.submittedAt)),
-      submitters:[...new Set(matches.map(row => row.submitter).filter(Boolean))]
+      totalItems:statusRows.length,
+      rows:statusRows,
+      submittedAt:latest(statusRows.map(row => row.submittedAt)),
+      submitters:[...new Set(statusRows.map(row => row.submitter).filter(Boolean))]
     };
   }
 
