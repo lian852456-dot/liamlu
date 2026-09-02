@@ -52,5 +52,6 @@ test('同仁大廳第一張卡為 KPI 戰情，原入口仍保留原連結', () 
     'kpitry.html',
     'audit-report.html',
     'https://twm-store-inspection.liamlu245.chatgpt.site/',
+    'daily-log-dashboard.html',
   ]);
 });

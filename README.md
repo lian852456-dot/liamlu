@@ -23,6 +23,12 @@
 - 九店稽核值使用既有正式 canonical ID；其中萬大為 `DNB10168`、通化為 `DNB10174`，不沿用巡店相容層的 provisional／legacy code。介面仍統一顯示「台北三創」。
 - 私有照片重新載入統一走永遠回傳 Promise 的 `ensurePrivatePhoto()`；照片仍只由 `audit_photo_read` 讀成暫時 Blob URL，頁面卸載時釋放。部署與 Liam iPhone UAT gate 見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
 
+## 每日日誌檢查（本機候選）
+
+- `home.html` 的同仁大廳新增 `daily-log-dashboard.html` 入口，以本機 Excel／CSV 呈現北一二B九店每日四項、每週第一至第四週及每月兩項的完成狀況。
+- 尚未到期的週／月表不列入需追蹤；點擊門市可展開長細項、填寫人及最後填寫時間。第五週與失分計算仍待規則確認。
+- 候選版只在瀏覽器解析並保存目前裝置預覽，尚未建立正式日誌 API、中央寫入、readback、權限或 Pages 部署。資料契約與發布條件見 [`docs/DAILY-LOG-DASHBOARD.md`](docs/DAILY-LOG-DASHBOARD.md)。
+
 ## 行進間戰報
 
 - `home.html` 的督導專區已有 `live-battle.html` 正式入口；AQ／RT 可先在公司電腦本機選檔，不必先載入目標。第一張戰報分成 AQ、RT 兩張全國各部明細表，依原表順序呈現合計、999↑、999↑占比、小A／小R、999／1199／1399／1599／1899／2699，並將好速接在 2699 後；RT 另列提前續約，原表有 RANK 時一併保留。九店戰情保留 AQ 上線、A999、A1399、RT 上線、R999、R1399、好速七項欄位。

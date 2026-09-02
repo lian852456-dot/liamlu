@@ -12,7 +12,7 @@ test('同仁大廳以 KPI、台獎戰情為前兩個入口，既有店務檢查�
   await page.goto(PAGE_URL);
 
   const staffCards = page.locator('[aria-label="同仁大廳"] .card');
-  await expect(staffCards).toHaveCount(7);
+  await expect(staffCards).toHaveCount(8);
   await expect(staffCards.first()).toContainText('KPI 戰情');
   await expect(staffCards.first()).toContainText('員編登入 · 核准裝置');
   await expect(staffCards.first()).toHaveAttribute('href', 'kpi-battle.html');
@@ -30,6 +30,9 @@ test('同仁大廳以 KPI、台獎戰情為前兩個入口，既有店務檢查�
   await expect(staffCards.nth(6)).toHaveAttribute('href', STORE_INSPECTION_URL);
   await expect(staffCards.nth(6)).toHaveAttribute('target', '_blank');
   await expect(staffCards.nth(6)).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(staffCards.nth(7)).toContainText('每日日誌檢查');
+  await expect(staffCards.nth(7)).toContainText('九店完成追蹤 · 本機檔案更新');
+  await expect(staffCards.nth(7)).toHaveAttribute('href', 'daily-log-dashboard.html');
 
   const boxes = await staffCards.evaluateAll(cards => cards.map(card => card.getBoundingClientRect().toJSON()));
   expect(boxes[0].y).toBe(boxes[1].y);
@@ -38,6 +41,7 @@ test('同仁大廳以 KPI、台獎戰情為前兩個入口，既有店務檢查�
   expect(boxes[4].y).toBeGreaterThan(boxes[2].y);
   expect(boxes[4].y).toBe(boxes[5].y);
   expect(boxes[6].y).toBeGreaterThan(boxes[4].y);
+  expect(boxes[6].y).toBe(boxes[7].y);
 });
 
 test('同仁大廳手機版維持單欄且文字未水平溢出，既有入口連結不變', async ({ page }) => {
@@ -52,10 +56,10 @@ test('同仁大廳手機版維持單欄且文字未水平溢出，既有入口�
   expect(boxes[4].y).toBeGreaterThan(boxes[3].y);
   expect(await page.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
 
-  await expect(page.locator('.card')).toHaveCount(10);
+  await expect(page.locator('.card')).toHaveCount(11);
   await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(3);
   await expect(page.locator('[aria-label="督導專區"] .card[href="live-battle.html"]')).toContainText('行進間戰報');
-  expect(await page.locator(`.card:not([href="kpi-battle.html"]):not([href="awards-battle.html"]):not([href="audit-report.html"]):not([href="live-battle.html"]):not([href="${STORE_INSPECTION_URL}"])`).evaluateAll(
+  expect(await page.locator(`.card:not([href="kpi-battle.html"]):not([href="awards-battle.html"]):not([href="audit-report.html"]):not([href="live-battle.html"]):not([href="daily-log-dashboard.html"]):not([href="${STORE_INSPECTION_URL}"])`).evaluateAll(
     cards => cards.map(card => card.getAttribute('href'))
   )).toEqual(ORIGINAL_HREFS);
 });

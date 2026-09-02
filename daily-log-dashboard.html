@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f6f4ef">
+<meta name="robots" content="noindex,nofollow">
+<title>每日日誌檢查 · 北一二B</title>
+<link rel="stylesheet" href="daily-log-dashboard.css">
+<script src="assets/vendor/xlsx.full.min.js"></script>
+<script src="daily-log-core.js"></script>
+</head>
+<body>
+<main class="page">
+  <header class="masthead">
+    <div>
+      <a class="back-link" href="home.html">← 返回同仁大廳</a>
+      <p class="eyebrow">STORE DAILY LOG</p>
+      <h1>每日日誌檢查</h1>
+      <p class="lede">九店每日、每週與每月表單完成狀況，一眼找到未完成項目。</p>
+    </div>
+    <div class="mode-badge">候選版 · 本機預覽</div>
+  </header>
+
+  <section class="panel upload-panel" aria-labelledby="uploadTitle">
+    <div class="panel-heading">
+      <div>
+        <p class="step-label">STEP 1</p>
+        <h2 id="uploadTitle">選擇日誌報表</h2>
+      </div>
+      <button class="text-button danger" id="clearSnapshot" type="button" hidden>清除本機預覽</button>
+    </div>
+    <div class="upload-grid">
+      <label class="field">
+        <span>資料基準日</span>
+        <input id="asOfDate" type="date" required>
+      </label>
+      <div class="file-field">
+        <label class="field file-picker">
+          <span>日誌 Excel</span>
+          <input class="file-input" id="fileInput" type="file" accept=".xlsx,.xls,.csv,.tsv">
+        </label>
+        <span class="file-status" id="fileName" aria-live="polite">尚未選擇檔案</span>
+      </div>
+    </div>
+    <p class="privacy-note">檔案只在目前裝置解析；候選版尚未寫入雲端，也不會修改公司原始表單。</p>
+    <div id="parseMessage" class="message" role="status" aria-live="polite"></div>
+    <div id="importPreview" class="import-preview" hidden>
+      <div class="preview-metrics">
+        <div><strong id="parsedRows">0</strong><span>有效資料列</span></div>
+        <div><strong id="parsedStores">0</strong><span>辨識門市</span></div>
+        <div><strong id="unknownRows">0</strong><span>待確認列</span></div>
+      </div>
+      <div id="previewNotes" class="preview-notes"></div>
+      <button class="primary-button" id="applyPreview" type="button" disabled>套用至本機預覽</button>
+    </div>
+  </section>
+
+  <section id="dashboard" hidden>
+    <div class="dashboard-head">
+      <div>
+        <p class="step-label">STEP 2</p>
+        <h2>九店完成總覽</h2>
+        <p id="sourceMeta" class="source-meta"></p>
+      </div>
+      <label class="field compact-field">
+        <span>查看日期</span>
+        <input id="viewDate" type="date">
+      </label>
+    </div>
+
+    <div class="summary-grid" aria-label="完成摘要">
+      <article><span>每日完成</span><strong id="dailyMetric">0 / 36</strong><small>九店 × 每日四項</small></article>
+      <article><span>每週完成</span><strong id="weeklyMetric">0 / 36</strong><small>九店 × 第一至第四週</small></article>
+      <article><span>每月完成</span><strong id="monthlyMetric">0 / 18</strong><small>物品清點＋資安個資</small></article>
+      <article class="attention"><span>需追蹤</span><strong id="exceptionMetric">0</strong><small>未完成、缺資料或待確認</small></article>
+    </div>
+
+    <div class="segmented" role="tablist" aria-label="日誌檢查分類">
+      <button class="active" type="button" role="tab" aria-selected="true" data-view="daily">每日</button>
+      <button type="button" role="tab" aria-selected="false" data-view="weekly">每週</button>
+      <button type="button" role="tab" aria-selected="false" data-view="monthly">每月</button>
+      <button type="button" role="tab" aria-selected="false" data-view="exceptions">需追蹤</button>
+    </div>
+
+    <div id="storeGrid" class="store-grid"></div>
+    <div id="exceptionList" class="exception-list" hidden></div>
+  </section>
+</main>
+
+<dialog id="detailDialog" class="detail-dialog">
+  <div class="dialog-head">
+    <div>
+      <p class="step-label" id="detailCadence"></p>
+      <h2 id="detailTitle">門市明細</h2>
+    </div>
+    <button class="close-button" id="closeDialog" type="button" aria-label="關閉">×</button>
+  </div>
+  <div id="detailBody" class="detail-body"></div>
+</dialog>
+
+<script src="daily-log-dashboard.js"></script>
+</body>
+</html>
