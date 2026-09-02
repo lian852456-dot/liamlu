@@ -106,6 +106,36 @@ test('群組提醒只列已到期需追蹤項目並附完成摘要', () => {
   assert.match(reminder, /需追蹤 45 項/);
 });
 
+test('獨立店務行事曆報表可依店名或營業點代碼解析', () => {
+  const matrix = [
+    ['店務行事曆填寫狀況'],
+    ['機密等級：'],
+    ['檢查日期', '督導區', '業務督導姓名', '營業點代碼', '店點名稱', '檢查人員', '填寫時間', '處理狀態'],
+    ['2026/09/02', '北一二B', '盧*榮', 'DNB10307', '台灣大哥大數位生活台北三創', '鍾*玲', '2026-09-02 16:35', '已完成'],
+    ['2026/09/02', '北一二B', '盧*榮', 'DNB10440', '', '劉*妮', '2026-09-02 16:58', '未完成']
+  ];
+  const result = Core.normalizeCalendarMatrix(matrix);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.meta.headerRow, 2);
+  assert.deepEqual(result.rows.map(row => [row.store, row.date, row.formId, row.status]), [
+    ['台北三創', '2026-09-02', 'calendar', 'done'],
+    ['台北六張犁', '2026-09-02', 'calendar', 'pending']
+  ]);
+});
+
+test('獨立行事曆只覆蓋相同店點與日期的行事曆列', () => {
+  const logRows = [
+    { store:'台北三創', date:'2026-09-02', formId:'calendar', status:'pending' },
+    { store:'台北三創', date:'2026-09-02', formId:'opening', status:'done' },
+    { store:'台北三創', date:'2026-09-01', formId:'calendar', status:'done' }
+  ];
+  const calendarRows = [{ store:'台北三創', date:'2026-09-02', formId:'calendar', status:'done' }];
+  const merged = Core.mergeLogAndCalendarRows(logRows, calendarRows);
+  assert.equal(merged.length, 3);
+  assert.equal(merged.find(row => row.date === '2026-09-02' && row.formId === 'calendar').status, 'done');
+  assert.equal(merged.find(row => row.date === '2026-09-01' && row.formId === 'calendar').status, 'done');
+});
+
 test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', () => {
   const root = path.resolve(__dirname, '..');
   const page = fs.readFileSync(path.join(root, 'daily-log-dashboard.html'), 'utf8');
@@ -115,7 +145,7 @@ test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', 
   assert.doesNotMatch(page, /https?:\/\//);
   assert.match(page, /<input class="file-input" id="fileInput" type="file" accept="\.xlsx,\.xls,\.csv,\.tsv">/);
   assert.doesNotMatch(page, /id="chooseFile"/);
-  assert.match(page, /<script src="daily-log-dashboard\.js"><\/script>/);
+  assert.match(page, /<script src="daily-log-dashboard\.js\?v=20260902-3"><\/script>/);
   assert.doesNotMatch(page, /type="module" src="daily-log-dashboard\.js"/);
   assert.match(page, /候選版 · 本機預覽/);
   assert.match(page, /尚未寫入雲端/);
@@ -124,6 +154,10 @@ test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', 
   assert.match(controller, /SUPPORTED_EXTENSIONS = new Set\(\['xlsx', 'xls', 'csv', 'tsv'\]\)/);
   assert.match(page, /id="copyReminder"[^>]*>一鍵複製群組提醒</);
   assert.match(controller, /Core\.buildGroupReminder/);
+  assert.match(page, /id="calendarFileInput" type="file"/);
+  assert.match(page, /店務行事曆 Excel/);
+  assert.match(controller, /Core\.chooseBestCalendarSheet/);
+  assert.match(page, /daily-log-dashboard\.js\?v=20260902-3/);
   assert.match(home, /href="daily-log-dashboard\.html"/);
   assert.match(home, />每日日誌檢查</);
 });

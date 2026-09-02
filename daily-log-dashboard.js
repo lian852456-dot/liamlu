@@ -5,6 +5,8 @@ const SUPPORTED_EXTENSIONS = new Set(['xlsx', 'xls', 'csv', 'tsv']);
 
 const state = {
   pending:null,
+  pendingLog:null,
+  pendingCalendar:null,
   snapshot:null,
   view:'daily'
 };
@@ -24,6 +26,11 @@ function setMessage(message, type) {
   $('parseMessage').className = `message${type ? ` ${type}` : ''}`;
 }
 
+function setCalendarMessage(message, type) {
+  $('calendarMessage').textContent = message || '';
+  $('calendarMessage').className = `message${type ? ` ${type}` : ''}`;
+}
+
 function statusLabel(status) {
   return { done:'已完成', pending:'未完成', missing:'缺資料', unknown:'待確認', upcoming:'未到期' }[status] || '待確認';
 }
@@ -35,21 +42,70 @@ function sheetRows(workbook) {
   }));
 }
 
-async function parseFile(file) {
-  if (!file) return;
+function validateFile(file, label, setStatus) {
   const extension = String(file.name || '').split('.').pop().toLowerCase();
   if (!SUPPORTED_EXTENSIONS.has(extension)) {
-    setMessage('只接受 XLSX、XLS、CSV 或 TSV 日誌報表。','error');
-    return;
+    setStatus(`${label}只接受 XLSX、XLS、CSV 或 TSV。`,'error');
+    return false;
   }
   if (!file.size) {
-    setMessage('檔案是空的，請重新匯出日誌報表。','error');
-    return;
+    setStatus(`${label}檔案是空的，請重新匯出。`,'error');
+    return false;
   }
   if (file.size > MAX_FILE_BYTES) {
-    setMessage('檔案超過 20 MB，請先縮小報表範圍再重試。','error');
-    return;
+    setStatus(`${label}檔案超過 20 MB，請先縮小報表範圍再重試。`,'error');
+    return false;
   }
+  return true;
+}
+
+function snapshotLogPart() {
+  if (!state.snapshot) return null;
+  const rows = Array.isArray(state.snapshot.logRows) ? state.snapshot.logRows : state.snapshot.rows.filter(row => row.formId !== 'calendar');
+  return { rows, unknownForms:state.snapshot.unknownForms || [], warnings:[], fileName:state.snapshot.fileName || '', sheetName:state.snapshot.sheetName || '' };
+}
+
+function snapshotCalendarPart() {
+  if (!state.snapshot) return null;
+  const rows = Array.isArray(state.snapshot.calendarRows) ? state.snapshot.calendarRows : state.snapshot.rows.filter(row => row.formId === 'calendar');
+  if (!rows.length && !state.snapshot.calendarFileName) return null;
+  return { rows, warnings:[], fileName:state.snapshot.calendarFileName || '', sheetName:state.snapshot.calendarSheetName || '' };
+}
+
+function refreshPending() {
+  const log = state.pendingLog || snapshotLogPart();
+  const calendar = state.pendingCalendar || snapshotCalendarPart();
+  if (!state.pendingLog && !state.pendingCalendar) return;
+  const logRows = log ? log.rows : [];
+  const calendarRows = calendar ? calendar.rows : [];
+  const asOfDate = $('asOfDate').value;
+  state.pending = {
+    rows:Core.mergeLogAndCalendarRows(logRows, calendarRows),
+    logRows,
+    calendarRows,
+    unknownForms:log ? log.unknownForms || [] : [],
+    fileName:log ? log.fileName : '',
+    sheetName:log ? log.sheetName : '',
+    calendarFileName:calendar ? calendar.fileName : '',
+    calendarSheetName:calendar ? calendar.sheetName : '',
+    asOfDate,
+    importedAt:new Date().toISOString()
+  };
+  const notes = [];
+  if (log && log.fileName) notes.push(`日誌檢查：${log.fileName}／${log.sheetName || '已辨識工作表'}。`);
+  if (calendar && calendar.fileName) notes.push(`店務行事曆：${calendar.fileName}／${calendar.sheetName || '已辨識工作表'}。`);
+  if (log) notes.push(...(log.warnings || []));
+  if (calendar) notes.push(...(calendar.warnings || []));
+  $('parsedRows').textContent = String(state.pending.rows.length);
+  $('parsedStores').textContent = String(new Set(state.pending.rows.map(row => row.store)).size);
+  $('unknownRows').textContent = String(state.pending.unknownForms.length);
+  $('previewNotes').innerHTML = notes.map(note => `<div>${escapeHtml(note)}</div>`).join('');
+  $('importPreview').hidden = false;
+  $('applyPreview').disabled = !state.pending.rows.length;
+}
+
+async function parseLogFile(file) {
+  if (!file || !validateFile(file, '日誌檢查', setMessage)) return;
   const asOfDate = $('asOfDate').value;
   if (!Core.normalizeDate(asOfDate)) {
     setMessage('請先選擇資料基準日。','error');
@@ -66,30 +122,43 @@ async function parseFile(file) {
     if (selected.parsed.errors.length) throw new Error(selected.parsed.errors.slice(0, 4).join('\n'));
     if (!selected.parsed.rows.length) throw new Error('報表沒有可辨識的北一二B日誌資料。');
     const parsed = selected.parsed;
-    state.pending = {
+    state.pendingLog = {
       rows:parsed.rows,
       unknownForms:parsed.unknownForms,
       warnings:parsed.warnings,
       fileName:file.name,
-      sheetName:selected.name,
-      asOfDate,
-      importedAt:new Date().toISOString()
+      sheetName:selected.name
     };
-    $('parsedRows').textContent = String(parsed.rows.length);
-    $('parsedStores').textContent = String(new Set(parsed.rows.map(row => row.store)).size);
-    $('unknownRows').textContent = String(parsed.unknownForms.length);
-    const notes = [
-      `工作表：${selected.name}；表頭位於第 ${parsed.meta.headerRow + 1} 列。`,
-      `辨識 ${new Set(parsed.rows.map(row => row.formId)).size} 種已確認表單。`,
-      ...parsed.warnings
-    ];
-    $('previewNotes').innerHTML = notes.map(note => `<div>${escapeHtml(note)}</div>`).join('');
-    $('importPreview').hidden = false;
-    $('applyPreview').disabled = false;
+    refreshPending();
     setMessage(parsed.unknownForms.length ? '解析完成，但有未定義表單；可先查看本機預覽，正式發布前仍需確認。' : '解析完成，可套用至本機預覽。', parsed.unknownForms.length ? '' : 'success');
   } catch (error) {
-    state.pending = null;
+    state.pendingLog = null;
     setMessage(error.message || '日誌報表解析失敗。','error');
+  }
+}
+
+async function parseCalendarFile(file) {
+  if (!file || !validateFile(file, '店務行事曆', setCalendarMessage)) return;
+  $('calendarFileName').textContent = file.name;
+  $('applyPreview').disabled = true;
+  setCalendarMessage('正在本機解析店務行事曆…');
+  try {
+    const workbook = window.XLSX.read(await file.arrayBuffer(), { type:'array', cellDates:true });
+    const selected = Core.chooseBestCalendarSheet(sheetRows(workbook), { date1904:Boolean(workbook.Workbook && workbook.Workbook.WBProps && workbook.Workbook.WBProps.date1904) });
+    if (!selected) throw new Error('找不到包含「檢查日期、店點名稱（或營業點代碼）、處理狀態」的工作表。');
+    if (selected.parsed.errors.length) throw new Error(selected.parsed.errors.slice(0, 4).join('\n'));
+    if (!selected.parsed.rows.length) throw new Error('報表沒有可辨識的北一二B店務行事曆資料。');
+    state.pendingCalendar = {
+      rows:selected.parsed.rows,
+      warnings:selected.parsed.warnings,
+      fileName:file.name,
+      sheetName:selected.name
+    };
+    refreshPending();
+    setCalendarMessage(`行事曆解析完成：${selected.parsed.rows.length} 列，可與日誌檢查合併套用。`,'success');
+  } catch (error) {
+    state.pendingCalendar = null;
+    setCalendarMessage(error.message || '店務行事曆解析失敗。','error');
   }
 }
 
@@ -126,12 +195,19 @@ function clearSnapshot() {
   try { localStorage.removeItem(STORAGE_KEY); } catch (_) { /* 無持久儲存時仍可清除記憶體狀態 */ }
   state.snapshot = null;
   state.pending = null;
+  state.pendingLog = null;
+  state.pendingCalendar = null;
   $('dashboard').hidden = true;
   $('importPreview').hidden = true;
   $('clearSnapshot').hidden = true;
   $('fileName').textContent = '尚未選擇檔案';
+  $('calendarFileName').textContent = '尚未選擇檔案';
   $('fileInput').value = '';
+  $('calendarFileInput').value = '';
+  $('reminderPreview').hidden = true;
+  $('groupReminderText').value = '';
   setMessage('已清除本機預覽。');
+  setCalendarMessage('');
 }
 
 function metricScore(store, view) {
@@ -163,12 +239,18 @@ function renderExceptions(model) {
 
 function renderDashboard() {
   if (!state.snapshot) return;
+  $('copyMessage').textContent = '';
+  $('reminderPreview').hidden = true;
   const selectedDate = Core.normalizeDate($('viewDate').value) || state.snapshot.asOfDate;
   $('viewDate').value = selectedDate;
   const model = Core.buildDashboard(state.snapshot.rows, selectedDate);
   state.model = model;
   $('dashboard').hidden = false;
-  $('sourceMeta').textContent = `${state.snapshot.fileName} · ${state.snapshot.sheetName} · 資料基準日 ${selectedDate} · 僅本機預覽`;
+  const sources = [
+    state.snapshot.fileName ? `日誌：${state.snapshot.fileName}` : '',
+    state.snapshot.calendarFileName ? `行事曆：${state.snapshot.calendarFileName}` : ''
+  ].filter(Boolean).join(' · ');
+  $('sourceMeta').textContent = `${sources || '本機資料'} · 資料基準日 ${selectedDate} · 僅本機預覽`;
   $('dailyMetric').textContent = `${model.dailyDone} / ${model.dailyExpected}`;
   $('weeklyMetric').textContent = `${model.weeklyDone} / ${model.weeklyExpected}`;
   $('monthlyMetric').textContent = `${model.monthlyDone} / ${model.monthlyExpected}`;
@@ -186,6 +268,8 @@ function renderDashboard() {
 async function copyGroupReminder() {
   if (!state.model || !state.snapshot) return;
   const reminder = Core.buildGroupReminder(state.model, state.snapshot.unknownForms);
+  $('groupReminderText').value = reminder;
+  $('reminderPreview').hidden = false;
   let copied = false;
   try {
     await navigator.clipboard.writeText(reminder);
@@ -237,7 +321,8 @@ document.querySelectorAll('[data-view]').forEach(button => button.addEventListen
   renderDashboard();
 }));
 
-$('fileInput').addEventListener('change', event => parseFile(event.target.files && event.target.files[0]));
+$('fileInput').addEventListener('change', event => parseLogFile(event.target.files && event.target.files[0]));
+$('calendarFileInput').addEventListener('change', event => parseCalendarFile(event.target.files && event.target.files[0]));
 $('applyPreview').addEventListener('click', applyPending);
 $('clearSnapshot').addEventListener('click', clearSnapshot);
 $('viewDate').addEventListener('change', renderDashboard);

@@ -74,6 +74,9 @@ h2{font-size:22px;margin:0;letter-spacing:-.015em}
 .copy-button{white-space:nowrap}
 .copy-message{min-height:20px;margin:0 0 12px;color:var(--green);font-size:13px;font-weight:700}
 .copy-message:empty{min-height:0;margin:0}
+.reminder-preview{margin:0 0 16px;padding:14px;background:var(--raised);border:1px solid var(--line);border-radius:14px}
+.reminder-preview label{display:block;margin-bottom:8px;color:var(--ink-soft);font-size:13px;font-weight:800}
+.reminder-preview textarea{width:100%;resize:vertical;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);padding:12px;font:13px/1.65 'Microsoft JhengHei',system-ui,sans-serif}
 .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .summary-grid article{background:var(--raised);border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:var(--shadow)}
 .summary-grid span,.summary-grid small{display:block;color:var(--ink-faint);font-size:12px}
@@ -118,7 +121,7 @@ h2{font-size:22px;margin:0;letter-spacing:-.015em}
 @media (max-width:820px){.summary-grid{grid-template-columns:repeat(2,1fr)}.store-grid{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:620px){
   .page{padding:28px 16px 48px}.masthead{display:block}.mode-badge{display:inline-block;margin-top:18px}
-  .panel{padding:18px}.upload-grid{grid-template-columns:1fr}.file-field{align-items:stretch;flex-direction:column}.file-status{max-width:100%;padding-bottom:0}
+  .panel{padding:18px}.upload-grid{grid-template-columns:1fr}.upload-grid>div:empty{display:none}.file-field{align-items:stretch;flex-direction:column}.file-status{max-width:100%;padding-bottom:0}
   .dashboard-head{align-items:stretch;flex-direction:column}.dashboard-actions{align-items:stretch;flex-direction:column}.compact-field{width:100%}
   .store-grid,.summary-grid{grid-template-columns:1fr}.segmented{position:sticky;top:6px;z-index:4;box-shadow:var(--shadow)}
   .segmented button{padding:10px 4px;font-size:13px}.exception-row{grid-template-columns:1fr auto}.exception-row span{grid-column:1/-1;grid-row:2}

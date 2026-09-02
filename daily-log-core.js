@@ -21,6 +21,14 @@
   });
 
   const REQUIRED_FIELDS = Object.freeze(['store', 'formName', 'status', 'itemText']);
+  const CALENDAR_FIELD_ALIASES = Object.freeze({
+    date:['檢查日期', '日期'],
+    store:['店點名稱', '店點', '門市名稱', '門市'],
+    storeCode:['營業點代碼', '店點代碼', '門市代碼'],
+    submitter:['檢查人員', '填寫人員', '填表人員'],
+    submittedAt:['填寫時間', '完成時間'],
+    status:['處理狀態', '完成狀態', '狀態']
+  });
 
   const FORM_DEFINITIONS = Object.freeze([
     { id:'calendar', cadence:'daily', label:'店務行事曆', shortLabel:'行事曆', dueLabel:'每日' },
@@ -119,6 +127,12 @@
       .replace(/台灣大哥大/g, '')
       .replace(/數位生活/g, '')
       .replace(/直營/g, '');
+    const codeAliases = {
+      dnb10062:'台北酒泉', dnb10082:'台北永吉', dnb10094:'台北復興南',
+      dnb10146:'台北杭州南', dnb10168:'台北萬大', dnb10174:'台北通化',
+      dnb10284:'台北大稻埕', dnb10307:'台北三創', dnb10440:'台北六張犁'
+    };
+    if (codeAliases[key]) return codeAliases[key];
     const aliases = [
       ['台北酒泉', ['台北酒泉', '酒泉']],
       ['台北永吉', ['台北永吉', '永吉']],
@@ -242,6 +256,91 @@
     }).filter(sheet => sheet.parsed.meta.map);
     candidates.sort((a, b) => b.score - a.score);
     return candidates[0] || null;
+  }
+
+  function detectCalendarHeader(matrix, maxRows) {
+    const rows = Array.isArray(matrix) ? matrix : [];
+    const limit = Math.min(rows.length, Number(maxRows || 40));
+    let best = null;
+    for (let rowIndex = 0; rowIndex < limit; rowIndex += 1) {
+      const row = Array.isArray(rows[rowIndex]) ? rows[rowIndex] : [];
+      const map = {};
+      Object.keys(CALENDAR_FIELD_ALIASES).forEach(field => {
+        const index = aliasIndex(row, CALENDAR_FIELD_ALIASES[field]);
+        if (index >= 0) map[field] = index;
+      });
+      const hasStore = Number.isInteger(map.store) || Number.isInteger(map.storeCode);
+      const requiredHits = [Number.isInteger(map.date), hasStore, Number.isInteger(map.status)].filter(Boolean).length;
+      const score = requiredHits * 100 + Object.keys(map).length;
+      if (requiredHits === 3 && (!best || score > best.score)) best = { rowIndex, map, score };
+    }
+    return best;
+  }
+
+  function normalizeCalendarMatrix(matrix, options) {
+    const settings = options || {};
+    const rows = Array.isArray(matrix) ? matrix : [];
+    const detected = detectCalendarHeader(rows, settings.maxHeaderRows || 40);
+    if (!detected) {
+      return { rows:[], errors:['找不到行事曆報表表頭；至少需要檢查日期、店點名稱（或營業點代碼）及處理狀態。'], warnings:[], meta:{ headerRow:-1, map:null } };
+    }
+    const output = [];
+    const errors = [];
+    const warnings = [];
+    for (let index = detected.rowIndex + 1; index < rows.length; index += 1) {
+      const source = Array.isArray(rows[index]) ? rows[index] : [];
+      if (!rowHasContent(source)) continue;
+      const date = normalizeDate(source[detected.map.date], settings);
+      const storeRaw = Number.isInteger(detected.map.store) ? text(source[detected.map.store]) : '';
+      const codeRaw = Number.isInteger(detected.map.storeCode) ? text(source[detected.map.storeCode]) : '';
+      if (normalizeHeader(source[detected.map.date]) === normalizeHeader('檢查日期')) continue;
+      const store = canonicalStore(storeRaw) || canonicalStore(codeRaw);
+      if (!date) {
+        errors.push(`第 ${index + 1} 列無法判定檢查日期。`);
+        continue;
+      }
+      if (!store) {
+        errors.push(`第 ${index + 1} 列店點無法對應北一二B九店：${storeRaw || codeRaw || '空白'}`);
+        continue;
+      }
+      const statusRaw = text(source[detected.map.status]);
+      const status = normalizeStatus(statusRaw);
+      if (status === 'unknown') warnings.push(`第 ${index + 1} 列使用未定義狀態「${statusRaw}」，暫列待確認。`);
+      const submittedAtRaw = Number.isInteger(detected.map.submittedAt) ? source[detected.map.submittedAt] : '';
+      output.push({
+        sourceRow:index + 1,
+        store,
+        submitter:Number.isInteger(detected.map.submitter) ? text(source[detected.map.submitter]) : '',
+        submittedAt:normalizeDateTime(submittedAtRaw, settings),
+        date,
+        month:date.slice(0, 7),
+        formId:'calendar',
+        cadence:'daily',
+        formName:'店務行事曆',
+        formLabel:'店務行事曆',
+        status,
+        statusRaw,
+        section:'店務行事曆',
+        itemText:'完成當日店務行事曆'
+      });
+    }
+    return { rows:errors.length ? [] : output, errors, warnings, meta:{ headerRow:detected.rowIndex, map:detected.map, parsedRows:output.length } };
+  }
+
+  function chooseBestCalendarSheet(sheets, options) {
+    const candidates = (Array.isArray(sheets) ? sheets : []).map(sheet => {
+      const parsed = normalizeCalendarMatrix(sheet.rows, options);
+      return { ...sheet, parsed, score:parsed.rows.length * 100 + (parsed.meta.map ? Object.keys(parsed.meta.map).length : 0) - parsed.errors.length * 1000 };
+    }).filter(sheet => sheet.parsed.meta.map);
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0] || null;
+  }
+
+  function mergeLogAndCalendarRows(logRows, calendarRows) {
+    const calendar = Array.isArray(calendarRows) ? calendarRows : [];
+    const overrideKeys = new Set(calendar.map(row => `${row.store}|${row.date}`));
+    const log = (Array.isArray(logRows) ? logRows : []).filter(row => row.formId !== 'calendar' || !overrideKeys.has(`${row.store}|${row.date}`));
+    return [...log, ...calendar];
   }
 
   function latest(values) {
@@ -385,6 +484,7 @@
   return {
     STORES,
     FIELD_ALIASES,
+    CALENDAR_FIELD_ALIASES,
     FORM_DEFINITIONS,
     normalizeHeader,
     detectHeader,
@@ -395,6 +495,10 @@
     normalizeStatus,
     normalizeMatrix,
     chooseBestSheet,
+    detectCalendarHeader,
+    normalizeCalendarMatrix,
+    chooseBestCalendarSheet,
+    mergeLogAndCalendarRows,
     summarizeForm,
     dueDateFor,
     withDueState,

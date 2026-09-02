@@ -6,9 +6,9 @@
 <meta name="theme-color" content="#f6f4ef">
 <meta name="robots" content="noindex,nofollow">
 <title>每日日誌檢查 · 北一二B</title>
-<link rel="stylesheet" href="daily-log-dashboard.css">
+<link rel="stylesheet" href="daily-log-dashboard.css?v=20260902-3">
 <script src="assets/vendor/xlsx.full.min.js"></script>
-<script src="daily-log-core.js"></script>
+<script src="daily-log-core.js?v=20260902-3"></script>
 </head>
 <body>
 <main class="page">
@@ -37,14 +37,23 @@
       </label>
       <div class="file-field">
         <label class="field file-picker">
-          <span>日誌 Excel</span>
+          <span>日誌檢查 Excel</span>
           <input class="file-input" id="fileInput" type="file" accept=".xlsx,.xls,.csv,.tsv">
         </label>
         <span class="file-status" id="fileName" aria-live="polite">尚未選擇檔案</span>
       </div>
+      <div></div>
+      <div class="file-field">
+        <label class="field file-picker">
+          <span>店務行事曆 Excel</span>
+          <input class="file-input" id="calendarFileInput" type="file" accept=".xlsx,.xls,.csv,.tsv">
+        </label>
+        <span class="file-status" id="calendarFileName" aria-live="polite">尚未選擇檔案</span>
+      </div>
     </div>
-    <p class="privacy-note">檔案只在目前裝置解析；候選版尚未寫入雲端，也不會修改公司原始表單。</p>
+    <p class="privacy-note">兩份檔案可分開選擇，系統會依店點與日期合併；檔案只在目前裝置解析，尚未寫入雲端，也不會修改公司原始表單。</p>
     <div id="parseMessage" class="message" role="status" aria-live="polite"></div>
+    <div id="calendarMessage" class="message" role="status" aria-live="polite"></div>
     <div id="importPreview" class="import-preview" hidden>
       <div class="preview-metrics">
         <div><strong id="parsedRows">0</strong><span>有效資料列</span></div>
@@ -72,6 +81,10 @@
       </div>
     </div>
     <p id="copyMessage" class="copy-message" role="status" aria-live="polite"></p>
+    <div id="reminderPreview" class="reminder-preview" hidden>
+      <label for="groupReminderText">群組提醒預覽</label>
+      <textarea id="groupReminderText" rows="10" readonly></textarea>
+    </div>
 
     <div class="summary-grid" aria-label="完成摘要">
       <article><span>每日完成</span><strong id="dailyMetric">0 / 36</strong><small>九店 × 每日四項</small></article>
@@ -103,6 +116,6 @@
   <div id="detailBody" class="detail-body"></div>
 </dialog>
 
-<script src="daily-log-dashboard.js"></script>
+<script src="daily-log-dashboard.js?v=20260902-3"></script>
 </body>
 </html>
