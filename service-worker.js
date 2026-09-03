@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-2-sep25-patrol-mileage-20260903-v2';
+const CACHE_NAME = 'liam-supervisor-app-1-2-patrol-na-v-20260903-v1';
 const SHELL = [
   './app.html',
   './app.css',

@@ -9,12 +9,37 @@ const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 
 test('App loads the shared September question model before its read adapters',()=>{
   const html=read('app.html');
-  const questionIndex=html.indexOf('patrol-question-versions.js?v=app-sep25-20260903-2');
+  const questionIndex=html.indexOf('patrol-question-versions.js?v=app-na-v-20260903-1');
   const halfIndex=html.indexOf('half-month-check-read-model.js?v=app-sep25-20260903-2');
-  const appIndex=html.indexOf('app.js?v=app-sep25-20260903-2');
+  const appIndex=html.indexOf('app.js?v=app-na-v-20260903-1');
   assert.ok(questionIndex>0&&questionIndex<halfIndex&&halfIndex<appIndex);
   assert.match(html,/id="patrolMileage"/);
   assert.match(html,/督導到店檢查/);
+});
+
+test('September App shares the V-only completion model for totals, groups, missing items and badges',()=>{
+  const Questions=require('../patrol-question-versions.js');
+  const store={code:'DNB10082',name:'台北永吉'};
+  const base={fillTime:'2026/9/2 10:00',month:'2026-09',code:store.code,store:store.name};
+  const rows=Array.from({length:25},(_,index)=>({...base,item:index+1,result:'v',reason:''}));
+  rows[0]={...rows[0],result:'na'};
+  rows[2]={...rows[2],result:'',reason:'NA'};
+  rows[9]={...rows[9],result:'NA'};
+  const summary=Questions.overview(rows,[store],'2026-09').stores[0];
+  const app=read('app.js');
+
+  assert.deepEqual({done:summary.done,missing:summary.missingItems,items:summary.missingItemNumbers},
+    {done:22,missing:3,items:[1,3,10]});
+  assert.deepEqual([summary.monthly.completed,summary.bimonthly.completed,summary.ncc.completed],[7,0,15]);
+  assert.equal(summary.questionsComplete,false);
+  assert.equal(summary.status,'attention');
+  assert.match(app,/Q\.overview\(rows,definitions,month\)/);
+  assert.match(app,/store\.monthly/);
+  assert.match(app,/store\.bimonthly/);
+  assert.match(app,/store\.ncc/);
+  assert.match(app,/row\.missingItems/);
+  assert.match(app,/storeModel\.questionsComplete/);
+  assert.match(app,/row\.status==='complete'/);
 });
 
 test('September App patrol reads ptdetail and mileage without adding a patrol write route',()=>{
@@ -24,6 +49,7 @@ test('September App patrol reads ptdetail and mileage without adding a patrol wr
   assert.match(app,/patrolRead\('ptdetail',\{month:task\.month,store:task\.store,page,limit:100\}\)/);
   assert.match(app,/patrolRead\('ptmileage2',\{month\}\)/);
   assert.match(app,/新版 25 項進度/);
+  assert.match(app,/只有 V 計入完成，NA 列為缺項/);
   assert.match(app,/兩次間隔 <b>至少 7 天<\/b>/);
   assert.match(app,/每日移動里程/);
   assert.match(app,/ptdetail:60_000/);

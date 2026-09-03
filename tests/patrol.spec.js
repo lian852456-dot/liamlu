@@ -482,6 +482,27 @@ test('新版 25 題缺第 25 題時只計缺 1 項，NCC 為 14/15', async ({ pa
   await expect(card.locator('.miss-group .item .no')).toHaveText(['25']);
 });
 
+test('新版 25 題只有 V 完成，NA 的第 1、3、10 題維持缺項', async ({ page }) => {
+  cloudRows = versionedPatrolRows('2026-09', '台北通化', 'DNB10059', Array.from({length:25}, (_, index) => index + 1));
+  cloudRows[0] = {...cloudRows[0], result:'na'};
+  cloudRows[2] = {...cloudRows[2], result:'', reason:'NA'};
+  cloudRows[9] = {...cloudRows[9], result:'NA'};
+  cloudRows.push({...cloudRows[1], fillTime:'2026/9/12 10:00', arriveTime:'2026/9/12 09:30', leaveTime:'2026/9/12 11:00'});
+  await stubGas(page);
+  await openAndUnlock(page, PT_KEY, '2026-09');
+
+  await expect(page.locator('#sep25LoadState')).toContainText('正式 ptdetail 唯讀驗證完成');
+  await expect(page.locator('#sep25Overview')).toContainText('尚缺檢核項次');
+  await expect(page.locator('#sep25Overview')).toContainText('3');
+  const card = page.locator('#sep25Content .store-card').filter({ hasText:'台北通化' });
+  await expect(card).toContainText('缺 3 項');
+  await expect(card.locator('.pill')).toHaveClass(/partial/);
+  await expect(card.locator('.pill')).not.toHaveClass(/done/);
+  await card.click();
+  await expect(card.locator('.sep25-group strong')).toHaveText(['7/9','0/1','15/15']);
+  await expect(card.locator('.miss-group .item .no')).toHaveText(['1','3','10']);
+});
+
 test('解析預覽先做 Server Preflight，不寫雲端、不改 rawDetails；確認後才逐店讀回', async ({ page }) => {
   await stubGas(page);
   await openAndUnlock(page);

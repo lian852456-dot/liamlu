@@ -39,7 +39,7 @@ test('原貼上文字框與 JSON 匯入／匯出入口完整保留', () => {
 test('Excel 元件只從 repo 本機載入並保留授權', () => {
   assert.doesNotMatch(patrol, /<script\s+src="assets\/vendor\/xlsx\.full\.min\.js/);
   assert.doesNotMatch(patrol, /<script\s+src="patrol-local-import\.js/);
-  assert.match(patrol, /<script src="patrol-question-versions\.js\?v=2"><\/script>[\s\S]*<script src="patrol-read-model\.js\?v=10"><\/script>/);
+  assert.match(patrol, /<script src="patrol-question-versions\.js\?v=3"><\/script>[\s\S]*<script src="patrol-read-model\.js\?v=10"><\/script>/);
   assert.match(patrol, /'patrolLocalImportParserScript','patrol-local-import\.js\?v=3'/);
   assert.match(patrol, /'patrolLocalImportXlsxScript','assets\/vendor\/xlsx\.full\.min\.js\?v=0\.20\.3'/);
   assert.match(patrol, /window\.XLSX\.version==='0\.20\.3'/);

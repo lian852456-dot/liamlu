@@ -150,6 +150,43 @@ test('store rows, battle modes, report rows, schedule and patrol dashboard are i
   await page.screenshot({path:'test-output/liam-supervisor-patrol-minimal-390x844.png',fullPage:true});
 });
 
+test('September App keeps NA items missing in totals, groups, store status and recent badge', async ({ page }) => {
+  const rows=Array.from({length:25},(_,index)=>({
+    fillTime:'2026/9/3 10:00',arriveTime:'2026/9/3 09:30',leaveTime:'2026/9/3 11:00',month:'2026-09',
+    code:'DNB10059',store:'台北通化',item:index+1,result:'v',reason:''
+  }));
+  rows[0]={...rows[0],result:'na'};
+  rows[2]={...rows[2],result:'',reason:'NA'};
+  rows[9]={...rows[9],result:'NA'};
+  const summary=patrolSummaryResponse('2026-09',rows,new Date('2026-09-03T12:00:00+08:00'));
+  await page.addInitScript(()=>sessionStorage.setItem('bei12b_pt_session_token','short-session-token'));
+  await page.route('https://script.google.com/**',async route=>{
+    const request=route.request();
+    if(request.method()==='POST'){
+      const payload=JSON.parse(request.postData()||'{}');
+      if(payload.action==='ptauth') return route.fulfill({json:{status:'ok',token:'short-session-token'}});
+      if(payload.action==='ptsummary') return route.fulfill({json:summary});
+      if(payload.action==='ptdetail') return route.fulfill({json:{status:'ok',rows,totalRows:rows.length,page:1,totalPages:1}});
+      if(payload.action==='ptmileage2') return route.fulfill({json:{status:'ok',contract:'patrol-mileage-visits-v2',month:'2026-09',fields:['fillTime','arriveTime','code','store','month'],visits:[],totalVisits:0,page:1,totalPages:1}});
+    }
+    const action=new URL(request.url()).searchParams.get('action');
+    if(action==='sread') return route.fulfill({json:{status:'ok',schedule:{month:'2026-09',stores:[]}}});
+    if(action==='ptvisit_read') return route.fulfill({json:{status:'ok',events:[]}});
+    if(action==='hread') return route.fulfill({json:{status:'ok',rows:[]}});
+    return route.fulfill({json:{status:'error',message:'unexpected action'}});
+  });
+
+  await page.goto(FORMAL_FILE_URL+'#patrol');
+  await expect(page.locator('#patrolOverview')).toContainText('2026-09 · 新版 25 項');
+  await expect(page.locator('#patrolOverview')).toContainText('只有 V 計入完成，NA 列為缺項');
+  await expect(page.locator('.patrol-kpis article',{hasText:'25 項完成店數'}).locator('b')).toHaveText('0');
+  await expect(page.locator('.patrol-kpis article',{hasText:'尚缺檢核項次'}).locator('b')).toHaveText('3');
+  const store=page.locator('#patrolStoreList .patrol-store-row').filter({hasText:'通化'});
+  await expect(store).toContainText('待補');
+  await expect(store).toContainText('第1–9項 7/9 · 第10項 0/1 · 第11–25項 15/15');
+  await expect(page.locator('#patrolRecentList')).toContainText('待補 3 項');
+});
+
 test('isolated patrol visit flow records arrival and departure with one protected POST per tap', async ({ page }) => {
   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   const events=[

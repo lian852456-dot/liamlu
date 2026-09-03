@@ -1431,7 +1431,7 @@
     const monthlyDone=overview.stores.filter(store=>store.monthly.missing===0).length;
     const bimonthlyDone=overview.stores.filter(store=>store.bimonthly.missing===0).length;
     const nccDone=overview.stores.filter(store=>store.ncc.missing===0).length;
-    return `<section class="panel patrol-rule-panel"><div class="panel-head"><div><h2>新版 25 項進度</h2><small>與完整巡店看板共用規則</small></div></div><div class="patrol-version-grid">${groupCard('每月到店檢查・第 1–9 項',monthlyDone,overview.totalStores,'每店每月完成')}${groupCard('到店全盤・第 10 項',bimonthlyDone,overview.totalStores,`${overview.window.label}共用進度`)}${groupCard('NCC 知悉宣導・第 11–25 項',nccDone,overview.totalStores,'每店每月 15 項')}</div></section>`;
+    return `<section class="panel patrol-rule-panel"><div class="panel-head"><div><h2>新版 25 項進度</h2><small>與完整巡店看板共用規則；只有 V 計入完成，NA 列為缺項</small></div></div><div class="patrol-version-grid">${groupCard('每月到店檢查・第 1–9 項',monthlyDone,overview.totalStores,'每店每月完成')}${groupCard('到店全盤・第 10 項',bimonthlyDone,overview.totalStores,`${overview.window.label}共用進度`)}${groupCard('NCC 知悉宣導・第 11–25 項',nccDone,overview.totalStores,'每店每月 15 項')}</div></section>`;
   }
 
   function renderPatrolMileage() {
@@ -1970,5 +1970,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=app-sep25-20260903-2',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=app-na-v-20260903-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);

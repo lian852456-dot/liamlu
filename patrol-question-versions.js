@@ -87,10 +87,9 @@
       (code && String(row && row.code || '') === code) || normalizedStoreName(row && row.store) === name
     );
   }
-  function checked(row) {
+  function completed(row) {
     const result = String(row && row.result || '').trim().toLowerCase();
-    const reason = String(row && row.reason || '').trim().toLowerCase();
-    return result === 'v' || result === 'na' || reason === 'na';
+    return result === 'v';
   }
   function addIsoDays(value, days) {
     const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -131,7 +130,7 @@
     if (!item) return { status:'miss' };
     const relevantMonths = item.rule === 'bimonthly' ? bimWindow(month).months : [month];
     const match = (Array.isArray(rows) ? rows : []).find(row =>
-      Number(row && row.item) === item.no && relevantMonths.includes(rowMonth(row)) && checked(row)
+      Number(row && row.item) === item.no && relevantMonths.includes(rowMonth(row)) && completed(row)
     );
     return match ? { status:'done', date:rowIsoDate(match) } : {
       status:'miss', detail:item.rule === 'bimonthly' ? `本期(${bimWindow(month).label})未完成` : item.label

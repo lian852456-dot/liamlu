@@ -118,16 +118,28 @@ test('9–10月共用第10題雙月進度，月檢與NCC仍各自按月', () => 
   assert.equal(october.missingItems, 24);
 });
 
-test('新版正式明細延續 v、result na、reason na 均視為已勾核', () => {
-  const base = {fillTime:'2026/9/2 10:00', month:'2026-09', code:'DNB10082', store:'台北永吉'};
-  const rows = [
-    {...base, item:1, result:'v', reason:''},
-    {...base, item:2, result:'na', reason:''},
-    {...base, item:3, result:'', reason:'NA'},
-  ];
-  assert.equal(Questions.itemStatus(rows, '2026-09', 1).status, 'done');
-  assert.equal(Questions.itemStatus(rows, '2026-09', 2).status, 'done');
-  assert.equal(Questions.itemStatus(rows, '2026-09', 3).status, 'done');
+test('新版正式明細只有 V 計入完成，NA 與原因 NA 都維持缺項', () => {
+  const store = { code:'DNB10082', name:'台北永吉' };
+  const base = {fillTime:'2026/9/2 10:00', month:'2026-09', code:store.code, store:store.name};
+  const rows = Array.from({ length:25 }, (_, index) => ({...base, item:index + 1, result:'v', reason:''}));
+  rows[0] = {...rows[0], result:'na'};
+  rows[2] = {...rows[2], result:'', reason:'NA'};
+  rows[9] = {...rows[9], result:'NA'};
+  rows.push({...base, fillTime:'2026/9/9 10:00', item:2, result:'v', reason:'NA'});
+
+  const summary = Questions.overview(rows, [store], '2026-09').stores[0];
+  assert.equal(Questions.itemStatus(rows, '2026-09', 1).status, 'miss');
+  assert.equal(Questions.itemStatus(rows, '2026-09', 2).status, 'done', 'V 不受 reason 欄影響');
+  assert.equal(Questions.itemStatus(rows, '2026-09', 3).status, 'miss');
+  assert.equal(Questions.itemStatus(rows, '2026-09', 10).status, 'miss');
+  assert.equal(summary.done, 22);
+  assert.equal(summary.missingItems, 3);
+  assert.deepEqual(summary.missingItemNumbers, [1,3,10]);
+  assert.equal(summary.monthly.completed, 7);
+  assert.equal(summary.bimonthly.completed, 0);
+  assert.equal(summary.ncc.completed, 15);
+  assert.equal(summary.questionsComplete, false);
+  assert.equal(summary.status, 'attention');
 });
 
 test('9月完成率與缺項只採新版25題，不要求26–33', () => {
