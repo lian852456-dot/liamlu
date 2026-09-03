@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-09-03 ｜ Codex（Supervisor App 9 月新版巡店與移動里程已發布）
+
+- 做了什麼：根因為 Supervisor App 仍沿用 8 月以前的 `ptsummary`／33 題讀取模型，沒有載入 9 月共用題庫，也沒有巡店里程讀取模組，因此 `patrol.html` 已更新但 App 看板與里程不會同步。App 現在於 2026-09-01 起讀取 `ptsummary` 後，以受限分頁的 `ptdetail` 套用共用 25 項、每月兩次且至少相隔 7 天模型；「督導到店檢查」同步改採第 1–9 題。新增既有唯讀 `ptmileage2` 的月里程、報銷日、待確認路段與近期路線顯示，並更新 Service Worker cache key 與資源版本。
+- 結果（Pages 已發布／靜態線上讀回完成）：本機 Node `376/376`、JS syntax 與 `git diff --check` 通過。正式提交 `06716fef99e4ac649038e1cde8e6d8f6d18f2466` 已快轉至 `main`；GitHub Pages `app.html` 已讀回 `patrol-question-versions.js?v=app-sep25-20260903-1`、新版 `app.js`，DOM 已出現「督導到店檢查」與 `patrolMileage`，Service Worker 已讀回 `liam-supervisor-app-1-2-sep25-patrol-mileage-20260903-v1`。
+- 經驗 / 給下一位的提醒：本次沒有修改 GAS、Sheet schema、OAuth／Cookie／session／權限，也沒有寫入正式巡店、里程、KPI、台獎或每日回報資料；正式資料仍維持唯讀，同店同日無可靠 visit/session identifier 時只計一次、不補猜。發布前回復分支 `rollback/app-sep25-patrol-mileage-predeploy-20260903` 指向 `ca1959fc`。Liam 的 iPhone Safari／主畫面 App 解鎖後真實資料驗收仍須與靜態發布分開記錄。
+
 ## 2026-09-02 ｜ Codex（群組提醒與獨立店務行事曆上傳已發布）
 
 - 做了什麼：在每日日誌檢查新增「一鍵複製群組提醒」及文字預覽；提醒依查看日期列出三類完成度、已到期缺項與門市，排除未到期項目。依 Liam 提供的店務行事曆匯出格式新增第二個獨立選檔入口，辨識檢查日期、九店店名／DNB 代碼、檢查人員、填寫時間與處理狀態，再以店點＋日期覆蓋／合併日誌檔內的行事曆資料。同步為 CSS、核心與控制器加版本參數，避免 Pages 快取舊腳本導致按鈕無反應。
