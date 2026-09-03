@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-09-03 ｜ Codex（Patrol 新版 25 題 NA/V 判定已發布）
+
+- 做了什麼：由最新 `origin/main` 建立乾淨 worktree，將 2026-09-01 起共用 25 題模型收斂為只有 `result=V` 計入完成；`result=NA`、`reason=NA` 與只有原因文字都維持缺項。`patrol.html` 與 Supervisor App 共用此模型，並升版題庫、App 與 Service Worker cache。8/31 前 `patrol-read-model.js` 33 題歷史判定未改。
+- 結果（Pages 已發布／靜態線上讀回完成）：固定樣本第 1、3、10 題為 NA 時為 22/25、缺 `[1,3,10]`、三群 7/9・0/1・15/15，完整看板與 App 待補徽章一致。Node `377/377`、Patrol/Auth Chromium `91/91`、App NA/V 專項 Chromium `1/1`；正式 commit `a3bb36e955f9b11ac6015d3c1014c26c4b64a3d2`、Pages run `33765914897` 全成功，線上題庫、`patrol.html`、`app.html`、`app.js`、Service Worker SHA-256 均與 repo 相同。
+- 經驗 / 給下一位的提醒：本次沒有修改 GAS、Sheet schema、登入／權限、貼上／readback、里程、班表、半月檢查或正式資料。回復分支 `rollback/patrol-na-v-predeploy-20260903` 指向 `d95aa736`。靜態發布與 SHA readback 不等於核准裝置正式資料驗收，Liam 仍需登入巡店頁與 Supervisor App 核對真實 NA 列。
+
 ## 2026-09-03 ｜ Codex（Supervisor App 9 月新版巡店與移動里程已發布）
 
 - 做了什麼：根因為 Supervisor App 仍沿用 8 月以前的 `ptsummary`／33 題讀取模型，沒有載入 9 月共用題庫，也沒有巡店里程讀取模組，因此 `patrol.html` 已更新但 App 看板與里程不會同步。App 現在於 2026-09-01 起讀取 `ptsummary` 後，以受限分頁的 `ptdetail` 套用共用 25 項、每月兩次且至少相隔 7 天模型；「督導到店檢查」同步改採第 1–9 題。新增既有唯讀 `ptmileage2` 的月里程、報銷日、待確認路段與近期路線顯示，並更新 Service Worker cache key 與資源版本。
