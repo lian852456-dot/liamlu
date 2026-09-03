@@ -16,7 +16,7 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 ## 2026-09-03 ｜ Codex（Supervisor App 9 月新版巡店與移動里程已發布）
 
 - 做了什麼：根因為 Supervisor App 仍沿用 8 月以前的 `ptsummary`／33 題讀取模型，沒有載入 9 月共用題庫，也沒有巡店里程讀取模組，因此 `patrol.html` 已更新但 App 看板與里程不會同步。App 現在於 2026-09-01 起讀取 `ptsummary` 後，以受限分頁的 `ptdetail` 套用共用 25 項、每月兩次且至少相隔 7 天模型；「督導到店檢查」同步改採第 1–9 題。新增既有唯讀 `ptmileage2` 的月里程、報銷日、待確認路段與近期路線顯示，並更新 Service Worker cache key 與資源版本。
-- 結果（Pages 已發布／靜態線上讀回完成）：本機 Node `376/376`、JS syntax 與 `git diff --check` 通過。正式提交 `06716fef99e4ac649038e1cde8e6d8f6d18f2466` 已快轉至 `main`；GitHub Pages `app.html` 已讀回 `patrol-question-versions.js?v=app-sep25-20260903-1`、新版 `app.js`，DOM 已出現「督導到店檢查」與 `patrolMileage`，Service Worker 已讀回 `liam-supervisor-app-1-2-sep25-patrol-mileage-20260903-v1`。
+- 結果（Pages 已發布／靜態線上讀回完成）：本機 Node `376/376`、JS syntax 與 `git diff --check` 通過。功能提交 `06716fef99e4ac649038e1cde8e6d8f6d18f2466` 發布後發現大型 `app.js` 經 GitHub API 傳送時被截短，已以 `9ec4c4b7473563a11a525616100a07d9a3add2aa` 還原完整 blob，並由 `695f7ea7d56aeab420d833119d9fb759fde57329` 升版快取。GitHub Pages `app.html` 已讀回 `patrol-question-versions.js?v=app-sep25-20260903-2`、新版 `app.js`，巡店分頁實際可開啟且 DOM 已出現「督導到店檢查」、`每日移動里程`、`ptdetail` 與 `ptmileage2`；新頁面無網站 console error，Service Worker cache 為 `liam-supervisor-app-1-2-sep25-patrol-mileage-20260903-v2`。
 - 經驗 / 給下一位的提醒：本次沒有修改 GAS、Sheet schema、OAuth／Cookie／session／權限，也沒有寫入正式巡店、里程、KPI、台獎或每日回報資料；正式資料仍維持唯讀，同店同日無可靠 visit/session identifier 時只計一次、不補猜。發布前回復分支 `rollback/app-sep25-patrol-mileage-predeploy-20260903` 指向 `ca1959fc`。Liam 的 iPhone Safari／主畫面 App 解鎖後真實資料驗收仍須與靜態發布分開記錄。
 
 ## 2026-09-02 ｜ Codex（群組提醒與獨立店務行事曆上傳已發布）
