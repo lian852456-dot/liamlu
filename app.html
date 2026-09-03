@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
-  <link rel="stylesheet" href="app.css?v=area-award-summary-20260818-1">
+  <link rel="stylesheet" href="app.css?v=app-sep25-20260903-1">
   <title>Liam Supervisor App 1.2</title>
 </head>
 <body>
@@ -101,13 +101,14 @@
         </section>
         <div class="segmented patrol-check-selector" role="group" aria-label="巡店檢查類型">
           <button class="active" type="button" data-patrol-check-view="patrol" aria-pressed="true">巡店檢查</button>
-          <button type="button" data-patrol-check-view="half-month" aria-pressed="false">半月督導檢查</button>
+          <button type="button" data-patrol-check-view="half-month" aria-pressed="false">督導到店檢查</button>
         </div>
         <div id="patrolCheckContent">
           <div id="patrolOverview"></div>
           <div id="patrolTodayDetail"></div>
+          <div id="patrolMileage"></div>
           <section class="panel"><div class="panel-head"><div><h2>店點狀況</h2><small>最近巡店與待追蹤</small></div></div><div id="patrolStoreList"></div></section>
-          <section class="panel"><div class="panel-head"><div><h2>最近巡店紀錄</h2><small>正式 ptsummary</small></div></div><div id="patrolRecentList"></div></section>
+          <section class="panel"><div class="panel-head"><div><h2>最近巡店紀錄</h2><small>正式 ptdetail</small></div></div><div id="patrolRecentList"></div></section>
           <div class="source-actions"><a href="patrol.html">完整巡店看板 <i data-lucide="external-link"></i></a><a href="patrol.html">巡店操作頁 <i data-lucide="external-link"></i></a></div>
         </div>
         <div id="halfMonthCheckPreview" hidden></div>
@@ -161,8 +162,9 @@
   <script src="app-data-contract.js?v=emergency-rollback-20260813-1"></script>
   <script src="app-preview-data.js?v=emergency-rollback-20260813-1"></script>
   <script src="patrol-read-model.js?v=13"></script>
-  <script src="half-month-check-read-model.js?v=2"></script>
+  <script src="patrol-question-versions.js?v=app-sep25-20260903-1"></script>
+  <script src="half-month-check-read-model.js?v=app-sep25-20260903-1"></script>
   <script src="yesterday-follow-up-model.js?v=yesterday-follow-up-phase2-20260814-1"></script>
-  <script src="app.js?v=app-kpi-dplus1-20260823-1" defer></script>
+  <script src="app.js?v=app-sep25-20260903-1" defer></script>
 </body>
 </html>

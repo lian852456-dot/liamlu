@@ -33,7 +33,7 @@ test('formal page uses 1–9 items from September while preview preserves legacy
 });
 
 test('half-month preview renderer is isolated and recovery formal mode stays read-only', () => {
-  assert.match(app, /const PATROL_READ_ACTIONS = new Set\(\['sread','ptsummary','ptdetail','ptvisit_read','hread'\]\)/);
+  assert.match(app, /const PATROL_READ_ACTIONS = new Set\(\['sread','ptsummary','ptdetail','ptmileage2','ptvisit_read','hread'\]\)/);
   assert.match(app, /const PATROL_WRITE_ACTIONS = new Set\(\['ptvisit_write'\]\)/);
   assert.doesNotMatch(app, /halfMonthWriteRows|data-half-preview-action="save"|half_media_upload/);
   assert.doesNotMatch(app.match(/function renderHalfMonthOverview[\s\S]+?async function loadHalfMonthFormalRead/)?.[0] || '', /fetch\(|patrolRead\(|patrolVisitWrite\(|privateInspectionRequest\(|privateInspectionMediaUpload\(/);

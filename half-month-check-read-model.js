@@ -9,6 +9,7 @@
     '待銷毀文件打包歸檔上鎖','待回送／未結案維修機盤點','保全金零找金現金盤點',
     'iPhone手機盤點盤差登載','到店全盤作業（2月1次）'
   ].map((title,index)=>Object.freeze({ item:index+1,title }));
+  const SEPTEMBER_EFFECTIVE_DATE='2026-09-01';
   const RESULT_LABELS = Object.freeze({ ok:'符合', abnormal:'異常', na:'不適用', '':'尚未填寫' });
   const VALID_RESULTS = new Set(['ok','abnormal','na','']);
 
@@ -48,6 +49,11 @@
     const period=['H1','H2'].includes(input.period)?input.period:periodForDate(date);
     const periodInfo=periodMeta(month,period);
     if(!periodInfo) throw new Error('半月正式期別無法判定。');
+    const versionApi=scope.PatrolQuestionVersions;
+    const questions=date>=SEPTEMBER_EFFECTIVE_DATE&&versionApi
+      ? versionApi.SEP25_GROUPS.monthly.map(item=>Object.freeze({item,title:versionApi.SEP25_BY_NO[item].text}))
+      : QUESTIONS;
+    const totalItems=questions.length;
     const stores=(Array.isArray(input.stores)?input.stores:[]).map(normalizeStore).filter(Boolean);
     const storeSet=new Set(stores);
     const latest=new Map();
@@ -55,14 +61,14 @@
       const store=normalizeStore(raw&&raw.store);
       const item=Number(raw&&raw.item);
       const rowMonth=String(raw&&raw.month||raw&&raw.date||'').slice(0,7);
-      if(!storeSet.has(store)||rowMonth!==month||String(raw&&raw.period||'')!==period||!Number.isInteger(item)||item<1||item>18) return;
+      if(!storeSet.has(store)||rowMonth!==month||String(raw&&raw.period||'')!==period||!Number.isInteger(item)||item<1||item>totalItems) return;
       const key=`${store}|${item}`;
       const candidate={raw,index,time:sourceTime(raw)};
       const current=latest.get(key);
       if(!current||candidate.time>current.time||(candidate.time===current.time&&candidate.index>current.index)) latest.set(key,candidate);
     });
     const storeRows=stores.map(name=>{
-      const questions=QUESTIONS.map(question=>{
+      const storeQuestions=questions.map(question=>{
         const raw=latest.get(`${name}|${question.item}`)?.raw||{};
         const result=resultValue(raw.result);
         return {
@@ -77,18 +83,18 @@
           savedAt:String(raw.savedAt||'')
         };
       });
-      const answeredItems=questions.filter(question=>question.result).length;
-      const abnormalCount=questions.filter(question=>question.result==='abnormal').length;
-      const latestQuestion=questions.slice().sort((a,b)=>sourceTime(b)-sourceTime(a))[0];
+      const answeredItems=storeQuestions.filter(question=>question.result).length;
+      const abnormalCount=storeQuestions.filter(question=>question.result==='abnormal').length;
+      const latestQuestion=storeQuestions.slice().sort((a,b)=>sourceTime(b)-sourceTime(a))[0];
       return {
         name,
-        fillState:answeredItems===0?'empty':answeredItems===18?'filled':'in_progress',
+        fillState:answeredItems===0?'empty':answeredItems===totalItems?'filled':'in_progress',
         answeredItems,
-        totalItems:18,
+        totalItems,
         abnormalCount,
         latestDate:latestQuestion&&latestQuestion.date||'',
         updatedAt:latestQuestion&&latestQuestion.savedAt||'',
-        questions
+        questions:storeQuestions
       };
     });
     const priority=row=>row.fillState==='empty'?0:row.fillState==='in_progress'?1:row.abnormalCount?2:3;
@@ -106,14 +112,14 @@
         emptyStores:storeRows.filter(row=>row.fillState==='empty').length
       },
       stores:storeRows,
-      questions:QUESTIONS,
+      questions,
       statuses:[
         {value:'ok',label:RESULT_LABELS.ok},
         {value:'abnormal',label:RESULT_LABELS.abnormal},
         {value:'na',label:RESULT_LABELS.na}
       ],
       updatedAt,
-      source:{label:'正式半月督導檢查 hread（唯讀）',href:'patrol.html'}
+      source:{label:'正式督導到店檢查 hread（唯讀）',href:'patrol.html'}
     };
   }
 

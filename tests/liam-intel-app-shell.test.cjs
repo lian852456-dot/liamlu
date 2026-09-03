@@ -27,7 +27,7 @@ test('Recovery keeps existing patrol auth and disables half-month writes', () =>
   assert.match(js, /action:'ptauth'/);
   assert.match(js, /patrolRead\('sread'/);
   assert.match(js, /patrolRead\('ptsummary',\{month\}\)/);
-  assert.match(js, /new Set\(\['sread','ptsummary','ptdetail','ptvisit_read','hread'\]\)/);
+  assert.match(js, /new Set\(\['sread','ptsummary','ptdetail','ptmileage2','ptvisit_read','hread'\]\)/);
   assert.doesNotMatch(js, /patrolRead\('ptread'/);
   assert.match(js, /new Set\(\['ptvisit_write'\]\)/);
   assert.doesNotMatch(js, /new Set\(\['ptvisit_write','hwrite'\]\)/);
@@ -53,7 +53,8 @@ test('PWA uses safe-area, standalone manifest, and app-only offline cache', () =
   assert.equal(manifest.prefer_related_applications, false);
   assert.equal(manifest.orientation, 'portrait-primary');
   assert.match(worker, /offline\.html/);
-  assert.match(worker, /liam-supervisor-app-1-2-pwa-iphone-stable-20260824-v1/);
+  assert.match(worker, /liam-supervisor-app-1-2-sep25-patrol-mileage-20260903-v1/);
+  assert.match(worker, /patrol-question-versions\.js/);
   assert.match(worker, /half-month-check-read-model\.js/);
   assert.match(worker, /half-month-check-write-prep\.js/);
   assert.match(worker, /function networkFirstShellAsset/);
