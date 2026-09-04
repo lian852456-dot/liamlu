@@ -12,6 +12,13 @@
   const DEFAULT_RETRY_DELAYS_MS = [2000, 5000];
   const KPI_BATTLE_CORE_KEYS = { a999: 'AQ V+D 999 (含)以上', a1399: 'AQ V+D 1399 (含)以上', haosu: '好速案銷售點數', r1399: 'RT V+D 1399 (含)以上' };
   const KPI_BATTLE_PERSONAL_KEYS = { A999: 'AQ V+D 999 (含)以上', A1399: 'AQ V+D 1399 (含)以上', '好速': '好速案銷售點數', R1399: 'RT V+D 1399 (含)以上', R999: 'RT V+D 999 (含)以上', RT: 'RT上線點數', '特維': '特殊維繫用戶續約數', '配件': '配件及其他營收', '包膜': '包膜與保貼營收' };
+  const KNOWN_HAOSU_CORRECTIONS = Object.freeze({
+    '0904.xlsx': Object.freeze({
+      dataAsOfDate: '2026-09-03',
+      districtExcluded: 5,
+      stores: Object.freeze({ '台北杭州南': 1.25, '台北通化': 2.5, '台北三創': 1.25 }),
+    }),
+  });
 
   function resolveGasUrl(storage) {
     const savedGasUrl = storage.getItem('bei12b_gas_url');
@@ -54,6 +61,56 @@
     return staged ? staged[1].toLowerCase() : raw;
   }
 
+  function kpiBattleReportDateFromSource(value, dataAsOfDate) {
+    const source = kpiBattleSourceFile(value);
+    const match = source.match(/^(0[1-9]|1[0-2])([0-2][0-9]|3[01])\.xlsx$/i);
+    const asOf = String(dataAsOfDate || '');
+    const yearMatch = asOf.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match || !yearMatch) return '';
+    let year = Number(yearMatch[1]);
+    const sourceMonth = Number(match[1]);
+    const asOfMonth = Number(yearMatch[2]);
+    if (sourceMonth === 1 && asOfMonth === 12) year += 1;
+    if (sourceMonth === 12 && asOfMonth === 1) year -= 1;
+    return `${year}-${match[1]}-${match[2]}`;
+  }
+
+  function kpiBattleCorrectMetric(metric, excluded) {
+    if (!metric || !Number.isFinite(Number(excluded)) || Number(excluded) <= 0) return metric;
+    const actual = Math.max(0, (Number(metric.actual) || 0) - Number(excluded));
+    const priorActual = Number(metric.actual) || 0;
+    const priorGap = Number(metric.daily_gap);
+    const expected = Number.isFinite(priorGap) ? priorActual - priorGap : null;
+    const rate = expected && expected > 0 ? Math.min(2.5, actual / expected) : metric.rate;
+    return { ...metric, actual, rate, daily_gap: expected == null ? metric.daily_gap : actual - expected };
+  }
+
+  function kpiBattleApplyKnownCorrections(data) {
+    const copy = data || {};
+    const source = kpiBattleSourceFile(copy.source_file);
+    const correction = KNOWN_HAOSU_CORRECTIONS[source];
+    if (!correction || correction.dataAsOfDate !== String(copy.data_as_of_date || '')) return copy;
+    const key = KPI_BATTLE_CORE_KEYS.haosu;
+    const adjust = (container, excluded) => {
+      if (!container || !container.metrics || !container.metrics[key]) return;
+      const corrected = kpiBattleCorrectMetric(container.metrics[key], excluded);
+      container.metrics[key] = corrected;
+      container.core = { ...(container.core || {}), haosu: corrected };
+    };
+    adjust(copy.aggregate, correction.districtExcluded);
+    (copy.stores || []).forEach(row => adjust(row, Number(correction.stores[displayStoreName(row.store)]) || 0));
+    (copy.personal || []).forEach(row => {
+      const excluded = Number(correction.stores[displayStoreName(row.store)]) || 0;
+      if (!excluded || !row.metrics || !row.metrics['好速']) return;
+      row.metrics['好速'] = kpiBattleCorrectMetric(row.metrics['好速'], excluded);
+    });
+    copy.corrections = [...(copy.corrections || []), {
+      type: 'haosu-enterprise-exclusion', source_file: source,
+      excluded_points: correction.districtExcluded, effective_points: copy.aggregate?.metrics?.[key]?.actual,
+    }];
+    return copy;
+  }
+
   function kpiBattleSourceDateRange(value) {
     const normalized = String(value || '').trim().replace(/\s*[~～]\s*/g, '～');
     return normalized || '—';
@@ -88,25 +145,25 @@
   function kpiBattleSupplementIsCurrent(kpiData, snapshot) {
     const snapshotReportDate = String((snapshot || {}).report_date || '');
     const snapshotDataAsOf = String((snapshot || {}).data_as_of_date || '');
+    const kpiReportDate = String((kpiData || {}).report_date || '');
     const kpiDataAsOf = String((kpiData || {}).data_as_of_date || '');
     const snapshotSource = kpiBattleSourceFile((snapshot || {}).source_file);
     const kpiDataSource = kpiBattleSourceFile((kpiData || {}).source_file);
+    const reportDateCompatible = snapshotReportDate === kpiReportDate || snapshotReportDate === snapshotDataAsOf;
     return Boolean(
       snapshot && snapshotReportDate && snapshotDataAsOf && kpiDataAsOf && snapshotSource && kpiDataSource &&
-      snapshotReportDate === snapshotDataAsOf &&
-      snapshotDataAsOf === kpiDataAsOf &&
-      snapshotSource === kpiDataSource
+      reportDateCompatible && snapshotDataAsOf === kpiDataAsOf && snapshotSource === kpiDataSource
     );
   }
 
   function mergeKpiBattleSupplement(kpiData, snapshot) {
-    if (!kpiBattleSupplementIsCurrent(kpiData, snapshot)) return { ...kpiData, supplement_synced: false };
+    if (!kpiBattleSupplementIsCurrent(kpiData, snapshot)) return kpiBattleApplyKnownCorrections({ ...kpiData, supplement_synced: false });
     const copy = JSON.parse(JSON.stringify(kpiData));
     const aggregate = snapshot.aggregate || {};
     const copyFields = (target, source, fields) => fields.forEach(field => {
       if (source && source[field] != null) target[field] = source[field];
     });
-    copy.report_date = String(snapshot.report_date);
+    copy.report_date = String(kpiData.report_date || snapshot.report_date);
     copy.source_date_range = snapshot.source_date_range || copy.source_date_range;
     copy.aggregate = { ...copy.aggregate };
     copyFields(copy.aggregate, aggregate, ['overall_kpi', 'overall_kpi_dod', 'company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod', 'insurance_attach_rate']);
@@ -124,13 +181,15 @@
       copyFields(merged, source, ['rank', 'rank_dod', 'insurance_attach_rate', 'phone_award_actual', 'phone_award_projected', 'phone_award_rank', 'phone_award_eligible']);
       return merged;
     });
-    return { ...copy, supplement_synced: true };
+    return kpiBattleApplyKnownCorrections({ ...copy, supplement_synced: true });
   }
 
   function kpicalcToKpiBattleView(data, fetchedAt) {
     const safeData = data || {};
     const meta = safeData.meta || {};
     const dataAsOfDate = kpiBattleDataAsOfDate(meta);
+    const sourceFile = kpiBattleSourceFile(meta.sourceFile);
+    const reportDate = kpiBattleReportDateFromSource(sourceFile, dataAsOfDate);
     const codeName = {};
     (safeData.stores || []).forEach(store => { codeName[store.code] = store.name; });
     const metricsOf = itemsObj => {
@@ -189,8 +248,8 @@
     return {
       source: 'kpicalc',
       fetchedAt: fetchedAt || '',
-      source_file: kpiBattleSourceFile(meta.sourceFile),
-      report_date: '',
+      source_file: sourceFile,
+      report_date: reportDate,
       data_as_of_date: dataAsOfDate,
       source_as_of_date: dataAsOfDate,
       source_date_range: meta.period || '',
@@ -716,6 +775,8 @@
     kpiBattleSupplementIsCurrent,
     mergeKpiBattleSupplement,
     kpiBattleSourceMetadata,
+    kpiBattleReportDateFromSource,
+    kpiBattleApplyKnownCorrections,
     displayStoreName,
     formatNumber,
     formatPercent,
