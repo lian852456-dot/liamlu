@@ -83,7 +83,7 @@ test('mileage exposes explicit health reason codes and zero-detail consistency g
    'MILEAGE_AUTH_ERROR','MILEAGE_DATA_FORMAT_ERROR','MILEAGE_CALC_ERROR',
    'MILEAGE_LOAD_SLOW','MILEAGE_LOAD_TIMEOUT'].forEach(code=>assert.match(patrol,new RegExp(code)));
   assert.match(patrol, /sourceInfo\.type==='none'[\s\S]*ERROR\.NO_PATROL/);
-  assert.match(patrol, /sourceInfo\.type==='patrol'&&visitCount===0[\s\S]*ERROR\.SOURCE_MISSING/);
+  assert.match(patrol, /\['patrol','provisional'\]\.includes\(sourceInfo\.type\)&&visitCount===0[\s\S]*ERROR\.SOURCE_MISSING/);
   assert.match(patrol, /sourceType:sourceInfo\.type/);
   assert.match(patrol, /type:'official-archive'/);
   assert.match(patrol, /patrol-mileage-read-diagnostic-v2/);

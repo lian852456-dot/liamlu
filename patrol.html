@@ -490,7 +490,7 @@
       <button class="secure-tab" data-view="mileage" onclick="switchPatrolView('mileage')">🚗 每日移動里程</button>
       <button class="secure-tab locked" data-view="schedule" onclick="switchPatrolView('schedule')">每月班表</button>
       <button class="secure-tab locked" data-view="half" onclick="switchPatrolView('half')">督導到店檢查</button>
-      <button class="secure-tab locked" data-view="halfDashboard" onclick="switchPatrolView('halfDashboard')">📊 督導檢查大盤</button>
+      <button class="secure-tab locked" data-view="halfDashboard" onclick="switchPatrolView('halfDashboard')">🗂️ 督導面談紀錄</button>
     </nav>
     <div class="private-auth-bar" aria-label="受保護資料解鎖">
       <span id="privateAuthStatus" class="auth-status ok">已通過正式後端驗證；session 關閉頁面或逾時即失效</span>
@@ -598,18 +598,22 @@
     </div>
   </section>
 
-  <section id="halfDashboardView" class="secure-view" aria-label="督導檢查大盤">
+  <section id="halfDashboardView" class="secure-view" aria-label="督導面談紀錄">
     <div class="secure-card">
-      <h2>督導巡店檢查大盤</h2>
-      <p class="hint">資料直接採用「貼上巡店紀錄」及其雲端同步明細，依原本巡店規則拆出上、下半月、每月檢查一次項目與雙月全盤。</p>
-      <div class="secure-toolbar">
-        <label>檢視月份<input id="halfDashboardMonth" type="month" onchange="selectPatrolSummaryMonth(this.value)"></label>
+      <h2>督導面談紀錄</h2>
+      <p class="hint">先選擇既有面談檔案，系統只在本機瀏覽器解析並顯示欄位預覽，不會寫入巡店、班表或雲端。確認實際欄位後，再設計正式面談紀錄畫面。</p>
+      <div class="patrol-local-import" aria-label="本機督導面談檔案上傳">
+        <div class="btn-row">
+          <button class="btn-ghost" id="supervisorInterviewFileButton" type="button" onclick="document.getElementById('supervisorInterviewFileInput').click()">📂 選擇督導面談檔案</button>
+          <span class="patrol-local-import-note">支援 .xlsx、.xls、.csv、.tsv；原始檔只在本機解析。</span>
+          <input id="supervisorInterviewFileInput" type="file" accept=".xlsx,.xls,.csv,.tsv" hidden onchange="handleSupervisorInterviewFileSelection(event)">
+        </div>
+        <div id="supervisorInterviewImportStatus" class="patrol-local-import-status" role="status" aria-live="polite">尚未選擇檔案。</div>
       </div>
     </div>
     <div class="secure-card">
-      <div id="halfDashboardSummary" class="half-summary"></div>
-      <p class="half-dashboard-rule">上、下半月採計第 2–13 項；每月檢查一次項目採計第 14–17 項；第 18 項依固定雙月規範獨立採計。資料更新後會立即反映於此。</p>
-      <div id="halfDashboardContent" class="half-dashboard-list"></div>
+      <h3>本機欄位預覽</h3>
+      <div id="supervisorInterviewPreview" class="half-dashboard-list"><div class="empty-state"><div class="big">🗂️</div>選擇檔案後，這裡會顯示工作表、欄位與前幾列內容。</div></div>
     </div>
   </section>
 
@@ -739,6 +743,7 @@ let patrolSummaryVerifiedAt = '';
 let patrolLegacyTitle = '北一二B區 · 33 項檢核追蹤';
 let sep25State = { month:'', status:'idle', rows:[], model:null, message:'', verifiedAt:'' };
 let sep25LoadSequence = 0;
+let patrolLocalPreview = {active:false,rows:[],mergedRows:[],fileName:'',previousSummaryState:'',previousSummaryMessage:''};
 // Patrol 只走獨立部署；Audit v67 不共用這個端點或 session。
 const PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbxqBtW2yQw_u4qqJ9Knz6CK34hAiunaa6lIQu4pMa8Ff2voJZCWKEh8MXTJ6qAoGTax/exec';
 const DEFAULT_PATROL_GAS_URL = PATROL_GAS_URL;
@@ -1076,9 +1081,9 @@ function patrolCandidateKey(row){
   return [normalizePatrolCandidateTime(row&&row.fillTime),canonicalPatrolCandidateStore(row),itemKey].join('|');
 }
 
-function preparePatrolCandidates(rows){
+function preparePatrolCandidates(rows,baseRows=rawDetails){
   const index=new Map();
-  const merged=rawDetails.slice();
+  const merged=(baseRows||[]).slice();
   merged.forEach((row,i)=>index.set(patrolCandidateKey(row),i));
   const addedRows=[];const writeRows=[];let duplicates=0;
   (rows||[]).forEach(row=>{
@@ -1101,6 +1106,47 @@ function mergePatrolCandidates(rows){
   const result=preparePatrolCandidates(rows);
   commitPatrolCandidates(result);
   return result;
+}
+
+function beginPatrolLocalPreview(rows,state={}){
+  if(!patrolLocalPreview.active){
+    patrolLocalPreview.previousSummaryState=patrolSummaryState;
+    patrolLocalPreview.previousSummaryMessage=patrolSummaryMessage;
+  }
+  const candidate=preparePatrolCandidates(rows,rawDetails);
+  patrolLocalPreview.active=true;
+  patrolLocalPreview.rows=(rows||[]).slice();
+  patrolLocalPreview.mergedRows=candidate.merged.slice();
+  patrolLocalPreview.fileName=String(state.fileName||'');
+  records=PatrolReadModel.rebuildFromRaw(patrolLocalPreview.mergedRows);
+  patrolSummaryState='local';
+  patrolSummaryMessage='本機預覽，雲端同步中';
+  if(typeof MI!=='undefined'&&MI.preview) MI.preview(currentMonth,patrolLocalPreview.mergedRows);
+  render();
+}
+
+function endPatrolLocalPreview(options={}){
+  if(!patrolLocalPreview.active)return;
+  const previousState=patrolLocalPreview.previousSummaryState||'loading';
+  const previousMessage=patrolLocalPreview.previousSummaryMessage||'巡店資料讀取中';
+  patrolLocalPreview={active:false,rows:[],mergedRows:[],fileName:'',previousSummaryState:'',previousSummaryMessage:''};
+  rebuildFromRaw();
+  if(!options.keepSummaryState){
+    patrolSummaryState=previousState;
+    patrolSummaryMessage=previousMessage;
+  }
+  if(typeof MI!=='undefined'&&MI.discardPreview) MI.discardPreview(currentMonth);
+  render();
+}
+
+async function refreshPatrolAndMileage(message,renderErr){
+  const results=await Promise.all([
+    cloudLoad({afterWrite:true,writeMessage:message,renderErr}),
+    MI.refresh(currentMonth)
+  ]);
+  const complete=results[0]===true&&results[1]!==false;
+  if(complete) endPatrolLocalPreview({keepSummaryState:true});
+  return complete;
 }
 
 function showPatrolPastePreview(label,result,preflight){
@@ -1238,6 +1284,12 @@ function getPatrolLocalFileController(){
     getRawDetails:()=>rawDetails,
     isReady:()=>Boolean(cloudOn&&secureUnlocked&&privateAccount&&PT_TOKEN),
     preflight:rows=>patrolServerPreflight(rows),
+    preview:(rows,state)=>beginPatrolLocalPreview(rows,state),
+    clearPreview:options=>endPatrolLocalPreview(options),
+    refreshExisting:async state=>{
+      const message=`${state.fileName} 已在雲端，正在自動刷新巡店與里程`;
+      await refreshPatrolAndMileage(message,null);
+    },
     setPending:value=>{pendingPatrolWrite=value;},
     setConfirmation:setPatrolWriteConfirmation,
     showMessage:showMsg
@@ -1266,6 +1318,61 @@ async function handlePatrolLocalFileSelection(event){
   }
 }
 
+let supervisorInterviewLocalFile=null;
+function supervisorInterviewCell(value){
+  if(value instanceof Date&&!Number.isNaN(value.getTime())) return value.toLocaleString('zh-TW');
+  if(value&&typeof value==='object') return JSON.stringify(value);
+  return String(value==null?'':value).trim();
+}
+function renderSupervisorInterviewPreview(parsed){
+  const target=document.getElementById('supervisorInterviewPreview');
+  if(!target)return;
+  const rows=parsed.rows.slice(0,8);
+  const width=Math.min(20,Math.max(1,...rows.map(row=>row.length)));
+  const tableRows=rows.map((row,index)=>`<tr><th>${index+1}</th>${Array.from({length:width},(_,column)=>`<td>${esc(supervisorInterviewCell(row[column]))||'—'}</td>`).join('')}</tr>`).join('');
+  target.innerHTML=`<p class="secure-note">檔案：${esc(parsed.fileName)} · 工作表：${esc(parsed.sheetName)} · ${parsed.totalRows} 列 / ${parsed.totalColumns} 欄。以下只顯示前 ${rows.length} 列供欄位判讀，尚未建立正式資料。</p>`+
+    `<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>列</th>${Array.from({length:width},(_,index)=>`<th>欄 ${index+1}</th>`).join('')}</tr></thead><tbody>${tableRows}</tbody></table></div>`+
+    (parsed.sheetNames.length>1?`<p class="secure-note">檔案另含工作表：${parsed.sheetNames.map(esc).join('、')}</p>`:'');
+}
+async function handleSupervisorInterviewFileSelection(event){
+  const input=event&&event.target;
+  const file=input&&input.files&&input.files[0];
+  if(!file)return;
+  const status=document.getElementById('supervisorInterviewImportStatus');
+  const extension=(file.name.split('.').pop()||'').toLowerCase();
+  try{
+    if(!['xlsx','xls','csv','tsv'].includes(extension)) throw new Error('只支援 .xlsx、.xls、.csv、.tsv');
+    if(file.size>20*1024*1024) throw new Error('檔案超過 20 MB，請先縮小後再選擇');
+    status.className='patrol-local-import-status';
+    status.textContent=`正在本機解析 ${file.name}…`;
+    await loadPatrolLocalImportDependencies();
+    const bytes=await file.arrayBuffer();
+    const workbook=(extension==='csv'||extension==='tsv')
+      ?XLSX.read(PatrolLocalFileImport.decodeDelimitedBytes(bytes).text,{type:'string',cellDates:true})
+      :XLSX.read(bytes,{type:'array',cellDates:true});
+    const sheetNames=Array.isArray(workbook.SheetNames)?workbook.SheetNames.slice():[];
+    if(!sheetNames.length) throw new Error('檔案沒有可讀取的工作表');
+    const candidates=sheetNames.map(sheetName=>{
+      const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,raw:true,defval:''})
+        .filter(row=>Array.isArray(row)&&row.some(value=>supervisorInterviewCell(value)));
+      const totalColumns=rows.reduce((max,row)=>Math.max(max,row.length),0);
+      return {sheetName,rows,totalRows:rows.length,totalColumns};
+    }).sort((a,b)=>b.totalRows-a.totalRows||b.totalColumns-a.totalColumns);
+    const selected=candidates[0];
+    if(!selected||!selected.totalRows) throw new Error('檔案沒有可供判讀的內容');
+    supervisorInterviewLocalFile={fileName:file.name,sheetNames,...selected};
+    renderSupervisorInterviewPreview(supervisorInterviewLocalFile);
+    status.className='patrol-local-import-status good';
+    status.textContent=`本機解析完成：${file.name}；已預覽 ${selected.sheetName}，未寫入雲端。`;
+  }catch(error){
+    supervisorInterviewLocalFile=null;
+    status.className='patrol-local-import-status bad';
+    status.textContent=`本機解析失敗：${error&&error.message||error}；未寫入雲端。`;
+  }finally{
+    if(input)input.value='';
+  }
+}
+
 /* ---------- 解析貼上資料 ---------- */
 let pendingPatrolWrite=null;
 let failedPatrolWriteRaw='';
@@ -1281,31 +1388,44 @@ function patrolCandidateContentKey(row){
   return [String(row&&row.result||'').trim().toLowerCase(),String(row&&row.reason||'').trim()].join('|');
 }
 
+async function formalPatrolRowsForGroup(group){
+  if(!group.month||!group.store) throw new Error('Server Preflight 缺少月份或店點，已封鎖寫入');
+  const formalRows=[];
+  let page=1,totalRows=null,loaded=0;
+  for(;;){
+    const result=await cloudCall('ptdetail',{month:group.month,store:group.store,page,limit:100});
+    if(!result||result.status!=='ok') throw new Error(result&&result.message||'Server Preflight ptdetail 失敗');
+    if(!Array.isArray(result.rows)) throw new Error('Server Preflight ptdetail 分頁 contract 不完整');
+    const reportedTotal=Number(result.totalRows);
+    if(!Number.isInteger(reportedTotal)||reportedTotal<0) throw new Error('Server Preflight ptdetail totalRows contract 不完整');
+    if(totalRows===null) totalRows=reportedTotal;
+    else if(totalRows!==reportedTotal) throw new Error('Server Preflight 期間正式資料筆數變更，已封鎖寫入');
+    formalRows.push(...result.rows); loaded+=result.rows.length;
+    if(loaded===totalRows) break;
+    if(result.rows.length===0||loaded>totalRows) throw new Error('Server Preflight ptdetail 分頁讀回筆數不一致');
+    page+=1; if(page>100) throw new Error('Server Preflight ptdetail 頁數異常');
+  }
+  return formalRows;
+}
+
 async function formalPatrolRowsForPreflight(rows){
   const groups=new Map();
   (rows||[]).forEach(row=>{
     const month=patrolCandidateMonth(row),store=canonicalPatrolCandidateStore(row);
     groups.set(`${month}|${store}`,{month,store});
   });
-  const formalRows=[];
-  for(const group of groups.values()){
-    if(!group.month||!group.store) throw new Error('Server Preflight 缺少月份或店點，已封鎖寫入');
-    let page=1,totalRows=null,loaded=0;
-    for(;;){
-      const result=await cloudCall('ptdetail',{month:group.month,store:group.store,page,limit:100});
-      if(!result||result.status!=='ok') throw new Error(result&&result.message||'Server Preflight ptdetail 失敗');
-      if(!Array.isArray(result.rows)) throw new Error('Server Preflight ptdetail 分頁 contract 不完整');
-      const reportedTotal=Number(result.totalRows);
-      if(!Number.isInteger(reportedTotal)||reportedTotal<0) throw new Error('Server Preflight ptdetail totalRows contract 不完整');
-      if(totalRows===null) totalRows=reportedTotal;
-      else if(totalRows!==reportedTotal) throw new Error('Server Preflight 期間正式資料筆數變更，已封鎖寫入');
-      formalRows.push(...result.rows); loaded+=result.rows.length;
-      if(loaded===totalRows) break;
-      if(result.rows.length===0||loaded>totalRows) throw new Error('Server Preflight ptdetail 分頁讀回筆數不一致');
-      page+=1; if(page>100) throw new Error('Server Preflight ptdetail 頁數異常');
+  const queue=[...groups.values()];
+  const results=new Array(queue.length);
+  let cursor=0;
+  async function worker(){
+    while(cursor<queue.length){
+      const index=cursor++;
+      results[index]=await formalPatrolRowsForGroup(queue[index]);
     }
   }
-  return formalRows;
+  const workers=Array.from({length:Math.min(3,queue.length)},()=>worker());
+  await Promise.all(workers);
+  return results.flat();
 }
 
 async function patrolServerPreflight(rows){
@@ -1391,6 +1511,35 @@ async function parseData(){
   }
 }
 
+async function finalizeLocalPatrolWrite(pending,receipt,renderErr){
+  const parsedRows=pending.localFile.validRowCount;
+  const additions=pending.preflight.additions.length;
+  const existing=pending.preflight.existingSame.length;
+  const writeMessage=`本機檔案寫入與雲端讀回一致（解析 ${parsedRows} 筆／新增 ${additions} 筆／已存在 ${existing} 筆／讀回 ${receipt.readbackRows} 筆）`;
+  pendingPatrolWrite=null;
+  setPatrolWriteConfirmation(false);
+  resetPatrolLocalFileSelection({keepPreview:true,keepStatus:true});
+  const refreshed=await refreshPatrolAndMileage(writeMessage,renderErr);
+  if(refreshed) resetPatrolLocalFileSelection({keepPreview:true});
+  else showMsg(`${writeMessage}；正式巡店或里程仍在刷新，本機預覽會保留，不需要重新匯入。`,'ok');
+}
+
+async function continueLocalPatrolReadback(pending,writtenRows,renderErr){
+  const delays=[800,1600,3200,6400];
+  let lastError=null;
+  for(const delay of delays){
+    await new Promise(resolve=>setTimeout(resolve,delay));
+    try{
+      const receipt=await readbackPatrolWriteRows(pending.candidate.writeRows,writtenRows);
+      await finalizeLocalPatrolWrite(pending,receipt,renderErr);
+      return true;
+    }catch(error){lastError=error;}
+  }
+  const report=lastError&&lastError.readbackReport;
+  showMsg(`雲端已接收資料，但自動讀回核對尚未完成${report?`（仍待確認 ${report.missingKeys.length} 筆）`:''}；本機預覽已保留，請勿重新匯入或再次寫入。`,'err');
+  return false;
+}
+
 async function confirmPatrolCloudWrite(){
   const pending=pendingPatrolWrite;
   const isLocalFile=Boolean(pending&&pending.sourceType==='file');
@@ -1410,15 +1559,7 @@ async function confirmPatrolCloudWrite(){
     const receipt=await cloudWrite(pending.candidate.writeRows);
     commitPatrolCandidates(pending.candidate);
     if(isLocalFile){
-      const parsedRows=pending.localFile.validRowCount;
-      const additions=pending.preflight.additions.length;
-      const existing=pending.preflight.existingSame.length;
-      const writeMessage=`本機檔案寫入與雲端讀回一致（解析 ${parsedRows} 筆／新增 ${additions} 筆／已存在 ${existing} 筆／讀回 ${receipt.readbackRows} 筆）`;
-      pendingPatrolWrite=null;
-      setPatrolWriteConfirmation(false);
-      resetPatrolLocalFileSelection();
-      MI.clear();
-      await Promise.all([cloudLoad({afterWrite:true,writeMessage,renderErr}),MI.open(currentMonth)]);
+      await finalizeLocalPatrolWrite(pending,receipt,renderErr);
     }else{
       document.getElementById('pasteBox').value='';
       pendingPatrolWrite=null;
@@ -1427,6 +1568,15 @@ async function confirmPatrolCloudWrite(){
       await cloudLoad({afterWrite:true,writeMessage,renderErr});
     }
   }catch(error){
+    if(isLocalFile&&error&&error.writeAccepted){
+      commitPatrolCandidates(pending.candidate);
+      pendingPatrolWrite=null;
+      setPatrolWriteConfirmation(false);
+      resetPatrolLocalFileSelection({keepPreview:true,keepStatus:true});
+      showMsg('雲端已接收資料，正在自動重試讀回核對；本機預覽會保留，請勿重新匯入。','ok');
+      continueLocalPatrolReadback(pending,error.writtenRows||0,renderErr).catch(recoveryError=>console.error('Patrol readback recovery failed:',recoveryError));
+      return;
+    }
     if(isLocalFile) setPatrolWriteConfirmation(true,false);
     else{
       setPatrolWriteConfirmation(false);
@@ -1582,6 +1732,7 @@ function sep25StoreCardHTML(store){
 }
 
 function sep25ModelForRender(){
+  if(patrolLocalPreview.active) return PatrolQuestionVersions.overview(patrolLocalPreview.mergedRows,STORES,currentMonth);
   if(sep25State.month===currentMonth&&sep25State.model) return sep25State.model;
   if(patrolSummaryState==='local') return PatrolQuestionVersions.overview(rawDetails,STORES,currentMonth);
   return null;
@@ -1598,7 +1749,9 @@ function renderSep25Dashboard(){
   catalog.innerHTML=sep25CatalogHTML();
   const model=sep25ModelForRender();
   const matched=sep25State.month===currentMonth?sep25State:null;
-  state.textContent=matched?.status==='loading'?'正在讀取新版 25 項正式巡店明細…':matched?.status==='error'?matched.message:model?`正式 ptdetail 唯讀驗證完成${matched?.verifiedAt?` · ${matched.verifiedAt}`:''}`:'新版 25 項資料尚未載入';
+  state.textContent=patrolLocalPreview.active
+    ? `本機預覽${patrolLocalPreview.fileName?` · ${patrolLocalPreview.fileName}`:''}；雲端比對與同步中`
+    : matched?.status==='loading'?'正在讀取新版 25 項正式巡店明細…':matched?.status==='error'?matched.message:model?`正式 ptdetail 唯讀驗證完成${matched?.verifiedAt?` · ${matched.verifiedAt}`:''}`:'新版 25 項資料尚未載入';
   if(!model){
     reminder.innerHTML='';overview.innerHTML='';groups.innerHTML='';content.innerHTML=patrolSummaryUnavailableHTML();return;
   }
@@ -1838,7 +1991,8 @@ function renderOverview(){
     ov.innerHTML=`${stale}<div class="stat"><div class="num">${patrolSummary.visitedStores}</div><div class="lbl">本月已巡店數</div></div><div class="stat"><div class="num good">${patrolSummary.fullyDoneStores}</div><div class="lbl">全項完成店數</div></div><div class="stat"><div class="num ${patrolSummary.totalMissingItems>0?'warn':''}">${patrolSummary.totalMissingItems}</div><div class="lbl">尚缺檢核項次</div></div><div class="stat"><div class="num ${patrolSummary.unvisitedStores.length?'warn':''}">${patrolSummary.unvisitedStores.length}</div><div class="lbl">尚未巡店數</div></div>`;
     return;
   }
-  const model = PatrolReadModel.overview(rawDetails, STORES, currentMonth, new Date());
+  const sourceRows=patrolLocalPreview.active?patrolLocalPreview.mergedRows:rawDetails;
+  const model = PatrolReadModel.overview(sourceRows, STORES, currentMonth, new Date());
 
   ov.innerHTML=`
     <div class="stat"><div class="num">${model.visited}</div><div class="lbl">本月已巡店數</div></div>
@@ -1858,7 +2012,8 @@ function renderStores(){
     c.innerHTML=(attention.length?`<div class="section-title">待補完成 <span class="badge">${attention.length} 店</span></div>${attention.map(summaryStoreCardHTML).join('')}`:'')+(done.length?`<div class="section-title">本月已完成 <span class="badge">${done.length} 店</span></div>${done.map(summaryStoreCardHTML).join('')}`:'')+(pending.length?`<div class="section-title">本月尚未巡店 <span class="badge">${pending.length} 店</span></div>${pending.map(summaryStoreCardHTML).join('')}`:'');
     return;
   }
-  const model = PatrolReadModel.overview(rawDetails, STORES, currentMonth, new Date());
+  const sourceRows=patrolLocalPreview.active?patrolLocalPreview.mergedRows:rawDetails;
+  const model = PatrolReadModel.overview(sourceRows, STORES, currentMonth, new Date());
   const visitedStores = model.stores.filter(store=>store.visited).map(store=>store.recordName)
     .sort((a,b)=>storeSummary(a).miss - storeSummary(b).miss ? storeSummary(b).miss-storeSummary(a).miss : 0);
 
@@ -2143,37 +2298,17 @@ function patrolReadbackKeyLabel(row){
 
 async function readbackPatrolWriteRows(details, writtenRows){
   const expected=new Map();
-  const groups=new Map();
   (details||[]).forEach(row=>{
     const key=patrolReadbackKey(row);
     expected.set(key,row);
-    const month=patrolCandidateMonth(row);
-    const store=canonicalPatrolCandidateStore(row);
-    const groupKey=`${month}|${store}`;
-    if(!groups.has(groupKey)) groups.set(groupKey,{month,store});
   });
   const found=new Set();
   try{
-    for(const group of groups.values()){
-      if(!group.month||!group.store) throw new Error('雲端讀回驗證缺少月份或店點');
-      let page=1;
-      let totalRows=null;
-      for(;;){
-        const result=await cloudCall('ptdetail',{month:group.month,store:group.store,page,limit:100});
-        if(!result||result.status!=='ok') throw new Error(result&&result.message||'雲端讀回驗證失敗');
-        if(!Array.isArray(result.rows)) throw new Error('雲端讀回 contract 不完整');
-        result.rows.forEach(row=>{
-          const key=patrolReadbackKey(row);
-          if(expected.has(key)) found.add(key);
-        });
-        const parsedTotal=Number(result.totalRows);
-        if(Number.isFinite(parsedTotal)&&parsedTotal>=0) totalRows=parsedTotal;
-        const pageRows=result.rows.length;
-        if(pageRows===0 || pageRows<100 || (totalRows!=null && page*100>=totalRows)) break;
-        page++;
-        if(page>100) throw new Error('雲端讀回頁數異常');
-      }
-    }
+    const formalRows=await formalPatrolRowsForPreflight(details);
+    formalRows.forEach(row=>{
+      const key=patrolReadbackKey(row);
+      if(expected.has(key)) found.add(key);
+    });
   }catch(error){
     const missing=[...expected.entries()].filter(([key])=>!found.has(key)).map(([,row])=>patrolReadbackKeyLabel(row));
     const failure=new Error(error&&error.message||'雲端讀回驗證失敗');
@@ -2187,6 +2322,20 @@ async function readbackPatrolWriteRows(details, writtenRows){
     throw failure;
   }
   return {parsedRows:details.length,writtenRows,readbackRows:found.size,missingKeys:[]};
+}
+
+function waitForPatrolReadback(details,writtenRows,delays=[0]){
+  let lastError=null;
+  return delays.reduce((chain,delay)=>chain.catch(async error=>{
+    lastError=error;
+    if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+    return readbackPatrolWriteRows(details,writtenRows);
+  }),Promise.reject(new Error('readback pending'))).catch(error=>{
+    const failure=error||lastError;
+    failure.writeAccepted=true;
+    failure.writtenRows=writtenRows;
+    throw failure;
+  });
 }
 
 function cloudWrite(details){
@@ -2223,7 +2372,7 @@ function cloudWrite(details){
 
   let written = 0, chain = Promise.resolve();
   chunks.forEach(c=>{ chain = chain.then(()=>sendChunk(c, 0)).then(n=>{ written += n; }); });
-  return chain.then(()=>readbackPatrolWriteRows(details,written));
+  return chain.then(()=>waitForPatrolReadback(details,written));
 }
 
 function setCloudStatus(text, on){
@@ -2714,8 +2863,9 @@ const MI = (function(){
   };
   const LOAD_TARGET_MS=10000;
   const RETENTION_MONTHS=6;
-  let state={date:'', month:'', loading:false, error:null, progress:'', slow:null, diagnostic:null};
+  let state={date:'', month:'', loading:false, error:null, progress:'', slow:null, diagnostic:null, provisional:false};
   let serverRowsByMonth={};
+  let previewRowsByMonth={};
   let loadedMonths={};
   let loadGeneration=0;
 
@@ -2877,6 +3027,8 @@ const MI = (function(){
       });
       serverRowsByMonth[month]=next;
       loadedMonths[month]=true;
+      delete previewRowsByMonth[month];
+      if(state.month===month) state.provisional=false;
       const report=health(month);
       console[report.abnormal?'warn':'info']('MILEAGE_HEALTH',report);
       if(generation===loadGeneration){
@@ -2899,8 +3051,8 @@ const MI = (function(){
 
   function clear(){
     loadGeneration+=1;
-    serverRowsByMonth={}; loadedMonths={};
-    state={date:'',month:'',loading:false,error:null,progress:'',slow:null,diagnostic:null};
+    serverRowsByMonth={}; previewRowsByMonth={}; loadedMonths={};
+    state={date:'',month:'',loading:false,error:null,progress:'',slow:null,diagnostic:null,provisional:false};
   }
 
   /* ---------- 人工資料層（localStorage，不觸碰 GAS／原始明細） ---------- */
@@ -2952,9 +3104,40 @@ const MI = (function(){
     const p=n=>String(n).padStart(2,'0');
     return {date:`${year}-${p(month)}-${p(day)}`, time:`${p(hour)}:${p(minute)}`, key:`${p(hour)}${p(minute)}`};
   }
+  function activeMonthRows(month){
+    return previewRowsByMonth[month]||serverRowsByMonth[month]||[];
+  }
+  function preview(value, rows){
+    const month=canonicalMonth(value);
+    if(!month) return false;
+    previewRowsByMonth[month]=(rows||[]).filter(row=>patrolCandidateMonth(row)===month);
+    state.month=month;
+    state.provisional=true;
+    state.loading=false;
+    state.error=null;
+    state.slow=null;
+    state.progress='雲端比對與同步中';
+    render();
+    return true;
+  }
+  function discardPreview(value){
+    const month=canonicalMonth(value)||canonicalMonth(state.month);
+    if(!month) return false;
+    delete previewRowsByMonth[month];
+    if(state.month===month) state.provisional=false;
+    return true;
+  }
+  function refresh(value){
+    const month=canonicalMonth(value)||canonicalMonth(state.month);
+    if(!month) return Promise.resolve(false);
+    return hydrateMonth(month,true).then(()=>true).catch(error=>{
+      console.error('Mileage refresh failed:',error);
+      return false;
+    });
+  }
   function parsedMonth(month){
     const by={}, issues=[];
-    (serverRowsByMonth[month]||[]).forEach((r,index)=>{
+    activeMonthRows(month).forEach((r,index)=>{
       if(!r||typeof r!=='object'||Array.isArray(r)){
         issues.push({code:ERROR.DATA_FORMAT,reason:`第 ${index+1} 列不是 object`}); return;
       }
@@ -2978,7 +3161,8 @@ const MI = (function(){
     return {by,issues};
   }
   function monthSource(month){
-    const patrolRows=serverRowsByMonth[month]||[];
+    const patrolRows=activeMonthRows(month);
+    if(previewRowsByMonth[month]) return {type:'provisional',patrolRows:patrolRows.length,archive:null};
     if(patrolRows.length) return {type:'patrol',patrolRows:patrolRows.length,archive:null};
     const archive=OFFICIAL[month]||null;
     if(archive) return {type:'official-archive',patrolRows:0,archive};
@@ -2986,8 +3170,9 @@ const MI = (function(){
   }
   function days(){
     const by={};
-    Object.keys(serverRowsByMonth).forEach(month=>{
-      if(monthSource(month).type!=='patrol') return;
+    const months=new Set([...Object.keys(serverRowsByMonth),...Object.keys(previewRowsByMonth)]);
+    months.forEach(month=>{
+      if(!['patrol','provisional'].includes(monthSource(month).type)) return;
       const parsed=parsedMonth(month).by;
       Object.keys(parsed).forEach(date=>{by[date]=Object.assign(by[date]||{},parsed[date]);});
     });
@@ -3066,7 +3251,7 @@ const MI = (function(){
   }
 
   function health(month){
-    const source=serverRowsByMonth[month]||[];
+    const source=activeMonthRows(month);
     const sourceInfo=monthSource(month);
     const parsed=parsedMonth(month);
     const visitCount=Object.values(parsed.by).reduce((sum,stores)=>sum+Object.keys(stores).length,0);
@@ -3075,7 +3260,7 @@ const MI = (function(){
     const todos=[]; plans.forEach(plan=>plan.todo.forEach(route=>todos.push(route)));
     const mileageDetails=sourceInfo.type==='official-archive' ? sourceInfo.archive.rows.length : visitCount;
     if(sourceInfo.type==='none') issues.push({code:ERROR.NO_PATROL,reason:`${month} 本月真的沒有巡店，也沒有正式歷史車資`});
-    else if(sourceInfo.type==='patrol'&&visitCount===0) issues.push({code:ERROR.SOURCE_MISSING,reason:`巡店已有 ${source.length} 筆，但里程同步為 0 筆`});
+    else if(['patrol','provisional'].includes(sourceInfo.type)&&visitCount===0) issues.push({code:ERROR.SOURCE_MISSING,reason:`巡店已有 ${source.length} 筆，但里程同步為 0 筆`});
     if(todos.length) issues.push({code:ERROR.STORE_MAPPING,reason:`${todos.length} 段店點無法匹配距離表：${todos.join('、')}`});
     const calcFailed=plans.filter(plan=>plan.km!=null&&(!Number.isFinite(plan.km)||plan.km<0));
     if(calcFailed.length) issues.push({code:ERROR.CALC,reason:`${calcFailed.length} 天距離計算結果無效`});
@@ -3241,7 +3426,7 @@ const MI = (function(){
     renderRecentMonths();
     renderCoverage();
     renderDiagnostic();
-    if(state.loading||state.error){
+    if((state.loading||state.error)&&!state.provisional){
       const label=state.loading?(state.progress||`正在載入 ${state.month}`):'正式月份明細尚未完成讀回';
       document.getElementById('miStats').innerHTML=`<div class="mi-card"><div class="k">里程資料</div><div class="v">—</div><div class="s">${esc2(label)}</div></div>`;
       document.getElementById('miAlerts').innerHTML='';
@@ -3289,6 +3474,11 @@ const MI = (function(){
 
   function renderCoverage(){
     const el=document.getElementById('miCoverage'), rc=reconcile(state.month);
+    if(state.provisional){
+      const syncNote=state.error?`；雲端刷新尚未完成：${esc2(state.error.message||state.error)}`:'；雲端正在自動比對與同步';
+      el.innerHTML=`<div class="mi-note"><b>本機預估里程</b>${syncNote}。正式匯出會等雲端讀回確認後才開放。</div>`;
+      return;
+    }
     if(state.loading){
       const slow=state.slow?`<br><b>⚠ ${ERROR.LOAD_SLOW}</b>：${esc2(state.slow.reason)}；卡點：${esc2(state.slow.progress||state.progress)}`:'';
       el.innerHTML=`<div class="mi-note${state.slow?' bad':''}">${esc2(state.progress||`正在載入 ${state.month}`)}…${slow}</div>`;
@@ -3402,13 +3592,15 @@ const MI = (function(){
   function open(v){
     const month=canonicalMonth(v)||canonicalMonth(currentMonth)||taipeiCurrentMonth();
     cleanupRetention(taipeiCurrentMonth(),month);
-    state.month=month; state.date=''; state.loading=!loadedMonths[month]; state.error=null; render();
+    state.month=month; state.date=''; state.provisional=Boolean(previewRowsByMonth[month]); state.loading=!state.provisional&&!loadedMonths[month]; state.error=null; render();
+    if(state.provisional) return Promise.resolve(true);
     return hydrateMonth(month,false).catch(error=>{console.error('Mileage hydration failed:',error);return false;});
   }
   function setMonth(v){
     const month=canonicalMonth(v); if(!month) return Promise.resolve(false);
     cleanupRetention(taipeiCurrentMonth(),month);
-    state.month=month; state.date=''; state.loading=!loadedMonths[month]; state.error=null; render();
+    state.month=month; state.date=''; state.provisional=Boolean(previewRowsByMonth[month]); state.loading=!state.provisional&&!loadedMonths[month]; state.error=null; render();
+    if(state.provisional) return Promise.resolve(true);
     return hydrateMonth(month,false).catch(error=>{console.error('Mileage hydration failed:',error);return false;});
   }
   function shiftMonth(delta){
@@ -3557,6 +3749,14 @@ const MI = (function(){
   }
 
   function exportConfirm(){
+    if(state.provisional){
+      document.getElementById('miDlgList').innerHTML=`<dt>匯出月份</dt><dd>${esc2(state.month)}</dd><dt>目前狀態</dt><dd>本機預估，等待雲端確認</dd>`;
+      document.getElementById('miDlgWarn').innerHTML='<div class="mi-note bad"><b>正式匯出尚未開放</b>：雲端讀回完成後會自動更新，不需要重新匯入檔案。</div>';
+      document.getElementById('miDlgAct').innerHTML='<button class="mi-btn ghost" type="button" onclick="MI.dlgClose()">取消</button>';
+      const provisionalDialog=document.getElementById('miExportDlg');
+      if(provisionalDialog.showModal) provisionalDialog.showModal(); else provisionalDialog.setAttribute('open','');
+      return;
+    }
     const {plans,all,total}=buildSheets(state.month);
     const healthReport=health(state.month);
     const todo=all.reduce((a,p)=>a+p.todo.length,0);
@@ -3624,7 +3824,7 @@ const MI = (function(){
     dlgClose(); render();
   }
 
-  return {render,open,clear,setMonth,shiftMonth,setDate,step,today,addLegPrompt,setLegKm,saveLegInput,removeNode,setCost,
+  return {render,open,clear,preview,discardPreview,refresh,setMonth,shiftMonth,setDate,step,today,addLegPrompt,setLegKm,saveLegInput,removeNode,setCost,
           importPick,importFile,exportDetails,exportConfirm,doExport,dlgClose,runDiagnostic,
           _reconcile:reconcile,_billable:billable,_officialPlans:officialPlans,OFFICIAL,
           _days:days,_dayPlan:dayPlan,_monthPlans:monthPlans,_coverage:coverage,

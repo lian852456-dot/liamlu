@@ -456,8 +456,18 @@
     function message(value, type) {
       if (typeof services.showMessage === 'function') services.showMessage(value, type);
     }
+    function preview(rows, state) {
+      if (typeof services.preview === 'function') services.preview(rows, state);
+    }
+    function clearPreview(options) {
+      if (typeof services.clearPreview === 'function') services.clearPreview(options || {});
+    }
+    async function refreshExisting(state, preflight) {
+      if (typeof services.refreshExisting === 'function') await services.refreshExisting(state, preflight);
+    }
     function reset(options) {
       selected = null;
+      if (!(options && options.keepPreview)) clearPreview(options);
       const input = documentRef && documentRef.getElementById('patrolLocalFileInput');
       if (input) input.value = '';
       if (!(options && options.keepStatus)) {
@@ -525,6 +535,7 @@
           return;
         }
         selected = localState;
+        preview(localState.parsedRows, localState);
         renderBrowserStatus(documentRef, localState, null, '');
         if (!services.isReady()) {
           message('檔案已在本機解析；必須完成督導驗證與連線後，才能執行 Server Preflight。', 'err');
@@ -536,12 +547,14 @@
         renderBrowserStatus(documentRef, localState, preflight, '');
         if (preflight.differences.length) {
           setPending(null);
+          clearPreview({keepStatus:true});
           message(`Server Preflight 發現 ${preflight.differences.length} 筆雲端同鍵異內容，整批已封鎖。`, 'err');
           return;
         }
         if (!preflight.additions.length) {
           setPending(null);
           message(`Server Preflight 完成：雲端已存在 ${preflight.existingSame.length} 筆，沒有新增資料，不呼叫 ptwrite。`, 'ok');
+          await refreshExisting(localState, preflight);
           return;
         }
         setPending({
@@ -557,6 +570,7 @@
       } catch (error) {
         selected = null;
         setPending(null);
+        clearPreview({keepStatus:true});
         renderBrowserStatus(documentRef, initial, null, error && error.message || '本機檔案解析失敗。');
         message(`${error && error.message || '本機檔案解析失敗'}；未呼叫 ptwrite。`, 'err');
         if (input) input.value = '';

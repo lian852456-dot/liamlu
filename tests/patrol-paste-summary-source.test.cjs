@@ -47,10 +47,14 @@ test('successful ptwrite requires keyed ptdetail readback before ptsummary refre
   const load = functionBody('cloudLoad', 'cloudWrite');
   const confirm = functionBody('confirmPatrolCloudWrite', 'rebuildFromRaw');
   const readback = functionBody('readbackPatrolWriteRows', 'cloudWrite');
-  assert.match(write, /readbackPatrolWriteRows\(details,written\)/);
-  assert.match(readback, /cloudCall\('ptdetail'/);
+  const finalize = functionBody('finalizeLocalPatrolWrite', 'continueLocalPatrolReadback');
+  assert.match(write, /waitForPatrolReadback\(details,written\)/);
+  assert.match(readback, /formalPatrolRowsForPreflight\(details\)/);
+  assert.match(patrol, /async function formalPatrolRowsForGroup[\s\S]*cloudCall\('ptdetail'/);
   assert.match(readback, /missingKeys/);
-  assert.match(confirm, /cloudLoad\(\{afterWrite:true,writeMessage,renderErr\}\)/);
+  assert.match(confirm, /finalizeLocalPatrolWrite\(pending,receipt,renderErr\)/);
+  assert.match(finalize, /refreshPatrolAndMileage\(writeMessage,renderErr\)/);
+  assert.match(confirm, /continueLocalPatrolReadback/);
   assert.match(load, /patrolSummaryState=patrolSummary\?'stale':'error'/);
   assert.match(load, /保留上次成功正式摘要/);
   assert.doesNotMatch(write, /patrolSummaryState\s*=\s*['"]local['"]/);

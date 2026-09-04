@@ -95,5 +95,8 @@ test('初始 HTML 不載入 parser／SheetJS，選檔 loader 失敗維持零寫�
   assert.match(patrol, /async function handlePatrolLocalFileSelection\(event\)/);
   assert.match(patrol, /await loadPatrolLocalImportDependencies\(\)/);
   assert.match(patrol, /本機解析元件載入失敗[^`]*未呼叫 ptwrite/);
-  assert.equal((patrol.match(/loadPatrolLocalImportDependencies\(\)/g) || []).length, 2);
+  assert.equal((patrol.match(/loadPatrolLocalImportDependencies\(\)/g) || []).length, 3);
+  assert.match(patrol, /async function handleSupervisorInterviewFileSelection\(event\)/);
+  assert.match(patrol, /督導面談紀錄/);
+  assert.match(patrol, /未寫入雲端/);
 });

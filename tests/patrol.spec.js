@@ -605,6 +605,14 @@ test('本機選檔後顯示檔名與預覽，尚未確認前不呼叫 ptwrite', 
   await expect(page.locator('#patrolConfirmWriteBtn')).toBeVisible();
   expect(writeCalls).toBe(0);
   expect(await page.evaluate(()=>rawDetails.length)).toBe(0);
+  await expect(page.locator('#content')).toContainText('台北通化');
+  await page.locator('.secure-tab[data-view="mileage"]').click();
+  await expect(page.locator('#miCoverage')).toContainText('本機預估里程');
+  await expect(page.locator('#miSummary')).toContainText('台北通化');
+  await page.getByRole('button',{name:'匯出公司報銷 Excel'}).click();
+  await expect(page.locator('#miExportDlg')).toContainText('正式匯出尚未開放');
+  await page.getByRole('button',{name:'取消'}).click();
+  await page.locator('.secure-tab[data-view="patrol"]').click();
   expect(await page.evaluate(()=>({version:window.XLSX&&window.XLSX.version,parser:Boolean(window.PatrolLocalFileImport),dependencies:document.querySelectorAll('script[data-patrol-local-import-dependency]').length}))).toEqual({version:'0.20.3',parser:true,dependencies:2});
 
   await selectPatrolLocalCsv(page,'第二份.csv',[pasteLine(7,'台北永吉','DNB10082',3,'v','')]);
@@ -681,7 +689,7 @@ test('本機解析元件動態載入失敗時 fail-closed 且零寫入', async (
   expect(writeCalls).toBe(0);
 });
 
-test('本機選檔 readback 失敗時保留檔名、待寫資料與重新確認', async ({ page }) => {
+test('本機選檔 readback 暫時缺漏時自動核對且不重複寫入', async ({ page }) => {
   await stubGas(page);
   await openAndUnlock(page);
   const lines=[
@@ -692,14 +700,28 @@ test('本機選檔 readback 失敗時保留檔名、待寫資料與重新確認'
   omitPtdetailRow=true;
   await page.getByRole('button',{name:'確認寫入雲端'}).click();
 
-  await expect(page.locator('#parseMsg')).toContainText('本機檔案與待確認狀態已保留');
-  await expect(page.locator('#patrolLocalImportStatus')).toContainText('保留重試.csv');
-  await expect(page.locator('#patrolConfirmWriteBtn')).toBeVisible();
-  expect(await page.evaluate(()=>rawDetails.length)).toBe(0);
-
+  await expect(page.locator('#parseMsg')).toContainText('正在自動重試讀回核對');
+  await expect(page.locator('#patrolConfirmWriteBtn')).toBeHidden();
+  expect(writeCalls).toBe(1);
   omitPtdetailRow=false;
-  await page.getByRole('button',{name:'確認寫入雲端'}).click();
-  await expect(page.locator('#parseMsg')).toContainText('本機檔案寫入與雲端讀回一致');
+  await expect(page.locator('#parseMsg')).toContainText('本機檔案寫入與雲端讀回一致',{timeout:10000});
+  expect(writeCalls).toBe(1);
+});
+
+test('督導面談紀錄可從網站選擇本機檔案並只做欄位預覽', async ({ page }) => {
+  await stubGas(page);
+  await openAndUnlock(page);
+  await page.locator('button[data-view="halfDashboard"]').click();
+  await expect(page.locator('#halfDashboardView')).toContainText('督導面談紀錄');
+  await page.locator('#supervisorInterviewFileInput').setInputFiles({
+    name:'督導面談範例.csv',mimeType:'text/csv',
+    buffer:Buffer.from('面談日期,門市,同仁,面談內容\n2026/9/4,台北通化,測試同仁,績效追蹤')
+  });
+  await expect(page.locator('#supervisorInterviewImportStatus')).toContainText('本機解析完成');
+  await expect(page.locator('#supervisorInterviewPreview')).toContainText('面談日期');
+  await expect(page.locator('#supervisorInterviewPreview')).toContainText('績效追蹤');
+  await expect(page.locator('#supervisorInterviewImportStatus')).toContainText('未寫入雲端');
+  expect(writeCalls).toBe(0);
 });
 
 test('本機選檔錯誤檔案不污染下一次正確匯入', async ({ page }) => {
@@ -883,7 +905,7 @@ test.describe('解析狀態訊息', () => {
   });
 });
 
-test('貼上明細後切到督導檢查大盤仍使用 fresh ptsummary', async ({ page }) => {
+test('貼上明細後切到督導面談紀錄不重讀巡店或班表', async ({ page }) => {
   cloudRows = item18EightStoreRows();
   await stubGas(page);
   await openAndUnlock(page);
@@ -901,8 +923,8 @@ test('貼上明細後切到督導檢查大盤仍使用 fresh ptsummary', async (
   const readsBeforeSwitch = ptReadCalls;
 
   await page.click('[data-view="halfDashboard"]');
-  await expect(page.locator('#halfDashboardView')).toContainText('資料來源：正式輕量巡店摘要');
-  await expect(page.locator('#halfDashboardView')).toContainText('7–8月雙月全盤');
+  await expect(page.locator('#halfDashboardView')).toContainText('督導面談紀錄');
+  await expect(page.locator('#halfDashboardView')).toContainText('尚未選擇檔案');
   expect(ptReadCalls).toBe(readsBeforeSwitch);
 });
 
@@ -1254,7 +1276,7 @@ test('加密頁籤：半月督導檢查可上傳照片影片並在歷史回放',
   expect(xml).toContain('ss:HRef="https://drive.google.com/file/d/media-1/view"');
 });
 
-test('督導檢查大盤直接採計貼上巡店紀錄的上下半月、月盤點與雙月第 18 項', async ({ page }) => {
+test('督導面談紀錄取代舊大盤且不再顯示巡店統計', async ({ page }) => {
   const full = (store, code, date, from, to) => Array.from({ length: to - from + 1 }, (_, index) => ({
     fillTime: `${date} 16:43`, arriveTime: `${date} 16:00`, leaveTime: `${date} 18:00`, district: '北一二B',
     code, store, inspector: '測試督導', item: from + index, result: 'v', reason: '', month: '2026-07',
@@ -1268,22 +1290,15 @@ test('督導檢查大盤直接採計貼上巡店紀錄的上下半月、月盤�
   await stubGas(page);
   await openAndUnlock(page);
   await page.locator('button[data-view="halfDashboard"]').click();
-  await page.locator('#halfDashboardMonth').fill('2026-07');
-  await page.locator('#halfDashboardMonth').press('Tab');
   const dashboard = page.locator('#halfDashboardView');
   await expect(dashboard).toBeVisible();
-  await expect(dashboard).toContainText('資料來源：正式輕量巡店摘要');
-  await expect(dashboard).toContainText('7–8月雙月全盤・題 18');
-  await expect(dashboard).toContainText('巡店異常明細（檢查≥10項、到店≥5次）');
-  const tonghua = dashboard.locator('.half-dashboard-store', { hasText: '台北通化' });
-  await expect(tonghua).toContainText('完成');
-  await expect(tonghua).toContainText('本月到店 2 次');
-  const jiuquan = dashboard.locator('.half-dashboard-store', { hasText: '台北酒泉' });
-  await expect(jiuquan).toContainText('缺 8 項');
-  await expect(jiuquan).toContainText('尚未開始');
+  await expect(dashboard).toContainText('督導面談紀錄');
+  await expect(dashboard).toContainText('選擇督導面談檔案');
+  await expect(dashboard).not.toContainText('巡店異常明細');
+  await expect(page.locator('#halfDashboardMonth')).toHaveCount(0);
 });
 
-test('巡店異常明細只計入檢查至少 10 項且到店至少 5 次的門市', async ({ page }) => {
+test('督導面談本機上傳不會觸發巡店、到店檢查或班表寫入', async ({ page }) => {
   const fixture = currentMonthFixture(1, '台北通化', 'DNB10059', 1, 'v', '');
   const rows = (store, code, days) => days.flatMap((day, index) => Array.from({ length: 10 }, (_, item) => ({
     fillTime: `${fixture.fillDate.replace(/\/1$/, `/${day}`)} 16:43`, arriveTime: `${fixture.fillDate.replace(/\/1$/, `/${day}`)} 16:00`, leaveTime: `${fixture.fillDate.replace(/\/1$/, `/${day}`)} 18:00`, district: '北一二B',
@@ -1300,10 +1315,10 @@ test('巡店異常明細只計入檢查至少 10 項且到店至少 5 次的門�
   await openAndUnlock(page);
   await page.locator('button[data-view="halfDashboard"]').click();
   const dashboard = page.locator('#halfDashboardView');
-  await expect(dashboard).toContainText('本月到店 5 次');
-  await expect(dashboard).toContainText('本月到店 4 次');
-  const issueStat = dashboard.locator('.half-stat').filter({ hasText: '巡店異常明細' });
-  await expect(issueStat).toHaveText(/1.*巡店異常明細/);
+  await page.locator('#supervisorInterviewFileInput').setInputFiles({name:'面談.tsv',mimeType:'text/tab-separated-values',buffer:Buffer.from('日期\t店點\t摘要\n2026/9/4\t台北通化\t追蹤')});
+  await expect(dashboard).toContainText('本機解析完成');
+  expect(writeCalls).toBe(0);
+  expect(halfWriteCalls).toBe(0);
 });
 
 /* =========================================================================

@@ -17,7 +17,7 @@ test('patrol.html and App delegate patrol calculations to the same read-only mod
   assert.match(patrolHtml, /PatrolReadModel\.itemStatus\(records, currentMonth, storeName, itemNo\)/);
   assert.match(patrolHtml, /PatrolReadModel\.storeSummary\(records, currentMonth, storeName\)/);
   assert.match(patrolHtml, /PatrolReadModel\.bimWindow\(mk\)/);
-  assert.match(patrolHtml, /PatrolReadModel\.overview\(rawDetails, STORES, currentMonth/);
+  assert.match(patrolHtml, /PatrolReadModel\.overview\(sourceRows, STORES, currentMonth/);
   assert.match(appJs, /function adaptPatrolSummary\(raw, currentMonth\)/);
   assert.match(appJs, /patrolRead\('ptsummary',\{month\}\)/);
   assert.doesNotMatch(appJs, /patrolRead\('ptread'/);
