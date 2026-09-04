@@ -1753,7 +1753,18 @@ function renderSep25Dashboard(){
     ? `本機預覽${patrolLocalPreview.fileName?` · ${patrolLocalPreview.fileName}`:''}；雲端比對與同步中`
     : matched?.status==='loading'?'正在讀取新版 25 項正式巡店明細…':matched?.status==='error'?matched.message:model?`正式 ptdetail 唯讀驗證完成${matched?.verifiedAt?` · ${matched.verifiedAt}`:''}`:'新版 25 項資料尚未載入';
   if(!model){
-    reminder.innerHTML='';overview.innerHTML='';groups.innerHTML='';content.innerHTML=patrolSummaryUnavailableHTML();return;
+    reminder.innerHTML='';groups.innerHTML='';
+    const quick=patrolSummary&&patrolSummary.month===currentMonth&&matched?.status==='loading'?patrolSummary:null;
+    if(quick){
+      const total=Number(quick.totalStores)||STORES.length;
+      const visited=Number(quick.visitedStores)||0;
+      const remaining=Array.isArray(quick.unvisitedStores)?quick.unvisitedStores.length:Math.max(0,total-visited);
+      overview.innerHTML=`<div class="stat"><div class="num">${visited}</div><div class="lbl">摘要已讀取・本月有到店店數</div></div><div class="stat"><div class="num ${remaining?'warn':'good'}">${remaining}</div><div class="lbl">摘要已讀取・尚未巡店店數</div></div>`;
+      content.innerHTML='<div class="empty-state"><div class="big">⏳</div><b>巡店摘要已更新</b><br>店別明細正在背景載入；完成的數字會自動補上，不需要重新整理。</div>';
+    }else{
+      overview.innerHTML='';content.innerHTML=patrolSummaryUnavailableHTML();
+    }
+    return;
   }
   const visitPending=model.stores.filter(store=>!store.visits.completed);
   reminder.innerHTML=visitPending.length
@@ -2240,9 +2251,10 @@ function cloudLoad(options={}){
       if(!res.summary||res.summary.month!==currentMonth||!Array.isArray(res.summary.stores)||res.summary.stores.length!==STORES.length) throw new Error('巡店摘要月份或九店 contract 不完整');
       patrolSummary=res.summary;
       patrolSummaryState='ok';
-      patrolSummaryMessage='';
+      patrolSummaryMessage=isSep25DashboardMonth()?'巡店摘要已更新，店別明細正在背景載入':'巡店摘要已更新';
       patrolSummaryVerifiedAt=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
       if(isSep25DashboardMonth()){
+        try{render();}catch(error){console.error('Patrol summary-first render failed:',error);}
         const loaded=await loadSep25FormalDashboard(currentMonth);
         if(!loaded){
           const message=sep25State.message||'新版 25 項正式資料讀取失敗';
@@ -2250,6 +2262,7 @@ function cloudLoad(options={}){
           return false;
         }
       }
+      patrolSummaryMessage='';
       let renderError=priorRenderError;
       try{render();}catch(error){renderError=renderError||error;console.error('Patrol render failed:',error);}
       if(renderError){

@@ -15,6 +15,7 @@ let ptReadCalls;
 let ptDetailCalls;
 let ptMileageCalls;
 let ptMileageDelayMs;
+let ptDetailDelayMs;
 let ptMileageContract;
 let cloudConfig; // 模擬各區 GAS 回傳的 PT_STORES / PT_TITLE
 let mediaUploads;
@@ -102,6 +103,7 @@ async function stubGas(page) {
         const rows=omitPtdetailRow&&matchingRows.length?matchingRows.slice(0,-1):matchingRows;
         const start=(pageNumber-1)*limit;
         ptDetailCalls.push({month,store,page:pageNumber,limit});
+        if (ptDetailDelayMs) await new Promise(resolve=>setTimeout(resolve,ptDetailDelayMs));
         return route.fulfill({ contentType:'application/json', body:JSON.stringify({
           status:'ok',month,store,page:pageNumber,limit,totalRows:rows.length,rows:rows.slice(start,start+limit)
         }) });
@@ -319,7 +321,7 @@ function item18Panel(page) {
   return page.locator('#invPanels .panel').filter({ hasText:'到店全盤提醒' });
 }
 
-test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; ptMileageContract = 'patrol-mileage-visits-v2'; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; omitPtdetailKeys = new Set(); omitPtdetailRow = false; ptwritePayloads = []; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; ptDetailDelayMs = 0; ptMileageContract = 'patrol-mileage-visits-v2'; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; omitPtdetailKeys = new Set(); omitPtdetailRow = false; ptwritePayloads = []; });
 
 test('填表時間為 ######## 時整批拒絕，不寫雲端、不改 rawDetails、不清除貼上內容', async ({ page }) => {
   await stubGas(page);
@@ -706,6 +708,22 @@ test('本機選檔 readback 暫時缺漏時自動核對且不重複寫入', asyn
   omitPtdetailRow=false;
   await expect(page.locator('#parseMsg')).toContainText('本機檔案寫入與雲端讀回一致',{timeout:10000});
   expect(writeCalls).toBe(1);
+});
+
+test('九月看板先顯示正式摘要，不把店別明細載入誤報成逾時', async ({ page }) => {
+  cloudRows=[{
+    fillTime:'2026/9/4 16:43',arriveTime:'2026/9/4 16:00',leaveTime:'2026/9/4 18:00',
+    district:'北一二B',code:'DNB10174',store:'台北通化',inspector:'測試督導',
+    item:1,content:'內容',result:'v',reason:'',month:'2026-09'
+  }];
+  ptDetailDelayMs=800;
+  await stubGas(page);
+  await openAndUnlock(page,PT_KEY,'2026-09');
+  await expect.poll(()=>ptDetailCalls.filter(call=>call.month==='2026-09').length).toBeGreaterThan(0);
+  await expect(page.locator('#sep25Overview')).toContainText('摘要已讀取');
+  await expect(page.locator('#sep25Content')).toContainText('店別明細正在背景載入');
+  await expect(page.locator('#sep25Content')).not.toContainText('巡店資料讀取逾時');
+  await expect(page.locator('#sep25LoadState')).toContainText('正式 ptdetail 唯讀驗證完成',{timeout:10000});
 });
 
 test('督導面談紀錄可從網站選擇本機檔案並只做欄位預覽', async ({ page }) => {
