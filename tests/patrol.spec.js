@@ -25,6 +25,8 @@ let halfWriteCalls;
 let omitPtdetailKeys;
 let omitPtdetailRow;
 let ptwritePayloads;
+let interviewRows;
+let interviewWriteCalls;
 
 function privateScheduleFixture() {
   const names = ['酒泉', '萬大', '大稻埕', '復興', '三創', '杭州', '永吉', '通化', '六張犁'];
@@ -138,6 +140,25 @@ async function stubGas(page) {
           month,page:1,limit:279,totalVisits:visits.length,totalPages:1,visits,
           diagnostics:{sourceRows:cloudRows.length,matchedRows:raw.length,uniqueVisits:visits.length,sheetScans:1,serverDurationMs:12}
         })});
+      }
+      if (payload.action === 'interview_read') {
+        if (payload.token !== PT_TOKEN) return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'error',message:'unauthorized'})});
+        const schedule=privateScheduleFixture();
+        const roster=[];const seen=new Set();
+        schedule.stores.forEach(store=>store.staff.forEach(person=>{if(!seen.has(person.name)){seen.add(person.name);roster.push({name:person.name,store:store.store,role:person.role});}}));
+        return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'ok',quarter:'2026-Q3',rosterMonth:schedule.month,roster,records:interviewRows})});
+      }
+      if (payload.action === 'interview_write') {
+        interviewWriteCalls++;
+        if (payload.token !== PT_TOKEN) return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'error',message:'unauthorized'})});
+        let written=0,updated=0;
+        (payload.rows||[]).forEach(row=>{
+          const key=[row.interviewDate,row.organization,row.interviewee,row.reason].join('|');
+          const index=interviewRows.findIndex(item=>[item.interviewDate,item.organization,item.interviewee,item.reason].join('|')===key);
+          const clean={...row};delete clean.employeeId;
+          if(index>=0){interviewRows[index]=clean;updated++;}else{interviewRows.push(clean);written++;}
+        });
+        return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'ok',quarter:'2026-Q3',written,updated})});
       }
       if (payload.action === 'half_media_upload') {
         const authed = payload.token === PT_TOKEN;
@@ -321,7 +342,7 @@ function item18Panel(page) {
   return page.locator('#invPanels .panel').filter({ hasText:'到店全盤提醒' });
 }
 
-test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; ptDetailDelayMs = 0; ptMileageContract = 'patrol-mileage-visits-v2'; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; omitPtdetailKeys = new Set(); omitPtdetailRow = false; ptwritePayloads = []; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; ptDetailDelayMs = 0; ptMileageContract = 'patrol-mileage-visits-v2'; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; omitPtdetailKeys = new Set(); omitPtdetailRow = false; ptwritePayloads = []; interviewRows = []; interviewWriteCalls = 0; });
 
 test('填表時間為 ######## 時整批拒絕，不寫雲端、不改 rawDetails、不清除貼上內容', async ({ page }) => {
   await stubGas(page);
@@ -726,19 +747,25 @@ test('九月看板先顯示正式摘要，不把店別明細載入誤報成逾�
   await expect(page.locator('#sep25LoadState')).toContainText('正式 ptdetail 唯讀驗證完成',{timeout:10000});
 });
 
-test('督導面談紀錄可從網站選擇本機檔案並只做欄位預覽', async ({ page }) => {
+test('督導面談紀錄可解析十一欄、排除員編並寫入獨立雲端後讀回', async ({ page }) => {
   await stubGas(page);
   await openAndUnlock(page);
   await page.locator('button[data-view="halfDashboard"]').click();
   await expect(page.locator('#halfDashboardView')).toContainText('督導面談紀錄');
   await page.locator('#supervisorInterviewFileInput').setInputFiles({
     name:'督導面談範例.csv',mimeType:'text/csv',
-    buffer:Buffer.from('面談日期,門市,同仁,面談內容\n2026/9/4,台北通化,測試同仁,績效追蹤')
+    buffer:Buffer.from('填報人員,面談人員組織,面談人員編號,面談人員,面談原因,表單狀態,面談日期,填表日期,結案日期,建議與指導,同仁回饋\n測試督導,台北通化,123456,測試同仁,例行人員訪談,已結案,2026/8/4,2026/8/4,2026/8/5,績效追蹤,收到')
   });
-  await expect(page.locator('#supervisorInterviewImportStatus')).toContainText('本機解析完成');
+  await expect(page.locator('#supervisorInterviewImportStatus')).toContainText('本機檢查完成');
   await expect(page.locator('#supervisorInterviewPreview')).toContainText('面談日期');
   await expect(page.locator('#supervisorInterviewPreview')).toContainText('績效追蹤');
-  await expect(page.locator('#supervisorInterviewImportStatus')).toContainText('未寫入雲端');
+  await expect(page.locator('#supervisorInterviewPreview')).not.toContainText('123456');
+  await page.getByRole('button',{name:'確認儲存本季紀錄'}).click();
+  await expect(page.locator('#supervisorInterviewImportStatus')).toContainText('雲端儲存並讀回完成');
+  await expect(page.locator('#supervisorInterviewProgress')).toContainText('已完成');
+  await expect(page.locator('#supervisorInterviewCompleted')).toContainText('測試同仁');
+  expect(interviewWriteCalls).toBe(1);
+  expect(JSON.stringify(interviewRows)).not.toContain('123456');
   expect(writeCalls).toBe(0);
 });
 
@@ -1333,10 +1360,11 @@ test('督導面談本機上傳不會觸發巡店、到店檢查或班表寫入',
   await openAndUnlock(page);
   await page.locator('button[data-view="halfDashboard"]').click();
   const dashboard = page.locator('#halfDashboardView');
-  await page.locator('#supervisorInterviewFileInput').setInputFiles({name:'面談.tsv',mimeType:'text/tab-separated-values',buffer:Buffer.from('日期\t店點\t摘要\n2026/9/4\t台北通化\t追蹤')});
-  await expect(dashboard).toContainText('本機解析完成');
+  await page.locator('#supervisorInterviewFileInput').setInputFiles({name:'面談.tsv',mimeType:'text/tab-separated-values',buffer:Buffer.from('填報人員\t面談人員組織\t面談人員編號\t面談人員\t面談原因\t表單狀態\t面談日期\t填表日期\t結案日期\t建議與指導\t同仁回饋\n測試督導\t台北通化\t123456\t測試同仁\t例行人員訪談\t已結案\t2026/8/4\t2026/8/4\t2026/8/5\t追蹤\t收到')});
+  await expect(dashboard).toContainText('本機檢查完成');
   expect(writeCalls).toBe(0);
   expect(halfWriteCalls).toBe(0);
+  expect(interviewWriteCalls).toBe(0);
 });
 
 /* =========================================================================

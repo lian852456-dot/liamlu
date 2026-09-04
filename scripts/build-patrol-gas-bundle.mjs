@@ -148,6 +148,8 @@ function doPost(e) {
       ptRequireSession_(payload.token, action);
       result = {schedule: readSchedule(payload.month || '')};
     }
+    else if (action === 'interview_read') result = supervisorInterviewReadPayload_(payload);
+    else if (action === 'interview_write') result = supervisorInterviewWritePayload_(payload);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
     else throw new Error('unknown patrol action');
     return patrolJsonResponse_({status: 'ok', ...result});

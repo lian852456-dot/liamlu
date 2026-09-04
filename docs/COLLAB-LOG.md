@@ -13,6 +13,12 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-09-05 ｜ Codex（督導面談季度雲端候選完成，待 Liam 部署 GAS）
+
+- 做了什麼：將「督導面談紀錄」從單次本機預覽補成當季管理頁；依十一欄來源解析七／八／九月，同仁編號在瀏覽器解析後立即排除。新增本季名冊、已完成、待結案、尚未面談與可回看面談內容；名冊沿用私有班表。新增受保護 `interview_read`／`interview_write` POST，寫入獨立 `督導面談紀錄` 工作表，採鎖定、去重、upsert 與寫後讀回。
+- 結果（本機候選／未部署）：季度規則固定七至九月同季，十月畫面立即全員歸零；讀取不刪資料，新季度第一次成功寫入後才清除舊季度。Node `155/155`、Patrol/Auth Chromium `93/93`、diff check 通過。巡店、里程、班表與督導到店檢查回歸均通過。
+- 經驗 / 給下一位的提醒：Patrol Apps Script 只能由 Liam 手動備份與建立新版本部署；在 GAS 部署、Pages 發布、真實七／八月檔寫入後讀回與 Liam 實機驗收完成前，不得宣稱正式雲端已上線。完整契約見 `docs/SUPERVISOR_INTERVIEW_QUARTERLY.md`。
+
 ## 2026-09-03 ｜ Codex（Patrol 新版 25 題 NA/V 判定已發布）
 
 - 做了什麼：由最新 `origin/main` 建立乾淨 worktree，將 2026-09-01 起共用 25 題模型收斂為只有 `result=V` 計入完成；`result=NA`、`reason=NA` 與只有原因文字都維持缺項。`patrol.html` 與 Supervisor App 共用此模型，並升版題庫、App 與 Service Worker cache。8/31 前 `patrol-read-model.js` 33 題歷史判定未改。

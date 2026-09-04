@@ -142,6 +142,7 @@
   .patrol-local-import-status{margin-top:10px;padding:10px 12px;border-radius:8px;background:#fff;border:1px solid var(--line);font-size:13px;line-height:1.65;overflow-wrap:anywhere}
   .patrol-local-import-status[hidden]{display:none}
   .patrol-local-import-status strong{display:block;font-size:14px;color:var(--ink)}
+  .patrol-local-import-status.good{border-color:#b9dfc8;background:var(--ok-bg);color:var(--ok)}
   .patrol-local-import-status.bad{border-color:#efc4c4;background:var(--miss-bg);color:var(--miss)}
   .patrol-local-import-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:8px}
   .patrol-local-import-metric{border:1px solid var(--line);border-radius:7px;padding:7px;background:#fff;min-width:0}
@@ -413,6 +414,19 @@
   .half-history{overflow:auto}
   .half-history table{min-width:900px}
   .half-dashboard-list{display:grid;gap:10px}
+  .interview-progress{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px;margin-top:12px}
+  .interview-progress .stat{padding:13px}
+  .interview-progress .num{font-size:24px}
+  .interview-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+  .interview-person-list{display:grid;gap:8px}
+  .interview-person{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff}
+  .interview-person strong{font-size:14px}
+  .interview-person small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+  .interview-pill{border-radius:999px;padding:3px 9px;font-size:12px;font-weight:800;white-space:nowrap;background:var(--miss-bg);color:var(--miss)}
+  .interview-pill.done{background:var(--ok-bg);color:var(--ok)}
+  .interview-pill.progress{background:#fff4d9;color:#8a5b00}
+  .interview-record-detail{max-width:430px;white-space:normal;line-height:1.55}
+  @media(max-width:720px){.interview-progress{grid-template-columns:repeat(2,minmax(0,1fr))}.interview-grid{grid-template-columns:1fr}}
   .half-dashboard-store{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}
   .half-dashboard-store-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:10px}
   .half-dashboard-store-head strong{font-size:15px}
@@ -601,19 +615,40 @@
   <section id="halfDashboardView" class="secure-view" aria-label="督導面談紀錄">
     <div class="secure-card">
       <h2>督導面談紀錄</h2>
-      <p class="hint">先選擇既有面談檔案，系統只在本機瀏覽器解析並顯示欄位預覽，不會寫入巡店、班表或雲端。確認實際欄位後，再設計正式面談紀錄畫面。</p>
+      <p class="hint">每位同仁每季完成一次。系統以私有班表名冊比對本季已結案紀錄；新季度會自動全部重設為尚未面談，上一季資料在本季首次成功匯入後清除。</p>
+      <div id="supervisorInterviewQuarterStatus" class="secure-note">正在載入本季面談進度…</div>
+      <div id="supervisorInterviewProgress" class="interview-progress"></div>
+    </div>
+    <div class="interview-grid">
+      <div class="secure-card">
+        <h3>尚未面談名單</h3>
+        <div id="supervisorInterviewMissing" class="interview-person-list"><div class="empty-state">正在比對私有班表名冊…</div></div>
+      </div>
+      <div class="secure-card">
+        <h3>本季已面談</h3>
+        <div id="supervisorInterviewCompleted" class="interview-person-list"><div class="empty-state">正在載入面談紀錄…</div></div>
+      </div>
+    </div>
+    <div class="secure-card">
+      <h3>匯入本季面談檔</h3>
+      <p class="hint">選檔後會先在本機檢查十一個欄位並排除員編；確認無誤後只需按一次即可存入私有雲端面談表。</p>
       <div class="patrol-local-import" aria-label="本機督導面談檔案上傳">
         <div class="btn-row">
           <button class="btn-ghost" id="supervisorInterviewFileButton" type="button" onclick="document.getElementById('supervisorInterviewFileInput').click()">📂 選擇督導面談檔案</button>
-          <span class="patrol-local-import-note">支援 .xlsx、.xls、.csv、.tsv；原始檔只在本機解析。</span>
+          <button class="secure-btn" id="supervisorInterviewSaveButton" type="button" onclick="saveSupervisorInterviewFile()" hidden>確認儲存本季紀錄</button>
+          <span class="patrol-local-import-note">支援 .xlsx、.xls、.csv、.tsv；原始檔只在本機解析，員編不會送往雲端。</span>
           <input id="supervisorInterviewFileInput" type="file" accept=".xlsx,.xls,.csv,.tsv" hidden onchange="handleSupervisorInterviewFileSelection(event)">
         </div>
         <div id="supervisorInterviewImportStatus" class="patrol-local-import-status" role="status" aria-live="polite">尚未選擇檔案。</div>
       </div>
     </div>
     <div class="secure-card">
-      <h3>本機欄位預覽</h3>
-      <div id="supervisorInterviewPreview" class="half-dashboard-list"><div class="empty-state"><div class="big">🗂️</div>選擇檔案後，這裡會顯示工作表、欄位與前幾列內容。</div></div>
+      <h3>匯入預覽</h3>
+      <div id="supervisorInterviewPreview" class="half-dashboard-list"><div class="empty-state"><div class="big">🗂️</div>選擇檔案後，這裡會顯示可匯入筆數、月份與前幾筆面談紀錄。</div></div>
+    </div>
+    <div class="secure-card">
+      <h3>本季面談紀錄</h3>
+      <div id="supervisorInterviewHistory" class="half-dashboard-list"><div class="empty-state">尚無本季雲端紀錄。</div></div>
     </div>
   </section>
 
@@ -673,6 +708,7 @@
 
 <script src="patrol-question-versions.js?v=3"></script>
 <script src="patrol-read-model.js?v=10"></script>
+<script src="supervisor-interview-model.js?v=1"></script>
 <script>
 /* ---------- 檢核規則設定 ---------- */
 // 預設門市清單（北一二B）。連上雲端後會改用 GAS 回傳的本區清單，
@@ -1000,6 +1036,7 @@ async function privateSignOut(){
   const token=PT_TOKEN;
   clearPatrolAuthState();
   records={};rawDetails=[];scheduleData=null;halfChecks=[];cloudOn=false;activePatrolView=null;
+  supervisorInterviewLocalFile=null;supervisorInterviewPendingRows=[];supervisorInterviewState={quarter:'',rosterMonth:'',roster:[],records:[]};
   sep25State={month:'',status:'idle',rows:[],model:null,message:'',verifiedAt:''};
   MI.clear();
   unmountPatrolApp();
@@ -1319,6 +1356,8 @@ async function handlePatrolLocalFileSelection(event){
 }
 
 let supervisorInterviewLocalFile=null;
+let supervisorInterviewPendingRows=[];
+let supervisorInterviewState={quarter:'',rosterMonth:'',roster:[],records:[]};
 function supervisorInterviewCell(value){
   if(value instanceof Date&&!Number.isNaN(value.getTime())) return value.toLocaleString('zh-TW');
   if(value&&typeof value==='object') return JSON.stringify(value);
@@ -1327,12 +1366,11 @@ function supervisorInterviewCell(value){
 function renderSupervisorInterviewPreview(parsed){
   const target=document.getElementById('supervisorInterviewPreview');
   if(!target)return;
-  const rows=parsed.rows.slice(0,8);
-  const width=Math.min(20,Math.max(1,...rows.map(row=>row.length)));
-  const tableRows=rows.map((row,index)=>`<tr><th>${index+1}</th>${Array.from({length:width},(_,column)=>`<td>${esc(supervisorInterviewCell(row[column]))||'—'}</td>`).join('')}</tr>`).join('');
-  target.innerHTML=`<p class="secure-note">檔案：${esc(parsed.fileName)} · 工作表：${esc(parsed.sheetName)} · ${parsed.totalRows} 列 / ${parsed.totalColumns} 欄。以下只顯示前 ${rows.length} 列供欄位判讀，尚未建立正式資料。</p>`+
-    `<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>列</th>${Array.from({length:width},(_,index)=>`<th>欄 ${index+1}</th>`).join('')}</tr></thead><tbody>${tableRows}</tbody></table></div>`+
-    (parsed.sheetNames.length>1?`<p class="secure-note">檔案另含工作表：${parsed.sheetNames.map(esc).join('、')}</p>`:'');
+  const rows=parsed.records.slice(0,8);
+  const months=[...new Set(parsed.records.map(row=>row.sourceMonth))].sort();
+  target.innerHTML=`<p class="secure-note">檔案：${esc(parsed.fileName)} · 工作表：${esc(parsed.sheetName)} · 可匯入 ${parsed.records.length} 筆 · 月份 ${months.map(esc).join('、')}。員編欄已排除，不會送往雲端。</p>`+
+    `<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>面談日期</th><th>組織</th><th>同仁</th><th>原因</th><th>狀態</th><th>建議與指導</th></tr></thead><tbody>${rows.map(row=>`<tr><td>${esc(row.interviewDate)}</td><td>${esc(row.organization)}</td><td>${esc(row.interviewee)}</td><td>${esc(row.reason)}</td><td>${esc(row.formStatus)}</td><td>${esc(row.guidance||'—')}</td></tr>`).join('')}</tbody></table></div>`+
+    (parsed.records.length>rows.length?`<p class="secure-note">另有 ${parsed.records.length-rows.length} 筆，儲存後會在本季面談紀錄中完整顯示。</p>`:'');
 }
 async function handleSupervisorInterviewFileSelection(event){
   const input=event&&event.target;
@@ -1356,21 +1394,101 @@ async function handleSupervisorInterviewFileSelection(event){
       const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,raw:true,defval:''})
         .filter(row=>Array.isArray(row)&&row.some(value=>supervisorInterviewCell(value)));
       const totalColumns=rows.reduce((max,row)=>Math.max(max,row.length),0);
-      return {sheetName,rows,totalRows:rows.length,totalColumns};
-    }).sort((a,b)=>b.totalRows-a.totalRows||b.totalColumns-a.totalColumns);
+      const parsed=SupervisorInterviewModel.parseMatrix(rows);
+      return {sheetName,rows,totalRows:rows.length,totalColumns,parsed};
+    }).sort((a,b)=>b.parsed.rows.length-a.parsed.rows.length||b.parsed.headerRow-a.parsed.headerRow||b.totalRows-a.totalRows);
     const selected=candidates[0];
     if(!selected||!selected.totalRows) throw new Error('檔案沒有可供判讀的內容');
-    supervisorInterviewLocalFile={fileName:file.name,sheetNames,...selected};
+    if(selected.parsed.blocked){
+      const details=(selected.parsed.invalidRows||[]).slice(0,3).map(row=>`第 ${row.rowNumber} 列：${row.errors.join('、')}`).join('；');
+      throw new Error(details||selected.parsed.errors.join('、')||'面談欄位檢查未通過');
+    }
+    const currentQuarter=supervisorInterviewState.quarter||SupervisorInterviewModel.currentQuarter();
+    const wrongQuarter=selected.parsed.rows.find(row=>row.quarter!==currentQuarter);
+    if(wrongQuarter) throw new Error(`目前為 ${currentQuarter}，只能匯入本季度紀錄`);
+    supervisorInterviewPendingRows=selected.parsed.rows.slice();
+    supervisorInterviewLocalFile={fileName:file.name,sheetNames,...selected,records:supervisorInterviewPendingRows};
     renderSupervisorInterviewPreview(supervisorInterviewLocalFile);
+    document.getElementById('supervisorInterviewSaveButton').hidden=false;
     status.className='patrol-local-import-status good';
-    status.textContent=`本機解析完成：${file.name}；已預覽 ${selected.sheetName}，未寫入雲端。`;
+    status.textContent=`本機檢查完成：${file.name}；${supervisorInterviewPendingRows.length} 筆可儲存，員編已排除。`;
   }catch(error){
     supervisorInterviewLocalFile=null;
+    supervisorInterviewPendingRows=[];
+    document.getElementById('supervisorInterviewSaveButton').hidden=true;
     status.className='patrol-local-import-status bad';
     status.textContent=`本機解析失敗：${error&&error.message||error}；未寫入雲端。`;
   }finally{
     if(input)input.value='';
   }
+}
+
+function supervisorInterviewQuarterLabel(quarter){
+  const match=String(quarter||'').match(/^(\d{4})-Q([1-4])$/);
+  if(!match)return quarter||'本季';
+  const start=(Number(match[2])-1)*3+1;
+  return `${match[1]} 年第 ${match[2]} 季（${start}–${start+2} 月）`;
+}
+function supervisorInterviewPersonRow(row){
+  const status=row.status==='completed'?['已完成','done']:row.status==='in_progress'?['待結案','progress']:['尚未面談',''];
+  return `<div class="interview-person"><div><strong>${esc(row.name)}</strong><small>${esc(row.store||'未分店')} · ${esc(row.role||'未標示職務')}</small></div><span class="interview-pill ${status[1]}">${status[0]}</span></div>`;
+}
+function renderSupervisorInterviews(){
+  const quarter=supervisorInterviewState.quarter||SupervisorInterviewModel.currentQuarter();
+  const progress=SupervisorInterviewModel.quarterProgress(supervisorInterviewState.roster,supervisorInterviewState.records,quarter);
+  const quarterStatus=document.getElementById('supervisorInterviewQuarterStatus');
+  if(quarterStatus)quarterStatus.textContent=`${supervisorInterviewQuarterLabel(quarter)} · 名冊來源 ${supervisorInterviewState.rosterMonth||'尚未取得'} 班表 · 新季度自動歸零`;
+  const progressEl=document.getElementById('supervisorInterviewProgress');
+  if(progressEl)progressEl.innerHTML=[['名冊人數',progress.total,''],['已完成',progress.completed,'good'],['待結案',progress.inProgress,''],['尚未面談',progress.missing,'warn']].map(item=>`<div class="stat"><div class="num ${item[2]}">${item[1]}</div><div class="lbl">${item[0]}</div></div>`).join('');
+  const missing=progress.rows.filter(row=>row.status!=='completed').sort((a,b)=>a.store.localeCompare(b.store,'zh-Hant')||a.name.localeCompare(b.name,'zh-Hant'));
+  const completed=progress.rows.filter(row=>row.status==='completed').sort((a,b)=>String(b.record?.interviewDate||'').localeCompare(String(a.record?.interviewDate||'')));
+  const missingEl=document.getElementById('supervisorInterviewMissing');
+  const completedEl=document.getElementById('supervisorInterviewCompleted');
+  if(missingEl)missingEl.innerHTML=missing.length?missing.map(supervisorInterviewPersonRow).join(''):'<div class="empty-state">本季全員已完成面談。</div>';
+  if(completedEl)completedEl.innerHTML=completed.length?completed.map(supervisorInterviewPersonRow).join(''):'<div class="empty-state">本季尚無已結案面談。</div>';
+  const history=document.getElementById('supervisorInterviewHistory');
+  const records=supervisorInterviewState.records.slice().sort((a,b)=>String(b.interviewDate).localeCompare(String(a.interviewDate))||String(a.interviewee).localeCompare(String(b.interviewee),'zh-Hant'));
+  if(history)history.innerHTML=records.length?`<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>日期</th><th>組織／同仁</th><th>原因／狀態</th><th>面談內容</th></tr></thead><tbody>${records.map(row=>`<tr><td>${esc(row.interviewDate)}</td><td>${esc(row.organization)}<br><strong>${esc(row.interviewee)}</strong></td><td>${esc(row.reason)}<br>${esc(row.formStatus)}</td><td><details class="interview-record-detail"><summary>查看紀錄</summary><b>建議與指導</b><br>${esc(row.guidance||'—')}<br><b>同仁回饋</b><br>${esc(row.feedback||'—')}</details></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty-state">本季尚無雲端面談紀錄。</div>';
+  return progress;
+}
+async function loadSupervisorInterviews(){
+  const status=document.getElementById('supervisorInterviewQuarterStatus');
+  if(status)status.textContent='正在讀取本季面談紀錄與私有班表名冊…';
+  try{
+    const response=await cloudCall('interview_read',{});
+    if(!response||response.status!=='ok')throw new Error(response&&response.message||'面談資料讀取失敗');
+    supervisorInterviewState={quarter:String(response.quarter||''),rosterMonth:String(response.rosterMonth||''),roster:Array.isArray(response.roster)?response.roster:[],records:Array.isArray(response.records)?response.records:[]};
+    return renderSupervisorInterviews();
+  }catch(error){
+    supervisorInterviewState={quarter:SupervisorInterviewModel.currentQuarter(),rosterMonth:'',roster:[],records:[]};
+    if(status)status.textContent=`面談雲端資料尚未就緒：${error&&error.message||error}`;
+    ['supervisorInterviewMissing','supervisorInterviewCompleted','supervisorInterviewHistory'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="empty-state">雲端面談服務尚未完成部署，未使用本機假資料。</div>';});
+    return null;
+  }
+}
+async function saveSupervisorInterviewFile(){
+  if(!supervisorInterviewPendingRows.length)return;
+  const button=document.getElementById('supervisorInterviewSaveButton');
+  const status=document.getElementById('supervisorInterviewImportStatus');
+  button.disabled=true;
+  status.className='patrol-local-import-status';
+  status.textContent=`正在儲存 ${supervisorInterviewPendingRows.length} 筆到私有雲端面談表…`;
+  const pending=supervisorInterviewPendingRows.slice();
+  try{
+    const response=await cloudCall('interview_write',{rows:pending});
+    if(!response||response.status!=='ok')throw new Error(response&&response.message||'面談資料儲存失敗');
+    await loadSupervisorInterviews();
+    const readbackKeys=new Set(supervisorInterviewState.records.map(SupervisorInterviewModel.recordKey));
+    if(!pending.every(row=>readbackKeys.has(SupervisorInterviewModel.recordKey(row))))throw new Error('雲端讀回尚未包含全部新紀錄');
+    supervisorInterviewPendingRows=[];
+    supervisorInterviewLocalFile=null;
+    button.hidden=true;
+    status.className='patrol-local-import-status good';
+    status.textContent=`雲端儲存並讀回完成：新增 ${Number(response.written||0)} 筆、更新 ${Number(response.updated||0)} 筆；員編未保存。`;
+  }catch(error){
+    status.className='patrol-local-import-status bad';
+    status.textContent=`雲端儲存未完成：${error&&error.message||error}。本機預覽仍保留，可直接重試，不必重新選檔。`;
+  }finally{button.disabled=false;}
 }
 
 /* ---------- 解析貼上資料 ---------- */
@@ -2105,8 +2223,8 @@ function storeCardHTML(storeName){
 function cloudCall(action, params={}){
   return patrolRequestWithReauth(()=>{
     if(!['ping','pthealth'].includes(action)&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
-    const timeoutMs=action==='ptsummary'?20000:action==='ptdetail'?60000:(action==='ptmileage'||action==='ptmileage2')?30000:0;
-    if(action==='ptsummary'||action==='ptdetail'||action==='ptmileage'||action==='ptmileage2'){
+    const timeoutMs=action==='ptsummary'?20000:action==='ptdetail'?60000:(action==='ptmileage'||action==='ptmileage2'||action==='interview_read'||action==='interview_write')?30000:0;
+    if(action==='ptsummary'||action==='ptdetail'||action==='ptmileage'||action==='ptmileage2'||action==='interview_read'||action==='interview_write'){
       const controller=new AbortController();
       const timer=setTimeout(()=>controller.abort(),timeoutMs);
       return patrolTrackedRequest(action,()=>fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:PT_TOKEN,...params}),cache:'no-store',signal:controller.signal}).then(async response=>{
@@ -2440,9 +2558,7 @@ async function switchPatrolView(view){
     loadSchedule();
   }else if(view==='halfDashboard'){
     document.getElementById('halfDashboardView').classList.add('active');
-    // 大盤與巡店看板共用 rawDetails。切頁只重繪目前資料，
-    // 不觸發雲端重讀，以免背景寫入尚未完成時還原成舊明細。
-    renderHalfDashboard();
+    loadSupervisorInterviews();
   }else if(view==='half'){
     document.getElementById('halfView').classList.add('active');
     loadHalfChecks();

@@ -12,15 +12,17 @@ const hashFile = file => crypto.createHash('sha256').update(fs.readFileSync(path
 const patrol = read('patrol.html');
 const importer = read('patrol-local-import.js');
 
-test('Patrol GAS 同步萬大正式代碼，正式 read model 維持 base main 位元一致', () => {
-  assert.equal(hashFile('patrol-gas/PatrolCode.gs'), 'fbd0b5bad7dd6af6024dfb8816eea0c7418dbe012e5fc9494cae834fdeba4b52');
-  assert.equal(hashFile('gas/Code.gs'), '42dc3d9c38a2c632b135db296e9e721628c0e85eff77fe309234a3bac7b44461');
+test('Patrol GAS 同步正式門市與讀取模型，並包含受保護的面談路由', () => {
   assert.equal(hashFile('patrol-read-model.js'), '2476e6073280d714ed645d90e1cd6194efd196a821fab95dd6da3bdc510f9de1');
   assert.match(read('gas/Code.gs'), /\{ code: 'DNB10168', name: '台北萬大' \}/);
   assert.match(read('patrol-gas/PatrolCode.gs'), /\{ code: 'DNB10168', name: '台北萬大' \}/);
+  assert.match(read('gas/Code.gs'), /action === 'interview_read'/);
+  assert.match(read('gas/Code.gs'), /action === 'interview_write'/);
+  assert.match(read('patrol-gas/PatrolCode.gs'), /action === 'interview_read'/);
+  assert.match(read('patrol-gas/PatrolCode.gs'), /action === 'interview_write'/);
 });
 
-test('沒有新增 GAS route、Sheet schema、通行碼或 session 儲存', () => {
+test('巡店本機解析器沒有新增 GAS route、Sheet schema、通行碼或 session 儲存', () => {
   assert.doesNotMatch(importer, /\b(?:fetch|XMLHttpRequest|cloudCall|cloudCallJsonp)\s*\(/);
   assert.doesNotMatch(importer, /localStorage|sessionStorage|PT_KEY|PT_TOKEN|bei12b_/);
   assert.doesNotMatch(importer, /action\s*[:=]\s*['"][^'"]+['"]/);

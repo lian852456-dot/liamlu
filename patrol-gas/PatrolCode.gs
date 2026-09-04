@@ -117,6 +117,8 @@ function doPost(e) {
       ptRequireSession_(payload.token, action);
       result = {schedule: readSchedule(payload.month || '')};
     }
+    else if (action === 'interview_read') result = supervisorInterviewReadPayload_(payload);
+    else if (action === 'interview_write') result = supervisorInterviewWritePayload_(payload);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
     else throw new Error('unknown patrol action');
     return patrolJsonResponse_({status: 'ok', ...result});
@@ -1346,6 +1348,204 @@ function readSchedule(requestedMonth) {
 function scheduleDateString(value) {
   if (value instanceof Date) return Utilities.formatDate(value, 'Asia/Taipei', 'yyyy-MM-dd');
   return String(value || '').slice(0, 10);
+}
+
+// ════════════════════════════════════
+// 督導面談紀錄（獨立私有工作表）
+// 只保留目前季度；員編不接受、不保存。名冊由同一份私有班表取得。
+// ════════════════════════════════════
+const SUPERVISOR_INTERVIEW_SHEET = '督導面談紀錄';
+const SUPERVISOR_INTERVIEW_HEADERS = [
+  'recordKey','quarter','sourceMonth','reporter','organization','interviewee','reason',
+  'formStatus','interviewDate','filledDate','closedDate','guidance','feedback','createdAt','updatedAt'
+];
+const SUPERVISOR_INTERVIEW_CLIENT_FIELDS = [
+  'reporter','organization','interviewee','reason','formStatus','interviewDate',
+  'filledDate','closedDate','guidance','feedback','sourceMonth','quarter'
+];
+
+function supervisorInterviewNow_() {
+  return Utilities.formatDate(new Date(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
+}
+
+function supervisorInterviewToday_() {
+  return Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd');
+}
+
+function supervisorInterviewQuarterForDate_(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) throw new Error('面談日期格式不正確');
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    throw new Error('面談日期格式不正確');
+  }
+  return match[1] + '-Q' + Math.ceil(month / 3);
+}
+
+function supervisorInterviewCurrentQuarter_() {
+  return supervisorInterviewQuarterForDate_(supervisorInterviewToday_());
+}
+
+function supervisorInterviewCurrentMonth_() {
+  return supervisorInterviewToday_().slice(0, 7);
+}
+
+function supervisorInterviewSheet_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(SUPERVISOR_INTERVIEW_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(SUPERVISOR_INTERVIEW_SHEET);
+    sheet.appendRow(SUPERVISOR_INTERVIEW_HEADERS);
+    sheet.setFrozenRows(1);
+    sheet.getRange('A:O').setNumberFormat('@');
+  }
+  const actual = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getDisplayValues()[0];
+  if (actual.slice(0, SUPERVISOR_INTERVIEW_HEADERS.length).join('|') !== SUPERVISOR_INTERVIEW_HEADERS.join('|')) {
+    throw new Error('督導面談紀錄欄位不一致，已停止讀寫');
+  }
+  return sheet;
+}
+
+function supervisorInterviewText_(value, limit, label) {
+  const result = String(value == null ? '' : value).trim();
+  if (result.length > limit) throw new Error(label + '過長');
+  return result;
+}
+
+function supervisorInterviewOptionalDate_(value, label) {
+  const result = supervisorInterviewText_(value, 10, label);
+  if (!result) return '';
+  try {
+    supervisorInterviewQuarterForDate_(result);
+  } catch (error) {
+    throw new Error(label + '格式不正確');
+  }
+  return result;
+}
+
+function supervisorInterviewRecordKey_(row) {
+  const material = [row.interviewDate, row.organization, row.interviewee, row.reason].join('|');
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, material);
+  return bytes.map(function(byte) {
+    const normalized = byte < 0 ? byte + 256 : byte;
+    return ('0' + normalized.toString(16)).slice(-2);
+  }).join('');
+}
+
+function supervisorInterviewValidateRow_(raw, currentQuarter) {
+  const row = {};
+  Object.keys(raw || {}).forEach(function(key) {
+    if (SUPERVISOR_INTERVIEW_CLIENT_FIELDS.indexOf(key) < 0) throw new Error('面談資料含不允許欄位');
+  });
+  row.reporter = supervisorInterviewText_(raw.reporter, 120, '填報人員');
+  row.organization = supervisorInterviewText_(raw.organization, 120, '面談人員組織');
+  row.interviewee = supervisorInterviewText_(raw.interviewee, 120, '面談人員');
+  row.reason = supervisorInterviewText_(raw.reason, 120, '面談原因');
+  row.formStatus = supervisorInterviewText_(raw.formStatus, 120, '表單狀態');
+  row.interviewDate = supervisorInterviewOptionalDate_(raw.interviewDate, '面談日期');
+  row.filledDate = supervisorInterviewOptionalDate_(raw.filledDate, '填表日期');
+  row.closedDate = supervisorInterviewOptionalDate_(raw.closedDate, '結案日期');
+  row.guidance = supervisorInterviewText_(raw.guidance, 2000, '建議與指導');
+  row.feedback = supervisorInterviewText_(raw.feedback, 2000, '同仁回饋');
+  row.sourceMonth = row.interviewDate.slice(0, 7);
+  row.quarter = supervisorInterviewQuarterForDate_(row.interviewDate);
+  if (!row.organization || !row.interviewee || !row.reason || !row.formStatus) throw new Error('面談資料缺少必要欄位');
+  if (row.quarter !== currentQuarter) throw new Error('只能匯入目前季度的面談紀錄');
+  if (String(raw.quarter || '') && String(raw.quarter) !== row.quarter) throw new Error('面談季度不一致');
+  if (String(raw.sourceMonth || '') && String(raw.sourceMonth) !== row.sourceMonth) throw new Error('面談月份不一致');
+  row.recordKey = supervisorInterviewRecordKey_(row);
+  return row;
+}
+
+function supervisorInterviewRows_() {
+  const sheet = supervisorInterviewSheet_();
+  if (sheet.getLastRow() < 2) return [];
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, SUPERVISOR_INTERVIEW_HEADERS.length).getDisplayValues().map(function(values) {
+    const row = {};
+    SUPERVISOR_INTERVIEW_HEADERS.forEach(function(header, index) { row[header] = String(values[index] || ''); });
+    return row;
+  });
+}
+
+function supervisorInterviewRoster_() {
+  const schedule = readSchedule(supervisorInterviewCurrentMonth_());
+  const seen = {};
+  const roster = [];
+  (schedule.stores || []).forEach(function(store) {
+    (store.staff || []).forEach(function(person) {
+      const name = String(person.name || '').trim();
+      const key = name.replace(/\s+/g, '');
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      roster.push({ name:name, store:String(store.store || ''), role:String(person.role || '') });
+    });
+  });
+  roster.sort(function(a, b) { return a.store.localeCompare(b.store, 'zh-Hant') || a.name.localeCompare(b.name, 'zh-Hant'); });
+  return { month:schedule.month, people:roster };
+}
+
+function supervisorInterviewReadPayload_(payload) {
+  const body = payload || {};
+  ptRequireSession_(body.token, 'interview_read');
+  const currentQuarter = supervisorInterviewCurrentQuarter_();
+  const roster = supervisorInterviewRoster_();
+  const records = supervisorInterviewRows_().filter(function(row) { return row.quarter === currentQuarter; }).map(function(row) {
+    const output = {};
+    SUPERVISOR_INTERVIEW_CLIENT_FIELDS.forEach(function(field) { output[field] = row[field] || ''; });
+    return output;
+  });
+  return { quarter:currentQuarter, rosterMonth:roster.month, roster:roster.people, records:records };
+}
+
+function supervisorInterviewWritePayload_(payload) {
+  const body = payload || {};
+  ptRequireSession_(body.token, 'interview_write');
+  Object.keys(body).forEach(function(key) {
+    if (['action','token','rows'].indexOf(key) < 0) throw new Error('面談寫入含不允許欄位');
+  });
+  const currentQuarter = supervisorInterviewCurrentQuarter_();
+  const rawRows = Array.isArray(body.rows) ? body.rows : [];
+  if (!rawRows.length || rawRows.length > 200) throw new Error('面談匯入筆數不正確');
+  const rows = rawRows.map(function(row) { return supervisorInterviewValidateRow_(row, currentQuarter); });
+  const keys = {};
+  rows.forEach(function(row) {
+    if (keys[row.recordKey]) throw new Error('面談檔案內有重複紀錄');
+    keys[row.recordKey] = true;
+  });
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = supervisorInterviewSheet_();
+    const existing = supervisorInterviewRows_();
+    // 新季度首次成功寫入時，刪除上一季資料。讀取不刪資料，避免時鐘或空檔造成誤刪。
+    for (let index = existing.length - 1; index >= 0; index -= 1) {
+      if (existing[index].quarter !== currentQuarter) sheet.deleteRow(index + 2);
+    }
+    const current = supervisorInterviewRows_();
+    const rowByKey = {};
+    current.forEach(function(item, index) { rowByKey[item.recordKey] = index + 2; });
+    let written = 0;
+    let updated = 0;
+    const now = supervisorInterviewNow_();
+    rows.forEach(function(row) {
+      const old = rowByKey[row.recordKey] ? current[rowByKey[row.recordKey] - 2] : null;
+      const stored = Object.assign({}, row, { createdAt:old && old.createdAt ? old.createdAt : now, updatedAt:now });
+      const values = SUPERVISOR_INTERVIEW_HEADERS.map(function(header) { return stored[header] || ''; });
+      if (rowByKey[row.recordKey]) {
+        sheet.getRange(rowByKey[row.recordKey], 1, 1, SUPERVISOR_INTERVIEW_HEADERS.length).setValues([values]);
+        updated += 1;
+      } else {
+        sheet.getRange(sheet.getLastRow() + 1, 1, 1, SUPERVISOR_INTERVIEW_HEADERS.length).setValues([values]);
+        written += 1;
+      }
+    });
+    return { written:written, updated:updated, quarter:currentQuarter };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // 每週一巡店週報（Email 夾 Excel）
