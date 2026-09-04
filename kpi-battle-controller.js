@@ -101,9 +101,16 @@
     (copy.stores || []).forEach(row => adjust(row, Number(correction.stores[displayStoreName(row.store)]) || 0));
     (copy.personal || []).forEach(row => {
       const excluded = Number(correction.stores[displayStoreName(row.store)]) || 0;
-      if (!excluded || !row.metrics || !row.metrics['好速']) return;
-      row.metrics['好速'] = kpiBattleCorrectMetric(row.metrics['好速'], excluded);
+      if (excluded && row.metrics && row.metrics['好速']) row.metrics['好速'] = kpiBattleCorrectMetric(row.metrics['好速'], excluded);
+      row.insurance_attach_rate = null;
+      row.phone_award_actual = null;
+      row.phone_award_projected = null;
+      row.phone_award_rank = null;
+      row.phone_award_eligible = null;
     });
+    if (copy.aggregate) copy.aggregate.insurance_attach_rate = null;
+    (copy.stores || []).forEach(row => { row.insurance_attach_rate = null; });
+    copy.supplement_status = '核心 KPI 已更新；QIS、保險與台獎待補';
     copy.corrections = [...(copy.corrections || []), {
       type: 'haosu-enterprise-exclusion', source_file: source,
       excluded_points: correction.districtExcluded, effective_points: copy.aggregate?.metrics?.[key]?.actual,
@@ -590,7 +597,7 @@
       if (!state.data) return;
       const note = doc.getElementById('kpiBattleSourceNote');
       if (note) {
-        const supplement = state.data.supplement_synced ? '同次正式快照已同步排名、加掛、個人台獎與保險' : '補充欄位尚未同步（來源或日期不一致）';
+        const supplement = state.data.supplement_status || (state.data.supplement_synced ? '同次正式快照已同步排名、加掛、個人台獎與保險' : '補充欄位尚未同步（來源或日期不一致）');
         note.innerHTML = kpiBattleSourceMetadata(state.data, supplement);
       }
       const content = doc.getElementById('kpiBattleContent');
