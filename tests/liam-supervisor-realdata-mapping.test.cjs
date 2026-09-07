@@ -398,3 +398,30 @@ test('80% gap rounds up, clamps at zero and never invents a missing target', () 
   assert.equal(gap(0,0),null);
   assert.equal(gap(0,null),null);
 });
+
+test('Award card simulation renders ten models in order, keeps rewards and does not mutate source', () => {
+  const context=vm.createContext({Math,Number, String, Array,
+    escapeHtml:value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),
+    fmtNumber:value=>Number(value).toLocaleString('en-US'),fmtPct:value=>(value*100).toFixed(1)+'%'});
+  vm.runInContext(`function awardGap80(actual,target){${body('awardGap80')}};function renderAwardProgress80(row){${body('renderAwardProgress80')}}`,context);
+  const names=['Google Pixel 10a','Samsung S26 Ultra / Z Fold8','Google Pixel 11 Pro / 11 Pro XL / 11 Pro Fold','Samsung S26 256G','Google Pixel 11','vivo V70 FE','OPPO Reno16 F','Samsung Galaxy A57','OPPO A6x 6G/128G','Samsung Galaxy A27'];
+  const row={name:'測試區',items:names.map(name=>({name,actual:8,target:28,rate:1.43,reward50:675,reward100:1015})).reverse()};
+  const before=JSON.stringify(row),html=context.renderAwardProgress80(row);
+  assert.equal((html.match(/<article /g)||[]).length,10);
+  assert.ok(names.every((name,i)=>i===0||html.indexOf('<strong>'+names[i-1]+'</strong>')<html.indexOf('<strong>'+name+'</strong>')));
+  assert.match(html,/尚缺 15 台/);assert.match(html,/28.6%/);assert.match(html,/143.0%/);
+  assert.match(html,/50% 獎金/);assert.match(html,/100% 獎金/);
+  assert.equal(JSON.stringify(row),before);
+  const escaped=context.renderAwardProgress80({items:[{name:'<img src=x>',actual:1,target:null}]});
+  assert.doesNotMatch(escaped,/<img/);assert.match(escaped,/目標待確認/);
+});
+
+test('Personal award simulation filters store, preserves non-winning money and unknown status', () => {
+  const people=[{name:'甲',store:'通化',actual:750,projected:3825,rank:1226,eligible:'N'},{name:'乙',store:'酒泉',actual:10,eligible:'Y'},{name:'丙',store:'通化',actual:null,eligible:''}];
+  const context=vm.createContext({contract:{awardSummary:{data:{people}}},STORES:['酒泉','通化'],escapeHtml:String,fmtNumber:value=>Number(value).toLocaleString('en-US')});
+  vm.runInContext(`function renderPersonalAwards(selectedStore){${body('renderPersonalAwards')}}`,context);
+  const html=context.renderPersonalAwards('通化');
+  assert.equal((html.match(/<article /g)||[]).length,2);assert.doesNotMatch(html,/酒泉｜乙/);
+  assert.match(html,/未領獎/);assert.match(html,/\$750/);assert.match(html,/\$3,825/);assert.match(html,/尚未同步/);
+  const all=context.renderPersonalAwards();assert.ok(all.indexOf('酒泉｜乙')<all.indexOf('通化｜甲'));
+});

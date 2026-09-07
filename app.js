@@ -913,6 +913,8 @@
       const valid=gap!=null;
       const progress=valid?item.actual/item.target:null;
       const metrics=[['實際數',item.actual==null?'—':fmtNumber(item.actual)],['全月目標',item.target==null?'—':fmtNumber(item.target)],['目前達成率',progress==null?'—':fmtPct(progress)],['80%目標',valid?fmtNumber(Math.ceil(item.target*80/100)):'—'],['距80%缺額',valid?`${fmtNumber(gap)} 台`:'尚未同步'],['預估達成率',item.rate==null?'—':fmtPct(item.rate)]];
+      if(item.reward50!=null) metrics.push(['50% 獎金','$'+fmtNumber(item.reward50,0)]);
+      if(item.reward100!=null) metrics.push(['100% 獎金','$'+fmtNumber(item.reward100,0)]);
       return `<article class="award-store-item"><div class="award-store-item-head"><strong>${escapeHtml(item.name)}</strong><span class="award-store-item-status ${valid&&gap>0?'no':''}">${valid?(gap===0?'已達80%':`尚缺 ${fmtNumber(gap)} 台`):'目標待確認'}</span></div><div class="award-store-item-metrics">${metrics.map(([label,value])=>`<span><small>${label}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></article>`;
     }).join('')||'<div class="empty-state">指定機款尚未同步。</div>'}</div></section>`;
   }
@@ -2011,5 +2013,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=app-na-v-20260903-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=awards80-personal-20260907',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);
