@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
-  <link rel="stylesheet" href="app.css?v=app-sep25-20260903-2">
+  <link rel="stylesheet" href="app.css?v=awards-bonus-tab-20260907">
   <title>Liam Supervisor App 1.2</title>
 </head>
 <body>
@@ -60,7 +60,7 @@
       <section data-view="battle" hidden aria-label="戰情">
         <div class="view-heading"><div><p>READ-ONLY SUMMARY</p><h1>戰情</h1></div><a class="icon-button" href="index.html" aria-label="開啟正式戰情網站"><i data-lucide="external-link"></i></a></div>
         <div class="segment-control battle-kind-control" role="tablist" aria-label="戰情類型"><button class="active" data-battle-kind="kpi" type="button">KPI</button><button data-battle-kind="award" type="button">台獎</button><button data-battle-kind="personal" type="button">個績</button></div>
-        <div class="scope-control" role="tablist" aria-label="戰情範圍"><button class="active" data-battle-scope="region" type="button">北一二B</button><button data-battle-scope="store" type="button">店點</button></div>
+        <div class="scope-control" role="tablist" aria-label="戰情範圍"><button class="active" data-battle-scope="region" type="button">北一二B</button><button data-battle-scope="store" type="button">店點</button><button data-battle-scope="bonus" type="button" hidden>同仁獎金</button></div>
         <label id="battleStorePicker" class="select-field" hidden><span>選擇店點</span><select id="battleStoreSelect"></select></label>
         <div id="battleContent"></div>
       </section>
@@ -165,7 +165,8 @@
   <script src="patrol-question-versions.js?v=app-na-v-20260903-1"></script>
   <script src="half-month-check-read-model.js?v=app-sep25-20260903-2"></script>
   <script src="yesterday-follow-up-model.js?v=yesterday-follow-up-phase2-20260814-1"></script>
-  <script src="app.js?v=awards80-personal-20260907" defer></script>
+  <script src="app.js?v=awards-bonus-tab-20260907" defer></script>
 </body>
 </html>
+
 

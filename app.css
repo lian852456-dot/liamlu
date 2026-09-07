@@ -657,3 +657,9 @@ body { font-size:16px; }
   .report-store-button span { min-width:0; overflow-wrap:anywhere; }
   .personal-performance-button { min-height:96px; }
 }
+
+/* Award-only third scope; keep the other battle modes at two columns. */
+.scope-control.award-scope-control { width:100%; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.scope-control button[hidden] { display:none; }
+.scope-control.award-scope-control button { min-height:44px; }
+

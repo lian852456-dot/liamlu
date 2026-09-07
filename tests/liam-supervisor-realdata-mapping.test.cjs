@@ -425,3 +425,17 @@ test('Personal award simulation filters store, preserves non-winning money and u
   assert.match(html,/未領獎/);assert.match(html,/\$750/);assert.match(html,/\$3,825/);assert.match(html,/尚未同步/);
   const all=context.renderPersonalAwards();assert.ok(all.indexOf('酒泉｜乙')<all.indexOf('通化｜甲'));
 });
+
+test('Bonus is an award-only scope; region/store exclude people and KPI resets the scope', () => {
+  const nodes=new Map();
+  const scopes=['region','store','bonus'].map(value=>({dataset:{battleScope:value},classList:{toggle(){}}}));
+  const dom=selector=>{if(selector==='[data-battle-scope="bonus"]')return scopes[2];if(!nodes.has(selector))nodes.set(selector,{innerHTML:'',hidden:false,options:[{}],value:'通化',classList:{toggle(){}},insertAdjacentHTML(){}});return nodes.get(selector);};
+  const context=vm.createContext({dom,privateAccessStatus:'approved',all:()=>scopes,battleKind:'award',battleScope:'region',STORES:['通化'],
+    contract:{kpiSummary:{status:'ok'},kpiStores:{data:[]},awardSummary:{status:'ok',data:{}},awardStores:{data:[{name:'通化',amount:0,eligible:false}]},personalPerformance:{data:{}}},
+    escapeHtml:String,fmtNumber:String,renderAwardProgress80:()=>'<models/>',renderPersonalAwards:()=>'<people/>',refreshIcons(){},privateUnlockState:()=>'<locked/>'});
+  vm.runInContext(`function renderBattle(){${body('renderBattle')}}`,context);
+  context.renderBattle();assert.match(dom('#battleContent').innerHTML,/<models\/>/);assert.doesNotMatch(dom('#battleContent').innerHTML,/<people\/>/);
+  context.battleScope='store';context.renderBattle();assert.doesNotMatch(dom('#battleContent').innerHTML,/<people\/>/);
+  context.battleScope='bonus';context.renderBattle();assert.equal(dom('#battleContent').innerHTML,'<people/>');assert.equal(dom('#battleStorePicker').hidden,true);
+  context.battleKind='kpi';context.contract.kpiSummary.status='unauthorized';context.renderBattle();assert.equal(context.battleScope,'region');assert.equal(scopes[2].hidden,true);
+});

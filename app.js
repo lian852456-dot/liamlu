@@ -923,7 +923,7 @@
     const summary=contract.awardSummary.data||{};
     const people=(summary.people||[]).filter(person=>!selectedStore||person.store===selectedStore).slice().sort((a,b)=>STORES.indexOf(a.store)-STORES.indexOf(b.store)||(a.rank??Infinity)-(b.rank??Infinity));
     const known=people.filter(p=>p.eligible==='Y'||p.eligible==='N');
-    return `<section class="panel award-store-items"><div class="panel-head"><div><h2>個人台獎</h2><small>領獎 ${known.filter(p=>p.eligible==='Y').length} 人 · 未領獎 ${known.filter(p=>p.eligible==='N').length} 人 · 待同步 ${people.length-known.length} 人</small></div></div><div class="award-store-item-list">${people.map(person=>{
+    return `<section class="panel award-store-items"><div class="panel-head"><div><h2>同仁獎金</h2><small>領獎 ${known.filter(p=>p.eligible==='Y').length} 人 · 未領獎 ${known.filter(p=>p.eligible==='N').length} 人 · 待同步 ${people.length-known.length} 人</small></div></div><div class="award-store-item-list">${people.map(person=>{
       const status=person.eligible==='Y'?'領獎':person.eligible==='N'?'未領獎':'尚未同步';
       const money=value=>value==null?'—':'$'+fmtNumber(value,0);
       return `<article class="award-store-item"><div class="award-store-item-head"><strong>${escapeHtml(person.store)}｜${escapeHtml(person.name)}</strong><span class="award-store-item-status ${person.eligible==='N'?'no':''}">${status}</span></div><div class="award-store-item-metrics"><span><small>實際獎金</small><b>${money(person.actual)}</b></span><span><small>推估獎金</small><b>${money(person.projected)}</b></span><span><small>公司排名</small><b>${person.rank==null?'—':fmtNumber(person.rank,0)}</b></span></div></article>`;
@@ -1166,6 +1166,11 @@
   }
 
   function renderBattle() {
+    if (battleKind !== 'award' && battleScope === 'bonus') battleScope = 'region';
+    dom('[data-battle-scope="bonus"]').hidden = battleKind !== 'award';
+    dom('.scope-control').classList.toggle('award-scope-control',battleKind === 'award');
+    all('[data-battle-scope]').forEach(button=>button.classList.toggle('active',button.dataset.battleScope===battleScope));
+    dom('#battleStorePicker').hidden = battleScope !== 'store';
     const content = dom('#battleContent');
     if (contract.kpiSummary.status === 'unauthorized') {
       content.innerHTML = privateUnlockState(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '解鎖後顯示 KPI／台獎正式摘要');
@@ -1203,11 +1208,13 @@
       const areaEligibility=a.areaEligible===true?'領獎':a.areaEligible===false?'未領獎':'尚未同步';
       const areaEligibilityClass=a.areaEligible===true?'positive':a.areaEligible===false?'neutral-value':'gold-value';
       content.innerHTML=`<section class="panel award-area-summary"><div class="panel-head"><div><h2>督導區台獎摘要</h2></div></div><div class="metric-card-grid"><article class="metric-card"><span>督導區實際獎金</span><strong class="gold-value">${a.areaActualAward==null?'—':'$'+fmtNumber(a.areaActualAward,0)}</strong><small>正式區域級欄位</small></article><article class="metric-card"><span>公司排名</span><strong>${a.areaCompanyRank==null?'—':fmtNumber(a.areaCompanyRank,0)}</strong><small>正式區域級欄位</small></article><article class="metric-card"><span>領獎資格</span><strong class="${areaEligibilityClass}">${areaEligibility}</strong><small>正式台獎判定</small></article></div></section><div class="metric-card-grid"><article class="metric-card"><span>領獎店數</span><strong>${a.winningStores??'—'}/9</strong><small>正式台獎判定</small></article><article class="metric-card"><span>未領獎店數</span><strong>${a.winningStores==null?'—':Math.max(0,9-a.winningStores)}</strong><small>九店完整顯示</small></article></div><div class="battle-list award-battle-list"><div class="battle-list-row award-battle-row header"><span>店點</span><span>金額</span><span>狀態</span></div>${awardStores.map(row=>`<div class="battle-list-row award-battle-row"><span>${escapeHtml(row.name)}</span><span>${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</span><span class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</span></div>`).join('')}</div>`;
+    } else if (battleKind === 'award' && battleScope === 'bonus') {
+      content.innerHTML=renderPersonalAwards();
     } else if (battleKind === 'award') {
       const row=awardStores.find(item=>item.name===selected);
-      content.innerHTML=row?`<div class="award-selected-store"><span>店點</span><strong>${escapeHtml(row.name)}</strong></div><div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>正式台獎金額</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div>${renderAwardProgress80(row)}${renderPersonalAwards(selected)}<a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
+      content.innerHTML=row?`<div class="award-selected-store"><span>店點</span><strong>${escapeHtml(row.name)}</strong></div><div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>正式台獎金額</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div>${renderAwardProgress80(row)}<a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
     } else content.innerHTML = renderPersonalPerformance(selected);
-    if (battleKind === 'award' && battleScope === 'region') content.innerHTML += renderAwardProgress80({name:'北一二B',items:(contract.awardSummary.data||{}).items}) + renderPersonalAwards();
+    if (battleKind === 'award' && battleScope === 'region') content.innerHTML += renderAwardProgress80({name:'北一二B',items:(contract.awardSummary.data||{}).items});
     const battleModule=battleKind==='kpi'?contract.kpiSummary:battleKind==='award'?contract.awardSummary:contract.personalPerformance;
     if(battleModule.status==='stale') content.insertAdjacentHTML('afterbegin',staleBanner(battleModule));
     refreshIcons();
@@ -2013,5 +2020,6 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=awards80-personal-20260907',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=awards-bonus-tab-20260907',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);
+
