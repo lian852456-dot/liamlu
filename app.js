@@ -477,9 +477,13 @@
   function adaptAwards(snapshot, expectedReportDate, readAt) {
     const awards = snapshot && snapshot.awardsBattle || {};
     const updatedAt = String(awards.generated_at || snapshot && snapshot.publishedAt || '');
-    const reportDate = String(awards.report_date || '');
+    const reportDate = String(awards.report_run_date || awards.report_date || '');
     const source = moduleSource('正式台獎私有戰情','index.html');
-    if (!expectedReportDate || reportDate !== expectedReportDate) {
+    const kpi = snapshot && snapshot.kpiBattle || {};
+    const cutoff = String(awards.data_as_of_date || awards.source_as_of_date || '');
+    const kpiCutoff = String(kpi.data_as_of_date || kpi.source_as_of_date || '');
+    const run = String(kpi.processing_run_id || kpi.kpi_run_id || '');
+    if (!expectedReportDate || reportDate !== expectedReportDate || ((cutoff || kpiCutoff) && cutoff !== kpiCutoff) || (run && run !== String(awards.processing_run_id || ''))) {
       const note = reportDate ? `台獎日期 ${reportDate} 與 KPI 日期 ${expectedReportDate || '—'} 不一致` : '正式台獎未提供可對齊的資料日期';
       const missing = data => C.moduleState({ status:'no_data', updatedAt:readAt, sourceUpdatedAt:updatedAt, stale:updatedAt?stale(updatedAt):false, source, data, note });
       return { summary:missing(null), stores:missing([]), top2:missing([]) };
@@ -516,7 +520,13 @@
       areaActualAward:numberOrNull(supervisorAward.actual_total),
       areaCompanyRank:numberOrNull(supervisorAward.rank),
       areaEligible:supervisorEligibility === 'Y' ? true : supervisorEligibility === 'N' ? false : null,
-      winningStores, totalStores:9, reportDate
+      winningStores, totalStores:9, reportDate,
+      items:models.map(item=>({name:String(item.display_name || item.name || ''),actual:numberOrNull(item.actual),target:numberOrNull(item.target),rate:numberOrNull(item.rate)})).filter(item=>item.name),
+      people:(Array.isArray(kpi.personal)?kpi.personal:[]).map(person=>({
+        name:String(person.name || ''),store:normalizeStore(person.store),
+        actual:numberOrNull(person.phone_award_actual),projected:numberOrNull(person.phone_award_projected),rank:numberOrNull(person.phone_award_rank),
+        eligible:String(person.phone_award_eligible || '').trim().toUpperCase()
+      })).filter(person=>person.name && person.store)
     };
     const base = { updatedAt:readAt, sourceUpdatedAt:updatedAt, stale:stale(updatedAt), source };
     return {
@@ -701,7 +711,7 @@
     }
     const snapshot = privateResult.snapshot || {};
     const readAt = nowIso();
-    const awards = adaptAwards(snapshot, String(snapshot.kpiBattle&&snapshot.kpiBattle.report_date||''), readAt);
+    const awards = adaptAwards(snapshot, String(snapshot.kpiBattle&&(snapshot.kpiBattle.report_run_date||snapshot.kpiBattle.report_date)||''), readAt);
     const personalPerformance = adaptPersonalPerformance(snapshot, readAt);
     contract = C.validateContract({
       ...contract, version:C.VERSION, generatedAt:readAt, mode:'formal',
@@ -886,6 +896,38 @@
       ].filter(Boolean);
       return `<article class="award-store-item"><div class="award-store-item-head"><strong>${escapeHtml(item.name)}</strong>${status?`<span class="award-store-item-status ${/未領獎/i.test(status)?'no':''}">${escapeHtml(status)}</span>`:''}</div>${metrics.length?`<div class="award-store-item-metrics">${metrics.map(([label,value])=>`<span><small>${label}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>`:''}</article>`;
     }).join('')}</div></section>`;
+  }
+
+  function awardGap80(actual,target) {
+    if (actual == null || target == null || !Number.isFinite(actual) || !Number.isFinite(target) || actual < 0 || target <= 0) return null;
+    return Math.max(0,Math.ceil(target * 80 / 100)-actual);
+  }
+
+  function renderAwardProgress80(row) {
+    const order=[/Pixel\s*10a/i,/Ultra|Fold8/i,/Pixel\s*11\s*Pro/i,/S26/i,/Pixel\s*11/i,/V70\s*FE/i,/Reno\s*16\s*F/i,/A57/i,/A6x/i,/A27/i];
+    const items=(Array.isArray(row&&row.items)?row.items:[]).slice();
+    const pos=item=>{const i=order.findIndex(re=>re.test(item.name));return i<0?order.length:i;};
+    items.sort((a,b)=>pos(a)-pos(b));
+    return `<section class="panel award-store-items"><div class="panel-head"><div><h2>督導指定機款進度</h2><small>${escapeHtml(row&&row.name||'北一二B')} · ${items.length} 款 · 追蹤80%目標</small></div></div><div class="award-store-item-list">${items.map(item=>{
+      const gap=awardGap80(item.actual,item.target);
+      const valid=gap!=null;
+      const progress=valid?item.actual/item.target:null;
+      const metrics=[['實際數',item.actual==null?'—':fmtNumber(item.actual)],['全月目標',item.target==null?'—':fmtNumber(item.target)],['目前達成率',progress==null?'—':fmtPct(progress)],['80%目標',valid?fmtNumber(Math.ceil(item.target*80/100)):'—'],['距80%缺額',valid?`${fmtNumber(gap)} 台`:'尚未同步'],['預估達成率',item.rate==null?'—':fmtPct(item.rate)]];
+      if(item.reward50!=null) metrics.push(['50% 獎金','$'+fmtNumber(item.reward50,0)]);
+      if(item.reward100!=null) metrics.push(['100% 獎金','$'+fmtNumber(item.reward100,0)]);
+      return `<article class="award-store-item"><div class="award-store-item-head"><strong>${escapeHtml(item.name)}</strong><span class="award-store-item-status ${valid&&gap>0?'no':''}">${valid?(gap===0?'已達80%':`尚缺 ${fmtNumber(gap)} 台`):'目標待確認'}</span></div><div class="award-store-item-metrics">${metrics.map(([label,value])=>`<span><small>${label}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></article>`;
+    }).join('')||'<div class="empty-state">指定機款尚未同步。</div>'}</div></section>`;
+  }
+
+  function renderPersonalAwards(selectedStore) {
+    const summary=contract.awardSummary.data||{};
+    const people=(summary.people||[]).filter(person=>!selectedStore||person.store===selectedStore).slice().sort((a,b)=>STORES.indexOf(a.store)-STORES.indexOf(b.store)||(a.rank??Infinity)-(b.rank??Infinity));
+    const known=people.filter(p=>p.eligible==='Y'||p.eligible==='N');
+    return `<section class="panel award-store-items"><div class="panel-head"><div><h2>個人台獎</h2><small>領獎 ${known.filter(p=>p.eligible==='Y').length} 人 · 未領獎 ${known.filter(p=>p.eligible==='N').length} 人 · 待同步 ${people.length-known.length} 人</small></div></div><div class="award-store-item-list">${people.map(person=>{
+      const status=person.eligible==='Y'?'領獎':person.eligible==='N'?'未領獎':'尚未同步';
+      const money=value=>value==null?'—':'$'+fmtNumber(value,0);
+      return `<article class="award-store-item"><div class="award-store-item-head"><strong>${escapeHtml(person.store)}｜${escapeHtml(person.name)}</strong><span class="award-store-item-status ${person.eligible==='N'?'no':''}">${status}</span></div><div class="award-store-item-metrics"><span><small>實際獎金</small><b>${money(person.actual)}</b></span><span><small>推估獎金</small><b>${money(person.projected)}</b></span><span><small>公司排名</small><b>${person.rank==null?'—':fmtNumber(person.rank,0)}</b></span></div></article>`;
+    }).join('')||'<div class="empty-state">個人台獎尚未同步。</div>'}</div></section>`;
   }
 
   function setView(name) {
@@ -1163,8 +1205,9 @@
       content.innerHTML=`<section class="panel award-area-summary"><div class="panel-head"><div><h2>督導區台獎摘要</h2></div></div><div class="metric-card-grid"><article class="metric-card"><span>督導區實際獎金</span><strong class="gold-value">${a.areaActualAward==null?'—':'$'+fmtNumber(a.areaActualAward,0)}</strong><small>正式區域級欄位</small></article><article class="metric-card"><span>公司排名</span><strong>${a.areaCompanyRank==null?'—':fmtNumber(a.areaCompanyRank,0)}</strong><small>正式區域級欄位</small></article><article class="metric-card"><span>領獎資格</span><strong class="${areaEligibilityClass}">${areaEligibility}</strong><small>正式台獎判定</small></article></div></section><div class="metric-card-grid"><article class="metric-card"><span>領獎店數</span><strong>${a.winningStores??'—'}/9</strong><small>正式台獎判定</small></article><article class="metric-card"><span>未領獎店數</span><strong>${a.winningStores==null?'—':Math.max(0,9-a.winningStores)}</strong><small>九店完整顯示</small></article></div><div class="battle-list award-battle-list"><div class="battle-list-row award-battle-row header"><span>店點</span><span>金額</span><span>狀態</span></div>${awardStores.map(row=>`<div class="battle-list-row award-battle-row"><span>${escapeHtml(row.name)}</span><span>${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</span><span class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</span></div>`).join('')}</div>`;
     } else if (battleKind === 'award') {
       const row=awardStores.find(item=>item.name===selected);
-      content.innerHTML=row?`<div class="award-selected-store"><span>店點</span><strong>${escapeHtml(row.name)}</strong></div><div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>正式台獎金額</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div>${renderAwardStoreItems(row)}<a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
+      content.innerHTML=row?`<div class="award-selected-store"><span>店點</span><strong>${escapeHtml(row.name)}</strong></div><div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>正式台獎金額</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div>${renderAwardProgress80(row)}${renderPersonalAwards(selected)}<a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
     } else content.innerHTML = renderPersonalPerformance(selected);
+    if (battleKind === 'award' && battleScope === 'region') content.innerHTML += renderAwardProgress80({name:'北一二B',items:(contract.awardSummary.data||{}).items}) + renderPersonalAwards();
     const battleModule=battleKind==='kpi'?contract.kpiSummary:battleKind==='award'?contract.awardSummary:contract.personalPerformance;
     if(battleModule.status==='stale') content.insertAdjacentHTML('afterbegin',staleBanner(battleModule));
     refreshIcons();
@@ -1970,5 +2013,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=app-na-v-20260903-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=awards80-personal-20260907',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);

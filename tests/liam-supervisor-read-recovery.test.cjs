@@ -51,10 +51,11 @@ test('transport failures fail closed and do not become zero-shaped formal data',
 });
 
 test('recovery release is cache-busted and formal half-month write remains disabled', () => {
-  assert.match(html, /app\.js\?v=app-na-v-20260903-1/);
-  assert.match(sw, /liam-supervisor-app-1-2-patrol-na-v-20260903-v1/);
-  assert.match(app, /service-worker\.js\?v=app-na-v-20260903-1/);
+  assert.match(html, /app\.js\?v=awards80-personal-20260907/);
+  assert.match(sw, /liam-supervisor-app-1-2-awards80-20260907-v1/);
+  assert.match(app, /service-worker\.js\?v=awards80-personal-20260907/);
   assert.doesNotMatch(app, /PATROL_WRITE_ACTIONS = new Set\(\[[^\]]*hwrite/);
   assert.doesNotMatch(app, /halfMonthWriteRows|patrolRead\(['"]hwrite|half_media_upload/);
   assert.match(app, /if\(!PREVIEW_MODE\) return/);
 });
+

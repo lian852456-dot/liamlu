@@ -120,7 +120,7 @@ test('受控 temporary filename 只解包 canonical source identity，變更暫�
     data.meta.sourceFile = `report-upload-temp-${token}-0810.xlsx`;
     const snapshot = snapshotFixture();
     snapshot.awardsBattle = {
-      report_date:'2026-08-09', overall:{award:{},items:[]},
+      report_date:'2026-08-09', data_as_of_date:'2026-08-09', overall:{award:{},items:[]},
       stores:Array.from({length:9},(_,index)=>({store:`店 ${index+1}`,award:{actual_total:index,award:index<3?'Y':'N'},items:[]})),
     };
     const result = A.adaptKpi(data, snapshot, '2026-08-10T01:02:00+08:00');
@@ -364,4 +364,64 @@ test('Personal performance AQ attention uses actual below ten and keeps null sep
   const result=A.personalAqReview([manager('八點',8,1.5),manager('十點',10,.2),manager('缺值',null,0),{name:'業代',roleGroup:'其他業代',metrics:[{key:'AQ',actual:1,rate:.1}]}]);
   assert.deepEqual(Array.from(result.attention,row=>({name:row.person.name,actual:row.actual,gap:row.gap})),[{name:'八點',actual:8,gap:2}]);
   assert.deepEqual(Array.from(result.missing,row=>row.name),['缺值']);
+});
+
+
+
+test('App awards publication day, cutoff and processing run must align; personal award status stays authoritative', () => {
+  const A=loadAdapters();
+  const snapshot={kpiBattle:{report_date:'2026-09-07',data_as_of_date:'2026-09-06',processing_run_id:'run-1',personal:[
+    {name:'測試甲',store:'台北通化',phone_award_actual:750,phone_award_projected:3825,phone_award_rank:1226,phone_award_eligible:'N'},
+    {name:'測試乙',store:'台北通化'}
+  ]},awardsBattle:{report_date:'2026-09-06',report_run_date:'2026-09-07',data_as_of_date:'2026-09-06',processing_run_id:'run-1',overall:{items:[{name:'Pixel 10a',actual:8,target:28,rate:1.43}]},stores:[{store:'台北通化'}]}};
+  const a=A.adaptAwards(snapshot,'2026-09-07','2026-09-07T10:00:00+08:00');
+  assert.equal(a.summary.data.items[0].target,28);
+  assert.equal(a.summary.data.people[0].eligible,'N');
+  assert.equal(a.summary.data.people[0].actual,750);
+  assert.equal(a.summary.data.people[1].actual,null);
+  assert.equal(a.summary.data.people[1].eligible,'');
+  snapshot.awardsBattle.processing_run_id='old';
+  assert.equal(A.adaptAwards(snapshot,'2026-09-07','now').summary.data,null);
+  snapshot.awardsBattle.processing_run_id='run-1';snapshot.awardsBattle.data_as_of_date='2026-09-05';
+  assert.equal(A.adaptAwards(snapshot,'2026-09-07','now').summary.data,null);
+});
+
+test('80% gap rounds up, clamps at zero and never invents a missing target', () => {
+  const gap=vm.runInNewContext(`(function awardGap80(actual,target){${body('awardGap80')}})`);
+  assert.equal(gap(8,28),15);
+  assert.equal(gap(10,26),11);
+  assert.equal(gap(3,21),14);
+  assert.equal(gap(9,82),57);
+  assert.equal(gap(3,3),0);
+  assert.equal(gap(0,1),1);
+  assert.equal(gap(null,3),null);
+  assert.equal(gap(0,0),null);
+  assert.equal(gap(0,null),null);
+});
+
+test('Award card simulation renders ten models in order, keeps rewards and does not mutate source', () => {
+  const context=vm.createContext({Math,Number, String, Array,
+    escapeHtml:value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),
+    fmtNumber:value=>Number(value).toLocaleString('en-US'),fmtPct:value=>(value*100).toFixed(1)+'%'});
+  vm.runInContext(`function awardGap80(actual,target){${body('awardGap80')}};function renderAwardProgress80(row){${body('renderAwardProgress80')}}`,context);
+  const names=['Google Pixel 10a','Samsung S26 Ultra / Z Fold8','Google Pixel 11 Pro / 11 Pro XL / 11 Pro Fold','Samsung S26 256G','Google Pixel 11','vivo V70 FE','OPPO Reno16 F','Samsung Galaxy A57','OPPO A6x 6G/128G','Samsung Galaxy A27'];
+  const row={name:'測試區',items:names.map(name=>({name,actual:8,target:28,rate:1.43,reward50:675,reward100:1015})).reverse()};
+  const before=JSON.stringify(row),html=context.renderAwardProgress80(row);
+  assert.equal((html.match(/<article /g)||[]).length,10);
+  assert.ok(names.every((name,i)=>i===0||html.indexOf('<strong>'+names[i-1]+'</strong>')<html.indexOf('<strong>'+name+'</strong>')));
+  assert.match(html,/尚缺 15 台/);assert.match(html,/28.6%/);assert.match(html,/143.0%/);
+  assert.match(html,/50% 獎金/);assert.match(html,/100% 獎金/);
+  assert.equal(JSON.stringify(row),before);
+  const escaped=context.renderAwardProgress80({items:[{name:'<img src=x>',actual:1,target:null}]});
+  assert.doesNotMatch(escaped,/<img/);assert.match(escaped,/目標待確認/);
+});
+
+test('Personal award simulation filters store, preserves non-winning money and unknown status', () => {
+  const people=[{name:'甲',store:'通化',actual:750,projected:3825,rank:1226,eligible:'N'},{name:'乙',store:'酒泉',actual:10,eligible:'Y'},{name:'丙',store:'通化',actual:null,eligible:''}];
+  const context=vm.createContext({contract:{awardSummary:{data:{people}}},STORES:['酒泉','通化'],escapeHtml:String,fmtNumber:value=>Number(value).toLocaleString('en-US')});
+  vm.runInContext(`function renderPersonalAwards(selectedStore){${body('renderPersonalAwards')}}`,context);
+  const html=context.renderPersonalAwards('通化');
+  assert.equal((html.match(/<article /g)||[]).length,2);assert.doesNotMatch(html,/酒泉｜乙/);
+  assert.match(html,/未領獎/);assert.match(html,/\$750/);assert.match(html,/\$3,825/);assert.match(html,/尚未同步/);
+  const all=context.renderPersonalAwards();assert.ok(all.indexOf('酒泉｜乙')<all.indexOf('通化｜甲'));
 });
