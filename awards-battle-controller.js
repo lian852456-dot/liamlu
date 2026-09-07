@@ -39,37 +39,42 @@
     return 'bad';
   }
 
-  function validateAwardsBattle(data, kpiData) {
+  function validateAwardsBattle(data, kpiData, snapshotKpi) {
     if (!data || typeof data !== 'object') return { ok: false, reason: '尚未取得與目前 KPI 同日期的台獎資料' };
-    const awardsDate = String(data.report_date || '');
+    const awardsDate = String(data.report_run_date || data.report_date || '');
     const kpiDate = String((kpiData || {}).report_date || '');
-    if (!awardsDate || !kpiDate || awardsDate !== kpiDate) {
+    const awardsCutoff = String(data.data_as_of_date || data.source_as_of_date || '');
+    const kpiCutoff = String((kpiData || {}).data_as_of_date || (kpiData || {}).source_as_of_date || '');
+    const cutoffMismatch = (awardsCutoff || kpiCutoff) && (!awardsCutoff || awardsCutoff !== kpiCutoff);
+    const snapshotRun = String((snapshotKpi || {}).processing_run_id || (snapshotKpi || {}).kpi_run_id || '');
+    const awardsRun = String(data.processing_run_id || '');
+    if (!awardsDate || !kpiDate || awardsDate !== kpiDate || cutoffMismatch || (snapshotRun && awardsRun !== snapshotRun)) {
       return {
         ok: false,
         reason: awardsDate
-          ? `台獎戰報日期 ${awardsDate} 與 KPI 戰報日期 ${kpiDate || '—'} 不一致`
+          ? `台獎戰報日期 ${awardsDate} 與 KPI 戰報日期 ${kpiDate || '—'} 不一致，或資料截止日／發布批次尚未同步`
           : '尚未取得與目前 KPI 同日期的台獎資料',
       };
     }
 
-    // kpiData.report_date 只有在 KPI controller 通過同次截止日與來源檔 gate 後才會存在。
-    // 台獎沿用既有契約，以同一份 private_access snapshot 的 report_date 與其對齊。
+    // 發布日與截止日分開核對；九月正式方案為 10 組，舊月份保留 13 款契約。
+    const expectedPhoneItems = (awardsCutoff || awardsDate).slice(0, 7) === '2026-09' ? 10 : EXPECTED_PHONE_ITEMS;
     const phoneItems = Number(data.phone_items);
     const storeRows = Number(data.store_rows);
     const stores = Array.isArray(data.stores) ? data.stores : [];
     const overallItems = Array.isArray(data.overall && data.overall.items) ? data.overall.items : [];
     const storeNames = new Set(stores.map(row => String((row || {}).store || '').trim()).filter(Boolean));
-    const allStoresComplete = stores.every(row => Array.isArray(row && row.items) && row.items.length === EXPECTED_PHONE_ITEMS);
+    const allStoresComplete = stores.every(row => Array.isArray(row && row.items) && row.items.length === expectedPhoneItems);
     if (
-      phoneItems !== EXPECTED_PHONE_ITEMS ||
+      phoneItems !== expectedPhoneItems ||
       storeRows !== EXPECTED_STORE_ROWS ||
       stores.length !== EXPECTED_STORES ||
       storeNames.size !== EXPECTED_STORES ||
-      overallItems.length !== EXPECTED_PHONE_ITEMS ||
+      overallItems.length !== expectedPhoneItems ||
       !allStoresComplete ||
       !data.supervisor || typeof data.supervisor !== 'object'
     ) {
-      return { ok: false, reason: '正式台獎資料不完整（需 13 款、9 店與北一二B整體），因此不顯示任何台獎數值' };
+      return { ok: false, reason: `正式台獎資料不完整（需 ${expectedPhoneItems} 款、9 店與北一二B整體），因此不顯示任何台獎數值` };
     }
     return { ok: true, reason: '' };
   }
@@ -140,7 +145,7 @@
         ? data.overall
         : (stores.find(row => row.store === selectedBefore) || data.overall);
       const note = doc.getElementById('awardsBattleSourceNote');
-      if (note) note.textContent = `${phoneItems} 款重點機款｜${storeRows} 列店點與整體資料｜台獎戰報日期 ${data.report_date}｜前三台依本月最高台獎順位；達成率超過 100% 由下一順位遞補｜店點差異數以 50% 目標無條件進位計算｜資料僅供受保護預覽`;
+      if (note) note.textContent = `${phoneItems} 款重點機款｜${storeRows} 列店點與整體資料｜發布日期 ${data.report_run_date || data.report_date}｜資料截至 ${data.data_as_of_date || data.report_date}｜前三台依本月最高台獎順位；達成率超過 100% 由下一順位遞補｜店點差異數以 50% 目標無條件進位計算｜資料僅供受保護預覽`;
       const content = doc.getElementById('awardsBattleContent');
       if (!content) return;
       content.innerHTML = `
@@ -162,7 +167,7 @@
       const result = (payload || {}).result || {};
       const kpiData = (payload || {}).data || null;
       const awards = result.snapshot && result.snapshot.awardsBattle;
-      const validation = validateAwardsBattle(awards, kpiData);
+      const validation = validateAwardsBattle(awards, kpiData, result.snapshot && result.snapshot.kpiBattle);
       if (!validation.ok) {
         state.data = null;
         state.unavailableReason = validation.reason;

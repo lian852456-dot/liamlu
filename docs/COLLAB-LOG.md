@@ -13,6 +13,13 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-09-07 ｜ Codex（台獎日期與九月機款檢核修復）
+
+- 原因：正式台獎已生成，但 controller 將截止日 report_date 與 KPI adapter 的發布日比較，並沿用舊 13 款 gate；九月正式 10 組資料被誤擋。資料發布紀錄的 readback PASSED 未涵蓋前端契約。
+- 修正：僅調整 awards-battle-controller.js，發布日與截止日分開核對，附帶驗證同一 snapshot 的 processing run，九月使用 10 組、其他月份保留既有 13 款；標示發布日期與資料截至日期。未修改正式數值、GAS、權限、KPI或其他入口。
+- 驗證：台獎契約 8/8；以當日私有 Drive latest snapshot 與 kpicalc 通過實際 adapter、validator、accept/render，10張整體／門市卡及10組機款。相鄰 KPI 靜態契約有一項既有失敗（測試 regex 不接受已存在的 script 版本參數），本次相關檔案零變更。主發布、救援、缺件與假日排程已加入台獎前端契約回讀門檻。發布狀態另以 GitHub Pages 部署與正式 JS SHA-256 回讀確認；核准裝置線上登入 E2E 尚未驗收，不可用本機 render 代替。
+- 交接：未來改月機款時必須同步 renderer 契約；不得把 private JSON 提交公開 repo，不得只改日期繞過 freshness。
+
 ## 2026-09-07 ｜ Codex（行進間戰報店點排序）
 
 - 做了什麼：VK 網頁與 PNG 共用穩定店點排序，依既有 STORE_NAMES 集中同店案件；商品 PNG 改為與網頁相同的每店一列、機款欄與合計，保留紫色非零數量。更新控制器快取版本。

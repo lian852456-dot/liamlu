@@ -97,6 +97,23 @@ test('renderer 保留正式獎金、達成率、threshold、next target 與 unlo
   }
 });
 
+test('九月 D+1 發布與截止日分別核對，10 組機款不可被舊 13 款門檻擋住', () => {
+  const data = fixture();
+  Object.assign(data, { report_date: '2026-09-06', report_run_date: '2026-09-07', data_as_of_date: '2026-09-06', phone_items: 10, processing_run_id: 'test-main' });
+  data.overall.items = data.overall.items.slice(0, 10);
+  data.stores.forEach(row => { row.items = row.items.slice(0, 10); });
+  const kpi = { report_date: '2026-09-07', data_as_of_date: '2026-09-06' };
+  const snapshot = { processing_run_id: 'test-main' };
+  assert.equal(controller.validateAwardsBattle(data, kpi, snapshot).ok, true);
+  assert.equal(controller.validateAwardsBattle({ ...data, data_as_of_date: '2026-09-05' }, kpi, snapshot).ok, false);
+  assert.equal(controller.validateAwardsBattle({ ...data, report_run_date: '2026-09-06' }, kpi, snapshot).ok, false);
+  assert.equal(controller.validateAwardsBattle({ ...data, processing_run_id: 'test-old' }, kpi, snapshot).ok, false);
+  assert.equal(controller.validateAwardsBattle({ ...data, stores: data.stores.slice(1) }, kpi, snapshot).ok, false);
+  assert.equal(controller.validateAwardsBattle({ ...data, phone_items: 13 }, kpi, snapshot).ok, false);
+  data.stores[0].items.pop();
+  assert.equal(controller.validateAwardsBattle(data, kpi, snapshot).ok, false);
+});
+
 test('三創名稱只在顯示層縮短，獎金摘要金額固定單行', () => {
   for (const api of [controller, kpiController]) {
     assert.equal(api.displayStoreName('台灣大哥大台北三創'), '台北三創');
