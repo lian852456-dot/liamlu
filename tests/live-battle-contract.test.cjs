@@ -99,7 +99,7 @@ test('分析完成後可分開下載四張本機產生的 PNG 戰報', () => {
   assert.match(html, /下載① 全國 AQ／RT 戰情 PNG/);
   assert.match(html, /下載② 上線商品 PNG/);
   assert.match(html, /下載③ 九店 AQ／RT 戰情 PNG/);
-  assert.match(js, /const hasDevice = index > 1 && Number\(value\) > 0/);
+  assert.match(js, /const hasDevice = index > 0 && index < values.length - 1 && Number\(value\) > 0/);
   assert.match(js, /hasDevice \? '#6741a5' : '#ffffff'/);
   assert.match(css, /\.product-hit \{ background:#6741a5; color:#fff; font-weight:950; \}/);
   assert.match(css, /\.region-detail-table td\.metric-hit,\.metric-cell\.metric-hit \{ background:#d9f3e8;/);

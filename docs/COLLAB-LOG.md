@@ -13,6 +13,13 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 
 ---
 
+## 2026-09-07 ｜ Codex（行進間戰報店點排序）
+
+- 做了什麼：VK 網頁與 PNG 共用穩定店點排序，依既有 STORE_NAMES 集中同店案件；商品 PNG 改為與網頁相同的每店一列、機款欄與合計，保留紫色非零數量。更新控制器快取版本。
+- 結果：相關 Node 29/29、JS syntax、diff check 通過；合成 Canvas 記錄驗證九店順序、機款數量、合計與 VK 穩定排序／原始陣列不變。提交後需確認 Pages 靜態讀回，真實 AQ／RT 重傳由 Liam 驗收。
+- 交接：未改解析資格、GAS、KPI 或其他功能。外部 ../AI協作中心 交接資料未存在於本環境，未同步；本日誌保留本輪交接。可回退本次提交恢復版型。
+
+
 ## 2026-09-03 ｜ Codex（Patrol 新版 25 題 NA/V 判定已發布）
 
 - 做了什麼：由最新 `origin/main` 建立乾淨 worktree，將 2026-09-01 起共用 25 題模型收斂為只有 `result=V` 計入完成；`result=NA`、`reason=NA` 與只有原因文字都維持缺項。`patrol.html` 與 Supervisor App 共用此模型，並升版題庫、App 與 Service Worker cache。8/31 前 `patrol-read-model.js` 33 題歷史判定未改。

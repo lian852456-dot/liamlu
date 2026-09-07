@@ -320,8 +320,16 @@
     }).join('');
   }
 
+  function orderedGiftRows(analysis) {
+    const rank = name => {
+      const index = Core.STORE_NAMES.indexOf(Core.normalizeStore(name));
+      return index < 0 ? Core.STORE_NAMES.length : index;
+    };
+    return analysis.giftAudit.slice().sort((a, b) => rank(a.store) - rank(b.store));
+  }
+
   function renderGiftAudit(analysis) {
-    const rows = analysis.giftAudit;
+    const rows = orderedGiftRows(analysis);
     $('giftCount').textContent = `${rows.length} 件`;
     $('giftCount').className = `status-badge${rows.length ? ' bad' : ' ok'}`;
     $('giftEmpty').hidden = rows.length > 0;
@@ -533,37 +541,39 @@
 
   function createProductsPng(analysis) {
     const models = analysis.productModels;
-    const width = 1800, rowHeight = 72, tableY = 188, rows = Math.max(1, models.length), height = tableY + 58 + rows * rowHeight + 80;
+    const stores = Core.STORE_NAMES;
+    const headHeight = 150, rowHeight = 72, tableY = 188;
+    const width = Math.max(1800, 104 + 170 + 110 + models.length * 180);
+    const height = tableY + headHeight + Math.max(1, models.length ? stores.length : 1) * rowHeight + 80;
     const { canvas, ctx } = exportSurface(width, height);
-    drawExportHeader(ctx, width, '② 目前上線商品', `${exportTimeLabel()} 產生｜深紫色格＝該店有設備上線數`);
+    drawExportHeader(ctx, width, '② 目前上線商品', `${exportTimeLabel()} 產生｜依店點排列・深紫色格＝該店有設備上線數`);
     if (!models.length) {
       drawCell(ctx, 52, tableY, width - 104, 130, '#ffffff', EXPORT_COLORS.line);
       ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '700 24px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText('原始檔未提供可辨識的商品型號', 82, tableY + 65);
       drawExportFooter(ctx, width, height); return canvas;
     }
-    const modelWidth = 440, totalWidth = 110, storeWidth = (width - 104 - modelWidth - totalWidth) / Core.STORE_NAMES.length;
-    const labels = ['商品型號', '合計', ...Core.STORE_NAMES];
-    const widths = [modelWidth, totalWidth, ...Core.STORE_NAMES.map(() => storeWidth)];
+    const modelWidth = (width - 104 - 170 - 110) / models.length;
+    const labels = ['店點', ...models, '合計'];
+    const widths = [170, ...models.map(() => modelWidth), 110];
     let x = 52;
     labels.forEach((label, index) => {
-      ctx.fillStyle = '#e9eff3'; ctx.fillRect(x, tableY, widths[index], 58);
+      drawCell(ctx, x, tableY, widths[index], headHeight, '#e9eff3', EXPORT_COLORS.line);
       ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '800 17px system-ui, "Microsoft JhengHei", sans-serif';
-      ctx.fillText(truncateCanvasText(ctx, label, widths[index] - 16), x + 8, tableY + 29); x += widths[index];
+      const lines = wrapCanvasText(ctx, label, widths[index] - 20, 6);
+      lines.forEach((line, lineIndex) => ctx.fillText(line, x + 10, tableY + headHeight / 2 + (lineIndex - (lines.length - 1) / 2) * 21));
+      x += widths[index];
     });
-    models.forEach((model, rowIndex) => {
-      const y = tableY + 58 + rowIndex * rowHeight;
-      const storeValues = Core.STORE_NAMES.map(name => Number(analysis.products[name][model] || 0));
-      const values = [model, storeValues.reduce((total, value) => total + value, 0), ...storeValues];
+    stores.forEach((name, rowIndex) => {
+      const y = tableY + headHeight + rowIndex * rowHeight;
+      const counts = models.map(model => Number(analysis.products[name][model] || 0));
+      const values = [name, ...counts, counts.reduce((total, value) => total + value, 0)];
       x = 52;
       values.forEach((value, index) => {
-        const hasDevice = index > 1 && Number(value) > 0;
+        const hasDevice = index > 0 && index < values.length - 1 && Number(value) > 0;
         ctx.fillStyle = hasDevice ? '#6741a5' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
         ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
-        ctx.fillStyle = hasDevice ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = `${index < 2 || value ? '900' : '700'} 18px system-ui, "Microsoft JhengHei", sans-serif`;
-        if (index === 0) {
-          const lines = wrapCanvasText(ctx, value, widths[index] - 22, 2);
-          lines.forEach((line, lineIndex) => ctx.fillText(line, x + 11, y + rowHeight / 2 + (lineIndex - (lines.length - 1) / 2) * 22));
-        } else ctx.fillText(String(value), x + widths[index] / 2 - ctx.measureText(String(value)).width / 2, y + rowHeight / 2);
+        ctx.fillStyle = hasDevice ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = '800 20px system-ui, "Microsoft JhengHei", sans-serif';
+        ctx.fillText(String(value), x + (widths[index] - ctx.measureText(String(value)).width) / 2, y + rowHeight / 2);
         x += widths[index];
       });
     });
@@ -572,7 +582,7 @@
   }
 
   function createGiftsPng(analysis) {
-    const rows = analysis.giftAudit;
+    const rows = orderedGiftRows(analysis);
     const width = 1600, rowHeight = 76, tableY = 188, count = Math.max(1, rows.length), height = tableY + 58 + count * rowHeight + 80;
     const { canvas, ctx } = exportSurface(width, height);
     drawExportHeader(ctx, width, '④ KKBOX／MyVideo 漏搭提醒', `${exportTimeLabel()} 產生｜5G 599 型含以上・提前續約適用・企客排除`);
