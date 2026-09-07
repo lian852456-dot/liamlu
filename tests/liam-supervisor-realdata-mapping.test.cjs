@@ -120,7 +120,7 @@ test('受控 temporary filename 只解包 canonical source identity，變更暫�
     data.meta.sourceFile = `report-upload-temp-${token}-0810.xlsx`;
     const snapshot = snapshotFixture();
     snapshot.awardsBattle = {
-      report_date:'2026-08-09', overall:{award:{},items:[]},
+      report_date:'2026-08-09', data_as_of_date:'2026-08-09', overall:{award:{},items:[]},
       stores:Array.from({length:9},(_,index)=>({store:`店 ${index+1}`,award:{actual_total:index,award:index<3?'Y':'N'},items:[]})),
     };
     const result = A.adaptKpi(data, snapshot, '2026-08-10T01:02:00+08:00');
@@ -364,4 +364,37 @@ test('Personal performance AQ attention uses actual below ten and keeps null sep
   const result=A.personalAqReview([manager('八點',8,1.5),manager('十點',10,.2),manager('缺值',null,0),{name:'業代',roleGroup:'其他業代',metrics:[{key:'AQ',actual:1,rate:.1}]}]);
   assert.deepEqual(Array.from(result.attention,row=>({name:row.person.name,actual:row.actual,gap:row.gap})),[{name:'八點',actual:8,gap:2}]);
   assert.deepEqual(Array.from(result.missing,row=>row.name),['缺值']);
+});
+
+
+
+test('App awards publication day, cutoff and processing run must align; personal award status stays authoritative', () => {
+  const A=loadAdapters();
+  const snapshot={kpiBattle:{report_date:'2026-09-07',data_as_of_date:'2026-09-06',processing_run_id:'run-1',personal:[
+    {name:'測試甲',store:'台北通化',phone_award_actual:750,phone_award_projected:3825,phone_award_rank:1226,phone_award_eligible:'N'},
+    {name:'測試乙',store:'台北通化'}
+  ]},awardsBattle:{report_date:'2026-09-06',report_run_date:'2026-09-07',data_as_of_date:'2026-09-06',processing_run_id:'run-1',overall:{items:[{name:'Pixel 10a',actual:8,target:28,rate:1.43}]},stores:[{store:'台北通化'}]}};
+  const a=A.adaptAwards(snapshot,'2026-09-07','2026-09-07T10:00:00+08:00');
+  assert.equal(a.summary.data.items[0].target,28);
+  assert.equal(a.summary.data.people[0].eligible,'N');
+  assert.equal(a.summary.data.people[0].actual,750);
+  assert.equal(a.summary.data.people[1].actual,null);
+  assert.equal(a.summary.data.people[1].eligible,'');
+  snapshot.awardsBattle.processing_run_id='old';
+  assert.equal(A.adaptAwards(snapshot,'2026-09-07','now').summary.data,null);
+  snapshot.awardsBattle.processing_run_id='run-1';snapshot.awardsBattle.data_as_of_date='2026-09-05';
+  assert.equal(A.adaptAwards(snapshot,'2026-09-07','now').summary.data,null);
+});
+
+test('80% gap rounds up, clamps at zero and never invents a missing target', () => {
+  const gap=vm.runInNewContext(`(function awardGap80(actual,target){${body('awardGap80')}})`);
+  assert.equal(gap(8,28),15);
+  assert.equal(gap(10,26),11);
+  assert.equal(gap(3,21),14);
+  assert.equal(gap(9,82),57);
+  assert.equal(gap(3,3),0);
+  assert.equal(gap(0,1),1);
+  assert.equal(gap(null,3),null);
+  assert.equal(gap(0,0),null);
+  assert.equal(gap(0,null),null);
 });

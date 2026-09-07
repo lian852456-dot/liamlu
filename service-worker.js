@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-2-patrol-na-v-20260903-v1';
+const CACHE_NAME = 'liam-supervisor-app-1-2-awards80-20260907-v1';
 const SHELL = [
   './app.html',
   './app.css',
@@ -92,3 +92,4 @@ self.addEventListener('fetch', event => {
     }).catch(() => event.request.mode === 'navigate' ? caches.match('./offline.html') : cached))
   );
 });
+
