@@ -148,7 +148,7 @@
     <select id="selStore" onchange="onSelectStore()"></select>
     <select id="selPerson" onchange="onSelectPerson()" style="display:none"></select>
   </div>
-  <div class="managerNote" id="managerNote">店長／代理店長沒有個人 KPI 成績，請切換到「店點試算」看店績。</div>
+  <div class="managerNote" id="managerNote">此店尚無可用個績資料；2026 年 9 月起店長／代理店長納入個人試算。</div>
 
   <div class="summary" id="summaryCard"></div>
 
@@ -472,7 +472,7 @@ function fillStoreSel(){
 }
 function fillPersonSel(){
   const sel = document.getElementById('selPerson');
-  const ps = personsOf(curStore).filter(p => !isManager(p));
+  const ps = personsOf(curStore).filter(p => !isManager(p) || (/^\d{4}-\d{2}$/.test(String(DATA.meta.month || '')) && DATA.meta.month >= '2026-09'));
   sel.innerHTML = ps.map(p => `<option value="${p.pname}">${p.role}｜${p.pname}</option>`).join('');
   if (!ps.find(p => p.pname === curPerson)) curPerson = ps.length ? ps[0].pname : '';
   sel.value = curPerson;
@@ -525,7 +525,7 @@ function render(){
   const sumEl = document.getElementById('summaryCard');
   const area = document.getElementById('itemArea');
   if (!ent){
-    sumEl.innerHTML = '<div class="who">此店沒有可試算的個人（店長請看店點）</div>';
+    sumEl.innerHTML = '<div class="who">此店沒有可試算的個人資料</div>';
     area.innerHTML = '';
     return;
   }

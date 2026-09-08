@@ -439,3 +439,20 @@ test('Bonus is an award-only scope; region/store exclude people and KPI resets t
   context.battleScope='bonus';context.renderBattle();assert.equal(dom('#battleContent').innerHTML,'<people/>');assert.equal(dom('#battleStorePicker').hidden,true);
   context.battleKind='kpi';context.contract.kpiSummary.status='unauthorized';context.renderBattle();assert.equal(context.battleScope,'region');assert.equal(scopes[2].hidden,true);
 });
+
+test('September managers join personal totals, store personnel and metric gaps using personal values', () => {
+  const A=loadAdapters();
+  const snapshot={kpiBattle:{source_as_of_date:'2026-09-07',personal:[{name:'測試主管',store:'酒泉',role:'店長',overall_rate:0.8,rank:20,overall_rate_dod:null,rank_dod:null,metrics:{A999:{rate:0.5,actual:1,target:2}}}]}};
+  const result=A.adaptPersonalPerformance(snapshot,'2026-09-08');
+  const people=result.data.people;
+  assert.equal(result.data.summary.underTarget,1);
+  assert.equal(result.status,'partial');
+  assert.equal(people[0].dod,null);
+  assert.equal(A.personalRankedByRole(people,'店長')[0].totalRate,0.8);
+  assert.equal(A.personalStoreViewRows(people,[{name:'酒泉',kpi:1.5,rank:1}],'酒泉').staff[0].totalRate,0.8);
+  assert.equal(A.personalUnderTargetByMetric(people,'A999').rows.length,1);
+  snapshot.kpiBattle.source_as_of_date='2026-08-31';
+  const historical=A.adaptPersonalPerformance(snapshot,'2026-09-08');
+  assert.equal(historical.data.summary.underTarget,0);
+  assert.equal(A.personalUnderTargetByMetric(historical.data.people,'A999').rows.length,0);
+});

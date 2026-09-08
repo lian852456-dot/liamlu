@@ -594,12 +594,12 @@
     const storePeople=(Array.isArray(people)?people:[]).filter(person=>normalizeStore(person.store)===selected);
     return {
       managers:managerStorePerformanceRows(storePeople,stores),
-      staff:storePeople.filter(person=>person.roleGroup!=='店長')
+      staff:storePeople.filter(person=>person.roleGroup!=='店長'||person.managerPersonalEnabled)
     };
   }
 
   function personalUnderTargetByMetric(people,key) {
-    const nonManagers=(Array.isArray(people)?people:[]).filter(person=>person.roleGroup!=='店長');
+    const nonManagers=(Array.isArray(people)?people:[]).filter(person=>person.roleGroup!=='店長'||person.managerPersonalEnabled);
     const missing=nonManagers.filter(person=>{ const metric=personalMetricByKey(person,key); return !metric||metric.rate==null; });
     const rows=nonManagers.filter(person=>{ const metric=personalMetricByKey(person,key); return metric&&metric.rate!=null&&metric.rate<1; })
       .slice().sort((a,b)=>personalMetricByKey(b,key).rate-personalMetricByKey(a,key).rate);
@@ -617,20 +617,22 @@
   function adaptPersonalPerformance(snapshot, readAt) {
     const sourceData = snapshot && snapshot.kpiBattle || {};
     const rows = Array.isArray(sourceData.personal) ? sourceData.personal : [];
+    const cutoff=String(sourceData.data_as_of_date || sourceData.source_as_of_date || sourceData.report_date || '');
+    const managerPersonalEnabled=/^\d{4}-\d{2}-\d{2}$/.test(cutoff) && cutoff >= '2026-09-01';
     const people = rows.map(row => ({
       name:String(row.name || ''), store:normalizeStore(row.store), role:String(row.role || ''), category:String(row.category || ''),
-      roleGroup:personalRoleGroup(row),
+      roleGroup:personalRoleGroup(row), managerPersonalEnabled,
       totalRate:numberOrNull(row.overall_rate), rank:numberOrNull(row.rank), dod:numberOrNull(row.overall_rate_dod), rankChange:numberOrNull(row.rank_dod),
       metrics:Object.entries(row.metrics || {}).map(([key,metric]) => ({
         key:String(key), rate:numberOrNull(metric && metric.rate), actual:numberOrNull(metric && metric.actual), target:numberOrNull(metric && metric.target),
         dailyTarget:numberOrNull(metric && metric.daily_target), dailyGap:numberOrNull(metric && metric.daily_gap), dod:numberOrNull(metric && metric.dod)
       }))
     })).filter(row => row.name && row.store);
-    const personalPeople=people.filter(row=>row.roleGroup!=='店長');
+    const personalPeople=people.filter(row=>row.roleGroup!=='店長'||row.managerPersonalEnabled);
     const achieved = personalPeople.filter(row => row.totalRate != null && row.totalRate >= 1).length;
     const underTarget = personalPeople.filter(row => row.totalRate != null && row.totalRate < 1).length;
     const aqReview=personalAqReview(people);
-    const complete = people.length > 0 && people.every(row => row.roleGroup === '店長'
+    const complete = people.length > 0 && people.every(row => row.roleGroup === '店長' && !row.managerPersonalEnabled
       ? row.metrics.length > 0
       : row.totalRate != null && row.rank != null && row.dod != null && row.rankChange != null && row.metrics.length > 0);
     const updatedAt = String(sourceData.generated_at || snapshot && snapshot.publishedAt || '');
@@ -1142,7 +1144,7 @@
       const storeView=personalStoreViewRows(allPeople,contract.kpiStores.data,selected);
       const managerCards=storeView.managers.map(managerStorePerformanceRow).join('');
       const staffRows=storeView.staff.map(person=>personalPerformanceRow(person)).join('');
-      return `<div class="award-selected-store"><span>店點個績</span><strong>${escapeHtml(selected)}</strong></div><section class="panel personal-performance-panel manager-store-panel"><div class="panel-head"><div><h2>店長管理資訊</h2><small>店績來自正式 kpiStores · AQ 來自個人 AQ actual</small></div></div><div class="personal-performance-list">${managerCards || '<div class="empty-state">此店正式來源目前沒有店長管理資料。</div>'}</div></section><section class="panel personal-performance-panel"><div class="panel-head"><div><h2>店點人員</h2><small>${storeView.staff.length} 人 · 副店／其他業代正式個績</small></div></div><div class="personal-performance-list">${staffRows || '<div class="empty-state">此店正式來源目前沒有副店／業代個績。</div>'}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
+      return `<div class="award-selected-store"><span>店點個績</span><strong>${escapeHtml(selected)}</strong></div><section class="panel personal-performance-panel manager-store-panel"><div class="panel-head"><div><h2>店長管理資訊</h2><small>店績來自正式 kpiStores · AQ 來自個人 AQ actual</small></div></div><div class="personal-performance-list">${managerCards || '<div class="empty-state">此店正式來源目前沒有店長管理資料。</div>'}</div></section><section class="panel personal-performance-panel"><div class="panel-head"><div><h2>店點人員</h2><small>${storeView.staff.length} 人 · 同仁正式個績</small></div></div><div class="personal-performance-list">${staffRows || '<div class="empty-state">此店正式來源目前沒有同仁個績。</div>'}</div></section><p class="personal-source-note">${escapeHtml(module.note || '')}</p><a class="source-button" href="index.html">開啟正式個績網站 <i data-lucide="external-link"></i></a>`;
     }
     const aqReview=personalAqReview(allPeople);
     const summaryCards = `<div class="metric-card-grid personal-summary-grid">
@@ -1153,13 +1155,13 @@
     </div>`;
     let people=[]; let managerRows=null; let heading=''; let note=''; let empty=''; let rowOptions={regionRanking:true};
     if(personalRegionView==='role') {
-      if(personalRole==='店長') {
+      if(personalRole==='店長' && !allPeople.some(person=>person.managerPersonalEnabled)) {
         managerRows=managerStorePerformanceRows(allPeople,contract.kpiStores.data); heading='店長店績'; note=`${managerRows.length} 人 · 依店公司排名由前至後`; empty='目前沒有可對應的店長／店績資料。';
       } else {
         people=personalRankedByRole(allPeople,personalRole); heading=`${personalRole}正式排名`; note=`${people.length} 人 · 正式排名由前至後`; empty=`目前沒有${personalRole}正式個績。`;
       }
     } else {
-      const result=personalUnderTargetByMetric(allPeople,personalGapMetric); people=result.rows; heading=`${personalGapMetric} 未達`; note=`${people.length} 人 · 達成率由高到低`; empty=`非店長同仁 ${personalGapMetric} 全數達標`; rowOptions={focusMetric:personalGapMetric};
+      const result=personalUnderTargetByMetric(allPeople,personalGapMetric); people=result.rows; heading=`${personalGapMetric} 未達`; note=`${people.length} 人 · 達成率由高到低`; empty=`有正式資料的同仁 ${personalGapMetric} 全數達標`; rowOptions={focusMetric:personalGapMetric};
       if(result.missing.length) note+=` · ${result.missing.length} 人無正式資料（未列入）`;
     }
     const rows=managerRows?managerRows.map(managerStorePerformanceRow).join(''):people.map(person=>personalPerformanceRow(person,rowOptions)).join('');
@@ -2022,7 +2024,7 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=bonus-sort-filter-20260907',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=manager-personal-20260908',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);
 
 
