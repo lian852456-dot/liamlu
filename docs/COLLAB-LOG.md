@@ -16,8 +16,8 @@ Liam、Claude、Codex（及其他 AI 助手）的共享工作紀錄。**新紀�
 ## 2026-09-08 ｜ Codex（VK 漏搭合約代碼篩選）
 
 - 做了什麼：在最新正式 `origin/main` 基準修正行進間戰報的 KKBOX／MyVideo 漏搭判定；RT 案件先以「合約代碼」欄篩出 `VK…` 合約，再套用 5G 599（含）以上、企客／4G 排除與同案件去重。網頁及第④張 PNG 新增合約代碼欄與資格說明。
-- 結果（本機完成／未部署）：行進間戰報專項與契約 `30/30 PASS`，兩支 runtime JavaScript syntax PASS；新增非 VK 不列入、同門號多個合約編號／多筆 VK 只列一次、企客與 4G 維持排除的回歸案例。全 Node 檢查另有 7 個 `kpi-battle-source`／`kpi-battle-standalone` 既有失敗，均位於本次 0 diff 檔案。
-- 經驗 / 給下一位的提醒：合約代碼欄優先取明確「合約代碼」，才相容促案／專案／優惠／服務／產品代碼；缺少可辨識代碼時漏搭採 fail-closed，不再用單純 5G 月租推定 VK。外部 `../AI協作中心` 本環境不存在，未同步；尚需正式 Pages 發布與 Liam 真實 RT 檔重傳驗收。
+- 結果（正式發布／線上回讀完成）：功能 commit `2af579bf6bed074db17ba1ea16fdf4aedb722bfd`，GitHub Pages run `34214772817` 成功；正式頁已回讀新版快取、VK 資格說明與合約代碼欄。行進間戰報專項與契約 `30/30 PASS`，兩支 runtime JavaScript syntax PASS。線上合成案例確認非 VK、4G、企客排除，同門號多個合約編號／多筆 VK 只列一次。智慧營運中心、每日回報、KPI、台獎、App、巡店、日誌、稽核、快速更新九個入口均可載入且無頁面自身執行錯誤；瀏覽器環境僅有各頁一致的 extension metadata 雜訊。
+- 經驗 / 給下一位的提醒：合約代碼欄優先取明確「合約代碼」，才相容促案／專案／優惠／服務／產品代碼；缺少可辨識代碼時漏搭採 fail-closed，不再用單純 5G 月租推定 VK。全 Node 檢查另有 7 個 `kpi-battle-source`／`kpi-battle-standalone` 既有失敗，均位於本次 0 diff 檔案；外部 `../AI協作中心` 本環境不存在，未同步。回退分支：`rollback/live-battle-vk-filter-predeploy-20260908`。仍建議 Liam 以真實 RT 檔重傳做資料 UAT。
 
 ## 2026-09-08 ｜ Codex（App KPI 總進度與 DOD 資料修復）
 

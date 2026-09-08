@@ -9,7 +9,7 @@
 - 第二階段候選：`feature/live-battle-upload-first-dynamic-20260830`，改為先選檔、正式目標選用、動態今日追缺與安全辨識資訊；尚未重新部署。
 - 第三階段候選：`feature/live-battle-metrics-products-gifts-20260831`，主畫面改為五項戰情、實際商品矩陣與影音漏搭；尚未部署。
 - 全國彙總版：正式 commit `12a015e`，已於 2026-08-31 部署；回退分支 `rollback/live-battle-national-predeploy-20260831`。必要 cloud-browser 視覺 QA 仍因連線逾時維持 blocked，正式部署是 Liam 在已知限制後明確指示執行。
-- 2026-09-08 VK 合約代碼篩選候選：影音漏搭先篩 `VK…` 合約，再判 5G 599（含）以上與缺項；同案件多筆 VK 明細只列一次。已完成本機專項驗證，尚未部署或以 Liam 真實 RT 檔驗收。
+- 2026-09-08 VK 合約代碼篩選已發布：影音漏搭先篩 `VK…` 合約，再判 5G 599（含）以上與缺項；同門號多個合約編號／多筆 VK 明細只列一次。功能 commit `2af579b`、Pages run `34214772817` 成功，正式頁與九個主要入口已線上回讀；尚待 Liam 真實 RT 檔資料 UAT。
 
 ## 使用流程
 
