@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-2-manager-personal-20260908-v1';
+const CACHE_NAME = 'liam-supervisor-app-1-2-manager-personal-source-fix-20260909-v1';
 const SHELL = [
   './app.html',
   './app.css',
@@ -92,6 +92,5 @@ self.addEventListener('fetch', event => {
     }).catch(() => event.request.mode === 'navigate' ? caches.match('./offline.html') : cached))
   );
 });
-
 
 

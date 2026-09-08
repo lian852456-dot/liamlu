@@ -1,5 +1,12 @@
 # 跨 AI 協作日誌
 
+## 2026-09-09 ｜ Codex（店長個績來源修正）
+
+- 原因：9 月店長納入個績後，私有 dashboard 快照的救援建置器錯把「店點達成率」寫入店長個人列，造成店長總績效、公司排名及各項目標誤顯示為店績；先前據此回覆的店長數值亦不正確。
+- 修復：店長個績的總績效、實績、目標及達成率固定以 `kpicalc_access`／原始報表「上線數KPI_個人達成率_明細」為準；dashboard 快照只在具 `personal_semantics: individual-v1` 標記時補個人排名與 DOD。同步修正正式 09-08 快照的 9 位店長個績，並保留 41 人及其他台獎、保險與店績資料。
+- 防護：兩個正式建置器新增個績語意與來源工作表標記；另提供 `scripts/correct_manager_personal_snapshot.py`，只修店長／代理店長且要求人數與來源完全對齊，避免再次以店績覆寫個績。
+- 驗證：App 個績映射、KPI controller、快取與 9 月店長規則的聚焦套件 39/39 PASS，另增「舊快照不得覆寫店長個績」的 controller 測試並通過；兩支 JavaScript syntax、三支 Python compile、diff check 通過。正式 Drive 原檔已先備份，再更新同一 latest ID；全檔回讀為 41 人、9 位店長來源值及 `individual-v1` 標記正確。
+
 ## 2026-09-08 ｜ Codex（9 月店長個績）
 
 - 9/1 起依 snapshot 資料截止日將店長納入 App 個績排名、達標統計、指標未達與店點個績；管理店績卡仍獨立保留。8 月歷史維持原規則。

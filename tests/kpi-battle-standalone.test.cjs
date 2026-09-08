@@ -11,7 +11,7 @@ const home = fs.readFileSync(path.join(root, 'home.html'), 'utf8');
 
 test('index 與獨立頁只掛載同一 KPI controller，不再以 iframe 遙控', () => {
   for (const page of [index, standalone]) {
-    assert.match(page, /<script src="kpi-battle-controller\.js"><\/script>/);
+    assert.match(page, /<script src="kpi-battle-controller\.js(?:\?[^\"]+)?"><\/script>/);
     assert.match(page, /id="panel-kpi-battle"/);
     assert.match(page, /id="kpiBattleContent"/);
     assert.doesNotMatch(page, /function\s+(?:kpicalcMetric|kpicalcToKpiBattleView|mergeKpiBattleSupplement|renderKpiBattleStores|renderKpiBattlePersonal)/);

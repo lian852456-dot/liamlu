@@ -727,6 +727,8 @@ def extract_kpi_battle(
         "source_file": source_path.name,
         "previous_report_date": previous_date.isoformat() if previous_report else None,
         "source_date_range": report.get("source_date_range") or personal_date_range,
+        "personal_semantics": "individual-v1",
+        "personal_source_sheet": "上線數KPI_個人達成率_明細",
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "aggregate": compact_store(report.get("aggregate", {})),
         "stores": [compact_store(row) for row in report.get("records", [])],

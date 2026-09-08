@@ -25,11 +25,12 @@ function loadAdapters() {
     const STORE_ALIASES = new Map([['三創','台北三創']]);
     const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
     const KPI_CORE_KEYS = { A999:'AQ V+D 999 (含)以上', A1399:'AQ V+D 1399 (含)以上', '好速':'好速案銷售點數', R999:'RT V+D 999 (含)以上', R1399:'RT V+D 1399 (含)以上', RT:'RT上線點數' };
+    const KPI_PERSONAL_KEYS = { AQ:'TTL AQ上線點數', A999:'AQ V+D 999 (含)以上', A1399:'AQ V+D 1399 (含)以上', RT:'RT上線點數', R999:'RT V+D 999 (含)以上', R1399:'RT V+D 1399 (含)以上', '好速':'好速案銷售點數', '特維':'特殊維繫用戶續約數', '配件':'配件及其他營收', '包膜':'包膜與保貼營收' };
     const FAILURE_LABELS = { a999:'A999', a1399:'A1399', haosu:'好速', achieve:'R999', r1399:'R1399', insurance:'保險搭售率' };
     const C = { moduleState: value => ({ ...value, sourceLink:value.source.href }) };
     const moduleSource = (label,href) => ({label,href});
     const stale = () => false;
-    ${names.map(name=>`function ${name}(${({numberOrNull:'value',normalizeStore:'value',kpiDataAsOfDate:'data',sourceFileName:'value',kpiSupplementIsCurrent:'data, supplement',officialKpiRate:'entry',kpicalcMetricItems:'data, rates',adaptKpi:'data, snapshot, readAt',adaptAwards:'snapshot, expectedReportDate, readAt',personalRecord:'raw',personalRoleGroup:'source',personalMetricByKey:'person,key',personalRankedByRole:'people,roleGroup',managerStorePerformanceRows:'people,stores',personalStoreViewRows:'people,stores,selectedStore',personalUnderTargetByMetric:'people,key',personalAqReview:'people',adaptPersonalPerformance:'snapshot, readAt',reportStoreFeedback:'report, summaryStore',adaptReport:'segment, storeData, personalData, formalSummary'})[name]}) {${body(name)}}`).join('\n')}
+    ${names.map(name=>`function ${name}(${({numberOrNull:'value',normalizeStore:'value',kpiDataAsOfDate:'data',sourceFileName:'value',kpiSupplementIsCurrent:'data, supplement',officialKpiRate:'entry',kpicalcMetricItems:'data, rates',adaptKpi:'data, snapshot, readAt',adaptAwards:'snapshot, expectedReportDate, readAt',personalRecord:'raw',personalRoleGroup:'source',personalMetricByKey:'person,key',personalRankedByRole:'people,roleGroup',managerStorePerformanceRows:'people,stores',personalStoreViewRows:'people,stores,selectedStore',personalUnderTargetByMetric:'people,key',personalAqReview:'people',adaptPersonalPerformance:'data, snapshot, readAt',reportStoreFeedback:'report, summaryStore',adaptReport:'segment, storeData, personalData, formalSummary'})[name]}) {${body(name)}}`).join('\n')}
     module.exports = { adaptKpi, adaptAwards, personalRecord, personalRoleGroup, personalMetricByKey, personalRankedByRole, managerStorePerformanceRows, personalStoreViewRows, personalUnderTargetByMetric, personalAqReview, adaptPersonalPerformance, reportStoreFeedback, adaptReport };
   `;
   const context = vm.createContext({ module:{exports:{}}, exports:{}, Map, Set, Object, Array, String, Number, Boolean, Math, Date, JSON });
@@ -271,23 +272,25 @@ test('Daily report adapter preserves each segment formal store feedback verbatim
 
 test('Personal performance adapter maps formal fields and derives AQ attention only from manager AQ actual', () => {
   const A = loadAdapters();
-  const metrics = Object.fromEntries(['AQ','A999','A1399','RT','R999','R1399','好速','特維','配件','包膜'].map((key,index)=>[key,{rate:1.1-index*.01,actual:index+1,target:index+2,daily_target:1,daily_gap:0,dod:.01}]));
-  const snapshot = { publishedAt:'2026-08-11T09:54:24+08:00', kpiBattle:{ report_date:'2026-08-11',source_as_of_date:'2026-08-10',generated_at:'2026-08-11T09:54:24+08:00',personal:[
-    {name:'測試同仁',store:'酒泉',role:'店長',category:'店長',overall_rate:.912,rank:7,overall_rate_dod:-.015,rank_dod:-2,metrics}
+  const items=Object.values({AQ:'TTL AQ上線點數',A999:'AQ V+D 999 (含)以上',A1399:'AQ V+D 1399 (含)以上',RT:'RT上線點數',R999:'RT V+D 999 (含)以上',R1399:'RT V+D 1399 (含)以上',好速:'好速案銷售點數',特維:'特殊維繫用戶續約數',配件:'配件及其他營收',包膜:'包膜與保貼營收'});
+  const personItems=Object.fromEntries(items.map((key,index)=>[key,{reportRate:1.1-index*.01,a:index+1,t:index+2}]));
+  const data={meta:{month:'2026-09',snapshotDay:7,sourceFile:'0908.xlsx'},stores:[{code:'DNB10062',name:'酒泉'}],persons:[{pname:'測試同仁',store:'DNB10062',role:'店長',official:.912,items:personItems}]};
+  const snapshot = { publishedAt:'2026-09-08T09:54:24+08:00', kpiBattle:{report_date:'2026-09-07',source_as_of_date:'2026-09-07',source_file:'0908.xlsx',personal_semantics:'individual-v1',generated_at:'2026-09-08T09:54:24+08:00',personal:[
+    {name:'測試同仁',store:'酒泉',role:'店長',rank:7,overall_rate_dod:-.015,rank_dod:-2,metrics:{}}
   ] } };
-  const result = A.adaptPersonalPerformance(snapshot, '2026-08-11T10:00:00+08:00');
+  const result = A.adaptPersonalPerformance(data,snapshot,'2026-09-08T10:00:00+08:00');
   assert.equal(result.status, 'ok');
   assert.equal(result.data.summary.total, 1);
   assert.equal(result.data.summary.achieved, 0);
-  assert.equal(result.data.summary.underTarget, 0);
+  assert.equal(result.data.summary.underTarget, 1);
   assert.equal(result.data.summary.aqAttentionCount, 1);
   assert.equal(result.data.summary.aqMissingCount, 0);
   assert.equal(result.data.people[0].roleGroup, '店長');
   assert.equal(result.data.people[0].metrics.length, 10);
   assert.equal(result.data.people[0].totalRate, .912);
   assert.equal(result.data.people[0].metrics.find(metric=>metric.key==='A1399').rate, 1.08);
-  assert.match(result.note, /不修改正式總績效/);
-  assert.match(result.note, /未提供個人 25 項/);
+  assert.equal(result.data.people[0].metrics.find(metric=>metric.key==='AQ').target,2);
+  assert.match(result.note, /正式 kpicalc/);
 });
 
 test('Personal performance area groups by formal category or role without guessing from name or store', () => {
@@ -442,17 +445,22 @@ test('Bonus is an award-only scope; region/store exclude people and KPI resets t
 
 test('September managers join personal totals, store personnel and metric gaps using personal values', () => {
   const A=loadAdapters();
-  const snapshot={kpiBattle:{source_as_of_date:'2026-09-07',personal:[{name:'測試主管',store:'酒泉',role:'店長',overall_rate:0.8,rank:20,overall_rate_dod:null,rank_dod:null,metrics:{A999:{rate:0.5,actual:1,target:2}}}]}};
-  const result=A.adaptPersonalPerformance(snapshot,'2026-09-08');
+  const keys={AQ:'TTL AQ上線點數',A999:'AQ V+D 999 (含)以上',A1399:'AQ V+D 1399 (含)以上',RT:'RT上線點數',R999:'RT V+D 999 (含)以上',R1399:'RT V+D 1399 (含)以上',好速:'好速案銷售點數',特維:'特殊維繫用戶續約數',配件:'配件及其他營收',包膜:'包膜與保貼營收'};
+  const items=Object.fromEntries(Object.values(keys).map(key=>[key,{reportRate:key===keys.A999 ? .5 : 1,a:1,t:key===keys.A999 ? 2 : 1}]));
+  const data={meta:{month:'2026-09',snapshotDay:7,sourceFile:'0908.xlsx'},stores:[{code:'DNB10062',name:'酒泉'}],persons:[{pname:'測試主管',store:'DNB10062',role:'店長',official:.8,items}]};
+  const snapshot={kpiBattle:{report_date:'2026-09-07',source_as_of_date:'2026-09-07',source_file:'0908.xlsx',personal:[{name:'測試主管',store:'酒泉',role:'店長',overall_rate:1.5,rank:1,metrics:{A999:{rate:1.5,actual:20,target:30}}}]}};
+  const result=A.adaptPersonalPerformance(data,snapshot,'2026-09-08');
   const people=result.data.people;
   assert.equal(result.data.summary.underTarget,1);
   assert.equal(result.status,'partial');
   assert.equal(people[0].dod,null);
   assert.equal(A.personalRankedByRole(people,'店長')[0].totalRate,0.8);
+  assert.equal(people[0].rank,null);
+  assert.equal(people[0].metrics.find(metric=>metric.key==='A999').target,2);
   assert.equal(A.personalStoreViewRows(people,[{name:'酒泉',kpi:1.5,rank:1}],'酒泉').staff[0].totalRate,0.8);
   assert.equal(A.personalUnderTargetByMetric(people,'A999').rows.length,1);
-  snapshot.kpiBattle.source_as_of_date='2026-08-31';
-  const historical=A.adaptPersonalPerformance(snapshot,'2026-09-08');
+  data.meta.month='2026-08'; data.meta.snapshotDay=31; data.meta.sourceFile='0901.xlsx'; snapshot.kpiBattle.report_date='2026-08-31'; snapshot.kpiBattle.source_as_of_date='2026-08-31'; snapshot.kpiBattle.source_file='0901.xlsx';
+  const historical=A.adaptPersonalPerformance(data,snapshot,'2026-09-08');
   assert.equal(historical.data.summary.underTarget,0);
   assert.equal(A.personalUnderTargetByMetric(historical.data.people,'A999').rows.length,0);
 });

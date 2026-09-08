@@ -182,10 +182,14 @@
       return merged;
     });
     const snapshotPeople = new Map((snapshot.personal || []).map(row => [kpiBattlePersonKey(row), row]));
+    const trustedManagerSupplement = String(snapshot.personal_semantics || '') === 'individual-v1';
     copy.personal = copy.personal.map(row => {
       const source = snapshotPeople.get(kpiBattlePersonKey(row));
       const merged = { ...row };
-      copyFields(merged, source, ['rank', 'rank_dod', 'insurance_attach_rate', 'phone_award_actual', 'phone_award_projected', 'phone_award_rank', 'phone_award_eligible']);
+      const manager = /店長/.test(String(row.role || row.category || '')) && !/副店長/.test(String(row.role || row.category || ''));
+      copyFields(merged, source, manager && !trustedManagerSupplement
+        ? ['insurance_attach_rate', 'phone_award_actual', 'phone_award_projected', 'phone_award_rank', 'phone_award_eligible']
+        : ['rank', 'rank_dod', 'overall_rate_dod', 'insurance_attach_rate', 'phone_award_actual', 'phone_award_projected', 'phone_award_rank', 'phone_award_eligible']);
       return merged;
     });
     return kpiBattleApplyKnownCorrections({ ...copy, supplement_synced: true });

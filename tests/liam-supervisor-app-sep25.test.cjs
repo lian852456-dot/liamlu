@@ -11,7 +11,7 @@ test('App loads the shared September question model before its read adapters',()
   const html=read('app.html');
   const questionIndex=html.indexOf('patrol-question-versions.js?v=app-na-v-20260903-1');
   const halfIndex=html.indexOf('half-month-check-read-model.js?v=app-sep25-20260903-2');
-  const appIndex=html.indexOf('app.js?v=manager-personal-20260908');
+  const appIndex=html.indexOf('app.js?v=manager-personal-source-fix-20260909');
   assert.ok(questionIndex>0&&questionIndex<halfIndex&&halfIndex<appIndex);
   assert.match(html,/id="patrolMileage"/);
   assert.match(html,/督導到店檢查/);
@@ -86,4 +86,3 @@ test('App supervisor visit adapter switches to questions 1–9 on September 1 an
   const august=model.adapt({rows:[],stores:['通化'],date:'2026-08-31',period:'H2'});
   assert.equal(august.questions.length,18);
 });
-

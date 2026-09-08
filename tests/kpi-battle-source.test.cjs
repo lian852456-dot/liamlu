@@ -164,6 +164,7 @@ test('同次正式快照補入 0804 資料日、34 名、109.7%、12.35 與個�
   const base = A.kpicalcToKpiBattleView(SAMPLE, '');
   const snapshot = {
     report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0805.xlsx', source_date_range: '2026/08/01 ~ 08/04',
+    personal_semantics: 'individual-v1',
     aggregate: { overall_kpi: 1.097, company_rank: 34, addon_score: 12.35, insurance_attach_rate: 0.46154 },
     stores: [{ store: '甲', company_rank: 20, addon_score: 14.2, insurance_attach_rate: 0.54545 }],
     personal: [{ store: '甲', name: '甲＊一', rank: 49, insurance_attach_rate: 0.83333, phone_award_actual: 1495, phone_award_projected: 14720 }],
@@ -181,6 +182,27 @@ test('同次正式快照補入 0804 資料日、34 名、109.7%、12.35 與個�
   assert.equal(view.personal[0].rank, 49);
   assert.equal(view.personal[0].phone_award_actual, 1495);
   assert.equal(view.personal[0].insurance_attach_rate, 0.83333);
+});
+
+test('未標記個人語意的快照不得以店績排名覆寫店長個績', () => {
+  const A = loadAdapter();
+  const base = A.kpicalcToKpiBattleView(SAMPLE, '');
+  const snapshot = {
+    report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0805.xlsx',
+    aggregate: {}, stores: [],
+    personal: [{
+      store: '甲', name: '甲＊一', rank: 1, rank_dod: 99, overall_rate_dod: 9.9,
+      insurance_attach_rate: 0.8, phone_award_actual: 1495,
+    }],
+  };
+  const view = A.mergeKpiBattleSupplement(base, snapshot);
+  assert.equal(view.supplement_synced, true);
+  assert.equal(view.personal[0].overall_rate, 1.05);
+  assert.equal(view.personal[0].rank, null);
+  assert.equal(view.personal[0].rank_dod, null);
+  assert.equal(view.personal[0].overall_rate_dod, null);
+  assert.equal(view.personal[0].insurance_attach_rate, 0.8);
+  assert.equal(view.personal[0].phone_award_actual, 1495);
 });
 
 test('受控 upload temporary filename 使用 canonical 0805.xlsx 合併，且頁面只顯示 canonical source', () => {

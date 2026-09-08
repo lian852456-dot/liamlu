@@ -20,6 +20,12 @@
     A999:'AQ V+D 999 (含)以上', A1399:'AQ V+D 1399 (含)以上', '好速':'好速案銷售點數',
     R999:'RT V+D 999 (含)以上', R1399:'RT V+D 1399 (含)以上', RT:'RT上線點數'
   };
+  const KPI_PERSONAL_KEYS = {
+    AQ:'TTL AQ上線點數', A999:'AQ V+D 999 (含)以上', A1399:'AQ V+D 1399 (含)以上',
+    RT:'RT上線點數', R999:'RT V+D 999 (含)以上', R1399:'RT V+D 1399 (含)以上',
+    '好速':'好速案銷售點數', '特維':'特殊維繫用戶續約數',
+    '配件':'配件及其他營收', '包膜':'包膜與保貼營收'
+  };
   const FAILURE_LABELS = { a999:'A999', a1399:'A1399', haosu:'好速', achieve:'R999', r1399:'R1399', insurance:'保險搭售率' };
   const READ_ACTIONS = new Set(['private_access','read','pread','kpicalc_access']);
   const DEVICE_ACTIONS = new Set(['private_request','private_request_status']);
@@ -614,20 +620,37 @@
     return { attention,missing };
   }
 
-  function adaptPersonalPerformance(snapshot, readAt) {
+  function adaptPersonalPerformance(data, snapshot, readAt) {
     const sourceData = snapshot && snapshot.kpiBattle || {};
-    const rows = Array.isArray(sourceData.personal) ? sourceData.personal : [];
-    const cutoff=String(sourceData.data_as_of_date || sourceData.source_as_of_date || sourceData.report_date || '');
+    const aligned=kpiSupplementIsCurrent(data,sourceData);
+    const supplementPeople=new Map((aligned&&Array.isArray(sourceData.personal)?sourceData.personal:[]).map(row=>[
+      `${normalizeStore(row.store)}|${String(row.name||'')}|${String(row.role||'')}`,row
+    ]));
+    const storeNames=new Map((Array.isArray(data&&data.stores)?data.stores:[]).map(row=>[String(row.code||''),normalizeStore(row.name)]));
+    const rows=Array.isArray(data&&data.persons)?data.persons:[];
+    const cutoff=kpiDataAsOfDate(data);
     const managerPersonalEnabled=/^\d{4}-\d{2}-\d{2}$/.test(cutoff) && cutoff >= '2026-09-01';
-    const people = rows.map(row => ({
-      name:String(row.name || ''), store:normalizeStore(row.store), role:String(row.role || ''), category:String(row.category || ''),
-      roleGroup:personalRoleGroup(row), managerPersonalEnabled,
-      totalRate:numberOrNull(row.overall_rate), rank:numberOrNull(row.rank), dod:numberOrNull(row.overall_rate_dod), rankChange:numberOrNull(row.rank_dod),
-      metrics:Object.entries(row.metrics || {}).map(([key,metric]) => ({
-        key:String(key), rate:numberOrNull(metric && metric.rate), actual:numberOrNull(metric && metric.actual), target:numberOrNull(metric && metric.target),
-        dailyTarget:numberOrNull(metric && metric.daily_target), dailyGap:numberOrNull(metric && metric.daily_gap), dod:numberOrNull(metric && metric.dod)
-      }))
-    })).filter(row => row.name && row.store);
+    const trustedManagerSupplement=String(sourceData.personal_semantics||'')==='individual-v1';
+    const people = rows.map(row => {
+      const name=String(row.pname||'');
+      const store=storeNames.get(String(row.store||''))||normalizeStore(row.store);
+      const role=String(row.role||'');
+      const roleGroup=personalRoleGroup({role});
+      const supplement=supplementPeople.get(`${store}|${name}|${role}`)||{};
+      const canUseSupplement=roleGroup!=='店長'||trustedManagerSupplement;
+      return {
+        name,store,role,category:role,roleGroup,managerPersonalEnabled,
+        totalRate:numberOrNull(row.official),rank:canUseSupplement?numberOrNull(supplement.rank):null,
+        dod:canUseSupplement?numberOrNull(supplement.overall_rate_dod):null,
+        rankChange:canUseSupplement?numberOrNull(supplement.rank_dod):null,
+        metrics:Object.entries(KPI_PERSONAL_KEYS).map(([key,sourceKey])=>{
+          const metric=row.items&&row.items[sourceKey]||{};
+          const supplementMetric=canUseSupplement&&supplement.metrics&&supplement.metrics[key]||{};
+          return {key,rate:officialKpiRate(metric),actual:numberOrNull(metric.a),target:numberOrNull(metric.t),
+            dailyTarget:numberOrNull(supplementMetric.daily_target),dailyGap:numberOrNull(supplementMetric.daily_gap),dod:numberOrNull(supplementMetric.dod)};
+        })
+      };
+    }).filter(row => row.name && row.store);
     const personalPeople=people.filter(row=>row.roleGroup!=='店長'||row.managerPersonalEnabled);
     const achieved = personalPeople.filter(row => row.totalRate != null && row.totalRate >= 1).length;
     const underTarget = personalPeople.filter(row => row.totalRate != null && row.totalRate < 1).length;
@@ -638,12 +661,12 @@
     const updatedAt = String(sourceData.generated_at || snapshot && snapshot.publishedAt || '');
     return C.moduleState({
       status:people.length ? (complete ? 'ok' : 'partial') : 'no_data', updatedAt:readAt, sourceUpdatedAt:updatedAt,
-      stale:updatedAt ? stale(updatedAt) : false, source:moduleSource('正式 KPI 個績快照','index.html'),
+      stale:updatedAt ? stale(updatedAt) : false, source:moduleSource('正式 KPI 個績','kpi.html'),
       data:{
         summary:{ total:people.length, achieved, underTarget, aqAttentionCount:aqReview.attention.length, aqMissingCount:aqReview.missing.length, reportDate:String(sourceData.report_date || ''), sourceAsOfDate:String(sourceData.source_as_of_date || '') },
         people
       },
-      note:people.length ? 'AQ需關注店長只依管理規則顯示 AQ actual < 10；不修改正式總績效、KPI 或公司排名。正式來源目前提供 10 項個人 KPI，未提供個人 25 項。' : '正式來源尚無個績資料。'
+      note:people.length ? '個績實績、目標、達成率與總績效來自正式 kpicalc；排名與 DOD 僅接受標記為 individual-v1 的同次快照。' : '正式來源尚無個績資料。'
     });
   }
 
@@ -715,7 +738,7 @@
     const snapshot = privateResult.snapshot || {};
     const readAt = nowIso();
     const awards = adaptAwards(snapshot, String(snapshot.kpiBattle&&(snapshot.kpiBattle.report_run_date||snapshot.kpiBattle.report_date)||''), readAt);
-    const personalPerformance = adaptPersonalPerformance(snapshot, readAt);
+    const personalPerformance = privateLoadingModule('personalPerformance','正式 KPI 個績');
     contract = C.validateContract({
       ...contract, version:C.VERSION, generatedAt:readAt, mode:'formal',
       todayOperations:privateLoadingModule('todayOperations','正式回報資料'),
@@ -748,12 +771,15 @@
     };
 
     const kpiTask=postReadOnly({action:'kpicalc_access',...credential}).then(result=>{
-      const kpi=adaptKpi(result.data||{},snapshot,nowIso());
+      const kpiData=result.data||{};
+      const kpi=adaptKpi(kpiData,snapshot,nowIso());
       contract.kpiSummary=kpi.summary; contract.kpiStores=kpi.stores; contract.kpiFullMetrics=kpi.full;
+      contract.personalPerformance=adaptPersonalPerformance(kpiData,snapshot,nowIso());
       contract.generatedAt=nowIso(); renderAll();
     }).catch(error=>{
       const note=readErrorNote(error,'正式 KPI');
       contract.kpiSummary=privateFailureModule('kpiSummary',error,'正式 KPI'); contract.kpiStores=privateFailureModule('kpiStores',error,'正式 KPI'); contract.kpiFullMetrics=privateFailureModule('kpiFullMetrics',error,'正式 KPI');
+      contract.personalPerformance=privateFailureModule('personalPerformance',error,'正式 KPI 個績');
       contract.generatedAt=nowIso(); renderAll();
     });
 
@@ -2024,7 +2050,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=manager-personal-20260908',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=manager-personal-source-fix-20260909',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);
-
-

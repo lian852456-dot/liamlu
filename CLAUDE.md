@@ -1,5 +1,11 @@
 # 北一二B 每日回報系統
 
+## 2026-09 店長個績來源契約
+
+- 2026-09 起店長／代理店長納入個績；其總績效、實績、目標及達成率必須來自 `kpicalc_access`，原始來源為「上線數KPI_個人達成率_明細」（缺表時才使用既有個人店點版回退）。
+- 店長的「個績」不可用 `store_calc[店點]`、店點總 KPI 或店績排名代替。救援／每日 builder 也必須先依姓名取得個人列，不能因 `category == 店長` 改讀店點列。
+- dashboard 私有快照只有在 `kpiBattle.personal_semantics == "individual-v1"` 時，前端才可採用店長個人排名與 DOD；無標記的舊快照視為語意不可信，不得覆寫 kpicalc 個績。
+
 ## 2026-08-23 D+1 KPI 補值門檻（取代舊的檔名推算）
 
 - 現行正式 snapshot 的 `report_date`、`data_as_of_date` 與 `source_as_of_date` 都代表資料截止日；
