@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f6f4ef">
 <meta name="robots" content="noindex,nofollow">
 <title>每日日誌檢查 · 北一二B</title>
-<link rel="stylesheet" href="daily-log-dashboard.css?v=20260902-6">
+<link rel="stylesheet" href="daily-log-dashboard.css?v=20260908-1">
 <script src="assets/vendor/xlsx.full.min.js"></script>
 <script src="daily-log-core.js?v=20260902-6"></script>
 </head>
@@ -73,10 +73,6 @@
         <p id="sourceMeta" class="source-meta"></p>
       </div>
       <div class="dashboard-actions">
-        <label class="field compact-field">
-          <span>查看日期</span>
-          <input id="viewDate" type="date">
-        </label>
         <button class="primary-button copy-button" id="copyReminder" type="button">一鍵複製群組提醒</button>
       </div>
     </div>
@@ -98,6 +94,13 @@
       <button type="button" role="tab" aria-selected="false" data-view="weekly">每週</button>
       <button type="button" role="tab" aria-selected="false" data-view="monthly">每月</button>
       <button type="button" role="tab" aria-selected="false" data-view="exceptions">需追蹤</button>
+    </div>
+
+    <div class="daily-date-row">
+      <label class="field compact-field" for="viewDate">
+        <span>每日查看日期</span>
+        <input id="viewDate" type="date">
+      </label>
     </div>
 
     <div id="storeGrid" class="store-grid"></div>
