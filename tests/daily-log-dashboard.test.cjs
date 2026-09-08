@@ -203,4 +203,7 @@ test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', 
   assert.match(page, /daily-log-dashboard\.js\?v=20260902-6/);
   assert.match(home, /href="daily-log-dashboard\.html"/);
   assert.match(home, />每日日誌檢查</);
+  assert.match(page, /daily-log-dashboard\.css\?v=20260908-1/);
+  assert.match(page, /<div class="daily-date-row">[\s\S]*?<span>每日查看日期<\/span>[\s\S]*?<input id="viewDate" type="date">/);
+  assert.ok(page.indexOf('class="daily-date-row"') > page.indexOf('data-view="daily"'), '每日查看日期應位於每日分頁列下方');
 });
