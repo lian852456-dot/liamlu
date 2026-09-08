@@ -56,6 +56,9 @@ test('戰報主畫面與下載圖呈現全國 AQ／RT 完整資費、好速、�
   assert.match(core, /商品型號/);
   assert.match(core, /提前續約/);
   assert.match(core, /企客/);
+  assert.match(core, /vkContractCode/);
+  assert.match(html, /僅篩選合約代碼 VK/);
+  assert.match(html, /<th>合約代碼<\/th>/);
   assert.match(js, /renderProducts/);
   assert.match(js, /renderGiftAudit/);
   assert.match(js, /\$\{prefix\}999↑占比/);

@@ -27,6 +27,7 @@
   const PRODUCT_HEADERS = ['商品型號', '商品名稱', '商品機型', '手機型號', '機款', '產品名稱', '上線商品'];
   const STAFF_HEADERS = ['前台服務人員', '承辦人', '申辦人員', '服務人員', '員工姓名', '業代', '申辦業務'];
   const ENTERPRISE_HEADERS = ['客戶分類', '企客標示', '客戶類型', '客群', '用戶標籤別', '專案資格'];
+  const CONTRACT_CODE_HEADERS = ['合約代碼', '促案代碼', '專案代號', '優惠代碼', '服務代碼', '產品代碼'];
   const BUSINESS_HEADERS = ['合約編號', '合約代碼', '專案代號', '促案代碼', '優惠代碼', '服務代碼', '產品代碼', '申辦業務', '方案名稱', '速率'];
 
   function text(value) { return String(value == null ? '' : value).trim(); }
@@ -397,6 +398,11 @@
     return { kkbox: /KKBOX/.test(source), myVideo: /MYVIDEO/.test(source) };
   }
 
+  function vkContractCode(value) {
+    const match = normalizeToken(value).match(/^VK[A-Z0-9]+/);
+    return match ? match[0] : '';
+  }
+
   function separatorFor(source, fileName) {
     if (/\.tsv$/i.test(String(fileName || ''))) return '\t';
     const lines = String(source || '').split(/\r?\n/).filter(line => line.trim()).slice(0, 8);
@@ -462,6 +468,8 @@
     const productCol = findPreferredColumn(headerRow, PRODUCT_HEADERS);
     const staffCol = findPreferredColumn(headerRow, STAFF_HEADERS);
     const regionCol = findPreferredColumn(headerRow, REGION_HEADERS);
+    const contractCodeCol = findPreferredColumn(headerRow, CONTRACT_CODE_HEADERS);
+    const giftIdCol = findPreferredColumn(headerRow, ['門號', '案件編號', '受理編號', '申請書編號', '交易序號', '訂單編號', '用戶編號', '合約編號']);
     const kind = String(settings.kind).toLowerCase();
     const totals = Object.fromEntries(STORE_NAMES.map(name => [name, 0]));
     const metrics = blankStoreMetrics();
@@ -511,8 +519,9 @@
       }
       if (!store) { ignoredRows += 1; return; }
       const uniqueKey = id ? `${store}|${id}` : '';
-      const caseKey = uniqueKey || `${store}|ROW${offset}`;
-      if (!caseRows.has(caseKey)) caseRows.set(caseKey, { store, id: header.idCol >= 0 ? text(row[header.idCol]) : '', rows: [] });
+      const giftId = giftIdCol >= 0 ? normalizeToken(row[giftIdCol]) : id;
+      const caseKey = giftId ? `${store}|${giftId}` : `${store}|ROW${offset}`;
+      if (!caseRows.has(caseKey)) caseRows.set(caseKey, { store, id: giftIdCol >= 0 ? text(row[giftIdCol]) : (header.idCol >= 0 ? text(row[header.idCol]) : ''), rows: [] });
       caseRows.get(caseKey).rows.push(row);
       if (uniqueKey && seen.has(uniqueKey)) { duplicateRows += 1; return; }
       if (uniqueKey) seen.add(uniqueKey);
@@ -533,10 +542,14 @@
     const giftAudit = [];
     if (kind === 'rt') {
       caseRows.forEach(group => {
-        const representative = group.rows[0] || [];
-        const amounts = group.rows.map(row => planCol >= 0 ? planAmount(row[planCol]) : null).filter(value => value != null);
+        const vkRows = contractCodeCol >= 0
+          ? group.rows.filter(row => vkContractCode(row[contractCodeCol]))
+          : [];
+        if (!vkRows.length) return;
+        const representative = vkRows[0];
+        const amounts = vkRows.map(row => planCol >= 0 ? planAmount(row[planCol]) : null).filter(value => value != null);
         const amount = amounts.length ? Math.max(...amounts) : null;
-        if (!(amount >= 599) || !group.rows.some(row => planCol >= 0 && fiveGPlan(row[planCol])) || group.rows.some(row => enterpriseRow(row, headerRow))) return;
+        if (!(amount >= 599) || !vkRows.some(row => planCol >= 0 && fiveGPlan(row[planCol])) || group.rows.some(row => enterpriseRow(row, headerRow))) return;
         const gifts = giftFlags(group.rows);
         const missing = [];
         if (!gifts.kkbox) missing.push('KKBOX');
@@ -548,6 +561,7 @@
           caseId: maskIdentifier(group.id),
           plan: amount,
           earlyRenewal: /提前續約/.test(normalizeToken(group.rows.flat().join('｜'))),
+          contractCode: Array.from(new Set(vkRows.map(row => vkContractCode(row[contractCodeCol])).filter(Boolean))).join('／'),
           missing
         });
       });
@@ -566,7 +580,7 @@
         mode: header.pointsCol >= 0 ? 'points' : 'rows', processedRows, regionProcessedRows, duplicateRows, ignoredRows,
         recognizedStores, missingStores: STORE_NAMES.filter(name => !recognizedStores.includes(name)),
         recognizedRegions: REGION_KEYS.filter(key => regions[key].total !== 0),
-        fields: { region: regionCol >= 0 ? text(headerRow[regionCol]) : '', plan: planCol >= 0 ? text(headerRow[planCol]) : '', product: productCol >= 0 ? text(headerRow[productCol]) : '', staff: staffCol >= 0 ? text(headerRow[staffCol]) : '' }
+        fields: { region: regionCol >= 0 ? text(headerRow[regionCol]) : '', plan: planCol >= 0 ? text(headerRow[planCol]) : '', product: productCol >= 0 ? text(headerRow[productCol]) : '', staff: staffCol >= 0 ? text(headerRow[staffCol]) : '', contractCode: contractCodeCol >= 0 ? text(headerRow[contractCodeCol]) : '' }
       }
     };
   }

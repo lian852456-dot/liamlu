@@ -334,7 +334,7 @@
     $('giftCount').className = `status-badge${rows.length ? ' bad' : ' ok'}`;
     $('giftEmpty').hidden = rows.length > 0;
     $('giftTableWrap').hidden = rows.length === 0;
-    $('giftRows').innerHTML = rows.map(item => `<tr class="gift-missing"><td><strong>${escapeHtml(item.store)}</strong></td><td>${escapeHtml(item.staff)}</td><td>${escapeHtml(item.caseId)}</td><td>5G ${displayCount(item.plan)}</td><td>${item.earlyRenewal ? '提前續約' : '一般續約'}</td><td><strong>${escapeHtml(item.missing.join('、'))}</strong></td></tr>`).join('');
+    $('giftRows').innerHTML = rows.map(item => `<tr class="gift-missing"><td><strong>${escapeHtml(item.store)}</strong></td><td>${escapeHtml(item.staff)}</td><td>${escapeHtml(item.caseId)}</td><td>5G ${displayCount(item.plan)}</td><td>${item.earlyRenewal ? '提前續約' : '一般續約'}</td><td>${escapeHtml(item.contractCode)}</td><td><strong>${escapeHtml(item.missing.join('、'))}</strong></td></tr>`).join('');
   }
 
   const EXPORT_COLORS = {
@@ -585,19 +585,19 @@
     const rows = orderedGiftRows(analysis);
     const width = 1600, rowHeight = 76, tableY = 188, count = Math.max(1, rows.length), height = tableY + 58 + count * rowHeight + 80;
     const { canvas, ctx } = exportSurface(width, height);
-    drawExportHeader(ctx, width, '④ KKBOX／MyVideo 漏搭提醒', `${exportTimeLabel()} 產生｜5G 599 型含以上・提前續約適用・企客排除`);
+    drawExportHeader(ctx, width, '④ KKBOX／MyVideo 漏搭提醒', `${exportTimeLabel()} 產生｜合約代碼 VK・5G 599 型含以上・同案僅認一次・企客排除`);
     if (!rows.length) {
       drawCell(ctx, 52, tableY, width - 104, 130, '#e8f7f1', '#b9ddcf');
       ctx.fillStyle = EXPORT_COLORS.green; ctx.font = '900 28px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText('目前沒有辨識到符合資格的漏搭案件', 82, tableY + 65);
       drawExportFooter(ctx, width, height); return canvas;
     }
-    const labels = ['店點', '承辦人', '遮罩門號／案件', '資費', '類型', '缺少項目'];
-    const widths = [170, 200, 260, 160, 210, 490];
+    const labels = ['店點', '承辦人', '遮罩門號／案件', '資費', '類型', '合約代碼', '缺少項目'];
+    const widths = [150, 180, 220, 145, 190, 190, 421];
     let x = 52;
     labels.forEach((label, index) => { ctx.fillStyle = '#fff0e6'; ctx.fillRect(x, tableY, widths[index], 58); ctx.fillStyle = EXPORT_COLORS.amber; ctx.font = '800 18px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText(label, x + 12, tableY + 29); x += widths[index]; });
     rows.forEach((item, rowIndex) => {
       const y = tableY + 58 + rowIndex * rowHeight;
-      const values = [item.store, item.staff, item.caseId, `5G ${displayCount(item.plan)}`, item.earlyRenewal ? '提前續約' : '一般續約', item.missing.join('、')];
+      const values = [item.store, item.staff, item.caseId, `5G ${displayCount(item.plan)}`, item.earlyRenewal ? '提前續約' : '一般續約', item.contractCode, item.missing.join('、')];
       x = 52;
       values.forEach((value, index) => {
         ctx.fillStyle = rowIndex % 2 ? '#fff8f9' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight); ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
