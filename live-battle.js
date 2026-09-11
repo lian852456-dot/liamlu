@@ -492,7 +492,7 @@
           ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
           ctx.fillStyle = home || isTotal ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = `${index === 0 || home || isTotal ? '900' : '750'} 19px system-ui, "Microsoft JhengHei", sans-serif`;
           const textWidth = ctx.measureText(String(value)).width;
-          ctx.fillText(String(value), x + Math.max(8, (widths[index] - textWidth) / 2), y + 43);
+          ctx.fillText(String(value), x + Math.max(8, (widths[index] - textWidth) / 2), y + rowHeight / 2);
           x += widths[index];
         });
       });
