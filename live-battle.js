@@ -373,17 +373,17 @@
     gradient.addColorStop(1, '#0b8eb0');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, 132);
-    ctx.fillStyle = '#63d9ef'; ctx.font = '800 19px system-ui, "Microsoft JhengHei", sans-serif';
+    ctx.fillStyle = '#63d9ef'; ctx.font = '900 20px "Microsoft YaHei", "Microsoft JhengHei", sans-serif';
     ctx.fillText('北一二B｜行進間戰報', 54, 34);
-    ctx.fillStyle = '#ffffff'; ctx.font = '900 36px system-ui, "Microsoft JhengHei", sans-serif';
+    ctx.fillStyle = '#ffffff'; ctx.font = '900 38px "Microsoft YaHei", "Microsoft JhengHei", sans-serif';
     ctx.fillText(title, 54, 76);
-    ctx.fillStyle = '#d8eff8'; ctx.font = '600 18px system-ui, "Microsoft JhengHei", sans-serif';
+    ctx.fillStyle = '#d8eff8'; ctx.font = '800 19px "Microsoft YaHei", "Microsoft JhengHei", sans-serif';
     ctx.fillText(subtitle, 54, 112);
   }
 
   function drawExportFooter(ctx, width, height) {
     ctx.strokeStyle = EXPORT_COLORS.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(48, height - 55); ctx.lineTo(width - 48, height - 55); ctx.stroke();
-    ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '500 16px system-ui, "Microsoft JhengHei", sans-serif';
+    ctx.fillStyle = '#42586a'; ctx.font = '800 17px "Microsoft YaHei", "Microsoft JhengHei", sans-serif';
     ctx.fillText('本機 AQ／RT 即時解析｜原始檔未上傳｜正式成績以公司報表為準', 48, height - 28);
   }
 
@@ -460,13 +460,13 @@
       const left = Math.round((width - tableWidth) / 2);
       ctx.fillStyle = '#c9f6ca'; ctx.fillRect(left, startY, tableWidth, groupHeight);
       ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(left, startY, tableWidth, groupHeight);
-      ctx.fillStyle = EXPORT_COLORS.navy; ctx.font = '950 22px system-ui, "Microsoft JhengHei", sans-serif';
+      ctx.fillStyle = EXPORT_COLORS.navy; ctx.font = '950 24px "Microsoft YaHei", "Microsoft JhengHei", sans-serif';
       ctx.fillText(`${nationalRows.length ? '全國 ' : '北一二 A／B／C／D（非全國）'}${isRt ? 'RT' : 'AQ'}`, width / 2 - 90, startY + 26);
       let x = left;
       labels.forEach((label, index) => {
         ctx.fillStyle = index === 0 ? '#6d2ca5' : '#fff600'; ctx.fillRect(x, startY + groupHeight, widths[index], headHeight);
         ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, startY + groupHeight, widths[index], headHeight);
-        ctx.fillStyle = index === 0 ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = '900 16px system-ui, "Microsoft JhengHei", sans-serif';
+        ctx.fillStyle = index === 0 ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = '900 18px "Microsoft YaHei", "Microsoft JhengHei", sans-serif';
         const labelWidth = ctx.measureText(label).width;
         ctx.fillText(label, x + Math.max(8, (widths[index] - labelWidth) / 2), startY + groupHeight + 35);
         x += widths[index];
@@ -490,7 +490,7 @@
                 : (index === 0 ? '#eef5f8' : sourceIndex % 2 ? '#fff8dd' : '#ffffff');
           ctx.fillRect(x, y, widths[index], rowHeight);
           ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
-          ctx.fillStyle = home || isTotal ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = `${index === 0 || home || isTotal ? '900' : '750'} 19px system-ui, "Microsoft JhengHei", sans-serif`;
+          ctx.fillStyle = home || isTotal ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = '900 22px "Microsoft YaHei", "Microsoft JhengHei", sans-serif';
           const textWidth = ctx.measureText(String(value)).width;
           ctx.fillText(String(value), x + Math.max(8, (widths[index] - textWidth) / 2), y + rowHeight / 2);
           x += widths[index];
@@ -513,7 +513,7 @@
     let x = 52;
     labels.forEach((label, index) => {
       ctx.fillStyle = '#e9eff3'; ctx.fillRect(x, tableY, widths[index], 58);
-      ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '800 18px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText(label, x + 14, tableY + 29);
+      ctx.fillStyle = '#385166'; ctx.font = '900 20px "Microsoft YaHei", "Microsoft JhengHei", sans-serif'; ctx.fillText(label, x + 14, tableY + 29);
       x += widths[index];
     });
     analysis.stores.forEach((store, rowIndex) => {
@@ -529,7 +529,7 @@
         ctx.fillStyle = hit ? '#d9f3e8' : (rowIndex % 2 ? '#f8fbfd' : '#ffffff'); ctx.fillRect(x, y, widths[index], rowHeight);
         ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
         ctx.fillStyle = index === values.length - 1 ? (gaps.length ? EXPORT_COLORS.red : EXPORT_COLORS.green) : EXPORT_COLORS.ink;
-        ctx.font = `${index === 0 || index === values.length - 1 ? '800' : '700'} ${index === values.length - 1 ? 16 : 19}px system-ui, "Microsoft JhengHei", sans-serif`;
+        ctx.font = `900 ${index === values.length - 1 ? 18 : index === 0 ? 21 : 24}px "Microsoft YaHei", "Microsoft JhengHei", sans-serif`;
         const lines = wrapCanvasText(ctx, value, widths[index] - 24, index === values.length - 1 ? 3 : 2);
         lines.forEach((line, lineIndex) => ctx.fillText(line, x + 12, y + rowHeight / 2 + (lineIndex - (lines.length - 1) / 2) * 23));
         x += widths[index];
@@ -549,7 +549,7 @@
     drawExportHeader(ctx, width, '② 目前上線商品', `${exportTimeLabel()} 產生｜依店點排列・深紫色格＝該店有設備上線數`);
     if (!models.length) {
       drawCell(ctx, 52, tableY, width - 104, 130, '#ffffff', EXPORT_COLORS.line);
-      ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '700 24px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText('原始檔未提供可辨識的商品型號', 82, tableY + 65);
+      ctx.fillStyle = '#42586a'; ctx.font = '900 26px "Microsoft YaHei", "Microsoft JhengHei", sans-serif'; ctx.fillText('原始檔未提供可辨識的商品型號', 82, tableY + 65);
       drawExportFooter(ctx, width, height); return canvas;
     }
     const modelWidth = (width - 104 - 170 - 110) / models.length;
@@ -558,7 +558,7 @@
     let x = 52;
     labels.forEach((label, index) => {
       drawCell(ctx, x, tableY, widths[index], headHeight, '#e9eff3', EXPORT_COLORS.line);
-      ctx.fillStyle = EXPORT_COLORS.muted; ctx.font = '800 17px system-ui, "Microsoft JhengHei", sans-serif';
+      ctx.fillStyle = '#385166'; ctx.font = '900 19px "Microsoft YaHei", "Microsoft JhengHei", sans-serif';
       const lines = wrapCanvasText(ctx, label, widths[index] - 20, 6);
       lines.forEach((line, lineIndex) => ctx.fillText(line, x + 10, tableY + headHeight / 2 + (lineIndex - (lines.length - 1) / 2) * 21));
       x += widths[index];
@@ -572,7 +572,7 @@
         const hasDevice = index > 0 && index < values.length - 1 && Number(value) > 0;
         ctx.fillStyle = hasDevice ? '#6741a5' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight);
         ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
-        ctx.fillStyle = hasDevice ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = '800 20px system-ui, "Microsoft JhengHei", sans-serif';
+        ctx.fillStyle = hasDevice ? '#ffffff' : EXPORT_COLORS.ink; ctx.font = '900 26px "Microsoft YaHei", "Microsoft JhengHei", sans-serif';
         ctx.fillText(String(value), x + (widths[index] - ctx.measureText(String(value)).width) / 2, y + rowHeight / 2);
         x += widths[index];
       });
@@ -588,20 +588,20 @@
     drawExportHeader(ctx, width, '④ KKBOX／MyVideo 漏搭提醒', `${exportTimeLabel()} 產生｜合約代碼 VK・5G 599 型含以上・同案僅認一次・企客排除`);
     if (!rows.length) {
       drawCell(ctx, 52, tableY, width - 104, 130, '#e8f7f1', '#b9ddcf');
-      ctx.fillStyle = EXPORT_COLORS.green; ctx.font = '900 28px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText('目前沒有辨識到符合資格的漏搭案件', 82, tableY + 65);
+      ctx.fillStyle = EXPORT_COLORS.green; ctx.font = '900 28px "Microsoft YaHei", "Microsoft JhengHei", sans-serif'; ctx.fillText('目前沒有辨識到符合資格的漏搭案件', 82, tableY + 65);
       drawExportFooter(ctx, width, height); return canvas;
     }
     const labels = ['店點', '承辦人', '遮罩門號／案件', '資費', '類型', '合約代碼', '缺少項目'];
     const widths = [150, 180, 220, 145, 190, 190, 421];
     let x = 52;
-    labels.forEach((label, index) => { ctx.fillStyle = '#fff0e6'; ctx.fillRect(x, tableY, widths[index], 58); ctx.fillStyle = EXPORT_COLORS.amber; ctx.font = '800 18px system-ui, "Microsoft JhengHei", sans-serif'; ctx.fillText(label, x + 12, tableY + 29); x += widths[index]; });
+    labels.forEach((label, index) => { ctx.fillStyle = '#fff0e6'; ctx.fillRect(x, tableY, widths[index], 58); ctx.fillStyle = EXPORT_COLORS.amber; ctx.font = '900 20px "Microsoft YaHei", "Microsoft JhengHei", sans-serif'; ctx.fillText(label, x + 12, tableY + 29); x += widths[index]; });
     rows.forEach((item, rowIndex) => {
       const y = tableY + 58 + rowIndex * rowHeight;
       const values = [item.store, item.staff, item.caseId, `5G ${displayCount(item.plan)}`, item.earlyRenewal ? '提前續約' : '一般續約', item.contractCode, item.missing.join('、')];
       x = 52;
       values.forEach((value, index) => {
         ctx.fillStyle = rowIndex % 2 ? '#fff8f9' : '#ffffff'; ctx.fillRect(x, y, widths[index], rowHeight); ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
-        ctx.fillStyle = index === values.length - 1 ? EXPORT_COLORS.red : EXPORT_COLORS.ink; ctx.font = `${index === 0 || index === values.length - 1 ? '800' : '650'} 19px system-ui, "Microsoft JhengHei", sans-serif`;
+        ctx.fillStyle = index === values.length - 1 ? EXPORT_COLORS.red : EXPORT_COLORS.ink; ctx.font = '900 21px "Microsoft YaHei", "Microsoft JhengHei", sans-serif';
         ctx.fillText(truncateCanvasText(ctx, value, widths[index] - 24), x + 12, y + rowHeight / 2); x += widths[index];
       });
     });
