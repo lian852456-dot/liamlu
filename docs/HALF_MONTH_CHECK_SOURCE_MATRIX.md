@@ -26,7 +26,7 @@
 | draft / completed | worksheet「填寫狀態」；`hread` 未回傳 | Sheet 有「填寫中／已完成」，App read 無該欄 | 每題 | stored, not exposed by hread | 否 | 只以 18 題非 blank 數呈現「填寫進度」 | 不得宣稱 App 有 backend 正式完成狀態 |
 | 歷史回讀 | GAS `hread` 讀取整張 worksheet | 全部 read fields | 跨月／跨期／跨店 | read | 是 | App 必須先依 month/period/store 篩選 | 不把其他期資料混入本期 |
 | 同店同半月多筆 | `writeHalfCheck()` key = `YYYY-MM-H1/H2 + store + item` | `檢查期別,門市,項目` | 同店同半月每題一列 | write semantics | 是 | 視為同一期更新，不建立多次 session 列表 | 不以 `checkId` 將同一期重複列冒充多次檢查 |
-| 正式寫入 | GAS `hwrite` → `writeHalfCheck()` | worksheet 16 欄 | 每題 | write | 本輪禁止 | 無 | Preview 的暫存／完成不得呼叫 `hwrite` |
+| 正式寫入 | GAS `hwrite` → `writeHalfCheck()` | worksheet 16 欄 | 每題 | write | 建立本文件時未啟用 | 無 | 當時的 Preview 暫存／完成不呼叫 `hwrite` |
 | 授權 | POST `ptauth`，`ptAuthorized()`；Script Cache token | `key` 僅驗證當下、`token` 1800 秒 | session | auth | 是 | `hread` 沿用目前班表／巡店短效 session | 無 token顯示「請先解鎖班表／巡店」；過期沿用既有逾時 UX；不得放寬或另建 auth |
 
 ## Canonical 規則確認

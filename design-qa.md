@@ -1,5 +1,7 @@
 # 行進間戰報 Design QA
 
+> 歷史 QA evidence：本檔記錄單次驗證狀態，不是現行 Agent 規則或後續發布 gate。現行規則以 `AGENTS.md` 為準。
+
 - Source visual truth paths:
   - `/workspace/scratch/3729926cc24f/upload/9127525a-9be2-4198-a1c6-c7465a81e229.png`
   - `/workspace/scratch/3729926cc24f/upload/f317ef44-ff9d-46cf-b85a-615cfa7160ea.png`

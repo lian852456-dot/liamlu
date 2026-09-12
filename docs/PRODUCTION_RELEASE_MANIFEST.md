@@ -1,5 +1,7 @@
 # Liam Supervisor Production Release Manifest
 
+> 歷史 release evidence：本檔只證明下列 frozen baseline 當時的組合與驗收結果，不是現行 Agent 工作流程，也不會把當時的 branch、canary、測試數或實機 gate 自動套用到其他任務。現行規則以 `AGENTS.md` 為準。
+
 狀態：**IMMUTABLE / LIAM DEVICE ACCEPTED / STABLE BASELINE**
 
 Release ID：`stable-baseline-20260815-patrol-paste-summary`

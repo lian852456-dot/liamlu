@@ -23,7 +23,7 @@
 - 督導可取消／重設遺失草稿或 edit token 的舊回報；舊照片與 append-only 事件保留為 `cancelled`，該店才能建立新的 submission。
 - 門市填報頁在批次資訊後提供品質管理整理提醒原圖，可點擊或以鍵盤開啟單張全螢幕預覽；督導模式不顯示此圖卡。
 - 九店稽核值使用既有正式 canonical ID；其中萬大為 `DNB10168`、通化為 `DNB10174`，不沿用巡店相容層的 provisional／legacy code。介面仍統一顯示「台北三創」。
-- 私有照片重新載入統一走永遠回傳 Promise 的 `ensurePrivatePhoto()`；照片仍只由 `audit_photo_read` 讀成暫時 Blob URL，頁面卸載時釋放。部署與 Liam iPhone UAT gate 見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
+- 私有照片重新載入統一走永遠回傳 Promise 的 `ensurePrivatePhoto()`；照片仍只由 `audit_photo_read` 讀成暫時 Blob URL，頁面卸載時釋放。歷史實作與 Liam iPhone UAT evidence 見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
 
 ## 每日日誌檢查（本機候選）
 
@@ -40,7 +40,7 @@
 - CSV／TSV 支援 UTF-8 與 Big5／CP950；XLSX／XLS 延用 repo 既有固定 SheetJS。若店碼需正式對照，載入目標後會自動以同一個本機 File 重新辨識，不需把原始檔送出公司電腦。
 - AQ／RT 若同一工作簿有全國彙總表，會保留所有部別列與完整資費帶；北一二 A／B／C／D 區域彙總仍用於北一二B對應與安全備援。只有原始明細時則依資費欄拆出各帶，並明確標示非全國資料。明細列的區域空白時，已辨識的北一二B九店會安全回填為 B。影音漏搭承辦人只保留姓名，商品型號會移除 Google、Samsung、Apple 等品牌前綴與品牌括號。
 - 產生辨識預覽後，可分開下載四張 PNG：全國完整 AQ／RT／好速戰情、九店七項戰情、目前上線商品、KKBOX／MyVideo 漏搭明細。商品名稱不依品牌分色；各店設備上線數大於 0 的格子以深紫色高對比標註，督導區與九店 AQ／RT 指標大於 0 的格子以綠色標註，0 維持原底色。圖片由瀏覽器 Canvas 在本機產生並存入電腦預設下載資料夾，不新增 CDN、套件、後端上傳或個資留存。
-- 部署範圍、測試與回退見 [`docs/LIVE_BATTLE_AQRT_20260830.md`](docs/LIVE_BATTLE_AQRT_20260830.md)。
+- 歷史部署、測試與回退 evidence 見 [`docs/LIVE_BATTLE_AQRT_20260830.md`](docs/LIVE_BATTLE_AQRT_20260830.md)。
 
 ## 智慧營運中心 Phase 1A（未部署）
 
@@ -82,7 +82,7 @@ python3 /Users/liamlu/Downloads/liam-agent/report-automation/work/build_github_p
 - `data/daily-momentum.json`
 - `data/phone-awards-latest.json`
 
-目前產生的 KPI／台獎 JSON 都保留在本機並由 `.gitignore` 排除；不得把它們放進 GitHub Pages。公開介面更新才可用 `.claude/scripts/auto-push.sh` 發布。
+目前產生的 KPI／台獎 JSON 都保留在本機並由 `.gitignore` 排除；不得把它們放進 GitHub Pages。
 
 ## KPI／台獎私有戰情部署與每日更新
 
@@ -120,13 +120,8 @@ GitHub Pages 只放介面程式，不提交員工姓名、班表、檢查紀錄�
 `ptAuthorized()` 已改回真的檢查**（`ptread`／`ptwrite`／`sread`／`hread`／`hwrite` 都要
 `PT_KEY` 才能通過），因為新增的導覽首頁 `home.html` 會給門市同仁用來跳轉，Liam情報站的
 卡片也會被看到，免密碼不再安全。媒體 POST 仍另外由 `HalfMedia.gs` 驗證同一組 `PT_KEY`。
-`PT_KEY` 真實密碼只存在 GAS 編輯器，repo 只放 `CHANGE_ME` 佔位字。未取得 Liam 明確授權前，
-不得自行改權限、資料欄位或既有串接。
+`PT_KEY` 真實密碼只存在 GAS 編輯器，repo 只放 `CHANGE_ME` 佔位字。
 
-## 文件與完成狀態
+## 文件定位
 
-- 所有 AI 開工前先讀 `../AI協作中心/00_WEBSITE_INDEX.md`、`AI_WORKFLOW.md`、目標網站正式
-  `PROJECT_HANDOFF.md`，再讀本 repo 的 `AGENTS.md`、`CLAUDE.md` 與 `docs/COLLAB-LOG.md`。
-- 展示頁、占位資料、HTTP 200、本機測試、GitHub Pages／GAS 部署、正式資料驗證與
-  Liam／門市驗收是不同狀態，不得只因頁面可開啟就寫成「已完成」。
-- 不確定或疑似舊版的檔案先保留並標記，不直接刪除；有意義的工作完成後更新交接文件與協作日誌。
+Agent 工作規則只在 `AGENTS.md` 維護。`CLAUDE.md` 保存現行產品契約與技術注意事項；日期型 handoff、incident、predeploy、QA 與 `docs/COLLAB-LOG.md` 保留為歷史 evidence，不是永久工作流程。
