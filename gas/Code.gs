@@ -2475,6 +2475,7 @@ function doPost(e) {
     else if (action === 'report_upload_commit') result = reportUploadCommit(payload);
     else if (action === 'report_upload_log') result = reportUploadLog(payload);
     else if (action === 'report_upload_rollback') result = reportUploadRollback(payload);
+    else if (action === 'report_award_pair_preview') result = reportAwardPairPreview(payload);
     else throw new Error('unknown private dashboard action');
     return privateDashboardPostResponse({ status: 'ok', ...result }, e);
   } catch (err) {
@@ -3840,13 +3841,15 @@ function checkSegAndNotify(seg) {
 // 每日回報 Deployment 固定停在第 15 版（舊碼，本來就沒有上傳路由）；
 // 快速上傳改走「獨立的新 Web App Deployment」。兩個 Deployment 共用同一份專案，
 // 但新 Deployment 設定指令碼屬性 REPORT_UPLOAD_DEPLOYMENT_URL = 它自己的 /exec URL 後，
-// 就只服務 report_upload_* 四個路由——其餘 read/write/巡店/戰情一律拒絕，
+// 只服務固定的上傳與 preview 路由——其餘 read/write/巡店/戰情一律拒絕，
 // 確保上傳功能的部署動作完全影響不到每日回報與其他系統。
 const REPORT_UPLOAD_ALLOWED_ACTIONS = [
-  'report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback'
+  'report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback',
+  // 雙檔台獎僅供解析與預覽，沒有任何 commit／publish 對應 action。
+  'report_award_pair_preview'
 ];
 
-// 上傳頁與上傳 API 同屬新 Deployment，使用 google.script.run 直接呼叫這四個包裝函式。
+// 上傳頁與上傳 API 同屬新 Deployment，使用 google.script.run 直接呼叫固定包裝函式。
 // 不從 GitHub Pages fetch，不需要 CORS／preflight，也不把任何設定值注入 HTML。
 function reportUploadHtmlService_() {
   return HtmlService.createHtmlOutputFromFile('ReportUpload')
@@ -3857,6 +3860,7 @@ function report_upload_preview(payload) { return reportUploadPreview(payload); }
 function report_upload_commit(payload) { return reportUploadCommit(payload); }
 function report_upload_log(payload) { return reportUploadLog(payload); }
 function report_upload_rollback(payload) { return reportUploadRollback(payload); }
+function report_award_pair_preview(payload) { return reportAwardPairPreview(payload); }
 
 function reportUploadIsUploadDeployment_() {
   try {
@@ -4124,6 +4128,20 @@ function reportUploadDateChecks_(incomingDate, live) {
   return checks;
 }
 
+// KPI 必須等到資料日期確實較新才可走正式更新；同日期或更舊的來源
+// 僅能停在預覽，不允許透過 force 取代目前正式 JSON。
+function reportUploadKpiDateChecks_(incomingDate, live) {
+  const checks = reportUploadDateChecks_(incomingDate, live);
+  const newer = checks.filter(function(check) { return check.key === 'newer'; })[0];
+  if (newer && live && live.dataDate && incomingDate <= live.dataDate) {
+    newer.level = 'block';
+    newer.detail = incomingDate === live.dataDate
+      ? '上傳資料與正式版本同一天（' + live.dataDate + '），依規則等待日期較新的正式 Excel，拒絕覆寫'
+      : '上傳資料 ' + incomingDate + ' 比正式版本 ' + live.dataDate + ' 舊，拒絕覆寫';
+  }
+  return checks;
+}
+
 function reportUploadValidateKpi_(data, live) {
   const checks = [];
   const meta = (data && data.meta) || {};
@@ -4134,7 +4152,7 @@ function reportUploadValidateKpi_(data, live) {
   checks.push(reportUploadCheck_('fields', '必要欄位', 'ok', KPICALC_ITEMS.length + ' 項加權欄位齊全'));
   checks.push(reportUploadCheck_('period', '資料期間', meta.period ? 'ok' : 'block', meta.period || '讀不到期間'));
 
-  reportUploadDateChecks_(reportUploadKpiDate_(meta), live).forEach(function(c) { checks.push(c); });
+  reportUploadKpiDateChecks_(reportUploadKpiDate_(meta), live).forEach(function(c) { checks.push(c); });
 
   // 區域檢查：北一二B 的店代碼是 DNB 開頭，且店名應落在已知門市清單內。
   const badCode = stores.filter(function(s) { return !/^DNB/i.test(String(s.code || '')); });
@@ -4204,6 +4222,241 @@ function reportUploadValidateAward_(snapshot, live) {
 
 function reportUploadBlocked_(checks) {
   return checks.filter(function(c) { return c.level === 'block'; });
+}
+
+// ── 台獎雙檔：僅記憶體解析預覽，沒有 staging、commit 或正式發布 ───────────
+const REPORT_AWARD_PAIR_MAX_BYTES = 8 * 1024 * 1024;
+const REPORT_AWARD_PAIR_MAX_ENTRIES = 500;
+const REPORT_AWARD_PAIR_MAX_UNZIPPED_BYTES = 48 * 1024 * 1024;
+const REPORT_AWARD_PAIR_MIMES = [
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip', 'application/octet-stream'
+];
+const REPORT_AWARD_PAIR_FILES = {
+  store: { label: '店點台獎檔', sheet: '上線數KPI_店點達成率_明細' },
+  person: { label: '個人台獎檔', sheet: '手機競賽_個人達成率' }
+};
+const REPORT_AWARD_PAIR_EXPECTED_STORES = 9;
+const REPORT_AWARD_PAIR_EXPECTED_PERSONS = 41;
+
+function reportAwardPairSafeText_(value) {
+  return String(value == null ? '' : value).replace(/[\u0000\r\n]/g, ' ').slice(0, 180);
+}
+
+function reportAwardPairDecode_(file, expected) {
+  const input = file || {};
+  const fileName = reportAwardPairSafeText_(input.fileName || '');
+  const mimeType = String(input.mimeType || '').toLowerCase().split(';')[0].trim();
+  const base64 = String(input.fileBase64 || '');
+  if (!base64) throw new Error(expected.label + '沒有收到檔案內容');
+  if (!/\.xlsx$/i.test(fileName) || /[\\/]/.test(fileName) || fileName.indexOf('..') !== -1) {
+    throw new Error(expected.label + '檔名必須是安全的 .xlsx');
+  }
+  if (REPORT_AWARD_PAIR_MIMES.indexOf(mimeType) === -1) throw new Error(expected.label + ' MIME 不受支援');
+  if (base64.length > REPORT_AWARD_PAIR_MAX_BYTES * 1.4) throw new Error(expected.label + '超過安全大小上限');
+  const bytes = Utilities.base64Decode(base64);
+  if (!bytes || bytes.length < 4 || bytes.length > REPORT_AWARD_PAIR_MAX_BYTES ||
+      bytes[0] !== 80 || bytes[1] !== 75 || bytes[2] !== 3 || bytes[3] !== 4) {
+    throw new Error(expected.label + '不是有效 XLSX ZIP');
+  }
+  return { fileName: fileName, bytes: bytes, mimeType: mimeType };
+}
+
+function reportAwardPairXmlText_(value) {
+  return String(value || '').replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+}
+
+function reportAwardPairXmlAttribute_(tag, name) {
+  const match = String(tag || '').match(new RegExp('(?:^|\\s)' + name.replace(/:/g, '\\:') + '="([^"]*)"'));
+  return match ? reportAwardPairXmlText_(match[1]) : '';
+}
+
+function reportAwardPairSharedStrings_(xml) {
+  const values = [];
+  const matcher = /<si\b[^>]*>([\s\S]*?)<\/si>/g;
+  let match;
+  while ((match = matcher.exec(String(xml || ''))) !== null) {
+    const pieces = [];
+    const textMatcher = /<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g;
+    let text;
+    while ((text = textMatcher.exec(match[1])) !== null) pieces.push(reportAwardPairXmlText_(text[1]));
+    values.push(pieces.join(''));
+  }
+  return values;
+}
+
+function reportAwardPairCellText_(cellXml, sharedStrings) {
+  const type = reportAwardPairXmlAttribute_(cellXml, 't');
+  const inline = String(cellXml || '').match(/<is(?:\s[^>]*)?>([\s\S]*?)<\/is>/);
+  if (inline) return reportAwardPairXmlText_(inline[1]);
+  const value = String(cellXml || '').match(/<v(?:\s[^>]*)?>([\s\S]*?)<\/v>/);
+  if (!value) return '';
+  const raw = reportAwardPairXmlText_(value[1]);
+  return type === 's' && sharedStrings[Number(raw)] != null ? sharedStrings[Number(raw)] : raw;
+}
+
+function reportAwardPairXmlRows_(sheetXml, sharedStrings) {
+  const rows = [];
+  const rowMatcher = /<row\b([^>]*)>([\s\S]*?)<\/row>/g;
+  let rowMatch;
+  while ((rowMatch = rowMatcher.exec(String(sheetXml || ''))) !== null) {
+    const cells = {};
+    const cellMatcher = /<c\b([^>]*)>([\s\S]*?)<\/c>/g;
+    let cellMatch;
+    while ((cellMatch = cellMatcher.exec(rowMatch[2])) !== null) {
+      const column = reportAwardPairXmlAttribute_(cellMatch[1], 'r').replace(/\d+/g, '');
+      if (column) cells[column] = reportAwardPairCellText_(cellMatch[2], sharedStrings);
+    }
+    if (Object.keys(cells).length) rows.push({ row: Number(reportAwardPairXmlAttribute_(rowMatch[1], 'r') || 0), cells: cells });
+  }
+  return rows;
+}
+
+function reportAwardPairSafeZipName_(name) {
+  const clean = String(name || '');
+  return !!clean && clean.charAt(0) !== '/' && clean.indexOf('\\') === -1 && clean.split('/').indexOf('..') === -1;
+}
+
+function reportAwardPairReadWorkbook_(decoded, expected) {
+  let files;
+  try { files = Utilities.unzip(Utilities.newBlob(decoded.bytes, 'application/zip', 'award.xlsx')); }
+  catch (err) { throw new Error(expected.label + ' XLSX 無法解壓'); }
+  if (!files.length || files.length > REPORT_AWARD_PAIR_MAX_ENTRIES) throw new Error(expected.label + ' XLSX entry 數量異常');
+  let expanded = 0;
+  const byName = {};
+  files.forEach(function(file) {
+    if (!reportAwardPairSafeZipName_(file.getName())) throw new Error(expected.label + ' XLSX entry 路徑不安全');
+    expanded += file.getBytes().length;
+    if (expanded > REPORT_AWARD_PAIR_MAX_UNZIPPED_BYTES) throw new Error(expected.label + ' XLSX 解壓後超過安全上限');
+    byName[file.getName()] = file;
+  });
+  if (!byName['[Content_Types].xml'] || !byName['xl/workbook.xml'] || !byName['xl/_rels/workbook.xml.rels']) {
+    throw new Error(expected.label + '不是完整 XLSX 容器');
+  }
+  const workbook = byName['xl/workbook.xml'].getDataAsString('UTF-8');
+  const relationships = byName['xl/_rels/workbook.xml.rels'].getDataAsString('UTF-8');
+  const targets = {};
+  const relMatcher = /<Relationship\b([^>]*)\/?\s*>/g;
+  let rel;
+  while ((rel = relMatcher.exec(relationships)) !== null) {
+    const id = reportAwardPairXmlAttribute_(rel[1], 'Id');
+    const target = reportAwardPairXmlAttribute_(rel[1], 'Target').replace(/^\/+/, '');
+    if (id && target) targets[id] = target.indexOf('xl/') === 0 ? target : 'xl/' + target;
+  }
+  const sheets = [];
+  const sheetMatcher = /<sheet\b([^>]*)\/?>(?:<\/sheet>)?/g;
+  let sheet;
+  while ((sheet = sheetMatcher.exec(workbook)) !== null) {
+    const name = reportAwardPairXmlAttribute_(sheet[1], 'name');
+    const id = reportAwardPairXmlAttribute_(sheet[1], 'r:id');
+    if (name && targets[id] && byName[targets[id]]) sheets.push({ name: name, xml: byName[targets[id]].getDataAsString('UTF-8') });
+  }
+  const selected = sheets.filter(function(item) { return item.name === expected.sheet; })[0];
+  if (!selected) throw new Error(expected.label + '缺少指定工作表');
+  return { sheetNames: sheets.map(function(item) { return item.name; }), selectedSheet: selected.name,
+    rows: reportAwardPairXmlRows_(selected.xml, reportAwardPairSharedStrings_(byName['xl/sharedStrings.xml'] ? byName['xl/sharedStrings.xml'].getDataAsString('UTF-8') : '')) };
+}
+
+function reportAwardPairRangeDate_(rows) {
+  const text = (rows || []).slice(0, 30).map(function(row) {
+    return Object.keys(row.cells || {}).map(function(column) { return row.cells[column]; }).join(' ');
+  }).join(' ');
+  const range = text.match(/(20\d{2})\s*[\/-]\s*(\d{1,2})\s*[\/-]\s*(\d{1,2})\s*~\s*(?:(20\d{2})\s*[\/-]\s*)?(\d{1,2})\s*[\/-]\s*(\d{1,2})/);
+  if (range) return (range[4] || range[1]) + '-' + ('0' + range[5]).slice(-2) + '-' + ('0' + range[6]).slice(-2);
+  const dates = text.match(/20\d{2}\s*[\/-]\s*\d{1,2}\s*[\/-]\s*\d{1,2}/g) || [];
+  const last = dates.length ? dates[dates.length - 1].match(/(20\d{2})\s*[\/-]\s*(\d{1,2})\s*[\/-]\s*(\d{1,2})/) : null;
+  return last ? last[1] + '-' + ('0' + last[2]).slice(-2) + '-' + ('0' + last[3]).slice(-2) : '';
+}
+
+function reportAwardPairHeaders_(rows) {
+  const values = {};
+  (rows || []).filter(function(row) { return row.row > 0 && row.row <= 18; }).forEach(function(row) {
+    Object.keys(row.cells || {}).forEach(function(column) {
+      const value = String(row.cells[column] || '').trim();
+      if (value) values[column] = (values[column] || []).concat(values[column] && values[column].indexOf(value) >= 0 ? [] : [value]);
+    });
+  });
+  return Object.keys(values).sort().map(function(column) { return { column: column, name: values[column].join(' / ') }; });
+}
+
+function reportAwardPairDuplicates_(keys) {
+  const counts = {};
+  (keys || []).filter(Boolean).forEach(function(key) { counts[key] = (counts[key] || 0) + 1; });
+  return Object.keys(counts).filter(function(key) { return counts[key] > 1; }).length;
+}
+
+function reportAwardPairAnalyze_(workbook, role) {
+  const isStore = role === 'store';
+  const rows = workbook.rows || [];
+  const records = rows.filter(function(row) {
+    const c = row.cells || {};
+    return isStore ? c.F === '北一二B' && /^DNB/i.test(String(c.G || '')) : c.B === '北一二B' && /^DNB/i.test(String(c.C || ''));
+  }).map(function(row) {
+    const c = row.cells || {};
+    const store = String(isStore ? c.I || '' : c.D || '').trim();
+    const personKey = isStore ? store : [store, String(c.F || '').trim(), String(c.G || '').trim()].join('|');
+    return { row: row.row, store: store, key: personKey, complete: isStore ? !!store : !!store && !!c.F && !!c.G };
+  });
+  const canonical = {}, unmatched = [];
+  records.forEach(function(record) {
+    const match = reportUploadStoreMatch_(record.store);
+    if (match.status === 'matched') canonical[match.store] = true;
+    else if (record.store) unmatched.push(record.store);
+  });
+  const headers = reportAwardPairHeaders_(rows);
+  const headerText = headers.map(function(header) { return header.name; }).join('｜');
+  return {
+    role: role, sheetNames: workbook.sheetNames, selectedSheet: workbook.selectedSheet,
+    dataDate: reportAwardPairRangeDate_(rows), recordCount: records.length,
+    canonicalStores: Object.keys(canonical).sort(), missingStores: STORES.filter(function(store) { return !canonical[store]; }),
+    unmatchedCount: unmatched.length, duplicateCount: reportAwardPairDuplicates_(records.map(function(record) { return record.key; })),
+    incompleteCount: records.filter(function(record) { return !record.complete; }).length,
+    rankFieldFound: /(排名|名次)/.test(headerText), awardFieldFound: /(獎金|領獎)/.test(headerText),
+    headers: headers.map(function(header) { return header.name; })
+  };
+}
+
+function reportAwardPairBuildPreview_(store, person, files) {
+  const sameDate = !!store.dataDate && store.dataDate === person.dataDate;
+  const storeCountOk = store.canonicalStores.length === REPORT_AWARD_PAIR_EXPECTED_STORES && !store.missingStores.length && !store.unmatchedCount;
+  const personCountOk = person.recordCount === REPORT_AWARD_PAIR_EXPECTED_PERSONS && !person.unmatchedCount;
+  const cleanRecords = !store.duplicateCount && !person.duplicateCount && !store.incompleteCount && !person.incompleteCount;
+  const rankOk = store.rankFieldFound && person.rankFieldFound;
+  const awardOk = store.awardFieldFound && person.awardFieldFound;
+  const checks = [
+    reportUploadCheck_('date', '資料日期一致', sameDate ? 'ok' : 'block', '店點：' + (store.dataDate || '讀不到') + '；個人：' + (person.dataDate || '讀不到')),
+    reportUploadCheck_('stores', '店點完整性', storeCountOk ? 'ok' : 'block', '預期 ' + REPORT_AWARD_PAIR_EXPECTED_STORES + ' 店，讀到 ' + store.canonicalStores.length + ' 店；缺少 ' + store.missingStores.length + '、未匹配 ' + store.unmatchedCount),
+    reportUploadCheck_('people', '人員完整性', personCountOk ? 'ok' : 'block', '預期 ' + REPORT_AWARD_PAIR_EXPECTED_PERSONS + ' 人，讀到 ' + person.recordCount + ' 人；未匹配店點 ' + person.unmatchedCount),
+    reportUploadCheck_('duplicates', '重複／缺漏', cleanRecords ? 'ok' : 'block', '店點重複 ' + store.duplicateCount + '、個人重複 ' + person.duplicateCount + '、店點缺欄 ' + store.incompleteCount + '、個人缺欄 ' + person.incompleteCount),
+    reportUploadCheck_('ranking', '排名欄位', rankOk ? 'ok' : 'block', '店點／個人皆須含排名或名次欄位'),
+    reportUploadCheck_('award', '獎金欄位', awardOk ? 'ok' : 'block', '店點／個人皆須含獎金或領獎欄位')
+  ];
+  return {
+    schemaVersion: 'phone-awards-preview-v2',
+    // 固定為兩端欄位，不再因一致而改成單一字串，避免 store／person 被讀成 null。
+    reportDate: { store: store.dataDate || null, person: person.dataDate || null },
+    summary: { sameDate: sameDate, storeCount: store.canonicalStores.length, expectedStores: REPORT_AWARD_PAIR_EXPECTED_STORES,
+      personCount: person.recordCount, expectedPersons: REPORT_AWARD_PAIR_EXPECTED_PERSONS },
+    diff: checks.map(function(check) { return { item: check.label, result: check.level, detail: check.detail }; }),
+    checks: checks, sourceFiles: files, publishable: false, formalDataChanged: false,
+    debug: { store: store, person: person }
+  };
+}
+
+function reportAwardPairPreview(payload) {
+  reportUploadAuthorize_(payload);
+  const storeFile = reportAwardPairDecode_((payload || {}).storeFile, REPORT_AWARD_PAIR_FILES.store);
+  const personFile = reportAwardPairDecode_((payload || {}).personFile, REPORT_AWARD_PAIR_FILES.person);
+  const store = reportAwardPairAnalyze_(reportAwardPairReadWorkbook_(storeFile, REPORT_AWARD_PAIR_FILES.store), 'store');
+  const person = reportAwardPairAnalyze_(reportAwardPairReadWorkbook_(personFile, REPORT_AWARD_PAIR_FILES.person), 'person');
+  const preview = reportAwardPairBuildPreview_(store, person, [
+    { role: 'store', fileName: storeFile.fileName, size: storeFile.bytes.length },
+    { role: 'person', fileName: personFile.fileName, size: personFile.bytes.length }
+  ]);
+  return { ok: reportUploadBlocked_(preview.checks).length === 0, preview: preview, checks: preview.checks,
+    publishable: false, formalDataChanged: false, message: '僅完成雙檔預覽；未建立暫存檔、未寫入正式台獎 JSON。' };
 }
 
 // ── 步驟一：預覽（只寫暫存，絕不碰正式資料）──────────────
@@ -4352,11 +4605,12 @@ function reportUploadCommit(payload) {
   let backupName = '';
   let message = '';
 
-  // 版本衝突把關：手動上傳可由操作者勾選強制覆寫，但必須是明示的
+  // KPI 不接受同日／舊日期強制覆寫；既有 award JSON 路徑不在本階段調整。
   const incoming = {
     dataDate: staged.dataDate, source: 'manual-upload', fileHash: staged.fileHash,
     fileName: staged.fileName, operator: employeeId, force: !!(payload || {}).force
   };
+  if (kind === 'kpi') incoming.force = false;
   const decision = reportVersionDecide_(kind, incoming);
   if (!decision.accept) {
     reportVersionRecord_(kind, incoming, 'skipped', { skipRule: decision.rule });
