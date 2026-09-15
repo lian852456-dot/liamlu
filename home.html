@@ -72,9 +72,10 @@
   }
 
   .page {
-    max-width: 900px;
+    width: 100%;
+    max-width: 1500px;
     margin: 0 auto;
-    padding: 56px 24px 40px;
+    padding: 48px 32px 40px;
     display: flex;
     flex-direction: column;
     gap: 36px;
@@ -136,12 +137,12 @@
 
   .board {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
     gap: 16px;
   }
   @media (max-width: 620px) {
     .board { grid-template-columns: 1fr; }
-    .page { padding: 40px 18px 32px; }
+    .page { padding: 32px 16px 28px; }
     h1 { font-size: 28px; }
   }
 
