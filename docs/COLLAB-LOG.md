@@ -1,3 +1,12 @@
+## 2026-09-15 19:36 巡店正式發布與唯讀驗收完成
+
+- GAS第9版（原Deployment ID／權限）；程式回讀一致，rollback第8版。
+- 功能提交76ea226、cfd6759；Pages建置built（19:29:36），線上patrol.html與候選一致。
+- 正式正常session：首次開啟、reload、9/10月切換、九店摘要、展開ptdetail、9月里程、班表、到店檢查讀取完成；面談入口可開啟。初始舊session已EXPIRED，正常登入一次後未再重登。
+- Node156/156；Patrol/Auth Chromium93/93；新恢復4/4；每日回報smoke4/4；正式增量候選parity2/2；語法與diff check通過。fixture逐店逐題新舊結果一致。
+- 無正式巡店資料寫入。寫入／上傳等功能驗證為隔離mock；實機本人UAT及長期404觀察未包含。Deployment或轉址層404根因仍未知。
+- 詳見docs/PATROL_READ_RESILIENCE_20260915.md；Pages rollback依序revert cfd6759與76ea226，GAS選回v8。
+
 ## 2026-09-15 巡店 GAS v9 與正式候選驗收
 
 - 原 Deployment 已於19:18完成第9版；ID/存取權限不變，程式與manifest回讀核對通過。

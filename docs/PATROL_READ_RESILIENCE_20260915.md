@@ -2,7 +2,7 @@
 
 ## 狀態
 
-GAS 已於 2026-09-15 19:18 (Asia/Taipei) 部署正式第9版，原 Deployment ID／權限不變。pthealth HTTP 200；隔離候選頁正常登入後，新 ptdashboard 正式契約驗證完成，重新整理保留 session，舊月份讀取可用。Pages 與正式網址新版驗收待完成。
+已完成 GAS 第9版、GitHub Pages 發布與正式瀏覽器唯讀驗收。GAS 於2026-09-15 19:18部署，Pages功能提交 `cfd67593e1622690368e3a0c8090b7afe797ec86` 於19:29:36建置完成；線上patrol.html與本機逐位元相同。長期偶發404是否完全消失仍不能由一次驗收推定，基礎設施層來源仍未知。
 
 ## 基線與直接原因
 
@@ -29,17 +29,23 @@ GAS 已於 2026-09-15 19:18 (Asia/Taipei) 部署正式第9版，原 Deployment I
 - Candidate 從 live editor 備份加入最小增量；原92個函式保留，新16個函式，各存在一次；逆向移除增量後與原備份逐位元一致。HalfMedia 與 manifest 原樣保留。
 - 共用 gas/Code.gs 原本229個函式定義中 `kpiCalcPct` 有2個，基線即如此，本次未動；指定 KPI自動化/watchdog/巡店/班表/半月/每日回報/通知關鍵函式仍各1個。不得宣稱共用大檔所有函式皆唯一，也不將它整份部署至隔離 Patrol。
 
-## 正式發布待辦
+## 正式部署與唯讀驗收
 
-1. 恢復可操作的 Apps Script 管理介面，重新核對 editor/v8 與備份一致；僅套 candidate 增量，不替換 Script Properties 或存取權限。
-2. 儲存 → 部署 → 管理部署作業 → 編輯現有正式 Deployment → 新版本 → 部署，保持原ID／權限。
-3. 唯讀驗證 pthealth、正常登入／session、舊讀取、新 ptdashboard；不建立正式測試資料。
-4. GAS通過後才合併修正及發布 Pages，核對線上版本，再驗首次開啟／reload／月份／店點／摘要／里程／班表／到店檢查。正式結果目前均未驗證。
+- 先備份／核對v8，再套最小增量並儲存，透過Apps Script管理部署編輯原Deployment，建立第9版；原執行身分與「所有人」權限不變。
+- 正式第9版PatrolCode與HalfMedia回讀和candidate逐位元一致；manifest JSON語意一致。私有v9備份已保存。
+- GAS先行驗收：pthealth HTTP200、dashboardContracts包含新契約；候選頁正常登入，ptdashboard契約驗證成功，舊月份讀取成功，之後才推送Pages。
+- Pages API回報built且無錯誤；原main由9acdd6a快轉到cfd6759，沒有動共享dirty工作樹。
+- 正式網址首次載入新版：ptdashboard唯讀驗證完成、九店摘要可見。
+- 重新整理：session自動恢復並完成讀回；9月→10月→9月皆完成新契約驗證。讀取有延遲，未以loading視為完成。
+- 展開店點成功；「查看完整巡店紀錄」由舊ptdetail讀回並渲染表格。
+- 9月里程完成正式讀回、統計與摘要表可見，無讀取錯誤；班表顯示已載入；督導到店檢查歷史表可見且無雲端錯誤；面談入口可開啟。
+- 舊session起初明確EXPIRED，正常登入一次後，本輪reload與切月未再要求重登。沒有為驗收新增／修改／刪除正式巡店資料。
+- 上傳、寫入readback、登入登出、媒体與其他寫入功能的零新增回歸證據是隔離測試；正式驗收只讀，未以正式寫入測試。手機本人UAT未包含於本輪。
 
 ## Rollback
 
 - GAS：管理部署作業編輯同一 Deployment，選回版本8；若已儲存候選 editor，還原本輪 editor 備份，保留 Script Properties、Deployment ID和權限。勿重建部署。
-- Pages：本輪尚未發布。發布後以 revert 本輪功能 commit 產生新提交、部署 Pages，還原至本輪前 `9acdd6a` 的相關檔案狀態；不要 reset 或覆蓋其他後續修改。
+- Pages：由最新main建立rollback分支，依序revert功能提交 `cfd6759` 與 `76ea226`，核對差異、提交並發布Pages；保留文件提交及其他後續修改，不使用reset。功能回復基線為 `9acdd6a34fc0a1bd34ed39d4261cfadf320efeb4`。
 
 ## 本機驗證
 
