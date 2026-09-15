@@ -2,6 +2,16 @@
 
 > 歷史 evidence：本檔保存過往改動、驗證與事故脈絡，不是現行 Agent 規則、待辦清單或固定工作流程。現行規則只以 repo 根目錄 `AGENTS.md` 為準。
 
+## 2026-09-15 ｜ Codex（巡店唯讀穩定性候選；正式部署待完成）
+
+- 功能 commit `76ea2269516dd9036bbb2f1cac03040cd395d1a7`，由最新 `origin/main` `9acdd6a` 建立獨立修正分支；共享 dirty checkout 未修改。
+- 修正唯讀404/429/5xx/network/timeout有限重試（2s/5s，共3次）、保留session與非個資摘要快取、診斷白名單；移除既有ptwrite失敗自動重送及寫入重驗後自動replay，保留逐鍵readback並背景刷新看板。
+- 新增summary-only `ptdashboard`，九店／25題／月份／版本／5000筆上限，單次工作表scan；unknown action安全回退舊API；缺來源表直接失敗，不建表。
+- 驗證：Node 155/155；Patrol/Auth Chromium 93/93＋新增4/4；每日回報smoke 4/4；正式v8增量候選parity 2/2；語法與diff check通過。全部為本機／合成資料。
+- 正式Patrol已核對v8且完成editor/v8私有備份；候選保留原92函式＋新16函式，全數唯一且逆向增量可還原。共用Code.gs基線既有kpiCalcPct重複2次，未動KPI；關鍵函式仍各1次。
+- 未完成：GAS管理介面連線逾時／原生畫面無內容，尚未儲存、部署GAS、合併main、發布Pages或新版正式session讀回。首次開啟、reload、是否仍需重登均未驗證；404的Deployment/轉址層來源仍未知。
+- 詳細contract／備份／rollback與後續順序：`docs/PATROL_READ_RESILIENCE_20260915.md`。先完成GAS同ID新版本與唯讀驗證，再發布Pages；不得以測試宣稱正式完成。
+
 ## 2026-09-11 ｜ Codex（行進間戰報字體與數字可讀性加強）
 
 - 做了什麼：依 Liam 實際畫面回饋，行進間戰報網頁與下載 PNG 統一優先使用 Microsoft YaHei 並改為粗體，將原灰藍文字加深；九店 A999／A1399／R999／R1399／好速等上線數與商品上線數再放大，商品長表頭同步加粗。CSS／JS 快取一起升版。
