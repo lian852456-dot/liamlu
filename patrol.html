@@ -484,6 +484,7 @@
       <label for="patrolPasscode">督導通行碼</label>
       <input id="patrolPasscode" type="password" autocomplete="current-password" required>
       <button id="patrolAuthSubmit" type="submit">驗證並進入</button>
+      <button id="patrolRestoreRetry" type="button" onclick="restorePatrolSession()" hidden>保留 session 重新連線</button>
     </form>
     <div id="patrolAuthMessage" class="auth-gate-message" role="alert" aria-live="polite"></div>
     <p class="auth-gate-note">通行碼不會保存於 localStorage；驗證成功後只保存本頁短效 session。</p>
@@ -493,7 +494,7 @@
 <section id="patrolReauthModal" class="reauth-modal" role="dialog" aria-modal="true" aria-labelledby="patrolReauthTitle" hidden>
   <div class="reauth-modal-card">
     <h2 id="patrolReauthTitle">督導驗證已逾時</h2>
-    <p>請重新驗證後繼續同步。原本的本機資料會保留，驗證成功後會自動續傳一次。</p>
+    <p>請重新驗證後繼續同步。原本的本機資料會保留；驗證成功後恢復唯讀請求，寫入不會自動重送。</p>
     <form class="auth-gate-form" onsubmit="resumePatrolReauth(event)">
       <label for="patrolReauthPasscode">督導通行碼</label>
       <input id="patrolReauthPasscode" type="password" autocomplete="current-password" required>
@@ -791,7 +792,41 @@ let patrolReauthPending = null;
 let resolvePatrolReauth = null;
 let patrolTimelineSequence = 0;
 
+// Deliberately cache aggregate counts only: no rows, people, store identities or free text.
+const PATROL_SUMMARY_CACHE_PREFIX='patrol-summary-safe-v1:';
+function patrolSummaryCacheContract(month){return month>='2026-09'?'sep25-v-only-two-visits-7d-v1':'legacy33-v1';}
+function clearPatrolSummaryCache(){
+  try{for(let i=sessionStorage.length-1;i>=0;i--){const key=sessionStorage.key(i);if(key?.startsWith(PATROL_SUMMARY_CACHE_PREFIX))sessionStorage.removeItem(key);}}catch{}
+}
+function savePatrolSummaryCache(month,summary,model){
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)||!summary||summary.month!==month)return;
+  const data={month,contract:patrolSummaryCacheContract(month),updatedAt:new Date().toISOString(),totalStores:9,
+    visitedStores:Number(model?.visitedStores??summary.visitedStores),
+    fullyDoneStores:Number(model?.fullyDoneStores??summary.fullyDoneStores)};
+  if([data.visitedStores,data.fullyDoneStores].some(value=>!Number.isInteger(value)||value<0||value>9))return;
+  // September's legacy summary cannot establish 25-item completion.
+  if(month>='2026-09'&&!model)data.fullyDoneStores=null;
+  try{sessionStorage.setItem(PATROL_SUMMARY_CACHE_PREFIX+data.contract+':'+month,JSON.stringify(data));}catch{}
+}
+function readPatrolSummaryCache(month){
+  try{
+    const key=PATROL_SUMMARY_CACHE_PREFIX+patrolSummaryCacheContract(month)+':'+month;
+    const data=JSON.parse(sessionStorage.getItem(key)||'null');if(!data)return null;
+    const keys=['month','contract','updatedAt','totalStores','visitedStores','fullyDoneStores'];
+    if(Object.keys(data).some(key=>!keys.includes(key))||data.month!==month||data.contract!==patrolSummaryCacheContract(month)||data.totalStores!==9||
+      !/^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/.test(data.updatedAt)||!Number.isFinite(Date.parse(data.updatedAt))||
+      !Number.isInteger(data.visitedStores)||data.visitedStores<0||data.visitedStores>9||
+      (data.fullyDoneStores!==null&&(!Number.isInteger(data.fullyDoneStores)||data.fullyDoneStores<0||data.fullyDoneStores>9))){clearPatrolSummaryCache();return null;}
+    return data;
+  }catch{clearPatrolSummaryCache();return null;}
+}
+function patrolCachedSummaryHTML(){
+  const cached=readPatrolSummaryCache(currentMonth);if(!cached)return '';
+  return `<div class="summary-stale-note"><strong>上次成功資料</strong> · ${esc(cached.updatedAt)}<br>本月有到店 ${cached.visitedStores}/9 店${cached.fullyDoneStores===null?'':` · 巡店完整完成 ${cached.fullyDoneStores}/9 店`}<br>背景重新讀取正式資料；此摘要不含店別明細。</div>`;
+}
 function clearPatrolAuthState(){
+  clearPatrolSummaryCache();
+  patrolSummary=null;patrolSummaryVerifiedAt='';sep25LoadSequence+=1;
   localStorage.removeItem('bei12b_pt_key');
   localStorage.removeItem('bei12b_pt_key_endpoint');
   localStorage.removeItem('bei12b_pt_gas_url');
@@ -823,26 +858,60 @@ function privateConfigMessage(){
 function patrolAuthReason(value){ return String(value?.reason||value?.auth?.reason||value?.authReason||''); }
 function patrolShouldReauth(value){ return PATROL_REAUTH_REASONS.has(patrolAuthReason(value)); }
 function patrolAuthReasonText(value){ const reason=patrolAuthReason(value);return PATROL_AUTH_REASON_TEXT[reason]||String(value?.message||value||'巡店服務授權失敗'); }
-function patrolTrace(action, phase, detail={}){
-  const safe={seq:detail.seq||++patrolTimelineSequence,action:String(action||''),phase:String(phase||''),tokenPresent:Boolean(PT_TOKEN),clientTime:new Date().toISOString()};
-  ['durationMs','status','reason','deployment','sessionContract'].forEach(key=>{if(detail[key]!=null)safe[key]=detail[key];});
-  console.info('PATROL_AUTH_TIMELINE',safe);
-  return safe.seq;
+// Only bounded, idempotent reads can enter the transport retry loop.
+const PATROL_READ_ACTIONS = new Set(['ping','pthealth','ptsummary','ptdetail','ptmileage','ptmileage2','sread','hread','ptdashboard']);
+const PATROL_RETRY_STATUSES = new Set([404,429,500,502,503,504]);
+const PATROL_READ_UNAVAILABLE = '巡店後端暫時無回應，已自動重試3次。session仍保留，可按重新連線，不需要登出。';
+function patrolSafeResponseUrl(value){
+  try{const url=new URL(value);return url.origin+url.pathname;}catch{return '';}
 }
-async function patrolTrackedRequest(action,request){
-  const started=performance.now();const seq=patrolTrace(action,'start');
-  try{
-    const result=await request();
-    patrolTrace(action,'response',{seq,durationMs:Math.round(performance.now()-started),status:result?.status||'',reason:patrolAuthReason(result),deployment:result?.auth?.deployment||result?.deployment||result?.authDeployment||'',sessionContract:result?.auth?.sessionContract||result?.sessionContract||''});
-    return result;
-  }catch(error){
-    patrolTrace(action,'error',{seq,durationMs:Math.round(performance.now()-started),status:'network-error',reason:patrolAuthReason(error)});
-    throw error;
+function patrolExceptionType(error){
+  return ['AbortError','TimeoutError','TypeError','SyntaxError'].includes(error?.name)?error.name:'Error';
+}
+async function patrolTrackedRequest(action,request){ return request(); }
+async function patrolReadRequest(action,url,options={},timeoutMs=30000){
+  const maxAttempts=PATROL_READ_ACTIONS.has(action)?3:1;
+  for(let attempt=1;attempt<=maxAttempts;attempt++){
+    const started=performance.now();
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),timeoutMs);
+    let response=null,exceptionType='',retry=false;
+    let result;
+    try{
+      response=await fetch(url,{...options,signal:controller.signal});
+      const text=await response.text();
+      try{result=JSON.parse(text);}catch{}
+      // Explicit backend auth errors win over HTTP retry classification.
+      if(patrolAuthReason(result)) return result;
+      if(!response.ok){
+        const error=new Error('HTTP '+response.status);error.httpStatus=response.status;throw error;
+      }
+      if(result===undefined){const error=new Error('巡店服務回傳非 JSON');error.name='SyntaxError';throw error;}
+      return result;
+    }catch(error){
+      exceptionType=error.httpStatus?'':patrolExceptionType(error);
+      retry=PATROL_READ_ACTIONS.has(action)&&(error.httpStatus?PATROL_RETRY_STATUSES.has(error.httpStatus):['TypeError','AbortError','TimeoutError'].includes(error?.name));
+      if(!retry||attempt===maxAttempts){
+        if(retry){const exhausted=new Error(PATROL_READ_UNAVAILABLE);exhausted.httpStatus=error.httpStatus;exhausted.retryExhausted=true;throw exhausted;}
+        throw error;
+      }
+    }finally{
+      clearTimeout(timer);
+      if(PATROL_READ_ACTIONS.has(action)) console.info('PATROL_READ_DIAGNOSTIC',{
+        timestamp:new Date().toISOString(),action,attempt,durationMs:Math.round(performance.now()-started),
+        httpStatus:response?.status||null,redirected:Boolean(response?.redirected),
+        contentType:String(response?.headers?.get('content-type')||'').split(';')[0].replace(/[^a-zA-Z0-9/+.-]/g,'').slice(0,80),
+        responseUrl:patrolSafeResponseUrl(response?.url||''),exceptionType,
+        retrySucceeded:attempt>1&&Boolean(response?.ok)&&result?.status==='ok'
+      });
+    }
+    await new Promise(resolve=>setTimeout(resolve,attempt===1?2000:5000));
   }
 }
 function patrolReauthFailure(){ return {status:'error',message:PATROL_REAUTH_MESSAGE,reauthFailed:true}; }
 function setPatrolReauthMessage(text){ const el=document.getElementById('patrolReauthMessage');if(el) el.textContent=text||''; }
 function openPatrolReauthModal(reason){
+  if(reason==='AUTH_SESSION_REVOKED')clearPatrolSummaryCache();
   // 只移除失效的短效 session；本機草稿、表單與待送 payload 全數保留。
   sessionStorage.removeItem(PT_SESSION_TOKEN_STORAGE);
   PT_TOKEN='';
@@ -876,7 +945,7 @@ async function resumePatrolReauth(event){
   }catch{setPatrolReauthMessage('督導驗證未成功，請確認通行碼後再試');}
   finally{if(button) button.disabled=false;}
 }
-async function patrolRequestWithReauth(request,retried=false){
+async function patrolRequestWithReauth(request,retried=false,allowReplay=true){
   let result;try{result=await request();}catch(error){if(!patrolShouldReauth(error)) throw error;result={status:'error',message:'unauthorized',reason:patrolAuthReason(error)};}
   if(!patrolShouldReauth(result)){
     if(result?.status==='error'&&result?.message==='unauthorized') return {...result,message:patrolAuthReasonText(result)};
@@ -884,15 +953,17 @@ async function patrolRequestWithReauth(request,retried=false){
   }
   if(retried) return patrolReauthFailure();
   const reauthed=await waitForPatrolReauth(patrolAuthReason(result));
+  if(!allowReplay)return {...patrolReauthFailure(),message:'驗證已更新；原寫入未自動重送，請先讀回核對。'};
   return reauthed?patrolRequestWithReauth(request,true):patrolReauthFailure();
 }
 function privateCloudCall(action, params={}){
   return patrolRequestWithReauth(()=>{
     if(action!=='pthealth'&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
+    if(['sread','hread'].includes(action))return patrolReadRequest(action,PRIVATE_GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:PT_TOKEN,...params}),cache:'no-store'});
     const url=new URL(PRIVATE_GAS_URL);url.searchParams.set('action',action);Object.keys(params).forEach(k=>url.searchParams.set(k,params[k]));
     if(action!=='pthealth') url.searchParams.set('token',PT_TOKEN);
-    return patrolTrackedRequest(action,()=>fetch(url.toString(),{method:'GET',cache:'no-store'}).then(r=>r.json()));
-  });
+    return patrolReadRequest(action,url.toString(),{method:'GET',cache:'no-store'});
+  },false,PATROL_READ_ACTIONS.has(action));
 }
 async function privateHealthCheck(){
   const res=await privateCloudCall('pthealth');
@@ -911,11 +982,11 @@ function privateAuthErrorText(err){
 }
 function privateAuthPost(payload){
   const action=String(payload?.action||'');
-  return patrolTrackedRequest(action,()=>fetch(PRIVATE_GAS_URL,{
+  return patrolReadRequest(action,PRIVATE_GAS_URL,{
     method:'POST',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
     body:JSON.stringify(payload||{})
-  }).then(r=>r.json()));
+  });
 }
 function privateCloudCallJsonp(action, params={}){
   return patrolRequestWithReauth(()=>{
@@ -927,7 +998,7 @@ function privateCloudCallJsonp(action, params={}){
       function cleanup(){clearTimeout(timer);delete window[cbName];s.remove();}
       window[cbName]=res=>{cleanup();resolve(res);};s.onerror=()=>{cleanup();reject(new Error('網路錯誤'));};s.src=url.toString();document.body.appendChild(s);
     });
-  });
+  },false,false);
 }
 function setPatrolAuthMessage(text){
   const el=document.getElementById('patrolAuthMessage');
@@ -978,7 +1049,8 @@ async function restorePatrolSession(){
       setPatrolAuthMessage(patrolAuthReasonText(error));
     }else{
       secureUnlocked=false;privateAccount=null;
-      setPatrolAuthMessage(`session 保留，恢復失敗：${patrolAuthReasonText(error)}`);
+      setPatrolAuthMessage(`session 保留，恢復失敗：${patrolAuthReasonText(error)}；可按重新連線，不需要重新輸入通行碼。`);
+      const retry=document.getElementById('patrolRestoreRetry');if(retry)retry.hidden=false;
     }
     return false;
   }
@@ -1059,7 +1131,7 @@ async function privateInspectionMediaUpload(file, context){
     try{payload=JSON.parse(raw);}catch{throw new Error(response.ok?'上傳服務回應無法辨識，請稍後再試':`上傳服務暫時無法使用（${response.status}）`);}
     if(!response.ok) throw new Error(payload.message||'上傳服務暫時無法使用');
     return payload;
-  });
+  },false,false);
   if(result.status!=='ok') throw new Error(result.message||'媒體上傳失敗');
   return result.media;
 }
@@ -1541,9 +1613,8 @@ async function finalizeLocalPatrolWrite(pending,receipt,renderErr){
   pendingPatrolWrite=null;
   setPatrolWriteConfirmation(false);
   resetPatrolLocalFileSelection({keepPreview:true,keepStatus:true});
-  const refreshed=await refreshPatrolAndMileage(writeMessage,renderErr);
-  if(refreshed) resetPatrolLocalFileSelection({keepPreview:true});
-  else showMsg(`${writeMessage}；正式巡店或里程仍在刷新，本機預覽會保留，不需要重新匯入。`,'ok');
+  showMsg(writeMessage+'；看板與里程正在背景刷新','ok');
+  void refreshPatrolAndMileage(writeMessage,renderErr).then(refreshed=>{if(refreshed)resetPatrolLocalFileSelection({keepPreview:true});}).catch(()=>{});
 }
 
 async function continueLocalPatrolReadback(pending,writtenRows,renderErr){
@@ -1576,7 +1647,7 @@ async function confirmPatrolCloudWrite(){
   setPatrolWriteConfirmation(true,true);
   showMsg(`正在寫入 ${pending.candidate.writeRows.length} 筆並逐鍵讀回驗證……`,'ok');
   let renderErr=null;
-  try{ render(); }catch(error){renderErr=error;console.error('Patrol render failed:',error);}
+  try{ render(); }catch(error){renderErr=error;void 0;}
   try{
     const receipt=await cloudWrite(pending.candidate.writeRows);
     commitPatrolCandidates(pending.candidate);
@@ -1587,7 +1658,8 @@ async function confirmPatrolCloudWrite(){
       pendingPatrolWrite=null;
       setPatrolWriteConfirmation(false);
       const writeMessage=`雲端寫入與 readback 一致（解析 ${pending.parsedRows.length} 筆／寫入 ${receipt.writtenRows} 筆／讀回 ${receipt.readbackRows} 筆）`;
-      await cloudLoad({afterWrite:true,writeMessage,renderErr});
+      showMsg(writeMessage+'；看板正在背景更新','ok');
+      void cloudLoad({afterWrite:true,writeMessage,renderErr});
     }
   }catch(error){
     if(isLocalFile&&error&&error.writeAccepted){
@@ -1596,7 +1668,7 @@ async function confirmPatrolCloudWrite(){
       setPatrolWriteConfirmation(false);
       resetPatrolLocalFileSelection({keepPreview:true,keepStatus:true});
       showMsg('雲端已接收資料，正在自動重試讀回核對；本機預覽會保留，請勿重新匯入。','ok');
-      continueLocalPatrolReadback(pending,error.writtenRows||0,renderErr).catch(recoveryError=>console.error('Patrol readback recovery failed:',recoveryError));
+      continueLocalPatrolReadback(pending,error.writtenRows||0,renderErr).catch(recoveryError=>void 0);
       return;
     }
     if(isLocalFile) setPatrolWriteConfirmation(true,false);
@@ -1773,18 +1845,19 @@ function renderSep25Dashboard(){
   const matched=sep25State.month===currentMonth?sep25State:null;
   state.textContent=patrolLocalPreview.active
     ? `本機預覽${patrolLocalPreview.fileName?` · ${patrolLocalPreview.fileName}`:''}；雲端比對與同步中`
-    : matched?.status==='loading'?'正在讀取新版 25 項正式巡店明細…':matched?.status==='error'?matched.message:model?`正式 ptdetail 唯讀驗證完成${matched?.verifiedAt?` · ${matched.verifiedAt}`:''}`:'新版 25 項資料尚未載入';
+    : matched?.status==='loading'?'正在讀取新版 25 項正式巡店明細…':matched?.status==='error'?matched.message:model?`正式 ${matched?.source==='ptdashboard'?'ptdashboard':'ptdetail'} 唯讀驗證完成${matched?.verifiedAt?` · ${matched.verifiedAt}`:''}`:'新版 25 項資料尚未載入';
   if(!model){
     reminder.innerHTML='';groups.innerHTML='';
-    const quick=patrolSummary&&patrolSummary.month===currentMonth&&matched?.status==='loading'?patrolSummary:null;
+    const quick=patrolSummary&&patrolSummary.month===currentMonth?patrolSummary:null;
     if(quick){
       const total=Number(quick.totalStores)||STORES.length;
       const visited=Number(quick.visitedStores)||0;
       const remaining=Array.isArray(quick.unvisitedStores)?quick.unvisitedStores.length:Math.max(0,total-visited);
       overview.innerHTML=`<div class="stat"><div class="num">${visited}</div><div class="lbl">摘要已讀取・本月有到店店數</div></div><div class="stat"><div class="num ${remaining?'warn':'good'}">${remaining}</div><div class="lbl">摘要已讀取・尚未巡店店數</div></div>`;
-      content.innerHTML='<div class="empty-state"><div class="big">⏳</div><b>巡店摘要已更新</b><br>店別明細正在背景載入；完成的數字會自動補上，不需要重新整理。</div>';
+      content.innerHTML=matched?.status==='error'?patrolSummaryUnavailableHTML():'<div class="empty-state"><b>巡店摘要已更新</b><br>店別明細正在背景載入。</div>';
+      if(matched?.status==='error')overview.innerHTML=patrolCachedSummaryHTML()+overview.innerHTML;
     }else{
-      overview.innerHTML='';content.innerHTML=patrolSummaryUnavailableHTML();
+      overview.innerHTML=patrolCachedSummaryHTML();content.innerHTML=patrolSummaryUnavailableHTML();
     }
     return;
   }
@@ -1819,8 +1892,8 @@ function render(){
 }
 
 function patrolSummaryUnavailableHTML(){
-  const previous=patrolSummary ? `<p class="hint">上次成功資料 · ${patrolSummaryVerifiedAt || '時間未知'}</p>` : '';
-  return `<div class="empty-state"><div class="big">⚠️</div><b>${patrolSummaryMessage || '巡店資料讀取逾時'}</b>${previous}<br><button class="btn-cloud" type="button" onclick="cloudLoad()">重新整理</button></div>`;
+  const previous=patrolSummary ? `<p class="hint">上次成功資料 · ${patrolSummaryVerifiedAt || '時間未知'}</p>` : patrolCachedSummaryHTML();
+  return `<div class="empty-state"><div class="big">⚠️</div><b>${patrolSummaryMessage || '巡店資料讀取逾時'}</b>${previous}<br><button class="btn-cloud" type="button" onclick="cloudLoad()">重新連線</button></div>`;
 }
 
 function summaryStoreCardHTML(store){
@@ -2127,27 +2200,15 @@ function storeCardHTML(storeName){
 function cloudCall(action, params={}){
   return patrolRequestWithReauth(()=>{
     if(!['ping','pthealth'].includes(action)&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
-    const timeoutMs=action==='ptsummary'?20000:action==='ptdetail'?60000:(action==='ptmileage'||action==='ptmileage2')?30000:0;
-    if(action==='ptsummary'||action==='ptdetail'||action==='ptmileage'||action==='ptmileage2'){
-      const controller=new AbortController();
-      const timer=setTimeout(()=>controller.abort(),timeoutMs);
-      return patrolTrackedRequest(action,()=>fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:PT_TOKEN,...params}),cache:'no-store',signal:controller.signal}).then(async response=>{
-        const text=await response.text();
-        if(!response.ok) throw new Error('HTTP '+response.status);
-        try{return JSON.parse(text);}catch(_){throw new Error('巡店服務回傳非 JSON');}
-      }).catch(error=>{if(error&&error.name==='AbortError') throw new Error('巡店資料讀取逾時');throw error;}).finally(()=>clearTimeout(timer)));
+    const timeoutMs=action==='ptdetail'||action==='ptdashboard'?60000:30000;
+    if(['ptsummary','ptdetail','ptmileage','ptmileage2','ptdashboard'].includes(action)){
+      return patrolReadRequest(action,GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:PT_TOKEN,...params}),cache:'no-store'},timeoutMs);
     }
     const query=[['action',action]];Object.keys(params).forEach(key=>query.push([key,String(params[key])]));
     if(!['ping','pthealth'].includes(action)) query.push(['token',PT_TOKEN]);
     const url=GAS_URL+'?'+query.map(pair=>encodeURIComponent(pair[0])+'='+encodeURIComponent(pair[1])).join('&');
-    const controller=timeoutMs?new AbortController():null;
-    const timer=controller?setTimeout(()=>controller.abort(),timeoutMs):null;
-    return patrolTrackedRequest(action,()=>fetch(url,{method:'GET',cache:'no-store',signal:controller?controller.signal:undefined}).then(async response=>{
-      const text=await response.text();
-      if(!response.ok) throw new Error('HTTP '+response.status);
-      try{return JSON.parse(text);}catch(_){throw new Error('巡店服務回傳非 JSON');}
-    }).catch(error=>{ if(error&&error.name==='AbortError') throw new Error('巡店資料讀取逾時'); throw error; }).finally(()=>{if(timer)clearTimeout(timer);}));
-  });
+    return patrolReadRequest(action,url,{method:'GET',cache:'no-store'},timeoutMs);
+  },false,PATROL_READ_ACTIONS.has(action));
 }
 
 // 寫入走 JSONP（script tag + callback，與 index.html 同作法）
@@ -2161,7 +2222,7 @@ function cloudCallJsonp(action, params={}){
       function cleanup(){clearTimeout(timer);delete window[cbName];s.remove();}
       window[cbName]=res=>{cleanup();resolve(res);};s.onerror=()=>{cleanup();reject(new Error('網路錯誤'));};s.src=url.toString();document.body.appendChild(s);
     }));
-  });
+  },false,false);
 }
 
 function cloudConnect(){
@@ -2232,13 +2293,14 @@ async function loadSep25FormalDashboard(month){
   render();
   try{
     const rows=await loadSep25DetailRows(month,patrolSummary);
-    if(sequence!==sep25LoadSequence||currentMonth!==month)return false;
+    if(sequence!==sep25LoadSequence||currentMonth!==month||!secureUnlocked)return false;
     const model=PatrolQuestionVersions.overview(rows,STORES,month);
+    savePatrolSummaryCache(month,patrolSummary,model);
     sep25State={month,status:'ok',rows,model,message:'',verifiedAt:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'})};
     render();
     return true;
   }catch(error){
-    if(sequence!==sep25LoadSequence||currentMonth!==month)return false;
+    if(sequence!==sep25LoadSequence||currentMonth!==month||!secureUnlocked)return false;
     const preserved=Boolean(previous&&previous.model);
     const message=String(error&&error.message||'新版 25 項正式資料讀取失敗');
     sep25State={month,status:'error',rows:previous?.rows||[],model:previous?.model||null,message:preserved?`${message}；顯示上次成功資料`:message,verifiedAt:previous?.verifiedAt||''};
@@ -2247,8 +2309,41 @@ async function loadSep25FormalDashboard(month){
   }
 }
 
+function validatePatrolDashboard(res,month){
+  const fail=()=>{clearPatrolSummaryCache();throw new Error('巡店完整看板 contract 不一致');};
+  if(res.contract!=='patrol-dashboard-sep25-v1'||res.version!==1||res.month!==month||res.storeCount!==9||res.maxRows!==5000||
+    !Number.isInteger(res.rowCount)||res.rowCount<0||res.rowCount>5000||!Number.isInteger(res.sourceRowCount)||res.sourceRowCount<res.rowCount||res.sourceRowCount>5000||!Array.isArray(res.stores)||res.stores.length!==9)fail();
+  const months=PatrolQuestionVersions.bimWindow(month).months.filter(value=>value<=month);
+  if(JSON.stringify(res.months)!==JSON.stringify(months))fail();
+  const expected=new Map(STORES.map(store=>[store.code,store.name]));
+  if(new Set(res.stores.map(store=>store.code)).size!==9||res.stores.some(store=>expected.get(store.code)!==store.name))fail();
+  const model=res.summary;
+  if(!model||model.month!==month||model.totalStores!==9||model.totalItems!==25||!Array.isArray(model.stores)||model.stores.length!==9)fail();
+  if(new Set(model.stores.map(store=>store.code)).size!==9)fail();
+  for(const store of model.stores){
+    if(expected.get(store.code)!==store.name||!Array.isArray(store.missingItemNumbers)||new Set(store.missingItemNumbers).size!==store.missingItemNumbers.length||
+      store.missingItemNumbers.some(item=>!Number.isInteger(item)||item<1||item>25)||store.missingItems!==store.missingItemNumbers.length||store.done!==25-store.missingItems||
+      !['pending','attention','complete'].includes(store.status)||typeof store.visited!=='boolean'||!store.visits||typeof store.visits.completed!=='boolean')fail();
+    for(const [key,total] of [['monthly',9],['bimonthly',1],['ncc',15]]){
+      const group=store[key];if(!group||group.total!==total||!Number.isInteger(group.completed)||group.completed<0||group.completed>total||group.missing!==total-group.completed)fail();
+    }
+  }
+  for(const key of ['visitedStores','fullyDoneStores','questionCompleteStores','visitCadenceCompleteStores'])if(!Number.isInteger(model[key])||model[key]<0||model[key]>9)fail();
+  return model;
+}
+async function patrolDashboardOrSummary(month){
+  if(month>='2026-09'){
+    const res=await cloudCall('ptdashboard',{month});
+    if(res?.status==='ok'){validatePatrolDashboard(res,month);return {...res,dashboard:true};}
+    if(!/^unknown (?:patrol )?action$/i.test(String(res?.message||'')))return res;
+  }
+  return cloudCall('ptsummary',{month});
+}
+
 function cloudLoad(options={}){
   if(!cloudOn || !secureUnlocked || !privateAccount || !PT_TOKEN) return Promise.resolve(false);
+  const loadMonth=currentMonth;
+  if(patrolSummary?.month!==loadMonth){patrolSummary=null;patrolSummaryVerifiedAt='';}
   const afterWrite=Boolean(options.afterWrite);
   const writeMessage=String(options.writeMessage||'資料已同步雲端');
   const priorRenderError=options.renderErr||null;
@@ -2258,9 +2353,18 @@ function cloudLoad(options={}){
     const previous=sep25State.month===currentMonth?sep25State:null;
     sep25State={month:currentMonth,status:'loading',rows:previous?.rows||[],model:previous?.model||null,message:'正在讀取新版 25 項正式巡店明細…',verifiedAt:previous?.verifiedAt||''};
   }
-  try{render();}catch(error){console.error('Patrol render failed:',error);}
-  return cloudCall('ptsummary',{month:currentMonth}).then(async res=>{
+  try{render();}catch(error){void 0;}
+  return patrolDashboardOrSummary(loadMonth).then(async res=>{
+    if(currentMonth!==loadMonth||!secureUnlocked)return false;
     if(res.status==='ok'){
+      if(res.dashboard){
+        patrolSummary=res.summary;patrolSummaryState='ok';patrolSummaryMessage='';
+        patrolSummaryVerifiedAt=new Date().toISOString();
+        sep25LoadSequence+=1;
+        sep25State={month:loadMonth,status:'ok',rows:[],model:res.summary,message:'',verifiedAt:patrolSummaryVerifiedAt,source:'ptdashboard'};
+        savePatrolSummaryCache(loadMonth,patrolSummary,res.summary);render();
+        showMsg(afterWrite?writeMessage+'；正式看板已更新':'巡店完整看板已更新','ok');return true;
+      }
       // 套用各區自己的設定（GAS 的 PT_STORES / PT_TITLE），沒回傳就用預設
       if(Array.isArray(res.stores) && res.stores.length){
         STORES = res.stores.map(s=>{
@@ -2273,10 +2377,11 @@ function cloudLoad(options={}){
       if(!res.summary||res.summary.month!==currentMonth||!Array.isArray(res.summary.stores)||res.summary.stores.length!==STORES.length) throw new Error('巡店摘要月份或九店 contract 不完整');
       patrolSummary=res.summary;
       patrolSummaryState='ok';
+      savePatrolSummaryCache(loadMonth,patrolSummary,null);
       patrolSummaryMessage=isSep25DashboardMonth()?'巡店摘要已更新，店別明細正在背景載入':'巡店摘要已更新';
       patrolSummaryVerifiedAt=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
       if(isSep25DashboardMonth()){
-        try{render();}catch(error){console.error('Patrol summary-first render failed:',error);}
+        try{render();}catch(error){void 0;}
         const loaded=await loadSep25FormalDashboard(currentMonth);
         if(!loaded){
           const message=sep25State.message||'新版 25 項正式資料讀取失敗';
@@ -2286,7 +2391,7 @@ function cloudLoad(options={}){
       }
       patrolSummaryMessage='';
       let renderError=priorRenderError;
-      try{render();}catch(error){renderError=renderError||error;console.error('Patrol render failed:',error);}
+      try{render();}catch(error){renderError=renderError||error;void 0;}
       if(renderError){
         showMsg(`${afterWrite?writeMessage+'；':''}正式摘要已更新，但看板更新失敗：${renderError.message||renderError}`,'err');
       }else{
@@ -2301,9 +2406,12 @@ function cloudLoad(options={}){
       throw new Error(res.message||'巡店摘要讀取失敗');
     }
   }).catch(error=>{
+    if(currentMonth!==loadMonth||!secureUnlocked)return false;
+    if(/contract/.test(String(error?.message)))clearPatrolSummaryCache();
+    if(sep25State.month===loadMonth)sep25State={...sep25State,status:'error',message:String(error?.message||'巡店讀取失敗')};
     patrolSummaryState=patrolSummary?'stale':'error';
     patrolSummaryMessage=String(error&&error.message||'巡店資料讀取失敗');
-    try{render();}catch(renderError){console.error('Patrol render failed:',renderError);}
+    try{render();}catch(renderError){void 0;}
     showMsg(afterWrite?`${writeMessage}，但正式摘要更新失敗：${patrolSummaryMessage}；保留上次成功正式摘要`:patrolSummaryMessage,'err');
     return false;
   });
@@ -2394,20 +2502,16 @@ function cloudWrite(details){
   });
   if(part.length) chunks.push(part);
 
-  // 每批失敗自動重試一次，避免一批網路閃斷讓後面全部沒送
-  const sendChunk = (c, attempt)=>cloudCallJsonp('ptwrite', {payload: JSON.stringify(c)})
+  // A failed write is ambiguous: never replay a batch automatically.
+  const sendChunk = c=>cloudCallJsonp('ptwrite', {payload: JSON.stringify(c)})
     .then(res=>{
       if(res.status==='ok') return res.written||0;
       const error=new Error(res.message||'寫入失敗');error.reauthFailed=Boolean(res.reauthFailed);throw error;
-    })
-    .catch(err=>{
-      if(attempt < 1 && !err.reauthFailed) return sendChunk(c, attempt+1);
-      throw err;
     });
 
   let written = 0, chain = Promise.resolve();
-  chunks.forEach(c=>{ chain = chain.then(()=>sendChunk(c, 0)).then(n=>{ written += n; }); });
-  return chain.then(()=>waitForPatrolReadback(details,written));
+  chunks.forEach(c=>{ chain = chain.then(()=>sendChunk(c)).then(n=>{ written += n; }); });
+  return chain.then(()=>{showMsg('原始巡店資料寫入成功；正在讀回核對，請勿重複送出。','ok');return waitForPatrolReadback(details,written);});
 }
 
 function setCloudStatus(text, on){
@@ -2981,7 +3085,6 @@ const MI = (function(){
         if(changed) localStorage.setItem(LS,JSON.stringify(next));
       }
     }catch(error){
-      console.warn('MILEAGE_RETENTION_CLEANUP_FAILED',{month:base,reason:String(error&&error.message||error)});
       // Fail open: leave browser state untouched and continue the mileage read.
       // Do not trim in-memory months either: a failed cleanup must be a no-op.
       return {months:[...retained].sort(),protectedMonth:protectedCurrent||'',cleanupFailed:true};
@@ -3053,7 +3156,6 @@ const MI = (function(){
       if(generation!==loadGeneration||!state.loading)return;
       state.slow={code:ERROR.LOAD_SLOW,reason:`${month} 月份明細讀取已超過 10 秒`,progress:state.progress};
       render();
-      console.warn('MILEAGE_HEALTH',{month,code:ERROR.LOAD_SLOW,reason:state.slow.reason,progress:state.progress});
     },LOAD_TARGET_MS);
     try{
       const next=await loadMonthDetails(month,()=>{
@@ -3065,7 +3167,6 @@ const MI = (function(){
       delete previewRowsByMonth[month];
       if(state.month===month) state.provisional=false;
       const report=health(month);
-      console[report.abnormal?'warn':'info']('MILEAGE_HEALTH',report);
       if(generation===loadGeneration){
         if(!wasLoaded) state.date='';
         state.loading=false; state.error=null; state.slow=null; state.progress=''; render();
@@ -3075,7 +3176,6 @@ const MI = (function(){
       if(generation===loadGeneration){
         state.loading=false;
         state.error=classifyReadError(error); state.slow=null;
-        console.error('MILEAGE_HEALTH', {month,code:state.error.code,reason:state.error.message});
         render();
       }
       throw error;
@@ -3166,7 +3266,7 @@ const MI = (function(){
     const month=canonicalMonth(value)||canonicalMonth(state.month);
     if(!month) return Promise.resolve(false);
     return hydrateMonth(month,true).then(()=>true).catch(error=>{
-      console.error('Mileage refresh failed:',error);
+      void 0;
       return false;
     });
   }
@@ -3418,7 +3518,6 @@ const MI = (function(){
     report.status=report.firstBreak?'error':'ok';
     report.finishedAt=new Date().toISOString();
     state.diagnostic=report;
-    console[report.firstBreak?'warn':'info']('PATROL_MILEAGE_READ_DIAGNOSTIC',report);
     render();
     return report;
   }
@@ -3629,14 +3728,14 @@ const MI = (function(){
     cleanupRetention(taipeiCurrentMonth(),month);
     state.month=month; state.date=''; state.provisional=Boolean(previewRowsByMonth[month]); state.loading=!state.provisional&&!loadedMonths[month]; state.error=null; render();
     if(state.provisional) return Promise.resolve(true);
-    return hydrateMonth(month,false).catch(error=>{console.error('Mileage hydration failed:',error);return false;});
+    return hydrateMonth(month,false).catch(error=>{void 0;return false;});
   }
   function setMonth(v){
     const month=canonicalMonth(v); if(!month) return Promise.resolve(false);
     cleanupRetention(taipeiCurrentMonth(),month);
     state.month=month; state.date=''; state.provisional=Boolean(previewRowsByMonth[month]); state.loading=!state.provisional&&!loadedMonths[month]; state.error=null; render();
     if(state.provisional) return Promise.resolve(true);
-    return hydrateMonth(month,false).catch(error=>{console.error('Mileage hydration failed:',error);return false;});
+    return hydrateMonth(month,false).catch(error=>{void 0;return false;});
   }
   function shiftMonth(delta){
     const month=canonicalMonth(state.month)||taipeiCurrentMonth();

@@ -56,7 +56,8 @@ function patrolHealth_() {
     contract: 'patrol-auth-v3',
     sessionContract: PATROL_SESSION_CONTRACT,
     authDeployment: PATROL_AUTH_DEPLOYMENT,
-    mileageContracts: ['patrol-mileage-month-v1', 'patrol-mileage-visits-v2']
+    mileageContracts: ['patrol-mileage-month-v1', 'patrol-mileage-visits-v2'],
+    dashboardContracts: [PATROL_DASHBOARD_CONTRACT]
   };
 }
 
@@ -72,6 +73,10 @@ function patrolGetRoute_(action, params) {
     ptRequireSession_(query.token, action);
     const month = patrolSummaryMonth_(query.month);
     return {status: 'ok', summary: readPatrolSummary_(month), stores: PT_STORES, title: PT_TITLE};
+  }
+  if (action === 'ptdashboard') {
+    ptRequireSession_(query.token, action);
+    return readPatrolDashboard_({month: patrolSummaryMonth_(query.month)});
   }
   if (action === 'ptdetail') {
     ptRequireSession_(query.token, action);
@@ -130,6 +135,7 @@ function doPost(e) {
     if (action === 'ptauth') result = ptAuthenticatePayload(payload);
     else if (action === 'ptlogout') result = ptLogoutPayload(payload);
     else if (action === 'ptsummary') result = ptSummaryPostPayload_(payload);
+    else if (action === 'ptdashboard') result = ptDashboardPostPayload_(payload);
     else if (action === 'ptdetail') result = ptDetailPostPayload_(payload);
     else if (action === 'ptmileage') result = ptMileageMonthPostPayload_(payload);
     else if (action === 'ptmileage2') result = ptMileage2MonthPostPayload_(payload);

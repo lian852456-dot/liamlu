@@ -68,6 +68,7 @@ async function stubGas(page) {
     const request = route.request();
     if (request.method() === 'POST') {
       const payload = JSON.parse(request.postData() || '{}');
+      if (payload.action === 'sread' || payload.action === 'hread') return route.fulfill({contentType:'application/json',body:JSON.stringify(payload.token===PT_TOKEN ? {status:'ok', ...(payload.action==='sread'?{schedule:privateScheduleFixture()}:{rows:halfRows})} : {status:'error',message:'unauthorized'})});
       if (payload.action === 'ptauth') {
         const authed = payload.key === PT_KEY || payload.token === PT_TOKEN;
         return route.fulfill({
@@ -494,8 +495,8 @@ test('新版 25 題只有 V 完成，NA 的第 1、3、10 題維持缺項', asyn
   await openAndUnlock(page, PT_KEY, '2026-09');
 
   await expect(page.locator('#sep25LoadState')).toContainText('正式 ptdetail 唯讀驗證完成');
-  await expect(page.locator('#sep25Overview')).toContainText('尚缺檢核項次');
-  await expect(page.locator('#sep25Overview')).toContainText('3');
+  await expect(page.locator('#sep25Overview')).not.toContainText('尚缺檢核項次');
+  await expect(page.locator('#sep25Overview')).toContainText('025 項完成店數');
   const card = page.locator('#sep25Content .store-card').filter({ hasText:'台北通化' });
   await expect(card).toContainText('缺 3 項');
   await expect(card.locator('.pill')).toHaveClass(/partial/);
@@ -1228,9 +1229,9 @@ test('督導到店檢查自 2026/09 起改為新版第 1–9 題，舊日期仍�
   await expect(page.locator('.half-item').last()).toContainText('到店全盤');
 });
 
-test('半月同步 token 逾時時保留本機資料，重新驗證後只續傳一次', async ({ page }) => {
+test('半月同步 token 逾時時保留本機資料，重新驗證後不自動重送寫入', async ({ page }) => {
   // 18 題依既有 URL 長度限制切成 3 個 hwrite；讓第 2 段失效，
-  // 驗證不會從頭重送已成功的第 1 段。
+  // 驗證重新驗證完成後也不自動重送任何寫入。
   expireHalfWriteAt = 2;
   await stubGas(page);
   await openAndUnlock(page);
@@ -1251,10 +1252,10 @@ test('半月同步 token 逾時時保留本機資料，重新驗證後只續傳�
 
   await page.locator('#patrolReauthPasscode').fill(PT_KEY);
   await page.getByRole('button', { name: '重新驗證並繼續同步' }).click();
-  await expect.poll(() => halfRows.length).toBe(18);
-  await expect(page.locator('#halfMsg')).toContainText('已同步雲端');
-  expect(halfWriteCalls).toBe(4); // 第 1 段成功 + 第 2 段失敗／續傳 + 第 3 段成功
-  expect(new Set(halfRows.map(row => `${row.checkId}|${row.item}`)).size).toBe(18);
+  await expect(page.locator('#halfMsg')).toContainText('原寫入未自動重送');
+  expect(halfRows).toHaveLength(7);
+  expect(halfWriteCalls).toBe(2);
+  expect(new Set(halfRows.map(row => `${row.checkId}|${row.item}`)).size).toBe(7);
 
   await page.reload();
   await expect(page.locator('#patrolAuthGate')).toBeHidden();

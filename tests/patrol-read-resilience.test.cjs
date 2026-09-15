@@ -1,0 +1,273 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+const vm = require('node:vm');
+
+const patrol = fs.readFileSync(path.join(__dirname, '..', 'patrol.html'), 'utf8');
+
+const readStart = patrol.indexOf('const PATROL_READ_ACTIONS =');
+const readEnd = patrol.indexOf('function patrolReauthFailure', readStart);
+assert.ok(readStart >= 0 && readEnd > readStart, 'patrolReadRequest source is present');
+const readTransportSource = patrol.slice(readStart, readEnd);
+
+const writeStart = patrol.indexOf('function cloudWrite(details){');
+const writeEnd = patrol.indexOf('\nfunction setCloudStatus', writeStart);
+assert.ok(writeStart >= 0 && writeEnd > writeStart, 'cloudWrite source is present');
+const writeSource = patrol.slice(writeStart, writeEnd);
+
+const READ_ACTIONS = [
+  'ping', 'pthealth', 'ptsummary', 'ptdetail', 'ptmileage', 'ptmileage2',
+  'sread', 'hread', 'ptdashboard'
+];
+const RETRY_STATUSES = [404, 429, 500, 502, 503, 504];
+const RETRY_DELAYS = [2000, 5000];
+
+function response(status, payload, options = {}) {
+  const body = options.rawBody === undefined ? JSON.stringify(payload) : options.rawBody;
+  const contentType = options.contentType || 'application/json; charset=utf-8';
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    redirected: options.redirected === undefined ? true : options.redirected,
+    url: options.url || `https://script.google.com/macros/s/test/exec?action=ptsummary&token=TOKEN_CANARY#HASH_CANARY`,
+    headers: { get: name => String(name).toLowerCase() === 'content-type' ? contentType : null },
+    text: async () => body
+  };
+}
+
+function namedError(name, message = `${name} CANARY`) {
+  const error = new Error(message);
+  error.name = name;
+  return error;
+}
+
+function harness(outcomes) {
+  let clock = 0;
+  let nextTimerId = 0;
+  const calls = [];
+  const logs = [];
+  const timers = [];
+  const clearedTimers = [];
+  const queue = [...outcomes];
+  const cachedSummaryKey = 'bei12b_patrol_summary_v2:sep25-v-only-two-visits-7d-v1:2026-09';
+  const sessionValues = new Map([[cachedSummaryKey, JSON.stringify({
+    month: '2026-09', contract: 'sep25-v-only-two-visits-7d-v1', updatedAt: '2026-09-15T09:00:00+08:00',
+    totalStores: 9, visitedStores: 4, fullyDoneStores: 1
+  })]]);
+  const sessionStorage = {
+    removeCalls: [],
+    setCalls: [],
+    getItem: key => sessionValues.get(key) || null,
+    setItem: (key, value) => { sessionStorage.setCalls.push(key); sessionValues.set(key, String(value)); },
+    removeItem: key => { sessionStorage.removeCalls.push(key); sessionValues.delete(key); }
+  };
+
+  class FakeAbortController {
+    constructor() { this.signal = {aborted: false}; }
+    abort() { this.signal.aborted = true; }
+  }
+
+  const context = vm.createContext({
+    AbortController: FakeAbortController,
+    Date,
+    JSON,
+    URL,
+    Promise,
+    PT_TOKEN: 'SESSION_CANARY',
+    sessionStorage,
+    performance: {now: () => ++clock},
+    patrolAuthReason: value => String(value?.reason || value?.auth?.reason || value?.authReason || ''),
+    setTimeout: (callback, delay) => {
+      const timer = {id: ++nextTimerId, callback, delay, cleared: false};
+      timers.push(timer);
+      // Retry sleeps are virtualized; request timeout timers never fire in these tests.
+      if (RETRY_DELAYS.includes(delay)) Promise.resolve().then(callback);
+      return timer;
+    },
+    clearTimeout: timer => {
+      if (timer) timer.cleared = true;
+      clearedTimers.push(timer);
+    },
+    console: {info: (...args) => logs.push(args[1] === undefined ? args[0] : args[1])},
+    fetch: async (url, options) => {
+      calls.push({url: String(url), options});
+      assert.ok(queue.length > 0, 'unexpected extra request');
+      const outcome = queue.shift();
+      if (outcome instanceof Error) throw outcome;
+      return outcome;
+    }
+  });
+
+  vm.runInContext(readTransportSource, context);
+  return {
+    context,
+    calls,
+    logs,
+    sessionStorage,
+    cachedSummaryKey,
+    timers,
+    clearedTimers,
+    retryDelays: () => timers.filter(timer => RETRY_DELAYS.includes(timer.delay)).map(timer => timer.delay)
+  };
+}
+
+test('every allowlisted read action retries each transient HTTP status once and stops on success', async () => {
+  for (const action of READ_ACTIONS) {
+    for (const status of RETRY_STATUSES) {
+      const env = harness([
+        response(status, {status: 'error', message: `temporary ${status}`}),
+        response(200, {status: 'ok', action})
+      ]);
+      const result = await env.context.patrolReadRequest(action, 'https://synthetic.invalid/read', {
+        method: 'POST',
+        body: JSON.stringify({token: 'TOKEN_CANARY', name: 'NAME_CANARY'})
+      });
+      assert.deepEqual(result, {status: 'ok', action});
+      assert.equal(env.calls.length, 2, `${action} HTTP ${status}`);
+      assert.deepEqual(env.retryDelays(), [2000], `${action} HTTP ${status} delay`);
+      assert.deepEqual(env.logs.map(entry => entry.attempt), [1, 2], `${action} HTTP ${status} attempts`);
+      assert.equal(env.logs[1].retrySucceeded, true, `${action} HTTP ${status} recovery`);
+    }
+  }
+});
+
+test('three transient failures are finite, wait 2 seconds then 5 seconds, and expose the required unavailable error', async () => {
+  const env = harness([
+    response(500, {status: 'error'}),
+    response(500, {status: 'error'}),
+    response(500, {status: 'error'})
+  ]);
+  await assert.rejects(
+    env.context.patrolReadRequest('ptsummary', 'https://synthetic.invalid/read'),
+    error => {
+      assert.equal(error.message, '巡店後端暫時無回應，已自動重試3次。session仍保留，可按重新連線，不需要登出。');
+      assert.equal(error.httpStatus, 500);
+      assert.equal(error.retryExhausted, true);
+      return true;
+    }
+  );
+  assert.equal(env.calls.length, 3);
+  assert.deepEqual(env.retryDelays(), [2000, 5000]);
+  assert.deepEqual(env.logs.map(entry => entry.attempt), [1, 2, 3]);
+  assert.equal(env.logs.every(entry => entry.action === 'ptsummary'), true);
+  assert.equal(env.context.PT_TOKEN, 'SESSION_CANARY');
+  assert.deepEqual(env.sessionStorage.removeCalls, []);
+  assert.deepEqual(env.sessionStorage.setCalls, []);
+  assert.match(env.sessionStorage.getItem(env.cachedSummaryKey), /"month":"2026-09"/);
+});
+
+test('network TypeError and AbortError are retried once and recover without clearing session state', async () => {
+  for (const networkError of [namedError('TypeError'), namedError('AbortError')]) {
+    const env = harness([networkError, response(200, {status: 'ok', recovered: true})]);
+    const result = await env.context.patrolReadRequest('ptdetail', 'https://synthetic.invalid/read');
+    assert.deepEqual(result, {status: 'ok', recovered: true});
+    assert.equal(env.calls.length, 2);
+    assert.deepEqual(env.retryDelays(), [2000]);
+    assert.equal(env.logs[0].exceptionType, networkError.name);
+    assert.equal(env.logs[1].retrySucceeded, true);
+  }
+});
+
+test('explicit AUTH reasons in an HTTP 404 response win over transport retry classification', async () => {
+  for (const reason of [
+    'AUTH_SESSION_EXPIRED', 'AUTH_SESSION_REVOKED',
+    'AUTH_TOKEN_INVALID', 'AUTH_DEPLOYMENT_MISMATCH'
+  ]) {
+    const env = harness([response(404, {
+      status: 'error', reason, message: `${reason} TOKEN_CANARY NAME_CANARY`
+    })]);
+    const result = await env.context.patrolReadRequest(
+      'ptsummary',
+      'https://synthetic.invalid/read?action=ptsummary&token=TOKEN_CANARY#HASH_CANARY'
+    );
+    assert.equal(result.reason, reason);
+    assert.equal(env.calls.length, 1, reason);
+    assert.deepEqual(env.retryDelays(), [], reason);
+  }
+});
+
+test('HTTP 200 with non-JSON content fails once as SyntaxError and is never retried', async () => {
+  const env = harness([response(200, null, {rawBody: '<html>404 CANARY</html>', contentType: 'text/html'})]);
+  await assert.rejects(
+    env.context.patrolReadRequest('ptsummary', 'https://synthetic.invalid/read'),
+    error => error.name === 'SyntaxError'
+  );
+  assert.equal(env.calls.length, 1);
+  assert.deepEqual(env.retryDelays(), []);
+  assert.equal(env.logs[0].exceptionType, 'SyntaxError');
+});
+
+test('write and auth/media actions never enter the read retry loop', async () => {
+  for (const action of [
+    'ptwrite', 'hwrite', 'ptauth', 'ptlogout', 'ptvisit_write',
+    'half_media_upload', 'media', 'unknown-write'
+  ]) {
+    const env = harness([response(500, {status: 'error', message: 'write failed'})]);
+    await assert.rejects(env.context.patrolReadRequest(action, 'https://synthetic.invalid/write'));
+    assert.equal(env.calls.length, 1, action);
+    assert.deepEqual(env.retryDelays(), [], action);
+    assert.equal(env.logs.length, 0, `${action} must not emit read diagnostics`);
+  }
+});
+
+test('cloudWrite sends a failed batch exactly once and does not replay the ambiguous write', async () => {
+  const calls = [];
+  const messages = [];
+  const context = vm.createContext({
+    Promise,
+    JSON,
+    encodeURIComponent,
+    cloudOn: true,
+    secureUnlocked: true,
+    privateAccount: {username: 'synthetic'},
+    PT_TOKEN: 'TOKEN_CANARY',
+    cloudCallJsonp: async (...args) => {
+      calls.push(args);
+      throw new Error('synthetic write failure');
+    },
+    waitForPatrolReadback: () => { throw new Error('readback must not run'); },
+    showMsg: message => messages.push(String(message))
+  });
+  vm.runInContext(writeSource, context);
+  const details = [{
+    fillTime: '2026/9/15 10:00', arriveTime: '2026/9/15 10:01', leaveTime: '',
+    district: 'synthetic', code: 'DNB00000', store: 'SYNTHETIC_STORE',
+    inspector: 'SYNTHETIC_INSPECTOR', item: 1, result: 'V', reason: '', month: '2026-09'
+  }];
+  await assert.rejects(context.cloudWrite(details), /synthetic write failure/);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(messages, []);
+});
+
+test('read diagnostics use an exact safe allowlist and never expose URL query, hash, request body, or canaries', async () => {
+  const env = harness([
+    response(404, {status: 'error', message: 'temporary'}, {
+      url: 'https://synthetic.invalid/exec?action=ptsummary&token=TOKEN_CANARY&name=NAME_CANARY#HASH_CANARY'
+    }),
+    response(200, {status: 'ok'}, {
+      redirected: false,
+      url: 'https://synthetic.invalid/exec?action=ptsummary&token=TOKEN_CANARY&name=NAME_CANARY#HASH_CANARY'
+    })
+  ]);
+  await env.context.patrolReadRequest('ptsummary', 'https://synthetic.invalid/exec?action=ptsummary&token=TOKEN_CANARY#HASH_CANARY', {
+    method: 'POST',
+    body: JSON.stringify({key: 'PASSWORD_CANARY', token: 'TOKEN_CANARY', name: 'NAME_CANARY', store: 'STORE_CANARY'})
+  });
+  const expectedKeys = [
+    'timestamp', 'action', 'attempt', 'durationMs', 'httpStatus', 'redirected',
+    'contentType', 'responseUrl', 'exceptionType', 'retrySucceeded'
+  ].sort();
+  assert.deepEqual(Object.keys(env.logs[0]).sort(), expectedKeys);
+  assert.deepEqual(Object.keys(env.logs[1]).sort(), expectedKeys);
+  assert.equal(env.logs[0].httpStatus, 404);
+  assert.equal(env.logs[0].responseUrl, 'https://synthetic.invalid/exec');
+  assert.equal(env.logs[1].httpStatus, 200);
+  assert.equal(env.logs[1].responseUrl, 'https://synthetic.invalid/exec');
+  const serializedLogs = JSON.stringify(env.logs);
+  for (const canary of ['PASSWORD_CANARY', 'TOKEN_CANARY', 'NAME_CANARY', 'STORE_CANARY', 'HASH_CANARY']) {
+    assert.equal(serializedLogs.includes(canary), false, `diagnostics leak ${canary}`);
+  }
+});

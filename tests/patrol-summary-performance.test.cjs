@@ -90,7 +90,8 @@ test('mileage exposes explicit health reason codes and zero-detail consistency g
   assert.match(patrol, /cloudCall\('ptsummary',\{month\}\)/);
   assert.match(patrol, /cloudCall\('ptdetail',\{month,store,page,limit:100\}\)/);
   assert.match(patrol, /cloudCall\('ptmileage2',\{month\}\)/);
-  assert.match(patrol, /console\[report\.abnormal\?'warn':'info'\]\('MILEAGE_HEALTH',report\)/);
+  assert.doesNotMatch(patrol, /console[^\n]*MILEAGE_HEALTH/);
+  assert.match(patrol, /PATROL_READ_DIAGNOSTIC/);
 });
 
 test('App and patrol.html load ptsummary for dashboards and fail closed on transport errors', () => {
@@ -102,8 +103,8 @@ test('App and patrol.html load ptsummary for dashboards and fail closed on trans
   assert.doesNotMatch(app, /patrolRead\('ptread'/);
   assert.match(app, /巡店資料讀取逾時/);
   assert.match(app, /data-retry-patrol/);
-  assert.match(patrol, /cloudCall\('ptsummary',\{month:currentMonth\}\)/);
-  assert.match(patrol, /action==='ptsummary'\|\|action==='ptdetail'\|\|action==='ptmileage'\|\|action==='ptmileage2'[\s\S]*method:'POST'/);
+  assert.match(patrol, /cloudCall\('ptsummary',\{month\}\)/);
+  assert.match(patrol, /\['ptsummary','ptdetail','ptmileage','ptmileage2','ptdashboard'\]\.includes\(action\)[\s\S]*method:'POST'/);
   assert.match(patrol, /JSON\.stringify\(\{action,token:PT_TOKEN,\.\.\.params\}\)/);
   assert.doesNotMatch(patrol, /cloudCall\('ptread'\)/);
   assert.match(patrol, /patrolSummaryUnavailableHTML/);

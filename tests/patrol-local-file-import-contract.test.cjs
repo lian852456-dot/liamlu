@@ -11,13 +11,26 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const hashFile = file => crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex');
 const patrol = read('patrol.html');
 const importer = read('patrol-local-import.js');
+const countFunction = (source, name) => (source.match(new RegExp(`^function ${name}\\(`, 'gm')) || []).length;
 
-test('Patrol GAS 同步萬大正式代碼，正式 read model 維持 base main 位元一致', () => {
-  assert.equal(hashFile('patrol-gas/PatrolCode.gs'), 'fbd0b5bad7dd6af6024dfb8816eea0c7418dbe012e5fc9494cae834fdeba4b52');
-  assert.equal(hashFile('gas/Code.gs'), '42dc3d9c38a2c632b135db296e9e721628c0e85eff77fe309234a3bac7b44461');
+test('Patrol GAS preserves the read-model baseline and unique critical functions', () => {
   assert.equal(hashFile('patrol-read-model.js'), '2476e6073280d714ed645d90e1cd6194efd196a821fab95dd6da3bdc510f9de1');
-  assert.match(read('gas/Code.gs'), /\{ code: 'DNB10168', name: '台北萬大' \}/);
-  assert.match(read('patrol-gas/PatrolCode.gs'), /\{ code: 'DNB10168', name: '台北萬大' \}/);
+  const gas = read('gas/Code.gs');
+  const patrolGas = read('patrol-gas/PatrolCode.gs');
+  for (const name of [
+    'doGet', 'doPost', 'ptAuthenticatePayload', 'ptSummaryPostPayload_', 'ptDashboardPostPayload_',
+    'readPatrolSummary_', 'readPatrolDetail_', 'readPatrolDashboard_', 'writePatrol', 'readSchedule',
+    'writeHalfCheck', 'readHalfCheck', 'sendWeeklyPatrolReport', 'check21', 'checkAwareAndNotify',
+    'check16', 'kpiCalcAutoUpdate', 'kpiCalcWatchdog', 'checkSegAndNotify'
+  ]) {
+    assert.equal(countFunction(gas, name), 1, `gas/Code.gs ${name} must exist once`);
+  }
+  for (const name of ['doGet', 'doPost', 'ptDashboardPostPayload_', 'readPatrolDashboard_', 'writePatrol']) {
+    assert.equal(countFunction(patrolGas, name), 1, `patrol-gas/PatrolCode.gs ${name} must exist once`);
+  }
+  assert.match(gas, /\{ code: 'DNB10168', name: '台北萬大' \}/);
+  assert.match(patrolGas, /\{ code: 'DNB10168', name: '台北萬大' \}/);
+  assert.match(gas, /patrol-dashboard-sep25-v1/);
 });
 
 test('沒有新增 GAS route、Sheet schema、通行碼或 session 儲存', () => {

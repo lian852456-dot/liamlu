@@ -7,7 +7,7 @@ const root = path.join(__dirname, '..');
 const code = fs.readFileSync(path.join(root, 'gas/Code.gs'), 'utf8');
 const media = fs.readFileSync(path.join(root, 'gas/HalfMedia.gs'), 'utf8');
 
-const protectedActions = ['debug', 'ptread', 'ptsummary', 'ptdetail', 'ptwrite', 'ptvisit_read', 'sread', 'hread', 'hwrite'];
+const protectedActions = ['debug', 'ptread', 'ptsummary', 'ptdashboard', 'ptdetail', 'ptwrite', 'ptvisit_read', 'sread', 'hread', 'hwrite'];
 
 test('PT_KEY comes only from Script Properties and fails closed when absent', () => {
   assert.match(code, /getScriptProperties\(\)\.getProperty\('PT_KEY'\)/);
@@ -39,6 +39,7 @@ test('summary, detail and mileage POST reads accept only the existing short-live
   assert.doesNotMatch(code, /function ptSummaryPostPayload_\(payload\)[\s\S]*?ptCredentialAuthorized_\(body\.key/);
   assert.doesNotMatch(code, /function ptDetailPostPayload_\(payload\)[\s\S]*?ptCredentialAuthorized_\(body\.key/);
   assert.doesNotMatch(code, /function ptMileageMonthPostPayload_\(payload\)[\s\S]*?ptCredentialAuthorized_\(body\.key/);
+  assert.match(code, /function ptDashboardPostPayload_\(payload\)[\s\S]*ptRequireSession_\(body\.token, 'ptdashboard'\)/);
 });
 
 test('public health actions expose no patrol data or credentials', () => {

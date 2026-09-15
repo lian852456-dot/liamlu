@@ -265,7 +265,8 @@ function doGet(e) {
       contract: 'patrol-auth-v3',
       sessionContract: PATROL_SESSION_CONTRACT,
       authDeployment: PATROL_AUTH_DEPLOYMENT,
-      mileageContracts: ['patrol-mileage-month-v1', 'patrol-mileage-visits-v2']
+      mileageContracts: ['patrol-mileage-month-v1', 'patrol-mileage-visits-v2'],
+      dashboardContracts: [PATROL_DASHBOARD_CONTRACT]
     }, cb);
   }
 
@@ -370,6 +371,16 @@ function doGet(e) {
       return jsonResponse({ status:'ok', summary:readPatrolSummary_(month), stores:PT_STORES, title:PT_TITLE });
     } catch(err) {
       return jsonResponse(ptRouteErrorPayload_(err, action, e.parameter.token));
+    }
+  }
+
+  // ── 巡店追蹤：新版 25 題完整看板單次唯讀（向下相容新增 action）──
+  if (action === 'ptdashboard') {
+    try {
+      ptRequireSession_(e.parameter.token, action);
+      return jsonResponse(readPatrolDashboard_({ month:patrolSummaryMonth_(e.parameter.month) }));
+    } catch(err) {
+      return jsonResponse(ptRouteErrorPayload_(err, action, e.parameter.token), cb);
     }
   }
 
@@ -676,6 +687,12 @@ function ptSummaryPostPayload_(payload) {
   return { summary:readPatrolSummary_(month), stores:PT_STORES, title:PT_TITLE };
 }
 
+function ptDashboardPostPayload_(payload) {
+  const body = payload || {};
+  ptRequireSession_(body.token, 'ptdashboard');
+  return readPatrolDashboard_({ month:patrolSummaryMonth_(body.month) });
+}
+
 function ptDetailPostPayload_(payload) {
   const body = payload || {};
   ptRequireSession_(body.token, 'ptdetail');
@@ -825,6 +842,14 @@ const PATROL_MILEAGE_MAX_LIMIT = 500;
 const PATROL_MILEAGE_MAX_VISITS = 279;
 const PATROL_MILEAGE_CACHE_SECONDS = 120;
 const PATROL_MILEAGE_FIELDS = ['fillTime','arriveTime','code','store','month'];
+const PATROL_DASHBOARD_CONTRACT = 'patrol-dashboard-sep25-v1';
+const PATROL_DASHBOARD_VERSION = 1;
+const PATROL_DASHBOARD_MAX_ROWS = 5000;
+const PATROL_DASHBOARD_TOTAL_ITEMS = 25;
+const PATROL_DASHBOARD_MONTHLY_ITEMS = [1,2,3,4,5,6,7,8,9];
+const PATROL_DASHBOARD_BIMONTHLY_ITEMS = [10];
+const PATROL_DASHBOARD_NCC_ITEMS = [11,12,13,14,15,16,17,18,19,20,21,22,23,24,25];
+const PATROL_DASHBOARD_MIN_GAP_DAYS = 7;
 
 function patrolSummaryMonth_(value) {
   const month = String(value || '').trim();
@@ -1078,6 +1103,181 @@ function readPatrolSummary_(month) {
   const serialized = JSON.stringify(summary);
   if (serialized.length < 95000) cache.put(cacheKey, serialized, PATROL_SUMMARY_CACHE_SECONDS);
   return summary;
+}
+
+// ── 新版 25 題完整看板：單次 A:L scan，summary-only response；完整列仍由 ptdetail 按需讀取 ──
+function patrolDashboardMonths_(month) {
+  return ptWinMonths(month).filter(function(value) { return value <= month; });
+}
+
+function patrolDashboardStoreKey_(value) {
+  return String(value || '').replace('台灣大哥大數位生活', '').replace(/^台北/, '').replace(/\s+/g, '').trim();
+}
+
+function patrolDashboardRowsForStore_(rows, store) {
+  const code = String(store && store.code || '');
+  const key = patrolDashboardStoreKey_(store && store.name);
+  return (Array.isArray(rows) ? rows : []).filter(function(row) {
+    return (code && String(row && row.code || '') === code) || patrolDashboardStoreKey_(row && row.store) === key;
+  });
+}
+
+function patrolDashboardDate_(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(text)) {
+    const parsed = new Date(text);
+    if (!isNaN(parsed.getTime())) return Utilities.formatDate(parsed, 'Asia/Taipei', 'yyyy-MM-dd');
+  }
+  const match = text.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  return match ? match[1] + '-' + ('0' + Number(match[2])).slice(-2) + '-' + ('0' + Number(match[3])).slice(-2) : '';
+}
+
+function patrolDashboardFillDate_(row) {
+  return patrolDashboardDate_(row && (row.fillTime || row.arriveTime || row.date));
+}
+
+function patrolDashboardVisitDate_(row) {
+  return patrolDashboardDate_(row && (row.arriveTime || row.fillTime || row.date));
+}
+
+function patrolDashboardRowMonth_(row) {
+  const explicit = String(row && row.month || '').slice(0, 7);
+  return /^\d{4}-\d{2}$/.test(explicit) ? explicit : patrolDashboardFillDate_(row).slice(0, 7);
+}
+
+function patrolDashboardIsoDayGap_(first, second) {
+  const start = Date.parse(String(first || '') + 'T00:00:00Z');
+  const end = Date.parse(String(second || '') + 'T00:00:00Z');
+  return Number.isFinite(start) && Number.isFinite(end) ? Math.round((end - start) / 86400000) : 0;
+}
+
+function patrolDashboardAddDays_(value, days) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  date.setUTCDate(date.getUTCDate() + Number(days || 0));
+  return date.getUTCFullYear() + '-' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date.getUTCDate()).slice(-2);
+}
+
+function patrolDashboardVisitCadence_(rows, store, month) {
+  const dates = [];
+  const seen = {};
+  patrolDashboardRowsForStore_(rows, store).forEach(function(row) {
+    if (patrolDashboardRowMonth_(row) !== month) return;
+    const date = patrolDashboardVisitDate_(row);
+    if (date && !seen[date]) { seen[date] = true; dates.push(date); }
+  });
+  dates.sort();
+  const firstVisit = dates[0] || '';
+  const nextEligibleDate = firstVisit ? patrolDashboardAddDays_(firstVisit, PATROL_DASHBOARD_MIN_GAP_DAYS) : '';
+  const secondVisit = firstVisit ? dates.find(function(date) {
+    return patrolDashboardIsoDayGap_(firstVisit, date) >= PATROL_DASHBOARD_MIN_GAP_DAYS;
+  }) || '' : '';
+  return {
+    target:2, minGapDays:PATROL_DASHBOARD_MIN_GAP_DAYS, recordedVisits:dates.length,
+    qualifyingVisits:secondVisit ? 2 : (firstVisit ? 1 : 0), completed:Boolean(secondVisit),
+    firstVisit:firstVisit, secondVisit:secondVisit, nextEligibleDate:nextEligibleDate,
+    gapDays:secondVisit ? patrolDashboardIsoDayGap_(firstVisit, secondVisit) : 0, dates:dates
+  };
+}
+
+function patrolDashboardItemStatus_(rows, month, itemNo) {
+  const item = Number(itemNo);
+  const relevantMonths = item === 10 ? ptWinMonths(month) : [month];
+  const match = (Array.isArray(rows) ? rows : []).find(function(row) {
+    return Number(row && row.item) === item && relevantMonths.indexOf(patrolDashboardRowMonth_(row)) !== -1 && String(row && row.result || '').trim().toLowerCase() === 'v';
+  });
+  if (match) return {status:'done', date:patrolDashboardFillDate_(match)};
+  return {status:'miss', detail:item === 10 ? '本期(' + Number(relevantMonths[0].slice(5)) + '–' + Number(relevantMonths[1].slice(5)) + '月)未完成' : item >= 11 ? 'NCC每月宣導1次' : '每月執行1次'};
+}
+
+function patrolDashboardGroupProgress_(rows, month, itemNumbers) {
+  const items = itemNumbers.map(function(itemNo) {
+    return Object.assign({no:itemNo}, patrolDashboardItemStatus_(rows, month, itemNo));
+  });
+  const completed = items.filter(function(item) { return item.status === 'done'; }).length;
+  return {
+    completed:completed, total:items.length, missing:items.length - completed,
+    missingItems:items.filter(function(item) { return item.status !== 'done'; }).map(function(item) { return item.no; })
+  };
+}
+
+function patrolDashboardStoreSummary_(rows, store, month) {
+  const storeRows = patrolDashboardRowsForStore_(rows, store);
+  const currentRows = storeRows.filter(function(row) { return patrolDashboardRowMonth_(row) === month; });
+  const visits = patrolDashboardVisitCadence_(rows, store, month);
+  const monthly = patrolDashboardGroupProgress_(storeRows, month, PATROL_DASHBOARD_MONTHLY_ITEMS);
+  const bimonthly = patrolDashboardGroupProgress_(storeRows, month, PATROL_DASHBOARD_BIMONTHLY_ITEMS);
+  const ncc = patrolDashboardGroupProgress_(storeRows, month, PATROL_DASHBOARD_NCC_ITEMS);
+  const missingItemNumbers = monthly.missingItems.concat(bimonthly.missingItems, ncc.missingItems);
+  const dates = currentRows.map(patrolDashboardFillDate_).filter(Boolean).sort();
+  const questionsComplete = missingItemNumbers.length === 0;
+  return {
+    name:String(store && (store.name || store.store) || ''), code:String(store && store.code || ''),
+    visited:currentRows.length > 0, done:PATROL_DASHBOARD_TOTAL_ITEMS - missingItemNumbers.length,
+    missingItems:missingItemNumbers.length, missingItemNumbers:missingItemNumbers,
+    pct:Math.round((PATROL_DASHBOARD_TOTAL_ITEMS - missingItemNumbers.length) / PATROL_DASHBOARD_TOTAL_ITEMS * 100),
+    status:currentRows.length ? (questionsComplete && visits.completed ? 'complete' : 'attention') : 'pending',
+    questionsComplete:questionsComplete, visits:visits,
+    lastVisit:dates.length ? dates[dates.length - 1] : '', monthly:monthly, bimonthly:bimonthly, ncc:ncc
+  };
+}
+
+function patrolDashboardOverview_(rows, month) {
+  const stores = PT_STORES.map(function(store) { return patrolDashboardStoreSummary_(rows, store, month); });
+  const visited = stores.filter(function(store) { return store.visited; });
+  return {
+    month:month, totalStores:stores.length, visitedStores:visited.length,
+    fullyDoneStores:visited.filter(function(store) { return store.status === 'complete'; }).length,
+    questionCompleteStores:visited.filter(function(store) { return store.questionsComplete; }).length,
+    visitCadenceCompleteStores:visited.filter(function(store) { return store.visits.completed; }).length,
+    totalMissingItems:visited.reduce(function(sum, store) { return sum + store.missingItems; }, 0),
+    unvisitedStores:stores.filter(function(store) { return !store.visited; }).map(function(store) { return store.name; }),
+    stores:stores, groups:{monthly:PATROL_DASHBOARD_MONTHLY_ITEMS, bimonthly:PATROL_DASHBOARD_BIMONTHLY_ITEMS, ncc:PATROL_DASHBOARD_NCC_ITEMS},
+    window:(function() {
+      const months = ptWinMonths(month);
+      return {months:months, label:Number(months[0].slice(5)) + '–' + Number(months[1].slice(5)) + '月'};
+    })(), totalItems:PATROL_DASHBOARD_TOTAL_ITEMS
+  };
+}
+
+function readPatrolDashboard_(options) {
+  const month = patrolSummaryMonth_(options && options.month);
+  if (month < '2026-09') throw new Error('ptdashboard_requires_sep25_contract');
+  if (PT_STORES.length !== 9) throw new Error('ptdashboard_store_contract_mismatch');
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(PATROL_SHEET);
+  if (!sheet) throw new Error('ptdashboard_source_missing');
+  const meta = patrolSummarySourceMeta_(sheet);
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'ptdashboard:' + month + ':' + Utilities.base64EncodeWebSafe(meta.sourceVersion).slice(0, 80);
+  const cached = cache.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+
+  const months = patrolDashboardMonths_(month);
+  const allRows = readPatrolContractColumns_(sheet);
+  const sourceRows = allRows.filter(function(row) {
+    return months.indexOf(patrolDashboardRowMonth_(row)) !== -1 && PT_STORES.some(function(store) {
+      return patrolDashboardRowsForStore_([row], store).length > 0;
+    });
+  });
+  if (sourceRows.length > PATROL_DASHBOARD_MAX_ROWS) throw new Error('ptdashboard_row_cap_exceeded');
+  const rowCount = sourceRows.filter(function(row) {
+    const item = Number(row && row.item);
+    return item >= 1 && item <= PATROL_DASHBOARD_TOTAL_ITEMS;
+  }).length;
+  const result = {
+    status:'ok', contract:PATROL_DASHBOARD_CONTRACT, version:PATROL_DASHBOARD_VERSION,
+    month:month, months:months, stores:PT_STORES, storeCount:PT_STORES.length,
+    rowCount:rowCount, sourceRowCount:sourceRows.length, maxRows:PATROL_DASHBOARD_MAX_ROWS,
+    summary:patrolDashboardOverview_(sourceRows, month),
+    sourceVersion:String(meta.sourceVersion || ''), sourceUpdatedAt:String(meta.sourceUpdatedAt || ''),
+    generatedAt:Utilities.formatDate(new Date(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX")
+  };
+  const serialized = JSON.stringify(result);
+  if (serialized.length >= 95000) throw new Error('ptdashboard_response_too_large');
+  cache.put(cacheKey, serialized, PATROL_SUMMARY_CACHE_SECONDS);
+  return result;
 }
 
 function readPatrolDetail_(options) {
@@ -2436,6 +2636,7 @@ function doPost(e) {
     if (action === 'ptauth') result = ptAuthenticatePayload(payload);
     else if (action === 'ptlogout') result = ptLogoutPayload(payload);
     else if (action === 'ptsummary') result = ptSummaryPostPayload_(payload);
+    else if (action === 'ptdashboard') result = ptDashboardPostPayload_(payload);
     else if (action === 'ptdetail') result = ptDetailPostPayload_(payload);
     else if (action === 'ptmileage') result = ptMileageMonthPostPayload_(payload);
     else if (action === 'ptmileage2') result = ptMileage2MonthPostPayload_(payload);
@@ -2478,7 +2679,7 @@ function doPost(e) {
     else throw new Error('unknown private dashboard action');
     return privateDashboardPostResponse({ status: 'ok', ...result }, e);
   } catch (err) {
-    const patrolActions = ['ptauth','ptlogout','ptsummary','ptdetail','ptmileage','ptmileage2','ptvisit_write','hwrite','half_media_upload'];
+    const patrolActions = ['ptauth','ptlogout','ptsummary','ptdashboard','ptdetail','ptmileage','ptmileage2','ptvisit_write','hwrite','half_media_upload'];
     const response = patrolActions.indexOf(action) >= 0
       ? ptRouteErrorPayload_(err, action, payload && payload.token)
       : { status: 'error', message: err && err.message ? err.message : String(err) };
