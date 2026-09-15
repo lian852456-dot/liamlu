@@ -62,7 +62,8 @@
     background:var(--bg);color:var(--ink);line-height:1.55;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:1080px;margin:0 auto;padding:20px 16px 80px}
+  .wrap{width:100%;max-width:1664px;margin:0 auto;padding:20px 32px 80px}
+  .wrap>*{min-width:0}
 
   /* Header */
   header{
@@ -352,6 +353,10 @@
   .secure-table th{background:#fff3e9;color:#b94b00;font-size:14px;white-space:nowrap}
   .secure-table tr:last-child td{border-bottom:0}
   .secure-table .center{text-align:center}
+  /* Keep imported columns readable; wide sheets scroll inside their card. */
+  #supervisorInterviewPreview .secure-table{table-layout:auto;line-height:1.6}
+  #supervisorInterviewPreview .secure-table td{min-width:96px;max-width:360px;overflow-wrap:anywhere}
+  #supervisorInterviewPreview .secure-table th{font-size:16px}
   .schedule-person{display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;padding:3px 7px;border-radius:6px;background:#f5f5f5;white-space:nowrap}
   .schedule-person.manager{background:#fff0df;color:#b94b00;font-weight:800}
   .schedule-person.off{color:#999;text-decoration:line-through;background:#fafafa}
@@ -440,6 +445,9 @@
   .auth-gate-message{min-height:20px;margin-top:14px;font-size:16px;font-weight:700;color:#b42318}
   .auth-gate-note{margin-top:18px!important;font-size:14px;color:#7a8692!important}
   @media(max-width:650px){
+    .wrap{padding:16px 12px 60px}
+    header{padding:18px 16px}
+    .cloud-row input{min-width:0;flex-basis:100%;width:100%}
     .secure-tab{flex:1;min-width:0;padding:8px 7px;font-size:14px}
     .mi-stats{grid-template-columns:repeat(2,1fr)}
     .mi-leg{grid-template-columns:1fr;gap:4px}
