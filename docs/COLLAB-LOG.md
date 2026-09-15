@@ -1,3 +1,9 @@
+## 2026-09-15 巡店 GAS v9 與正式候選驗收
+
+- 原 Deployment 已於19:18完成第9版；ID/存取權限不變，程式與manifest回讀核對通過。
+- pthealth HTTP200、新 ptdashboard 正常session驗證通過；補上歷史店碼相容，Node156/156、四項恢復瀏覽器回歸PASS。
+- Pages發布與正式網址新版驗收待完成，未寫入正式測試資料。詳見 PATROL_READ_RESILIENCE_20260915.md。
+
 # 跨 AI 協作日誌
 
 > 歷史 evidence：本檔保存過往改動、驗證與事故脈絡，不是現行 Agent 規則、待辦清單或固定工作流程。現行規則只以 repo 根目錄 `AGENTS.md` 為準。

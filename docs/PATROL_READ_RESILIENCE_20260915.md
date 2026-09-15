@@ -2,7 +2,7 @@
 
 ## 狀態
 
-候選程式完成，正式發布尚未完成。GAS 管理介面讀取受阻，未儲存或部署正式 GAS，未合併 main 或發布 Pages，未做新版正式 session 讀回。不得以本機測試認定偶發 404 已在線上排除。
+GAS 已於 2026-09-15 19:18 (Asia/Taipei) 部署正式第9版，原 Deployment ID／權限不變。pthealth HTTP 200；隔離候選頁正常登入後，新 ptdashboard 正式契約驗證完成，重新整理保留 session，舊月份讀取可用。Pages 與正式網址新版驗收待完成。
 
 ## 基線與直接原因
 
@@ -24,7 +24,7 @@
 ## 備份與部署候選
 
 - 已由既有 clasp 唯讀取回正式 v8 與 editor HEAD；兩者 PatrolCode SHA-256 相同：`8667d0fe01ef8b16989429a3cd99f0bb9a11fcaa27e62aa2ff726d489ccb9078`。
-- 正式 Deployment：`AKfycbxqBtW2yQw_u4qqJ9Knz6CK34hAiunaa6lIQu4pMa8Ff2voJZCWKEh8MXTJ6qAoGTax`，版本 **8**。這是目前 patrol.html 的隔離 Patrol 後端，不能使用早期 v58 共用後端交接代替。
+- 正式 Deployment：`AKfycbxqBtW2yQw_u4qqJ9Knz6CK34hAiunaa6lIQu4pMa8Ff2voJZCWKEh8MXTJ6qAoGTax`，本輪前版本 **8**，本輪已部署 **9**。這是目前 patrol.html 的隔離 Patrol 後端，不能使用早期 v58 共用後端交接代替。
 - 私有備份：工作區 `private-backups/patrol-read-resilience-20260915/{editor,v8,candidate}`，不納入 repo。未備份或輸出 Script Properties、通行碼、token 或正式巡店資料。
 - Candidate 從 live editor 備份加入最小增量；原92個函式保留，新16個函式，各存在一次；逆向移除增量後與原備份逐位元一致。HalfMedia 與 manifest 原樣保留。
 - 共用 gas/Code.gs 原本229個函式定義中 `kpiCalcPct` 有2個，基線即如此，本次未動；指定 KPI自動化/watchdog/巡店/班表/半月/每日回報/通知關鍵函式仍各1個。不得宣稱共用大檔所有函式皆唯一，也不將它整份部署至隔離 Patrol。
@@ -43,9 +43,15 @@
 
 ## 本機驗證
 
-- 巡店／auth／bundle／read model／新版contract／cache／retry，加上共用GAS日期與半月契約：155/155 PASS。
+- 巡店／auth／bundle／read model／新版contract／cache／retry，加上共用GAS日期與半月契約：156/156 PASS。
 - 原巡店與登入 Chromium：93/93 PASS；新增故障恢復／reload快取／新API單次讀取：4/4 PASS。
 - 每日回報入口最小 Chromium smoke：4/4 PASS；六個入口 inline JavaScript syntax、GAS syntax與diff check PASS。
 - 以正式v8增量候選執行相同GAS parity/單次scan測試：2/2 PASS；來源工作表不存在時直接失敗，不建立工作表。
 - 所有fixture與端點皆為合成／mock，未為驗收寫入正式巡店資料。匯入、寫入readback、里程、班表、到店檢查、面談入口、媒體與登入登出包含於93項瀏覽器回歸；這是本機零新增回歸證據，不是正式各功能驗收。
 - 舊版整檔GAS hash鎖定與已移除「尚缺檢核項次」卡片斷言已更新成目前契約；過期後写入自動續傳斷言依本次要求改為不重送，仍檢查本機內容與已成功批次保留。
+
+## 19:30 部署前正式驗收補記
+
+- 第9版 PatrolCode／HalfMedia 回讀與 candidate 位元組相同；manifest JSON 語意相同（僅格式差異）。v9 私有備份已保存。
+- 正式獨立 GAS 仍有歷史店碼別名；新前端補用舊讀取已有的限定別名轉換，未知碼仍拒絕。新增回歸通過，最新 Node 156/156、新瀏覽器4/4。
+- 早先頁面「通過正式後端驗證」是登入說明，不能當登入證據；實際舊 session 已明確 EXPIRED。正常重新驗證後，候選頁 ptdashboard 正式讀回成功，再次reload無須重登。

@@ -2309,7 +2309,15 @@ async function loadSep25FormalDashboard(month){
   }
 }
 
+function normalizePatrolDashboardStores(res){
+  // The isolated v8 backend retains this historical alias; match the existing legacy-reader normalization.
+  const normalize=store=>store&&store.name==='台北萬大'&&store.code==='DNB10xxx_wanda'?{...store,code:'DNB10168'}:store;
+  if(Array.isArray(res?.stores))res.stores=res.stores.map(normalize);
+  if(Array.isArray(res?.summary?.stores))res.summary={...res.summary,stores:res.summary.stores.map(normalize)};
+  return res;
+}
 function validatePatrolDashboard(res,month){
+  normalizePatrolDashboardStores(res);
   const fail=()=>{clearPatrolSummaryCache();throw new Error('巡店完整看板 contract 不一致');};
   if(res.contract!=='patrol-dashboard-sep25-v1'||res.version!==1||res.month!==month||res.storeCount!==9||res.maxRows!==5000||
     !Number.isInteger(res.rowCount)||res.rowCount<0||res.rowCount>5000||!Number.isInteger(res.sourceRowCount)||res.sourceRowCount<res.rowCount||res.sourceRowCount>5000||!Array.isArray(res.stores)||res.stores.length!==9)fail();
