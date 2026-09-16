@@ -60,14 +60,34 @@
             <div class="metric"><span>人員 / KPI</span><b id="peopleAndItems">—</b></div>
           </div>
           <div id="checks"></div>
-          <label class="confirm"><input id="confirmPublish" type="checkbox">我已確認檔名、資料日期、店數、人數與 KPI 項目，且知悉同日期發布會先備份目前正式 JSON。</label>
-          <label id="forceWrap" class="confirm hidden"><input id="forcePublish" type="checkbox" disabled>同日期或內容相同的版本，仍確認強制覆寫。</label>
+          <label class="confirm"><input id="confirmPublish" type="checkbox">我已確認檔名、資料日期、店數、人數與 KPI 項目；只有資料日期較目前正式版本更新時才能發布。</label>
           <div class="actions">
             <button id="publishBtn" type="button" disabled>確認發布</button>
             <button id="rollbackBtn" class="warn" type="button">回復上一版</button>
           </div>
         </div>
         <div id="result"></div>
+      </section>
+
+      <section class="card">
+        <h2>台獎雙檔預覽</h2>
+        <p class="small">店點與個人 Excel 只在本次記憶體解析，僅產生預覽摘要；不建立 Drive 暫存、不寫入正式台獎 JSON、不寄信、不更新網站或排程。</p>
+        <div class="grid">
+          <label>店點台獎 Excel <input id="awardStoreFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+          <label>個人台獎 Excel <input id="awardPersonFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+        </div>
+        <div class="actions"><button id="awardPreviewBtn" type="button">解析雙檔預覽</button></div>
+        <div id="awardMessage" class="message hidden" role="status"></div>
+        <div id="awardPreviewPanel" class="hidden">
+          <div class="meta">
+            <div class="metric"><span>店點資料日期</span><b id="awardStoreDate">—</b></div>
+            <div class="metric"><span>個人資料日期</span><b id="awardPersonDate">—</b></div>
+            <div class="metric"><span>店點 / 預期</span><b id="awardStoreCount">—</b></div>
+            <div class="metric"><span>人員 / 預期</span><b id="awardPersonCount">—</b></div>
+          </div>
+          <div id="awardDiff"></div>
+          <details class="notice"><summary>除錯資料（可展開；不含原始 Excel 內容）</summary><pre id="awardDebug"></pre></details>
+        </div>
       </section>
 
       <section class="card">
@@ -92,8 +112,7 @@
     function payload(extra) { return Object.assign({ employeeId: auth.employeeId, adminSecret: auth.adminSecret }, extra || {}); }
     function setBusy(button, busy, label) { button.disabled = busy; if (label) button.textContent = label; }
     function updatePublishButton() {
-      const forceRequired = !$('forceWrap').classList.contains('hidden');
-      $('publishBtn').disabled = !previewToken || !$('confirmPublish').checked || (forceRequired && !$('forcePublish').checked);
+      $('publishBtn').disabled = !previewToken || !$('confirmPublish').checked;
     }
     function renderLive(live) {
       $('liveInfo').textContent = live ? '目前正式版本：' + (live.label || '—') + '｜資料日期 ' + (live.dataDate || '—') + '｜最後更新 ' + (live.updatedAt || '—') : '目前尚無正式 KPI JSON。';
@@ -105,6 +124,19 @@
     function renderLog(entries) {
       const rows = (entries || []).map(entry => '<tr><td>' + esc(entry.acted_at) + '</td><td>' + esc(entry.kind) + '</td><td>' + esc(entry.file_name) + '</td><td>' + esc(entry.data_date) + '</td><td>' + esc(entry.result) + '</td></tr>').join('');
       $('log').innerHTML = rows ? '<table><thead><tr><th>時間</th><th>類型</th><th>檔案</th><th>資料日期</th><th>結果</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<p class="small">目前沒有更新紀錄。</p>';
+    }
+    function renderAwardPreview(result) {
+      const preview = result.preview || {};
+      const summary = preview.summary || {};
+      const reportDate = preview.reportDate || {};
+      $('awardStoreDate').textContent = reportDate.store || '讀不到';
+      $('awardPersonDate').textContent = reportDate.person || '讀不到';
+      $('awardStoreCount').textContent = (summary.storeCount == null ? '—' : summary.storeCount) + ' / ' + (summary.expectedStores == null ? '—' : summary.expectedStores) + ' 店';
+      $('awardPersonCount').textContent = (summary.personCount == null ? '—' : summary.personCount) + ' / ' + (summary.expectedPersons == null ? '—' : summary.expectedPersons) + ' 人';
+      const rows = (preview.diff || []).map(row => '<tr class="' + esc(row.result) + '"><td>' + esc(row.item) + '</td><td>' + esc(row.result === 'ok' ? '通過' : '阻擋') + '</td><td>' + esc(row.detail) + '</td></tr>').join('');
+      $('awardDiff').innerHTML = '<table class="checks"><thead><tr><th>檢查項目</th><th>結果</th><th>差異摘要</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      $('awardDebug').textContent = JSON.stringify(preview, null, 2);
+      $('awardPreviewPanel').classList.remove('hidden');
     }
     function readFileBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onerror = () => reject(new Error('檔案讀取失敗')); reader.onload = () => resolve(String(reader.result).split(',')[1] || ''); reader.readAsDataURL(file); }); }
     async function refreshLog() {
@@ -134,22 +166,17 @@
         $('peopleAndItems').textContent = (result.preview && result.preview.personCount != null ? result.preview.personCount : '—') + ' 人 / 25 項';
         previewToken = result.ok ? result.token : '';
         $('confirmPublish').checked = false;
-        const needsForce = Boolean(result.needsForce);
-        $('forceWrap').classList.toggle('hidden', !needsForce);
-        $('forcePublish').checked = false;
-        $('forcePublish').disabled = !needsForce || !previewToken;
         updatePublishButton();
         message('kpiMessage', result.ok ? '預覽完成，請核對後再確認發布。' : '預覽未通過，正式 JSON 未變更。', result.ok ? 'ok' : 'bad');
-      } catch (error) { previewToken = ''; $('forceWrap').classList.add('hidden'); updatePublishButton(); message('kpiMessage', error.message, 'bad'); }
+      } catch (error) { previewToken = ''; updatePublishButton(); message('kpiMessage', error.message, 'bad'); }
       finally { setBusy(button, false, '檔案預覽'); }
     });
     $('confirmPublish').addEventListener('change', updatePublishButton);
-    $('forcePublish').addEventListener('change', updatePublishButton);
     $('publishBtn').addEventListener('click', async () => {
       if (!previewToken || !$('confirmPublish').checked) return; const button = $('publishBtn');
       if (!window.confirm('確定發布此預覽版本？伺服器會先備份目前正式 JSON。')) return;
       setBusy(button, true, '發布中…'); message('kpiMessage', '正在備份、發布並讀回驗證…');
-      try { const result = await call('report_upload_commit', payload({ token:previewToken, force:$('forcePublish').checked })); $('result').innerHTML = '<div class="notice">' + esc(result.message || result.result || '已完成') + '</div>'; renderLive(result.live); previewToken = ''; $('confirmPublish').checked = false; $('forcePublish').checked = false; $('forceWrap').classList.add('hidden'); updatePublishButton(); await refreshLog(); message('kpiMessage', result.result === 'ok' ? '發布完成。' : (result.message || '發布未完成，正式資料維持上一版。'), result.result === 'ok' ? 'ok' : 'warn'); }
+      try { const result = await call('report_upload_commit', payload({ token:previewToken })); $('result').innerHTML = '<div class="notice">' + esc(result.message || result.result || '已完成') + '</div>'; renderLive(result.live); previewToken = ''; $('confirmPublish').checked = false; updatePublishButton(); await refreshLog(); message('kpiMessage', result.result === 'ok' ? '發布完成。' : (result.message || '發布未完成，正式資料維持上一版。'), result.result === 'ok' ? 'ok' : 'warn'); }
       catch (error) { message('kpiMessage', error.message, 'bad'); }
       finally { setBusy(button, false, '確認發布'); }
     });
@@ -159,6 +186,20 @@
       try { const result = await call('report_upload_rollback', payload({ kind:'kpi' })); renderLive(result.live); await refreshLog(); message('kpiMessage', '已回復：' + result.restored, 'ok'); }
       catch (error) { message('kpiMessage', error.message, 'bad'); }
       finally { setBusy(button, false, '回復上一版'); }
+    });
+    $('awardPreviewBtn').addEventListener('click', async () => {
+      const store = $('awardStoreFile').files[0]; const person = $('awardPersonFile').files[0]; const button = $('awardPreviewBtn');
+      if (!store || !person) return message('awardMessage', '請同時選擇店點與個人台獎 Excel。', 'bad');
+      setBusy(button, true, '解析預覽中…'); message('awardMessage', '正在進行雙檔日期、店點、人員、重複／缺漏、排名與獎金欄位檢查；不會建立暫存或發布。');
+      try {
+        const result = await call('report_award_pair_preview', payload({
+          storeFile: { fileName: store.name, mimeType: store.type, fileBase64: await readFileBase64(store) },
+          personFile: { fileName: person.name, mimeType: person.type, fileBase64: await readFileBase64(person) }
+        }));
+        renderAwardPreview(result);
+        message('awardMessage', result.ok ? '雙檔預覽通過；仍未發布任何正式資料。' : '雙檔預覽發現阻擋項目；正式台獎資料維持不變。', result.ok ? 'ok' : 'bad');
+      } catch (error) { message('awardMessage', error.message, 'bad'); }
+      finally { setBusy(button, false, '解析雙檔預覽'); }
     });
   </script>
 </body>

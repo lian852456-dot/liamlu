@@ -156,8 +156,8 @@ test('稽核紀錄寫在私有名冊試算表的新分頁，未改既有 Sheet �
 });
 
 // ── 五：權限（前端與後端都檢查）─────────────────────────────
-test('四個上傳端點在做任何事之前都先授權', () => {
-  for (const name of ['reportUploadPreview', 'reportUploadCommit', 'reportUploadLog', 'reportUploadRollback']) {
+test('所有上傳與雙檔預覽端點在做任何事之前都先授權', () => {
+  for (const name of ['reportUploadPreview', 'reportUploadCommit', 'reportUploadLog', 'reportUploadRollback', 'reportAwardPairPreview']) {
     const body = functionBody(code, name);
     const authAt = body.indexOf('reportUploadAuthorize_');
     assert.notEqual(authAt, -1, `${name} 未授權`);
@@ -180,9 +180,9 @@ test('commit 會確認預覽與確認是同一位操作者', () => {
   assert.match(functionBody(code, 'reportUploadCommit'), /staged\.employeeId !== employeeId/);
 });
 
-test('doPost 已掛上四個上傳 action', () => {
+test('doPost 已掛上上傳與 preview-only 台獎 action', () => {
   const doPost = functionBody(code, 'doPost');
-  for (const action of ['report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback']) {
+  for (const action of ['report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback', 'report_award_pair_preview']) {
     assert.match(doPost, new RegExp(`action === '${action}'`));
   }
 });
@@ -223,7 +223,7 @@ test('智慧營運中心入口直接開啟獨立 Apps Script，且本身仍不�
 // ── 純函式行為測試（把驗證函式抽出來實際跑）────────────────
 function loadValidators() {
   const names = [
-    'reportUploadCheck_', 'reportUploadValidateFile_', 'reportUploadDateChecks_',
+    'reportUploadCheck_', 'reportUploadValidateFile_', 'reportUploadDateChecks_', 'reportUploadKpiDateChecks_',
     'reportUploadValidateKpi_', 'reportUploadValidateAward_', 'reportUploadBlocked_',
     'reportUploadKpiDate_', 'reportUploadKind_', 'reportUploadStoreMatch_', 'reportUploadStoreBuckets_'
   ];
@@ -268,6 +268,14 @@ test('舊日期會被擋下、同日期只提醒（情境 7：上傳舊日期）
   assert.equal(V.reportUploadDateChecks_('2026-07-30', live).find(c => c.key === 'newer').level, 'warn');
   assert.equal(V.reportUploadDateChecks_('2026-07-31', live).find(c => c.key === 'newer').level, 'ok');
   assert.equal(V.reportUploadDateChecks_('', live).find(c => c.key === 'date').level, 'block');
+});
+
+test('KPI 同日期或舊日期一律拒絕，不能走 force 覆寫', () => {
+  const live = { dataDate: '2026-07-30' };
+  assert.equal(V.reportUploadKpiDateChecks_('2026-07-30', live).find(c => c.key === 'newer').level, 'block');
+  assert.equal(V.reportUploadKpiDateChecks_('2026-07-29', live).find(c => c.key === 'newer').level, 'block');
+  assert.equal(V.reportUploadKpiDateChecks_('2026-07-31', live).find(c => c.key === 'newer').level, 'ok');
+  assert.match(functionBody(code, 'reportUploadCommit'), /if \(kind === 'kpi'\) incoming\.force = false/);
 });
 
 test('首次發佈（無正式資料）視為可放行的提醒', () => {
@@ -622,6 +630,79 @@ test('前端日期面板同時顯示四項並說明檔名與資料日期的差�
   assert.match(fn, /不用檔名推算/);
 });
 
+function loadAwardPairPreviewBuilder() {
+  const names = ['reportAwardPairBuildPreview_'];
+  const src = `
+    const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
+    const REPORT_AWARD_PAIR_EXPECTED_STORES = 9;
+    const REPORT_AWARD_PAIR_EXPECTED_PERSONS = 41;
+    function reportUploadCheck_(${rawArgs('reportUploadCheck_')}) {${functionBody(code, 'reportUploadCheck_')}}
+    function reportAwardPairBuildPreview_(${rawArgs('reportAwardPairBuildPreview_')}) {${functionBody(code, 'reportAwardPairBuildPreview_')}}
+    module.exports = { reportAwardPairBuildPreview_ };
+  `;
+  const sandbox = { module: { exports: {} }, console };
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox);
+  return sandbox.module.exports;
+}
+
+const AwardPreview = loadAwardPairPreviewBuilder();
+function loadAwardDateParser() {
+  const src = `module.exports = function reportAwardPairRangeDate_(${rawArgs('reportAwardPairRangeDate_')}) {${functionBody(code, 'reportAwardPairRangeDate_')}};`;
+  const sandbox = { module: { exports: {} }, console };
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox);
+  return sandbox.module.exports;
+}
+const awardRangeDate = loadAwardDateParser();
+function awardSource(role, overrides = {}) {
+  const stores = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
+  return Object.assign({
+    role, dataDate: '2026-08-06', sheetNames: [role === 'store' ? '上線數KPI_店點達成率_明細' : '手機競賽_個人達成率'],
+    selectedSheet: role === 'store' ? '上線數KPI_店點達成率_明細' : '手機競賽_個人達成率',
+    recordCount: role === 'store' ? 9 : 41, canonicalStores: stores, missingStores: [], unmatchedCount: 0,
+    duplicateCount: 0, incompleteCount: 0, rankFieldFound: true, awardFieldFound: true, headers: ['排名', '實際獎金']
+  }, overrides);
+}
+
+test('雙檔 preview 以固定 reportDate.store／person 輸出，並檢查 9 店與 41 人', () => {
+  const preview = AwardPreview.reportAwardPairBuildPreview_(awardSource('store'), awardSource('person'), []);
+  assert.deepEqual(JSON.parse(JSON.stringify(preview.reportDate)), { store: '2026-08-06', person: '2026-08-06' });
+  assert.equal(preview.summary.storeCount, 9);
+  assert.equal(preview.summary.personCount, 41);
+  assert.equal(preview.publishable, false);
+  assert.equal(preview.formalDataChanged, false);
+  assert.equal(preview.checks.every(check => check.level === 'ok'), true);
+});
+
+test('雙檔資料日期從 Excel 期間右端擷取，避免 store／person 日期為空', () => {
+  const rows = [{ row: 2, cells: { A: '統計期間 2026/08/01 ~ 08/06' } }];
+  assert.equal(awardRangeDate(rows), '2026-08-06');
+  assert.match(functionBody(code, 'reportAwardPairAnalyze_'), /dataDate: reportAwardPairRangeDate_\(rows\)/);
+});
+
+test('雙檔日期不一致、重複或缺少排名／獎金欄位均停在 preview block', () => {
+  const person = awardSource('person', { dataDate: '2026-08-05', duplicateCount: 1, rankFieldFound: false, awardFieldFound: false });
+  const preview = AwardPreview.reportAwardPairBuildPreview_(awardSource('store'), person, []);
+  for (const key of ['date', 'duplicates', 'ranking', 'award']) {
+    assert.equal(preview.checks.find(check => check.key === key).level, 'block', key);
+  }
+  assert.equal(preview.reportDate.store, '2026-08-06');
+  assert.equal(preview.reportDate.person, '2026-08-05');
+});
+
+test('雙檔 preview 不建立 staging、不寫正式 JSON、Mail、網站或排程', () => {
+  const body = functionBody(code, 'reportAwardPairPreview');
+  for (const forbidden of ['DriveApp', 'privateDashboardFolder', 'createFile', 'setContent', 'reportUploadCommit', 'MailApp', 'privateDashboardPublish', 'ScriptApp.newTrigger']) {
+    assert.equal(body.includes(forbidden), false, forbidden);
+  }
+  assert.match(body, /publishable: false/);
+  assert.match(body, /formalDataChanged: false/);
+  assert.match(htmlPage, /<details class="notice">/);
+  assert.match(functionBody(htmlPage, 'renderAwardPreview'), /awardDiff/);
+  assert.match(functionBody(htmlPage, 'renderAwardPreview'), /awardDebug/);
+});
+
 // ── 三：預覽不得更新任何正式資料 ────────────────────────────
 test('preview 不寫正式 JSON、不寫版本屬性、不發佈', () => {
   const body = functionBody(code, 'reportUploadPreview');
@@ -644,7 +725,7 @@ test('正式資料的寫入只發生在 commit 與 rollback', () => {
 });
 
 // ── 部署隔離：上傳走獨立 Deployment，每日回報固定第 15 版 ──
-test('doPost 在上傳部署模式只放行四個上傳路由，且判斷在所有路由之前', () => {
+test('doPost 在上傳部署模式只放行固定上傳／preview 路由，且判斷在所有路由之前', () => {
   const doPost = functionBody(code, 'doPost');
   const gateAt = doPost.indexOf('reportUploadIsUploadDeployment_()');
   const firstRouteAt = doPost.indexOf("action === 'ptauth'");
@@ -655,7 +736,7 @@ test('doPost 在上傳部署模式只放行四個上傳路由，且判斷在所�
   assert.ok(list, '缺少 REPORT_UPLOAD_ALLOWED_ACTIONS');
   const actions = list[1].match(/'[^']+'/g).map(x => x.slice(1, -1));
   assert.deepEqual(actions.sort(), ['report_upload_commit', 'report_upload_log',
-    'report_upload_preview', 'report_upload_rollback'].sort(), '白名單必須恰好是四個上傳路由');
+    'report_upload_preview', 'report_upload_rollback', 'report_award_pair_preview'].sort(), '白名單必須只包含固定上傳與 preview 路由');
 });
 
 test('doGet 在上傳部署模式回 ping／同源頁面，其餘 JSON GET 一律拒絕', () => {
@@ -703,9 +784,9 @@ test('GitHub Pages 模板不含正式端點，正式頁改走同源 HtmlService'
     '__UPLOAD_GAS_URL_OVERRIDE__ 只應出現在註解與 uploadGasUrl 讀取處');
 });
 
-test('同源 HtmlService 僅使用 google.script.run，且四個上傳呼叫都有包裝函式', () => {
+test('同源 HtmlService 僅使用 google.script.run，且所有上傳／preview 呼叫都有包裝函式', () => {
   assert.match(functionBody(code, 'reportUploadHtmlService_'), /createHtmlOutputFromFile\('ReportUpload'\)/);
-  for (const name of ['report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback']) {
+  for (const name of ['report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback', 'report_award_pair_preview']) {
     assert.match(code, new RegExp(`function ${name}\\(payload\\)`));
     assert.match(htmlPage, new RegExp(`call\\('${name}'`));
   }
