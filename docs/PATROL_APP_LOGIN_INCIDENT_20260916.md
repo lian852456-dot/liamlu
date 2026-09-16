@@ -23,7 +23,7 @@
 
 - 候選看板正常登入及ptdashboard正式讀回成功。
 - 候選App正常登入後九店／25項進度、最近巡店與里程已渲染，unknown action未出現。
-- 專項Node212/212、看板Auth／恢復Chromium13/13通過；App Chromium10/10通過，含登入後reload；正式發布待補。
+- 專項Node212/212、看板Auth／恢復Chromium13/13通過；App Chromium10/10通過，含登入後reload；JavaScript語法與git diff --check通過。
 - 全Node額外盤點398/404，有6個既有KPI／台獎fixture失敗；App全檔另有既有台獎摘要fixture失敗，不列為巡店通過。
 - 兩項8月到離店fixture原受今天日期影響，固定fixture時鐘後保留原斷言，均通過。
 
@@ -31,3 +31,14 @@
 
 - 最新GAS私有備份：private-backups/patrol-app-unknown-action-20260916/editor，未讀取或保存Script Properties；部署仍v9。
 - 前端回復基線093d1e0357414b8185cd5bb1a12d5468ba8cc589；以revert本輪功能提交回復，不reset或覆蓋他人修改。
+
+## 正式發布與讀回完成（15:32）
+
+- 功能commit：03ed29482fa60da8e9a3fb08b29f8d23021c5195，已fast-forward到origin/main。
+- GitHub Pages於2026-09-16 15:28:22（台北）built；app.js、app.html、patrol.html及service-worker.js正式資產均與提交逐位元一致。
+- 正式看板正常登入成功，ptdashboard完成契約驗證；重新整理未重輸通行碼，session自動恢復並讀回九店。
+- 正式App正常登入成功；重新整理未重輸通行碼，session自動恢復，九店摘要與最近巡店均渲染、里程結束載入，unknown action未出現。
+- 此為Chrome正式頁驗收，iPhone主畫面App實機驗收仍待使用者確認。舊App遷移到獨立session key後首次需要正常登入一次；不要求反覆登出。
+- GAS維持既有正式v9，本輪無GAS差異，未重新部署或變更Deployment ID／權限。
+- 既有新舊看板parity沿用9/15已驗證結果；本輪未修改看板計算與GAS。專項212項Node與23項Chromium提供巡店／auth回歸證據；額外KPI／台獎fixture失敗仍單獨列管，不能宣稱全站零失敗。
+- 回復操作：從最新main建立修正分支，git revert 03ed29482fa60da8e9a3fb08b29f8d23021c5195，檢查差異並發布Pages；GAS保留v9，不回退昨日後端修正。

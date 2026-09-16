@@ -1,3 +1,12 @@
+## 2026-09-16 巡店 App 登入障礙正式修復與讀回
+
+- 功能03ed294已進main，Pages 15:28:22 built，四項正式資產與提交一致。
+- App與看板統一Patrol隔離端點及session key；登入單次60秒，唯讀有限重試，寫入未加重試。
+- 正式Chrome兩入口正常登入、重新整理session恢復及九店讀回通過；App最近巡店與里程載入完成，未見unknown action。iPhone實機仍待本人確認。
+- Node212/212、Chromium23/23及語法／diff通過；额外6項KPI／台獎Node與1項台獎browser fixture失敗另外列管。
+- GAS既有v9未變，無正式資料寫入。404來源層及截圖當時unknown action仍無足夠trace定論。
+- 詳見[本輪交接](PATROL_APP_LOGIN_INCIDENT_20260916.md)，含備份與revert 03ed294回復方式。
+
 ## 2026-09-16 巡店看板／App登入障礙修正候選
 
 - 發現App仍使用歷史共享Patrol端點／舊session key，與看板獨立後端不同；正式看板單次登入實測30秒AbortError，pthealth有間歇404後成功。
