@@ -1,3 +1,10 @@
+## 2026-09-16 匯入預檢 unknown action 相容修正
+
+- 照片為「未呼叫ptwrite」，錯誤在共用ptdetail Preflight。正式路由存在，Chrome合成唯讀預覽PASS，未重現使用者電腦錯誤。
+- 加入ptdetail POST unknown action一次同端點GET回退，與有限重試共用3次預算，保留auth／完整preflight／readback與寫入單次。
+- Node27/27、匯入Chromium11/11、語法／diff PASS；未寫正式資料、GAS維持v9。使用者來源報表實機驗收仍待確認。
+- 詳見 PATROL_IMPORT_RECOVERY_20260916.md。
+
 ## 2026-09-16 巡店 App 登入障礙正式修復與讀回
 
 - 功能03ed294已進main，Pages 15:28:22 built，四項正式資產與提交一致。

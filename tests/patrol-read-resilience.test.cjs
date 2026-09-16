@@ -384,3 +384,26 @@ test('Patrol sign-in keeps passcode on transient failure, clears on success or b
   assert.equal(authCalls[0][3], 60_000);
   assert.equal(authCalls[0][2].method, 'POST');
 });
+
+test('detail POST unknown action uses same-endpoint GET once, preserving the three-request budget and redacted diagnostics', async () => {
+  const env=harness([response(200,{status:'error',message:'unknown patrol action'}),response(200,{status:'ok',rows:[],totalRows:0})]);
+  const result=await env.context.patrolReadRequest('ptdetail','https://synthetic.invalid/exec',{method:'POST',body:JSON.stringify({action:'ptdetail',token:'SESSION_CANARY',month:'2026-07',store:'synthetic',page:1,limit:100})});
+  assert.equal(result.status,'ok');assert.equal(env.calls.length,2);
+  assert.equal(env.calls[1].options.method,'GET');
+  const url=new URL(env.calls[1].url);assert.equal(url.searchParams.get('action'),'ptdetail');assert.equal(url.searchParams.get('month'),'2026-07');
+  assert.equal(JSON.stringify(env.logs).includes('SESSION_CANARY'),false);
+  const exhausted=harness([response(200,{status:'error',message:'unknown patrol action'}),response(503,{}),response(503,{})]);
+  await assert.rejects(exhausted.context.patrolReadRequest('ptdetail','https://synthetic.invalid/exec',{method:'POST',body:'{}'}));
+  assert.equal(exhausted.calls.length,3);
+});
+
+test('detail compatibility never falls back for auth errors or writes and never loops on GET unknown action', async () => {
+  for(const [action,payload] of [['ptdetail',{status:'error',reason:'AUTH_SESSION_EXPIRED'}],['ptwrite',{status:'error',message:'unknown patrol action'}]]){
+    const env=harness([response(200,payload)]);
+    await env.context.patrolReadRequest(action,'https://synthetic.invalid/exec',{method:'POST',body:'{}'});
+    assert.equal(env.calls.length,1);
+  }
+  const env=harness([response(200,{status:'error',message:'unknown patrol action'}),response(200,{status:'error',message:'unknown patrol action'})]);
+  assert.equal((await env.context.patrolReadRequest('ptdetail','https://synthetic.invalid/exec',{method:'POST',body:'{}'})).status,'error');
+  assert.equal(env.calls.length,2);
+});

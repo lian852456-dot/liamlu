@@ -871,6 +871,7 @@ function patrolExceptionType(error){
 async function patrolTrackedRequest(action,request){ return request(); }
 async function patrolReadRequest(action,url,options={},timeoutMs=30000){
   const maxAttempts=PATROL_READ_ACTIONS.has(action)?3:1;
+  let detailGetFallback=false;
   for(let attempt=1;attempt<=maxAttempts;attempt++){
     const started=performance.now();
     const controller=new AbortController();
@@ -883,6 +884,20 @@ async function patrolReadRequest(action,url,options={},timeoutMs=30000){
       try{result=JSON.parse(text);}catch{}
       // Explicit backend auth errors win over HTTP retry classification.
       if(patrolAuthReason(result)) return result;
+      // Older route surfaces can reject POST detail while retaining GET detail.
+      // Share the same three-request budget; never apply this to a write.
+      if(response.ok&&action==='ptdetail'&&options.method==='POST'&&!detailGetFallback&&
+          result?.status==='error'&&/^unknown (?:patrol )?action$/i.test(String(result.message||'').trim())&&attempt<maxAttempts){
+        const body=JSON.parse(options.body||'{}');
+        const fallbackUrl=new URL(url);
+        fallbackUrl.search='';fallbackUrl.hash='';
+        for(const key of ['month','store','page','limit','token']){
+          if(body[key]!==undefined)fallbackUrl.searchParams.set(key,String(body[key]));
+        }
+        fallbackUrl.searchParams.set('action','ptdetail');
+        url=fallbackUrl.toString();options={method:'GET',cache:'no-store'};detailGetFallback=true;
+        continue;
+      }
       if(!response.ok){
         const error=new Error('HTTP '+response.status);error.httpStatus=response.status;throw error;
       }
@@ -1490,7 +1505,7 @@ async function formalPatrolRowsForGroup(group){
   let page=1,totalRows=null,loaded=0;
   for(;;){
     const result=await cloudCall('ptdetail',{month:group.month,store:group.store,page,limit:100});
-    if(!result||result.status!=='ok') throw new Error(result&&result.message||'Server Preflight ptdetail 失敗');
+    if(!result||result.status!=='ok') throw new Error('Server Preflight ptdetail：'+(result&&result.message||'正式明細讀取失敗'));
     if(!Array.isArray(result.rows)) throw new Error('Server Preflight ptdetail 分頁 contract 不完整');
     const reportedTotal=Number(result.totalRows);
     if(!Number.isInteger(reportedTotal)||reportedTotal<0) throw new Error('Server Preflight ptdetail totalRows contract 不完整');
