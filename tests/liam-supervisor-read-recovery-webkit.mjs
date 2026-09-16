@@ -4,7 +4,7 @@ import { webkit } from 'playwright';
 const APP_URL = process.env.LIAM_RECOVERY_APP_URL ||
   'https://lian852456-dot.github.io/liamlu/app.html?preview=1';
 const PATROL_API =
-  'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
+  'https://script.google.com/macros/s/AKfycbxqBtW2yQw_u4qqJ9Knz6CK34hAiunaa6lIQu4pMa8Ff2voJZCWKEh8MXTJ6qAoGTax/exec';
 
 const browser = await webkit.launch({ headless: true });
 try {

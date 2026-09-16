@@ -2,6 +2,12 @@
 
 > 本文件保存現行產品契約與技術注意事項；Agent 工作規則只以 `AGENTS.md` 為準。日期型事故內容僅供追溯，不會自動成為後續任務的限制。
 
+## 現行巡店登入與端點（2026-09-16）
+
+- `app.js` 的 PATROL_API 必須與 `patrol.html` 的 PATROL_GAS_URL 相同，正式為獨立 Patrol Deployment，session key 為 `bei12b_patrol_session_token_v2`。歷史共享端點及舊key不得當作現行值。
+- 巡店通行碼只在既有 Apps Script Properties 設定；不寫入repo。登入／登出／寫入不自動重送，唯讀才使用有限重試。
+- 舊段落中的「巡店與每日回報共用GAS」、「真實PT_KEY寫入程式」屬過時歷史，不適用現行部署。
+
 ## 2026-09 店長個績來源契約
 
 - 2026-09 起店長／代理店長納入個績；其總績效、實績、目標及達成率必須來自 `kpicalc_access`，原始來源為「上線數KPI_個人達成率_明細」（缺表時才使用既有個人店點版回退）。

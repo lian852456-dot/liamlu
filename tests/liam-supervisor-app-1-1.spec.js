@@ -159,7 +159,7 @@ test('September App keeps NA items missing in totals, groups, store status and r
   rows[2]={...rows[2],result:'',reason:'NA'};
   rows[9]={...rows[9],result:'NA'};
   const summary=patrolSummaryResponse('2026-09',rows,new Date('2026-09-03T12:00:00+08:00'));
-  await page.addInitScript(()=>sessionStorage.setItem('bei12b_pt_session_token','short-session-token'));
+  await page.addInitScript(()=>sessionStorage.setItem('bei12b_patrol_session_token_v2','short-session-token'));
   await page.route('https://script.google.com/**',async route=>{
     const request=route.request();
     if(request.method()==='POST'){
@@ -188,12 +188,13 @@ test('September App keeps NA items missing in totals, groups, store status and r
 });
 
 test('isolated patrol visit flow records arrival and departure with one protected POST per tap', async ({ page }) => {
-  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  await page.clock.install({time:new Date('2026-08-11T04:00:00.000Z')});
+  const today='2026-08-11';
   const events=[
     {serverTime:'2026-08-11T14:57:50+08:00',date:'2026-08-11',action:'arrival',store:'台北通化',note:'DEPLOY_TEST_20260811T145733',visitSessionId:'deploy-test'},
     {serverTime:'2026-08-11T14:57:53+08:00',date:'2026-08-11',action:'departure',store:'台北通化',note:'DEPLOY_TEST_20260811T145733',visitSessionId:'deploy-test'}
   ]; let writes=0; const submittedStores=[];
-  await page.addInitScript(()=>sessionStorage.setItem('bei12b_pt_session_token','short-session-token'));
+  await page.addInitScript(()=>sessionStorage.setItem('bei12b_patrol_session_token_v2','short-session-token'));
   await page.route('https://script.google.com/**',async route=>{
     const request=route.request();
     if(request.method()==='POST') {
@@ -248,7 +249,8 @@ test('isolated patrol visit flow records arrival and departure with one protecte
 });
 
 test('patrol visit UI fails closed when server response store differs from explicit selection', async ({ page }) => {
-  await page.addInitScript(()=>sessionStorage.setItem('bei12b_pt_session_token','short-session-token'));
+  await page.clock.install({time:new Date('2026-08-11T04:00:00.000Z')});
+  await page.addInitScript(()=>sessionStorage.setItem('bei12b_patrol_session_token_v2','short-session-token'));
   await page.route('https://script.google.com/**',async route=>{
     const request=route.request();
     if(request.method()==='POST') {
@@ -272,6 +274,42 @@ test('patrol visit UI fails closed when server response store differs from expli
   await page.locator('#patrolVisitSubmit').click();
   await expect(page.locator('#patrolVisitMessage')).toContainText('伺服器回傳店點與送出店點不一致');
   await expect(page.locator('#patrolVisitToday .patrol-visit-event')).toHaveCount(0);
+});
+
+test('patrol login session restores after reload without re-entering passcode', async ({ page }) => {
+  await page.clock.install({time:new Date('2026-08-11T04:00:00.000Z')});
+  const authPayloads=[];
+  await page.route('https://script.google.com/**',async route=>{
+    const request=route.request();
+    if(request.method()==='POST') {
+      const payload=JSON.parse(request.postData()||'{}');
+      if(payload.action==='ptauth') { authPayloads.push(payload); return route.fulfill({json:{status:'ok',token:'short-session-token'}}); }
+      if(payload.action==='ptsummary') return route.fulfill({json:patrolSummaryResponse('2026-08')});
+      if(payload.action==='ptmileage2') return route.fulfill({json:{status:'ok',contract:'patrol-mileage-visits-v2',month:'2026-08',fields:['fillTime','arriveTime','code','store','month'],visits:[],totalVisits:0,page:1,totalPages:1}});
+    }
+    const action=new URL(request.url()).searchParams.get('action');
+    if(action==='sread') return route.fulfill({json:{status:'ok',schedule:{month:'2026-08',stores:[]}}});
+    if(action==='ptvisit_read') return route.fulfill({json:{status:'ok',events:[]}});
+    if(action==='hread') return route.fulfill({json:{status:'ok',rows:[]}});
+    return route.fulfill({json:{status:'error',message:'unexpected action'}});
+  });
+
+  await page.goto(FORMAL_FILE_URL+'#patrol');
+  await page.locator('#dataMode').click();
+  await expect(page.locator('[data-view="me"]')).toBeVisible();
+  await page.locator('#patrolPasscode').fill('PASSCODE_CANARY');
+  await page.locator('#patrolAccessForm').getByRole('button').click();
+  await expect(page.locator('#patrolOverview')).toContainText('本期巡店進度');
+  await expect(page.locator('#patrolLogout')).toBeVisible();
+  await expect.poll(()=>authPayloads.length).toBe(1);
+  expect(Object.hasOwn(authPayloads[0],'key')).toBe(true);
+
+  await page.reload();
+  await expect(page.locator('#patrolOverview')).toContainText('本期巡店進度');
+  await expect(page.locator('#patrolLogout')).toBeVisible();
+  await expect(page.locator('#patrolPasscode')).toHaveValue('');
+  await expect.poll(()=>authPayloads.length).toBe(2);
+  expect(Object.hasOwn(authPayloads[1],'token')).toBe(true);
 });
 
 test('formal unlock is explicit and does not load summaries before Approved Device succeeds', async ({ page }) => {

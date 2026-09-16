@@ -11,7 +11,7 @@ test('App loads the shared September question model before its read adapters',()
   const html=read('app.html');
   const questionIndex=html.indexOf('patrol-question-versions.js?v=app-na-v-20260903-1');
   const halfIndex=html.indexOf('half-month-check-read-model.js?v=app-sep25-20260903-2');
-  const appIndex=html.indexOf('app.js?v=manager-personal-source-fix-20260909');
+  const appIndex=html.indexOf('app.js?v=patrol-isolated-recovery-20260916');
   assert.ok(questionIndex>0&&questionIndex<halfIndex&&halfIndex<appIndex);
   assert.match(html,/id="patrolMileage"/);
   assert.match(html,/督導到店檢查/);

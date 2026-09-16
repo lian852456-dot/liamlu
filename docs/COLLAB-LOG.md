@@ -1,3 +1,11 @@
+## 2026-09-16 巡店看板／App登入障礙修正候選
+
+- 發現App仍使用歷史共享Patrol端點／舊session key，與看板獨立後端不同；正式看板單次登入實測30秒AbortError，pthealth有間歇404後成功。
+- 統一App Patrol端點/session契約；唯讀2s/5s最多3次；App登入／登出不自動重送、登入60秒；看板同樣60秒、暫時錯誤保留input方便手動重試，成功／錯碼清空。更新SW資產版本。
+- 專項Node212/212、看板Auth／恢復Chromium13/13、App Chromium10/10通過。另有6個既有KPI Node及1個台獎Browser fixture失敗，未改無關產品邏輯。
+- 候選看板／App正式正常登入讀回成功，App九店25題、最近紀錄與里程可見。既有App稍後也成功，未重現截圖當下unknown action；不宣稱所有失敗唯一根因已知。
+- GAS editor和v9一致，部署保持v9，本輪不修改GAS或正式巡店資料。Pages發布待補。詳見docs/PATROL_APP_LOGIN_INCIDENT_20260916.md。
+
 ## 2026-09-15 19:36 巡店正式發布與唯讀驗收完成
 
 - GAS第9版（原Deployment ID／權限）；程式回讀一致，rollback第8版。

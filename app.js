@@ -7,13 +7,14 @@
   const P = scope.PatrolReadModel;
   const Q = scope.PatrolQuestionVersions;
   const DAILY_REPORT_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
-  const PATROL_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
+  const PATROL_API = 'https://script.google.com/macros/s/AKfycbxqBtW2yQw_u4qqJ9Knz6CK34hAiunaa6lIQu4pMa8Ff2voJZCWKEh8MXTJ6qAoGTax/exec';
   const PRIVATE_TIMEOUT_MS = 20_000;
   const PATROL_TIMEOUT_MS = Object.freeze({ sread:30_000, ptsummary:20_000, ptdetail:60_000, ptmileage2:30_000, hread:90_000, ptvisit_read:30_000 });
   const RETRY_DELAY_MS = 1_000;
   const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
   const DEVICE_KEY = 'north12b_private_dashboard_device_id';
-  const PATROL_TOKEN_KEY = 'bei12b_pt_session_token';
+  const PATROL_TOKEN_KEY = 'bei12b_patrol_session_token_v2';
+  const PATROL_RETRY_STATUSES = new Set([404,429,500,502,503,504]);
   const STORES = ['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
   const STORE_ALIASES = new Map([['三創','台北三創']]);
   const KPI_CORE_KEYS = {
@@ -160,7 +161,7 @@
     }
   }
 
-  async function fetchJsonAttempt(input, options, timeoutMs, timeoutMessage) {
+  async function fetchJsonAttempt(input, options, timeoutMs, timeoutMessage, patrol = false) {
     const controller = new AbortController();
     const timer = scope.setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -173,7 +174,8 @@
         const googleHtml404 = response.status === 404 && /(?:text\/html|<!doctype html|<html)/i.test(`${response.headers.get('content-type') || ''}\n${text.slice(0,200)}`);
         throw new ReadTransportError(googleHtml404 ? 'google-html-404' : 'non-json', googleHtml404 ? '正式資料服務暫時回傳 HTTP 404。' : '正式資料服務回傳無法解析的內容。', googleHtml404, response.status);
       }
-      if (!response.ok) throw new ReadTransportError('http', `正式資料服務連線失敗（HTTP ${response.status}）`, false, response.status);
+      if (patrol && patrolApiReason(body)) return { response, body };
+      if (!response.ok) throw new ReadTransportError('http', `正式資料服務連線失敗（HTTP ${response.status}）`, patrol && PATROL_RETRY_STATUSES.has(response.status), response.status);
       return { response, body };
     } catch (error) {
       if (error && error.name === 'AbortError') throw new ReadTransportError('timeout', timeoutMessage, true);
@@ -197,6 +199,18 @@
       }
     }
     throw lastError;
+  }
+
+  async function fetchPatrolReadWithRecovery(input, options, timeoutMs, timeoutMessage) {
+    for (let attempt=0;attempt<3;attempt+=1) {
+      try { return await fetchJsonAttempt(input,options,timeoutMs,timeoutMessage,true); }
+      catch(error) {
+        const retryable=error&&((error.status&&PATROL_RETRY_STATUSES.has(error.status))||(!error.status&&error.retryable));
+        if(!retryable)throw error;
+        if(attempt===2)throw new ReadTransportError('retry-exhausted','巡店後端暫時無回應，已自動重試3次。session仍保留，可按重新連線，不需要登出。',false,error.status);
+        await new Promise(resolve=>scope.setTimeout(resolve,attempt===0?2000:5000));
+      }
+    }
   }
 
   function readErrorNote(error, label = '正式資料') {
@@ -317,9 +331,9 @@
 
   async function postPatrolAuth(payload) {
     if (!['ptauth','ptlogout'].includes(payload.action)) throw new Error('不允許的 session action。');
-    const { body } = await fetchJsonWithRecovery(PATROL_API, {
+    const { body } = await fetchJsonAttempt(PATROL_API, {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload), cache:'no-store'
-    }, 30_000, '班表／巡店驗證逾時，請稍後重試。');
+    }, 60_000, '班表／巡店驗證服務回應較慢，請按解鎖重試；不需要重新輸入通行碼。', true);
     if (!body || body.status !== 'ok') throw patrolApiError(body,'班表／巡店驗證失敗。');
     return body;
   }
@@ -334,7 +348,7 @@
       : action === 'sread' ? '班表讀取逾時，請點擊重試。'
       : '今日到離店紀錄讀取逾時，請點擊重試。';
     if (action === 'ptsummary' || action === 'ptdetail' || action === 'ptmileage2') {
-      const { body } = await fetchJsonWithRecovery(PATROL_API, {
+      const { body } = await fetchPatrolReadWithRecovery(PATROL_API, {
         method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
         body:JSON.stringify({ action, token:patrolToken, ...params }), cache:'no-store'
       }, timeoutMs, timeoutMessage);
@@ -348,7 +362,7 @@
       if (value !== '' && value != null) query.push([key,String(value)]);
     });
     const url = `${PATROL_API}?${query.map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&')}`;
-    const { body } = await fetchJsonWithRecovery(url, { method:'GET', cache:'no-store' }, timeoutMs, timeoutMessage);
+    const { body } = await fetchPatrolReadWithRecovery(url, { method:'GET', cache:'no-store' }, timeoutMs, timeoutMessage);
     if (!body || body.status !== 'ok') {
       const error=patrolApiError(body,'班表／巡店讀取失敗。');clearExpiredPatrolSession(error);throw error;
     }
@@ -1906,12 +1920,13 @@
   async function unlockPatrol(passcode) {
     const result=await postPatrolAuth({action:'ptauth',key:String(passcode||'').trim()}); patrolToken=String(result.token||'');
     if (!patrolToken) throw new Error('正式服務未簽發短效 session。');
-    scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken); setMessage('#patrolAccessMessage','短效 session 已驗證，正在讀取班表／巡店。','success'); dom('#patrolLogout').hidden=false; await loadPatrolData();
+    scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken); dom('#patrolPasscode').value=''; setMessage('#patrolAccessMessage','短效 session 已驗證，正在讀取班表／巡店。','success'); dom('#patrolLogout').hidden=false; await loadPatrolData();
   }
 
   async function restorePatrol() {
     if (!patrolToken||PREVIEW_MODE) return;
-    try { const result=await postPatrolAuth({action:'ptauth',token:patrolToken}); patrolToken=String(result.token||''); if(!patrolToken) throw new Error('session 已失效'); scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken); dom('#patrolLogout').hidden=false; await loadPatrolData(); }
+    setMessage('#patrolAccessMessage','正在恢復巡店 session，請稍候。');
+    try { const result=await postPatrolAuth({action:'ptauth',token:patrolToken}); patrolToken=String(result.token||''); if(!patrolToken) throw new Error('session 已失效'); scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken); setMessage('#patrolAccessMessage','短效 session 已恢復，正在讀取班表／巡店。','success'); dom('#patrolLogout').hidden=false; await loadPatrolData(); }
     catch (error) {
       if(clearExpiredPatrolSession(error)) setMessage('#patrolAccessMessage',error.message,'error');
       else setMessage('#patrolAccessMessage',`session 保留，恢復失敗：${String(error.message||error)}`,'error');
@@ -1939,7 +1954,7 @@
   dom('#privateBindingForm').addEventListener('submit',async event=>{ event.preventDefault(); const button=event.currentTarget.querySelector('button'); const input=dom('#bootstrapCode'); const code=input.value; input.value=''; button.disabled=true; try { await requestDeviceBinding(dom('#employeeId').value,code); } catch(error) { setMessage('#privateAccessMessage',error.message,'error'); } finally { button.disabled=false; } });
   dom('#privateStatusCheck').addEventListener('click',async event=>{ event.currentTarget.disabled=true; try { await checkDeviceBinding(dom('#employeeId').value); } catch(error) { setMessage('#privateAccessMessage',error.message,'error'); } finally { event.currentTarget.disabled=false; } });
   dom('#privateLogout').addEventListener('click',logoutPrivateSummary);
-  dom('#patrolAccessForm').addEventListener('submit',async event=>{ event.preventDefault(); const button=event.currentTarget.querySelector('button'); const input=dom('#patrolPasscode'); const passcode=input.value; input.value=''; button.disabled=true; try { await unlockPatrol(passcode); } catch(error) { setMessage('#patrolAccessMessage',error.message,'error'); } finally { button.disabled=false; } });
+  dom('#patrolAccessForm').addEventListener('submit',async event=>{ event.preventDefault(); const button=event.currentTarget.querySelector('button'); const input=dom('#patrolPasscode'); const passcode=input.value; button.disabled=true; setMessage('#patrolAccessMessage','正在向正式巡店服務驗證，請稍候。'); try { await unlockPatrol(passcode); input.value=''; } catch(error) { if(error.authReason==='AUTH_CREDENTIAL_INVALID')input.value=''; setMessage('#patrolAccessMessage',error.message,'error'); } finally { button.disabled=false; } });
   dom('#patrolLogout').addEventListener('click',()=>{ const token=patrolToken; patrolToken=''; scheduleRaw=null; scheduleViewData=null; patrolVisitEvents=[]; patrolOpenVisit=null; patrolStaleOpenVisit=null; patrolVisitError=''; patrolMileageState={status:'idle',data:null,note:''}; halfMonthFormalRows=[]; halfMonthReadState='unauthorized'; halfMonthReadMessage='請先解鎖班表／巡店'; scope.sessionStorage.removeItem(PATROL_TOKEN_KEY); dom('#patrolLogout').hidden=true; contract.scheduleToday=statusModule('scheduleToday'); contract.scheduleByDate=statusModule('scheduleByDate'); contract.patrolToday=statusModule('patrolToday'); contract.patrolOverview=statusModule('patrolOverview'); contract.patrolStores=statusModule('patrolStores'); renderAll(); if(token) postPatrolAuth({action:'ptlogout',token}).catch(()=>{}); });
   all('[data-patrol-visit]').forEach(button=>button.addEventListener('click',()=>openPatrolVisitDialog(button.dataset.patrolVisit)));
   all('[data-patrol-check-view]').forEach(button=>button.addEventListener('click',()=>{ setPatrolCheckView(button.dataset.patrolCheckView); if(button.dataset.patrolCheckView==='half-month')loadHalfMonthFormalRead(); }));
@@ -2050,5 +2065,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=manager-personal-source-fix-20260909',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=patrol-isolated-recovery-20260916',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);

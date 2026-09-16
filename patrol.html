@@ -977,6 +977,8 @@ function privateAuthErrorText(err){
   if(message==='patrol_not_configured') return '管理者尚未完成安全設定，請先在 Apps Script Script Properties 設定 PT_KEY';
   if(message==='patrol_contract_mismatch') return '巡店服務版本不相容，請重新部署受保護服務後再試';
   if(patrolAuthReason(err)) return patrolAuthReasonText(err);
+  if(['AbortError','TimeoutError'].includes(err?.name)) return '驗證服務回應較慢，請按進入重試；不需要重新輸入通行碼';
+  if(err?.name==='TypeError'||/^HTTP (404|429|500|502|503|504)$/.test(message)) return '驗證服務暫時無回應，請按進入重試；不需要重新輸入通行碼';
   if(message==='unauthorized') return '巡店服務未提供可追查的授權原因';
   return `解鎖失敗：${message||'未知錯誤'}`;
 }
@@ -986,7 +988,7 @@ function privateAuthPost(payload){
     method:'POST',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
     body:JSON.stringify(payload||{})
-  });
+  },action==='ptauth'?60000:30000);
 }
 function privateCloudCallJsonp(action, params={}){
   return patrolRequestWithReauth(()=>{
@@ -1025,7 +1027,7 @@ async function privateSignIn(passcode){
     const errorText=privateAuthErrorText(err);
     setPatrolAuthMessage(errorText+'；資料仍保持鎖定');
     const input=document.getElementById('patrolPasscode');
-    if(input) input.value='';
+    if(input&&patrolAuthReason(err)==='AUTH_CREDENTIAL_INVALID') input.value='';
     return false;
   }finally{
     PT_KEY='';
@@ -1062,7 +1064,7 @@ async function unlockPatrol(event){
   if(button) button.disabled=true;
   setPatrolAuthMessage('正在向正式後端驗證…');
   const ok=await privateSignIn(input?.value||'');
-  if(ok) mountPatrolApp();
+  if(ok){if(input)input.value='';mountPatrolApp();}
   if(button) button.disabled=false;
 }
 function mountPatrolApp(){

@@ -8,6 +8,58 @@ const vm = require('node:vm');
 
 const patrol = fs.readFileSync(path.join(__dirname, '..', 'patrol.html'), 'utf8');
 
+function extractFunction(source, name) {
+  const asyncMarker = `async function ${name}`;
+  const plainMarker = `function ${name}`;
+  const asyncStart = source.indexOf(asyncMarker);
+  const marker = asyncStart >= 0 ? asyncMarker : plainMarker;
+  const start = source.indexOf(marker);
+  assert.ok(start >= 0, `${name} is present`);
+  let parenDepth = 0;
+  let quote = '';
+  let escaped = false;
+  let brace = -1;
+  for (let index = start; index < source.length; index += 1) {
+    const character = source[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === quote) quote = '';
+      continue;
+    }
+    if (character === "'" || character === '"' || character === '`') {
+      quote = character;
+      continue;
+    }
+    if (character === '(') parenDepth += 1;
+    else if (character === ')') parenDepth -= 1;
+    else if (character === '{' && parenDepth === 0) {
+      brace = index;
+      break;
+    }
+  }
+  assert.ok(brace > start, `${name} has a body`);
+  let depth = 0;
+  quote = '';
+  escaped = false;
+  for (let index = brace; index < source.length; index += 1) {
+    const character = source[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === quote) quote = '';
+      continue;
+    }
+    if (character === "'" || character === '"' || character === '`') {
+      quote = character;
+      continue;
+    }
+    if (character === '{') depth += 1;
+    if (character === '}' && --depth === 0) return source.slice(start, index + 1);
+  }
+  assert.fail(`${name} body is unterminated`);
+}
+
 const readStart = patrol.indexOf('const PATROL_READ_ACTIONS =');
 const readEnd = patrol.indexOf('function patrolReauthFailure', readStart);
 assert.ok(readStart >= 0 && readEnd > readStart, 'patrolReadRequest source is present');
@@ -270,4 +322,65 @@ test('read diagnostics use an exact safe allowlist and never expose URL query, h
   for (const canary of ['PASSWORD_CANARY', 'TOKEN_CANARY', 'NAME_CANARY', 'STORE_CANARY', 'HASH_CANARY']) {
     assert.equal(serializedLogs.includes(canary), false, `diagnostics leak ${canary}`);
   }
+});
+
+test('Patrol sign-in keeps passcode on transient failure, clears on success or bad credential, and auth uses one 60s request', async () => {
+  const privateSignIn = extractFunction(patrol, 'privateSignIn');
+  const unlockPatrol = extractFunction(patrol, 'unlockPatrol');
+  const privateAuthPost = extractFunction(patrol, 'privateAuthPost');
+  const input = {value:'PASSCODE_CANARY'};
+  const button = {disabled:false};
+  const messages = [];
+  const sessionStorage = {
+    setCalls: [],
+    setItem: (key, value) => sessionStorage.setCalls.push([key, value])
+  };
+  const context = vm.createContext({
+    Promise,
+    String,
+    Error,
+    PT_SESSION_TOKEN_STORAGE: 'bei12b_patrol_session_token_v2',
+    PRIVATE_GAS_URL: 'https://synthetic.invalid/patrol',
+    sessionStorage,
+    document: {getElementById: id => id === 'patrolPasscode' ? input : id === 'patrolAuthSubmit' ? button : null},
+    setPatrolAuthMessage: message => messages.push(String(message)),
+    patrolAuthReason: value => String(value?.reason || value?.auth?.reason || value?.authReason || ''),
+    patrolAuthReasonText: value => String(value?.message || value?.reason || value || 'auth failure'),
+    privateAuthErrorText: error => String(error?.message || error),
+    privateHealthCheck: async () => {},
+    privateAuthPost: async () => ({status:'ok', token:'SESSION_CANARY'}),
+    mountPatrolApp: () => {},
+    patrolReadRequest: async (...args) => ({args})
+  });
+  vm.runInContext(`let PT_KEY=''; let PT_TOKEN=''; let secureUnlocked=false; let privateAccount=null; let appMounted=false; ${privateAuthPost}\n${privateSignIn}\n${unlockPatrol}`, context);
+
+  context.privateHealthCheck = async () => { const error = new Error('temporary network'); error.name = 'TypeError'; throw error; };
+  await context.unlockPatrol({preventDefault(){}});
+  assert.equal(input.value, 'PASSCODE_CANARY', 'temporary auth failure preserves the input for retry');
+  assert.equal(button.disabled, false);
+
+  input.value = 'PASSCODE_CANARY';
+  context.privateHealthCheck = async () => {};
+  context.privateAuthPost = async () => ({status:'ok', token:'SESSION_CANARY'});
+  await context.unlockPatrol({preventDefault(){}});
+  assert.equal(input.value, '', 'successful auth clears the input');
+  assert.deepEqual(sessionStorage.setCalls, [['bei12b_patrol_session_token_v2', 'SESSION_CANARY']]);
+
+  input.value = 'PASSCODE_CANARY';
+  context.privateAuthPost = async () => ({status:'error', reason:'AUTH_CREDENTIAL_INVALID'});
+  await context.unlockPatrol({preventDefault(){}});
+  assert.equal(input.value, '', 'explicit credential rejection clears the input');
+
+  const authCalls = [];
+  const authContext = vm.createContext({
+    Promise,
+    String,
+    PRIVATE_GAS_URL: 'https://synthetic.invalid/patrol',
+    patrolReadRequest: async (...args) => { authCalls.push(args); return {status:'ok'}; }
+  });
+  vm.runInContext(privateAuthPost, authContext);
+  await authContext.privateAuthPost({action:'ptauth', key:'PASSCODE_CANARY'});
+  assert.equal(authCalls.length, 1);
+  assert.equal(authCalls[0][3], 60_000);
+  assert.equal(authCalls[0][2].method, 'POST');
 });
