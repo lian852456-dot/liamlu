@@ -19,3 +19,7 @@
 - Node27/27，Chromium貼上／選檔／去重／write-readback合成回歸11/11，語法與diff檢查PASS。
 - 正式匯入前只讀預覽PASS；實際使用者報表匯入與寫入尚待本人重新操作確認。
 - rollback：revert本次功能commit並發布Pages；GAS維持v9。
+
+## 發布
+
+- 功能commit debe754已進origin/main。Pages 2026-09-16 16:33:06 built，正式patrol.html與提交逐位元一致。原報表的實際匯入仍待使用者重新操作確認。
