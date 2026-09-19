@@ -13,7 +13,7 @@ const patrol = read('patrol.html');
 const importer = read('patrol-local-import.js');
 const countFunction = (source, name) => (source.match(new RegExp(`^function ${name}\\(`, 'gm')) || []).length;
 
-test('Patrol GAS preserves the read-model baseline and unique critical functions', () => {
+test('Patrol GAS preserves the read-model baseline, critical functions, and protected interview routes', () => {
   assert.equal(hashFile('patrol-read-model.js'), '2476e6073280d714ed645d90e1cd6194efd196a821fab95dd6da3bdc510f9de1');
   const gas = read('gas/Code.gs');
   const patrolGas = read('patrol-gas/PatrolCode.gs');
@@ -31,9 +31,13 @@ test('Patrol GAS preserves the read-model baseline and unique critical functions
   assert.match(gas, /\{ code: 'DNB10168', name: '台北萬大' \}/);
   assert.match(patrolGas, /\{ code: 'DNB10168', name: '台北萬大' \}/);
   assert.match(gas, /patrol-dashboard-sep25-v1/);
+  assert.match(read('gas/Code.gs'), /action === 'interview_read'/);
+  assert.match(read('gas/Code.gs'), /action === 'interview_write'/);
+  assert.match(read('patrol-gas/PatrolCode.gs'), /action === 'interview_read'/);
+  assert.match(read('patrol-gas/PatrolCode.gs'), /action === 'interview_write'/);
 });
 
-test('沒有新增 GAS route、Sheet schema、通行碼或 session 儲存', () => {
+test('巡店本機解析器沒有新增 GAS route、Sheet schema、通行碼或 session 儲存', () => {
   assert.doesNotMatch(importer, /\b(?:fetch|XMLHttpRequest|cloudCall|cloudCallJsonp)\s*\(/);
   assert.doesNotMatch(importer, /localStorage|sessionStorage|PT_KEY|PT_TOKEN|bei12b_/);
   assert.doesNotMatch(importer, /action\s*[:=]\s*['"][^'"]+['"]/);

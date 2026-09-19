@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 40598)
+Total output lines: 1168
+
 ## 2026-09-16 匯入預檢 unknown action 相容修正
 
 - 照片為「未呼叫ptwrite」，錯誤在共用ptdetail Preflight。正式路由存在，Chrome合成唯讀預覽PASS，未重現使用者電腦錯誤。
@@ -152,6 +155,12 @@
 - 結果：相關 Node 29/29、JS syntax、diff check 通過；合成 Canvas 記錄驗證九店順序、機款數量、合計與 VK 穩定排序／原始陣列不變。提交後需確認 Pages 靜態讀回，真實 AQ／RT 重傳由 Liam 驗收。
 - 交接：未改解析資格、GAS、KPI 或其他功能。外部 ../AI協作中心 交接資料未存在於本環境，未同步；本日誌保留本輪交接。可回退本次提交恢復版型。
 
+
+## 2026-09-05 ｜ Codex（督導面談季度雲端候選完成，待 Liam 部署 GAS）
+
+- 做了什麼：將「督導面談紀錄」從單次本機預覽補成當季管理頁；依十一欄來源解析七／八／九月，同仁編號在瀏覽器解析後立即排除。新增本季名冊、已完成、待結案、尚未面談與可回看面談內容；名冊沿用私有班表。新增受保護 `interview_read`／`interview_write` POST，寫入獨立 `督導面談紀錄` 工作表，採鎖定、去重、upsert 與寫後讀回。
+- 結果（本機候選／未部署）：季度規則固定七至九月同季，十月畫面立即全員歸零；讀取不刪資料，新季度第一次成功寫入後才清除舊季度。Node `155/155`、Patrol/Auth Chromium `93/93`、diff check 通過。巡店、里程、班表與督導到店檢查回歸均通過。
+- 經驗 / 給下一位的提醒：Patrol Apps Script 只能由 Liam 手動備份與建立新版本部署；在 GAS 部署、Pages 發布、真實七／八月檔寫入後讀回與 Liam 實機驗收完成前，不得宣稱正式雲端已上線。完整契約見 `docs/SUPERVISOR_INTERVIEW_QUARTERLY.md`。
 
 ## 2026-09-03 ｜ Codex（Patrol 新版 25 題 NA/V 判定已發布）
 
@@ -339,182 +348,7 @@
 
 - Root Cause：Mac `report-automation` 以單一 `REPORT_DATE_ISO` 同時代表寄信日、manifest 日與網站 snapshot 日；`build_github_pages_data.py` 又讓台獎從 email body 檔名取日期。當 `0822.xlsx` 的資料範圍只到 8/21 時，正式 KPI parser 正確讀到 8/21，但 dashboard snapshot／readback 仍要求 8/22，因而被 fail-closed date gate 擋住。
 - 修正：實際非 Git runtime 明確分成 `report_run_date`／`mail_date` 與 `data_cutoff_date`。Builder 從 `source_date_range` 取得 cutoff，並接受顯式 `--report-run-date`／`--data-cutoff-date` 交叉驗證；KPI／台獎 `report_date` 與 KPI `data_as_of_date` 都改用 cutoff，來源檔仍保留 `0822.xlsx`。Consumer、publisher、Keychain wrapper 與 manifest/readback 全鏈傳遞兩個日期；任一缺少、無法解析、晚於 run date 或正式讀回不一致都維持 blocked。
-- 驗證（未發布）：Node 日期／正式 gate `20/20`；Python 日期契約與真實 8/22 本機產物 `3/3`。回歸案例確認寄信／檔名日 2026-08-22、資料截止日 2026-08-21 時，KPI／台獎 snapshot `report_date=2026-08-21`、KPI `data_as_of_date=2026-08-21`、`source_file=0822.xlsx`。未合併 PR、未部署 Pages／GAS、未執行正式私有資料發布或 readback。
-- Repo 邊界：`report-automation` 位於 Git repo 外；本 Draft PR 保存可審查／可 rollback 的 runtime patch 與契約文件。合併 PR 不等於部署或套用 runtime，正式發布仍須由既有 Keychain wrapper 完成雙路徑 readback。
-
-## 2026-08-21 ｜ Codex（P0 稽核門市自助回報簡化，Draft PR #72）
-
-- Root Cause：正式門市頁仍依賴 Approved Device／名冊店點與 30 分鐘 audit-only session，現場 token 過期或裝置不符即無法繼續；前端另在 active batch 改變時直接建立空白草稿，會讓既有店點、姓名、備註與照片清單從畫面消失。
-- 修正：門市改為自行選九店、填實際姓名與員編；首次 `audit_start` 後以 active batch、canonical store、`submission_id + edit_token` 驗證後續 upload/delete/submit/status/photo read。督導 overview/detail/photo/review/cancel 仍只接受 PT session，Drive 照片仍為 private 且 API 不回 file ID／URL。舊草稿採無損 migration，IndexedDB bytes 複製到新 submission key，不清 Safari storage。
-- 驗證：完整 Node `243/243`；稽核 contract `12/12`；稽核 Chromium `9/9`；稽核 WebKit `9/9`。完整 Chromium `172/173`、完整 WebKit `170/173`；三個非全綠案例（半月逾時文案一案、WebKit `file://` CORS console 兩案）均在乾淨 `origin/main` `4f0baab52d2254c4b322b8a53a611973468db1f3` 以相同訊息重現。本 PR 對 `patrol.html`、`patrol-read-model.js`、`tests/patrol.spec.js` 與該半月測試皆 0 diff，依 Freeze 未越界修改。
-- 狀態：程式與測試仍在同一 Draft PR #72 收斂中；尚未合併、部署或完成 Liam iPhone 實機驗收。正式完成前仍須 Pages／GAS 受控部署、API readback 與 Liam iPhone 三創三項送出。
-
-## 2026-08-21 ｜ Codex（每日移動里程根因修復＋異常偵測，Draft PR #68／待正式部署）
-
-- Root Cause：里程頁只掃本頁 `rawDetails`，reload／登出後候選明細被清空；固定 Y2606 對帳資料又會讓預設月份回到六月。另有第二層契約落差：看板 `ptsummary` 會由到店時間 fallback 月份，但 `ptdetail` 只看 `row.month`，所以月份欄缺漏時會「看板有、里程 API 0 筆」。8/4 同步修正未動里程來源，沒有涵蓋此問題。
-- 修正：里程登入後以既有 PT 短效 token，按月份、九店、每頁 100 筆完整讀取 `ptdetail`；`ptsummary`／`ptdetail` 共用 `patrolSummaryRowMonth_()` 並回傳 canonical month，既有 8/1 起資料自動讀回，不寫回 Sheet。前端依日期＋canonical store 去重，同日同店多題／重讀只算一次；月份按 Asia/Taipei 解析。service-worker cache 已換版，避免正式手機保留舊 `patrol.html`。
-- 異常偵測：新增來源列／去重店次／里程日一致性檢查；來源列 > 0 且里程明細 = 0 直接顯示 `⚠ 巡店已有 X 筆，但里程同步為 0 筆`。畫面與 console 記錄 `MILEAGE_NO_PATROL`、`MILEAGE_SOURCE_MISSING`、`MILEAGE_DATE_PARSE_ERROR`、`MILEAGE_STORE_MAPPING_ERROR`、`MILEAGE_CLOUD_READ_ERROR`、`MILEAGE_API_ERROR`、`MILEAGE_AUTH_ERROR`、`MILEAGE_DATA_FORMAT_ERROR`、`MILEAGE_CALC_ERROR`；異常時停用正式匯出。
-- 驗證（未部署）：8/20 fixture 透過三創 101 筆跨兩頁＋六張犁 1 筆驗證為 2 店／4.5 KM，且 `rawDetails=0`；新增 7/8 月隔離、重讀去重、真無資料 0 KM、來源不一致、未知店點、timezone 跨日測試皆通過。Node `243/243`；完整 Chromium 功能 `171/176`，5 個逾時都停在與本次無關的 screenshot 寫檔，單 worker 重跑其中 2 個恢復，剩 3 個仍為 screenshot timeout；里程 24/24 全通過。正式 GAS／Pages 尚未部署，正式 8 月回補筆數、總里程與 iPhone readback 仍待 release 後確認。
-
-## 2026-08-21 ｜ Codex（稽核 UAT 名冊 probe／Safari 私有照片恢復，PR #67 deployment candidate）
-
-- 做了什麼：從 PR #66 合併後正式 `main` 建立隔離分支 `hotfix/audit-uat-roster-probe-photo-restore-20260821`。新增僅限 active `*-uat` 且既有 Trusted Employee audit session 的 `audit_roster_probe`，只回傳存在性、啟用狀態、遮罩名、名冊店點、九店映射及是否已有 Approved Device；不修改裝置綁定或 `last_login_at`，不回傳 employee hash／device ID，不換發受測同仁 token，也不讀 private snapshot／KPI／台獎。前端只有具該 UAT 權限時才顯示「員編名冊測試」，正式批次與一般員工都 fail closed。
-- 結果（本機完成／待受控部署與 Liam UAT）：`ensurePrivatePhoto` 改為 async 並在所有路徑固定回 Promise，維持 `audit_photo_read → base64 → Blob URL` 私有照片合約；JS／CSS 加 PR #67 release query，root-scope Service Worker 同步 bump cache namespace，稽核 HTML 改為 network-first。Node `242/242`、完整 Chromium `168/168`、稽核 WebKit `15/15`；15 張 server photos 在 reload、重新驗證、`audit_status` 恢復後可載入縮圖與放大，Blob URL 在離頁釋放，console 無 `.then is not a function`。完整 WebKit 的 file／HTTP 環境結果與一個既有 Patrol fixture 差異另記於正式交接，不把它誤報為本 PR 全綠。
-- 經驗 / 給下一位的提醒：正式批次必須繼續 `active=FALSE`，UAT 批次維持唯一 `active=TRUE`。部署只能從正式 GAS 最新版本最小更新 `AuditReport.gs` 並確認 `Code.gs` 十三條 audit dispatch，不得覆蓋 HalfMedia、ReportUpload、巡店 PR #63／#64 或其他正式函式。部署後先由 Liam 用真實 Trusted Employee 身分逐一 probe 名冊，再重開三創 UAT submission 驗證 15 張照片；完成退回／補件／通過／cancel 前不可啟用正式批次或通知九店。
-
-## 2026-08-21 ｜ Codex（稽核 Approved Device audit-only follow-up，未部署）
-
-- 做了什麼：從 PR #62 合併後的最新 `main` `5eddf26` 建立隔離分支 `fix/audit-approved-device-token-20260821`。取消門市批次回報碼，改由既有員編＋Approved Device 驗證後換發 30 分鐘 audit-only token；token 綁定員編雜湊、批次、名冊店點與 submission，店點不可自選。依 Liam 最新決策，名冊遮罩名只顯示「名冊辨識」提示，實際檢查人員姓名恢復必填文字欄位，由 `audit_start` 後端清理、長度驗證並寫入 submission／photo／timeline；姓名不綁 token。員編可持久化自動帶入，audit token 僅存分頁 session。後端只核對啟用名冊與裝置綁定，不呼叫私有戰情 access／snapshot，不把 Approved Device 的全區權限帶入稽核。
-- 結果（本機完成／未部署）：正式 Sheet 已讀回確認 UAT `audit-cleaning-202608-uat` 與正式 `audit-cleaning-202608` 都是 `active=FALSE`。門市後續開始、上傳、刪除、送出、狀態與照片讀取仍需 audit token，並疊加既有 `submission_id + edit token` ownership；提交列保留不可逆 `auth_employee_hash`，舊回報碼 token 與缺少員編綁定的舊 submission fail closed。Node `238/238`、稽核合約 `16/16`（既有 15 案全保留）、稽核 Chromium `11/11`、稽核 WebKit `11/11`、指定稽核＋Patrol/Auth `60/60`。完整 Chromium 最新為 `159/163`，4 案只卡既有截圖等待穩定，其中 3 案獨立重跑通過；完整 WebKit `161/163`，2 案為既有 file-origin CORS console error。`gas/Code.gs`、巡店、半月、KPI、台獎與其他正式資料流無變更；本次未部署 GAS／Pages，正式批次未啟用。
-- 經驗 / 給下一位的提醒：Approved Device 在本流程只作身分與單一裝置證明，不能直接重用可讀全區資料的授權回應；`masked_name` 也不能當成正式填報人。正式部署前須確認 `DASHBOARD_ROSTER_SHEET_ID` 與名冊店點 canonical value，並先以 UAT submission 驗證實際姓名落地、同店不同員編、跨店、token 過期與督導取消復原；本 follow-up 未獲准部署或開放九店。
-
-## 2026-08-21 ｜ Codex（稽核回報受控部署 canonical blocker 與 rollback）
-
-- 做了什麼：PR #62 已合入最新正式 main `0693468` 並保留 PR #63／#64；Liam 完成 `AUDIT_REPORT_SUBMIT_CODE` 手動 gate 與 `setupAuditReportStorage()`。初始化建立四個稽核 Sheet 與私有 `04_稽核回報_照片`，先建立 UAT 批次。GAS v59 部署後的 `audit_config` smoke 發現萬大仍回 provisional `DNB10xxx_wanda`、通化仍回 legacy `DNB10059`，因此沒有把 PR 轉 Ready、沒有合併或發布 Pages，立即把既有 deployment 指回 v58並停用 UAT 批次。其後只在 `AuditReport.gs` 固定既有正式 canonical ID（萬大 `DNB10168`、通化 `DNB10174` 等九店），不修改 `PT_STORES`、`patrol.html` 或巡店資料流。
-- 結果（進行中）：rollback tag `rollback/audit-cleaning-predeploy-20260820-v2` 指向部署前 main；照片資料夾讀回 `shared=false` 且只有 owner 權限，四個稽核資料分頁尚無 submission／照片／事件資料。修正後 Node `234/234`、完整 Chromium `162/162`、完整 WebKit `162/162`、指定 Patrol/Auth/稽核安全案例 `30/30` 通過；PR #62 尚待新 commit push、重新部署固定版本及正式 UAT。
-- 經驗 / 給下一位的提醒：稽核不能直接把巡店相容層 `PT_STORES.code` 當 canonical value；正式 UAT 前一定要讀回 `audit_config` 的九店 ID，看到 placeholder 或 legacy code 必須立即 rollback。v59 是已封存的失敗 smoke 版本，不可再指向正式 deployment；後續從修正後 PR head 建立新版本。未完成 iPhone／督導正式 UAT 前不得開放九店。
-
-## 2026-08-20 ｜ Codex（北一二B 稽核回報專區，未部署）
-
-- 做了什麼：從最新 `origin/main` `6564a68` 建立隔離分支 `feature/audit-cleaning-report-20260820`。在 `home.html` 新增稽核入口，新增手機優先 `audit-report.html/css/js` 與隔離 `gas/AuditReport.gs`；九店 canonical value 直接由既有 `PT_STORES` 解析。門市草稿以 localStorage + IndexedDB 保存，逐張壓縮／上傳／失敗重試，只有寫入後讀回一致才完成；督導總覽、逐項通過／退回與逾時重驗沿用既有 PT token。其後在同一 Draft PR #62 追加「整理方向」圖卡；本次再補 `AUDIT_REPORT_SUBMIT_CODE` 換發的 30 分鐘 submission-bound token、PT／ownership 保護的 `audit_photo_read`、Blob URL 生命週期，以及保留照片／事件的督導 `audit_cancel` 復原流程。
-- 結果（Draft PR #62／未部署）：照片 metadata API 已移除 Drive URL／file ID，Drive 維持 private；匿名、錯誤／過期 token、跨門市越權、PT 私有照片讀取、取消保留證據與重新回報均通過。追加素材位於 `assets/audit/quality-management-reminder.png`；收到的附件實檔為 932×526 JPEG，未裁切／縮放／改字，只轉為 932×526 lossless PNG。Node `227/227`、完整 Chromium `160/160`、完整 WebKit `160/160`、GAS／JS syntax、diff check 與 390×844 overflow 通過；既有截圖位於 `docs/screenshots/audit-report-20260820/`。`gas/Code.gs` 只增加隔離 `audit_*` dispatch；`index.html`、`patrol.html`、`HalfMedia.gs` 及 KPI／台獎／每日回報／巡店／班表／半月資料流均未改。
-- 經驗 / 給下一位的提醒：本輪不部署 Pages／GAS、不建立正式 Sheet 或照片、不等於 Liam 驗收。GAS 存檔不是部署；後續須從屆時最新 main 只套本次增量、新建 GAS version，先設定 `AUDIT_REPORT_SUBMIT_CODE`、記錄 rollback tag／舊 deployment version，再做正式私有權限、跨帳號照片 readback 與 iPhone Safari UAT。首批截止日暫定 `2026-08-31`，部署前由 Liam 確認。
-
-## 2026-08-20 ｜ Codex（ptsummary 最近巡店紀錄 NA 判定 hotfix，未部署）
-
-- 做了什麼：由最新 `origin/main` 的 PR #63 merge commit `bbaf045` 建立獨立分支 `hotfix/ptsummary-na-20260820`，只調整正式 `ptsummary.recentVisits` 與其唯讀 parity model 的單題已檢查判定；`result=v`、`result=na`、`reason=na` 視為已檢查，空白與真正缺失原因仍維持待補。沒有修改 `ptwrite`、Sheet schema、正式 66 筆巡店資料或其他巡店週期規則。
-- 結果：程式與本機測試完成，尚未合併或部署。專項 Node `16/16`、完整 Node `222/222`、巡店與 auth Playwright `50/50` 通過；三創 `13 v + 20 na` 與含兩種 NA 的六張犁均為 `complete=true / missingItems=0`，空白及真正缺失 fixture 仍為 `complete=false / missingItems=2`。
-- 經驗 / 給下一位的提醒：Apps Script editor HEAD 已含尚未部署的 `AuditReport.gs`／`audit_*` dispatch，不能直接從 editor HEAD 建立巡店 GAS 新版本。先保持 Draft PR，確認未混入稽核 PR #62；後續只能另行安排由乾淨 `main` 準備的最小 GAS hotfix 部署。本次未部署 GAS／Pages，也未寫入或修改正式資料。
-
-## 2026-08-20 ｜ Codex（巡店貼上日期／NA 緊急防呆，Draft PR、未部署）
-
-- 做了什麼：由最新 `origin/main` `cd3faf1` 建立獨立分支 `hotfix/patrol-paste-20260820`。`patrol.html` 的貼上 parser 改為先完整驗證整批，再一次更新候選；任一列「填表時間」為 `####` 或無法解析時整批拒絕，保留文字框與既有 `rawDetails`，且不呼叫 `cloudWrite`。未使用到店時間替代填表時間。`na` 同時相容「是否合格」欄與舊版原因欄，空白／`na` 原因正規化為 `reason:'na'`，真正的非 NA 原因文字保留。
-- 結果：成功（本機程式／測試）。新增 8/20 的 66 筆 fixture，三創 33 筆、六張犁 33 筆；Node `221/221`、完整巡店 Playwright `43/43` 通過，涵蓋整批拒絕、零 cloud write、`rawDetails` 不變、貼上內容保留、新舊 NA、去重、正式摘要、班表、半月、媒體 mock 與里程回歸。
-- 經驗 / 給下一位的提醒：Excel 顯示 `########` 不是可推導的日期值；不可用到店時間補造填表時間，否則會改變 `fillTime + store + item` 去重身分。此 hotfix 未修改 `gas/Code.gs`、Sheet schema、`gas/HalfMedia.gs`、正式 Sheet 資料、PR #62，也未合併或部署 Pages／GAS。
-
-## 2026-08-18 ｜ Codex（台獎摘要金額單行與三創顯示名稱，未部署）
-
-- 做了什麼：由最新 `origin/main` `b23a101` 建立隔離分支 `fix/awards-ui-store-label-20260818`。台獎摘要的「督導區實際／推估獎金」共用 `award-summary-money`，固定 `nowrap`、`keep-all`、`line-height:1` 並將金額字級調為 27px；六張摘要卡片只在台獎面板內補齊置中與等高規則。KPI／台獎共用 controller 新增純顯示層 `displayStoreName()`，只把 `台灣大哥大台北三創` 與 `台灣大哥大數位生活台北三創` 顯示為 `台北三創`。
-- 結果（本機完成，未部署）：Node contract `216/216`、兩個 controller syntax、`git diff --check` 通過；本機正式 renderer 驗證 `$11,784` 為單行、六卡同高、三創選單文字／卡片文字為 `台北三創`，但 `option value` 仍是原始完整名稱，13 款篩選後數量與金額不變，console error `0`。前後截圖在 `docs/screenshots/awards-ui-20260818/`。
-- 經驗 / 給下一位的提醒：本次未修改 `row.store`、`kpiBattleStoreKey()`、巡店 alias、GAS、正式 JSON/schema、資料計算、排序或統計；也未推送、PR、Pages/GAS 部署、正式資料 readback 或 Liam 實機驗收。後續若發布，需另走 release gate，不能把本機畫面證據當成正式上線。
-
-## 2026-08-17 ｜ Codex（巡店上下半月雙輪進度，未部署）
-
-- 做了什麼：只調整 Liam Supervisor App 「巡店」頁進度顯示；以既有 `ptsummary.halfDashboard` 的巡店檢查紀錄分開 H1（1–15 日）與 H2（16 日至月底），本期以 9 店為分母，另顯示上半月、下半月與整月 18 店次。保留題 14–33 原周期，並維持 `ptvisit_read/write` 到店／離店 session 與巡店完成統計分離。
-- 結果（成功／未部署）：8/15、8/16、8/17、同店重複巡店與只按到店等 boundary 測試通過；Node `196/196`，Playwright `133/133`，390×844 無橫向溢出。未新增欄位，未修改 Sheet、GAS API、PT_TOKEN、reauth、hwrite、半月督導檢查或正式資料；未部署、未實機驗收。
-- 經驗／給下一位的提醒：進度完成來源必須是既有巡店檢查摘要，不可以 `ptvisit` 到店 session 、本月最後到店日或「去過幾間不同門市」代替。
-
-## 2026-08-17 ｜ Codex（Phase 1B：台獎戰情獨立化，implementation complete / awaiting Liam acceptance）
-
-- 做了什麼：從正式 `origin/main` `a43ba42688125e68021ad1548e47ce1ca151e6b9` 建立隔離分支 `feature/phase1b-awards-battle-standalone`。新增 `awards-battle-controller.js` 與 `awards-battle.html`；原 `index.html` 與 standalone 共用同一台獎 controller，standalone 直接沿用既有 KPI controller 的 Approved Device／員編、`private_access → kpicalc_access`、同次正式 `snapshot.awardsBattle` 與 fail-closed。已移除 standalone iframe、程式化 click、`window.event` 與 DOM 遙控；沒有第二套 API、公式、JSON、快取、登入或 localStorage 台獎 fallback。原 index 台獎保留，`home.html` 順序為 KPI 第一、台獎第二。
-- 結果（implementation complete / awaiting Liam acceptance）：Node `211/211`；台獎 standalone Chromium `5/5`、WebKit `5/5`，涵蓋 Approved Device、action 次序、未授權 fail-closed、日期／13 款／9 店完整性、原 index 與 standalone 九店逐店 exact match、390px 與返回大廳；原 index／KPI／App 聚焦 Chromium `54/54`，KPI WebKit `5/5`。完整 Chromium 為 `147/149`，兩個失敗已在乾淨同 SHA `origin/main` 以相同訊息重現：半月檢查既有 `5 / 9` 斷言，以及巡店里程入口 fixture 的九店 contract；均不屬 Phase 1B diff。
-- 經驗 / 給下一位的提醒：App、Native/iOS、`gas/Code.gs`、`kpi-battle-controller.js`、`kpi.html`、正式 KPI／台獎 JSON/schema、Mail、Trigger、巡店、半月檢查、班表與回報邏輯均 0 diff。只可建立遠端分支與 Draft PR；未 Ready、未合併、未部署 Pages/GAS、未建立 rollback tag、未做正式資料 readback 或 Liam iPhone Safari smoke。下一步只等待 Liam 驗收決策，不得自行擴大到其他階段。
-
-## 2026-08-16 ｜ Codex（Phase 1A.2：KPI Standalone 共用控制器，未部署）
-
-- 做了什麼：從最新 `origin/main` `d12068f91185ac86117b414595700ca91ab2b43e` 建立隔離分支 `feature/phase1a2-kpi-controller-shared`。將 Approved Device／員編、`private_access → kpicalc_access`、KPI adapter、同次快照 supplement merge、店績／個績 renderer 與 fail-closed 抽到唯一 `kpi-battle-controller.js`；`index.html` 與 `kpi-battle.html` 均掛載同一 controller，standalone 不再以 iframe 遙控 index。沒有新增 KPI 公式、API、JSON、快取、登入或 localStorage KPI fallback。
-- 結果（本機完成，未部署）：Node `205/205`；KPI standalone Chromium `5/5`、WebKit `5/5`，包含新舊日期／來源／整體／9 店／排名／DOD／加掛／保險／25 項 exact match、未授權 fail-closed、action 次序與 390px 無頁面級溢出；App／index Chromium regression（排除已證實 main 基線失敗）`52/52`。完整 Chromium 為 `143/144`，唯一失敗 `liam-supervisor-half-month-formal-read` 的既有 `5 / 9` 斷言已在乾淨同 SHA main 重現，非本次變更。
-- 經驗 / 給下一位的提醒：本輪 App、Native/iOS、`gas/Code.gs`、`kpi.html`、正式 JSON/schema、Mail、Trigger、巡店、班表與回報邏輯均 0 diff；不得為了清除既有半月測試基線而越界修改 App。尚未推送、未建立 PR、未部署 Pages/GAS、未做正式資料 readback 或 Liam Safari smoke，也未進入 Phase 1B。
-
-## 2026-08-16 ｜ Codex（智慧營運中心 Phase 1A：KPI 戰情獨立入口，未部署）
-
-- 做了什麼：最初由 `origin/main` `fa40375` 建立隔離分支 `feature/ops-center-kpi-battle-standalone`；正式驗收前再 fetch，確認最新 main 為 `d8edb5557126c81418de305f11164373edfccc47`，並將原 commit `c2011d9` 無衝突 rebase 為 patch-equivalent `76422dc`。新增 `kpi-battle.html` 同源殼層，直接載入並切換到原 `index.html` 的既有 KPI 面板；`home.html` 同仁大廳新增第一順位「KPI 戰情」，原 KPI 與其他入口保留。
-- 結果（Draft PR #53，待 Liam 正式驗收）：同步後 Node `204/204`；Phase 1A exact match、原 index、`kpi.html`、App 1.2 與 390px 聚焦 Playwright `40/40`。新舊日期、來源、北一二B整體、9 店、公司排名、DOD、加掛、保險搭售率與 25 項 KPI 逐區完全相同；權限 action 同為 `private_access → kpicalc_access`，未授權維持 fail-closed。遠端 Draft PR base 為指定 main、merge state `CLEAN`。
-- 經驗 / 給下一位的提醒：`range-diff` 證明 rebase 前後 Phase 1A patch 等價；最新 main 新增的 `.github/workflows/publisher-shadow-preflight.yml` 與分支 blob 完全相同。`index.html`、`kpi.html`、App Freeze 檔案與 `gas/Code.gs` diff 均為 0。尚未 merge、未部署、未做正式 HTTPS／核准裝置／Liam 驗收；不得進入 Phase 1B 或順手處理台獎、回報拆分、App、GAS 或其他 backlog。
-
-## 2026-08-12 ｜ Codex（半月 hwrite Security Review 修復，未部署）
-
-- 做了什麼：依獨立 diff review，將 App 專用 hwrite 從 JSONP query 改為單次 POST body；移除 client URL chunk。新增 doPost hwrite route，沿用 ptauth token，server 先完整驗證 rows，再於 ScriptLock 內依 period/store/item 更新。App POST 拒絕非異常狀態的 note/improvement、evidence/media 與任意 extra field；既有 patrol.html JSONP hwrite 保持相容。
-- 結果：POST URL 不含 token/payload，且 server 會拒絕 query token/payload；18 題單一 request、完整驗證先於寫入、unauthorized fail-closed、ScriptLock 競態保護、write→hread parity、跨店／跨期隔離與 390×844 測試已通過。Node 172/172、半月正式讀取與 hwrite Playwright 7/7；正式 hwrite 與 half_media_upload request 仍為 0，未 merge、未部署。
-- 經驗 / 給下一位的提醒：既有 patrol.html 仍有不同的 legacy note/media semantics，不可用 App strict allowlist 直接破壞；App POST 與 legacy JSONP 必須維持分離的驗證選項。
-
-## 2026-08-12 ｜ Codex（App 1.2 半月督導檢查 hwrite Predeploy，未部署）
-
-- 做了什麼：在獨立 `feature/liam-supervisor-half-month-hwrite-integration` 分支，沿用既有 ptauth 1800 秒 token、`hwrite`、`hread` 與 H1/H2 規則，完成 18 題文字進度的明確 opt-in 儲存。到店只預選店點；只有 Liam 按「+ 開始半月督導檢查」、選店並按「儲存目前進度」才會寫入。每次 `hwrite` 後必須重新 `hread`，逐欄比對 period/store/item/status/note/improvement；不一致即顯示失敗。最近填寫日期只顯示可靠的 `YYYY/M/D`，不再產生 `0:00`。
-- 結果（Predeploy Gate 通過，待 Liam review）：GAS 對既有 hwrite row 增加 auth-before-parse、九店／日期／期別／題號／狀態／extra field 嚴格驗證，business key 重複儲存不新增重複題目，且保留既有附件。Node 165/165、半月 hwrite Playwright 3/3、npm audit 0 vulnerabilities；正式 `hwrite` 與 `half_media_upload` request 均為 0，未部署 GAS／Pages。
-- 經驗 / 給下一位的提醒：backend 沒有 completed flag，18/18 只能叫「18/18 已填」。媒體仍為唯讀且 `half_media_upload=0`。選定五頁籤回歸唯一未過是既有 2026-08-11 ptvisit fixture 在 8/12 today-only 規則下被排除；本輪依範圍不修改 ptvisit。
-
-## 2026-08-12 ｜ Codex（App 1.2 Daily Report 門市回覆正式部署候選）
-
-- 做了什麼：將獨立 hotfix `f4614d6` 以 cherry-pick 疊加在半月正式唯讀 release 之上，只保留 Daily Report 的 `zero_reason`、`zero_consult`、`zero_method`、`zero_plan` mapping、門市請益彙整、單店回覆、對應 contract/CSS/tests 與 cache bust。
-- 結果（部署前 Gate）：兩時段互不沿用，空欄位不顯示，原文只做 HTML escaping；KPI、台獎、個績、班表、巡店、ptvisit、auth、Approved Device、Native shell 與 GAS write semantics 無變更。正式部署與 21:00 readback 仍須以後續 Gate 為準。
-- 經驗 / 給下一位的提醒：正式 summary 未提供 canonical storeFeedback 時，唯一來源是同一 segment 的原始 `read.data[store].zero_*`；禁止跨時段帶值、推算或改寫原文。
-
-## 2026-08-12 ｜ Codex（App 1.2 半月督導檢查 Formal Read，未部署）
-
-- 做了什麼：從已通過 UI Preview 的 `51ce311` 建立隔離分支，只把既有 ptauth 1800 秒短效 session 接到 `hread`。新增純 read model，依正式 H1／H2、九店與題 1–18 篩選；`ok/abnormal/na/blank` 分別顯示符合／異常／不適用／尚未填寫。九店只呈現透明的「18/18 已填」「n/18 已填」「尚未填」，不建立 backend completed flag；openVisit 仍只提示與預選。
-- 結果（成功，待 Liam review）：合成 fixture、未授權／逾時與 390×844 測試均通過；console error 0、橫向溢出 0、正式 write request 0。Liam 解鎖後正式 hread 讀回 2026-08 H1 為 1 店 18/18、4 店填寫中、4 店尚未填，有異常 1 店／1 項；大稻埕 18/18 無異常、歷史 H2 復興南 18/18 有異常、酒泉 7/18 三種店況的 item/status/原文/media/period/store/date 全欄 parity 通過。正式 `hwrite`、`half_media_upload`、GAS、Pages、Native 與既有 ptvisit／巡店 canonical 計算均未修改。
-- 經驗 / 給下一位的提醒：hread 不暴露 worksheet 的正式 completed 欄位，因此 App 的 18 題 completeness 必須持續命名為「填寫進度」。既有 ptvisit fixture 固定 2026-08-11，在 08-12 會被 today-only 規則排除；依任務邊界只記錄，不可藉本次半月 read 修正它。
-
-## 2026-08-12 ｜ Codex（App 1.2 半月督導檢查 Discovery／UI Preview，未部署）
-
-- 做了什麼：從乾淨 `origin/main` 建立 `feature/liam-supervisor-half-month-preview-20260812`，只盤點正式 `patrol.html`／`gas/Code.gs` 的半月督導檢查資料、設計 read-only contract，並在 App 巡店頁加入第二層「巡店檢查／半月督導檢查」Preview。到店與半月檢查維持完全 opt-in；openVisit 只提示並預選店點，沒有自動開始、沒有呼叫 `hread`／`hwrite`／`half_media_upload`。
-- 結果（進行中）：確認正式期別規則為 `H1=1–15 日`、`H2=16 日–月底`，固定 18 題，狀態為 `ok/abnormal/na/blank`；正式資料由 `hread` 回讀「半月督導檢查」worksheet，`hwrite` 與媒體上傳仍維持既有 ptauth 1800 秒短效 token。Preview Node／contract 15/15、390×844 App/Preview 10/10、既有 `patrol.html` 36/36；console error 0、橫向溢出 0、觸控目標至少 44px。未部署 GAS／Pages／Native，也沒有正式 write。
-- 經驗 / 給下一位的提醒：現行 `hread` 不回傳 worksheet 的獨立建立時間與填寫狀態，且讀函式會透過 `getHalfCheckSheet()` 在缺表時建表；本輪只記錄，未改 GAS。App 正式接線前必須先決定 read adapter 是否補足 canonical status，並保持 Preview fail-closed。另有既有 App ptvisit 測試把日期固定為 2026-08-11，於 08-12 會被正式「只顯示台北當日」規則排除；本輪未越界修改 ptvisit fixture。
-
-## 2026-08-12 ｜ Codex（App 1.2 店長績效語意修正，待部署／實機驗收）
-
-- 做了什麼：從已部署個績區版本建立隔離分支 `hotfix/liam-supervisor-manager-semantics-20260812`，只修正「戰情 → 個績 → 北一二B → 職稱排名 → 店長」。店長列改以既有正式 `kpiStores` 顯示店 KPI、店公司排名、店 KPI DOD、店排名變化；AQ 仍只取店長 personal row 的正式 `AQ actual` 並提示距 10 點缺口。店長不再顯示或排序 personal `totalRate/rank/DOD/rankChange`，副店、其他業代與指標未達檢視維持原語意。
-- 結果（進行中）：Node 全套 141/141；App 1.2 Chromium 390×844 2/2，console error、橫向溢出、ellipsis 與觸控目標 assertions 均通過。以 2026-08-11 正式快照副本驗證 9 位店長全部精確對應 9 店、依店公司排名排序，AQ 關注 7 人、AQ 缺值 0；Preview 特意放入店長 personal rank `1326` 與 totalRate `0`，UI 防洩漏測試確認兩者不顯示。完整五頁 smoke 的功能 assertion 已走完，但仍有既有巡店 full-page screenshot timeout 與跨日 visit fixture 失敗，未在本輪越界修改巡店。
-- 經驗 / 給下一位的提醒：2026-08-12 Liam 已正式確認「店長沒有個人績效，店長看店績」；前一筆 2026-08-11 日誌要求忠實顯示店長 personal rank `1326` 的語意已被本次管理規則取代。此分支尚未合併／部署、未更新 Native release query、未完成 Liam 實機驗收，也未建立 final pilot tag。
-
-## 2026-08-11 ｜ Codex（App 1.2 區個績職稱／未達檢視，待部署／實機驗收）
-
-- 做了什麼：從乾淨 `origin/main` 建立隔離分支 `hotfix/liam-supervisor-personal-area-20260811`，只調整「戰情 → 個績 → 北一二B」。正式 `category/role` 映射為店長／副店／其他業代；職稱排名依正式 `rank` 由小到大、空值置後；指標未達只列非店長的 A999／好速／R1399 正式 `rate < 100%`，空值不當 0。第四張摘要卡改為店長 AQ `actual < 10`，只作管理提示，不重算總績效、KPI 或排名。店點模式沿用既有資料語意與來源排序。
-- 結果（進行中）：Node 全套 140/140；390×844 個績專項、五頁籤互動、console、無 ellipsis／橫向溢出與 44px 觸控 assertion 均通過。完整 Playwright 10 項中 9 項通過，唯一失敗為既有巡店 full-page screenshot 在所有功能 assertion 通過後逾時。以 2026-08-11 已 `published-verified` 的正式快照副本做 source→adapter Gate：40 人＝店長 9／副店 11／其他業代 20，三項未達與 AQ 規則皆通過，另抽 5 人逐欄 exact match。
-- 經驗 / 給下一位的提醒：正式來源目前 9 位店長的 `rank` 都是 1326，App 必須忠實顯示，不得以總達成率自行替換。此分支未包含 Daily Report 門市回覆 hotfix `f4614d6`，也未部署或完成 Liam 實機驗收；KPI、台獎、回報、班表、巡店、auth、Approved Device 與 Native 均未修改。
-
-## 2026-08-11 ｜ Codex（App 1.2 個績＋每日回報摘要，待部署／21:00 live data）
-
-- 做了什麼：從乾淨 `origin/main` 建立 `feature/liam-supervisor-app-1-2`。每日回報新增既有 GAS `read` 的唯讀 `formal-index-summary-v1` adapter，直接提供完成／缺店、更新時間、A999、好速、R1399、R999、保險搭售率與設備案佔比；App 只直通顯示，不從店列重算。戰情新增「個績」，沿用 Approved Device 保護下的 `private_access.snapshot.kpiBattle.personal`，顯示正式總績效、排名、DOD、排名變化與現有 10 項個人 KPI；正式來源沒有的「需要關注」與個人 25 項保持 `—`／不顯示。
-- 結果（進行中）：全 Node 134/134、App 1.2 Chromium 390×844 2/2、npm audit 0；橫向溢出 0、可見數字無 ellipsis、相關 touch target ≥44px、console error 0。18:06 後正式 16:00 readback 為 9/9，A999 3、好速 2、R1399 6、R999 13、保險 50.5%、設備案 52.2%、更新 18:06:51；21:00 仍為 0/9，Gate 維持 `WAITING-LIVE-DATA`。尚未部署 GAS／GitHub Pages，不能把本機 mapping 當正式 App PASS。
-- 經驗 / 給下一位的提醒：正式 16:00 資料會由 partial 變成 complete，測試保留 8/9 partial fixture，但 App 絕不可硬編當下數字。21:00 若正式欄位較少，adapter 必須省略欄位，不能把缺欄位變成 0 或帶入 16:00。KPI、台獎、班表、巡店、auth、Approved Device 與 Native shell 本輪未改。
-
-## 2026-08-11 ｜ Codex（App 1.1 巡店最小修正，待部署／實機驗收）
-
-- 做了什麼：只動巡店。擴充既有 `patrol-read-model.js`，讓 App 與 `patrol.html` 共用題 14–17、題 18、不同到店日期計數與一次巡店一列的聚合；App 巡店頁新增雙月全盤、每月盤點、九店本月次數、最近 10 次，以及獨立快速到店／離店。GAS 只新增 `ptvisit_read`／`ptvisit_write` 與獨立工作表 `巡店到離店紀錄`，既有 `ptread`／`ptwrite`／`sread` 語意與 schema 不變。
-- 結果（進行中）：巡店 Node 契約與 Chromium/WebKit 390×844 回歸已通過；到離店驗證涵蓋短效 token、店點/action allowlist、server timestamp、額外欄位拒絕、open visit 配對與快速連點阻擋。尚未合併 main、尚未部署 GAS／Pages、尚未以 Liam iPhone 與正式資料驗收，因此不可宣稱正式完成。
-- 經驗 / 給下一位的提醒：正式 ptread 只能可靠識別「店點＋不同到店日期」，同店同日多次沒有 session ID，只能計一次並明示 fail-closed。新到離店 `visitSessionId` 只服務新獨立紀錄，不得回寫或改造巡店明細。
-
-## 2026-08-11 ｜ Codex（App 1.1 台獎店點指定機款補齊）
-
-- 做了什麼：本輪只修正戰情 → 台獎 → 店點。店點模式直接映射正式台獎所選店的完整 `row.items`，保留來源已提供的機款名稱、達成率、實際、目標、50% 目標／差異、50%／100% 獎金與狀態；不再從全區 Top 2 推算，也不過濾、截斷或混入其他店機款。北一二B模式仍只列完整九店的店名、金額與領獎狀態。
-- 結果（進行中）：等待契約、390×844、巡店 parity、Safari/WebKit 與 Native shell 回歸後部署。每日回報程式本輪完全不動；正式時段真人資料出現前，Gate 固定為 `WAITING-LIVE-DATA`，partial 可合法通過資料一致性驗收。App icon／Header Logo／Launch mark／favicon 僅記入 Visual Polish backlog，未修改任何圖示。
-- 經驗 / 給下一位的提醒：正式網站的店點指定機款來源是該店自己的 `row.items`；App 只能逐欄轉接正式值。不得拿區 Top 2、九店合併結果或前端推算補出店點清單。
-
-## 2026-08-11 ｜ Codex（App 1.1 實機巡店／台獎／KPI 修正）
-
-- 做了什麼：只處理三個實機問題。巡店將 `patrol.html` 的 1–33 題、上下半月、題 18 固定雙月、題 19–33 每月 20 日前等純讀取計算抽成 `patrol-read-model.js`，正式巡店頁與 App 共用同一模型；台獎首頁與戰情改列完整九店、只顯示金額與「領獎／未領獎」，移除 Top 1／Top 2／機款欄，並拒絕把不同口徑的 aggregate `actual_total` 當區獎金；KPI 390px 店點列改成兩層排列，完整顯示 KPI、排名、DOD、排名變動與加減分。
-- 結果（成功 / 失敗 / 進行中）：完整 `npm test` 為 Playwright 120/120，Node 契約 124/124、巡店同 fixture parity 2/2、巡店逾時草稿並行回歸 5/5、Chromium 390×844 6/6、WebKit/Safari 等價回歸 7/7、npm audit 0；console error 0、horizontal overflow 0、九店 KPI 觸控列皆至少 44px。另修正正式巡店頁初始雲端讀回可能覆寫尚未送出的半月表單草稿競態，只調整 render 時序，不改驗證或寫入規則。未修改 `gas/Code.gs`、OAuth、Approved Device、`ptauth` 或任何寫入 action。正式 Pages 合併／讀回及 Liam Native 實機複驗仍須分開確認。
-- 經驗 / 給下一位的提醒：`ptread` 正式回應已有 rows 與 stores，不能再因缺少自訂 `summary/overview/period` 而讓月大盤整塊失效。台獎 aggregate `actual_total=179` 與店點千元金額不是可證明的同一幣別契約，前端不得相加或冒充區總額；來源未提供明確同口徑欄位時維持不顯示。
-
-## 2026-08-09 ｜ Codex（Liam Supervisor Pilot 1.0 最小唯讀整合，待正式部署／實機驗收）
-
-- 做了什麼：以最新 `origin/main` `b2e4533` 重整既有 `feature/liam-intel-app`；首頁依今日 Gate 固定為營運狀態、KPI、台獎、16:00／21:00 回報、今日班表、巡店提醒。KPI／台獎／回報只連既有正式頁；班表／巡店只重用正式 `ptauth` 短效 session，allowlist 固定 `sread`／`ptread`，未修改 `index.html`、`patrol.html`、`gas/Code.gs`、Sheet schema 或任何寫入 action。
-- 結果（進行中）：本機 Node 契約 3/3、390×844 Playwright 3/3，HTTP／Service Worker 載入與 console error 掃描通過；npm audit 0。班表可顯示九店人員、班別、出勤／休假、店點與日期切換；巡店可顯示九店狀態、最近日期、待追蹤摘要與既有入口。正式部署、真資料三店勾稽、iPhone Safari／加入主畫面尚未取得證據，因此不可宣稱 Pilot 已上線。
-- 經驗 / 給下一位的提醒：Service Worker 只快取 App shell，不快取 `sread`／`ptread`；通行碼不保存、token 只用既有 sessionStorage key。巡店摘要失敗必須 fallback 到既有巡店入口，不可顯示猜測值或拖延整體 Pilot。今日明確不做 Viewer B、TEST Admin recovery、金牌、店務檢查、多人登入或任何新架構。
-
-## 2026-08-06 ｜ Codex（Liam 情報站 App 1.0 安全盤點與 PWA 空殼）
-
-- 做了什麼：從最新 `origin/main` `31857ca` 建立 `liam-intel-app-baseline-2026-08-06` tag、可驗證 Git bundle／tar 備份，以及隔離 worktree 分支 `feature/liam-intel-app`。在分支中新增 `app.html`、manifest、Service Worker、離線頁、App icons、手機優先樣式與 App shell 契約／Playwright 測試；新頁只以原系統連結作為入口，未呼叫 GAS、Google Sheet、私有 Drive、D1 或 R2，也沒有寫入按鈕。
-- 結果：本機 Node 契約 3/3、375px Playwright 2/2 通過；確認五個固定頁籤、iPhone safe area、44px 觸控目標、無橫向溢出、督導「Liam AI 指揮室」靜態預覽與離線 fallback。`index.html`、`home.html`、`kpi.html`、`kpitry.html`、`patrol.html`、`gas/Code.gs` 均未改動。
-- 經驗 / 給下一位的提醒：此成果是未部署的 PWA 入口空殼，並不代表跨系統登入、KPI／台獎摘要、班表、公告、店務檢查或自動化狀態已串接。下一階段必須先定義最小只讀、已授權的摘要 adapter；不得把私有 JSON、名冊、員編、密碼、token 或既有 session 直接搬入 App。
-
-## 2026-08-05 ｜ Codex（巡店單筆隔離寫入／清除驗收）
-
-- 做了什麼：在 Liam 已完成督導通行碼登入的正式 Liam 情報站，僅新增一筆 `巡店明細` 隔離紀錄：`2026/8/5 20:00`、台北通化、題號 33，檢查人員與未查原因均為 `驗收測試_20260805`。頁面回覆「已同步至雲端（新增 1 筆，重複資料自動略過）」；重新整理後雲端看板本月已巡店數由 3 顯示為 4，確認走正式讀回路徑。
-- 結果：已清除。以唯一識別字搜尋 `巡店明細` A1:L1272，唯一命中第 1272 列（完整欄位均為本次測試）後，只刪除該列；刪除 API 成功。再次重新載入雲端回覆「雲端已載入 1271 筆明細」，頁面不再出現 `驗收測試_20260805`，試算表精確搜尋亦為 0 筆。未操作班表、半月督導檢查、其他巡店列、KPI 快照或任何 PR。
-- 經驗 / 給下一位的提醒：此頁面目前只有新增／讀回介面，沒有單列刪除控制；若必須做正式隔離測試，需使用唯一識別字，讀回精確定位列後以 Google Sheets row delete 清除，並再做頁面與工作表雙重讀回。看板店點彙整可能含另一筆既有通化紀錄，是否有任何非測試資料的併發異動需另依來源紀錄追查，不能把它歸因於已刪除的測試列。
-
-## 2026-08-05 ｜ Codex（正式營運中心安全驗收）
-
-- 做了什麼：以加上驗收參數的正式 GitHub Pages 請求逐一開啟 `home.html`、`index.html`、`kpi.html`、`kpitry.html`、`patrol.html`；全部非 404，且 `home.html` 唯一入口仍只連向每日回報、同仁 KPI 試算、公開 KPI 模擬器與需通行碼的 Liam 情報站。每日回報僅用既有 `2026-07-20 16:00` 做唯讀日期回放，沒有新增或覆寫 2026-08-05 資料。
-- 結果：每日回放成功讀到 9 間門市、顯示「全數填報」；畫面未出現 `1899-12-30`。 `origin/main` 的 `readData()` 已以 `getDisplayValues()` 讀取 `savedAt`，與 PR #23 的核心修正等效；但 PR #23 的文件／測試提交本身不在目前 main，且本次頁面未顯示原始 `savedAt` 欄位，故保留 PR #23，不能以本次驗收宣稱整支 PR 已納入。巡店頁要求督導通行碼，未在無憑證情況下寫入、刪除或讀取正式資料，隔離測試維持 blocked。KPI 不重複發布：Drive `north12b-dashboard-private-latest.json` 讀回為 `report_date=2026-08-05`、`data_as_of_date=2026-08-04`、`source_file=0805.xlsx`、`publishedAt=2026-08-05T07:57:29.761Z`，與最新正式來源一致，檔案為 owner-only／未分享。PR #25 已留言「獨立台獎預覽流程尚未正式驗收，本次不合併，相關成果留作後續參考」後關閉（未合併）；PR #33 的班表匯入／`swrite` 功能未在目前 main 找到等效實作，且未完成正式 GAS 驗收，保留不關閉。
-- 經驗 / 給下一位的提醒：通過「可開頁」不等於可寫入驗收。巡店驗收需要由 Liam 提供一次性、可撤銷的督導測試授權，才能完成「建立 → 已同步雲端 → 重整讀回 → 刪除 → 重整確認清除」；KPI 若遠端快照的 `report_date` 已與最新來源一致，應跳過發布，保留 Drive 讀回而非重覆覆寫。
-
-## 2026-08-05 ｜ Codex（KPI 保險搭售率與台獎篩選門檻）
-- 做了什麼：KPI 店績摘要與排名表在「加掛」後新增實際「保險搭售率」。本機快照建立器以同日、同來源檔的 `supplemental_daily_report` 補入北一二B整體及九店的 `insurance_attach_rate`；若報表日期或來源檔不一致，拒絕補值。台獎上方排序卡維持不變；下方 13 款篩選新增「北一二B整體」，預設選北一二B時顯示每款督導獎金 80%／100%，改選店點時才顯示店長獎金 50%／100%。
-- 結果（成功 / 失敗 / 進行中）：以 0805 正式產物重建驗證：北一二B保險搭售率 `46.154%`，九店皆有實際搭售率；vivo X300／V70 FE 範例，北一二B 80%／100% 為 `$2,215`／`$3,410`，店點 50%／100% 為 `$2,130`／`$3,195`。契約測試 17/17、介面測試 32/32 通過。
+- 驗證（未發布）：Node 日期／正式 gate `20/20`；Python 日期契約與真實 8/22 本機產物 `3/3`。回歸案例確認寄信／檔名日 2026-08-22、資料截止日 2026-08-21 時，KPI／台獎 snapshot `report_date=2026-08-21`、KPI `data_as_of_date=2026-08-21`、`source_file=0822.xlsx`。未合併 PR、未部署 Pages／GAS、未執行正式私有資料發布或 r…10598 tokens truncated…/ 進行中）：以 0805 正式產物重建驗證：北一二B保險搭售率 `46.154%`，九店皆有實際搭售率；vivo X300／V70 FE 範例，北一二B 80%／100% 為 `$2,215`／`$3,410`，店點 50%／100% 為 `$2,130`／`$3,195`。契約測試 17/17、介面測試 32/32 通過。
 - 經驗 / 給下一位的提醒：篩選器的北一二B金額只取 `supervisor` 規則的 80%／100%，店點金額只取 `manager` 規則的 50%／100%，不得把兩條獎金軌合併；上方實際獎金排序與優先補量卡不因篩選器而改動。
 
 ---
