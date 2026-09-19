@@ -13,7 +13,7 @@
   const MIN_VISIT_GAP_DAYS = 7;
 
   const SEP25_ITEMS = Object.freeze([
-    { no:1, group:'monthly', rule:'monthly', label:'每月執行1次', text:'督導打卡' },
+    { no:1, group:'monthly', rule:'monthly', label:'非必要項目', required:false, text:'督導打卡' },
     { no:2, group:'monthly', rule:'monthly', label:'每月執行1次', text:'(第一次巡檢)，1.檢查店格陳列(含招牌、布旗、中島、電視是否有聲音…等)2.展機、配件防盜功能皆正常 3.確認門市前後場環境整潔且無非公司商品' },
     { no:3, group:'monthly', rule:'monthly', label:'每月執行1次', text:'(第二次巡檢)，1.檢查店格陳列(含招牌、布旗、中島、電視是否有聲音…等)2.展機、配件防盜功能皆正常 3.確認門市前後場環境整潔且無非公司商品' },
     { no:4, group:'monthly', rule:'monthly', label:'每月執行1次', text:'每月1次，1.觀察同仁服裝儀容及服務過程是否熱情並符合規範2.人員出勤與班表一致並詳載休息時間' },
@@ -132,7 +132,10 @@
     const match = (Array.isArray(rows) ? rows : []).find(row =>
       Number(row && row.item) === item.no && relevantMonths.includes(rowMonth(row)) && completed(row)
     );
-    return match ? { status:'done', date:rowIsoDate(match) } : {
+    if (match) return { status:'done', date:rowIsoDate(match) };
+    // 督導打卡保留於巡店清單，但不是完成巡店的必要項目；沒有勾選時仍視同完成。
+    if (item.required === false) return { status:'done', optional:true };
+    return {
       status:'miss', detail:item.rule === 'bimonthly' ? `本期(${bimWindow(month).label})未完成` : item.label
     };
   }

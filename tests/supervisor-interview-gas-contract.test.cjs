@@ -12,7 +12,7 @@ test('面談讀寫只走受保護 POST action 並納入巡店 session 錯誤格�
   assert.match(code,/ptRequireSession_\(body\.token, 'interview_read'\)/);
   assert.match(code,/ptRequireSession_\(body\.token, 'interview_write'\)/);
   assert.match(code,/const patrolActions = \[[^\]]*'interview_read'[^\]]*'interview_write'/);
-  assert.match(html,/action==='interview_read'\|\|action==='interview_write'/);
+  assert.match(html,/'interview_read','interview_write'/);
 });
 
 test('面談資料使用獨立工作表，拒收員編並以季度隔離',()=>{
@@ -28,4 +28,13 @@ test('名冊沿用私有班表且前端新季度歸零由純模型負責',()=>{
   assert.match(html,/新季度會自動全部重設為尚未面談/);
   assert.match(html,/SupervisorInterviewModel\.quarterProgress/);
   assert.match(html,/雲端儲存並讀回完成/);
+});
+
+test('面談預覽與歷史完整顯示所有欄位，未結案使用不同色標',()=>{
+  assert.match(html,/const rows=parsed\.records;/);
+  assert.doesNotMatch(html,/parsed\.records\.slice\(0,8\)/);
+  assert.match(html,/function supervisorInterviewRecordRow\(row\)/);
+  assert.match(html,/面談／填表／結案/);
+  assert.match(html,/未結案\$\{source/);
+  assert.match(html,/interview-pill \$\{closed\?'done':'progress'\}/);
 });

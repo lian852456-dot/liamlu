@@ -16,6 +16,7 @@ test('新版題目依圖片固定為 25 項與三個頻率群組', () => {
   assert.deepEqual(Questions.SEP25_GROUPS.monthly, [1,2,3,4,5,6,7,8,9]);
   assert.deepEqual(Questions.SEP25_GROUPS.bimonthly, [10]);
   assert.deepEqual(Questions.SEP25_GROUPS.ncc, [11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]);
+  assert.equal(Questions.SEP25_BY_NO[1].required, false, '督導打卡為顯示項目，不是巡店完成必要條件');
   assert.ok(Questions.SEP25_GROUPS.monthly.every(no => Questions.SEP25_BY_NO[no].rule === 'monthly'));
   assert.equal(Questions.SEP25_BY_NO[10].rule, 'bimonthly');
   assert.ok(Questions.SEP25_GROUPS.ncc.every(no => Questions.SEP25_BY_NO[no].rule === 'monthly'));
@@ -57,6 +58,19 @@ test('新版店點完整完成需同時滿足 25 題與兩次相隔七天', () =
   const completed = Questions.storeSummary([...questions, {...questions[0], fillTime:'2026/9/8 10:00'}], store, '2026-09');
   assert.equal(completed.visits.completed, true);
   assert.equal(completed.status, 'complete');
+});
+
+test('督導打卡未勾選時仍視為完成，不列入缺項或阻擋巡店結案', () => {
+  const store = { code:'DNB10168', name:'台北萬大' };
+  const requiredQuestions = Array.from({ length:24 }, (_, index) => ({
+    fillTime:'2026/9/1 10:00', month:'2026-09', code:store.code, store:store.name,
+    item:index + 2, result:'v'
+  }));
+  const summary = Questions.storeSummary([...requiredQuestions, {...requiredQuestions[0], fillTime:'2026/9/8 10:00'}], store, '2026-09');
+  assert.equal(summary.monthly.completed, 9);
+  assert.equal(summary.missingItems, 0);
+  assert.equal(summary.done, 25);
+  assert.equal(summary.status, 'complete');
 });
 
 test('圖片權威文字逐題鎖定且不覆蓋舊 ITEM_TEXT', () => {
@@ -113,12 +127,12 @@ test('9–10月共用第10題雙月進度，月檢與NCC仍各自按月', () => 
 
   const october = Questions.overview(september, [store], '2026-10').stores[0];
   assert.equal(october.bimonthly.completed, 1);
-  assert.equal(october.monthly.completed, 0);
+  assert.equal(october.monthly.completed, 1, '督導打卡未填為非必要，視同完成');
   assert.equal(october.ncc.completed, 0);
-  assert.equal(october.missingItems, 24);
+  assert.equal(october.missingItems, 23);
 });
 
-test('新版正式明細只有 V 計入完成，NA 與原因 NA 都維持缺項', () => {
+test('新版正式明細只有 V 計入必要項目的完成，督導打卡除外；NA 與原因 NA 都維持缺項', () => {
   const store = { code:'DNB10082', name:'台北永吉' };
   const base = {fillTime:'2026/9/2 10:00', month:'2026-09', code:store.code, store:store.name};
   const rows = Array.from({ length:25 }, (_, index) => ({...base, item:index + 1, result:'v', reason:''}));
@@ -128,14 +142,14 @@ test('新版正式明細只有 V 計入完成，NA 與原因 NA 都維持缺項'
   rows.push({...base, fillTime:'2026/9/9 10:00', item:2, result:'v', reason:'NA'});
 
   const summary = Questions.overview(rows, [store], '2026-09').stores[0];
-  assert.equal(Questions.itemStatus(rows, '2026-09', 1).status, 'miss');
+  assert.equal(Questions.itemStatus(rows, '2026-09', 1).status, 'done');
   assert.equal(Questions.itemStatus(rows, '2026-09', 2).status, 'done', 'V 不受 reason 欄影響');
   assert.equal(Questions.itemStatus(rows, '2026-09', 3).status, 'miss');
   assert.equal(Questions.itemStatus(rows, '2026-09', 10).status, 'miss');
-  assert.equal(summary.done, 22);
-  assert.equal(summary.missingItems, 3);
-  assert.deepEqual(summary.missingItemNumbers, [1,3,10]);
-  assert.equal(summary.monthly.completed, 7);
+  assert.equal(summary.done, 23);
+  assert.equal(summary.missingItems, 2);
+  assert.deepEqual(summary.missingItemNumbers, [3,10]);
+  assert.equal(summary.monthly.completed, 8);
   assert.equal(summary.bimonthly.completed, 0);
   assert.equal(summary.ncc.completed, 15);
   assert.equal(summary.questionsComplete, false);

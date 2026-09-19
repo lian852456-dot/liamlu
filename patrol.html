@@ -1,5 +1,5 @@
-Warning: truncated output (original token count: 66804)
-Total output lines: 4114
+Warning: truncated output (original token count: 67081)
+Total output lines: 4131
 
 <!DOCTYPE html>
 <html lang="zh-Hant">
@@ -433,7 +433,11 @@ Total output lines: 4114
   .interview-pill{border-radius:999px;padding:3px 9px;font-size:12px;font-weight:800;white-space:nowrap;background:var(--miss-bg);color:var(--miss)}
   .interview-pill.done{background:var(--ok-bg);color:var(--ok)}
   .interview-pill.progress{background:#fff4d9;color:#8a5b00}
-  .interview-record-detail{max-width:430px;white-space:normal;line-height:1.55}
+  .interview-table{min-width:1660px;table-layout:auto;line-height:1.6}
+  .interview-table td{min-width:116px;max-width:420px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
+  .interview-table .interview-guidance,.interview-table .interview-feedback{min-width:260px}
+  .interview-date-stack{display:grid;gap:3px;min-width:122px}
+  .interview-date-stack small{font-size:12px;color:var(--muted)}
   @media(max-width:720px){.interview-progress{grid-template-columns:repeat(2,minmax(0,1fr))}.interview-grid{grid-template-columns:1fr}}
   .half-dashboard-store{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}
   .half-dashboard-store-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:10px}
@@ -647,11 +651,11 @@ Total output lines: 4114
     </div>
     <div class="interview-grid">
       <div class="secure-card">
-        <h3>尚未面談名單</h3>
+        <h3>未完成面談／待結案</h3>
         <div id="supervisorInterviewMissing" class="interview-person-list"><div class="empty-state">正在比對私有班表名冊…</div></div>
       </div>
       <div class="secure-card">
-        <h3>本季已面談</h3>
+        <h3>本季已結案</h3>
         <div id="supervisorInterviewCompleted" class="interview-person-list"><div class="empty-state">正在載入面談紀錄…</div></div>
       </div>
     </div>
@@ -732,7 +736,7 @@ Total output lines: 4114
 </div>
 </template>
 
-<script src="patrol-question-versions.js?v=3"></script>
+<script src="patrol-question-versions.js?v=4"></script>
 <script src="patrol-read-model.js?v=10"></script>
 <script src="supervisor-interview-model.js?v=1"></script>
 <script>
@@ -955,15 +959,7 @@ async function patrolReadRequest(action,url,options={},timeoutMs=30000){
         timestamp:new Date().toISOString(),action,attempt,durationMs:Math.round(performance.now()-started),
         httpStatus:response?.status||null,redirected:Boolean(response?.redirected),
         contentType:String(response?.headers?.get('content-type')||'').split(';')[0].replace(/[^a-zA-Z0-9/+.-]/g,'').slice(0,80),
-        responseUrl:patrolSafeResponseUrl(response?.url||''),exceptionType,
-        retrySucceeded:attempt>1&&Boolean(response?.ok)&&result?.status==='ok'
-      });
-    }
-    await new Promise(resolve=>setTimeout(resolve,attempt===1?2000:5000));
-  }
-}
-function patrolReauthFailure(){ return {status:'error',message:PATROL_REAUTH_MESSAGE,reauthFailed:true}; }
-function setPatrolReauthMessage(text){ const el=docu…36804 tokens truncated…509','2025-09-22','Y2509 月車資實際觀測','observed'),
+        responseUrl:patrolSafeResponseUrl(response?.url||''),exception…37081 tokens truncated…509','2025-09-22','Y2509 月車資實際觀測','observed'),
     seg('台北三創','台北酒泉',4.5,'Y2509','2025-09-02','Y2509 月車資實際觀測','observed'),
     // 特殊地點固定受控（人工確認）
     seg('台北電信','台北復興南',1.5,'Y2511','2025-11-18','Y2511 實際觀測｜原文誤植為「台北萬大→台北復興南」，最終採用「台北電信→台北復興南」｜Y2606 受控版／人工確認','manual'),

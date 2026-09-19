@@ -1,5 +1,12 @@
-Warning: truncated output (original token count: 40598)
-Total output lines: 1168
+Warning: truncated output (original token count: 40889)
+Total output lines: 1175
+
+## 2026-09-20 ｜ Codex（巡店打卡完成判定與面談紀錄候選）
+
+- 做了什麼：將巡店第 1 項「督導打卡」保留在清單，但設為非必要項目；未勾選時不再列入缺項或阻擋店點完成。面談匯入預覽與雲端歷程改為完整八欄，包含三種日期、填報人員、建議與同仁回饋，不再只顯示前 8 筆或折疊內容。
+- 面談儲存：前端以既有 Patrol session 讀／寫獨立「督導面談紀錄」工作表；寫入後必須完整讀回才顯示成功。未結案以琥珀色「未結案」標示，且列入「未完成面談／待結案」名單；已結案維持綠色。
+- 驗證：題目版本、面談模型、GAS、來源檔契約聚焦 Node 30/30 PASS；`npm run build:patrol-gas`、JavaScript syntax、`git diff --check` 通過。Playwright Chromium 執行檔在本環境不可用，未以靜態檢查宣稱實機驗收。
+- 發布邊界：候選含完整 `patrol-gas/PatrolCode.gs`；Liam 仍須備份並手動更新既有 Patrol Apps Script、建立原部署的新版本，再以真實當季匯出檔按下「確認儲存本季紀錄」驗證讀回。未寫入正式資料。
 
 ## 2026-09-16 匯入預檢 unknown action 相容修正
 
@@ -346,9 +353,7 @@ Total output lines: 1168
 
 ## 2026-08-22 ｜ Codex（戰報執行日／資料截止日分離，Draft PR）
 
-- Root Cause：Mac `report-automation` 以單一 `REPORT_DATE_ISO` 同時代表寄信日、manifest 日與網站 snapshot 日；`build_github_pages_data.py` 又讓台獎從 email body 檔名取日期。當 `0822.xlsx` 的資料範圍只到 8/21 時，正式 KPI parser 正確讀到 8/21，但 dashboard snapshot／readback 仍要求 8/22，因而被 fail-closed date gate 擋住。
-- 修正：實際非 Git runtime 明確分成 `report_run_date`／`mail_date` 與 `data_cutoff_date`。Builder 從 `source_date_range` 取得 cutoff，並接受顯式 `--report-run-date`／`--data-cutoff-date` 交叉驗證；KPI／台獎 `report_date` 與 KPI `data_as_of_date` 都改用 cutoff，來源檔仍保留 `0822.xlsx`。Consumer、publisher、Keychain wrapper 與 manifest/readback 全鏈傳遞兩個日期；任一缺少、無法解析、晚於 run date 或正式讀回不一致都維持 blocked。
-- 驗證（未發布）：Node 日期／正式 gate `20/20`；Python 日期契約與真實 8/22 本機產物 `3/3`。回歸案例確認寄信／檔名日 2026-08-22、資料截止日 2026-08-21 時，KPI／台獎 snapshot `report_date=2026-08-21`、KPI `data_as_of_date=2026-08-21`、`source_file=0822.xlsx`。未合併 PR、未部署 Pages／GAS、未執行正式私有資料發布或 r…10598 tokens truncated…/ 進行中）：以 0805 正式產物重建驗證：北一二B保險搭售率 `46.154%`，九店皆有實際搭售率；vivo X300／V70 FE 範例，北一二B 80%／100% 為 `$2,215`／`$3,410`，店點 50%／100% 為 `$2,130`／`$3,195`。契約測試 17/17、介面測試 32/32 通過。
+- Root Cause：Mac `report-automation` 以單一 `REPORT_DATE_ISO` 同時代表寄信日、manifest 日與網站 sna…10889 tokens truncated…/ 進行中）：以 0805 正式產物重建驗證：北一二B保險搭售率 `46.154%`，九店皆有實際搭售率；vivo X300／V70 FE 範例，北一二B 80%／100% 為 `$2,215`／`$3,410`，店點 50%／100% 為 `$2,130`／`$3,195`。契約測試 17/17、介面測試 32/32 通過。
 - 經驗 / 給下一位的提醒：篩選器的北一二B金額只取 `supervisor` 規則的 80%／100%，店點金額只取 `manager` 規則的 50%／100%，不得把兩條獎金軌合併；上方實際獎金排序與優先補量卡不因篩選器而改動。
 
 ---
