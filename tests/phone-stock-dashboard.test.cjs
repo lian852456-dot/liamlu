@@ -40,6 +40,27 @@ test('近三日分欄銷售可隨截止日辨識，非北一二B店點不混入'
   assert.match(result.warnings.join('\n'), /非北一二B店點/);
 });
 
+test('SAR26_4 銷貨與 INVRC101 庫存格式可辨識民國日期、數量與退貨', () => {
+  const sales = Core.parseMatrix([
+    ['序號', '區域', '店點名稱', '品名', '數量', '銷貨日期'],
+    [1, '北一二B', '台灣大哥大數位生活台北三創', 'APPLE iPhone 18 Pro_256G-(黑)(5G)', 1, 1150920],
+    [2, '北一二B', '台北杭州南', 'APPLE iPhone 18 Pro Max_256G-(勃根地紅)(5G)', -1, 1150920]
+  ], 'sales', '2026-09-20');
+  const stock = Core.parseMatrix([
+    ['營業點代碼', '區域名稱', '門市名稱', '日期', '料號', '品名', '數量', '庫存合計'],
+    ['DNB10307', '北一二B', '台灣大哥大數位生活台北三創', 1150920, 'H01001118340100', 'APPLE iPhone 18 Pro_256G-(黑)(5G)', 1, 4],
+    ['DNB10146', '北一二B', '台北杭州南', 1150920, 'H0100111838E900', 'APPLE iPhone 18 Pro Max_256G-(勃根地紅)(5G)', 2, 2]
+  ], 'stock', '2026-09-20');
+  assert.deepEqual(sales.errors, []);
+  assert.deepEqual(stock.errors, []);
+  assert.deepEqual(sales.rows.map(row => row.date), ['2026-09-20', '2026-09-20']);
+  assert.equal(sales.rows[1].quantity, -1, '退貨應扣回近三日銷售');
+  const report = Core.buildReport(sales.rows, stock.rows, '2026-09-20');
+  assert.equal(report.totalSales, 0);
+  assert.equal(report.totalStock, 6);
+  assert.equal(report.stockDate, '2026-09-20');
+});
+
 test('督導入口包含手機本機雙檔工具，日誌檢查不再位於同仁大廳', () => {
   const root = path.resolve(__dirname, '..');
   const home = fs.readFileSync(path.join(root, 'home.html'), 'utf8');
