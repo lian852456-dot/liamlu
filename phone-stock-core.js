@@ -105,7 +105,17 @@
       const hasRows = store >= 0 && model >= 0 && (quantity >= 0 || dateColumns.length > 0);
       if (!hasRows) continue;
       const score = 20 + (quantity >= 0 ? 6 : 0) + (date >= 0 ? 5 : 0) + Math.min(dateColumns.length, 5) + Math.max(0, 10 - rowIndex) / 100;
-      if (!best || score > best.score) best = { rowIndex, map:{ store, model, quantity, date, dateColumns }, score };
+      if (!best || score > best.score) {
+        const sar26 = type === 'sales' && headerIndex(headers, ['銷貨單號']) >= 0 && headerIndex(headers, ['組合促銷名稱']) >= 0;
+        // SAR26_4CSV 的明細列未輸出部分組合欄位，資料會比表頭向左位移。
+        // 以實際明細位置讀取料號名稱、數量與銷貨日期，避免整份檔案被判定為無效。
+        const dataMap = sar26 ? {
+          model: headerIndex(headers, ['料號']),
+          quantity: headerIndex(headers, ['組合促銷名稱']),
+          date: headerIndex(headers, ['抵用券折抵'])
+        } : null;
+        best = { rowIndex, map:{ store, model, quantity, date, dateColumns, dataMap }, score };
+      }
     }
     return best;
   }
@@ -116,7 +126,7 @@
     for (let rowIndex = detected.rowIndex + 1; rowIndex < matrix.length; rowIndex += 1) {
       const source = Array.isArray(matrix[rowIndex]) ? matrix[rowIndex] : [];
       const rawStore = source[detected.map.store];
-      const rawModel = source[detected.map.model];
+      const rawModel = source[detected.map.dataMap ? detected.map.dataMap.model : detected.map.model];
       if (!text(rawStore) && !text(rawModel)) continue;
       const store = canonicalStore(rawStore);
       const model = normalizeModel(rawModel);
@@ -131,9 +141,10 @@
         }
         continue;
       }
-      const quantity = numberValue(source[detected.map.quantity]);
+      const quantity = numberValue(source[detected.map.dataMap ? detected.map.dataMap.quantity : detected.map.quantity]);
       if (quantity == null || (type !== 'sales' && quantity < 0)) { invalidNumbers += 1; continue; }
-      const date = detected.map.date >= 0 ? normalizeDate(source[detected.map.date]) : '';
+      const dateIndex = detected.map.dataMap ? detected.map.dataMap.date : detected.map.date;
+      const date = dateIndex >= 0 ? normalizeDate(source[dateIndex]) : '';
       if (type === 'sales' && !date) { missingDates += 1; continue; }
       rows.push({ store, model, quantity, date });
     }
