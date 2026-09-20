@@ -73,6 +73,15 @@ test('SAR26_4CSV 明細欄位左移時，仍以實際料號、數量與銷貨日
   assert.deepEqual(sales.rows.map(row => row.date), ['2026-09-20', '2026-09-19']);
 });
 
+test('SAR26_4CSV 原始明細欄位正常對齊時，優先依表頭解析', () => {
+  const sales = Core.parseMatrix([
+    ['序號', '公司別', '區域', '店點代碼', '店點名稱', '銷貨單號', '組合料號', '料號', '品名', '活動名稱', '組合項目代碼', '組合促銷名稱', '促銷代碼', '專案名稱', 'SubId', '數量', '銷售金額', '抵用券折抵', '優惠折抵', '優惠折扣', '銷售淨額', '銷貨日期'],
+    [1, 'TWM', '北一二B', 'DNB10307', '台灣大哥大數位生活台北三創', 'S35', 'H010', 'H01001118340100', 'APPLE iPhone 18 Pro_256G-(黑)(5G)', 'AD766', '72979312', '組合促銷', '促銷碼', '專案', 'SubId', 1, '31,300', 0, 3500, 0, '27,800', 1150920, '12:23:15', '', '', '15263-蔡後琪', '', '', 'SCMS0001', '']
+  ], 'sales', '2026-09-20');
+  assert.deepEqual(sales.errors, []);
+  assert.deepEqual(sales.rows, [{ store:'台北三創', model:'APPLE iPhone 18 Pro_256G-(黑)(5G)', quantity:1, date:'2026-09-20' }]);
+});
+
 test('督導入口包含手機本機雙檔工具，日誌檢查不再位於同仁大廳', () => {
   const root = path.resolve(__dirname, '..');
   const home = fs.readFileSync(path.join(root, 'home.html'), 'utf8');
