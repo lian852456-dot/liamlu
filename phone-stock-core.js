@@ -59,6 +59,12 @@
     date.setUTCDate(date.getUTCDate() + amount);
     return formatDateUtc(date);
   }
+  function isNearbyReportDate(date, asOfDate) {
+    if (!date) return false;
+    const asOf = normalizeDate(asOfDate);
+    if (!asOf) return true;
+    return Math.abs(Number(date.slice(0, 4)) - Number(asOf.slice(0, 4))) <= 2;
+  }
   function canonicalStore(value) {
     const candidate = key(value);
     if (!candidate) return '';
@@ -126,7 +132,12 @@
     for (let rowIndex = detected.rowIndex + 1; rowIndex < matrix.length; rowIndex += 1) {
       const source = Array.isArray(matrix[rowIndex]) ? matrix[rowIndex] : [];
       const rawStore = source[detected.map.store];
-      const rawModel = source[detected.map.dataMap ? detected.map.dataMap.model : detected.map.model];
+      // 正常 SAR26 CSV 依表頭對齊；只有少數轉檔版本會遺漏組合欄位而左移。
+      // 先採正常欄位，僅在銷貨日期無法辨識且左移日期可辨識時才切換。
+      const normalDate = detected.map.date >= 0 ? normalizeDate(source[detected.map.date]) : '';
+      const shiftedDate = detected.map.dataMap ? normalizeDate(source[detected.map.dataMap.date]) : '';
+      const rowMap = detected.map.dataMap && !isNearbyReportDate(normalDate, asOfDate) && isNearbyReportDate(shiftedDate, asOfDate) ? detected.map.dataMap : detected.map;
+      const rawModel = source[rowMap.model];
       if (!text(rawStore) && !text(rawModel)) continue;
       const store = canonicalStore(rawStore);
       const model = normalizeModel(rawModel);
@@ -141,10 +152,9 @@
         }
         continue;
       }
-      const quantity = numberValue(source[detected.map.dataMap ? detected.map.dataMap.quantity : detected.map.quantity]);
+      const quantity = numberValue(source[rowMap.quantity]);
       if (quantity == null || (type !== 'sales' && quantity < 0)) { invalidNumbers += 1; continue; }
-      const dateIndex = detected.map.dataMap ? detected.map.dataMap.date : detected.map.date;
-      const date = dateIndex >= 0 ? normalizeDate(source[dateIndex]) : '';
+      const date = rowMap === detected.map ? normalDate : shiftedDate;
       if (type === 'sales' && !date) { missingDates += 1; continue; }
       rows.push({ store, model, quantity, date });
     }
