@@ -11,11 +11,11 @@
   ]);
 
   const HEADER_ALIASES = Object.freeze({
-    store:['店點','店點名稱','門市','門市名稱','營業點','營業點名稱','營業據點','據點名稱'],
-    model:['商品','商品名稱','品名','機型','型號','商品型號','手機型號','產品名稱'],
-    salesQuantity:['銷售數','銷售量','銷售台數','銷量','成交台數','實銷','申裝數'],
-    stockQuantity:['庫存數','庫存','可售庫存','可用庫存','現有庫存','庫存台數','盤點數','數量','台數'],
-    salesDate:['銷售日期','交易日期','成交日期','申裝日期','日期','銷售日'],
+    store:['店點名稱','門市名稱','營業點名稱','營業據點','據點名稱','店點','門市','營業點'],
+    model:['品名','商品名稱','商品型號','手機型號','產品名稱','機型','型號','商品'],
+    salesQuantity:['銷售數','銷售量','銷售台數','銷量','成交台數','實銷','申裝數','數量'],
+    stockQuantity:['庫存合計','庫存數','庫存','可售庫存','可用庫存','現有庫存','庫存台數','盤點數','數量','台數'],
+    salesDate:['銷貨日期','銷售日期','交易日期','成交日期','申裝日期','日期','銷售日'],
     stockDate:['庫存日期','盤點日期','資料日期','日期','盤點日']
   });
 
@@ -28,13 +28,16 @@
   }
   function normalizeDate(value) {
     if (value instanceof Date && !Number.isNaN(value.getTime())) return formatDateUtc(value);
+    if (typeof value === 'number' && Number.isInteger(value) && value >= 1000000 && value <= 1991231) value = String(value);
     if (typeof value === 'number' && Number.isFinite(value) && value > 1 && value < 100000) {
       return formatDateUtc(new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000));
     }
     const source = text(value);
     const match = source.match(/(20\d{2})\D{0,3}(\d{1,2})\D{0,3}(\d{1,2})/);
-    if (!match) return '';
-    const year = Number(match[1]); const month = Number(match[2]); const day = Number(match[3]);
+    const rocMatch = source.match(/(?:^|\D)(1\d{2})\D{0,3}(\d{1,2})\D{0,3}(\d{1,2})(?:\D|$)/);
+    if (!match && !rocMatch) return '';
+    const year = match ? Number(match[1]) : Number(rocMatch[1]) + 1911;
+    const month = Number((match || rocMatch)[2]); const day = Number((match || rocMatch)[3]);
     const date = new Date(Date.UTC(year, month - 1, day));
     return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? formatDateUtc(date) : '';
   }
@@ -78,8 +81,15 @@
   }
   function headerIndex(headers, aliases) {
     const normalized = headers.map(key);
-    const exact = normalized.findIndex(value => aliases.some(alias => value === key(alias)));
-    return exact >= 0 ? exact : normalized.findIndex(value => aliases.some(alias => value.includes(key(alias))));
+    for (const alias of aliases) {
+      const exact = normalized.indexOf(key(alias));
+      if (exact >= 0) return exact;
+    }
+    for (const alias of aliases) {
+      const partial = normalized.findIndex(value => value.includes(key(alias)));
+      if (partial >= 0) return partial;
+    }
+    return -1;
   }
   function detectHeader(matrix, type, asOfDate) {
     const rows = Array.isArray(matrix) ? matrix : [];
@@ -116,13 +126,13 @@
         for (const dateColumn of detected.map.dateColumns) {
           const quantity = numberValue(source[dateColumn.index]);
           if (quantity == null) continue;
-          if (quantity < 0) { invalidNumbers += 1; continue; }
+          if (type !== 'sales' && quantity < 0) { invalidNumbers += 1; continue; }
           rows.push({ store, model, quantity, date:dateColumn.date });
         }
         continue;
       }
       const quantity = numberValue(source[detected.map.quantity]);
-      if (quantity == null || quantity < 0) { invalidNumbers += 1; continue; }
+      if (quantity == null || (type !== 'sales' && quantity < 0)) { invalidNumbers += 1; continue; }
       const date = detected.map.date >= 0 ? normalizeDate(source[detected.map.date]) : '';
       if (type === 'sales' && !date) { missingDates += 1; continue; }
       rows.push({ store, model, quantity, date });
