@@ -99,9 +99,13 @@ test('新頁面只使用既有本機 SheetJS，不含上傳或資料持久化', 
   assert.match(page, /assets\/vendor\/xlsx\.full\.min\.js/);
   assert.match(page, /id="salesFile" type="file"/);
   assert.match(page, /id="stockFile" type="file"/);
+  assert.match(page, /id="modelQuery" type="search"/);
+  assert.match(page, /id="minSales" type="number"/);
+  assert.match(page, /id="minStock" type="number"/);
   assert.match(page, /銷售 ÷（銷售＋庫存）/);
   assert.doesNotMatch(`${page}\n${controller}`, /localStorage|indexedDB|fetch\(|XMLHttpRequest|sendBeacon/);
   assert.match(controller, /MAX_FILE_BYTES = 20 \* 1024 \* 1024/);
   assert.match(controller, /new TextDecoder\('big5'\)/);
   assert.match(controller, /type:'string'/);
+  assert.match(controller, /minimumValue\('minSales'\)/);
 });
