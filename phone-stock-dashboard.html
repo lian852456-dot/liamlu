@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f3f7fa">
+<meta name="robots" content="noindex,nofollow">
+<title>手機近三日銷售與庫存 · 北一二B</title>
+<link rel="stylesheet" href="phone-stock-dashboard.css?v=20260920-1">
+<script src="assets/vendor/xlsx.full.min.js"></script>
+<script src="phone-stock-core.js?v=20260920-1"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="back-link" href="home.html">← 返回營運中心</a>
+    <strong>北一二B 督導專區</strong>
+    <span class="local-pill">本機解析</span>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">PHONE STOCK PULSE</p>
+      <h1>手機近三日銷售與庫存</h1>
+      <p>一次選擇銷售與庫存兩份檔案，立即查看九店、各機型的銷售數、庫存數與去化率。</p>
+      <p class="privacy-note">檔案只在目前瀏覽器解析；不會上傳、不會寫回公司原始資料，也不會保留原始檔。</p>
+    </section>
+
+    <section class="panel" aria-labelledby="uploadTitle">
+      <div class="panel-heading">
+        <div>
+          <p class="step">STEP 1</p>
+          <h2 id="uploadTitle">上傳兩份資料</h2>
+        </div>
+        <span class="status-badge neutral" id="uploadStatus">尚待選檔</span>
+      </div>
+      <div class="cutoff-row">
+        <label for="asOfDate">資料截止日
+          <input id="asOfDate" type="date" required>
+        </label>
+        <p>近三日計算範圍會自動以截止日往前推兩日。</p>
+      </div>
+      <div class="upload-grid">
+        <label class="upload-card sales-card" for="salesFile">
+          <span class="upload-kind">銷</span>
+          <strong>近三日銷售檔</strong>
+          <small>需要店點、機型、銷售日期、銷售數；也支援三日分欄。</small>
+          <input id="salesFile" type="file" accept=".xlsx,.xls,.csv,.tsv">
+          <span id="salesFileName" class="file-status">選擇 Excel／CSV 檔案</span>
+        </label>
+        <label class="upload-card stock-card" for="stockFile">
+          <span class="upload-kind">庫</span>
+          <strong>目前庫存檔</strong>
+          <small>需要店點、機型、庫存數；若有庫存日期會取截止日前最新快照。</small>
+          <input id="stockFile" type="file" accept=".xlsx,.xls,.csv,.tsv">
+          <span id="stockFileName" class="file-status">選擇 Excel／CSV 檔案</span>
+        </label>
+      </div>
+      <div id="salesMessage" class="message" role="status" aria-live="polite"></div>
+      <div id="stockMessage" class="message" role="status" aria-live="polite"></div>
+      <div id="importPreview" class="import-preview" hidden>
+        <div class="preview-metrics">
+          <div><strong id="salesRows">0</strong><span>銷售資料列</span></div>
+          <div><strong id="stockRows">0</strong><span>庫存資料列</span></div>
+          <div><strong id="detectedStores">0</strong><span>辨識店點</span></div>
+        </div>
+        <p id="importNote" class="import-note"></p>
+        <button id="generateReport" type="button" disabled>產生近三日分析</button>
+      </div>
+    </section>
+
+    <section id="results" class="results" hidden aria-labelledby="resultsTitle">
+      <div class="results-head">
+        <div>
+          <p class="step">STEP 2</p>
+          <h2 id="resultsTitle">近三日去化總覽</h2>
+          <p id="sourceMeta" class="source-meta"></p>
+        </div>
+      </div>
+      <div class="summary-grid" aria-label="近三日彙總">
+        <article><span>近三日銷售</span><strong id="totalSales">0</strong><small>九店合計</small></article>
+        <article><span>目前庫存</span><strong id="totalStock">0</strong><small>庫存檔最新快照</small></article>
+        <article class="rate-card"><span>整體去化率</span><strong id="totalRate">—</strong><small>銷售 ÷（銷售＋庫存）</small></article>
+        <article><span>有銷售店點</span><strong id="activeStores">0 / 9</strong><small>近三日內有手機銷售</small></article>
+      </div>
+
+      <section class="panel result-panel">
+        <div class="panel-heading">
+          <div><h2>九店銷售／庫存／去化率</h2><p class="helper">以門市彙總，0 代表本次檔案沒有可辨識的數量。</p></div>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>店點</th><th>近三日銷售</th><th>目前庫存</th><th>去化率</th></tr></thead><tbody id="storeRows"></tbody></table></div>
+      </section>
+
+      <section class="panel result-panel model-panel">
+        <div class="panel-heading model-heading">
+          <div><h2>機型明細</h2><p class="helper">依近三日銷售、庫存數排序；可切換查看整體或單店。</p></div>
+          <label class="filter-label" for="storeFilter">查看範圍<select id="storeFilter"><option value="all">北一二B 整體</option></select></label>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>機型</th><th>近三日銷售</th><th>目前庫存</th><th>去化率</th></tr></thead><tbody id="modelRows"></tbody></table></div>
+      </section>
+    </section>
+  </main>
+  <footer>去化率公式：近三日銷售 ÷（近三日銷售＋目前庫存）。分母為 0 時顯示「—」。</footer>
+  <script src="phone-stock-dashboard.js?v=20260920-1"></script>
+</body>
+</html>
