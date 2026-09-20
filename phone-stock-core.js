@@ -184,37 +184,43 @@
     if (!endDate) throw new Error('請選擇有效的資料截止日。');
     const startDate = addDays(endDate, -2);
     const sales = (salesRows || []).filter(row => row.date >= startDate && row.date <= endDate);
+    const salesDates = Array.from(new Set(sales.map(row => row.date).filter(Boolean))).sort();
     const datedStocks = (stockRows || []).filter(row => row.date && row.date <= endDate);
     const stockDate = datedStocks.length ? datedStocks.reduce((latest, row) => row.date > latest ? row.date : latest, datedStocks[0].date) : '';
     const stocks = stockDate ? datedStocks.filter(row => row.date === stockDate) : (stockRows || []).filter(row => !row.date);
-    const byStore = new Map(STORE_NAMES.map(store => [store, { store, sales:0, stock:0, models:new Map() }]));
+    const blankSalesByDate = () => Object.fromEntries(salesDates.map(date => [date, 0]));
+    const byStore = new Map(STORE_NAMES.map(store => [store, { store, sales:0, stock:0, salesByDate:blankSalesByDate(), models:new Map() }]));
     function add(rows, field) {
       rows.forEach(row => {
         const store = byStore.get(row.store);
         if (!store) return;
         store[field] += row.quantity;
-        const model = store.models.get(row.model) || { model:row.model, sales:0, stock:0 };
+        if (field === 'sales') store.salesByDate[row.date] = (store.salesByDate[row.date] || 0) + row.quantity;
+        const model = store.models.get(row.model) || { model:row.model, sales:0, stock:0, salesByDate:blankSalesByDate() };
         model[field] += row.quantity;
+        if (field === 'sales') model.salesByDate[row.date] = (model.salesByDate[row.date] || 0) + row.quantity;
         store.models.set(row.model, model);
       });
     }
     add(sales, 'sales'); add(stocks, 'stock');
     const modelMap = new Map();
     byStore.forEach(store => store.models.forEach(model => {
-      const total = modelMap.get(model.model) || { model:model.model, sales:0, stock:0 };
-      total.sales += model.sales; total.stock += model.stock; modelMap.set(model.model, total);
+      const total = modelMap.get(model.model) || { model:model.model, sales:0, stock:0, salesByDate:blankSalesByDate() };
+      total.sales += model.sales; total.stock += model.stock;
+      salesDates.forEach(date => { total.salesByDate[date] += model.salesByDate[date] || 0; });
+      modelMap.set(model.model, total);
     }));
     const storeSummary = STORE_NAMES.map(store => {
       const entry = byStore.get(store);
-      return { store, sales:entry.sales, stock:entry.stock, rate:rate(entry.sales, entry.stock) };
+      return { store, sales:entry.sales, stock:entry.stock, salesByDate:entry.salesByDate, rate:rate(entry.sales, entry.stock) };
     });
     const modelSummary = Array.from(modelMap.values()).map(entry => ({ ...entry, rate:rate(entry.sales, entry.stock) })).sort((a, b) => b.sales - a.sales || b.stock - a.stock || a.model.localeCompare(b.model, 'zh-Hant'));
     const totalSales = storeSummary.reduce((sum, row) => sum + row.sales, 0);
     const totalStock = storeSummary.reduce((sum, row) => sum + row.stock, 0);
     return {
-      startDate, endDate, stockDate, salesRows:sales.length, stockRows:stocks.length,
+      startDate, endDate, stockDate, salesDates, salesRows:sales.length, stockRows:stocks.length,
       totalSales, totalStock, totalRate:rate(totalSales, totalStock), storeSummary, modelSummary,
-      storeModels:Object.fromEntries(STORE_NAMES.map(store => [store, Array.from(byStore.get(store).models.values()).map(row => ({ ...row, rate:rate(row.sales, row.stock) })).sort((a, b) => b.sales - a.sales || b.stock - a.stock || a.model.localeCompare(b.model, 'zh-Hant'))]))
+      storeModels:Object.fromEntries(STORE_NAMES.map(store => [store, Array.from(byStore.get(store).models.values()).map(row => ({ ...row, salesByDate:{ ...row.salesByDate }, rate:rate(row.sales, row.stock) })).sort((a, b) => b.sales - a.sales || b.stock - a.stock || a.model.localeCompare(b.model, 'zh-Hant'))]))
     };
   }
 
