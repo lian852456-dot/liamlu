@@ -85,10 +85,21 @@
     const className = value >= .5 ? 'good' : 'low';
     return `<span class="rate ${className}">${displayRate(value)}</span>`;
   }
+  function minimumValue(id) {
+    const value = $(id).value.trim();
+    if (!value) return null;
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? number : null;
+  }
   function renderModelRows() {
     const selected = $('storeFilter').value;
     const rows = selected === 'all' ? state.report.modelSummary : state.report.storeModels[selected];
-    $('modelRows').innerHTML = rows && rows.length ? rows.map(row => `<tr><td><strong>${escapeHtml(row.model)}</strong></td><td>${displayCount(row.sales)}</td><td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('') : '<tr><td class="empty-row" colspan="4">此範圍沒有可辨識的機型資料。</td></tr>';
+    const query = $('modelQuery').value.trim().toLocaleLowerCase('zh-Hant');
+    const minSales = minimumValue('minSales');
+    const minStock = minimumValue('minStock');
+    const filtered = (rows || []).filter(row => (!query || row.model.toLocaleLowerCase('zh-Hant').includes(query)) && (minSales == null || row.sales >= minSales) && (minStock == null || row.stock >= minStock));
+    $('modelFilterSummary').textContent = `顯示 ${filtered.length} / ${(rows || []).length} 款機型`;
+    $('modelRows').innerHTML = filtered.length ? filtered.map(row => `<tr><td><strong>${escapeHtml(row.model)}</strong></td><td>${displayCount(row.sales)}</td><td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('') : '<tr><td class="empty-row" colspan="4">沒有符合篩選條件的機型。</td></tr>';
   }
   function renderReport() {
     const report = state.report;
@@ -116,6 +127,10 @@
   $('stockFile').addEventListener('change', event => parseFile(event.target.files && event.target.files[0], 'stock'));
   $('generateReport').addEventListener('click', generateReport);
   $('storeFilter').addEventListener('change', renderModelRows);
+  ['modelQuery', 'minSales', 'minStock'].forEach(id => $(id).addEventListener('input', renderModelRows));
+  $('clearModelFilters').addEventListener('click', () => {
+    $('modelQuery').value = ''; $('minSales').value = ''; $('minStock').value = ''; renderModelRows();
+  });
   $('asOfDate').addEventListener('change', () => {
     state.sales = null; state.stock = null; state.report = null; $('results').hidden = true;
     $('salesFile').value = ''; $('stockFile').value = '';
