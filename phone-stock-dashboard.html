@@ -11,7 +11,7 @@
   .model-filters{display:flex;align-items:end;justify-content:flex-end;flex-wrap:wrap;gap:8px}.model-filters .filter-label{min-width:156px}.model-filters .filter-label input{min-height:42px;border:1px solid #b8c8d3;border-radius:10px;padding:8px 10px;color:#102d43;background:#fff;font-weight:800}.model-filters .compact-filter{min-width:104px}.filter-reset{min-height:42px;padding:8px 12px;background:#eaf1f5;color:#385166;font-size:13px}.filter-summary{margin:12px 0 -5px;color:#526c7f;font-size:13px}@media(max-width:680px){.model-filters{justify-content:stretch}.model-filters .filter-label,.model-filters .compact-filter{min-width:calc(50% - 4px)}.filter-reset{width:100%}}
 </style>
 <script src="assets/vendor/xlsx.full.min.js"></script>
-  <script src="phone-stock-core.js?v=20260920-4"></script>
+  <script src="phone-stock-core.js?v=20260920-5"></script>
 </head>
 <body>
   <header class="topbar">
@@ -80,7 +80,7 @@
         </div>
       </div>
       <div class="summary-grid" aria-label="近三日彙總">
-        <article><span>近三日銷售</span><strong id="totalSales">0</strong><small>九店合計</small></article>
+        <article><span>銷售加總</span><strong id="totalSales">0</strong><small>報表日期合計</small></article>
         <article><span>目前庫存</span><strong id="totalStock">0</strong><small>庫存檔最新快照</small></article>
         <article class="rate-card"><span>整體去化率</span><strong id="totalRate">—</strong><small>銷售 ÷（銷售＋庫存）</small></article>
         <article><span>有銷售店點</span><strong id="activeStores">0 / 9</strong><small>近三日內有手機銷售</small></article>
@@ -88,9 +88,9 @@
 
       <section class="panel result-panel">
         <div class="panel-heading">
-          <div><h2>九店銷售／庫存／去化率</h2><p class="helper">以門市彙總，0 代表本次檔案沒有可辨識的數量。</p></div>
+          <div><h2>九店銷售／庫存／去化率</h2><p class="helper">銷售欄依報表實際日期呈現；「加總」為各日期銷售合計。</p></div>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>店點</th><th>近三日銷售</th><th>目前庫存</th><th>去化率</th></tr></thead><tbody id="storeRows"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr id="storeTableHead"></tr></thead><tbody id="storeRows"></tbody></table></div>
       </section>
 
       <section class="panel result-panel model-panel">
@@ -105,11 +105,11 @@
           </div>
         </div>
         <p id="modelFilterSummary" class="filter-summary" aria-live="polite"></p>
-        <div class="table-wrap"><table><thead><tr><th>機型</th><th>近三日銷售</th><th>目前庫存</th><th>去化率</th></tr></thead><tbody id="modelRows"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr id="modelTableHead"></tr></thead><tbody id="modelRows"></tbody></table></div>
       </section>
     </section>
   </main>
   <footer>去化率公式：近三日銷售 ÷（近三日銷售＋目前庫存）。分母為 0 時顯示「—」。</footer>
-  <script src="phone-stock-dashboard.js?v=20260920-3"></script>
+  <script src="phone-stock-dashboard.js?v=20260920-4"></script>
 </body>
 </html>
