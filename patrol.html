@@ -658,7 +658,7 @@
     </div>
     <div class="secure-card">
       <h3>匯入本季面談檔</h3>
-      <p class="hint">選檔後會先在本機檢查十一個欄位並排除員編；確認無誤後只需按一次即可存入私有雲端面談表。</p>
+      <p class="hint">選檔後會先在本機檢查九個必要欄位；填報人員與員編可省略，員編若存在也會排除。確認無誤後只需按一次即可存入私有雲端面談表。</p>
       <div class="patrol-local-import" aria-label="本機督導面談檔案上傳">
         <div class="btn-row">
           <button class="btn-ghost" id="supervisorInterviewFileButton" type="button" onclick="document.getElementById('supervisorInterviewFileInput').click()">📂 選擇督導面談檔案</button>
@@ -733,9 +733,9 @@
 </div>
 </template>
 
-<script src="patrol-question-versions.js?v=4"></script>
+<script src="patrol-question-versions.js?v=5"></script>
 <script src="patrol-read-model.js?v=10"></script>
-<script src="supervisor-interview-model.js?v=1"></script>
+<script src="supervisor-interview-model.js?v=2"></script>
 <script>
 /* ---------- 檢核規則設定 ---------- */
 // 預設門市清單（北一二B）。連上雲端後會改用 GAS 回傳的本區清單，
@@ -834,7 +834,7 @@ let patrolTimelineSequence = 0;
 
 // Deliberately cache aggregate counts only: no rows, people, store identities or free text.
 const PATROL_SUMMARY_CACHE_PREFIX='patrol-summary-safe-v1:';
-function patrolSummaryCacheContract(month){return month>='2026-09'?'sep25-v-only-two-visits-7d-v1':'legacy33-v1';}
+function patrolSummaryCacheContract(month){return month>='2026-09'?'sep25-v-only-two-visits-7d-v2':'legacy33-v1';}
 function clearPatrolSummaryCache(){
   try{for(let i=sessionStorage.length-1;i>=0;i--){const key=sessionStorage.key(i);if(key?.startsWith(PATROL_SUMMARY_CACHE_PREFIX))sessionStorage.removeItem(key);}}catch{}
 }

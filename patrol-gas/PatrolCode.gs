@@ -860,6 +860,9 @@ function patrolDashboardItemStatus_(rows, month, itemNo) {
     return Number(row && row.item) === item && relevantMonths.indexOf(patrolDashboardRowMonth_(row)) !== -1 && String(row && row.result || '').trim().toLowerCase() === 'v';
   });
   if (match) return {status:'done', date:patrolDashboardFillDate_(match)};
+  // 第 1 項「督導打卡」保留在 25 項清單中供顯示，但不屬於巡店完成的必要條件。
+  // 此處必須與前端 PatrolQuestionVersions 的 optional 規則一致。
+  if (item === 1) return {status:'done', optional:true};
   return {status:'miss', detail:item === 10 ? '本期(' + Number(relevantMonths[0].slice(5)) + '–' + Number(relevantMonths[1].slice(5)) + '月)未完成' : item >= 11 ? 'NCC每月宣導1次' : '每月執行1次'};
 }
 

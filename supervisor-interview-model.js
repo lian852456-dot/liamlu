@@ -18,6 +18,12 @@
     guidance:['建議與指導'],
     feedback:['同仁回饋']
   });
+  // 匯入來源有時不提供填報人員或員編；兩者都不是建立面談紀錄、
+  // 判定季度或寫入私有表所必需的欄位。員編即使存在也只會在本機捨棄。
+  const REQUIRED_FIELDS=Object.freeze([
+    'organization','interviewee','reason','formStatus','interviewDate',
+    'filledDate','closedDate','guidance','feedback'
+  ]);
   const PERSISTED_FIELDS=Object.freeze([
     'reporter','organization','interviewee','reason','formStatus','interviewDate',
     'filledDate','closedDate','guidance','feedback','sourceMonth','quarter'
@@ -83,12 +89,12 @@
   function parseMatrix(matrix){
     const rows=Array.isArray(matrix)?matrix:[];
     const header=detectHeader(rows);
-    const missing=Object.keys(FIELD_HEADERS).filter(field=>!header||!Number.isInteger(header.map[field]));
+    const missing=REQUIRED_FIELDS.filter(field=>!header||!Number.isInteger(header.map[field]));
     if(missing.length)return {blocked:true,rows:[],errors:[`缺少必要欄位：${missing.join('、')}`],invalidRows:[],headerRow:-1,employeeIdsDiscarded:0};
     const parsed=[];const invalidRows=[];let employeeIdsDiscarded=0;
     rows.slice(header.rowIndex+1).forEach((cells,index)=>{
       if(!Array.isArray(cells)||!cells.some(value=>text(value)))return;
-      const get=field=>cells[header.map[field]];
+      const get=field=>Number.isInteger(header.map[field])?cells[header.map[field]]:'';
       const raw={
         reporter:text(get('reporter')),organization:text(get('organization')),
         interviewee:text(get('interviewee')),reason:text(get('reason')),
@@ -154,5 +160,5 @@
     return result;
   }
 
-  return Object.freeze({FIELD_HEADERS,PERSISTED_FIELDS,normalizeHeader,normalizeDate,quarterForDate,quarterMonths,currentQuarter,detectHeader,parseMatrix,persistedRow,recordKey,personKey,quarterProgress,monthsEnding});
+  return Object.freeze({FIELD_HEADERS,REQUIRED_FIELDS,PERSISTED_FIELDS,normalizeHeader,normalizeDate,quarterForDate,quarterMonths,currentQuarter,detectHeader,parseMatrix,persistedRow,recordKey,personKey,quarterProgress,monthsEnding});
 });

@@ -104,7 +104,7 @@ test('App and patrol.html load ptsummary for dashboards and fail closed on trans
   assert.match(app, /巡店資料讀取逾時/);
   assert.match(app, /data-retry-patrol/);
   assert.match(patrol, /cloudCall\('ptsummary',\{month\}\)/);
-  assert.match(patrol, /\['ptsummary','ptdetail','ptmileage','ptmileage2','ptdashboard'\]\.includes\(action\)[\s\S]*method:'POST'/);
+  assert.match(patrol, /\['ptsummary','ptdetail','ptmileage','ptmileage2','ptdashboard','interview_read','interview_write'\]\.includes\(action\)[\s\S]*method:'POST'/);
   assert.match(patrol, /JSON\.stringify\(\{action,token:PT_TOKEN,\.\.\.params\}\)/);
   assert.doesNotMatch(patrol, /cloudCall\('ptread'\)/);
   assert.match(patrol, /patrolSummaryUnavailableHTML/);

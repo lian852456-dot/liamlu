@@ -38,6 +38,18 @@ test('缺欄或無效日期整批停止，不留下部分資料',()=>{
   assert.deepEqual(invalid.rows,[]);
 });
 
+test('沒有填報人員與員編仍可匯入，兩欄都不會成為資料寫入 gate',()=>{
+  const requiredHeaders=['面談人員組織','面談人員','面談原因','表單狀態','面談日期','填表日期','結案日期','建議與指導','同仁回饋'];
+  const parsed=model.parseMatrix([
+    requiredHeaders,
+    ['台北測試店','同仁A','例行人員訪談','已結案','2026/9/20','2026/9/20','2026/9/20','指導內容','回饋內容']
+  ]);
+  assert.equal(parsed.blocked,false);
+  assert.equal(parsed.rows.length,1);
+  assert.equal(parsed.rows[0].reporter,'');
+  assert.equal(Object.hasOwn(parsed.rows[0],'employeeId'),false);
+});
+
 test('新季度只計算本季已結案紀錄，十月自動全員重設',()=>{
   const roster=[
     {name:'同仁 A',store:'台北測試店',role:'業代'},

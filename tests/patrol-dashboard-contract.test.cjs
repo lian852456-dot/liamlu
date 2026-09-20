@@ -100,7 +100,7 @@ test('ptdashboard reads one A:L snapshot, caps rows, and strips inspector/conten
   assert.equal(response.maxRows, 5000);
   assert.ok(response.rowCount <= response.maxRows);
   assert.equal(Object.hasOwn(response, 'rows'), false, 'summary-only response does not expose raw dashboard rows');
-  assert.equal(response.summary.stores[1].missingItemNumbers.includes(1), true, 'NA result remains a missing V item');
+  assert.equal(response.summary.stores[1].missingItemNumbers.includes(1), false, '督導打卡未填為非必要，不得列為缺項');
   assert.equal(JSON.stringify(response).includes('SYNTHETIC_INSPECTOR'), false);
   assert.equal(JSON.stringify(response).includes('SYNTHETIC_CONTENT_CANARY'), false);
 
