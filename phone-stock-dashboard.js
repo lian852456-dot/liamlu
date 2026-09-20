@@ -13,6 +13,8 @@
   const escapeHtml = value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
   const displayCount = value => new Intl.NumberFormat('zh-TW', { maximumFractionDigits:1 }).format(Number(value || 0));
   const displayRate = value => value == null ? '—' : `${(Number(value) * 100).toFixed(1)}%`;
+  const extensionOf = file => String(file && file.name || '').split('.').pop().toLowerCase();
+  const csvTextScore = value => (String(value).match(/店點|門市|品名|庫存|銷貨|日期|數量|區域|營業點/g) || []).length * 10 - (String(value).match(/�/g) || []).length * 50;
 
   function setMessage(kind, message, type) {
     const target = $(kind === 'sales' ? 'salesMessage' : 'stockMessage');
@@ -21,7 +23,7 @@
   }
   function validateFile(file, kind) {
     const label = kind === 'sales' ? '銷售檔' : '庫存檔';
-    const extension = String(file && file.name || '').split('.').pop().toLowerCase();
+    const extension = extensionOf(file);
     if (!file || !SUPPORTED_EXTENSIONS.has(extension)) { setMessage(kind, `${label}只接受 XLSX、XLS、CSV 或 TSV。`, 'error'); return false; }
     if (!file.size) { setMessage(kind, `${label}是空檔，請重新匯出。`, 'error'); return false; }
     if (file.size > MAX_FILE_BYTES) { setMessage(kind, `${label}超過 20 MB，請先縮小報表範圍再重試。`, 'error'); return false; }
@@ -29,6 +31,19 @@
   }
   function sheetRows(workbook) {
     return workbook.SheetNames.map(name => ({ name, rows:window.XLSX.utils.sheet_to_json(workbook.Sheets[name], { header:1, raw:true, defval:'', blankrows:false }) }));
+  }
+  async function readWorkbook(file) {
+    const buffer = await file.arrayBuffer();
+    const extension = extensionOf(file);
+    if (extension !== 'csv' && extension !== 'tsv') return { workbook:window.XLSX.read(buffer, { type:'array', cellDates:true }), encoding:'' };
+    const utf8 = new TextDecoder('utf-8').decode(buffer);
+    let content = utf8;
+    let encoding = 'UTF-8';
+    try {
+      const big5 = new TextDecoder('big5').decode(buffer);
+      if (csvTextScore(big5) > csvTextScore(utf8)) { content = big5; encoding = 'Big5'; }
+    } catch (_) { /* Browser does not provide a Big5 decoder; retain UTF-8. */ }
+    return { workbook:window.XLSX.read(content, { type:'string', cellDates:true, FS:extension === 'tsv' ? '\t' : ',' }), encoding };
   }
   function refreshPreview() {
     const ready = Boolean(state.sales && state.stock);
@@ -51,12 +66,13 @@
     $(label).textContent = file.name;
     setMessage(kind, '正在本機解析檔案…');
     try {
-      const workbook = window.XLSX.read(await file.arrayBuffer(), { type:'array', cellDates:true });
-      const selected = Core.chooseBestSheet(sheetRows(workbook), kind, $('asOfDate').value);
+      const loaded = await readWorkbook(file);
+      const selected = Core.chooseBestSheet(sheetRows(loaded.workbook), kind, $('asOfDate').value);
       if (!selected) throw new Error(kind === 'sales' ? '找不到可辨識的北一二B銷售工作表；請確認店點、機型、日期及銷售數欄。' : '找不到可辨識的北一二B庫存工作表；請確認店點、機型及庫存數欄。');
       state[kind] = { rows:selected.parsed.rows, fileName:file.name, sheetName:selected.name };
       const warnings = selected.parsed.warnings.length ? `\n${selected.parsed.warnings.join('\n')}` : '';
-      setMessage(kind, `解析完成：${selected.parsed.rows.length} 列／${selected.name}。${warnings}`, selected.parsed.warnings.length ? '' : 'success');
+      const encoding = loaded.encoding ? `／${loaded.encoding}` : '';
+      setMessage(kind, `解析完成：${selected.parsed.rows.length} 列／${selected.name}${encoding}。${warnings}`, selected.parsed.warnings.length ? '' : 'success');
       refreshPreview();
     } catch (error) {
       state[kind] = null;
