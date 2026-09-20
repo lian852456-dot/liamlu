@@ -25,7 +25,9 @@ test('銷售直列與庫存快照可計算近三日去化率', () => {
   assert.equal(report.totalSales, 3);
   assert.equal(report.totalStock, 10);
   assert.equal(report.totalRate, 3 / 13);
-  assert.deepEqual(report.storeSummary.find(row => row.store === '台北三創'), { store:'台北三創', sales:3, stock:3, rate:.5 });
+  assert.deepEqual(report.salesDates, ['2026-09-18', '2026-09-20']);
+  assert.deepEqual(report.storeSummary.find(row => row.store === '台北三創'), { store:'台北三創', sales:3, stock:3, salesByDate:{ '2026-09-18':2, '2026-09-20':1 }, rate:.5 });
+  assert.deepEqual(report.modelSummary.find(row => row.model === 'iPhone 18 Pro').salesByDate, { '2026-09-18':2, '2026-09-20':1 });
 });
 
 test('近三日分欄銷售可隨截止日辨識，非北一二B店點不混入', () => {
@@ -102,10 +104,13 @@ test('新頁面只使用既有本機 SheetJS，不含上傳或資料持久化', 
   assert.match(page, /id="modelQuery" type="search"/);
   assert.match(page, /id="minSales" type="number"/);
   assert.match(page, /id="minStock" type="number"/);
+  assert.match(page, /id="storeTableHead"/);
+  assert.match(page, /id="modelTableHead"/);
   assert.match(page, /銷售 ÷（銷售＋庫存）/);
   assert.doesNotMatch(`${page}\n${controller}`, /localStorage|indexedDB|fetch\(|XMLHttpRequest|sendBeacon/);
   assert.match(controller, /MAX_FILE_BYTES = 20 \* 1024 \* 1024/);
   assert.match(controller, /new TextDecoder\('big5'\)/);
   assert.match(controller, /type:'string'/);
   assert.match(controller, /minimumValue\('minSales'\)/);
+  assert.match(controller, /salesHeaderCells\(report\)/);
 });
