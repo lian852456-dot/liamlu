@@ -7,6 +7,9 @@
 <meta name="robots" content="noindex,nofollow">
 <title>手機近三日銷售與庫存 · 北一二B</title>
 <link rel="stylesheet" href="phone-stock-dashboard.css?v=20260920-1">
+<style>
+  .model-filters{display:flex;align-items:end;justify-content:flex-end;flex-wrap:wrap;gap:8px}.model-filters .filter-label{min-width:156px}.model-filters .filter-label input{min-height:42px;border:1px solid #b8c8d3;border-radius:10px;padding:8px 10px;color:#102d43;background:#fff;font-weight:800}.model-filters .compact-filter{min-width:104px}.filter-reset{min-height:42px;padding:8px 12px;background:#eaf1f5;color:#385166;font-size:13px}.filter-summary{margin:12px 0 -5px;color:#526c7f;font-size:13px}@media(max-width:680px){.model-filters{justify-content:stretch}.model-filters .filter-label,.model-filters .compact-filter{min-width:calc(50% - 4px)}.filter-reset{width:100%}}
+</style>
 <script src="assets/vendor/xlsx.full.min.js"></script>
   <script src="phone-stock-core.js?v=20260920-4"></script>
 </head>
@@ -92,14 +95,21 @@
 
       <section class="panel result-panel model-panel">
         <div class="panel-heading model-heading">
-          <div><h2>機型明細</h2><p class="helper">依近三日銷售、庫存數排序；可切換查看整體或單店。</p></div>
-          <label class="filter-label" for="storeFilter">查看範圍<select id="storeFilter"><option value="all">北一二B 整體</option></select></label>
+          <div><h2>機型明細</h2><p class="helper">可依店點、機型關鍵字與銷售／庫存數篩選。</p></div>
+          <div class="model-filters" aria-label="機型明細篩選">
+            <label class="filter-label" for="storeFilter">查看範圍<select id="storeFilter"><option value="all">北一二B 整體</option></select></label>
+            <label class="filter-label" for="modelQuery">機型搜尋<input id="modelQuery" type="search" placeholder="例如：Pro Max、512G"></label>
+            <label class="filter-label compact-filter" for="minSales">銷售至少<input id="minSales" type="number" min="0" step="1" inputmode="numeric" placeholder="不限"></label>
+            <label class="filter-label compact-filter" for="minStock">庫存至少<input id="minStock" type="number" min="0" step="1" inputmode="numeric" placeholder="不限"></label>
+            <button id="clearModelFilters" class="filter-reset" type="button">清除篩選</button>
+          </div>
         </div>
+        <p id="modelFilterSummary" class="filter-summary" aria-live="polite"></p>
         <div class="table-wrap"><table><thead><tr><th>機型</th><th>近三日銷售</th><th>目前庫存</th><th>去化率</th></tr></thead><tbody id="modelRows"></tbody></table></div>
       </section>
     </section>
   </main>
   <footer>去化率公式：近三日銷售 ÷（近三日銷售＋目前庫存）。分母為 0 時顯示「—」。</footer>
-  <script src="phone-stock-dashboard.js?v=20260920-2"></script>
+  <script src="phone-stock-dashboard.js?v=20260920-3"></script>
 </body>
 </html>
