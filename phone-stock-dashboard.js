@@ -85,6 +85,13 @@
     const className = value >= .5 ? 'good' : 'low';
     return `<span class="rate ${className}">${displayRate(value)}</span>`;
   }
+  const displaySalesDate = iso => String(iso || '').slice(5).replace('-', '/');
+  function salesHeaderCells(report) {
+    return report.salesDates.map(date => `<th>${displaySalesDate(date)}</th>`).join('') + '<th>加總</th>';
+  }
+  function salesValueCells(row, report) {
+    return report.salesDates.map(date => `<td>${displayCount((row.salesByDate || {})[date] || 0)}</td>`).join('') + `<td>${displayCount(row.sales)}</td>`;
+  }
   function minimumValue(id) {
     const value = $(id).value.trim();
     if (!value) return null;
@@ -99,16 +106,20 @@
     const minStock = minimumValue('minStock');
     const filtered = (rows || []).filter(row => (!query || row.model.toLocaleLowerCase('zh-Hant').includes(query)) && (minSales == null || row.sales >= minSales) && (minStock == null || row.stock >= minStock));
     $('modelFilterSummary').textContent = `顯示 ${filtered.length} / ${(rows || []).length} 款機型`;
-    $('modelRows').innerHTML = filtered.length ? filtered.map(row => `<tr><td><strong>${escapeHtml(row.model)}</strong></td><td>${displayCount(row.sales)}</td><td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('') : '<tr><td class="empty-row" colspan="4">沒有符合篩選條件的機型。</td></tr>';
+    const columnCount = state.report.salesDates.length + 4;
+    $('modelRows').innerHTML = filtered.length ? filtered.map(row => `<tr><td><strong>${escapeHtml(row.model)}</strong></td>${salesValueCells(row, state.report)}<td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('') : `<tr><td class="empty-row" colspan="${columnCount}">沒有符合篩選條件的機型。</td></tr>`;
   }
   function renderReport() {
     const report = state.report;
-    $('sourceMeta').textContent = `銷售期間 ${report.startDate} ～ ${report.endDate} · ${report.stockDate ? `庫存快照 ${report.stockDate}` : '庫存檔未提供日期，依本次上傳內容計算'} · 僅本機預覽`;
+    const salesDateLabel = report.salesDates.length ? report.salesDates.map(displaySalesDate).join('、') : `${report.startDate} ～ ${report.endDate}`;
+    $('sourceMeta').textContent = `報表銷售日期 ${salesDateLabel} · ${report.stockDate ? `庫存快照 ${report.stockDate}` : '庫存檔未提供日期，依本次上傳內容計算'} · 僅本機預覽`;
     $('totalSales').textContent = displayCount(report.totalSales);
     $('totalStock').textContent = displayCount(report.totalStock);
     $('totalRate').textContent = displayRate(report.totalRate);
     $('activeStores').textContent = `${report.storeSummary.filter(row => row.sales > 0).length} / 9`;
-    $('storeRows').innerHTML = report.storeSummary.map(row => `<tr><td><strong>${escapeHtml(row.store)}</strong></td><td>${displayCount(row.sales)}</td><td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('');
+    $('storeTableHead').innerHTML = `<th>店點</th>${salesHeaderCells(report)}<th>目前庫存</th><th>去化率</th>`;
+    $('modelTableHead').innerHTML = `<th>機型</th>${salesHeaderCells(report)}<th>目前庫存</th><th>去化率</th>`;
+    $('storeRows').innerHTML = report.storeSummary.map(row => `<tr><td><strong>${escapeHtml(row.store)}</strong></td>${salesValueCells(row, report)}<td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('');
     $('storeFilter').innerHTML = '<option value="all">北一二B 整體</option>' + Core.STORE_NAMES.map(store => `<option value="${escapeHtml(store)}">${escapeHtml(store)}</option>`).join('');
     renderModelRows();
     $('results').hidden = false;
