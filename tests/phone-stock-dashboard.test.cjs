@@ -61,6 +61,18 @@ test('SAR26_4 銷貨與 INVRC101 庫存格式可辨識民國日期、數量與�
   assert.equal(report.stockDate, '2026-09-20');
 });
 
+test('SAR26_4CSV 明細欄位左移時，仍以實際料號、數量與銷貨日期解析', () => {
+  const sales = Core.parseMatrix([
+    ['序號', '公司別', '區域', '店點代碼', '店點名稱', '銷貨單號', '組合料號', '料號', '品名', '活動名稱', '組合項目代碼', '組合促銷名稱', '促銷代碼', '專案名稱', 'SubId', '數量', '銷售金額', '抵用券折抵', '優惠折抵', '優惠折扣', '銷售淨額', '銷貨日期'],
+    [1, 'TWM', '北一二B', 'DNB10307', '台灣大哥大數位生活台北三創', 'S35', 'H010', 'APPLE iPhone 18 Pro_256G-(黑)(5G)', 'AD766', '5G手機案', '72979312', 1, 31300, 0, 3500, 0, 27800, 1150920],
+    [2, 'TWM', '北一二B', 'DNB10146', '台北杭州南', 'S36', 'H011', 'APPLE iPhone 18 Pro Max_256G-(銀)(5G)', 'AE264', '5G手機案', '72979566', -1, -49900, 0, 0, 0, -49900, 1150919]
+  ], 'sales', '2026-09-20');
+  assert.deepEqual(sales.errors, []);
+  assert.deepEqual(sales.rows.map(row => row.model), ['APPLE iPhone 18 Pro_256G-(黑)(5G)', 'APPLE iPhone 18 Pro Max_256G-(銀)(5G)']);
+  assert.deepEqual(sales.rows.map(row => row.quantity), [1, -1]);
+  assert.deepEqual(sales.rows.map(row => row.date), ['2026-09-20', '2026-09-19']);
+});
+
 test('督導入口包含手機本機雙檔工具，日誌檢查不再位於同仁大廳', () => {
   const root = path.resolve(__dirname, '..');
   const home = fs.readFileSync(path.join(root, 'home.html'), 'utf8');
