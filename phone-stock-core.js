@@ -54,6 +54,13 @@
     const result = formatDateUtc(candidate);
     return result > asOf ? formatDateUtc(new Date(Date.UTC(year - 1, month - 1, day))) : result;
   }
+  function reportDateRange(rows, lastRowIndex) {
+    const source = (rows || []).slice(0, Math.max(0, lastRowIndex)).map(row => Array.isArray(row) ? row.join(' ') : '').join(' ');
+    const match = source.match(/((?:20\d{2}|1\d{2})\s*[\/-]\s*\d{1,2}\s*[\/-]\s*\d{1,2})\s*(?:~|～|至|-)\s*((?:20\d{2}|1\d{2})\s*[\/-]\s*\d{1,2}\s*[\/-]\s*\d{1,2})/);
+    if (!match) return null;
+    const start = normalizeDate(match[1]); const end = normalizeDate(match[2]);
+    return start && end && start <= end ? { start, end } : null;
+  }
   function addDays(iso, amount) {
     const date = new Date(`${iso}T00:00:00Z`);
     date.setUTCDate(date.getUTCDate() + amount);
@@ -63,7 +70,7 @@
     if (!date) return false;
     const asOf = normalizeDate(asOfDate);
     if (!asOf) return true;
-    return Math.abs(Number(date.slice(0, 4)) - Number(asOf.slice(0, 4))) <= 2;
+    return Math.abs(new Date(`${date}T00:00:00Z`).getTime() - new Date(`${asOf}T00:00:00Z`).getTime()) <= 366 * 86400000;
   }
   function canonicalStore(value) {
     const candidate = key(value);
@@ -120,7 +127,8 @@
           quantity: headerIndex(headers, ['組合促銷名稱']),
           date: headerIndex(headers, ['抵用券折抵'])
         } : null;
-        best = { rowIndex, map:{ store, model, quantity, date, dateColumns, dataMap }, score };
+        const range = type === 'sales' ? reportDateRange(rows, rowIndex) : null;
+        best = { rowIndex, map:{ store, model, quantity, date, dateColumns, dataMap, reportRange:range }, score };
       }
     }
     return best;
@@ -136,7 +144,8 @@
       // 先採正常欄位，僅在銷貨日期無法辨識且左移日期可辨識時才切換。
       const normalDate = detected.map.date >= 0 ? normalizeDate(source[detected.map.date]) : '';
       const shiftedDate = detected.map.dataMap ? normalizeDate(source[detected.map.dataMap.date]) : '';
-      const rowMap = detected.map.dataMap && !isNearbyReportDate(normalDate, asOfDate) && isNearbyReportDate(shiftedDate, asOfDate) ? detected.map.dataMap : detected.map;
+      const dateFitsReport = date => detected.map.reportRange ? Boolean(date && date >= detected.map.reportRange.start && date <= detected.map.reportRange.end) : isNearbyReportDate(date, asOfDate);
+      const rowMap = detected.map.dataMap && !dateFitsReport(normalDate) && dateFitsReport(shiftedDate) ? detected.map.dataMap : detected.map;
       const rawModel = source[rowMap.model];
       if (!text(rawStore) && !text(rawModel)) continue;
       const store = canonicalStore(rawStore);
@@ -156,6 +165,7 @@
       if (quantity == null || (type !== 'sales' && quantity < 0)) { invalidNumbers += 1; continue; }
       const date = rowMap === detected.map ? normalDate : shiftedDate;
       if (type === 'sales' && !date) { missingDates += 1; continue; }
+      if (type === 'sales' && detected.map.reportRange && !dateFitsReport(date)) { missingDates += 1; continue; }
       rows.push({ store, model, quantity, date });
     }
     const warnings = [];
@@ -183,8 +193,12 @@
     const endDate = normalizeDate(asOfDate);
     if (!endDate) throw new Error('請選擇有效的資料截止日。');
     const startDate = addDays(endDate, -2);
-    const sales = (salesRows || []).filter(row => row.date >= startDate && row.date <= endDate);
+    // 銷售檔本身就是使用者匯出的報表區間；完整保留其中的所有銷售日期。
+    // 截止日僅用來挑選庫存檔的最新快照，不能因此截掉銷售報表較早的日期。
+    const sales = (salesRows || []).filter(row => row && row.date);
     const salesDates = Array.from(new Set(sales.map(row => row.date).filter(Boolean))).sort();
+    const salesStartDate = salesDates[0] || '';
+    const salesEndDate = salesDates[salesDates.length - 1] || '';
     const datedStocks = (stockRows || []).filter(row => row.date && row.date <= endDate);
     const stockDate = datedStocks.length ? datedStocks.reduce((latest, row) => row.date > latest ? row.date : latest, datedStocks[0].date) : '';
     const stocks = stockDate ? datedStocks.filter(row => row.date === stockDate) : (stockRows || []).filter(row => !row.date);
@@ -218,7 +232,7 @@
     const totalSales = storeSummary.reduce((sum, row) => sum + row.sales, 0);
     const totalStock = storeSummary.reduce((sum, row) => sum + row.stock, 0);
     return {
-      startDate, endDate, stockDate, salesDates, salesRows:sales.length, stockRows:stocks.length,
+      startDate, endDate, salesStartDate, salesEndDate, stockDate, salesDates, salesRows:sales.length, stockRows:stocks.length,
       totalSales, totalStock, totalRate:rate(totalSales, totalStock), storeSummary, modelSummary,
       storeModels:Object.fromEntries(STORE_NAMES.map(store => [store, Array.from(byStore.get(store).models.values()).map(row => ({ ...row, salesByDate:{ ...row.salesByDate }, rate:rate(row.sales, row.stock) })).sort((a, b) => b.sales - a.sales || b.stock - a.stock || a.model.localeCompare(b.model, 'zh-Hant'))]))
     };
