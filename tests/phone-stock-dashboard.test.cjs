@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const Core = require('../phone-stock-core.js');
 
-test('銷售直列與庫存快照可計算近三日去化率', () => {
+test('完整銷售報表日期與庫存快照可計算去化率', () => {
   const sales = Core.parseMatrix([
     ['店點', '機型', '銷售日期', '銷售數'],
     ['台灣大哥大數位生活台北三創直營', 'iPhone 18 Pro', '2026/09/18', 2],
@@ -22,12 +22,14 @@ test('銷售直列與庫存快照可計算近三日去化率', () => {
   const report = Core.buildReport(sales.rows, stock.rows, '2026-09-20');
   assert.equal(report.startDate, '2026-09-18');
   assert.equal(report.stockDate, '2026-09-20');
-  assert.equal(report.totalSales, 3);
+  assert.equal(report.salesStartDate, '2026-09-17');
+  assert.equal(report.salesEndDate, '2026-09-20');
+  assert.equal(report.totalSales, 12);
   assert.equal(report.totalStock, 10);
-  assert.equal(report.totalRate, 3 / 13);
-  assert.deepEqual(report.salesDates, ['2026-09-18', '2026-09-20']);
-  assert.deepEqual(report.storeSummary.find(row => row.store === '台北三創'), { store:'台北三創', sales:3, stock:3, salesByDate:{ '2026-09-18':2, '2026-09-20':1 }, rate:.5 });
-  assert.deepEqual(report.modelSummary.find(row => row.model === 'iPhone 18 Pro').salesByDate, { '2026-09-18':2, '2026-09-20':1 });
+  assert.equal(report.totalRate, 12 / 22);
+  assert.deepEqual(report.salesDates, ['2026-09-17', '2026-09-18', '2026-09-20']);
+  assert.deepEqual(report.storeSummary.find(row => row.store === '台北三創'), { store:'台北三創', sales:3, stock:3, salesByDate:{ '2026-09-17':0, '2026-09-18':2, '2026-09-20':1 }, rate:.5 });
+  assert.deepEqual(report.modelSummary.find(row => row.model === 'iPhone 18 Pro').salesByDate, { '2026-09-17':0, '2026-09-18':2, '2026-09-20':1 });
 });
 
 test('近三日分欄銷售可隨截止日辨識，非北一二B店點不混入', () => {
@@ -82,6 +84,17 @@ test('SAR26_4CSV 原始明細欄位正常對齊時，優先依表頭解析', () 
   ], 'sales', '2026-09-20');
   assert.deepEqual(sales.errors, []);
   assert.deepEqual(sales.rows, [{ store:'台北三創', model:'APPLE iPhone 18 Pro_256G-(黑)(5G)', quantity:1, date:'2026-09-20' }]);
+});
+
+test('SAR26_4CSV 依報表區間保留早期日期並排除錯位產生的日期', () => {
+  const sales = Core.parseMatrix([
+    ['區間：', '115/09/18-115/09/22'],
+    ['序號', '公司別', '區域', '店點代碼', '店點名稱', '銷貨單號', '組合料號', '料號', '品名', '活動名稱', '組合項目代碼', '組合促銷名稱', '促銷代碼', '專案名稱', 'SubId', '數量', '銷售金額', '抵用券折抵', '優惠折抵', '優惠折扣', '銷售淨額', '銷貨日期'],
+    [1, 'TWM', '北一二B', 'DNB10307', '台灣大哥大數位生活台北三創', 'S35', 'H010', 'APPLE iPhone 18 Pro_256G-(黑)(5G)', 'AD766', '5G手機案', '72979312', 1, 31300, 0, 3500, 0, 27800, 1150918],
+    [2, 'TWM', '北一二B', 'DNB10307', '台灣大哥大數位生活台北三創', 'S36', 'H010', 'APPLE iPhone 18 Pro_256G-(銀)(5G)', 'AD766', '5G手機案', '72979312', 1, 31300, 0, 3500, 0, 27800, 1150921]
+  ], 'sales', '2026-09-22');
+  assert.deepEqual(sales.errors, []);
+  assert.deepEqual(sales.rows.map(row => row.date), ['2026-09-18', '2026-09-21']);
 });
 
 test('督導入口包含手機本機雙檔工具，日誌檢查不再位於同仁大廳', () => {
