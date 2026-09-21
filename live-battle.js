@@ -288,10 +288,7 @@
   }
 
   function metricCell(metric) {
-    const target = metric.todayGoal;
-    if (target == null) return `<strong>${displayCount(metric.actual)}</strong><small>目前上線</small>`;
-    const detail = metric.gap > 0 ? `缺 ${displayCount(metric.gap)}` : '達標';
-    return `<strong>${displayCount(metric.actual)}<span> / ${displayCount(target)}</span></strong><small class="${metric.gap > 0 ? 'negative' : 'positive'}">${detail}</small>`;
+    return `<strong>${displayCount(metric.actual)}</strong>`;
   }
 
   function storeMetricSequence(store) {
@@ -505,9 +502,9 @@
   }
 
   function createStoresPng(analysis) {
-    const width = 1900, rowHeight = 96, tableY = 188, height = tableY + 58 + analysis.stores.length * rowHeight + 80;
+    const width = 1900, rowHeight = 78, tableY = 188, height = tableY + 58 + analysis.stores.length * rowHeight + 80;
     const { canvas, ctx } = exportSurface(width, height);
-    drawExportHeader(ctx, width, '③ 九店 AQ／RT 戰情', `${exportTimeLabel()} 產生｜數字為目前上線 / 今日目標`);
+    drawExportHeader(ctx, width, '③ 九店 AQ／RT 戰情', `${exportTimeLabel()} 產生｜數字為各項上線數`);
     const labels = ['店點', 'AQ上線', 'A999', 'A1399', 'RT上線', 'R999', 'R1399', '好速', '今日差異'];
     const widths = [160, 150, 150, 150, 150, 150, 150, 150, 520];
     let x = 52;
@@ -519,19 +516,21 @@
     analysis.stores.forEach((store, rowIndex) => {
       const y = tableY + 58 + rowIndex * rowHeight;
       const gaps = storeGapEntries(store);
-      const values = [store.name, ...storeMetricSequence(store).map(([, metric]) => {
-        return metric.todayGoal == null ? displayCount(metric.actual) : `${displayCount(metric.actual)} / ${displayCount(metric.todayGoal)}`;
-      }), analysis.dynamic.available ? (gaps.join('、') || '今日已達標') : '尚未載入目標'];
+      const values = [store.name, ...storeMetricSequence(store).map(([, metric]) => displayCount(metric.actual)), analysis.dynamic.available ? (gaps.join('、') || '今日已達標') : '尚未載入目標'];
       x = 52;
       const metricActuals = storeMetricSequence(store).map(([, metric]) => Number(metric.actual || 0));
       values.forEach((value, index) => {
         const hit = index >= 1 && index <= metricActuals.length && metricActuals[index - 1] > 0;
         ctx.fillStyle = hit ? '#d9f3e8' : (rowIndex % 2 ? '#f8fbfd' : '#ffffff'); ctx.fillRect(x, y, widths[index], rowHeight);
         ctx.strokeStyle = EXPORT_COLORS.line; ctx.strokeRect(x, y, widths[index], rowHeight);
+        const isMetric = index >= 1 && index <= metricActuals.length;
         ctx.fillStyle = index === values.length - 1 ? (gaps.length ? EXPORT_COLORS.red : EXPORT_COLORS.green) : EXPORT_COLORS.ink;
-        ctx.font = `900 ${index === values.length - 1 ? 18 : index === 0 ? 21 : 24}px "Microsoft YaHei", "Microsoft JhengHei", sans-serif`;
+        ctx.font = `950 ${index === values.length - 1 ? 18 : index === 0 ? 21 : isMetric ? 30 : 24}px "Microsoft YaHei", "Microsoft JhengHei", sans-serif`;
         const lines = wrapCanvasText(ctx, value, widths[index] - 24, index === values.length - 1 ? 3 : 2);
-        lines.forEach((line, lineIndex) => ctx.fillText(line, x + 12, y + rowHeight / 2 + (lineIndex - (lines.length - 1) / 2) * 23));
+        lines.forEach((line, lineIndex) => {
+          const textX = isMetric ? x + (widths[index] - ctx.measureText(line).width) / 2 : x + 12;
+          ctx.fillText(line, textX, y + rowHeight / 2 + (lineIndex - (lines.length - 1) / 2) * 23);
+        });
         x += widths[index];
       });
     });
