@@ -111,7 +111,7 @@
   }
   function renderReport() {
     const report = state.report;
-    const salesDateLabel = report.salesDates.length ? report.salesDates.map(displaySalesDate).join('、') : `${report.startDate} ～ ${report.endDate}`;
+    const salesDateLabel = report.salesDates.length ? report.salesDates.map(displaySalesDate).join('、') : '無可辨識銷售日期';
     $('sourceMeta').textContent = `報表銷售日期 ${salesDateLabel} · ${report.stockDate ? `庫存快照 ${report.stockDate}` : '庫存檔未提供日期，依本次上傳內容計算'} · 僅本機預覽`;
     $('totalSales').textContent = displayCount(report.totalSales);
     $('totalStock').textContent = displayCount(report.totalStock);
@@ -143,9 +143,8 @@
     $('modelQuery').value = ''; $('minSales').value = ''; $('minStock').value = ''; renderModelRows();
   });
   $('asOfDate').addEventListener('change', () => {
-    state.sales = null; state.stock = null; state.report = null; $('results').hidden = true;
-    $('salesFile').value = ''; $('stockFile').value = '';
-    $('salesFileName').textContent = '選擇 Excel／CSV 檔案'; $('stockFileName').textContent = '選擇 Excel／CSV 檔案';
-    setMessage('sales', '已變更資料截止日，請重新選擇兩份檔案。'); setMessage('stock', ''); refreshPreview();
+    state.stock = null; state.report = null; $('results').hidden = true;
+    $('stockFile').value = ''; $('stockFileName').textContent = '選擇 Excel／CSV 檔案';
+    setMessage('stock', '已變更庫存快照截止日，請重新選擇庫存檔。'); refreshPreview();
   });
 })();
