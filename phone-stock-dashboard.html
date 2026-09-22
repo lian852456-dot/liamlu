@@ -95,9 +95,9 @@
 
       <section class="panel result-panel model-panel">
         <div class="panel-heading model-heading">
-          <div><h2>機型明細</h2><p class="helper">可依店點、機型關鍵字與銷售／庫存數篩選。</p></div>
+          <div><h2>機型明細</h2><p class="helper">可依店點、機型關鍵字與銷售／庫存數篩選；不選店點時會逐店顯示庫存。</p></div>
           <div class="model-filters" aria-label="機型明細篩選">
-            <label class="filter-label" for="storeFilter">查看範圍<select id="storeFilter"><option value="all">北一二B 整體</option></select></label>
+            <label class="filter-label" for="storeFilter">查看範圍<select id="storeFilter"><option value="">— 各店庫存明細 —</option><option value="all">北一二B 整體</option></select></label>
             <label class="filter-label" for="modelQuery">機型搜尋<input id="modelQuery" type="search" placeholder="例如：Pro Max、512G"></label>
             <label class="filter-label compact-filter" for="minSales">銷售至少<input id="minSales" type="number" min="0" step="1" inputmode="numeric" placeholder="不限"></label>
             <label class="filter-label compact-filter" for="minStock">庫存至少<input id="minStock" type="number" min="0" step="1" inputmode="numeric" placeholder="不限"></label>
@@ -110,6 +110,6 @@
     </section>
   </main>
   <footer>去化率公式：銷售加總 ÷（銷售加總＋目前庫存）。分母為 0 時顯示「—」。</footer>
-  <script src="phone-stock-dashboard.js?v=20260922-1"></script>
+  <script src="phone-stock-dashboard.js?v=20260922-2"></script>
 </body>
 </html>
