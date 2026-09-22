@@ -98,16 +98,25 @@
     const number = Number(value);
     return Number.isFinite(number) && number >= 0 ? number : null;
   }
+  function modelRowsForScope(selected) {
+    if (selected === 'all') return { rows:state.report.modelSummary, showStore:false, rowLabel:'款機型' };
+    if (selected) return { rows:state.report.storeModels[selected] || [], showStore:false, rowLabel:'款機型' };
+    const rows = Core.STORE_NAMES.flatMap(store => (state.report.storeModels[store] || []).map(row => ({ ...row, store })))
+      .sort((a, b) => a.model.localeCompare(b.model, 'zh-Hant') || b.stock - a.stock || b.sales - a.sales || a.store.localeCompare(b.store, 'zh-Hant'));
+    return { rows, showStore:true, rowLabel:'筆店點機型' };
+  }
   function renderModelRows() {
     const selected = $('storeFilter').value;
-    const rows = selected === 'all' ? state.report.modelSummary : state.report.storeModels[selected];
+    const scoped = modelRowsForScope(selected);
+    const rows = scoped.rows;
     const query = $('modelQuery').value.trim().toLocaleLowerCase('zh-Hant');
     const minSales = minimumValue('minSales');
     const minStock = minimumValue('minStock');
     const filtered = (rows || []).filter(row => (!query || row.model.toLocaleLowerCase('zh-Hant').includes(query)) && (minSales == null || row.sales >= minSales) && (minStock == null || row.stock >= minStock));
-    $('modelFilterSummary').textContent = `顯示 ${filtered.length} / ${(rows || []).length} 款機型`;
-    const columnCount = state.report.salesDates.length + 4;
-    $('modelRows').innerHTML = filtered.length ? filtered.map(row => `<tr><td><strong>${escapeHtml(row.model)}</strong></td>${salesValueCells(row, state.report)}<td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('') : `<tr><td class="empty-row" colspan="${columnCount}">沒有符合篩選條件的機型。</td></tr>`;
+    $('modelTableHead').innerHTML = `${scoped.showStore ? '<th>店點</th>' : ''}<th>機型</th>${salesHeaderCells(state.report)}<th>目前庫存</th><th>去化率</th>`;
+    $('modelFilterSummary').textContent = `顯示 ${filtered.length} / ${(rows || []).length} ${scoped.rowLabel}`;
+    const columnCount = state.report.salesDates.length + 4 + (scoped.showStore ? 1 : 0);
+    $('modelRows').innerHTML = filtered.length ? filtered.map(row => `<tr>${scoped.showStore ? `<td><strong>${escapeHtml(row.store)}</strong></td>` : ''}<td><strong>${escapeHtml(row.model)}</strong></td>${salesValueCells(row, state.report)}<td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('') : `<tr><td class="empty-row" colspan="${columnCount}">沒有符合篩選條件的機型。</td></tr>`;
   }
   function renderReport() {
     const report = state.report;
@@ -118,9 +127,8 @@
     $('totalRate').textContent = displayRate(report.totalRate);
     $('activeStores').textContent = `${report.storeSummary.filter(row => row.sales > 0).length} / 9`;
     $('storeTableHead').innerHTML = `<th>店點</th>${salesHeaderCells(report)}<th>目前庫存</th><th>去化率</th>`;
-    $('modelTableHead').innerHTML = `<th>機型</th>${salesHeaderCells(report)}<th>目前庫存</th><th>去化率</th>`;
     $('storeRows').innerHTML = report.storeSummary.map(row => `<tr><td><strong>${escapeHtml(row.store)}</strong></td>${salesValueCells(row, report)}<td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('');
-    $('storeFilter').innerHTML = '<option value="all">北一二B 整體</option>' + Core.STORE_NAMES.map(store => `<option value="${escapeHtml(store)}">${escapeHtml(store)}</option>`).join('');
+    $('storeFilter').innerHTML = '<option value="">— 各店庫存明細 —</option><option value="all">北一二B 整體</option>' + Core.STORE_NAMES.map(store => `<option value="${escapeHtml(store)}">${escapeHtml(store)}</option>`).join('');
     renderModelRows();
     $('results').hidden = false;
     $('results').scrollIntoView({ behavior:'smooth', block:'start' });
@@ -140,7 +148,7 @@
   $('storeFilter').addEventListener('change', renderModelRows);
   ['modelQuery', 'minSales', 'minStock'].forEach(id => $(id).addEventListener('input', renderModelRows));
   $('clearModelFilters').addEventListener('click', () => {
-    $('modelQuery').value = ''; $('minSales').value = ''; $('minStock').value = ''; renderModelRows();
+    $('storeFilter').value = ''; $('modelQuery').value = ''; $('minSales').value = ''; $('minStock').value = ''; renderModelRows();
   });
   $('asOfDate').addEventListener('change', () => {
     state.stock = null; state.report = null; $('results').hidden = true;
