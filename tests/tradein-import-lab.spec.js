@@ -18,7 +18,7 @@ test('3C 與舊換新資料都能在本機上傳、辨識與預覽', async ({ pa
   await expect(page.locator('#shoppingAnalysis')).toContainText('3c-shopping.csv');
   await expect(page.locator('#shoppingAnalysis')).toContainText('CSV（UTF-8）');
   await expect(page.locator('#shoppingAnalysis')).toContainText('iPhone, 18 Pro');
-  await expect(page.locator('#shoppingAnalysis')).toContainText('無法分類的欄位');
+  await expect(page.locator('#shoppingAnalysis')).toContainText('解析驗收摘要');
   await expect(page.locator('#shoppingAnalysis')).toContainText('欄位映射');
   await expect(page.locator('#shoppingAnalysis')).toContainText('資料品質與解析異常');
   await expect(page.locator('#shoppingAnalysis')).toContainText('標準化資料預覽（Wide → Long）');
