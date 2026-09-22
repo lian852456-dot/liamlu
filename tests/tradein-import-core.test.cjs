@@ -50,6 +50,53 @@ test('XLSX 多工作表會選擇具有可辨識欄位與資料的工作表', asy
   assert.equal(result.previewRows[0].values['商品名稱'], 'iPad Pro');
 });
 
+test('3C 購物通公司欄位可映射成標準化資料並標記空值', () => {
+  const result = Core.analyseMatrix([
+    ['廠牌', '機型', 'SIM卡類別', '售價', '其他欄位'],
+    ['Apple', 'iPhone 18 Pro', '5G', 39900, ''],
+    ['Samsung', 'Galaxy S26', '5G', '', '待確認']
+  ], 'shopping');
+  assert.deepEqual(result.fieldMapping.map(field => [field.sourceName, field.key]), [
+    ['廠牌', 'brand'], ['機型', 'model'], ['SIM卡類別', 'category'], ['售價', 'retailPrice'], ['其他欄位', '']
+  ]);
+  assert.equal(result.standardized.summary.sourceRows, 2);
+  assert.equal(result.standardized.summary.normalizedRows, 2);
+  assert.equal(result.standardized.summary.success, 2);
+  assert.equal(result.standardized.rows[0].brand, 'Apple');
+  assert.equal(result.standardized.rows[0].retailPrice, '39900');
+  assert.equal(result.standardized.rows[1].status, 'success');
+});
+
+test('舊換新 A／B／C／S 等級寬表會正規化成 Long Format', () => {
+  const result = Core.analyseMatrix([
+    ['機型(A等級)', '品名 Item(A等級)', '回收價(A等級)', '機型(B等級)', '品名 Item(B等級)', '回收價(B等級)', '機型(S等級)', '品名 Item(S等級)', '回收價(S等級)'],
+    ['iPhone 17 Pro', 'APPLE IPHONE 17 PRO 256G', 24500, 'iPhone 17 Pro', 'APPLE IPHONE 17 PRO 256G', 21800, 'iPhone 17 Pro', 'APPLE IPHONE 17 PRO 256G', 26500],
+    ['Pixel 11', 'GOOGLE PIXEL 11', '', 'Pixel 11', 'GOOGLE PIXEL 11', 12000, '', '', '']
+  ], 'tradein');
+  assert.deepEqual(result.standardized.rows.map(row => [row.sourceRowNumber, row.grade, row.tradeInPrice, row.status]), [
+    [2, 'S', '26500', 'success'], [2, 'A', '24500', 'success'], [2, 'B', '21800', 'success'],
+    [3, 'A', '', 'failed'], [3, 'B', '12000', 'success']
+  ]);
+  assert.equal(result.standardized.summary.sourceRows, 2);
+  assert.equal(result.standardized.summary.normalizedRows, 5);
+  assert.equal(result.standardized.summary.success, 4);
+  assert.equal(result.standardized.summary.failed, 1);
+  assert.equal(result.standardized.rows[0].product, 'APPLE IPHONE 17 PRO 256G');
+  assert.match(result.warnings.join('\n'), /缺少必要值/);
+});
+
+test('無法對應標準欄位時會保留原始列並正確計入無法辨識', () => {
+  const result = Core.analyseMatrix([
+    ['內部代碼', '說明文字'],
+    ['X-001', '僅供備註']
+  ], 'shopping');
+  assert.equal(result.recordCount, 1);
+  assert.equal(result.standardized.summary.normalizedRows, 1);
+  assert.equal(result.standardized.summary.unrecognized, 1);
+  assert.equal(result.standardized.rows[0].status, 'unrecognized');
+  assert.match(result.standardized.rows[0].issues.join('、'), /無可對應/);
+});
+
 test('沒有可用欄位列的檔案會安全提示而不是建立資料', () => {
   const result = Core.analyseMatrix([['只有標題'], [], ['']], 'shopping');
   assert.equal(result.recordCount, 0);

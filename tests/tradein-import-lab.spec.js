@@ -19,6 +19,9 @@ test('3C 與舊換新資料都能在本機上傳、辨識與預覽', async ({ pa
   await expect(page.locator('#shoppingAnalysis')).toContainText('CSV（UTF-8）');
   await expect(page.locator('#shoppingAnalysis')).toContainText('iPhone, 18 Pro');
   await expect(page.locator('#shoppingAnalysis')).toContainText('無法分類的欄位');
+  await expect(page.locator('#shoppingAnalysis')).toContainText('欄位映射');
+  await expect(page.locator('#shoppingAnalysis')).toContainText('資料品質與解析異常');
+  await expect(page.locator('#shoppingAnalysis')).toContainText('標準化資料預覽（Wide → Long）');
   await page.setInputFiles('#tradeinFile', {
     name:'tradein.csv',
     mimeType:'text/csv',
@@ -28,4 +31,25 @@ test('3C 與舊換新資料都能在本機上傳、辨識與預覽', async ({ pa
   await expect(page.locator('#tradeinAnalysis')).toContainText('回收價 ← 回收價');
   await expect(page.locator('#tradeinAnalysis')).toContainText('22000');
   expect(errors).toEqual([]);
+});
+
+test('舊換新寬表可轉 Long Format，並支援搜尋與前 50 筆預覽', async ({ page }) => {
+  await page.goto(PAGE_URL);
+  await page.setInputFiles('#tradeinFile', {
+    name:'company-tradein-wide.csv',
+    mimeType:'text/csv',
+    buffer:Buffer.from([
+      '機型(A等級),品名 Item(A等級),回收價(A等級),機型(B等級),品名 Item(B等級),回收價(B等級),機型(S等級),品名 Item(S等級),回收價(S等級)',
+      'iPhone 17 Pro,APPLE IPHONE 17 PRO 256G,24500,iPhone 17 Pro,APPLE IPHONE 17 PRO 256G,21800,iPhone 17 Pro,APPLE IPHONE 17 PRO 256G,26500',
+      'Pixel 11,GOOGLE PIXEL 11,,Pixel 11,GOOGLE PIXEL 11,12000,,,'
+    ].join('\n'))
+  });
+  const analysis = page.locator('#tradeinAnalysis');
+  await expect(analysis).toContainText('標準化資料預覽（Wide → Long）');
+  await expect(analysis).toContainText('標準化');
+  await expect(analysis).toContainText('失敗');
+  await expect(analysis).toContainText('S');
+  await page.getByRole('searchbox', { name:'搜尋標準化資料' }).fill('Pixel 11');
+  await expect(analysis.locator('.normalized-wrap tbody')).toContainText('Pixel 11');
+  await expect(analysis.locator('.normalized-wrap tbody')).not.toContainText('iPhone 17 Pro');
 });

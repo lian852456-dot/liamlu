@@ -8,13 +8,15 @@
   const MAX_FILE_BYTES = 20 * 1024 * 1024;
   const SUPPORTED_EXTENSIONS = Object.freeze(['xlsx', 'xls', 'csv', 'tsv']);
   const PREVIEW_LIMIT = 5;
+  const NORMALIZED_PREVIEW_LIMIT = 50;
+  const GRADE_ORDER = Object.freeze(['S', 'A', 'B', 'C']);
   const HEADER_ALIASES = Object.freeze([
-    { key:'brand', label:'品牌', aliases:['品牌', '廠牌', 'brand'] },
-    { key:'product', label:'商品名稱', aliases:['商品名稱', '商品', '品名', '產品名稱', 'product name'] },
-    { key:'model', label:'機型／型號', aliases:['機型', '型號', '商品型號', '產品型號', 'model', 'sku', '料號'] },
-    { key:'category', label:'商品分類', aliases:['分類', '類別', '品類', '商品類別', 'category'] },
-    { key:'retailPrice', label:'售價', aliases:['售價', '建議售價', '定價', '零售價', 'price', 'msrp'] },
-    { key:'tradeInPrice', label:'回收價', aliases:['回收價', '回收價格', '回收金額', '舊換新回收價', '折抵價', '估價', 'trade in price'] },
+    { key:'brand', label:'品牌', aliases:['品牌', '廠牌', '品牌名稱', 'brand', 'brand name'] },
+    { key:'product', label:'商品名稱', aliases:['商品名稱', '商品', '品名', '品名item', '產品名稱', 'product name', 'item'] },
+    { key:'model', label:'機型／型號', aliases:['機型', '型號', '模型', '商品型號', '產品型號', 'model', 'model name', 'sku', '料號'] },
+    { key:'category', label:'商品分類', aliases:['分類', '類別', '品類', '商品類別', '商品分類', 'sim卡類別', 'category'] },
+    { key:'retailPrice', label:'售價', aliases:['售價', '建議售價', '定價', '零售價', '商品售價', 'price', 'msrp'] },
+    { key:'tradeInPrice', label:'回收價', aliases:['回收價', '回收價格', '回收金額', '舊換新回收價', '折抵價', '估價', 'trade in price', 'tradeinprice'] },
     { key:'condition', label:'機況／等級', aliases:['機況', '成色', '狀態', '等級', '品況', 'condition', 'grade'] },
     { key:'store', label:'店點／通路', aliases:['店點', '門市', '通路', '營業點', '據點', 'store', 'channel'] },
     { key:'date', label:'資料日期', aliases:['日期', '生效日期', '更新日期', '資料日期', '期間', 'date', 'effective date'] },
@@ -35,6 +37,22 @@
       .normalize('NFKC')
       .replace(/[\s　_\-－／/()（）【】[\]：:．.]/g, '')
       .toLowerCase();
+  }
+
+  function gradeFromHeader(value) {
+    const source = text(value).normalize('NFKC').toUpperCase();
+    const bracket = source.match(/[\(（\[【]\s*([SABC])\s*(?:級|等級)?\s*[\)）\]】]/);
+    if (bracket) return bracket[1];
+    const plain = source.match(/(?:^|[\s_\-－／/])([SABC])\s*(?:級|等級)(?:$|[\s_\-－／/])/);
+    return plain ? plain[1] : '';
+  }
+
+  function headerWithoutGrade(value) {
+    return text(value)
+      .normalize('NFKC')
+      .replace(/[\(（\[【]\s*[SABC]\s*(?:級|等級)?\s*[\)）\]】]/gi, ' ')
+      .replace(/(?:^|[\s_\-－／/])[SABC]\s*(?:級|等級)(?:$|[\s_\-－／/])/gi, ' ')
+      .trim();
   }
 
   function extensionOf(file) {
@@ -59,7 +77,7 @@
   }
 
   function recognizeHeader(value) {
-    const source = normalized(value);
+    const source = normalized(headerWithoutGrade(value));
     if (!source) return null;
     for (const definition of HEADER_ALIASES) {
       for (const alias of definition.aliases) {
@@ -116,6 +134,122 @@
       seen.set(base, count);
       return count === 1 ? base : base + ' (' + String(count) + ')';
     });
+  }
+
+  function firstValue(record, columns) {
+    for (const column of columns || []) {
+      const value = text(record && record[column.name]);
+      if (value) return value;
+    }
+    return '';
+  }
+
+  function statusFor(kind, values, hasMapping) {
+    if (!hasMapping) return 'unrecognized';
+    const hasIdentity = Boolean(values.brand || values.product || values.model);
+    const hasPrice = Boolean(kind === 'tradein' ? values.tradeInPrice : values.retailPrice);
+    if (!hasIdentity) return 'failed';
+    if (kind === 'tradein' && !hasPrice) return 'failed';
+    return 'success';
+  }
+
+  function issueList(kind, values, hasMapping) {
+    if (!hasMapping) return ['無可對應的標準欄位'];
+    const issues = [];
+    if (!values.brand && !values.product && !values.model) issues.push('缺少商品識別欄位');
+    if (kind === 'tradein' && !values.tradeInPrice) issues.push('缺少回收價');
+    return issues;
+  }
+
+  function makeNormalizedRow(kind, rowNumber, values, hasMapping, grade) {
+    const status = statusFor(kind, values, hasMapping);
+    return {
+      sourceRowNumber:rowNumber,
+      grade:grade || '',
+      brand:values.brand || '',
+      product:values.product || '',
+      model:values.model || '',
+      category:values.category || '',
+      retailPrice:values.retailPrice || '',
+      tradeInPrice:values.tradeInPrice || '',
+      store:values.store || '',
+      date:values.date || '',
+      vendor:values.vendor || '',
+      promotion:values.promotion || '',
+      status,
+      issues:issueList(kind, values, hasMapping)
+    };
+  }
+
+  function standardizeShopping(records, fields) {
+    const mapped = new Map();
+    fields.forEach(field => {
+      if (!field.recognized) return;
+      const list = mapped.get(field.recognized.key) || [];
+      list.push(field);
+      mapped.set(field.recognized.key, list);
+    });
+    const hasMapping = mapped.size > 0;
+    return records.map(record => {
+      const values = {};
+      HEADER_ALIASES.forEach(definition => { values[definition.key] = firstValue(record.values, mapped.get(definition.key)); });
+      return makeNormalizedRow('shopping', record.rowNumber, values, hasMapping, '');
+    });
+  }
+
+  function standardizeTradeIn(records, fields) {
+    const common = new Map();
+    const byGrade = new Map();
+    fields.forEach(field => {
+      if (!field.recognized) return;
+      const grade = gradeFromHeader(field.sourceName);
+      const target = grade ? (byGrade.get(grade) || new Map()) : common;
+      const list = target.get(field.recognized.key) || [];
+      list.push(field);
+      target.set(field.recognized.key, list);
+      if (grade) byGrade.set(grade, target);
+    });
+    const grades = Array.from(byGrade.keys()).sort((left, right) => {
+      const leftIndex = GRADE_ORDER.indexOf(left);
+      const rightIndex = GRADE_ORDER.indexOf(right);
+      return (leftIndex < 0 ? 99 : leftIndex) - (rightIndex < 0 ? 99 : rightIndex);
+    });
+    const hasMapping = common.size > 0 || grades.length > 0;
+    const normalizedRows = [];
+    records.forEach(record => {
+      const rowResults = [];
+      const candidates = grades.length ? grades : [''];
+      candidates.forEach(grade => {
+        const gradeFields = grade ? byGrade.get(grade) : new Map();
+        const values = {};
+        let hasContent = false;
+        HEADER_ALIASES.forEach(definition => {
+          const columns = (gradeFields.get(definition.key) || []).concat(common.get(definition.key) || []);
+          values[definition.key] = firstValue(record.values, columns);
+          if (values[definition.key]) hasContent = true;
+        });
+        if (hasContent) rowResults.push(makeNormalizedRow('tradein', record.rowNumber, values, hasMapping, grade));
+      });
+      if (rowResults.length) normalizedRows.push.apply(normalizedRows, rowResults);
+      else normalizedRows.push(makeNormalizedRow('tradein', record.rowNumber, {}, hasMapping, ''));
+    });
+    return normalizedRows;
+  }
+
+  function buildStandardization(kind, records, fields) {
+    const rows = kind === 'tradein'
+      ? standardizeTradeIn(records, fields)
+      : standardizeShopping(records, fields);
+    const summary = { sourceRows:records.length, normalizedRows:rows.length, success:0, failed:0, unrecognized:0 };
+    rows.forEach(row => { summary[row.status] += 1; });
+    const mapping = fields.map(field => ({
+      sourceName:field.sourceName,
+      key:field.recognized ? field.recognized.key : '',
+      label:field.recognized ? field.recognized.label : '',
+      grade:gradeFromHeader(field.sourceName),
+      status:field.recognized ? 'mapped' : 'unrecognized'
+    }));
+    return { mapping, rows, summary, previewRows:rows.slice(0, NORMALIZED_PREVIEW_LIMIT) };
   }
 
   function analyseMatrix(matrix, kind) {
@@ -186,9 +320,14 @@
     if (overflowRowCount) warnings.push(String(overflowRowCount) + ' 筆資料欄數多於偵測表頭，超出欄位未納入預覽。');
     if (!records.length) warnings.push('已辨識欄位，但沒有可預覽的資料列。');
 
+    const standardization = buildStandardization(kind, records, fields);
+    const standardWarnings = [];
+    if (standardization.summary.failed) standardWarnings.push(String(standardization.summary.failed) + ' 筆標準化資料缺少必要值。');
+    if (standardization.summary.unrecognized) standardWarnings.push(String(standardization.summary.unrecognized) + ' 筆資料沒有可對應的標準欄位。');
+
     return {
       errors:[],
-      warnings,
+      warnings:warnings.concat(standardWarnings),
       recordCount:records.length,
       fieldNames,
       recognizedFields,
@@ -197,7 +336,10 @@
       headerRow:detected.rowIndex,
       blankRowCount,
       partialRowCount,
-      overflowRowCount
+      overflowRowCount,
+      rawRows:records,
+      fieldMapping:standardization.mapping,
+      standardized:standardization
     };
   }
 
@@ -284,9 +426,12 @@
     MAX_FILE_BYTES,
     SUPPORTED_EXTENSIONS,
     PREVIEW_LIMIT,
+    NORMALIZED_PREVIEW_LIMIT,
+    GRADE_ORDER,
     extensionOf,
     isSupported,
     recognizeHeader,
+    gradeFromHeader,
     detectHeader,
     analyseMatrix,
     parseFile
