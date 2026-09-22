@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f3f7fa">
+<meta name="robots" content="noindex,nofollow">
+<title>3C／舊換新資料匯入測試區 · 北一二B</title>
+<link rel="stylesheet" href="phone-stock-dashboard.css?v=20260922-1">
+<style>
+  .import-lanes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.import-lane{margin-top:0;border-top:4px solid var(--blue)}.import-lane.tradein{border-top-color:var(--green)}.lane-icon{display:grid;place-items:center;flex:0 0 auto;width:42px;height:42px;border-radius:12px;background:var(--blue);color:#fff;font-size:17px;font-weight:950}.tradein .lane-icon{background:var(--green)}.upload-zone{position:relative;display:grid;min-height:154px;place-content:center;gap:7px;margin-top:17px;padding:19px;border:1.5px dashed #a9c2d2;border-radius:15px;background:#f7fcff;text-align:center;cursor:pointer}.tradein .upload-zone{background:#f8fdfa}.upload-zone:hover{border-color:var(--blue)}.tradein .upload-zone:hover{border-color:var(--green)}.upload-zone input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.upload-zone strong{font-size:17px}.upload-zone small,.lane-note{color:var(--muted);font-size:13px;font-weight:600}.file-name{max-width:100%;overflow-wrap:anywhere;color:var(--blue);font-size:12px;font-weight:850}.tradein .file-name{color:var(--green)}.analysis[hidden]{display:none}.analysis{margin-top:17px;padding-top:17px;border-top:1px solid var(--line)}.analysis-title{display:flex;align-items:center;justify-content:space-between;gap:12px}.analysis-title h3{margin:0;font-size:17px}.file-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:13px 0}.file-meta div{padding:10px;border-radius:11px;background:#f1f6f9}.file-meta dt{color:var(--muted);font-size:11px;font-weight:850}.file-meta dd{margin:2px 0 0;font-size:14px;overflow-wrap:anywhere}.field-group{margin-top:13px}.field-group h4{margin:0 0 6px;font-size:13px}.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}.chips li{padding:4px 8px;border-radius:999px;background:#e8f5fd;color:#17628a;font-size:12px;font-weight:800}.chips.warning li{background:#fff5df;color:#875900}.warning-list{margin:13px 0 0;padding:10px 12px 10px 30px;border-radius:10px;background:#fff6df;color:#875900;font-size:13px}.warning-list:empty{display:none}.preview-wrap{overflow-x:auto;margin-top:15px;border:1px solid var(--line);border-radius:12px}.preview-wrap table{min-width:620px}.preview-wrap td{vertical-align:top;white-space:normal;overflow-wrap:anywhere}.preview-wrap th,.preview-wrap td{max-width:220px}.preview-caption{margin:11px 0 0;color:var(--muted);font-size:12px}.empty-state{margin-top:13px;padding:11px 12px;border-radius:10px;background:#fff0f2;color:var(--red);font-size:13px}.privacy-note{width:auto}.scope-list{margin:14px 0 0;padding-left:20px;color:#d8eff8;font-size:13px}.scope-list li+li{margin-top:3px}@media(max-width:760px){.import-lanes{grid-template-columns:1fr}.file-meta{grid-template-columns:1fr 1fr}.file-meta div:last-child{grid-column:1/-1}}@media(max-width:460px){.file-meta{grid-template-columns:1fr}.file-meta div:last-child{grid-column:auto}}
+</style>
+<script src="assets/vendor/xlsx.full.min.js"></script>
+<script src="tradein-import-core.js?v=20260922-1"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="back-link" href="home.html">← 返回營運中心</a>
+    <strong>北一二B 督導專區</strong>
+    <span class="local-pill">本機測試</span>
+  </header>
+  <main>
+    <section class="hero">
+      <p class="eyebrow">LOCAL FORMAT DISCOVERY</p>
+      <h1>3C／舊換新資料匯入測試區</h1>
+      <p>先辨識公司每月提供檔案的欄位與內容樣貌，作為後續正式 3C 購物通與舊換新功能的設計依據。</p>
+      <p class="privacy-note">檔案只在目前瀏覽器記憶體解析；不會上傳雲端、不會寫入資料庫，也不會保留原始檔。</p>
+      <ul class="scope-list">
+        <li>本階段只做檔案辨識、欄位分析與資料預覽。</li>
+        <li>不會建立正式查詢、價格計算、資料同步或任何寫入流程。</li>
+      </ul>
+    </section>
+
+    <section class="import-lanes" aria-label="3C 與舊換新資料上傳測試">
+      <article class="panel import-lane" data-lane="shopping">
+        <div class="panel-heading">
+          <div>
+            <p class="step">A. 3C 購物通資料</p>
+            <h2>3C 購物通資料</h2>
+          </div>
+          <span class="lane-icon" aria-hidden="true">3C</span>
+        </div>
+        <p class="lane-note">支援目前規劃的 Excel、CSV、TSV 公司匯出檔；先顯示欄位與前幾筆資料，不建立商品庫。</p>
+        <label class="upload-zone" for="shoppingFile">
+          <strong>選擇 3C 購物通資料檔</strong>
+          <small>XLSX、XLS、CSV、TSV；上限 20 MB</small>
+          <input id="shoppingFile" data-import-file="shopping" type="file" accept=".xlsx,.xls,.csv,.tsv">
+          <span id="shoppingFileName" class="file-name">尚未選擇檔案</span>
+        </label>
+        <section id="shoppingAnalysis" class="analysis" hidden aria-live="polite"></section>
+      </article>
+
+      <article class="panel import-lane tradein" data-lane="tradein">
+        <div class="panel-heading">
+          <div>
+            <p class="step">B. 舊換新回收價資料</p>
+            <h2>舊換新回收價資料</h2>
+          </div>
+          <span class="lane-icon" aria-hidden="true">換</span>
+        </div>
+        <p class="lane-note">用於確認回收價、機況、機型等欄位的公司檔案格式；本頁不估價、不保存資料。</p>
+        <label class="upload-zone" for="tradeinFile">
+          <strong>選擇舊換新回收價資料檔</strong>
+          <small>XLSX、XLS、CSV、TSV；上限 20 MB</small>
+          <input id="tradeinFile" data-import-file="tradein" type="file" accept=".xlsx,.xls,.csv,.tsv">
+          <span id="tradeinFileName" class="file-name">尚未選擇檔案</span>
+        </label>
+        <section id="tradeinAnalysis" class="analysis" hidden aria-live="polite"></section>
+      </article>
+    </section>
+  </main>
+  <footer>此頁僅供資料格式分析；所有檔案均在本機端處理。</footer>
+  <script src="tradein-import-lab.js?v=20260922-1"></script>
+</body>
+</html>
