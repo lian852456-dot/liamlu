@@ -117,6 +117,7 @@ test('新頁面只使用既有本機 SheetJS，不含上傳或資料持久化', 
   assert.match(page, /id="modelQuery" type="search"/);
   assert.match(page, /id="minSales" type="number"/);
   assert.match(page, /id="minStock" type="number"/);
+  assert.match(page, /option value="">— 各店庫存明細 —/);
   assert.match(page, /id="storeTableHead"/);
   assert.match(page, /id="modelTableHead"/);
   assert.match(page, /銷售 ÷（銷售＋庫存）/);
@@ -125,5 +126,7 @@ test('新頁面只使用既有本機 SheetJS，不含上傳或資料持久化', 
   assert.match(controller, /new TextDecoder\('big5'\)/);
   assert.match(controller, /type:'string'/);
   assert.match(controller, /minimumValue\('minSales'\)/);
+  assert.match(controller, /modelRowsForScope\(selected\)/);
+  assert.match(controller, /showStore:true/);
   assert.match(controller, /salesHeaderCells\(report\)/);
 });
