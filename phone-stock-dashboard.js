@@ -127,7 +127,12 @@
     $('totalRate').textContent = displayRate(report.totalRate);
     $('activeStores').textContent = `${report.storeSummary.filter(row => row.sales > 0).length} / 9`;
     $('storeTableHead').innerHTML = `<th>店點</th>${salesHeaderCells(report)}<th>目前庫存</th><th>去化率</th>`;
-    $('storeRows').innerHTML = report.storeSummary.map(row => `<tr><td><strong>${escapeHtml(row.store)}</strong></td>${salesValueCells(row, report)}<td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('');
+    const regionRow = {
+      salesByDate:Object.fromEntries(report.salesDates.map(date => [date, report.storeSummary.reduce((sum, row) => sum + (row.salesByDate[date] || 0), 0)])),
+      sales:report.totalSales, stock:report.totalStock, rate:report.totalRate
+    };
+    $('storeRows').innerHTML = report.storeSummary.map(row => `<tr><td><strong>${escapeHtml(row.store)}</strong></td>${salesValueCells(row, report)}<td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('')
+      + `<tr class="region-total"><td><strong>N12B 加總</strong></td>${salesValueCells(regionRow, report)}<td>${displayCount(regionRow.stock)}</td><td>${rateCell(regionRow.rate)}</td></tr>`;
     $('storeFilter').innerHTML = '<option value="">— 各店庫存明細 —</option><option value="all">北一二B 整體</option>' + Core.STORE_NAMES.map(store => `<option value="${escapeHtml(store)}">${escapeHtml(store)}</option>`).join('');
     renderModelRows();
     $('results').hidden = false;
