@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const Core = window.PhoneStockCore;
+  const PRIVATE_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
   const MAX_FILE_BYTES = 20 * 1024 * 1024;
   const SUPPORTED_EXTENSIONS = new Set(['xlsx', 'xls', 'csv', 'tsv']);
   const state = { sales:null, stock:null, report:null };
@@ -59,6 +60,7 @@
     $('importNote').textContent = ready ? `${notes.join(' · ')}。兩份資料皆完成，可產生分析。` : `${notes.join(' · ')}。請再選擇另一份資料。`;
     $('uploadStatus').textContent = ready ? '可產生分析' : '尚待選檔';
     $('uploadStatus').className = `status-badge ${ready ? 'ok' : 'neutral'}`;
+    $('publishStock').disabled = !state.stock;
   }
   async function parseFile(file, kind) {
     if (!validateFile(file, kind)) return;
@@ -146,10 +148,37 @@
     } catch (error) { setMessage('sales', error.message || '無法產生分析。', 'error'); }
   }
 
+  async function publishStock() {
+    if (!state.stock) return;
+    const button = $('publishStock');
+    const note = $('stockSyncMessage');
+    const employeeId = $('stockEmployeeId').value.trim().toUpperCase();
+    const deviceId = localStorage.getItem('north12b_private_dashboard_device_id') || '';
+    if (!employeeId || !deviceId) { note.textContent = '請先在這台電腦完成 KPI 戰情的裝置核准，並輸入員編。'; return; }
+    const cutoff = $('asOfDate').value;
+    const dated = state.stock.rows.filter(row => row.date && row.date <= cutoff).map(row => row.date).sort();
+    const date = dated[dated.length - 1] || cutoff;
+    const latest = state.stock.rows.filter(row => dated.length ? row.date === date : !row.date);
+    const grouped = new Map();
+    latest.forEach(row => { const key = JSON.stringify([row.store,row.model]); grouped.set(key,(grouped.get(key)||0)+row.quantity); });
+    const rows = [...grouped].map(([key,quantity]) => { const [store,model] = JSON.parse(key); return {store,model,quantity}; });
+    if (!rows.length) { note.textContent = '截止日前沒有可發布的庫存快照。'; return; }
+    button.disabled = true; note.textContent = '正在同步九店庫存…';
+    try {
+      const response = await fetch(PRIVATE_API, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'phone_stock_publish',employeeId,deviceId,date,rows}),cache:'no-store'});
+      const result = await response.json();
+      if (!response.ok || result.status !== 'ok') throw new Error(result.message || '正式服務尚未支援庫存同步');
+      note.textContent = `已同步 ${result.rowCount} 筆庫存，快照日期 ${result.date}；APP 下次開啟庫存時更新。`;
+    } catch (error) { note.textContent = `同步失敗：${error.message}`; }
+    finally { button.disabled = false; }
+  }
+
   $('asOfDate').value = taipeiToday();
   $('salesFile').addEventListener('change', event => parseFile(event.target.files && event.target.files[0], 'sales'));
   $('stockFile').addEventListener('change', event => parseFile(event.target.files && event.target.files[0], 'stock'));
   $('generateReport').addEventListener('click', generateReport);
+  $('publishStock').addEventListener('click', publishStock);
+  $('stockEmployeeId').value = sessionStorage.getItem('north12b_private_dashboard_employee_id') || localStorage.getItem('north12b_private_dashboard_employee_id') || '';
   $('storeFilter').addEventListener('change', renderModelRows);
   ['modelQuery', 'minSales', 'minStock'].forEach(id => $(id).addEventListener('input', renderModelRows));
   $('clearModelFilters').addEventListener('click', () => {

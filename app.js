@@ -1209,6 +1209,11 @@
   }
 
   function renderBattle() {
+    const stock = battleKind === 'stock';
+    dom('#stockPanel').hidden = !stock;
+    dom('#battleContent').hidden = stock;
+    dom('.scope-control').hidden = stock;
+    if (stock) { dom('#battleStorePicker').hidden = true; return; }
     if (battleKind !== 'award' && battleScope === 'bonus') battleScope = 'region';
     dom('[data-battle-scope="bonus"]').hidden = battleKind !== 'award';
     dom('.scope-control').classList.toggle('award-scope-control',battleKind === 'award');
