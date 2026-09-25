@@ -3070,10 +3070,20 @@ function privateDashboardNotifyAdminOfBindingRequest(request, user) {
   }
 }
 
-function privateDashboardSnapshot() {
+function privateDashboardLatestSnapshotFile_() {
   const files = privateDashboardFolder().getFilesByName(PRIVATE_DASHBOARD_FILE);
-  if (!files.hasNext()) throw new Error('今日私有戰情尚未更新');
-  const snapshot = JSON.parse(files.next().getBlob().getDataAsString('UTF-8'));
+  let latest = null;
+  while (files.hasNext()) {
+    const file = files.next();
+    if (!latest || file.getLastUpdated().getTime() > latest.getLastUpdated().getTime()) latest = file;
+  }
+  return latest;
+}
+
+function privateDashboardSnapshot() {
+  const file = privateDashboardLatestSnapshotFile_();
+  if (!file) throw new Error('今日私有戰情尚未更新');
+  const snapshot = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
   return snapshot;
 }
@@ -3224,9 +3234,8 @@ function privateDashboardAdminSetTrustedEmployee(payload) {
 
 function privateDashboardAdminSnapshotStatus(payload) {
   privateDashboardAdminAuthorized(payload);
-  const files = privateDashboardFolder().getFilesByName(PRIVATE_DASHBOARD_FILE);
-  if (!files.hasNext()) throw new Error('私有戰情快照不存在');
-  const file = files.next();
+  const file = privateDashboardLatestSnapshotFile_();
+  if (!file) throw new Error('私有戰情快照不存在');
   const snapshot = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
   const owner = file.getOwner();
@@ -3986,9 +3995,8 @@ function privateDashboardPublishKpiComponent(payload) {
   const kpicalc = JSON.parse(kpiFile.getBlob().getDataAsString('UTF-8'));
   const identity = privateDashboardValidateKpiComponent_(incomingKpi, kpicalc);
   const folder = privateDashboardFolder();
-  const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
-  if (!files.hasNext()) throw new Error('既有私有戰情快照不存在');
-  const file = files.next();
+  const file = privateDashboardLatestSnapshotFile_();
+  if (!file) throw new Error('既有私有戰情快照不存在');
   const currentText = file.getBlob().getDataAsString('UTF-8');
   const current = JSON.parse(currentText);
   if (!current || !current.kpiBattle || !current.awardsBattle) throw new Error('既有私有戰情快照格式不完整');
@@ -4091,10 +4099,8 @@ function privateDashboardPublishAwardsComponent(payload) {
   if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('awards component 缺少或過大');
   const decoded = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
   const incomingAwards = JSON.parse(decoded);
-  const folder = privateDashboardFolder();
-  const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
-  if (!files.hasNext()) throw new Error('既有私有戰情快照不存在');
-  const file = files.next();
+  const file = privateDashboardLatestSnapshotFile_();
+  if (!file) throw new Error('既有私有戰情快照不存在');
   const currentText = file.getBlob().getDataAsString('UTF-8');
   const current = JSON.parse(currentText);
   if (!current || !current.kpiBattle || !current.awardsBattle) throw new Error('既有私有戰情快照格式不完整');
@@ -4146,10 +4152,8 @@ function privateDashboardPublish(payload) {
   snapshot.publishedAt = publishedAt;
   const text = JSON.stringify(snapshot);
   const folder = privateDashboardFolder();
-  const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
-  let file;
-  if (files.hasNext()) {
-    file = files.next();
+  let file = privateDashboardLatestSnapshotFile_();
+  if (file) {
     file.setContent(text);
   } else {
     file = folder.createFile(Utilities.newBlob(text, 'application/json', PRIVATE_DASHBOARD_FILE));

@@ -473,15 +473,18 @@
     const aggregate = aligned && supplement.aggregate || {};
     const aggregateRates = data && data.aggregateRates || {};
     const fullRegion = kpicalcMetricItems(data, Object.fromEntries(Object.keys(aggregateRates).map(key=>[key,{reportRate:aggregateRates[key]}])));
+    // The protected kpicalc carries the official region total for the current
+    // source file. Keep rankings and DOD gated by the matching supplement.
+    const officialRegionKpi = numberOrNull(data && data.meta && data.meta.aggregateOfficialCorrected);
     const summaryData = {
-      kpi:numberOrNull(aggregate.overall_kpi), companyRank:numberOrNull(aggregate.company_rank), companyRankTotal:numberOrNull(supplement.company_rank_total),
+      kpi:officialRegionKpi != null ? officialRegionKpi : numberOrNull(aggregate.overall_kpi), companyRank:numberOrNull(aggregate.company_rank), companyRankTotal:numberOrNull(supplement.company_rank_total),
       kpiDod:numberOrNull(aggregate.overall_kpi_dod), rankChange:numberOrNull(aggregate.company_rank_dod), addonScore:numberOrNull(aggregate.addon_score),
-      reportDate:aligned ? String(supplement.report_date || '') : '', fullKpis:fullRegion
+      reportDate:kpiDataAsOfDate(data), fullKpis:fullRegion
     };
     const completeMetrics = fullRegion.length === 25 && fullRegion.every(metric=>metric.rate != null) && storeRows.length === 9 && storeRows.every(row=>row.fullKpis.length === 25);
     const base = { updatedAt:readAt, sourceUpdatedAt, stale:sourceUpdatedAt ? stale(sourceUpdatedAt) : false, source };
     const summaryStatus = summaryData.kpi != null && summaryData.companyRank != null ? (completeMetrics?'ok':'partial') : 'partial';
-    const note = aligned ? (completeMetrics?'':'正式 kpicalc 未完整提供 9 店 × 25 項 rate') : 'kpicalc 與摘要日期／來源檔不一致，排名與 DOD 已 fail-closed';
+    const note = aligned ? (completeMetrics?'':'正式 kpicalc 未完整提供 9 店 × 25 項 rate') : `正式 KPI 截至 ${kpiDataAsOfDate(data)||'未知日期'}；排名與 DOD 快照未同步，已暫停顯示`;
     return {
       summary:C.moduleState({ ...base, status:summaryStatus, data:summaryData, note }),
       stores:C.moduleState({ ...base, status:completeMetrics?'ok':(storeRows.length?'partial':'no_data'), data:storeRows, note }),
@@ -1061,7 +1064,7 @@
       return;
     }
     const data = contract.kpiSummary.data || {};
-    dom('#kpiHero').innerHTML = `${staleBanner(contract.kpiSummary)}<div class="kpi-stat"><span>KPI</span><strong class="cyan-value">${fmtPct(data.kpi)}</strong><div class="mini-progress"><i style="width:${Math.min(100,Math.max(0,Number(data.kpi||0)*100))}%"></i></div></div>
+    dom('#kpiHero').innerHTML = `${staleBanner(contract.kpiSummary)}${contract.kpiSummary.note ? `<p class="stale-note">${escapeHtml(contract.kpiSummary.note)}</p>` : ''}<div class="kpi-stat"><span>KPI</span><strong class="cyan-value">${fmtPct(data.kpi)}</strong><div class="mini-progress"><i style="width:${Math.min(100,Math.max(0,Number(data.kpi||0)*100))}%"></i></div></div>
       <div class="kpi-stat"><span>公司排名</span><strong class="gold-value">${data.companyRank == null?'—':escapeHtml(data.companyRank)}</strong><small>/ ${data.companyRankTotal || '—'}</small></div>
       <div class="kpi-stat"><span>KPI DOD</span><strong class="${valueClass(data.kpiDod)}">${fmtSignedPct(data.kpiDod)}</strong></div>
       <div class="kpi-stat"><span>排名變動</span><strong class="${valueClass(data.rankChange)}">${fmtSigned(data.rankChange)}</strong></div>
@@ -1245,7 +1248,7 @@
     const selected = select.value || STORES[0];
     if (battleKind === 'kpi' && battleScope === 'region') {
       const k = contract.kpiSummary.data||{};
-      content.innerHTML = `<div class="metric-card-grid">${[
+      content.innerHTML = `${contract.kpiSummary.note ? `<p class="stale-note">${escapeHtml(contract.kpiSummary.note)}</p>` : ''}<div class="metric-card-grid">${[
         ['KPI 達成率',fmtPct(k.kpi),'cyan-value'],['公司排名',k.companyRank??'—','gold-value'],['KPI DOD',fmtSignedPct(k.kpiDod),valueClass(k.kpiDod)],['排名變化',fmtSigned(k.rankChange),valueClass(k.rankChange)],['加減分',fmtNumber(k.addonScore),'gold-value'],['九店比較',`${stores.filter(row=>row.kpi>=1).length}/9 達標`,'']
       ].map(([label,value,cls])=>`<article class="metric-card"><span>${label}</span><strong class="${cls}">${value}</strong><small>更新 ${formatTime(contract.kpiSummary.sourceUpdatedAt)}</small></article>`).join('')}</div><div class="battle-list"><div class="battle-list-row header"><span>店點</span><span>KPI</span><span>排名</span><span>DOD</span><span>加減分</span></div>${stores.slice().sort((a,b)=>(b.kpi??-1)-(a.kpi??-1)).map(row=>`<div class="battle-list-row"><span>${escapeHtml(row.name)}</span><span>${fmtPct(row.kpi)}</span><span>${row.rank??'—'}</span><span class="${valueClass(row.kpiDod)}">${fmtSignedPct(row.kpiDod)}</span><span>${fmtNumber(row.addon)}</span></div>`).join('')}</div>${renderFullKpis(k.fullKpis,'北一二B')}<a class="source-button" href="index.html">開啟正式 KPI 網站 <i data-lucide="external-link"></i></a>`;
     } else if (battleKind === 'kpi') {

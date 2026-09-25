@@ -87,11 +87,15 @@ test('KPI supplement mismatch fails closed instead of mixing rank and DOD', () =
   const A = loadAdapters();
   const snapshot = snapshotFixture();
   snapshot.kpiBattle.source_file = 'wrong.xlsx';
-  const result = A.adaptKpi(kpiFixture(), snapshot, '2026-08-10T01:02:00+08:00');
+  const data = kpiFixture();
+  data.meta.aggregateOfficialCorrected = 1.0813;
+  const result = A.adaptKpi(data, snapshot, '2026-08-10T01:02:00+08:00');
   assert.equal(result.summary.status, 'partial');
+  assert.equal(result.summary.data.kpi, 1.0813);
   assert.equal(result.summary.data.companyRank, null);
-  assert.equal(result.summary.data.reportDate, '');
-  assert.match(result.summary.note, /fail-closed/);
+  assert.equal(result.summary.data.kpiDod, null);
+  assert.equal(result.summary.data.reportDate, '2026-08-09');
+  assert.match(result.summary.note, /排名與 DOD 快照未同步/);
 });
 
 test('mixed freshness：App KPI aligned 完整顯示，舊 awards 維持 no_data', () => {
