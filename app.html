@@ -59,10 +59,11 @@
 
       <section data-view="battle" hidden aria-label="戰情">
         <div class="view-heading"><div><p>READ-ONLY SUMMARY</p><h1>戰情</h1></div><a class="icon-button" href="index.html" aria-label="開啟正式戰情網站"><i data-lucide="external-link"></i></a></div>
-        <div class="segment-control battle-kind-control" role="tablist" aria-label="戰情類型"><button class="active" data-battle-kind="kpi" type="button">KPI</button><button data-battle-kind="award" type="button">台獎</button><button data-battle-kind="personal" type="button">個績</button></div>
+        <div class="segment-control battle-kind-control" role="tablist" aria-label="戰情類型"><button class="active" data-battle-kind="kpi" type="button">KPI</button><button data-battle-kind="award" type="button">台獎</button><button data-battle-kind="personal" type="button">個績</button><button data-battle-kind="stock" type="button">庫存</button></div>
         <div class="scope-control" role="tablist" aria-label="戰情範圍"><button class="active" data-battle-scope="region" type="button">北一二B</button><button data-battle-scope="store" type="button">店點</button><button data-battle-scope="bonus" type="button" hidden>同仁獎金</button></div>
         <label id="battleStorePicker" class="select-field" hidden><span>選擇店點</span><select id="battleStoreSelect"></select></label>
         <div id="battleContent"></div>
+        <section id="stockPanel" class="panel stock-panel" hidden aria-label="手機庫存"><div class="panel-head"><div><h2>手機庫存</h2><small id="stockMeta">尚未匯入</small></div><strong id="stockTotal">—</strong></div><button id="stockRefresh" type="button">更新</button><div class="stock-filters"><label>機款搜尋<input id="stockModel" type="search" placeholder="機款／容量／顏色"></label><label>店點<select id="stockStore"><option value="">九店全部</option><option value="台北酒泉">酒泉</option><option value="台北永吉">永吉</option><option value="台北復興南">復興南</option><option value="台北杭州南">杭州南</option><option value="台北萬大">萬大</option><option value="台北通化">通化</option><option value="台北大稻埕">大稻埕</option><option value="台北三創">三創</option><option value="台北六張犁">六張犁</option></select></label></div><div id="stockResults"></div><label class="stock-import">也可從此裝置匯入庫存檔<input id="stockFile" type="file" accept=".xlsx,.xls,.csv,.tsv"></label><p id="stockImportMessage" class="form-message">電腦發布庫存後，開啟此頁會讀取最新快照。</p></section>
       </section>
 
       <section data-view="report" hidden aria-label="回報">
@@ -159,14 +160,15 @@
     </nav>
   </div>
   <script src="app-assets/lucide.min.js"></script>
+  <script src="assets/vendor/xlsx.full.min.js"></script>
+  <script src="phone-stock-core.js?v=app-stock-20260925"></script>
   <script src="app-data-contract.js?v=emergency-rollback-20260813-1"></script>
   <script src="app-preview-data.js?v=emergency-rollback-20260813-1"></script>
   <script src="patrol-read-model.js?v=13"></script>
   <script src="patrol-question-versions.js?v=app-na-v-20260903-1"></script>
   <script src="half-month-check-read-model.js?v=app-sep25-20260903-2"></script>
   <script src="yesterday-follow-up-model.js?v=yesterday-follow-up-phase2-20260814-1"></script>
-  <script src="app.js?v=patrol-isolated-recovery-20260916" defer></script>
+  <script src="app.js?v=app-stock-20260925" defer></script>
+  <script src="phone-stock-app.js?v=sync-20260925" defer></script>
 </body>
 </html>
-
-

@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f3f7fa">
 <meta name="robots" content="noindex,nofollow">
 <title>手機銷售與庫存 · 北一二B</title>
-<link rel="stylesheet" href="phone-stock-dashboard.css?v=20260924-n12b">
+<link rel="stylesheet" href="phone-stock-dashboard.css?v=20260925-sync">
 <style>
   .model-filters{display:flex;align-items:end;justify-content:flex-end;flex-wrap:wrap;gap:8px}.model-filters .filter-label{min-width:156px}.model-filters .filter-label input{min-height:42px;border:1px solid #b8c8d3;border-radius:10px;padding:8px 10px;color:#102d43;background:#fff;font-weight:800}.model-filters .compact-filter{min-width:104px}.filter-reset{min-height:42px;padding:8px 12px;background:#eaf1f5;color:#385166;font-size:13px}.filter-summary{margin:12px 0 -5px;color:#526c7f;font-size:13px}@media(max-width:680px){.model-filters{justify-content:stretch}.model-filters .filter-label,.model-filters .compact-filter{min-width:calc(50% - 4px)}.filter-reset{width:100%}}
 </style>
@@ -25,7 +25,7 @@
       <p class="eyebrow">PHONE STOCK PULSE</p>
       <h1>手機銷售與庫存</h1>
       <p>一次選擇銷售與庫存兩份檔案，完整呈現銷售報表中的日期、九店、各機型銷售數、庫存數與去化率。</p>
-      <p class="privacy-note">檔案只在目前瀏覽器解析；不會上傳、不會寫回公司原始資料，也不會保留原始檔。</p>
+      <p class="privacy-note">檔案在目前瀏覽器解析；按「同步庫存到 APP」後，僅將九店機款與庫存數發布到私有資料服務，不包含銷售數或原始檔。</p>
     </section>
 
     <section class="panel" aria-labelledby="uploadTitle">
@@ -60,6 +60,8 @@
       </div>
       <div id="salesMessage" class="message" role="status" aria-live="polite"></div>
       <div id="stockMessage" class="message" role="status" aria-live="polite"></div>
+      <div class="stock-sync-actions"><label>督導員編<input id="stockEmployeeId" autocomplete="username" placeholder="已核准裝置的員編"></label><button id="publishStock" type="button" disabled>同步庫存到 APP</button></div>
+      <p id="stockSyncMessage" class="message" role="status" aria-live="polite">先上傳庫存檔；此電腦需完成正式裝置核准。</p>
       <div id="importPreview" class="import-preview" hidden>
         <div class="preview-metrics">
           <div><strong id="salesRows">0</strong><span>銷售資料列</span></div>
@@ -110,6 +112,6 @@
     </section>
   </main>
   <footer>去化率公式：銷售加總 ÷（銷售加總＋目前庫存）。分母為 0 時顯示「—」。</footer>
-  <script src="phone-stock-dashboard.js?v=20260924-n12b"></script>
+  <script src="phone-stock-dashboard.js?v=20260925-sync"></script>
 </body>
 </html>

@@ -2860,6 +2860,8 @@ function doPost(e) {
     else if (action === 'private_request') result = privateDashboardRequestBinding(payload);
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
     else if (action === 'private_access') result = privateDashboardAccess(payload);
+    else if (action === 'phone_stock_publish') result = phoneStockPublish(payload);
+    else if (action === 'phone_stock_read') result = phoneStockRead(payload);
     else if (action === 'private_admin_requests') result = privateDashboardAdminRequests(payload);
     else if (action === 'private_admin_approve') result = privateDashboardAdminApprove(payload);
     else if (action === 'private_admin_revoke') result = privateDashboardAdminRevoke(payload);
@@ -3087,6 +3089,64 @@ function privateDashboardAccess(payload) {
   privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
   const snapshot = privateDashboardSnapshot();
   return { snapshot: snapshot, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role } };
+}
+
+const PHONE_STOCK_FILE = 'north12b-phone-stock-latest.json';
+const PHONE_STOCK_LATEST_ID = 'PHONE_STOCK_LATEST_FILE_ID';
+const PHONE_STOCK_STORES = ['台北酒泉','台北永吉','台北復興南','台北萬大','台北通化','台北杭州南','台北大稻埕','台北三創','台北六張犁'];
+
+function phoneStockAuthorize_(payload) {
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
+  const user = privateDashboardUserByEmployeeId(employeeId).user;
+  // Inventory is restricted to the supervisor's explicitly approved device.
+  // Trusted employee bypass in private_access does not apply here.
+  if (!privateDashboardIsTrustedEmployee(employeeId) || !user || user.status !== 'active' || user.device_id !== deviceId) {
+    throw new Error('此裝置尚未核准手機庫存存取');
+  }
+  return employeeId;
+}
+
+function phoneStockRead(payload) {
+  phoneStockAuthorize_(payload || {});
+  const id = String(privateDashboardProperties().getProperty(PHONE_STOCK_LATEST_ID) || '');
+  if (!id) return { snapshot:null };
+  const snapshot = JSON.parse(DriveApp.getFileById(id).getBlob().getDataAsString('UTF-8'));
+  if (!snapshot || snapshot.version !== 1 || !Array.isArray(snapshot.rows)) throw new Error('庫存快照格式不正確');
+  return { snapshot:snapshot };
+}
+
+function phoneStockPublish(payload) {
+  const body = payload || {};
+  const employeeId = phoneStockAuthorize_(body);
+  const rows = body.rows;
+  if (!Array.isArray(rows) || rows.length < 1 || rows.length > 10000) throw new Error('庫存資料筆數不正確');
+  const date = String(body.date || '');
+  if (!/^20\d{2}-\d{2}-\d{2}$/.test(date)) throw new Error('請指定庫存快照日期');
+  const normalized = [];
+  rows.forEach(function(row) {
+    const store = String(row && row.store || '');
+    const model = String(row && row.model || '').trim();
+    const quantity = Number(row && row.quantity);
+    if (PHONE_STOCK_STORES.indexOf(store) < 0 || !model || model.length > 180 || !Number.isSafeInteger(quantity) || quantity < 0 || quantity > 100000) {
+      throw new Error('庫存資料含有不正確的店點、機款或數量');
+    }
+    normalized.push({store:store,model:model,quantity:quantity});
+  });
+  const snapshot = {version:1,date:date,importedAt:new Date().toISOString(),rows:normalized};
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const folder = privateDashboardFolder();
+    const file = folder.createFile(PHONE_STOCK_FILE, JSON.stringify(snapshot), MimeType.PLAIN_TEXT);
+    const props = privateDashboardProperties();
+    const previous = String(props.getProperty(PHONE_STOCK_LATEST_ID) || '');
+    props.setProperty(PHONE_STOCK_LATEST_ID, file.getId());
+    if (previous && previous !== file.getId()) {
+      try { DriveApp.getFileById(previous).setTrashed(true); } catch (error) { console.log('old phone stock snapshot cleanup failed: ' + error); }
+    }
+  } finally { lock.releaseLock(); }
+  return { publishedAt:snapshot.importedAt,date:date,rowCount:normalized.length,updatedBy:employeeId };
 }
 
 function privateDashboardAdminRequests(payload) {
