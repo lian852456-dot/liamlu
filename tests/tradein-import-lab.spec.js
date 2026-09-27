@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const path = require('node:path');
+const XLSX = require('../assets/vendor/xlsx.full.min.js');
 
 const PAGE_URL = 'file://' + path.resolve(__dirname, '../tradein-import-lab.html');
 
@@ -94,4 +95,55 @@ test('去識別化驗收報告可複製，剪貼簿失敗時保留可手動複�
   expect(downloaded).toContain('"privacyBoundary"');
   expect(downloaded).not.toContain('PRIVATE-MODEL');
   await expect(analysis.getByText(/已下載去識別化驗收報告 JSON/)).toBeVisible();
+});
+
+test('3C 候選查詢不以顏色為條件、要求選擇方案，且 BLOCKED 時發布控制停用', async ({ page }) => {
+  await page.goto(PAGE_URL);
+  await page.setInputFiles('#shoppingFile', {
+    name:'candidate-shopping.csv',
+    mimeType:'text/csv',
+    buffer:Buffer.from([
+      '廠牌,代碼,機型,單機價,999H,1599H',
+      'Apple,A-128-B,iPhone 18 Pro 128G(黑),39900,12000,9000',
+      'Apple,A-128-W,iPhone 18 Pro 128G(白),39900,12000,9000',
+      'Apple,A-MISSING,iPhone 18 Pro 256G(黑),,'
+    ].join('\n'))
+  });
+  const preview = page.locator('.shopping-candidate');
+  await expect(preview.getByText('門市查詢候選預覽（未發布）')).toBeVisible();
+  await expect(preview).toContainText('整批驗收未通過，正式發布已停用。');
+  await expect(preview.locator('[data-candidate-publish="shopping"]')).toBeDisabled();
+  await preview.getByLabel('搜尋手機專案價候選資料').fill('128G');
+  await preview.locator('#shoppingCandidatePlan').selectOption('999H');
+  const results = preview.locator('.candidate-results');
+  await expect(results).toContainText('iPhone 18 Pro 128G');
+  await expect(results).toContainText('12000');
+  await expect(results).toContainText('已合併 2 個色別');
+  await expect(results).not.toContainText('黑');
+  await expect(results).not.toContainText('白');
+});
+
+test('舊換新候選同表比較兩家回收商，缺少等級明示來源未提供', async ({ page }) => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['', '', '點子行動舊機回收報價', '', '', 'FutureDial(FDI)舊機回收報價'],
+    ['品牌', '機款'],
+    ['', '', '報價(A等級)', '報價(B等級)', '報價(C等級)', '報價(S等級)', '報價(A等級)', '報價(B等級)', '報價(C等級)'],
+    ['APPLE', 'iPhone 18 Pro 256G', '24000', '21000', '18000', '26000', '23000', '20000', '17000']
+  ]), '比較表');
+  await page.goto(PAGE_URL);
+  await page.setInputFiles('#tradeinFile', {
+    name:'candidate-tradein.xlsx',
+    mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer:Buffer.from(XLSX.write(workbook, { type:'buffer', bookType:'xlsx' }))
+  });
+  const preview = page.locator('.tradein-candidate');
+  await expect(preview.getByText('舊換新比較候選預覽（未發布）')).toBeVisible();
+  await preview.getByLabel('搜尋舊換新候選資料').fill('256G');
+  const results = preview.locator('.candidate-results');
+  await expect(results).toContainText('點子行動 S');
+  await expect(results).toContainText('FutureDial（FDI） S');
+  await expect(results).toContainText('來源未提供');
+  await expect(results).toContainText('26000');
+  await expect(preview.locator('[data-candidate-publish="tradein"]')).toBeDisabled();
 });

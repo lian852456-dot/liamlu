@@ -226,6 +226,72 @@ test('舊換新去識別化驗收報告列出合併儲存格與回收商彙總�
   assert.doesNotMatch(serialised, /private-tradein|PRIVATE-TRADEIN-MODEL|S-SECRET|PRIVATE-PRODUCT-S|23456/);
 });
 
+test('3C 候選查詢只合併同來源同容量的色別，並且要求選擇完整方案', async () => {
+  const csv = [
+    '廠牌,代碼,機型,單機價,999H,1599H',
+    'Apple,A-128-B,iPhone 18 Pro 128G(黑),39900,12000,9000',
+    'Apple,A-128-W,iPhone 18 Pro 128G(白),39900,12000,9000',
+    'Apple,A-256-B,iPhone 18 Pro 256G(黑),42900,15000,11000'
+  ].join('\n');
+  const result = await Core.parseFile(localFile('candidate-colors.csv', csv), XLSX, 'shopping');
+  const candidate = Core.buildShoppingCandidate(result);
+  assert.equal(candidate.metadata.acceptanceStatus, 'PASS');
+  assert.match(candidate.metadata.version, /^local-candidate-[a-f0-9]{12}$/);
+  assert.equal(candidate.rows.length, 2);
+  assert.equal(candidate.rows.find(row => row.model.includes('128G')).colorVariantCount, 2);
+  assert.equal(Core.filterShoppingCandidate(candidate, { query:'128G' }).length, 1);
+  const exactPlan = Core.filterShoppingCandidate(candidate, { query:'128G', plan:'999H' });
+  assert.equal(exactPlan.length, 1);
+  assert.equal(exactPlan[0].selectedPlanPrice, '12000');
+  assert.equal(Core.filterShoppingCandidate(candidate, { query:'128G', plan:'1599H' })[0].selectedPlanPrice, '9000');
+  assert.equal(Core.filterShoppingCandidate(candidate, { query:'256G', plan:'999H' })[0].selectedPlanPrice, '15000');
+});
+
+test('色別去除後若價格矩陣不同，候選查詢會 fail-closed 排除該組', async () => {
+  const csv = [
+    '廠牌,代碼,機型,單機價,999H',
+    'Apple,A-B,iPhone 18 128G(黑),29900,9000',
+    'Apple,A-W,iPhone 18 128G(白),29900,9500'
+  ].join('\n');
+  const candidate = Core.buildShoppingCandidate(await Core.parseFile(localFile('candidate-conflict.csv', csv), XLSX, 'shopping'));
+  assert.equal(candidate.priceMatrixConflictCount, 1);
+  assert.equal(Core.filterShoppingCandidate(candidate, { plan:'999H' }).length, 0);
+});
+
+test('3C 整批 BLOCKED 時仍可預覽成功列，但候選發布契約必須停用', async () => {
+  const csv = [
+    '廠牌,代碼,機型,單機價,999H',
+    'Apple,A-OK,iPhone 18 128G(黑),29900,9000',
+    'Apple,A-MISSING,iPhone 18 256G(黑),,'
+  ].join('\n');
+  const candidate = Core.buildShoppingCandidate(await Core.parseFile(localFile('candidate-blocked.csv', csv), XLSX, 'shopping'));
+  assert.equal(candidate.metadata.acceptanceStatus, 'BLOCKED');
+  assert.equal(candidate.metadata.publication.disabled, true);
+  assert.equal(candidate.metadata.publication.status, 'BLOCKED');
+  assert.match(candidate.metadata.publication.reason, /驗收未通過/);
+  assert.equal(candidate.eligibleRowCount, 1);
+  assert.equal(Core.filterShoppingCandidate(candidate, { plan:'999H' }).length, 1);
+});
+
+test('舊換新候選比較兩家回收商與 S/A/B/C，缺少等級不補零', async () => {
+  const rows = [
+    ['', '', '點子行動舊機回收報價', '', '', 'FutureDial(FDI)舊機回收報價'],
+    ['品牌', '機款'],
+    ['', '', '報價(A等級)', '報價(B等級)', '報價(C等級)', '報價(S等級)', '報價(A等級)', '報價(B等級)', '報價(C等級)'],
+    ['APPLE', 'iPhone 18 Pro 256G', '24000', '21000', '18000', '26000', '23000', '20000', '17000']
+  ];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), '比較表');
+  const candidate = Core.buildTradeInCandidate(await Core.parseFile(localFile('candidate-tradein.xlsx', XLSX.write(workbook, { type:'buffer', bookType:'xlsx' })), XLSX, 'tradein'));
+  assert.equal(candidate.metadata.acceptanceStatus, 'PASS');
+  const matched = Core.filterTradeInCandidate(candidate, { query:'256G' });
+  assert.equal(matched.length, 1);
+  assert.equal(matched[0].quotes['點子行動'].S, null);
+  assert.equal(matched[0].quotes['點子行動'].A, '24000');
+  assert.equal(matched[0].quotes['FutureDial（FDI）'].S, '26000');
+  assert.equal(matched[0].quotes['FutureDial（FDI）'].C, '17000');
+});
+
 test('營運中心入口與測試頁都維持本機解析邊界', () => {
   const root = path.resolve(__dirname, '..');
   const home = fs.readFileSync(path.join(root, 'home.html'), 'utf8');
@@ -237,5 +303,8 @@ test('營運中心入口與測試頁都維持本機解析邊界', () => {
   assert.match(page, /id="tradeinFile"[^>]*type="file"/);
   assert.match(page + '\n' + client, /一鍵複製驗收報告/);
   assert.match(page + '\n' + client, /下載驗收報告 JSON/);
+  assert.match(page + '\n' + client, /門市查詢候選預覽/);
+  assert.match(page + '\n' + client, /正式發布（驗收未通過）/);
+  assert.match(page + '\n' + client, /來源未提供/);
   assert.doesNotMatch(page + '\n' + client, /localStorage|indexedDB|fetch\(|XMLHttpRequest|sendBeacon/);
 });

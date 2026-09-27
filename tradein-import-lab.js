@@ -187,6 +187,180 @@
     host.append(section);
   }
 
+  function makeSelect(label, id, values, emptyLabel) {
+    const field = element('label', 'candidate-filter');
+    field.append(element('span', '', label));
+    const select = document.createElement('select');
+    select.id = id;
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = emptyLabel;
+    select.append(empty);
+    values.forEach(value => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      select.append(option);
+    });
+    field.append(select);
+    return { field, select };
+  }
+
+  function candidateMeta(host, candidate) {
+    const metadata = candidate.metadata;
+    const grid = element('dl', 'candidate-meta');
+    [
+      ['候選版本', metadata.version],
+      ['來源檔日期', metadata.sourceDateLabel],
+      ['解析時間', metadata.parsedAt || '未提供'],
+      ['驗收狀態', metadata.acceptanceStatus]
+    ].forEach(pair => {
+      const item = document.createElement('div');
+      item.append(element('dt', '', pair[0]), element('dd', '', pair[1]));
+      grid.append(item);
+    });
+    host.append(grid);
+    const state = element('p', 'candidate-state ' + (metadata.acceptanceStatus === 'PASS' ? 'ok' : 'blocked'), metadata.publication.reason);
+    host.append(state);
+    const publish = element('button', 'candidate-publish', metadata.acceptanceStatus === 'PASS' ? '正式發布（本輪未啟用）' : '正式發布（驗收未通過）');
+    publish.type = 'button';
+    publish.disabled = true;
+    publish.dataset.candidatePublish = candidate.kind;
+    publish.setAttribute('aria-describedby', 'candidate-' + candidate.kind + '-publication-note');
+    state.id = 'candidate-' + candidate.kind + '-publication-note';
+    host.append(publish);
+    if (metadata.blockers.length || metadata.warnings.length) {
+      const notices = element('ul', 'candidate-notices');
+      metadata.blockers.forEach(message => notices.append(element('li', 'blocked', '阻擋：' + message)));
+      metadata.warnings.forEach(message => notices.append(element('li', 'warning', '警告：' + message)));
+      host.append(notices);
+    }
+  }
+
+  function candidateTable(host, headings, rows) {
+    const wrap = element('div', 'preview-wrap candidate-results');
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const heading = document.createElement('tr');
+    headings.forEach(value => heading.append(element('th', '', value)));
+    thead.append(heading);
+    const tbody = document.createElement('tbody');
+    table.append(thead, tbody);
+    wrap.append(table);
+    host.append(wrap);
+    return tbody;
+  }
+
+  function emptyCandidateRow(tbody, count, textContent) {
+    const tr = document.createElement('tr');
+    const cell = element('td', 'empty-cell', textContent);
+    cell.colSpan = count;
+    tr.append(cell);
+    tbody.append(tr);
+  }
+
+  function appendShoppingCandidatePreview(host, result) {
+    const candidate = Core.buildShoppingCandidate(result);
+    const section = element('section', 'candidate-preview shopping-candidate');
+    section.append(element('h4', 'preview-heading', '門市查詢候選預覽（未發布）'));
+    section.append(element('p', 'report-intro', '只使用驗收成功列。顏色不作查詢條件；容量、版本、來源工作表與專案方案仍各自保留，絕不跨方案合併價格。'));
+    candidateMeta(section, candidate);
+    if (candidate.priceMatrixConflictCount) section.append(element('p', 'candidate-state blocked', String(candidate.priceMatrixConflictCount) + ' 組去色後價格矩陣不一致，已從查詢候選排除。'));
+    const filters = element('div', 'candidate-filters');
+    const brand = makeSelect('品牌', 'shoppingCandidateBrand', candidate.brands, '全部品牌');
+    const sourceSheet = makeSelect('方案來源', 'shoppingCandidateSource', candidate.sourceSheets, '全部來源工作表');
+    const plan = makeSelect('資費／方案', 'shoppingCandidatePlan', candidate.plans, '請選擇完整方案');
+    const queryField = element('label', 'candidate-filter');
+    queryField.append(element('span', '', '機型／容量／版本'));
+    const query = document.createElement('input');
+    query.type = 'search';
+    query.id = 'shoppingCandidateQuery';
+    query.placeholder = '例如機型、容量或版本；不需輸入顏色';
+    query.setAttribute('aria-label', '搜尋手機專案價候選資料');
+    queryField.append(query);
+    filters.append(brand.field, queryField, sourceSheet.field, plan.field);
+    section.append(filters);
+    const count = element('p', 'preview-caption');
+    const tbody = candidateTable(section, ['方案來源', '品牌', '機型／容量／版本', '色別合併', '單機價', '已選方案', '方案價'], []);
+    function render() {
+      const matched = Core.filterShoppingCandidate(candidate, { brand:brand.select.value, sourceSheet:sourceSheet.select.value, plan:plan.select.value, query:query.value });
+      tbody.replaceChildren();
+      if (!matched.length) emptyCandidateRow(tbody, 7, '沒有符合的可查詢候選資料。');
+      else matched.slice(0, Core.NORMALIZED_PREVIEW_LIMIT || 50).forEach(row => {
+        const tr = document.createElement('tr');
+        tr.append(
+          element('td', '', row.sourceSheet || '未提供'),
+          element('td', '', row.brand),
+          element('td', '', row.model),
+          element('td', '', row.colorVariantCount > 1 ? '已合併 ' + String(row.colorVariantCount) + ' 個色別' : '不分色'),
+          element('td', '', row.retailPrice || '來源未提供'),
+          element('td', '', row.selectedPlan || '請選擇完整方案'),
+          element('td', '', row.selectedPlan ? (row.selectedPlanPrice || '來源未提供') : '未選方案，不顯示方案價')
+        );
+        tbody.append(tr);
+      });
+      count.textContent = '可查詢候選 ' + String(matched.length) + ' 組；只顯示同一來源工作表與已選完整方案的價格，前 ' + String(Math.min(matched.length, Core.NORMALIZED_PREVIEW_LIMIT || 50)) + ' 組。';
+    }
+    [brand.select, sourceSheet.select, plan.select].forEach(control => control.addEventListener('change', render));
+    query.addEventListener('input', render);
+    section.append(count);
+    render();
+    host.append(section);
+  }
+
+  function quoteCell(row, vendor, grade) {
+    if (row.quoteConflicts.includes(vendor + '／' + grade)) return '需確認（多筆不同報價）';
+    const value = row.quotes[vendor] && row.quotes[vendor][grade];
+    return value == null || value === '' ? '來源未提供' : value;
+  }
+
+  function appendTradeInCandidatePreview(host, result) {
+    const candidate = Core.buildTradeInCandidate(result);
+    const section = element('section', 'candidate-preview tradein-candidate');
+    section.append(element('h4', 'preview-heading', '舊換新比較候選預覽（未發布）'));
+    section.append(element('p', 'report-intro', '同一機型畫面並列兩家回收商的 S／A／B／C；來源缺少的回收商或等級一律標示「來源未提供」，不補零、不估價。'));
+    candidateMeta(section, candidate);
+    if (candidate.quoteConflictCount) section.append(element('p', 'candidate-state blocked', String(candidate.quoteConflictCount) + ' 組比較資料有同回收商／等級的不同報價，需先確認，未自動取值。'));
+    const filters = element('div', 'candidate-filters');
+    const brand = makeSelect('品牌', 'tradeinCandidateBrand', candidate.brands, '全部品牌');
+    const sourceSheet = makeSelect('來源工作表', 'tradeinCandidateSource', candidate.sourceSheets, '全部來源工作表');
+    const queryField = element('label', 'candidate-filter');
+    queryField.append(element('span', '', '機型／容量／版本'));
+    const query = document.createElement('input');
+    query.type = 'search';
+    query.id = 'tradeinCandidateQuery';
+    query.placeholder = '搜尋品牌或機型';
+    query.setAttribute('aria-label', '搜尋舊換新候選資料');
+    queryField.append(query);
+    filters.append(brand.field, queryField, sourceSheet.field);
+    section.append(filters);
+    const headings = ['來源', '品牌', '機型／容量／版本'].concat(candidate.providers.flatMap(vendor => Core.GRADE_ORDER.map(grade => vendor + ' ' + grade)));
+    const count = element('p', 'preview-caption');
+    const tbody = candidateTable(section, headings, []);
+    function render() {
+      const matched = Core.filterTradeInCandidate(candidate, { brand:brand.select.value, sourceSheet:sourceSheet.select.value, query:query.value });
+      tbody.replaceChildren();
+      if (!matched.length) emptyCandidateRow(tbody, headings.length, '沒有符合的舊換新候選資料。');
+      else matched.slice(0, Core.NORMALIZED_PREVIEW_LIMIT || 50).forEach(row => {
+        const tr = document.createElement('tr');
+        tr.append(element('td', '', row.sourceSheet || '未提供'), element('td', '', row.brand || '未提供'), element('td', '', row.model));
+        candidate.providers.forEach(vendor => Core.GRADE_ORDER.forEach(grade => tr.append(element('td', '', quoteCell(row, vendor, grade)))));
+        tbody.append(tr);
+      });
+      count.textContent = '符合 ' + String(matched.length) + ' 組，顯示前 ' + String(Math.min(matched.length, Core.NORMALIZED_PREVIEW_LIMIT || 50)) + ' 組。';
+    }
+    [brand.select, sourceSheet.select].forEach(control => control.addEventListener('change', render));
+    query.addEventListener('input', render);
+    section.append(count);
+    render();
+    host.append(section);
+  }
+
+  function appendCandidatePreview(host, kind, result) {
+    if (kind === 'tradein') appendTradeInCandidatePreview(host, result);
+    else appendShoppingCandidatePreview(host, result);
+  }
+
   function appendSheetSummaries(host, result) {
     if (!result.sheetSummaries || !result.sheetSummaries.length) return;
     host.append(element('h4', 'preview-heading', '工作表驗收明細'));
@@ -319,6 +493,7 @@
     if (result.unknownFields.length) appendFieldGroup(host, '原始保留欄位（尚未標準化）', result.unknownFields, 'warning');
     appendAcceptanceSummary(host, kind, result);
     appendAcceptanceReport(host, kind, result);
+    appendCandidatePreview(host, kind, result);
     appendSheetSummaries(host, result);
     appendMapping(host, result);
     appendQuality(host, result);

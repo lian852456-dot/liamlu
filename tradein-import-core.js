@@ -10,7 +10,7 @@
   const PREVIEW_LIMIT = 5;
   const NORMALIZED_PREVIEW_LIMIT = 50;
   const GRADE_ORDER = Object.freeze(['S', 'A', 'B', 'C']);
-  const PARSER_VERSION = '2026.09.27-acceptance-1';
+  const PARSER_VERSION = '2026.09.27-candidate-preview-2';
   const HEADER_ALIASES = Object.freeze([
     { key:'brand', label:'品牌', aliases:['品牌', '廠牌', '品牌名稱', 'brand', 'brand name'] },
     { key:'code', label:'商品代碼／料號', aliases:['代碼', '商品代碼', '產品代碼', 'code', 'item code'] },
@@ -888,6 +888,173 @@
     return base;
   }
 
+  function candidateVersion(result) {
+    const hash = text(result && result.fileSha256);
+    return hash && hash !== 'unavailable' ? 'local-candidate-' + hash.slice(0, 12) : 'local-candidate-unhashed';
+  }
+
+  function candidateSourceDates(rows) {
+    return Array.from(new Set((rows || []).map(row => text(row.date)).filter(Boolean))).sort();
+  }
+
+  function candidateMetadata(kind, result) {
+    const report = buildAcceptanceReport(kind, result);
+    const sourceDates = candidateSourceDates(result && result.standardized && result.standardized.rows);
+    const passed = report.acceptance.passed;
+    return {
+      version:candidateVersion(result),
+      sourceDates,
+      sourceDateLabel:sourceDates.length === 1 ? sourceDates[0] : (sourceDates.length ? '多個來源日期' : '來源檔未提供日期'),
+      parsedAt:text(result && result.parsedAt),
+      acceptanceStatus:report.acceptance.status,
+      blockers:report.acceptance.blockers.slice(),
+      warnings:report.acceptance.warnings.slice(),
+      publication:{
+        disabled:true,
+        status:passed ? 'PREVIEW_ONLY' : 'BLOCKED',
+        reason:passed ? '本輪沒有正式發布端點；候選資料只供查詢驗證。' : '整批驗收未通過，正式發布已停用。'
+      }
+    };
+  }
+
+  function priceMatrixSignature(row) {
+    const projectPrices = row && row.projectPrices || {};
+    return JSON.stringify({
+      retailPrice:text(row && row.retailPrice),
+      projectPrices:Object.keys(projectPrices).sort().map(key => [key, text(projectPrices[key])])
+    });
+  }
+
+  function sortedObject(values) {
+    return Object.fromEntries(Object.keys(values || {}).sort((left, right) => left.localeCompare(right, 'zh-Hant')).map(key => [key, values[key]]));
+  }
+
+  function buildShoppingCandidate(result) {
+    const rows = result && result.standardized && result.standardized.rows || [];
+    const groups = new Map();
+    rows.filter(row => row.status === 'success' && row.brand && row.colorlessModel).forEach(row => {
+      const key = [row.sourceSheet, row.brand, row.colorlessModel].join('\u0001');
+      const entry = groups.get(key) || {
+        sourceSheet:row.sourceSheet,
+        brand:row.brand,
+        model:row.colorlessModel,
+        variants:new Set(),
+        matrices:new Map()
+      };
+      entry.variants.add(text(row.model));
+      const signature = priceMatrixSignature(row);
+      if (!entry.matrices.has(signature)) {
+        entry.matrices.set(signature, {
+          retailPrice:text(row.retailPrice),
+          projectPrices:sortedObject(row.projectPrices || {})
+        });
+      }
+      groups.set(key, entry);
+    });
+    const candidateRows = Array.from(groups.values()).map(entry => {
+      const matrices = Array.from(entry.matrices.values());
+      const conflict = matrices.length > 1;
+      const matrix = conflict ? null : (matrices[0] || { retailPrice:'', projectPrices:{} });
+      return {
+        sourceSheet:entry.sourceSheet,
+        brand:entry.brand,
+        model:entry.model,
+        colorVariantCount:entry.variants.size,
+        priceMatrixConflict:conflict,
+        retailPrice:matrix ? matrix.retailPrice : '',
+        projectPrices:matrix ? matrix.projectPrices : {}
+      };
+    }).sort((left, right) => left.brand.localeCompare(right.brand, 'zh-Hant') || left.model.localeCompare(right.model, 'zh-Hant') || left.sourceSheet.localeCompare(right.sourceSheet, 'zh-Hant'));
+    const usableRows = candidateRows.filter(row => !row.priceMatrixConflict);
+    const plans = Array.from(new Set(usableRows.flatMap(row => Object.keys(row.projectPrices)))).sort((left, right) => left.localeCompare(right, 'zh-Hant'));
+    return {
+      kind:'shopping',
+      metadata:candidateMetadata('shopping', result),
+      rows:candidateRows,
+      brands:Array.from(new Set(candidateRows.map(row => row.brand))).sort((left, right) => left.localeCompare(right, 'zh-Hant')),
+      sourceSheets:Array.from(new Set(candidateRows.map(row => row.sourceSheet))).sort((left, right) => left.localeCompare(right, 'zh-Hant')),
+      plans,
+      priceMatrixConflictCount:candidateRows.filter(row => row.priceMatrixConflict).length,
+      eligibleRowCount:rows.filter(row => row.status === 'success').length
+    };
+  }
+
+  function candidateSearchText(row) {
+    return [row.brand, row.model, row.sourceSheet].map(value => text(value).toLocaleLowerCase('zh-Hant')).join('\u0001');
+  }
+
+  function filterShoppingCandidate(candidate, filters) {
+    const criteria = filters || {};
+    const query = text(criteria.query).toLocaleLowerCase('zh-Hant');
+    const brand = text(criteria.brand);
+    const sourceSheet = text(criteria.sourceSheet);
+    const plan = text(criteria.plan);
+    return (candidate && candidate.rows || []).filter(row =>
+      !row.priceMatrixConflict &&
+      (!brand || row.brand === brand) &&
+      (!sourceSheet || row.sourceSheet === sourceSheet) &&
+      (!query || candidateSearchText(row).includes(query)) &&
+      (!plan || Object.prototype.hasOwnProperty.call(row.projectPrices, plan))
+    ).map(row => Object.assign({}, row, {
+      selectedPlan:plan,
+      selectedPlanPrice:plan ? text(row.projectPrices[plan]) : ''
+    }));
+  }
+
+  function emptyQuotes() {
+    return Object.fromEntries(['點子行動', 'FutureDial（FDI）'].map(vendor => [vendor, Object.fromEntries(GRADE_ORDER.map(grade => [grade, null]))]));
+  }
+
+  function buildTradeInCandidate(result) {
+    const rows = result && result.standardized && result.standardized.rows || [];
+    const groups = new Map();
+    rows.filter(row => row.status === 'success' && (row.sourceModel || row.model)).forEach(row => {
+      const model = row.colorlessModel || row.sourceModel || row.model;
+      const key = [row.sourceSheet, row.brand, model].join('\u0001');
+      const entry = groups.get(key) || { sourceSheet:row.sourceSheet, brand:row.brand, model, quotes:emptyQuotes(), quoteConflicts:[] };
+      if (entry.quotes[row.vendor] && GRADE_ORDER.includes(row.grade)) {
+        const current = entry.quotes[row.vendor][row.grade];
+        const quote = text(row.tradeInPrice);
+        if (current != null && current !== quote) entry.quoteConflicts.push(row.vendor + '／' + row.grade);
+        else entry.quotes[row.vendor][row.grade] = quote;
+      }
+      groups.set(key, entry);
+    });
+    const candidateRows = Array.from(groups.values()).map(entry => ({
+      sourceSheet:entry.sourceSheet,
+      brand:entry.brand,
+      model:entry.model,
+      quotes:entry.quotes,
+      quoteConflicts:Array.from(new Set(entry.quoteConflicts)).sort()
+    })).sort((left, right) => left.brand.localeCompare(right.brand, 'zh-Hant') || left.model.localeCompare(right.model, 'zh-Hant') || left.sourceSheet.localeCompare(right.sourceSheet, 'zh-Hant'));
+    return {
+      kind:'tradein',
+      metadata:candidateMetadata('tradein', result),
+      rows:candidateRows,
+      brands:Array.from(new Set(candidateRows.map(row => row.brand).filter(Boolean))).sort((left, right) => left.localeCompare(right, 'zh-Hant')),
+      sourceSheets:Array.from(new Set(candidateRows.map(row => row.sourceSheet))).sort((left, right) => left.localeCompare(right, 'zh-Hant')),
+      providers:['點子行動', 'FutureDial（FDI）'],
+      eligibleRowCount:rows.filter(row => row.status === 'success').length,
+      quoteConflictCount:candidateRows.filter(row => row.quoteConflicts.length).length
+    };
+  }
+
+  function filterTradeInCandidate(candidate, filters) {
+    const criteria = filters || {};
+    const query = text(criteria.query).toLocaleLowerCase('zh-Hant');
+    const brand = text(criteria.brand);
+    const sourceSheet = text(criteria.sourceSheet);
+    return (candidate && candidate.rows || []).filter(row =>
+      (!brand || row.brand === brand) &&
+      (!sourceSheet || row.sourceSheet === sourceSheet) &&
+      (!query || candidateSearchText(row).includes(query))
+    );
+  }
+
+  function buildPrepublishCandidate(kind, result) {
+    return kind === 'tradein' ? buildTradeInCandidate(result) : buildShoppingCandidate(result);
+  }
+
   async function parseFile(file, XLSX, kind) {
     if (!XLSX || typeof XLSX.read !== 'function') throw new Error('本機 SheetJS 解析器未載入，請重新整理後再試。');
     const extension = extensionOf(file);
@@ -919,6 +1086,7 @@
       fileType:fileType(extension, loaded.encoding),
       fileSize:Number(file.size || 0),
       fileSha256,
+      parsedAt:new Date().toISOString(),
       encoding:loaded.encoding,
       sheetName:analysis.sheetName || '',
       sheetCount:sheets.length,
@@ -928,5 +1096,5 @@
     });
   }
 
-  return Object.freeze({ MAX_FILE_BYTES, SUPPORTED_EXTENSIONS, PREVIEW_LIMIT, NORMALIZED_PREVIEW_LIMIT, GRADE_ORDER, PARSER_VERSION, extensionOf, isSupported, recognizeHeader, gradeFromHeader, detectHeader, analyseMatrix, parseFile, buildAcceptanceReport, colorlessModel });
+  return Object.freeze({ MAX_FILE_BYTES, SUPPORTED_EXTENSIONS, PREVIEW_LIMIT, NORMALIZED_PREVIEW_LIMIT, GRADE_ORDER, PARSER_VERSION, extensionOf, isSupported, recognizeHeader, gradeFromHeader, detectHeader, analyseMatrix, parseFile, buildAcceptanceReport, buildPrepublishCandidate, buildShoppingCandidate, filterShoppingCandidate, buildTradeInCandidate, filterTradeInCandidate, colorlessModel });
 });
