@@ -216,7 +216,7 @@ test('狀態顯示涵蓋成功／失敗／未執行／維持上一版四種', ()
 });
 
 test('智慧營運中心入口直接開啟獨立 Apps Script，且本身仍不含資料或密碼', () => {
-  assert.match(home, /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbxN43frfQ8hwjQg2p3Xnb73iT6ED-yTWg4M0bHUbVPhiphtNkzU_Yx_j0NXT6Gbburs\/exec"/);
+  assert.match(home, /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
   assert.doesNotMatch(home, /adminSecret|employeeId|REPORT_UPLOAD_ALLOWED_EMPLOYEES|DASHBOARD_ADMIN_SECRET/);
 });
 

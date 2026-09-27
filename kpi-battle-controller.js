@@ -6,7 +6,7 @@
   'use strict';
 
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
-  const QUICK_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbxN43frfQ8hwjQg2p3Xnb73iT6ED-yTWg4M0bHUbVPhiphtNkzU_Yx_j0NXT6Gbburs/exec';
+  const QUICK_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
   const TRANSIENT_HTTP_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
   const RETRYABLE_PRIVATE_ACTIONS = new Set(['private_access', 'kpicalc_access']);
   const DEFAULT_RETRY_DELAYS_MS = [2000, 5000];
@@ -344,7 +344,7 @@
 
   function privateDashboardLockMarkup(kind) {
     const title = kind === 'awards' ? '台獎戰情受保護' : 'KPI 戰情受保護';
-    const uploadEntry = kind === 'kpi' ? `<a class="secondary" href="${QUICK_UPLOAD_URL}" target="_blank" rel="noopener">戰報快速更新</a>` : '';
+    const uploadEntry = kind === 'kpi' ? `<a class="secondary" href="${QUICK_UPLOAD_URL}" target="_blank" rel="noopener">資料快速上傳</a>` : '';
     return `<div class="card private-lock">
       <h3>🔐 ${title}</h3>
       <p>僅限北一二B在職同仁使用。姓名維持遮罩，KPI、排名與獎金不會出現在公開 GitHub 頁面。</p>
