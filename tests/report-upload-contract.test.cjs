@@ -704,7 +704,7 @@ test('GitHub Pages 模板不含正式端點，正式頁改走同源 HtmlService'
 });
 
 test('同源 HtmlService 僅使用 google.script.run，且四個上傳呼叫都有包裝函式', () => {
-  assert.match(functionBody(code, 'reportUploadHtmlService_'), /createHtmlOutputFromFile\('ReportUpload'\)/);
+  assert.match(functionBody(code, 'reportUploadHtmlService_'), /createTemplateFromFile\('ReportUpload'\)\.evaluate\(\)/);
   for (const name of ['report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback']) {
     assert.match(code, new RegExp(`function ${name}\\(payload\\)`));
     assert.match(htmlPage, new RegExp(`call\\('${name}'`));
