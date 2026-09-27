@@ -4722,7 +4722,7 @@ const REPORT_UPLOAD_ALLOWED_ACTIONS = [
 // 不從 GitHub Pages fetch，不需要 CORS／preflight，也不把任何設定值注入 HTML。
 function reportUploadHtmlService_() {
   return HtmlService.createTemplateFromFile('ReportUpload').evaluate()
-    .setTitle('北一二B 戰報快速更新');
+    .setTitle('北一二B 資料快速上傳');
 }
 
 function reportUploadInclude_(name) {

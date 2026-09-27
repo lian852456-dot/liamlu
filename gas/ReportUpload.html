@@ -4,7 +4,7 @@
   <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>戰報快速更新</title>
+  <title>資料快速上傳</title>
   <style>
     :root { color-scheme: light; --ink:#12304a; --muted:#617387; --line:#d9e3eb; --bg:#f4f8fb; --navy:#09395f; --cyan:#0b9ec5; --ok:#087d59; --warn:#a65d00; --bad:#bb2639; }
     * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 system-ui,-apple-system,"Microsoft JhengHei",sans-serif; }
@@ -26,22 +26,26 @@
 <body>
   <main>
     <section class="hero">
-      <h1>戰報快速更新</h1>
+      <h1>資料快速上傳</h1>
       <p>獨立 Apps Script Deployment ・同源上傳與發布 ・不經 GitHub Pages 跨網域 POST</p>
     </section>
 
     <section id="authCard" class="card">
       <h2>督導驗證</h2>
-      <p class="small">帳號與管理者密碼只在本次同源呼叫中使用，不會寫入 HTML、瀏覽器儲存或 Script Properties。</p>
+      <p class="small">帳號與管理者驗證碼只在本次同源呼叫中使用，不會寫入 HTML、瀏覽器儲存或 Script Properties。</p>
       <div class="grid">
         <label>員編 <input id="employeeId" autocomplete="username" placeholder="請輸入員編"></label>
-        <label>管理者密碼 <input id="adminSecret" type="password" autocomplete="current-password"></label>
+        <label>管理者驗證碼 <input id="adminSecret" type="password" autocomplete="current-password"></label>
       </div>
       <div class="actions"><button id="loginBtn" type="button">登入並讀取目前版本</button></div>
       <div id="authMessage" class="message hidden" role="status"></div>
     </section>
 
     <section id="app" class="hidden">
+      <section class="card">
+        <h2>戰報資料更新</h2>
+        <p class="small">KPI 與既有戰報發布維持原流程，不會與 3C／舊換新共用發布按鈕或正式檔案。</p>
+      </section>
       <section class="card">
         <h2>KPI Excel</h2>
         <p class="small">預覽只建立受控暫存與檢查資料；在你勾選確認並發布前，不會改寫正式 JSON。</p>
@@ -77,7 +81,7 @@
       </section>
 
       <section class="card">
-        <h2>3C／舊換新私有資料</h2>
+        <h2>3C／舊換新資料更新</h2>
         <p class="small">Excel 只在這個分頁解析；後端只接收通過 gate 的標準化 JSON，原始 Excel 不會上傳或寫入 Drive。</p>
         <div class="grid">
           <label>3C 手機專案價（.xls／.xlsx）
