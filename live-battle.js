@@ -291,6 +291,10 @@
     return `<strong>${displayCount(metric.actual)}</strong>`;
   }
 
+  function displayStoreName(name) {
+    return name === '台北三創' ? '三創' : name;
+  }
+
   function storeMetricSequence(store) {
     return [
       ['AQ上線', { actual: store.aqActual, todayGoal: store.aqTodayGoal, gap: store.aqGap }],
@@ -516,7 +520,7 @@
     analysis.stores.forEach((store, rowIndex) => {
       const y = tableY + 58 + rowIndex * rowHeight;
       const gaps = storeGapEntries(store);
-      const values = [store.name, ...storeMetricSequence(store).map(([, metric]) => displayCount(metric.actual)), analysis.dynamic.available ? (gaps.join('、') || '今日已達標') : '尚未載入目標'];
+      const values = [displayStoreName(store.name), ...storeMetricSequence(store).map(([, metric]) => displayCount(metric.actual)), analysis.dynamic.available ? (gaps.join('、') || '今日已達標') : '尚未載入目標'];
       x = 52;
       const metricActuals = storeMetricSequence(store).map(([, metric]) => Number(metric.actual || 0));
       values.forEach((value, index) => {
@@ -647,7 +651,7 @@
     $('storeRows').innerHTML = a.stores.map(store => {
       const gaps = storeGapEntries(store);
       const gapLabel = !a.dynamic.available ? '載入目標後顯示' : (gaps.length ? gaps.join('、') : '今日已達標');
-      return `<tr class="${priorityNames.has(store.name) ? 'priority' : ''}"><td><strong>${escapeHtml(store.name)}</strong></td>${storeMetricSequence(store).map(([, metric]) => `<td class="metric-cell ${Number(metric.actual) > 0 ? 'metric-hit' : ''}">${metricCell(metric)}</td>`).join('')}<td class="gap ${a.dynamic.available && !gaps.length ? 'done' : ''}">${gapLabel}</td></tr>`;
+      return `<tr class="${priorityNames.has(store.name) ? 'priority' : ''}"><td><strong>${escapeHtml(displayStoreName(store.name))}</strong></td>${storeMetricSequence(store).map(([, metric]) => `<td class="metric-cell ${Number(metric.actual) > 0 ? 'metric-hit' : ''}">${metricCell(metric)}</td>`).join('')}<td class="gap ${a.dynamic.available && !gaps.length ? 'done' : ''}">${gapLabel}</td></tr>`;
     }).join('');
     renderProducts(a);
     renderGiftAudit(a);

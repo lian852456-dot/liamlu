@@ -85,6 +85,16 @@
   function normalizeModel(value) {
     return text(value).replace(/\s+/g, ' ').replace(/[\u3000]/g, ' ').trim();
   }
+  function shortModel(value) {
+    const original = normalizeModel(value);
+    const clean = original.replace(/\(5G\)/ig, '').replace(/^APPLE\s+/i, '').trim();
+    const iphone = clean.match(/^iPhone\s*(\d+)\s*(Pro\s*Max|Pro|Plus|Mini)?\s*[_-]\s*(\d+\s*(?:G|TB))\s*[-_]?\s*\(([^)]+)\)/i);
+    if (!iphone) return clean;
+    const family = 'i' + iphone[1] + ({'pro max':'PM',pro:'P',plus:'Plus',mini:'Mini'}[(iphone[2] || '').replace(/\s+/g,' ').toLowerCase()] || '');
+    const capacity = iphone[3].replace(/\s+/g,'').toUpperCase();
+    const color = iphone[4].replace(/^(?:勃根地紅|酒紅|深紅)$/,'紅').replace(/^冰川藍$/,'藍');
+    return `${family}_${capacity}_${color}`;
+  }
   function numberValue(value) {
     if (typeof value === 'number') return Number.isFinite(value) ? value : null;
     const source = text(value).replace(/,/g, '').replace(/[^0-9.\-]/g, '');
@@ -238,5 +248,5 @@
     };
   }
 
-  return Object.freeze({ STORE_NAMES, normalizeDate, dateFromHeader, addDays, canonicalStore, numberValue, detectHeader, parseMatrix, chooseBestSheet, buildReport });
+  return Object.freeze({ STORE_NAMES, normalizeDate, dateFromHeader, addDays, canonicalStore, shortModel, numberValue, detectHeader, parseMatrix, chooseBestSheet, buildReport });
 });

@@ -2860,6 +2860,8 @@ function doPost(e) {
     else if (action === 'private_request') result = privateDashboardRequestBinding(payload);
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
     else if (action === 'private_access') result = privateDashboardAccess(payload);
+    else if (action === 'phone_stock_publish') result = phoneStockPublish(payload);
+    else if (action === 'phone_stock_read') result = phoneStockRead(payload);
     else if (action === 'private_admin_requests') result = privateDashboardAdminRequests(payload);
     else if (action === 'private_admin_approve') result = privateDashboardAdminApprove(payload);
     else if (action === 'private_admin_revoke') result = privateDashboardAdminRevoke(payload);
@@ -3068,10 +3070,20 @@ function privateDashboardNotifyAdminOfBindingRequest(request, user) {
   }
 }
 
-function privateDashboardSnapshot() {
+function privateDashboardLatestSnapshotFile_() {
   const files = privateDashboardFolder().getFilesByName(PRIVATE_DASHBOARD_FILE);
-  if (!files.hasNext()) throw new Error('今日私有戰情尚未更新');
-  const snapshot = JSON.parse(files.next().getBlob().getDataAsString('UTF-8'));
+  let latest = null;
+  while (files.hasNext()) {
+    const file = files.next();
+    if (!latest || file.getLastUpdated().getTime() > latest.getLastUpdated().getTime()) latest = file;
+  }
+  return latest;
+}
+
+function privateDashboardSnapshot() {
+  const file = privateDashboardLatestSnapshotFile_();
+  if (!file) throw new Error('今日私有戰情尚未更新');
+  const snapshot = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
   return snapshot;
 }
@@ -3087,6 +3099,77 @@ function privateDashboardAccess(payload) {
   privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
   const snapshot = privateDashboardSnapshot();
   return { snapshot: snapshot, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role } };
+}
+
+const PHONE_STOCK_FILE = 'north12b-phone-stock-latest.json';
+const PHONE_STOCK_LATEST_ID = 'PHONE_STOCK_LATEST_FILE_ID';
+const PHONE_STOCK_STORES = ['台北酒泉','台北永吉','台北復興南','台北萬大','台北通化','台北杭州南','台北大稻埕','台北三創','台北六張犁'];
+
+function phoneStockTrustedUser_(payload) {
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  const user = privateDashboardUserByEmployeeId(employeeId).user;
+  if (!privateDashboardIsTrustedEmployee(employeeId) || !user || user.status !== 'active') {
+    throw new Error('此員編無手機庫存存取權限');
+  }
+  return {employeeId:employeeId,user:user};
+}
+
+function phoneStockAuthorizeRead_(payload) {
+  const trusted = phoneStockTrustedUser_(payload);
+  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
+  // APP 讀取庫存仍限督導已核准的裝置，避免其他人看見庫存數。
+  if (trusted.user.device_id !== deviceId) throw new Error('此裝置尚未核准手機庫存存取');
+  return trusted.employeeId;
+}
+
+function phoneStockAuthorizePublish_(payload) {
+  const trusted = phoneStockTrustedUser_(payload);
+  // 發布端是督導使用的電腦，與已核准 APP 手機會有不同裝置 ID。
+  // 確認發布端帶有有效裝置識別，但不要求它等於 APP 的綁定裝置。
+  privateDashboardCleanDeviceId(payload.deviceId);
+  return trusted.employeeId;
+}
+
+function phoneStockRead(payload) {
+  phoneStockAuthorizeRead_(payload || {});
+  const id = String(privateDashboardProperties().getProperty(PHONE_STOCK_LATEST_ID) || '');
+  if (!id) return { snapshot:null };
+  const snapshot = JSON.parse(DriveApp.getFileById(id).getBlob().getDataAsString('UTF-8'));
+  if (!snapshot || snapshot.version !== 1 || !Array.isArray(snapshot.rows)) throw new Error('庫存快照格式不正確');
+  return { snapshot:snapshot };
+}
+
+function phoneStockPublish(payload) {
+  const body = payload || {};
+  const employeeId = phoneStockAuthorizePublish_(body);
+  const rows = body.rows;
+  if (!Array.isArray(rows) || rows.length < 1 || rows.length > 10000) throw new Error('庫存資料筆數不正確');
+  const date = String(body.date || '');
+  if (!/^20\d{2}-\d{2}-\d{2}$/.test(date)) throw new Error('請指定庫存快照日期');
+  const normalized = [];
+  rows.forEach(function(row) {
+    const store = String(row && row.store || '');
+    const model = String(row && row.model || '').trim();
+    const quantity = Number(row && row.quantity);
+    if (PHONE_STOCK_STORES.indexOf(store) < 0 || !model || model.length > 180 || !Number.isSafeInteger(quantity) || quantity < 0 || quantity > 100000) {
+      throw new Error('庫存資料含有不正確的店點、機款或數量');
+    }
+    normalized.push({store:store,model:model,quantity:quantity});
+  });
+  const snapshot = {version:1,date:date,importedAt:new Date().toISOString(),rows:normalized};
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const folder = privateDashboardFolder();
+    const file = folder.createFile(PHONE_STOCK_FILE, JSON.stringify(snapshot), MimeType.PLAIN_TEXT);
+    const props = privateDashboardProperties();
+    const previous = String(props.getProperty(PHONE_STOCK_LATEST_ID) || '');
+    props.setProperty(PHONE_STOCK_LATEST_ID, file.getId());
+    if (previous && previous !== file.getId()) {
+      try { DriveApp.getFileById(previous).setTrashed(true); } catch (error) { console.log('old phone stock snapshot cleanup failed: ' + error); }
+    }
+  } finally { lock.releaseLock(); }
+  return { publishedAt:snapshot.importedAt,date:date,rowCount:normalized.length,updatedBy:employeeId };
 }
 
 function privateDashboardAdminRequests(payload) {
@@ -3164,9 +3247,8 @@ function privateDashboardAdminSetTrustedEmployee(payload) {
 
 function privateDashboardAdminSnapshotStatus(payload) {
   privateDashboardAdminAuthorized(payload);
-  const files = privateDashboardFolder().getFilesByName(PRIVATE_DASHBOARD_FILE);
-  if (!files.hasNext()) throw new Error('私有戰情快照不存在');
-  const file = files.next();
+  const file = privateDashboardLatestSnapshotFile_();
+  if (!file) throw new Error('私有戰情快照不存在');
   const snapshot = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
   const owner = file.getOwner();
@@ -3926,9 +4008,8 @@ function privateDashboardPublishKpiComponent(payload) {
   const kpicalc = JSON.parse(kpiFile.getBlob().getDataAsString('UTF-8'));
   const identity = privateDashboardValidateKpiComponent_(incomingKpi, kpicalc);
   const folder = privateDashboardFolder();
-  const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
-  if (!files.hasNext()) throw new Error('既有私有戰情快照不存在');
-  const file = files.next();
+  const file = privateDashboardLatestSnapshotFile_();
+  if (!file) throw new Error('既有私有戰情快照不存在');
   const currentText = file.getBlob().getDataAsString('UTF-8');
   const current = JSON.parse(currentText);
   if (!current || !current.kpiBattle || !current.awardsBattle) throw new Error('既有私有戰情快照格式不完整');
@@ -4031,10 +4112,8 @@ function privateDashboardPublishAwardsComponent(payload) {
   if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('awards component 缺少或過大');
   const decoded = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
   const incomingAwards = JSON.parse(decoded);
-  const folder = privateDashboardFolder();
-  const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
-  if (!files.hasNext()) throw new Error('既有私有戰情快照不存在');
-  const file = files.next();
+  const file = privateDashboardLatestSnapshotFile_();
+  if (!file) throw new Error('既有私有戰情快照不存在');
   const currentText = file.getBlob().getDataAsString('UTF-8');
   const current = JSON.parse(currentText);
   if (!current || !current.kpiBattle || !current.awardsBattle) throw new Error('既有私有戰情快照格式不完整');
@@ -4086,10 +4165,8 @@ function privateDashboardPublish(payload) {
   snapshot.publishedAt = publishedAt;
   const text = JSON.stringify(snapshot);
   const folder = privateDashboardFolder();
-  const files = folder.getFilesByName(PRIVATE_DASHBOARD_FILE);
-  let file;
-  if (files.hasNext()) {
-    file = files.next();
+  let file = privateDashboardLatestSnapshotFile_();
+  if (file) {
     file.setContent(text);
   } else {
     file = folder.createFile(Utilities.newBlob(text, 'application/json', PRIVATE_DASHBOARD_FILE));

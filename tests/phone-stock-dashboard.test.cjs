@@ -107,7 +107,7 @@ test('督導入口包含手機本機雙檔工具，日誌檢查不再位於同�
   assert.doesNotMatch(staff, /daily-log-dashboard\.html/);
 });
 
-test('新頁面只使用既有本機 SheetJS，不含上傳或資料持久化', () => {
+test('庫存檔本機解析，只有明確按同步鍵才發布庫存快照', () => {
   const root = path.resolve(__dirname, '..');
   const page = fs.readFileSync(path.join(root, 'phone-stock-dashboard.html'), 'utf8');
   const controller = fs.readFileSync(path.join(root, 'phone-stock-dashboard.js'), 'utf8');
@@ -121,7 +121,10 @@ test('新頁面只使用既有本機 SheetJS，不含上傳或資料持久化', 
   assert.match(page, /id="storeTableHead"/);
   assert.match(page, /id="modelTableHead"/);
   assert.match(page, /銷售 ÷（銷售＋庫存）/);
-  assert.doesNotMatch(`${page}\n${controller}`, /localStorage|indexedDB|fetch\(|XMLHttpRequest|sendBeacon/);
+  assert.match(page, /id="publishStock" type="button" disabled/);
+  assert.match(controller, /action:'phone_stock_publish'/);
+  assert.match(controller, /rows = \[\.\.\.grouped\]/);
+  assert.doesNotMatch(controller, /sales:.*quantity|saleRows:.*state\.sales/);
   assert.match(controller, /MAX_FILE_BYTES = 20 \* 1024 \* 1024/);
   assert.match(controller, /new TextDecoder\('big5'\)/);
   assert.match(controller, /type:'string'/);

@@ -29,6 +29,23 @@ a { text-decoration:none; }
 .sr-only { position:absolute; width:1px; height:1px; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
 .icon-sprite { position:absolute; width:0; height:0; overflow:hidden; }
 svg { width:1.1em; height:1.1em; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.battle-kind-control { overflow-x:auto; }
+.battle-kind-control button { min-width:55px; }
+.stock-panel { margin-top:14px; }
+.stock-panel .panel-head { align-items:flex-start; }
+.stock-panel .panel-head small { display:block; margin-top:5px; line-height:1.5; }
+.stock-panel .panel-head > strong { color:var(--cyan); white-space:nowrap; }
+.stock-filters { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px; }
+.stock-filters label { display:grid; gap:6px; font-size:12px; color:var(--muted); }
+.stock-filters input,.stock-filters select { width:100%; min-width:0; padding:10px; border:1px solid var(--line); border-radius:10px; color:var(--text); background:var(--surface-2); }
+.stock-item { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 13px; border-top:1px solid var(--line-soft); }
+.stock-item span { min-width:0; display:grid; gap:3px; }
+.stock-item strong { overflow-wrap:anywhere; }
+.stock-item small { color:var(--muted); }
+.stock-item b { font-size:20px; color:var(--cyan); }
+.stock-import { display:block; margin:12px; padding:12px; border:1px solid var(--line); border-radius:10px; }
+.stock-import input { display:block; width:100%; margin-top:8px; font-size:12px; }
+.stock-panel .form-message { padding:0 12px 12px; }
 
 .app-shell { width:min(100%,680px); min-height:100dvh; margin:0 auto; background:radial-gradient(circle at 88% -8%,rgba(31,106,163,.34),transparent 31%),linear-gradient(180deg,#06182b 0,#061526 55%,#04111f 100%); }
 .app-header { position:relative; display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:88px; padding:calc(14px + env(safe-area-inset-top)) 14px 13px; border-bottom:1px solid var(--line-soft); }
@@ -528,7 +545,7 @@ body { font-size:16px; }
 .half-preview-result-list p { margin:7px 0 0; color:var(--muted); font-size:14px; line-height:1.45; }
 
 /* App 1.2: Daily Report summary and read-only Personal Performance only. */
-.battle-kind-control { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.battle-kind-control { grid-template-columns:repeat(4,minmax(0,1fr)); }
 .battle-kind-control button,.personal-scope-control button,.report-segment button { min-height:44px; }
 .report-operations-panel { padding-bottom:12px; }
 .report-operation-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:0 13px; }
@@ -662,4 +679,3 @@ body { font-size:16px; }
 .scope-control.award-scope-control { width:100%; grid-template-columns:repeat(3,minmax(0,1fr)); }
 .scope-control button[hidden] { display:none; }
 .scope-control.award-scope-control button { min-height:44px; }
-
