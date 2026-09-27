@@ -158,7 +158,11 @@
     const section = element('section', 'acceptance-report');
     section.append(element('h4', 'preview-heading', '本機完整驗收報告'));
     section.append(element('p', 'report-intro', '複製前請先檢查下方內容：它只包含檔案雜湊／大小、工作表與欄位結構、彙總統計、來源列號與最多 3 筆遮罩範例；不包含檔名、原始列、完整商品、料號或精確價格。'));
-    const state = element('p', 'report-result ' + (report.acceptance.passed ? 'ok' : 'blocked'), report.acceptance.passed ? '驗收通過：可複製本去識別化報告進行 review。' : '驗收待處理：請先查看報告內的阻擋原因與下一步。');
+    const stateClass = report.acceptance.status === 'PASS' ? 'ok' : (report.acceptance.status === 'PARTIAL_READY' ? 'partial' : 'blocked');
+    const stateText = report.acceptance.status === 'PASS'
+      ? '驗收通過：可複製本去識別化報告進行 review。'
+      : (report.acceptance.status === 'PARTIAL_READY' ? '部分可發布：無任何價格的商品已排除，請查看筆數與來源工作表分布。' : '驗收待處理：請先查看報告內的阻擋原因與下一步。');
+    const state = element('p', 'report-result ' + stateClass, stateText);
     const controls = element('div', 'report-controls');
     const copy = element('button', 'report-button primary', '一鍵複製驗收報告');
     copy.type = 'button';
@@ -220,15 +224,26 @@
       grid.append(item);
     });
     host.append(grid);
-    const state = element('p', 'candidate-state ' + (metadata.acceptanceStatus === 'PASS' ? 'ok' : 'blocked'), metadata.publication.reason);
+    const stateClass = metadata.acceptanceStatus === 'BLOCKED' ? 'blocked' : (metadata.acceptanceStatus === 'PARTIAL_READY' ? 'ready' : 'ok');
+    const state = element('p', 'candidate-state ' + stateClass, metadata.publication.reason);
     host.append(state);
-    const publish = element('button', 'candidate-publish', metadata.acceptanceStatus === 'PASS' ? '正式發布（本輪未啟用）' : '正式發布（驗收未通過）');
+    const publish = element('button', 'candidate-publish', metadata.publication.disabled ? '正式發布（驗收未通過）' : (metadata.acceptanceStatus === 'PARTIAL_READY' ? '發布條件通過（PARTIAL_READY）' : '發布條件通過（PASS）'));
     publish.type = 'button';
-    publish.disabled = true;
+    publish.disabled = metadata.publication.disabled;
     publish.dataset.candidatePublish = candidate.kind;
     publish.setAttribute('aria-describedby', 'candidate-' + candidate.kind + '-publication-note');
     state.id = 'candidate-' + candidate.kind + '-publication-note';
     host.append(publish);
+    const publishNote = element('p', 'preview-caption', '此控制只顯示候選發布 gate；本頁不會上傳、寫入或發布資料。');
+    if (!publish.disabled) publish.addEventListener('click', () => {
+      publishNote.textContent = '候選發布條件已確認；請依受控網站 release 流程處理，原始資料仍只在目前瀏覽器記憶體。';
+    });
+    host.append(publishNote);
+    if (metadata.presentation) {
+      const presentation = metadata.presentation;
+      const distribution = presentation.excludedNoPriceBySheet.map(entry => entry.sheet + '：' + String(entry.count) + ' 筆').join('；');
+      host.append(element('p', 'candidate-exclusion', '本版共 ' + String(presentation.sourceRows) + ' 筆來源資料，呈現 ' + String(presentation.presentedRows) + ' 筆；' + String(presentation.excludedNoPriceRows) + ' 筆商品因無任何價格未顯示。' + (distribution ? ' 來源工作表分布：' + distribution + '。' : '')));
+    }
     if (metadata.blockers.length || metadata.warnings.length) {
       const notices = element('ul', 'candidate-notices');
       metadata.blockers.forEach(message => notices.append(element('li', 'blocked', '阻擋：' + message)));

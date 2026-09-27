@@ -785,6 +785,55 @@
     }));
   }
 
+  function shoppingNoPricePresentation(result) {
+    const rows = result && result.standardized && result.standardized.rows || [];
+    const excludedRows = rows.filter(row =>
+      row.status === 'partial' &&
+      present(row.brand) &&
+      present(row.code) &&
+      present(row.model) &&
+      !present(row.retailPrice) &&
+      !projectPricePresent(row)
+    );
+    const bySheet = new Map();
+    excludedRows.forEach(row => {
+      const name = text(row.sourceSheet) || '未提供工作表';
+      const entry = bySheet.get(name) || { sheet:name, count:0, firstSourceRow:row.sourceRowNumber, lastSourceRow:row.sourceRowNumber };
+      entry.count += 1;
+      entry.firstSourceRow = Math.min(entry.firstSourceRow, row.sourceRowNumber);
+      entry.lastSourceRow = Math.max(entry.lastSourceRow, row.sourceRowNumber);
+      bySheet.set(name, entry);
+    });
+    return {
+      sourceRows:Number(result && result.acceptance && result.acceptance.rawDataRows || rows.length),
+      normalizedRows:rows.length,
+      presentedRows:rows.filter(row => row.status === 'success').length,
+      excludedNoPriceRows:excludedRows.length,
+      excludedNoPriceBySheet:Array.from(bySheet.values()).sort((left, right) => left.sheet.localeCompare(right.sheet, 'zh-Hant')),
+      excludedRows
+    };
+  }
+
+  function shoppingPartialReady(result) {
+    const presentation = shoppingNoPricePresentation(result);
+    const remaining = (result && result.standardized && result.standardized.rows || []).filter(row => !presentation.excludedRows.includes(row));
+    const remainingOutcomes = outcomeSummary(remaining);
+    const schema = reportSchema('shopping');
+    const missingRequiredMappings = missingMappings('shopping', result || {}, schema);
+    const invalidCurrencyCount = Number(result && result.invalidCurrencyCount || 0);
+    const duplicateRowCount = Number(result && result.duplicateRowCount || 0);
+    const errors = result && result.errors || [];
+    const ready = presentation.excludedNoPriceRows > 0 &&
+      errors.length === 0 &&
+      missingRequiredMappings.length === 0 &&
+      remainingOutcomes.partial === 0 &&
+      remainingOutcomes.failed === 0 &&
+      remainingOutcomes.unrecognized === 0 &&
+      invalidCurrencyCount === 0 &&
+      duplicateRowCount === 0;
+    return { ready, presentation, remainingOutcomes, missingRequiredMappings, invalidCurrencyCount, duplicateRowCount };
+  }
+
   function buildAcceptanceReport(kind, result) {
     const rows = result && result.standardized && result.standardized.rows || [];
     const schema = reportSchema(kind);
@@ -810,11 +859,15 @@
     if (kind === 'tradein' && Number(acceptance.unrecognized || 0)) blockers.push('至少一筆舊換新資料無法辨識回收商或原始機型。');
     if (kind === 'tradein' && flags.hasDuplicateGradeColumns) blockers.push('仍有 A／B／C／S 重複欄位標籤，需先確認欄位群組。');
     if (kind === 'tradein' && flags.hasUnnamedColumns) blockers.push('仍有未命名欄位，需先確認多列表頭結構。');
+    const shoppingReadiness = kind === 'shopping' ? shoppingPartialReady(result) : null;
     const warnings = [];
     if (outcomes.partial) warnings.push('部分成功資料已保留在本機預覽；請依必要欄位統計判斷是否需要補檔。');
     if (Object.values(optionalBlankCounts).some(value => value > 0)) warnings.push('選填欄位空白只供檢查，不單獨視為阻擋。');
     if (Number(result && result.duplicateRowCount || 0)) warnings.push('偵測到重複資料列，未自動刪除。');
+    if (shoppingReadiness && shoppingReadiness.presentation.excludedNoPriceRows) warnings.push('依目前不呈現規則，' + String(shoppingReadiness.presentation.excludedNoPriceRows) + ' 筆品牌、代碼與機型完整但所有價格皆空的資料不會出現在查詢結果。');
     const passed = blockers.length === 0;
+    const partialReady = !passed && Boolean(shoppingReadiness && shoppingReadiness.ready);
+    const acceptanceStatus = passed ? 'PASS' : (partialReady ? 'PARTIAL_READY' : 'BLOCKED');
     const base = {
       reportVersion:'local-import-acceptance/v1',
       generatedAt:new Date().toISOString(),
@@ -848,11 +901,20 @@
       },
       acceptance:{
         passed,
-        status:passed ? 'PASS' : 'BLOCKED',
-        blockers,
+        status:acceptanceStatus,
+        publishEligible:passed || partialReady,
+        blockers:partialReady ? [] : blockers,
         warnings,
-        nextStep:passed ? '可複製本去識別化報告回傳進行下一步 review；原始檔仍只留在本機瀏覽器。' : '請依阻擋原因修正或重新匯出來源檔，再於本頁重新執行驗收。'
+        nextStep:passed ? '可複製本去識別化報告回傳進行下一步 review；原始檔仍只留在本機瀏覽器。' : (partialReady ? '有價格資料可依不呈現規則進入候選發布 review；無價格資料仍保留在稽核統計中。' : '請依阻擋原因修正或重新匯出來源檔，再於本頁重新執行驗收。')
       },
+      presentation:kind === 'shopping' ? {
+        rule:'單機價與所有專案價皆空時，不納入門市查詢；0 視為有效價格。',
+        sourceRows:shoppingReadiness.presentation.sourceRows,
+        normalizedRows:shoppingReadiness.presentation.normalizedRows,
+        presentedRows:shoppingReadiness.presentation.presentedRows,
+        excludedNoPriceRows:shoppingReadiness.presentation.excludedNoPriceRows,
+        excludedNoPriceBySheet:shoppingReadiness.presentation.excludedNoPriceBySheet.map(entry => ({ sheet:entry.sheet, count:entry.count, firstSourceRow:entry.firstSourceRow, lastSourceRow:entry.lastSourceRow }))
+      } : null,
       privacyBoundary:{
         processing:'僅在目前瀏覽器記憶體內解析；重新整理後消失。',
         included:'檔案格式、大小與 SHA-256、工作表結構、表頭與欄位 mapping、彙總計數、來源列號與遮罩範例。',
@@ -900,7 +962,7 @@
   function candidateMetadata(kind, result) {
     const report = buildAcceptanceReport(kind, result);
     const sourceDates = candidateSourceDates(result && result.standardized && result.standardized.rows);
-    const passed = report.acceptance.passed;
+    const publishEligible = Boolean(report.acceptance.publishEligible);
     return {
       version:candidateVersion(result),
       sourceDates,
@@ -909,10 +971,11 @@
       acceptanceStatus:report.acceptance.status,
       blockers:report.acceptance.blockers.slice(),
       warnings:report.acceptance.warnings.slice(),
+      presentation:report.presentation,
       publication:{
-        disabled:true,
-        status:passed ? 'PREVIEW_ONLY' : 'BLOCKED',
-        reason:passed ? '本輪沒有正式發布端點；候選資料只供查詢驗證。' : '整批驗收未通過，正式發布已停用。'
+        disabled:!publishEligible,
+        status:publishEligible ? report.acceptance.status : 'BLOCKED',
+        reason:publishEligible ? (report.acceptance.status === 'PARTIAL_READY' ? '有價格資料可候選發布；無任何價格的商品不會呈現。' : '完整驗收通過，可進入候選發布 review。') : '驗收未通過，正式發布已停用。'
       }
     };
   }
@@ -967,14 +1030,21 @@
     }).sort((left, right) => left.brand.localeCompare(right.brand, 'zh-Hant') || left.model.localeCompare(right.model, 'zh-Hant') || left.sourceSheet.localeCompare(right.sourceSheet, 'zh-Hant'));
     const usableRows = candidateRows.filter(row => !row.priceMatrixConflict);
     const plans = Array.from(new Set(usableRows.flatMap(row => Object.keys(row.projectPrices)))).sort((left, right) => left.localeCompare(right, 'zh-Hant'));
+    const metadata = candidateMetadata('shopping', result);
+    const priceMatrixConflictCount = candidateRows.filter(row => row.priceMatrixConflict).length;
+    if (priceMatrixConflictCount) {
+      metadata.acceptanceStatus = 'BLOCKED';
+      metadata.blockers.push('去色後存在 ' + String(priceMatrixConflictCount) + ' 組價格矩陣不一致。');
+      metadata.publication = { disabled:true, status:'BLOCKED', reason:'價格矩陣不一致，正式發布已停用。' };
+    }
     return {
       kind:'shopping',
-      metadata:candidateMetadata('shopping', result),
+      metadata,
       rows:candidateRows,
       brands:Array.from(new Set(candidateRows.map(row => row.brand))).sort((left, right) => left.localeCompare(right, 'zh-Hant')),
       sourceSheets:Array.from(new Set(candidateRows.map(row => row.sourceSheet))).sort((left, right) => left.localeCompare(right, 'zh-Hant')),
       plans,
-      priceMatrixConflictCount:candidateRows.filter(row => row.priceMatrixConflict).length,
+      priceMatrixConflictCount,
       eligibleRowCount:rows.filter(row => row.status === 'success').length
     };
   }
@@ -1096,5 +1166,5 @@
     });
   }
 
-  return Object.freeze({ MAX_FILE_BYTES, SUPPORTED_EXTENSIONS, PREVIEW_LIMIT, NORMALIZED_PREVIEW_LIMIT, GRADE_ORDER, PARSER_VERSION, extensionOf, isSupported, recognizeHeader, gradeFromHeader, detectHeader, analyseMatrix, parseFile, buildAcceptanceReport, buildPrepublishCandidate, buildShoppingCandidate, filterShoppingCandidate, buildTradeInCandidate, filterTradeInCandidate, colorlessModel });
+  return Object.freeze({ MAX_FILE_BYTES, SUPPORTED_EXTENSIONS, PREVIEW_LIMIT, NORMALIZED_PREVIEW_LIMIT, GRADE_ORDER, PARSER_VERSION, extensionOf, isSupported, recognizeHeader, gradeFromHeader, detectHeader, analyseMatrix, parseFile, buildAcceptanceReport, buildPrepublishCandidate, buildShoppingPresentation:shoppingNoPricePresentation, buildShoppingCandidate, filterShoppingCandidate, buildTradeInCandidate, filterTradeInCandidate, colorlessModel });
 });

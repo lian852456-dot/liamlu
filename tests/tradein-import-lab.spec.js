@@ -97,7 +97,7 @@ test('去識別化驗收報告可複製，剪貼簿失敗時保留可手動複�
   await expect(analysis.getByText(/已下載去識別化驗收報告 JSON/)).toBeVisible();
 });
 
-test('3C 候選查詢不以顏色為條件、要求選擇方案，且 BLOCKED 時發布控制停用', async ({ page }) => {
+test('3C 候選查詢不以顏色為條件、要求選擇方案，並透明排除全空價格商品', async ({ page }) => {
   await page.goto(PAGE_URL);
   await page.setInputFiles('#shoppingFile', {
     name:'candidate-shopping.csv',
@@ -111,8 +111,9 @@ test('3C 候選查詢不以顏色為條件、要求選擇方案，且 BLOCKED �
   });
   const preview = page.locator('.shopping-candidate');
   await expect(preview.getByText('門市查詢候選預覽（未發布）')).toBeVisible();
-  await expect(preview).toContainText('整批驗收未通過，正式發布已停用。');
-  await expect(preview.locator('[data-candidate-publish="shopping"]')).toBeDisabled();
+  await expect(preview).toContainText('有價格資料可候選發布；無任何價格的商品不會呈現。');
+  await expect(preview).toContainText('本版共 3 筆來源資料，呈現 2 筆；1 筆商品因無任何價格未顯示。');
+  await expect(preview.locator('[data-candidate-publish="shopping"]')).toBeEnabled();
   await preview.getByLabel('搜尋手機專案價候選資料').fill('128G');
   await preview.locator('#shoppingCandidatePlan').selectOption('999H');
   const results = preview.locator('.candidate-results');
@@ -145,5 +146,5 @@ test('舊換新候選同表比較兩家回收商，缺少等級明示來源未�
   await expect(results).toContainText('FutureDial（FDI） S');
   await expect(results).toContainText('來源未提供');
   await expect(results).toContainText('26000');
-  await expect(preview.locator('[data-candidate-publish="tradein"]')).toBeDisabled();
+  await expect(preview.locator('[data-candidate-publish="tradein"]')).toBeEnabled();
 });

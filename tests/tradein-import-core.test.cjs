@@ -258,19 +258,59 @@ test('色別去除後若價格矩陣不同，候選查詢會 fail-closed 排除�
   assert.equal(Core.filterShoppingCandidate(candidate, { plan:'999H' }).length, 0);
 });
 
-test('3C 整批 BLOCKED 時仍可預覽成功列，但候選發布契約必須停用', async () => {
+test('全空價格商品會 PARTIAL_READY 排除，剩餘有價資料可候選發布並保留稽核統計', async () => {
   const csv = [
     '廠牌,代碼,機型,單機價,999H',
     'Apple,A-OK,iPhone 18 128G(黑),29900,9000',
     'Apple,A-MISSING,iPhone 18 256G(黑),,'
   ].join('\n');
   const candidate = Core.buildShoppingCandidate(await Core.parseFile(localFile('candidate-blocked.csv', csv), XLSX, 'shopping'));
-  assert.equal(candidate.metadata.acceptanceStatus, 'BLOCKED');
-  assert.equal(candidate.metadata.publication.disabled, true);
-  assert.equal(candidate.metadata.publication.status, 'BLOCKED');
-  assert.match(candidate.metadata.publication.reason, /驗收未通過/);
+  const report = Core.buildAcceptanceReport('shopping', await Core.parseFile(localFile('candidate-blocked-report.csv', csv), XLSX, 'shopping'));
+  assert.equal(candidate.metadata.acceptanceStatus, 'PARTIAL_READY');
+  assert.equal(candidate.metadata.publication.disabled, false);
+  assert.equal(candidate.metadata.publication.status, 'PARTIAL_READY');
+  assert.match(candidate.metadata.publication.reason, /無任何價格/);
   assert.equal(candidate.eligibleRowCount, 1);
   assert.equal(Core.filterShoppingCandidate(candidate, { plan:'999H' }).length, 1);
+  assert.equal(report.acceptance.status, 'PARTIAL_READY');
+  assert.equal(report.acceptance.passed, false);
+  assert.equal(report.acceptance.publishEligible, true);
+  assert.equal(report.presentation.sourceRows, 2);
+  assert.equal(report.presentation.presentedRows, 1);
+  assert.equal(report.presentation.excludedNoPriceRows, 1);
+  assert.equal(report.presentation.excludedNoPriceBySheet[0].count, 1);
+});
+
+test('零元是有效價格，部分價格空白不會被排除', async () => {
+  const csv = [
+    '廠牌,代碼,機型,單機價,999H,1599H',
+    'Apple,A-ZERO,iPhone 18 128G(黑),0,,',
+    'Apple,A-PLAN,iPhone 18 256G(黑),,0,'
+  ].join('\n');
+  const result = await Core.parseFile(localFile('candidate-zero.csv', csv), XLSX, 'shopping');
+  const report = Core.buildAcceptanceReport('shopping', result);
+  const candidate = Core.buildShoppingCandidate(result);
+  assert.equal(result.standardized.summary.success, 2);
+  assert.equal(report.acceptance.status, 'PASS');
+  assert.equal(report.presentation.excludedNoPriceRows, 0);
+  assert.equal(candidate.eligibleRowCount, 2);
+  assert.equal(Core.filterShoppingCandidate(candidate, { query:'256G', plan:'999H' })[0].selectedPlanPrice, '0');
+});
+
+test('全空價格以外的錯誤仍會 BLOCKED，不能套用部分可發布規則', async () => {
+  const csv = [
+    '廠牌,代碼,機型,單機價,999H',
+    'Apple,A-OK,iPhone 18 128G(黑),29900,9000',
+    'Apple,A-MISSING,iPhone 18 256G(黑),,',
+    'Apple,A-BAD,iPhone 18 512G(黑),NOT-A-PRICE,10000'
+  ].join('\n');
+  const result = await Core.parseFile(localFile('candidate-other-error.csv', csv), XLSX, 'shopping');
+  const report = Core.buildAcceptanceReport('shopping', result);
+  const candidate = Core.buildShoppingCandidate(result);
+  assert.equal(report.acceptance.status, 'BLOCKED');
+  assert.equal(report.acceptance.publishEligible, false);
+  assert.equal(candidate.metadata.publication.disabled, true);
+  assert.match(candidate.metadata.publication.reason, /驗收未通過/);
 });
 
 test('舊換新候選比較兩家回收商與 S/A/B/C，缺少等級不補零', async () => {
