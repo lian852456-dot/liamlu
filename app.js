@@ -430,14 +430,38 @@
     return staged ? staged[1].toLowerCase() : raw;
   }
 
+  function validSourceVersionDate(year, month, day) {
+    const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+    return date.getUTCFullYear() === Number(year) && date.getUTCMonth() === Number(month) - 1 && date.getUTCDate() === Number(day)
+      ? `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '';
+  }
+
+  function sourceVersionDate(fileName, dataAsOf) {
+    const source = sourceFileName(fileName);
+    const tokens = digits => Array.from(new Set(Array.from(source.matchAll(new RegExp(`(^|\\D)(\\d{${digits}})(?=\\D|$)`, 'g')), match => match[2])));
+    const full = tokens(8);
+    if (full.length) return full.length === 1
+      ? validSourceVersionDate(full[0].slice(0, 4), full[0].slice(4, 6), full[0].slice(6, 8)) : '';
+    const short = tokens(4);
+    const anchor = String(dataAsOf || '').match(/^(\d{4})-\d{2}-\d{2}$/);
+    if (short.length !== 1 || !anchor) return '';
+    const anchorTime = Date.parse(`${dataAsOf}T00:00:00Z`);
+    const candidates = [Number(anchor[1]) - 1, Number(anchor[1]), Number(anchor[1]) + 1]
+      .map(year => validSourceVersionDate(year, short[0].slice(0, 2), short[0].slice(2, 4)))
+      .filter(Boolean).map(date => ({ date, distance: Math.abs(Date.parse(`${date}T00:00:00Z`) - anchorTime) }))
+      .sort((left, right) => left.distance - right.distance || left.date.localeCompare(right.date));
+    return candidates.length && (!candidates[1] || candidates[0].distance !== candidates[1].distance) ? candidates[0].date : '';
+  }
+
   function kpiSupplementIsCurrent(data, supplement) {
     const dataAsOf = kpiDataAsOfDate(data);
-    const supplementReportDate = String(supplement && supplement.report_date || '');
+    const sourceVersion = sourceVersionDate(data && data.meta && data.meta.sourceFile, dataAsOf);
+    const supplementVersion = String(supplement && (supplement.source_version_date || supplement.report_date) || '');
     const supplementAsOf = String(supplement && (supplement.data_as_of_date || supplement.source_as_of_date) || '');
     const supplementSource = sourceFileName(supplement && supplement.source_file);
     const kpiSource = sourceFileName(data && data.meta && data.meta.sourceFile);
-    return Boolean(dataAsOf && supplement && supplementReportDate && supplementAsOf &&
-      supplementReportDate === supplementAsOf && supplementAsOf === dataAsOf &&
+    return Boolean(dataAsOf && sourceVersion && supplement && supplementVersion && supplementAsOf &&
+      supplementVersion === sourceVersion && supplementAsOf === dataAsOf &&
       supplementSource && kpiSource && supplementSource === kpiSource);
   }
 
@@ -479,7 +503,8 @@
     const summaryData = {
       kpi:officialRegionKpi != null ? officialRegionKpi : numberOrNull(aggregate.overall_kpi), companyRank:numberOrNull(aggregate.company_rank), companyRankTotal:numberOrNull(supplement.company_rank_total),
       kpiDod:numberOrNull(aggregate.overall_kpi_dod), rankChange:numberOrNull(aggregate.company_rank_dod), addonScore:numberOrNull(aggregate.addon_score),
-      reportDate:kpiDataAsOfDate(data), fullKpis:fullRegion
+      reportDate:sourceVersionDate(data && data.meta && data.meta.sourceFile, kpiDataAsOfDate(data)),
+      dataAsOfDate:kpiDataAsOfDate(data), fullKpis:fullRegion
     };
     const completeMetrics = fullRegion.length === 25 && fullRegion.every(metric=>metric.rate != null) && storeRows.length === 9 && storeRows.every(row=>row.fullKpis.length === 25);
     const base = { updatedAt:readAt, sourceUpdatedAt, stale:sourceUpdatedAt ? stale(sourceUpdatedAt) : false, source };
@@ -498,17 +523,17 @@
     return Number.isFinite(number) ? number : null;
   }
 
-  function adaptAwards(snapshot, expectedReportDate, readAt) {
+  function adaptAwards(snapshot, expectedVersionDate, readAt) {
     const awards = snapshot && snapshot.awardsBattle || {};
     const updatedAt = String(awards.generated_at || snapshot && snapshot.publishedAt || '');
-    const reportDate = String(awards.report_run_date || awards.report_date || '');
+    const versionDate = String(awards.source_version_date || awards.report_run_date || awards.report_date || '');
     const source = moduleSource('正式台獎私有戰情','index.html');
     const kpi = snapshot && snapshot.kpiBattle || {};
     const cutoff = String(awards.data_as_of_date || awards.source_as_of_date || '');
     const kpiCutoff = String(kpi.data_as_of_date || kpi.source_as_of_date || '');
     const run = String(kpi.processing_run_id || kpi.kpi_run_id || '');
-    if (!expectedReportDate || reportDate !== expectedReportDate || ((cutoff || kpiCutoff) && cutoff !== kpiCutoff) || (run && run !== String(awards.processing_run_id || ''))) {
-      const note = reportDate ? `台獎日期 ${reportDate} 與 KPI 日期 ${expectedReportDate || '—'} 不一致` : '正式台獎未提供可對齊的資料日期';
+    if (!expectedVersionDate || versionDate !== expectedVersionDate || !cutoff || !kpiCutoff || cutoff !== kpiCutoff || (run && run !== String(awards.processing_run_id || ''))) {
+      const note = versionDate ? `台獎版本日期 ${versionDate} 與 KPI 版本日期 ${expectedVersionDate || '—'} 不一致，或資料截至日期未對齊` : '正式台獎未提供可對齊的資料日期';
       const missing = data => C.moduleState({ status:'no_data', updatedAt:readAt, sourceUpdatedAt:updatedAt, stale:updatedAt?stale(updatedAt):false, source, data, note });
       return { summary:missing(null), stores:missing([]), top2:missing([]) };
     }
@@ -544,7 +569,7 @@
       areaActualAward:numberOrNull(supervisorAward.actual_total),
       areaCompanyRank:numberOrNull(supervisorAward.rank),
       areaEligible:supervisorEligibility === 'Y' ? true : supervisorEligibility === 'N' ? false : null,
-      winningStores, totalStores:9, reportDate,
+      winningStores, totalStores:9, reportDate:versionDate, dataAsOfDate:cutoff,
       items:models.map(item=>({name:String(item.display_name || item.name || ''),actual:numberOrNull(item.actual),target:numberOrNull(item.target),rate:numberOrNull(item.rate)})).filter(item=>item.name),
       people:(Array.isArray(kpi.personal)?kpi.personal:[]).map(person=>({
         name:String(person.name || ''),store:normalizeStore(person.store),
@@ -754,7 +779,7 @@
     }
     const snapshot = privateResult.snapshot || {};
     const readAt = nowIso();
-    const awards = adaptAwards(snapshot, String(snapshot.kpiBattle&&(snapshot.kpiBattle.report_run_date||snapshot.kpiBattle.report_date)||''), readAt);
+    const awards = adaptAwards(snapshot, String(snapshot.kpiBattle&&(snapshot.kpiBattle.source_version_date||snapshot.kpiBattle.report_date)||''), readAt);
     const personalPerformance = privateLoadingModule('personalPerformance','正式 KPI 個績');
     contract = C.validateContract({
       ...contract, version:C.VERSION, generatedAt:readAt, mode:'formal',
@@ -2073,5 +2098,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=patrol-isolated-recovery-20260916',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=release-gate-20260928-v1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);

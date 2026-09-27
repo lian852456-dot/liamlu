@@ -10,7 +10,7 @@
   const PREVIEW_LIMIT = 5;
   const NORMALIZED_PREVIEW_LIMIT = 50;
   const GRADE_ORDER = Object.freeze(['S', 'A', 'B', 'C']);
-  const PARSER_VERSION = '2026.09.27-candidate-preview-2';
+  const PARSER_VERSION = '2026.09.28-private-registry-1';
   const HEADER_ALIASES = Object.freeze([
     { key:'brand', label:'品牌', aliases:['品牌', '廠牌', '品牌名稱', 'brand', 'brand name'] },
     { key:'code', label:'商品代碼／料號', aliases:['代碼', '商品代碼', '產品代碼', 'code', 'item code'] },
@@ -655,6 +655,21 @@
     return 'unavailable';
   }
 
+  // Version newness comes only from one complete YYYYMMDD token in the chosen
+  // source filename. Spreadsheet cell dates remain informational. Missing,
+  // invalid, or competing tokens fail closed rather than being guessed.
+  function sourceVersionDateFromFileName(value) {
+    const tokens = Array.from(new Set(Array.from(text(value).matchAll(/(^|\D)(\d{8})(?=\D|$)/g), match => match[2])));
+    if (tokens.length !== 1) return '';
+    const token = tokens[0];
+    const year = Number(token.slice(0, 4));
+    const month = Number(token.slice(4, 6));
+    const day = Number(token.slice(6, 8));
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return year >= 2000 && date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+      ? `${token.slice(0, 4)}-${token.slice(4, 6)}-${token.slice(6, 8)}` : '';
+  }
+
   function chooseSheet(sheets, kind) {
     const candidates = [];
     (sheets || []).forEach(sheet => {
@@ -961,22 +976,49 @@
 
   function candidateMetadata(kind, result) {
     const report = buildAcceptanceReport(kind, result);
-    const sourceDates = candidateSourceDates(result && result.standardized && result.standardized.rows);
-    const publishEligible = Boolean(report.acceptance.publishEligible);
-    return {
+    const internalSourceDates = candidateSourceDates(result && result.standardized && result.standardized.rows);
+    const sourceVersionDate = text(result && result.sourceVersionDate) || sourceVersionDateFromFileName(result && result.fileName);
+    const metadata = {
       version:candidateVersion(result),
-      sourceDates,
-      sourceDateLabel:sourceDates.length === 1 ? sourceDates[0] : (sourceDates.length ? '多個來源日期' : '來源檔未提供日期'),
+      sourceVersionDate,
+      sourceDateLabel:sourceVersionDate || '來源檔名日期無效',
+      internalSourceDates,
       parsedAt:text(result && result.parsedAt),
       acceptanceStatus:report.acceptance.status,
       blockers:report.acceptance.blockers.slice(),
       warnings:report.acceptance.warnings.slice(),
       presentation:report.presentation,
       publication:{
-        disabled:!publishEligible,
-        status:publishEligible ? report.acceptance.status : 'BLOCKED',
-        reason:publishEligible ? (report.acceptance.status === 'PARTIAL_READY' ? '有價格資料可候選發布；無任何價格的商品不會呈現。' : '完整驗收通過，可進入候選發布 review。') : '驗收未通過，正式發布已停用。'
+        disabled:!report.acceptance.publishEligible,
+        status:report.acceptance.publishEligible ? report.acceptance.status : 'BLOCKED',
+        reason:report.acceptance.publishEligible ? (report.acceptance.status === 'PARTIAL_READY' ? '有價格資料可候選發布；無任何價格的商品不會呈現。' : '完整驗收通過，可進入候選發布 review。') : '驗收未通過，正式發布已停用。'
       }
+    };
+    if (!sourceVersionDate) {
+      metadata.acceptanceStatus = 'BLOCKED';
+      metadata.blockers.unshift('來源檔名必須且只能包含一個有效 YYYYMMDD 版本日期。');
+      metadata.publication = { disabled:true, status:'BLOCKED', reason:'來源檔名日期缺失、無效或不唯一，正式發布已停用。' };
+    }
+    return metadata;
+  }
+
+  function buildPublishSnapshot(kind, result) {
+    const candidate = buildPrepublishCandidate(kind, result);
+    const metadata = candidate.metadata || {};
+    if (metadata.publication && metadata.publication.disabled) throw new Error('候選未通過發布 gate。');
+    if (!metadata.sourceVersionDate) throw new Error('來源檔名版本日期無效。');
+    const rows = kind === 'tradein'
+      ? candidate.rows.map(row => ({ source_sheet:text(row.sourceSheet), brand:text(row.brand), model:text(row.model), quotes:row.quotes || {} }))
+      : candidate.rows.filter(row => !row.priceMatrixConflict).map(row => ({ source_sheet:text(row.sourceSheet), brand:text(row.brand), model:text(row.model), color_variant_count:Number(row.colorVariantCount || 0), retail_price:text(row.retailPrice), project_prices:row.projectPrices || {} }));
+    return {
+      schema_version:'threec-normalized-snapshot/v1',
+      kind:kind === 'tradein' ? 'tradein' : 'shopping',
+      source_version_date:metadata.sourceVersionDate,
+      source_file_name:text(result && result.fileName),
+      source_file_sha256:text(result && result.fileSha256),
+      parser_version:PARSER_VERSION,
+      internal_source_dates:metadata.internalSourceDates || [],
+      rows
     };
   }
 
@@ -1153,6 +1195,7 @@
     }];
     return Object.assign({}, analysis, {
       fileName:String(file.name || ''),
+      sourceVersionDate:sourceVersionDateFromFileName(file && file.name),
       fileType:fileType(extension, loaded.encoding),
       fileSize:Number(file.size || 0),
       fileSha256,
@@ -1166,5 +1209,5 @@
     });
   }
 
-  return Object.freeze({ MAX_FILE_BYTES, SUPPORTED_EXTENSIONS, PREVIEW_LIMIT, NORMALIZED_PREVIEW_LIMIT, GRADE_ORDER, PARSER_VERSION, extensionOf, isSupported, recognizeHeader, gradeFromHeader, detectHeader, analyseMatrix, parseFile, buildAcceptanceReport, buildPrepublishCandidate, buildShoppingPresentation:shoppingNoPricePresentation, buildShoppingCandidate, filterShoppingCandidate, buildTradeInCandidate, filterTradeInCandidate, colorlessModel });
+  return Object.freeze({ MAX_FILE_BYTES, SUPPORTED_EXTENSIONS, PREVIEW_LIMIT, NORMALIZED_PREVIEW_LIMIT, GRADE_ORDER, PARSER_VERSION, extensionOf, isSupported, recognizeHeader, gradeFromHeader, detectHeader, analyseMatrix, parseFile, buildAcceptanceReport, buildPrepublishCandidate, buildPublishSnapshot, buildShoppingPresentation:shoppingNoPricePresentation, buildShoppingCandidate, filterShoppingCandidate, buildTradeInCandidate, filterTradeInCandidate, sourceVersionDateFromFileName, colorlessModel });
 });

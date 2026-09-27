@@ -12,11 +12,11 @@ test('3C 與舊換新資料都能在本機上傳、辨識與預覽', async ({ pa
   await page.goto(PAGE_URL);
   await expect(page.getByRole('heading', { name:'3C／舊換新資料匯入測試區' })).toBeVisible();
   await page.setInputFiles('#shoppingFile', {
-    name:'3c-shopping.csv',
+    name:'20260928-3c-shopping.csv',
     mimeType:'text/csv',
     buffer:Buffer.from('\ufeff品牌,商品名稱,商品型號,售價,備註\r\nApple,"iPhone, 18 Pro",A18P,39900,\r\n')
   });
-  await expect(page.locator('#shoppingAnalysis')).toContainText('3c-shopping.csv');
+  await expect(page.locator('#shoppingAnalysis')).toContainText('20260928-3c-shopping.csv');
   await expect(page.locator('#shoppingAnalysis')).toContainText('CSV（UTF-8）');
   await expect(page.locator('#shoppingAnalysis')).toContainText('iPhone, 18 Pro');
   await expect(page.locator('#shoppingAnalysis')).toContainText('解析驗收摘要');
@@ -24,11 +24,11 @@ test('3C 與舊換新資料都能在本機上傳、辨識與預覽', async ({ pa
   await expect(page.locator('#shoppingAnalysis')).toContainText('資料品質與解析異常');
   await expect(page.locator('#shoppingAnalysis')).toContainText('標準化資料預覽（Wide → Long）');
   await page.setInputFiles('#tradeinFile', {
-    name:'tradein.csv',
+    name:'20260928-tradein.csv',
     mimeType:'text/csv',
     buffer:Buffer.from('品牌,機型,回收價,機況\nApple,iPhone 18 Pro,22000,A級\n')
   });
-  await expect(page.locator('#tradeinAnalysis')).toContainText('tradein.csv');
+  await expect(page.locator('#tradeinAnalysis')).toContainText('20260928-tradein.csv');
   await expect(page.locator('#tradeinAnalysis')).toContainText('回收價 ← 回收價');
   await expect(page.locator('#tradeinAnalysis')).toContainText('22000');
   expect(errors).toEqual([]);
@@ -37,7 +37,7 @@ test('3C 與舊換新資料都能在本機上傳、辨識與預覽', async ({ pa
 test('舊換新寬表可轉 Long Format，並支援搜尋與前 50 筆預覽', async ({ page }) => {
   await page.goto(PAGE_URL);
   await page.setInputFiles('#tradeinFile', {
-    name:'company-tradein-wide.csv',
+    name:'20260928-company-tradein-wide.csv',
     mimeType:'text/csv',
     buffer:Buffer.from([
       '機型(A等級),品名 Item(A等級),回收價(A等級),機型(B等級),品名 Item(B等級),回收價(B等級),機型(S等級),品名 Item(S等級),回收價(S等級)',
@@ -64,7 +64,7 @@ test('去識別化驗收報告可複製，剪貼簿失敗時保留可手動複�
   });
   await page.goto(PAGE_URL);
   await page.setInputFiles('#shoppingFile', {
-    name:'private-file-name.csv',
+    name:'20260928-private-file-name.csv',
     mimeType:'text/csv',
     buffer:Buffer.from('廠牌,代碼,機型,商品名稱,單機價\nApple,SECRET-CODE,PRIVATE-MODEL,PRIVATE-PRODUCT,39888\n')
   });
@@ -100,7 +100,7 @@ test('去識別化驗收報告可複製，剪貼簿失敗時保留可手動複�
 test('3C 候選查詢不以顏色為條件、要求選擇方案，並透明排除全空價格商品', async ({ page }) => {
   await page.goto(PAGE_URL);
   await page.setInputFiles('#shoppingFile', {
-    name:'candidate-shopping.csv',
+    name:'20260928-candidate-shopping.csv',
     mimeType:'text/csv',
     buffer:Buffer.from([
       '廠牌,代碼,機型,單機價,999H,1599H',
@@ -134,7 +134,7 @@ test('舊換新候選同表比較兩家回收商，缺少等級明示來源未�
   ]), '比較表');
   await page.goto(PAGE_URL);
   await page.setInputFiles('#tradeinFile', {
-    name:'candidate-tradein.xlsx',
+    name:'20260928-candidate-tradein.xlsx',
     mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     buffer:Buffer.from(XLSX.write(workbook, { type:'buffer', bookType:'xlsx' }))
   });

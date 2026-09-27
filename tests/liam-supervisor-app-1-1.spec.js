@@ -180,11 +180,11 @@ test('September App keeps NA items missing in totals, groups, store status and r
   await expect(page.locator('#patrolOverview')).toContainText('2026-09 · 新版 25 項');
   await expect(page.locator('#patrolOverview')).toContainText('只有 V 計入完成，NA 列為缺項');
   await expect(page.locator('.patrol-kpis article',{hasText:'25 項完成店數'}).locator('b')).toHaveText('0');
-  await expect(page.locator('.patrol-kpis article',{hasText:'尚缺檢核項次'}).locator('b')).toHaveText('3');
+  await expect(page.locator('.patrol-kpis article',{hasText:'尚缺檢核項次'}).locator('b')).toHaveText('2');
   const store=page.locator('#patrolStoreList .patrol-store-row').filter({hasText:'通化'});
   await expect(store).toContainText('待補');
-  await expect(store).toContainText('第1–9項 7/9 · 第10項 0/1 · 第11–25項 15/15');
-  await expect(page.locator('#patrolRecentList')).toContainText('待補 3 項');
+  await expect(store).toContainText('第1–9項 8/9 · 第10項 0/1 · 第11–25項 15/15');
+  await expect(page.locator('#patrolRecentList')).toContainText('待補 2 項');
 });
 
 test('isolated patrol visit flow records arrival and departure with one protected POST per tap', async ({ page }) => {
@@ -354,8 +354,8 @@ test('formal area award summary renders supervisor fields and fails closed when 
     const payload=JSON.parse(route.request().postData()||'{}');
     if(payload.action==='private_access') {
       return route.fulfill({json:{status:'ok',profile:{maskedName:'測＊員'},snapshot:{
-        kpiBattle:{report_date:'2026-08-09',source_file:'0810.xlsx',data_as_of_date:'2026-08-09',aggregate:{},stores:[]},
-        awardsBattle:{report_date:'2026-08-09',generated_at:'2026-08-10T08:00:00+08:00',supervisor:{...supervisor},overall:{award:{actual_total:99999},items:[]},stores:storeNames.map((store,index)=>({store,award:{actual_total:1000+index,award:index<4?'Y':'N'},items:[]}))}
+        kpiBattle:{report_date:'2026-08-10',source_version_date:'2026-08-10',source_file:'0810.xlsx',data_as_of_date:'2026-08-09',aggregate:{},stores:[]},
+        awardsBattle:{report_date:'2026-08-10',source_version_date:'2026-08-10',data_as_of_date:'2026-08-09',generated_at:'2026-08-10T08:00:00+08:00',supervisor:{...supervisor},overall:{award:{actual_total:99999},items:[]},stores:storeNames.map((store,index)=>({store,award:{actual_total:1000+index,award:index<4?'Y':'N'},items:[]}))}
       }}});
     }
     if(payload.action==='kpicalc_access') return route.fulfill({json:{status:'ok',data:{meta:{month:'2026-08',snapshotDay:9,sourceFile:'0810.xlsx'},items:[],aggregateRates:{},stores:[]}}});

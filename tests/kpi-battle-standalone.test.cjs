@@ -52,6 +52,7 @@ test('同仁大廳第一張卡為 KPI 戰情，原入口仍保留原連結', () 
     'kpitry.html',
     'audit-report.html',
     'https://twm-store-inspection.liamlu245.chatgpt.site/',
-    'daily-log-dashboard.html',
   ]);
+  const supervisor = home.match(/<nav class="board" aria-label="督導專區">([\s\S]*?)<\/nav>/)?.[1] || '';
+  assert.match(supervisor, /href="daily-log-dashboard\.html"/);
 });

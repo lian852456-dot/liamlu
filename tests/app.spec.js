@@ -32,7 +32,8 @@ async function mockGAS(page, { readData = {}, privateKpi = KPI_BATTLE_FIXTURE, p
 }
 
 const KPI_BATTLE_FIXTURE = {
-  report_date: '2026-08-04',
+  report_date: '2026-08-05',
+  source_version_date: '2026-08-05',
   data_as_of_date: '2026-08-04',
   source_as_of_date: '2026-08-04',
   source_file: '0805.xlsx',
@@ -96,7 +97,9 @@ const AWARD_ITEMS = [
 }));
 
 const AWARDS_BATTLE_FIXTURE = {
-  report_date: '2026-08-04',
+  report_date: '2026-08-05',
+  source_version_date: '2026-08-05',
+  data_as_of_date: '2026-08-04',
   phone_items: 13,
   store_rows: 10,
   supervisor: { actual_total: 2431, projected: 11260, rank: '22', award: 'Y' },
@@ -377,7 +380,7 @@ test.describe('KPI 戰情', () => {
     await expect(page.locator('#kpiBattleContent')).toContainText('台北大稻埕');
     await expect(page.locator('#kpiBattleContent')).toContainText('A999');
     await expect(page.locator('#kpiBattleContent')).toContainText('R1399');
-    await expect(page.locator('#kpiBattleSourceNote')).toContainText('戰報日期 2026-08-04');
+    await expect(page.locator('#kpiBattleSourceNote')).toContainText('版本日期 2026-08-05');
     await expect(page.locator('#kpiBattleSourceNote')).toContainText('資料統計至 2026-08-04');
     await expect(page.locator('#kpiBattleSourceNote')).toContainText('來源檔 0805.xlsx');
     await expect(page.locator('#kpiBattleSourceNote')).toContainText('區間 2026/08/01～08/04');
@@ -438,7 +441,7 @@ test.describe('台獎戰情', () => {
     await expect(page.locator('#awardsBattleContent')).toContainText('通化');
     await expect(page.locator('#awardsBattleSourceNote')).toContainText('13 款重點機款');
     await expect(page.locator('#awardsBattleSourceNote')).toContainText('10 列店點與整體資料');
-    await expect(page.locator('#awardsBattleSourceNote')).toContainText('台獎戰報日期 2026-08-04');
+    await expect(page.locator('#awardsBattleSourceNote')).toContainText('版本日期 2026-08-05');
     await expect(page.locator('#awardsBattleContent')).toContainText('北一二B／門市 13 款機款篩選');
     await expect(page.locator('.award-store-card').nth(1)).toContainText('通化');
     await expect(page.locator('#awardsStoreSelect')).toHaveValue('北一二B整體');
@@ -454,7 +457,7 @@ test.describe('台獎戰情', () => {
   });
 
   test('台獎戰報日期與 KPI 戰報日期不一致時必須阻擋', async ({ page }) => {
-    await mockGAS(page, { privateAwards: { ...AWARDS_BATTLE_FIXTURE, report_date: '2026-08-03' } });
+    await mockGAS(page, { privateAwards: { ...AWARDS_BATTLE_FIXTURE, report_date: '2026-08-03', source_version_date: '2026-08-03' } });
     await kpiBattleLogin(page);
     await page.getByRole('button', { name: /台獎戰情/ }).click();
     await expect(page.locator('#awardsBattleContent')).toContainText('台獎尚未同步');

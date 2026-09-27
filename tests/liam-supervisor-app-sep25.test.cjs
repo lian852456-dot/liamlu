@@ -11,7 +11,7 @@ test('App loads the shared September question model before its read adapters',()
   const html=read('app.html');
   const questionIndex=html.indexOf('patrol-question-versions.js?v=app-na-v-20260903-1');
   const halfIndex=html.indexOf('half-month-check-read-model.js?v=app-sep25-20260903-2');
-  const appIndex=html.indexOf('app.js?v=patrol-isolated-recovery-20260916');
+  const appIndex=html.indexOf('app.js?v=release-gate-20260928-v1');
   assert.ok(questionIndex>0&&questionIndex<halfIndex&&halfIndex<appIndex);
   assert.match(html,/id="patrolMileage"/);
   assert.match(html,/督導到店檢查/);
@@ -29,8 +29,8 @@ test('September App shares the V-only completion model for totals, groups, missi
   const app=read('app.js');
 
   assert.deepEqual({done:summary.done,missing:summary.missingItems,items:summary.missingItemNumbers},
-    {done:22,missing:3,items:[1,3,10]});
-  assert.deepEqual([summary.monthly.completed,summary.bimonthly.completed,summary.ncc.completed],[7,0,15]);
+    {done:23,missing:2,items:[3,10]});
+  assert.deepEqual([summary.monthly.completed,summary.bimonthly.completed,summary.ncc.completed],[8,0,15]);
   assert.equal(summary.questionsComplete,false);
   assert.equal(summary.status,'attention');
   assert.match(app,/Q\.overview\(rows,definitions,month\)/);

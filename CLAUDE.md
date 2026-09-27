@@ -14,20 +14,20 @@
 - 店長的「個績」不可用 `store_calc[店點]`、店點總 KPI 或店績排名代替。救援／每日 builder 也必須先依姓名取得個人列，不能因 `category == 店長` 改讀店點列。
 - dashboard 私有快照只有在 `kpiBattle.personal_semantics == "individual-v1"` 時，前端才可採用店長個人排名與 DOD；無標記的舊快照視為語意不可信，不得覆寫 kpicalc 個績。
 
-## 2026-08-23 D+1 KPI 補值門檻（取代舊的檔名推算）
+## 2026-09-28 KPI 版本／資料日契約（取代舊的日期同值規則）
 
-- 現行正式 snapshot 的 `report_date`、`data_as_of_date` 與 `source_as_of_date` 都代表資料截止日；
-  來源附件可在次日收到，例如截止 `2026-08-22`、來源 `0823.xlsx`。
-- App／standalone controller 只比較三件事：snapshot 日期等於 `kpicalc` cutoff、snapshot
-  `source_file` 等於 `kpicalc.meta.sourceFile`、KPI 結構完整。絕對不可由日期推算 `MMDD.xlsx`；
-  否則會誤把有效 D+1 快照判成不同步，並隱藏公司排名、DOD、排名變動與加減分。
+- `source_file` 檔名中唯一、有效的日期是版本權威：寫入 `source_version_date` 與相容欄位 `report_date`。
+  檔名缺少、無效或含多個日期時 fail-closed；不得以系統日、寄件日或 Excel 內日期補猜。
+- Excel 內 `period`／`snapshotDay` 是 `data_as_of_date`（相容讀取 `source_as_of_date`），只表示資料截至日。
+  它可與版本日不同，例如版本 `2026-08-05`、資料截至 `2026-08-04`、來源 `0805.xlsx`。
+- App／standalone controller 必須分別比對版本日、資料截至日與 canonical `source_file`，再補入排名、DOD、排名變動與加減分；任一項不符即 fail-closed。
 
 ## 2026-08-05 固定 KPI／台獎日期契約
 
-- `report_date` 是每日戰報／網站發布日；`data_as_of_date`（相容讀取 `source_as_of_date`）是來源資料截止日，兩者不得互換。0805 範例：發布日 `2026-08-05`，截止日 `2026-08-04`，來源 `0805.xlsx`，區間 `2026/08/01 ~ 08/04`。
+- `report_date`／`source_version_date` 是來源檔名的版本日；`data_as_of_date`（相容讀取 `source_as_of_date`）是來源資料截止日，兩者不得互換。0805 範例：版本日 `2026-08-05`，截止日 `2026-08-04`，來源 `0805.xlsx`，區間 `2026/08/01 ~ 08/04`。
 - KPI 實績、目標、店點總達成率、核心與逐項 KPI 必須取 `kpicalc_access`。公司排名、DOD、加掛、個人排名、個人台獎與保險搭售率，只能從同一次私有 snapshot 補入。
-- 補值門檻必須同時通過：snapshot `report_date` 存在、snapshot 截止日等於 kpicalc 截止日、snapshot `source_file` 等於 kpicalc `meta.sourceFile`。任一項不符，顯示「尚未同步」，不得使用 localStorage、舊 snapshot 或舊附件。
-- KPI 與台獎是否同次發布只比較 `report_date`。不可因為 KPI 截止日較早而隱藏同日發布的台獎。
+- 補值門檻必須同時通過：snapshot 版本日等於來源檔名版本日、snapshot 截止日等於 kpicalc 截止日、snapshot `source_file` 等於 kpicalc `meta.sourceFile`。任一項不符，顯示「尚未同步」，不得使用 localStorage、舊 snapshot 或舊附件。
+- KPI 與台獎必須分別比較版本日與資料截至日；不可因兩者正常不同而隱藏同批資料。
 - 本機快照建立器：`/Users/liamlu/Downloads/liam-agent/report-automation/work/build_github_pages_data.py` 必須輸出 `report_date`、`data_as_of_date`、`source_as_of_date`、`source_file`、`source_date_range`。2026-08-05 快照已驗證：公司排名 34、整體 KPI 1.097、加掛 12.35、9 店、41 人；台獎 13 款、10 列。
 - KPI 店績的「保險搭售率」是實際搭售率，取同日、同來源的 `supplemental_daily_report`；快照要同時含整體與九店 `insurance_attach_rate`，來源不一致時不得補舊值。畫面位置固定接在「加掛」後。
 - 台獎上方排序卡維持原規則。僅下方 13 款篩選器新增「北一二B整體」：選北一二B顯示每款督導 `80%／100%` 獎金，選店點顯示每款店長 `50%／100%` 獎金；兩者不可混算。

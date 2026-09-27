@@ -42,12 +42,13 @@
 ## KPI hard gates
 
 1. 25 項 rate 只讀 `kpicalc` 的正式 `aggregateRates`／各店 `reportRate`；不以實績／目標重算。
-2. KPI 摘要補充只有在 snapshot `report_date`、`data_as_of_date`（相容 `source_as_of_date`）與
-   `kpicalc` cutoff 三者同日，且 snapshot `source_file` 與 `kpicalc.meta.sourceFile` canonical basename
-   相同時，才可合併排名、DOD、加減分。來源檔名可能是截止日次日收到的 `MMDD.xlsx`，不得由
-   cutoff／`report_date` 推算檔名。
+2. KPI 摘要補充只有在 snapshot `source_version_date`（相容讀取 `report_date`）等於唯一、有效的
+   `kpicalc.meta.sourceFile` 檔名版本日，snapshot `data_as_of_date`（相容 `source_as_of_date`）等於
+   `kpicalc` cutoff，且 canonical basename 相同時，才可合併排名、DOD、加減分。版本日與截止日各自
+   驗證，不要求相等；檔名缺少、無效或多個日期時 fail-closed。
 3. 九店或 25 項不完整時為 `partial`；來源不一致時補充欄位 fail-closed。
-4. 台獎 `report_date` 必須與 KPI `report_date` 一致，否則整個台獎摘要為 `no_data`。
+4. 台獎版本日（`source_version_date`、相容 `report_run_date`／`report_date`）必須與 KPI 版本日一致，
+   資料截至日也必須與 KPI 截止日一致，否則整個台獎摘要為 `no_data`。
 5. 店點指定機款只可直接映射該店 `row.items`；不得用區 Top 2 推算、跨店合併、前端計算或人工補值。
 
 ## Schedule／Patrol hard gates

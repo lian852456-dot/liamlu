@@ -78,10 +78,11 @@ python3 /Users/liamlu/Downloads/liam-agent/report-automation/work/build_github_p
 ```
 
 `report_run_date`／`mail_date` 是執行與寄信日；`data_cutoff_date` 是
-`today_report_data.json` 的 `source_date_range` 最後一日。KPI／台獎網站 snapshot 的
-`report_date` 與 KPI `data_as_of_date` 一律使用 `data_cutoff_date`，不得由
-`MMDD.xlsx`、郵件主旨或附件檔名推導。正式發布另須顯式傳入
-`REPORT_RUN_DATE_ISO` 與 `REPORT_DATA_CUTOFF_DATE`；任一缺少或不一致都 fail closed。
+`today_report_data.json` 的 `source_date_range` 最後一日，寫入 `data_as_of_date`。
+正式 snapshot 的 `report_date`（並建議同步 `source_version_date`）必須是唯一、有效的來源檔名日期；
+檔名缺少、無效或多個日期即 fail closed，不能用郵件主旨、執行日或 Excel 內日期代替。
+兩個日期各自驗證，不要求相等。正式發布另須顯式傳入
+`REPORT_RUN_DATE_ISO` 與 `REPORT_DATA_CUTOFF_DATE`；任一缺少、版本不唯一或來源不一致都 fail closed。
 
 輸出會更新：
 

@@ -5,8 +5,22 @@ const {patrolSummaryResponse}=require('./fixtures/patrol-summary-response.cjs');
 
 const FORMAL_URL=`file://${path.resolve(__dirname,'../app.html')}#patrol`;
 const TOKEN='formal-read-short-token';
-const TODAY=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const TODAY='2026-08-12';
+const FORMAL_TEST_NOW='2026-08-12T04:00:00.000Z';
 test.use({viewport:{width:390,height:844},serviceWorkers:'block'});
+
+async function useFormalTestDate(page){
+  await page.addInitScript(iso=>{
+    const NativeDate=Date;
+    const base=NativeDate.parse(iso);
+    const nativeStart=NativeDate.now();
+    class CalendarDate extends NativeDate {
+      constructor(...args){super(...(args.length?args:[base+NativeDate.now()-nativeStart]));}
+      static now(){return NativeDate.now();}
+    }
+    window.Date=CalendarDate;
+  },FORMAL_TEST_NOW);
+}
 
 async function installFormalRoutes(page,{expireHread=false}={}){
   const state={hread:0,writes:[],requests:[]};
@@ -31,7 +45,7 @@ async function installFormalRoutes(page,{expireHread=false}={}){
     if(action==='ptvisit_read') return route.fulfill({json:{status:'ok',events:[{serverTime:`${TODAY}T09:12:00+08:00`,date:TODAY,action:'arrival',store:'台北酒泉',note:'',visitSessionId:'formal-open'}],openVisit:{serverTime:`${TODAY}T09:12:00+08:00`,date:TODAY,action:'arrival',store:'台北酒泉',note:'',visitSessionId:'formal-open'}}});
     if(action==='hread'){
       state.hread+=1;
-      return route.fulfill({json:expireHread?{status:'error',message:'unauthorized'}:{status:'ok',rows:fixture.rows}});
+      return route.fulfill({json:expireHread?{status:'error',reason:'AUTH_SESSION_EXPIRED'}:{status:'ok',rows:fixture.rows}});
     }
     return route.fulfill({json:{status:'error',message:`unexpected action ${action}`}});
   });
@@ -50,6 +64,7 @@ async function mobileAssertions(page){
 }
 
 test('formal hread maps nine stores while recovery remains read-only',async({page})=>{
+  await useFormalTestDate(page);
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   const state=await installFormalRoutes(page);
@@ -103,6 +118,7 @@ test('formal hread maps nine stores while recovery remains read-only',async({pag
 });
 
 test('period selector reads cached H2 rows without a write or second hread',async({page})=>{
+  await useFormalTestDate(page);
   const state=await installFormalRoutes(page);
   await page.goto(FORMAL_URL);
   await page.locator('[data-patrol-check-view="half-month"]').click();
@@ -116,6 +132,7 @@ test('period selector reads cached H2 rows without a write or second hread',asyn
 });
 
 test('without a patrol session formal half-month stays locked and sends no hread',async({page})=>{
+  await useFormalTestDate(page);
   const requests=[];
   await page.route('https://script.google.com/**',route=>{requests.push(route.request().url());return route.abort();});
   await page.goto(FORMAL_URL);
@@ -125,6 +142,7 @@ test('without a patrol session formal half-month stays locked and sends no hread
 });
 
 test('expired hread reuses the existing patrol timeout UX and fails closed',async({page})=>{
+  await useFormalTestDate(page);
   const state=await installFormalRoutes(page,{expireHread:true});
   await page.goto(FORMAL_URL);
   await page.locator('[data-patrol-check-view="half-month"]').click();

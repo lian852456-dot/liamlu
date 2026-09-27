@@ -215,7 +215,8 @@
     const grid = element('dl', 'candidate-meta');
     [
       ['候選版本', metadata.version],
-      ['來源檔日期', metadata.sourceDateLabel],
+      ['檔名版本日期', metadata.sourceDateLabel],
+      ['Excel 內日期（資訊）', (metadata.internalSourceDates || []).join('、') || '來源未提供'],
       ['解析時間', metadata.parsedAt || '未提供'],
       ['驗收狀態', metadata.acceptanceStatus]
     ].forEach(pair => {

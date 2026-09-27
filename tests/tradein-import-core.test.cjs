@@ -233,7 +233,7 @@ test('3C 候選查詢只合併同來源同容量的色別，並且要求選擇�
     'Apple,A-128-W,iPhone 18 Pro 128G(白),39900,12000,9000',
     'Apple,A-256-B,iPhone 18 Pro 256G(黑),42900,15000,11000'
   ].join('\n');
-  const result = await Core.parseFile(localFile('candidate-colors.csv', csv), XLSX, 'shopping');
+  const result = await Core.parseFile(localFile('20260922-candidate-colors.csv', csv), XLSX, 'shopping');
   const candidate = Core.buildShoppingCandidate(result);
   assert.equal(candidate.metadata.acceptanceStatus, 'PASS');
   assert.match(candidate.metadata.version, /^local-candidate-[a-f0-9]{12}$/);
@@ -253,7 +253,7 @@ test('色別去除後若價格矩陣不同，候選查詢會 fail-closed 排除�
     'Apple,A-B,iPhone 18 128G(黑),29900,9000',
     'Apple,A-W,iPhone 18 128G(白),29900,9500'
   ].join('\n');
-  const candidate = Core.buildShoppingCandidate(await Core.parseFile(localFile('candidate-conflict.csv', csv), XLSX, 'shopping'));
+  const candidate = Core.buildShoppingCandidate(await Core.parseFile(localFile('20260922-candidate-conflict.csv', csv), XLSX, 'shopping'));
   assert.equal(candidate.priceMatrixConflictCount, 1);
   assert.equal(Core.filterShoppingCandidate(candidate, { plan:'999H' }).length, 0);
 });
@@ -264,7 +264,7 @@ test('全空價格商品會 PARTIAL_READY 排除，剩餘有價資料可候選�
     'Apple,A-OK,iPhone 18 128G(黑),29900,9000',
     'Apple,A-MISSING,iPhone 18 256G(黑),,'
   ].join('\n');
-  const candidate = Core.buildShoppingCandidate(await Core.parseFile(localFile('candidate-blocked.csv', csv), XLSX, 'shopping'));
+  const candidate = Core.buildShoppingCandidate(await Core.parseFile(localFile('20260922-candidate-blocked.csv', csv), XLSX, 'shopping'));
   const report = Core.buildAcceptanceReport('shopping', await Core.parseFile(localFile('candidate-blocked-report.csv', csv), XLSX, 'shopping'));
   assert.equal(candidate.metadata.acceptanceStatus, 'PARTIAL_READY');
   assert.equal(candidate.metadata.publication.disabled, false);
@@ -304,7 +304,7 @@ test('全空價格以外的錯誤仍會 BLOCKED，不能套用部分可發布規
     'Apple,A-MISSING,iPhone 18 256G(黑),,',
     'Apple,A-BAD,iPhone 18 512G(黑),NOT-A-PRICE,10000'
   ].join('\n');
-  const result = await Core.parseFile(localFile('candidate-other-error.csv', csv), XLSX, 'shopping');
+  const result = await Core.parseFile(localFile('20260922-candidate-other-error.csv', csv), XLSX, 'shopping');
   const report = Core.buildAcceptanceReport('shopping', result);
   const candidate = Core.buildShoppingCandidate(result);
   assert.equal(report.acceptance.status, 'BLOCKED');
@@ -322,7 +322,7 @@ test('舊換新候選比較兩家回收商與 S/A/B/C，缺少等級不補零', 
   ];
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), '比較表');
-  const candidate = Core.buildTradeInCandidate(await Core.parseFile(localFile('candidate-tradein.xlsx', XLSX.write(workbook, { type:'buffer', bookType:'xlsx' })), XLSX, 'tradein'));
+  const candidate = Core.buildTradeInCandidate(await Core.parseFile(localFile('20260916-candidate-tradein.xlsx', XLSX.write(workbook, { type:'buffer', bookType:'xlsx' })), XLSX, 'tradein'));
   assert.equal(candidate.metadata.acceptanceStatus, 'PASS');
   const matched = Core.filterTradeInCandidate(candidate, { query:'256G' });
   assert.equal(matched.length, 1);
@@ -347,4 +347,24 @@ test('營運中心入口與測試頁都維持本機解析邊界', () => {
   assert.match(page + '\n' + client, /正式發布（驗收未通過）/);
   assert.match(page + '\n' + client, /來源未提供/);
   assert.doesNotMatch(page + '\n' + client, /localStorage|indexedDB|fetch\(|XMLHttpRequest|sendBeacon/);
+});
+
+test('3C 與舊換新版本日只採來源檔名，缺失、無效或多日期均不可發布', () => {
+  assert.equal(Core.sourceVersionDateFromFileName('20260922手機價格異動清單.xls'), '2026-09-22');
+  assert.equal(Core.sourceVersionDateFromFileName('【銷通網】兩家舊機回收價格比較_20260916.xlsx'), '2026-09-16');
+  assert.equal(Core.sourceVersionDateFromFileName('價格異動清單.xls'), '');
+  assert.equal(Core.sourceVersionDateFromFileName('20261340手機價格.xls'), '');
+  assert.equal(Core.sourceVersionDateFromFileName('20260916-to-20260922.xlsx'), '');
+});
+
+test('準備私有發布的 3C 快照只包含正規化資料、檔名版本日與檔案雜湊', async () => {
+  const csv = ['廠牌,代碼,機型,單機價,999H', 'Apple,A-001,iPhone 18 Pro 128G(黑),39900,12000'].join('\n');
+  const result = await Core.parseFile(localFile('20260922手機價格異動清單.csv', csv), XLSX, 'shopping');
+  const snapshot = Core.buildPublishSnapshot('shopping', result);
+  assert.equal(snapshot.schema_version, 'threec-normalized-snapshot/v1');
+  assert.equal(snapshot.source_version_date, '2026-09-22');
+  assert.match(snapshot.source_file_sha256, /^[a-f0-9]{64}$/);
+  assert.equal(snapshot.rows.length, 1);
+  assert.equal(Object.hasOwn(snapshot.rows[0], 'rawValues'), false);
+  assert.equal(Object.hasOwn(snapshot.rows[0], 'sourceRowNumber'), false);
 });

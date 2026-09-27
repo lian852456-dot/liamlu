@@ -30,6 +30,7 @@ test('mobile App 1.1 has no horizontal overflow and exposes all five tabs', asyn
 });
 
 test('existing short session renders real-shape schedule and patrol data read-only', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-08-09T04:00:00.000Z'));
   const patrolRows = stores.map((store, index) => ({
     fillTime: `2026/8/${index + 1} 10:00`, arriveTime: `2026/8/${index + 1} 10:00`, store,
     code: String(index + 1), item: 2, result: index === 0 ? '' : 'v', reason: index === 0 ? '待追蹤' : '', month: '2026-08', savedAt: `2026/8/${index + 1} 11:00`

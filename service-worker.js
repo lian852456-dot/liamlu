@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-2-phone-stock-20260925-v1';
+const CACHE_NAME = 'liam-supervisor-app-1-2-release-gate-20260928-v1';
 const SHELL = [
   './app.html',
   './app.css',
@@ -50,17 +50,7 @@ function networkFirstShellAsset(request) {
 }
 
 function networkFirstKpiController(request) {
-  return fetch(request, { cache:'no-store' }).then(async response => {
-    if (!response.ok) return response;
-    const original = await response.text();
-    const oldGuard = `    const reportSource = kpiBattleReportSourceFile((snapshot || {}).report_date);\n    return Boolean(\n      snapshot && reportSource &&\n      snapshotDataAsOf === kpiData.data_as_of_date &&\n      snapshotSource && snapshotSource === reportSource &&\n      snapshotSource === kpiBattleSourceFile(kpiData.source_file)\n    );`;
-    const newGuard = `    return Boolean(\n      snapshot &&\n      snapshotDataAsOf === kpiData.data_as_of_date &&\n      snapshotSource &&\n      snapshotSource === kpiBattleSourceFile(kpiData.source_file)\n    );`;
-    const patched = original.includes(oldGuard) ? original.replace(oldGuard, newGuard) : original;
-    const headers = new Headers(response.headers);
-    headers.set('Content-Type', 'application/javascript; charset=utf-8');
-    headers.set('Cache-Control', 'no-store');
-    return new Response(patched, { status: response.status, statusText: response.statusText, headers });
-  }).catch(() => caches.match(request));
+  return networkFirstShellAsset(request);
 }
 
 self.addEventListener('fetch', event => {
