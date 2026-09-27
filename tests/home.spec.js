@@ -4,7 +4,7 @@ const path = require('path');
 const PAGE_URL = process.env.TEST_BASE_URL
   ? new URL('home.html', process.env.TEST_BASE_URL).href
   : 'file://' + path.resolve(__dirname, '../home.html');
-const ORIGINAL_HREFS = ['index.html', 'kpi.html', 'kpitry.html', 'patrol.html', 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec'];
+const ORIGINAL_HREFS = ['index.html', 'kpi.html', 'kpitry.html', 'patrol.html', 'https://script.google.com/macros/s/AKfycbxN43frfQ8hwjQg2p3Xnb73iT6ED-yTWg4M0bHUbVPhiphtNkzU_Yx_j0NXT6Gbburs/exec'];
 const STORE_INSPECTION_URL = 'https://twm-store-inspection.liamlu245.chatgpt.site/';
 
 test('同仁大廳以 KPI、台獎戰情為前兩個入口，既有店務檢查入口保持安全連結', async ({ page }) => {
