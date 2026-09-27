@@ -3105,20 +3105,33 @@ const PHONE_STOCK_FILE = 'north12b-phone-stock-latest.json';
 const PHONE_STOCK_LATEST_ID = 'PHONE_STOCK_LATEST_FILE_ID';
 const PHONE_STOCK_STORES = ['台北酒泉','台北永吉','台北復興南','台北萬大','台北通化','台北杭州南','台北大稻埕','台北三創','台北六張犁'];
 
-function phoneStockAuthorize_(payload) {
+function phoneStockTrustedUser_(payload) {
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
-  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
   const user = privateDashboardUserByEmployeeId(employeeId).user;
-  // Inventory is restricted to the supervisor's explicitly approved device.
-  // Trusted employee bypass in private_access does not apply here.
-  if (!privateDashboardIsTrustedEmployee(employeeId) || !user || user.status !== 'active' || user.device_id !== deviceId) {
-    throw new Error('此裝置尚未核准手機庫存存取');
+  if (!privateDashboardIsTrustedEmployee(employeeId) || !user || user.status !== 'active') {
+    throw new Error('此員編無手機庫存存取權限');
   }
-  return employeeId;
+  return {employeeId:employeeId,user:user};
+}
+
+function phoneStockAuthorizeRead_(payload) {
+  const trusted = phoneStockTrustedUser_(payload);
+  const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
+  // APP 讀取庫存仍限督導已核准的裝置，避免其他人看見庫存數。
+  if (trusted.user.device_id !== deviceId) throw new Error('此裝置尚未核准手機庫存存取');
+  return trusted.employeeId;
+}
+
+function phoneStockAuthorizePublish_(payload) {
+  const trusted = phoneStockTrustedUser_(payload);
+  // 發布端是督導使用的電腦，與已核准 APP 手機會有不同裝置 ID。
+  // 確認發布端帶有有效裝置識別，但不要求它等於 APP 的綁定裝置。
+  privateDashboardCleanDeviceId(payload.deviceId);
+  return trusted.employeeId;
 }
 
 function phoneStockRead(payload) {
-  phoneStockAuthorize_(payload || {});
+  phoneStockAuthorizeRead_(payload || {});
   const id = String(privateDashboardProperties().getProperty(PHONE_STOCK_LATEST_ID) || '');
   if (!id) return { snapshot:null };
   const snapshot = JSON.parse(DriveApp.getFileById(id).getBlob().getDataAsString('UTF-8'));
@@ -3128,7 +3141,7 @@ function phoneStockRead(payload) {
 
 function phoneStockPublish(payload) {
   const body = payload || {};
-  const employeeId = phoneStockAuthorize_(body);
+  const employeeId = phoneStockAuthorizePublish_(body);
   const rows = body.rows;
   if (!Array.isArray(rows) || rows.length < 1 || rows.length > 10000) throw new Error('庫存資料筆數不正確');
   const date = String(body.date || '');
