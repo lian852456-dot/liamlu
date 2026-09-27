@@ -10,6 +10,7 @@
   const PREVIEW_LIMIT = 5;
   const NORMALIZED_PREVIEW_LIMIT = 50;
   const GRADE_ORDER = Object.freeze(['S', 'A', 'B', 'C']);
+  const PARSER_VERSION = '2026.09.27-acceptance-1';
   const HEADER_ALIASES = Object.freeze([
     { key:'brand', label:'品牌', aliases:['品牌', '廠牌', '品牌名稱', 'brand', 'brand name'] },
     { key:'code', label:'商品代碼／料號', aliases:['代碼', '商品代碼', '產品代碼', 'code', 'item code'] },
@@ -17,7 +18,8 @@
     { key:'product', label:'商品名稱', aliases:['商品名稱', '商品', '品名', '品名item', '產品名稱', 'product name', 'item'] },
     { key:'model', label:'機型／型號', aliases:['機型', '型號', '模型', '商品型號', '產品型號', 'model', 'model name'] },
     { key:'sourceModel', label:'原始機型', aliases:['機款', '原始機型'] },
-    { key:'category', label:'商品分類', aliases:['分類', '類別', '品類', '商品類別', '商品分類', 'sim卡類別', 'category'] },
+    { key:'category', label:'商品分類', aliases:['分類', '類別', '品類', '商品類別', '商品分類', '商品別', 'sim卡類別', 'SIM 卡類別', 'category'] },
+    { key:'priceBand', label:'價格帶', aliases:['價格帶', '價位帶', 'price band'] },
     { key:'retailPrice', label:'單機價／售價', aliases:['單機價', '售價', '建議售價', '定價', '零售價', '商品售價', 'price', 'msrp'] },
     { key:'tradeInPrice', label:'回收價', aliases:['回收價', '回收價格', '回收金額', '舊換新回收價', '折抵價', '估價', '報價', 'trade in price', 'tradeinprice'] },
     { key:'condition', label:'機況／等級', aliases:['機況', '成色', '狀態', '等級', '品況', 'condition', 'grade'] },
@@ -82,7 +84,7 @@
     for (const definition of HEADER_ALIASES) {
       if (definition.aliases.some(alias => {
         const expected = normalized(alias);
-        return definition.key !== 'code' && expected.length >= 2 && source.includes(expected);
+        return definition.key !== 'code' && definition.key !== 'sourceModel' && expected.length >= 2 && source.includes(expected);
       })) return definition;
     }
     return null;
@@ -341,7 +343,7 @@
       const values = {
         brand:suppliedBrand || lastBrand, code:firstFieldValue(record, fields, 'code'),
         model:firstFieldValue(record, fields, 'model') || firstFieldValue(record, fields, 'sourceModel'), product:firstFieldValue(record, fields, 'product'),
-        category:firstFieldValue(record, fields, 'category'), retailPrice:firstFieldValue(record, fields, 'retailPrice'), note:firstFieldValue(record, fields, 'note'), date:firstFieldValue(record, fields, 'date')
+        category:firstFieldValue(record, fields, 'category'), priceBand:firstFieldValue(record, fields, 'priceBand'), retailPrice:firstFieldValue(record, fields, 'retailPrice'), note:firstFieldValue(record, fields, 'note'), date:firstFieldValue(record, fields, 'date')
       };
       const projectPrices = {};
       fields.forEach(field => {
@@ -365,7 +367,7 @@
       if (!values.retailPrice && !hasProjectPrice) { status = 'partial'; issues.push('缺少單機價與所有專案價'); }
       normalizedRows.push({
         sourceRowNumber:record.rowNumber, sourceSheet:sheetName || '', grade:'', vendor:'', brand:values.brand, code:values.code, sku:'', sourceModel:values.model,
-        model:values.model, colorlessModel:colorlessModel(values.model), product:values.product, category:values.category, retailPrice:priceText(values.retailPrice), tradeInPrice:'', note:values.note,
+        model:values.model, colorlessModel:colorlessModel(values.model), product:values.product, category:values.category, priceBand:values.priceBand, retailPrice:priceText(values.retailPrice), tradeInPrice:'', note:values.note,
         store:'', date:values.date, promotion:'', projectPrices, status, issues, rawValues:original
       });
     });
@@ -504,8 +506,8 @@
         const product = group.productColumn < 0 ? '' : text(source[group.productColumn]);
         const quote = text(source[group.priceColumn]);
         if (!sku && !product && !quote) { skippedEmptyGradeCount += 1; return; }
-        if (!sku) missingSkuCount += 1;
-        if (!product) missingProductCount += 1;
+        if (group.skuColumn >= 0 && !sku) missingSkuCount += 1;
+        if (group.productColumn >= 0 && !product) missingProductCount += 1;
         if (!quote) missingQuoteCount += 1;
         if (quote && !isCurrency(quote)) invalidCurrencyCount += 1;
         const productGrade = gradeFromHeader(product);
@@ -514,8 +516,8 @@
         const issues = [];
         if (!originalModel) issues.push('缺少原始機型');
         if (!group.vendor) issues.push('無法辨識回收商');
-        if (!sku) issues.push('缺料號');
-        if (!product) issues.push('缺品名');
+        if (group.skuColumn >= 0 && !sku) issues.push('缺料號');
+        if (group.productColumn >= 0 && !product) issues.push('缺品名');
         if (!quote) issues.push('缺報價');
         if (productGrade && productGrade !== group.grade) issues.push('品名等級與欄位等級不一致');
         if (/\bFDI\b/i.test(product) && !/FDI/i.test(group.vendor)) issues.push('品名回收商與欄位回收商不一致');
@@ -535,7 +537,7 @@
     if (gradeMismatchCount) warnings.push(String(gradeMismatchCount) + ' 筆品名等級與欄位等級不一致。');
     if (providerMismatchCount) warnings.push(String(providerMismatchCount) + ' 筆品名回收商與欄位回收商不一致。');
     const duplicateRows = duplicateCount(rawRows, fieldNames);
-    return { errors:[], warnings, sheetName:sheetName || '', recordCount:rawRows.length, fieldNames, fields, recognizedFields, unknownFields:fields.filter(field => !field.recognized).map(field => field.sourceName), previewRows:rawRows.slice(0, PREVIEW_LIMIT), rawRows, headerRow:layout.gradeHeaderRow, blankRowCount, partialRowCount:missingProductCount + missingSkuCount + missingQuoteCount, overflowRowCount:0, duplicateRowCount:duplicateRows, ignoredRows, invalidCurrencyCount, fieldMapping:mapping, standardized:{ mapping, rows:normalizedRows, summary, previewRows:normalizedRows.slice(0, NORMALIZED_PREVIEW_LIMIT) }, acceptance:{ rawModelRows:rawRows.length, expandedGradeRows:normalizedRows.length, gradeCounts, missingQuoteCount, missingSkuCount, missingProductCount, unrecognized:summary.unrecognized, skippedEmptyGradeCount, invalidCurrencyCount, gradeMismatchCount, providerMismatchCount, duplicateRows } };
+    return { errors:[], warnings, sheetName:sheetName || '', recordCount:rawRows.length, fieldNames, fields, recognizedFields, unknownFields:fields.filter(field => !field.recognized).map(field => field.sourceName), previewRows:rawRows.slice(0, PREVIEW_LIMIT), rawRows, headerRow:layout.gradeHeaderRow, blankRowCount, partialRowCount:missingProductCount + missingSkuCount + missingQuoteCount, overflowRowCount:0, duplicateRowCount:duplicateRows, ignoredRows, invalidCurrencyCount, fieldMapping:mapping, standardized:{ mapping, rows:normalizedRows, summary, previewRows:normalizedRows.slice(0, NORMALIZED_PREVIEW_LIMIT) }, acceptance:{ rawModelRows:rawRows.length, expandedGradeRows:normalizedRows.length, gradeCounts, missingQuoteCount, missingSkuCount, missingProductCount, absentSkuColumnGroupCount:gradeGroups.filter(group => group.skuColumn < 0).length, absentProductColumnGroupCount:gradeGroups.filter(group => group.productColumn < 0).length, unrecognized:summary.unrecognized, skippedEmptyGradeCount, invalidCurrencyCount, gradeMismatchCount, providerMismatchCount, duplicateRows } };
   }
 
   function combineShoppingAnalyses(analyses) {
@@ -560,7 +562,18 @@
       rawRows.push.apply(rawRows, analysis.rawRows.map(row => Object.assign({}, row, { values:Object.assign({ '來源工作表':analysis.sheetName }, row.values) })));
       normalizedRows.push.apply(normalizedRows, analysis.standardized.rows);
       Object.keys(acceptance).forEach(key => { if (typeof analysis.acceptance[key] === 'number') acceptance[key] += analysis.acceptance[key]; });
-      sheetSummaries.push({ name:analysis.sheetName, rawDataRows:analysis.acceptance.rawDataRows, validDataRows:analysis.acceptance.validDataRows, success:analysis.acceptance.success, partial:analysis.acceptance.partial, invalidCurrencyCount:analysis.acceptance.invalidCurrencyCount });
+      sheetSummaries.push({
+        name:analysis.sheetName,
+        rawDataRows:analysis.acceptance.rawDataRows,
+        validDataRows:analysis.acceptance.validDataRows,
+        success:analysis.acceptance.success,
+        partial:analysis.acceptance.partial,
+        invalidCurrencyCount:analysis.acceptance.invalidCurrencyCount,
+        headerRow:analysis.headerRow,
+        columnCount:analysis.sheetStructure && analysis.sheetStructure.columnCount || analysis.fieldNames.length,
+        mergedRangeCount:analysis.sheetStructure && analysis.sheetStructure.mergedRangeCount || 0,
+        mergedRangeSamples:analysis.sheetStructure && analysis.sheetStructure.mergedRangeSamples || []
+      });
     });
     fieldNames.unshift('來源工作表');
     const summary = summaryForRows(rawRows.length, normalizedRows);
@@ -588,8 +601,58 @@
     return { workbook:XLSX.read(content, { type:'string', cellDates:true, FS:extension === 'tsv' ? '\t' : ',' }), encoding };
   }
 
+  function columnName(columnIndex) {
+    let index = columnIndex + 1;
+    let name = '';
+    while (index > 0) {
+      const remainder = (index - 1) % 26;
+      name = String.fromCharCode(65 + remainder) + name;
+      index = Math.floor((index - 1) / 26);
+    }
+    return name;
+  }
+
+  function mergeRangeLabel(range) {
+    if (!range || !range.s || !range.e) return '';
+    const start = columnName(range.s.c) + String(range.s.r + 1);
+    const end = columnName(range.e.c) + String(range.e.r + 1);
+    return start === end ? start : start + ':' + end;
+  }
+
+  function sheetMetadata(sheet) {
+    const rows = sheet.rows || [];
+    const columnCount = rows.reduce((maximum, row) => Math.max(maximum, Array.isArray(row) ? row.length : 0), 0);
+    return {
+      name:sheet.name,
+      rowCount:rows.length,
+      columnCount,
+      mergedRangeCount:(sheet.mergedRanges || []).length,
+      mergedRangeSamples:(sheet.mergedRanges || []).slice(0, 40)
+    };
+  }
+
   function workbookSheets(workbook, XLSX) {
-    return (workbook.SheetNames || []).map(name => ({ name, rows:XLSX.utils.sheet_to_json(workbook.Sheets[name], { header:1, raw:false, defval:'', blankrows:true }) }));
+    return (workbook.SheetNames || []).map(name => {
+      const worksheet = workbook.Sheets[name] || {};
+      return {
+        name,
+        rows:XLSX.utils.sheet_to_json(worksheet, { header:1, raw:false, defval:'', blankrows:true }),
+        mergedRanges:(worksheet['!merges'] || []).map(mergeRangeLabel).filter(Boolean)
+      };
+    });
+  }
+
+  async function sha256Hex(buffer) {
+    const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    const browserCrypto = typeof globalThis !== 'undefined' && globalThis.crypto;
+    if (browserCrypto && browserCrypto.subtle && typeof browserCrypto.subtle.digest === 'function') {
+      const digest = await browserCrypto.subtle.digest('SHA-256', bytes);
+      return Array.from(new Uint8Array(digest)).map(value => value.toString(16).padStart(2, '0')).join('');
+    }
+    if (typeof require === 'function') {
+      return require('node:crypto').createHash('sha256').update(Buffer.from(bytes)).digest('hex');
+    }
+    return 'unavailable';
   }
 
   function chooseSheet(sheets, kind) {
@@ -608,6 +671,223 @@
     return best;
   }
 
+  function present(value) {
+    return Boolean(text(value));
+  }
+
+  function projectPricePresent(row) {
+    return Object.keys(row && row.projectPrices || {}).some(key => present(row.projectPrices[key]));
+  }
+
+  function outcomeSummary(rows) {
+    const summary = { success:0, partial:0, failed:0, unrecognized:0 };
+    (rows || []).forEach(row => { summary[row.status] = (summary[row.status] || 0) + 1; });
+    return summary;
+  }
+
+  function numberStats(values) {
+    const result = {};
+    Object.keys(values).forEach(key => { result[key] = Number(values[key] || 0); });
+    return result;
+  }
+
+  function reportSchema(kind) {
+    if (kind === 'tradein') {
+      return {
+        required:[
+          { key:'sourceModel', label:'原始機型' },
+          { key:'tradeInPrice', label:'回收價' }
+        ],
+        optional:[
+          { key:'brand', label:'品牌' },
+          { key:'sku', label:'料號' },
+          { key:'product', label:'品名' },
+          { key:'date', label:'資料日期' }
+        ]
+      };
+    }
+    return {
+      required:[
+        { key:'brand', label:'廠牌' },
+        { key:'code', label:'商品代碼' },
+        { key:'model', label:'機型' },
+        { key:'retailOrProjectPrice', label:'單機價或至少一個專案價' }
+      ],
+      optional:[
+        { key:'product', label:'商品／品名' },
+        { key:'category', label:'SIM 卡類別／商品別' },
+        { key:'priceBand', label:'價格帶' },
+        { key:'note', label:'異動／備註' }
+      ]
+    };
+  }
+
+  function fieldPresent(row, key) {
+    return key === 'retailOrProjectPrice'
+      ? present(row && row.retailPrice) || projectPricePresent(row)
+      : present(row && row[key]);
+  }
+
+  function mappingKeys(result) {
+    return new Set((result.fieldMapping || []).map(field => field.key).filter(Boolean));
+  }
+
+  function missingMappings(kind, result, schema) {
+    const keys = mappingKeys(result);
+    return schema.required.filter(field => {
+      if (field.key === 'retailOrProjectPrice') return !keys.has('retailPrice') && !keys.has('projectPrice');
+      return !keys.has(field.key);
+    }).map(field => field.label);
+  }
+
+  function fieldBlankStats(rows, fields) {
+    const stats = {};
+    fields.forEach(field => {
+      stats[field.label] = (rows || []).filter(row => !fieldPresent(row, field.key)).length;
+    });
+    return stats;
+  }
+
+  function maskedExamples(rows, fields) {
+    return (rows || []).filter(row => row.status !== 'success' || (row.issues || []).length).slice(0, 3).map(row => ({
+      sourceRow:row.sourceRowNumber,
+      result:row.status,
+      issueCategories:(row.issues || []).slice(0, 4),
+      fieldPresence:Object.fromEntries(fields.map(field => [field.label, fieldPresent(row, field.key) ? '有值' : '空白']))
+    }));
+  }
+
+  function structuralFlags(result) {
+    const names = (result.fieldNames || []).map(text);
+    const duplicateGradeColumns = names.filter(name => /(?:[SABC](?:等級|級|等)?|[SABC]級)\s*[\)）]?\s*\(\d+\)$/i.test(name) || /[\(（][SABC](?:等級|級|等)?[\)）]\s*\(\d+\)$/i.test(name));
+    const unnamedColumns = names.filter(name => /未命名欄位|原始補充欄位/.test(name));
+    return {
+      duplicateGradeColumnLabels:duplicateGradeColumns,
+      unnamedColumnLabels:unnamedColumns,
+      hasDuplicateGradeColumns:duplicateGradeColumns.length > 0,
+      hasUnnamedColumns:unnamedColumns.length > 0
+    };
+  }
+
+  function selectedStructures(result) {
+    const selectedNames = result.selectedSourceSheets || result.sheetNames || (result.sheetName ? [result.sheetName] : []);
+    const all = result.sheetMetadata || [];
+    return all.filter(sheet => selectedNames.includes(sheet.name));
+  }
+
+  function reportSheets(result) {
+    return (result.sheetMetadata || []).map(sheet => ({
+      name:sheet.name,
+      rowCount:Number(sheet.rowCount || 0),
+      columnCount:Number(sheet.columnCount || 0),
+      mergedRangeCount:Number(sheet.mergedRangeCount || 0),
+      mergedRangeSamples:(sheet.mergedRangeSamples || []).slice(0, 40)
+    }));
+  }
+
+  function buildAcceptanceReport(kind, result) {
+    const rows = result && result.standardized && result.standardized.rows || [];
+    const schema = reportSchema(kind);
+    const requiredBlankCounts = fieldBlankStats(rows, schema.required);
+    const optionalBlankCounts = fieldBlankStats(rows, schema.optional);
+    const missingRequiredMappings = missingMappings(kind, result || {}, schema);
+    const missingRequiredValues = Object.keys(requiredBlankCounts).filter(label => requiredBlankCounts[label] > 0);
+    const outcomes = outcomeSummary(rows);
+    const selectedSheets = selectedStructures(result || {});
+    const sheetSummaries = result && result.sheetSummaries || [];
+    const detectedHeaderRows = sheetSummaries.length
+      ? sheetSummaries.map(sheet => ({ sheet:sheet.name, row:Number(sheet.headerRow || 0) + 1 }))
+      : (result && result.sheetName ? [{ sheet:result.sheetName, row:Number(result.headerRow || 0) + 1 }] : []);
+    const mergedRangeCount = selectedSheets.reduce((total, sheet) => total + Number(sheet.mergedRangeCount || 0), 0);
+    const acceptance = result && result.acceptance || {};
+    const flags = structuralFlags(result || {});
+    const blockers = [];
+    (result && result.errors || []).forEach(message => blockers.push(message));
+    if (missingRequiredMappings.length) blockers.push('缺少必要欄位映射：' + missingRequiredMappings.join('、'));
+    if (missingRequiredValues.length) blockers.push('必要欄位仍有空值：' + missingRequiredValues.join('、'));
+    if (outcomes.failed) blockers.push('存在 ' + String(outcomes.failed) + ' 筆標準化失敗資料。');
+    if (outcomes.unrecognized) blockers.push('存在 ' + String(outcomes.unrecognized) + ' 筆無法辨識資料。');
+    if (kind === 'tradein' && Number(acceptance.unrecognized || 0)) blockers.push('至少一筆舊換新資料無法辨識回收商或原始機型。');
+    if (kind === 'tradein' && flags.hasDuplicateGradeColumns) blockers.push('仍有 A／B／C／S 重複欄位標籤，需先確認欄位群組。');
+    if (kind === 'tradein' && flags.hasUnnamedColumns) blockers.push('仍有未命名欄位，需先確認多列表頭結構。');
+    const warnings = [];
+    if (outcomes.partial) warnings.push('部分成功資料已保留在本機預覽；請依必要欄位統計判斷是否需要補檔。');
+    if (Object.values(optionalBlankCounts).some(value => value > 0)) warnings.push('選填欄位空白只供檢查，不單獨視為阻擋。');
+    if (Number(result && result.duplicateRowCount || 0)) warnings.push('偵測到重複資料列，未自動刪除。');
+    const passed = blockers.length === 0;
+    const base = {
+      reportVersion:'local-import-acceptance/v1',
+      generatedAt:new Date().toISOString(),
+      parserVersion:PARSER_VERSION,
+      source:{
+        type:kind === 'tradein' ? '舊換新回收價資料' : '3C 購物通資料',
+        file:{
+          format:result && result.fileType || '未知',
+          byteSize:Number(result && result.fileSize || 0),
+          sha256:result && result.fileSha256 || 'unavailable'
+        },
+        workbookSheets:reportSheets(result || {}),
+        selectedSourceSheets:result && (result.selectedSourceSheets || result.sheetNames) || (result && result.sheetName ? [result.sheetName] : []),
+        detectedHeaderRows,
+        selectedMergedCells:{ count:mergedRangeCount, ranges:selectedSheets.flatMap(sheet => sheet.mergedRangeSamples || []).slice(0, 40) }
+      },
+      fieldRecognition:{
+        originalFieldNames:(result && result.fieldNames || []).slice(),
+        mapping:(result && result.fieldMapping || []).map(field => ({ originalField:field.sourceName, normalizedField:field.label || null, key:field.key || null, vendor:field.vendor || null, grade:field.grade || null, result:field.status })),
+        missingRequiredMappings,
+        requiredValueBlankCounts:requiredBlankCounts,
+        optionalValueBlankCounts:optionalBlankCounts
+      },
+      rowOutcomes:outcomes,
+      dataQuality:{
+        fullyBlankRows:Number(result && result.blankRowCount || 0),
+        duplicateRows:Number(result && result.duplicateRowCount || 0),
+        invalidCurrencyValues:Number(result && result.invalidCurrencyCount || 0),
+        ignoredRows:Number(result && result.ignoredRows && result.ignoredRows.length || 0),
+        maskedExamples:maskedExamples(rows, schema.required.concat(schema.optional))
+      },
+      acceptance:{
+        passed,
+        status:passed ? 'PASS' : 'BLOCKED',
+        blockers,
+        warnings,
+        nextStep:passed ? '可複製本去識別化報告回傳進行下一步 review；原始檔仍只留在本機瀏覽器。' : '請依阻擋原因修正或重新匯出來源檔，再於本頁重新執行驗收。'
+      },
+      privacyBoundary:{
+        processing:'僅在目前瀏覽器記憶體內解析；重新整理後消失。',
+        included:'檔案格式、大小與 SHA-256、工作表結構、表頭與欄位 mapping、彙總計數、來源列號與遮罩範例。',
+        excluded:'檔名、原始資料列、完整商品名稱、料號、精確價格、完整價格表，以及任何自動上傳、追蹤或瀏覽器持久化資料。'
+      }
+    };
+    if (kind === 'shopping') {
+      base.shopping = {
+        sheetRecordCounts:(result && result.sheetSummaries || []).map(sheet => ({ sheet:sheet.name, rawDataRows:Number(sheet.rawDataRows || 0), validDataRows:Number(sheet.validDataRows || 0) })),
+        recognizedFields:(result && result.recognizedFields || []).map(field => field.label),
+        standardizationSuccess:Number(acceptance.success || outcomes.success),
+        partial:Number(acceptance.partial || outcomes.partial),
+        missingRetailPrice:Number(acceptance.missingRetailPriceCount || 0),
+        uniqueColorlessModels:Number(acceptance.uniqueColorlessModels || 0)
+      };
+    } else {
+      const knownProviders = Array.from(new Set(rows.map(row => row.vendor).filter(provider => provider === '點子行動' || provider === 'FutureDial（FDI）')));
+      base.tradeIn = {
+        providerCount:knownProviders.length,
+        providers:knownProviders,
+        rawModelRows:Number(acceptance.rawModelRows || result && result.recordCount || 0),
+        longFormatRows:Number(acceptance.expandedGradeRows || rows.length),
+        gradeCounts:numberStats(acceptance.gradeCounts || {}),
+        missingSku:Number(acceptance.missingSkuCount || 0),
+        missingQuote:Number(acceptance.missingQuoteCount || 0),
+        missingProduct:Number(acceptance.missingProductCount || 0),
+        absentSkuColumnGroups:Number(acceptance.absentSkuColumnGroupCount || 0),
+        absentProductColumnGroups:Number(acceptance.absentProductColumnGroupCount || 0),
+        unrecognized:Number(acceptance.unrecognized || outcomes.unrecognized),
+        columnStructureFlags:flags
+      };
+    }
+    return base;
+  }
+
   async function parseFile(file, XLSX, kind) {
     if (!XLSX || typeof XLSX.read !== 'function') throw new Error('本機 SheetJS 解析器未載入，請重新整理後再試。');
     const extension = extensionOf(file);
@@ -616,13 +896,37 @@
     if (file.size > MAX_FILE_BYTES) throw new Error('檔案超過 20 MB，請先縮小範圍後再試。');
     const buffer = await file.arrayBuffer();
     const loaded = readWorkbook(buffer, extension, XLSX);
+    const fileSha256 = await sha256Hex(buffer);
     const sheets = workbookSheets(loaded.workbook, XLSX);
+    const shoppingAnalyses = kind === 'shopping' ? sheets.map(sheet => Object.assign(analyseShoppingMatrix(sheet.rows, sheet.name), { sheetStructure:sheetMetadata(sheet) })) : [];
+    const selected = kind === 'tradein' ? chooseSheet(sheets, kind) : null;
     const analysis = kind === 'shopping'
-      ? combineShoppingAnalyses(sheets.map(sheet => analyseShoppingMatrix(sheet.rows, sheet.name)))
-      : (chooseSheet(sheets, kind) || {}).analysis;
+      ? combineShoppingAnalyses(shoppingAnalyses)
+      : selected && selected.analysis;
     if (!analysis) throw new Error('所有工作表都找不到可辨識的欄位列。');
-    return Object.assign({}, analysis, { fileName:String(file.name || ''), fileType:fileType(extension, loaded.encoding), encoding:loaded.encoding, sheetName:analysis.sheetName || '', sheetCount:sheets.length });
+    const selectedSourceSheets = kind === 'shopping'
+      ? shoppingAnalyses.filter(item => !item.errors.length && item.standardized && item.standardized.rows.length).map(item => item.sheetName)
+      : [selected.name];
+    const sheetSummaries = analysis.sheetSummaries || [{
+      name:analysis.sheetName,
+      headerRow:analysis.headerRow,
+      columnCount:(analysis.sheetStructure || {}).columnCount || analysis.fieldNames.length,
+      mergedRangeCount:(analysis.sheetStructure || {}).mergedRangeCount || 0,
+      mergedRangeSamples:(analysis.sheetStructure || {}).mergedRangeSamples || []
+    }];
+    return Object.assign({}, analysis, {
+      fileName:String(file.name || ''),
+      fileType:fileType(extension, loaded.encoding),
+      fileSize:Number(file.size || 0),
+      fileSha256,
+      encoding:loaded.encoding,
+      sheetName:analysis.sheetName || '',
+      sheetCount:sheets.length,
+      sheetMetadata:sheets.map(sheetMetadata),
+      selectedSourceSheets,
+      sheetSummaries
+    });
   }
 
-  return Object.freeze({ MAX_FILE_BYTES, SUPPORTED_EXTENSIONS, PREVIEW_LIMIT, NORMALIZED_PREVIEW_LIMIT, GRADE_ORDER, extensionOf, isSupported, recognizeHeader, gradeFromHeader, detectHeader, analyseMatrix, parseFile, colorlessModel });
+  return Object.freeze({ MAX_FILE_BYTES, SUPPORTED_EXTENSIONS, PREVIEW_LIMIT, NORMALIZED_PREVIEW_LIMIT, GRADE_ORDER, PARSER_VERSION, extensionOf, isSupported, recognizeHeader, gradeFromHeader, detectHeader, analyseMatrix, parseFile, buildAcceptanceReport, colorlessModel });
 });

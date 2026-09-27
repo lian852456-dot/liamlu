@@ -67,6 +67,15 @@ test('3C 購物通公司欄位可映射成標準化資料並標記空值', () =>
   assert.equal(result.standardized.rows[1].status, 'success');
 });
 
+test('含「特定機款」的資費欄位仍保留為專案價，不誤判成原始機型', async () => {
+  const csv = '廠牌,代碼,機型,單機價,(企客_5G)5力全開1599H(48)_特定機款\nApple,A-001,iPhone 18 Pro,39900,12000\n';
+  const result = await Core.parseFile(localFile('company-project-price.csv', csv), XLSX, 'shopping');
+  const mapping = result.fieldMapping.find(field => field.sourceName.includes('特定機款'));
+  assert.equal(Core.recognizeHeader('(企客_5G)5力全開1599H(48)_特定機款'), null);
+  assert.equal(mapping.key, 'projectPrice');
+  assert.equal(result.standardized.rows[0].projectPrices['(企客_5G)5力全開1599H(48)_特定機款'], '12000');
+});
+
 test('舊換新 A／B／C／S 等級寬表會正規化成 Long Format', () => {
   const result = Core.analyseMatrix([
     ['機型(A等級)', '品名 Item(A等級)', '回收價(A等級)', '機型(B等級)', '品名 Item(B等級)', '回收價(B等級)', '機型(S等級)', '品名 Item(S等級)', '回收價(S等級)'],
@@ -137,6 +146,28 @@ test('公司雙回收商版型依回收商與等級展開，略過完全空白�
   assert.equal(fdiS.tradeInPrice, '3000');
 });
 
+test('兩家回收商純價格矩陣沒有料號或品名欄時，仍可完成回收價驗收', async () => {
+  const rows = [
+    ['', '', '點子行動舊機回收報價', '', '', 'FutureDial(FDI)舊機回收報價'],
+    ['品牌', '機款'],
+    ['', '', '報價(A等級)', '報價(B等級)', '報價(C等級)', '報價(S等級)', '報價(A等級)', '報價(B等級)', '報價(C等級)'],
+    ['APPLE', 'iPhone 18 Pro', '24000', '21000', '18000', '26000', '23000', '20000', '17000']
+  ];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), '比較表');
+  const buffer = XLSX.write(workbook, { type:'buffer', bookType:'xlsx' });
+  const result = await Core.parseFile(localFile('tradein-price-matrix.xlsx', buffer), XLSX, 'tradein');
+  const report = Core.buildAcceptanceReport('tradein', result);
+  assert.equal(result.standardized.summary.success, 7);
+  assert.equal(result.acceptance.missingSkuCount, 0);
+  assert.equal(result.acceptance.missingProductCount, 0);
+  assert.equal(result.acceptance.absentSkuColumnGroupCount, 7);
+  assert.equal(result.acceptance.absentProductColumnGroupCount, 7);
+  assert.equal(report.acceptance.passed, true);
+  assert.equal(report.tradeIn.missingSku, 0);
+  assert.equal(report.tradeIn.absentSkuColumnGroups, 7);
+});
+
 test('無法對應標準欄位時會保留原始列並正確計入無法辨識', () => {
   const result = Core.analyseMatrix([
     ['內部代碼', '來源描述'],
@@ -155,6 +186,46 @@ test('沒有可用欄位列的檔案會安全提示而不是建立資料', () =>
   assert.match(result.errors[0], /找不到可辨識/);
 });
 
+test('3C 去識別化驗收報告保留結構統計與雜湊，不輸出檔名、商品、代碼或精確價格', async () => {
+  const csv = '\ufeff廠牌,商品代碼,商品型號,商品名稱,商品別,價格帶,單機價,異動\r\nApple,SECRET-CODE-928,PRIVATE-MODEL-ALPHA,PRIVATE-PRODUCT-NAME,手機,高價,39888,調價\r\n';
+  const result = await Core.parseFile(localFile('private-source-name-2026.csv', csv), XLSX, 'shopping');
+  const report = Core.buildAcceptanceReport('shopping', result);
+  const serialised = JSON.stringify(report);
+  assert.equal(report.acceptance.passed, true);
+  assert.equal(report.source.file.format, 'CSV（UTF-8）');
+  assert.equal(report.source.file.byteSize, Buffer.byteLength(csv));
+  assert.match(report.source.file.sha256, /^[a-f0-9]{64}$/);
+  assert.deepEqual(report.fieldRecognition.missingRequiredMappings, []);
+  assert.equal(report.fieldRecognition.requiredValueBlankCounts['商品代碼'], 0);
+  assert.equal(report.fieldRecognition.optionalValueBlankCounts['價格帶'], 0);
+  assert.equal(report.shopping.standardizationSuccess, 1);
+  assert.ok(report.fieldRecognition.mapping.some(field => field.key === 'priceBand'));
+  assert.doesNotMatch(serialised, /private-source-name-2026|SECRET-CODE-928|PRIVATE-MODEL-ALPHA|PRIVATE-PRODUCT-NAME|39888/);
+});
+
+test('舊換新去識別化驗收報告列出合併儲存格與回收商彙總，不輸出逐機型價格', async () => {
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ['', '', '點子行動舊機回收報價'],
+    ['品牌', '原始機型'],
+    ['', '', '料號(S等級)', '品名 Item(S等級)', '報價(S等級)', '料號(A等級)', '品名 Item(A等級)', '報價(A等級)', '料號(B等級)', '品名 Item(B等級)', '報價(B等級)', '料號(C等級)', '品名 Item(C等級)', '報價(C等級)'],
+    ['Apple', 'PRIVATE-TRADEIN-MODEL', 'S-SECRET', 'PRIVATE-PRODUCT-S', '23456', 'A-SECRET', 'PRIVATE-PRODUCT-A', '20000', 'B-SECRET', 'PRIVATE-PRODUCT-B', '16000', 'C-SECRET', 'PRIVATE-PRODUCT-C', '9000']
+  ]);
+  sheet['!merges'] = [XLSX.utils.decode_range('C1:N1')];
+  XLSX.utils.book_append_sheet(workbook, sheet, '回收報價');
+  const buffer = XLSX.write(workbook, { type:'buffer', bookType:'xlsx' });
+  const result = await Core.parseFile(localFile('private-tradein.xlsx', buffer), XLSX, 'tradein');
+  const report = Core.buildAcceptanceReport('tradein', result);
+  const serialised = JSON.stringify(report);
+  assert.equal(report.acceptance.passed, true);
+  assert.equal(report.source.selectedMergedCells.count, 1);
+  assert.deepEqual(report.source.selectedMergedCells.ranges, ['C1:N1']);
+  assert.deepEqual(report.tradeIn.providers, ['點子行動']);
+  assert.deepEqual(report.tradeIn.gradeCounts, { S:1, A:1, B:1, C:1 });
+  assert.equal(report.tradeIn.columnStructureFlags.hasDuplicateGradeColumns, false);
+  assert.doesNotMatch(serialised, /private-tradein|PRIVATE-TRADEIN-MODEL|S-SECRET|PRIVATE-PRODUCT-S|23456/);
+});
+
 test('營運中心入口與測試頁都維持本機解析邊界', () => {
   const root = path.resolve(__dirname, '..');
   const home = fs.readFileSync(path.join(root, 'home.html'), 'utf8');
@@ -164,5 +235,7 @@ test('營運中心入口與測試頁都維持本機解析邊界', () => {
   assert.match(page, /assets\/vendor\/xlsx\.full\.min\.js/);
   assert.match(page, /id="shoppingFile"[^>]*type="file"/);
   assert.match(page, /id="tradeinFile"[^>]*type="file"/);
+  assert.match(page + '\n' + client, /一鍵複製驗收報告/);
+  assert.match(page + '\n' + client, /下載驗收報告 JSON/);
   assert.doesNotMatch(page + '\n' + client, /localStorage|indexedDB|fetch\(|XMLHttpRequest|sendBeacon/);
 });

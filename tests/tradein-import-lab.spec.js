@@ -53,3 +53,45 @@ test('舊換新寬表可轉 Long Format，並支援搜尋與前 50 筆預覽', a
   await expect(analysis.locator('.normalized-wrap tbody')).toContainText('Pixel 11');
   await expect(analysis.locator('.normalized-wrap tbody')).not.toContainText('iPhone 17 Pro');
 });
+
+test('去識別化驗收報告可複製，剪貼簿失敗時保留可手動複製的唯讀內容', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable:true,
+      value:{ writeText:async value => { window.__copiedAcceptanceReport = value; } }
+    });
+  });
+  await page.goto(PAGE_URL);
+  await page.setInputFiles('#shoppingFile', {
+    name:'private-file-name.csv',
+    mimeType:'text/csv',
+    buffer:Buffer.from('廠牌,代碼,機型,商品名稱,單機價\nApple,SECRET-CODE,PRIVATE-MODEL,PRIVATE-PRODUCT,39888\n')
+  });
+  const analysis = page.locator('#shoppingAnalysis');
+  const report = page.getByRole('textbox', { name:'去識別化驗收報告內容' });
+  await expect(analysis.getByText('本機完整驗收報告')).toBeVisible();
+  await expect(report).not.toHaveValue(/private-file-name|SECRET-CODE|PRIVATE-MODEL|PRIVATE-PRODUCT|39888/);
+  await analysis.getByRole('button', { name:'一鍵複製驗收報告' }).click();
+  await expect(analysis.getByText('已複製去識別化驗收報告。')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__copiedAcceptanceReport || '')).toContain('"privacyBoundary"');
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable:true,
+      value:{ writeText:async () => { throw new Error('denied'); } }
+    });
+  });
+  await analysis.getByRole('button', { name:'一鍵複製驗收報告' }).click();
+  await expect(analysis.getByText(/無法自動複製；報告已選取/)).toBeVisible();
+  await expect(report).toBeFocused();
+  const downloadPromise = page.waitForEvent('download');
+  await analysis.getByRole('button', { name:'下載驗收報告 JSON' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^local-shopping-acceptance-\d{4}-\d{2}-\d{2}\.json$/);
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  const downloaded = Buffer.concat(chunks).toString('utf8');
+  expect(downloaded).toContain('"privacyBoundary"');
+  expect(downloaded).not.toContain('PRIVATE-MODEL');
+  await expect(analysis.getByText(/已下載去識別化驗收報告 JSON/)).toBeVisible();
+});

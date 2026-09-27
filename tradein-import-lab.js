@@ -130,6 +130,63 @@
     if (kind === 'shopping') host.append(element('p', 'preview-caption', '「無色機款」僅用於門市拉選；原始機型、色別、代碼與各專案價欄位仍完整保留。'));
   }
 
+  function reportText(report) {
+    return JSON.stringify(report, null, 2);
+  }
+
+  function selectManualCopy(textarea, status) {
+    textarea.focus();
+    textarea.select();
+    status.textContent = '無法自動複製；報告已選取，請使用 Ctrl／⌘ + C 手動複製。';
+    status.className = 'report-status warning';
+  }
+
+  function downloadReport(kind, report, status) {
+    const blob = new Blob([reportText(report)], { type:'application/json;charset=utf-8' });
+    const link = document.createElement('a');
+    const date = new Date().toISOString().slice(0, 10);
+    link.href = URL.createObjectURL(blob);
+    link.download = 'local-' + kind + '-acceptance-' + date + '.json';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 0);
+    status.textContent = '已下載去識別化驗收報告 JSON；原始資料不會包含在檔案中。';
+    status.className = 'report-status ok';
+  }
+
+  function appendAcceptanceReport(host, kind, result) {
+    const report = Core.buildAcceptanceReport(kind, result);
+    const section = element('section', 'acceptance-report');
+    section.append(element('h4', 'preview-heading', '本機完整驗收報告'));
+    section.append(element('p', 'report-intro', '複製前請先檢查下方內容：它只包含檔案雜湊／大小、工作表與欄位結構、彙總統計、來源列號與最多 3 筆遮罩範例；不包含檔名、原始列、完整商品、料號或精確價格。'));
+    const state = element('p', 'report-result ' + (report.acceptance.passed ? 'ok' : 'blocked'), report.acceptance.passed ? '驗收通過：可複製本去識別化報告進行 review。' : '驗收待處理：請先查看報告內的阻擋原因與下一步。');
+    const controls = element('div', 'report-controls');
+    const copy = element('button', 'report-button primary', '一鍵複製驗收報告');
+    copy.type = 'button';
+    const download = element('button', 'report-button', '下載驗收報告 JSON');
+    download.type = 'button';
+    const status = element('p', 'report-status', '報告僅保留在目前頁面；重新整理後即消失。');
+    const textarea = document.createElement('textarea');
+    textarea.className = 'report-box';
+    textarea.readOnly = true;
+    textarea.rows = 18;
+    textarea.value = reportText(report);
+    textarea.setAttribute('aria-label', '去識別化驗收報告內容');
+    copy.addEventListener('click', async () => {
+      try {
+        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') throw new Error('clipboard unavailable');
+        await navigator.clipboard.writeText(textarea.value);
+        status.textContent = '已複製去識別化驗收報告。';
+        status.className = 'report-status ok';
+      } catch (_) {
+        selectManualCopy(textarea, status);
+      }
+    });
+    download.addEventListener('click', () => downloadReport(kind, report, status));
+    controls.append(copy, download);
+    section.append(state, controls, status, textarea);
+    host.append(section);
+  }
+
   function appendSheetSummaries(host, result) {
     if (!result.sheetSummaries || !result.sheetSummaries.length) return;
     host.append(element('h4', 'preview-heading', '工作表驗收明細'));
@@ -261,6 +318,7 @@
     appendFieldGroup(host, '原始欄位名稱', result.fieldNames);
     if (result.unknownFields.length) appendFieldGroup(host, '原始保留欄位（尚未標準化）', result.unknownFields, 'warning');
     appendAcceptanceSummary(host, kind, result);
+    appendAcceptanceReport(host, kind, result);
     appendSheetSummaries(host, result);
     appendMapping(host, result);
     appendQuality(host, result);
