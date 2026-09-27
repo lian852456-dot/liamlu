@@ -21,10 +21,11 @@ function service() {
   return context;
 }
 
-test('APP 讀取及網站發布都要求已核准的督導裝置', () => {
+test('APP 讀取要求已核准的督導裝置，網站可由督導電腦發布', () => {
   const backend = service();
   assert.throws(()=>backend.phoneStockRead({employeeId:'LIAM',deviceId:'wrong-device'}),/尚未核准/);
-  assert.throws(()=>backend.phoneStockPublish({employeeId:'OTHER',deviceId:'approved-device',date:'2026-09-25',rows:[{store:'台北三創',model:'i18',quantity:1}]}),/尚未核准/);
+  assert.doesNotThrow(()=>backend.phoneStockPublish({employeeId:'LIAM',deviceId:'desktop-device',date:'2026-09-25',rows:[{store:'台北三創',model:'i18',quantity:1}]}));
+  assert.throws(()=>backend.phoneStockPublish({employeeId:'OTHER',deviceId:'approved-device',date:'2026-09-25',rows:[{store:'台北三創',model:'i18',quantity:1}]}),/無手機庫存存取權限/);
 });
 
 test('同步後僅回傳庫存快照，且拒絕負數及未辨識店點', () => {
