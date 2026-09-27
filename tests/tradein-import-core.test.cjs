@@ -365,6 +365,30 @@ test('準備私有發布的 3C 快照只包含正規化資料、檔名版本日�
   assert.equal(snapshot.source_version_date, '2026-09-22');
   assert.match(snapshot.source_file_sha256, /^[a-f0-9]{64}$/);
   assert.equal(snapshot.rows.length, 1);
+  assert.equal(snapshot.row_count, 1);
+  assert.equal(snapshot.source_row_count, 1);
+  assert.equal(snapshot.excluded_no_price_count, 0);
+  assert.equal(snapshot.rows[0].code, 'A-001');
+  assert.equal(snapshot.rows[0].model, 'iPhone 18 Pro 128G(黑)');
+  assert.equal(snapshot.rows[0].colorless_model, 'iPhone 18 Pro 128G');
   assert.equal(Object.hasOwn(snapshot.rows[0], 'rawValues'), false);
   assert.equal(Object.hasOwn(snapshot.rows[0], 'sourceRowNumber'), false);
+});
+
+test('私有發布快照以有價格的標準化列為正式筆數，排除數另列稽核', async () => {
+  const csv = [
+    '廠牌,代碼,機型,單機價,999H',
+    'Apple,A-001,iPhone 18 Pro 128G(黑),39900,12000',
+    'Apple,A-002,iPhone 18 Pro 256G(白),0,0',
+    'Apple,A-003,iPhone 18 Pro 512G(黑),,'
+  ].join('\n');
+  const result = await Core.parseFile(localFile('20260922手機價格異動清單.csv', csv), XLSX, 'shopping');
+  const snapshot = Core.buildPublishSnapshot('shopping', result);
+  assert.equal(snapshot.source_row_count, 3);
+  assert.equal(snapshot.row_count, 2);
+  assert.equal(snapshot.rows.length, 2);
+  assert.equal(snapshot.excluded_no_price_count, 1);
+  assert.equal(snapshot.query_model_count, 2);
+  assert.equal(snapshot.rows[1].retail_price, '0');
+  assert.equal(snapshot.rows[1].project_prices['999H'], '0');
 });

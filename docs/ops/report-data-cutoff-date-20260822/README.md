@@ -6,10 +6,6 @@
 
 日期契約：
 
-> 2026-09-28 現行契約已取代本文件下方的歷史同值規則：來源檔名唯一有效日期為
-> `report_date`／`source_version_date`，內部 `period`／`snapshotDay` 為 `data_as_of_date`。
-> 兩者分開驗證；以下 2026-08-22 段落是當時的 deployment evidence，不可覆蓋為現行規則。
-
 - `report_run_date` / `mail_date`：執行、附件、郵件與 manifest 檔名日期。
 - `data_cutoff_date`：`source_date_range` 最後一日；正式 KPI／台獎 `report_date`。
 - `source_file`：保留實際來源檔名，例如 `0822.xlsx`，但不得用它推導正式資料日。

@@ -8,7 +8,7 @@ async function expectMobileSafe(page) {
   const result=await page.evaluate(()=>({
     overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
     ellipsis:Array.from(document.querySelectorAll('[data-view]:not([hidden]) *')).filter(node=>node instanceof HTMLElement&&getComputedStyle(node).textOverflow==='ellipsis'&&node.scrollWidth>node.clientWidth).map(node=>node.textContent.trim()),
-    shortTargets:Array.from(document.querySelectorAll('[data-view]:not([hidden]) button')).filter(node=>node.getClientRects().length&&node.getBoundingClientRect().height<44).map(node=>node.textContent.trim())
+    shortTargets:Array.from(document.querySelectorAll('[data-view]:not([hidden]) button')).filter(node=>node.getBoundingClientRect().height<44).map(node=>node.textContent.trim())
   }));
   expect(result.overflow).toBeLessThanOrEqual(0);
   expect(result.ellipsis).toEqual([]);
@@ -83,8 +83,7 @@ test('App 1.2 personal area groups formal roles, filters under-target metrics an
   await expect(page.locator('.manager-store-performance')).toContainText('AQ');
   await expect(page.locator('.manager-store-performance')).not.toContainText('總績效');
   await expect(page.locator('.manager-store-performance')).not.toContainText('0.0%');
-  await expect(page.locator('.personal-performance-panel').nth(1)).toContainText('店點人員');
-  await expect(page.locator('.personal-performance-panel').nth(1)).toContainText('0 人 · 同仁正式個績');
+  await expect(page.locator('.personal-performance-panel').nth(1)).toContainText('副店／其他業代正式個績');
   await expect(page.locator('.personal-performance-panel').nth(1).locator('.manager-store-performance')).toHaveCount(0);
   await expectMobileSafe(page);
   expect(errors).toEqual([]);

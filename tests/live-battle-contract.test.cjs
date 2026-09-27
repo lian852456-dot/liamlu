@@ -105,7 +105,7 @@ test('分析完成後可分開下載四張本機產生的 PNG 戰報', () => {
   assert.match(js, /const hasDevice = index > 0 && index < values.length - 1 && Number\(value\) > 0/);
   assert.match(js, /hasDevice \? '#6741a5' : '#ffffff'/);
   assert.match(css, /font:700 16px\/1\.55 "Microsoft YaHei"/);
-  assert.match(css, /\.metric-cell strong \{[^}]*font-size:24px; font-weight:950/);
+  assert.match(css, /\.metric-cell strong \{[^}]*font-size:19px; font-weight:950/);
   assert.match(css, /\.product-table-wrap td \{ font-size:18px; font-weight:900; \}/);
   assert.match(css, /\.product-hit \{ background:#6741a5; color:#fff; font-size:20px; font-weight:950; \}/);
   assert.match(css, /\.region-detail-table td\.metric-hit,\.metric-cell\.metric-hit \{ background:#d9f3e8;/);
@@ -114,7 +114,7 @@ test('分析完成後可分開下載四張本機產生的 PNG 戰報', () => {
   assert.match(js, /ctx\.fillText\(String\(value\),[\s\S]*y \+ rowHeight \/ 2\)/);
   assert.doesNotMatch(js, /ctx\.fillText\(String\(value\),[^\n]*y \+ 43\)/);
   assert.match(js, /ctx\.font = '900 22px "Microsoft YaHei"/);
-  assert.match(js, /ctx\.font = `950 \$\{index === values\.length - 1 \? 18 : index === 0 \? 21 : isMetric \? 30 : 24\}px "Microsoft YaHei"/);
+  assert.match(js, /ctx\.font = `900 \$\{index === values\.length - 1 \? 18 : index === 0 \? 21 : 24\}px "Microsoft YaHei"/);
   assert.match(js, /ctx\.font = '900 26px "Microsoft YaHei"/);
   assert.match(html, /深紫色格代表該店有設備上線數/);
   assert.doesNotMatch(`${html}\n${js}`, /html2canvas|dom-to-image|cdnjs|unpkg|jsdelivr/i);

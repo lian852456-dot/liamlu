@@ -37,19 +37,18 @@ test('KPI 主資料取 kpicalc，快照只作條件式補充', () => {
   assert.doesNotMatch(login, /state\.data = result\.snapshot\.kpiBattle/);
 });
 
-test('台獎分別核對檔名版本日期與資料截至日', () => {
+test('台獎僅以 KPI 戰報日期比對，不得使用資料截止日', () => {
   const guard = functionBody(awardsControllerSource, 'validateAwardsBattle');
   assert.match(guard, /awardsDate !== kpiDate/);
-  assert.match(guard, /data_as_of_date|source_as_of_date/);
-  assert.match(guard, /cutoffMismatch/);
+  assert.doesNotMatch(guard, /data_as_of_date|source_as_of_date/);
   assert.match(functionBody(awardsControllerSource, 'acceptKpiResult'), /renderUnavailable\(\)/);
 });
 
-test('來源說明以資訊格分開顯示版本日期、資料截止日與來源檔', () => {
+test('來源說明以資訊格分開顯示戰報日期、資料截止日與來源檔', () => {
   const render = functionBody(controllerSource, 'render');
   const metadata = functionBody(controllerSource, 'kpiBattleSourceMetadata');
   assert.match(render, /note\.innerHTML = kpiBattleSourceMetadata/);
-  for (const label of ['版本日期', '資料統計至', '來源檔', '統計區間', '同步狀態']) {
+  for (const label of ['戰報日期', '資料統計至', '來源檔', '統計區間', '同步狀態']) {
     assert.ok(metadata.includes(label), `來源資訊格缺少：${label}`);
   }
 });
@@ -77,9 +76,9 @@ test('台獎篩選可選北一二B，北一二B顯示80%／100%，門市顯示50
   }
 });
 
-test('快照合併硬性要求檔名版本日期、KPI 截止日與來源檔各自一致', () => {
+test('快照合併硬性要求快照日期、KPI 截止日與來源檔一致', () => {
   const guard = functionBody(controllerSource, 'kpiBattleSupplementIsCurrent');
-  for (const field of ['snapshotVersionDate', 'kpiVersionDate', 'snapshotDataAsOf', 'kpiDataAsOf', 'source_file']) {
+  for (const field of ['snapshotReportDate', 'snapshotDataAsOf', 'kpiDataAsOf', 'source_file']) {
     assert.ok(guard.includes(field), `缺少快照合併門檻：${field}`);
   }
   assert.doesNotMatch(guard, /kpiBattleReportSourceFile|reportSource/);
@@ -151,21 +150,20 @@ test('各項達成率直接沿用正式報表欄位，實績／目標／差異�
   assert.match(functionBody(controllerSource, 'kpiBattleMetricCell'), /metric\.rate == null[^;]+kpiBattleTargetLine\(metric\)/);
 });
 
-test('0805.xlsx 的版本日期為 0805，資料截至 0804，兩者分開保留', () => {
+test('0805.xlsx 統計至 0804，未合併快照時不可偽裝成 0805 戰報', () => {
   const view = loadAdapter().kpicalcToKpiBattleView(SAMPLE, '');
-  assert.equal(view.report_date, '2026-08-05');
-  assert.equal(view.source_version_date, '2026-08-05');
+  assert.equal(view.report_date, '');
   assert.equal(view.data_as_of_date, '2026-08-04');
   assert.equal(view.source_file, '0805.xlsx');
   assert.equal(view.stores.length, 2);
   assert.equal(view.personal.length, 1);
 });
 
-test('同次正式快照以 0805 版本、0804 資料日補入 34 名、109.7%、12.35 與個人補充欄位', () => {
+test('同次正式快照補入 0804 資料日、34 名、109.7%、12.35 與個人補充欄位', () => {
   const A = loadAdapter();
   const base = A.kpicalcToKpiBattleView(SAMPLE, '');
   const snapshot = {
-    report_date: '2026-08-05', source_version_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0805.xlsx', source_date_range: '2026/08/01 ~ 08/04',
+    report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0805.xlsx', source_date_range: '2026/08/01 ~ 08/04',
     personal_semantics: 'individual-v1',
     aggregate: { overall_kpi: 1.097, company_rank: 34, addon_score: 12.35, insurance_attach_rate: 0.46154 },
     stores: [{ store: '甲', company_rank: 20, addon_score: 14.2, insurance_attach_rate: 0.54545 }],
@@ -173,7 +171,7 @@ test('同次正式快照以 0805 版本、0804 資料日補入 34 名、109.7%�
   };
   const view = A.mergeKpiBattleSupplement(base, snapshot);
   assert.equal(view.supplement_synced, true);
-  assert.equal(view.report_date, '2026-08-05');
+  assert.equal(view.report_date, '2026-08-04');
   assert.equal(view.data_as_of_date, '2026-08-04');
   assert.equal(view.aggregate.company_rank, 34);
   assert.equal(view.aggregate.overall_kpi, 1.097);
@@ -190,7 +188,7 @@ test('未標記個人語意的快照不得以店績排名覆寫店長個績', ()
   const A = loadAdapter();
   const base = A.kpicalcToKpiBattleView(SAMPLE, '');
   const snapshot = {
-    report_date: '2026-08-05', source_version_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0805.xlsx',
+    report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0805.xlsx',
     aggregate: {}, stores: [],
     personal: [{
       store: '甲', name: '甲＊一', rank: 1, rank_dod: 99, overall_rate_dod: 9.9,
@@ -214,13 +212,13 @@ test('受控 upload temporary filename 使用 canonical 0805.xlsx 合併，且�
   const base = A.kpicalcToKpiBattleView(staged, '');
   assert.equal(base.source_file, '0805.xlsx');
   const snapshot = {
-    report_date: '2026-08-05', source_version_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0805.xlsx',
+    report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0805.xlsx',
     aggregate: { overall_kpi: 1.097, company_rank: 34, overall_kpi_dod: -0.0142, company_rank_dod: -1, addon_score: 13.09 },
     stores: [], personal: [],
   };
   const merged = A.mergeKpiBattleSupplement(base, snapshot);
   assert.equal(merged.supplement_synced, true);
-  assert.equal(merged.report_date, '2026-08-05');
+  assert.equal(merged.report_date, '2026-08-04');
   assert.equal(merged.aggregate.company_rank, 34);
   assert.equal(merged.aggregate.overall_kpi_dod, -0.0142);
   assert.equal(merged.aggregate.company_rank_dod, -1);
@@ -247,7 +245,7 @@ test('過期截止日或不同來源檔快照不得混入補充欄位', () => {
   const base = A.kpicalcToKpiBattleView(SAMPLE, '');
   for (const snapshot of [
     { report_date: '2026-08-03', data_as_of_date: '2026-08-03', source_file: '0805.xlsx' },
-    { report_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0804.xlsx' },
+    { report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0804.xlsx' },
   ]) {
     const merged = A.mergeKpiBattleSupplement(base, { ...snapshot, aggregate: { company_rank: 1 }, stores: [], personal: [] });
     assert.equal(merged.supplement_synced, false);
@@ -261,19 +259,19 @@ test('快照報表日期、canonical source 或不受控 temporary filename 矛�
   staged.meta.sourceFile = `report-upload-temp-${'b'.repeat(64)}-0805.xlsx`;
   const base = A.kpicalcToKpiBattleView(staged, '');
   for (const snapshot of [
-    { report_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0804.xlsx' },
-    { report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0805.xlsx' },
+    { report_date: '2026-08-04', data_as_of_date: '2026-08-04', source_file: '0804.xlsx' },
+    { report_date: '2026-08-05', data_as_of_date: '2026-08-04', source_file: '0805.xlsx' },
   ]) {
     assert.equal(A.mergeKpiBattleSupplement(base, { ...snapshot, aggregate: { company_rank: 1 }, stores: [], personal: [] }).supplement_synced, false);
   }
   const uncontrolled = JSON.parse(JSON.stringify(SAMPLE));
   uncontrolled.meta.sourceFile = 'report-upload-temp-token-0805.xlsx';
   assert.equal(A.mergeKpiBattleSupplement(A.kpicalcToKpiBattleView(uncontrolled, ''), {
-    report_date:'2026-08-05', data_as_of_date:'2026-08-04', source_file:'0805.xlsx', aggregate:{company_rank:1}, stores:[], personal:[],
+    report_date:'2026-08-04', data_as_of_date:'2026-08-04', source_file:'0805.xlsx', aggregate:{company_rank:1}, stores:[], personal:[],
   }).supplement_synced, false);
 });
 
-test('0822.xlsx 的版本日期為 0822、資料截至 0821，且保留受控 temporary filename canonical 化', () => {
+test('0822.xlsx 的 D+1 來源只接受同為 0821 的快照資料日，且保留受控 temporary filename canonical 化', () => {
   const A = loadAdapter();
   const staged = JSON.parse(JSON.stringify(SAMPLE));
   staged.meta.period = '2026/08/01 ~ 08/21';
@@ -282,15 +280,15 @@ test('0822.xlsx 的版本日期為 0822、資料截至 0821，且保留受控 te
   const base = A.kpicalcToKpiBattleView(staged, '');
   assert.equal(base.data_as_of_date, '2026-08-21');
   assert.equal(base.source_file, '0822.xlsx');
-  const valid = { report_date: '2026-08-22', source_version_date: '2026-08-22', data_as_of_date: '2026-08-21', source_file: '0822.xlsx', aggregate: { company_rank: 28 }, stores: [], personal: [] };
+  const valid = { report_date: '2026-08-21', data_as_of_date: '2026-08-21', source_file: '0822.xlsx', aggregate: { company_rank: 28 }, stores: [], personal: [] };
   assert.equal(A.mergeKpiBattleSupplement(base, valid).supplement_synced, true);
   for (const snapshot of [
-    { report_date: '2026-08-21', data_as_of_date: '2026-08-21', source_file: '0822.xlsx' },
-    { report_date: '2026-08-22', data_as_of_date: '2026-08-21', source_file: '0821.xlsx' },
+    { report_date: '2026-08-22', data_as_of_date: '2026-08-21', source_file: '0822.xlsx' },
+    { report_date: '2026-08-21', data_as_of_date: '2026-08-21', source_file: '0821.xlsx' },
     { report_date: '2026-08-20', data_as_of_date: '2026-08-20', source_file: '0822.xlsx' },
     { report_date: '', data_as_of_date: '2026-08-21', source_file: '0822.xlsx' },
     { report_date: '2026-08-21', data_as_of_date: '', source_file: '0822.xlsx' },
-    { report_date: '2026-08-22', data_as_of_date: '2026-08-21', source_file: '' },
+    { report_date: '2026-08-21', data_as_of_date: '2026-08-21', source_file: '' },
   ]) {
     const merged = A.mergeKpiBattleSupplement(base, { ...snapshot, aggregate: { company_rank: 1 }, stores: [], personal: [] });
     assert.equal(merged.supplement_synced, false);
@@ -306,8 +304,7 @@ test('mixed freshness：0824 KPI supplement 可同步，8/22 awards 不參與 KP
   data.meta.sourceFile = '0824.xlsx';
   const base = A.kpicalcToKpiBattleView(data, '');
   const supplement = {
-    report_date: '2026-08-24',
-    source_version_date: '2026-08-24',
+    report_date: '2026-08-23',
     data_as_of_date: '2026-08-23',
     source_as_of_date: '2026-08-23',
     source_file: '0824.xlsx',

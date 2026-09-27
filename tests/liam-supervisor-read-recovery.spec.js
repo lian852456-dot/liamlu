@@ -5,27 +5,9 @@ const { patrolSummaryResponse } = require('./fixtures/patrol-summary-response.cj
 const FORMAL_URL = `file://${path.resolve(__dirname, '../app.html')}#patrol`;
 const TOKEN = 'read-recovery-timeout-token';
 
-async function useReadRecoveryDate(page) {
-  await page.addInitScript(iso => {
-    const NativeDate=Date;
-    const base=NativeDate.parse(iso);
-    const nativeStart=NativeDate.now();
-    class CalendarDate extends NativeDate {
-      constructor(...args){super(...(args.length?args:[base+NativeDate.now()-nativeStart]));}
-      static now(){return NativeDate.now();}
-    }
-    window.Date=CalendarDate;
-  }, '2026-08-12T04:00:00.000Z');
-}
-
 test.use({ viewport:{ width:390, height:844 }, serviceWorkers:'block' });
 
-test('hread Google HTML 404 exhausts the guarded retry contract and fails closed', async ({ page }) => {
-  await useReadRecoveryDate(page);
-  await page.addInitScript(() => {
-    const nativeSetTimeout=window.setTimeout.bind(window);
-    window.setTimeout=(callback,delay,...args)=>nativeSetTimeout(callback,delay===2000||delay===5000?0:delay,...args);
-  });
+test('hread Google HTML 404 is retried once then fails closed', async ({ page }) => {
   const errors = [];
   const writes = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -49,7 +31,7 @@ test('hread Google HTML 404 exhausts the guarded retry contract and fails closed
   await page.goto(FORMAL_URL);
   const started = Date.now();
   await page.locator('[data-patrol-check-view="half-month"]').click();
-  await expect(page.locator('#halfMonthCheckPreview')).toContainText('巡店後端暫時無回應，已自動重試3次', { timeout:4_000 });
+  await expect(page.locator('#halfMonthCheckPreview')).toContainText('正式資料服務暫時回傳 HTTP 404', { timeout:4_000 });
   expect(Date.now() - started).toBeLessThan(4_000);
   await expect(page.locator('#halfMonthCheckPreview')).not.toContainText('正在讀取半月督導檢查…');
   const layout = await page.evaluate(() => ({

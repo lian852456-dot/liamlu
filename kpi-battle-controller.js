@@ -61,50 +61,18 @@
     return staged ? staged[1].toLowerCase() : raw;
   }
 
-  function kpiBattleValidIsoDate(year, month, day) {
-    const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
-    return date.getUTCFullYear() === Number(year) && date.getUTCMonth() === Number(month) - 1 && date.getUTCDate() === Number(day)
-      ? `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      : '';
-  }
-
-  function kpiBattleFilenameDateTokens(source, digits) {
-    const matches = [];
-    const pattern = new RegExp(`\\d{${digits}}`, 'g');
-    let match;
-    while ((match = pattern.exec(source))) {
-      const start = match.index;
-      const end = start + match[0].length;
-      if (/\d/.test(source[start - 1] || '') || /\d/.test(source[end] || '')) continue;
-      matches.push(match[0]);
-    }
-    return Array.from(new Set(matches));
-  }
-
-  // The source filename owns the version date. A four-digit MMDD filename
-  // needs the parsed report year only; it never uses the cutoff month/day to
-  // invent a version date. Missing, invalid, or competing tokens fail closed.
-  function kpiBattleSourceVersionDate(value, dataAsOfDate) {
+  function kpiBattleReportDateFromSource(value, dataAsOfDate) {
     const source = kpiBattleSourceFile(value);
-    const fullDates = kpiBattleFilenameDateTokens(source, 8);
-    if (fullDates.length) {
-      if (fullDates.length !== 1) return '';
-      const token = fullDates[0];
-      return kpiBattleValidIsoDate(token.slice(0, 4), token.slice(4, 6), token.slice(6, 8));
-    }
-    const shortDates = kpiBattleFilenameDateTokens(source, 4);
-    const anchor = String(dataAsOfDate || '').match(/^(\d{4})-\d{2}-\d{2}$/);
-    if (shortDates.length !== 1 || !anchor) return '';
-    const token = shortDates[0];
-    const month = token.slice(0, 2);
-    const day = token.slice(2, 4);
-    const anchorDate = Date.parse(`${dataAsOfDate}T00:00:00Z`);
-    const candidates = [Number(anchor[1]) - 1, Number(anchor[1]), Number(anchor[1]) + 1]
-      .map(year => kpiBattleValidIsoDate(year, month, day))
-      .filter(Boolean)
-      .map(date => ({ date, distance:Math.abs(Date.parse(`${date}T00:00:00Z`) - anchorDate) }));
-    candidates.sort((left, right) => left.distance - right.distance || left.date.localeCompare(right.date));
-    return candidates.length && (!candidates[1] || candidates[0].distance !== candidates[1].distance) ? candidates[0].date : '';
+    const match = source.match(/^(0[1-9]|1[0-2])([0-2][0-9]|3[01])\.xlsx$/i);
+    const asOf = String(dataAsOfDate || '');
+    const yearMatch = asOf.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match || !yearMatch) return '';
+    let year = Number(yearMatch[1]);
+    const sourceMonth = Number(match[1]);
+    const asOfMonth = Number(yearMatch[2]);
+    if (sourceMonth === 1 && asOfMonth === 12) year += 1;
+    if (sourceMonth === 12 && asOfMonth === 1) year -= 1;
+    return `${year}-${match[1]}-${match[2]}`;
   }
 
   function kpiBattleCorrectMetric(metric, excluded) {
@@ -157,7 +125,7 @@
 
   function kpiBattleSourceMetadata(data, supplement) {
     const items = [
-      ['版本日期', data.source_version_date || data.report_date || '—'],
+      ['戰報日期', data.report_date || '—'],
       ['資料統計至', data.data_as_of_date || data.source_as_of_date || '—'],
       ['來源檔', data.source_file || '—'],
       ['統計區間', kpiBattleSourceDateRange(data.source_date_range)],
@@ -182,15 +150,16 @@
   }
 
   function kpiBattleSupplementIsCurrent(kpiData, snapshot) {
-    const snapshotVersionDate = String((snapshot || {}).source_version_date || (snapshot || {}).report_date || '');
+    const snapshotReportDate = String((snapshot || {}).report_date || '');
     const snapshotDataAsOf = String((snapshot || {}).data_as_of_date || '');
-    const kpiVersionDate = String((kpiData || {}).source_version_date || (kpiData || {}).report_date || '');
+    const kpiReportDate = String((kpiData || {}).report_date || '');
     const kpiDataAsOf = String((kpiData || {}).data_as_of_date || '');
     const snapshotSource = kpiBattleSourceFile((snapshot || {}).source_file);
     const kpiDataSource = kpiBattleSourceFile((kpiData || {}).source_file);
+    const reportDateCompatible = snapshotReportDate === kpiReportDate || snapshotReportDate === snapshotDataAsOf;
     return Boolean(
-      snapshot && snapshotVersionDate && kpiVersionDate && snapshotDataAsOf && kpiDataAsOf && snapshotSource && kpiDataSource &&
-      snapshotVersionDate === kpiVersionDate && snapshotDataAsOf === kpiDataAsOf && snapshotSource === kpiDataSource
+      snapshot && snapshotReportDate && snapshotDataAsOf && kpiDataAsOf && snapshotSource && kpiDataSource &&
+      reportDateCompatible && snapshotDataAsOf === kpiDataAsOf && snapshotSource === kpiDataSource
     );
   }
 
@@ -231,7 +200,7 @@
     const meta = safeData.meta || {};
     const dataAsOfDate = kpiBattleDataAsOfDate(meta);
     const sourceFile = kpiBattleSourceFile(meta.sourceFile);
-    const sourceVersionDate = kpiBattleSourceVersionDate(sourceFile, dataAsOfDate);
+    const reportDate = kpiBattleReportDateFromSource(sourceFile, dataAsOfDate);
     const codeName = {};
     (safeData.stores || []).forEach(store => { codeName[store.code] = store.name; });
     const metricsOf = itemsObj => {
@@ -291,8 +260,7 @@
       source: 'kpicalc',
       fetchedAt: fetchedAt || '',
       source_file: sourceFile,
-      report_date: sourceVersionDate,
-      source_version_date: sourceVersionDate,
+      report_date: reportDate,
       data_as_of_date: dataAsOfDate,
       source_as_of_date: dataAsOfDate,
       source_date_range: meta.period || '',
@@ -818,7 +786,7 @@
     kpiBattleSupplementIsCurrent,
     mergeKpiBattleSupplement,
     kpiBattleSourceMetadata,
-    kpiBattleSourceVersionDate,
+    kpiBattleReportDateFromSource,
     kpiBattleApplyKnownCorrections,
     displayStoreName,
     formatNumber,

@@ -6,40 +6,20 @@ const PAGE_URL = process.env.TEST_BASE_URL
   : 'file://' + path.resolve(__dirname, '../live-battle.html');
 const stores = ['通化', '酒泉', '台北三創', '萬大', '六張犁', '復興南', '永吉', '大稻埕', '杭州南'];
 
-async function useLiveBattleDate(page) {
-  await page.addInitScript(iso => {
-    const NativeDate=Date;
-    const base=NativeDate.parse(iso);
-    const nativeStart=NativeDate.now();
-    class CalendarDate extends NativeDate {
-      constructor(...args){super(...(args.length?args:[base+NativeDate.now()-nativeStart]));}
-      static now(){return NativeDate.now();}
-    }
-    window.Date=CalendarDate;
-  }, '2026-08-30T04:00:00.000Z');
-}
-
 function kpiData() {
-  const metric=(actual,target)=>({a:actual,t:target,reportRate:actual/target});
   return {
-    meta: { month: '2026-08', snapshotDay: 29, sourceFile: '20260830-kpicalc.xlsx' },
+    meta: { month: '2026-08', snapshotDay: 29, sourceFile: '0830.xlsx' },
     stores: stores.map((name, index) => ({
       name, code: `DNB${String(index + 1).padStart(3, '0')}`,
       items: {
         'TTL AQ上線點數': { a: index, t: 10, reportRate: index / 10 },
-        'RT上線點數': { a: index, t: 20, reportRate: index / 20 },
-        'AQ V+D 999 (含)以上': metric(index + 1, 10),
-        'AQ V+D 1399 (含)以上': metric(index + 1, 10),
-        'RT V+D 999 (含)以上': metric(index + 1, 10),
-        'RT V+D 1399 (含)以上': metric(index + 1, 10),
-        '好速案銷售點數': metric(index + 1, 10)
+        'RT上線點數': { a: index, t: 20, reportRate: index / 20 }
       }
     }))
   };
 }
 
 test('本機雙檔先產生預覽，督導再載入正式目標追加動態今日追缺', async ({ page }) => {
-  await useLiveBattleDate(page);
   const actions = [];
   await page.route('https://script.google.com/**', async route => {
     const payload = JSON.parse(route.request().postData() || '{}');
@@ -68,13 +48,12 @@ test('本機雙檔先產生預覽，督導再載入正式目標追加動態今�
 
   await expect(page.locator('#storeRows tr')).toHaveCount(9);
   await expect(page.locator('#reportText')).toHaveValue(/北一二B 行進間戰報/);
-  await expect(page.locator('#reportText')).toHaveValue(/通化｜AQ上線缺4/);
+  await expect(page.locator('#reportText')).toHaveValue(/通化｜AQ 1\/5/);
   expect(actions).toEqual(['private_access', 'kpicalc_access']);
   expect(await page.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
 });
 
 test('非督導 Approved Device 仍 fail closed', async ({ page }) => {
-  await useLiveBattleDate(page);
   await page.route('https://script.google.com/**', async route => {
     const payload = JSON.parse(route.request().postData() || '{}');
     const body = payload.action === 'private_access'

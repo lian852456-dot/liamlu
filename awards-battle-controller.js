@@ -41,8 +41,8 @@
 
   function validateAwardsBattle(data, kpiData, snapshotKpi) {
     if (!data || typeof data !== 'object') return { ok: false, reason: '尚未取得與目前 KPI 同日期的台獎資料' };
-    const awardsDate = String(data.source_version_date || data.report_run_date || data.report_date || '');
-    const kpiDate = String((kpiData || {}).source_version_date || (kpiData || {}).report_date || '');
+    const awardsDate = String(data.report_run_date || data.report_date || '');
+    const kpiDate = String((kpiData || {}).report_date || '');
     const awardsCutoff = String(data.data_as_of_date || data.source_as_of_date || '');
     const kpiCutoff = String((kpiData || {}).data_as_of_date || (kpiData || {}).source_as_of_date || '');
     const cutoffMismatch = (awardsCutoff || kpiCutoff) && (!awardsCutoff || awardsCutoff !== kpiCutoff);
@@ -52,7 +52,7 @@
       return {
         ok: false,
         reason: awardsDate
-          ? `台獎版本日期 ${awardsDate} 與 KPI 版本日期 ${kpiDate || '—'} 不一致，或資料截至日／發布批次尚未同步`
+          ? `台獎戰報日期 ${awardsDate} 與 KPI 戰報日期 ${kpiDate || '—'} 不一致，或資料截止日／發布批次尚未同步`
           : '尚未取得與目前 KPI 同日期的台獎資料',
       };
     }
@@ -145,7 +145,7 @@
         ? data.overall
         : (stores.find(row => row.store === selectedBefore) || data.overall);
       const note = doc.getElementById('awardsBattleSourceNote');
-      if (note) note.textContent = `${phoneItems} 款重點機款｜${storeRows} 列店點與整體資料｜版本日期 ${data.source_version_date || data.report_run_date || data.report_date}｜資料截至 ${data.data_as_of_date || data.source_as_of_date || '—'}｜前三台依本月最高台獎順位；達成率超過 100% 由下一順位遞補｜店點差異數以 50% 目標無條件進位計算｜資料僅供受保護預覽`;
+      if (note) note.textContent = `${phoneItems} 款重點機款｜${storeRows} 列店點與整體資料｜發布日期 ${data.report_run_date || data.report_date}｜資料截至 ${data.data_as_of_date || data.report_date}｜前三台依本月最高台獎順位；達成率超過 100% 由下一順位遞補｜店點差異數以 50% 目標無條件進位計算｜資料僅供受保護預覽`;
       const content = doc.getElementById('awardsBattleContent');
       if (!content) return;
       content.innerHTML = `

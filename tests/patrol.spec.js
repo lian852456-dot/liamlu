@@ -506,7 +506,7 @@ test('新版 25 題缺第 25 題時只計缺 1 項，NCC 為 14/15', async ({ pa
   await expect(card.locator('.miss-group .item .no')).toHaveText(['25']);
 });
 
-test('新版 25 題將新舊 NA 視為完成，只有空白第 3、10 題維持缺項', async ({ page }) => {
+test('新版 25 題只有 V 完成，NA 的第 1、3、10 題維持缺項', async ({ page }) => {
   cloudRows = versionedPatrolRows('2026-09', '台北通化', 'DNB10059', Array.from({length:25}, (_, index) => index + 1));
   cloudRows[0] = {...cloudRows[0], result:'na'};
   cloudRows[2] = {...cloudRows[2], result:'', reason:'NA'};
@@ -519,12 +519,12 @@ test('新版 25 題將新舊 NA 視為完成，只有空白第 3、10 題維持�
   await expect(page.locator('#sep25Overview')).not.toContainText('尚缺檢核項次');
   await expect(page.locator('#sep25Overview')).toContainText('025 項完成店數');
   const card = page.locator('#sep25Content .store-card').filter({ hasText:'台北通化' });
-  await expect(card).toContainText('缺 2 項');
+  await expect(card).toContainText('缺 3 項');
   await expect(card.locator('.pill')).toHaveClass(/partial/);
   await expect(card.locator('.pill')).not.toHaveClass(/done/);
   await card.click();
-  await expect(card.locator('.sep25-group strong')).toHaveText(['8/9','0/1','15/15']);
-  await expect(card.locator('.miss-group .item .no')).toHaveText(['3','10']);
+  await expect(card.locator('.sep25-group strong')).toHaveText(['7/9','0/1','15/15']);
+  await expect(card.locator('.miss-group .item .no')).toHaveText(['1','3','10']);
 });
 
 test('解析預覽先做 Server Preflight，不寫雲端、不改 rawDetails；確認後才逐店讀回', async ({ page }) => {
@@ -758,7 +758,7 @@ test('督導面談紀錄可解析十一欄、排除員編並寫入獨立雲端�
     buffer:Buffer.from('填報人員,面談人員組織,面談人員編號,面談人員,面談原因,表單狀態,面談日期,填表日期,結案日期,建議與指導,同仁回饋\n測試督導,台北通化,123456,測試同仁,例行人員訪談,已結案,2026/8/4,2026/8/4,2026/8/5,績效追蹤,收到')
   });
   await expect(page.locator('#supervisorInterviewImportStatus')).toContainText('本機檢查完成');
-  await expect(page.locator('#supervisorInterviewPreview')).toContainText('面談／填表／結案');
+  await expect(page.locator('#supervisorInterviewPreview')).toContainText('面談日期');
   await expect(page.locator('#supervisorInterviewPreview')).toContainText('績效追蹤');
   await expect(page.locator('#supervisorInterviewPreview')).not.toContainText('123456');
   await page.getByRole('button',{name:'確認儲存本季紀錄'}).click();

@@ -2862,6 +2862,7 @@ function doPost(e) {
     else if (action === 'private_access') result = privateDashboardAccess(payload);
     else if (action === 'phone_stock_publish') result = phoneStockPublish(payload);
     else if (action === 'phone_stock_read') result = phoneStockRead(payload);
+    else if (action === 'threec_snapshot_read') result = threecSnapshotRead(payload);
     else if (action === 'private_admin_requests') result = privateDashboardAdminRequests(payload);
     else if (action === 'private_admin_approve') result = privateDashboardAdminApprove(payload);
     else if (action === 'private_admin_revoke') result = privateDashboardAdminRevoke(payload);
@@ -3170,6 +3171,396 @@ function phoneStockPublish(payload) {
     }
   } finally { lock.releaseLock(); }
   return { publishedAt:snapshot.importedAt,date:date,rowCount:normalized.length,updatedBy:employeeId };
+}
+
+// ═══════════════════════════════════
+// 3C／舊換新私有標準化快照
+// - 原始 Excel 只在管理頁的瀏覽器記憶體解析，後端只接受經驗證的 JSON。
+// - 資料寫入獨立私有資料夾，不列舉、不存取其他 Drive 目錄。
+// - registry 採用不可變檔案＋Script Property 指標；指標切換前失敗不會改變 active。
+// 需先在 Script Properties 設定 THREEC_PRIVATE_FOLDER_ID，不得將資料夾 ID 寫進公開 repo。
+// ═══════════════════════════════════
+
+const THREEC_PRIVATE_FOLDER_PROPERTY = 'THREEC_PRIVATE_FOLDER_ID';
+const THREEC_REGISTRY_POINTER_PROPERTY = 'THREEC_REGISTRY_FILE_ID';
+const THREEC_PRIVATE_FOLDER_NAME = '3C／舊換新資料庫（私有）';
+const THREEC_REGISTRY_SCHEMA = 'threec-private-registry/v1';
+const THREEC_SNAPSHOT_SCHEMA = 'threec-normalized-snapshot/v1';
+const THREEC_MAX_SNAPSHOT_JSON_BYTES = 10 * 1024 * 1024;
+const THREEC_PROVIDERS = ['點子行動', 'FutureDial（FDI）'];
+const THREEC_GRADES = ['S', 'A', 'B', 'C'];
+const THREEC_INITIAL_RELEASE = {
+  shopping:{ sourceVersionDate:'2026-09-22', rowCount:2031, excludedNoPriceCount:50 },
+  tradein:{ sourceVersionDate:'2026-09-16', rowCount:496, quoteConflictCount:0 }
+};
+
+function threecKind_(value) {
+  const kind = String(value || '').trim();
+  if (kind !== 'shopping' && kind !== 'tradein') throw new Error('僅支援 3C 手機專案價與舊換新兩類資料');
+  return kind;
+}
+
+function threecIsoDate_(value) {
+  const source = String(value || '');
+  const match = source.match(/^(20\d{2})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  return date.getUTCFullYear() === Number(match[1]) && date.getUTCMonth() === Number(match[2]) - 1 && date.getUTCDate() === Number(match[3]) ? source : '';
+}
+
+function threecPrivateFolder_() {
+  const folderId = String(privateDashboardProperties().getProperty(THREEC_PRIVATE_FOLDER_PROPERTY) || '').trim();
+  if (!folderId) throw new Error('尚未設定 3C／舊換新私有資料夾');
+  const folder = DriveApp.getFolderById(folderId);
+  if (folder.getName() !== THREEC_PRIVATE_FOLDER_NAME) throw new Error('3C／舊換新私有資料夾名稱不符，已停止存取');
+  if (folder.getSharingAccess() !== DriveApp.Access.PRIVATE) throw new Error('3C／舊換新資料夾不是私有狀態，已停止存取');
+  return folder;
+}
+
+function threecEmptyRegistry_() {
+  return {
+    schema_version:THREEC_REGISTRY_SCHEMA,
+    updated_at:'',
+    kinds:{ shopping:{ active:null, previous:null }, tradein:{ active:null, previous:null } },
+    audit:[]
+  };
+}
+
+function threecReadJsonFile_(fileId) {
+  const file = DriveApp.getFileById(String(fileId || ''));
+  const targetFolderId = threecPrivateFolder_().getId();
+  const parents = file.getParents();
+  let inTargetFolder = false;
+  while (parents.hasNext()) {
+    if (parents.next().getId() === targetFolderId) inTargetFolder = true;
+  }
+  if (!inTargetFolder) throw new Error('3C／舊換新檔案不在指定私有資料夾，已停止存取');
+  const text = file.getBlob().getDataAsString('UTF-8');
+  return JSON.parse(text);
+}
+
+function threecRegistry_() {
+  const id = String(privateDashboardProperties().getProperty(THREEC_REGISTRY_POINTER_PROPERTY) || '').trim();
+  if (!id) return threecEmptyRegistry_();
+  const registry = threecReadJsonFile_(id);
+  if (!registry || registry.schema_version !== THREEC_REGISTRY_SCHEMA || !registry.kinds || !registry.kinds.shopping || !registry.kinds.tradein) {
+    throw new Error('3C／舊換新 registry 格式不正確');
+  }
+  return registry;
+}
+
+function threecRegistrySummary_(registry) {
+  function clean(item) {
+    if (!item) return null;
+    return {
+      kind:item.kind,
+      source_version_date:item.source_version_date,
+      published_at:item.published_at,
+      source_file_sha256:item.source_file_sha256,
+      snapshot_hash:item.snapshot_hash,
+      row_count:Number(item.row_count || 0),
+      source_row_count:Number(item.source_row_count || 0),
+      excluded_no_price_count:Number(item.excluded_no_price_count || 0),
+      query_model_count:Number(item.query_model_count || 0),
+      quote_conflict_count:Number(item.quote_conflict_count || 0)
+    };
+  }
+  return {
+    schema_version:THREEC_REGISTRY_SCHEMA,
+    updated_at:String(registry.updated_at || ''),
+    shopping:{ active:clean(registry.kinds.shopping.active), previous:clean(registry.kinds.shopping.previous) },
+    tradein:{ active:clean(registry.kinds.tradein.active), previous:clean(registry.kinds.tradein.previous) }
+  };
+}
+
+function threecAllowedKeys_(value, allowed, label) {
+  Object.keys(value || {}).forEach(function(key) {
+    if (allowed.indexOf(key) === -1) throw new Error(label + '含有不允許的欄位：' + key);
+  });
+}
+
+function threecTextField_(value, label, maxLength, required) {
+  const text = String(value == null ? '' : value).trim();
+  if (required && !text) throw new Error(label + '不得為空');
+  if (text.length > maxLength) throw new Error(label + '過長');
+  return text;
+}
+
+function threecPriceField_(value, label, allowEmpty) {
+  if (value == null || String(value).trim() === '') {
+    if (allowEmpty) return '';
+    throw new Error(label + '不得為空');
+  }
+  const text = String(value).trim();
+  if (!/^\d+(?:\.\d+)?$/.test(text)) throw new Error(label + '不是有效的非負價格');
+  return text;
+}
+
+function threecValidateShoppingRows_(rows) {
+  const seen = {};
+  return rows.map(function(row, index) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error('3C 第 ' + (index + 1) + ' 筆格式不正確');
+    threecAllowedKeys_(row, ['source_sheet','source_row_number','brand','code','model','colorless_model','retail_price','project_prices'], '3C 第 ' + (index + 1) + ' 筆');
+    const sourceSheet = threecTextField_(row.source_sheet, '來源工作表', 160, true);
+    const sourceRowNumber = Number(row.source_row_number);
+    if (!Number.isSafeInteger(sourceRowNumber) || sourceRowNumber < 1 || sourceRowNumber > 1000000) throw new Error('3C 來源列號不正確');
+    const key = sourceSheet + '\u0001' + sourceRowNumber;
+    if (seen[key]) throw new Error('3C 資料含重複來源列');
+    seen[key] = true;
+    const project = row.project_prices;
+    if (!project || typeof project !== 'object' || Array.isArray(project)) throw new Error('3C 專案價格式不正確');
+    const projectPrices = {};
+    const projectKeys = Object.keys(project);
+    if (projectKeys.length > 120) throw new Error('3C 專案價欄位過多');
+    projectKeys.forEach(function(name) {
+      const cleanName = threecTextField_(name, '專案價欄名', 120, true);
+      projectPrices[cleanName] = threecPriceField_(project[name], cleanName, true);
+    });
+    const retailPrice = threecPriceField_(row.retail_price, '單機價', true);
+    const hasPrice = retailPrice !== '' || Object.keys(projectPrices).some(function(name) { return projectPrices[name] !== ''; });
+    if (!hasPrice) throw new Error('3C 正式快照不得包含全部價格空白的資料');
+    return {
+      source_sheet:sourceSheet,
+      source_row_number:sourceRowNumber,
+      brand:threecTextField_(row.brand, '品牌', 160, true),
+      code:threecTextField_(row.code, '代碼', 160, true),
+      model:threecTextField_(row.model, '機型', 240, true),
+      colorless_model:threecTextField_(row.colorless_model, '無色機型', 240, true),
+      retail_price:retailPrice,
+      project_prices:projectPrices
+    };
+  });
+}
+
+function threecValidateTradeinRows_(rows) {
+  return rows.map(function(row, index) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error('舊換新第 ' + (index + 1) + ' 組格式不正確');
+    threecAllowedKeys_(row, ['source_sheet','brand','model','quotes'], '舊換新第 ' + (index + 1) + ' 組');
+    const quotes = row.quotes;
+    if (!quotes || typeof quotes !== 'object' || Array.isArray(quotes)) throw new Error('舊換新報價格式不正確');
+    const providerKeys = Object.keys(quotes).sort();
+    if (JSON.stringify(providerKeys) !== JSON.stringify(THREEC_PROVIDERS.slice().sort())) throw new Error('舊換新必須完整保留兩家回收商');
+    const normalizedQuotes = {};
+    let priceCount = 0;
+    THREEC_PROVIDERS.forEach(function(provider) {
+      const grades = quotes[provider];
+      if (!grades || typeof grades !== 'object' || Array.isArray(grades)) throw new Error(provider + '報價格式不正確');
+      if (JSON.stringify(Object.keys(grades).sort()) !== JSON.stringify(THREEC_GRADES.slice().sort())) throw new Error(provider + '必須完整保留 S／A／B／C 欄位');
+      normalizedQuotes[provider] = {};
+      THREEC_GRADES.forEach(function(grade) {
+        const value = grades[grade];
+        const price = value == null || String(value).trim() === '' ? null : threecPriceField_(value, provider + ' ' + grade, false);
+        if (price !== null) priceCount += 1;
+        normalizedQuotes[provider][grade] = price;
+      });
+    });
+    if (!priceCount) throw new Error('舊換新正式快照不得包含全無報價的機型');
+    return {
+      source_sheet:threecTextField_(row.source_sheet, '來源工作表', 160, true),
+      brand:threecTextField_(row.brand, '品牌', 160, false),
+      model:threecTextField_(row.model, '舊機機型', 240, true),
+      quotes:normalizedQuotes
+    };
+  });
+}
+
+function threecNormalizeIncomingSnapshot_(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('3C／舊換新快照格式不正確');
+  threecAllowedKeys_(raw, ['schema_version','kind','source_version_date','source_file_name','source_file_sha256','parser_version','internal_source_dates','source_row_count','row_count','excluded_no_price_count','query_model_count','quote_conflict_count','rows','published_at','operator_hash','snapshot_hash'], '快照');
+  if (raw.schema_version !== THREEC_SNAPSHOT_SCHEMA) throw new Error('3C／舊換新快照 schema 不正確');
+  const kind = threecKind_(raw.kind);
+  const sourceVersionDate = threecIsoDate_(raw.source_version_date);
+  if (!sourceVersionDate) throw new Error('來源檔名版本日期無效');
+  const sourceFileName = threecTextField_(raw.source_file_name, '來源檔名', 280, true);
+  const dateTokens = sourceFileName.match(/(?:^|\D)(20\d{6})(?=\D|$)/g) || [];
+  const compactDate = sourceVersionDate.replace(/-/g, '');
+  if (dateTokens.length !== 1 || dateTokens[0].replace(/\D/g, '') !== compactDate) throw new Error('來源檔名與 source_version_date 不一致');
+  const sourceFileSha256 = String(raw.source_file_sha256 || '').toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(sourceFileSha256)) throw new Error('來源檔案 SHA-256 不正確');
+  if (!Array.isArray(raw.rows) || !raw.rows.length || raw.rows.length > (kind === 'shopping' ? 10000 : 5000)) throw new Error('正式快照筆數不正確');
+  const rows = kind === 'shopping' ? threecValidateShoppingRows_(raw.rows) : threecValidateTradeinRows_(raw.rows);
+  const rowCount = Number(raw.row_count);
+  const sourceRowCount = Number(raw.source_row_count);
+  const excludedNoPriceCount = Number(raw.excluded_no_price_count || 0);
+  const queryModelCount = Number(raw.query_model_count || 0);
+  const quoteConflictCount = Number(raw.quote_conflict_count || 0);
+  if (!Number.isSafeInteger(rowCount) || rowCount !== rows.length) throw new Error('快照 row_count 與正式列不一致');
+  if (!Number.isSafeInteger(sourceRowCount) || sourceRowCount < rowCount) throw new Error('快照 source_row_count 不正確');
+  if (!Number.isSafeInteger(excludedNoPriceCount) || excludedNoPriceCount < 0) throw new Error('排除數不正確');
+  if (kind === 'shopping' && sourceRowCount !== rowCount + excludedNoPriceCount) throw new Error('3C 來源筆數、發布筆數與排除數不一致');
+  if (kind === 'tradein' && quoteConflictCount !== 0) throw new Error('舊換新含有報價衝突');
+  const expected = THREEC_INITIAL_RELEASE[kind];
+  if (expected && expected.sourceVersionDate === sourceVersionDate) {
+    if (rowCount !== expected.rowCount) throw new Error('首次正式發布筆數不符授權基線');
+    if (kind === 'shopping' && excludedNoPriceCount !== expected.excludedNoPriceCount) throw new Error('首次 3C 排除數不符授權基線');
+    if (kind === 'tradein' && quoteConflictCount !== expected.quoteConflictCount) throw new Error('首次舊換新報價衝突數不符授權基線');
+  }
+  return {
+    schema_version:THREEC_SNAPSHOT_SCHEMA,
+    kind:kind,
+    source_version_date:sourceVersionDate,
+    source_file_name:sourceFileName,
+    source_file_sha256:sourceFileSha256,
+    parser_version:threecTextField_(raw.parser_version, 'parser_version', 80, true),
+    internal_source_dates:Array.isArray(raw.internal_source_dates) ? raw.internal_source_dates.map(function(value) { return threecTextField_(value, '檔內日期', 80, false); }).slice(0, 100) : [],
+    source_row_count:sourceRowCount,
+    row_count:rowCount,
+    excluded_no_price_count:excludedNoPriceCount,
+    query_model_count:queryModelCount,
+    quote_conflict_count:quoteConflictCount,
+    rows:rows
+  };
+}
+
+function threecSnapshotHash_(snapshot) {
+  const copy = JSON.parse(JSON.stringify(snapshot));
+  delete copy.snapshot_hash;
+  return reportVersionHash_(JSON.stringify(copy));
+}
+
+function threecSnapshotSummary_(snapshot, file) {
+  return {
+    snapshot_file_id:file.getId(),
+    snapshot_file_name:file.getName(),
+    kind:snapshot.kind,
+    source_version_date:snapshot.source_version_date,
+    published_at:snapshot.published_at,
+    source_file_sha256:snapshot.source_file_sha256,
+    snapshot_hash:snapshot.snapshot_hash,
+    row_count:snapshot.row_count,
+    source_row_count:snapshot.source_row_count,
+    excluded_no_price_count:snapshot.excluded_no_price_count,
+    query_model_count:snapshot.query_model_count,
+    quote_conflict_count:snapshot.quote_conflict_count
+  };
+}
+
+function threecWriteRegistry_(registry) {
+  const folder = threecPrivateFolder_();
+  const stamp = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyyMMdd-HHmmss-SSS');
+  const file = folder.createFile('threec-registry-' + stamp + '-' + Utilities.getUuid().slice(0, 8) + '.json', JSON.stringify(registry), MimeType.PLAIN_TEXT);
+  const readback = threecReadJsonFile_(file.getId());
+  if (!readback || readback.schema_version !== THREEC_REGISTRY_SCHEMA || reportVersionHash_(JSON.stringify(readback)) !== reportVersionHash_(JSON.stringify(registry))) {
+    throw new Error('3C／舊換新 registry 寫入讀回失敗');
+  }
+  privateDashboardProperties().setProperty(THREEC_REGISTRY_POINTER_PROPERTY, file.getId());
+  return file;
+}
+
+function threecAuditEvent_(registry, action, kind, employeeId, detail) {
+  const events = Array.isArray(registry.audit) ? registry.audit.slice(-99) : [];
+  events.push({
+    action:String(action || ''),
+    kind:String(kind || ''),
+    acted_at:privateDashboardNow(),
+    operator_hash:privateDashboardHash(employeeId).slice(0, 16),
+    detail:String(detail || '').slice(0, 240)
+  });
+  registry.audit = events;
+}
+
+function threec_status(payload) { return threecStatus(payload); }
+function threec_publish(payload) { return threecPublish(payload); }
+function threec_rollback(payload) { return threecRollback(payload); }
+
+function threecStatus(payload) {
+  reportUploadAuthorize_(payload);
+  threecPrivateFolder_();
+  return { registry:threecRegistrySummary_(threecRegistry_()) };
+}
+
+function threecPublish(payload) {
+  const employeeId = reportUploadAuthorize_(payload);
+  const encoded = String((payload || {}).snapshotJson || '');
+  if (!encoded || encoded.length > THREEC_MAX_SNAPSHOT_JSON_BYTES) throw new Error('3C／舊換新標準化快照缺少或過大');
+  const incoming = threecNormalizeIncomingSnapshot_(JSON.parse(encoded));
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const registry = threecRegistry_();
+    const slot = registry.kinds[incoming.kind];
+    const active = slot.active;
+    if (active && incoming.source_version_date < active.source_version_date) throw new Error('較舊檔名日期不得覆蓋目前正式版本');
+    if (active && incoming.source_version_date === active.source_version_date && incoming.source_file_sha256 === active.source_file_sha256) {
+      return { status:'already_current', kind:incoming.kind, registry:threecRegistrySummary_(registry) };
+    }
+    if (active && incoming.source_version_date === active.source_version_date && incoming.source_file_sha256 !== active.source_file_sha256 && (payload || {}).confirmSameDateHashChange !== true) {
+      return { status:'confirmation_required', reason:'same_date_hash_changed', kind:incoming.kind, registry:threecRegistrySummary_(registry) };
+    }
+    const publishedAt = privateDashboardNow();
+    const snapshot = Object.assign({}, incoming, {
+      published_at:publishedAt,
+      operator_hash:privateDashboardHash(employeeId).slice(0, 16)
+    });
+    snapshot.snapshot_hash = threecSnapshotHash_(snapshot);
+    const folder = threecPrivateFolder_();
+    const compactDate = snapshot.source_version_date.replace(/-/g, '');
+    const snapshotName = 'threec-' + snapshot.kind + '-' + compactDate + '-' + snapshot.source_file_sha256.slice(0, 12) + '-' + Utilities.getUuid().slice(0, 8) + '.json';
+    const snapshotFile = folder.createFile(snapshotName, JSON.stringify(snapshot), MimeType.PLAIN_TEXT);
+    const readback = threecReadJsonFile_(snapshotFile.getId());
+    const validatedReadback = threecNormalizeIncomingSnapshot_(readback);
+    if (validatedReadback.row_count !== snapshot.row_count || readback.snapshot_hash !== snapshot.snapshot_hash || threecSnapshotHash_(readback) !== snapshot.snapshot_hash) {
+      throw new Error('3C／舊換新快照寫入讀回失敗，active 維持原版');
+    }
+    const next = JSON.parse(JSON.stringify(registry));
+    next.updated_at = publishedAt;
+    next.kinds[incoming.kind].previous = next.kinds[incoming.kind].active || null;
+    next.kinds[incoming.kind].active = threecSnapshotSummary_(snapshot, snapshotFile);
+    threecAuditEvent_(next, 'publish', incoming.kind, employeeId, incoming.source_version_date + ' rows=' + incoming.row_count);
+    threecWriteRegistry_(next);
+    return { status:'published', kind:incoming.kind, registry:threecRegistrySummary_(next) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function threecRollback(payload) {
+  const employeeId = reportUploadAuthorize_(payload);
+  const kind = threecKind_((payload || {}).kind);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const registry = threecRegistry_();
+    const slot = registry.kinds[kind];
+    if (!slot.active || !slot.previous) throw new Error('此類資料尚無可回復的 previous 版本');
+    const previousSnapshot = threecReadJsonFile_(slot.previous.snapshot_file_id);
+    threecNormalizeIncomingSnapshot_(previousSnapshot);
+    if (threecSnapshotHash_(previousSnapshot) !== previousSnapshot.snapshot_hash) throw new Error('previous 快照雜湊驗證失敗');
+    const next = JSON.parse(JSON.stringify(registry));
+    const oldActive = next.kinds[kind].active;
+    next.kinds[kind].active = next.kinds[kind].previous;
+    next.kinds[kind].previous = oldActive;
+    next.updated_at = privateDashboardNow();
+    threecAuditEvent_(next, 'rollback', kind, employeeId, next.kinds[kind].active.source_version_date);
+    threecWriteRegistry_(next);
+    return { status:'rolled_back', kind:kind, registry:threecRegistrySummary_(next) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function threecAuthorizeRead_(payload) {
+  const employeeId = privateDashboardCleanEmployeeId((payload || {}).employeeId);
+  const deviceId = privateDashboardCleanDeviceId((payload || {}).deviceId);
+  const lookup = privateDashboardUserByEmployeeId(employeeId);
+  if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
+    throw new Error('此員編尚未核准此裝置，無法讀取 3C／舊換新私有資料');
+  }
+  lookup.user.last_login_at = privateDashboardNow();
+  privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
+  return employeeId;
+}
+
+function threecSnapshotRead(payload) {
+  threecAuthorizeRead_(payload);
+  const kind = threecKind_((payload || {}).kind);
+  const registry = threecRegistry_();
+  const active = registry.kinds[kind].active;
+  if (!active) return { snapshot:null, registry:threecRegistrySummary_(registry) };
+  const snapshot = threecReadJsonFile_(active.snapshot_file_id);
+  threecNormalizeIncomingSnapshot_(snapshot);
+  if (threecSnapshotHash_(snapshot) !== snapshot.snapshot_hash) throw new Error('3C／舊換新 active 快照雜湊驗證失敗');
+  return { snapshot:snapshot, registry:threecRegistrySummary_(registry) };
 }
 
 function privateDashboardAdminRequests(payload) {
@@ -4330,8 +4721,15 @@ const REPORT_UPLOAD_ALLOWED_ACTIONS = [
 // 上傳頁與上傳 API 同屬新 Deployment，使用 google.script.run 直接呼叫這四個包裝函式。
 // 不從 GitHub Pages fetch，不需要 CORS／preflight，也不把任何設定值注入 HTML。
 function reportUploadHtmlService_() {
-  return HtmlService.createHtmlOutputFromFile('ReportUpload')
+  return HtmlService.createTemplateFromFile('ReportUpload').evaluate()
     .setTitle('北一二B 戰報快速更新');
+}
+
+function reportUploadInclude_(name) {
+  if (name !== 'ReportUploadSheetJs' && name !== 'ReportUploadTradeInCore') {
+    throw new Error('report-upload-include-not-allowed');
+  }
+  return HtmlService.createHtmlOutputFromFile(name).getContent();
 }
 
 function report_upload_preview(payload) { return reportUploadPreview(payload); }

@@ -8,7 +8,7 @@ const GAS_PATTERN = 'https://script.google.com/**';
 const VALID_KEY = 'synthetic-patrol-key';
 const SESSION_TOKEN = 'synthetic-session-token';
 const SESSION_STORAGE_KEY = 'bei12b_patrol_session_token_v2';
-const SUMMARY_CACHE_KEY = 'patrol-summary-safe-v1:sep25-v-only-two-visits-7d-v2:2026-09';
+const SUMMARY_CACHE_KEY = 'patrol-summary-safe-v1:sep25-v-only-two-visits-7d-v1:2026-09';
 const READ_UNAVAILABLE = '巡店後端暫時無回應，已自動重試3次。session仍保留，可按重新連線，不需要登出。';
 
 const legacySummaryRows = [{
@@ -146,7 +146,7 @@ async function seedSessionAndSummary(page) {
     token: SESSION_TOKEN,
     cacheKey: SUMMARY_CACHE_KEY,
     cache: {
-      month: '2026-09', contract: 'sep25-v-only-two-visits-7d-v2',
+      month: '2026-09', contract: 'sep25-v-only-two-visits-7d-v1',
       updatedAt: '2026-09-15T01:00:00.000Z', totalStores: 9,
       visitedStores: 4, fullyDoneStores: 4
     }
@@ -199,20 +199,10 @@ test('valid ptdashboard response renders the complete summary with one request a
 test('three 404 responses keep the session and cached aggregate summary visible with the specified error', async ({browser}) => {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.addInitScript(iso => {
-    const NativeDate=Date;
-    const base=NativeDate.parse(iso);
-    const nativeStart=NativeDate.now();
-    class CalendarDate extends NativeDate {
-      constructor(...args){super(...(args.length?args:[base+NativeDate.now()-nativeStart]));}
-      static now(){return NativeDate.now();}
-    }
-    window.Date=CalendarDate;
-  }, '2026-09-15T04:00:00.000Z');
   await installFastReadRetry(page);
   await page.addInitScript(({cacheKey}) => {
     sessionStorage.setItem(cacheKey, JSON.stringify({
-      month: '2026-09', contract: 'sep25-v-only-two-visits-7d-v2',
+      month: '2026-09', contract: 'sep25-v-only-two-visits-7d-v1',
       updatedAt: '2026-09-15T01:00:00.000Z', totalStores: 9,
       visitedStores: 4, fullyDoneStores: 2
     }));

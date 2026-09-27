@@ -88,7 +88,7 @@ function encodedSnapshot(snapshot) {
 
 test('private_publish persists publishedAt and returns the same value', () => {
   const { state, context } = createHarness(JSON.stringify({ version: 1, kpiBattle: {}, awardsBattle: {} }));
-  loadFunctions(context, ['privateDashboardLatestSnapshotFile_', 'privateDashboardPublish']);
+  vm.runInNewContext(functionSource('privateDashboardPublish'), context);
   const result = context.privateDashboardPublish({ snapshotBase64: encodedSnapshot({
     version: 1,
     publishedAt: 'stale',
@@ -111,7 +111,7 @@ test('snapshot status reads the same persisted publishedAt', () => {
     kpiBattle: { report_date: '2026-08-05' },
     awardsBattle: { report_date: '2026-08-05', phone_items: 13, store_rows: 10 },
   }));
-  loadFunctions(context, ['privateDashboardLatestSnapshotFile_', 'privateDashboardAdminSnapshotStatus']);
+  vm.runInNewContext(functionSource('privateDashboardAdminSnapshotStatus'), context);
   const status = context.privateDashboardAdminSnapshotStatus({});
 
   assert.equal(status.publishedAt, '2026-08-05T16:30:00+08:00');
@@ -123,7 +123,7 @@ test('snapshot status reads the same persisted publishedAt', () => {
 
 test('oversized snapshotBase64 is rejected before Drive access', () => {
   const { context } = createHarness('');
-  loadFunctions(context, ['privateDashboardLatestSnapshotFile_', 'privateDashboardPublish']);
+  vm.runInNewContext(functionSource('privateDashboardPublish'), context);
   assert.throws(
     () => context.privateDashboardPublish({ snapshotBase64: 'x'.repeat(8 * 1024 * 1024 + 1) }),
     /私有戰情快照缺少或過大/
@@ -174,7 +174,6 @@ test('mixed freshness：只發布 fresh KPI component，awards payload 保持 8/
   const initial = { version: 1, publishedAt: '2026-08-23T20:33:34+08:00', kpiBattle: { report_date: '2026-08-22' }, awardsBattle: awards };
   const { state, context } = createHarness(JSON.stringify(initial), protectedKpi());
   loadFunctions(context, [
-    'privateDashboardLatestSnapshotFile_',
     'reportUploadKpiDate_',
     'privateDashboardCanonicalKpiSource_',
     'privateDashboardValidateKpiComponent_',
@@ -207,7 +206,6 @@ test('KPI component source/date mismatch 仍 fail-closed，partial publish 不�
   });
   const { state, context } = createHarness(initial, protectedKpi());
   loadFunctions(context, [
-    'privateDashboardLatestSnapshotFile_',
     'reportUploadKpiDate_',
     'privateDashboardCanonicalKpiSource_',
     'privateDashboardValidateKpiComponent_',
@@ -252,7 +250,7 @@ test('awards component-only publish 更新 fresh awards 並完整保留 KPI payl
     awardsBattle: { report_date: '2026-08-22' }, components: { kpi: kpiMeta, awards: { status: 'blocked' } },
   };
   const { state, context } = createHarness(JSON.stringify(initial), protectedKpi());
-  loadFunctions(context, ['privateDashboardLatestSnapshotFile_', 'privateDashboardValidateAwardsComponent_', 'privateDashboardPublishAwardsComponent']);
+  loadFunctions(context, ['privateDashboardValidateAwardsComponent_', 'privateDashboardPublishAwardsComponent']);
   const result = context.privateDashboardPublishAwardsComponent({ awardsBattleBase64: encodedSnapshot(freshAwardsComponent()) });
   const stored = JSON.parse(state.text);
   assert.deepEqual(stored.kpiBattle, kpi);
@@ -271,7 +269,7 @@ test('awards component-only publish 接受 Google Drive immutable identity 且�
     components: { kpi: { status: 'fresh' }, awards: { status: 'blocked' } },
   };
   const { state, context } = createHarness(JSON.stringify(initial), protectedKpi());
-  loadFunctions(context, ['privateDashboardLatestSnapshotFile_', 'privateDashboardValidateAwardsComponent_', 'privateDashboardPublishAwardsComponent']);
+  loadFunctions(context, ['privateDashboardValidateAwardsComponent_', 'privateDashboardPublishAwardsComponent']);
   const result = context.privateDashboardPublishAwardsComponent({
     awardsBattleBase64: encodedSnapshot(freshAwardsComponent({}, 'google-drive-cloud')),
   });
@@ -289,7 +287,7 @@ test('awards cutoff/source identity mismatch 必須 fail-closed 且不得改 KPI
     components: { kpi: { status: 'fresh' }, awards: { status: 'blocked' } },
   });
   const { state, context } = createHarness(initial, protectedKpi());
-  loadFunctions(context, ['privateDashboardLatestSnapshotFile_', 'privateDashboardValidateAwardsComponent_', 'privateDashboardPublishAwardsComponent']);
+  loadFunctions(context, ['privateDashboardValidateAwardsComponent_', 'privateDashboardPublishAwardsComponent']);
   assert.throws(
     () => context.privateDashboardPublishAwardsComponent({
       awardsBattleBase64: encodedSnapshot(freshAwardsComponent({ report_date: '2026-08-22' })),

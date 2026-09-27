@@ -53,7 +53,7 @@ test('PWA uses safe-area, standalone manifest, and app-only offline cache', () =
   assert.equal(manifest.prefer_related_applications, false);
   assert.equal(manifest.orientation, 'portrait-primary');
   assert.match(worker, /offline\.html/);
-  assert.match(worker, /liam-supervisor-app-1-2-release-gate-20260928-v1/);
+  assert.match(worker, /liam-supervisor-app-1-2-patrol-isolated-recovery-20260916-v1/);
   assert.match(worker, /patrol-question-versions\.js/);
   assert.match(worker, /half-month-check-read-model\.js/);
   assert.match(worker, /half-month-check-write-prep\.js/);

@@ -75,12 +75,51 @@
         <p class="small">發布會先備份正式 JSON；讀回驗證失敗時，伺服器會自動還原上一版。</p>
         <div id="log"></div>
       </section>
+
+      <section class="card">
+        <h2>3C／舊換新私有資料</h2>
+        <p class="small">Excel 只在這個分頁解析；後端只接收通過 gate 的標準化 JSON，原始 Excel 不會上傳或寫入 Drive。</p>
+        <div class="grid">
+          <label>3C 手機專案價（.xls／.xlsx）
+            <input id="shoppingFile" type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          </label>
+          <label>舊換新回收價（.xlsx）
+            <input id="tradeinFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          </label>
+        </div>
+        <div class="actions">
+          <button id="shoppingPreviewBtn" type="button">解析 3C 檔案</button>
+          <button id="tradeinPreviewBtn" type="button">解析舊換新檔案</button>
+          <button id="threecRefreshBtn" class="secondary" type="button">重新讀取正式版本</button>
+        </div>
+        <div id="threecMessage" class="message hidden" role="status"></div>
+        <div id="threecRegistry" class="notice">目前正式版本讀取中…</div>
+        <div id="threecPreview" class="hidden">
+          <div class="meta">
+            <div class="metric"><span>類別</span><b id="threecKind">—</b></div>
+            <div class="metric"><span>檔名版本日</span><b id="threecVersion">—</b></div>
+            <div class="metric"><span>正式筆數</span><b id="threecRows">—</b></div>
+            <div class="metric"><span>稽核</span><b id="threecAudit">—</b></div>
+          </div>
+          <p id="threecHash" class="small"></p>
+          <label class="confirm"><input id="threecConfirm" type="checkbox">我已核對來源檔名日期、正式筆數與稽核數，確認發布此標準化快照。</label>
+          <label id="threecSameDateWrap" class="confirm hidden"><input id="threecSameDateConfirm" type="checkbox">同日期但來源雜湊不同；我確認這是更正版，允許切換 active 指標。</label>
+          <div class="actions">
+            <button id="threecPublishBtn" type="button" disabled>確認發布私有快照</button>
+            <button id="shoppingRollbackBtn" class="warn" type="button">3C 回復上一版</button>
+            <button id="tradeinRollbackBtn" class="warn" type="button">舊換新回復上一版</button>
+          </div>
+        </div>
+      </section>
     </section>
   </main>
 
+  <script><?!= reportUploadInclude_('ReportUploadSheetJs'); ?></script>
+  <script><?!= reportUploadInclude_('ReportUploadTradeInCore'); ?></script>
   <script>
     const auth = { employeeId: '', adminSecret: '' };
     let previewToken = '';
+    let threecPreviewSnapshot = null;
     const $ = id => document.getElementById(id);
     const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     function message(id, text, tone) { const node = $(id); node.textContent = text; node.className = 'message ' + (tone || ''); }
@@ -113,11 +152,63 @@
       renderLog(result.entries);
       return result;
     }
+    function threecSlotText(label, slot) {
+      const active = slot && slot.active;
+      const previous = slot && slot.previous;
+      return '<div><b>' + esc(label) + '</b>：active ' + esc(active ? active.source_version_date + '／' + active.row_count + ' 筆' : '尚無') +
+        '；previous ' + esc(previous ? previous.source_version_date + '／' + previous.row_count + ' 筆' : '尚無') + '</div>';
+    }
+    function renderThreecRegistry(result) {
+      const registry = result && result.registry || {};
+      $('threecRegistry').innerHTML = threecSlotText('3C', registry.shopping) + threecSlotText('舊換新', registry.tradein);
+    }
+    async function refreshThreec() {
+      const result = await call('threec_status', payload());
+      renderThreecRegistry(result);
+      return result;
+    }
+    function updateThreecPublishButton() {
+      const sameDateRequired = !$('threecSameDateWrap').classList.contains('hidden');
+      $('threecPublishBtn').disabled = !threecPreviewSnapshot || !$('threecConfirm').checked || (sameDateRequired && !$('threecSameDateConfirm').checked);
+    }
+    async function previewThreec(kind) {
+      const file = $(kind + 'File').files[0];
+      const button = $(kind + 'PreviewBtn');
+      if (!file) return message('threecMessage', '請先選擇' + (kind === 'shopping' ? ' 3C 手機專案價' : '舊換新回收價') + '檔案。', 'bad');
+      if (!window.XLSX || !window.TradeInImportCore) return message('threecMessage', '本機解析器尚未載入，請重新整理後再試。', 'bad');
+      setBusy(button, true, '解析中…');
+      message('threecMessage', '正在本機解析與驗證；原始 Excel 不會上傳。');
+      try {
+        const parsed = await window.TradeInImportCore.parseFile(file, window.XLSX, kind);
+        const snapshot = window.TradeInImportCore.buildPublishSnapshot(kind, parsed);
+        const expectedRows = kind === 'shopping' ? 2031 : 496;
+        const expectedAudit = kind === 'shopping' ? snapshot.excluded_no_price_count === 50 : snapshot.quote_conflict_count === 0;
+        if (snapshot.row_count !== expectedRows || !expectedAudit) throw new Error('正式基線不符：' + (kind === 'shopping' ? '須為 2031 筆且排除 50 筆無價格資料。' : '須為 496 組且報價衝突為 0。'));
+        threecPreviewSnapshot = snapshot;
+        $('threecKind').textContent = kind === 'shopping' ? '3C 手機專案價' : '舊換新回收價';
+        $('threecVersion').textContent = snapshot.source_version_date;
+        $('threecRows').textContent = snapshot.row_count + ' 筆';
+        $('threecAudit').textContent = kind === 'shopping' ? '排除 ' + snapshot.excluded_no_price_count + ' 筆／零元保留' : '衝突 ' + snapshot.quote_conflict_count + '／兩家 S/A/B/C';
+        $('threecHash').textContent = '來源 SHA-256：' + snapshot.source_file_sha256;
+        $('threecPreview').classList.remove('hidden');
+        $('threecConfirm').checked = false;
+        $('threecSameDateConfirm').checked = false;
+        $('threecSameDateWrap').classList.add('hidden');
+        updateThreecPublishButton();
+        message('threecMessage', '本機解析與正式基線驗證通過；請核對後再發布。', 'ok');
+      } catch (error) {
+        threecPreviewSnapshot = null;
+        updateThreecPublishButton();
+        message('threecMessage', error.message, 'bad');
+      } finally {
+        setBusy(button, false, kind === 'shopping' ? '解析 3C 檔案' : '解析舊換新檔案');
+      }
+    }
     $('loginBtn').addEventListener('click', async () => {
       const button = $('loginBtn'); auth.employeeId = $('employeeId').value.trim().toUpperCase(); auth.adminSecret = $('adminSecret').value;
       if (!auth.employeeId || !auth.adminSecret) return message('authMessage', '請輸入員編與管理者密碼。', 'bad');
       setBusy(button, true, '驗證中…'); message('authMessage', '正在讀取目前版本…');
-      try { await refreshLog(); $('authCard').classList.add('hidden'); $('app').classList.remove('hidden'); }
+      try { await Promise.all([refreshLog(), refreshThreec()]); $('authCard').classList.add('hidden'); $('app').classList.remove('hidden'); }
       catch (error) { message('authMessage', error.message, 'bad'); }
       finally { setBusy(button, false, '登入並讀取目前版本'); }
     });
@@ -160,6 +251,50 @@
       catch (error) { message('kpiMessage', error.message, 'bad'); }
       finally { setBusy(button, false, '回復上一版'); }
     });
+    $('shoppingPreviewBtn').addEventListener('click', () => previewThreec('shopping'));
+    $('tradeinPreviewBtn').addEventListener('click', () => previewThreec('tradein'));
+    $('threecRefreshBtn').addEventListener('click', async () => {
+      try { await refreshThreec(); message('threecMessage', '已重新讀取 3C／舊換新正式版本。', 'ok'); }
+      catch (error) { message('threecMessage', error.message, 'bad'); }
+    });
+    $('threecConfirm').addEventListener('change', updateThreecPublishButton);
+    $('threecSameDateConfirm').addEventListener('change', updateThreecPublishButton);
+    $('threecPublishBtn').addEventListener('click', async () => {
+      if (!threecPreviewSnapshot || !$('threecConfirm').checked) return;
+      const button = $('threecPublishBtn');
+      const sameDateConfirmed = !$('threecSameDateWrap').classList.contains('hidden') && $('threecSameDateConfirm').checked;
+      if (!window.confirm('確定將此標準化快照寫入指定私有資料夾並切換 active 指標？')) return;
+      setBusy(button, true, '發布中…');
+      message('threecMessage', '正在寫入不可變快照、讀回驗證並更新 registry…');
+      try {
+        const result = await call('threec_publish', payload({ snapshotJson:JSON.stringify(threecPreviewSnapshot), confirmSameDateHashChange:sameDateConfirmed }));
+        renderThreecRegistry(result);
+        if (result.status === 'confirmation_required') {
+          $('threecSameDateWrap').classList.remove('hidden');
+          $('threecSameDateConfirm').checked = false;
+          updateThreecPublishButton();
+          return message('threecMessage', '同日期來源雜湊不同。請確認這是更正版後再發布一次。', 'warn');
+        }
+        const text = result.status === 'already_current' ? '正式版本已是同日期同雜湊，未產生新寫入。' : '私有快照已發布並完成讀回驗證。';
+        message('threecMessage', text, 'ok');
+        if (result.status === 'published') threecPreviewSnapshot = null;
+        $('threecConfirm').checked = false;
+        $('threecSameDateConfirm').checked = false;
+        $('threecSameDateWrap').classList.add('hidden');
+        updateThreecPublishButton();
+      } catch (error) { message('threecMessage', error.message, 'bad'); }
+      finally { setBusy(button, false, '確認發布私有快照'); }
+    });
+    async function rollbackThreec(kind) {
+      if (!window.confirm('確定只切換 ' + (kind === 'shopping' ? '3C' : '舊換新') + ' active／previous 指標回復上一版？')) return;
+      const button = $(kind + 'RollbackBtn');
+      setBusy(button, true, '回復中…');
+      try { const result = await call('threec_rollback', payload({ kind })); renderThreecRegistry(result); message('threecMessage', '已回復上一版並完成指標讀回。', 'ok'); }
+      catch (error) { message('threecMessage', error.message, 'bad'); }
+      finally { setBusy(button, false, kind === 'shopping' ? '3C 回復上一版' : '舊換新回復上一版'); }
+    }
+    $('shoppingRollbackBtn').addEventListener('click', () => rollbackThreec('shopping'));
+    $('tradeinRollbackBtn').addEventListener('click', () => rollbackThreec('tradein'));
   </script>
 </body>
 </html>
