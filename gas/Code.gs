@@ -4360,14 +4360,15 @@ function privateDashboardValidateKpiComponent_(kpiBattle, kpicalc) {
   if (privateDashboardCanonicalKpiSource_(kpiBattle.source_file) !== sourceFile) {
     throw new Error('KPI component source_file 與 protected KPI 不一致');
   }
+  const protectedPersonCount = Array.isArray(kpicalc.persons) ? kpicalc.persons.length : 0;
   if (!Array.isArray(kpicalc.stores) || kpicalc.stores.length !== 9 ||
-      !Array.isArray(kpicalc.persons) || kpicalc.persons.length !== 40 ||
+      protectedPersonCount < 10 ||
       !Array.isArray(kpicalc.items) || kpicalc.items.length !== 25) {
-    throw new Error('protected KPI 必須為 9 店／40 人／25 KPI items');
+    throw new Error('protected KPI 必須為 9 店／至少 10 人／25 KPI items');
   }
   if (!Array.isArray(kpiBattle.stores) || kpiBattle.stores.length !== 9 ||
-      !Array.isArray(kpiBattle.personal) || kpiBattle.personal.length !== 40) {
-    throw new Error('KPI supplement 必須為九店與 40 人');
+      !Array.isArray(kpiBattle.personal) || kpiBattle.personal.length !== protectedPersonCount) {
+    throw new Error('KPI supplement 必須為九店，且人員筆數需與 protected KPI 一致（' + protectedPersonCount + ' 人）');
   }
   const rows = [kpiBattle.aggregate].concat(kpiBattle.stores);
   const required = ['overall_kpi', 'company_rank', 'overall_kpi_dod', 'company_rank_dod', 'addon_score'];
