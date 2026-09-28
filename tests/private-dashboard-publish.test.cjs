@@ -148,7 +148,10 @@ function freshKpiComponent(overrides = {}) {
     generated_at: '2026-08-24T18:00:00+08:00',
     aggregate: supplement(0),
     stores: Array.from({ length: 9 }, (_, index) => ({ store: `店${index + 1}`, ...supplement(index + 1) })),
-    personal: Array.from({ length: 40 }, (_, index) => ({ name: `同仁${index + 1}` })),
+    personal: Array.from({ length: 40 }, (_, index) => ({
+      store: `店${index % 9 + 1}`,
+      name: `同仁${index + 1}`,
+    })),
     ...overrides,
   };
 }
@@ -159,8 +162,11 @@ function protectedKpi() {
       month: '2026-08', snapshotDay: 23, period: '2026/08/01 ~ 08/23',
       sourceFile: '0824.xlsx', processingRunId: 'quick-20260824-125725-777574ab',
     },
-    stores: Array.from({ length: 9 }, () => ({})),
-    persons: Array.from({ length: 40 }, () => ({})),
+    stores: Array.from({ length: 9 }, (_, index) => ({ code: `S${index + 1}`, name: `台北店${index + 1}` })),
+    persons: Array.from({ length: 40 }, (_, index) => ({
+      store: `S${index % 9 + 1}`,
+      pname: `同仁${index + 1}`,
+    })),
     items: Array.from({ length: 25 }, () => ({})),
   };
 }
@@ -176,6 +182,9 @@ test('mixed freshness：只發布 fresh KPI component，awards payload 保持 8/
   loadFunctions(context, [
     'reportUploadKpiDate_',
     'privateDashboardCanonicalKpiSource_',
+    'privateDashboardCanonicalKpiStore_',
+    'privateDashboardCanonicalKpiPersonName_',
+    'privateDashboardKpiPersonKeys_',
     'privateDashboardValidateKpiComponent_',
     'privateDashboardPublishKpiComponent',
   ]);
@@ -205,14 +214,23 @@ test('KPI component accepts 41 people when protected KPI and supplement counts m
     awardsBattle: { report_date: '2026-08-22' },
   };
   const protected41 = protectedKpi();
-  protected41.persons = Array.from({ length: 41 }, () => ({}));
+  protected41.persons = Array.from({ length: 41 }, (_, index) => ({
+    store: `S${index % 9 + 1}`,
+    pname: `同仁${index + 1}`,
+  }));
   const supplement41 = freshKpiComponent({
-    personal: Array.from({ length: 41 }, (_, index) => ({ name: `同仁${index + 1}` })),
+    personal: Array.from({ length: 41 }, (_, index) => ({
+      store: `店${index % 9 + 1}`,
+      name: `同仁${index + 1}`,
+    })),
   });
   const { state, context } = createHarness(JSON.stringify(initial), protected41);
   loadFunctions(context, [
     'reportUploadKpiDate_',
     'privateDashboardCanonicalKpiSource_',
+    'privateDashboardCanonicalKpiStore_',
+    'privateDashboardCanonicalKpiPersonName_',
+    'privateDashboardKpiPersonKeys_',
     'privateDashboardValidateKpiComponent_',
     'privateDashboardPublishKpiComponent',
   ]);
@@ -233,11 +251,17 @@ test('KPI component rejects supplement when current protected person count diffe
     awardsBattle: { report_date: '2026-08-22' },
   });
   const protected41 = protectedKpi();
-  protected41.persons = Array.from({ length: 41 }, () => ({}));
+  protected41.persons = Array.from({ length: 41 }, (_, index) => ({
+    store: `S${index % 9 + 1}`,
+    pname: `同仁${index + 1}`,
+  }));
   const { state, context } = createHarness(initial, protected41);
   loadFunctions(context, [
     'reportUploadKpiDate_',
     'privateDashboardCanonicalKpiSource_',
+    'privateDashboardCanonicalKpiStore_',
+    'privateDashboardCanonicalKpiPersonName_',
+    'privateDashboardKpiPersonKeys_',
     'privateDashboardValidateKpiComponent_',
     'privateDashboardPublishKpiComponent',
   ]);
@@ -247,6 +271,67 @@ test('KPI component rejects supplement when current protected person count diffe
       kpiBattleBase64: encodedSnapshot(freshKpiComponent()),
     }),
     /人員筆數需與 protected KPI 一致（41 人）/,
+  );
+  assert.equal(state.text, initial);
+});
+
+test('KPI component rejects same-count replacement when personnel identities differ', () => {
+  const initial = JSON.stringify({
+    version: 1,
+    kpiBattle: { report_date: '2026-08-22' },
+    awardsBattle: { report_date: '2026-08-22' },
+  });
+  const protectedData = protectedKpi();
+  const replacement = freshKpiComponent();
+  replacement.personal[replacement.personal.length - 1] = {
+    store: '店4',
+    name: '新*人',
+  };
+  const { state, context } = createHarness(initial, protectedData);
+  loadFunctions(context, [
+    'reportUploadKpiDate_',
+    'privateDashboardCanonicalKpiSource_',
+    'privateDashboardCanonicalKpiStore_',
+    'privateDashboardCanonicalKpiPersonName_',
+    'privateDashboardKpiPersonKeys_',
+    'privateDashboardValidateKpiComponent_',
+    'privateDashboardPublishKpiComponent',
+  ]);
+
+  assert.throws(
+    () => context.privateDashboardPublishKpiComponent({
+      kpiBattleBase64: encodedSnapshot(replacement),
+    }),
+    /人員名單與 protected KPI 不一致/,
+  );
+  assert.equal(state.text, initial);
+});
+
+test('KPI component rejects same person moved to a different store until both sources agree', () => {
+  const initial = JSON.stringify({
+    version: 1,
+    kpiBattle: { report_date: '2026-08-22' },
+    awardsBattle: { report_date: '2026-08-22' },
+  });
+  const protectedData = protectedKpi();
+  const moved = freshKpiComponent();
+  moved.personal[0] = { ...moved.personal[0], store: '店2' };
+  const { state, context } = createHarness(initial, protectedData);
+  loadFunctions(context, [
+    'reportUploadKpiDate_',
+    'privateDashboardCanonicalKpiSource_',
+    'privateDashboardCanonicalKpiStore_',
+    'privateDashboardCanonicalKpiPersonName_',
+    'privateDashboardKpiPersonKeys_',
+    'privateDashboardValidateKpiComponent_',
+    'privateDashboardPublishKpiComponent',
+  ]);
+
+  assert.throws(
+    () => context.privateDashboardPublishKpiComponent({
+      kpiBattleBase64: encodedSnapshot(moved),
+    }),
+    /人員名單與 protected KPI 不一致/,
   );
   assert.equal(state.text, initial);
 });
@@ -261,6 +346,9 @@ test('KPI component source/date mismatch 仍 fail-closed，partial publish 不�
   loadFunctions(context, [
     'reportUploadKpiDate_',
     'privateDashboardCanonicalKpiSource_',
+    'privateDashboardCanonicalKpiStore_',
+    'privateDashboardCanonicalKpiPersonName_',
+    'privateDashboardKpiPersonKeys_',
     'privateDashboardValidateKpiComponent_',
     'privateDashboardPublishKpiComponent',
   ]);

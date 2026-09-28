@@ -4344,6 +4344,40 @@ function privateDashboardCanonicalKpiSource_(value) {
   return staged ? staged[1] : raw;
 }
 
+function privateDashboardCanonicalKpiStore_(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/^台灣大哥大數位生活台北/, '')
+    .replace(/^台灣大哥大台北/, '')
+    .replace(/^台北/, '');
+}
+
+function privateDashboardCanonicalKpiPersonName_(value) {
+  return String(value || '').trim().replace(/\s+/g, '').replace(/＊/g, '*');
+}
+
+function privateDashboardKpiPersonKeys_(kpicalc, kpiBattle) {
+  const codeToStore = {};
+  (Array.isArray(kpicalc && kpicalc.stores) ? kpicalc.stores : []).forEach(function(store) {
+    const code = String(store && store.code || '').trim();
+    const name = privateDashboardCanonicalKpiStore_(store && (store.name || store.store));
+    if (code && name) codeToStore[code] = name;
+  });
+  const protectedKeys = (Array.isArray(kpicalc && kpicalc.persons) ? kpicalc.persons : []).map(function(person) {
+    const rawStore = String(person && person.store || '').trim();
+    const store = codeToStore[rawStore] || privateDashboardCanonicalKpiStore_(rawStore);
+    const name = privateDashboardCanonicalKpiPersonName_(person && (person.pname || person.name));
+    return store && name ? store + '|' + name : '';
+  }).sort();
+  const supplementKeys = (Array.isArray(kpiBattle && kpiBattle.personal) ? kpiBattle.personal : []).map(function(person) {
+    const store = privateDashboardCanonicalKpiStore_(person && person.store);
+    const name = privateDashboardCanonicalKpiPersonName_(person && (person.name || person.pname));
+    return store && name ? store + '|' + name : '';
+  }).sort();
+  return { protectedKeys: protectedKeys, supplementKeys: supplementKeys };
+}
+
 function privateDashboardValidateKpiComponent_(kpiBattle, kpicalc) {
   if (!kpiBattle || typeof kpiBattle !== 'object' || Array.isArray(kpiBattle)) {
     throw new Error('KPI component 格式不完整');
@@ -4369,6 +4403,14 @@ function privateDashboardValidateKpiComponent_(kpiBattle, kpicalc) {
   if (!Array.isArray(kpiBattle.stores) || kpiBattle.stores.length !== 9 ||
       !Array.isArray(kpiBattle.personal) || kpiBattle.personal.length !== protectedPersonCount) {
     throw new Error('KPI supplement 必須為九店，且人員筆數需與 protected KPI 一致（' + protectedPersonCount + ' 人）');
+  }
+  const personKeys = privateDashboardKpiPersonKeys_(kpicalc, kpiBattle);
+  if (personKeys.protectedKeys.some(function(key) { return !key; }) ||
+      personKeys.supplementKeys.some(function(key) { return !key; })) {
+    throw new Error('KPI 人員名單含無法辨識的店點或姓名');
+  }
+  if (JSON.stringify(personKeys.protectedKeys) !== JSON.stringify(personKeys.supplementKeys)) {
+    throw new Error('KPI supplement 人員名單與 protected KPI 不一致');
   }
   const rows = [kpiBattle.aggregate].concat(kpiBattle.stores);
   const required = ['overall_kpi', 'company_rank', 'overall_kpi_dod', 'company_rank_dod', 'addon_score'];
