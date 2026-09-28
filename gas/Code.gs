@@ -3471,6 +3471,7 @@ function threecStatus(payload) {
 
 function threecPublish(payload) {
   const employeeId = reportUploadAuthorize_(payload);
+  if ((payload || {}).confirmPublish !== true) throw new Error('請明確確認後再發布 3C／舊換新快照');
   const encoded = String((payload || {}).snapshotJson || '');
   if (!encoded || encoded.length > THREEC_MAX_SNAPSHOT_JSON_BYTES) throw new Error('3C／舊換新標準化快照缺少或過大');
   const incoming = threecNormalizeIncomingSnapshot_(JSON.parse(encoded));
@@ -4729,7 +4730,12 @@ function reportUploadInclude_(name) {
   if (name !== 'ReportUploadSheetJs' && name !== 'ReportUploadTradeInCore') {
     throw new Error('report-upload-include-not-allowed');
   }
-  return HtmlService.createHtmlOutputFromFile(name).getContent();
+  // Assets are JavaScript, not standalone HTML. Read them without HTML parsing;
+  // escape literal codepage control characters before inserting into <script>.
+  return HtmlService.createTemplateFromFile(name).getRawContent()
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, function(character) {
+      return '\\x' + ('0' + character.charCodeAt(0).toString(16)).slice(-2);
+    });
 }
 
 function report_upload_preview(payload) { return reportUploadPreview(payload); }

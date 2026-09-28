@@ -43,6 +43,9 @@ test('管理頁只內嵌同專案解析器，3C 原始 Excel 不離開瀏覽器'
   assert.doesNotMatch(publish, /fileBase64|arrayBuffer|readAsDataURL/);
   assert.equal(read('gas/ReportUploadSheetJs.html'), read('assets/vendor/xlsx.full.min.js'));
   assert.equal(read('gas/ReportUploadTradeInCore.html'), read('tradein-import-core.js'));
+  const include = functionBody(code, 'reportUploadInclude_');
+  assert.match(include, /createTemplateFromFile\(name\)\.getRawContent\(\)/);
+  assert.doesNotMatch(include, /createHtmlOutputFromFile/);
 });
 
 test('私有資料夾只能由 Script Property 指定且必須名稱及分享狀態都正確', () => {
