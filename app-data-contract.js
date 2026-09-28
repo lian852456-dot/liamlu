@@ -9,6 +9,9 @@
   ];
   const STATUSES = new Set(['ok', 'partial', 'no_data', 'unauthorized', 'stale', 'error']);
   const REPORT_FEEDBACK_FIELDS = ['reason','consult','method','plan'];
+  const KPI_COMPLETENESS_WARNING = '正式 kpicalc 未完整提供 9 店 × 25 項 rate';
+  const KPI_REGION_OPTIONAL_RATE_KEYS = new Set(['解約後NP OUT(督導績)']);
+  let pendingKpiCompletenessStates = [];
 
   function assert(condition, message) {
     if (!condition) throw new Error(`App 1.2 contract: ${message}`);
@@ -47,8 +50,44 @@
     return contract;
   }
 
+  function knownKpiAggregateGapIsBenign(data) {
+    if (!data || !Array.isArray(data.region) || !data.stores || typeof data.stores !== 'object') return false;
+    if (data.region.length !== 25) return false;
+    const storeLists = Object.values(data.stores);
+    if (storeLists.length !== 9 || storeLists.some(items => !Array.isArray(items) || items.length !== 25)) return false;
+    const missing = data.region.filter(metric => !metric || metric.rate == null).map(metric => String(metric && metric.key || ''));
+    return missing.length > 0 && missing.every(key => KPI_REGION_OPTIONAL_RATE_KEYS.has(key));
+  }
+
+  function normalizePendingKpiCompletenessStates(proofData) {
+    if (!knownKpiAggregateGapIsBenign(proofData)) return;
+    pendingKpiCompletenessStates.forEach(state => {
+      state.note = '';
+      if (Array.isArray(state.data)) {
+        state.status = state.data.length === 9 ? 'ok' : state.status;
+        return;
+      }
+      if (state.data && Array.isArray(state.data.region) && state.data.stores) {
+        state.status = 'ok';
+        return;
+      }
+      if (state.data && Array.isArray(state.data.fullKpis) && state.data.kpi != null && state.data.companyRank != null) {
+        state.status = 'ok';
+      }
+    });
+    pendingKpiCompletenessStates = [];
+  }
+
   function moduleState({ status = 'no_data', updatedAt = '', sourceUpdatedAt = '', stale = false, source, sourceLink = '', data = null, note = '' }) {
-    return { status, updatedAt, sourceUpdatedAt, stale, source, sourceLink:sourceLink || (source && source.href) || '', data, note };
+    const state = { status, updatedAt, sourceUpdatedAt, stale, source, sourceLink:sourceLink || (source && source.href) || '', data, note };
+    if (note === KPI_COMPLETENESS_WARNING) {
+      if (data && Array.isArray(data.fullKpis) && !Array.isArray(data.region)) pendingKpiCompletenessStates = [];
+      pendingKpiCompletenessStates.push(state);
+      normalizePendingKpiCompletenessStates(data);
+    } else if (pendingKpiCompletenessStates.length && status === 'error') {
+      pendingKpiCompletenessStates = [];
+    }
+    return state;
   }
 
   const api = { VERSION, MODULE_KEYS, STATUSES, REPORT_FEEDBACK_FIELDS, validateContract, validateModule, moduleState };
