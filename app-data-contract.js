@@ -55,7 +55,7 @@
     if (data.region.length !== 25) return false;
     const storeLists = Object.values(data.stores);
     if (storeLists.length !== 9 || storeLists.some(items => !Array.isArray(items) || items.length !== 25)) return false;
-    const missing = data.region.filter(metric => metric && metric.rate == null).map(metric => String(metric.key || ''));
+    const missing = data.region.filter(metric => !metric || metric.rate == null).map(metric => String(metric && metric.key || ''));
     return missing.length > 0 && missing.every(key => KPI_REGION_OPTIONAL_RATE_KEYS.has(key));
   }
 
@@ -81,6 +81,7 @@
   function moduleState({ status = 'no_data', updatedAt = '', sourceUpdatedAt = '', stale = false, source, sourceLink = '', data = null, note = '' }) {
     const state = { status, updatedAt, sourceUpdatedAt, stale, source, sourceLink:sourceLink || (source && source.href) || '', data, note };
     if (note === KPI_COMPLETENESS_WARNING) {
+      if (data && Array.isArray(data.fullKpis) && !Array.isArray(data.region)) pendingKpiCompletenessStates = [];
       pendingKpiCompletenessStates.push(state);
       normalizePendingKpiCompletenessStates(data);
     } else if (pendingKpiCompletenessStates.length && status === 'error') {
