@@ -198,6 +198,59 @@ test('mixed freshness：只發布 fresh KPI component，awards payload 保持 8/
   assert.equal(result.awardsReportDate, '2026-08-22');
 });
 
+test('KPI component accepts 41 people when protected KPI and supplement counts match', () => {
+  const initial = {
+    version: 1,
+    kpiBattle: { report_date: '2026-08-22' },
+    awardsBattle: { report_date: '2026-08-22' },
+  };
+  const protected41 = protectedKpi();
+  protected41.persons = Array.from({ length: 41 }, () => ({}));
+  const supplement41 = freshKpiComponent({
+    personal: Array.from({ length: 41 }, (_, index) => ({ name: `同仁${index + 1}` })),
+  });
+  const { state, context } = createHarness(JSON.stringify(initial), protected41);
+  loadFunctions(context, [
+    'reportUploadKpiDate_',
+    'privateDashboardCanonicalKpiSource_',
+    'privateDashboardValidateKpiComponent_',
+    'privateDashboardPublishKpiComponent',
+  ]);
+
+  const result = context.privateDashboardPublishKpiComponent({
+    kpiBattleBase64: encodedSnapshot(supplement41),
+  });
+  const stored = JSON.parse(state.text);
+
+  assert.equal(stored.kpiBattle.personal.length, 41);
+  assert.equal(result.reportDate, '2026-08-23');
+});
+
+test('KPI component rejects supplement when current protected person count differs', () => {
+  const initial = JSON.stringify({
+    version: 1,
+    kpiBattle: { report_date: '2026-08-22' },
+    awardsBattle: { report_date: '2026-08-22' },
+  });
+  const protected41 = protectedKpi();
+  protected41.persons = Array.from({ length: 41 }, () => ({}));
+  const { state, context } = createHarness(initial, protected41);
+  loadFunctions(context, [
+    'reportUploadKpiDate_',
+    'privateDashboardCanonicalKpiSource_',
+    'privateDashboardValidateKpiComponent_',
+    'privateDashboardPublishKpiComponent',
+  ]);
+
+  assert.throws(
+    () => context.privateDashboardPublishKpiComponent({
+      kpiBattleBase64: encodedSnapshot(freshKpiComponent()),
+    }),
+    /人員筆數需與 protected KPI 一致（41 人）/,
+  );
+  assert.equal(state.text, initial);
+});
+
 test('KPI component source/date mismatch 仍 fail-closed，partial publish 不得覆寫正式 snapshot', () => {
   const initial = JSON.stringify({
     version: 1,
