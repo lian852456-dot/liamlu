@@ -3292,8 +3292,11 @@ function threecPriceField_(value, label, allowEmpty) {
     throw new Error(label + '不得為空');
   }
   const text = String(value).trim();
-  if (!/^\d+(?:\.\d+)?$/.test(text)) throw new Error(label + '不是有效的非負價格');
-  return text;
+  // SheetJS raw:false preserves formatted Excel thousands separators.
+  // Accept only complete groups; never strip arbitrary punctuation or fill zero.
+  if (/^\d+(?:\.\d+)?$/.test(text)) return text;
+  if (/^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(text)) return text.replace(/,/g, '');
+  throw new Error(label + '不是有效的非負價格');
 }
 
 function threecValidateShoppingRows_(rows) {

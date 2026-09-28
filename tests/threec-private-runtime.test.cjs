@@ -319,3 +319,70 @@ test('資料夾名稱或分享狀態不符時拒絕存取，不建立 registry',
     assert.equal(env.createdFileCount, 0);
   }
 });
+
+test('正確千分位價格轉成純數字，零元與空白保留，異常格式仍拒絕', () => {
+  const env = runtime();
+  for (const [input, expected] of [['1,234','1234'], ['12,345.00','12345.00'], ['1,234,567.5','1234567.5'], [' 1,000 ','1000'], ['0','0'], ['0.00','0.00'], ['','']]) {
+    assert.equal(env.context.threecPriceField_(input,'測試價',true),expected);
+  }
+  for (const input of ['1,23','1234,567','1,,000','1,000,','1 000','-1,000','-0','(1,000)','NT$1,000','Infinity','NaN','1e3','0xFF','1.234,56']) {
+    assert.throws(()=>env.context.threecPriceField_(input,'測試價',true),/有效的非負價格/,input);
+  }
+  assert.throws(()=>env.context.threecPriceField_('','測試價',false),/不得為空/);
+  assert.equal(env.createdFileCount,0);
+});
+
+test('千分位 3C 快照可發布讀回，來源雜湊及既有舊換新 active 不變', () => {
+  const env = runtime();
+  publish(env,tradeinSnapshot());
+  const tradeinActive = env.context.threecRegistry_().kinds.tradein.active.snapshot_file_id;
+  const snapshot=shoppingSnapshot();
+  snapshot.rows[0].retail_price='12,345';
+  snapshot.rows[0].project_prices['999H']='1,234.00';
+  snapshot.rows[1].project_prices['999H']='0';
+  const result=publish(env,snapshot);
+  assert.equal(result.status,'published');
+  const readback=env.context.threecSnapshotRead({...env.auth,kind:'shopping',deviceId:'device-123456789012'}).snapshot;
+  assert.equal(readback.rows[0].retail_price,'12345');
+  assert.equal(readback.rows[0].project_prices['999H'],'1234.00');
+  assert.equal(readback.rows[1].project_prices['999H'],'0');
+  assert.equal(readback.source_file_sha256,snapshot.source_file_sha256);
+  assert.equal(env.context.threecRegistry_().kinds.tradein.active.snapshot_file_id,tradeinActive);
+});
+
+test('錯誤價格仍在 Drive 寫入之前 fail closed，不移除資料或補零', () => {
+  const env=runtime();
+  publish(env,tradeinSnapshot());
+  const pointer=env.properties.get('THREEC_REGISTRY_FILE_ID');
+  const count=env.createdFileCount;
+  for(const input of ['1,23','-1,000','尚未提供']) {
+    const snapshot=shoppingSnapshot();snapshot.rows[0].project_prices['999H']=input;
+    assert.throws(()=>publish(env,snapshot),/有效的非負價格/);
+    assert.equal(env.createdFileCount,count);
+    assert.equal(env.properties.get('THREEC_REGISTRY_FILE_ID'),pointer);
+    assert.equal(env.context.threecRegistry_().kinds.shopping.active,null);
+  }
+});
+
+test('真實 SheetJS 格式化 XLSX 經 Work 解析及後端正規化不改價值', async () => {
+  const XLSX=require('../assets/vendor/xlsx.full.min.js');
+  const Core=require('../tradein-import-core.js');
+  const sheet=XLSX.utils.aoa_to_sheet([
+    ['廠牌','代碼','機型','單機價','999H'],
+    ['品牌甲','A-001','測試機型甲',12345,1234],
+    ['品牌甲','A-002','測試機型乙',0,0],
+    ['品牌甲','A-003','測試機型丙','','']
+  ]);
+  sheet.D2.z='#,##0';sheet.E2.z='#,##0.00';
+  const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,sheet,'格式測試');
+  const bytes=XLSX.write(book,{type:'buffer',bookType:'xlsx'});
+  const parsed=await Core.parseFile({name:'20260929-format-test.xlsx',size:bytes.length,arrayBuffer:async()=>bytes},XLSX,'shopping');
+  const incoming=Core.buildPublishSnapshot('shopping',parsed);
+  assert.equal(incoming.rows[0].retail_price,'12,345');
+  assert.equal(incoming.rows[0].project_prices['999H'],'1,234.00');
+  const normalized=runtime().context.threecNormalizeIncomingSnapshot_(incoming);
+  assert.equal(normalized.rows[0].retail_price,'12345');
+  assert.equal(normalized.rows[0].project_prices['999H'],'1234.00');
+  assert.equal(normalized.rows[1].retail_price,'0');
+  assert.equal(normalized.row_count,2);assert.equal(normalized.excluded_no_price_count,1);
+});
