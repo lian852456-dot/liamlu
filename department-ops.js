@@ -6,6 +6,7 @@
   const SESSION_KEY = 'bei12b_patrol_session_token_v2';
   const GOLD_HISTORY_KEY = 'north12_department_gold_history_v1';
   const GOLD_REVIEW_KEY = 'north12_department_gold_reviews_v1';
+  const AUTH_RETRY_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
   let goldData = null;
   let goldSourceName = '';
   let storeData = null;
@@ -21,21 +22,50 @@
     target.className = `message${type ? ` ${type}` : ''}`;
   }
 
-  async function authRequest(payload) {
+  const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+  async function authRequestOnce(payload) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 60000);
+    const timer = setTimeout(() => controller.abort(), 20000);
     try {
       const response = await fetch(PATROL_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload),
+        cache: 'no-store',
         signal: controller.signal
       });
-      if (!response.ok) throw new Error(`驗證服務 HTTP ${response.status}`);
+      if (!response.ok) {
+        const error = new Error(`驗證服務 HTTP ${response.status}`);
+        error.httpStatus = response.status;
+        throw error;
+      }
       return await response.json();
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  async function authRequest(payload) {
+    // Apps Script 偶爾會在 doPost 已完成後，於回傳重新導向階段短暫落成 404。
+    // 只有冪等的通行碼驗證允許重試；金牌同步等寫入動作絕不自動重送。
+    const canRetry = payload?.action === 'ptauth';
+    const maxAttempts = canRetry ? 3 : 1;
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await authRequestOnce(payload);
+      } catch (error) {
+        lastError = error;
+        const retryable = AUTH_RETRY_STATUSES.has(Number(error?.httpStatus)) || ['AbortError', 'TypeError'].includes(error?.name);
+        if (!canRetry || !retryable || attempt === maxAttempts) break;
+        await wait(attempt === 1 ? 1200 : 2500);
+      }
+    }
+    if (canRetry && (AUTH_RETRY_STATUSES.has(Number(lastError?.httpStatus)) || ['AbortError', 'TypeError'].includes(lastError?.name))) {
+      throw new Error('驗證服務暫時無回應，已自動重試 3 次，請稍後再試。');
+    }
+    throw lastError;
   }
 
   async function unlockWithPasscode(passcode) {
