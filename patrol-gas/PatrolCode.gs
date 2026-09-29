@@ -131,6 +131,7 @@ function doPost(e) {
     }
     else if (action === 'interview_read') result = supervisorInterviewReadPayload_(payload);
     else if (action === 'interview_write') result = supervisorInterviewWritePayload_(payload);
+    else if (action === 'department_ops_publish') result = departmentOpsPublish(payload);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
     else throw new Error('unknown patrol action');
     return patrolJsonResponse_({status: 'ok', ...result});
@@ -1878,6 +1879,144 @@ function supervisorInterviewWritePayload_(payload) {
 // 想立即試寄：函式選單選「testWeeklyReport」執行。
 // 注意：時間觸發器跑最新存檔程式碼，不需重新部署。
 // ════════════════════════════════════
+
+const DEPARTMENT_OPS_FILE = 'north12-department-ops-private-latest.json';
+const DEPARTMENT_OPS_REGIONS = ['北一二A','北一二B','北一二C','北一二D'];
+
+function departmentOpsEmployeeId_(value) {
+  const employeeId = String(value || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{5,12}$/.test(employeeId)) throw new Error('員編格式不正確');
+  return employeeId;
+}
+
+function departmentOpsFolder_() {
+  const parents = DriveApp.getFileById(SPREADSHEET_ID).getParents();
+  if (!parents.hasNext()) throw new Error('找不到部區金牌私有儲存位置');
+  return parents.next();
+}
+
+function departmentOpsText_(value, maxLength) {
+  const result = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+  if (result.length > maxLength) throw new Error('部區金牌資料文字過長');
+  return result;
+}
+
+function departmentOpsDate_(value) {
+  const result = String(value || '');
+  if (result && !/^20\d{2}-\d{2}-\d{2}$/.test(result)) throw new Error('部區金牌日期格式不正確');
+  return result;
+}
+
+function departmentOpsNumber_(value, min, max) {
+  const result = Number(value);
+  if (!isFinite(result) || result < min || result > max) throw new Error('部區金牌數值超出範圍');
+  return result;
+}
+
+function departmentOpsNormalizeRecord_(row) {
+  const region = departmentOpsText_(row && row.region, 12);
+  if (DEPARTMENT_OPS_REGIONS.indexOf(region) < 0) throw new Error('部區金牌含有不正確的區域');
+  return {
+    region:region,
+    storeCode:departmentOpsText_(row.storeCode, 24),
+    store:departmentOpsText_(row.store, 40),
+    role:departmentOpsText_(row.role, 50),
+    employeeId:departmentOpsEmployeeId_(row.employeeId),
+    employeeName:departmentOpsText_(row.employeeName, 30),
+    level:departmentOpsText_(row.level, 30),
+    employment:departmentOpsText_(row.employment, 20),
+    eligible9m:departmentOpsText_(row.eligible9m, 10),
+    storeType:departmentOpsText_(row.storeType, 20),
+    spe:departmentOpsNumber_(row.spe, -100, 100),
+    medal:departmentOpsNumber_(row.medal, -10000, 10000)
+  };
+}
+
+function departmentOpsNormalizeGold_(gold) {
+  const months = gold && gold.months;
+  if (!Array.isArray(months) || months.length < 1 || months.length > 24) throw new Error('部區金牌月份數不正確');
+  return months.map(function(month) {
+    const records = month && month.records;
+    if (!Array.isArray(records) || records.length < 1 || records.length > 1000) throw new Error('部區金牌人員筆數不正確');
+    return {
+      sheetName:departmentOpsText_(month.sheetName, 30),
+      monthKey:departmentOpsText_(month.monthKey, 20),
+      dateRange:{
+        start:departmentOpsDate_(month.dateRange && month.dateRange.start),
+        end:departmentOpsDate_(month.dateRange && month.dateRange.end),
+        cutoff:departmentOpsDate_(month.dateRange && month.dateRange.cutoff)
+      },
+      records:records.map(departmentOpsNormalizeRecord_)
+    };
+  }).sort(function(a,b){ return a.monthKey.localeCompare(b.monthKey); });
+}
+
+function departmentOpsNormalizeReviews_(reviews) {
+  const source = reviews && typeof reviews === 'object' ? reviews : {};
+  const keys = Object.keys(source);
+  if (keys.length > 5000) throw new Error('複核註記筆數過多');
+  const result = {};
+  keys.forEach(function(key) {
+    if (key.length > 80) return;
+    const item = source[key] || {};
+    result[key] = {
+      reason:departmentOpsText_(item.reason, 40),
+      status:departmentOpsText_(item.status, 20)
+    };
+  });
+  return result;
+}
+
+function departmentOpsLatestSnapshot_() {
+  const files = departmentOpsFolder_().getFilesByName(DEPARTMENT_OPS_FILE);
+  let latest = null;
+  while (files.hasNext()) {
+    const file = files.next();
+    if (!latest || file.getLastUpdated().getTime() > latest.getLastUpdated().getTime()) latest = file;
+  }
+  if (!latest) return null;
+  const snapshot = JSON.parse(latest.getBlob().getDataAsString('UTF-8'));
+  if (!snapshot || snapshot.version !== 1 || !Array.isArray(snapshot.months)) throw new Error('部區金牌快照格式不正確');
+  return snapshot;
+}
+
+function departmentOpsPublish(payload) {
+  const body = payload || {};
+  ptRequireSession_(body.token, 'department_ops_publish');
+  const months = departmentOpsNormalizeGold_(body.gold || {});
+  const latestMonth = months[months.length - 1];
+  const cutoff = latestMonth.dateRange.cutoff;
+  if (!cutoff) throw new Error('最新金牌 Final 缺少截止日');
+  const prior = departmentOpsLatestSnapshot_();
+  let history = prior && Array.isArray(prior.goldHistory) ? prior.goldHistory.slice() : [];
+  const bRows = latestMonth.records.filter(function(row){ return row.region === '北一二B'; });
+  const existing = history.findIndex(function(item){ return item.cutoff === cutoff; });
+  const historyItem = {cutoff:cutoff,sourceName:departmentOpsText_(body.sourceName, 120),publishedAt:new Date().toISOString(),rows:bRows};
+  if (existing >= 0) {
+    const previous = history[existing];
+    historyItem.revisions = (Array.isArray(previous.revisions) ? previous.revisions.slice() : []).concat([{
+      sourceName:previous.sourceName,
+      publishedAt:previous.publishedAt,
+      rows:previous.rows
+    }]).slice(-20);
+    history[existing] = historyItem;
+  } else history.push(historyItem);
+  history = history.sort(function(a,b){return a.cutoff.localeCompare(b.cutoff);}).slice(-120);
+  const snapshot = {
+    version:1,
+    publishedAt:new Date().toISOString(),
+    sourceName:departmentOpsText_(body.sourceName, 120),
+    months:months,
+    goldHistory:history,
+    reviews:departmentOpsNormalizeReviews_(body.reviews)
+  };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    departmentOpsFolder_().createFile(DEPARTMENT_OPS_FILE, JSON.stringify(snapshot), MimeType.PLAIN_TEXT);
+  } finally { lock.releaseLock(); }
+  return {publishedAt:snapshot.publishedAt,cutoff:cutoff,people:bRows.length,months:months.length};
+}
 
 function ptWinMonths(monthKey) {
   const p = monthKey.split('-');
