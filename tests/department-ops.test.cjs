@@ -60,6 +60,10 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(page, /id="excelPassword"[^>]*placeholder="請輸入檔案密碼"/);
   assert.doesNotMatch(page, /id="excelPassword"[^>]*value=/);
   assert.match(controller, /action: 'ptauth'/);
+  assert.match(controller, /AUTH_RETRY_STATUSES = new Set\(\[404, 429, 500, 502, 503, 504\]\)/);
+  assert.match(controller, /const canRetry = payload\?\.action === 'ptauth'/);
+  assert.match(controller, /const maxAttempts = canRetry \? 3 : 1/);
+  assert.match(controller, /金牌同步等寫入動作絕不自動重送/);
   assert.match(controller, /GOLD_HISTORY_KEY/);
   assert.match(controller, /action: 'department_ops_publish'/);
   assert.match(viewerController, /action:'department_gold_access'/);
@@ -76,4 +80,34 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(patrolBundle, /action === 'department_ops_publish'/);
   assert.doesNotMatch(patrolBundle, /department_gold_access|privateDashboard/);
   assert.doesNotMatch(`${page}\n${controller}`, /551\d{4}/);
+});
+
+test('督導驗證遇到 Apps Script 回傳 404 會重試，但同步寫入不會重送', async () => {
+  const controller = fs.readFileSync(path.resolve(__dirname, '../department-ops.js'), 'utf8');
+  const start = controller.indexOf('const AUTH_RETRY_STATUSES');
+  const end = controller.indexOf('async function unlockWithPasscode');
+  const runtimeSource = controller.slice(start, end);
+  const buildRuntime = new Function('fetch', 'AbortController', 'setTimeout', 'clearTimeout', 'PATROL_URL', `${runtimeSource}\nreturn { authRequest };`);
+  const immediateTimers = (callback, milliseconds) => {
+    if (milliseconds !== 20000) queueMicrotask(callback);
+    return 1;
+  };
+
+  const authStatuses = [404, 404, 200];
+  let authCalls = 0;
+  const authRuntime = buildRuntime(async () => {
+    const status = authStatuses[authCalls++];
+    return { ok:status === 200, status, json:async () => ({status:'ok', token:'test-token'}) };
+  }, AbortController, immediateTimers, () => {}, 'https://example.test/exec');
+  const authResult = await authRuntime.authRequest({action:'ptauth', key:'test'});
+  assert.equal(authCalls, 3);
+  assert.equal(authResult.token, 'test-token');
+
+  let publishCalls = 0;
+  const publishRuntime = buildRuntime(async () => {
+    publishCalls += 1;
+    return {ok:false, status:404, json:async () => ({})};
+  }, AbortController, immediateTimers, () => {}, 'https://example.test/exec');
+  await assert.rejects(() => publishRuntime.authRequest({action:'department_ops_publish'}), /HTTP 404/);
+  assert.equal(publishCalls, 1);
 });
