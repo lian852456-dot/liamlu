@@ -226,16 +226,20 @@ async function stubGas(page) {
       } else {
         const rows = JSON.parse(url.searchParams.get('payload'));
         ptwritePayloads.push(rows);
-        const seen = new Set(cloudRows.map(r => `${r.fillTime}|${r.store}|${r.item}`));
-        let written = 0;
+        const indexByKey = new Map(cloudRows.map((r,index) => [`${r.fillTime}|${r.store}|${r.item}`,index]));
+        let written = 0, updated = 0;
         rows.forEach(r => {
           const k = `${r.fillTime}|${r.store}|${r.item}`;
-          if (seen.has(k)) return;
-          seen.add(k);
+          if (indexByKey.has(k)) {
+            cloudRows[indexByKey.get(k)]={...r,savedAt:new Date().toISOString()};
+            updated++;
+            return;
+          }
+          indexByKey.set(k,cloudRows.length);
           cloudRows.push({ ...r, savedAt: new Date().toISOString() });
           written++;
         });
-        body = JSON.stringify({ status: 'ok', written });
+        body = JSON.stringify({ status: 'ok', written, updated });
       }
     } else if (action === 'hread') {
       body = authed
@@ -609,7 +613,7 @@ test('write 後 readback 缺 key 時不得顯示成功，保留原始貼上與�
   expect(writeCalls).toBe(1);
 });
 
-test('Server Preflight 僅送新增缺失，既有內容差異 fail-closed', async ({ page }) => {
+test('Server Preflight 略過相同資料，並以最新上傳更新既有內容', async ({ page }) => {
   await stubGas(page);
   await openAndUnlock(page);
   const existing=pasteLine(6,'台北通化','DNB10059',1,'v','');
@@ -621,8 +625,8 @@ test('Server Preflight 僅送新增缺失，既有內容差異 fail-closed', asy
   }];
   await page.fill('#pasteBox',[existing,addition].join('\n'));
   await page.getByRole('button',{name:'解析並預覽'}).click();
-  await expect(page.locator('#patrolPastePreview')).toContainText('正式已存在且內容相同 1 筆');
-  await expect(page.locator('#patrolPastePreview')).toContainText('新增缺失 1 筆');
+  await expect(page.locator('#patrolPastePreview')).toContainText('正式已相同 1 筆');
+  await expect(page.locator('#patrolPastePreview')).toContainText('預計新增 1 筆');
   await page.getByRole('button',{name:'確認寫入雲端'}).click();
   await expect(page.locator('#parseMsg')).toContainText('解析 2 筆／寫入 1 筆／讀回 1 筆');
   expect(ptwritePayloads).toHaveLength(1);
@@ -631,9 +635,14 @@ test('Server Preflight 僅送新增缺失，既有內容差異 fail-closed', asy
 
   await page.fill('#pasteBox',pasteLine(6,'台北通化','DNB10059',1,'na','na'));
   await page.getByRole('button',{name:'解析並預覽'}).click();
-  await expect(page.locator('#parseMsg')).toContainText('既有內容差異');
-  await expect(page.locator('#patrolConfirmWriteBtn')).toBeHidden();
-  expect(writeCalls).toBe(1);
+  await expect(page.locator('#parseMsg')).toContainText('以最新上傳更新 1 筆');
+  await expect(page.locator('#patrolConfirmWriteBtn')).toBeVisible();
+  await page.getByRole('button',{name:'確認寫入雲端'}).click();
+  await expect(page.locator('#parseMsg')).toContainText('雲端寫入與 readback 一致');
+  expect(writeCalls).toBe(2);
+  expect(ptwritePayloads[1]).toHaveLength(1);
+  expect(ptwritePayloads[1][0]).toEqual(expect.objectContaining({item:1,result:'na',reason:'na'}));
+  expect(cloudRows.find(row=>Number(row.item)===1)).toEqual(expect.objectContaining({result:'na',reason:'na'}));
 });
 
 test('本機選檔後顯示檔名與預覽，尚未確認前不呼叫 ptwrite', async ({ page }) => {
@@ -680,7 +689,7 @@ test('本機選檔的 code／store 矛盾在 dedupe 與 Preflight 前整批封�
   expect(writeCalls).toBe(0);
 });
 
-test('本機選檔遇到雲端衝突時不顯示確認寫入', async ({ page }) => {
+test('本機選檔遇到雲端同鍵異內容時可以最新上傳更新', async ({ page }) => {
   await stubGas(page);
   await openAndUnlock(page);
   const fixture=currentMonthFixture(6,'台北通化','DNB10059',1,'v','');
@@ -690,10 +699,13 @@ test('本機選檔遇到雲端衝突時不顯示確認寫入', async ({ page }) 
   }];
   await selectPatrolLocalCsv(page,'有衝突.csv',[pasteLine(6,'台北通化','DNB10174',1,'na','na')]);
 
-  await expect(page.locator('#patrolLocalImportStatus')).toContainText('衝突');
-  await expect(page.locator('#parseMsg')).toContainText('雲端同鍵異內容');
-  await expect(page.locator('#patrolConfirmWriteBtn')).toBeHidden();
-  expect(writeCalls).toBe(0);
+  await expect(page.locator('#patrolLocalImportStatus')).toContainText('預計更新');
+  await expect(page.locator('#parseMsg')).toContainText('更新 1 筆');
+  await expect(page.locator('#patrolConfirmWriteBtn')).toBeVisible();
+  await page.getByRole('button',{name:'確認寫入雲端'}).click();
+  await expect(page.locator('#parseMsg')).toContainText('更新 1 筆');
+  expect(writeCalls).toBe(1);
+  expect(cloudRows[0]).toEqual(expect.objectContaining({code:'DNB10174',result:'na',reason:'na'}));
 });
 
 test('本機選檔確認後才 ptwrite，readback 成功後刷新看板與移動里程', async ({ page }) => {
@@ -709,7 +721,7 @@ test('本機選檔確認後才 ptwrite，readback 成功後刷新看板與移動
   await page.getByRole('button',{name:'確認寫入雲端'}).click();
 
   await expect(page.locator('#parseMsg')).toContainText('本機檔案寫入與雲端讀回一致');
-  await expect(page.locator('#parseMsg')).toContainText('解析 3 筆／新增 3 筆／已存在 0 筆／讀回 3 筆');
+  await expect(page.locator('#parseMsg')).toContainText('解析 3 筆／新增 3 筆／更新 0 筆／已相同 0 筆／讀回 3 筆');
   await expect(page.locator('#patrolLocalImportStatus')).toBeHidden();
   await expect(page.locator('#content')).toContainText('台北通化');
   await expect(page.locator('#content')).toContainText('台北酒泉');

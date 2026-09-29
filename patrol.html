@@ -1233,7 +1233,7 @@ function patrolCandidateKey(row){
   return [normalizePatrolCandidateTime(row&&row.fillTime),canonicalPatrolCandidateStore(row),itemKey].join('|');
 }
 
-function preparePatrolCandidates(rows,baseRows=rawDetails){
+function preparePatrolCandidates(rows,baseRows=rawDetails,options={}){
   const index=new Map();
   const merged=(baseRows||[]).slice();
   merged.forEach((row,i)=>index.set(patrolCandidateKey(row),i));
@@ -1241,6 +1241,10 @@ function preparePatrolCandidates(rows,baseRows=rawDetails){
   (rows||[]).forEach(row=>{
     const key=patrolCandidateKey(row);
     if(index.has(key)){
+      if(options.replaceExisting){
+        merged[index.get(key)]=row;addedRows.push(row);writeRows.push(row);
+        return;
+      }
       duplicates++;
       return;
     }
@@ -1303,11 +1307,11 @@ async function refreshPatrolAndMileage(message,renderErr){
 
 function showPatrolPastePreview(label,result,preflight){
   const preview=document.getElementById('patrolPastePreview');if(!preview)return;
-  const writeRows=preflight?preflight.additions:(result.writeRows||[]);
+  const writeRows=preflight?preflight.additions.concat(preflight.differences.map(entry=>entry.input)):(result.writeRows||[]);
   const stores=[...new Set(writeRows.map(canonicalPatrolCandidateStore).filter(Boolean))];
-  const storesText=stores.length?`<br>本次預計寫入店點：${stores.map(esc).join('、')}（${writeRows.length} 筆）`:'<br>本次沒有需要寫入的新增缺失。';
+  const storesText=stores.length?`<br>本次預計寫入店點：${stores.map(esc).join('、')}（${writeRows.length} 筆）`:'<br>本次沒有需要新增或更新的資料。';
   const preflightText=preflight
-    ? `<br><b>Server Preflight（唯讀 ptdetail 分頁）</b>：正式已存在且內容相同 ${preflight.existingSame.length} 筆／新增缺失 ${preflight.additions.length} 筆／既有內容差異 ${preflight.differences.length} 筆`
+    ? `<br><b>Server Preflight（唯讀 ptdetail 分頁）</b>：正式已相同 ${preflight.existingSame.length} 筆／預計新增 ${preflight.additions.length} 筆／以最新上傳更新 ${preflight.differences.length} 筆`
     : '';
   preview.hidden=false;
   preview.innerHTML=`<strong>${label}：${result.addedRows.length} 筆</strong>本頁去重候選共 ${result.total} 筆${result.duplicates?`・略過重複 ${result.duplicates} 筆`:''}${preflightText}${storesText}<br>正式摘要仍以雲端 ptsummary 為準。`;
@@ -1420,7 +1424,7 @@ function loadPatrolLocalImportDependencies(){
   if(window.PatrolLocalFileImport&&window.XLSX&&window.XLSX.version==='0.20.3') return Promise.resolve();
   if(!patrolLocalImportLoadPromise){
     patrolLocalImportLoadPromise=loadPatrolLocalScript(
-      'patrolLocalImportParserScript','patrol-local-import.js?v=3',()=>Boolean(window.PatrolLocalFileImport)
+      'patrolLocalImportParserScript','patrol-local-import.js?v=4',()=>Boolean(window.PatrolLocalFileImport)
     ).then(()=>loadPatrolLocalScript(
       'patrolLocalImportXlsxScript','assets/vendor/xlsx.full.min.js?v=0.20.3',()=>Boolean(window.XLSX&&window.XLSX.version==='0.20.3')
     )).catch(error=>{ patrolLocalImportLoadPromise=null;throw error; });
@@ -1631,7 +1635,12 @@ function setPatrolWriteConfirmation(visible, disabled=false){
 }
 
 function patrolCandidateContentKey(row){
-  return [String(row&&row.result||'').trim().toLowerCase(),String(row&&row.reason||'').trim()].join('|');
+  return [
+    normalizePatrolCandidateTime(row&&row.arriveTime),normalizePatrolCandidateTime(row&&row.leaveTime),
+    String(row&&row.district||'').trim(),String(row&&row.code||'').trim().toUpperCase(),
+    String(row&&row.inspector||'').trim(),String(row&&row.result||'').trim().toLowerCase(),
+    String(row&&row.reason||'').trim(),String(row&&row.month||'').trim()
+  ].join('|');
 }
 
 async function formalPatrolRowsForGroup(group){
@@ -1735,19 +1744,16 @@ async function parseData(){
   try{
     const preflight=await patrolServerPreflight(candidate.writeRows);
     showPatrolPastePreview('本次貼上',candidate,preflight);
-    if(preflight.differences.length){
+    const updates=preflight.differences.map(entry=>entry.input);
+    const writeRows=preflight.additions.concat(updates);
+    if(!writeRows.length){
       pendingPatrolWrite=null;
-      showMsg(`Server Preflight 發現 ${preflight.differences.length} 筆既有內容差異，已 fail-closed；本輪不允許寫入。`,'err');
+      showMsg(`Server Preflight 完成：正式已相同 ${preflight.existingSame.length} 筆，本輪沒有新增缺失，也沒有需要更新的資料。`,'ok');
       return;
     }
-    if(!preflight.additions.length){
-      pendingPatrolWrite=null;
-      showMsg(`Server Preflight 完成：正式已存在 ${preflight.existingSame.length} 筆，本輪沒有新增缺失，不建立雲端寫入。`,'ok');
-      return;
-    }
-    pendingPatrolWrite={raw,parsedRows:newDetails,candidate:preparePatrolCandidates(preflight.additions),preflight};
+    pendingPatrolWrite={raw,parsedRows:newDetails,candidate:preparePatrolCandidates(writeRows,rawDetails,{replaceExisting:true}),preflight};
     setPatrolWriteConfirmation(true);
-    showMsg(`Server Preflight PASS：正式已存在 ${preflight.existingSame.length} 筆，僅 ${preflight.additions.length} 筆新增缺失可寫入；寫入後仍須逐鍵 readback 一致。`,'ok');
+    showMsg(`Server Preflight PASS：新增 ${preflight.additions.length} 筆、以最新上傳更新 ${updates.length} 筆、已相同 ${preflight.existingSame.length} 筆；寫入後仍須逐筆 readback 一致。`,'ok');
   }catch(error){
     pendingPatrolWrite=null;
     showPatrolPastePreview('本次貼上',candidate);
@@ -1760,8 +1766,9 @@ async function parseData(){
 async function finalizeLocalPatrolWrite(pending,receipt,renderErr){
   const parsedRows=pending.localFile.validRowCount;
   const additions=pending.preflight.additions.length;
+  const updates=pending.preflight.differences.length;
   const existing=pending.preflight.existingSame.length;
-  const writeMessage=`本機檔案寫入與雲端讀回一致（解析 ${parsedRows} 筆／新增 ${additions} 筆／已存在 ${existing} 筆／讀回 ${receipt.readbackRows} 筆）`;
+  const writeMessage=`本機檔案寫入與雲端讀回一致（解析 ${parsedRows} 筆／新增 ${additions} 筆／更新 ${updates} 筆／已相同 ${existing} 筆／讀回 ${receipt.readbackRows} 筆）`;
   pendingPatrolWrite=null;
   setPatrolWriteConfirmation(false);
   resetPatrolLocalFileSelection({keepPreview:true,keepStatus:true});
@@ -2610,7 +2617,8 @@ async function readbackPatrolWriteRows(details, writtenRows){
     const formalRows=await formalPatrolRowsForPreflight(details);
     formalRows.forEach(row=>{
       const key=patrolReadbackKey(row);
-      if(expected.has(key)) found.add(key);
+      const input=expected.get(key);
+      if(input&&patrolCandidateContentKey(row)===patrolCandidateContentKey(input)) found.add(key);
     });
   }catch(error){
     const missing=[...expected.entries()].filter(([key])=>!found.has(key)).map(([,row])=>patrolReadbackKeyLabel(row));
@@ -2665,7 +2673,7 @@ function cloudWrite(details){
   // A failed write is ambiguous: never replay a batch automatically.
   const sendChunk = c=>cloudCallJsonp('ptwrite', {payload: JSON.stringify(c)})
     .then(res=>{
-      if(res.status==='ok') return res.written||0;
+      if(res.status==='ok') return Number(res.written||0)+Number(res.updated||0);
       const error=new Error(res.message||'寫入失敗');error.reauthFailed=Boolean(res.reauthFailed);throw error;
     });
 

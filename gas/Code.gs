@@ -872,11 +872,11 @@ function writePatrol(rows) {
   try {
     const sh = getPatrolSheet();
     const data = sh.getDataRange().getValues();
-    // key → { row: 試算表列號, result, reason }
+    // key → { row: 試算表列號, values }
     const seen = {};
     for (let i = 1; i < data.length; i++) {
       seen[patrolKey(data[i][0], data[i][5], data[i][7])] =
-        { row: i + 1, result: String(data[i][8] || ''), reason: String(data[i][9] || '') };
+        { row: i + 1, values: data[i].slice(0, 11).map(function(value) { return patrolTimeStr(value); }) };
     }
     const now = new Date().toISOString();
     const toAdd = [];
@@ -884,23 +884,22 @@ function writePatrol(rows) {
     rows.forEach(r => {
       const k = patrolKey(r.fillTime, r.store, r.item);
       const ex = seen[k];
+      const values = [
+        patrolTimeStr(r.fillTime), String(r.arriveTime || ''), String(r.leaveTime || ''),
+        String(r.district || ''), String(r.code || ''), String(r.store || ''), String(r.inspector || ''),
+        String(r.item || ''), String(r.result || ''), String(r.reason || ''), String(r.month || '')
+      ];
       if (ex) {
-        // 同一筆但結果/原因有變（來源表事後補填「是否合格」）→ 就地更新
-        const nr = String(r.result || ''), nrs = String(r.reason || '');
-        if (ex.row > 0 && (nr !== ex.result || nrs !== ex.reason)) {
-          sh.getRange(ex.row, 9, 1, 2).setValues([[nr, nrs]]);
-          sh.getRange(ex.row, 12).setValue(now);
-          ex.result = nr; ex.reason = nrs;
+        // 同鍵資料以本次最新上傳為準，就地覆寫完整巡店內容。
+        if (ex.row > 0 && JSON.stringify(values) !== JSON.stringify(ex.values)) {
+          sh.getRange(ex.row, 1, 1, PATROL_HEADERS.length).setValues([[].concat(values, now)]);
+          ex.values = values.slice();
           updated++;
         }
         return;
       }
-      seen[k] = { row: -1, result: String(r.result || ''), reason: String(r.reason || '') };
-      toAdd.push([
-        patrolTimeStr(r.fillTime), String(r.arriveTime || ''), String(r.leaveTime || ''),
-        String(r.district || ''), String(r.code || ''), String(r.store || ''), String(r.inspector || ''),
-        String(r.item || ''), String(r.result || ''), String(r.reason || ''), String(r.month || ''), now
-      ]);
+      seen[k] = { row: -1, values: values.slice() };
+      toAdd.push([].concat(values, now));
     });
     if (toAdd.length > 0) {
       sh.getRange(sh.getLastRow() + 1, 1, toAdd.length, PATROL_HEADERS.length).setValues(toAdd);

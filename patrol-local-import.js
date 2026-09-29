@@ -417,18 +417,19 @@
     if (!status || !state) return;
     const additions = preflight ? preflight.additions.length : 0;
     const existing = preflight ? preflight.existingSame.length : 0;
-    const serverConflicts = preflight ? preflight.differences.length : 0;
+    const updates = preflight ? preflight.differences.length : 0;
     const fileConflicts = Number(state.fileConflictCount || 0);
     const invalid = Number(state.invalidCount || 0);
     const metric = (label, value) => `<div class="patrol-local-import-metric"><b>${escapeHtml(value)}</b><span>${escapeHtml(label)}</span></div>`;
     status.hidden = false;
-    status.className = `patrol-local-import-status${errorText || fileConflicts || serverConflicts || invalid ? ' bad' : ''}`;
+    status.className = `patrol-local-import-status${errorText || fileConflicts || invalid ? ' bad' : ''}`;
     status.innerHTML = `<strong>${errorText ? '巡店報表解析封鎖' : '巡店報表解析完成'}</strong>` +
       `檔案：${escapeHtml(state.fileName || '—')}<br>工作表：${escapeHtml(state.sheetName || '—')}${state.encoding ? `<br>編碼：${escapeHtml(state.encoding)}` : ''}<br>` +
       `<div class="patrol-local-import-metrics">` +
       metric('原始資料', state.rawRowCount ?? 0) + metric('有效資料', state.validRowCount ?? 0) +
       metric('檔案內重複', state.duplicateCount ?? 0) + metric('預計新增', preflight ? additions : '—') +
-      metric('雲端已存在', preflight ? existing : '—') + metric('衝突', fileConflicts + serverConflicts) +
+      metric('預計更新', preflight ? updates : '—') + metric('雲端已相同', preflight ? existing : '—') +
+      metric('衝突', fileConflicts) +
       metric('無法辨識', invalid) + metric('Server Preflight', preflight ? '完成' : '未完成') +
       `</div>${errorText ? `<div class="patrol-local-import-error">${escapeHtml(errorText)}</div>` : ''}`;
   }
@@ -545,15 +546,11 @@
         const preflight = await services.preflight(localState.parsedRows);
         localState.preflight = preflight;
         renderBrowserStatus(documentRef, localState, preflight, '');
-        if (preflight.differences.length) {
+        const updates = preflight.differences.map(entry => entry.input);
+        const writeRows = preflight.additions.concat(updates);
+        if (!writeRows.length) {
           setPending(null);
-          clearPreview({keepStatus:true});
-          message(`Server Preflight 發現 ${preflight.differences.length} 筆雲端同鍵異內容，整批已封鎖。`, 'err');
-          return;
-        }
-        if (!preflight.additions.length) {
-          setPending(null);
-          message(`Server Preflight 完成：雲端已存在 ${preflight.existingSame.length} 筆，沒有新增資料，不呼叫 ptwrite。`, 'ok');
+          message(`Server Preflight 完成：雲端已相同 ${preflight.existingSame.length} 筆，沒有新增缺失，也沒有需要更新的資料，不呼叫 ptwrite。`, 'ok');
           await refreshExisting(localState, preflight);
           return;
         }
@@ -561,12 +558,12 @@
           sourceType:'file',
           raw:'',
           parsedRows:localState.parsedRows,
-          candidate:prepareCandidates(preflight.additions, services.getRawDetails(), services.candidateKey),
+          candidate:prepareCandidates(writeRows, services.getRawDetails(), services.candidateKey),
           preflight,
           localFile:localState
         });
         setConfirmation(true);
-        message(`Server Preflight PASS：預計新增 ${preflight.additions.length} 筆、已存在 ${preflight.existingSame.length} 筆；按確認後才會沿用 ptwrite。`, 'ok');
+        message(`Server Preflight PASS：預計新增 ${preflight.additions.length} 筆、更新 ${updates.length} 筆、已相同 ${preflight.existingSame.length} 筆；按確認後才會沿用 ptwrite。`, 'ok');
       } catch (error) {
         selected = null;
         setPending(null);

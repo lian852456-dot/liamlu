@@ -21,7 +21,7 @@
 - 營業點代碼與店名都必須命中同一筆正式 `STORES`；矛盾或任一未知即整批封鎖，通過後輸出正式 code／name。
 - 唯一鍵沿用正式前端 canonical key：`fillTime + store + item`。
 - 檔內同鍵同內容只保留一筆；同鍵異內容整批封鎖。
-- 必須完成既有 `ptdetail` Server Preflight；雲端同鍵異內容整批封鎖。
+- 必須完成既有 `ptdetail` Server Preflight；雲端同鍵同內容略過，同鍵異內容列為更新，由使用者確認後以本次最新上傳覆寫該筆完整巡店內容。
 - 使用者確認前不呼叫 `ptwrite`；readback 失敗時保留檔案、pending 與重試按鈕，不修改 `rawDetails`。
 
 ## 驗證紀錄（follow-up）
