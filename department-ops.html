@@ -40,20 +40,6 @@
       </div>
 
       <section id="goldPanel" data-panel="gold">
-        <section class="panel upload-panel">
-          <div class="panel-heading">
-            <div><p class="step-label">FINAL IMPORT</p><h2>上傳北一二部金牌 Final</h2></div>
-            <span class="local-chip">本機解析</span>
-          </div>
-          <div class="upload-grid">
-            <label class="field file-field"><span>金牌 Final Excel</span><input id="goldFile" type="file" accept=".xlsx,.xls"></label>
-            <label class="field password-field"><span>Excel 開啟密碼</span><input id="excelPassword" type="password" placeholder="請輸入檔案密碼" autocomplete="off"></label>
-            <button id="goldImport" class="primary-button" type="button">讀取並更新儀表板</button>
-          </div>
-          <p class="privacy-note">支援目前密碼保護的「北一二部金牌.xlsx」。原始檔與明細只在本機解析，不會寫入公開網頁。</p>
-          <p id="goldMessage" class="message" aria-live="polite"></p>
-        </section>
-
         <section id="goldDashboard" hidden>
           <div class="dashboard-head">
             <div><p class="step-label">GOLD MEDAL FINAL</p><h2>金牌儀表板</h2><p id="goldSourceMeta" class="source-meta"></p></div>
@@ -86,6 +72,20 @@
           </section>
           <p id="publishMessage" class="message" aria-live="polite"></p>
         </section>
+
+        <section class="panel upload-panel">
+          <div class="panel-heading">
+            <div><p class="step-label">FINAL UPDATE</p><h2>需要更新時才上傳新版 Final</h2></div>
+            <span class="local-chip">選檔僅供更新</span>
+          </div>
+          <div class="upload-grid">
+            <label class="field file-field"><span>新版金牌 Final Excel</span><input id="goldFile" type="file" accept=".xlsx,.xls"></label>
+            <label class="field password-field"><span>Excel 開啟密碼</span><input id="excelPassword" type="password" placeholder="請輸入檔案密碼" autocomplete="off"></label>
+            <button id="goldImport" class="primary-button" type="button">讀取新版並預覽</button>
+          </div>
+          <p class="privacy-note">通行碼驗證後會自動顯示上次同步結果；只有資料更新時才需選擇「北一二部金牌.xlsx」。原始檔仍只在本機解析。</p>
+          <p id="goldMessage" class="message" aria-live="polite"></p>
+        </section>
       </section>
 
       <section id="storePanel" data-panel="store" hidden>
@@ -113,6 +113,6 @@
   <script src="assets/vendor/xlsx.full.min.js"></script>
   <script src="assets/vendor/officecrypto.bundle.min.js?v=0.0.19"></script>
   <script src="department-ops-core.js?v=20260930-2"></script>
-  <script src="department-ops.js?v=20260930-2" defer></script>
+  <script src="department-ops.js?v=20260930-3" defer></script>
 </body>
 </html>

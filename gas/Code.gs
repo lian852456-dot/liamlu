@@ -2981,6 +2981,7 @@ function doPost(e) {
     else if (action === 'private_access') result = privateDashboardAccess(payload);
     else if (action === 'phone_stock_publish') result = phoneStockPublish(payload);
     else if (action === 'phone_stock_read') result = phoneStockRead(payload);
+    else if (action === 'department_ops_read') result = departmentOpsRead(payload);
     else if (action === 'department_ops_publish') result = departmentOpsPublish(payload);
     else if (action === 'department_gold_access') result = departmentGoldAccess(payload);
     else if (action === 'threec_snapshot_read') result = threecSnapshotRead(payload);
@@ -3430,6 +3431,21 @@ function departmentOpsPublish(payload) {
     departmentOpsFolder_().createFile(DEPARTMENT_OPS_FILE, JSON.stringify(snapshot), MimeType.PLAIN_TEXT);
   } finally { lock.releaseLock(); }
   return {publishedAt:snapshot.publishedAt,cutoff:cutoff,people:bRows.length,months:months.length};
+}
+
+function departmentOpsRead(payload) {
+  const body = payload || {};
+  ptRequireSession_(body.token, 'department_ops_read');
+  const snapshot = departmentOpsLatestSnapshot_();
+  if (!snapshot) return {available:false};
+  return {
+    available:true,
+    publishedAt:String(snapshot.publishedAt || ''),
+    sourceName:String(snapshot.sourceName || ''),
+    gold:{type:'north12-final-v1',months:snapshot.months},
+    goldHistory:Array.isArray(snapshot.goldHistory) ? snapshot.goldHistory : [],
+    reviews:snapshot.reviews && typeof snapshot.reviews === 'object' ? snapshot.reviews : {}
+  };
 }
 
 function departmentGoldAuthorizedUser_(payload) {

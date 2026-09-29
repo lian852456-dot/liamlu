@@ -44,7 +44,8 @@ test('Patrol GAS bundle has only the Patrol route surface and own session audien
   [
     'ptauth', 'ptlogout', 'ptsummary', 'ptdashboard', 'ptdetail', 'ptmileage', 'ptmileage2',
     'ptmileage_legs_read', 'ptmileage_leg_write',
-    'ptvisit_read', 'ptvisit_write', 'hread', 'hwrite', 'sread', 'half_media_upload'
+    'ptvisit_read', 'ptvisit_write', 'hread', 'hwrite', 'sread', 'half_media_upload',
+    'department_ops_read', 'department_ops_publish'
   ].forEach(action => assert.match(code, new RegExp(`['\\"]${action}['\\"]`)));
   assert.doesNotMatch(code, /audit_|AuditReport|auditReport|privateDashboard|reportUpload|kpicalc/i);
   assert.doesNotMatch(media, /audit_|AuditReport|auditReport/i);

@@ -42,7 +42,8 @@ test('isolated Patrol bundle contains the complete reachable helper closure for 
   const bundleFunctions = functionsIn(generated);
   const requiredActions = [
     'ptauth', 'ptlogout', 'ptsummary', 'ptdashboard', 'ptdetail', 'ptmileage', 'ptmileage2',
-    'ptvisit_read', 'ptvisit_write', 'hread', 'hwrite', 'sread', 'half_media_upload'
+    'ptvisit_read', 'ptvisit_write', 'hread', 'hwrite', 'sread', 'half_media_upload',
+    'department_ops_read', 'department_ops_publish'
   ];
 
   for (const action of requiredActions) {

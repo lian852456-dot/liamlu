@@ -9,6 +9,8 @@
   const AUTH_RETRY_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
   let goldData = null;
   let goldSourceName = '';
+  let goldPublishedAt = '';
+  let goldHistory = null;
   let storeData = null;
   let patrolToken = '';
 
@@ -48,8 +50,8 @@
 
   async function authRequest(payload) {
     // Apps Script 偶爾會在 doPost 已完成後，於回傳重新導向階段短暫落成 404。
-    // 只有冪等的通行碼驗證允許重試；金牌同步等寫入動作絕不自動重送。
-    const canRetry = payload?.action === 'ptauth';
+    // 只有冪等的驗證與資料讀取允許重試；金牌同步等寫入動作絕不自動重送。
+    const canRetry = ['ptauth', 'department_ops_read'].includes(payload?.action);
     const maxAttempts = canRetry ? 3 : 1;
     let lastError;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -63,7 +65,8 @@
       }
     }
     if (canRetry && (AUTH_RETRY_STATUSES.has(Number(lastError?.httpStatus)) || ['AbortError', 'TypeError'].includes(lastError?.name))) {
-      throw new Error('驗證服務暫時無回應，已自動重試 3 次，請稍後再試。');
+      const label = payload?.action === 'department_ops_read' ? '已同步資料' : '驗證服務';
+      throw new Error(`${label}暫時無回應，已自動重試 3 次，請稍後再試。`);
     }
     throw lastError;
   }
@@ -73,7 +76,7 @@
     if (result?.status !== 'ok' || !result.token) throw new Error('通行碼驗證未成功');
     patrolToken = result.token;
     sessionStorage.setItem(SESSION_KEY, patrolToken);
-    unlockWorkspace();
+    await unlockWorkspace();
   }
 
   async function restoreSession() {
@@ -84,17 +87,18 @@
       if (result?.status !== 'ok' || !result.token) throw new Error('expired');
       patrolToken = result.token;
       sessionStorage.setItem(SESSION_KEY, patrolToken);
-      unlockWorkspace();
+      await unlockWorkspace();
     } catch {
       sessionStorage.removeItem(SESSION_KEY);
     }
   }
 
-  function unlockWorkspace() {
+  async function unlockWorkspace() {
     $('authPanel').hidden = true;
     $('workspace').hidden = false;
     $('securityBadge').textContent = '督導權限已驗證';
     $('securityBadge').classList.add('ok');
+    await loadPublishedGold();
   }
 
   function readLocalJson(key, fallback) {
@@ -213,7 +217,7 @@
   }
 
   function renderDaily() {
-    const history = readLocalJson(GOLD_HISTORY_KEY, []);
+    const history = goldHistory || readLocalJson(GOLD_HISTORY_KEY, []);
     const reviews = readLocalJson(GOLD_REVIEW_KEY, {});
     const changes = CORE.dailyChanges(history, $('dateFrom').value, $('dateTo').value);
     $('dailyBody').innerHTML = changes.length ? changes.map((row) => {
@@ -230,20 +234,47 @@
     renderQuarter(people);
     renderDaily();
     const latest = goldData.months[goldData.months.length - 1];
-    $('goldSourceMeta').textContent = `${goldSourceName}｜${goldData.months.length} 個月份｜最新截止 ${latest.dateRange.cutoff}`;
+    const syncMeta = goldPublishedAt ? `｜上次同步 ${new Date(goldPublishedAt).toLocaleString('zh-TW', { hour12: false })}` : '';
+    $('goldSourceMeta').textContent = `${goldSourceName}｜${goldData.months.length} 個月份｜最新截止 ${latest.dateRange.cutoff}${syncMeta}`;
   }
 
   function saveGoldHistory(fileName) {
     const latest = goldData.months[goldData.months.length - 1];
     if (!latest.dateRange.cutoff) return;
     const rows = latest.records.filter((row) => row.region === '北一二B');
-    const history = CORE.upsertSnapshot(readLocalJson(GOLD_HISTORY_KEY, []), {
+    const history = CORE.upsertSnapshot(goldHistory || readLocalJson(GOLD_HISTORY_KEY, []), {
       cutoff: latest.dateRange.cutoff,
       importedAt: new Date().toISOString(),
       sourceName: fileName,
       rows
     });
+    goldHistory = history;
     localStorage.setItem(GOLD_HISTORY_KEY, JSON.stringify(history));
+  }
+
+  async function loadPublishedGold() {
+    setMessage('goldMessage', '正在載入上次同步的金牌資料…');
+    try {
+      const result = await authRequest({ action: 'department_ops_read', token: patrolToken });
+      if (result?.status !== 'ok') throw new Error(result?.message || '讀取已同步資料失敗');
+      if (!result.available || !Array.isArray(result.gold?.months) || !result.gold.months.length) {
+        setMessage('goldMessage', '目前尚無已同步資料，需要更新時再選擇 Final Excel。');
+        return;
+      }
+      goldData = result.gold;
+      goldSourceName = result.sourceName || '上次同步資料';
+      goldPublishedAt = result.publishedAt || '';
+      goldHistory = Array.isArray(result.goldHistory) ? result.goldHistory : [];
+      if (result.reviews && typeof result.reviews === 'object') {
+        localStorage.setItem(GOLD_REVIEW_KEY, JSON.stringify(result.reviews));
+      }
+      initializeFilters();
+      renderGold();
+      $('goldDashboard').hidden = false;
+      setMessage('goldMessage', `已自動載入上次同步資料；最新截止 ${goldData.months[goldData.months.length - 1].dateRange.cutoff}。`, 'success');
+    } catch (error) {
+      setMessage('goldMessage', error.message || '上次同步資料載入失敗，可重新整理或上傳新版 Final。', 'error');
+    }
   }
 
   async function importGold() {
@@ -255,6 +286,7 @@
       const workbook = await readWorkbook(file, $('excelPassword').value);
       goldData = CORE.parseGoldWorkbook(workbook);
       goldSourceName = file.name;
+      goldPublishedAt = '';
       saveGoldHistory(file.name);
       initializeFilters();
       renderGold();
@@ -312,6 +344,8 @@
         reviews: readLocalJson(GOLD_REVIEW_KEY, {})
       });
       if (result?.status !== 'ok') throw new Error(result?.message || '同步失敗');
+      goldPublishedAt = result.publishedAt || new Date().toISOString();
+      renderGold();
       setMessage('publishMessage', `已同步給核准裝置；最新截止 ${result.cutoff}，北一二B ${result.people} 人。`, 'success');
     } catch (error) {
       setMessage('publishMessage', error.name === 'AbortError' ? '同步服務回應逾時，請先勿重複操作並重新整理確認。' : (error.message || '同步失敗。'), 'error');

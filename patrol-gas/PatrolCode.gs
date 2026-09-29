@@ -131,6 +131,7 @@ function doPost(e) {
     }
     else if (action === 'interview_read') result = supervisorInterviewReadPayload_(payload);
     else if (action === 'interview_write') result = supervisorInterviewWritePayload_(payload);
+    else if (action === 'department_ops_read') result = departmentOpsRead(payload);
     else if (action === 'department_ops_publish') result = departmentOpsPublish(payload);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
     else throw new Error('unknown patrol action');
@@ -2016,6 +2017,21 @@ function departmentOpsPublish(payload) {
     departmentOpsFolder_().createFile(DEPARTMENT_OPS_FILE, JSON.stringify(snapshot), MimeType.PLAIN_TEXT);
   } finally { lock.releaseLock(); }
   return {publishedAt:snapshot.publishedAt,cutoff:cutoff,people:bRows.length,months:months.length};
+}
+
+function departmentOpsRead(payload) {
+  const body = payload || {};
+  ptRequireSession_(body.token, 'department_ops_read');
+  const snapshot = departmentOpsLatestSnapshot_();
+  if (!snapshot) return {available:false};
+  return {
+    available:true,
+    publishedAt:String(snapshot.publishedAt || ''),
+    sourceName:String(snapshot.sourceName || ''),
+    gold:{type:'north12-final-v1',months:snapshot.months},
+    goldHistory:Array.isArray(snapshot.goldHistory) ? snapshot.goldHistory : [],
+    reviews:snapshot.reviews && typeof snapshot.reviews === 'object' ? snapshot.reviews : {}
+  };
 }
 
 function ptWinMonths(monthKey) {

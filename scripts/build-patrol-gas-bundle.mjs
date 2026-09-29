@@ -162,6 +162,7 @@ function doPost(e) {
     }
     else if (action === 'interview_read') result = supervisorInterviewReadPayload_(payload);
     else if (action === 'interview_write') result = supervisorInterviewWritePayload_(payload);
+    else if (action === 'department_ops_read') result = departmentOpsRead(payload);
     else if (action === 'department_ops_publish') result = departmentOpsPublish(payload);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
     else throw new Error('unknown patrol action');

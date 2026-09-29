@@ -66,23 +66,29 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(home, /href="gold-medal\.html"[\s\S]*北一二B 金牌明細/);
   assert.match(page, /officecrypto\.bundle\.min\.js/);
   assert.match(page, /department-ops-core\.js\?v=20260930-2/);
-  assert.match(page, /department-ops\.js\?v=20260930-2/);
+  assert.match(page, /department-ops\.js\?v=20260930-3/);
+  assert.match(page, /需要更新時才上傳新版 Final/);
+  assert.match(page, /選檔僅供更新/);
   assert.match(page, /id="excelPassword"[^>]*placeholder="請輸入檔案密碼"/);
   assert.doesNotMatch(page, /id="excelPassword"[^>]*value=/);
   assert.match(controller, /action: 'ptauth'/);
   assert.match(controller, /AUTH_RETRY_STATUSES = new Set\(\[404, 429, 500, 502, 503, 504\]\)/);
-  assert.match(controller, /const canRetry = payload\?\.action === 'ptauth'/);
+  assert.match(controller, /\['ptauth', 'department_ops_read'\]\.includes\(payload\?\.action\)/);
   assert.match(controller, /const maxAttempts = canRetry \? 3 : 1/);
   assert.match(controller, /金牌同步等寫入動作絕不自動重送/);
   assert.match(controller, /GOLD_HISTORY_KEY/);
   assert.match(controller, /季度彙整/);
   assert.doesNotMatch(controller, /<option value="all">全部月份<\/option>/);
   assert.match(controller, /action: 'department_ops_publish'/);
+  assert.match(controller, /action: 'department_ops_read'/);
+  assert.match(controller, /await loadPublishedGold\(\)/);
   assert.match(viewerController, /action:'department_gold_access'/);
   assert.match(viewerController, /action:'private_request'/);
   assert.match(viewerController, /AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/);
   assert.match(viewer, /員編登入|以員編查看/);
   assert.match(gas, /action === 'department_ops_publish'/);
+  assert.match(gas, /action === 'department_ops_read'/);
+  assert.match(gas, /ptRequireSession_\(body\.token, 'department_ops_read'\)/);
   assert.match(gas, /action === 'department_gold_access'/);
   assert.match(gas, /ptRequireSession_\(body\.token, 'department_ops_publish'\)/);
   assert.match(gas, /row\.region === '北一二B'/);
@@ -90,6 +96,7 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(gas, /previous\.rows/);
   assert.match(gas, /revisionCount:Array\.isArray/);
   assert.match(patrolBundle, /action === 'department_ops_publish'/);
+  assert.match(patrolBundle, /action === 'department_ops_read'/);
   assert.doesNotMatch(patrolBundle, /department_gold_access|privateDashboard/);
   assert.doesNotMatch(`${page}\n${controller}`, /551\d{4}/);
 });
@@ -114,6 +121,17 @@ test('督導驗證遇到 Apps Script 回傳 404 會重試，但同步寫入不�
   const authResult = await authRuntime.authRequest({action:'ptauth', key:'test'});
   assert.equal(authCalls, 3);
   assert.equal(authResult.token, 'test-token');
+
+  let readCalls = 0;
+  const readRuntime = buildRuntime(async () => {
+    readCalls += 1;
+    return readCalls === 1
+      ? {ok:false, status:503, json:async () => ({})}
+      : {ok:true, status:200, json:async () => ({status:'ok', available:true})};
+  }, AbortController, immediateTimers, () => {}, 'https://example.test/exec');
+  const readResult = await readRuntime.authRequest({action:'department_ops_read', token:'test-token'});
+  assert.equal(readCalls, 2);
+  assert.equal(readResult.available, true);
 
   let publishCalls = 0;
   const publishRuntime = buildRuntime(async () => {
