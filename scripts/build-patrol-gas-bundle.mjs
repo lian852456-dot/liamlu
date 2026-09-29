@@ -162,6 +162,7 @@ function doPost(e) {
     }
     else if (action === 'interview_read') result = supervisorInterviewReadPayload_(payload);
     else if (action === 'interview_write') result = supervisorInterviewWritePayload_(payload);
+    else if (action === 'department_ops_publish') result = departmentOpsPublish(payload);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
     else throw new Error('unknown patrol action');
     return patrolJsonResponse_({status: 'ok', ...result});
@@ -185,6 +186,7 @@ const patrolCode = [
   range(source, 'const PATROL_SESSION_TTL_SECONDS', 'const PATROL_VISIT_SHEET'),
   range(source, 'const PATROL_VISIT_SHEET', 'const HALF_CHECK_SHEET'),
   range(source, 'const HALF_CHECK_SHEET', 'const PT_ITEM_TEXT'),
+  range(source, 'const DEPARTMENT_OPS_FILE', 'function departmentGoldAuthorizedUser_'),
   ...patrolDependencyClosure
 ].join('\n\n')
   .replace("const PATROL_AUTH_DEPLOYMENT = 'patrol-auth-stateless-20260821';", "const PATROL_AUTH_DEPLOYMENT = 'patrol-isolated-v1';");
