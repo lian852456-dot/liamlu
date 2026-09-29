@@ -57,6 +57,7 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(home, /href="department-ops\.html"[\s\S]*北一二部｜部區管理/);
   assert.match(home, /href="gold-medal\.html"[\s\S]*北一二B 金牌明細/);
   assert.match(page, /officecrypto\.bundle\.min\.js/);
+  assert.match(page, /department-ops\.js\?v=20260930-1/);
   assert.match(page, /id="excelPassword"[^>]*placeholder="請輸入檔案密碼"/);
   assert.doesNotMatch(page, /id="excelPassword"[^>]*value=/);
   assert.match(controller, /action: 'ptauth'/);
