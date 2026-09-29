@@ -33,6 +33,14 @@ test('季度累計依員編整併並標記 80/100/120/180 門檻', () => {
   assert.equal(person.nextThreshold, 180);
 });
 
+test('依資料月份列出每一季，包含 Q2 與 Q3，並以最新季度優先', () => {
+  const months = ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09']
+    .map((monthKey) => ({ monthKey }));
+  assert.deepEqual(Core.quarterKeys(months), ['2026-Q3', '2026-Q2']);
+  assert.equal(Core.quarterKeyForMonth('2026-06'), '2026-Q2');
+  assert.equal(Core.quarterKeyForMonth('2026-07'), '2026-Q3');
+});
+
 test('同日修正版覆蓋目前顯示但保留版本，跨日產生北一二B個人增減', () => {
   const row = (medal) => [{ employeeId:'1', employeeName:'A', region:'北一二B', store:'三創', role:'店長', medal, spe:0 }];
   let history = Core.upsertSnapshot([], { cutoff:'2026-01-09', sourceName:'0109.xlsx', rows:row(10) });
@@ -57,7 +65,8 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(home, /href="department-ops\.html"[\s\S]*北一二部｜部區管理/);
   assert.match(home, /href="gold-medal\.html"[\s\S]*北一二B 金牌明細/);
   assert.match(page, /officecrypto\.bundle\.min\.js/);
-  assert.match(page, /department-ops\.js\?v=20260930-1/);
+  assert.match(page, /department-ops-core\.js\?v=20260930-2/);
+  assert.match(page, /department-ops\.js\?v=20260930-2/);
   assert.match(page, /id="excelPassword"[^>]*placeholder="請輸入檔案密碼"/);
   assert.doesNotMatch(page, /id="excelPassword"[^>]*value=/);
   assert.match(controller, /action: 'ptauth'/);
@@ -66,6 +75,8 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(controller, /const maxAttempts = canRetry \? 3 : 1/);
   assert.match(controller, /金牌同步等寫入動作絕不自動重送/);
   assert.match(controller, /GOLD_HISTORY_KEY/);
+  assert.match(controller, /季度彙整/);
+  assert.doesNotMatch(controller, /<option value="all">全部月份<\/option>/);
   assert.match(controller, /action: 'department_ops_publish'/);
   assert.match(viewerController, /action:'department_gold_access'/);
   assert.match(viewerController, /action:'private_request'/);
