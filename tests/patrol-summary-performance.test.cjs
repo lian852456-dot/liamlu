@@ -48,7 +48,7 @@ test('versioned mileage actions preserve v1 while ptmlieage2 provides single-pag
   assert.match(gas, /action === 'ptmileage'\) result = ptMileageMonthPostPayload_\(payload\)/);
   assert.match(gas, /function ptMileage2MonthPostPayload_\(payload\)[\s\S]*ptRequireSession_\(body\.token, 'ptmileage2'\)/);
   assert.match(gas, /action === 'ptmileage2'\) result = ptMileage2MonthPostPayload_\(payload\)/);
-  assert.match(gas, /mileageContracts: \['patrol-mileage-month-v1', 'patrol-mileage-visits-v2'\]/);
+  assert.match(gas, /mileageContracts: \['patrol-mileage-month-v1', 'patrol-mileage-visits-v2', 'patrol-mileage-leg-master-v1'\]/);
   assert.match(gas, /PATROL_MILEAGE_FIELDS = \['fillTime','arriveTime','code','store','month'\]/);
   assert.match(gas, /PATROL_MILEAGE_MAX_LIMIT = 500/);
   assert.match(gas, /PATROL_MILEAGE_MAX_VISITS = 279/);
@@ -79,7 +79,7 @@ test('versioned mileage actions preserve v1 while ptmlieage2 provides single-pag
 test('mileage exposes explicit health reason codes and zero-detail consistency gate', () => {
   const patrol = read('patrol.html');
   ['MILEAGE_NO_PATROL','MILEAGE_SOURCE_MISSING','MILEAGE_DATE_PARSE_ERROR',
-   'MILEAGE_STORE_MAPPING_ERROR','MILEAGE_CLOUD_READ_ERROR','MILEAGE_API_ERROR',
+   'MILEAGE_STORE_MAPPING_ERROR','MILEAGE_DISTANCE_MISSING','MILEAGE_CLOUD_READ_ERROR','MILEAGE_API_ERROR',
    'MILEAGE_AUTH_ERROR','MILEAGE_DATA_FORMAT_ERROR','MILEAGE_CALC_ERROR',
    'MILEAGE_LOAD_SLOW','MILEAGE_LOAD_TIMEOUT'].forEach(code=>assert.match(patrol,new RegExp(code)));
   assert.match(patrol, /sourceInfo\.type==='none'[\s\S]*ERROR\.NO_PATROL/);
@@ -104,7 +104,7 @@ test('App and patrol.html load ptsummary for dashboards and fail closed on trans
   assert.match(app, /巡店資料讀取逾時/);
   assert.match(app, /data-retry-patrol/);
   assert.match(patrol, /cloudCall\('ptsummary',\{month\}\)/);
-  assert.match(patrol, /\['ptsummary','ptdetail','ptmileage','ptmileage2','ptdashboard','interview_read','interview_write'\]\.includes\(action\)[\s\S]*method:'POST'/);
+  assert.match(patrol, /\['ptsummary','ptdetail','ptmileage','ptmileage2','ptmileage_legs_read','ptdashboard','interview_read','interview_write'\]\.includes\(action\)[\s\S]*method:'POST'/);
   assert.match(patrol, /JSON\.stringify\(\{action,token:PT_TOKEN,\.\.\.params\}\)/);
   assert.doesNotMatch(patrol, /cloudCall\('ptread'\)/);
   assert.match(patrol, /patrolSummaryUnavailableHTML/);

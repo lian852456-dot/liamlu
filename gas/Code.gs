@@ -265,7 +265,7 @@ function doGet(e) {
       contract: 'patrol-auth-v3',
       sessionContract: PATROL_SESSION_CONTRACT,
       authDeployment: PATROL_AUTH_DEPLOYMENT,
-      mileageContracts: ['patrol-mileage-month-v1', 'patrol-mileage-visits-v2'],
+      mileageContracts: ['patrol-mileage-month-v1', 'patrol-mileage-visits-v2', 'patrol-mileage-leg-master-v1'],
       dashboardContracts: [PATROL_DASHBOARD_CONTRACT]
     }, cb);
   }
@@ -721,6 +721,124 @@ function ptMileage2MonthPostPayload_(payload) {
     month:patrolSummaryMonth_(body.month),
     page:body.page
   });
+}
+
+function ptMileageLegsReadPayload_(payload) {
+  const body = payload || {};
+  ptRequireSession_(body.token, 'ptmileage_legs_read');
+  return {
+    contract:'patrol-mileage-leg-master-v1',
+    legs:readPatrolMileageLegs_()
+  };
+}
+
+function ptMileageLegWritePayload_(payload) {
+  const body = payload || {};
+  ptRequireSession_(body.token, 'ptmileage_leg_write');
+  return {
+    contract:'patrol-mileage-leg-master-v1',
+    leg:writePatrolMileageLeg_(body)
+  };
+}
+
+// ════════════════════════════════════
+// 每日移動里程人工路段主檔（獨立工作表）
+// 不修改「巡店明細」schema 或任何既有巡店列。
+// routeKey 依兩端 canonical 名稱排序，故正向／反向共用同一筆正式人工距離。
+// ════════════════════════════════════
+const PATROL_MILEAGE_LEG_SHEET = '巡店里程路段主檔';
+const PATROL_MILEAGE_LEG_HEADERS = ['routeKey','from','to','km','source','confirmedAt','createdAt','updatedAt'];
+const PATROL_MILEAGE_LEG_NODES = [
+  '台北酒泉','台北大稻埕','台北三創','台北六張犁','台北復興南',
+  '台北萬大','台北通化','台北永吉','台北杭州南','台北電信'
+];
+
+function patrolMileageLegNode_(value) {
+  const raw = String(value || '').replace(/\s+/g, '');
+  const match = PATROL_MILEAGE_LEG_NODES.find(function(name) {
+    const canonical = String(name).replace(/\s+/g, '');
+    return raw === canonical || raw === canonical.replace(/^台北/, '');
+  });
+  if (!match) throw new Error('invalid mileage leg node');
+  return match;
+}
+
+function patrolMileageLegKey_(fromValue, toValue) {
+  const from = patrolMileageLegNode_(fromValue);
+  const to = patrolMileageLegNode_(toValue);
+  if (from === to) throw new Error('mileage leg endpoints must differ');
+  return [from, to].sort().join('|');
+}
+
+function patrolMileageLegSheet_(create) {
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = spreadsheet.getSheetByName(PATROL_MILEAGE_LEG_SHEET);
+  if (!sheet && create) {
+    sheet = spreadsheet.insertSheet(PATROL_MILEAGE_LEG_SHEET);
+  }
+  if (sheet && sheet.getLastRow() === 0 && create) {
+    sheet.appendRow(PATROL_MILEAGE_LEG_HEADERS);
+    sheet.setFrozenRows(1);
+    sheet.getRange('A:H').setNumberFormat('@');
+  }
+  if (sheet && sheet.getLastRow() > 0) {
+    const headers = sheet.getRange(1, 1, 1, PATROL_MILEAGE_LEG_HEADERS.length).getDisplayValues()[0];
+    if (PATROL_MILEAGE_LEG_HEADERS.some(function(header, index) { return String(headers[index] || '') !== header; })) {
+      throw new Error('invalid mileage leg master headers');
+    }
+  }
+  return sheet;
+}
+
+function patrolMileageLegRecord_(row) {
+  const key = String(row[0] || '').trim();
+  const from = patrolMileageLegNode_(row[1]);
+  const to = patrolMileageLegNode_(row[2]);
+  const expectedKey = patrolMileageLegKey_(from, to);
+  const km = Number(row[3]);
+  const source = String(row[4] || '').trim();
+  if (key !== expectedKey || !Number.isFinite(km) || km < 0.1 || km > 999 || source !== '人工確認') throw new Error('invalid mileage leg master row');
+  return {
+    routeKey:key, from:from, to:to, km:Math.round(km * 10) / 10,
+    source:'人工確認', confirmedAt:String(row[5] || ''),
+    createdAt:String(row[6] || ''), updatedAt:String(row[7] || '')
+  };
+}
+
+function readPatrolMileageLegs_() {
+  const sheet = patrolMileageLegSheet_(false);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, PATROL_MILEAGE_LEG_HEADERS.length).getDisplayValues()
+    .filter(function(row) { return row.some(function(value) { return String(value || '').trim(); }); })
+    .map(patrolMileageLegRecord_)
+    .sort(function(left, right) { return left.routeKey.localeCompare(right.routeKey); });
+}
+
+function writePatrolMileageLeg_(payload) {
+  const body = payload || {};
+  const from = patrolMileageLegNode_(body.from);
+  const to = patrolMileageLegNode_(body.to);
+  const routeKey = patrolMileageLegKey_(from, to);
+  const km = Math.round(Number(body.km) * 10) / 10;
+  if (!Number.isFinite(km) || km < 0.1 || km > 999) throw new Error('mileage leg km must be between 0.1 and 999');
+  const expectedUpdatedAt = String(body.expectedUpdatedAt || '');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = patrolMileageLegSheet_(true);
+    const rows = sheet.getLastRow() < 2 ? [] : sheet.getRange(2, 1, sheet.getLastRow() - 1, PATROL_MILEAGE_LEG_HEADERS.length).getDisplayValues();
+    const index = rows.findIndex(function(row) { return String(row[0] || '').trim() === routeKey; });
+    const existing = index >= 0 ? patrolMileageLegRecord_(rows[index]) : null;
+    if (existing && expectedUpdatedAt !== existing.updatedAt) throw new Error('mileage leg changed; reload before updating');
+    const now = Utilities.formatDate(new Date(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
+    const createdAt = existing ? existing.createdAt : now;
+    const values = [routeKey, from, to, km, '人工確認', now, createdAt, now];
+    if (existing) sheet.getRange(index + 2, 1, 1, values.length).setValues([values]);
+    else sheet.appendRow(values);
+    return patrolMileageLegRecord_(values);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 const PATROL_SHEET = '巡店明細';
@@ -2841,6 +2959,8 @@ function doPost(e) {
     else if (action === 'ptdetail') result = ptDetailPostPayload_(payload);
     else if (action === 'ptmileage') result = ptMileageMonthPostPayload_(payload);
     else if (action === 'ptmileage2') result = ptMileage2MonthPostPayload_(payload);
+    else if (action === 'ptmileage_legs_read') result = ptMileageLegsReadPayload_(payload);
+    else if (action === 'ptmileage_leg_write') result = ptMileageLegWritePayload_(payload);
     else if (action === 'ptvisit_write') result = writePatrolVisitEvent_(payload);
     else if (action === 'interview_read') result = supervisorInterviewReadPayload_(payload);
     else if (action === 'interview_write') result = supervisorInterviewWritePayload_(payload);
@@ -2885,7 +3005,7 @@ function doPost(e) {
     else throw new Error('unknown private dashboard action');
     return privateDashboardPostResponse({ status: 'ok', ...result }, e);
   } catch (err) {
-    const patrolActions = ['ptauth','ptlogout','ptsummary','ptdashboard','ptdetail','ptmileage','ptmileage2','ptvisit_write','interview_read','interview_write','hwrite','half_media_upload'];
+    const patrolActions = ['ptauth','ptlogout','ptsummary','ptdashboard','ptdetail','ptmileage','ptmileage2','ptmileage_legs_read','ptmileage_leg_write','ptvisit_write','interview_read','interview_write','hwrite','half_media_upload'];
     const response = patrolActions.indexOf(action) >= 0
       ? ptRouteErrorPayload_(err, action, payload && payload.token)
       : { status: 'error', message: err && err.message ? err.message : String(err) };

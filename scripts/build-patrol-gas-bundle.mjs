@@ -56,7 +56,7 @@ function patrolHealth_() {
     contract: 'patrol-auth-v3',
     sessionContract: PATROL_SESSION_CONTRACT,
     authDeployment: PATROL_AUTH_DEPLOYMENT,
-    mileageContracts: ['patrol-mileage-month-v1', 'patrol-mileage-visits-v2'],
+    mileageContracts: ['patrol-mileage-month-v1', 'patrol-mileage-visits-v2', 'patrol-mileage-leg-master-v1'],
     dashboardContracts: [PATROL_DASHBOARD_CONTRACT]
   };
 }
@@ -89,6 +89,10 @@ function patrolGetRoute_(action, params) {
   if (action === 'ptmileage2') {
     ptRequireSession_(query.token, action);
     return readPatrolMileageMonthV2_({month: patrolSummaryMonth_(query.month), page: query.page});
+  }
+  if (action === 'ptmileage_legs_read') {
+    ptRequireSession_(query.token, action);
+    return {status:'ok', contract:'patrol-mileage-leg-master-v1', legs:readPatrolMileageLegs_()};
   }
   if (action === 'ptvisit_read') {
     ptRequireSession_(query.token, action);
@@ -139,6 +143,8 @@ function doPost(e) {
     else if (action === 'ptdetail') result = ptDetailPostPayload_(payload);
     else if (action === 'ptmileage') result = ptMileageMonthPostPayload_(payload);
     else if (action === 'ptmileage2') result = ptMileage2MonthPostPayload_(payload);
+    else if (action === 'ptmileage_legs_read') result = ptMileageLegsReadPayload_(payload);
+    else if (action === 'ptmileage_leg_write') result = ptMileageLegWritePayload_(payload);
     else if (action === 'ptvisit_write') result = writePatrolVisitEvent_(payload);
     else if (action === 'ptvisit_read') {
       ptRequireSession_(payload.token, action);
