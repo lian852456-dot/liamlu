@@ -1,3 +1,11 @@
+## 2026-09-29 ｜ Codex（每日移動里程人工路段主檔候選）
+
+- 範圍：只修改每日移動里程。未知但已辨識的店間路段改用 `MILEAGE_DISTANCE_MISSING`，畫面就地提供 0.1–999 KM 輸入與「儲存為路段距離」；真正未知門市仍維持 `MILEAGE_STORE_MAPPING_ERROR`。
+- 持久化：新增 session 保護的 `patrol-mileage-leg-master-v1`，資料寫入既有 Patrol 試算表中的獨立工作表「巡店里程路段主檔」；雙向共用排序後 route key，來源固定「人工確認」，保留確認／建立／更新時間，寫入後重新讀回驗證。未修改「巡店明細」或既有 GAS URL。
+- 門市代碼：里程主檔確認永吉 `DNB10082`、杭州南 `DNB10146`、通化 `DNB10174`；通化 `DNB10059` 保留 legacy alias。只對真正未確認的 store 顯示待複核，特殊地點不誤報。
+- 驗證：里程／GAS Node 契約 `23/23 PASS`；六項里程重點 Chrome 驗收通過。完整 Patrol Chrome 回歸 `84/86 PASS`，其餘兩項（25 題 NA 計數、面談預覽欄名字樣）已在未修改的 `origin/main` 同樣失敗，未跨範圍修正。`build:patrol-gas` 與 `git diff --check` PASS。
+- 發布邊界：僅為程式候選；未部署 Pages／GAS、未建立正式工作表、未寫正式路段或巡店資料。上線前須先以現有 Deployment ID 建立新版 Patrol Web App，再發布前端，URL／session 設定維持不變。
+
 ## 2026-09-20 ｜ Codex（面談匯入與六張犁完成判定正式修復）
 
 - 修復：面談檔的「填報人員」與「面談人員編號」改為可省略；若來源仍帶員編，資料仍只在本機捨棄、不寫入私有工作表。其餘九個面談欄位與日期／季度／授權驗證維持 fail-closed。

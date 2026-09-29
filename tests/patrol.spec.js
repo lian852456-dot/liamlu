@@ -17,6 +17,8 @@ let ptMileageCalls;
 let ptMileageDelayMs;
 let ptDetailDelayMs;
 let ptMileageContract;
+let mileageLegs;
+let mileageLegWriteCalls;
 let cloudConfig; // 模擬各區 GAS 回傳的 PT_STORES / PT_TITLE
 let mediaUploads;
 let failPtwrite; // 測試用：強制 ptwrite 回錯，模擬雲端寫入失敗
@@ -110,6 +112,27 @@ async function stubGas(page) {
         return route.fulfill({ contentType:'application/json', body:JSON.stringify({
           status:'ok',month,store,page:pageNumber,limit,totalRows:rows.length,rows:rows.slice(start,start+limit)
         }) });
+      }
+      if (payload.action === 'ptmileage_legs_read') {
+        return route.fulfill({contentType:'application/json',body:JSON.stringify(payload.token===PT_TOKEN
+          ? {status:'ok',contract:'patrol-mileage-leg-master-v1',legs:mileageLegs}
+          : {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'})});
+      }
+      if (payload.action === 'ptmileage_leg_write') {
+        if(payload.token!==PT_TOKEN) return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'})});
+        mileageLegWriteCalls++;
+        const km=Math.round(Number(payload.km)*10)/10;
+        if(!Number.isFinite(km)||km<0.1||km>999) return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'error',message:'mileage leg km must be between 0.1 and 999'})});
+        const routeKey=[String(payload.from),String(payload.to)].sort().join('|');
+        const index=mileageLegs.findIndex(leg=>leg.routeKey===routeKey);
+        const existing=index>=0?mileageLegs[index]:null;
+        if(existing&&String(payload.expectedUpdatedAt||'')!==String(existing.updatedAt||''))
+          return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'error',message:'mileage leg changed; reload before updating'})});
+        const sequence=String(mileageLegWriteCalls).padStart(2,'0');
+        const now=`2026-09-29T10:00:${sequence}+08:00`;
+        const leg={routeKey,from:String(payload.from),to:String(payload.to),km,source:'人工確認',confirmedAt:now,createdAt:existing?existing.createdAt:now,updatedAt:now};
+        if(existing) mileageLegs[index]=leg; else mileageLegs.push(leg);
+        return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'ok',contract:'patrol-mileage-leg-master-v1',leg})});
       }
       if (payload.action === 'ptmileage' || payload.action === 'ptmileage2') {
         if (payload.token !== PT_TOKEN) {
@@ -343,7 +366,7 @@ function item18Panel(page) {
   return page.locator('#invPanels .panel').filter({ hasText:'到店全盤提醒' });
 }
 
-test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; ptDetailDelayMs = 0; ptMileageContract = 'patrol-mileage-visits-v2'; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; omitPtdetailKeys = new Set(); omitPtdetailRow = false; ptwritePayloads = []; interviewRows = []; interviewWriteCalls = 0; });
+test.beforeEach(() => { cloudRows = []; halfRows = []; writeCalls = 0; ptReadCalls = 0; ptDetailCalls = []; ptMileageCalls = []; ptMileageDelayMs = 0; ptDetailDelayMs = 0; ptMileageContract = 'patrol-mileage-visits-v2'; mileageLegs = []; mileageLegWriteCalls = 0; cloudConfig = null; mediaUploads = []; failPtwrite = false; expireHalfWriteAt = null; halfWriteCalls = 0; omitPtdetailKeys = new Set(); omitPtdetailRow = false; ptwritePayloads = []; interviewRows = []; interviewWriteCalls = 0; });
 
 test('填表時間為 ######## 時整批拒絕，不寫雲端、不改 rawDetails、不清除貼上內容', async ({ page }) => {
   await stubGas(page);
@@ -1870,35 +1893,97 @@ test('待查路段可在網站補登，8/27 通化至萬大顯示 7.4 KM', async
   expect(plan.km).toBe(11);
   await expect(page.locator('#miTimeline')).toContainText('7.4 KM');
   await expect(page.locator('#miLegKm-1')).toHaveValue('7.4');
-  await expect(page.locator('#miLegKm-1').locator('xpath=following-sibling::button')).toHaveText('更新');
+  await expect(page.locator('#miLegKm-1').locator('xpath=following-sibling::button')).toHaveText('更新路段距離');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
 });
 
-test('補登欄位只寫入里程資料層並解除待查', async ({ page }) => {
+test('缺漏路段寫入雲端主檔，清除瀏覽器資料、跨月份及反向仍自動使用', async ({ page }) => {
   const rows=[
-    {fillTime:'2026/8/28 12:00',arriveTime:'2026/8/28 10:00',leaveTime:'2026/8/28 12:00',district:'北一二B',code:'DNB10146',store:'台北杭州南',inspector:'測試督導',item:'1',content:'',result:'v',reason:'',month:'2026-08'},
-    {fillTime:'2026/8/28 19:00',arriveTime:'2026/8/28 17:00',leaveTime:'2026/8/28 19:00',district:'北一二B',code:'DNB10174',store:'台北通化',inspector:'測試督導',item:'1',content:'',result:'v',reason:'',month:'2026-08'},
+    {fillTime:'2026/8/28 12:00',arriveTime:'2026/8/28 10:00',leaveTime:'2026/8/28 12:00',district:'北一二B',code:'DNB10174',store:'台北通化',inspector:'測試督導',item:'1',content:'',result:'v',reason:'',month:'2026-08'},
+    {fillTime:'2026/8/28 19:00',arriveTime:'2026/8/28 17:00',leaveTime:'2026/8/28 19:00',district:'北一二B',code:'DNB10094',store:'台北復興南',inspector:'測試督導',item:'1',content:'',result:'v',reason:'',month:'2026-08'},
+    {fillTime:'2026/9/8 12:00',arriveTime:'2026/9/8 10:00',leaveTime:'2026/9/8 12:00',district:'北一二B',code:'DNB10094',store:'台北復興南',inspector:'測試督導',item:'1',content:'',result:'v',reason:'',month:'2026-09'},
+    {fillTime:'2026/9/8 19:00',arriveTime:'2026/9/8 17:00',leaveTime:'2026/9/8 19:00',district:'北一二B',code:'DNB10174',store:'台北通化',inspector:'測試督導',item:'1',content:'',result:'v',reason:'',month:'2026-09'},
   ];
   await openMileage(page,rows);
   await page.evaluate(()=>MI.setMonth('2026-08'));
   await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取/);
   await page.evaluate(()=>MI.setDate('2026-08-28'));
-  await expect(page.locator('#miTimeline')).toContainText('待查');
+  await expect(page.locator('#miCoverage')).toContainText('MILEAGE_DISTANCE_MISSING');
+  await expect(page.locator('#miTimeline')).toContainText('⚠ 尚未建立路段距離：台北通化 → 台北復興南');
+  await expect(page.locator('#miLegSave-0')).toHaveText('儲存為路段距離');
   const beforeNodes=await page.evaluate(()=>MI._days()['2026-08-28'].map(node=>({name:node.name,time:node.time,code:node.code})));
-  await page.locator('#miLegKm-0').fill('7.1');
-  await page.locator('#miLegKm-0').locator('xpath=following-sibling::button').click();
+  await page.locator('#miLegKm-0').fill('3.2');
+  page.once('dialog',dialog=>dialog.accept());
+  await page.locator('#miLegSave-0').click();
+  await expect.poll(()=>mileageLegWriteCalls).toBe(1);
+  await expect(page.locator('#miTimeline')).toContainText('3.2 KM');
 
   const result=await page.evaluate(()=>({
     plan:MI._dayPlan('2026-08-28',MI._days()['2026-08-28']),
-    saved:MI._store().dayEdits['2026-08-28'].legKm['台北杭州南|台北通化'],
+    dayEdit:MI._store().dayEdits['2026-08-28'],
     nodes:MI._days()['2026-08-28'].map(node=>({name:node.name,time:node.time,code:node.code})),
   }));
-  expect(result.plan.km).toBe(7.1);
+  expect(result.plan.km).toBe(3.2);
   expect(result.plan.todo).toEqual([]);
-  expect(result.saved).toMatchObject({km:7.1,note:'2026-08-28 實際里程／人工補登'});
+  expect(result.dayEdit).toBeUndefined();
   expect(result.nodes).toEqual(beforeNodes);
-  await expect(page.locator('#miTimeline')).not.toContainText('待查');
+  expect(mileageLegWriteCalls).toBe(1);
+  expect(mileageLegs[0]).toMatchObject({routeKey:'台北復興南|台北通化',km:3.2,source:'人工確認'});
+  await expect(page.locator('#miCoverage')).not.toContainText('MILEAGE_DISTANCE_MISSING');
   await expect(page.locator('#miTimeline')).toContainText('人工確認');
+  await expect(page.locator('#miTimeline')).toContainText('2026-09-29');
+
+  await page.evaluate(()=>localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#patrolAuthGate')).toBeHidden();
+  await page.evaluate(()=>{currentMonth='2026-09';});
+  await page.click('.secure-tab[data-view="mileage"]');
+  await page.evaluate(()=>MI.setMonth('2026-09'));
+  await expect(page.locator('#miCoverage')).not.toContainText(/正在載入|正在讀取/);
+  await page.evaluate(()=>MI.setDate('2026-09-08'));
+  const reverse=await page.evaluate(()=>MI._dayPlan('2026-09-08',MI._days()['2026-09-08']));
+  expect(reverse.legs[0]).toMatchObject({from:'台北復興南',to:'台北通化',km:3.2,source:'人工確認'});
+  expect(reverse.km).toBe(3.2);
+  expect(reverse.todo).toEqual([]);
+  await expect(page.locator('#miCoverage')).not.toContainText('MILEAGE_DISTANCE_MISSING');
+  await expect(page.locator('#miAlerts')).not.toContainText('尚未建立路段距離');
+});
+
+test('三家正式門市代碼皆為 confirmed，通化舊碼仍可讀取且不顯示待複核', async ({page})=>{
+  cloudRows=[
+    {arriveTime:'2026/8/3 09:00',month:'2026-08',code:'DNB10082',store:'台北永吉',item:'1'},
+    {arriveTime:'2026/8/3 12:00',month:'2026-08',code:'DNB10146',store:'台北杭州南',item:'1'},
+    {arriveTime:'2026/8/3 15:00',month:'2026-08',code:'DNB10059',store:'台北通化',item:'1'},
+  ];
+  await stubGas(page);await openAndUnlock(page);
+  await page.evaluate(()=>{currentMonth='2026-08';});
+  await page.click('.secure-tab[data-view="mileage"]');
+  const result=await page.evaluate(()=>({
+    statuses:MI.NODES.filter(node=>['台北永吉','台北杭州南','台北通化'].includes(node.name)).map(node=>[node.name,node.status]),
+    legacy:MI._normalize('DNB10059',''),
+  }));
+  expect(result.statuses).toEqual([['台北通化','confirmed'],['台北永吉','confirmed'],['台北杭州南','confirmed']]);
+  expect(result.legacy).toBe('台北通化');
+  await expect(page.locator('#miAlerts')).not.toContainText('門市代碼待複核');
+});
+
+test('修改既有正式人工距離會先確認，取消時不寫入', async ({page})=>{
+  mileageLegs=[{routeKey:'台北復興南|台北通化',from:'台北通化',to:'台北復興南',km:3.2,source:'人工確認',confirmedAt:'2026-09-28T10:00:00+08:00',createdAt:'2026-09-28T10:00:00+08:00',updatedAt:'2026-09-28T10:00:00+08:00'}];
+  const rows=[
+    {arriveTime:'2026/8/28 10:00',month:'2026-08',code:'DNB10174',store:'台北通化',item:'1'},
+    {arriveTime:'2026/8/28 17:00',month:'2026-08',code:'DNB10094',store:'台北復興南',item:'1'},
+  ];
+  await openMileage(page,rows);
+  await page.evaluate(()=>MI.setMonth('2026-08'));
+  await page.evaluate(()=>MI.setDate('2026-08-28'));
+  await page.locator('#miLegKm-0').fill('3.3');
+  let dialogType='',dialogMessage='';
+  page.once('dialog',async dialog=>{dialogType=dialog.type();dialogMessage=dialog.message();await dialog.dismiss();});
+  await page.locator('#miLegSave-0').click();
+  expect(dialogType).toBe('confirm');
+  expect(dialogMessage).toContain('所有月份與雙向路段的正式人工依據');
+  expect(mileageLegWriteCalls).toBe(0);
+  expect(mileageLegs[0].km).toBe(3.2);
 });
 
 test('三店以上不平均拆分：可拆段就逐段加總，不可拆就不猜', async ({ page }) => {
