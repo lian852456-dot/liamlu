@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f5f0">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>北一二B 金牌明細</title>
+  <link rel="stylesheet" href="department-ops.css?v=20260929-1">
+</head>
+<body>
+  <main class="page">
+    <a class="back-link" href="home.html">← 返回智慧營運中心</a>
+    <header class="masthead"><div><p class="eyebrow">NORTH 12B GOLD</p><h1>北一二B 金牌明細</h1><p class="lede">查看個人每月金牌、累計與每日增減；Final 尚未同步或核准前不顯示數字。</p></div><span id="viewerBadge" class="mode-badge">核准裝置</span></header>
+    <section id="loginPanel" class="panel auth-panel">
+      <div><p class="step-label">APPROVED DEVICE</p><h2>以員編查看</h2><p>沿用 KPI／台獎戰情的員編與核准裝置。資料只顯示北一二B，姓名採 Final 遮罩。</p></div>
+      <form id="loginForm" class="auth-form"><label>員工編號<input id="employeeId" autocomplete="username" autocapitalize="characters" required></label><button class="primary-button" type="submit">查看金牌</button></form>
+      <details class="binding"><summary>首次使用這台裝置</summary><form id="bindingForm" class="auth-form"><label>員工編號<input id="bindingEmployeeId" autocomplete="username" required></label><label>首次啟用碼<input id="bootstrapCode" type="password" autocomplete="one-time-code" required></label><button class="secondary-button" type="submit">送出核准申請</button></form></details>
+      <p id="loginMessage" class="message" aria-live="polite"></p>
+    </section>
+    <section id="goldViewer" hidden>
+      <div class="dashboard-head"><div><p class="step-label">FINAL RESULT</p><h2>金牌查詢</h2><p id="viewerMeta" class="source-meta"></p></div><button id="logoutButton" class="secondary-button" type="button">登出</button></div>
+      <section class="filter-panel"><label>期間<select id="viewerMonth"></select></label><label>店點<select id="viewerStore"><option value="">九店全部</option></select></label><label>個人<select id="viewerEmployee"><option value="">全部同仁</option></select></label><label>變化起日<input id="viewerDateFrom" type="date"></label></section>
+      <div id="viewerSummary" class="summary-grid"></div>
+      <section class="data-card"><div class="card-head"><div><h3>個人累計與月趨勢</h3><p>Final 正式結果直接呈現，不在本站重算。</p></div></div><div class="table-scroll"><table><thead id="viewerHead"></thead><tbody id="viewerBody"></tbody></table></div></section>
+      <section class="data-card"><div class="card-head"><div><h3>每日增減與複核</h3><p>休假／上課免扣與待複核原因由督導同步後顯示。</p></div></div><div class="table-scroll"><table><thead><tr><th>日期</th><th>店點</th><th>同仁</th><th>增減</th><th>原因／免扣</th><th>狀態</th></tr></thead><tbody id="viewerDailyBody"></tbody></table></div></section>
+    </section>
+  </main>
+  <script src="department-ops-core.js?v=20260929-1"></script>
+  <script src="gold-medal.js?v=20260929-1" defer></script>
+</body>
+</html>

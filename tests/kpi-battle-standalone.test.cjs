@@ -47,11 +47,11 @@ test('同仁大廳第一張卡為 KPI 戰情，原入口仍保留原連結', () 
   assert.deepEqual(hrefs, [
     'kpi-battle.html',
     'awards-battle.html',
+    'gold-medal.html',
     'index.html',
     'kpi.html',
     'kpitry.html',
     'audit-report.html',
     'https://twm-store-inspection.liamlu245.chatgpt.site/',
-    'daily-log-dashboard.html',
   ]);
 });
