@@ -17,7 +17,7 @@ HEADERS = [
 ]
 
 
-def workbook(path: Path, count: int, malformed: bool = False) -> None:
+def workbook(path: Path, count: int, malformed: bool = False, duplicate: bool = False) -> None:
     book = Workbook()
     sheet = book.active
     sheet.title = "好速上線明細"
@@ -26,6 +26,9 @@ def workbook(path: Path, count: int, malformed: bool = False) -> None:
     for index in range(count):
         row = [f"台北店{index}", datetime(2026, 9, 28), f"同仁{index}", "認列（公司）",
                "999S", "150M", "24M", 0, "", "", 0, 1, 1]
+        if duplicate and index == count - 1:
+            row = ["台北店0", datetime(2026, 9, 28), "同仁0", "認列（公司）",
+                   "999S", "150M", "24M", 0, "", "", 0, 1, 1]
         if malformed and index == count - 1:
             row = [f"台北店{index}"]
         sheet.append(row)
@@ -74,6 +77,18 @@ class GoodspeedRendererTests(unittest.TestCase):
                                  str(self.tmp_path / "broken.png")], text=True, capture_output=True)
         self.assertEqual(result.returncode, 2)
         self.assertIn("GOODSPEED_PNG_ROW_MISMATCH", result.stdout)
+
+    def test_identical_transactions_are_preserved_in_source_order(self):
+        source = self.tmp_path / "duplicates.xlsx"
+        output = self.tmp_path / "duplicates.png"
+        receipt = self.tmp_path / "duplicates.json"
+        workbook(source, 2, duplicate=True)
+        subprocess.run([sys.executable, str(SCRIPT), "render", str(source), str(output),
+                        "--receipt", str(receipt)], check=True)
+        data = json.loads(receipt.read_text(encoding="utf-8"))
+        self.assertEqual(data["row_count"], 2)
+        self.assertEqual(data["row_keys"][0], data["row_keys"][1])
+        self.assertEqual(len(data["drawn_rows"]), 2)
 
 
 if __name__ == "__main__":
