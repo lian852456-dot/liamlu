@@ -43,6 +43,20 @@
     return match ? `unknown-${String(match[1]).padStart(2, '0')}` : text(sheetName);
   }
 
+  function quarterKeyForMonth(monthKey) {
+    const match = text(monthKey).match(/^(\d{4})-(\d{2})$/);
+    const month = Number(match?.[2]);
+    if (!match || month < 1 || month > 12) return '';
+    return `${match[1]}-Q${Math.ceil(month / 3)}`;
+  }
+
+  function quarterKeys(months) {
+    return Array.from(new Set((months || [])
+      .map((month) => quarterKeyForMonth(month?.monthKey))
+      .filter(Boolean)))
+      .sort((a, b) => b.localeCompare(a));
+  }
+
   function parseGoldRows(rows, sheetName) {
     if (!Array.isArray(rows) || rows.length < 4) return null;
     const dateRange = parseDateRange(rows[0]?.[0]);
@@ -234,6 +248,8 @@
     REGIONS,
     QUARTER_THRESHOLDS,
     parseDateRange,
+    quarterKeyForMonth,
+    quarterKeys,
     parseGoldRows,
     parseGoldWorkbook,
     parseStoreWorkbook,
