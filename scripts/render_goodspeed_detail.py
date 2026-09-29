@@ -110,10 +110,6 @@ def read_rows(workbook_path: Path) -> tuple[str, list[Row], list[str]]:
         rows.append(row)
     if header_row is None:
         fail("header row was not found")
-    keys = [row.key for row in rows]
-    if len(keys) != len(set(keys)):
-        duplicates = sorted({key for key in keys if keys.count(key) > 1})
-        fail(f"duplicate stable row key(s): {duplicates}")
     return title, rows, footers
 
 
