@@ -126,14 +126,6 @@
     }
   }
 
-  function currentQuarterKey() {
-    const latest = goldData.months[goldData.months.length - 1]?.monthKey || '';
-    const match = latest.match(/^(\d{4})-(\d{2})$/);
-    if (!match) return '';
-    const quarter = Math.ceil(Number(match[2]) / 3);
-    return `${match[1]}-Q${quarter}`;
-  }
-
   function quarterMonths(key) {
     const match = String(key).match(/^(\d{4})-Q([1-4])$/);
     if (!match) return [];
@@ -147,7 +139,6 @@
       const allowed = new Set(quarterMonths(value.slice(8)));
       return goldData.months.filter((month) => allowed.has(month.monthKey));
     }
-    if (value === 'all') return goldData.months;
     return goldData.months.filter((month) => month.monthKey === value);
   }
 
@@ -162,11 +153,10 @@
   }
 
   function initializeFilters() {
-    const quarter = currentQuarterKey();
+    const quarters = CORE.quarterKeys(goldData.months);
     $('monthFilter').innerHTML = [
-      quarter ? `<option value="quarter:${quarter}">${quarter.replace('-', ' ')} 季度結算</option>` : '',
-      ...goldData.months.slice().reverse().map((month) => `<option value="${month.monthKey}">${month.sheetName}（至 ${month.dateRange.cutoff || '—'}）</option>`),
-      '<option value="all">全部月份</option>'
+      quarters.length ? `<optgroup label="季度彙整">${quarters.map((quarter) => `<option value="quarter:${quarter}">${quarter.replace('-', ' ')} 季度彙整</option>`).join('')}</optgroup>` : '',
+      `<optgroup label="單月明細">${goldData.months.slice().reverse().map((month) => `<option value="${month.monthKey}">${month.sheetName}（至 ${month.dateRange.cutoff || '—'}）</option>`).join('')}</optgroup>`
     ].join('');
     setOptions($('regionFilter'), CORE.REGIONS.map((region) => ({ value: region, label: region })), 'A–D 全部');
     updateDependentFilters();
