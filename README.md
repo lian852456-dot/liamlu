@@ -28,6 +28,8 @@
 ## 每日日誌檢查（本機候選）
 
 - `home.html` 的督導專區提供 `daily-log-dashboard.html` 入口，以本機 Excel／CSV 呈現北一二B九店每日四項、每週第一至第四週及每月兩項的完成狀況。
+- `home.html` 的督導專區提供 `department-ops.html`「北一二部｜部區管理」入口。頁面沿用巡店短效督導驗證，在瀏覽器本機解密並解析部區金牌 Final，支援月份／A-D 區／店點／個人篩選、季度門檻、北一二B截止日快照增減與 Excel 匯出；店務頁籤預留每月各店一列的原始檔上傳，不在公開 repo 內保存員工或正式報表資料。
+- `home.html` 的同仁大廳提供 `gold-medal.html`「北一二B 金牌明細」入口，沿用 KPI／台獎員編與 Approved Device；後端只回傳北一二B遮罩姓名的 Final、每日增減與複核註記，不把員編或 A／C／D 明細送到同仁頁面。
 - 尚未到期的週／月表不列入需追蹤；點擊門市可展開長細項、填寫人及最後填寫時間。第五週與失分計算仍待規則確認。
 - 候選版只在瀏覽器解析並保存目前裝置預覽，尚未建立正式日誌 API、中央寫入、readback、權限或 Pages 部署。資料契約與發布條件見 [`docs/DAILY-LOG-DASHBOARD.md`](docs/DAILY-LOG-DASHBOARD.md)。
 
