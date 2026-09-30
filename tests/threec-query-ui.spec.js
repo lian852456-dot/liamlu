@@ -200,3 +200,32 @@ test('GAS JSON序列化的 changePage 能顯示正式異動並跨頁', async ({ 
   await page.locator('#changeNextBtn').click();
   await expect(page.locator('#changeResults')).toContainText('NEXT PAGE MODEL');
 });
+
+
+test('切換分類清空搜尋後返回手機，會重新查詢全版清單', async ({ page }) => {
+  const calls=await intercept(page);await seed(page,true);await page.goto(PAGE_URL);
+  await expect(page.locator('#queryCard')).toBeVisible();
+  await page.locator('#changeSearch').fill('合約24期');
+  await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read'&&c.kind==='shopping').length).toBe(1);
+  await page.locator('#tradeinTab').click();await page.locator('#changeSearch').fill('');
+  await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read'&&c.kind==='tradein'&&c.search==='').length).toBe(1);
+  await page.locator('#shoppingTab').click();
+  await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read'&&c.kind==='shopping'&&c.search==='').length).toBe(1);
+  await expect(page.locator('#changeSummary')).not.toContainText('正在搜尋');
+});
+
+test('首版完整異動匯出由已驗證正式快照生成，避免重複下載全價資料', async ({ page }) => {
+  const Diff=require('../threec-price-diff-core.js'),fs=require('node:fs');let calls=0;
+  await page.route('**/exec',async route=>{
+    const payload=route.request().postDataJSON(),body=response(payload.kind);
+    body.changeSet=Diff.diffSnapshots(payload.kind,null,body.snapshot,{limit:1});
+    if(payload.action==='threec_changes_read'){calls++;return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:body.changeSet})});}
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
+  });
+  await seed(page,true);await page.goto(PAGE_URL);await expect(page.locator('#queryCard')).toBeVisible();
+  const pending=page.waitForEvent('download');await page.locator('#changeJsonBtn').click();
+  const download=await pending;const exported=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
+  expect(exported.changes).toHaveLength(4);expect(exported.counts.added).toBe(4);expect(calls).toBe(1);
+  expect(exported.changes.some(c=>c.after.kind==='zero')).toBe(true);
+  expect(exported.changes.some(c=>c.after.kind==='missing')).toBe(true);
+});
