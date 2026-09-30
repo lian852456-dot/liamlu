@@ -229,3 +229,34 @@ test('首版完整異動匯出由已驗證正式快照生成，避免重複下�
   expect(exported.changes.some(c=>c.after.kind==='zero')).toBe(true);
   expect(exported.changes.some(c=>c.after.kind==='missing')).toBe(true);
 });
+
+test('快速切換分類時，舊分類延遲請求不能作廢新分類清單', async ({ page }) => {
+  let releaseShopping, releaseTradein;
+  const shoppingPending=new Promise(resolve=>{releaseShopping=resolve;});
+  const tradeinPending=new Promise(resolve=>{releaseTradein=resolve;});
+  const calls=[];
+  await page.route('**/exec',async route=>{
+    const payload=route.request().postDataJSON();
+    if(payload.action==='threec_changes_read'){
+      calls.push(payload);
+      if(payload.kind==='shopping'&&payload.search==='')await shoppingPending;
+      if(payload.kind==='tradein'&&payload.search==='')await tradeinPending;
+      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:response(payload.kind).changeSet})});
+    }
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(response(payload.kind))});
+  });
+  await seed(page,true);await page.goto(PAGE_URL);
+  await expect(page.locator('#queryCard')).toBeVisible();
+  await page.locator('#changeSearch').fill('合約24期');
+  await expect.poll(()=>calls.filter(c=>c.kind==='shopping').length).toBe(1);
+  await expect(page.locator('#changeSummary')).not.toContainText('正在搜尋');
+  await page.locator('#tradeinTab').click();await page.locator('#changeSearch').fill('');
+  await page.locator('#shoppingTab').click();
+  await expect.poll(()=>calls.filter(c=>c.kind==='shopping'&&c.search==='').length).toBe(1);
+  await expect.poll(()=>calls.filter(c=>c.kind==='tradein'&&c.search==='').length).toBe(1);
+  releaseShopping();
+  await expect(page.locator('#changeSummary')).not.toContainText('正在搜尋');
+  await expect(page.locator('#changeCsvBtn')).toBeEnabled();
+  releaseTradein();
+  await expect(page.locator('#changeTitle')).toContainText('手機專案');
+});
