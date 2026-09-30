@@ -371,6 +371,7 @@
     }
     function threecDiffRows(changeSet) {
       if (!changeSet || typeof changeSet !== 'object') return [];
+      if (Array.isArray(changeSet.changePage)) return changeSet.changePage;
       if (Array.isArray(changeSet.changes)) return changeSet.changes;
       if (Array.isArray(changeSet.records)) return changeSet.records;
       return [];
