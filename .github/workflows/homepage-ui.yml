@@ -1,0 +1,78 @@
+name: Homepage UI checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'design-qa.md'
+      - 'home.html'
+      - 'home.css'
+      - 'home.js'
+      - 'home-reminder-model.js'
+      - 'patrol-question-versions.js'
+      - 'tests/home.spec.js'
+      - 'tests/home-reminder-model.test.cjs'
+      - 'playwright.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/homepage-ui.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homepage-ui-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  homepage-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the exact candidate commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked test dependencies
+        run: npm ci --ignore-scripts
+      - name: Install Chromium and rendering fonts
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y fonts-noto-cjk
+      - name: Validate reminder contracts
+        run: |
+          git rev-parse HEAD
+          node --check home.js
+          node --test tests/home-reminder-model.test.cjs tests/patrol-question-versions.test.cjs tests/patrol-dashboard-contract.test.cjs tests/patrol-dashboard-client.test.cjs
+      - name: Run isolated homepage browser checks
+        env:
+          TEST_BASE_URL: http://127.0.0.1:4173/
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/homepage-test-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/home.html >/dev/null; then break; fi
+            sleep 1
+          done
+          # tests/home.spec.js intercepts every external browser request and uses
+          # synthetic credentials/data only. No production login or data write.
+          # Repeat exact 5-second pause/resume boundaries before the full suite.
+          npx playwright test tests/home.spec.js --grep '提醒每 5 秒輪播|提醒滑鼠停留|滑鼠點擊可暫停' --repeat-each=5 --workers=1 --reporter=list --output=test-results/rotation-stability
+          npx playwright test tests/home.spec.js --workers=1 --reporter=list,html
+      - name: Save screenshots and browser test report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: homepage-ui-${{ github.event.pull_request.head.sha }}
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 7

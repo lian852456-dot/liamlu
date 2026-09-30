@@ -1,433 +1,91 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<meta name="robots" content="noindex, nofollow">
-<title>北一二B 智慧營運中心</title>
-<!--
-  純導覽頁：只提供各系統連結，不經手任何資料、不做登入。
-  各系統的權限各自獨立（Liam 情報站需 GAS PT_KEY 通行碼、同仁 KPI 試算需員編授權），
-  不要因為這頁公開就把任何資料或密碼搬進來。
--->
-<style>
-  :root {
-    --ink: #1a1a1a;
-    --ink-soft: #55504a;
-    /* 調深：原 #8b8478 對比僅 3.37:1，日期／開啟／頁尾偏淡；現為 5.4:1 */
-    --ink-faint: #6b6459;
-    --paper: #f6f4ef;
-    --paper-raised: #ffffff;
-    --line: #e4dfd4;
-    --orange: #ff6900;
-    --orange-deep: #c24f00;
-    --cyan: #0891b2;
-    --cyan-deep: #0a6d86;
-    --shadow: 0 10px 26px -14px rgba(26,20,10,.35);
-  }
-  :root[data-theme="dark"] {
-    --ink: #f1ece2;
-    --ink-soft: #bcb4a6;
-    /* 深色底要「調亮」才等於調深色底下的可讀性（原 4.46:1 → 現 6.2:1） */
-    --ink-faint: #9c9384;
-    --paper: #16130e;
-    --paper-raised: #201c15;
-    --line: #35301f;
-    --orange: #ff8a3d;
-    --orange-deep: #ffb27a;
-    --cyan: #35c4e8;
-    --cyan-deep: #8fe0f5;
-    --shadow: 0 14px 30px -14px rgba(0,0,0,.6);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --ink: #f1ece2;
-      --ink-soft: #bcb4a6;
-      --ink-faint: #9c9384;
-      --paper: #16130e;
-      --paper-raised: #201c15;
-      --line: #35301f;
-      --orange: #ff8a3d;
-      --orange-deep: #ffb27a;
-      --cyan: #35c4e8;
-      --cyan-deep: #8fe0f5;
-      --shadow: 0 14px 30px -14px rgba(0,0,0,.6);
-    }
-  }
-
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
-  body {
-    background: var(--paper);
-    color: var(--ink);
-    font-family: 'Microsoft YaHei', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    min-height: 100vh;
-  }
-  .mono {
-    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, 'Roboto Mono', monospace;
-  }
-
-  .page {
-    width: 100%;
-    max-width: 1500px;
-    margin: 0 auto;
-    padding: 48px 32px 40px;
-    display: flex;
-    flex-direction: column;
-    gap: 36px;
-  }
-
-  .masthead { display: flex; flex-direction: column; gap: 10px; }
-  .crew {
-    font-size: 13px;
-    letter-spacing: .04em;
-    color: var(--ink-faint);
-    margin: -4px 0 0;
-  }
-  .eyebrow {
-    font-size: 12px;
-    letter-spacing: .06em;
-    color: var(--orange-deep);
-    font-weight: 600;
-  }
-  h1 {
-    font-size: 34px;
-    line-height: 1.25;
-    font-weight: 800;
-    margin: 0;
-    text-wrap: balance;
-    letter-spacing: -.01em;
-  }
-  .lede {
-    font-size: 15.5px;
-    line-height: 1.7;
-    color: var(--ink-soft);
-    max-width: 46ch;
-    margin: 0;
-  }
-  .today {
-    font-size: 13px;
-    color: var(--ink-faint);
-    margin: 2px 0 0;
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* 功能分區：純視覺分組，不牽涉任何權限判斷 */
-  .zone { display: flex; flex-direction: column; gap: 14px; }
-  .zone-title {
-    font-size: 14px;
-    font-weight: 700;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--ink-soft);
-    letter-spacing: .02em;
-  }
-  .zone-title::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: var(--line);
-  }
-
-  .board {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
-    gap: 16px;
-  }
-  @media (max-width: 620px) {
-    .board { grid-template-columns: 1fr; }
-    .page { padding: 32px 16px 28px; }
-    h1 { font-size: 28px; }
-  }
-
-  .card {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    background: var(--paper-raised);
-    border: 1px solid var(--line);
-    border-radius: 14px 17px 14px 17px;
-    padding: 24px 20px 20px;
-    text-decoration: none;
-    color: inherit;
-    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
-    outline-offset: 3px;
-  }
-  .card:hover, .card:focus-visible {
-    transform: translateY(-3px);
-    border-color: var(--card-accent);
-    box-shadow: var(--shadow);
-  }
-  .card:focus-visible { outline: 2px solid var(--card-accent); }
-
-  .stamp {
-    position: absolute;
-    top: -12px;
-    right: 20px;
-    width: 46px;
-    height: 46px;
-    background: var(--card-accent);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 21px;
-    font-weight: 700;
-    border-radius: 8px 13px 9px 14px;
-    box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--card-accent) 70%, transparent);
-    transform: rotate(-4deg);
-    transition: transform .18s ease;
-  }
-  .card:hover .stamp, .card:focus-visible .stamp {
-    transform: rotate(0deg) translateY(-1px);
-  }
-
-  .tag {
-    font-size: 12px;
-    letter-spacing: .03em;
-    color: var(--card-accent-deep);
-    font-weight: 600;
-  }
-  .card h3 {
-    font-size: 19px;
-    font-weight: 700;
-    margin: 0;
-    padding-right: 40px;
-  }
-  .card p {
-    font-size: 14px;
-    line-height: 1.65;
-    color: var(--ink-soft);
-    margin: 0;
-  }
-  .go {
-    font-size: 13px;
-    color: var(--ink-faint);
-    margin-top: auto;   /* 同一列的卡片高度相同，靠這行讓「開啟」一律貼齊卡片底部 */
-    padding-top: 8px;
-    align-self: flex-end;
-    transition: color .18s ease;
-  }
-  .card:hover .go, .card:focus-visible .go { color: var(--card-accent-deep); }
-
-  .foot {
-    border-top: 1px solid var(--line);
-    padding-top: 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .foot p {
-    margin: 0;
-    font-size: 13px;
-    line-height: 1.7;
-    color: var(--ink-faint);
-  }
-  .foot .brand {
-    color: var(--ink-soft);
-    font-weight: 600;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .card, .stamp, .go { transition: none; }
-  }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>北一二B 智慧營運中心</title>
+  <link rel="stylesheet" href="home.css?v=20260930">
+  <!-- Public navigation only. Reminder reads require each existing system's verified access.
+       No employee records, report snapshots, credentials or private cache are published here. -->
+  <script defer src="app-assets/lucide.min.js"></script>
+  <script defer src="patrol-question-versions.js"></script>
+  <script defer src="home-reminder-model.js?v=20260930"></script>
+  <script defer src="home.js?v=20260930"></script>
 </head>
 <body>
-
-<div class="page">
-  <header class="masthead">
-    <div class="eyebrow mono">One Portal. All Operations.</div>
-    <h1>北一二B 智慧營運中心</h1>
-    <p class="crew mono">Liam AI Crew</p>
-    <p class="lede">整合每日回報、店務檢查、KPI 試算與督導管理工具，依使用權限進入。</p>
-    <p class="today mono" id="today"></p>
-  </header>
-
-  <section class="zone" aria-labelledby="zone-staff">
-    <h2 class="zone-title" id="zone-staff">同仁大廳</h2>
-    <nav class="board" aria-label="同仁大廳">
-      <a class="card" href="kpi-battle.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
-        <span class="stamp">戰</span>
-        <div class="card-body">
-          <span class="tag mono">員編登入 · 核准裝置</span>
-          <h3>KPI 戰情</h3>
-          <p>查看北一二B整體、9 店與個績排名，沿用既有正式 KPI 戰情。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-
-      <a class="card" href="awards-battle.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
-        <span class="stamp">獎</span>
-        <div class="card-body">
-          <span class="tag mono">員編登入 · 核准裝置</span>
-          <h3>台獎戰情</h3>
-          <p>查看北一二B整體、9 店與 13 款正式機型，沿用既有正式台獎戰情。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-
-      <a class="card" href="gold-medal.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
-        <span class="stamp">金</span>
-        <div class="card-body">
-          <span class="tag mono">員編登入 · 核准裝置</span>
-          <h3>北一二B 金牌明細</h3>
-          <p>查看個人每月金牌、每日增減、休假／上課免扣與待複核狀態。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-
-      <a class="card" href="index.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
-        <span class="stamp">報</span>
-        <div class="card-body">
-          <span class="tag mono">門市使用</span>
-          <h3>每日回報系統</h3>
-          <p>門市每日鍵入業績數字，自動彙整回報資料。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-
-      <a class="card" href="kpi.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
-        <span class="stamp">績</span>
-        <div class="card-body">
-          <span class="tag mono">員編登入</span>
-          <h3>同仁 KPI 試算</h3>
-          <p>鍵入今日上線數，試算個人與店點的 KPI 達成率。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-
-      <a class="card" href="kpitry.html" style="--card-accent:var(--cyan);--card-accent-deep:var(--cyan-deep)">
-        <span class="stamp">算</span>
-        <div class="card-body">
-          <span class="tag mono">公開試算 · 不讀取正式資料</span>
-          <h3>自訂 KPI 模擬器</h3>
-          <p>通用計算引擎，免登入，自行輸入店點與目標試算。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-
-      <a class="card" href="audit-report.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
-        <span class="stamp">稽</span>
-        <div class="card-body">
-          <span class="tag mono">門市填報・稽核前確認</span>
-          <h3>稽核回報專區</h3>
-          <p>上傳環境清潔照片，查看補件狀態。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-
-      <a class="card" href="https://twm-store-inspection.liamlu245.chatgpt.site/" target="_blank" rel="noopener noreferrer" style="--card-accent:var(--cyan);--card-accent-deep:var(--cyan-deep)">
-        <span class="stamp">檢</span>
-        <div class="card-body">
-          <span class="tag mono">門市使用</span>
-          <h3>門市店務檢查</h3>
-          <p>完成每日、半月與每月店務檢查，支援備註及照片／影片上傳。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-
-    </nav>
+<a class="skip-link" href="#main">跳至主要內容</a>
+<header class="masthead">
+  <div class="shell header-inner">
+    <a class="brand" href="home.html" aria-label="北一二B 智慧營運中心首頁">
+      <span class="brand-icon"><i data-lucide="layers" aria-hidden="true"></i></span>
+      <span><strong>北一二B 智慧營運中心</strong><small>Liam AI Crew</small></span>
+    </a>
+    <div class="header-actions">
+      <label class="search-box" for="tool-search"><i data-lucide="search" aria-hidden="true"></i><span class="sr-only">搜尋工具或系統</span><input id="tool-search" type="search" placeholder="搜尋工具或系統" autocomplete="off"></label>
+      <a class="outline-button" href="#zone-supervisor">督導專區</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <div class="shell start-section">
+    <section class="reminder" aria-labelledby="reminder-heading" aria-roledescription="輪播">
+      <div class="reminder-label"><i data-lucide="bell-ring" aria-hidden="true"></i><strong id="reminder-heading">營運提醒</strong></div>
+      <div class="reminder-main" id="reminder-display" aria-live="off" aria-atomic="true">
+        <div class="reminder-meta"><span id="reminder-status" class="status-tag">待更新</span><span id="reminder-period">確認日期中</span></div>
+        <a id="reminder-link" href="kpi-battle.html"><strong id="reminder-title">昨日業績提醒</strong><span id="reminder-text">確認既有登入狀態後，讀取正式資料</span><i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+      </div>
+      <div class="reminder-controls" aria-label="提醒控制">
+        <button type="button" id="reminder-prev" aria-label="上一則提醒"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+        <span id="reminder-count" aria-label="提醒位置">1 / 4</span>
+        <button type="button" id="reminder-next" aria-label="下一則提醒"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+        <button type="button" id="reminder-pause" aria-label="暫停自動輪播" aria-pressed="false"><i data-lucide="pause" aria-hidden="true"></i></button>
+        <button type="button" id="reminder-refresh" aria-label="重新驗證並更新提醒"><i data-lucide="refresh-cw" aria-hidden="true"></i></button>
+      </div>
+    </section>
+    <div class="intro"><div><h1>今天，從這裡開始</h1><p>常用系統一鍵進入，工作工具清楚分流</p></div><p id="today" class="today"></p></div>
+    <section class="quick-section" aria-labelledby="quick-title" data-tool-group>
+      <h2 class="eyebrow" id="quick-title">常用入口</h2>
+      <nav class="quick-grid" aria-label="常用入口">
+<a class="card quick-card primary" href="kpi-battle.html" data-search="KPI 戰情 快速掌握部區與門市表現"><i data-lucide="chart-no-axes-combined" aria-hidden="true"></i><div><h3>KPI 戰情</h3><p>快速掌握部區與門市表現</p></div><span class="card-action">查看戰情<i data-lucide="arrow-right" aria-hidden="true"></i></span></a>
+<a class="card quick-card " href="awards-battle.html" data-search="台獎戰情 門市排名與機型表現"><i data-lucide="trophy" aria-hidden="true"></i><div><h3>台獎戰情</h3><p>門市排名與機型表現</p></div><span class="card-action">立即查看<i data-lucide="arrow-right" aria-hidden="true"></i></span></a>
+<a class="card quick-card " href="index.html" data-search="每日回報系統 每日業績回報"><i data-lucide="clipboard-list" aria-hidden="true"></i><div><h3>每日回報系統</h3><p>每日業績回報</p></div><span class="card-action">開始回報<i data-lucide="arrow-right" aria-hidden="true"></i></span></a>
+<a class="card quick-card " href="gold-medal.html" data-search="北一二B 金牌明細 個人金牌與每日增減"><i data-lucide="medal" aria-hidden="true"></i><div><h3>北一二B 金牌明細</h3><p>個人金牌與每日增減</p></div><span class="card-action">查看明細<i data-lucide="arrow-right" aria-hidden="true"></i></span></a>
+      </nav>
+    </section>
+    <p id="search-result" class="search-result" role="status" hidden></p>
+  </div>
+  <nav class="section-nav" aria-label="工作分區"><div class="shell"><a href="#zone-staff" class="active" aria-current="location">同仁大廳</a><a href="#zone-supervisor">督導專區</a><span>依工作角色找到工具</span></div></nav>
+  <section class="staff-section" id="zone-staff" aria-labelledby="staff-title">
+    <div class="shell">
+      <div class="section-heading"><h2 id="staff-title">同仁大廳</h2><p>日常工作與業績試算</p></div>
+      <nav class="staff-grid" aria-label="同仁大廳">
+        <section class="tool-group" data-tool-group><h3><i data-lucide="chart-no-axes-combined" aria-hidden="true"></i>業績與試算</h3>
+<a class="card tool-card " href="kpi.html" data-search="同仁 KPI 試算 計算個人與店點達成率"><i data-lucide="calculator" aria-hidden="true"></i><div><h3>同仁 KPI 試算</h3><p>計算個人與店點達成率</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a><a class="card tool-card " href="kpitry.html" data-search="自訂 KPI 模擬器 自行輸入目標與店點條件"><i data-lucide="target" aria-hidden="true"></i><div><h3>自訂 KPI 模擬器</h3><p>自行輸入目標與店點條件</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+        </section>
+        <section class="tool-group store-group" data-tool-group><h3><i data-lucide="clipboard-check" aria-hidden="true"></i>門市作業</h3>
+<a class="card tool-card " href="audit-report.html" data-search="稽核回報專區 照片上傳與補件追蹤"><i data-lucide="image" aria-hidden="true"></i><div><h3>稽核回報專區</h3><p>照片上傳與補件追蹤</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a><a class="card tool-card " href="https://twm-store-inspection.liamlu245.chatgpt.site/" target="_blank" rel="noopener noreferrer" data-search="門市店務檢查 每日、半月與每月檢查"><i data-lucide="store" aria-hidden="true"></i><div><h3>門市店務檢查</h3><p>每日、半月與每月檢查</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+        </section>
+      </nav>
+    </div>
   </section>
-
-  <section class="zone" aria-labelledby="zone-sup">
-    <h2 class="zone-title" id="zone-sup">督導專區</h2>
-    <nav class="board" aria-label="督導專區">
-      <a class="card" href="department-ops.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep);grid-column:1/-1">
-        <span class="stamp">部</span>
-        <div class="card-body">
-          <span class="tag mono">督導專用 · A／B／C／D 部區管理</span>
-          <h3>北一二部｜部區管理</h3>
-          <p>查看 A／B／C／D 金牌月趨勢、季度結算與店務成績，資料更新時上傳新版原始檔。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-      <a class="card" href="north12b-gold-ops.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
-        <span class="stamp">金</span>
-        <div class="card-body">
-          <span class="tag mono">督導專用 · 北一二B</span>
-          <h3>北一二B｜金牌管理</h3>
-          <p>查看每日個人金牌增減，註記休假／上課免扣原因與複核狀態。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-      <a class="card" href="patrol.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep)">
-        <span class="stamp">巡</span>
-        <div class="card-body">
-          <span class="tag mono">督導專用 · 需通行碼</span>
-          <h3>Liam 情報站</h3>
-          <p>巡店紀錄、班表、半月檢查、檢核大盤，一次追蹤 33 項。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-      <a class="card" href="https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec" style="--card-accent:var(--cyan);--card-accent-deep:var(--cyan-deep)">
-        <span class="stamp">報</span>
-        <div class="card-body">
-          <span class="tag mono">督導專用 · 同源 Apps Script</span>
-          <h3>資料快速上傳</h3>
-          <p>戰報資料與 3C／舊換新資料分區管理；登入不會自動寫入正式資料。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-      <a class="card" href="phone-stock-dashboard.html" style="--card-accent:var(--cyan);--card-accent-deep:var(--cyan-deep)">
-        <span class="stamp">庫</span>
-        <div class="card-body">
-          <span class="tag mono">督導專用 · 本機雙檔解析</span>
-          <h3>手機近三日銷售與庫存</h3>
-          <p>上傳銷售、庫存兩檔，查看九店與機型的銷售數、庫存數及去化率。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-      <a class="card" href="tradein-import-lab.html" style="--card-accent:#16a34a;--card-accent-deep:#117a38">
-        <span class="stamp">換</span>
-        <div class="card-body">
-          <span class="tag mono">督導專用 · 本機格式測試</span>
-          <h3>3C／舊換新資料匯入測試區</h3>
-          <p>分開上傳 3C 購物通與舊換新回收價資料，辨識欄位、異常提示與前幾筆預覽。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-      <a class="card" href="daily-log-dashboard.html" style="--card-accent:var(--cyan);--card-accent-deep:var(--cyan-deep)">
-        <span class="stamp">誌</span>
-        <div class="card-body">
-          <span class="tag mono">督導專用 · 九店完成追蹤</span>
-          <h3>每日日誌檢查</h3>
-          <p>查看每日、每週與每月表單完成狀況，快速找出未完成項目。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
-      <a class="card" href="live-battle.html" style="--card-accent:var(--orange);--card-accent-deep:var(--orange-deep);grid-column:1/-1">
-        <span class="stamp">行</span>
-        <div class="card-body">
-          <span class="tag mono">督導專用 · 五項即時戰情</span>
-          <h3>行進間戰報</h3>
-          <p>A999／A1399／R999／R1399／好速、上線商品與影音漏搭，一次產生九店追進提醒。</p>
-        </div>
-        <span class="go mono">開啟 →</span>
-      </a>
+  <section class="supervisor-section shell" id="zone-supervisor" aria-labelledby="supervisor-title">
+    <div class="section-heading"><h2 id="supervisor-title">督導專區</h2><span class="role-badge">督導專用</span></div>
+    <p class="section-description">部區管理、資料查詢與追蹤</p>
+    <nav aria-label="督導專區">
+      <div class="management-grid" data-tool-group>
+<a class="card tool-card management-card" href="department-ops.html" data-search="北一二部｜部區管理 A／B／C／D 部區總覽"><i data-lucide="network" aria-hidden="true"></i><div><h3>北一二部｜部區管理</h3><p>A／B／C／D 部區總覽</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a><a class="card tool-card management-card" href="north12b-gold-ops.html" data-search="北一二B｜金牌管理 B 區每日增減與複核"><i data-lucide="medal" aria-hidden="true"></i><div><h3>北一二B｜金牌管理</h3><p>B 區每日增減與複核</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+      </div>
+      <div class="supervisor-grid" data-tool-group>
+<a class="card tool-card " href="patrol.html" data-search="Liam 情報站 巡店紀錄、班表、半月檢查、檢核大盤"><i data-lucide="notebook-text" aria-hidden="true"></i><div><h3>Liam 情報站</h3><p>巡店紀錄、班表、半月檢查、檢核大盤</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a><a class="card tool-card " href="daily-log-dashboard.html" data-search="每日日誌檢查 每週與每月表單完成狀況"><i data-lucide="calendar-days" aria-hidden="true"></i><div><h3>每日日誌檢查</h3><p>每週與每月表單完成狀況</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a><a class="card tool-card " href="live-battle.html" data-search="行進間戰報 A999／A1399／R999／R1399／好速"><i data-lucide="chart-no-axes-column-increasing" aria-hidden="true"></i><div><h3>行進間戰報</h3><p>A999／A1399／R999／R1399／好速</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a><a class="card tool-card " href="https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec" data-search="資料快速上傳 戰報資料與 3C／舊換新資料分區管理"><i data-lucide="cloud-upload" aria-hidden="true"></i><div><h3>資料快速上傳</h3><p>戰報資料與 3C／舊換新資料分區管理</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a><a class="card tool-card " href="phone-stock-dashboard.html" data-search="手機近三日銷售與庫存 上傳銷售、庫存兩檔"><i data-lucide="smartphone" aria-hidden="true"></i><div><h3>手機近三日銷售與庫存</h3><p>上傳銷售、庫存兩檔</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a><a class="card tool-card " href="tradein-import-lab.html" data-search="3C／舊換新資料匯入測試區 分開上傳 3C 購物通與舊換新回收價資料"><i data-lucide="file-input" aria-hidden="true"></i><div><h3>3C／舊換新資料匯入測試區</h3><p>分開上傳 3C 購物通與舊換新回收價資料</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+      </div>
     </nav>
+    <p class="access-note"><i data-lucide="shield-check" aria-hidden="true"></i>各系統沿用原有權限；提醒須驗證後才顯示門市資料。登入後返回本頁，按更新即可查看。</p>
   </section>
-
-  <footer class="foot">
-    <p>各系統資料各自獨立存放，本頁僅提供連結、不經手任何資料。</p>
-    <p>內部工作輔助入口，非官方對外網站。</p>
-    <p class="brand">台灣大哥大 · 北一二B</p>
-  </footer>
-</div>
-
-<script>
-  document.getElementById('today').textContent =
-    new Date().toLocaleDateString('zh-TW', {
-      timeZone: 'Asia/Taipei',
-      year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
-    });
-</script>
+</main>
+<footer class="shell footer"><p>各系統資料獨立存放，提醒唯讀且不留存於本頁</p><p>內部工作輔助入口 · 非官方對外網站</p></footer>
+<noscript><p class="shell">請啟用 JavaScript 以搜尋工具與查看提醒。所有入口連結仍可使用。</p></noscript>
 </body>
 </html>
