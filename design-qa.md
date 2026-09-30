@@ -84,3 +84,33 @@ Deployment note: Liam 已先授權「隔離檢查通過即可部署、不用再�
 ## Result
 
 final result: blocked
+
+
+## 首頁 QA 更新 — GitHub Chromium 驗證已完成
+
+- Candidate code: `941a7239e37b71f4e92351f5da1b56c098b4f590`; draft PR https://github.com/lian852456-dot/liamlu/pull/125
+- Exact-commit run: https://github.com/lian852456-dot/liamlu/actions/runs/36688880098
+- Result: 30 contract tests + 33 Playwright browser tests passed; screenshot artifact ID `11084254781`, SHA-256 `d3ae87ccec497683e9e52e88400630e7c9ba2c690e7103674e263f248a752710` verified after download.
+- Source: 1254×1254 reference image noted above. Browser screenshots: `../homepage-ci-evidence/test-results/homepage/desktop-1280-unauthenticated.png` (1280×1449, 1280×1300 CSS viewport); `mobile-390-unauthenticated.png` (390×2429, 390×844 CSS viewport); `wide-1920-unauthenticated.png` (1920×1475, 1920×1300 CSS viewport). Device scale 1.
+- Full comparison: `../homepage-ci-evidence/comparison-desktop.png` combines both actual images; 1280px capture normalized to 1254px width. Added reminder height intentionally changes page height. Focused comparison: `../homepage-ci-evidence/comparison-quick-entries.png` compares the four primary entries using real image crops, not recreated UI.
+- Source and rendered results were actually opened and compared. Public screenshots show unauthenticated state; synthetic sales/patrol screenshots were inspected only as synthetic interaction evidence, never as live figures.
+
+### Fidelity surfaces
+
+- Typography: strong sans-serif heading hierarchy and readable card labels preserved; Noto CJK rendering verified. Mobile names wrap without clipping. Minor P3: the long gold-detail title may wrap its last character on narrow cards; this is readable and non-blocking.
+- Layout/rhythm: compact masthead, orange primary card, four common entries, two staff groups and separate supervisor management cards match the reference structure. Added reminder, wider 1920px content and stacked mobile groups are intentional scope changes. No horizontal overflow at 1280, 390 or 320px.
+- Colors/tokens: white/soft-gray surfaces and orange hierarchy retained; teal staff-operations group retained. Primary CTA uses darker orange than the mock to support white-text contrast.
+- Icons/assets: existing bundled Lucide outline icons remain sharp; standard navigation mark and chart/medal variants are intentional production-safe icon substitutions, not official brand marks. No placeholder imagery or external icon dependencies.
+- Copy/content: all 16 tool destinations preserved, department vs B-region gold labels distinct. Pending/authenticated reminder copy and dates were checked. No fabricated production metrics.
+
+### Interaction verification
+
+All 33 tests passed: 16 links, responsive widths, search clear/empty, same-page navigation, 5-second rotation/manual/pause/focus/hover/reduced-motion, missing/denied credentials, session-only identity, valid/error/empty/stale/partial source fixtures, old-response races, hidden-page clearing, refresh, expiry, and Taipei midnight rollover. Public-page test captured no uncaught page errors; expected mocked transport errors are intentional test states, not a claim about production console health.
+
+### Remaining scope limits
+
+No merge or deployment. No live credentials used. Real-origin KPI Approved Device, patrol sessions and current production source data still require authorized live verification. Local cloud-browser preview remains unavailable; these are actual GitHub Actions Chromium renders. The existing daily read server-side-auth limitation remains unchanged and disclosed.
+
+Latest visual result: no actionable P0/P1/P2 findings; the narrow gold-title wrap is P3 only.
+
+final result: passed

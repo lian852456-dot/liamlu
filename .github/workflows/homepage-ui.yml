@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'design-qa.md'
       - 'home.html'
       - 'home.css'
       - 'home.js'
