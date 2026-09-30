@@ -12,6 +12,8 @@ on:
       - 'patrol-question-versions.js'
       - 'tests/home.spec.js'
       - 'tests/home-reminder-model.test.cjs'
+      - 'tests/home-navigation-contract.test.cjs'
+      - 'tests/department-ops.test.cjs'
       - 'playwright.config.js'
       - 'package.json'
       - 'package-lock.json'
@@ -49,7 +51,7 @@ jobs:
         run: |
           git rev-parse HEAD
           node --check home.js
-          node --test tests/home-reminder-model.test.cjs tests/patrol-question-versions.test.cjs tests/patrol-dashboard-contract.test.cjs tests/patrol-dashboard-client.test.cjs
+          node --test tests/home-reminder-model.test.cjs tests/home-navigation-contract.test.cjs tests/department-ops.test.cjs tests/patrol-question-versions.test.cjs tests/patrol-dashboard-contract.test.cjs tests/patrol-dashboard-client.test.cjs
       - name: Run isolated homepage browser checks
         env:
           TEST_BASE_URL: http://127.0.0.1:4173/
