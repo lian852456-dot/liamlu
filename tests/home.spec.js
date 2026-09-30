@@ -98,6 +98,36 @@ async function start(page, { keys = {}, reply = successful, reducedMotion = 'no-
 }
 async function ready(page) { await expect(page.locator('#reminder-refresh')).toBeEnabled(); }
 async function next(page) { await page.locator('#reminder-next').click(); }
+async function leaveReminder(page) {
+  // Register before real input. A CDP mouse-move acknowledgment alone does not
+  // establish that the app's mouseleave/focusout timer reset has run.
+  const acknowledgment = await page.locator('.reminder').evaluateHandle(banner => {
+    let pointerOutside = !banner.matches(':hover');
+    let focusOutside = !banner.contains(document.activeElement);
+    let resolve;
+    const done = new Promise(complete => { resolve = complete; });
+    function check() {
+      if (!pointerOutside || !focusOutside) return;
+      banner.removeEventListener('mouseleave', onLeave);
+      banner.removeEventListener('focusout', onBlur);
+      resolve();
+    }
+    function onLeave() { pointerOutside = true; check(); }
+    function onBlur(event) { focusOutside = !banner.contains(event.relatedTarget); check(); }
+    banner.addEventListener('mouseleave', onLeave);
+    banner.addEventListener('focusout', onBlur);
+    check();
+    return { done };
+  });
+  try {
+    await page.locator('#tool-search').focus();
+    await page.mouse.move(0,0);
+    await acknowledgment.evaluate(state => state.done);
+    await expect(page.locator('#tool-search')).toBeFocused();
+  } finally {
+    await acknowledgment.dispose();
+  }
+}
 async function readSlides(page) {
   const count = Number((await page.locator('#reminder-count').innerText()).split('/')[1]);
   const result = [];
@@ -194,12 +224,15 @@ test('提醒每 5 秒輪播，手動前後切換與暫停可用', async ({page})
   await expect(page.locator('#reminder-count')).toHaveText('2 / 4');
   await page.locator('#reminder-pause').click();
   await expect(page.locator('#reminder-pause')).toHaveAttribute('aria-pressed','true');
-  await page.locator('#tool-search').focus(); await page.mouse.move(0,0);
+  await leaveReminder(page);
   await page.clock.runFor(15000);
   await expect(page.locator('#reminder-count')).toHaveText('2 / 4');
   await page.locator('#reminder-pause').click();
-  await page.locator('#tool-search').focus(); await page.mouse.move(0,0);
-  await page.clock.runFor(5000);
+  await expect(page.locator('#reminder-pause')).toHaveAttribute('aria-pressed','false');
+  await leaveReminder(page);
+  await page.clock.runFor(4999);
+  await expect(page.locator('#reminder-count')).toHaveText('2 / 4');
+  await page.clock.runFor(1);
   await expect(page.locator('#reminder-count')).toHaveText('3 / 4');
 });
 
@@ -209,7 +242,10 @@ test('提醒滑鼠停留與鍵盤焦點期間不會自動切換', async ({page})
   await expect(page.locator('#reminder-count')).toHaveText('1 / 4');
   await page.mouse.move(0,0); await page.locator('#reminder-next').focus(); await page.clock.runFor(10000);
   await expect(page.locator('#reminder-count')).toHaveText('1 / 4');
-  await page.locator('#tool-search').focus(); await page.clock.runFor(5000);
+  await leaveReminder(page);
+  await page.clock.runFor(4999);
+  await expect(page.locator('#reminder-count')).toHaveText('1 / 4');
+  await page.clock.runFor(1);
   await expect(page.locator('#reminder-count')).toHaveText('2 / 4');
 });
 
