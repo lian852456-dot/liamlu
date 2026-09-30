@@ -2982,6 +2982,7 @@ function doPost(e) {
     else if (action === 'phone_stock_publish') result = phoneStockPublish(payload);
     else if (action === 'phone_stock_read') result = phoneStockRead(payload);
     else if (action === 'department_ops_read') result = departmentOpsRead(payload);
+    else if (action === 'north12b_gold_read') result = north12bGoldDailyRead(payload);
     else if (action === 'department_ops_publish') result = departmentOpsPublish(payload);
     else if (action === 'department_gold_access') result = departmentGoldAccess(payload);
     else if (action === 'threec_snapshot_read') result = threecSnapshotRead(payload);
@@ -3471,30 +3472,8 @@ function departmentGoldSafeRecord_(row) {
 
 function departmentGoldAccess(payload) {
   const user = departmentGoldAuthorizedUser_(payload || {});
-  const source = departmentOpsLatestSnapshot_();
-  if (!source) throw new Error('北一二B 金牌尚未同步');
-  const months = source.months.map(function(month){
-    return {
-      sheetName:month.sheetName,monthKey:month.monthKey,dateRange:month.dateRange,
-      records:month.records.filter(function(row){return row.region === '北一二B';}).map(departmentGoldSafeRecord_)
-    };
-  });
-  const history = (source.goldHistory || []).map(function(item){
-    return {
-      cutoff:item.cutoff,sourceName:item.sourceName,publishedAt:item.publishedAt,
-      revisionCount:Array.isArray(item.revisions) ? item.revisions.length : Number(item.revisions || 0),
-      rows:(item.rows||[]).map(departmentGoldSafeRecord_)
-    };
-  });
-  const reviews = {};
-  Object.keys(source.reviews || {}).forEach(function(key){
-    const parts = key.split('|');
-    if (parts.length !== 2) return;
-    reviews[parts[0] + '|' + privateDashboardHash(parts[1]).slice(0,16)] = source.reviews[key];
-  });
   return {
-    gold:{type:'north12b-gold-view-v1',months:months},history:history,reviews:reviews,
-    sourceName:source.sourceName,publishedAt:source.publishedAt,
+    ledger:north12bGoldDailyLedger_(),
     profile:{maskedName:user.masked_name,store:user.store,role:user.role}
   };
 }
