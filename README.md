@@ -141,3 +141,8 @@ GitHub Pages 只放介面程式，不提交員工姓名、班表、檢查紀錄�
 ## 文件定位
 
 Agent 工作規則只在 `AGENTS.md` 維護。`CLAUDE.md` 保存現行產品契約與技術注意事項；日期型 handoff、incident、predeploy、QA 與 `docs/COLLAB-LOG.md` 保留為歷史 evidence，不是永久工作流程。
+
+
+### 手機專案／3C＋舊換新正式查詢
+
+智慧營運中心的同仁大廳提供 `threec-query.html`。沿用既有核准裝置與員編授權，讀取私有active版本；手機專案保留原始資費／合約條件，舊換新分別顯示兩家回收商S/A/B/C。沒有正式版本時明確顯示未發布，缺價不補零。價格更新由督導使用原「資料快速上傳」選檔、解析、核對並明確確認，完成逐價正式讀回後門市重新讀取。詳見 [3C更新與查詢契約](docs/THREEC_FORMAL_UPLOAD.md)。

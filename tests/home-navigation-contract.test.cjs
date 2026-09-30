@@ -24,11 +24,11 @@ function cardFor(source, href) {
   return matches[0];
 }
 
-test('home navigation contains 4 quick, 5 staff and 8 supervisor cards', () => {
+test('home navigation contains 4 quick, 6 staff and 8 supervisor cards', () => {
   assert.equal(cards(navigation('常用入口')).length, 4);
-  assert.equal(cards(navigation('同仁大廳')).length, 5);
+  assert.equal(cards(navigation('同仁大廳')).length, 6);
   assert.equal(cards(navigation('督導專區')).length, 8);
-  assert.equal(cards(html).length, 17);
+  assert.equal(cards(html).length, 18);
 });
 
 test('staff gold lookup lives under performance tools and uses the existing viewer', () => {
@@ -54,4 +54,11 @@ test('supervisor gold maintenance retains its distinct administration route', ()
   assert.match(gold, /<h3>金牌資料維護（督導）<\/h3>/);
   assert.match(gold, /data-search="[^"]*金牌資料維護[^"]*"/);
   assert.doesNotMatch(supervisor, /href="gold-medal\.html"/);
+});
+
+
+test('formal price lookup is a staff tool without publisher privileges', () => {
+  const lookup = cardFor(navigation('同仁大廳'), 'threec-query.html');
+  assert.match(lookup, /手機專案／3C＋舊換新/);
+  assert.doesNotMatch(lookup, /發布|上傳/);
 });

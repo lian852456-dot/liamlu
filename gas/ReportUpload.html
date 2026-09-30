@@ -27,7 +27,9 @@
   <main>
     <section class="hero">
       <h1>資料快速上傳</h1>
+    <p id="threecUiVersion">3C／舊換新正式上傳 · 來源逐價核對與正式讀回 2026-10-01</p>
       <p>獨立 Apps Script Deployment ・同源上傳與發布 ・不經 GitHub Pages 跨網域 POST</p>
+      <p id="awardUiVersion" class="small" style="color:#d5f5ff">台獎雙檔預覽前端：單一 File ID 契約・可恢復暫存檔</p>
     </section>
 
     <section id="authCard" class="card">
@@ -44,8 +46,9 @@
     <section id="app" class="hidden">
       <section class="card">
         <h2>戰報資料更新</h2>
-        <p class="small">KPI 與既有戰報發布維持原流程，不會與 3C／舊換新共用發布按鈕或正式檔案。</p>
+        <p class="small">KPI、更新紀錄與既有測試上傳維持原流程；不會與 3C／舊換新資料共用發布按鈕或正式檔案。</p>
       </section>
+
       <section class="card">
         <h2>KPI Excel</h2>
         <p class="small">預覽只建立受控暫存與檢查資料；在你勾選確認並發布前，不會改寫正式 JSON。</p>
@@ -81,8 +84,46 @@
       </section>
 
       <section class="card">
+        <h2>台獎雙檔測試上傳</h2>
+        <p class="small">僅供暫存上傳、結構解析與日期一致性預覽。兩份原始 Excel 只暫存於私人 Drive；本階段沒有發布按鈕，不會更新台獎 JSON、網站、Mail、回報區或試算表。</p>
+        <div class="grid">
+          <div>
+            <label>檔案一：01-08-03.xlsx（店點） <input id="awardStoreFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+            <div id="awardStoreUploadState" class="notice">尚未上傳</div>
+            <div id="awardStoreUploadMeta" class="small"></div>
+            <button id="awardStoreUploadBtn" type="button">上傳店點檔</button>
+          </div>
+          <div>
+            <label>檔案二：01-08-04.xlsx（個人） <input id="awardPersonFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+            <div id="awardPersonUploadState" class="notice">尚未上傳</div>
+            <div id="awardPersonUploadMeta" class="small"></div>
+            <button id="awardPersonUploadBtn" type="button" disabled>上傳個人檔</button>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="awardPreviewBtn" type="button" disabled>解析預覽</button>
+          <button id="awardClearBtn" class="secondary" type="button" disabled>清除暫存檔</button>
+          <button id="awardCleanupBtn" class="secondary" type="button">清理逾期暫存</button>
+        </div>
+        <div id="awardMessage" class="message hidden" role="status"></div>
+        <pre id="awardPayloadDiagnostic" class="small" aria-live="polite">尚未建立解析 payload。</pre>
+        <pre id="awardServerDiagnostic" class="small hidden" aria-live="polite"></pre>
+        <div id="awardPreviewPanel" class="hidden">
+          <div class="meta">
+            <div class="metric"><span>資料日期</span><b id="awardDataDate">—</b></div>
+            <div class="metric"><span>門市</span><b id="awardStoreCount">—</b></div>
+            <div class="metric"><span>人員</span><b id="awardPersonCount">—</b></div>
+            <div class="metric"><span>上傳時間</span><b id="awardUploadedAt">—</b></div>
+          </div>
+          <div id="awardFiles" class="small"></div>
+          <div id="awardChecks"></div>
+          <pre id="awardStructurePreview" class="small hidden" aria-live="polite"></pre>
+        </div>
+      </section>
+
+      <section class="card">
         <h2>3C／舊換新資料更新</h2>
-        <p class="small">Excel 只在這個分頁解析；後端只接收通過 gate 的標準化 JSON，原始 Excel 不會上傳或寫入 Drive。</p>
+        <p class="small">Excel 在這個分頁解析；確認發布後，只將檢查通過的標準化資料存入私有資料庫。原始 Excel 不會上傳。</p>
         <div class="grid">
           <label>3C 手機專案價（.xls／.xlsx）
             <input id="shoppingFile" type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
@@ -105,7 +146,10 @@
             <div class="metric"><span>正式筆數</span><b id="threecRows">—</b></div>
             <div class="metric"><span>稽核</span><b id="threecAudit">—</b></div>
           </div>
+          <p id="threecSource" class="small"></p>
           <p id="threecHash" class="small"></p>
+          <label>搜尋預覽機款 <input id="threecPreviewSearch" type="search" placeholder="輸入機型或容量"></label>
+          <div id="threecPricePreview" style="overflow:auto;max-height:520px"></div>
           <label class="confirm"><input id="threecConfirm" type="checkbox">我已核對來源檔名日期、正式筆數與稽核數，確認發布此標準化快照。</label>
           <label id="threecSameDateWrap" class="confirm hidden"><input id="threecSameDateConfirm" type="checkbox">同日期但來源雜湊不同；我確認這是更正版，允許切換 active 指標。</label>
           <div class="actions">
@@ -124,6 +168,14 @@
     const auth = { employeeId: '', adminSecret: '' };
     let previewToken = '';
     let threecPreviewSnapshot = null;
+    let threecPreviewGeneration = 0;
+    let threecPublishing = false;
+    let awardPreviewJobId = '';
+    let awardPolling = false;
+    const awardUploadState = {
+      uploadSessionId: '', storeFileId: '', personalFileId: '',
+      storeStatus: 'not-uploaded', personalStatus: 'not-uploaded'
+    };
     const $ = id => document.getElementById(id);
     const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     function message(id, text, tone) { const node = $(id); node.textContent = text; node.className = 'message ' + (tone || ''); }
@@ -144,6 +196,87 @@
     function renderChecks(checks) {
       const rows = (checks || []).map(check => '<tr class="' + esc(check.level) + '"><td>' + esc(check.label) + '</td><td>' + esc(check.level === 'ok' ? '通過' : check.level === 'warn' ? '提醒' : '阻擋') + '</td><td>' + esc(check.detail) + '</td></tr>').join('');
       $('checks').innerHTML = '<table class="checks"><thead><tr><th>檢查</th><th>結果</th><th>說明</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+    function renderAwardChecks(checks) {
+      const rows = (checks || []).map(check => '<tr class="' + esc(check.level) + '"><td>' + esc(check.label) + '</td><td>' + esc(check.level === 'ok' ? '通過' : check.level === 'warn' ? '提醒' : '阻擋') + '</td><td>' + esc(check.detail) + '</td></tr>').join('');
+      $('awardChecks').innerHTML = '<table class="checks"><thead><tr><th>檢查</th><th>結果</th><th>說明</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+    function renderAwardPayloadDiagnostic(previewPayload) {
+      const diagnostic = {
+        storeFileId: previewPayload.storeFileId,
+        personalFileId: previewPayload.personalFileId,
+        storeUploaded: !!previewPayload.storeFileId,
+        personalUploaded: !!previewPayload.personalFileId
+      };
+      $('awardPayloadDiagnostic').textContent = JSON.stringify(diagnostic, null, 2);
+    }
+    function renderAwardServerDiagnostic(diagnostic) {
+      if (!diagnostic) { $('awardServerDiagnostic').classList.add('hidden'); return; }
+      $('awardServerDiagnostic').textContent = JSON.stringify(diagnostic, null, 2);
+      $('awardServerDiagnostic').classList.remove('hidden');
+    }
+    function updateAwardPreviewButton() {
+      const ready = !!awardUploadState.storeFileId && !!awardUploadState.personalFileId && awardUploadState.storeStatus === 'completed' && awardUploadState.personalStatus === 'completed' && !awardPolling;
+      $('awardPreviewBtn').disabled = !ready;
+      $('awardPersonUploadBtn').disabled = !$('awardPersonFile').files[0] || !awardUploadState.storeFileId || awardUploadState.personalStatus === 'uploading' || awardUploadState.personalStatus === 'completed' || awardPolling;
+      $('awardStoreUploadBtn').disabled = !$('awardStoreFile').files[0] || awardUploadState.storeStatus === 'uploading' || awardUploadState.storeStatus === 'completed' || awardPolling;
+    }
+    function setAwardUploadState(role, state, meta) {
+      awardUploadState[role === 'store' ? 'storeStatus' : 'personalStatus'] = state;
+      const label = role === 'store' ? 'awardStoreUploadState' : 'awardPersonUploadState';
+      const metaId = role === 'store' ? 'awardStoreUploadMeta' : 'awardPersonUploadMeta';
+      const labels = { 'not-uploaded': '尚未上傳', selected: '尚未上傳（已選檔）', uploading: '上傳中…', completed: '上傳完成', failed: '上傳失敗' };
+      $(label).textContent = labels[state] || state;
+      $(label).className = 'notice message ' + (state === 'completed' ? 'ok' : state === 'failed' ? 'bad' : state === 'uploading' ? 'warn' : '');
+      $(metaId).textContent = meta || '';
+      updateAwardPreviewButton();
+    }
+    function resetAwardUpload(role, reason) {
+      if (role === 'store') {
+        awardUploadState.storeFileId = ''; awardUploadState.uploadSessionId = ''; awardUploadState.personalFileId = '';
+        setAwardUploadState('store', $('awardStoreFile').files[0] ? 'selected' : 'not-uploaded', reason || '');
+        setAwardUploadState('person', $('awardPersonFile').files[0] ? 'selected' : 'not-uploaded', '需重新上傳個人檔');
+      } else {
+        awardUploadState.personalFileId = '';
+        setAwardUploadState('person', $('awardPersonFile').files[0] ? 'selected' : 'not-uploaded', reason || '');
+      }
+      awardPreviewJobId = ''; $('awardClearBtn').disabled = true; updateAwardPreviewButton();
+    }
+    async function recoverLatestAwardUpload() {
+      const result = await call('report_award_pair_recover_latest', payload({}));
+      if (!result.ok) return result;
+      console.log('award recovery response', result);
+      awardUploadState.uploadSessionId = result.uploadSessionId || '';
+      awardUploadState.storeFileId = result.storeFileId || '';
+      awardUploadState.personalFileId = result.personalFileId || '';
+      setAwardUploadState('store', 'completed', '已恢復：' + result.storeFileName + '｜大小：' + result.storeSize + ' bytes｜SHA-256：' + result.storeHash + '｜storeFileId：' + result.storeFileId);
+      setAwardUploadState('person', 'completed', '已恢復：' + result.personalFileName + '｜大小：' + result.personalSize + ' bytes｜SHA-256：' + result.personalHash + '｜personalFileId：' + result.personalFileId);
+      return result;
+    }
+    async function uploadAwardFile(role) {
+      const isStore = role === 'store';
+      const file = $(isStore ? 'awardStoreFile' : 'awardPersonFile').files[0];
+      if (!file) return message('awardMessage', '請先選擇 ' + (isStore ? '店點' : '個人') + '檔。', 'bad');
+      if (!isStore && !awardUploadState.storeFileId) return message('awardMessage', '請先完成店點檔上傳。', 'bad');
+      setAwardUploadState(role, 'uploading', '正在讀取檔案並計算 SHA-256…');
+      try {
+        const result = await call(isStore ? 'report_award_pair_upload_store' : 'report_award_pair_upload_personal', payload({
+          uploadSessionId: awardUploadState.uploadSessionId,
+          file: { fileName: file.name, mimeType: file.type, fileBase64: await readFileBase64(file) }
+        }));
+        console.log('award upload success response', result);
+        if (isStore) { awardUploadState.uploadSessionId = result.uploadSessionId || ''; awardUploadState.storeFileId = result.storeFileId || result.fileId || ''; }
+        else awardUploadState.personalFileId = result.personalFileId || result.fileId || '';
+        const id = isStore ? awardUploadState.storeFileId : awardUploadState.personalFileId;
+        if (!id) throw new Error((isStore ? '店點' : '個人') + '上傳回應缺少 File ID');
+        setAwardUploadState(role, 'completed', '檔名：' + result.fileName + '｜大小：' + result.size + ' bytes｜SHA-256：' + result.hash + '｜' + (isStore ? 'storeFileId：' : 'personalFileId：') + id);
+        message('awardMessage', (isStore ? '店點檔' : '個人檔') + '上傳完成。', 'ok');
+      } catch (error) {
+        if (isStore) { awardUploadState.storeFileId = ''; awardUploadState.uploadSessionId = ''; } else awardUploadState.personalFileId = '';
+        setAwardUploadState(role, 'failed', error.message);
+        message('awardMessage', error.message, 'bad');
+      }
+      updateAwardPreviewButton();
     }
     function renderLog(entries) {
       const rows = (entries || []).map(entry => '<tr><td>' + esc(entry.acted_at) + '</td><td>' + esc(entry.kind) + '</td><td>' + esc(entry.file_name) + '</td><td>' + esc(entry.data_date) + '</td><td>' + esc(entry.result) + '</td></tr>').join('');
@@ -173,9 +306,57 @@
     }
     function updateThreecPublishButton() {
       const sameDateRequired = !$('threecSameDateWrap').classList.contains('hidden');
-      $('threecPublishBtn').disabled = !threecPreviewSnapshot || !$('threecConfirm').checked || (sameDateRequired && !$('threecSameDateConfirm').checked);
+      $('threecPublishBtn').disabled = threecPublishing || !threecPreviewSnapshot || !$('threecConfirm').checked || (sameDateRequired && !$('threecSameDateConfirm').checked);
+    }
+    function invalidateThreecPreview() {
+      threecPreviewGeneration += 1;
+      threecPreviewSnapshot = null;
+      $('threecConfirm').checked = false;
+      $('threecSameDateConfirm').checked = false;
+      $('threecSameDateWrap').classList.add('hidden');
+      $('threecPreview').classList.add('hidden');
+      updateThreecPublishButton();
+    }
+    function setThreecPublishing(busy) {
+      threecPublishing = busy;
+      ['shoppingFile', 'tradeinFile', 'shoppingPreviewBtn', 'tradeinPreviewBtn', 'shoppingRollbackBtn', 'tradeinRollbackBtn', 'threecConfirm', 'threecSameDateConfirm'].forEach(id => { $(id).disabled = busy; });
+      updateThreecPublishButton();
+    }
+    function threecPriceText(value) {
+      if (value == null || String(value).trim() === '') return '無報價';
+      const clean = String(value).trim().replace(/,/g, '');
+      return Number(clean).toLocaleString('zh-TW', { maximumFractionDigits:10 }) + ' 元';
+    }
+    function renderThreecPrices(snapshot) {
+      const query = $('threecPreviewSearch').value.trim().toLowerCase();
+      const rows = (snapshot.rows || []).filter(row => !query || (row.brand + ' ' + row.model + ' ' + row.source_sheet).toLowerCase().includes(query));
+      const html = rows.slice(0, 50).map(row => {
+        const prices = snapshot.kind === 'shopping'
+          ? [['單機價', row.retail_price]].concat(Object.entries(row.project_prices || {}))
+          : ['點子行動','FutureDial（FDI）'].flatMap(provider => ['S','A','B','C'].map(grade => [provider + ' ' + grade, (row.quotes[provider] || {})[grade]]));
+        return '<tr><td>' + esc(row.source_sheet) + '</td><td>' + esc(row.brand + ' ' + row.model) + '</td><td>' + prices.map(pair => '<div>' + esc(pair[0]) + '：' + esc(threecPriceText(pair[1])) + '</div>').join('') + '</td></tr>';
+      }).join('');
+      $('threecPricePreview').innerHTML = '<p>符合 ' + rows.length + ' 筆；顯示前 50 筆，可搜尋機款逐價核對。</p><table><thead><tr><th>來源／條件</th><th>機款</th><th>原始資費、合約及報價</th></tr></thead><tbody>' + html + '</tbody></table>';
+    }
+    function threecComparableRows(snapshot) {
+      const price = value => value == null || String(value).trim() === '' ? null : String(value).trim().replace(/,/g, '');
+      return (snapshot.rows || []).map(row => snapshot.kind === 'shopping'
+        ? { sheet:row.source_sheet, row:row.source_row_number, brand:row.brand, code:row.code, model:row.model, colorless:row.colorless_model, retail:price(row.retail_price), projects:Object.keys(row.project_prices || {}).sort().map(name => [name, price(row.project_prices[name])]) }
+        : { sheet:row.source_sheet, brand:row.brand, model:row.model, quotes:['點子行動','FutureDial（FDI）'].map(provider => ['S','A','B','C'].map(grade => price(row.quotes[provider][grade]))) });
+    }
+    async function verifyThreecReadback(expected) {
+      const readback = await call('threec_readback', payload({ kind:expected.kind }));
+      const actual = readback.snapshot;
+      if (!actual || actual.kind !== expected.kind || actual.source_version_date !== expected.source_version_date || actual.source_file_sha256 !== expected.source_file_sha256 || actual.row_count !== expected.row_count || JSON.stringify(threecComparableRows(actual)) !== JSON.stringify(threecComparableRows(expected))) {
+        throw new Error('正式讀回與來源預覽不一致；請先重新讀取版本核對，勿重複發布。');
+      }
+      renderThreecRegistry(readback);
+      return actual;
     }
     async function previewThreec(kind) {
+      if (threecPublishing) return;
+      invalidateThreecPreview();
+      const generation = threecPreviewGeneration;
       const file = $(kind + 'File').files[0];
       const button = $(kind + 'PreviewBtn');
       if (!file) return message('threecMessage', '請先選擇' + (kind === 'shopping' ? ' 3C 手機專案價' : '舊換新回收價') + '檔案。', 'bad');
@@ -184,23 +365,26 @@
       message('threecMessage', '正在本機解析與驗證；原始 Excel 不會上傳。');
       try {
         const parsed = await window.TradeInImportCore.parseFile(file, window.XLSX, kind);
+        if (generation !== threecPreviewGeneration || $(kind + 'File').files[0] !== file) return;
         const snapshot = window.TradeInImportCore.buildPublishSnapshot(kind, parsed);
-        const expectedRows = kind === 'shopping' ? 2031 : 496;
-        const expectedAudit = kind === 'shopping' ? snapshot.excluded_no_price_count === 50 : snapshot.quote_conflict_count === 0;
-        if (snapshot.row_count !== expectedRows || !expectedAudit) throw new Error('正式基線不符：' + (kind === 'shopping' ? '須為 2031 筆且排除 50 筆無價格資料。' : '須為 496 組且報價衝突為 0。'));
+        if (kind === 'tradein' && snapshot.quote_conflict_count !== 0) throw new Error('舊換新仍有報價衝突，請先確認來源資料。');
         threecPreviewSnapshot = snapshot;
         $('threecKind').textContent = kind === 'shopping' ? '3C 手機專案價' : '舊換新回收價';
         $('threecVersion').textContent = snapshot.source_version_date;
         $('threecRows').textContent = snapshot.row_count + ' 筆';
         $('threecAudit').textContent = kind === 'shopping' ? '排除 ' + snapshot.excluded_no_price_count + ' 筆／零元保留' : '衝突 ' + snapshot.quote_conflict_count + '／兩家 S/A/B/C';
+        $('threecSource').textContent = '來源：' + snapshot.source_file_name;
+        $('threecPreviewSearch').value = '';
+        renderThreecPrices(snapshot);
         $('threecHash').textContent = '來源 SHA-256：' + snapshot.source_file_sha256;
         $('threecPreview').classList.remove('hidden');
         $('threecConfirm').checked = false;
         $('threecSameDateConfirm').checked = false;
         $('threecSameDateWrap').classList.add('hidden');
         updateThreecPublishButton();
-        message('threecMessage', '本機解析與正式基線驗證通過；請核對後再發布。', 'ok');
+        message('threecMessage', '本機解析與來源筆數驗證通過；請核對後再發布。', 'ok');
       } catch (error) {
+        if (generation !== threecPreviewGeneration) return;
         threecPreviewSnapshot = null;
         updateThreecPublishButton();
         message('threecMessage', error.message, 'bad');
@@ -212,7 +396,12 @@
       const button = $('loginBtn'); auth.employeeId = $('employeeId').value.trim().toUpperCase(); auth.adminSecret = $('adminSecret').value;
       if (!auth.employeeId || !auth.adminSecret) return message('authMessage', '請輸入員編與管理者密碼。', 'bad');
       setBusy(button, true, '驗證中…'); message('authMessage', '正在讀取目前版本…');
-      try { await Promise.all([refreshLog(), refreshThreec()]); $('authCard').classList.add('hidden'); $('app').classList.remove('hidden'); }
+      try {
+        await refreshLog(); $('authCard').classList.add('hidden'); $('app').classList.remove('hidden');
+        try { await refreshThreec(); } catch (error) { message('threecMessage', error.message, 'bad'); }
+        const recovered = await recoverLatestAwardUpload();
+        if (recovered.ok) message('awardMessage', recovered.message + ' 可直接建立預覽任務。', 'ok');
+      }
       catch (error) { message('authMessage', error.message, 'bad'); }
       finally { setBusy(button, false, '登入並讀取目前版本'); }
     });
@@ -255,23 +444,171 @@
       catch (error) { message('kpiMessage', error.message, 'bad'); }
       finally { setBusy(button, false, '回復上一版'); }
     });
+    function renderAwardPreview(result) {
+      const preview = result.preview || {};
+      renderAwardChecks(result.checks || preview.checks || []); $('awardPreviewPanel').classList.remove('hidden');
+      $('awardDataDate').textContent = preview.dataDate || '—';
+      $('awardStoreCount').textContent = preview.storeCount == null ? '—' : preview.storeCount + ' 家';
+      $('awardPersonCount').textContent = preview.personCount == null ? '—' : preview.personCount + ' 人';
+      $('awardUploadedAt').textContent = preview.uploadedAt || '—';
+      $('awardFiles').textContent = (preview.files || []).map(file => '原始檔：' + file.fileName).join('｜');
+    }
+    function awardEvidenceFields(detail, patterns) {
+      return (detail && Array.isArray(detail.relatedFields) ? detail.relatedFields : []).filter(field => {
+        const text = typeof field === 'string' ? field : JSON.stringify(field || {});
+        return patterns.some(pattern => text.indexOf(pattern) !== -1);
+      });
+    }
+    function buildPhoneAwardsPreview(store, person, files) {
+      const storeDate = store.dataDate || '';
+      const personDate = person.dataDate || '';
+      const sameDate = !!storeDate && storeDate === personDate;
+      const blocking = [
+        '尚未完成與既有台獎黃金樣本逐欄比對',
+        '預覽階段禁止寫入正式台獎 JSON',
+        '8 月台獎金額、門檻、特殊規則與生效期間尚未確認'
+      ];
+      if (!sameDate) blocking.unshift('店點檔與個人檔資料日期不一致');
+      return {
+        schemaVersion: 'phone-awards-v1',
+        reportDate: sameDate ? storeDate : { store: storeDate, person: personDate },
+        sourceFiles: files.map(file => ({ role: file.role, fileName: file.fileName, size: file.size, sha256: file.hash })),
+        updatedAt: new Date().toISOString(),
+        versionId: 'preview-' + String(awardPreviewJobId || ''),
+        stores: { count: Number(store.storeCount || 0), names: store.identifiableStores || [], unmatchedOrAmbiguous: store.unmatchedOrAmbiguous || [] },
+        employees: { count: Number(person.personCount || 0), names: person.identifiablePersons || [], identifierColumns: person.personIdentifierColumns || [] },
+        rankings: { status: 'evidence-only', fields: awardEvidenceFields(store, ['排名']).concat(awardEvidenceFields(person, ['排名'])) },
+        achievementRates: { status: 'evidence-only', fields: awardEvidenceFields(store, ['達成率']).concat(awardEvidenceFields(person, ['達成率'])) },
+        awardAmounts: { status: 'evidence-only', fields: awardEvidenceFields(store, ['獎金']).concat(awardEvidenceFields(person, ['獎金'])) },
+        models: { status: 'evidence-only', fields: awardEvidenceFields(store, ['上線數', '空機數', '機款']).concat(awardEvidenceFields(person, ['上線數', '空機數', '機款'])) },
+        validation: {
+          sameDate: sameDate,
+          storeSheets: store.sheetNames || [], personSheets: person.sheetNames || [],
+          selectedStoreSheet: store.selectedSheet || '', selectedPersonSheet: person.selectedSheet || '',
+          storeRows: Number(store.rowCount || 0), personRows: Number(person.rowCount || 0),
+          duplicateRecords: (store.duplicateRecords || []).concat(person.duplicateRecords || []),
+          blankRows: (store.blankRows || []).concat(person.blankRows || []),
+          unmatchedOrAmbiguous: (store.unmatchedOrAmbiguous || []).concat(person.unmatchedOrAmbiguous || [])
+        },
+        publishable: false,
+        publishBlockingReasons: blocking,
+        formalDataChanged: false
+      };
+    }
+    async function loadAwardStructurePreview() {
+      const files = {};
+      for (const role of ['store', 'person']) {
+        files[role] = await call('report_award_pair_structure_file', payload({ previewJobId: awardPreviewJobId, role: role }));
+      }
+      const store = files.store.structure || {};
+      const person = files.person.structure || {};
+      const standardized = buildPhoneAwardsPreview(store, person, [
+        { role: 'store', fileName: files.store.fileName, size: files.store.size, hash: files.store.hash },
+        { role: 'person', fileName: files.person.fileName, size: files.person.size, hash: files.person.hash }
+      ]);
+      $('awardStructurePreview').textContent = JSON.stringify(standardized, null, 2);
+      $('awardStructurePreview').classList.remove('hidden');
+      return standardized;
+    }
+    async function pollAwardJob() {
+      if (!awardPreviewJobId || awardPolling) return;
+      awardPolling = true;
+      try {
+        const result = await call('report_award_pair_job_status', payload({ previewJobId: awardPreviewJobId }));
+        message('awardMessage', '預覽進度：' + result.stage + (result.errorMessage ? '｜' + result.errorMessage : ''), result.status === 'failed' ? 'bad' : 'warn');
+        if (result.status === 'completed') {
+          renderAwardPreview(result); $('awardClearBtn').disabled = false; awardPolling = false;
+          setBusy($('awardPreviewBtn'), false, '解析預覽');
+          try {
+            message('awardMessage', '基本預覽完成，正在分別讀取店點／個人結構…', 'warn');
+            await loadAwardStructurePreview();
+            message('awardMessage', '雙檔結構預覽完成；僅讀取私人暫存檔，正式台獎資料未變更。', 'ok');
+          } catch (detailError) {
+            message('awardMessage', '基本預覽已完成；結構解析失敗：' + detailError.message, 'bad');
+          }
+          return;
+        }
+        if (result.status === 'failed') {
+          $('awardClearBtn').disabled = false; awardPolling = false; setBusy($('awardPreviewBtn'), false, '解析預覽');
+          return;
+        }
+        awardPolling = false; window.setTimeout(pollAwardJob, 3000);
+      } catch (error) {
+        awardPolling = false; setBusy($('awardPreviewBtn'), false, '解析預覽');
+        message('awardMessage', error.message, 'bad');
+      }
+    }
+    $('awardStoreFile').addEventListener('change', () => resetAwardUpload('store'));
+    $('awardPersonFile').addEventListener('change', () => resetAwardUpload('person'));
+    $('awardStoreUploadBtn').addEventListener('click', () => uploadAwardFile('store'));
+    $('awardPersonUploadBtn').addEventListener('click', () => uploadAwardFile('person'));
+    $('awardPreviewBtn').addEventListener('click', async () => {
+      const button = $('awardPreviewBtn');
+      const previewPayload = {
+        storeFileId: awardUploadState.storeFileId,
+        personalFileId: awardUploadState.personalFileId
+      };
+      renderAwardPayloadDiagnostic(previewPayload);
+      console.log('award preview create request File IDs', previewPayload);
+      console.log('award preview guard state', JSON.stringify({
+        uploadSessionId: awardUploadState.uploadSessionId,
+        storeFileId: previewPayload.storeFileId,
+        personalFileId: previewPayload.personalFileId,
+        storeStatus: awardUploadState.storeStatus,
+        personalStatus: awardUploadState.personalStatus
+      }));
+      if (!previewPayload.storeFileId || !previewPayload.personalFileId || awardUploadState.storeStatus !== 'completed' || awardUploadState.personalStatus !== 'completed') {
+        return message('awardMessage', '請先完成店點檔與個人檔上傳。（目前狀態：店點 ' + awardUploadState.storeStatus + '、個人 ' + awardUploadState.personalStatus + '）', 'bad');
+      }
+      if (awardPolling) return;
+      setBusy(button, true, '建立任務中…'); message('awardMessage', '兩份檔案已完成上傳，正在建立預覽任務；不會更新正式台獎資料。');
+      try {
+        const job = await call('report_award_pair_create_job', payload(previewPayload));
+        renderAwardServerDiagnostic(job.diagnostics || null);
+        if (!job.ok) {
+          message('awardMessage', job.message || '台獎暫存檔驗證未通過。', 'bad');
+          setBusy(button, false, '解析預覽'); updateAwardPreviewButton();
+          return;
+        }
+        awardPreviewJobId = job.previewJobId; awardPolling = false; $('awardClearBtn').disabled = true;
+        message('awardMessage', '預覽任務已建立（queued），正在分階段驗證與解析…', 'warn');
+        window.setTimeout(pollAwardJob, 2000);
+      } catch (error) { awardPreviewJobId = ''; $('awardClearBtn').disabled = true; message('awardMessage', error.message, 'bad'); setBusy(button, false, '解析預覽'); updateAwardPreviewButton(); }
+    });
+    $('awardClearBtn').addEventListener('click', async () => {
+      if (!awardPreviewJobId) return; const button = $('awardClearBtn'); setBusy(button, true, '清除中…');
+      try { const result = await call('report_award_pair_clear', payload({ previewJobId: awardPreviewJobId })); awardPreviewJobId = ''; $('awardClearBtn').disabled = true; message('awardMessage', result.message, 'ok'); }
+      catch (error) { message('awardMessage', error.message, 'bad'); }
+      finally { setBusy(button, false, '清除暫存檔'); }
+    });
+    $('awardCleanupBtn').addEventListener('click', async () => {
+      const button = $('awardCleanupBtn'); setBusy(button, true, '清理中…');
+      try { const result = await call('report_award_pair_daily_cleanup', payload({})); message('awardMessage', result.message, 'ok'); }
+      catch (error) { message('awardMessage', error.message, 'bad'); }
+      finally { setBusy(button, false, '清理逾期暫存'); }
+    });
     $('shoppingPreviewBtn').addEventListener('click', () => previewThreec('shopping'));
     $('tradeinPreviewBtn').addEventListener('click', () => previewThreec('tradein'));
+    $('shoppingFile').addEventListener('change', invalidateThreecPreview);
+    $('tradeinFile').addEventListener('change', invalidateThreecPreview);
     $('threecRefreshBtn').addEventListener('click', async () => {
       try { await refreshThreec(); message('threecMessage', '已重新讀取 3C／舊換新正式版本。', 'ok'); }
       catch (error) { message('threecMessage', error.message, 'bad'); }
     });
+    $('threecPreviewSearch').addEventListener('input', () => { if (threecPreviewSnapshot) renderThreecPrices(threecPreviewSnapshot); });
     $('threecConfirm').addEventListener('change', updateThreecPublishButton);
     $('threecSameDateConfirm').addEventListener('change', updateThreecPublishButton);
     $('threecPublishBtn').addEventListener('click', async () => {
-      if (!threecPreviewSnapshot || !$('threecConfirm').checked) return;
+      if (threecPublishing || !threecPreviewSnapshot || !$('threecConfirm').checked) return;
       const button = $('threecPublishBtn');
       const sameDateConfirmed = !$('threecSameDateWrap').classList.contains('hidden') && $('threecSameDateConfirm').checked;
+      if (!$('threecSameDateWrap').classList.contains('hidden') && !sameDateConfirmed) return;
       if (!window.confirm('確定將此標準化快照寫入指定私有資料夾並切換 active 指標？')) return;
+      setThreecPublishing(true);
       setBusy(button, true, '發布中…');
       message('threecMessage', '正在寫入不可變快照、讀回驗證並更新 registry…');
       try {
-        const result = await call('threec_publish', payload({ snapshotJson:JSON.stringify(threecPreviewSnapshot), confirmSameDateHashChange:sameDateConfirmed }));
+        const result = await call('threec_publish', payload({ snapshotJson:JSON.stringify(threecPreviewSnapshot), confirmPublish:true, confirmSameDateHashChange:sameDateConfirmed }));
         renderThreecRegistry(result);
         if (result.status === 'confirmation_required') {
           $('threecSameDateWrap').classList.remove('hidden');
@@ -279,7 +616,9 @@
           updateThreecPublishButton();
           return message('threecMessage', '同日期來源雜湊不同。請確認這是更正版後再發布一次。', 'warn');
         }
-        const text = result.status === 'already_current' ? '正式版本已是同日期同雜湊，未產生新寫入。' : '私有快照已發布並完成讀回驗證。';
+        if (result.status !== 'published' && result.status !== 'already_current') throw new Error('發布回應不完整，請核對正式版本。');
+        await verifyThreecReadback(threecPreviewSnapshot);
+        const text = result.status === 'already_current' ? '正式版本已是同日期同雜湊，未產生新寫入。' : '私有快照已發布，正式讀回所有價格與來源預覽一致；門市查詢重新讀取即可更新。';
         message('threecMessage', text, 'ok');
         if (result.status === 'published') threecPreviewSnapshot = null;
         $('threecConfirm').checked = false;
@@ -287,15 +626,18 @@
         $('threecSameDateWrap').classList.add('hidden');
         updateThreecPublishButton();
       } catch (error) { message('threecMessage', error.message, 'bad'); }
-      finally { setBusy(button, false, '確認發布私有快照'); }
+      finally { setBusy(button, false, '確認發布私有快照'); setThreecPublishing(false); }
     });
     async function rollbackThreec(kind) {
+      if (threecPublishing) return;
       if (!window.confirm('確定只切換 ' + (kind === 'shopping' ? '3C' : '舊換新') + ' active／previous 指標回復上一版？')) return;
       const button = $(kind + 'RollbackBtn');
+      invalidateThreecPreview();
+      setThreecPublishing(true);
       setBusy(button, true, '回復中…');
       try { const result = await call('threec_rollback', payload({ kind })); renderThreecRegistry(result); message('threecMessage', '已回復上一版並完成指標讀回。', 'ok'); }
       catch (error) { message('threecMessage', error.message, 'bad'); }
-      finally { setBusy(button, false, kind === 'shopping' ? '3C 回復上一版' : '舊換新回復上一版'); }
+      finally { setBusy(button, false, kind === 'shopping' ? '3C 回復上一版' : '舊換新回復上一版'); setThreecPublishing(false); }
     }
     $('shoppingRollbackBtn').addEventListener('click', () => rollbackThreec('shopping'));
     $('tradeinRollbackBtn').addEventListener('click', () => rollbackThreec('tradein'));

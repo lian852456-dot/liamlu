@@ -43,6 +43,9 @@ test('管理頁只內嵌同專案解析器，3C 原始 Excel 不離開瀏覽器'
   assert.doesNotMatch(publish, /fileBase64|arrayBuffer|readAsDataURL/);
   assert.equal(read('gas/ReportUploadSheetJs.html'), read('assets/vendor/xlsx.full.min.js'));
   assert.equal(read('gas/ReportUploadTradeInCore.html'), read('tradein-import-core.js'));
+  const include = functionBody(code, 'reportUploadInclude_');
+  assert.match(include, /createTemplateFromFile\(name\)\.getRawContent\(\)/);
+  assert.doesNotMatch(include, /createHtmlOutputFromFile/);
 });
 
 test('私有資料夾只能由 Script Property 指定且必須名稱及分享狀態都正確', () => {
@@ -56,8 +59,7 @@ test('私有資料夾只能由 Script Property 指定且必須名稱及分享狀
 });
 
 test('首次正式基線與來源身份 gate 固定且零元不會被當成空值', () => {
-  assert.match(code, /shopping:\{ sourceVersionDate:'2026-09-22', rowCount:2031, excludedNoPriceCount:50 \}/);
-  assert.match(code, /tradein:\{ sourceVersionDate:'2026-09-16', rowCount:496, quoteConflictCount:0 \}/);
+  assert.doesNotMatch(code, /THREEC_INITIAL_RELEASE/);
   const normalize = functionBody(code, 'threecNormalizeIncomingSnapshot_');
   assert.match(normalize, /來源檔名與 source_version_date 不一致/);
   assert.match(normalize, /sourceFileSha256/);
@@ -105,6 +107,5 @@ test('管理頁需要明確勾選，且同日異雜湊另有第二個確認', ()
   assert.match(page, /id="threecSameDateConfirm" type="checkbox"/);
   assert.match(page, /result\.status === 'confirmation_required'/);
   assert.match(page, /window\.confirm\('確定將此標準化快照/);
-  assert.match(page, /2031/);
-  assert.match(page, /496/);
+  assert.doesNotMatch(page, /const expectedRows/);
 });
