@@ -386,6 +386,8 @@
       };
     }
     function threecDiffPrice(value) {
+      if (value == null) return '—（無此條件）';
+      if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'value')) return threecPriceText(value.value);
       if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'display')) return String(value.display || '無報價（缺價）');
       if (window.ThreecPriceDiffCore && typeof window.ThreecPriceDiffCore.formatPrice === 'function') return window.ThreecPriceDiffCore.formatPrice(value);
       if (value == null || String(value).trim() === '') return '無報價（缺價）';
@@ -474,7 +476,9 @@
       const search = $('threecDiffSearch').value.trim();
       const first = await call('threec_changes_read', payload({ kind:threecPreviewSnapshot.kind, offset:0, limit:1000, snapshotHash:threecFormalSnapshotHash, search }));
       if (generation !== threecPreviewGeneration) return;
-      const firstSet = first.changeSet || threecPreviewChangeSet;
+      const firstSet = first.changeSet && first.changeSet.firstRelease && window.ThreecPriceDiffCore
+        ? window.ThreecPriceDiffCore.diffSnapshots(threecPreviewSnapshot.kind, null, threecPreviewSnapshot, {limit:Infinity,search})
+        : first.changeSet || threecPreviewChangeSet;
       const all = threecDiffRows(firstSet).slice();
       let next = firstSet;
       let offset = Number(next.offset || 0) + Number(next.limit || 100);
