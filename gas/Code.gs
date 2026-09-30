@@ -2946,7 +2946,7 @@ function doPost(e) {
     payload = privateDashboardParsePostPayload(e);
     action = String(payload.action || '');
     if (action === 'write') assertNoDuplicateReportAwardModelIds_(rawPayload);
-    // 部署隔離：上傳專用 Deployment 只放行四個上傳路由
+    // 部署隔離：上傳專用 Deployment 只放行原上傳路由與已授權價格讀取
     if (reportUploadIsUploadDeployment_() && REPORT_UPLOAD_ALLOWED_ACTIONS.indexOf(action) === -1) {
       throw new Error('route-not-available-on-upload-deployment');
     }
@@ -3494,10 +3494,7 @@ const THREEC_SNAPSHOT_SCHEMA = 'threec-normalized-snapshot/v1';
 const THREEC_MAX_SNAPSHOT_JSON_BYTES = 10 * 1024 * 1024;
 const THREEC_PROVIDERS = ['點子行動', 'FutureDial（FDI）'];
 const THREEC_GRADES = ['S', 'A', 'B', 'C'];
-const THREEC_INITIAL_RELEASE = {
-  shopping:{ sourceVersionDate:'2026-09-22', rowCount:2031, excludedNoPriceCount:50 },
-  tradein:{ sourceVersionDate:'2026-09-16', rowCount:496, quoteConflictCount:0 }
-};
+
 
 function threecKind_(value) {
   const kind = String(value || '').trim();
@@ -3597,8 +3594,11 @@ function threecPriceField_(value, label, allowEmpty) {
     throw new Error(label + '不得為空');
   }
   const text = String(value).trim();
-  if (!/^\d+(?:\.\d+)?$/.test(text)) throw new Error(label + '不是有效的非負價格');
-  return text;
+  // SheetJS raw:false preserves formatted Excel thousands separators.
+  // Accept only complete groups; never strip arbitrary punctuation or fill zero.
+  if (/^\d+(?:\.\d+)?$/.test(text)) return text;
+  if (/^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(text)) return text.replace(/,/g, '');
+  throw new Error(label + '不是有效的非負價格');
 }
 
 function threecValidateShoppingRows_(rows) {
@@ -3694,12 +3694,6 @@ function threecNormalizeIncomingSnapshot_(raw) {
   if (!Number.isSafeInteger(excludedNoPriceCount) || excludedNoPriceCount < 0) throw new Error('排除數不正確');
   if (kind === 'shopping' && sourceRowCount !== rowCount + excludedNoPriceCount) throw new Error('3C 來源筆數、發布筆數與排除數不一致');
   if (kind === 'tradein' && quoteConflictCount !== 0) throw new Error('舊換新含有報價衝突');
-  const expected = THREEC_INITIAL_RELEASE[kind];
-  if (expected && expected.sourceVersionDate === sourceVersionDate) {
-    if (rowCount !== expected.rowCount) throw new Error('首次正式發布筆數不符授權基線');
-    if (kind === 'shopping' && excludedNoPriceCount !== expected.excludedNoPriceCount) throw new Error('首次 3C 排除數不符授權基線');
-    if (kind === 'tradein' && quoteConflictCount !== expected.quoteConflictCount) throw new Error('首次舊換新報價衝突數不符授權基線');
-  }
   return {
     schema_version:THREEC_SNAPSHOT_SCHEMA,
     kind:kind,
@@ -3767,6 +3761,10 @@ function threecAuditEvent_(registry, action, kind, employeeId, detail) {
 function threec_status(payload) { return threecStatus(payload); }
 function threec_publish(payload) { return threecPublish(payload); }
 function threec_rollback(payload) { return threecRollback(payload); }
+function threec_readback(payload) {
+  reportUploadAuthorize_(payload);
+  return threecReadActive_((payload || {}).kind);
+}
 
 function threecStatus(payload) {
   reportUploadAuthorize_(payload);
@@ -3776,6 +3774,7 @@ function threecStatus(payload) {
 
 function threecPublish(payload) {
   const employeeId = reportUploadAuthorize_(payload);
+  if ((payload || {}).confirmPublish !== true) throw new Error('請明確確認後再發布 3C／舊換新快照');
   const encoded = String((payload || {}).snapshotJson || '');
   if (!encoded || encoded.length > THREEC_MAX_SNAPSHOT_JSON_BYTES) throw new Error('3C／舊換新標準化快照缺少或過大');
   const incoming = threecNormalizeIncomingSnapshot_(JSON.parse(encoded));
@@ -3858,14 +3857,26 @@ function threecAuthorizeRead_(payload) {
 
 function threecSnapshotRead(payload) {
   threecAuthorizeRead_(payload);
-  const kind = threecKind_((payload || {}).kind);
+  return threecReadActive_((payload || {}).kind);
+}
+
+function threecReadActive_(requestedKind) {
+  const kind = threecKind_(requestedKind);
   const registry = threecRegistry_();
   const active = registry.kinds[kind].active;
   if (!active) return { snapshot:null, registry:threecRegistrySummary_(registry) };
   const snapshot = threecReadJsonFile_(active.snapshot_file_id);
-  threecNormalizeIncomingSnapshot_(snapshot);
-  if (threecSnapshotHash_(snapshot) !== snapshot.snapshot_hash) throw new Error('3C／舊換新 active 快照雜湊驗證失敗');
-  return { snapshot:snapshot, registry:threecRegistrySummary_(registry) };
+  const normalized = threecNormalizeIncomingSnapshot_(snapshot);
+  if (threecSnapshotHash_(snapshot) !== snapshot.snapshot_hash ||
+      active.snapshot_hash !== snapshot.snapshot_hash || active.kind !== normalized.kind ||
+      active.source_version_date !== normalized.source_version_date ||
+      active.source_file_sha256 !== normalized.source_file_sha256 ||
+      Number(active.row_count) !== normalized.row_count) {
+    throw new Error('3C／舊換新 active 快照雜湊或版本驗證失敗');
+  }
+  normalized.published_at = snapshot.published_at;
+  normalized.snapshot_hash = snapshot.snapshot_hash;
+  return { snapshot:normalized, registry:threecRegistrySummary_(registry) };
 }
 
 function privateDashboardAdminRequests(payload) {
@@ -5063,7 +5074,8 @@ function checkSegAndNotify(seg) {
 // 就只服務 report_upload_* 四個路由——其餘 read/write/巡店/戰情一律拒絕，
 // 確保上傳功能的部署動作完全影響不到每日回報與其他系統。
 const REPORT_UPLOAD_ALLOWED_ACTIONS = [
-  'report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback'
+  'report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback',
+  'threec_snapshot_read'
 ];
 
 // 上傳頁與上傳 API 同屬新 Deployment，使用 google.script.run 直接呼叫這四個包裝函式。
@@ -5077,7 +5089,12 @@ function reportUploadInclude_(name) {
   if (name !== 'ReportUploadSheetJs' && name !== 'ReportUploadTradeInCore') {
     throw new Error('report-upload-include-not-allowed');
   }
-  return HtmlService.createHtmlOutputFromFile(name).getContent();
+  // Assets are JavaScript, not standalone HTML. Read them without HTML parsing;
+  // escape literal codepage control characters before inserting into <script>.
+  return HtmlService.createTemplateFromFile(name).getRawContent()
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, function(character) {
+      return '\\x' + ('0' + character.charCodeAt(0).toString(16)).slice(-2);
+    });
 }
 
 function report_upload_preview(payload) { return reportUploadPreview(payload); }

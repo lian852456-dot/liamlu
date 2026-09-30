@@ -21,7 +21,7 @@ const STORE_INSPECTION_URL = 'https://twm-store-inspection.liamlu245.chatgpt.sit
 const UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
 const EXPECTED_HREFS = [
   'kpi-battle.html', 'awards-battle.html', 'index.html', 'gold-medal.html',
-  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL,
+  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'threec-query.html',
   'department-ops.html', 'north12b-gold-ops.html', 'patrol.html',
   'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
   'phone-stock-dashboard.html', 'tradein-import-lab.html'
@@ -123,11 +123,11 @@ async function changeKeys(page, keys) {
   }, {keys,EMPLOYEE_KEY,DEVICE_KEY,SESSION_KEY});
 }
 
-test('首頁分成 4 常用、5 同仁及 8 督導入口，保留原連結並新增同仁金牌查詢', async ({page}) => {
+test('首頁分成 4 常用、6 同仁及 8 督導入口，保留原連結並新增同仁金牌查詢', async ({page}) => {
   const {calls,errors} = await start(page);
   await ready(page);
   await expect(page.locator('[aria-label="常用入口"] .card')).toHaveCount(4);
-  await expect(page.locator('[aria-label="同仁大廳"] .card')).toHaveCount(5);
+  await expect(page.locator('[aria-label="同仁大廳"] .card')).toHaveCount(6);
   await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(8);
   expect(await page.locator('a.card').evaluateAll(cards => cards.map(card => card.getAttribute('href')))).toEqual(EXPECTED_HREFS);
   await expect(page.locator('.quick-card').first()).toHaveAttribute('href','kpi-battle.html');
@@ -165,7 +165,7 @@ test('同仁金牌查詢與常用明細連到既有查詢頁，督導維護入�
 for (const viewport of [{width:1280,height:1300},{width:390,height:844},{width:320,height:800}]) {
   test(`${viewport.width}px 無水平溢出且所有入口可見`, async ({page}) => {
     await start(page,{viewport}); await ready(page); await noOverflow(page);
-    await expect(page.locator('a.card:visible')).toHaveCount(17);
+    await expect(page.locator('a.card:visible')).toHaveCount(18);
     const boxes = await page.locator('.quick-card').evaluateAll(cards => cards.map(card => card.getBoundingClientRect().toJSON()));
     if (viewport.width >= 1280) expect(new Set(boxes.map(box => box.y)).size).toBe(1);
     else {
@@ -187,7 +187,7 @@ test('搜尋不分大小寫、查無結果與清除搜尋會恢復所有工具',
   await expect(page.locator('a.card:visible')).toHaveCount(0);
   await expect(page.locator('#search-result')).toContainText('沒有符合的工具');
   await page.locator('#tool-search').fill('');
-  await expect(page.locator('a.card:visible')).toHaveCount(17);
+  await expect(page.locator('a.card:visible')).toHaveCount(18);
   await expect(page.locator('#search-result')).toBeHidden();
 });
 
@@ -205,7 +205,7 @@ test('金牌搜尋可區分同仁查詢與督導資料維護，清除後恢復�
   await expect(page.locator('a.card:visible')).toHaveCount(1);
   await expect(page.locator('[aria-label="督導專區"] a.card[href="north12b-gold-ops.html"]')).toBeVisible();
   await page.locator('#tool-search').fill('');
-  await expect(page.locator('a.card:visible')).toHaveCount(17);
+  await expect(page.locator('a.card:visible')).toHaveCount(18);
   await expect(page.locator('#search-result')).toBeHidden();
   expect(calls).toEqual([]);
 });

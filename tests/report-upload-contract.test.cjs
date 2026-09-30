@@ -644,7 +644,7 @@ test('正式資料的寫入只發生在 commit 與 rollback', () => {
 });
 
 // ── 部署隔離：上傳走獨立 Deployment，每日回報固定第 15 版 ──
-test('doPost 在上傳部署模式只放行四個上傳路由，且判斷在所有路由之前', () => {
+test('doPost 上傳部署只放行原四個上傳路由與已授權價格讀取', () => {
   const doPost = functionBody(code, 'doPost');
   const gateAt = doPost.indexOf('reportUploadIsUploadDeployment_()');
   const firstRouteAt = doPost.indexOf("action === 'ptauth'");
@@ -655,7 +655,7 @@ test('doPost 在上傳部署模式只放行四個上傳路由，且判斷在所�
   assert.ok(list, '缺少 REPORT_UPLOAD_ALLOWED_ACTIONS');
   const actions = list[1].match(/'[^']+'/g).map(x => x.slice(1, -1));
   assert.deepEqual(actions.sort(), ['report_upload_commit', 'report_upload_log',
-    'report_upload_preview', 'report_upload_rollback'].sort(), '白名單必須恰好是四個上傳路由');
+    'report_upload_preview', 'report_upload_rollback', 'threec_snapshot_read'].sort(), '白名單僅新增價格讀取');
 });
 
 test('doGet 在上傳部署模式回 ping／同源頁面，其餘 JSON GET 一律拒絕', () => {

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>手機專案／3C＋舊換新查詢｜北一二B</title>
+  <style>
+    :root{color-scheme:light;--ink:#12304a;--muted:#617387;--line:#d9e3eb;--bg:#f4f8fb;--navy:#09395f;--cyan:#0b9ec5;--ok:#087d59;--warn:#925900;--bad:#b32639}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Microsoft JhengHei",sans-serif}
+    main{width:min(1180px,calc(100% - 24px));margin:16px auto 48px}.hero{padding:22px 24px;border-radius:16px;background:linear-gradient(135deg,var(--navy),#0b6c9a);color:#fff;box-shadow:0 10px 24px #09395f20}.hero h1{margin:0;font-size:clamp(23px,4vw,32px)}.hero p{margin:5px 0 0;color:#d9f7ff;overflow-wrap:anywhere}.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}.home-link{color:#fff;font-weight:800;text-decoration:none;overflow-wrap:anywhere}.card{margin-top:14px;padding:18px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 15px #12304a0d}.card h2{margin:0 0 8px;font-size:19px}.grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}.field{display:grid;gap:5px;color:var(--muted);font-weight:750}.field input,.field select{width:100%;min-height:40px;border:1px solid #b8c9d7;border-radius:8px;padding:8px 10px;background:#fff;color:var(--ink);font:inherit}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}button{appearance:none;border:0;border-radius:8px;padding:9px 13px;background:var(--navy);color:#fff;font:inherit;font-weight:800;cursor:pointer}button.secondary{background:#e7f1f7;color:var(--navy)}button:disabled{cursor:not-allowed;opacity:.55}.hint,.status{color:var(--muted);font-size:13px}.status{margin-top:10px;padding:9px 11px;border-radius:8px;background:#eef6fb}.status.ok{background:#e7f7ef;color:var(--ok)}.status.warn{background:#fff4df;color:var(--warn)}.status.bad{background:#fff0f1;color:var(--bad)}.hidden{display:none!important}.tabs{display:flex;gap:8px;margin-top:14px}.tab{background:#e7f1f7;color:var(--navy)}.tab.active{background:var(--navy);color:#fff}.toolbar{display:grid;grid-template-columns:minmax(180px,1fr) minmax(180px,270px);gap:10px;margin-top:12px}.meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}.metric{min-width:0;padding:9px 10px;border-radius:8px;background:#f4f8fb}.metric span{display:block;color:var(--muted);font-size:12px}.metric strong{display:block;overflow-wrap:anywhere;word-break:break-word;font-size:14px}.meta .wide{grid-column:span 2}.table-scroll{max-width:100%;overflow-x:auto;margin-top:12px;border:1px solid var(--line);border-radius:9px}table{width:100%;min-width:720px;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;white-space:normal}th{color:var(--muted);font-size:12px;background:#f8fbfd;position:sticky;top:0}tr:last-child td{border-bottom:0}.group{margin-top:15px}.group-title,.group-note{overflow-wrap:anywhere;word-break:break-word}.group-title{margin:0;font-size:16px}.group-note{margin:2px 0;color:var(--muted);font-size:12px}.price-list{display:grid;gap:4px;min-width:190px}.price-item{display:flex;justify-content:space-between;gap:10px}.price-item.missing{color:var(--muted)}.price-item.zero strong{color:var(--ok)}.provider{margin-top:14px}.provider h3{margin:0;font-size:15px;overflow-wrap:anywhere;word-break:break-word}.empty{padding:18px;text-align:center;color:var(--muted)}.privacy{margin-top:15px;color:var(--muted);font-size:12px}@media(max-width:700px){main{width:min(100% - 14px,1180px);margin-top:7px}.hero{padding:18px}.grid,.toolbar{grid-template-columns:1fr}.meta{grid-template-columns:repeat(2,minmax(0,1fr))}.meta .wide{grid-column:auto}.actions button{flex:1 1 auto}.table-scroll{margin-left:-1px;margin-right:-1px}}
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="topbar"><div><h1>手機專案／3C＋舊換新查詢</h1><p>門市查詢正式價格；資料由既有私有上傳服務即時讀回</p></div><a class="home-link" href="https://lian852456-dot.github.io/liamlu/home.html">← 智慧營運中心</a></div>
+  </section>
+  <section class="card" id="authCard">
+    <h2>門市登入</h2>
+    <p class="hint">沿用已核准的員編與本機裝置。此頁沒有發布功能，也不會要求管理者密碼。</p>
+    <div class="grid"><label class="field" for="employeeId">員編<input id="employeeId" autocomplete="username" placeholder="請輸入員編"></label><button id="loginBtn" type="button">登入並讀取正式資料</button></div>
+    <label class="hint" style="display:flex;gap:7px;align-items:center;margin-top:9px"><input id="rememberEmployee" type="checkbox">記住員編（只保存識別，不保存價格）</label>
+    <div id="authStatus" class="status" role="status">尚未讀取</div>
+  </section>
+  <section class="card hidden" id="queryCard">
+    <div class="topbar"><h2 style="margin:0">正式價格查詢</h2><button class="secondary" id="logoutBtn" type="button">登出並清除結果</button></div>
+    <div class="tabs" role="tablist"><button class="tab active" id="shoppingTab" data-kind="shopping" type="button" role="tab" aria-selected="true">手機專案／3C</button><button class="tab" id="tradeinTab" data-kind="tradein" type="button" role="tab" aria-selected="false">舊換新</button></div>
+    <section id="shoppingPane" data-pane="shopping" role="tabpanel"><div class="toolbar"><label class="field">搜尋品牌／機款／容量／專案條件<input id="shoppingSearch" type="search" autocomplete="off" placeholder="例如：iPhone、256GB、合約"></label><label class="field">選機款（不分顏色）<select id="shoppingModel"><option value="">全部機款</option></select></label></div><div id="shoppingMeta" class="meta"></div><div id="shoppingResults"></div></section>
+    <section id="tradeinPane" class="hidden" data-pane="tradein" role="tabpanel"><div class="toolbar"><label class="field">搜尋品牌／機款／容量<input id="tradeinSearch" type="search" autocomplete="off" placeholder="例如：Galaxy、512GB"></label><label class="field">選機款<select id="tradeinModel"><option value="">全部機款</option></select></label></div><div id="tradeinMeta" class="meta"></div><div id="tradeinResults"></div></section>
+    <p class="privacy">價格與正式快照只留在本頁記憶體；離頁、登出或授權失敗即清除，重新開啟會重新讀取。</p>
+  </section>
+</main>
+<script src="threec-query-core.js?v=20261001-1"></script>
+<script>
+(function(scope){
+  'use strict';
+  const Core=scope.ThreecQueryCore;
+  const API='https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
+  const EMPLOYEE_KEY=Core.STORAGE_KEYS.employee;
+  const DEVICE_KEY=Core.STORAGE_KEYS.device;
+  const state={shopping:null,tradein:null,active:'shopping',loading:false};
+  let generation=0;
+  let autoQueryEnabled=true;
+  let pageShowSeen=false;
+  const $=id=>document.getElementById(id);
+  function storageGet(key){try{return scope.localStorage.getItem(key)||'';}catch{return '';}}
+  function storageSet(key,value){try{scope.localStorage.setItem(key,value);}catch{}}
+  function esc(value){return String(value==null?'':value).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
+  function setStatus(text,kind){const el=$('authStatus');el.textContent=text;el.className='status'+(kind?' '+kind:'');}
+  function invoke(kind,employeeId,deviceId){
+    return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'threec_snapshot_read',employeeId,deviceId,kind}),cache:'no-store',credentials:'omit'}).then(async response=>{let body={};try{body=await response.json();}catch{throw new Error('正式資料回應格式錯誤');}if(!response.ok||!body||body.status!=='ok')throw new Error(body&&body.message||'正式資料讀取失敗');return body;});
+  }
+  function clearResults(){state.shopping=null;state.tradein=null;renderKind('shopping');renderKind('tradein');}
+  function invalidateView(){generation+=1;clearResults();$('queryCard').classList.add('hidden');}
+  function isAuthError(error){return /員編|員工|裝置|授權|核准|登入|approved|authoriz|access/i.test(String(error&&error.message||error));}
+  function metaHtml(meta){const hash=meta.sourceFileSha256||'—';return `<div class="metric"><span>正式資料版本（snapshot hash）</span><strong>${esc(meta.snapshotHash||meta.version||'—')}</strong></div><div class="metric"><span>來源日期</span><strong>${esc(meta.sourceVersionDate||'—')}</strong></div><div class="metric"><span>發布時間</span><strong>${esc(meta.publishedAt||'—')}</strong></div><div class="metric wide"><span>來源 SHA-256</span><strong>${esc(hash)}</strong></div>`;}
+  function renderPrice(name,value){const state=Core.priceState(value);return `<div class="price-item${state.missing?' missing':''}${state.zero?' zero':''}"><span>${esc(name)}</span><strong>${esc(Core.formatPrice(value))}</strong></div>`;}
+  function renderShopping(view){
+    const target=$('shoppingResults');
+    if(!view){$('shoppingMeta').innerHTML='';target.innerHTML='<div class="empty">尚未讀取正式手機專案資料。</div>';return;}
+    if(!view.available){$('shoppingMeta').innerHTML='';target.innerHTML='<div class="empty">尚未發布正式資料：手機專案／3C。</div>';return;}
+    $('shoppingMeta').innerHTML=metaHtml(view.meta);
+    if(!view.rows.length){target.innerHTML='<div class="empty">沒有符合搜尋條件的正式機款。</div>';return;}
+    const notice=view.limited?`<div class="status warn">目前顯示前 ${view.displayLimit} 組（符合條件共 ${view.totalRows} 組）。請先從「選機款」縮小範圍後查看完整資料。</div>`:'';
+    target.innerHTML=notice+view.rows.map(group=>`<article class="group"><h3 class="group-title">${esc([group.brand,group.colorlessModel].filter(Boolean).join(' · ')||'未命名機款')}</h3><p class="group-note">來源工作表：${esc(group.sourceSheet||'—')}；同色款合併查詢，容量／必要型號差異仍保留</p><div class="table-scroll"><table><thead><tr><th>原始機型／容量</th><th>代碼</th><th>單機價</th><th>資費／合約／適用條件（原始欄名）</th></tr></thead><tbody>${group.rows.map(row=>`<tr><td>${esc(row.model||'—')}</td><td>${esc(row.code||'—')}</td><td>${renderPrice('單機價',row.retailPrice)}</td><td><div class="price-list">${row.projectPrices.length?row.projectPrices.map(price=>renderPrice(price.name,price.value)).join(''):'<span class="hint">無專案價欄位</span>'}</div></td></tr>`).join('')}</tbody></table></div></article>`).join('');
+  }
+  function renderTradein(view){
+    const target=$('tradeinResults');
+    if(!view){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未讀取正式舊換新資料。</div>';return;}
+    if(!view.available){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未發布正式資料：舊換新。</div>';return;}
+    $('tradeinMeta').innerHTML=metaHtml(view.meta);
+    if(!view.rows.length){target.innerHTML='<div class="empty">沒有符合搜尋條件的正式機款。</div>';return;}
+    const notice=view.limited?`<div class="status warn">目前顯示前 ${view.displayLimit} 筆（符合條件共 ${view.totalRows} 筆）。請先從「選機款」縮小範圍後查看完整資料。</div>`:'';
+    target.innerHTML=notice+view.rows.map(row=>`<article class="provider"><h3>${esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')}</h3><p class="group-note">來源工作表：${esc(row.sourceSheet||'—')}</p>${Core.PROVIDERS.map(provider=>`<div class="table-scroll"><table><thead><tr><th colspan="${Core.GRADES.length+1}">${esc(provider)}（獨立報價）</th></tr><tr><th>原始機型／容量</th>${Core.GRADES.map(grade=>`<th>${grade} 級</th>`).join('')}</tr></thead><tbody><tr><td>${esc(row.model||'—')}</td>${Core.GRADES.map(grade=>`<td>${esc(Core.formatPrice(row.quotes[provider]&&row.quotes[provider][grade]))}</td>`).join('')}</tr></tbody></table></div>`).join('')}</article>`).join('');
+  }
+  function renderKind(kind){const search=$(kind==='shopping'?'shoppingSearch':'tradeinSearch').value;const modelKey=$(kind==='shopping'?'shoppingModel':'tradeinModel').value;const response=state[kind];const view=response?Core.buildView(kind,response,{query:search,modelKey}):null;if(kind==='shopping')renderShopping(view);else renderTradein(view);if(view){const select=$(kind==='shopping'?'shoppingModel':'tradeinModel');const prior=select.value;select.innerHTML='<option value="">全部機款</option>'+view.modelOptions.map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');if(view.modelOptions.some(option=>option.value===prior))select.value=prior;}}
+  function showKind(kind){state.active=kind;['shopping','tradein'].forEach(value=>{const tab=$(value+'Tab'),pane=$(value+'Pane');const active=value===kind;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));pane.classList.toggle('hidden',!active);});}
+  async function refresh(){
+    const employeeId=$('employeeId').value.trim().toUpperCase(),deviceId=storageGet(DEVICE_KEY),requestGeneration=++generation;
+    if(!employeeId){setStatus('請輸入員編。','warn');clearResults();return;}
+    if(!deviceId){setStatus('找不到已核准的本機裝置，請先在 KPI 戰情完成既有裝置核准。','warn');clearResults();return;}
+    state.loading=true;$('loginBtn').disabled=true;setStatus('正在讀取兩類正式價格…');clearResults();
+    try{
+      const results=await Promise.all([invoke('shopping',employeeId,deviceId),invoke('tradein',employeeId,deviceId)]);
+      if(requestGeneration!==generation)return;
+      state.shopping=results[0];state.tradein=results[1];
+      if($('rememberEmployee').checked)storageSet(EMPLOYEE_KEY,employeeId);
+      $('queryCard').classList.remove('hidden');
+      const available=results.filter(result=>result&&result.snapshot).length;
+      const missingKinds=results.map((result,index)=>result&&result.snapshot?'':index===0?'手機專案／3C':'舊換新').filter(Boolean);
+      setStatus(available===2?'已讀取正式資料；請依版本／日期核對後查詢。':`已讀取；${missingKinds.join('、')} 尚未發布正式資料，可查詢已有正式版本。`,available?'ok':'warn');
+      renderKind('shopping');renderKind('tradein');
+    }catch(error){
+      if(requestGeneration!==generation)return;
+      clearResults();$('queryCard').classList.add('hidden');
+      if(isAuthError(error))setStatus(String(error.message||'授權失敗')+'；正式資料已清除。','bad');
+      else setStatus(String(error.message||'正式資料讀取失敗')+'；正式資料已清除。','bad');
+    }finally{if(requestGeneration===generation){state.loading=false;$('loginBtn').disabled=false;}}
+  }
+  function logout(){autoQueryEnabled=false;generation+=1;clearResults();$('queryCard').classList.add('hidden');$('employeeId').value='';$('rememberEmployee').checked=false;$('loginBtn').disabled=false;setStatus('已登出，正式資料已清除。','');}
+  function bind(){
+    const remembered=storageGet(EMPLOYEE_KEY);
+    if(remembered){$('employeeId').value=remembered;$('rememberEmployee').checked=true;}
+    $('loginBtn').addEventListener('click',()=>{autoQueryEnabled=true;refresh();});
+    $('logoutBtn').addEventListener('click',logout);
+    $('employeeId').addEventListener('input',()=>{autoQueryEnabled=true;invalidateView();});
+    document.querySelectorAll('[data-kind]').forEach(button=>button.addEventListener('click',()=>showKind(button.dataset.kind)));
+    ['shopping','tradein'].forEach(kind=>{const search=$(kind+'Search'),select=$(kind+'Model');search.addEventListener('input',()=>renderKind(kind));select.addEventListener('change',()=>renderKind(kind));});
+    scope.addEventListener('pagehide',()=>{generation+=1;clearResults();});
+    scope.addEventListener('pageshow',()=>{if(!pageShowSeen){pageShowSeen=true;return;}if(autoQueryEnabled&&storageGet(EMPLOYEE_KEY)&&storageGet(DEVICE_KEY))refresh();});
+    showKind('shopping');
+    if(remembered&&storageGet(DEVICE_KEY))refresh();
+  }
+  if(!Core){setStatus('查詢元件載入失敗。','bad');return;}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+})(window);
+</script>
+</body>
+</html>
