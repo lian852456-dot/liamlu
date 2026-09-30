@@ -37,7 +37,8 @@ test('管理頁只內嵌同專案解析器，3C 原始 Excel 不離開瀏覽器'
   const preview = functionBody(page, 'previewThreec');
   assert.match(preview, /TradeInImportCore\.parseFile/);
   assert.match(preview, /TradeInImportCore\.buildPublishSnapshot/);
-  assert.doesNotMatch(preview, /readFileBase64|call\(/, '解析階段不得傳送原始 Excel 或呼叫後端');
+  assert.doesNotMatch(preview, /readFileBase64|fileBase64|readAsDataURL/, '解析階段不得傳送原始 Excel');
+  assert.match(preview, /threecDiffPreviewRequest/, '以授權後端的現有版本核對完整條件差異');
   const publish = page.slice(page.indexOf("$('threecPublishBtn').addEventListener"), page.indexOf('async function rollbackThreec'));
   assert.match(publish, /snapshotJson:JSON\.stringify\(threecPreviewSnapshot\)/);
   assert.doesNotMatch(publish, /fileBase64|arrayBuffer|readAsDataURL/);

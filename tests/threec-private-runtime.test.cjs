@@ -7,7 +7,7 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'gas', 'Code.gs'), 'utf8');
+const source = fs.readFileSync(process.env.THREEC_RUNTIME_CODE_PATH || path.join(__dirname, '..', 'gas', 'Code.gs'), 'utf8');
 const start = source.indexOf('const THREEC_PRIVATE_FOLDER_PROPERTY');
 const nextModule = source.indexOf('function privateDashboardAdminRequests', start);
 const end = nextModule < 0 ? source.length : nextModule;
@@ -150,6 +150,7 @@ function runtime(options = {}) {
     reportVersionHash_: input => digest('md5', typeof input === 'string' ? input : Buffer.from(input)).map(byte => ('0' + byte.toString(16)).slice(-2)).join(''),
     MimeType: { PLAIN_TEXT: 'text/plain' },
   });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'threec-price-diff-core.js'), 'utf8'), context);
   vm.runInContext(threecBlock, context);
   return {
     context,
@@ -280,12 +281,21 @@ test('舊日期、同雜湊 noop 與同日異雜湊二次確認都不會繞過 a
 
   const noop = publish(env, first);
   assert.equal(noop.status, 'already_current');
-  assert.equal(env.createdFileCount, filesAfterInitial);
+  assert.equal(env.createdFileCount, filesAfterInitial + 1, '首次無異動核對只新增 registry，保留價格快照');
+  const pointerAfterCheck = env.properties.get('THREEC_REGISTRY_FILE_ID');
+  const activeAfterCheck = env.context.threecRegistry_().kinds.shopping.active;
+  assert.equal(activeAfterCheck.snapshot_file_id, 'file-1');
+  assert.equal(noop.changeSet.counts.changed, 0);
+  assert.equal(noop.changeSet.counts.added, 0);
+  assert.ok(noop.changeSet.counts.unchanged > 0);
+  publish(env, first);
+  assert.equal(env.properties.get('THREEC_REGISTRY_FILE_ID'), pointerAfterCheck, '重複核對不再新增 registry');
 
   const replacement = shoppingSnapshot({ hash: 'c'.repeat(64) });
+  replacement.rows[0].project_prices['999H'] = '15000';
   const confirmation = publish(env, replacement);
   assert.equal(confirmation.status, 'confirmation_required');
-  assert.equal(env.createdFileCount, filesAfterInitial);
+  assert.equal(env.createdFileCount, filesAfterInitial + 1);
   const replaced = publish(env, replacement, { confirmSameDateHashChange: true });
   assert.equal(replaced.status, 'published');
   const replacedRegistry = env.context.threecRegistry_();
@@ -435,4 +445,77 @@ test('來源XLSX→解析預覽→後端發布及讀回→查詢模型逐價相�
   assert.equal(Query.priceState(view.rows[0].quotes['點子行動'].A).zero, true);
   assert.equal(Query.priceState(view.rows[0].quotes['點子行動'].B).missing, true);
   assert.notEqual(view.rows[0].quotes['點子行動'].S, view.rows[0].quotes['FutureDial（FDI）'].S);
+});
+
+
+test('全語意相同的新日期來源只保存核對紀錄；更舊來源不得回退核對版本', () => {
+  const env = runtime();
+  const first = shoppingSnapshot({ rows:2, excluded:0 });
+  publish(env, first);
+  const original = env.context.threecRegistry_().kinds.shopping.active.snapshot_file_id;
+  const fresh = shoppingSnapshot({ date:'2026-09-24', hash:'b'.repeat(64), rows:2, excluded:0 });
+  fresh.rows.reverse();
+  const result = publish(env, fresh);
+  assert.equal(result.status, 'already_current');
+  assert.equal(result.changeSet.counts.changed, 0);
+  assert.equal(result.changeSet.counts.added, 0);
+  assert.equal(result.updateCheck.source_version_date, '2026-09-24');
+  assert.equal(env.createdFileCount, 3, 'one price snapshot and two registry files');
+  assert.equal(env.context.threecRegistry_().kinds.shopping.active.snapshot_file_id, original);
+  assert.throws(() => publish(env, shoppingSnapshot({ date:'2026-09-23', hash:'c'.repeat(64), rows:2, excluded:0 })), /較舊檔名日期/);
+  assert.equal(env.createdFileCount, 3);
+});
+
+test('伺服器預覽與發布綁定 active 雜湊，完整条件異動與分頁搜尋讀回一致', () => {
+  const env = runtime();
+  const first = shoppingSnapshot({ rows:2, excluded:0 });
+  first.rows.forEach(row => { row.project_prices['999H'] = '100'; });
+  publish(env, first);
+  const next = shoppingSnapshot({ date:'2026-09-23', hash:'b'.repeat(64), rows:2, excluded:0 });
+  next.rows[0].project_prices['999H'] = '0';
+  next.rows[1].project_prices['999H'] = '';
+  const preview = env.context.threec_diff_preview({ ...env.auth, snapshotJson:JSON.stringify(next) });
+  assert.equal(preview.changeSet.counts.changed, 2);
+  assert.equal(preview.changeSet.counts.unchanged, 2);
+  assert.throws(() => publish(env, next, { requiresDiffCheck:true, expectedActiveHash:'stale' }), /active 已變動/);
+  assert.equal(env.createdFileCount, 2);
+  const result = publish(env, next, { requiresDiffCheck:true, expectedActiveHash:preview.basis.snapshot_hash });
+  assert.equal(result.changeSet.counts.changed, 2);
+  const readback = env.context.threec_readback({ ...env.auth, kind:'shopping' });
+  const a = env.context.threec_changes_read({ ...env.auth, kind:'shopping', limit:1, snapshotHash:readback.snapshot.snapshot_hash });
+  const b = env.context.threecChangesRead({ ...env.auth, kind:'shopping', deviceId:'device-123456789012', limit:1, offset:1, snapshotHash:readback.snapshot.snapshot_hash });
+  assert.equal(a.changeSet.changeCount, 2);
+  assert.equal(a.changeSet.hasMore, true);
+  assert.notEqual(a.changeSet.changes[0].key, b.changeSet.changes[0].key);
+  assert.equal(b.changeSet.hasMore, false);
+  const searched = env.context.threec_changes_read({ ...env.auth, kind:'shopping', search:next.rows[1].model });
+  assert.equal(searched.changeSet.changeCount, 1);
+  assert.equal(searched.changeSet.counts.changed, 2);
+  assert.throws(() => env.context.threec_changes_read({ ...env.auth, kind:'shopping', snapshotHash:preview.basis.snapshot_hash }), /正式版本已變動/);
+});
+
+test('歷史 v74 人工欄序只在已知解析器版本正規化，價格與完整方案不變', () => {
+  const env = runtime();
+  const snapshot = shoppingSnapshot({ rows:1, excluded:0 });
+  snapshot.parser_version = '2026.09.28-private-registry-1';
+  snapshot.rows[0].project_prices = { '5G(24)新申裝／999H (2)':'1,234', '5G(36)續約／999H (3)':'0' };
+  const legacy = env.context.threecNormalizeIncomingSnapshot_(snapshot);
+  assert.equal(legacy.rows[0].project_prices['5G(24)新申裝／999H'], '1234');
+  assert.equal(legacy.rows[0].project_prices['5G(36)續約／999H'], '0');
+  snapshot.parser_version = 'new-parser';
+  const modern = env.context.threecNormalizeIncomingSnapshot_(snapshot);
+  assert.equal(modern.rows[0].project_prices['5G(24)新申裝／999H (2)'], '1234');
+});
+
+test('首版回復空檢查點，再回復可找回首版；不偽造前版價格', () => {
+  const env = runtime();
+  publish(env, shoppingSnapshot({ rows:1, excluded:0 }));
+  const original = env.context.threecRegistry_().kinds.shopping.active.snapshot_file_id;
+  assert.equal(env.context.threecStatus(env.auth).registry.shopping.can_rollback, true);
+  env.context.threecRollback({ ...env.auth, kind:'shopping' });
+  assert.equal(env.context.threecRegistry_().kinds.shopping.active, null);
+  assert.equal(env.context.threecRegistry_().kinds.shopping.previous.snapshot_file_id, original);
+  env.context.threecRollback({ ...env.auth, kind:'shopping' });
+  assert.equal(env.context.threecRegistry_().kinds.shopping.active.snapshot_file_id, original);
+  assert.equal(env.context.threec_readback({ ...env.auth, kind:'shopping' }).changeSet.firstRelease, true);
 });

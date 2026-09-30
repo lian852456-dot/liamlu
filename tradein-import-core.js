@@ -10,7 +10,7 @@
   const PREVIEW_LIMIT = 5;
   const NORMALIZED_PREVIEW_LIMIT = 50;
   const GRADE_ORDER = Object.freeze(['S', 'A', 'B', 'C']);
-  const PARSER_VERSION = '2026.09.28-private-registry-1';
+  const PARSER_VERSION = '2026.10.01-semantic-plan-1';
   const HEADER_ALIASES = Object.freeze([
     { key:'brand', label:'品牌', aliases:['品牌', '廠牌', '品牌名稱', 'brand', 'brand name'] },
     { key:'code', label:'商品代碼／料號', aliases:['代碼', '商品代碼', '產品代碼', 'code', 'item code'] },
@@ -350,8 +350,14 @@
         if (field.recognized || !looksLikeProjectPriceField(field.sourceName)) return;
         const rawValue = text(record.values[field.name]);
         const group = planGroupName(matrix, base.headerRow, field.columnIndex);
-        const key = (group ? group + '／' : '') + field.name;
-        projectPrices[key] = priceText(rawValue);
+        // field.name appends a duplicate-column ordinal. It is a display
+        // identifier, not a tariff/contract condition, and changes on reorder.
+        const key = (group ? group + '／' : '') + field.sourceName;
+        const price = priceText(rawValue);
+        if (Object.prototype.hasOwnProperty.call(projectPrices, key) && projectPrices[key] !== price) {
+          throw new Error('相同完整方案條件有不同報價：' + key + '，請核對來源合併標題。');
+        }
+        projectPrices[key] = price;
         if (rawValue && !isCurrency(rawValue)) invalidCurrencyCount += 1;
       });
       if (values.retailPrice && !isCurrency(values.retailPrice)) invalidCurrencyCount += 1;

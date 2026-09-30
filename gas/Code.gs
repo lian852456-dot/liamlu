@@ -2986,6 +2986,7 @@ function doPost(e) {
     else if (action === 'department_ops_publish') result = departmentOpsPublish(payload);
     else if (action === 'department_gold_access') result = departmentGoldAccess(payload);
     else if (action === 'threec_snapshot_read') result = threecSnapshotRead(payload);
+    else if (action === 'threec_changes_read') result = threecChangesRead(payload);
     else if (action === 'private_admin_requests') result = privateDashboardAdminRequests(payload);
     else if (action === 'private_admin_approve') result = privateDashboardAdminApprove(payload);
     else if (action === 'private_admin_revoke') result = privateDashboardAdminRevoke(payload);
@@ -3570,8 +3571,8 @@ function threecRegistrySummary_(registry) {
   return {
     schema_version:THREEC_REGISTRY_SCHEMA,
     updated_at:String(registry.updated_at || ''),
-    shopping:{ active:clean(registry.kinds.shopping.active), previous:clean(registry.kinds.shopping.previous) },
-    tradein:{ active:clean(registry.kinds.tradein.active), previous:clean(registry.kinds.tradein.previous) }
+    shopping:{ active:clean(registry.kinds.shopping.active), previous:clean(registry.kinds.shopping.previous), can_rollback:threecCanRollback_(registry, 'shopping') },
+    tradein:{ active:clean(registry.kinds.tradein.active), previous:clean(registry.kinds.tradein.previous), can_rollback:threecCanRollback_(registry, 'tradein') }
   };
 }
 
@@ -3601,7 +3602,7 @@ function threecPriceField_(value, label, allowEmpty) {
   throw new Error(label + '不是有效的非負價格');
 }
 
-function threecValidateShoppingRows_(rows) {
+function threecValidateShoppingRows_(rows, legacyColumnOrdinals) {
   const seen = {};
   return rows.map(function(row, index) {
     if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error('3C 第 ' + (index + 1) + ' 筆格式不正確');
@@ -3618,8 +3619,11 @@ function threecValidateShoppingRows_(rows) {
     const projectKeys = Object.keys(project);
     if (projectKeys.length > 120) throw new Error('3C 專案價欄位過多');
     projectKeys.forEach(function(name) {
-      const cleanName = threecTextField_(name, '專案價欄名', 120, true);
-      projectPrices[cleanName] = threecPriceField_(project[name], cleanName, true);
+      const displayName = threecTextField_(name, '專案價欄名', 120, true);
+      const cleanName = legacyColumnOrdinals ? displayName.replace(/ \(\d+\)$/, '') : displayName;
+      const price = threecPriceField_(project[name], cleanName, true);
+      if (Object.prototype.hasOwnProperty.call(projectPrices, cleanName) && projectPrices[cleanName] !== price) throw new Error('相同完整方案條件有不同報價：' + cleanName);
+      projectPrices[cleanName] = price;
     });
     const retailPrice = threecPriceField_(row.retail_price, '單機價', true);
     const hasPrice = retailPrice !== '' || Object.keys(projectPrices).some(function(name) { return projectPrices[name] !== ''; });
@@ -3671,7 +3675,7 @@ function threecValidateTradeinRows_(rows) {
 
 function threecNormalizeIncomingSnapshot_(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('3C／舊換新快照格式不正確');
-  threecAllowedKeys_(raw, ['schema_version','kind','source_version_date','source_file_name','source_file_sha256','parser_version','internal_source_dates','source_row_count','row_count','excluded_no_price_count','query_model_count','quote_conflict_count','rows','published_at','operator_hash','snapshot_hash'], '快照');
+  threecAllowedKeys_(raw, ['schema_version','kind','source_version_date','source_file_name','source_file_sha256','parser_version','internal_source_dates','source_row_count','row_count','excluded_no_price_count','query_model_count','quote_conflict_count','rows','published_at','operator_hash','snapshot_hash','change_basis','change_counts'], '快照');
   if (raw.schema_version !== THREEC_SNAPSHOT_SCHEMA) throw new Error('3C／舊換新快照 schema 不正確');
   const kind = threecKind_(raw.kind);
   const sourceVersionDate = threecIsoDate_(raw.source_version_date);
@@ -3683,7 +3687,7 @@ function threecNormalizeIncomingSnapshot_(raw) {
   const sourceFileSha256 = String(raw.source_file_sha256 || '').toLowerCase();
   if (!/^[a-f0-9]{64}$/.test(sourceFileSha256)) throw new Error('來源檔案 SHA-256 不正確');
   if (!Array.isArray(raw.rows) || !raw.rows.length || raw.rows.length > (kind === 'shopping' ? 10000 : 5000)) throw new Error('正式快照筆數不正確');
-  const rows = kind === 'shopping' ? threecValidateShoppingRows_(raw.rows) : threecValidateTradeinRows_(raw.rows);
+  const rows = kind === 'shopping' ? threecValidateShoppingRows_(raw.rows, raw.parser_version === '2026.09.28-private-registry-1') : threecValidateTradeinRows_(raw.rows);
   const rowCount = Number(raw.row_count);
   const sourceRowCount = Number(raw.source_row_count);
   const excludedNoPriceCount = Number(raw.excluded_no_price_count || 0);
@@ -3758,6 +3762,87 @@ function threecAuditEvent_(registry, action, kind, employeeId, detail) {
   registry.audit = events;
 }
 
+// Semantic comparisons are shared with the local parser preview. Prices stay
+// in immutable snapshots; only counts/basis are added to the version metadata.
+function threecVerifiedSnapshot_(item) {
+  if (!item) return null;
+  const raw = threecReadJsonFile_(item.snapshot_file_id);
+  const normalized = threecNormalizeIncomingSnapshot_(raw);
+  if (threecSnapshotHash_(raw) !== raw.snapshot_hash || item.snapshot_hash !== raw.snapshot_hash ||
+      item.kind !== normalized.kind || item.source_version_date !== normalized.source_version_date ||
+      item.source_file_sha256 !== normalized.source_file_sha256 || Number(item.row_count) !== normalized.row_count) {
+    throw new Error('3C／舊換新 active 快照雜湊或版本驗證失敗');
+  }
+  normalized.published_at = raw.published_at;
+  normalized.snapshot_hash = raw.snapshot_hash;
+  return { raw:raw, normalized:normalized };
+}
+
+function threecDiff_(kind, before, after, options) {
+  if (typeof ThreecPriceDiffCore === 'undefined') throw new Error('完整條件差異模組尚未部署');
+  const opts = options || {};
+  const offset = Math.max(0, Math.floor(Number(opts.offset || 0)));
+  const limit = Math.min(1000, Math.max(1, Math.floor(Number(opts.limit || 100))));
+  return ThreecPriceDiffCore.diffSnapshots(kind, before, after, { offset:offset, limit:limit, search:String(opts.search || '') });
+}
+
+function threecLatestSource_(slot) {
+  const active = slot.active;
+  const check = slot.latest_check;
+  return check && active && check.snapshot_hash === active.snapshot_hash && check.source_version_date >= active.source_version_date ? check : active;
+}
+
+function threecPreviewBasis_(active) {
+  return { snapshot_hash:active ? active.snapshot_hash : '', date:active ? active.source_version_date : '', source_sha:active ? active.source_file_sha256 : '' };
+}
+
+function threec_diff_preview(payload) {
+  reportUploadAuthorize_(payload);
+  const encoded = String((payload || {}).snapshotJson || '');
+  if (!encoded || encoded.length > THREEC_MAX_SNAPSHOT_JSON_BYTES) throw new Error('來源預覽缺少或過大');
+  const incoming = threecNormalizeIncomingSnapshot_(JSON.parse(encoded));
+  const registry = threecRegistry_();
+  const source = threecLatestSource_(registry.kinds[incoming.kind]);
+  const active = registry.kinds[incoming.kind].active;
+  if (source && incoming.source_version_date < source.source_version_date) throw new Error('較舊檔名日期不得覆蓋目前正式版本');
+  const previous = threecVerifiedSnapshot_(active);
+  return { changeSet:threecDiff_(incoming.kind, previous && previous.normalized, incoming, payload), basis:threecPreviewBasis_(active), registry:threecRegistrySummary_(registry) };
+}
+
+function threec_changes_read(payload) {
+  reportUploadAuthorize_(payload);
+  return threecChangesResult_(payload || {});
+}
+
+function threecChangesRead(payload) {
+  threecAuthorizeRead_(payload);
+  return threecChangesResult_(payload || {});
+}
+
+function threecVersionChanges_(kind, verified, slot, payload) {
+  let basis = verified.raw.change_basis || null;
+  // Older snapshots predate this feature. A first version has no prior price
+  // version; never use a newer rollback slot as its historical basis.
+  if (!basis && slot.previous && slot.previous.published_at < verified.raw.published_at) basis = slot.previous;
+  const previous = basis ? threecVerifiedSnapshot_(basis) : null;
+  return threecDiff_(kind, previous && previous.normalized, verified.normalized, payload);
+}
+
+function threecChangesResult_(payload, suppliedRegistry, suppliedVerified) {
+  const kind = threecKind_(payload.kind);
+  const registry = suppliedRegistry || threecRegistry_();
+  const slot = registry.kinds[kind];
+  const active = slot.active;
+  if (!active) return { changeSet:null, snapshotHash:'', updateCheck:null };
+  if (payload.snapshotHash && String(payload.snapshotHash) !== active.snapshot_hash) throw new Error('正式版本已變動，請重新讀取再查詢異動清單');
+  const verified = suppliedVerified || threecVerifiedSnapshot_(active);
+  const updateCheck = slot.latest_check && slot.latest_check.snapshot_hash === active.snapshot_hash ? slot.latest_check : null;
+  const changeSet = updateCheck && updateCheck.status === 'already_current'
+    ? Object.assign({}, updateCheck.changeSet, { changes:[], offset:0, limit:100, changeCount:0, totalChangeCount:0, hasMore:false })
+    : threecVersionChanges_(kind, verified, slot, payload);
+  return { changeSet:changeSet, snapshotHash:active.snapshot_hash, updateCheck:updateCheck };
+}
+
 function threec_status(payload) { return threecStatus(payload); }
 function threec_publish(payload) { return threecPublish(payload); }
 function threec_rollback(payload) { return threecRollback(payload); }
@@ -3784,17 +3869,34 @@ function threecPublish(payload) {
     const registry = threecRegistry_();
     const slot = registry.kinds[incoming.kind];
     const active = slot.active;
-    if (active && incoming.source_version_date < active.source_version_date) throw new Error('較舊檔名日期不得覆蓋目前正式版本');
-    if (active && incoming.source_version_date === active.source_version_date && incoming.source_file_sha256 === active.source_file_sha256) {
-      return { status:'already_current', kind:incoming.kind, registry:threecRegistrySummary_(registry) };
-    }
-    if (active && incoming.source_version_date === active.source_version_date && incoming.source_file_sha256 !== active.source_file_sha256 && (payload || {}).confirmSameDateHashChange !== true) {
+    if ((payload || {}).requiresDiffCheck === true && String((payload || {}).expectedActiveHash || '') !== String(active && active.snapshot_hash || '')) throw new Error('預覽後正式 active 已變動，請重新解析核對差異');
+    const previous = threecVerifiedSnapshot_(active);
+    const changeSet = threecDiff_(incoming.kind, previous && previous.normalized, incoming);
+    const latestSource = threecLatestSource_(slot);
+    if (latestSource && incoming.source_version_date < latestSource.source_version_date) throw new Error('較舊檔名日期不得覆蓋目前正式版本');
+    const hasChanges = !!(changeSet.counts.changed || changeSet.counts.added || changeSet.counts.removed);
+    if (active && incoming.source_file_sha256 === active.source_file_sha256 && hasChanges) throw new Error('相同來源 SHA 的解析價格與 active 不一致，請核對解析器與來源，不可重複發布');
+    if (latestSource && incoming.source_version_date === latestSource.source_version_date && incoming.source_file_sha256 !== latestSource.source_file_sha256 && (payload || {}).confirmSameDateHashChange !== true) {
       return { status:'confirmation_required', reason:'same_date_hash_changed', kind:incoming.kind, registry:threecRegistrySummary_(registry) };
+    }
+    if (active && !hasChanges) {
+      const existing = slot.latest_check;
+      if (!existing || existing.snapshot_hash !== active.snapshot_hash || existing.source_file_sha256 !== incoming.source_file_sha256 || existing.source_version_date !== incoming.source_version_date) {
+        const checked = JSON.parse(JSON.stringify(registry));
+        checked.updated_at = privateDashboardNow();
+        checked.kinds[incoming.kind].latest_check = { status:'already_current', checked_at:checked.updated_at, snapshot_hash:active.snapshot_hash, source_version_date:incoming.source_version_date, source_file_sha256:incoming.source_file_sha256, source_file_name:incoming.source_file_name, row_count:incoming.row_count, source_row_count:incoming.source_row_count, changeSet:changeSet };
+        threecAuditEvent_(checked, 'check_no_price_change', incoming.kind, employeeId, 'unchanged=' + changeSet.counts.unchanged);
+        threecWriteRegistry_(checked);
+        return { status:'already_current', kind:incoming.kind, changeSet:changeSet, updateCheck:checked.kinds[incoming.kind].latest_check, registry:threecRegistrySummary_(checked) };
+      }
+      return { status:'already_current', kind:incoming.kind, changeSet:changeSet, updateCheck:existing, registry:threecRegistrySummary_(registry) };
     }
     const publishedAt = privateDashboardNow();
     const snapshot = Object.assign({}, incoming, {
       published_at:publishedAt,
-      operator_hash:privateDashboardHash(employeeId).slice(0, 16)
+      operator_hash:privateDashboardHash(employeeId).slice(0, 16),
+      change_basis:active || null,
+      change_counts:changeSet.counts
     });
     snapshot.snapshot_hash = threecSnapshotHash_(snapshot);
     const folder = threecPrivateFolder_();
@@ -3808,14 +3910,22 @@ function threecPublish(payload) {
     }
     const next = JSON.parse(JSON.stringify(registry));
     next.updated_at = publishedAt;
+    next.kinds[incoming.kind].empty_checkpoint = !next.kinds[incoming.kind].active;
+    next.kinds[incoming.kind].latest_check = null;
     next.kinds[incoming.kind].previous = next.kinds[incoming.kind].active || null;
     next.kinds[incoming.kind].active = threecSnapshotSummary_(snapshot, snapshotFile);
     threecAuditEvent_(next, 'publish', incoming.kind, employeeId, incoming.source_version_date + ' rows=' + incoming.row_count);
     threecWriteRegistry_(next);
-    return { status:'published', kind:incoming.kind, registry:threecRegistrySummary_(next) };
+    return { status:'published', kind:incoming.kind, changeSet:changeSet, registry:threecRegistrySummary_(next) };
   } finally {
     lock.releaseLock();
   }
+}
+
+function threecCanRollback_(registry, kind) {
+  const slot = registry.kinds[kind];
+  const events = (registry.audit || []).filter(function(event) { return event.kind === kind; });
+  return !!slot.previous || !!(slot.active && (slot.empty_checkpoint || (events.filter(function(event) { return event.action === 'publish'; }).length === 1 && !events.some(function(event) { return event.action === 'rollback'; }))));
 }
 
 function threecRollback(payload) {
@@ -3826,16 +3936,20 @@ function threecRollback(payload) {
   try {
     const registry = threecRegistry_();
     const slot = registry.kinds[kind];
-    if (!slot.active || !slot.previous) throw new Error('此類資料尚無可回復的 previous 版本');
-    const previousSnapshot = threecReadJsonFile_(slot.previous.snapshot_file_id);
-    threecNormalizeIncomingSnapshot_(previousSnapshot);
-    if (threecSnapshotHash_(previousSnapshot) !== previousSnapshot.snapshot_hash) throw new Error('previous 快照雜湊驗證失敗');
+    if (!threecCanRollback_(registry, kind)) throw new Error('此類資料尚無可回復的 previous 版本');
+    const previousSnapshot = slot.previous ? threecReadJsonFile_(slot.previous.snapshot_file_id) : null;
+    if (previousSnapshot) {
+      threecNormalizeIncomingSnapshot_(previousSnapshot);
+      if (threecSnapshotHash_(previousSnapshot) !== previousSnapshot.snapshot_hash) throw new Error('previous 快照雜湊驗證失敗');
+    }
     const next = JSON.parse(JSON.stringify(registry));
     const oldActive = next.kinds[kind].active;
     next.kinds[kind].active = next.kinds[kind].previous;
     next.kinds[kind].previous = oldActive;
+    next.kinds[kind].empty_checkpoint = false;
+    next.kinds[kind].latest_check = null;
     next.updated_at = privateDashboardNow();
-    threecAuditEvent_(next, 'rollback', kind, employeeId, next.kinds[kind].active.source_version_date);
+    threecAuditEvent_(next, 'rollback', kind, employeeId, next.kinds[kind].active ? next.kinds[kind].active.source_version_date : 'restored-empty-first-release-checkpoint');
     threecWriteRegistry_(next);
     return { status:'rolled_back', kind:kind, registry:threecRegistrySummary_(next) };
   } finally {
@@ -3876,7 +3990,8 @@ function threecReadActive_(requestedKind) {
   }
   normalized.published_at = snapshot.published_at;
   normalized.snapshot_hash = snapshot.snapshot_hash;
-  return { snapshot:normalized, registry:threecRegistrySummary_(registry) };
+  const changes = threecChangesResult_({ kind:kind, snapshotHash:active.snapshot_hash, limit:100 }, registry, { raw:snapshot, normalized:normalized });
+  return { snapshot:normalized, registry:threecRegistrySummary_(registry), changeSet:changes.changeSet, updateCheck:changes.updateCheck };
 }
 
 function privateDashboardAdminRequests(payload) {
@@ -5075,7 +5190,7 @@ function checkSegAndNotify(seg) {
 // 確保上傳功能的部署動作完全影響不到每日回報與其他系統。
 const REPORT_UPLOAD_ALLOWED_ACTIONS = [
   'report_upload_preview', 'report_upload_commit', 'report_upload_log', 'report_upload_rollback',
-  'threec_snapshot_read'
+  'threec_snapshot_read', 'threec_changes_read'
 ];
 
 // 上傳頁與上傳 API 同屬新 Deployment，使用 google.script.run 直接呼叫這四個包裝函式。
