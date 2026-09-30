@@ -392,3 +392,21 @@ test('私有發布快照以有價格的標準化列為正式筆數，排除數�
   assert.equal(snapshot.rows[1].retail_price, '0');
   assert.equal(snapshot.rows[1].project_prices['999H'], '0');
 });
+
+
+test('相同資費在不同合約群組按原始欄名保留，欄位移動不改方案鍵', async () => {
+  const groups = [['', '', '', '', '5G(24)新申裝','5G(36)續約'], ['廠牌','代碼','機型','單機價','999H','999H'], ['Apple','X1','測試手機 256G(黑)','20000','1234','0']];
+  const moved = groups.map(row => [...row.slice(0,4),row[5],row[4]]);
+  async function parse(rows) {
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), '方案表');
+    return Core.parseFile(localFile('20260922-reorder.xlsx', XLSX.write(book, {type:'buffer',bookType:'xlsx'})), XLSX, 'shopping');
+  }
+  const left = await parse(groups);
+  const right = await parse(moved);
+  assert.deepEqual(left.standardized.rows[0].projectPrices, right.standardized.rows[0].projectPrices);
+  const keys = Object.keys(left.standardized.rows[0].projectPrices);
+  assert.ok(keys.some(key => key.includes('(24)') && key.includes('999H')));
+  assert.ok(keys.some(key => key.includes('(36)') && key.includes('999H')));
+  assert.ok(keys.every(key => !/ \(\d+\)$/.test(key)));
+});

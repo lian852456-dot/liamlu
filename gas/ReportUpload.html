@@ -19,6 +19,7 @@
     .notice,.message { margin-top:12px; padding:10px 12px; border-radius:9px; background:#eef6fb; color:#24516d; } .message.ok { background:#e7f7ef; color:var(--ok); } .message.warn { background:#fff4df; color:var(--warn); } .message.bad { background:#fff0f1; color:var(--bad); }
     .meta { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; } .metric { padding:11px; background:#f4f8fb; border-radius:9px; } .metric b { display:block; font-size:18px; color:var(--navy); }
     table { width:100%; border-collapse:collapse; margin-top:12px; } th,td { padding:8px; text-align:left; border-bottom:1px solid var(--line); } th { color:var(--muted); font-size:13px; } .checks .ok { color:var(--ok); } .checks .warn { color:var(--warn); } .checks .block,.checks .bad { color:var(--bad); }
+    .diff-panel { margin-top:14px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#fbfdff; } .diff-counts { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:10px; } .diff-count { padding:9px; border-radius:8px; background:#eef6fb; } .diff-count b { display:block; color:var(--navy); font-size:18px; } .diff-count span { display:block; color:var(--muted); font-size:12px; } .diff-scroll { max-width:100%; overflow-x:auto; margin-top:10px; border:1px solid var(--line); border-radius:8px; } .diff-scroll table { min-width:860px; margin-top:0; } .diff-price.missing { color:var(--muted); } .diff-price.zero { color:var(--ok); } .diff-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; } @media (max-width:680px) { .diff-counts { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     .confirm { display:flex; gap:8px; align-items:flex-start; margin-top:14px; color:var(--muted); } .confirm input { width:auto; min-height:auto; margin-top:5px; }
     .small { color:var(--muted); font-size:13px; } code { background:#edf3f7; border-radius:4px; padding:1px 4px; } @media (max-width:680px) { .grid,.meta { grid-template-columns:1fr; } main { width:min(100% - 20px,960px); margin-top:10px; } }
   </style>
@@ -150,6 +151,19 @@
           <p id="threecHash" class="small"></p>
           <label>搜尋預覽機款 <input id="threecPreviewSearch" type="search" placeholder="輸入機型或容量"></label>
           <div id="threecPricePreview" style="overflow:auto;max-height:520px"></div>
+          <section id="threecDiffPanel" class="diff-panel hidden" aria-live="polite">
+            <h3 style="margin:0">完整條件差異比對</h3>
+            <p id="threecDiffBasis" class="small">正在讀取既有 active 基準…</p>
+            <div id="threecDiffCounts" class="diff-counts"></div>
+            <label>搜尋異動條件 <input id="threecDiffSearch" type="search" placeholder="機款、容量、資費／合約、回收商或等級"></label>
+            <p id="threecDiffSummary" class="small"></p>
+            <div id="threecDiffResults" class="diff-scroll"></div>
+            <div class="diff-actions"><button id="threecDiffPrevBtn" class="secondary" type="button" disabled>上一頁異動</button><span id="threecDiffPage" class="small" style="align-self:center">第 1 頁</span><button id="threecDiffNextBtn" class="secondary" type="button" disabled>下一頁異動</button></div>
+            <div class="diff-actions">
+              <button id="threecDiffJsonBtn" class="secondary" type="button" disabled>下載完整異動 JSON</button>
+              <button id="threecDiffCsvBtn" class="secondary" type="button" disabled>下載完整異動 CSV</button>
+            </div>
+          </section>
           <label class="confirm"><input id="threecConfirm" type="checkbox">我已核對來源檔名日期、正式筆數與稽核數，確認發布此標準化快照。</label>
           <label id="threecSameDateWrap" class="confirm hidden"><input id="threecSameDateConfirm" type="checkbox">同日期但來源雜湊不同；我確認這是更正版，允許切換 active 指標。</label>
           <div class="actions">
@@ -164,10 +178,19 @@
 
   <script><?!= reportUploadInclude_('ReportUploadSheetJs'); ?></script>
   <script><?!= reportUploadInclude_('ReportUploadTradeInCore'); ?></script>
+  <script><?!= reportUploadInclude_('ReportUploadThreecDiffCore'); ?></script>
   <script>
     const auth = { employeeId: '', adminSecret: '' };
     let previewToken = '';
     let threecPreviewSnapshot = null;
+    let threecPreviewBasis = null;
+    let threecPreviewChangeSet = null;
+    let threecPreviewUpdateCheck = null;
+    let threecFormalChangeMode = false;
+    let threecFormalSnapshotHash = '';
+    let threecDiffRequestGeneration = 0;
+    let threecRegistryState = {};
+    const threecRollbackAvailable = { shopping:false, tradein:false };
     let threecPreviewGeneration = 0;
     let threecPublishing = false;
     let awardPreviewJobId = '';
@@ -292,12 +315,19 @@
     function threecSlotText(label, slot) {
       const active = slot && slot.active;
       const previous = slot && slot.previous;
+      const latest = slot && (slot.latest_check || slot.latestCheck);
       return '<div><b>' + esc(label) + '</b>：active ' + esc(active ? active.source_version_date + '／' + active.row_count + ' 筆' : '尚無') +
-        '；previous ' + esc(previous ? previous.source_version_date + '／' + previous.row_count + ' 筆' : '尚無') + '</div>';
+        '；previous ' + esc(previous ? previous.source_version_date + '／' + previous.row_count + ' 筆' : '尚無') +
+        '；最近來源核對 ' + esc(latest ? (latest.source_version_date || latest.date || '—') + '／' + (latest.row_count == null ? '—' : latest.row_count) + ' 筆／' + (latest.status || '已核對') : '尚無') + '</div>';
     }
     function renderThreecRegistry(result) {
       const registry = result && result.registry || {};
-      $('threecRegistry').innerHTML = threecSlotText('3C', registry.shopping) + threecSlotText('舊換新', registry.tradein);
+      threecRegistryState = registry;
+      const slots = { shopping: registry.shopping || (registry.kinds && registry.kinds.shopping), tradein: registry.tradein || (registry.kinds && registry.kinds.tradein) };
+      ['shopping','tradein'].forEach(kind => { const slot = slots[kind]; threecRollbackAvailable[kind] = !!(slot && slot.can_rollback); });
+      $('threecRegistry').innerHTML = threecSlotText('3C', slots.shopping) + threecSlotText('舊換新', slots.tradein);
+      if ($('shoppingRollbackBtn')) $('shoppingRollbackBtn').disabled = threecPublishing || !threecRollbackAvailable.shopping;
+      if ($('tradeinRollbackBtn')) $('tradeinRollbackBtn').disabled = threecPublishing || !threecRollbackAvailable.tradein;
     }
     async function refreshThreec() {
       const result = await call('threec_status', payload());
@@ -306,26 +336,160 @@
     }
     function updateThreecPublishButton() {
       const sameDateRequired = !$('threecSameDateWrap').classList.contains('hidden');
-      $('threecPublishBtn').disabled = threecPublishing || !threecPreviewSnapshot || !$('threecConfirm').checked || (sameDateRequired && !$('threecSameDateConfirm').checked);
+      const diffBlocked = threecPreviewUpdateCheck && (threecPreviewUpdateCheck.blocked || threecPreviewUpdateCheck.status === 'blocked' || threecPreviewUpdateCheck.ok === false || threecPreviewUpdateCheck.matches === false);
+      $('threecPublishBtn').disabled = threecPublishing || diffBlocked || !threecPreviewSnapshot || !$('threecConfirm').checked || (sameDateRequired && !$('threecSameDateConfirm').checked);
     }
     function invalidateThreecPreview() {
       threecPreviewGeneration += 1;
       threecPreviewSnapshot = null;
+      threecPreviewBasis = null;
+      threecPreviewChangeSet = null;
+      threecPreviewUpdateCheck = null;
+      threecFormalChangeMode = false;
+      threecFormalSnapshotHash = '';
+      threecDiffRequestGeneration += 1;
       $('threecConfirm').checked = false;
       $('threecSameDateConfirm').checked = false;
       $('threecSameDateWrap').classList.add('hidden');
       $('threecPreview').classList.add('hidden');
+      $('threecDiffPanel').classList.add('hidden');
+      $('threecDiffResults').innerHTML = '';
+      $('threecDiffCounts').innerHTML = '';
+      $('threecDiffSearch').value = '';
       updateThreecPublishButton();
     }
     function setThreecPublishing(busy) {
       threecPublishing = busy;
       ['shoppingFile', 'tradeinFile', 'shoppingPreviewBtn', 'tradeinPreviewBtn', 'shoppingRollbackBtn', 'tradeinRollbackBtn', 'threecConfirm', 'threecSameDateConfirm'].forEach(id => { $(id).disabled = busy; });
+      if (!busy) { $('shoppingRollbackBtn').disabled = !threecRollbackAvailable.shopping; $('tradeinRollbackBtn').disabled = !threecRollbackAvailable.tradein; }
       updateThreecPublishButton();
     }
     function threecPriceText(value) {
       if (value == null || String(value).trim() === '') return '無報價';
       const clean = String(value).trim().replace(/,/g, '');
       return Number(clean).toLocaleString('zh-TW', { maximumFractionDigits:10 }) + ' 元';
+    }
+    function threecDiffRows(changeSet) {
+      if (!changeSet || typeof changeSet !== 'object') return [];
+      if (Array.isArray(changeSet.changes)) return changeSet.changes;
+      if (Array.isArray(changeSet.records)) return changeSet.records;
+      return [];
+    }
+    function threecDiffCounts(changeSet) {
+      const counts = changeSet && changeSet.counts && typeof changeSet.counts === 'object' ? changeSet.counts : {};
+      return {
+        added: Number(changeSet && changeSet.addedCount != null ? changeSet.addedCount : counts.added || 0),
+        changed: Number(changeSet && changeSet.changedCount != null ? changeSet.changedCount : counts.changed || 0),
+        unchanged: Number(changeSet && changeSet.unchangedCount != null ? changeSet.unchangedCount : counts.unchanged || 0),
+        removed: Number(changeSet && changeSet.removedCount != null ? changeSet.removedCount : counts.removed || 0)
+      };
+    }
+    function threecDiffPrice(value) {
+      if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'display')) return String(value.display || '無報價（缺價）');
+      if (window.ThreecPriceDiffCore && typeof window.ThreecPriceDiffCore.formatPrice === 'function') return window.ThreecPriceDiffCore.formatPrice(value);
+      if (value == null || String(value).trim() === '') return '無報價（缺價）';
+      const clean = String(value).trim().replace(/,/g, '');
+      const number = Number(clean);
+      return Number.isFinite(number) ? number.toLocaleString('zh-TW', { maximumFractionDigits:10 }) + ' 元' : String(value);
+    }
+    function threecDiffPriceClass(value) {
+      if (value == null || (value && value.kind === 'missing') || String(value).trim() === '') return 'missing';
+      if ((value && value.kind === 'zero') || Number(String(value).replace(/,/g, '')) === 0) return 'zero';
+      return '';
+    }
+    function threecDiffRecordText(record) {
+      const identity = record && record.identity || {};
+      return [record && (record.modelCapacity || record.model), record && (record.plan || record.condition), record && (record.provider || identity.provider), record && (record.grade || identity.grade)].filter(Boolean).join(' ');
+    }
+    function threecDiffBasisText(basis, updateCheck) {
+      const value = basis || {};
+      const check = updateCheck || {};
+      const checkBlocked = check.blocked || check.status === 'blocked' || check.ok === false || check.matches === false;
+      const latest = check.latest_check || check.latestCheck || check;
+      const source = threecPreviewSnapshot || {};
+      const latestDate = latest && (latest.source_version_date || latest.date || latest.latest_source_version_date);
+      const latestRows = latest && (latest.row_count != null ? latest.row_count : latest.source_row_count);
+      const latestText = latestDate || latestRows != null || latest.status ? '；最近來源核對日期 ' + (latestDate || '—') + '／' + (latestRows == null ? '—' : latestRows) + ' 筆／' + (latest.status || '已核對') : '';
+      const text = '既有 active 基準：' + (value.snapshot_hash || '尚無（首次發布）') + '；日期 ' + (value.date || value.source_version_date || '—') + '；來源 SHA-256 ' + (value.source_sha || value.source_file_sha256 || '—') + latestText + '；本次來源日期 ' + (source.source_version_date || '—') + '／SHA-256 ' + (source.source_file_sha256 || '—');
+      return checkBlocked ? text + '；目前 active 已變動，請重新預覽後再發布。' : text;
+    }
+    function renderThreecDiff(changeSet, basis, updateCheck) {
+      threecPreviewChangeSet = changeSet || null;
+      threecPreviewBasis = basis || null;
+      threecPreviewUpdateCheck = updateCheck || null;
+      const panel = $('threecDiffPanel');
+      const rows = threecDiffRows(changeSet);
+      const counts = threecDiffCounts(changeSet);
+      const labels = { changed:'調價（筆報價條件）', added:'新增報價條件', unchanged:'未變報價條件', removed:'移除報價條件' };
+      $('threecDiffBasis').textContent = threecDiffBasisText(basis, updateCheck);
+      $('threecDiffCounts').innerHTML = ['changed','added','unchanged','removed'].map(key => '<div class="diff-count"><span>' + labels[key] + '</span><b>' + counts[key].toLocaleString('zh-TW') + '</b></div>').join('');
+      const query = $('threecDiffSearch').value.trim();
+      const loadedSearch = String(changeSet && changeSet._search == null ? '' : changeSet && changeSet._search || '');
+      const pendingSearch = threecFormalChangeMode && query !== loadedSearch;
+      const displayRows = pendingSearch ? [] : rows;
+      const changeCount = Number(changeSet && (changeSet.changeCount != null ? changeSet.changeCount : rows.length) || 0);
+      const total = Number(changeSet && (changeSet.totalChangeCount != null ? changeSet.totalChangeCount : changeSet.totalCount != null ? changeSet.totalCount : changeCount) || 0);
+      const offset = Number(changeSet && changeSet.offset || 0);
+      const limit = Number(changeSet && changeSet.limit || 100);
+      const page = Math.floor(offset / Math.max(1, limit)) + 1;
+      const pageCount = Math.max(1, Math.ceil(changeCount / Math.max(1, limit)));
+      $('threecDiffSummary').textContent = pendingSearch ? '正在搜尋完整異動條件…' : '本頁顯示 ' + displayRows.length + ' 筆；搜尋符合 ' + changeCount.toLocaleString('zh-TW') + ' 筆，整版共 ' + total.toLocaleString('zh-TW') + ' 筆報價條件（含缺價欄位，不等同 Excel 機款列數）。';
+      const html = displayRows.slice(0, 100).map(record => '<tr><td>' + esc(record.status === 'changed' ? '調價' : record.status === 'added' ? '新增' : record.status === 'removed' ? '移除' : '未變') + '</td><td>' + esc(record.modelCapacity || record.model || '—') + '</td><td>' + esc(record.plan || record.condition || '—') + '</td><td>' + esc(record.provider || '—') + '</td><td>' + esc(record.grade || '—') + '</td><td class="diff-price ' + threecDiffPriceClass(record.before) + '">' + esc(threecDiffPrice(record.before)) + '</td><td class="diff-price ' + threecDiffPriceClass(record.after) + '">' + esc(threecDiffPrice(record.after)) + '</td></tr>').join('');
+      $('threecDiffResults').innerHTML = html ? '<table><thead><tr><th>狀態</th><th>機款／容量</th><th>完整資費／合約／條件</th><th>回收商</th><th>等級</th><th>之前</th><th>目前</th></tr></thead><tbody>' + html + '</tbody></table>' : '<p class="small" style="padding:10px">本頁沒有符合搜尋條件的異動。</p>';
+      $('threecDiffPage').textContent = '第 ' + page + ' 頁／共 ' + pageCount + ' 頁';
+      $('threecDiffPrevBtn').disabled = pendingSearch || offset <= 0 || !threecFormalChangeMode;
+      $('threecDiffNextBtn').disabled = pendingSearch || !(changeSet && changeSet.hasMore) || !threecFormalChangeMode;
+      $('threecDiffJsonBtn').disabled = pendingSearch || !changeSet || !threecFormalChangeMode;
+      $('threecDiffCsvBtn').disabled = pendingSearch || !changeSet || !threecFormalChangeMode;
+      if (!threecFormalChangeMode) $('threecDiffSummary').textContent += '；預覽先顯示前 100 筆，正式發布讀回後可分頁下載完整清單。';
+      panel.classList.remove('hidden');
+    }
+    function threecDiffPreviewRequest(snapshot, offset) {
+      return call('threec_diff_preview', payload({ snapshotJson:JSON.stringify(snapshot), offset:Number(offset || 0), limit:100 }));
+    }
+    async function loadThreecDiffPage(offset, search, requestToken) {
+      if (!threecPreviewSnapshot) return;
+      const generation = threecPreviewGeneration;
+      const token = requestToken || ++threecDiffRequestGeneration;
+      const query = String(search == null ? $('threecDiffSearch').value.trim() : search);
+      const result = threecFormalChangeMode
+        ? await call('threec_changes_read', payload({ kind:threecPreviewSnapshot.kind, offset:Number(offset || 0), limit:100, snapshotHash:threecFormalSnapshotHash, search:query }))
+        : await threecDiffPreviewRequest(threecPreviewSnapshot, offset);
+      if (generation !== threecPreviewGeneration || token !== threecDiffRequestGeneration) return;
+      const basis = result.basis || threecPreviewBasis || {};
+      if (threecPreviewBasis && threecPreviewBasis.snapshot_hash && basis.snapshot_hash && threecPreviewBasis.snapshot_hash !== basis.snapshot_hash) throw new Error('預覽期間正式 active 已變動；請重新解析檔案。');
+      const changeSet = result.changeSet ? Object.assign({}, result.changeSet, { _search:threecFormalChangeMode ? query : '' }) : null;
+      renderThreecDiff(changeSet, basis, result.updateCheck || null);
+    }
+    function threecDiffDownloadBlob(filename, content, type) {
+      const url = URL.createObjectURL(new Blob([content], { type }));
+      const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
+    function threecDiffCsvCell(value) { const text = value == null ? '' : String(value); return '"' + text.replace(/"/g, '""') + '"'; }
+    async function downloadThreecDiff(format) {
+      if (!threecFormalChangeMode || !threecPreviewSnapshot || !threecPreviewChangeSet) return;
+      const generation = threecPreviewGeneration;
+      const search = $('threecDiffSearch').value.trim();
+      const first = await call('threec_changes_read', payload({ kind:threecPreviewSnapshot.kind, offset:0, limit:1000, snapshotHash:threecFormalSnapshotHash, search }));
+      if (generation !== threecPreviewGeneration) return;
+      const firstSet = first.changeSet || threecPreviewChangeSet;
+      const all = threecDiffRows(firstSet).slice();
+      let next = firstSet;
+      let offset = Number(next.offset || 0) + Number(next.limit || 100);
+      while (next.hasMore) {
+        if (generation !== threecPreviewGeneration) return;
+        const page = await call('threec_changes_read', payload({ kind:threecPreviewSnapshot.kind, offset, limit:1000, snapshotHash:threecFormalSnapshotHash, search }));
+        if (generation !== threecPreviewGeneration) return;
+        next = page.changeSet || {};
+        all.push(...threecDiffRows(next));
+        offset += Number(next.limit || 100);
+      }
+      if (generation !== threecPreviewGeneration) return;
+      if (format === 'json') return threecDiffDownloadBlob('threec-price-changes.json', JSON.stringify({ unit:'報價條件', basis:first.basis || threecPreviewBasis, search, totalChangeCount:Number(firstSet.totalChangeCount != null ? firstSet.totalChangeCount : firstSet.changeCount || all.length), changeCount:Number(firstSet.changeCount != null ? firstSet.changeCount : all.length), counts:threecDiffCounts(firstSet), changes:all }, null, 2), 'application/json;charset=utf-8');
+      const header = ['unit','status','model_or_capacity','condition','provider','grade','before','after'];
+      const lines = [header.map(threecDiffCsvCell).join(',')].concat(all.map(record => ['報價條件', record.status, record.modelCapacity || record.model, record.plan || record.condition, record.provider, record.grade, threecDiffPrice(record.before), threecDiffPrice(record.after)].map(threecDiffCsvCell).join(',')));
+      threecDiffDownloadBlob('threec-price-changes.csv', '\ufeff' + lines.join('\n'), 'text/csv;charset=utf-8');
     }
     function renderThreecPrices(snapshot) {
       const query = $('threecPreviewSearch').value.trim().toLowerCase();
@@ -344,13 +508,30 @@
         ? { sheet:row.source_sheet, row:row.source_row_number, brand:row.brand, code:row.code, model:row.model, colorless:row.colorless_model, retail:price(row.retail_price), projects:Object.keys(row.project_prices || {}).sort().map(name => [name, price(row.project_prices[name])]) }
         : { sheet:row.source_sheet, brand:row.brand, model:row.model, quotes:['點子行動','FutureDial（FDI）'].map(provider => ['S','A','B','C'].map(grade => price(row.quotes[provider][grade]))) });
     }
+    function threecAlreadyCurrentReadbackMatches(expected, actual, readback) {
+      const check = readback && readback.updateCheck || {};
+      if (check.status !== 'already_current' || String(check.source_version_date || '') !== String(expected.source_version_date || '') || String(check.source_file_sha256 || '') !== String(expected.source_file_sha256 || '') || Number(check.row_count) !== Number(expected.row_count) || !actual.snapshot_hash || String(actual.snapshot_hash) !== String(check.snapshot_hash || '')) return false;
+      const core = window.ThreecPriceDiffCore;
+      if (!core || typeof core.diffSnapshots !== 'function') return false;
+      const diff = core.diffSnapshots(expected.kind, actual, expected);
+      const counts = diff && diff.counts || {};
+      return Number(counts.changed || diff.changedCount || 0) === 0 && Number(counts.added || diff.addedCount || 0) === 0 && Number(counts.removed || diff.removedCount || 0) === 0;
+    }
     async function verifyThreecReadback(expected) {
       const readback = await call('threec_readback', payload({ kind:expected.kind }));
       const actual = readback.snapshot;
-      if (!actual || actual.kind !== expected.kind || actual.source_version_date !== expected.source_version_date || actual.source_file_sha256 !== expected.source_file_sha256 || actual.row_count !== expected.row_count || JSON.stringify(threecComparableRows(actual)) !== JSON.stringify(threecComparableRows(expected))) {
+      const strictMatch = !!actual && actual.kind === expected.kind && actual.source_version_date === expected.source_version_date && actual.source_file_sha256 === expected.source_file_sha256 && actual.row_count === expected.row_count && JSON.stringify(threecComparableRows(actual)) === JSON.stringify(threecComparableRows(expected));
+      if (!strictMatch && !threecAlreadyCurrentReadbackMatches(expected, actual, readback)) {
         throw new Error('正式讀回與來源預覽不一致；請先重新讀取版本核對，勿重複發布。');
       }
       renderThreecRegistry(readback);
+      threecFormalChangeMode = true;
+      threecFormalSnapshotHash = String(actual.snapshot_hash || '');
+      if (readback.changeSet) renderThreecDiff(readback.changeSet, readback.basis || threecPreviewBasis, readback.updateCheck || null);
+      else {
+        const changeRead = await call('threec_changes_read', payload({ kind:expected.kind, offset:0, limit:100, snapshotHash:threecFormalSnapshotHash }));
+        if (changeRead.changeSet) renderThreecDiff(changeRead.changeSet, changeRead.basis || threecPreviewBasis, changeRead.updateCheck || null);
+      }
       return actual;
     }
     async function previewThreec(kind) {
@@ -369,14 +550,29 @@
         const snapshot = window.TradeInImportCore.buildPublishSnapshot(kind, parsed);
         if (kind === 'tradein' && snapshot.quote_conflict_count !== 0) throw new Error('舊換新仍有報價衝突，請先確認來源資料。');
         threecPreviewSnapshot = snapshot;
+        const diffPreview = await threecDiffPreviewRequest(snapshot, 0);
+        if (generation !== threecPreviewGeneration || $(kind + 'File').files[0] !== file) return;
+        const basis = diffPreview.basis || {};
+        const registry = diffPreview.registry || {};
+        const slot = registry.kinds && registry.kinds[kind] ? registry.kinds[kind] : registry[kind];
+        const active = slot && slot.active;
+        const activeDate = String(active && active.source_version_date || '');
+        const activeSha = String(active && (active.source_file_sha256 || active.source_sha) || '');
+        const sourceDate = String(snapshot.source_version_date || '');
+        const sourceSha = String(snapshot.source_file_sha256 || '');
+        const sameSource = !!activeDate && !!sourceDate && activeDate === sourceDate && !!activeSha && !!sourceSha && activeSha === sourceSha;
+        if (activeDate && sourceDate && sourceDate < activeDate) throw new Error('來源日期早於目前 active；正式資料未變更。');
+        if (active && basis.snapshot_hash && active.snapshot_hash && String(active.snapshot_hash) !== String(basis.snapshot_hash)) throw new Error('預覽期間正式 active 已變動；請重新解析檔案。');
+        if (!diffPreview.changeSet) throw new Error('差異預覽回應缺少 changeSet；正式資料未變更。');
         $('threecKind').textContent = kind === 'shopping' ? '3C 手機專案價' : '舊換新回收價';
         $('threecVersion').textContent = snapshot.source_version_date;
         $('threecRows').textContent = snapshot.row_count + ' 筆';
         $('threecAudit').textContent = kind === 'shopping' ? '排除 ' + snapshot.excluded_no_price_count + ' 筆／零元保留' : '衝突 ' + snapshot.quote_conflict_count + '／兩家 S/A/B/C';
-        $('threecSource').textContent = '來源：' + snapshot.source_file_name;
+        $('threecSource').textContent = '來源：' + snapshot.source_file_name + '；與 active ' + (sameSource ? '日期／SHA-256 相同（確認同版）' : '日期／SHA-256 已逐項比對');
         $('threecPreviewSearch').value = '';
         renderThreecPrices(snapshot);
         $('threecHash').textContent = '來源 SHA-256：' + snapshot.source_file_sha256;
+        renderThreecDiff(diffPreview.changeSet, basis, diffPreview.updateCheck || null);
         $('threecPreview').classList.remove('hidden');
         $('threecConfirm').checked = false;
         $('threecSameDateConfirm').checked = false;
@@ -386,6 +582,10 @@
       } catch (error) {
         if (generation !== threecPreviewGeneration) return;
         threecPreviewSnapshot = null;
+        threecPreviewBasis = null;
+        threecPreviewChangeSet = null;
+        threecPreviewUpdateCheck = null;
+        $('threecDiffPanel').classList.add('hidden');
         updateThreecPublishButton();
         message('threecMessage', error.message, 'bad');
       } finally {
@@ -596,6 +796,11 @@
       catch (error) { message('threecMessage', error.message, 'bad'); }
     });
     $('threecPreviewSearch').addEventListener('input', () => { if (threecPreviewSnapshot) renderThreecPrices(threecPreviewSnapshot); });
+    $('threecDiffSearch').addEventListener('input', () => { if (!threecPreviewChangeSet) return; if (threecFormalChangeMode) { const token = ++threecDiffRequestGeneration; loadThreecDiffPage(0, $('threecDiffSearch').value.trim(), token).catch(error => message('threecMessage', error.message, 'bad')); } else renderThreecDiff(threecPreviewChangeSet, threecPreviewBasis, threecPreviewUpdateCheck); });
+    $('threecDiffPrevBtn').addEventListener('click', async () => { const offset = Number(threecPreviewChangeSet && threecPreviewChangeSet.offset || 0); if (offset < 100) return; try { await loadThreecDiffPage(Math.max(0, offset - Number(threecPreviewChangeSet.limit || 100)), $('threecDiffSearch').value.trim()); } catch (error) { message('threecMessage', error.message, 'bad'); } });
+    $('threecDiffNextBtn').addEventListener('click', async () => { const offset = Number(threecPreviewChangeSet && threecPreviewChangeSet.offset || 0) + Number(threecPreviewChangeSet && threecPreviewChangeSet.limit || 100); try { await loadThreecDiffPage(offset, $('threecDiffSearch').value.trim()); } catch (error) { message('threecMessage', error.message, 'bad'); } });
+    $('threecDiffJsonBtn').addEventListener('click', () => downloadThreecDiff('json').catch(error => message('threecMessage', error.message, 'bad')));
+    $('threecDiffCsvBtn').addEventListener('click', () => downloadThreecDiff('csv').catch(error => message('threecMessage', error.message, 'bad')));
     $('threecConfirm').addEventListener('change', updateThreecPublishButton);
     $('threecSameDateConfirm').addEventListener('change', updateThreecPublishButton);
     $('threecPublishBtn').addEventListener('click', async () => {
@@ -608,8 +813,9 @@
       setBusy(button, true, '發布中…');
       message('threecMessage', '正在寫入不可變快照、讀回驗證並更新 registry…');
       try {
-        const result = await call('threec_publish', payload({ snapshotJson:JSON.stringify(threecPreviewSnapshot), confirmPublish:true, confirmSameDateHashChange:sameDateConfirmed }));
+        const result = await call('threec_publish', payload({ snapshotJson:JSON.stringify(threecPreviewSnapshot), confirmPublish:true, confirmSameDateHashChange:sameDateConfirmed, expectedActiveHash:threecPreviewBasis && threecPreviewBasis.snapshot_hash ? String(threecPreviewBasis.snapshot_hash) : '', requiresDiffCheck:true }));
         renderThreecRegistry(result);
+        if (result.changeSet) renderThreecDiff(result.changeSet, result.basis || threecPreviewBasis, result.updateCheck || null);
         if (result.status === 'confirmation_required') {
           $('threecSameDateWrap').classList.remove('hidden');
           $('threecSameDateConfirm').checked = false;
@@ -620,7 +826,6 @@
         await verifyThreecReadback(threecPreviewSnapshot);
         const text = result.status === 'already_current' ? '正式版本已是同日期同雜湊，未產生新寫入。' : '私有快照已發布，正式讀回所有價格與來源預覽一致；門市查詢重新讀取即可更新。';
         message('threecMessage', text, 'ok');
-        if (result.status === 'published') threecPreviewSnapshot = null;
         $('threecConfirm').checked = false;
         $('threecSameDateConfirm').checked = false;
         $('threecSameDateWrap').classList.add('hidden');
@@ -630,7 +835,10 @@
     });
     async function rollbackThreec(kind) {
       if (threecPublishing) return;
-      if (!window.confirm('確定只切換 ' + (kind === 'shopping' ? '3C' : '舊換新') + ' active／previous 指標回復上一版？')) return;
+      if (!threecRollbackAvailable[kind]) return message('threecMessage', '此類資料目前沒有可回復的版本。', 'warn');
+      const slot = threecRegistryState && (threecRegistryState[kind] || (threecRegistryState.kinds && threecRegistryState.kinds[kind])) || {};
+      const target = slot.previous ? '上一個成功版本' : '無正式價格狀態（首版空檢查點）';
+      if (!window.confirm('確定將 ' + (kind === 'shopping' ? '3C' : '舊換新') + ' active 回復到' + target + '？此操作只切換正式指標。')) return;
       const button = $(kind + 'RollbackBtn');
       invalidateThreecPreview();
       setThreecPublishing(true);

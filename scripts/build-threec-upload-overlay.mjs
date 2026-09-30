@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 // Build from a freshly pulled, private copy of the existing upload project.
@@ -21,12 +22,20 @@ if (sharedEnd < 0) throw Error('Missing shared module end');
 let code = original.slice(0, originalStart) + shared.slice(shared.indexOf(marker), sharedEnd);
 const whitelist = /const REPORT_UPLOAD_ALLOWED_ACTIONS = \[[\s\S]*?\];/;
 const expected = original.match(whitelist)?.[0];
-if (!expected || expected.includes('threec_snapshot_read')) throw Error('Reconcile already updated whitelist before building');
-code = code.replace(whitelist, shared.match(whitelist)[0]);
+if (!expected) throw Error('Missing upload whitelist');
+const nextWhitelist = shared.match(whitelist)[0];
+for (const action of [...expected.matchAll(/'([^']+)'/g)].map(match => match[1])) {
+  if (!nextWhitelist.includes("'" + action + "'")) throw Error('Existing upload action would be removed: ' + action);
+}
+code = code.replace(whitelist, nextWhitelist);
 const route = "    else if (action === 'private_access') result = privateDashboardAccess(payload);";
-if (code.includes("action === 'threec_snapshot_read'")) throw Error('Existing read route: reconcile first');
 if (code.split(route).length !== 2) throw Error('Ambiguous existing private route');
-code = code.replace(route, route + "\n    else if (action === 'threec_snapshot_read') result = threecSnapshotRead(payload);");
+for (const [action, handler] of [['threec_snapshot_read','threecSnapshotRead'], ['threec_changes_read','threecChangesRead']]) {
+  const line = "    else if (action === '" + action + "') result = " + handler + "(payload);";
+  const count = code.split("action === '" + action + "'").length - 1;
+  if (count > 1 || (count === 1 && !code.includes(line))) throw Error('Ambiguous existing read route: ' + action);
+  if (!count) code = code.replace(route, route + "\n" + line);
+}
 fs.mkdirSync(destination, { recursive:true });
 for (const name of fs.readdirSync(baseline)) {
   const file = path.join(baseline, name);
@@ -34,13 +43,21 @@ for (const name of fs.readdirSync(baseline)) {
 }
 fs.writeFileSync(path.join(destination, codeName), code);
 fs.copyFileSync(path.join(root, 'gas/ReportUpload.html'), path.join(destination, 'ReportUpload.html'));
-// Parser assets are reused, not regenerated or changed.
+// SheetJS is unchanged. The shopping parser only removes artificial column ordinals;
+// its baseline must be the exact known v74 parser before applying this scoped update.
 for (const [asset, source] of [['ReportUploadSheetJs.html','assets/vendor/xlsx.full.min.js'], ['ReportUploadTradeInCore.html','tradein-import-core.js']]) {
-  if (read(path.join(baseline, asset)) !== read(path.join(root, source))) throw Error('Parser asset drift: ' + asset);
+  const prior = read(path.join(baseline, asset));
+  const current = read(path.join(root, source));
+  const v74ParserSha = 'bfcdf1e122ab31a8d676a2dc77fdff0be31ee7e3c5ce2b615b8363455d98fbe3';
+  const knownPrior = source === 'tradein-import-core.js' && crypto.createHash('sha256').update(prior).digest('hex') === v74ParserSha;
+  if (prior !== current && !knownPrior) throw Error('Parser asset drift: ' + asset);
+  fs.copyFileSync(path.join(root, source), path.join(destination, asset));
 }
+fs.copyFileSync(path.join(root, 'threec-price-diff-core.js'), path.join(destination, 'ThreecPriceDiffCore.js'));
+fs.copyFileSync(path.join(root, 'threec-price-diff-core.js'), path.join(destination, 'ReportUploadThreecDiffCore.html'));
 const before = [...original.matchAll(/^function (\w+)\(/gm)].map(match => match[1]);
 const after = [...code.matchAll(/^function (\w+)\(/gm)].map(match => match[1]);
 for (const name of new Set(before)) {
   if (before.filter(value => value === name).length !== after.filter(value => value === name).length) throw Error('Existing function lost or duplicated: ' + name);
 }
-console.log(JSON.stringify({ preservedFunctions:before.length, addedFunctions:after.filter(name => !before.includes(name)), changedFiles:[codeName,'ReportUpload.html'], parserAssetsUnchanged:true }));
+console.log(JSON.stringify({ preservedFunctions:before.length, addedFunctions:after.filter(name => !before.includes(name)), changedFiles:[codeName,'ReportUpload.html','ReportUploadTradeInCore.html'], addedFiles:['ThreecPriceDiffCore.js','ReportUploadThreecDiffCore.html'], sheetJsUnchanged:true }));

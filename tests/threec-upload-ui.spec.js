@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const pageSource = fs.readFileSync(path.join(__dirname, '../gas/ReportUpload.html'), 'utf8');
+const diffCore = fs.readFileSync(path.join(__dirname, '../gas/ReportUploadThreecDiffCore.html'), 'utf8');
 
 test('正式內嵌資產可載入真實 SheetJS 與 Work 解析器，保留中文 XLSX roundtrip', async ({page}) => {
   const code = fs.readFileSync(path.join(__dirname, '../gas/Code.gs'), 'utf8');
@@ -33,26 +34,30 @@ async function setup(page) {
     window.rpcCalls = [];
     window.nextPublishStatus = 'published';
     window.delayParse = false;
+    window.noopMode = false;
     window.XLSX = {};
     window.TradeInImportCore = {
       parseFile: async (file, xlsx, kind) => {
         if (window.delayParse) await new Promise(resolve => { window.resolveParse = resolve; });
         return { kind, fileName:file.name };
       },
-      buildPublishSnapshot: (kind, parsed) => ({
-        kind, source_file_name:parsed.fileName, source_version_date:'2026-09-29',
-        source_file_sha256:'a'.repeat(64), row_count:3, excluded_no_price_count:0, quote_conflict_count:0, rows:[{source_sheet:'iPhone 24期',source_row_number:2,brand:'Apple',code:'TEST',model:'iPhone test 256G(黑)',colorless_model:'iPhone test 256G',retail_price:'29,900',project_prices:{'999H 24期':'1,299','1399H 36期':'0','1799H':''}}]
-      })
+      buildPublishSnapshot: (kind, parsed) => {
+        const rows = window.noopMode ? [
+          {source_sheet:'iPhone 24期',source_row_number:3,brand:'Apple',code:'TEST-B',model:'iPhone test B 256G(黑)',colorless_model:'iPhone test B 256G',retail_price:'28,900',project_prices:{'999H 24期':'1,199'}},
+          {source_sheet:'iPhone 24期',source_row_number:2,brand:'Apple',code:'TEST-A',model:'iPhone test A 256G(黑)',colorless_model:'iPhone test A 256G',retail_price:'29,900',project_prices:{'999H 24期':'1,299'}}
+        ] : [{source_sheet:'iPhone 24期',source_row_number:2,brand:'Apple',code:'TEST',model:'iPhone test 256G(黑)',colorless_model:'iPhone test 256G',retail_price:'29,900',project_prices:{'999H 24期':'1,299','1399H 36期':'0','1799H':''}}];
+        return {kind, source_file_name:parsed.fileName, source_version_date:window.noopMode?'2026-10-02':'2026-09-29', source_file_sha256:window.noopMode?'b'.repeat(64):'a'.repeat(64), row_count:window.noopMode?2:3, excluded_no_price_count:0, quote_conflict_count:0, rows};
+      }
     };
   `;
   // Use a tiny isolated google.script.run mock with one handler chain per RPC.
   const mockRpc = `window.google={script:{get run(){let success;const chain=new Proxy({}, {get(_,name){
     if(name==='withSuccessHandler')return fn=>{success=fn;return chain};
     if(name==='withFailureHandler')return ()=>chain;
-    return payload=>{window.rpcCalls.push({name,payload});if(name==='threec_publish')window.lastSnapshot=JSON.parse(payload.snapshotJson);const result=name==='threec_readback'?{snapshot:window.failReadback?{...window.lastSnapshot,rows:[]} : window.lastSnapshot,registry:{}}:name==='report_upload_log'?{entries:[],live:null}:name==='threec_publish'?{status:window.nextPublishStatus,registry:{}}:name==='threec_status'?{registry:{}}:{ok:false};queueMicrotask(()=>success(result));};
+    return payload=>{window.rpcCalls.push({name,payload});if(name==='threec_publish')window.lastSnapshot=JSON.parse(payload.snapshotJson);let result={ok:false};if(name==='threec_diff_preview'){const active=window.noopMode?{snapshot_hash:'active-hash',source_version_date:'2026-09-29',source_file_sha256:'a'.repeat(64),row_count:2}:null;result={status:'ok',basis:{snapshot_hash:active?active.snapshot_hash:'',date:active?active.source_version_date:'',source_sha:active?active.source_file_sha256:''},registry:{shopping:{active}},changeSet:{kind:'shopping',counts:{added:0,changed:0,unchanged:window.noopMode?6:0,removed:0},addedCount:0,changedCount:0,unchangedCount:window.noopMode?6:0,removedCount:0,changeCount:0,offset:0,limit:100,hasMore:false,changes:[]}};}else if(name==='threec_readback'){let snapshot=window.lastSnapshot;if(window.noopMode&&window.nextPublishStatus==='already_current')snapshot={...window.lastSnapshot,source_version_date:'2026-09-29',source_file_sha256:'a'.repeat(64),snapshot_hash:'active-hash',rows:[...window.lastSnapshot.rows].reverse()};const updateCheck=window.noopMode&&window.nextPublishStatus==='already_current'?{status:'already_current',snapshot_hash:'active-hash',source_version_date:window.lastSnapshot.source_version_date,source_file_sha256:window.lastSnapshot.source_file_sha256,row_count:window.lastSnapshot.row_count}:null;result={snapshot:window.failReadback?{...snapshot,rows:[]} : snapshot,registry:{},updateCheck};}else if(name==='report_upload_log')result={entries:[],live:null};else if(name==='threec_publish')result={status:window.nextPublishStatus,registry:{}};else if(name==='threec_status')result={registry:{}};queueMicrotask(()=>success(result));};
   }});return chain;}}};`;
   const html = pageSource.replace(/<script><\?!=[\s\S]*?\?><\/script>/g, '')
-    .replace('    const auth', mocks + mockRpc + '\n    const auth');
+    .replace('    const auth', mocks + diffCore + mockRpc + '\n    const auth');
   await page.setContent(html);
   page.on('dialog', dialog => dialog.accept());
   await page.locator('#employeeId').fill('TEST01');
@@ -138,5 +143,22 @@ test('來源預覽显示千分位、零元与缺價，正式讀回不一致不�
   await expect(page.locator('#threecMessage')).toContainText('正式讀回與來源預覽不一致');
   await expect(page.locator('#threecMessage')).not.toContainText('已發布');
   const calls=await page.evaluate(()=>window.rpcCalls.map(c=>c.name));
+  expect(calls.indexOf('threec_readback')).toBeGreaterThan(calls.indexOf('threec_publish'));
+});
+
+test('already_current 以來源核對欄位與語意價格差異驗證，容許日期／列序更新', async ({page}) => {
+  await setup(page);
+  await page.evaluate(() => { window.noopMode = true; window.nextPublishStatus = 'already_current'; });
+  await choose(page, 'shopping20261002.xlsx');
+  await page.locator('#shoppingPreviewBtn').click();
+  await expect(page.locator('#threecVersion')).toHaveText('2026-10-02');
+  const preview = await page.evaluate(() => window.rpcCalls.find(call => call.name === 'threec_diff_preview'));
+  expect(preview.payload).not.toHaveProperty('fileBase64');
+  expect(JSON.parse(preview.payload.snapshotJson).source_version_date).toBe('2026-10-02');
+  await page.locator('#threecConfirm').check();
+  await page.locator('#threecPublishBtn').click();
+  await expect(page.locator('#threecMessage')).toContainText('正式版本已是同日期同雜湊，未產生新寫入');
+  await expect(page.locator('#threecMessage')).not.toContainText('正式讀回與來源預覽不一致');
+  const calls = await page.evaluate(() => window.rpcCalls.map(call => call.name));
   expect(calls.indexOf('threec_readback')).toBeGreaterThan(calls.indexOf('threec_publish'));
 });
