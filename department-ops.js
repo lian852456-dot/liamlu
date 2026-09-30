@@ -6,6 +6,7 @@
   const SESSION_KEY = 'bei12b_patrol_session_token_v2';
   const GOLD_HISTORY_KEY = 'north12_department_gold_history_v1';
   const GOLD_REVIEW_KEY = 'north12_department_gold_reviews_v1';
+  const DAILY_ONLY = document.body.dataset.goldView === 'daily';
   const AUTH_RETRY_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
   let goldData = null;
   let goldSourceName = '';
@@ -157,6 +158,7 @@
   }
 
   function initializeFilters() {
+    if (DAILY_ONLY) return;
     const quarters = CORE.quarterKeys(goldData.months);
     $('monthFilter').innerHTML = [
       quarters.length ? `<optgroup label="季度彙整">${quarters.map((quarter) => `<option value="quarter:${quarter}">${quarter.replace('-', ' ')} 季度彙整</option>`).join('')}</optgroup>` : '',
@@ -217,9 +219,10 @@
   }
 
   function renderDaily() {
+    if (!$('dailyBody')) return;
     const history = goldHistory || readLocalJson(GOLD_HISTORY_KEY, []);
     const reviews = readLocalJson(GOLD_REVIEW_KEY, {});
-    const changes = CORE.dailyChanges(history, $('dateFrom').value, $('dateTo').value);
+    const changes = CORE.dailyChanges(history, $('dateFrom').value, $('dateTo').value).filter((row) => row.region === '北一二B');
     $('dailyBody').innerHTML = changes.length ? changes.map((row) => {
       const review = reviews[reviewKey(row)] || {};
       return `<tr><td>${escapeHtml(row.cutoff)}</td><td>${escapeHtml(row.store)}</td><td>${escapeHtml(row.employeeName)}</td><td class="number">${formatNumber(row.previousMedal)}</td><td class="number">${formatNumber(row.medal)}</td><td class="number ${row.delta > 0 ? 'up' : 'down'}">${row.delta > 0 ? '+' : ''}${formatNumber(row.delta)}</td><td>${reviewSelect('reason', row, review.reason || '')}</td><td>${reviewSelect('status', row, review.status || '待複核')}</td></tr>`;
@@ -227,15 +230,19 @@
   }
 
   function renderGold() {
+    const latest = goldData.months[goldData.months.length - 1];
+    const syncMeta = goldPublishedAt ? `｜上次同步 ${new Date(goldPublishedAt).toLocaleString('zh-TW', { hour12: false })}` : '';
+    $('goldSourceMeta').textContent = `${goldSourceName}｜${goldData.months.length} 個月份｜最新截止 ${latest.dateRange.cutoff}${syncMeta}`;
+    if (DAILY_ONLY) {
+      renderDaily();
+      return;
+    }
     const months = selectedMonths();
     const people = CORE.aggregatePeople(months, filters());
     renderSummary(months, people);
     renderPeople(months, people);
     renderQuarter(people);
     renderDaily();
-    const latest = goldData.months[goldData.months.length - 1];
-    const syncMeta = goldPublishedAt ? `｜上次同步 ${new Date(goldPublishedAt).toLocaleString('zh-TW', { hour12: false })}` : '';
-    $('goldSourceMeta').textContent = `${goldSourceName}｜${goldData.months.length} 個月份｜最新截止 ${latest.dateRange.cutoff}${syncMeta}`;
   }
 
   function saveGoldHistory(fileName) {
@@ -258,7 +265,7 @@
       const result = await authRequest({ action: 'department_ops_read', token: patrolToken });
       if (result?.status !== 'ok') throw new Error(result?.message || '讀取已同步資料失敗');
       if (!result.available || !Array.isArray(result.gold?.months) || !result.gold.months.length) {
-        setMessage('goldMessage', '目前尚無已同步資料，需要更新時再選擇 Final Excel。');
+        setMessage('goldMessage', DAILY_ONLY ? '目前尚無已同步資料，請先至部區管理更新並同步 Final Excel。' : '目前尚無已同步資料，需要更新時再選擇 Final Excel。');
         return;
       }
       goldData = result.gold;
@@ -273,7 +280,7 @@
       $('goldDashboard').hidden = false;
       setMessage('goldMessage', `已自動載入上次同步資料；最新截止 ${goldData.months[goldData.months.length - 1].dateRange.cutoff}。`, 'success');
     } catch (error) {
-      setMessage('goldMessage', error.message || '上次同步資料載入失敗，可重新整理或上傳新版 Final。', 'error');
+      setMessage('goldMessage', error.message || '上次同步資料載入失敗，請重新整理後再試。', 'error');
     }
   }
 
@@ -373,17 +380,17 @@
       document.querySelectorAll('[data-tab]').forEach((item) => { item.classList.toggle('active', item === button); item.setAttribute('aria-selected', item === button ? 'true' : 'false'); });
       document.querySelectorAll('[data-panel]').forEach((panel) => { panel.hidden = panel.dataset.panel !== button.dataset.tab; });
     }));
-    $('goldImport').addEventListener('click', importGold);
-    $('storeImport').addEventListener('click', importStore);
+    $('goldImport')?.addEventListener('click', importGold);
+    $('storeImport')?.addEventListener('click', importStore);
     $('publishGold').addEventListener('click', publishGold);
-    $('exportGold').addEventListener('click', exportGold);
-    $('monthFilter').addEventListener('change', () => { updateDependentFilters(); renderGold(); });
-    $('regionFilter').addEventListener('change', () => { updateDependentFilters(); renderGold(); });
-    $('storeFilter').addEventListener('change', () => { updateDependentFilters(); renderGold(); });
-    $('employeeFilter').addEventListener('change', renderGold);
-    $('dateFrom').addEventListener('change', renderDaily);
-    $('dateTo').addEventListener('change', renderDaily);
-    $('dailyBody').addEventListener('change', (event) => {
+    $('exportGold')?.addEventListener('click', exportGold);
+    $('monthFilter')?.addEventListener('change', () => { updateDependentFilters(); renderGold(); });
+    $('regionFilter')?.addEventListener('change', () => { updateDependentFilters(); renderGold(); });
+    $('storeFilter')?.addEventListener('change', () => { updateDependentFilters(); renderGold(); });
+    $('employeeFilter')?.addEventListener('change', renderGold);
+    $('dateFrom')?.addEventListener('change', renderDaily);
+    $('dateTo')?.addEventListener('change', renderDaily);
+    $('dailyBody')?.addEventListener('change', (event) => {
       const select = event.target.closest('[data-review-key]');
       if (!select) return;
       const reviews = readLocalJson(GOLD_REVIEW_KEY, {});

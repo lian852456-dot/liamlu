@@ -54,8 +54,8 @@ test('同仁大廳手機版維持單欄且文字未水平溢出，既有入口�
   expect(boxes[4].y).toBeGreaterThan(boxes[3].y);
   expect(await page.locator('body').evaluate(body => body.scrollWidth <= body.clientWidth)).toBe(true);
 
-  await expect(page.locator('.card')).toHaveCount(15);
-  await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(7);
+  await expect(page.locator('.card')).toHaveCount(16);
+  await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(8);
   await expect(page.locator('[aria-label="督導專區"] .card[href="department-ops.html"]')).toContainText('北一二部｜部區管理');
   await expect(page.locator('[aria-label="督導專區"] .card[href="live-battle.html"]')).toContainText('行進間戰報');
   const allHrefs = await page.locator('.card').evaluateAll(cards => cards.map(card => card.getAttribute('href')));
