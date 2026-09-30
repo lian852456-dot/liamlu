@@ -64,7 +64,7 @@ jobs:
           # tests/home.spec.js intercepts every external browser request and uses
           # synthetic credentials/data only. No production login or data write.
           # Repeat exact 5-second pause/resume boundaries before the full suite.
-          npx playwright test tests/home.spec.js --grep '提醒每 5 秒輪播|提醒滑鼠停留' --repeat-each=5 --workers=1 --reporter=list --output=test-results/rotation-stability
+          npx playwright test tests/home.spec.js --grep '提醒每 5 秒輪播|提醒滑鼠停留|滑鼠點擊可暫停' --repeat-each=5 --workers=1 --reporter=list --output=test-results/rotation-stability
           npx playwright test tests/home.spec.js --workers=1 --reporter=list,html
       - name: Save screenshots and browser test report
         if: always()
