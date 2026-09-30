@@ -51,3 +51,36 @@
 final result: blocked
 
 Deployment note: Liam 已先授權「隔離檢查通過即可部署、不用再詢問」。GitHub Pages run `33388025723` 成功，正式 commit `6cf2c33` 已發布，四個 runtime 檔案 SHA-256 與候選一致；cloud-browser 仍連線逾時，因此 `final result` 維持 blocked，部署與自動化回歸不取代缺少的瀏覽器視覺比對。
+
+
+# 首頁白橘改版 Design QA — 2026-09-30
+
+- Source visual truth: `../homepage-reference/北一二B_首頁白橘改版預覽.png` (Library `libfile_2388a8a9bcc48191916e9b957e7eca15`); actual pixels inspected before implementation.
+- Target route: `home.html`, local isolated branch `codex/homepage-white-orange-reminders`, base `9a28f90c016fc823103a43f3f75a249adb95f562`.
+- Intended states: public/unauthenticated desktop 1280×1300, wide 1920×1300, mobile 390×844 and 320×800; synthetic authenticated feeds are test-only.
+- Implementation screenshot: unavailable. The cloud browser at `http://terminal.local:4173/home.html` returned 502/connection refused. Chromium launched by the repository's Playwright suite exited before test execution with `socket() failed: Operation not permitted`, including the supported escalated attempt.
+- Source pixels: 1254×1254; implementation dimensions and density normalization could not be measured. No side-by-side or focused-region visual comparison was possible.
+
+## Findings
+
+- [P1 verification blocker] Browser-rendered visual and interaction evidence is missing. No application-level browser test result or screenshot can be claimed from launcher failures.
+- No visual-match claim is made. Fonts/typography, spacing/layout rhythm, colors/tokens, image/icon fidelity and copy require rendered comparison at the listed viewports.
+- Intentional scope additions relative to the reference: dated reminder carousel with manual/pause/reload controls above the four quick entries; auth-aware pending states. Brand mark is a bundled standard navigation icon; no official brand-logo claim.
+- Static review: large white/orange layout, four quick links, two staff groups, separate department/B gold entries, and all 16 original tool links are present. All 43 icon references resolve to the repo's existing bundled Lucide library. White primary-action text uses the darker orange token for contrast.
+
+## Comparison History
+
+- First pass: source reference opened; cloud browser and executable Chromium attempts blocked before a rendered implementation was available. No visual fixes claimed based on unavailable screenshots.
+
+## Required Verification Before Publication
+
+1. Run `node --test tests/home-reminder-model.test.cjs tests/patrol-question-versions.test.cjs tests/patrol-dashboard-contract.test.cjs tests/patrol-dashboard-client.test.cjs` (30/30 passed locally).
+2. Run `tests/home.spec.js` with the repo's Playwright config in a browser-capable environment and capture the designated screenshots. Test fixtures are synthetic and external calls must remain mocked.
+3. Compare the rendered desktop/mobile results with the source reference; check keyboard focus, touch targets, horizontal overflow, readable wrapping, carousel pause/reduced-motion, search and navigation.
+4. Check browser console errors; blocked Chromium launch does not establish a clean console.
+5. On an authorized real origin, verify existing KPI session + Approved Device restore and patrol session restore against current live services. Confirm exact yesterday 21:00 data, partial reports, monthly visits and the current bimonthly window. Recheck visibility/logout/expiry/midnight transitions.
+6. Preserve the existing security limitation disclosure: legacy daily `read` is not server-authenticated; this homepage retains `private_access` before it and makes no backend/auth changes.
+
+## Result
+
+final result: blocked
