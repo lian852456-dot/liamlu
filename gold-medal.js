@@ -1,30 +1,23 @@
 (function(){
   'use strict';
-  const CORE=window.DepartmentOpsCore;
   const GAS_URL='https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
   const EMPLOYEE_KEY='north12b_private_dashboard_employee_id';
   const DEVICE_KEY='north12b_private_dashboard_device_id';
-  let payload=null;
   const $=id=>document.getElementById(id);
-  const esc=value=>String(value==null?'':value).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
-  const fmt=value=>Number(value||0).toLocaleString('zh-TW',{maximumFractionDigits:1});
   function deviceId(){let id=localStorage.getItem(DEVICE_KEY);if(id)return id;id=crypto.randomUUID?crypto.randomUUID().replace(/-/g,''):Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>b.toString(16).padStart(2,'0')).join('');localStorage.setItem(DEVICE_KEY,id);return id;}
   function message(text,type){$('loginMessage').textContent=text||'';$('loginMessage').className=`message${type?` ${type}`:''}`;}
   async function request(body){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),45000);try{const response=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:controller.signal});if(!response.ok)throw new Error(`HTTP ${response.status}`);const result=await response.json();if(result?.status!=='ok')throw new Error(result?.message||'讀取失敗');return result;}finally{clearTimeout(timer);}}
-  function setOptions(select,items,label){const current=select.value;select.innerHTML=`<option value="">${esc(label)}</option>${items.map(item=>`<option value="${esc(item.value)}">${esc(item.label)}</option>`).join('')}`;if(Array.from(select.options).some(option=>option.value===current))select.value=current;}
-  function selectedMonths(){const value=$('viewerMonth').value;if(!value)return payload.gold.months;return payload.gold.months.filter(month=>month.monthKey===value);}
-  function filters(){return {region:'北一二B',store:$('viewerStore').value,employee:$('viewerEmployee').value};}
-  function refreshOptions(){const months=selectedMonths();const rows=months.flatMap(month=>month.records);const stores=Array.from(new Set(rows.map(row=>row.store))).sort((a,b)=>a.localeCompare(b,'zh-Hant'));setOptions($('viewerStore'),stores.map(value=>({value,label:value})),'九店全部');const store=$('viewerStore').value;const people=Array.from(new Map(rows.filter(row=>!store||row.store===store).map(row=>[row.personKey,row])).values()).sort((a,b)=>a.employeeName.localeCompare(b.employeeName,'zh-Hant'));setOptions($('viewerEmployee'),people.map(row=>({value:row.personKey,label:`${row.employeeName}｜${row.store}`})),'全部同仁');}
-  function render(){const months=selectedMonths();const people=CORE.aggregatePeople(months,filters());const latest=months[months.length-1];const summary=CORE.summarizeRecords(CORE.filterRecords(latest?.records||[],filters()));$('viewerSummary').innerHTML=[['期間累計',people.reduce((sum,row)=>sum+row.total,0),''],['目前人數',people.length,''],['正金牌',summary.positive,'positive'],['負金牌',summary.negative,'negative'],['待複核',pendingCount(),'negative']].map(([label,value,cls])=>`<article class="summary-card ${cls}"><span>${label}</span><strong>${fmt(value)}</strong></article>`).join('');$('viewerHead').innerHTML=`<tr><th>排名</th><th>店點</th><th>同仁</th>${months.map(month=>`<th class="number">${esc(month.sheetName)}</th>`).join('')}<th class="number">累計</th><th>門檻</th></tr>`;$('viewerBody').innerHTML=people.length?people.map((row,index)=>`<tr><td>${index+1}</td><td>${esc(row.store)}</td><td><strong>${esc(row.employeeName)}</strong></td>${months.map(month=>`<td class="number ${Number(row.months[month.monthKey]||0)<0?'down':'up'}">${fmt(row.months[month.monthKey]||0)}</td>`).join('')}<td class="number ${row.total<0?'down':'up'}">${fmt(row.total)}</td><td>${row.reached.join('／')||'—'}</td></tr>`).join(''):'<tr><td colspan="20">目前篩選沒有資料。</td></tr>';renderDaily();}
-  function reviewKey(row){return `${row.cutoff}|${row.personKey}`;}
-  function filteredChanges(){return CORE.dailyChanges(payload.history||[],$('viewerDateFrom').value,'').filter(row=>(!$('viewerStore').value||row.store===$('viewerStore').value)&&(!$('viewerEmployee').value||row.personKey===$('viewerEmployee').value));}
-  function pendingCount(){return filteredChanges().filter(row=>(payload.reviews?.[reviewKey(row)]?.status||'待複核')==='待複核').length;}
-  function renderDaily(){const changes=filteredChanges();$('viewerDailyBody').innerHTML=changes.length?changes.map(row=>{const review=payload.reviews?.[reviewKey(row)]||{};return `<tr><td>${esc(row.cutoff)}</td><td>${esc(row.store)}</td><td>${esc(row.employeeName)}</td><td class="number ${row.delta>0?'up':'down'}">${row.delta>0?'+':''}${fmt(row.delta)}</td><td>${esc(review.reason||'尚未註記')}</td><td>${esc(review.status||'待複核')}</td></tr>`;}).join(''):'<tr><td colspan="6">尚無跨日增減資料。</td></tr>';}
-  function openViewer(result,employeeId){payload=result;localStorage.setItem(EMPLOYEE_KEY,employeeId);$('loginPanel').hidden=true;$('goldViewer').hidden=false;$('viewerBadge').textContent=`${result.profile?.maskedName||'已登入'}｜${result.profile?.store||''}`;$('viewerBadge').classList.add('ok');$('viewerMeta').textContent=`${result.sourceName||'Final'}｜同步 ${String(result.publishedAt||'').replace('T',' ').slice(0,16)}`;$('viewerMonth').innerHTML='<option value="">全部月份</option>'+result.gold.months.slice().reverse().map(month=>`<option value="${month.monthKey}">${esc(month.sheetName)}｜至 ${esc(month.dateRange.cutoff)}</option>`).join('');refreshOptions();render();}
+  function openViewer(result,employeeId){
+    if(!result.ledger) throw new Error('日結讀取服務尚未更新，請稍後再試');
+    window.openGoldDaily(result);
+    localStorage.setItem(EMPLOYEE_KEY,employeeId);
+    $('loginPanel').hidden=true;
+    $('viewerBadge').textContent=`${result.profile?.maskedName||'已登入'}｜${result.profile?.store||''}`;
+    $('viewerBadge').classList.add('ok');
+  }
   async function login(employeeId){message('正在讀取受保護資料…');const result=await request({action:'department_gold_access',employeeId,deviceId:deviceId()});openViewer(result,employeeId);}
   $('loginForm').addEventListener('submit',async event=>{event.preventDefault();const employeeId=$('employeeId').value.trim().toUpperCase();event.submitter.disabled=true;try{await login(employeeId);}catch(error){message(error.message||'讀取失敗','error');}finally{event.submitter.disabled=false;}});
   $('bindingForm').addEventListener('submit',async event=>{event.preventDefault();event.submitter.disabled=true;try{const employeeId=$('bindingEmployeeId').value.trim().toUpperCase();const result=await request({action:'private_request',employeeId,bootstrapCode:$('bootstrapCode').value,deviceId:deviceId()});message(result.message||'已送出核准申請','success');}catch(error){message(error.message||'申請失敗','error');}finally{event.submitter.disabled=false;}});
-  $('viewerMonth').addEventListener('change',()=>{refreshOptions();render();});$('viewerStore').addEventListener('change',()=>{refreshOptions();render();});$('viewerEmployee').addEventListener('change',render);$('viewerDateFrom').addEventListener('change',render);
   $('logoutButton').addEventListener('click',()=>{localStorage.removeItem(EMPLOYEE_KEY);location.reload();});
   const saved=localStorage.getItem(EMPLOYEE_KEY)||'';$('employeeId').value=saved;$('bindingEmployeeId').value=saved;
 })();
