@@ -184,3 +184,19 @@ test('登出後延遲的異動清單不能恢復資料或下載', async ({ page 
   expect(downloads).toHaveLength(0);
   await expect(page.locator('#changeResults')).toContainText('尚無異動記錄');
 });
+
+
+test('GAS JSON序列化的 changePage 能顯示正式異動並跨頁', async ({ page }) => {
+  await page.route('**/exec', async route => {
+    const payload=route.request().postDataJSON();const body=response(payload.kind);
+    const set=body.changeSet;set.changePage=set.changes;delete set.changes;
+    set.hasMore=payload.action!=='threec_changes_read';
+    if(payload.action==='threec_changes_read'){set.offset=100;set.changePage=[{...set.changePage[0],model:'NEXT PAGE MODEL',modelCapacity:'NEXT PAGE MODEL'}];}
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(payload.action==='threec_changes_read'?{status:'ok',changeSet:set}:body)});
+  });
+  await seed(page,true);await page.goto(PAGE_URL);
+  await expect(page.locator('#changeResults')).toContainText('合約24期');
+  await expect(page.locator('#changeSummary')).toContainText('本頁顯示 2 筆');
+  await page.locator('#changeNextBtn').click();
+  await expect(page.locator('#changeResults')).toContainText('NEXT PAGE MODEL');
+});
