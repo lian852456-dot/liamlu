@@ -8,39 +8,25 @@
   <title>北一二B｜金牌管理</title>
   <link rel="stylesheet" href="department-ops.css?v=20260930-1">
 </head>
-<body data-gold-view="daily">
+<body>
   <main class="page">
     <a class="back-link" href="home.html">← 返回智慧營運中心</a>
-    <header class="masthead">
-      <div><p class="eyebrow">NORTH 12B GOLD MANAGEMENT</p><h1>北一二B｜金牌管理</h1><p class="lede">查看每日個人金牌增減，註記原因／免扣與複核狀態。</p></div>
-      <span id="securityBadge" class="mode-badge">督導驗證</span>
-    </header>
-    <section id="authPanel" class="panel auth-panel" aria-labelledby="authTitle">
-      <div><p class="step-label">SECURE ACCESS</p><h2 id="authTitle">沿用督導通行碼</h2><p>驗證成功後自動載入已同步的北一二B金牌紀錄。</p></div>
-      <form id="authForm" class="auth-form">
-        <label>督導通行碼<input id="passcode" type="password" autocomplete="current-password" required></label>
-        <button class="primary-button" type="submit">進入金牌管理</button>
-      </form>
-      <p id="authMessage" class="message" aria-live="polite"></p>
+    <header class="masthead"><div><p class="eyebrow">NORTH 12B GOLD</p><h1>北一二B｜金牌管理</h1><p class="lede">查看已確認的每日接龍結算總牌數與跨日增減。</p></div><span id="viewerBadge" class="mode-badge">督導驗證</span></header>
+    <section id="loginPanel" class="panel auth-panel">
+      <div><p class="step-label">SUPERVISOR ACCESS</p><h2>沿用督導通行碼</h2><p>每日結算確認後由 Codex 同步；可依店點與接龍代稱查詢。</p></div>
+      <form id="loginForm" class="auth-form"><label>督導通行碼<input id="passcode" type="password" autocomplete="current-password" required></label><button class="primary-button" type="submit">進入金牌管理</button></form>
+      <p id="loginMessage" class="message" aria-live="polite"></p>
     </section>
-    <div id="workspace" hidden>
-      <section id="goldDashboard" hidden>
-        <div class="dashboard-head">
-          <div><p class="step-label">DAILY GOLD CHANGES</p><h2>北一二B 每日個人變化</h2><p id="goldSourceMeta" class="source-meta"></p></div>
-          <button id="publishGold" class="primary-button" type="button">同步複核給同仁</button>
-        </div>
-        <section class="data-card">
-          <div class="card-head"><div><h3>個人增減明細</h3><p>依不同截止日的 Final 比對前次快照；同日修正版以最新結果呈現。</p></div></div>
-          <div class="date-filters"><label>開始日期<input id="dateFrom" type="date"></label><label>結束日期<input id="dateTo" type="date"></label></div>
-          <div class="table-scroll"><table><thead><tr><th>日期</th><th>店點</th><th>同仁</th><th>前次</th><th>本次</th><th>增減</th><th>原因／免扣</th><th>狀態</th></tr></thead><tbody id="dailyBody"></tbody></table></div>
-        </section>
-        <p id="publishMessage" class="message" aria-live="polite"></p>
-      </section>
-      <p id="goldMessage" class="message" aria-live="polite"></p>
-      <p><a class="back-link" href="department-ops.html">更新金牌 Final／查看部區季度結算</a></p>
-    </div>
+    <section id="goldViewer" hidden>
+      <div class="dashboard-head"><div><p class="step-label">CONFIRMED SETTLEMENT</p><h2>金牌查詢</h2><p id="viewerMeta" class="source-meta"></p></div><button id="logoutButton" class="secondary-button" type="button">登出</button></div>
+      <section class="filter-panel"><label>結算日期<select id="viewerMonth"></select></label><label>店點<select id="viewerStore"><option value="">九店全部</option></select></label><label>個人<select id="viewerEmployee"><option value="">全部同仁</option></select></label><label>紀錄起日<input id="viewerDateFrom" type="date"></label></section>
+      <div id="viewerSummary" class="summary-grid"></div>
+      <section class="data-card"><div class="card-head"><div><h3>個人結算總牌數</h3><p>每個日期是截至當日的總牌數；不同日結不重複加總。</p></div></div><div class="table-scroll"><table><thead id="viewerHead"></thead><tbody id="viewerBody"></tbody></table></div></section>
+      <section class="data-card"><div class="card-head"><div><h3>每日增減與原因</h3><p>僅連續兩日皆有確認紀錄時顯示增減；原因與免扣依提供的紀錄呈現。</p></div></div><div class="table-scroll"><table><thead><tr><th>日期</th><th>店點</th><th>同仁</th><th>增減</th><th>原因／免扣</th><th>狀態</th></tr></thead><tbody id="viewerDailyBody"></tbody></table></div></section>
+    </section>
   </main>
-  <script src="department-ops-core.js?v=20260930-2"></script>
-  <script src="department-ops.js?v=20260930-5" defer></script>
+  <script src="gold-daily-core.js?v=20260930-1"></script>
+  <script src="gold-daily-ui.js?v=20260930-1"></script>
+  <script src="north12b-gold-ops.js?v=20260930-1" defer></script>
 </body>
 </html>
