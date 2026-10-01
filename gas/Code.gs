@@ -32,6 +32,13 @@ const REPORT_AWARD_MODEL_IDS = [
   'pixel-11', 'oppo-r16f', 'samsung-a57', 'oppo-a6x',
   'samsung-a27-a17', 'vivo-y21'
 ];
+const REPORT_AWARD_MONTH_IDS = {
+  '2026-09': ["pixel-10a","s26u-zfold8-family","pixel-11-pro-family","s26-256g","pixel-11","vivo-v70fe","oppo-r16f","samsung-a57","oppo-a6x","samsung-a27"],
+  '2026-10': ["zfold8-family","pixel-10a","pixel-11-pro-family","s26-ultra","pixel-11","s26-family","oppo-r16f","samsung-a57","vivo-v80-lite","oppo-a6x-a7pro"]
+};
+function reportAwardModelIds_(date) {
+  return REPORT_AWARD_MONTH_IDS[String(date || '').slice(0,7)] || REPORT_AWARD_MODEL_IDS;
+}
 const REPORT_AWARD_SAFE_LEGACY_MAP = {
   tw_pixel10: 'pixel-10-family',
   tw_sharpr11: 'sharp-r11',
@@ -62,15 +69,18 @@ function getReportAwardModelsSheet_() {
   return sh;
 }
 
-function normalizeReportAwardModels_(input) {
+function normalizeReportAwardModels_(input, date, historicalRead) {
   if (input == null || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('awardModels 必須是物件');
   }
   const keys = Object.keys(input);
-  const unknown = keys.filter(k => REPORT_AWARD_MODEL_IDS.indexOf(k) === -1);
+  const ids = reportAwardModelIds_(date);
+  const knownIds = historicalRead
+    ? REPORT_AWARD_MODEL_IDS.concat(...Object.keys(REPORT_AWARD_MONTH_IDS).map(month=>REPORT_AWARD_MONTH_IDS[month])) : ids;
+  const unknown = keys.filter(k => knownIds.indexOf(k) === -1);
   if (unknown.length) throw new Error('未知 modelId：' + unknown.join('、'));
   const out = {};
-  REPORT_AWARD_MODEL_IDS.forEach(id => {
+  ids.forEach(id => {
     const value = Object.prototype.hasOwnProperty.call(input, id) ? input[id] : null;
     if (value === null || value === '') {
       out[id] = null;
@@ -103,7 +113,7 @@ function reportAwardVersionId_() {
 
 function writeReportAwardModels_(date, store, seg, awardModels, versionId) {
   const sh = getReportAwardModelsSheet_();
-  const normalized = normalizeReportAwardModels_(awardModels);
+  const normalized = normalizeReportAwardModels_(awardModels, date);
   const values = sh.getDataRange().getValues();
   let rowIdx = -1;
   for (let i = 1; i < values.length; i++) {
@@ -161,7 +171,7 @@ function readReportAwardModels_(date, seg) {
   for (let i = 1; i < values.length; i++) {
     if (toDateStr(values[i][0]) !== String(date) || String(values[i][1]) !== String(seg)) continue;
     let awardModels = null;
-    try { awardModels = normalizeReportAwardModels_(JSON.parse(String(values[i][3] || '{}'))); } catch (err) { throw new Error('ReportAwardModels 資料無效：' + err.message); }
+    try { awardModels = normalizeReportAwardModels_(JSON.parse(String(values[i][3] || '{}')), date, true); } catch (err) { throw new Error('ReportAwardModels 資料無效：' + err.message); }
     result[String(values[i][2])] = {
       awardModels,
       schemaVersion: String(values[i][4] || ''),
@@ -172,13 +182,14 @@ function readReportAwardModels_(date, seg) {
   return result;
 }
 
-function mapLegacyAwardModels_(record) {
+function mapLegacyAwardModels_(record, date) {
   const awardModels = {};
-  REPORT_AWARD_MODEL_IDS.forEach(id => { awardModels[id] = null; });
+  const ids = reportAwardModelIds_(date);
+  ids.forEach(id => { awardModels[id] = null; });
   const unmappedLegacyFields = [];
   Object.keys(REPORT_AWARD_SAFE_LEGACY_MAP).forEach(key => {
     const value = record && record[key];
-    if (value !== null && value !== undefined && value !== '') awardModels[REPORT_AWARD_SAFE_LEGACY_MAP[key]] = value;
+    if (ids.indexOf(REPORT_AWARD_SAFE_LEGACY_MAP[key]) >= 0 && value !== null && value !== undefined && value !== '') awardModels[REPORT_AWARD_SAFE_LEGACY_MAP[key]] = value;
   });
   REPORT_AWARD_UNMAPPED_LEGACY.forEach(key => {
     const value = record && record[key];
@@ -200,7 +211,7 @@ function attachReportAwardModels_(result, date, seg) {
       };
       result[store].unmappedLegacyFields = [];
     } else {
-      const mapped = mapLegacyAwardModels_(result[store]);
+      const mapped = mapLegacyAwardModels_(result[store], date);
       result[store].awardModels = mapped.awardModels;
       result[store].unmappedLegacyFields = mapped.unmappedLegacyFields;
     }
@@ -2850,7 +2861,7 @@ function privateDashboardParsePostPayload(e) {
 function reportWritePayload_(payload) {
   const data = payload.data || {};
   if (data.awardModels !== undefined) {
-    const normalizedAwardModels = normalizeReportAwardModels_(data.awardModels);
+    const normalizedAwardModels = normalizeReportAwardModels_(data.awardModels, payload.date);
     // 新契約資料不得回寫 legacy tw_*；其餘既有 KPI 欄位仍維持 v15 寫入方式。
     const legacyData = {};
     Object.keys(data).forEach(key => {
@@ -4978,10 +4989,24 @@ function privateDashboardValidateAwardsComponent_(awardsBattle, kpiBattle) {
       throw new Error('awards component ' + field + ' 與 KPI cutoff 不一致');
     }
   });
-  if (Number(awardsBattle.phone_items) !== 13 || Number(awardsBattle.store_rows) !== 10 ||
+  const expectedPhoneItems = /^2026-(09|10)-/.test(cutoff) ? 10 : 13;
+  if (Number(awardsBattle.phone_items) !== expectedPhoneItems || Number(awardsBattle.store_rows) !== 10 ||
       !Array.isArray(awardsBattle.stores) || awardsBattle.stores.length !== 9 ||
-      !awardsBattle.overall || !Array.isArray(awardsBattle.overall.items) || awardsBattle.overall.items.length !== 13) {
-    throw new Error('awards component 必須為 13 機款／九店／10 列');
+      !awardsBattle.overall || !Array.isArray(awardsBattle.overall.items) || awardsBattle.overall.items.length !== expectedPhoneItems ||
+      awardsBattle.stores.some(row => !Array.isArray(row.items) || row.items.length !== expectedPhoneItems)) {
+    throw new Error('awards component 必須為 ' + expectedPhoneItems + ' 機款／九店／10 列');
+  }
+  if (cutoff.slice(0,7) === '2026-10') {
+    const expectedModels = ["ZFold8Ultra/ZFold8/ZFlip8","Pixel10a","Pixel11Pro/11ProXL/11ProFold","S26Ultra","Pixel11","S26/S26+","Reno16F","A57","V80Lite","A6x6G/128G/A7Pro"];
+    const normalizeName = name => String(name || '').replace(/Google|Samsung|Galaxy|OPPO|vivo/gi,'').replace(/[\s/／&＆+]/g,'').toLowerCase();
+    const expected = expectedModels.map(normalizeName);
+    const matches = items => {
+      const names = items.map(item=>normalizeName(item && (item.name || item.display_name)));
+      return new Set(names).size === expected.length && names.every(name=>expected.indexOf(name)>=0);
+    };
+    if (!matches(awardsBattle.overall.items) || awardsBattle.stores.some(row=>!matches(row.items))) {
+      throw new Error('AWARDS_MODEL_MONTH_MISMATCH：十月機款組合不符');
+    }
   }
   const expectedNames = {
     store:'01-08-03-(密)直營_手機競賽日報_店點達成率、排名及獎金.xlsx',

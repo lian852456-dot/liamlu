@@ -172,3 +172,38 @@ test('isolated doGet write response contains row metadata and same-condition rea
   assert.equal(response.readbackMatches, true);
   assert.deepEqual(response.readback.awardModels, models);
 });
+
+test('October report saves and reads back ten independent groups, preserving zero and missing', () => {
+  const spreadsheet = new MockSpreadsheet();
+  const api = loadAwardModelFunctions(spreadsheet);
+  const catalog = require('../award-model-catalog.js');
+  const ids = catalog.definitions('2026-10-01').map(row=>row.modelId);
+  const models = Object.fromEntries(ids.map((id,index)=>[id,index]));
+  models['vivo-v80-lite'] = null;
+  const saved = api.writeReportAwardModels_('2026-10-01','隔離測試門市',16,models,'test-october');
+  assert.equal(saved.readbackMatches,true);
+  assert.deepEqual(saved.readback.awardModels,models);
+  assert.equal(saved.readback.awardModels['zfold8-family'],0);
+  assert.equal(saved.readback.awardModels['vivo-v80-lite'],null);
+  assert.equal(Object.keys(saved.awardModels).length,10);
+  assert.throws(()=>api.writeReportAwardModels_('2026-10-01','隔離測試門市',16,
+    {'s26u-zfold8-family':7}),/未知 modelId/);
+  const legacy = Object.fromEntries(MODEL_IDS.map(id=>[id,1]));
+  api.writeReportAwardModels_('2026-08-31','隔離測試門市',16,legacy,'test-august');
+  assert.deepEqual(api.readReportAwardModels_('2026-08-31',16)['隔離測試門市'].awardModels,legacy);
+});
+
+test('October read never reassigns old combined S26 Ultra or X300 counts to new models', () => {
+  const spreadsheet = new MockSpreadsheet();
+  const api = loadAwardModelFunctions(spreadsheet);
+  const sheet=api.getReportAwardModelsSheet_();
+  sheet.appendRow(['2026-10-01','16','隔離測試門市',JSON.stringify({
+    's26u-zfold8-family':8,'vivo-x300-v70fe':9,'oppo-a6x':4,'pixel-11':0
+  }),'award-models-v1','old-client','2026-10-01T01:00:00Z']);
+  const models=api.readReportAwardModels_('2026-10-01',16)['隔離測試門市'].awardModels;
+  assert.equal(models['zfold8-family'],null);
+  assert.equal(models['s26-ultra'],null);
+  assert.equal(models['vivo-v80-lite'],null);
+  assert.equal(models['oppo-a6x-a7pro'],null);
+  assert.equal(models['pixel-11'],0);
+});

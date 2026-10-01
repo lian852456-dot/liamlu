@@ -1,9 +1,10 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-2-phone-stock-20260925-v1';
+const CACHE_NAME = 'liam-supervisor-app-1-2-awards-20261001-v1';
 const SHELL = [
   './app.html',
   './app.css',
   './app.js',
+  './award-model-catalog.js',
   './phone-stock-app.js',
   './phone-stock-core.js',
   './assets/vendor/xlsx.full.min.js',
