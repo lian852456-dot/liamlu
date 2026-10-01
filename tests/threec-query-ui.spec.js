@@ -7,6 +7,15 @@ const PAGE_URL = 'file://' + path.resolve(__dirname, '../threec-query.html');
 const DEVICE_KEY = 'north12b_private_dashboard_device_id';
 const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
 
+function publicPayload(request){const text=request.postData()||'{}';try{return JSON.parse(text);}catch{return JSON.parse(new URLSearchParams(text).get('payload')||'{}');}}
+function fulfillPublic(route,options){
+ const url=new URL(route.request().url());
+ if(url.searchParams.get('transport')!=='iframe'||options.contentType!=='application/json')return route.fulfill(options);
+ const message=JSON.stringify({type:'north12b-gas-response-v1',requestId:url.searchParams.get('requestId'),body:JSON.parse(options.body)}).replace(/</g,'\\u003c');
+ return route.fulfill({...options,contentType:'text/html',body:'<!doctype html><meta charset="utf-8"><script>window.top.postMessage('+message+',"*")</script>'});
+}
+
+
 function response(kind) {
   if (kind === 'shopping') return { status:'ok', snapshot:{ kind, source_version_date:'2026-10-01', snapshot_hash:'shopping-snapshot-v1', source_file_sha256:'a'.repeat(64), published_at:'2026-10-01T09:00:00+08:00', rows:[
     { source_sheet:'iPhone', source_row_number:2, brand:'Apple', model:'iPhone 16 256GB 黑色', colorless_model:'iPhone 16 256GB', code:'A16', retail_price:'29,900', project_prices:{'999型專案價':'0','合約24期':'1,299','合約36期':''} },
@@ -25,17 +34,17 @@ async function intercept(page, { fail = false, missing = '' } = {}) {
   const calls = [];
   await page.route('**/exec*', async route => {
     let payload = {};
-    try { payload = route.request().postDataJSON(); } catch {}
+    try { payload = publicPayload(route.request()); } catch {}
     calls.push(payload);
-    if (fail) return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ status:'error', message:'此員編尚未核准此裝置' }) });
-    if (missing === payload.kind) return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ status:'ok', snapshot:null, registry:{} }) });
+    if (fail) return fulfillPublic(route,{ status:200, contentType:'application/json', body:JSON.stringify({ status:'error', message:'此員編尚未核准此裝置' }) });
+    if (missing === payload.kind) return fulfillPublic(route,{ status:200, contentType:'application/json', body:JSON.stringify({ status:'ok', snapshot:null, registry:{} }) });
     if (payload.action === 'threec_changes_read') {
       const full = response(payload.kind).changeSet;
       const search = String(payload.search || '').toLocaleLowerCase();
       const matching = search ? full.changes.filter(change => JSON.stringify(change).toLocaleLowerCase().includes(search)) : full.changes;
-      return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ status:'ok', snapshotHash:response(payload.kind).snapshot.snapshot_hash, changeSet:{ ...full, offset:Number(payload.offset||0), limit:Number(payload.limit||1000), changeCount:matching.length, totalChangeCount:full.changeCount, changes:Number(payload.offset||0) === 0 ? matching : [], hasMore:false } }) });
+      return fulfillPublic(route,{ status:200, contentType:'application/json', body:JSON.stringify({ status:'ok', snapshotHash:response(payload.kind).snapshot.snapshot_hash, changeSet:{ ...full, offset:Number(payload.offset||0), limit:Number(payload.limit||1000), changeCount:matching.length, totalChangeCount:full.changeCount, changes:Number(payload.offset||0) === 0 ? matching : [], hasMore:false } }) });
     }
-    return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(response(payload.kind)) });
+    return fulfillPublic(route,{ status:200, contentType:'application/json', body:JSON.stringify(response(payload.kind)) });
   });
   return calls;
 }
@@ -109,10 +118,10 @@ test('離頁會使尚未完成的讀取失效，不回寫已清除的價格', as
   const calls = [];
   await page.route('**/exec*', async route => {
     let payload = {};
-    try { payload = route.request().postDataJSON(); } catch {}
+    try { payload = publicPayload(route.request()); } catch {}
     calls.push(payload);
     await pending;
-    return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(response(payload.kind)) });
+    return fulfillPublic(route,{ status:200, contentType:'application/json', body:JSON.stringify(response(payload.kind)) });
   });
   await page.goto(PAGE_URL);
   await expect.poll(() => calls.length).toBe(2);
@@ -138,13 +147,13 @@ test('離頁後延遲的異動清單不能恢復資料或下載', async ({ page 
   const pending = new Promise(resolve => { release=resolve; });
   let requests=0;
   await page.route('**/exec*', async route => {
-    const payload=route.request().postDataJSON();
+    const payload=publicPayload(route.request());
     if(payload.action==='threec_changes_read') {
       requests++;
       await pending;
-      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:response(payload.kind).changeSet})});
+      return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:response(payload.kind).changeSet})});
     }
-    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(response(payload.kind))});
+    return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify(response(payload.kind))});
   });
   await page.goto(PAGE_URL);
   await expect(page.locator('#queryCard')).toBeVisible();
@@ -161,11 +170,11 @@ test('離頁後延遲的異動清單不能恢復資料或下載', async ({ page 
 
 test('GAS JSON序列化的 changePage 能顯示正式異動並跨頁', async ({ page }) => {
   await page.route('**/exec*', async route => {
-    const payload=route.request().postDataJSON();const body=response(payload.kind);
+    const payload=publicPayload(route.request());const body=response(payload.kind);
     const set=body.changeSet;set.changePage=set.changes;delete set.changes;
     set.hasMore=payload.action!=='threec_changes_read';
     if(payload.action==='threec_changes_read'){set.offset=100;set.changePage=[{...set.changePage[0],model:'NEXT PAGE MODEL',modelCapacity:'NEXT PAGE MODEL'}];}
-    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(payload.action==='threec_changes_read'?{status:'ok',changeSet:set}:body)});
+    return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify(payload.action==='threec_changes_read'?{status:'ok',changeSet:set}:body)});
   });
   await page.goto(PAGE_URL);
   await expect(page.locator('#changeResults')).toContainText('合約24期');
@@ -190,10 +199,10 @@ test('切換分類清空搜尋後返回手機，會重新查詢全版清單', as
 test('首版完整異動匯出由已驗證正式快照生成，避免重複下載全價資料', async ({ page }) => {
   const Diff=require('../threec-price-diff-core.js'),fs=require('node:fs');let calls=0;
   await page.route('**/exec*',async route=>{
-    const payload=route.request().postDataJSON(),body=response(payload.kind);
+    const payload=publicPayload(route.request()),body=response(payload.kind);
     body.changeSet=Diff.diffSnapshots(payload.kind,null,body.snapshot,{limit:1});
-    if(payload.action==='threec_changes_read'){calls++;return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:body.changeSet})});}
-    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
+    if(payload.action==='threec_changes_read'){calls++;return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:body.changeSet})});}
+    return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify(body)});
   });
   await page.goto(PAGE_URL);await expect(page.locator('#queryCard')).toBeVisible();
   const pending=page.waitForEvent('download');await page.locator('#changeJsonBtn').click();
@@ -209,14 +218,14 @@ test('快速切換分類時，舊分類延遲請求不能作廢新分類清單',
   const tradeinPending=new Promise(resolve=>{releaseTradein=resolve;});
   const calls=[];
   await page.route('**/exec*',async route=>{
-    const payload=route.request().postDataJSON();
+    const payload=publicPayload(route.request());
     if(payload.action==='threec_changes_read'){
       calls.push(payload);
       if(payload.kind==='shopping'&&payload.search==='')await shoppingPending;
       if(payload.kind==='tradein'&&payload.search==='')await tradeinPending;
-      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:response(payload.kind).changeSet})});
+      return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:response(payload.kind).changeSet})});
     }
-    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(response(payload.kind))});
+    return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify(response(payload.kind))});
   });
   await page.goto(PAGE_URL);
   await expect(page.locator('#queryCard')).toBeVisible();
@@ -236,23 +245,23 @@ test('快速切換分類時，舊分類延遲請求不能作廢新分類清單',
 
 test('某一類 API 失敗不清除另一類已完成價格，並允許重整復原',async({page})=>{
  let fail=true;
- await page.route('**/exec*',route=>{const p=route.request().postDataJSON();return route.fulfill({contentType:'application/json',body:JSON.stringify(fail&&p.kind==='tradein'?{status:'error',message:'獨立測試失敗'}:response(p.kind))});});
+ await page.route('**/exec*',route=>{const p=publicPayload(route.request());return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(fail&&p.kind==='tradein'?{status:'error',message:'獨立測試失敗'}:response(p.kind))});});
  await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('舊換新：獨立測試失敗');await expect(page.locator('#shoppingResults')).toContainText('iPhone');
  fail=false;await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('Galaxy');
 });
 test('另一類慢讀取時手機先可查，不能等待兩類才渲染',async({page})=>{
  let release;const pending=new Promise(resolve=>release=resolve);
- await page.route('**/exec*',async route=>{const p=route.request().postDataJSON();if(p.kind==='tradein')await pending;return route.fulfill({contentType:'application/json',body:JSON.stringify(response(p.kind))});});
+ await page.route('**/exec*',async route=>{const p=publicPayload(route.request());if(p.kind==='tradein')await pending;return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(response(p.kind))});});
  await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#queryStatus')).toContainText('可先查詢');release();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
 });
 test('Google JSON 轉址回 HTML 時，限定來源與 requestId 的既有 iframe 可讀回',async({page})=>{
  const requests=[];
  await page.route('**/exec*',async route=>{
   const url=new URL(route.request().url());
-  if(!url.searchParams.has('transport'))return route.fulfill({contentType:'text/html',body:'<html>上傳頁非 JSON</html>'});
+  if(!url.searchParams.has('transport'))return fulfillPublic(route,{contentType:'text/html',body:'<html>上傳頁非 JSON</html>'});
   const p=JSON.parse(new URLSearchParams(route.request().postData()).get('payload'));requests.push(p);
   const requestId=url.searchParams.get('requestId');
-  await route.fulfill({contentType:'text/html',body:'<html>合成傳輸頁</html>'});
+  await fulfillPublic(route,{contentType:'text/html',body:'<html>合成傳輸頁</html>'});
   await page.evaluate(({requestId,body})=>{
     const send=(origin,id,value)=>window.dispatchEvent(new MessageEvent('message',{origin,source:window,data:{type:'north12b-gas-response-v1',requestId:id,body:value}}));
     send('https://evil.example',requestId,{status:'ok',snapshot:null});
@@ -275,7 +284,7 @@ for(const width of [1280,390,360])test(`${width}px 閱讀文字至少18px，價�
 
 for(const width of [1280,390])test(`三家公開報價與來源未分級 ${width}px，篩選和SABC不互相覆蓋`,async({page})=>{
  await page.setViewportSize({width,height:900});
- await page.route('**/exec*',route=>{const p=route.request().postDataJSON();const r=response(p.kind);if(p.kind==='tradein'){r.snapshot.rows[0].quotes['愛鋒派']={S:null,A:'900',B:null,C:null,'未分級':0};}return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(r)});});
+ await page.route('**/exec*',route=>{const p=publicPayload(route.request());const r=response(p.kind);if(p.kind==='tradein'){r.snapshot.rows[0].quotes['愛鋒派']={S:null,A:'900',B:null,C:null,'未分級':0};}return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify(r)});});
  await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.locator('#tradeinTab').click();
  await expect(page.locator('#tradeinResults')).toContainText('愛鋒派（獨立報價）');await expect(page.locator('#tradeinResults')).toContainText('來源未分級');
  await page.locator('#tradeinProvider').selectOption('愛鋒派');await page.locator('#tradeinGrade').selectOption('未分級');const table=page.locator('#tradeinResults table');await expect(table).toHaveCount(1);await expect(table).toContainText('0 元');await expect(table).not.toContainText('900 元');await expect(table).not.toContainText('A 級');
@@ -284,14 +293,64 @@ for(const width of [1280,390])test(`三家公開報價與來源未分級 ${width
 });
 
 for(const width of [1280,390,360])test(`企業專區 ${width}px 修復截圖情境：iPhone專用報價可讀，一般/空白企業欄分流`,async({page})=>{
- await page.route('**/*',async route=>{const req=route.request();if(req.url().includes('/macros/s/')){const payload=JSON.parse(req.postData());const data=response(payload.kind);if(payload.kind==='shopping')data.snapshot.rows=[
+ await page.route('**/*',async route=>{const req=route.request();if(req.url().includes('/macros/s/')){const payload=publicPayload(req);const data=response(payload.kind);if(payload.kind==='shopping')data.snapshot.rows=[
  {source_sheet:'一般',brand:'APPLE',model:'APPLE iPhone 17 Pro 256G(黑)(5G)',colorless_model:'APPLE iPhone 17 Pro 256G(5G)',code:'test-consumer',retail_price:39900,project_prices:{'5G_iPhone_XH(24)-續約／999H':1234}},
  {source_sheet:'企客員工眷',brand:'APPLE',model:'APPLE iPhone 17 Pro 256G(黑)(5G)',colorless_model:'APPLE iPhone 17 Pro 256G(5G)',code:'test-enterprise',retail_price:39900,project_prices:{'企客特殊專案(2)／(企客_5G)榮耀之星999H(24)':'','企客特殊專案(2)／(企客_5G)榮耀之星999H(24)_iPhone':2999,'企客特殊專案(2)／(企客_5G)榮耀之星999H(30)_iPhone':0,'企客特殊專案(2)／(企客_5G)榮耀之星999H(48)_iPhone':''}}
- ];return route.fulfill({contentType:'application/json',body:JSON.stringify(data)})}if(/^https?:/.test(req.url()))return route.abort();return route.continue()});
+ ];return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(data)})}if(/^https?:/.test(req.url()))return route.abort();return route.continue()});
  await page.setViewportSize({width,height:844});await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('1,234 元');await expect(page.locator('#shoppingResults')).not.toContainText('榮耀之星');
  await page.locator('#shoppingBrand').selectOption('APPLE');await page.locator('#shoppingModel').selectOption('APPLE iPhone 17 Pro (5G)');await page.locator('#shoppingCapacity').selectOption('256GB');await page.locator('#enterpriseSegmentBtn').click();await expect(page.locator('#shoppingSectionTitle')).toHaveText('企業用戶專區');if(width<700)await page.locator('.filter-details summary').click();await page.locator('#shoppingRent').selectOption('999');
  await expect(page.locator('#shoppingProject option')).toHaveText(['全部專案','(企客 5G)榮耀之星 iPhone']);await page.locator('#tableModeBtn').click();await expect(page.locator('.comparison-table tbody tr')).toHaveCount(1);await expect(page.locator('.comparison-table tbody td')).toHaveText(['2,999 元','0 元']);await expect(page.locator('.comparison-table tbody')).not.toContainText('未列此條件');await expect(page.locator('.comparison-table tbody')).not.toContainText('無報價');
  await page.locator('.comparison-table details').filter({hasText:'完整條件'}).first().click();await expect(page.locator('.raw-condition').first()).toHaveText('企客特殊專案(2)／(企客_5G)榮耀之星999H(24)_iPhone');
  await page.locator('#cardModeBtn').click();await expect(page.locator('.quote-card')).toContainText('2,999 元');expect(await page.locator('.quote-card .quote').evaluate(e=>parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(28);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.locator('#consumerSegmentBtn').click();await expect(page.locator('#shoppingResults')).toContainText('1,234 元');await expect(page.locator('#shoppingResults')).not.toContainText('2,999 元');
+});
+
+test('完整價格先讀取，異動僅在要求時載入且鎖定目前快照',async({page})=>{
+ const calls=[];
+ await page.route('**/exec*',async route=>{
+  const p=publicPayload(route.request());calls.push(p);
+  if(p.action==='threec_snapshot_read')return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify({...response(p.kind),changeSet:null,changesDeferred:true})});
+  return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify({status:'ok',snapshotHash:response(p.kind).snapshot.snapshot_hash,changeSet:response(p.kind).changeSet})});
+ });
+ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ expect(calls).toHaveLength(2);expect(calls.every(p=>p.includeChanges===false)).toBe(true);
+ await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('17,500');expect(calls).toHaveLength(2);
+ await page.locator('#changeLoadBtn').click();await expect(page.locator('#changeResults')).toContainText('FutureDial');
+ expect(calls[2]).toMatchObject({action:'threec_changes_read',kind:'tradein',snapshotHash:'tradein-snapshot-v1',offset:0,limit:100});
+ await expect(page.locator('#changeLoadBtn')).toBeHidden();
+});
+
+test('異動逾時可單獨重試，完整價格和一般企業切換仍可用',async({page})=>{
+ let fail=true;
+ await page.route('**/exec*',async route=>{
+  const p=publicPayload(route.request());
+  if(p.action==='threec_snapshot_read')return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify({...response(p.kind),changeSet:null,changesDeferred:true})});
+  return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(fail?{status:'error',message:'異動測試逾時'}:{status:'ok',changeSet:response(p.kind).changeSet})});
+ });
+ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ await page.locator('#changeLoadBtn').click();await expect(page.locator('#changeSummary')).toContainText('異動測試逾時');
+ await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#changeLoadBtn')).toBeEnabled();
+ await page.locator('#enterpriseSegmentBtn').click();await page.locator('#consumerSegmentBtn').click();await expect(page.locator('#shoppingResults')).toContainText('iPhone');
+ fail=false;await page.locator('#changeLoadBtn').click();await expect(page.locator('#changeResults')).toContainText('合約24期');
+});
+
+test('compact response reconstructs all prices before query; refresh and segment switches remain compatible',async({page})=>{
+ const T=require('../threec-price-transport.js'),calls=[];
+ await page.route('**/exec*',async route=>{
+  const p=publicPayload(route.request());calls.push(p);const body=response(p.kind);
+  body.snapshot.row_count=body.snapshot.rows.length;
+  if(p.action==='threec_snapshot_read'){body.changeSet=null;body.changesDeferred=true;return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(T.encode(body))});}
+  return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(body)});
+ });
+ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ await expect(page.locator('#shoppingResults')).toContainText('0 元');await expect(page.locator('#shoppingResults')).toContainText('無報價');
+ await page.locator('#enterpriseSegmentBtn').click();await page.locator('#consumerSegmentBtn').click();await expect(page.locator('#shoppingResults')).toContainText('iPhone');
+ await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ expect(calls).toHaveLength(4);expect(calls.every(p=>p.priceEncoding===T.ENCODING&&p.includeChanges===false&&!p.employeeId)).toBe(true);
+});
+
+test('大手機快照先走單次 iframe，避免15秒中止後重複執行',async({page})=>{
+ const reads=[];await page.route('**/exec*',route=>{const p=publicPayload(route.request());reads.push({kind:p.kind,transport:new URL(route.request().url()).searchParams.get('transport')||'fetch'});return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(response(p.kind))});});
+ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ expect(reads.filter(r=>r.kind==='shopping')).toEqual([{kind:'shopping',transport:'iframe'}]);expect(reads.filter(r=>r.kind==='tradein')).toEqual([{kind:'tradein',transport:'fetch'}]);
 });

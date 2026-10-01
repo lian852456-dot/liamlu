@@ -26,6 +26,8 @@ function runtime(options = {}) {
     ['REPORT_UPLOAD_ALLOWED_EMPLOYEES', 'A12345'],
     ['THREEC_PRIVATE_FOLDER_ID', 'folder-private'],
   ]);
+  const cacheEntries = new Map();
+  let snapshotReads = 0;
   const files = new Map();
   const folders = new Map();
   let nextFileId = 0;
@@ -51,6 +53,7 @@ function runtime(options = {}) {
         getId() { return this.id; },
         getName() { return this.name; },
         getBlob() {
+          if (/^threec-(shopping|tradein)-/.test(this.name)) snapshotReads++;
           let value = this.content;
           if (this.corrupt) {
             const changed = JSON.parse(this.content);
@@ -87,6 +90,12 @@ function runtime(options = {}) {
     Array,
     Error,
     PropertiesService: { getScriptProperties: () => propertiesApi },
+    CacheService: { getScriptCache: () => ({
+      get: key => cacheEntries.get(key) || null,
+      getAll: keys => Object.fromEntries(keys.filter(key => cacheEntries.has(key)).map(key => [key, cacheEntries.get(key)])),
+      putAll: (entries, ttl) => { assert.equal(ttl,600); if(options.cacheWriteFailure) throw Error('cache unavailable'); for(const [key,value] of Object.entries(entries)){assert.ok(Buffer.byteLength(value)<=100000);cacheEntries.set(key,value);}},
+      put: (key,value) => cacheEntries.set(key,value),
+    }) },
     DriveApp: {
       Access: { PRIVATE: 'PRIVATE' },
       getFolderById: id => {
@@ -108,6 +117,7 @@ function runtime(options = {}) {
     },
     Utilities: {
       DigestAlgorithm: { SHA_256: 'sha256', MD5: 'md5' },
+      Charset: { UTF_8: 'UTF-8' },
       computeDigest: digest,
       newBlob: value => ({ getBytes: () => Buffer.from(String(value)) }),
       formatDate: () => '2026-09-28T12:00:00+08:00',
@@ -151,9 +161,12 @@ function runtime(options = {}) {
     MimeType: { PLAIN_TEXT: 'text/plain' },
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'threec-price-diff-core.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'threec-price-transport.js'), 'utf8'), context);
   vm.runInContext(threecBlock, context);
   return {
     context,
+    cacheEntries,
+    get snapshotReads() { return snapshotReads; },
     properties,
     files,
     folder,
@@ -568,4 +581,92 @@ test('手機來源目錄另列稽核，價格/缺价/目錄加總守恆，容量
  assert.throws(()=>env.context.threecNormalizeIncomingSnapshot_({...input,catalog_row_count:-1}),/目錄/);
  assert.throws(()=>env.context.threecNormalizeIncomingSnapshot_({...input,rows:Array(20001).fill(input.rows[0])}),/筆數/);
  const legacy=env.context.threecNormalizeIncomingSnapshot_(shoppingSnapshot());assert.equal(Object.hasOwn(legacy,'catalog_row_count'),false);
+});
+
+test('price-only public read preserves every verified price without computing historical changes',()=>{
+ const env=runtime();publish(env,shoppingSnapshot({rows:2,excluded:0}));
+ const before=env.context.threecSnapshotRead({kind:'shopping'});
+ const writes=env.registryWrites,files=env.createdFileCount;
+ env.context.threecChangesResult_=()=>{throw new Error('historical diff invoked');};
+ const fast=env.context.threecSnapshotRead({kind:'shopping',includeChanges:false});
+ assert.deepEqual(fast.snapshot,before.snapshot);assert.equal(fast.changeSet,null);assert.equal(fast.changesDeferred,true);
+ assert.deepEqual(Object.keys(fast).sort(),['changeSet','changesDeferred','snapshot','updateCheck']);
+ assert.doesNotMatch(JSON.stringify(fast),/registry|operator_hash|source_file_name|employeeId|snapshot_file_id/);
+ assert.throws(()=>env.context.threecSnapshotRead({kind:'shopping'}),/historical diff invoked/);
+ assert.throws(()=>env.context.threec_readback({...env.auth,kind:'shopping',includeChanges:false}),/historical diff invoked/);
+ assert.equal(env.registryWrites,writes);assert.equal(env.createdFileCount,files);
+ const file=env.files.get(env.properties.get('THREEC_REGISTRY_FILE_ID')),r=JSON.parse(file.content);
+ r.kinds.shopping.active.source_file_sha256='0'.repeat(64);file.content=JSON.stringify(r);
+ assert.throws(()=>env.context.threecSnapshotRead({kind:'shopping',includeChanges:false}),/版本驗證失敗/);
+});
+
+test('compact public read is opt-in, lossless and compatible with legacy readers',()=>{
+ const env=runtime();publish(env,shoppingSnapshot({rows:2,excluded:0}));
+ const normal=JSON.parse(JSON.stringify(env.context.threecSnapshotRead({kind:'shopping',includeChanges:false})));
+ const count=env.createdFileCount,writes=env.registryWrites;
+ const packed=env.context.threecSnapshotRead({kind:'shopping',includeChanges:false,priceEncoding:'shopping-columns/v1'});
+ const restored=JSON.parse(JSON.stringify(env.context.ThreecPriceTransport.decode(packed)));
+ assert.deepEqual(restored,normal);assert.equal(packed.priceEncoding,'shopping-columns/v1');
+ assert.equal(env.context.threecSnapshotRead({kind:'shopping'}).priceEncoding,undefined);
+ assert.equal(env.context.threecSnapshotRead({kind:'shopping',priceEncoding:'unknown'}).priceEncoding,undefined);
+ assert.doesNotMatch(JSON.stringify(packed),/operator_hash|source_file_name|registry|employeeId|snapshot_file_id/);
+ assert.equal(env.createdFileCount,count);assert.equal(env.registryWrites,writes);
+ assert.throws(()=>env.context.threec_publish({kind:'shopping',includeChanges:false,priceEncoding:'shopping-columns/v1',confirmPublish:true}),/管理者驗證失敗/);
+});
+
+const fastPublicPayload={kind:'shopping',includeChanges:false,priceEncoding:'shopping-columns/v1'};
+test('verified compact cache saves full source reads; registry stays authoritative after publish',()=>{
+ const env=runtime();publish(env,shoppingSnapshot({rows:10}));
+ const cold=env.context.threecSnapshotRead({...fastPublicPayload,includeReadTimings:true});
+ assert.equal(cold.readTimings.cacheHit,false);delete cold.readTimings;
+ const reads=env.snapshotReads,writes=env.createdFileCount;
+ const hot=env.context.threecSnapshotRead({...fastPublicPayload,includeReadTimings:true});
+ assert.equal(hot.readTimings.cacheHit,true);delete hot.readTimings;
+ assert.deepEqual(JSON.parse(JSON.stringify(hot)),JSON.parse(JSON.stringify(cold)));assert.equal(env.snapshotReads,reads);assert.equal(env.createdFileCount,writes);
+ publish(env,shoppingSnapshot({date:'2026-10-01',hash:'b'.repeat(64),rows:11}));
+ const next=env.context.threecSnapshotRead({...fastPublicPayload,includeReadTimings:true});
+ assert.equal(next.readTimings.cacheHit,false);assert.equal(next.snapshot.source_version_date,'2026-10-01');assert.equal(next.snapshot.row_count,11);
+ env.folder.sharing='ANYONE';assert.throws(()=>env.context.threecSnapshotRead(fastPublicPayload),/私有/);
+});
+test('missing or tampered cache chunks and wrong active metadata fall back to verified source',()=>{
+ for(const mode of ['missing','tampered','metadata','manifest']){
+  const env=runtime();publish(env,shoppingSnapshot({rows:10}));env.context.threecSnapshotRead(fastPublicPayload);
+  const manifestKey=[...env.cacheEntries.keys()].find(k=>k.endsWith(':manifest')),key=manifestKey.replace(/:manifest$/,'');
+  if(mode==='missing')env.cacheEntries.delete(key+':0');
+  if(mode==='tampered')env.cacheEntries.set(key+':0',env.cacheEntries.get(key+':0')+'bad');
+  if(mode==='manifest')env.cacheEntries.set(manifestKey,JSON.stringify({protocol:'public-compact/v2',count:501,digest:'a'.repeat(64)}));
+  if(mode==='metadata'){
+   const changed=JSON.parse(env.cacheEntries.get(key+':0'));changed.snapshot.snapshot_hash='0'.repeat(32);
+   env.context.threecPublicCacheWrite_(env.context.CacheService.getScriptCache(),key,changed);
+  }
+  const reads=env.snapshotReads,result=env.context.threecSnapshotRead({...fastPublicPayload,includeReadTimings:true});
+  assert.equal(result.readTimings.cacheHit,false,mode);assert.equal(env.snapshotReads,reads+1,mode);assert.notEqual(result.snapshot.snapshot_hash,'0'.repeat(32));
+ }
+});
+test('expired cache plus corrupt source fails closed; cache outage uses validated full read',()=>{
+ const env=runtime();publish(env,shoppingSnapshot({rows:10}));env.context.threecSnapshotRead(fastPublicPayload);env.cacheEntries.clear();
+ const file=[...env.files.values()].find(file=>file.name.startsWith('threec-'));file.corrupt=true;
+ assert.throws(()=>env.context.threecSnapshotRead(fastPublicPayload),/版本驗證失敗/);
+ const down=runtime({cacheWriteFailure:true});publish(down,shoppingSnapshot({rows:10}));
+ assert.equal(down.context.threecSnapshotRead(fastPublicPayload).snapshot.row_count,10);
+ assert.equal(down.context.threecSnapshotRead({...fastPublicPayload,includeReadTimings:true}).readTimings.cacheHit,false);
+});
+
+test('native UTF-8 snapshot digest preserves legacy MD5 exactly without Blob Byte[] bridge',()=>{
+ const env=runtime();
+ const input=shoppingSnapshot({rows:10});input.rows[0].model='台灣 📱 Café';input.published_at='2026-10-01T23:11:00+08:00';input.snapshot_hash='ignored';
+ const copy=JSON.parse(JSON.stringify(input));delete copy.snapshot_hash;
+ const expected=crypto.createHash('md5').update(JSON.stringify(copy),'utf8').digest('hex');
+ env.context.Utilities.newBlob=()=>{throw Error('expensive Byte[] bridge invoked');};
+ assert.equal(env.context.threecSnapshotHash_(input),expected);
+});
+
+test('deployed read-contract change invalidates verified cache without changing active prices',()=>{
+ const env=runtime();publish(env,shoppingSnapshot({rows:10}));env.context.threecSnapshotRead(fastPublicPayload);
+ assert.equal(env.context.threecSnapshotRead({...fastPublicPayload,includeReadTimings:true}).readTimings.cacheHit,true);
+ const original=env.context.threecNormalizeIncomingSnapshot_;
+ env.context.threecNormalizeIncomingSnapshot_=function revisedContract(value){return original(value);};
+ const revised=env.context.threecSnapshotRead({...fastPublicPayload,includeReadTimings:true});
+ assert.equal(revised.readTimings.cacheHit,false);assert.equal(revised.snapshot.row_count,10);
+ assert.equal(env.context.threecSnapshotRead(fastPublicPayload).readTimings,undefined);
 });

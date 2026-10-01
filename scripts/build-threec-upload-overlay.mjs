@@ -53,6 +53,7 @@ for (const [asset, source] of [['ReportUploadSheetJs.html','assets/vendor/xlsx.f
   if (prior !== current && !knownPrior) throw Error('Parser asset drift: ' + asset);
   fs.copyFileSync(path.join(root, source), path.join(destination, asset));
 }
+fs.copyFileSync(path.join(root, 'threec-price-transport.js'), path.join(destination, 'ThreecPriceTransport.js'));
 fs.copyFileSync(path.join(root, 'threec-price-diff-core.js'), path.join(destination, 'ThreecPriceDiffCore.js'));
 fs.copyFileSync(path.join(root, 'threec-price-diff-core.js'), path.join(destination, 'ReportUploadThreecDiffCore.html'));
 const before = [...original.matchAll(/^function (\w+)\(/gm)].map(match => match[1]);

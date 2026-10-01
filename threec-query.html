@@ -38,10 +38,11 @@
       <div class="comparison-pagination"><div><button id="columnPrev" class="secondary" type="button">← 前一組條件</button><span id="columnPage" class="hint"></span><button id="columnNext" class="secondary" type="button">下一組條件 →</button></div><div><button id="rowPrev" class="secondary" type="button">上一頁機款</button><span id="rowPage" class="hint"></span><button id="rowNext" class="secondary" type="button">下一頁機款</button></div></div>
     </section>
     <section id="tradeinPane" class="hidden" data-pane="tradein" role="tabpanel"><div class="toolbar"><label class="field">搜尋品牌／機款／容量<input id="tradeinSearch" type="search" autocomplete="off" placeholder="例如：Galaxy、512GB"></label><label class="field">選機款<select id="tradeinModel"><option value="">全部機款</option></select></label></div><div class="toolbar"><label class="field">回收商<select id="tradeinProvider"><option value="">全部回收商</option><option>點子行動</option><option>FutureDial（FDI）</option><option>愛鋒派</option></select></label><label class="field">報價等級<select id="tradeinGrade"><option value="">全部等級</option><option value="S">S 級</option><option value="A">A 級</option><option value="B">B 級</option><option value="C">C 級</option><option value="未分級">來源未分級</option></select></label></div><div id="tradeinMeta" class="meta"></div><div id="tradeinResults"></div></section>
-    <section id="changeCard" class="change-card" aria-live="polite"><h3 id="changeTitle" style="margin:0">本次異動／版本檢查</h3><details class="source-details"><summary>異動來源與版本核對</summary><p id="changeBasis" class="hint">尚未讀取正式異動。</p></details><div id="changeCounts" class="change-counts"></div><label class="field" style="margin-top:9px">搜尋完整異動條件<input id="changeSearch" type="search" autocomplete="off" placeholder="機款、容量、資費／合約、回收商或等級"></label><p id="changeSummary" class="hint"></p><div id="changeResults" class="change-table"></div><div class="actions"><button class="secondary" id="changePrevBtn" type="button" disabled>上一頁</button><span id="changePage" class="hint" style="align-self:center">第 1 頁</span><button class="secondary" id="changeNextBtn" type="button" disabled>下一頁</button><button class="secondary" id="changeJsonBtn" type="button" disabled>下載完整 JSON</button><button class="secondary" id="changeCsvBtn" type="button" disabled>下載完整 CSV</button></div></section>
+    <section id="changeCard" class="change-card" aria-live="polite"><h3 id="changeTitle" style="margin:0">本次異動／版本檢查</h3><details class="source-details"><summary>異動來源與版本核對</summary><p id="changeBasis" class="hint">尚未讀取正式異動。</p></details><div id="changeCounts" class="change-counts"></div><label class="field" style="margin-top:9px">搜尋完整異動條件<input id="changeSearch" type="search" autocomplete="off" placeholder="機款、容量、資費／合約、回收商或等級"></label><button class="secondary" id="changeLoadBtn" type="button" hidden>載入本次異動明細</button><p id="changeSummary" class="hint"></p><div id="changeResults" class="change-table"></div><div class="actions"><button class="secondary" id="changePrevBtn" type="button" disabled>上一頁</button><span id="changePage" class="hint" style="align-self:center">第 1 頁</span><button class="secondary" id="changeNextBtn" type="button" disabled>下一頁</button><button class="secondary" id="changeJsonBtn" type="button" disabled>下載完整 JSON</button><button class="secondary" id="changeCsvBtn" type="button" disabled>下載完整 CSV</button></div></section>
     <p class="privacy">免登入即可瀏覽；重新開啟或按「重新整理」會讀取最新正式價格。</p>
   </section>
 </main>
+<script src="threec-price-transport.js?v=20261001-load-1"></script>
 <script src="threec-query-core.js?v=20261001-providers-1"></script>
 <script src="threec-comparison-core.js?v=20261001-enterprise-1"></script>
 <script src="threec-price-diff-core.js?v=20261001-providers-1"></script>
@@ -50,6 +51,7 @@
   'use strict';
   const Core=scope.ThreecQueryCore;
   const DiffCore=scope.ThreecPriceDiffCore;
+  const Transport=scope.ThreecPriceTransport;
   const Compare=scope.ThreecComparisonCore;
   let shoppingIndex=null, shoppingView=null;
   let shoppingSegment=new URLSearchParams(scope.location.search).get('section')==='enterprise'?'enterprise':'consumer';
@@ -58,6 +60,7 @@
   const API='https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
   const state={shopping:null,tradein:null,active:'shopping',loading:false,changePage:{shopping:null,tradein:null}};
   let generation=0;
+  const changeLoading={shopping:false,tradein:false};
   const changeRequestGeneration={shopping:0,tradein:0};
   const $=id=>document.getElementById(id);
   function esc(value){return String(value==null?'':value).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
@@ -83,8 +86,11 @@
       try{form.submit();}catch{finish(new Error('正式資料連線失敗'));}
     });
   }
-  async function readPublic(payload){
-    for(let attempt=0;attempt<2;attempt++){
+  async function readPublic(payload,preferFrame=false){
+    // Large price snapshots use one iframe request first, avoiding an aborted
+    // fetch that keeps a duplicate GAS execution running in the background.
+    if(preferFrame){try{return await readPublicFrame(payload);}catch(error){if(error.authoritative)throw error;}}
+    for(let attempt=0;attempt<(preferFrame?1:2);attempt++){
       const controller=new AbortController();
       const timer=setTimeout(()=>controller.abort(),15000);
       try{
@@ -101,14 +107,14 @@
         throw new Error('正式資料讀取失敗（HTTP '+response.status+'）');
       }catch(error){
         if(error.authoritative)throw error;
-        if(attempt===0){try{return await readPublicFrame(payload);}catch(frameError){if(frameError.authoritative)throw frameError;}}
+        if(attempt===0&&!preferFrame){try{return await readPublicFrame(payload);}catch(frameError){if(frameError.authoritative)throw frameError;}}
         else throw new Error(error.name==='AbortError'?'正式資料讀取逾時，請重新整理':error.message||'正式資料連線失敗');
       }finally{clearTimeout(timer);}
     }
   }
-  function invoke(kind){return readPublic({action:'threec_snapshot_read',kind});}
+  async function invoke(kind){const payload={action:'threec_snapshot_read',kind,includeChanges:false,priceEncoding:Transport.ENCODING};return Transport.decode(await readPublic(payload,kind==='shopping'));}
   function invokeChanges(kind,offset,limit,snapshotHash,search){return readPublic({action:'threec_changes_read',kind,offset:Number(offset||0),limit:Number(limit||1000),snapshotHash:snapshotHash||'',search:String(search||'')});}
-  function clearResults(){shoppingIndex=null;shoppingView=null;state.shopping=null;state.tradein=null;state.changePage={shopping:null,tradein:null};renderKind('shopping');renderKind('tradein');}
+  function clearResults(){shoppingIndex=null;shoppingView=null;state.shopping=null;state.tradein=null;state.changePage={shopping:null,tradein:null};changeLoading.shopping=false;changeLoading.tradein=false;renderKind('shopping');renderKind('tradein');}
   function metaHtml(meta){return `<div class="source-date"><span>正式來源日期</span><strong>${esc(meta.sourceVersionDate||'未提供')}</strong><span>${esc(meta.rowCount)} 筆來源資料</span></div><details class="source-details"><summary>資料版本與來源資訊</summary><dl><dt>正式版本</dt><dd>${esc(meta.snapshotHash||meta.version||'—')}</dd><dt>發布時間</dt><dd>${esc(meta.publishedAt||'—')}</dd><dt>來源 SHA-256</dt><dd>${esc(meta.sourceFileSha256||'—')}</dd></dl></details>`;}
   function renderPrice(name,value){const state=Core.priceState(value);return `<div class="price-item${state.missing?' missing':''}${state.zero?' zero':''}"><span>${esc(name)}</span><strong>${esc(Core.formatPrice(value))}</strong></div>`;}
   function changeRows(changeSet){if(!changeSet||typeof changeSet!=='object')return [];if(Array.isArray(changeSet.changePage))return changeSet.changePage;if(Array.isArray(changeSet.changes))return changeSet.changes;if(Array.isArray(changeSet.records))return changeSet.records;return [];}
@@ -120,9 +126,17 @@
   function renderChanges(kind){
     if(kind!==state.active)return;
     const response=state[kind];
+    $('changeLoadBtn').hidden=true;
     const title=kind==='shopping'?'手機專案／3C':'舊換新';
     $('changeTitle').textContent=title+' 本次異動／版本檢查';
     if(!response||!response.snapshot){$('changeBasis').textContent='尚無正式異動記錄。';$('changeCounts').innerHTML='';$('changeResults').innerHTML='<div class="empty">尚無異動記錄。</div>';['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;}
+    if(response.changesDeferred&&!state.changePage[kind]){
+      $('changeLoadBtn').hidden=false;$('changeLoadBtn').disabled=changeLoading[kind];
+      $('changeBasis').textContent='價格 active 版本：'+response.snapshot.snapshot_hash+'；版本日期 '+response.snapshot.source_version_date+'。';
+      $('changeCounts').innerHTML='';$('changeResults').innerHTML='';$('changePage').textContent='';
+      $('changeSummary').textContent=changeLoading[kind]?'正在讀取本次異動明細，價格可繼續查詢…':'正式價格已完整讀取；需要核對本次調價時，請載入異動明細或搜尋條件。';
+      ['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;
+    }
     const snapshot=response.snapshot||{};const set=state.changePage[kind]||responseChangeSet(response);if(!set){$('changeBasis').textContent='正式版本已讀取；後端尚未提供異動記錄。';$('changeCounts').innerHTML='';$('changeResults').innerHTML='<div class="empty">尚無異動記錄。</div>';['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;}
     const query=$('changeSearch').value.trim();const loadedSearch=String(set._search==null?'':set._search);const pendingSearch=query!==loadedSearch;const counts=changeCounts(set);const rows=pendingSearch?[]:changeRows(set);const changeCount=Number(set.changeCount!=null?set.changeCount:rows.length);const totalChangeCount=Number(set.totalChangeCount!=null?set.totalChangeCount:(set.totalCount!=null?set.totalCount:changeCount));const offset=Number(set.offset||0);const limit=Number(set.limit||100);const page=Math.floor(offset/Math.max(1,limit))+1;const pageCount=Math.max(1,Math.ceil(changeCount/Math.max(1,limit)));
     const activeHash=snapshot.snapshot_hash||'';const update=response.updateCheck||{};const updateBlocked=update.blocked||update.status==='blocked'||update.ok===false||update.matches===false;const latest=update.latest_check||update.latestCheck||update;const latestDate=latest&&(latest.source_version_date||latest.date||latest.latest_source_version_date);const latestRows=latest&&(latest.row_count!=null?latest.row_count:latest.source_row_count);const latestText=latestDate||latestRows!=null||latest.status?'；最近來源核對日期 '+(latestDate||'—')+'／'+(latestRows==null?'—':latestRows)+' 筆／'+(latest.status||'已核對'):'';
@@ -178,7 +192,7 @@
     target.innerHTML=notice+view.rows.map(row=>`<article class="provider"><h3>${esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')}</h3><p class="group-note">來源工作表：${esc(row.sourceSheet||'—')}</p>${Core.providersForRow(row).filter(provider=>(!selectedProvider||provider===selectedProvider)&&(!selectedGrade||Core.providerGrades(provider).includes(selectedGrade))).map(provider=>{const grades=Core.providerGrades(provider).filter(grade=>!selectedGrade||grade===selectedGrade);return `<div class="table-scroll"><table><thead><tr><th colspan="${grades.length+1}">${esc(provider)}（獨立報價）</th></tr><tr><th>原始機型／容量</th>${grades.map(grade=>`<th>${esc(Core.gradeLabel(grade))}</th>`).join('')}</tr></thead><tbody><tr><td>${esc(row.model||'—')}</td>${grades.map(grade=>`<td>${esc(Core.formatPrice(row.quotes[provider]&&row.quotes[provider][grade]))}</td>`).join('')}</tr></tbody></table></div>`;}).join('')}</article>`).join('');
   }
   function renderKind(kind){if(kind==='shopping'){if(shoppingIndex)updateShoppingOptions();renderShopping();renderChanges(kind);return;}const search=$('tradeinSearch').value,modelKey=$('tradeinModel').value;const response=state[kind];const view=response?Core.buildView(kind,response,{query:search,modelKey,provider:$('tradeinProvider').value,grade:$('tradeinGrade').value}):null;renderTradein(view);renderChanges(kind);if(view){const select=$('tradeinModel'),prior=select.value;select.innerHTML='<option value="">全部機款</option>'+view.modelOptions.map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');if(view.modelOptions.some(option=>option.value===prior))select.value=prior;}}
-  function showKind(kind){state.active=kind;['shopping','tradein'].forEach(value=>{const tab=$(value+'Tab'),pane=$(value+'Pane');const active=value===kind;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));pane.classList.toggle('hidden',!active);});renderChanges(kind);const query=$('changeSearch').value.trim();const set=state.changePage[kind]||responseChangeSet(state[kind]);if(state[kind]&&(!set||String(set._search||'')!==query))loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad'));}
+  function showKind(kind){state.active=kind;['shopping','tradein'].forEach(value=>{const tab=$(value+'Tab'),pane=$(value+'Pane');const active=value===kind;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));pane.classList.toggle('hidden',!active);});renderChanges(kind);const query=$('changeSearch').value.trim();const set=state.changePage[kind]||responseChangeSet(state[kind]);if(state[kind]&&!state[kind].changesDeferred&&(!set||String(set._search||'')!==query))loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad'));}
   async function refresh(){
     const requestGeneration=++generation;
     state.loading=true;$('refreshBtn').disabled=true;setStatus('正在讀取兩類正式價格…');clearResults();
@@ -212,6 +226,7 @@
   function bind(){
     $('consumerSegmentBtn').addEventListener('click',()=>setShoppingSegment('consumer'));$('enterpriseSegmentBtn').addEventListener('click',()=>setShoppingSegment('enterprise'));
     $('refreshBtn').addEventListener('click',refresh);
+    $('changeLoadBtn').addEventListener('click',async()=>{const kind=state.active,readGeneration=generation;if(changeLoading[kind])return;changeLoading[kind]=true;renderChanges(kind);try{await loadChangePage(kind,0,$('changeSearch').value.trim());}catch(error){if(readGeneration!==generation||kind!==state.active)return;$('changeSummary').textContent='異動明細讀取失敗：'+error.message+'；正式價格仍可查詢。';}finally{if(readGeneration===generation){changeLoading[kind]=false;$('changeLoadBtn').disabled=false;}}});
     document.querySelectorAll('[data-kind]').forEach(button=>button.addEventListener('click',()=>showKind(button.dataset.kind)));
     ['shoppingBrand','shoppingModel','shoppingCapacity','shoppingProject','shoppingVersion','shoppingRent','shoppingTerm'].forEach(id=>$(id).addEventListener('change',()=>{rowPage=0;columnPage=0;renderKind('shopping');}));
     $('shoppingSearch').addEventListener('input',()=>{rowPage=0;columnPage=0;renderKind('shopping');});
@@ -233,7 +248,7 @@
     showKind('shopping');
     refresh();
   }
-  if(!Core||!Compare){setStatus('查詢元件載入失敗。','bad');return;}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+  if(!Core||!Compare||!Transport){setStatus('查詢元件載入失敗。','bad');return;}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
 })(window);
 </script>
 </body>
