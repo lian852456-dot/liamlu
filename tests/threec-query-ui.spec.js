@@ -282,3 +282,16 @@ for(const width of [1280,390])test(`三家公開報價與來源未分級 ${width
  await page.locator('#tradeinGrade').selectOption('A');await expect(table).toContainText('900 元');await expect(table).not.toContainText('來源未分級');
  await page.locator('#tradeinProvider').selectOption('點子行動');await page.locator('#tradeinGrade').selectOption('未分級');await expect(page.locator('#tradeinResults')).toContainText('沒有符合搜尋條件');
 });
+
+for(const width of [1280,390,360])test(`企業專區 ${width}px 修復截圖情境：iPhone專用報價可讀，一般/空白企業欄分流`,async({page})=>{
+ await page.route('**/*',async route=>{const req=route.request();if(req.url().includes('/macros/s/')){const payload=JSON.parse(req.postData());const data=response(payload.kind);if(payload.kind==='shopping')data.snapshot.rows=[
+ {source_sheet:'一般',brand:'APPLE',model:'APPLE iPhone 17 Pro 256G(黑)(5G)',colorless_model:'APPLE iPhone 17 Pro 256G(5G)',code:'test-consumer',retail_price:39900,project_prices:{'5G_iPhone_XH(24)-續約／999H':1234}},
+ {source_sheet:'企客員工眷',brand:'APPLE',model:'APPLE iPhone 17 Pro 256G(黑)(5G)',colorless_model:'APPLE iPhone 17 Pro 256G(5G)',code:'test-enterprise',retail_price:39900,project_prices:{'企客特殊專案(2)／(企客_5G)榮耀之星999H(24)':'','企客特殊專案(2)／(企客_5G)榮耀之星999H(24)_iPhone':2999,'企客特殊專案(2)／(企客_5G)榮耀之星999H(30)_iPhone':0,'企客特殊專案(2)／(企客_5G)榮耀之星999H(48)_iPhone':''}}
+ ];return route.fulfill({contentType:'application/json',body:JSON.stringify(data)})}if(/^https?:/.test(req.url()))return route.abort();return route.continue()});
+ await page.setViewportSize({width,height:844});await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('1,234 元');await expect(page.locator('#shoppingResults')).not.toContainText('榮耀之星');
+ await page.locator('#shoppingBrand').selectOption('APPLE');await page.locator('#shoppingModel').selectOption('APPLE iPhone 17 Pro (5G)');await page.locator('#shoppingCapacity').selectOption('256GB');await page.locator('#enterpriseSegmentBtn').click();await expect(page.locator('#shoppingSectionTitle')).toHaveText('企業用戶專區');if(width<700)await page.locator('.filter-details summary').click();await page.locator('#shoppingRent').selectOption('999');
+ await expect(page.locator('#shoppingProject option')).toHaveText(['全部專案','(企客 5G)榮耀之星 iPhone']);await page.locator('#tableModeBtn').click();await expect(page.locator('.comparison-table tbody tr')).toHaveCount(1);await expect(page.locator('.comparison-table tbody td')).toHaveText(['2,999 元','0 元']);await expect(page.locator('.comparison-table tbody')).not.toContainText('未列此條件');await expect(page.locator('.comparison-table tbody')).not.toContainText('無報價');
+ await page.locator('.comparison-table details').filter({hasText:'完整條件'}).first().click();await expect(page.locator('.raw-condition').first()).toHaveText('企客特殊專案(2)／(企客_5G)榮耀之星999H(24)_iPhone');
+ await page.locator('#cardModeBtn').click();await expect(page.locator('.quote-card')).toContainText('2,999 元');expect(await page.locator('.quote-card .quote').evaluate(e=>parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(28);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.locator('#consumerSegmentBtn').click();await expect(page.locator('#shoppingResults')).toContainText('1,234 元');await expect(page.locator('#shoppingResults')).not.toContainText('2,999 元');
+});

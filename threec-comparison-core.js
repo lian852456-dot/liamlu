@@ -14,7 +14,9 @@
     const version=/加碼/.test(raw)?'加碼':/VIP/i.test(raw)?'VIP':'一般';
     // Group only the recognised plan prefix. Raw conditions remain unique keys,
     // including handset, application, renewal and speed restrictions.
-    let project=parts.length>1?parts[0]:raw;
+    // New flat workbooks prefix a generic source group. Keep the actual
+    // enterprise plan and its handset eligibility visible as separate choices.
+    let project=parts.length>1&&/企客特殊專案/.test(parts[0])&&/企客|榮耀之星/.test(parts[1])?parts[1]:(parts.length>1?parts[0]:raw);
     project=project.replace(/\((24|30|36|48|60)\)/g,'').replace(/(?:月租\s*)?\d{3,4}(?:H(?=$|[^A-Za-z0-9])|型|\s*元)/gi,'').replace(/合約\s*\d{2}期/g,'').replace(/_(?:加碼版|VIP)/gi,'').replace(/_XH/g,'').replace(/[_\s]+/g,' ').trim();
     if(!project||/^(專案價|合約)$/.test(project))project='原表條件';
     const detail=parts.length>1?parts.slice(1).join('／').replace(/^\d{3,4}H/i,'').replace(/\((24|30|36|48|60)\)/g,'').replace(/^[_\s]+/,''):'';
@@ -57,24 +59,29 @@
     });
     return {rows:Array.from(merged.values()),columns:Array.from(columns.values()).sort((a,b)=>a.project.localeCompare(b.project,'zh-Hant')||Number(a.rent)-Number(b.rent)||Number(a.term)-Number(b.term)||a.version.localeCompare(b.version,'zh-Hant')||a.raw.localeCompare(b.raw,'zh-Hant'))};
   }
+  function enterpriseCondition(column){return /企客|企業|員工眷|榮耀之星/.test(column.raw);}
+  function scopeColumns(columns,filters){return columns.filter(col=>!filters.segment||(filters.segment==='enterprise'?enterpriseCondition(col):!enterpriseCondition(col)));}
+  function hasQuote(row,column){return Object.prototype.hasOwnProperty.call(row.prices,column.key)&&!Core.priceState(row.prices[column.key]).missing;}
+  function scopeRows(index,filters){const columns=scopeColumns(index.columns,filters);return index.rows.filter(row=>columns.some(col=>filters.segment==='enterprise'?hasQuote(row,col):Object.prototype.hasOwnProperty.call(row.prices,col.key)));}
   function options(index,filters={}){
-    const rows=index.rows.filter(row=>!filters.brand||row.brand===filters.brand);
+    const scoped=scopeRows(index,filters);
+    const rows=scoped.filter(row=>!filters.brand||row.brand===filters.brand);
     const models=rows.filter(row=>!filters.model||row.model===filters.model);
     const modelRows=models.filter(row=>!filters.capacity||row.capacity===filters.capacity);
     const keys=new Set(modelRows.flatMap(row=>Object.keys(row.prices)));
-    const relevant=index.columns.filter(col=>keys.has(col.key));
+    const relevant=scopeColumns(index.columns,filters).filter(col=>keys.has(col.key)&&(filters.segment!=='enterprise'||modelRows.some(row=>hasQuote(row,col))));
     const plans=relevant.filter(col=>!filters.project||col.project===filters.project);
-    return {brands:unique(index.rows.map(row=>row.brand)),models:unique(rows.map(row=>row.model)),capacities:unique(models.map(row=>row.capacity).filter(Boolean)),projects:unique(relevant.map(col=>col.project)),versions:unique(plans.map(col=>col.version)),rents:unique(plans.map(col=>col.rent).filter(Boolean)),terms:unique(plans.map(col=>col.term).filter(Boolean))};
+    return {brands:unique(scoped.map(row=>row.brand)),models:unique(rows.map(row=>row.model)),capacities:unique(models.map(row=>row.capacity).filter(Boolean)),projects:unique(relevant.map(col=>col.project)),versions:unique(plans.map(col=>col.version)),rents:unique(plans.map(col=>col.rent).filter(Boolean)),terms:unique(plans.map(col=>col.term).filter(Boolean))};
   }
   function selectColumns(columns,filters){
     return columns.filter(col=>(!filters.project||col.project===filters.project)&&(!filters.version||col.version===filters.version)&&(!filters.term||col.term===filters.term)&&(!filters.rent||(filters.rent==='common'?(!col.rent||['999','1399'].includes(col.rent)):col.rent===filters.rent)));
   }
   function buildView(index,filters={}){
     const query=text(filters.query).toLocaleLowerCase();
-    const rows=index.rows.filter(row=>(!filters.brand||row.brand===filters.brand)&&(!filters.model||row.model===filters.model)&&(!filters.capacity||row.capacity===filters.capacity)&&(!query||[row.brand,row.model,row.capacity,row.ram,row.sourceSheet,...row.models,...row.codes,...Object.keys(row.prices)].join(' ').toLocaleLowerCase().includes(query)));
+    const rows=scopeRows(index,filters).filter(row=>(!filters.brand||row.brand===filters.brand)&&(!filters.model||row.model===filters.model)&&(!filters.capacity||row.capacity===filters.capacity)&&(!query||[row.brand,row.model,row.capacity,row.ram,row.sourceSheet,...row.models,...row.codes,...Object.keys(row.prices)].join(' ').toLocaleLowerCase().includes(query)));
     const keys=new Set(rows.flatMap(row=>Object.keys(row.prices)));
-    const columns=selectColumns(index.columns.filter(col=>keys.has(col.key)),filters);
-    const matching=rows.filter(row=>columns.some(col=>Object.prototype.hasOwnProperty.call(row.prices,col.key)));
+    const columns=selectColumns(scopeColumns(index.columns,filters).filter(col=>keys.has(col.key)&&(filters.segment!=='enterprise'||rows.some(row=>hasQuote(row,col)))),filters);
+    const matching=rows.filter(row=>columns.some(col=>filters.segment==='enterprise'?hasQuote(row,col):Object.prototype.hasOwnProperty.call(row.prices,col.key)));
     const rowOffset=Math.max(0,Number(filters.rowPage||0))*20, columnOffset=Math.max(0,Number(filters.columnPage||0))*12;
     return {rows:matching.slice(rowOffset,rowOffset+20),columns:columns.slice(columnOffset,columnOffset+12),totalRows:matching.length,totalColumns:columns.length,rowPages:Math.max(1,Math.ceil(matching.length/20)),columnPages:Math.max(1,Math.ceil(columns.length/12)),options:options(index,filters)};
   }
