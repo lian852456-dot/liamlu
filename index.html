@@ -1763,9 +1763,9 @@
       <span class="ks-icon">🏅</span> 台獎手機專區
       <div class="ks-line"></div>
     </div>
-    <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;padding:0 2px;">填寫今日各機款銷售筆數（0可不填）｜<span style="color:#22c55e;">●</span> 50%達成獎金 <span style="color:#ff6600;">●</span> 100%達成獎金</div>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;padding:0 2px;">填寫今日各機款銷售筆數｜0 代表無銷售，空白代表未填｜獎金標示採店長 50%／100% 達成級距</div>
 
-    <div id="awardModelsV1Grid" class="form-grid" aria-label="8月台獎13組機款"></div>
+    <div id="awardModelsV1Grid" class="form-grid" aria-label="當月台獎機款"></div>
     <div id="awardModelsV1Status" style="font-size:11px;color:var(--text-dim);margin:6px 2px 10px;">資料契約：award-models-v1｜缺少項目保留空值，0 與空值分開記錄</div>
 
     <div id="legacyAwardInputs" style="display:none;" aria-hidden="true">
@@ -2187,6 +2187,12 @@ const AWARD_MODEL_DEFINITIONS = [
   { modelId:'vivo-y21', shortName:'vivo Y21' }
 ];
 const AWARD_MODEL_IDS = AWARD_MODEL_DEFINITIONS.map(item => item.modelId);
+function awardDefinitionsForDate(date) {
+  return AwardModelCatalog.definitions(date) || AWARD_MODEL_DEFINITIONS;
+}
+function fillAwardDefinitions() {
+  return awardDefinitionsForDate(document.getElementById('fillDate').value || today());
+}
 
 let currentSeg = 16;
 let sumSeg = 16;
@@ -2307,7 +2313,7 @@ async function saveToStorage(date, store, seg, data) {
   // 先取得正式端點的可驗證回應；在伺服器讀回前，不寫 local shadow，也不顯示成功。
   const result = await privateDashboardPost({ action: 'write', date, store, seg, data });
   const readback = result && result.readback && result.readback.awardModels;
-  const modelsMatch = readback && AWARD_MODEL_IDS.every(id =>
+  const modelsMatch = readback && Object.keys(data.awardModels).every(id =>
     Object.prototype.hasOwnProperty.call(readback, id) && readback[id] === data.awardModels[id]
   );
   const responseValid = result && result.status === 'ok' && result.rowWritten === true &&
@@ -2361,8 +2367,13 @@ function showToast(msg) {
 // ════════════════════════════════════
 window.onload = async () => {
   const td = today();
-  renderAwardModelInputs();
   document.getElementById('fillDate').value = td;
+  renderAwardModelInputs();
+  document.getElementById('fillDate').addEventListener('change', () => {
+    renderAwardModelInputs();
+    const store = document.getElementById('fillStore').value;
+    if (store) selectStore(store);
+  });
   document.getElementById('playbackDate').value = td;
   document.getElementById('todayBadge').textContent = '📅 ' + td;
   document.getElementById('summaryDateLabel').textContent = td;
@@ -2605,13 +2616,15 @@ function renderAwardModelInputs(values) {
   const grid = document.getElementById('awardModelsV1Grid');
   if (!grid) return;
   const current = values || {};
-  grid.innerHTML = AWARD_MODEL_DEFINITIONS.map(item => `
+  const definitions = fillAwardDefinitions();
+  grid.setAttribute('aria-label', (document.getElementById('fillDate').value || today()).slice(0,7) + ' 台獎' + definitions.length + '組機款');
+  grid.innerHTML = definitions.map(item => `
     <div class="kpi-input-wrap" data-award-model-id="${item.modelId}">
-      <label>${item.shortName}</label>
+      <label>${item.shortName}${item.managerRewards ? '<span class="tw-bonus"><span class="tw-b50">50%・$' + item.managerRewards[0].toLocaleString() + '</span><span class="tw-b100">100%・$' + item.managerRewards[2].toLocaleString() + '</span></span>' : ''}</label>
       <span class="ki-icon">📱</span>
       <input type="number" id="f_award_${item.modelId}" placeholder="0" min="0" step="1" inputmode="numeric">
     </div>`).join('');
-  AWARD_MODEL_IDS.forEach(id => {
+  definitions.map(item=>item.modelId).forEach(id => {
     const el = document.getElementById('f_award_' + id);
     if (el) el.value = current[id] === null || current[id] === undefined ? '' : current[id];
   });
@@ -2619,7 +2632,7 @@ function renderAwardModelInputs(values) {
 
 function getAwardModelsFormData() {
   const awardModels = {};
-  AWARD_MODEL_IDS.forEach(id => {
+  fillAwardDefinitions().map(item=>item.modelId).forEach(id => {
     const el = document.getElementById('f_award_' + id);
     awardModels[id] = !el || el.value === '' ? null : Number(el.value);
   });
@@ -2627,8 +2640,9 @@ function getAwardModelsFormData() {
 }
 
 function setAwardModelsFormData(awardModels) {
+  renderAwardModelInputs(awardModels);
   const values = awardModels && typeof awardModels === 'object' ? awardModels : {};
-  AWARD_MODEL_IDS.forEach(id => {
+  fillAwardDefinitions().map(item=>item.modelId).forEach(id => {
     const el = document.getElementById('f_award_' + id);
     if (el) el.value = values[id] === null || values[id] === undefined ? '' : values[id];
   });
@@ -2826,7 +2840,7 @@ async function renderSummary() {
 
   // Table 3: 台獎手機
   const cols3 = [
-    ...AWARD_MODEL_DEFINITIONS.map(item => ({key:'awardModels.' + item.modelId, label:item.shortName, isRaw:true}))
+    ...awardDefinitionsForDate(date).map(item => ({key:'awardModels.' + item.modelId, label:item.shortName, isRaw:true}))
   ];
   renderSummaryTable('summaryTable3', date, sumSeg, cols3);
 
@@ -3263,7 +3277,7 @@ async function renderPlayback() {
   renderSummaryTable('pbTable1', date, pbSeg, cols1);
   renderSummaryTable('pbTable2', date, pbSeg, cols2);
   const colsTw = [
-    ...AWARD_MODEL_DEFINITIONS.map(item => ({key:'awardModels.' + item.modelId, label:item.shortName, isRaw:true}))
+    ...awardDefinitionsForDate(date).map(item => ({key:'awardModels.' + item.modelId, label:item.shortName, isRaw:true}))
   ];
   renderSummaryTable('pbTable3', date, pbSeg, colsTw);
   renderStorePersonalDetail(date, pbSeg, dayCache, 'pbStorePersonalSection');
@@ -3502,6 +3516,7 @@ function selectStore(store) {
 
   // 載入已填資料
   getData(date, store, currentSeg).then(data => {
+    if (document.getElementById('fillDate').value !== date || document.getElementById('fillStore').value !== store) return;
     FIELDS.forEach(f => {
       const el = document.getElementById('f_' + f);
       if (el) el.value = data ? (data[f] ?? '') : '';
