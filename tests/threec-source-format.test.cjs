@@ -39,3 +39,56 @@ test('目錄額外未知欄與目錄識別缺漏不能被分類規則吞掉',asy
  const r=await parse('20261116-catalog-control.xlsx',[['OP',rows],['正常',[['品牌','代碼','機型','999H'],['QA','P1','機型',100]]]],'shopping');assert.equal(Core.buildAcceptanceReport('shopping',r).acceptance.publishEligible,false);assert.equal(r.rawRows.length,2);
  }
 });
+
+// Actual source structure, synthetic identities and prices only.
+for(const date of ['20261116','20270302'])test(`七欄OP與非數字方案 ${date}：NA缺價與0元、料號與raw守恆`,async()=>{
+ const headers=['品牌','代碼','機型','單機價','新復原者年繳型','新復原者月繳型','預付卡平板加掛案','Entry SD','中低階SD','中高階SD','高階SD','加碼機款'];
+ const values=['QA','NEW1','任意新機 512GB','NA',0,3100,'N/A',4100,5100,6100,7100,8100];
+ const r=await parse(date+'-original.xls',[['OP',[['OP專案別','品牌','料號/組合料號','品名','上架日','下架日','是否搭專案'],['OP','','BUNDLE1','目錄套裝','11/1','12/31','是']]],['價格',[headers,values,['QA','EMPTY1','全空機',...Array(9).fill('')]]]],'shopping');
+ assert.equal(r.recordCount,3);assert.equal(r.catalogRowCount,1);assert.equal(r.catalogIssueCount,0);assert.equal(r.standardized.rows.length,2);assert.equal(r.rawRows.length,3);
+ const a=Core.buildAcceptanceReport('shopping',r),s=Core.buildPublishSnapshot('shopping',r);
+ assert.equal(a.acceptance.status,'PARTIAL_READY');assert.equal(a.presentation.excludedNoPriceRows,1);assert.equal(s.rows.length,1);
+ assert.equal(s.rows[0].retail_price,'');assert.equal(s.rows[0].project_prices['新復原者年繳型'],'0');assert.equal(s.rows[0].project_prices['Entry SD'],'4100');assert.equal(s.rows[0].project_prices['預付卡平板加掛案'],'');
+ assert.equal(r.standardized.rows[0].rawValues['單機價'],'NA');assert.equal(r.standardized.rows[0].rawValues['預付卡平板加掛案'],'N/A');assert.equal(s.source_version_date,date==='20261116'?'2026-11-16':'2027-03-02');
+});
+const flatHeader=range=>['料號','品名 Item',range+'報價',''];
+for(const [date,range,notes] of [['20261116','11/16-11/30','11/16新增'],['20270302','3/2-3/15','3/2新增']])test(`四欄原格式 ${date} 尾綴是來源契約，換日／新機／新價不用改欄名`,async()=>{
+ const r=await parse(date+'-original.xlsx',[['價格設定',[flatHeader(range),['SKU-A','(舊機)QA 任意新機_512G-(黑)_(點子)_A等',0,notes],['SKU-S','(舊機)QA 任意新機_512G-(黑)(FDI)_S等',9876,'']]]],'tradein');
+ const a=Core.buildAcceptanceReport('tradein',r),s=Core.buildPublishSnapshot('tradein',r);
+ assert.equal(a.acceptance.status,'PASS');assert.equal(r.recordCount,2);assert.equal(r.standardized.rows.length,2);assert.equal(r.sourceNoteColumn,'未命名欄位 4');assert.deepEqual(a.tradeIn.sourceProviders,['點子行動','FutureDial（FDI）']);
+ assert.equal(r.standardized.rows[0].note,notes);assert.equal(r.standardized.rows[0].date,range);assert.equal(r.standardized.rows[0].product,'(舊機)QA 任意新機_512G-(黑)_(點子)_A等');assert.equal(s.rows[0].quotes['點子行動'].A,'0');assert.equal(s.rows[0].quotes['FutureDial（FDI）'].S,'9876');assert.equal(s.rows[0].quotes['FutureDial（FDI）'].C,null);
+});
+test('明確FDI與四等級尾綴容許來源舊機前綴漏括號，raw與警示保留',async()=>{
+ const records=['S','A','B','C'].map((g,i)=>['SKU'+g,'(舊機QA 新機_12G/512G(5G)(FDI)_'+g+'等',400-i*100,'']);
+ const r=await parse('20270302-typo.xlsx',[['價格設定',[flatHeader('3/2-3/15'),...records]]],'tradein');
+ assert.equal(Core.buildAcceptanceReport('tradein',r).acceptance.status,'PASS');assert.equal(r.standardized.rows.length,4);
+ for(const row of r.standardized.rows){assert.equal(row.vendor,'FutureDial（FDI）');assert.equal(row.sourceModel,'QA 新機_12G/512G(5G)');assert.equal(row.sourceSyntaxWarnings.length,1);assert.match(row.rawValues['品名 Item'],/^\(舊機QA/);}
+});
+test('愛鋒派及來源未分級獨立留原價，不排除或補SABC',async()=>{
+ const rows=[['K1','(舊機)QA 新機(點子)_A等',100,''],['K2','(舊機)QA 新機(愛鋒派)_B等',200,''],['K3','(舊機)QA 新機(愛鋒派)',300,'']];
+ const r=await parse('20270302-provider.xlsx',[['價格設定',[flatHeader('3/2-3/15'),...rows]]],'tradein');
+ assert.equal(r.recordCount,3);assert.equal(r.standardized.rows.length,3);assert.equal(r.standardized.summary.success,3);assert.equal(r.standardized.summary.partial,0);assert.equal(r.standardized.rows[2].grade,'未分級');assert.equal(r.standardized.rows[2].sourceGrade,'');assert.equal(r.standardized.rows[2].tradeInPrice,'300');assert.equal(r.standardized.rows[1].vendor,'愛鋒派');const a=Core.buildAcceptanceReport('tradein',r);assert.equal(a.acceptance.status,'PASS');assert.equal(a.tradeIn.providerCount,2);assert.equal(a.tradeIn.gradeCounts['未分級'],1);const snap=Core.buildPublishSnapshot('tradein',r);assert.equal(snap.rows[0].quotes['愛鋒派'].B,'200');assert.equal(snap.rows[0].quotes['愛鋒派']['未分級'],'300');assert.equal(snap.rows[0].quotes['愛鋒派'].A,null);
+});
+test('有名或無名第四欄不因明確品名而吞掉未知數值／等級／任意備註',async()=>{
+ for(const [header,value] of [['',777],['','A'],['備註','自訂條件'],['額外價格',888]]){
+ const r=await parse('20270302-extra.xlsx',[['價格設定',[[...flatHeader('3/2-3/15').slice(0,3),header],['K1','(舊機)QA 新機(點子)_A等',100,value]]]],'tradein');
+ assert.equal(r.rawRows.length,1);assert.equal(r.standardized.rows[0].rawValues[r.fields[3].name],String(value));assert.equal(Core.buildAcceptanceReport('tradein',r).acceptance.publishEligible,false);assert.throws(()=>Core.buildPublishSnapshot('tradein',r),/gate/);
+ }
+});
+test('四欄缺價、非法價及重複列保持阻擋；NA不補0',async()=>{
+ for(const value of ['','NA','N/A','待確認']){
+ const r=await parse('20270302-price.xlsx',[['價格設定',[flatHeader('3/2-3/15'),['K1','(舊機)QA 新機(點子)_A等',value,'']]]],'tradein');assert.equal(r.standardized.rows[0].rawValues['3/2-3/15報價'],value);assert.equal(Core.buildAcceptanceReport('tradein',r).acceptance.publishEligible,false);
+ }
+ const row=['K1','(舊機)QA 新機(點子)_A等',100,''];const r=await parse('20270302-duplicate.xlsx',[['價格設定',[flatHeader('3/2-3/15'),row,row]]],'tradein');assert.equal(r.standardized.rows.length,2);assert.equal(r.duplicateRowCount,1);assert.throws(()=>Core.buildPublishSnapshot('tradein',r),/gate/);
+});
+test('不同SKU的同機型／商／等級異價不能以第一個價格發布',async()=>{
+ const r=await parse('20270302-conflict.xlsx',[['價格設定',[flatHeader('3/2-3/15'),['K1','(舊機)QA 新機(點子)_A等',100,''],['K2','(舊機)QA 新機(點子)_A等',200,'']]]],'tradein');
+ const candidate=Core.buildTradeInCandidate(r);assert.equal(candidate.quoteConflictCount,1);assert.equal(candidate.metadata.publication.disabled,true);assert.throws(()=>Core.buildPublishSnapshot('tradein',r),/gate/);
+});
+test('固定格式保留整個599(6)條件；其為唯一價時不能當全空列',async()=>{
+ const r=await parse('20270302-only.xls',[['價格',[['品牌','代碼','機型','單機價','599(6)'],['QA','P1','機型','','7654'],['QA','P2','另一機','','']]]],'shopping');
+ const s=Core.buildPublishSnapshot('shopping',r);assert.equal(s.rows.length,1);assert.deepEqual(s.rows[0].project_prices,{'599(6)':'7654'});assert.equal(s.excluded_no_price_count,1);
+});
+test('前後端parser資產逐byte一致，parser版本供稽核',()=>{
+ const fs=require('node:fs'),path=require('node:path');assert.equal(fs.readFileSync(path.join(__dirname,'../tradein-import-core.js'),'utf8'),fs.readFileSync(path.join(__dirname,'../gas/ReportUploadTradeInCore.html'),'utf8'));assert.equal(Core.PARSER_VERSION,'2026.10.01-source-format-4');
+});

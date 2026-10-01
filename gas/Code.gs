@@ -3513,9 +3513,10 @@ const THREEC_REGISTRY_POINTER_PROPERTY = 'THREEC_REGISTRY_FILE_ID';
 const THREEC_PRIVATE_FOLDER_NAME = '3C／舊換新資料庫（私有）';
 const THREEC_REGISTRY_SCHEMA = 'threec-private-registry/v1';
 const THREEC_SNAPSHOT_SCHEMA = 'threec-normalized-snapshot/v1';
-const THREEC_MAX_SNAPSHOT_JSON_BYTES = 10 * 1024 * 1024;
-const THREEC_PROVIDERS = ['點子行動', 'FutureDial（FDI）'];
+const THREEC_MAX_SNAPSHOT_JSON_BYTES = 25 * 1024 * 1024;
+const THREEC_PROVIDERS = ['點子行動', 'FutureDial（FDI）', '愛鋒派'];
 const THREEC_GRADES = ['S', 'A', 'B', 'C'];
+function threecProviderGrades_(provider) { return provider === '愛鋒派' ? THREEC_GRADES.concat('未分級') : THREEC_GRADES.slice(); }
 
 
 function threecKind_(value) {
@@ -3669,15 +3670,16 @@ function threecValidateTradeinRows_(rows) {
     const quotes = row.quotes;
     if (!quotes || typeof quotes !== 'object' || Array.isArray(quotes)) throw new Error('舊換新報價格式不正確');
     const providerKeys = Object.keys(quotes).sort();
-    if (JSON.stringify(providerKeys) !== JSON.stringify(THREEC_PROVIDERS.slice().sort())) throw new Error('舊換新必須完整保留兩家回收商');
+    if (THREEC_PROVIDERS.slice(0, 2).some(function(provider) { return !Object.prototype.hasOwnProperty.call(quotes, provider); }) || providerKeys.some(function(provider) { return THREEC_PROVIDERS.indexOf(provider) < 0; })) throw new Error('舊換新必須完整保留兩家回收商，僅可另加愛鋒派');
     const normalizedQuotes = {};
     let priceCount = 0;
-    THREEC_PROVIDERS.forEach(function(provider) {
+    providerKeys.forEach(function(provider) {
+      const expectedGrades = threecProviderGrades_(provider);
       const grades = quotes[provider];
       if (!grades || typeof grades !== 'object' || Array.isArray(grades)) throw new Error(provider + '報價格式不正確');
-      if (JSON.stringify(Object.keys(grades).sort()) !== JSON.stringify(THREEC_GRADES.slice().sort())) throw new Error(provider + '必須完整保留 S／A／B／C 欄位');
+      if (JSON.stringify(Object.keys(grades).sort()) !== JSON.stringify(expectedGrades.slice().sort())) throw new Error(provider + '必須完整保留 S／A／B／C 欄位；愛鋒派另保留來源未分級');
       normalizedQuotes[provider] = {};
-      THREEC_GRADES.forEach(function(grade) {
+      expectedGrades.forEach(function(grade) {
         const value = grades[grade];
         const price = value == null || String(value).trim() === '' ? null : threecPriceField_(value, provider + ' ' + grade, false);
         if (price !== null) priceCount += 1;
@@ -3696,7 +3698,7 @@ function threecValidateTradeinRows_(rows) {
 
 function threecNormalizeIncomingSnapshot_(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('3C／舊換新快照格式不正確');
-  threecAllowedKeys_(raw, ['schema_version','kind','source_version_date','source_file_name','source_file_sha256','parser_version','internal_source_dates','source_row_count','row_count','excluded_no_price_count','query_model_count','quote_conflict_count','rows','published_at','operator_hash','snapshot_hash','change_basis','change_counts'], '快照');
+  threecAllowedKeys_(raw, ['schema_version','kind','source_version_date','source_file_name','source_file_sha256','parser_version','internal_source_dates','source_row_count','row_count','catalog_row_count','excluded_no_price_count','query_model_count','quote_conflict_count','rows','published_at','operator_hash','snapshot_hash','change_basis','change_counts'], '快照');
   if (raw.schema_version !== THREEC_SNAPSHOT_SCHEMA) throw new Error('3C／舊換新快照 schema 不正確');
   const kind = threecKind_(raw.kind);
   const sourceVersionDate = threecIsoDate_(raw.source_version_date);
@@ -3707,17 +3709,19 @@ function threecNormalizeIncomingSnapshot_(raw) {
   if (dateTokens.length !== 1 || dateTokens[0].replace(/\D/g, '') !== compactDate) throw new Error('來源檔名與 source_version_date 不一致');
   const sourceFileSha256 = String(raw.source_file_sha256 || '').toLowerCase();
   if (!/^[a-f0-9]{64}$/.test(sourceFileSha256)) throw new Error('來源檔案 SHA-256 不正確');
-  if (!Array.isArray(raw.rows) || !raw.rows.length || raw.rows.length > (kind === 'shopping' ? 10000 : 5000)) throw new Error('正式快照筆數不正確');
+  if (!Array.isArray(raw.rows) || !raw.rows.length || raw.rows.length > (kind === 'shopping' ? 20000 : 5000)) throw new Error('正式快照筆數不正確');
   const rows = kind === 'shopping' ? threecValidateShoppingRows_(raw.rows, raw.parser_version === '2026.09.28-private-registry-1') : threecValidateTradeinRows_(raw.rows);
   const rowCount = Number(raw.row_count);
   const sourceRowCount = Number(raw.source_row_count);
   const excludedNoPriceCount = Number(raw.excluded_no_price_count || 0);
+  const catalogRowCount = Number(raw.catalog_row_count || 0);
+  if (!Number.isSafeInteger(catalogRowCount) || catalogRowCount < 0 || (kind !== 'shopping' && catalogRowCount)) throw new Error('目錄稽核筆數不正確');
   const queryModelCount = Number(raw.query_model_count || 0);
   const quoteConflictCount = Number(raw.quote_conflict_count || 0);
   if (!Number.isSafeInteger(rowCount) || rowCount !== rows.length) throw new Error('快照 row_count 與正式列不一致');
   if (!Number.isSafeInteger(sourceRowCount) || sourceRowCount < rowCount) throw new Error('快照 source_row_count 不正確');
   if (!Number.isSafeInteger(excludedNoPriceCount) || excludedNoPriceCount < 0) throw new Error('排除數不正確');
-  if (kind === 'shopping' && sourceRowCount !== rowCount + excludedNoPriceCount) throw new Error('3C 來源筆數、發布筆數與排除數不一致');
+  if (kind === 'shopping' && sourceRowCount !== rowCount + excludedNoPriceCount + catalogRowCount) throw new Error('3C 來源筆數、發布筆數與排除數不一致');
   if (kind === 'tradein' && quoteConflictCount !== 0) throw new Error('舊換新含有報價衝突');
   return {
     schema_version:THREEC_SNAPSHOT_SCHEMA,
@@ -3732,6 +3736,7 @@ function threecNormalizeIncomingSnapshot_(raw) {
     excluded_no_price_count:excludedNoPriceCount,
     query_model_count:queryModelCount,
     quote_conflict_count:quoteConflictCount,
+    ...(Object.prototype.hasOwnProperty.call(raw, 'catalog_row_count') ? {catalog_row_count:catalogRowCount} : {}),
     rows:rows
   };
 }
@@ -3755,7 +3760,8 @@ function threecSnapshotSummary_(snapshot, file) {
     source_row_count:snapshot.source_row_count,
     excluded_no_price_count:snapshot.excluded_no_price_count,
     query_model_count:snapshot.query_model_count,
-    quote_conflict_count:snapshot.quote_conflict_count
+    quote_conflict_count:snapshot.quote_conflict_count,
+    ...(Object.prototype.hasOwnProperty.call(snapshot, 'catalog_row_count') ? {catalog_row_count:snapshot.catalog_row_count} : {})
   };
 }
 
@@ -3820,7 +3826,7 @@ function threecPreviewBasis_(active) {
 function threec_diff_preview(payload) {
   reportUploadAuthorize_(payload);
   const encoded = String((payload || {}).snapshotJson || '');
-  if (!encoded || encoded.length > THREEC_MAX_SNAPSHOT_JSON_BYTES) throw new Error('來源預覽缺少或過大');
+  if (!encoded || Utilities.newBlob(encoded).getBytes().length > THREEC_MAX_SNAPSHOT_JSON_BYTES) throw new Error('來源預覽缺少或過大');
   const incoming = threecNormalizeIncomingSnapshot_(JSON.parse(encoded));
   const registry = threecRegistry_();
   const source = threecLatestSource_(registry.kinds[incoming.kind]);
@@ -3853,13 +3859,13 @@ function threecPublicResult_(result) {
   }
   const clean = {};
   if (Object.prototype.hasOwnProperty.call(result, 'snapshot')) {
-    clean.snapshot = result.snapshot ? pick(result.snapshot, ['schema_version','kind','source_version_date','source_file_sha256','source_row_count','row_count','excluded_no_price_count','query_model_count','quote_conflict_count','published_at','snapshot_hash']) : null;
+    clean.snapshot = result.snapshot ? pick(result.snapshot, ['schema_version','kind','source_version_date','source_file_sha256','source_row_count','row_count','catalog_row_count','excluded_no_price_count','query_model_count','quote_conflict_count','published_at','snapshot_hash']) : null;
     if (clean.snapshot) clean.snapshot.rows = result.snapshot.rows.map(function(row) {
       const output = pick(row, result.snapshot.kind === 'shopping' ? ['source_sheet','brand','code','model','colorless_model','retail_price'] : ['source_sheet','brand','model']);
       if (result.snapshot.kind === 'shopping') output.project_prices = pick(row.project_prices, Object.keys(row.project_prices));
       else {
         output.quotes = {};
-        THREEC_PROVIDERS.forEach(function(provider) { output.quotes[provider] = pick(row.quotes[provider], THREEC_GRADES); });
+        THREEC_PROVIDERS.filter(function(provider) { return Object.prototype.hasOwnProperty.call(row.quotes, provider); }).forEach(function(provider) { output.quotes[provider] = pick(row.quotes[provider], threecProviderGrades_(provider)); });
       }
       return output;
     });
@@ -3917,7 +3923,7 @@ function threecPublish(payload) {
   const employeeId = reportUploadAuthorize_(payload);
   if ((payload || {}).confirmPublish !== true) throw new Error('請明確確認後再發布 3C／舊換新快照');
   const encoded = String((payload || {}).snapshotJson || '');
-  if (!encoded || encoded.length > THREEC_MAX_SNAPSHOT_JSON_BYTES) throw new Error('3C／舊換新標準化快照缺少或過大');
+  if (!encoded || Utilities.newBlob(encoded).getBytes().length > THREEC_MAX_SNAPSHOT_JSON_BYTES) throw new Error('3C／舊換新標準化快照缺少或過大');
   const incoming = threecNormalizeIncomingSnapshot_(JSON.parse(encoded));
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);

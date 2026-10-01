@@ -272,3 +272,13 @@ for(const width of [1280,390,360])test(`${width}px 閱讀文字至少18px，價�
  expect(await page.locator('.quote.price,.quote.zero').evaluateAll(els=>els.every(el=>parseFloat(getComputedStyle(el).fontSize)>=24))).toBe(true);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+for(const width of [1280,390])test(`三家公開報價與來源未分級 ${width}px，篩選和SABC不互相覆蓋`,async({page})=>{
+ await page.setViewportSize({width,height:900});
+ await page.route('**/exec*',route=>{const p=route.request().postDataJSON();const r=response(p.kind);if(p.kind==='tradein'){r.snapshot.rows[0].quotes['愛鋒派']={S:null,A:'900',B:null,C:null,'未分級':0};}return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(r)});});
+ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.locator('#tradeinTab').click();
+ await expect(page.locator('#tradeinResults')).toContainText('愛鋒派（獨立報價）');await expect(page.locator('#tradeinResults')).toContainText('來源未分級');
+ await page.locator('#tradeinProvider').selectOption('愛鋒派');await page.locator('#tradeinGrade').selectOption('未分級');const table=page.locator('#tradeinResults table');await expect(table).toHaveCount(1);await expect(table).toContainText('0 元');await expect(table).not.toContainText('900 元');await expect(table).not.toContainText('A 級');
+ await page.locator('#tradeinGrade').selectOption('A');await expect(table).toContainText('900 元');await expect(table).not.toContainText('來源未分級');
+ await page.locator('#tradeinProvider').selectOption('點子行動');await page.locator('#tradeinGrade').selectOption('未分級');await expect(page.locator('#tradeinResults')).toContainText('沒有符合搜尋條件');
+});

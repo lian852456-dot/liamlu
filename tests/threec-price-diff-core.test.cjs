@@ -225,3 +225,9 @@ test('includeUnchanged 只在明確要求時將 unchanged 放入 page', () => {
   assert.equal(withUnchanged.changePage.length, 8);
   assert.equal(withUnchanged.changePage.every(record => record.status === 'unchanged'), true);
 });
+
+test('愛鋒派來源未分級有獨立差異key，不覆蓋同機型A等',()=>{
+ const row={source_sheet:'原表',brand:'QA',model:'機型',quotes:{'點子行動':{S:null,A:100,B:null,C:null},'FutureDial（FDI）':{S:null,A:null,B:null,C:null},'愛鋒派':{S:null,A:200,B:null,C:null,'未分級':0}}};
+ const current={rows:[row]},previous=JSON.parse(JSON.stringify(current));previous.rows[0].quotes['愛鋒派']['未分級']=300;
+ const d=fullDiff('tradein',previous,current);assert.equal(d.counts.changed,1);assert.equal(d.changed[0].grade,'未分級');assert.equal(d.changed[0].provider,'愛鋒派');assert.equal(d.changed[0].after.kind,'zero');
+});

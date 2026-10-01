@@ -195,3 +195,19 @@ test('already_current 以來源核對欄位與語意價格差異驗證，容許�
   const calls = await page.evaluate(() => window.rpcCalls.map(call => call.name));
   expect(calls.indexOf('threec_readback')).toBeGreaterThan(calls.indexOf('threec_publish'));
 });
+
+test('三商預覽保留來源未分級，讀回第三商或未分級價格改變必須失敗', async ({page}) => {
+  await setup(page);
+  const result = await page.evaluate(() => {
+    const snapshot={kind:'tradein',rows:[{source_sheet:'舊換新',brand:'Apple',model:'iPhone test',quotes:{'點子行動':{S:null,A:100,B:null,C:null},'FutureDial（FDI）':{S:null,A:null,B:null,C:null},'愛鋒派':{S:null,A:900,B:null,C:null,'未分級':0}}}]};
+    renderThreecPrices(snapshot);
+    const before=JSON.stringify(threecComparableRows(snapshot));
+    const changed=JSON.parse(JSON.stringify(snapshot));changed.rows[0].quotes['愛鋒派']['未分級']=1;
+    const missing=JSON.parse(JSON.stringify(snapshot));delete missing.rows[0].quotes['愛鋒派'];
+    return {text:document.getElementById('threecPricePreview').textContent,ungradedChanged:before!==JSON.stringify(threecComparableRows(changed)),providerMissing:before!==JSON.stringify(threecComparableRows(missing))};
+  });
+  expect(result.text).toContain('愛鋒派 來源未分級：0 元');
+  expect(result.text).toContain('愛鋒派 A：900 元');
+  expect(result.ungradedChanged).toBe(true);
+  expect(result.providerMissing).toBe(true);
+});

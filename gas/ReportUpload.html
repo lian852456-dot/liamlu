@@ -502,7 +502,7 @@
       const html = rows.slice(0, 50).map(row => {
         const prices = snapshot.kind === 'shopping'
           ? [['單機價', row.retail_price]].concat(Object.entries(row.project_prices || {}))
-          : ['點子行動','FutureDial（FDI）'].flatMap(provider => ['S','A','B','C'].map(grade => [provider + ' ' + grade, (row.quotes[provider] || {})[grade]]));
+          : Object.keys(row.quotes || {}).flatMap(provider => Object.keys(row.quotes[provider]).map(grade => [provider + ' ' + (grade==='未分級'?'來源未分級':grade), row.quotes[provider][grade]]));
         return '<tr><td>' + esc(row.source_sheet) + '</td><td>' + esc(row.brand + ' ' + row.model) + '</td><td>' + prices.map(pair => '<div>' + esc(pair[0]) + '：' + esc(threecPriceText(pair[1])) + '</div>').join('') + '</td></tr>';
       }).join('');
       $('threecPricePreview').innerHTML = '<p>符合 ' + rows.length + ' 筆；顯示前 50 筆，可搜尋機款逐價核對。</p><table><thead><tr><th>來源／條件</th><th>機款</th><th>原始資費、合約及報價</th></tr></thead><tbody>' + html + '</tbody></table>';
@@ -511,7 +511,7 @@
       const price = value => value == null || String(value).trim() === '' ? null : String(value).trim().replace(/,/g, '');
       return (snapshot.rows || []).map(row => snapshot.kind === 'shopping'
         ? { sheet:row.source_sheet, row:row.source_row_number, brand:row.brand, code:row.code, model:row.model, colorless:row.colorless_model, retail:price(row.retail_price), projects:Object.keys(row.project_prices || {}).sort().map(name => [name, price(row.project_prices[name])]) }
-        : { sheet:row.source_sheet, brand:row.brand, model:row.model, quotes:['點子行動','FutureDial（FDI）'].map(provider => ['S','A','B','C'].map(grade => price(row.quotes[provider][grade]))) });
+        : { sheet:row.source_sheet, brand:row.brand, model:row.model, quotes:Object.keys(row.quotes||{}).sort().map(provider => [provider,Object.keys(row.quotes[provider]).sort().map(grade => [grade,price(row.quotes[provider][grade])])]) });
     }
     function threecAlreadyCurrentReadbackMatches(expected, actual, readback) {
       const check = readback && readback.updateCheck || {};

@@ -72,7 +72,7 @@ test('首次正式基線與來源身份 gate 固定且零元不會被當成空�
 });
 
 test('兩家回收商與 S/A/B/C 必須完整保留且衝突為零', () => {
-  assert.match(code, /THREEC_PROVIDERS = \['點子行動', 'FutureDial（FDI）'\]/);
+  assert.match(code, /THREEC_PROVIDERS = \['點子行動', 'FutureDial（FDI）', '愛鋒派'\]/);
   assert.match(code, /THREEC_GRADES = \['S', 'A', 'B', 'C'\]/);
   const body = functionBody(code, 'threecValidateTradeinRows_');
   assert.match(body, /必須完整保留兩家回收商/);

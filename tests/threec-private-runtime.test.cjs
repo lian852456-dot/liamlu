@@ -439,7 +439,7 @@ test('來源XLSX→解析預覽→後端發布及讀回→查詢模型逐價相�
   const formal = env.context.threec_readback({...env.auth,kind:'tradein'});
   const view = Query.buildView('tradein', JSON.parse(JSON.stringify(formal)), {});
   assert.equal(view.rows.length, 1);
-  for (const provider of Query.PROVIDERS) for (const grade of Query.GRADES) {
+  for (const provider of Object.keys(preview.rows[0].quotes)) for (const grade of Query.providerGrades(provider)) {
     assert.equal(Query.formatPrice(view.rows[0].quotes[provider][grade]), Query.formatPrice(preview.rows[0].quotes[provider][grade]));
   }
   assert.equal(Query.priceState(view.rows[0].quotes['點子行動'].A).zero, true);
@@ -550,4 +550,22 @@ test('public price projections allow only query fields and never registry, ident
   assert.throws(()=>env.context.threec_readback({kind}),/管理者驗證失敗/);
  }
  assert.equal(env.createdFileCount,count);
+});
+
+test('三商來源未分級完整模擬發布/公開讀回；未知商或把未分級塞舊雙商均拒絕且不寫',()=>{
+ const env=runtime(),input=tradeinSnapshot();input.rows[0].quotes['愛鋒派']={S:null,A:'600',B:null,C:null,'未分級':'0'};
+ publish(env,input);const response=env.context.threecSnapshotRead({kind:'tradein'});
+ assert.equal(response.snapshot.rows[0].quotes['愛鋒派']['未分級'],'0');assert.equal(response.snapshot.rows[0].quotes['愛鋒派'].A,'600');assert.equal(response.snapshot.rows[0].quotes['點子行動'].A,'100');
+ for(const mutate of [s=>s.rows[0].quotes['未知商']={S:1,A:2,B:3,C:4},s=>s.rows[0].quotes['點子行動']['未分級']=100,s=>delete s.rows[0].quotes['愛鋒派']['未分級']]){
+  const bad=JSON.parse(JSON.stringify(input));mutate(bad);assert.throws(()=>env.context.threecNormalizeIncomingSnapshot_(bad));
+ }
+});
+
+test('手機來源目錄另列稽核，價格/缺价/目錄加總守恆，容量仍有上限',()=>{
+ const env=runtime(),input=shoppingSnapshot();input.catalog_row_count=3;input.source_row_count+=3;
+ const normalized=env.context.threecNormalizeIncomingSnapshot_(input);assert.equal(normalized.catalog_row_count,3);
+ assert.throws(()=>env.context.threecNormalizeIncomingSnapshot_({...input,catalog_row_count:4}),/來源筆數/);
+ assert.throws(()=>env.context.threecNormalizeIncomingSnapshot_({...input,catalog_row_count:-1}),/目錄/);
+ assert.throws(()=>env.context.threecNormalizeIncomingSnapshot_({...input,rows:Array(20001).fill(input.rows[0])}),/筆數/);
+ const legacy=env.context.threecNormalizeIncomingSnapshot_(shoppingSnapshot());assert.equal(Object.hasOwn(legacy,'catalog_row_count'),false);
 });

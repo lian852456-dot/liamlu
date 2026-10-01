@@ -5,3 +5,5 @@
 .variant-label{display:block;color:var(--muted);font-size:18px;margin-top:4px;font-weight:400}.variant-label:empty{display:none}.comparison-scroll{max-height:70vh}.comparison-table thead th{position:sticky;top:0;z-index:1}.comparison-table .project-label{white-space:normal;overflow-wrap:anywhere}
 
 #tradeinResults tbody td:not(:first-child){font-size:24px;font-weight:700} .spec-cell strong{font-size:20px}
+
+#tradeinResults tbody td:not(:first-child){font-size:24px;font-weight:700}
