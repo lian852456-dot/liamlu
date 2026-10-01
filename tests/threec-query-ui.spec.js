@@ -324,3 +324,18 @@ test('異動逾時可單獨重試，完整價格和一般企業切換仍可用',
  await page.locator('#enterpriseSegmentBtn').click();await page.locator('#consumerSegmentBtn').click();await expect(page.locator('#shoppingResults')).toContainText('iPhone');
  fail=false;await page.locator('#changeLoadBtn').click();await expect(page.locator('#changeResults')).toContainText('合約24期');
 });
+
+test('compact response reconstructs all prices before query; refresh and segment switches remain compatible',async({page})=>{
+ const T=require('../threec-price-transport.js'),calls=[];
+ await page.route('**/exec*',async route=>{
+  const p=route.request().postDataJSON();calls.push(p);const body=response(p.kind);
+  body.snapshot.row_count=body.snapshot.rows.length;
+  if(p.action==='threec_snapshot_read'){body.changeSet=null;body.changesDeferred=true;return route.fulfill({contentType:'application/json',body:JSON.stringify(T.encode(body))});}
+  return route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
+ });
+ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ await expect(page.locator('#shoppingResults')).toContainText('0 元');await expect(page.locator('#shoppingResults')).toContainText('無報價');
+ await page.locator('#enterpriseSegmentBtn').click();await page.locator('#consumerSegmentBtn').click();await expect(page.locator('#shoppingResults')).toContainText('iPhone');
+ await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ expect(calls).toHaveLength(4);expect(calls.every(p=>p.priceEncoding===T.ENCODING&&p.includeChanges===false&&!p.employeeId)).toBe(true);
+});

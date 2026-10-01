@@ -151,6 +151,7 @@ function runtime(options = {}) {
     MimeType: { PLAIN_TEXT: 'text/plain' },
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'threec-price-diff-core.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'threec-price-transport.js'), 'utf8'), context);
   vm.runInContext(threecBlock, context);
   return {
     context,
@@ -585,4 +586,18 @@ test('price-only public read preserves every verified price without computing hi
  const file=env.files.get(env.properties.get('THREEC_REGISTRY_FILE_ID')),r=JSON.parse(file.content);
  r.kinds.shopping.active.source_file_sha256='0'.repeat(64);file.content=JSON.stringify(r);
  assert.throws(()=>env.context.threecSnapshotRead({kind:'shopping',includeChanges:false}),/版本驗證失敗/);
+});
+
+test('compact public read is opt-in, lossless and compatible with legacy readers',()=>{
+ const env=runtime();publish(env,shoppingSnapshot({rows:2,excluded:0}));
+ const normal=JSON.parse(JSON.stringify(env.context.threecSnapshotRead({kind:'shopping',includeChanges:false})));
+ const count=env.createdFileCount,writes=env.registryWrites;
+ const packed=env.context.threecSnapshotRead({kind:'shopping',includeChanges:false,priceEncoding:'shopping-columns/v1'});
+ const restored=JSON.parse(JSON.stringify(env.context.ThreecPriceTransport.decode(packed)));
+ assert.deepEqual(restored,normal);assert.equal(packed.priceEncoding,'shopping-columns/v1');
+ assert.equal(env.context.threecSnapshotRead({kind:'shopping'}).priceEncoding,undefined);
+ assert.equal(env.context.threecSnapshotRead({kind:'shopping',priceEncoding:'unknown'}).priceEncoding,undefined);
+ assert.doesNotMatch(JSON.stringify(packed),/operator_hash|source_file_name|registry|employeeId|snapshot_file_id/);
+ assert.equal(env.createdFileCount,count);assert.equal(env.registryWrites,writes);
+ assert.throws(()=>env.context.threec_publish({kind:'shopping',includeChanges:false,priceEncoding:'shopping-columns/v1',confirmPublish:true}),/管理者驗證失敗/);
 });

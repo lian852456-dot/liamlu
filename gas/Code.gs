@@ -4033,7 +4033,8 @@ function threecAuthorizeRead_(payload) {
 }
 
 function threecSnapshotRead(payload) {
-  return threecPublicResult_(threecReadActive_((payload || {}).kind, {includeChanges:(payload || {}).includeChanges !== false}));
+  const result = threecPublicResult_(threecReadActive_((payload || {}).kind, {includeChanges:(payload || {}).includeChanges !== false}));
+  return (payload || {}).priceEncoding === 'shopping-columns/v1' ? ThreecPriceTransport.encode(result) : result;
 }
 
 function threecReadActive_(requestedKind, options) {

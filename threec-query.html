@@ -42,6 +42,7 @@
     <p class="privacy">免登入即可瀏覽；重新開啟或按「重新整理」會讀取最新正式價格。</p>
   </section>
 </main>
+<script src="threec-price-transport.js?v=20261001-load-1"></script>
 <script src="threec-query-core.js?v=20261001-providers-1"></script>
 <script src="threec-comparison-core.js?v=20261001-enterprise-1"></script>
 <script src="threec-price-diff-core.js?v=20261001-providers-1"></script>
@@ -50,6 +51,7 @@
   'use strict';
   const Core=scope.ThreecQueryCore;
   const DiffCore=scope.ThreecPriceDiffCore;
+  const Transport=scope.ThreecPriceTransport;
   const Compare=scope.ThreecComparisonCore;
   let shoppingIndex=null, shoppingView=null;
   let shoppingSegment=new URLSearchParams(scope.location.search).get('section')==='enterprise'?'enterprise':'consumer';
@@ -107,7 +109,7 @@
       }finally{clearTimeout(timer);}
     }
   }
-  function invoke(kind){return readPublic({action:'threec_snapshot_read',kind,includeChanges:false});}
+  async function invoke(kind){const payload={action:'threec_snapshot_read',kind,includeChanges:false,priceEncoding:Transport.ENCODING};return Transport.decode(await readPublic(payload));}
   function invokeChanges(kind,offset,limit,snapshotHash,search){return readPublic({action:'threec_changes_read',kind,offset:Number(offset||0),limit:Number(limit||1000),snapshotHash:snapshotHash||'',search:String(search||'')});}
   function clearResults(){shoppingIndex=null;shoppingView=null;state.shopping=null;state.tradein=null;state.changePage={shopping:null,tradein:null};changeLoading.shopping=false;changeLoading.tradein=false;renderKind('shopping');renderKind('tradein');}
   function metaHtml(meta){return `<div class="source-date"><span>正式來源日期</span><strong>${esc(meta.sourceVersionDate||'未提供')}</strong><span>${esc(meta.rowCount)} 筆來源資料</span></div><details class="source-details"><summary>資料版本與來源資訊</summary><dl><dt>正式版本</dt><dd>${esc(meta.snapshotHash||meta.version||'—')}</dd><dt>發布時間</dt><dd>${esc(meta.publishedAt||'—')}</dd><dt>來源 SHA-256</dt><dd>${esc(meta.sourceFileSha256||'—')}</dd></dl></details>`;}
@@ -243,7 +245,7 @@
     showKind('shopping');
     refresh();
   }
-  if(!Core||!Compare){setStatus('查詢元件載入失敗。','bad');return;}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+  if(!Core||!Compare||!Transport){setStatus('查詢元件載入失敗。','bad');return;}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
 })(window);
 </script>
 </body>
