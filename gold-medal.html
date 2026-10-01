@@ -18,11 +18,12 @@
       <section class="filter-panel"><label>結算日期<select id="viewerMonth"></select></label><label>店點<select id="viewerStore"><option value="">九店全部</option></select></label><label>個人<select id="viewerEmployee"><option value="">全部同仁</option></select></label><label>紀錄起日<input id="viewerDateFrom" type="date"></label></section>
       <div id="viewerSummary" class="summary-grid"></div>
       <section class="data-card"><div class="card-head"><div><h3>個人結算總牌數</h3><p>每個日期是截至當日的總牌數；不同日結不重複加總。</p></div></div><div class="table-scroll"><table><thead id="viewerHead"></thead><tbody id="viewerBody"></tbody></table></div></section>
-      <section class="data-card"><div class="card-head"><div><h3>每日增減與原因</h3><p>僅連續兩日皆有確認紀錄時顯示增減；原因與免扣依提供的紀錄呈現。</p></div></div><div class="table-scroll"><table><thead><tr><th>日期</th><th>店點</th><th>同仁</th><th>增減</th><th>原因／免扣</th><th>狀態</th></tr></thead><tbody id="viewerDailyBody"></tbody></table></div></section>
+      <section class="data-card"><div class="card-head"><div><h3>每日數值增減</h3><p>僅連續兩日皆有確認紀錄時顯示增減。</p></div></div><div class="table-scroll"><table><thead><tr><th>日期</th><th>店點</th><th>同仁</th><th>增減</th><th>狀態</th></tr></thead><tbody id="viewerDailyBody"></tbody></table></div></section>
     </section>
   </main>
   <script src="gold-daily-core.js?v=20260930-1"></script>
-  <script src="gold-daily-ui.js?v=20260930-1"></script>
-  <script src="gold-medal.js?v=20261001-public-1" defer></script>
+  <script src="gold-public-core.js?v=20261001-public-2"></script>
+  <script src="gold-daily-ui.js?v=20261001-public-2"></script>
+  <script src="gold-medal.js?v=20261001-public-2" defer></script>
 </body>
 </html>

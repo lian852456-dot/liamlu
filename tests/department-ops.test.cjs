@@ -94,7 +94,7 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(gas, /row\.region === '北一二B'/);
   assert.match(gas, /personKey:privateDashboardHash\(row\.employeeId\)/);
   assert.match(gas, /previous\.rows/);
-  assert.match(gas, /ledger:north12bGoldDailyLedger_\(\)/);
+  assert.match(gas, /ledger:departmentGoldPublicLedger_\(north12bGoldDailyLedger_\(\)\)/);
   assert.match(patrolBundle, /action === 'department_ops_publish'/);
   assert.match(patrolBundle, /action === 'department_ops_read'/);
   assert.doesNotMatch(patrolBundle, /department_gold_access|privateDashboard/);

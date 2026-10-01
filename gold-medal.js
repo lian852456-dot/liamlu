@@ -16,7 +16,7 @@
       if(!response.ok)throw new Error(`HTTP ${response.status}`);
       const result=await response.json();
       if(current!==generation)return;
-      if(result?.status!=='ok'||!result.ledger)throw new Error(result?.message||'金牌資料讀取失敗');
+      if(result?.status!=='ok'||result.ledger?.schema!=='north12b-public-gold/v1')throw new Error(result?.message||'金牌資料讀取失敗');
       window.openGoldDaily(result);
       message('已載入已確認的金牌結算。','success');
     }catch(error){
