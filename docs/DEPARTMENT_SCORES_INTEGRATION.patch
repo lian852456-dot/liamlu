@@ -1,0 +1,18 @@
+# Base: 0b862fc7eab15f05049ea53c52ee324a3a1cfcd0
+# Candidate hooks only; semantic integration script supports adjacent gold/rules changes.
+--- a/gas/Code.gs
++++ b/gas/Code.gs
+@@ -2995,2 +2995,3 @@
+     else if (action === 'department_ops_read') result = departmentOpsRead(payload);
++    else if (['department_scores_read','department_scores_history_read','department_scores_publish','department_scores_restore'].indexOf(action) >= 0) result = departmentScoresDispatch_(payload);
+     else if (action === 'north12b_gold_read') result = north12bGoldDailyRead(payload);
+--- a/scripts/build-patrol-gas-bundle.mjs
++++ b/scripts/build-patrol-gas-bundle.mjs
+@@ -165,2 +165,3 @@
+     else if (action === 'department_ops_read') result = departmentOpsRead(payload);
++    else if (['department_scores_read','department_scores_history_read','department_scores_publish','department_scores_restore'].indexOf(action) >= 0) result = departmentScoresDispatch_(payload);
+     else if (action === 'north12b_gold_read') result = north12bGoldDailyRead(payload);
+@@ -205 +206,3 @@
+ for (const file of ['GoldDailyCore.gs', 'GoldDaily.gs']) fs.copyFileSync(path.join(root, 'gas', file), path.join(outputDir, file));
++
++for (const file of ['DepartmentScoresCore.gs', 'DepartmentScores.gs']) fs.copyFileSync(path.join(root, 'gas', file), path.join(outputDir, file));
