@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>手機專案／3C＋舊換新查詢｜北一二B</title>
-  <link rel="stylesheet" href="threec-query.css?v=20261001-phase1">
+  <link rel="stylesheet" href="threec-query.css?v=20261001-recovery-1">
 </head>
 <body>
 <main>
@@ -41,7 +41,7 @@
   </section>
 </main>
 <script src="threec-query-core.js?v=20261001-1"></script>
-<script src="threec-comparison-core.js?v=20261001-phase1"></script>
+<script src="threec-comparison-core.js?v=20261001-recovery-1"></script>
 <script src="threec-price-diff-core.js?v=20261001-2"></script>
 <script>
 (function(scope){
@@ -59,12 +59,52 @@
   const $=id=>document.getElementById(id);
   function esc(value){return String(value==null?'':value).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
   function setStatus(text,kind){const el=$('queryStatus');el.textContent=text;el.className='status'+(kind?' '+kind:'');}
-  function invoke(kind){
-    return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'threec_snapshot_read',kind}),cache:'no-store',credentials:'omit'}).then(async response=>{let body={};try{body=await response.json();}catch{throw new Error('正式資料回應格式錯誤');}if(!response.ok||!body||body.status!=='ok')throw new Error(body&&body.message||'正式資料讀取失敗');return body;});
+  function readPublicFrame(payload){
+    return new Promise((resolve,reject)=>{
+      const requestId=crypto.randomUUID();
+      const endpoint=new URL(API);endpoint.searchParams.set('transport','iframe');endpoint.searchParams.set('requestId',requestId);endpoint.searchParams.set('origin',location.origin);
+      const frame=document.createElement('iframe'),form=document.createElement('form'),field=document.createElement('textarea');
+      let finished=false;
+      function finish(error,body){if(finished)return;finished=true;clearTimeout(timer);scope.removeEventListener('message',onMessage);frame.remove();form.remove();error?reject(error):resolve(body);}
+      function onMessage(event){
+        let origin;try{origin=new URL(event.origin);}catch{return;}
+        if(origin.protocol!=='https:'||origin.port||!(origin.hostname==='script.google.com'||origin.hostname==='script.googleusercontent.com'||origin.hostname.endsWith('-script.googleusercontent.com')))return;
+        const message=event.data;if(!event.source||!message||message.type!=='north12b-gas-response-v1'||message.requestId!==requestId)return;
+        if(!message.body||message.body.status!=='ok'){const error=new Error(message.body&&message.body.message||'正式資料讀取失敗');error.authoritative=true;finish(error);return;}
+        finish(null,message.body);
+      }
+      const timer=setTimeout(()=>finish(new Error('正式資料讀取逾時，請重新整理')),35000);
+      frame.name='public_price_'+requestId;frame.title='正式價格讀取';frame.hidden=true;
+      form.method='POST';form.action=endpoint.toString();form.target=frame.name;form.enctype='application/x-www-form-urlencoded';form.hidden=true;
+      field.name='payload';field.value=JSON.stringify(payload);form.append(field);scope.addEventListener('message',onMessage);document.body.append(frame,form);
+      try{form.submit();}catch{finish(new Error('正式資料連線失敗'));}
+    });
   }
-  function invokeChanges(kind,offset,limit,snapshotHash,search){
-    return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'threec_changes_read',kind,offset:Number(offset||0),limit:Number(limit||1000),snapshotHash:snapshotHash||'',search:String(search||'')}),cache:'no-store',credentials:'omit'}).then(async response=>{let body={};try{body=await response.json();}catch{throw new Error('正式異動回應格式錯誤');}if(!response.ok||!body||body.status!=='ok')throw new Error(body&&body.message||'正式異動讀取失敗');return body;});
+  async function readPublic(payload){
+    for(let attempt=0;attempt<2;attempt++){
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),15000);
+      try{
+        // A unique URL prevents an expired Google ContentService redirect from
+        // being reused. Only public, read-only actions call this helper.
+        const requestId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+        const response=await fetch(API+'?readAttempt='+requestId,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),cache:'no-store',credentials:'omit',signal:controller.signal});
+        let body;
+        try{body=await response.json();}catch{throw new Error('正式資料回應格式錯誤');}
+        if(response.ok&&body&&body.status==='ok')return body;
+        if(body&&body.status==='error'){
+          const error=new Error(body.message||'正式資料讀取失敗');error.authoritative=true;throw error;
+        }
+        throw new Error('正式資料讀取失敗（HTTP '+response.status+'）');
+      }catch(error){
+        if(error.authoritative)throw error;
+        if(attempt===0){try{return await readPublicFrame(payload);}catch(frameError){if(frameError.authoritative)throw frameError;}}
+        else throw new Error(error.name==='AbortError'?'正式資料讀取逾時，請重新整理':error.message||'正式資料連線失敗');
+      }finally{clearTimeout(timer);}
+    }
   }
+  function invoke(kind){return readPublic({action:'threec_snapshot_read',kind});}
+  function invokeChanges(kind,offset,limit,snapshotHash,search){return readPublic({action:'threec_changes_read',kind,offset:Number(offset||0),limit:Number(limit||1000),snapshotHash:snapshotHash||'',search:String(search||'')});}
   function clearResults(){shoppingIndex=null;shoppingView=null;state.shopping=null;state.tradein=null;state.changePage={shopping:null,tradein:null};renderKind('shopping');renderKind('tradein');}
   function metaHtml(meta){return `<div class="source-date"><span>正式來源日期</span><strong>${esc(meta.sourceVersionDate||'未提供')}</strong><span>${esc(meta.rowCount)} 筆來源資料</span></div><details class="source-details"><summary>資料版本與來源資訊</summary><dl><dt>正式版本</dt><dd>${esc(meta.snapshotHash||meta.version||'—')}</dd><dt>發布時間</dt><dd>${esc(meta.publishedAt||'—')}</dd><dt>來源 SHA-256</dt><dd>${esc(meta.sourceFileSha256||'—')}</dd></dl></details>`;}
   function renderPrice(name,value){const state=Core.priceState(value);return `<div class="price-item${state.missing?' missing':''}${state.zero?' zero':''}"><span>${esc(name)}</span><strong>${esc(Core.formatPrice(value))}</strong></div>`;}
@@ -113,7 +153,7 @@
     $('shoppingSummary').textContent=`符合 ${view.totalRows} 組機款報價，${view.totalColumns} 個方案條件；每頁最多 20 組、12 個條件。同價顏色合併，差價或不同條件分列。`;
     $('rowPage').textContent=`${rowPage+1} / ${view.rowPages} 頁`;$('columnPage').textContent=`${columnPage+1} / ${view.columnPages} 組`;
     $('rowPrev').disabled=rowPage===0;$('rowNext').disabled=rowPage+1>=view.rowPages;$('columnPrev').disabled=columnPage===0;$('columnNext').disabled=columnPage+1>=view.columnPages;
-    const select=$('shoppingCardCondition'),prior=select.value;select.innerHTML=view.columns.map(col=>`<option value="${esc(col.key)}">${esc(col.project+' · '+columnLabel(col))}</option>`).join('');if(view.columns.some(col=>col.key===prior))select.value=prior;
+    const select=$('shoppingCardCondition'),prior=select.value;select.innerHTML=view.columns.map(col=>`<option value="${esc(col.key)}">${esc(col.project+' · '+columnLabel(col))}</option>`).join('');if(view.columns.some(col=>col.key===prior))select.value=prior;else if(view.columns.length){const ranked=view.columns.slice().sort((a,b)=>view.rows.filter(row=>Object.prototype.hasOwnProperty.call(row.prices,b.key)&&!Core.priceState(row.prices[b.key]).missing).length-view.rows.filter(row=>Object.prototype.hasOwnProperty.call(row.prices,a.key)&&!Core.priceState(row.prices[a.key]).missing).length);select.value=ranked[0].key;}
     $('cardConditionField').classList.toggle('hidden',readingMode!=='card');
     if(!view.rows.length||!view.columns.length){target.innerHTML='<div class="empty">沒有符合搜尋或資費篩選的正式報價。請調整條件或重設篩選。</div>';return;}
     if(readingMode==='card'){
@@ -137,18 +177,31 @@
   async function refresh(){
     const requestGeneration=++generation;
     state.loading=true;$('refreshBtn').disabled=true;setStatus('正在讀取兩類正式價格…');clearResults();
+    const outcomes={};
+    function progress(){
+      const completed=Object.keys(outcomes).length;
+      const available=['shopping','tradein'].filter(kind=>state[kind]&&state[kind].snapshot);
+      const names={shopping:'手機專案／3C',tradein:'舊換新'};
+      const failures=Object.keys(outcomes).filter(kind=>outcomes[kind].error).map(kind=>names[kind]+'：'+outcomes[kind].error);
+      if(completed<2){setStatus(available.length?names[available[0]]+' 已讀取，可先查詢；另一類正在讀取…':'正在讀取兩類正式價格…');return;}
+      if(failures.length){setStatus(failures.join('；')+(available.length?'；已成功讀取的類別可繼續查詢。':'；正式資料已清除，請重新整理。'),available.length?'warn':'bad');return;}
+      const missing=['shopping','tradein'].filter(kind=>!state[kind].snapshot).map(kind=>names[kind]);
+      setStatus(missing.length?'已讀取；'+missing.join('、')+' 尚未發布正式資料，可查詢已有正式版本。':'已讀取正式資料；請依版本／日期核對後查詢。',available.length?'ok':'warn');
+    }
     try{
-      const results=await Promise.all([invoke('shopping'),invoke('tradein')]);
-      if(requestGeneration!==generation)return;
-      state.shopping=results[0];state.tradein=results[1];
-      shoppingIndex=Compare.buildIndex(state.shopping.snapshot||{});
-      const available=results.filter(result=>result&&result.snapshot).length;
-      const missingKinds=results.map((result,index)=>result&&result.snapshot?'':index===0?'手機專案／3C':'舊換新').filter(Boolean);
-      setStatus(available===2?'已讀取正式資料；請依版本／日期核對後查詢。':`已讀取；${missingKinds.join('、')} 尚未發布正式資料，可查詢已有正式版本。`,available?'ok':'warn');
-      renderKind('shopping');renderKind('tradein');
-    }catch(error){
-      if(requestGeneration!==generation)return;
-      clearResults();setStatus(String(error.message||'正式資料讀取失敗')+'；正式資料已清除。','bad');
+      await Promise.all(['shopping','tradein'].map(async kind=>{
+        try{
+          const response=await invoke(kind);
+          if(requestGeneration!==generation)return;
+          const index=kind==='shopping'?Compare.buildIndex(response.snapshot||{}):null;
+          state[kind]=response;if(kind==='shopping')shoppingIndex=index;
+          outcomes[kind]={};renderKind(kind);
+        }catch(error){
+          if(requestGeneration!==generation)return;
+          outcomes[kind]={error:String(error.message||'正式資料讀取失敗')};
+        }
+        if(requestGeneration===generation)progress();
+      }));
     }finally{if(requestGeneration===generation){state.loading=false;$('refreshBtn').disabled=false;}}
   }
   function bind(){

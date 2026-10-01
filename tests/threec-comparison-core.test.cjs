@@ -45,3 +45,8 @@ test('品牌選單只列相關機款、容量，常用月租跨期且分页不�
  assert.equal(Compare.buildView(index,{rent:'599'}).columns.length,0);
  const opts=Compare.options(index,{brand:'APPLE'});assert.equal(opts.models.length,12);assert.deepEqual(opts.capacities,['256GB']);
 });
+test('月租／期數篩選只列有該條件的機款，保留真正缺價，不列整排未列',()=>{
+ const index=Compare.buildIndex({rows:[row(),row({model:'僅599',colorless_model:'僅599',project_prices:{'599H':100}}),row({model:'真正缺價',colorless_model:'真正缺價',project_prices:{[plan]:''}})]});
+ const view=Compare.buildView(index,{rent:'999'});assert.equal(view.totalRows,2);assert.equal(view.rows.some(r=>r.model==='僅599'),false);assert.equal(view.rows.some(r=>r.model==='真正缺價'),true);
+ const unknown=Compare.condition('599(6)');assert.equal(unknown.rent,'599');assert.equal(unknown.term,'');assert.equal(unknown.raw,'599(6)');
+});

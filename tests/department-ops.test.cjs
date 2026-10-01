@@ -160,10 +160,15 @@ test('首頁正式上傳入口的完整模板包含資產皆通過白名單，�
   assert.throws(()=>context.reportUploadInclude_('../Code'), /report-upload-include-not-allowed/);
 });
 
-test('首頁查價入口保留匿名讀取，第一階段比較不合併不同價格矩陣', () => {
+test('首頁查價入口保留公開讀取與受限傳輸備援，比較不合併不同價格矩陣', () => {
   const Compare=require('../threec-comparison-core.js');
   const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8');
   assert.match(html,/credentials:'omit'/);
+  assert.match(html,/function readPublicFrame/);
+  assert.match(html,/message.requestId!==requestId/);
+  assert.match(html,/origin.protocol!=='https:'/);
+  assert.match(html,/state\[kind\]=response/);
+  assert.doesNotMatch(html,/Promise.all\(\[invoke/);
   assert.match(html,/threec-comparison-core\.js/);
   assert.match(html,/threec-query\.css/);
   assert.doesNotMatch(html,/id="(?:adminSecret|employeeId)"/);

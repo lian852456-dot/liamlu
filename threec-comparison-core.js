@@ -8,7 +8,7 @@
   const unique=values=>Array.from(new Set(values)).sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}));
   function condition(name){
     const raw=text(name), parts=raw.split('／');
-    const rentMatch=raw.match(/(?:月租\s*)?(\d{3,4})(?:H(?=$|[^A-Za-z0-9])|型|\s*元)/i)||raw.match(/月租\s*(\d{3,4})/);
+    const rentMatch=raw.match(/(?:月租\s*)?(\d{3,4})(?:H(?=$|[^A-Za-z0-9])|型|\s*元)/i)||raw.match(/月租\s*(\d{3,4})/)||raw.match(/(?:^|／)(\d{3,4})(?=專案|型|元|\s*\()/);
     const termMatch=raw.match(/(?:合約\s*)?(\d{2})(?:期|個月)/)||raw.match(/\((24|30|36|48|60)\)/);
     const rent=rentMatch?rentMatch[1]:'',term=termMatch?termMatch[1]:'';
     const version=/加碼/.test(raw)?'加碼':/VIP/i.test(raw)?'VIP':'一般';
@@ -74,7 +74,7 @@
     const rows=index.rows.filter(row=>(!filters.brand||row.brand===filters.brand)&&(!filters.model||row.model===filters.model)&&(!filters.capacity||row.capacity===filters.capacity)&&(!query||[row.brand,row.model,row.capacity,row.ram,row.sourceSheet,...row.models,...row.codes,...Object.keys(row.prices)].join(' ').toLocaleLowerCase().includes(query)));
     const keys=new Set(rows.flatMap(row=>Object.keys(row.prices)));
     const columns=selectColumns(index.columns.filter(col=>keys.has(col.key)),filters);
-    const matching=rows.filter(row=>!filters.project||columns.some(col=>Object.prototype.hasOwnProperty.call(row.prices,col.key)));
+    const matching=rows.filter(row=>columns.some(col=>Object.prototype.hasOwnProperty.call(row.prices,col.key)));
     const rowOffset=Math.max(0,Number(filters.rowPage||0))*20, columnOffset=Math.max(0,Number(filters.columnPage||0))*12;
     return {rows:matching.slice(rowOffset,rowOffset+20),columns:columns.slice(columnOffset,columnOffset+12),totalRows:matching.length,totalColumns:columns.length,rowPages:Math.max(1,Math.ceil(matching.length/20)),columnPages:Math.max(1,Math.ceil(columns.length/12)),options:options(index,filters)};
   }

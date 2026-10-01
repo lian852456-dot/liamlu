@@ -10,7 +10,7 @@
   const PREVIEW_LIMIT = 5;
   const NORMALIZED_PREVIEW_LIMIT = 50;
   const GRADE_ORDER = Object.freeze(['S', 'A', 'B', 'C']);
-  const PARSER_VERSION = '2026.10.01-semantic-plan-1';
+  const PARSER_VERSION = '2026.10.01-source-format-2';
   const HEADER_ALIASES = Object.freeze([
     { key:'brand', label:'品牌', aliases:['品牌', '廠牌', '品牌名稱', 'brand', 'brand name'] },
     { key:'code', label:'商品代碼／料號', aliases:['代碼', '商品代碼', '產品代碼', 'code', 'item code'] },
@@ -75,7 +75,12 @@
     return /[A-Za-z\u3400-\u9fff]/.test(text(value));
   }
 
+  function numericPlanHeader(value) {
+    return /^\d{3,4}(?:H(?:$|[^A-Za-z0-9])|專案|型|元|\s*[(（]\d+[)）])/i.test(text(value).normalize('NFKC'));
+  }
+
   function recognizeHeader(value) {
+    if(numericPlanHeader(value))return null;
     const source = normalized(headerWithoutGrade(value));
     if (!source) return null;
     for (const definition of HEADER_ALIASES) {
@@ -225,6 +230,9 @@
           values[definition.key] = firstValue(record.values, columns);
           if (values[definition.key]) hasAnyValue = true;
         });
+        const priceHeaders=(gradeFields.get('tradeInPrice')||[]).concat(common.get('tradeInPrice')||[]);
+        const ranges=Array.from(new Set(priceHeaders.map(field=>text(field.sourceName).match(/\d{1,2}[/.]\d{1,2}\s*[-~～至]\s*\d{1,2}[/.]\d{1,2}/)?.[0]).filter(Boolean)));
+        if(!values.date&&ranges.length===1)values.date=ranges[0];
         if (hasAnyValue) rowResults.push(makeNormalizedRow('tradein', record.rowNumber, values, hasMapping, grade, { rawValues:record.values }));
       });
       if (rowResults.length) normalizedRows.push.apply(normalizedRows, rowResults);
@@ -302,7 +310,7 @@
   }
 
   function looksLikeProjectPriceField(value) {
-    return /(?:\d{3,4}H|\dG\)?|\b[45]G\b|榮耀|全開|iPhone|智能|專案)/i.test(text(value));
+    return numericPlanHeader(value) || /(?:\d{3,4}H|\dG\)?|\b[45]G\b|榮耀|全開|iPhone|智能|專案)/i.test(text(value));
   }
 
   function valuesForFields(record, fields) {
@@ -331,6 +339,13 @@
     const base = analyseMatrix(matrix, 'shopping');
     if (base.errors.length) return base;
     const fields = base.fields || [];
+    const headerNames=fields.map(field=>normalized(field.sourceName));
+    const catalogHeaders=['OP專案別','品牌','料號組合料號','品名','上架下架','是否搭專案'].map(normalized);
+    const catalog=catalogHeaders.every(name=>headerNames.includes(name)) && headerNames.length===catalogHeaders.length;
+    if(catalog){
+      return Object.assign({},base,{sheetName:sheetName||'',rowType:'catalog',catalogRowCount:base.rawRows.length,catalogIssueCount:base.rawRows.filter(record=>['品牌','料號組合料號','品名'].some(header=>!text(record.values[header]))).length,unmappedNumericColumns:[],standardized:{mapping:base.fieldMapping,rows:[],summary:summaryForRows(base.rawRows.length,[]),previewRows:[]},acceptance:{rawDataRows:base.rawRows.length,validDataRows:0,success:0,partial:0,unrecognized:0,ignoredBlankRows:base.blankRowCount,duplicateRows:base.duplicateRowCount,invalidCurrencyCount:0}});
+    }
+    const unmappedNumericColumns=fields.filter(field=>!field.recognized&&!looksLikeProjectPriceField(field.sourceName)&&base.rawRows.some(record=>text(record.values[field.name])&&isCurrency(record.values[field.name]))).map(field=>field.sourceName);
     let lastBrand = '';
     const normalizedRows = [];
     const ignoredRows = [];
@@ -363,7 +378,7 @@
       if (values.retailPrice && !isCurrency(values.retailPrice)) invalidCurrencyCount += 1;
       const hasProjectPrice = Object.keys(projectPrices).some(name => text(projectPrices[name]));
       if (!values.retailPrice) missingRetailPriceCount += 1;
-      if (!values.code && !values.model && !values.product) {
+      if (!values.code && !values.model && !values.product && !values.retailPrice && !hasProjectPrice) {
         ignoredRows.push({ sourceRowNumber:record.rowNumber, reason:'缺少代碼、機型與商品名稱，保留原始列但未建立商品資料。' });
         return;
       }
@@ -386,7 +401,7 @@
     const warnings = base.warnings.filter(message => !/^未分類欄位：/.test(message));
     if (ignoredRows.length) warnings.push(String(ignoredRows.length) + ' 列不具商品識別值，已標記原因且未建立標準化商品。');
     return Object.assign({}, base, {
-      sheetName:sheetName || '', recordCount:base.rawRows.length, unknownFields:fields.filter(field => !field.recognized && !looksLikeProjectPriceField(field.sourceName)).map(field => field.sourceName), fieldMapping:mapping, standardized:{ mapping, rows:normalizedRows, summary, previewRows:normalizedRows.slice(0, NORMALIZED_PREVIEW_LIMIT) }, warnings, ignoredRows, invalidCurrencyCount, missingRetailPriceCount,
+      sheetName:sheetName || '', rowType:'price', catalogRowCount:0, unmappedNumericColumns, recordCount:base.rawRows.length, unknownFields:fields.filter(field => !field.recognized && !looksLikeProjectPriceField(field.sourceName)).map(field => field.sourceName), fieldMapping:mapping, standardized:{ mapping, rows:normalizedRows, summary, previewRows:normalizedRows.slice(0, NORMALIZED_PREVIEW_LIMIT) }, warnings, ignoredRows, invalidCurrencyCount, missingRetailPriceCount,
       acceptance:{ rawDataRows:base.rawRows.length, validDataRows:normalizedRows.length, success:summary.success, partial:summary.partial, unrecognized:summary.unrecognized, ignoredBlankRows:base.blankRowCount, duplicateRows:base.duplicateRowCount, invalidCurrencyCount, missingRetailPriceCount }
     });
   }
@@ -547,7 +562,7 @@
   }
 
   function combineShoppingAnalyses(analyses) {
-    const usable = analyses.filter(analysis => !analysis.errors.length && analysis.standardized.rows.length);
+    const usable = analyses.filter(analysis => !analysis.errors.length && (analysis.standardized.rows.length || analysis.rowType==='catalog'));
     if (!usable.length) return null;
     if (usable.length === 1) return usable[0];
     const fieldNames = [];
@@ -570,6 +585,8 @@
       Object.keys(acceptance).forEach(key => { if (typeof analysis.acceptance[key] === 'number') acceptance[key] += analysis.acceptance[key]; });
       sheetSummaries.push({
         name:analysis.sheetName,
+        rowType:analysis.rowType||'price',
+        catalogRowCount:Number(analysis.catalogRowCount||0),
         rawDataRows:analysis.acceptance.rawDataRows,
         validDataRows:analysis.acceptance.validDataRows,
         success:analysis.acceptance.success,
@@ -584,7 +601,7 @@
     fieldNames.unshift('來源工作表');
     const summary = summaryForRows(rawRows.length, normalizedRows);
     acceptance.uniqueColorlessModels = new Set(normalizedRows.map(row => row.colorlessModel).filter(Boolean)).size;
-    return Object.assign({}, usable[0], { sheetName:String(usable.length) + ' 個可解析工作表', sheetNames:usable.map(analysis => analysis.sheetName), sheetSummaries, fieldNames, rawRows, previewRows:rawRows.slice(0, PREVIEW_LIMIT), recordCount:rawRows.length, fieldMapping:mapping, standardized:{ mapping, rows:normalizedRows, summary, previewRows:normalizedRows.slice(0, NORMALIZED_PREVIEW_LIMIT) }, warnings, blankRowCount:acceptance.ignoredBlankRows, partialRowCount:acceptance.partial, duplicateRowCount:acceptance.duplicateRows, invalidCurrencyCount:acceptance.invalidCurrencyCount, acceptance });
+    return Object.assign({}, usable[0], { sheetName:String(usable.length) + ' 個可解析工作表', sheetNames:usable.map(analysis => analysis.sheetName), sheetSummaries, catalogIssueCount:usable.reduce((sum,analysis)=>sum+Number(analysis.catalogIssueCount||0),0), catalogRowCount:usable.reduce((sum,analysis)=>sum+Number(analysis.catalogRowCount||0),0), unmappedNumericColumns:usable.flatMap(analysis=>(analysis.unmappedNumericColumns||[]).map(name=>analysis.sheetName+'／'+name)), fieldNames, rawRows, previewRows:rawRows.slice(0, PREVIEW_LIMIT), recordCount:rawRows.length, fieldMapping:mapping, standardized:{ mapping, rows:normalizedRows, summary, previewRows:normalizedRows.slice(0, NORMALIZED_PREVIEW_LIMIT) }, warnings, blankRowCount:acceptance.ignoredBlankRows, partialRowCount:acceptance.partial, duplicateRowCount:acceptance.duplicateRows, invalidCurrencyCount:acceptance.invalidCurrencyCount, acceptance });
   }
 
   function csvScore(value) {
@@ -809,6 +826,7 @@
   function shoppingNoPricePresentation(result) {
     const rows = result && result.standardized && result.standardized.rows || [];
     const excludedRows = rows.filter(row =>
+      !(result && result.unmappedNumericColumns || []).length &&
       row.status === 'partial' &&
       present(row.brand) &&
       present(row.code) &&
@@ -851,6 +869,8 @@
       remainingOutcomes.failed === 0 &&
       remainingOutcomes.unrecognized === 0 &&
       invalidCurrencyCount === 0 &&
+      !(result && result.unmappedNumericColumns || []).length &&
+      !Number(result&&result.catalogIssueCount||0) &&
       duplicateRowCount === 0;
     return { ready, presentation, remainingOutcomes, missingRequiredMappings, invalidCurrencyCount, duplicateRowCount };
   }
@@ -873,8 +893,14 @@
     const flags = structuralFlags(result || {});
     const blockers = [];
     (result && result.errors || []).forEach(message => blockers.push(message));
+    if (Number(result&&result.catalogIssueCount||0)) blockers.push('目錄列缺少品牌、料號或品名，需核對原始列。');
+    if ((result && result.unmappedNumericColumns || []).length) blockers.push('仍有未對應的數值欄位，不能確認價格覆蓋：'+result.unmappedNumericColumns.join('、'));
+    if (kind === 'tradein' && rows.some(row=>present(row.tradeInPrice)&&(!['點子行動','FutureDial（FDI）'].includes(row.vendor)||!GRADE_ORDER.includes(row.grade)||!present(row.sourceModel||row.model)))) blockers.push('原表報價尚未能完整對應機型、回收商與 S/A/B/C 等級；已保留原值，禁止產生空報價快照。');
     if (missingRequiredMappings.length) blockers.push('缺少必要欄位映射：' + missingRequiredMappings.join('、'));
     if (missingRequiredValues.length) blockers.push('必要欄位仍有空值：' + missingRequiredValues.join('、'));
+    if (outcomes.partial) blockers.push('仍有 '+outcomes.partial+' 筆部分成功資料，需核對來源。');
+    if (Number(result&&result.invalidCurrencyCount||0) || kind==='tradein'&&rows.some(row=>present(row.tradeInPrice)&&!isCurrency(row.tradeInPrice))) blockers.push('仍有非法價格值，禁止發布。');
+    if (Number(result&&result.duplicateRowCount||0)) blockers.push('仍有重複來源列，需核對來源。');
     if (outcomes.failed) blockers.push('存在 ' + String(outcomes.failed) + ' 筆標準化失敗資料。');
     if (outcomes.unrecognized) blockers.push('存在 ' + String(outcomes.unrecognized) + ' 筆無法辨識資料。');
     if (kind === 'tradein' && Number(acceptance.unrecognized || 0)) blockers.push('至少一筆舊換新資料無法辨識回收商或原始機型。');
@@ -914,6 +940,8 @@
       },
       rowOutcomes:outcomes,
       dataQuality:{
+        catalogRows:Number(result&&result.catalogRowCount||0),
+        unmappedNumericColumns:(result&&result.unmappedNumericColumns||[]).slice(),
         fullyBlankRows:Number(result && result.blankRowCount || 0),
         duplicateRows:Number(result && result.duplicateRowCount || 0),
         invalidCurrencyValues:Number(result && result.invalidCurrencyCount || 0),
@@ -926,7 +954,7 @@
         publishEligible:passed || partialReady,
         blockers:partialReady ? [] : blockers,
         warnings,
-        nextStep:passed ? '可複製本去識別化報告回傳進行下一步 review；原始檔仍只留在本機瀏覽器。' : (partialReady ? '有價格資料可依不呈現規則進入候選發布 review；無價格資料仍保留在稽核統計中。' : '請依阻擋原因修正或重新匯出來源檔，再於本頁重新執行驗收。')
+        nextStep:passed ? '可複製本去識別化報告回傳進行下一步 review；原始檔仍只留在本機瀏覽器。' : (partialReady ? '有價格資料可依不呈現規則進入候選發布 review；無價格資料仍保留在稽核統計中。' : '保留原始檔，先核對未辨識欄位與報價對應；不要改欄名或補猜價格。')
       },
       presentation:kind === 'shopping' ? {
         rule:'單機價與所有專案價皆空時，不納入門市查詢；0 視為有效價格。',
@@ -1206,7 +1234,7 @@
       : selected && selected.analysis;
     if (!analysis) throw new Error('所有工作表都找不到可辨識的欄位列。');
     const selectedSourceSheets = kind === 'shopping'
-      ? shoppingAnalyses.filter(item => !item.errors.length && item.standardized && item.standardized.rows.length).map(item => item.sheetName)
+      ? shoppingAnalyses.filter(item => !item.errors.length && item.standardized && (item.standardized.rows.length||item.rowType==='catalog')).map(item => item.sheetName)
       : [selected.name];
     const sheetSummaries = analysis.sheetSummaries || [{
       name:analysis.sheetName,
