@@ -99,7 +99,8 @@
     $('workspace').hidden = false;
     $('securityBadge').textContent = '督導權限已驗證';
     $('securityBadge').classList.add('ok');
-    await loadPublishedGold();
+    if (monthlyUI) await monthlyUI.load();
+    else setMessage('goldMessage', '月報元件未完整載入，請重新整理；目前停止讀取與上傳。', 'error');
   }
 
   function readLocalJson(key, fallback) {
@@ -380,27 +381,25 @@
       document.querySelectorAll('[data-tab]').forEach((item) => { item.classList.toggle('active', item === button); item.setAttribute('aria-selected', item === button ? 'true' : 'false'); });
       document.querySelectorAll('[data-panel]').forEach((panel) => { panel.hidden = panel.dataset.panel !== button.dataset.tab; });
     }));
-    $('goldImport')?.addEventListener('click', importGold);
     $('storeImport')?.addEventListener('click', importStore);
-    $('publishGold').addEventListener('click', publishGold);
-    $('exportGold')?.addEventListener('click', exportGold);
-    $('monthFilter')?.addEventListener('change', () => { updateDependentFilters(); renderGold(); });
-    $('regionFilter')?.addEventListener('change', () => { updateDependentFilters(); renderGold(); });
-    $('storeFilter')?.addEventListener('change', () => { updateDependentFilters(); renderGold(); });
-    $('employeeFilter')?.addEventListener('change', renderGold);
-    $('dateFrom')?.addEventListener('change', renderDaily);
-    $('dateTo')?.addEventListener('change', renderDaily);
-    $('dailyBody')?.addEventListener('change', (event) => {
-      const select = event.target.closest('[data-review-key]');
-      if (!select) return;
-      const reviews = readLocalJson(GOLD_REVIEW_KEY, {});
-      const row = reviews[select.dataset.reviewKey] || {};
-      row[select.dataset.reviewKind] = select.value;
-      reviews[select.dataset.reviewKey] = row;
-      localStorage.setItem(GOLD_REVIEW_KEY, JSON.stringify(reviews));
-    });
+    if (!monthlyUI) {
+      ['goldImport', 'publishGold', 'exportGold', 'monthlyRestore'].forEach(id => { $(id).disabled = true; });
+      return;
+    }
+    $('goldImport').addEventListener('click', monthlyUI.importGold);
+    $('publishGold').addEventListener('click', monthlyUI.prepare);
+    $('exportGold').addEventListener('click', monthlyUI.exportGold);
+    monthlyUI.bind();
   }
 
+  const monthlyUI = window.DepartmentGoldMonthlyCore && window.DepartmentGoldMonthlyUI ? window.DepartmentGoldMonthlyUI.create({
+    request: authRequest, readWorkbook, getToken: () => patrolToken,
+    lockWorkspace: () => {
+      patrolToken = ''; sessionStorage.removeItem(SESSION_KEY);
+      $('workspace').hidden = true; $('authPanel').hidden = false;
+      $('securityBadge').textContent = '督導驗證'; $('securityBadge').classList.remove('ok');
+    }
+  }) : null;
   bindEvents();
   restoreSession();
 })();

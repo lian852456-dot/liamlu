@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f7f5f0">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>北一二部｜部區管理</title>
-  <link rel="stylesheet" href="department-ops.css?v=20260930-1">
+  <link rel="stylesheet" href="department-ops.css?v=20261002-monthly-1">
 </head>
 <body>
   <main class="page">
@@ -15,7 +15,7 @@
       <div>
         <p class="eyebrow">NORTH 12 DEPARTMENT</p>
         <h1>北一二部｜部區管理</h1>
-        <p class="lede">金牌 Final、季度結算與店務成績集中查看。正式結果以原始檔為準，本站不自行重算。</p>
+        <p class="lede">已保存月報、季度累計與店務成績集中查看。正式結果以原始檔為準，本站不自行重算。</p>
       </div>
       <span id="securityBadge" class="mode-badge">督導驗證</span>
     </header>
@@ -42,8 +42,8 @@
       <section id="goldPanel" data-panel="gold">
         <section id="goldDashboard" hidden>
           <div class="dashboard-head">
-            <div><p class="step-label">GOLD MEDAL FINAL</p><h2>金牌儀表板</h2><p id="goldSourceMeta" class="source-meta"></p></div>
-            <div class="header-buttons"><button id="publishGold" class="primary-button" type="button">同步給同仁</button><button id="exportGold" class="secondary-button" type="button">匯出目前結果 Excel</button></div>
+            <div><p class="step-label">GOLD MEDAL MONTHLY</p><h2>金牌儀表板</h2><p id="goldSourceMeta" class="source-meta"></p></div>
+            <div class="header-buttons"><button id="publishGold" class="primary-button" type="button" disabled>確認月報差異</button><button id="exportGold" class="secondary-button" type="button">匯出目前結果 Excel</button></div>
           </div>
 
           <section class="filter-panel" aria-label="金牌篩選">
@@ -56,29 +56,33 @@
           <div id="goldSummary" class="summary-grid"></div>
 
           <section class="data-card">
-            <div class="card-head"><div><h3>個人累計與月趨勢</h3><p>依目前篩選範圍排序；Final 數字直接呈現。</p></div><span id="peopleCount"></span></div>
+            <div class="card-head"><div><h3>個人累計與月趨勢</h3><p>按員編累計完整季度；區／店篩選顯示曾任職同仁，月欄保留當月店區。</p></div><span id="peopleCount"></span></div>
             <div class="table-scroll"><table><thead id="peopleHead"></thead><tbody id="peopleBody"></tbody></table></div>
           </section>
 
           <section class="data-card">
-            <div class="card-head"><div><h3>季度結算</h3><p>列出 80／100／120／180 金牌門檻，供獎狀、禮物與 SPE +0.1 名單複核。</p></div></div>
+            <div class="card-head"><div><h3>四區淨金牌</h3><p id="monthlyStatus">只採來源主表淨金牌；發獎資格待確認。</p></div></div>
             <div class="quarter-strip" id="quarterStrip"></div>
           </section>
 
           <p id="publishMessage" class="message" aria-live="polite"></p>
         </section>
 
+        <section id="monthlyPreview" hidden aria-label="月報差異預覽"><div id="monthlyPreviewBody"></div><button id="monthlyCancel" class="secondary-button" type="button">取消預覽</button></section>
+        <section id="monthlyConfirm" class="panel" hidden aria-label="確認更新月版本"><h3>確認替代指定月份</h3><p id="monthlyConfirmText"></p><div id="monthlyServerDiff"></div><label id="monthlyRegressionLabel" class="final-choice" hidden><input id="monthlyRegression" type="checkbox"> 我已核對截止較早或結算狀態變更，確認替代</label><button id="monthlyCommit" type="button" class="primary-button">確認保存並讀回</button></section>
+        <section class="panel monthly-history"><h3>已保存資料與歷史</h3><div class="header-buttons"><button id="monthlyReload" class="secondary-button" type="button">重新讀取已保存月報</button><button id="monthlyLogout" class="secondary-button" type="button">登出</button></div><div class="upload-grid"><label class="field">月份<select id="monthlyHistoryMonth"></select></label><label class="field">歷史版本<select id="monthlyHistoryVersion"></select></label><button id="monthlyRestore" type="button" class="secondary-button">預覽回復差異</button></div></section>
+
         <section class="panel upload-panel">
           <div class="panel-heading">
-            <div><p class="step-label">FINAL UPDATE</p><h2>需要更新時才上傳新版 Final</h2></div>
+            <div><p class="step-label">MONTHLY UPDATE</p><h2>需要更新時才上傳助理月報原檔</h2></div>
             <span class="local-chip">選檔僅供更新</span>
           </div>
           <div class="upload-grid">
-            <label class="field file-field"><span>新版金牌 Final Excel</span><input id="goldFile" type="file" accept=".xlsx,.xls"></label>
+            <label class="field file-field"><span>助理金牌月報 Excel</span><input id="goldFile" type="file" accept=".xlsx,.xls"></label>
             <label class="field password-field"><span>Excel 開啟密碼</span><input id="excelPassword" type="password" placeholder="請輸入檔案密碼" autocomplete="off"></label>
-            <button id="goldImport" class="primary-button" type="button">讀取新版並預覽</button>
+            <button id="goldImport" class="primary-button" type="button">辨識新版與比較差異</button>
           </div>
-          <p class="privacy-note">通行碼驗證後會自動顯示上次同步結果；只有資料更新時才需選擇「北一二部金牌.xlsx」。原始檔仍只在本機解析。</p>
+          <p class="privacy-note">通行碼驗證後會自動顯示上次同步結果；只有資料更新時才需選擇助理原檔。原始檔仍只在本機解析。</p>
           <p id="goldMessage" class="message" aria-live="polite"></p>
         </section>
       </section>
@@ -108,6 +112,8 @@
   <script src="assets/vendor/xlsx.full.min.js"></script>
   <script src="assets/vendor/officecrypto.bundle.min.js?v=0.0.19"></script>
   <script src="department-ops-core.js?v=20260930-2"></script>
-  <script src="department-ops.js?v=20260930-5" defer></script>
+  <script src="department-gold-monthly-core.js?v=20261002-1" defer></script>
+  <script src="department-gold-monthly-ui.js?v=20261002-1" defer></script>
+  <script src="department-ops.js?v=20261002-monthly-1" defer></script>
 </body>
 </html>
