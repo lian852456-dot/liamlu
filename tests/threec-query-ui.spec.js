@@ -295,3 +295,32 @@ for(const width of [1280,390,360])test(`企業專區 ${width}px 修復截圖情�
  await page.locator('#cardModeBtn').click();await expect(page.locator('.quote-card')).toContainText('2,999 元');expect(await page.locator('.quote-card .quote').evaluate(e=>parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(28);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.locator('#consumerSegmentBtn').click();await expect(page.locator('#shoppingResults')).toContainText('1,234 元');await expect(page.locator('#shoppingResults')).not.toContainText('2,999 元');
 });
+
+test('完整價格先讀取，異動僅在要求時載入且鎖定目前快照',async({page})=>{
+ const calls=[];
+ await page.route('**/exec*',async route=>{
+  const p=route.request().postDataJSON();calls.push(p);
+  if(p.action==='threec_snapshot_read')return route.fulfill({contentType:'application/json',body:JSON.stringify({...response(p.kind),changeSet:null,changesDeferred:true})});
+  return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'ok',snapshotHash:response(p.kind).snapshot.snapshot_hash,changeSet:response(p.kind).changeSet})});
+ });
+ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ expect(calls).toHaveLength(2);expect(calls.every(p=>p.includeChanges===false)).toBe(true);
+ await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('17,500');expect(calls).toHaveLength(2);
+ await page.locator('#changeLoadBtn').click();await expect(page.locator('#changeResults')).toContainText('FutureDial');
+ expect(calls[2]).toMatchObject({action:'threec_changes_read',kind:'tradein',snapshotHash:'tradein-snapshot-v1',offset:0,limit:100});
+ await expect(page.locator('#changeLoadBtn')).toBeHidden();
+});
+
+test('異動逾時可單獨重試，完整價格和一般企業切換仍可用',async({page})=>{
+ let fail=true;
+ await page.route('**/exec*',async route=>{
+  const p=route.request().postDataJSON();
+  if(p.action==='threec_snapshot_read')return route.fulfill({contentType:'application/json',body:JSON.stringify({...response(p.kind),changeSet:null,changesDeferred:true})});
+  return route.fulfill({contentType:'application/json',body:JSON.stringify(fail?{status:'error',message:'異動測試逾時'}:{status:'ok',changeSet:response(p.kind).changeSet})});
+ });
+ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ await page.locator('#changeLoadBtn').click();await expect(page.locator('#changeSummary')).toContainText('異動測試逾時');
+ await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#changeLoadBtn')).toBeEnabled();
+ await page.locator('#enterpriseSegmentBtn').click();await page.locator('#consumerSegmentBtn').click();await expect(page.locator('#shoppingResults')).toContainText('iPhone');
+ fail=false;await page.locator('#changeLoadBtn').click();await expect(page.locator('#changeResults')).toContainText('合約24期');
+});

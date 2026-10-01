@@ -3870,6 +3870,7 @@ function threecPublicResult_(result) {
       return output;
     });
   }
+  if (result.changesDeferred === true) clean.changesDeferred = true;
   if (Object.prototype.hasOwnProperty.call(result, 'snapshotHash')) clean.snapshotHash = result.snapshotHash;
   clean.changeSet = publicChanges(result.changeSet);
   clean.updateCheck = result.updateCheck ? pick(result.updateCheck, ['status','checked_at','snapshot_hash','source_version_date','source_file_sha256','row_count','source_row_count']) : null;
@@ -4032,10 +4033,10 @@ function threecAuthorizeRead_(payload) {
 }
 
 function threecSnapshotRead(payload) {
-  return threecPublicResult_(threecReadActive_((payload || {}).kind));
+  return threecPublicResult_(threecReadActive_((payload || {}).kind, {includeChanges:(payload || {}).includeChanges !== false}));
 }
 
-function threecReadActive_(requestedKind) {
+function threecReadActive_(requestedKind, options) {
   const kind = threecKind_(requestedKind);
   const registry = threecRegistry_();
   const active = registry.kinds[kind].active;
@@ -4051,6 +4052,11 @@ function threecReadActive_(requestedKind) {
   }
   normalized.published_at = snapshot.published_at;
   normalized.snapshot_hash = snapshot.snapshot_hash;
+  // Query prices need the complete verified snapshot, not a full historical
+  // diff. Keep authenticated maintenance readbacks and legacy callers intact.
+  if (options && options.includeChanges === false) {
+    return { snapshot:normalized, registry:threecRegistrySummary_(registry), changeSet:null, updateCheck:null, changesDeferred:true };
+  }
   const changes = threecChangesResult_({ kind:kind, snapshotHash:active.snapshot_hash, limit:100 }, registry, { raw:snapshot, normalized:normalized });
   return { snapshot:normalized, registry:threecRegistrySummary_(registry), changeSet:changes.changeSet, updateCheck:changes.updateCheck };
 }

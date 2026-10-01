@@ -569,3 +569,20 @@ test('手機來源目錄另列稽核，價格/缺价/目錄加總守恆，容量
  assert.throws(()=>env.context.threecNormalizeIncomingSnapshot_({...input,rows:Array(20001).fill(input.rows[0])}),/筆數/);
  const legacy=env.context.threecNormalizeIncomingSnapshot_(shoppingSnapshot());assert.equal(Object.hasOwn(legacy,'catalog_row_count'),false);
 });
+
+test('price-only public read preserves every verified price without computing historical changes',()=>{
+ const env=runtime();publish(env,shoppingSnapshot({rows:2,excluded:0}));
+ const before=env.context.threecSnapshotRead({kind:'shopping'});
+ const writes=env.registryWrites,files=env.createdFileCount;
+ env.context.threecChangesResult_=()=>{throw new Error('historical diff invoked');};
+ const fast=env.context.threecSnapshotRead({kind:'shopping',includeChanges:false});
+ assert.deepEqual(fast.snapshot,before.snapshot);assert.equal(fast.changeSet,null);assert.equal(fast.changesDeferred,true);
+ assert.deepEqual(Object.keys(fast).sort(),['changeSet','changesDeferred','snapshot','updateCheck']);
+ assert.doesNotMatch(JSON.stringify(fast),/registry|operator_hash|source_file_name|employeeId|snapshot_file_id/);
+ assert.throws(()=>env.context.threecSnapshotRead({kind:'shopping'}),/historical diff invoked/);
+ assert.throws(()=>env.context.threec_readback({...env.auth,kind:'shopping',includeChanges:false}),/historical diff invoked/);
+ assert.equal(env.registryWrites,writes);assert.equal(env.createdFileCount,files);
+ const file=env.files.get(env.properties.get('THREEC_REGISTRY_FILE_ID')),r=JSON.parse(file.content);
+ r.kinds.shopping.active.source_file_sha256='0'.repeat(64);file.content=JSON.stringify(r);
+ assert.throws(()=>env.context.threecSnapshotRead({kind:'shopping',includeChanges:false}),/版本驗證失敗/);
+});
