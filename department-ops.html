@@ -8,6 +8,7 @@
   <title>北一二部｜部區管理</title>
   <link rel="stylesheet" href="department-ops.css?v=20260930-1">
   <link rel="stylesheet" href="store-rule-reminders.css?v=20261002-1">
+  <link rel="stylesheet" href="department-scores.css?v=20261002-1">
 </head>
 <body>
   <main class="page">
@@ -85,24 +86,32 @@
       </section>
 
       <section id="storePanel" data-panel="store" hidden>
-        <div id="storeRulesMount"></div>
+        <div id="storeRulesMount" data-department-rules-mount></div>
+        <section class="dashboard-head">
+          <div><p class="step-label">STORE OPERATIONS</p><h2>店務成績儀表板</h2><p class="score-limits">門市歷史採各月明細。原始 G 成績、E 缺失與 F 扣分分開，不依新版規章回算。</p></div>
+          <button id="scoreRefresh" class="secondary-button" type="button">重新讀取保存版本</button>
+        </section>
+        <p id="scoreMessage" class="message" aria-live="polite"></p>
+        <section id="scoreDashboard" hidden>
+          <p id="scoreSourceMeta" class="source-meta"></p>
+          <section class="filter-panel" aria-label="店務成績篩選">
+            <label>月份／季度<select id="scorePeriod"></select></label>
+            <label>部區<select id="scoreRegion"></select></label>
+            <label>店點<select id="scoreStore"></select></label>
+          </section>
+          <div id="scoreSummary" class="summary-grid"></div>
+          <section class="data-card"><h3>四區比較</h3><p class="score-limits">所選月份的門市平均分；部平均按各店等權計算。此區保留四區供比較。</p><div id="scoreRegions" class="score-regions"></div></section>
+          <section class="data-card"><h3>各月成績趨勢</h3><p class="score-limits">依目前部區與店點篩選，缺月不補零。</p><div id="scoreTrend"></div></section>
+          <section class="data-card"><div class="card-head"><h3>各店月成績與缺失</h3><div class="score-actions"><button id="scoreExport" class="secondary-button" type="button">匯出 Excel</button><button id="scoreBrief" class="secondary-button" type="button">匯出簡報資料</button></div></div><p id="scoreWarnings" class="score-limits"></p><div class="table-scroll"><table><thead id="scoreHead"></thead><tbody id="scoreBody"></tbody></table></div></section>
+          <section id="scoreDetail" class="data-card" hidden></section>
+          <section class="data-card"><h3>歷史版本回復</h3><p class="score-limits">先預覽歷史版本，再確認回復；保留目前版本。</p><div class="score-actions"><select id="scoreHistory" aria-label="歷史版本"></select><button id="scoreHistoryPreview" class="secondary-button" type="button">預覽歷史版本</button></div><div id="scoreRestorePreview" hidden><p id="scoreRestoreMeta"></p><div id="scoreRestoreDiff"></div><label class="score-confirm"><input id="scoreRestoreConfirm" type="checkbox">我已核對此月份歷史版本，確認回復</label><button id="scoreRestore" class="primary-button" type="button" disabled>確認回復此月</button></div></section>
+        </section>
         <section class="panel upload-panel">
-          <div class="panel-heading">
-            <div><p class="step-label">STORE OPERATIONS</p><h2>上傳店務原始 Excel</h2></div>
-            <span class="local-chip">每月各店一列</span>
-          </div>
-          <div class="upload-grid store-upload-grid">
-            <label class="field file-field"><span>店務原始 Excel</span><input id="storeFile" type="file" accept=".xlsx,.xls,.csv,.tsv"></label>
-            <button id="storeImport" class="primary-button" type="button">讀取店務資料</button>
-          </div>
-          <p class="privacy-note">正式功能採本機上傳。收到店務原始檔後，依實際欄位補上固定映射；不會影響現有每日日誌、巡店或店務檢查。</p>
-          <p id="storeMessage" class="message" aria-live="polite"></p>
+          <h2>本機原檔自助更新</h2><p class="score-limits">各月頁籤沿用固定原格式。選檔只在本機解析，預覽確認後僅保存 A–D 門市明細到既有私有資料域。重開後登入即可查看。</p>
+          <div class="score-update-grid"><label class="field">店務原始 XLSX<input id="scoreFile" type="file" accept=".xlsx"></label><label class="field">資料年度（原檔無年份時）<input id="scoreYear" type="text" inputmode="numeric" maxlength="4" placeholder="例如 2026"></label><button id="scoreImport" class="primary-button" type="button">讀取新版並預覽</button></div>
+          <section id="scorePreview" hidden><h3>更新預覽</h3><p id="scorePreviewMeta"></p><div id="scoreMonthChoices"></div><p id="scoreErrors"></p><div id="scoreDiff"></div><label class="score-confirm"><input id="scoreConfirm" type="checkbox">我已核對月份、差異與缺資料警告，確認保存勾選月份</label><button id="scorePublish" class="primary-button" type="button" disabled>確認保存勾選月份</button></section>
+          <p class="score-limits">尚無改善紀錄與個案原因，不推定已改善或改善率。簡報範例尚未提供，目前提供資料匯出介面。</p>
         </section>
-        <section id="storeDashboard" class="data-card" hidden>
-          <div class="card-head"><div><h3>店務月成績</h3><p id="storeSourceMeta"></p></div></div>
-          <div class="table-scroll"><table><thead><tr><th>月份</th><th>店點</th><th>成績</th><th>狀態</th><th>來源工作表</th></tr></thead><tbody id="storeBody"></tbody></table></div>
-        </section>
-        <section id="storeEmpty" class="empty-state"><strong>店務入口已完成</strong><span>等待店務原始 Excel 後接上正式欄位；目前不使用示意數字。</span></section>
       </section>
     </div>
   </main>
@@ -110,6 +119,8 @@
   <script src="assets/vendor/xlsx.full.min.js"></script>
   <script src="assets/vendor/officecrypto.bundle.min.js?v=0.0.19"></script>
   <script src="department-ops-core.js?v=20260930-2"></script>
+  <script src="department-scores-core.js?v=20261002-1"></script>
+  <script src="department-scores.js?v=20261002-1" defer></script>
   <script src="department-ops.js?v=20260930-5" defer></script>
   <script src="store-rule-reminders.js?v=20261002-1" defer></script>
 </body>

@@ -6,6 +6,15 @@
 - 驗證：里程／GAS Node 契約 `23/23 PASS`；六項里程重點 Chrome 驗收通過。完整 Patrol Chrome 回歸 `84/86 PASS`，其餘兩項（25 題 NA 計數、面談預覽欄名字樣）已在未修改的 `origin/main` 同樣失敗，未跨範圍修正。`build:patrol-gas` 與 `git diff --check` PASS。
 - 發布邊界：僅為程式候選；未部署 Pages／GAS、未建立正式工作表、未寫正式路段或巡店資料。上線前須先以現有 Deployment ID 建立新版 Patrol Web App，再發布前端，URL／session 設定維持不變。
 
+## 2026-10-02 ｜ Codex（部區店務成績持久儀表板候選）
+
+- 以獨立成績解析／控制器／樣式與私有 GAS 模組實作：多層表頭語義版本、各月門市 G/E/F/H 原值、四區與店點趨勢、缺失來源定位、預覽差異、明確選月確認、SHA 去重、generation 防舊預覽、逐月 immutable revision 與歷史回復。未提供月以 null／缺資料顯示，季度／近半年標完整性。
+- 既有金牌 controller/core/style 及 gas/Code.gs、Patrol bundle 保持基準；共用 HTML 只改 storePanel與增加成績資產，保留 storeRulesMount 供提醒語義整合。精確基準 0b862fc7eab15f05049ea53c52ee324a3a1cfcd0，掛接patch及父任務整合腳本見 DEPARTMENT_SCORES_HANDOFF.md。
+- Library 原檔已在本 Mac repo外私有工作目錄落地可讀；222店月、1554核心與10952分項儲存格逐格對帳通過，外部公式快取不重算。公開repo僅提交合成fixture，未提交真人姓名／店分數／原檔。
+- 本機成績與原部區 Node 18/18、Chrome 8/8 通過；含匿名不讀取、reload免原檔、確認前0寫入、ack遺失後不重送、同月更正／回復、錯檔缺列與核心錯誤、子指標warning、1440/390px及session失效清除。全庫回歸與未改main失敗逐項比對見交接。
+- 尚未正式部署、初始化／正式讀回或Liam實機驗收；父任務協調共用部署與既有私有owner資料域初始化。無新增共享／權限，Liam勿動範圍不動。簡報模板未到，僅提供可擴充資料匯出，未宣稱PPT產製完成。
+- 外部AI協作中心已閱讀、未同步修改（超出本任務 writable scope）；此repo交接與日誌供父任務統整。
+
 ## 2026-09-20 ｜ Codex（面談匯入與六張犁完成判定正式修復）
 
 - 修復：面談檔的「填報人員」與「面談人員編號」改為可省略；若來源仍帶員編，資料仍只在本機捨棄、不寫入私有工作表。其餘九個面談欄位與日期／季度／授權驗證維持 fail-closed。
