@@ -1,0 +1,69 @@
+/* The staff gold viewer uses the same wide shell as the operations home. */
+.gold-page {
+  --ink: #171b22;
+  --muted: #656d79;
+  --paper: #f5f6f8;
+  --line: #e5e7eb;
+  --shadow: none;
+  background: #fff;
+  font-size: 1.125rem;
+  line-height: 1.55;
+}
+.gold-page .page { width: calc(100% - 80px); max-width: 1720px; padding: 28px 0 64px; }
+.gold-page .back-link { font-size: 1.125rem; margin-bottom: 20px; }
+.gold-page .masthead { align-items: center; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+.gold-page h1 { font-size: clamp(2rem, 3vw, 2.75rem); line-height: 1.35; letter-spacing: 0; }
+.gold-page h2 { font-size: 1.75rem; }
+.gold-page h3 { font-size: 1.5rem; }
+.gold-page .eyebrow, .gold-page .step-label { font-size: .875rem; }
+.gold-page .lede { font-size: 1.125rem; max-width: none; margin-top: 8px; }
+.gold-page .mode-badge { font-size: 1rem; }
+.gold-page .panel, .gold-page .filter-panel, .gold-page .data-card { border-radius: 12px; }
+.gold-page .load-panel { display: flex; align-items: center; gap: 16px; padding: 16px; }
+.gold-page .load-panel .message { flex: 1; margin: 0; }
+.gold-page .message, .gold-page .source-meta, .gold-page .card-head p { font-size: 1rem; }
+.gold-page .filter-panel { grid-template-columns: repeat(5, minmax(0, 1fr)) auto; align-items: end; gap: 16px; padding: 20px; background: var(--paper); }
+.gold-page .filter-panel label { min-width: 0; font-size: 1.125rem; }
+.gold-page .filter-panel select, .gold-page .filter-panel input { width: 100%; min-width: 0; min-height: 52px; padding: 10px 12px; border: 1px solid #d0d4db; border-radius: 8px; background: #fff; color: var(--ink); font-size: 1.125rem; }
+.gold-page .secondary-button { min-height: 52px; font-size: 1.125rem; white-space: nowrap; border-radius: 8px; }
+.gold-page .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
+.gold-page .summary-card { padding: 20px; border-radius: 10px; }
+.gold-page .summary-card span { font-size: 1.125rem; }
+.gold-page .summary-card strong { font-size: 2.5rem; line-height: 1.2; }
+.gold-page .table-scroll { border-radius: 8px; }
+.gold-page th { font-size: 1.125rem; padding: 16px; }
+.gold-page td { font-size: 1.25rem; padding: 16px; }
+.gold-page tbody tr:nth-child(even) { background: #fafbfc; }
+.gold-page .number { font-size: 1.375rem; }
+.gold-page :is(a, button, select, input):focus-visible { outline: 3px solid #005fcc; outline-offset: 3px; }
+@media (max-width: 1200px) {
+  .gold-page .filter-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 1100px) {
+  .gold-page .page { width: calc(100% - 48px); }
+}
+@media (max-width: 760px) {
+  .gold-page .page { width: calc(100% - 32px); padding-top: 20px; }
+  .gold-page .masthead { display: block; }
+  .gold-page .mode-badge { display: inline-block; margin-top: 12px; }
+  .gold-page .load-panel { align-items: stretch; flex-direction: column; }
+  .gold-page .filter-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px; gap: 14px; }
+  .gold-page .filter-panel label:has(input[type="date"]), .gold-page #viewerReset { grid-column: 1 / -1; }
+  .gold-page .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .gold-page .summary-card { padding: 16px; }
+  .gold-page .summary-card strong { font-size: 2rem; }
+  .gold-page .data-card { padding: 16px; }
+  .gold-page .table-scroll { max-height: none; border: 0; overflow: visible; }
+  .gold-page table { min-width: 0; display: block; }
+  .gold-page thead { display: none; }
+  .gold-page tbody { display: grid; gap: 12px; }
+  .gold-page tbody tr { display: block; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; }
+  .gold-page td { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 7px 0; font-size: 1.125rem; white-space: normal; overflow-wrap: anywhere; }
+  .gold-page td::before { content: attr(data-label); color: var(--muted); font-size: 1rem; font-weight: 700; flex-shrink: 0; }
+  .gold-page td[colspan]::before { display: none; }
+  .gold-page td:last-child { border: 0; }
+  .gold-page td.number { font-size: 1.375rem; }
+}
+@media (max-width: 360px) {
+  .gold-page .filter-panel { grid-template-columns: 1fr; }
+}
