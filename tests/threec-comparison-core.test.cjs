@@ -50,3 +50,19 @@ test('月租／期數篩選只列有該條件的機款，保留真正缺價，�
  const view=Compare.buildView(index,{rent:'999'});assert.equal(view.totalRows,2);assert.equal(view.rows.some(r=>r.model==='僅599'),false);assert.equal(view.rows.some(r=>r.model==='真正缺價'),true);
  const unknown=Compare.condition('599(6)');assert.equal(unknown.rent,'599');assert.equal(unknown.term,'');assert.equal(unknown.raw,'599(6)');
 });
+
+test('企業專區依機款保留有價iPhone限定條件，空白Android欄與一般方案不混入',()=>{
+ const android='(企客_5G)榮耀之星999H(24)',iphone=android+'_iPhone';
+ const index=Compare.buildIndex({rows:[row({source_sheet:'一般',project_prices:{[plan]:1299}}),row({source_sheet:'企客',project_prices:{[android]:'',[iphone]:2999,'(企客_5G)榮耀之星999H(30)_iPhone':0,'(企客_5G)榮耀之星999H(48)_iPhone':''}})]});
+ const enterprise=Compare.buildView(index,{segment:'enterprise',model:'iPhone 測試機',rent:'999'});
+ assert.equal(enterprise.totalRows,1);assert.equal(enterprise.totalColumns,2);assert.ok(enterprise.columns.every(c=>c.raw.endsWith('_iPhone')));
+ assert.deepEqual(enterprise.columns.map(c=>Compare.cell(enterprise.rows[0],c).value),[2999,0]);
+ assert.deepEqual(Compare.options(index,{segment:'enterprise',model:'iPhone 測試機'}).projects,['(企客 5G)榮耀之星 iPhone']);
+ const consumer=Compare.buildView(index,{segment:'consumer'});assert.equal(consumer.totalRows,1);assert.ok(consumer.columns.every(c=>!/企客/.test(c.raw)));
+});
+
+test('十月群組前綴仍保留iPhone適用資格及完整原條件，非iPhone方案不冒用',()=>{
+ const raw='企客特殊專案(2)／(企客_5G)榮耀之星999H(30)_iPhone';
+ const column=Compare.condition(raw);assert.equal(column.raw,raw);assert.equal(column.key,raw);assert.equal(column.project,'(企客 5G)榮耀之星 iPhone');assert.equal(column.rent,'999');assert.equal(column.term,'30');
+ const index=Compare.buildIndex({rows:[row({project_prices:{[raw]:0}})]});assert.equal(Compare.buildView(index,{segment:'enterprise',project:'(企客 5G)榮耀之星',rent:'999'}).totalRows,0);assert.equal(Compare.buildView(index,{segment:'enterprise',project:column.project,rent:'999'}).totalRows,1);
+});
