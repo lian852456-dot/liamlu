@@ -144,7 +144,7 @@
   function observeAuth(){const token=sessionStorage.getItem(KEY);if($('workspace').hidden){if(verifiedToken&&!locked){snapshot=null;pending=null;verifiedToken='';loaded=false;$('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';}return;}if(token&&token!==verifiedToken){verifiedToken=token;locked=false;load();}}
   new MutationObserver(observeAuth).observe($('workspace'),{attributes:true,attributeFilter:['hidden']});
   window.addEventListener('pageshow',observeAuth);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&verifiedToken)load();});
-  window.addEventListener('department-session-cleared',()=>lock('已登出，請重新登入。'));
+  window.addEventListener('department-session-cleared',()=>lock('驗證已結束，請重新登入。'));
   setInterval(()=>{if(!verifiedToken)return;if(sessionStorage.getItem(KEY)!==verifiedToken)return lock('督導驗證已變更，請重新登入。');try{const part=verifiedToken.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'),claims=JSON.parse(atob(part));if(Number.isFinite(claims.exp)&&claims.exp*1000<=Date.now())lock();}catch{}},10000);
   observeAuth();updatePublish();
 })();

@@ -125,7 +125,10 @@
     } catch (error) {
       if (current !== generation) return;
       clear(error.name === 'AbortError' ? '提醒服務逾時，請重新讀取。' : error.message);
-      if (error.auth) sessionStorage.removeItem(SESSION_KEY);
+      if (error.auth) {
+        sessionStorage.removeItem(SESSION_KEY);
+        window.dispatchEvent(new Event('department-session-cleared'));
+      }
     } finally {
       clearTimeout(timeout);
       if (current === generation) { loading = false; refresh.disabled = false; controller = null; }

@@ -394,12 +394,19 @@
 
   const monthlyUI = window.DepartmentGoldMonthlyCore && window.DepartmentGoldMonthlyUI ? window.DepartmentGoldMonthlyUI.create({
     request: authRequest, readWorkbook, getToken: () => patrolToken,
-    lockWorkspace: () => {
-      patrolToken = ''; sessionStorage.removeItem(SESSION_KEY);
-      $('workspace').hidden = true; $('authPanel').hidden = false;
-      $('securityBadge').textContent = '督導驗證'; $('securityBadge').classList.remove('ok');
-    }
+    lockWorkspace: lockSharedWorkspace
   }) : null;
+  function lockSharedWorkspace() {
+    patrolToken = ''; sessionStorage.removeItem(SESSION_KEY);
+    monthlyUI?.clear();
+    if (!$('workspace').hidden) $('workspace').hidden = true;
+    if ($('authPanel').hidden) $('authPanel').hidden = false;
+    $('securityBadge').textContent = '督導驗證'; $('securityBadge').classList.remove('ok');
+  }
+  window.addEventListener('department-session-cleared', lockSharedWorkspace);
+  new MutationObserver(() => {
+    if ($('workspace').hidden) lockSharedWorkspace();
+  }).observe($('workspace'), {attributes:true, attributeFilter:['hidden']});
   bindEvents();
   restoreSession();
 })();
