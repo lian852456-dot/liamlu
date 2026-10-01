@@ -76,3 +76,92 @@ test('台北三創映射為三創且同店最後一列覆蓋', () => {
   assert.match(message, /✅ 21:00 下班回報 9\/9 店已完成/);
   assert.match(message, /三創｜1/);
 });
+
+test('正式 GAS status/data 店點物件直接取得資料，不誤觸備援', async () => {
+  let fallbackCalls = 0;
+  const result = await loadRowsWithRecovery({
+    date, attempts: 1,
+    readPrimary: async () => ({ status: 'ok', data: Object.fromEntries(rows.map(row => [row.store, row])) }),
+    readFallback: async () => { fallbackCalls++; throw new Error('不應呼叫'); },
+  });
+  assert.equal(result.source, 'primary');
+  assert.equal(result.rows.length, 8);
+  assert.equal(fallbackCalls, 0);
+});
+
+test('Sheets values 表頭與原始日期序號可用，空白保留 null', async () => {
+  const result = await loadRowsWithRecovery({
+    date: '2026-10-01', attempts: 1,
+    readPrimary: async () => { throw new Error('network timeout'); },
+    readFallback: async () => ({ values: [
+      ['date', 'store', 'seg', 'aq999', 'haosu', 'rt1399', 'rt999', 'insurance_pct'],
+      [46296, '台北酒泉', 21, 0, 2, 3, 4],
+      [46295, '永吉', 21, 9, 9, 9, 9, 100],
+      [46296, '永吉', 16, 9, 9, 9, 9, 100],
+    ] }),
+  });
+  assert.equal(result.source, 'fallback');
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.rows[0].store, '酒泉');
+  assert.equal(result.rows[0].insurance_pct, null);
+  const message = buildClosingMessage({ date: '2026-10-01', rows: result.rows });
+  assert.match(message, /已提交：1\/9 店/);
+  assert.match(message, /五項資料完整：0\/9 店/);
+  assert.match(message, /已提交但欄位未完整：1 店/);
+  assert.match(message, /A999 掛蛋：酒泉/);
+  assert.match(message, /保險 <50%：無/);
+});
+
+test('GAS 錯誤狀態不能使用隨附資料，改讀備援', async () => {
+  const result = await loadRowsWithRecovery({
+    date, attempts: 1,
+    readPrimary: async () => ({ status: 'error', message: 'auth failed', data: rows }),
+    readFallback: async () => rows,
+  });
+  assert.equal(result.source, 'fallback');
+  assert.equal(result.diagnostics[0].code, 'SOURCE_ERROR');
+});
+
+test('只有未知店點不是成功讀取，需轉備援', async () => {
+  const result = await loadRowsWithRecovery({
+    date, attempts: 1,
+    readPrimary: async () => [{ date, seg: 21, store: '測試店' }],
+    readFallback: async () => rows,
+  });
+  assert.equal(result.source, 'fallback');
+});
+
+test('重複列依提交時間取最新，較舊列不覆寫', () => {
+  const message = buildClosingMessage({ date, rows: [
+    { date, seg: 21, store: '六張犁', savedAt: '下午 9:20:00', aq999: 3 },
+    { date, seg: 21, store: '台北六張犁', savedAt: '下午 9:10:00', aq999: 1 },
+  ] });
+  assert.match(message, /六張犁｜3/);
+});
+
+test('sender 失敗只呼叫一次，不誤送第二則來源異常', async () => {
+  let calls = 0;
+  await assert.rejects(runClosing({
+    date, attempts: 1, readPrimary: async () => rows,
+    send: async () => { calls++; throw new Error('LINE timeout'); },
+    logger: { error() {} },
+  }), /LINE timeout/);
+  assert.equal(calls, 1);
+});
+
+test('來源完全失敗重試三次後只發一則來源異常', async () => {
+  let primaryCalls = 0;
+  let fallbackCalls = 0;
+  let sends = 0;
+  const result = await runClosing({
+    date, attempts: 3, sleep: async () => {},
+    readPrimary: async () => { primaryCalls++; return { status: 'ok', data: {} }; },
+    readFallback: async () => { fallbackCalls++; throw new Error('Sheets down'); },
+    send: async message => { sends++; assert.doesNotMatch(message, /酒泉｜/); },
+    logger: { error() {} },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(primaryCalls, 3);
+  assert.equal(fallbackCalls, 3);
+  assert.equal(sends, 1);
+});
