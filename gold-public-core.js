@@ -1,4 +1,4 @@
-/* Public numeric settlements. No private identity or explanation fields. */
+/* Staff settlements with confirmed change reasons; no private identity fields. */
 var North12BGoldPublic = (function () {
   'use strict';
   const SCHEMA = 'north12b-public-gold/v1';
@@ -14,7 +14,10 @@ var North12BGoldPublic = (function () {
         const key = JSON.stringify([row.store,row.alias]);
         if (!STORES.includes(row.store) || typeof row.alias!=='string' || !row.alias.trim() || row.alias.length>30 || people.has(key) || !Number.isSafeInteger(row.balance) || Math.abs(row.balance)>10000 || (row.delta!==null && !Number.isSafeInteger(row.delta))) throw new Error('公開日結欄位不正確');
         people.add(key);
-        return {store:row.store,alias:row.alias,balance:row.balance,delta:row.delta};
+        const reason=row.reason==null?'':row.reason;
+        const exemption=row.exemption==null?'':row.exemption;
+        if(typeof reason!=='string'||reason.length>1000||typeof exemption!=='string'||exemption.length>100)throw new Error('公開日結原因格式不正確');
+        return {store:row.store,alias:row.alias,balance:row.balance,delta:row.delta,reason:reason.trim(),exemption:exemption.trim()};
       });
       return {date:item.date,rows};
     }).sort((a,b)=>a.date.localeCompare(b.date));

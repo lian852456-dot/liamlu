@@ -2,7 +2,7 @@
 const {test,expect}=require('@playwright/test');
 const path=require('node:path');
 const PAGE_URL='file://'+path.resolve(__dirname,'../gold-medal.html');
-const ledger={schema:'north12b-public-gold/v1',settlements:[{date:'2026-09-29',rows:[{store:'三創',alias:'測試同仁',balance:7,delta:null},{store:'通化',alias:'測試同仁',balance:-3,delta:null}]},{date:'2026-09-30',rows:[{store:'三創',alias:'測試同仁',balance:9,delta:2},{store:'通化',alias:'測試同仁',balance:-4,delta:-1}]}]};
+const ledger={schema:'north12b-public-gold/v1',settlements:[{date:'2026-09-29',rows:[{store:'三創',alias:'測試同仁',balance:7,delta:null},{store:'通化',alias:'測試同仁',balance:-3,delta:null}]},{date:'2026-09-30',rows:[{store:'三創',alias:'測試同仁',balance:9,delta:2,reason:'完成指定任務 <script>window.reasonInjected=true</script>',exemption:'核准免扣'},{store:'通化',alias:'測試同仁',balance:-4,delta:-1,reason:'未達指定目標，依確認紀錄扣牌'}]}]};
 for(const viewport of [{width:1920,height:1080},{width:1280,height:900},{width:390,height:844}]){
   test(`${viewport.width}px 金牌空白裝置免登入載入、篩選及重新整理`,async({page})=>{
     const calls=[];
@@ -14,11 +14,15 @@ for(const viewport of [{width:1920,height:1080},{width:1280,height:900},{width:3
     await page.locator('#viewerStore').selectOption('三創');
     await expect(page.locator('#viewerBody')).toContainText('9');
     await expect(page.locator('#viewerDailyBody')).toContainText('+2');
-    await expect(page.getByText('原因／免扣',{exact:true})).toHaveCount(0);
+    await expect(page.locator('thead th').filter({hasText:'增減原因／免扣'})).toHaveText('增減原因／免扣');
+    await expect(page.locator('#viewerDailyBody')).toContainText('完成指定任務 <script>window.reasonInjected=true</script>／核准免扣');
+    expect(await page.evaluate(()=>window.reasonInjected)).toBeUndefined();
+    expect(await page.locator('#viewerDailyBody').evaluate(el=>el.closest('section').compareDocumentPosition(document.querySelector('#viewerBody').closest('section')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
     await page.locator('#viewerEmployee').selectOption(JSON.stringify(['三創','測試同仁']));
     await page.locator('#viewerMonth').selectOption('2026-09-29');
     await expect(page.locator('#viewerBody')).toContainText('7');
     await expect(page.locator('#viewerDailyBody')).toContainText('—');
+    await expect(page.locator('#viewerDailyBody')).toContainText('尚未建立前一日基準');
     await expect(page.locator('#refreshButton')).toBeEnabled();
     await page.locator('#refreshButton').click();
     await expect(page.locator('#loadStatus')).toContainText('已載入');

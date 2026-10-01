@@ -3490,7 +3490,7 @@ function departmentGoldPublicLedger_(ledger) {
     settlements:ledger.settlements.map(function(item) {
       return { date:item.date, rows:item.rows.map(function(row) {
         const delta = changes[offset++].delta;
-        return { store:row.store, alias:row.alias, balance:row.balance, delta:delta };
+        return { store:row.store, alias:row.alias, balance:row.balance, delta:delta, reason:row.reason, exemption:row.exemption };
       }) };
     })
   };
