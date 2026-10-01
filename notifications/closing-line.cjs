@@ -13,21 +13,48 @@ class ClosingSourceUnavailableError extends Error {
 
 function normalizeStore(value) {
   const name = String(value || '').trim();
-  return STORE_ALIASES.get(name) || name;
+  const alias = STORE_ALIASES.get(name) || name.replace(/^台北/, '');
+  return STORES.includes(alias) ? alias : name;
+}
+
+function normalizeDate(value) {
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    return new Date(Date.UTC(1899, 11, 30) + value * 86400000).toISOString().slice(0, 10);
+  }
+  return String(value || '').trim();
 }
 
 function normalizeRows(payload, date, seg) {
-  const rows = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload?.rows)
-      ? payload.rows
-      : Array.isArray(payload?.data)
-        ? payload.data
-        : null;
-  if (!rows) throw new TypeError('來源回傳格式不是資料列陣列');
+  if (payload?.status && payload.status !== 'ok') {
+    const error = new Error(String(payload.message || '來源回傳錯誤狀態'));
+    error.code = String(payload.code || 'SOURCE_ERROR');
+    throw error;
+  }
+  let rows;
+  if (Array.isArray(payload)) rows = payload;
+  else if (Array.isArray(payload?.rows)) rows = payload.rows;
+  else if (Array.isArray(payload?.data)) rows = payload.data;
+  else if (Array.isArray(payload?.values)) {
+    const [headers, ...values] = payload.values;
+    if (!Array.isArray(headers) || !['date', 'store', 'seg'].every(key => headers.includes(key))) {
+      throw new TypeError('Sheets values 必須包含 date、store、seg 表頭');
+    }
+    rows = values.map(values => Object.fromEntries(headers.map((key, i) => [key, values[i] ?? null])));
+  } else {
+    // 正式 GAS readData 回傳 {status:'ok', data:{店點:資料列}}。
+    const data = payload?.data || payload;
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      const entries = Object.entries(data);
+      if (entries.every(([store, row]) => STORES.includes(normalizeStore(store)) && row && typeof row === 'object' && !Array.isArray(row))) {
+        rows = entries.map(([store, row]) => ({ ...row, store: row.store || store }));
+      }
+    }
+  }
+  if (!rows) throw new TypeError('來源回傳格式不符合正式回報契約');
   return rows
-    .filter((row) => String(row?.date || '') === date && String(row?.seg || '') === String(seg))
-    .map((row) => ({ ...row, store: normalizeStore(row.store) }));
+    .filter((row) => normalizeDate(row?.date) === date && String(row?.seg ?? '').trim() === String(seg))
+    .map((row) => ({ ...row, date: normalizeDate(row.date), store: normalizeStore(row.store) }))
+    .filter(row => STORES.includes(row.store));
 }
 
 async function retryRead(name, reader, options) {
@@ -80,13 +107,27 @@ function lastRowsByStore(rows) {
   const byStore = new Map();
   for (const row of rows) {
     const store = normalizeStore(row.store);
-    if (STORES.includes(store)) byStore.set(store, { ...row, store });
+    const current = byStore.get(store);
+    const nextTime = savedAtSeconds(row.savedAt);
+    const currentTime = savedAtSeconds(current?.savedAt);
+    if (STORES.includes(store) && (!current || nextTime === null || currentTime === null || nextTime >= currentTime)) {
+      byStore.set(store, { ...row, store });
+    }
   }
   return byStore;
 }
 
+function savedAtSeconds(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.round((value % 1) * 86400);
+  const text = String(value || '').trim();
+  const zh = text.match(/^(上午|下午)\s*(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (zh) return (Number(zh[2]) % 12 + (zh[1] === '下午' ? 12 : 0)) * 3600 + Number(zh[3]) * 60 + Number(zh[4] || 0);
+  const clock = text.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  return clock ? Number(clock[1]) * 3600 + Number(clock[2]) * 60 + Number(clock[3] || 0) : null;
+}
+
 function metric(row, key) {
-  if (!row || row[key] === null || row[key] === undefined || String(row[key]).trim() === '') return null;
+  if (!row || typeof row[key] === 'boolean' || row[key] === null || row[key] === undefined || String(row[key]).trim() === '') return null;
   const value = Number(row[key]);
   return Number.isFinite(value) ? value : null;
 }
@@ -107,6 +148,8 @@ function buildClosingMessage({ date, time = '21:45', rows }) {
   const byStore = lastRowsByStore(rows);
   const missingStores = STORES.filter((store) => !byStore.has(store));
   const completed = STORES.length - missingStores.length;
+  const required = ['aq999', 'haosu', 'rt1399', 'rt999', 'insurance_pct'];
+  const complete = [...byStore.values()].filter(row => required.every(key => metric(row, key) !== null)).length;
   const line = (store, key, suffix = '') => {
     const value = metric(byStore.get(store), key);
     return `${store}｜${displayMetric(value, suffix)}${zeroLabel(value)}`;
@@ -122,6 +165,10 @@ function buildClosingMessage({ date, time = '21:45', rows }) {
   const out = [
     `北一二B｜${date} ${time} 最終收官`,
     completed === STORES.length ? '✅ 21:00 下班回報 9/9 店已完成' : `21:00 下班回報：${completed}/9 店完成`,
+    `已提交：${completed}/9 店`,
+    `五項資料完整：${complete}/9 店`,
+    `已提交但欄位未完整：${completed - complete} 店`,
+    `尚未提交：${joinOrNone(missingStores)}`,
     `尚未完成：${joinOrNone(missingStores)}`,
     '',
     'A999 上線數',
@@ -166,17 +213,19 @@ function buildSourceFailureMessage({ date, time = '21:45', error }) {
 async function runClosing(options) {
   const { date, time = '21:45', send, logger = console } = options;
   if (typeof send !== 'function') throw new TypeError('send 必須是函式');
+  let result;
   try {
-    const result = await loadRowsWithRecovery(options);
-    const message = buildClosingMessage({ date, time, rows: result.rows });
-    await send(message, { source: result.source, diagnostics: result.diagnostics });
-    return { ok: true, message, ...result };
+    result = await loadRowsWithRecovery(options);
   } catch (error) {
     logger.error?.('closing_source_unavailable', { error: error.message, attempts: error.attempts || [] });
     const message = buildSourceFailureMessage({ date, time, error });
     await send(message, { source: 'unavailable', diagnostics: error.attempts || [] });
     return { ok: false, message, error };
   }
+  // 發送失敗交由既有 sender／ledger 處理，不能再發另一則來源故障訊息。
+  const message = buildClosingMessage({ date, time, rows: result.rows });
+  await send(message, { source: result.source, diagnostics: result.diagnostics });
+  return { ok: true, message, ...result };
 }
 
 module.exports = {
