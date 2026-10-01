@@ -143,9 +143,9 @@
     revoked = true;
     clear('已登出。');
     sessionStorage.removeItem(SESSION_KEY);
-    // Remove the complete authenticated workspace before any network wait.
-    workspace.replaceChildren();
+    // Each authenticated module clears its own state while preserving shared DOM anchors.
     workspace.hidden = true;
+    window.dispatchEvent(new Event('department-session-cleared'));
     if (session) fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'ptlogout',token:session}),cache:'no-store',keepalive:true}).catch(() => {});
     location.reload();
   });
