@@ -163,6 +163,7 @@ function doPost(e) {
     else if (action === 'interview_read') result = supervisorInterviewReadPayload_(payload);
     else if (action === 'interview_write') result = supervisorInterviewWritePayload_(payload);
     else if (action === 'department_ops_read') result = departmentOpsRead(payload);
+    else if (action === 'department_store_rules_read') result = storeRulesRead(payload);
     else if (action === 'north12b_gold_read') result = north12bGoldDailyRead(payload);
     else if (action === 'department_ops_publish') result = departmentOpsPublish(payload);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
@@ -202,4 +203,4 @@ fs.writeFileSync(path.join(outputDir, 'PatrolCode.gs'), patrolCode + '\n');
 fs.copyFileSync(halfMediaPath, path.join(outputDir, 'HalfMedia.gs'));
 console.log('Built patrol-only GAS bundle');
 
-for (const file of ['GoldDailyCore.gs', 'GoldDaily.gs']) fs.copyFileSync(path.join(root, 'gas', file), path.join(outputDir, file));
+for (const file of ['GoldDailyCore.gs', 'GoldDaily.gs', 'StoreRules.gs']) fs.copyFileSync(path.join(root, 'gas', file), path.join(outputDir, file));
