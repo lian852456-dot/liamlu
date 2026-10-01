@@ -132,6 +132,7 @@ function doPost(e) {
     else if (action === 'interview_read') result = supervisorInterviewReadPayload_(payload);
     else if (action === 'interview_write') result = supervisorInterviewWritePayload_(payload);
     else if (action === 'department_ops_read') result = departmentOpsRead(payload);
+    else if (['department_scores_read','department_scores_history_read','department_scores_publish','department_scores_restore'].indexOf(action) >= 0) result = departmentScoresDispatch_(payload);
     else if (action === 'department_store_rules_read') result = storeRulesRead(payload);
     else if (action === 'north12b_gold_read') result = north12bGoldDailyRead(payload);
     else if (action === 'department_ops_publish') result = departmentOpsPublish(payload);

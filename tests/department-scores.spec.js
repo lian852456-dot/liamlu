@@ -1,7 +1,7 @@
 const {test,expect}=require('@playwright/test');
 const crypto=require('node:crypto'),fs=require('node:fs');
 const XLSX=require('../assets/vendor/xlsx.full.min.js'),Core=require('../department-scores-core.js'),F=require('./helpers/department-scores-synthetic.cjs'),backend=require('./helpers/department-scores-backend.cjs');
-const PAGE='http://127.0.0.1:8763/department-ops.html';
+const PAGE=process.env.TEST_BASE_URL ? new URL('department-ops.html',process.env.TEST_BASE_URL).href : 'http://127.0.0.1:8763/department-ops.html';
 const p=months=>({action:'department_scores_publish',token:'authorized',contract:Core.CONTRACT,confirm:true,requestId:crypto.randomUUID(),expectedGeneration:0,selectedMonthKeys:months.map(m=>m.monthKey),months,sourceName:'synthetic.xlsx',sourceHash:'a'.repeat(64)});
 const encode=workbook=>Buffer.from(XLSX.write(workbook,{type:'array',bookType:'xlsx'}));
 const buffer=options=>encode(F.workbook(options));
