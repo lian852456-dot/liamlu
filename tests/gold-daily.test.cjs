@@ -46,21 +46,32 @@ test('private ledger is validated and only safe fields reach the viewer',()=>{
  assert.equal(result.settlements[0].rows[0].employeeId,undefined);
 });
 
-test('public gold allowlist removes identities, reasons and leave while preserving history and numeric changes',()=>{
+test('public gold exposes confirmed explanations while removing private identities and preserving changes',()=>{
  const source=fs.readFileSync(require.resolve('../gas/Code.gs'),'utf8');
  const start=source.indexOf('function departmentGoldPublicLedger_');
  const end=source.indexOf('// ═',start);
- const privateData=ledger([day('2026-09-29',[row(10)]),day('2026-09-30',[{...row(13),reason:'PRIVATE-REASON',exemption:'PRIVATE-LEAVE'}])]);
+ const privateData=ledger([day('2026-09-29',[row(10)]),day('2026-09-30',[{...row(13),reason:'確認增牌原因',exemption:'確認免扣紀錄'}])]);
  const before=JSON.stringify(privateData);
  const context=vm.createContext({North12BGoldDaily:Core,north12bGoldDailyLedger_:()=>privateData});vm.runInContext(source.slice(start,end),context);
  const result=JSON.parse(JSON.stringify(context.departmentGoldAccess({})));
  assert.deepEqual(Object.keys(result),['ledger']);
  assert.deepEqual(Object.keys(result.ledger).sort(),['schema','settlements']);
- for(const item of result.ledger.settlements){assert.deepEqual(Object.keys(item).sort(),['date','rows']);for(const person of item.rows)assert.deepEqual(Object.keys(person).sort(),['alias','balance','delta','store']);}
+ for(const item of result.ledger.settlements){assert.deepEqual(Object.keys(item).sort(),['date','rows']);for(const person of item.rows)assert.deepEqual(Object.keys(person).sort(),['alias','balance','delta','exemption','reason','store']);}
  assert.deepEqual(result.ledger.settlements.map(x=>x.rows[0].delta),[null,3]);
- assert.doesNotMatch(JSON.stringify(result),/PRIVATE|test-person|reason|exemption|recordedAt|personKey/);
+ assert.doesNotMatch(JSON.stringify(result),/PRIVATE|test-person|recordedAt|personKey/);
+ assert.equal(result.ledger.settlements[1].rows[0].reason,'確認增牌原因');
+ assert.equal(result.ledger.settlements[1].rows[0].exemption,'確認免扣紀錄');
  assert.equal(JSON.stringify(privateData),before);
  const Public=require('../gold-public-core.js');
  assert.equal(Public.latest(Public.validate(result.ledger),'2026-09-29').rows[0].balance,10);
  assert.equal(Public.changes(Public.validate(result.ledger))[1].delta,3);
+});
+
+test('public explanations accept legacy omissions and reject malformed text',()=>{
+ const Public=require('../gold-public-core.js');
+ const source={schema:Public.SCHEMA,settlements:[{date:'2026-09-30',rows:[{store:'三創',alias:'測試',balance:9,delta:2}]}]};
+ assert.equal(Public.validate(source).settlements[0].rows[0].reason,'');
+ for(const fields of [{reason:42},{reason:'a'.repeat(1001)},{exemption:[]},{exemption:'a'.repeat(101)}]){
+  assert.throws(()=>Public.validate({...source,settlements:[{...source.settlements[0],rows:[{...source.settlements[0].rows[0],...fields}]}]}),/原因格式/);
+ }
 });
