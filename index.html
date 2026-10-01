@@ -1476,6 +1476,67 @@
   @media (max-width:500px) {
     #panel-fill .form-grid { grid-template-columns:minmax(0,1fr); }
   }
+  /* 四個回報頁共用閱讀尺寸，包含動態彙整、回放及個人紀錄。 */
+  .tab-bar { flex-wrap:wrap; }
+  .report-tab { display:flex; align-items:center; justify-content:center; gap:10px; min-height:72px; font-size:21px; line-height:1.45; }
+  .report-tab .tab-icon { font-size:35px; line-height:1.2; flex-shrink:0; }
+  .report-tab .tab-role { display:inline-block; white-space:nowrap; }
+  .report-panel { font-size:17px; line-height:1.55; min-width:0; }
+  .report-panel .card-title { font-size:21px; line-height:1.45; letter-spacing:0; text-transform:none; }
+  .report-panel .card-title .dot { width:10px; height:10px; flex-shrink:0; }
+  .report-panel .section-divider { font-size:20px; letter-spacing:0; text-transform:none; margin:24px 0 14px; }
+  .report-panel .btn, .report-panel .seg-btn { min-height:48px; font-size:17px; line-height:1.5; padding:11px 18px; }
+  /* 舊模板與動態紀錄仍使用行內小字，限定四頁及相關彈窗提高至正文尺寸。 */
+  :is(.report-panel, .report-dialog) [style*="font-size:1"] { font-size:17px !important; line-height:1.55; }
+  .report-panel .report-heading { font-size:24px !important; line-height:1.45; }
+  .report-heading { flex-wrap:wrap; }
+  .report-heading .heading-icon { font-size:35px !important; line-height:1.2; }
+  .report-panel .fill-chip { font-size:17px; line-height:1.5; padding:7px 12px; }
+  .report-panel .summary-grid { grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; }
+  .report-panel .summary-card { padding:18px 14px; }
+  .report-panel .sc-label, .report-panel .sc-sub { font-size:17px; line-height:1.5; }
+  .report-panel .sc-val { font-size:32px; line-height:1.3; margin:6px 0; }
+  .report-panel table { font-size:17px; }
+  .report-panel thead th, .report-panel tbody td { font-size:17px; padding:14px 12px; line-height:1.5; }
+  .report-panel .playback-row label, .report-panel .form-group label { font-size:17px; }
+  .report-panel :is(select, input:not([type=checkbox]):not([type=radio]), textarea),
+  .report-dialog :is(select, input, textarea) { min-height:48px; font-family:var(--font); font-size:17px !important; line-height:1.55; min-width:0; }
+  .report-panel .playback-row input[type=date] { padding:10px 12px; }
+  :is(#panel-fill, #panel-personal) .kpi-input-wrap input { font-size:20px !important; }
+  .report-panel button, .report-dialog button { min-height:48px; font-size:17px; line-height:1.5; }
+  #panel-personal .form-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)) !important; gap:20px !important; }
+  #panel-personal .kpi-input-wrap { min-width:0; display:flex; flex-direction:column; justify-content:flex-end; }
+  #panel-personal .kpi-input-wrap label { font-size:17px; line-height:1.55; letter-spacing:0; margin-bottom:8px; overflow-wrap:anywhere; }
+  #panel-personal .kpi-input-wrap input { min-height:52px; font-size:20px !important; padding:12px 14px 12px 46px; }
+  #panel-personal .kpi-input-wrap textarea { padding:12px 14px 12px 46px !important; }
+  #panel-personal .ki-icon { font-size:24px; line-height:1; left:12px; top:auto; bottom:14px; transform:none; }
+  #panel-personal .kpi-input-wrap.highlight input { padding-right:88px; }
+  #panel-personal .kpi-hot-badge { font-size:14px; line-height:1.4; top:auto; bottom:13px; }
+  #panel-personal .ri-header { flex-wrap:wrap; gap:8px; }
+  #panel-personal .ri-name, #panel-personal .ri-val, #panel-personal .ri-sublabel { font-size:17px; }
+  #personalHistory { max-width:100%; overflow-x:auto; padding:4px 3px 12px; }
+  #panel-personal .track-wall { width:max-content; gap:10px; }
+  #panel-personal .track-row, #panel-personal .track-dates { gap:8px; }
+  #panel-personal .track-row-label { flex:0 0 140px; font-size:17px; }
+  #panel-personal .track-cell { flex:0 0 44px; width:44px; height:44px; font-size:20px; }
+  #panel-personal .track-dates { padding-left:148px; }
+  #panel-personal .track-date-label { flex:0 0 44px; width:44px; font-size:14px; font-weight:700; white-space:nowrap; }
+  .report-dialog .zero-label, .report-dialog .under-subtitle { font-size:17px; line-height:1.55; }
+  .report-dialog .under-title { font-size:24px; }
+  @media (max-width:700px) {
+    .tab-bar { padding:0 8px; gap:0; }
+    .tab-btn { flex:1 1 50%; min-width:0; white-space:normal; }
+    .report-tab { min-height:72px; padding:10px 8px; font-size:21px; gap:8px; }
+    .report-tab .tab-icon { font-size:30px; }
+    .report-panel { padding:16px 12px; }
+    .report-panel .summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .report-panel .summary-card { min-width:0; padding:14px 10px; }
+    .report-panel .sc-val { font-size:29px; }
+    #panel-personal .report-today-metrics { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:10px !important; }
+  }
+  @media (max-width:500px) {
+    #panel-personal .form-grid { grid-template-columns:minmax(0,1fr) !important; }
+  }
 </style>
 </head>
 <body>
@@ -1528,10 +1589,10 @@
 
 <!-- TABS -->
 <div class="tab-bar">
-  <button class="tab-btn active" onclick="switchTab('fill')">📝 填報（店長）</button>
-  <button class="tab-btn" onclick="switchTab('summary')">📊 彙整大盤（督導）</button>
-  <button class="tab-btn" onclick="switchTab('playback')">🕐 日期回放</button>
-  <button class="tab-btn" onclick="switchTab('personal')">👤 個人追蹤</button>
+  <button class="tab-btn report-tab active" onclick="switchTab('fill')"><span class="tab-icon" aria-hidden="true">📝</span><span>填報<span class="tab-role">（店長）</span></span></button>
+  <button class="tab-btn report-tab" onclick="switchTab('summary')"><span class="tab-icon" aria-hidden="true">📊</span><span>彙整大盤<span class="tab-role">（督導）</span></span></button>
+  <button class="tab-btn report-tab" onclick="switchTab('playback')"><span class="tab-icon" aria-hidden="true">🕐</span><span>日期回放</span></button>
+  <button class="tab-btn report-tab" onclick="switchTab('personal')"><span class="tab-icon" aria-hidden="true">👤</span><span>個人追蹤</span></button>
   <button class="tab-btn" onclick="switchTab('kpi-battle')">🏆 KPI戰情</button>
   <button class="tab-btn" onclick="switchTab('awards-battle')">🏅 台獎戰情</button>
 </div>
@@ -1539,7 +1600,7 @@
 <!-- ═══════════════════════════════════
      PANEL 1: 填報（美化版）
 ═══════════════════════════════════ -->
-<div class="panel active" id="panel-fill">
+<div class="panel report-panel active" id="panel-fill">
 
   <!-- Hero Banner -->
   <div class="fill-hero">
@@ -1937,11 +1998,11 @@
 <!-- ═══════════════════════════════════
      PANEL 2: 督導彙整
 ═══════════════════════════════════ -->
-<div class="panel" id="panel-summary">
+<div class="panel report-panel" id="panel-summary">
 
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-    <div style="font-size:16px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px;">
-      <span style="font-size:20px;">🦆</span> 今日彙整 <span id="summaryDateLabel" style="color:var(--accent);font-size:14px;font-weight:700;"></span>
+    <div class="report-heading" style="font-size:16px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px;">
+      <span class="heading-icon" style="font-size:20px;">🦆</span> 今日彙整 <span id="summaryDateLabel" style="color:var(--accent);font-size:14px;font-weight:700;"></span>
     </div>
     <div class="seg-toggle">
       <button class="seg-btn active-16" id="sumSeg16" onclick="setSumSeg(16)">16:00 回報</button>
@@ -1998,7 +2059,7 @@
 <!-- ═══════════════════════════════════
      PANEL 3: 日期回放
 ═══════════════════════════════════ -->
-<div class="panel" id="panel-playback">
+<div class="panel report-panel" id="panel-playback">
 
   <div class="card">
     <div class="card-title"><span class="dot"></span>選擇日期回放</div>
@@ -2020,7 +2081,7 @@
 <!-- ═══════════════════════════════════
      PANEL 4: 個人追蹤
 ═══════════════════════════════════ -->
-<div class="panel" id="panel-personal">
+<div class="panel report-panel" id="panel-personal">
 
   <!-- 連續未過關警示 -->
   <div id="personalStreakAlert" style="display:none;"></div>
@@ -4486,7 +4547,7 @@ function _renderTodayCard(record, seg) {
         <span style="font-size:12px;font-weight:700;color:var(--text-dim);">${seg}:00 回報</span>
         <span style="font-size:12px;font-weight:800;color:${statusColor};">${statusText}</span>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:8px 0;font-size:12px;">
+      <div class="report-today-metrics" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:8px 0;font-size:12px;">
         <span style="color:var(--text-dim);">KPI <strong style="color:var(--text);">${data.kpi||0}</strong></span>
         <span style="color:var(--text-dim);">R999 <strong style="color:var(--text);">${data.achieve||0} 筆</strong></span>
         <span style="color:var(--text-dim);">A999 <strong style="color:${(data.a999||0)>0?'#22c55e':'#ef4444'};">${data.a999||0}筆</strong></span>
@@ -4611,7 +4672,7 @@ function submitReview() {
 
 
 <!-- ══ 21:00 零報說明彈窗（強制填寫）══ -->
-<div id="underModal" style="display:none;position:fixed;inset:0;z-index:9200;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(5px);padding:16px;">
+<div id="underModal" class="report-dialog" style="display:none;position:fixed;inset:0;z-index:9200;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(5px);padding:16px;">
   <div class="under-box">
     <div class="under-title" id="underModalTitle">📋 21:00 零報說明（必填）</div>
     <div class="under-subtitle">⚠️ A999／好速／R1399 有任一項為 0，請完整填寫以下說明才能送出回報</div>
@@ -4634,7 +4695,7 @@ function submitReview() {
 </div>
 
 <!-- ══ 個人檢討單 Modal（送出後自動彈出）══ -->
-<div id="reviewModal" style="display:none;position:fixed;inset:0;z-index:9250;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(5px);padding:16px;">
+<div id="reviewModal" class="report-dialog" style="display:none;position:fixed;inset:0;z-index:9250;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(5px);padding:16px;">
   <div class="under-box" style="border-color:rgba(245,158,11,0.4);max-height:92vh;">
     <div class="under-title" id="reviewModalTitle">📋 今日個人檢討單</div>
     <div class="under-subtitle" id="reviewModalSub">以下項目今日未過關，請填寫原因與明日改善行動</div>
@@ -4647,7 +4708,7 @@ function submitReview() {
 </div>
 
 <!-- ══ 新增人員 Modal ══ -->
-<div class="add-name-modal" id="addNameModal">
+<div class="add-name-modal report-dialog" id="addNameModal">
   <div class="add-name-box">
     <div style="font-size:14px;font-weight:800;color:#ff8533;margin-bottom:12px;">＋ 新增人員</div>
     <select id="addNameStore" style="width:100%;background:var(--bg-deep);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:10px;">
