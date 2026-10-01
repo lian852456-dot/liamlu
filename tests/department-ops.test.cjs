@@ -159,3 +159,18 @@ test('首頁正式上傳入口的完整模板包含資產皆通過白名單，�
   assert.throws(()=>context.reportUploadInclude_('PrivateDashboard'), /report-upload-include-not-allowed/);
   assert.throws(()=>context.reportUploadInclude_('../Code'), /report-upload-include-not-allowed/);
 });
+
+test('首頁查價入口保留匿名讀取，第一階段比較不合併不同價格矩陣', () => {
+  const Compare=require('../threec-comparison-core.js');
+  const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8');
+  assert.match(html,/credentials:'omit'/);
+  assert.match(html,/threec-comparison-core\.js/);
+  assert.match(html,/threec-query\.css/);
+  assert.doesNotMatch(html,/id="(?:adminSecret|employeeId)"/);
+  const plan='5G_XH(24)-續約／999H', other='5G_XH(48)-續約／1399H_加碼版';
+  const row={source_sheet:'QA',brand:'QA',colorless_model:'示範機 256G',model:'示範機 256G 黑',project_prices:{[plan]:0,[other]:10}};
+  const index=Compare.buildIndex({rows:[row,{...row,model:'示範機 256G 白'},{...row,model:'示範機 256G 藍',project_prices:{[plan]:0,[other]:11}}]});
+  assert.equal(index.rows.length,2);assert.equal(index.rows[0].models.length,2);
+  assert.equal(Compare.buildView(index,{rent:'999'}).rows.length,2);
+  assert.equal(Compare.cell(index.rows[0],Compare.condition(plan)).kind,'zero');
+});
