@@ -3,19 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f7f5f0">
+  <meta name="theme-color" content="#ffffff">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>北一二B 金牌明細</title>
   <link rel="stylesheet" href="department-ops.css?v=20260930-1">
+  <link rel="stylesheet" href="gold-medal.css?v=20261001-wide-1">
 </head>
-<body>
+<body class="gold-page">
   <main class="page">
     <a class="back-link" href="home.html">← 返回智慧營運中心</a>
     <header class="masthead"><div><p class="eyebrow">NORTH 12B GOLD</p><h1>北一二B 金牌明細</h1><p class="lede">查看已確認的每日接龍結算總牌數與跨日增減。</p></div><span id="viewerBadge" class="mode-badge">免登入查詢</span></header>
-    <section class="panel"><p id="loadStatus" class="message" role="status" aria-live="polite">正在讀取金牌資料…</p><button id="refreshButton" class="secondary-button" type="button">重新整理</button></section>
+    <section class="panel load-panel"><p id="loadStatus" class="message" role="status" aria-live="polite">正在讀取金牌資料…</p><button id="refreshButton" class="secondary-button" type="button">重新整理</button></section>
     <section id="goldViewer" hidden>
       <div class="dashboard-head"><div><p class="step-label">CONFIRMED SETTLEMENT</p><h2>金牌查詢</h2><p id="viewerMeta" class="source-meta"></p></div></div>
-      <section class="filter-panel"><label>結算日期<select id="viewerMonth"></select></label><label>店點<select id="viewerStore"><option value="">九店全部</option></select></label><label>個人<select id="viewerEmployee"><option value="">全部同仁</option></select></label><label>紀錄起日<input id="viewerDateFrom" type="date"></label></section>
+      <section class="filter-panel" aria-label="金牌篩選"><label>店點<select id="viewerStore"><option value="">九店全部</option></select></label><label>個人<select id="viewerEmployee"><option value="">全部同仁</option></select></label><label>結算日期<select id="viewerMonth"></select></label><label>紀錄起日<input id="viewerDateFrom" type="date"></label><label>紀錄迄日<input id="viewerDateTo" type="date"></label><button id="viewerReset" class="secondary-button" type="button">清除篩選</button></section>
+      <p id="viewerFilterStatus" class="message" role="status" aria-live="polite" hidden></p>
       <div id="viewerSummary" class="summary-grid"></div>
       <section class="data-card"><div class="card-head"><div><h3>個人結算總牌數</h3><p>每個日期是截至當日的總牌數；不同日結不重複加總。</p></div></div><div class="table-scroll"><table><thead id="viewerHead"></thead><tbody id="viewerBody"></tbody></table></div></section>
       <section class="data-card"><div class="card-head"><div><h3>每日數值增減</h3><p>僅連續兩日皆有確認紀錄時顯示增減。</p></div></div><div class="table-scroll"><table><thead><tr><th>日期</th><th>店點</th><th>同仁</th><th>增減</th><th>狀態</th></tr></thead><tbody id="viewerDailyBody"></tbody></table></div></section>
@@ -23,7 +25,7 @@
   </main>
   <script src="gold-daily-core.js?v=20260930-1"></script>
   <script src="gold-public-core.js?v=20261001-public-2"></script>
-  <script src="gold-daily-ui.js?v=20261001-public-2"></script>
+  <script src="gold-daily-ui.js?v=20261001-wide-1"></script>
   <script src="gold-medal.js?v=20261001-public-2" defer></script>
 </body>
 </html>
