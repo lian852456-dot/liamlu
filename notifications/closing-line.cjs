@@ -120,8 +120,8 @@ function lastRowsByStore(rows) {
 function savedAtSeconds(value) {
   if (typeof value === 'number' && Number.isFinite(value)) return Math.round((value % 1) * 86400);
   const text = String(value || '').trim();
-  const zh = text.match(/^(上午|下午)\s*(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-  if (zh) return (Number(zh[2]) % 12 + (zh[1] === '下午' ? 12 : 0)) * 3600 + Number(zh[3]) * 60 + Number(zh[4] || 0);
+  const zh = text.match(/^(上午|下午|晚上)\s*(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (zh) return (Number(zh[2]) % 12 + (zh[1] !== '上午' ? 12 : 0)) * 3600 + Number(zh[3]) * 60 + Number(zh[4] || 0);
   const clock = text.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
   return clock ? Number(clock[1]) * 3600 + Number(clock[2]) * 60 + Number(clock[3] || 0) : null;
 }
