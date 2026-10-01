@@ -5245,7 +5245,7 @@ function reportUploadHtmlService_() {
 }
 
 function reportUploadInclude_(name) {
-  if (name !== 'ReportUploadSheetJs' && name !== 'ReportUploadTradeInCore') {
+  if (name !== 'ReportUploadSheetJs' && name !== 'ReportUploadTradeInCore' && name !== 'ReportUploadThreecDiffCore') {
     throw new Error('report-upload-include-not-allowed');
   }
   // Assets are JavaScript, not standalone HTML. Read them without HTML parsing;

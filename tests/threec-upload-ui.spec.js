@@ -7,7 +7,7 @@ const diffCore = fs.readFileSync(path.join(__dirname, '../gas/ReportUploadThreec
 
 test('正式內嵌資產可載入真實 SheetJS 與 Work 解析器，保留中文 XLSX roundtrip', async ({page}) => {
   const code = fs.readFileSync(path.join(__dirname, '../gas/Code.gs'), 'utf8');
-  const include = code.slice(code.indexOf('function reportUploadInclude_('), code.indexOf('function report_upload_preview('));
+  const include = code.slice(code.indexOf('function reportUploadInclude_('), code.indexOf('\n}', code.indexOf('function reportUploadInclude_('))+2);
   const context = vm.createContext({HtmlService:{createTemplateFromFile(name){return {
     getRawContent:()=>fs.readFileSync(path.join(__dirname, '../gas', name+'.html'), 'utf8')
   };}}});
@@ -26,6 +26,39 @@ test('正式內嵌資產可載入真實 SheetJS 與 Work 解析器，保留中�
   });
   expect(errors).toEqual([]);
   expect(actual).toEqual({parser:'function',rows:[['商品型號','價格'],['中文商品',0]]});
+});
+
+test('整份正式上傳模板經白名單評估後可載入，匿名維持驗證入口', async ({page}) => {
+  const root = process.env.REPORT_UPLOAD_RUNTIME_DIR || path.join(__dirname, '../gas');
+  const file = process.env.REPORT_UPLOAD_RUNTIME_DIR ? '程式碼.js' : 'Code.gs';
+  const code = fs.readFileSync(path.join(root, file), 'utf8');
+  const include = code.slice(code.indexOf('function reportUploadInclude_('), code.indexOf('\n}', code.indexOf('function reportUploadInclude_('))+2);
+  const context = vm.createContext({HtmlService:{createTemplateFromFile(name){return {
+    getRawContent:()=>fs.readFileSync(path.join(root, name+'.html'), 'utf8')
+  };}}});
+  vm.runInContext(include, context);
+  expect(()=>context.reportUploadInclude_('PrivateDashboard')).toThrow('report-upload-include-not-allowed');
+  expect(()=>context.reportUploadInclude_('../Code')).toThrow('report-upload-include-not-allowed');
+  // Evaluate every include in the complete template through the production guard.
+  // A missing allowlist entry must fail before any browser content is installed.
+  let includeCount = 0;
+  const html = fs.readFileSync(path.join(root, 'ReportUpload.html'), 'utf8')
+    .replace(/<\?!=\s*reportUploadInclude_\('([^']+)'\)\s*;?\s*\?>/g, (_, name)=>{
+      includeCount++; return context.reportUploadInclude_(name);
+    });
+  expect(includeCount).toBe(3);
+  expect(html).not.toContain('<?!= reportUploadInclude_');
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.route('**/*',route=>route.abort());
+  await page.setContent(html);
+  await expect(page.locator('#authCard')).toBeVisible();
+  await expect(page.locator('#app')).toBeHidden();
+  expect(await page.evaluate(()=>({xlsx:typeof XLSX.read,parser:typeof TradeInImportCore.parseFile,diff:typeof ThreecPriceDiffCore.diffSnapshots})))
+    .toEqual({xlsx:'function',parser:'function',diff:'function'});
+  await page.locator('#loginBtn').click();
+  await expect(page.locator('#authMessage')).toContainText('請輸入員編與管理者密碼');
+  await expect(page.locator('#app')).toBeHidden();
+  expect(errors).toEqual([]);
 });
 
 async function setup(page) {

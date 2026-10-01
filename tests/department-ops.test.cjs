@@ -141,3 +141,21 @@ test('督導驗證遇到 Apps Script 回傳 404 會重試，但同步寫入不�
   await assert.rejects(() => publishRuntime.authRequest({action:'department_ops_publish'}), /HTTP 404/);
   assert.equal(publishCalls, 1);
 });
+
+test('首頁正式上傳入口的完整模板包含資產皆通過白名單，其他名稱拒絕', () => {
+  const vm = require('node:vm');
+  const root = path.join(__dirname, '../gas');
+  const code = fs.readFileSync(path.join(root, 'Code.gs'), 'utf8');
+  const start = code.indexOf('function reportUploadInclude_(');
+  const include = code.slice(start, code.indexOf('\n}', start)+2);
+  const context = vm.createContext({HtmlService:{createTemplateFromFile(name){return {
+    getRawContent:()=>fs.readFileSync(path.join(root, name+'.html'), 'utf8')
+  };}}});
+  vm.runInContext(include, context);
+  const template = fs.readFileSync(path.join(root, 'ReportUpload.html'), 'utf8');
+  const names = [...template.matchAll(/reportUploadInclude_\('([^']+)'\)/g)].map(match=>match[1]);
+  assert.deepEqual(names, ['ReportUploadSheetJs','ReportUploadTradeInCore','ReportUploadThreecDiffCore']);
+  for (const name of names) assert.ok(context.reportUploadInclude_(name).length > 100);
+  assert.throws(()=>context.reportUploadInclude_('PrivateDashboard'), /report-upload-include-not-allowed/);
+  assert.throws(()=>context.reportUploadInclude_('../Code'), /report-upload-include-not-allowed/);
+});
