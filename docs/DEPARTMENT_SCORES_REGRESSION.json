@@ -1,0 +1,38 @@
+{
+  "baseline": "0b862fc7eab15f05049ea53c52ee324a3a1cfcd0",
+  "candidate": {
+    "tests": 616,
+    "pass": 593,
+    "fail": 22,
+    "skipped": 1
+  },
+  "baselineTests": 606,
+  "baselinePass": 583,
+  "baselineFail": 22,
+  "baselineSkipped": 1,
+  "failureIdentitiesSame": true,
+  "existingFailures": [
+    "tests/kpi-battle-source.test.cjs:153:1",
+    "tests/kpi-battle-source.test.cjs:162:1",
+    "tests/kpi-battle-source.test.cjs:208:1",
+    "tests/kpi-battle-source.test.cjs:256:1",
+    "tests/kpi-battle-source.test.cjs:274:1",
+    "tests/kpi-battle-source.test.cjs:40:1",
+    "tests/kpi-battle-standalone.test.cjs:44:1",
+    "tests/liam-intel-app-shell.test.cjs:41:1",
+    "tests/liam-supervisor-app-1-1.test.cjs:102:1",
+    "tests/liam-supervisor-app-1-1.test.cjs:118:1",
+    "tests/liam-supervisor-app-sep25.test.cjs:10:1",
+    "tests/liam-supervisor-app-sep25.test.cjs:20:1",
+    "tests/live-battle-contract.test.cjs:88:1",
+    "tests/live-battle-contract.test.cjs:9:1",
+    "tests/private-dashboard-publish.test.cjs:107:1",
+    "tests/private-dashboard-publish.test.cjs:174:1",
+    "tests/private-dashboard-publish.test.cjs:210:1",
+    "tests/private-dashboard-publish.test.cjs:386:1",
+    "tests/private-dashboard-publish.test.cjs:406:1",
+    "tests/private-dashboard-publish.test.cjs:425:1",
+    "tests/private-dashboard-publish.test.cjs:89:1",
+    "tests/report-upload-contract.test.cjs:647:1"
+  ]
+}
