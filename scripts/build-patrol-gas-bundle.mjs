@@ -207,3 +207,6 @@ console.log('Built patrol-only GAS bundle');
 for (const file of ['GoldDailyCore.gs', 'GoldDaily.gs', 'StoreRules.gs']) fs.copyFileSync(path.join(root, 'gas', file), path.join(outputDir, file));
 
 for (const file of ['DepartmentScoresCore.gs', 'DepartmentScores.gs']) fs.copyFileSync(path.join(root, 'gas', file), path.join(outputDir, file));
+
+fs.copyFileSync(path.join(root, 'department-gold-monthly-core.js'), path.join(root, 'gas', 'DepartmentGoldMonthlyCore.gs'));
+for (const file of ['DepartmentGoldMonthlyCore.gs', 'DepartmentGoldMonthly.gs']) fs.copyFileSync(path.join(root, 'gas', file), path.join(outputDir, file));

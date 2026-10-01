@@ -66,8 +66,8 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(home, /href="gold-medal\.html"[\s\S]*北一二B 金牌明細/);
   assert.match(page, /officecrypto\.bundle\.min\.js/);
   assert.match(page, /department-ops-core\.js\?v=20260930-2/);
-  assert.match(page, /department-ops\.js\?v=20260930-5/);
-  assert.match(page, /需要更新時才上傳新版 Final/);
+  assert.match(page, /department-ops\.js\?v=20261002-monthly-1/);
+  assert.match(page, /需要更新時才上傳助理月報原檔/);
   assert.match(page, /選檔僅供更新/);
   assert.match(page, /id="excelPassword"[^>]*placeholder="請輸入檔案密碼"/);
   assert.doesNotMatch(page, /id="excelPassword"[^>]*value=/);
@@ -81,7 +81,7 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.doesNotMatch(controller, /<option value="all">全部月份<\/option>/);
   assert.match(controller, /action: 'department_ops_publish'/);
   assert.match(controller, /action: 'department_ops_read'/);
-  assert.match(controller, /await loadPublishedGold\(\)/);
+  assert.match(controller, /if \(monthlyUI\) await monthlyUI\.load\(\)/);
   assert.match(viewerController, /action:'department_gold_access'/);
   assert.doesNotMatch(viewerController, /private_request|employeeId|deviceId/);
   assert.match(viewerController, /AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/);
@@ -91,9 +91,9 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(gas, /ptRequireSession_\(body\.token, 'department_ops_read'\)/);
   assert.match(gas, /action === 'department_gold_access'/);
   assert.match(gas, /ptRequireSession_\(body\.token, 'department_ops_publish'\)/);
-  assert.match(gas, /row\.region === '北一二B'/);
+  assert.match(gas, /return departmentGoldMonthlyPublish_\(body\)/);
   assert.match(gas, /personKey:privateDashboardHash\(row\.employeeId\)/);
-  assert.match(gas, /previous\.rows/);
+  assert.match(page, /department-gold-monthly-ui\.js/);
   assert.match(gas, /ledger:departmentGoldPublicLedger_\(north12bGoldDailyLedger_\(\)\)/);
   assert.match(patrolBundle, /action === 'department_ops_publish'/);
   assert.match(patrolBundle, /action === 'department_ops_read'/);

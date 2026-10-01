@@ -3405,6 +3405,7 @@ function departmentOpsLatestSnapshot_() {
     if (!latest || file.getLastUpdated().getTime() > latest.getLastUpdated().getTime()) latest = file;
   }
   if (!latest) return null;
+  departmentGoldMonthlyFile_(latest.getId(), departmentGoldMonthlyFolder_());
   const snapshot = JSON.parse(latest.getBlob().getDataAsString('UTF-8'));
   if (!snapshot || snapshot.version !== 1 || !Array.isArray(snapshot.months)) throw new Error('部區金牌快照格式不正確');
   return snapshot;
@@ -3413,54 +3414,13 @@ function departmentOpsLatestSnapshot_() {
 function departmentOpsPublish(payload) {
   const body = payload || {};
   ptRequireSession_(body.token, 'department_ops_publish');
-  const months = departmentOpsNormalizeGold_(body.gold || {});
-  const latestMonth = months[months.length - 1];
-  const cutoff = latestMonth.dateRange.cutoff;
-  if (!cutoff) throw new Error('最新金牌 Final 缺少截止日');
-  const prior = departmentOpsLatestSnapshot_();
-  let history = prior && Array.isArray(prior.goldHistory) ? prior.goldHistory.slice() : [];
-  const bRows = latestMonth.records.filter(function(row){ return row.region === '北一二B'; });
-  const existing = history.findIndex(function(item){ return item.cutoff === cutoff; });
-  const historyItem = {cutoff:cutoff,sourceName:departmentOpsText_(body.sourceName, 120),publishedAt:new Date().toISOString(),rows:bRows};
-  if (existing >= 0) {
-    const previous = history[existing];
-    historyItem.revisions = (Array.isArray(previous.revisions) ? previous.revisions.slice() : []).concat([{
-      sourceName:previous.sourceName,
-      publishedAt:previous.publishedAt,
-      rows:previous.rows
-    }]).slice(-20);
-    history[existing] = historyItem;
-  } else history.push(historyItem);
-  history = history.sort(function(a,b){return a.cutoff.localeCompare(b.cutoff);}).slice(-120);
-  const snapshot = {
-    version:1,
-    publishedAt:new Date().toISOString(),
-    sourceName:departmentOpsText_(body.sourceName, 120),
-    months:months,
-    goldHistory:history,
-    reviews:departmentOpsNormalizeReviews_(body.reviews)
-  };
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    departmentOpsFolder_().createFile(DEPARTMENT_OPS_FILE, JSON.stringify(snapshot), MimeType.PLAIN_TEXT);
-  } finally { lock.releaseLock(); }
-  return {publishedAt:snapshot.publishedAt,cutoff:cutoff,people:bRows.length,months:months.length};
+  return departmentGoldMonthlyPublish_(body);
 }
 
 function departmentOpsRead(payload) {
   const body = payload || {};
   ptRequireSession_(body.token, 'department_ops_read');
-  const snapshot = departmentOpsLatestSnapshot_();
-  if (!snapshot) return {available:false};
-  return {
-    available:true,
-    publishedAt:String(snapshot.publishedAt || ''),
-    sourceName:String(snapshot.sourceName || ''),
-    gold:{type:'north12-final-v1',months:snapshot.months},
-    goldHistory:Array.isArray(snapshot.goldHistory) ? snapshot.goldHistory : [],
-    reviews:snapshot.reviews && typeof snapshot.reviews === 'object' ? snapshot.reviews : {}
-  };
+  return departmentGoldMonthlyRead_(body);
 }
 
 function departmentGoldAuthorizedUser_(payload) {
