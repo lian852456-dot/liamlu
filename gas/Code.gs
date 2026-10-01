@@ -3842,7 +3842,7 @@ function threecPublicResult_(result) {
   }
   const clean = {};
   if (Object.prototype.hasOwnProperty.call(result, 'snapshot')) {
-    clean.snapshot = result.snapshot ? pick(result.snapshot, ['schema_version','kind','source_version_date','source_file_sha256','parser_version','source_row_count','row_count','excluded_no_price_count','query_model_count','quote_conflict_count','published_at','snapshot_hash']) : null;
+    clean.snapshot = result.snapshot ? pick(result.snapshot, ['schema_version','kind','source_version_date','source_file_sha256','source_row_count','row_count','excluded_no_price_count','query_model_count','quote_conflict_count','published_at','snapshot_hash']) : null;
     if (clean.snapshot) clean.snapshot.rows = result.snapshot.rows.map(function(row) {
       const output = pick(row, result.snapshot.kind === 'shopping' ? ['source_sheet','brand','code','model','colorless_model','retail_price'] : ['source_sheet','brand','model']);
       if (result.snapshot.kind === 'shopping') output.project_prices = pick(row.project_prices, Object.keys(row.project_prices));

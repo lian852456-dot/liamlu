@@ -540,7 +540,7 @@ test('public price projections allow only query fields and never registry, ident
   const result=JSON.parse(JSON.stringify(env.context.threecSnapshotRead({kind})));
   assert.deepEqual(Object.keys(result).sort(),['changeSet','snapshot','updateCheck']);
   assert.doesNotMatch(JSON.stringify(result),/operator_hash|employeeId|deviceId|snapshot_file_id|can_rollback|rowRefs|sourceVariants|registry/);
-  assert.deepEqual(Object.keys(result.snapshot).sort(),['schema_version','kind','source_version_date','source_file_sha256','parser_version','source_row_count','row_count','excluded_no_price_count','query_model_count','quote_conflict_count','published_at','snapshot_hash','rows'].sort());
+  assert.deepEqual(Object.keys(result.snapshot).sort(),['schema_version','kind','source_version_date','source_file_sha256','source_row_count','row_count','excluded_no_price_count','query_model_count','quote_conflict_count','published_at','snapshot_hash','rows'].sort());
   for(const row of result.snapshot.rows) assert.deepEqual(Object.keys(row).sort(),(kind==='shopping'?['source_sheet','brand','code','model','colorless_model','retail_price','project_prices']:['source_sheet','brand','model','quotes']).sort());
   const diff=env.context.threecChangesRead({kind,snapshotHash:result.snapshot.snapshot_hash});
   assert.deepEqual(Object.keys(diff).sort(),['changeSet','snapshotHash','updateCheck']);
