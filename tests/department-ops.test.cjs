@@ -83,9 +83,9 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(controller, /action: 'department_ops_read'/);
   assert.match(controller, /await loadPublishedGold\(\)/);
   assert.match(viewerController, /action:'department_gold_access'/);
-  assert.match(viewerController, /action:'private_request'/);
+  assert.doesNotMatch(viewerController, /private_request|employeeId|deviceId/);
   assert.match(viewerController, /AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/);
-  assert.match(viewer, /員編登入|以員編查看/);
+  assert.match(viewer, /免登入查詢/);
   assert.match(gas, /action === 'department_ops_publish'/);
   assert.match(gas, /action === 'department_ops_read'/);
   assert.match(gas, /ptRequireSession_\(body\.token, 'department_ops_read'\)/);
@@ -94,7 +94,7 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(gas, /row\.region === '北一二B'/);
   assert.match(gas, /personKey:privateDashboardHash\(row\.employeeId\)/);
   assert.match(gas, /previous\.rows/);
-  assert.match(gas, /ledger:north12bGoldDailyLedger_\(\)/);
+  assert.match(gas, /ledger:departmentGoldPublicLedger_\(north12bGoldDailyLedger_\(\)\)/);
   assert.match(patrolBundle, /action === 'department_ops_publish'/);
   assert.match(patrolBundle, /action === 'department_ops_read'/);
   assert.doesNotMatch(patrolBundle, /department_gold_access|privateDashboard/);

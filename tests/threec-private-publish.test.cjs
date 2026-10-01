@@ -91,15 +91,14 @@ test('發布在讀回成功後才切換 active，且同日異雜湊需要二次�
   assert.match(functionBody(code, 'threecWriteRegistry_'), /setProperty\(THREEC_REGISTRY_POINTER_PROPERTY, file\.getId\(\)\)/);
 });
 
-test('回滾只交換 active/previous 指標，私有讀取沿用既有裝置授權', () => {
+test('回滾仍驗證權限且只交換指標，價格查詢免登入', () => {
   const rollback = functionBody(code, 'threecRollback');
   assert.match(rollback, /threecSnapshotHash_\(previousSnapshot\)/);
   assert.match(rollback, /active = next\.kinds\[kind\]\.previous/);
   assert.match(rollback, /previous = oldActive/);
-  const authorize = functionBody(code, 'threecAuthorizeRead_');
-  assert.match(authorize, /privateDashboardUserByEmployeeId/);
-  assert.match(authorize, /privateDashboardIsTrustedEmployee/);
-  assert.match(authorize, /device_id !== deviceId/);
+  assert.match(rollback, /reportUploadAuthorize_/);
+  assert.doesNotMatch(functionBody(code, 'threecSnapshotRead'), /threecAuthorizeRead_|reportUploadAuthorize_/);
+  assert.doesNotMatch(functionBody(code, 'threecChangesRead'), /threecAuthorizeRead_|reportUploadAuthorize_/);
   assert.match(code, /action === 'threec_snapshot_read'/);
 });
 

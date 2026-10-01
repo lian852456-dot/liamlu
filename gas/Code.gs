@@ -3471,12 +3471,22 @@ function departmentGoldSafeRecord_(row) {
   };
 }
 
-function departmentGoldAccess(payload) {
-  const user = departmentGoldAuthorizedUser_(payload || {});
+function departmentGoldPublicLedger_(ledger) {
+  const changes = North12BGoldDaily.changes(ledger);
+  let offset = 0;
   return {
-    ledger:north12bGoldDailyLedger_(),
-    profile:{maskedName:user.masked_name,store:user.store,role:user.role}
+    schema:'north12b-public-gold/v1',
+    settlements:ledger.settlements.map(function(item) {
+      return { date:item.date, rows:item.rows.map(function(row) {
+        const delta = changes[offset++].delta;
+        return { store:row.store, alias:row.alias, balance:row.balance, delta:delta };
+      }) };
+    })
   };
+}
+
+function departmentGoldAccess(payload) {
+  return {ledger:departmentGoldPublicLedger_(north12bGoldDailyLedger_())};
 }
 
 // ═══════════════════════════════════
@@ -3814,9 +3824,44 @@ function threec_changes_read(payload) {
   return threecChangesResult_(payload || {});
 }
 
+function threecPublicResult_(result) {
+  function pick(value, keys) {
+    const clean = {};
+    keys.forEach(function(key) { if (value && Object.prototype.hasOwnProperty.call(value, key)) clean[key] = value[key]; });
+    return clean;
+  }
+  function publicChanges(value) {
+    if (!value) return null;
+    const clean = pick(value, ['kind','previousAvailable','currentAvailable','firstRelease','addedCount','changedCount','unchangedCount','removedCount','totalChangeCount','changeCount','totalRecordCount','recordCount','offset','limit','hasMore','search']);
+    clean.counts = pick(value.counts, ['added','changed','unchanged','removed']);
+    clean.changePage = (value.changePage || value.changes || []).map(function(row) {
+      return pick(row, ['status','kind','model','modelCapacity','dimension','plan','condition','provider','grade','before','after','sourceModel','sourceCode']);
+    });
+    Object.defineProperty(clean, 'changes', {value:clean.changePage, enumerable:false});
+    return clean;
+  }
+  const clean = {};
+  if (Object.prototype.hasOwnProperty.call(result, 'snapshot')) {
+    clean.snapshot = result.snapshot ? pick(result.snapshot, ['schema_version','kind','source_version_date','source_file_sha256','source_row_count','row_count','excluded_no_price_count','query_model_count','quote_conflict_count','published_at','snapshot_hash']) : null;
+    if (clean.snapshot) clean.snapshot.rows = result.snapshot.rows.map(function(row) {
+      const output = pick(row, result.snapshot.kind === 'shopping' ? ['source_sheet','brand','code','model','colorless_model','retail_price'] : ['source_sheet','brand','model']);
+      if (result.snapshot.kind === 'shopping') output.project_prices = pick(row.project_prices, Object.keys(row.project_prices));
+      else {
+        output.quotes = {};
+        THREEC_PROVIDERS.forEach(function(provider) { output.quotes[provider] = pick(row.quotes[provider], THREEC_GRADES); });
+      }
+      return output;
+    });
+  }
+  if (Object.prototype.hasOwnProperty.call(result, 'snapshotHash')) clean.snapshotHash = result.snapshotHash;
+  clean.changeSet = publicChanges(result.changeSet);
+  clean.updateCheck = result.updateCheck ? pick(result.updateCheck, ['status','checked_at','snapshot_hash','source_version_date','source_file_sha256','row_count','source_row_count']) : null;
+  if (clean.updateCheck) clean.updateCheck.changeSet = publicChanges(result.updateCheck.changeSet);
+  return clean;
+}
+
 function threecChangesRead(payload) {
-  threecAuthorizeRead_(payload);
-  return threecChangesResult_(payload || {});
+  return threecPublicResult_(threecChangesResult_(payload || {}));
 }
 
 function threecVersionChanges_(kind, verified, slot, payload) {
@@ -3970,8 +4015,7 @@ function threecAuthorizeRead_(payload) {
 }
 
 function threecSnapshotRead(payload) {
-  threecAuthorizeRead_(payload);
-  return threecReadActive_((payload || {}).kind);
+  return threecPublicResult_(threecReadActive_((payload || {}).kind));
 }
 
 function threecReadActive_(requestedKind) {

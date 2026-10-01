@@ -486,7 +486,7 @@ test('伺服器預覽與發布綁定 active 雜湊，完整条件異動與分頁
   const b = env.context.threecChangesRead({ ...env.auth, kind:'shopping', deviceId:'device-123456789012', limit:1, offset:1, snapshotHash:readback.snapshot.snapshot_hash });
   assert.equal(a.changeSet.changeCount, 2);
   assert.equal(a.changeSet.hasMore, true);
-  assert.notEqual(a.changeSet.changes[0].key, b.changeSet.changes[0].key);
+  assert.notEqual(a.changeSet.changes[0].model, b.changeSet.changes[0].model);
   assert.equal(b.changeSet.hasMore, false);
   const searched = env.context.threec_changes_read({ ...env.auth, kind:'shopping', search:next.rows[1].model });
   assert.equal(searched.changeSet.changeCount, 1);
@@ -518,4 +518,36 @@ test('首版回復空檢查點，再回復可找回首版；不偽造前版價�
   env.context.threecRollback({ ...env.auth, kind:'shopping' });
   assert.equal(env.context.threecRegistry_().kinds.shopping.active.snapshot_file_id, original);
   assert.equal(env.context.threec_readback({ ...env.auth, kind:'shopping' }).changeSet.firstRelease, true);
+});
+
+
+test('anonymous visitors can read prices and changes but cannot publish or roll back', () => {
+  const env = runtime();
+  const snapshot = shoppingSnapshot();
+  publish(env, snapshot);
+  const readback = env.context.threecSnapshotRead({ kind:'shopping' });
+  assert.equal(readback.snapshot.row_count, snapshot.rows.length);
+  assert.equal(env.context.threecChangesRead({ kind:'shopping', snapshotHash:readback.snapshot.snapshot_hash }).snapshotHash, readback.snapshot.snapshot_hash);
+  assert.throws(() => env.context.threecPublish({ confirmPublish:true, snapshotJson:JSON.stringify(snapshot) }));
+  assert.throws(() => env.context.threecRollback({ kind:'shopping' }));
+  assert.throws(() => env.context.threecChangesRead({ kind:'shopping', snapshotHash:'stale-version' }), /正式版本已變動/);
+});
+
+test('public price projections allow only query fields and never registry, identities or management metadata',()=>{
+ const env=runtime();publish(env,shoppingSnapshot({rows:2,excluded:0}));publish(env,tradeinSnapshot({rows:2}));
+ const count=env.createdFileCount;
+ for(const kind of ['shopping','tradein']){
+  const result=JSON.parse(JSON.stringify(env.context.threecSnapshotRead({kind})));
+  assert.deepEqual(Object.keys(result).sort(),['changeSet','snapshot','updateCheck']);
+  assert.doesNotMatch(JSON.stringify(result),/operator_hash|employeeId|deviceId|snapshot_file_id|can_rollback|rowRefs|sourceVariants|registry/);
+  assert.deepEqual(Object.keys(result.snapshot).sort(),['schema_version','kind','source_version_date','source_file_sha256','source_row_count','row_count','excluded_no_price_count','query_model_count','quote_conflict_count','published_at','snapshot_hash','rows'].sort());
+  for(const row of result.snapshot.rows) assert.deepEqual(Object.keys(row).sort(),(kind==='shopping'?['source_sheet','brand','code','model','colorless_model','retail_price','project_prices']:['source_sheet','brand','model','quotes']).sort());
+  const diff=env.context.threecChangesRead({kind,snapshotHash:result.snapshot.snapshot_hash});
+  assert.deepEqual(Object.keys(diff).sort(),['changeSet','snapshotHash','updateCheck']);
+  for(const row of diff.changeSet.changePage)assert.ok(Object.keys(row).every(k=>['status','kind','model','modelCapacity','dimension','plan','condition','provider','grade','before','after','sourceModel','sourceCode'].includes(k)));
+  assert.throws(()=>env.context.threec_publish({kind,confirmPublish:true}),/管理者驗證失敗/);
+  assert.throws(()=>env.context.threec_rollback({kind}),/管理者驗證失敗/);
+  assert.throws(()=>env.context.threec_readback({kind}),/管理者驗證失敗/);
+ }
+ assert.equal(env.createdFileCount,count);
 });
