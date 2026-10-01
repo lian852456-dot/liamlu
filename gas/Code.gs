@@ -3472,11 +3472,8 @@ function departmentGoldSafeRecord_(row) {
 }
 
 function departmentGoldAccess(payload) {
-  const user = departmentGoldAuthorizedUser_(payload || {});
-  return {
-    ledger:north12bGoldDailyLedger_(),
-    profile:{maskedName:user.masked_name,store:user.store,role:user.role}
-  };
+  // Public read-only relay aliases and confirmed balances; no employee registry.
+  return {ledger:north12bGoldDailyLedger_()};
 }
 
 // ═══════════════════════════════════
@@ -3815,7 +3812,7 @@ function threec_changes_read(payload) {
 }
 
 function threecChangesRead(payload) {
-  threecAuthorizeRead_(payload);
+  // Public price changes, bound to the validated active snapshot.
   return threecChangesResult_(payload || {});
 }
 
@@ -3970,7 +3967,7 @@ function threecAuthorizeRead_(payload) {
 }
 
 function threecSnapshotRead(payload) {
-  threecAuthorizeRead_(payload);
+  // Public price lookup; publishing and rollback retain their own authorization.
   return threecReadActive_((payload || {}).kind);
 }
 

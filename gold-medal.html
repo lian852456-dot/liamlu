@@ -11,15 +11,10 @@
 <body>
   <main class="page">
     <a class="back-link" href="home.html">← 返回智慧營運中心</a>
-    <header class="masthead"><div><p class="eyebrow">NORTH 12B GOLD</p><h1>北一二B 金牌明細</h1><p class="lede">查看已確認的每日接龍結算總牌數與跨日增減。</p></div><span id="viewerBadge" class="mode-badge">核准裝置</span></header>
-    <section id="loginPanel" class="panel auth-panel">
-      <div><p class="step-label">APPROVED DEVICE</p><h2>以員編查看</h2><p>沿用 KPI／台獎戰情的員編與核准裝置。資料只顯示北一二B，保留接龍代稱。</p></div>
-      <form id="loginForm" class="auth-form"><label>員工編號<input id="employeeId" autocomplete="username" autocapitalize="characters" required></label><button class="primary-button" type="submit">查看金牌</button></form>
-      <details class="binding"><summary>首次使用這台裝置</summary><form id="bindingForm" class="auth-form"><label>員工編號<input id="bindingEmployeeId" autocomplete="username" required></label><label>首次啟用碼<input id="bootstrapCode" type="password" autocomplete="one-time-code" required></label><button class="secondary-button" type="submit">送出核准申請</button></form></details>
-      <p id="loginMessage" class="message" aria-live="polite"></p>
-    </section>
+    <header class="masthead"><div><p class="eyebrow">NORTH 12B GOLD</p><h1>北一二B 金牌明細</h1><p class="lede">查看已確認的每日接龍結算總牌數與跨日增減。</p></div><span id="viewerBadge" class="mode-badge">免登入查詢</span></header>
+    <section class="panel"><p id="loadStatus" class="message" role="status" aria-live="polite">正在讀取金牌資料…</p><button id="refreshButton" class="secondary-button" type="button">重新整理</button></section>
     <section id="goldViewer" hidden>
-      <div class="dashboard-head"><div><p class="step-label">CONFIRMED SETTLEMENT</p><h2>金牌查詢</h2><p id="viewerMeta" class="source-meta"></p></div><button id="logoutButton" class="secondary-button" type="button">登出</button></div>
+      <div class="dashboard-head"><div><p class="step-label">CONFIRMED SETTLEMENT</p><h2>金牌查詢</h2><p id="viewerMeta" class="source-meta"></p></div></div>
       <section class="filter-panel"><label>結算日期<select id="viewerMonth"></select></label><label>店點<select id="viewerStore"><option value="">九店全部</option></select></label><label>個人<select id="viewerEmployee"><option value="">全部同仁</option></select></label><label>紀錄起日<input id="viewerDateFrom" type="date"></label></section>
       <div id="viewerSummary" class="summary-grid"></div>
       <section class="data-card"><div class="card-head"><div><h3>個人結算總牌數</h3><p>每個日期是截至當日的總牌數；不同日結不重複加總。</p></div></div><div class="table-scroll"><table><thead id="viewerHead"></thead><tbody id="viewerBody"></tbody></table></div></section>
@@ -28,6 +23,6 @@
   </main>
   <script src="gold-daily-core.js?v=20260930-1"></script>
   <script src="gold-daily-ui.js?v=20260930-1"></script>
-  <script src="gold-medal.js?v=20260930-1" defer></script>
+  <script src="gold-medal.js?v=20261001-public-1" defer></script>
 </body>
 </html>

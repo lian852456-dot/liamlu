@@ -519,3 +519,16 @@ test('首版回復空檢查點，再回復可找回首版；不偽造前版價�
   assert.equal(env.context.threecRegistry_().kinds.shopping.active.snapshot_file_id, original);
   assert.equal(env.context.threec_readback({ ...env.auth, kind:'shopping' }).changeSet.firstRelease, true);
 });
+
+
+test('anonymous visitors can read prices and changes but cannot publish or roll back', () => {
+  const env = runtime();
+  const snapshot = shoppingSnapshot();
+  publish(env, snapshot);
+  const readback = env.context.threecSnapshotRead({ kind:'shopping' });
+  assert.equal(readback.snapshot.row_count, snapshot.rows.length);
+  assert.equal(env.context.threecChangesRead({ kind:'shopping', snapshotHash:readback.snapshot.snapshot_hash }).snapshotHash, readback.snapshot.snapshot_hash);
+  assert.throws(() => env.context.threecPublish({ confirmPublish:true, snapshotJson:JSON.stringify(snapshot) }));
+  assert.throws(() => env.context.threecRollback({ kind:'shopping' }));
+  assert.throws(() => env.context.threecChangesRead({ kind:'shopping', snapshotHash:'stale-version' }), /正式版本已變動/);
+});

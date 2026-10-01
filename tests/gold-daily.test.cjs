@@ -25,7 +25,7 @@ test('rejects ambiguous dates, people, unconfirmed status and nonnumeric balance
    [day('2026-09-29',[{...row(1),balance:null}])]
  ]) assert.throws(()=>ledger(entries));
 });
-test('both server readers require their original authentication before reading Drive',()=>{
+test('supervisor reader stays protected while store reader accepts anonymous read-only access',()=>{
  let reads=0;
  const context=vm.createContext({North12BGoldDaily:Core,ptRequireSession_:()=>{throw new Error('unauthorized')},departmentGoldAuthorizedUser_:()=>{throw new Error('device not approved')},departmentOpsFolder_:()=>{reads++;throw new Error('unexpected Drive read')}});
  vm.runInContext(fs.readFileSync(require.resolve('../gas/GoldDaily.gs'),'utf8'),context);
@@ -33,8 +33,9 @@ test('both server readers require their original authentication before reading D
  const access=source.slice(source.indexOf('function departmentGoldAccess(payload) {'),source.indexOf('// ═',source.indexOf('function departmentGoldAccess(payload) {')));
  vm.runInContext(access,context);
  assert.throws(()=>context.north12bGoldDailyRead({}),/unauthorized/);
- assert.throws(()=>context.departmentGoldAccess({}),/device not approved/);
  assert.equal(reads,0);
+ context.north12bGoldDailyLedger_=()=>({safe:'relay-aliases'});
+ assert.equal(context.departmentGoldAccess({}).ledger.safe,'relay-aliases');
 });
 test('private ledger is validated and only safe fields reach the viewer',()=>{
  const data={schema:Core.SCHEMA,region:'北一二B',updatedAt:'2026-09-30T00:00:00Z',settlements:[day('2026-09-29',[{...row(20),employeeId:'PRIVATE-ID'}])]};
