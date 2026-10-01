@@ -86,8 +86,11 @@
       try{form.submit();}catch{finish(new Error('正式資料連線失敗'));}
     });
   }
-  async function readPublic(payload){
-    for(let attempt=0;attempt<2;attempt++){
+  async function readPublic(payload,preferFrame=false){
+    // Large price snapshots use one iframe request first, avoiding an aborted
+    // fetch that keeps a duplicate GAS execution running in the background.
+    if(preferFrame){try{return await readPublicFrame(payload);}catch(error){if(error.authoritative)throw error;}}
+    for(let attempt=0;attempt<(preferFrame?1:2);attempt++){
       const controller=new AbortController();
       const timer=setTimeout(()=>controller.abort(),15000);
       try{
@@ -104,12 +107,12 @@
         throw new Error('正式資料讀取失敗（HTTP '+response.status+'）');
       }catch(error){
         if(error.authoritative)throw error;
-        if(attempt===0){try{return await readPublicFrame(payload);}catch(frameError){if(frameError.authoritative)throw frameError;}}
+        if(attempt===0&&!preferFrame){try{return await readPublicFrame(payload);}catch(frameError){if(frameError.authoritative)throw frameError;}}
         else throw new Error(error.name==='AbortError'?'正式資料讀取逾時，請重新整理':error.message||'正式資料連線失敗');
       }finally{clearTimeout(timer);}
     }
   }
-  async function invoke(kind){const payload={action:'threec_snapshot_read',kind,includeChanges:false,priceEncoding:Transport.ENCODING};return Transport.decode(await readPublic(payload));}
+  async function invoke(kind){const payload={action:'threec_snapshot_read',kind,includeChanges:false,priceEncoding:Transport.ENCODING};return Transport.decode(await readPublic(payload,kind==='shopping'));}
   function invokeChanges(kind,offset,limit,snapshotHash,search){return readPublic({action:'threec_changes_read',kind,offset:Number(offset||0),limit:Number(limit||1000),snapshotHash:snapshotHash||'',search:String(search||'')});}
   function clearResults(){shoppingIndex=null;shoppingView=null;state.shopping=null;state.tradein=null;state.changePage={shopping:null,tradein:null};changeLoading.shopping=false;changeLoading.tradein=false;renderKind('shopping');renderKind('tradein');}
   function metaHtml(meta){return `<div class="source-date"><span>正式來源日期</span><strong>${esc(meta.sourceVersionDate||'未提供')}</strong><span>${esc(meta.rowCount)} 筆來源資料</span></div><details class="source-details"><summary>資料版本與來源資訊</summary><dl><dt>正式版本</dt><dd>${esc(meta.snapshotHash||meta.version||'—')}</dd><dt>發布時間</dt><dd>${esc(meta.publishedAt||'—')}</dd><dt>來源 SHA-256</dt><dd>${esc(meta.sourceFileSha256||'—')}</dd></dl></details>`;}

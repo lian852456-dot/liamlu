@@ -3744,7 +3744,10 @@ function threecNormalizeIncomingSnapshot_(raw) {
 function threecSnapshotHash_(snapshot) {
   const copy = JSON.parse(JSON.stringify(snapshot));
   delete copy.snapshot_hash;
-  return reportVersionHash_(JSON.stringify(copy));
+  // Hash the same UTF-8 JSON bytes without materializing a multi-million
+  // element Apps Script Byte[] in JavaScript. Existing stored MD5s stay exact.
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(copy), Utilities.Charset.UTF_8)
+    .map(function(byte) { return ('0' + ((byte + 256) % 256).toString(16)).slice(-2); }).join('');
 }
 
 function threecSnapshotSummary_(snapshot, file) {
@@ -4032,19 +4035,92 @@ function threecAuthorizeRead_(payload) {
   return employeeId;
 }
 
+// Only verified, public price projections enter this ephemeral cache. Every
+// request reads the current private registry first; a new active or deployment
+// protocol gets a different key. Missing/tampered chunks are always a cold read.
+function threecPublicCacheDigest_(text) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text)
+    .map(function(byte) { return ('0' + ((byte + 256) % 256).toString(16)).slice(-2); }).join('');
+}
+
+function threecPublicCacheRead_(cache, key) {
+  try {
+    const manifest = JSON.parse(cache.get(key + ':manifest') || 'null');
+    if (!manifest || manifest.protocol !== 'public-compact/v2' ||
+        !Number.isInteger(manifest.count) || manifest.count < 1 || manifest.count > 500 ||
+        !/^[a-f0-9]{64}$/.test(manifest.digest)) return null;
+    const keys = Array.from({length:manifest.count}, function(_, index) { return key + ':' + index; });
+    const chunks = cache.getAll(keys);
+    if (keys.some(function(name) { return typeof chunks[name] !== 'string'; })) return null;
+    const text = keys.map(function(name) { return chunks[name]; }).join('');
+    if (threecPublicCacheDigest_(text) !== manifest.digest) return null;
+    const result = JSON.parse(text);
+    // Validate compact structure as well as the full-string checksum.
+    ThreecPriceTransport.decode(result);
+    return result;
+  } catch (_) { return null; }
+}
+
+function threecPublicCacheWrite_(cache, key, result) {
+  try {
+    const text = JSON.stringify(result), chunks = {}, count = Math.ceil(text.length / 20000);
+    if (count < 1 || count > 500) return;
+    for (let index = 0; index < count; index++) chunks[key + ':' + index] = text.slice(index * 20000, (index + 1) * 20000);
+    // <=60 KB UTF-8 per chunk, below CacheService's 100 KB limit.
+    cache.putAll(chunks, 600);
+    cache.put(key + ':manifest', JSON.stringify({protocol:'public-compact/v2', count:count, digest:threecPublicCacheDigest_(text)}), 600);
+  } catch (_) { /* Cache availability never prevents a verified source read. */ }
+}
+
 function threecSnapshotRead(payload) {
-  const result = threecPublicResult_(threecReadActive_((payload || {}).kind, {includeChanges:(payload || {}).includeChanges !== false}));
-  return (payload || {}).priceEncoding === 'shopping-columns/v1' ? ThreecPriceTransport.encode(result) : result;
+  payload = payload || {};
+  const started = Date.now(), timings = {};
+  const kind = threecKind_(payload.kind);
+  const registry = threecRegistry_();
+  timings.registryMs = Date.now() - started;
+  const active = registry.kinds[kind].active;
+  const fast = kind === 'shopping' && payload.includeChanges === false && payload.priceEncoding === 'shopping-columns/v1' && active;
+  let cache, key, result, stage = Date.now();
+  if (fast) {
+    // Code fingerprint invalidates cache when the deployed read contract changes.
+    const revision = [threecReadActive_, threecSnapshotHash_, threecNormalizeIncomingSnapshot_, threecPublicResult_, threecPublicCacheRead_, threecPublicCacheWrite_, ThreecPriceTransport.encode, ThreecPriceTransport.decode].map(String).join('\n');
+    key = 'threec-public-v2:' + threecPublicCacheDigest_(revision + JSON.stringify({active:active, registry:threecRegistrySummary_(registry)}));
+    try { cache = CacheService.getScriptCache(); } catch (_) {}
+    if (cache) result = threecPublicCacheRead_(cache, key);
+    // Anchor cached metadata to the freshly verified registry, never the client.
+    if (result && (!result.snapshot || result.snapshot.snapshot_hash !== active.snapshot_hash ||
+        result.snapshot.kind !== active.kind || result.snapshot.source_version_date !== active.source_version_date ||
+        result.snapshot.source_file_sha256 !== active.source_file_sha256 || Number(result.snapshot.row_count) !== Number(active.row_count))) result = null;
+  }
+  timings.cacheMs = Date.now() - stage;
+  timings.cacheHit = !!result;
+  if (!result) {
+    result = threecPublicResult_(threecReadActive_(kind, {registry:registry, includeChanges:payload.includeChanges !== false, timings:timings}));
+    stage = Date.now();
+    if (payload.priceEncoding === 'shopping-columns/v1') result = ThreecPriceTransport.encode(result);
+    timings.encodeMs = Date.now() - stage;
+    if (fast && cache) threecPublicCacheWrite_(cache, key, result);
+  }
+  timings.totalMs = Date.now() - started;
+  if (payload.includeReadTimings === true) result.readTimings = timings;
+  return result;
 }
 
 function threecReadActive_(requestedKind, options) {
   const kind = threecKind_(requestedKind);
-  const registry = threecRegistry_();
+  const registry = options && options.registry || threecRegistry_();
   const active = registry.kinds[kind].active;
   if (!active) return { snapshot:null, registry:threecRegistrySummary_(registry) };
+  let stage = Date.now();
   const snapshot = threecReadJsonFile_(active.snapshot_file_id);
+  if (options && options.timings) options.timings.sourceReadMs = Date.now() - stage;
+  stage = Date.now();
   const normalized = threecNormalizeIncomingSnapshot_(snapshot);
-  if (threecSnapshotHash_(snapshot) !== snapshot.snapshot_hash ||
+  if (options && options.timings) options.timings.normalizeMs = Date.now() - stage;
+  stage = Date.now();
+  const sourceHash = threecSnapshotHash_(snapshot);
+  if (options && options.timings) options.timings.hashMs = Date.now() - stage;
+  if (sourceHash !== snapshot.snapshot_hash ||
       active.snapshot_hash !== snapshot.snapshot_hash || active.kind !== normalized.kind ||
       active.source_version_date !== normalized.source_version_date ||
       active.source_file_sha256 !== normalized.source_file_sha256 ||
