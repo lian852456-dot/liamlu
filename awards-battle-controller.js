@@ -2,10 +2,12 @@
   const kpiController = typeof module === 'object' && module.exports
     ? require('./kpi-battle-controller.js')
     : root && root.KpiBattleController;
-  const api = factory(kpiController);
+  const catalog = typeof module === 'object' && module.exports
+    ? require('./award-model-catalog.js') : root && root.AwardModelCatalog;
+  const api = factory(kpiController, catalog);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.AwardsBattleController = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (KpiBattleController) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (KpiBattleController, Catalog) {
   'use strict';
 
   const EXPECTED_PHONE_ITEMS = 13;
@@ -57,20 +59,22 @@
       };
     }
 
-    // 發布日與截止日分開核對；九月正式方案為 10 組，舊月份保留 13 款契約。
-    const expectedPhoneItems = (awardsCutoff || awardsDate).slice(0, 7) === '2026-09' ? 10 : EXPECTED_PHONE_ITEMS;
+    // 依來源截止月份選方案，避免十月一日的九月收官套用十月機款。
+    const modelDate = awardsCutoff || awardsDate;
+    const expectedPhoneItems = Catalog.expectedCount(modelDate);
     const phoneItems = Number(data.phone_items);
     const storeRows = Number(data.store_rows);
     const stores = Array.isArray(data.stores) ? data.stores : [];
     const overallItems = Array.isArray(data.overall && data.overall.items) ? data.overall.items : [];
     const storeNames = new Set(stores.map(row => String((row || {}).store || '').trim()).filter(Boolean));
-    const allStoresComplete = stores.every(row => Array.isArray(row && row.items) && row.items.length === expectedPhoneItems);
+    const allStoresComplete = stores.every(row => Array.isArray(row && row.items) && row.items.length === expectedPhoneItems && Catalog.selectionMatches(row.items, modelDate));
     if (
       phoneItems !== expectedPhoneItems ||
       storeRows !== EXPECTED_STORE_ROWS ||
       stores.length !== EXPECTED_STORES ||
       storeNames.size !== EXPECTED_STORES ||
       overallItems.length !== expectedPhoneItems ||
+      !Catalog.selectionMatches(overallItems, modelDate) ||
       !allStoresComplete ||
       !data.supervisor || typeof data.supervisor !== 'object'
     ) {

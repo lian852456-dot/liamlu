@@ -513,6 +513,13 @@
       return { summary:missing(null), stores:missing([]), top2:missing([]) };
     }
     const sourceOverall = awards.overall || {};
+    if (String(cutoff || reportDate).slice(0,7) === '2026-10' &&
+        (!scope.AwardModelCatalog.selectionMatches(sourceOverall.items, cutoff || reportDate) ||
+         !Array.isArray(awards.stores) || awards.stores.length !== 9 ||
+         awards.stores.some(row=>!scope.AwardModelCatalog.selectionMatches(row.items, cutoff || reportDate)))) {
+      const missing = data => C.moduleState({ status:'no_data', updatedAt:readAt, sourceUpdatedAt:updatedAt, stale:false, source, data, note:'十月台獎機款尚未同步，請更新正式來源。' });
+      return {summary:missing(null), stores:missing([]), top2:missing([])};
+    }
     const supervisorAward = awards.supervisor || {};
     const overallAward = sourceOverall.award || awards.supervisor || {};
     const storeRows = Array.isArray(awards.stores) ? awards.stores.map(row => {
@@ -526,7 +533,7 @@
         reward50:numberOrNull(item && item.store_reward_50), reward100:numberOrNull(item && item.store_reward_100),
         status:item && item.award != null ? String(item.award) : item && item.status != null ? String(item.status) : item && item.eligible != null ? String(item.eligible) : ''
       })).filter(item => item.name);
-      return { name:normalizeStore(row.store), amount:numberOrNull(award.actual_total) || 0, eligible:String(award.award || '').toUpperCase() === 'Y', items };
+      return { name:normalizeStore(row.store), amount:numberOrNull(award.actual_total) || 0, eligible:String(award.award || '').toUpperCase() === 'Y', modelMonth:String(cutoff || reportDate).slice(0,7), items };
     }).filter(row => row.name) : [];
     const models = Array.isArray(sourceOverall.items) ? sourceOverall.items : [];
     const top2 = models.map(item => ({
@@ -544,7 +551,7 @@
       areaActualAward:numberOrNull(supervisorAward.actual_total),
       areaCompanyRank:numberOrNull(supervisorAward.rank),
       areaEligible:supervisorEligibility === 'Y' ? true : supervisorEligibility === 'N' ? false : null,
-      winningStores, totalStores:9, reportDate,
+      winningStores, totalStores:9, reportDate, modelMonth:String(cutoff || reportDate).slice(0,7),
       items:models.map(item=>({name:String(item.display_name || item.name || ''),actual:numberOrNull(item.actual),target:numberOrNull(item.target),rate:numberOrNull(item.rate)})).filter(item=>item.name),
       people:(Array.isArray(kpi.personal)?kpi.personal:[]).map(person=>({
         name:String(person.name || ''),store:normalizeStore(person.store),
@@ -950,7 +957,9 @@
   }
 
   function renderAwardProgress80(row) {
-    const order=[/Pixel\s*10a/i,/Ultra|Fold8/i,/Pixel\s*11\s*Pro/i,/S26/i,/Pixel\s*11/i,/V70\s*FE/i,/Reno\s*16\s*F/i,/A57/i,/A6x/i,/A27/i];
+    const order=row&&row.modelMonth==='2026-10'
+      ? [/Fold8|Flip8/i,/Pixel\s*10a/i,/Pixel\s*11\s*Pro/i,/S26\s*Ultra/i,/Pixel\s*11/i,/S26/i,/Reno\s*16\s*F/i,/A57/i,/V80\s*Lite/i,/A6x|A7\s*Pro/i]
+      : [/Pixel\s*10a/i,/Ultra|Fold8/i,/Pixel\s*11\s*Pro/i,/S26/i,/Pixel\s*11/i,/V70\s*FE/i,/Reno\s*16\s*F/i,/A57/i,/A6x/i,/A27/i];
     const items=(Array.isArray(row&&row.items)?row.items:[]).slice();
     const pos=item=>{const i=order.findIndex(re=>re.test(item.name));return i<0?order.length:i;};
     items.sort((a,b)=>pos(a)-pos(b));
@@ -1265,7 +1274,7 @@
       const row=awardStores.find(item=>item.name===selected);
       content.innerHTML=row?`<div class="award-selected-store"><span>店點</span><strong>${escapeHtml(row.name)}</strong></div><div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>正式台獎金額</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div>${renderAwardProgress80(row)}<a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
     } else content.innerHTML = renderPersonalPerformance(selected);
-    if (battleKind === 'award' && battleScope === 'region') content.innerHTML += renderAwardProgress80({name:'北一二B',items:(contract.awardSummary.data||{}).items});
+    if (battleKind === 'award' && battleScope === 'region') content.innerHTML += renderAwardProgress80({name:'北一二B',modelMonth:(contract.awardSummary.data||{}).modelMonth,items:(contract.awardSummary.data||{}).items});
     const battleModule=battleKind==='kpi'?contract.kpiSummary:battleKind==='award'?contract.awardSummary:contract.personalPerformance;
     if(battleModule.status==='stale') content.insertAdjacentHTML('afterbegin',staleBanner(battleModule));
     refreshIcons();
@@ -2073,5 +2082,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=patrol-isolated-recovery-20260916',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=awards-20261001-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);
