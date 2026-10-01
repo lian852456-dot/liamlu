@@ -12,8 +12,12 @@
     employee: 'north12b_private_dashboard_employee_id',
     device: 'north12b_private_dashboard_device_id',
   });
-  const PROVIDERS = Object.freeze(['點子行動', 'FutureDial（FDI）']);
+  const PROVIDERS = Object.freeze(['點子行動', 'FutureDial（FDI）', '愛鋒派']);
   const GRADES = Object.freeze(['S', 'A', 'B', 'C']);
+  const UNGRADED = '未分級';
+  function providerGrades(provider){return provider==='愛鋒派'?GRADES.concat(UNGRADED):GRADES.slice();}
+  function providersForRow(row){return PROVIDERS.filter(provider=>row.quotes&&Object.prototype.hasOwnProperty.call(row.quotes,provider));}
+  function gradeLabel(grade){return grade===UNGRADED?'來源未分級':grade+' 級';}
 
   function text(value) {
     return value == null ? '' : String(value).trim();
@@ -156,9 +160,10 @@
     const quotes = row && row.quotes && typeof row.quotes === 'object' ? row.quotes : {};
     const normalizedQuotes = {};
     PROVIDERS.forEach(provider => {
+      if(!Object.prototype.hasOwnProperty.call(quotes,provider))return;
       const values = quotes[provider] && typeof quotes[provider] === 'object' ? quotes[provider] : {};
       normalizedQuotes[provider] = {};
-      GRADES.forEach(grade => { normalizedQuotes[provider][grade] = values[grade]; });
+      providerGrades(provider).forEach(grade => { normalizedQuotes[provider][grade] = values[grade]; });
     });
     return {
       sourceSheet: text(row && (row.source_sheet || row.sourceSheet)),
@@ -173,7 +178,8 @@
 
   function filterTradein(snapshot, filters) {
     const query = text(filters && filters.query).toLocaleLowerCase();
-    return rowList(snapshot).map(tradeinRow).filter(row => !query || [row.sourceSheet, row.brand, row.model, row.colorlessModel].join(' ').toLocaleLowerCase().includes(query));
+    const provider=text(filters&&filters.provider),grade=text(filters&&filters.grade);
+    return rowList(snapshot).map(tradeinRow).filter(row => (!query || [row.sourceSheet, row.brand, row.model, row.colorlessModel].join(' ').toLocaleLowerCase().includes(query)) && (!provider||Object.values(row.quotes[provider]||{}).some(value=>!priceState(value).missing)) && (!grade||(provider?[provider]:providersForRow(row)).some(vendor=>row.quotes[vendor]&&Object.prototype.hasOwnProperty.call(row.quotes[vendor],grade)&&!priceState(row.quotes[vendor][grade]).missing)));
   }
 
   function modelOptions(snapshot, kind) {
@@ -225,7 +231,7 @@
   return Object.freeze({
     STORAGE_KEYS,
     PROVIDERS,
-    GRADES,
+    GRADES, UNGRADED, providerGrades, providersForRow, gradeLabel,
     rowList,
     sourceMeta,
     priceState,

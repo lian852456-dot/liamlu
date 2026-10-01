@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>手機專案／3C＋舊換新查詢｜北一二B</title>
-  <link rel="stylesheet" href="threec-query.css?v=20261001-recovery-1">
+  <link rel="stylesheet" href="threec-query.css?v=20261001-providers-1">
 </head>
 <body>
 <main>
@@ -35,14 +35,14 @@
       <div id="shoppingResults"></div>
       <div class="comparison-pagination"><div><button id="columnPrev" class="secondary" type="button">← 前一組條件</button><span id="columnPage" class="hint"></span><button id="columnNext" class="secondary" type="button">下一組條件 →</button></div><div><button id="rowPrev" class="secondary" type="button">上一頁機款</button><span id="rowPage" class="hint"></span><button id="rowNext" class="secondary" type="button">下一頁機款</button></div></div>
     </section>
-    <section id="tradeinPane" class="hidden" data-pane="tradein" role="tabpanel"><div class="toolbar"><label class="field">搜尋品牌／機款／容量<input id="tradeinSearch" type="search" autocomplete="off" placeholder="例如：Galaxy、512GB"></label><label class="field">選機款<select id="tradeinModel"><option value="">全部機款</option></select></label></div><div id="tradeinMeta" class="meta"></div><div id="tradeinResults"></div></section>
+    <section id="tradeinPane" class="hidden" data-pane="tradein" role="tabpanel"><div class="toolbar"><label class="field">搜尋品牌／機款／容量<input id="tradeinSearch" type="search" autocomplete="off" placeholder="例如：Galaxy、512GB"></label><label class="field">選機款<select id="tradeinModel"><option value="">全部機款</option></select></label></div><div class="toolbar"><label class="field">回收商<select id="tradeinProvider"><option value="">全部回收商</option><option>點子行動</option><option>FutureDial（FDI）</option><option>愛鋒派</option></select></label><label class="field">報價等級<select id="tradeinGrade"><option value="">全部等級</option><option value="S">S 級</option><option value="A">A 級</option><option value="B">B 級</option><option value="C">C 級</option><option value="未分級">來源未分級</option></select></label></div><div id="tradeinMeta" class="meta"></div><div id="tradeinResults"></div></section>
     <section id="changeCard" class="change-card" aria-live="polite"><h3 id="changeTitle" style="margin:0">本次異動／版本檢查</h3><details class="source-details"><summary>異動來源與版本核對</summary><p id="changeBasis" class="hint">尚未讀取正式異動。</p></details><div id="changeCounts" class="change-counts"></div><label class="field" style="margin-top:9px">搜尋完整異動條件<input id="changeSearch" type="search" autocomplete="off" placeholder="機款、容量、資費／合約、回收商或等級"></label><p id="changeSummary" class="hint"></p><div id="changeResults" class="change-table"></div><div class="actions"><button class="secondary" id="changePrevBtn" type="button" disabled>上一頁</button><span id="changePage" class="hint" style="align-self:center">第 1 頁</span><button class="secondary" id="changeNextBtn" type="button" disabled>下一頁</button><button class="secondary" id="changeJsonBtn" type="button" disabled>下載完整 JSON</button><button class="secondary" id="changeCsvBtn" type="button" disabled>下載完整 CSV</button></div></section>
     <p class="privacy">免登入即可瀏覽；重新開啟或按「重新整理」會讀取最新正式價格。</p>
   </section>
 </main>
-<script src="threec-query-core.js?v=20261001-1"></script>
+<script src="threec-query-core.js?v=20261001-providers-1"></script>
 <script src="threec-comparison-core.js?v=20261001-recovery-1"></script>
-<script src="threec-price-diff-core.js?v=20261001-2"></script>
+<script src="threec-price-diff-core.js?v=20261001-providers-1"></script>
 <script>
 (function(scope){
   'use strict';
@@ -170,9 +170,10 @@
     $('tradeinMeta').innerHTML=metaHtml(view.meta);
     if(!view.rows.length){target.innerHTML='<div class="empty">沒有符合搜尋條件的正式機款。</div>';return;}
     const notice=view.limited?`<div class="status warn">目前顯示前 ${view.displayLimit} 筆（符合條件共 ${view.totalRows} 筆）。請先從「選機款」縮小範圍後查看完整資料。</div>`:'';
-    target.innerHTML=notice+view.rows.map(row=>`<article class="provider"><h3>${esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')}</h3><p class="group-note">來源工作表：${esc(row.sourceSheet||'—')}</p>${Core.PROVIDERS.map(provider=>`<div class="table-scroll"><table><thead><tr><th colspan="${Core.GRADES.length+1}">${esc(provider)}（獨立報價）</th></tr><tr><th>原始機型／容量</th>${Core.GRADES.map(grade=>`<th>${grade} 級</th>`).join('')}</tr></thead><tbody><tr><td>${esc(row.model||'—')}</td>${Core.GRADES.map(grade=>`<td>${esc(Core.formatPrice(row.quotes[provider]&&row.quotes[provider][grade]))}</td>`).join('')}</tr></tbody></table></div>`).join('')}</article>`).join('');
+    const selectedProvider=$('tradeinProvider').value,selectedGrade=$('tradeinGrade').value;
+    target.innerHTML=notice+view.rows.map(row=>`<article class="provider"><h3>${esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')}</h3><p class="group-note">來源工作表：${esc(row.sourceSheet||'—')}</p>${Core.providersForRow(row).filter(provider=>(!selectedProvider||provider===selectedProvider)&&(!selectedGrade||Core.providerGrades(provider).includes(selectedGrade))).map(provider=>{const grades=Core.providerGrades(provider).filter(grade=>!selectedGrade||grade===selectedGrade);return `<div class="table-scroll"><table><thead><tr><th colspan="${grades.length+1}">${esc(provider)}（獨立報價）</th></tr><tr><th>原始機型／容量</th>${grades.map(grade=>`<th>${esc(Core.gradeLabel(grade))}</th>`).join('')}</tr></thead><tbody><tr><td>${esc(row.model||'—')}</td>${grades.map(grade=>`<td>${esc(Core.formatPrice(row.quotes[provider]&&row.quotes[provider][grade]))}</td>`).join('')}</tr></tbody></table></div>`;}).join('')}</article>`).join('');
   }
-  function renderKind(kind){if(kind==='shopping'){if(shoppingIndex)updateShoppingOptions();renderShopping();renderChanges(kind);return;}const search=$('tradeinSearch').value,modelKey=$('tradeinModel').value;const response=state[kind];const view=response?Core.buildView(kind,response,{query:search,modelKey}):null;renderTradein(view);renderChanges(kind);if(view){const select=$('tradeinModel'),prior=select.value;select.innerHTML='<option value="">全部機款</option>'+view.modelOptions.map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');if(view.modelOptions.some(option=>option.value===prior))select.value=prior;}}
+  function renderKind(kind){if(kind==='shopping'){if(shoppingIndex)updateShoppingOptions();renderShopping();renderChanges(kind);return;}const search=$('tradeinSearch').value,modelKey=$('tradeinModel').value;const response=state[kind];const view=response?Core.buildView(kind,response,{query:search,modelKey,provider:$('tradeinProvider').value,grade:$('tradeinGrade').value}):null;renderTradein(view);renderChanges(kind);if(view){const select=$('tradeinModel'),prior=select.value;select.innerHTML='<option value="">全部機款</option>'+view.modelOptions.map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');if(view.modelOptions.some(option=>option.value===prior))select.value=prior;}}
   function showKind(kind){state.active=kind;['shopping','tradein'].forEach(value=>{const tab=$(value+'Tab'),pane=$(value+'Pane');const active=value===kind;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));pane.classList.toggle('hidden',!active);});renderChanges(kind);const query=$('changeSearch').value.trim();const set=state.changePage[kind]||responseChangeSet(state[kind]);if(state[kind]&&(!set||String(set._search||'')!==query))loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad'));}
   async function refresh(){
     const requestGeneration=++generation;
@@ -209,7 +210,7 @@
     document.querySelectorAll('[data-kind]').forEach(button=>button.addEventListener('click',()=>showKind(button.dataset.kind)));
     ['shoppingBrand','shoppingModel','shoppingCapacity','shoppingProject','shoppingVersion','shoppingRent','shoppingTerm'].forEach(id=>$(id).addEventListener('change',()=>{rowPage=0;columnPage=0;renderKind('shopping');}));
     $('shoppingSearch').addEventListener('input',()=>{rowPage=0;columnPage=0;renderKind('shopping');});
-    ['tradeinSearch','tradeinModel'].forEach(id=>$(id).addEventListener(id.endsWith('Search')?'input':'change',()=>renderKind('tradein')));
+    ['tradeinSearch','tradeinModel','tradeinProvider','tradeinGrade'].forEach(id=>$(id).addEventListener(id.endsWith('Search')?'input':'change',()=>renderKind('tradein')));
     $('shoppingReset').addEventListener('click',()=>{['shoppingSearch','shoppingBrand','shoppingModel','shoppingCapacity','shoppingProject','shoppingVersion','shoppingTerm'].forEach(id=>$(id).value='');$('shoppingRent').value='common';rowPage=0;columnPage=0;renderKind('shopping');});
     document.querySelectorAll('[data-shortcut]').forEach(button=>button.addEventListener('click',()=>{const value=button.dataset.shortcut;const [rent,term]=value.split('-');$('shoppingRent').value=rent;$('shoppingTerm').value=term||'';$('shoppingVersion').value='';rowPage=0;columnPage=0;renderKind('shopping');}));
     $('tableModeBtn').addEventListener('click',()=>setReadingMode('table'));$('cardModeBtn').addEventListener('click',()=>setReadingMode('card'));$('shoppingCardCondition').addEventListener('change',renderShopping);

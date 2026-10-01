@@ -35,7 +35,8 @@ test('舊換新兩家回收商與 S/A/B/C 各級獨立保留', () => {
     'FutureDial（FDI）':{S:'17,500',A:'12,000',B:'8,000',C:null},
   } }] };
   const row = Core.tradeinRow(snapshot.rows[0]);
-  assert.deepEqual(Object.keys(row.quotes), Core.PROVIDERS);
+  assert.deepEqual(Object.keys(row.quotes), ['點子行動','FutureDial（FDI）']);
+  assert.equal(row.quotes['愛鋒派'],undefined);
   assert.deepEqual(Object.keys(row.quotes['點子行動']), Core.GRADES);
   assert.equal(Core.priceState(row.quotes['點子行動'].A).zero, true);
   assert.equal(Core.priceState(row.quotes['點子行動'].B).missing, true);
@@ -84,4 +85,10 @@ test('大型 snapshot 預設限量，選機款後展開完整 rows，並暴露 p
   const trade = Core.buildView('tradein', { snapshot:{ rows:tradeRows }, registry:{} }, {});
   assert.equal(trade.rows.length, 50);
   assert.equal(trade.modelOptions.length, 55);
+});
+
+test('第三家愛鋒派來源未分級独立於SABC，provider/grade篩選保留0而排除缺價',()=>{
+ const rows=[{source_sheet:'原表',brand:'QA',model:'新機512G',quotes:{'點子行動':{S:null,A:100,B:null,C:null},'FutureDial（FDI）':{S:200,A:null,B:null,C:null},'愛鋒派':{S:null,A:300,B:null,C:null,'未分級':0}}},{source_sheet:'原表',brand:'QA',model:'另一機',quotes:{'點子行動':{S:null,A:400,B:null,C:null},'FutureDial（FDI）':{S:null,A:null,B:null,C:null},'愛鋒派':{S:null,A:500,B:null,C:null,'未分級':null}}}];
+ const snapshot={rows};const row=Core.tradeinRow(rows[0]);assert.equal(row.quotes['愛鋒派']['未分級'],0);assert.equal(row.quotes['愛鋒派'].A,300);assert.equal(Core.gradeLabel('未分級'),'來源未分級');assert.deepEqual(Core.providersForRow(row),Core.PROVIDERS);
+ assert.equal(Core.filterTradein(snapshot,{provider:'愛鋒派',grade:'未分級'}).length,1);assert.equal(Core.filterTradein(snapshot,{provider:'點子行動',grade:'未分級'}).length,0);assert.equal(Core.filterTradein(snapshot,{provider:'愛鋒派',grade:'A'}).length,2);
 });

@@ -10,7 +10,10 @@
   const PREVIEW_LIMIT = 5;
   const NORMALIZED_PREVIEW_LIMIT = 50;
   const GRADE_ORDER = Object.freeze(['S', 'A', 'B', 'C']);
-  const PARSER_VERSION = '2026.10.01-source-format-3';
+  const PARSER_VERSION = '2026.10.01-source-format-4';
+  const PROVIDERS = Object.freeze(['點子行動','FutureDial（FDI）','愛鋒派']);
+  const UNGRADED = '未分級';
+  function providerGrades(provider){return provider==='愛鋒派'?GRADE_ORDER.concat(UNGRADED):GRADE_ORDER.slice();}
   const HEADER_ALIASES = Object.freeze([
     { key:'brand', label:'品牌', aliases:['品牌', '廠牌', '品牌名稱', 'brand', 'brand name'] },
     { key:'code', label:'商品代碼／料號', aliases:['代碼', '商品代碼', '產品代碼', 'code', 'item code'] },
@@ -473,16 +476,16 @@
       const identity=graded?graded[1]:ungraded?ungraded[1]:'';
       const provider=graded?graded[2]:ungraded?'愛鋒派':'';
       const vendor=provider==='點子'?'點子行動':provider==='FDI'?'FutureDial（FDI）':provider;
-      const grade=graded?graded[3]:'';
+      const grade=graded?graded[3]:ungraded?UNGRADED:'';
       const issues=[];
       if(!identity)issues.push('品名不符合已確認的機型尾綴格式');
-      if(!['點子行動','FutureDial（FDI）'].includes(vendor))issues.push(vendor?'原檔回收商尚未納入既有正式查詢契約：'+vendor:'缺少明確回收商');
+      if(!PROVIDERS.includes(vendor))issues.push(vendor?'原檔回收商尚未納入既有正式查詢契約：'+vendor:'缺少明確回收商');
       if(!grade)issues.push('原檔未標示 S/A/B/C 等級，不自動補等級');
       if(!text(record.values[sku.name]))issues.push('缺少料號');
       if(!priceText(rawPrice))issues.push('缺少回收價');
       if(!isCurrency(rawPrice)){invalidCurrencyCount++;issues.push('非法回收價');}
       const brand=identity.match(/^([^\s_]+)\s+/)?.[1]||'';
-      return {sourceRowNumber:record.rowNumber,sourceSheet:sheetName||'',grade,vendor,brand,code:'',sku:text(record.values[sku.name]),sourceModel:identity,model:identity,colorlessModel:colorlessModel(identity),product:rawProduct,category:'',retailPrice:'',tradeInPrice:priceText(rawPrice),note:noteColumn?text(record.values[extra.name]):'',store:'',date:range,promotion:'',sourceSyntaxWarnings:graded&&!rawProduct.startsWith('(舊機)')?['舊機前綴缺少右括號；依完整回收商與等級尾綴解析，原品名保留。']:[],status:issues.length?'partial':'success',issues,rawValues:record.values};
+      return {sourceRowNumber:record.rowNumber,sourceSheet:sheetName||'',grade,sourceGrade:graded?graded[3]:'',vendor,brand,code:'',sku:text(record.values[sku.name]),sourceModel:identity,model:identity,colorlessModel:colorlessModel(identity),product:rawProduct,category:'',retailPrice:'',tradeInPrice:priceText(rawPrice),note:noteColumn?text(record.values[extra.name]):'',store:'',date:range,promotion:'',sourceSyntaxWarnings:graded&&!rawProduct.startsWith('(舊機)')?['舊機前綴缺少右括號；依完整回收商與等級尾綴解析，原品名保留。']:[],status:issues.length?'partial':'success',issues,rawValues:record.values};
     });
     const summary=summaryForRows(base.rawRows.length,rows);
     return Object.assign({},base,{errors:noteColumn?base.errors:base.errors.concat('四欄來源的補充欄尚未確認為日期新增備註，保留原值並阻擋發布。'),sheetName:sheetName||'',rowType:'flat-product-quotes',fieldMapping:mapped,unknownFields:noteColumn?[]:[extra.sourceName],invalidCurrencyCount,sourceProviders:Array.from(new Set(rows.map(row=>row.vendor).filter(Boolean))),unmappedQuoteRows:rows.filter(row=>row.status!=='success').length,sourceNoteColumn:noteColumn?extra.name:null,standardized:{mapping:mapped,rows,summary,previewRows:rows.slice(0,NORMALIZED_PREVIEW_LIMIT)},acceptance:{rawModelRows:base.rawRows.length,expandedGradeRows:rows.length,invalidCurrencyCount,unrecognized:summary.unrecognized}});
@@ -934,7 +937,7 @@
     (result && result.errors || []).forEach(message => blockers.push(message));
     if (Number(result&&result.catalogIssueCount||0)) blockers.push('目錄列缺少料號或品名，需核對原始列。');
     if ((result && result.unmappedNumericColumns || []).length) blockers.push('仍有未對應的數值欄位，不能確認價格覆蓋：'+result.unmappedNumericColumns.join('、'));
-    if (kind === 'tradein' && rows.some(row=>present(row.tradeInPrice)&&(!['點子行動','FutureDial（FDI）'].includes(row.vendor)||!GRADE_ORDER.includes(row.grade)||!present(row.sourceModel||row.model)))) blockers.push('原表報價尚未能完整對應機型、回收商與 S/A/B/C 等級；已保留原值，禁止產生空報價快照。');
+    if (kind === 'tradein' && rows.some(row=>present(row.tradeInPrice)&&(!PROVIDERS.includes(row.vendor)||!providerGrades(row.vendor).includes(row.grade)||!present(row.sourceModel||row.model)))) blockers.push('原表報價尚未能完整對應機型、回收商與 S/A/B/C 等級；已保留原值，禁止產生空報價快照。');
     if (missingRequiredMappings.length) blockers.push('缺少必要欄位映射：' + missingRequiredMappings.join('、'));
     if (missingRequiredValues.length) blockers.push('必要欄位仍有空值：' + missingRequiredValues.join('、'));
     if (outcomes.partial) blockers.push('仍有 '+outcomes.partial+' 筆部分成功資料，需核對來源。');
@@ -949,8 +952,8 @@
     const warnings = [];
     if (outcomes.partial) warnings.push('部分成功資料已保留在本機預覽；請依必要欄位統計判斷是否需要補檔。');
     if(kind==='tradein'&&result&&result.rowType==='flat-product-quotes'){
-      const outside=rows.filter(row=>row.vendor&&!['點子行動','FutureDial（FDI）'].includes(row.vendor));
-      const ungraded=rows.filter(row=>!row.grade);
+      const outside=rows.filter(row=>row.vendor&&!PROVIDERS.includes(row.vendor));
+      const ungraded=rows.filter(row=>row.grade===UNGRADED);
       const syntax=rows.filter(row=>(row.sourceSyntaxWarnings||[]).length);
       if(outside.length)warnings.push(outside.length+' 筆原檔明確標示 '+Array.from(new Set(outside.map(row=>row.vendor))).join('、')+'，既有正式查詢尚未支援；原價保留，整份發布停用。');
       if(ungraded.length)warnings.push(ungraded.length+' 筆原品名未標示 S/A/B/C 等級，保留未分級且不自動補值。');
@@ -1027,7 +1030,7 @@
         uniqueColorlessModels:Number(acceptance.uniqueColorlessModels || 0)
       };
     } else {
-      const knownProviders = Array.from(new Set(rows.map(row => row.vendor).filter(provider => provider === '點子行動' || provider === 'FutureDial（FDI）')));
+      const knownProviders = Array.from(new Set(rows.map(row => row.vendor).filter(provider => PROVIDERS.includes(provider))));
       base.tradeIn = {
         sourceProviders:(result&&result.sourceProviders||knownProviders).slice(),
         unmappedQuoteRows:Number(result&&result.unmappedQuoteRows||0),
@@ -1035,7 +1038,7 @@
         providers:knownProviders,
         rawModelRows:Number(acceptance.rawModelRows || result && result.recordCount || 0),
         longFormatRows:Number(acceptance.expandedGradeRows || rows.length),
-        gradeCounts:numberStats(acceptance.gradeCounts || {}),
+        gradeCounts:numberStats(rows.reduce((counts,row)=>{if(row.grade)counts[row.grade]=(counts[row.grade]||0)+1;return counts;},{})),
         missingSku:Number(acceptance.missingSkuCount || 0),
         missingQuote:Number(acceptance.missingQuoteCount || 0),
         missingProduct:Number(acceptance.missingProductCount || 0),
@@ -1117,6 +1120,7 @@
       excluded_no_price_count:presentation ? Number(presentation.excludedNoPriceRows || 0) : 0,
       query_model_count:kind === 'shopping' ? candidate.rows.filter(row => !row.priceMatrixConflict).length : candidate.rows.length,
       quote_conflict_count:kind === 'tradein' ? Number(candidate.quoteConflictCount || 0) : 0,
+      ...(kind==='shopping'&&result.catalogRowCount?{catalog_row_count:Number(result.catalogRowCount)}:{}),
       rows
     };
   }
@@ -1212,18 +1216,19 @@
     }));
   }
 
-  function emptyQuotes() {
-    return Object.fromEntries(['點子行動', 'FutureDial（FDI）'].map(vendor => [vendor, Object.fromEntries(GRADE_ORDER.map(grade => [grade, null]))]));
+  function emptyQuotes(providers) {
+    return Object.fromEntries(providers.map(vendor => [vendor, Object.fromEntries(providerGrades(vendor).map(grade => [grade, null]))]));
   }
 
   function buildTradeInCandidate(result) {
     const rows = result && result.standardized && result.standardized.rows || [];
     const groups = new Map();
+    const providers=PROVIDERS.filter(provider=>provider!=='愛鋒派'||rows.some(row=>row.vendor===provider));
     rows.filter(row => row.status === 'success' && (row.sourceModel || row.model)).forEach(row => {
       const model = row.colorlessModel || row.sourceModel || row.model;
       const key = [row.sourceSheet, row.brand, model].join('\u0001');
-      const entry = groups.get(key) || { sourceSheet:row.sourceSheet, brand:row.brand, model, quotes:emptyQuotes(), quoteConflicts:[] };
-      if (entry.quotes[row.vendor] && GRADE_ORDER.includes(row.grade)) {
+      const entry = groups.get(key) || { sourceSheet:row.sourceSheet, brand:row.brand, model, quotes:emptyQuotes(providers), quoteConflicts:[] };
+      if (entry.quotes[row.vendor] && providerGrades(row.vendor).includes(row.grade)) {
         const current = entry.quotes[row.vendor][row.grade];
         const quote = text(row.tradeInPrice);
         if (current != null && current !== quote) entry.quoteConflicts.push(row.vendor + '／' + row.grade);
@@ -1251,7 +1256,7 @@
       rows:candidateRows,
       brands:Array.from(new Set(candidateRows.map(row => row.brand).filter(Boolean))).sort((left, right) => left.localeCompare(right, 'zh-Hant')),
       sourceSheets:Array.from(new Set(candidateRows.map(row => row.sourceSheet))).sort((left, right) => left.localeCompare(right, 'zh-Hant')),
-      providers:['點子行動', 'FutureDial（FDI）'],
+      providers,
       eligibleRowCount:rows.filter(row => row.status === 'success').length,
       quoteConflictCount
     };
@@ -1265,7 +1270,9 @@
     return (candidate && candidate.rows || []).filter(row =>
       (!brand || row.brand === brand) &&
       (!sourceSheet || row.sourceSheet === sourceSheet) &&
-      (!query || candidateSearchText(row).includes(query))
+      (!query || candidateSearchText(row).includes(query)) &&
+      (!criteria.provider || Object.values(row.quotes[criteria.provider]||{}).some(value=>value!=null&&text(value)!=='')) &&
+      (!criteria.grade || (criteria.provider?[criteria.provider]:candidate.providers).some(provider=>row.quotes[provider]&&row.quotes[provider][criteria.grade]!=null&&text(row.quotes[provider][criteria.grade])!==''))
     );
   }
 
@@ -1315,5 +1322,5 @@
     });
   }
 
-  return Object.freeze({ MAX_FILE_BYTES, SUPPORTED_EXTENSIONS, PREVIEW_LIMIT, NORMALIZED_PREVIEW_LIMIT, GRADE_ORDER, PARSER_VERSION, extensionOf, isSupported, recognizeHeader, gradeFromHeader, detectHeader, analyseMatrix, parseFile, buildAcceptanceReport, buildPrepublishCandidate, buildPublishSnapshot, buildShoppingPresentation:shoppingNoPricePresentation, buildShoppingCandidate, filterShoppingCandidate, buildTradeInCandidate, filterTradeInCandidate, sourceVersionDateFromFileName, colorlessModel });
+  return Object.freeze({ MAX_FILE_BYTES, SUPPORTED_EXTENSIONS, PREVIEW_LIMIT, NORMALIZED_PREVIEW_LIMIT, GRADE_ORDER, PROVIDERS, UNGRADED, providerGrades, PARSER_VERSION, extensionOf, isSupported, recognizeHeader, gradeFromHeader, detectHeader, analyseMatrix, parseFile, buildAcceptanceReport, buildPrepublishCandidate, buildPublishSnapshot, buildShoppingPresentation:shoppingNoPricePresentation, buildShoppingCandidate, filterShoppingCandidate, buildTradeInCandidate, filterTradeInCandidate, sourceVersionDateFromFileName, colorlessModel });
 });

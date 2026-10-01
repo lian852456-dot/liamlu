@@ -5,8 +5,8 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const PROVIDERS = Object.freeze(['點子行動', 'FutureDial（FDI）']);
-  const GRADES = Object.freeze(['S', 'A', 'B', 'C']);
+  const PROVIDERS = Object.freeze(['點子行動', 'FutureDial（FDI）', '愛鋒派']);
+  const GRADES = Object.freeze(['S', 'A', 'B', 'C', '未分級']);
   const MISSING = Object.freeze({ kind:'missing', value:null, display:'無報價（缺價）' });
 
   function text(value) {

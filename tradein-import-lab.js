@@ -334,7 +334,7 @@
     const candidate = Core.buildTradeInCandidate(result);
     const section = element('section', 'candidate-preview tradein-candidate');
     section.append(element('h4', 'preview-heading', '舊換新比較候選預覽（未發布）'));
-    section.append(element('p', 'report-intro', '同一機型畫面並列兩家回收商的 S／A／B／C；來源缺少的回收商或等級一律標示「來源未提供」，不補零、不估價。'));
+    section.append(element('p', 'report-intro', '同一機型畫面並列來源回收商的 S／A／B／C；愛鋒派未標等級的原價獨立列為「來源未分級」；來源缺少的回收商或等級一律標示「來源未提供」，不補零、不估價。'));
     candidateMeta(section, candidate);
     if (candidate.quoteConflictCount) section.append(element('p', 'candidate-state blocked', String(candidate.quoteConflictCount) + ' 組比較資料有同回收商／等級的不同報價，需先確認，未自動取值。'));
     const filters = element('div', 'candidate-filters');
@@ -348,24 +348,27 @@
     query.placeholder = '搜尋品牌或機型';
     query.setAttribute('aria-label', '搜尋舊換新候選資料');
     queryField.append(query);
-    filters.append(brand.field, queryField, sourceSheet.field);
+    const provider=makeSelect('回收商','tradeinCandidateProvider',candidate.providers,'全部回收商');
+    const grade=makeSelect('報價等級','tradeinCandidateGrade',Core.GRADE_ORDER.concat(Core.UNGRADED),'全部等級');
+    grade.select.querySelector('option[value="未分級"]').textContent='來源未分級';
+    filters.append(brand.field, queryField, sourceSheet.field,provider.field,grade.field);
     section.append(filters);
-    const headings = ['來源', '品牌', '機型／容量／版本'].concat(candidate.providers.flatMap(vendor => Core.GRADE_ORDER.map(grade => vendor + ' ' + grade)));
+    const headings = ['來源', '品牌', '機型／容量／版本'].concat(candidate.providers.flatMap(vendor => Core.providerGrades(vendor).map(grade => vendor + ' ' + (grade===Core.UNGRADED?'來源未分級':grade))));
     const count = element('p', 'preview-caption');
     const tbody = candidateTable(section, headings, []);
     function render() {
-      const matched = Core.filterTradeInCandidate(candidate, { brand:brand.select.value, sourceSheet:sourceSheet.select.value, query:query.value });
+      const matched = Core.filterTradeInCandidate(candidate, { brand:brand.select.value, sourceSheet:sourceSheet.select.value, query:query.value,provider:provider.select.value,grade:grade.select.value });
       tbody.replaceChildren();
       if (!matched.length) emptyCandidateRow(tbody, headings.length, '沒有符合的舊換新候選資料。');
       else matched.slice(0, Core.NORMALIZED_PREVIEW_LIMIT || 50).forEach(row => {
         const tr = document.createElement('tr');
         tr.append(element('td', '', row.sourceSheet || '未提供'), element('td', '', row.brand || '未提供'), element('td', '', row.model));
-        candidate.providers.forEach(vendor => Core.GRADE_ORDER.forEach(grade => tr.append(element('td', '', quoteCell(row, vendor, grade)))));
+        candidate.providers.forEach(vendor => Core.providerGrades(vendor).forEach(grade => tr.append(element('td', '', quoteCell(row, vendor, grade)))));
         tbody.append(tr);
       });
       count.textContent = '符合 ' + String(matched.length) + ' 組，顯示前 ' + String(Math.min(matched.length, Core.NORMALIZED_PREVIEW_LIMIT || 50)) + ' 組。';
     }
-    [brand.select, sourceSheet.select].forEach(control => control.addEventListener('change', render));
+    [brand.select, sourceSheet.select,provider.select,grade.select].forEach(control => control.addEventListener('change', render));
     query.addEventListener('input', render);
     section.append(count);
     render();

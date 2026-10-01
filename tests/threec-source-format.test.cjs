@@ -64,10 +64,10 @@ test('明確FDI與四等級尾綴容許來源舊機前綴漏括號，raw與警�
  assert.equal(Core.buildAcceptanceReport('tradein',r).acceptance.status,'PASS');assert.equal(r.standardized.rows.length,4);
  for(const row of r.standardized.rows){assert.equal(row.vendor,'FutureDial（FDI）');assert.equal(row.sourceModel,'QA 新機_12G/512G(5G)');assert.equal(row.sourceSyntaxWarnings.length,1);assert.match(row.rawValues['品名 Item'],/^\(舊機QA/);}
 });
-test('愛鋒派及無等級留原價且阻擋整份，不默默排除或補SABC',async()=>{
+test('愛鋒派及來源未分級獨立留原價，不排除或補SABC',async()=>{
  const rows=[['K1','(舊機)QA 新機(點子)_A等',100,''],['K2','(舊機)QA 新機(愛鋒派)_B等',200,''],['K3','(舊機)QA 新機(愛鋒派)',300,'']];
  const r=await parse('20270302-provider.xlsx',[['價格設定',[flatHeader('3/2-3/15'),...rows]]],'tradein');
- assert.equal(r.recordCount,3);assert.equal(r.standardized.rows.length,3);assert.equal(r.standardized.summary.partial,2);assert.equal(r.standardized.rows[2].grade,'');assert.equal(r.standardized.rows[2].tradeInPrice,'300');assert.equal(r.standardized.rows[1].vendor,'愛鋒派');assert.equal(Core.buildAcceptanceReport('tradein',r).acceptance.publishEligible,false);assert.throws(()=>Core.buildPublishSnapshot('tradein',r),/gate/);
+ assert.equal(r.recordCount,3);assert.equal(r.standardized.rows.length,3);assert.equal(r.standardized.summary.success,3);assert.equal(r.standardized.summary.partial,0);assert.equal(r.standardized.rows[2].grade,'未分級');assert.equal(r.standardized.rows[2].sourceGrade,'');assert.equal(r.standardized.rows[2].tradeInPrice,'300');assert.equal(r.standardized.rows[1].vendor,'愛鋒派');const a=Core.buildAcceptanceReport('tradein',r);assert.equal(a.acceptance.status,'PASS');assert.equal(a.tradeIn.providerCount,2);assert.equal(a.tradeIn.gradeCounts['未分級'],1);const snap=Core.buildPublishSnapshot('tradein',r);assert.equal(snap.rows[0].quotes['愛鋒派'].B,'200');assert.equal(snap.rows[0].quotes['愛鋒派']['未分級'],'300');assert.equal(snap.rows[0].quotes['愛鋒派'].A,null);
 });
 test('有名或無名第四欄不因明確品名而吞掉未知數值／等級／任意備註',async()=>{
  for(const [header,value] of [['',777],['','A'],['備註','自訂條件'],['額外價格',888]]){
@@ -90,5 +90,5 @@ test('固定格式保留整個599(6)條件；其為唯一價時不能當全空�
  const s=Core.buildPublishSnapshot('shopping',r);assert.equal(s.rows.length,1);assert.deepEqual(s.rows[0].project_prices,{'599(6)':'7654'});assert.equal(s.excluded_no_price_count,1);
 });
 test('前後端parser資產逐byte一致，parser版本供稽核',()=>{
- const fs=require('node:fs'),path=require('node:path');assert.equal(fs.readFileSync(path.join(__dirname,'../tradein-import-core.js'),'utf8'),fs.readFileSync(path.join(__dirname,'../gas/ReportUploadTradeInCore.html'),'utf8'));assert.equal(Core.PARSER_VERSION,'2026.10.01-source-format-3');
+ const fs=require('node:fs'),path=require('node:path');assert.equal(fs.readFileSync(path.join(__dirname,'../tradein-import-core.js'),'utf8'),fs.readFileSync(path.join(__dirname,'../gas/ReportUploadTradeInCore.html'),'utf8'));assert.equal(Core.PARSER_VERSION,'2026.10.01-source-format-4');
 });
