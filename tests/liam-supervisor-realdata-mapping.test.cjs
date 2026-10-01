@@ -429,7 +429,7 @@ test('Personal award simulation filters store, preserves non-winning money and u
   vm.runInContext(`function renderPersonalAwards(selectedStore){${body('renderPersonalAwards')}}`,context);
   const html=context.renderPersonalAwards('通化');
   assert.equal((html.match(/<article /g)||[]).length,2);assert.doesNotMatch(html,/酒泉｜乙/);
-  assert.match(html,/未領獎/);assert.match(html,/\$750/);assert.match(html,/\$3,825/);assert.match(html,/尚未同步/);
+  assert.match(html,/未領獎/);assert.match(html,/\$750/);assert.match(html,/\$3,825/);assert.match(html,/尚未有資料/);
   const all=context.renderPersonalAwards();assert.ok(all.indexOf('通化｜甲')<all.indexOf('酒泉｜乙'));assert.match(all,/全部店點/);
 });
 

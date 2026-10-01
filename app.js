@@ -391,6 +391,7 @@
       return Number.isFinite(direct) ? direct : null;
     }
     const value = metric.reportRate != null ? metric.reportRate : metric.rate;
+    if (value === null || value === undefined || value === '') return null;
     const number = Number(value);
     return Number.isFinite(number) ? number : null;
   }
@@ -533,14 +534,14 @@
         reward50:numberOrNull(item && item.store_reward_50), reward100:numberOrNull(item && item.store_reward_100),
         status:item && item.award != null ? String(item.award) : item && item.status != null ? String(item.status) : item && item.eligible != null ? String(item.eligible) : ''
       })).filter(item => item.name);
-      return { name:normalizeStore(row.store), amount:numberOrNull(award.actual_total) || 0, eligible:String(award.award || '').toUpperCase() === 'Y', modelMonth:String(cutoff || reportDate).slice(0,7), items };
+      return { name:normalizeStore(row.store), amount:numberOrNull(award.actual_total), eligible:award.award === 'Y' ? true : award.award === 'N' ? false : null, modelMonth:String(cutoff || reportDate).slice(0,7), items };
     }).filter(row => row.name) : [];
     const models = Array.isArray(sourceOverall.items) ? sourceOverall.items : [];
     const top2 = models.map(item => ({
       name:String(item.display_name || item.name || ''), amount100:numberOrNull(item.district_reward_100 != null ? item.district_reward_100 : item.store_reward_100),
       progress:numberOrNull(item.rate), status:String(item.award || item.status || '')
     })).filter(item => item.name && item.amount100 != null).sort((a,b) => b.amount100 - a.amount100).slice(0,2);
-    const winningStores = storeRows.filter(row => row.eligible).length;
+    const winningStores = storeRows.every(row => row.eligible != null) ? storeRows.filter(row => row.eligible).length : null;
     // overallAward.actual_total is not the same currency contract as store award.actual_total
     // (the formal snapshot currently exposes count-scale 179 beside store amounts in the thousands).
     // Fail closed until the source publishes an explicit same-unit district amount field.
@@ -901,10 +902,10 @@
     node.className = `form-message ${state}`.trim();
   }
 
-  function fmtPct(value) { return value == null ? '—' : `${(Number(value) * 100).toFixed(1)}%`; }
+  function fmtPct(value) { return value == null || value === '' ? '尚未有資料' : `${(Number(value) * 100).toFixed(1)}%`; }
   function fmtSignedPct(value) { if (value == null) return '—'; const n=Number(value)*100; return `${n>0?'+':''}${n.toFixed(1)}pp`; }
   function fmtSigned(value) { if (value == null) return '—'; const n=Number(value); return n===0?'0':`${n>0?'↑':'↓'}${Math.abs(n)}`; }
-  function fmtNumber(value, digits=2) { if (value == null) return '—'; return Number(value).toLocaleString('zh-TW',{maximumFractionDigits:digits}); }
+  function fmtNumber(value, digits=2) { if (value == null || value === '') return '尚未有資料'; return Number(value).toLocaleString('zh-TW',{maximumFractionDigits:digits}); }
   function valueClass(value) { if (value == null || Number(value)===0) return 'neutral-value'; return Number(value)>0?'positive':'negative'; }
   function privateUnlockState(message = '解鎖後顯示正式資料') {
     return `<div class="unlock-state"><span>${escapeHtml(message)}</span><button class="unlock-cta" type="button" data-unlock-private>解鎖正式資料</button></div>`;
@@ -967,7 +968,7 @@
       const gap=awardGap80(item.actual,item.target);
       const valid=gap!=null;
       const progress=valid?item.actual/item.target:null;
-      const metrics=[['實際數',item.actual==null?'—':fmtNumber(item.actual)],['全月目標',item.target==null?'—':fmtNumber(item.target)],['目前達成率',progress==null?'—':fmtPct(progress)],['80%目標',valid?fmtNumber(Math.ceil(item.target*80/100)):'—'],['距80%缺額',valid?`${fmtNumber(gap)} 台`:'尚未同步'],['預估達成率',item.rate==null?'—':fmtPct(item.rate)]];
+      const metrics=[['實際數',item.actual==null?'尚未有資料':fmtNumber(item.actual)],['全月目標',item.target==null?'尚未有資料':fmtNumber(item.target)],['目前達成率',progress==null?'尚未有資料':fmtPct(progress)],['80%目標',valid?fmtNumber(Math.ceil(item.target*80/100)):'—'],['距80%缺額',valid?`${fmtNumber(gap)} 台`:'尚未有資料'],['預估達成率',item.rate==null?'尚未有資料':fmtPct(item.rate)]];
       if(item.reward50!=null) metrics.push(['50% 獎金','$'+fmtNumber(item.reward50,0)]);
       if(item.reward100!=null) metrics.push(['100% 獎金','$'+fmtNumber(item.reward100,0)]);
       return `<article class="award-store-item"><div class="award-store-item-head"><strong>${escapeHtml(item.name)}</strong><span class="award-store-item-status ${valid&&gap>0?'no':''}">${valid?(gap===0?'已達80%':`尚缺 ${fmtNumber(gap)} 台`):'目標待確認'}</span></div><div class="award-store-item-metrics">${metrics.map(([label,value])=>`<span><small>${label}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></article>`;
@@ -979,9 +980,9 @@
     const people=(summary.people||[]).filter(person=>!selectedStore||person.store===selectedStore).slice().sort((a,b)=>(b.projected??-Infinity)-(a.projected??-Infinity)||STORES.indexOf(a.store)-STORES.indexOf(b.store)||(a.rank??Infinity)-(b.rank??Infinity));
     const known=people.filter(p=>p.eligible==='Y'||p.eligible==='N');
     return `<label class="select-field"><span>篩選店點</span><select id="bonusStoreSelect"><option value="">全部店點</option>${STORES.map(name=>`<option value="${escapeHtml(name)}"${name===selectedStore?' selected':''}>${escapeHtml(name)}</option>`).join('')}</select></label><section class="panel award-store-items"><div class="panel-head"><div><h2>同仁獎金</h2><small>領獎 ${known.filter(p=>p.eligible==='Y').length} 人 · 未領獎 ${known.filter(p=>p.eligible==='N').length} 人 · 待同步 ${people.length-known.length} 人</small></div></div><div class="award-store-item-list">${people.map(person=>{
-      const status=person.eligible==='Y'?'領獎':person.eligible==='N'?'未領獎':'尚未同步';
-      const money=value=>value==null?'—':'$'+fmtNumber(value,0);
-      return `<article class="award-store-item"><div class="award-store-item-head"><strong>${escapeHtml(person.store)}｜${escapeHtml(person.name)}</strong><span class="award-store-item-status ${person.eligible==='N'?'no':''}">${status}</span></div><div class="award-store-item-metrics"><span><small>實際獎金</small><b>${money(person.actual)}</b></span><span><small>推估獎金</small><b>${money(person.projected)}</b></span><span><small>公司排名</small><b>${person.rank==null?'—':fmtNumber(person.rank,0)}</b></span></div></article>`;
+      const status=person.eligible==='Y'?'領獎':person.eligible==='N'?'未領獎':'尚未有資料';
+      const money=value=>value==null?'尚未有資料':'$'+fmtNumber(value,0);
+      return `<article class="award-store-item"><div class="award-store-item-head"><strong>${escapeHtml(person.store)}｜${escapeHtml(person.name)}</strong><span class="award-store-item-status ${person.eligible==='N'?'no':''}">${status}</span></div><div class="award-store-item-metrics"><span><small>實際獎金</small><b>${money(person.actual)}</b></span><span><small>推估獎金</small><b>${money(person.projected)}</b></span><span><small>公司排名</small><b>${person.rank==null?'尚未有資料':fmtNumber(person.rank,0)}</b></span></div></article>`;
     }).join('')||'<div class="empty-state">個人台獎尚未同步。</div>'}</div></section>`;
   }
 
@@ -1085,7 +1086,7 @@
     const core = row.core || {};
     return `<article class="store-item${index===0?' expanded':''}"><button class="store-row" type="button" aria-expanded="${index===0?'true':'false'}">
       <span class="store-row-line store-row-primary"><span class="store-name">${warn?`<i data-lucide="${row.kpi<.8?'triangle-alert':'circle-alert'}" class="store-alert ${row.kpi<.8?'critical':''}"></i>`:`<span class="store-rank">${index+1}</span>`}${escapeHtml(row.name)}</span>
-      <span class="store-metric store-kpi ${row.kpi<.8?'negative':''}"><small>KPI</small><b>${fmtPct(row.kpi)}</b></span><span class="store-metric store-company"><small>公司排名</small><b>${row.rank??'—'}</b></span></span>
+      <span class="store-metric store-kpi ${row.kpi!=null&&row.kpi<.8?'negative':''}"><small>KPI</small><b>${fmtPct(row.kpi)}</b></span><span class="store-metric store-company"><small>公司排名</small><b>${row.rank??'尚未有資料'}</b></span></span>
       <span class="store-row-line store-row-secondary"><span class="store-metric store-dod ${valueClass(row.kpiDod)}"><small>KPI DOD</small><b>${fmtSignedPct(row.kpiDod)}</b></span><span class="store-metric store-rank-change ${valueClass(row.rankChange)}"><small>排名變動</small><b>${fmtSigned(row.rankChange)}</b></span>
       <span class="store-metric store-addon ${valueClass(row.addon)}"><small>加減分</small><b>${fmtNumber(row.addon)}</b></span></span><i data-lucide="chevron-down" class="row-chevron"></i>
     </button><div class="store-detail"><div class="core-grid">${['A999','A1399','好速','R999','R1399','RT'].map(key => `<div class="core-cell"><span>${key}</span><b class="${core[key]!=null&&core[key]<1?'negative':''}">${fmtPct(core[key])}</b></div>`).join('')}</div><a class="detail-link" href="index.html">查看完整 KPI <i data-lucide="arrow-right"></i></a></div></article>`;
@@ -1104,9 +1105,9 @@
     }
     const summary = contract.awardSummary.data || {};
     const stores = Array.isArray(contract.awardStores.data) ? contract.awardStores.data : [];
-    const losingStores=summary.winningStores==null?'—':Math.max(0,Number(summary.totalStores||9)-Number(summary.winningStores));
-    dom('#awardHome').innerHTML = `${staleBanner(contract.awardSummary)}<div class="award-summary"><h2 id="awardHomeTitle">台獎總覽</h2><span>領獎店數 <b>${summary.winningStores??'—'}<small> / 9</small></b></span><span>未領獎店數 <b>${losingStores}</b></span></div>
-      <div class="award-list"><div class="award-row header"><span>店名</span><span>獎勵金額</span><span>狀態</span></div>${stores.map(row=>`<div class="award-row"><span>${escapeHtml(row.name)}</span><span class="award-amount">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</span><span><i class="award-tag ${row.eligible?'':'no'}">${row.eligible?'領獎':'未領獎'}</i></span></div>`).join('')}</div>
+    const losingStores=summary.winningStores==null?'尚未有資料':Math.max(0,Number(summary.totalStores||9)-Number(summary.winningStores));
+    dom('#awardHome').innerHTML = `${staleBanner(contract.awardSummary)}<div class="award-summary"><h2 id="awardHomeTitle">台獎總覽</h2><span>領獎店數 <b>${summary.winningStores??'尚未有資料'}<small> / 9</small></b></span><span>未領獎店數 <b>${losingStores}</b></span></div>
+      <div class="award-list"><div class="award-row header"><span>店名</span><span>獎勵金額</span><span>狀態</span></div>${stores.map(row=>`<div class="award-row"><span>${escapeHtml(row.name)}</span><span class="award-amount">${row.amount==null?'尚未有資料':'$'+fmtNumber(row.amount,0)}</span><span><i class="award-tag ${row.eligible===false?'no':''}">${row.eligible===true?'領獎':row.eligible===false?'未領獎':'尚未有資料'}</i></span></div>`).join('')}</div>
       <a class="award-link" href="#battle" data-open-awards>查看完整台獎摘要 <i data-lucide="arrow-right"></i></a>`;
   }
 
@@ -1258,21 +1259,21 @@
     if (battleKind === 'kpi' && battleScope === 'region') {
       const k = contract.kpiSummary.data||{};
       content.innerHTML = `${contract.kpiSummary.note ? `<p class="stale-note">${escapeHtml(contract.kpiSummary.note)}</p>` : ''}<div class="metric-card-grid">${[
-        ['KPI 達成率',fmtPct(k.kpi),'cyan-value'],['公司排名',k.companyRank??'—','gold-value'],['KPI DOD',fmtSignedPct(k.kpiDod),valueClass(k.kpiDod)],['排名變化',fmtSigned(k.rankChange),valueClass(k.rankChange)],['加減分',fmtNumber(k.addonScore),'gold-value'],['九店比較',`${stores.filter(row=>row.kpi>=1).length}/9 達標`,'']
-      ].map(([label,value,cls])=>`<article class="metric-card"><span>${label}</span><strong class="${cls}">${value}</strong><small>更新 ${formatTime(contract.kpiSummary.sourceUpdatedAt)}</small></article>`).join('')}</div><div class="battle-list"><div class="battle-list-row header"><span>店點</span><span>KPI</span><span>排名</span><span>DOD</span><span>加減分</span></div>${stores.slice().sort((a,b)=>(b.kpi??-1)-(a.kpi??-1)).map(row=>`<div class="battle-list-row"><span>${escapeHtml(row.name)}</span><span>${fmtPct(row.kpi)}</span><span>${row.rank??'—'}</span><span class="${valueClass(row.kpiDod)}">${fmtSignedPct(row.kpiDod)}</span><span>${fmtNumber(row.addon)}</span></div>`).join('')}</div>${renderFullKpis(k.fullKpis,'北一二B')}<a class="source-button" href="index.html">開啟正式 KPI 網站 <i data-lucide="external-link"></i></a>`;
+        ['KPI 達成率',fmtPct(k.kpi),'cyan-value'],['公司排名',k.companyRank??'尚未有資料','gold-value'],['KPI DOD',fmtSignedPct(k.kpiDod),valueClass(k.kpiDod)],['排名變化',fmtSigned(k.rankChange),valueClass(k.rankChange)],['加減分',fmtNumber(k.addonScore),'gold-value'],['九店比較',`${stores.filter(row=>row.kpi>=1).length}/9 達標`,'']
+      ].map(([label,value,cls])=>`<article class="metric-card"><span>${label}</span><strong class="${cls}">${value}</strong><small>更新 ${formatTime(contract.kpiSummary.sourceUpdatedAt)}</small></article>`).join('')}</div><div class="battle-list"><div class="battle-list-row header"><span>店點</span><span>KPI</span><span>排名</span><span>DOD</span><span>加減分</span></div>${stores.slice().sort((a,b)=>(b.kpi??-1)-(a.kpi??-1)).map(row=>`<div class="battle-list-row"><span>${escapeHtml(row.name)}</span><span>${fmtPct(row.kpi)}</span><span>${row.rank??'尚未有資料'}</span><span class="${valueClass(row.kpiDod)}">${fmtSignedPct(row.kpiDod)}</span><span>${fmtNumber(row.addon)}</span></div>`).join('')}</div>${renderFullKpis(k.fullKpis,'北一二B')}<a class="source-button" href="index.html">開啟正式 KPI 網站 <i data-lucide="external-link"></i></a>`;
     } else if (battleKind === 'kpi') {
       const row=stores.find(item=>item.name===selected);
-      content.innerHTML = row ? `<div class="metric-card-grid"><article class="metric-card"><span>店 KPI</span><strong class="cyan-value">${fmtPct(row.kpi)}</strong><small>${escapeHtml(row.name)}</small></article><article class="metric-card"><span>公司排名</span><strong class="gold-value">${row.rank??'—'}</strong><small>${fmtSigned(row.rankChange)}</small></article><article class="metric-card"><span>KPI DOD</span><strong class="${valueClass(row.kpiDod)}">${fmtSignedPct(row.kpiDod)}</strong><small>正式快照</small></article><article class="metric-card"><span>加減分</span><strong>${fmtNumber(row.addon)}</strong><small>正式快照</small></article></div><section class="panel"><div class="panel-head"><div><h2>六項主要 KPI</h2><small>${escapeHtml(row.name)}</small></div></div><div class="core-grid">${Object.entries(row.core||{}).map(([key,value])=>`<div class="core-cell"><span>${key}</span><b class="${value!=null&&value<1?'negative':''}">${fmtPct(value)}</b></div>`).join('')}</div></section>${renderFullKpis(row.fullKpis,row.name)}<a class="source-button" href="index.html">開啟正式 KPI 網站 <i data-lucide="external-link"></i></a>` : '<div class="empty-state">尚無此店 KPI 摘要。</div>';
+      content.innerHTML = row ? `<div class="metric-card-grid"><article class="metric-card"><span>店 KPI</span><strong class="cyan-value">${fmtPct(row.kpi)}</strong><small>${escapeHtml(row.name)}</small></article><article class="metric-card"><span>公司排名</span><strong class="gold-value">${row.rank??'尚未有資料'}</strong><small>${fmtSigned(row.rankChange)}</small></article><article class="metric-card"><span>KPI DOD</span><strong class="${valueClass(row.kpiDod)}">${fmtSignedPct(row.kpiDod)}</strong><small>正式快照</small></article><article class="metric-card"><span>加減分</span><strong>${fmtNumber(row.addon)}</strong><small>正式快照</small></article></div><section class="panel"><div class="panel-head"><div><h2>六項主要 KPI</h2><small>${escapeHtml(row.name)}</small></div></div><div class="core-grid">${Object.entries(row.core||{}).map(([key,value])=>`<div class="core-cell"><span>${key}</span><b class="${value!=null&&value<1?'negative':''}">${fmtPct(value)}</b></div>`).join('')}</div></section>${renderFullKpis(row.fullKpis,row.name)}<a class="source-button" href="index.html">開啟正式 KPI 網站 <i data-lucide="external-link"></i></a>` : '<div class="empty-state">尚無此店 KPI 摘要。</div>';
     } else if (battleKind === 'award' && battleScope === 'region') {
       const a=contract.awardSummary.data||{};
-      const areaEligibility=a.areaEligible===true?'領獎':a.areaEligible===false?'未領獎':'尚未同步';
+      const areaEligibility=a.areaEligible===true?'領獎':a.areaEligible===false?'未領獎':'尚未有資料';
       const areaEligibilityClass=a.areaEligible===true?'positive':a.areaEligible===false?'neutral-value':'gold-value';
-      content.innerHTML=`<section class="panel award-area-summary"><div class="panel-head"><div><h2>督導區台獎摘要</h2></div></div><div class="metric-card-grid"><article class="metric-card"><span>督導區實際獎金</span><strong class="gold-value">${a.areaActualAward==null?'—':'$'+fmtNumber(a.areaActualAward,0)}</strong><small>正式區域級欄位</small></article><article class="metric-card"><span>公司排名</span><strong>${a.areaCompanyRank==null?'—':fmtNumber(a.areaCompanyRank,0)}</strong><small>正式區域級欄位</small></article><article class="metric-card"><span>領獎資格</span><strong class="${areaEligibilityClass}">${areaEligibility}</strong><small>正式台獎判定</small></article></div></section><div class="metric-card-grid"><article class="metric-card"><span>領獎店數</span><strong>${a.winningStores??'—'}/9</strong><small>正式台獎判定</small></article><article class="metric-card"><span>未領獎店數</span><strong>${a.winningStores==null?'—':Math.max(0,9-a.winningStores)}</strong><small>九店完整顯示</small></article></div><div class="battle-list award-battle-list"><div class="battle-list-row award-battle-row header"><span>店點</span><span>金額</span><span>狀態</span></div>${awardStores.map(row=>`<div class="battle-list-row award-battle-row"><span>${escapeHtml(row.name)}</span><span>${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</span><span class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</span></div>`).join('')}</div>`;
+      content.innerHTML=`<section class="panel award-area-summary"><div class="panel-head"><div><h2>督導區台獎摘要</h2></div></div><div class="metric-card-grid"><article class="metric-card"><span>督導區實際獎金</span><strong class="gold-value">${a.areaActualAward==null?'尚未有資料':'$'+fmtNumber(a.areaActualAward,0)}</strong><small>正式區域級欄位</small></article><article class="metric-card"><span>公司排名</span><strong>${a.areaCompanyRank==null?'—':fmtNumber(a.areaCompanyRank,0)}</strong><small>正式區域級欄位</small></article><article class="metric-card"><span>領獎資格</span><strong class="${areaEligibilityClass}">${areaEligibility}</strong><small>正式台獎判定</small></article></div></section><div class="metric-card-grid"><article class="metric-card"><span>領獎店數</span><strong>${a.winningStores??'—'}/9</strong><small>正式台獎判定</small></article><article class="metric-card"><span>未領獎店數</span><strong>${a.winningStores==null?'尚未有資料':Math.max(0,9-a.winningStores)}</strong><small>九店完整顯示</small></article></div><div class="battle-list award-battle-list"><div class="battle-list-row award-battle-row header"><span>店點</span><span>金額</span><span>狀態</span></div>${awardStores.map(row=>`<div class="battle-list-row award-battle-row"><span>${escapeHtml(row.name)}</span><span>${row.amount==null?'尚未有資料':'$'+fmtNumber(row.amount,0)}</span><span class="${row.eligible?'positive':'neutral-value'}">${row.eligible===true?'領獎':row.eligible===false?'未領獎':'尚未有資料'}</span></div>`).join('')}</div>`;
     } else if (battleKind === 'award' && battleScope === 'bonus') {
       content.innerHTML=renderPersonalAwards(bonusStore);
     } else if (battleKind === 'award') {
       const row=awardStores.find(item=>item.name===selected);
-      content.innerHTML=row?`<div class="award-selected-store"><span>店點</span><strong>${escapeHtml(row.name)}</strong></div><div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'—':'$'+fmtNumber(row.amount,0)}</strong><small>正式台獎金額</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible?'領獎':'未領獎'}</strong><small>正式台獎判定</small></article></div>${renderAwardProgress80(row)}<a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
+      content.innerHTML=row?`<div class="award-selected-store"><span>店點</span><strong>${escapeHtml(row.name)}</strong></div><div class="metric-card-grid"><article class="metric-card"><span>店領獎金額</span><strong class="gold-value">${row.amount==null?'尚未有資料':'$'+fmtNumber(row.amount,0)}</strong><small>正式台獎金額</small></article><article class="metric-card"><span>領獎狀態</span><strong class="${row.eligible?'positive':'neutral-value'}">${row.eligible===true?'領獎':row.eligible===false?'未領獎':'尚未有資料'}</strong><small>正式台獎判定</small></article></div>${renderAwardProgress80(row)}<a class="source-button" href="index.html">完整台獎入口 <i data-lucide="external-link"></i></a>`:'<div class="empty-state">尚無此店台獎摘要。</div>';
     } else content.innerHTML = renderPersonalPerformance(selected);
     if (battleKind === 'award' && battleScope === 'region') content.innerHTML += renderAwardProgress80({name:'北一二B',modelMonth:(contract.awardSummary.data||{}).modelMonth,items:(contract.awardSummary.data||{}).items});
     const battleModule=battleKind==='kpi'?contract.kpiSummary:battleKind==='award'?contract.awardSummary:contract.personalPerformance;
@@ -2082,5 +2083,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=awards-20261001-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=month-start-20261001-2',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);

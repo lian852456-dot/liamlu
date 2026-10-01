@@ -34,6 +34,7 @@
   }
 
   function awardRateTone(value) {
+    if (value == null || value === '') return '';
     const number = Number(value);
     if (!Number.isFinite(number)) return '';
     if (number >= 1) return 'good';
@@ -85,8 +86,8 @@
 
   function renderAwardPriority(item) {
     if (!item) return '';
-    const difference = Number(item.difference);
-    const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${formatNumber(difference)}` : '—';
+    const difference = item.difference == null || item.difference === '' ? NaN : Number(item.difference);
+    const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${formatNumber(difference)}` : '尚未有資料';
     return `<div class="award-priority-card">
       <div class="award-priority-title">${item.display_name}</div>
       <div class="award-priority-action">${item.next_label || '已達最高獎階'}</div>
@@ -101,8 +102,8 @@
   }
 
   function renderAwardModel(item, district) {
-    const difference = Number(item.difference);
-    const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${formatNumber(difference)}` : '—';
+    const difference = item.difference == null || item.difference === '' ? NaN : Number(item.difference);
+    const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${formatNumber(difference)}` : '尚未有資料';
     const levels = district
       ? [{ label: '北一二B 80%獎金', amount: item.district_reward_80 }, { label: '北一二B 100%獎金', amount: item.district_reward_100 }]
       : [{ label: '店點 50%獎金', amount: item.store_reward_50 }, { label: '店點 100%獎金', amount: item.store_reward_100 }];
@@ -112,7 +113,7 @@
 
   function renderAwardUnit(row, district) {
     const award = (row && row.award) || {};
-    return `<div class="award-store-card"><div class="award-store-head"><div class="award-store-name">${district ? '🏢 ' : ''}${displayStoreName(row && row.store) || '—'}</div><div class="award-store-rank">排名 ${award.rank ?? '—'}<br>${award.award === 'Y' ? '✅ 可領獎' : '⚠️ 未領獎'}</div></div>
+    return `<div class="award-store-card"><div class="award-store-head"><div class="award-store-name">${district ? '🏢 ' : ''}${displayStoreName(row && row.store) || '—'}</div><div class="award-store-rank">排名 ${award.rank ?? '尚未有資料'}<br>${award.award === 'Y' ? '✅ 可領獎' : award.award === 'N' ? '⚠️ 未領獎' : '尚未有資料'}</div></div>
       <div class="award-role-indicator${district ? ' district' : ''}">${district ? '督導獎金角色｜北一二B 80%／100%' : '店長獎金角色｜店點 50%／100%'}</div>
       <div class="award-store-values"><div class="award-value"><div class="label">實際金額</div><div class="number">${formatMoney(award.actual_total)}</div></div><div class="award-value"><div class="label">推估金額</div><div class="number">${formatMoney(award.projected)}</div></div></div>
       <div class="award-priority-grid">${((row && row.priorities) || []).map(renderAwardPriority).join('') || '<span class="val-dim">沒有符合優先順位的機款</span>'}</div>
@@ -129,10 +130,10 @@
 
     function renderUnavailable() {
       const note = doc.getElementById('awardsBattleSourceNote');
-      if (note) note.textContent = '台獎尚未同步：不使用舊 dashboard snapshot 的數字。';
+      if (note) note.textContent = '台獎尚未有資料，待來源更新後顯示。';
       const content = doc.getElementById('awardsBattleContent');
       if (!content) return;
-      content.innerHTML = `<div class="card private-lock"><h3>台獎尚未同步</h3><p>${state.unavailableReason || '尚未取得與目前 KPI 同日期的台獎資料。'}</p><p class="kpi-battle-note">KPI 已使用最新正式 JSON；台獎會在同日期正式資料完成後另行顯示。</p></div>`;
+      content.innerHTML = `<div class="card private-lock"><h3>台獎尚未有資料</h3><p>${state.unavailableReason || '尚未取得與目前 KPI 同日期的台獎資料。'}</p><p class="kpi-battle-note">已取得的 KPI 正常顯示；台獎待正式資料到齊後更新。</p></div>`;
     }
 
     function render() {
@@ -142,6 +143,7 @@
       const stores = data.stores || [];
       const phoneItems = Number(data.phone_items);
       const storeRows = Number(data.store_rows);
+      const eligibilityComplete = stores.every(row => row.award && ['Y', 'N'].includes(row.award.award));
       const eligibleStores = stores.filter(row => row.award && row.award.award === 'Y').length;
       const selectedBefore = doc.getElementById('awardsStoreSelect')?.value;
       const selectedDistrict = !selectedBefore || selectedBefore === '北一二B整體';
@@ -156,10 +158,10 @@
         <div class="summary-grid">
           <div class="summary-card"><div class="sc-label">督導區實際獎金</div><div class="sc-val award-summary-money" style="color:#6d28d9">${formatMoney(supervisor.actual_total)}</div><div class="sc-sub">公司實際獎金</div></div>
           <div class="summary-card"><div class="sc-label">督導區推估獎金</div><div class="sc-val award-summary-money" style="color:var(--accent)">${formatMoney(supervisor.projected)}</div><div class="sc-sub">依目前進度推估</div></div>
-          <div class="summary-card"><div class="sc-label">督導區排名</div><div class="sc-val" style="color:var(--gold)">${supervisor.rank ?? '—'}</div><div class="sc-sub">公司獎金排名</div></div>
-          <div class="summary-card"><div class="sc-label">是否領獎</div><div class="sc-val" style="color:${supervisor.award === 'Y' ? 'var(--green)' : 'var(--red)'}">${supervisor.award === 'Y' ? '有' : '無'}</div><div class="sc-sub">督導區資格</div></div>
-          <div class="summary-card"><div class="sc-label">有領獎店</div><div class="sc-val" style="color:var(--green)">${eligibleStores}</div><div class="sc-sub">家門市</div></div>
-          <div class="summary-card"><div class="sc-label">未領獎店</div><div class="sc-val" style="color:var(--red)">${stores.length - eligibleStores}</div><div class="sc-sub">家門市</div></div>
+          <div class="summary-card"><div class="sc-label">督導區排名</div><div class="sc-val" style="color:var(--gold)">${supervisor.rank ?? '尚未有資料'}</div><div class="sc-sub">公司獎金排名</div></div>
+          <div class="summary-card"><div class="sc-label">是否領獎</div><div class="sc-val" style="color:${supervisor.award === 'Y' ? 'var(--green)' : 'var(--red)'}">${supervisor.award === 'Y' ? '有' : supervisor.award === 'N' ? '無' : '尚未有資料'}</div><div class="sc-sub">督導區資格</div></div>
+          <div class="summary-card"><div class="sc-label">有領獎店</div><div class="sc-val" style="color:var(--green)">${eligibilityComplete ? eligibleStores : '尚未有資料'}</div><div class="sc-sub">家門市</div></div>
+          <div class="summary-card"><div class="sc-label">未領獎店</div><div class="sc-val" style="color:var(--red)">${eligibilityComplete ? stores.length - eligibleStores : '尚未有資料'}</div><div class="sc-sub">家門市</div></div>
         </div>
         <div class="section-divider">督導區及各店台獎（依實際獎金排序）</div>
         <div class="award-store-grid">${renderAwardUnit(data.overall, true)}${stores.map(row => renderAwardUnit(row, false)).join('')}</div>

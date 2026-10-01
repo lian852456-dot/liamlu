@@ -37,17 +37,17 @@
   }
 
   function kpiPendingCell() {
-    return '<span class="kpi-sub" style="font-weight:800;color:var(--text-muted)">尚未同步</span>';
+    return '<span class="kpi-sub" style="font-weight:800;color:var(--text-muted)">尚未有資料</span>';
   }
 
   function kpicalcMetric(entry, meta) {
     if (!entry) return null;
-    const actual = Number(entry.a) || 0;
-    const target = Number(entry.t) || 0;
+    const actual = entry.a == null || entry.a === '' ? null : Number(entry.a);
+    const target = entry.t == null || entry.t === '' ? null : Number(entry.t);
     const reportRate = entry.reportRate === '' || entry.reportRate === null || entry.reportRate === undefined
       ? null : Number(entry.reportRate);
     const expected = (target > 0 && Number(meta.monthDays) > 0) ? target * Number(meta.snapshotDay) / Number(meta.monthDays) : null;
-    return { actual, target, rate: Number.isFinite(reportRate) ? reportRate : null, daily_gap: expected == null ? null : actual - expected };
+    return { actual, target, rate: Number.isFinite(reportRate) ? reportRate : null, daily_gap: expected == null || actual == null ? null : actual - expected };
   }
 
   function kpiBattleDataAsOfDate(meta) {
@@ -226,15 +226,17 @@
       let actual = 0;
       let target = 0;
       let seen = false;
+      let actualComplete = true;
+      let targetComplete = true;
       (safeData.stores || []).forEach(store => {
         const entry = (store.items || {})[item.key];
         if (entry) {
-          actual += Number(entry.a) || 0;
-          target += Number(entry.t) || 0;
+          if (entry.a == null || entry.a === '') actualComplete = false; else actual += Number(entry.a);
+          if (entry.t == null || entry.t === '') targetComplete = false; else target += Number(entry.t);
           seen = true;
-        }
+        } else { actualComplete = false; targetComplete = false; }
       });
-      if (seen) aggregateItems[item.key] = kpicalcMetric({ a: actual, t: target, reportRate: aggregateRates[item.key] }, meta);
+      if (seen) aggregateItems[item.key] = kpicalcMetric({ a: actualComplete ? actual : null, t: targetComplete ? target : null, reportRate: aggregateRates[item.key] }, meta);
     });
     const personal = (safeData.persons || []).map(person => {
       const metrics = {};
@@ -265,18 +267,20 @@
       source_as_of_date: dataAsOfDate,
       source_date_range: meta.period || '',
       previous_report_date: null,
-      aggregate: { store: '北一二B整體', overall_kpi: null, company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(aggregateItems), metrics: aggregateItems },
+      aggregate: { store: '北一二B整體', overall_kpi: meta.aggregateOfficialCorrected == null ? null : Number(meta.aggregateOfficialCorrected), company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(aggregateItems), metrics: aggregateItems },
       stores,
       personal,
     };
   }
 
   function formatPercent(value) {
+    if (value == null || value === '') return '尚未有資料';
     const number = Number(value);
     return Number.isFinite(number) ? `${(number * 100).toFixed(1)}%` : '—';
   }
 
   function kpiBattleTone(value) {
+    if (value == null || value === '') return '';
     const number = Number(value);
     if (!Number.isFinite(number)) return '';
     if (number >= 1) return 'good';
@@ -285,19 +289,21 @@
   }
 
   function formatNumber(value) {
+    if (value == null || value === '') return '尚未有資料';
     const number = Number(value);
     if (!Number.isFinite(number)) return '—';
     return String(Math.round(number * 100) / 100);
   }
 
   function formatMoney(value) {
+    if (value == null || value === '') return '尚未有資料';
     const number = Number(value);
     return Number.isFinite(number) ? `$${Math.round(number).toLocaleString('en-US')}` : '—';
   }
 
   function kpiBattleTargetLine(metric, verbose) {
     if (!metric || metric.actual == null || metric.target == null) return '';
-    const gap = Number(metric.daily_gap);
+    const gap = metric.daily_gap == null ? NaN : Number(metric.daily_gap);
     const gapText = !Number.isFinite(gap) ? '進度差 —' : gap < -0.05 ? `尚差 ${formatNumber(Math.abs(gap))}` : gap > 0.05 ? `超前 ${formatNumber(gap)}` : '已達進度';
     const gapTone = gap > 0.05 ? 'up' : gap < -0.05 ? 'down' : '';
     const separator = verbose ? '｜' : '｜';
@@ -305,6 +311,7 @@
   }
 
   function kpiBattleDod(value) {
+    if (value == null || value === '') return '';
     const number = Number(value);
     if (!Number.isFinite(number)) return '';
     const direction = number > 0.0005 ? 'up' : number < -0.0005 ? 'down' : '';
@@ -313,6 +320,7 @@
   }
 
   function kpiBattleRankDod(value) {
+    if (value == null || value === '') return '';
     const number = Number(value);
     if (!Number.isFinite(number)) return '';
     if (number > 0) return `<span class="kpi-dod up">DOD ↑ ${number}名</span>`;
@@ -321,18 +329,18 @@
   }
 
   function kpiBattleRate(value, dod) {
-    if (value == null || !Number.isFinite(Number(value))) return '<span class="val-dim">—</span>';
+    if (value == null || !Number.isFinite(Number(value))) return kpiPendingCell();
     return `<span class="kpi-rate ${kpiBattleTone(value)}">${formatPercent(value)}</span>${kpiBattleDod(dod)}`;
   }
 
   function kpiBattleMetricCell(metric, includeDod) {
-    if (!metric) return '<span class="val-dim">—</span>';
-    if (metric.rate == null) return `<span class="val-dim">—</span>${kpiBattleTargetLine(metric)}${includeDod ? kpiBattleDod(metric.dod) : ''}`;
+    if (!metric) return kpiPendingCell();
+    if (metric.rate == null) return `${kpiPendingCell()}${kpiBattleTargetLine(metric)}${includeDod ? kpiBattleDod(metric.dod) : ''}`;
     return `<span class="kpi-rate ${kpiBattleTone(metric.rate)}">${formatPercent(metric.rate)}</span>${kpiBattleTargetLine(metric)}${includeDod ? kpiBattleDod(metric.dod) : ''}`;
   }
 
   function kpiBattleAwardCell(row) {
-    if (row.phone_award_actual == null && row.phone_award_projected == null) return '<span class="val-dim">—</span>';
+    if (row.phone_award_actual == null && row.phone_award_projected == null) return kpiPendingCell();
     const eligible = row.phone_award_eligible === 'Y';
     return `<span class="kpi-award-meta">實際獎金</span><span class="kpi-award-val">${formatMoney(row.phone_award_actual)}</span><span class="kpi-award-meta">推估獎金 ${formatMoney(row.phone_award_projected)}</span><span class="kpi-award-meta ${eligible ? '' : 'no'}">獎金排名 ${row.phone_award_rank ?? '—'}｜${eligible ? '可領獎' : '未領獎'}</span>`;
   }
@@ -563,7 +571,7 @@
           <div class="summary-card"><div class="sc-label">公司排名</div><div class="sc-val" style="color:var(--gold)">${aggregate.company_rank ?? kpiPendingCell()}</div><div class="sc-sub">${kpiBattleRankDod(aggregate.company_rank_dod) || '北一二B整體'}</div></div>
           <div class="summary-card"><div class="sc-label">加掛得分</div><div class="sc-val" style="color:var(--purple)">${aggregate.addon_score == null ? kpiPendingCell() : formatNumber(aggregate.addon_score)}</div><div class="sc-sub">${aggregate.addon_score_dod == null ? '整體得分' : `DOD ${aggregate.addon_score_dod > 0 ? '+' : ''}${formatNumber(aggregate.addon_score_dod)} 分`}</div></div>
           <div class="summary-card"><div class="sc-label">保險搭售率</div><div class="sc-val" style="color:#0f766e">${aggregate.insurance_attach_rate == null ? kpiPendingCell() : formatPercent(aggregate.insurance_attach_rate)}</div><div class="sc-sub">實際搭售率</div></div>
-          <div class="summary-card"><div class="sc-label">KPI未達100%</div><div class="sc-val" style="color:var(--red)">${stores.filter(row => Number(row.overall_kpi) < 1).length}</div><div class="sc-sub">間門市</div></div>
+          <div class="summary-card"><div class="sc-label">KPI未達100%</div><div class="sc-val" style="color:var(--red)">${stores.every(row => row.overall_kpi != null && row.overall_kpi !== '') ? stores.filter(row => Number(row.overall_kpi) < 1).length : kpiPendingCell()}</div><div class="sc-sub">間門市</div></div>
         </div>
         <div class="section-divider">北一二B／店點 KPI 排名</div>
         <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
@@ -601,7 +609,7 @@
       if (!state.data) return;
       const note = doc.getElementById('kpiBattleSourceNote');
       if (note) {
-        const supplement = state.data.supplement_status || (state.data.supplement_synced ? '同次正式快照已同步排名、加掛、個人台獎與保險' : '補充欄位尚未同步（來源或日期不一致）');
+        const supplement = state.data.supplement_status || (state.data.supplement_synced ? '同次正式來源已對齊；缺項顯示尚未有資料' : '補充欄位尚未有資料；有效 KPI 已顯示');
         note.innerHTML = kpiBattleSourceMetadata(state.data, supplement);
       }
       const content = doc.getElementById('kpiBattleContent');
