@@ -23,7 +23,7 @@ function response(kind) {
 
 async function intercept(page, { fail = false, missing = '' } = {}) {
   const calls = [];
-  await page.route('**/exec', async route => {
+  await page.route('**/exec*', async route => {
     let payload = {};
     try { payload = route.request().postDataJSON(); } catch {}
     calls.push(payload);
@@ -107,7 +107,7 @@ test('離頁會使尚未完成的讀取失效，不回寫已清除的價格', as
   let release;
   const pending = new Promise(resolve => { release = resolve; });
   const calls = [];
-  await page.route('**/exec', async route => {
+  await page.route('**/exec*', async route => {
     let payload = {};
     try { payload = route.request().postDataJSON(); } catch {}
     calls.push(payload);
@@ -137,7 +137,7 @@ test('離頁後延遲的異動清單不能恢復資料或下載', async ({ page 
   let release;
   const pending = new Promise(resolve => { release=resolve; });
   let requests=0;
-  await page.route('**/exec', async route => {
+  await page.route('**/exec*', async route => {
     const payload=route.request().postDataJSON();
     if(payload.action==='threec_changes_read') {
       requests++;
@@ -160,7 +160,7 @@ test('離頁後延遲的異動清單不能恢復資料或下載', async ({ page 
 
 
 test('GAS JSON序列化的 changePage 能顯示正式異動並跨頁', async ({ page }) => {
-  await page.route('**/exec', async route => {
+  await page.route('**/exec*', async route => {
     const payload=route.request().postDataJSON();const body=response(payload.kind);
     const set=body.changeSet;set.changePage=set.changes;delete set.changes;
     set.hasMore=payload.action!=='threec_changes_read';
@@ -189,7 +189,7 @@ test('切換分類清空搜尋後返回手機，會重新查詢全版清單', as
 
 test('首版完整異動匯出由已驗證正式快照生成，避免重複下載全價資料', async ({ page }) => {
   const Diff=require('../threec-price-diff-core.js'),fs=require('node:fs');let calls=0;
-  await page.route('**/exec',async route=>{
+  await page.route('**/exec*',async route=>{
     const payload=route.request().postDataJSON(),body=response(payload.kind);
     body.changeSet=Diff.diffSnapshots(payload.kind,null,body.snapshot,{limit:1});
     if(payload.action==='threec_changes_read'){calls++;return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:body.changeSet})});}
@@ -208,7 +208,7 @@ test('快速切換分類時，舊分類延遲請求不能作廢新分類清單',
   const shoppingPending=new Promise(resolve=>{releaseShopping=resolve;});
   const tradeinPending=new Promise(resolve=>{releaseTradein=resolve;});
   const calls=[];
-  await page.route('**/exec',async route=>{
+  await page.route('**/exec*',async route=>{
     const payload=route.request().postDataJSON();
     if(payload.action==='threec_changes_read'){
       calls.push(payload);
@@ -232,4 +232,43 @@ test('快速切換分類時，舊分類延遲請求不能作廢新分類清單',
   await expect(page.locator('#changeCsvBtn')).toBeEnabled();
   releaseTradein();
   await expect(page.locator('#changeTitle')).toContainText('手機專案');
+});
+
+test('某一類 API 失敗不清除另一類已完成價格，並允許重整復原',async({page})=>{
+ let fail=true;
+ await page.route('**/exec*',route=>{const p=route.request().postDataJSON();return route.fulfill({contentType:'application/json',body:JSON.stringify(fail&&p.kind==='tradein'?{status:'error',message:'獨立測試失敗'}:response(p.kind))});});
+ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('舊換新：獨立測試失敗');await expect(page.locator('#shoppingResults')).toContainText('iPhone');
+ fail=false;await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('Galaxy');
+});
+test('另一類慢讀取時手機先可查，不能等待兩類才渲染',async({page})=>{
+ let release;const pending=new Promise(resolve=>release=resolve);
+ await page.route('**/exec*',async route=>{const p=route.request().postDataJSON();if(p.kind==='tradein')await pending;return route.fulfill({contentType:'application/json',body:JSON.stringify(response(p.kind))});});
+ await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#queryStatus')).toContainText('可先查詢');release();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+});
+test('Google JSON 轉址回 HTML 時，限定來源與 requestId 的既有 iframe 可讀回',async({page})=>{
+ const requests=[];
+ await page.route('**/exec*',async route=>{
+  const url=new URL(route.request().url());
+  if(!url.searchParams.has('transport'))return route.fulfill({contentType:'text/html',body:'<html>上傳頁非 JSON</html>'});
+  const p=JSON.parse(new URLSearchParams(route.request().postData()).get('payload'));requests.push(p);
+  const requestId=url.searchParams.get('requestId');
+  await route.fulfill({contentType:'text/html',body:'<html>合成傳輸頁</html>'});
+  await page.evaluate(({requestId,body})=>{
+    const send=(origin,id,value)=>window.dispatchEvent(new MessageEvent('message',{origin,source:window,data:{type:'north12b-gas-response-v1',requestId:id,body:value}}));
+    send('https://evil.example',requestId,{status:'ok',snapshot:null});
+    send('https://script.googleusercontent.com','錯誤ID',{status:'ok',snapshot:null});
+    send('https://script.googleusercontent.com',requestId,body);
+  },{requestId,body:response(p.kind)});
+ });
+ await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ expect(requests.map(p=>p.kind).sort()).toEqual(['shopping','tradein']);expect(requests.every(p=>p.action==='threec_snapshot_read'&&!p.employeeId&&!p.adminSecret)).toBe(true);await expect(page.locator('iframe')).toHaveCount(0);
+});
+for(const width of [1280,390,360])test(`${width}px 閱讀文字至少18px，價錢至少24px且不靠縮字塞欄`,async({page})=>{
+ await intercept(page);await page.setViewportSize({width,height:844});await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');
+ await page.locator('#tableModeBtn').click();
+ for(const selector of ['body','#shoppingBrand','#shoppingModel','.hint','.condition-detail','.comparison-table details','.spec-cell strong','.variant-label','.comparison-pagination button']){
+ const fonts=await page.locator(selector).evaluateAll(els=>els.map(el=>parseFloat(getComputedStyle(el).fontSize)));expect(fonts.every(size=>size>=18)).toBe(true);
+ }
+ expect(await page.locator('.quote.price,.quote.zero').evaluateAll(els=>els.every(el=>parseFloat(getComputedStyle(el).fontSize)>=24))).toBe(true);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
