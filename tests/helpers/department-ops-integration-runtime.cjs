@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),cryp
 const root=path.resolve(__dirname,'../..');
 const clone=value=>JSON.parse(JSON.stringify(value));
 const rules=()=>({contract:'store-rule-reminders-v1',scope:'store-daily-reminders',revision:'synthetic-v1',context:'合成版本說明',rules:[{id:'combined-a',category:'合成分類',title:'合成提醒',instruction:'SYNTHETIC_COMBINED_RULE',frequency:'合成頻率',audience:'合成對象',exceptions:[],sources:[{shortName:'合成來源',pages:[1]}]}]});
-function runtime(){
+function runtime({sourceFiles}={}){
   const files=new Map(),properties=new Map([['PT_KEY','synthetic-passcode']]),cache=new Map();
   const owner={getEmail:()=> 'owner@example.test'};
   let serial=0,reads=0,writes=0,now=Math.floor(Date.now()/1000);
@@ -23,7 +23,8 @@ function runtime(){
     Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(_,value)=>[...crypto.createHash('sha256').update(String(value)).digest()],computeHmacSha256Signature:(value,key)=>[...crypto.createHmac('sha256',String(key)).update(String(value)).digest()],base64EncodeWebSafe:value=>bytes(value).toString('base64url'),base64DecodeWebSafe:value=>[...Buffer.from(value,'base64url')],newBlob:value=>({getBytes:()=>[...bytes(value)],getDataAsString:()=>bytes(value).toString()}),getUuid:()=>crypto.randomUUID()},
     ContentService:{MimeType:{JSON:'json',JAVASCRIPT:'js'},createTextOutput:text=>({text,setMimeType(){return this;}})}
   });
-  for(const relative of ['patrol-gas/PatrolCode.gs','gas/DepartmentGoldMonthlyCore.gs','gas/DepartmentGoldMonthly.gs','gas/DepartmentScoresCore.gs','gas/DepartmentScores.gs','gas/StoreRules.gs'])vm.runInContext(fs.readFileSync(path.join(root,relative),'utf8'),context,{filename:relative});
+  const sources=sourceFiles||['patrol-gas/PatrolCode.gs','gas/DepartmentGoldMonthlyCore.gs','gas/DepartmentGoldMonthly.gs','gas/DepartmentScoresCore.gs','gas/DepartmentScores.gs','gas/StoreRules.gs'].map(relative=>path.join(root,relative));
+  for(const file of sources)vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
   const q2={monthKey:'2026-06',dateRange:{start:'2026-06-01',end:'2026-06-30',cutoff:'2026-06-30'},records:[{employeeId:'SYN-Q2',employeeName:'合成保留',region:'北一二A',storeCode:'SYN-Q2',store:'合成歷史店',role:'合成職稱',medal:77}]};
   context.departmentOpsLatestSnapshot_=()=>({version:1,months:[clone(q2)]});
   context.ptSessionNowSeconds_=()=>now;
