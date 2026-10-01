@@ -149,6 +149,14 @@ test('sender 失敗只呼叫一次，不誤送第二則來源異常', async () =
   assert.equal(calls, 1);
 });
 
+test('晚上提交時間與下午格式一起排序，舊列不能覆寫', () => {
+  const message = buildClosingMessage({ date, rows: [
+    { date, seg: 21, store: '台北三創', savedAt: '晚上9:55:48', aq999: 3 },
+    { date, seg: 21, store: '三創', savedAt: '下午 8:10:00', aq999: 1 },
+  ] });
+  assert.match(message, /三創｜3/);
+});
+
 test('來源完全失敗重試三次後只發一則來源異常', async () => {
   let primaryCalls = 0;
   let fallbackCalls = 0;
