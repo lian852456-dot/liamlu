@@ -22,23 +22,30 @@
     const token=sessionStorage.getItem(KEY);
     if(!token||$('workspace').hidden)throw new Error('請先完成督導驗證');
     const readonly=['department_scores_read','department_scores_history_read'].includes(action);
-    const count=readonly?3:1;let failure;
+    // Give the first six-month read time to finish, while bounding all retries together.
+    const count=readonly?3:1,deadline=Date.now()+(readonly?75000:25000);let failure;
     for(let attempt=0;attempt<count;attempt++){
-      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
+      const remaining=deadline-Date.now();if(remaining<=0)break;
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.min(readonly?45000:25000,remaining));
       try{
-        const response=await fetch(URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token,...body}),cache:'no-store',signal:controller.signal});
+        if(action==='department_scores_read')msg(`正在讀取已保存成績…${attempt?'服務暫時無回應，正在重試（'+(attempt+1)+'/3）。':'首次讀取包含歷史月份，請稍候。'}`);
+        const requestURL=new window.URL(URL);requestURL.searchParams.set('_request',crypto.randomUUID());
+        const response=await fetch(requestURL.href,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token,...body}),cache:'no-store',credentials:'omit',redirect:'follow',signal:controller.signal});
         if(!response.ok){const e=new Error(`成績服務 HTTP ${response.status}`);e.httpStatus=response.status;throw e;}
         const result=await response.json();
+        if(sessionStorage.getItem(KEY)!==token||$('workspace').hidden)throw new Error('驗證已變更，請重新載入成績');
         if(result.status!=='ok'){
+          if(readonly&&result.message==='unknown patrol action'){const e=new Error('成績服務回應未對應此次讀取');e.routeResponseMismatch=true;throw e;}
           if(/AUTH_|SESSION|token/i.test(String(result.code||'')+' '+String(result.message||'')))lock();
           throw new Error(result.message||result.code||'成績服務回傳失敗');
         }
         if(result.contract!==C.CONTRACT)throw new Error('成績服務尚未部署此版本，請保留原檔');
         if(sessionStorage.getItem(KEY)!==token||$('workspace').hidden)throw new Error('驗證已變更，請重新載入成績');
         return result;
-      }catch(e){failure=e;if(!readonly||!([404,429,500,502,503,504].includes(e.httpStatus)||['AbortError','TypeError'].includes(e.name))||attempt===count-1)break;await new Promise(resolve=>setTimeout(resolve,800*(attempt+1)));}
+      }catch(e){failure=e;if(!readonly||!([404,429,500,502,503,504].includes(e.httpStatus)||e.routeResponseMismatch||['AbortError','TypeError'].includes(e.name))||attempt===count-1||deadline-Date.now()<=800*(attempt+1)||sessionStorage.getItem(KEY)!==token||$('workspace').hidden)break;await new Promise(resolve=>setTimeout(resolve,800*(attempt+1)));}
       finally{clearTimeout(timer);}
     }
+    if(readonly&&failure?.name==='AbortError')throw new Error('保存成績讀取逾時，已停止等待。請按「重新讀取保存版本」重試，無需重新選檔。');
     throw failure;
   }
   function setBusy(value){busy=value;for(const id of ['scoreImport','scorePublish','scoreRefresh','scoreRestore','scoreHistoryPreview'])$(id).disabled=value;updatePublish();}
@@ -54,10 +61,10 @@
   async function load(){if(busy)return;setBusy(true);msg('正在讀取已保存成績…');try{await read();pending=null;restore=null;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;msg(snapshot.available?'已讀取私有保存版本；更新資料時才需要選檔。':'尚未初始化成績。請選原檔、預覽並確認保存。');}catch(e){msg(e.message,true);}finally{setBusy(false);}}
   function selectedMonths(){return snapshot?C.periodMonths(snapshot.months.map(s=>s.month),$('scorePeriod').value):[];}
   function initializeFilters(){
-    const months=snapshot.months.map(s=>s.month),old=$('scorePeriod').value;
+    const months=snapshot.months.map(s=>s.month),old=$('scorePeriod').value,oldRegion=$('scoreRegion').value;
     $('scorePeriod').innerHTML='<option value="half">近半年（以最新資料月為止）</option>'+C.quarterInfo(months).reverse().map(q=>`<option value="quarter:${q.key}">${escape(q.key)}（${q.complete?'完整':'不完整 '+q.present.length+'/3月'}）</option>`).join('')+months.slice().reverse().map(m=>`<option value="${m.monthKey}">${m.monthKey}</option>`).join('');
     if(Array.from($('scorePeriod').options).some(o=>o.value===old))$('scorePeriod').value=old;
-    $('scoreRegion').innerHTML='<option value="">A–D 全部</option>'+C.REGIONS.map(r=>`<option value="${r}">${r}</option>`).join('');updateStores();
+    $('scoreRegion').innerHTML='<option value="">A–D 全部</option>'+C.REGIONS.map(r=>`<option value="${r}">${r}</option>`).join('');if(C.REGIONS.includes(oldRegion))$('scoreRegion').value=oldRegion;updateStores();
     $('scoreHistory').innerHTML='<option value="">選擇月份歷史版本</option>'+snapshot.months.flatMap(s=>s.history.slice().reverse().map(v=>`<option value="${escape(s.month.monthKey+'|'+v.revision)}">${escape(s.month.monthKey+'｜'+v.publishedAt+'｜'+v.sourceName)}</option>`)).join('');
   }
   function updateStores(){const previous=$('scoreStore').value,region=$('scoreRegion').value;const stores=[...new Set(selectedMonths().flatMap(m=>m.records.filter(r=>!region||r.region===region).map(r=>r.store)))].sort();$('scoreStore').innerHTML='<option value="">全部店點</option>'+stores.map(s=>`<option value="${escape(s)}">${escape(s)}</option>`).join('');if(stores.includes(previous))$('scoreStore').value=previous;}
@@ -142,8 +149,8 @@
   $('scoreBody').addEventListener('click',e=>{const b=e.target.closest('[data-score-detail]');if(b)detail(b.dataset.scoreDetail);});
   $('scoreHistoryPreview').addEventListener('click',previewHistory);$('scoreRestore').addEventListener('click',restoreHistory);$('scoreRestoreConfirm').addEventListener('change',updatePublish);$('scoreHistory').addEventListener('change',()=>{restore=null;$('scoreRestorePreview').hidden=true;updatePublish();});
   $('scoreExport').addEventListener('click',()=>exportData(false));$('scoreBrief').addEventListener('click',()=>exportData(true));
-  function observeAuth(){if(window.PortalLogout?.isLocked()||!$('workspace'))return;const token=sessionStorage.getItem(KEY);if($('workspace').hidden){if(verifiedToken&&!locked){snapshot=null;pending=null;verifiedToken='';loaded=false;$('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';}return;}if(token&&token!==verifiedToken){verifiedToken=token;locked=false;load();}}
-  new MutationObserver(observeAuth).observe($('workspace'),{attributes:true,attributeFilter:['hidden']});
+  function observeAuth(){if(window.PortalLogout?.isLocked()||!$('workspace'))return;const token=sessionStorage.getItem(KEY);if($('workspace').hidden){if(verifiedToken&&!locked){snapshot=null;pending=null;verifiedToken='';loaded=false;$('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';}return;}if(token&&token!==verifiedToken){verifiedToken=token;locked=false;load();}else if(token&&!loaded&&!busy&&!$('storePanel').hidden)load();}
+  const authObserver=new MutationObserver(observeAuth);authObserver.observe($('workspace'),{attributes:true,attributeFilter:['hidden']});authObserver.observe($('storePanel'),{attributes:true,attributeFilter:['hidden']});
   window.addEventListener('pageshow',observeAuth);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&verifiedToken)load();});
   window.addEventListener('department-session-cleared',()=>lock('驗證已結束，請重新登入。'));
   setInterval(()=>{if(!verifiedToken)return;if(sessionStorage.getItem(KEY)!==verifiedToken)return lock('督導驗證已變更，請重新登入。');try{const part=verifiedToken.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'),claims=JSON.parse(atob(part));if(Number.isFinite(claims.exp)&&claims.exp*1000<=Date.now())lock();}catch{}},10000);
