@@ -7,11 +7,12 @@ const baseURL=process.env.DEPARTMENT_GOLD_PREVIEW_URL||'http://127.0.0.1:8765';
 const hash=v=>crypto.createHash('sha256').update(v).digest('hex');
 const staff=(medal,extra={})=>({employeeId:'DEMO001',employeeName:'示*甲',region:'北一二A',storeCode:'SYN-A',store:'合成一店',role:'合成職稱',medal,sourceRow:4,sourceFields:[],...extra});
 const month=(key,records,final=false)=>({...C.validateMonth({schema:C.SCHEMA,monthKey:key,sheetName:'動員(全員)',sourceName:'synthetic.xlsx',sourceHash:hash(key),dateRange:{start:key+'-01',end:key+'-28',cutoff:key+'-28'},settlementStatus:final?'final':'provisional',finalConfirmed:final,records,validation:{sourceTotal:records.reduce((s,r)=>s+r.medal,0)}}),versionId:'synthetic-'+key});
-function replacement(){
-  const rows=[['資料日期 : 2026/09/01~09/30',...Array(13).fill(null),'SPE加分總計','金牌'],['Y26/9_北一二(全員)'],['部','區域','區域','督導區','營業店點代碼','服務中心','店內職稱','員編','員工姓名','職級','正/派','9M(含)以上','其他','店型',null,null,'活動金牌'],['北一區','北一二','北一二區','北一二B','SYN-B','合成二店','合成職稱','DEMO001','示*甲',null,null,null,null,null,999,20,999],['北一區','北一二','北一二區','北一二',null,'統計',null,null,null,null,null,null,null,null,999,20]];
+function replacement(monthNumber=9){
+  const number=String(monthNumber).padStart(2,'0'),lastDay=monthNumber===9?30:31;
+  const rows=[[`資料日期 : 2026/${number}/01~${number}/${lastDay}`,...Array(13).fill(null),'SPE加分總計','金牌'],[`Y26/${monthNumber}_北一二(全員)`],['部','區域','區域','督導區','營業店點代碼','服務中心','店內職稱','員編','員工姓名','職級','正/派','9M(含)以上','其他','店型',null,null,'活動金牌'],['北一區','北一二','北一二區','北一二B','SYN-B','合成二店','合成職稱','DEMO001','示*甲',null,null,null,null,null,999,20,999],['北一區','北一二','北一二區','北一二',null,'統計',null,null,null,null,null,null,null,null,999,20]];
   const wb=X.utils.book_new();X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet(rows),'動員(全員)');return {name:'synthetic.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from(X.write(wb,{type:'buffer',bookType:'xlsx'}))};
 }
-async function setup(page,{empty=false}={}){
+async function setup(page,{empty=false,planRouteFailures=0,loseCommitResponse=false}={}){
   let revision='synthetic-r1',counter=0;
   const all=empty?[]:[month('2026-06',[staff(80)]),month('2026-07',[staff(40)],true),month('2026-08',[staff(70,{region:'北一二B',storeCode:'SYN-B',store:'合成二店'})],true),month('2026-09',[staff(10,{region:'北一二B',storeCode:'SYN-B',store:'合成二店'}),staff(2,{employeeId:'DEMO002',employeeName:'示*乙',storeCode:'SYN-C',store:'合成三店'})])];
   const versions=new Map(all.map(m=>[m.versionId,m])),history={},operations={},calls=[];
@@ -24,19 +25,32 @@ async function setup(page,{empty=false}={}){
     else if(p.action==='ptlogout')result={loggedOut:true};
     else if(p.action==='department_ops_read')result=read(p.operationId);
     else if(p.action==='department_ops_publish'){
+      if(p.mode.endsWith('plan')&&planRouteFailures>0){planRouteFailures--;await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({status:'error',message:'unknown patrol action'})});return;}
       const restoring=p.mode.startsWith('restore'),incoming=restoring?[versions.get(p.versionId)]:p.months;
       if(p.mode.endsWith('plan'))result={planReceipt:'synthetic-plan',changes:incoming.map(m=>{const old=all.find(s=>s.monthKey===m.monthKey);return {monthKey:m.monthKey,beforeTotal:old?.validation.total??null,total:m.validation.total,changedPeople:C.diff(old,m).length,older:!!old&&m.dateRange.cutoff<old.dateRange.cutoff,finalDowngrade:old?.settlementStatus==='final'&&m.settlementStatus!=='final'};}),differences:incoming.map(m=>({monthKey:m.monthKey,rows:C.diff(all.find(s=>s.monthKey===m.monthKey),m)}))};
       else {
         for(const m of incoming){const index=all.findIndex(x=>x.monthKey===m.monthKey),saved=restoring?m:{...m,versionId:'synthetic-new-'+(++counter)};if(index<0)all.push(saved);else all[index]=saved;versions.set(saved.versionId,saved);if(!restoring)(history[m.monthKey]||=[]).push({versionId:saved.versionId,cutoff:m.dateRange.cutoff,total:m.validation.total,status:m.settlementStatus,sourceName:m.sourceName});}
         revision='synthetic-r'+(++counter+1);operations[p.operationId]={revision,operationId:p.operationId};result={result:'committed',...read(p.operationId)};
+        if(loseCommitResponse){loseCommitResponse=false;result={message:'unknown patrol action'};}
       }
     }else result={message:'unexpected fixture action'};
     await route.fulfill({status:200,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({status:result.message?'error':'ok',...result})});
   });
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(baseURL+'/department-ops.html');await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#goldMessage')).not.toContainText('正在');
-  return {calls,errors,all};
+  return {calls,errors,all,failNextPlan:()=>{planRouteFailures++;}};
 }
+test('July receipt recovery followed by an August route failure keeps writes single and preserves Q2',async({page})=>{
+  const state=await setup(page,{loseCommitResponse:true});
+  await page.locator('#goldFile').setInputFiles(replacement(7));await page.click('#goldImport');await page.click('#publishGold');await page.check('#monthlyRegression');await page.click('#monthlyCommit');
+  await expect(page.locator('#publishMessage')).toContainText('已查到此次保存紀錄並完成逐值讀回');
+  const july=JSON.stringify(state.all.find(m=>m.monthKey==='2026-07')),q2=JSON.stringify(state.all.find(m=>m.monthKey==='2026-06'));
+  state.failNextPlan();await page.locator('#goldFile').setInputFiles(replacement(8));await page.click('#goldImport');await page.click('#publishGold');
+  await expect(page.locator('#monthlyConfirm')).toBeVisible();await expect(page.locator('#publishMessage')).toContainText('正式版本尚未變更');
+  const augustPlans=state.calls.filter(c=>c.action==='department_ops_publish'&&c.mode==='plan'&&c.months[0].monthKey==='2026-08');expect(augustPlans).toHaveLength(2);expect(augustPlans[0]).toEqual(augustPlans[1]);expect(state.calls.filter(c=>c.mode==='commit')).toHaveLength(1);
+  await page.check('#monthlyRegression');await page.click('#monthlyCommit');await expect(page.locator('#publishMessage')).toContainText('月版本已保存並完成逐值讀回');
+  expect(state.calls.filter(c=>c.mode==='commit')).toHaveLength(2);expect(JSON.stringify(state.all.find(m=>m.monthKey==='2026-07'))).toBe(july);expect(JSON.stringify(state.all.find(m=>m.monthKey==='2026-06'))).toBe(q2);expect(state.errors).toEqual([]);
+});
 test('login opens saved quarter without upload; missing month and historical placements remain explicit',async({page})=>{
   await page.setViewportSize({width:1440,height:1100});
   const state=await setup(page);await expect(page.locator('#peopleCount')).toHaveText('2 人');await expect(page.locator('#goldSummary')).toContainText('122');await expect(page.locator('#peopleBody')).toContainText('無來源');await expect(page.locator('#monthlyStatus')).toContainText('暫定');
