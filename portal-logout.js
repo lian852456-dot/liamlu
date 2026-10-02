@@ -8,10 +8,11 @@
   const SCOPE_NOTE = '同步登出同一瀏覽器內本網站的營運中心頁籤；手機 App 另行登出。';
   const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
   const PT_KEY = 'bei12b_patrol_session_token_v2';
+  const UAT_KEY = 'bei12b_patrol_uat_session_token_v1';
   const AUDIT_KEY = 'bei12b_pt_session_token';
   const PATROL_API = 'https://script.google.com/macros/s/AKfycbxqBtW2yQw_u4qqJ9Knz6CK34hAiunaa6lIQu4pMa8Ff2voJZCWKEh8MXTJ6qAoGTax/exec';
   const AUDIT_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
-  const LOGOUT_BUTTONS = '[data-portal-logout], #portal-logout, #departmentLogout, #monthlyLogout, #store-rules-logout, #privateLogoutBtn, #privateLogout, #patrolLogout, #supervisorLogoutButton, #logoutButton, a[onclick="kpiLogout()"]';
+  const LOGOUT_BUTTONS = '[data-portal-logout], #portal-logout, #departmentLogout, #monthlyLogout, #store-rules-logout, #privateLogoutBtn, #privateLogout, #patrolLogout, #supervisorLogoutButton, #logoutButton, #signOutButton, a[onclick="kpiLogout()"]';
   const nativeFetch = scope.fetch.bind(scope);
   let locked = false;
   let activeWrites = 0;
@@ -31,11 +32,13 @@
       && Number.isFinite(value.at) && Object.keys(value).every(key => ['type','version','id','at'].includes(key));
   }
   function latestEvent() { const value = parse(read('localStorage', EVENT_KEY)); return validEvent(value) ? value : null; }
-  let epoch = read('sessionStorage', SEEN_KEY);
+  let savedEpoch;
+  try { savedEpoch = scope.sessionStorage.getItem(SEEN_KEY); } catch { savedEpoch = null; }
+  let epoch = savedEpoch ?? '';
   const initial = latestEvent();
   // A tab restored from history or cloned from an opener must observe any logout since it last ran.
-  const missedLogout = epoch && initial && epoch !== initial.id;
-  if (!epoch) { epoch = initial?.id || ''; write('sessionStorage', SEEN_KEY, epoch); }
+  const missedLogout = initial && ((savedEpoch !== null && epoch !== initial.id) || (savedEpoch === null && hasIdentity()));
+  if (savedEpoch === null && !missedLogout) { epoch = initial?.id || ''; write('sessionStorage', SEEN_KEY, epoch); }
   function assertActive(expected = epoch) {
     if (locked || expected !== epoch) throw new DOMException('營運中心網頁已登出，請重新驗證。', 'AbortError');
   }
@@ -46,7 +49,7 @@
     assertActive(expected);
     let action = '';
     try { action = JSON.parse(args[1]?.body || '{}').action || ''; } catch {}
-    const mutation = /(?:write|publish|restore|commit)$/.test(action) && action !== 'ptlogout';
+    const mutation = /(?:write|publish|restore|commit|upload)$/.test(action) && action !== 'ptlogout';
     if (mutation) activeWrites += 1;
     let finished = false;
     const finish = () => { if (!finished && mutation) { activeWrites -= 1; finished = true; } };
@@ -66,7 +69,7 @@
   };
 
   function clearIdentity() {
-    for (const key of [PT_KEY, AUDIT_KEY, EMPLOYEE_KEY, 'bei12b_half_checks']) remove('sessionStorage', key);
+    for (const key of [PT_KEY, UAT_KEY, AUDIT_KEY, EMPLOYEE_KEY, 'bei12b_half_checks']) remove('sessionStorage', key);
     for (const key of [EMPLOYEE_KEY, 'bei12b_kpi_emp']) remove('localStorage', key);
     // Only the existing protected summary cache is cleared. Draft files, prefs and device IDs remain.
     try {
@@ -92,6 +95,19 @@
   function allowedAuditOrigin(value) {
     try { const url = new URL(value); return url.protocol === 'https:' && !url.port &&
       (['script.google.com','script.googleusercontent.com'].includes(url.hostname) || url.hostname.endsWith('-script.googleusercontent.com')); } catch { return false; }
+  }
+  function auditTransportSource(source, frame) {
+    // HtmlService replies from a sandbox child of the form target. Only that
+    // frame's descendant chain is accepted, alongside origin + request nonce.
+    try {
+      for (let depth = 0; source && depth < 12; depth += 1) {
+        if (source === frame.contentWindow) return true;
+        const parent = source.parent;
+        if (!parent || parent === source || parent === scope) return false;
+        source = parent;
+      }
+    } catch {}
+    return false;
   }
   function revokeAudit(token) {
     // Preserve audit's existing POST form + iframe response transport.
@@ -131,7 +147,7 @@
   }
   async function applyLogout(event, broadcast = false) {
     if (locked) return logoutPromise;
-    const tokens = [[PATROL_API,read('sessionStorage',PT_KEY)],[AUDIT_API,read('sessionStorage',AUDIT_KEY)]].filter(([,token]) => token);
+    const tokens = [[PATROL_API,read('sessionStorage',PT_KEY)],[PATROL_API,read('sessionStorage',UAT_KEY)],[AUDIT_API,read('sessionStorage',AUDIT_KEY)]].filter((entry,index,all) => entry[1] && all.findIndex(other => other[0] === entry[0] && other[1] === entry[1]) === index);
     locked = true; epoch = event.id;
     write('sessionStorage',SEEN_KEY,epoch);
     clearIdentity();
@@ -146,6 +162,7 @@
       if (!stored && !posted) note('本頁已登出，但頁籤同步通知未確認，請關閉其他已開啟的營運中心頁籤。');
     }
     logoutPromise = (async () => {
+      if (!document.body) await new Promise(resolve => document.addEventListener('DOMContentLoaded',resolve,{once:true}));
       const results = await Promise.all(tokens.map(([url,token]) => revoke(url,token)));
       if (results.some(value => !value)) note('本頁已登出並通知網站頁籤；督導連線撤銷未確認，請關閉其他已開啟的營運中心頁籤。');
       // A new document removes each page's private memory without changing its business module.
@@ -159,7 +176,7 @@
   }
   function checkMissedLogout() { const event = latestEvent(); if (event && event.id !== epoch) accept(event); }
   function hasIdentity() {
-    return read('sessionStorage',PT_KEY) || read('sessionStorage',AUDIT_KEY) || read('sessionStorage',EMPLOYEE_KEY)
+    return read('sessionStorage',PT_KEY) || read('sessionStorage',UAT_KEY) || read('sessionStorage',AUDIT_KEY) || read('sessionStorage',EMPLOYEE_KEY)
       || read('localStorage',EMPLOYEE_KEY) || read('localStorage','bei12b_kpi_emp');
   }
   async function requestLogout() {
@@ -217,7 +234,7 @@
     const message = event.data;
     const pending = auditRevocations.get(message?.requestId);
     if (pending && allowedAuditOrigin(event.origin)
-        && event.source === pending.frame.contentWindow && message.type === 'north12b-gas-response-v1') {
+        && auditTransportSource(event.source,pending.frame) && message.type === 'north12b-gas-response-v1') {
       const result = message.body;
       pending.finish(result?.status === 'ok' || result?.reason === 'AUTH_SESSION_REVOKED');
     }

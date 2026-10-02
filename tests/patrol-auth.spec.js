@@ -237,3 +237,28 @@ test('服務未設定 PT_KEY 時維持鎖定並顯示管理者設定錯誤', asy
   await expect(page.locator('#patrolAuthMessage')).toContainText('管理者尚未完成安全設定');
   await expect(page.locator('#patrolAppHost')).toBeEmpty();
 });
+
+test('media upload, attachment linking and readback all block logout; cancellation preserves files and completed evidence',async({page})=>{
+ await installAuthGas(page);let releaseUpload,releaseLink,releaseRead;
+ const uploadWait=new Promise(r=>releaseUpload=r),linkWait=new Promise(r=>releaseLink=r),readWait=new Promise(r=>releaseRead=r);
+ let uploading=false,linking=false,reading=false,rows=[];
+ await page.route(GAS_PATTERN,async route=>{
+  const request=route.request(),url=new URL(request.url());let p;try{p=request.postDataJSON();}catch{}
+  if(p?.action==='half_media_upload'){uploading=true;await uploadWait;return route.fulfill({json:{status:'ok',media:{id:'SYNTHETIC_MEDIA',name:'SYNTHETIC.jpg',mimeType:'image/jpeg'}}});}
+  const action=url.searchParams.get('action'),callback=url.searchParams.get('callback');
+  if(action==='hwrite'){rows=JSON.parse(url.searchParams.get('payload'));linking=true;await linkWait;return route.fulfill({contentType:'application/javascript',body:`${callback}(${JSON.stringify({status:'ok',written:rows.length})})`});}
+  if(p?.action==='hread'&&rows.length){reading=true;await readWait;return route.fulfill({json:{status:'ok',rows}});}
+  return route.fallback();
+ });
+ await page.goto(PAGE_URL);await unlock(page,VALID_KEY);await page.locator('[data-view="half"]').click();await page.locator('#halfInspector').fill('SYNTHETIC_INSPECTOR');
+ await page.locator('.half-evidence-file').first().setInputFiles({name:'SYNTHETIC.jpg',mimeType:'image/jpeg',buffer:Buffer.from('synthetic')});
+ page.once('dialog',d=>d.dismiss());await page.locator('#privateLogoutBtn').click();await expect(page.locator('.half-media-list').first()).toContainText('SYNTHETIC.jpg');
+ await page.locator('.half-media-upload').first().click();await expect.poll(()=>uploading).toBe(true);
+ for(const next of [()=>releaseUpload(),()=>releaseLink(),()=>releaseRead()]){
+  const dialog=page.waitForEvent('dialog');const clicking=page.locator('#privateLogoutBtn').click();const warning=await dialog;expect(warning.type()).toBe('alert');expect(warning.message()).toContain('正在保存');await warning.accept();await clicking;expect(await page.evaluate(()=>sessionStorage.getItem('bei12b_patrol_session_token_v2'))).toBe(SESSION_TOKEN);
+  next();if(!linking)await expect.poll(()=>linking).toBe(true);else if(!reading)await expect.poll(()=>reading).toBe(true);
+ }
+ await expect(page.locator('#halfMsg')).toContainText('已上傳並同步');await expect(page.locator('.half-media-upload').first()).toBeEnabled();
+ page.once('dialog',d=>d.dismiss());await page.locator('#privateLogoutBtn').click();await expect(page.locator('.half-media-list').first()).toContainText('SYNTHETIC.jpg');
+ expect(rows).toHaveLength(1);expect(rows[0].evidenceNames).toContain('SYNTHETIC_MEDIA');
+});

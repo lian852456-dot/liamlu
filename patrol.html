@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <script src="portal-logout.js?v=20261002-1"></script>
+  <script src="portal-logout.js?v=20261002-logout-2"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Liam情報站 · 北一二B</title>
@@ -2950,6 +2950,7 @@ function renderHalfMediaList(box){
 }
 async function uploadHalfMedia(box){
   const key=box.dataset.mediaKey;const files=halfPendingMedia.get(key)||[];if(!files.length){showHalfMsg('請先選擇照片或影片','err');return;}
+  const finishWrite=window.PortalLogout?.beginWrite();
   const item=Number(box.dataset.halfItem);const current=currentHalfRows();const inspector=document.getElementById('halfInspector').value.trim();const button=box.querySelector('.half-media-upload');button.disabled=true;
   try{
     const stored=mediaItems(box.dataset.evidence||'');const uploaded=[];
@@ -2965,13 +2966,16 @@ async function uploadHalfMedia(box){
       if(privateAccount){
         const linked=await privateInspectionRequest('write',[mediaRow]);
         if(linked.status!=='ok') throw new Error(linked.message||'附件連結同步失敗');
+        const readback=await privateInspectionRequest('read');
+        const saved=readback.status==='ok' && (readback.rows||[]).find(row=>halfKey(row)===halfKey(mediaRow));
+        if(!saved || String(saved.evidenceNames||'')!==String(mediaRow.evidenceNames||'')) throw new Error('附件連結讀回未確認，請先讀回雲端結果，勿重複上傳');
       }
     }
     showHalfMsg(`已上傳並同步 ${uploaded.length} 個私有檔案；可立即從歷史紀錄預覽／回放`,'ok');
   }catch(err){
     const linked=mediaItems(box.dataset.evidence||'').length;
     showHalfMsg(linked?`檔案已上傳 ${linked} 個，但附件連結同步失敗：${err.message}；本機仍保留連結，請稍後按「儲存並同步本期檢查」`:`上傳失敗：${err.message}`,'err');
-  }finally{button.disabled=false;}
+  }finally{button.disabled=false;finishWrite?.();}
 }
 function renderHalfForm(){
   initHalfSelectors(); const {date,store,period,checkId,rows}=currentHalfRows();
@@ -2999,8 +3003,9 @@ function submitHalfCheck(){
   const rows=readHalfForm(); mergeHalfRows(rows); renderHalfSummary(); renderHalfHistory();
   if(!privateAccount){showHalfMsg('已保留本機資料；尚未解鎖，未上傳雲端','err');return;}
   const chunks=[];let part=[];rows.forEach(r=>{part.push(r);if(encodeURIComponent(JSON.stringify(part)).length>3500){if(part.length>1){part.pop();chunks.push(part);part=[r];}else{chunks.push(part);part=[];}}});if(part.length)chunks.push(part);
+  const finishWrite=window.PortalLogout?.beginWrite();
   let chain=Promise.resolve(),written=0;chunks.forEach(chunk=>{chain=chain.then(()=>privateInspectionRequest('write',chunk)).then(res=>{if(res.status!=='ok')throw new Error(res.message||'寫入失敗');written+=Number(res.written||chunk.length||0);});});
-  chain.then(async()=>{await loadHalfChecks();showHalfMsg(`已同步雲端（${written} 列）；照片／影片已連結至本期檢查，可從歷史紀錄預覽／回放`,'ok');}).catch(err=>showHalfMsg(err?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端同步失敗：${err.message}；本機資料仍保留`,'err'));
+  chain.then(async()=>{await loadHalfChecks();showHalfMsg(`已同步雲端（${written} 列）；照片／影片已連結至本期檢查，可從歷史紀錄預覽／回放`,'ok');}).catch(err=>showHalfMsg(err?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端同步失敗：${err.message}；本機資料仍保留`,'err')).finally(()=>finishWrite?.());
 }
 function renderHalfSummary(){
   const c=document.getElementById('halfSummary');if(!c)return;const active=activeHalfRows(halfChecks);const groups={};active.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const issues=active.filter(r=>r.result==='abnormal').length;const pending=Object.values(groups).filter(rows=>{const expected=halfItemsForDate(rows[0]?.date).length;return rows.filter(r=>r.result).length<expected;}).length;c.innerHTML=`<div class="half-stat"><strong>${Object.keys(groups).length}</strong><span>已建立到店檢查</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>缺失／異常項目</span></div><div class="half-stat"><strong>${pending}</strong><span>尚有待填檢查</span></div>`;}

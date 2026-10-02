@@ -144,7 +144,7 @@ test('page contract keeps Liam Patrol endpoint, session boundary, preflight and 
   assert.match(bundle,/action:'ptwrite'/);
   assert.match(bundle,/verifyReadback/);
   assert.match(bundle,/\.xlsx,\.xls,\.csv,\.tsv/);
-  assert.match(html,/type="module" src="patrol-import\.js"/);
+  assert.match(html,/type="module" src="patrol-import\.js\?v=20261002-logout-2"/);
   assert.match(html,/原本「貼上巡店紀錄/);
   assert.doesNotMatch(bundle,/localStorage\.setItem\([^)]*(?:passcode|key)/i);
 });

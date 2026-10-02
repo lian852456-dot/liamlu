@@ -135,3 +135,71 @@ test('common controls hide anonymously and a new verified login removes the old 
  await expect.poll(()=>page.evaluate(()=>sessionStorage.getItem('north12b_private_dashboard_employee_id'))).toBe('SYNTHETIC_EMPLOYEE');
  await expect(page.locator('#portal-session-note')).not.toContainText('已同步登出');
 });
+
+test('first logout missed by a tab with an initialized empty epoch is enforced after full reload',async({context,page})=>{
+ const {b,calls}=await intercept(context);const other=await context.newPage();
+ await other.addInitScript(()=>{window.BroadcastChannel=undefined;window.addEventListener('storage',e=>{if(e.key==='north12b_portal_logout_event_v1')e.stopImmediatePropagation();},true);});
+ const token=b.post({action:'ptauth',key:'synthetic-passcode'}).token;
+ await identify(page);await identify(other,{token});expect(await other.evaluate(()=>sessionStorage.getItem('north12b_portal_logout_seen_v1'))).toBe('');
+ await logout(page);await expect(page.locator('#portal-session-note')).toContainText('已同步登出');
+ expect(await other.evaluate(()=>sessionStorage.getItem('bei12b_patrol_session_token_v2'))).toBe(token);
+ await other.reload();await expect(other.locator('#portal-session-note')).toContainText('已同步登出');
+ expect(await other.evaluate(({EMP,PT})=>[sessionStorage.getItem(EMP),sessionStorage.getItem(PT)],{EMP,PT})).toEqual([null,null]);
+ expect(calls.some(c=>c.action==='ptlogout'&&c.token===token)).toBe(true);expect(b.post({action:'ptauth',token}).reason).toBe('AUTH_SESSION_REVOKED');
+});
+
+for(const [filename,key] of [['patrol-import.html',PT],['patrol-uat.html','bei12b_patrol_uat_session_token_v1']]){
+ test(filename+' shares logout, cancels without discarding work and revokes its stored supervisor token',async({context,page})=>{
+  const {b,calls,releaseLogout}=await intercept(context,{holdLogout:true});const token=b.post({action:'ptauth',key:'synthetic-passcode'}).token;
+  await page.goto(BASE+filename);await page.evaluate(({key,token})=>{sessionStorage.setItem(key,token);const marker=document.createElement('p');marker.id='synthetic-private-marker';marker.textContent='SYNTHETIC_IMPORT_PREVIEW';document.body.append(marker);},{key,token});
+  await expect(page.locator('[data-portal-logout]')).toBeVisible();page.once('dialog',d=>d.dismiss());await page.locator('[data-portal-logout]').click();await expect(page.locator('#synthetic-private-marker')).toHaveText('SYNTHETIC_IMPORT_PREVIEW');
+  const home=await context.newPage();await identify(home);await logout(home);await expect(page.locator('#portal-logout-screen')).toBeVisible();expect(await page.evaluate(key=>sessionStorage.getItem(key),key)).toBeNull();
+  releaseLogout();await expect(page.locator('#portal-session-note')).toContainText('已同步登出');expect(calls.some(c=>c.action==='ptlogout'&&c.token===token)).toBe(true);expect(b.post({action:'ptauth',token}).reason).toBe('AUTH_SESSION_REVOKED');
+ });
+}
+
+test('audit accepts its legitimate nested GAS sandbox and rejects foreign frame, wrong nonce and wrong origin',async({context,page})=>{
+ let release;const wait=new Promise(r=>release=r);let requested;
+ await context.route('https://script.google.com/**',async route=>{
+  const url=new URL(route.request().url());requested=url.searchParams.get('requestId');
+  await route.fulfill({contentType:'text/html',body:`<iframe src="https://script.googleusercontent.com/_session-test/nested?requestId=${requested}"></iframe>`});
+ });
+ await context.route('https://script.googleusercontent.com/**',async route=>{
+  const id=new URL(route.request().url()).searchParams.get('requestId');await wait;
+  await route.fulfill({contentType:'text/html',body:`<script>top.postMessage(${JSON.stringify({type:'north12b-gas-response-v1',requestId:id,body:{status:'ok'}})},'${new URL(BASE).origin}');</script>`});
+ });
+ await page.goto(BASE+'kpi-battle.html');await page.evaluate(()=>sessionStorage.setItem('bei12b_pt_session_token','SYNTHETIC_AUDIT_TOKEN'));
+ page.once('dialog',d=>d.accept());await page.locator('[data-portal-logout]').click();await expect(page.locator('#portal-logout-screen')).toBeVisible();await expect.poll(()=>requested).toBeTruthy();
+ await expect.poll(()=>page.evaluate(()=>document.querySelector('iframe[name^="portal_logout_"]')?.contentWindow.length)).toBe(1);
+ const invalid=await page.evaluate(id=>{
+  const frame=document.querySelector('iframe[name^="portal_logout_"]');const child=frame.contentWindow.frames[0];const other=document.createElement('iframe');document.body.append(other);
+  const body={type:'north12b-gas-response-v1',requestId:id,body:{status:'ok'}};
+  window.dispatchEvent(new MessageEvent('message',{origin:'https://script.googleusercontent.com',source:other.contentWindow,data:body}));
+  window.dispatchEvent(new MessageEvent('message',{origin:'https://evil.example',source:child,data:body}));
+  window.dispatchEvent(new MessageEvent('message',{origin:'https://script.googleusercontent.com',source:child,data:{...body,requestId:'wrong-nonce'}}));
+  return Boolean(document.querySelector('iframe[name^="portal_logout_"]'));
+ },requested);
+ expect(invalid).toBe(true);await expect(page.locator('#portal-logout-screen')).toBeVisible();release();
+ await expect(page.locator('#portal-session-note')).toContainText('已同步登出');await expect(page.locator('#portal-session-note')).not.toContainText('撤銷未確認');
+});
+
+test('formal import holds logout through its actual write and readback and permits cancellation without clearing preview',async({context,page})=>{
+ const {b}=await intercept(context);let releaseWrite,releaseRead;const writeWait=new Promise(r=>releaseWrite=r),readWait=new Promise(r=>releaseRead=r);let writing=false,reading=false,rows=[];
+ await context.route('https://script.google.com/**',async route=>{
+  const url=new URL(route.request().url());let p;try{p=route.request().postDataJSON();}catch{}
+  if(url.searchParams.get('action')==='ptwrite'){rows=JSON.parse(url.searchParams.get('payload'));writing=true;await writeWait;return route.fulfill({contentType:'application/javascript',body:`${url.searchParams.get('callback')}(${JSON.stringify({status:'ok',written:rows.length})})`});}
+  if(p?.action==='ptdetail'){reading=true;await readWait;return route.fulfill({json:{status:'ok',rows,totalRows:rows.length}});}
+  return route.fallback();
+ });
+ await page.goto(BASE+'patrol-import.html');await page.locator('#passcode').fill('synthetic-passcode');await page.locator('#loginBtn').click();await expect(page.locator('#authStatus')).toContainText('督導連線正常');
+ await page.evaluate(async()=>{
+  const r=await import('./patrol-import-runtime.js?v=20261002-logout-2');
+  const row={fillTime:'2026/10/2 10:00',arriveTime:'2026/10/2 10:00',leaveTime:'2026/10/2 11:00',district:'北一二B',code:'DNB10174',store:'台北通化',inspector:'SYNTHETIC_INSPECTOR',item:1,result:'v',reason:'',month:'2026-10'};
+  r.state.pending={fileName:'SYNTHETIC.csv',parsedRows:[row],classified:{writeRows:[row]},groups:[{month:row.month,store:row.store}],blocked:false};document.getElementById('preview').classList.add('show');r.setBusy(false);
+ });
+ page.once('dialog',d=>d.dismiss());await page.locator('[data-portal-logout]').click();await expect(page.locator('#preview')).toBeVisible();
+ await page.locator('#confirmBtn').click();await expect.poll(()=>writing).toBe(true);
+ const busy=async()=>{const dialog=page.waitForEvent('dialog'),clicking=page.locator('[data-portal-logout]').click();const warning=await dialog;expect(warning.type()).toBe('alert');await warning.accept();await clicking;expect(await page.evaluate(()=>sessionStorage.getItem('bei12b_patrol_session_token_v2'))).toBeTruthy();};
+ await busy();releaseWrite();await expect.poll(()=>reading).toBe(true);await busy();releaseRead();await expect(page.locator('#writeMessage')).toContainText('讀回驗證 1/1 筆一致');
+ page.once('dialog',d=>d.dismiss());await page.locator('[data-portal-logout]').click();await expect(page.locator('#preview')).toBeVisible();
+});

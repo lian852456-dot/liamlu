@@ -9,7 +9,10 @@ const state = {
   pending:null,
   busy:false
 };
-const $ = id => document.getElementById(id);
+const elements = new Map([...document.querySelectorAll('[id]')].map(element => [element.id,element]));
+const $ = id => document.getElementById(id) || elements.get(id) || (window.PortalLogout?.isLocked() ? document.createElement('div') : null);
+window.PortalLogout?.setWorkState(() => ({busy:state.busy,unsaved:Boolean(state.pending && !state.pending.completed)}));
+window.addEventListener('portal-before-logout',() => { state.token = ''; state.pending = null; });
 const escapeHtml = value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
 function setBusy(value) {
@@ -22,6 +25,7 @@ function setBusy(value) {
       element.disabled = state.busy || !pending || pending.completed || pending.blocked || !pending.classified || pending.classified.writeRows.length === 0;
     } else element.disabled = state.busy;
   });
+  if (window.PortalLogout?.isLocked()) return;
   $('fileInput').disabled = state.busy;
 }
 
@@ -34,18 +38,21 @@ function setStep(active, doneThrough) {
 }
 
 function status(elementId, message, type) {
+  if (window.PortalLogout?.isLocked()) return;
   const element = $(elementId);
   element.className = `status-line ${type || 'info'}`;
   element.innerHTML = `<span class="status-dot"></span><span>${escapeHtml(message)}</span>`;
 }
 
 function showMessage(elementId, message, type) {
+  if (window.PortalLogout?.isLocked()) return;
   const element = $(elementId);
   element.className = `message show ${type || 'info'}`;
   element.textContent = message;
 }
 
 function hideMessage(elementId) {
+  if (window.PortalLogout?.isLocked()) return;
   const element = $(elementId);
   element.className = 'message';
   element.textContent = '';
@@ -93,6 +100,7 @@ async function postAction(action, params, timeoutMs) {
 
 function jsonpWrite(rows) {
   return new Promise((resolve, reject) => {
+    try { window.PortalLogout?.assertActive(); } catch (error) { reject(error); return; }
     if (!state.token) { reject(new Error('督導驗證已逾時，請重新驗證')); return; }
     const callback = `patrolLocalImport_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement('script');
@@ -107,6 +115,7 @@ function jsonpWrite(rows) {
       if (error) reject(error); else resolve(value);
     }
     window[callback] = payload => {
+      try { window.PortalLogout?.assertActive(); } catch (error) { finish(error); return; }
       if (authFailure(payload)) {
         clearToken();
         finish(new Error('督導驗證已逾時，請重新驗證'));
@@ -150,6 +159,7 @@ async function authenticate(passcode) {
   if (!result || result.status !== 'ok' || !result.token) throw new Error(result && result.message ? result.message : '驗證失敗');
   state.token = String(result.token);
   sessionStorage.setItem(SESSION_STORAGE_KEY, state.token);
+  window.PortalLogout?.notifyLogin();
   return result;
 }
 
