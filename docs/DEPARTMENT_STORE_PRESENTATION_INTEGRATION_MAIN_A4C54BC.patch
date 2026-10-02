@@ -1,0 +1,100 @@
+--- a/department-ops.html
++++ b/department-ops.html
+@@ -112,7 +112,7 @@
+           <div id="scoreSummary" class="summary-grid"></div>
+           <section class="data-card"><h3>四區比較</h3><p class="score-limits">所選月份的門市平均分；部平均按各店等權計算。此區保留四區供比較。</p><div id="scoreRegions" class="score-regions"></div></section>
+           <section class="data-card"><h3>各月成績趨勢</h3><p class="score-limits">依目前部區與店點篩選，缺月不補零。</p><div id="scoreTrend"></div></section>
+-          <section class="data-card"><div class="card-head"><h3>各店月成績與缺失</h3><div class="score-actions"><button id="scoreExport" class="secondary-button" type="button">匯出 Excel</button><button id="scoreBrief" class="secondary-button" type="button">匯出簡報資料</button></div></div><p id="scoreWarnings" class="score-limits"></p><div class="table-scroll"><table><thead id="scoreHead"></thead><tbody id="scoreBody"></tbody></table></div></section>
++          <section class="data-card"><div class="card-head"><h3>各店月成績與缺失</h3><div class="score-actions"><button id="scoreExport" class="secondary-button" type="button">匯出 Excel</button><button id="scoreBrief" class="secondary-button" type="button">匯出簡報資料</button><button id="scorePptx" class="secondary-button" type="button">產生可編輯PPT</button><button id="scorePrintPdf" class="secondary-button" type="button">列印／另存PDF</button></div></div><p id="scoreWarnings" class="score-limits"></p><div class="table-scroll"><table><thead id="scoreHead"></thead><tbody id="scoreBody"></tbody></table></div></section>
+           <section id="scoreDetail" class="data-card" hidden></section>
+           <section class="data-card"><h3>歷史版本回復</h3><p class="score-limits">先預覽歷史版本，再確認回復；保留目前版本。</p><div class="score-actions"><select id="scoreHistory" aria-label="歷史版本"></select><button id="scoreHistoryPreview" class="secondary-button" type="button">預覽歷史版本</button></div><div id="scoreRestorePreview" hidden><p id="scoreRestoreMeta"></p><div id="scoreRestoreDiff"></div><label class="score-confirm"><input id="scoreRestoreConfirm" type="checkbox">我已核對此月份歷史版本，確認回復</label><button id="scoreRestore" class="primary-button" type="button" disabled>確認回復此月</button></div></section>
+         </section>
+@@ -130,9 +130,11 @@
+   <script src="assets/vendor/officecrypto.bundle.min.js?v=0.0.19"></script>
+   <script src="department-ops-core.js?v=20260930-2"></script>
+   <script src="department-scores-core.js?v=20261002-1"></script>
++  <script src="department-store-presentation-core.js?v=20261002-store-export-2"></script>
++  <script src="department-store-presentation-browser.js?v=20261002-store-export-2"></script>
+   <script src="department-gold-monthly-core.js?v=20261002-1" defer></script>
+   <script src="department-gold-monthly-ui.js?v=20261002-logout-2" defer></script>
+-  <script src="department-scores.js?v=20261002-display-1" defer></script>
++  <script src="department-scores.js?v=20261002-store-export-2" defer></script>
+   <script src="department-ops.js?v=20261002-logout-2" defer></script>
+   <script src="store-rule-reminders.js?v=20261002-1" defer></script>
+ </body>
+--- a/department-scores.js
++++ b/department-scores.js
+@@ -11,7 +11,18 @@
+   const msg=(v,error=false)=>{$('scoreMessage').textContent=v;$('scoreMessage').className='message'+(error?' error':'');};
+   const digest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(v=>v.toString(16).padStart(2,'0')).join('');
+   const monthHash=m=>digest(new TextEncoder().encode(C.canonical(m)));
++  function presentationAuthorized(){
++    if(!(loaded&&snapshot&&!locked&&!$('workspace').hidden&&verifiedToken&&sessionStorage.getItem(KEY)===verifiedToken&&!window.PortalLogout?.isLocked()))return false;
++    // Only the server-verified loaded session is eligible; decode its expiry at every boundary.
++    try{const part=verifiedToken.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'),claims=JSON.parse(atob(part));return Number.isFinite(claims.exp)&&Date.now()<claims.exp*1000;}catch{return false;}
++  }
++  const presentationExporter=window.DepartmentStorePresentationBrowser?.createExporter({
++    getBrief:()=>C.brief(selectedMonths(),filters()),
++    isAuthorized:presentationAuthorized,
++    onStatus:v=>msg(v)
++  });
+   function lock(message) {
++    presentationExporter?.invalidate();
+     snapshot=null;pending=null;restore=null;verifiedToken='';loaded=false;locked=true;
+     sessionStorage.removeItem(KEY);$('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;
+     for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';
+@@ -52,6 +63,7 @@
+   function selectedKeys(){return Array.from(document.querySelectorAll('[data-score-month]:checked')).map(e=>e.value);}
+   function updatePublish(){ $('scorePublish').disabled=busy||!pending||!loaded||!selectedKeys().length||!$('scoreConfirm').checked; $('scoreRestore').disabled=busy||!restore||!$('scoreRestoreConfirm').checked; }
+   async function read() {
++    presentationExporter?.invalidate();
+     snapshot=null;loaded=false;$('scoreDashboard').hidden=true;
+     const result=await request('department_scores_read');
+     if(!Array.isArray(result.months)||!Number.isInteger(result.generation))throw new Error('持久成績資料格式不完整');
+@@ -145,13 +157,16 @@
+     XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet(sheet),'門市月成績');XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([['月份','部區','店點','分類','原項目','原值','原值狀態','單位','來源儲存格'],...data.records.flatMap(r=>r.metrics.map(m=>[r.monthKey,r.region,r.store,m.group,m.label,m.value,m.status,m.unit,months.find(v=>v.monthKey===r.monthKey).sheetName+'!'+m.cell]))]),'原缺失項目');XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([['限制'],...data.limitations.map(v=>[v])]),'說明');XLSX.writeFile(workbook,'北一二部_店務成績.xlsx');}
+   $('scoreImport').addEventListener('click',preview);$('scorePublish').addEventListener('click',publish);$('scoreRefresh').addEventListener('click',load);$('scoreConfirm').addEventListener('change',updatePublish);$('scoreMonthChoices').addEventListener('change',updatePublish);
+   $('scoreFile').addEventListener('change',()=>{pending=null;$('scorePreview').hidden=true;updatePublish();});$('scoreYear').addEventListener('input',()=>{pending=null;$('scorePreview').hidden=true;updatePublish();});
+-  $('scorePeriod').addEventListener('change',()=>{updateStores();render();});$('scoreRegion').addEventListener('change',()=>{updateStores();render();});$('scoreStore').addEventListener('change',render);
++  $('scorePeriod').addEventListener('change',()=>{presentationExporter?.invalidate();updateStores();render();});$('scoreRegion').addEventListener('change',()=>{presentationExporter?.invalidate();updateStores();render();});$('scoreStore').addEventListener('change',()=>{presentationExporter?.invalidate();render();});
+   $('scoreBody').addEventListener('click',e=>{const b=e.target.closest('[data-score-detail]');if(b)detail(b.dataset.scoreDetail);});
+   $('scoreHistoryPreview').addEventListener('click',previewHistory);$('scoreRestore').addEventListener('click',restoreHistory);$('scoreRestoreConfirm').addEventListener('change',updatePublish);$('scoreHistory').addEventListener('change',()=>{restore=null;$('scoreRestorePreview').hidden=true;updatePublish();});
+   $('scoreExport').addEventListener('click',()=>exportData(false));$('scoreBrief').addEventListener('click',()=>exportData(true));
+-  function observeAuth(){if(window.PortalLogout?.isLocked()||!$('workspace'))return;const token=sessionStorage.getItem(KEY);if($('workspace').hidden){if(verifiedToken&&!locked){snapshot=null;pending=null;verifiedToken='';loaded=false;$('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';}return;}if(token&&token!==verifiedToken){verifiedToken=token;locked=false;load();}else if(token&&!loaded&&!busy&&!$('storePanel').hidden)load();}
++  $('scorePptx')?.addEventListener('click',async()=>{try{if(!presentationExporter)throw new Error('簡報模組未載入');await presentationExporter.downloadPptx();}catch(e){msg(e.message,true);}});
++  $('scorePrintPdf')?.addEventListener('click',()=>{try{if(!presentationExporter)throw new Error('簡報模組未載入');presentationExporter.printPdf();}catch(e){msg(e.message,true);}});
++  function observeAuth(){if(window.PortalLogout?.isLocked()||!$('workspace'))return;const token=sessionStorage.getItem(KEY);if($('workspace').hidden){presentationExporter?.invalidate();if(verifiedToken&&!locked){snapshot=null;pending=null;verifiedToken='';loaded=false;$('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';}return;}if(token&&token!==verifiedToken){verifiedToken=token;locked=false;load();}else if(token&&!loaded&&!busy&&!$('storePanel').hidden)load();}
+   const authObserver=new MutationObserver(observeAuth);authObserver.observe($('workspace'),{attributes:true,attributeFilter:['hidden']});authObserver.observe($('storePanel'),{attributes:true,attributeFilter:['hidden']});
+   window.addEventListener('pageshow',observeAuth);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&verifiedToken)load();});
++  window.addEventListener('portal-before-logout',()=>presentationExporter?.invalidate());
+   window.addEventListener('department-session-cleared',()=>lock('驗證已結束，請重新登入。'));
+   setInterval(()=>{if(!verifiedToken)return;if(sessionStorage.getItem(KEY)!==verifiedToken)return lock('督導驗證已變更，請重新登入。');try{const part=verifiedToken.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'),claims=JSON.parse(atob(part));if(Number.isFinite(claims.exp)&&claims.exp*1000<=Date.now())lock();}catch{}},10000);
+   observeAuth();updatePublish();
+--- a/service-worker.js
++++ b/service-worker.js
+@@ -1,5 +1,5 @@
+ const CACHE_FAMILY = 'liam-supervisor-app-';
+-const CACHE_NAME = 'liam-supervisor-app-1-2-logout-20261002-v2';
++const CACHE_NAME = 'liam-supervisor-app-1-2-store-export-20261002-v2';
+ const SHELL = [
+   './app.html',
+   './portal-logout.js',
+@@ -8,6 +8,9 @@
+   './department-ops.js',
+   './department-gold-monthly-ui.js',
+   './department-scores.js',
++  './department-store-presentation-core.js',
++  './department-store-presentation-browser.js',
++  './assets/vendor/store-presentation/pptxgenjs-4.0.1.bundle.js',
+   './home.js',
+   './kpi-battle-controller.js',
+   './live-battle.js',
+--- a/app.js
++++ b/app.js
+@@ -2084,5 +2084,5 @@
+   }
+   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
+ 
+-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261002-logout-2',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
++  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261002-store-export-2',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+ })(window);
