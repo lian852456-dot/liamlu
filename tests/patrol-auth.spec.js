@@ -218,7 +218,7 @@ test('登出立即移除督導 DOM 與 session，重新載入後再次鎖定', a
   await page.goto(PAGE_URL);
   await unlock(page, VALID_KEY);
   await expect(page.locator('#pasteBox')).toBeVisible();
-  await page.getByRole('button', { name: '登出' }).click();
+  page.once('dialog',dialog=>dialog.accept());await page.getByRole('button', { name: '登出', exact:true }).first().click();
 
   await expect(page.locator('#patrolAuthGate')).toBeVisible();
   await expect(page.locator('#patrolAppHost')).toBeEmpty();

@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
+  <script src="portal-logout.js?v=20261002-1"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#07182a">
@@ -141,7 +142,7 @@
         </section>
 
         <section class="panel access-panel" aria-labelledby="patrolAccessTitle">
-          <div class="panel-head"><div><h2 id="patrolAccessTitle">班表／巡店</h2><small>沿用既有 30 分鐘短效 session</small></div></div>
+          <div class="panel-head"><div><h2 id="patrolAccessTitle">班表／巡店</h2><small>督導登入最長 12 小時，可隨時自行登出</small></div></div>
           <form id="patrolAccessForm" class="access-form"><label>督導通行碼<input id="patrolPasscode" type="password" autocomplete="current-password" placeholder="輸入既有通行碼" required></label><button type="submit">解鎖唯讀資料</button></form>
           <p id="patrolAccessMessage" class="form-message">未驗證前不讀取班表、人名或巡店紀錄。</p>
           <button id="patrolLogout" class="text-button danger-text" type="button" hidden>登出班表／巡店 session</button>

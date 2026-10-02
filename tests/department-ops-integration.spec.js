@@ -41,7 +41,7 @@ test('combined store panel preserves both modules and logout clears them without
   const {calls,errors}=await setup(page);await login(page);
   await expect(page.locator('#storeRulesMount')).toHaveCount(1);await expect(page.locator('#scoreDashboard')).toBeVisible();
   expect(calls.filter(c=>c.action.endsWith('_publish'))).toEqual([]);
-  await page.locator('#store-rules-logout').click();await expect(page.locator('#authPanel')).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());await page.locator('#store-rules-logout').click();await expect(page.locator('#authPanel')).toBeVisible();
   await expect(page.locator('#workspace')).toBeHidden();expect(await page.content()).not.toContain(RULE);await expect(page.locator('#scoreBody')).toBeEmpty();
   await expect(page.locator('#peopleBody')).toBeEmpty();
   expect(await page.evaluate(key=>sessionStorage.getItem(key),KEY)).toBeNull();expect(calls.some(c=>c.action==='ptlogout')).toBe(true);expect(errors).toEqual([]);
@@ -53,7 +53,7 @@ test('score authentication failure also clears the reminder module',async({page}
   expect(await page.content()).not.toContain(RULE);expect(errors).toEqual([]);
 });
 test('gold logout clears all three modules and a new login reopens persisted data without files',async({page})=>{
-  const {errors}=await setup(page);await login(page);await page.locator('[data-tab="gold"]').click();await page.locator('#monthlyLogout').click();
+  const {errors}=await setup(page);await login(page);await page.locator('[data-tab="gold"]').click();page.once('dialog',dialog=>dialog.accept());await page.locator('#monthlyLogout').click();
   await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#scoreBody')).toBeEmpty();await expect(page.locator('#peopleBody')).toBeEmpty();await expect(page.locator('.store-rule-card')).toHaveCount(0);
   await login(page);await expect(page.locator('#scoreFile')).toHaveValue('');await expect(page.locator('#goldFile')).toHaveValue('');expect(errors).toEqual([]);
 });

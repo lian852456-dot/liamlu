@@ -646,6 +646,7 @@
         const deviceId = privateDashboardDeviceId();
         const result = await request({ action: 'private_access', employeeId, deviceId });
         session.setItem('north12b_private_dashboard_employee_id', employeeId);
+        globalThis.PortalLogout?.notifyLogin();
         state.profile = result.profile || null;
         try {
           const kpiResult = await request({ action: 'kpicalc_access', employeeId, deviceId });

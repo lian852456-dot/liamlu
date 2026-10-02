@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+  <script src="portal-logout.js?v=20261002-1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -272,6 +273,7 @@ async function kpiLogin(){
   try {
     const result = await gasPost({ action: 'kpicalc_access', employeeId: emp, deviceId: deviceId() });
     localStorage.setItem('bei12b_kpi_emp', emp);
+    window.PortalLogout?.notifyLogin();
     DATA = result.data;
     window._profile = result.profile || null;
     document.getElementById('lockCard').style.display = 'none';

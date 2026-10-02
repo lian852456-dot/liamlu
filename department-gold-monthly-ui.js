@@ -134,6 +134,6 @@
       $('monthlyLogout').addEventListener('click',async()=>{const token=getToken();clear();lockWorkspace();await request({action:'ptlogout',token}).catch(()=>{});});
       window.addEventListener('pagehide',clear);window.addEventListener('pageshow',e=>{if(e.persisted&&getToken())load();});
     }
-    return {load,importGold,prepare:()=>prepare(false),exportGold,bind,clear};
+    return {load,importGold,prepare:()=>prepare(false),exportGold,bind,clear,workState:()=>({busy,unsaved:Boolean(candidate.length||plan||$('goldFile').files?.length)})};
   }
 })();

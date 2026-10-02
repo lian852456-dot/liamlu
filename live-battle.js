@@ -70,6 +70,7 @@
     if (!result.profile || result.profile.isTrusted !== true) throw new Error('此功能只開放督導帳號使用。');
     state.targets = Core.extractTargets(result.data || {});
     scope.localStorage.setItem(EMPLOYEE_KEY, employeeId);
+    scope.PortalLogout?.notifyLogin();
     setTargetState('ok', '目標已載入');
     formatTargetMeta(state.targets.meta);
     message('targetMessage', `已驗證 ${result.profile.maskedName || '督導'}，AQ／RT 七項正式目標載入完成；將追加今日動態目標。`, 'ok');

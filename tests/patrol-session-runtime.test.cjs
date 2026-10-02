@@ -81,7 +81,7 @@ test('legal session remains valid for five minutes and is restored without rotat
   env.setNow(env.getNow() + 300);
   const restored = env.context.ptAuthenticatePayload({token:auth.token});
   assert.equal(restored.token, auth.token);
-  assert.equal(restored.expiresIn, 1500);
+  assert.equal(restored.expiresIn, 42900);
 });
 
 test('missing, malformed, legacy cache miss, expiry, revocation and deployment mismatch are distinct', () => {
@@ -91,7 +91,7 @@ test('missing, malformed, legacy cache miss, expiry, revocation and deployment m
   assert.equal(authReason(() => env.context.ptRequireSession_('a'.repeat(32), 'ptsummary')), 'AUTH_SESSION_NOT_FOUND');
 
   const expiring = env.context.ptAuthenticatePayload({key:'test-passcode'});
-  env.setNow(env.getNow() + 1800);
+  env.setNow(env.getNow() + 43200);
   assert.equal(authReason(() => env.context.ptRequireSession_(expiring.token, 'ptsummary')), 'AUTH_SESSION_EXPIRED');
 
   const revokedEnv = runtime();

@@ -164,6 +164,9 @@ function allowedGasMessageOrigin(origin){
 }
 
 async function api(payload){
+  window.PortalLogout?.assertActive();
+  const finishWrite = ['audit_start','audit_upload','audit_photo_delete','audit_submit','audit_cancel','audit_review'].includes(payload.action)
+    ? window.PortalLogout?.beginWrite() : null;
   return new Promise((resolve,reject)=>{
     const requestId=uid('audit_request');
     let endpoint;
@@ -221,7 +224,7 @@ async function api(payload){
     window.addEventListener('message',onMessage);
     document.body.append(frame,form);
     try{form.submit();}catch{finish(new Error('無法連上稽核服務，請確認網路後再試'));}
-  });
+  }).finally(()=>finishWrite?.());
 }
 
 function storeCall(payload){return api(payload);}

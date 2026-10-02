@@ -207,3 +207,17 @@ test('supervisor cancel preserves evidence and exposes a fresh store submission 
   await page.addInitScript(({ initial, editToken }) => { if (window.top !== window) return; localStorage.setItem('bei12b_audit_draft_v1', JSON.stringify({ batch_id: initial.batch_id, store_id: initial.store_id, inspector_name: initial.inspector_name, employee_id: initial.employee_id, submission_id: initial.submission_id, edit_token: editToken, notes: {}, items: {} })); }, { initial, editToken });
   const mock = await mockApi(page, { initialStatus: initial, editToken }); await page.goto(PAGE_URL); await page.locator('#modeSwitch').click(); await page.fill('#supervisorPasscode', 'correct-pass'); await page.locator('#supervisorLoginButton').click(); await page.locator('.review-item-button:not([disabled])').first().click(); await expect(page.locator('#reviewDialog')).toBeVisible(); page.once('dialog', dialog => dialog.accept()); await page.locator('.cancel-submission-button').click(); await expect(page.locator('#reviewDetail')).toContainText('此回報已取消'); expect(mock.calls.some(call => call.action === 'audit_cancel')).toBe(true); await page.locator('#reviewForm .dialog-close').click(); await page.locator('#modeSwitch').click(); await expect(page.locator('#storeView')).toBeVisible(); await expect(page.locator('#newSubmissionButton')).toBeVisible();
 });
+
+
+test('portal logout uses the existing audit iframe revocation and retains the owned store draft', async ({page}) => {
+  const {calls} = await mockApi(page); await page.goto(PAGE_URL); await fillBasic(page);
+  await page.locator('#modeSwitch').click(); await page.locator('#supervisorPasscode').fill('correct-pass'); await page.locator('#supervisorLoginButton').click();
+  await expect(page.locator('#supervisorWorkspace')).toBeVisible();
+  const draft = await page.evaluate(()=>{const value=JSON.parse(localStorage.getItem('bei12b_audit_draft_v1'));delete value.updated_at;return value;});
+  page.once('dialog',dialog=>dialog.accept()); await page.locator('#supervisorLogoutButton').click();
+  await expect(page.locator('#portal-session-note')).toContainText('已同步登出');
+  expect(await page.evaluate(()=>sessionStorage.getItem('bei12b_pt_session_token'))).toBeNull();
+  expect(await page.evaluate(()=>{const value=JSON.parse(localStorage.getItem('bei12b_audit_draft_v1'));delete value.updated_at;return value;})).toEqual(draft);
+  expect(calls.filter(call=>call.action==='ptlogout')).toHaveLength(1);
+  await expect(page.locator('#portal-session-note')).not.toContainText('撤銷未確認');
+});

@@ -14,6 +14,8 @@
   let goldHistory = null;
   let storeData = null;
   let patrolToken = '';
+  let sessionExpiresAt = 0;
+  let accessTimer;
 
   const $ = (id) => document.getElementById(id);
   const escapeHtml = (value) => String(value == null ? '' : value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
@@ -90,6 +92,8 @@
     if (result?.status !== 'ok' || !result.token) throw new Error('通行碼驗證未成功');
     patrolToken = result.token;
     sessionStorage.setItem(SESSION_KEY, patrolToken);
+    window.PortalLogout?.notifyLogin();
+    showSessionDeadline(result);
     await unlockWorkspace();
   }
 
@@ -101,12 +105,46 @@
       if (result?.status !== 'ok' || !result.token) throw new Error('expired');
       patrolToken = result.token;
       sessionStorage.setItem(SESSION_KEY, patrolToken);
+      showSessionDeadline(result);
       await unlockWorkspace();
     } catch {
       sessionStorage.removeItem(SESSION_KEY);
+      setMessage('authMessage', '先前督導登入無法恢復，請重新驗證；已保存資料仍在私有資料域。', 'error');
     }
   }
 
+  function showSessionDeadline(result) {
+    // Display only a server-returned deadline; this UI never issues or extends a session.
+    sessionExpiresAt = Number(result.expiresAt) > 0 ? Number(result.expiresAt) * 1000
+      : Number(result.expiresIn) > 0 ? Date.now() + Number(result.expiresIn) * 1000 : 0;
+    clearInterval(accessTimer);
+    $('departmentAccess').hidden = false;
+    updateSessionDeadline();
+    accessTimer = setInterval(updateSessionDeadline, 15000);
+  }
+  function updateSessionDeadline() {
+    if (!$('departmentAccess')) return;
+    if (!sessionExpiresAt) {
+      $('departmentExpiry').textContent = '督導登入已驗證；服務未提供到期時間，請留意保存。';
+      return;
+    }
+    const remaining = sessionExpiresAt - Date.now();
+    const minutes = Math.max(0, Math.ceil(remaining / 60000));
+    const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} 小時${minutes % 60 ? ` ${minutes % 60} 分鐘` : ''}` : `${minutes} 分鐘`;
+    const deadline = new Date(sessionExpiresAt).toLocaleTimeString('zh-TW', {timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit'});
+    $('departmentAccess').dataset.expiring = String(remaining <= 300000);
+    $('departmentExpiry').textContent = remaining > 0
+      ? `登入於 ${deadline}（臺北時間）到期，約剩 ${duration}。`
+      : '督導登入已到期，請重新驗證。';
+    $('departmentWorkNotice').textContent = remaining <= 300000
+      ? '請先完成保存並保留原檔。到期後未保存的預覽需重新選檔；操作與重新整理不會延長登入。'
+      : '操作與重新整理不會延長登入。請先完成保存並保留原檔。';
+  }
+  function workState() {
+    const gold = monthlyUI?.workState() || {};
+    const scores = window.DepartmentScoresWorkState?.() || {};
+    return {busy:gold.busy || scores.busy,unsaved:gold.unsaved || scores.unsaved};
+  }
   async function unlockWorkspace() {
     $('authPanel').hidden = true;
     $('workspace').hidden = false;
@@ -376,6 +414,14 @@
   }
 
   function bindEvents() {
+    window.PortalLogout?.setWorkState(workState, () => {
+      $('departmentWorkNotice').textContent = '資料正在處理或保存，請等待結果；若回應不明請先讀回確認，避免重複保存。';
+    });
+    window.addEventListener('beforeunload', event => {
+      const state = workState();
+      if (state.unsaved || state.busy) { event.preventDefault(); event.returnValue = ''; }
+    });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && patrolToken) updateSessionDeadline(); });
     $('authForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       const button = event.submitter;
@@ -410,15 +456,20 @@
     lockWorkspace: lockSharedWorkspace
   }) : null;
   function lockSharedWorkspace() {
+    if (!$('workspace')) return;
     patrolToken = ''; sessionStorage.removeItem(SESSION_KEY);
+    clearInterval(accessTimer); sessionExpiresAt = 0;
+    $('departmentAccess').hidden = true;
+    $('departmentAccess').dataset.expiring = 'false';
     monthlyUI?.clear();
     if (!$('workspace').hidden) $('workspace').hidden = true;
     if ($('authPanel').hidden) $('authPanel').hidden = false;
     $('securityBadge').textContent = '督導驗證'; $('securityBadge').classList.remove('ok');
   }
   window.addEventListener('department-session-cleared', lockSharedWorkspace);
+  window.addEventListener('portal-before-logout', lockSharedWorkspace);
   new MutationObserver(() => {
-    if ($('workspace').hidden) lockSharedWorkspace();
+    if ($('workspace')?.hidden) lockSharedWorkspace();
   }).observe($('workspace'), {attributes:true, attributeFilter:['hidden']});
   bindEvents();
   restoreSession();
