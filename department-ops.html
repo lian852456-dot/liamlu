@@ -112,7 +112,7 @@
           <div id="scoreSummary" class="summary-grid"></div>
           <section class="data-card"><h3>四區比較</h3><p class="score-limits">所選月份的門市平均分；部平均按各店等權計算。此區保留四區供比較。</p><div id="scoreRegions" class="score-regions"></div></section>
           <section class="data-card"><h3>各月成績趨勢</h3><p class="score-limits">依目前部區與店點篩選，缺月不補零。</p><div id="scoreTrend"></div></section>
-          <section class="data-card"><div class="card-head"><h3>各店月成績與缺失</h3><div class="score-actions"><button id="scoreExport" class="secondary-button" type="button">匯出 Excel</button><button id="scoreBrief" class="secondary-button" type="button">匯出簡報資料</button></div></div><p id="scoreWarnings" class="score-limits"></p><div class="table-scroll"><table><thead id="scoreHead"></thead><tbody id="scoreBody"></tbody></table></div></section>
+          <section class="data-card"><div class="card-head"><h3>各店月成績與缺失</h3><div class="score-actions"><button id="scoreExport" class="secondary-button" type="button">匯出 Excel</button><button id="scoreBrief" class="secondary-button" type="button">匯出簡報資料</button><button id="scorePptx" class="secondary-button" type="button">產生可編輯PPT</button><button id="scorePrintPdf" class="secondary-button" type="button">列印／另存PDF</button></div></div><p id="scoreWarnings" class="score-limits"></p><div class="table-scroll"><table><thead id="scoreHead"></thead><tbody id="scoreBody"></tbody></table></div></section>
           <section id="scoreDetail" class="data-card" hidden></section>
           <section class="data-card"><h3>歷史版本回復</h3><p class="score-limits">先預覽歷史版本，再確認回復；保留目前版本。</p><div class="score-actions"><select id="scoreHistory" aria-label="歷史版本"></select><button id="scoreHistoryPreview" class="secondary-button" type="button">預覽歷史版本</button></div><div id="scoreRestorePreview" hidden><p id="scoreRestoreMeta"></p><div id="scoreRestoreDiff"></div><label class="score-confirm"><input id="scoreRestoreConfirm" type="checkbox">我已核對此月份歷史版本，確認回復</label><button id="scoreRestore" class="primary-button" type="button" disabled>確認回復此月</button></div></section>
         </section>
@@ -130,9 +130,11 @@
   <script src="assets/vendor/officecrypto.bundle.min.js?v=0.0.19"></script>
   <script src="department-ops-core.js?v=20260930-2"></script>
   <script src="department-scores-core.js?v=20261002-1"></script>
+  <script src="department-store-presentation-core.js?v=20261002-store-export-2"></script>
+  <script src="department-store-presentation-browser.js?v=20261002-store-export-2"></script>
   <script src="department-gold-monthly-core.js?v=20261002-1" defer></script>
   <script src="department-gold-monthly-ui.js?v=20261002-logout-2" defer></script>
-  <script src="department-scores.js?v=20261002-display-1" defer></script>
+  <script src="department-scores.js?v=20261002-store-export-2" defer></script>
   <script src="department-ops.js?v=20261002-logout-2" defer></script>
   <script src="store-rule-reminders.js?v=20261002-1" defer></script>
 </body>

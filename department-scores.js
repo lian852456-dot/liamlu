@@ -11,7 +11,18 @@
   const msg=(v,error=false)=>{$('scoreMessage').textContent=v;$('scoreMessage').className='message'+(error?' error':'');};
   const digest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(v=>v.toString(16).padStart(2,'0')).join('');
   const monthHash=m=>digest(new TextEncoder().encode(C.canonical(m)));
+  function presentationAuthorized(){
+    if(!(loaded&&snapshot&&!locked&&!$('workspace').hidden&&verifiedToken&&sessionStorage.getItem(KEY)===verifiedToken&&!window.PortalLogout?.isLocked()))return false;
+    // Only the server-verified loaded session is eligible; decode its expiry at every boundary.
+    try{const part=verifiedToken.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'),claims=JSON.parse(atob(part));return Number.isFinite(claims.exp)&&Date.now()<claims.exp*1000;}catch{return false;}
+  }
+  const presentationExporter=window.DepartmentStorePresentationBrowser?.createExporter({
+    getBrief:()=>C.brief(selectedMonths(),filters()),
+    isAuthorized:presentationAuthorized,
+    onStatus:v=>msg(v)
+  });
   function lock(message) {
+    presentationExporter?.invalidate();
     snapshot=null;pending=null;restore=null;verifiedToken='';loaded=false;locked=true;
     sessionStorage.removeItem(KEY);$('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;
     for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';
@@ -52,6 +63,7 @@
   function selectedKeys(){return Array.from(document.querySelectorAll('[data-score-month]:checked')).map(e=>e.value);}
   function updatePublish(){ $('scorePublish').disabled=busy||!pending||!loaded||!selectedKeys().length||!$('scoreConfirm').checked; $('scoreRestore').disabled=busy||!restore||!$('scoreRestoreConfirm').checked; }
   async function read() {
+    presentationExporter?.invalidate();
     snapshot=null;loaded=false;$('scoreDashboard').hidden=true;
     const result=await request('department_scores_read');
     if(!Array.isArray(result.months)||!Number.isInteger(result.generation))throw new Error('持久成績資料格式不完整');
@@ -145,13 +157,16 @@
     XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet(sheet),'門市月成績');XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([['月份','部區','店點','分類','原項目','原值','原值狀態','單位','來源儲存格'],...data.records.flatMap(r=>r.metrics.map(m=>[r.monthKey,r.region,r.store,m.group,m.label,m.value,m.status,m.unit,months.find(v=>v.monthKey===r.monthKey).sheetName+'!'+m.cell]))]),'原缺失項目');XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([['限制'],...data.limitations.map(v=>[v])]),'說明');XLSX.writeFile(workbook,'北一二部_店務成績.xlsx');}
   $('scoreImport').addEventListener('click',preview);$('scorePublish').addEventListener('click',publish);$('scoreRefresh').addEventListener('click',load);$('scoreConfirm').addEventListener('change',updatePublish);$('scoreMonthChoices').addEventListener('change',updatePublish);
   $('scoreFile').addEventListener('change',()=>{pending=null;$('scorePreview').hidden=true;updatePublish();});$('scoreYear').addEventListener('input',()=>{pending=null;$('scorePreview').hidden=true;updatePublish();});
-  $('scorePeriod').addEventListener('change',()=>{updateStores();render();});$('scoreRegion').addEventListener('change',()=>{updateStores();render();});$('scoreStore').addEventListener('change',render);
+  $('scorePeriod').addEventListener('change',()=>{presentationExporter?.invalidate();updateStores();render();});$('scoreRegion').addEventListener('change',()=>{presentationExporter?.invalidate();updateStores();render();});$('scoreStore').addEventListener('change',()=>{presentationExporter?.invalidate();render();});
   $('scoreBody').addEventListener('click',e=>{const b=e.target.closest('[data-score-detail]');if(b)detail(b.dataset.scoreDetail);});
   $('scoreHistoryPreview').addEventListener('click',previewHistory);$('scoreRestore').addEventListener('click',restoreHistory);$('scoreRestoreConfirm').addEventListener('change',updatePublish);$('scoreHistory').addEventListener('change',()=>{restore=null;$('scoreRestorePreview').hidden=true;updatePublish();});
   $('scoreExport').addEventListener('click',()=>exportData(false));$('scoreBrief').addEventListener('click',()=>exportData(true));
-  function observeAuth(){if(window.PortalLogout?.isLocked()||!$('workspace'))return;const token=sessionStorage.getItem(KEY);if($('workspace').hidden){if(verifiedToken&&!locked){snapshot=null;pending=null;verifiedToken='';loaded=false;$('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';}return;}if(token&&token!==verifiedToken){verifiedToken=token;locked=false;load();}else if(token&&!loaded&&!busy&&!$('storePanel').hidden)load();}
+  $('scorePptx')?.addEventListener('click',async()=>{try{if(!presentationExporter)throw new Error('簡報模組未載入');await presentationExporter.downloadPptx();}catch(e){msg(e.message,true);}});
+  $('scorePrintPdf')?.addEventListener('click',()=>{try{if(!presentationExporter)throw new Error('簡報模組未載入');presentationExporter.printPdf();}catch(e){msg(e.message,true);}});
+  function observeAuth(){if(window.PortalLogout?.isLocked()||!$('workspace'))return;const token=sessionStorage.getItem(KEY);if($('workspace').hidden){presentationExporter?.invalidate();if(verifiedToken&&!locked){snapshot=null;pending=null;verifiedToken='';loaded=false;$('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';}return;}if(token&&token!==verifiedToken){verifiedToken=token;locked=false;load();}else if(token&&!loaded&&!busy&&!$('storePanel').hidden)load();}
   const authObserver=new MutationObserver(observeAuth);authObserver.observe($('workspace'),{attributes:true,attributeFilter:['hidden']});authObserver.observe($('storePanel'),{attributes:true,attributeFilter:['hidden']});
   window.addEventListener('pageshow',observeAuth);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&verifiedToken)load();});
+  window.addEventListener('portal-before-logout',()=>presentationExporter?.invalidate());
   window.addEventListener('department-session-cleared',()=>lock('驗證已結束，請重新登入。'));
   setInterval(()=>{if(!verifiedToken)return;if(sessionStorage.getItem(KEY)!==verifiedToken)return lock('督導驗證已變更，請重新登入。');try{const part=verifiedToken.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'),claims=JSON.parse(atob(part));if(Number.isFinite(claims.exp)&&claims.exp*1000<=Date.now())lock();}catch{}},10000);
   observeAuth();updatePublish();

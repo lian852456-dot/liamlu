@@ -1,0 +1,17 @@
+{
+  "source": "bundled primary runtime 26.921.10847, official PptxGenJS package dist/pptxgen.bundle.js",
+  "version": "4.0.1",
+  "license": "MIT",
+  "embeddedZip": "JSZip 3.10.1 (MIT option)",
+  "bytes": 460889,
+  "gzipBytes": 156324,
+  "sha256": "4fb9eac5cfefb213e2d8743c2b7151025f31bfb3f834c73c12062916daa0f3f8",
+  "runtimeNetwork": "same-origin lazy script only; no report upload or remote image fetch",
+  "gzipLevel": 9,
+  "notices": [
+    "PptxGenJS.LICENSE",
+    "JSZip.LICENSE",
+    "THIRD_PARTY_LICENSES.txt",
+    "NOTICE.md"
+  ]
+}

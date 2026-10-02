@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-2-logout-20261002-v2';
+const CACHE_NAME = 'liam-supervisor-app-1-2-store-export-20261002-v2';
 const SHELL = [
   './app.html',
   './portal-logout.js',
@@ -8,6 +8,9 @@ const SHELL = [
   './department-ops.js',
   './department-gold-monthly-ui.js',
   './department-scores.js',
+  './department-store-presentation-core.js',
+  './department-store-presentation-browser.js',
+  './assets/vendor/store-presentation/pptxgenjs-4.0.1.bundle.js',
   './home.js',
   './kpi-battle-controller.js',
   './live-battle.js',
