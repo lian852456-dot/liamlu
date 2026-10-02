@@ -1,7 +1,7 @@
 import {
   Core, MAX_FILE_BYTES, state, $, setBusy, setStep, status,
   showMessage, hideMessage, postAction
-} from './patrol-import-runtime.js';
+} from './patrol-import-runtime.js?v=20261002-logout-2';
 
 function workbookSheets(arrayBuffer) {
   if (!window.XLSX) throw new Error('Excel 解析元件載入失敗；可先將報表另存 CSV 後再匯入。');
@@ -57,6 +57,7 @@ async function chooseFile(file, renderPreview) {
   showMessage('parseMessage', '正在本機解析檔案，尚未上傳任何資料…', 'info');
   try {
     const source = await readFile(file);
+    window.PortalLogout?.assertActive();
     const normalized = Core.normalizeMatrix(source.rows, { date1904:source.date1904 });
     if (normalized.errors.length) throw new Error(normalized.errors.slice(0, 12).join('\n'));
     const deduped = Core.dedupeRows(normalized.rows);

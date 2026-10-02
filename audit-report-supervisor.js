@@ -234,6 +234,7 @@ async function logoutSupervisor(){
 }
 
 function bindEvents(){
+  window.PortalLogout?.setWorkState(()=>({busy:state.submitting}));
   document.getElementById('modeSwitch').addEventListener('click',switchMode);
   document.getElementById('auditForm').addEventListener('submit',submitReport);
   document.getElementById('storeSelect').addEventListener('change',event=>{

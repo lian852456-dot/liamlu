@@ -28,7 +28,7 @@ test('one signed session reads all three modules; version writes preserve other 
   assert.equal(r.post({action:'department_store_rules_read',token}).document.rules[0].instruction,'SYNTHETIC_COMBINED_RULE');
 });
 test('logout and expiration revoke all merged read and write routes without touching private data',()=>{
-  for(const expired of [false,true]){const r=runtime(),token=r.post({action:'ptauth',key:'synthetic-passcode'}).token;if(expired)r.advance(1801);else r.post({action:'ptlogout',token});const reads=r.reads,writes=r.writes;for(const action of actions){assert.notEqual(r.post({action,token}).status,'ok',action);assert.equal(r.reads,reads,action);assert.equal(r.writes,writes,action);}}
+  for(const expired of [false,true]){const r=runtime(),token=r.post({action:'ptauth',key:'synthetic-passcode'}).token;if(expired)r.advance(43201);else r.post({action:'ptlogout',token});const reads=r.reads,writes=r.writes;for(const action of actions){assert.notEqual(r.post({action,token}).status,'ok',action);assert.equal(r.reads,reads,action);assert.equal(r.writes,writes,action);}}
 });
 test('none of the new module routes become anonymous GET entrypoints',()=>{
   const r=runtime(),token=r.post({action:'ptauth',key:'synthetic-passcode'}).token;

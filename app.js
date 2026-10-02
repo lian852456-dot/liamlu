@@ -760,6 +760,7 @@
       renderAll();
       throw error;
     }
+    scope.PortalLogout?.notifyLogin();
     const snapshot = privateResult.snapshot || {};
     const readAt = nowIso();
     const awards = adaptAwards(snapshot, String(snapshot.kpiBattle&&(snapshot.kpiBattle.report_run_date||snapshot.kpiBattle.report_date)||''), readAt);
@@ -1116,7 +1117,7 @@
     const node = dom('#scheduleHome');
     if (!data || !Array.isArray(data.stores) || !data.stores.length) {
       const message=contract.scheduleToday.status==='unauthorized'?'班表／巡店尚未解鎖':contract.scheduleToday.status==='error'?(contract.scheduleToday.note||'正式班表讀取失敗'):'目前尚無班表摘要';
-      node.innerHTML = `<div class="home-schedule-head"><span class="compact-icon"><i data-lucide="calendar-days"></i></span><div class="compact-copy"><h2 id="scheduleHomeTitle">今日班表</h2><p>${escapeHtml(message)}</p></div><span class="compact-next"><b>${formatDate(taipeiDate())}</b><small>${contract.scheduleToday.note||'唯讀'}</small></span></div>${contract.scheduleToday.status==='unauthorized'?patrolUnlockState('使用既有 30 分鐘短效授權'):''}`;
+      node.innerHTML = `<div class="home-schedule-head"><span class="compact-icon"><i data-lucide="calendar-days"></i></span><div class="compact-copy"><h2 id="scheduleHomeTitle">今日班表</h2><p>${escapeHtml(message)}</p></div><span class="compact-next"><b>${formatDate(taipeiDate())}</b><small>${contract.scheduleToday.note||'唯讀'}</small></span></div>${contract.scheduleToday.status==='unauthorized'?patrolUnlockState('督導登入最長 12 小時，可隨時自行登出'):''}`;
       return;
     }
     const working = data.stores.reduce((sum,row)=>sum+Number(row.working||0),0);
@@ -1133,7 +1134,7 @@
     const node = dom('#patrolHome');
     if (!data || !Array.isArray(data.route) || !data.route.length) {
       const message=contract.patrolToday.status==='error'?(contract.patrolToday.note||'正式巡店讀取失敗'):(contract.patrolToday.note || '今日無排定巡店');
-      node.innerHTML = `<span class="compact-icon"><i data-lucide="route"></i></span><div class="compact-copy"><h2 id="patrolHomeTitle">今日巡店</h2><p>${escapeHtml(message)}</p></div><span class="compact-next"><b>${contract.patrolToday.status==='unauthorized'?'需解鎖':contract.patrolToday.status==='error'?'讀取失敗':'今日無排定'}</b><small>不自行推測路線</small></span>${contract.patrolToday.status==='unauthorized'?patrolUnlockState('使用既有 30 分鐘短效授權'):''}`;
+      node.innerHTML = `<span class="compact-icon"><i data-lucide="route"></i></span><div class="compact-copy"><h2 id="patrolHomeTitle">今日巡店</h2><p>${escapeHtml(message)}</p></div><span class="compact-next"><b>${contract.patrolToday.status==='unauthorized'?'需解鎖':contract.patrolToday.status==='error'?'讀取失敗':'今日無排定'}</b><small>不自行推測路線</small></span>${contract.patrolToday.status==='unauthorized'?patrolUnlockState('督導登入最長 12 小時，可隨時自行登出'):''}`;
       return;
     }
     node.innerHTML = `<span class="compact-icon"><i data-lucide="route"></i></span><div class="compact-copy"><h2 id="patrolHomeTitle">今日巡店</h2><p>${data.route.map(escapeHtml).join(' → ')}</p></div><span class="compact-next"><b>下一站：${escapeHtml(data.nextStop||'—')}</b><small>${data.nextEta?`預計 ${escapeHtml(data.nextEta)} 到達`:''}</small></span>`;
@@ -1938,7 +1939,7 @@
   async function unlockPatrol(passcode) {
     const result=await postPatrolAuth({action:'ptauth',key:String(passcode||'').trim()}); patrolToken=String(result.token||'');
     if (!patrolToken) throw new Error('正式服務未簽發短效 session。');
-    scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken); dom('#patrolPasscode').value=''; setMessage('#patrolAccessMessage','短效 session 已驗證，正在讀取班表／巡店。','success'); dom('#patrolLogout').hidden=false; await loadPatrolData();
+    scope.sessionStorage.setItem(PATROL_TOKEN_KEY,patrolToken); scope.PortalLogout?.notifyLogin(); dom('#patrolPasscode').value=''; setMessage('#patrolAccessMessage','短效 session 已驗證，正在讀取班表／巡店。','success'); dom('#patrolLogout').hidden=false; await loadPatrolData();
   }
 
   async function restorePatrol() {
@@ -2083,5 +2084,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=month-start-20261001-2',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261002-logout-2',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);

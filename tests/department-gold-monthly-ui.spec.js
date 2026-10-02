@@ -18,7 +18,7 @@ async function setup(page,{empty=false,planRouteFailures=0,loseCommitResponse=fa
   const versions=new Map(all.map(m=>[m.versionId,m])),history={},operations={},calls=[];
   for(const m of all)history[m.monthKey]=[{versionId:m.versionId,cutoff:m.dateRange.cutoff,total:m.validation.total,status:m.settlementStatus,sourceName:m.sourceName}];
   const read=operationId=>({available:all.length>0,gold:{type:'north12-monthly-v2',months:all.slice().sort((a,b)=>a.monthKey.localeCompare(b.monthKey))},monthly:{revision,history,operation:operations[operationId]||null}});
-  await page.addInitScript(()=>sessionStorage.setItem('bei12b_patrol_session_token_v2','synthetic-session'));
+  await page.addInitScript(()=>{if(!localStorage.getItem('north12b_portal_logout_event_v1'))sessionStorage.setItem('bei12b_patrol_session_token_v2','synthetic-session');});
   await page.route(/https:\/\/script\.google\.com\/macros\//,async route=>{
     const p=JSON.parse(route.request().postData()||'{}');calls.push(p);let result;
     if(p.action==='ptauth')result={token:'synthetic-session'};
@@ -69,7 +69,7 @@ test('upload is preview-only until confirmation; September 30 is provisional and
 test('first upload can be saved and history restore needs explicit confirmation; logout clears private DOM',async({page})=>{
   const state=await setup(page,{empty:true});await page.locator('#goldFile').setInputFiles(replacement());await page.click('#goldImport');await expect(page.locator('#publishGold')).toBeVisible();await page.click('#publishGold');await page.click('#monthlyCommit');await expect(page.locator('#publishMessage')).toContainText('逐值讀回');
   await page.selectOption('#monthlyHistoryMonth','2026-09');await page.locator('#monthlyHistoryVersion').selectOption({index:1});await page.click('#monthlyRestore');await expect(page.locator('#monthlyConfirm')).toBeVisible();expect(state.calls.filter(c=>c.mode==='restore')).toHaveLength(0);await page.click('#monthlyCommit');await expect(page.locator('#publishMessage')).toContainText('逐值讀回');
-  await page.click('#monthlyLogout');await expect(page.locator('#authPanel')).toBeVisible();expect(await page.locator('body').textContent()).not.toContain('DEMO001');expect(await page.evaluate(()=>sessionStorage.getItem('bei12b_patrol_session_token_v2'))).toBeNull();expect(state.errors).toEqual([]);
+  page.once('dialog',dialog=>dialog.accept());await page.click('#monthlyLogout');await expect(page.locator('#authPanel')).toBeVisible();expect(await page.locator('body').textContent()).not.toContain('DEMO001');expect(await page.evaluate(()=>sessionStorage.getItem('bei12b_patrol_session_token_v2'))).toBeNull();expect(state.errors).toEqual([]);
 });
 test('phone layout keeps all sections within viewport and quarter export preserves missing sources',async({page})=>{
   await page.setViewportSize({width:390,height:844});const state=await setup(page);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

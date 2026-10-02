@@ -144,7 +144,9 @@ function doPost(e) {
   }
 }
 
-const PATROL_SESSION_TTL_SECONDS = 1800;
+const PATROL_SESSION_TTL_SECONDS = 43200;
+// CacheService accepts at most 6 hours; authentication always checks signed expiry and revocation first.
+const PATROL_SESSION_CACHE_TTL_SECONDS = 21600;
 const PATROL_SESSION_CONTRACT = 'patrol-session-v2';
 const PATROL_AUTH_DEPLOYMENT = 'patrol-isolated-v1';
 const PATROL_SESSION_SIGNING_KEY_PROPERTY = 'PATROL_SESSION_SIGNING_KEY';
@@ -265,7 +267,7 @@ function ptIssueSession_() {
   const claims = {v:2, aud:PATROL_AUTH_DEPLOYMENT, iat:now, exp:now + PATROL_SESSION_TTL_SECONDS, jti:Utilities.getUuid()};
   const payloadPart = ptBase64UrlEncode_(Utilities.newBlob(JSON.stringify(claims), 'application/json').getBytes());
   const token = payloadPart + '.' + ptSessionSignature_(payloadPart);
-  CacheService.getScriptCache().put(ptSessionCacheKey_(token), String(claims.exp), PATROL_SESSION_TTL_SECONDS);
+  CacheService.getScriptCache().put(ptSessionCacheKey_(token), String(claims.exp), Math.min(PATROL_SESSION_TTL_SECONDS, PATROL_SESSION_CACHE_TTL_SECONDS));
   return {token:token, claims:claims};
 }
 
@@ -300,7 +302,7 @@ function ptVerifySession_(token, action) {
   const cache = CacheService.getScriptCache();
   if (!cache.get(ptSessionCacheKey_(clean))) {
     ptAuthLog_(action, 'AUTH_CACHE_MISS', true);
-    cache.put(ptSessionCacheKey_(clean), String(claims.exp), Math.max(1, Math.min(PATROL_SESSION_TTL_SECONDS, Number(claims.exp) - now)));
+    cache.put(ptSessionCacheKey_(clean), String(claims.exp), Math.max(1, Math.min(PATROL_SESSION_CACHE_TTL_SECONDS, Number(claims.exp) - now)));
   }
   return claims;
 }

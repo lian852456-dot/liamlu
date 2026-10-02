@@ -2,8 +2,8 @@ import {
   Core, WRITE_MAX_ROWS, WRITE_MAX_QUERY_LENGTH, state, $, escapeHtml,
   setBusy, setStep, status, showMessage, hideMessage, jsonpWrite,
   validateSession, authenticate
-} from './patrol-import-runtime.js';
-import { resetPending, chooseFile, fetchDetail, runPreflight } from './patrol-import-file.js';
+} from './patrol-import-runtime.js?v=20261002-logout-2';
+import { resetPending, chooseFile, fetchDetail, runPreflight } from './patrol-import-file.js?v=20261002-logout-2';
 
 async function login() {
   const passcode = $('passcode').value;
@@ -35,7 +35,7 @@ function outcomeLabel(row) {
 
 function renderPreview() {
   const pending = state.pending;
-  if (!pending) return;
+  if (!pending || window.PortalLogout?.isLocked()) return;
   $('preview').classList.add('show');
   const classified = pending.classified || { additions:[], updates:[], existing:[], conflicts:[], writeRows:[] };
   $('metricParsed').textContent = String(pending.parsedRows.length);
@@ -158,6 +158,7 @@ async function confirmWrite() {
   }
 }
 
+if (!window.PortalLogout?.isLocked()) {
 $('loginBtn').addEventListener('click', login);
 $('passcode').addEventListener('keydown', event => { if (event.key === 'Enter') login(); });
 $('recheckSessionBtn').addEventListener('click', validateSession);
@@ -175,3 +176,4 @@ if (!Core) {
   showMessage('parseMessage', '巡店本機解析核心未載入，已封鎖匯入。', 'bad');
   setBusy(true);
 } else validateSession();
+}

@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
+  <script src="portal-logout.js?v=20261002-logout-2"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow,noarchive">
@@ -80,7 +81,9 @@ let pendingWrite=null;
 let failedRaw='';
 const confirmedKeys=new Set();
 
-const $=id=>document.getElementById(id);
+const elements=new Map([...document.querySelectorAll('[id]')].map(element=>[element.id,element]));
+const $=id=>document.getElementById(id)||elements.get(id)||(window.PortalLogout?.isLocked()?document.createElement('div'):null);
+window.addEventListener('portal-before-logout',()=>{sessionToken='';pendingWrite=null;failedRaw='';confirmedKeys.clear();});
 function taipeiMonth(){
   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).formatToParts(new Date());
   const value=type=>parts.find(part=>part.type===type)?.value||'';
@@ -260,11 +263,12 @@ async function readback(rows,writtenRows){
 }
 function jsonpWrite(payload){
   return new Promise((resolve,reject)=>{
+    try{window.PortalLogout?.assertActive();}catch(error){reject(error);return;}
     const callback=`patrolUatCb_${Date.now()}_${Math.floor(Math.random()*1000000)}`;const url=new URL(PATROL_UAT_GAS_URL);
     url.searchParams.set('action','ptwrite');url.searchParams.set('token',sessionToken);url.searchParams.set('payload',JSON.stringify(payload));url.searchParams.set('callback',callback);
     const script=document.createElement('script');const timer=setTimeout(()=>{cleanup();reject(new Error('ptwrite 連線逾時'));},30000);
     function cleanup(){clearTimeout(timer);delete window[callback];script.remove();}
-    window[callback]=result=>{cleanup();resolve(result);};script.onerror=()=>{cleanup();reject(new Error('ptwrite 網路錯誤'));};script.src=url.toString();document.head.appendChild(script);
+    window[callback]=result=>{cleanup();try{window.PortalLogout?.assertActive();resolve(result);}catch(error){reject(error);}};script.onerror=()=>{cleanup();reject(new Error('ptwrite 網路錯誤'));};script.src=url.toString();document.head.appendChild(script);
   });
 }
 async function writeAndReadback(rows){
@@ -382,7 +386,7 @@ async function signIn(){
   try{
     await health();const result=await post('ptauth',{key:passcode});
     if(!authResultOk(result))throw new Error(result?.status==='error'?authReasonText(result):'ptauth session contract 或 audience 不相符');
-    sessionToken=result.token;sessionStorage.setItem(UAT_SESSION_TOKEN_STORAGE,sessionToken);input.value='';
+    sessionToken=result.token;sessionStorage.setItem(UAT_SESSION_TOKEN_STORAGE,sessionToken);input.value='';window.PortalLogout?.notifyLogin();
     $('authCard').classList.add('hidden');$('uatCard').classList.remove('hidden');setConnected(true,'已連線至 Patrol UAT');
     await refreshSummary();
   }catch(error){input.value='';setNotice('authNotice',error?.message||'督導驗證失敗。','err');}
@@ -421,6 +425,7 @@ async function parse(){
 }
 async function confirmWrite(){
   const pending=pendingWrite;if(!pending){setNotice('mainNotice','沒有待確認的雲端寫入資料，請先解析並預覽。','err');return;}
+  const finishWrite=window.PortalLogout?.beginWrite();
   const button=$('confirmButton');button.disabled=true;setNotice('mainNotice',`正在寫入 ${pending.candidate.writeRows.length} 筆，並執行 ptdetail 分頁 readback…`,'info');
   try{
     const receipt=await writeAndReadback(pending.candidate.writeRows);pending.candidate.writeRows.forEach(row=>confirmedKeys.add(candidateKey(row)));$('pasteBox').value='';pendingWrite=null;failedRaw='';button.classList.add('hidden');$('preview').classList.add('hidden');
@@ -429,12 +434,14 @@ async function confirmWrite(){
     failedRaw=pending.raw;const report=error?.report;
     const detail=report?`解析 ${report.parsedRows} 筆／written ${report.writtenRows} 筆／readback ${report.readbackRows} 筆／missing keys：${report.missing.join('；')||'無法完成讀回驗證'}`:(error?.message||'未知錯誤');
     setNotice('mainNotice',`雲端未完整寫入，已保留原始資料，請勿重複操作。${detail}`,'err');
-  }finally{button.disabled=false;}
+  }finally{button.disabled=false;finishWrite?.();}
 }
 function signOut(){sessionToken='';sessionStorage.removeItem(UAT_SESSION_TOKEN_STORAGE);pendingWrite=null;failedRaw='';$('pasteBox').value='';$('preview').classList.add('hidden');$('confirmButton').classList.add('hidden');$('uatCard').classList.add('hidden');$('authCard').classList.remove('hidden');setNotice('authNotice','已登出 Patrol UAT。','info');}
 
+if(!window.PortalLogout?.isLocked()){
 $('signInButton').addEventListener('click',signIn);$('signOutButton').addEventListener('click',signOut);$('parseButton').addEventListener('click',parse);$('confirmButton').addEventListener('click',confirmWrite);$('refreshSummaryButton').addEventListener('click',refreshSummary);$('runReadonlyDiagnosticButton').addEventListener('click',runReadonlyDiagnostic);$('monthInput').addEventListener('change',refreshSummary);$('passcode').addEventListener('keydown',event=>{if(event.key==='Enter')signIn();});
 restore();
+}
 </script>
 </body>
 </html>

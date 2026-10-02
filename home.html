@@ -1,19 +1,20 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
+  <script src="portal-logout.js?v=20261002-logout-2"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#ffffff">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>北一二B 智慧營運中心</title>
-  <link rel="stylesheet" href="home.css?v=20260930">
+  <link rel="stylesheet" href="home.css?v=20261002-logout-2">
   <!-- Public navigation only. Reminder reads require each existing system's verified access.
        No employee records, report snapshots, credentials or private cache are published here. -->
   <script defer src="app-assets/lucide.min.js"></script>
   <script defer src="patrol-question-versions.js"></script>
   <script defer src="home-reminder-model.js?v=20260930"></script>
-  <script defer src="home.js?v=20260930"></script>
+  <script defer src="home.js?v=20261002-logout-2"></script>
 </head>
 <body>
 <a class="skip-link" href="#main">跳至主要內容</a>
@@ -26,11 +27,17 @@
     <div class="header-actions">
       <label class="search-box" for="tool-search"><i data-lucide="search" aria-hidden="true"></i><span class="sr-only">搜尋工具或系統</span><input id="tool-search" type="search" placeholder="搜尋工具或系統" autocomplete="off"></label>
       <a class="outline-button" href="#zone-supervisor">督導專區</a>
+      <button id="portal-logout" class="outline-button" type="button" aria-label="登出營運中心網頁" hidden>登出</button>
     </div>
   </div>
 </header>
 <main id="main">
   <div class="shell start-section">
+    <div class="portal-access" aria-label="目前頁面登入狀態">
+      <p id="portal-access-status" role="status">尚未恢復登入</p>
+      <p id="portal-expiry-notice" role="status" hidden></p>
+      <small>登出會同步清除同一瀏覽器、本網站頁籤的督導與業績登入；裝置核准資格保留。手機 App 請另行登出。</small>
+    </div>
     <section class="reminder" aria-labelledby="reminder-heading" aria-roledescription="輪播">
       <div class="reminder-label"><i data-lucide="bell-ring" aria-hidden="true"></i><strong id="reminder-heading">營運提醒</strong></div>
       <div class="reminder-main" id="reminder-display" aria-live="off" aria-atomic="true">

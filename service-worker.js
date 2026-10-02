@@ -1,7 +1,22 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-1-2-month-start-20261001-v2';
+const CACHE_NAME = 'liam-supervisor-app-1-2-logout-20261002-v2';
 const SHELL = [
   './app.html',
+  './portal-logout.js',
+  './department-ops.css',
+  './home.css',
+  './department-ops.js',
+  './department-gold-monthly-ui.js',
+  './department-scores.js',
+  './home.js',
+  './kpi-battle-controller.js',
+  './live-battle.js',
+  './north12b-gold-ops.js',
+  './audit-report.js',
+  './audit-report-supervisor.js',
+  './patrol-import.js',
+  './patrol-import-runtime.js',
+  './patrol-import-file.js',
   './app.css',
   './app.js',
   './award-model-catalog.js',
@@ -61,7 +76,7 @@ function networkFirstKpiController(request) {
     headers.set('Content-Type', 'application/javascript; charset=utf-8');
     headers.set('Cache-Control', 'no-store');
     return new Response(patched, { status: response.status, statusText: response.statusText, headers });
-  }).catch(() => caches.match(request));
+  }).catch(() => caches.match(request, { ignoreSearch:true }));
 }
 
 self.addEventListener('fetch', event => {
@@ -70,12 +85,12 @@ self.addEventListener('fetch', event => {
   if (requestUrl.origin !== self.location.origin) return;
   const scopePath = new URL(self.registration.scope).pathname;
   const relativePath = requestUrl.pathname.startsWith(scopePath) ? requestUrl.pathname.slice(scopePath.length) : '';
-  if (SHELL_PATHS.has(relativePath)) {
-    event.respondWith(networkFirstShellAsset(event.request));
-    return;
-  }
   if (requestUrl.pathname.endsWith('/kpi-battle-controller.js')) {
     event.respondWith(networkFirstKpiController(event.request));
+    return;
+  }
+  if (SHELL_PATHS.has(relativePath)) {
+    event.respondWith(networkFirstShellAsset(event.request));
     return;
   }
   if (requestUrl.pathname.endsWith('/audit-report.html')) {

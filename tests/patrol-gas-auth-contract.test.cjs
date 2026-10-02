@@ -57,9 +57,10 @@ test('media POST uses the same property-backed credential or short-lived token',
   assert.doesNotMatch(media, /PT_KEY\s*!==\s*'CHANGE_ME'/);
 });
 
-test('patrol session tokens are short-lived and revocable', () => {
+test('patrol session tokens have a fixed 12-hour limit and remain revocable', () => {
   assert.match(code, /CacheService\.getScriptCache\(\)/);
-  assert.match(code, /PATROL_SESSION_TTL_SECONDS\s*=\s*1800/);
+  assert.match(code, /PATROL_SESSION_TTL_SECONDS\s*=\s*43200/);
+  assert.match(code, /PATROL_SESSION_CACHE_TTL_SECONDS\s*=\s*21600/);
   assert.match(code, /computeHmacSha256Signature/);
   assert.match(code, /PATROL_SESSION_SIGNING_KEY_PROPERTY/);
   assert.match(code, /PATROL_SESSION_REVOKED_PREFIX/);

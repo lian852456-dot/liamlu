@@ -11,6 +11,10 @@
   --focus:#005fcc;
   font-family:'Noto Sans CJK TC','Noto Sans TC','PingFang TC','Microsoft JhengHei',system-ui,sans-serif
 }
+.portal-access{margin:0 0 20px;padding:14px 18px;border:1px solid var(--line);border-radius:12px;background:var(--subtle);font-size:14px}
+.portal-access p{margin:0 0 5px}.portal-access small{color:var(--muted)}
+#portal-expiry-notice{color:var(--orange-ink);font-weight:700}
+#portal-logout{white-space:nowrap;flex:none;background:#fff}
 * {
   box-sizing:border-box
 }

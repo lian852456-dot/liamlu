@@ -291,7 +291,7 @@ test('減少動態效果預設暫停，但仍可手動切換', async ({page}) =>
   await next(page); await expect(page.locator('#reminder-count')).toHaveText('2 / 4');
 });
 
-for (const [label, keys] of [['沒有憑證',{}],['只有員編',{employeeId:KEYS.employeeId}],['只有裝置',{deviceId:KEYS.deviceId}],['舊 app localStorage 員編',{legacyEmployeeId:KEYS.employeeId,deviceId:KEYS.deviceId}]]) {
+for (const [label, keys] of [['沒有憑證',{}],['只有員編',{employeeId:KEYS.employeeId}],['只有裝置',{deviceId:KEYS.deviceId}]]) {
   test(`${label}完全不請求私有端點`, async ({page}) => {
     const {calls} = await start(page,{keys}); await ready(page);
     await page.clock.runFor(60000); await ready(page);
@@ -303,11 +303,11 @@ for (const [label, keys] of [['沒有憑證',{}],['只有員編',{employeeId:KEY
 }
 
 test('private_access 拒絕後不發出 read', async ({page}) => {
-  const {calls} = await start(page,{keys:{employeeId:KEYS.employeeId,deviceId:KEYS.deviceId},reply:() => ({status:'error',message:'SYNTHETIC_DENIAL'})});
+  const {calls} = await start(page,{keys:{employeeId:KEYS.employeeId,deviceId:KEYS.deviceId},reply:() => ({status:'error',message:'此員編尚未核准此裝置'})});
   await ready(page);
   expect(calls.map(call => call.payload.action)).toEqual(['private_access']);
-  await expect(page.locator('#reminder-status')).toHaveAttribute('data-status','pending');
-  await expect(page.locator('#reminder-text')).toContainText('驗證或資料讀取未完成');
+  await expect(page.locator('#reminder-status')).toHaveAttribute('data-status','locked');
+  await expect(page.locator('#reminder-text')).toContainText('員編或裝置驗證未通過');
 });
 
 test('督導驗證回傳不同 token 時不讀 ptdashboard、不保存新 token', async ({page}) => {
