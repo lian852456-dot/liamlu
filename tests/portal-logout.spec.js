@@ -203,3 +203,42 @@ test('formal import holds logout through its actual write and readback and permi
  await busy();releaseWrite();await expect.poll(()=>reading).toBe(true);await busy();releaseRead();await expect(page.locator('#writeMessage')).toContainText('讀回驗證 1/1 筆一致');
  page.once('dialog',d=>d.dismiss());await page.locator('[data-portal-logout]').click();await expect(page.locator('#preview')).toBeVisible();
 });
+
+async function reloginPersistentApp(page){
+ await page.goto(BASE+'app.html');await page.locator('#dataMode').click();await page.locator('#employeeId').fill('SYNTHETIC_EMPLOYEE');await page.locator('#privateAccessForm button').click();
+ await expect(page.locator('#privateDeviceStatus')).toContainText('裝置已核准');await expect(page.locator('#privateAccessForm button')).toBeEnabled();
+ await expect.poll(()=>page.evaluate(()=>localStorage.getItem('north12b_private_dashboard_employee_id'))).toBe('SYNTHETIC_EMPLOYEE');
+ expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('north12b_portal_login_event_v1')).at>JSON.parse(localStorage.getItem('north12b_portal_logout_event_v1')).at)).toBe(true);
+}
+for(const filename of ['home.html','app.html']){
+ test('logout then explicit persistent App login survives a new independent '+filename+' tab and its server gate',async({context,page})=>{
+  const {calls}=await intercept(context);await identify(page,{legacy:true});await logout(page);await expect(page.locator('#portal-session-note')).toContainText('已同步登出');await reloginPersistentApp(page);
+  const gates=calls.filter(c=>c.action==='private_access').length,other=await context.newPage();await other.goto(BASE+filename);
+  if(filename==='home.html')await expect(other.locator('#portal-access-status')).toContainText('業績登入已驗證');
+  else{await other.locator('#dataMode').click();await expect(other.locator('#privateDeviceStatus')).toContainText('裝置已核准');}
+  expect(calls.filter(c=>c.action==='private_access').length).toBeGreaterThan(gates);
+  for(const tab of [page,other]){expect(await tab.evaluate(()=>window.PortalLogout.isLocked())).toBe(false);expect(await tab.evaluate(()=>localStorage.getItem('north12b_private_dashboard_employee_id'))).toBe('SYNTHETIC_EMPLOYEE');}
+  expect(await other.evaluate(()=>sessionStorage.getItem('bei12b_patrol_session_token_v2'))).toBeNull();
+ });
+}
+
+test('later persistent login event never revives an old uninitialized-tab PT or session employee and stale cleanup preserves the new shared login',async({context,page})=>{
+ const {b,calls}=await intercept(context);const stale=await context.newPage();
+ await stale.addInitScript(()=>{window.BroadcastChannel=undefined;window.addEventListener('storage',e=>{if(e.key==='north12b_portal_logout_event_v1')e.stopImmediatePropagation();},true);});
+ const token=b.post({action:'ptauth',key:'synthetic-passcode'}).token;
+ await identify(page,{legacy:true});await identify(stale,{token});await stale.evaluate(()=>sessionStorage.removeItem('north12b_portal_logout_seen_v1'));
+ await logout(page);await expect(page.locator('#portal-session-note')).toContainText('已同步登出');await reloginPersistentApp(page);
+ expect(await stale.evaluate(()=>sessionStorage.getItem('bei12b_patrol_session_token_v2'))).toBe(token);
+ await stale.reload();await expect(stale.locator('#portal-session-note')).toContainText('已同步登出');expect(await stale.evaluate(()=>sessionStorage.getItem('bei12b_patrol_session_token_v2'))).toBeNull();
+ await expect.poll(()=>stale.evaluate(()=>sessionStorage.getItem('north12b_private_dashboard_employee_id'))).toBeNull();
+ await expect.poll(()=>calls.some(c=>c.action==='ptlogout'&&c.token===token)).toBe(true);expect(b.post({action:'ptauth',token}).reason).toBe('AUTH_SESSION_REVOKED');
+ expect(await page.evaluate(()=>localStorage.getItem('north12b_private_dashboard_employee_id'))).toBe('SYNTHETIC_EMPLOYEE');
+ await expect(stale.locator('#portal-access-status')).not.toContainText('督導登入已驗證');
+});
+
+test('post-logout persistent login notification does not bypass the unapproved-device gate in a new tab',async({context,page})=>{
+ const {calls}=await intercept(context);await identify(page,{legacy:true});await logout(page);await expect(page.locator('#portal-session-note')).toContainText('已同步登出');await reloginPersistentApp(page);
+ await context.route('https://script.google.com/**',route=>{let p;try{p=route.request().postDataJSON();}catch{}if(p?.action==='private_access'){calls.push(p);return route.fulfill({json:{status:'error',message:'尚未核准此裝置'}});}return route.fallback();});
+ const before=calls.filter(c=>c.action==='read').length,other=await context.newPage();await other.goto(BASE+'home.html');await expect(other.locator('#portal-access-status')).toContainText('尚未驗證');await expect(other.locator('#reminder-text')).toContainText('驗證未通過');
+ expect(calls.filter(c=>c.action==='read')).toHaveLength(before);expect(await page.evaluate(()=>localStorage.getItem('north12b_private_dashboard_employee_id'))).toBe('SYNTHETIC_EMPLOYEE');
+});

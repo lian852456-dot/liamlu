@@ -36,8 +36,18 @@
   try { savedEpoch = scope.sessionStorage.getItem(SEEN_KEY); } catch { savedEpoch = null; }
   let epoch = savedEpoch ?? '';
   const initial = latestEvent();
-  // A tab restored from history or cloned from an opener must observe any logout since it last ran.
-  const missedLogout = initial && ((savedEpoch !== null && epoch !== initial.id) || (savedEpoch === null && hasIdentity()));
+  function persistentLoginAfter(event) {
+    const login = parse(read('localStorage',LOGIN_EVENT_KEY));
+    return validEvent(login,'login') && login.at > event.at;
+  }
+  function hasSessionIdentity() {
+    return [PT_KEY,UAT_KEY,AUDIT_KEY,EMPLOYEE_KEY].some(key => read('sessionStorage',key));
+  }
+  function hasPersistentIdentity() { return read('localStorage',EMPLOYEE_KEY) || read('localStorage','bei12b_kpi_emp'); }
+  // An unseen historical logout invalidates old tab credentials. A new tab may
+  // still restore a later explicit persistent login through the page's server gate.
+  const missedLogout = initial && ((savedEpoch !== null && epoch !== initial.id)
+    || (savedEpoch === null && (hasSessionIdentity() || (hasPersistentIdentity() && !persistentLoginAfter(initial)))));
   if (savedEpoch === null && !missedLogout) { epoch = initial?.id || ''; write('sessionStorage', SEEN_KEY, epoch); }
   function assertActive(expected = epoch) {
     if (locked || expected !== epoch) throw new DOMException('營運中心網頁已登出，請重新驗證。', 'AbortError');
@@ -68,9 +78,13 @@
     } catch (error) { finish(); throw error; }
   };
 
-  function clearIdentity() {
+  function clearIdentity(event,forcePersistent) {
     for (const key of [PT_KEY, UAT_KEY, AUDIT_KEY, EMPLOYEE_KEY, 'bei12b_half_checks']) remove('sessionStorage', key);
-    for (const key of [EMPLOYEE_KEY, 'bei12b_kpi_emp']) remove('localStorage', key);
+    // A delayed old-tab notification must not delete a newer shared login.
+    // It still clears every old sessionStorage credential and its private cache.
+    if (forcePersistent || !persistentLoginAfter(event)) {
+      for (const key of [EMPLOYEE_KEY, 'bei12b_kpi_emp']) remove('localStorage', key);
+    }
     // Only the existing protected summary cache is cleared. Draft files, prefs and device IDs remain.
     try {
       for (let i = scope.sessionStorage.length - 1; i >= 0; i -= 1) {
@@ -150,7 +164,7 @@
     const tokens = [[PATROL_API,read('sessionStorage',PT_KEY)],[PATROL_API,read('sessionStorage',UAT_KEY)],[AUDIT_API,read('sessionStorage',AUDIT_KEY)]].filter((entry,index,all) => entry[1] && all.findIndex(other => other[0] === entry[0] && other[1] === entry[1]) === index);
     locked = true; epoch = event.id;
     write('sessionStorage',SEEN_KEY,epoch);
-    clearIdentity();
+    clearIdentity(event,broadcast);
     note('已同步登出同一瀏覽器內本網站的營運中心頁籤。裝置核准資格保留；手機 App 請另行登出。');
     scope.dispatchEvent(new Event('portal-before-logout'));
     lockScreen();
@@ -176,8 +190,7 @@
   }
   function checkMissedLogout() { const event = latestEvent(); if (event && event.id !== epoch) accept(event); }
   function hasIdentity() {
-    return read('sessionStorage',PT_KEY) || read('sessionStorage',UAT_KEY) || read('sessionStorage',AUDIT_KEY) || read('sessionStorage',EMPLOYEE_KEY)
-      || read('localStorage',EMPLOYEE_KEY) || read('localStorage','bei12b_kpi_emp');
+    return hasSessionIdentity() || hasPersistentIdentity();
   }
   async function requestLogout() {
     if (locked) return logoutPromise;
