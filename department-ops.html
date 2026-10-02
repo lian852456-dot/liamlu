@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#f7f5f0">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>北一二部｜部區管理</title>
-  <link rel="stylesheet" href="department-ops.css?v=20261002-logout-2">
+  <link rel="stylesheet" href="department-ops.css?v=20261002-display-1">
   <link rel="stylesheet" href="store-rule-reminders.css?v=20261002-1">
   <link rel="stylesheet" href="department-scores.css?v=20261002-1">
 </head>
@@ -64,7 +64,8 @@
 
           <section class="data-card">
             <div class="card-head"><div><h3>個人累計與月趨勢</h3><p>按員編累計完整季度；區／店篩選顯示曾任職同仁，月欄保留當月店區。</p></div><span id="peopleCount"></span></div>
-            <div class="table-scroll"><table><thead id="peopleHead"></thead><tbody id="peopleBody"></tbody></table></div>
+            <p id="goldTableHelp" class="table-hint">左右滑動查看各月金牌與店區；同仁姓名固定在左側。</p>
+            <div class="table-scroll" tabindex="0" aria-label="個人金牌月趨勢，可左右捲動" aria-describedby="goldTableHelp"><table><thead id="peopleHead"></thead><tbody id="peopleBody"></tbody></table></div>
           </section>
 
           <section class="data-card">
@@ -131,7 +132,7 @@
   <script src="department-scores-core.js?v=20261002-1"></script>
   <script src="department-gold-monthly-core.js?v=20261002-1" defer></script>
   <script src="department-gold-monthly-ui.js?v=20261002-logout-2" defer></script>
-  <script src="department-scores.js?v=20261002-logout-2" defer></script>
+  <script src="department-scores.js?v=20261002-display-1" defer></script>
   <script src="department-ops.js?v=20261002-logout-2" defer></script>
   <script src="store-rule-reminders.js?v=20261002-1" defer></script>
 </body>

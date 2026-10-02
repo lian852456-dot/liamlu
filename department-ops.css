@@ -12,3 +12,24 @@
 @media(max-width:620px){.header-buttons{flex-direction:column}}
 
 .month-placement{display:block;margin-top:5px;font-size:11px;font-weight:400;color:var(--muted)}.final-choice{display:flex;align-items:center;gap:8px;margin:14px 0;line-height:1.6}.final-choice input{width:20px;height:20px;flex:none}.monthly-history{margin:18px 0}.monthly-history select{width:100%;min-height:46px;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--paper)}#monthlyConfirm{margin:18px 0}.summary-grid{grid-template-columns:repeat(4,1fr)}@media(max-width:620px){.summary-grid{grid-template-columns:1fr 1fr}}
+
+/* Department monthly tables keep readable type; narrow screens scroll the table. */
+body:has(#storePanel){--paper:#fff;--muted:#52606c}
+.page:has(#storePanel){width:min(1600px,100%)}
+#goldPanel{font-size:18px;line-height:1.6;min-width:0}
+#goldPanel h2{font-size:30px}#goldPanel h3{font-size:24px}
+#goldPanel .filter-panel label,#goldPanel .field,#goldPanel .source-meta,#goldPanel .privacy-note,#goldPanel .card-head p,#goldPanel .card-head>span,#goldPanel .message{font-size:16px}
+#goldPanel .filter-panel select,#goldPanel button,#goldPanel .monthly-history select{font-size:18px}
+#goldPanel .summary-card span,#goldPanel .summary-card small,#goldPanel .quarter-card span{font-size:16px;line-height:1.5}
+#goldPanel .summary-card strong{font-size:40px;line-height:1.15}
+#goldPanel .quarter-card strong{font-size:34px}
+#goldPanel .table-scroll{min-width:0}
+#goldPanel th,#goldPanel td{padding:17px 18px;font-size:20px;line-height:1.5}
+#goldPanel th{font-size:17px;color:var(--ink);background:#fff5ec}
+#goldPanel td:first-child{font-weight:750}
+#goldPanel .number{font-size:22px}
+#goldPanel .month-placement{margin-top:6px;min-width:180px;max-width:240px;white-space:normal;font-size:16px;line-height:1.5;font-weight:500;color:var(--muted)}
+#goldPanel tbody tr:nth-child(even){background:#fafbfc}
+#goldPanel tbody tr:hover{background:#fff5ec}
+#goldPanel .table-hint{display:none;margin:0 0 12px;color:var(--muted);font-size:16px}
+@media(max-width:620px){#goldPanel h2{font-size:26px}#goldPanel .data-card{padding:16px}#goldPanel .summary-card{min-width:0;padding:14px}#goldPanel .summary-card strong{font-size:34px}#goldPanel th,#goldPanel td{padding:15px;font-size:19px}#goldPanel th{font-size:16px}#goldPanel .number{font-size:21px}#goldPanel .table-hint{display:block}#peopleHead th:first-child,#peopleBody td:first-child{position:sticky;left:0;z-index:2;background:var(--card);box-shadow:1px 0 var(--line)}#peopleHead th:first-child{z-index:3;background:#fff5ec}#peopleBody tr:nth-child(even) td:first-child{background:#fafbfc}}
