@@ -31,11 +31,16 @@
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20000);
     try {
-      const response = await fetch(PATROL_URL, {
+      const requestURL = new URL(PATROL_URL);
+      // 每次傳輸使用獨立識別碼；驗證及月報內容仍只放在 POST 本文。
+      requestURL.searchParams.set('_request', crypto.randomUUID());
+      const response = await fetch(requestURL.href, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload),
         cache: 'no-store',
+        credentials: 'omit',
+        redirect: 'follow',
         signal: controller.signal
       });
       if (!response.ok) {
@@ -51,22 +56,30 @@
 
   async function authRequest(payload) {
     // Apps Script 偶爾會在 doPost 已完成後，於回傳重新導向階段短暫落成 404。
-    // 只有冪等的驗證與資料讀取允許重試；金牌同步等寫入動作絕不自動重送。
-    const canRetry = ['ptauth', 'department_ops_read'].includes(payload?.action);
+    // 驗證、讀取及不寫入資料的月報差異預覽允許有限重試。
+    // 正式金牌同步等寫入動作絕不自動重送，逾時後由 UI 查保存紀錄。
+    const canRetry = ['ptauth', 'department_ops_read'].includes(payload?.action) ||
+      (payload?.action === 'department_ops_publish' && ['plan', 'restore-plan'].includes(payload?.mode));
     const maxAttempts = canRetry ? 3 : 1;
     let lastError;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
-        return await authRequestOnce(payload);
+        const result = await authRequestOnce(payload);
+        if (canRetry && result?.status === 'error' && result.message === 'unknown patrol action') {
+          const error = new Error('資料服務回應未對應此次 POST');
+          error.routeResponseMismatch = true;
+          throw error;
+        }
+        return result;
       } catch (error) {
         lastError = error;
-        const retryable = AUTH_RETRY_STATUSES.has(Number(error?.httpStatus)) || ['AbortError', 'TypeError'].includes(error?.name);
+        const retryable = error?.routeResponseMismatch || AUTH_RETRY_STATUSES.has(Number(error?.httpStatus)) || ['AbortError', 'TypeError'].includes(error?.name);
         if (!canRetry || !retryable || attempt === maxAttempts) break;
         await wait(attempt === 1 ? 1200 : 2500);
       }
     }
-    if (canRetry && (AUTH_RETRY_STATUSES.has(Number(lastError?.httpStatus)) || ['AbortError', 'TypeError'].includes(lastError?.name))) {
-      const label = payload?.action === 'department_ops_read' ? '已同步資料' : '驗證服務';
+    if (canRetry && (lastError?.routeResponseMismatch || AUTH_RETRY_STATUSES.has(Number(lastError?.httpStatus)) || ['AbortError', 'TypeError'].includes(lastError?.name))) {
+      const label = payload?.action === 'department_ops_read' ? '已同步資料' : payload?.action === 'department_ops_publish' ? '月報差異確認' : '驗證服務';
       throw new Error(`${label}暫時無回應，已自動重試 3 次，請稍後再試。`);
     }
     throw lastError;
