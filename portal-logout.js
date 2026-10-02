@@ -202,21 +202,25 @@
   function ready() {
     if (locked) { lockScreen(); return; }
     const savedNote = read('sessionStorage',NOTE_KEY);
-    const ownControls = document.getElementById('portal-logout') || document.getElementById('departmentLogout');
-    if (!ownControls || savedNote) {
+    const sessionHost = document.querySelector('[data-portal-session-host]');
+    const ownControls = document.getElementById('portal-logout') || document.getElementById('departmentLogout')
+      || (sessionHost && document.getElementById('privateLogout'));
+    if (sessionHost || !ownControls || savedNote) {
       control = document.createElement('aside'); control.id = 'portal-session-controls';
       control.setAttribute('aria-label','營運中心網頁登出');
-      control.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 20px;background:#fff;color:#171b22;border-bottom:1px solid #e5e7eb;font:14px/1.6 system-ui;position:relative;z-index:10';
+      if (sessionHost) control.className = 'form-message';
+      else control.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 20px;background:#fff;color:#171b22;border-bottom:1px solid #e5e7eb;font:14px/1.6 system-ui;position:relative;z-index:10';
       const copy = document.createElement('span'); copy.id = 'portal-session-note'; copy.setAttribute('role','status');
       copy.textContent = savedNote || SCOPE_NOTE;
       const button = document.createElement('button'); button.type = 'button'; button.dataset.portalLogout = ''; button.textContent = '登出';
       button.style.cssText = 'margin-left:auto;min-height:44px;padding:8px 16px;border:1px solid #e5e7eb;border-radius:8px;background:white;color:#bd4700;font:inherit;font-weight:700;cursor:pointer';
-      control.append(copy,button); document.body.prepend(control);
+      control.append(copy,button);
+      if (sessionHost) sessionHost.append(control); else document.body.prepend(control);
       const update = () => { if (!locked) {
         const currentNote = read('sessionStorage',NOTE_KEY);
         copy.textContent = currentNote || SCOPE_NOTE;
         button.hidden = !hasIdentity() || Boolean(ownControls);
-        const visible = Boolean((!ownControls && hasIdentity()) || currentNote);
+        const visible = Boolean(((!ownControls || sessionHost) && hasIdentity()) || currentNote);
         control.hidden = !visible; control.style.display = visible ? 'flex' : 'none';
       } };
       update(); scope.setInterval(update,1000);

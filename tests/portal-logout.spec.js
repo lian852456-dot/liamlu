@@ -27,6 +27,36 @@ async function identify(page,{employee='SYNTHETIC_EMPLOYEE',token='',legacy=fals
 }
 async function logout(page,selector='#portal-logout'){page.once('dialog',d=>d.accept());await page.locator(selector).click();}
 
+for(const width of [390,430]){
+ test('App keeps logout controls in settings without shifting mobile views at '+width+'px',async({context,page})=>{
+  const {calls,errors}=await intercept(context);await page.setViewportSize({width,height:844});await identify(page,{legacy:true});
+  await page.goto(BASE+'app.html');await expect(page.locator('#privateLogout')).toBeHidden();
+  for(const view of ['home','battle','report','schedule','patrol']){
+   await page.locator('[data-nav="'+view+'"]').last().click();
+   await expect(page.locator('[data-view="'+view+'"]')).toBeVisible();
+   expect((await page.locator('.app-header').boundingBox()).y).toBe(0);
+   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+   await expect(page.locator('#portal-session-controls')).toBeHidden();
+  }
+  await page.locator('[data-nav="battle"]').last().click();
+  await page.screenshot({path:'test-results/app-battle-layout-'+width+'.png'});
+  await page.locator('#dataMode').click();await expect(page.locator('#privateLogout')).toBeVisible();
+  await expect(page.locator('[data-portal-session-host] #portal-session-controls')).toBeVisible();
+  expect(await page.locator('#portal-session-controls').evaluate(node=>getComputedStyle(node).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  await page.screenshot({path:'test-results/app-logout-settings-'+width+'.png'});
+  const reads=calls.filter(c=>c.action==='private_access').length;
+  await logout(page,'#privateLogout');await expect(page.locator('.app-header')).toBeVisible();
+  expect((await page.locator('.app-header').boundingBox()).y).toBe(0);
+  await expect(page.locator('#portal-session-note')).toContainText('已同步登出');
+  await page.locator('[data-nav="home"]').last().click();
+  await expect(page.locator('#portal-session-controls')).toBeHidden();
+  await page.locator('#dataMode').click();await expect(page.locator('#portal-session-note')).toContainText('已同步登出');
+  await expect(page.locator('#privateLogout')).toBeHidden();
+  expect(await page.evaluate(({EMP})=>localStorage.getItem(EMP),{EMP})).toBeNull();
+  expect(calls.filter(c=>c.action==='private_access')).toHaveLength(reads);expect(errors).toEqual([]);
+ });
+}
+
 test('same-tab department password login, home return, refresh and history retain the original validated deadline',async({context,page})=>{
  const {calls,errors}=await intercept(context);await page.goto(BASE+'department-ops.html');
  await page.locator('#passcode').fill('synthetic-passcode');await page.locator('#authForm button').click();await expect(page.locator('#workspace')).toBeVisible();
