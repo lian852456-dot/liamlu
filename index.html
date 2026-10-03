@@ -1947,6 +1947,8 @@
 
     <!-- 儲存 -->
     <div class="save-btn-wrap">
+      <p style="margin:0 0 12px;line-height:1.6;">21:00 回報請填齊 A999、好速、R1399、R999 與保險分子／分母；沒有成交請明確填 0。保險無適用案件時，分子與分母都填 0。</p>
+      <p id="closingReportError" role="alert" hidden style="margin:0 0 12px;color:#dc2626;font-weight:700;line-height:1.6;"></p>
       <button class="btn-save-main" onclick="saveData()">
         💾 送出回報
       </button>
@@ -2424,6 +2426,8 @@ async function saveToStorage(date, store, seg, data) {
     showToast('⚠️ 尚未設定 Apps Script 網址');
     return false;
   }
+  const issues = closingReportIssues(data, seg);
+  if (issues.length) throw new Error('請補齊或修正：' + issues.map(issue => issue.label).join('、'));
   // 先取得正式端點的可驗證回應；在伺服器讀回前，不寫 local shadow，也不顯示成功。
   const result = await privateDashboardPost({ action: 'write', date, store, seg, data });
   const readback = result && result.readback && result.readback.awardModels;
@@ -2436,6 +2440,12 @@ async function saveToStorage(date, store, seg, data) {
     String(result.date) === String(date) && String(result.seg) === String(seg) &&
     String(result.store) === String(store) && result.readbackMatches === true && modelsMatch;
   if (!responseValid) throw new Error('ReportAwardModels 寫入回應未通過讀回驗證');
+
+  // 台獎讀回成功不代表 LINE 使用的回報欄位也已存妥。
+  if (Number(seg) === 21) {
+    const verified = await privateDashboardPost({ action: 'read', date, seg });
+    assertClosingReportReadback(verified, date, store, seg, data);
+  }
 
   // 只有同一端點確認 rowWritten + readback 後，才更新本機 shadow/cache。
   writeLocalShadow(date, store, seg, data);
@@ -2768,6 +2778,62 @@ function reportValue(record, key) {
   return record[key];
 }
 
+function closingReportNumber(value) {
+  if (value === null || value === undefined || typeof value === 'boolean' || String(value).trim() === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function closingReportIssues(data, seg) {
+  if (Number(seg) !== 21) return [];
+  const definitions = [
+    ['aq999', 'A999'], ['haosu', '好速'], ['rt1399', 'R1399'], ['rt999', 'R999'],
+    ['insurance_num', '保險分子'], ['insurance_den', '保險分母']
+  ];
+  const issues = definitions.filter(([key]) => {
+    const value = closingReportNumber(data[key]);
+    return value === null || value < 0;
+  }).map(([key, label]) => ({ key, label }));
+  const numerator = closingReportNumber(data.insurance_num);
+  const denominator = closingReportNumber(data.insurance_den);
+  if (numerator !== null && denominator !== null && numerator > denominator) {
+    issues.push({ key:'insurance_num', label:'保險分子不可大於分母' });
+  }
+  if (numerator === 0 && denominator === 0 && closingReportNumber(data.insurance_pct) !== null) {
+    issues.push({ key:'insurance_den', label:'無適用案件應清除搭售率（請重新輸入分子／分母）' });
+  }
+  if (denominator > 0 && numerator !== null && numerator >= 0 && numerator <= denominator) {
+    const expected = Number((numerator / denominator * 100).toFixed(1));
+    if (closingReportNumber(data.insurance_pct) !== expected) {
+      issues.push({ key:'insurance_num', label:'保險搭售率（請重新輸入分子／分母）' });
+    }
+  }
+  return issues;
+}
+
+function validateClosingReportForm(data, seg) {
+  const issues = closingReportIssues(data, seg);
+  const error = document.getElementById('closingReportError');
+  if (error) {
+    error.hidden = issues.length === 0;
+    error.textContent = issues.length ? '請補齊或修正：' + issues.map(issue => issue.label).join('、') + '。沒有成交請填 0，空白不代表 0。' : '';
+  }
+  if (!issues.length) return true;
+  showToast('⚠️ 回報尚未送出，請補齊必填欄位');
+  document.getElementById('f_' + issues[0].key)?.focus();
+  return false;
+}
+
+function assertClosingReportReadback(response, date, store, seg, expected) {
+  const row = response && response.status === 'ok' && response.data && response.data[store];
+  if (!row || String(row.date) !== String(date) || String(row.store) !== String(store) || Number(row.seg) !== Number(seg)) {
+    throw new Error('回報讀回失敗，尚未確認完整儲存，請重試');
+  }
+  const fields = ['aq999','haosu','rt1399','rt999','insurance_num','insurance_den','insurance_pct'];
+  const mismatch = fields.filter(key => closingReportNumber(row[key]) !== closingReportNumber(expected[key]));
+  if (mismatch.length) throw new Error('回報讀回不一致，尚未確認完整儲存，請重試');
+}
+
 function getFormData() {
   const obj = {};
   FIELDS.forEach(f => {
@@ -2784,6 +2850,7 @@ async function saveData() {
   if (!GAS_URL) { showToast('⚠️ 請先設定 Apps Script 網址'); openSettings(); return; }
   const date = document.getElementById('fillDate').value;
   const data = getFormData();
+  if (!validateClosingReportForm(data, currentSeg)) return;
   data.savedAt = new Date().toLocaleTimeString('zh-TW');
   showToast('🔄 上傳中…');
   try {
@@ -4025,6 +4092,7 @@ async function saveData() {
   if (!GAS_URL) { showToast('⚠️ 請先設定 Apps Script 網址'); openSettings(); return; }
   const date = document.getElementById('fillDate').value;
   const data = getFormData();
+  if (!validateClosingReportForm(data, currentSeg)) return;
   data.savedAt = new Date().toLocaleTimeString('zh-TW');
 
   // 21:00 零報攔截：A999=0 或 好速=0 或 R1399=0 任一項 → 強制填說明
