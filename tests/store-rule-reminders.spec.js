@@ -39,6 +39,15 @@ for(const width of [390,1440])test(`legal login renders reminder metadata and no
   const {calls,errors}=await setup(page);
   await login(page);
   await expect(page.locator('.store-rule-card')).toHaveCount(1);
+  await expect(page.locator('.store-rule-card')).toBeHidden();
+  expect(await page.locator('#storeRulesMount').evaluate(node => node === node.parentElement.lastElementChild)).toBe(true);
+  await page.locator('.store-rules-toggle').click();
+  await expect(page.locator('.store-rule-card')).toBeVisible();
+  await page.locator('.store-rules-toggle').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.store-rule-card')).toBeHidden();
+  await page.keyboard.press('Space');
+  await expect(page.locator('.store-rule-card')).toBeVisible();
   await expect(page.locator('.store-rule-card')).toContainText('SYNTHETIC_PRIVATE_RULE_ALPHA');
   await expect(page.locator('.store-rule-card')).toContainText('合成來源｜第 1、2 頁');
   await expect(page.locator('.store-rule-card')).toContainText('合成頻率');
@@ -66,6 +75,7 @@ test('tab changes remove private rendering and reread when returning',async({pag
 test('logout clears authenticated DOM and session, then revokes current token',async({page})=>{
   const {calls}=await setup(page);await login(page);
   await expect(page.locator('.store-rule-card')).toHaveCount(1);
+  await page.locator('.store-rules-toggle').click();
   await page.locator('#store-rules-logout').click();
   await expect(page.locator('#authPanel')).toBeVisible();
   await expect(page.locator('#workspace')).toBeHidden();
@@ -96,6 +106,7 @@ test('session expiration removes already-rendered private contents',async({page}
   await login(page);
   await expect(page.locator('.store-rule-card')).toHaveCount(1);
   await expect(page.locator('.store-rule-card')).toHaveCount(0,{timeout:4000});
+  await page.locator('.store-rules-toggle').click();
   await expect(page.locator('#store-rules-status')).toContainText('登入已到期');
   expect(await page.content()).not.toContain('SYNTHETIC_PRIVATE_RULE_ALPHA');
 });

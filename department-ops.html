@@ -8,7 +8,7 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>北一二部｜部區管理</title>
   <link rel="stylesheet" href="department-ops.css?v=20261002-display-1">
-  <link rel="stylesheet" href="store-rule-reminders.css?v=20261002-1">
+  <link rel="stylesheet" href="store-rule-reminders.css?v=20261004-collapse-1">
   <link rel="stylesheet" href="department-scores.css?v=20261002-1">
 </head>
 <body>
@@ -96,7 +96,6 @@
       </section>
 
       <section id="storePanel" data-panel="store" hidden>
-        <div id="storeRulesMount" data-department-rules-mount></div>
         <section class="dashboard-head">
           <div><p class="step-label">STORE OPERATIONS</p><h2>店務成績儀表板</h2><p class="score-limits">門市歷史採各月明細。原始 G 成績、E 缺失與 F 扣分分開，不依新版規章回算。</p></div>
           <button id="scoreRefresh" class="secondary-button" type="button">重新讀取保存版本</button>
@@ -122,6 +121,7 @@
           <section id="scorePreview" hidden><h3>更新預覽</h3><p id="scorePreviewMeta"></p><div id="scoreMonthChoices"></div><p id="scoreErrors"></p><div id="scoreDiff"></div><label class="score-confirm"><input id="scoreConfirm" type="checkbox">我已核對月份、差異與缺資料警告，確認保存勾選月份</label><button id="scorePublish" class="primary-button" type="button" disabled>確認保存勾選月份</button></section>
           <p class="score-limits">尚無改善紀錄與個案原因，不推定已改善或改善率。簡報範例尚未提供，目前提供資料匯出介面。</p>
         </section>
+        <div id="storeRulesMount" data-department-rules-mount></div>
       </section>
     </div>
   </main>
@@ -136,6 +136,6 @@
   <script src="department-gold-monthly-ui.js?v=20261002-logout-2" defer></script>
   <script src="department-scores.js?v=20261003-department-perf-r2" defer></script>
   <script src="department-ops.js?v=20261002-logout-2" defer></script>
-  <script src="store-rule-reminders.js?v=20261002-1" defer></script>
+  <script src="store-rule-reminders.js?v=20261004-collapse-1" defer></script>
 </body>
 </html>
