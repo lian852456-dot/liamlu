@@ -10,6 +10,9 @@ const focus = (opOnline,opAccum,opTarget,clicked,tagged) => JSON.stringify({
   mycharge_clicked:clicked, mycharge_tagged:tagged,
   mycharge_pct:tagged > 0 ? Number((clicked/tagged*100).toFixed(1)) : null
 });
+const authoritativeSummary = (overrides={}) => ({
+  date, segment:21, totalStores:9, completedStores:0, semantics:'formal-index-summary-v1', ...overrides
+});
 const rows = [
   {date,seg:21,store:'酒泉',aq999:3,aq1399:1,haosu:1,rt999:2,rt1399:1,insurance_num:1,insurance_den:2,management_focus_json:focus(1,4,8,3,5)},
   {date,seg:21,store:'永吉',aq999:0,aq1399:0,haosu:2,rt999:1,rt1399:0,insurance_num:0,insurance_den:1,management_focus_json:focus(0,2,7,2,4)},
@@ -46,6 +49,51 @@ test('正式 GAS status/data 可直接讀取', async () => {
   });
   assert.equal(result.source,'primary');
   assert.equal(result.rows.length,3);
+});
+
+test('同日 seg21 的權威零提交 summary 保留為空資料，不切到備援', async () => {
+  let fallbackCalls = 0;
+  const result = await loadRowsWithRecovery({
+    date, attempts:1,
+    readPrimary:async()=>({status:'ok', data:{}, rows:[], summary:authoritativeSummary()}),
+    readFallback:async()=>{ fallbackCalls += 1; throw new Error('不應呼叫'); }
+  });
+  assert.equal(result.source,'primary');
+  assert.deepEqual(result.rows,[]);
+  assert.equal(fallbackCalls,0);
+  assert.equal(result.diagnostics[0].code,'AUTHORITATIVE_EMPTY');
+});
+
+test('權威零提交拒絕 null/字串 identity、錯誤 semantics 與非空 rows 矛盾', async () => {
+  const invalidSummaries = [
+    authoritativeSummary({segment:null}),
+    authoritativeSummary({segment:'21'}),
+    authoritativeSummary({totalStores:null}),
+    authoritativeSummary({completedStores:null}),
+    authoritativeSummary({semantics:'formal-index-summary-v3'}),
+  ];
+  for (const summary of invalidSummaries) {
+    await assert.rejects(loadRowsWithRecovery({
+      date, attempts:1,
+      readPrimary:async()=>({status:'ok',data:{},rows:[],summary}),
+    }), error => error.name === 'ClosingSourceUnavailableError');
+  }
+  await assert.rejects(loadRowsWithRecovery({
+    date, attempts:1,
+    readPrimary:async()=>({status:'ok',data:{},rows:[{date,seg:21,store:'酒泉'}],summary:authoritativeSummary()}),
+  }), error => error.name === 'ClosingSourceUnavailableError');
+});
+
+test('無同日 identity 的空 payload 仍 fail closed', async () => {
+  await assert.rejects(loadRowsWithRecovery({
+    date, attempts:1,
+    readPrimary:async()=>({status:'ok', data:{}}),
+    readFallback:async()=>{throw new Error('fallback');}
+  }), error => {
+    assert.equal(error.name,'ClosingSourceUnavailableError');
+    assert.ok(error.attempts.some(item => item.code === 'EMPTY_RESULT'));
+    return true;
+  });
 });
 
 test('主要來源失敗可切換備援 Sheets values', async () => {

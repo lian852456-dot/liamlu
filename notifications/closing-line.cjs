@@ -30,6 +30,10 @@ function normalizeRows(payload, date, seg) {
     error.code = String(payload.code || 'SOURCE_ERROR');
     throw error;
   }
+  if (payload?.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+      && Object.keys(payload.data).length === 0 && Array.isArray(payload.rows) && payload.rows.length > 0) {
+    throw new TypeError('來源回傳 data 與 rows 矛盾');
+  }
   let rows;
   if (Array.isArray(payload)) rows = payload;
   else if (Array.isArray(payload?.rows)) rows = payload.rows;
@@ -56,12 +60,31 @@ function normalizeRows(payload, date, seg) {
     .filter(row => STORES.includes(row.store));
 }
 
+function isAuthoritativeEmpty(payload, date, seg) {
+  const summary = payload?.summary;
+  return payload?.status === 'ok'
+    && payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+    && Object.keys(payload.data).length === 0
+    && summary && summary.date === date
+    && typeof summary.segment === 'number' && summary.segment === seg
+    && typeof summary.totalStores === 'number' && summary.totalStores === STORES.length
+    && typeof summary.completedStores === 'number' && summary.completedStores === 0
+    && (summary.semantics === 'formal-index-summary-v1' || summary.semantics === 'formal-index-summary-v2')
+    && (!Object.prototype.hasOwnProperty.call(payload, 'rows')
+      || (Array.isArray(payload.rows) && payload.rows.length === 0));
+}
+
 async function retryRead(name, reader, options) {
   const { date, seg, attempts, initialDelayMs, sleep, diagnostics } = options;
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      const rows = normalizeRows(await reader(date, seg), date, seg);
+      const payload = await reader(date, seg);
+      if (isAuthoritativeEmpty(payload, date, seg)) {
+        diagnostics.push({ source:name, attempt, ok:true, rowCount:0, code:'AUTHORITATIVE_EMPTY' });
+        return [];
+      }
+      const rows = normalizeRows(payload, date, seg);
       diagnostics.push({ source:name, attempt, ok:true, rowCount:rows.length });
       if (rows.length > 0) return rows;
       lastError = new Error('來源可讀但查無當日時段資料');
