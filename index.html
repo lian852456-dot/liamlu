@@ -1730,7 +1730,6 @@
         <input type="number" id="f_rt_close_pct" placeholder="0.0" readonly style="background:rgba(255,102,0,0.05);cursor:not-allowed;">
       </div>
       <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
-        <span class="ks-icon">☂️</span> 保險搭售率      <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
         <span class="ks-icon">☂️</span> 保險搭售率
         <div class="ks-line"></div>
       </div>
@@ -2844,7 +2843,10 @@ function assertClosingReportReadback(response, date, store, seg, expected) {
     throw new Error('回報讀回失敗，尚未確認完整儲存，請重試');
   }
   const fields = ['aq999','aq1399','haosu','rt999','rt1399','insurance_num','insurance_den','insurance_pct','management_focus_json'];
-  const mismatch = fields.filter(key => closingReportNumber(row[key]) !== closingReportNumber(expected[key]));
+  const mismatch = fields.filter(key => {
+    if (key === 'management_focus_json') return String(row[key] || '') !== String(expected[key] || '');
+    return closingReportNumber(row[key]) !== closingReportNumber(expected[key]);
+  });
   if (mismatch.length) throw new Error('回報讀回不一致，尚未確認完整儲存，請重試');
 }
 
