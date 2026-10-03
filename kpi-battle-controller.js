@@ -200,7 +200,10 @@
     const meta = safeData.meta || {};
     const dataAsOfDate = kpiBattleDataAsOfDate(meta);
     const sourceFile = kpiBattleSourceFile(meta.sourceFile);
-    const reportDate = kpiBattleReportDateFromSource(sourceFile, dataAsOfDate);
+    // The MMDD source filename is the publication-day identity, not the
+    // business cutoff.  Leave report_date unset until the same-source formal
+    // snapshot supplies the authoritative report/data cutoff date.
+    const reportDate = '';
     const codeName = {};
     (safeData.stores || []).forEach(store => { codeName[store.code] = store.name; });
     const metricsOf = itemsObj => {
