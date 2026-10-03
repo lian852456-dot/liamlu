@@ -171,6 +171,8 @@
       if (source && source[field] != null) target[field] = source[field];
     });
     copy.report_date = String(kpiData.report_date || snapshot.report_date);
+    // Preserve the source's explicit publication day separately from its cutoff.
+    copy.report_run_date = String(snapshot.report_run_date || '');
     copy.source_date_range = snapshot.source_date_range || copy.source_date_range;
     copy.aggregate = { ...copy.aggregate };
     copyFields(copy.aggregate, aggregate, ['overall_kpi', 'overall_kpi_dod', 'company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod', 'insurance_attach_rate']);

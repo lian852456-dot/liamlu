@@ -53,7 +53,7 @@ function fixture() {
 
 test('index 與 standalone 只掛載唯一台獎 controller，沒有 iframe 或 DOM 遙控', () => {
   for (const page of [index, standalone]) {
-    assert.match(page, /<script src="awards-battle-controller\.js"><\/script>/);
+    assert.match(page, /<script src="awards-battle-controller\.js\?v=20261003-publication-date-1"><\/script>/);
     assert.match(page, /id="panel-awards-battle"/);
     assert.match(page, /id="awardsBattleContent"/);
     assert.doesNotMatch(page, /function\s+(?:renderAwardPriority|renderAwardModel|renderAwardUnit)\s*\(/);
