@@ -83,7 +83,7 @@ test('only POST exposes the protected reminder read; no public write action exis
 test('module is isolated from department controller and contains no private fixture', () => {
   const page=fs.readFileSync(path.join(root,'department-ops.html'),'utf8');
   const module=fs.readFileSync(path.join(root,'store-rule-reminders.js'),'utf8');
-  assert.match(page,/store-rule-reminders\.js\?v=20261002-1/);
+  assert.match(page,/store-rule-reminders\.js\?v=20261004-collapse-1/);
   assert.match(module,/textContent = text/);
   assert.doesNotMatch(module,/localStorage|indexedDB|SYNTHETIC_PRIVATE_RULE_ALPHA/);
   assert.equal(rulesSource,fs.readFileSync(path.join(root,'patrol-gas/StoreRules.gs'),'utf8'));

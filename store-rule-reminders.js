@@ -19,7 +19,7 @@
   const section = document.createElement('section');
   section.className = 'store-rules';
   section.setAttribute('aria-labelledby', 'store-rules-title');
-  section.innerHTML = '<div class="store-rules-head"><h2 id="store-rules-title">門市規則提醒</h2><div class="store-rules-actions"><button id="store-rules-refresh" class="secondary-button" type="button">重新讀取提醒</button><button id="store-rules-logout" class="secondary-button" type="button">登出</button></div></div><p id="store-rules-status" class="store-rules-status" role="status" aria-live="polite">登入後讀取私有提醒。</p><details id="store-rules-context" class="store-rules-context" hidden><summary>來源版本與適用說明</summary><p id="store-rules-context-copy"></p></details><div id="store-rules-list" class="store-rules-list"></div>';
+  section.innerHTML = '<details class="store-rules-disclosure"><summary class="store-rules-toggle"><h2 id="store-rules-title">門市規則提醒</h2><span class="store-rules-toggle-hint"><span class="store-rules-expand">展開查看</span><span class="store-rules-collapse">收合提醒</span></span></summary><div class="store-rules-content"><div class="store-rules-actions"><button id="store-rules-refresh" class="secondary-button" type="button">重新讀取提醒</button><button id="store-rules-logout" class="secondary-button" type="button">登出</button></div><p id="store-rules-status" class="store-rules-status" role="status" aria-live="polite">登入後讀取私有提醒。</p><details id="store-rules-context" class="store-rules-context" hidden><summary>來源版本與適用說明</summary><p id="store-rules-context-copy"></p></details><div id="store-rules-list" class="store-rules-list"></div></div></details>';
   mount.replaceChildren(section);
   const status = section.querySelector('#store-rules-status');
   const context = section.querySelector('#store-rules-context');
