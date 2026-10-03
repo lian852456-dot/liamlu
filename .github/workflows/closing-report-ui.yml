@@ -6,6 +6,8 @@ on:
       - 'index.html'
       - 'tests/closing-report-completeness.test.cjs'
       - 'tests/closing-report-ui.spec.js'
+      - 'notifications/**'
+      - 'tests/closing-line.test.cjs'
       - '.github/workflows/closing-report-ui.yml'
 permissions:
   contents: read
@@ -26,7 +28,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: sudo apt-get install -y fonts-noto-cjk
       - name: Verify closing and existing report contracts
-        run: node --test tests/closing-report-completeness.test.cjs tests/report-award-models-isolated.test.cjs tests/award-models-v1-contract.test.cjs tests/daily-report-summary-gas.test.cjs tests/gas-date.test.cjs
+        run: node --test tests/closing-report-completeness.test.cjs tests/closing-line.test.cjs tests/report-award-models-isolated.test.cjs tests/award-models-v1-contract.test.cjs tests/daily-report-summary-gas.test.cjs tests/gas-date.test.cjs
       - name: Verify desktop and mobile save flows
         env:
           TEST_BASE_URL: http://127.0.0.1:4176/

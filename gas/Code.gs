@@ -14,6 +14,7 @@ const FIELDS = [
   'early_renew','rt_close_num','rt_close_den','rt_close_pct',
   'insurance_num','insurance_den','insurance_pct',
   'device_num','device_den','device_ratio',
+  'management_focus_json',
   'tw_pixel10','tw_s26u','tw_sharpr11','tw_vivo','tw_s26','tw_reno16f',
   'tw_pixel10fold','tw_findx9s','tw_sony1','tw_poketomo',
   'tw_oppoa6x','tw_a27','tw_y21','tw_myfirst',
@@ -2779,7 +2780,7 @@ function readData(date, seg) {
       result[store] = obj;
     }
   }
-  return attachReportAwardModels_(result, date, seg);
+  return result;
 }
 
 function jsonResponse(obj, callback) {
@@ -2875,7 +2876,22 @@ function reportWritePayload_(payload) {
     return { status: 'ok', ...saved };
   }
   writeData(payload.date, payload.store, payload.seg, data);
-  return { status: 'ok' };
+  const readback = readData(payload.date, Number(payload.seg))[String(payload.store)] || null;
+  const keys = Object.keys(data).filter(function(key) {
+    return key !== 'savedAt' && key !== 'awardModels' && data[key] !== null && data[key] !== undefined;
+  });
+  const readbackMatches = Boolean(readback) && keys.every(function(key) {
+    if (key === 'management_focus_json') return String(readback[key] || '') === String(data[key] || '');
+    const expected = reportSummaryNumber_(data[key]);
+    const actual = reportSummaryNumber_(readback[key]);
+    return expected === null ? String(readback[key] || '') === String(data[key] || '') : actual === expected;
+  });
+  if (!readbackMatches) throw new Error('每日回報寫入後讀回不一致');
+  return {
+    status:'ok', rowWritten:true, spreadsheetId:SPREADSHEET_ID, sheetName:SHEET_NAME,
+    date:String(payload.date), store:String(payload.store), seg:Number(payload.seg),
+    readbackMatches:true, readback:readback
+  };
 }
 
 function reportSummaryNumber_(value) {
@@ -2899,15 +2915,38 @@ function reportSummaryClock_(value) {
   return { seconds:hour * 3600 + Number(plain[2]) * 60 + Number(plain[3] || 0), text:String(hour).padStart(2, '0') + ':' + plain[2] + ':' + String(plain[3] || '00').padStart(2, '0') };
 }
 
+function reportManagementFocus_(record) {
+  let raw = {};
+  try {
+    raw = record && record.management_focus_json
+      ? JSON.parse(String(record.management_focus_json))
+      : {};
+  } catch (error) {
+    raw = {};
+  }
+  const n = function(key) { return reportSummaryNumber_(raw[key]); };
+  const clicked = n('mycharge_clicked');
+  const tagged = n('mycharge_tagged');
+  return {
+    op: { online:n('op_online'), accumulated:n('op_accum'), target:n('op_target') },
+    mycharge: {
+      clicked:clicked, tagged:tagged,
+      rate:clicked !== null && tagged !== null && tagged > 0 ? Number((clicked / tagged * 100).toFixed(1)) : null
+    }
+  };
+}
+
 function reportSummaryFromData_(data, date, seg) {
   const source = data && typeof data === 'object' ? data : {};
   const definitions = [
     { key:'A999', sourceField:'aq999', unit:'count', aggregation:'sum' },
+    { key:'A1399', sourceField:'aq1399', unit:'count', aggregation:'sum' },
     { key:'好速', sourceField:'haosu', unit:'points', aggregation:'sum' },
-    { key:'R1399', sourceField:'rt1399', unit:'count', aggregation:'sum' },
     { key:'R999', sourceField:'rt999', unit:'count', aggregation:'sum' },
-    { key:'保險搭售率', sourceField:'insurance_pct', unit:'percent', aggregation:'average' },
-    { key:'設備案佔比', sourceField:'device_ratio', unit:'percent', aggregation:'average' }
+    { key:'R1399', sourceField:'rt1399', unit:'count', aggregation:'sum' },
+    { key:'保險分子', sourceField:'insurance_num', unit:'count', aggregation:'sum' },
+    { key:'保險分母', sourceField:'insurance_den', unit:'count', aggregation:'sum' },
+    { key:'保險搭售率', sourceField:'insurance_pct', unit:'percent', aggregation:'average' }
   ];
   const stores = STORES.map(function(store) {
     const row = source[store] || null;
@@ -2916,7 +2955,12 @@ function reportSummaryFromData_(data, date, seg) {
       const value = reportSummaryNumber_(row[definition.sourceField]);
       if (value !== null) metrics[definition.key] = { value:value, unit:definition.unit, sourceField:definition.sourceField };
     });
-    return { name:store, reported:Boolean(row), reportedAt:row ? String(row.savedAt || row.updatedAt || '') : '', metrics:metrics };
+    return {
+      name:store, reported:Boolean(row),
+      reportedAt:row ? String(row.savedAt || row.updatedAt || '') : '',
+      metrics:metrics,
+      managementFocus:row ? reportManagementFocus_(row) : null
+    };
   });
   const reportedRows = STORES.map(function(store) { return source[store] || null; }).filter(Boolean);
   const metrics = {};
@@ -2929,11 +2973,34 @@ function reportSummaryFromData_(data, date, seg) {
     metrics[definition.key] = { value:value, unit:definition.unit, sourceField:definition.sourceField, aggregation:definition.aggregation };
   });
   const latest = stores.map(function(store) { return reportSummaryClock_(store.reportedAt); }).filter(Boolean).sort(function(a, b) { return a.seconds - b.seconds; }).pop();
+  const managementRows = reportedRows.map(reportManagementFocus_);
+  const sumManagement = function(path) {
+    const values = managementRows.map(function(row) {
+      const value = path.reduce(function(current, key) { return current && current[key] !== undefined ? current[key] : null; }, row);
+      return reportSummaryNumber_(value);
+    }).filter(function(value) { return value !== null; });
+    return values.length ? values.reduce(function(sum, value) { return sum + value; }, 0) : null;
+  };
+  const mychargeClicked = sumManagement(['mycharge','clicked']);
+  const mychargeTagged = sumManagement(['mycharge','tagged']);
+  const managementFocus = {
+    op:{
+      online:sumManagement(['op','online']),
+      accumulated:sumManagement(['op','accumulated']),
+      target:sumManagement(['op','target'])
+    },
+    mycharge:{
+      clicked:mychargeClicked,
+      tagged:mychargeTagged,
+      rate:mychargeClicked !== null && mychargeTagged !== null && mychargeTagged > 0
+        ? Number((mychargeClicked / mychargeTagged * 100).toFixed(1)) : null
+    }
+  };
   return {
     date:String(date || ''), segment:Number(seg), completedStores:stores.filter(function(store) { return store.reported; }).length,
     totalStores:STORES.length, missingStores:stores.filter(function(store) { return !store.reported; }).map(function(store) { return store.name; }),
-    updatedAt:latest ? latest.text : '', metrics:metrics, stores:stores,
-    semantics:'formal-index-summary-v1'
+    updatedAt:latest ? latest.text : '', metrics:metrics, managementFocus:managementFocus, stores:stores,
+    semantics:'formal-index-summary-v2'
   };
 }
 
