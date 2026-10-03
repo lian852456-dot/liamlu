@@ -1730,25 +1730,7 @@
         <input type="number" id="f_rt_close_pct" placeholder="0.0" readonly style="background:rgba(255,102,0,0.05);cursor:not-allowed;">
       </div>
       <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
-        <span class="ks-icon">📱</span> 設備案佔比
-        <div class="ks-line"></div>
-      </div>
-      <div class="kpi-input-wrap">
-        <label>設備案 分子</label>
-        <span class="ki-icon">➗</span>
-        <input type="number" id="f_device_num" placeholder="0" oninput="calcPct('device_num','device_den','device_ratio')">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>設備案 分母</label>
-        <span class="ki-icon">➗</span>
-        <input type="number" id="f_device_den" placeholder="0" oninput="calcPct('device_num','device_den','device_ratio')">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>設備案佔比（自動）</label>
-        <span class="ki-icon">📊</span>
-        <input type="number" id="f_device_ratio" placeholder="0.0" readonly style="background:rgba(255,102,0,0.05);cursor:not-allowed;">
-      </div>
-      <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
+        <span class="ks-icon">☂️</span> 保險搭售率      <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
         <span class="ks-icon">☂️</span> 保險搭售率
         <div class="ks-line"></div>
       </div>
@@ -1872,82 +1854,20 @@
       </div>
     </div>
 
-    <!-- 台獎手機專區 -->
-    <div class="kpi-section-title" style="margin-top:18px;">
-      <span class="ks-icon">🏅</span> 台獎手機專區
-      <div class="ks-line"></div>
-    </div>
-    <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;padding:0 2px;">填寫今日各機款銷售筆數｜0 代表無銷售，空白代表未填｜獎金標示採店長 50%／100% 達成級距</div>
-
-    <div id="awardModelsV1Grid" class="form-grid" aria-label="當月台獎機款"></div>
-    <div id="awardModelsV1Status" style="font-size:11px;color:var(--text-dim);margin:6px 2px 10px;">資料契約：award-models-v1｜缺少項目保留空值，0 與空值分開記錄</div>
-
-    <div id="legacyAwardInputs" style="display:none;" aria-hidden="true">
-    <!-- KPI 高SD - 黃底 -->
-    <div style="font-size:11px;font-weight:700;color:#b8860b;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);border-radius:6px;padding:4px 10px;margin-bottom:6px;">⭐ KPI 高SD</div>
-    <div class="form-grid">
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">Pixel 10/10 Pro/10 Pro XL/10a<span class="tw-bonus"><span class="tw-b50">50%・$1,105</span><span class="tw-b100">100%・$1,660</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_pixel10" placeholder="0" step="1">
+    <!-- 管理重點：每月由 MANAGEMENT_FOCUS_BY_MONTH 調整 -->
+    <div id="managementFocusSection">
+      <div class="kpi-section-title" style="margin-top:18px;">
+        <span class="ks-icon">🎯</span> 管理重點
+        <span id="managementFocusMonthLabel" style="font-size:12px;color:var(--text-muted);font-weight:700;"></span>
+        <div class="ks-line"></div>
       </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">S26 Ultra<span class="tw-bonus"><span class="tw-b50">50%・$405</span><span class="tw-b100">100%・$610</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_s26u" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">SHARP R11<span class="tw-bonus"><span class="tw-b50">50%・$470</span><span class="tw-b100">100%・$705</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_sharpr11" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">vivo X300/X300 Pro/V70 FE<span class="tw-bonus"><span class="tw-b50">50%・$1,890</span><span class="tw-b100">100%・$2,835</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_vivo" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">S26/S26+/A57<span class="tw-bonus"><span class="tw-b50">50%・$2,335</span><span class="tw-b100">100%・$3,500</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_s26" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">Reno16 F<span class="tw-bonus"><span class="tw-b50">50%・$685</span><span class="tw-b100">100%・$1,025</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_reno16f" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">moto razr fold<span class="tw-bonus"><span class="tw-b50">50%・$275</span><span class="tw-b100">100%・$415</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_sony1" placeholder="0" step="1">
-      </div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;padding:0 2px;">每月管理項目可調整；21:00 收官需填完整，0 與空白分開記錄。</div>
+      <div id="managementFocusGrid" class="form-grid" aria-label="當月管理重點"></div>
     </div>
 
-    <!-- KPI 中SD - 黃底 -->
-    <div style="font-size:11px;font-weight:700;color:#b8860b;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);border-radius:6px;padding:4px 10px;margin:8px 0 6px;">⭐ KPI 中SD</div>
-    <div class="form-grid">
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">OPPO A6x 6G/128G<span class="tw-bonus"><span class="tw-b50">50%・$550</span><span class="tw-b100">100%・$825</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_oppoa6x" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">A27 &amp; A17<span class="tw-bonus"><span class="tw-b50">50%・$265</span><span class="tw-b100">100%・$400</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_a27" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">Y21 &amp; Redmi Note 15 Pro<span class="tw-bonus"><span class="tw-b50">50%・$85</span><span class="tw-b100">100%・$125</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_y21" placeholder="0" step="1">
-      </div>
-    </div>
-
-    </div>
-
-    <!-- 儲存 -->
+    <!-- 儲存 -->    <!-- 儲存 -->
     <div class="save-btn-wrap">
-      <p style="margin:0 0 12px;line-height:1.6;">21:00 回報請填齊 A999、好速、R1399、R999 與保險分子／分母；沒有成交請明確填 0。保險無適用案件時，分子與分母都填 0。</p>
+      <p style="margin:0 0 12px;line-height:1.6;">21:00 收官請填齊 A999、A1399、好速、R999、R1399、保險分子／分母與當月管理重點；沒有成交請明確填 0。KPI 達成率與公司排名會自動沿用 16:00 回報，不需重填。</p>
       <p id="closingReportError" role="alert" hidden style="margin:0 0 12px;color:#dc2626;font-weight:700;line-height:1.6;"></p>
       <button class="btn-save-main" onclick="saveData()">
         💾 送出回報
@@ -2039,8 +1959,8 @@
     </div>
   </div>
 
-  <!-- 大盤表 - 台獎手機 -->
-  <div class="section-divider">🏅 台獎手機專區</div>
+  <!-- 大盤表 - 管理重點 -->
+  <div class="section-divider">🎯 管理重點</div>
   <div class="card" style="padding:14px 10px;">
     <div class="table-wrap">
       <table id="summaryTable3"></table>
@@ -2426,20 +2346,15 @@ async function saveToStorage(date, store, seg, data) {
     showToast('⚠️ 尚未設定 Apps Script 網址');
     return false;
   }
-  const issues = closingReportIssues(data, seg);
+  const issues = closingReportIssues(data, seg, date);
   if (issues.length) throw new Error('請補齊或修正：' + issues.map(issue => issue.label).join('、'));
   // 先取得正式端點的可驗證回應；在伺服器讀回前，不寫 local shadow，也不顯示成功。
   const result = await privateDashboardPost({ action: 'write', date, store, seg, data });
-  const readback = result && result.readback && result.readback.awardModels;
-  const modelsMatch = readback && Object.keys(data.awardModels).every(id =>
-    Object.prototype.hasOwnProperty.call(readback, id) && readback[id] === data.awardModels[id]
-  );
   const responseValid = result && result.status === 'ok' && result.rowWritten === true &&
     typeof result.spreadsheetId === 'string' && result.spreadsheetId.length > 0 &&
-    result.sheetName === 'ReportAwardModels' &&
-    String(result.date) === String(date) && String(result.seg) === String(seg) &&
-    String(result.store) === String(store) && result.readbackMatches === true && modelsMatch;
-  if (!responseValid) throw new Error('ReportAwardModels 寫入回應未通過讀回驗證');
+    String(result.date) === String(date) && Number(result.seg) === Number(seg) &&
+    String(result.store) === String(store) && result.readbackMatches === true;
+  if (!responseValid) throw new Error('每日回報寫入回應未通過正式讀回驗證');
 
   // 台獎讀回成功不代表 LINE 使用的回報欄位也已存妥。
   if (Number(seg) === 21) {
@@ -2732,9 +2647,93 @@ const FIELDS = [
   '5g','aq_ttl','aq999','aq1399','rt_pts',
   'special_renew','premium_renew','rt999','rt1399','haosu',
   'early_renew','rt_close_num','rt_close_den','rt_close_pct',
-  'insurance_num','insurance_den','insurance_pct',
-  'device_num','device_den','device_ratio'
+  'insurance_num','insurance_den','insurance_pct'
 ];
+
+const CARRY_FROM_16_FIELDS = ['kpi','rank'];
+const MANAGEMENT_FOCUS_BY_MONTH = Object.freeze({
+  '2026-10': [
+    { key:'op_online', label:'OP 上線', icon:'🟣', unit:'筆' },
+    { key:'op_accum', label:'OP 累積', icon:'📈', unit:'筆' },
+    { key:'op_target', label:'OP 目標', icon:'🎯', unit:'筆' },
+    { key:'mycharge_clicked', label:'MyCharge 已點選', icon:'⚡', unit:'筆' },
+    { key:'mycharge_tagged', label:'MyCharge 今日貼標數', icon:'🏷️', unit:'筆' },
+    { key:'mycharge_pct', label:'MyCharge 點選率（自動）', icon:'%', unit:'%', readonly:true }
+  ]
+});
+const MANAGEMENT_FOCUS_DEFAULT_MONTH = '2026-10';
+
+function managementFocusDefinitions(date) {
+  const month = String(date || document.getElementById('fillDate')?.value || today()).slice(0,7);
+  return MANAGEMENT_FOCUS_BY_MONTH[month] || MANAGEMENT_FOCUS_BY_MONTH[MANAGEMENT_FOCUS_DEFAULT_MONTH];
+}
+
+function parseManagementFocus(value) {
+  if (!value) return {};
+  if (typeof value === 'object' && !Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function managementFocusData(record) {
+  return parseManagementFocus(record && record.management_focus_json);
+}
+
+function managementValue(record, key) {
+  const value = managementFocusData(record)[key];
+  return value === null || value === undefined || value === '' ? null : value;
+}
+
+function calcManagementFocusPct() {
+  const clicked = document.getElementById('f_mgmt_mycharge_clicked');
+  const tagged = document.getElementById('f_mgmt_mycharge_tagged');
+  const pct = document.getElementById('f_mgmt_mycharge_pct');
+  if (!clicked || !tagged || !pct) return;
+  const n = Number(clicked.value);
+  const d = Number(tagged.value);
+  pct.value = clicked.value !== '' && tagged.value !== '' && d > 0 && Number.isFinite(n) && Number.isFinite(d)
+    ? (n / d * 100).toFixed(1)
+    : '';
+}
+
+function renderManagementFocusInputs(values) {
+  const grid = document.getElementById('managementFocusGrid');
+  if (!grid) return;
+  const date = document.getElementById('fillDate')?.value || today();
+  const definitions = managementFocusDefinitions(date);
+  const current = parseManagementFocus(values);
+  const month = String(date).slice(0,7);
+  const label = document.getElementById('managementFocusMonthLabel');
+  if (label) label.textContent = '｜' + month;
+  grid.setAttribute('aria-label', month + ' 管理重點');
+  grid.innerHTML = definitions.map(item => `
+    <div class="kpi-input-wrap${item.readonly ? ' highlight' : ''}">
+      <label>${item.label}${item.unit ? '（' + item.unit + '）' : ''}</label>
+      <span class="ki-icon">${item.icon}</span>
+      <input type="number" id="f_mgmt_${item.key}" placeholder="0" min="0" step="${item.unit === '%' ? '0.1' : '1'}"
+        ${item.readonly ? 'readonly style="background:rgba(255,102,0,0.05);cursor:not-allowed;"' : ''}
+        ${item.key === 'mycharge_clicked' || item.key === 'mycharge_tagged' ? 'oninput="calcManagementFocusPct()"' : ''}>
+    </div>`).join('');
+  definitions.forEach(item => {
+    const el = document.getElementById('f_mgmt_' + item.key);
+    if (el) el.value = current[item.key] === null || current[item.key] === undefined ? '' : current[item.key];
+  });
+  calcManagementFocusPct();
+}
+
+function getManagementFocusFormData() {
+  const date = document.getElementById('fillDate')?.value || today();
+  const values = {};
+  managementFocusDefinitions(date).forEach(item => {
+    const el = document.getElementById('f_mgmt_' + item.key);
+    values[item.key] = !el || el.value === '' ? null : Number(el.value);
+  });
+  return values;
+}
 
 function renderAwardModelInputs(values) {
   const grid = document.getElementById('awardModelsV1Grid');
@@ -2774,6 +2773,7 @@ function setAwardModelsFormData(awardModels) {
 
 function reportValue(record, key) {
   if (!record) return null;
+  if (key.indexOf('management.') === 0) return managementValue(record, key.slice('management.'.length));
   if (key.indexOf('awardModels.') === 0) return record.awardModels ? record.awardModels[key.slice('awardModels.'.length)] : null;
   return record[key];
 }
@@ -2784,10 +2784,10 @@ function closingReportNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-function closingReportIssues(data, seg) {
+function closingReportIssues(data, seg, date) {
   if (Number(seg) !== 21) return [];
   const definitions = [
-    ['aq999', 'A999'], ['haosu', '好速'], ['rt1399', 'R1399'], ['rt999', 'R999'],
+    ['aq999', 'A999'], ['aq1399', 'A1399'], ['haosu', '好速'], ['rt999', 'R999'], ['rt1399', 'R1399'],
     ['insurance_num', '保險分子'], ['insurance_den', '保險分母']
   ];
   const issues = definitions.filter(([key]) => {
@@ -2808,11 +2808,25 @@ function closingReportIssues(data, seg) {
       issues.push({ key:'insurance_num', label:'保險搭售率（請重新輸入分子／分母）' });
     }
   }
+  const management = parseManagementFocus(data.management_focus_json);
+  const managementRequired = [
+    ['op_online','OP 上線'], ['op_accum','OP 累積'], ['op_target','OP 目標'],
+    ['mycharge_clicked','MyCharge 已點選'], ['mycharge_tagged','MyCharge 今日貼標數']
+  ];
+  managementRequired.forEach(([key,label]) => {
+    const value = closingReportNumber(management[key]);
+    if (value === null || value < 0) issues.push({ key:'mgmt_' + key, label });
+  });
+  const clicked = closingReportNumber(management.mycharge_clicked);
+  const tagged = closingReportNumber(management.mycharge_tagged);
+  if (clicked !== null && tagged !== null && clicked > tagged) {
+    issues.push({ key:'mgmt_mycharge_clicked', label:'MyCharge 已點選不可大於今日貼標數' });
+  }
   return issues;
 }
 
-function validateClosingReportForm(data, seg) {
-  const issues = closingReportIssues(data, seg);
+function validateClosingReportForm(data, seg, date) {
+  const issues = closingReportIssues(data, seg, date);
   const error = document.getElementById('closingReportError');
   if (error) {
     error.hidden = issues.length === 0;
@@ -2829,7 +2843,7 @@ function assertClosingReportReadback(response, date, store, seg, expected) {
   if (!row || String(row.date) !== String(date) || String(row.store) !== String(store) || Number(row.seg) !== Number(seg)) {
     throw new Error('回報讀回失敗，尚未確認完整儲存，請重試');
   }
-  const fields = ['aq999','haosu','rt1399','rt999','insurance_num','insurance_den','insurance_pct'];
+  const fields = ['aq999','aq1399','haosu','rt999','rt1399','insurance_num','insurance_den','insurance_pct','management_focus_json'];
   const mismatch = fields.filter(key => closingReportNumber(row[key]) !== closingReportNumber(expected[key]));
   if (mismatch.length) throw new Error('回報讀回不一致，尚未確認完整儲存，請重試');
 }
@@ -2840,7 +2854,7 @@ function getFormData() {
     const el = document.getElementById('f_' + f);
     obj[f] = el ? (el.value !== '' ? parseFloat(el.value) : null) : null;
   });
-  obj.awardModels = getAwardModelsFormData();
+  obj.management_focus_json = JSON.stringify(getManagementFocusFormData());
   return obj;
 }
 
@@ -2850,7 +2864,7 @@ async function saveData() {
   if (!GAS_URL) { showToast('⚠️ 請先設定 Apps Script 網址'); openSettings(); return; }
   const date = document.getElementById('fillDate').value;
   const data = getFormData();
-  if (!validateClosingReportForm(data, currentSeg)) return;
+  if (!validateClosingReportForm(data, currentSeg, date)) return;
   data.savedAt = new Date().toLocaleTimeString('zh-TW');
   showToast('🔄 上傳中…');
   try {
@@ -2870,7 +2884,7 @@ function clearForm() {
     const el = document.getElementById('f_' + f);
     if (el) el.value = '';
   });
-  setAwardModelsFormData({});
+  renderManagementFocusInputs({});
 }
 
 // ════════════════════════════════════
@@ -2931,11 +2945,21 @@ async function renderSummary() {
   };
 
   const aq999Total    = sumRaw('aq999');
+  const aq1399Total   = sumRaw('aq1399');
   const haosuTotal    = sumRaw('haosu');
   const rt1399Total   = sumRaw('rt1399');
   const rt999Total    = sumRaw('rt999');
   const avgInsurance  = avgPct('insurance_pct');
-  const avgDevice     = avgPct('device_ratio');
+  const managementSum = key => STORES.reduce((acc, store) => {
+    const value = Number(managementValue(dayCache[store], key));
+    return acc + (Number.isFinite(value) ? value : 0);
+  }, 0);
+  const opOnline = managementSum('op_online');
+  const opAccum = managementSum('op_accum');
+  const opTarget = managementSum('op_target');
+  const myChargeClicked = managementSum('mycharge_clicked');
+  const myChargeTagged = managementSum('mycharge_tagged');
+  const myChargeRate = myChargeTagged > 0 ? (myChargeClicked / myChargeTagged * 100).toFixed(1) : '—';
 
   document.getElementById('summaryCards').innerHTML = `
     <div class="summary-card">
@@ -2951,6 +2975,11 @@ async function renderSummary() {
     <div class="summary-card">
       <div class="sc-label">A999 上線數</div>
       <div class="sc-val" style="color:var(--accent-bright)">${aq999Total}</div>
+      <div class="sc-sub">全區合計(筆)</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">A1399 上線數</div>
+      <div class="sc-val" style="color:var(--accent-bright)">${aq1399Total}</div>
       <div class="sc-sub">全區合計(筆)</div>
     </div>
     <div class="summary-card">
@@ -2974,9 +3003,14 @@ async function renderSummary() {
       <div class="sc-sub">區內均值</div>
     </div>
     <div class="summary-card">
-      <div class="sc-label">設備案佔比</div>
-      <div class="sc-val" style="color:${avgDevice!=='—'&&parseFloat(avgDevice)>=80?'var(--green)':avgDevice!=='—'?'var(--warn)':'var(--text-muted)'}">${avgDevice==='—'?'—':avgDevice+'%'}</div>
-      <div class="sc-sub">區內均值</div>
+      <div class="sc-label">OP 上線／累積／目標</div>
+      <div class="sc-val" style="color:var(--accent-bright)">${opOnline}/${opAccum}/${opTarget}</div>
+      <div class="sc-sub">管理重點</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">⚡ MyCharge 點選</div>
+      <div class="sc-val" style="color:var(--accent-bright)">${myChargeClicked}/${myChargeTagged}</div>
+      <div class="sc-sub">${myChargeRate === '—' ? '—' : myChargeRate + '%'}</div>
     </div>
   `;
 
@@ -2991,9 +3025,6 @@ async function renderSummary() {
     {key:'insurance_num', label:'保險分子', isRaw:true},
     {key:'insurance_den', label:'保險分母', isRaw:true},
     {key:'insurance_pct', label:'保險搭售率%', th:70},
-    {key:'device_num', label:'Device分子', isRaw:true},
-    {key:'device_den', label:'Device分母', isRaw:true},
-    {key:'device_ratio', label:'設備佔比%', th:80},
     {key:'5g', label:'5G銷售(筆)', isRaw:true},
     {key:'aq_ttl', label:'AQ上線(筆)', isRaw:true},
     {key:'aq999', label:'AQ V+D 999(筆)', isRaw:true},
@@ -3019,9 +3050,14 @@ async function renderSummary() {
   ];
   renderSummaryTable('summaryTable2', date, sumSeg, cols2);
 
-  // Table 3: 台獎手機
+  // Table 3: 管理重點
   const cols3 = [
-    ...awardDefinitionsForDate(date).map(item => ({key:'awardModels.' + item.modelId, label:item.shortName, isRaw:true}))
+    {key:'management.op_online', label:'OP上線', isRaw:true},
+    {key:'management.op_accum', label:'OP累積', isRaw:true},
+    {key:'management.op_target', label:'OP目標', isRaw:true},
+    {key:'management.mycharge_clicked', label:'MyCharge已點選', isRaw:true},
+    {key:'management.mycharge_tagged', label:'今日貼標數', isRaw:true},
+    {key:'management.mycharge_pct', label:'MyCharge點選率%', th:0}
   ];
   renderSummaryTable('summaryTable3', date, sumSeg, cols3);
 
@@ -3406,7 +3442,6 @@ async function renderPlayback() {
     {key:'early_renew', label:'提前續約(件)', isRaw:true},
     {key:'rt_close_pct', label:'RT締結率%', th:80},
     {key:'insurance_pct', label:'保險搭售率%', th:70},
-    {key:'device_ratio', label:'設備佔比%', th:80},
     {key:'5g', label:'5G(筆)', isRaw:true},
     {key:'aq_ttl', label:'AQ上線(筆)', isRaw:true},
     {key:'aq999', label:'AQ V+D 999(筆)', isRaw:true},
@@ -3448,7 +3483,7 @@ async function renderPlayback() {
     <div class="card" style="padding:14px 10px;">
       <div class="table-wrap"><table id="pbTable2"></table></div>
     </div>
-    <div class="section-divider">🏅 台獎手機專區</div>
+    <div class="section-divider">🎯 管理重點</div>
     <div class="card" style="padding:14px 10px;">
       <div class="table-wrap"><table id="pbTable3"></table></div>
     </div>
@@ -3457,10 +3492,15 @@ async function renderPlayback() {
 
   renderSummaryTable('pbTable1', date, pbSeg, cols1);
   renderSummaryTable('pbTable2', date, pbSeg, cols2);
-  const colsTw = [
-    ...awardDefinitionsForDate(date).map(item => ({key:'awardModels.' + item.modelId, label:item.shortName, isRaw:true}))
+  const colsManagement = [
+    {key:'management.op_online', label:'OP上線', isRaw:true},
+    {key:'management.op_accum', label:'OP累積', isRaw:true},
+    {key:'management.op_target', label:'OP目標', isRaw:true},
+    {key:'management.mycharge_clicked', label:'MyCharge已點選', isRaw:true},
+    {key:'management.mycharge_tagged', label:'今日貼標數', isRaw:true},
+    {key:'management.mycharge_pct', label:'MyCharge點選率%', th:0}
   ];
-  renderSummaryTable('pbTable3', date, pbSeg, colsTw);
+  renderSummaryTable('pbTable3', date, pbSeg, colsManagement);
   renderStorePersonalDetail(date, pbSeg, dayCache, 'pbStorePersonalSection');
 }
 
@@ -3695,15 +3735,31 @@ function selectStore(store) {
   const isNew = NEW_STORES.includes(store);
   if (isNew) showToast(`🚀 ${store} 新店！6/25 起營業`);
 
-  // 載入已填資料
-  getData(date, store, currentSeg).then(data => {
+  // 載入已填資料；21:00 的 KPI 達成率／公司排名固定沿用同日 16:00。
+  Promise.all([
+    getData(date, store, currentSeg),
+    Number(currentSeg) === 21 ? getData(date, store, 16) : Promise.resolve(null)
+  ]).then(([data, afternoon]) => {
     if (document.getElementById('fillDate').value !== date || document.getElementById('fillStore').value !== store) return;
     FIELDS.forEach(f => {
       const el = document.getElementById('f_' + f);
-      if (el) el.value = data ? (data[f] ?? '') : '';
+      if (!el) return;
+      const inherited = Number(currentSeg) === 21 && CARRY_FROM_16_FIELDS.includes(f) && afternoon;
+      const value = data && data[f] !== null && data[f] !== undefined && data[f] !== ''
+        ? data[f] : inherited ? (afternoon[f] ?? '') : '';
+      el.value = value;
+      const locked = Number(currentSeg) === 21 && CARRY_FROM_16_FIELDS.includes(f);
+      el.readOnly = locked;
+      if (locked) {
+        el.style.background = 'rgba(249,115,22,0.08)';
+        el.title = '自動沿用 16:00 回報';
+      } else {
+        el.style.background = '';
+        el.title = '';
+      }
     });
-    setAwardModelsFormData(data && data.awardModels ? data.awardModels : {});
-    updateFilledSummary(data);
+    renderManagementFocusInputs(managementFocusData(data));
+    updateFilledSummary(data || afternoon);
   });
 
   // 更新隱藏 select（相容舊邏輯）
@@ -3797,7 +3853,7 @@ function clearForm() {
     const el = document.getElementById('f_' + f);
     if (el) { el.value = ''; el.style.borderColor = ''; el.style.boxShadow = ''; }
   });
-  setAwardModelsFormData({});
+  renderManagementFocusInputs({});
   document.getElementById('filledSummary').classList.remove('show');
   showToast('🗑️ 已清除');
 }
@@ -4092,7 +4148,7 @@ async function saveData() {
   if (!GAS_URL) { showToast('⚠️ 請先設定 Apps Script 網址'); openSettings(); return; }
   const date = document.getElementById('fillDate').value;
   const data = getFormData();
-  if (!validateClosingReportForm(data, currentSeg)) return;
+  if (!validateClosingReportForm(data, currentSeg, date)) return;
   data.savedAt = new Date().toLocaleTimeString('zh-TW');
 
   // 21:00 零報攔截：A999=0 或 好速=0 或 R1399=0 任一項 → 強制填說明
@@ -4236,26 +4292,23 @@ function copyReport() {
   const date = document.getElementById('fillDate').value;
   const seg = currentSeg;
   const g = (id) => { const el = document.getElementById('f_' + id); return el ? (el.value || '—') : '—'; };
-  const fmtPct = (v) => v === '—' || v === '' ? '—' : parseFloat(v).toFixed(1) + '%';
   const fmtNum = (v) => v === '—' || v === '' ? '—' : (parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(2));
+  const mgmt = getManagementFocusFormData();
+  const mg = key => mgmt[key] === null || mgmt[key] === undefined || Number.isNaN(mgmt[key]) ? '—' : fmtNum(mgmt[key]);
   const line = '─────────────────────────';
   const rows = [
     `【${store} ${seg}:00 回報】${date}`,
     line,
-    `📊 KPI達成率   ${fmtPct(g('kpi'))}   排名 #${g('rank')}`,
-    `🔄 提前續約    ${fmtNum(g('early_renew'))} 件`,
-    `📡 RT締結率    ${g('rt_close_num')}/${g('rt_close_den')}  ${fmtPct(g('rt_close_pct'))}`,
-    `☂️  保險搭售    ${g('insurance_num')}/${g('insurance_den')}  ${fmtPct(g('insurance_pct'))}`,
-    `📱 設備佔比    ${g('device_num')}/${g('device_den')}  ${fmtPct(g('device_ratio'))}`,
-    line,
     `⭐ A999        ${fmtNum(g('aq999'))} 筆`,
     `👑 A1399       ${fmtNum(g('aq1399'))} 筆`,
     `⚡ 好速         ${fmtNum(g('haosu'))} 點`,
-    `📶 RT999       ${fmtNum(g('rt999'))} 筆`,
-    `🌐 RT1399      ${fmtNum(g('rt1399'))} 筆`,
-    `5️⃣  5G銷售     ${fmtNum(g('5g'))} 筆`,
-    `📡 AQ上線      ${fmtNum(g('aq_ttl'))} 點`,
+    `📶 R999        ${fmtNum(g('rt999'))} 筆`,
+    `🌐 R1399       ${fmtNum(g('rt1399'))} 筆`,
+    `☂️ 保險搭售    ${g('insurance_num')}/${g('insurance_den')}`,
     line,
+    '🎯 管理重點',
+    `OP 上線/累積/目標  ${mg('op_online')}/${mg('op_accum')}/${mg('op_target')}`,
+    `⚡ MyCharge 已點選/今日貼標數  ${mg('mycharge_clicked')}/${mg('mycharge_tagged')}=${mg('mycharge_pct') === '—' ? '—' : mg('mycharge_pct') + '%'}`
   ].join('\n');
   const preview = document.getElementById('copyPreview');
   const textArea = document.getElementById('copyText');
@@ -4263,6 +4316,8 @@ function copyReport() {
     preview.style.display = 'block';
     textArea.value = rows;
     preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } else {
+    navigator.clipboard?.writeText(rows);
   }
 }
 
