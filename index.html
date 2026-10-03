@@ -2368,32 +2368,25 @@ async function saveToStorage(date, store, seg, data) {
   }
   const issues = closingReportIssues(data, seg);
   if (issues.length) throw new Error('請補齊或修正：' + issues.map(issue => issue.label).join('、'));
-  // 先取得正式端點的可驗證回應；在伺服器讀回前，不寫 local shadow，也不顯示成功。
   const result = await privateDashboardPost({ action: 'write', date, store, seg, data });
-  const readback = result && result.readback && result.readback.awardModels;
-  const modelsMatch = readback && Object.keys(data.awardModels).every(id =>
-    Object.prototype.hasOwnProperty.call(readback, id) && readback[id] === data.awardModels[id]
-  );
   const responseValid = result && result.status === 'ok' && result.rowWritten === true &&
-    typeof result.spreadsheetId === 'string' && result.spreadsheetId.length > 0 &&
-    result.sheetName === 'ReportAwardModels' &&
-    String(result.date) === String(date) && String(result.seg) === String(seg) &&
-    String(result.store) === String(store) && result.readbackMatches === true && modelsMatch;
-  if (!responseValid) throw new Error('ReportAwardModels 寫入回應未通過讀回驗證');
+    String(result.date) === String(date) && Number(result.seg) === Number(seg) &&
+    String(result.store) === String(store) && result.reportReadback;
+  if (!responseValid) throw new Error('每日回報寫入回應未通過讀回驗證');
+  assertClosingReportReadback({status:'ok', data:{[store]:result.reportReadback}}, date, store, seg, data);
 
-  // 台獎讀回成功不代表 LINE 使用的回報欄位也已存妥。
   if (Number(seg) === 21) {
     const verified = await privateDashboardPost({ action: 'read', date, seg });
     assertClosingReportReadback(verified, date, store, seg, data);
   }
 
-  // 只有同一端點確認 rowWritten + readback 後，才更新本機 shadow/cache。
   writeLocalShadow(date, store, seg, data);
   const ck = cacheKey(date, seg);
   if (!_cache[ck]) _cache[ck] = {};
   _cache[ck][store] = { ...data, date, store, seg };
   return true;
 }
+
 function pct(val) {
   if (val === null || val === undefined || val === '') return '—';
   return parseFloat(val).toFixed(1) + '%';
@@ -2848,7 +2841,7 @@ function closingReportNumber(value) {
 function closingReportIssues(data, seg) {
   if (Number(seg) !== 21) return [];
   const definitions = [
-    ['aq999', 'A999'], ['haosu', '好速'], ['rt1399', 'R1399'], ['rt999', 'R999'],
+    ['aq999', 'A999'], ['aq1399', 'A1399'], ['haosu', '好速'], ['rt1399', 'R1399'], ['rt999', 'R999'],
     ['insurance_num', '保險分子'], ['insurance_den', '保險分母']
   ];
   const issues = definitions.filter(([key]) => {
@@ -2869,7 +2862,7 @@ function closingReportIssues(data, seg) {
       issues.push({ key:'insurance_num', label:'保險搭售率（請重新輸入分子／分母）' });
     }
   }
-  return issues;
+  return issues.concat(managementFocusIssues(data.management_json, data.date, seg));
 }
 
 function validateClosingReportForm(data, seg) {
@@ -2890,8 +2883,13 @@ function assertClosingReportReadback(response, date, store, seg, expected) {
   if (!row || String(row.date) !== String(date) || String(row.store) !== String(store) || Number(row.seg) !== Number(seg)) {
     throw new Error('回報讀回失敗，尚未確認完整儲存，請重試');
   }
-  const fields = ['aq999','haosu','rt1399','rt999','insurance_num','insurance_den','insurance_pct'];
+  const fields = Number(seg) === 21
+    ? ['aq999','aq1399','haosu','rt1399','rt999','insurance_num','insurance_den','insurance_pct']
+    : ['kpi','rank'];
   const mismatch = fields.filter(key => closingReportNumber(row[key]) !== closingReportNumber(expected[key]));
+  if (Number(seg) === 21 && JSON.stringify(parseManagementFocus(row.management_json)) !== JSON.stringify(parseManagementFocus(expected.management_json))) {
+    mismatch.push('management_json');
+  }
   if (mismatch.length) throw new Error('回報讀回不一致，尚未確認完整儲存，請重試');
 }
 
@@ -2901,7 +2899,8 @@ function getFormData() {
     const el = document.getElementById('f_' + f);
     obj[f] = el ? (el.value !== '' ? parseFloat(el.value) : null) : null;
   });
-  obj.awardModels = getAwardModelsFormData();
+  obj.management_json = JSON.stringify(getManagementFocusFormData());
+  obj.date = document.getElementById('fillDate').value || today();
   return obj;
 }
 
@@ -2931,7 +2930,7 @@ function clearForm() {
     const el = document.getElementById('f_' + f);
     if (el) el.value = '';
   });
-  setAwardModelsFormData({});
+  setManagementFocusFormData(null);
 }
 
 // ════════════════════════════════════
@@ -2992,11 +2991,11 @@ async function renderSummary() {
   };
 
   const aq999Total    = sumRaw('aq999');
+  const aq1399Total   = sumRaw('aq1399');
   const haosuTotal    = sumRaw('haosu');
   const rt1399Total   = sumRaw('rt1399');
   const rt999Total    = sumRaw('rt999');
   const avgInsurance  = avgPct('insurance_pct');
-  const avgDevice     = avgPct('device_ratio');
 
   document.getElementById('summaryCards').innerHTML = `
     <div class="summary-card">
@@ -3012,6 +3011,11 @@ async function renderSummary() {
     <div class="summary-card">
       <div class="sc-label">A999 上線數</div>
       <div class="sc-val" style="color:var(--accent-bright)">${aq999Total}</div>
+      <div class="sc-sub">全區合計(筆)</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">A1399 上線數</div>
+      <div class="sc-val" style="color:var(--accent-bright)">${aq1399Total}</div>
       <div class="sc-sub">全區合計(筆)</div>
     </div>
     <div class="summary-card">
@@ -3034,11 +3038,6 @@ async function renderSummary() {
       <div class="sc-val" style="color:${avgInsurance!=='—'&&parseFloat(avgInsurance)>=80?'var(--green)':avgInsurance!=='—'?'var(--warn)':'var(--text-muted)'}">${avgInsurance==='—'?'—':avgInsurance+'%'}</div>
       <div class="sc-sub">區內均值</div>
     </div>
-    <div class="summary-card">
-      <div class="sc-label">設備案佔比</div>
-      <div class="sc-val" style="color:${avgDevice!=='—'&&parseFloat(avgDevice)>=80?'var(--green)':avgDevice!=='—'?'var(--warn)':'var(--text-muted)'}">${avgDevice==='—'?'—':avgDevice+'%'}</div>
-      <div class="sc-sub">區內均值</div>
-    </div>
   `;
 
   // Table 1: Main KPI
@@ -3052,9 +3051,6 @@ async function renderSummary() {
     {key:'insurance_num', label:'保險分子', isRaw:true},
     {key:'insurance_den', label:'保險分母', isRaw:true},
     {key:'insurance_pct', label:'保險搭售率%', th:70},
-    {key:'device_num', label:'Device分子', isRaw:true},
-    {key:'device_den', label:'Device分母', isRaw:true},
-    {key:'device_ratio', label:'設備佔比%', th:80},
     {key:'5g', label:'5G銷售(筆)', isRaw:true},
     {key:'aq_ttl', label:'AQ上線(筆)', isRaw:true},
     {key:'aq999', label:'AQ V+D 999(筆)', isRaw:true},
@@ -3080,11 +3076,8 @@ async function renderSummary() {
   ];
   renderSummaryTable('summaryTable2', date, sumSeg, cols2);
 
-  // Table 3: 台獎手機
-  const cols3 = [
-    ...awardDefinitionsForDate(date).map(item => ({key:'awardModels.' + item.modelId, label:item.shortName, isRaw:true}))
-  ];
-  renderSummaryTable('summaryTable3', date, sumSeg, cols3);
+  // 管理重點
+  renderManagementSummaryTable('summaryManagement', date, dayCache);
 
   // 零報說明彙整（21:00）
   // 舊零報區塊已由「店點零報說明」取代，避免重複顯示
@@ -3467,7 +3460,6 @@ async function renderPlayback() {
     {key:'early_renew', label:'提前續約(件)', isRaw:true},
     {key:'rt_close_pct', label:'RT締結率%', th:80},
     {key:'insurance_pct', label:'保險搭售率%', th:70},
-    {key:'device_ratio', label:'設備佔比%', th:80},
     {key:'5g', label:'5G(筆)', isRaw:true},
     {key:'aq_ttl', label:'AQ上線(筆)', isRaw:true},
     {key:'aq999', label:'AQ V+D 999(筆)', isRaw:true},
@@ -3509,19 +3501,16 @@ async function renderPlayback() {
     <div class="card" style="padding:14px 10px;">
       <div class="table-wrap"><table id="pbTable2"></table></div>
     </div>
-    <div class="section-divider">🏅 台獎手機專區</div>
+    <div class="section-divider">🎯 管理重點</div>
     <div class="card" style="padding:14px 10px;">
-      <div class="table-wrap"><table id="pbTable3"></table></div>
+      <div class="table-wrap"><table id="pbManagement"></table></div>
     </div>
     <div id="pbStorePersonalSection"></div>
   `;
 
   renderSummaryTable('pbTable1', date, pbSeg, cols1);
   renderSummaryTable('pbTable2', date, pbSeg, cols2);
-  const colsTw = [
-    ...awardDefinitionsForDate(date).map(item => ({key:'awardModels.' + item.modelId, label:item.shortName, isRaw:true}))
-  ];
-  renderSummaryTable('pbTable3', date, pbSeg, colsTw);
+  renderManagementSummaryTable('pbManagement', date, dayCache);
   renderStorePersonalDetail(date, pbSeg, dayCache, 'pbStorePersonalSection');
 }
 
@@ -3756,15 +3745,33 @@ function selectStore(store) {
   const isNew = NEW_STORES.includes(store);
   if (isNew) showToast(`🚀 ${store} 新店！6/25 起營業`);
 
-  // 載入已填資料
-  getData(date, store, currentSeg).then(data => {
+  // 載入已填資料；21:00 的 KPI / 公司排名固定沿用同日 16:00 正式回報。
+  Promise.all([
+    getData(date, store, currentSeg),
+    currentSeg === 21 ? getData(date, store, 16) : Promise.resolve(null)
+  ]).then(([data, afternoon]) => {
     if (document.getElementById('fillDate').value !== date || document.getElementById('fillStore').value !== store) return;
     FIELDS.forEach(f => {
       const el = document.getElementById('f_' + f);
       if (el) el.value = data ? (data[f] ?? '') : '';
     });
-    setAwardModelsFormData(data && data.awardModels ? data.awardModels : {});
+    const kpiEl = document.getElementById('f_kpi');
+    const rankEl = document.getElementById('f_rank');
+    if (currentSeg === 21) {
+      if (kpiEl) kpiEl.value = afternoon && afternoon.kpi !== null && afternoon.kpi !== undefined ? afternoon.kpi : '';
+      if (rankEl) rankEl.value = afternoon && afternoon.rank !== null && afternoon.rank !== undefined ? afternoon.rank : '';
+    }
+    [kpiEl,rankEl].forEach(el => {
+      if (!el) return;
+      el.readOnly = currentSeg === 21;
+      el.style.background = currentSeg === 21 ? 'rgba(255,102,0,0.05)' : '';
+      el.style.cursor = currentSeg === 21 ? 'not-allowed' : '';
+    });
+    setManagementFocusFormData(data && data.management_json ? data.management_json : null);
     updateFilledSummary(data);
+    if (currentSeg === 21 && (!afternoon || afternoon.kpi === null || afternoon.kpi === undefined || afternoon.rank === null || afternoon.rank === undefined)) {
+      showToast('ℹ️ 16:00 尚未完整回填 KPI 達成率／公司排名；21:00 不需手動重填');
+    }
   });
 
   // 更新隱藏 select（相容舊邏輯）
@@ -3855,10 +3862,11 @@ function getSelectedStore() {
 // 覆蓋 clearForm
 function clearForm() {
   FIELDS.forEach(f => {
+    if (currentSeg === 21 && (f === 'kpi' || f === 'rank')) return;
     const el = document.getElementById('f_' + f);
     if (el) { el.value = ''; el.style.borderColor = ''; el.style.boxShadow = ''; }
   });
-  setAwardModelsFormData({});
+  setManagementFocusFormData(null);
   document.getElementById('filledSummary').classList.remove('show');
   showToast('🗑️ 已清除');
 }
@@ -4296,27 +4304,26 @@ function copyReport() {
   if (!store) { showToast('⚠️ 請先選擇門市'); return; }
   const date = document.getElementById('fillDate').value;
   const seg = currentSeg;
-  const g = (id) => { const el = document.getElementById('f_' + id); return el ? (el.value || '—') : '—'; };
-  const fmtPct = (v) => v === '—' || v === '' ? '—' : parseFloat(v).toFixed(1) + '%';
-  const fmtNum = (v) => v === '—' || v === '' ? '—' : (parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(2));
-  const line = '─────────────────────────';
+  const g = id => { const el = document.getElementById('f_' + id); return el ? (el.value || '—') : '—'; };
+  const fmtNum = v => v === '—' || v === '' ? '—' : (parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(2));
+  const management = getManagementFocusFormData();
+  const op = management.items.find(item => item.id === 'op');
+  const mycharge = management.items.find(item => item.id === 'mycharge-ebm');
+  const opv = op ? op.values : {};
+  const mv = mycharge ? mycharge.values : {};
+  const rate = mv.rate === null || mv.rate === undefined ? '—' : Number(mv.rate).toFixed(1) + '%';
   const rows = [
     `【${store} ${seg}:00 回報】${date}`,
-    line,
-    `📊 KPI達成率   ${fmtPct(g('kpi'))}   排名 #${g('rank')}`,
-    `🔄 提前續約    ${fmtNum(g('early_renew'))} 件`,
-    `📡 RT締結率    ${g('rt_close_num')}/${g('rt_close_den')}  ${fmtPct(g('rt_close_pct'))}`,
-    `☂️  保險搭售    ${g('insurance_num')}/${g('insurance_den')}  ${fmtPct(g('insurance_pct'))}`,
-    `📱 設備佔比    ${g('device_num')}/${g('device_den')}  ${fmtPct(g('device_ratio'))}`,
-    line,
-    `⭐ A999        ${fmtNum(g('aq999'))} 筆`,
-    `👑 A1399       ${fmtNum(g('aq1399'))} 筆`,
-    `⚡ 好速         ${fmtNum(g('haosu'))} 點`,
-    `📶 RT999       ${fmtNum(g('rt999'))} 筆`,
-    `🌐 RT1399      ${fmtNum(g('rt1399'))} 筆`,
-    `5️⃣  5G銷售     ${fmtNum(g('5g'))} 筆`,
-    `📡 AQ上線      ${fmtNum(g('aq_ttl'))} 點`,
-    line,
+    `⭐ A999　${fmtNum(g('aq999'))}`,
+    `👑 A1399　${fmtNum(g('aq1399'))}`,
+    `⚡ 好速　${fmtNum(g('haosu'))}`,
+    `📶 R999　${fmtNum(g('rt999'))}`,
+    `🌐 R1399　${fmtNum(g('rt1399'))}`,
+    `☂️ 保險搭售　${g('insurance_num')}/${g('insurance_den')}`,
+    '',
+    '🎯 管理重點',
+    `OP 上線/累積/目標　${opv.online ?? '—'}/${opv.cumulative ?? '—'}/${opv.target ?? '—'}`,
+    `⚡ MyCharge EBM 已點選/今日貼標數　${mv.clicked ?? '—'}/${mv.taggedToday ?? '—'}=${rate}`
   ].join('\n');
   const preview = document.getElementById('copyPreview');
   const textArea = document.getElementById('copyText');
