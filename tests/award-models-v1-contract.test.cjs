@@ -22,13 +22,11 @@ test('Apps Script source parses and declares the independent sheet contract', ()
   assert.match(gas, /attachReportAwardModels_\(result, date, seg\)/);
 });
 
-test('legacy award model catalog remains readable but daily report no longer writes awardModels', () => {
+test('frontend uses the canonical modelId state and fixed order', () => {
   const positions = ids.map(id => html.indexOf(`modelId:'${id}'`));
   assert.ok(positions.every(pos => pos >= 0));
   assert.deepEqual([...positions].sort((a, b) => a - b), positions);
   assert.match(html, /const AWARD_MODELS_SCHEMA = 'award-models-v1'/);
-  assert.match(html, /function getAwardModelsFormData\(\)/);
-  assert.doesNotMatch(html, /obj\.awardModels\s*=\s*getAwardModelsFormData\(\)/);
-  assert.doesNotMatch(html, /id="awardModelsV1Grid"/);
-  assert.match(html, /obj\.management_focus_json\s*=\s*JSON\.stringify\(getManagementFocusFormData\(\)\)/);
+  assert.match(html, /obj\.awardModels\s*=\s*getAwardModelsFormData\(\)/);
+  assert.match(html, /setAwardModelsFormData\(data && data\.awardModels/);
 });
