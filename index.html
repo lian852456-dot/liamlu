@@ -2406,9 +2406,9 @@ function showToast(msg) {
 window.onload = async () => {
   const td = today();
   document.getElementById('fillDate').value = td;
-  renderAwardModelInputs();
+  renderManagementFocusInputs({});
   document.getElementById('fillDate').addEventListener('change', () => {
-    renderAwardModelInputs();
+    renderManagementFocusInputs({});
     const store = document.getElementById('fillStore').value;
     if (store) selectStore(store);
   });
