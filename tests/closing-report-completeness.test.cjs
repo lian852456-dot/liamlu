@@ -4,9 +4,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const html = fs.readFileSync(require('node:path').join(__dirname, '../index.html'), 'utf8');
-const helpers = html.slice(html.indexOf('function closingReportNumber('), html.indexOf('function getFormData('));
+const helpers = html.slice(html.indexOf('function parseManagementFocus('), html.indexOf('function getFormData('));
 const storage = html.slice(html.indexOf('async function saveToStorage('), html.indexOf('function pct('));
-const valid = { aq999:0, haosu:0, rt1399:0, rt999:0, insurance_num:0, insurance_den:2, insurance_pct:0, awardModels:{'pixel-11':0} };
+const valid = { aq999:0, aq1399:0, haosu:0, rt1399:0, rt999:0, insurance_num:0, insurance_den:2, insurance_pct:0, management_focus_json:JSON.stringify({op_online:0,op_accum:0,op_target:0,mycharge_clicked:0,mycharge_tagged:0,mycharge_pct:null}) };
 function api(extra = {}) {
   const context = { ...extra };
   vm.runInNewContext(helpers, context);
@@ -16,7 +16,7 @@ function api(extra = {}) {
 test('empty counts are blocked while explicitly entered zero counts are accepted', () => {
   const c = api();
   assert.equal(c.closingReportIssues(valid, 21).length, 0);
-  for (const key of ['aq999','haosu','rt1399','rt999','insurance_num','insurance_den']) {
+  for (const key of ['aq999','aq1399','haosu','rt1399','rt999','insurance_num','insurance_den']) {
     for (const value of [null, undefined, '', ' ', NaN, Infinity, -1, true]) {
       assert.ok(c.closingReportIssues({...valid, [key]:value}, 21).some(issue => issue.key === key), key);
     }
@@ -39,6 +39,14 @@ test('inconsistent insurance data cannot be submitted as a complete report', () 
   assert.equal(c.closingReportIssues({...valid, insurance_num:1, insurance_den:3, insurance_pct:33.3}, 21).length, 0);
 });
 
+test('management focus is required at 21:00 and MyCharge clicked cannot exceed tagged', () => {
+  const c = api();
+  const missing={...valid,management_focus_json:JSON.stringify({op_online:1,op_accum:null,op_target:3,mycharge_clicked:1,mycharge_tagged:2,mycharge_pct:50})};
+  assert.ok(c.closingReportIssues(missing,21).some(issue=>issue.label==='OP 累積'));
+  const invalid={...valid,management_focus_json:JSON.stringify({op_online:1,op_accum:2,op_target:3,mycharge_clicked:3,mycharge_tagged:2,mycharge_pct:150})};
+  assert.ok(c.closingReportIssues(invalid,21).some(issue=>/不可大於/.test(issue.label)));
+});
+
 test('formal readback must match the requested date, store, segment and all closing fields', () => {
   const c = api();
   const date = '2099-10-02', store = '酒泉';
@@ -51,7 +59,7 @@ test('formal readback must match the requested date, store, segment and all clos
   assert.throws(() => c.assertClosingReportReadback({status:'error', data:{[store]:row}}, date, store, 21, valid));
 });
 
-test('award-model success alone cannot update local shadow or report a successful save', async () => {
+test('write success alone cannot update local shadow when closing readback is inconsistent', async () => {
   const date = '2099-10-02', store = '酒泉';
   let writes = 0, calls = 0;
   const c = api({
@@ -60,8 +68,8 @@ test('award-model success alone cannot update local shadow or report a successfu
     async privateDashboardPost(payload) {
       calls++;
       if (payload.action === 'write') return {
-        status:'ok', rowWritten:true, spreadsheetId:'mock', sheetName:'ReportAwardModels',
-        date, store, seg:21, readbackMatches:true, readback:{awardModels:valid.awardModels}
+        status:'ok', rowWritten:true, spreadsheetId:'mock', sheetName:'回報資料',
+        date, store, seg:21, readbackMatches:true
       };
       return {status:'ok', data:{[store]:{...valid,date,store,seg:21,aq999:''}}};
     }
@@ -90,8 +98,8 @@ test('complete persisted closing report updates local state only after readback'
     async privateDashboardPost(payload) {
       actions.push(payload.action);
       return payload.action === 'write' ? {
-        status:'ok', rowWritten:true, spreadsheetId:'mock', sheetName:'ReportAwardModels',
-        date,store,seg:21,readbackMatches:true,readback:{awardModels:valid.awardModels}
+        status:'ok', rowWritten:true, spreadsheetId:'mock', sheetName:'回報資料',
+        date,store,seg:21,readbackMatches:true
       } : {status:'ok',data:{[store]:{...valid,date,store,seg:21}}};
     }
   });
