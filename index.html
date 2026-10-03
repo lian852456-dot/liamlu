@@ -1730,25 +1730,6 @@
         <input type="number" id="f_rt_close_pct" placeholder="0.0" readonly style="background:rgba(255,102,0,0.05);cursor:not-allowed;">
       </div>
       <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
-        <span class="ks-icon">📱</span> 設備案佔比
-        <div class="ks-line"></div>
-      </div>
-      <div class="kpi-input-wrap">
-        <label>設備案 分子</label>
-        <span class="ki-icon">➗</span>
-        <input type="number" id="f_device_num" placeholder="0" oninput="calcPct('device_num','device_den','device_ratio')">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>設備案 分母</label>
-        <span class="ki-icon">➗</span>
-        <input type="number" id="f_device_den" placeholder="0" oninput="calcPct('device_num','device_den','device_ratio')">
-      </div>
-      <div class="kpi-input-wrap">
-        <label>設備案佔比（自動）</label>
-        <span class="ki-icon">📊</span>
-        <input type="number" id="f_device_ratio" placeholder="0.0" readonly style="background:rgba(255,102,0,0.05);cursor:not-allowed;">
-      </div>
-      <div class="kpi-section-title" style="grid-column:1/-1;margin:8px 0 4px;">
         <span class="ks-icon">☂️</span> 保險搭售率
         <div class="ks-line"></div>
       </div>
@@ -1872,82 +1853,19 @@
       </div>
     </div>
 
-    <!-- 台獎手機專區 -->
+    <!-- 管理重點：依月份設定 -->
     <div class="kpi-section-title" style="margin-top:18px;">
-      <span class="ks-icon">🏅</span> 台獎手機專區
+      <span class="ks-icon">🎯</span> 管理重點
       <div class="ks-line"></div>
     </div>
-    <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;padding:0 2px;">填寫今日各機款銷售筆數｜0 代表無銷售，空白代表未填｜獎金標示採店長 50%／100% 達成級距</div>
-
-    <div id="awardModelsV1Grid" class="form-grid" aria-label="當月台獎機款"></div>
-    <div id="awardModelsV1Status" style="font-size:11px;color:var(--text-dim);margin:6px 2px 10px;">資料契約：award-models-v1｜缺少項目保留空值，0 與空值分開記錄</div>
-
-    <div id="legacyAwardInputs" style="display:none;" aria-hidden="true">
-    <!-- KPI 高SD - 黃底 -->
-    <div style="font-size:11px;font-weight:700;color:#b8860b;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);border-radius:6px;padding:4px 10px;margin-bottom:6px;">⭐ KPI 高SD</div>
-    <div class="form-grid">
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">Pixel 10/10 Pro/10 Pro XL/10a<span class="tw-bonus"><span class="tw-b50">50%・$1,105</span><span class="tw-b100">100%・$1,660</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_pixel10" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">S26 Ultra<span class="tw-bonus"><span class="tw-b50">50%・$405</span><span class="tw-b100">100%・$610</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_s26u" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">SHARP R11<span class="tw-bonus"><span class="tw-b50">50%・$470</span><span class="tw-b100">100%・$705</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_sharpr11" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">vivo X300/X300 Pro/V70 FE<span class="tw-bonus"><span class="tw-b50">50%・$1,890</span><span class="tw-b100">100%・$2,835</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_vivo" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">S26/S26+/A57<span class="tw-bonus"><span class="tw-b50">50%・$2,335</span><span class="tw-b100">100%・$3,500</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_s26" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">Reno16 F<span class="tw-bonus"><span class="tw-b50">50%・$685</span><span class="tw-b100">100%・$1,025</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_reno16f" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">moto razr fold<span class="tw-bonus"><span class="tw-b50">50%・$275</span><span class="tw-b100">100%・$415</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_sony1" placeholder="0" step="1">
-      </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;padding:0 2px;">
+      項目依月份調整；21:00 收工回報需填完整，0 與空白分開判定。
     </div>
-
-    <!-- KPI 中SD - 黃底 -->
-    <div style="font-size:11px;font-weight:700;color:#b8860b;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);border-radius:6px;padding:4px 10px;margin:8px 0 6px;">⭐ KPI 中SD</div>
-    <div class="form-grid">
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">OPPO A6x 6G/128G<span class="tw-bonus"><span class="tw-b50">50%・$550</span><span class="tw-b100">100%・$825</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_oppoa6x" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">A27 &amp; A17<span class="tw-bonus"><span class="tw-b50">50%・$265</span><span class="tw-b100">100%・$400</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_a27" placeholder="0" step="1">
-      </div>
-      <div class="kpi-input-wrap" style="border-color:rgba(255,215,0,0.4);background:rgba(255,215,0,0.05);">
-        <label style="color:#b8860b;">Y21 &amp; Redmi Note 15 Pro<span class="tw-bonus"><span class="tw-b50">50%・$85</span><span class="tw-b100">100%・$125</span></span></label>
-        <span class="ki-icon">📱</span>
-        <input type="number" id="f_tw_y21" placeholder="0" step="1">
-      </div>
-    </div>
-
-    </div>
+    <div id="managementFocusGrid"></div>
 
     <!-- 儲存 -->
     <div class="save-btn-wrap">
-      <p style="margin:0 0 12px;line-height:1.6;">21:00 回報請填齊 A999、好速、R1399、R999 與保險分子／分母；沒有成交請明確填 0。保險無適用案件時，分子與分母都填 0。</p>
+      <p style="margin:0 0 12px;line-height:1.6;">21:00 收工回報請填齊 A999、A1399、好速、R999、R1399、保險分子／分母與當月管理重點；KPI 達成率及公司排名會自動沿用同日 16:00 正式回報，不需重填。</p>
       <p id="closingReportError" role="alert" hidden style="margin:0 0 12px;color:#dc2626;font-weight:700;line-height:1.6;"></p>
       <button class="btn-save-main" onclick="saveData()">
         💾 送出回報
@@ -2039,11 +1957,11 @@
     </div>
   </div>
 
-  <!-- 大盤表 - 台獎手機 -->
-  <div class="section-divider">🏅 台獎手機專區</div>
+  <!-- 大盤表 - 管理重點 -->
+  <div class="section-divider">🎯 管理重點</div>
   <div class="card" style="padding:14px 10px;">
     <div class="table-wrap">
-      <table id="summaryTable3"></table>
+      <table id="summaryManagement"></table>
     </div>
   </div>
 
@@ -2284,6 +2202,28 @@ const KPI_THRESHOLDS = {
   '5g': 80, aq_ttl: 80, aq999: 80, aq1399: 80,
   rt_pts: 80, special_renew: 80, premium_renew: 80, rt999: 80, rt1399: 80, haosu: 80
 };
+
+const MANAGEMENT_FOCUS_SCHEMA = 'management-focus-v1';
+const MANAGEMENT_FOCUS_MONTHS = Object.freeze({
+  '2026-10': [
+    {
+      id:'op', label:'OP 上線／累積／目標',
+      fields:[
+        {key:'online', label:'OP 上線', unit:'筆'},
+        {key:'cumulative', label:'OP 累積', unit:'筆'},
+        {key:'target', label:'OP 目標', unit:'筆'}
+      ]
+    },
+    {
+      id:'mycharge-ebm', label:'⚡ MyCharge EBM系統貼標點選',
+      fields:[
+        {key:'clicked', label:'已點選', unit:'筆'},
+        {key:'taggedToday', label:'今日貼標數', unit:'筆'}
+      ],
+      ratio:{key:'rate', numerator:'clicked', denominator:'taggedToday', label:'點選率'}
+    }
+  ]
+});
 
 // 8 月中央台獎契約（畫面簡稱僅為顯示；儲存一律使用 modelId）。
 const AWARD_MODELS_SCHEMA = 'award-models-v1';
@@ -2732,44 +2672,165 @@ const FIELDS = [
   '5g','aq_ttl','aq999','aq1399','rt_pts',
   'special_renew','premium_renew','rt999','rt1399','haosu',
   'early_renew','rt_close_num','rt_close_den','rt_close_pct',
-  'insurance_num','insurance_den','insurance_pct',
-  'device_num','device_den','device_ratio'
+  'insurance_num','insurance_den','insurance_pct'
 ];
 
-function renderAwardModelInputs(values) {
-  const grid = document.getElementById('awardModelsV1Grid');
+function managementDefinitionsForDate(date) {
+  return MANAGEMENT_FOCUS_MONTHS[String(date || '').slice(0,7)] || [];
+}
+
+function managementInputId(itemId, fieldKey) {
+  return 'f_management_' + String(itemId).replace(/[^a-z0-9]+/gi, '_') + '_' + String(fieldKey).replace(/[^a-z0-9]+/gi, '_');
+}
+
+function parseManagementFocus(raw) {
+  if (!raw) return null;
+  if (typeof raw === 'object') return raw;
+  try { return JSON.parse(String(raw)); } catch(e) { return null; }
+}
+
+function managementItemMap(raw) {
+  const parsed = parseManagementFocus(raw);
+  const items = parsed && Array.isArray(parsed.items) ? parsed.items : [];
+  return new Map(items.map(item => [String(item.id || ''), item]));
+}
+
+function recalcManagementRatio(item) {
+  if (!item || !item.ratio) return;
+  const numEl = document.getElementById(managementInputId(item.id, item.ratio.numerator));
+  const denEl = document.getElementById(managementInputId(item.id, item.ratio.denominator));
+  const rateEl = document.getElementById(managementInputId(item.id, item.ratio.key));
+  if (!numEl || !denEl || !rateEl) return;
+  const num = closingReportNumber(numEl.value);
+  const den = closingReportNumber(denEl.value);
+  rateEl.value = num !== null && den !== null && den > 0 ? (num / den * 100).toFixed(1) : '';
+}
+
+function renderManagementFocusInputs(rawValues) {
+  const grid = document.getElementById('managementFocusGrid');
   if (!grid) return;
-  const current = values || {};
-  const definitions = fillAwardDefinitions();
-  grid.setAttribute('aria-label', (document.getElementById('fillDate').value || today()).slice(0,7) + ' 台獎' + definitions.length + '組機款');
-  grid.innerHTML = definitions.map(item => `
-    <div class="kpi-input-wrap" data-award-model-id="${item.modelId}">
-      <label>${item.shortName}${item.managerRewards ? '<span class="tw-bonus"><span class="tw-b50">50%・$' + item.managerRewards[0].toLocaleString() + '</span><span class="tw-b100">100%・$' + item.managerRewards[2].toLocaleString() + '</span></span>' : ''}</label>
-      <span class="ki-icon">📱</span>
-      <input type="number" id="f_award_${item.modelId}" placeholder="0" min="0" step="1" inputmode="numeric">
-    </div>`).join('');
-  definitions.map(item=>item.modelId).forEach(id => {
-    const el = document.getElementById('f_award_' + id);
-    if (el) el.value = current[id] === null || current[id] === undefined ? '' : current[id];
+  const date = document.getElementById('fillDate').value || today();
+  const definitions = managementDefinitionsForDate(date);
+  const current = managementItemMap(rawValues);
+  if (!definitions.length) {
+    grid.innerHTML = '<div class="empty-state">本月尚未設定管理重點。</div>';
+    return;
+  }
+  grid.innerHTML = definitions.map(item => {
+    const saved = current.get(item.id);
+    const values = saved && saved.values ? saved.values : {};
+    const fields = item.fields.map(field => {
+      const id = managementInputId(item.id, field.key);
+      const value = values[field.key];
+      return '<div class="kpi-input-wrap"><label>' + field.label + (field.unit ? '（' + field.unit + '）' : '') + '</label>' +
+        '<span class="ki-icon">🎯</span><input type="number" min="0" step="1" inputmode="numeric" id="' + id + '" value="' +
+        (value === null || value === undefined ? '' : value) + '"></div>';
+    }).join('');
+    const ratio = item.ratio ? '<div class="kpi-input-wrap"><label>' + item.ratio.label + '（自動）</label>' +
+      '<span class="ki-icon">⚡</span><input type="number" id="' + managementInputId(item.id,item.ratio.key) +
+      '" value="' + (values[item.ratio.key] === null || values[item.ratio.key] === undefined ? '' : values[item.ratio.key]) +
+      '" readonly style="background:rgba(255,102,0,0.05);cursor:not-allowed;"></div>' : '';
+    return '<div class="card" style="padding:12px;margin-bottom:10px;"><div style="font-size:14px;font-weight:800;margin-bottom:10px;">' +
+      item.label + '</div><div class="form-grid">' + fields + ratio + '</div></div>';
+  }).join('');
+  definitions.forEach(item => {
+    item.fields.forEach(field => {
+      const el = document.getElementById(managementInputId(item.id,field.key));
+      if (el && item.ratio && (field.key === item.ratio.numerator || field.key === item.ratio.denominator)) {
+        el.addEventListener('input', () => recalcManagementRatio(item));
+      }
+    });
+    recalcManagementRatio(item);
   });
 }
 
-function getAwardModelsFormData() {
-  const awardModels = {};
-  fillAwardDefinitions().map(item=>item.modelId).forEach(id => {
-    const el = document.getElementById('f_award_' + id);
-    awardModels[id] = !el || el.value === '' ? null : Number(el.value);
-  });
-  return awardModels;
+function getManagementFocusFormData() {
+  const date = document.getElementById('fillDate').value || today();
+  const definitions = managementDefinitionsForDate(date);
+  return {
+    schemaVersion:MANAGEMENT_FOCUS_SCHEMA,
+    month:String(date).slice(0,7),
+    items:definitions.map(item => {
+      const values = {};
+      item.fields.forEach(field => {
+        const el = document.getElementById(managementInputId(item.id,field.key));
+        values[field.key] = closingReportNumber(el && el.value);
+      });
+      if (item.ratio) {
+        const num = values[item.ratio.numerator];
+        const den = values[item.ratio.denominator];
+        values[item.ratio.key] = num !== null && den !== null && den > 0 ? Number((num / den * 100).toFixed(1)) : null;
+      }
+      return {id:item.id,label:item.label,values};
+    })
+  };
 }
 
-function setAwardModelsFormData(awardModels) {
-  renderAwardModelInputs(awardModels);
-  const values = awardModels && typeof awardModels === 'object' ? awardModels : {};
-  fillAwardDefinitions().map(item=>item.modelId).forEach(id => {
-    const el = document.getElementById('f_award_' + id);
-    if (el) el.value = values[id] === null || values[id] === undefined ? '' : values[id];
+function setManagementFocusFormData(rawValues) {
+  renderManagementFocusInputs(rawValues);
+}
+
+function managementFocusIssues(raw, date, seg) {
+  if (Number(seg) !== 21) return [];
+  const definitions = managementDefinitionsForDate(date);
+  const items = managementItemMap(raw);
+  const issues = [];
+  definitions.forEach(item => {
+    const saved = items.get(item.id);
+    const values = saved && saved.values ? saved.values : {};
+    item.fields.forEach(field => {
+      const value = closingReportNumber(values[field.key]);
+      if (value === null || value < 0) issues.push({key:'management_json', label:item.label + '－' + field.label});
+    });
+    if (item.ratio) {
+      const numerator = closingReportNumber(values[item.ratio.numerator]);
+      const denominator = closingReportNumber(values[item.ratio.denominator]);
+      if (numerator !== null && denominator !== null && numerator > denominator) {
+        issues.push({key:'management_json', label:item.label + '－已點選不可大於今日貼標數'});
+      }
+    }
   });
+  return issues;
+}
+
+function managementFocusValue(raw, itemId, fieldKey) {
+  const item = managementItemMap(raw).get(itemId);
+  return item && item.values ? closingReportNumber(item.values[fieldKey]) : null;
+}
+
+function renderManagementSummaryTable(tableId, date, dayCache) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const definitions = managementDefinitionsForDate(date);
+  if (!definitions.length) {
+    table.innerHTML = '<tbody><tr><td>本月尚未設定管理重點。</td></tr></tbody>';
+    return;
+  }
+  const columns = [];
+  definitions.forEach(item => {
+    item.fields.forEach(field => columns.push({item,field,label:field.label}));
+    if (item.ratio) columns.push({item,field:{key:item.ratio.key},label:item.ratio.label,ratio:true});
+  });
+  const header = '<thead><tr><th>店點</th>' + columns.map(col => '<th>' + col.label + '</th>').join('') + '</tr></thead>';
+  const rows = STORES.map(store => {
+    const raw = dayCache[store] && dayCache[store].management_json;
+    const cells = columns.map(col => {
+      const value = managementFocusValue(raw,col.item.id,col.field.key);
+      return '<td>' + (value === null ? '—' : (col.ratio ? value.toFixed(1) + '%' : (Number.isInteger(value) ? value : value.toFixed(1)))) + '</td>';
+    }).join('');
+    return '<tr><td style="font-weight:700;">' + store + '</td>' + cells + '</tr>';
+  }).join('');
+  const totalCells = columns.map(col => {
+    if (col.ratio) {
+      const item = col.item;
+      const num = STORES.reduce((sum,store) => sum + (managementFocusValue(dayCache[store] && dayCache[store].management_json,item.id,item.ratio.numerator) || 0),0);
+      const den = STORES.reduce((sum,store) => sum + (managementFocusValue(dayCache[store] && dayCache[store].management_json,item.id,item.ratio.denominator) || 0),0);
+      return '<td>' + (den > 0 ? (num / den * 100).toFixed(1) + '%' : '—') + '</td>';
+    }
+    const total = STORES.reduce((sum,store) => sum + (managementFocusValue(dayCache[store] && dayCache[store].management_json,col.item.id,col.field.key) || 0),0);
+    return '<td>' + (Number.isInteger(total) ? total : total.toFixed(1)) + '</td>';
+  }).join('');
+  table.innerHTML = header + '<tbody><tr style="font-weight:800;"><td>全區合計</td>' + totalCells + '</tr>' + rows + '</tbody>';
 }
 
 function reportValue(record, key) {
