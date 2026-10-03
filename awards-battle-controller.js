@@ -45,13 +45,13 @@
   function validateAwardsBattle(data, kpiData, snapshotKpi) {
     if (!data || typeof data !== 'object') return { ok: false, reason: '尚未取得與目前 KPI 同日期的台獎資料' };
     const awardsDate = String(data.report_run_date || data.report_date || '');
-    const kpiDate = String((kpiData || {}).report_date || '');
+    const kpiDate = String((kpiData || {}).report_run_date || (kpiData || {}).report_date || '');
     const awardsCutoff = String(data.data_as_of_date || data.source_as_of_date || '');
     const kpiCutoff = String((kpiData || {}).data_as_of_date || (kpiData || {}).source_as_of_date || '');
     const cutoffMismatch = (awardsCutoff || kpiCutoff) && (!awardsCutoff || awardsCutoff !== kpiCutoff);
     const snapshotRun = String((snapshotKpi || {}).processing_run_id || (snapshotKpi || {}).kpi_run_id || '');
     const awardsRun = String(data.processing_run_id || '');
-    if (!awardsDate || !kpiDate || awardsDate !== kpiDate || cutoffMismatch || (snapshotRun && awardsRun !== snapshotRun)) {
+    if (!awardsDate || !kpiDate || awardsDate !== kpiDate || (kpiData || {}).supplement_synced === false || cutoffMismatch || (snapshotRun && awardsRun !== snapshotRun)) {
       return {
         ok: false,
         reason: awardsDate
