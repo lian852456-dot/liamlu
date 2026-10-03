@@ -14,6 +14,7 @@ const FIELDS = [
   'early_renew','rt_close_num','rt_close_den','rt_close_pct',
   'insurance_num','insurance_den','insurance_pct',
   'device_num','device_den','device_ratio',
+  'management_json',
   'tw_pixel10','tw_s26u','tw_sharpr11','tw_vivo','tw_s26','tw_reno16f',
   'tw_pixel10fold','tw_findx9s','tw_sony1','tw_poketomo',
   'tw_oppoa6x','tw_a27','tw_y21','tw_myfirst',
@@ -2865,17 +2866,30 @@ function reportWritePayload_(payload) {
   const data = payload.data || {};
   if (data.awardModels !== undefined) {
     const normalizedAwardModels = normalizeReportAwardModels_(data.awardModels, payload.date);
-    // 新契約資料不得回寫 legacy tw_*；其餘既有 KPI 欄位仍維持 v15 寫入方式。
     const legacyData = {};
     Object.keys(data).forEach(key => {
       if (key !== 'awardModels' && key.indexOf('tw_') !== 0) legacyData[key] = data[key];
     });
     writeData(payload.date, payload.store, payload.seg, legacyData);
     const saved = writeReportAwardModels_(payload.date, payload.store, payload.seg, normalizedAwardModels, payload.versionId);
-    return { status: 'ok', ...saved };
+    const reportReadback = readData(payload.date, Number(payload.seg))[String(payload.store)] || null;
+    if (!reportReadback) throw new Error('每日回報寫入後讀回失敗');
+    return { status: 'ok', ...saved, reportReadback };
   }
+
   writeData(payload.date, payload.store, payload.seg, data);
-  return { status: 'ok' };
+  const reportReadback = readData(payload.date, Number(payload.seg))[String(payload.store)] || null;
+  if (!reportReadback) throw new Error('每日回報寫入後讀回失敗');
+  return {
+    status:'ok',
+    rowWritten:true,
+    spreadsheetId:SPREADSHEET_ID,
+    sheetName:SHEET_NAME,
+    date:String(payload.date || ''),
+    seg:Number(payload.seg),
+    store:String(payload.store || ''),
+    reportReadback:reportReadback
+  };
 }
 
 function reportSummaryNumber_(value) {
@@ -2899,15 +2913,26 @@ function reportSummaryClock_(value) {
   return { seconds:hour * 3600 + Number(plain[2]) * 60 + Number(plain[3] || 0), text:String(hour).padStart(2, '0') + ':' + plain[2] + ':' + String(plain[3] || '00').padStart(2, '0') };
 }
 
+function reportSummaryManagement_(value) {
+  if (!value) return null;
+  if (typeof value === 'object') return value;
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch(e) {
+    return null;
+  }
+}
+
 function reportSummaryFromData_(data, date, seg) {
   const source = data && typeof data === 'object' ? data : {};
   const definitions = [
     { key:'A999', sourceField:'aq999', unit:'count', aggregation:'sum' },
+    { key:'A1399', sourceField:'aq1399', unit:'count', aggregation:'sum' },
     { key:'好速', sourceField:'haosu', unit:'points', aggregation:'sum' },
     { key:'R1399', sourceField:'rt1399', unit:'count', aggregation:'sum' },
     { key:'R999', sourceField:'rt999', unit:'count', aggregation:'sum' },
-    { key:'保險搭售率', sourceField:'insurance_pct', unit:'percent', aggregation:'average' },
-    { key:'設備案佔比', sourceField:'device_ratio', unit:'percent', aggregation:'average' }
+    { key:'保險搭售率', sourceField:'insurance_pct', unit:'percent', aggregation:'average' }
   ];
   const stores = STORES.map(function(store) {
     const row = source[store] || null;
@@ -2916,7 +2941,17 @@ function reportSummaryFromData_(data, date, seg) {
       const value = reportSummaryNumber_(row[definition.sourceField]);
       if (value !== null) metrics[definition.key] = { value:value, unit:definition.unit, sourceField:definition.sourceField };
     });
-    return { name:store, reported:Boolean(row), reportedAt:row ? String(row.savedAt || row.updatedAt || '') : '', metrics:metrics };
+    const insuranceNum = row ? reportSummaryNumber_(row.insurance_num) : null;
+    const insuranceDen = row ? reportSummaryNumber_(row.insurance_den) : null;
+    const insurancePct = row ? reportSummaryNumber_(row.insurance_pct) : null;
+    return {
+      name:store,
+      reported:Boolean(row),
+      reportedAt:row ? String(row.savedAt || row.updatedAt || '') : '',
+      metrics:metrics,
+      insurance:row ? { numerator:insuranceNum, denominator:insuranceDen, percent:insurancePct } : null,
+      management:row ? reportSummaryManagement_(row.management_json) : null
+    };
   });
   const reportedRows = STORES.map(function(store) { return source[store] || null; }).filter(Boolean);
   const metrics = {};
@@ -2928,12 +2963,55 @@ function reportSummaryFromData_(data, date, seg) {
       : values.reduce(function(sum, item) { return sum + item; }, 0);
     metrics[definition.key] = { value:value, unit:definition.unit, sourceField:definition.sourceField, aggregation:definition.aggregation };
   });
+
+  const insuranceTotals = reportedRows.reduce(function(acc,row) {
+    const numerator = reportSummaryNumber_(row.insurance_num);
+    const denominator = reportSummaryNumber_(row.insurance_den);
+    if (numerator !== null) acc.numerator += numerator;
+    if (denominator !== null) acc.denominator += denominator;
+    return acc;
+  }, { numerator:0, denominator:0 });
+  const insurance = {
+    numerator:insuranceTotals.numerator,
+    denominator:insuranceTotals.denominator,
+    percent:insuranceTotals.denominator > 0 ? Number((insuranceTotals.numerator / insuranceTotals.denominator * 100).toFixed(1)) : null
+  };
+
   const latest = stores.map(function(store) { return reportSummaryClock_(store.reportedAt); }).filter(Boolean).sort(function(a, b) { return a.seconds - b.seconds; }).pop();
+  const lineStores = stores.map(function(store) {
+    return {
+      name:store.name,
+      reported:store.reported,
+      reportedAt:store.reportedAt,
+      metrics:{
+        A999:store.metrics.A999 ? store.metrics.A999.value : null,
+        A1399:store.metrics.A1399 ? store.metrics.A1399.value : null,
+        '好速':store.metrics['好速'] ? store.metrics['好速'].value : null,
+        R999:store.metrics.R999 ? store.metrics.R999.value : null,
+        R1399:store.metrics.R1399 ? store.metrics.R1399.value : null
+      },
+      insurance:store.insurance,
+      management:store.management
+    };
+  });
+
   return {
-    date:String(date || ''), segment:Number(seg), completedStores:stores.filter(function(store) { return store.reported; }).length,
-    totalStores:STORES.length, missingStores:stores.filter(function(store) { return !store.reported; }).map(function(store) { return store.name; }),
-    updatedAt:latest ? latest.text : '', metrics:metrics, stores:stores,
-    semantics:'formal-index-summary-v1'
+    date:String(date || ''),
+    segment:Number(seg),
+    completedStores:stores.filter(function(store) { return store.reported; }).length,
+    totalStores:STORES.length,
+    missingStores:stores.filter(function(store) { return !store.reported; }).map(function(store) { return store.name; }),
+    updatedAt:latest ? latest.text : '',
+    metrics:metrics,
+    insurance:insurance,
+    stores:stores,
+    lineReport:{
+      contract:'north12b-line-closing-v2',
+      managementSchema:'management-focus-v1',
+      fields:['A999','A1399','好速','R999','R1399','保險搭售','管理重點'],
+      stores:lineStores
+    },
+    semantics:'formal-index-summary-v2'
   };
 }
 
