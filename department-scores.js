@@ -4,7 +4,12 @@
   if (!$('scoreFile')) return;
   const URL='https://script.google.com/macros/s/AKfycbxqBtW2yQw_u4qqJ9Knz6CK34hAiunaa6lIQu4pMa8Ff2voJZCWKEh8MXTJ6qAoGTax/exec';
   const KEY='bei12b_patrol_session_token_v2';
-  let snapshot=null,pending=null,restore=null,busy=false,verifiedToken='',loaded=false,locked=false;
+  const ACCESS_DENIAL_CODES=new Set([
+    'AUTH_TOKEN_MISSING','AUTH_TOKEN_INVALID','AUTH_SESSION_NOT_FOUND','AUTH_SESSION_EXPIRED',
+    'AUTH_SESSION_REVOKED','AUTH_DEPLOYMENT_MISMATCH','AUTH_CREDENTIAL_INVALID',
+    'SCORES_OWNER_DOMAIN_UNVERIFIED','SCORES_PROTECTED_FOLDER','SCORES_FOLDER_NOT_PRIVATE','SCORES_REVISION_OUTSIDE_PRIVATE_DOMAIN'
+  ]);
+  let snapshot=null,pending=null,restore=null,busy=false,verifiedToken='',loaded=false,locked=false,returnAuth=null,authGeneration=0;
   window.DepartmentScoresWorkState=()=>({busy,unsaved:Boolean(pending||restore||$('scoreFile').files?.length)});
   const escape=v=>String(v==null?'':v).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const number=(v,places=2)=>v==null?'缺資料':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:places});
@@ -21,42 +26,63 @@
     isAuthorized:presentationAuthorized,
     onStatus:v=>msg(v)
   });
-  function lock(message) {
+  function invalidateReturnAuth() {
+    authGeneration+=1;
+    const previous=returnAuth;returnAuth=null;
+    previous?.controller.abort();
+  }
+  function clearPrivateData() {
+    invalidateReturnAuth();
     presentationExporter?.invalidate();
-    snapshot=null;pending=null;restore=null;verifiedToken='';loaded=false;locked=true;
-    sessionStorage.removeItem(KEY);$('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;
+    snapshot=null;pending=null;restore=null;loaded=false;
+    $('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;
     for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';
+  }
+  function lock(message) {
+    clearPrivateData();verifiedToken='';locked=true;
+    sessionStorage.removeItem(KEY);
     $('workspace').hidden=true;$('authPanel').hidden=false;$('securityBadge').textContent='請重新驗證';$('authMessage').textContent=message||'督導驗證已到期，請重新登入。';
     msg('請重新驗證督導權限。',true);
   }
-  async function request(action,body) {
+  function accessDenied(result) {
+    if(!result||typeof result!=='object')return false;
+    // Use explicit server denial fields; ordinary transport and diagnostic errors retain the session.
+    if(['unauthorized','forbidden','denied'].includes(String(result.status||'').trim().toLowerCase()))return true;
+    return [result.code,result.reason,result.authReason,result.auth?.reason,result.message].some(value=>typeof value==='string'&&(ACCESS_DENIAL_CODES.has(value.trim().toUpperCase())||value.trim().toLowerCase()==='unauthorized'));
+  }
+  async function request(action,body,signal) {
     const token=sessionStorage.getItem(KEY);
     if(!token||$('workspace').hidden)throw new Error('請先完成督導驗證');
-    const readonly=['department_scores_read','department_scores_history_read'].includes(action);
+    const authOnly=action==='ptauth';
+    const readonly=authOnly||['department_scores_read','department_scores_history_read'].includes(action);
     // Give the first six-month read time to finish, while bounding all retries together.
     const count=readonly?3:1,deadline=Date.now()+(readonly?75000:25000);let failure;
     for(let attempt=0;attempt<count;attempt++){
+      if(signal?.aborted)throw new DOMException('驗證已取消','AbortError');
       const remaining=deadline-Date.now();if(remaining<=0)break;
-      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.min(readonly?45000:25000,remaining));
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.min(authOnly?20000:readonly?45000:25000,remaining));
+      const abort=()=>controller.abort();signal?.addEventListener('abort',abort,{once:true});
       try{
         if(action==='department_scores_read')msg(`正在讀取已保存成績…${attempt?'服務暫時無回應，正在重試（'+(attempt+1)+'/3）。':'首次讀取包含歷史月份，請稍候。'}`);
         const requestURL=new window.URL(URL);requestURL.searchParams.set('_request',crypto.randomUUID());
         const response=await fetch(requestURL.href,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token,...body}),cache:'no-store',credentials:'omit',redirect:'follow',signal:controller.signal});
-        if(!response.ok){const e=new Error(`成績服務 HTTP ${response.status}`);e.httpStatus=response.status;throw e;}
-        const result=await response.json();
+        const result=await (response.ok?response.json():response.json().catch(()=>null));
+        if(signal?.aborted)throw new DOMException('驗證已取消','AbortError');
         if(sessionStorage.getItem(KEY)!==token||$('workspace').hidden)throw new Error('驗證已變更，請重新載入成績');
+        if(result?.status!=='ok'&&accessDenied(result))lock();
+        if(!response.ok){const e=new Error(`成績服務 HTTP ${response.status}`);e.httpStatus=response.status;throw e;}
         if(result.status!=='ok'){
           if(readonly&&result.message==='unknown patrol action'){const e=new Error('成績服務回應未對應此次讀取');e.routeResponseMismatch=true;throw e;}
-          if(/AUTH_|SESSION|token/i.test(String(result.code||'')+' '+String(result.message||'')))lock();
           throw new Error(result.message||result.code||'成績服務回傳失敗');
         }
-        if(result.contract!==C.CONTRACT)throw new Error('成績服務尚未部署此版本，請保留原檔');
+        if(authOnly?result.token!==token:result.contract!==C.CONTRACT)throw new Error(authOnly?'登入狀態已變更，請重新登入。':'成績服務尚未部署此版本，請保留原檔');
         if(sessionStorage.getItem(KEY)!==token||$('workspace').hidden)throw new Error('驗證已變更，請重新載入成績');
         return result;
-      }catch(e){failure=e;if(!readonly||!([404,429,500,502,503,504].includes(e.httpStatus)||e.routeResponseMismatch||['AbortError','TypeError'].includes(e.name))||attempt===count-1||deadline-Date.now()<=800*(attempt+1)||sessionStorage.getItem(KEY)!==token||$('workspace').hidden)break;await new Promise(resolve=>setTimeout(resolve,800*(attempt+1)));}
-      finally{clearTimeout(timer);}
+      }catch(e){failure=e;if(signal?.aborted||!readonly||!([404,429,500,502,503,504].includes(e.httpStatus)||e.routeResponseMismatch||['AbortError','TypeError'].includes(e.name))||attempt===count-1||deadline-Date.now()<=800*(attempt+1)||sessionStorage.getItem(KEY)!==token||$('workspace').hidden)break;await new Promise(resolve=>setTimeout(resolve,800*(attempt+1)));}
+      finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
     }
-    if(readonly&&failure?.name==='AbortError')throw new Error('保存成績讀取逾時，已停止等待。請按「重新讀取保存版本」重試，無需重新選檔。');
+    if(signal?.aborted)throw new DOMException('驗證已取消','AbortError');
+    if(readonly&&failure?.name==='AbortError')throw new Error(authOnly?'督導驗證逾時，請重新登入。':'保存成績讀取逾時，已停止等待。請按「重新讀取保存版本」重試，無需重新選檔。');
     throw failure;
   }
   function setBusy(value){busy=value;for(const id of ['scoreImport','scorePublish','scoreRefresh','scoreRestore','scoreHistoryPreview'])$(id).disabled=value;updatePublish();}
@@ -163,10 +189,33 @@
   $('scoreExport').addEventListener('click',()=>exportData(false));$('scoreBrief').addEventListener('click',()=>exportData(true));
   $('scorePptx')?.addEventListener('click',async()=>{try{if(!presentationExporter)throw new Error('簡報模組未載入');await presentationExporter.downloadPptx();}catch(e){msg(e.message,true);}});
   $('scorePrintPdf')?.addEventListener('click',()=>{try{if(!presentationExporter)throw new Error('簡報模組未載入');presentationExporter.printPdf();}catch(e){msg(e.message,true);}});
-  function observeAuth(){if(window.PortalLogout?.isLocked()||!$('workspace'))return;const token=sessionStorage.getItem(KEY);if($('workspace').hidden){presentationExporter?.invalidate();if(verifiedToken&&!locked){snapshot=null;pending=null;verifiedToken='';loaded=false;$('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';}return;}if(token&&token!==verifiedToken){verifiedToken=token;locked=false;load();}else if(token&&!loaded&&!busy&&!$('storePanel').hidden)load();}
+  function observeAuth(){
+    if(window.PortalLogout?.isLocked()||!$('workspace'))return;
+    const token=sessionStorage.getItem(KEY);
+    if($('workspace').hidden){
+      if(verifiedToken&&!locked){clearPrivateData();verifiedToken='';}
+      return;
+    }
+    if(verifiedToken&&!token){lock();return;}
+    if(token&&token!==verifiedToken){clearPrivateData();verifiedToken=token;locked=false;}
+    // Gold is the initial tab. Read scores only when the user opens the store panel.
+    if(token&&!loaded&&!busy&&!$('storePanel').hidden&&!document.hidden)load();
+  }
   const authObserver=new MutationObserver(observeAuth);authObserver.observe($('workspace'),{attributes:true,attributeFilter:['hidden']});authObserver.observe($('storePanel'),{attributes:true,attributeFilter:['hidden']});
-  window.addEventListener('pageshow',observeAuth);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&verifiedToken)load();});
-  window.addEventListener('portal-before-logout',()=>presentationExporter?.invalidate());
+  window.addEventListener('pageshow',observeAuth);document.addEventListener('visibilitychange',()=>{
+    if(document.hidden)return;
+    observeAuth();
+    if(!verifiedToken||$('workspace').hidden)return;
+    if(!$('storePanel').hidden){load();return;}
+    // Preserve return-time revocation checks without transferring hidden score data.
+    if(returnAuth?.token===verifiedToken&&returnAuth.generation===authGeneration)return;
+    const current={token:verifiedToken,generation:authGeneration,controller:new AbortController()};
+    returnAuth=current;
+    current.promise=request('ptauth',undefined,current.controller.signal).catch(e=>{
+      if(returnAuth===current&&authGeneration===current.generation&&verifiedToken===current.token&&!$('workspace').hidden)lock(e.message);
+    }).finally(()=>{if(returnAuth===current)returnAuth=null;});
+  });
+  window.addEventListener('portal-before-logout',()=>{invalidateReturnAuth();presentationExporter?.invalidate();});
   window.addEventListener('department-session-cleared',()=>lock('驗證已結束，請重新登入。'));
   setInterval(()=>{if(!verifiedToken)return;if(sessionStorage.getItem(KEY)!==verifiedToken)return lock('督導驗證已變更，請重新登入。');try{const part=verifiedToken.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'),claims=JSON.parse(atob(part));if(Number.isFinite(claims.exp)&&claims.exp*1000<=Date.now())lock();}catch{}},10000);
   observeAuth();updatePublish();
