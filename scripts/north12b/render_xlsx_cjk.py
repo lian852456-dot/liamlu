@@ -29,7 +29,7 @@ FONT_BOLD = FONT_DIR / "NotoSansTC-Bold.ttf"
 SCALE = 1.65
 
 SHEETS = {
-    "配件包膜影音": f"TWM_North12B_Sales_Overview_{REPORT_DATE}.png",
+    "配件包膜銷售": f"TWM_North12B_Sales_Overview_{REPORT_DATE}.png",
     "主力KPI": f"TWM_North12B_Main_KPI_{REPORT_DATE}.png",
     "加掛得分": f"TWM_North12B_Addon_Score_{REPORT_DATE}.png",
     "好速上線明細": f"TWM_North12B_Goodspeed_Detail_{REPORT_DATE}.png",
