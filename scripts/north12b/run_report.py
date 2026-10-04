@@ -11,6 +11,7 @@ def main():
     p.add_argument('--source',type=Path,required=True)
     p.add_argument('--previous-source',type=Path)
     p.add_argument('--previous-kpi',type=Path)
+    p.add_argument('--vk-source',type=Path,action='append',default=[],help='Optional same-batch AQ/RT or VK transaction workbook; repeat for multiple files')
     p.add_argument('--template',type=Path,required=True)
     p.add_argument('--run-dir',type=Path,required=True)
     p.add_argument('--report-date',required=True)
@@ -26,6 +27,8 @@ def main():
     env={**os.environ,'RUN_ROOT':str(root),'OUT_DIR':str(out),'REPORT_DATE':args.report_date,'SOURCE_FILE':source.name,'SOURCE_STEM':stem,'SOURCE_LOCAL':str(source),'BATCH_ID':run_id,'PROCESSING_RUN_ID':run_id,'SOURCE_SHA256':sha,'FONT_DIR':str(args.font_dir.resolve()),'TEMPLATE_PATH':str(args.template.resolve()),'PREVIOUS_SOURCE_PATH':str(previous or root/'missing-previous.xlsx'),'PREVIOUS_SOURCE_FILE':previous.name if previous else '前日無資料'}
     record={'schema':'north12b-artifact-run/v1','report_date':args.report_date,'source_file':source.name,'source_sha256':sha,'batch_id':run_id,'started_at':datetime.now(timezone.utc).isoformat(),'stages':[],'status':'processing','website_publish':'not_run','email':'not_run'}
     recordpath=private/'artifact-run.json'
+    env['VK_SOURCE_PATHS']=json.dumps([str(p.resolve()) for p in args.vk_source])
+    record['vk_sources']=[{'file':p.name,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in args.vk_source]
     def save():recordpath.write_text(json.dumps(record,ensure_ascii=False,indent=2))
     def stage(name,cmd):
         entry={'name':name,'started_at':datetime.now(timezone.utc).isoformat(),'attempt':1,'retry':0};started=time.monotonic();record['stages'].append(entry);save()

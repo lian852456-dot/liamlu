@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { FileBlob, SpreadsheetFile } from '@oai/artifact-tool';
 import {repairSemanticFormats,renderOptions} from './semantic-format.mjs';
+import {addSalesSheet} from './sales_sheet.mjs';
 
 const root = process.env.RUN_ROOT;
 const out = process.env.OUT_DIR;
@@ -213,6 +214,7 @@ src.getRange('A9:B11').format={font:{size:10,color:'#0F172A'},wrapText:true,rowH
 
 repairSemanticFormats(report);
 repairSemanticFormats(closureBook);
+addSalesSheet(report, daily.salesMetrics, reportDate, sourceFile);
 report.recalculate(); closureBook.recalculate();
 await (await SpreadsheetFile.exportXlsx(report)).save(reportPath);
 await (await SpreadsheetFile.exportXlsx(closureBook)).save(closurePath);
