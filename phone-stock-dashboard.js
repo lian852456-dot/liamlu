@@ -47,7 +47,7 @@
     return { workbook:window.XLSX.read(content, { type:'string', cellDates:true, FS:extension === 'tsv' ? '\t' : ',' }), encoding };
   }
   function refreshPreview() {
-    const ready = Boolean(state.sales && state.stock);
+    const ready = Boolean(state.stock);
     const stores = new Set([...(state.sales ? state.sales.rows : []), ...(state.stock ? state.stock.rows : [])].map(row => row.store));
     $('salesRows').textContent = state.sales ? String(state.sales.rows.length) : '0';
     $('stockRows').textContent = state.stock ? String(state.stock.rows.length) : '0';
@@ -57,13 +57,15 @@
     const notes = [];
     if (state.sales) notes.push(`銷售：${state.sales.fileName}／${state.sales.sheetName}`);
     if (state.stock) notes.push(`庫存：${state.stock.fileName}／${state.stock.sheetName}`);
-    $('importNote').textContent = ready ? `${notes.join(' · ')}。兩份資料皆完成，可產生分析。` : `${notes.join(' · ')}。請再選擇另一份資料。`;
-    $('uploadStatus').textContent = ready ? '可產生分析' : '尚待選檔';
+    $('importNote').textContent = ready ? `${notes.join(' · ')}。${state.sales ? '兩份資料皆完成，可產生分析。' : '可直接查看庫存；未提供銷售資料，銷售數與去化率顯示「未提供」。'}` : `${notes.join(' · ')}。請選擇庫存檔。`;
+    $('generateReport').textContent = state.sales ? '產生銷售／庫存分析' : '查看庫存';
+    $('uploadStatus').textContent = ready ? (state.sales ? '可產生分析' : '可查看庫存') : '尚待庫存檔';
     $('uploadStatus').className = `status-badge ${ready ? 'ok' : 'neutral'}`;
     $('publishStock').disabled = !state.stock;
   }
   async function parseFile(file, kind) {
     if (!validateFile(file, kind)) return;
+    state[kind] = null; state.report = null; $('results').hidden = true; refreshPreview();
     const label = kind === 'sales' ? 'salesFileName' : 'stockFileName';
     $(label).textContent = file.name;
     setMessage(kind, '正在本機解析檔案…');
@@ -89,10 +91,10 @@
   }
   const displaySalesDate = iso => String(iso || '').slice(5).replace('-', '/');
   function salesHeaderCells(report) {
-    return report.salesDates.map(date => `<th>${displaySalesDate(date)}</th>`).join('') + '<th>加總</th>';
+    return report.salesDates.map(date => `<th>${displaySalesDate(date)}</th>`).join('') + `<th>${report.salesAvailable ? '加總' : '銷售數'}</th>`;
   }
   function salesValueCells(row, report) {
-    return report.salesDates.map(date => `<td>${displayCount((row.salesByDate || {})[date] || 0)}</td>`).join('') + `<td>${displayCount(row.sales)}</td>`;
+    return report.salesDates.map(date => `<td>${displayCount((row.salesByDate || {})[date] || 0)}</td>`).join('') + `<td>${report.salesAvailable ? displayCount(row.sales) : '未提供'}</td>`;
   }
   function minimumValue(id) {
     const value = $(id).value.trim();
@@ -112,40 +114,43 @@
     const scoped = modelRowsForScope(selected);
     const rows = scoped.rows;
     const query = $('modelQuery').value.trim().toLocaleLowerCase('zh-Hant');
-    const minSales = minimumValue('minSales');
+    const minSales = state.report.salesAvailable ? minimumValue('minSales') : null;
     const minStock = minimumValue('minStock');
     const filtered = (rows || []).filter(row => (!query || row.model.toLocaleLowerCase('zh-Hant').includes(query)) && (minSales == null || row.sales >= minSales) && (minStock == null || row.stock >= minStock));
     $('modelTableHead').innerHTML = `${scoped.showStore ? '<th>店點</th>' : ''}<th>機型</th>${salesHeaderCells(state.report)}<th>目前庫存</th><th>去化率</th>`;
     $('modelFilterSummary').textContent = `顯示 ${filtered.length} / ${(rows || []).length} ${scoped.rowLabel}`;
     const columnCount = state.report.salesDates.length + 4 + (scoped.showStore ? 1 : 0);
-    $('modelRows').innerHTML = filtered.length ? filtered.map(row => `<tr>${scoped.showStore ? `<td><strong>${escapeHtml(row.store)}</strong></td>` : ''}<td><strong>${escapeHtml(row.model)}</strong></td>${salesValueCells(row, state.report)}<td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('') : `<tr><td class="empty-row" colspan="${columnCount}">沒有符合篩選條件的機型。</td></tr>`;
+    $('modelRows').innerHTML = filtered.length ? filtered.map(row => `<tr>${scoped.showStore ? `<td><strong>${escapeHtml(row.store)}</strong></td>` : ''}<td><strong>${escapeHtml(row.model)}</strong></td>${salesValueCells(row, state.report)}<td>${displayCount(row.stock)}</td><td>${state.report.salesAvailable ? rateCell(row.rate) : '未提供'}</td></tr>`).join('') : `<tr><td class="empty-row" colspan="${columnCount}">沒有符合篩選條件的機型。</td></tr>`;
   }
   function renderReport() {
     const report = state.report;
-    const salesDateLabel = report.salesDates.length ? report.salesDates.map(displaySalesDate).join('、') : '無可辨識銷售日期';
-    $('sourceMeta').textContent = `報表銷售日期 ${salesDateLabel} · ${report.stockDate ? `庫存快照 ${report.stockDate}` : '庫存檔未提供日期，依本次上傳內容計算'} · 僅本機預覽`;
-    $('totalSales').textContent = displayCount(report.totalSales);
+    const salesDateLabel = report.salesAvailable ? `報表銷售日期 ${report.salesDates.map(displaySalesDate).join('、')}` : '未提供銷售資料';
+    $('sourceMeta').textContent = `${salesDateLabel} · ${report.stockDate ? `庫存快照 ${report.stockDate}` : '庫存檔未提供日期，依本次上傳內容計算'} · 僅本機預覽`;
+    $('resultsTitle').textContent = report.salesAvailable ? '銷售／庫存／去化總覽' : '庫存總覽';
+    $('minSales').disabled = !report.salesAvailable;
+    if (!report.salesAvailable) $('minSales').value = '';
+    $('totalSales').textContent = report.salesAvailable ? displayCount(report.totalSales) : '未提供';
     $('totalStock').textContent = displayCount(report.totalStock);
-    $('totalRate').textContent = displayRate(report.totalRate);
-    $('activeStores').textContent = `${report.storeSummary.filter(row => row.sales > 0).length} / 9`;
+    $('totalRate').textContent = report.salesAvailable ? displayRate(report.totalRate) : '未提供';
+    $('activeStores').textContent = report.salesAvailable ? `${report.storeSummary.filter(row => row.sales > 0).length} / 9` : '未提供';
     $('storeTableHead').innerHTML = `<th>店點</th>${salesHeaderCells(report)}<th>目前庫存</th><th>去化率</th>`;
     const regionRow = {
       salesByDate:Object.fromEntries(report.salesDates.map(date => [date, report.storeSummary.reduce((sum, row) => sum + (row.salesByDate[date] || 0), 0)])),
       sales:report.totalSales, stock:report.totalStock, rate:report.totalRate
     };
-    $('storeRows').innerHTML = report.storeSummary.map(row => `<tr><td><strong>${escapeHtml(row.store)}</strong></td>${salesValueCells(row, report)}<td>${displayCount(row.stock)}</td><td>${rateCell(row.rate)}</td></tr>`).join('')
-      + `<tr class="region-total"><td><strong>N12B 加總</strong></td>${salesValueCells(regionRow, report)}<td>${displayCount(regionRow.stock)}</td><td>${rateCell(regionRow.rate)}</td></tr>`;
+    $('storeRows').innerHTML = report.storeSummary.map(row => `<tr><td><strong>${escapeHtml(row.store)}</strong></td>${salesValueCells(row, report)}<td>${displayCount(row.stock)}</td><td>${report.salesAvailable ? rateCell(row.rate) : '未提供'}</td></tr>`).join('')
+      + `<tr class="region-total"><td><strong>N12B 加總</strong></td>${salesValueCells(regionRow, report)}<td>${displayCount(regionRow.stock)}</td><td>${report.salesAvailable ? rateCell(regionRow.rate) : '未提供'}</td></tr>`;
     $('storeFilter').innerHTML = '<option value="">— 各店庫存明細 —</option><option value="all">北一二B 整體</option>' + Core.STORE_NAMES.map(store => `<option value="${escapeHtml(store)}">${escapeHtml(store)}</option>`).join('');
     renderModelRows();
     $('results').hidden = false;
     $('results').scrollIntoView({ behavior:'smooth', block:'start' });
   }
   function generateReport() {
-    if (!state.sales || !state.stock) return;
+    if (!state.stock) return;
     try {
-      state.report = Core.buildReport(state.sales.rows, state.stock.rows, $('asOfDate').value);
+      state.report = Core.buildReport(state.sales ? state.sales.rows : [], state.stock.rows, $('asOfDate').value);
       renderReport();
-    } catch (error) { setMessage('sales', error.message || '無法產生分析。', 'error'); }
+    } catch (error) { setMessage('stock', error.message || '無法產生分析。', 'error'); }
   }
 
   async function publishStock() {

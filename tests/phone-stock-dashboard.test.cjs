@@ -4,6 +4,38 @@ const fs = require('node:fs');
 const path = require('node:path');
 const Core = require('../phone-stock-core.js');
 
+test('只有庫存檔仍呈現最新快照，未提供的銷售與去化率不當成零', () => {
+  const report = Core.buildReport([], [
+    {store:'台北三創', model:'iPhone 18 Pro', quantity:99, date:'2026-10-02'},
+    {store:'台北三創', model:'iPhone 18 Pro', quantity:3, date:'2026-10-03'},
+    {store:'台北酒泉', model:'Pixel 11', quantity:2, date:'2026-10-03'},
+    {store:'台北三創', model:'iPhone 18 Pro', quantity:100, date:'2026-10-05'}
+  ], '2026-10-04');
+  assert.equal(report.salesAvailable, false);
+  assert.equal(report.stockDate, '2026-10-03');
+  assert.equal(report.totalStock, 5);
+  assert.equal(report.totalSales, null);
+  assert.equal(report.totalRate, null);
+  assert.deepEqual(report.salesDates, []);
+  for (const row of [...report.storeSummary, ...report.modelSummary, ...Object.values(report.storeModels).flat()]) {
+    assert.equal(row.sales, null);
+    assert.equal(row.rate, null);
+  }
+  assert.equal(report.storeModels['台北三創'][0].stock, 3);
+});
+
+test('無日期庫存可單獨呈現；補上零銷售報表後才計算零去化率', () => {
+  const stock = [{store:'台北三創', model:'iPhone 18 Pro', quantity:3, date:''}];
+  const onlyStock = Core.buildReport(null, stock, '2026-10-04');
+  assert.equal(onlyStock.totalStock, 3);
+  assert.equal(onlyStock.totalRate, null);
+  const withSales = Core.buildReport([{store:'台北三創', model:'iPhone 18 Pro', quantity:0, date:'2026-10-04'}], stock, '2026-10-04');
+  assert.equal(withSales.salesAvailable, true);
+  assert.equal(withSales.totalSales, 0);
+  assert.equal(withSales.totalRate, 0);
+  assert.equal(withSales.storeModels['台北三創'][0].rate, 0);
+});
+
 test('完整銷售報表日期與庫存快照可計算去化率', () => {
   const sales = Core.parseMatrix([
     ['店點', '機型', '銷售日期', '銷售數'],
