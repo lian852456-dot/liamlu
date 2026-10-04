@@ -1539,8 +1539,8 @@
     #panel-personal .form-grid { grid-template-columns:minmax(0,1fr) !important; }
   }
 </style>
-<link rel="stylesheet" href="daily-report-layout.css?v=20261004-layout-1">
-<script src="daily-report-layout.js?v=20261004-layout-1" defer></script>
+<link rel="stylesheet" href="daily-report-layout.css?v=20261004-layout-3">
+<script src="daily-report-layout.js?v=20261004-layout-3" defer></script>
 </head>
 <body>
 
@@ -2368,6 +2368,7 @@ async function saveToStorage(date, store, seg, data) {
   // 只有同一端點確認 rowWritten + readback 後，才更新本機 shadow/cache。
   writeLocalShadow(date, store, seg, data);
   const ck = cacheKey(date, seg);
+  if (typeof _cacheReadGeneration !== 'undefined') _cacheReadGeneration[ck] = (_cacheReadGeneration[ck] || 0) + 1;
   if (!_cache[ck]) _cache[ck] = {};
   _cache[ck][store] = { ...data, date, store, seg };
   return true;
@@ -3794,7 +3795,6 @@ function updateFilledSummary(data) {
     ? highlights.map(h => `<span class="filled-chip">${h}</span>`).join('')
     : '<span style="color:#64748b;font-size:11px;">已有填報資料，可修改後重新送出</span>';
   wrap.classList.add('show');
-  globalThis.DailyReportLayout?.onSummaryUpdated(data);
 }
 
 // 門市選擇時更新 sub title
@@ -4181,12 +4181,14 @@ async function saveData() {
 }
 
 async function _doSave(store, date, data) {
+  const seg = currentSeg;
+  const saveToken = globalThis.DailyReportLayout?.beginSave(store, date, seg);
   showToast('🔄 上傳中…');
   try {
-    const ok = await saveToStorage(date, store, currentSeg, data);
+    const ok = await saveToStorage(date, store, seg, data);
     if (ok) {
-      showToast(`✅ ${store} ${currentSeg}:00 已儲存`);
-      updateFilledSummary(data);
+      showToast(`✅ ${store} ${seg}:00 已儲存`);
+      if (!globalThis.DailyReportLayout || globalThis.DailyReportLayout.onSaveSucceeded(saveToken)) updateFilledSummary(data);
 
       const achievements = [];
       if (data.kpi && parseFloat(data.kpi) >= 100) achievements.push('KPI');
@@ -4204,7 +4206,7 @@ async function _doSave(store, date, data) {
       const personalName = document.getElementById('personalName')?.value || '';
       if (personalName) {
         const delay = achievements.length > 0 ? 3000 : 600;
-        setTimeout(() => triggerReviewModal(store, personalName, date, currentSeg, data), delay);
+        setTimeout(() => triggerReviewModal(store, personalName, date, seg, data), delay);
       }
     } else {
       showToast('❌ 儲存失敗，請檢查連線');

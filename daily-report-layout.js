@@ -7,6 +7,12 @@
   let dirty = false;
   const drafts = new Map();
   const draftKey = () => JSON.stringify([selected, selectedDate, selectedSeg]);
+  const edits = new Map(), saves = new Map();
+  const snapshot = () => Object.fromEntries(Array.from(area.querySelectorAll('input:not([readonly]),textarea')).map(input => [input.id, input.value]));
+  function recordEdit() {
+    const key = draftKey();
+    edits.set(key, { revision:(edits.get(key)?.revision || 0) + 1, values:snapshot() });
+  }
   const zeroIds = ['z_reason', 'z_consult', 'z_method', 'z_plan'];
 
   function element(tag, cls, text) {
@@ -154,6 +160,7 @@
     area.addEventListener('input', event => {
       dirty = true; byId('dailyDraftNote').hidden = false;
       updateZero(); updateRates();
+      recordEdit();
       if (event.target.hasAttribute('aria-invalid')) event.target.removeAttribute('aria-invalid');
     });
     window.visualViewport?.addEventListener('resize', keyboardLayout);
@@ -164,7 +171,7 @@
   window.DailyReportLayout = {
     onSelectionStart(store, date, seg) {
       if (!panel) return;
-      if (selected && !loading && dirty) drafts.set(draftKey(), Object.fromEntries(Array.from(area.querySelectorAll('input:not([readonly]),textarea')).map(input => [input.id, input.value])));
+      if (selected && !loading && dirty) drafts.set(draftKey(), snapshot());
       dirty = false; byId('dailyDraftNote').hidden = true;
       selected = store; selectedDate = date; selectedSeg = Number(seg); loading = true;
       panel.querySelector('.store-grid').hidden = true; byId('dailyStoreToggle').setAttribute('aria-expanded', 'false');
@@ -212,8 +219,27 @@
       else locate(byId(zeroIds.find(id => !byId(id)?.value.trim())));
       return true;
     },
-    onSummaryUpdated() { if (!panel || loading) return; drafts.delete(draftKey()); dirty = false; byId('dailyDraftNote').hidden = true; },
-    onClear() { if (!panel) return; drafts.delete(draftKey()); dirty = false; byId('dailyDraftNote').hidden = true; byId('underForms').replaceChildren(); updateZero(); updateRates(); }
+    beginSave(store, date, seg) {
+      const key = JSON.stringify([store, date, Number(seg)]);
+      const sequence = (saves.get(key) || 0) + 1; saves.set(key, sequence);
+      return { key, revision:edits.get(key)?.revision || 0, sequence };
+    },
+    onSaveSucceeded(token) {
+      if (!panel || !token) return false;
+      const edit = edits.get(token.key);
+      const current = draftKey() === token.key && !loading;
+      if ((edit?.revision || 0) !== token.revision) {
+        // An older verified write may have replaced the source; keep the later edit as a draft.
+        drafts.set(token.key, current ? snapshot() : edit.values);
+        if (current) { dirty = true; byId('dailyDraftNote').hidden = false; }
+        return false;
+      }
+      if (saves.get(token.key) !== token.sequence) return false;
+      drafts.delete(token.key);
+      if (current) { dirty = false; byId('dailyDraftNote').hidden = true; }
+      return current;
+    },
+    onClear() { if (!panel) return; drafts.delete(draftKey()); dirty = false; byId('dailyDraftNote').hidden = true; byId('underForms').replaceChildren(); updateZero(); updateRates(); recordEdit(); }
   };
   document.addEventListener('DOMContentLoaded', initialize);
 })();

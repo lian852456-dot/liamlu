@@ -49,6 +49,23 @@ async function complete(page, zero=false) {
   for(const key of closingKeys) await page.locator('#f_'+key).fill(zero?'0':key==='insurance_den'?'2':'1');
   for(const key of management) await page.locator('#f_mgmt_'+key).fill(zero?'0':key==='mycharge_tagged'?'2':'1');
 }
+async function holdWrites(page) {
+  await page.evaluate(()=>{
+    window.__savePromises=[];window.__heldWrites=[];const original=window.fetch;
+    window.fetch=(url,options={})=>{
+      const payload=JSON.parse(options.body||'{}');
+      if(payload.action!=='write')return original(url,options);
+      return new Promise(resolve=>window.__heldWrites.push({payload,release:async()=>resolve(await original(url,options))}));
+    };
+  });
+}
+async function submitHeld(page,count) {
+  await page.evaluate(()=>{window.__savePromises.push(saveData());});
+  await page.waitForFunction(n=>window.__heldWrites.length===n,count);
+}
+async function releaseHeld(page,index=0) {
+  await page.evaluate(async i=>{await window.__heldWrites[i].release();await window.__savePromises[i];},index);
+}
 for(const width of [390,1440]) test.describe(width+'px',()=>{
   test.use({viewport:{width,height:width===390?844:1000}});
   test('single controls, keyboard selection, rank first and all 26 fields remain',async({page})=>{
@@ -139,6 +156,52 @@ for(const width of [390,1440]) test.describe(width+'px',()=>{
     await page.locator('#fillDate').fill(date);await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#f_aq999')).toHaveValue('5');await expect(page.locator('#f_mgmt_op_online')).toHaveValue('7');
     await page.locator('.btn-save-main').click();await expect(page.locator('#toast')).toContainText('已儲存');await expect(page.locator('#dailyDraftNote')).toBeHidden();
     await page.locator('#f_aq999').fill('9');await page.evaluate(()=>clearForm());await expect(page.locator('#dailyDraftNote')).toBeHidden();
+  });
+  for(const flow of ['store','date','segment']) test('late save cannot clear another '+flow+' draft or replace its summary',async({page})=>{
+    await seed(page,{date,store:'酒泉',seg:16,rank:24,kpi:88,aq999:2});
+    await seed(page,{date,store:'通化',seg:16,rank:26,kpi:133,aq999:2});
+    await seed(page,{date:'2099-10-03',store:'酒泉',seg:16,rank:26,kpi:133,aq999:2});
+    await seed(page,{date,store:'酒泉',seg:21,rank:26,kpi:133,aq999:2});
+    await choose(page);await holdWrites(page);await page.locator('#f_aq999').fill('9');await submitHeld(page,1);
+    const context=async other=>{
+      if(flow==='store')await choose(page,other?'通化':'酒泉');
+      if(flow==='date')await page.locator('#fillDate').fill(other?'2099-10-03':date);
+      if(flow==='segment')await page.locator(other?'#newSeg21':'#newSeg16').click();
+      await expect(page.locator('.btn-save-main')).toBeEnabled();
+    };
+    await context(true);await page.locator('#f_aq999').fill('55');const summary=await page.locator('#filledSummary').innerHTML();
+    await releaseHeld(page);await expect(page.locator('#dailyDraftNote')).toBeVisible();expect(await page.locator('#filledSummary').innerHTML()).toBe(summary);
+    await context(false);await expect(page.locator('#f_aq999')).toHaveValue('9');await expect(page.locator('#dailyDraftNote')).toBeHidden();
+    await context(true);await expect(page.locator('#f_aq999')).toHaveValue('55');await expect(page.locator('#dailyDraftNote')).toBeVisible();
+    expect(await page.evaluate(()=>window.__heldWrites[0].payload.seg)).toBe(16);
+  });
+  for(const value of ['11','0','']) test('post-submit edit '+JSON.stringify(value)+' survives verified success and returning',async({page})=>{
+    await seed(page,{date,store:'酒泉',seg:16,rank:24,kpi:88,aq999:2});await choose(page);await holdWrites(page);
+    await page.locator('#f_aq999').fill('9');await submitHeld(page,1);await page.locator('#f_aq999').fill(value);await releaseHeld(page);
+    await expect(page.locator('#dailyDraftNote')).toBeVisible();await choose(page,'通化');await choose(page);
+    await expect(page.locator('#f_aq999')).toHaveValue(value);await expect(page.locator('#dailyDraftNote')).toBeVisible();
+  });
+  test('same-key saves resolved in reverse preserve newer values after older verified write',async({page})=>{
+    await choose(page);await holdWrites(page);await page.locator('#f_aq999').fill('9');await submitHeld(page,1);
+    await page.locator('#f_aq999').fill('11');await submitHeld(page,2);await releaseHeld(page,1);await expect(page.locator('#dailyDraftNote')).toBeHidden();
+    await releaseHeld(page,0);await expect(page.locator('#dailyDraftNote')).toBeVisible();await choose(page,'通化');await choose(page);
+    await expect(page.locator('#f_aq999')).toHaveValue('11');await expect(page.locator('#dailyDraftNote')).toBeVisible();
+  });
+  test('unchanged submitted draft clears on success; later clear during save remains empty',async({page})=>{
+    await choose(page);await holdWrites(page);await page.locator('#f_aq999').fill('9');await submitHeld(page,1);await releaseHeld(page);
+    await expect(page.locator('#dailyDraftNote')).toBeHidden();await choose(page,'通化');await choose(page);await expect(page.locator('#f_aq999')).toHaveValue('9');await expect(page.locator('#dailyDraftNote')).toBeHidden();
+    await page.locator('#f_aq999').fill('12');await submitHeld(page,2);await page.evaluate(()=>clearForm());await releaseHeld(page,1);
+    await expect(page.locator('#f_aq999')).toHaveValue('');await expect(page.locator('#dailyDraftNote')).toBeVisible();await choose(page,'通化');await choose(page);await expect(page.locator('#f_aq999')).toHaveValue('');
+  });
+  test('verified saved source cannot be overwritten by a read begun before write success',async({page})=>{
+    await choose(page);await holdWrites(page);await page.locator('#f_aq999').fill('9');await submitHeld(page,1);
+    await page.evaluate(d=>{
+      const original=window.fetch;window.fetch=(url,options={})=>JSON.parse(options.body||'{}').action==='read'?new Promise(resolve=>window.__releaseOldRead=()=>resolve(new Response(JSON.stringify({status:'ok',data:{'酒泉':{date:d,store:'酒泉',seg:16,aq999:2}}})))):original(url,options);
+      window.__oldRead=fetchDayData(d,16);
+    },date);
+    await releaseHeld(page);await page.evaluate(async()=>{window.__releaseOldRead();await window.__oldRead;});
+    expect(await page.evaluate(d=>_cache[cacheKey(d,16)].酒泉.aq999,date)).toBe(9);
+    await choose(page,'通化');await choose(page);await expect(page.locator('#f_aq999')).toHaveValue('9');await expect(page.locator('#dailyDraftNote')).toBeHidden();
   });
   test('night required errors link to controls, no write; optional fold retains exact values',async({page})=>{
     await choose(page);await page.locator('#newSeg21').click();await expect(page.locator('.btn-save-main')).toBeEnabled();await page.locator('.btn-save-main').click();
