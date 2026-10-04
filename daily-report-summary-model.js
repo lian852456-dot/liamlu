@@ -7,7 +7,7 @@
   'use strict';
   const core = [['aq999','A999','筆'],['aq1399','A1399','筆'],['haosu','好速','點'],['rt999','R999','筆'],['rt1399','R1399','筆']];
   const main = [['kpi','KPI 達成率','%'],['rank','公司排名','名'],['early_renew','提前續約','件'],['rt_close_num','RT 締結分子',''],['rt_close_den','RT 締結分母',''],['rt_close_pct','RT 締結率','%'],['insurance_num','保險分子',''],['insurance_den','保險分母',''],['insurance_pct','保險搭售率','%'],['5g','5G 銷售','筆'],['aq_ttl','AQ 上線','筆'],['aq999','A999','筆'],['aq1399','A1399','筆'],['rt_pts','RT 上線','筆'],['special_renew','特殊維繫','筆'],['premium_renew','高高特維','筆'],['rt999','R999','筆'],['rt1399','R1399','筆'],['haosu','好速','點']];
-  const addon = [['acc','配件','元'],['film','包膜保貼','筆'],['insurance','手機保險','筆'],['myvideo','MyVideo','筆'],['apple_google','Apple/Google','筆'],['hbo','HBO','筆'],['netflix','Netflix','筆']];
+  const addon = [['acc','配件','元'],['film','包膜保貼','筆'],['insurance','手機保險','筆'],['myvideo','MyVideo','筆'],['apple_google','Google服務及雜誌週刊開通數','筆'],['hbo','HBO','筆'],['netflix','Netflix','筆']];
   const management = [['op_online','OP 上線','筆'],['op_accum','OP 累積','筆'],['op_target','OP 目標','筆'],['mycharge_clicked','MyCharge 已點選','筆'],['mycharge_tagged','今日貼標數','筆'],['mycharge_pct','MyCharge 點選率','%']];
   const fields = [...main,...addon,...management];
   const ratios = {insurance_pct:['insurance_num','insurance_den'],rt_close_pct:['rt_close_num','rt_close_den'],mycharge_pct:['mycharge_clicked','mycharge_tagged']};
