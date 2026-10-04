@@ -23,19 +23,18 @@ for row in range(4,14):
     for col in range(1,12):assert v['締結率'].cell(row,col).value==cv['締結率近三日'].cell(row,col).value,'CLOSURE_REPORT_MISMATCH'
 assert c['latest']['formal_cases']+c['latest']['unassigned_cases']+c['latest']['anomaly_cases']==c['latest']['gap']
 sales=d['salesMetrics']
-assert len(sales['rows'])==10 and v['配件包膜影音'].max_row==17
+assert len(sales['rows'])==10 and v['配件包膜銷售'].max_row==16 and v['配件包膜銷售'].max_column==4
 for index,row in enumerate(sales['rows'],4):
-    expected=[row['store'],row['accessory_amount'],row['film_amount'],row['vk_contracts'],row['auto_film_month_count']]
+    expected=[row['store'],row['accessory_amount'],row['film_amount'],row['auto_film_month_count']]
     for col,value in enumerate(expected,1):
-        pending='待補明細' if col==4 else '尚未有資料'
-        assert v['配件包膜影音'].cell(index,col).value==(pending if value is None else value),'SALES_REPORT_MISMATCH'
+        assert v['配件包膜銷售'].cell(index,col).value==('尚未有資料' if value is None else value),'SALES_REPORT_MISMATCH'
 for ws in v:
     for row in ws:
         for cell in row:assert not (cell.data_type=='e'),'FORMULA_ERROR '+ws.title+'!'+cell.coordinate
 # Output files follow worksheet presence and the verified paginated receipt.
 images={'主力KPI':'Main_KPI','加掛得分':'Addon_Score','手機保險':'Insurance','QIS店績':'QIS','締結率':'Closure_Rate','加減分日目標':'Daily_Targets','店長（含代理）':'Personal_Manager','副店長':'Personal_Deputy','業代（含銷售人員）':'Personal_Sales'}
 files=[(b,list(s)),(cb,['續約率(分子)','續約率(分母)'])]+[(out/f'TWM_North12B_{name}_{date}.png',[sheet]) for sheet,name in images.items() if sheet in v]
-files.append((out/f'TWM_North12B_Sales_Overview_{date}.png',sales['source_sheets']))
+files.append((out/f'TWM_North12B_Sales_Overview_{date}.png',['上線數KPI_每日上線','AQ其他-包膜與保貼營收']))
 receipt=json.loads((r.parent/'private-run/goodspeed-receipt.json').read_text())
 assert receipt['status']=='pass'
 for item in receipt['files']:
@@ -47,5 +46,5 @@ for path,sheets in files:
     data=path.read_bytes();assert data
     entries.append({'fileName':path.name,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),'sourceSheets':sheets,'renderStatus':'PENDING_VISUAL_REVIEW' if path.suffix=='.png' else 'WORKBOOK_VALIDATED'})
 assert len({x['fileName'] for x in entries})==len(entries)
-(out/'attachment-manifest.json').write_text(json.dumps({'reportDate':date,'sourceFile':os.environ['SOURCE_FILE'],'sourceSha256':k['meta']['sourceSha256'],'salesAdditionalSources':sales.get('additional_sources',[]),'requiredCount':len(entries),'requiredAttachments':entries},ensure_ascii=False,indent=2))
+(out/'attachment-manifest.json').write_text(json.dumps({'reportDate':date,'sourceFile':os.environ['SOURCE_FILE'],'sourceSha256':k['meta']['sourceSha256'],'requiredCount':len(entries),'requiredAttachments':entries},ensure_ascii=False,indent=2))
 print(json.dumps({'status':'pass','attachments':len(entries),'roster':len(k['persons']),'dodNote':'前日無資料時暫不比較'},ensure_ascii=False))
