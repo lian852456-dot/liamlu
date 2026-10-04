@@ -4,6 +4,9 @@
   const byId = id => document.getElementById(id);
   let panel, area, context, rank, core, insurance, other, zero, submit, dock;
   let selected = '', selectedDate = '', selectedSeg = 16, loading = false;
+  let dirty = false;
+  const drafts = new Map();
+  const draftKey = () => JSON.stringify([selected, selectedDate, selectedSeg]);
   const zeroIds = ['z_reason', 'z_consult', 'z_method', 'z_plan'];
 
   function element(tag, cls, text) {
@@ -110,6 +113,8 @@
     rank = section('公司 KPI 排名', 'daily-rank');
     const carryNote = element('p', 'daily-note', '首次填排名與 KPI；晚間自動沿用，不用重填。'); carryNote.id = 'dailyCarryNote';
     rank.append(carryNote);
+    const draftNote = element('p', 'daily-note', '尚有未送出修改；切換後會保留。晚間承接以已保存的 16:00 回報為準。');
+    draftNote.id = 'dailyDraftNote'; draftNote.hidden = true; rank.append(draftNote);
     const rankGrid = element('div', 'daily-grid'); moveFields(['rank','kpi'], rankGrid); rank.append(rankGrid);
     core = section('核心業績', 'daily-core');
     const coreTag = element('span', 'daily-tag', '當日累計'); coreTag.id = 'dailyCoreTag'; core.firstChild.append(coreTag);
@@ -147,6 +152,7 @@
     submit = panel.querySelector('.btn-save-main'); dock.append(dockText, submit); area.append(dock);
     labelControls(area);
     area.addEventListener('input', event => {
+      dirty = true; byId('dailyDraftNote').hidden = false;
       updateZero(); updateRates();
       if (event.target.hasAttribute('aria-invalid')) event.target.removeAttribute('aria-invalid');
     });
@@ -158,6 +164,8 @@
   window.DailyReportLayout = {
     onSelectionStart(store, date, seg) {
       if (!panel) return;
+      if (selected && !loading && dirty) drafts.set(draftKey(), Object.fromEntries(Array.from(area.querySelectorAll('input:not([readonly]),textarea')).map(input => [input.id, input.value])));
+      dirty = false; byId('dailyDraftNote').hidden = true;
       selected = store; selectedDate = date; selectedSeg = Number(seg); loading = true;
       panel.querySelector('.store-grid').hidden = true; byId('dailyStoreToggle').setAttribute('aria-expanded', 'false');
       byId('underForms').replaceChildren(); zero.hidden = true;
@@ -170,14 +178,20 @@
     onStoreLoaded(store, date, seg, record, first) {
       if (!panel || selected !== store || selectedDate !== date || selectedSeg !== Number(seg)) return;
       loading = false; submit.disabled = false; area.querySelectorAll('input').forEach(input => { input.disabled = false; }); labelControls(area); updateZero(record); updateRates();
+      const draft = drafts.get(draftKey());
+      if (draft) {
+        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly) input.value = value; });
+        updateZero();
+        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly) input.value = value; });
+        calcPct('insurance_num','insurance_den','insurance_pct'); calcPct('rt_close_num','rt_close_den','rt_close_pct'); calcManagementFocusPct(); updateRates();
+        dirty = true; byId('dailyDraftNote').hidden = false;
+      }
       if (selectedSeg !== 21) byId('dailyCarryNote').textContent = '首次填排名與 KPI；晚間自動沿用，不用重填。';
       else {
         const missing = ['rank','kpi'].filter(key => byId('f_' + key).value === '');
-        const existing = record && ['rank','kpi'].some(key => record[key] !== null && record[key] !== undefined && record[key] !== '');
         byId('dailyCarryNote').textContent = missing.length
-          ? '尚缺' + missing.map(key => key === 'rank' ? '公司 KPI 排名' : 'KPI 達成率').join('、') + '；晚間保持空白並鎖定，請回 16:00 首次回報補填。'
-          : existing ? '已載入此店、此日期的晚間回報；排名與 KPI 已鎖定，不用重填。'
-          : first ? '已沿用同店、同日首次回報（16:00）；排名與 KPI 已鎖定，不用重填。' : '尚無同店、同日首次回報；晚間保持空白並鎖定。';
+          ? '同店同日首次回報（16:00）尚缺' + missing.map(key => key === 'rank' ? '公司 KPI 排名' : 'KPI 達成率').join('、') + '；晚間保持空白並鎖定，請回 16:00 補填並保存。'
+          : '已沿用同店、同日已保存的首次回報（16:00）；晚間排名與 KPI 已鎖定，不用重填。';
       }
     },
     showClosingIssues(issues) {
@@ -198,7 +212,8 @@
       else locate(byId(zeroIds.find(id => !byId(id)?.value.trim())));
       return true;
     },
-    onClear() { if (!panel) return; byId('underForms').replaceChildren(); updateZero(); updateRates(); }
+    onSummaryUpdated() { if (!panel || loading) return; drafts.delete(draftKey()); dirty = false; byId('dailyDraftNote').hidden = true; },
+    onClear() { if (!panel) return; drafts.delete(draftKey()); dirty = false; byId('dailyDraftNote').hidden = true; byId('underForms').replaceChildren(); updateZero(); updateRates(); }
   };
   document.addEventListener('DOMContentLoaded', initialize);
 })();

@@ -2249,6 +2249,7 @@ if (savedGasUrl !== GAS_URL) localStorage.setItem('bei12b_gas_url', GAS_URL);
 
 // 記憶體快取（避免重複拉資料）
 const _cache = {};
+const _cacheReadGeneration = {};
 function cacheKey(date, seg) { return `${date}_${seg}`; }
 function shadowKey(date, seg) { return `bei12b_shadow_${date}_${seg}`; }
 
@@ -2329,15 +2330,16 @@ async function requestGasJson(url) {
 
 async function fetchDayData(date, seg) {
   const ck = cacheKey(date, seg);
+  const generation = _cacheReadGeneration[ck] = (_cacheReadGeneration[ck] || 0) + 1;
   const localShadow = readLocalShadow(date, seg);
   if (!GAS_URL) { _cache[ck] = {}; return; }
   try {
     const json = await privateDashboardPost({ action: 'read', date, seg });
     if (!json || json.status !== 'ok') throw new Error((json && json.message) || '讀取失敗');
-    _cache[ck] = mergeDayData(json.data || {}, localShadow);
+    if (_cacheReadGeneration[ck] === generation) _cache[ck] = mergeDayData(json.data || {}, localShadow);
   } catch(e) {
     console.error('fetchDayData error', e);
-    _cache[ck] = mergeDayData({}, localShadow);
+    if (_cacheReadGeneration[ck] === generation) _cache[ck] = mergeDayData({}, localShadow);
   }
 }
 
@@ -2410,9 +2412,9 @@ window.onload = async () => {
   document.getElementById('fillDate').value = td;
   renderManagementFocusInputs({});
   document.getElementById('fillDate').addEventListener('change', () => {
-    renderManagementFocusInputs({});
     const store = document.getElementById('fillStore').value;
     if (store) selectStore(store);
+    else renderManagementFocusInputs({});
   });
   document.getElementById('playbackDate').value = td;
   document.getElementById('todayBadge').textContent = '📅 ' + td;
@@ -3725,7 +3727,9 @@ async function renderPerf() {
 // ════════════════════════════════════
 // 填報 UI - 門市選擇
 // ════════════════════════════════════
+let fillSelectionGeneration = 0;
 function selectStore(store) {
+  const selectionGeneration = ++fillSelectionGeneration;
   document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
   const card = document.querySelector(`.store-card[data-store="${store}"]`);
   if (card) card.classList.add('selected');
@@ -3738,6 +3742,7 @@ function selectStore(store) {
 
   const date = document.getElementById('fillDate').value;
   const selectedSeg = currentSeg;
+  updateFilledSummary(null);
   globalThis.DailyReportLayout?.onSelectionStart(store, date, selectedSeg);
   const isNew = NEW_STORES.includes(store);
   if (isNew) showToast(`🚀 ${store} 新店！6/25 起營業`);
@@ -3747,26 +3752,25 @@ function selectStore(store) {
     getData(date, store, currentSeg),
     Number(currentSeg) === 21 ? getData(date, store, 16) : Promise.resolve(null)
   ]).then(([data, afternoon]) => {
-    if (document.getElementById('fillDate').value !== date || document.getElementById('fillStore').value !== store || currentSeg !== selectedSeg) return;
+    if (selectionGeneration !== fillSelectionGeneration || document.getElementById('fillDate').value !== date || document.getElementById('fillStore').value !== store || currentSeg !== selectedSeg) return;
     FIELDS.forEach(f => {
       const el = document.getElementById('f_' + f);
       if (!el) return;
-      const inherited = Number(currentSeg) === 21 && CARRY_FROM_16_FIELDS.includes(f) && afternoon;
-      const value = data && data[f] !== null && data[f] !== undefined && data[f] !== ''
-        ? data[f] : inherited ? (afternoon[f] ?? '') : '';
-      el.value = value;
       const locked = Number(currentSeg) === 21 && CARRY_FROM_16_FIELDS.includes(f);
+      const source = locked ? afternoon : data;
+      const value = source && source[f] !== null && source[f] !== undefined && source[f] !== '' ? source[f] : '';
+      el.value = value;
       el.readOnly = locked;
       if (locked) {
         el.style.background = 'rgba(249,115,22,0.08)';
-        el.title = '自動沿用 16:00 回報';
+        el.title = value === '' ? '同店同日 16:00 尚缺此欄；晚間保持空白並鎖定' : '自動沿用同店同日已保存的 16:00 回報';
       } else {
         el.style.background = '';
         el.title = '';
       }
     });
     renderManagementFocusInputs(managementFocusData(data));
-    updateFilledSummary(data || afternoon);
+    updateFilledSummary(data);
     globalThis.DailyReportLayout?.onStoreLoaded(store, date, selectedSeg, data, afternoon);
   });
 
@@ -3790,6 +3794,7 @@ function updateFilledSummary(data) {
     ? highlights.map(h => `<span class="filled-chip">${h}</span>`).join('')
     : '<span style="color:#64748b;font-size:11px;">已有填報資料，可修改後重新送出</span>';
   wrap.classList.add('show');
+  globalThis.DailyReportLayout?.onSummaryUpdated(data);
 }
 
 // 門市選擇時更新 sub title

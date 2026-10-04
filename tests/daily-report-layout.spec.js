@@ -1,7 +1,7 @@
 const {test, expect} = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
-const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:4184/';
+const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:4198/';
 const date = '2099-10-02';
 const closingKeys = ['aq999','aq1399','haosu','rt999','rt1399','insurance_num','insurance_den'];
 const management = ['op_online','op_accum','op_target','mycharge_clicked','mycharge_tagged'];
@@ -85,12 +85,60 @@ for(const width of [390,1440]) test.describe(width+'px',()=>{
     await page.evaluate(()=>{window.__pending.filter(p=>p.seg===16).forEach((p,i)=>p.resolve({kpi:i===0?12:88,rank:i===0?1:24}));window.__pending.find(p=>p.seg===21).resolve(null);});
     await expect(page.locator('#f_rank')).toHaveValue('24');await expect(page.locator('#f_kpi')).toHaveValue('88');await expect(page.locator('.btn-save-main')).toBeEnabled();
   });
-  test('existing same-store/day evening rank keeps current main precedence and labels its source',async({page})=>{
+  test('saved first-report rank wins evening conflicts; missing first field stays blank and source titles agree',async({page})=>{
     await seed(page,{date,store:'酒泉',seg:16,kpi:88,rank:24});
     await seed(page,{date,store:'酒泉',seg:21,kpi:90,rank:20});
     await choose(page);await page.locator('#newSeg21').click();await expect(page.locator('.btn-save-main')).toBeEnabled();
-    await expect(page.locator('#f_rank')).toHaveValue('20');await expect(page.locator('#f_kpi')).toHaveValue('90');
-    await expect(page.locator('#dailyCarryNote')).toContainText('晚間回報');await expect(page.locator('#f_rank')).toHaveAttribute('readonly','');
+    await expect(page.locator('#f_rank')).toHaveValue('24');await expect(page.locator('#f_kpi')).toHaveValue('88');
+    await expect(page.locator('#dailyCarryNote')).toContainText('已保存的首次回報（16:00）');await expect(page.locator('#f_rank')).toHaveAttribute('readonly','');
+    for (const missing of ['rank','kpi','both']) {
+      await page.evaluate(({date,missing})=>{window.__rows=[{date,store:'酒泉',seg:16,...(missing==='both'?{}:{[missing==='rank'?'kpi':'rank']:0})},{date,store:'酒泉',seg:21,kpi:90,rank:20}];Object.keys(_cache).forEach(k=>delete _cache[k]);},{date,missing});
+      await choose(page);
+      for(const key of ['rank','kpi']) {
+        await expect(page.locator('#f_'+key)).toHaveValue(missing==='both'||key===missing?'':'0');
+        await expect(page.locator('#f_'+key)).toHaveAttribute('title',missing==='both'||key===missing?/16:00 尚缺/:/已保存的 16:00/);
+      }
+      await expect(page.locator('#dailyCarryNote')).toContainText('尚缺');
+    }
+  });
+  test('only current segment has a completed summary; pending selection hides previous summary',async({page})=>{
+    await seed(page,{date,store:'酒泉',seg:16,rank:24,kpi:88});await choose(page);await expect(page.locator('#filledSummary')).toHaveClass(/show/);
+    await page.locator('#newSeg21').click();await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#filledSummary')).not.toHaveClass(/show/);
+    expect(await page.evaluate(()=>window.__apiCalls.filter(p=>p.action==='write').length)).toBe(0);
+    await seed(page,{date,store:'酒泉',seg:21,aq999:3});await choose(page);await expect(page.locator('#filledSummary')).toHaveClass(/show/);
+    await page.evaluate(()=>{Object.keys(_cache).forEach(k=>delete _cache[k]);window.__restoreFetch=fetch;window.__pendingFetch=[];window.fetch=(url,opts)=>new Promise(resolve=>window.__pendingFetch.push({url,opts,resolve}));selectStore('通化');});
+    await expect(page.locator('#filledSummary')).not.toHaveClass(/show/);await expect(page.locator('.btn-save-main')).toBeDisabled();
+    await page.evaluate(()=>{window.fetch=window.__restoreFetch;window.__pendingFetch.forEach(p=>p.resolve(new Response(JSON.stringify({status:'ok',data:{}}))));});
+    await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#filledSummary')).not.toHaveClass(/show/);
+  });
+  for(const flow of ['store','date','segment']) test(flow+' ABA via real transport rejects stale DOM/cache, preserves edited and returned draft',async({page})=>{
+    await choose(page);
+    await page.evaluate(({date,flow})=>{
+      window.__restoreFetch=fetch;window.__held=[];Object.keys(_cache).forEach(k=>delete _cache[k]);
+      window.fetch=(url,options={})=>{const payload=JSON.parse(options.body||'{}');if(payload.action!=='read')return window.__restoreFetch(url,options);window.__apiCalls.push(payload);return new Promise(resolve=>window.__held.push({payload,resolve:data=>resolve(new Response(JSON.stringify({status:'ok',data})))}));};
+      const selectDate=d=>{document.getElementById('fillDate').value=d;document.getElementById('fillDate').dispatchEvent(new Event('change'));};
+      if(flow==='store'){selectStore('酒泉');selectStore('通化');selectStore('酒泉');}
+      if(flow==='date'){selectDate(date);selectDate('2099-10-03');selectDate(date);}
+      if(flow==='segment'){selectStore('酒泉');setSeg(21);setSeg(16);}
+    },{date,flow});
+    await expect(page.locator('.btn-save-main')).toBeDisabled();
+    await page.evaluate(d=>window.__held.at(-1).resolve({'酒泉':{date:d,store:'酒泉',seg:16,rank:24,kpi:88.8}}),date);
+    await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#f_rank')).toHaveValue('24');await page.locator('#f_aq999').fill('5');await page.locator('#f_mgmt_op_online').fill('7');
+    await page.evaluate(()=>window.__held.slice(0,-1).forEach(p=>p.resolve({'酒泉':{date:p.payload.date,store:'酒泉',seg:p.payload.seg,rank:99,kpi:9}})));
+    await page.waitForTimeout(50);await expect(page.locator('#f_rank')).toHaveValue('24');await expect(page.locator('#f_aq999')).toHaveValue('5');
+    expect(await page.evaluate(d=>_cache[cacheKey(d,16)].酒泉.rank,date)).toBe(24);
+    await page.evaluate(()=>window.fetch=window.__restoreFetch);await choose(page,'通化');await choose(page,'酒泉');
+    await expect(page.locator('#f_aq999')).toHaveValue('5');await expect(page.locator('#f_mgmt_op_online')).toHaveValue('7');await expect(page.locator('#dailyDraftNote')).toBeVisible();
+  });
+  test('drafts isolated by date/segment; saved first source overrides evening; clear and save discard draft marker',async({page})=>{
+    await seed(page,{date,store:'酒泉',seg:16,kpi:88,rank:24});await choose(page);
+    await page.locator('#f_rank').fill('33');await page.locator('#f_aq999').fill('5');await page.locator('#f_mgmt_op_online').fill('7');
+    await page.locator('#newSeg21').click();await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#f_rank')).toHaveValue('24');await expect(page.locator('#f_aq999')).toHaveValue('');
+    await page.locator('#newSeg16').click();await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#f_rank')).toHaveValue('33');await expect(page.locator('#f_mgmt_op_online')).toHaveValue('7');
+    await page.locator('#fillDate').fill('2099-10-03');await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#f_aq999')).toHaveValue('');
+    await page.locator('#fillDate').fill(date);await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#f_aq999')).toHaveValue('5');await expect(page.locator('#f_mgmt_op_online')).toHaveValue('7');
+    await page.locator('.btn-save-main').click();await expect(page.locator('#toast')).toContainText('已儲存');await expect(page.locator('#dailyDraftNote')).toBeHidden();
+    await page.locator('#f_aq999').fill('9');await page.evaluate(()=>clearForm());await expect(page.locator('#dailyDraftNote')).toBeHidden();
   });
   test('night required errors link to controls, no write; optional fold retains exact values',async({page})=>{
     await choose(page);await page.locator('#newSeg21').click();await expect(page.locator('.btn-save-main')).toBeEnabled();await page.locator('.btn-save-main').click();
@@ -126,6 +174,7 @@ for(const width of [390,1440]) test.describe(width+'px',()=>{
     await choose(page);await page.locator('#newSeg21').click();await expect(page.locator('.btn-save-main')).toBeEnabled();await complete(page);await page.evaluate(()=>window.__badReadback=true);
     await page.locator('.btn-save-main').click();await expect(page.locator('#toast')).toContainText('讀回不一致');
     expect(await page.evaluate(d=>localStorage.getItem(shadowKey(d,21)),date)).toBeNull();
+    await expect(page.locator('#dailyDraftNote')).toBeVisible();
   });
   test('tab/visibility return retains inputs, dock only on fill, keyboard layout simulation',async({page})=>{
     await choose(page);await page.locator('#f_aq999').fill('5');
