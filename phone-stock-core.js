@@ -206,6 +206,9 @@
     // 銷售檔本身就是使用者匯出的報表區間；完整保留其中的所有銷售日期。
     // 截止日僅用來挑選庫存檔的最新快照，不能因此截掉銷售報表較早的日期。
     const sales = (salesRows || []).filter(row => row && row.date);
+    const salesAvailable = sales.length > 0;
+    const salesValue = value => salesAvailable ? value : null;
+    const salesRate = (sales, stock) => salesAvailable ? rate(sales, stock) : null;
     const salesDates = Array.from(new Set(sales.map(row => row.date).filter(Boolean))).sort();
     const salesStartDate = salesDates[0] || '';
     const salesEndDate = salesDates[salesDates.length - 1] || '';
@@ -236,15 +239,15 @@
     }));
     const storeSummary = STORE_NAMES.map(store => {
       const entry = byStore.get(store);
-      return { store, sales:entry.sales, stock:entry.stock, salesByDate:entry.salesByDate, rate:rate(entry.sales, entry.stock) };
+      return { store, sales:salesValue(entry.sales), stock:entry.stock, salesByDate:entry.salesByDate, rate:salesRate(entry.sales, entry.stock) };
     });
-    const modelSummary = Array.from(modelMap.values()).map(entry => ({ ...entry, rate:rate(entry.sales, entry.stock) })).sort((a, b) => b.sales - a.sales || b.stock - a.stock || a.model.localeCompare(b.model, 'zh-Hant'));
+    const modelSummary = Array.from(modelMap.values()).map(entry => ({ ...entry, sales:salesValue(entry.sales), rate:salesRate(entry.sales, entry.stock) })).sort((a, b) => b.sales - a.sales || b.stock - a.stock || a.model.localeCompare(b.model, 'zh-Hant'));
     const totalSales = storeSummary.reduce((sum, row) => sum + row.sales, 0);
     const totalStock = storeSummary.reduce((sum, row) => sum + row.stock, 0);
     return {
-      startDate, endDate, salesStartDate, salesEndDate, stockDate, salesDates, salesRows:sales.length, stockRows:stocks.length,
-      totalSales, totalStock, totalRate:rate(totalSales, totalStock), storeSummary, modelSummary,
-      storeModels:Object.fromEntries(STORE_NAMES.map(store => [store, Array.from(byStore.get(store).models.values()).map(row => ({ ...row, salesByDate:{ ...row.salesByDate }, rate:rate(row.sales, row.stock) })).sort((a, b) => b.sales - a.sales || b.stock - a.stock || a.model.localeCompare(b.model, 'zh-Hant'))]))
+      startDate, endDate, salesStartDate, salesEndDate, stockDate, salesDates, salesAvailable, salesRows:sales.length, stockRows:stocks.length,
+      totalSales:salesValue(totalSales), totalStock, totalRate:salesRate(totalSales, totalStock), storeSummary, modelSummary,
+      storeModels:Object.fromEntries(STORE_NAMES.map(store => [store, Array.from(byStore.get(store).models.values()).map(row => ({ ...row, sales:salesValue(row.sales), salesByDate:{ ...row.salesByDate }, rate:salesRate(row.sales, row.stock) })).sort((a, b) => b.sales - a.sales || b.stock - a.stock || a.model.localeCompare(b.model, 'zh-Hant'))]))
     };
   }
 
