@@ -28,8 +28,9 @@
     return { n, d, valid, rate:valid && d > 0 ? n / d * 100 : null, notApplicable:valid && n === 0 && d === 0 };
   }
   function values(record) {
-    const source = {...record,...managementData(record)};
-    const result = Object.fromEntries(fields.map(([key]) => [key,number(source[key])]));
+    const managementSource = managementData(record);
+    const managementKeys = new Set(management.map(([key])=>key));
+    const result = Object.fromEntries(fields.map(([key]) => [key,number(managementKeys.has(key) ? managementSource[key] : record[key])]));
     for (const [key,keys] of Object.entries(ratios)) result[key] = pair(result,keys).rate;
     return result;
   }

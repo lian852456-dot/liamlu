@@ -57,3 +57,9 @@ test('mismatched local personal record cannot hide a valid current cloud record'
  const cloud={status:'ok',data:{通化:{合成人員:good}}},local={通化:{合成人員:{...good,date:'2099-10-01'}}};
  assert.deepEqual(M.personal(cloud,date,16,stores,local).通化,[{name:'合成人員',record:good}]);
 });
+
+test('management JSON cannot override main/addon raw values; only its six defined keys are projected',()=>{
+ const record=row('通化',{aq999:7,insurance_num:1,insurance_den:2,acc:100,op_online:999,management_focus_json:JSON.stringify({op_online:3,aq999:9000,insurance_num:9,insurance_den:9,acc:9999})});
+ const projected=project({通化:record});assert.equal(projected[0].values.aq999,7);assert.equal(projected[0].values.insurance_num,1);assert.equal(projected[0].values.acc,100);assert.equal(projected[0].values.op_online,3);assert.equal(M.sum(projected,'aq999').value,7);assert.equal(M.ratio(projected,'insurance_pct').rate,50);
+ assert.equal(project({通化:row('通化',{op_online:999,management_focus_json:'invalid'})})[0].values.op_online,null);
+});
