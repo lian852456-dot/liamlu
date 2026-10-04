@@ -1540,6 +1540,7 @@
   }
 </style>
 <link rel="stylesheet" href="daily-report-layout.css?v=20261004-layout-3">
+<link rel="stylesheet" href="daily-report-summary.css?v=20261004-summary-1">
 <script src="daily-report-layout.js?v=20261004-layout-3" defer></script>
 </head>
 <body>
@@ -1922,61 +1923,33 @@
 <!-- ═══════════════════════════════════
      PANEL 2: 督導彙整
 ═══════════════════════════════════ -->
-<div class="panel report-panel" id="panel-summary">
-
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-    <div class="report-heading" style="font-size:16px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px;">
-      <span class="heading-icon" style="font-size:20px;">🦆</span> 今日彙整 <span id="summaryDateLabel" style="color:var(--accent);font-size:14px;font-weight:700;"></span>
+<div class="panel report-panel sum-layout" id="panel-summary">
+  <h1 class="report-heading">彙整大盤（督導）</h1>
+  <div class="sum-toolbar">
+    <label>回報日期<input type="date" id="sumDate"></label>
+    <div class="sum-segments" role="group" aria-label="正式回報時段">
+      <button type="button" id="sumSeg16" data-summary-seg="16" aria-pressed="true">16:00 下午</button>
+      <button type="button" id="sumSeg21" data-summary-seg="21" aria-pressed="false">21:00 晚間</button>
     </div>
-    <div class="seg-toggle">
-      <button class="seg-btn active-16" id="sumSeg16" onclick="setSumSeg(16)">16:00 回報</button>
-      <button class="seg-btn" id="sumSeg21" onclick="setSumSeg(21)">21:00 回報</button>
+    <button type="button" data-summary-retry>重新讀取</button>
+  </div>
+  <section class="sum-box" aria-labelledby="sumTitle">
+    <div class="sum-heading"><h2 id="sumTitle">N12B 全區摘要</h2><div id="sumCoverage"></div></div>
+    <p class="sum-note" id="summaryDateLabel"></p>
+    <div id="summaryCards"></div>
+  </section>
+  <section aria-labelledby="sumCompareTitle">
+    <div class="sum-compare-header"><div><h2 id="sumCompareTitle">門市對比</h2><p class="sum-note" id="sumStoreCount"></p></div>
+      <div class="sum-filters"><label>門市<select id="sumStore"><option value="all">全部九店</option></select></label><label>填報狀態<select id="sumStatus"><option value="all">全部狀態</option><option value="reported">已回報</option><option value="attention">待確認</option></select></label></div>
     </div>
-  </div>
-
-  <!-- 填報狀態 -->
-  <div class="card" style="padding:14px 18px;">
-    <div class="card-title" style="margin-bottom:10px;"><span class="dot"></span>填報狀態</div>
-    <div id="missingAlert" style="display:none;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.4);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#ef4444;font-weight:700;"></div>
-    <div class="fill-status" id="fillStatus"></div>
-  </div>
-
-  <!-- 概覽數字 -->
-  <div class="summary-grid" id="summaryCards"></div>
-
-  <!-- 大盤表 - 基本KPI -->
-  <div class="section-divider">主力 KPI 達成</div>
-  <div class="card" style="padding:14px 10px;">
-    <div class="table-wrap">
-      <table id="summaryTable1"></table>
+    <div class="sum-groups" role="group" aria-label="資料分群">
+      <button type="button" data-summary-group="sales" aria-pressed="true">核心業績</button><button type="button" data-summary-group="insurance" aria-pressed="false">保險搭售</button><button type="button" data-summary-group="management" aria-pressed="false">管理重點</button><button type="button" data-summary-group="consult" aria-pressed="false">零報與請益</button>
     </div>
-  </div>
-
-  <!-- 大盤表 - 加掛類 -->
-  <div class="section-divider">加掛類得分</div>
-  <div class="card" style="padding:14px 10px;">
-    <div class="table-wrap">
-      <table id="summaryTable2"></table>
-    </div>
-  </div>
-
-  <!-- 大盤表 - 管理重點 -->
-  <div class="section-divider">🎯 管理重點</div>
-  <div class="card" style="padding:14px 10px;">
-    <div class="table-wrap">
-      <table id="summaryTable3"></table>
-    </div>
-  </div>
-
-  <!-- 零報說明彙整（21:00才顯示）-->
-  <div id="zeroReportSection" style="display:none;"></div>
-
-  <!-- 整合彙整：店點回報 + 個人明細 -->
-  <div id="storePersonalSection" style="display:none;"></div>
-
-  <!-- 個人未過關彙整（舊區塊保留相容）-->
-  <div id="personalFailSummarySection" style="display:none;"></div>
-
+    <p class="sum-note" id="sumGroupNote"></p><div id="sumStores"></div>
+  </section>
+  <details class="sum-complete" id="sumComplete"><summary>完整欄位核對（含加掛類）</summary><p class="sum-note">保留原有 32 個數值欄位；只有此表可左右移動。請先聚焦表格區，再以方向鍵捲動。</p><div id="sumFullTable" class="sum-table-scroll" tabindex="0" role="region" aria-label="完整欄位核對表，可左右捲動"></div></details>
+  <aside class="sum-footnotes"><p>0 為明確回報零；— 為未取得／未填欄位。已回報只表示記錄存在，不代表完整。下午管理非必填，晚間仍必填。</p><p>保險與 MyCharge 只計有效配對分子／分母，0／0 不適用；公司排名不加總，KPI 店均值明示口徑。三創假日 18:30／22:20 沿用既有截止規則。</p><p>個人明細仍依原授權來源，不因更換版面新增權限。</p></aside>
+  <div class="sum-live" id="sumAnnounce" role="status" aria-live="polite"></div>
 </div><!-- /panel-summary -->
 
 
@@ -2189,6 +2162,8 @@
 </div>
 
 
+<script src="daily-report-summary-model.js?v=20261004-summary-1"></script>
+<script src="daily-report-summary-controller.js?v=20261004-summary-1"></script>
 <script src="kpi-battle-controller.js?v=20261002-logout-2"></script>
 <script src="award-model-catalog.js?v=20261001-1"></script>
 <script src="awards-battle-controller.js?v=20261003-publication-date-1"></script>
@@ -2622,14 +2597,8 @@ function renderAwardsBattleUnavailable() {
 // SEG TOGGLE (FILL)
 // ════════════════════════════════════
 function setSumSeg(s) {
-  sumSeg = s;
-  ['sumSeg16','sumSeg21'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.className = 'seg-btn';
-  });
-  const el = document.getElementById('sumSeg' + s);
-  if (el) el.className = 'seg-btn ' + (s===16?'active-16':'active-21');
-  renderSummary();
+  sumSeg = Number(s);
+  return getDailySummaryController().setSegment(sumSeg);
 }
 function setPbSeg(s) {
   pbSeg = s;
@@ -2898,185 +2867,25 @@ function clearForm() {
 // ════════════════════════════════════
 // SUMMARY RENDER
 // ════════════════════════════════════
+let dailySummaryController;
+function getDailySummaryController() {
+  if (!dailySummaryController) dailySummaryController = DailyReportSummaryController.create({
+    root:document.getElementById('panel-summary'), stores:STORES, today,
+    readDay:(date, seg) => privateDashboardPost({action:'read', date, seg}),
+    readPersonal:(date, seg) => privateDashboardPost({action:'pread', date, seg}),
+    localPersonal:(date, seg) => {
+      let index = {};
+      try { index = JSON.parse(localStorage.getItem(`pIdx_${date}_${seg}`) || '{}'); } catch (_) {}
+      return Object.fromEntries(STORES.map(store => [store, Object.fromEntries(Object.keys(index[store] || {}).map(name => [name,_loadReview(store,name,date,seg)]))]));
+    },
+    personalItems:PERSONAL_ITEMS,
+    onSegmentChange:seg => {sumSeg = seg;},
+    assertActive:() => globalThis.PortalLogout?.assertActive(),
+  });
+  return dailySummaryController;
+}
 async function renderSummary() {
-  const date = today();
-  document.getElementById('summaryDateLabel').textContent = date + `  ${sumSeg}:00 時段`;
-
-  // 先拉雲端資料（若有設定）
-  if (GAS_URL) await fetchDayData(date, sumSeg);
-  const ck = cacheKey(date, sumSeg);
-  const dayCache = _cache[ck] || {};
-  console.log('彙整讀取：日期=' + date + ' 時段=' + sumSeg + ' 門市數=' + Object.keys(dayCache).length, dayCache);
-
-  // Fill status chips
-  const fsEl = document.getElementById('fillStatus');
-  fsEl.innerHTML = STORES.map(s => {
-    const d = dayCache[s];
-    const isNew = NEW_STORES.includes(s);
-    if (isNew && date < '2026-06-25') {
-      return `<span class="fill-chip new-s">${s} 🆕 未開幕</span>`;
-    }
-    return d
-      ? `<span class="fill-chip done">✓ ${s} ${d.savedAt||''}</span>`
-      : `<span class="fill-chip pending">○ ${s} 未填</span>`;
-  }).join('');
-
-  // 未填警示
-  const missing = STORES.filter(s => !dayCache[s] && !(NEW_STORES.includes(s) && date < '2026-06-25'));
-  const alertEl = document.getElementById('missingAlert');
-  if (alertEl) {
-    if (missing.length > 0) {
-      alertEl.style.display = 'block';
-      alertEl.innerHTML = `⚠️ 尚有 ${missing.length} 間未填：${missing.join('、')}`;
-    } else {
-      alertEl.style.display = 'none';
-    }
-  }
-  // 同步更新瀏覽器標題
-  if (missing.length > 0) {
-    document.title = `⚠️ ${missing.length}間未填 · 北一二B回報`;
-  } else {
-    document.title = `✅ 全數完成 · 北一二B回報`;
-  }
-
-  // Summary cards
-  const filled = STORES.filter(s => !!dayCache[s]);
-  const total = STORES.filter(s => !(NEW_STORES.includes(s) && date < '2026-06-25')).length;
-
-  const sumRaw = key => STORES.reduce((acc, s) => {
-    const v = parseFloat(dayCache[s]?.[key]);
-    return acc + (isNaN(v) ? 0 : v);
-  }, 0);
-  const avgPct = key => {
-    const vals = STORES.map(s => parseFloat(dayCache[s]?.[key])).filter(v => !isNaN(v));
-    return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : '—';
-  };
-
-  const aq999Total    = sumRaw('aq999');
-  const aq1399Total   = sumRaw('aq1399');
-  const haosuTotal    = sumRaw('haosu');
-  const rt1399Total   = sumRaw('rt1399');
-  const rt999Total    = sumRaw('rt999');
-  const avgInsurance  = avgPct('insurance_pct');
-  const managementSum = key => STORES.reduce((acc, store) => {
-    const value = Number(managementValue(dayCache[store], key));
-    return acc + (Number.isFinite(value) ? value : 0);
-  }, 0);
-  const opOnline = managementSum('op_online');
-  const opAccum = managementSum('op_accum');
-  const opTarget = managementSum('op_target');
-  const myChargeClicked = managementSum('mycharge_clicked');
-  const myChargeTagged = managementSum('mycharge_tagged');
-  const myChargeRate = myChargeTagged > 0 ? (myChargeClicked / myChargeTagged * 100).toFixed(1) : '—';
-
-  document.getElementById('summaryCards').innerHTML = `
-    <div class="summary-card">
-      <div class="sc-label">時段</div>
-      <div class="sc-val" style="color:${sumSeg===16?'var(--gold)':'var(--accent-bright)'}">${sumSeg}:00</div>
-      <div class="sc-sub">${date}</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">填報完成</div>
-      <div class="sc-val" style="color:${filled.length===total?'var(--green)':'var(--warn)'}">${filled.length}/${total}</div>
-      <div class="sc-sub">間門市</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">A999 上線數</div>
-      <div class="sc-val" style="color:var(--accent-bright)">${aq999Total}</div>
-      <div class="sc-sub">全區合計(筆)</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">A1399 上線數</div>
-      <div class="sc-val" style="color:var(--accent-bright)">${aq1399Total}</div>
-      <div class="sc-sub">全區合計(筆)</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">好速銷售點數</div>
-      <div class="sc-val" style="color:var(--accent-bright)">${haosuTotal % 1 === 0 ? haosuTotal : haosuTotal.toFixed(2)}</div>
-      <div class="sc-sub">全區合計(點)</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">R1399 上線數</div>
-      <div class="sc-val" style="color:var(--accent-bright)">${rt1399Total}</div>
-      <div class="sc-sub">全區合計(筆)</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">R999 上線數</div>
-      <div class="sc-val" style="color:var(--accent-bright)">${rt999Total}</div>
-      <div class="sc-sub">全區合計(筆)</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">保險搭售率</div>
-      <div class="sc-val" style="color:${avgInsurance!=='—'&&parseFloat(avgInsurance)>=80?'var(--green)':avgInsurance!=='—'?'var(--warn)':'var(--text-muted)'}">${avgInsurance==='—'?'—':avgInsurance+'%'}</div>
-      <div class="sc-sub">區內均值</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">OP 上線／累積／目標</div>
-      <div class="sc-val" style="color:var(--accent-bright)">${opOnline}/${opAccum}/${opTarget}</div>
-      <div class="sc-sub">管理重點</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">⚡ MyCharge 點選</div>
-      <div class="sc-val" style="color:var(--accent-bright)">${myChargeClicked}/${myChargeTagged}</div>
-      <div class="sc-sub">${myChargeRate === '—' ? '—' : myChargeRate + '%'}</div>
-    </div>
-  `;
-
-  // Table 1: Main KPI
-  const cols1 = [
-    {key:'kpi', label:'KPI%', th:80},
-    {key:'rank', label:'公司排名', isRank:true},
-    {key:'early_renew', label:'提前續約(件)', isRaw:true},
-    {key:'rt_close_num', label:'RT締結分子', isRaw:true},
-    {key:'rt_close_den', label:'RT締結分母', isRaw:true},
-    {key:'rt_close_pct', label:'RT締結率%', th:80},
-    {key:'insurance_num', label:'保險分子', isRaw:true},
-    {key:'insurance_den', label:'保險分母', isRaw:true},
-    {key:'insurance_pct', label:'保險搭售率%', th:70},
-    {key:'5g', label:'5G銷售(筆)', isRaw:true},
-    {key:'aq_ttl', label:'AQ上線(筆)', isRaw:true},
-    {key:'aq999', label:'AQ V+D 999(筆)', isRaw:true},
-    {key:'aq1399', label:'AQ V+D 1399(筆)', isRaw:true},
-    {key:'rt_pts', label:'RT上線(筆)', isRaw:true},
-    {key:'special_renew', label:'特殊維繫(筆)', isRaw:true},
-    {key:'premium_renew', label:'高高特維(筆)', isRaw:true},
-    {key:'rt999', label:'RT V+D 999(筆)', isRaw:true},
-    {key:'rt1399', label:'RT V+D 1399(筆)', isRaw:true},
-    {key:'haosu', label:'好速銷售(筆)', isRaw:true},
-  ];
-  renderSummaryTable('summaryTable1', date, sumSeg, cols1);
-
-  // Table 2: Hang
-  const cols2 = [
-    {key:'acc', label:'配件(元)', isRaw:true},
-    {key:'film', label:'包膜保貼(筆)', isRaw:true},
-    {key:'insurance', label:'手機保險(筆)', isRaw:true},
-    {key:'myvideo', label:'MyVideo(筆)', isRaw:true},
-    {key:'apple_google', label:'Apple/Google(筆)', isRaw:true},
-    {key:'hbo', label:'HBO(筆)', isRaw:true},
-    {key:'netflix', label:'Netflix(筆)', isRaw:true},
-  ];
-  renderSummaryTable('summaryTable2', date, sumSeg, cols2);
-
-  // Table 3: 管理重點
-  const cols3 = [
-    {key:'management.op_online', label:'OP上線', isRaw:true},
-    {key:'management.op_accum', label:'OP累積', isRaw:true},
-    {key:'management.op_target', label:'OP目標', isRaw:true},
-    {key:'management.mycharge_clicked', label:'MyCharge已點選', isRaw:true},
-    {key:'management.mycharge_tagged', label:'今日貼標數', isRaw:true},
-    {key:'management.mycharge_pct', label:'MyCharge點選率%', th:0}
-  ];
-  renderSummaryTable('summaryTable3', date, sumSeg, cols3);
-
-  // 零報說明彙整（21:00）
-  // 舊零報區塊已由「店點零報說明」取代，避免重複顯示
-  const _zrEl = document.getElementById('zeroReportSection');
-  if (_zrEl) _zrEl.style.display = 'none';
-  // 整合：店點回報 + 個人明細
-  renderStorePersonalDetail(date, sumSeg, dayCache);
-  // 個人未過關彙整（舊）
-  document.getElementById('personalFailSummarySection').style.display = 'none';
+  return getDailySummaryController().refresh();
 }
 
 function renderZeroReportSection(date, seg, dayCache) {
