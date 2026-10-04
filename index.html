@@ -1539,6 +1539,8 @@
     #panel-personal .form-grid { grid-template-columns:minmax(0,1fr) !important; }
   }
 </style>
+<link rel="stylesheet" href="daily-report-layout.css?v=20261004-layout-1">
+<script src="daily-report-layout.js?v=20261004-layout-1" defer></script>
 </head>
 <body>
 
@@ -2831,6 +2833,7 @@ function validateClosingReportForm(data, seg, date) {
     error.hidden = issues.length === 0;
     error.textContent = issues.length ? '請補齊或修正：' + issues.map(issue => issue.label).join('、') + '。沒有成交請填 0，空白不代表 0。' : '';
   }
+  globalThis.DailyReportLayout?.showClosingIssues(issues);
   if (!issues.length) return true;
   showToast('⚠️ 回報尚未送出，請補齊必填欄位');
   document.getElementById('f_' + issues[0].key)?.focus();
@@ -3734,6 +3737,8 @@ function selectStore(store) {
   sub.textContent = `${icons[store]||'🏪'} ${store} · 目前選擇 ${currentSeg}:00 時段`;
 
   const date = document.getElementById('fillDate').value;
+  const selectedSeg = currentSeg;
+  globalThis.DailyReportLayout?.onSelectionStart(store, date, selectedSeg);
   const isNew = NEW_STORES.includes(store);
   if (isNew) showToast(`🚀 ${store} 新店！6/25 起營業`);
 
@@ -3742,7 +3747,7 @@ function selectStore(store) {
     getData(date, store, currentSeg),
     Number(currentSeg) === 21 ? getData(date, store, 16) : Promise.resolve(null)
   ]).then(([data, afternoon]) => {
-    if (document.getElementById('fillDate').value !== date || document.getElementById('fillStore').value !== store) return;
+    if (document.getElementById('fillDate').value !== date || document.getElementById('fillStore').value !== store || currentSeg !== selectedSeg) return;
     FIELDS.forEach(f => {
       const el = document.getElementById('f_' + f);
       if (!el) return;
@@ -3762,6 +3767,7 @@ function selectStore(store) {
     });
     renderManagementFocusInputs(managementFocusData(data));
     updateFilledSummary(data || afternoon);
+    globalThis.DailyReportLayout?.onStoreLoaded(store, date, selectedSeg, data, afternoon);
   });
 
   // 更新隱藏 select（相容舊邏輯）
@@ -3857,6 +3863,7 @@ function clearForm() {
   });
   renderManagementFocusInputs({});
   document.getElementById('filledSummary').classList.remove('show');
+  globalThis.DailyReportLayout?.onClear();
   showToast('🗑️ 已清除');
 }
 
@@ -4206,8 +4213,14 @@ async function _doSave(store, date, data) {
 // 21:00 零報說明 Modal
 // ════════════════════════════════════
 function openZeroModal(store) {
+  if (globalThis.DailyReportLayout?.showZeroDetails(store)) return;
   const m = document.getElementById('underModal');
   document.getElementById('underModalTitle').textContent = `📋 ${store} 21:00 零報說明（必填）`;
+  renderZeroReportInputs();
+  m.style.display = 'flex';
+}
+
+function renderZeroReportInputs() {
   document.getElementById('underForms').innerHTML = `
     <div class="zero-field-group">
       <label class="zero-label">① 未開市原因 <span style="color:#ef4444">*</span></label>
@@ -4231,7 +4244,6 @@ function openZeroModal(store) {
     document.getElementById(id).addEventListener('input', _updateZeroSubmitBtn);
   });
   _updateZeroSubmitBtn();
-  m.style.display = 'flex';
 }
 
 function _updateZeroSubmitBtn() {

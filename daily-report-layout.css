@@ -1,0 +1,95 @@
+/* Scoped to the daily fill panel; dashboards, access screens and personal reports retain their styling. */
+#panel-fill.daily-layout-ready { max-width:1180px; margin:auto; padding:20px 24px 130px; color:#172435; }
+#panel-fill.daily-layout-ready .fill-hero { display:none; }
+#panel-fill.daily-layout-ready [hidden] { display:none !important; }
+#panel-fill .daily-section, #panel-fill .daily-context { background:#fff; border:1px solid #d6dde4; border-radius:13px; padding:20px; margin-bottom:18px; min-width:0; }
+#panel-fill .daily-context-row { display:grid; grid-template-columns:1fr 1fr 1.45fr; gap:18px; align-items:end; }
+#panel-fill .daily-context label { display:block; font-size:16px; font-weight:700; margin-bottom:6px; }
+#panel-fill .daily-store-toggle { width:100%; display:flex; align-items:center; justify-content:space-between; min-height:50px; background:white; border:1px solid #aebbc7; border-radius:8px; padding:9px 12px; font:inherit; font-weight:700; cursor:pointer; }
+#panel-fill .daily-store-toggle span:last-child { font-size:15px; color:#b74700; }
+#panel-fill.daily-layout-ready #fillDate { width:100%; min-width:0; max-width:100%; min-height:50px; margin:0 !important; font-size:18px !important; color:#172435; border-color:#aebbc7; padding:8px 12px; }
+#panel-fill.daily-layout-ready .seg-cards { margin:0; display:flex; gap:6px; padding:4px; border:1px solid #d6dde4; border-radius:10px; }
+#panel-fill.daily-layout-ready .seg-card { flex:1; min-width:0; padding:7px 8px; min-height:40px; display:flex; align-items:center; justify-content:center; gap:5px; border:0; box-shadow:none; border-radius:7px; }
+#panel-fill.daily-layout-ready .seg-time { font-size:18px; }
+#panel-fill.daily-layout-ready .seg-label { font-size:14px; margin:0; }
+#panel-fill.daily-layout-ready .seg-card.sel-16, #panel-fill.daily-layout-ready .seg-card.sel-21 { background:#fff0df; color:#873600; box-shadow:inset 0 0 0 1px #e7b68e; }
+#panel-fill.daily-layout-ready .store-grid { margin:14px 0 0; gap:8px; }
+#panel-fill.daily-layout-ready .store-card { min-height:48px; padding:10px; font-size:18px; }
+#panel-fill.daily-layout-ready .store-icon, #panel-fill.daily-layout-ready .store-card::after { display:none; }
+#panel-fill .daily-section h2 { display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:21px; line-height:1.4; margin:0 0 8px; }
+#panel-fill .daily-note { font-size:15px; line-height:1.55; color:#526275; margin:0 0 14px; }
+#panel-fill .daily-tag { font-size:14px; color:#873600; background:#fff6ed; border-radius:5px; padding:3px 8px; white-space:nowrap; }
+#panel-fill .daily-columns { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:20px; align-items:start; }
+#panel-fill .daily-column { min-width:0; }
+#panel-fill .daily-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+#panel-fill.daily-layout-ready .kpi-input-wrap { min-width:0; padding:0; position:relative; }
+#panel-fill.daily-layout-ready .kpi-input-wrap label { font-size:17px; margin-bottom:6px; line-height:1.45; text-transform:none; }
+#panel-fill.daily-layout-ready .kpi-input-wrap input { min-height:50px; padding:9px 12px; font-size:21px; border:1px solid #aebbc7; background:#fff; color:#172435; box-sizing:border-box; width:100%; }
+#panel-fill.daily-layout-ready .kpi-input-wrap input[readonly] { background:#f0f4f7 !important; color:#43566a; }
+#panel-fill.daily-layout-ready .ki-icon, #panel-fill.daily-layout-ready .kpi-hot-badge { display:none; }
+#panel-fill.daily-layout-ready .daily-metric { padding:12px 14px; background:#fafbfc; border:1px solid #e0e5ea; border-radius:9px; }
+#panel-fill.daily-layout-ready .daily-metric label { font-size:20px; margin:0; }
+#panel-fill .daily-definition { display:block; font-size:14px; color:#526275; margin-bottom:7px; }
+#panel-fill.daily-layout-ready .daily-metric input { font-size:26px; font-weight:650; }
+#panel-fill .daily-haosu { grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr; gap:4px 15px; align-items:center; background:#fff6ed !important; border-color:#efd0b6 !important; }
+#panel-fill .daily-haosu input { grid-column:2; grid-row:1/3; }
+#panel-fill .daily-haosu .daily-definition { margin:0; }
+#panel-fill .daily-rank { display:grid; grid-template-columns:1fr 1.4fr; gap:0 24px; }
+#panel-fill .daily-rank h2 { grid-column:1; grid-row:1; }
+#panel-fill .daily-rank .daily-note { grid-column:1; grid-row:2; margin:0; }
+#panel-fill .daily-rank .daily-grid { grid-column:2; grid-row:1/3; align-self:center; }
+#panel-fill.daily-layout-ready #f_rank { font-size:27px; font-weight:700; }
+#panel-fill .daily-insurance .kpi-input-wrap:last-child { grid-column:1/-1; }
+#panel-fill .daily-insurance .daily-note { margin:12px 0 0; }
+#panel-fill .daily-management .kpi-section-title { font-size:20px; margin:0 0 8px !important; }
+#panel-fill .daily-management .ks-icon, #panel-fill .daily-management .ks-line { display:none; }
+#panel-fill .daily-management .form-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+#panel-fill .daily-management > div[style*="font-size:12px"] { display:none; }
+#panel-fill .daily-other { padding:0; }
+#panel-fill .daily-other summary { cursor:pointer; font-size:20px; font-weight:700; padding:18px 20px; }
+#panel-fill .daily-other .daily-grid { padding:0 20px 20px; }
+#panel-fill .daily-zero { border-color:#e5b5ad; }
+#panel-fill .daily-zero textarea { min-height:104px; font-size:17px; background:white; color:#172435; border-color:#aebbc7; width:100%; box-sizing:border-box; }
+#panel-fill .daily-zero .zero-label { font-size:17px; }
+#panel-fill #closingReportError { background:#fff3f1; border:1px solid #e8b4ad; border-radius:9px; padding:15px; }
+#panel-fill #closingReportError a { display:inline-block; margin:6px 12px 0 0; color:#b42318; font-size:16px; }
+#panel-fill.daily-layout-ready input[aria-invalid=true] { border:2px solid #b42318; }
+#panel-fill .daily-submit-bar { position:fixed; z-index:100; bottom:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center; gap:14px; background:white; border-top:1px solid #d6dde4; padding:12px max(24px,calc((100vw - 1132px)/2)); padding-bottom:calc(12px + env(safe-area-inset-bottom)); }
+#panel-fill .daily-submit-bar strong { display:block; font-size:16px; }
+#panel-fill .daily-submit-bar small { display:block; font-size:13px; color:#526275; }
+#panel-fill .daily-submit-bar .btn-save-main { width:auto; min-width:150px; min-height:52px; padding:10px 25px; font-size:19px; background:#b74700; box-shadow:none; margin:0; }
+#panel-fill .daily-submit-bar .btn-save-main:disabled { opacity:.5; cursor:wait; }
+#panel-fill .daily-submit-bar.daily-keyboard-open { position:static; padding:12px; margin-top:14px; border-radius:9px; }
+#panel-fill.daily-layout-ready :is(input,textarea,button,summary,[role=button],a):focus-visible { outline:3px solid #2076b8; outline-offset:3px; }
+#panel-fill.daily-layout-ready :is(input,textarea) { scroll-margin:110px 0; }
+@media(max-width:760px) {
+  /* Keep every existing destination reachable while making room for ranking on the fill screen. */
+  body:has(#panel-fill.daily-layout-ready.active) .tab-bar { flex-wrap:nowrap; overflow-x:auto; }
+  body:has(#panel-fill.daily-layout-ready.active) .tab-btn { flex:0 0 auto; min-height:48px; padding:9px 12px; white-space:nowrap; font-size:16px; }
+  body:has(#panel-fill.daily-layout-ready.active) .tab-icon { font-size:20px; }
+  #panel-fill.daily-layout-ready { padding:14px 14px 125px; }
+  #panel-fill .daily-section, #panel-fill .daily-context { padding:16px; margin-bottom:14px; }
+  #panel-fill .daily-context-row { grid-template-columns:1fr 1fr; gap:10px 12px; }
+  #panel-fill .daily-context-row>div:last-child { grid-column:1/-1; }
+  #panel-fill.daily-layout-ready #fillDate { font-size:17px !important; padding:8px; }
+  #panel-fill.daily-layout-ready .seg-time { font-size:17px; }
+  #panel-fill.daily-layout-ready .seg-label { font-size:13px; }
+  #panel-fill .daily-rank { display:block; }
+  #panel-fill .daily-rank .daily-note { margin-bottom:13px; }
+  #panel-fill .daily-columns { display:flex; flex-direction:column; gap:0; }
+  #panel-fill .daily-column { width:100%; }
+  #panel-fill .daily-grid { gap:10px 12px; }
+  #panel-fill.daily-layout-ready .daily-metric { padding:8px 10px; }
+  #panel-fill.daily-layout-ready .daily-metric input { font-size:25px; line-height:1.2; padding:8px 10px; }
+  #panel-fill .daily-definition { font-size:13px; }
+  #panel-fill .daily-section h2 { font-size:20px; }
+  #panel-fill.daily-layout-ready .kpi-input-wrap label { font-size:16px; }
+  #panel-fill.daily-layout-ready .daily-metric label { font-size:20px; }
+  #panel-fill .daily-other { padding:0; }
+  #panel-fill .daily-other summary { font-size:19px; padding:16px; }
+  #panel-fill .daily-other .daily-grid { padding:0 16px 16px; }
+  #panel-fill .daily-submit-bar { padding:11px 14px; padding-bottom:calc(11px + env(safe-area-inset-bottom)); gap:8px; }
+  #panel-fill .daily-submit-bar strong { font-size:15px; }
+  #panel-fill .daily-submit-bar small { font-size:12px; }
+  #panel-fill .daily-submit-bar .btn-save-main { min-width:124px; padding:10px 14px; font-size:17px; }
+}
