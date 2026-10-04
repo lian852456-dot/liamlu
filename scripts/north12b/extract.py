@@ -278,6 +278,17 @@ daily={"summary":summary,
                "previousCoreAsOf":previous_asof,"sameMonthDod":same_month,"previousBaselineValid":previous_baseline_valid,"dodNote":"同月且兩次都有有效來源才比較；前日無資料時暫不比較",
                "goodspeed":{"companyActual":company_actual,"companyTarget":company_target,"companyRate":company_rate,
                             "sourceExcludedCount":len(excluded),"excludedCount":len(excluded),"excludedPoints":sum(float(r[30] or 0) for r in excluded)}}}
+from sales_metrics import build_sales_metrics
+sales_book=dict(cur_book)
+vk_sources=[]
+for vk_path in json.loads(os.environ.get('VK_SOURCE_PATHS','[]')):
+    vk_path=Path(vk_path)
+    vk_sources.append({'file':vk_path.name,'sha256':hashlib.sha256(vk_path.read_bytes()).hexdigest()})
+    for sheet,data in values_book(vk_path).items():
+        sales_book[f'{vk_path.name}/{sheet}']=data
+sales_metrics = build_sales_metrics(sales_book, cur_stores, asof)
+sales_metrics['additional_sources']=vk_sources
+daily['salesMetrics'] = sales_metrics
 json.dump(daily,open(OUT/'daily-kpi-data.json','w'),ensure_ascii=False)
 
 # Closure audit.
