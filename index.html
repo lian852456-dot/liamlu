@@ -1539,6 +1539,8 @@
     #panel-personal .form-grid { grid-template-columns:minmax(0,1fr) !important; }
   }
 </style>
+<link rel="stylesheet" href="daily-report-layout.css?v=20261004-layout-3">
+<script src="daily-report-layout.js?v=20261004-layout-3" defer></script>
 </head>
 <body>
 
@@ -2247,6 +2249,7 @@ if (savedGasUrl !== GAS_URL) localStorage.setItem('bei12b_gas_url', GAS_URL);
 
 // 記憶體快取（避免重複拉資料）
 const _cache = {};
+const _cacheReadGeneration = {};
 function cacheKey(date, seg) { return `${date}_${seg}`; }
 function shadowKey(date, seg) { return `bei12b_shadow_${date}_${seg}`; }
 
@@ -2327,15 +2330,16 @@ async function requestGasJson(url) {
 
 async function fetchDayData(date, seg) {
   const ck = cacheKey(date, seg);
+  const generation = _cacheReadGeneration[ck] = (_cacheReadGeneration[ck] || 0) + 1;
   const localShadow = readLocalShadow(date, seg);
   if (!GAS_URL) { _cache[ck] = {}; return; }
   try {
     const json = await privateDashboardPost({ action: 'read', date, seg });
     if (!json || json.status !== 'ok') throw new Error((json && json.message) || '讀取失敗');
-    _cache[ck] = mergeDayData(json.data || {}, localShadow);
+    if (_cacheReadGeneration[ck] === generation) _cache[ck] = mergeDayData(json.data || {}, localShadow);
   } catch(e) {
     console.error('fetchDayData error', e);
-    _cache[ck] = mergeDayData({}, localShadow);
+    if (_cacheReadGeneration[ck] === generation) _cache[ck] = mergeDayData({}, localShadow);
   }
 }
 
@@ -2364,6 +2368,7 @@ async function saveToStorage(date, store, seg, data) {
   // 只有同一端點確認 rowWritten + readback 後，才更新本機 shadow/cache。
   writeLocalShadow(date, store, seg, data);
   const ck = cacheKey(date, seg);
+  if (typeof _cacheReadGeneration !== 'undefined') _cacheReadGeneration[ck] = (_cacheReadGeneration[ck] || 0) + 1;
   if (!_cache[ck]) _cache[ck] = {};
   _cache[ck][store] = { ...data, date, store, seg };
   return true;
@@ -2408,9 +2413,9 @@ window.onload = async () => {
   document.getElementById('fillDate').value = td;
   renderManagementFocusInputs({});
   document.getElementById('fillDate').addEventListener('change', () => {
-    renderManagementFocusInputs({});
     const store = document.getElementById('fillStore').value;
     if (store) selectStore(store);
+    else renderManagementFocusInputs({});
   });
   document.getElementById('playbackDate').value = td;
   document.getElementById('todayBadge').textContent = '📅 ' + td;
@@ -2831,6 +2836,7 @@ function validateClosingReportForm(data, seg, date) {
     error.hidden = issues.length === 0;
     error.textContent = issues.length ? '請補齊或修正：' + issues.map(issue => issue.label).join('、') + '。沒有成交請填 0，空白不代表 0。' : '';
   }
+  globalThis.DailyReportLayout?.showClosingIssues(issues);
   if (!issues.length) return true;
   showToast('⚠️ 回報尚未送出，請補齊必填欄位');
   document.getElementById('f_' + issues[0].key)?.focus();
@@ -3722,7 +3728,9 @@ async function renderPerf() {
 // ════════════════════════════════════
 // 填報 UI - 門市選擇
 // ════════════════════════════════════
+let fillSelectionGeneration = 0;
 function selectStore(store) {
+  const selectionGeneration = ++fillSelectionGeneration;
   document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
   const card = document.querySelector(`.store-card[data-store="${store}"]`);
   if (card) card.classList.add('selected');
@@ -3734,6 +3742,9 @@ function selectStore(store) {
   sub.textContent = `${icons[store]||'🏪'} ${store} · 目前選擇 ${currentSeg}:00 時段`;
 
   const date = document.getElementById('fillDate').value;
+  const selectedSeg = currentSeg;
+  updateFilledSummary(null);
+  globalThis.DailyReportLayout?.onSelectionStart(store, date, selectedSeg);
   const isNew = NEW_STORES.includes(store);
   if (isNew) showToast(`🚀 ${store} 新店！6/25 起營業`);
 
@@ -3742,26 +3753,26 @@ function selectStore(store) {
     getData(date, store, currentSeg),
     Number(currentSeg) === 21 ? getData(date, store, 16) : Promise.resolve(null)
   ]).then(([data, afternoon]) => {
-    if (document.getElementById('fillDate').value !== date || document.getElementById('fillStore').value !== store) return;
+    if (selectionGeneration !== fillSelectionGeneration || document.getElementById('fillDate').value !== date || document.getElementById('fillStore').value !== store || currentSeg !== selectedSeg) return;
     FIELDS.forEach(f => {
       const el = document.getElementById('f_' + f);
       if (!el) return;
-      const inherited = Number(currentSeg) === 21 && CARRY_FROM_16_FIELDS.includes(f) && afternoon;
-      const value = data && data[f] !== null && data[f] !== undefined && data[f] !== ''
-        ? data[f] : inherited ? (afternoon[f] ?? '') : '';
-      el.value = value;
       const locked = Number(currentSeg) === 21 && CARRY_FROM_16_FIELDS.includes(f);
+      const source = locked ? afternoon : data;
+      const value = source && source[f] !== null && source[f] !== undefined && source[f] !== '' ? source[f] : '';
+      el.value = value;
       el.readOnly = locked;
       if (locked) {
         el.style.background = 'rgba(249,115,22,0.08)';
-        el.title = '自動沿用 16:00 回報';
+        el.title = value === '' ? '同店同日 16:00 尚缺此欄；晚間保持空白並鎖定' : '自動沿用同店同日已保存的 16:00 回報';
       } else {
         el.style.background = '';
         el.title = '';
       }
     });
     renderManagementFocusInputs(managementFocusData(data));
-    updateFilledSummary(data || afternoon);
+    updateFilledSummary(data);
+    globalThis.DailyReportLayout?.onStoreLoaded(store, date, selectedSeg, data, afternoon);
   });
 
   // 更新隱藏 select（相容舊邏輯）
@@ -3857,6 +3868,7 @@ function clearForm() {
   });
   renderManagementFocusInputs({});
   document.getElementById('filledSummary').classList.remove('show');
+  globalThis.DailyReportLayout?.onClear();
   showToast('🗑️ 已清除');
 }
 
@@ -4169,12 +4181,14 @@ async function saveData() {
 }
 
 async function _doSave(store, date, data) {
+  const seg = currentSeg;
+  const saveToken = globalThis.DailyReportLayout?.beginSave(store, date, seg);
   showToast('🔄 上傳中…');
   try {
-    const ok = await saveToStorage(date, store, currentSeg, data);
+    const ok = await saveToStorage(date, store, seg, data);
     if (ok) {
-      showToast(`✅ ${store} ${currentSeg}:00 已儲存`);
-      updateFilledSummary(data);
+      showToast(`✅ ${store} ${seg}:00 已儲存`);
+      if (!globalThis.DailyReportLayout || globalThis.DailyReportLayout.onSaveSucceeded(saveToken)) updateFilledSummary(data);
 
       const achievements = [];
       if (data.kpi && parseFloat(data.kpi) >= 100) achievements.push('KPI');
@@ -4192,7 +4206,7 @@ async function _doSave(store, date, data) {
       const personalName = document.getElementById('personalName')?.value || '';
       if (personalName) {
         const delay = achievements.length > 0 ? 3000 : 600;
-        setTimeout(() => triggerReviewModal(store, personalName, date, currentSeg, data), delay);
+        setTimeout(() => triggerReviewModal(store, personalName, date, seg, data), delay);
       }
     } else {
       showToast('❌ 儲存失敗，請檢查連線');
@@ -4206,8 +4220,14 @@ async function _doSave(store, date, data) {
 // 21:00 零報說明 Modal
 // ════════════════════════════════════
 function openZeroModal(store) {
+  if (globalThis.DailyReportLayout?.showZeroDetails(store)) return;
   const m = document.getElementById('underModal');
   document.getElementById('underModalTitle').textContent = `📋 ${store} 21:00 零報說明（必填）`;
+  renderZeroReportInputs();
+  m.style.display = 'flex';
+}
+
+function renderZeroReportInputs() {
   document.getElementById('underForms').innerHTML = `
     <div class="zero-field-group">
       <label class="zero-label">① 未開市原因 <span style="color:#ef4444">*</span></label>
@@ -4231,7 +4251,6 @@ function openZeroModal(store) {
     document.getElementById(id).addEventListener('input', _updateZeroSubmitBtn);
   });
   _updateZeroSubmitBtn();
-  m.style.display = 'flex';
 }
 
 function _updateZeroSubmitBtn() {
