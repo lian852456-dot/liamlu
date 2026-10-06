@@ -3,6 +3,7 @@
   'use strict';
   function create({getEndpoint, getContext, post, timeoutMs = 30000}) {
     const pending = new Map();
+    let isolatedSequence = 0;
     const cancelled = () => new DOMException('讀取已取消，請重新讀取。', 'AbortError');
     function finish(entry, error, value) {
       if (entry.done) return;
@@ -22,19 +23,19 @@
     }
     function invalidate({date, seg} = {}) {
       for (const entry of [...pending.values()]) {
-        if (date === undefined || (entry.payload.date === date && Number(entry.payload.seg) === Number(seg))) stop(entry);
+        if (date === undefined || (!entry.isolated && entry.payload.date === date && Number(entry.payload.seg) === Number(seg))) stop(entry);
       }
     }
-    function read(payload, {signal, force = false} = {}) {
+    function read(payload, {signal, force = false, isolated = false} = {}) {
       if (!['read', 'pread'].includes(payload.action)) return Promise.reject(new Error('只允許資料讀取'));
       if (signal?.aborted) return Promise.reject(cancelled());
       payload = JSON.parse(JSON.stringify(payload));
       const context = getContext(), endpoint = getEndpoint();
-      const key = JSON.stringify([endpoint, context, Object.keys(payload).sort().map(key => [key, payload[key]])]);
+      const key = JSON.stringify([endpoint, context, Object.keys(payload).sort().map(key => [key, payload[key]]), isolated ? ++isolatedSequence : null]);
       let entry = pending.get(key);
       if (entry && force) { stop(entry); entry = null; }
       if (!entry) {
-        entry = {key, context, payload:{...payload}, consumers:new Set(), controller:new AbortController(), done:false};
+        entry = {key, context, isolated, payload:{...payload}, consumers:new Set(), controller:new AbortController(), done:false};
         pending.set(key, entry);
         entry.timer = setTimeout(() => {
           const error = new Error('讀取超過 30 秒，請稍後手動重新讀取。');

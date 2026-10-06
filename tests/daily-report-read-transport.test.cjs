@@ -49,3 +49,19 @@ test('write invalidation is scoped to date/segment; unrelated pending reads surv
 test('caller payload changes cannot change a dispatched read into a write',async()=>{
  const h=setup(),payload=read(),p=h.api.read(payload);payload.action='write';await tick();assert.equal(h.calls[0].payload.action,'read');h.calls[0].resolve({status:'ok',data:{}});await p;
 });
+
+test('isolated save verification survives panel force retry and scoped mutation invalidation, but not logout', async () => {
+  const file=require('node:path').join(__dirname,'../daily-report-read-transport.js');
+  const context={DOMException,AbortController,setTimeout,clearTimeout};require('node:vm').runInNewContext(require('node:fs').readFileSync(file,'utf8'),context);
+  const calls=[];let auth=0;
+  const broker=context.DailyReportReadTransport.create({getEndpoint:()=> 'synthetic',getContext:()=>auth,post:(payload,signal)=>new Promise(resolve=>calls.push({payload,signal,resolve}))});
+  const payload={action:'read',date:'2099-10-02',seg:21};
+  const verification=broker.read(payload,{isolated:true});
+  const panel=broker.read(payload).catch(e=>e.name);
+  await Promise.resolve();
+  const retry=broker.read(payload,{force:true}).catch(e=>e.name);
+  await Promise.resolve();broker.invalidate({date:payload.date,seg:payload.seg});
+  assert.equal(await panel,'AbortError');assert.equal(await retry,'AbortError');assert.equal(calls[0].signal.aborted,false);
+  calls[0].resolve({status:'ok',data:{}});assert.equal((await verification).status,'ok');
+  const after=broker.read(payload,{isolated:true}).catch(e=>e.name);await Promise.resolve();auth++;broker.invalidate();assert.equal(await after,'AbortError');
+});
