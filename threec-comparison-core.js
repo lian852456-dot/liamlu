@@ -79,7 +79,9 @@
   // Default option lists remain compatible; the query UI can skip unused catalog sorts.
   function buildView(index,filters={},viewOptions={}){
     const query=text(filters.query).toLocaleLowerCase();
-    const rows=scopeRows(index,filters).filter(row=>(!filters.brand||row.brand===filters.brand)&&(!filters.model||row.model===filters.model)&&(!filters.capacity||row.capacity===filters.capacity)&&(!query||[row.brand,row.model,row.capacity,row.ram,row.sourceSheet,...row.models,...row.codes,...Object.keys(row.prices)].join(' ').toLocaleLowerCase().includes(query)));
+    // Accept compact model names such as iphone17 without joining unrelated fields.
+    const modelQuery=query.replace(/\s+/g,'');
+    const rows=scopeRows(index,filters).filter(row=>(!filters.brand||row.brand===filters.brand)&&(!filters.model||row.model===filters.model)&&(!filters.capacity||row.capacity===filters.capacity)&&(!query||[row.brand,row.model,row.capacity,row.ram,row.sourceSheet,...row.models,...row.codes,...Object.keys(row.prices)].join(' ').toLocaleLowerCase().includes(query)||[row.model,...row.models].some(model=>model.toLocaleLowerCase().replace(/\s+/g,'').includes(modelQuery))));
     const keys=new Set(rows.flatMap(row=>Object.keys(row.prices)));
     const columns=selectColumns(scopeColumns(index.columns,filters).filter(col=>keys.has(col.key)&&(filters.segment!=='enterprise'||rows.some(row=>hasQuote(row,col)))),filters);
     const matching=rows.filter(row=>columns.some(col=>filters.segment==='enterprise'?hasQuote(row,col):Object.prototype.hasOwnProperty.call(row.prices,col.key)));
