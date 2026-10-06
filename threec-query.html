@@ -154,7 +154,19 @@
   function shoppingFilters(){return {segment:shoppingSegment,query:$('shoppingSearch').value,brand:$('shoppingBrand').value,model:$('shoppingModel').value,capacity:$('shoppingCapacity').value,project:$('shoppingProject').value,version:$('shoppingVersion').value,rent:$('shoppingRent').value,term:$('shoppingTerm').value,rowPage,columnPage};}
   function setShoppingSegment(segment){shoppingSegment=segment;$('consumerSegmentBtn').setAttribute('aria-pressed',String(segment==='consumer'));$('enterpriseSegmentBtn').setAttribute('aria-pressed',String(segment==='enterprise'));$('shoppingSectionTitle').textContent=segment==='enterprise'?'企業用戶專區':'一般手機方案';$('shoppingSectionDescription').textContent=segment==='enterprise'?'僅顯示所選機款原表有報價的企業、員工及眷屬方案；資格與申辦條件請開啟「完整原表條件」核對。':'一般申辦方案；企業、員工與眷屬優惠請切換「企業用戶專區」。';['shoppingProject','shoppingVersion','shoppingTerm'].forEach(id=>$(id).value='');$('shoppingRent').value=segment==='enterprise'?'':'common';rowPage=0;columnPage=0;renderKind('shopping');}
   function fillSelect(id,values,label){const select=$(id),prior=select.value;select.innerHTML=(id==='shoppingRent'?'<option value="common">999＋1399</option>':'')+`<option value="">${esc(label)}</option>`+values.map(value=>`<option value="${esc(value)}">${esc(value)}${id==='shoppingRent'?' 元':id==='shoppingTerm'?' 期':''}</option>`).join('');select.value=(prior==='common'&&id==='shoppingRent')||values.includes(prior)?prior:'';}
-  function updateShoppingOptions(){if(!shoppingIndex)return;const fields=[['shoppingBrand','brands','全部品牌'],['shoppingModel','models','全部機款'],['shoppingCapacity','capacities','全部容量'],['shoppingProject','projects','全部專案'],['shoppingVersion','versions','一般／VIP／加碼'],['shoppingRent','rents','全部月租'],['shoppingTerm','terms','全部期數']];fields.forEach(([id,key,label])=>fillSelect(id,Compare.options(shoppingIndex,shoppingFilters())[key],label));}
+  function updateShoppingOptions(){
+    if(!shoppingIndex)return;
+    const fields=[['shoppingBrand','brands','全部品牌'],['shoppingModel','models','全部機款'],['shoppingCapacity','capacities','全部容量'],['shoppingProject','projects','全部專案'],['shoppingVersion','versions','一般／VIP／加碼'],['shoppingRent','rents','全部月租'],['shoppingTerm','terms','全部期數']];
+    // Reuse options within this update; invalid selections still reset in order.
+    const optionSets=new Map();
+    fields.forEach(([id,key,label])=>{
+      const filters=shoppingFilters();
+      const signature=JSON.stringify(filters);
+      let options=optionSets.get(signature);
+      if(!options){options=Compare.options(shoppingIndex,filters);optionSets.set(signature,options);}
+      fillSelect(id,options[key],label);
+    });
+  }
   function columnLabel(col){return `${col.rent?col.rent+' 元':'月租未標示'} · ${col.term?col.term+'期':'期數未標示'} · ${col.version}${col.detail?' · '+col.detail:''}`;}
   function columnHtml(col){return `<span class="rent-label">${esc(col.rent?col.rent+' 元':'月租未標示')}</span><span>${esc(col.term?col.term+' 期':'期數未標示')} · ${esc(col.version)}</span>${col.detail?`<span class="condition-detail">${esc(col.detail)}</span>`:''}<details><summary>完整條件</summary><span class="raw-condition">${esc(col.raw)}</span></details>`;}
   function variantLabel(row){const names=row.models.map(model=>{const matches=Array.from(model.matchAll(/(?:[-_(\s])(宇宙橙|勃根地紅|午夜|星光|太空灰|黑色?|白色?|藍色?|粉色?|黃色?|綠色?|紫色?|銀色?|金色?)(?=[)\s]|$)/g));return matches.length?matches[matches.length-1][1]:'';}).filter(Boolean);return Array.from(new Set(names)).join('／');}
