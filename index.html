@@ -1541,7 +1541,7 @@
 </style>
 <link rel="stylesheet" href="daily-report-layout.css?v=20261004-layout-3">
 <link rel="stylesheet" href="daily-report-summary.css?v=20261004-summary-1">
-<script src="daily-report-layout.js?v=20261004-layout-3" defer></script>
+<script src="daily-report-layout.js?v=20261006-read-1" defer></script>
 </head>
 <body>
 
@@ -2163,7 +2163,8 @@
 
 
 <script src="daily-report-summary-model.js?v=20261005-google-magazine-1"></script>
-<script src="daily-report-summary-controller.js?v=20261004-summary-1"></script>
+<script src="daily-report-summary-controller.js?v=20261006-read-1"></script>
+<script src="daily-report-read-transport.js?v=20261006-read-1"></script>
 <script src="kpi-battle-controller.js?v=20261002-logout-2"></script>
 <script src="award-model-catalog.js?v=20261001-1"></script>
 <script src="awards-battle-controller.js?v=20261003-publication-date-1"></script>
@@ -2225,6 +2226,28 @@ if (savedGasUrl !== GAS_URL) localStorage.setItem('bei12b_gas_url', GAS_URL);
 // 記憶體快取（避免重複拉資料）
 const _cache = {};
 const _cacheReadGeneration = {};
+let dailyReportReadContext = 0;
+let playbackReadGeneration = 0, perfReadGeneration = 0;
+function invalidateDailyReportReads(date, seg) {
+  dailyReportReads.invalidate(date ? {date, seg} : undefined);
+  const keys = date ? [cacheKey(date, seg)] : Object.keys(_cacheReadGeneration);
+  for (const key of keys) {
+    _cacheReadGeneration[key] = (_cacheReadGeneration[key] || 0) + 1;
+    delete _cache[key];
+  }
+  if (!date) Object.keys(_cache).forEach(key => delete _cache[key]);
+}
+for (const name of ['portal-before-logout', 'portal-login-changed']) window.addEventListener(name, () => {
+  dailyReportReadContext++;
+  invalidateDailyReportReads();
+  fillSelectionGeneration++;
+  fillSelectionController?.abort();
+  globalThis.DailyReportLayout?.resetReadContext();
+  playbackReadGeneration++;
+  perfReadGeneration++;
+  document.getElementById('playbackResult')?.replaceChildren();
+  document.getElementById('perfResult')?.replaceChildren();
+});
 function cacheKey(date, seg) { return `${date}_${seg}`; }
 function shadowKey(date, seg) { return `bei12b_shadow_${date}_${seg}`; }
 
@@ -2279,10 +2302,11 @@ function today() {
 }
 
 // ── 讀取：先查快取，再打 GAS
-async function getData(date, store, seg) {
+async function getData(date, store, seg, options) {
   const ck = cacheKey(date, seg);
   if (!_cache[ck]) {
-    await fetchDayData(date, seg);
+    const result = await fetchDayData(date, seg, options);
+    if (result?.error) throw result.error;
   }
   return (_cache[ck] && _cache[ck][store]) ? _cache[ck][store] : null;
 }
@@ -2303,23 +2327,28 @@ async function requestGasJson(url) {
   return privateDashboardPost(payload);
 }
 
-async function fetchDayData(date, seg) {
+async function fetchDayData(date, seg, options) {
   const ck = cacheKey(date, seg);
-  const generation = _cacheReadGeneration[ck] = (_cacheReadGeneration[ck] || 0) + 1;
+  // Shared consumers must not supersede one another. Only auth/write invalidation
+  // advances this generation; the transport cancels superseded physical reads.
+  const generation = _cacheReadGeneration[ck] = (_cacheReadGeneration[ck] || 0);
+  const context = dailyReportReadContext;
+  const endpoint = GAS_URL;
   const localShadow = readLocalShadow(date, seg);
   if (!GAS_URL) { _cache[ck] = {}; return; }
   try {
-    const json = await privateDashboardPost({ action: 'read', date, seg });
+    const json = await privateDashboardPost({ action: 'read', date, seg }, options);
     if (!json || json.status !== 'ok') throw new Error((json && json.message) || '讀取失敗');
-    if (_cacheReadGeneration[ck] === generation) _cache[ck] = mergeDayData(json.data || {}, localShadow);
+    if (context === dailyReportReadContext && endpoint === GAS_URL && !options?.signal?.aborted && _cacheReadGeneration[ck] === generation) _cache[ck] = mergeDayData(json.data || {}, localShadow);
   } catch(e) {
-    console.error('fetchDayData error', e);
-    if (_cacheReadGeneration[ck] === generation) _cache[ck] = mergeDayData({}, localShadow);
+    if (context === dailyReportReadContext && endpoint === GAS_URL && !options?.signal?.aborted && _cacheReadGeneration[ck] === generation) delete _cache[ck];
+    return {error:e};
   }
 }
 
 // ── 寫入到 GAS
 async function saveToStorage(date, store, seg, data) {
+  const readContext = typeof dailyReportReadContext === 'undefined' ? null : dailyReportReadContext;
   if (!GAS_URL) {
     showToast('⚠️ 尚未設定 Apps Script 網址');
     return false;
@@ -2328,6 +2357,7 @@ async function saveToStorage(date, store, seg, data) {
   if (issues.length) throw new Error('請補齊或修正：' + issues.map(issue => issue.label).join('、'));
   // 先取得正式端點的可驗證回應；在伺服器讀回前，不寫 local shadow，也不顯示成功。
   const result = await privateDashboardPost({ action: 'write', date, store, seg, data });
+  if (readContext !== null && readContext !== dailyReportReadContext) throw new DOMException('登入狀態已變更，請重新讀回確認。', 'AbortError');
   const responseValid = result && result.status === 'ok' && result.rowWritten === true &&
     typeof result.spreadsheetId === 'string' && result.spreadsheetId.length > 0 &&
     String(result.date) === String(date) && Number(result.seg) === Number(seg) &&
@@ -2341,6 +2371,7 @@ async function saveToStorage(date, store, seg, data) {
   }
 
   // 只有同一端點確認 rowWritten + readback 後，才更新本機 shadow/cache。
+  if (readContext !== null && readContext !== dailyReportReadContext) throw new DOMException('登入狀態已變更，請重新讀回確認。', 'AbortError');
   writeLocalShadow(date, store, seg, data);
   const ck = cacheKey(date, seg);
   if (typeof _cacheReadGeneration !== 'undefined') _cacheReadGeneration[ck] = (_cacheReadGeneration[ck] || 0) + 1;
@@ -2396,11 +2427,7 @@ window.onload = async () => {
   document.getElementById('todayBadge').textContent = '📅 ' + td;
   document.getElementById('summaryDateLabel').textContent = td;
   updateConnectionBadge();
-  if (GAS_URL) {
-    await fetchDayData(td, 16);
-    await fetchDayData(td, 21);
-  }
-  renderSummary();
+  // Read after selecting a store or entering a data panel, never preload hidden panels.
   updateMarquee();
   setInterval(updateMarquee, 60000);
 };
@@ -2481,10 +2508,9 @@ async function saveSettings() {
       updateConnectionBadge();
       closeSettings();
       showToast('✅ 連線成功！Google Sheets 已串接');
-      const td = today();
-      await fetchDayData(td, 16);
-      await fetchDayData(td, 21);
-      renderSummary();
+      if (document.getElementById('panel-summary').classList.contains('active')) renderSummary();
+      const store = getSelectedStore();
+      if (store && document.getElementById('panel-fill').classList.contains('active')) selectStore(store);
     } else {
       showToast('❌ 連線失敗，請確認網址');
     }
@@ -2505,6 +2531,7 @@ function clearSettings() {
 // TABS
 // ════════════════════════════════════
 function switchTab(name) {
+  if (name !== 'summary') dailySummaryController?.deactivate();
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + name).classList.add('active');
@@ -2535,17 +2562,37 @@ function privateDashboardAllowedGasMessageOrigin(origin) {
   }
 }
 
-async function privateDashboardPost(payload) {
+const dailyReportReads = DailyReportReadTransport.create({
+  getEndpoint:() => GAS_URL,
+  getContext:() => dailyReportReadContext,
+  post:(payload, signal, endpoint) => privateDashboardRequest(payload, signal, endpoint),
+});
+async function privateDashboardPost(payload, options) {
+  globalThis.PortalLogout?.assertActive();
+  if (payload.action === 'read' || payload.action === 'pread') return dailyReportReads.read(payload, options);
+  const mutation = payload.action === 'write' || payload.action === 'pwrite';
+  const context = dailyReportReadContext;
+  if (mutation) invalidateDailyReportReads(payload.date, payload.seg);
+  try {
+    const result = await privateDashboardRequest(payload);
+    if (context !== dailyReportReadContext) throw new DOMException('登入狀態已變更，請重新讀回確認。', 'AbortError');
+    return result;
+  }
+  finally { if (mutation && context === dailyReportReadContext) invalidateDailyReportReads(payload.date, payload.seg); }
+}
+async function privateDashboardRequest(payload, signal, endpoint = GAS_URL) {
   if (!GAS_URL) throw new Error('尚未設定 Apps Script 服務網址');
   let response;
   try {
-    response = await fetch(GAS_URL, {
+    response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload),
       cache: 'no-store',
+      signal,
     });
   } catch (error) {
+    if (signal?.aborted) throw new DOMException('讀取已取消', 'AbortError');
     throw new Error('服務連線失敗，請稍後再試。');
   }
   if (!response.ok) throw new Error(`服務連線失敗（HTTP ${response.status}）`);
@@ -2871,8 +2918,8 @@ let dailySummaryController;
 function getDailySummaryController() {
   if (!dailySummaryController) dailySummaryController = DailyReportSummaryController.create({
     root:document.getElementById('panel-summary'), stores:STORES, today,
-    readDay:(date, seg) => privateDashboardPost({action:'read', date, seg}),
-    readPersonal:(date, seg) => privateDashboardPost({action:'pread', date, seg}),
+    readDay:(date, seg, options) => privateDashboardPost({action:'read', date, seg}, options),
+    readPersonal:(date, seg, options) => privateDashboardPost({action:'pread', date, seg}, options),
     localPersonal:(date, seg) => {
       let index = {};
       try { index = JSON.parse(localStorage.getItem(`pIdx_${date}_${seg}`) || '{}'); } catch (_) {}
@@ -3228,14 +3275,23 @@ function renderSummaryTable(tableId, date, seg, cols) {
 // ════════════════════════════════════
 // PLAYBACK
 // ════════════════════════════════════
+function renderDailyReadFailure(element, error, retry) {
+  element.innerHTML = `<div class="card" style="text-align:center;padding:24px" role="status">
+    <p>${error?.name === 'TimeoutError' ? '讀取超過 30 秒' : '回報資料未取得'}，目前無法確認回報狀態。</p>
+    <button type="button" class="seg-btn" data-daily-read-retry>重新讀取</button></div>`;
+  element.querySelector('[data-daily-read-retry]').addEventListener('click', retry);
+}
 async function renderPlayback() {
   const date = document.getElementById('playbackDate').value;
   if (!date) { showToast('⚠️ 請選擇日期'); return; }
+  const generation = ++playbackReadGeneration, context = dailyReportReadContext, seg = pbSeg;
 
   document.getElementById('playbackResult').innerHTML =
     `<div class="card" style="text-align:center;padding:24px;color:var(--text-muted)">🔄 載入中…</div>`;
 
-  if (GAS_URL) await fetchDayData(date, pbSeg);
+  const result = GAS_URL ? await fetchDayData(date, seg) : {error:new Error('服務未設定')};
+  if (generation !== playbackReadGeneration || context !== dailyReportReadContext || seg !== pbSeg || date !== document.getElementById('playbackDate').value) return;
+  if (result?.error) { renderDailyReadFailure(document.getElementById('playbackResult'), result.error, renderPlayback); return; }
   const ck = cacheKey(date, pbSeg);
   const dayCache = _cache[ck] || {};
   const filled = STORES.filter(s => !!dayCache[s]);
@@ -3467,11 +3523,14 @@ async function renderPerf() {
     if (hour >= 19 || hour < 6) return;
   }
   const date = dateEl.value;
+  const generation = ++perfReadGeneration, context = dailyReportReadContext, seg = perfSeg;
   const el = document.getElementById('perfResult');
   el.innerHTML = `<div class="card" style="text-align:center;padding:24px;color:var(--text-muted)">🔄 載入中…</div>`;
 
   // ── 店點 KPI 達成 ──
-  if (GAS_URL) await fetchDayData(date, perfSeg);
+  const result = GAS_URL ? await fetchDayData(date, seg) : {error:new Error('服務未設定')};
+  if (generation !== perfReadGeneration || context !== dailyReportReadContext || seg !== perfSeg || date !== dateEl.value) return;
+  if (result?.error) { renderDailyReadFailure(el, result.error, renderPerf); return; }
   const dayCache = _cache[cacheKey(date, perfSeg)] || {};
   const storeRows = STORES.map(s => {
     const d = dayCache[s];
@@ -3538,7 +3597,11 @@ async function renderPerf() {
 // 填報 UI - 門市選擇
 // ════════════════════════════════════
 let fillSelectionGeneration = 0;
+let fillSelectionController;
 function selectStore(store) {
+  fillSelectionController?.abort();
+  fillSelectionController = new AbortController();
+  const signal = fillSelectionController.signal;
   const selectionGeneration = ++fillSelectionGeneration;
   document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
   const card = document.querySelector(`.store-card[data-store="${store}"]`);
@@ -3559,8 +3622,8 @@ function selectStore(store) {
 
   // 載入已填資料；21:00 的 KPI 達成率／公司排名固定沿用同日 16:00。
   Promise.all([
-    getData(date, store, currentSeg),
-    Number(currentSeg) === 21 ? getData(date, store, 16) : Promise.resolve(null)
+    getData(date, store, currentSeg, {signal}),
+    Number(currentSeg) === 21 ? getData(date, store, 16, {signal}) : Promise.resolve(null)
   ]).then(([data, afternoon]) => {
     if (selectionGeneration !== fillSelectionGeneration || document.getElementById('fillDate').value !== date || document.getElementById('fillStore').value !== store || currentSeg !== selectedSeg) return;
     FIELDS.forEach(f => {
@@ -3582,6 +3645,9 @@ function selectStore(store) {
     renderManagementFocusInputs(managementFocusData(data));
     updateFilledSummary(data);
     globalThis.DailyReportLayout?.onStoreLoaded(store, date, selectedSeg, data, afternoon);
+  }).catch(error => {
+    if (signal.aborted || selectionGeneration !== fillSelectionGeneration) return;
+    globalThis.DailyReportLayout?.onStoreLoadError(store, date, selectedSeg, error, () => selectStore(store));
   });
 
   // 更新隱藏 select（相容舊邏輯）
@@ -3991,10 +4057,12 @@ async function saveData() {
 
 async function _doSave(store, date, data) {
   const seg = currentSeg;
+  const context = dailyReportReadContext;
   const saveToken = globalThis.DailyReportLayout?.beginSave(store, date, seg);
   showToast('🔄 上傳中…');
   try {
     const ok = await saveToStorage(date, store, seg, data);
+    if (context !== dailyReportReadContext) return;
     if (ok) {
       showToast(`✅ ${store} ${seg}:00 已儲存`);
       if (!globalThis.DailyReportLayout || globalThis.DailyReportLayout.onSaveSucceeded(saveToken)) updateFilledSummary(data);
@@ -4008,19 +4076,20 @@ async function _doSave(store, date, data) {
         achievements.push('ALL');
       }
       if (achievements.length > 0) {
-        setTimeout(() => showCelebModal(achievements), 400);
+        setTimeout(() => { if (context === dailyReportReadContext) showCelebModal(achievements); }, 400);
       }
 
       // 個人檢討單（慶祝彈窗後觸發，或無慶祝時直接觸發）
       const personalName = document.getElementById('personalName')?.value || '';
       if (personalName) {
         const delay = achievements.length > 0 ? 3000 : 600;
-        setTimeout(() => triggerReviewModal(store, personalName, date, seg, data), delay);
+        setTimeout(() => { if (context === dailyReportReadContext) triggerReviewModal(store, personalName, date, seg, data); }, delay);
       }
     } else {
       showToast('❌ 儲存失敗，請檢查連線');
     }
   } catch(e) {
+    if (context !== dailyReportReadContext) return;
     showToast('❌ 錯誤：' + e.message);
   }
 }
