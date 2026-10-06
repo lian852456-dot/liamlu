@@ -154,7 +154,7 @@ test('主站 KPI 改走 controller scoped retry，每日回報 transport 保持�
   const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const createBlock = index.match(/const kpiBattleController = KpiBattleController\.create\(\{([\s\S]*?)\}\);/)?.[1] || '';
   assert.doesNotMatch(createBlock, /post:\s*privateDashboardPost/);
-  assert.match(index, /async function privateDashboardPost\(payload\)/);
+  assert.match(index, /async function privateDashboardPost\(payload, options\)/);
   for (const action of ['read', 'write', 'pread', 'pwrite']) {
     assert.match(index, new RegExp(`privateDashboardPost\\(\\{ action: '${action}'`));
   }

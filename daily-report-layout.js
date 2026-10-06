@@ -169,6 +169,17 @@
   }
 
   window.DailyReportLayout = {
+    resetReadContext() {
+      if (!panel) return;
+      drafts.clear(); edits.clear(); saves.clear(); dirty = false; loading = true;
+      selected = ''; selectedDate = ''; selectedSeg = 16;
+      area.querySelectorAll('input,textarea').forEach(input => {input.value = ''; input.disabled = true;});
+      byId('dailyDraftNote').hidden = true; byId('filledSummary').classList.remove('show');
+      byId('fillStore').value = ''; panel.querySelectorAll('.store-card').forEach(card => card.classList.remove('selected'));
+      panel.querySelector('.store-grid').hidden = false;
+      byId('dailyStoreToggle').setAttribute('aria-expanded', 'true');
+      area.style.display = 'none'; submit.disabled = true;
+    },
     onSelectionStart(store, date, seg) {
       if (!panel) return;
       if (selected && !loading && dirty) drafts.set(draftKey(), snapshot());
@@ -200,6 +211,17 @@
           ? '同店同日首次回報（16:00）尚缺' + missing.map(key => key === 'rank' ? '公司 KPI 排名' : 'KPI 達成率').join('、') + '；晚間保持空白並鎖定，請回 16:00 補填並保存。'
           : '已沿用同店、同日已保存的首次回報（16:00）；晚間排名與 KPI 已鎖定，不用重填。';
       }
+    },
+    onStoreLoadError(store, date, seg, error, retry) {
+      if (!panel || selected !== store || selectedDate !== date || selectedSeg !== Number(seg)) return;
+      const note = byId('dailyCarryNote');
+      note.textContent = error.name === 'TimeoutError'
+        ? '讀取超過 30 秒；尚未確認已保存資料，請稍後重新讀取。'
+        : '回報資料未取得；尚未確認已保存資料，請重新讀取。';
+      const button = element('button', '', '重新讀取');
+      button.type = 'button'; button.id = 'dailyReadRetry'; button.addEventListener('click', retry);
+      note.append(' ', button);
+      // Stay disabled until a verified load; drafts remain in their original context.
     },
     showClosingIssues(issues) {
       if (!panel) return;

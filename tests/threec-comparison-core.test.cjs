@@ -66,3 +66,19 @@ test('十月群組前綴仍保留iPhone適用資格及完整原條件，非iPhon
  const column=Compare.condition(raw);assert.equal(column.raw,raw);assert.equal(column.key,raw);assert.equal(column.project,'(企客 5G)榮耀之星 iPhone');assert.equal(column.rent,'999');assert.equal(column.term,'30');
  const index=Compare.buildIndex({rows:[row({project_prices:{[raw]:0}})]});assert.equal(Compare.buildView(index,{segment:'enterprise',project:'(企客 5G)榮耀之星',rent:'999'}).totalRows,0);assert.equal(Compare.buildView(index,{segment:'enterprise',project:column.project,rent:'999'}).totalRows,1);
 });
+
+test('opt-out keeps prices, order and pagination identical while the default option-list API remains intact',()=>{
+ const names=Array.from({length:18},(_,j)=>`5G_XH(${24+j})-續約／${j%2?'999':'1399'}H${j%3?'':'_VIP'}`);
+ const snapshots=[{rows:Array.from({length:31},(_,i)=>row({brand:i%2?'APPLE':'Samsung',model:`測試機 ${i} ${i%2?'256':'512'}G(黑)`,colorless_model:`測試機 ${i} ${i%2?'256':'512'}G`,project_prices:{...Object.fromEntries(names.map((n,j)=>[n,j===0?'':j===1?'0':String(i+j)])),['(企客_5G)榮耀之星999H(24)_iPhone']:i%2?'0':''}}))},{rows:[row({model:'新版本機款',colorless_model:'新版本機款',project_prices:{[plan]:'9876'}})]}];
+ for(const snapshot of snapshots){
+  const index=Compare.buildIndex(snapshot),before=JSON.stringify(index);
+  for(const filters of [{segment:'consumer',rent:'common'},{segment:'enterprise',rent:'999'},{segment:'consumer',query:'測試機',rowPage:1,columnPage:1},{brand:'APPLE',capacity:'256GB',version:'VIP',term:'24'},{model:'新版本機款',query:'9876'},{query:'沒有機款'},{}]){
+   const {options,...expected}=Compare.buildView(index,filters);
+   assert.deepEqual(options,Compare.options(index,filters));
+   const {options:skipped,...actual}=Compare.buildView(index,filters,{includeOptions:false});
+   assert.equal(skipped,null);assert.deepEqual(actual,expected);
+   assert.deepEqual(Compare.buildView(index,filters,{includeOptions:true}),Compare.buildView(index,filters));
+  }
+  assert.equal(JSON.stringify(index),before);
+ }
+});

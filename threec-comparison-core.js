@@ -76,14 +76,15 @@
   function selectColumns(columns,filters){
     return columns.filter(col=>(!filters.project||col.project===filters.project)&&(!filters.version||col.version===filters.version)&&(!filters.term||col.term===filters.term)&&(!filters.rent||(filters.rent==='common'?(!col.rent||['999','1399'].includes(col.rent)):col.rent===filters.rent)));
   }
-  function buildView(index,filters={}){
+  // Default option lists remain compatible; the query UI can skip unused catalog sorts.
+  function buildView(index,filters={},viewOptions={}){
     const query=text(filters.query).toLocaleLowerCase();
     const rows=scopeRows(index,filters).filter(row=>(!filters.brand||row.brand===filters.brand)&&(!filters.model||row.model===filters.model)&&(!filters.capacity||row.capacity===filters.capacity)&&(!query||[row.brand,row.model,row.capacity,row.ram,row.sourceSheet,...row.models,...row.codes,...Object.keys(row.prices)].join(' ').toLocaleLowerCase().includes(query)));
     const keys=new Set(rows.flatMap(row=>Object.keys(row.prices)));
     const columns=selectColumns(scopeColumns(index.columns,filters).filter(col=>keys.has(col.key)&&(filters.segment!=='enterprise'||rows.some(row=>hasQuote(row,col)))),filters);
     const matching=rows.filter(row=>columns.some(col=>filters.segment==='enterprise'?hasQuote(row,col):Object.prototype.hasOwnProperty.call(row.prices,col.key)));
     const rowOffset=Math.max(0,Number(filters.rowPage||0))*20, columnOffset=Math.max(0,Number(filters.columnPage||0))*12;
-    return {rows:matching.slice(rowOffset,rowOffset+20),columns:columns.slice(columnOffset,columnOffset+12),totalRows:matching.length,totalColumns:columns.length,rowPages:Math.max(1,Math.ceil(matching.length/20)),columnPages:Math.max(1,Math.ceil(columns.length/12)),options:options(index,filters)};
+    return {rows:matching.slice(rowOffset,rowOffset+20),columns:columns.slice(columnOffset,columnOffset+12),totalRows:matching.length,totalColumns:columns.length,rowPages:Math.max(1,Math.ceil(matching.length/20)),columnPages:Math.max(1,Math.ceil(columns.length/12)),options:viewOptions.includeOptions===false?null:options(index,filters)};
   }
   function cell(row,column){
     if(!Object.prototype.hasOwnProperty.call(row.prices,column.key))return {kind:'absent',text:'未列此條件'};

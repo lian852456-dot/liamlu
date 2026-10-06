@@ -10,6 +10,8 @@
     const byId = id => root.querySelector('#'+id);
     const state = {date:today(),seg:16,group:'sales',store:'all',filter:'all',status:'idle',rows:[],people:null,personalStatus:'idle',receivedAt:null};
     let generation = 0, personalGeneration = 0, locked = false;
+    let dayController, personalController;
+    const visible = () => root.classList.contains('active');
     const dateInput = byId('sumDate'); dateInput.value = state.date;
     for (const name of stores) {const option = document.createElement('option');option.value=name;option.textContent=name;byId('sumStore').append(option);}
     function active() {if(locked)throw new Error('連線已失效');assertActive?.();}
@@ -30,8 +32,8 @@
       byId('summaryCards').innerHTML=`${notice?`<p class="sum-notice">${escape(notice)}。已回報不代表欄位完整。</p>`:'<p class="sum-note">資料已取得；各欄位涵蓋店數列於合計下方。</p>'}<div class="sum-totals">${M.core.map(([key,label,unit])=>{const total=M.sum(rows,key);return `<div><span>${label} <small>${unit}</small></span><strong class="sum-num" data-summary-total="${key}">${fmt(total.value)}</strong><small>${coverage(total)}</small></div>`;}).join('')}</div><div class="sum-rates"><div>保險 <strong>${ratioText(ins)}</strong><small>${coverage(ins)}，只計有效配對分子／分母</small></div>${state.group==='management'?`<div>OP ${M.management.slice(0,3).map(([key,label])=>{const total=M.sum(rows,key);return `<strong>${label.replace('OP ','')} ${fmt(total.value)}</strong> <small>${coverage(total)}</small>`;}).join(' · ')}</div><div>MyCharge <strong>${ratioText(my)}</strong><small>${coverage(my)}，已點選／今日貼標</small></div>`:''}</div><p class="sum-source">來源：本日期／時段的門市回報原始欄位；${state.store==='all'?'九店':escape(state.store)}／${state.filter==='all'?'全部狀態':state.filter==='reported'?'已回報':'待確認'}<br>來源最新回報：${escape(M.latest(rows)||'未提供時間')} · 本次取得：${escape(state.receivedAt)}（臺北）</p>`;
     }
     function empty(status) {
-      const title=status==='loading'?'正在讀取本時段資料':status==='locked'?'連線已失效':'回報資料未取得';
-      const note=status==='loading'?'資料完成前不顯示上次數字，也不判斷未回報。':status==='locked'?'請依既有登入流程重新驗證；此頁不保留舊摘要或個人明細。':'讀取失敗或來源格式不符，不以舊快取、影子資料或 0 代替。';
+      const title=status==='loading'?'正在讀取本時段資料':status==='locked'?'連線已失效':status==='timeout'?'讀取超過 30 秒':'回報資料未取得';
+      const note=status==='loading'?'資料完成前不顯示上次數字，也不判斷未回報。':status==='locked'?'請依既有登入流程重新驗證；此頁不保留舊摘要或個人明細。':status==='timeout'?'請稍後手動重新讀取；本頁不會自動重送，也不以舊資料代替。':'讀取失敗或來源格式不符，不以舊快取、影子資料或 0 代替。';
       return `<div class="sum-empty"><h3>${title}</h3><p>${note}</p>${status!=='loading'&&status!=='locked'?'<button type="button" data-summary-retry>重新讀取</button>':''}</div>`;
     }
     function fields(title,columns,row) {return `<section class="sum-fields"><h4>${title}</h4><dl>${columns.map(([key,label,unit])=>`<div><dt>${label}${unit?'（'+unit+'）':''}</dt><dd class="sum-num">${unit==='%'?pct(row.values[key]):fmt(row.values[key])}</dd></div>`).join('')}</dl></section>`;}
@@ -87,36 +89,43 @@
       byId('sumAnnounce').textContent=`${state.date} ${state.seg}:00；${byId('sumCoverage').textContent}；${byId('sumStoreCount').textContent}`;
     }
     async function loadPeople() {
-      if(state.status!=='ready'||state.personalStatus!=='idle'||state.group!=='consult')return;
+      if(!visible()||state.status!=='ready'||state.personalStatus!=='idle'||state.group!=='consult')return;
       const token=++personalGeneration,dayToken=generation,date=state.date,seg=state.seg;
       state.personalStatus='loading';render();
+      personalController = new AbortController();
       try {
-        active();const response=await readPersonal(date,seg);active();
+        active();const response=await readPersonal(date,seg,{signal:personalController.signal});active();
         if(token!==personalGeneration||dayToken!==generation)return;
         state.people=M.personal(response,date,seg,stores,localPersonal(date,seg));state.personalStatus='ready';
       } catch (_) {if(token!==personalGeneration||dayToken!==generation)return;state.people=null;state.personalStatus='error';}
       render();
     }
-    async function refresh() {
+    async function refresh({force=false}={}) {
+      if(!visible())return;
+      const samePending=state.status==='loading'&&!force&&!dayController?.signal.aborted;
+      if(!samePending)dayController?.abort();
+      personalController?.abort();
+      const controller=samePending?dayController:new AbortController();dayController=controller;
       const token=++generation;personalGeneration++;const date=state.date,seg=state.seg;
       state.status=locked?'locked':'loading';state.rows=[];state.people=null;state.personalStatus='idle';state.receivedAt=null;render();
       if(locked)return;
       try {
-        active();const response=await readDay(date,seg);active();
+        active();const response=await readDay(date,seg,{signal:controller.signal,force});active();
         if(token!==generation)return;
         state.rows=M.project(response,date,seg,stores);state.status='ready';
         state.receivedAt=new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour12:false});
-      } catch (_) {if(token!==generation)return;state.rows=[];state.people=null;state.status='error';}
+      } catch (error) {if(token!==generation)return;state.rows=[];state.people=null;state.status=error.name==='TimeoutError'?'timeout':'error';}
       render();await loadPeople();
     }
-    function setSegment(seg) {if(![16,21].includes(Number(seg)))return;state.seg=Number(seg);onSegmentChange(state.seg);return refresh();}
-    dateInput.addEventListener('change',()=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(dateInput.value))return;state.date=dateInput.value;refresh();});
+    function setSegment(seg) {if(![16,21].includes(Number(seg)))return;if(state.seg!==Number(seg))dayController?.abort();state.seg=Number(seg);onSegmentChange(state.seg);return refresh();}
+    dateInput.addEventListener('change',()=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(dateInput.value))return;if(state.date!==dateInput.value)dayController?.abort();state.date=dateInput.value;refresh();});
     byId('sumStore').addEventListener('change',event=>{state.store=event.target.value;render();});
     byId('sumStatus').addEventListener('change',event=>{state.filter=event.target.value;render();});
-    root.addEventListener('click',event=>{const group=event.target.closest('[data-summary-group]'),seg=event.target.closest('[data-summary-seg]');if(group){state.group=group.dataset.summaryGroup;render();loadPeople();}else if(seg)setSegment(seg.dataset.summarySeg);else if(event.target.closest('[data-summary-retry]'))refresh();});
-    window.addEventListener('portal-before-logout',()=>{locked=true;generation++;personalGeneration++;state.rows=[];state.people=null;state.status='locked';state.personalStatus='idle';render();});
+    root.addEventListener('click',event=>{const group=event.target.closest('[data-summary-group]'),seg=event.target.closest('[data-summary-seg]');if(group){state.group=group.dataset.summaryGroup;render();loadPeople();}else if(seg)setSegment(seg.dataset.summarySeg);else if(event.target.closest('[data-summary-retry]'))refresh({force:true});});
+    function deactivate() {generation++;personalGeneration++;dayController?.abort();personalController?.abort();state.rows=[];state.people=null;state.status=locked?'locked':'idle';state.personalStatus='idle';render();}
+    window.addEventListener('portal-before-logout',()=>{locked=true;deactivate();});
     window.addEventListener('portal-login-changed',()=>{locked=false;refresh();});
-    render();return Object.freeze({refresh,setSegment});
+    render();return Object.freeze({refresh,setSegment,deactivate});
   }
   scope.DailyReportSummaryController=Object.freeze({create});
 })(globalThis);
