@@ -3,6 +3,23 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const Compare=require('../threec-comparison-core.js');
 const plan='5G_iPhone_XH(24)-新申裝/續約／999H';
 const row=(changes={})=>({source_sheet:'iPhone',brand:'APPLE',model:'iPhone 測試機 256G(黑)',colorless_model:'iPhone 測試機 256G',retail_price:'29,900',project_prices:{[plan]:'1,299','5G_iPhone_XH(48)-新申裝/續約／1399H_加碼版':'0'},...changes});
+test('機型搜尋容許省略或重複空白，保留大小寫、價格與既有篩選',()=>{
+ const enterprise='(企客_5G)榮耀之星999H(24)_iPhone';
+ const index=Compare.buildIndex({rows:[row({model:'iPhone 17 Pro 256GB(黑)',colorless_model:'iPhone 17 Pro 256GB',project_prices:{[plan]:0,[enterprise]:2999}}),row({model:'iPhone 17 512GB(白)',colorless_model:'iPhone 17 512GB',project_prices:{[plan]:1299}}),row({model:'iPhone 16 256GB',colorless_model:'iPhone 16 256GB'}),row({brand:'Samsung',model:'Galaxy S 25 256GB',colorless_model:'Galaxy S 25 256GB'})]});
+ const before=JSON.stringify(index),filters={segment:'consumer',rent:'common'};
+ const expected=Compare.buildView(index,{...filters,query:'iPhone 17'},{includeOptions:false});
+ assert.equal(expected.totalRows,2);
+ for(const query of ['iphone17','IPHONE17',' iPhone  17 ','iPhone\t17','iPhone\u300017'])assert.deepEqual(Compare.buildView(index,{...filters,query},{includeOptions:false}),expected);
+ const pro=Compare.buildView(index,{...filters,query:'iphone17pro',brand:'APPLE',capacity:'256GB'},{includeOptions:false});assert.equal(pro.totalRows,1);assert.equal(Compare.cell(pro.rows[0],pro.columns[0]).value,0);
+ for(const extra of [{brand:'Samsung'},{capacity:'128GB'},{model:'iPhone 16'},{rent:'599'},{term:'36'},{version:'VIP'},{project:'不存在'}])assert.equal(Compare.buildView(index,{...filters,query:'iphone17',...extra},{includeOptions:false}).totalRows,0);
+ const ent=Compare.buildView(index,{segment:'enterprise',query:'iphone17'},{includeOptions:false});assert.equal(ent.totalRows,1);assert.equal(Compare.cell(ent.rows[0],ent.columns[0]).value,2999);
+ assert.equal(Compare.buildView(index,{...filters,query:'iphone 18'},{includeOptions:false}).totalRows,0);assert.equal(JSON.stringify(index),before);
+});
+test('空白容錯只用於單一機型，不拼接品牌、來源、代碼或原始方案條件',()=>{
+ const index=Compare.buildIndex({rows:[row({brand:'APPLE',source_sheet:'17',model:'iPhone 256GB',colorless_model:'iPhone 256GB',code:'SYN 17',project_prices:{'一般 續約 999H(24)':0}})]});
+ for(const query of ['appleiphone','iphone17','syn17','續約999'])assert.equal(Compare.buildView(index,{query},{includeOptions:false}).totalRows,0);
+ for(const query of ['APPLE','SYN 17','續約 999','一般','256GB'])assert.equal(Compare.buildView(index,{query},{includeOptions:false}).totalRows,1);
+});
 test('完整條件解析月租、跨期數、版本且保留原始限定條件',()=>{
  assert.deepEqual({...Compare.condition(plan)}, {key:plan,raw:plan,project:'5G iPhone-新申裝/續約',rent:'999',term:'24',version:'一般',detail:''});
  const addon=Compare.condition('(企客_5G)榮耀之星599H(30)_iPhone');
