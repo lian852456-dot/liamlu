@@ -119,7 +119,7 @@
     rank = section('公司 KPI 排名', 'daily-rank');
     const carryNote = element('p', 'daily-note', '首次填排名與 KPI；晚間自動沿用，不用重填。'); carryNote.id = 'dailyCarryNote';
     rank.append(carryNote);
-    const draftNote = element('p', 'daily-note', '尚有未送出修改；切換後會保留。晚間承接以已保存的 16:00 回報為準。');
+    const draftNote = element('p', 'daily-note', '未送出修改只保留於本分頁；切換門市／日期可取回，重整、關頁或登出會清除。晚間承接以已保存的 16:00 回報為準。');
     draftNote.id = 'dailyDraftNote'; draftNote.hidden = true; rank.append(draftNote);
     const rankGrid = element('div', 'daily-grid'); moveFields(['rank','kpi'], rankGrid); rank.append(rankGrid);
     core = section('核心業績', 'daily-core');
@@ -198,7 +198,7 @@
       area.querySelectorAll('input,textarea').forEach(input => { input.disabled = input.readOnly; });
       const draft = drafts.get(draftKey());
       if (draft) {
-        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly) input.value = value; });
+        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly && input.value !== value) input.value = value; });
         calcPct('insurance_num','insurance_den','insurance_pct'); calcPct('rt_close_num','rt_close_den','rt_close_pct'); calcManagementFocusPct(); updateRates();
         dirty = true; byId('dailyDraftNote').hidden = false;
       }
@@ -211,9 +211,9 @@
       loading = false; submit.disabled = false; area.querySelectorAll('input').forEach(input => { input.disabled = false; }); labelControls(area); updateZero(record); updateRates();
       const draft = drafts.get(draftKey());
       if (draft) {
-        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly) input.value = value; });
+        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly && input.value !== value) input.value = value; });
         updateZero();
-        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly) input.value = value; });
+        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly && input.value !== value) input.value = value; });
         calcPct('insurance_num','insurance_den','insurance_pct'); calcPct('rt_close_num','rt_close_den','rt_close_pct'); calcManagementFocusPct(); updateRates();
         dirty = true; byId('dailyDraftNote').hidden = false;
       }
@@ -238,6 +238,10 @@
     },
     canSubmit(store, date, seg) {
       return !panel || (!loading && selected === store && selectedDate === date && selectedSeg === Number(seg));
+    },
+    pendingFieldIds(store, date, seg) {
+      if (!panel || !loading || selected !== store || selectedDate !== date || selectedSeg !== Number(seg)) return new Set();
+      return new Set(Object.keys(drafts.get(draftKey()) || {}));
     },
     showClosingIssues(issues) {
       if (!panel) return;

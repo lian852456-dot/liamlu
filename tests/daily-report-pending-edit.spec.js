@@ -29,6 +29,23 @@ for(const width of [390,1440])test.describe(`pending edit ${width}`,()=>{
   await page.locator('#f_insurance_num').fill('1');await page.locator('#f_insurance_den').fill('4');await release(page);
   await expect(page.locator('#f_mgmt_mycharge_pct')).toHaveValue('25.0');await expect(page.locator('#f_insurance_pct')).toHaveValue('25.0');await expect(page.locator('#f_mgmt_op_target')).toHaveValue('20');
  });
+ for(const field of ['aq999','mgmt_op_online'])test(`${field} keeps focus, node and partial numeric input across the late reply`,async({page})=>{
+  await select(page);const input=page.locator('#f_'+field);await input.pressSequentially('1e');
+  expect(await input.evaluate(el=>el.validity.badInput)).toBe(true);await page.evaluate(id=>window.__editingNode=document.getElementById(id),'f_'+field);
+  await release(page);await expect(input).toBeFocused();expect(await input.evaluate(el=>el===__editingNode&&el.validity.badInput)).toBe(true);
+  await input.pressSequentially('2');await expect(input).toHaveValue('1e2');
+ });
+ test('service error retains pending edits and manual retry confirms the source',async({page})=>{
+  await page.evaluate(()=>__readMode='error');await select(page);await page.locator('#f_aq999').fill('55');await page.evaluate(()=>__heldReads[0].release());
+  await expect(page.locator('#dailyReadRetry')).toBeVisible();await expect(page.locator('.btn-save-main')).toBeDisabled();await expect(page.locator('#f_aq999')).toHaveValue('55');
+  await page.evaluate(()=>saveData());expect(await page.evaluate(()=>__summaryCalls.length)).toBe(1);
+  await page.evaluate(()=>__readMode='ok');await page.locator('#dailyReadRetry').click();await page.waitForFunction(()=>__heldReads.length===2);await release(page,1);await expect(page.locator('#f_aq999')).toHaveValue('55');
+ });
+ test('cache version and memory-only draft notice match the new editable state',async({page})=>{
+  const script=await page.locator('script[src*="daily-report-layout.js"]').getAttribute('src');expect(script).toBe('daily-report-layout.js?v=20261007-pending-edit-1');
+  await select(page);await page.locator('#f_aq999').fill('55');await expect(page.locator('#dailyDraftNote')).toContainText('只保留於本分頁');await expect(page.locator('#dailyDraftNote')).toContainText('重整、關頁或登出會清除');
+  expect(await page.evaluate(()=>localStorage.getItem(shadowKey('2099-10-02',16)))).toBe(null);
+ });
  test('pending drafts stay with the store and reuse one physical read',async({page})=>{
   await select(page);await page.locator('#f_aq999').fill('55');await page.evaluate(()=>selectStore('萬大'));await expect(page.locator('#f_aq999')).toHaveValue('');await page.locator('#f_aq999').fill('66');
   await page.evaluate(()=>selectStore('酒泉'));await expect(page.locator('#f_aq999')).toHaveValue('55');expect(await page.evaluate(()=>__summaryCalls.length)).toBe(1);
