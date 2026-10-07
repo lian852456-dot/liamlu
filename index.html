@@ -1541,7 +1541,7 @@
 </style>
 <link rel="stylesheet" href="daily-report-layout.css?v=20261004-layout-3">
 <link rel="stylesheet" href="daily-report-summary.css?v=20261004-summary-1">
-<script src="daily-report-layout.js?v=20261006-read-1" defer></script>
+<script src="daily-report-layout.js?v=20261007-pending-edit-1" defer></script>
 </head>
 <body>
 
@@ -2312,8 +2312,8 @@ async function getData(date, store, seg, options) {
 }
 
 // ── 拉取整天所有門市資料存入快取
-// 舊呼叫介面保留給既有頁面相容；實際傳輸已改為表單 POST + iframe postMessage，
-// 不再把回報資料或登入資料放入 URL，也不依賴 JSONP。
+// 舊呼叫介面保留給既有頁面相容；實際傳輸是 text/plain POST + fetch JSON。
+// 回報資料放在 POST body，不依賴 JSONP 或 iframe postMessage。
 async function requestGasJson(url) {
   const endpoint = new URL(url, window.location.href);
   const payload = {};
@@ -2748,7 +2748,7 @@ function calcManagementFocusPct() {
     : '';
 }
 
-function renderManagementFocusInputs(values) {
+function renderManagementFocusInputs(values, {preserveIds = new Set()} = {}) {
   const grid = document.getElementById('managementFocusGrid');
   if (!grid) return;
   const date = document.getElementById('fillDate')?.value || today();
@@ -2758,7 +2758,9 @@ function renderManagementFocusInputs(values) {
   const label = document.getElementById('managementFocusMonthLabel');
   if (label) label.textContent = '｜' + month;
   grid.setAttribute('aria-label', month + ' 管理重點');
-  grid.innerHTML = definitions.map(item => `
+  const schemaKey = JSON.stringify(definitions);
+  if (grid.dataset.schemaKey !== schemaKey) {
+    grid.innerHTML = definitions.map(item => `
     <div class="kpi-input-wrap${item.readonly ? ' highlight' : ''}">
       <label>${item.label}${item.unit ? '（' + item.unit + '）' : ''}</label>
       <span class="ki-icon">${item.icon}</span>
@@ -2766,9 +2768,11 @@ function renderManagementFocusInputs(values) {
         ${item.readonly ? 'readonly style="background:rgba(255,102,0,0.05);cursor:not-allowed;"' : ''}
         ${item.key === 'mycharge_clicked' || item.key === 'mycharge_tagged' ? 'oninput="calcManagementFocusPct()"' : ''}>
     </div>`).join('');
+    grid.dataset.schemaKey = schemaKey;
+  }
   definitions.forEach(item => {
     const el = document.getElementById('f_mgmt_' + item.key);
-    if (el) el.value = current[item.key] === null || current[item.key] === undefined ? '' : current[item.key];
+    if (el && (!preserveIds.has(el.id) || item.readonly)) el.value = current[item.key] === null || current[item.key] === undefined ? '' : current[item.key];
   });
   calcManagementFocusPct();
 }
@@ -3654,13 +3658,14 @@ function selectStore(store) {
     Number(currentSeg) === 21 ? getData(date, store, 16, {signal}) : Promise.resolve(null)
   ]).then(([data, afternoon]) => {
     if (selectionGeneration !== fillSelectionGeneration || document.getElementById('fillDate').value !== date || document.getElementById('fillStore').value !== store || currentSeg !== selectedSeg) return;
+    const pendingEdits = globalThis.DailyReportLayout?.pendingFieldIds(store, date, selectedSeg) || new Set();
     FIELDS.forEach(f => {
       const el = document.getElementById('f_' + f);
       if (!el) return;
       const locked = Number(currentSeg) === 21 && CARRY_FROM_16_FIELDS.includes(f);
       const source = locked ? afternoon : data;
       const value = source && source[f] !== null && source[f] !== undefined && source[f] !== '' ? source[f] : '';
-      el.value = value;
+      if (locked || !pendingEdits.has(el.id)) el.value = value;
       el.readOnly = locked;
       if (locked) {
         el.style.background = 'rgba(249,115,22,0.08)';
@@ -3670,7 +3675,7 @@ function selectStore(store) {
         el.title = '';
       }
     });
-    renderManagementFocusInputs(managementFocusData(data));
+    renderManagementFocusInputs(managementFocusData(data), {preserveIds:pendingEdits});
     updateFilledSummary(data);
     globalThis.DailyReportLayout?.onStoreLoaded(store, date, selectedSeg, data, afternoon);
   }).catch(error => {
@@ -4069,6 +4074,9 @@ async function saveData() {
   if (!store) { showToast('⚠️ 請先選擇門市'); return; }
   if (!GAS_URL) { showToast('⚠️ 請先設定 Apps Script 網址'); openSettings(); return; }
   const date = document.getElementById('fillDate').value;
+  if (globalThis.DailyReportLayout?.canSubmit && !globalThis.DailyReportLayout.canSubmit(store, date, currentSeg)) {
+    showToast('已保留輸入，完成讀取已保存回報後才能送出。'); return;
+  }
   const data = getFormData();
   if (!validateClosingReportForm(data, currentSeg, date)) return;
   data.savedAt = new Date().toLocaleTimeString('zh-TW');
@@ -4090,6 +4098,9 @@ async function saveData() {
 
 async function _doSave(store, date, data) {
   const seg = currentSeg;
+  if (globalThis.DailyReportLayout?.canSubmit && !globalThis.DailyReportLayout.canSubmit(store, date, seg)) {
+    showToast('已保留輸入，完成讀取已保存回報後才能送出。'); return;
+  }
   const context = dailyReportReadContext;
   const saveToken = globalThis.DailyReportLayout?.beginSave(store, date, seg);
   showToast('🔄 上傳中…');

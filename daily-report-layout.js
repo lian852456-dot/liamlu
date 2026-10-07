@@ -119,7 +119,7 @@
     rank = section('公司 KPI 排名', 'daily-rank');
     const carryNote = element('p', 'daily-note', '首次填排名與 KPI；晚間自動沿用，不用重填。'); carryNote.id = 'dailyCarryNote';
     rank.append(carryNote);
-    const draftNote = element('p', 'daily-note', '尚有未送出修改；切換後會保留。晚間承接以已保存的 16:00 回報為準。');
+    const draftNote = element('p', 'daily-note', '未送出修改只保留於本分頁；切換門市／日期可取回，重整、關頁或登出會清除。晚間承接以已保存的 16:00 回報為準。');
     draftNote.id = 'dailyDraftNote'; draftNote.hidden = true; rank.append(draftNote);
     const rankGrid = element('div', 'daily-grid'); moveFields(['rank','kpi'], rankGrid); rank.append(rankGrid);
     core = section('核心業績', 'daily-core');
@@ -159,6 +159,11 @@
     labelControls(area);
     area.addEventListener('input', event => {
       dirty = true; byId('dailyDraftNote').hidden = false;
+      // While the source is pending, retain only explicitly edited fields.
+      // Untouched blanks must not replace values returned by the server.
+      if (loading && event.target.id && !event.target.readOnly && !event.target.disabled) {
+        drafts.set(draftKey(), { ...drafts.get(draftKey()), [event.target.id]:event.target.value });
+      }
       updateZero(); updateRates();
       recordEdit();
       if (event.target.hasAttribute('aria-invalid')) event.target.removeAttribute('aria-invalid');
@@ -189,8 +194,16 @@
       byId('underForms').replaceChildren(); zero.hidden = true;
       area.querySelectorAll('input').forEach(input => { input.value = ''; input.disabled = true; input.removeAttribute('aria-invalid'); });
       ['kpi','rank'].forEach(key => { byId('f_' + key).readOnly = selectedSeg === 21; });
+      renderManagementFocusInputs({}); labelControls(area);
+      area.querySelectorAll('input,textarea').forEach(input => { input.disabled = input.readOnly; });
+      const draft = drafts.get(draftKey());
+      if (draft) {
+        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly && input.value !== value) input.value = value; });
+        calcPct('insurance_num','insurance_den','insurance_pct'); calcPct('rt_close_num','rt_close_den','rt_close_pct'); calcManagementFocusPct(); updateRates();
+        dirty = true; byId('dailyDraftNote').hidden = false;
+      }
       byId('closingReportError').hidden = true;
-      byId('dailyCarryNote').textContent = '正在讀取此門市、此日期的回報…';
+      byId('dailyCarryNote').textContent = '正在讀取已保存回報；可先填寫，完成讀取後才能送出。';
       submit.disabled = true; summaryContext();
     },
     onStoreLoaded(store, date, seg, record, first) {
@@ -198,9 +211,9 @@
       loading = false; submit.disabled = false; area.querySelectorAll('input').forEach(input => { input.disabled = false; }); labelControls(area); updateZero(record); updateRates();
       const draft = drafts.get(draftKey());
       if (draft) {
-        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly) input.value = value; });
+        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly && input.value !== value) input.value = value; });
         updateZero();
-        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly) input.value = value; });
+        Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly && input.value !== value) input.value = value; });
         calcPct('insurance_num','insurance_den','insurance_pct'); calcPct('rt_close_num','rt_close_den','rt_close_pct'); calcManagementFocusPct(); updateRates();
         dirty = true; byId('dailyDraftNote').hidden = false;
       }
@@ -221,7 +234,14 @@
       const button = element('button', '', '重新讀取');
       button.type = 'button'; button.id = 'dailyReadRetry'; button.addEventListener('click', retry);
       note.append(' ', button);
-      // Stay disabled until a verified load; drafts remain in their original context.
+      // Submission stays disabled; pending edits remain local to this selection.
+    },
+    canSubmit(store, date, seg) {
+      return !panel || (!loading && selected === store && selectedDate === date && selectedSeg === Number(seg));
+    },
+    pendingFieldIds(store, date, seg) {
+      if (!panel || !loading || selected !== store || selectedDate !== date || selectedSeg !== Number(seg)) return new Set();
+      return new Set(Object.keys(drafts.get(draftKey()) || {}));
     },
     showClosingIssues(issues) {
       if (!panel) return;
@@ -261,7 +281,7 @@
       if (current) { dirty = false; byId('dailyDraftNote').hidden = true; }
       return current;
     },
-    onClear() { if (!panel) return; drafts.delete(draftKey()); dirty = false; byId('dailyDraftNote').hidden = true; byId('underForms').replaceChildren(); updateZero(); updateRates(); recordEdit(); }
+    onClear() { if (!panel) return; drafts.delete(draftKey()); dirty = loading; byId('dailyDraftNote').hidden = !dirty; byId('underForms').replaceChildren(); updateZero(); updateRates(); if (loading) drafts.set(draftKey(), snapshot()); recordEdit(); }
   };
   document.addEventListener('DOMContentLoaded', initialize);
 })();
