@@ -18,7 +18,9 @@ test('品牌機款容量拆分，合併顏色但隱藏差價仍分列，只呈�
  await page.locator('#shoppingModel').selectOption('iPhone 示範機');
  await page.locator('#shoppingCapacity').selectOption('256GB');
  await expect(page.locator('.comparison-table tbody tr')).toHaveCount(2);
- await expect(page.locator('#shoppingResults')).toContainText('2 款顏色同價');
+ await expect(page.locator('#shoppingResults')).not.toContainText('顏色同價');
+ await page.locator('.spec-cell details').first().click();
+ await expect(page.locator('.spec-cell details').first()).toContainText('iPhone 示範機');
  await page.locator('#shoppingReset').click();
  await expect(page.locator('#shoppingResults')).toContainText('RAM 16GB');
  await expect(page.locator('#shoppingResults')).toContainText('0 元');

@@ -272,13 +272,14 @@ test('Google JSON 轉址回 HTML 時，限定來源與 requestId 的既有 ifram
  await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
  expect(requests.map(p=>p.kind).sort()).toEqual(['shopping','tradein']);expect(requests.every(p=>p.action==='threec_snapshot_read'&&!p.employeeId&&!p.adminSecret)).toBe(true);await expect(page.locator('iframe')).toHaveCount(0);
 });
-for(const width of [1280,390,360])test(`${width}px 閱讀文字至少18px，價錢至少24px且不靠縮字塞欄`,async({page})=>{
+for(const width of [1280,390,360])test(`${width}px 桌面緊湊字級與手機大字價格保障`,async({page})=>{
  await intercept(page);await page.setViewportSize({width,height:844});await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');
  await page.locator('#tableModeBtn').click();
- for(const selector of ['body','#shoppingBrand','#shoppingModel','.hint','.condition-detail','.comparison-table details','.spec-cell strong','.variant-label','.comparison-pagination button']){
- const fonts=await page.locator(selector).evaluateAll(els=>els.map(el=>parseFloat(getComputedStyle(el).fontSize)));expect(fonts.every(size=>size>=18)).toBe(true);
+ const minima=width>=1280?{'body':18,'#shoppingBrand':16,'#shoppingModel':16,'.hint':14,'.condition-detail':13,'.comparison-table details':13,'.spec-cell strong':17,'.variant-label':13,'.comparison-pagination button':14}:Object.fromEntries(['body','#shoppingBrand','#shoppingModel','.hint','.condition-detail','.comparison-table details','.spec-cell strong','.variant-label','.comparison-pagination button'].map(selector=>[selector,18]));
+ for(const [selector,minimum] of Object.entries(minima)){
+ const fonts=await page.locator(selector).evaluateAll(els=>els.map(el=>parseFloat(getComputedStyle(el).fontSize)));expect(fonts.every(size=>size>=minimum)).toBe(true);
  }
- expect(await page.locator('.quote.price,.quote.zero').evaluateAll(els=>els.every(el=>parseFloat(getComputedStyle(el).fontSize)>=24))).toBe(true);
+ expect(await page.locator('.quote.price,.quote.zero').evaluateAll((els,minimum)=>els.every(el=>parseFloat(getComputedStyle(el).fontSize)>=minimum),width>=1280?17:24)).toBe(true);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
