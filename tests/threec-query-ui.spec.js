@@ -59,6 +59,9 @@ test('空白裝置開頁自動查到兩類正式資料，顯示版本且兩家�
   await page.locator('#tradeinTab').click();
   await expect(page.locator('#tradeinResults')).toContainText('點子行動（獨立報價）');
   await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
+  await expect(page.locator('#tradeinResults')).not.toContainText('無報價');
+  await expect(page.locator('#tradeinResults table').nth(0).locator('thead tr').nth(1).locator('th')).toHaveText(['原始機型／容量','S 級','A 級','C 級']);
+  await expect(page.locator('#tradeinResults')).toContainText('0 元');
   expect(calls.map(call => call.action)).toEqual(['threec_snapshot_read','threec_snapshot_read']);
   expect(calls.every(call => !('employeeId' in call) && !('deviceId' in call))).toBe(true);
   await expect(page.locator('#employeeId')).toHaveCount(0);
