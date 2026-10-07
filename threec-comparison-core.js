@@ -61,15 +61,16 @@
   }
   function enterpriseCondition(column){return /企客|企業|員工眷|榮耀之星/.test(column.raw);}
   function scopeColumns(columns,filters){return columns.filter(col=>!filters.segment||(filters.segment==='enterprise'?enterpriseCondition(col):!enterpriseCondition(col)));}
-  function hasQuote(row,column){return Object.prototype.hasOwnProperty.call(row.prices,column.key)&&!Core.priceState(row.prices[column.key]).missing;}
-  function scopeRows(index,filters){const columns=scopeColumns(index.columns,filters);return index.rows.filter(row=>columns.some(col=>filters.segment==='enterprise'?hasQuote(row,col):Object.prototype.hasOwnProperty.call(row.prices,col.key)));}
+  function hasPrice(value){if(typeof value==='number')return Number.isFinite(value);if(typeof value!=='string')return false;const raw=value.trim();return /^\d+(?:,\d{3})*(?:\.\d+)?$/.test(raw)&&Number.isFinite(Number(raw.replace(/,/g,'')));}
+  function hasQuote(row,column){return Object.prototype.hasOwnProperty.call(row.prices,column.key)&&hasPrice(row.prices[column.key]);}
+  function scopeRows(index,filters){const columns=scopeColumns(index.columns,filters);return index.rows.filter(row=>columns.some(col=>hasQuote(row,col)));}
   function options(index,filters={}){
     const scoped=scopeRows(index,filters);
     const rows=scoped.filter(row=>!filters.brand||row.brand===filters.brand);
     const models=rows.filter(row=>!filters.model||row.model===filters.model);
     const modelRows=models.filter(row=>!filters.capacity||row.capacity===filters.capacity);
     const keys=new Set(modelRows.flatMap(row=>Object.keys(row.prices)));
-    const relevant=scopeColumns(index.columns,filters).filter(col=>keys.has(col.key)&&(filters.segment!=='enterprise'||modelRows.some(row=>hasQuote(row,col))));
+    const relevant=scopeColumns(index.columns,filters).filter(col=>keys.has(col.key)&&modelRows.some(row=>hasQuote(row,col)));
     const plans=relevant.filter(col=>!filters.project||col.project===filters.project);
     return {brands:unique(scoped.map(row=>row.brand)),models:unique(rows.map(row=>row.model)),capacities:unique(models.map(row=>row.capacity).filter(Boolean)),projects:unique(relevant.map(col=>col.project)),versions:unique(plans.map(col=>col.version)),rents:unique(plans.map(col=>col.rent).filter(Boolean)),terms:unique(plans.map(col=>col.term).filter(Boolean))};
   }
@@ -81,17 +82,29 @@
     const query=text(filters.query).toLocaleLowerCase();
     // Accept compact model names such as iphone17 without joining unrelated fields.
     const modelQuery=query.replace(/\s+/g,'');
-    const rows=scopeRows(index,filters).filter(row=>(!filters.brand||row.brand===filters.brand)&&(!filters.model||row.model===filters.model)&&(!filters.capacity||row.capacity===filters.capacity)&&(!query||[row.brand,row.model,row.capacity,row.ram,row.sourceSheet,...row.models,...row.codes,...Object.keys(row.prices)].join(' ').toLocaleLowerCase().includes(query)||[row.model,...row.models].some(model=>model.toLocaleLowerCase().replace(/\s+/g,'').includes(modelQuery))));
+    const searchColumns=scopeColumns(index.columns,filters);
+    const rows=scopeRows(index,filters).filter(row=>(!filters.brand||row.brand===filters.brand)&&(!filters.model||row.model===filters.model)&&(!filters.capacity||row.capacity===filters.capacity)&&(!query||[row.brand,row.model,row.capacity,row.ram,row.sourceSheet,...row.models,...row.codes,...searchColumns.filter(col=>hasQuote(row,col)).map(col=>col.raw)].join(' ').toLocaleLowerCase().includes(query)||[row.model,...row.models].some(model=>model.toLocaleLowerCase().replace(/\s+/g,'').includes(modelQuery))));
     const keys=new Set(rows.flatMap(row=>Object.keys(row.prices)));
-    const columns=selectColumns(scopeColumns(index.columns,filters).filter(col=>keys.has(col.key)&&(filters.segment!=='enterprise'||rows.some(row=>hasQuote(row,col)))),filters);
-    const matching=rows.filter(row=>columns.some(col=>filters.segment==='enterprise'?hasQuote(row,col):Object.prototype.hasOwnProperty.call(row.prices,col.key)));
+    const columns=selectColumns(scopeColumns(index.columns,filters).filter(col=>keys.has(col.key)&&rows.some(row=>hasQuote(row,col))),filters);
     const rowOffset=Math.max(0,Number(filters.rowPage||0))*20, columnOffset=Math.max(0,Number(filters.columnPage||0))*12;
-    return {rows:matching.slice(rowOffset,rowOffset+20),columns:columns.slice(columnOffset,columnOffset+12),totalRows:matching.length,totalColumns:columns.length,rowPages:Math.max(1,Math.ceil(matching.length/20)),columnPages:Math.max(1,Math.ceil(columns.length/12)),options:viewOptions.includeOptions===false?null:options(index,filters)};
+    const pageColumns=columns.slice(columnOffset,columnOffset+12);
+    const cardMode=viewOptions.cardConditionKey!=null;
+    let cardColumn=cardMode?pageColumns.find(col=>col.key===viewOptions.cardConditionKey):null;
+    if(cardMode&&!cardColumn){
+      const counts=new Map(pageColumns.map(col=>[col.key,rows.filter(row=>hasQuote(row,col)).length]));
+      cardColumn=pageColumns.slice().sort((a,b)=>counts.get(b.key)-counts.get(a.key))[0];
+    }
+    // Match before row pagination so card counts and pages include priced rows only.
+    const matching=rows.filter(row=>cardMode?(cardColumn&&hasQuote(row,cardColumn)):pageColumns.some(col=>hasQuote(row,col)));
+    const pageRows=matching.slice(rowOffset,rowOffset+20);
+    // Keep keyed cell positions; omit columns with no quotes on this row page.
+    const visibleColumns=cardMode?pageColumns:pageColumns.filter(col=>pageRows.some(row=>hasQuote(row,col)));
+    return {rows:pageRows,columns:visibleColumns,cardConditionKey:cardColumn?cardColumn.key:null,totalRows:matching.length,totalColumns:columns.length,rowPages:Math.max(1,Math.ceil(matching.length/20)),columnPages:Math.max(1,Math.ceil(columns.length/12)),options:viewOptions.includeOptions===false?null:options(index,filters)};
   }
   function cell(row,column){
     if(!Object.prototype.hasOwnProperty.call(row.prices,column.key))return {kind:'absent',text:'未列此條件'};
     const value=row.prices[column.key],state=Core.priceState(value);
     return {kind:state.missing?'missing':state.zero?'zero':'price',value,text:Core.formatPrice(value)};
   }
-  return Object.freeze({condition,specification,buildIndex,options,selectColumns,buildView,cell});
+  return Object.freeze({condition,specification,buildIndex,hasPrice,hasQuote,options,selectColumns,buildView,cell});
 });

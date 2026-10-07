@@ -62,9 +62,9 @@ test('品牌選單只列相關機款、容量，常用月租跨期且分页不�
  assert.equal(Compare.buildView(index,{rent:'599'}).columns.length,0);
  const opts=Compare.options(index,{brand:'APPLE'});assert.equal(opts.models.length,12);assert.deepEqual(opts.capacities,['256GB']);
 });
-test('月租／期數篩選只列有該條件的機款，保留真正缺價，不列整排未列',()=>{
+test('月租／期數篩選只列有價格的機款，缺價與未列均不計入',()=>{
  const index=Compare.buildIndex({rows:[row(),row({model:'僅599',colorless_model:'僅599',project_prices:{'599H':100}}),row({model:'真正缺價',colorless_model:'真正缺價',project_prices:{[plan]:''}})]});
- const view=Compare.buildView(index,{rent:'999'});assert.equal(view.totalRows,2);assert.equal(view.rows.some(r=>r.model==='僅599'),false);assert.equal(view.rows.some(r=>r.model==='真正缺價'),true);
+ const view=Compare.buildView(index,{rent:'999'});assert.equal(view.totalRows,1);assert.equal(view.rows.some(r=>r.model==='僅599'),false);assert.equal(view.rows.some(r=>r.model==='真正缺價'),false);
  const unknown=Compare.condition('599(6)');assert.equal(unknown.rent,'599');assert.equal(unknown.term,'');assert.equal(unknown.raw,'599(6)');
 });
 
@@ -98,4 +98,52 @@ test('opt-out keeps prices, order and pagination identical while the default opt
   }
   assert.equal(JSON.stringify(index),before);
  }
+});
+
+test('有效價格只接受有限數值與數字字串；0元保留，缺價與文字不當成價格',()=>{
+ for(const value of [0,'0',' 0 ','0.00',1299,'1,299','12.5'])assert.equal(Compare.hasPrice(value),true,String(value));
+ for(const value of [null,undefined,'','  ','\t',NaN,Infinity,false,true,'NA','未列此條件','無報價（缺價）','0x10'])assert.equal(Compare.hasPrice(value),false,String(value));
+});
+test('一般與企業使用相同有價口徑，搜尋／選單去除全缺價條件且不修改來源',()=>{
+ const missing='5G_XH(60)-續約／1599H_加碼版',enterprise='(企客_5G)榮耀之星999H(24)_iPhone';
+ const snapshot={rows:[row({model:'保留機 256GB',colorless_model:'保留機 256GB',project_prices:{[plan]:null,[missing]:'  ',[enterprise]:0,'5G_XH(36)-續約／1399H':'8,900'}}),row({model:'全缺價機',colorless_model:'全缺價機',project_prices:{[plan]:'',[missing]:null,[enterprise]:undefined}})]};
+ const before=JSON.stringify(snapshot),index=Compare.buildIndex(snapshot);
+ for(const segment of ['consumer','enterprise']){
+  const view=Compare.buildView(index,{segment});assert.equal(view.totalRows,1);assert.equal(view.totalColumns,1);assert.equal(view.rows[0].model,'保留機');
+  assert.equal(Compare.buildView(index,{segment,query:'全缺價機'}).totalRows,0);
+  assert.deepEqual(Compare.options(index,{segment}).models,['保留機']);
+ }
+ assert.equal(Compare.buildView(index,{segment:'consumer',rent:'999'}).totalRows,0);
+ assert.equal(JSON.stringify(snapshot),before);
+});
+test('稀疏矩陣各頁只列有價列／欄，完整遍歷不遺漏或誤配任何價格',()=>{
+ const names=Array.from({length:15},(_,j)=>`5G_XH(${24+j})-續約／999H`);
+ const snapshot={rows:Array.from({length:41},(_,i)=>row({model:`矩陣機 ${i} 256GB`,colorless_model:`矩陣機 ${i} 256GB`,project_prices:{[names[i%15]]:i,[names[(i+7)%15]]:1000+i}}))};
+ const index=Compare.buildIndex(snapshot),expected=new Set(index.rows.flatMap(r=>Object.keys(r.prices).map(k=>JSON.stringify([r.model,k,r.prices[k]])))),seen=new Set();
+ for(let columnPage=0;columnPage<2;columnPage++){
+  const first=Compare.buildView(index,{columnPage});
+  for(let rowPage=0;rowPage<first.rowPages;rowPage++){
+   const view=Compare.buildView(index,{columnPage,rowPage});assert.equal(view.totalRows,first.totalRows);assert.equal(view.totalColumns,15);
+   assert.ok(view.rows.every(r=>view.columns.some(c=>Compare.hasQuote(r,c))));assert.ok(view.columns.every(c=>view.rows.some(r=>Compare.hasQuote(r,c))));
+   for(const r of view.rows)for(const c of view.columns)if(Compare.hasQuote(r,c))seen.add(JSON.stringify([r.model,c.key,Compare.cell(r,c).value]));
+  }
+ }
+ assert.deepEqual(seen,expected);
+});
+test('卡片在分頁前排除所選條件缺價機款，0元不丟失且換條件計數準確',()=>{
+ const second='5G_XH(36)-續約／1399H';
+ const index=Compare.buildIndex({rows:Array.from({length:45},(_,i)=>row({model:`卡片機 ${i} 256GB`,colorless_model:`卡片機 ${i} 256GB`,project_prices:{[plan]:i%2?null:0,[second]:i}}))});
+ const first=Compare.buildView(index,{}, {cardConditionKey:plan,includeOptions:false}),next=Compare.buildView(index,{rowPage:1},{cardConditionKey:plan});
+ assert.equal(first.totalRows,23);assert.equal(first.rowPages,2);assert.equal(first.rows.length,20);assert.equal(next.rows.length,3);assert.ok(first.rows.concat(next.rows).every(r=>Compare.cell(r,Compare.condition(plan)).kind==='zero'));
+ assert.equal(Compare.buildView(index,{}, {cardConditionKey:second}).totalRows,45);
+ assert.equal(Compare.buildView(index,{}, {cardConditionKey:''}).cardConditionKey,second);
+});
+test('搜尋缺價條件或另一專區條件不回傳無關有價方案',()=>{
+ const absent='5G_XH(60)-續約／1599H',enterprise='(企客_5G)榮耀之星1899H(48)_iPhone';
+ const index=Compare.buildIndex({rows:[row({project_prices:{[plan]:0,[absent]:null,[enterprise]:2999}})]});
+ for(const query of ['1599','60','1899','榮耀之星'])assert.equal(Compare.buildView(index,{segment:'consumer',query}).totalRows,0);
+ assert.equal(Compare.buildView(index,{segment:'consumer',query:'999'}).totalRows,1);
+ assert.equal(Compare.buildView(index,{segment:'enterprise',query:'1899'}).totalRows,1);
+ assert.equal(Compare.buildView(index,{segment:'enterprise',query:'24'}).totalRows,0);
+ assert.equal(Compare.hasPrice('9'.repeat(400)),false);
 });
