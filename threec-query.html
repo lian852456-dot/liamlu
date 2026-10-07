@@ -44,7 +44,7 @@
 </main>
 <script src="threec-price-transport.js?v=20261001-load-1"></script>
 <script src="threec-query-core.js?v=20261001-providers-1"></script>
-<script src="threec-comparison-core.js?v=20261006-model-space-1"></script>
+<script src="threec-comparison-core.js?v=20261007-priced-only-1"></script>
 <script src="threec-price-diff-core.js?v=20261001-providers-1"></script>
 <script>
 (function(scope){
@@ -170,27 +170,28 @@
   function columnLabel(col){return `${col.rent?col.rent+' 元':'月租未標示'} · ${col.term?col.term+'期':'期數未標示'} · ${col.version}${col.detail?' · '+col.detail:''}`;}
   function columnHtml(col){return `<span class="rent-label">${esc(col.rent?col.rent+' 元':'月租未標示')}</span><span>${esc(col.term?col.term+' 期':'期數未標示')} · ${esc(col.version)}</span>${col.detail?`<span class="condition-detail">${esc(col.detail)}</span>`:''}<details><summary>完整條件</summary><span class="raw-condition">${esc(col.raw)}</span></details>`;}
   function variantLabel(row){const names=row.models.map(model=>{const matches=Array.from(model.matchAll(/(?:[-_(\s])(宇宙橙|勃根地紅|午夜|星光|太空灰|黑色?|白色?|藍色?|粉色?|黃色?|綠色?|紫色?|銀色?|金色?)(?=[)\s]|$)/g));return matches.length?matches[matches.length-1][1]:'';}).filter(Boolean);return Array.from(new Set(names)).join('／');}
-  function specHtml(row){return `<strong>${esc(row.model||'未命名機款')}</strong><span class="spec-tags">${esc([row.capacity,row.ram?'RAM '+row.ram:''].filter(Boolean).join(' · ')||'依原表規格')}</span><span class="variant-label">${esc(variantLabel(row))}</span><span class="brand-label">${esc(row.brand)} · ${esc(Core.formatPrice(row.retailPrice))} 單機</span><details><summary>${row.models.length>1?row.models.length+' 款顏色同價':'原始機型／來源'}</summary><span>${row.models.map(esc).join('<br>')}</span><span class="hint">${esc(row.sourceSheet)}${row.codes.length?' · '+row.codes.map(esc).join(' / '):''}</span></details>`;}
-  function cellHtml(row,col){const cell=Compare.cell(row,col);return `<span class="quote ${cell.kind}">${esc(cell.text)}</span>`;}
-  function setReadingMode(mode){readingMode=mode;$('tableModeBtn').setAttribute('aria-pressed',String(mode==='table'));$('cardModeBtn').setAttribute('aria-pressed',String(mode==='card'));$('cardConditionField').classList.toggle('hidden',mode!=='card');renderShopping();}
+  function specHtml(row){return `<strong>${esc(row.model||'未命名機款')}</strong><span class="spec-tags">${esc([row.capacity,row.ram?'RAM '+row.ram:''].filter(Boolean).join(' · ')||'依原表規格')}</span><span class="variant-label">${esc(variantLabel(row))}</span><span class="brand-label">${esc(row.brand)}${Compare.hasPrice(row.retailPrice)?' · '+esc(Core.formatPrice(row.retailPrice))+' 單機':''}</span><details><summary>${row.models.length>1?row.models.length+' 款顏色同價':'原始機型／來源'}</summary><span>${row.models.map(esc).join('<br>')}</span><span class="hint">${esc(row.sourceSheet)}${row.codes.length?' · '+row.codes.map(esc).join(' / '):''}</span></details>`;}
+  function cellHtml(row,col){if(!Compare.hasQuote(row,col))return '';const cell=Compare.cell(row,col);return `<span class="quote ${cell.kind}">${esc(cell.text)}</span>`;}
+  function setReadingMode(mode){readingMode=mode;rowPage=0;$('tableModeBtn').setAttribute('aria-pressed',String(mode==='table'));$('cardModeBtn').setAttribute('aria-pressed',String(mode==='card'));$('cardConditionField').classList.toggle('hidden',mode!=='card');renderShopping();}
   function renderShopping(){
     const target=$('shoppingResults'),response=state.shopping;
     if(!response||!response.snapshot){$('shoppingMeta').innerHTML='';$('shoppingSummary').textContent='';target.innerHTML=`<div class="empty">${response?'尚未發布正式資料：手機專案／3C。':'尚未讀取正式手機專案資料。'}</div>`;['columnPrev','columnNext','rowPrev','rowNext'].forEach(id=>$(id).disabled=true);return;}
     $('shoppingMeta').innerHTML=metaHtml(Core.sourceMeta(response.snapshot,response.registry,'shopping'));
-    shoppingView=Compare.buildView(shoppingIndex,shoppingFilters(),{includeOptions:false});
-    if(rowPage>=shoppingView.rowPages||columnPage>=shoppingView.columnPages){rowPage=0;columnPage=0;shoppingView=Compare.buildView(shoppingIndex,shoppingFilters(),{includeOptions:false});}
+    const viewOptions={includeOptions:false,...(readingMode==='card'?{cardConditionKey:$('shoppingCardCondition').value}:{})};
+    shoppingView=Compare.buildView(shoppingIndex,shoppingFilters(),viewOptions);
+    if(rowPage>=shoppingView.rowPages||columnPage>=shoppingView.columnPages){rowPage=0;columnPage=0;shoppingView=Compare.buildView(shoppingIndex,shoppingFilters(),viewOptions);}
     const view=shoppingView;
-    $('shoppingSummary').textContent=`符合 ${view.totalRows} 組機款報價，${view.totalColumns} 個方案條件；每頁最多 20 組、12 個條件。同價顏色合併，差價或不同條件分列。`;
+    $('shoppingSummary').textContent=`${readingMode==='card'?'本方案':'本組方案'}符合 ${view.totalRows} 組機款報價；篩選共 ${view.totalColumns} 個有價方案條件，本頁呈現 ${view.rows.length} 組。每頁最多 20 組、12 個條件。同價顏色合併，差價或不同條件分列。`;
     $('rowPage').textContent=`${rowPage+1} / ${view.rowPages} 頁`;$('columnPage').textContent=`${columnPage+1} / ${view.columnPages} 組`;
     $('rowPrev').disabled=rowPage===0;$('rowNext').disabled=rowPage+1>=view.rowPages;$('columnPrev').disabled=columnPage===0;$('columnNext').disabled=columnPage+1>=view.columnPages;
-    const select=$('shoppingCardCondition'),prior=select.value;select.innerHTML=view.columns.map(col=>`<option value="${esc(col.key)}">${esc(col.project+' · '+columnLabel(col))}</option>`).join('');if(view.columns.some(col=>col.key===prior))select.value=prior;else if(view.columns.length){const ranked=view.columns.slice().sort((a,b)=>view.rows.filter(row=>Object.prototype.hasOwnProperty.call(row.prices,b.key)&&!Core.priceState(row.prices[b.key]).missing).length-view.rows.filter(row=>Object.prototype.hasOwnProperty.call(row.prices,a.key)&&!Core.priceState(row.prices[a.key]).missing).length);select.value=ranked[0].key;}
+    const select=$('shoppingCardCondition'),prior=select.value;select.innerHTML=view.columns.map(col=>`<option value="${esc(col.key)}">${esc(col.project+' · '+columnLabel(col))}</option>`).join('');if(view.cardConditionKey)select.value=view.cardConditionKey;else if(view.columns.some(col=>col.key===prior))select.value=prior;
     $('cardConditionField').classList.toggle('hidden',readingMode!=='card');
     if(!view.rows.length||!view.columns.length){target.innerHTML='<div class="empty">沒有符合搜尋或資費篩選的正式報價。請調整條件或重設篩選。</div>';return;}
     if(readingMode==='card'){
       const col=view.columns.find(col=>col.key===select.value)||view.columns[0];
       target.innerHTML=`<p class="scroll-hint">一次閱讀一個方案；可切換「橫向比較」對照其他期數。</p><div class="quote-cards">`+view.rows.map(row=>`<article class="quote-card"><div class="spec-cell">${specHtml(row)}</div><div class="card-plan"><span>${esc(col.project)}</span><strong>${esc(columnLabel(col))}</strong>${cellHtml(row,col)}<details><summary>完整原表條件</summary><p>${esc(col.raw)}</p></details></div></article>`).join('')+'</div>';
     }else{
-      target.innerHTML=`<p class="scroll-hint">← 左右滑動比較月租與期數，機款／容量／RAM 固定在左側。未列此條件與無報價（缺價）均不等於 0 元。</p><div class="table-scroll comparison-scroll" tabindex="0" role="region" aria-label="手機專案橫向價格比較"><table class="comparison-table"><caption class="visually-hidden">正式手機專案價格；同規格、同条件、同價的顏色才合併</caption><thead><tr><th class="spec-cell" scope="col">機款／容量／RAM<br><span class="hint">單機價與顏色</span></th>${view.columns.map(col=>`<th scope="col"><span class="project-label" title="${esc(col.project)}">${esc(col.project)}</span>${columnHtml(col)}</th>`).join('')}</tr></thead><tbody>${view.rows.map(row=>`<tr><th scope="row" class="spec-cell">${specHtml(row)}</th>${view.columns.map(col=>`<td>${cellHtml(row,col)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      target.innerHTML=`<p class="scroll-hint">← 左右滑動比較月租與期數，機款／容量／RAM 固定在左側。只呈現有價格的條件，0 元報價保留；空格表示該機款沒有此條件的報價。</p><div class="table-scroll comparison-scroll" tabindex="0" role="region" aria-label="手機專案橫向價格比較"><table class="comparison-table"><caption class="visually-hidden">正式手機專案價格；同規格、同条件、同價的顏色才合併</caption><thead><tr><th class="spec-cell" scope="col">機款／容量／RAM<br><span class="hint">單機價與顏色</span></th>${view.columns.map(col=>`<th scope="col"><span class="project-label" title="${esc(col.project)}">${esc(col.project)}</span>${columnHtml(col)}</th>`).join('')}</tr></thead><tbody>${view.rows.map(row=>`<tr><th scope="row" class="spec-cell">${specHtml(row)}</th>${view.columns.map(col=>`<td>${cellHtml(row,col)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
     }
   }
   function renderTradein(view){
@@ -246,8 +247,8 @@
     ['tradeinSearch','tradeinModel','tradeinProvider','tradeinGrade'].forEach(id=>$(id).addEventListener(id.endsWith('Search')?'input':'change',()=>renderKind('tradein')));
     $('shoppingReset').addEventListener('click',()=>{['shoppingSearch','shoppingBrand','shoppingModel','shoppingCapacity','shoppingProject','shoppingVersion','shoppingTerm'].forEach(id=>$(id).value='');$('shoppingRent').value=shoppingSegment==='enterprise'?'':'common';rowPage=0;columnPage=0;renderKind('shopping');});
     document.querySelectorAll('[data-shortcut]').forEach(button=>button.addEventListener('click',()=>{const value=button.dataset.shortcut;const [rent,term]=value.split('-');$('shoppingRent').value=rent;$('shoppingTerm').value=term||'';$('shoppingVersion').value='';rowPage=0;columnPage=0;renderKind('shopping');}));
-    $('tableModeBtn').addEventListener('click',()=>setReadingMode('table'));$('cardModeBtn').addEventListener('click',()=>setReadingMode('card'));$('shoppingCardCondition').addEventListener('change',renderShopping);
-    [['rowPrev','row',-1],['rowNext','row',1],['columnPrev','column',-1],['columnNext','column',1]].forEach(([id,axis,direction])=>$(id).addEventListener('click',()=>{if(axis==='row')rowPage+=direction;else columnPage+=direction;renderShopping();}));
+    $('tableModeBtn').addEventListener('click',()=>setReadingMode('table'));$('cardModeBtn').addEventListener('click',()=>setReadingMode('card'));$('shoppingCardCondition').addEventListener('change',()=>{rowPage=0;renderShopping();});
+    [['rowPrev','row',-1],['rowNext','row',1],['columnPrev','column',-1],['columnNext','column',1]].forEach(([id,axis,direction])=>$(id).addEventListener('click',()=>{if(axis==='row')rowPage+=direction;else{columnPage+=direction;rowPage=0;}renderShopping();}));
     if(scope.matchMedia('(max-width:700px)').matches)document.querySelector('.filter-details').open=false;
     setShoppingSegment(shoppingSegment);setReadingMode(readingMode);
     let changeSearchTimer=0;

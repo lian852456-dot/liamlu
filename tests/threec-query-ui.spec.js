@@ -55,7 +55,7 @@ test('空白裝置開頁自動查到兩類正式資料，顯示版本且兩家�
   await expect(page.locator('#queryCard')).toBeVisible();
   await expect(page.locator('#shoppingResults')).toContainText('iPhone 16 256GB 黑色');
   await expect(page.locator('#shoppingResults')).toContainText('0 元');
-  await expect(page.locator('#shoppingResults')).toContainText('無報價（缺價）');
+  await expect(page.locator('#shoppingResults')).not.toContainText('無報價（缺價）');
   await page.locator('#tradeinTab').click();
   await expect(page.locator('#tradeinResults')).toContainText('點子行動（獨立報價）');
   await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
@@ -343,7 +343,7 @@ test('compact response reconstructs all prices before query; refresh and segment
   return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(body)});
  });
  await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
- await expect(page.locator('#shoppingResults')).toContainText('0 元');await expect(page.locator('#shoppingResults')).toContainText('無報價');
+ await expect(page.locator('#shoppingResults')).toContainText('0 元');await expect(page.locator('#shoppingResults')).not.toContainText('無報價');
  await page.locator('#enterpriseSegmentBtn').click();await page.locator('#consumerSegmentBtn').click();await expect(page.locator('#shoppingResults')).toContainText('iPhone');
  await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
  expect(calls).toHaveLength(4);expect(calls.every(p=>p.priceEncoding===T.ENCODING&&p.includeChanges===false&&!p.employeeId)).toBe(true);
