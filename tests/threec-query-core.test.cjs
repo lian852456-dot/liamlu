@@ -92,3 +92,16 @@ test('第三家愛鋒派來源未分級独立於SABC，provider/grade篩選保�
  const snapshot={rows};const row=Core.tradeinRow(rows[0]);assert.equal(row.quotes['愛鋒派']['未分級'],0);assert.equal(row.quotes['愛鋒派'].A,300);assert.equal(Core.gradeLabel('未分級'),'來源未分級');assert.deepEqual(Core.providersForRow(row),Core.PROVIDERS);
  assert.equal(Core.filterTradein(snapshot,{provider:'愛鋒派',grade:'未分級'}).length,1);assert.equal(Core.filterTradein(snapshot,{provider:'點子行動',grade:'未分級'}).length,0);assert.equal(Core.filterTradein(snapshot,{provider:'愛鋒派',grade:'A'}).length,2);
 });
+
+ test('舊換新查詢隱藏缺價等級、全缺價回收商及機款，保留零元', () => {
+  const snapshot={rows:[{brand:'Xiaomi',model:'14 512GB',quotes:{'點子行動':{S:null,A:5000,B:4000,C:1000},'FutureDial（FDI）':{S:'',A:null,B:' ',C:undefined}}},{brand:'Apple',model:'zero',quotes:{'愛鋒派':{'未分級':0}}},{brand:'Samsung',model:'missing',quotes:{'點子行動':{S:null,A:'',B:' ',C:undefined}}}]};
+  const rows=Core.filterTradein(snapshot,{});
+  assert.deepEqual(rows.map(row=>row.model),['14 512GB','zero']);
+  assert.deepEqual(Core.quotedProviders(rows[0]),['點子行動']);
+  assert.deepEqual(Core.quotedGrades(rows[0],'點子行動'),['A','B','C']);
+  assert.deepEqual(Core.quotedGrades(rows[1],'愛鋒派'),['未分級']);
+  assert.equal(Core.modelOptions(snapshot,'tradein').length,2);
+  assert.equal(Core.filterTradein(snapshot,{grade:'S'}).length,0);
+  assert.equal(Core.filterTradein(snapshot,{provider:'FutureDial（FDI）'}).length,0);
+  assert.equal(snapshot.rows.length,3);
+ });
