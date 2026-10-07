@@ -275,7 +275,7 @@ test('Google JSON 轉址回 HTML 時，限定來源與 requestId 的既有 ifram
 for(const width of [1280,390,360])test(`${width}px 桌面緊湊字級與手機大字價格保障`,async({page})=>{
  await intercept(page);await page.setViewportSize({width,height:844});await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');
  await page.locator('#tableModeBtn').click();
- const minima=width>=1280?{'body':18,'#shoppingBrand':16,'#shoppingModel':16,'.hint':14,'.condition-detail':13,'.comparison-table details':13,'.spec-cell strong':17,'.variant-label':13,'.comparison-pagination button':14}:Object.fromEntries(['body','#shoppingBrand','#shoppingModel','.hint','.condition-detail','.comparison-table details','.spec-cell strong','.variant-label','.comparison-pagination button'].map(selector=>[selector,18]));
+ const minima=width>=1280?{'body':18,'#shoppingBrand':16,'#shoppingModel':16,'.hint':14,'.condition-detail':13,'.comparison-table details':13,'.spec-cell strong':16,'.variant-label':13,'.comparison-pagination button':14}:Object.fromEntries(['body','#shoppingBrand','#shoppingModel','.hint','.condition-detail','.comparison-table details','.spec-cell strong','.variant-label','.comparison-pagination button'].map(selector=>[selector,18]));
  for(const [selector,minimum] of Object.entries(minima)){
  const fonts=await page.locator(selector).evaluateAll(els=>els.map(el=>parseFloat(getComputedStyle(el).fontSize)));expect(fonts.every(size=>size>=minimum)).toBe(true);
  }

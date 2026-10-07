@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>手機專案／3C＋舊換新查詢｜北一二B</title>
-  <link rel="stylesheet" href="threec-query.css?v=20261007-compact-1">
+  <link rel="stylesheet" href="threec-query.css?v=20261007-compact-2">
 </head>
 <body>
 <main>
@@ -53,7 +53,7 @@
   const DiffCore=scope.ThreecPriceDiffCore;
   const Transport=scope.ThreecPriceTransport;
   const Compare=scope.ThreecComparisonCore;
-  let shoppingIndex=null, shoppingView=null;
+  let shoppingIndex=null, shoppingView=null, splitSpecKeys=new Set();
   let shoppingSegment=new URLSearchParams(scope.location.search).get('section')==='enterprise'?'enterprise':'consumer';
   let rowPage=0,columnPage=0;
   let readingMode=scope.matchMedia('(max-width:700px)').matches?'card':'table';
@@ -114,7 +114,7 @@
   }
   async function invoke(kind){const payload={action:'threec_snapshot_read',kind,includeChanges:false,priceEncoding:Transport.ENCODING};return Transport.decode(await readPublic(payload,kind==='shopping'));}
   function invokeChanges(kind,offset,limit,snapshotHash,search){return readPublic({action:'threec_changes_read',kind,offset:Number(offset||0),limit:Number(limit||1000),snapshotHash:snapshotHash||'',search:String(search||'')});}
-  function clearResults(){shoppingIndex=null;shoppingView=null;state.shopping=null;state.tradein=null;state.changePage={shopping:null,tradein:null};changeLoading.shopping=false;changeLoading.tradein=false;renderKind('shopping');renderKind('tradein');}
+  function clearResults(){shoppingIndex=null;shoppingView=null;splitSpecKeys=new Set();state.shopping=null;state.tradein=null;state.changePage={shopping:null,tradein:null};changeLoading.shopping=false;changeLoading.tradein=false;renderKind('shopping');renderKind('tradein');}
   function metaHtml(meta){return `<div class="source-date"><span>正式來源日期</span><strong>${esc(meta.sourceVersionDate||'未提供')}</strong><span>${esc(meta.rowCount)} 筆來源資料</span></div><details class="source-details"><summary>資料版本與來源資訊</summary><dl><dt>正式版本</dt><dd>${esc(meta.snapshotHash||meta.version||'—')}</dd><dt>發布時間</dt><dd>${esc(meta.publishedAt||'—')}</dd><dt>來源 SHA-256</dt><dd>${esc(meta.sourceFileSha256||'—')}</dd></dl></details>`;}
   function renderPrice(name,value){const state=Core.priceState(value);return `<div class="price-item${state.missing?' missing':''}${state.zero?' zero':''}"><span>${esc(name)}</span><strong>${esc(Core.formatPrice(value))}</strong></div>`;}
   function changeRows(changeSet){if(!changeSet||typeof changeSet!=='object')return [];if(Array.isArray(changeSet.changePage))return changeSet.changePage;if(Array.isArray(changeSet.changes))return changeSet.changes;if(Array.isArray(changeSet.records))return changeSet.records;return [];}
@@ -169,8 +169,11 @@
   }
   function columnLabel(col){return `${col.rent?col.rent+' 元':'月租未標示'} · ${col.term?col.term+'期':'期數未標示'} · ${col.version}${col.detail?' · '+col.detail:''}`;}
   function columnHtml(col){const detail=col.detail.replace(/^[_\s]+/,'');const repeated=detail.replace(/版$/,'').toLocaleLowerCase()===col.version.toLocaleLowerCase();return `<span class="rent-label">${esc(col.rent?col.rent+' 元':'月租未標示')}</span><span class="contract-label">${esc(col.term?col.term+' 期':'期數未標示')} · ${esc(col.version)}</span>${detail&&!repeated?`<span class="condition-detail">${esc(detail)}</span>`:''}<details><summary>完整條件</summary><span class="raw-condition">${esc(col.raw)}</span></details>`;}
-  function variantLabel(row){const names=row.models.map(model=>{const matches=Array.from(model.matchAll(/(?:[-_(\s])(宇宙橙|勃根地紅|午夜|星光|太空灰|黑色?|白色?|藍色?|粉色?|黃色?|綠色?|紫色?|銀色?|金色?)(?=[)\s]|$)/g));return matches.length?matches[matches.length-1][1]:'';}).filter(Boolean);return Array.from(new Set(names)).join('／');}
-  function specHtml(row){return `<strong>${esc(row.model||'未命名機款')}</strong><span class="spec-tags">${esc([row.capacity,row.ram?'RAM '+row.ram:''].filter(Boolean).join(' · ')||'依原表規格')}</span><span class="variant-label">${esc(variantLabel(row))}</span><span class="brand-label">${esc(row.brand)}${Compare.hasPrice(row.retailPrice)?' · '+esc(Core.formatPrice(row.retailPrice))+' 單機':''}</span><details><summary>機型與來源</summary><span>${row.models.map(esc).join('<br>')}</span><span class="hint">${esc(row.sourceSheet)}${row.codes.length?' · '+row.codes.map(esc).join(' / '):''}</span></details>`;}
+  function variantLabel(row){const names=row.models.map(model=>{const matches=Array.from(model.matchAll(/(?:[-_(\s])(宇宙橙|勃根地紅|午夜|星光|太空灰|鈦原色|黑色?|白色?|藍色?|粉色?|黃色?|綠色?|紫色?|銀色?|金色?)(?=[)\s]|$)/g));return matches.length?matches[matches.length-1][1]:'';}).filter(Boolean);return Array.from(new Set(names)).join('／');}
+  function specIdentity(row){return JSON.stringify([row.brand,row.model,row.capacity,row.ram]);}
+  // Derive display distinctions once per accepted snapshot, never during search input.
+  function findSplitSpecs(index){const counts=new Map();index.rows.forEach(row=>{if(!row.projectPrices.some(price=>Compare.hasPrice(price.value)))return;const key=specIdentity(row);counts.set(key,(counts.get(key)||0)+1);});return new Set(Array.from(counts).filter(([,count])=>count>1).map(([key])=>key));}
+  function specHtml(row){const variant=splitSpecKeys.has(specIdentity(row))?(variantLabel(row)||[row.models.join('／'),row.codes.join('／')].filter(Boolean).join(' · ')):'';return `<strong>${esc(row.model||'未命名機款')}</strong><span class="spec-tags">${esc([row.capacity,row.ram?'RAM '+row.ram:''].filter(Boolean).join(' · ')||'依原表規格')}</span>${variant?`<span class="variant-label">${esc(variant)}</span>`:''}<span class="brand-label">${Compare.hasPrice(row.retailPrice)?'單機 '+esc(Core.formatPrice(row.retailPrice)):esc(row.brand)}</span><details><summary>來源</summary><span>${row.models.map(esc).join('<br>')}</span><span class="hint">${esc(row.brand)} · ${esc(row.sourceSheet)}${row.codes.length?' · '+row.codes.map(esc).join(' / '):''}</span></details>`;}
   function cellHtml(row,col){if(!Compare.hasQuote(row,col))return '';const cell=Compare.cell(row,col);return `<span class="quote ${cell.kind}" aria-label="${esc(cell.text)}"><span class="price-value">${esc(cell.text.replace(/ 元$/,''))}</span> <span class="price-unit">元</span></span>`;}
   function setReadingMode(mode){readingMode=mode;rowPage=0;$('tableModeBtn').setAttribute('aria-pressed',String(mode==='table'));$('cardModeBtn').setAttribute('aria-pressed',String(mode==='card'));$('cardConditionField').classList.toggle('hidden',mode!=='card');renderShopping();}
   function renderShopping(){
@@ -226,7 +229,7 @@
           const response=await invoke(kind);
           if(requestGeneration!==generation)return;
           const index=kind==='shopping'?Compare.buildIndex(response.snapshot||{}):null;
-          state[kind]=response;if(kind==='shopping')shoppingIndex=index;
+          state[kind]=response;if(kind==='shopping'){shoppingIndex=index;splitSpecKeys=findSplitSpecs(index);}
           outcomes[kind]={};renderKind(kind);
         }catch(error){
           if(requestGeneration!==generation)return;
