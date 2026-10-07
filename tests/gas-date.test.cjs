@@ -82,3 +82,15 @@ test('absent dates and header-only sheets return empty without fetching unrelate
   assert.deepEqual(Object.keys(loadSheet([['date','store','seg']]).read('2026-10-07',16)), []);
   assert.throws(() => loadSheet([['store','seg']]).read('2026-10-07',16), /缺少/);
 });
+
+test('duplicate savedAt headers preserve the live backend last-column precedence', () => {
+  const h = loadSheet([
+    ['date','store','seg','savedAt','savedAt'],
+    ['2026-10-07','萬大',16,0.5,0.7],
+  ], [
+    ['date','store','seg','savedAt','savedAt'],
+    ['2026-10-07','萬大','16','12:00','16:48'],
+  ]);
+  assert.equal(h.read('2026-10-07',16).萬大.savedAt, '16:48');
+  assert.equal(h.calls.find(r => r.method === 'getDisplayValues').column, 5);
+});

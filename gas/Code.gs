@@ -2760,7 +2760,7 @@ function readData(date, seg) {
   const dateIdx  = headers.indexOf('date');
   const storeIdx = headers.indexOf('store');
   const segIdx   = headers.indexOf('seg');
-  const savedAtIdx = headers.indexOf('savedAt');
+  const savedAtIdx = headers.lastIndexOf('savedAt');
   if (dateIdx < 0 || storeIdx < 0 || segIdx < 0) throw new Error('回報資料缺少 date/store/seg 欄位');
   if (lastRow < 2) return {};
 
