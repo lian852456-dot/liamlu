@@ -2768,9 +2768,18 @@ function readData(date, seg) {
   // Do not assume chronological ordering: late updates and duplicate rows must
   // still be read in sheet order, with the latest matching row winning.
   const dates = sh.getRange(2, dateIdx + 1, lastRow - 1, 1).getValues();
+  // Many rows share the same date. Format each timestamp only once per read;
+  // keep Utilities' timezone semantics and discard this memo after returning.
+  const formattedDates = new Map();
+  function readDate(value) {
+    if (!(value instanceof Date)) return toDateStr(value);
+    const timestamp = value.getTime();
+    if (!formattedDates.has(timestamp)) formattedDates.set(timestamp, toDateStr(value));
+    return formattedDates.get(timestamp);
+  }
   let first = -1, last = -1;
   for (let i = 0; i < dates.length; i++) {
-    if (toDateStr(dates[i][0]) !== String(date)) continue;
+    if (readDate(dates[i][0]) !== String(date)) continue;
     if (first < 0) first = i + 2;
     last = i + 2;
   }
@@ -2785,7 +2794,7 @@ function readData(date, seg) {
   const result = {};
   for (let i = 0; i < allData.length; i++) {
     const r = allData[i];
-    if (toDateStr(r[dateIdx]) === date && Number(r[segIdx]) === Number(seg)) {
+    if (readDate(r[dateIdx]) === date && Number(r[segIdx]) === Number(seg)) {
       const store = r[storeIdx];
       const obj = {};
       headers.forEach((h, idx) => {
@@ -2793,7 +2802,7 @@ function readData(date, seg) {
         if (h === 'savedAt') {
           obj[h] = displayTimes[i][0] || '';
         } else {
-          obj[h] = (v instanceof Date) ? toDateStr(v) : v;
+          obj[h] = (v instanceof Date) ? readDate(v) : v;
         }
       });
       result[store] = obj;
