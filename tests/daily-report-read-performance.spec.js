@@ -10,6 +10,27 @@ test.beforeEach(async({page})=>{
 });
 test.afterEach(async({page})=>{expect(page.__errors).toEqual([]);expect(page.__external).toEqual([]);});
 const summary=page=>page.locator('.tab-btn').filter({hasText:'彙整大盤'}).click();
+test('rapid store changes retain one physical read and display only the final selection',async({page})=>{
+ await page.evaluate(()=>__holdRead=true);
+ await page.locator('.store-card[data-store="酒泉"]').click();await page.waitForFunction(()=>__heldReads.length===1);
+ await page.locator('#dailyStoreToggle').click();await page.locator('.store-card[data-store="萬大"]').click();
+ await page.locator('#dailyStoreToggle').click();await page.locator('.store-card[data-store="通化"]').click();
+ expect(await page.evaluate(()=>__summaryCalls.filter(p=>p.action==='read').length)).toBe(1);
+ await expect(page.locator('.btn-save-main')).toBeDisabled();
+ await page.evaluate(()=>__heldReads[0].release());await expect(page.locator('.btn-save-main')).toBeEnabled();
+ await expect(page.locator('#f_rank')).toHaveValue('20');await expect(page.locator('#dailyStoreToggle')).toContainText('通化');
+});
+test('16 to 21 switch reuses the pending afternoon source, including repeated 21 selection',async({page})=>{
+ await page.evaluate(()=>__holdRead=true);
+ await page.locator('.store-card[data-store="酒泉"]').click();await page.waitForFunction(()=>__heldReads.length===1);
+ await page.locator('#newSeg21').click();await page.waitForFunction(()=>__heldReads.length===2);
+ await page.locator('#newSeg21').click();
+ expect(await page.evaluate(()=>__summaryCalls.map(p=>p.seg))).toEqual([16,21]);
+ await page.evaluate(()=>__heldReads.find(p=>p.payload.seg===21).release());await expect(page.locator('.btn-save-main')).toBeDisabled();
+ await page.evaluate(()=>__heldReads.find(p=>p.payload.seg===16).release());await expect(page.locator('.btn-save-main')).toBeEnabled();
+ await expect(page.locator('#f_rank')).toHaveValue('21');await expect(page.locator('#f_kpi')).toHaveValue('81');
+ await expect(page.locator('#f_aq999')).toHaveValue('11');await expect(page.locator('#f_kpi')).toHaveAttribute('readonly','');
+});
 test('cold fill does not preload hidden data; summary reads only its selected segment, filters do not read',async({page})=>{
  expect(await page.evaluate(()=>__summaryCalls.length)).toBe(0);
  await page.evaluate(()=>dispatchEvent(new Event('portal-login-changed')));
