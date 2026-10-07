@@ -172,7 +172,18 @@
   function variantLabel(row){const names=row.models.map(model=>{const matches=Array.from(model.matchAll(/(?:[-_(\s])(宇宙橙|勃根地紅|午夜|星光|太空灰|鈦原色|黑色?|白色?|藍色?|粉色?|黃色?|綠色?|紫色?|銀色?|金色?)(?=[)\s]|$)/g));return matches.length?matches[matches.length-1][1]:'';}).filter(Boolean);return Array.from(new Set(names)).join('／');}
   function specIdentity(row){return JSON.stringify([row.brand,row.model,row.capacity,row.ram]);}
   // Derive display distinctions once per accepted snapshot, never during search input.
-  function findSplitSpecs(index){const counts=new Map();index.rows.forEach(row=>{if(!row.projectPrices.some(price=>Compare.hasPrice(price.value)))return;const key=specIdentity(row);counts.set(key,(counts.get(key)||0)+1);});return new Set(Array.from(counts).filter(([,count])=>count>1).map(([key])=>key));}
+  function findSplitSpecs(index){
+    const specs=new Map(),amount=value=>Number(String(value).trim().replace(/,/g,''));
+    for(const row of index.rows){
+      const quotes=row.projectPrices.filter(price=>Compare.hasPrice(price.value));if(!quotes.length)continue;
+      const key=specIdentity(row),models=JSON.stringify([...row.models].sort());
+      if(!specs.has(key))specs.set(key,{models,prices:new Map(),retail:null,split:false});
+      const spec=specs.get(key);if(spec.models!==models)spec.split=true;
+      for(const quote of quotes){const value=amount(quote.value);if(spec.prices.has(quote.name)&&spec.prices.get(quote.name)!==value)spec.split=true;spec.prices.set(quote.name,value);}
+      if(Compare.hasPrice(row.retailPrice)){const retail=amount(row.retailPrice);if(spec.retail!==null&&spec.retail!==retail)spec.split=true;spec.retail=retail;}
+    }
+    return new Set(Array.from(specs).filter(([,spec])=>spec.split).map(([key])=>key));
+  }
   function specHtml(row){const variant=splitSpecKeys.has(specIdentity(row))?(variantLabel(row)||[row.models.join('／'),row.codes.join('／')].filter(Boolean).join(' · ')):'';return `<strong>${esc(row.model||'未命名機款')}</strong><span class="spec-tags">${esc([row.capacity,row.ram?'RAM '+row.ram:''].filter(Boolean).join(' · ')||'依原表規格')}</span>${variant?`<span class="variant-label">${esc(variant)}</span>`:''}<span class="brand-label">${Compare.hasPrice(row.retailPrice)?'單機 '+esc(Core.formatPrice(row.retailPrice)):esc(row.brand)}</span><details><summary>來源</summary><span>${row.models.map(esc).join('<br>')}</span><span class="hint">${esc(row.brand)} · ${esc(row.sourceSheet)}${row.codes.length?' · '+row.codes.map(esc).join(' / '):''}</span></details>`;}
   function cellHtml(row,col){if(!Compare.hasQuote(row,col))return '';const cell=Compare.cell(row,col);return `<span class="quote ${cell.kind}" aria-label="${esc(cell.text)}"><span class="price-value">${esc(cell.text.replace(/ 元$/,''))}</span> <span class="price-unit">元</span></span>`;}
   function setReadingMode(mode){readingMode=mode;rowPage=0;$('tableModeBtn').setAttribute('aria-pressed',String(mode==='table'));$('cardModeBtn').setAttribute('aria-pressed',String(mode==='card'));$('cardConditionField').classList.toggle('hidden',mode!=='card');renderShopping();}
