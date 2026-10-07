@@ -17,6 +17,8 @@
   const UNGRADED = '未分級';
   function providerGrades(provider){return provider==='愛鋒派'?GRADES.concat(UNGRADED):GRADES.slice();}
   function providersForRow(row){return PROVIDERS.filter(provider=>row.quotes&&Object.prototype.hasOwnProperty.call(row.quotes,provider));}
+  function quotedGrades(row,provider,selectedGrade){return providerGrades(provider).filter(grade=>(!selectedGrade||grade===selectedGrade)&&!priceState(row.quotes&&row.quotes[provider]&&row.quotes[provider][grade]).missing);}
+  function quotedProviders(row,selectedProvider,selectedGrade){return providersForRow(row).filter(provider=>(!selectedProvider||provider===selectedProvider)&&quotedGrades(row,provider,selectedGrade).length>0);}
   function gradeLabel(grade){return grade===UNGRADED?'來源未分級':grade+' 級';}
 
   function text(value) {
@@ -179,7 +181,7 @@
   function filterTradein(snapshot, filters) {
     const query = text(filters && filters.query).toLocaleLowerCase();
     const provider=text(filters&&filters.provider),grade=text(filters&&filters.grade);
-    return rowList(snapshot).map(tradeinRow).filter(row => (!query || [row.sourceSheet, row.brand, row.model, row.colorlessModel].join(' ').toLocaleLowerCase().includes(query)) && (!provider||Object.values(row.quotes[provider]||{}).some(value=>!priceState(value).missing)) && (!grade||(provider?[provider]:providersForRow(row)).some(vendor=>row.quotes[vendor]&&Object.prototype.hasOwnProperty.call(row.quotes[vendor],grade)&&!priceState(row.quotes[vendor][grade]).missing)));
+    return rowList(snapshot).map(tradeinRow).filter(row => (!query || [row.sourceSheet, row.brand, row.model, row.colorlessModel].join(' ').toLocaleLowerCase().includes(query)) && quotedProviders(row,provider,grade).length>0);
   }
 
   function modelOptions(snapshot, kind) {
@@ -187,7 +189,7 @@
       return shoppingGroups(snapshot).map(group => ({ value: group.key, label: [group.sourceSheet, group.brand, group.colorlessModel].filter(Boolean).join(' · ') || '未命名機款' }));
     }
     const seen = new Set();
-    return rowList(snapshot).map(tradeinRow).filter(row => {
+    return filterTradein(snapshot, {}).filter(row => {
       const key = [row.brand, row.colorlessModel || row.model].join('\u0001');
       if (seen.has(key)) return false;
       seen.add(key);
@@ -231,7 +233,7 @@
   return Object.freeze({
     STORAGE_KEYS,
     PROVIDERS,
-    GRADES, UNGRADED, providerGrades, providersForRow, gradeLabel,
+    GRADES, UNGRADED, providerGrades, providersForRow, quotedGrades, quotedProviders, gradeLabel,
     rowList,
     sourceMeta,
     priceState,
