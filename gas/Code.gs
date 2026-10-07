@@ -2754,17 +2754,36 @@ function toDateStr(v) {
 
 function readData(date, seg) {
   const sh = getSheet();
-  const dataRange = sh.getDataRange();
-  const allData = dataRange.getValues();
-  // savedAt 是純時間序號；使用試算表顯示值，避免被格式化為 1899-12-30。
-  const displayData = dataRange.getDisplayValues();
-  const headers = allData[0];
+  const lastRow = sh.getLastRow();
+  const lastColumn = sh.getLastColumn();
+  const headers = sh.getRange(1, 1, 1, lastColumn).getValues()[0];
   const dateIdx  = headers.indexOf('date');
   const storeIdx = headers.indexOf('store');
   const segIdx   = headers.indexOf('seg');
+  const savedAtIdx = headers.indexOf('savedAt');
+  if (dateIdx < 0 || storeIdx < 0 || segIdx < 0) throw new Error('回報資料缺少 date/store/seg 欄位');
+  if (lastRow < 2) return {};
+
+  // Read the date column first, then only the span containing this day's rows.
+  // Do not assume chronological ordering: late updates and duplicate rows must
+  // still be read in sheet order, with the latest matching row winning.
+  const dates = sh.getRange(2, dateIdx + 1, lastRow - 1, 1).getValues();
+  let first = -1, last = -1;
+  for (let i = 0; i < dates.length; i++) {
+    if (toDateStr(dates[i][0]) !== String(date)) continue;
+    if (first < 0) first = i + 2;
+    last = i + 2;
+  }
+  if (first < 0) return {};
+  const count = last - first + 1;
+  const dataRange = sh.getRange(first, 1, count, lastColumn);
+  const allData = dataRange.getValues();
+  // savedAt 是純時間序號；使用試算表顯示值，避免被格式化為 1899-12-30。
+  // Only this one column needs formatting, not the entire historical table.
+  const displayTimes = savedAtIdx < 0 ? [] : sh.getRange(first, savedAtIdx + 1, count, 1).getDisplayValues();
 
   const result = {};
-  for (let i = 1; i < allData.length; i++) {
+  for (let i = 0; i < allData.length; i++) {
     const r = allData[i];
     if (toDateStr(r[dateIdx]) === date && Number(r[segIdx]) === Number(seg)) {
       const store = r[storeIdx];
@@ -2772,7 +2791,7 @@ function readData(date, seg) {
       headers.forEach((h, idx) => {
         const v = r[idx];
         if (h === 'savedAt') {
-          obj[h] = displayData[i][idx] || '';
+          obj[h] = displayTimes[i][0] || '';
         } else {
           obj[h] = (v instanceof Date) ? toDateStr(v) : v;
         }
