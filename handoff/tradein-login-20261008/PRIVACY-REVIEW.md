@@ -1,12 +1,12 @@
 # 本次公開交接的去敏檢查
 
-範圍僅 README 明列的七個新增 allowlist 檔案與這一筆從既有公開 main 建立的提交；沒有整個既有公開儲存庫或歷史的個資保證。
+範圍僅 README 明列的七個新增 allowlist 檔案與从既有公開 main 建立的這條純交接提交鏈；沒有整個既有公開儲存庫或歷史的個資保證。
 
 逐檔人工核對與工具掃描已完成：
 
 | 檔案 | 核對结果 |
 | --- | --- |
-| INTEGRATION.patch | 只有 UI/controller/合成測試程式；employeeId/password 欄名是接口，沒有真實值或內嵌來源資料。價格 URL 為既有公開入口，沒有私有 Script/Sheet/Drive ID／正式設定值 |
+| INTEGRATION.patch | 只有 UI/controller/合成測試及 CI 程式；employeeId/password 欄名是接口，沒有真實值或內嵌來源資料。價格 URL 為既有公開入口，沒有私有 Script/Sheet/Drive ID／正式設定值 |
 | GasBClient.js | 取自最新 e857c5f 的 client 並匹配來源 manifest SHA；URL 為 caller 參數，無硬編碼 credential/真實 proof，無持久或 log bearer |
 | owner-read-boundary.example.patch | 只包 host read 函式／native fence，沒有名冊或真實 payload，未帶後端完整 editor／設定 |
 | LOGIN-INTERFACE.md | 人工重寫去敏契約；不複製含真實識別的原交接文件，不記具名身份／私有資源／設定值 |

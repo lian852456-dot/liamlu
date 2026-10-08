@@ -1,3 +1,42 @@
+diff --git a/.github/workflows/homepage-ui.yml b/.github/workflows/homepage-ui.yml
+index 3f1d37a..244d864 100644
+--- a/.github/workflows/homepage-ui.yml
++++ b/.github/workflows/homepage-ui.yml
+@@ -13,6 +13,14 @@ on:
+       - 'tests/home.spec.js'
+       - 'tests/home-reminder-model.test.cjs'
+       - 'tests/home-navigation-contract.test.cjs'
++      - 'threec-query.html'
++      - 'threec-query-ui.js'
++      - 'tradein-query.html'
++      - 'tradein-area.css'
++      - 'tests/tradein-area-ui.spec.js'
++      - 'tests/threec-query-ui.spec.js'
++      - 'tests/threec-phase1-ui.spec.js'
++      - 'tests/threec-options-update.test.cjs'
+       - 'tradein-progress.html'
+       - 'tradein-progress.css'
+       - 'tradein-progress.mjs'
+@@ -59,7 +67,7 @@ jobs:
+         run: |
+           git rev-parse HEAD
+           node --check home.js
+-          node --test tests/home-reminder-model.test.cjs tests/home-navigation-contract.test.cjs tests/department-ops.test.cjs tests/patrol-question-versions.test.cjs tests/patrol-dashboard-contract.test.cjs tests/patrol-dashboard-client.test.cjs tests/tradein-performance.test.cjs
++          node --test tests/home-reminder-model.test.cjs tests/home-navigation-contract.test.cjs tests/department-ops.test.cjs tests/patrol-question-versions.test.cjs tests/patrol-dashboard-contract.test.cjs tests/patrol-dashboard-client.test.cjs tests/tradein-performance.test.cjs tests/threec-options-update.test.cjs
+       - name: Run isolated homepage browser checks
+         env:
+           TEST_BASE_URL: http://127.0.0.1:4173/
+@@ -75,7 +83,7 @@ jobs:
+           # synthetic credentials/data only. No production login or data write.
+           # Repeat exact 5-second pause/resume boundaries before the full suite.
+           npx playwright test tests/home.spec.js --grep '提醒每 5 秒輪播|提醒滑鼠停留|滑鼠點擊可暫停' --repeat-each=5 --workers=1 --reporter=list --output=test-results/rotation-stability
+-          npx playwright test tests/home.spec.js tests/tradein-performance-ui.spec.js --workers=1 --reporter=list,html
++          npx playwright test tests/home.spec.js tests/tradein-performance-ui.spec.js tests/tradein-area-ui.spec.js tests/threec-query-ui.spec.js tests/threec-phase1-ui.spec.js --workers=1 --reporter=list,html
+       - name: Save screenshots and browser test report
+         if: always()
+         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+diff --git a/app.html b/app.html
+index 7b6f685..4de185f 100644
 --- a/app.html
 +++ b/app.html
 @@ -129,7 +129,7 @@
@@ -9,6 +48,8 @@
          <article class="profile-card"><span class="profile-mark">L</span><div><strong>Liam Supervisor</strong><small>App 1.2 · 個績與每日回報摘要</small></div><span id="viewerState" class="status-chip">未登入</span></article>
  
          <section class="panel access-panel" aria-labelledby="battleAccessTitle">
+diff --git a/home.html b/home.html
+index 3e00560..2656415 100644
 --- a/home.html
 +++ b/home.html
 @@ -15,8 +15,10 @@
@@ -34,6 +75,281 @@
          </section>
        </nav>
      </div>
+diff --git a/tests/department-ops.test.cjs b/tests/department-ops.test.cjs
+index 29122c7..1e3c003 100644
+--- a/tests/department-ops.test.cjs
++++ b/tests/department-ops.test.cjs
+@@ -162,7 +162,7 @@ test('首頁正式上傳入口的完整模板包含資產皆通過白名單，
+ 
+ test('首頁查價入口保留公開讀取與受限傳輸備援，比較不合併不同價格矩陣', () => {
+   const Compare=require('../threec-comparison-core.js');
+-  const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8');
++  const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8')+fs.readFileSync(path.join(__dirname,'../threec-query-ui.js'),'utf8');
+   assert.match(html,/credentials:'omit'/);
+   assert.match(html,/function readPublicFrame/);
+   assert.match(html,/message.requestId!==requestId/);
+diff --git a/tests/home-navigation-contract.test.cjs b/tests/home-navigation-contract.test.cjs
+index d566988..2776008 100644
+--- a/tests/home-navigation-contract.test.cjs
++++ b/tests/home-navigation-contract.test.cjs
+@@ -30,7 +30,7 @@ test('home navigation retains PR179 performance and PR181 lab removal', () => {
+   assert.deepEqual(staffHrefs, [
+     'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html',
+     'https://twm-store-inspection.liamlu245.chatgpt.site/',
+-    'tradein-progress.html', 'threec-query.html'
++    'threec-query.html', 'tradein-query.html'
+   ]);
+   assert.equal(cards(navigation('督導專區')).length, 7);
+   assert.equal(cards(html).length, 4 + staffHrefs.length + 7);
+@@ -64,7 +64,8 @@ test('supervisor gold maintenance retains its distinct administration route', ()
+ 
+ test('formal price lookup is a staff tool without publisher privileges', () => {
+   const lookup = cardFor(navigation('同仁大廳'), 'threec-query.html');
+-  assert.match(lookup, /手機專案／3C＋舊換新/);
++  assert.match(lookup, /手機專案價查詢/);
++  assert.doesNotMatch(lookup, /舊換新/);
+   assert.doesNotMatch(lookup, /發布|上傳/);
+ });
+ 
+@@ -75,3 +76,12 @@ test('home omits the import lab entry while retaining its maintenance page and f
+   assert.equal(upload.length, 1);
+   assert.match(upload[0], /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
+ });
++
++test('trade-in area groups public recovery prices and the existing private performance route', () => {
++  const area=cardFor(navigation('同仁大廳'),'tradein-query.html');
++  assert.match(area, /<h3>舊換新專區<\/h3>/);
++  assert.match(area, /回收價查詢／個人績效/);
++  assert.doesNotMatch(navigation('同仁大廳'), /href="tradein-progress\.html"/);
++  const app=fs.readFileSync(path.resolve(__dirname,'../app.html'),'utf8');
++  assert.match(app, /href="tradein-progress\.html">舊換新專區｜個人績效/);
++});
+diff --git a/tests/home.spec.js b/tests/home.spec.js
+index e9b97ea..14c261d 100644
+--- a/tests/home.spec.js
++++ b/tests/home.spec.js
+@@ -21,7 +21,7 @@ const STORE_INSPECTION_URL = 'https://twm-store-inspection.liamlu245.chatgpt.sit
+ const UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
+ const EXPECTED_HREFS = [
+   'kpi-battle.html', 'awards-battle.html', 'index.html', 'gold-medal.html',
+-  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'tradein-progress.html', 'threec-query.html',
++  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'threec-query.html', 'tradein-query.html',
+   'department-ops.html', 'north12b-gold-ops.html', 'patrol.html',
+   'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
+   'phone-stock-dashboard.html'
+@@ -216,17 +216,18 @@ for (const viewport of [{width:1280,height:1300},{width:390,height:844}]) {
+     const lab = page.locator('a[href="tradein-import-lab.html"]');
+     const lookup = page.locator('a.card[href="threec-query.html"]');
+     const upload = page.locator(`a.card[href="${UPLOAD_URL}"]`);
++    const area = page.locator('a.card[href="tradein-query.html"]');
+     await expect(lab).toHaveCount(0);
+     for (const query of ['匯入測試區','3C','舊換新','']) {
+       await page.locator('#tool-search').fill(query);
+       await expect(lab).toHaveCount(0);
+       if (query !== '匯入測試區') {
+-        await expect(lookup).toBeVisible();
++        await expect(query==='舊換新'?area:lookup).toBeVisible();
+         await expect(upload).toBeVisible();
+       }
+     }
+     await expect(page.locator('a.card:visible')).toHaveCount(EXPECTED_HREFS.length);
+-    await expect(lookup.locator('h3')).toHaveText('手機專案／3C＋舊換新');
++    await expect(lookup.locator('h3')).toHaveText('手機專案價查詢');
+     await expect(upload.locator('h3')).toHaveText('資料快速上傳');
+     await noOverflow(page);
+     expect(calls).toEqual([]);
+diff --git a/tests/threec-options-update.test.cjs b/tests/threec-options-update.test.cjs
+index 67f0cf6..ce5e362 100644
+--- a/tests/threec-options-update.test.cjs
++++ b/tests/threec-options-update.test.cjs
+@@ -1,7 +1,7 @@
+ 'use strict';
+ const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+ const Compare=require('../threec-comparison-core.js'),fixture=require('./threec-search-fixture.cjs');
+-const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8');
++const html=fs.readFileSync(path.join(__dirname,'../threec-query-ui.js'),'utf8');
+ function section(name,next){return html.slice(html.indexOf('  function '+name+'('),html.indexOf('  function '+next+'('));}
+ const current=section('updateShoppingOptions','columnLabel');
+ // The pre-change behavior is an independent oracle for ordered selection resets.
+diff --git a/tests/threec-phase1-ui.spec.js b/tests/threec-phase1-ui.spec.js
+index ef39072..e3be12f 100644
+--- a/tests/threec-phase1-ui.spec.js
++++ b/tests/threec-phase1-ui.spec.js
+@@ -55,8 +55,8 @@ for(const width of [1280,390,360])test(`${width}px 橫滑固定規格、卡片
+  await expect(page.locator('#shoppingCardCondition option')).not.toContainText(['加碼']);
+  await page.locator('#shoppingCardCondition').selectOption(fixture.p(999,24,'VIP'));
+  await expect(page.locator('.quote-cards')).not.toContainText('無報價（缺價）');
+- await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
+- await page.locator('#shoppingTab').click();await expect(page.locator('.quote-cards')).toBeVisible();expect(errors).toEqual([]);
++ await page.goto('file://'+path.resolve(__dirname,'../tradein-query.html'));await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
++ await page.goto(URL);if(width>700)await page.locator('#cardModeBtn').click();await expect(page.locator('.quote-cards')).toBeVisible();expect(errors).toEqual([]);
+ });
+ test('大量條件與機款獨立分页，不一次展開所有維度',async({page})=>{
+  const response=JSON.parse(JSON.stringify(fixture.shopping));response.snapshot.rows=Array.from({length:25},(_,i)=>({...fixture.shopping.snapshot.rows[0],model:'大量機款 '+i+' 256GB',colorless_model:'大量機款 '+i+' 256GB',project_prices:Object.fromEntries(Array.from({length:18},(_,j)=>[fixture.p(999,24+j),j]))}));
+diff --git a/tests/threec-query-ui.spec.js b/tests/threec-query-ui.spec.js
+index 4c1f698..88f866a 100644
+--- a/tests/threec-query-ui.spec.js
++++ b/tests/threec-query-ui.spec.js
+@@ -4,6 +4,7 @@ const { test, expect } = require('@playwright/test');
+ const path = require('node:path');
+ 
+ const PAGE_URL = 'file://' + path.resolve(__dirname, '../threec-query.html');
++const TRADEIN_URL = 'file://' + path.resolve(__dirname, '../tradein-query.html');
+ const DEVICE_KEY = 'north12b_private_dashboard_device_id';
+ const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
+ 
+@@ -56,13 +57,13 @@ test('空白裝置開頁自動查到兩類正式資料，顯示版本且兩家
+   await expect(page.locator('#shoppingResults')).toContainText('iPhone 16 256GB 黑色');
+   await expect(page.locator('#shoppingResults')).toContainText('0 元');
+   await expect(page.locator('#shoppingResults')).not.toContainText('無報價（缺價）');
+-  await page.locator('#tradeinTab').click();
++  await page.goto(TRADEIN_URL);
+   await expect(page.locator('#tradeinResults')).toContainText('點子行動（獨立報價）');
+   await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
+   await expect(page.locator('#tradeinResults')).not.toContainText('無報價');
+   await expect(page.locator('#tradeinResults table').nth(0).locator('thead tr').nth(1).locator('th')).toHaveText(['原始機型／容量','S 級','A 級','C 級']);
+   await expect(page.locator('#tradeinResults')).toContainText('0 元');
+-  expect(calls.map(call => call.action)).toEqual(['threec_snapshot_read','threec_snapshot_read']);
++  expect(calls.map(call => call.action)).toEqual(Array(4).fill('threec_snapshot_read'));
+   expect(calls.every(call => !('employeeId' in call) && !('deviceId' in call))).toBe(true);
+   await expect(page.locator('#employeeId')).toHaveCount(0);
+   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 1280);
+@@ -74,7 +75,7 @@ test('正式異動顯示報價條件 counts、完整資費與回收商等級，
+   await expect(page.locator('#changeCard')).toContainText('調價（筆報價條件）');
+   await expect(page.locator('#changeCard')).toContainText('合約24期');
+   await expect(page.locator('#changeCard')).toContainText('1,299 元');
+-  await page.locator('#tradeinTab').click();
++  await page.goto(TRADEIN_URL);
+   await expect(page.locator('#changeCard')).toContainText('FutureDial（FDI）');
+   await expect(page.locator('#changeCard')).toContainText('A');
+   await page.locator('#changeSearch').fill('FutureDial');
+@@ -109,9 +110,9 @@ test('單一類別尚未發布時保留另一類查詢，並明確標示未發
+   await intercept(page, { missing:'shopping' });
+   await page.goto(PAGE_URL);
+   await expect(page.locator('#queryCard')).toBeVisible();
+-  await expect(page.locator('#queryStatus')).toContainText('手機專案／3C 尚未發布正式資料');
++  await expect(page.locator('#queryStatus')).toContainText('手機專案價查詢 尚未發布正式資料');
+   await expect(page.locator('#shoppingResults')).toContainText('尚未發布正式資料：手機專案／3C');
+-  await page.locator('#tradeinTab').click();
++  await page.goto(TRADEIN_URL);
+   await expect(page.locator('#tradeinResults')).toContainText('Galaxy S25 512GB');
+ });
+ 
+@@ -187,16 +188,18 @@ test('GAS JSON序列化的 changePage 能顯示正式異動並跨頁', async ({
+ });
+ 
+ 
+-test('切換分類清空搜尋後返回手機，會重新查詢全版清單', async ({ page }) => {
++test('搜尋後跨專區與返回手機會清空篩選並讀取 active', async ({page}) => {
+   const calls=await intercept(page);await page.goto(PAGE_URL);
+-  await expect(page.locator('#queryCard')).toBeVisible();
++  await expect(page.locator('#changeResults')).toContainText('合約24期');
+   await page.locator('#changeSearch').fill('合約24期');
+   await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read'&&c.kind==='shopping').length).toBe(1);
+-  await page.locator('#tradeinTab').click();await page.locator('#changeSearch').fill('');
+-  await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read'&&c.kind==='tradein'&&c.search==='').length).toBe(1);
+-  await page.locator('#shoppingTab').click();
+-  await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read'&&c.kind==='shopping'&&c.search==='').length).toBe(1);
+-  await expect(page.locator('#changeSummary')).not.toContainText('正在搜尋');
++  await page.goto(TRADEIN_URL);
++  await expect(page.locator('#changeResults')).toContainText('FutureDial');
++  await expect(page.locator('#changeSearch')).toHaveValue('');
++  await page.goto(PAGE_URL);
++  await expect(page.locator('#changeResults')).toContainText('999型專案價');
++  await expect(page.locator('#changeSearch')).toHaveValue('');
++  expect(calls.filter(c=>c.action==='threec_snapshot_read')).toHaveLength(6);
+ });
+ 
+ test('首版完整異動匯出由已驗證正式快照生成，避免重複下載全價資料', async ({ page }) => {
+@@ -215,47 +218,38 @@ test('首版完整異動匯出由已驗證正式快照生成，避免重複下
+   expect(exported.changes.some(c=>c.after.kind==='missing')).toBe(true);
+ });
+ 
+-test('快速切換分類時，舊分類延遲請求不能作廢新分類清單', async ({ page }) => {
+-  let releaseShopping, releaseTradein;
+-  const shoppingPending=new Promise(resolve=>{releaseShopping=resolve;});
+-  const tradeinPending=new Promise(resolve=>{releaseTradein=resolve;});
+-  const calls=[];
++test('跨專區離頁後，舊手機搜尋延遲回應不能覆蓋回收價與異動', async ({page}) => {
++  let release;
++  const pending=new Promise(resolve=>release=resolve);const calls=[];
+   await page.route('**/exec*',async route=>{
+-    const payload=publicPayload(route.request());
++    const payload=publicPayload(route.request());calls.push(payload);
+     if(payload.action==='threec_changes_read'){
+-      calls.push(payload);
+-      if(payload.kind==='shopping'&&payload.search==='')await shoppingPending;
+-      if(payload.kind==='tradein'&&payload.search==='')await tradeinPending;
+-      return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:response(payload.kind).changeSet})});
++      await pending;
++      return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:response('shopping').changeSet})});
+     }
+-    return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify(response(payload.kind))});
++    return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(response(payload.kind))});
+   });
+-  await page.goto(PAGE_URL);
+-  await expect(page.locator('#queryCard')).toBeVisible();
++  await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');
+   await page.locator('#changeSearch').fill('合約24期');
+-  await expect.poll(()=>calls.filter(c=>c.kind==='shopping').length).toBe(1);
+-  await expect(page.locator('#changeSummary')).not.toContainText('正在搜尋');
+-  await page.locator('#tradeinTab').click();await page.locator('#changeSearch').fill('');
+-  await page.locator('#shoppingTab').click();
+-  await expect.poll(()=>calls.filter(c=>c.kind==='shopping'&&c.search==='').length).toBe(1);
+-  await expect.poll(()=>calls.filter(c=>c.kind==='tradein'&&c.search==='').length).toBe(1);
+-  releaseShopping();
+-  await expect(page.locator('#changeSummary')).not.toContainText('正在搜尋');
+-  await expect(page.locator('#changeCsvBtn')).toBeEnabled();
+-  releaseTradein();
+-  await expect(page.locator('#changeTitle')).toContainText('手機專案');
++  await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read').length).toBe(1);
++  await page.goto(TRADEIN_URL);await expect(page.locator('#tradeinResults')).toContainText('Galaxy');
++  release();
++  await expect(page.locator('#changeResults')).toContainText('FutureDial');
++  await expect(page.locator('#changeResults')).not.toContainText('合約24期');
++  await expect(page.locator('#shoppingPane')).toBeHidden();
+ });
+ 
+ test('某一類 API 失敗不清除另一類已完成價格，並允許重整復原',async({page})=>{
+  let fail=true;
+  await page.route('**/exec*',route=>{const p=publicPayload(route.request());return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(fail&&p.kind==='tradein'?{status:'error',message:'獨立測試失敗'}:response(p.kind))});});
+- await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('舊換新：獨立測試失敗');await expect(page.locator('#shoppingResults')).toContainText('iPhone');
+- fail=false;await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('Galaxy');
++ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await expect(page.locator('#shoppingResults')).toContainText('iPhone');
++ await page.goto(TRADEIN_URL);await expect(page.locator('#queryStatus')).toContainText('獨立測試失敗');
++ fail=false;await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.goto(TRADEIN_URL);await expect(page.locator('#tradeinResults')).toContainText('Galaxy');
+ });
+ test('另一類慢讀取時手機先可查，不能等待兩類才渲染',async({page})=>{
+  let release;const pending=new Promise(resolve=>release=resolve);
+  await page.route('**/exec*',async route=>{const p=publicPayload(route.request());if(p.kind==='tradein')await pending;return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(response(p.kind))});});
+- await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#queryStatus')).toContainText('可先查詢');release();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
++ await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');release();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ });
+ test('Google JSON 轉址回 HTML 時，限定來源與 requestId 的既有 iframe 可讀回',async({page})=>{
+  const requests=[];
+@@ -289,7 +283,7 @@ for(const width of [1280,390,360])test(`${width}px 桌面緊湊字級與手機
+ for(const width of [1280,390])test(`三家公開報價與來源未分級 ${width}px，篩選和SABC不互相覆蓋`,async({page})=>{
+  await page.setViewportSize({width,height:900});
+  await page.route('**/exec*',route=>{const p=publicPayload(route.request());const r=response(p.kind);if(p.kind==='tradein'){r.snapshot.rows[0].quotes['愛鋒派']={S:null,A:'900',B:null,C:null,'未分級':0};}return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify(r)});});
+- await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.locator('#tradeinTab').click();
++ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.goto(TRADEIN_URL);
+  await expect(page.locator('#tradeinResults')).toContainText('愛鋒派（獨立報價）');await expect(page.locator('#tradeinResults')).toContainText('來源未分級');
+  await page.locator('#tradeinProvider').selectOption('愛鋒派');await page.locator('#tradeinGrade').selectOption('未分級');const table=page.locator('#tradeinResults table');await expect(table).toHaveCount(1);await expect(table).toContainText('0 元');await expect(table).not.toContainText('900 元');await expect(table).not.toContainText('A 級');
+  await page.locator('#tradeinGrade').selectOption('A');await expect(table).toContainText('900 元');await expect(table).not.toContainText('來源未分級');
+@@ -316,9 +310,9 @@ test('完整價格先讀取，異動僅在要求時載入且鎖定目前快照',
+   if(p.action==='threec_snapshot_read')return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify({...response(p.kind),changeSet:null,changesDeferred:true})});
+   return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify({status:'ok',snapshotHash:response(p.kind).snapshot.snapshot_hash,changeSet:response(p.kind).changeSet})});
+  });
+- await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
++ await page.goto(TRADEIN_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+  expect(calls).toHaveLength(2);expect(calls.every(p=>p.includeChanges===false)).toBe(true);
+- await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('17,500');expect(calls).toHaveLength(2);
++ await expect(page.locator('#tradeinResults')).toContainText('17,500');expect(calls).toHaveLength(2);
+  await page.locator('#changeLoadBtn').click();await expect(page.locator('#changeResults')).toContainText('FutureDial');
+  expect(calls[2]).toMatchObject({action:'threec_changes_read',kind:'tradein',snapshotHash:'tradein-snapshot-v1',offset:0,limit:100});
+  await expect(page.locator('#changeLoadBtn')).toBeHidden();
+diff --git a/threec-query.html b/threec-query.html
+index f9a2cf9..87cc155 100644
 --- a/threec-query.html
 +++ b/threec-query.html
 @@ -3,18 +3,21 @@
@@ -305,6 +621,8 @@
 +<script src="threec-query-ui.js"></script>
  </body>
  </html>
+diff --git a/tradein-progress.html b/tradein-progress.html
+index 3fafe91..dff0caa 100644
 --- a/tradein-progress.html
 +++ b/tradein-progress.html
 @@ -1,8 +1,10 @@
@@ -322,6 +640,92 @@
  <div id="privateWorkspace" hidden><div class="role-select"><strong id="profileLabel"></strong><label>統計月份<input id="periodMonth" type="month"></label><button id="refreshData" class="secondary" type="button">重新讀取</button><button id="logout" class="secondary" type="button">登出</button></div>
  <section class="panel"><div class="panel-heading"><div><h2>本月進度</h2><p id="periodMeta" class="meta">尚未讀取來源</p></div><span id="updatedLabel" class="badge blue"></span></div><div id="self" class="self-grid" style="margin-top:20px"></div></section>
  <section id="exportPanel" class="panel"><div class="panel-heading"><div><h2>複製與匯出提醒</h2><p id="exportScopeLabel" class="meta"></p></div><label>匯出範圍<select id="exportScope"><option value="self">本人</option></select></label></div>
+diff --git a/tests/tradein-area-ui.spec.js b/tests/tradein-area-ui.spec.js
+new file mode 100644
+index 0000000..5bf7791
+--- /dev/null
++++ b/tests/tradein-area-ui.spec.js
+@@ -0,0 +1,77 @@
++'use strict';
++
++const {test,expect}=require('@playwright/test');
++const fs=require('node:fs/promises'),http=require('node:http'),path=require('node:path');
++const Fixture=require('./threec-search-fixture.cjs');
++let BASE,server;
++test.beforeAll(async()=>{
++  if(process.env.TEST_BASE_URL){BASE=process.env.TEST_BASE_URL;return;}
++  const root=path.resolve(__dirname,'..');
++  server=http.createServer(async(req,res)=>{
++    try{
++      const file=path.resolve(root,'.'+decodeURIComponent(new URL(req.url,'http://localhost').pathname));
++      if(path.relative(root,file).startsWith('..'))throw new Error('outside test root');
++      const type={'.html':'text/html','.js':'application/javascript','.mjs':'application/javascript','.css':'text/css'}[path.extname(file)];
++      if(!type)throw new Error('unsupported asset');
++      res.writeHead(200,{'Content-Type':type+';charset=utf-8','Connection':'close'});res.end(await fs.readFile(file));
++    }catch{res.writeHead(404);res.end();}
++  });
++  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
++  BASE=`http://127.0.0.1:${server.address().port}/`;
++});
++test.afterAll(async()=>{if(server)await new Promise(resolve=>server.close(resolve));});
++async function intercept(page){
++  const calls=[],errors=[];
++  page.on('pageerror',error=>errors.push(error.message));
++  await page.route('**/*',async route=>{
++    const request=route.request(),url=new URL(request.url());
++    if(url.origin===new URL(BASE).origin)return route.continue();
++    if(url.hostname!=='script.google.com')return route.abort('blockedbyclient');
++    const text=request.postData()||'{}';let payload;
++    try{payload=JSON.parse(text);}catch{payload=JSON.parse(new URLSearchParams(text).get('payload')||'{}');}
++    calls.push(payload);
++    if(!['threec_snapshot_read','threec_changes_read'].includes(payload.action))return route.abort('blockedbyclient');
++    const body=payload.action==='threec_snapshot_read'?Fixture[payload.kind]():{status:'ok',changeSet:{kind:payload.kind,changes:[],changeCount:0,totalChangeCount:0,hasMore:false}};
++    if(url.searchParams.get('transport')==='iframe')return route.fulfill({contentType:'text/html; charset=utf-8',body:'<script>window.top.postMessage('+JSON.stringify({type:'north12b-gas-response-v1',requestId:url.searchParams.get('requestId'),body})+',"*")</script>'});
++    return route.fulfill({contentType:'application/json; charset=utf-8',body:JSON.stringify(body)});
++  });
++  return {calls,errors};
++}
++async function noOverflow(page){expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
++for(const width of [1280,390,320])test(`${width}px phone prices and both trade-in views use real navigation without exposing private data`,async({page},testInfo)=>{
++  const {calls,errors}=await intercept(page);await page.setViewportSize({width,height:900});
++  await page.goto(new URL('home.html',BASE).href);
++  await expect(page.locator('a.card[href="tradein-import-lab.html"]')).toHaveCount(0);
++  await expect(page.locator('a.card[href="threec-query.html"] h3')).toHaveText('手機專案價查詢');
++  await expect(page.locator('a.card[href="tradein-query.html"] h3')).toHaveText('舊換新專區');
++  expect(calls).toEqual([]);
++  await page.locator('a.card[href="tradein-query.html"]').click();
++  await expect(page.locator('h1')).toHaveText('舊換新專區');
++  await expect(page.locator('#tradeinResults')).toContainText('示範回收');
++  await expect(page.locator('#tradeinResults')).toContainText('0 元');
++  await expect(page.locator('#shoppingPane')).toBeHidden();await noOverflow(page);
++  await page.screenshot({path:testInfo.outputPath(`SYNTHETIC-recovery-${width}.png`),fullPage:true});
++  const reads=calls.length;
++  await page.getByRole('link',{name:'個人績效',exact:true}).click();
++  await expect(page).toHaveTitle('舊換新專區｜個人績效｜北一二B');
++  await expect(page.locator('h1')).toHaveText('舊換新專區');
++  await expect(page.locator('#locked')).toBeVisible();await expect(page.locator('#privateWorkspace')).toBeHidden();
++  await expect(page.locator('#reminderText')).toHaveValue('');expect(calls).toHaveLength(reads);await noOverflow(page);
++  await page.screenshot({path:testInfo.outputPath(`LOCKED-performance-${width}.png`),fullPage:true});
++  await page.locator('.tabs').getByRole('link',{name:'回收價查詢',exact:true}).click();
++  await expect(page.locator('#tradeinResults')).toContainText('示範回收');
++  await page.goto(new URL('threec-query.html',BASE).href);
++  await expect(page.locator('h1')).toHaveText('手機專案價查詢');
++  await expect(page.locator('#shoppingMeta')).toContainText('正式來源日期');
++  await expect(page.locator('#tradeinPane')).toBeHidden();await expect(page.locator('.legacy-tabs')).toBeHidden();await noOverflow(page);
++  await page.screenshot({path:testInfo.outputPath(`SYNTHETIC-phone-${width}.png`),fullPage:true});
++  expect(calls.every(c=>!('employeeId'in c)&&!('deviceId'in c)&&!('token'in c)&&!('adminSecret'in c))).toBe(true);
++  expect(calls.filter(c=>c.action==='threec_snapshot_read').every(c=>c.includeChanges===false&&c.priceEncoding==='shopping-columns/v1')).toBe(true);
++  expect(errors).toEqual([]);
++});
++test('existing #tradein deep links resolve to the recovery view',async({page})=>{
++  const {errors}=await intercept(page);await page.goto(new URL('threec-query.html#tradein',BASE).href);
++  await expect(page).toHaveURL(/\/tradein-query\.html$/);
++  await expect(page.locator('#tradeinResults')).toContainText('示範回收');
++  await expect(page.locator('#shoppingPane')).toBeHidden();expect(errors).toEqual([]);
++});
+diff --git a/threec-query-ui.js b/threec-query-ui.js
+new file mode 100644
+index 0000000..444abaf
 --- /dev/null
 +++ b/threec-query-ui.js
 @@ -0,0 +1,232 @@
@@ -557,10 +961,16 @@
 +  }
 +  if(!Core||!Compare||!Transport){setStatus('查詢元件載入失敗。','bad');return;}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
 +})(window);
+diff --git a/tradein-area.css b/tradein-area.css
+new file mode 100644
+index 0000000..cbac06e
 --- /dev/null
 +++ b/tradein-area.css
 @@ -0,0 +1 @@
 +.preview-notice{background:#fff4e6;color:#a94300;text-align:center;padding:10px 16px;font:700 14px system-ui;border-bottom:1px solid #ffd4b3}.area-nav{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap}.area-nav a{padding:12px 20px;border-radius:10px;text-decoration:none;border:1px solid #e4e7ec;background:#fff;color:#435065;font-weight:700}.area-nav a.active{background:#fff0e2;color:#b64b00;border-color:#ff984f}.legacy-tabs{display:none!important}body[data-query-kind="shopping"] #tradeinPane,body[data-query-kind="tradein"] #shoppingPane{display:none!important}
+diff --git a/tradein-query.html b/tradein-query.html
+new file mode 100644
+index 0000000..1472e45
 --- /dev/null
 +++ b/tradein-query.html
 @@ -0,0 +1,54 @@
@@ -618,265 +1028,3 @@
 +<script src="threec-query-ui.js"></script>
 +</body>
 +</html>
---- a/tests/home-navigation-contract.test.cjs
-+++ b/tests/home-navigation-contract.test.cjs
-@@ -30,7 +30,7 @@
-   assert.deepEqual(staffHrefs, [
-     'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html',
-     'https://twm-store-inspection.liamlu245.chatgpt.site/',
--    'tradein-progress.html', 'threec-query.html'
-+    'threec-query.html', 'tradein-query.html'
-   ]);
-   assert.equal(cards(navigation('督導專區')).length, 7);
-   assert.equal(cards(html).length, 4 + staffHrefs.length + 7);
-@@ -64,7 +64,8 @@
- 
- test('formal price lookup is a staff tool without publisher privileges', () => {
-   const lookup = cardFor(navigation('同仁大廳'), 'threec-query.html');
--  assert.match(lookup, /手機專案／3C＋舊換新/);
-+  assert.match(lookup, /手機專案價查詢/);
-+  assert.doesNotMatch(lookup, /舊換新/);
-   assert.doesNotMatch(lookup, /發布|上傳/);
- });
- 
-@@ -75,3 +76,12 @@
-   assert.equal(upload.length, 1);
-   assert.match(upload[0], /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
- });
-+
-+test('trade-in area groups public recovery prices and the existing private performance route', () => {
-+  const area=cardFor(navigation('同仁大廳'),'tradein-query.html');
-+  assert.match(area, /<h3>舊換新專區<\/h3>/);
-+  assert.match(area, /回收價查詢／個人績效/);
-+  assert.doesNotMatch(navigation('同仁大廳'), /href="tradein-progress\.html"/);
-+  const app=fs.readFileSync(path.resolve(__dirname,'../app.html'),'utf8');
-+  assert.match(app, /href="tradein-progress\.html">舊換新專區｜個人績效/);
-+});
---- a/tests/home.spec.js
-+++ b/tests/home.spec.js
-@@ -21,7 +21,7 @@
- const UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
- const EXPECTED_HREFS = [
-   'kpi-battle.html', 'awards-battle.html', 'index.html', 'gold-medal.html',
--  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'tradein-progress.html', 'threec-query.html',
-+  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'threec-query.html', 'tradein-query.html',
-   'department-ops.html', 'north12b-gold-ops.html', 'patrol.html',
-   'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
-   'phone-stock-dashboard.html'
-@@ -216,17 +216,18 @@
-     const lab = page.locator('a[href="tradein-import-lab.html"]');
-     const lookup = page.locator('a.card[href="threec-query.html"]');
-     const upload = page.locator(`a.card[href="${UPLOAD_URL}"]`);
-+    const area = page.locator('a.card[href="tradein-query.html"]');
-     await expect(lab).toHaveCount(0);
-     for (const query of ['匯入測試區','3C','舊換新','']) {
-       await page.locator('#tool-search').fill(query);
-       await expect(lab).toHaveCount(0);
-       if (query !== '匯入測試區') {
--        await expect(lookup).toBeVisible();
-+        await expect(query==='舊換新'?area:lookup).toBeVisible();
-         await expect(upload).toBeVisible();
-       }
-     }
-     await expect(page.locator('a.card:visible')).toHaveCount(EXPECTED_HREFS.length);
--    await expect(lookup.locator('h3')).toHaveText('手機專案／3C＋舊換新');
-+    await expect(lookup.locator('h3')).toHaveText('手機專案價查詢');
-     await expect(upload.locator('h3')).toHaveText('資料快速上傳');
-     await noOverflow(page);
-     expect(calls).toEqual([]);
---- a/tests/department-ops.test.cjs
-+++ b/tests/department-ops.test.cjs
-@@ -162,7 +162,7 @@
- 
- test('首頁查價入口保留公開讀取與受限傳輸備援，比較不合併不同價格矩陣', () => {
-   const Compare=require('../threec-comparison-core.js');
--  const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8');
-+  const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8')+fs.readFileSync(path.join(__dirname,'../threec-query-ui.js'),'utf8');
-   assert.match(html,/credentials:'omit'/);
-   assert.match(html,/function readPublicFrame/);
-   assert.match(html,/message.requestId!==requestId/);
---- a/tests/threec-options-update.test.cjs
-+++ b/tests/threec-options-update.test.cjs
-@@ -1,7 +1,7 @@
- 'use strict';
- const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
- const Compare=require('../threec-comparison-core.js'),fixture=require('./threec-search-fixture.cjs');
--const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8');
-+const html=fs.readFileSync(path.join(__dirname,'../threec-query-ui.js'),'utf8');
- function section(name,next){return html.slice(html.indexOf('  function '+name+'('),html.indexOf('  function '+next+'('));}
- const current=section('updateShoppingOptions','columnLabel');
- // The pre-change behavior is an independent oracle for ordered selection resets.
---- a/tests/threec-phase1-ui.spec.js
-+++ b/tests/threec-phase1-ui.spec.js
-@@ -55,8 +55,8 @@
-  await expect(page.locator('#shoppingCardCondition option')).not.toContainText(['加碼']);
-  await page.locator('#shoppingCardCondition').selectOption(fixture.p(999,24,'VIP'));
-  await expect(page.locator('.quote-cards')).not.toContainText('無報價（缺價）');
-- await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
-- await page.locator('#shoppingTab').click();await expect(page.locator('.quote-cards')).toBeVisible();expect(errors).toEqual([]);
-+ await page.goto('file://'+path.resolve(__dirname,'../tradein-query.html'));await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
-+ await page.goto(URL);await expect(page.locator('.quote-cards')).toBeVisible();expect(errors).toEqual([]);
- });
- test('大量條件與機款獨立分页，不一次展開所有維度',async({page})=>{
-  const response=JSON.parse(JSON.stringify(fixture.shopping));response.snapshot.rows=Array.from({length:25},(_,i)=>({...fixture.shopping.snapshot.rows[0],model:'大量機款 '+i+' 256GB',colorless_model:'大量機款 '+i+' 256GB',project_prices:Object.fromEntries(Array.from({length:18},(_,j)=>[fixture.p(999,24+j),j]))}));
---- a/tests/threec-query-ui.spec.js
-+++ b/tests/threec-query-ui.spec.js
-@@ -4,6 +4,7 @@
- const path = require('node:path');
- 
- const PAGE_URL = 'file://' + path.resolve(__dirname, '../threec-query.html');
-+const TRADEIN_URL = 'file://' + path.resolve(__dirname, '../tradein-query.html');
- const DEVICE_KEY = 'north12b_private_dashboard_device_id';
- const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
- 
-@@ -56,13 +57,13 @@
-   await expect(page.locator('#shoppingResults')).toContainText('iPhone 16 256GB 黑色');
-   await expect(page.locator('#shoppingResults')).toContainText('0 元');
-   await expect(page.locator('#shoppingResults')).not.toContainText('無報價（缺價）');
--  await page.locator('#tradeinTab').click();
-+  await page.goto(TRADEIN_URL);
-   await expect(page.locator('#tradeinResults')).toContainText('點子行動（獨立報價）');
-   await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
-   await expect(page.locator('#tradeinResults')).not.toContainText('無報價');
-   await expect(page.locator('#tradeinResults table').nth(0).locator('thead tr').nth(1).locator('th')).toHaveText(['原始機型／容量','S 級','A 級','C 級']);
-   await expect(page.locator('#tradeinResults')).toContainText('0 元');
--  expect(calls.map(call => call.action)).toEqual(['threec_snapshot_read','threec_snapshot_read']);
-+  expect(calls.map(call => call.action)).toEqual(Array(4).fill('threec_snapshot_read'));
-   expect(calls.every(call => !('employeeId' in call) && !('deviceId' in call))).toBe(true);
-   await expect(page.locator('#employeeId')).toHaveCount(0);
-   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 1280);
-@@ -74,7 +75,7 @@
-   await expect(page.locator('#changeCard')).toContainText('調價（筆報價條件）');
-   await expect(page.locator('#changeCard')).toContainText('合約24期');
-   await expect(page.locator('#changeCard')).toContainText('1,299 元');
--  await page.locator('#tradeinTab').click();
-+  await page.goto(TRADEIN_URL);
-   await expect(page.locator('#changeCard')).toContainText('FutureDial（FDI）');
-   await expect(page.locator('#changeCard')).toContainText('A');
-   await page.locator('#changeSearch').fill('FutureDial');
-@@ -109,9 +110,9 @@
-   await intercept(page, { missing:'shopping' });
-   await page.goto(PAGE_URL);
-   await expect(page.locator('#queryCard')).toBeVisible();
--  await expect(page.locator('#queryStatus')).toContainText('手機專案／3C 尚未發布正式資料');
-+  await expect(page.locator('#queryStatus')).toContainText('手機專案價查詢 尚未發布正式資料');
-   await expect(page.locator('#shoppingResults')).toContainText('尚未發布正式資料：手機專案／3C');
--  await page.locator('#tradeinTab').click();
-+  await page.goto(TRADEIN_URL);
-   await expect(page.locator('#tradeinResults')).toContainText('Galaxy S25 512GB');
- });
- 
-@@ -187,16 +188,18 @@
- });
- 
- 
--test('切換分類清空搜尋後返回手機，會重新查詢全版清單', async ({ page }) => {
-+test('搜尋後跨專區與返回手機會清空篩選並讀取 active', async ({page}) => {
-   const calls=await intercept(page);await page.goto(PAGE_URL);
--  await expect(page.locator('#queryCard')).toBeVisible();
-+  await expect(page.locator('#changeResults')).toContainText('合約24期');
-   await page.locator('#changeSearch').fill('合約24期');
-   await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read'&&c.kind==='shopping').length).toBe(1);
--  await page.locator('#tradeinTab').click();await page.locator('#changeSearch').fill('');
--  await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read'&&c.kind==='tradein'&&c.search==='').length).toBe(1);
--  await page.locator('#shoppingTab').click();
--  await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read'&&c.kind==='shopping'&&c.search==='').length).toBe(1);
--  await expect(page.locator('#changeSummary')).not.toContainText('正在搜尋');
-+  await page.goto(TRADEIN_URL);
-+  await expect(page.locator('#changeResults')).toContainText('FutureDial');
-+  await expect(page.locator('#changeSearch')).toHaveValue('');
-+  await page.goto(PAGE_URL);
-+  await expect(page.locator('#changeResults')).toContainText('999型專案價');
-+  await expect(page.locator('#changeSearch')).toHaveValue('');
-+  expect(calls.filter(c=>c.action==='threec_snapshot_read')).toHaveLength(6);
- });
- 
- test('首版完整異動匯出由已驗證正式快照生成，避免重複下載全價資料', async ({ page }) => {
-@@ -215,47 +218,38 @@
-   expect(exported.changes.some(c=>c.after.kind==='missing')).toBe(true);
- });
- 
--test('快速切換分類時，舊分類延遲請求不能作廢新分類清單', async ({ page }) => {
--  let releaseShopping, releaseTradein;
--  const shoppingPending=new Promise(resolve=>{releaseShopping=resolve;});
--  const tradeinPending=new Promise(resolve=>{releaseTradein=resolve;});
--  const calls=[];
-+test('跨專區離頁後，舊手機搜尋延遲回應不能覆蓋回收價與異動', async ({page}) => {
-+  let release;
-+  const pending=new Promise(resolve=>release=resolve);const calls=[];
-   await page.route('**/exec*',async route=>{
--    const payload=publicPayload(route.request());
-+    const payload=publicPayload(route.request());calls.push(payload);
-     if(payload.action==='threec_changes_read'){
--      calls.push(payload);
--      if(payload.kind==='shopping'&&payload.search==='')await shoppingPending;
--      if(payload.kind==='tradein'&&payload.search==='')await tradeinPending;
--      return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:response(payload.kind).changeSet})});
-+      await pending;
-+      return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:response('shopping').changeSet})});
-     }
--    return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify(response(payload.kind))});
--  });
--  await page.goto(PAGE_URL);
--  await expect(page.locator('#queryCard')).toBeVisible();
-+    return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(response(payload.kind))});
-+  });
-+  await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');
-   await page.locator('#changeSearch').fill('合約24期');
--  await expect.poll(()=>calls.filter(c=>c.kind==='shopping').length).toBe(1);
--  await expect(page.locator('#changeSummary')).not.toContainText('正在搜尋');
--  await page.locator('#tradeinTab').click();await page.locator('#changeSearch').fill('');
--  await page.locator('#shoppingTab').click();
--  await expect.poll(()=>calls.filter(c=>c.kind==='shopping'&&c.search==='').length).toBe(1);
--  await expect.poll(()=>calls.filter(c=>c.kind==='tradein'&&c.search==='').length).toBe(1);
--  releaseShopping();
--  await expect(page.locator('#changeSummary')).not.toContainText('正在搜尋');
--  await expect(page.locator('#changeCsvBtn')).toBeEnabled();
--  releaseTradein();
--  await expect(page.locator('#changeTitle')).toContainText('手機專案');
-+  await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read').length).toBe(1);
-+  await page.goto(TRADEIN_URL);await expect(page.locator('#tradeinResults')).toContainText('Galaxy');
-+  release();
-+  await expect(page.locator('#changeResults')).toContainText('FutureDial');
-+  await expect(page.locator('#changeResults')).not.toContainText('合約24期');
-+  await expect(page.locator('#shoppingPane')).toBeHidden();
- });
- 
- test('某一類 API 失敗不清除另一類已完成價格，並允許重整復原',async({page})=>{
-  let fail=true;
-  await page.route('**/exec*',route=>{const p=publicPayload(route.request());return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(fail&&p.kind==='tradein'?{status:'error',message:'獨立測試失敗'}:response(p.kind))});});
-- await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('舊換新：獨立測試失敗');await expect(page.locator('#shoppingResults')).toContainText('iPhone');
-- fail=false;await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('Galaxy');
-+ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await expect(page.locator('#shoppingResults')).toContainText('iPhone');
-+ await page.goto(TRADEIN_URL);await expect(page.locator('#queryStatus')).toContainText('獨立測試失敗');
-+ fail=false;await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.goto(TRADEIN_URL);await expect(page.locator('#tradeinResults')).toContainText('Galaxy');
- });
- test('另一類慢讀取時手機先可查，不能等待兩類才渲染',async({page})=>{
-  let release;const pending=new Promise(resolve=>release=resolve);
-  await page.route('**/exec*',async route=>{const p=publicPayload(route.request());if(p.kind==='tradein')await pending;return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(response(p.kind))});});
-- await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#queryStatus')).toContainText('可先查詢');release();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
-+ await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');release();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
- });
- test('Google JSON 轉址回 HTML 時，限定來源與 requestId 的既有 iframe 可讀回',async({page})=>{
-  const requests=[];
-@@ -289,7 +283,7 @@
- for(const width of [1280,390])test(`三家公開報價與來源未分級 ${width}px，篩選和SABC不互相覆蓋`,async({page})=>{
-  await page.setViewportSize({width,height:900});
-  await page.route('**/exec*',route=>{const p=publicPayload(route.request());const r=response(p.kind);if(p.kind==='tradein'){r.snapshot.rows[0].quotes['愛鋒派']={S:null,A:'900',B:null,C:null,'未分級':0};}return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify(r)});});
-- await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.locator('#tradeinTab').click();
-+ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.goto(TRADEIN_URL);
-  await expect(page.locator('#tradeinResults')).toContainText('愛鋒派（獨立報價）');await expect(page.locator('#tradeinResults')).toContainText('來源未分級');
-  await page.locator('#tradeinProvider').selectOption('愛鋒派');await page.locator('#tradeinGrade').selectOption('未分級');const table=page.locator('#tradeinResults table');await expect(table).toHaveCount(1);await expect(table).toContainText('0 元');await expect(table).not.toContainText('900 元');await expect(table).not.toContainText('A 級');
-  await page.locator('#tradeinGrade').selectOption('A');await expect(table).toContainText('900 元');await expect(table).not.toContainText('來源未分級');
-@@ -316,9 +310,9 @@
-   if(p.action==='threec_snapshot_read')return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify({...response(p.kind),changeSet:null,changesDeferred:true})});
-   return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify({status:'ok',snapshotHash:response(p.kind).snapshot.snapshot_hash,changeSet:response(p.kind).changeSet})});
-  });
-- await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
-+ await page.goto(TRADEIN_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
-  expect(calls).toHaveLength(2);expect(calls.every(p=>p.includeChanges===false)).toBe(true);
-- await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('17,500');expect(calls).toHaveLength(2);
-+ await expect(page.locator('#tradeinResults')).toContainText('17,500');expect(calls).toHaveLength(2);
-  await page.locator('#changeLoadBtn').click();await expect(page.locator('#changeResults')).toContainText('FutureDial');
-  expect(calls[2]).toMatchObject({action:'threec_changes_read',kind:'tradein',snapshotHash:'tradein-snapshot-v1',offset:0,limit:100});
-  await expect(page.locator('#changeLoadBtn')).toBeHidden();

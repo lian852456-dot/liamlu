@@ -19,8 +19,14 @@ WORK 整合基底：PR179 `4d9da62f62f5c3dab164cdbaf162ac0ac8180f9d`，已包含
 1. WORK owner 在自己的 fresh PR179 checkout 固定上述 head，下載 `INTEGRATION.patch`，先 `git apply --check`；head 移動則先檢查實際差異，避免覆蓋新 WORK／登入改動。此 task 已在獨立本機 checkout 完成套用，不需 WORK 讀本機絕對路徑。
 2. patch 直接呈現手機價／舊換新回收價／個人績效，首頁與 APP 名稱一致，PR181 測試入口保持移除。價格 parser／來源 API／payload／管理快速上傳未改；新 B 不是公開查价依賴。
 3. 公開價 UI 與原合法個績界線可先本機驗，不等待尚未正式啟用的 B。個績仍沿用 PR179 的合法權限；正式資料正向串接未驗時維持鎖定並列 blocker，不造數據。
-4. 先跑首頁／價格／WORK Node 契約，再跑首頁、價格、分區與合成個績 Chromium 桌面/手機／匯出。初版交接 Node 71/71 已通過；本輪完整 browser／live read 補驗還在進行，後續會更新驗證結果與 patch。所有 fixtures 僅合成，不能把本機通過寫成正式績效已驗收。
+4. 本輪範圍 Node 195 項：194 通過、1 跳過、0 失敗；跳過項需另外提供批准的完整來源快照。Chromium 126 個案例完成驗證：第一輪 125 通過、1 個舊頁籤狀態假設失敗，修正為跨頁後重新選卡片，該檔 9/9 重驗通過；分區 4/4（1280／390／320px）及合成個績 6/6（含實際 PNG/XLSX 下載）最後重驗通過。正式公開價格唯讀補驗：手機 14,976 筆／回收 620 筆、日期 2026-10-01，版本與來源 SHA 均與現行站相同；快速上傳登入頁可進入，未登入或上傳。所有個績 fixtures 僅合成，不能把本機通過寫成正式績效已驗收。
 5. LOGIN-INTERFACE.md 与 owner 示例獨立審查。只把必要 helper/read fence 增量納入 fresh owner；不能把舊 GAS 全檔覆蓋 editor，也不能將 B 當新 WORK 授權。
 6. 本次只批准公開交接，未批准 merge、GAS/Pages 部署、真實 roster/grant/Properties 改動或私人資料公開。正式發布須以最終 source/hash、驗收／資料映射與回復點另確認；先完成公開價格的所有可行驗收，再精確列個績／登入 blocker。
 
 31/32 個目標同仁分母、九店員編／職務映射與正式跨月取消樣本仍依 WORK 的私有來源證據核實；本目錄不提供真實名冊，沒有把候選 96 台或來源缺漏猜成正式月目標。
+
+## patch 完整性與 CI
+
+整合 patch 共 15 檔：首頁／APP／兩查價 HTML／共用 controller／分區 CSS／個績 HTML、七個測試檔及既有 homepage-ui workflow。已在乾淨 PR179 4d9da62 checkout 通過 `git apply --check`，套用後逐檔 bytes 與驗收候選完全一致。`tradein-progress.mjs`、績效／匯出計算、價格 parser／transport、GAS 個績與快速上傳、home.js 均逐檔比對未更動。價格狀態提示僅呈現當前查價類別，原两類 API read 與 payload 保留。
+
+workflow 已備好分區／查價回歸 gate，但交接 branch 只存 patch，未套用 runtime；本次沒有把交接分支 CI 當成候選已執行 CI。WORK 採用後須對它最終實際 head 重新跑正常 CI。頁面保留「整合候選 · 尚未上線」供 review，正式切換需另核准並移除標記。不要把 archive dryrun 或另一登入 task 的正式改動帶入此包。
