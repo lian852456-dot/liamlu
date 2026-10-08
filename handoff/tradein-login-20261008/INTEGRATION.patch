@@ -1,0 +1,882 @@
+--- a/app.html
++++ b/app.html
+@@ -129,7 +129,7 @@
+       </dialog>
+ 
+       <section data-view="me" hidden aria-label="我的">
+-        <a class="source-button" href="tradein-progress.html">個人舊換新進度 · 每月3台</a><div class="view-heading"><div><p>LIAM ONLY</p><h1>個人與系統設定</h1></div><button class="icon-button" type="button" data-nav="home" aria-label="返回首頁"><i data-lucide="arrow-left"></i></button></div>
++        <a class="source-button" href="tradein-progress.html">舊換新專區｜個人績效</a><div class="view-heading"><div><p>LIAM ONLY</p><h1>個人與系統設定</h1></div><button class="icon-button" type="button" data-nav="home" aria-label="返回首頁"><i data-lucide="arrow-left"></i></button></div>
+         <article class="profile-card"><span class="profile-mark">L</span><div><strong>Liam Supervisor</strong><small>App 1.2 · 個績與每日回報摘要</small></div><span id="viewerState" class="status-chip">未登入</span></article>
+ 
+         <section class="panel access-panel" aria-labelledby="battleAccessTitle">
+--- a/home.html
++++ b/home.html
+@@ -15,8 +15,10 @@
+   <script defer src="patrol-question-versions.js"></script>
+   <script defer src="home-reminder-model.js?v=20260930"></script>
+   <script defer src="home.js?v=20261002-logout-2"></script>
++<link rel="stylesheet" href="tradein-area.css">
+ </head>
+ <body>
++<div class="preview-notice">整合候選 · 尚未上線</div>
+ <a class="skip-link" href="#main">跳至主要內容</a>
+ <header class="masthead">
+   <div class="shell header-inner">
+@@ -75,8 +77,9 @@
+         </section>
+         <section class="tool-group store-group" data-tool-group><h3><i data-lucide="clipboard-check" aria-hidden="true"></i>門市作業</h3>
+ <a class="card tool-card " href="audit-report.html" data-search="稽核回報專區 照片上傳與補件追蹤"><i data-lucide="image" aria-hidden="true"></i><div><h3>稽核回報專區</h3><p>照片上傳與補件追蹤</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a><a class="card tool-card " href="https://twm-store-inspection.liamlu245.chatgpt.site/" target="_blank" rel="noopener noreferrer" data-search="門市店務檢查 每日、半月與每月檢查"><i data-lucide="store" aria-hidden="true"></i><div><h3>門市店務檢查</h3><p>每日、半月與每月檢查</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+-<a class="card tool-card" href="tradein-progress.html" data-search="個人舊換新 管理 進度 每月3台"><i data-lucide="repeat" aria-hidden="true"></i><div><h3>個人舊換新進度</h3><p>每月3台目標、本人實績與複製匯出</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+-<a class="card tool-card " href="threec-query.html" data-search="手機專案 3C 舊換新 正式價格查詢 資費 容量 回收商"><i data-lucide="search" aria-hidden="true"></i><div><h3>手機專案／3C＋舊換新</h3><p>查詢正式專案價與兩家回收報價</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a>
++
++<a class="card tool-card " href="threec-query.html" data-search="手機專案價查詢 3C 正式價格查詢 資費 容量"><i data-lucide="search" aria-hidden="true"></i><div><h3>手機專案價查詢</h3><p>查詢一般與企業手機專案價</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a>
++<a class="card tool-card" href="tradein-query.html" data-search="舊換新專區 回收價查詢 個人績效 每月3台"><i data-lucide="repeat" aria-hidden="true"></i><div><h3>舊換新專區</h3><p>回收價查詢／個人績效</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+         </section>
+       </nav>
+     </div>
+--- a/threec-query.html
++++ b/threec-query.html
+@@ -3,18 +3,21 @@
+ <head>
+   <meta charset="utf-8">
+   <meta name="viewport" content="width=device-width,initial-scale=1">
+-  <title>手機專案／3C＋舊換新查詢｜北一二B</title>
++  <title>手機專案價查詢｜北一二B</title>
+   <link rel="stylesheet" href="threec-query.css?v=20261007-compact-2">
++<link rel="stylesheet" href="tradein-area.css">
+ </head>
+-<body>
++<body data-query-kind="shopping">
++<div class="preview-notice">整合候選 · 尚未上線</div>
+ <main>
+   <section class="hero">
+-    <div class="topbar"><div><h1>手機專案／3C＋舊換新查詢</h1><p>開頁即可查詢最新專案價與舊換新報價</p></div><a class="home-link" href="https://lian852456-dot.github.io/liamlu/home.html">← 智慧營運中心</a></div>
++    <div class="topbar"><div><h1>手機專案價查詢</h1><p>查詢一般手機方案與企業用戶專案價</p></div><a class="home-link" href="home.html">← 智慧營運中心</a></div>
+   </section>
+-  <section class="card" id="queryCard">
+-    <div class="topbar"><h2 style="margin:0">正式價格查詢</h2><button class="secondary" id="refreshBtn" type="button">重新整理</button></div>
++  <nav class="area-nav" aria-label="價格查詢分區"><a class="active" aria-current="page" href="threec-query.html">手機專案價查詢</a><a href="tradein-query.html">舊換新專區</a></nav>
++<section class="card" id="queryCard">
++    <div class="topbar"><h2 style="margin:0">手機專案價查詢</h2><button class="secondary" id="refreshBtn" type="button">重新整理</button></div>
+     <div id="queryStatus" class="status" role="status">正在讀取正式價格…</div>
+-    <div class="tabs" role="tablist"><button class="tab active" id="shoppingTab" data-kind="shopping" type="button" role="tab" aria-selected="true">手機專案／3C</button><button class="tab" id="tradeinTab" data-kind="tradein" type="button" role="tab" aria-selected="false">舊換新</button></div>
++    <div class="tabs legacy-tabs" role="tablist" hidden><button class="tab active" id="shoppingTab" data-kind="shopping" type="button" role="tab" aria-selected="true">手機專案／3C</button><button class="tab" id="tradeinTab" data-kind="tradein" type="button" role="tab" aria-selected="false">舊換新</button></div>
+     <section id="shoppingPane" data-pane="shopping" role="tabpanel">
+       <div class="segment-switch" role="group" aria-label="方案專區"><button id="consumerSegmentBtn" type="button" aria-pressed="true">一般手機方案</button><button id="enterpriseSegmentBtn" type="button" aria-pressed="false">企業用戶專區</button></div>
+       <h3 id="shoppingSectionTitle">一般手機方案</h3><p id="shoppingSectionDescription" class="hint">一般申辦方案；企業、員工與眷屬優惠請切換「企業用戶專區」。</p>
+@@ -46,238 +49,7 @@
+ <script src="threec-query-core.js?v=20261007-quoted-only-1"></script>
+ <script src="threec-comparison-core.js?v=20261007-priced-only-1"></script>
+ <script src="threec-price-diff-core.js?v=20261001-providers-1"></script>
+-<script>
+-(function(scope){
+-  'use strict';
+-  const Core=scope.ThreecQueryCore;
+-  const DiffCore=scope.ThreecPriceDiffCore;
+-  const Transport=scope.ThreecPriceTransport;
+-  const Compare=scope.ThreecComparisonCore;
+-  let shoppingIndex=null, shoppingView=null, splitSpecKeys=new Set();
+-  let shoppingSegment=new URLSearchParams(scope.location.search).get('section')==='enterprise'?'enterprise':'consumer';
+-  let rowPage=0,columnPage=0;
+-  let readingMode=scope.matchMedia('(max-width:700px)').matches?'card':'table';
+-  const API='https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
+-  const state={shopping:null,tradein:null,active:'shopping',loading:false,changePage:{shopping:null,tradein:null}};
+-  let generation=0;
+-  const changeLoading={shopping:false,tradein:false};
+-  const changeRequestGeneration={shopping:0,tradein:0};
+-  const $=id=>document.getElementById(id);
+-  function esc(value){return String(value==null?'':value).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
+-  function setStatus(text,kind){const el=$('queryStatus');el.textContent=text;el.className='status'+(kind?' '+kind:'');}
+-  function readPublicFrame(payload){
+-    return new Promise((resolve,reject)=>{
+-      const requestId=crypto.randomUUID();
+-      const endpoint=new URL(API);endpoint.searchParams.set('transport','iframe');endpoint.searchParams.set('requestId',requestId);endpoint.searchParams.set('origin',location.origin);
+-      const frame=document.createElement('iframe'),form=document.createElement('form'),field=document.createElement('textarea');
+-      let finished=false;
+-      function finish(error,body){if(finished)return;finished=true;clearTimeout(timer);scope.removeEventListener('message',onMessage);frame.remove();form.remove();error?reject(error):resolve(body);}
+-      function onMessage(event){
+-        let origin;try{origin=new URL(event.origin);}catch{return;}
+-        if(origin.protocol!=='https:'||origin.port||!(origin.hostname==='script.google.com'||origin.hostname==='script.googleusercontent.com'||origin.hostname.endsWith('-script.googleusercontent.com')))return;
+-        const message=event.data;if(!event.source||!message||message.type!=='north12b-gas-response-v1'||message.requestId!==requestId)return;
+-        if(!message.body||message.body.status!=='ok'){const error=new Error(message.body&&message.body.message||'正式資料讀取失敗');error.authoritative=true;finish(error);return;}
+-        finish(null,message.body);
+-      }
+-      const timer=setTimeout(()=>finish(new Error('正式資料讀取逾時，請重新整理')),35000);
+-      frame.name='public_price_'+requestId;frame.title='正式價格讀取';frame.hidden=true;
+-      form.method='POST';form.action=endpoint.toString();form.target=frame.name;form.enctype='application/x-www-form-urlencoded';form.hidden=true;
+-      field.name='payload';field.value=JSON.stringify(payload);form.append(field);scope.addEventListener('message',onMessage);document.body.append(frame,form);
+-      try{form.submit();}catch{finish(new Error('正式資料連線失敗'));}
+-    });
+-  }
+-  async function readPublic(payload,preferFrame=false){
+-    // Large price snapshots use one iframe request first, avoiding an aborted
+-    // fetch that keeps a duplicate GAS execution running in the background.
+-    if(preferFrame){try{return await readPublicFrame(payload);}catch(error){if(error.authoritative)throw error;}}
+-    for(let attempt=0;attempt<(preferFrame?1:2);attempt++){
+-      const controller=new AbortController();
+-      const timer=setTimeout(()=>controller.abort(),15000);
+-      try{
+-        // A unique URL prevents an expired Google ContentService redirect from
+-        // being reused. Only public, read-only actions call this helper.
+-        const requestId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+-        const response=await fetch(API+'?readAttempt='+requestId,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),cache:'no-store',credentials:'omit',signal:controller.signal});
+-        let body;
+-        try{body=await response.json();}catch{throw new Error('正式資料回應格式錯誤');}
+-        if(response.ok&&body&&body.status==='ok')return body;
+-        if(body&&body.status==='error'){
+-          const error=new Error(body.message||'正式資料讀取失敗');error.authoritative=true;throw error;
+-        }
+-        throw new Error('正式資料讀取失敗（HTTP '+response.status+'）');
+-      }catch(error){
+-        if(error.authoritative)throw error;
+-        if(attempt===0&&!preferFrame){try{return await readPublicFrame(payload);}catch(frameError){if(frameError.authoritative)throw frameError;}}
+-        else throw new Error(error.name==='AbortError'?'正式資料讀取逾時，請重新整理':error.message||'正式資料連線失敗');
+-      }finally{clearTimeout(timer);}
+-    }
+-  }
+-  async function invoke(kind){const payload={action:'threec_snapshot_read',kind,includeChanges:false,priceEncoding:Transport.ENCODING};return Transport.decode(await readPublic(payload,kind==='shopping'));}
+-  function invokeChanges(kind,offset,limit,snapshotHash,search){return readPublic({action:'threec_changes_read',kind,offset:Number(offset||0),limit:Number(limit||1000),snapshotHash:snapshotHash||'',search:String(search||'')});}
+-  function clearResults(){shoppingIndex=null;shoppingView=null;splitSpecKeys=new Set();state.shopping=null;state.tradein=null;state.changePage={shopping:null,tradein:null};changeLoading.shopping=false;changeLoading.tradein=false;renderKind('shopping');renderKind('tradein');}
+-  function metaHtml(meta){return `<div class="source-date"><span>正式來源日期</span><strong>${esc(meta.sourceVersionDate||'未提供')}</strong><span>${esc(meta.rowCount)} 筆來源資料</span></div><details class="source-details"><summary>資料版本與來源資訊</summary><dl><dt>正式版本</dt><dd>${esc(meta.snapshotHash||meta.version||'—')}</dd><dt>發布時間</dt><dd>${esc(meta.publishedAt||'—')}</dd><dt>來源 SHA-256</dt><dd>${esc(meta.sourceFileSha256||'—')}</dd></dl></details>`;}
+-  function renderPrice(name,value){const state=Core.priceState(value);return `<div class="price-item${state.missing?' missing':''}${state.zero?' zero':''}"><span>${esc(name)}</span><strong>${esc(Core.formatPrice(value))}</strong></div>`;}
+-  function changeRows(changeSet){if(!changeSet||typeof changeSet!=='object')return [];if(Array.isArray(changeSet.changePage))return changeSet.changePage;if(Array.isArray(changeSet.changes))return changeSet.changes;if(Array.isArray(changeSet.records))return changeSet.records;return [];}
+-  function changeCounts(changeSet){const counts=changeSet&&changeSet.counts&&typeof changeSet.counts==='object'?changeSet.counts:{};return {added:Number(changeSet&&changeSet.addedCount!=null?changeSet.addedCount:counts.added||0),changed:Number(changeSet&&changeSet.changedCount!=null?changeSet.changedCount:counts.changed||0),unchanged:Number(changeSet&&changeSet.unchangedCount!=null?changeSet.unchangedCount:counts.unchanged||0),removed:Number(changeSet&&changeSet.removedCount!=null?changeSet.removedCount:counts.removed||0)};}
+-  function changePrice(value){if(value==null)return '—（無此條件）';if(value&&typeof value==='object'&&Object.prototype.hasOwnProperty.call(value,'value'))return Core.formatPrice(value.value);if(value&&typeof value==='object'&&Object.prototype.hasOwnProperty.call(value,'display'))return String(value.display||'無報價（缺價）');return Core.formatPrice(value);}
+-  function changePriceClass(value){if(value==null||(value&&value.kind==='missing')||String(value).trim()==='')return 'missing';if((value&&value.kind==='zero')||Number(String(value).replace(/,/g,''))===0)return 'zero';return '';}
+-  function changeText(record){const identity=record&&record.identity||{};return [record&&(record.modelCapacity||record.model),record&&(record.plan||record.condition),record&&(record.provider||identity.provider),record&&(record.grade||identity.grade)].filter(Boolean).join(' ');}
+-  function responseChangeSet(response){const check=response&&response.updateCheck;return check&&check.changeSet?check.changeSet:(response&&response.changeSet)||null;}
+-  function renderChanges(kind){
+-    if(kind!==state.active)return;
+-    const response=state[kind];
+-    $('changeLoadBtn').hidden=true;
+-    const title=kind==='shopping'?'手機專案／3C':'舊換新';
+-    $('changeTitle').textContent=title+' 本次異動／版本檢查';
+-    if(!response||!response.snapshot){$('changeBasis').textContent='尚無正式異動記錄。';$('changeCounts').innerHTML='';$('changeResults').innerHTML='<div class="empty">尚無異動記錄。</div>';['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;}
+-    if(response.changesDeferred&&!state.changePage[kind]){
+-      $('changeLoadBtn').hidden=false;$('changeLoadBtn').disabled=changeLoading[kind];
+-      $('changeBasis').textContent='價格 active 版本：'+response.snapshot.snapshot_hash+'；版本日期 '+response.snapshot.source_version_date+'。';
+-      $('changeCounts').innerHTML='';$('changeResults').innerHTML='';$('changePage').textContent='';
+-      $('changeSummary').textContent=changeLoading[kind]?'正在讀取本次異動明細，價格可繼續查詢…':'正式價格已完整讀取；需要核對本次調價時，請載入異動明細或搜尋條件。';
+-      ['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;
+-    }
+-    const snapshot=response.snapshot||{};const set=state.changePage[kind]||responseChangeSet(response);if(!set){$('changeBasis').textContent='正式版本已讀取；後端尚未提供異動記錄。';$('changeCounts').innerHTML='';$('changeResults').innerHTML='<div class="empty">尚無異動記錄。</div>';['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;}
+-    const query=$('changeSearch').value.trim();const loadedSearch=String(set._search==null?'':set._search);const pendingSearch=query!==loadedSearch;const counts=changeCounts(set);const rows=pendingSearch?[]:changeRows(set);const changeCount=Number(set.changeCount!=null?set.changeCount:rows.length);const totalChangeCount=Number(set.totalChangeCount!=null?set.totalChangeCount:(set.totalCount!=null?set.totalCount:changeCount));const offset=Number(set.offset||0);const limit=Number(set.limit||100);const page=Math.floor(offset/Math.max(1,limit))+1;const pageCount=Math.max(1,Math.ceil(changeCount/Math.max(1,limit)));
+-    const activeHash=snapshot.snapshot_hash||'';const update=response.updateCheck||{};const updateBlocked=update.blocked||update.status==='blocked'||update.ok===false||update.matches===false;const latest=update.latest_check||update.latestCheck||update;const latestDate=latest&&(latest.source_version_date||latest.date||latest.latest_source_version_date);const latestRows=latest&&(latest.row_count!=null?latest.row_count:latest.source_row_count);const latestText=latestDate||latestRows!=null||latest.status?'；最近來源核對日期 '+(latestDate||'—')+'／'+(latestRows==null?'—':latestRows)+' 筆／'+(latest.status||'已核對'):'';
+-    $('changeBasis').textContent='價格 active 版本：'+(activeHash||'—')+'；版本日期 '+(snapshot.source_version_date||'—')+latestText+'；異動資料以 active／previous 讀回為準。'+(updateBlocked?' 目前 active 已更新，請重新讀取。':'');
+-    $('changeCounts').innerHTML=[['changed','調價（筆報價條件）'],['added','新增報價條件'],['unchanged','未變報價條件'],['removed','移除報價條件']].map(pair=>`<div class="change-count"><span>${pair[1]}</span><strong>${counts[pair[0]].toLocaleString('zh-TW')}</strong></div>`).join('');
+-    $('changeSummary').textContent=pendingSearch?'正在搜尋完整異動條件…':'本頁顯示 '+rows.length+' 筆；搜尋符合 '+changeCount.toLocaleString('zh-TW')+' 筆，整版共 '+totalChangeCount.toLocaleString('zh-TW')+' 筆報價條件（含缺價欄位，不等同 Excel 機款列數）。';
+-    const html=rows.slice(0,100).map(record=>`<tr><td>${esc(record.status==='changed'?'調價':record.status==='added'?'新增':record.status==='removed'?'移除':'未變')}</td><td>${esc(record.modelCapacity||record.model||'—')}</td><td><details><summary>${esc((record.plan||record.condition||'—').slice(0,24))}${String(record.plan||record.condition||'').length>24?'…':''}</summary><span class="raw-condition">${esc(record.plan||record.condition||'—')}</span></details></td><td>${esc(record.provider||'—')}</td><td>${esc(record.grade||'—')}</td><td class="${changePriceClass(record.before)}">${esc(changePrice(record.before))}</td><td class="${changePriceClass(record.after)}">${esc(changePrice(record.after))}</td></tr>`).join('');
+-    $('changeResults').innerHTML=html?`<table><thead><tr><th>狀態</th><th>機款／容量</th><th>完整資費／合約／條件</th><th>回收商</th><th>等級</th><th>之前</th><th>目前</th></tr></thead><tbody>${html}</tbody></table>`:'<div class="empty">本頁沒有符合搜尋條件的異動。</div>';
+-    $('changePage').textContent='第 '+page+' 頁／共 '+pageCount+' 頁';$('changePrevBtn').disabled=pendingSearch||offset<=0;$('changeNextBtn').disabled=pendingSearch||!set.hasMore;$('changeJsonBtn').disabled=pendingSearch||!set;$('changeCsvBtn').disabled=pendingSearch||!set;
+-  }
+-  function changePageSize(set){return Number(set&&set.limit||100);}
+-  async function loadChangePage(kind,offset,search){const requestGeneration=generation;const changeRequest=++changeRequestGeneration[kind];const response=state[kind];if(!response||!response.snapshot)return;const query=String(search==null?$('changeSearch').value.trim():search);const hash=response.snapshot.snapshot_hash||'';const result=await invokeChanges(kind,offset,100,hash,query);if(requestGeneration!==generation||changeRequest!==changeRequestGeneration[kind]||state[kind]!==response)return;state.changePage[kind]=Object.assign({},result.changeSet||{},{_search:query});renderChanges(kind);}
+-  async function fetchAllChanges(kind,search){const requestGeneration=generation;const response=state[kind];if(!response||!response.snapshot)return null;const query=String(search==null?$('changeSearch').value.trim():search);const hash=response.snapshot.snapshot_hash||'';let offset=0;let first=null;let next=null;const records=[];do{const result=await invokeChanges(kind,offset,1000,hash,query);if(requestGeneration!==generation||state[kind]!==response)return null;next=result.changeSet||{};if(next.firstRelease&&DiffCore){const local=DiffCore.diffSnapshots(kind,null,response.snapshot,{limit:Infinity,search:query});return {set:local,records:changeRows(local),search:query};}if(!first)first=next;records.push(...changeRows(next));offset+=Number(next.limit||1000);}while(next.hasMore);return {set:first||{},records,search:query};}
+-  async function downloadChanges(kind,format){const fetched=await fetchAllChanges(kind);if(!fetched)return;const set=fetched.set;const records=fetched.records;const body=format==='json'?JSON.stringify({unit:'報價條件',snapshotHash:state[kind].snapshot.snapshot_hash||'',search:fetched.search,totalChangeCount:Number(set.totalChangeCount!=null?set.totalChangeCount:(set.changeCount||records.length)),changeCount:Number(set.changeCount!=null?set.changeCount:records.length),counts:changeCounts(set),changes:records},null,2):[['unit','status','model_or_capacity','condition','provider','grade','before','after'],...records.map(record=>['報價條件',record.status,record.modelCapacity||record.model,record.plan||record.condition,record.provider,record.grade,changePrice(record.before),changePrice(record.after)])].map(row=>row.map(value=>`"${String(value==null?'':value).replace(/"/g,'""')}"`).join(',')).join('\n');const url=URL.createObjectURL(new Blob([format==='json'?body:'\ufeff'+body],{type:format==='json'?'application/json;charset=utf-8':'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='threec-'+kind+'-changes.'+format;link.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
+-  function shoppingFilters(){return {segment:shoppingSegment,query:$('shoppingSearch').value,brand:$('shoppingBrand').value,model:$('shoppingModel').value,capacity:$('shoppingCapacity').value,project:$('shoppingProject').value,version:$('shoppingVersion').value,rent:$('shoppingRent').value,term:$('shoppingTerm').value,rowPage,columnPage};}
+-  function setShoppingSegment(segment){shoppingSegment=segment;$('consumerSegmentBtn').setAttribute('aria-pressed',String(segment==='consumer'));$('enterpriseSegmentBtn').setAttribute('aria-pressed',String(segment==='enterprise'));$('shoppingSectionTitle').textContent=segment==='enterprise'?'企業用戶專區':'一般手機方案';$('shoppingSectionDescription').textContent=segment==='enterprise'?'僅顯示所選機款原表有報價的企業、員工及眷屬方案；資格與申辦條件請開啟「完整原表條件」核對。':'一般申辦方案；企業、員工與眷屬優惠請切換「企業用戶專區」。';['shoppingProject','shoppingVersion','shoppingTerm'].forEach(id=>$(id).value='');$('shoppingRent').value=segment==='enterprise'?'':'common';rowPage=0;columnPage=0;renderKind('shopping');}
+-  function fillSelect(id,values,label){const select=$(id),prior=select.value;select.innerHTML=(id==='shoppingRent'?'<option value="common">999＋1399</option>':'')+`<option value="">${esc(label)}</option>`+values.map(value=>`<option value="${esc(value)}">${esc(value)}${id==='shoppingRent'?' 元':id==='shoppingTerm'?' 期':''}</option>`).join('');select.value=(prior==='common'&&id==='shoppingRent')||values.includes(prior)?prior:'';}
+-  function updateShoppingOptions(){
+-    if(!shoppingIndex)return;
+-    const fields=[['shoppingBrand','brands','全部品牌'],['shoppingModel','models','全部機款'],['shoppingCapacity','capacities','全部容量'],['shoppingProject','projects','全部專案'],['shoppingVersion','versions','一般／VIP／加碼'],['shoppingRent','rents','全部月租'],['shoppingTerm','terms','全部期數']];
+-    // Reuse options within this update; invalid selections still reset in order.
+-    const optionSets=new Map();
+-    fields.forEach(([id,key,label])=>{
+-      const filters=shoppingFilters();
+-      const signature=JSON.stringify(filters);
+-      let options=optionSets.get(signature);
+-      if(!options){options=Compare.options(shoppingIndex,filters);optionSets.set(signature,options);}
+-      fillSelect(id,options[key],label);
+-    });
+-  }
+-  function columnLabel(col){return `${col.rent?col.rent+' 元':'月租未標示'} · ${col.term?col.term+'期':'期數未標示'} · ${col.version}${col.detail?' · '+col.detail:''}`;}
+-  function columnHtml(col){const detail=col.detail.replace(/^[_\s]+/,'');const repeated=detail.replace(/版$/,'').toLocaleLowerCase()===col.version.toLocaleLowerCase();return `<span class="rent-label">${esc(col.rent?col.rent+' 元':'月租未標示')}</span><span class="contract-label">${esc(col.term?col.term+' 期':'期數未標示')} · ${esc(col.version)}</span>${detail&&!repeated?`<span class="condition-detail">${esc(detail)}</span>`:''}<details><summary>完整條件</summary><span class="raw-condition">${esc(col.raw)}</span></details>`;}
+-  function variantLabel(row){const names=row.models.map(model=>{const matches=Array.from(model.matchAll(/(?:[-_(\s])(宇宙橙|勃根地紅|午夜|星光|太空灰|鈦原色|黑色?|白色?|藍色?|粉色?|黃色?|綠色?|紫色?|銀色?|金色?)(?=[)\s]|$)/g));return matches.length?matches[matches.length-1][1]:'';}).filter(Boolean);return Array.from(new Set(names)).join('／');}
+-  function specIdentity(row){return JSON.stringify([row.brand,row.model,row.capacity,row.ram]);}
+-  // Derive display distinctions once per accepted snapshot, never during search input.
+-  function findSplitSpecs(index){
+-    const specs=new Map(),amount=value=>Number(String(value).trim().replace(/,/g,''));
+-    for(const row of index.rows){
+-      const quotes=row.projectPrices.filter(price=>Compare.hasPrice(price.value));if(!quotes.length)continue;
+-      const key=specIdentity(row),models=JSON.stringify([...row.models].sort());
+-      if(!specs.has(key))specs.set(key,{models,prices:new Map(),retail:null,split:false});
+-      const spec=specs.get(key);if(spec.models!==models)spec.split=true;
+-      for(const quote of quotes){const value=amount(quote.value);if(spec.prices.has(quote.name)&&spec.prices.get(quote.name)!==value)spec.split=true;spec.prices.set(quote.name,value);}
+-      if(Compare.hasPrice(row.retailPrice)){const retail=amount(row.retailPrice);if(spec.retail!==null&&spec.retail!==retail)spec.split=true;spec.retail=retail;}
+-    }
+-    return new Set(Array.from(specs).filter(([,spec])=>spec.split).map(([key])=>key));
+-  }
+-  function specHtml(row){const variant=splitSpecKeys.has(specIdentity(row))?(variantLabel(row)||[row.models.join('／'),row.codes.join('／')].filter(Boolean).join(' · ')):'';return `<strong>${esc(row.model||'未命名機款')}</strong><span class="spec-tags">${esc([row.capacity,row.ram?'RAM '+row.ram:''].filter(Boolean).join(' · ')||'依原表規格')}</span>${variant?`<span class="variant-label">${esc(variant)}</span>`:''}<span class="brand-label">${Compare.hasPrice(row.retailPrice)?'單機 '+esc(Core.formatPrice(row.retailPrice)):esc(row.brand)}</span><details><summary>來源</summary><span>${row.models.map(esc).join('<br>')}</span><span class="hint">${esc(row.brand)} · ${esc(row.sourceSheet)}${row.codes.length?' · '+row.codes.map(esc).join(' / '):''}</span></details>`;}
+-  function cellHtml(row,col){if(!Compare.hasQuote(row,col))return '';const cell=Compare.cell(row,col);return `<span class="quote ${cell.kind}" aria-label="${esc(cell.text)}"><span class="price-value">${esc(cell.text.replace(/ 元$/,''))}</span> <span class="price-unit">元</span></span>`;}
+-  function setReadingMode(mode){readingMode=mode;rowPage=0;$('tableModeBtn').setAttribute('aria-pressed',String(mode==='table'));$('cardModeBtn').setAttribute('aria-pressed',String(mode==='card'));$('cardConditionField').classList.toggle('hidden',mode!=='card');renderShopping();}
+-  function renderShopping(){
+-    const target=$('shoppingResults'),response=state.shopping;
+-    if(!response||!response.snapshot){$('shoppingMeta').innerHTML='';$('shoppingSummary').textContent='';target.innerHTML=`<div class="empty">${response?'尚未發布正式資料：手機專案／3C。':'尚未讀取正式手機專案資料。'}</div>`;['columnPrev','columnNext','rowPrev','rowNext'].forEach(id=>$(id).disabled=true);return;}
+-    $('shoppingMeta').innerHTML=metaHtml(Core.sourceMeta(response.snapshot,response.registry,'shopping'));
+-    const viewOptions={includeOptions:false,...(readingMode==='card'?{cardConditionKey:$('shoppingCardCondition').value}:{})};
+-    shoppingView=Compare.buildView(shoppingIndex,shoppingFilters(),viewOptions);
+-    if(rowPage>=shoppingView.rowPages||columnPage>=shoppingView.columnPages){rowPage=0;columnPage=0;shoppingView=Compare.buildView(shoppingIndex,shoppingFilters(),viewOptions);}
+-    const view=shoppingView;
+-    $('shoppingSummary').textContent=`${readingMode==='card'?'本方案':'本組方案'}符合 ${view.totalRows} 組機款報價 · 篩選共 ${view.totalColumns} 個有價條件 · 本頁 ${view.rows.length} 組`;
+-    $('rowPage').textContent=`${rowPage+1} / ${view.rowPages} 頁`;$('columnPage').textContent=`${columnPage+1} / ${view.columnPages} 組`;
+-    $('rowPrev').disabled=rowPage===0;$('rowNext').disabled=rowPage+1>=view.rowPages;$('columnPrev').disabled=columnPage===0;$('columnNext').disabled=columnPage+1>=view.columnPages;
+-    const select=$('shoppingCardCondition'),prior=select.value;select.innerHTML=view.columns.map(col=>`<option value="${esc(col.key)}">${esc(col.project+' · '+columnLabel(col))}</option>`).join('');if(view.cardConditionKey)select.value=view.cardConditionKey;else if(view.columns.some(col=>col.key===prior))select.value=prior;
+-    $('cardConditionField').classList.toggle('hidden',readingMode!=='card');
+-    if(!view.rows.length||!view.columns.length){target.innerHTML='<div class="empty">沒有符合搜尋或資費篩選的正式報價。請調整條件或重設篩選。</div>';return;}
+-    if(readingMode==='card'){
+-      const col=view.columns.find(col=>col.key===select.value)||view.columns[0];
+-      target.innerHTML=`<p class="scroll-hint">一次閱讀一個方案；可切換「橫向比較」對照其他期數。</p><div class="quote-cards">`+view.rows.map(row=>`<article class="quote-card"><div class="spec-cell">${specHtml(row)}</div><div class="card-plan"><span>${esc(col.project)}</span><strong>${esc(columnLabel(col))}</strong>${cellHtml(row,col)}<details><summary>完整原表條件</summary><p>${esc(col.raw)}</p></details></div></article>`).join('')+'</div>';
+-    }else{
+-      target.innerHTML=`<p class="scroll-hint"><span class="narrow-scroll-hint">左右滑動比較；機款固定在左側。 </span>價格含 0 元；空格表示此機款沒有該條件報價。展開可核對完整條件。</p><div class="table-scroll comparison-scroll" tabindex="0" role="region" aria-label="手機專案橫向價格比較"><table class="comparison-table" style="--comparison-columns:${view.columns.length}"><caption class="visually-hidden">正式手機專案價格，依機款規格與完整方案條件對照</caption><thead><tr><th class="spec-cell" scope="col">機款／規格<br><span class="hint">專案價單位：元</span></th>${view.columns.map(col=>`<th scope="col"><span class="project-label" title="${esc(col.project)}">${esc(col.project)}</span>${columnHtml(col)}</th>`).join('')}</tr></thead><tbody>${view.rows.map(row=>`<tr><th scope="row" class="spec-cell">${specHtml(row)}</th>${view.columns.map(col=>`<td>${cellHtml(row,col)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+-    }
+-  }
+-  function renderTradein(view){
+-    const target=$('tradeinResults');
+-    if(!view){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未讀取正式舊換新資料。</div>';return;}
+-    if(!view.available){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未發布正式資料：舊換新。</div>';return;}
+-    $('tradeinMeta').innerHTML=metaHtml(view.meta);
+-    if(!view.rows.length){target.innerHTML='<div class="empty">沒有符合搜尋條件的正式機款。</div>';return;}
+-    const notice=view.limited?`<div class="status warn">目前顯示前 ${view.displayLimit} 筆（符合條件共 ${view.totalRows} 筆）。請先從「選機款」縮小範圍後查看完整資料。</div>`:'';
+-    const selectedProvider=$('tradeinProvider').value,selectedGrade=$('tradeinGrade').value;
+-    target.innerHTML=notice+view.rows.map(row=>`<article class="provider"><h3>${esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')}</h3><p class="group-note">來源工作表：${esc(row.sourceSheet||'—')}</p>${Core.quotedProviders(row,selectedProvider,selectedGrade).map(provider=>{const grades=Core.quotedGrades(row,provider,selectedGrade);return `<div class="table-scroll"><table><thead><tr><th colspan="${grades.length+1}">${esc(provider)}（獨立報價）</th></tr><tr><th>原始機型／容量</th>${grades.map(grade=>`<th>${esc(Core.gradeLabel(grade))}</th>`).join('')}</tr></thead><tbody><tr><td>${esc(row.model||'—')}</td>${grades.map(grade=>`<td>${esc(Core.formatPrice(row.quotes[provider]&&row.quotes[provider][grade]))}</td>`).join('')}</tr></tbody></table></div>`;}).join('')}</article>`).join('');
+-  }
+-  function renderKind(kind){if(kind==='shopping'){if(shoppingIndex)updateShoppingOptions();renderShopping();renderChanges(kind);return;}const search=$('tradeinSearch').value,modelKey=$('tradeinModel').value;const response=state[kind];const view=response?Core.buildView(kind,response,{query:search,modelKey,provider:$('tradeinProvider').value,grade:$('tradeinGrade').value}):null;renderTradein(view);renderChanges(kind);if(view){const select=$('tradeinModel'),prior=select.value;select.innerHTML='<option value="">全部機款</option>'+view.modelOptions.map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');if(view.modelOptions.some(option=>option.value===prior))select.value=prior;}}
+-  function showKind(kind){state.active=kind;['shopping','tradein'].forEach(value=>{const tab=$(value+'Tab'),pane=$(value+'Pane');const active=value===kind;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));pane.classList.toggle('hidden',!active);});renderChanges(kind);const query=$('changeSearch').value.trim();const set=state.changePage[kind]||responseChangeSet(state[kind]);if(state[kind]&&!state[kind].changesDeferred&&(!set||String(set._search||'')!==query))loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad'));}
+-  async function refresh(){
+-    const requestGeneration=++generation;
+-    state.loading=true;$('refreshBtn').disabled=true;setStatus('正在讀取兩類正式價格…');clearResults();
+-    const outcomes={};
+-    function progress(){
+-      const completed=Object.keys(outcomes).length;
+-      const available=['shopping','tradein'].filter(kind=>state[kind]&&state[kind].snapshot);
+-      const names={shopping:'手機專案／3C',tradein:'舊換新'};
+-      const failures=Object.keys(outcomes).filter(kind=>outcomes[kind].error).map(kind=>names[kind]+'：'+outcomes[kind].error);
+-      if(completed<2){setStatus(available.length?names[available[0]]+' 已讀取，可先查詢；另一類正在讀取…':'正在讀取兩類正式價格…');return;}
+-      if(failures.length){setStatus(failures.join('；')+(available.length?'；已成功讀取的類別可繼續查詢。':'；正式資料已清除，請重新整理。'),available.length?'warn':'bad');return;}
+-      const missing=['shopping','tradein'].filter(kind=>!state[kind].snapshot).map(kind=>names[kind]);
+-      setStatus(missing.length?'已讀取；'+missing.join('、')+' 尚未發布正式資料，可查詢已有正式版本。':'已讀取正式資料；請依版本／日期核對後查詢。',available.length?'ok':'warn');
+-    }
+-    try{
+-      await Promise.all(['shopping','tradein'].map(async kind=>{
+-        try{
+-          const response=await invoke(kind);
+-          if(requestGeneration!==generation)return;
+-          const index=kind==='shopping'?Compare.buildIndex(response.snapshot||{}):null;
+-          state[kind]=response;if(kind==='shopping'){shoppingIndex=index;splitSpecKeys=findSplitSpecs(index);}
+-          outcomes[kind]={};renderKind(kind);
+-        }catch(error){
+-          if(requestGeneration!==generation)return;
+-          outcomes[kind]={error:String(error.message||'正式資料讀取失敗')};
+-        }
+-        if(requestGeneration===generation)progress();
+-      }));
+-    }finally{if(requestGeneration===generation){state.loading=false;$('refreshBtn').disabled=false;}}
+-  }
+-  function bind(){
+-    $('consumerSegmentBtn').addEventListener('click',()=>setShoppingSegment('consumer'));$('enterpriseSegmentBtn').addEventListener('click',()=>setShoppingSegment('enterprise'));
+-    $('refreshBtn').addEventListener('click',refresh);
+-    $('changeLoadBtn').addEventListener('click',async()=>{const kind=state.active,readGeneration=generation;if(changeLoading[kind])return;changeLoading[kind]=true;renderChanges(kind);try{await loadChangePage(kind,0,$('changeSearch').value.trim());}catch(error){if(readGeneration!==generation||kind!==state.active)return;$('changeSummary').textContent='異動明細讀取失敗：'+error.message+'；正式價格仍可查詢。';}finally{if(readGeneration===generation){changeLoading[kind]=false;$('changeLoadBtn').disabled=false;}}});
+-    document.querySelectorAll('[data-kind]').forEach(button=>button.addEventListener('click',()=>showKind(button.dataset.kind)));
+-    ['shoppingBrand','shoppingModel','shoppingCapacity','shoppingProject','shoppingVersion','shoppingRent','shoppingTerm'].forEach(id=>$(id).addEventListener('change',()=>{rowPage=0;columnPage=0;renderKind('shopping');}));
+-    // Catalog options do not depend on the search query; keep select updates on filter changes.
+-    $('shoppingSearch').addEventListener('input',()=>{rowPage=0;columnPage=0;renderShopping();renderChanges('shopping');});
+-    ['tradeinSearch','tradeinModel','tradeinProvider','tradeinGrade'].forEach(id=>$(id).addEventListener(id.endsWith('Search')?'input':'change',()=>renderKind('tradein')));
+-    $('shoppingReset').addEventListener('click',()=>{['shoppingSearch','shoppingBrand','shoppingModel','shoppingCapacity','shoppingProject','shoppingVersion','shoppingTerm'].forEach(id=>$(id).value='');$('shoppingRent').value=shoppingSegment==='enterprise'?'':'common';rowPage=0;columnPage=0;renderKind('shopping');});
+-    document.querySelectorAll('[data-shortcut]').forEach(button=>button.addEventListener('click',()=>{const value=button.dataset.shortcut;const [rent,term]=value.split('-');$('shoppingRent').value=rent;$('shoppingTerm').value=term||'';$('shoppingVersion').value='';rowPage=0;columnPage=0;renderKind('shopping');}));
+-    $('tableModeBtn').addEventListener('click',()=>setReadingMode('table'));$('cardModeBtn').addEventListener('click',()=>setReadingMode('card'));$('shoppingCardCondition').addEventListener('change',()=>{rowPage=0;renderShopping();});
+-    [['rowPrev','row',-1],['rowNext','row',1],['columnPrev','column',-1],['columnNext','column',1]].forEach(([id,axis,direction])=>$(id).addEventListener('click',()=>{if(axis==='row')rowPage+=direction;else{columnPage+=direction;rowPage=0;}renderShopping();}));
+-    if(scope.matchMedia('(max-width:700px)').matches)document.querySelector('.filter-details').open=false;
+-    setShoppingSegment(shoppingSegment);setReadingMode(readingMode);
+-    let changeSearchTimer=0;
+-    $('changeSearch').addEventListener('input',()=>{const kind=state.active;const query=$('changeSearch').value.trim();state.changePage[kind]=null;renderChanges(kind);clearTimeout(changeSearchTimer);changeSearchTimer=setTimeout(()=>loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad')),250);});
+-    $('changePrevBtn').addEventListener('click',()=>{const kind=state.active;const set=state.changePage[kind]||responseChangeSet(state[kind]);const size=changePageSize(set);if(set&&Number(set.offset||0)>=size)loadChangePage(kind,Math.max(0,Number(set.offset||0)-size),$('changeSearch').value.trim()).catch(error=>setStatus(error.message,'bad'));});
+-    $('changeNextBtn').addEventListener('click',()=>{const kind=state.active;const set=state.changePage[kind]||responseChangeSet(state[kind]);if(set&&set.hasMore)loadChangePage(kind,Number(set.offset||0)+changePageSize(set),$('changeSearch').value.trim()).catch(error=>setStatus(error.message,'bad'));});
+-    $('changeJsonBtn').addEventListener('click',()=>downloadChanges(state.active,'json').catch(error=>setStatus(error.message,'bad')));
+-    $('changeCsvBtn').addEventListener('click',()=>downloadChanges(state.active,'csv').catch(error=>setStatus(error.message,'bad')));
+-    scope.addEventListener('pagehide',()=>{generation+=1;clearResults();});
+-    scope.addEventListener('pageshow',event=>{if(event.persisted)refresh();});
+-    showKind(scope.location.hash==='#tradein'?'tradein':'shopping');
+-    refresh();
+-  }
+-  if(!Core||!Compare||!Transport){setStatus('查詢元件載入失敗。','bad');return;}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+-})(window);
+-</script>
++<script>if(location.hash==="#tradein")location.replace("tradein-query.html");</script>
++<script src="threec-query-ui.js"></script>
+ </body>
+ </html>
+--- a/tradein-progress.html
++++ b/tradein-progress.html
+@@ -1,8 +1,10 @@
+-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>舊換新個人進度｜北一二B</title><link rel="stylesheet" href="tradein-progress.css?v=20261008-1"></head><body>
++<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>舊換新專區｜個人績效｜北一二B</title><link rel="stylesheet" href="tradein-progress.css?v=20261008-1"><link rel="stylesheet" href="tradein-area.css">
++</head><body>
++<div class="preview-notice">整合候選 · 尚未上線</div>
+ <script src="portal-logout.js?v=20261002-logout-2"></script><header class="topbar"><div class="topbar-inner"><a class="brand" href="home.html">北一二B <em>智慧營運中心</em></a><nav class="toplinks"><a href="home.html">工具首頁</a><a href="phone-stock-dashboard.html">庫存</a></nav></div></header>
+-<main><p class="breadcrumb"><a href="home.html">同仁大廳</a> / <a href="threec-query.html#tradein">舊換新專區</a> / 個人進度</p><section class="hero"><p class="eyebrow">TEAM PROGRESS</p><h1>每位同仁，每月 3 台</h1><p>同仁查看每月進度；店長與代理店長免目標、顯示實績，督導掌握各店動員與資料缺漏。</p><div class="badges"><span class="badge orange">每月個人進度</span><span class="badge">店長／代理不設目標</span></div></section>
+-<nav class="tabs" aria-label="專區功能"><a href="threec-query.html#tradein">回收價查詢</a><a class="active" aria-current="page" href="tradein-progress.html">個人進度與店點動員</a></nav>
+-<div id="locked" class="access-grid"><section class="panel"><div class="lock-icon" aria-hidden="true">⌑</div><h2>登入後查看進度</h2><p>正式版沿用既有員編與核准裝置。登入前不載入任何人員實績。</p><form id="loginForm"><label>員編<input id="employeeId" type="text" inputmode="text" autocomplete="username" required></label><button type="submit">登入並查看進度</button></form><details><summary>首次使用或更換裝置</summary><form id="bindForm"><label>指定密碼<input id="bootstrapCode" type="password" autocomplete="off" required></label><button type="submit">申請核准裝置</button></form><button id="checkBinding" class="secondary" type="button">檢查核准狀態</button></details><p id="loginMessage" class="form-message" role="status">沿用營運中心的員編及核准裝置。</p></section><section class="panel"><h2>先查回收價</h2><p>不需要登入即可查詢回收商報價與等級。</p><a class="button secondary" style="margin-top:18px" href="threec-query.html#tradein">查詢回收價 →</a></section></div>
++<main><p class="breadcrumb"><a href="home.html">同仁大廳</a> / <a href="tradein-query.html">舊換新專區</a> / 個人績效</p><section class="hero"><p class="eyebrow">TEAM PROGRESS</p><h1>舊換新專區</h1><h2>個人績效</h2><p>每位同仁，每月 3 台</p><p>同仁查看每月進度；店長與代理店長免目標、顯示實績，督導掌握各店動員與資料缺漏。</p><div class="badges"><span class="badge orange">每月個人進度</span><span class="badge">店長／代理不設目標</span></div></section>
++<nav class="tabs" aria-label="專區功能"><a href="tradein-query.html">回收價查詢</a><a class="active" aria-current="page" href="tradein-progress.html">個人績效</a></nav>
++<div id="locked" class="access-grid"><section class="panel"><div class="lock-icon" aria-hidden="true">⌑</div><h2>登入後查看進度</h2><p>正式版沿用既有員編與核准裝置。登入前不載入任何人員實績。</p><form id="loginForm"><label>員編<input id="employeeId" type="text" inputmode="text" autocomplete="username" required></label><button type="submit">登入並查看進度</button></form><details><summary>首次使用或更換裝置</summary><form id="bindForm"><label>指定密碼<input id="bootstrapCode" type="password" autocomplete="off" required></label><button type="submit">申請核准裝置</button></form><button id="checkBinding" class="secondary" type="button">檢查核准狀態</button></details><p id="loginMessage" class="form-message" role="status">沿用營運中心的員編及核准裝置。</p></section><section class="panel"><h2>先查回收價</h2><p>不需要登入即可查詢回收商報價與等級。</p><a class="button secondary" style="margin-top:18px" href="tradein-query.html">查詢回收價 →</a></section></div>
+ <div id="privateWorkspace" hidden><div class="role-select"><strong id="profileLabel"></strong><label>統計月份<input id="periodMonth" type="month"></label><button id="refreshData" class="secondary" type="button">重新讀取</button><button id="logout" class="secondary" type="button">登出</button></div>
+ <section class="panel"><div class="panel-heading"><div><h2>本月進度</h2><p id="periodMeta" class="meta">尚未讀取來源</p></div><span id="updatedLabel" class="badge blue"></span></div><div id="self" class="self-grid" style="margin-top:20px"></div></section>
+ <section id="exportPanel" class="panel"><div class="panel-heading"><div><h2>複製與匯出提醒</h2><p id="exportScopeLabel" class="meta"></p></div><label>匯出範圍<select id="exportScope"><option value="self">本人</option></select></label></div>
+--- /dev/null
++++ b/threec-query-ui.js
+@@ -0,0 +1,232 @@
++(function(scope){
++  'use strict';
++  const queryKind=document.body.dataset.queryKind==='tradein'?'tradein':'shopping';
++  const Core=scope.ThreecQueryCore;
++  const DiffCore=scope.ThreecPriceDiffCore;
++  const Transport=scope.ThreecPriceTransport;
++  const Compare=scope.ThreecComparisonCore;
++  let shoppingIndex=null, shoppingView=null, splitSpecKeys=new Set();
++  let shoppingSegment=new URLSearchParams(scope.location.search).get('section')==='enterprise'?'enterprise':'consumer';
++  let rowPage=0,columnPage=0;
++  let readingMode=scope.matchMedia('(max-width:700px)').matches?'card':'table';
++  const API='https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
++  const state={shopping:null,tradein:null,active:'shopping',loading:false,changePage:{shopping:null,tradein:null}};
++  let generation=0;
++  const changeLoading={shopping:false,tradein:false};
++  const changeRequestGeneration={shopping:0,tradein:0};
++  const $=id=>document.getElementById(id);
++  function esc(value){return String(value==null?'':value).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
++  function setStatus(text,kind){const el=$('queryStatus');el.textContent=text;el.className='status'+(kind?' '+kind:'');}
++  function readPublicFrame(payload){
++    return new Promise((resolve,reject)=>{
++      const requestId=crypto.randomUUID();
++      const endpoint=new URL(API);endpoint.searchParams.set('transport','iframe');endpoint.searchParams.set('requestId',requestId);endpoint.searchParams.set('origin',location.origin);
++      const frame=document.createElement('iframe'),form=document.createElement('form'),field=document.createElement('textarea');
++      let finished=false;
++      function finish(error,body){if(finished)return;finished=true;clearTimeout(timer);scope.removeEventListener('message',onMessage);frame.remove();form.remove();error?reject(error):resolve(body);}
++      function onMessage(event){
++        let origin;try{origin=new URL(event.origin);}catch{return;}
++        if(origin.protocol!=='https:'||origin.port||!(origin.hostname==='script.google.com'||origin.hostname==='script.googleusercontent.com'||origin.hostname.endsWith('-script.googleusercontent.com')))return;
++        const message=event.data;if(!event.source||!message||message.type!=='north12b-gas-response-v1'||message.requestId!==requestId)return;
++        if(!message.body||message.body.status!=='ok'){const error=new Error(message.body&&message.body.message||'正式資料讀取失敗');error.authoritative=true;finish(error);return;}
++        finish(null,message.body);
++      }
++      const timer=setTimeout(()=>finish(new Error('正式資料讀取逾時，請重新整理')),35000);
++      frame.name='public_price_'+requestId;frame.title='正式價格讀取';frame.hidden=true;
++      form.method='POST';form.action=endpoint.toString();form.target=frame.name;form.enctype='application/x-www-form-urlencoded';form.hidden=true;
++      field.name='payload';field.value=JSON.stringify(payload);form.append(field);scope.addEventListener('message',onMessage);document.body.append(frame,form);
++      try{form.submit();}catch{finish(new Error('正式資料連線失敗'));}
++    });
++  }
++  async function readPublic(payload,preferFrame=false){
++    // Large price snapshots use one iframe request first, avoiding an aborted
++    // fetch that keeps a duplicate GAS execution running in the background.
++    if(preferFrame){try{return await readPublicFrame(payload);}catch(error){if(error.authoritative)throw error;}}
++    for(let attempt=0;attempt<(preferFrame?1:2);attempt++){
++      const controller=new AbortController();
++      const timer=setTimeout(()=>controller.abort(),15000);
++      try{
++        // A unique URL prevents an expired Google ContentService redirect from
++        // being reused. Only public, read-only actions call this helper.
++        const requestId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
++        const response=await fetch(API+'?readAttempt='+requestId,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),cache:'no-store',credentials:'omit',signal:controller.signal});
++        let body;
++        try{body=await response.json();}catch{throw new Error('正式資料回應格式錯誤');}
++        if(response.ok&&body&&body.status==='ok')return body;
++        if(body&&body.status==='error'){
++          const error=new Error(body.message||'正式資料讀取失敗');error.authoritative=true;throw error;
++        }
++        throw new Error('正式資料讀取失敗（HTTP '+response.status+'）');
++      }catch(error){
++        if(error.authoritative)throw error;
++        if(attempt===0&&!preferFrame){try{return await readPublicFrame(payload);}catch(frameError){if(frameError.authoritative)throw frameError;}}
++        else throw new Error(error.name==='AbortError'?'正式資料讀取逾時，請重新整理':error.message||'正式資料連線失敗');
++      }finally{clearTimeout(timer);}
++    }
++  }
++  async function invoke(kind){const payload={action:'threec_snapshot_read',kind,includeChanges:false,priceEncoding:Transport.ENCODING};return Transport.decode(await readPublic(payload,kind==='shopping'));}
++  function invokeChanges(kind,offset,limit,snapshotHash,search){return readPublic({action:'threec_changes_read',kind,offset:Number(offset||0),limit:Number(limit||1000),snapshotHash:snapshotHash||'',search:String(search||'')});}
++  function clearResults(){shoppingIndex=null;shoppingView=null;splitSpecKeys=new Set();state.shopping=null;state.tradein=null;state.changePage={shopping:null,tradein:null};changeLoading.shopping=false;changeLoading.tradein=false;renderKind('shopping');renderKind('tradein');}
++  function metaHtml(meta){return `<div class="source-date"><span>正式來源日期</span><strong>${esc(meta.sourceVersionDate||'未提供')}</strong><span>${esc(meta.rowCount)} 筆來源資料</span></div><details class="source-details"><summary>資料版本與來源資訊</summary><dl><dt>正式版本</dt><dd>${esc(meta.snapshotHash||meta.version||'—')}</dd><dt>發布時間</dt><dd>${esc(meta.publishedAt||'—')}</dd><dt>來源 SHA-256</dt><dd>${esc(meta.sourceFileSha256||'—')}</dd></dl></details>`;}
++  function renderPrice(name,value){const state=Core.priceState(value);return `<div class="price-item${state.missing?' missing':''}${state.zero?' zero':''}"><span>${esc(name)}</span><strong>${esc(Core.formatPrice(value))}</strong></div>`;}
++  function changeRows(changeSet){if(!changeSet||typeof changeSet!=='object')return [];if(Array.isArray(changeSet.changePage))return changeSet.changePage;if(Array.isArray(changeSet.changes))return changeSet.changes;if(Array.isArray(changeSet.records))return changeSet.records;return [];}
++  function changeCounts(changeSet){const counts=changeSet&&changeSet.counts&&typeof changeSet.counts==='object'?changeSet.counts:{};return {added:Number(changeSet&&changeSet.addedCount!=null?changeSet.addedCount:counts.added||0),changed:Number(changeSet&&changeSet.changedCount!=null?changeSet.changedCount:counts.changed||0),unchanged:Number(changeSet&&changeSet.unchangedCount!=null?changeSet.unchangedCount:counts.unchanged||0),removed:Number(changeSet&&changeSet.removedCount!=null?changeSet.removedCount:counts.removed||0)};}
++  function changePrice(value){if(value==null)return '—（無此條件）';if(value&&typeof value==='object'&&Object.prototype.hasOwnProperty.call(value,'value'))return Core.formatPrice(value.value);if(value&&typeof value==='object'&&Object.prototype.hasOwnProperty.call(value,'display'))return String(value.display||'無報價（缺價）');return Core.formatPrice(value);}
++  function changePriceClass(value){if(value==null||(value&&value.kind==='missing')||String(value).trim()==='')return 'missing';if((value&&value.kind==='zero')||Number(String(value).replace(/,/g,''))===0)return 'zero';return '';}
++  function changeText(record){const identity=record&&record.identity||{};return [record&&(record.modelCapacity||record.model),record&&(record.plan||record.condition),record&&(record.provider||identity.provider),record&&(record.grade||identity.grade)].filter(Boolean).join(' ');}
++  function responseChangeSet(response){const check=response&&response.updateCheck;return check&&check.changeSet?check.changeSet:(response&&response.changeSet)||null;}
++  function renderChanges(kind){
++    if(kind!==state.active)return;
++    const response=state[kind];
++    $('changeLoadBtn').hidden=true;
++    const title=kind==='shopping'?'手機專案／3C':'舊換新';
++    $('changeTitle').textContent=title+' 本次異動／版本檢查';
++    if(!response||!response.snapshot){$('changeBasis').textContent='尚無正式異動記錄。';$('changeCounts').innerHTML='';$('changeResults').innerHTML='<div class="empty">尚無異動記錄。</div>';['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;}
++    if(response.changesDeferred&&!state.changePage[kind]){
++      $('changeLoadBtn').hidden=false;$('changeLoadBtn').disabled=changeLoading[kind];
++      $('changeBasis').textContent='價格 active 版本：'+response.snapshot.snapshot_hash+'；版本日期 '+response.snapshot.source_version_date+'。';
++      $('changeCounts').innerHTML='';$('changeResults').innerHTML='';$('changePage').textContent='';
++      $('changeSummary').textContent=changeLoading[kind]?'正在讀取本次異動明細，價格可繼續查詢…':'正式價格已完整讀取；需要核對本次調價時，請載入異動明細或搜尋條件。';
++      ['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;
++    }
++    const snapshot=response.snapshot||{};const set=state.changePage[kind]||responseChangeSet(response);if(!set){$('changeBasis').textContent='正式版本已讀取；後端尚未提供異動記錄。';$('changeCounts').innerHTML='';$('changeResults').innerHTML='<div class="empty">尚無異動記錄。</div>';['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;}
++    const query=$('changeSearch').value.trim();const loadedSearch=String(set._search==null?'':set._search);const pendingSearch=query!==loadedSearch;const counts=changeCounts(set);const rows=pendingSearch?[]:changeRows(set);const changeCount=Number(set.changeCount!=null?set.changeCount:rows.length);const totalChangeCount=Number(set.totalChangeCount!=null?set.totalChangeCount:(set.totalCount!=null?set.totalCount:changeCount));const offset=Number(set.offset||0);const limit=Number(set.limit||100);const page=Math.floor(offset/Math.max(1,limit))+1;const pageCount=Math.max(1,Math.ceil(changeCount/Math.max(1,limit)));
++    const activeHash=snapshot.snapshot_hash||'';const update=response.updateCheck||{};const updateBlocked=update.blocked||update.status==='blocked'||update.ok===false||update.matches===false;const latest=update.latest_check||update.latestCheck||update;const latestDate=latest&&(latest.source_version_date||latest.date||latest.latest_source_version_date);const latestRows=latest&&(latest.row_count!=null?latest.row_count:latest.source_row_count);const latestText=latestDate||latestRows!=null||latest.status?'；最近來源核對日期 '+(latestDate||'—')+'／'+(latestRows==null?'—':latestRows)+' 筆／'+(latest.status||'已核對'):'';
++    $('changeBasis').textContent='價格 active 版本：'+(activeHash||'—')+'；版本日期 '+(snapshot.source_version_date||'—')+latestText+'；異動資料以 active／previous 讀回為準。'+(updateBlocked?' 目前 active 已更新，請重新讀取。':'');
++    $('changeCounts').innerHTML=[['changed','調價（筆報價條件）'],['added','新增報價條件'],['unchanged','未變報價條件'],['removed','移除報價條件']].map(pair=>`<div class="change-count"><span>${pair[1]}</span><strong>${counts[pair[0]].toLocaleString('zh-TW')}</strong></div>`).join('');
++    $('changeSummary').textContent=pendingSearch?'正在搜尋完整異動條件…':'本頁顯示 '+rows.length+' 筆；搜尋符合 '+changeCount.toLocaleString('zh-TW')+' 筆，整版共 '+totalChangeCount.toLocaleString('zh-TW')+' 筆報價條件（含缺價欄位，不等同 Excel 機款列數）。';
++    const html=rows.slice(0,100).map(record=>`<tr><td>${esc(record.status==='changed'?'調價':record.status==='added'?'新增':record.status==='removed'?'移除':'未變')}</td><td>${esc(record.modelCapacity||record.model||'—')}</td><td><details><summary>${esc((record.plan||record.condition||'—').slice(0,24))}${String(record.plan||record.condition||'').length>24?'…':''}</summary><span class="raw-condition">${esc(record.plan||record.condition||'—')}</span></details></td><td>${esc(record.provider||'—')}</td><td>${esc(record.grade||'—')}</td><td class="${changePriceClass(record.before)}">${esc(changePrice(record.before))}</td><td class="${changePriceClass(record.after)}">${esc(changePrice(record.after))}</td></tr>`).join('');
++    $('changeResults').innerHTML=html?`<table><thead><tr><th>狀態</th><th>機款／容量</th><th>完整資費／合約／條件</th><th>回收商</th><th>等級</th><th>之前</th><th>目前</th></tr></thead><tbody>${html}</tbody></table>`:'<div class="empty">本頁沒有符合搜尋條件的異動。</div>';
++    $('changePage').textContent='第 '+page+' 頁／共 '+pageCount+' 頁';$('changePrevBtn').disabled=pendingSearch||offset<=0;$('changeNextBtn').disabled=pendingSearch||!set.hasMore;$('changeJsonBtn').disabled=pendingSearch||!set;$('changeCsvBtn').disabled=pendingSearch||!set;
++  }
++  function changePageSize(set){return Number(set&&set.limit||100);}
++  async function loadChangePage(kind,offset,search){const requestGeneration=generation;const changeRequest=++changeRequestGeneration[kind];const response=state[kind];if(!response||!response.snapshot)return;const query=String(search==null?$('changeSearch').value.trim():search);const hash=response.snapshot.snapshot_hash||'';const result=await invokeChanges(kind,offset,100,hash,query);if(requestGeneration!==generation||changeRequest!==changeRequestGeneration[kind]||state[kind]!==response)return;state.changePage[kind]=Object.assign({},result.changeSet||{},{_search:query});renderChanges(kind);}
++  async function fetchAllChanges(kind,search){const requestGeneration=generation;const response=state[kind];if(!response||!response.snapshot)return null;const query=String(search==null?$('changeSearch').value.trim():search);const hash=response.snapshot.snapshot_hash||'';let offset=0;let first=null;let next=null;const records=[];do{const result=await invokeChanges(kind,offset,1000,hash,query);if(requestGeneration!==generation||state[kind]!==response)return null;next=result.changeSet||{};if(next.firstRelease&&DiffCore){const local=DiffCore.diffSnapshots(kind,null,response.snapshot,{limit:Infinity,search:query});return {set:local,records:changeRows(local),search:query};}if(!first)first=next;records.push(...changeRows(next));offset+=Number(next.limit||1000);}while(next.hasMore);return {set:first||{},records,search:query};}
++  async function downloadChanges(kind,format){const fetched=await fetchAllChanges(kind);if(!fetched)return;const set=fetched.set;const records=fetched.records;const body=format==='json'?JSON.stringify({unit:'報價條件',snapshotHash:state[kind].snapshot.snapshot_hash||'',search:fetched.search,totalChangeCount:Number(set.totalChangeCount!=null?set.totalChangeCount:(set.changeCount||records.length)),changeCount:Number(set.changeCount!=null?set.changeCount:records.length),counts:changeCounts(set),changes:records},null,2):[['unit','status','model_or_capacity','condition','provider','grade','before','after'],...records.map(record=>['報價條件',record.status,record.modelCapacity||record.model,record.plan||record.condition,record.provider,record.grade,changePrice(record.before),changePrice(record.after)])].map(row=>row.map(value=>`"${String(value==null?'':value).replace(/"/g,'""')}"`).join(',')).join('\n');const url=URL.createObjectURL(new Blob([format==='json'?body:'\ufeff'+body],{type:format==='json'?'application/json;charset=utf-8':'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='threec-'+kind+'-changes.'+format;link.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
++  function shoppingFilters(){return {segment:shoppingSegment,query:$('shoppingSearch').value,brand:$('shoppingBrand').value,model:$('shoppingModel').value,capacity:$('shoppingCapacity').value,project:$('shoppingProject').value,version:$('shoppingVersion').value,rent:$('shoppingRent').value,term:$('shoppingTerm').value,rowPage,columnPage};}
++  function setShoppingSegment(segment){shoppingSegment=segment;$('consumerSegmentBtn').setAttribute('aria-pressed',String(segment==='consumer'));$('enterpriseSegmentBtn').setAttribute('aria-pressed',String(segment==='enterprise'));$('shoppingSectionTitle').textContent=segment==='enterprise'?'企業用戶專區':'一般手機方案';$('shoppingSectionDescription').textContent=segment==='enterprise'?'僅顯示所選機款原表有報價的企業、員工及眷屬方案；資格與申辦條件請開啟「完整原表條件」核對。':'一般申辦方案；企業、員工與眷屬優惠請切換「企業用戶專區」。';['shoppingProject','shoppingVersion','shoppingTerm'].forEach(id=>$(id).value='');$('shoppingRent').value=segment==='enterprise'?'':'common';rowPage=0;columnPage=0;renderKind('shopping');}
++  function fillSelect(id,values,label){const select=$(id),prior=select.value;select.innerHTML=(id==='shoppingRent'?'<option value="common">999＋1399</option>':'')+`<option value="">${esc(label)}</option>`+values.map(value=>`<option value="${esc(value)}">${esc(value)}${id==='shoppingRent'?' 元':id==='shoppingTerm'?' 期':''}</option>`).join('');select.value=(prior==='common'&&id==='shoppingRent')||values.includes(prior)?prior:'';}
++  function updateShoppingOptions(){
++    if(!shoppingIndex)return;
++    const fields=[['shoppingBrand','brands','全部品牌'],['shoppingModel','models','全部機款'],['shoppingCapacity','capacities','全部容量'],['shoppingProject','projects','全部專案'],['shoppingVersion','versions','一般／VIP／加碼'],['shoppingRent','rents','全部月租'],['shoppingTerm','terms','全部期數']];
++    // Reuse options within this update; invalid selections still reset in order.
++    const optionSets=new Map();
++    fields.forEach(([id,key,label])=>{
++      const filters=shoppingFilters();
++      const signature=JSON.stringify(filters);
++      let options=optionSets.get(signature);
++      if(!options){options=Compare.options(shoppingIndex,filters);optionSets.set(signature,options);}
++      fillSelect(id,options[key],label);
++    });
++  }
++  function columnLabel(col){return `${col.rent?col.rent+' 元':'月租未標示'} · ${col.term?col.term+'期':'期數未標示'} · ${col.version}${col.detail?' · '+col.detail:''}`;}
++  function columnHtml(col){const detail=col.detail.replace(/^[_\s]+/,'');const repeated=detail.replace(/版$/,'').toLocaleLowerCase()===col.version.toLocaleLowerCase();return `<span class="rent-label">${esc(col.rent?col.rent+' 元':'月租未標示')}</span><span class="contract-label">${esc(col.term?col.term+' 期':'期數未標示')} · ${esc(col.version)}</span>${detail&&!repeated?`<span class="condition-detail">${esc(detail)}</span>`:''}<details><summary>完整條件</summary><span class="raw-condition">${esc(col.raw)}</span></details>`;}
++  function variantLabel(row){const names=row.models.map(model=>{const matches=Array.from(model.matchAll(/(?:[-_(\s])(宇宙橙|勃根地紅|午夜|星光|太空灰|鈦原色|黑色?|白色?|藍色?|粉色?|黃色?|綠色?|紫色?|銀色?|金色?)(?=[)\s]|$)/g));return matches.length?matches[matches.length-1][1]:'';}).filter(Boolean);return Array.from(new Set(names)).join('／');}
++  function specIdentity(row){return JSON.stringify([row.brand,row.model,row.capacity,row.ram]);}
++  // Derive display distinctions once per accepted snapshot, never during search input.
++  function findSplitSpecs(index){
++    const specs=new Map(),amount=value=>Number(String(value).trim().replace(/,/g,''));
++    for(const row of index.rows){
++      const quotes=row.projectPrices.filter(price=>Compare.hasPrice(price.value));if(!quotes.length)continue;
++      const key=specIdentity(row),models=JSON.stringify([...row.models].sort());
++      if(!specs.has(key))specs.set(key,{models,prices:new Map(),retail:null,split:false});
++      const spec=specs.get(key);if(spec.models!==models)spec.split=true;
++      for(const quote of quotes){const value=amount(quote.value);if(spec.prices.has(quote.name)&&spec.prices.get(quote.name)!==value)spec.split=true;spec.prices.set(quote.name,value);}
++      if(Compare.hasPrice(row.retailPrice)){const retail=amount(row.retailPrice);if(spec.retail!==null&&spec.retail!==retail)spec.split=true;spec.retail=retail;}
++    }
++    return new Set(Array.from(specs).filter(([,spec])=>spec.split).map(([key])=>key));
++  }
++  function specHtml(row){const variant=splitSpecKeys.has(specIdentity(row))?(variantLabel(row)||[row.models.join('／'),row.codes.join('／')].filter(Boolean).join(' · ')):'';return `<strong>${esc(row.model||'未命名機款')}</strong><span class="spec-tags">${esc([row.capacity,row.ram?'RAM '+row.ram:''].filter(Boolean).join(' · ')||'依原表規格')}</span>${variant?`<span class="variant-label">${esc(variant)}</span>`:''}<span class="brand-label">${Compare.hasPrice(row.retailPrice)?'單機 '+esc(Core.formatPrice(row.retailPrice)):esc(row.brand)}</span><details><summary>來源</summary><span>${row.models.map(esc).join('<br>')}</span><span class="hint">${esc(row.brand)} · ${esc(row.sourceSheet)}${row.codes.length?' · '+row.codes.map(esc).join(' / '):''}</span></details>`;}
++  function cellHtml(row,col){if(!Compare.hasQuote(row,col))return '';const cell=Compare.cell(row,col);return `<span class="quote ${cell.kind}" aria-label="${esc(cell.text)}"><span class="price-value">${esc(cell.text.replace(/ 元$/,''))}</span> <span class="price-unit">元</span></span>`;}
++  function setReadingMode(mode){readingMode=mode;rowPage=0;$('tableModeBtn').setAttribute('aria-pressed',String(mode==='table'));$('cardModeBtn').setAttribute('aria-pressed',String(mode==='card'));$('cardConditionField').classList.toggle('hidden',mode!=='card');renderShopping();}
++  function renderShopping(){
++    const target=$('shoppingResults'),response=state.shopping;
++    if(!response||!response.snapshot){$('shoppingMeta').innerHTML='';$('shoppingSummary').textContent='';target.innerHTML=`<div class="empty">${response?'尚未發布正式資料：手機專案／3C。':'尚未讀取正式手機專案資料。'}</div>`;['columnPrev','columnNext','rowPrev','rowNext'].forEach(id=>$(id).disabled=true);return;}
++    $('shoppingMeta').innerHTML=metaHtml(Core.sourceMeta(response.snapshot,response.registry,'shopping'));
++    const viewOptions={includeOptions:false,...(readingMode==='card'?{cardConditionKey:$('shoppingCardCondition').value}:{})};
++    shoppingView=Compare.buildView(shoppingIndex,shoppingFilters(),viewOptions);
++    if(rowPage>=shoppingView.rowPages||columnPage>=shoppingView.columnPages){rowPage=0;columnPage=0;shoppingView=Compare.buildView(shoppingIndex,shoppingFilters(),viewOptions);}
++    const view=shoppingView;
++    $('shoppingSummary').textContent=`${readingMode==='card'?'本方案':'本組方案'}符合 ${view.totalRows} 組機款報價 · 篩選共 ${view.totalColumns} 個有價條件 · 本頁 ${view.rows.length} 組`;
++    $('rowPage').textContent=`${rowPage+1} / ${view.rowPages} 頁`;$('columnPage').textContent=`${columnPage+1} / ${view.columnPages} 組`;
++    $('rowPrev').disabled=rowPage===0;$('rowNext').disabled=rowPage+1>=view.rowPages;$('columnPrev').disabled=columnPage===0;$('columnNext').disabled=columnPage+1>=view.columnPages;
++    const select=$('shoppingCardCondition'),prior=select.value;select.innerHTML=view.columns.map(col=>`<option value="${esc(col.key)}">${esc(col.project+' · '+columnLabel(col))}</option>`).join('');if(view.cardConditionKey)select.value=view.cardConditionKey;else if(view.columns.some(col=>col.key===prior))select.value=prior;
++    $('cardConditionField').classList.toggle('hidden',readingMode!=='card');
++    if(!view.rows.length||!view.columns.length){target.innerHTML='<div class="empty">沒有符合搜尋或資費篩選的正式報價。請調整條件或重設篩選。</div>';return;}
++    if(readingMode==='card'){
++      const col=view.columns.find(col=>col.key===select.value)||view.columns[0];
++      target.innerHTML=`<p class="scroll-hint">一次閱讀一個方案；可切換「橫向比較」對照其他期數。</p><div class="quote-cards">`+view.rows.map(row=>`<article class="quote-card"><div class="spec-cell">${specHtml(row)}</div><div class="card-plan"><span>${esc(col.project)}</span><strong>${esc(columnLabel(col))}</strong>${cellHtml(row,col)}<details><summary>完整原表條件</summary><p>${esc(col.raw)}</p></details></div></article>`).join('')+'</div>';
++    }else{
++      target.innerHTML=`<p class="scroll-hint"><span class="narrow-scroll-hint">左右滑動比較；機款固定在左側。 </span>價格含 0 元；空格表示此機款沒有該條件報價。展開可核對完整條件。</p><div class="table-scroll comparison-scroll" tabindex="0" role="region" aria-label="手機專案橫向價格比較"><table class="comparison-table" style="--comparison-columns:${view.columns.length}"><caption class="visually-hidden">正式手機專案價格，依機款規格與完整方案條件對照</caption><thead><tr><th class="spec-cell" scope="col">機款／規格<br><span class="hint">專案價單位：元</span></th>${view.columns.map(col=>`<th scope="col"><span class="project-label" title="${esc(col.project)}">${esc(col.project)}</span>${columnHtml(col)}</th>`).join('')}</tr></thead><tbody>${view.rows.map(row=>`<tr><th scope="row" class="spec-cell">${specHtml(row)}</th>${view.columns.map(col=>`<td>${cellHtml(row,col)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
++    }
++  }
++  function renderTradein(view){
++    const target=$('tradeinResults');
++    if(!view){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未讀取正式舊換新資料。</div>';return;}
++    if(!view.available){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未發布正式資料：舊換新。</div>';return;}
++    $('tradeinMeta').innerHTML=metaHtml(view.meta);
++    if(!view.rows.length){target.innerHTML='<div class="empty">沒有符合搜尋條件的正式機款。</div>';return;}
++    const notice=view.limited?`<div class="status warn">目前顯示前 ${view.displayLimit} 筆（符合條件共 ${view.totalRows} 筆）。請先從「選機款」縮小範圍後查看完整資料。</div>`:'';
++    const selectedProvider=$('tradeinProvider').value,selectedGrade=$('tradeinGrade').value;
++    target.innerHTML=notice+view.rows.map(row=>`<article class="provider"><h3>${esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')}</h3><p class="group-note">來源工作表：${esc(row.sourceSheet||'—')}</p>${Core.quotedProviders(row,selectedProvider,selectedGrade).map(provider=>{const grades=Core.quotedGrades(row,provider,selectedGrade);return `<div class="table-scroll"><table><thead><tr><th colspan="${grades.length+1}">${esc(provider)}（獨立報價）</th></tr><tr><th>原始機型／容量</th>${grades.map(grade=>`<th>${esc(Core.gradeLabel(grade))}</th>`).join('')}</tr></thead><tbody><tr><td>${esc(row.model||'—')}</td>${grades.map(grade=>`<td>${esc(Core.formatPrice(row.quotes[provider]&&row.quotes[provider][grade]))}</td>`).join('')}</tr></tbody></table></div>`;}).join('')}</article>`).join('');
++  }
++  function renderKind(kind){if(kind==='shopping'){if(shoppingIndex)updateShoppingOptions();renderShopping();renderChanges(kind);return;}const search=$('tradeinSearch').value,modelKey=$('tradeinModel').value;const response=state[kind];const view=response?Core.buildView(kind,response,{query:search,modelKey,provider:$('tradeinProvider').value,grade:$('tradeinGrade').value}):null;renderTradein(view);renderChanges(kind);if(view){const select=$('tradeinModel'),prior=select.value;select.innerHTML='<option value="">全部機款</option>'+view.modelOptions.map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');if(view.modelOptions.some(option=>option.value===prior))select.value=prior;}}
++  function showKind(kind){state.active=kind;['shopping','tradein'].forEach(value=>{const tab=$(value+'Tab'),pane=$(value+'Pane');const active=value===kind;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));pane.classList.toggle('hidden',!active);});renderChanges(kind);const query=$('changeSearch').value.trim();const set=state.changePage[kind]||responseChangeSet(state[kind]);if(state[kind]&&!state[kind].changesDeferred&&(!set||String(set._search||'')!==query))loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad'));}
++  async function refresh(){
++    const requestGeneration=++generation;
++    state.loading=true;$('refreshBtn').disabled=true;setStatus('正在讀取正式價格…');clearResults();
++    const outcomes={};
++    function progress(){
++      // Each route presents its own price category. The shared reader keeps
++      // the existing payload/transport and other-category state unchanged.
++      const result=outcomes[queryKind];
++      if(!result){setStatus('正在讀取正式價格…');return;}
++      const name=queryKind==='shopping'?'手機專案價查詢':'回收價查詢';
++      if(result.error){setStatus(name+'：'+result.error+'；正式資料已清除，請重新整理。','bad');return;}
++      const available=!!state[queryKind]?.snapshot;
++      setStatus(available?'已讀取正式資料；請依版本／日期核對後查詢。':name+' 尚未發布正式資料。',available?'ok':'warn');
++    }
++    try{
++      await Promise.all(['shopping','tradein'].map(async kind=>{
++        try{
++          const response=await invoke(kind);
++          if(requestGeneration!==generation)return;
++          const index=kind==='shopping'?Compare.buildIndex(response.snapshot||{}):null;
++          state[kind]=response;if(kind==='shopping'){shoppingIndex=index;splitSpecKeys=findSplitSpecs(index);}
++          outcomes[kind]={};renderKind(kind);
++        }catch(error){
++          if(requestGeneration!==generation)return;
++          outcomes[kind]={error:String(error.message||'正式資料讀取失敗')};
++        }
++        if(requestGeneration===generation)progress();
++      }));
++    }finally{if(requestGeneration===generation){state.loading=false;$('refreshBtn').disabled=false;}}
++  }
++  function bind(){
++    $('consumerSegmentBtn').addEventListener('click',()=>setShoppingSegment('consumer'));$('enterpriseSegmentBtn').addEventListener('click',()=>setShoppingSegment('enterprise'));
++    $('refreshBtn').addEventListener('click',refresh);
++    $('changeLoadBtn').addEventListener('click',async()=>{const kind=state.active,readGeneration=generation;if(changeLoading[kind])return;changeLoading[kind]=true;renderChanges(kind);try{await loadChangePage(kind,0,$('changeSearch').value.trim());}catch(error){if(readGeneration!==generation||kind!==state.active)return;$('changeSummary').textContent='異動明細讀取失敗：'+error.message+'；正式價格仍可查詢。';}finally{if(readGeneration===generation){changeLoading[kind]=false;$('changeLoadBtn').disabled=false;}}});
++    document.querySelectorAll('[data-kind]').forEach(button=>button.addEventListener('click',()=>showKind(button.dataset.kind)));
++    ['shoppingBrand','shoppingModel','shoppingCapacity','shoppingProject','shoppingVersion','shoppingRent','shoppingTerm'].forEach(id=>$(id).addEventListener('change',()=>{rowPage=0;columnPage=0;renderKind('shopping');}));
++    // Catalog options do not depend on the search query; keep select updates on filter changes.
++    $('shoppingSearch').addEventListener('input',()=>{rowPage=0;columnPage=0;renderShopping();renderChanges('shopping');});
++    ['tradeinSearch','tradeinModel','tradeinProvider','tradeinGrade'].forEach(id=>$(id).addEventListener(id.endsWith('Search')?'input':'change',()=>renderKind('tradein')));
++    $('shoppingReset').addEventListener('click',()=>{['shoppingSearch','shoppingBrand','shoppingModel','shoppingCapacity','shoppingProject','shoppingVersion','shoppingTerm'].forEach(id=>$(id).value='');$('shoppingRent').value=shoppingSegment==='enterprise'?'':'common';rowPage=0;columnPage=0;renderKind('shopping');});
++    document.querySelectorAll('[data-shortcut]').forEach(button=>button.addEventListener('click',()=>{const value=button.dataset.shortcut;const [rent,term]=value.split('-');$('shoppingRent').value=rent;$('shoppingTerm').value=term||'';$('shoppingVersion').value='';rowPage=0;columnPage=0;renderKind('shopping');}));
++    $('tableModeBtn').addEventListener('click',()=>setReadingMode('table'));$('cardModeBtn').addEventListener('click',()=>setReadingMode('card'));$('shoppingCardCondition').addEventListener('change',()=>{rowPage=0;renderShopping();});
++    [['rowPrev','row',-1],['rowNext','row',1],['columnPrev','column',-1],['columnNext','column',1]].forEach(([id,axis,direction])=>$(id).addEventListener('click',()=>{if(axis==='row')rowPage+=direction;else{columnPage+=direction;rowPage=0;}renderShopping();}));
++    if(scope.matchMedia('(max-width:700px)').matches)document.querySelector('.filter-details').open=false;
++    setShoppingSegment(shoppingSegment);setReadingMode(readingMode);
++    let changeSearchTimer=0;
++    $('changeSearch').addEventListener('input',()=>{const kind=state.active;const query=$('changeSearch').value.trim();state.changePage[kind]=null;renderChanges(kind);clearTimeout(changeSearchTimer);changeSearchTimer=setTimeout(()=>loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad')),250);});
++    $('changePrevBtn').addEventListener('click',()=>{const kind=state.active;const set=state.changePage[kind]||responseChangeSet(state[kind]);const size=changePageSize(set);if(set&&Number(set.offset||0)>=size)loadChangePage(kind,Math.max(0,Number(set.offset||0)-size),$('changeSearch').value.trim()).catch(error=>setStatus(error.message,'bad'));});
++    $('changeNextBtn').addEventListener('click',()=>{const kind=state.active;const set=state.changePage[kind]||responseChangeSet(state[kind]);if(set&&set.hasMore)loadChangePage(kind,Number(set.offset||0)+changePageSize(set),$('changeSearch').value.trim()).catch(error=>setStatus(error.message,'bad'));});
++    $('changeJsonBtn').addEventListener('click',()=>downloadChanges(state.active,'json').catch(error=>setStatus(error.message,'bad')));
++    $('changeCsvBtn').addEventListener('click',()=>downloadChanges(state.active,'csv').catch(error=>setStatus(error.message,'bad')));
++    scope.addEventListener('pagehide',()=>{generation+=1;clearResults();});
++    scope.addEventListener('pageshow',event=>{if(event.persisted)refresh();});
++    showKind(queryKind);
++    refresh();
++  }
++  if(!Core||!Compare||!Transport){setStatus('查詢元件載入失敗。','bad');return;}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
++})(window);
+--- /dev/null
++++ b/tradein-area.css
+@@ -0,0 +1 @@
++.preview-notice{background:#fff4e6;color:#a94300;text-align:center;padding:10px 16px;font:700 14px system-ui;border-bottom:1px solid #ffd4b3}.area-nav{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap}.area-nav a{padding:12px 20px;border-radius:10px;text-decoration:none;border:1px solid #e4e7ec;background:#fff;color:#435065;font-weight:700}.area-nav a.active{background:#fff0e2;color:#b64b00;border-color:#ff984f}.legacy-tabs{display:none!important}body[data-query-kind="shopping"] #tradeinPane,body[data-query-kind="tradein"] #shoppingPane{display:none!important}
+--- /dev/null
++++ b/tradein-query.html
+@@ -0,0 +1,54 @@
++<!doctype html>
++<html lang="zh-Hant">
++<head>
++  <meta charset="utf-8">
++  <meta name="viewport" content="width=device-width,initial-scale=1">
++  <title>舊換新專區｜北一二B</title>
++  <link rel="stylesheet" href="threec-query.css?v=20261007-compact-2">
++<link rel="stylesheet" href="tradein-area.css">
++</head>
++<body data-query-kind="tradein">
++<div class="preview-notice">整合候選 · 尚未上線</div>
++<main>
++  <section class="hero">
++    <div class="topbar"><div><h1>舊換新專區</h1><p>回收價查詢與個人績效，各自沿用原有資料與權限</p></div><a class="home-link" href="home.html">← 智慧營運中心</a></div>
++  </section>
++  <nav class="area-nav" aria-label="舊換新專區功能"><a class="active" aria-current="page" href="tradein-query.html">回收價查詢</a><a href="tradein-progress.html">個人績效</a></nav>
++<section class="card" id="queryCard">
++    <div class="topbar"><h2 style="margin:0">回收價查詢</h2><button class="secondary" id="refreshBtn" type="button">重新整理</button></div>
++    <div id="queryStatus" class="status" role="status">正在讀取正式價格…</div>
++    <div class="tabs legacy-tabs" role="tablist" hidden><button class="tab active" id="shoppingTab" data-kind="shopping" type="button" role="tab" aria-selected="true">手機專案／3C</button><button class="tab" id="tradeinTab" data-kind="tradein" type="button" role="tab" aria-selected="false">舊換新</button></div>
++    <section id="shoppingPane" data-pane="shopping" role="tabpanel">
++      <div class="segment-switch" role="group" aria-label="方案專區"><button id="consumerSegmentBtn" type="button" aria-pressed="true">一般手機方案</button><button id="enterpriseSegmentBtn" type="button" aria-pressed="false">企業用戶專區</button></div>
++      <h3 id="shoppingSectionTitle">一般手機方案</h3><p id="shoppingSectionDescription" class="hint">一般申辦方案；企業、員工與眷屬優惠請切換「企業用戶專區」。</p>
++      <div id="shoppingMeta" class="meta"></div>
++      <div class="shopping-toolbar">
++        <label class="field search-field">搜尋機款或原始條件<input id="shoppingSearch" type="search" autocomplete="off" placeholder="例如：iPhone、256GB、續約"></label>
++        <label class="field">品牌<select id="shoppingBrand"><option value="">全部品牌</option></select></label>
++        <label class="field">機款<select id="shoppingModel"><option value="">全部機款</option></select></label>
++        <label class="field">容量<select id="shoppingCapacity"><option value="">全部容量</option></select></label>
++      </div>
++      <details class="filter-details" open><summary>專案與資費篩選</summary><div class="plan-filters">
++        <label class="field">專案<select id="shoppingProject"><option value="">全部專案</option></select></label>
++        <label class="field">版本<select id="shoppingVersion"><option value="">一般／VIP／加碼</option></select></label>
++        <label class="field">月租<select id="shoppingRent"><option value="common">999＋1399</option><option value="">全部月租</option></select></label>
++        <label class="field">合約期數<select id="shoppingTerm"><option value="">全部期數</option></select></label>
++      </div></details>
++      <div class="shortcut-bar" aria-label="常用比較"><span>常用</span><button class="secondary" data-shortcut="common" type="button">999＋1399 全期</button><button class="secondary" data-shortcut="999-24" type="button">999／24期</button><button class="secondary" data-shortcut="1399-48" type="button">1399／48期</button><button class="text-button" id="shoppingReset" type="button">重設篩選</button></div>
++      <div class="comparison-toolbar"><p id="shoppingSummary" class="hint" role="status"></p><div class="view-switch" role="group" aria-label="閱讀方式"><button id="tableModeBtn" class="secondary" type="button" aria-pressed="true">橫向比較</button><button id="cardModeBtn" class="secondary" type="button" aria-pressed="false">單方案卡片</button></div></div>
++      <label class="field card-selector hidden" id="cardConditionField">卡片閱讀方案<select id="shoppingCardCondition"></select></label>
++      <div id="shoppingResults"></div>
++      <div class="comparison-pagination"><div><button id="columnPrev" class="secondary" type="button">← 前一組條件</button><span id="columnPage" class="hint"></span><button id="columnNext" class="secondary" type="button">下一組條件 →</button></div><div><button id="rowPrev" class="secondary" type="button">上一頁機款</button><span id="rowPage" class="hint"></span><button id="rowNext" class="secondary" type="button">下一頁機款</button></div></div>
++    </section>
++    <section id="tradeinPane" class="hidden" data-pane="tradein" role="tabpanel"><div class="toolbar"><label class="field">搜尋品牌／機款／容量<input id="tradeinSearch" type="search" autocomplete="off" placeholder="例如：Galaxy、512GB"></label><label class="field">選機款<select id="tradeinModel"><option value="">全部機款</option></select></label></div><div class="toolbar"><label class="field">回收商<select id="tradeinProvider"><option value="">全部回收商</option><option>點子行動</option><option>FutureDial（FDI）</option><option>愛鋒派</option></select></label><label class="field">報價等級<select id="tradeinGrade"><option value="">全部等級</option><option value="S">S 級</option><option value="A">A 級</option><option value="B">B 級</option><option value="C">C 級</option><option value="未分級">來源未分級</option></select></label></div><div id="tradeinMeta" class="meta"></div><div id="tradeinResults"></div></section>
++    <section id="changeCard" class="change-card" aria-live="polite"><h3 id="changeTitle" style="margin:0">本次異動／版本檢查</h3><details class="source-details"><summary>異動來源與版本核對</summary><p id="changeBasis" class="hint">尚未讀取正式異動。</p></details><div id="changeCounts" class="change-counts"></div><label class="field" style="margin-top:9px">搜尋完整異動條件<input id="changeSearch" type="search" autocomplete="off" placeholder="機款、容量、資費／合約、回收商或等級"></label><button class="secondary" id="changeLoadBtn" type="button" hidden>載入本次異動明細</button><p id="changeSummary" class="hint"></p><div id="changeResults" class="change-table"></div><div class="actions"><button class="secondary" id="changePrevBtn" type="button" disabled>上一頁</button><span id="changePage" class="hint" style="align-self:center">第 1 頁</span><button class="secondary" id="changeNextBtn" type="button" disabled>下一頁</button><button class="secondary" id="changeJsonBtn" type="button" disabled>下載完整 JSON</button><button class="secondary" id="changeCsvBtn" type="button" disabled>下載完整 CSV</button></div></section>
++    <p class="privacy">免登入即可瀏覽；重新開啟或按「重新整理」會讀取最新正式價格。</p>
++  </section>
++</main>
++<script src="threec-price-transport.js?v=20261001-load-1"></script>
++<script src="threec-query-core.js?v=20261007-quoted-only-1"></script>
++<script src="threec-comparison-core.js?v=20261007-priced-only-1"></script>
++<script src="threec-price-diff-core.js?v=20261001-providers-1"></script>
++<script src="threec-query-ui.js"></script>
++</body>
++</html>
+--- a/tests/home-navigation-contract.test.cjs
++++ b/tests/home-navigation-contract.test.cjs
+@@ -30,7 +30,7 @@
+   assert.deepEqual(staffHrefs, [
+     'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html',
+     'https://twm-store-inspection.liamlu245.chatgpt.site/',
+-    'tradein-progress.html', 'threec-query.html'
++    'threec-query.html', 'tradein-query.html'
+   ]);
+   assert.equal(cards(navigation('督導專區')).length, 7);
+   assert.equal(cards(html).length, 4 + staffHrefs.length + 7);
+@@ -64,7 +64,8 @@
+ 
+ test('formal price lookup is a staff tool without publisher privileges', () => {
+   const lookup = cardFor(navigation('同仁大廳'), 'threec-query.html');
+-  assert.match(lookup, /手機專案／3C＋舊換新/);
++  assert.match(lookup, /手機專案價查詢/);
++  assert.doesNotMatch(lookup, /舊換新/);
+   assert.doesNotMatch(lookup, /發布|上傳/);
+ });
+ 
+@@ -75,3 +76,12 @@
+   assert.equal(upload.length, 1);
+   assert.match(upload[0], /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
+ });
++
++test('trade-in area groups public recovery prices and the existing private performance route', () => {
++  const area=cardFor(navigation('同仁大廳'),'tradein-query.html');
++  assert.match(area, /<h3>舊換新專區<\/h3>/);
++  assert.match(area, /回收價查詢／個人績效/);
++  assert.doesNotMatch(navigation('同仁大廳'), /href="tradein-progress\.html"/);
++  const app=fs.readFileSync(path.resolve(__dirname,'../app.html'),'utf8');
++  assert.match(app, /href="tradein-progress\.html">舊換新專區｜個人績效/);
++});
+--- a/tests/home.spec.js
++++ b/tests/home.spec.js
+@@ -21,7 +21,7 @@
+ const UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
+ const EXPECTED_HREFS = [
+   'kpi-battle.html', 'awards-battle.html', 'index.html', 'gold-medal.html',
+-  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'tradein-progress.html', 'threec-query.html',
++  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'threec-query.html', 'tradein-query.html',
+   'department-ops.html', 'north12b-gold-ops.html', 'patrol.html',
+   'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
+   'phone-stock-dashboard.html'
+@@ -216,17 +216,18 @@
+     const lab = page.locator('a[href="tradein-import-lab.html"]');
+     const lookup = page.locator('a.card[href="threec-query.html"]');
+     const upload = page.locator(`a.card[href="${UPLOAD_URL}"]`);
++    const area = page.locator('a.card[href="tradein-query.html"]');
+     await expect(lab).toHaveCount(0);
+     for (const query of ['匯入測試區','3C','舊換新','']) {
+       await page.locator('#tool-search').fill(query);
+       await expect(lab).toHaveCount(0);
+       if (query !== '匯入測試區') {
+-        await expect(lookup).toBeVisible();
++        await expect(query==='舊換新'?area:lookup).toBeVisible();
+         await expect(upload).toBeVisible();
+       }
+     }
+     await expect(page.locator('a.card:visible')).toHaveCount(EXPECTED_HREFS.length);
+-    await expect(lookup.locator('h3')).toHaveText('手機專案／3C＋舊換新');
++    await expect(lookup.locator('h3')).toHaveText('手機專案價查詢');
+     await expect(upload.locator('h3')).toHaveText('資料快速上傳');
+     await noOverflow(page);
+     expect(calls).toEqual([]);
+--- a/tests/department-ops.test.cjs
++++ b/tests/department-ops.test.cjs
+@@ -162,7 +162,7 @@
+ 
+ test('首頁查價入口保留公開讀取與受限傳輸備援，比較不合併不同價格矩陣', () => {
+   const Compare=require('../threec-comparison-core.js');
+-  const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8');
++  const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8')+fs.readFileSync(path.join(__dirname,'../threec-query-ui.js'),'utf8');
+   assert.match(html,/credentials:'omit'/);
+   assert.match(html,/function readPublicFrame/);
+   assert.match(html,/message.requestId!==requestId/);
+--- a/tests/threec-options-update.test.cjs
++++ b/tests/threec-options-update.test.cjs
+@@ -1,7 +1,7 @@
+ 'use strict';
+ const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+ const Compare=require('../threec-comparison-core.js'),fixture=require('./threec-search-fixture.cjs');
+-const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8');
++const html=fs.readFileSync(path.join(__dirname,'../threec-query-ui.js'),'utf8');
+ function section(name,next){return html.slice(html.indexOf('  function '+name+'('),html.indexOf('  function '+next+'('));}
+ const current=section('updateShoppingOptions','columnLabel');
+ // The pre-change behavior is an independent oracle for ordered selection resets.
+--- a/tests/threec-phase1-ui.spec.js
++++ b/tests/threec-phase1-ui.spec.js
+@@ -55,8 +55,8 @@
+  await expect(page.locator('#shoppingCardCondition option')).not.toContainText(['加碼']);
+  await page.locator('#shoppingCardCondition').selectOption(fixture.p(999,24,'VIP'));
+  await expect(page.locator('.quote-cards')).not.toContainText('無報價（缺價）');
+- await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
+- await page.locator('#shoppingTab').click();await expect(page.locator('.quote-cards')).toBeVisible();expect(errors).toEqual([]);
++ await page.goto('file://'+path.resolve(__dirname,'../tradein-query.html'));await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
++ await page.goto(URL);await expect(page.locator('.quote-cards')).toBeVisible();expect(errors).toEqual([]);
+ });
+ test('大量條件與機款獨立分页，不一次展開所有維度',async({page})=>{
+  const response=JSON.parse(JSON.stringify(fixture.shopping));response.snapshot.rows=Array.from({length:25},(_,i)=>({...fixture.shopping.snapshot.rows[0],model:'大量機款 '+i+' 256GB',colorless_model:'大量機款 '+i+' 256GB',project_prices:Object.fromEntries(Array.from({length:18},(_,j)=>[fixture.p(999,24+j),j]))}));
+--- a/tests/threec-query-ui.spec.js
++++ b/tests/threec-query-ui.spec.js
+@@ -4,6 +4,7 @@
+ const path = require('node:path');
+ 
+ const PAGE_URL = 'file://' + path.resolve(__dirname, '../threec-query.html');
++const TRADEIN_URL = 'file://' + path.resolve(__dirname, '../tradein-query.html');
+ const DEVICE_KEY = 'north12b_private_dashboard_device_id';
+ const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
+ 
+@@ -56,13 +57,13 @@
+   await expect(page.locator('#shoppingResults')).toContainText('iPhone 16 256GB 黑色');
+   await expect(page.locator('#shoppingResults')).toContainText('0 元');
+   await expect(page.locator('#shoppingResults')).not.toContainText('無報價（缺價）');
+-  await page.locator('#tradeinTab').click();
++  await page.goto(TRADEIN_URL);
+   await expect(page.locator('#tradeinResults')).toContainText('點子行動（獨立報價）');
+   await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
+   await expect(page.locator('#tradeinResults')).not.toContainText('無報價');
+   await expect(page.locator('#tradeinResults table').nth(0).locator('thead tr').nth(1).locator('th')).toHaveText(['原始機型／容量','S 級','A 級','C 級']);
+   await expect(page.locator('#tradeinResults')).toContainText('0 元');
+-  expect(calls.map(call => call.action)).toEqual(['threec_snapshot_read','threec_snapshot_read']);
++  expect(calls.map(call => call.action)).toEqual(Array(4).fill('threec_snapshot_read'));
+   expect(calls.every(call => !('employeeId' in call) && !('deviceId' in call))).toBe(true);
+   await expect(page.locator('#employeeId')).toHaveCount(0);
+   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 1280);
+@@ -74,7 +75,7 @@
+   await expect(page.locator('#changeCard')).toContainText('調價（筆報價條件）');
+   await expect(page.locator('#changeCard')).toContainText('合約24期');
+   await expect(page.locator('#changeCard')).toContainText('1,299 元');
+-  await page.locator('#tradeinTab').click();
++  await page.goto(TRADEIN_URL);
+   await expect(page.locator('#changeCard')).toContainText('FutureDial（FDI）');
+   await expect(page.locator('#changeCard')).toContainText('A');
+   await page.locator('#changeSearch').fill('FutureDial');
+@@ -109,9 +110,9 @@
+   await intercept(page, { missing:'shopping' });
+   await page.goto(PAGE_URL);
+   await expect(page.locator('#queryCard')).toBeVisible();
+-  await expect(page.locator('#queryStatus')).toContainText('手機專案／3C 尚未發布正式資料');
++  await expect(page.locator('#queryStatus')).toContainText('手機專案價查詢 尚未發布正式資料');
+   await expect(page.locator('#shoppingResults')).toContainText('尚未發布正式資料：手機專案／3C');
+-  await page.locator('#tradeinTab').click();
++  await page.goto(TRADEIN_URL);
+   await expect(page.locator('#tradeinResults')).toContainText('Galaxy S25 512GB');
+ });
+ 
+@@ -187,16 +188,18 @@
+ });
+ 
+ 
+-test('切換分類清空搜尋後返回手機，會重新查詢全版清單', async ({ page }) => {
++test('搜尋後跨專區與返回手機會清空篩選並讀取 active', async ({page}) => {
+   const calls=await intercept(page);await page.goto(PAGE_URL);
+-  await expect(page.locator('#queryCard')).toBeVisible();
++  await expect(page.locator('#changeResults')).toContainText('合約24期');
+   await page.locator('#changeSearch').fill('合約24期');
+   await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read'&&c.kind==='shopping').length).toBe(1);
+-  await page.locator('#tradeinTab').click();await page.locator('#changeSearch').fill('');
+-  await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read'&&c.kind==='tradein'&&c.search==='').length).toBe(1);
+-  await page.locator('#shoppingTab').click();
+-  await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read'&&c.kind==='shopping'&&c.search==='').length).toBe(1);
+-  await expect(page.locator('#changeSummary')).not.toContainText('正在搜尋');
++  await page.goto(TRADEIN_URL);
++  await expect(page.locator('#changeResults')).toContainText('FutureDial');
++  await expect(page.locator('#changeSearch')).toHaveValue('');
++  await page.goto(PAGE_URL);
++  await expect(page.locator('#changeResults')).toContainText('999型專案價');
++  await expect(page.locator('#changeSearch')).toHaveValue('');
++  expect(calls.filter(c=>c.action==='threec_snapshot_read')).toHaveLength(6);
+ });
+ 
+ test('首版完整異動匯出由已驗證正式快照生成，避免重複下載全價資料', async ({ page }) => {
+@@ -215,47 +218,38 @@
+   expect(exported.changes.some(c=>c.after.kind==='missing')).toBe(true);
+ });
+ 
+-test('快速切換分類時，舊分類延遲請求不能作廢新分類清單', async ({ page }) => {
+-  let releaseShopping, releaseTradein;
+-  const shoppingPending=new Promise(resolve=>{releaseShopping=resolve;});
+-  const tradeinPending=new Promise(resolve=>{releaseTradein=resolve;});
+-  const calls=[];
++test('跨專區離頁後，舊手機搜尋延遲回應不能覆蓋回收價與異動', async ({page}) => {
++  let release;
++  const pending=new Promise(resolve=>release=resolve);const calls=[];
+   await page.route('**/exec*',async route=>{
+-    const payload=publicPayload(route.request());
++    const payload=publicPayload(route.request());calls.push(payload);
+     if(payload.action==='threec_changes_read'){
+-      calls.push(payload);
+-      if(payload.kind==='shopping'&&payload.search==='')await shoppingPending;
+-      if(payload.kind==='tradein'&&payload.search==='')await tradeinPending;
+-      return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:response(payload.kind).changeSet})});
++      await pending;
++      return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify({status:'ok',changeSet:response('shopping').changeSet})});
+     }
+-    return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify(response(payload.kind))});
+-  });
+-  await page.goto(PAGE_URL);
+-  await expect(page.locator('#queryCard')).toBeVisible();
++    return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(response(payload.kind))});
++  });
++  await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');
+   await page.locator('#changeSearch').fill('合約24期');
+-  await expect.poll(()=>calls.filter(c=>c.kind==='shopping').length).toBe(1);
+-  await expect(page.locator('#changeSummary')).not.toContainText('正在搜尋');
+-  await page.locator('#tradeinTab').click();await page.locator('#changeSearch').fill('');
+-  await page.locator('#shoppingTab').click();
+-  await expect.poll(()=>calls.filter(c=>c.kind==='shopping'&&c.search==='').length).toBe(1);
+-  await expect.poll(()=>calls.filter(c=>c.kind==='tradein'&&c.search==='').length).toBe(1);
+-  releaseShopping();
+-  await expect(page.locator('#changeSummary')).not.toContainText('正在搜尋');
+-  await expect(page.locator('#changeCsvBtn')).toBeEnabled();
+-  releaseTradein();
+-  await expect(page.locator('#changeTitle')).toContainText('手機專案');
++  await expect.poll(()=>calls.filter(c=>c.action==='threec_changes_read').length).toBe(1);
++  await page.goto(TRADEIN_URL);await expect(page.locator('#tradeinResults')).toContainText('Galaxy');
++  release();
++  await expect(page.locator('#changeResults')).toContainText('FutureDial');
++  await expect(page.locator('#changeResults')).not.toContainText('合約24期');
++  await expect(page.locator('#shoppingPane')).toBeHidden();
+ });
+ 
+ test('某一類 API 失敗不清除另一類已完成價格，並允許重整復原',async({page})=>{
+  let fail=true;
+  await page.route('**/exec*',route=>{const p=publicPayload(route.request());return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(fail&&p.kind==='tradein'?{status:'error',message:'獨立測試失敗'}:response(p.kind))});});
+- await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('舊換新：獨立測試失敗');await expect(page.locator('#shoppingResults')).toContainText('iPhone');
+- fail=false;await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('Galaxy');
++ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await expect(page.locator('#shoppingResults')).toContainText('iPhone');
++ await page.goto(TRADEIN_URL);await expect(page.locator('#queryStatus')).toContainText('獨立測試失敗');
++ fail=false;await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.goto(TRADEIN_URL);await expect(page.locator('#tradeinResults')).toContainText('Galaxy');
+ });
+ test('另一類慢讀取時手機先可查，不能等待兩類才渲染',async({page})=>{
+  let release;const pending=new Promise(resolve=>release=resolve);
+  await page.route('**/exec*',async route=>{const p=publicPayload(route.request());if(p.kind==='tradein')await pending;return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(response(p.kind))});});
+- await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#queryStatus')).toContainText('可先查詢');release();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
++ await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');release();await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ });
+ test('Google JSON 轉址回 HTML 時，限定來源與 requestId 的既有 iframe 可讀回',async({page})=>{
+  const requests=[];
+@@ -289,7 +283,7 @@
+ for(const width of [1280,390])test(`三家公開報價與來源未分級 ${width}px，篩選和SABC不互相覆蓋`,async({page})=>{
+  await page.setViewportSize({width,height:900});
+  await page.route('**/exec*',route=>{const p=publicPayload(route.request());const r=response(p.kind);if(p.kind==='tradein'){r.snapshot.rows[0].quotes['愛鋒派']={S:null,A:'900',B:null,C:null,'未分級':0};}return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify(r)});});
+- await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.locator('#tradeinTab').click();
++ await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');await page.goto(TRADEIN_URL);
+  await expect(page.locator('#tradeinResults')).toContainText('愛鋒派（獨立報價）');await expect(page.locator('#tradeinResults')).toContainText('來源未分級');
+  await page.locator('#tradeinProvider').selectOption('愛鋒派');await page.locator('#tradeinGrade').selectOption('未分級');const table=page.locator('#tradeinResults table');await expect(table).toHaveCount(1);await expect(table).toContainText('0 元');await expect(table).not.toContainText('900 元');await expect(table).not.toContainText('A 級');
+  await page.locator('#tradeinGrade').selectOption('A');await expect(table).toContainText('900 元');await expect(table).not.toContainText('來源未分級');
+@@ -316,9 +310,9 @@
+   if(p.action==='threec_snapshot_read')return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify({...response(p.kind),changeSet:null,changesDeferred:true})});
+   return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify({status:'ok',snapshotHash:response(p.kind).snapshot.snapshot_hash,changeSet:response(p.kind).changeSet})});
+  });
+- await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
++ await page.goto(TRADEIN_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+  expect(calls).toHaveLength(2);expect(calls.every(p=>p.includeChanges===false)).toBe(true);
+- await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('17,500');expect(calls).toHaveLength(2);
++ await expect(page.locator('#tradeinResults')).toContainText('17,500');expect(calls).toHaveLength(2);
+  await page.locator('#changeLoadBtn').click();await expect(page.locator('#changeResults')).toContainText('FutureDial');
+  expect(calls[2]).toMatchObject({action:'threec_changes_read',kind:'tradein',snapshotHash:'tradein-snapshot-v1',offset:0,limit:100});
+  await expect(page.locator('#changeLoadBtn')).toBeHidden();
