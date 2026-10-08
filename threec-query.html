@@ -273,7 +273,7 @@
     $('changeCsvBtn').addEventListener('click',()=>downloadChanges(state.active,'csv').catch(error=>setStatus(error.message,'bad')));
     scope.addEventListener('pagehide',()=>{generation+=1;clearResults();});
     scope.addEventListener('pageshow',event=>{if(event.persisted)refresh();});
-    showKind('shopping');
+    showKind(scope.location.hash==='#tradein'?'tradein':'shopping');
     refresh();
   }
   if(!Core||!Compare||!Transport){setStatus('查詢元件載入失敗。','bad');return;}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
