@@ -23,7 +23,9 @@
     }
     function invalidate({date, seg} = {}) {
       for (const entry of [...pending.values()]) {
-        if (date === undefined || (!entry.isolated && entry.payload.date === date && Number(entry.payload.seg) === Number(seg))) stop(entry);
+        const includesSegment = Number(entry.payload.seg) === Number(seg) ||
+          (Number(seg) === 16 && entry.payload.action === 'read' && Number(entry.payload.seg) === 21 && entry.payload.include16 === true);
+        if (date === undefined || (!entry.isolated && entry.payload.date === date && includesSegment)) stop(entry);
       }
     }
     function read(payload, {signal, force = false, isolated = false} = {}) {
