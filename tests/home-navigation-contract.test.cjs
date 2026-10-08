@@ -24,11 +24,16 @@ function cardFor(source, href) {
   return matches[0];
 }
 
-test('home navigation contains 4 quick, 6 staff and 8 supervisor cards', () => {
+test('home navigation retains PR179 performance and PR181 lab removal', () => {
   assert.equal(cards(navigation('常用入口')).length, 4);
-  assert.equal(cards(navigation('同仁大廳')).length, 6);
-  assert.equal(cards(navigation('督導專區')).length, 8);
-  assert.equal(cards(html).length, 18);
+  const staffHrefs = cards(navigation('同仁大廳')).map(card => card.match(/href="([^"]+)"/)[1]);
+  assert.deepEqual(staffHrefs, [
+    'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html',
+    'https://twm-store-inspection.liamlu245.chatgpt.site/',
+    'tradein-progress.html', 'threec-query.html'
+  ]);
+  assert.equal(cards(navigation('督導專區')).length, 7);
+  assert.equal(cards(html).length, 4 + staffHrefs.length + 7);
 });
 
 test('staff gold lookup lives under performance tools and uses the existing viewer', () => {
@@ -61,4 +66,12 @@ test('formal price lookup is a staff tool without publisher privileges', () => {
   const lookup = cardFor(navigation('同仁大廳'), 'threec-query.html');
   assert.match(lookup, /手機專案／3C＋舊換新/);
   assert.doesNotMatch(lookup, /發布|上傳/);
+});
+
+test('home omits the import lab entry while retaining its maintenance page and formal upload', () => {
+  assert.doesNotMatch(html, /href="tradein-import-lab\.html"/);
+  assert.ok(fs.existsSync(path.resolve(__dirname, '../tradein-import-lab.html')));
+  const upload = cards(navigation('督導專區')).filter(card => /<h3>資料快速上傳<\/h3>/.test(card));
+  assert.equal(upload.length, 1);
+  assert.match(upload[0], /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
 });

@@ -332,12 +332,13 @@ test('舊換新候選比較兩家回收商與 S/A/B/C，缺少等級不補零', 
   assert.equal(matched[0].quotes['FutureDial（FDI）'].C, '17000');
 });
 
-test('營運中心入口與測試頁都維持本機解析邊界', () => {
+test('PR181 移除營運中心測試入口，測試頁仍維持本機解析邊界', () => {
   const root = path.resolve(__dirname, '..');
   const home = fs.readFileSync(path.join(root, 'home.html'), 'utf8');
   const page = fs.readFileSync(path.join(root, 'tradein-import-lab.html'), 'utf8');
   const client = fs.readFileSync(path.join(root, 'tradein-import-lab.js'), 'utf8');
-  assert.match(home, /href="tradein-import-lab\.html"[\s\S]*3C／舊換新資料匯入測試區/);
+  assert.doesNotMatch(home, /href="tradein-import-lab\.html"/);
+  assert.ok(fs.existsSync(path.join(root, 'tradein-import-core.js')));
   assert.match(page, /assets\/vendor\/xlsx\.full\.min\.js/);
   assert.match(page, /id="shoppingFile"[^>]*type="file"/);
   assert.match(page, /id="tradeinFile"[^>]*type="file"/);

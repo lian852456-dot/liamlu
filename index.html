@@ -2164,7 +2164,7 @@
 
 <script src="daily-report-summary-model.js?v=20261005-google-magazine-1"></script>
 <script src="daily-report-summary-controller.js?v=20261006-read-1"></script>
-<script src="daily-report-read-transport.js?v=20261007-load-1"></script>
+<script src="daily-report-read-transport.js?v=20261008-pair-1"></script>
 <script src="kpi-battle-controller.js?v=20261002-logout-2"></script>
 <script src="award-model-catalog.js?v=20261001-1"></script>
 <script src="awards-battle-controller.js?v=20261003-publication-date-1"></script>
@@ -2309,6 +2309,39 @@ async function getData(date, store, seg, options) {
     if (result?.error) throw result.error;
   }
   return (_cache[ck] && _cache[ck][store]) ? _cache[ck][store] : null;
+}
+
+async function getFillData(date, store, seg, options) {
+  if (Number(seg) !== 21) return [await getData(date, store, seg, options), null];
+  const eveningKey = cacheKey(date, 21), afternoonKey = cacheKey(date, 16);
+  if (_cache[eveningKey] || _cache[afternoonKey]) {
+    return Promise.all([getData(date, store, 21, options), getData(date, store, 16, options)]);
+  }
+  const context = dailyReportReadContext, endpoint = GAS_URL;
+  const eveningGeneration = _cacheReadGeneration[eveningKey] = (_cacheReadGeneration[eveningKey] || 0);
+  const afternoonGeneration = _cacheReadGeneration[afternoonKey] = (_cacheReadGeneration[afternoonKey] || 0);
+  const eveningShadow = readLocalShadow(date, 21), afternoonShadow = readLocalShadow(date, 16);
+  if (!endpoint) return Promise.all([getData(date, store, 21, options), getData(date, store, 16, options)]);
+  const json = await privateDashboardPost({action:'read', date, seg:21, include16:true}, options);
+  const current = () => context === dailyReportReadContext && endpoint === GAS_URL && !options?.signal?.aborted &&
+    _cacheReadGeneration[eveningKey] === eveningGeneration && _cacheReadGeneration[afternoonKey] === afternoonGeneration;
+  if (!current()) throw new DOMException('讀取來源已變更，請重新讀取。', 'AbortError');
+  if (!json || json.status !== 'ok') throw new Error((json && json.message) || '讀取失敗');
+  if (!Object.prototype.hasOwnProperty.call(json, 'carry16')) {
+    // Compatibility with the original backend during frontend rollback/skew.
+    _cache[eveningKey] = mergeDayData(json.data || {}, eveningShadow);
+    return [(_cache[eveningKey] && _cache[eveningKey][store]) || null, await getData(date, store, 16, options)];
+  }
+  const validRows = (rows, expectedSeg) => rows && typeof rows === 'object' && !Array.isArray(rows) &&
+    Object.entries(rows).every(([key, row]) => row && typeof row === 'object' && !Array.isArray(row) &&
+      String(row.date) === String(date) && String(row.store) === key && Number(row.seg) === expectedSeg);
+  if (json.carry16?.schema !== 'daily-fill-pair-v1' || json.carry16.date !== String(date) ||
+      json.carry16.seg !== 16 || !validRows(json.data, 21) || !validRows(json.carry16.data, 16)) {
+    throw new Error('同日兩時段讀取來源不一致，請重新讀取。');
+  }
+  _cache[eveningKey] = mergeDayData(json.data, eveningShadow);
+  _cache[afternoonKey] = mergeDayData(json.carry16.data, afternoonShadow);
+  return [(_cache[eveningKey] && _cache[eveningKey][store]) || null, (_cache[afternoonKey] && _cache[afternoonKey][store]) || null];
 }
 
 // ── 拉取整天所有門市資料存入快取
@@ -3653,10 +3686,7 @@ function selectStore(store) {
   if (isNew) showToast(`🚀 ${store} 新店！6/25 起營業`);
 
   // 載入已填資料；21:00 的 KPI 達成率／公司排名固定沿用同日 16:00。
-  Promise.all([
-    getData(date, store, currentSeg, {signal}),
-    Number(currentSeg) === 21 ? getData(date, store, 16, {signal}) : Promise.resolve(null)
-  ]).then(([data, afternoon]) => {
+  getFillData(date, store, currentSeg, {signal}).then(([data, afternoon]) => {
     if (selectionGeneration !== fillSelectionGeneration || document.getElementById('fillDate').value !== date || document.getElementById('fillStore').value !== store || currentSeg !== selectedSeg) return;
     const pendingEdits = globalThis.DailyReportLayout?.pendingFieldIds(store, date, selectedSeg) || new Set();
     FIELDS.forEach(f => {

@@ -27,7 +27,7 @@ var TradeinPerformanceCore = (function () {
   function role(value) {
     if (value==='店長') return '店長';
     if (value==='代理店長') return '代理店長';
-    if (/^(副店長|業務代表\([I]+\)|業代|銷售人員|同仁)$/.test(value || '')) return '同仁';
+    if (/^(副店長|資深業務代表|業務代表\([I]+\)|業代|銷售人員|同仁)$/.test(value || '')) return '同仁';
     return '待核';
   }
   function build(input, roster) {

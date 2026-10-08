@@ -8,6 +8,12 @@ test('個人目標逐人計算，店長與代理免目標且保留實績',()=>{
   assert.equal(s.summary.total_units,6);assert.equal(s.summary.staff_target_units,6);assert.equal(s.summary.staff_gap_units,3);
   assert.equal(s.people[0].remaining_units,0);assert.equal(s.people[2].target_units,null);assert.equal(s.people[3].remaining_units,null);
 });
+test('資深業務代表仍為有月目標的同仁，不因職稱誤列待核',()=>{
+  const s=C.build(source([record('senior')]),[employee('12345','資深業務代表')]);
+  assert.equal(s.people[0].role,'同仁');assert.equal(s.people[0].target_units,3);
+  assert.equal(s.people[0].remaining_units,2);assert.equal(s.summary.target_staff_count,1);
+  assert.equal(s.stores.find(v=>v.store==='萬大').coverage,'complete');
+});
 test('九店全量來源的未列員工與門市為已核零；未確認範圍拒絕',()=>{
   const s=C.build(source([]),[employee('12345')]);assert.equal(s.people[0].actual_units,0);assert.equal(s.stores.length,9);assert.ok(s.stores.every(s=>s.total_units===0));
   assert.throws(()=>C.build(source([],{complete_nine_stores:false}),[]));

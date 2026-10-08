@@ -2752,7 +2752,8 @@ function toDateStr(v) {
   return String(v).substring(0, 10);
 }
 
-function readData(date, seg) {
+function readData(date, seg, include16) {
+  const paired = include16 === true && Number(seg) === 21;
   const sh = getSheet();
   const lastRow = sh.getLastRow();
   const lastColumn = sh.getLastColumn();
@@ -2762,7 +2763,7 @@ function readData(date, seg) {
   const segIdx   = headers.indexOf('seg');
   const savedAtIdx = headers.lastIndexOf('savedAt');
   if (dateIdx < 0 || storeIdx < 0 || segIdx < 0) throw new Error('回報資料缺少 date/store/seg 欄位');
-  if (lastRow < 2) return {};
+  if (lastRow < 2) return paired ? {data:{}, afternoon:{}} : {};
 
   // Read the date column first, then only the span containing this day's rows.
   // Do not assume chronological ordering: late updates and duplicate rows must
@@ -2783,7 +2784,7 @@ function readData(date, seg) {
     if (first < 0) first = i + 2;
     last = i + 2;
   }
-  if (first < 0) return {};
+  if (first < 0) return paired ? {data:{}, afternoon:{}} : {};
   const count = last - first + 1;
   const dataRange = sh.getRange(first, 1, count, lastColumn);
   const allData = dataRange.getValues();
@@ -2792,9 +2793,12 @@ function readData(date, seg) {
   const displayTimes = savedAtIdx < 0 ? [] : sh.getRange(first, savedAtIdx + 1, count, 1).getDisplayValues();
 
   const result = {};
+  const afternoon = {};
   for (let i = 0; i < allData.length; i++) {
     const r = allData[i];
-    if (readDate(r[dateIdx]) === date && Number(r[segIdx]) === Number(seg)) {
+    if (readDate(r[dateIdx]) !== date) continue;
+    const rowSeg = Number(r[segIdx]);
+    if (rowSeg === Number(seg) || (paired && rowSeg === 16)) {
       const store = r[storeIdx];
       const obj = {};
       headers.forEach((h, idx) => {
@@ -2805,10 +2809,10 @@ function readData(date, seg) {
           obj[h] = (v instanceof Date) ? readDate(v) : v;
         }
       });
-      result[store] = obj;
+      (rowSeg === Number(seg) ? result : afternoon)[store] = obj;
     }
   }
-  return result;
+  return paired ? {data:result, afternoon:afternoon} : result;
 }
 
 function jsonResponse(obj, callback) {
@@ -3034,6 +3038,15 @@ function reportSummaryFromData_(data, date, seg) {
 
 function reportReadPayload_(payload) {
   const seg = parseInt(payload.seg, 10);
+  if (payload.include16 === true && seg === 21) {
+    const pair = readData(payload.date, seg, true);
+    // Preserve failures that the separate original 16:00 read would report.
+    reportSummaryFromData_(pair.afternoon, payload.date, 16);
+    return {
+      status:'ok', data:pair.data, summary:reportSummaryFromData_(pair.data, payload.date, seg),
+      carry16:{schema:'daily-fill-pair-v1', date:String(payload.date), seg:16, data:pair.afternoon}
+    };
+  }
   const data = readData(payload.date, seg);
   return { status: 'ok', data:data, summary:reportSummaryFromData_(data, payload.date, seg) };
 }
@@ -6307,7 +6320,7 @@ var TradeinPerformanceCore = (function () {
   function role(value) {
     if (value==='店長') return '店長';
     if (value==='代理店長') return '代理店長';
-    if (/^(副店長|業務代表\([I]+\)|業代|銷售人員|同仁)$/.test(value || '')) return '同仁';
+    if (/^(副店長|資深業務代表|業務代表\([I]+\)|業代|銷售人員|同仁)$/.test(value || '')) return '同仁';
     return '待核';
   }
   function build(input, roster) {
