@@ -162,7 +162,7 @@ test('首頁正式上傳入口的完整模板包含資產皆通過白名單，�
 
 test('首頁查價入口保留公開讀取與受限傳輸備援，比較不合併不同價格矩陣', () => {
   const Compare=require('../threec-comparison-core.js');
-  const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8');
+  const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8')+fs.readFileSync(path.join(__dirname,'../threec-query-ui.js'),'utf8');
   assert.match(html,/credentials:'omit'/);
   assert.match(html,/function readPublicFrame/);
   assert.match(html,/message.requestId!==requestId/);
