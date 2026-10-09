@@ -40,7 +40,7 @@ function createRuntime(options={}){
   privateDashboardHash:hash,privateDashboardNow:()=> '2026-10-09T12:00:00+08:00',privateDashboardFolder:()=>folder,
   reportUploadAuthorize_:p=>{if(p.adminSecret!==fakeSecret || options.operatorRequired!==false&&p.employeeId!==OPERATOR)throw Error('合成管理者驗證失敗');return OPERATOR;},
   DriveApp:{Access:{PRIVATE:'PRIVATE'},Permission:{NONE:'NONE'},getFileById:id=>{if(!files.has(id))throw Error('未知合成檔案');return files.get(id);}},
-  MimeType:{PLAIN_TEXT:'text'},Utilities:{getUuid:()=>String(++counter).padStart(32,'0'),formatDate:(_d,_t,format)=>format==='yyyy-MM'?'2026-10':'2026-11-10'},
+  MimeType:{PLAIN_TEXT:'text'},Utilities:{DigestAlgorithm:{SHA_256:'SHA_256'},Charset:{UTF_8:'UTF_8'},computeDigest:(_algorithm,text,charset)=>[...crypto.createHash('sha256').update(charset==='UTF_8'?String(text):String(text).replace(/[^\x00-\x7f]/g,'?')).digest()],getUuid:()=>String(++counter).padStart(32,'0'),formatDate:(_d,_t,format)=>format==='yyyy-MM'?'2026-10':'2026-11-10'},
   LockService:{getScriptLock:()=>({waitLock:()=>{assert.equal(held,false);held=true;},releaseLock:()=>{assert.ok(held);held=false;}})}});
  const gas=fs.readFileSync(require.resolve('../../gas/Code.gs'),'utf8');
  vm.runInContext(gas.slice(gas.indexOf('// Auth ownership candidate.')),context);

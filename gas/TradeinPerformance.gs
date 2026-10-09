@@ -74,7 +74,12 @@ function tradeinPerformanceRegistry_() {
   if(!registry || registry.schema_version!=='tradein-performance-registry/v1' || !registry.months)throw new Error('舊換新 registry 格式無效');
   return registry;
 }
-function tradeinPerformanceHash_(value) {return privateDashboardHash(JSON.stringify(value));}
+// Business hashes use UTF-8 explicitly; legacy authentication hashing is untouched.
+function tradeinPerformanceDigest_(value) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value || ''), Utilities.Charset.UTF_8)
+    .map(function(byte){return ('0'+((byte+256)%256).toString(16)).slice(-2);}).join('');
+}
+function tradeinPerformanceHash_(value) {return tradeinPerformanceDigest_(JSON.stringify(value));}
 function tradeinPerformanceSnapshot_(entry) {
   if(!entry)return null;
   const file=DriveApp.getFileById(entry.file_id),parents=file.getParents(),folderId=tradeinPerformanceFolder_().getId();
@@ -147,7 +152,7 @@ function tradeinPerformancePublish(payload) {
     const hash=tradeinPerformanceHash_(value),file=tradeinPerformanceFolder_().createFile(
       'north12b-tradein-performance-'+value.period_key+'-'+hash.slice(0,16)+'.json',JSON.stringify(value),MimeType.PLAIN_TEXT);
     const entry={file_id:file.getId(),snapshot_hash:hash,source_sha256:value.source_sha256,
-      source_cutoff_date:value.source_cutoff_date,roster_hash:payload.rosterHash,preview_hash:payload.previewHash,operator_hash:privateDashboardHash(operator)};
+      source_cutoff_date:value.source_cutoff_date,roster_hash:payload.rosterHash,preview_hash:payload.previewHash,operator_hash:tradeinPerformanceDigest_(operator)};
     // Validate bytes before switching active. All historical files are retained.
     tradeinPerformanceSnapshot_(entry);
     registry.months[value.period_key]={active:entry,previous:current.active};
@@ -187,7 +192,7 @@ function tradeinPerformanceCheckpointAuthorize_(payload) {
 function tradeinPerformanceCheckpointConfig_(name) {
   const file=tradeinPerformanceFile_(name),body=file?file.getBlob().getDataAsString('UTF-8'):null;
   if(body!==null && body.length>1000000)throw new Error('檢查點配置超過容量');
-  return {name:name,exists:!!file,body:body,sha256:body===null?null:privateDashboardHash(body)};
+  return {name:name,exists:!!file,body:body,sha256:body===null?null:tradeinPerformanceDigest_(body)};
 }
 function tradeinPerformanceCheckpointRegistryValue_(body) {
   if(typeof body!=='string' || body.length>1000000)throw new Error('檢查點 registry 容量／內容無效');
@@ -210,8 +215,8 @@ function tradeinPerformanceCheckpointState_(payload) {
   const publicBody=publicFile?publicFile.getBlob().getDataAsString('UTF-8'):JSON.stringify({schema_version:'tradein-public-registry/v1',months:{}});
   const publicRegistry=tradeinPerformancePublicRegistry_();
   return {registry:registry,registryBody:registryBody,registryExists:!!registryFile,
-    publicRegistry:publicRegistry,publicRegistryBody:publicBody,publicRegistryExists:!!publicFile,publicRegistryHash:privateDashboardHash(publicBody),
-    registryHash:privateDashboardHash(registryBody),slotPresent:slotPresent,slot:slot,
+    publicRegistry:publicRegistry,publicRegistryBody:publicBody,publicRegistryExists:!!publicFile,publicRegistryHash:tradeinPerformanceDigest_(publicBody),
+    registryHash:tradeinPerformanceDigest_(registryBody),slotPresent:slotPresent,slot:slot,
     activeHash:slot && slot.active?slot.active.snapshot_hash:null,
     monthly:tradeinPerformanceCheckpointConfig_('north12b-tradein-monthly-roster-'+payload.month+'.json'),
     reference:tradeinPerformanceCheckpointConfig_('north12b-tradein-reference-'+payload.sourceHash+'.json')};
@@ -286,13 +291,13 @@ function tradeinPerformanceCheckpointCapture(payload) {
     }
     const value={schema_version:'tradein-checkpoint/v1',stage:payload.stage,month:payload.month,
       source_sha256:payload.sourceHash,owner_script_id:auth.owner,folder_id:tradeinPerformanceFolder_().getId(),
-      captured_at:privateDashboardNow(),operator_hash:privateDashboardHash(auth.operator),
+      captured_at:privateDashboardNow(),operator_hash:tradeinPerformanceDigest_(auth.operator),
       registry_exists:state.registryExists,registry_body:state.registryBody,registry_sha256:state.registryHash,
       public_registry_exists:state.publicRegistryExists,public_registry_body:state.publicRegistryBody,public_registry_sha256:state.publicRegistryHash,
       slot_present:state.slotPresent,slot:state.slot,monthly:state.monthly,reference:state.reference,preview_hash:previewHash};
-    const body=JSON.stringify(value),hash=privateDashboardHash(body);
+    const body=JSON.stringify(value),hash=tradeinPerformanceDigest_(body);
     const file=tradeinPerformanceFolder_().createFile('north12b-tradein-checkpoint-'+payload.month+'-'+payload.stage+'-'+hash.slice(0,16)+'.json',body,MimeType.PLAIN_TEXT);
-    if(privateDashboardHash(file.getBlob().getDataAsString('UTF-8'))!==hash)throw new Error('檢查點保存後內容核對失敗');
+    if(tradeinPerformanceDigest_(file.getBlob().getDataAsString('UTF-8'))!==hash)throw new Error('檢查點保存後內容核對失敗');
     return {status:'checkpoint_saved',checkpointId:file.getId(),checkpointHash:hash,stage:payload.stage,
       state:tradeinPerformanceCheckpointSummary_(state),previewHash:previewHash};
   } finally{lock.releaseLock();}
@@ -308,13 +313,13 @@ function tradeinPerformanceCheckpointRestore(payload) {
     let inFolder=false;while(parents.hasNext()){if(parents.next().getId()===folderId)inFolder=true;}
     if(!inFolder)throw new Error('檢查點不在指定私有 owner 資料夾');
     const body=file.getBlob().getDataAsString('UTF-8');
-    if(body.length>3000000 || privateDashboardHash(body)!==payload.checkpointHash)throw new Error('檢查點完整性核對失敗');
+    if(body.length>3000000 || tradeinPerformanceDigest_(body)!==payload.checkpointHash)throw new Error('檢查點完整性核對失敗');
     const saved=JSON.parse(body);
     if(saved.schema_version!=='tradein-checkpoint/v1' || !['C0','C1'].includes(saved.stage) || saved.month!==payload.month ||
         saved.source_sha256!==payload.sourceHash || saved.owner_script_id!==auth.owner || saved.folder_id!==folderId ||
         typeof saved.registry_exists!=='boolean' || typeof saved.slot_present!=='boolean' ||
-        typeof saved.public_registry_exists!=='boolean' || privateDashboardHash(saved.public_registry_body)!==saved.public_registry_sha256 ||
-        privateDashboardHash(saved.registry_body)!==saved.registry_sha256)
+        typeof saved.public_registry_exists!=='boolean' || tradeinPerformanceDigest_(saved.public_registry_body)!==saved.public_registry_sha256 ||
+        tradeinPerformanceDigest_(saved.registry_body)!==saved.registry_sha256)
       throw new Error('檢查點 owner／月份／來源或 registry 核對失敗');
     const prior=tradeinPerformanceCheckpointRegistryValue_(saved.registry_body);
     if(Object.prototype.hasOwnProperty.call(prior.months,payload.month)!==saved.slot_present ||
@@ -323,7 +328,7 @@ function tradeinPerformanceCheckpointRestore(payload) {
     [['monthly',current.monthly.name],['reference',current.reference.name]].forEach(function(pair){
       const config=saved[pair[0]];
       if(!config || config.name!==pair[1] || typeof config.exists!=='boolean' ||
-          config.exists && (typeof config.body!=='string' || config.body.length>1000000 || privateDashboardHash(config.body)!==config.sha256) ||
+          config.exists && (typeof config.body!=='string' || config.body.length>1000000 || tradeinPerformanceDigest_(config.body)!==config.sha256) ||
           !config.exists && (config.body!==null || config.sha256!==null))throw new Error('檢查點配置完整性核對失敗');
     });
     tradeinPerformanceCheckpointSlot_(saved.slot,payload.month,saved.monthly);
@@ -341,7 +346,7 @@ function tradeinPerformanceCheckpointRestore(payload) {
     ['monthly','reference'].forEach(function(key){
       const config=saved[key],existing=tradeinPerformanceFile_(config.name);
       if(!config.exists){if(existing)retained.push(key);return;}
-      if(existing){if(privateDashboardHash(existing.getBlob().getDataAsString('UTF-8'))!==config.sha256)existing.setContent(config.body);}
+      if(existing){if(tradeinPerformanceDigest_(existing.getBlob().getDataAsString('UTF-8'))!==config.sha256)existing.setContent(config.body);}
       else tradeinPerformanceFolder_().createFile(config.name,config.body,MimeType.PLAIN_TEXT);
       if(tradeinPerformanceCheckpointConfig_(config.name).sha256!==config.sha256)throw new Error('檢查點配置恢復後核對失敗');
     });
@@ -357,8 +362,8 @@ function tradeinPerformanceCheckpointRestore(payload) {
     if(publicFile)publicFile.setContent(nextPublicBody);
     else if(saved.public_registry_exists)tradeinPerformanceFolder_().createFile('north12b-tradein-public-registry.json',nextPublicBody,MimeType.PLAIN_TEXT);
     const restored=tradeinPerformanceCheckpointState_(payload);
-    if(restored.registryHash!==privateDashboardHash(nextBody) || restored.slotPresent!==saved.slot_present ||
-        restored.publicRegistryHash!==privateDashboardHash(nextPublicBody) ||
+    if(restored.registryHash!==tradeinPerformanceDigest_(nextBody) || restored.slotPresent!==saved.slot_present ||
+        restored.publicRegistryHash!==tradeinPerformanceDigest_(nextPublicBody) ||
         JSON.stringify(restored.slot)!==JSON.stringify(saved.slot))throw new Error('檢查點恢復後完整 registry 核對失敗');
     return {status:'checkpoint_restored',stage:saved.stage,state:tradeinPerformanceCheckpointSummary_(restored),
       retainedNewConfigurationFiles:retained,historyRetained:true};

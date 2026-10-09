@@ -112,3 +112,12 @@ test('checkpoint contains no raw transaction, customer or secret fields; status 
  for(const value of ['SYNTHETIC_ADMIN_ONLY','SYNTHETIC-REC','SYNTHETIC-ORDER','device_id','adminSecret','records'])assert.equal(text.includes(value),false,value);
  for(const value of ['ZX00001','合＊','body','employee_id','folder_id'])assert.equal(s.includes(value),false,value);
 });
+
+test('business digest hashes Chinese as UTF-8 even when legacy digest defaults to ASCII',()=>{
+ const r=createRuntime(),crypto=require('node:crypto');
+ const utf8=crypto.createHash('sha256').update('北一二B＊店點').digest('hex');
+ const other=crypto.createHash('sha256').update('北一三B＊店點').digest('hex');
+ assert.equal(r.a.tradeinPerformanceDigest_('北一二B＊店點'),utf8);
+ assert.equal(r.a.tradeinPerformanceDigest_('北一三B＊店點'),other);
+ assert.notEqual(utf8,other);
+});
