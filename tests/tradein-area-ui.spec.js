@@ -30,23 +30,26 @@ async function intercept(page){
     const text=request.postData()||'{}';let payload;
     try{payload=JSON.parse(text);}catch{payload=JSON.parse(new URLSearchParams(text).get('payload')||'{}');}
     calls.push(payload);
-    if(!['threec_snapshot_read','threec_changes_read'].includes(payload.action))return route.abort('blockedbyclient');
-    const body=payload.action==='threec_snapshot_read'?Fixture[payload.kind]():{status:'ok',changeSet:{kind:payload.kind,changes:[],changeCount:0,totalChangeCount:0,hasMore:false}};
+    if(!['threec_snapshot_read','threec_changes_read','tradein_performance_public_read'].includes(payload.action))return route.abort('blockedbyclient');
+    const body=payload.action==='tradein_performance_public_read'?{status:'ok',snapshot:null}:payload.action==='threec_snapshot_read'?Fixture[payload.kind]():{status:'ok',changeSet:{kind:payload.kind,changes:[],changeCount:0,totalChangeCount:0,hasMore:false}};
     if(url.searchParams.get('transport')==='iframe')return route.fulfill({contentType:'text/html; charset=utf-8',body:'<script>window.top.postMessage('+JSON.stringify({type:'north12b-gas-response-v1',requestId:url.searchParams.get('requestId'),body})+',"*")</script>'});
     return route.fulfill({contentType:'application/json; charset=utf-8',body:JSON.stringify(body)});
   });
   return {calls,errors};
 }
 async function noOverflow(page){expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
-for(const width of [1280,390,320])test(`${width}px public price routes work from home and APP without expanding private access`,async({page},testInfo)=>{
+for(const width of [1280,390,320])test(`${width}px home and APP open progress first and retain public price routes`,async({page},testInfo)=>{
   const {calls,errors}=await intercept(page);await page.setViewportSize({width,height:900});
   await page.goto(new URL('home.html',BASE).href);
   await expect(page.locator('a.card[href="tradein-import-lab.html"]')).toHaveCount(0);
   await expect(page.locator('a.card[href="threec-query.html"] h3')).toHaveText('手機專案價查詢');
-  await expect(page.locator('a.card[href="tradein-query.html"] h3')).toHaveText('舊換新專區');
+  await expect(page.locator('a.card[href="tradein-progress.html"] h3')).toHaveText('舊換新專區');
   expect(calls).toEqual([]);
-  await page.locator('a.card[href="tradein-query.html"]').click();
+  await page.locator('a.card[href="tradein-progress.html"]').click();
   await expect(page.locator('h1')).toHaveText('舊換新專區');
+  await expect(page.locator('.area-nav a')).toHaveText(['目標進度','回收價查詢']);
+  await expect(page.locator('#readMessage')).toContainText('保留未知');
+  await page.getByRole('link',{name:'回收價查詢',exact:true}).click();
   await expect(page.locator('#tradeinResults')).toContainText('示範回收');
   await expect(page.locator('#tradeinResults')).toContainText('0 元');
   await expect(page.locator('#shoppingPane')).toBeHidden();await noOverflow(page);
@@ -62,7 +65,7 @@ for(const width of [1280,390,320])test(`${width}px public price routes work from
   await page.screenshot({path:testInfo.outputPath(`SYNTHETIC-phone-${width}.png`),fullPage:true});
   await page.locator('.home-link').click();
   await page.locator('#tool-search').fill('舊換新');
-  await expect(page.locator('a.card[href="tradein-query.html"]')).toBeVisible();
+  await expect(page.locator('a.card[href="tradein-progress.html"]')).toBeVisible();
   await page.locator('#tool-search').fill('');
   await expect(page.locator('a.card[href="tradein-import-lab.html"]')).toHaveCount(0);
   await page.goto(new URL('app.html',BASE).href);
@@ -71,7 +74,8 @@ for(const width of [1280,390,320])test(`${width}px public price routes work from
   await expect(prices.getByRole('link',{name:'舊換新專區',exact:true})).toBeVisible();
   await page.screenshot({path:testInfo.outputPath(`APP-public-prices-${width}.png`),fullPage:true});
   await prices.getByRole('link',{name:'舊換新專區',exact:true}).click();
-  await expect(page.locator('#tradeinResults')).toContainText('示範回收');
+  await expect(page.locator('.area-nav a')).toHaveText(['目標進度','回收價查詢']);
+  await expect(page.locator('#readMessage')).toContainText('保留未知');
   await page.goBack();
   await expect(prices.getByRole('link',{name:'手機專案價查詢',exact:true})).toBeVisible();
   await page.locator('[data-profile-entry]').click();

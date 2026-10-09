@@ -7,6 +7,12 @@ export function rulesForMonth(month){
   return Object.freeze({...DEFAULT_RULES,month,start:month+'-01',end:new Date(Date.UTC(year,number,0)).toISOString().slice(0,10)});
 }
 export function hasMonthlySource(rules){return rules.start<=rules.sourceStart&&rules.end>=rules.sourceEnd;}
+export function formatDifference(actual,target){
+  if(target===null)return '不適用';
+  if(actual===null)return '待核';
+  const difference=actual-target;
+  return (difference>0?'+':difference<0?'−':'')+Math.abs(difference)+' 台';
+}
 export function describePerson(person,rules=DEFAULT_RULES){
   const [store,name,role,raw]=person;
   if(raw!==null&&(!Number.isSafeInteger(raw)||raw<0))throw new Error('實績型別或數值無效，停止匯出。');
@@ -40,22 +46,22 @@ export function buildExportModel(context,scope,rules=DEFAULT_RULES){
   }
   if(!rows.length)throw new Error('此範圍沒有可匯出的資料。');
   if(rows.length>100)throw new Error('資料超過 100 人，請縮小匯出範圍。');
-  return Object.freeze({title:'舊換新個人提醒',scopeLabel,rules:Object.freeze({...rules}),rows:Object.freeze(rows.map(p=>describePerson(p,rules)))});
+  return Object.freeze({title:'舊換新個人提醒',scopeLabel,showDifference:context.mode==='public',rules:Object.freeze({...rules}),rows:Object.freeze(rows.map(p=>describePerson(p,rules)))});
 }
 export function reminderText(model){
   const r=model.rules;
   return [(r.isDemo?'【舊換新提醒｜全為示意資料】':'【舊換新每月進度提醒】'),`月份：${r.month}｜本期 ${r.start}–${r.end}（每月 3 台）`,`來源期間：${r.sourceStart}–${r.sourceEnd}`,`來源截止：${r.cutoff}（日期精度；${r.timezone}）`,...(r.statusAsOf?[`取消狀態核對至：${r.statusAsOf}（含取消交易停止同步，沖回月份待核）`]:[]),`月份資料：${hasMonthlySource(r)?(r.isDemo?'選定月份截至來源截止的累積有效交易示意；未核涵蓋仍為未知':'選定月份截至報表查詢截止的有效回收；日期精度不代表當日終日'):'選定月份尚未提供來源；其他月份實績不納入'}`,`匯出範圍：${model.scopeLabel}`,'',...model.rows.flatMap(p=>[
     `${p.store}｜${p.name}｜${p.role}`,
-    `實績：${p.actual===null?'未提供':p.actual+' 台'}；目標：${p.target===null?(p.status==='不設目標'?'不設目標':'身份待核'):p.target+' 台／月'}；尚缺：${p.remaining===null?'未判定':p.remaining+' 台'+(r.isDemo?'（示意）':'')}`,
+    `實績：${p.actual===null?'未提供':p.actual+' 台'}；目標：${p.target===null?(p.status==='不設目標'?'不設目標':'身份待核'):p.target+' 台／月'}；${model.showDifference?'目前差異：'+formatDifference(p.actual,p.target):'尚缺：'+(p.remaining===null?'未判定':p.remaining+' 台'+(r.isDemo?'（示意）':''))}`,
     `狀態：${p.status}；${p.reason}`,''
-  ]),'未知值不當成 0；超標台數不能替其他同仁達標。'].join('\n');
+  ]),...(model.showDifference?['目前差異＝實績－月目標；負數為未達，正數為超標。']:[]),'未知值不當成 0；超標台數不能替其他同仁達標。'].join('\n');
 }
 export function workbookRows(model){
   const r=model.rules;
   return [[],[r.isDemo?'舊換新進度｜合成示意':'舊換新每月個人進度'],[r.isDemo?'規則已核定：每月 3 台；店長與代理店長免目標。人員與實績仍為合成示意。':'每月 3 台；店長與代理店長免目標。單銷計入；含取消交易停止同步，沖回月份待核。'],[],
     ['選定月開始',{date:r.start}],['選定月結束',{date:r.end}],['來源期間開始',{date:r.sourceStart}],['來源期間結束',{date:r.sourceEnd}],['來源截止',{date:r.cutoff}],['規則狀態','每月 3 台；店長與代理店長免目標'+(r.statusAsOf?'；取消狀態核對至 '+r.statusAsOf:'')],['匯出範圍',model.scopeLabel],['月份／缺值',r.month+'；'+r.timezone+'；'+(hasMonthlySource(r)?'截至來源截止；未知數值留空':'選定月份來源未提供；實績留空')],[],
-    ['店點','人員','職務','實績（台）','目標（台）','尚缺（台）','達標／未知狀態','目標／資料狀態'],
-    ...model.rows.map(p=>[p.store,p.name,p.role,p.actual,p.target,p.remaining,p.status,p.reason])];
+    ['店點','人員','職務','實績（台）','目標（台）',model.showDifference?'目前差異（實績－月目標）':'尚缺（台）','達標／未知狀態','目標／資料狀態'],
+    ...model.rows.map(p=>[p.store,p.name,p.role,p.actual,p.target,model.showDifference?(p.actual===null||p.target===null?null:p.actual-p.target):p.remaining,p.status,p.reason])];
 }
 const xml=value=>String(value).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
 const excelDate=iso=>(Date.parse(iso+'T00:00:00Z')-Date.UTC(1899,11,30))/86400000;
@@ -83,7 +89,7 @@ export function createXlsx(model){
     const cells=row.map((value,col)=>{
       if(value===null||value===undefined)return '';
       const ref=String.fromCharCode(65+col)+num;
-      if(typeof value==='number'){if(!Number.isSafeInteger(value)||value<0)throw new Error('匯出含有不正確數值。');return `<c r="${ref}" s="3" t="n"><v>${value}</v></c>`;}
+      if(typeof value==='number'){const difference=model.showDifference&&table&&col===5;if(!Number.isSafeInteger(value)||value<0&&!difference)throw new Error('匯出含有不正確數值。');return `<c r="${ref}" s="${difference?6:3}" t="n"><v>${value}</v></c>`;}
       if(value&&typeof value==='object'&&value.date){if(!isDate(value.date))throw new Error('匯出日期無效。');return `<c r="${ref}" s="4" t="n"><v>${excelDate(value.date)}</v></c>`;}
       const style=header?2:num===2?1:num===3?5:0;
       return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;
@@ -98,7 +104,7 @@ export function createXlsx(model){
     ['_rels/.rels',head+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${rel}/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
     ['xl/workbook.xml',head+`<workbook xmlns="${main}" xmlns:r="${rel}"><bookViews><workbookView/></bookViews><sheets><sheet name="舊換新進度" sheetId="1" r:id="rId1"/></sheets></workbook>`],
     ['xl/_rels/workbook.xml.rels',head+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${rel}/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="${rel}/styles" Target="styles.xml"/></Relationships>`],
-    ['xl/styles.xml',head+`<styleSheet xmlns="${main}"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/></numFmts><fonts count="3"><font><sz val="11"/><color rgb="FF273746"/><name val="Arial"/></font><font><b/><sz val="15"/><color rgb="FF273746"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF8C421C"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="1" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`],
+    ['xl/styles.xml',head+`<styleSheet xmlns="${main}"><numFmts count="2"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/><numFmt numFmtId="165" formatCode="+0;-0;0"/></numFmts><fonts count="3"><font><sz val="11"/><color rgb="FF273746"/><name val="Arial"/></font><font><b/><sz val="15"/><color rgb="FF273746"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF8C421C"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="1" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`],
     ['xl/worksheets/sheet1.xml',head+`<worksheet xmlns="${main}"><dimension ref="A1:H${rows.length}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane ySplit="14" topLeftCell="A15" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="25"/><cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rowXml}</sheetData><autoFilter ref="A14:H${rows.length}"/><mergeCells count="6"><mergeCell ref="A2:H2"/><mergeCell ref="A3:H3"/><mergeCell ref="B10:H10"/><mergeCell ref="B11:H11"/><mergeCell ref="B12:H12"/><mergeCell ref="B4:H4"/></mergeCells><printOptions horizontalCentered="1"/><pageMargins left="0.25" right="0.25" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`]
   ];
   return zip(files);
