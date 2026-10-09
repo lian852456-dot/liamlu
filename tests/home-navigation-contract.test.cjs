@@ -32,8 +32,8 @@ test('home navigation retains PR179 performance and PR181 lab removal', () => {
     'https://twm-store-inspection.liamlu245.chatgpt.site/',
     'threec-query.html', 'tradein-query.html'
   ]);
-  assert.equal(cards(navigation('督導專區')).length, 7);
-  assert.equal(cards(html).length, 4 + staffHrefs.length + 7);
+  assert.equal(cards(navigation('督導專區')).length, 6);
+  assert.equal(cards(html).length, 4 + staffHrefs.length + 6);
 });
 
 test('staff gold lookup lives under performance tools and uses the existing viewer', () => {
@@ -53,14 +53,18 @@ test('quick gold details retain the existing viewer and label', () => {
   assert.match(gold, /查看明細/);
 });
 
-test('supervisor gold maintenance retains its distinct administration route', () => {
+test('home omits supervisor gold entry and moves the original intelligence station to management', () => {
   const supervisor = navigation('督導專區');
-  const gold = cardFor(supervisor, 'north12b-gold-ops.html');
-  assert.match(gold, /<h3>金牌資料維護（督導）<\/h3>/);
-  assert.match(gold, /data-search="[^"]*金牌資料維護[^"]*"/);
+  assert.doesNotMatch(html, /href="north12b-gold-ops\.html"/);
+  assert.ok(fs.existsSync(path.resolve(__dirname, '../north12b-gold-ops.html')));
+  const management=supervisor.match(/<div class="management-grid"[^>]*>([\s\S]*?)<\/div>\s*<div class="supervisor-grid"/)[1];
+  assert.deepEqual(cards(management).map(card=>card.match(/href="([^"]+)"/)[1]),['department-ops.html','patrol.html']);
+  const intel=cardFor(supervisor,'patrol.html');
+  assert.match(intel, /class="card tool-card management-card"/);
+  assert.match(intel, /<h3>Liam 情報站<\/h3>/);
+  assert.match(intel, /data-search="Liam 情報站 巡店紀錄、班表、半月檢查、檢核大盤"/);
   assert.doesNotMatch(supervisor, /href="gold-medal\.html"/);
 });
-
 
 test('formal price lookup is a staff tool without publisher privileges', () => {
   const lookup = cardFor(navigation('同仁大廳'), 'threec-query.html');
