@@ -25,7 +25,7 @@ async function connect(page,r){
   const url=new URL(route.request().url());
   if(url.origin===new URL(BASE).origin){
    if(url.pathname.endsWith('/tradein-progress.html'))return route.fulfill({contentType:'text/html; charset=utf-8',
-    body:(await fs.readFile(path.resolve(__dirname,'../tradein-progress.html'),'utf8')).replace('data-performance-release="pending"','data-performance-release="ready"')});
+    body:(await fs.readFile(path.resolve(__dirname,'./fixtures/tradein-private-progress.html'),'utf8')).replace('data-performance-release="pending"','data-performance-release="ready"')});
    return route.continue();
   }
   if(url.hostname!=='script.google.com')return route.abort('blockedbyclient');

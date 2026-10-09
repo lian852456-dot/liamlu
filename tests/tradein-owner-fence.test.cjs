@@ -114,3 +114,13 @@ test('malformed or foreign-owner state is rejected without replacing it', () => 
     assert.equal(f.counts().reads, 0);
   }
 });
+
+// Public data and owner checkpoints share the existing CI owner-contract entry.
+require('./tradein-public.test.cjs');
+require('./tradein-checkpoint.test.cjs');
+
+// Keep source and configuration contracts covered without changing workflow access.
+require('./tradein-sar74-parser.test.cjs');
+require('./tradein-private-reference.test.cjs');
+require('./tradein-monthly-basis.test.cjs');
+require('./tradein-source-preview.test.cjs');

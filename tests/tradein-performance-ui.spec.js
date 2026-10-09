@@ -123,3 +123,6 @@ test('a rejected API read keeps private contents and exports unavailable',async(
   await expect(page.locator('#privateWorkspace')).toBeHidden();await expect(page.locator('#storeRows tr')).toHaveCount(0);
   await expect(page.locator('#reminderText')).toHaveValue('');expect(errors).toEqual([]);
 });
+
+// The public page runs beside the protected regression in the existing CI entry.
+require('./helpers/tradein-public-ui-contract.cjs')();
