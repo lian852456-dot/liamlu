@@ -3101,6 +3101,10 @@ function doPost(e) {
     else if (action === 'private_request') result = privateDashboardRequestBinding(payload);
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
     else if (action === 'private_access') result = privateDashboardAccess(payload);
+    else if (action === 'tradein_performance_read') result = tradeinPerformanceRead(payload);
+    else if (action === 'tradein_performance_preview') result = tradeinPerformancePreview(payload);
+    else if (action === 'tradein_performance_publish') result = tradeinPerformancePublish(payload);
+    else if (action === 'tradein_performance_rollback') result = tradeinPerformanceRollback(payload);
     else if (action === 'phone_stock_publish') result = phoneStockPublish(payload);
     else if (action === 'phone_stock_read') result = phoneStockRead(payload);
     else if (action === 'department_ops_read') result = departmentOpsRead(payload);
@@ -3114,6 +3118,7 @@ function doPost(e) {
     else if (action === 'private_admin_requests') result = privateDashboardAdminRequests(payload);
     else if (action === 'private_admin_approve') result = privateDashboardAdminApprove(payload);
     else if (action === 'private_admin_revoke') result = privateDashboardAdminRevoke(payload);
+    else if (action === 'private_admin_restore_eligibility') result = privateDashboardAdminRestoreEligibility(payload);
     else if (action === 'private_admin_set_trusted_employee') result = privateDashboardAdminSetTrustedEmployee(payload);
     else if (action === 'private_admin_snapshot_status') result = privateDashboardAdminSnapshotStatus(payload);
     else if (action === 'private_sync_roster') result = privateDashboardSyncRoster(payload);
@@ -3196,10 +3201,11 @@ function privateDashboardRoster() {
   const props = privateDashboardProperties();
   const id = props.getProperty('DASHBOARD_ROSTER_SHEET_ID');
   if (!id) throw new Error('尚未初始化私有戰情名冊，請先執行 setupPrivateDashboard');
-  return SpreadsheetApp.openById(id);
+  return privateDashboardAuthGuardRoster_(SpreadsheetApp.openById(id));
 }
 
 function privateDashboardSheet(name, headers) {
+  privateDashboardAuthGuardSheetName_(name, headers);
   const ss = privateDashboardRoster();
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
@@ -3215,6 +3221,7 @@ function privateDashboardSheet(name, headers) {
 }
 
 function privateDashboardRows(sheet, headers) {
+  privateDashboardAuthGuardSheet_(sheet, headers);
   if (sheet.getLastRow() < 2) return [];
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues().map(function(row, offset) {
     const item = { _row: offset + 2 };
@@ -3223,12 +3230,96 @@ function privateDashboardRows(sheet, headers) {
   });
 }
 
-function privateDashboardWriteObject(sheet, headers, rowIndex, item) {
-  sheet.getRange(rowIndex, 1, 1, headers.length).setValues([headers.map(function(header) { return item[header] || ''; })]);
+let privateDashboardRosterLockDepth_ = 0;
+
+function privateDashboardRosterTransaction_(run) {
+  privateDashboardRequireAuthOwner_();
+  if (privateDashboardRosterLockDepth_) return run();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  privateDashboardRosterLockDepth_ = 1;
+  try {
+    return run();
+  } finally {
+    try { SpreadsheetApp.flush(); }
+    finally {
+      privateDashboardRosterLockDepth_ = 0;
+      lock.releaseLock();
+    }
+  }
+}
+
+function privateDashboardRecordLogin_(employeeId, deviceId) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('privateDashboardRecordLogin_', __authArgs, function() {
+
+  return privateDashboardRosterTransaction_(function() {
+    const lookup = privateDashboardUserByEmployeeId(employeeId);
+    if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
+      throw new Error('此員編尚未核准此裝置，請先申請並等待管理者核准');
+    }
+    lookup.user.last_login_at = privateDashboardNow();
+    // A read must never write a stale status, profile or device binding back.
+    lookup.sheet.getRange(lookup.user._row, 8, 1, 1).setValues([[lookup.user.last_login_at]]);
+    return lookup.user;
+  });
+
+  });
+}
+
+function privateDashboardAdminRestoreEligibility(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('privateDashboardAdminRestoreEligibility', __authArgs, function() {
+
+  privateDashboardAdminAuthorized(payload);
+  if (payload.restoreEligibility !== true || payload.currentRosterConfirmed !== true) {
+    throw new Error('須明確確認現職名冊並批准恢復資格');
+  }
+  const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
+  return privateDashboardRosterTransaction_(function() {
+    const lookup = privateDashboardUserByEmployeeId(employeeId);
+    if (!lookup.user || (lookup.user.status !== 'revoked' && !privateDashboardAuthResumeNative_('privateDashboardAdminRestoreEligibility', employeeId))) throw new Error('找不到已撤權員編');
+    const requestSheet = privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS);
+    // Retrying a partially completed revoke must not leave a pre-revoke request
+    // available for approval after eligibility is restored.
+    privateDashboardRows(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS).forEach(function(request) {
+      if (request.employee_id !== employeeId || request.status !== 'pending') return;
+      request.status = 'revoked';
+      privateDashboardWriteObject(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS, request._row, request);
+    });
+    privateDashboardAuthNativeBegin_('privateDashboardAdminRestoreEligibility', __authArgs);
+    lookup.user.status = 'active';
+    lookup.user.device_id = '';
+    lookup.user.device_bound_at = '';
+    lookup.user.last_login_at = '';
+    privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user, {restoreRevoked:true});
+    return { restored: true, employeeId: employeeId, deviceApprovalRequired: !privateDashboardIsTrustedEmployee(employeeId) };
+  });
+
+  });
+}
+
+function privateDashboardWriteObject(sheet, headers, rowIndex, item, options) {
+  const __authKind = privateDashboardAuthGuardSheet_(sheet, headers);
+  function write() {
+    if (__authKind === 'users') {
+      const current = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+      if (current[0] && String(current[0]) !== item.employee_id) throw new Error('名冊列已變更，請重新讀取');
+      if (String(current[4]) === 'revoked' && item.status !== 'revoked' && !(options && options.restoreRevoked === true)) {
+        throw new Error('此員編已撤權，須由管理者明確恢復資格');
+      }
+    }
+    sheet.getRange(rowIndex, 1, 1, headers.length).setValues([headers.map(function(header) { return item[header] || ''; })]);
+  }
+  if (__authKind) return privateDashboardRosterTransaction_(write);
+  return write();
 }
 
 // 由管理者在 Apps Script 編輯器執行一次。建立的 Sheet 位於同一個私有 Drive 資料夾中。
 function setupPrivateDashboard() {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('setupPrivateDashboard', __authArgs, function() {
+
   const props = privateDashboardProperties();
   const folder = privateDashboardFolder();
   let rosterId = props.getProperty('DASHBOARD_ROSTER_SHEET_ID');
@@ -3246,25 +3337,37 @@ function setupPrivateDashboard() {
   privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
   privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS);
   return { rosterSheetId: rosterId, folderId: folder.getId() };
+
+  });
 }
 
 function privateDashboardUserByEmployeeId(employeeId) {
+  privateDashboardRequireAuthOwner_();
+  const canonicalId = privateDashboardCleanEmployeeId(employeeId);
+  if (employeeId !== canonicalId) throw new Error('名冊員編格式不一致，請管理者核對');
   const sheet = privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
   const found = privateDashboardRows(sheet, PRIVATE_DASHBOARD_USERS_HEADERS)
-    .filter(function(item) { return item.employee_id === employeeId; });
+    .filter(function(item) {
+      return String(item.employee_id || '').trim().toUpperCase() === canonicalId;
+    });
+  if (found.some(function(item) { return item.employee_id !== canonicalId; })) {
+    throw new Error('名冊員編格式不一致，請管理者核對');
+  }
+  if (found.length > 1) throw new Error('名冊員編重複，請管理者核對');
   return { sheet: sheet, user: found.length ? found[0] : null };
 }
 
 function privateDashboardRequestBinding(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('privateDashboardRequestBinding', __authArgs, function() {
+
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
   const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
   const bootstrapCode = String(payload.bootstrapCode || '');
   if (privateDashboardHash(bootstrapCode) !== privateDashboardHash(privateDashboardRequiredProperty('DASHBOARD_BOOTSTRAP_CODE'))) {
     throw new Error('首次啟用碼不正確');
   }
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
+  return privateDashboardRosterTransaction_(function() {
     const lookup = privateDashboardUserByEmployeeId(employeeId);
     if (!lookup.user || lookup.user.status !== 'active') throw new Error('此員編不在可使用名冊中');
     if (lookup.user.device_id === deviceId) return { requestStatus: 'approved', message: '此裝置已核准，可直接以員編登入。' };
@@ -3281,14 +3384,19 @@ function privateDashboardRequestBinding(payload) {
     privateDashboardWriteObject(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS, requestSheet.getLastRow() + 1, request);
     privateDashboardNotifyAdminOfBindingRequest(request, lookup.user);
     return { requestStatus: 'pending', requestId: request.request_id, message: '已送出綁定申請，等待管理者核准。' };
-  } finally {
-    lock.releaseLock();
-  }
+  });
+
+  });
 }
 
 function privateDashboardRequestStatus(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('privateDashboardRequestStatus', __authArgs, function() {
+
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
   const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
+  const user = privateDashboardUserByEmployeeId(employeeId).user;
+  if (!user || user.status !== 'active') throw new Error('此員編不在可使用名冊中');
   const requests = privateDashboardRows(
     privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS),
     PRIVATE_DASHBOARD_REQUEST_HEADERS
@@ -3297,6 +3405,8 @@ function privateDashboardRequestStatus(payload) {
   const latest = requests[0];
   if (!latest) return { requestStatus: 'none' };
   return { requestStatus: latest.status, requestedAt: latest.requested_at, approvedAt: latest.approved_at };
+
+  });
 }
 
 function privateDashboardNotifyAdminOfBindingRequest(request, user) {
@@ -3338,16 +3448,16 @@ function privateDashboardSnapshot() {
 }
 
 function privateDashboardAccess(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('privateDashboardAccess', __authArgs, function() {
+
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
   const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
-  const lookup = privateDashboardUserByEmployeeId(employeeId);
-  if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
-    throw new Error('此員編尚未核准此裝置，請先申請並等待管理者核准');
-  }
-  lookup.user.last_login_at = privateDashboardNow();
-  privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
+  const user = privateDashboardRecordLogin_(employeeId, deviceId);
   const snapshot = privateDashboardSnapshot();
-  return { snapshot: snapshot, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role } };
+  return { snapshot: snapshot, profile: { maskedName: user.masked_name, store: user.store, role: user.role } };
+
+  });
 }
 
 const PHONE_STOCK_FILE = 'north12b-phone-stock-latest.json';
@@ -3355,28 +3465,43 @@ const PHONE_STOCK_LATEST_ID = 'PHONE_STOCK_LATEST_FILE_ID';
 const PHONE_STOCK_STORES = ['台北酒泉','台北永吉','台北復興南','台北萬大','台北通化','台北杭州南','台北大稻埕','台北三創','台北六張犁'];
 
 function phoneStockTrustedUser_(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('phoneStockTrustedUser_', __authArgs, function() {
+
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
   const user = privateDashboardUserByEmployeeId(employeeId).user;
   if (!privateDashboardIsTrustedEmployee(employeeId) || !user || user.status !== 'active') {
     throw new Error('此員編無手機庫存存取權限');
   }
   return {employeeId:employeeId,user:user};
+
+  });
 }
 
 function phoneStockAuthorizeRead_(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('phoneStockAuthorizeRead_', __authArgs, function() {
+
   const trusted = phoneStockTrustedUser_(payload);
   const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
   // APP 讀取庫存仍限督導已核准的裝置，避免其他人看見庫存數。
   if (trusted.user.device_id !== deviceId) throw new Error('此裝置尚未核准手機庫存存取');
   return trusted.employeeId;
+
+  });
 }
 
 function phoneStockAuthorizePublish_(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('phoneStockAuthorizePublish_', __authArgs, function() {
+
   const trusted = phoneStockTrustedUser_(payload);
   // 發布端是督導使用的電腦，與已核准 APP 手機會有不同裝置 ID。
   // 確認發布端帶有有效裝置識別，但不要求它等於 APP 的綁定裝置。
   privateDashboardCleanDeviceId(payload.deviceId);
   return trusted.employeeId;
+
+  });
 }
 
 function phoneStockRead(payload) {
@@ -3535,15 +3660,14 @@ function departmentOpsRead(payload) {
 }
 
 function departmentGoldAuthorizedUser_(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('departmentGoldAuthorizedUser_', __authArgs, function() {
+
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
   const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
-  const lookup = privateDashboardUserByEmployeeId(employeeId);
-  if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
-    throw new Error('此員編尚未核准此裝置，請先申請並等待管理者核准');
-  }
-  lookup.user.last_login_at = privateDashboardNow();
-  privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
-  return lookup.user;
+  return privateDashboardRecordLogin_(employeeId, deviceId);
+
+  });
 }
 
 function departmentGoldSafeRecord_(row) {
@@ -4097,15 +4221,21 @@ function threecRollback(payload) {
 }
 
 function threecAuthorizeRead_(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('threecAuthorizeRead_', __authArgs, function() {
+
   const employeeId = privateDashboardCleanEmployeeId((payload || {}).employeeId);
   const deviceId = privateDashboardCleanDeviceId((payload || {}).deviceId);
-  const lookup = privateDashboardUserByEmployeeId(employeeId);
-  if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
-    throw new Error('此員編尚未核准此裝置，無法讀取 3C／舊換新私有資料');
-  }
-  lookup.user.last_login_at = privateDashboardNow();
-  privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
-  return employeeId;
+  return privateDashboardRosterTransaction_(function() {
+    const lookup = privateDashboardUserByEmployeeId(employeeId);
+    if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
+      throw new Error('此員編尚未核准此裝置，無法讀取 3C／舊換新私有資料');
+    }
+    lookup.sheet.getRange(lookup.user._row, 8, 1, 1).setValues([[privateDashboardNow()]]);
+    return employeeId;
+  });
+
+  });
 }
 
 // Only verified, public price projections enter this ephemeral cache. Every
@@ -4212,6 +4342,9 @@ function threecReadActive_(requestedKind, options) {
 }
 
 function privateDashboardAdminRequests(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('privateDashboardAdminRequests', __authArgs, function() {
+
   privateDashboardAdminAuthorized(payload);
   const requests = privateDashboardRows(
     privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS),
@@ -4221,15 +4354,18 @@ function privateDashboardAdminRequests(payload) {
   return { requests: requests.map(function(item) { return {
     requestId: item.request_id, employeeId: item.employee_id, requestedAt: item.requested_at
   }; }) };
+
+  });
 }
 
 function privateDashboardAdminApprove(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('privateDashboardAdminApprove', __authArgs, function() {
+
   privateDashboardAdminAuthorized(payload);
   const requestId = String(payload.requestId || '');
   if (!requestId) throw new Error('缺少綁定申請編號');
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
+  return privateDashboardRosterTransaction_(function() {
     const requestSheet = privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS);
     const requests = privateDashboardRows(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS);
     const request = requests.filter(function(item) { return item.request_id === requestId; })[0];
@@ -4252,29 +4388,48 @@ function privateDashboardAdminApprove(payload) {
       privateDashboardWriteObject(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS, item._row, item);
     });
     return { approved: true, employeeId: request.employee_id };
-  } finally {
-    lock.releaseLock();
-  }
+  });
+
+  });
 }
 
 function privateDashboardAdminRevoke(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('privateDashboardAdminRevoke', __authArgs, function() {
+
   privateDashboardAdminAuthorized(payload);
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
-  const lookup = privateDashboardUserByEmployeeId(employeeId);
-  if (!lookup.user) throw new Error('找不到員編');
-  lookup.user.device_id = '';
-  lookup.user.device_bound_at = '';
-  lookup.user.last_login_at = '';
-  privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
-  return { revoked: true, employeeId: employeeId };
+  return privateDashboardRosterTransaction_(function() {
+    const lookup = privateDashboardUserByEmployeeId(employeeId);
+    if (!lookup.user) throw new Error('找不到員編');
+    privateDashboardAuthNativeBegin_('privateDashboardAdminRevoke', __authArgs);
+    lookup.user.status = 'revoked';
+    lookup.user.device_id = '';
+    lookup.user.device_bound_at = '';
+    lookup.user.last_login_at = '';
+    privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
+    const requestSheet = privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS);
+    privateDashboardRows(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS).forEach(function(request) {
+      if (request.employee_id !== employeeId || request.status !== 'pending') return;
+      request.status = 'revoked';
+      privateDashboardWriteObject(requestSheet, PRIVATE_DASHBOARD_REQUEST_HEADERS, request._row, request);
+    });
+    return { revoked: true, employeeId: employeeId };
+  });
+
+  });
 }
 
 function privateDashboardAdminSetTrustedEmployee(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('privateDashboardAdminSetTrustedEmployee', __authArgs, function() {
+
   privateDashboardAdminAuthorized(payload);
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
   const lookup = privateDashboardUserByEmployeeId(employeeId);
   if (!lookup.user || lookup.user.status !== 'active') throw new Error('此員編不在可使用名冊中');
   const props = privateDashboardProperties();
+    privateDashboardAuthNativeBegin_('privateDashboardAdminSetTrustedEmployee', __authArgs);
   props.setProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID', employeeId);
   const notificationEmail = String(payload.notificationEmail || '').trim();
   if (notificationEmail) {
@@ -4282,6 +4437,8 @@ function privateDashboardAdminSetTrustedEmployee(payload) {
     props.setProperty('DASHBOARD_NOTIFY_EMAIL', notificationEmail);
   }
   return { trustedEmployeeId: employeeId };
+
+  });
 }
 
 function privateDashboardAdminSnapshotStatus(payload) {
@@ -4324,19 +4481,19 @@ function privateDashboardAdminSnapshotStatus(payload) {
 const PRIVATE_KPICALC_FILE = 'north12b-kpicalc-private-latest.json';
 
 function kpiCalcAccess(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('kpiCalcAccess', __authArgs, function() {
+
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
   const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
-  const lookup = privateDashboardUserByEmployeeId(employeeId);
-  if (!lookup.user || lookup.user.status !== 'active' || (!privateDashboardIsTrustedEmployee(employeeId) && lookup.user.device_id !== deviceId)) {
-    throw new Error('此員編尚未核准此裝置，請先「首次申請綁定」並等待督導核准');
-  }
-  lookup.user.last_login_at = privateDashboardNow();
-  privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, lookup.user._row, lookup.user);
+  const user = privateDashboardRecordLogin_(employeeId, deviceId);
   const file = kpiCalcLatestDataFile();
   if (!file) throw new Error('KPI 試算資料尚未發佈，請通知督導');
   const data = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!data || !data.meta || !data.stores || !data.persons) throw new Error('KPI 試算資料格式不完整');
-  return { data: data, profile: { maskedName: lookup.user.masked_name, store: lookup.user.store, role: lookup.user.role, isTrusted: privateDashboardIsTrustedEmployee(employeeId) } };
+  return { data: data, profile: { maskedName: user.masked_name, store: user.store, role: user.role, isTrusted: privateDashboardIsTrustedEmployee(employeeId) } };
+
+  });
 }
 
 // 取私有資料夾中最新的一份 KPI 試算資料。
@@ -4419,19 +4576,25 @@ const KPICALC_ITEMS = [
 //   2. 函式選單選 kpiCalcSetupSelf → 執行一次
 // 之後該員編在任何裝置輸入員編即可登入 kpi.html 與戰情，不用申請綁定。
 function kpiCalcSetupSelf() {
-  const raw = PropertiesService.getScriptProperties().getProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID');
-  if (!raw) throw new Error('請先在「專案設定 > 指令碼屬性」新增 DASHBOARD_TRUSTED_EMPLOYEE_ID = 你的員編');
-  const employeeId = privateDashboardCleanEmployeeId(raw);
-  const sheet = privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
-  const lookup = privateDashboardUserByEmployeeId(employeeId);
-  const user = lookup.user || {
-    employee_id: employeeId, masked_name: '督導', store: '北一二B', role: '督導',
-    device_id: '', device_bound_at: '', last_login_at: ''
-  };
-  user.status = 'active';
-  if (user._row) privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, user._row, user);
-  else privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, sheet.getLastRow() + 1, user);
-  return { trusted: employeeId, status: 'active', note: '此員編已可在任何裝置直接登入' };
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('kpiCalcSetupSelf', __authArgs, function() {
+
+  return privateDashboardRosterTransaction_(function() {
+    const raw = PropertiesService.getScriptProperties().getProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID');
+    if (!raw) throw new Error('請先在「專案設定 > 指令碼屬性」新增 DASHBOARD_TRUSTED_EMPLOYEE_ID = 你的員編');
+    const employeeId = privateDashboardCleanEmployeeId(raw);
+    const lookup = privateDashboardUserByEmployeeId(employeeId);
+    const user = lookup.user || {
+      employee_id: employeeId, masked_name: '督導', store: '北一二B', role: '督導',
+      device_id: '', device_bound_at: '', last_login_at: ''
+    };
+    if (user.status === 'revoked') throw new Error('此員編已撤權，須由管理者明確恢復資格');
+    user.status = 'active';
+    privateDashboardWriteObject(lookup.sheet, PRIVATE_DASHBOARD_USERS_HEADERS, user._row || lookup.sheet.getLastRow() + 1, user);
+    return { trusted: employeeId, status: 'active', note: '此員編已可在任何裝置直接登入' };
+  });
+
+  });
 }
 
 function setupKpiCalcAutoUpdate() {
@@ -4963,27 +5126,55 @@ function kpiCalcParseMeta(sv, fileName) {
 
 // 每日自動化以管理者密碼同步遮罩後名冊。既有裝置綁定不會被覆蓋。
 function privateDashboardSyncRoster(payload) {
+  const __authArgs = Array.prototype.slice.call(arguments);
+  return privateDashboardAuthRun_('privateDashboardSyncRoster', __authArgs, function() {
+
   privateDashboardAdminAuthorized(payload);
   const members = Array.isArray(payload.members) ? payload.members : [];
-  const sheet = privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
-  const existing = privateDashboardRows(sheet, PRIVATE_DASHBOARD_USERS_HEADERS);
-  const byId = {};
-  existing.forEach(function(item) { byId[item.employee_id] = item; });
-  let synced = 0;
-  members.forEach(function(member) {
+  // Reject an unsafe batch before even creating/repairing the roster sheet.
+  const seen = Object.create(null);
+  const prepared = members.map(function(member) {
+    if (!member || typeof member !== 'object' || Array.isArray(member)) throw new Error('名冊成員格式不正確');
     const employeeId = privateDashboardCleanEmployeeId(member.employeeId);
-    const item = byId[employeeId] || {
-      employee_id: employeeId, device_id: '', device_bound_at: '', last_login_at: ''
+    if (seen[employeeId]) throw new Error('同步名冊員編重複，請管理者核對');
+    seen[employeeId] = true;
+    return {
+      employee_id: employeeId, masked_name: String(member.maskedName || ''),
+      store: String(member.store || ''), role: String(member.role || ''),
+      status: member.status === 'inactive' ? 'inactive' : 'active'
     };
-    item.masked_name = String(member.maskedName || '');
-    item.store = String(member.store || '');
-    item.role = String(member.role || '');
-    item.status = member.status === 'inactive' ? 'inactive' : 'active';
-    if (item._row) privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, item._row, item);
-    else privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, sheet.getLastRow() + 1, item);
-    synced += 1;
   });
-  return { synced: synced };
+  return privateDashboardRosterTransaction_(function() {
+    const sheet = privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS);
+    const existing = privateDashboardRows(sheet, PRIVATE_DASHBOARD_USERS_HEADERS);
+    const byId = Object.create(null);
+    existing.forEach(function(item) {
+      const employeeId = privateDashboardCleanEmployeeId(item.employee_id);
+      if (employeeId !== item.employee_id) throw new Error('名冊員編格式不一致，請管理者核對');
+      if (byId[employeeId]) throw new Error('名冊員編重複，請管理者核對');
+      byId[employeeId] = item;
+    });
+    let synced = 0;
+    privateDashboardAuthNativeBegin_('privateDashboardSyncRoster', __authArgs);
+    prepared.forEach(function(member) {
+      const employeeId = member.employee_id;
+      const item = byId[employeeId] || {
+        employee_id: employeeId, device_id: '', device_bound_at: '', last_login_at: ''
+      };
+      item.masked_name = member.masked_name;
+      item.store = member.store;
+      item.role = member.role;
+      // Only the separate, explicit admin restore action may clear this deny.
+      item.status = item.status === 'revoked' ? 'revoked' : member.status;
+      item._row = item._row || sheet.getLastRow() + 1;
+      privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, item._row, item);
+      byId[employeeId] = item;
+      synced += 1;
+    });
+    return { synced: synced };
+  });
+
+  });
 }
 
 function privateDashboardCanonicalKpiSource_(value) {
@@ -6284,4 +6475,797 @@ function reportVersionRecord_(kind, incoming, updateStatus, extra) {
 // 供 GAS 編輯器手動查詢目前兩邊的版本狀態
 function reportVersionStatus() {
   return { state: reportVersionState_(), sources: REPORT_VERSION_SOURCES };
+}
+
+// BEGIN TRADEIN PERFORMANCE MODULE (generated by scripts/build-tradein-gas.mjs)
+/* Shared calculation contract. Raw transaction keys exist only during this call. */
+var TradeinPerformanceCore = (function () {
+  'use strict';
+  const STORES = Object.freeze([
+    ['DNB10062','酒泉'],['DNB10082','永吉'],['DNB10094','復興南'],
+    ['DNB10146','杭州南'],['DNB10168','萬大'],['DNB10174','通化'],
+    ['DNB10284','大稻埕'],['DNB10307','三創'],['DNB10440','六張犁']
+  ]);
+  const RULE_ID = 'monthly3-inclusive-original-month-v1';
+  function date(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '') || isNaN(Date.parse(value+'T00:00:00Z')) ||
+        new Date(value+'T00:00:00Z').toISOString().slice(0,10)!==value) throw new Error('日期無效');
+    return value;
+  }
+  function monthPeriod(month) {
+    if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month || '')) throw new Error('月份無效');
+    const parts=month.split('-').map(Number);
+    return {start:month+'-01',end:new Date(Date.UTC(parts[0],parts[1],0)).toISOString().slice(0,10)};
+  }
+  function storeName(value) {
+    const v=String(value || '').trim();
+    if (v==='台灣大哥大數位生活台北三創' || v==='台北三創') return '三創';
+    const short=v.replace(/^台北/,'');
+    return STORES.some(s=>s[1]===short)?short:null;
+  }
+  function role(value) {
+    if (value==='店長') return '店長';
+    if (value==='代理店長') return '代理店長';
+    if (/^(副店長|資深業務代表|業務代表\([I]+\)|業代|銷售人員|同仁)$/.test(value || '')) return '同仁';
+    return '待核';
+  }
+  // Only an owner-loaded private configuration may supply this third argument.
+  // Transaction payloads cannot supply a crosswalk or grant roster/auth status.
+  function references(input, config) {
+    if(!config || config.schema_version!=='tradein-private-reference/v1' ||
+       config.source_sha256!==input.source_sha256 || config.source_start!==input.source_start || config.source_end!==input.source_end)
+      throw new Error('私有對照配置缺漏或與本批來源不符');
+    if(!Array.isArray(config.stores) || config.stores.length!==9 || !Array.isArray(config.employees))throw new Error('私有店碼／員編對照格式無效');
+    const stores=new Map(),storeNames=new Set(),employees=new Map(),canonical=new Set();
+    config.stores.forEach(s=>{
+      const name=storeName(s.store);
+      if(typeof s.store_code!=='string' || !STORES.some(v=>v[0]===s.store_code&&v[1]===name) || stores.has(s.store_code) || storeNames.has(name))
+        throw new Error('私有店碼對照未知、重複或衝突');
+      stores.set(s.store_code,name);storeNames.add(name);
+    });
+    config.employees.forEach(e=>{
+      if(typeof e.source_employee_id!=='string' || !/^[A-Za-z0-9]{5}$/.test(e.source_employee_id) ||
+         typeof e.employee_key!=='string' || !/^[A-Z0-9]{7}$/.test(e.employee_key) ||
+         employees.has(e.source_employee_id) || canonical.has(e.employee_key) || !Array.isArray(e.observations) || !e.observations.length)
+        throw new Error('私有員編對照未知、重複或衝突');
+      const observations=new Set();
+      e.observations.forEach(o=>{
+        const observed=date(o.trade_date);
+        if(observed<input.source_start || observed>input.source_end || !stores.has(o.store_code))throw new Error('員編對照觀測期間／店碼衝突');
+        observations.add(JSON.stringify([observed,o.store_code]));
+      });
+      employees.set(e.source_employee_id,{employee_key:e.employee_key,observations});canonical.add(e.employee_key);
+    });
+    return {stores,employees};
+  }
+  function build(input, roster, privateConfig) {
+    if (!input || input.rule_id!==RULE_ID || input.complete_nine_stores!==true) throw new Error('九店涵蓋或計數規則尚未確認');
+    const period=monthPeriod(input.month), start=date(input.source_start), end=date(input.source_end);
+    const statusAsOf=date(input.status_as_of_date || end);
+    if(statusAsOf<end)throw new Error('取消核對日期不可早於報表查詢截止');
+    if (start!==period.start || end>period.end || end<start) throw new Error('必須提供選定月首日起的完整九店報表');
+    if (!/^[a-f0-9]{64}$/.test(input.source_sha256 || '')) throw new Error('來源雜湊無效');
+    if (!Array.isArray(input.records) || input.records.length>20000 || !Array.isArray(roster)) throw new Error('來源／名冊格式無效');
+    const reference=references(input,privateConfig);
+    const people=[], byId={};
+    roster.forEach(r=>{
+      if (r.status!=='active') return;
+      const store=storeName(r.store);
+      if (!store) return;
+      if(typeof r.employee_id!=='string')throw new Error('名冊員編必須為字串');
+      const employee=r.employee_id.toUpperCase();
+      if (!/^[A-Z0-9]{5,12}$/.test(employee) || byId[employee]) throw new Error('名冊員編重複或無效');
+      const p={employee_key:employee,store:store,masked_name:String(r.masked_name || '姓名未提供'),
+        role:role(r.role),original_role:String(r.role || ''),identity_status:'confirmed',actual_units:0};
+      people.push(p);byId[employee]=p;
+    });
+    const stores=STORES.map(s=>({store:s[1],store_code:s[0],total_units:0,pending_identity_units:0,
+      target_staff_count:0,staff_target_units:0,target_staff_actual_units:0,met_staff_count:0,
+      manager_actual_units:0,acting_manager_actual_units:0,staff_gap_units:0,pending_staff_count:0,coverage:'complete'}));
+    const byStore=Object.fromEntries(stores.map(s=>[s.store,s]));
+    const unique={};let duplicates=0,cancelled=0;
+    input.records.forEach(r=>{
+      const store=reference.stores.get(r.store_code);
+      if (!store) throw new Error('來源含九店範圍以外或未知店碼');
+      const trade=date(r.trade_date), cancel=r.cancel_date?date(r.cancel_date):null;
+      if (trade<start || trade>end || cancel && (cancel<trade || cancel>statusAsOf)) throw new Error('交易／取消日期與來源期間衝突');
+      if (!['單銷','RT','AQNP'].includes(r.project)) throw new Error('未知專案類別，停止計數');
+      if(typeof r.source_employee_id!=='string' || !/^[A-Za-z0-9]{5}$/.test(r.source_employee_id))throw new Error('來源員編必須保留五碼字串');
+      const seller=r.source_employee_id,identity=reference.employees.get(seller);
+      if(!identity || !identity.observations.has(JSON.stringify([trade,r.store_code])))throw new Error('來源員編缺少本批日期／店碼的精確私有對照');
+      if(typeof r.recycle_code!=='string' || typeof r.order_number!=='string')throw new Error('回收碼／銷貨單號必須為字串');
+      const key=r.recycle_code.trim(), order=r.order_number.trim();
+      if (!key || !order || key.length>100 || order.length>100) throw new Error('缺少有效回收碼／銷貨單號');
+      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project};
+      if (unique[key]) {
+        const prior=unique[key];
+        if (prior.store!==store || prior.trade_date!==trade || prior.employee_key!==normalized.employee_key || prior.order!==order || prior.project!==r.project) throw new Error('同回收碼的交易、人員或店點衝突');
+        if (cancel && (!prior.cancel_date || cancel>prior.cancel_date)) prior.cancel_date=cancel;
+        duplicates++;
+      } else unique[key]=normalized;
+    });
+    Object.values(unique).forEach(r=>{
+      const person=byId[r.employee_key];
+      if(!r.cancel_date && person && person.store!==r.store)person.identity_status='conflict';
+    });
+    Object.values(unique).forEach(r=>{
+      if (r.cancel_date) {cancelled++;return;}
+      const store=byStore[r.store];store.total_units++;
+      const person=byId[r.employee_key];
+      if (!person || person.store!==r.store || person.identity_status==='conflict') {store.pending_identity_units++;store.coverage='partial_identity';return;}
+      person.actual_units++;
+    });
+    people.forEach(p=>{
+      const s=byStore[p.store], exempt=['店長','代理店長'].includes(p.role);
+      if(p.identity_status==='conflict'){p.actual_units=null;s.coverage='partial_identity';}
+      p.target_units=p.role==='同仁'?3:null;
+      p.remaining_units=p.target_units===null||p.actual_units===null?null:Math.max(3-p.actual_units,0);
+      p.attainment_status=exempt?'exempt':p.role==='同仁'&&p.actual_units!==null?(p.actual_units>=3?'met':'in_progress'):'pending';
+      if (p.role==='同仁') {
+        s.target_staff_count++;s.staff_target_units+=3;s.target_staff_actual_units+=p.actual_units;
+        s.staff_gap_units+=p.remaining_units;if(p.actual_units>=3)s.met_staff_count++;if(p.actual_units===null)s.pending_staff_count++;
+      } else if(p.role==='店長') s.manager_actual_units=p.actual_units===null||s.manager_actual_units===null?null:s.manager_actual_units+p.actual_units;
+      else if(p.role==='代理店長') s.acting_manager_actual_units=p.actual_units===null||s.acting_manager_actual_units===null?null:s.acting_manager_actual_units+p.actual_units;
+      else s.coverage='partial_roster';
+    });
+    const sum=key=>stores.reduce((n,s)=>n+s[key],0);
+    const summary={total_units:sum('total_units'),assigned_units:people.reduce((n,p)=>n+p.actual_units,0),
+      pending_identity_units:sum('pending_identity_units'),target_staff_count:sum('target_staff_count'),
+      staff_target_units:sum('staff_target_units'),met_staff_count:sum('met_staff_count'),staff_gap_units:sum('staff_gap_units'),
+      mobilized_stores:stores.filter(s=>s.total_units>0).length,pending_staff_count:sum('pending_staff_count'),store_count:9,duplicate_rows:duplicates,cancelled_units:cancelled};
+    if (summary.assigned_units+summary.pending_identity_units!==summary.total_units) throw new Error('店、人員與未分配台數對帳失敗');
+    return {schema_version:'tradein-performance/v1',period_key:input.month,rule_id:RULE_ID,target_period:period,
+      source_period:{start:start,end:end},source_cutoff_date:end,cutoff_precision:'date',timezone:'Asia/Taipei',
+      source_sha256:input.source_sha256,status_as_of_date:statusAsOf,printed_at:String(input.printed_at || ''),people:people,stores:stores,summary:summary};
+  }
+  function csv(text) {
+    const rows=[];let row=[],cell='',quoted=false;
+    for(let i=0;i<text.length;i++){
+      const c=text[i];
+      if(c==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++;}else if(!quoted&&cell.length)cell+='"';else quoted=!quoted;}
+      else if(c===','&&!quoted){row.push(cell);cell='';}
+      else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;row.push(cell);rows.push(row);row=[];cell='';}
+      else cell+=c;
+    }
+    if(quoted)throw new Error('CSV 引號未完整結束');
+    if(cell||row.length){row.push(cell);rows.push(row);}return rows;
+  }
+  function unwrap(v){return String(v || '').trim().replace(/^="(.*)"$/,'$1');}
+  function roc(v){const s=unwrap(v).replace(/[\/\-]/g,'');if(!/^\d{7}$/.test(s))throw new Error('SAR74 日期格式無效');return date(String(Number(s.slice(0,3))+1911)+'-'+s.slice(3,5)+'-'+s.slice(5,7));}
+  function parseSar74(text) {
+    const rows=csv(String(text).replace(/^\uFEFF/,''));
+    const labels=['序號','店點代碼','區域別','日期','專案類別','回收代碼/IMEI','銷貨單號','員工編號','取消交易日期'];
+    const headers=rows.map((r,i)=>({names:r.map(c=>String(c).trim()),i})).filter(r=>r.names.includes('序號')&&r.names.includes('店點代碼'));
+    if(headers.length!==1)throw new Error('無法辨識 SAR74 欄位');
+    const names=headers[0].names,h=headers[0].i;
+    // Keep the empty placeholders: the verified export metadata describes 29
+    // columns with blanks at 15/18, while earlier synthetic exports use 30.
+    const nonemptyNames=names.filter(Boolean);
+    const legacy30=names.length===30 && nonemptyNames.length===30;
+    const sar29=names.length===29 && names[15]==='' && names[18]==='' && nonemptyNames.length===27 &&
+      names[17]==='銷貨單號' && names[23]==='員工編號' && names[26]==='取消交易日期';
+    if((!legacy30&&!sar29) || new Set(nonemptyNames).size!==nonemptyNames.length || labels.some(n=>!names.includes(n)))throw new Error('無法辨識 SAR74 欄位');
+    const columns=Object.fromEntries(labels.map(n=>[n,names.indexOf(n)]));
+    const header=rows.slice(0,h).flat().join(' '),ranges=Array.from(header.matchAll(/(\d{3}\/\d{2}\/\d{2})\s*-\s*(\d{3}\/\d{2}\/\d{2})/g));
+    if(ranges.length!==1)throw new Error('SAR74 查詢期間缺漏或不唯一');
+    const start=roc(ranges[0][1]),end=roc(ranges[0][2]),period=monthPeriod(start.slice(0,7));
+    if(start!==period.start || end<start || end>period.end)throw new Error('SAR74 必須為選定月首日起的單月查詢期間');
+    const printed=header.match(/(\d{2})年(\d{2})月(\d{2})日\s+(\d{2}):(\d{2})/);
+    const statusAsOf=printed?date('20'+printed[1]+'-'+printed[2]+'-'+printed[3]):end;
+    if(statusAsOf<end || printed&&(Number(printed[4])>23||Number(printed[5])>59))throw new Error('SAR74 列印／取消核對日期無效');
+    const field=(r,label)=>unwrap(r[columns[label]]);
+    function transactionDate(value) {
+      if(!/^\d{7}$/.test(value))throw new Error('SAR74 日期必須為民國七碼');
+      return roc(value);
+    }
+    const records=[],serials=new Set();
+    rows.slice(h+1).forEach(r=>{
+      if(r.every(c=>!String(c).trim()))return;
+      if(r.length!==names.length)throw new Error('SAR74 欄位數衝突');
+      const nonempty=r.map(c=>String(c).trim()).filter(Boolean);
+      if(nonempty.length===2 && nonempty.includes('主管:') && nonempty.includes('製表:'))return;
+      const serial=field(r,'序號');
+      if(!/^[1-9]\d*$/.test(serial) || !Number.isSafeInteger(Number(serial)) || serials.has(serial))throw new Error('SAR74 序號無效或重複');
+      serials.add(serial);
+      const store=field(r,'店點代碼'),region=field(r,'區域別'),project=field(r,'專案類別'),seller=field(r,'員工編號');
+      if(!/^DNB\d{5}$/.test(store) || region!=='北一二B')throw new Error('SAR74 店碼或區域格式衝突');
+      if(!['單銷','RT','AQNP'].includes(project))throw new Error('SAR74 未知專案類別');
+      if(!/^[A-Za-z0-9]{5}$/.test(seller))throw new Error('SAR74 來源員編必須保留五碼英數字');
+      const recycle=field(r,'回收代碼/IMEI'),order=field(r,'銷貨單號');
+      if(!recycle || !order || recycle.length>100 || order.length>100)throw new Error('SAR74 缺少有效回收碼／銷貨單號');
+      const trade=transactionDate(field(r,'日期')),cancelValue=field(r,'取消交易日期');
+      const cancel=cancelValue?transactionDate(cancelValue):null;
+      if(trade<start || trade>end || cancel&&(cancel<trade || cancel>statusAsOf))throw new Error('SAR74 交易／取消日期與來源期間衝突');
+      // Preserve identifiers as source strings. Store verification and employee
+      // crosswalk are separate release prerequisites; no alias/prefix is inferred.
+      records.push({store_code:store,trade_date:trade,project:project,source_employee_id:seller,
+        recycle_code:recycle,order_number:order,cancel_date:cancel});
+    });
+    return {month:start.slice(0,7),source_start:start,source_end:end,status_as_of_date:statusAsOf,rule_id:RULE_ID,complete_nine_stores:false,header_column_count:names.length,
+      printed_at:printed?printed[0]:'',records:records};
+  }
+  return Object.freeze({STORES:STORES,RULE_ID:RULE_ID,monthPeriod:monthPeriod,storeName:storeName,build:build,parseSar74:parseSar74});
+})();
+if(typeof module!=='undefined'&&module.exports)module.exports=TradeinPerformanceCore;
+
+// Monthly performance has its own private registry; it never enters public price data.
+function tradeinPerformanceAuthorize_(payload) {
+  return privateDashboardTradeinReadBoundary_(payload, function() {
+
+  const id=privateDashboardCleanEmployeeId((payload || {}).employeeId);
+  const device=privateDashboardCleanDeviceId((payload || {}).deviceId);
+  const lookup=privateDashboardUserByEmployeeId(id);
+  const trusted=privateDashboardIsTrustedEmployee(id);
+  if(!lookup.user || lookup.user.status!=='active' || !trusted && lookup.user.device_id!==device)
+    throw new Error('此員編或裝置尚未核准，無法讀取個人舊換新');
+  if(!trusted && !TradeinPerformanceCore.storeName(lookup.user.store))throw new Error('此員編不在九店範圍');
+  return {id:id,user:lookup.user,supervisor:trusted && lookup.user.role==='督導'};
+
+  });
+}
+function tradeinPerformanceRoster_() {
+  return privateDashboardRows(privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET,PRIVATE_DASHBOARD_USERS_HEADERS),PRIVATE_DASHBOARD_USERS_HEADERS)
+    .map(function(r){return {employee_id:r.employee_id,masked_name:r.masked_name,store:r.store,role:r.role,status:r.status};});
+}
+function tradeinPerformanceMonthRoster_(month) {
+  // Access roster authorizes viewing; it is not an HR/monthly-target source.
+  const period=TradeinPerformanceCore.monthPeriod(month);
+  const file=tradeinPerformanceFile_('north12b-tradein-monthly-roster-'+month+'.json');
+  if(!file)throw new Error('本月正式名冊／職務生效期間尚未核實，不能用登入名冊推算目標');
+  const basis=JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if(basis.schema_version!=='tradein-monthly-roster/v1' || basis.month!==month || basis.review_status!=='verified' ||
+     basis.rule_id!==TradeinPerformanceCore.RULE_ID || !/^[a-f0-9]{64}$/.test(basis.source_sha256 || '') || (!Array.isArray(basis.people) || !basis.people.length || basis.people.length>5000))
+    throw new Error('月名冊來源、月份或核定狀態不符');
+  const seen={},roles=['店長','代理店長','副店長','資深業務代表','業代','銷售人員','同仁','業務代表(I)','業務代表(II)','業務代表(III)'];
+  function validDate(v){return typeof v==='string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v+'T00:00:00Z')) && new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v;}
+  return basis.people.map(function(p){
+    if(typeof p.employee_id!=='string' || !/^[A-Z0-9]{7}$/.test(p.employee_id) || seen[p.employee_id] ||
+       !TradeinPerformanceCore.storeName(p.store) || !roles.includes(p.role) || !['active','inactive'].includes(p.status) ||
+       typeof p.masked_name!=='string' || !p.masked_name.trim() || !validDate(p.effective_from) ||
+       p.effective_to!==null && (!validDate(p.effective_to) || p.effective_to<p.effective_from))
+      throw new Error('月名冊身份、店點、職務或生效期間缺漏／衝突');
+    seen[p.employee_id]=true;
+    // Partial-month employment/role changes require an explicit reviewed policy.
+    // No proration, role inference or automatic monthly target is introduced here.
+    if(p.status==='active' && (p.effective_from>period.start || p.effective_to!==null && p.effective_to<period.end))
+      throw new Error('月中到離職／職務異動尚待核定，本批停止目標計算');
+    return {employee_id:p.employee_id,masked_name:p.masked_name,store:p.store,role:p.role,status:p.status,
+      effective_from:p.effective_from,effective_to:p.effective_to,monthly_basis_sha256:basis.source_sha256};
+  });
+}
+function tradeinPerformancePrivateReference_(source) {
+  if(!source || !/^[a-f0-9]{64}$/.test(source.source_sha256 || ''))throw new Error('來源雜湊無效');
+  const file=tradeinPerformanceFile_('north12b-tradein-reference-'+source.source_sha256+'.json');
+  if(!file)throw new Error('本批私有員編／店碼對照尚未配置，停止預覽與同步');
+  const value=JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  // Monthly actuals reset independently. Until cancellation attribution has
+  // been approved, this narrow policy only admits batches with no cancellations.
+  if(value.counting_review_status!=='verified' || value.counting_rule_id!==TradeinPerformanceCore.RULE_ID ||
+     value.counting_policy!=='monthly-reset-no-cancellations/v1')
+    throw new Error('每月重新計數口徑尚未核定，停止實績計算');
+  if(!Array.isArray(source.records) || source.records.some(function(r){return r.cancel_date!==null && r.cancel_date!==undefined && r.cancel_date!=='';}))
+    throw new Error('本批含取消交易；取消／跨月沖回月份尚待核定，整批停止同步');
+  return value;
+}
+function tradeinPerformanceFolder_() {
+  const folder=privateDashboardFolder();
+  if(folder.getSharingAccess()!==DriveApp.Access.PRIVATE || folder.getSharingPermission()!==DriveApp.Permission.NONE)
+    throw new Error('舊換新資料夾必須維持私有');
+  return folder;
+}
+function tradeinPerformanceFile_(name) {
+  const files=tradeinPerformanceFolder_().getFilesByName(name);let found=null;
+  while(files.hasNext()){if(found)throw new Error('舊換新私有資料檔重複');found=files.next();}return found;
+}
+function tradeinPerformanceRegistry_() {
+  const file=tradeinPerformanceFile_('north12b-tradein-performance-registry.json');
+  if(!file)return {schema_version:'tradein-performance-registry/v1',months:{}};
+  const registry=JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if(!registry || registry.schema_version!=='tradein-performance-registry/v1' || !registry.months)throw new Error('舊換新 registry 格式無效');
+  return registry;
+}
+function tradeinPerformanceHash_(value) {return privateDashboardHash(JSON.stringify(value));}
+function tradeinPerformanceSnapshot_(entry) {
+  if(!entry)return null;
+  const file=DriveApp.getFileById(entry.file_id),parents=file.getParents(),folderId=tradeinPerformanceFolder_().getId();
+  let inFolder=false;while(parents.hasNext()){if(parents.next().getId()===folderId)inFolder=true;}
+  if(!inFolder)throw new Error('舊換新快照不屬於指定私有資料夾');
+  const value=JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if(value.schema_version!=='tradein-performance/v1' || value.rule_id!==TradeinPerformanceCore.RULE_ID ||
+      tradeinPerformanceHash_(value)!==entry.snapshot_hash)throw new Error('舊換新私有快照版本或雜湊核對失敗');
+  return value;
+}
+function tradeinPerformanceProjection_(snapshot,auth) {
+  if(!snapshot)return null;
+  const people=snapshot.people.filter(function(p){return auth.supervisor || p.employee_key===auth.id;});
+  return {
+    schema_version:snapshot.schema_version,period_key:snapshot.period_key,rule_id:snapshot.rule_id,
+    target_period:snapshot.target_period,source_period:snapshot.source_period,source_cutoff_date:snapshot.source_cutoff_date,
+    cutoff_precision:snapshot.cutoff_precision,timezone:snapshot.timezone,published_at:snapshot.published_at,status_as_of_date:snapshot.status_as_of_date,
+    people:people.map(function(p){return {store:p.store,masked_name:p.masked_name,role:p.role,original_role:p.original_role,
+      actual_units:p.actual_units,target_units:p.target_units,remaining_units:p.remaining_units,attainment_status:p.attainment_status};}),
+    stores:auth.supervisor?snapshot.stores:[],summary:auth.supervisor?snapshot.summary:null
+  };
+}
+function tradeinPerformanceRead(payload) {
+  return privateDashboardTradeinReadBoundary_(payload, function() {
+
+  const auth=tradeinPerformanceAuthorize_(payload);
+  TradeinPerformanceCore.monthPeriod(payload.month);
+  const registry=tradeinPerformanceRegistry_(),entry=(registry.months[payload.month] || {}).active;
+  if(entry && entry.roster_hash!==tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(payload.month)))throw new Error('核定月名冊已變更，請管理者重新核對來源與月份；不以登入名冊回填');
+  const snapshot=tradeinPerformanceSnapshot_(entry);
+  return {snapshot:tradeinPerformanceProjection_(snapshot,auth),snapshotHash:entry?entry.snapshot_hash:null,
+    access:{mode:auth.supervisor?'supervisor':'self',allowedStores:auth.supervisor?TradeinPerformanceCore.STORES.map(function(s){return s[1];}):[],
+      maskedName:auth.user.masked_name,role:auth.user.role,store:TradeinPerformanceCore.storeName(auth.user.store)},
+    availableMonths:Object.keys(registry.months).sort()};
+
+  });
+}
+function tradeinPerformancePreview(payload) {
+  reportUploadAuthorize_(payload);
+  const roster=tradeinPerformanceMonthRoster_(payload.source.month),snapshot=tradeinPerformanceBuild_(payload.source,roster);
+  const current=(tradeinPerformanceRegistry_().months[snapshot.period_key] || {}).active;
+  return {snapshot:tradeinPerformanceProjection_(snapshot,{supervisor:true}),expectedActiveHash:current?current.snapshot_hash:null,
+    rosterHash:tradeinPerformanceHash_(roster),previewHash:tradeinPerformanceHash_(snapshot),sourceHash:snapshot.source_sha256};
+}
+function tradeinPerformanceBuild_(source,roster) {
+  const today=Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd');
+  if(source.source_end>today || source.status_as_of_date>today)throw new Error('來源或取消核對日期不可晚於今天');
+  return TradeinPerformanceCore.build(source,roster,tradeinPerformancePrivateReference_(source));
+}
+function tradeinPerformanceSaveRegistry_(registry) {
+  const name='north12b-tradein-performance-registry.json',file=tradeinPerformanceFile_(name),body=JSON.stringify(registry);
+  if(file)file.setContent(body);else tradeinPerformanceFolder_().createFile(name,body,MimeType.PLAIN_TEXT);
+}
+function tradeinPerformancePublish(payload) {
+  const operator=reportUploadAuthorize_(payload),lock=LockService.getScriptLock();lock.waitLock(10000);
+  try {
+    const roster=tradeinPerformanceMonthRoster_(payload.source.month);
+    if(tradeinPerformanceHash_(roster)!==payload.rosterHash)throw new Error('名冊已變更，請重新預覽');
+    const value=tradeinPerformanceBuild_(payload.source,roster),registry=tradeinPerformanceRegistry_();
+    if(payload.previewHash!==tradeinPerformanceHash_(value))throw new Error('來源或計算結果與預覽不同，請重新預覽');
+    const current=registry.months[value.period_key] || {active:null,previous:null};
+    const activeHash=current.active?current.active.snapshot_hash:null;
+    if(payload.expectedActiveHash!==activeHash)throw new Error('同期版本已變更，請重新預覽');
+    if(current.active && current.active.source_sha256===value.source_sha256 && current.active.roster_hash===payload.rosterHash) {
+      if(current.active.preview_hash!==payload.previewHash)throw new Error('相同來源雜湊的計算結果不同，請核對原檔後重新預覽');
+      return {status:'unchanged',snapshotHash:activeHash,snapshot:tradeinPerformanceProjection_(tradeinPerformanceSnapshot_(current.active),{supervisor:true})};
+    }
+    if(current.active && value.source_cutoff_date<current.active.source_cutoff_date)throw new Error('來源比目前版本舊，請使用回復功能');
+    value.published_at=privateDashboardNow();
+    const hash=tradeinPerformanceHash_(value),file=tradeinPerformanceFolder_().createFile(
+      'north12b-tradein-performance-'+value.period_key+'-'+hash.slice(0,16)+'.json',JSON.stringify(value),MimeType.PLAIN_TEXT);
+    const entry={file_id:file.getId(),snapshot_hash:hash,source_sha256:value.source_sha256,
+      source_cutoff_date:value.source_cutoff_date,roster_hash:payload.rosterHash,preview_hash:payload.previewHash,operator_hash:privateDashboardHash(operator)};
+    // Validate bytes before switching active. All historical files are retained.
+    tradeinPerformanceSnapshot_(entry);
+    registry.months[value.period_key]={active:entry,previous:current.active};
+    tradeinPerformanceSaveRegistry_(registry);
+    const readback=tradeinPerformanceRegistry_().months[value.period_key].active;
+    if(readback.snapshot_hash!==hash)throw new Error('保存後版本回讀核對失敗');
+    return {status:'published',snapshotHash:hash,snapshot:tradeinPerformanceProjection_(tradeinPerformanceSnapshot_(readback),{supervisor:true})};
+  } finally {lock.releaseLock();}
+}
+function tradeinPerformanceRollback(payload) {
+  reportUploadAuthorize_(payload);TradeinPerformanceCore.monthPeriod(payload.month);
+  const lock=LockService.getScriptLock();lock.waitLock(10000);
+  try {
+    const registry=tradeinPerformanceRegistry_(),current=registry.months[payload.month];
+    if(!current || !current.active || current.active.snapshot_hash!==payload.expectedActiveHash)throw new Error('版本已變更，請重新讀取');
+    if(!current.previous)throw new Error('本月沒有可回復的前一版');
+    tradeinPerformanceSnapshot_(current.previous);
+    const prior=current.active;current.active=current.previous;current.previous=prior;
+    tradeinPerformanceSaveRegistry_(registry);
+    const readback=tradeinPerformanceRegistry_().months[payload.month].active;
+    if(readback.snapshot_hash!==current.active.snapshot_hash)throw new Error('回復後版本核對失敗');
+    return {status:'rolled_back',snapshotHash:readback.snapshot_hash};
+  } finally {lock.releaseLock();}
+}
+
+// END TRADEIN PERFORMANCE MODULE
+
+// Auth ownership candidate. No transport, credentials, scopes, Properties
+// writes or trigger installation are supplied by this module. Missing approved
+// owner transport/provider fails closed; it never falls back to a peer roster.
+const PRIVATE_DASHBOARD_AUTH_OPERATIONS_ = [
+  'privateDashboardRequestBinding','privateDashboardRequestStatus',
+  'privateDashboardAccess','kpiCalcAccess','privateDashboardAdminRequests',
+  'privateDashboardAdminApprove','privateDashboardAdminRevoke',
+  'privateDashboardAdminRestoreEligibility','privateDashboardAdminSetTrustedEmployee',
+  'privateDashboardSyncRoster','phoneStockAuthorizeRead_','phoneStockAuthorizePublish_',
+  'threecAuthorizeRead_','privateDashboardThreecRead_'
+];
+let privateDashboardAuthFrames_ = [];
+
+function privateDashboardAuthBoundaryEnabled_() {
+  // Source-only boundary fixtures have no GAS release switch. Concrete GAS
+  // candidates preserve native A while off; only host-held synthetic Script
+  // identities may exercise adapters without enabling a real deployment.
+  return typeof PRIVATE_DASHBOARD_GAS_AUTH_RELEASE_ENABLED_ === 'undefined' ||
+    PRIVATE_DASHBOARD_GAS_AUTH_RELEASE_ENABLED_ === true ||
+    (typeof ScriptApp !== 'undefined' && /^SYNTHETIC_[A-Z_]+$/.test(String(ScriptApp.getScriptId())));
+}
+
+function privateDashboardAuthOwnerConfig_() {
+  const owner = String(privateDashboardProperties().getProperty('DASHBOARD_AUTH_OWNER_SCRIPT_ID') || '');
+  const current = String(ScriptApp.getScriptId() || '');
+  if (!/^[A-Za-z0-9_-]{12,120}$/.test(owner) || !/^[A-Za-z0-9_-]{12,120}$/.test(current)) {
+    throw new Error('AUTH_OWNER_CONFIGURATION_REQUIRED');
+  }
+  return { owner:owner, current:current };
+}
+
+function privateDashboardRequireAuthOwner_() {
+  if (!privateDashboardAuthBoundaryEnabled_()) return;
+  const config = privateDashboardAuthOwnerConfig_();
+  if (config.current !== config.owner) throw new Error('AUTH_OWNER_ONLY');
+}
+
+function privateDashboardAuthProvider_() {
+  privateDashboardRequireAuthOwner_();
+  if (typeof privateDashboardAuthNativeProvider_ !== 'function') throw new Error('AUTH_NATIVE_PROVIDER_REQUIRED');
+  const provider = privateDashboardAuthNativeProvider_();
+  if (!provider || typeof provider.assertNativeEntry !== 'function' ||
+      typeof provider.begin !== 'function' || typeof provider.complete !== 'function') {
+    throw new Error('AUTH_NATIVE_PROVIDER_REQUIRED');
+  }
+  return provider;
+}
+
+function privateDashboardAuthRun_(operation, args, run) {
+  if (!privateDashboardAuthBoundaryEnabled_()) return run();
+  const config = privateDashboardAuthOwnerConfig_();
+  const input = Array.prototype.slice.call(args);
+  if (config.current !== config.owner) {
+    if (PRIVATE_DASHBOARD_AUTH_OPERATIONS_.indexOf(operation) < 0 ||
+        typeof privateDashboardAuthOwnerTransport_ !== 'function') throw new Error('AUTH_OWNER_UNAVAILABLE');
+    // The endpoint/provider is host-held. No request field selects an owner.
+    if (operation === 'threecAuthorizeRead_' && typeof privateDashboardGasThreecPayload_ === 'function') {
+      if (input.length !== 1) throw new Error('AUTH_REQUEST_INVALID');
+      const payload = privateDashboardGasThreecPayload_(input[0]);
+      delete payload.kind; // The legacy helper never reads business data, even when its caller has kind.
+      const reply = privateDashboardAuthOwnerTransport_(config.owner,'privateDashboardThreecRead_',[payload]);
+      if (!reply || reply.employeeId !== payload.employeeId) throw new Error('AUTH_OWNER_DENIED');
+      return reply.employeeId;
+    }
+    return privateDashboardAuthOwnerTransport_(config.owner, operation, input);
+  }
+  return privateDashboardRosterTransaction_(function() {
+    const provider = privateDashboardAuthProvider_();
+    const frame = { operation:operation, args:input, receipt:null };
+    privateDashboardAuthFrames_.push(frame);
+    try {
+      provider.assertNativeEntry(operation, input);
+      const result = run();
+      SpreadsheetApp.flush();
+      if (frame.receipt) provider.complete(frame.receipt);
+      return result;
+    } finally {
+      // Failed native mutations retain their pending fence/deny. Only a
+      // successful, validated owner operation may complete that transition.
+      privateDashboardAuthFrames_.pop();
+    }
+  });
+}
+
+function privateDashboardAuthNativeBegin_(operation, args) {
+  if (!privateDashboardAuthBoundaryEnabled_()) return;
+  privateDashboardRequireAuthOwner_();
+  const frame = privateDashboardAuthFrames_[privateDashboardAuthFrames_.length - 1];
+  if (!frame || frame.operation !== operation || frame.receipt) throw new Error('AUTH_OWNER_OPERATION_REQUIRED');
+  frame.receipt = privateDashboardAuthProvider_().begin(operation, Array.prototype.slice.call(args));
+}
+
+function privateDashboardAuthResumeNative_(operation, employeeId) {
+  if (!privateDashboardAuthBoundaryEnabled_()) return false;
+  privateDashboardRequireAuthOwner_();
+  const frame = privateDashboardAuthFrames_[privateDashboardAuthFrames_.length - 1];
+  if (!frame || frame.operation !== operation) throw new Error('AUTH_OWNER_OPERATION_REQUIRED');
+  const provider = privateDashboardAuthProvider_();
+  return typeof provider.canResume === 'function' && provider.canResume(operation, employeeId) === true;
+}
+
+function privateDashboardAuthSheetKind_(sheet, headers) {
+  const name = sheet && typeof sheet.getName === 'function' ? String(sheet.getName()) : '';
+  const key = Array.isArray(headers) ? headers.join('|') : '';
+  if (name === PRIVATE_DASHBOARD_USERS_SHEET) return 'users';
+  if (name === PRIVATE_DASHBOARD_REQUESTS_SHEET) return 'requests';
+  if (key === PRIVATE_DASHBOARD_USERS_HEADERS.join('|') || key === PRIVATE_DASHBOARD_REQUEST_HEADERS.join('|')) {
+    throw new Error('AUTH_SHEET_IDENTITY_REQUIRED');
+  }
+  return '';
+}
+
+function privateDashboardAuthGuardSheet_(sheet, headers) {
+  const kind = privateDashboardAuthSheetKind_(sheet, headers);
+  if (!privateDashboardAuthBoundaryEnabled_()) return kind;
+  if (!kind) return '';
+  privateDashboardRequireAuthOwner_();
+  const expected = kind === 'users' ? PRIVATE_DASHBOARD_USERS_HEADERS : PRIVATE_DASHBOARD_REQUEST_HEADERS;
+  if (!Array.isArray(headers) || headers.join('|') !== expected.join('|')) throw new Error('AUTH_SHEET_SCHEMA_REQUIRED');
+  return kind;
+}
+
+function privateDashboardAuthGuardSheetName_(name, headers) {
+  if (name !== PRIVATE_DASHBOARD_USERS_SHEET && name !== PRIVATE_DASHBOARD_REQUESTS_SHEET) return;
+  privateDashboardAuthGuardSheet_({getName:function() { return name; }}, headers);
+}
+
+function privateDashboardAuthGuardRoster_(roster) {
+  if (!privateDashboardAuthBoundaryEnabled_()) return roster;
+  // Existing callers require these two methods only. Never expose a raw
+  // Spreadsheet/getSheets/getSheetById capability to a nonowner runtime.
+  const guard = function(name) {
+    if (name === PRIVATE_DASHBOARD_USERS_SHEET || name === PRIVATE_DASHBOARD_REQUESTS_SHEET) {
+      privateDashboardRequireAuthOwner_();
+    }
+  };
+  return {
+    getSheetByName:function(name) { guard(name); return roster.getSheetByName(name); },
+    insertSheet:function(name) { guard(name); return roster.insertSheet(name); }
+  };
+}
+
+// Candidate only. Every production entry remains disabled. Synthetic mode
+// additionally requires a synthetic ScriptApp identity, never a payload flag.
+const PRIVATE_DASHBOARD_GAS_AUTH_RELEASE_ENABLED_ = false;
+const PRIVATE_DASHBOARD_GAS_AUTH_STATE_KEY_ = 'DASHBOARD_AUTH_NATIVE_V1';
+const PRIVATE_DASHBOARD_GAS_AUTH_NONCE_PREFIX_ = 'DASHBOARD_AUTH_RPC_V1_';
+
+function privateDashboardGasAuthGate_(options) {
+  const synthetic = options && options.mode === 'LOCAL_SYNTHETIC_ONLY' &&
+    /^SYNTHETIC_[A-Z_]+$/.test(String(ScriptApp.getScriptId()));
+  if (!synthetic && PRIVATE_DASHBOARD_GAS_AUTH_RELEASE_ENABLED_ !== true) throw new Error('AUTH_RELEASE_DISABLED');
+  return synthetic;
+}
+
+function privateDashboardGasAuthDigest_(value) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value))
+    .map(function(b) { return ('0' + ((b + 256) % 256).toString(16)).slice(-2); }).join('');
+}
+
+function privateDashboardGasAuthJson_(value, maxBytes) {
+  const text = JSON.stringify(value);
+  if (typeof text !== 'string' || encodeURIComponent(text).replace(/%[A-F0-9]{2}/g, 'x').length > maxBytes) {
+    throw new Error('AUTH_CAPACITY');
+  }
+  return text;
+}
+
+function privateDashboardCreateGasAuthStore_(options) {
+  privateDashboardGasAuthGate_(options);
+  privateDashboardRequireAuthOwner_();
+  const config = privateDashboardAuthOwnerConfig_();
+  const props = options.properties || privateDashboardProperties();
+  const now = options.now || function() { return Date.now(); };
+  function writeChecked(key, value) {
+    const text = privateDashboardGasAuthJson_(value, 8000);
+    props.setProperty(key, text);
+    if (props.getProperty(key) !== text) throw new Error('AUTH_PERSISTENCE_FAILED');
+  }
+  function readState() {
+    const text = props.getProperty(PRIVATE_DASHBOARD_GAS_AUTH_STATE_KEY_);
+    if (!text || text.length > 8000) throw new Error('AUTH_STATE_REQUIRED');
+    let state;
+    try { state = JSON.parse(text); } catch (_) { throw new Error('AUTH_STATE_INVALID'); }
+    if (!state || Object.keys(state).sort().join('|') !== 'owner|revision|subjects|v' || state.v !== 1 ||
+        state.owner !== config.owner || !Number.isSafeInteger(state.revision) || state.revision < 0 ||
+        !state.subjects || Array.isArray(state.subjects) || typeof state.subjects !== 'object' ||
+        Object.keys(state.subjects).length > 64) throw new Error('AUTH_STATE_INVALID');
+    Object.keys(state.subjects).forEach(function(id) {
+      const row = state.subjects[id];
+      if (!/^[A-Z0-9]{5,12}$/.test(id) || !row || Object.keys(row).sort().join('|') !== 'denied|generation|pending' ||
+          !Number.isSafeInteger(row.generation) || row.generation < 0 || typeof row.denied !== 'boolean' ||
+          row.pending !== null && (!row.pending || Object.keys(row.pending).sort().join('|') !== 'intent|operation|version' ||
+            !Number.isInteger(row.pending.operation) || row.pending.operation < 0 || row.pending.operation > 3 ||
+            row.pending.version !== row.generation || !/^[a-f0-9]{32}$/.test(row.pending.intent))) {
+        throw new Error('AUTH_STATE_INVALID');
+      }
+    });
+    return state;
+  }
+  function transaction(run) {
+    return privateDashboardRosterTransaction_(function() {
+      const state = readState(), result = run(state);
+      if (result && typeof result.then === 'function') throw new Error('AUTH_ASYNC_TRANSACTION_FORBIDDEN');
+      state.revision++;
+      if (!Number.isSafeInteger(state.revision)) throw new Error('AUTH_CAPACITY');
+      writeChecked(PRIVATE_DASHBOARD_GAS_AUTH_STATE_KEY_, state);
+      return result;
+    });
+  }
+  function read(run) { return privateDashboardRosterTransaction_(function() { return run(readState()); }); }
+  function consumeRequest(requestId, issuedAt) {
+    // Sixteen bounded buckets; no getProperties(), credential reads, persisted
+    // request bodies, responses, actor names, devices or credential digests.
+    return privateDashboardRosterTransaction_(function() {
+      const current = now();
+      if (!/^[A-Za-z0-9_-]{20,80}$/.test(requestId) || !Number.isSafeInteger(issuedAt) ||
+          issuedAt > current + 30000 || issuedAt < current - 120000) throw new Error('AUTH_REQUEST_EXPIRED');
+      const digest = privateDashboardGasAuthDigest_(requestId), key = PRIVATE_DASHBOARD_GAS_AUTH_NONCE_PREFIX_ + digest[0];
+      const text = props.getProperty(key);
+      if (!text || text.length > 8000) throw new Error('AUTH_REPLAY_STATE_REQUIRED');
+      let bucket;
+      try { bucket = JSON.parse(text); } catch (_) { throw new Error('AUTH_REPLAY_STATE_INVALID'); }
+      if (!bucket || Object.keys(bucket).sort().join('|') !== 'entries|owner|v' || bucket.v !== 1 ||
+          bucket.owner !== config.owner || !Array.isArray(bucket.entries) || bucket.entries.length > 64 ||
+          bucket.entries.some(function(e) { return !Array.isArray(e) || e.length !== 2 ||
+            !/^[a-f0-9]{64}$/.test(e[0]) || e[0][0] !== digest[0] || !Number.isSafeInteger(e[1]); }) ||
+          new Set(bucket.entries.map(function(e) { return e[0]; })).size !== bucket.entries.length) throw new Error('AUTH_REPLAY_STATE_INVALID');
+      bucket.entries = bucket.entries.filter(function(e) { return e[1] >= current; });
+      if (bucket.entries.some(function(e) { return e[0] === digest; })) throw new Error('AUTH_REPLAY_DENIED');
+      if (bucket.entries.length >= 64) throw new Error('AUTH_CAPACITY');
+      // Retain beyond the maximum accepted request timestamp lifetime, including
+      // clock skew. The nonce is consumed before the native operation can write.
+      bucket.entries.push([digest, issuedAt + 150000]);
+      writeChecked(key, bucket);
+    });
+  }
+  readState();
+  return Object.freeze({transaction:transaction,read:read,consumeRequest:consumeRequest});
+}
+
+// GAS-native native-authority provider. No Node APIs, new KDF, credentials,
+// logging, resource creation, implicit initialization or cross-project stores.
+function privateDashboardCreateGasAuthProvider_(options) {
+  privateDashboardGasAuthGate_(options);
+  privateDashboardRequireAuthOwner_();
+  const store = options.store;
+  if (!store || typeof store.transaction !== 'function' || typeof store.read !== 'function') throw new Error('AUTH_STATE_REQUIRED');
+  const mutations = ['privateDashboardAdminRevoke','privateDashboardAdminRestoreEligibility','privateDashboardSyncRoster','privateDashboardAdminSetTrustedEmployee'];
+  const receipts = new WeakSet(), snapshots = new WeakSet();
+  const canonical = function(id) { return privateDashboardCleanEmployeeId(id); };
+  const nativeUsers = function() {
+    return privateDashboardRows(privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET, PRIVATE_DASHBOARD_USERS_HEADERS), PRIVATE_DASHBOARD_USERS_HEADERS);
+  };
+  function subject(state, id) {
+    if (!Object.prototype.hasOwnProperty.call(state.subjects, id)) {
+      if (Object.keys(state.subjects).length >= 64) throw new Error('AUTH_CAPACITY');
+      state.subjects[id] = {generation:0,denied:false,pending:null};
+    }
+    return state.subjects[id];
+  }
+  function assertEmployee(id) {
+    return store.read(function(state) {
+      const row = state.subjects[id];
+      if (row && (row.denied || row.pending)) throw new Error('NATIVE_ELIGIBILITY_DENIED');
+      return true;
+    });
+  }
+  function intent(operation, id, payload) {
+    const target = operation === 2 ? (payload.members || []).filter(function(m) { return canonical(m.employeeId) === id; })[0] : null;
+    const meaning = operation === 2 ? [id,String(target.store || ''),String(target.role || ''),target.status === 'inactive' ? 'inactive' : 'active'] :
+      operation === 3 ? [canonical(payload.employeeId)] : [id];
+    return privateDashboardGasAuthDigest_(JSON.stringify(meaning)).slice(0,32);
+  }
+  function begin(operation, args) {
+    const code = mutations.indexOf(operation), payload = args[0] || {};
+    if (code < 0) throw new Error('NATIVE_OPERATION_INVALID');
+    return store.transaction(function(state) {
+      let ids;
+      if (code === 2) {
+        const previous = Object.create(null);
+        nativeUsers().forEach(function(row) { previous[row.employee_id] = row; });
+        ids = (payload.members || []).filter(function(m) {
+          const id = canonical(m.employeeId), row = previous[id], current = state.subjects[id];
+          return (!row || row.status !== 'revoked') && (current && current.pending && current.pending.operation === code ||
+            !row || row.status !== (m.status === 'inactive' ? 'inactive' : 'active') || row.store !== String(m.store || '') || row.role !== String(m.role || ''));
+        }).map(function(m) { return canonical(m.employeeId); });
+      } else if (code === 3) {
+        const target = canonical(payload.employeeId), fingerprint = intent(code, target, payload);
+        ids = [privateDashboardProperties().getProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID'), target].filter(Boolean).map(canonical);
+        // The prior trusted property may already have changed before a failure.
+        Object.keys(state.subjects).forEach(function(id) {
+          const pending = state.subjects[id].pending;
+          if (pending && pending.operation === code && pending.intent === fingerprint) ids.push(id);
+        });
+      } else ids = [canonical(payload.employeeId)];
+      ids = Array.from(new Set(ids));
+      if (!ids.length) return null;
+      ids.forEach(function(id) {
+        const row = subject(state, id), fingerprint = intent(code, id, payload);
+        if (code > 1 && row.pending && (row.pending.operation !== code || row.pending.intent !== fingerprint)) throw new Error('NATIVE_TRANSITION_CONFLICT');
+      });
+      const versions = ids.map(function(id) {
+        const row = subject(state, id); row.generation++;
+        if (!Number.isSafeInteger(row.generation)) throw new Error('AUTH_CAPACITY');
+        if (code < 2) row.denied = true;
+        row.pending = {operation:code,version:row.generation,intent:intent(code,id,payload)};
+        return row.generation;
+      });
+      const receipt = Object.freeze({operation:code,ids:ids,versions:versions});
+      receipts.add(receipt); return receipt;
+    });
+  }
+  function complete(receipt) {
+    if (!receipts.has(receipt)) throw new Error('NATIVE_RECEIPT_REQUIRED');
+    store.transaction(function(state) {
+      receipt.ids.forEach(function(id,index) {
+        const row = state.subjects[id];
+        if (!row || !row.pending || row.pending.operation !== receipt.operation ||
+            row.pending.version !== receipt.versions[index] || row.generation !== receipt.versions[index]) throw new Error('NATIVE_TRANSITION_REQUIRED');
+      });
+      receipt.ids.forEach(function(id) {
+        const row = state.subjects[id]; row.generation++;
+        if (!Number.isSafeInteger(row.generation)) throw new Error('AUTH_CAPACITY');
+        if (receipt.operation === 1) row.denied = false;
+        row.pending = null;
+      });
+    });
+    receipts.delete(receipt);
+  }
+  function assertNativeEntry(operation, args) {
+    const payload = args[0] || {}, reads = ['privateDashboardAccess','kpiCalcAccess','privateDashboardRequestBinding','privateDashboardRequestStatus',
+      'privateDashboardRecordLogin_','phoneStockTrustedUser_','phoneStockAuthorizeRead_','phoneStockAuthorizePublish_','threecAuthorizeRead_','privateDashboardThreecRead_','departmentGoldAuthorizedUser_'];
+    let id = reads.indexOf(operation) >= 0 ? operation === 'privateDashboardRecordLogin_' ? payload : payload.employeeId : null;
+    if (operation === 'kpiCalcSetupSelf') id = privateDashboardProperties().getProperty('DASHBOARD_TRUSTED_EMPLOYEE_ID');
+    if (operation === 'privateDashboardAdminApprove') {
+      privateDashboardAdminAuthorized(payload);
+      const requests = privateDashboardRows(privateDashboardSheet(PRIVATE_DASHBOARD_REQUESTS_SHEET, PRIVATE_DASHBOARD_REQUEST_HEADERS),PRIVATE_DASHBOARD_REQUEST_HEADERS);
+      const request = requests.filter(function(r) { return r.request_id === payload.requestId; })[0];
+      id = request && request.employee_id;
+    }
+    if (id) assertEmployee(canonical(id));
+  }
+  function capture(employee) {
+    const id = canonical(employee);
+    return privateDashboardRosterTransaction_(function() {
+      assertEmployee(id);
+      const user = privateDashboardUserByEmployeeId(id).user;
+      if (user && user.status !== 'active') throw new Error('NATIVE_ELIGIBILITY_DENIED');
+      const snapshot = store.read(function(state) { return Object.freeze({employee:id,generation:(state.subjects[id] || {}).generation || 0}); });
+      snapshots.add(snapshot); return snapshot;
+    });
+  }
+  function commit(snapshot, run) {
+    if (!snapshots.has(snapshot) || typeof run !== 'function') throw new Error('AUTH_SNAPSHOT_REQUIRED');
+    return privateDashboardRosterTransaction_(function() {
+      assertEmployee(snapshot.employee);
+      const user = privateDashboardUserByEmployeeId(snapshot.employee).user;
+      if (user && user.status !== 'active') throw new Error('NATIVE_ELIGIBILITY_DENIED');
+      return store.read(function(state) {
+        if (((state.subjects[snapshot.employee] || {}).generation || 0) !== snapshot.generation) throw new Error('AUTH_GENERATION_CHANGED');
+        const result = run();
+        if (result && typeof result.then === 'function') throw new Error('AUTH_ASYNC_TRANSACTION_FORBIDDEN');
+        return result;
+      });
+    });
+  }
+  return Object.freeze({assertNativeEntry:assertNativeEntry,begin:begin,complete:complete,
+    canResume:function(operation,id) { return operation === mutations[1] && store.read(function(state) {
+      const row = state.subjects[canonical(id)];return Boolean(row && row.denied && row.pending && row.pending.operation === 1);
+    }); },
+    capture:capture,commit:commit,withEligibility:function(id,run) { return commit(capture(id),run); },
+    // Host-only source for the existing verifier/session core. It cannot be
+    // selected, overridden or supplied as a generation by an RPC caller.
+    currentGeneration:function(employee) { const id=canonical(employee);return store.read(function(state) { return (state.subjects[id] || {}).generation || 0; }); },
+    eligibilityStatus:function(employee) { const id=canonical(employee);return privateDashboardRosterTransaction_(function() {
+      return store.read(function(state) {
+        const row=state.subjects[id],user=privateDashboardUserByEmployeeId(id).user;
+        return row && (row.denied || row.pending) || user && user.status !== 'active' ? 'blocked' : 'allowed';
+      });
+    }); }
+  });
+}
+
+// Owner-local adapter derived from the native store/provider wiring.
+// No RPC, peer transport, B/password endpoint, implicit state initialization,
+// settings values, resource creation, triggers or authority extension.
+let privateDashboardOwnerLocalProviderInstance_ = null;
+function privateDashboardAuthNativeProvider_() {
+  privateDashboardGasAuthGate_({});
+  privateDashboardRequireAuthOwner_();
+  if (!privateDashboardOwnerLocalProviderInstance_) {
+    const store = privateDashboardCreateGasAuthStore_({});
+    privateDashboardOwnerLocalProviderInstance_ = privateDashboardCreateGasAuthProvider_({store:store});
+  }
+  return privateDashboardOwnerLocalProviderInstance_;
+}
+
+function privateDashboardTradeinReadBoundary_(payload, read) {
+  if (!privateDashboardAuthBoundaryEnabled_()) return read();
+  privateDashboardRequireAuthOwner_();
+  const id = privateDashboardCleanEmployeeId((payload || {}).employeeId);
+  return privateDashboardAuthProvider_().withEligibility(id, read);
 }

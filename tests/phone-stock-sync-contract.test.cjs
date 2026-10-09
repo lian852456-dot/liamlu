@@ -17,7 +17,10 @@ function service() {
     privateDashboardUserByEmployeeId:()=>({user:{status:'active',device_id:'approved-device'}}),
     privateDashboardIsTrustedEmployee:value=>value==='LIAM',privateDashboardProperties:()=>props,privateDashboardFolder:()=>folder,
     DriveApp:{getFileById:id=>files.get(id)},LockService:{getScriptLock:()=>({waitLock:()=>{},releaseLock:()=>{}})},MimeType:{PLAIN_TEXT:'text/plain'},console};
-  vm.createContext(context);vm.runInContext(code.slice(start,end),context);
+  vm.createContext(context);
+  // Load the shipped, disabled owner boundary rather than bypass its wrapper.
+  vm.runInContext(code.slice(code.indexOf('// Auth ownership candidate.')),context);
+  vm.runInContext(code.slice(start,end),context);
   return context;
 }
 

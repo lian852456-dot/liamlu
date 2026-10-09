@@ -13,6 +13,27 @@ on:
       - 'tests/home.spec.js'
       - 'tests/home-reminder-model.test.cjs'
       - 'tests/home-navigation-contract.test.cjs'
+      - 'tradein-progress.html'
+      - 'tradein-progress.css'
+      - 'tradein-progress.mjs'
+      - 'tradein-performance-core.js'
+      - 'tradein-export-core.mjs'
+      - 'tradein-export-ui.mjs'
+      - 'tests/tradein-performance.test.cjs'
+      - 'tests/tradein-performance-ui.spec.js'
+      - 'gas/Code.gs'
+      - 'gas/TradeinPerformance.gs'
+      - 'scripts/build-tradein-gas.mjs'
+      - 'tests/tradein-owner-fence.test.cjs'
+      - 'tests/tradein-sar74-parser.test.cjs'
+      - 'tests/tradein-private-reference.test.cjs'
+      - 'tests/tradein-reference-fixture.cjs'
+      - 'tests/tradein-monthly-basis.test.cjs'
+      - 'tests/tradein-source-preview.test.cjs'
+      - 'tests/tradein-upload-integration.spec.js'
+      - 'tests/helpers/tradein-synthetic-runtime.cjs'
+      - 'scripts/preview-sar74.mjs'
+      - 'tests/phone-stock-sync-contract.test.cjs'
       - 'tests/department-ops.test.cjs'
       - 'playwright.config.js'
       - 'package.json'
@@ -51,7 +72,10 @@ jobs:
         run: |
           git rev-parse HEAD
           node --check home.js
-          node --test tests/home-reminder-model.test.cjs tests/home-navigation-contract.test.cjs tests/department-ops.test.cjs tests/patrol-question-versions.test.cjs tests/patrol-dashboard-contract.test.cjs tests/patrol-dashboard-client.test.cjs
+          node --test tests/home-reminder-model.test.cjs tests/home-navigation-contract.test.cjs tests/department-ops.test.cjs tests/patrol-question-versions.test.cjs tests/patrol-dashboard-contract.test.cjs tests/patrol-dashboard-client.test.cjs tests/tradein-performance.test.cjs
+          node -e "new Function(require('fs').readFileSync('gas/Code.gs', 'utf8'))"
+          node --test tests/tradein-owner-fence.test.cjs tests/phone-stock-sync-contract.test.cjs tests/threec-private-runtime.test.cjs
+          node --test tests/tradein-sar74-parser.test.cjs tests/tradein-private-reference.test.cjs tests/tradein-monthly-basis.test.cjs tests/tradein-source-preview.test.cjs
       - name: Run isolated homepage browser checks
         env:
           TEST_BASE_URL: http://127.0.0.1:4173/
@@ -67,7 +91,7 @@ jobs:
           # synthetic credentials/data only. No production login or data write.
           # Repeat exact 5-second pause/resume boundaries before the full suite.
           npx playwright test tests/home.spec.js --grep '提醒每 5 秒輪播|提醒滑鼠停留|滑鼠點擊可暫停' --repeat-each=5 --workers=1 --reporter=list --output=test-results/rotation-stability
-          npx playwright test tests/home.spec.js --workers=1 --reporter=list,html
+          npx playwright test tests/home.spec.js tests/tradein-performance-ui.spec.js tests/tradein-upload-integration.spec.js tests/tradein-area-ui.spec.js tests/tradein-area-pending-ui.spec.js --workers=1 --reporter=list,html
       - name: Save screenshots and browser test report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
