@@ -1,0 +1,104 @@
+{
+  "schema": "owner-local-full-read-handoff/v1",
+  "status": "PUBLIC_CODE_HANDOFF_ONLY_FORMAL_GATE_OFF",
+  "base": {
+    "repository": "https://github.com/lian852456-dot/liamlu",
+    "commit": "4d9da62f62f5c3dab164cdbaf162ac0ac8180f9d",
+    "path": "gas/Code.gs",
+    "sha256": "52e79ab8c25ed3ec9d1e51695aa9ef6140fdb93daac31d942bd1d4a8b0225aeb",
+    "characters": 303791
+  },
+  "sourceReference": {
+    "localOnlyCommit": "e857c5f980441d93c1ca1377217d13ef498fa7bd",
+    "notNeededByConsumer": true,
+    "modules": "local-candidates/dual-track-integration/single-writer"
+  },
+  "dependencyOrder": [
+    "01-native-owner-foundation.patch",
+    "02-work-full-read-fence.patch"
+  ],
+  "phase1": {
+    "sha256": "ace0ff55d51d26d7367f6ec6c6944037bc3abc9319443cbbd3bbb2413dfb9479",
+    "changedFunctions": [
+      "doPost",
+      "privateDashboardRoster",
+      "privateDashboardSheet",
+      "privateDashboardRows",
+      "privateDashboardWriteObject",
+      "setupPrivateDashboard",
+      "privateDashboardUserByEmployeeId",
+      "privateDashboardRequestBinding",
+      "privateDashboardRequestStatus",
+      "privateDashboardAccess",
+      "phoneStockTrustedUser_",
+      "phoneStockAuthorizeRead_",
+      "phoneStockAuthorizePublish_",
+      "departmentGoldAuthorizedUser_",
+      "threecAuthorizeRead_",
+      "privateDashboardAdminRequests",
+      "privateDashboardAdminApprove",
+      "privateDashboardAdminRevoke",
+      "privateDashboardAdminSetTrustedEmployee",
+      "kpiCalcAccess",
+      "kpiCalcSetupSelf",
+      "privateDashboardSyncRoster"
+    ],
+    "addedFunctions": [
+      "privateDashboardRosterTransaction_",
+      "privateDashboardRecordLogin_",
+      "privateDashboardAdminRestoreEligibility",
+      "privateDashboardAuthBoundaryEnabled_",
+      "privateDashboardAuthOwnerConfig_",
+      "privateDashboardRequireAuthOwner_",
+      "privateDashboardAuthProvider_",
+      "privateDashboardAuthRun_",
+      "privateDashboardAuthNativeBegin_",
+      "privateDashboardAuthResumeNative_",
+      "privateDashboardAuthSheetKind_",
+      "privateDashboardAuthGuardSheet_",
+      "privateDashboardAuthGuardSheetName_",
+      "privateDashboardAuthGuardRoster_",
+      "privateDashboardGasAuthGate_",
+      "privateDashboardGasAuthDigest_",
+      "privateDashboardGasAuthJson_",
+      "privateDashboardCreateGasAuthStore_",
+      "privateDashboardCreateGasAuthProvider_",
+      "privateDashboardAuthNativeProvider_"
+    ],
+    "nativeInversePreservation": true,
+    "releaseEnabled": false,
+    "newOwnerRpc": false,
+    "newBEndpoint": false
+  },
+  "phase2": {
+    "sha256": "2a74d015e527247950a0a9b14bf5dfef205bfafa192764623edc86a9a5001e43",
+    "changedFunctions": [
+      "tradeinPerformanceAuthorize_",
+      "tradeinPerformanceRead"
+    ],
+    "addedFunctions": [
+      "privateDashboardTradeinReadBoundary_"
+    ],
+    "everyOtherBytePreserved": true
+  },
+  "moduleHashes": {
+    "AuthOwnerBoundary.gs": "bbce9ac3eda6dceb4838fe3efd362bc7773e62355285440efaa84a08d39babcf",
+    "GasAuthStore.gs": "0459137bc25c614a17f9ac35fe97a098bcf648591f26fea83dac5de6a3aaa7e4",
+    "GasAuthProvider.gs": "36cd78030d09f4ecdde6eeb251b778a44fcc5da102fb68c28fb3bc612fffee0b",
+    "OwnerLocalProvider.gs": "aabf3665fe5595fbceeede99b18212845aaefc065dc806b4ad66a702aa48fdd8"
+  },
+  "assembly": "Patches already embed modules. Do not append module copies again.",
+  "runtimeDependencies": [
+    "Existing native GAS service APIs",
+    "Existing base native auth/roster helpers",
+    "Existing TradeinPerformanceCore and private tradein registry/snapshot/projection helpers"
+  ],
+  "remainingGates": [
+    "Fresh owner source/function drift review",
+    "Single actual owner deployment location",
+    "Approved native persistent eligibility state; no implicit creation or reset",
+    "Native writer inventory and deny-preserving recovery",
+    "Positive/negative formal runtime validation and deployment approval"
+  ],
+  "bRightsExpanded": false
+}

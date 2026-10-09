@@ -33,11 +33,13 @@ employeeId canonical 5–12 位大寫英數，deviceId 16–128 位原識別。p
 
 上層 e857c5f frontend shell 負責 A/B 切換、頁面恢復重驗、逾時／晚回應清空與完整資料來源批次核對。此處 transport 不是整套 frontend shell 的替代品；不能只貼此檔就宣稱登入接線完成。
 
-## WORK owner read 示例
+## WORK owner 完整純碼套件
 
-`owner-read-boundary.example.patch` 保留 WORK 原 business body，包住 Authorize **及完整 Read**：off 原樣；enabled 僅容許當前 auth owner，在同 ScriptLock/withEligibility transaction 保持 native fence，直到 registry/snapshot/readback/角色投影完成。callback 由 host code 提供，不能由 JSON/RPC 指定。
+原 owner-read-boundary.example.patch 只是示例，缺少依賴，不能單獨採用。新增 [owner-code-20261009](owner-code-20261009/README.md) 提供相對公開 PR179 4d9da62 的 01 foundation／02 完整 read fence；兩份 patch 已包含四件純碼模組，不要再追加 modules 或疊舊示例。完整 helper／store／provider 的存在與依賴已驗證，UI owner 獨立 dry-apply、GS 語法與 16 個合成案例通過。
 
-示例需 owner 在 fresh source 核對 `privateDashboardAuthBoundaryEnabled_`、`privateDashboardRequireAuthOwner_`、`privateDashboardAuthProvider_().withEligibility` 已完整接入且經測試；不是 standalone 後端。WORK 若部署於 peer，不能繞過 raw roster guard；需另定完整 owner-executed read operation，這份示例不新增該 RPC。
+新套件只支援 WORK 在實際 auth owner 執行，包住原 Authorize 與完整 Read，保持同一 reentrant ScriptLock 至 registry/hash/snapshot/原角色投影及回應建構完成。原 A 裝置／trusted／self規則保留；缺合法 state、owner 不符、pending／deny／generation 改變均拒絕。peer 路徑仍需另外完整 owner-executed operation，本套件沒有新增此 RPC。
+
+正式 source drift、native state／writer inventory、grant／runtime／部署／回復仍須 owner 核實。新增碼公開批准不是正式啟用批准，也沒有新增 B 的 WORK 權限。
 
 ## 尚未完成的 gate
 
