@@ -43,7 +43,12 @@ test('私有保存投影不保留交易或客戶識別欄',()=>{
 function api(){
   const context={TradeinPerformanceCore:C,privateDashboardCleanEmployeeId:v=>v,privateDashboardCleanDeviceId:v=>{if(!v)throw new Error('device');return v;},
     privateDashboardIsTrustedEmployee:id=>id==='supervisor',privateDashboardUserByEmployeeId:id=>({user:({staff:{employee_id:'5512345',status:'active',device_id:'approved',store:'台北萬大',role:'業務代表(I)'},supervisor:{status:'active',store:'北一二B',role:'督導'}})[id]})};
-  vm.createContext(context);vm.runInContext(fs.readFileSync(require.resolve('../gas/TradeinPerformance.gs'),'utf8'),context);return context;
+  vm.createContext(context);
+  // Exercise the real gate-off owner boundary for the original business tests.
+  // Enabled pending/deny/generation behavior is covered by tradein-owner-fence.
+  const gas=fs.readFileSync(require.resolve('../gas/Code.gs'),'utf8');
+  vm.runInContext(gas.slice(gas.indexOf('// Auth ownership candidate.')),context);
+  vm.runInContext(fs.readFileSync(require.resolve('../gas/TradeinPerformance.gs'),'utf8'),context);return context;
 }
 test('後端拒絕未登入、錯誤裝置，不接受前端role擴權',()=>{
   const a=api();assert.throws(()=>a.tradeinPerformanceAuthorize_({employeeId:'missing',deviceId:'approved'}));

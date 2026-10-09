@@ -1,5 +1,7 @@
 // Monthly performance has its own private registry; it never enters public price data.
 function tradeinPerformanceAuthorize_(payload) {
+  return privateDashboardTradeinReadBoundary_(payload, function() {
+
   const id=privateDashboardCleanEmployeeId((payload || {}).employeeId);
   const device=privateDashboardCleanDeviceId((payload || {}).deviceId);
   const lookup=privateDashboardUserByEmployeeId(id);
@@ -8,6 +10,8 @@ function tradeinPerformanceAuthorize_(payload) {
     throw new Error('此員編或裝置尚未核准，無法讀取個人舊換新');
   if(!trusted && !TradeinPerformanceCore.storeName(lookup.user.store))throw new Error('此員編不在九店範圍');
   return {id:id,user:lookup.user,supervisor:trusted && lookup.user.role==='督導'};
+
+  });
 }
 function tradeinPerformanceRoster_() {
   return privateDashboardRows(privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET,PRIVATE_DASHBOARD_USERS_HEADERS),PRIVATE_DASHBOARD_USERS_HEADERS)
@@ -62,6 +66,8 @@ function tradeinPerformanceProjection_(snapshot,auth) {
   };
 }
 function tradeinPerformanceRead(payload) {
+  return privateDashboardTradeinReadBoundary_(payload, function() {
+
   const auth=tradeinPerformanceAuthorize_(payload);
   TradeinPerformanceCore.monthPeriod(payload.month);
   const registry=tradeinPerformanceRegistry_(),entry=(registry.months[payload.month] || {}).active;
@@ -71,6 +77,8 @@ function tradeinPerformanceRead(payload) {
     access:{mode:auth.supervisor?'supervisor':'self',allowedStores:auth.supervisor?TradeinPerformanceCore.STORES.map(function(s){return s[1];}):[],
       maskedName:auth.user.masked_name,role:auth.user.role,store:TradeinPerformanceCore.storeName(auth.user.store)},
     availableMonths:Object.keys(registry.months).sort()};
+
+  });
 }
 function tradeinPerformancePreview(payload) {
   reportUploadAuthorize_(payload);

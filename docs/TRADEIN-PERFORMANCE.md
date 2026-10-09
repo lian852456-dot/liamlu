@@ -28,7 +28,9 @@
 
 ## 私有資料與登入
 
-`tradein_performance_read` 原候選僅驗證 active 員編與核准裝置，沿用私有戰情的 trusted 規則；這不足以證明 pending／deny／撤銷與登入候選相容。需先取得登入 owner 的完整讀取介面、狀態契約及示例 patch，再對接 `tradeinPerformanceAuthorize_`，不能自行增加另一套登入或變更權限。一般同仁、店長與代理只回傳本人；只有既有登入契約授權且名冊職務為督導者才可回傳九店。前端傳入role或範圍不能擴權。
+`tradein_performance_read` 已依 owner 公開交接的 01／02 修補接入完整讀取 fence；不疊加舊 example。`tradeinPerformanceAuthorize_` 與完整 `tradeinPerformanceRead` 共用 host-only `privateDashboardTradeinReadBoundary_`，capture／commit 重驗 native generation、pending／deny 及撤銷，commit 持有同一可重入 ScriptLock 至 registry、snapshot、roster hash、投影與回應完成。release gate 仍為 false，正式環境尚未啟用此 fence；本機合成驗證不能代替正式驗收。
+
+一般同仁、店長與代理仍只回傳本人；只有原 A trusted 身份且名冊職務為督導者才回傳九店。原核准裝置規則保持，前端 role 或範圍不能擴權。未引入 B 登入、bearer proof、WORK RPC、peer transport 或自動 state 初始化。此交接只支援 WORK 與 auth owner 在同一 GAS 專案；peer 執行完整 read 或 raw roster 在 gate 啟用後拒絕。
 
 讀取投影不包含員編、回收碼、銷貨單號、顧客資訊、來源檔案或私有Drive識別。正式資料不提交GitHub，不保存localStorage／IndexedDB；只沿用既有員編及裝置識別，登出／頁面離開清除本頁資料與匯出預覽。
 
@@ -59,9 +61,9 @@
 - 畫面／剪貼簿／PNG／Excel下載實際瀏覽器驗收尚未完成：雲端瀏覽器不能連線scratch HTTP預覽，安全政策禁止開啟本機檔案。
 - 正式GAS專案尚無登入，部署及正式登入正向讀取未驗證。
 
-部署順序：先備份原GAS editor與部署版本，只將四個dispatch及本次模組增量套用至當下最新editor，保留所有現存程式與設定。`gas/Code.gs` 尾端已生成核心與API模組，不得再把 `gas/TradeinPerformance.gs` 重複貼入同一GAS專案。建立既有部署的新版本、保留原URL／身分／權限，確認舊KPI與查價仍可讀，再發布Pages入口並以核准裝置驗證。禁止以repo舊全檔覆蓋正式editor。
+正式採用前先備份當下 GAS editor 與部署版本，核對 owner runtime、既有 native writers、已批准持久 state 及最新函式差異，再採用本候選增量；禁止以 repo 全檔覆蓋正式 editor。01 另含 durable revoke／restore 與 restore action，須列入批准範圍，不能稱作只有個績 UI wrapper。`gas/Code.gs` 已內嵌核心、API 及 owner 模組，不再重複貼入 `gas/TradeinPerformance.gs` 或交接 `modules/`。正式 gate／state／部署及權限須完成驗收後由 Liam 確認，本次不執行。
 
-首次正式同步應先核對上述台數及待核1台，再由既有管理入口發布、讀回版本及逐值比對。完成督導九店、一般同仁本人、店長／代理免目標、未核准裝置拒絕、未知月份、登出清除、複製、PNG與Excel，以及可用的正式取消樣本後，才可列正式驗收完成。
+首次正式同步須先核實名冊生效日、員編映射及台數，不能以先前候選對應數字作為驗收基準，再由既有管理入口發布、讀回版本及逐值比對。完成督導九店、一般同仁本人、店長／代理免目標、未核准裝置拒絕、未知月份、登出清除、複製、PNG與Excel，以及可用的正式取消樣本後，才可列正式驗收完成。
 
 ## 2026-10-08 接續整合查核
 
@@ -89,4 +91,21 @@ PR179 接續分支已合併 `main` 的 `1c38ae08a2c637900c1e64b80491abf54fd2f334
 
 正式發布候選範圍仍待完成：首頁／APP／查價入口、共用回收價 view、個績前端與 GAS 增量模組；登入契約接線、名冊／映射與取消樣本核實均是發布前阻擋。完成後須列出精確 Pages commit、GAS 新舊版本及回復點，由 Liam 確認正式發布與任何登入權限變更。本次只有 PR 候選更新，沒有正式發布或資料寫入。
 
-程式回復為GAS切回發布前版本、Pages回復發布前commit；資料回復使用選定月前一版，不刪除資料檔案。正式發布時補記GAS版本、Pages commit及線上驗證證據。
+## 2026-10-09 owner 01／02 接續
+
+已取得 [owner 公開交接 README](https://github.com/lian852456-dot/liamlu/blob/7373d7deb2bb8556b6efd2f41ec833f4930874ff/handoff/tradein-login-20261008/owner-code-20261009/README.md) 與同目錄完整 allowlist，SHA256SUMS 十項均吻合。最新 main 仍為 `1c38ae0`，PR179 基準為 `4d9da62`，交接指定 `gas/Code.gs` base SHA-256 `52e79ab8c25ed3ec9d1e51695aa9ef6140fdb93daac31d942bd1d4a8b0225aeb` 完全吻合。依序 check／套用 01 foundation、02 full read fence；未套用上層 INTEGRATION.patch 或 owner-read-boundary.example.patch，也未重貼模組。
+
+| 階段 | Code.gs SHA-256 |
+| --- | --- |
+| 01 套用後 | `ace0ff55d51d26d7367f6ec6c6944037bc3abc9319443cbbd3bbb2413dfb9479` |
+| 02 套用後及同步生成來源後 | `2a74d015e527247950a0a9b14bf5dfef205bfafa192764623edc86a9a5001e43` |
+
+兩階段均與 owner SOURCE-MANIFEST 一致。`gas/TradeinPerformance.gs` 同步兩個 wrapper；執行 `scripts/build-tradein-gas.mjs` 後 bytes／hash 不變，未改 business body。新增 `tests/tradein-owner-fence.test.cjs` 沿用 owner 原附 16 項，僅增加預設本 checkout 路徑及七項整合檢查：生成來源／唯一函式、restore 後重核裝置、同步／setup 不清除 revoked、重複名冊在寫入前拒絕、capture 後 pending／deny、格式或 owner 不符 state 不重設。舊個績與手機庫存測試載入實際 gate-off boundary，未以 mock 跳過新 wrapper。CI 已加入 GAS 語法、owner fence、手機庫存與查價後端回歸。
+
+本輪 Node 217項：216通過、1略過、0失敗；略過仍為缺少正式大型價格快照的體積比較。另擴查發布／上傳契約86項，78通過、8失敗；在未修改 `4d9da62` 乾淨基準重現完全相同八項：七項 private-dashboard 發布 harness 缺 `privateDashboardLatestSnapshotFile_`，一項 report-upload 路由預期漏既有 `threec_changes_read`。保留證據，不改無關程式或放寬測試。這些既有失敗未列為通過。手機／桌面、本人／免目標／九店與 PNG／XLSX 沿用合成瀏覽器回歸，不代表正式 GAS 正向登入。
+
+登入 owner 介面與可執行依賴已取得，10/8 的「缺 owner patch」阻擋已解除；以下仍阻擋正式啟用：同一實際 owner 部署位置、`DASHBOARD_AUTH_OWNER_SCRIPT_ID` 核對、經批准的 `DASHBOARD_AUTH_NATIVE_V1` 與既有 generation／pending／deny 保存、所有會寫 Users／Requests 的專案盤點、owner runtime 正反向與失敗恢復、最終 editor source hash。不得初始化／清空 state 或自行把 gate 改為 true。新增 restore action 仍須明確批准；B 權限沒有擴張。
+
+UI 任務 integration-candidate.patch 仍未取得；首頁／APP 改名、實際新回收查價 view 及價格更新後新舊位置同版本尚未完成。名冊生效日、正式員編映射及取消／跨月沖回實例仍待核實。上述 owner 純碼包未提供這些資料，不以 auth 修補視為整個儀表板已完成或上線。
+
+程式回復為 GAS 切回發布前版本、Pages 回復發布前 commit；資料回復使用選定月前一版，不刪除資料檔案。gate 啟用後的 auth state 必須保留 deny／generation，失敗恢復不能清空資格狀態。正式發布時補記 GAS 版本、Pages commit、state 恢復計畫及線上驗證證據。
