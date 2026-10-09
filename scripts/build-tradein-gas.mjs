@@ -7,4 +7,6 @@ const a=old.indexOf(start),b=old.indexOf(end,a);
 if(a<0||b<0)throw new Error('找不到舊換新模組界線');
 const core=await readFile(new URL('../tradein-performance-core.js',import.meta.url),'utf8');
 const api=await readFile(new URL('../gas/TradeinPerformance.gs',import.meta.url),'utf8');
-await writeFile(target,old.slice(0,a)+start+'\n'+core+'\n'+api+'\n'+end+old.slice(b+end.length));
+const publicCore=await readFile(new URL('../tradein-public-core.js',import.meta.url),'utf8');
+const publicApi=await readFile(new URL('../gas/TradeinPublic.gs',import.meta.url),'utf8');
+await writeFile(target,old.slice(0,a)+start+'\n'+core+'\n'+api+'\n'+publicCore+'\n'+publicApi+'\n'+end+old.slice(b+end.length));

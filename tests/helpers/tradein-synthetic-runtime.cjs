@@ -31,17 +31,21 @@ function createRuntime(options={}){
   createFile:(name,text)=>{assert.ok(held);const id='SYNTHETIC_FILE_'+(++counter),value=file(id,name,text);files.set(id,value);writes.push({operation:'create',name});return value;}};
  const accessRows=new Map([[OPERATOR,{employee_id:OPERATOR,masked_name:'合＊督',store:'北一二B',role:'督導',status:'active',device_id:DEVICE}]]);
  for(const id of Object.values(Ref.IDS))accessRows.set(id,{employee_id:id,masked_name:'合＊員',store:id==='ZX00004'?'杭州南':id==='ZX00008'?'三創':'萬大',role:'業務代表(I)',status:'active',device_id:DEVICE});
- const context=vm.createContext({TradeinPerformanceCore:Core,
+ const context=vm.createContext({TradeinPerformanceCore:Core,TradeinPublicCore:require('../../tradein-public-core.js'),
+  ScriptApp:{getScriptId:()=>options.ownerScriptId||'LOCAL_CHECKPOINT_OWNER_A'},
+  privateDashboardProperties:()=>({getProperty:name=>name==='TRADEIN_PERFORMANCE_OWNER_SCRIPT_ID'?
+    (options.configuredOwner===undefined?'LOCAL_CHECKPOINT_OWNER_A':options.configuredOwner):null}),
   privateDashboardCleanEmployeeId:v=>String(v||'').trim().toUpperCase(),privateDashboardCleanDeviceId:v=>{if(!v)throw Error('裝置缺漏');return String(v);},
   privateDashboardIsTrustedEmployee:id=>id===OPERATOR,privateDashboardUserByEmployeeId:id=>({user:accessRows.get(id)}),
   privateDashboardHash:hash,privateDashboardNow:()=> '2026-10-09T12:00:00+08:00',privateDashboardFolder:()=>folder,
   reportUploadAuthorize_:p=>{if(p.adminSecret!==fakeSecret || options.operatorRequired!==false&&p.employeeId!==OPERATOR)throw Error('合成管理者驗證失敗');return OPERATOR;},
   DriveApp:{Access:{PRIVATE:'PRIVATE'},Permission:{NONE:'NONE'},getFileById:id=>{if(!files.has(id))throw Error('未知合成檔案');return files.get(id);}},
-  MimeType:{PLAIN_TEXT:'text'},Utilities:{formatDate:(_d,_t,format)=>format==='yyyy-MM'?'2026-10':'2026-11-10'},
+  MimeType:{PLAIN_TEXT:'text'},Utilities:{getUuid:()=>String(++counter).padStart(32,'0'),formatDate:(_d,_t,format)=>format==='yyyy-MM'?'2026-10':'2026-11-10'},
   LockService:{getScriptLock:()=>({waitLock:()=>{assert.equal(held,false);held=true;},releaseLock:()=>{assert.ok(held);held=false;}})}});
  const gas=fs.readFileSync(require.resolve('../../gas/Code.gs'),'utf8');
  vm.runInContext(gas.slice(gas.indexOf('// Auth ownership candidate.')),context);
  vm.runInContext(fs.readFileSync(require.resolve('../../gas/TradeinPerformance.gs'),'utf8'),context);
+ vm.runInContext(fs.readFileSync(require.resolve('../../gas/TradeinPublic.gs'),'utf8'),context);
  function setConfig(name,value){configs.set(name,file('SYNTHETIC_CONFIG_'+name,name,JSON.stringify(value)));}
  function setMonthlyRoster(month,people,patch={}){
   setConfig('north12b-tradein-monthly-roster-'+month+'.json',{schema_version:'tradein-monthly-roster/v1',month,review_status:'verified',rule_id:Core.RULE_ID,source_sha256:'d'.repeat(64),people:people.map(p=>({...p,effective_from:p.effective_from||'2026-01-01',effective_to:p.effective_to===undefined?null:p.effective_to})),...patch});

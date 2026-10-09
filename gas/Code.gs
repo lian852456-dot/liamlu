@@ -3102,9 +3102,14 @@ function doPost(e) {
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
     else if (action === 'private_access') result = privateDashboardAccess(payload);
     else if (action === 'tradein_performance_read') result = tradeinPerformanceRead(payload);
+    else if (action === 'tradein_performance_public_read') result = tradeinPerformancePublicRead(payload);
+    else if (action === 'tradein_performance_public_publish') result = tradeinPerformancePublicPublish(payload);
     else if (action === 'tradein_performance_preview') result = tradeinPerformancePreview(payload);
     else if (action === 'tradein_performance_publish') result = tradeinPerformancePublish(payload);
     else if (action === 'tradein_performance_rollback') result = tradeinPerformanceRollback(payload);
+    else if (action === 'tradein_performance_checkpoint_status') result = tradeinPerformanceCheckpointStatus(payload);
+    else if (action === 'tradein_performance_checkpoint_capture') result = tradeinPerformanceCheckpointCapture(payload);
+    else if (action === 'tradein_performance_checkpoint_restore') result = tradeinPerformanceCheckpointRestore(payload);
     else if (action === 'phone_stock_publish') result = phoneStockPublish(payload);
     else if (action === 'phone_stock_read') result = phoneStockRead(payload);
     else if (action === 'department_ops_read') result = departmentOpsRead(payload);
@@ -6861,6 +6866,312 @@ function tradeinPerformanceRollback(payload) {
     if(readback.snapshot_hash!==current.active.snapshot_hash)throw new Error('回復後版本核對失敗');
     return {status:'rolled_back',snapshotHash:readback.snapshot_hash};
   } finally {lock.releaseLock();}
+}
+
+// Checkpoints are owner-held business-data backups, never auth-state backups.
+// These operations do not enable the auth gate, initialize eligibility, or grant access.
+function tradeinPerformanceCheckpointAuthorize_(payload) {
+  const operator=reportUploadAuthorize_(payload);
+  const owner=String(privateDashboardProperties().getProperty('TRADEIN_PERFORMANCE_OWNER_SCRIPT_ID') || '');
+  if(!/^[A-Za-z0-9_-]{12,120}$/.test(owner) || owner!==String(ScriptApp.getScriptId()))
+    throw new Error('檢查點只能在已明確配置的同一 owner 執行');
+  TradeinPerformanceCore.monthPeriod(payload.month);
+  if(!/^[a-f0-9]{64}$/.test(payload.sourceHash || ''))throw new Error('檢查點來源雜湊無效');
+  return {operator:operator,owner:owner};
+}
+function tradeinPerformanceCheckpointConfig_(name) {
+  const file=tradeinPerformanceFile_(name),body=file?file.getBlob().getDataAsString('UTF-8'):null;
+  if(body!==null && body.length>1000000)throw new Error('檢查點配置超過容量');
+  return {name:name,exists:!!file,body:body,sha256:body===null?null:privateDashboardHash(body)};
+}
+function tradeinPerformanceCheckpointRegistryValue_(body) {
+  if(typeof body!=='string' || body.length>1000000)throw new Error('檢查點 registry 容量／內容無效');
+  const value=JSON.parse(body);
+  if(!value || value.schema_version!=='tradein-performance-registry/v1' ||
+      !value.months || typeof value.months!=='object' || Array.isArray(value.months))
+    throw new Error('檢查點 registry 格式無效');
+  Object.keys(value.months).forEach(function(month){TradeinPerformanceCore.monthPeriod(month);});
+  return value;
+}
+function tradeinPerformanceCheckpointState_(payload) {
+  const registryFile=tradeinPerformanceFile_('north12b-tradein-performance-registry.json');
+  const registryBody=registryFile?registryFile.getBlob().getDataAsString('UTF-8'):
+    JSON.stringify({schema_version:'tradein-performance-registry/v1',months:{}});
+  const registry=tradeinPerformanceCheckpointRegistryValue_(registryBody);
+  const slotPresent=Object.prototype.hasOwnProperty.call(registry.months,payload.month);
+  const slot=slotPresent?registry.months[payload.month]:null;
+  if(slotPresent && (!slot || typeof slot!=='object' || Array.isArray(slot)))throw new Error('本月指標格式無效');
+  const publicFile=tradeinPerformanceFile_('north12b-tradein-public-registry.json');
+  const publicBody=publicFile?publicFile.getBlob().getDataAsString('UTF-8'):JSON.stringify({schema_version:'tradein-public-registry/v1',months:{}});
+  const publicRegistry=tradeinPerformancePublicRegistry_();
+  return {registry:registry,registryBody:registryBody,registryExists:!!registryFile,
+    publicRegistry:publicRegistry,publicRegistryBody:publicBody,publicRegistryExists:!!publicFile,publicRegistryHash:privateDashboardHash(publicBody),
+    registryHash:privateDashboardHash(registryBody),slotPresent:slotPresent,slot:slot,
+    activeHash:slot && slot.active?slot.active.snapshot_hash:null,
+    monthly:tradeinPerformanceCheckpointConfig_('north12b-tradein-monthly-roster-'+payload.month+'.json'),
+    reference:tradeinPerformanceCheckpointConfig_('north12b-tradein-reference-'+payload.sourceHash+'.json')};
+}
+function tradeinPerformanceCheckpointSummary_(state) {
+  return {registryExists:state.registryExists,registryHash:state.registryHash,slotPresent:state.slotPresent,
+    publicRegistryExists:state.publicRegistryExists,publicRegistryHash:state.publicRegistryHash,
+    activeHash:state.activeHash,monthlyHash:state.monthly.sha256,referenceHash:state.reference.sha256};
+}
+function tradeinPerformanceCheckpointCompare_(state,payload) {
+  const expected=['expectedRegistryHash','expectedPublicRegistryHash','expectedActiveHash','expectedMonthlyHash','expectedReferenceHash'];
+  expected.forEach(function(key){
+    if(!Object.prototype.hasOwnProperty.call(payload,key) ||
+        !(payload[key]===null && !['expectedRegistryHash','expectedPublicRegistryHash'].includes(key)) && !/^[a-f0-9]{64}$/.test(payload[key] || ''))
+      throw new Error('檢查點必須明確提供完整預期雜湊');
+  });
+  if(typeof payload.expectedRegistryExists!=='boolean' || payload.expectedRegistryExists!==state.registryExists ||
+      typeof payload.expectedPublicRegistryExists!=='boolean' || payload.expectedPublicRegistryExists!==state.publicRegistryExists ||
+      payload.expectedPublicRegistryHash!==state.publicRegistryHash ||
+      payload.expectedRegistryHash!==state.registryHash || payload.expectedActiveHash!==state.activeHash ||
+      payload.expectedMonthlyHash!==state.monthly.sha256 || payload.expectedReferenceHash!==state.reference.sha256)
+    throw new Error('registry／本月指標或配置已變更，請重新讀取檢查點狀態');
+}
+function tradeinPerformanceCheckpointSlot_(slot,month,monthly) {
+  if(slot===null)return;
+  if(!slot || typeof slot!=='object' || Array.isArray(slot) ||
+      !Object.prototype.hasOwnProperty.call(slot,'active') || !Object.prototype.hasOwnProperty.call(slot,'previous') ||
+      slot.previous && !slot.active)throw new Error('檢查點本月指標格式無效');
+  ['active','previous'].forEach(function(key){
+    const entry=slot[key];if(entry===null)return;
+    if(!entry || typeof entry.file_id!=='string' || !entry.file_id ||
+        !['snapshot_hash','source_sha256','roster_hash','preview_hash'].every(function(k){return /^[a-f0-9]{64}$/.test(entry[k] || '');}))
+      throw new Error('檢查點快照指標格式無效');
+    const snapshot=tradeinPerformanceSnapshot_(entry);
+    if(snapshot.period_key!==month)throw new Error('檢查點快照月份不符');
+    if(key==='active'){
+      if(!monthly.exists)throw new Error('檢查點缺少原月名冊');
+      const basis=JSON.parse(monthly.body);
+      if(basis.month!==month || basis.review_status!=='verified')throw new Error('檢查點原月名冊未核定');
+      // The canonical validated roster hash was captured while this exact file was active.
+      if(entry.roster_hash!==monthly.rosterHash)throw new Error('檢查點原名冊與快照不符');
+    }
+  });
+}
+function tradeinPerformanceCheckpointStatus(payload) {
+  tradeinPerformanceCheckpointAuthorize_(payload);
+  const lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{return tradeinPerformanceCheckpointSummary_(tradeinPerformanceCheckpointState_(payload));}
+  finally{lock.releaseLock();}
+}
+function tradeinPerformanceCheckpointCapture(payload) {
+  const auth=tradeinPerformanceCheckpointAuthorize_(payload);
+  if(!['C0','C1'].includes(payload.stage))throw new Error('檢查點階段無效');
+  const lock=LockService.getScriptLock();lock.waitLock(10000);
+  try {
+    const state=tradeinPerformanceCheckpointState_(payload);tradeinPerformanceCheckpointCompare_(state,payload);
+    if(state.monthly.exists)state.monthly.rosterHash=tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(payload.month));
+    tradeinPerformanceCheckpointSlot_(state.slot,payload.month,state.monthly);
+    const publicEntry=state.publicRegistry.months[payload.month];
+    if(publicEntry){
+      if(!state.slot || !state.slot.active || publicEntry.private_snapshot_hash!==state.slot.active.snapshot_hash)throw new Error('公開／私人本月版本不一致，停止檢查點');
+      tradeinPerformancePublicSnapshot_(publicEntry,payload.month);
+    }
+    let previewHash=null;
+    if(payload.stage==='C1'){
+      if(!payload.source || payload.source.month!==payload.month || payload.source.source_sha256!==payload.sourceHash)
+        throw new Error('C1 必須核對本批來源');
+      const snapshot=tradeinPerformanceBuild_(payload.source,tradeinPerformanceMonthRoster_(payload.month));
+      previewHash=tradeinPerformanceHash_(snapshot);
+      if(payload.previewHash!==previewHash || payload.rosterHash!==state.monthly.rosterHash)
+        throw new Error('C1 來源／名冊與預覽不符');
+    }
+    const value={schema_version:'tradein-checkpoint/v1',stage:payload.stage,month:payload.month,
+      source_sha256:payload.sourceHash,owner_script_id:auth.owner,folder_id:tradeinPerformanceFolder_().getId(),
+      captured_at:privateDashboardNow(),operator_hash:privateDashboardHash(auth.operator),
+      registry_exists:state.registryExists,registry_body:state.registryBody,registry_sha256:state.registryHash,
+      public_registry_exists:state.publicRegistryExists,public_registry_body:state.publicRegistryBody,public_registry_sha256:state.publicRegistryHash,
+      slot_present:state.slotPresent,slot:state.slot,monthly:state.monthly,reference:state.reference,preview_hash:previewHash};
+    const body=JSON.stringify(value),hash=privateDashboardHash(body);
+    const file=tradeinPerformanceFolder_().createFile('north12b-tradein-checkpoint-'+payload.month+'-'+payload.stage+'-'+hash.slice(0,16)+'.json',body,MimeType.PLAIN_TEXT);
+    if(privateDashboardHash(file.getBlob().getDataAsString('UTF-8'))!==hash)throw new Error('檢查點保存後內容核對失敗');
+    return {status:'checkpoint_saved',checkpointId:file.getId(),checkpointHash:hash,stage:payload.stage,
+      state:tradeinPerformanceCheckpointSummary_(state),previewHash:previewHash};
+  } finally{lock.releaseLock();}
+}
+function tradeinPerformanceCheckpointRestore(payload) {
+  const auth=tradeinPerformanceCheckpointAuthorize_(payload);
+  if(payload.restoreMonth!==true || typeof payload.checkpointId!=='string' ||
+      !/^[a-f0-9]{64}$/.test(payload.checkpointHash || ''))throw new Error('必須明確確認本月檢查點恢復');
+  const lock=LockService.getScriptLock();lock.waitLock(10000);
+  try {
+    const current=tradeinPerformanceCheckpointState_(payload);tradeinPerformanceCheckpointCompare_(current,payload);
+    const file=DriveApp.getFileById(payload.checkpointId),parents=file.getParents(),folderId=tradeinPerformanceFolder_().getId();
+    let inFolder=false;while(parents.hasNext()){if(parents.next().getId()===folderId)inFolder=true;}
+    if(!inFolder)throw new Error('檢查點不在指定私有 owner 資料夾');
+    const body=file.getBlob().getDataAsString('UTF-8');
+    if(body.length>3000000 || privateDashboardHash(body)!==payload.checkpointHash)throw new Error('檢查點完整性核對失敗');
+    const saved=JSON.parse(body);
+    if(saved.schema_version!=='tradein-checkpoint/v1' || !['C0','C1'].includes(saved.stage) || saved.month!==payload.month ||
+        saved.source_sha256!==payload.sourceHash || saved.owner_script_id!==auth.owner || saved.folder_id!==folderId ||
+        typeof saved.registry_exists!=='boolean' || typeof saved.slot_present!=='boolean' ||
+        typeof saved.public_registry_exists!=='boolean' || privateDashboardHash(saved.public_registry_body)!==saved.public_registry_sha256 ||
+        privateDashboardHash(saved.registry_body)!==saved.registry_sha256)
+      throw new Error('檢查點 owner／月份／來源或 registry 核對失敗');
+    const prior=tradeinPerformanceCheckpointRegistryValue_(saved.registry_body);
+    if(Object.prototype.hasOwnProperty.call(prior.months,payload.month)!==saved.slot_present ||
+        JSON.stringify(saved.slot_present?prior.months[payload.month]:null)!==JSON.stringify(saved.slot))
+      throw new Error('檢查點本月指標與原 registry 不符');
+    [['monthly',current.monthly.name],['reference',current.reference.name]].forEach(function(pair){
+      const config=saved[pair[0]];
+      if(!config || config.name!==pair[1] || typeof config.exists!=='boolean' ||
+          config.exists && (typeof config.body!=='string' || config.body.length>1000000 || privateDashboardHash(config.body)!==config.sha256) ||
+          !config.exists && (config.body!==null || config.sha256!==null))throw new Error('檢查點配置完整性核對失敗');
+    });
+    tradeinPerformanceCheckpointSlot_(saved.slot,payload.month,saved.monthly);
+    const priorPublic=JSON.parse(saved.public_registry_body);
+    if(!priorPublic || priorPublic.schema_version!=='tradein-public-registry/v1' || !priorPublic.months || typeof priorPublic.months!=='object' || Array.isArray(priorPublic.months))throw new Error('公開檢查點 registry 格式無效');
+    Object.keys(priorPublic.months).forEach(function(month){TradeinPerformanceCore.monthPeriod(month);});
+    const priorPublicEntry=priorPublic.months[payload.month];
+    if(priorPublicEntry){
+      if(!saved.slot || !saved.slot.active || priorPublicEntry.private_snapshot_hash!==saved.slot.active.snapshot_hash)throw new Error('公開檢查點本月快照版本不符');
+      tradeinPerformancePublicSnapshot_(priorPublicEntry,payload.month);
+    }
+    // Only the captured month and its two fixed configuration names are mutable.
+    // New files from a first import are retained. No auth property or roster is written.
+    const retained=[];
+    ['monthly','reference'].forEach(function(key){
+      const config=saved[key],existing=tradeinPerformanceFile_(config.name);
+      if(!config.exists){if(existing)retained.push(key);return;}
+      if(existing){if(privateDashboardHash(existing.getBlob().getDataAsString('UTF-8'))!==config.sha256)existing.setContent(config.body);}
+      else tradeinPerformanceFolder_().createFile(config.name,config.body,MimeType.PLAIN_TEXT);
+      if(tradeinPerformanceCheckpointConfig_(config.name).sha256!==config.sha256)throw new Error('檢查點配置恢復後核對失敗');
+    });
+    if(saved.slot && saved.slot.active && tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(payload.month))!==saved.slot.active.roster_hash)
+      throw new Error('恢復名冊與原月快照不符；尚未切换 registry');
+    const next=JSON.parse(JSON.stringify(current.registry));
+    if(saved.slot_present)next.months[payload.month]=saved.slot;else delete next.months[payload.month];
+    const nextBody=JSON.stringify(next);
+    tradeinPerformanceSaveRegistry_(next);
+    const nextPublic=JSON.parse(JSON.stringify(current.publicRegistry));
+    if(priorPublicEntry)nextPublic.months[payload.month]=priorPublicEntry;else delete nextPublic.months[payload.month];
+    const nextPublicBody=JSON.stringify(nextPublic),publicFile=tradeinPerformanceFile_('north12b-tradein-public-registry.json');
+    if(publicFile)publicFile.setContent(nextPublicBody);
+    else if(saved.public_registry_exists)tradeinPerformanceFolder_().createFile('north12b-tradein-public-registry.json',nextPublicBody,MimeType.PLAIN_TEXT);
+    const restored=tradeinPerformanceCheckpointState_(payload);
+    if(restored.registryHash!==privateDashboardHash(nextBody) || restored.slotPresent!==saved.slot_present ||
+        restored.publicRegistryHash!==privateDashboardHash(nextPublicBody) ||
+        JSON.stringify(restored.slot)!==JSON.stringify(saved.slot))throw new Error('檢查點恢復後完整 registry 核對失敗');
+    return {status:'checkpoint_restored',stage:saved.stage,state:tradeinPerformanceCheckpointSummary_(restored),
+      retainedNewConfigurationFiles:retained,historyRetained:true};
+  } finally{lock.releaseLock();}
+}
+
+/* Server-only whitelist. Public IDs are random, never employee-derived. */
+var TradeinPublicCore=(function(){
+  'use strict';
+  const STORES=['酒泉','永吉','復興南','杭州南','萬大','通化','大稻埕','三創','六張犁'];
+  const keys=(v,names)=>v && typeof v==='object' && !Array.isArray(v) && Object.keys(v).sort().join('|')===names.slice().sort().join('|');
+  const number=(n,nullable=false)=>nullable&&n===null || Number.isSafeInteger(n)&&n>=0&&n<=10000000;
+  const day=v=>typeof v==='string'&&/^20\d{2}-\d{2}-\d{2}$/.test(v)&&!isNaN(Date.parse(v+'T00:00:00Z'))&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v;
+  function mask(value){const chars=Array.from(String(value||'').trim());if(!chars.length||chars.length>40)throw Error('公開姓名來源格式無效');return chars.length<2?'＊':chars[0]+'＊'+chars[chars.length-1];}
+  function validate(value){
+    if(!keys(value,['schema_version','region','month','source_period','source_cutoff_date','published_at','people','stores','summary']) ||
+      value.schema_version!=='tradein-public/v1'||value.region!=='北一二B'||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(value.month)||
+      !keys(value.source_period,['start','end'])||!day(value.source_period.start)||!day(value.source_period.end)||
+      value.source_period.start.slice(0,7)!==value.month||value.source_period.end.slice(0,7)!==value.month||
+      value.source_period.start>value.source_period.end||value.source_cutoff_date!==value.source_period.end||
+      typeof value.published_at!=='string'||isNaN(Date.parse(value.published_at))||!Array.isArray(value.people)||value.people.length>5000||
+      !Array.isArray(value.stores)||value.stores.length!==9)throw Error('公開績效白名單格式無效');
+    const seen=new Set();
+    value.people.forEach(function(p){
+      if(!keys(p,['public_id','store','masked_name','actual_units','target_units','remaining_units','attainment_status'])||
+        !/^tp_[a-f0-9]{32}$/.test(p.public_id)||seen.has(p.public_id)||!STORES.includes(p.store)||
+        !(p.masked_name==='＊'||Array.from(p.masked_name||'').length===3&&Array.from(p.masked_name)[1]==='＊')||
+        /[<>\r\n\t]/.test(p.masked_name)||!number(p.actual_units,true)||![null,3].includes(p.target_units)||
+        !number(p.remaining_units,true)||p.remaining_units!==(p.target_units===null||p.actual_units===null?null:Math.max(3-p.actual_units,0))||
+        p.attainment_status!==(p.target_units===null?'exempt':p.actual_units===null?'pending':p.actual_units>=3?'met':'in_progress'))
+        throw Error('公開人員白名單格式無效');seen.add(p.public_id);
+    });
+    value.stores.forEach(function(s,i){
+      if(!keys(s,['store','actual_units','target_units','remaining_units','target_people','met_people'])||s.store!==STORES[i]||
+        !['actual_units','target_units','remaining_units','target_people','met_people'].every(k=>number(s[k])))throw Error('公開店點白名單格式無效');
+      const people=value.people.filter(p=>p.store===s.store),targets=people.filter(p=>p.target_units===3);
+      if(s.target_units!==targets.length*3||s.target_people!==targets.length||s.met_people!==targets.filter(p=>p.attainment_status==='met').length||
+        s.remaining_units!==targets.reduce((n,p)=>n+(p.remaining_units||0),0)||s.actual_units<people.reduce((n,p)=>n+(p.actual_units||0),0))throw Error('公開店點數字不一致');
+    });
+    const s=value.summary;
+    if(!keys(s,['actual_units','target_units','remaining_units','target_people','met_people','store_count'])||s.store_count!==9||
+       !['actual_units','target_units','remaining_units','target_people','met_people'].every(k=>number(s[k])&&s[k]===value.stores.reduce((n,p)=>n+p[k],0)))throw Error('公開區數字不一致');
+    return value;
+  }
+  function project(snapshot,randomId){
+    if(!snapshot||snapshot.schema_version!=='tradein-performance/v1'||!Array.isArray(snapshot.people)||!Array.isArray(snapshot.stores))throw Error('公開來源尚未核實');
+    const value={schema_version:'tradein-public/v1',region:'北一二B',month:snapshot.period_key,
+      source_period:{start:snapshot.source_period.start,end:snapshot.source_period.end},source_cutoff_date:snapshot.source_cutoff_date,
+      published_at:snapshot.published_at,people:snapshot.people.map(function(p){
+        const publicId='tp_'+String(randomId()).replace(/-/g,'').toLowerCase();
+        return {public_id:publicId,store:p.store,masked_name:mask(p.masked_name),actual_units:p.actual_units,target_units:p.target_units,
+          remaining_units:p.remaining_units,attainment_status:p.target_units===null?'exempt':p.actual_units===null?'pending':p.actual_units>=3?'met':'in_progress'};
+      }),stores:STORES.map(function(store){
+        const s=snapshot.stores.find(s=>s.store===store);if(!s)throw Error('公開來源店點缺漏');
+        return {store:store,actual_units:s.total_units,target_units:s.staff_target_units,remaining_units:s.staff_gap_units,
+          target_people:s.target_staff_count,met_people:s.met_staff_count};
+      }),summary:{}};
+    ['actual_units','target_units','remaining_units','target_people','met_people'].forEach(k=>{value.summary[k]=value.stores.reduce((n,s)=>n+s[k],0);});
+    value.summary.store_count=9;return validate(value);
+  }
+  return Object.freeze({project:project,validate:validate,mask:mask});
+})();
+if(typeof module!=='undefined'&&module.exports)module.exports=TradeinPublicCore;
+
+// Independent anonymous read. Never calls or exposes the private reader.
+function tradeinPerformancePublicRegistry_(){
+  const file=tradeinPerformanceFile_('north12b-tradein-public-registry.json');
+  const value=file?JSON.parse(file.getBlob().getDataAsString('UTF-8')):{schema_version:'tradein-public-registry/v1',months:{}};
+  if(!value||value.schema_version!=='tradein-public-registry/v1'||!value.months||typeof value.months!=='object'||Array.isArray(value.months))throw Error('公開績效版本索引無效');
+  Object.keys(value.months).forEach(function(month){TradeinPerformanceCore.monthPeriod(month);});
+  return value;
+}
+function tradeinPerformancePublicSnapshot_(entry,month){
+  if(!entry||!entry.file_id||!/^[a-f0-9]{64}$/.test(entry.snapshot_hash||''))throw Error('公開績效快照指標無效');
+  const file=DriveApp.getFileById(entry.file_id),parents=file.getParents(),folder=tradeinPerformanceFolder_().getId();
+  let present=false;while(parents.hasNext())if(parents.next().getId()===folder)present=true;
+  if(!present)throw Error('公開投影來源位置不符');
+  const value=JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if(tradeinPerformanceHash_(value)!==entry.snapshot_hash||value.month!==month)throw Error('公開投影內容雜湊不符');
+  return TradeinPublicCore.validate(value);
+}
+function tradeinPerformancePublicRead(payload){
+  TradeinPerformanceCore.monthPeriod(payload.month);
+  const lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{
+    const registry=tradeinPerformancePublicRegistry_(),entry=registry.months[payload.month];
+    if(!entry)return {snapshot:null,availableMonths:Object.keys(registry.months).sort()};
+    const current=(tradeinPerformanceRegistry_().months[payload.month]||{}).active;
+    if(!current||current.snapshot_hash!==entry.private_snapshot_hash)throw Error('本月公開進度待重新核對');
+    if(tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(payload.month))!==current.roster_hash)throw Error('本月公開基線待重新核對');
+    const value=tradeinPerformancePublicSnapshot_(entry,payload.month);
+    // Reconstruct the response from a strict validated allowlist, never spread registry/entry/private JSON.
+    return {snapshot:value,availableMonths:Object.keys(registry.months).sort()};
+  }catch(error){throw Error('公開目標進度尚未完成核對，請稍後重新讀取');}
+  finally{lock.releaseLock();}
+}
+function tradeinPerformancePublicPublish(payload){
+  tradeinPerformanceCheckpointAuthorize_(payload);
+  const lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{
+    const current=(tradeinPerformanceRegistry_().months[payload.month]||{}).active;
+    if(!current||current.snapshot_hash!==payload.expectedActiveHash)throw Error('私人月版本已變更，停止公開投影');
+    if(current.source_sha256!==payload.sourceHash)throw Error('公開投影來源雜湊不符');
+    const registry=tradeinPerformancePublicRegistry_(),previous=registry.months[payload.month];
+    if(previous&&previous.private_snapshot_hash===current.snapshot_hash){
+      tradeinPerformancePublicSnapshot_(previous,payload.month);return {status:'unchanged'};
+    }
+    const source=tradeinPerformanceSnapshot_(current);
+    if(tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(payload.month))!==current.roster_hash)throw Error('核定月名冊已變更，停止公開投影');
+    const value=TradeinPublicCore.project(source,function(){return Utilities.getUuid();}),hash=tradeinPerformanceHash_(value);
+    const file=tradeinPerformanceFolder_().createFile('north12b-tradein-public-'+payload.month+'-'+hash.slice(0,16)+'.json',JSON.stringify(value),MimeType.PLAIN_TEXT);
+    const entry={file_id:file.getId(),snapshot_hash:hash,private_snapshot_hash:current.snapshot_hash};
+    tradeinPerformancePublicSnapshot_(entry,payload.month);registry.months[payload.month]=entry;
+    const name='north12b-tradein-public-registry.json',registryFile=tradeinPerformanceFile_(name),body=JSON.stringify(registry);
+    if(registryFile)registryFile.setContent(body);else tradeinPerformanceFolder_().createFile(name,body,MimeType.PLAIN_TEXT);
+    if(JSON.stringify(tradeinPerformancePublicRegistry_())!==body)throw Error('公開投影版本保存後核對失敗');
+    return {status:'published'};
+  }finally{lock.releaseLock();}
 }
 
 // END TRADEIN PERFORMANCE MODULE
