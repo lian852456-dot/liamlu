@@ -76,6 +76,24 @@ test('其他月份匯出維持未知，不借用原月實績',async()=>{
   const E=await import('../tradein-export-core.mjs'),r={...E.rulesForMonth('2026-11'),isDemo:false};
   const p=E.describePerson(['萬大','示＊甲','同仁',4],r);assert.equal(p.actual,null);assert.equal(p.remaining,null);
 });
+test('公開個人差異保留未達、達標、超標與未知，Excel 為可計算的正負數',async()=>{
+  const E=await import('../tradein-export-core.mjs'),rules={...E.rulesForMonth('2026-10'),isDemo:false};
+  const context={active:true,mode:'public',allowedStores:['萬大'],people:[
+    ['萬大','合＊甲','同仁',1],['萬大','合＊乙','同仁',3],['萬大','合＊丙','同仁',4],
+    ['萬大','合＊丁','免目標',2],['萬大','合＊戊','同仁',null]
+  ]};
+  const model=E.buildExportModel(context,'all',rules),text=E.reminderText(model),rows=E.workbookRows(model);
+  for(const value of ['−2 台','0 台','+1 台','不適用','待核'])assert.ok(text.includes('目前差異：'+value));
+  assert.equal(rows[13][5],'目前差異（實績－月目標）');
+  assert.deepEqual(rows.slice(14).map(row=>row[5]),[-2,0,1,null,null]);
+  const workbook=Buffer.from(E.createXlsx(model)).toString();
+  assert.ok(workbook.includes('<c r="F15" s="6" t="n"><v>-2</v></c>'));
+  assert.ok(workbook.includes('formatCode="+0;-0;0"'));
+  assert.ok(!workbook.includes('<c r="F18"'));
+  const privateModel=E.buildExportModel({...context,mode:'supervisor'},'all',rules);
+  assert.deepEqual(E.workbookRows(privateModel).slice(14).map(row=>row[5]),[2,0,0,null,null]);
+  assert.throws(()=>E.createXlsx({...model,rows:[{...model.rows[0],actual:-1}]}),/不正確數值/);
+});
 function storageApi(){
   const runtime=require('./helpers/tradein-synthetic-runtime.cjs').createRuntime({adminSecret:'secret',operatorRequired:false,monthlyRoster:[employee('12345')]});
   runtime.configure(source([record('a')]));return runtime;

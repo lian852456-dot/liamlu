@@ -1,4 +1,4 @@
-import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs';
+import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261010-difference-1';
 const $=id=>document.getElementById(id);
 let contextReader,revision=0,busy=false,canvas=null;
 export function currentRules(){return contextReader?.().rules || rulesForMonth($('periodMonth').value);}
