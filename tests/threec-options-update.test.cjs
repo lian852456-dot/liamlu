@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const Compare=require('../threec-comparison-core.js'),fixture=require('./threec-search-fixture.cjs');
-const html=fs.readFileSync(path.join(__dirname,'../threec-query.html'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'../threec-query-ui.js'),'utf8');
 function section(name,next){return html.slice(html.indexOf('  function '+name+'('),html.indexOf('  function '+next+'('));}
 const current=section('updateShoppingOptions','columnLabel');
 // The pre-change behavior is an independent oracle for ordered selection resets.

@@ -1,0 +1,232 @@
+(function(scope){
+  'use strict';
+  const queryKind=document.body.dataset.queryKind==='tradein'?'tradein':'shopping';
+  const Core=scope.ThreecQueryCore;
+  const DiffCore=scope.ThreecPriceDiffCore;
+  const Transport=scope.ThreecPriceTransport;
+  const Compare=scope.ThreecComparisonCore;
+  let shoppingIndex=null, shoppingView=null, splitSpecKeys=new Set();
+  let shoppingSegment=new URLSearchParams(scope.location.search).get('section')==='enterprise'?'enterprise':'consumer';
+  let rowPage=0,columnPage=0;
+  let readingMode=scope.matchMedia('(max-width:700px)').matches?'card':'table';
+  const API='https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
+  const state={shopping:null,tradein:null,active:'shopping',loading:false,changePage:{shopping:null,tradein:null}};
+  let generation=0;
+  const changeLoading={shopping:false,tradein:false};
+  const changeRequestGeneration={shopping:0,tradein:0};
+  const $=id=>document.getElementById(id);
+  function esc(value){return String(value==null?'':value).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
+  function setStatus(text,kind){const el=$('queryStatus');el.textContent=text;el.className='status'+(kind?' '+kind:'');}
+  function readPublicFrame(payload){
+    return new Promise((resolve,reject)=>{
+      const requestId=crypto.randomUUID();
+      const endpoint=new URL(API);endpoint.searchParams.set('transport','iframe');endpoint.searchParams.set('requestId',requestId);endpoint.searchParams.set('origin',location.origin);
+      const frame=document.createElement('iframe'),form=document.createElement('form'),field=document.createElement('textarea');
+      let finished=false;
+      function finish(error,body){if(finished)return;finished=true;clearTimeout(timer);scope.removeEventListener('message',onMessage);frame.remove();form.remove();error?reject(error):resolve(body);}
+      function onMessage(event){
+        let origin;try{origin=new URL(event.origin);}catch{return;}
+        if(origin.protocol!=='https:'||origin.port||!(origin.hostname==='script.google.com'||origin.hostname==='script.googleusercontent.com'||origin.hostname.endsWith('-script.googleusercontent.com')))return;
+        const message=event.data;if(!event.source||!message||message.type!=='north12b-gas-response-v1'||message.requestId!==requestId)return;
+        if(!message.body||message.body.status!=='ok'){const error=new Error(message.body&&message.body.message||'正式資料讀取失敗');error.authoritative=true;finish(error);return;}
+        finish(null,message.body);
+      }
+      const timer=setTimeout(()=>finish(new Error('正式資料讀取逾時，請重新整理')),35000);
+      frame.name='public_price_'+requestId;frame.title='正式價格讀取';frame.hidden=true;
+      form.method='POST';form.action=endpoint.toString();form.target=frame.name;form.enctype='application/x-www-form-urlencoded';form.hidden=true;
+      field.name='payload';field.value=JSON.stringify(payload);form.append(field);scope.addEventListener('message',onMessage);document.body.append(frame,form);
+      try{form.submit();}catch{finish(new Error('正式資料連線失敗'));}
+    });
+  }
+  async function readPublic(payload,preferFrame=false){
+    // Large price snapshots use one iframe request first, avoiding an aborted
+    // fetch that keeps a duplicate GAS execution running in the background.
+    if(preferFrame){try{return await readPublicFrame(payload);}catch(error){if(error.authoritative)throw error;}}
+    for(let attempt=0;attempt<(preferFrame?1:2);attempt++){
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),15000);
+      try{
+        // A unique URL prevents an expired Google ContentService redirect from
+        // being reused. Only public, read-only actions call this helper.
+        const requestId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+        const response=await fetch(API+'?readAttempt='+requestId,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),cache:'no-store',credentials:'omit',signal:controller.signal});
+        let body;
+        try{body=await response.json();}catch{throw new Error('正式資料回應格式錯誤');}
+        if(response.ok&&body&&body.status==='ok')return body;
+        if(body&&body.status==='error'){
+          const error=new Error(body.message||'正式資料讀取失敗');error.authoritative=true;throw error;
+        }
+        throw new Error('正式資料讀取失敗（HTTP '+response.status+'）');
+      }catch(error){
+        if(error.authoritative)throw error;
+        if(attempt===0&&!preferFrame){try{return await readPublicFrame(payload);}catch(frameError){if(frameError.authoritative)throw frameError;}}
+        else throw new Error(error.name==='AbortError'?'正式資料讀取逾時，請重新整理':error.message||'正式資料連線失敗');
+      }finally{clearTimeout(timer);}
+    }
+  }
+  async function invoke(kind){const payload={action:'threec_snapshot_read',kind,includeChanges:false,priceEncoding:Transport.ENCODING};return Transport.decode(await readPublic(payload,kind==='shopping'));}
+  function invokeChanges(kind,offset,limit,snapshotHash,search){return readPublic({action:'threec_changes_read',kind,offset:Number(offset||0),limit:Number(limit||1000),snapshotHash:snapshotHash||'',search:String(search||'')});}
+  function clearResults(){shoppingIndex=null;shoppingView=null;splitSpecKeys=new Set();state.shopping=null;state.tradein=null;state.changePage={shopping:null,tradein:null};changeLoading.shopping=false;changeLoading.tradein=false;renderKind('shopping');renderKind('tradein');}
+  function metaHtml(meta){return `<div class="source-date"><span>正式來源日期</span><strong>${esc(meta.sourceVersionDate||'未提供')}</strong><span>${esc(meta.rowCount)} 筆來源資料</span></div><details class="source-details"><summary>資料版本與來源資訊</summary><dl><dt>正式版本</dt><dd>${esc(meta.snapshotHash||meta.version||'—')}</dd><dt>發布時間</dt><dd>${esc(meta.publishedAt||'—')}</dd><dt>來源 SHA-256</dt><dd>${esc(meta.sourceFileSha256||'—')}</dd></dl></details>`;}
+  function renderPrice(name,value){const state=Core.priceState(value);return `<div class="price-item${state.missing?' missing':''}${state.zero?' zero':''}"><span>${esc(name)}</span><strong>${esc(Core.formatPrice(value))}</strong></div>`;}
+  function changeRows(changeSet){if(!changeSet||typeof changeSet!=='object')return [];if(Array.isArray(changeSet.changePage))return changeSet.changePage;if(Array.isArray(changeSet.changes))return changeSet.changes;if(Array.isArray(changeSet.records))return changeSet.records;return [];}
+  function changeCounts(changeSet){const counts=changeSet&&changeSet.counts&&typeof changeSet.counts==='object'?changeSet.counts:{};return {added:Number(changeSet&&changeSet.addedCount!=null?changeSet.addedCount:counts.added||0),changed:Number(changeSet&&changeSet.changedCount!=null?changeSet.changedCount:counts.changed||0),unchanged:Number(changeSet&&changeSet.unchangedCount!=null?changeSet.unchangedCount:counts.unchanged||0),removed:Number(changeSet&&changeSet.removedCount!=null?changeSet.removedCount:counts.removed||0)};}
+  function changePrice(value){if(value==null)return '—（無此條件）';if(value&&typeof value==='object'&&Object.prototype.hasOwnProperty.call(value,'value'))return Core.formatPrice(value.value);if(value&&typeof value==='object'&&Object.prototype.hasOwnProperty.call(value,'display'))return String(value.display||'無報價（缺價）');return Core.formatPrice(value);}
+  function changePriceClass(value){if(value==null||(value&&value.kind==='missing')||String(value).trim()==='')return 'missing';if((value&&value.kind==='zero')||Number(String(value).replace(/,/g,''))===0)return 'zero';return '';}
+  function changeText(record){const identity=record&&record.identity||{};return [record&&(record.modelCapacity||record.model),record&&(record.plan||record.condition),record&&(record.provider||identity.provider),record&&(record.grade||identity.grade)].filter(Boolean).join(' ');}
+  function responseChangeSet(response){const check=response&&response.updateCheck;return check&&check.changeSet?check.changeSet:(response&&response.changeSet)||null;}
+  function renderChanges(kind){
+    if(kind!==state.active)return;
+    const response=state[kind];
+    $('changeLoadBtn').hidden=true;
+    const title=kind==='shopping'?'手機專案／3C':'舊換新';
+    $('changeTitle').textContent=title+' 本次異動／版本檢查';
+    if(!response||!response.snapshot){$('changeBasis').textContent='尚無正式異動記錄。';$('changeCounts').innerHTML='';$('changeResults').innerHTML='<div class="empty">尚無異動記錄。</div>';['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;}
+    if(response.changesDeferred&&!state.changePage[kind]){
+      $('changeLoadBtn').hidden=false;$('changeLoadBtn').disabled=changeLoading[kind];
+      $('changeBasis').textContent='價格 active 版本：'+response.snapshot.snapshot_hash+'；版本日期 '+response.snapshot.source_version_date+'。';
+      $('changeCounts').innerHTML='';$('changeResults').innerHTML='';$('changePage').textContent='';
+      $('changeSummary').textContent=changeLoading[kind]?'正在讀取本次異動明細，價格可繼續查詢…':'正式價格已完整讀取；需要核對本次調價時，請載入異動明細或搜尋條件。';
+      ['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;
+    }
+    const snapshot=response.snapshot||{};const set=state.changePage[kind]||responseChangeSet(response);if(!set){$('changeBasis').textContent='正式版本已讀取；後端尚未提供異動記錄。';$('changeCounts').innerHTML='';$('changeResults').innerHTML='<div class="empty">尚無異動記錄。</div>';['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;}
+    const query=$('changeSearch').value.trim();const loadedSearch=String(set._search==null?'':set._search);const pendingSearch=query!==loadedSearch;const counts=changeCounts(set);const rows=pendingSearch?[]:changeRows(set);const changeCount=Number(set.changeCount!=null?set.changeCount:rows.length);const totalChangeCount=Number(set.totalChangeCount!=null?set.totalChangeCount:(set.totalCount!=null?set.totalCount:changeCount));const offset=Number(set.offset||0);const limit=Number(set.limit||100);const page=Math.floor(offset/Math.max(1,limit))+1;const pageCount=Math.max(1,Math.ceil(changeCount/Math.max(1,limit)));
+    const activeHash=snapshot.snapshot_hash||'';const update=response.updateCheck||{};const updateBlocked=update.blocked||update.status==='blocked'||update.ok===false||update.matches===false;const latest=update.latest_check||update.latestCheck||update;const latestDate=latest&&(latest.source_version_date||latest.date||latest.latest_source_version_date);const latestRows=latest&&(latest.row_count!=null?latest.row_count:latest.source_row_count);const latestText=latestDate||latestRows!=null||latest.status?'；最近來源核對日期 '+(latestDate||'—')+'／'+(latestRows==null?'—':latestRows)+' 筆／'+(latest.status||'已核對'):'';
+    $('changeBasis').textContent='價格 active 版本：'+(activeHash||'—')+'；版本日期 '+(snapshot.source_version_date||'—')+latestText+'；異動資料以 active／previous 讀回為準。'+(updateBlocked?' 目前 active 已更新，請重新讀取。':'');
+    $('changeCounts').innerHTML=[['changed','調價（筆報價條件）'],['added','新增報價條件'],['unchanged','未變報價條件'],['removed','移除報價條件']].map(pair=>`<div class="change-count"><span>${pair[1]}</span><strong>${counts[pair[0]].toLocaleString('zh-TW')}</strong></div>`).join('');
+    $('changeSummary').textContent=pendingSearch?'正在搜尋完整異動條件…':'本頁顯示 '+rows.length+' 筆；搜尋符合 '+changeCount.toLocaleString('zh-TW')+' 筆，整版共 '+totalChangeCount.toLocaleString('zh-TW')+' 筆報價條件（含缺價欄位，不等同 Excel 機款列數）。';
+    const html=rows.slice(0,100).map(record=>`<tr><td>${esc(record.status==='changed'?'調價':record.status==='added'?'新增':record.status==='removed'?'移除':'未變')}</td><td>${esc(record.modelCapacity||record.model||'—')}</td><td><details><summary>${esc((record.plan||record.condition||'—').slice(0,24))}${String(record.plan||record.condition||'').length>24?'…':''}</summary><span class="raw-condition">${esc(record.plan||record.condition||'—')}</span></details></td><td>${esc(record.provider||'—')}</td><td>${esc(record.grade||'—')}</td><td class="${changePriceClass(record.before)}">${esc(changePrice(record.before))}</td><td class="${changePriceClass(record.after)}">${esc(changePrice(record.after))}</td></tr>`).join('');
+    $('changeResults').innerHTML=html?`<table><thead><tr><th>狀態</th><th>機款／容量</th><th>完整資費／合約／條件</th><th>回收商</th><th>等級</th><th>之前</th><th>目前</th></tr></thead><tbody>${html}</tbody></table>`:'<div class="empty">本頁沒有符合搜尋條件的異動。</div>';
+    $('changePage').textContent='第 '+page+' 頁／共 '+pageCount+' 頁';$('changePrevBtn').disabled=pendingSearch||offset<=0;$('changeNextBtn').disabled=pendingSearch||!set.hasMore;$('changeJsonBtn').disabled=pendingSearch||!set;$('changeCsvBtn').disabled=pendingSearch||!set;
+  }
+  function changePageSize(set){return Number(set&&set.limit||100);}
+  async function loadChangePage(kind,offset,search){const requestGeneration=generation;const changeRequest=++changeRequestGeneration[kind];const response=state[kind];if(!response||!response.snapshot)return;const query=String(search==null?$('changeSearch').value.trim():search);const hash=response.snapshot.snapshot_hash||'';const result=await invokeChanges(kind,offset,100,hash,query);if(requestGeneration!==generation||changeRequest!==changeRequestGeneration[kind]||state[kind]!==response)return;state.changePage[kind]=Object.assign({},result.changeSet||{},{_search:query});renderChanges(kind);}
+  async function fetchAllChanges(kind,search){const requestGeneration=generation;const response=state[kind];if(!response||!response.snapshot)return null;const query=String(search==null?$('changeSearch').value.trim():search);const hash=response.snapshot.snapshot_hash||'';let offset=0;let first=null;let next=null;const records=[];do{const result=await invokeChanges(kind,offset,1000,hash,query);if(requestGeneration!==generation||state[kind]!==response)return null;next=result.changeSet||{};if(next.firstRelease&&DiffCore){const local=DiffCore.diffSnapshots(kind,null,response.snapshot,{limit:Infinity,search:query});return {set:local,records:changeRows(local),search:query};}if(!first)first=next;records.push(...changeRows(next));offset+=Number(next.limit||1000);}while(next.hasMore);return {set:first||{},records,search:query};}
+  async function downloadChanges(kind,format){const fetched=await fetchAllChanges(kind);if(!fetched)return;const set=fetched.set;const records=fetched.records;const body=format==='json'?JSON.stringify({unit:'報價條件',snapshotHash:state[kind].snapshot.snapshot_hash||'',search:fetched.search,totalChangeCount:Number(set.totalChangeCount!=null?set.totalChangeCount:(set.changeCount||records.length)),changeCount:Number(set.changeCount!=null?set.changeCount:records.length),counts:changeCounts(set),changes:records},null,2):[['unit','status','model_or_capacity','condition','provider','grade','before','after'],...records.map(record=>['報價條件',record.status,record.modelCapacity||record.model,record.plan||record.condition,record.provider,record.grade,changePrice(record.before),changePrice(record.after)])].map(row=>row.map(value=>`"${String(value==null?'':value).replace(/"/g,'""')}"`).join(',')).join('\n');const url=URL.createObjectURL(new Blob([format==='json'?body:'\ufeff'+body],{type:format==='json'?'application/json;charset=utf-8':'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='threec-'+kind+'-changes.'+format;link.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
+  function shoppingFilters(){return {segment:shoppingSegment,query:$('shoppingSearch').value,brand:$('shoppingBrand').value,model:$('shoppingModel').value,capacity:$('shoppingCapacity').value,project:$('shoppingProject').value,version:$('shoppingVersion').value,rent:$('shoppingRent').value,term:$('shoppingTerm').value,rowPage,columnPage};}
+  function setShoppingSegment(segment){shoppingSegment=segment;$('consumerSegmentBtn').setAttribute('aria-pressed',String(segment==='consumer'));$('enterpriseSegmentBtn').setAttribute('aria-pressed',String(segment==='enterprise'));$('shoppingSectionTitle').textContent=segment==='enterprise'?'企業用戶專區':'一般手機方案';$('shoppingSectionDescription').textContent=segment==='enterprise'?'僅顯示所選機款原表有報價的企業、員工及眷屬方案；資格與申辦條件請開啟「完整原表條件」核對。':'一般申辦方案；企業、員工與眷屬優惠請切換「企業用戶專區」。';['shoppingProject','shoppingVersion','shoppingTerm'].forEach(id=>$(id).value='');$('shoppingRent').value=segment==='enterprise'?'':'common';rowPage=0;columnPage=0;renderKind('shopping');}
+  function fillSelect(id,values,label){const select=$(id),prior=select.value;select.innerHTML=(id==='shoppingRent'?'<option value="common">999＋1399</option>':'')+`<option value="">${esc(label)}</option>`+values.map(value=>`<option value="${esc(value)}">${esc(value)}${id==='shoppingRent'?' 元':id==='shoppingTerm'?' 期':''}</option>`).join('');select.value=(prior==='common'&&id==='shoppingRent')||values.includes(prior)?prior:'';}
+  function updateShoppingOptions(){
+    if(!shoppingIndex)return;
+    const fields=[['shoppingBrand','brands','全部品牌'],['shoppingModel','models','全部機款'],['shoppingCapacity','capacities','全部容量'],['shoppingProject','projects','全部專案'],['shoppingVersion','versions','一般／VIP／加碼'],['shoppingRent','rents','全部月租'],['shoppingTerm','terms','全部期數']];
+    // Reuse options within this update; invalid selections still reset in order.
+    const optionSets=new Map();
+    fields.forEach(([id,key,label])=>{
+      const filters=shoppingFilters();
+      const signature=JSON.stringify(filters);
+      let options=optionSets.get(signature);
+      if(!options){options=Compare.options(shoppingIndex,filters);optionSets.set(signature,options);}
+      fillSelect(id,options[key],label);
+    });
+  }
+  function columnLabel(col){return `${col.rent?col.rent+' 元':'月租未標示'} · ${col.term?col.term+'期':'期數未標示'} · ${col.version}${col.detail?' · '+col.detail:''}`;}
+  function columnHtml(col){const detail=col.detail.replace(/^[_\s]+/,'');const repeated=detail.replace(/版$/,'').toLocaleLowerCase()===col.version.toLocaleLowerCase();return `<span class="rent-label">${esc(col.rent?col.rent+' 元':'月租未標示')}</span><span class="contract-label">${esc(col.term?col.term+' 期':'期數未標示')} · ${esc(col.version)}</span>${detail&&!repeated?`<span class="condition-detail">${esc(detail)}</span>`:''}<details><summary>完整條件</summary><span class="raw-condition">${esc(col.raw)}</span></details>`;}
+  function variantLabel(row){const names=row.models.map(model=>{const matches=Array.from(model.matchAll(/(?:[-_(\s])(宇宙橙|勃根地紅|午夜|星光|太空灰|鈦原色|黑色?|白色?|藍色?|粉色?|黃色?|綠色?|紫色?|銀色?|金色?)(?=[)\s]|$)/g));return matches.length?matches[matches.length-1][1]:'';}).filter(Boolean);return Array.from(new Set(names)).join('／');}
+  function specIdentity(row){return JSON.stringify([row.brand,row.model,row.capacity,row.ram]);}
+  // Derive display distinctions once per accepted snapshot, never during search input.
+  function findSplitSpecs(index){
+    const specs=new Map(),amount=value=>Number(String(value).trim().replace(/,/g,''));
+    for(const row of index.rows){
+      const quotes=row.projectPrices.filter(price=>Compare.hasPrice(price.value));if(!quotes.length)continue;
+      const key=specIdentity(row),models=JSON.stringify([...row.models].sort());
+      if(!specs.has(key))specs.set(key,{models,prices:new Map(),retail:null,split:false});
+      const spec=specs.get(key);if(spec.models!==models)spec.split=true;
+      for(const quote of quotes){const value=amount(quote.value);if(spec.prices.has(quote.name)&&spec.prices.get(quote.name)!==value)spec.split=true;spec.prices.set(quote.name,value);}
+      if(Compare.hasPrice(row.retailPrice)){const retail=amount(row.retailPrice);if(spec.retail!==null&&spec.retail!==retail)spec.split=true;spec.retail=retail;}
+    }
+    return new Set(Array.from(specs).filter(([,spec])=>spec.split).map(([key])=>key));
+  }
+  function specHtml(row){const variant=splitSpecKeys.has(specIdentity(row))?(variantLabel(row)||[row.models.join('／'),row.codes.join('／')].filter(Boolean).join(' · ')):'';return `<strong>${esc(row.model||'未命名機款')}</strong><span class="spec-tags">${esc([row.capacity,row.ram?'RAM '+row.ram:''].filter(Boolean).join(' · ')||'依原表規格')}</span>${variant?`<span class="variant-label">${esc(variant)}</span>`:''}<span class="brand-label">${Compare.hasPrice(row.retailPrice)?'單機 '+esc(Core.formatPrice(row.retailPrice)):esc(row.brand)}</span><details><summary>來源</summary><span>${row.models.map(esc).join('<br>')}</span><span class="hint">${esc(row.brand)} · ${esc(row.sourceSheet)}${row.codes.length?' · '+row.codes.map(esc).join(' / '):''}</span></details>`;}
+  function cellHtml(row,col){if(!Compare.hasQuote(row,col))return '';const cell=Compare.cell(row,col);return `<span class="quote ${cell.kind}" aria-label="${esc(cell.text)}"><span class="price-value">${esc(cell.text.replace(/ 元$/,''))}</span> <span class="price-unit">元</span></span>`;}
+  function setReadingMode(mode){readingMode=mode;rowPage=0;$('tableModeBtn').setAttribute('aria-pressed',String(mode==='table'));$('cardModeBtn').setAttribute('aria-pressed',String(mode==='card'));$('cardConditionField').classList.toggle('hidden',mode!=='card');renderShopping();}
+  function renderShopping(){
+    const target=$('shoppingResults'),response=state.shopping;
+    if(!response||!response.snapshot){$('shoppingMeta').innerHTML='';$('shoppingSummary').textContent='';target.innerHTML=`<div class="empty">${response?'尚未發布正式資料：手機專案／3C。':'尚未讀取正式手機專案資料。'}</div>`;['columnPrev','columnNext','rowPrev','rowNext'].forEach(id=>$(id).disabled=true);return;}
+    $('shoppingMeta').innerHTML=metaHtml(Core.sourceMeta(response.snapshot,response.registry,'shopping'));
+    const viewOptions={includeOptions:false,...(readingMode==='card'?{cardConditionKey:$('shoppingCardCondition').value}:{})};
+    shoppingView=Compare.buildView(shoppingIndex,shoppingFilters(),viewOptions);
+    if(rowPage>=shoppingView.rowPages||columnPage>=shoppingView.columnPages){rowPage=0;columnPage=0;shoppingView=Compare.buildView(shoppingIndex,shoppingFilters(),viewOptions);}
+    const view=shoppingView;
+    $('shoppingSummary').textContent=`${readingMode==='card'?'本方案':'本組方案'}符合 ${view.totalRows} 組機款報價 · 篩選共 ${view.totalColumns} 個有價條件 · 本頁 ${view.rows.length} 組`;
+    $('rowPage').textContent=`${rowPage+1} / ${view.rowPages} 頁`;$('columnPage').textContent=`${columnPage+1} / ${view.columnPages} 組`;
+    $('rowPrev').disabled=rowPage===0;$('rowNext').disabled=rowPage+1>=view.rowPages;$('columnPrev').disabled=columnPage===0;$('columnNext').disabled=columnPage+1>=view.columnPages;
+    const select=$('shoppingCardCondition'),prior=select.value;select.innerHTML=view.columns.map(col=>`<option value="${esc(col.key)}">${esc(col.project+' · '+columnLabel(col))}</option>`).join('');if(view.cardConditionKey)select.value=view.cardConditionKey;else if(view.columns.some(col=>col.key===prior))select.value=prior;
+    $('cardConditionField').classList.toggle('hidden',readingMode!=='card');
+    if(!view.rows.length||!view.columns.length){target.innerHTML='<div class="empty">沒有符合搜尋或資費篩選的正式報價。請調整條件或重設篩選。</div>';return;}
+    if(readingMode==='card'){
+      const col=view.columns.find(col=>col.key===select.value)||view.columns[0];
+      target.innerHTML=`<p class="scroll-hint">一次閱讀一個方案；可切換「橫向比較」對照其他期數。</p><div class="quote-cards">`+view.rows.map(row=>`<article class="quote-card"><div class="spec-cell">${specHtml(row)}</div><div class="card-plan"><span>${esc(col.project)}</span><strong>${esc(columnLabel(col))}</strong>${cellHtml(row,col)}<details><summary>完整原表條件</summary><p>${esc(col.raw)}</p></details></div></article>`).join('')+'</div>';
+    }else{
+      target.innerHTML=`<p class="scroll-hint"><span class="narrow-scroll-hint">左右滑動比較；機款固定在左側。 </span>價格含 0 元；空格表示此機款沒有該條件報價。展開可核對完整條件。</p><div class="table-scroll comparison-scroll" tabindex="0" role="region" aria-label="手機專案橫向價格比較"><table class="comparison-table" style="--comparison-columns:${view.columns.length}"><caption class="visually-hidden">正式手機專案價格，依機款規格與完整方案條件對照</caption><thead><tr><th class="spec-cell" scope="col">機款／規格<br><span class="hint">專案價單位：元</span></th>${view.columns.map(col=>`<th scope="col"><span class="project-label" title="${esc(col.project)}">${esc(col.project)}</span>${columnHtml(col)}</th>`).join('')}</tr></thead><tbody>${view.rows.map(row=>`<tr><th scope="row" class="spec-cell">${specHtml(row)}</th>${view.columns.map(col=>`<td>${cellHtml(row,col)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    }
+  }
+  function renderTradein(view){
+    const target=$('tradeinResults');
+    if(!view){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未讀取正式舊換新資料。</div>';return;}
+    if(!view.available){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未發布正式資料：舊換新。</div>';return;}
+    $('tradeinMeta').innerHTML=metaHtml(view.meta);
+    if(!view.rows.length){target.innerHTML='<div class="empty">沒有符合搜尋條件的正式機款。</div>';return;}
+    const notice=view.limited?`<div class="status warn">目前顯示前 ${view.displayLimit} 筆（符合條件共 ${view.totalRows} 筆）。請先從「選機款」縮小範圍後查看完整資料。</div>`:'';
+    const selectedProvider=$('tradeinProvider').value,selectedGrade=$('tradeinGrade').value;
+    target.innerHTML=notice+view.rows.map(row=>`<article class="provider"><h3>${esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')}</h3><p class="group-note">來源工作表：${esc(row.sourceSheet||'—')}</p>${Core.quotedProviders(row,selectedProvider,selectedGrade).map(provider=>{const grades=Core.quotedGrades(row,provider,selectedGrade);return `<div class="table-scroll"><table><thead><tr><th colspan="${grades.length+1}">${esc(provider)}（獨立報價）</th></tr><tr><th>原始機型／容量</th>${grades.map(grade=>`<th>${esc(Core.gradeLabel(grade))}</th>`).join('')}</tr></thead><tbody><tr><td>${esc(row.model||'—')}</td>${grades.map(grade=>`<td>${esc(Core.formatPrice(row.quotes[provider]&&row.quotes[provider][grade]))}</td>`).join('')}</tr></tbody></table></div>`;}).join('')}</article>`).join('');
+  }
+  function renderKind(kind){if(kind==='shopping'){if(shoppingIndex)updateShoppingOptions();renderShopping();renderChanges(kind);return;}const search=$('tradeinSearch').value,modelKey=$('tradeinModel').value;const response=state[kind];const view=response?Core.buildView(kind,response,{query:search,modelKey,provider:$('tradeinProvider').value,grade:$('tradeinGrade').value}):null;renderTradein(view);renderChanges(kind);if(view){const select=$('tradeinModel'),prior=select.value;select.innerHTML='<option value="">全部機款</option>'+view.modelOptions.map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');if(view.modelOptions.some(option=>option.value===prior))select.value=prior;}}
+  function showKind(kind){state.active=kind;['shopping','tradein'].forEach(value=>{const tab=$(value+'Tab'),pane=$(value+'Pane');const active=value===kind;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));pane.classList.toggle('hidden',!active);});renderChanges(kind);const query=$('changeSearch').value.trim();const set=state.changePage[kind]||responseChangeSet(state[kind]);if(state[kind]&&!state[kind].changesDeferred&&(!set||String(set._search||'')!==query))loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad'));}
+  async function refresh(){
+    const requestGeneration=++generation;
+    state.loading=true;$('refreshBtn').disabled=true;setStatus('正在讀取正式價格…');clearResults();
+    const outcomes={};
+    function progress(){
+      // Each route presents its own price category. The shared reader keeps
+      // the existing payload/transport and other-category state unchanged.
+      const result=outcomes[queryKind];
+      if(!result){setStatus('正在讀取正式價格…');return;}
+      const name=queryKind==='shopping'?'手機專案價查詢':'回收價查詢';
+      if(result.error){setStatus(name+'：'+result.error+'；正式資料已清除，請重新整理。','bad');return;}
+      const available=!!state[queryKind]?.snapshot;
+      setStatus(available?'已讀取正式資料；請依版本／日期核對後查詢。':name+' 尚未發布正式資料。',available?'ok':'warn');
+    }
+    try{
+      await Promise.all(['shopping','tradein'].map(async kind=>{
+        try{
+          const response=await invoke(kind);
+          if(requestGeneration!==generation)return;
+          const index=kind==='shopping'?Compare.buildIndex(response.snapshot||{}):null;
+          state[kind]=response;if(kind==='shopping'){shoppingIndex=index;splitSpecKeys=findSplitSpecs(index);}
+          outcomes[kind]={};renderKind(kind);
+        }catch(error){
+          if(requestGeneration!==generation)return;
+          outcomes[kind]={error:String(error.message||'正式資料讀取失敗')};
+        }
+        if(requestGeneration===generation)progress();
+      }));
+    }finally{if(requestGeneration===generation){state.loading=false;$('refreshBtn').disabled=false;}}
+  }
+  function bind(){
+    $('consumerSegmentBtn').addEventListener('click',()=>setShoppingSegment('consumer'));$('enterpriseSegmentBtn').addEventListener('click',()=>setShoppingSegment('enterprise'));
+    $('refreshBtn').addEventListener('click',refresh);
+    $('changeLoadBtn').addEventListener('click',async()=>{const kind=state.active,readGeneration=generation;if(changeLoading[kind])return;changeLoading[kind]=true;renderChanges(kind);try{await loadChangePage(kind,0,$('changeSearch').value.trim());}catch(error){if(readGeneration!==generation||kind!==state.active)return;$('changeSummary').textContent='異動明細讀取失敗：'+error.message+'；正式價格仍可查詢。';}finally{if(readGeneration===generation){changeLoading[kind]=false;$('changeLoadBtn').disabled=false;}}});
+    document.querySelectorAll('[data-kind]').forEach(button=>button.addEventListener('click',()=>showKind(button.dataset.kind)));
+    ['shoppingBrand','shoppingModel','shoppingCapacity','shoppingProject','shoppingVersion','shoppingRent','shoppingTerm'].forEach(id=>$(id).addEventListener('change',()=>{rowPage=0;columnPage=0;renderKind('shopping');}));
+    // Catalog options do not depend on the search query; keep select updates on filter changes.
+    $('shoppingSearch').addEventListener('input',()=>{rowPage=0;columnPage=0;renderShopping();renderChanges('shopping');});
+    ['tradeinSearch','tradeinModel','tradeinProvider','tradeinGrade'].forEach(id=>$(id).addEventListener(id.endsWith('Search')?'input':'change',()=>renderKind('tradein')));
+    $('shoppingReset').addEventListener('click',()=>{['shoppingSearch','shoppingBrand','shoppingModel','shoppingCapacity','shoppingProject','shoppingVersion','shoppingTerm'].forEach(id=>$(id).value='');$('shoppingRent').value=shoppingSegment==='enterprise'?'':'common';rowPage=0;columnPage=0;renderKind('shopping');});
+    document.querySelectorAll('[data-shortcut]').forEach(button=>button.addEventListener('click',()=>{const value=button.dataset.shortcut;const [rent,term]=value.split('-');$('shoppingRent').value=rent;$('shoppingTerm').value=term||'';$('shoppingVersion').value='';rowPage=0;columnPage=0;renderKind('shopping');}));
+    $('tableModeBtn').addEventListener('click',()=>setReadingMode('table'));$('cardModeBtn').addEventListener('click',()=>setReadingMode('card'));$('shoppingCardCondition').addEventListener('change',()=>{rowPage=0;renderShopping();});
+    [['rowPrev','row',-1],['rowNext','row',1],['columnPrev','column',-1],['columnNext','column',1]].forEach(([id,axis,direction])=>$(id).addEventListener('click',()=>{if(axis==='row')rowPage+=direction;else{columnPage+=direction;rowPage=0;}renderShopping();}));
+    if(scope.matchMedia('(max-width:700px)').matches)document.querySelector('.filter-details').open=false;
+    setShoppingSegment(shoppingSegment);setReadingMode(readingMode);
+    let changeSearchTimer=0;
+    $('changeSearch').addEventListener('input',()=>{const kind=state.active;const query=$('changeSearch').value.trim();state.changePage[kind]=null;renderChanges(kind);clearTimeout(changeSearchTimer);changeSearchTimer=setTimeout(()=>loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad')),250);});
+    $('changePrevBtn').addEventListener('click',()=>{const kind=state.active;const set=state.changePage[kind]||responseChangeSet(state[kind]);const size=changePageSize(set);if(set&&Number(set.offset||0)>=size)loadChangePage(kind,Math.max(0,Number(set.offset||0)-size),$('changeSearch').value.trim()).catch(error=>setStatus(error.message,'bad'));});
+    $('changeNextBtn').addEventListener('click',()=>{const kind=state.active;const set=state.changePage[kind]||responseChangeSet(state[kind]);if(set&&set.hasMore)loadChangePage(kind,Number(set.offset||0)+changePageSize(set),$('changeSearch').value.trim()).catch(error=>setStatus(error.message,'bad'));});
+    $('changeJsonBtn').addEventListener('click',()=>downloadChanges(state.active,'json').catch(error=>setStatus(error.message,'bad')));
+    $('changeCsvBtn').addEventListener('click',()=>downloadChanges(state.active,'csv').catch(error=>setStatus(error.message,'bad')));
+    scope.addEventListener('pagehide',()=>{generation+=1;clearResults();});
+    scope.addEventListener('pageshow',event=>{if(event.persisted)refresh();});
+    showKind(queryKind);
+    refresh();
+  }
+  if(!Core||!Compare||!Transport){setStatus('查詢元件載入失敗。','bad');return;}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+})(window);

@@ -55,8 +55,8 @@ for(const width of [1280,390,360])test(`${width}px 橫滑固定規格、卡片�
  await expect(page.locator('#shoppingCardCondition option')).not.toContainText(['加碼']);
  await page.locator('#shoppingCardCondition').selectOption(fixture.p(999,24,'VIP'));
  await expect(page.locator('.quote-cards')).not.toContainText('無報價（缺價）');
- await page.locator('#tradeinTab').click();await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
- await page.locator('#shoppingTab').click();await expect(page.locator('.quote-cards')).toBeVisible();expect(errors).toEqual([]);
+ await page.goto('file://'+path.resolve(__dirname,'../tradein-query.html'));await expect(page.locator('#tradeinResults')).toContainText('FutureDial（FDI）（獨立報價）');
+ await page.goto(URL);if(width>700)await page.locator('#cardModeBtn').click();await expect(page.locator('.quote-cards')).toBeVisible();expect(errors).toEqual([]);
 });
 test('大量條件與機款獨立分页，不一次展開所有維度',async({page})=>{
  const response=JSON.parse(JSON.stringify(fixture.shopping));response.snapshot.rows=Array.from({length:25},(_,i)=>({...fixture.shopping.snapshot.rows[0],model:'大量機款 '+i+' 256GB',colorless_model:'大量機款 '+i+' 256GB',project_prices:Object.fromEntries(Array.from({length:18},(_,j)=>[fixture.p(999,24+j),j]))}));
