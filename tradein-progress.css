@@ -11,3 +11,4 @@ body{font-size:17px}.meta,.info{font-size:15px}input[type=password],input[type=t
 
 .pending-progress{margin-top:20px}.pending-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}.pending-tabs button{background:#fff;color:var(--ink);border:1px solid var(--line)}.pending-tabs button[aria-selected="true"]{background:var(--soft);color:#ad490e;border-color:#e79c6d}.pending-scope h3{margin:0 0 12px}.pending-scope .kpi strong{font-size:24px}.pending-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.pending-progress .info{margin-top:16px}@media(max-width:700px){.pending-grid{grid-template-columns:1fr}.pending-tabs button{flex:1;padding:9px 10px}.pending-scope .kpi strong{font-size:20px}}
 @media(max-width:380px){.pending-tabs button{font-size:13px;padding:9px 6px;white-space:nowrap;min-width:0}}
+.maintenance .scope-confirm input{width:20px;min-width:20px;height:20px;min-height:20px;padding:0;flex:0 0 20px}

@@ -84,7 +84,7 @@ test('home omits the import lab entry while retaining its maintenance page and f
 test('home and APP expose the same public price routes without unreleased performance links', () => {
   const area=cardFor(navigation('同仁大廳'),'tradein-query.html');
   assert.match(area, /<h3>舊換新專區<\/h3>/);
-  assert.match(area, /查詢兩家回收報價/);
+  assert.match(area, /回收價查詢與每月目標進度/);
   assert.doesNotMatch(navigation('同仁大廳'), /href="tradein-progress\.html"/);
   const app=fs.readFileSync(path.resolve(__dirname,'../app.html'),'utf8');
   assert.match(app, /href="threec-query\.html">手機專案價查詢/);
@@ -95,6 +95,6 @@ test('home and APP expose the same public price routes without unreleased perfor
   assert.doesNotMatch(app, /href="tradein-progress\.html"/);
   assert.match(recovery, /href="tradein-progress\.html">目標進度/);
   const progress=fs.readFileSync(path.resolve(__dirname,'../tradein-progress.html'),'utf8');
-  assert.match(progress, /data-performance-release="pending"/);
+  assert.match(progress, /data-performance-release="public"/);
   assert.doesNotMatch(html+recovery, /整合候選|尚未上線/);
 });

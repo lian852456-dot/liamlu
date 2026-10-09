@@ -5,9 +5,10 @@ const fs=require('node:fs/promises');
 const http=require('node:http');
 const path=require('node:path');
 const Core=require('../tradein-performance-core.js');
+const Ref=require('./tradein-reference-fixture.cjs');
 // All identities, transactions, and API replies below are synthetic. These tests
-// verify retained PR179 UI with a ready HTML reply only inside this synthetic
-// test server. The candidate ships pending; this does not validate real runtime.
+// verify historical private PR179 UI fixture with a ready reply only inside this synthetic
+// test server. The production candidate has a separate anonymous UI; this fixture only prevents private-reader regressions.
 let PAGE,localServer;
 test.beforeAll(async()=>{
   if(process.env.TEST_BASE_URL){PAGE=new URL('tradein-progress.html',process.env.TEST_BASE_URL).href;return;}
@@ -25,16 +26,17 @@ test.beforeAll(async()=>{
   PAGE=`http://127.0.0.1:${localServer.address().port}/tradein-progress.html`;
 });
 test.afterAll(async()=>{if(localServer)await new Promise(resolve=>localServer.close(resolve));});
-const staff=(id,store,role)=>({employee_id:'55'+id,masked_name:'測＊'+id.slice(-1),store,role,status:'active'});
+const staff=(id,store,role)=>({employee_id:Ref.IDS[id],masked_name:'測＊'+id.slice(-1),store,role,status:'active'});
 function snapshot(){
   const records=[['a','12345','DNB10168'],['b','12346','DNB10168'],['c','12346','DNB10168'],['d','12347','DNB10146']].map(([key,id,store])=>({
     store_code:store,source_employee_id:id,trade_date:'2026-10-02',cancel_date:null,project:'單銷',recycle_code:'synthetic-'+key,order_number:'synthetic-order-'+key
   }));
-  const value=Core.build({month:'2026-10',source_start:'2026-10-01',source_end:'2026-10-07',status_as_of_date:'2026-10-07',
-    rule_id:Core.RULE_ID,source_sha256:'a'.repeat(64),complete_nine_stores:true,records},[
+  const source={month:'2026-10',source_start:'2026-10-01',source_end:'2026-10-07',status_as_of_date:'2026-10-07',
+    rule_id:Core.RULE_ID,source_sha256:'a'.repeat(64),complete_nine_stores:true,records};
+  const value=Core.build(source,[
     staff('12345','台北萬大','業務代表(I)'),staff('12346','台北萬大','店長'),
     staff('12347','台北杭州南','代理店長'),staff('12348','台北三創','資深業務代表')
-  ]);
+  ],Ref.reference(source));
   value.published_at='2026-10-08T09:00:00+08:00';
   value.people=value.people.map(({employee_key,...person})=>person);
   return value;
@@ -47,7 +49,7 @@ async function start(page,{person=0,supervisor=false,deny=false,viewport={width:
   await page.route('**/*',async route=>{
     const url=new URL(route.request().url());
     if(url.origin===new URL(PAGE).origin){
-      if(url.pathname.endsWith('/tradein-progress.html'))return route.fulfill({contentType:'text/html; charset=utf-8',body:(await fs.readFile(path.resolve(__dirname,'../tradein-progress.html'),'utf8')).replace('data-performance-release="pending"','data-performance-release="ready"')});
+      if(url.pathname.endsWith('/tradein-progress.html'))return route.fulfill({contentType:'text/html; charset=utf-8',body:(await fs.readFile(path.resolve(__dirname,'./fixtures/tradein-private-progress.html'),'utf8')).replace('data-performance-release="pending"','data-performance-release="ready"')});
       return route.continue();
     }
     if(url.hostname!=='script.google.com')return route.abort('blockedbyclient');
@@ -82,7 +84,7 @@ for(const width of [1280,390])test(`${width}px retained self progress and actual
     expect(download.suggestedFilename()).toContain('2026-10_截至2026-10-07_本人');
     expect(download.suggestedFilename()).toMatch(new RegExp(extension.replace('.','\\.')+'$'));
     const bytes=await fs.readFile(await download.path());expect(bytes.subarray(0,signature.length)).toEqual(signature);
-    expect(bytes.length).toBeGreaterThan(1000);expect(bytes.includes(Buffer.from('5512345'))).toBe(false);
+    expect(bytes.length).toBeGreaterThan(1000);expect(bytes.includes(Buffer.from('ZX00001'))).toBe(false);
     await download.saveAs(testInfo.outputPath('synthetic-export'+extension));
   }
   // Exercise the documented fallback without granting clipboard permissions.
@@ -121,3 +123,6 @@ test('a rejected API read keeps private contents and exports unavailable',async(
   await expect(page.locator('#privateWorkspace')).toBeHidden();await expect(page.locator('#storeRows tr')).toHaveCount(0);
   await expect(page.locator('#reminderText')).toHaveValue('');expect(errors).toEqual([]);
 });
+
+// The public page runs beside the protected regression in the existing CI entry.
+require('./helpers/tradein-public-ui-contract.cjs')();
