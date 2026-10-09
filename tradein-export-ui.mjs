@@ -41,8 +41,8 @@ async function operate(kind){
 export function refreshExports(){
   revision++;canvas=null;feedback('');
   const context=contextReader();
-  const supervisor=context.mode==='supervisor',prior=$('exportScope').value;
-  $('exportScope').replaceChildren(...(supervisor?[['current','目前明細範圍'],['all','全部授權店點']]:[['self','本人']]).map(([value,text])=>{const o=document.createElement('option');o.value=value;o.textContent=text;return o;}));
+  const supervisor=['supervisor','public'].includes(context.mode),prior=$('exportScope').value;
+  $('exportScope').replaceChildren(...(supervisor?[['current','目前明細範圍'],['all',context.mode==='public'?'全區九店':'全部授權店點']]:[['self','本人']]).map(([value,text])=>{const o=document.createElement('option');o.value=value;o.textContent=text;return o;}));
   if(supervisor&&['current','all'].includes(prior))$('exportScope').value=prior;
   updatePreview();
 }

@@ -57,7 +57,7 @@ function createRuntime(options={}){
  setMonthlyRoster('2026-10',people);setMonthlyRoster('2026-11',people);
  function dispatch(payload){
   try{
-   const method={tradein_performance_read:'tradeinPerformanceRead',tradein_performance_preview:'tradeinPerformancePreview',tradein_performance_publish:'tradeinPerformancePublish',tradein_performance_rollback:'tradeinPerformanceRollback'}[payload.action];
+   const method={tradein_performance_public_read:'tradeinPerformancePublicRead',tradein_performance_public_publish:'tradeinPerformancePublicPublish',tradein_performance_checkpoint_status:'tradeinPerformanceCheckpointStatus',tradein_performance_checkpoint_capture:'tradeinPerformanceCheckpointCapture',tradein_performance_checkpoint_restore:'tradeinPerformanceCheckpointRestore',tradein_performance_read:'tradeinPerformanceRead',tradein_performance_preview:'tradeinPerformancePreview',tradein_performance_publish:'tradeinPerformancePublish',tradein_performance_rollback:'tradeinPerformanceRollback'}[payload.action];
    if(!method)throw Error('未允許的合成API');const result=context[method](payload);return {status:'ok',...result};
   }catch(error){return {status:'error',message:error.message};}
  }

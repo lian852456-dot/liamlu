@@ -7,8 +7,8 @@ const path=require('node:path');
 const Core=require('../tradein-performance-core.js');
 const Ref=require('./tradein-reference-fixture.cjs');
 // All identities, transactions, and API replies below are synthetic. These tests
-// verify retained PR179 UI with a ready HTML reply only inside this synthetic
-// test server. The candidate ships pending; this does not validate real runtime.
+// verify historical private PR179 UI fixture with a ready reply only inside this synthetic
+// test server. The production candidate has a separate anonymous UI; this fixture only prevents private-reader regressions.
 let PAGE,localServer;
 test.beforeAll(async()=>{
   if(process.env.TEST_BASE_URL){PAGE=new URL('tradein-progress.html',process.env.TEST_BASE_URL).href;return;}
@@ -49,7 +49,7 @@ async function start(page,{person=0,supervisor=false,deny=false,viewport={width:
   await page.route('**/*',async route=>{
     const url=new URL(route.request().url());
     if(url.origin===new URL(PAGE).origin){
-      if(url.pathname.endsWith('/tradein-progress.html'))return route.fulfill({contentType:'text/html; charset=utf-8',body:(await fs.readFile(path.resolve(__dirname,'../tradein-progress.html'),'utf8')).replace('data-performance-release="pending"','data-performance-release="ready"')});
+      if(url.pathname.endsWith('/tradein-progress.html'))return route.fulfill({contentType:'text/html; charset=utf-8',body:(await fs.readFile(path.resolve(__dirname,'./fixtures/tradein-private-progress.html'),'utf8')).replace('data-performance-release="pending"','data-performance-release="ready"')});
       return route.continue();
     }
     if(url.hostname!=='script.google.com')return route.abort('blockedbyclient');

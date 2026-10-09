@@ -11,18 +11,18 @@ export function describePerson(person,rules=DEFAULT_RULES){
   const [store,name,role,raw]=person;
   if(raw!==null&&(!Number.isSafeInteger(raw)||raw<0))throw new Error('實績型別或數值無效，停止匯出。');
   const actual=hasMonthlySource(rules)?raw:null;
-  const exempt=role==='店長'||role==='代理店長'&&rules.actingManager==='exempt';
+  const exempt=role==='免目標'||role==='店長'||role==='代理店長'&&rules.actingManager==='exempt';
   const target=role==='同仁'?rules.staffTarget:null;
   const remaining=target!==null&&actual!==null?Math.max(0,target-actual):null;
   const status=exempt?'不設目標':role!=='同仁'?'未知（身份／職務待核）':actual===null?'未知（實績未提供）':actual>=target?(rules.isDemo?'示意達標':'已達標'):(rules.isDemo?'示意進行中':'進行中');
   const missing=!hasMonthlySource(rules)?'選定月份來源未提供':'實績未提供';
-  const reason=exempt?role+'免目標'+(actual===null?'；'+missing:''):role!=='同仁'?'身份／職務待確認':actual===null?missing+'；每月 3 台':(rules.isDemo?'每月 3 台；實績為示意':'每月 3 台；單銷計入，含取消交易待核');
+  const reason=exempt?(role==='免目標'?'不設目標':role+'免目標')+(actual===null?'；'+missing:''):role!=='同仁'?'身份／職務待確認':actual===null?missing+'；每月 3 台':(rules.isDemo?'每月 3 台；實績為示意':'每月 3 台；單銷計入，含取消交易待核');
   return Object.freeze({store:String(store),name:String(name),role:String(role),actual,target,remaining,status,reason});
 }
 export function buildExportModel(context,scope,rules=DEFAULT_RULES){
   if(!context||!context.active)throw new Error('請先完成登入並讀取資料。');
   if(!['self','current','all'].includes(scope))throw new Error('匯出範圍無效。');
-  if(context.mode!=='supervisor'&&scope!=='self')throw new Error('此角色只能匯出本人。');
+  if(!['supervisor','public'].includes(context.mode)&&scope!=='self')throw new Error('此角色只能匯出本人。');
   const monthRules=rulesForMonth(rules.month);
   if(![rules.start,rules.end,rules.sourceStart,rules.sourceEnd,rules.cutoff].every(isDate)||rules.start!==monthRules.start||rules.end!==monthRules.end||rules.sourceStart>rules.sourceEnd||rules.cutoff!==rules.sourceEnd)throw new Error('本期須為選定月份的完整日曆月，來源日期須有效。');
   if(rules.staffTarget!==3||rules.actingManager!=='exempt'||rules.cadence!=='monthly'||rules.periodStatus!=='confirmed')throw new Error('已核定每月 3 台，店長與代理店長免目標。');
@@ -36,7 +36,7 @@ export function buildExportModel(context,scope,rules=DEFAULT_RULES){
     const store=scope==='current'?context.selectedStore:'';
     if(store&&!allowed.has(store))throw new Error('此店點不在目前授權範圍。');
     rows=context.people.filter(p=>allowed.has(p[0])&&(!store||p[0]===store));
-    scopeLabel=store?store+' · 已授權'+(rules.isDemo?'示意':''):'全部已授權店點'+(rules.isDemo?' · 示意':'');
+    scopeLabel=context.mode==='public'?(store?store+' · 公開進度':'全區九店 · 公開進度'):(store?store+' · 已授權'+(rules.isDemo?'示意':''):'全部已授權店點'+(rules.isDemo?' · 示意':''));
   }
   if(!rows.length)throw new Error('此範圍沒有可匯出的資料。');
   if(rows.length>100)throw new Error('資料超過 100 人，請縮小匯出範圍。');
