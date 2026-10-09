@@ -1,1 +1,39 @@
 .area-nav{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap}.area-nav a{padding:12px 20px;border-radius:10px;text-decoration:none;border:1px solid #e4e7ec;background:#fff;color:#435065;font-weight:700}.area-nav a.active{background:#fff0e2;color:#b64b00;border-color:#ff984f}.legacy-tabs{display:none!important}body[data-query-kind="shopping"] #tradeinPane,body[data-query-kind="tradein"] #shoppingPane{display:none!important}
+
+/* The progress page shares the recovery-price page's width and reading scale. */
+body[data-performance-release="public"]{--ink:#252a31;--muted:#687078;--line:#e5e5e5;--bg:#faf9f7;--orange:#d76526;--soft:#fff0e6;font:18px/1.6 system-ui,-apple-system,"Microsoft JhengHei",sans-serif}
+body[data-performance-release="public"] main{width:min(1640px,calc(100% - 32px));max-width:none;margin:16px auto 32px;padding:0}
+body[data-performance-release="public"] .hero{padding:14px 20px;border:0;border-top:5px solid #f36b00;border-radius:14px;box-shadow:0 4px 24px #28200d08}
+body[data-performance-release="public"] .hero:after{display:none}
+body[data-performance-release="public"] .hero h1{margin:0;font-size:26px;line-height:1.6;letter-spacing:.02em}
+body[data-performance-release="public"] .hero p{max-width:none;font-size:15px;margin:5px 0 0}
+body[data-performance-release="public"] .hero .topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border:0}
+body[data-performance-release="public"] .panel{padding:16px;border-radius:14px;margin-top:12px}
+body[data-performance-release="public"] .panel h2{font-size:20px}
+body[data-performance-release="public"] label,body[data-performance-release="public"] table,body[data-performance-release="public"] th,body[data-performance-release="public"] td strong,body[data-performance-release="public"] .kpi span{font-size:18px}
+body[data-performance-release="public"] table{min-width:0}
+body[data-performance-release="public"] .meta{display:block;border:0;background:none;padding:0;margin:0;font-size:15px!important}
+body[data-performance-release="public"] .kpi small,body[data-performance-release="public"] td small,body[data-performance-release="public"] .badge,body[data-performance-release="public"] .export-preview summary,body[data-performance-release="public"] .export-rules summary{font-size:15px}
+body[data-performance-release="public"] .kpi strong{font-size:32px}
+body[data-performance-release="public"] .role-select{justify-content:flex-start;gap:16px;align-items:end}
+body[data-performance-release="public"] .role-select>strong{margin-right:auto;font-size:20px}
+body[data-performance-release="public"] .form-message{overflow-wrap:anywhere}
+body[data-performance-release="public"] #readMessage:empty{display:none}
+body[data-performance-release="public"] .footer{max-width:none;width:min(1640px,calc(100% - 32px));padding:18px 0;font-size:15px}
+body[data-performance-release="public"] .export-feedback,body[data-performance-release="public"] .export-preview textarea{font-size:18px}
+@media(max-width:700px){
+ body[data-performance-release="public"] main,body[data-performance-release="public"] .footer{width:calc(100% - 16px);margin:8px auto 32px}
+ body[data-performance-release="public"] .hero{padding:18px 16px}
+ body[data-performance-release="public"] .hero h1{font-size:25px}
+ body[data-performance-release="public"] .hero p{font-size:18px}
+ body[data-performance-release="public"] .panel{padding:16px 12px}
+ body[data-performance-release="public"] .role-select{align-items:stretch}
+ body[data-performance-release="public"] .role-select>strong{width:100%}
+ body[data-performance-release="public"] .role-select label{flex:1;min-width:0}
+ body[data-performance-release="public"] .role-select input{width:100%;min-width:0}
+ body[data-performance-release="public"] .mobile-stack td:before{font-size:18px}
+ body[data-performance-release="public"] .mobile-stack td{grid-template-columns:100px minmax(0,1fr);overflow-wrap:anywhere}
+ body[data-performance-release="public"] .mobile-stack td:first-child strong{font-size:18px}
+ body[data-performance-release="public"] .kpi{padding:14px 12px}
+ body[data-performance-release="public"] .kpi strong{font-size:28px}
+}

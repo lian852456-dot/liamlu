@@ -21,7 +21,7 @@ const STORE_INSPECTION_URL = 'https://twm-store-inspection.liamlu245.chatgpt.sit
 const UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
 const EXPECTED_HREFS = [
   'kpi-battle.html', 'awards-battle.html', 'index.html', 'gold-medal.html',
-  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'threec-query.html', 'tradein-query.html',
+  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'threec-query.html', 'tradein-progress.html',
   'department-ops.html', 'patrol.html',
   'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
   'phone-stock-dashboard.html'
@@ -261,7 +261,7 @@ for (const viewport of [{width:1280,height:1300},{width:390,height:844}]) {
     const lab = page.locator('a[href="tradein-import-lab.html"]');
     const lookup = page.locator('a.card[href="threec-query.html"]');
     const upload = page.locator(`a.card[href="${UPLOAD_URL}"]`);
-    const area = page.locator('a.card[href="tradein-query.html"]');
+    const area = page.locator('a.card[href="tradein-progress.html"]');
     await expect(lab).toHaveCount(0);
     for (const query of ['匯入測試區','3C','舊換新','']) {
       await page.locator('#tool-search').fill(query);

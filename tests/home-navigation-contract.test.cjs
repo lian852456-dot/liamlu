@@ -30,7 +30,7 @@ test('home navigation retains PR179 performance and PR181 lab removal', () => {
   assert.deepEqual(staffHrefs, [
     'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html',
     'https://twm-store-inspection.liamlu245.chatgpt.site/',
-    'threec-query.html', 'tradein-query.html'
+    'threec-query.html', 'tradein-progress.html'
   ]);
   assert.equal(cards(navigation('督導專區')).length, 6);
   assert.equal(cards(html).length, 4 + staffHrefs.length + 6);
@@ -81,20 +81,22 @@ test('home omits the import lab entry while retaining its maintenance page and f
   assert.match(upload[0], /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
 });
 
-test('home and APP expose the same public price routes without unreleased performance links', () => {
-  const area=cardFor(navigation('同仁大廳'),'tradein-query.html');
+test('home and APP open target progress first and retain recovery price navigation', () => {
+  const area=cardFor(navigation('同仁大廳'),'tradein-progress.html');
   assert.match(area, /<h3>舊換新專區<\/h3>/);
-  assert.match(area, /回收價查詢與每月目標進度/);
-  assert.doesNotMatch(navigation('同仁大廳'), /href="tradein-progress\.html"/);
+  assert.match(area, /每月目標進度與回收價查詢/);
   const app=fs.readFileSync(path.resolve(__dirname,'../app.html'),'utf8');
   assert.match(app, /href="threec-query\.html">手機專案價查詢/);
-  assert.match(app, /href="tradein-query\.html">舊換新專區/);
+  assert.match(app, /href="tradein-progress\.html">舊換新專區/);
   const recovery=fs.readFileSync(path.resolve(__dirname,'../tradein-query.html'),'utf8');
   assert.match(recovery, /<h1>舊換新專區<\/h1>/);
   assert.match(recovery, /id="tradeinResults"/);
-  assert.doesNotMatch(app, /href="tradein-progress\.html"/);
   assert.match(recovery, /href="tradein-progress\.html">目標進度/);
   const progress=fs.readFileSync(path.resolve(__dirname,'../tradein-progress.html'),'utf8');
   assert.match(progress, /data-performance-release="public"/);
+  for(const page of [progress,recovery]){
+    const nav=page.match(/<nav class="area-nav"[\s\S]*?<\/nav>/)[0];
+    assert.ok(nav.indexOf('目標進度')<nav.indexOf('回收價查詢'));
+  }
   assert.doesNotMatch(html+recovery, /整合候選|尚未上線/);
 });
