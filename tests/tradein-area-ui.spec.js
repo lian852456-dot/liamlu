@@ -51,10 +51,11 @@ for(const width of [1280,390,320])test(`${width}px public price routes work from
   await expect(page.locator('#tradeinResults')).toContainText('0 元');
   await expect(page.locator('#shoppingPane')).toBeHidden();await noOverflow(page);
   await page.screenshot({path:testInfo.outputPath(`SYNTHETIC-recovery-${width}.png`),fullPage:true});
-  await expect(page.locator('a[href="tradein-progress.html"]')).toHaveCount(0);
+  await expect(page.locator('a[href="tradein-progress.html"]')).toHaveText('目標進度');
+  await expect(page.locator('.area-nav')).not.toContainText('手機專案價查詢');
   await expect(page.locator('#employeeId')).toHaveCount(0);
-  await page.getByRole('link',{name:'手機專案價查詢',exact:true}).click();
-  await page.goto(new URL('threec-query.html',BASE).href);
+  await page.locator('.home-link').click();
+  await page.locator('a.card[href="threec-query.html"]').click();
   await expect(page.locator('h1')).toHaveText('手機專案價查詢');
   await expect(page.locator('#shoppingMeta')).toContainText('正式來源日期');
   await expect(page.locator('#tradeinPane')).toBeHidden();await expect(page.locator('.legacy-tabs')).toBeHidden();await noOverflow(page);

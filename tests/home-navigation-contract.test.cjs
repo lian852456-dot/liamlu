@@ -88,6 +88,9 @@ test('home and APP expose the same public price routes without unreleased perfor
   const recovery=fs.readFileSync(path.resolve(__dirname,'../tradein-query.html'),'utf8');
   assert.match(recovery, /<h1>舊換新專區<\/h1>/);
   assert.match(recovery, /id="tradeinResults"/);
-  assert.doesNotMatch(app+recovery, /href="tradein-progress\.html"/);
+  assert.doesNotMatch(app, /href="tradein-progress\.html"/);
+  assert.match(recovery, /href="tradein-progress\.html">目標進度/);
+  const progress=fs.readFileSync(path.resolve(__dirname,'../tradein-progress.html'),'utf8');
+  assert.match(progress, /data-performance-release="pending"/);
   assert.doesNotMatch(html+recovery, /整合候選|尚未上線/);
 });
