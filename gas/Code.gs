@@ -6769,7 +6769,7 @@ function tradeinPerformanceAuthorize_(payload) {
   const id=privateDashboardCleanEmployeeId((payload || {}).employeeId);
   const device=privateDashboardCleanDeviceId((payload || {}).deviceId);
   const lookup=privateDashboardUserByEmployeeId(id);
-  const trusted=privateDashboardBTrusted_(id);
+  const trusted=privateDashboardIsTrustedEmployee(id);
   if(!lookup.user || lookup.user.status!=='active' || !trusted && lookup.user.device_id!==device)
     throw new Error('此員編或裝置尚未核准，無法讀取個人舊換新');
   if(!trusted && !TradeinPerformanceCore.storeName(lookup.user.store))throw new Error('此員編不在九店範圍');
