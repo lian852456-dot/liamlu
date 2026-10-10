@@ -7475,7 +7475,7 @@ function privateDashboardAuthGuardRoster_(roster) {
 
 // Candidate only. Every production entry remains disabled. Synthetic mode
 // additionally requires a synthetic ScriptApp identity, never a payload flag.
-const PRIVATE_DASHBOARD_GAS_AUTH_RELEASE_ENABLED_ = true;
+const PRIVATE_DASHBOARD_GAS_AUTH_RELEASE_ENABLED_ = false;
 const PRIVATE_DASHBOARD_GAS_AUTH_STATE_KEY_ = 'DASHBOARD_AUTH_NATIVE_V1';
 const PRIVATE_DASHBOARD_GAS_AUTH_NONCE_PREFIX_ = 'DASHBOARD_AUTH_RPC_V1_';
 
@@ -8498,7 +8498,7 @@ function privateDashboardBVerifyPassword_(password, verifier) {
 }
 
 // Candidate GAS ScriptProperties persistence; never initializes or migrates.
-const PRIVATE_DASHBOARD_GAS_PASSWORD_ENABLED_ = true;
+const PRIVATE_DASHBOARD_GAS_PASSWORD_ENABLED_ = false;
 const PRIVATE_DASHBOARD_B_CONFIG_KEY_ = 'DASHBOARD_AUTH_B_CONFIG_V1';
 const PRIVATE_DASHBOARD_B_BIND_KEY_ = 'DASHBOARD_AUTH_B_BIND_V1';
 const PRIVATE_DASHBOARD_B_LIMIT_KEY_ = 'DASHBOARD_AUTH_B_LIMIT_V1';

@@ -2,10 +2,10 @@
 
 The existing approved-device path remains available. Password login uses the existing single Daily owner, preserves native revoked/inactive/pending/denied states, binds the first eligible device, and keeps the 30-minute session proof only in browser memory. Logout records durable revocation. Existing complete nine-store roster synchronization renews the password authority for 48 hours; missing configuration or incomplete sources fail closed.
 
-Cloud rollout uses exact deployed sources, not a whole-project replacement from this repository:
+The repository GAS template keeps both release gates off by default, so copying it to an unprovisioned project cannot enable authentication. The named formal versions explicitly enable the reviewed owner/password gates; the 21-test runtime suite verifies that enabled path. Cloud rollout uses exact deployed sources, not a whole-project replacement from this repository:
 
 - Daily v52 → owner-only v54 → password-enabled v55. Only main Code changed. Original 26 properties were preserved byte-for-byte, including the empty automation revocation property. The user installed the verifier; no credentials are committed.
-- Protected A v90 → owner-only v93 → v94. The frozen `TradeinReleaseA` module also dispatches auth routes; `gas/patches/TradeinReleaseA-auth-owner.patch` is the minimal auth overlay on that exact module. Public trade-in functions are unchanged. The root Code owner adapters supply the shared implementation.
+- Protected A v90 → owner-only v93 → v94. The frozen `TradeinReleaseA` module also dispatches auth routes; `gas/patches/TradeinReleaseA-auth-owner.patch` is the minimal auth overlay on that exact module. The zero-context overlay applies with `git apply --unidiff-zero` only to the verified v90 module; reproducing it matches the deployed module byte-for-byte. Public trade-in functions are unchanged. The root Code owner adapters supply the shared implementation.
 - Protected upload B v86 → v92; upload isolation still rejects auth actions.
 - Protected audit v67 → v91; existing-member status reaches Daily through the original RPC contract.
 
