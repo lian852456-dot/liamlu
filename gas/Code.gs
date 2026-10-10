@@ -8662,13 +8662,19 @@ function privateDashboardBStrictNative_(id,config,now) {
 
 function privateDashboardBPayload_(input) {
   if(!input || Array.isArray(input) || typeof input!=='object')throw new Error('B_REQUEST_INVALID');
-  const adminFields={employee_admin_list:['action','adminSecret'],employee_admin_refresh_roster:['action','adminSecret'],employee_admin_reset_device:['action','adminSecret','employeeId'],
+  const adminFields={employee_admin_rotate_password:['action','adminSecret','expectedEpoch','verifier'],employee_admin_list:['action','adminSecret'],employee_admin_refresh_roster:['action','adminSecret'],employee_admin_reset_device:['action','adminSecret','employeeId'],
     employee_admin_supervisor:['action','adminSecret','employeeId','enabled']};
   if(Object.prototype.hasOwnProperty.call(adminFields,input.action)) {
     privateDashboardBShape_(input,adminFields[input.action]);
     if(typeof input.adminSecret!=='string' || !input.adminSecret || input.adminSecret.length>1024)throw new Error('B_REQUEST_INVALID');
-    if(['employee_admin_list','employee_admin_refresh_roster'].indexOf(input.action)<0 && (typeof input.employeeId!=='string' || privateDashboardCleanEmployeeId(input.employeeId)!==input.employeeId))throw new Error('B_REQUEST_INVALID');
+    if(['employee_admin_list','employee_admin_refresh_roster','employee_admin_rotate_password'].indexOf(input.action)<0 && (typeof input.employeeId!=='string' || privateDashboardCleanEmployeeId(input.employeeId)!==input.employeeId))throw new Error('B_REQUEST_INVALID');
     if(input.action==='employee_admin_supervisor' && typeof input.enabled!=='boolean')throw new Error('B_REQUEST_INVALID');
+    if(input.action==='employee_admin_rotate_password') {
+      privateDashboardBInt_(input.expectedEpoch,1);
+      privateDashboardBShape_(input.verifier,['algorithm','iterations','salt','digest']);
+      if(input.verifier.algorithm!=='PBKDF2-HMAC-SHA256' || input.verifier.iterations!==600000 || typeof input.verifier.salt!=='string' || !/^(?:[a-f0-9]{2}){16,32}$/.test(input.verifier.salt))throw new Error('B_REQUEST_INVALID');
+      privateDashboardBDigestShape_(input.verifier.digest);
+    }
     return input;
   }
   const fields={employee_status:['action'],employee_login:['action','employeeId','deviceId','track','password','sessionNonce','idempotencyKey'],
@@ -8815,11 +8821,23 @@ function privateDashboardCreateGasB_(options) {
       catch(error) { return {status:'error',code:'B_ROSTER_REFRESH_FAILED',failureType:String(error.name||'Error')}; }
     }
     return transaction(function() {
+      if(p.action==='employee_admin_rotate_password') {
+        const config=store.config();
+        if(config.epoch!==p.expectedEpoch)throw new Error('B_CONFIG_CHANGED');
+        config.epoch++;privateDashboardBInt_(config.epoch,1);
+        config.verifier=p.verifier;delete config.fingerprint;
+        const text=privateDashboardGasAuthJson_(config,8000),props=privateDashboardProperties();
+        // One atomic config write invalidates every old B session and in-flight
+        // login via epoch/fingerprint, without touching device or native state.
+        props.setProperty(PRIVATE_DASHBOARD_B_CONFIG_KEY_,text);
+        if(props.getProperty(PRIVATE_DASHBOARD_B_CONFIG_KEY_)!==text)throw new Error('B_PERSISTENCE_FAILED');
+        return {status:'ok',passwordEpoch:config.epoch};
+      }
       const state=store.bindings();
       if(p.action==='employee_admin_list') {
         const users=privateDashboardRows(privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET,PRIVATE_DASHBOARD_USERS_HEADERS),PRIVATE_DASHBOARD_USERS_HEADERS);
-        const authority=store.config().authority;
-        return {status:'ok',roster:{updatedAt:authority.effectiveAt,validUntil:authority.validUntil,expired:now()>=authority.validUntil,sync:typeof privateDashboardRosterSyncStatus_==='function'?privateDashboardRosterSyncStatus_():null},users:users.map(function(u){return {employeeId:u.employee_id,maskedName:u.masked_name,store:u.store,status:u.status,
+        const config=store.config(),authority=config.authority;
+        return {status:'ok',passwordEpoch:config.epoch,roster:{updatedAt:authority.effectiveAt,validUntil:authority.validUntil,expired:now()>=authority.validUntil,sync:typeof privateDashboardRosterSyncStatus_==='function'?privateDashboardRosterSyncStatus_():null},users:users.map(function(u){return {employeeId:u.employee_id,maskedName:u.masked_name,store:u.store,status:u.status,
           passwordBound:Boolean(state.bindings[u.employee_id]),supervisor:privateDashboardBTrusted_(u.employee_id),primarySupervisor:privateDashboardIsTrustedEmployee(u.employee_id)};})};
       }
       const id=p.employeeId,lookup=privateDashboardUserByEmployeeId(id);
