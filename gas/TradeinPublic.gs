@@ -24,7 +24,10 @@ function tradeinPerformancePublicRead(payload){
     const current=(tradeinPerformanceRegistry_().months[payload.month]||{}).active;
     if(!current||current.snapshot_hash!==entry.private_snapshot_hash)throw Error('本月公開進度待重新核對');
     if(tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(payload.month))!==current.roster_hash)throw Error('本月公開基線待重新核對');
-    const value=tradeinPerformancePublicSnapshot_(entry,payload.month);
+    let value=tradeinPerformancePublicSnapshot_(entry,payload.month);
+    const modelsFile=value.people.some(p=>p.actual_units>0&&!Array.isArray(p.recovered_models))?
+      tradeinPerformanceFile_('north12b-tradein-models-'+current.source_sha256+'.json'):null;
+    if(modelsFile)value=TradeinPublicCore.withModels(value,tradeinPerformanceSnapshot_(current),JSON.parse(modelsFile.getBlob().getDataAsString('UTF-8')));
     // Reconstruct the response from a strict validated allowlist, never spread registry/entry/private JSON.
     return {snapshot:value,availableMonths:Object.keys(registry.months).sort()};
   }catch(error){throw Error('公開目標進度尚未完成核對，請稍後重新讀取');}

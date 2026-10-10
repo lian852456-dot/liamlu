@@ -17,12 +17,19 @@ on:
       - 'tradein-progress.css'
       - 'tradein-progress.mjs'
       - 'tradein-performance-core.js'
+      - 'tradein-public-core.js'
+      - 'tradein-public-progress.mjs'
+      - 'tradein-area.css'
       - 'tradein-export-core.mjs'
       - 'tradein-export-ui.mjs'
       - 'tests/tradein-performance.test.cjs'
+      - 'tests/tradein-models.test.cjs'
+      - 'tests/helpers/tradein-public-ui-contract.cjs'
+      - 'tests/helpers/tradein-synthetic-runtime.cjs'
       - 'tests/tradein-performance-ui.spec.js'
       - 'gas/Code.gs'
       - 'gas/TradeinPerformance.gs'
+      - 'gas/TradeinPublic.gs'
       - 'scripts/build-tradein-gas.mjs'
       - 'tests/tradein-owner-fence.test.cjs'
       - 'tests/phone-stock-sync-contract.test.cjs'
@@ -66,7 +73,7 @@ jobs:
           node --check home.js
           node --test tests/home-reminder-model.test.cjs tests/home-navigation-contract.test.cjs tests/department-ops.test.cjs tests/patrol-question-versions.test.cjs tests/patrol-dashboard-contract.test.cjs tests/patrol-dashboard-client.test.cjs tests/tradein-performance.test.cjs
           node -e "new Function(require('fs').readFileSync('gas/Code.gs', 'utf8'))"
-          node --test tests/tradein-owner-fence.test.cjs tests/phone-stock-sync-contract.test.cjs tests/threec-private-runtime.test.cjs
+          node --test tests/tradein-owner-fence.test.cjs tests/tradein-models.test.cjs tests/phone-stock-sync-contract.test.cjs tests/threec-private-runtime.test.cjs
       - name: Run isolated homepage browser checks
         env:
           TEST_BASE_URL: http://127.0.0.1:4173/

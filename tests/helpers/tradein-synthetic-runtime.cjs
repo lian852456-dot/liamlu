@@ -9,9 +9,9 @@ function employee(id,role='業務代表(I)',store='萬大'){
 }
 function csv(){
  const header=Array.from({length:29},(_,i)=>'合成欄'+i);header[15]='';header[18]='';
- Object.assign(header,{0:'序號',1:'店點代碼',3:'區域別',4:'日期',6:'專案類別',11:'回收代碼/IMEI',17:'銷貨單號',23:'員工編號',26:'取消交易日期'});
+ Object.assign(header,{0:'序號',1:'店點代碼',3:'區域別',4:'日期',6:'專案類別',10:'回收舊機品名',11:'回收代碼/IMEI',17:'銷貨單號',23:'員工編號',26:'取消交易日期'});
  const rows=[['REC-A','12345','DNB10168'],['REC-B','12346','DNB10168'],['REC-C','12346','DNB10168'],['REC-D','12347','DNB10146']].map(([code,id,store],i)=>{
-  const row=Array(29).fill('');Object.assign(row,{0:String(i+1),1:store,3:'北一二B',4:'1151002',6:'單銷',11:'SYNTHETIC-'+code,17:'SYNTHETIC-ORDER-'+i,23:id});return row.join(',');
+  const row=Array(29).fill('');Object.assign(row,{0:String(i+1),1:store,3:'北一二B',4:'1151002',6:'單銷',10:'(舊機)APPLE iPhone 15 Pro Max_256G-(黑)(5G)_(合成)_S等',11:'SYNTHETIC-'+code,17:'SYNTHETIC-ORDER-'+i,23:id});return row.join(',');
  });
  return Buffer.from('日期 :,115/10/01 - 115/10/07,列印日期 :,26年10月08日 11:23\n'+header.join(',')+'\n'+rows.join('\n'),'utf8');
 }
