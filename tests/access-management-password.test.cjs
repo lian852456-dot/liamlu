@@ -24,3 +24,8 @@ test('locking during derivation cancels submission and clears both password fiel
 test('ambiguous network outcome clears passwords and never automatically retries',async()=>{
  const f=fixture({failRotation:true});await f.unlock();await f.change();assert.equal(f.requests.filter(p=>p.action==='employee_admin_rotate_password').length,1);assert.match(f.el('password-message').textContent,/不要直接重送/);assert.equal(f.el('new-password').value,'');assert.equal(f.el('confirm-password').value,'');
 });
+
+test('ten-character passwords are accepted while nine characters are rejected',async()=>{
+ const f=fixture();await f.unlock();await f.change('SYNTH12345');assert.equal(f.requests.filter(p=>p.action==='employee_admin_rotate_password').length,1);
+ const g=fixture();await g.unlock();await g.change('SYNTH1234');assert.equal(g.requests.some(p=>p.action==='employee_admin_rotate_password'),false);assert.match(g.el('password-message').textContent,/10～128/);
+});
