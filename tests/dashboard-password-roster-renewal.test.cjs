@@ -35,6 +35,25 @@ test('missing config or incomplete nine-store source fail closed before sheet/na
 
 test('sync never revives existing inactive or revoked rows',()=>{const f=fixture();f.rows.DashboardUsers[1][4]='inactive';f.rows.DashboardUsers[2][4]='revoked';sync(f,members());assert.equal(f.rows.DashboardUsers[1][4],'inactive');assert.equal(f.rows.DashboardUsers[2][4],'revoked');});
 
+test('complete renewal demotes absent active staff while preserving device, revoked status, and primary supervisor',()=>{
+ const f=fixture();
+ const primary='SYNTH003';
+ f.props.set('DASHBOARD_TRUSTED_EMPLOYEE_ID',primary);
+ const oldActive=f.rows.DashboardUsers[1],oldRevoked=f.rows.DashboardUsers[2],supervisor=f.rows.DashboardUsers[3];
+ oldActive[5]='SYNTHETIC_OLD_ACTIVE_DEVICE';
+ oldRevoked[4]='revoked';oldRevoked[5]='SYNTHETIC_REVOKED_DEVICE';
+ supervisor[5]='SYNTHETIC_PRIMARY_DEVICE';
+ const replacement=STORES.map((store,i)=>({employeeId:'NEWSYNTH'+String(i+1).padStart(3,'0'),maskedName:'SYNTHETIC_NEW_MASK_'+i,store,role:'SYNTHETIC_ROLE',status:'active'}));
+ sync(f,replacement);
+ assert.equal(oldActive[4],'inactive');
+ assert.equal(oldActive[5],'SYNTHETIC_OLD_ACTIVE_DEVICE');
+ assert.equal(oldRevoked[4],'revoked');
+ assert.equal(oldRevoked[5],'SYNTHETIC_REVOKED_DEVICE');
+ assert.equal(supervisor[0],primary);
+ assert.equal(supervisor[4],'active');
+ assert.equal(supervisor[5],'SYNTHETIC_PRIMARY_DEVICE');
+});
+
 test('authority CAS/readback failures reject renewal',()=>{let cas=false;const f=fixture({hookGet:(key,props,count)=>{if(key===CONFIG&&count>=2&&cas){const c=JSON.parse(props.get(CONFIG));c.authority.version++;props.set(CONFIG,JSON.stringify(c));}}});cas=true;assert.throws(()=>sync(f),/B_CONFIG_CHANGED/);cas=false;const g=fixture({flipReadback:true});assert.throws(()=>sync(g),/B_PERSISTENCE_FAILED/);});
 
 test('gate off preserves original sync path and never reads B config',()=>{const f=fixture({enabled:false,scriptId:'REAL_OWNER_SCRIPT_123',hookGet:key=>{if(key===CONFIG)throw Error('B_CONFIG_MUST_NOT_BE_READ');}});f.props.delete(CONFIG);const result=sync(f);assert.equal(result.synced,9);assert.equal(f.held(),false);});
