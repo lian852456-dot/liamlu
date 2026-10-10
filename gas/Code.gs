@@ -5214,6 +5214,15 @@ function privateDashboardSyncRoster(payload) {
       byId[employeeId] = item;
       synced += 1;
     });
+    // A complete password roster is authoritative for current nine-store staff.
+    // Keep approved devices, but deny departed staff through both login tracks.
+    if (renewPasswordRoster) existing.forEach(function(item) {
+      const store = String(item.store || '').trim().replace(/\s+/g, '').replace(/^台灣大哥大數位生活台北/, '').replace(/^台灣大哥大台北/, '').replace(/^台北/, '');
+      if (!seen[item.employee_id] && PRIVATE_DASHBOARD_B_STORES_.indexOf(store) >= 0 && item.status === 'active' && !privateDashboardIsTrustedEmployee(item.employee_id)) {
+        item.status = 'inactive';
+        privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, item._row, item);
+      }
+    });
     if (renewPasswordRoster) renewPasswordRoster();
     return { synced: synced };
   });
@@ -8653,12 +8662,12 @@ function privateDashboardBStrictNative_(id,config,now) {
 
 function privateDashboardBPayload_(input) {
   if(!input || Array.isArray(input) || typeof input!=='object')throw new Error('B_REQUEST_INVALID');
-  const adminFields={employee_admin_list:['action','adminSecret'],employee_admin_reset_device:['action','adminSecret','employeeId'],
+  const adminFields={employee_admin_list:['action','adminSecret'],employee_admin_refresh_roster:['action','adminSecret'],employee_admin_reset_device:['action','adminSecret','employeeId'],
     employee_admin_supervisor:['action','adminSecret','employeeId','enabled']};
   if(Object.prototype.hasOwnProperty.call(adminFields,input.action)) {
     privateDashboardBShape_(input,adminFields[input.action]);
     if(typeof input.adminSecret!=='string' || !input.adminSecret || input.adminSecret.length>1024)throw new Error('B_REQUEST_INVALID');
-    if(input.action!=='employee_admin_list' && (typeof input.employeeId!=='string' || privateDashboardCleanEmployeeId(input.employeeId)!==input.employeeId))throw new Error('B_REQUEST_INVALID');
+    if(['employee_admin_list','employee_admin_refresh_roster'].indexOf(input.action)<0 && (typeof input.employeeId!=='string' || privateDashboardCleanEmployeeId(input.employeeId)!==input.employeeId))throw new Error('B_REQUEST_INVALID');
     if(input.action==='employee_admin_supervisor' && typeof input.enabled!=='boolean')throw new Error('B_REQUEST_INVALID');
     return input;
   }
@@ -8801,12 +8810,13 @@ function privateDashboardCreateGasB_(options) {
   }
   function adminOperation(p) {
     privateDashboardAdminAuthorized(p);
+    if(p.action==='employee_admin_refresh_roster')return privateDashboardRefreshRoster_(p);
     return transaction(function() {
       const state=store.bindings();
       if(p.action==='employee_admin_list') {
         const users=privateDashboardRows(privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET,PRIVATE_DASHBOARD_USERS_HEADERS),PRIVATE_DASHBOARD_USERS_HEADERS);
         const authority=store.config().authority;
-        return {status:'ok',roster:{updatedAt:authority.effectiveAt,validUntil:authority.validUntil,expired:now()>=authority.validUntil},users:users.map(function(u){return {employeeId:u.employee_id,maskedName:u.masked_name,store:u.store,status:u.status,
+        return {status:'ok',roster:{updatedAt:authority.effectiveAt,validUntil:authority.validUntil,expired:now()>=authority.validUntil,sync:typeof privateDashboardRosterSyncStatus_==='function'?privateDashboardRosterSyncStatus_():null},users:users.map(function(u){return {employeeId:u.employee_id,maskedName:u.masked_name,store:u.store,status:u.status,
           passwordBound:Boolean(state.bindings[u.employee_id]),supervisor:privateDashboardBTrusted_(u.employee_id),primarySupervisor:privateDashboardIsTrustedEmployee(u.employee_id)};})};
       }
       const id=p.employeeId,lookup=privateDashboardUserByEmployeeId(id);
