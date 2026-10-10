@@ -8810,7 +8810,10 @@ function privateDashboardCreateGasB_(options) {
   }
   function adminOperation(p) {
     privateDashboardAdminAuthorized(p);
-    if(p.action==='employee_admin_refresh_roster')return privateDashboardRefreshRoster_(p);
+    if(p.action==='employee_admin_refresh_roster') {
+      try { return privateDashboardRefreshRoster_(p); }
+      catch(error) { return {status:'error',code:'B_ROSTER_REFRESH_FAILED',failureType:String(error.name||'Error')}; }
+    }
     return transaction(function() {
       const state=store.bindings();
       if(p.action==='employee_admin_list') {
