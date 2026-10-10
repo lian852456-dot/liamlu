@@ -7,6 +7,7 @@
   const CHANNEL = 'north12b-portal-logout-v1';
   const SCOPE_NOTE = '同步登出同一瀏覽器內本網站的營運中心頁籤；手機 App 另行登出。';
   const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
+  const PHONE_KEY = 'north12b_owner_phone_v1';
   const B_KEY = 'north12b_password_session_v1';
   const B_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
   const PT_KEY = 'bei12b_patrol_session_token_v2';
@@ -86,7 +87,7 @@
     // A delayed old-tab notification must not delete a newer shared login.
     // It still clears every old sessionStorage credential and its private cache.
     if (forcePersistent || !persistentLoginAfter(event)) {
-      for (const key of [EMPLOYEE_KEY, 'bei12b_kpi_emp']) remove('localStorage', key);
+      for (const key of [EMPLOYEE_KEY, 'bei12b_kpi_emp', PHONE_KEY]) remove('localStorage', key);
     }
     // Only the existing protected summary cache is cleared. Draft files, prefs and device IDs remain.
     try {
@@ -171,9 +172,18 @@
       return response.ok && (await response.json()).status==='ok';
     }catch{return false;}finally{scope.clearTimeout(timer);}
   }
+  async function revokeSavedPhone(event) {
+    if(persistentLoginAfter(event))return true;
+    const p=parse(read('localStorage',PHONE_KEY));
+    if(!p || p.owner!==B_API || !/^BP1_[a-f0-9]{64}$/.test(p.phoneToken||'') || typeof p.deviceId!=='string')return true;
+    const controller=new AbortController(),timer=scope.setTimeout(()=>controller.abort(),15000);
+    try{const r=await nativeFetch(B_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'employee_phone_forget',deviceId:p.deviceId,phoneToken:p.phoneToken}),credentials:'omit',cache:'no-store',signal:controller.signal});return r.ok && (await r.json()).status==='ok';}
+    catch{return false;}finally{scope.clearTimeout(timer);}
+  }
   async function applyLogout(event, broadcast = false) {
     if (locked) return logoutPromise;
     const tokens = [[PATROL_API,read('sessionStorage',PT_KEY)],[PATROL_API,read('sessionStorage',UAT_KEY)],[AUDIT_API,read('sessionStorage',AUDIT_KEY)]].filter((entry,index,all) => entry[1] && all.findIndex(other => other[0] === entry[0] && other[1] === entry[1]) === index);
+    const phoneRevocation=revokeSavedPhone(event);
     const memoryResults=[...memoryRevokers].map(fn=>Promise.resolve(fn(nativeFetch)).catch(()=>false));
     if(!memoryRevokers.size)memoryResults.push(revokeSavedB());
     locked = true; epoch = event.id;
@@ -191,7 +201,7 @@
     }
     logoutPromise = (async () => {
       if (!document.body) await new Promise(resolve => document.addEventListener('DOMContentLoaded',resolve,{once:true}));
-      const results = await Promise.all([...memoryResults,...tokens.map(([url,token]) => revoke(url,token))]);
+      const results = await Promise.all([phoneRevocation,...memoryResults,...tokens.map(([url,token]) => revoke(url,token))]);
       if (results.some(value => !value)) note('本頁已登出並通知網站頁籤；登入連線撤銷未確認，請關閉其他已開啟的營運中心頁籤。');
       // A new document removes each page's private memory without changing its business module.
       scope.location.reload();

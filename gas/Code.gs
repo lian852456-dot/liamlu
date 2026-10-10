@@ -8512,6 +8512,8 @@ const PRIVATE_DASHBOARD_B_CONFIG_KEY_ = 'DASHBOARD_AUTH_B_CONFIG_V1';
 const PRIVATE_DASHBOARD_B_BIND_KEY_ = 'DASHBOARD_AUTH_B_BIND_V1';
 const PRIVATE_DASHBOARD_B_LIMIT_KEY_ = 'DASHBOARD_AUTH_B_LIMIT_V1';
 const PRIVATE_DASHBOARD_B_SESSION_PREFIX_ = 'DASHBOARD_AUTH_B_SESS_V1_';
+const PRIVATE_DASHBOARD_B_PHONE_KEY_ = 'DASHBOARD_AUTH_B_OWNER_PHONE_V1';
+const PRIVATE_DASHBOARD_B_PHONE_TTL_ = 90*24*60*60*1000;
 const PRIVATE_DASHBOARD_B_STORES_ = ['酒泉','永吉','復興南','杭州南','萬大','通化','大稻埕','三創','六張犁'];
 
 function privateDashboardBGate_(options) {
@@ -8678,6 +8680,9 @@ function privateDashboardBPayload_(input) {
     return input;
   }
   const fields={employee_status:['action'],employee_login:['action','employeeId','deviceId','track','password','sessionNonce','idempotencyKey'],
+    employee_phone_enroll:['action','deviceId','token','phoneNonce'],
+    employee_phone_resume:['action','deviceId','phoneToken','sessionNonce','idempotencyKey'],
+    employee_phone_forget:['action','deviceId','phoneToken'],
     employee_session:['action','deviceId','token'],employee_logout:['action','deviceId','token'],
     employee_private_read:['action','deviceId','token'],employee_kpi_read:['action','deviceId','token']};
   if(!Object.prototype.hasOwnProperty.call(fields,input.action))throw new Error('B_REQUEST_INVALID');
@@ -8688,7 +8693,12 @@ function privateDashboardBPayload_(input) {
     if(input.track!=='password-bound' || typeof input.employeeId!=='string' || privateDashboardCleanEmployeeId(input.employeeId)!==input.employeeId ||
       typeof input.password!=='string' || input.password.length>1024 || typeof input.sessionNonce!=='string' || !/^[a-f0-9]{64}$/.test(input.sessionNonce) ||
       typeof input.idempotencyKey!=='string' || !/^[A-Za-z0-9_-]{20,80}$/.test(input.idempotencyKey))throw new Error('B_REQUEST_INVALID');
+  } else if(input.action==='employee_phone_resume' || input.action==='employee_phone_forget') {
+    if(typeof input.phoneToken!=='string' || !/^BP1_[a-f0-9]{64}$/.test(input.phoneToken))throw new Error('B_REQUEST_INVALID');
+    if(input.action==='employee_phone_resume' && (typeof input.sessionNonce!=='string' || !/^[a-f0-9]{64}$/.test(input.sessionNonce) ||
+      typeof input.idempotencyKey!=='string' || !/^[A-Za-z0-9_-]{20,80}$/.test(input.idempotencyKey)))throw new Error('B_REQUEST_INVALID');
   } else if(typeof input.token!=='string' || !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(input.token))throw new Error('B_REQUEST_INVALID');
+  if(input.action==='employee_phone_enroll' && (typeof input.phoneNonce!=='string' || !/^[a-f0-9]{64}$/.test(input.phoneNonce)))throw new Error('B_REQUEST_INVALID');
   return input;
 }
 
@@ -8745,7 +8755,13 @@ function privateDashboardCreateGasB_(options) {
       if(bindingState.revision!==captured.bindingRevision)throw new Error('B_BINDING_CHANGED');
       if(!trusted && (existing && existing[0]!==device || Object.keys(bindingState.bindings).some(function(other) { return other!==id && bindingState.bindings[other][0]===device; })))throw new Error('B_BINDING_DENIED');
       if(!trusted && !existing && Object.keys(bindingState.bindings).length>=64)throw new Error('B_CAPACITY');
-      const binding=trusted ? [device,0] : existing || [device,1],generation=provider.currentGeneration(id),bucket=privateDashboardGasAuthDigest_(id)[0];
+      return issueSession(p,id,device,config,trusted,bindingState,existing);
+    });
+  }
+  // The same short-lived ledger and validation serve password and owner-phone login.
+  function issueSession(p,id,device,config,trusted,bindingState,existing) {
+      const binding=trusted ? [device,0] : existing || [device,1];
+      const generation=provider.currentGeneration(id),bucket=privateDashboardGasAuthDigest_(id)[0];
       const sessions=store.sessions(bucket),time=now(),idem=privateDashboardGasAuthDigest_(p.idempotencyKey),nonce=privateDashboardGasAuthDigest_(p.sessionNonce);
       retire(sessions,function(s) { return s.revoked || s.epoch!==config.epoch || s.configHash!==config.fingerprint || s.employee===id && s.nativeGeneration!==generation; },time);
       if(sessions.tombstones.some(function(t) { return t[0]===id && t[1]===idem; }))throw new Error('B_LOGIN_DENIED');
@@ -8778,6 +8794,58 @@ function privateDashboardCreateGasB_(options) {
       if(!trusted && !existing)store.saveBindings(bindingState);
       store.saveSessions(bucket,sessions);
       return {status:'ok',token:token,expiresAt:record.expiresAt,trustSource:'password-bound'};
+  }
+  function phoneGrant() {
+    const text=privateDashboardProperties().getProperty(PRIVATE_DASHBOARD_B_PHONE_KEY_);
+    if(!text)return null;
+    const g=privateDashboardGasAuthParse_(text);
+    privateDashboardBShape_(g,['v','owner','employee','device','digest','epoch','nativeGeneration','issuedAt','expiresAt']);
+    if(g.v!==1 || g.owner!==privateDashboardAuthOwnerConfig_().owner || privateDashboardCleanEmployeeId(g.employee)!==g.employee)throw new Error('B_STATE_INVALID');
+    ['device','digest'].forEach(function(k){privateDashboardBDigestShape_(g[k]);});
+    ['epoch','nativeGeneration','issuedAt','expiresAt'].forEach(function(k){privateDashboardBInt_(g[k],k==='epoch'?1:0);});
+    if(g.expiresAt<=g.issuedAt || g.expiresAt-g.issuedAt>PRIVATE_DASHBOARD_B_PHONE_TTL_)throw new Error('B_STATE_INVALID');
+    return g;
+  }
+  function savePhone(g) {
+    const props=privateDashboardProperties(),text=g?privateDashboardGasAuthJson_(g,2000):'';
+    props.setProperty(PRIVATE_DASHBOARD_B_PHONE_KEY_,text);
+    if((props.getProperty(PRIVATE_DASHBOARD_B_PHONE_KEY_)||'')!==text)throw new Error('B_PERSISTENCE_FAILED');
+  }
+  function enrollPhone(p,s,config) {
+    // Only the existing primary owner can enroll. Extra supervisors and staff cannot.
+    if(!privateDashboardIsTrustedEmployee(s.employee))throw new Error('B_ELIGIBILITY_DENIED');
+    const old=phoneGrant(),time=now(),generation=provider.currentGeneration(s.employee);
+    if(old && old.expiresAt>time && old.epoch===config.epoch && old.nativeGeneration===generation &&
+      (old.employee!==s.employee || old.device!==s.device))throw new Error('B_PHONE_ALREADY_BOUND');
+    const token='BP1_'+privateDashboardGasAuthDigest_(JSON.stringify([p.phoneNonce,s.employee,s.device,config.epoch,generation]));
+    const g={v:1,owner:privateDashboardAuthOwnerConfig_().owner,employee:s.employee,device:s.device,
+      digest:privateDashboardGasAuthDigest_(token),epoch:config.epoch,nativeGeneration:generation,issuedAt:time,expiresAt:time+PRIVATE_DASHBOARD_B_PHONE_TTL_};
+    savePhone(g);
+    return {status:'ok',phoneToken:token,expiresAt:g.expiresAt};
+  }
+  function phoneOperation(p) {
+    return transaction(function() {
+      const g=phoneGrant(),device=privateDashboardGasAuthDigest_(p.deviceId),digest=privateDashboardGasAuthDigest_(p.phoneToken);
+      if(!g && p.action==='employee_phone_forget')return {status:'ok'};
+      if(!g || g.device!==device || g.digest!==digest)throw new Error('B_SESSION_DENIED');
+      if(p.action==='employee_phone_forget') {
+        // Retire every short lease issued on this phone as well as the durable grant.
+        const bucket=privateDashboardGasAuthDigest_(g.employee)[0],sessions=store.sessions(bucket);
+        retire(sessions,function(s){return s.employee===g.employee && s.device===device;},now());
+        savePhone(null);store.saveSessions(bucket,sessions);return {status:'ok'};
+      }
+      const time=now(),config=store.config();
+      if(time<g.issuedAt || time>=g.expiresAt || !privateDashboardIsTrustedEmployee(g.employee) || config.epoch!==g.epoch)throw new Error('B_SESSION_DENIED');
+      privateDashboardBStrictNative_(g.employee,config,time);
+      return provider.withEligibility(g.employee,function() {
+        if(provider.currentGeneration(g.employee)!==g.nativeGeneration)throw new Error('B_SESSION_DENIED');
+        const admission=store.admit(g.employee,device,time);if(!admission.allowed)throw new Error('B_RATE_DENIED');
+        const request=Object.assign({},p,{idempotencyKey:privateDashboardGasAuthDigest_(JSON.stringify([p.idempotencyKey,config.fingerprint])),sessionNonce:privateDashboardGasAuthDigest_(JSON.stringify([p.sessionNonce,config.fingerprint]))});
+        const result=issueSession(request,g.employee,device,config,true,store.bindings(),null);
+        // Renew only after current eligibility and the short lease have both succeeded.
+        g.issuedAt=time;g.expiresAt=time+PRIVATE_DASHBOARD_B_PHONE_TTL_;savePhone(g);
+        return Object.assign(result,{phoneExpiresAt:g.expiresAt});
+      });
     });
   }
   function sessionOperation(p) {
@@ -8789,14 +8857,15 @@ function privateDashboardCreateGasB_(options) {
       if(s.revoked || time<s.issuedAt || time>=s.expiresAt)throw new Error('B_SESSION_DENIED');
       // Logout may invalidate the matching session after an authority change;
       // it still requires both its token and original device proof.
-      if(p.action==='employee_logout') {retire(sessions,function(record) { return record.digest===s.digest; },time);store.saveSessions(bucket,sessions);return {status:'ok'};}
+      if(p.action==='employee_logout') {const phone=phoneGrant();if(phone && phone.employee===s.employee && phone.device===device){savePhone(null);retire(sessions,function(record){return record.employee===s.employee && record.device===device;},time);}else retire(sessions,function(record) { return record.digest===s.digest; },time);store.saveSessions(bucket,sessions);return {status:'ok'};}
       const config=store.config(),bindings=store.bindings(),binding=bindings.bindings[s.employee];
       const profile=privateDashboardBStrictNative_(s.employee,config,time);
       const validBinding=s.bindingVersion===0 ? privateDashboardBTrusted_(s.employee) : binding && binding[0]===device && binding[1]===s.bindingVersion;
       if(!validBinding || config.epoch!==s.epoch || config.fingerprint!==s.configHash)throw new Error('B_SESSION_DENIED');
       return provider.withEligibility(s.employee,function() {
         if(provider.currentGeneration(s.employee)!==s.nativeGeneration)throw new Error('B_SESSION_DENIED');
-        if(p.action==='employee_session')return {status:'ok',expiresAt:s.expiresAt,trustSource:'password-bound'};
+        if(p.action==='employee_session')return {status:'ok',expiresAt:s.expiresAt,trustSource:'password-bound',phoneEligible:privateDashboardIsTrustedEmployee(s.employee)};
+        if(p.action==='employee_phone_enroll')return enrollPhone(p,s,config);
         let result;
         if(p.action==='employee_private_read')result={snapshot:privateDashboardSnapshot()};
         else if(p.action==='employee_kpi_read') {
@@ -8836,9 +8905,9 @@ function privateDashboardCreateGasB_(options) {
       const state=store.bindings();
       if(p.action==='employee_admin_list') {
         const users=privateDashboardRows(privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET,PRIVATE_DASHBOARD_USERS_HEADERS),PRIVATE_DASHBOARD_USERS_HEADERS);
-        const config=store.config(),authority=config.authority;
+        const config=store.config(),authority=config.authority,phone=phoneGrant();
         return {status:'ok',passwordEpoch:config.epoch,roster:{updatedAt:authority.effectiveAt,validUntil:authority.validUntil,expired:now()>=authority.validUntil,sync:typeof privateDashboardRosterSyncStatus_==='function'?privateDashboardRosterSyncStatus_():null},users:users.map(function(u){return {employeeId:u.employee_id,maskedName:u.masked_name,store:u.store,status:u.status,
-          passwordBound:Boolean(state.bindings[u.employee_id]),supervisor:privateDashboardBTrusted_(u.employee_id),primarySupervisor:privateDashboardIsTrustedEmployee(u.employee_id)};})};
+          passwordBound:Boolean(state.bindings[u.employee_id]),phoneBound:Boolean(phone && phone.employee===u.employee_id),supervisor:privateDashboardBTrusted_(u.employee_id),primarySupervisor:privateDashboardIsTrustedEmployee(u.employee_id)};})};
       }
       const id=p.employeeId,lookup=privateDashboardUserByEmployeeId(id);
       if(!lookup.user)throw new Error('B_ELIGIBILITY_DENIED');
@@ -8850,6 +8919,7 @@ function privateDashboardCreateGasB_(options) {
       retire(sessions,function(record){return record.employee===id;},now());
       store.saveSessions(bucket,sessions);
       if(p.action==='employee_admin_reset_device') {
+        const phone=phoneGrant();if(phone && phone.employee===id)savePhone(null);
         delete state.bindings[id];store.saveBindings(state);
         return {status:'ok',reset:true};
       }
@@ -8869,7 +8939,7 @@ function privateDashboardCreateGasB_(options) {
       if(typeof reportUploadIsUploadDeployment_==='function' && reportUploadIsUploadDeployment_())throw new Error('B_REQUEST_INVALID');
       if(typeof text!=='string' || text.length>16384)throw new Error('B_REQUEST_INVALID');
       const p=privateDashboardBPayload_(privateDashboardGasAuthParse_(text));
-      return p.action.indexOf('employee_admin_')===0?adminOperation(p):p.action==='employee_status'?status():p.action==='employee_login'?login(p):sessionOperation(p);
+      return p.action.indexOf('employee_admin_')===0?adminOperation(p):p.action==='employee_status'?status():p.action==='employee_login'?login(p):['employee_phone_resume','employee_phone_forget'].indexOf(p.action)>=0?phoneOperation(p):sessionOperation(p);
     } catch (_) { return {status:'error',code:'B_AUTH_DENIED'}; }
   }
   return Object.freeze({handle:handle});
