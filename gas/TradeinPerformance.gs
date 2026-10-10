@@ -146,11 +146,14 @@ function tradeinPerformancePublish(payload) {
     if(current.active && current.active.source_sha256===value.source_sha256 && current.active.roster_hash===payload.rosterHash) {
       const saved=tradeinPerformanceSnapshot_(current.active);
       if(current.active.preview_hash!==payload.previewHash){
-        // A legacy snapshot may lack only the newly added model aggregates.
+        // A legacy snapshot may lack only the newly added safe aggregates.
         // Compare every original calculation field before preserving the no-op.
-        const legacy=JSON.parse(JSON.stringify(value));legacy.people.forEach(p=>delete p.recovered_models);
-        if(!saved.people.every(p=>!Object.prototype.hasOwnProperty.call(p,'recovered_models'))||
-          current.active.preview_hash!==tradeinPerformanceHash_(legacy))throw new Error('相同來源雜湊的計算結果不同，請核對原檔後重新預覽');
+        const legacy=JSON.parse(JSON.stringify(value));
+        ['recovered_models','recovered_days'].forEach(function(key){
+          if(saved.people.every(p=>!Object.prototype.hasOwnProperty.call(p,key)))legacy.people.forEach(p=>delete p[key]);
+          else if(!saved.people.every(p=>Object.prototype.hasOwnProperty.call(p,key)))throw new Error('舊快照聚合欄位不完整');
+        });
+        if(current.active.preview_hash!==tradeinPerformanceHash_(legacy))throw new Error('相同來源雜湊的計算結果不同，請核對原檔後重新預覽');
       }
       return {status:'unchanged',snapshotHash:activeHash,snapshot:tradeinPerformanceProjection_(saved,{supervisor:true})};
     }

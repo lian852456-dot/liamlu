@@ -22,7 +22,8 @@ export function createPublicReader({endpoint,frame,post,timeoutMs=35000}){
   }finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);controller.signal.removeEventListener('abort',onAbort);}
  }
  return async function read(payload,{signal,onFallback}={}){
-  if(payload.action!=='tradein_performance_public_read'||Object.keys(payload).sort().join('|')!=='action|month')throw Error('只允許公開目標進度讀取');
+  const keys=Object.keys(payload).sort().join('|');
+  if(payload.action!=='tradein_performance_public_read'||!['action|month','action|includeDays|month'].includes(keys)||keys.includes('includeDays')&&payload.includeDays!==true)throw Error('只允許公開目標進度讀取');
   try{return await attempt(frame,payload,signal);}
   catch(error){if(signal?.aborted||error.name==='AbortError'||error.authoritative)throw error;}
   onFallback?.();
