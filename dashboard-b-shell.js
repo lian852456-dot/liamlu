@@ -48,7 +48,8 @@ async function login(event){event.preventDefault();const employee=panel.querySel
 }
 async function resume(){
  if(active || loading || checking)return;
- const lease=client.restore(device());if(!lease)return;
+ let existingDevice='';try{existingDevice=scope.localStorage.getItem(DEVICE_KEY)||'';}catch{}
+ const lease=client.restore(existingDevice);if(!lease)return;
  epoch++;active=true;expiresAt=lease.expiresAt;
  await refresh();
  if(active){scope.clearTimeout(expiryTimer);expiryTimer=scope.setTimeout(()=>wipe('登入已到期，請重新輸入指定密碼。'),Math.max(0,expiresAt-Date.now()));}
