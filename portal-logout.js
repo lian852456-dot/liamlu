@@ -7,6 +7,8 @@
   const CHANNEL = 'north12b-portal-logout-v1';
   const SCOPE_NOTE = '同步登出同一瀏覽器內本網站的營運中心頁籤；手機 App 另行登出。';
   const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
+  const B_KEY = 'north12b_password_session_v1';
+  const B_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
   const PT_KEY = 'bei12b_patrol_session_token_v2';
   const UAT_KEY = 'bei12b_patrol_uat_session_token_v1';
   const AUDIT_KEY = 'bei12b_pt_session_token';
@@ -42,7 +44,7 @@
     return validEvent(login,'login') && login.at > event.at;
   }
   function hasSessionIdentity() {
-    return [PT_KEY,UAT_KEY,AUDIT_KEY,EMPLOYEE_KEY].some(key => read('sessionStorage',key));
+    return [PT_KEY,UAT_KEY,AUDIT_KEY,EMPLOYEE_KEY,B_KEY].some(key => read('sessionStorage',key));
   }
   function hasPersistentIdentity() { return read('localStorage',EMPLOYEE_KEY) || read('localStorage','bei12b_kpi_emp'); }
   // An unseen historical logout invalidates old tab credentials. A new tab may
@@ -80,7 +82,7 @@
   };
 
   function clearIdentity(event,forcePersistent) {
-    for (const key of [PT_KEY, UAT_KEY, AUDIT_KEY, EMPLOYEE_KEY, 'bei12b_half_checks']) remove('sessionStorage', key);
+    for (const key of [PT_KEY, UAT_KEY, AUDIT_KEY, EMPLOYEE_KEY, B_KEY, 'bei12b_half_checks']) remove('sessionStorage', key);
     // A delayed old-tab notification must not delete a newer shared login.
     // It still clears every old sessionStorage credential and its private cache.
     if (forcePersistent || !persistentLoginAfter(event)) {
@@ -160,10 +162,20 @@
     } catch { return false; }
     finally { scope.clearTimeout(timer); }
   }
+  async function revokeSavedB() {
+    const proof=parse(read('sessionStorage',B_KEY));
+    if(!proof || proof.owner!==B_API || !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(proof.token||'') || typeof proof.deviceId!=='string')return true;
+    const controller=new AbortController(),timer=scope.setTimeout(()=>controller.abort(),15000);
+    try {
+      const response=await nativeFetch(B_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'employee_logout',deviceId:proof.deviceId,token:proof.token}),credentials:'omit',cache:'no-store',signal:controller.signal});
+      return response.ok && (await response.json()).status==='ok';
+    }catch{return false;}finally{scope.clearTimeout(timer);}
+  }
   async function applyLogout(event, broadcast = false) {
     if (locked) return logoutPromise;
     const tokens = [[PATROL_API,read('sessionStorage',PT_KEY)],[PATROL_API,read('sessionStorage',UAT_KEY)],[AUDIT_API,read('sessionStorage',AUDIT_KEY)]].filter((entry,index,all) => entry[1] && all.findIndex(other => other[0] === entry[0] && other[1] === entry[1]) === index);
     const memoryResults=[...memoryRevokers].map(fn=>Promise.resolve(fn(nativeFetch)).catch(()=>false));
+    if(!memoryRevokers.size)memoryResults.push(revokeSavedB());
     locked = true; epoch = event.id;
     write('sessionStorage',SEEN_KEY,epoch);
     clearIdentity(event,broadcast);
