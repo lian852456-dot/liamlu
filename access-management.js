@@ -23,7 +23,7 @@
  $('unlock').onsubmit=async event=>{event.preventDefault();const value=$('secret').value;lock();secret=value;controller=new AbortController();const expected=epoch;message('驗證中…');try{await load();if(expected===epoch)message('已驗證，資料已讀回。');}catch(e){if(expected===epoch){lock();message(e.message);}}};$('lock').onclick=()=>{lock();message('管理區已鎖定。');};window.addEventListener('pagehide',lock);
  $('change-password').onsubmit=async event=>{
  event.preventDefault();let value=$('new-password').value;
- if(value.length<12||value.length>128||value!==$('confirm-password').value){$('password-message').textContent='請輸入 12～128 個字元，兩次密碼必須相同。';value='';return;}
+ if(value.length<10||value.length>128||value!==$('confirm-password').value){$('password-message').textContent='請輸入 10～128 個字元，兩次密碼必須相同。';value='';return;}
  if(!Number.isSafeInteger(passwordEpoch)||passwordEpoch<1){clearPasswords();value='';$('password-message').textContent='請重新驗證管理者後再變更。';return;}
  if(!confirm('確定變更全體同仁指定密碼？所有既有密碼登入將立即失效，裝置綁定與停權設定保留。')){value='';return;}
  const expected=epoch,version=passwordEpoch;let submitted=false;
