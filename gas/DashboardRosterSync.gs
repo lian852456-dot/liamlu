@@ -1,7 +1,7 @@
 // Daily owner only. Reuses the approved KPI folder, Drive conversion, date
 // parser and privateDashboardSyncRoster; never publishes reports or snapshots.
 const PRIVATE_DASHBOARD_ROSTER_SYNC_KEY_ = 'DASHBOARD_ROSTER_SYNC_V1';
-const PRIVATE_DASHBOARD_ROSTER_TRIGGER_ = 'refreshNorth12BRoster';
+const PRIVATE_DASHBOARD_ROSTER_TRIGGER_ = 'refreshNorth12BRoster_';
 
 function privateDashboardRosterSyncStatus_() {
   const raw = privateDashboardProperties().getProperty(PRIVATE_DASHBOARD_ROSTER_SYNC_KEY_);
@@ -104,6 +104,7 @@ function privateDashboardRefreshRoster_(payload) {
       if (props.getProperty(PRIVATE_DASHBOARD_ROSTER_SYNC_KEY_) !== text) throw new Error('B_PERSISTENCE_FAILED');
       const triggers = ScriptApp.getProjectTriggers().filter(function(t) { return t.getHandlerFunction() === PRIVATE_DASHBOARD_ROSTER_TRIGGER_; });
       if (!triggers.length) ScriptApp.newTrigger(PRIVATE_DASHBOARD_ROSTER_TRIGGER_).timeBased().everyHours(6).create();
+      ScriptApp.getProjectTriggers().filter(function(t) { return t.getHandlerFunction() === 'refreshNorth12BRoster'; }).forEach(function(t) { ScriptApp.deleteTrigger(t); });
       return {status:'ok',result:result,validUntil:updated.authority.validUntil,automatic:true};
     });
   } catch (err) {
@@ -119,7 +120,8 @@ function privateDashboardRefreshRoster_(payload) {
   }
 }
 
-function refreshNorth12BRoster() {
+function refreshNorth12BRoster_() {
   // Time trigger runs as the same Daily owner using its existing admin secret.
+  // The trailing underscore also prevents anonymous HtmlService RPC access.
   return privateDashboardRefreshRoster_({adminSecret:privateDashboardProperties().getProperty('DASHBOARD_ADMIN_SECRET')});
 }

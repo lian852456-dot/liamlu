@@ -18,6 +18,9 @@ const YESTERDAY = '2026-10-09';
 const CLOCK = Date.parse(TODAY + 'T04:00:00Z');
 const CONFIG = 'DASHBOARD_AUTH_B_CONFIG_V1';
 const SYNC_STATE = 'DASHBOARD_ROSTER_SYNC_V1';
+const LEGACY_TRIGGER = 'refreshNorth12BRoster';
+const CURRENT_TRIGGER = 'refreshNorth12BRoster_';
+const OTHER_TRIGGER = 'unrelatedExistingTrigger';
 
 function extractFunction(source, name) {
   const start = source.indexOf('function ' + name + '(');
@@ -132,7 +135,9 @@ function refreshFixture({ source = 'detail', period = '2026/10/01 ~ 10/09', file
   let driveLookups = 0;
   let triggerCreates = 0;
   let convertedTrashes = 0;
-  const triggers = [];
+  const makeTrigger = (handler) => ({ getHandlerFunction: () => handler });
+  const triggers = [makeTrigger(LEGACY_TRIGGER), makeTrigger(OTHER_TRIGGER)];
+  const deletedTriggers = [];
   const bytes = Buffer.alloc(1024, 7);
   bytes[0] = 80;
   bytes[1] = 75;
@@ -206,7 +211,11 @@ function refreshFixture({ source = 'detail', period = '2026/10/01 ~ 10/09', file
     SpreadsheetApp: { openById: (id) => { assert.equal(id, 'SYNTHETIC_CONVERTED_FILE'); return sourceSpreadsheet; } },
     ScriptApp: {
       getProjectTriggers: () => triggers.slice(),
-      newTrigger: (handler) => ({ timeBased: () => ({ everyHours: () => ({ create: () => { triggers.push({ getHandlerFunction: () => handler }); triggerCreates += 1; } }) }) })
+      deleteTrigger: (trigger) => {
+        const index = triggers.indexOf(trigger);
+        if (index >= 0) { deletedTriggers.push(trigger.getHandlerFunction()); triggers.splice(index, 1); }
+      },
+      newTrigger: (handler) => ({ timeBased: () => ({ everyHours: () => ({ create: () => { triggers.push(makeTrigger(handler)); triggerCreates += 1; } }) }) })
     }
   });
   const declarations = `
@@ -237,7 +246,7 @@ function refreshFixture({ source = 'detail', period = '2026/10/01 ~ 10/09', file
   return {
     context,
     props,
-    stats: () => ({ syncCalls: context.__syncCalls, rosterWrites: context.__rosterWrites, driveLookups, triggerCreates, convertedTrashes, triggers: triggers.length }),
+    stats: () => ({ syncCalls: context.__syncCalls, rosterWrites: context.__rosterWrites, driveLookups, triggerCreates, convertedTrashes, triggers: triggers.length, triggerHandlers: triggers.map((trigger) => trigger.getHandlerFunction()), deletedTriggers: deletedTriggers.slice() }),
     fileHash: crypto.createHash('sha256').update(bytes).digest('hex')
   };
 }
@@ -308,6 +317,23 @@ test('refresh rejects a source roster that drops below the active native baselin
   assert.throws(() => fixture.context.privateDashboardRefreshRoster_({ adminSecret: 'SYNTHETIC_ADMIN' }), /ROSTER_REFRESH_FAILED/);
   assert.equal(fixture.stats().syncCalls, 0);
   assert.equal(fixture.props.get(CONFIG), before);
+});
+
+test('successful refresh migrates only the legacy roster timer to the private handler', () => {
+  const fixture = refreshFixture();
+  assert.equal(typeof fixture.context.refreshNorth12BRoster_, 'function');
+  assert.equal(typeof fixture.context.refreshNorth12BRoster, 'undefined');
+  fixture.context.privateDashboardRefreshRoster_({ adminSecret: 'SYNTHETIC_ADMIN' });
+  const first = fixture.stats();
+  assert.deepEqual(first.deletedTriggers, [LEGACY_TRIGGER]);
+  assert.equal(first.triggerCreates, 1);
+  assert.deepEqual(first.triggerHandlers.sort(), [CURRENT_TRIGGER, OTHER_TRIGGER].sort());
+  assert.equal(fixture.context.privateDashboardRosterSyncStatus_().automatic, true);
+  fixture.context.privateDashboardRefreshRoster_({ adminSecret: 'SYNTHETIC_ADMIN' });
+  const second = fixture.stats();
+  assert.deepEqual(second.deletedTriggers, [LEGACY_TRIGGER], 'legacy migration runs once');
+  assert.equal(second.triggerCreates, 1, 'current private handler is not duplicated');
+  assert.deepEqual(second.triggerHandlers.sort(), [CURRENT_TRIGGER, OTHER_TRIGGER].sort());
 });
 
 test('successful refresh creates one timer, and a valid no-op keeps authority expiry unchanged', () => {
