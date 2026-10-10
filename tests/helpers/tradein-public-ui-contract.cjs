@@ -42,10 +42,11 @@ test('changing month cancels a stalled iframe and clears its data and exports',a
  expect(calls.filter(p=>p.month==='2026-10')).toHaveLength(1);expect(errors).toEqual([]);
 });
 test('malformed public payload clears all data and exports',async({page})=>{const {errors}=await start(page,{tamper:true});await expect(page.locator('#readMessage')).toContainText('白名單');await expect(page.locator('#publicWorkspace')).toBeHidden();await expect(page.locator('#staffRows tr')).toHaveCount(0);expect(errors).toEqual([]);});
-for(const width of [1280,390,320])test(width+'px multiple count choices intersect store and current exports',async({page})=>{
+for(const width of [1280,390,320])test(width+'px multiple count choices intersect store and current exports',async({page},info)=>{
  const {calls,errors}=await start(page,{width});await expect(page.locator('#refreshData')).toBeEnabled();await page.getByRole('tab',{name:'個人進度',exact:true}).click();
  await page.getByRole('checkbox',{name:'0 筆',exact:true}).check();await page.getByRole('checkbox',{name:'1 筆',exact:true}).check();await expect(page.locator('#staffRows tr')).toHaveCount(3);await expect(page.locator('#staffResultCount')).toHaveText('顯示 3 人');
  await expect(page.locator('#reminderText')).toHaveValue(/回收 0 筆、1 筆/);await expect(page.locator('#reminderText')).not.toHaveValue(/實績：2 台/);await expect(page.locator('#reminderText')).toHaveValue(/回收機款：i15PM 256G/);
+ await page.screenshot({path:info.outputPath('SYNTHETIC-multiple-counts-'+width+'.png'),fullPage:true});
  await page.locator('#staffStore').selectOption('萬大');await expect(page.locator('#staffRows tr')).toHaveCount(1);await page.getByRole('checkbox',{name:'1 筆',exact:true}).uncheck();await expect(page.locator('#staffRows')).toContainText('沒有符合');await expect(page.locator('#staffResultCount')).toHaveText('顯示 0 人');await expect(page.locator('#downloadReminderXlsx')).toBeDisabled();
  await page.getByRole('button',{name:'全部筆數',exact:true}).click();await expect(page.locator('#staffRows tr')).toHaveCount(2);await expect(page.locator('#downloadReminderXlsx')).toBeEnabled();await page.getByRole('checkbox',{name:'1 筆',exact:true}).check();await page.locator('#exportScope').selectOption('all');await expect(page.locator('#reminderText')).toHaveValue(/實績：2 台/);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(calls).toHaveLength(1);expect(errors).toEqual([]);

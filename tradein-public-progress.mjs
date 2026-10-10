@@ -1,5 +1,5 @@
 import {bindExports,refreshExports,clearExports} from './tradein-export-ui.mjs?v=20261010-person-models-1';
-import {formatDifference} from './tradein-export-core.mjs?v=20261010-person-models-1';
+import {formatDifference,formatRecoveredModels} from './tradein-export-core.mjs?v=20261010-person-models-1';
 import {createPublicReader,readPublicFrame} from './tradein-public-read.mjs?v=20261010-read-1';
 const $=id=>document.getElementById(id),CORE=window.TradeinPerformanceCore,PUBLIC=window.TradeinPublicCore;
 const API='https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
@@ -9,7 +9,7 @@ const units=n=>n===null?'未提供':n+' 台';
 const selectedCounts=new Set();
 const personTuple=p=>[p.store,p.masked_name,p.target_units===null?'免目標':'同仁',p.actual_units,p.recovered_models??null];
 function filteredPeople(){const store=$('staffStore').value;return (snapshot?.people||[]).filter(p=>(!store||p.store===store)&&(!selectedCounts.size||selectedCounts.has(p.actual_units===null?'unknown':String(p.actual_units))));}
-function modelsText(p){if(p.actual_units===0)return '尚無回收';if(!Array.isArray(p.recovered_models))return '機款待補';return p.recovered_models.map(m=>esc(m.model)+(m.units>1?' × '+m.units:'')).join('、');}
+function modelsText(p){return esc(formatRecoveredModels(p.actual_units,p.recovered_models));}
 async function request(payload,signal){
  const response=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),cache:'no-store',credentials:'omit',signal});
  if(!response.ok)throw Error('服務暫時無回應');const body=await response.json();if(!body||body.status==='error')throw Error(body?.message||'讀取未完成');return body;
