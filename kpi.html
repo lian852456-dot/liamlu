@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <script src="portal-logout.js?v=20261010-shared-login-1"></script>
+  <script src="portal-logout.js?v=20261010-supervisor-login-2"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -112,8 +112,8 @@
     th.hide-m, td.hide-m { display:none; }
   }
 </style>
-<script src="GasBClient.js?v=20261010-shared-login-1" defer></script>
-<script src="dashboard-b-shell.js?v=20261010-shared-login-1" defer></script>
+<script src="GasBClient.js?v=20261010-supervisor-login-2" defer></script>
+<script src="dashboard-b-shell.js?v=20261010-supervisor-login-2" defer></script>
 </head>
 <body>
 <header class="site-header">
@@ -861,6 +861,7 @@ function initApp(){
 window.DashboardBHost={
  navigationSelector:'#tabStore, #tabPerson',
  clear(){DATA=null;window._profile=null;document.getElementById('appArea').style.display='none';for(const id of ['whoami','summaryCard','itemArea','strategyView','selStore','selPerson','srcNote'])document.getElementById(id)?.replaceChildren();document.getElementById('appArea').querySelectorAll('input').forEach(node=>node.value='');document.getElementById('lockCard').style.display='';},
+ showLegacyAccess(){const card=document.getElementById('lockCard');if(!card)return;card.style.display='';card.scrollIntoView({block:'start',behavior:'smooth'});document.getElementById('lockEmp')?.focus();},
  accept(bundle){DATA=bundle.kpiResult.data;window._profile=bundle.kpiResult.profile;document.getElementById('lockCard').style.display='none';document.getElementById('appArea').style.display='';initApp();},
  navigate(module){if(module==='awards'){document.querySelector('[data-b-message]').textContent='台獎請至首頁或 APP 登入後查看。';return;}setTab(module==='personal'?'person':'store');}
 };

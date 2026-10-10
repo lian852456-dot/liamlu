@@ -51,3 +51,44 @@ test('password native eligibility accepts numeric cells but retains canonical, s
  row[2]=STORES[1];assert.throws(()=>f.ctx.privateDashboardBStrictNative_('7000001',c,Date.now()),/B_ELIGIBILITY_DENIED/);
  assert.equal(f.writes.length,0);
 });
+
+test('trusted supervisor can use two devices without moving employee bindings; tokens remain device scoped and revocable',()=>{
+ const f=fixture();const id='SYNTHBOSS';f.props.set('DASHBOARD_TRUSTED_EMPLOYEE_ID',id);
+ f.rows.DashboardUsers.push([id,'SYNTHETIC_BOSS','北一二B','督導','active','','','']);
+ f.ctx.privateDashboardBVerifyPassword_=(password)=>password==='SYNTHETIC_PASSWORD';
+ const before=f.props.get(BIND),api=f.ctx.privateDashboardCreateGasB_({});
+ const login=(device,suffix,password='SYNTHETIC_PASSWORD')=>JSON.parse(JSON.stringify(api.handle(JSON.stringify({action:'employee_login',employeeId:id,deviceId:device,track:'password-bound',password,sessionNonce:suffix.repeat(64),idempotencyKey:'SYNTHETIC_IDEMPOTENCY_'+suffix}))));
+ const d1='SYNTHETIC_SUPERVISOR_DEVICE_1',d2='SYNTHETIC_SUPERVISOR_DEVICE_2';
+ assert.equal(login(d1,'c','WRONG').status,'error');
+ const a=login(d1,'a'),b=login(d2,'b');assert.equal(a.status,'ok');assert.equal(b.status,'ok');assert.equal(f.props.get(BIND),before);
+ const access=(token,device,action='employee_session')=>api.handle(JSON.stringify({action,token,deviceId:device}));
+ assert.equal(access(a.token,d1).status,'ok');assert.equal(access(a.token,d2).status,'error');
+ assert.equal(access(a.token,d1,'employee_logout').status,'ok');assert.equal(access(a.token,d1).status,'error');assert.equal(access(b.token,d2).status,'ok');
+ f.props.delete('DASHBOARD_TRUSTED_EMPLOYEE_ID');assert.equal(access(b.token,d2).status,'error');
+ f.props.set('DASHBOARD_TRUSTED_EMPLOYEE_ID',id);f.rows.DashboardUsers.at(-1)[4]='revoked';assert.equal(access(b.token,d2).status,'error');
+ assert.equal(f.props.get(BIND),before);
+});
+
+test('admin-only B reset preserves employee status and other bindings, removes sessions and prevents replay',()=>{
+ const f=fixture();f.ctx.privateDashboardBVerifyPassword_=()=>true;
+ const api=f.ctx.privateDashboardCreateGasB_({}),invoke=p=>api.handle(JSON.stringify(p));
+ const p={action:'employee_login',employeeId:'SYNTH002',deviceId:'SYNTHETIC_DEVICE_FOR_RESET',track:'password-bound',password:'SYNTHETIC_PASSWORD',sessionNonce:'a'.repeat(64),idempotencyKey:'SYNTHETIC_RESET_IDEMPOTENCY'};
+ const a=invoke(p);assert.equal(a.status,'ok');const before=f.raw();
+ assert.equal(invoke({action:'employee_admin_reset_device',adminSecret:'wrong',employeeId:p.employeeId}).status,'error');assert.deepEqual(f.raw(),before);
+ assert.equal(invoke({action:'employee_admin_reset_device',adminSecret:ADMIN,employeeId:p.employeeId}).status,'ok');
+ assert.deepEqual(f.rows,before.rows);assert.deepEqual(JSON.parse(f.props.get(BIND)).bindings.SYNTH001,JSON.parse(before.props.get(BIND)).bindings.SYNTH001);
+ assert.equal(invoke({action:'employee_session',token:a.token,deviceId:p.deviceId}).status,'error');assert.equal(invoke(p).status,'error');
+ assert.equal(invoke({...p,deviceId:'SYNTHETIC_REPLACEMENT_DEVICE',idempotencyKey:'SYNTHETIC_NEW_IDEMPOTENCY',sessionNonce:'b'.repeat(64)}).status,'ok');
+});
+
+test('additional supervisor exemption is admin-only, preserves primary supervisor and revokes on removal',()=>{
+ const f=fixture();f.ctx.privateDashboardBVerifyPassword_=()=>true;f.props.set('DASHBOARD_TRUSTED_EMPLOYEE_ID','SYNTH001');
+ const api=f.ctx.privateDashboardCreateGasB_({}),invoke=p=>api.handle(JSON.stringify(p));
+ const change={action:'employee_admin_supervisor',adminSecret:ADMIN,employeeId:'SYNTH002',enabled:true};
+ assert.equal(invoke({...change,adminSecret:'wrong'}).status,'error');assert.equal(invoke(change).status,'ok');
+ assert.equal(f.ctx.privateDashboardIsTrustedEmployee('SYNTH002'),false);assert.equal(f.ctx.privateDashboardBTrusted_('SYNTH002'),true);
+ assert.equal(invoke({...change,employeeId:'SYNTH001',enabled:false}).status,'error');
+ const p={action:'employee_login',employeeId:'SYNTH002',deviceId:'SYNTHETIC_NEW_SUPERVISOR_DEVICE',track:'password-bound',password:'SYNTHETIC_PASSWORD',sessionNonce:'c'.repeat(64),idempotencyKey:'SYNTHETIC_SUPERVISOR_IDEMPOTENCY'};
+ const a=invoke(p);assert.equal(a.status,'ok');assert.equal(invoke({...change,enabled:false}).status,'ok');
+ assert.equal(invoke({action:'employee_session',token:a.token,deviceId:p.deviceId}).status,'error');assert.equal(f.ctx.privateDashboardBTrusted_('SYNTH002'),false);
+});
