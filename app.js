@@ -2105,6 +2105,7 @@
   scope.DashboardBHost={
     navigationSelector:'[data-nav], [data-battle-kind], [data-battle-scope]',
     clear(){resetPrivateSummary();privateAccessStatus='unauthorized';dom('#viewerState').textContent='未登入';renderAll();},
+    showLegacyAccess(){setView('me');dom('#privateAccessForm')?.closest('.access-panel')?.scrollIntoView({block:'start',behavior:'smooth'});dom('#employeeId')?.focus();},
     accept(bundle){
       const snapshot=bundle.privateResult.snapshot||{},data=bundle.kpiResult.data,at=nowIso();
       const kpi=adaptKpi(data,snapshot,at),awards=adaptAwards(snapshot,String(snapshot.kpiBattle&&(snapshot.kpiBattle.report_run_date||snapshot.kpiBattle.report_date)||''),at);
