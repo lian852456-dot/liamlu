@@ -21,6 +21,20 @@ body[data-performance-release="public"] .form-message{overflow-wrap:anywhere}
 body[data-performance-release="public"] #readMessage:empty{display:none}
 body[data-performance-release="public"] .footer{max-width:none;width:min(1640px,calc(100% - 32px));padding:18px 0;font-size:15px}
 body[data-performance-release="public"] .export-feedback,body[data-performance-release="public"] .export-preview textarea{font-size:18px}
+body[data-performance-release="public"] #actual-person{font-weight:700}
+body[data-performance-release="public"] #actual-person td small{font-weight:650}
+.person-filters{align-items:flex-end;flex-wrap:wrap;gap:16px}
+.count-filter{border:0;padding:0;margin:0;min-width:0}
+.count-filter legend{padding:0;margin-bottom:8px}
+.count-options{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.count-choice{display:flex;align-items:center;gap:7px;min-height:44px;padding:8px 12px;border:1px solid #e4e7ec;border-radius:10px;background:#fff;cursor:pointer}
+.count-choice:has(input:checked),#allStaffCounts[aria-pressed="true"]{background:#fff0e6;border-color:#d76526;color:#a84311}
+.person-filters #staffCounts .count-choice{flex:0 0 auto;min-width:0;font-weight:700}
+.count-choice input{width:20px;min-width:20px;height:20px;min-height:0;padding:0;margin:0;accent-color:#d76526}
+body[data-performance-release="public"] #actual-person label{font-weight:700}
+body[data-performance-release="public"] #staffRows td{font-weight:700}
+body[data-performance-release="public"] .recovered-models{max-width:440px;overflow-wrap:anywhere}
+body[data-performance-release="public"] .empty-people td{text-align:center;color:var(--muted);padding:24px 12px}
 @media(max-width:700px){
  body[data-performance-release="public"] main,body[data-performance-release="public"] .footer{width:calc(100% - 16px);margin:8px auto 32px}
  body[data-performance-release="public"] .hero{padding:18px 16px}
@@ -36,4 +50,8 @@ body[data-performance-release="public"] .export-feedback,body[data-performance-r
  body[data-performance-release="public"] .mobile-stack td:first-child strong{font-size:18px}
  body[data-performance-release="public"] .kpi{padding:14px 12px}
  body[data-performance-release="public"] .kpi strong{font-size:28px}
+ .person-filters>label,.count-filter{width:100%}
+ body[data-performance-release="public"] .recovered-models{max-width:none}
+ body[data-performance-release="public"] .empty-people td{display:block}
+ body[data-performance-release="public"] .empty-people td:before{display:none}
 }

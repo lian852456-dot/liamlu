@@ -13,8 +13,13 @@ export function formatDifference(actual,target){
   const difference=actual-target;
   return (difference>0?'+':difference<0?'−':'')+Math.abs(difference)+' 台';
 }
+export function formatRecoveredModels(actual,models){
+  if(actual===0)return '尚無回收';
+  if(!Array.isArray(models))return actual===null?'待核':'機款待補';
+  return models.map(m=>m.model+(m.units>1?' × '+m.units:'')).join('、');
+}
 export function describePerson(person,rules=DEFAULT_RULES){
-  const [store,name,role,raw]=person;
+  const [store,name,role,raw,recoveredModels=null]=person;
   if(raw!==null&&(!Number.isSafeInteger(raw)||raw<0))throw new Error('實績型別或數值無效，停止匯出。');
   const actual=hasMonthlySource(rules)?raw:null;
   const exempt=role==='免目標'||role==='店長'||role==='代理店長'&&rules.actingManager==='exempt';
@@ -23,7 +28,7 @@ export function describePerson(person,rules=DEFAULT_RULES){
   const status=exempt?'不設目標':role!=='同仁'?'未知（身份／職務待核）':actual===null?'未知（實績未提供）':actual>=target?(rules.isDemo?'示意達標':'已達標'):(rules.isDemo?'示意進行中':'進行中');
   const missing=!hasMonthlySource(rules)?'選定月份來源未提供':'實績未提供';
   const reason=exempt?(role==='免目標'?'不設目標':role+'免目標')+(actual===null?'；'+missing:''):role!=='同仁'?'身份／職務待確認':actual===null?missing+'；每月 3 台':(rules.isDemo?'每月 3 台；實績為示意':'每月 3 台；單銷計入，含取消交易待核');
-  return Object.freeze({store:String(store),name:String(name),role:String(role),actual,target,remaining,status,reason});
+  return Object.freeze({store:String(store),name:String(name),role:String(role),actual,target,remaining,status,reason,recoveredModels});
 }
 export function buildExportModel(context,scope,rules=DEFAULT_RULES){
   if(!context||!context.active)throw new Error('請先完成登入並讀取資料。');
@@ -41,8 +46,9 @@ export function buildExportModel(context,scope,rules=DEFAULT_RULES){
     const allowed=new Set(context.allowedStores||[]);
     const store=scope==='current'?context.selectedStore:'';
     if(store&&!allowed.has(store))throw new Error('此店點不在目前授權範圍。');
-    rows=context.people.filter(p=>allowed.has(p[0])&&(!store||p[0]===store));
+    rows=(scope==='current'&&Array.isArray(context.currentPeople)?context.currentPeople:context.people).filter(p=>allowed.has(p[0])&&(!store||p[0]===store));
     scopeLabel=context.mode==='public'?(store?store+' · 公開進度':'全區九店 · 公開進度'):(store?store+' · 已授權'+(rules.isDemo?'示意':''):'全部已授權店點'+(rules.isDemo?' · 示意':''));
+    if(scope==='current'&&context.countFilterLabel)scopeLabel+=' · '+context.countFilterLabel;
   }
   if(!rows.length)throw new Error('此範圍沒有可匯出的資料。');
   if(rows.length>100)throw new Error('資料超過 100 人，請縮小匯出範圍。');
@@ -53,15 +59,15 @@ export function reminderText(model){
   return [(r.isDemo?'【舊換新提醒｜全為示意資料】':'【舊換新每月進度提醒】'),`月份：${r.month}｜本期 ${r.start}–${r.end}（每月 3 台）`,`來源期間：${r.sourceStart}–${r.sourceEnd}`,`來源截止：${r.cutoff}（日期精度；${r.timezone}）`,...(r.statusAsOf?[`取消狀態核對至：${r.statusAsOf}（含取消交易停止同步，沖回月份待核）`]:[]),`月份資料：${hasMonthlySource(r)?(r.isDemo?'選定月份截至來源截止的累積有效交易示意；未核涵蓋仍為未知':'選定月份截至報表查詢截止的有效回收；日期精度不代表當日終日'):'選定月份尚未提供來源；其他月份實績不納入'}`,`匯出範圍：${model.scopeLabel}`,'',...model.rows.flatMap(p=>[
     `${p.store}｜${p.name}｜${p.role}`,
     `實績：${p.actual===null?'未提供':p.actual+' 台'}；目標：${p.target===null?(p.status==='不設目標'?'不設目標':'身份待核'):p.target+' 台／月'}；${model.showDifference?'目前差異：'+formatDifference(p.actual,p.target):'尚缺：'+(p.remaining===null?'未判定':p.remaining+' 台'+(r.isDemo?'（示意）':''))}`,
-    `狀態：${p.status}；${p.reason}`,''
+    model.showDifference?`回收機款：${formatRecoveredModels(p.actual,p.recoveredModels)}`:`狀態：${p.status}；${p.reason}`,''
   ]),...(model.showDifference?['目前差異＝實績－月目標；負數為未達，正數為超標。']:[]),'未知值不當成 0；超標台數不能替其他同仁達標。'].join('\n');
 }
 export function workbookRows(model){
   const r=model.rules;
   return [[],[r.isDemo?'舊換新進度｜合成示意':'舊換新每月個人進度'],[r.isDemo?'規則已核定：每月 3 台；店長與代理店長免目標。人員與實績仍為合成示意。':'每月 3 台；店長與代理店長免目標。單銷計入；含取消交易停止同步，沖回月份待核。'],[],
     ['選定月開始',{date:r.start}],['選定月結束',{date:r.end}],['來源期間開始',{date:r.sourceStart}],['來源期間結束',{date:r.sourceEnd}],['來源截止',{date:r.cutoff}],['規則狀態','每月 3 台；店長與代理店長免目標'+(r.statusAsOf?'；取消狀態核對至 '+r.statusAsOf:'')],['匯出範圍',model.scopeLabel],['月份／缺值',r.month+'；'+r.timezone+'；'+(hasMonthlySource(r)?'截至來源截止；未知數值留空':'選定月份來源未提供；實績留空')],[],
-    ['店點','人員','職務','實績（台）','目標（台）',model.showDifference?'目前差異（實績－月目標）':'尚缺（台）','達標／未知狀態','目標／資料狀態'],
-    ...model.rows.map(p=>[p.store,p.name,p.role,p.actual,p.target,model.showDifference?(p.actual===null||p.target===null?null:p.actual-p.target):p.remaining,p.status,p.reason])];
+    ['店點','人員','職務','實績（台）','目標（台）',model.showDifference?'目前差異（實績－月目標）':'尚缺（台）',model.showDifference?'回收機款':'達標／未知狀態','目標／資料狀態'],
+    ...model.rows.map(p=>[p.store,p.name,p.role,p.actual,p.target,model.showDifference?(p.actual===null||p.target===null?null:p.actual-p.target):p.remaining,model.showDifference?formatRecoveredModels(p.actual,p.recoveredModels):p.status,p.reason])];
 }
 const xml=value=>String(value).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
 const excelDate=iso=>(Date.parse(iso+'T00:00:00Z')-Date.UTC(1899,11,30))/86400000;
@@ -123,7 +129,7 @@ export function createReminderCanvas(model){
   const lines=reminderText(model).split('\n'),layout=[];let height=36;
   for(let i=0;i<lines.length;i++){
     const title=i===0,size=title?29:19;
-    ctx.font=`${title?'700':'500'} ${size}px system-ui,"PingFang TC","Microsoft JhengHei",sans-serif`;
+    ctx.font=`${title||model.showDifference?'700':'500'} ${size}px system-ui,"PingFang TC","Microsoft JhengHei",sans-serif`;
     const wrapped=wrapText(ctx,lines[i],content),step=title?42:29;
     for(const text of wrapped){layout.push({text,y:height+size,size,title});height+=step;}
     if(i===0)height+=16;
@@ -133,6 +139,6 @@ export function createReminderCanvas(model){
   canvas.width=width*2;canvas.height=height*2;ctx.scale(2,2);
   ctx.fillStyle='#ffffff';ctx.fillRect(0,0,width,height);
   ctx.fillStyle='#fff0e6';ctx.fillRect(0,0,width,108);
-  for(const line of layout){ctx.font=`${line.title?'700':'500'} ${line.size}px system-ui,"PingFang TC","Microsoft JhengHei",sans-serif`;ctx.fillStyle=line.title?'#a44a17':'#273746';ctx.fillText(line.text,pad,line.y);}
+  for(const line of layout){ctx.font=`${line.title||model.showDifference?'700':'500'} ${line.size}px system-ui,"PingFang TC","Microsoft JhengHei",sans-serif`;ctx.fillStyle=line.title?'#a44a17':'#273746';ctx.fillText(line.text,pad,line.y);}
   return {canvas,layout,width,height};
 }

@@ -7,6 +7,22 @@ var TradeinPerformanceCore = (function () {
     ['DNB10284','大稻埕'],['DNB10307','三創'],['DNB10440','六張犁']
   ]);
   const RULE_ID = 'monthly3-inclusive-original-month-v1';
+  function shortModel(value) {
+    if(value===null || value===undefined || value==='')return null;
+    if(typeof value!=='string' || value.length>300 || /[<>\u0000-\u001f]|\d{10,}/.test(value))throw new Error('回收機款格式無效');
+    let model=value.trim().replace(/^\(舊機\)\s*/,'').replace(/\((20\d{2})\)/g,' $1 ').replace(/\([^)]*\)/g,'')
+      .replace(/_[A-Z]等.*$/i,'').replace(/[_-]+$/,'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
+    model=model.replace(/^APPLE\s+/i,'').replace(/iPhone\s*(\d+)\s*Pro\s*Max/i,'i$1PM')
+      .replace(/iPhone\s*(\d+)\s*Pro/i,'i$1P').replace(/iPhone\s*(\d+)\s*Plus/i,'i$1Plus')
+      .replace(/iPhone\s*(\d+)/i,'i$1').replace(/iPhone\s*SE\s*/i,'iSE ')
+      .replace(/^Google\s+/i,'').replace(/\bPixel\s*(\d+)\s*Pro\s*XL/i,'Pixel $1P XL').replace(/\bPixel\s*(\d+)\s*Pro/i,'Pixel $1P')
+      .replace(/^SAMSUNG\s+(?:Galaxy\s+)?/i,'').replace(/\bUltra\b/gi,'U')
+      .replace(/\d+GB\/(\d+)(?:GB|G)\b/gi,'$1G').replace(/\b(\d+)GB\b/gi,'$1G')
+      .replace(/\bPlus\b/gi,'+').replace(/\s*[-_]\s*(?=\d+(?:G|T)\b)/gi,' ')
+      .replace(/\s*[-_]\s*$/,'').replace(/\s+/g,' ').trim();
+    if(!model || model.length>80 || !/^[A-Za-z0-9 .+()\/\-]+$/.test(model))throw new Error('回收機款簡稱無法辨識');
+    return model;
+  }
   function date(value) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '') || isNaN(Date.parse(value+'T00:00:00Z')) ||
         new Date(value+'T00:00:00Z').toISOString().slice(0,10)!==value) throw new Error('日期無效');
@@ -77,7 +93,7 @@ var TradeinPerformanceCore = (function () {
       if (!/^[A-Z0-9]{5,12}$/.test(employee) || byId[employee]) throw new Error('名冊員編重複或無效');
       const p={employee_key:employee,store:store,masked_name:String(r.masked_name || '姓名未提供'),
         role:role(r.role),original_role:String(r.role || ''),identity_status:'confirmed',actual_units:0};
-      people.push(p);byId[employee]=p;
+      p.recovered_models=[];people.push(p);byId[employee]=p;
     });
     const stores=STORES.map(s=>({store:s[1],store_code:s[0],total_units:0,pending_identity_units:0,
       target_staff_count:0,staff_target_units:0,target_staff_actual_units:0,met_staff_count:0,
@@ -96,10 +112,12 @@ var TradeinPerformanceCore = (function () {
       if(typeof r.recycle_code!=='string' || typeof r.order_number!=='string')throw new Error('回收碼／銷貨單號必須為字串');
       const key=r.recycle_code.trim(), order=r.order_number.trim();
       if (!key || !order || key.length>100 || order.length>100) throw new Error('缺少有效回收碼／銷貨單號');
-      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project};
+      const model=shortModel(r.recycle_model);
+      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project,model:model};
       if (unique[key]) {
         const prior=unique[key];
         if (prior.store!==store || prior.trade_date!==trade || prior.employee_key!==normalized.employee_key || prior.order!==order || prior.project!==r.project) throw new Error('同回收碼的交易、人員或店點衝突');
+        if(prior.model!==model)throw new Error('同回收碼的機款衝突');
         if (cancel && (!prior.cancel_date || cancel>prior.cancel_date)) prior.cancel_date=cancel;
         duplicates++;
       } else unique[key]=normalized;
@@ -114,10 +132,13 @@ var TradeinPerformanceCore = (function () {
       const person=byId[r.employee_key];
       if (!person || person.store!==r.store || person.identity_status==='conflict') {store.pending_identity_units++;store.coverage='partial_identity';return;}
       person.actual_units++;
+      if(!r.model)person.recovered_models=null;
+      else if(person.recovered_models!==null){const item=person.recovered_models.find(m=>m.model===r.model);if(item)item.units++;else person.recovered_models.push({model:r.model,units:1});}
     });
     people.forEach(p=>{
       const s=byStore[p.store], exempt=['店長','代理店長'].includes(p.role);
-      if(p.identity_status==='conflict'){p.actual_units=null;s.coverage='partial_identity';}
+      if(p.identity_status==='conflict'){p.actual_units=null;p.recovered_models=null;s.coverage='partial_identity';}
+      if(p.recovered_models)p.recovered_models.sort((a,b)=>a.model.localeCompare(b.model,'en'));
       p.target_units=p.role==='同仁'?3:null;
       p.remaining_units=p.target_units===null||p.actual_units===null?null:Math.max(3-p.actual_units,0);
       p.attainment_status=exempt?'exempt':p.role==='同仁'&&p.actual_units!==null?(p.actual_units>=3?'met':'in_progress'):'pending';
@@ -166,6 +187,7 @@ var TradeinPerformanceCore = (function () {
       names[17]==='銷貨單號' && names[23]==='員工編號' && names[26]==='取消交易日期';
     if((!legacy30&&!sar29) || new Set(nonemptyNames).size!==nonemptyNames.length || labels.some(n=>!names.includes(n)))throw new Error('無法辨識 SAR74 欄位');
     const columns=Object.fromEntries(labels.map(n=>[n,names.indexOf(n)]));
+    if(names.includes('回收舊機品名'))columns['回收舊機品名']=names.indexOf('回收舊機品名');
     const header=rows.slice(0,h).flat().join(' '),ranges=Array.from(header.matchAll(/(\d{3}\/\d{2}\/\d{2})\s*-\s*(\d{3}\/\d{2}\/\d{2})/g));
     if(ranges.length!==1)throw new Error('SAR74 查詢期間缺漏或不唯一');
     const start=roc(ranges[0][1]),end=roc(ranges[0][2]),period=monthPeriod(start.slice(0,7));
@@ -198,12 +220,14 @@ var TradeinPerformanceCore = (function () {
       if(trade<start || trade>end || cancel&&(cancel<trade || cancel>statusAsOf))throw new Error('SAR74 交易／取消日期與來源期間衝突');
       // Preserve identifiers as source strings. Store verification and employee
       // crosswalk are separate release prerequisites; no alias/prefix is inferred.
-      records.push({store_code:store,trade_date:trade,project:project,source_employee_id:seller,
-        recycle_code:recycle,order_number:order,cancel_date:cancel});
+      const record={store_code:store,trade_date:trade,project:project,source_employee_id:seller,
+        recycle_code:recycle,order_number:order,cancel_date:cancel};
+      if(names.includes('回收舊機品名'))record.recycle_model=field(r,'回收舊機品名');
+      records.push(record);
     });
     return {month:start.slice(0,7),source_start:start,source_end:end,status_as_of_date:statusAsOf,rule_id:RULE_ID,complete_nine_stores:false,header_column_count:names.length,
       printed_at:printed?printed[0]:'',records:records};
   }
-  return Object.freeze({STORES:STORES,RULE_ID:RULE_ID,monthPeriod:monthPeriod,storeName:storeName,build:build,parseSar74:parseSar74});
+  return Object.freeze({STORES:STORES,RULE_ID:RULE_ID,monthPeriod:monthPeriod,storeName:storeName,build:build,parseSar74:parseSar74,shortModel:shortModel});
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=TradeinPerformanceCore;
