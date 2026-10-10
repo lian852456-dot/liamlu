@@ -750,6 +750,8 @@
   }
 
   async function loadFormalSummary(employeeId) {
+    await scope.DashboardB?.leaveForA();
+    const authContext=scope.DashboardB?.context()||0;
     const id = String(employeeId || '').trim();
     if (!id) throw new Error('請輸入既有員工編號。');
     const credential = { employeeId:id, deviceId:deviceId() };
@@ -758,6 +760,7 @@
     try {
       privateResult = await postReadOnly({ action:'private_access', ...credential });
     } catch (error) {
+      if(authContext!==(scope.DashboardB?.context()||0))return;
       const pending = privateAccessPending(error && error.message);
       const transportFailure = error instanceof ReadTransportError;
       const state = pending ? 'unauthorized' : transportFailure ? 'error' : 'unauthorized';
@@ -769,6 +772,7 @@
       renderAll();
       throw error;
     }
+    if(authContext!==(scope.DashboardB?.context()||0))return;
     scope.PortalLogout?.notifyLogin();
     const snapshot = privateResult.snapshot || {};
     const readAt = nowIso();
@@ -806,12 +810,14 @@
     };
 
     const kpiTask=postReadOnly({action:'kpicalc_access',...credential}).then(result=>{
+      if(authContext!==(scope.DashboardB?.context()||0))return;
       const kpiData=result.data||{};
       const kpi=adaptKpi(kpiData,snapshot,nowIso());
       contract.kpiSummary=kpi.summary; contract.kpiStores=kpi.stores; contract.kpiFullMetrics=kpi.full;
       contract.personalPerformance=adaptPersonalPerformance(kpiData,snapshot,nowIso());
       contract.generatedAt=nowIso(); renderAll();
     }).catch(error=>{
+      if(authContext!==(scope.DashboardB?.context()||0))return;
       const note=readErrorNote(error,'正式 KPI');
       contract.kpiSummary=privateFailureModule('kpiSummary',error,'正式 KPI'); contract.kpiStores=privateFailureModule('kpiStores',error,'正式 KPI'); contract.kpiFullMetrics=privateFailureModule('kpiFullMetrics',error,'正式 KPI');
       contract.personalPerformance=privateFailureModule('personalPerformance',error,'正式 KPI 個績');
@@ -825,12 +831,14 @@
           postReadOnly({action:'read',date:taipeiDate(),seg:segment,...credential}),
           postReadOnly({action:'pread',date:taipeiDate(),seg:segment,...credential})
         ]);
+        if(authContext!==(scope.DashboardB?.context()||0))return;
         if(reportResult.status==='rejected') throw reportResult.reason;
         const report=adaptReport(segment,reportResult.value.data,peopleResult.status==='fulfilled'?peopleResult.value.data:{},reportResult.value.summary);
         reportRows[segment]=report;
         contract[key]=C.moduleState({status:report.completedStores===0?'no_data':report.completedStores===9&&report.summaryAvailable?'ok':'partial',updatedAt:nowIso(),sourceUpdatedAt:report.updatedAt,stale:false,source:moduleSource('北一二B每日回報','index.html'),data:report,note:!report.summaryAvailable?'正式來源尚未提供 report summary adapter；營運摘要 fail-closed。':report.completedStores===0?`尚未進入／尚無正式 ${segment}:00 回報`:''});
         failureRows[segment]=peopleResult.status==='fulfilled'?failureSummary(report):{unavailable:true,failedStoreCount:null,failedPeopleCount:null,missingStores:report.missingStores,byMetric:null,people:null};
       }catch(error){
+        if(authContext!==(scope.DashboardB?.context()||0))return;
         reportRows[segment]=null;
         contract[key]=privateFailureModule(key,error,`${segment}:00 正式回報`);
         failureRows[segment]={unavailable:true,failedStoreCount:null,failedPeopleCount:null,missingStores:[],byMetric:null,people:null};
@@ -838,16 +846,19 @@
       updateOperations();
     };
     await Promise.allSettled([kpiTask,reportTask(16),reportTask(21)]);
+    if(authContext!==(scope.DashboardB?.context()||0))return;
     setPrivateAccessState('approved','已由既有 Approved Device 完成正式唯讀模組載入。');
   }
 
   async function loadYesterdayFollowUp(credential) {
+    const authContext=scope.DashboardB?.context()||0;
     const date=taipeiDateOffset(-1);
     try {
       const [reportResult,peopleResult]=await Promise.all([
         postReadOnly({action:'read',date,seg:21,...credential}),
         postReadOnly({action:'pread',date,seg:21,...credential})
       ]);
+      if(authContext!==(scope.DashboardB?.context()||0))return;
       const report=adaptReport(21,reportResult.data,peopleResult.data,reportResult.summary);
       const data=Y.adapt({date,report});
       yesterdayFollowUpModule=C.moduleState({
@@ -856,6 +867,7 @@
         note:data.formalDataAvailable?'':'昨日 21:00 尚無正式資料'
       });
     } catch(error) {
+      if(authContext!==(scope.DashboardB?.context()||0))return;
       yesterdayFollowUpModule=yesterdayFailureModule(error);
     }
     contract.generatedAt=nowIso();
@@ -2004,7 +2016,7 @@
   dom('[data-date-today]').addEventListener('click',()=>{ dom('#scheduleDate').value=taipeiDate(); if(patrolToken)loadPatrolData(); else renderSchedule(); });
   dom('#scheduleDate').addEventListener('change',()=>patrolToken?loadPatrolData():renderSchedule());
   dom('#scheduleStoreFilter').addEventListener('change',renderSchedule);
-  all('[data-refresh]').forEach(button=>button.addEventListener('click',()=>{ if(PREVIEW_MODE)renderAll(); else { const id=scope.localStorage.getItem(EMPLOYEE_KEY); if(id)loadFormalSummary(id).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); }); if(patrolToken)loadPatrolData(); } }));
+  all('[data-refresh]').forEach(button=>button.addEventListener('click',()=>{ if(PREVIEW_MODE)renderAll(); else { const id=scope.localStorage.getItem(EMPLOYEE_KEY); if(scope.DashboardB?.active())scope.DashboardB.refresh(); else if(id)loadFormalSummary(id).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); }); if(patrolToken)loadPatrolData(); } }));
   document.addEventListener('click',event=>{
     const patrolRetry=event.target.closest('[data-retry-patrol]');
     if(patrolRetry){
@@ -2090,6 +2102,20 @@
   });
   scope.addEventListener('hashchange',()=>{ const name=location.hash.slice(1); if(all('[data-view]').some(view=>view.dataset.view===name))setView(name); });
 
+  scope.DashboardBHost={
+    navigationSelector:'[data-nav], [data-battle-kind], [data-battle-scope]',
+    clear(){resetPrivateSummary();privateAccessStatus='unauthorized';dom('#viewerState').textContent='未登入';renderAll();},
+    accept(bundle){
+      const snapshot=bundle.privateResult.snapshot||{},data=bundle.kpiResult.data,at=nowIso();
+      const kpi=adaptKpi(data,snapshot,at),awards=adaptAwards(snapshot,String(snapshot.kpiBattle&&(snapshot.kpiBattle.report_run_date||snapshot.kpiBattle.report_date)||''),at);
+      contract=C.validateContract({...contract,mode:'formal',generatedAt:at,kpiSummary:kpi.summary,kpiStores:kpi.stores,kpiFullMetrics:kpi.full,
+        personalPerformance:adaptPersonalPerformance(data,snapshot,at),awardSummary:awards.summary,awardStores:awards.stores,awardTop2Models:awards.top2});
+      privateAccessStatus='approved';dom('#viewerState').textContent='指定密碼唯讀';renderAll();
+    },
+    navigate(module){if(module==='return'){setView('home');return;}battleKind=module==='awards'?'award':module==='personal'?'personal':'kpi';battleScope='region';
+      all('[data-battle-kind]').forEach(b=>b.classList.toggle('active',b.dataset.battleKind===battleKind));setView('battle');renderBattle();}
+  };
+  scope.DashboardB?.configure(scope.DashboardBHost);
   dom('#scheduleDate').value=taipeiDate();
   if (PREVIEW_MODE) {
     scheduleViewData=contract.scheduleToday.data;
@@ -2104,5 +2130,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261002-store-export-2',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261010-employee-login-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);

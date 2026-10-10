@@ -21,6 +21,7 @@
   let channel;
   let control;
   let logoutPromise;
+  const memoryRevokers=new Set();
   const auditRevocations = new Map();
 
   function read(area, key) { try { return scope[area].getItem(key) || ''; } catch { return ''; } }
@@ -162,6 +163,7 @@
   async function applyLogout(event, broadcast = false) {
     if (locked) return logoutPromise;
     const tokens = [[PATROL_API,read('sessionStorage',PT_KEY)],[PATROL_API,read('sessionStorage',UAT_KEY)],[AUDIT_API,read('sessionStorage',AUDIT_KEY)]].filter((entry,index,all) => entry[1] && all.findIndex(other => other[0] === entry[0] && other[1] === entry[1]) === index);
+    const memoryResults=[...memoryRevokers].map(fn=>Promise.resolve(fn(nativeFetch)).catch(()=>false));
     locked = true; epoch = event.id;
     write('sessionStorage',SEEN_KEY,epoch);
     clearIdentity(event,broadcast);
@@ -177,7 +179,7 @@
     }
     logoutPromise = (async () => {
       if (!document.body) await new Promise(resolve => document.addEventListener('DOMContentLoaded',resolve,{once:true}));
-      const results = await Promise.all(tokens.map(([url,token]) => revoke(url,token)));
+      const results = await Promise.all([...memoryResults,...tokens.map(([url,token]) => revoke(url,token))]);
       if (results.some(value => !value)) note('本頁已登出並通知網站頁籤；督導連線撤銷未確認，請關閉其他已開啟的營運中心頁籤。');
       // A new document removes each page's private memory without changing its business module.
       scope.location.reload();
@@ -190,7 +192,7 @@
   }
   function checkMissedLogout() { const event = latestEvent(); if (event && event.id !== epoch) accept(event); }
   function hasIdentity() {
-    return hasSessionIdentity() || hasPersistentIdentity();
+    return hasSessionIdentity() || hasPersistentIdentity() || Boolean(scope.DashboardB?.active());
   }
   async function requestLogout() {
     if (locked) return logoutPromise;
@@ -236,7 +238,7 @@
   function acceptLogin(event) {
     if (!locked && validEvent(event,'login')) scope.dispatchEvent(new Event('portal-login-changed'));
   }
-  scope.PortalLogout = Object.freeze({request:requestLogout,isLocked:() => locked,assertActive,notifyLogin,
+  scope.PortalLogout = Object.freeze({registerMemoryRevoker(fn){if(typeof fn!=='function')throw Error('REVOCATION_REQUIRED');memoryRevokers.add(fn);return()=>memoryRevokers.delete(fn);},request:requestLogout,isLocked:() => locked,assertActive,notifyLogin,
     beginWrite() {
       assertActive(); activeWrites += 1; let done = false;
       return () => { if (!done) { done = true; activeWrites -= 1; } };

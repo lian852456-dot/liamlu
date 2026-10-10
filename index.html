@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <script src="portal-logout.js?v=20261002-logout-2"></script>
+  <script src="portal-logout.js?v=20261010-employee-login-1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -1542,6 +1542,8 @@
 <link rel="stylesheet" href="daily-report-layout.css?v=20261004-layout-3">
 <link rel="stylesheet" href="daily-report-summary.css?v=20261004-summary-1">
 <script src="daily-report-layout.js?v=20261007-pending-edit-1" defer></script>
+<script src="GasBClient.js?v=20261010-employee-login-1" defer></script>
+<script src="dashboard-b-shell.js?v=20261010-employee-login-1" defer></script>
 </head>
 <body>
 
@@ -2165,7 +2167,7 @@
 <script src="daily-report-summary-model.js?v=20261005-google-magazine-1"></script>
 <script src="daily-report-summary-controller.js?v=20261006-read-1"></script>
 <script src="daily-report-read-transport.js?v=20261008-pair-1"></script>
-<script src="kpi-battle-controller.js?v=20261002-logout-2"></script>
+<script src="kpi-battle-controller.js?v=20261010-employee-login-1"></script>
 <script src="award-model-catalog.js?v=20261001-1"></script>
 <script src="awards-battle-controller.js?v=20261003-publication-date-1"></script>
 <script>
@@ -2685,6 +2687,17 @@ const kpiBattleController = KpiBattleController.create({
   onKpiLoadError: handleKpiLoadError,
 });
 
+window.DashboardBHost={
+  navigationSelector:'.tab-btn, [data-kpi-battle-view]',
+  clear(){kpiBattleController.failClosed('請重新驗證登入。');awardsBattleController.failClosed('請重新驗證登入。');},
+  accept(bundle){kpiBattleController.acceptB(bundle);},
+  navigate(module){
+    const tab=module==='awards'?'awards-battle':module==='return'?'fill':'kpi-battle';
+    document.querySelector('.tab-btn[onclick*="'+tab+'"]')?.click();
+    if(module==='personal')kpiBattleController.setView('personal');
+    if(module==='kpi')kpiBattleController.setView('stores');
+  }
+};
 function renderPrivateDashboardLock() {
   return kpiBattleController.renderLock();
 }

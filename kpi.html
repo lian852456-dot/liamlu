@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <script src="portal-logout.js?v=20261002-logout-2"></script>
+  <script src="portal-logout.js?v=20261010-employee-login-1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -112,6 +112,8 @@
     th.hide-m, td.hide-m { display:none; }
   }
 </style>
+<script src="GasBClient.js?v=20261010-employee-login-1" defer></script>
+<script src="dashboard-b-shell.js?v=20261010-employee-login-1" defer></script>
 </head>
 <body>
 <header class="site-header">
@@ -267,11 +269,14 @@ function lockStatus(msg, err){
 }
 function lockEmp(){ return String(document.getElementById('lockEmp').value || '').trim().toUpperCase(); }
 async function kpiLogin(){
+  await window.DashboardB?.leaveForA();
+  const authContext=window.DashboardB?.context()||0;
   const emp = lockEmp() || localStorage.getItem('bei12b_kpi_emp') || '';
   if (!emp){ lockStatus('請先輸入員工編號。', true); return; }
   lockStatus('正在驗證這台裝置…');
   try {
     const result = await gasPost({ action: 'kpicalc_access', employeeId: emp, deviceId: deviceId() });
+    if(authContext!==(window.DashboardB?.context()||0))return;
     localStorage.setItem('bei12b_kpi_emp', emp);
     window.PortalLogout?.notifyLogin();
     DATA = result.data;
@@ -280,6 +285,7 @@ async function kpiLogin(){
     document.getElementById('appArea').style.display = '';
     initApp();
   } catch (error) {
+    if(authContext!==(window.DashboardB?.context()||0))return;
     lockStatus(String(error.message || error), true);
   }
 }
@@ -852,6 +858,12 @@ function initApp(){
   save();
 }
 
+window.DashboardBHost={
+ navigationSelector:'#tabStore, #tabPerson',
+ clear(){DATA=null;window._profile=null;document.getElementById('appArea').style.display='none';for(const id of ['whoami','summaryCard','itemArea','strategyView','selStore','selPerson','srcNote'])document.getElementById(id)?.replaceChildren();document.getElementById('appArea').querySelectorAll('input').forEach(node=>node.value='');document.getElementById('lockCard').style.display='';},
+ accept(bundle){DATA=bundle.kpiResult.data;window._profile=bundle.kpiResult.profile;document.getElementById('lockCard').style.display='none';document.getElementById('appArea').style.display='';initApp();},
+ navigate(module){if(module==='awards'){document.querySelector('[data-b-message]').textContent='台獎請至首頁或 APP 登入後查看。';return;}setTab(module==='personal'?'person':'store');}
+};
 (function boot(){
   const emp = localStorage.getItem('bei12b_kpi_emp');
   document.getElementById('lockCard').style.display = '';

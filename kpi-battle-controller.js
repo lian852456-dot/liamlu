@@ -641,6 +641,8 @@
     }
 
     async function login() {
+      await win.DashboardB?.leaveForA();
+      const authContext=win.DashboardB?.context()||0;
       const employeeId = privateDashboardEmployeeInput();
       if (!employeeId) {
         privateDashboardSetStatus('請先輸入員工編號。', true);
@@ -650,17 +652,20 @@
       try {
         const deviceId = privateDashboardDeviceId();
         const result = await request({ action: 'private_access', employeeId, deviceId });
+        if(authContext!==(win.DashboardB?.context()||0))return;
         session.setItem('north12b_private_dashboard_employee_id', employeeId);
         globalThis.PortalLogout?.notifyLogin();
         state.profile = result.profile || null;
         try {
           const kpiResult = await request({ action: 'kpicalc_access', employeeId, deviceId });
+          if(authContext!==(win.DashboardB?.context()||0))return;
           const kpiData = kpicalcToKpiBattleView(kpiResult.data, new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }));
           const snapshotKpi = result.snapshot && result.snapshot.kpiBattle;
           state.data = mergeKpiBattleSupplement(kpiData, snapshotKpi);
           render();
           onKpiLoaded({ result, data: state.data, profile: state.profile });
         } catch (kpiError) {
+          if(authContext!==(win.DashboardB?.context()||0))return;
           state.data = null;
           privateDashboardSetStatus(kpiError.message, true);
           const note = doc.getElementById('kpiBattleSourceNote');
@@ -668,6 +673,7 @@
           onKpiLoadError({ result, error: kpiError, profile: state.profile });
         }
       } catch (error) {
+        if(authContext!==(win.DashboardB?.context()||0))return;
         state.data = null;
         privateDashboardSetStatus(error.message, true);
       }
@@ -749,6 +755,7 @@
     }
 
     function failClosed(message) {
+      state.profile=null;state.adminSecret='';
       state.data = null;
       const note = doc.getElementById('kpiBattleSourceNote');
       if (note) note.textContent = message || 'KPI 戰情目前無法載入。';
@@ -786,6 +793,12 @@
       renderLock,
       setView,
       failClosed,
+      acceptB(bundle) {
+        state.profile=bundle.privateResult.profile;
+        const data=kpicalcToKpiBattleView(bundle.kpiResult.data,new Date().toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}));
+        state.data=mergeKpiBattleSupplement(data,bundle.privateResult.snapshot?.kpiBattle);
+        render();onKpiLoaded({result:bundle.privateResult,data:state.data,profile:state.profile});
+      },
       getData: () => state.data,
       getProfile: () => state.profile,
     });
