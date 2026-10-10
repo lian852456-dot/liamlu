@@ -38,3 +38,16 @@ test('sync never revives existing inactive or revoked rows',()=>{const f=fixture
 test('authority CAS/readback failures reject renewal',()=>{let cas=false;const f=fixture({hookGet:(key,props,count)=>{if(key===CONFIG&&count>=2&&cas){const c=JSON.parse(props.get(CONFIG));c.authority.version++;props.set(CONFIG,JSON.stringify(c));}}});cas=true;assert.throws(()=>sync(f),/B_CONFIG_CHANGED/);cas=false;const g=fixture({flipReadback:true});assert.throws(()=>sync(g),/B_PERSISTENCE_FAILED/);});
 
 test('gate off preserves original sync path and never reads B config',()=>{const f=fixture({enabled:false,scriptId:'REAL_OWNER_SCRIPT_123',hookGet:key=>{if(key===CONFIG)throw Error('B_CONFIG_MUST_NOT_BE_READ');}});f.props.delete(CONFIG);const result=sync(f);assert.equal(result.synced,9);assert.equal(f.held(),false);});
+
+// Google Sheets returns numeric employee cells as numbers, unlike the existing
+// privateDashboardRows adapter, which already converts every cell to text.
+test('password native eligibility accepts numeric cells but retains canonical, status, duplicate and store guards',()=>{
+ const f=fixture(),c=JSON.parse(f.props.get(CONFIG));delete c.authority.members.SYNTH001;c.authority.members['7000001']=STORES[0];
+ const row=f.rows.DashboardUsers[1];row[0]=7000001;
+ assert.equal(f.ctx.privateDashboardBStrictNative_('7000001',c,Date.now()).role,'employee');
+ for(const status of ['inactive','revoked']){row[4]=status;assert.throws(()=>f.ctx.privateDashboardBStrictNative_('7000001',c,Date.now()),/B_ELIGIBILITY_DENIED/);}row[4]='active';
+ row[0]=' 7000001';assert.throws(()=>f.ctx.privateDashboardBStrictNative_('7000001',c,Date.now()),/B_ELIGIBILITY_DENIED/);row[0]=7000001;
+ f.rows.DashboardUsers.push([...row]);assert.throws(()=>f.ctx.privateDashboardBStrictNative_('7000001',c,Date.now()),/B_ELIGIBILITY_DENIED/);f.rows.DashboardUsers.pop();
+ row[2]=STORES[1];assert.throws(()=>f.ctx.privateDashboardBStrictNative_('7000001',c,Date.now()),/B_ELIGIBILITY_DENIED/);
+ assert.equal(f.writes.length,0);
+});
