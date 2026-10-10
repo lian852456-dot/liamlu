@@ -28,6 +28,11 @@ function tradeinPerformancePublicRead(payload){
     const modelsFile=value.people.some(p=>p.actual_units>0&&!Array.isArray(p.recovered_models))?
       tradeinPerformanceFile_('north12b-tradein-models-'+current.source_sha256+'.json'):null;
     if(modelsFile)value=TradeinPublicCore.withModels(value,tradeinPerformanceSnapshot_(current),JSON.parse(modelsFile.getBlob().getDataAsString('UTF-8')));
+    const daysFile=payload.includeDays===true&&value.people.some(p=>!Object.prototype.hasOwnProperty.call(p,'recovered_days'))?
+      tradeinPerformanceFile_('north12b-tradein-days-'+current.source_sha256+'.json'):null;
+    if(daysFile)value=TradeinPublicCore.withDays(value,tradeinPerformanceSnapshot_(current),JSON.parse(daysFile.getBlob().getDataAsString('UTF-8')),current.roster_hash);
+    // Old cached clients validate the original allowlist. Daily aggregates are opt-in.
+    if(payload.includeDays!==true)value=TradeinPublicCore.validate({...value,people:value.people.map(function(p){const safe={...p};delete safe.recovered_days;return safe;})});
     // Reconstruct the response from a strict validated allowlist, never spread registry/entry/private JSON.
     return {snapshot:value,availableMonths:Object.keys(registry.months).sort()};
   }catch(error){throw Error('公開目標進度尚未完成核對，請稍後重新讀取');}

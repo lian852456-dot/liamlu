@@ -1,4 +1,4 @@
-import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261010-person-models-1';
+import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261010-single-date-1';
 import {copyReminderText} from './tradein-clipboard.mjs?v=20261010-copy-recovery-1';
 const $=id=>document.getElementById(id);
 let contextReader,revision=0,busy=false,canvas=null;
@@ -14,7 +14,7 @@ function download(blob,name){
   try{link.href=url;link.download=name;document.body.appendChild(link);link.click();}catch(error){URL.revokeObjectURL(url);throw error;}finally{link.remove();}
   setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
-function stamp(){return (rules().isDemo?'示意_':'')+'舊換新_'+rules().month+'_截至'+rules().cutoff+'_'+($('exportScope').value==='self'?'本人':'授權範圍');}
+function stamp(){const r=rules();return (r.isDemo?'示意_':'')+'舊換新_'+r.month+(r.selectedDate?'_單日'+r.selectedDate:'_截至'+r.cutoff)+'_'+($('exportScope').value==='self'?'本人':'授權範圍');}
 async function operate(kind){
   if(busy)return;
   const ticket=revision;let snapshot;
@@ -51,7 +51,7 @@ function updatePreview(){
   canvas=null;feedback('');
   try{
     const snapshot=model();$('reminderText').value=reminderText(snapshot);$('exportScopeLabel').textContent='目前範圍：'+snapshot.scopeLabel;
-    const r=snapshot.rules;$('periodMeta').textContent=`本月 ${r.start}–${r.end}（每月 3 台${r.isDemo?'；實績示意':''}） · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 來源截止 ${r.cutoff} · 台北時間${hasMonthlySource(r)?'':' · 選定月份來源未提供，實績未知'}`;
+    const r=snapshot.rules;$('periodMeta').textContent=r.selectedDate?`單日 ${r.selectedDate} · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 台北時間`:`本月 ${r.start}–${r.end}（每月 3 台${r.isDemo?'；實績示意':''}） · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 來源截止 ${r.cutoff} · 台北時間${hasMonthlySource(r)?'':' · 選定月份來源未提供，實績未知'}`;
     buttons(busy);
     Promise.resolve(document.fonts?.ready).then(()=>{
       current(ticket);const built=createReminderCanvas(snapshot);canvas=built.canvas;

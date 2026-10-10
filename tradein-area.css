@@ -17,6 +17,7 @@ body[data-performance-release="public"] .kpi small,body[data-performance-release
 body[data-performance-release="public"] .kpi strong{font-size:32px}
 body[data-performance-release="public"] .role-select{justify-content:flex-start;gap:16px;align-items:end}
 body[data-performance-release="public"] .role-select>strong{margin-right:auto;font-size:20px}
+body[data-performance-release="public"] .date-mode-note{margin:8px 0 0;padding:8px 12px;border-left:4px solid var(--orange);background:var(--soft);font-weight:700}
 body[data-performance-release="public"] .form-message{overflow-wrap:anywhere}
 body[data-performance-release="public"] #readMessage:empty{display:none}
 body[data-performance-release="public"] .footer{max-width:none;width:min(1640px,calc(100% - 32px));padding:18px 0;font-size:15px}

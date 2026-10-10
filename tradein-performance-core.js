@@ -93,7 +93,7 @@ var TradeinPerformanceCore = (function () {
       if (!/^[A-Z0-9]{5,12}$/.test(employee) || byId[employee]) throw new Error('名冊員編重複或無效');
       const p={employee_key:employee,store:store,masked_name:String(r.masked_name || '姓名未提供'),
         role:role(r.role),original_role:String(r.role || ''),identity_status:'confirmed',actual_units:0};
-      p.recovered_models=[];people.push(p);byId[employee]=p;
+      p.recovered_models=[];p.recovered_days=[];people.push(p);byId[employee]=p;
     });
     const stores=STORES.map(s=>({store:s[1],store_code:s[0],total_units:0,pending_identity_units:0,
       target_staff_count:0,staff_target_units:0,target_staff_actual_units:0,met_staff_count:0,
@@ -132,13 +132,19 @@ var TradeinPerformanceCore = (function () {
       const person=byId[r.employee_key];
       if (!person || person.store!==r.store || person.identity_status==='conflict') {store.pending_identity_units++;store.coverage='partial_identity';return;}
       person.actual_units++;
+      let daily=person.recovered_days.find(d=>d.date===r.trade_date);
+      if(!daily){daily={date:r.trade_date,actual_units:0,recovered_models:[]};person.recovered_days.push(daily);}
+      daily.actual_units++;
+      if(!r.model)daily.recovered_models=null;
+      else if(daily.recovered_models!==null){const item=daily.recovered_models.find(m=>m.model===r.model);if(item)item.units++;else daily.recovered_models.push({model:r.model,units:1});}
       if(!r.model)person.recovered_models=null;
       else if(person.recovered_models!==null){const item=person.recovered_models.find(m=>m.model===r.model);if(item)item.units++;else person.recovered_models.push({model:r.model,units:1});}
     });
     people.forEach(p=>{
       const s=byStore[p.store], exempt=['店長','代理店長'].includes(p.role);
-      if(p.identity_status==='conflict'){p.actual_units=null;p.recovered_models=null;s.coverage='partial_identity';}
+      if(p.identity_status==='conflict'){p.actual_units=null;p.recovered_models=null;p.recovered_days=null;s.coverage='partial_identity';}
       if(p.recovered_models)p.recovered_models.sort((a,b)=>a.model.localeCompare(b.model,'en'));
+      if(p.recovered_days){p.recovered_days.sort((a,b)=>a.date.localeCompare(b.date));p.recovered_days.forEach(d=>{if(d.recovered_models)d.recovered_models.sort((a,b)=>a.model.localeCompare(b.model,'en'));});}
       p.target_units=p.role==='同仁'?3:null;
       p.remaining_units=p.target_units===null||p.actual_units===null?null:Math.max(3-p.actual_units,0);
       p.attainment_status=exempt?'exempt':p.role==='同仁'&&p.actual_units!==null?(p.actual_units>=3?'met':'in_progress'):'pending';
