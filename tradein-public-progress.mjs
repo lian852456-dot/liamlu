@@ -1,4 +1,4 @@
-import {bindExports,refreshExports,clearExports} from './tradein-export-ui.mjs?v=20261010-person-models-1';
+import {bindExports,refreshExports,clearExports} from './tradein-export-ui.mjs?v=20261010-copy-recovery-1';
 import {formatDifference,formatRecoveredModels} from './tradein-export-core.mjs?v=20261010-person-models-1';
 import {createPublicReader,readPublicFrame} from './tradein-public-read.mjs?v=20261010-read-1';
 const $=id=>document.getElementById(id),CORE=window.TradeinPerformanceCore,PUBLIC=window.TradeinPublicCore;
