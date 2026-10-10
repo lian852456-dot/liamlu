@@ -8805,7 +8805,8 @@ function privateDashboardCreateGasB_(options) {
       const state=store.bindings();
       if(p.action==='employee_admin_list') {
         const users=privateDashboardRows(privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET,PRIVATE_DASHBOARD_USERS_HEADERS),PRIVATE_DASHBOARD_USERS_HEADERS);
-        return {status:'ok',users:users.map(function(u){return {employeeId:u.employee_id,maskedName:u.masked_name,store:u.store,status:u.status,
+        const authority=store.config().authority;
+        return {status:'ok',roster:{updatedAt:authority.effectiveAt,validUntil:authority.validUntil,expired:now()>=authority.validUntil},users:users.map(function(u){return {employeeId:u.employee_id,maskedName:u.masked_name,store:u.store,status:u.status,
           passwordBound:Boolean(state.bindings[u.employee_id]),supervisor:privateDashboardBTrusted_(u.employee_id),primarySupervisor:privateDashboardIsTrustedEmployee(u.employee_id)};})};
       }
       const id=p.employeeId,lookup=privateDashboardUserByEmployeeId(id);

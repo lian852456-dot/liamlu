@@ -9,6 +9,7 @@
  function button(label,run){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=run;return b;}
  async function operate(question,action,args){if(!confirm(question))return;const expected=epoch;document.querySelectorAll('#management button').forEach(b=>b.disabled=true);try{await rpc(action,args);if(expected!==epoch)return;await load();message('操作完成，已重新讀回。');}catch(e){if(expected===epoch){message(e.message);$('management').hidden=true;}}}
  async function load(){const expected=epoch;const [data,pending]=await Promise.all([rpc('employee_admin_list'),rpc('private_admin_requests')]);if(expected!==epoch)return;
+ const stamp=n=>new Date(n).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'});$('roster-status').textContent='名冊同步：'+stamp(data.roster.updatedAt)+'｜授權到期：'+stamp(data.roster.validUntil)+(data.roster.expired?'（已到期，需完成正式名冊同步）':'');
  $('users').replaceChildren();for(const u of data.users){const row=document.createElement('tr');row.append(cell(u.employeeId+'／'+u.maskedName),cell(u.store+'／'+u.status));const actions=cell('');
  if(u.passwordBound)actions.append(button('解除密碼裝置',()=>operate('撤銷此員編的密碼登入連線及綁定，讓本人在新手機重新登入？','employee_admin_reset_device',{employeeId:u.employeeId})));
  if(u.status==='active')actions.append(button('停權',()=>operate('停用此員編並使現有登入失效？','private_admin_revoke',{employeeId:u.employeeId})));
