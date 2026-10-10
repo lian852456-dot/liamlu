@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <script src="portal-logout.js?v=20261010-employee-login-1"></script>
+  <script src="portal-logout.js?v=20261010-shared-login-1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -112,8 +112,8 @@
     th.hide-m, td.hide-m { display:none; }
   }
 </style>
-<script src="GasBClient.js?v=20261010-employee-login-1" defer></script>
-<script src="dashboard-b-shell.js?v=20261010-employee-login-1" defer></script>
+<script src="GasBClient.js?v=20261010-shared-login-1" defer></script>
+<script src="dashboard-b-shell.js?v=20261010-shared-login-1" defer></script>
 </head>
 <body>
 <header class="site-header">
@@ -869,7 +869,7 @@ window.DashboardBHost={
   document.getElementById('lockCard').style.display = '';
   if (emp){
     document.getElementById('lockEmp').value = emp;
-    kpiLogin();
+    if(!sessionStorage.getItem('north12b_password_session_v1'))kpiLogin();
   }
 })();
 </script>

@@ -20,6 +20,7 @@
   let accessNoticeTimer;
   let patrolExpiresAt = 0;
   let salesVerified = false;
+  let passwordVerified = false;
   let patrolVerified = false;
   let rolloverTimer;
   let userPaused = reducedMotion.matches;
@@ -38,8 +39,9 @@
   }
   function updateAccessNotice(message) {
     const storedIdentity = credentials().employeeId || storage('localStorage', EMPLOYEE_KEY) || storage('localStorage', 'bei12b_kpi_emp');
-    $('portal-logout').hidden = !storedIdentity && !storage('sessionStorage', SESSION_KEY);
+    $('portal-logout').hidden = !storedIdentity && !storage('sessionStorage', SESSION_KEY) && !scope.DashboardB?.active();
     const states = [];
+    if (passwordVerified) states.push('同仁專區登入已驗證');
     if (salesVerified) states.push('業績登入已驗證');
     if (patrolVerified) states.push('督導登入已驗證');
     $('portal-access-status').textContent = message || states.join('；') || '目前頁面尚未驗證登入';
@@ -141,7 +143,7 @@
     const current = () => requestId === generation && !document.hidden && sameCredentials(credential)
       && Model.dateContext(new Date()).today === context.today;
     if (!credential.employeeId || !credential.deviceId) {
-      feeds.sales = pending('sales', '請先在 KPI 戰情完成員編與裝置驗證，再返回更新提醒', 'locked');
+      feeds.sales = pending('sales', passwordVerified?'同仁專區已登入，請由下方入口查看 KPI、台獎與個績；此提醒尚未讀取。':'請在上方登入後開啟同仁專區。原裝置核准用戶可在 KPI 戰情驗證後更新提醒。', passwordVerified?'pending':'locked');
       render(); return;
     }
     feeds.sales = pending('sales', '正在驗證原有員編與核准裝置', 'loading'); render();
@@ -301,6 +303,16 @@
   scope.addEventListener('pagehide', () => clearPrivateView());
   scope.addEventListener('pageshow', event => { if (event.persisted) refresh(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) clearPrivateView(); else refresh(); });
+  scope.DashboardBHost={
+    sessionOnly:true,mountSelector:'#home-login',navigationSelector:'#zone-staff a, .quick-card',
+    clear(){passwordVerified=false;updateAccessNotice();},
+    accept(){passwordVerified=true;updateAccessNotice();if(!salesVerified){feeds.sales=pending('sales','同仁專區已登入，請由下方入口查看 KPI、台獎與個績；此提醒尚未讀取。');render();}},
+    navigate(module){
+      const targets={kpi:'kpi-battle.html',awards:'awards-battle.html',personal:'kpi.html',return:'#zone-staff'};
+      scope.location.href=targets[module]||'#zone-staff';
+    }
+  };
+  scope.DashboardB?.configure(scope.DashboardBHost);
   updatePauseButton();
   refresh();
 })(window);
