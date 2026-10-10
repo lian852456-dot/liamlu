@@ -104,7 +104,7 @@
     main.style.cssText = 'max-width:700px;margin:10vh auto;padding:28px;font:16px/1.7 system-ui;color:#171b22;background:white;border:1px solid #e5e7eb;border-radius:16px';
     const heading = document.createElement('h1'); heading.textContent = '營運中心網頁已登出';
     const copy = document.createElement('p'); copy.id = 'portal-logout-result'; copy.setAttribute('role','status');
-    copy.textContent = '本頁已鎖定並清除畫面。正在結束督導連線，完成後會重新開啟登入頁。';
+    copy.textContent = '本頁已鎖定並清除畫面。正在結束登入連線，完成後會重新開啟登入頁。';
     const help = document.createElement('p'); help.textContent = '未保存的預覽需保留原檔重新載入。若剛才正在保存，重新登入後請先讀回確認結果，勿重複提交。手機 App 請另行登出。';
     main.append(heading,copy,help);
     document.body.replaceChildren(main);
@@ -192,7 +192,7 @@
     logoutPromise = (async () => {
       if (!document.body) await new Promise(resolve => document.addEventListener('DOMContentLoaded',resolve,{once:true}));
       const results = await Promise.all([...memoryResults,...tokens.map(([url,token]) => revoke(url,token))]);
-      if (results.some(value => !value)) note('本頁已登出並通知網站頁籤；督導連線撤銷未確認，請關閉其他已開啟的營運中心頁籤。');
+      if (results.some(value => !value)) note('本頁已登出並通知網站頁籤；登入連線撤銷未確認，請關閉其他已開啟的營運中心頁籤。');
       // A new document removes each page's private memory without changing its business module.
       scope.location.reload();
     })();
