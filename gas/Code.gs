@@ -8633,7 +8633,7 @@ function privateDashboardBStrictNative_(id,config,now) {
   const count=sheet.getLastRow()-1;
   if(count<1 || count>10000)throw new Error('B_NATIVE_SCHEMA_INVALID');
   const rows=sheet.getRange(2,1,count,5).getValues().filter(function(row) { return String(row[0]||'').trim().toUpperCase()===id; });
-  if(rows.length!==1 || rows[0][0]!==id || rows[0][4]!=='active')throw new Error('B_ELIGIBILITY_DENIED');
+  if(rows.length!==1 || String(rows[0][0])!==id || rows[0][4]!=='active')throw new Error('B_ELIGIBILITY_DENIED');
   const store=String(rows[0][2]||'').trim().replace(/\s+/g,'').replace(/^台灣大哥大數位生活台北/,'').replace(/^台灣大哥大台北/,'').replace(/^台北/,'');
   if(store!==config.authority.members[id])throw new Error('B_ELIGIBILITY_DENIED');
   return {maskedName:String(rows[0][1]||''),store:store,role:'employee',isTrusted:false};
