@@ -2103,6 +2103,7 @@
   scope.addEventListener('hashchange',()=>{ const name=location.hash.slice(1); if(all('[data-view]').some(view=>view.dataset.view===name))setView(name); });
 
   scope.DashboardBHost={
+    ownerPhone:true,
     navigationSelector:'[data-nav], [data-battle-kind], [data-battle-scope]',
     clear(){resetPrivateSummary();privateAccessStatus='unauthorized';dom('#viewerState').textContent='未登入';renderAll();},
     showLegacyAccess(){setView('me');dom('#privateAccessForm')?.closest('.access-panel')?.scrollIntoView({block:'start',behavior:'smooth'});dom('#employeeId')?.focus();},

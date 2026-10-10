@@ -7,7 +7,7 @@ let host,client,active=false,epoch=0,expiresAt=0,expiryTimer,ready=false,loading
 const pendingHost=scope.DashboardBHost;
 let legacyObserver;
 function message(text){if(panel)panel.querySelector('[data-b-message]').textContent=text;}
-function state(name){if(panel){panel.dataset.state=name;panel.querySelector('h2').textContent=name==='active'?'同仁專區已登入':'員編與密碼登入';}}
+function state(name){if(panel){panel.dataset.state=name;panel.querySelector('h2').textContent=name==='active'?(host?.ownerPhone&&client?.hasPhone()?'手機自動登入已啟用':'同仁專區已登入'):(host?.ownerPhone?'首次驗證與手機綁定':'員編與密碼登入');panel.querySelector('[data-b-phone]').hidden=!(name==='active'&&host?.ownerPhone&&host.phoneEligible&&!client?.hasPhone());}}
 function markLegacyRoots(){
  const roots=[];
  const appForm=document.querySelector('#privateAccessForm');
@@ -34,21 +34,21 @@ function wipe(note='請重新輸入員編與指定密碼。',clearTransport=true
 function device(){let value=scope.localStorage.getItem(DEVICE_KEY);if(value)return value;
  value=Array.from(scope.crypto.getRandomValues(new Uint8Array(24)),b=>b.toString(16).padStart(2,'0')).join('');scope.localStorage.setItem(DEVICE_KEY,value);return value;}
 async function logout(note='已登出指定密碼通道；裝置綁定保留。',transport){
- const operation=client?.logout(transport);wipe(note,false);
- try{await operation;return true;}catch{message('畫面已清除；伺服器登出未確認，請關閉本頁。原 session 最多存活至原30分鐘期限。');return false;}
+ const operation=client?.logout(transport);wipe(host.ownerPhone?'已登出並取消手機自動登入。':note,false);
+ try{await operation;return true;}catch{message(host.ownerPhone?'本機已登出；伺服器撤銷未確認，請連線後由人員與裝置管理解除手機自動登入。':'畫面已清除；伺服器登出未確認，請關閉本頁。原 session 最多存活至原30分鐘期限。');return false;}
 }
 function checkProfile(result){if(!result?.profile || result.profile.role!=='employee' || result.profile.isTrusted!==false || result.trustSource!=='password-bound')throw Error('B_AUTH_DENIED');}
-async function refresh(){
+async function refresh(allowPhone=true){
  if(!active)return false;if(checking)return checking;
  const expected=epoch;host.clear();state('checking');
  checking=(async()=>{try{
   const status=await client.status();if(!status.enabled || !status.passwordAvailable)throw Error('B_DISABLED');
-  const lease=await client.validate();if(lease.expiresAt!==expiresAt || expiresAt<=Date.now())throw Error('B_AUTH_DENIED');
+  const lease=await client.validate();host.phoneEligible=lease.phoneEligible===true;if(lease.expiresAt!==expiresAt || expiresAt<=Date.now())throw Error('B_AUTH_DENIED');
   if(host.sessionOnly){if(expected!==epoch)return false;host.accept({lease});state('active');message('可直接開啟同仁專區；登入至 '+new Date(expiresAt).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})+'，換頁不延長。');return true;}
   const [privateResult,kpiResult]=await Promise.all([client.read('private'),client.read('kpi')]);
   if(expected!==epoch)return false;checkProfile(privateResult);checkProfile(kpiResult);
-  host.accept({privateResult,kpiResult});state('active');message('指定密碼已驗證；KPI、台獎、個績唯讀。');return true;
- }catch(error){if(expected===epoch)wipe(error.message==='B_TIMEOUT'?'服務逾時，畫面已清除；請重新登入。':'登入已失效或通道關閉，請重新登入。');return false;}
+  host.accept({privateResult,kpiResult});state('active');message(host.ownerPhone&&client.hasPhone()?'這支手機已驗證，下次開啟 App 會自動登入。':'指定密碼已驗證；KPI、台獎、個績唯讀。');return true;
+ }catch(error){if(expected===epoch && allowPhone && host.ownerPhone && client.hasPhone()){checking=null;active=false;return resumePhone();}if(expected===epoch)wipe(error.message==='B_TIMEOUT'?'服務逾時，畫面已清除；請重新登入。':'登入已失效或通道關閉，請重新登入。');return false;}
  finally{if(expected===epoch)checking=null;}
  })();return checking;
 }
@@ -61,28 +61,43 @@ async function login(event){event.preventDefault();const employee=panel.querySel
   if(!status.enabled || !status.passwordAvailable)throw Error('B_DISABLED');
   const lease=await client.login(employee,device(),password);password='';if(expected!==epoch)return;
   active=true;expiresAt=lease.expiresAt;
-  const ok=await refresh();if(!ok)return;scope.PortalLogout?.notifyLogin();
-  scope.clearTimeout(expiryTimer);expiryTimer=scope.setTimeout(()=>wipe('登入已到期，請重新輸入指定密碼。'),Math.max(0,expiresAt-Date.now()));
+  const ok=await refresh(false);if(!ok)return;scope.PortalLogout?.notifyLogin();
+  if(host.ownerPhone && host.phoneEligible){try{await client.enrollPhone();state('active');message('已綁定這支手機，下次開啟 App 不用再輸入帳密。');}catch{message('本次已登入，但手機綁定未完成；可登出後重試，或請管理者撤銷舊手機。');}}
+  scope.clearTimeout(expiryTimer);expiryTimer=scope.setTimeout(()=>{active=false;void resumePhone();},Math.max(0,expiresAt-Date.now()));
  }catch(error){if(expected===epoch)wipe(error.message==='B_DISABLED'?'指定密碼通道尚未開放，請使用原員編通道。':error.message==='B_TIMEOUT'?'服務逾時，請重新登入；不會自動重送。':'無法登入，請核對員編、指定密碼及裝置。');}
  finally{password='';if(expected===epoch)loading=false;if(!loading)submit.disabled=false;}
+}
+async function resumePhone(){
+ if(!host.ownerPhone){wipe('登入已到期，請重新輸入指定密碼。');return false;}
+ let id='';try{id=scope.localStorage.getItem(DEVICE_KEY)||'';}catch{}
+ if(!client.hasPhone(id)){wipe('請完成首次驗證，綁定這支手機。');return false;}
+ epoch++;const expected=epoch;loading=true;checking=null;host.clear();state('checking');message('正在辨識這支手機…');
+ try{
+  const lease=await client.resumePhone(id);if(expected!==epoch || !lease)return false;
+  active=true;expiresAt=lease.expiresAt;loading=false;
+  const ok=await refresh(false);if(!ok)return false;
+  scope.PortalLogout?.notifyLogin();scope.clearTimeout(expiryTimer);
+  expiryTimer=scope.setTimeout(()=>{active=false;void resumePhone();},Math.max(0,expiresAt-Date.now()));return true;
+ }catch{if(expected===epoch)wipe('手機驗證未完成，請確認連線；若裝置已撤銷，請重新驗證。');return false;}
+ finally{if(expected===epoch)loading=false;}
 }
 async function resume(){
  if(active || loading || checking)return;
  let existingDevice='';try{existingDevice=scope.localStorage.getItem(DEVICE_KEY)||'';}catch{}
- const lease=client.restore(existingDevice);if(!lease)return;
+ const lease=client.restore(existingDevice);if(!lease){if(host.ownerPhone)await resumePhone();return;}
  epoch++;active=true;expiresAt=lease.expiresAt;
  await refresh();
- if(active){scope.clearTimeout(expiryTimer);expiryTimer=scope.setTimeout(()=>wipe('登入已到期，請重新輸入指定密碼。'),Math.max(0,expiresAt-Date.now()));}
+ if(active){scope.clearTimeout(expiryTimer);expiryTimer=scope.setTimeout(()=>{active=false;void resumePhone();},Math.max(0,expiresAt-Date.now()));}
 }
 function navigateVerified(module){guarded=true;try{host.navigate(module);}finally{guarded=false;}}
 function configure(value){host=value;if(ready)mount();}
 function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
- let storage;try{storage=scope.sessionStorage;}catch{}
- client=createDashboardBClient(OWNER,{storage,logoutEpoch:()=>{try{return JSON.parse(scope.localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||'';}catch{return '';}}});panel=document.createElement('section');panel.id='dashboard-b-access';panel.setAttribute('aria-label','指定密碼登入');panel.dataset.state='locked';
+ let storage,phoneStorage;try{storage=scope.sessionStorage;if(host.ownerPhone)phoneStorage=scope.localStorage;}catch{}
+ client=createDashboardBClient(OWNER,{storage,phoneStorage,logoutEpoch:()=>{try{return JSON.parse(scope.localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||'';}catch{return '';}}});panel=document.createElement('section');panel.id='dashboard-b-access';panel.setAttribute('aria-label','指定密碼登入');panel.dataset.state='locked';
  panel.innerHTML=`<h2>員編與密碼登入</h2>
  <form data-b-form><label>員工編號<input data-b-employee required autocomplete="username" autocapitalize="characters" maxlength="12" placeholder="輸入員工編號"></label><label>指定密碼<input data-b-password required type="password" autocomplete="off" maxlength="1024" placeholder="輸入指定密碼"></label><button data-b-submit type="submit">登入這台裝置</button></form>
  <p data-b-message role="status">同仁首次登入會綁定這台裝置；已授權督導可跨裝置登入。</p>
- <div class="b-toolbar"><nav class="b-modules" aria-label="資料入口"><button type="button" data-b-module="kpi">KPI</button><button type="button" data-b-module="awards">台獎</button><button type="button" data-b-module="personal">個績</button><button type="button" data-b-return>返回</button></nav><nav class="b-account" aria-label="登入管理"><button type="button" data-b-a>原員編通道</button><button type="button" data-b-refresh>重新核驗</button><button type="button" data-b-logout>登出</button></nav></div>`;
+ <div class="b-toolbar"><nav class="b-modules" aria-label="資料入口"><button type="button" data-b-module="kpi">KPI</button><button type="button" data-b-module="awards">台獎</button><button type="button" data-b-module="personal">個績</button><button type="button" data-b-return>返回</button></nav><nav class="b-account" aria-label="登入管理"><button type="button" data-b-a>原員編通道</button><button type="button" data-b-phone hidden>綁定這支手機，之後免輸帳密</button><button type="button" data-b-refresh>重新核驗</button><button type="button" data-b-logout>登出</button></nav></div>`;
  const style=document.createElement('style');style.textContent=`
  body.dashboard-b-password-mode .dashboard-b-legacy-root{display:none!important}
  body.dashboard-b-legacy-mode #dashboard-b-access{display:none!important}
@@ -109,10 +124,11 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
  @media(max-width:1100px){#dashboard-b-access{width:calc(100% - 40px)}}
  @media(max-width:760px){#dashboard-b-access{width:calc(100% - 40px)}}
  @media(max-width:600px){#dashboard-b-access{margin-bottom:12px;padding:12px 0 14px}#dashboard-b-access form{grid-template-columns:1fr;gap:12px}#dashboard-b-access [data-b-submit]{width:100%}#dashboard-b-access .b-toolbar{align-items:stretch;gap:12px}#dashboard-b-access nav{width:100%}#dashboard-b-access nav button{flex:1;padding:8px 10px}}
- `;document.head.append(style);setAccessMode('password');const mountPoint=host.mountSelector&&document.querySelector(host.mountSelector);if(mountPoint)mountPoint.prepend(panel);else{const header=document.querySelector('header');if(header)header.insertAdjacentElement('afterend',panel);else document.body.prepend(panel);}if(!legacyObserver){legacyObserver=new MutationObserver(markLegacyRoots);legacyObserver.observe(document.body,{childList:true,subtree:true});}panel.querySelector('form').addEventListener('submit',login);
+ `;document.head.append(style);setAccessMode('password');const mountPoint=host.mountSelector&&document.querySelector(host.mountSelector);if(mountPoint)mountPoint.prepend(panel);else{const header=document.querySelector('header');if(header)header.insertAdjacentElement('afterend',panel);else document.body.prepend(panel);}if(!legacyObserver){legacyObserver=new MutationObserver(markLegacyRoots);legacyObserver.observe(document.body,{childList:true,subtree:true});}panel.querySelector('form').addEventListener('submit',login);if(host.ownerPhone){panel.querySelector('[data-b-submit]').textContent='首次驗證並綁定這支手機';state('locked');message('只需首次驗證；綁定後平常開啟 App 免輸入帳密。登出會取消自動登入。');}
  panel.addEventListener('click',async event=>{const target=event.target.closest('button');if(!target)return;
   if(target.hasAttribute('data-b-a')){await scope.DashboardB.leaveForA();showLegacyAccess();return;}
   if(target.hasAttribute('data-b-logout')){await logout();return;}
+  if(target.hasAttribute('data-b-phone')){target.disabled=true;try{await client.enrollPhone();state('active');message('已綁定這支手機，下次開啟 App 不用再輸入帳密。');}catch{message('手機綁定未完成；請確認連線或請管理者撤銷舊手機。');}finally{target.disabled=false;}return;}
   if(target.hasAttribute('data-b-refresh')){await refresh();return;}
   if(target.hasAttribute('data-b-return') || target.hasAttribute('data-b-module')){
    if(target.hasAttribute('data-b-return') && loading){await logout('已取消登入，返回原頁面。');host.navigate('return');return;}

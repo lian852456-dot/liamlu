@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-employee-login-20261010-v1';
+const CACHE_NAME = 'liam-supervisor-app-owner-phone-20261011-v1';
 const SHELL = [
   './app.html',
   './portal-logout.js',
