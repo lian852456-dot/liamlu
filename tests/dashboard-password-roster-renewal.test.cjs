@@ -5,7 +5,7 @@ const sourceText=fs.readFileSync(sourcePath,'utf8');
 const STORES=['酒泉','永吉','復興南','杭州南','萬大','通化','大稻埕','三創','六張犁'];
 const HEADERS=['employee_id','masked_name','store','role','status','device_id','device_bound_at','last_login_at'];
 const REQ_HEADERS=['request_id','employee_id','device_id','requested_at','status','approved_at','approved_by','replaced_device_id'];
-const OWNER='SYNTHETIC_OWNER_123',CONFIG='DASHBOARD_AUTH_B_CONFIG_V1',NATIVE='DASHBOARD_AUTH_NATIVE_V1',BIND='DASHBOARD_AUTH_B_BIND_V1',LIMIT='DASHBOARD_AUTH_B_LIMIT_V1',SESS='DASHBOARD_AUTH_B_SESS_V1_';
+const OWNER='SYNTHETIC_OWNER',CONFIG='DASHBOARD_AUTH_B_CONFIG_V1',NATIVE='DASHBOARD_AUTH_NATIVE_V1',BIND='DASHBOARD_AUTH_B_BIND_V1',LIMIT='DASHBOARD_AUTH_B_LIMIT_V1',SESS='DASHBOARD_AUTH_B_SESS_V1_';
 const ADMIN='SYNTHETIC_ADMIN_ONLY';
 const deep=x=>JSON.parse(JSON.stringify(x));
 const makeConfig=(now,version=7)=>{const members=Object.fromEntries(STORES.map((s,i)=>['SYNTH'+String(i+1).padStart(3,'0'),s]));return {v:1,owner:OWNER,epoch:3,verifier:{algorithm:'PBKDF2-HMAC-SHA256',iterations:600000,salt:'ab'.repeat(16),digest:'cd'.repeat(32)},authority:{version,sourceHash:'ef'.repeat(32),effectiveAt:now-1000,validUntil:now+3600000,members}};};
@@ -28,6 +28,10 @@ function fixture({enabled=true,clock=Date.now(),config=true,hookGet=()=>{},scrip
 }
 function members(statuses={}){return STORES.map((store,i)=>({employeeId:'SYNTH'+String(i+1).padStart(3,'0'),maskedName:'SYNTHETIC_MASK_'+i,store,role:'SYNTHETIC_ROLE',status:statuses[i]||'active'}));}
 function sync(f,list=members()){return f.ctx.privateDashboardSyncRoster({adminSecret:ADMIN,members:list});}
+function pbkdf2Verifier(password,salt='11'.repeat(16)){return {algorithm:'PBKDF2-HMAC-SHA256',iterations:600000,salt,digest:crypto.pbkdf2Sync(Buffer.from(password),Buffer.from(salt,'hex'),600000,32,'sha256').toString('hex')};}
+function pbkdf2Verify(password,verifier){return crypto.pbkdf2Sync(Buffer.from(password),Buffer.from(verifier.salt,'hex'),verifier.iterations,32,'sha256').toString('hex')===verifier.digest;}
+function rotationRequest(epoch,verifier=pbkdf2Verifier('SYNTHETIC_NEW_PASSWORD')){return {action:'employee_admin_rotate_password',adminSecret:ADMIN,expectedEpoch:epoch,verifier};}
+function passwordLogin(employeeId,deviceId,password,idempotencyKey,nonceChar='a'){return {action:'employee_login',employeeId,deviceId,track:'password-bound',password,sessionNonce:nonceChar.repeat(64),idempotencyKey};}
 
 test('nine-store sync renews password authority for exactly 48h without touching verifier/epoch/device/binding/session',()=>{const f=fixture(),before=new Map(f.props);const started=Date.now(),result=sync(f),after=JSON.parse(f.props.get(CONFIG));assert.equal(result.synced,9);assert.equal(after.authority.validUntil-after.authority.effectiveAt,48*60*60*1000);assert.ok(after.authority.effectiveAt>=started);assert.equal(after.authority.version,8);assert.match(after.authority.sourceHash,/^[a-f0-9]{64}$/);assert.deepEqual(Object.keys(after.authority.members).sort(),members().map(x=>x.employeeId).sort());for(const key of [BIND,LIMIT,...'0123456789abcdef'.split('').map(b=>SESS+b)])assert.equal(f.props.get(key),before.get(key),key);assert.equal(after.verifier.digest,JSON.parse(before.get(CONFIG)).verifier.digest);assert.equal(after.epoch,JSON.parse(before.get(CONFIG)).epoch);assert.equal(f.held(),false);});
 
@@ -120,4 +124,71 @@ test('device reset during password verification prevents the old in-flight login
  const pending=f.ctx.privateDashboardCreateGasB_({});
  const result=pending.handle(JSON.stringify({action:'employee_login',employeeId:'SYNTH002',deviceId:'SYNTHETIC_OLD_IN_FLIGHT_DEVICE',track:'password-bound',password:'SYNTHETIC_PASSWORD',sessionNonce:'d'.repeat(64),idempotencyKey:'SYNTHETIC_IN_FLIGHT_REQUEST'}));
  assert.equal(result.status,'error');assert.equal(JSON.parse(f.props.get(BIND)).bindings.SYNTH002,undefined);
+});
+
+test('password rotation rejects invalid admin, shape and stale epoch requests without writes and exposes the current epoch',()=>{
+ const f=fixture(),api=f.ctx.privateDashboardCreateGasB_({mode:'LOCAL_SYNTHETIC_ONLY',verify:pbkdf2Verify}),invoke=p=>api.handle(JSON.stringify(p));
+ const epoch=JSON.parse(f.props.get(CONFIG)).epoch,request=rotationRequest(epoch),before=f.raw();
+ for(const invalid of [
+   {...request,adminSecret:'SYNTHETIC_WRONG_ADMIN'},
+   {...request,verifier:{...request.verifier,digest:'not-a-digest'}},
+   {...request,expectedEpoch:epoch-1},
+   {...request,unexpected:'SYNTHETIC_EXTRA_FIELD'}
+ ]) {
+   assert.equal(invoke(invalid).status,'error');
+   assert.deepEqual(f.raw(),before);
+ }
+ const listed=invoke({action:'employee_admin_list',adminSecret:ADMIN});
+ assert.equal(listed.status,'ok');assert.equal(listed.passwordEpoch,epoch);
+ assert.equal(f.held(),false);
+});
+
+test('password rotation writes only CONFIG, invalidates old password/session, accepts new password on the bound device, and preserves revoked eligibility',()=>{
+ const f=fixture(),oldPassword='SYNTHETIC_OLD_PASSWORD',device='SYNTHETIC_ROTATION_DEVICE';
+ const oldVerifier=pbkdf2Verifier(oldPassword,'22'.repeat(16)),config=JSON.parse(f.props.get(CONFIG));
+ config.verifier=oldVerifier;f.props.set(CONFIG,JSON.stringify(config));
+ const api=f.ctx.privateDashboardCreateGasB_({mode:'LOCAL_SYNTHETIC_ONLY',verify:pbkdf2Verify}),invoke=p=>api.handle(JSON.stringify(p));
+ const first=invoke(passwordLogin('SYNTH002',device,oldPassword,'SYNTHETIC_OLD_LOGIN_1','a'));
+ assert.equal(first.status,'ok');
+ const before=f.raw(),nextVerifier=pbkdf2Verifier('SYNTHETIC_NEW_PASSWORD','33'.repeat(16));
+ const rotated=invoke(rotationRequest(config.epoch,nextVerifier));
+ assert.equal(rotated.status,'ok');assert.equal(rotated.passwordEpoch,config.epoch+1);
+ const after=f.raw(),afterConfig=JSON.parse(after.props.get(CONFIG)),beforeConfig=JSON.parse(before.props.get(CONFIG));
+ assert.equal(afterConfig.epoch,beforeConfig.epoch+1);
+ assert.deepEqual(afterConfig.authority,beforeConfig.authority);
+ assert.deepEqual(afterConfig.verifier,nextVerifier);
+ for(const [key,value] of before.props)if(key!==CONFIG)assert.equal(after.props.get(key),value,key);
+ assert.deepEqual(after.rows,before.rows);
+ assert.equal(invoke({action:'employee_session',token:first.token,deviceId:device}).status,'error');
+ assert.equal(invoke(passwordLogin('SYNTH002',device,oldPassword,'SYNTHETIC_OLD_AFTER_ROTATE','b')).status,'error');
+ assert.equal(invoke(passwordLogin('SYNTH002',device,'SYNTHETIC_NEW_PASSWORD','SYNTHETIC_NEW_LOGIN_1','c')).status,'ok');
+ f.rows.DashboardUsers[2][4]='revoked';
+ assert.equal(invoke(passwordLogin('SYNTH002','SYNTHETIC_REVOKED_DEVICE','SYNTHETIC_NEW_PASSWORD','SYNTHETIC_REVOKED_LOGIN','d')).status,'error');
+ assert.equal(f.rows.DashboardUsers[2][4],'revoked');
+});
+
+test('password rotation readback failure is rejected without changing native, binding, session or authority state',()=>{
+ const f=fixture({flipReadback:true}),config=JSON.parse(f.props.get(CONFIG)),before=f.raw();
+ const api=f.ctx.privateDashboardCreateGasB_({mode:'LOCAL_SYNTHETIC_ONLY',verify:pbkdf2Verify});
+ const result=api.handle(JSON.stringify(rotationRequest(config.epoch,pbkdf2Verifier('SYNTHETIC_READBACK_PASSWORD','44'.repeat(16)))));
+ assert.equal(result.status,'error');
+ const after=f.raw(),afterConfig=JSON.parse(after.props.get(CONFIG));
+ assert.deepEqual(after.rows,before.rows);
+ for(const key of [NATIVE,BIND,LIMIT,...'0123456789abcdef'.split('').map(b=>SESS+b)])assert.equal(after.props.get(key),before.props.get(key),key);
+ assert.deepEqual(afterConfig.authority,JSON.parse(before.props.get(CONFIG)).authority);
+});
+
+test('captured password login is rejected when an admin rotates the password concurrently',()=>{
+ const f=fixture(),oldPassword='SYNTHETIC_IN_FLIGHT_PASSWORD',config=JSON.parse(f.props.get(CONFIG));
+ config.verifier=pbkdf2Verifier(oldPassword,'55'.repeat(16));f.props.set(CONFIG,JSON.stringify(config));
+ const nextVerifier=pbkdf2Verifier('SYNTHETIC_CONCURRENT_NEW_PASSWORD','66'.repeat(16));
+ const admin=f.ctx.privateDashboardCreateGasB_({mode:'LOCAL_SYNTHETIC_ONLY',verify:pbkdf2Verify});
+ let rotation;
+ const pending=f.ctx.privateDashboardCreateGasB_({mode:'LOCAL_SYNTHETIC_ONLY',verify:(password,verifier)=>{
+   rotation=admin.handle(JSON.stringify(rotationRequest(config.epoch,nextVerifier)));
+   return pbkdf2Verify(password,verifier);
+ }});
+ const result=pending.handle(JSON.stringify(passwordLogin('SYNTH002','SYNTHETIC_CONCURRENT_DEVICE',oldPassword,'SYNTHETIC_CONCURRENT_LOGIN','e')));
+ assert.equal(rotation.status,'ok');assert.equal(result.status,'error');
+ assert.equal(JSON.parse(f.props.get(BIND)).bindings.SYNTH002,undefined);
 });
