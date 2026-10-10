@@ -38,7 +38,7 @@
  submitted=true;const result=await rpc('employee_admin_rotate_password',{expectedEpoch:version,verifier});
  if(expected!==epoch)return;
  if(result.passwordEpoch!==version+1)throw Error('ROTATION_READBACK');
- await load();if(expected!==epoch)return;
+ passwordEpoch=result.passwordEpoch;$('password-version').textContent='目前密碼版本：'+passwordEpoch;
  $('password-message').textContent='密碼已變更並讀回確認。舊密碼與既有密碼登入已失效，請通知同仁使用新密碼登入。';
  }catch(_){if(expected===epoch)$('password-message').textContent=submitted?'未取得變更成功確認，請重新驗證管理者並核對密碼版本，再使用新密碼測試登入；不要直接重送。':'密碼尚未送出，請確認瀏覽器支援安全連線後再試。';}
  finally{value='';if(expected===epoch){clearPasswords();$('save-password').disabled=false;}}
