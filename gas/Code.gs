@@ -8716,7 +8716,7 @@ function privateDashboardCreateGasB_(options) {
       if(!admission.allowed)throw new Error('B_RATE_DENIED');
       let snapshot=null;
       try {privateDashboardBStrictNative_(id,config,now());snapshot=provider.capture(id);}catch(_){/* Same KDF for an unknown/ineligible canonical identity. */}
-      return {config:config,snapshot:snapshot,delay:admission.delay};
+      return {config:config,snapshot:snapshot,delay:admission.delay,bindingRevision:store.bindings().revision};
     });
     sleep(captured.delay);
     const verified=verify(p.password,captured.config.verifier);
@@ -8727,6 +8727,7 @@ function privateDashboardCreateGasB_(options) {
       privateDashboardBStrictNative_(id,config,now());
       const trusted=privateDashboardBTrusted_(id);
       const bindingState=store.bindings(),existing=bindingState.bindings[id];
+      if(bindingState.revision!==captured.bindingRevision)throw new Error('B_BINDING_CHANGED');
       if(!trusted && (existing && existing[0]!==device || Object.keys(bindingState.bindings).some(function(other) { return other!==id && bindingState.bindings[other][0]===device; })))throw new Error('B_BINDING_DENIED');
       if(!trusted && !existing && Object.keys(bindingState.bindings).length>=64)throw new Error('B_CAPACITY');
       const binding=trusted ? [device,0] : existing || [device,1],generation=provider.currentGeneration(id),bucket=privateDashboardGasAuthDigest_(id)[0];
@@ -8817,9 +8818,10 @@ function privateDashboardCreateGasB_(options) {
       retire(sessions,function(record){return record.employee===id;},now());
       store.saveSessions(bucket,sessions);
       if(p.action==='employee_admin_reset_device') {
-        if(state.bindings[id]) {delete state.bindings[id];store.saveBindings(state);}
+        delete state.bindings[id];store.saveBindings(state);
         return {status:'ok',reset:true};
       }
+      store.saveBindings(state); // invalidate logins captured before this role change
       const props=privateDashboardProperties(),key='DASHBOARD_AUTH_B_SUPERVISORS_V1';
       privateDashboardBTrusted_(id); // validate prior state before writing
       const ids=JSON.parse(props.getProperty(key)||'[]').filter(function(x){return x!==id;});

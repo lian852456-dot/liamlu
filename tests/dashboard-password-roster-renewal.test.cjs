@@ -92,3 +92,13 @@ test('additional supervisor exemption is admin-only, preserves primary superviso
  const a=invoke(p);assert.equal(a.status,'ok');assert.equal(invoke({...change,enabled:false}).status,'ok');
  assert.equal(invoke({action:'employee_session',token:a.token,deviceId:p.deviceId}).status,'error');assert.equal(f.ctx.privateDashboardBTrusted_('SYNTH002'),false);
 });
+
+test('device reset during password verification prevents the old in-flight login from rebinding',()=>{
+ const f=fixture(),api=f.ctx.privateDashboardCreateGasB_({});
+ f.ctx.privateDashboardBVerifyPassword_=()=>true;
+ // Factory captures its verifier, so recreate after installing the hook.
+ f.ctx.privateDashboardBVerifyPassword_=()=>{assert.equal(api.handle(JSON.stringify({action:'employee_admin_reset_device',adminSecret:ADMIN,employeeId:'SYNTH002'})).status,'ok');return true;};
+ const pending=f.ctx.privateDashboardCreateGasB_({});
+ const result=pending.handle(JSON.stringify({action:'employee_login',employeeId:'SYNTH002',deviceId:'SYNTHETIC_OLD_IN_FLIGHT_DEVICE',track:'password-bound',password:'SYNTHETIC_PASSWORD',sessionNonce:'d'.repeat(64),idempotencyKey:'SYNTHETIC_IN_FLIGHT_REQUEST'}));
+ assert.equal(result.status,'error');assert.equal(JSON.parse(f.props.get(BIND)).bindings.SYNTH002,undefined);
+});
