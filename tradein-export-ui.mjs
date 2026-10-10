@@ -1,4 +1,5 @@
 import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261010-person-models-1';
+import {copyReminderText} from './tradein-clipboard.mjs?v=20261010-copy-recovery-1';
 const $=id=>document.getElementById(id);
 let contextReader,revision=0,busy=false,canvas=null;
 export function currentRules(){return contextReader?.().rules || rulesForMonth($('periodMonth').value);}
@@ -21,8 +22,7 @@ async function operate(kind){
   busy=true;buttons(true);feedback(kind==='copy'?'正在複製提醒…':'正在產生匯出檔…');
   try{
     if(kind==='copy'){
-      if(!navigator.clipboard?.writeText)throw new Error('瀏覽器未提供一鍵複製。');
-      current(ticket);await navigator.clipboard.writeText(reminderText(snapshot));current(ticket);feedback('已複製目前範圍的提醒，可貼上使用。');
+      current(ticket);await copyReminderText(reminderText(snapshot));current(ticket);feedback('已複製目前範圍的提醒，可貼上使用。');
     }else if(kind==='png'){
       if(document.fonts)await document.fonts.ready;current(ticket);
       const built=createReminderCanvas(snapshot);canvas=built.canvas;
