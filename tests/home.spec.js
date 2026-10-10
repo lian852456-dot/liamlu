@@ -22,7 +22,7 @@ const UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8
 const EXPECTED_HREFS = [
   'kpi-battle.html', 'awards-battle.html', 'index.html', 'gold-medal.html',
   'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'threec-query.html', 'tradein-progress.html',
-  'department-ops.html', 'patrol.html',
+  'access-management.html', 'department-ops.html', 'patrol.html',
   'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
   'phone-stock-dashboard.html'
 ];
