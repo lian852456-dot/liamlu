@@ -46,6 +46,7 @@ body[data-performance-release="public"] .empty-people td{text-align:center;color
  body[data-performance-release="public"] .role-select>strong{grid-column:1/-1;width:100%}
  body[data-performance-release="public"] .role-select label{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr);width:100%;min-width:0}
  body[data-performance-release="public"] .role-select input{box-sizing:border-box;display:block;appearance:none;-webkit-appearance:none;width:100%;max-width:100%;min-width:0;min-height:48px}
+ body[data-performance-release="public"] .role-select input[type="month"]{appearance:auto;-webkit-appearance:auto}
  body[data-performance-release="public"] .role-select>button{width:100%;min-width:0}
  body[data-performance-release="public"] .mobile-stack td:before{font-size:18px}
  body[data-performance-release="public"] .mobile-stack td{grid-template-columns:100px minmax(0,1fr);overflow-wrap:anywhere}
