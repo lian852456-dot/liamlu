@@ -3072,6 +3072,10 @@ function doPost(e) {
     if (reportUploadIsUploadDeployment_() && REPORT_UPLOAD_ALLOWED_ACTIONS.indexOf(action) === -1) {
       throw new Error('route-not-available-on-upload-deployment');
     }
+    const __authBResponse = privateDashboardGasBMaybePost_(e);
+    if (__authBResponse) return __authBResponse;
+    const __authRpcResponse = privateDashboardGasAuthMaybeRpcPost_(e);
+    if (__authRpcResponse) return __authRpcResponse;
     let result;
     if (action === 'ptauth') result = ptAuthenticatePayload(payload);
     else if (action === 'ptlogout') result = ptLogoutPayload(payload);
@@ -5130,6 +5134,39 @@ function kpiCalcParseMeta(sv, fileName) {
 }
 
 // 每日自動化以管理者密碼同步遮罩後名冊。既有裝置綁定不會被覆蓋。
+// Renew password eligibility only from the existing administrator-authorized full roster sync.
+// No new trigger, credential, automatic initialization, or binding/session reset.
+function privateDashboardPreparePasswordRosterRenewal_(prepared) {
+  if (PRIVATE_DASHBOARD_GAS_AUTH_RELEASE_ENABLED_ !== true || PRIVATE_DASHBOARD_GAS_PASSWORD_ENABLED_ !== true) return null;
+  privateDashboardRequireAuthOwner_();
+  if (!privateDashboardRosterLockDepth_) throw new Error('B_OWNER_LOCK_REQUIRED');
+  const props = privateDashboardProperties();
+  const before = props.getProperty(PRIVATE_DASHBOARD_B_CONFIG_KEY_);
+  const config = privateDashboardCreateGasBStore_({}).config();
+  const members = Object.create(null);
+  prepared.forEach(function(member) {
+    const store = String(member.store || '').trim().replace(/\s+/g, '').replace(/^台灣大哥大數位生活台北/, '').replace(/^台灣大哥大台北/, '').replace(/^台北/, '');
+    if (PRIVATE_DASHBOARD_B_STORES_.indexOf(store) >= 0) members[member.employee_id] = store;
+  });
+  const ids = Object.keys(members).sort();
+  if (!ids.length || ids.length > 64 || PRIVATE_DASHBOARD_B_STORES_.some(function(store) {
+    return !ids.some(function(id) { return members[id] === store; });
+  })) throw new Error('B_COMPLETE_ROSTER_REQUIRED');
+  const canonical = JSON.stringify(ids.map(function(id) { return [id, members[id]]; }));
+  const sourceHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, canonical, Utilities.Charset.UTF_8)
+    .map(function(byte) { return ('0' + ((byte + 256) % 256).toString(16)).slice(-2); }).join('');
+  const now = Date.now(), version = config.authority.version + 1;
+  if (!Number.isSafeInteger(version)) throw new Error('B_STATE_INVALID');
+  config.authority = {version: version, sourceHash: sourceHash, effectiveAt: now, validUntil: now + 48 * 60 * 60 * 1000, members: members};
+  delete config.fingerprint;
+  const after = privateDashboardGasAuthJson_(config, 8000);
+  return function() {
+    if (props.getProperty(PRIVATE_DASHBOARD_B_CONFIG_KEY_) !== before) throw new Error('B_CONFIG_CHANGED');
+    props.setProperty(PRIVATE_DASHBOARD_B_CONFIG_KEY_, after);
+    if (props.getProperty(PRIVATE_DASHBOARD_B_CONFIG_KEY_) !== after) throw new Error('B_PERSISTENCE_FAILED');
+  };
+}
+
 function privateDashboardSyncRoster(payload) {
   const __authArgs = Array.prototype.slice.call(arguments);
   return privateDashboardAuthRun_('privateDashboardSyncRoster', __authArgs, function() {
@@ -5159,6 +5196,7 @@ function privateDashboardSyncRoster(payload) {
       if (byId[employeeId]) throw new Error('名冊員編重複，請管理者核對');
       byId[employeeId] = item;
     });
+    const renewPasswordRoster = privateDashboardPreparePasswordRosterRenewal_(prepared);
     let synced = 0;
     privateDashboardAuthNativeBegin_('privateDashboardSyncRoster', __authArgs);
     prepared.forEach(function(member) {
@@ -5170,12 +5208,13 @@ function privateDashboardSyncRoster(payload) {
       item.store = member.store;
       item.role = member.role;
       // Only the separate, explicit admin restore action may clear this deny.
-      item.status = item.status === 'revoked' ? 'revoked' : member.status;
+      item.status = ['revoked', 'inactive'].indexOf(item.status) >= 0 ? item.status : member.status;
       item._row = item._row || sheet.getLastRow() + 1;
       privateDashboardWriteObject(sheet, PRIVATE_DASHBOARD_USERS_HEADERS, item._row, item);
       byId[employeeId] = item;
       synced += 1;
     });
+    if (renewPasswordRoster) renewPasswordRoster();
     return { synced: synced };
   });
 
@@ -7436,7 +7475,7 @@ function privateDashboardAuthGuardRoster_(roster) {
 
 // Candidate only. Every production entry remains disabled. Synthetic mode
 // additionally requires a synthetic ScriptApp identity, never a payload flag.
-const PRIVATE_DASHBOARD_GAS_AUTH_RELEASE_ENABLED_ = false;
+const PRIVATE_DASHBOARD_GAS_AUTH_RELEASE_ENABLED_ = true;
 const PRIVATE_DASHBOARD_GAS_AUTH_STATE_KEY_ = 'DASHBOARD_AUTH_NATIVE_V1';
 const PRIVATE_DASHBOARD_GAS_AUTH_NONCE_PREFIX_ = 'DASHBOARD_AUTH_RPC_V1_';
 
@@ -7679,20 +7718,1086 @@ function privateDashboardCreateGasAuthProvider_(options) {
 // Owner-local adapter derived from the native store/provider wiring.
 // No RPC, peer transport, B/password endpoint, implicit state initialization,
 // settings values, resource creation, triggers or authority extension.
-let privateDashboardOwnerLocalProviderInstance_ = null;
-function privateDashboardAuthNativeProvider_() {
-  privateDashboardGasAuthGate_({});
-  privateDashboardRequireAuthOwner_();
-  if (!privateDashboardOwnerLocalProviderInstance_) {
-    const store = privateDashboardCreateGasAuthStore_({});
-    privateDashboardOwnerLocalProviderInstance_ = privateDashboardCreateGasAuthProvider_({store:store});
-  }
-  return privateDashboardOwnerLocalProviderInstance_;
-}
+
+
 
 function privateDashboardTradeinReadBoundary_(payload, read) {
   if (!privateDashboardAuthBoundaryEnabled_()) return read();
   privateDashboardRequireAuthOwner_();
   const id = privateDashboardCleanEmployeeId((payload || {}).employeeId);
   return privateDashboardAuthProvider_().withEligibility(id, read);
+}
+
+// Offline B integration: owner-local provider retained; production gates remain off.
+// Complete-operation RPC only. Authorize on the owner using original caller
+// proof, consume a durable nonce, then run the whole operation under its lock.
+// This module supplies no endpoint/credentials, logger or automatic retry.
+const PRIVATE_DASHBOARD_GAS_RPC_SPECS_ = {
+  privateDashboardRequestBinding:{action:'private_request',fields:['employeeId','deviceId','bootstrapCode'],result:['requestStatus','requestId','message']},
+  privateDashboardRequestStatus:{action:'private_request_status',fields:['employeeId','deviceId'],result:['requestStatus','requestedAt','approvedAt']},
+  privateDashboardAccess:{action:'private_access',fields:['employeeId','deviceId'],result:['snapshot','profile']},
+  kpiCalcAccess:{action:'kpicalc_access',fields:['employeeId','deviceId'],result:['data','profile']},
+  privateDashboardThreecRead_:{action:'threec_snapshot_read',fields:['employeeId','deviceId','kind'],result:['employeeId','snapshot','registry']},
+  privateDashboardAdminRequests:{action:'private_admin_requests',fields:['adminSecret'],result:['requests']},
+  privateDashboardAdminApprove:{action:'private_admin_approve',fields:['adminSecret','requestId'],result:['approved','employeeId']},
+  privateDashboardAdminRevoke:{action:'private_admin_revoke',fields:['adminSecret','employeeId'],result:['revoked','employeeId']},
+  privateDashboardAdminRestoreEligibility:{action:'private_admin_restore_eligibility',fields:['adminSecret','employeeId','restoreEligibility','currentRosterConfirmed'],result:['restored','employeeId','deviceApprovalRequired']},
+  privateDashboardAdminSetTrustedEmployee:{action:'private_admin_set_trusted_employee',fields:['adminSecret','employeeId','notificationEmail'],result:['trustedEmployeeId']},
+  privateDashboardSyncRoster:{action:'private_sync_roster',fields:['adminSecret','members'],result:['synced']}
+};
+
+function privateDashboardGasRpcResponseLimit_(operation) {
+  // Existing 3C schemas allow up to 25 MiB snapshots; reserve a bounded 64 KiB
+  // envelope/registry budget. Other operations retain their prior 1 MiB limit.
+  return operation === 'privateDashboardThreecRead_' ? 25*1024*1024+65536 : 1024*1024;
+}
+
+function privateDashboardGasAuthParse_(text, responseOperation) {
+  if (typeof text !== 'string') throw new Error('AUTH_REQUEST_INVALID');
+  const parsed = JSON.parse(text);
+  let index = 0, nodes = 0;
+  function space() { while (/\s/.test(text[index] || '') && index < text.length) index++; }
+  function string() {
+    const start = index++;
+    while (index < text.length) {
+      const ch = text[index++];
+      if (ch === '\\') index++;
+      else if (ch === '"') return JSON.parse(text.slice(start,index));
+    }
+    throw new Error('AUTH_REQUEST_INVALID');
+  }
+  function value(depth) {
+    const maxNodes = responseOperation === 'privateDashboardThreecRead_' ? 3000000 : responseOperation === 'privateDashboardBRead_' ? 5000000 : 20000;
+    space(); if (depth > 20 || ++nodes > maxNodes) throw new Error('AUTH_CAPACITY');
+    const ch = text[index];
+    if (ch === '"') { string(); return; }
+    if (ch === '{') {
+      index++; space(); const keys = new Set();
+      if (text[index] === '}') { index++; return; }
+      for (;;) {
+        space(); const key = string();
+        if (keys.has(key) || ['__proto__','constructor','prototype'].indexOf(key) >= 0) throw new Error('AUTH_REQUEST_INVALID');
+        keys.add(key); space(); if (text[index++] !== ':') throw new Error('AUTH_REQUEST_INVALID');
+        value(depth+1); space(); const end = text[index++];
+        if (end === '}') return; if (end !== ',') throw new Error('AUTH_REQUEST_INVALID');
+      }
+    }
+    if (ch === '[') {
+      index++; space(); if (text[index] === ']') { index++; return; }
+      for (;;) { value(depth+1); space(); const end = text[index++]; if (end === ']') return; if (end !== ',') throw new Error('AUTH_REQUEST_INVALID'); }
+    }
+    while (index < text.length && !/[\s,}\]]/.test(text[index])) index++;
+  }
+  value(0); space(); if (index !== text.length) throw new Error('AUTH_REQUEST_INVALID');
+  return parsed;
+}
+
+function privateDashboardGasRpcPayload_(operation, input, originalRoute) {
+  if (!Object.prototype.hasOwnProperty.call(PRIVATE_DASHBOARD_GAS_RPC_SPECS_, operation)) throw new Error('AUTH_OPERATION_DENIED');
+  if (!input || Array.isArray(input) || typeof input !== 'object') throw new Error('AUTH_REQUEST_INVALID');
+  const spec = PRIVATE_DASHBOARD_GAS_RPC_SPECS_[operation], payload = {};
+  Object.keys(input).forEach(function(key) {
+    if (originalRoute && key === 'action' && input.action === spec.action) return;
+    if (spec.fields.indexOf(key) < 0) throw new Error('AUTH_REQUEST_INVALID');
+    payload[key] = input[key];
+  });
+  spec.fields.forEach(function(key) {
+    if (operation === 'privateDashboardThreecRead_' && key === 'kind') {
+      if (payload.kind !== undefined && payload.kind !== 'shopping' && payload.kind !== 'tradein') throw new Error('AUTH_REQUEST_INVALID');
+    } else if (key === 'notificationEmail') {
+      if (payload[key] !== undefined && (typeof payload[key] !== 'string' || payload[key].length > 254)) throw new Error('AUTH_REQUEST_INVALID');
+    } else if (key === 'members') {
+      if (!Array.isArray(payload.members) || payload.members.length > 64) throw new Error('AUTH_REQUEST_INVALID');
+      const ids = new Set();
+      payload.members = payload.members.map(function(member) {
+        if (!member || Array.isArray(member) || typeof member !== 'object' ||
+            Object.keys(member).some(function(k) { return ['employeeId','maskedName','store','role','status'].indexOf(k) < 0; })) throw new Error('AUTH_REQUEST_INVALID');
+        const result = {};
+        Object.keys(member).forEach(function(k) {
+          if (typeof member[k] !== 'string' || member[k].length > 100) throw new Error('AUTH_REQUEST_INVALID');
+          result[k] = member[k];
+        });
+        result.employeeId = privateDashboardCleanEmployeeId(member.employeeId);
+        if (ids.has(result.employeeId) || result.status !== undefined && ['active','inactive'].indexOf(result.status) < 0) throw new Error('AUTH_REQUEST_INVALID');
+        ids.add(result.employeeId); return result;
+      });
+    } else if (key === 'restoreEligibility' || key === 'currentRosterConfirmed') {
+      if (payload[key] !== true) throw new Error('AUTH_REQUEST_INVALID');
+    } else {
+      if (typeof payload[key] !== 'string' || !payload[key] || payload[key].length > 256) throw new Error('AUTH_REQUEST_INVALID');
+      if (key === 'employeeId') payload[key] = privateDashboardCleanEmployeeId(payload[key]);
+      if (key === 'deviceId') payload[key] = privateDashboardCleanDeviceId(payload[key]);
+    }
+  });
+  privateDashboardGasAuthJson_(payload,64000); return payload;
+}
+
+function privateDashboardGasRpcResult_(operation, result, payload, hostResponseProfile) {
+  if(hostResponseProfile!==undefined && hostResponseProfile!=='privateDashboardBRead_')throw new Error('AUTH_RESULT_INVALID');
+  const spec = PRIVATE_DASHBOARD_GAS_RPC_SPECS_[operation];
+  if (!result || Array.isArray(result) || typeof result !== 'object' ||
+      Object.keys(result).some(function(k) { return spec.result.indexOf(k) < 0; })) throw new Error('AUTH_RESULT_INVALID');
+  if (operation === 'privateDashboardThreecRead_') {
+    const keys = Object.keys(result).sort().join('|');
+    if (result.employeeId !== payload.employeeId || keys !== (payload.kind === undefined ? 'employeeId' : 'employeeId|registry|snapshot') ||
+        payload.kind !== undefined && (!result.registry || Array.isArray(result.registry) || typeof result.registry !== 'object' ||
+          result.snapshot !== null && (!result.snapshot || Array.isArray(result.snapshot) || typeof result.snapshot !== 'object' || result.snapshot.kind !== payload.kind))) throw new Error('AUTH_RESULT_INVALID');
+  }
+  const secrets = ['adminSecret','bootstrapCode','deviceId'].map(function(k) { return payload[k]; }).filter(Boolean);
+  function inspect(value, depth) {
+    if (depth > 20) throw new Error('AUTH_CAPACITY');
+    if (typeof value === 'string' && secrets.some(function(secret) { return value.indexOf(secret) >= 0; })) throw new Error('AUTH_RESULT_INVALID');
+    if (value && typeof value === 'object') Object.keys(value).forEach(function(k) {
+      if (['adminSecret','bootstrapCode','password','token','apiKey','deviceCredential','__proto__','constructor','prototype'].indexOf(k) >= 0) throw new Error('AUTH_RESULT_INVALID');
+      inspect(value[k],depth+1);
+    });
+  }
+  inspect(result,0);
+  return privateDashboardGasAuthParse_(privateDashboardGasAuthJson_(result,hostResponseProfile==='privateDashboardBRead_'?8*1024*1024+65536:privateDashboardGasRpcResponseLimit_(operation)),hostResponseProfile || operation);
+}
+
+function privateDashboardCreateGasAuthRpcOwner_(options) {
+  privateDashboardGasAuthGate_(options); privateDashboardRequireAuthOwner_();
+  const config = privateDashboardAuthOwnerConfig_(), store = options.store, provider = options.provider;
+  if (!store || !provider || !options.invoke || typeof options.invoke !== 'function') throw new Error('AUTH_OWNER_UNAVAILABLE');
+  function authorize(operation,payload) {
+    const spec = PRIVATE_DASHBOARD_GAS_RPC_SPECS_[operation];
+    if (spec.fields.indexOf('adminSecret') >= 0) privateDashboardAdminAuthorized(payload);
+    else {
+      const id = privateDashboardCleanEmployeeId(payload.employeeId), device = privateDashboardCleanDeviceId(payload.deviceId);
+      if (operation === 'privateDashboardRequestBinding' && privateDashboardHash(payload.bootstrapCode) !==
+          privateDashboardHash(privateDashboardRequiredProperty('DASHBOARD_BOOTSTRAP_CODE'))) throw new Error('AUTH_CALLER_DENIED');
+      const user = privateDashboardUserByEmployeeId(id).user;
+      if (!user || user.status !== 'active') throw new Error('AUTH_CALLER_DENIED');
+      if (operation !== 'privateDashboardRequestBinding' && operation !== 'privateDashboardRequestStatus' &&
+          !privateDashboardIsTrustedEmployee(id) && user.device_id !== device) throw new Error('AUTH_CALLER_DENIED');
+    }
+    provider.assertNativeEntry(operation,[payload]);
+  }
+  function handle(text) {
+    try {
+      if (typeof reportUploadIsUploadDeployment_ === 'function' && reportUploadIsUploadDeployment_()) throw new Error('AUTH_OPERATION_DENIED');
+      if (typeof text !== 'string' || text.length > 64000) throw new Error('AUTH_REQUEST_INVALID');
+      const request = privateDashboardGasAuthParse_(text);
+      if (!request || Array.isArray(request) || Object.keys(request).sort().join('|') !== 'action|issuedAt|operation|owner|payload|protocol|requestId' ||
+          request.action !== 'auth_owner_rpc' || request.protocol !== 'auth-owner/v1' || request.owner !== config.owner) throw new Error('AUTH_REQUEST_INVALID');
+      const payload = privateDashboardGasRpcPayload_(request.operation,request.payload,false);
+      return privateDashboardRosterTransaction_(function() {
+        authorize(request.operation,payload);
+        store.consumeRequest(request.requestId,request.issuedAt);
+        const result = options.invoke(request.operation,payload);
+        SpreadsheetApp.flush();
+        return {protocol:'auth-owner/v1',requestId:request.requestId,owner:config.owner,operation:request.operation,status:'ok',
+          result:privateDashboardGasRpcResult_(request.operation,result,payload)};
+      });
+    } catch (_) { return {status:'error',code:'AUTH_OWNER_DENIED'}; }
+  }
+  return Object.freeze({handle:handle});
+}
+
+function privateDashboardCreateGasAuthPeerTransport_(options) {
+  const synthetic = privateDashboardGasAuthGate_(options), config = privateDashboardAuthOwnerConfig_();
+  const endpoint = String(options.endpoint || '');
+  if (!(synthetic && endpoint === 'https://synthetic-owner.invalid/exec') &&
+      !/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,200}\/exec$/.test(endpoint)) throw new Error('AUTH_ENDPOINT_REQUIRED');
+  if (options.owner !== config.owner) throw new Error('AUTH_OWNER_UNAVAILABLE');
+  const fetcher = options.fetch || function(url,parameters) { return UrlFetchApp.fetch(url,parameters); };
+  const now = options.now || function() { return Date.now(); };
+  const uuid = options.requestId || function() { return Utilities.getUuid(); };
+  function fetchResult(request) {
+    let response = fetcher(endpoint,{method:'post',contentType:'text/plain',payload:JSON.stringify(request),
+      muteHttpExceptions:true,followRedirects:false,validateHttpsCertificates:true});
+    const code = response.getResponseCode();
+    if (code === 302 || code === 303) {
+      const headers = response.getAllHeaders(), location = headers.Location || headers.location;
+      if (typeof location !== 'string' || !/^https:\/\/script\.googleusercontent\.com\/macros\/echo\?[A-Za-z0-9_%=&.-]+$/.test(location)) throw new Error('AUTH_REDIRECT_DENIED');
+      const keys = location.slice(location.indexOf('?')+1).split('&').map(function(pair) { return pair.split('=')[0]; });
+      if (keys.length !== 2 || new Set(keys).size !== 2 || keys.some(function(key) { return ['user_content_key','lib'].indexOf(key) < 0; })) throw new Error('AUTH_REDIRECT_DENIED');
+      // A single pinned response GET carries no caller body/credentials. Never
+      // repeat the native mutation POST, including network/timeout failures.
+      response = fetcher(location,{method:'get',muteHttpExceptions:true,followRedirects:false,validateHttpsCertificates:true});
+    }
+    if (response.getResponseCode() !== 200) throw new Error('AUTH_TRANSPORT_FAILED');
+    const text = response.getContentText();
+    if (typeof text !== 'string' || text.length > privateDashboardGasRpcResponseLimit_(request.operation)) throw new Error('AUTH_RESULT_INVALID');
+    const reply = privateDashboardGasAuthParse_(text,request.operation);
+    if (!reply || Object.keys(reply).sort().join('|') !== 'operation|owner|protocol|requestId|result|status' || reply.status !== 'ok' ||
+        reply.protocol !== request.protocol || reply.owner !== config.owner || reply.operation !== request.operation || reply.requestId !== request.requestId) throw new Error('AUTH_OWNER_DENIED');
+    return privateDashboardGasRpcResult_(request.operation,reply.result,request.payload);
+  }
+  return function(destination,operation,args) {
+    try {
+      if (destination !== config.owner || !Array.isArray(args) || args.length !== 1) throw new Error('AUTH_OWNER_UNAVAILABLE');
+      const payload = privateDashboardGasRpcPayload_(operation,args[0],true);
+      return fetchResult({action:'auth_owner_rpc',protocol:'auth-owner/v1',owner:config.owner,operation:operation,payload:payload,requestId:uuid(),issuedAt:now()});
+    } catch (_) { throw new Error('AUTH_OWNER_DENIED'); }
+  };
+}
+
+// One typed, owner-executed 3C operation. No generic method, roster projection,
+// credential provisioning, bearer grant or business-data write is exposed.
+function privateDashboardGasThreecPayload_(input) {
+  if (!input || Array.isArray(input) || typeof input !== 'object' ||
+      Object.keys(input).some(function(k) { return ['employeeId','deviceId','kind','action'].indexOf(k) < 0; })) throw new Error('AUTH_REQUEST_INVALID');
+  if (input.action !== undefined && input.action !== 'threec_snapshot_read') throw new Error('AUTH_REQUEST_INVALID');
+  const result = {employeeId:privateDashboardCleanEmployeeId(input.employeeId),deviceId:privateDashboardCleanDeviceId(input.deviceId)};
+  if (Object.prototype.hasOwnProperty.call(input,'kind')) {
+    if (input.kind !== 'shopping' && input.kind !== 'tradein') throw new Error('AUTH_REQUEST_INVALID');
+    result.kind = input.kind;
+  }
+  return result;
+}
+
+function privateDashboardThreecRead_(payload) {
+  privateDashboardGasAuthGate_({mode:'LOCAL_SYNTHETIC_ONLY'});
+  return privateDashboardAuthRun_('privateDashboardThreecRead_', [payload], function() {
+    const body = privateDashboardGasRpcPayload_('privateDashboardThreecRead_',payload,false);
+    // Original A device/trusted rules plus the durable native deny/pending gate
+    // execute inside the owner's transaction before any private file lookup.
+    const employeeId = threecAuthorizeRead_(body);
+    if (body.kind === undefined) return {employeeId:employeeId}; // Legacy helper compatibility only.
+    const kind = threecKind_(body.kind), registry = threecRegistry_();
+    const active = registry.kinds[kind].active;
+    if (!active) return {employeeId:employeeId,snapshot:null,registry:threecRegistrySummary_(registry)};
+    const snapshot = threecReadJsonFile_(active.snapshot_file_id);
+    threecNormalizeIncomingSnapshot_(snapshot);
+    if (snapshot.kind !== kind || threecSnapshotHash_(snapshot) !== snapshot.snapshot_hash ||
+        active.snapshot_hash !== snapshot.snapshot_hash) throw new Error('THREEC_SNAPSHOT_INVALID');
+    return {employeeId:employeeId,snapshot:snapshot,registry:threecRegistrySummary_(registry)};
+  });
+}
+
+function privateDashboardGasThreecSnapshotEntry_(input) {
+  const payload = privateDashboardGasThreecPayload_(input);
+  if (payload.kind === undefined) throw new Error('AUTH_REQUEST_INVALID');
+  const result = privateDashboardThreecRead_(payload);
+  return {snapshot:result.snapshot,registry:result.registry};
+}
+
+// Concrete candidate wiring, still disabled by GasAuthStore.gs. No placeholder
+// endpoint, secret provisioning, initialization, trigger or deployment code.
+let privateDashboardGasAuthAdapterInstance_ = null;
+
+function privateDashboardGasAuthInvoke_(operation, payload) {
+  const functions = {
+    privateDashboardRequestBinding:privateDashboardRequestBinding,
+    privateDashboardRequestStatus:privateDashboardRequestStatus,
+    privateDashboardAccess:privateDashboardAccess,
+    kpiCalcAccess:kpiCalcAccess,
+    privateDashboardThreecRead_:privateDashboardThreecRead_,
+    privateDashboardAdminRequests:privateDashboardAdminRequests,
+    privateDashboardAdminApprove:privateDashboardAdminApprove,
+    privateDashboardAdminRevoke:privateDashboardAdminRevoke,
+    privateDashboardAdminRestoreEligibility:privateDashboardAdminRestoreEligibility,
+    privateDashboardAdminSetTrustedEmployee:privateDashboardAdminSetTrustedEmployee,
+    privateDashboardSyncRoster:privateDashboardSyncRoster
+  };
+  if (!Object.prototype.hasOwnProperty.call(functions,operation)) throw new Error('AUTH_OPERATION_DENIED');
+  return functions[operation](payload);
+}
+
+function privateDashboardCreateGasAuthAdapters_(options) {
+  privateDashboardGasAuthGate_(options);
+  const config = privateDashboardAuthOwnerConfig_();
+  if (config.current === config.owner) {
+    const store = privateDashboardCreateGasAuthStore_(options);
+    const provider = privateDashboardCreateGasAuthProvider_({mode:options.mode,store:store});
+    const rpc = privateDashboardCreateGasAuthRpcOwner_({mode:options.mode,store:store,provider:provider,invoke:privateDashboardGasAuthInvoke_});
+    return Object.freeze({store:store,provider:provider,rpc:rpc});
+  }
+  const send = privateDashboardCreateGasAuthPeerTransport_({mode:options.mode,owner:config.owner,
+    endpoint:options.endpoint,fetch:options.fetch,now:options.now,requestId:options.requestId});
+  return Object.freeze({send:send});
+}
+
+function privateDashboardGasAuthAdapters_() {
+  privateDashboardGasAuthGate_({});
+  if (!privateDashboardGasAuthAdapterInstance_) {
+    privateDashboardGasAuthAdapterInstance_ = privateDashboardCreateGasAuthAdapters_({
+      endpoint:privateDashboardProperties().getProperty('DASHBOARD_AUTH_OWNER_EXEC_URL')
+    });
+  }
+  return privateDashboardGasAuthAdapterInstance_;
+}
+
+function privateDashboardAuthNativeProvider_() {
+  return privateDashboardGasAuthAdapters_().provider;
+}
+
+function privateDashboardAuthOwnerTransport_(owner, operation, args) {
+  const send = privateDashboardGasAuthAdapters_().send;
+  if (typeof send !== 'function') throw new Error('AUTH_OWNER_UNAVAILABLE');
+  return send(owner,operation,args);
+}
+
+function privateDashboardGasAuthRpcPost_(event) {
+  try {
+    if (!event || !event.postData || !/^text\/plain(?:;\s*charset=utf-8)?$/i.test(String(event.postData.type || ''))) throw new Error('AUTH_REQUEST_INVALID');
+    const result = privateDashboardGasAuthAdapters_().rpc.handle(event.postData.contents);
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+  } catch (_) {
+    return ContentService.createTextOutput('{"status":"error","code":"AUTH_OWNER_DENIED"}').setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function privateDashboardGasAuthMaybeRpcPost_(event) {
+  if (!event || !event.postData || typeof event.postData.contents !== 'string') return null;
+  try {
+    const body = JSON.parse(event.postData.contents);
+    if (body && body.action === 'auth_owner_rpc') return privateDashboardGasAuthRpcPost_(event);
+  } catch (_) { /* Other original routes retain their existing parser. */ }
+  return null;
+}
+
+// Retained fast-sha256 1.3.0 factory body; no Node loader or network.
+const PRIVATE_DASHBOARD_B_PBKDF2_ = (function() {
+var exports = {};
+
+"use strict";
+exports.__esModule = true;
+// SHA-256 (+ HMAC and PBKDF2) for JavaScript.
+//
+// Written in 2014-2016 by Dmitry Chestnykh.
+// Public domain, no warranty.
+//
+// Functions (accept and return Uint8Arrays):
+//
+//   sha256(message) -> hash
+//   sha256.hmac(key, message) -> mac
+//   sha256.pbkdf2(password, salt, rounds, dkLen) -> dk
+//
+//  Classes:
+//
+//   new sha256.Hash()
+//   new sha256.HMAC(key)
+//
+exports.digestLength = 32;
+exports.blockSize = 64;
+// SHA-256 constants
+var K = new Uint32Array([
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b,
+    0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01,
+    0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7,
+    0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+    0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152,
+    0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
+    0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+    0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819,
+    0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08,
+    0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f,
+    0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+    0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+]);
+function hashBlocks(w, v, p, pos, len) {
+    var a, b, c, d, e, f, g, h, u, i, j, t1, t2;
+    while (len >= 64) {
+        a = v[0];
+        b = v[1];
+        c = v[2];
+        d = v[3];
+        e = v[4];
+        f = v[5];
+        g = v[6];
+        h = v[7];
+        for (i = 0; i < 16; i++) {
+            j = pos + i * 4;
+            w[i] = (((p[j] & 0xff) << 24) | ((p[j + 1] & 0xff) << 16) |
+                ((p[j + 2] & 0xff) << 8) | (p[j + 3] & 0xff));
+        }
+        for (i = 16; i < 64; i++) {
+            u = w[i - 2];
+            t1 = (u >>> 17 | u << (32 - 17)) ^ (u >>> 19 | u << (32 - 19)) ^ (u >>> 10);
+            u = w[i - 15];
+            t2 = (u >>> 7 | u << (32 - 7)) ^ (u >>> 18 | u << (32 - 18)) ^ (u >>> 3);
+            w[i] = (t1 + w[i - 7] | 0) + (t2 + w[i - 16] | 0);
+        }
+        for (i = 0; i < 64; i++) {
+            t1 = (((((e >>> 6 | e << (32 - 6)) ^ (e >>> 11 | e << (32 - 11)) ^
+                (e >>> 25 | e << (32 - 25))) + ((e & f) ^ (~e & g))) | 0) +
+                ((h + ((K[i] + w[i]) | 0)) | 0)) | 0;
+            t2 = (((a >>> 2 | a << (32 - 2)) ^ (a >>> 13 | a << (32 - 13)) ^
+                (a >>> 22 | a << (32 - 22))) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+            h = g;
+            g = f;
+            f = e;
+            e = (d + t1) | 0;
+            d = c;
+            c = b;
+            b = a;
+            a = (t1 + t2) | 0;
+        }
+        v[0] += a;
+        v[1] += b;
+        v[2] += c;
+        v[3] += d;
+        v[4] += e;
+        v[5] += f;
+        v[6] += g;
+        v[7] += h;
+        pos += 64;
+        len -= 64;
+    }
+    return pos;
+}
+// Hash implements SHA256 hash algorithm.
+var Hash = /** @class */ (function () {
+    function Hash() {
+        this.digestLength = exports.digestLength;
+        this.blockSize = exports.blockSize;
+        // Note: Int32Array is used instead of Uint32Array for performance reasons.
+        this.state = new Int32Array(8); // hash state
+        this.temp = new Int32Array(64); // temporary state
+        this.buffer = new Uint8Array(128); // buffer for data to hash
+        this.bufferLength = 0; // number of bytes in buffer
+        this.bytesHashed = 0; // number of total bytes hashed
+        this.finished = false; // indicates whether the hash was finalized
+        this.reset();
+    }
+    // Resets hash state making it possible
+    // to re-use this instance to hash other data.
+    Hash.prototype.reset = function () {
+        this.state[0] = 0x6a09e667;
+        this.state[1] = 0xbb67ae85;
+        this.state[2] = 0x3c6ef372;
+        this.state[3] = 0xa54ff53a;
+        this.state[4] = 0x510e527f;
+        this.state[5] = 0x9b05688c;
+        this.state[6] = 0x1f83d9ab;
+        this.state[7] = 0x5be0cd19;
+        this.bufferLength = 0;
+        this.bytesHashed = 0;
+        this.finished = false;
+        return this;
+    };
+    // Cleans internal buffers and re-initializes hash state.
+    Hash.prototype.clean = function () {
+        for (var i = 0; i < this.buffer.length; i++) {
+            this.buffer[i] = 0;
+        }
+        for (var i = 0; i < this.temp.length; i++) {
+            this.temp[i] = 0;
+        }
+        this.reset();
+    };
+    // Updates hash state with the given data.
+    //
+    // Optionally, length of the data can be specified to hash
+    // fewer bytes than data.length.
+    //
+    // Throws error when trying to update already finalized hash:
+    // instance must be reset to use it again.
+    Hash.prototype.update = function (data, dataLength) {
+        if (dataLength === void 0) { dataLength = data.length; }
+        if (this.finished) {
+            throw new Error("SHA256: can't update because hash was finished.");
+        }
+        var dataPos = 0;
+        this.bytesHashed += dataLength;
+        if (this.bufferLength > 0) {
+            while (this.bufferLength < 64 && dataLength > 0) {
+                this.buffer[this.bufferLength++] = data[dataPos++];
+                dataLength--;
+            }
+            if (this.bufferLength === 64) {
+                hashBlocks(this.temp, this.state, this.buffer, 0, 64);
+                this.bufferLength = 0;
+            }
+        }
+        if (dataLength >= 64) {
+            dataPos = hashBlocks(this.temp, this.state, data, dataPos, dataLength);
+            dataLength %= 64;
+        }
+        while (dataLength > 0) {
+            this.buffer[this.bufferLength++] = data[dataPos++];
+            dataLength--;
+        }
+        return this;
+    };
+    // Finalizes hash state and puts hash into out.
+    //
+    // If hash was already finalized, puts the same value.
+    Hash.prototype.finish = function (out) {
+        if (!this.finished) {
+            var bytesHashed = this.bytesHashed;
+            var left = this.bufferLength;
+            var bitLenHi = (bytesHashed / 0x20000000) | 0;
+            var bitLenLo = bytesHashed << 3;
+            var padLength = (bytesHashed % 64 < 56) ? 64 : 128;
+            this.buffer[left] = 0x80;
+            for (var i = left + 1; i < padLength - 8; i++) {
+                this.buffer[i] = 0;
+            }
+            this.buffer[padLength - 8] = (bitLenHi >>> 24) & 0xff;
+            this.buffer[padLength - 7] = (bitLenHi >>> 16) & 0xff;
+            this.buffer[padLength - 6] = (bitLenHi >>> 8) & 0xff;
+            this.buffer[padLength - 5] = (bitLenHi >>> 0) & 0xff;
+            this.buffer[padLength - 4] = (bitLenLo >>> 24) & 0xff;
+            this.buffer[padLength - 3] = (bitLenLo >>> 16) & 0xff;
+            this.buffer[padLength - 2] = (bitLenLo >>> 8) & 0xff;
+            this.buffer[padLength - 1] = (bitLenLo >>> 0) & 0xff;
+            hashBlocks(this.temp, this.state, this.buffer, 0, padLength);
+            this.finished = true;
+        }
+        for (var i = 0; i < 8; i++) {
+            out[i * 4 + 0] = (this.state[i] >>> 24) & 0xff;
+            out[i * 4 + 1] = (this.state[i] >>> 16) & 0xff;
+            out[i * 4 + 2] = (this.state[i] >>> 8) & 0xff;
+            out[i * 4 + 3] = (this.state[i] >>> 0) & 0xff;
+        }
+        return this;
+    };
+    // Returns the final hash digest.
+    Hash.prototype.digest = function () {
+        var out = new Uint8Array(this.digestLength);
+        this.finish(out);
+        return out;
+    };
+    // Internal function for use in HMAC for optimization.
+    Hash.prototype._saveState = function (out) {
+        for (var i = 0; i < this.state.length; i++) {
+            out[i] = this.state[i];
+        }
+    };
+    // Internal function for use in HMAC for optimization.
+    Hash.prototype._restoreState = function (from, bytesHashed) {
+        for (var i = 0; i < this.state.length; i++) {
+            this.state[i] = from[i];
+        }
+        this.bytesHashed = bytesHashed;
+        this.finished = false;
+        this.bufferLength = 0;
+    };
+    return Hash;
+}());
+exports.Hash = Hash;
+// HMAC implements HMAC-SHA256 message authentication algorithm.
+var HMAC = /** @class */ (function () {
+    function HMAC(key) {
+        this.inner = new Hash();
+        this.outer = new Hash();
+        this.blockSize = this.inner.blockSize;
+        this.digestLength = this.inner.digestLength;
+        var pad = new Uint8Array(this.blockSize);
+        if (key.length > this.blockSize) {
+            (new Hash()).update(key).finish(pad).clean();
+        }
+        else {
+            for (var i = 0; i < key.length; i++) {
+                pad[i] = key[i];
+            }
+        }
+        for (var i = 0; i < pad.length; i++) {
+            pad[i] ^= 0x36;
+        }
+        this.inner.update(pad);
+        for (var i = 0; i < pad.length; i++) {
+            pad[i] ^= 0x36 ^ 0x5c;
+        }
+        this.outer.update(pad);
+        this.istate = new Uint32Array(8);
+        this.ostate = new Uint32Array(8);
+        this.inner._saveState(this.istate);
+        this.outer._saveState(this.ostate);
+        for (var i = 0; i < pad.length; i++) {
+            pad[i] = 0;
+        }
+    }
+    // Returns HMAC state to the state initialized with key
+    // to make it possible to run HMAC over the other data with the same
+    // key without creating a new instance.
+    HMAC.prototype.reset = function () {
+        this.inner._restoreState(this.istate, this.inner.blockSize);
+        this.outer._restoreState(this.ostate, this.outer.blockSize);
+        return this;
+    };
+    // Cleans HMAC state.
+    HMAC.prototype.clean = function () {
+        for (var i = 0; i < this.istate.length; i++) {
+            this.ostate[i] = this.istate[i] = 0;
+        }
+        this.inner.clean();
+        this.outer.clean();
+    };
+    // Updates state with provided data.
+    HMAC.prototype.update = function (data) {
+        this.inner.update(data);
+        return this;
+    };
+    // Finalizes HMAC and puts the result in out.
+    HMAC.prototype.finish = function (out) {
+        if (this.outer.finished) {
+            this.outer.finish(out);
+        }
+        else {
+            this.inner.finish(out);
+            this.outer.update(out, this.digestLength).finish(out);
+        }
+        return this;
+    };
+    // Returns message authentication code.
+    HMAC.prototype.digest = function () {
+        var out = new Uint8Array(this.digestLength);
+        this.finish(out);
+        return out;
+    };
+    return HMAC;
+}());
+exports.HMAC = HMAC;
+// Returns SHA256 hash of data.
+function hash(data) {
+    var h = (new Hash()).update(data);
+    var digest = h.digest();
+    h.clean();
+    return digest;
+}
+exports.hash = hash;
+// Function hash is both available as module.hash and as default export.
+exports["default"] = hash;
+// Returns HMAC-SHA256 of data under the key.
+function hmac(key, data) {
+    var h = (new HMAC(key)).update(data);
+    var digest = h.digest();
+    h.clean();
+    return digest;
+}
+exports.hmac = hmac;
+// Fills hkdf buffer like this:
+// T(1) = HMAC-Hash(PRK, T(0) | info | 0x01)
+function fillBuffer(buffer, hmac, info, counter) {
+    // Counter is a byte value: check if it overflowed.
+    var num = counter[0];
+    if (num === 0) {
+        throw new Error("hkdf: cannot expand more");
+    }
+    // Prepare HMAC instance for new data with old key.
+    hmac.reset();
+    // Hash in previous output if it was generated
+    // (i.e. counter is greater than 1).
+    if (num > 1) {
+        hmac.update(buffer);
+    }
+    // Hash in info if it exists.
+    if (info) {
+        hmac.update(info);
+    }
+    // Hash in the counter.
+    hmac.update(counter);
+    // Output result to buffer and clean HMAC instance.
+    hmac.finish(buffer);
+    // Increment counter inside typed array, this works properly.
+    counter[0]++;
+}
+var hkdfSalt = new Uint8Array(exports.digestLength); // Filled with zeroes.
+function hkdf(key, salt, info, length) {
+    if (salt === void 0) { salt = hkdfSalt; }
+    if (length === void 0) { length = 32; }
+    var counter = new Uint8Array([1]);
+    // HKDF-Extract uses salt as HMAC key, and key as data.
+    var okm = hmac(salt, key);
+    // Initialize HMAC for expanding with extracted key.
+    // Ensure no collisions with `hmac` function.
+    var hmac_ = new HMAC(okm);
+    // Allocate buffer.
+    var buffer = new Uint8Array(hmac_.digestLength);
+    var bufpos = buffer.length;
+    var out = new Uint8Array(length);
+    for (var i = 0; i < length; i++) {
+        if (bufpos === buffer.length) {
+            fillBuffer(buffer, hmac_, info, counter);
+            bufpos = 0;
+        }
+        out[i] = buffer[bufpos++];
+    }
+    hmac_.clean();
+    buffer.fill(0);
+    counter.fill(0);
+    return out;
+}
+exports.hkdf = hkdf;
+// Derives a key from password and salt using PBKDF2-HMAC-SHA256
+// with the given number of iterations.
+//
+// The number of bytes returned is equal to dkLen.
+//
+// (For better security, avoid dkLen greater than hash length - 32 bytes).
+function pbkdf2(password, salt, iterations, dkLen) {
+    var prf = new HMAC(password);
+    var len = prf.digestLength;
+    var ctr = new Uint8Array(4);
+    var t = new Uint8Array(len);
+    var u = new Uint8Array(len);
+    var dk = new Uint8Array(dkLen);
+    for (var i = 0; i * len < dkLen; i++) {
+        var c = i + 1;
+        ctr[0] = (c >>> 24) & 0xff;
+        ctr[1] = (c >>> 16) & 0xff;
+        ctr[2] = (c >>> 8) & 0xff;
+        ctr[3] = (c >>> 0) & 0xff;
+        prf.reset();
+        prf.update(salt);
+        prf.update(ctr);
+        prf.finish(u);
+        for (var j = 0; j < len; j++) {
+            t[j] = u[j];
+        }
+        for (var j = 2; j <= iterations; j++) {
+            prf.reset();
+            prf.update(u).finish(u);
+            for (var k = 0; k < len; k++) {
+                t[k] ^= u[k];
+            }
+        }
+        for (var j = 0; j < len && i * len + j < dkLen; j++) {
+            dk[i * len + j] = t[j];
+        }
+    }
+    for (var i = 0; i < len; i++) {
+        t[i] = u[i] = 0;
+    }
+    for (var i = 0; i < 4; i++) {
+        ctr[i] = 0;
+    }
+    prf.clean();
+    return dk;
+}
+exports.pbkdf2 = pbkdf2;
+
+return Object.freeze(exports);
+})();
+
+// Production-shaped GAS verifier. No credential initialization or entropy API.
+// GasBPbkdf2.gs embeds the already reviewed fast-sha256 1.3.0 implementation.
+function privateDashboardBBytes_(hex) {
+  if (typeof hex !== 'string' || !/^(?:[a-f0-9]{2})+$/.test(hex)) throw new Error('B_CONFIG_INVALID');
+  return new Uint8Array(hex.match(/../g).map(function(pair) { return parseInt(pair,16); }));
+}
+
+function privateDashboardBVerifyPassword_(password, verifier) {
+  let bytes, valid = typeof password === 'string';
+  try {
+    const encoded = encodeURIComponent(valid ? password : 'INVALID_PASSWORD_INPUT');
+    const values = [];
+    for (let i=0;i<encoded.length;i++) {
+      if (encoded[i] === '%') { values.push(parseInt(encoded.slice(i+1,i+3),16));i+=2; }
+      else values.push(encoded.charCodeAt(i));
+    }
+    valid = valid && values.length > 0 && values.length <= 1024;
+    bytes = new Uint8Array(valid ? values : [0]);
+  } catch (_) { valid=false;bytes=new Uint8Array([0]); }
+  const salt=privateDashboardBBytes_(verifier.salt), expected=privateDashboardBBytes_(verifier.digest);
+  let actual;
+  try {
+    actual=PRIVATE_DASHBOARD_B_PBKDF2_.pbkdf2(bytes,salt,600000,32);
+    let difference=0;
+    for(let i=0;i<32;i++) difference |= actual[i]^expected[i];
+    return difference === 0 && valid;
+  } finally {
+    bytes.fill(0);salt.fill(0);expected.fill(0);if(actual)actual.fill(0);
+  }
+}
+
+// Candidate GAS ScriptProperties persistence; never initializes or migrates.
+const PRIVATE_DASHBOARD_GAS_PASSWORD_ENABLED_ = true;
+const PRIVATE_DASHBOARD_B_CONFIG_KEY_ = 'DASHBOARD_AUTH_B_CONFIG_V1';
+const PRIVATE_DASHBOARD_B_BIND_KEY_ = 'DASHBOARD_AUTH_B_BIND_V1';
+const PRIVATE_DASHBOARD_B_LIMIT_KEY_ = 'DASHBOARD_AUTH_B_LIMIT_V1';
+const PRIVATE_DASHBOARD_B_SESSION_PREFIX_ = 'DASHBOARD_AUTH_B_SESS_V1_';
+const PRIVATE_DASHBOARD_B_STORES_ = ['酒泉','永吉','復興南','杭州南','萬大','通化','大稻埕','三創','六張犁'];
+
+function privateDashboardBGate_(options) {
+  const synthetic=privateDashboardGasAuthGate_(options);
+  if (!synthetic && PRIVATE_DASHBOARD_GAS_PASSWORD_ENABLED_ !== true) throw new Error('B_RELEASE_DISABLED');
+  privateDashboardRequireAuthOwner_();
+  return synthetic;
+}
+
+function privateDashboardBShape_(value, keys) {
+  if (!value || Array.isArray(value) || typeof value !== 'object' || Object.keys(value).sort().join('|') !== keys.slice().sort().join('|')) throw new Error('B_STATE_INVALID');
+}
+
+function privateDashboardBInt_(value, minimum) {
+  if (!Number.isSafeInteger(value) || value < minimum) throw new Error('B_STATE_INVALID');
+}
+
+function privateDashboardBDigestShape_(value) {
+  if (typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value)) throw new Error('B_STATE_INVALID');
+}
+
+function privateDashboardCreateGasBStore_(options) {
+  privateDashboardBGate_(options);
+  const owner=privateDashboardAuthOwnerConfig_().owner, props=privateDashboardProperties();
+  function locked() { if (!privateDashboardRosterLockDepth_) throw new Error('B_OWNER_LOCK_REQUIRED'); }
+  function load(key, fields) {
+    locked();const text=props.getProperty(key);
+    if (!text) throw new Error('B_STATE_REQUIRED');
+    const value=privateDashboardGasAuthParse_(text);
+    privateDashboardGasAuthJson_(value,8000);privateDashboardBShape_(value,fields);
+    if(value.v!==1 || value.owner!==owner)throw new Error('B_STATE_INVALID');
+    return value;
+  }
+  function write(key,value) {
+    locked();const text=privateDashboardGasAuthJson_(value,8000);
+    props.setProperty(key,text);
+    if(props.getProperty(key)!==text)throw new Error('B_PERSISTENCE_FAILED');
+  }
+  function revision(value) { privateDashboardBInt_(value.revision,0);value.revision++;privateDashboardBInt_(value.revision,0); }
+  function config() {
+    const value=load(PRIVATE_DASHBOARD_B_CONFIG_KEY_,['v','owner','epoch','verifier','authority']);
+    privateDashboardBInt_(value.epoch,1);
+    privateDashboardBShape_(value.verifier,['algorithm','iterations','salt','digest']);
+    if(value.verifier.algorithm!=='PBKDF2-HMAC-SHA256' || value.verifier.iterations!==600000 ||
+      typeof value.verifier.salt!=='string' || !/^(?:[a-f0-9]{2}){16,32}$/.test(value.verifier.salt))throw new Error('B_CONFIG_INVALID');
+    privateDashboardBDigestShape_(value.verifier.digest);
+    const a=value.authority;privateDashboardBShape_(a,['version','sourceHash','effectiveAt','validUntil','members']);
+    privateDashboardBInt_(a.version,1);privateDashboardBDigestShape_(a.sourceHash);
+    privateDashboardBInt_(a.effectiveAt,0);privateDashboardBInt_(a.validUntil,0);
+    if(a.validUntil<=a.effectiveAt || !a.members || Array.isArray(a.members) || typeof a.members!=='object' ||
+      !Object.keys(a.members).length || Object.keys(a.members).length>64)throw new Error('B_CONFIG_INVALID');
+    Object.keys(a.members).forEach(function(id) {
+      if(privateDashboardCleanEmployeeId(id)!==id || PRIVATE_DASHBOARD_B_STORES_.indexOf(a.members[id])<0)throw new Error('B_CONFIG_INVALID');
+    });
+    // Approved authority must contain all nine stores, never a truncated source.
+    if(PRIVATE_DASHBOARD_B_STORES_.some(function(store) { return !Object.keys(a.members).some(function(id) { return a.members[id]===store; }); }))throw new Error('B_CONFIG_INVALID');
+    value.fingerprint=privateDashboardGasAuthDigest_(JSON.stringify([value.epoch,value.verifier,a.version,a.sourceHash,a.effectiveAt,a.validUntil,
+      Object.keys(a.members).sort().map(function(id) { return [id,a.members[id]]; })]));
+    return value;
+  }
+  function bindings() {
+    const value=load(PRIVATE_DASHBOARD_B_BIND_KEY_,['v','owner','revision','bindings']);
+    privateDashboardBInt_(value.revision,0);
+    if(!value.bindings || Array.isArray(value.bindings) || typeof value.bindings!=='object' || Object.keys(value.bindings).length>64)throw new Error('B_STATE_INVALID');
+    Object.keys(value.bindings).forEach(function(id) {
+      const b=value.bindings[id];
+      if(privateDashboardCleanEmployeeId(id)!==id || !Array.isArray(b) || b.length!==2)throw new Error('B_STATE_INVALID');
+      privateDashboardBDigestShape_(b[0]);privateDashboardBInt_(b[1],1);
+    });
+    return value;
+  }
+  function sessions(bucket) {
+    if(!/^[a-f0-9]$/.test(bucket))throw new Error('B_STATE_INVALID');
+    const value=load(PRIVATE_DASHBOARD_B_SESSION_PREFIX_+bucket,['v','owner','revision','sessions','tombstones']);
+    privateDashboardBInt_(value.revision,0);
+    if(!Array.isArray(value.sessions) || value.sessions.length>12)throw new Error('B_STATE_INVALID');
+    const seen=new Set();
+    value.sessions.forEach(function(s) {
+      privateDashboardBShape_(s,['digest','employee','device','bindingVersion','nativeGeneration','epoch','configHash','idempotencyHash','nonceHash','mint','issuedAt','expiresAt','revoked']);
+      ['digest','device','configHash','idempotencyHash','nonceHash','mint'].forEach(function(key) { privateDashboardBDigestShape_(s[key]); });
+      if(privateDashboardCleanEmployeeId(s.employee)!==s.employee || privateDashboardGasAuthDigest_(s.employee)[0]!==bucket || seen.has(s.digest) || typeof s.revoked!=='boolean')throw new Error('B_STATE_INVALID');
+      seen.add(s.digest);['bindingVersion','epoch'].forEach(function(key) { privateDashboardBInt_(s[key],1); });
+      ['nativeGeneration','issuedAt','expiresAt'].forEach(function(key) { privateDashboardBInt_(s[key],0); });
+      if(s.expiresAt-s.issuedAt!==1800000)throw new Error('B_STATE_INVALID');
+    });
+    if(!Array.isArray(value.tombstones) || value.tombstones.length>32 || value.tombstones.length+value.sessions.length>32)throw new Error('B_STATE_INVALID');
+    const tombstones=new Set();
+    value.tombstones.forEach(function(t) {
+      if(!Array.isArray(t) || t.length!==3 || privateDashboardCleanEmployeeId(t[0])!==t[0] ||
+        privateDashboardGasAuthDigest_(t[0])[0]!==bucket || tombstones.has(t[0]+'|'+t[1]))throw new Error('B_STATE_INVALID');
+      privateDashboardBDigestShape_(t[1]);privateDashboardBInt_(t[2],0);tombstones.add(t[0]+'|'+t[1]);
+    });
+    return value;
+  }
+  function limiter() {
+    const value=load(PRIVATE_DASHBOARD_B_LIMIT_KEY_,['v','owner','revision','start','total','employees','devices']);
+    ['revision','start','total'].forEach(function(key) { privateDashboardBInt_(value[key],0); });
+    ['employees','devices'].forEach(function(key) {
+      if(!value[key] || Array.isArray(value[key]) || typeof value[key]!=='object' || Object.keys(value[key]).length>30)throw new Error('B_STATE_INVALID');
+      Object.keys(value[key]).forEach(function(hash) { privateDashboardBDigestShape_(hash);privateDashboardBInt_(value[key][hash],1); });
+    });
+    if(value.total>30)throw new Error('B_STATE_INVALID');return value;
+  }
+  function admit(id,device,now) {
+    const value=limiter();
+    if(now<value.start)throw new Error('B_CLOCK_INVALID');
+    if(now-value.start>=60000){value.start=now;value.total=0;value.employees={};value.devices={};}
+    if(value.total>=30)return {allowed:false,delay:0};
+    const employee=privateDashboardGasAuthDigest_(id);
+    value.total++;value.employees[employee]=(value.employees[employee]||0)+1;value.devices[device]=(value.devices[device]||0)+1;
+    const allowed=value.employees[employee]<=6 && value.devices[device]<=12;
+    revision(value);write(PRIVATE_DASHBOARD_B_LIMIT_KEY_,value);
+    return {allowed:allowed,delay:Math.min(1000,(Math.max(value.employees[employee],value.devices[device])-1)*75)};
+  }
+  return Object.freeze({config:config,bindings:bindings,sessions:sessions,limiter:limiter,admit:admit,
+    validateAll:function() { config();bindings();limiter();'0123456789abcdef'.split('').forEach(sessions); },
+    saveBindings:function(value) {revision(value);write(PRIVATE_DASHBOARD_B_BIND_KEY_,value);},
+    saveSessions:function(bucket,value) {revision(value);write(PRIVATE_DASHBOARD_B_SESSION_PREFIX_+bucket,value);}});
+}
+
+// GAS owner endpoint. Original A routes remain separate; B cannot invoke admin,
+// phone-stock, 3C, WORK, arbitrary readers or caller-selected roles/resources.
+function privateDashboardBStrictNative_(id,config,now) {
+  if(now<config.authority.effectiveAt || now>=config.authority.validUntil || !Object.prototype.hasOwnProperty.call(config.authority.members,id))throw new Error('B_ELIGIBILITY_DENIED');
+  const sheet=privateDashboardRoster().getSheetByName(PRIVATE_DASHBOARD_USERS_SHEET);
+  if(!sheet || sheet.getLastColumn()!==PRIVATE_DASHBOARD_USERS_HEADERS.length ||
+    sheet.getRange(1,1,1,PRIVATE_DASHBOARD_USERS_HEADERS.length).getValues()[0].join('|')!==PRIVATE_DASHBOARD_USERS_HEADERS.join('|'))throw new Error('B_NATIVE_SCHEMA_INVALID');
+  const count=sheet.getLastRow()-1;
+  if(count<1 || count>10000)throw new Error('B_NATIVE_SCHEMA_INVALID');
+  const rows=sheet.getRange(2,1,count,5).getValues().filter(function(row) { return String(row[0]||'').trim().toUpperCase()===id; });
+  if(rows.length!==1 || rows[0][0]!==id || rows[0][4]!=='active')throw new Error('B_ELIGIBILITY_DENIED');
+  const store=String(rows[0][2]||'').trim().replace(/\s+/g,'').replace(/^台灣大哥大數位生活台北/,'').replace(/^台灣大哥大台北/,'').replace(/^台北/,'');
+  if(store!==config.authority.members[id])throw new Error('B_ELIGIBILITY_DENIED');
+  return {maskedName:String(rows[0][1]||''),store:store,role:'employee',isTrusted:false};
+}
+
+function privateDashboardBPayload_(input) {
+  if(!input || Array.isArray(input) || typeof input!=='object')throw new Error('B_REQUEST_INVALID');
+  const fields={employee_status:['action'],employee_login:['action','employeeId','deviceId','track','password','sessionNonce','idempotencyKey'],
+    employee_session:['action','deviceId','token'],employee_logout:['action','deviceId','token'],
+    employee_private_read:['action','deviceId','token'],employee_kpi_read:['action','deviceId','token']};
+  if(!Object.prototype.hasOwnProperty.call(fields,input.action))throw new Error('B_REQUEST_INVALID');
+  privateDashboardBShape_(input,fields[input.action]);
+  if(input.action==='employee_status')return input;
+  if(typeof input.deviceId!=='string' || privateDashboardCleanDeviceId(input.deviceId)!==input.deviceId)throw new Error('B_REQUEST_INVALID');
+  if(input.action==='employee_login') {
+    if(input.track!=='password-bound' || typeof input.employeeId!=='string' || privateDashboardCleanEmployeeId(input.employeeId)!==input.employeeId ||
+      typeof input.password!=='string' || input.password.length>1024 || typeof input.sessionNonce!=='string' || !/^[a-f0-9]{64}$/.test(input.sessionNonce) ||
+      typeof input.idempotencyKey!=='string' || !/^[A-Za-z0-9_-]{20,80}$/.test(input.idempotencyKey))throw new Error('B_REQUEST_INVALID');
+  } else if(typeof input.token!=='string' || !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(input.token))throw new Error('B_REQUEST_INVALID');
+  return input;
+}
+
+function privateDashboardBToken_(id,device,bindingVersion,generation,config,nonce,mint) {
+  // Entropy comes from the client's 32-byte WebCrypto nonce; GAS UUID is only
+  // a mint uniqueness marker. No raw nonce or token is stored on the owner.
+  return 'B1_'+privateDashboardGasAuthDigest_(id)[0]+'_'+privateDashboardGasAuthDigest_(JSON.stringify([
+    nonce,mint,id,device,bindingVersion,generation,config.epoch,config.fingerprint]));
+}
+
+function privateDashboardCreateGasB_(options) {
+  const synthetic=privateDashboardBGate_(options), store=privateDashboardCreateGasBStore_(options);
+  const provider=options.provider || privateDashboardAuthNativeProvider_();
+  const now=options.now || function() { return Date.now(); };
+  // Only explicit local synthetic hosts may replace KDF to isolate races.
+  const verify=synthetic && options.verify ? options.verify : privateDashboardBVerifyPassword_;
+  const sleep=synthetic && options.sleep ? options.sleep : function(ms) { if(ms)Utilities.sleep(ms); };
+  function transaction(run) { return privateDashboardRosterTransaction_(run); }
+  function retire(sessions,predicate,time) {
+    sessions.tombstones=sessions.tombstones.filter(function(t) { return t[2]>time; });
+    sessions.sessions=sessions.sessions.filter(function(s) {
+      if(s.expiresAt<=time)return false;
+      if(!predicate(s))return true;
+      if(!sessions.tombstones.some(function(t) { return t[0]===s.employee && t[1]===s.idempotencyHash; })) {
+        if(sessions.tombstones.length>=32)throw new Error('B_CAPACITY');
+        sessions.tombstones.push([s.employee,s.idempotencyHash,s.expiresAt]);
+      }
+      return false;
+    });
+  }
+  function status() {
+    return transaction(function() { store.validateAll();const c=store.config(),t=now();
+      if(t<c.authority.effectiveAt || t>=c.authority.validUntil)throw new Error('B_ELIGIBILITY_DENIED');
+      return {status:'ok',enabled:true,passwordAvailable:true}; });
+  }
+  function login(p) {
+    const id=p.employeeId,device=privateDashboardGasAuthDigest_(p.deviceId);
+    const captured=transaction(function() {
+      const config=store.config(),admission=store.admit(id,device,now());
+      if(!admission.allowed)throw new Error('B_RATE_DENIED');
+      let snapshot=null;
+      try {privateDashboardBStrictNative_(id,config,now());snapshot=provider.capture(id);}catch(_){/* Same KDF for an unknown/ineligible canonical identity. */}
+      return {config:config,snapshot:snapshot,delay:admission.delay};
+    });
+    sleep(captured.delay);
+    const verified=verify(p.password,captured.config.verifier);
+    if(!verified || !captured.snapshot)throw new Error('B_LOGIN_DENIED');
+    return provider.commit(captured.snapshot,function() {
+      const config=store.config();
+      if(config.fingerprint!==captured.config.fingerprint)throw new Error('B_CONFIG_CHANGED');
+      privateDashboardBStrictNative_(id,config,now());
+      const bindingState=store.bindings(),existing=bindingState.bindings[id];
+      if(existing && existing[0]!==device || Object.keys(bindingState.bindings).some(function(other) { return other!==id && bindingState.bindings[other][0]===device; }))throw new Error('B_BINDING_DENIED');
+      if(!existing && Object.keys(bindingState.bindings).length>=64)throw new Error('B_CAPACITY');
+      const binding=existing || [device,1],generation=provider.currentGeneration(id),bucket=privateDashboardGasAuthDigest_(id)[0];
+      const sessions=store.sessions(bucket),time=now(),idem=privateDashboardGasAuthDigest_(p.idempotencyKey),nonce=privateDashboardGasAuthDigest_(p.sessionNonce);
+      retire(sessions,function(s) { return s.revoked || s.epoch!==config.epoch || s.configHash!==config.fingerprint || s.employee===id && s.nativeGeneration!==generation; },time);
+      if(sessions.tombstones.some(function(t) { return t[0]===id && t[1]===idem; }))throw new Error('B_LOGIN_DENIED');
+      const prior=sessions.sessions.filter(function(s) { return s.employee===id && s.idempotencyHash===idem; });
+      if(prior.length>1)throw new Error('B_STATE_INVALID');
+      if(prior.length) {
+        const s=prior[0];
+        const token=privateDashboardBToken_(id,device,binding[1],generation,config,p.sessionNonce,s.mint);
+        if(s.revoked || s.nonceHash!==nonce || s.device!==device || s.bindingVersion!==binding[1] || s.nativeGeneration!==generation ||
+          s.epoch!==config.epoch || s.configHash!==config.fingerprint || time<s.issuedAt || s.digest!==privateDashboardGasAuthDigest_(token))throw new Error('B_LOGIN_DENIED');
+        return {status:'ok',token:token,expiresAt:s.expiresAt,trustSource:'password-bound'};
+      }
+      // Reserve a durable tombstone slot for every active session, so even a
+      // full ledger can invalidate every already-issued token on logout.
+      if(sessions.sessions.length>=12 || sessions.sessions.length+sessions.tombstones.length>=32 ||
+        sessions.sessions.filter(function(s) { return s.employee===id; }).length>=3)throw new Error('B_CAPACITY');
+      const mint=privateDashboardGasAuthDigest_(JSON.stringify([Utilities.getUuid(),time,sessions.revision+1])),token=privateDashboardBToken_(id,device,binding[1],generation,config,p.sessionNonce,mint);
+      const record={digest:privateDashboardGasAuthDigest_(token),employee:id,device:device,bindingVersion:binding[1],nativeGeneration:generation,
+        epoch:config.epoch,configHash:config.fingerprint,idempotencyHash:idem,nonceHash:nonce,mint:mint,issuedAt:time,expiresAt:time+1800000,revoked:false};
+      if(sessions.sessions.some(function(s) {return s.digest===record.digest;}))throw new Error('B_STATE_INVALID');
+      bindingState.bindings[id]=binding;sessions.sessions.push(record);
+      // Check both capacities before either write. A partial write returns no
+      // token; existing durable binding is never reset or moved on retry.
+      privateDashboardBInt_(sessions.revision+1,0);
+      privateDashboardGasAuthJson_(Object.assign({},sessions,{revision:sessions.revision+1}),8000);
+      if(!existing) {
+        privateDashboardBInt_(bindingState.revision+1,0);
+        privateDashboardGasAuthJson_(Object.assign({},bindingState,{revision:bindingState.revision+1}),8000);
+      }
+      if(!existing)store.saveBindings(bindingState);
+      store.saveSessions(bucket,sessions);
+      return {status:'ok',token:token,expiresAt:record.expiresAt,trustSource:'password-bound'};
+    });
+  }
+  function sessionOperation(p) {
+    return transaction(function() {
+      const bucket=p.token.split('_')[1],sessions=store.sessions(bucket),hash=privateDashboardGasAuthDigest_(p.token),device=privateDashboardGasAuthDigest_(p.deviceId);
+      const matches=sessions.sessions.filter(function(s) { return s.digest===hash; });
+      if(matches.length!==1 || matches[0].device!==device)throw new Error('B_SESSION_DENIED');
+      const s=matches[0],time=now();
+      if(s.revoked || time<s.issuedAt || time>=s.expiresAt)throw new Error('B_SESSION_DENIED');
+      // Logout may invalidate the matching session after an authority change;
+      // it still requires both its token and original device proof.
+      if(p.action==='employee_logout') {retire(sessions,function(record) { return record.digest===s.digest; },time);store.saveSessions(bucket,sessions);return {status:'ok'};}
+      const config=store.config(),bindings=store.bindings(),binding=bindings.bindings[s.employee];
+      const profile=privateDashboardBStrictNative_(s.employee,config,time);
+      if(!binding || binding[0]!==device || binding[1]!==s.bindingVersion || config.epoch!==s.epoch || config.fingerprint!==s.configHash)throw new Error('B_SESSION_DENIED');
+      return provider.withEligibility(s.employee,function() {
+        if(provider.currentGeneration(s.employee)!==s.nativeGeneration)throw new Error('B_SESSION_DENIED');
+        if(p.action==='employee_session')return {status:'ok',expiresAt:s.expiresAt,trustSource:'password-bound'};
+        let result;
+        if(p.action==='employee_private_read')result={snapshot:privateDashboardSnapshot()};
+        else if(p.action==='employee_kpi_read') {
+          const file=kpiCalcLatestDataFile();if(!file)throw new Error('B_DATA_UNAVAILABLE');
+          const data=JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+          if(!data || !data.meta || !data.stores || !data.persons)throw new Error('B_DATA_INVALID');
+          result={data:data};
+        } else throw new Error('B_REQUEST_INVALID');
+        // Use the existing strict private-result validator under the same lock;
+        // no password/token/device proof may leak through a data projection.
+        result.profile=profile;
+        result=privateDashboardGasRpcResult_(p.action==='employee_private_read'?'privateDashboardAccess':'kpiCalcAccess',result,
+          {deviceId:p.deviceId,adminSecret:p.token,bootstrapCode:''},'privateDashboardBRead_');
+        return Object.assign({status:'ok',trustSource:'password-bound'},result);
+      });
+    });
+  }
+  function handle(text) {
+    try {
+      if(typeof reportUploadIsUploadDeployment_==='function' && reportUploadIsUploadDeployment_())throw new Error('B_REQUEST_INVALID');
+      if(typeof text!=='string' || text.length>16384)throw new Error('B_REQUEST_INVALID');
+      const p=privateDashboardBPayload_(privateDashboardGasAuthParse_(text));
+      return p.action==='employee_status'?status():p.action==='employee_login'?login(p):sessionOperation(p);
+    } catch (_) { return {status:'error',code:'B_AUTH_DENIED'}; }
+  }
+  return Object.freeze({handle:handle});
+}
+
+function privateDashboardGasBMaybePost_(event) {
+  if(!event || !event.postData || typeof event.postData.contents!=='string')return null;
+  let input;
+  try {input=JSON.parse(event.postData.contents);}catch(_){return null;}
+  if(!input || typeof input.action!=='string' || input.action.indexOf('employee_')!==0)return null;
+  let result={status:'error',code:'B_AUTH_DENIED'};
+  try {
+    if(!/^text\/plain(?:;\s*charset=utf-8)?$/i.test(String(event.postData.type||'')) || event.postData.contents.length>16384 ||
+      typeof reportUploadIsUploadDeployment_==='function' && reportUploadIsUploadDeployment_())throw new Error('B_REQUEST_INVALID');
+    const p=privateDashboardBPayload_(privateDashboardGasAuthParse_(event.postData.contents));
+    if(p.action==='employee_status' && (PRIVATE_DASHBOARD_GAS_PASSWORD_ENABLED_!==true || PRIVATE_DASHBOARD_GAS_AUTH_RELEASE_ENABLED_!==true))result={status:'ok',enabled:false,passwordAvailable:false};
+    else result=privateDashboardCreateGasB_({}).handle(event.postData.contents);
+  } catch(_){/* Never expose exceptions, identity, source or credentials. */}
+  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
 }
