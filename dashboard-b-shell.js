@@ -10,12 +10,12 @@ let legacyObserver;
 // Opt-in, bounded timing diagnostics. Only fixed operation labels, durations
 // and counts are kept; never record a request body, URL, identity or response.
 const timingKey='north12b_loading_timings_v1',timingEnabledKey='north12b_loading_timings_enabled';
-let timings=[],timingEnabled=false,timingOutput,timingDetails;
+let timings=[],timingEnabled=false,timingOutput,timingSummary,timingDetails;
 try{timingEnabled=new URLSearchParams(scope.location.search).get('timing')==='1'||scope.localStorage.getItem(timingEnabledKey)==='1';
  if(timingEnabled){scope.localStorage.setItem(timingEnabledKey,'1');const saved=JSON.parse(scope.sessionStorage.getItem(timingKey)||'[]');
   if(Array.isArray(saved))timings=saved.filter(row=>validTiming(row)).slice(-100).map(({name,ms,at,outcome})=>({name,ms,at,outcome}));}}
 catch{}
-function validTiming(row){return row && /^(request:employee_(status|login|session|private_read|kpi_read|phone_resume|phone_enroll|phone_forget|logout)|phase:(login|restore|phone-resume|validate|data|render|ready)|tab:(home|battle|report|schedule|patrol|me))$/.test(row.name) &&
+function validTiming(row){return row && /^(request:employee_(status|login|session|private_read|kpi_read|phone_resume|phone_enroll|phone_forget|logout)|server:employee_(status|login|session|private_read|kpi_read|phone_resume|phone_enroll|phone_forget|logout):(lockWait|flush|rosterLookup|privateDrive|kpiLocate|strictNative|resultValidation|kpiBlob|request)|session:(missing|epoch|device|expired|invalid|restored)|lifecycle:(pagehide|pageshow|hidden|visible)|phase:(login|restore|phone-resume|validate|data|render|ready)|tab:(home|battle|report|schedule|patrol|me))$/.test(row.name) &&
  Number.isFinite(row.ms)&&row.ms>=0&&row.ms<600000&&Number.isFinite(row.at)&&row.at>0&&['ok','error'].includes(row.outcome);}
 function timing(name,ms,outcome='ok'){
  const row={name,ms:Math.round(ms),at:Date.now(),outcome};if(!validTiming(row))return;
@@ -27,13 +27,24 @@ function paint(bundle){const start=performance.now();host.accept(bundle);timing(
 function recordReady(start,expected){scope.requestAnimationFrame(()=>scope.requestAnimationFrame(()=>{
  if(expected===epoch && active && confirmed && !document.hidden)timing('phase:ready',performance.now()-start);
 }));}
-function renderTiming(){if(timingOutput)timingOutput.textContent=JSON.stringify({version:'loading-20261011-1',requests:timings.filter(r=>r.name.startsWith('request:')).length,events:timings},null,2);}
+function renderTiming(){
+ const server={},pending={};
+ for(const row of timings){const match=/^server:(employee_[a-z_]+):([a-zA-Z]+)$/.exec(row.name);if(!match)continue;
+  const [,action,name]=match;pending[action]??={};pending[action][name]=(pending[action][name]||0)+row.ms;
+  if(name==='request'){server[action]=pending[action];pending[action]={};}
+ }
+ if(timingSummary)timingSummary.textContent='版本 loading-20261011-2 / 請求 '+timings.filter(r=>r.name.startsWith('request:')).length+'\n'+
+  Object.entries(server).map(([action,stages])=>action+': '+Object.entries(stages).map(([name,ms])=>name+'='+ms+'ms').join(', ')).join('\n')+'\n'+
+  timings.filter(r=>r.name.startsWith('phase:')).slice(-7).map(r=>r.name+'='+r.ms+'ms').join(' / ');
+ if(timingOutput)timingOutput.textContent=JSON.stringify({version:'loading-20261011-2',requests:timings.filter(r=>r.name.startsWith('request:')).length,server,events:timings},null,2);
+}
 function mountTiming(){if(timingOutput)return;const details=document.createElement('details');details.id='loading-timings';timingDetails=details;details.hidden=!timingEnabled;
  details.style.cssText='margin:16px 20px;max-width:100%;font:12px system-ui';const summary=document.createElement('summary');summary.textContent='載入測試紀錄（僅耗時與請求次數）';
  const reset=document.createElement('button');reset.type='button';reset.textContent='清除計時紀錄';reset.onclick=()=>{timings=[];try{scope.sessionStorage.removeItem(timingKey);}catch{}renderTiming();};
  const copy=document.createElement('button');copy.type='button';copy.textContent='複製計時紀錄';copy.onclick=async()=>{try{await scope.navigator.clipboard.writeText(timingOutput.textContent);copy.textContent='已複製';}catch{copy.textContent='請選取下方紀錄複製';}};
  const stop=document.createElement('button');stop.type='button';stop.textContent='停止計時';stop.onclick=()=>{timingEnabled=false;details.hidden=true;try{scope.localStorage.removeItem(timingEnabledKey);scope.sessionStorage.removeItem(timingKey);}catch{}};
- timingOutput=document.createElement('pre');timingOutput.style.cssText='max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-all';details.append(summary,reset,copy,stop,timingOutput);panel.after(details);renderTiming();}
+ timingSummary=document.createElement('pre');timingSummary.style.cssText='white-space:pre-wrap;word-break:break-all';
+ timingOutput=document.createElement('pre');timingOutput.style.cssText='max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-all';details.append(summary,reset,copy,stop,timingSummary,timingOutput);panel.after(details);renderTiming();}
 function message(text){if(panel)panel.querySelector('[data-b-message]').textContent=text;}
 function state(name){if(panel){panel.dataset.state=name;panel.querySelector('h2').textContent=name==='active'?(host?.ownerPhone&&client?.hasPhone()?'手機自動登入已啟用':'同仁專區已登入'):name==='checking'?'正在確認登入':name==='loading'?'正在登入這台裝置':(host?.ownerPhone?'首次驗證與手機綁定':'員編與密碼登入');panel.querySelector('[data-b-phone]').hidden=!(name==='active'&&host?.ownerPhone&&host.phoneEligible&&!client?.hasPhone());}}
 function markLegacyRoots(){
@@ -170,7 +181,7 @@ function navigateVerified(module){guarded=true;try{host.navigate(module);}finall
 function configure(value){host=value;if(ready)mount();}
 function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
  let storage,phoneStorage;try{storage=scope.sessionStorage;if(host.ownerPhone)phoneStorage=scope.localStorage;}catch{}
- client=createDashboardBClient(OWNER,{storage,phoneStorage,onRequest:row=>timing('request:'+row.action,row.ms,row.outcome),logoutEpoch:()=>{try{return JSON.parse(scope.localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||'';}catch{return '';}}});panel=document.createElement('section');panel.id='dashboard-b-access';panel.setAttribute('aria-label','指定密碼登入');panel.dataset.state='locked';
+ client=createDashboardBClient(OWNER,{storage,phoneStorage,onRequest:row=>timing('request:'+row.action,row.ms,row.outcome),onServerTiming:row=>timing('server:'+row.action+':'+row.name,row.ms),onSessionState:name=>timing('session:'+name,0),logoutEpoch:()=>{try{return JSON.parse(scope.localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||'';}catch{return '';}}});panel=document.createElement('section');panel.id='dashboard-b-access';panel.setAttribute('aria-label','指定密碼登入');panel.dataset.state='locked';
  panel.innerHTML=`<h2>員編與密碼登入</h2>
  <form data-b-form><label>員工編號<input data-b-employee required autocomplete="username" autocapitalize="characters" maxlength="12" placeholder="輸入員工編號"></label><label>指定密碼<input data-b-password required type="password" autocomplete="off" maxlength="1024" placeholder="輸入指定密碼"></label><button data-b-submit type="submit">登入這台裝置</button></form>
  <p data-b-message role="status">同仁首次登入會綁定這台裝置；已授權督導可跨裝置登入。</p>
@@ -221,13 +232,13 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
   event.preventDefault();event.stopImmediatePropagation();const target=event.target.closest(host.navigationSelector);
   if(await refresh()){guarded=true;try{target.click();}finally{guarded=false;}}
  },true);
- for(const name of ['focus','pageshow'])scope.addEventListener(name,()=>{if(document.hidden)return;if(active)void refresh();else void resume();});
- document.addEventListener('visibilitychange',()=>{if(!active)return;if(document.hidden){lastCheck=0;conceal(true);}else void refresh();});
+ for(const name of ['focus','pageshow'])scope.addEventListener(name,()=>{if(name==='pageshow')timing('lifecycle:pageshow',0);if(document.hidden)return;if(active)void refresh();else void resume();});
+ document.addEventListener('visibilitychange',()=>{timing(document.hidden?'lifecycle:hidden':'lifecycle:visible',0);if(!active)return;if(document.hidden){lastCheck=0;conceal(true);}else void refresh();});
  scope.setInterval(()=>{if(active && !document.hidden)void refresh();},60000);
  const portalRegistered=Boolean(scope.PortalLogout?.registerMemoryRevoker);
  if(portalRegistered)scope.PortalLogout.registerMemoryRevoker(transport=>logout('網站已登出；指定密碼畫面已清除。',transport));
  scope.addEventListener('portal-before-logout',()=>{if(portalRegistered)wipe('網站已登出。',false);else void logout('網站已登出；指定密碼畫面已清除。');});
- scope.addEventListener('pagehide',()=>{epoch++;active=false;confirmed=false;loading=false;checking=null;expiresAt=0;scope.clearTimeout(expiryTimer);client.suspend();host.clear();state('locked');});
+ scope.addEventListener('pagehide',()=>{timing('lifecycle:pagehide',0);epoch++;active=false;confirmed=false;loading=false;checking=null;expiresAt=0;scope.clearTimeout(expiryTimer);client.suspend();host.clear();state('locked');});
  mountTiming();void resume();
 }
 scope.DashboardB=Object.freeze({configure,active:()=>active,refresh,context:()=>epoch,metrics:()=>timings.map(row=>({...row})),recordTab:(name,ms)=>timing('tab:'+name,ms),leaveForA:async()=>{if(!DASHBOARD_B_CLIENT_ENABLED_)return;if(active || checking || loading)await logout('已返回原員編通道。');else{epoch++;client?.clear();}},clear:()=>wipe()});

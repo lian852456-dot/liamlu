@@ -5,15 +5,20 @@ function createDashboardBClient(ownerExecUrl, options={}) {
   const phoneStorage=options.phoneStorage,phoneKey='north12b_owner_phone_v1',phoneTtl=90*24*60*60*1000;
   let session=null,generation=0,expiresAt=0,lastDeviceId='',lastPhoneToken='';
   function removeSaved(){try{storage?.removeItem(storageKey);}catch{}}
+  function sessionState(name){try{options.onSessionState?.(name);}catch{}}
   function savedSession(deviceId){
+    let reason='invalid';
     try {
       const value=JSON.parse(storage?.getItem(storageKey)||'null');
-      if(!value)return null;
+      if(!value){sessionState('missing');return null;}
+      if(value.logoutEpoch!==(options.logoutEpoch?.()||'')){reason='epoch';throw Error('B_AUTH_DENIED');}
+      if(value.deviceId!==deviceId){reason='device';throw Error('B_AUTH_DENIED');}
+      if(Number.isSafeInteger(value.expiresAt)&&value.expiresAt<=Date.now()){reason='expired';throw Error('B_AUTH_DENIED');}
       if(value.v!==1 || value.owner!==ownerExecUrl || value.logoutEpoch!==(options.logoutEpoch?.()||'') || value.deviceId!==deviceId ||
         !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(value.token) || !Number.isSafeInteger(value.expiresAt) ||
         value.expiresAt<=Date.now() || value.expiresAt>Date.now()+1800000)throw Error('B_AUTH_DENIED');
-      return value;
-    }catch{removeSaved();return null;}
+      sessionState('restored');return value;
+    }catch{sessionState(reason);removeSaved();return null;}
   }
   const requests=new Set(),reads=new Map(),hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
   function removePhone(){try{phoneStorage?.removeItem(phoneKey);}catch{}}
@@ -35,7 +40,8 @@ function createDashboardBClient(ownerExecUrl, options={}) {
   function suspend(){generation++;session=null;expiresAt=0;reads.clear();for(const controller of requests)controller.abort();requests.clear();}
   function clear(){suspend();removeSaved();}
   async function post(payload,expected=generation,transport=fetch) {
-    const controller=new AbortController(),started=Date.now();let outcome='error';requests.add(controller);
+    const clock=()=>typeof performance==='object'?performance.now():Date.now();
+    const controller=new AbortController(),started=clock();let outcome='error';requests.add(controller);
     const timer=setTimeout(()=>controller.abort(),90000);
     try {
       const response=await transport(ownerExecUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),
@@ -43,9 +49,13 @@ function createDashboardBClient(ownerExecUrl, options={}) {
       if(!response.ok)throw new Error('B_SERVICE_UNAVAILABLE');const value=await response.json();
       if(expected!==generation)throw new Error('B_CONTEXT_CHANGED');
       if(controller.signal.aborted)throw new Error('B_TIMEOUT');
-      if(!value || value.status!=='ok')throw new Error('B_AUTH_DENIED');outcome='ok';return value;
+      if(!value || value.status!=='ok')throw new Error('B_AUTH_DENIED');
+      if(Array.isArray(value.serverTiming)&&value.serverTiming.length<=40){for(const row of value.serverTiming){
+        if(row && /^(lockWait|flush|rosterLookup|privateDrive|kpiLocate|strictNative|resultValidation|kpiBlob|request)$/.test(row.name) &&
+          Number.isFinite(row.ms)&&row.ms>=0&&row.ms<600000)try{options.onServerTiming?.({action:payload.action,name:row.name,ms:row.ms});}catch{}
+      }}outcome='ok';return value;
     } catch(error){if(expected!==generation)throw new Error('B_CONTEXT_CHANGED');if(controller.signal.aborted)throw new Error('B_TIMEOUT');throw error;}
-    finally {clearTimeout(timer);requests.delete(controller);try{options.onRequest?.({action:payload.action,ms:Date.now()-started,outcome});}catch{}}
+    finally {clearTimeout(timer);requests.delete(controller);try{options.onRequest?.({action:payload.action,ms:clock()-started,outcome});}catch{}}
   }
   function protectedPost(action) {
     if(reads.has(action))return reads.get(action);

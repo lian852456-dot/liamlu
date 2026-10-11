@@ -3245,12 +3245,12 @@ function privateDashboardRosterTransaction_(run) {
   privateDashboardRequireAuthOwner_();
   if (privateDashboardRosterLockDepth_) return run();
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  privateDashboardBMeasure_('lockWait', function() { lock.waitLock(10000); });
   privateDashboardRosterLockDepth_ = 1;
   try {
     return run();
   } finally {
-    try { SpreadsheetApp.flush(); }
+    try { privateDashboardBMeasure_('flush', function() { SpreadsheetApp.flush(); }); }
     finally {
       privateDashboardRosterLockDepth_ = 0;
       lock.releaseLock();
@@ -3351,6 +3351,7 @@ function setupPrivateDashboard() {
 }
 
 function privateDashboardUserByEmployeeId(employeeId) {
+  return privateDashboardBMeasure_('rosterLookup', function() {
   privateDashboardRequireAuthOwner_();
   const canonicalId = privateDashboardCleanEmployeeId(employeeId);
   if (employeeId !== canonicalId) throw new Error('名冊員編格式不一致，請管理者核對');
@@ -3364,6 +3365,7 @@ function privateDashboardUserByEmployeeId(employeeId) {
   }
   if (found.length > 1) throw new Error('名冊員編重複，請管理者核對');
   return { sheet: sheet, user: found.length ? found[0] : null };
+  });
 }
 
 function privateDashboardRequestBinding(payload) {
@@ -3449,11 +3451,13 @@ function privateDashboardLatestSnapshotFile_() {
 }
 
 function privateDashboardSnapshot() {
+  return privateDashboardBMeasure_('privateDrive', function() {
   const file = privateDashboardLatestSnapshotFile_();
   if (!file) throw new Error('今日私有戰情尚未更新');
   const snapshot = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
   return snapshot;
+  });
 }
 
 function privateDashboardAccess(payload) {
@@ -4510,6 +4514,7 @@ function kpiCalcAccess(payload) {
 // 以及外部工具（例如 AI 助手經 Drive 直接補檔）建立的 north12b-kpicalc-<日期>.json。
 // 一律取「最後更新時間最新」者，避免舊檔覆蓋新資料。
 function kpiCalcLatestDataFile() {
+  return privateDashboardBMeasure_('kpiLocate', function() {
   const files = privateDashboardFolder().getFiles();
   let best = null;
   while (files.hasNext()) {
@@ -4518,6 +4523,7 @@ function kpiCalcLatestDataFile() {
     if (!best || f.getLastUpdated() > best.getLastUpdated()) best = f;
   }
   return best;
+  });
 }
 
 function kpiCalcPublish(payload) {
@@ -7914,6 +7920,7 @@ function privateDashboardGasRpcPayload_(operation, input, originalRoute) {
 }
 
 function privateDashboardGasRpcResult_(operation, result, payload, hostResponseProfile) {
+  return privateDashboardBMeasure_('resultValidation', function() {
   if(hostResponseProfile!==undefined && hostResponseProfile!=='privateDashboardBRead_')throw new Error('AUTH_RESULT_INVALID');
   const spec = PRIVATE_DASHBOARD_GAS_RPC_SPECS_[operation];
   if (!result || Array.isArray(result) || typeof result !== 'object' ||
@@ -7935,6 +7942,7 @@ function privateDashboardGasRpcResult_(operation, result, payload, hostResponseP
   }
   inspect(result,0);
   return privateDashboardGasAuthParse_(privateDashboardGasAuthJson_(result,hostResponseProfile==='privateDashboardBRead_'?8*1024*1024+65536:privateDashboardGasRpcResponseLimit_(operation)),hostResponseProfile || operation);
+  });
 }
 
 function privateDashboardCreateGasAuthRpcOwner_(options) {
@@ -8720,6 +8728,7 @@ function privateDashboardBTrusted_(id) {
 }
 
 function privateDashboardBStrictNative_(id,config,now) {
+  return privateDashboardBMeasure_('strictNative', function() {
   const trusted=privateDashboardBTrusted_(id);
   if(now<config.authority.effectiveAt || now>=config.authority.validUntil || !trusted && !Object.prototype.hasOwnProperty.call(config.authority.members,id))throw new Error('B_ELIGIBILITY_DENIED');
   const sheet=privateDashboardRoster().getSheetByName(PRIVATE_DASHBOARD_USERS_SHEET);
@@ -8732,6 +8741,7 @@ function privateDashboardBStrictNative_(id,config,now) {
   const store=String(rows[0][2]||'').trim().replace(/\s+/g,'').replace(/^台灣大哥大數位生活台北/,'').replace(/^台灣大哥大台北/,'').replace(/^台北/,'');
   if(!trusted && store!==config.authority.members[id])throw new Error('B_ELIGIBILITY_DENIED');
   return {maskedName:String(rows[0][1]||''),store:store,role:'employee',isTrusted:false};
+  });
 }
 
 function privateDashboardBPayload_(input) {
@@ -8954,7 +8964,7 @@ function privateDashboardCreateGasB_(options) {
         if(p.action==='employee_private_read')result={snapshot:privateDashboardSnapshot()};
         else if(p.action==='employee_kpi_read') {
           const file=kpiCalcLatestDataFile();if(!file)throw new Error('B_DATA_UNAVAILABLE');
-          const data=JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+          const data=privateDashboardBMeasure_('kpiBlob', function() { return JSON.parse(file.getBlob().getDataAsString('UTF-8')); });
           if(!data || !data.meta || !data.stores || !data.persons)throw new Error('B_DATA_INVALID');
           result={data:data};
         } else throw new Error('B_REQUEST_INVALID');
@@ -9035,6 +9045,7 @@ function privateDashboardGasBMaybePost_(event) {
   try {input=JSON.parse(event.postData.contents);}catch(_){return null;}
   if(!input || typeof input.action!=='string' || input.action.indexOf('employee_')!==0)return null;
   let result={status:'error',code:'B_AUTH_DENIED'};
+  const timingStart=Date.now();privateDashboardBTimings_=[];
   try {
     if(!/^text\/plain(?:;\s*charset=utf-8)?$/i.test(String(event.postData.type||'')) || event.postData.contents.length>16384 ||
       typeof reportUploadIsUploadDeployment_==='function' && reportUploadIsUploadDeployment_())throw new Error('B_REQUEST_INVALID');
@@ -9042,5 +9053,16 @@ function privateDashboardGasBMaybePost_(event) {
     if(p.action==='employee_status' && (PRIVATE_DASHBOARD_GAS_PASSWORD_ENABLED_!==true || PRIVATE_DASHBOARD_GAS_AUTH_RELEASE_ENABLED_!==true))result={status:'ok',enabled:false,passwordAvailable:false};
     else result=privateDashboardCreateGasB_({}).handle(event.postData.contents);
   } catch(_){/* Never expose exceptions, identity, source or credentials. */}
+  const serverTiming=privateDashboardBTimings_;privateDashboardBTimings_=null;
+  if(result.status==='ok'){serverTiming.push({name:'request',ms:Date.now()-timingStart});result.serverTiming=serverTiming.slice(0,40);}
   return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Per-execution diagnostics: fixed labels and durations only, no identities or data.
+let privateDashboardBTimings_=null;
+function privateDashboardBMeasure_(name,run) {
+  if(!privateDashboardBTimings_)return run();
+  const started=Date.now();
+  try{return run();}
+  finally{if(privateDashboardBTimings_.length<39)privateDashboardBTimings_.push({name:name,ms:Date.now()-started});}
 }
