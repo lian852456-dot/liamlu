@@ -15,7 +15,7 @@ try{timingEnabled=new URLSearchParams(scope.location.search).get('timing')==='1'
  if(timingEnabled){scope.localStorage.setItem(timingEnabledKey,'1');const saved=JSON.parse(scope.sessionStorage.getItem(timingKey)||'[]');
   if(Array.isArray(saved))timings=saved.filter(row=>validTiming(row)).slice(-100).map(({name,ms,at,outcome})=>({name,ms,at,outcome}));}}
 catch{}
-function validTiming(row){return row && /^(request:employee_(status|login|session|private_read|kpi_read|phone_resume|phone_enroll|phone_forget|logout)|server:employee_(status|login|session|private_read|kpi_read|phone_resume|phone_enroll|phone_forget|logout):(lockWait|flush|rosterLookup|privateDrive|kpiLocate|strictNative|resultValidation|kpiBlob|request)|session:(missing|epoch|device|expired|invalid|restored)|lifecycle:(pagehide|pageshow|hidden|visible)|phase:(login|restore|phone-resume|validate|data|render|ready)|tab:(home|battle|report|schedule|patrol|me))$/.test(row.name) &&
+function validTiming(row){return row && /^(request:employee_(status|login|session|private_read|kpi_read|dashboard_read|phone_resume|phone_enroll|phone_forget|logout)|server:employee_(status|login|session|private_read|kpi_read|dashboard_read|phone_resume|phone_enroll|phone_forget|logout):(lockWait|flush|rosterLookup|privateDrive|kpiLocate|strictNative|resultValidation|kpiBlob|request)|session:(missing|epoch|device|expired|invalid|restored)|lifecycle:(pagehide|pageshow|hidden|visible)|phase:(login|restore|phone-resume|validate|data|render|ready)|tab:(home|battle|report|schedule|patrol|me))$/.test(row.name) &&
  Number.isFinite(row.ms)&&row.ms>=0&&row.ms<600000&&Number.isFinite(row.at)&&row.at>0&&['ok','error'].includes(row.outcome);}
 function timing(name,ms,outcome='ok'){
  const row={name,ms:Math.round(ms),at:Date.now(),outcome};if(!validTiming(row))return;
@@ -33,10 +33,10 @@ function renderTiming(){
   const [,action,name]=match;pending[action]??={};pending[action][name]=(pending[action][name]||0)+row.ms;
   if(name==='request'){server[action]=pending[action];pending[action]={};}
  }
- if(timingSummary)timingSummary.textContent='版本 loading-20261011-2 / 請求 '+timings.filter(r=>r.name.startsWith('request:')).length+'\n'+
+ if(timingSummary)timingSummary.textContent='版本 loading-20261011-3 / 請求 '+timings.filter(r=>r.name.startsWith('request:')).length+'\n'+
   Object.entries(server).map(([action,stages])=>action+': '+Object.entries(stages).map(([name,ms])=>name+'='+ms+'ms').join(', ')).join('\n')+'\n'+
   timings.filter(r=>r.name.startsWith('phase:')).slice(-7).map(r=>r.name+'='+r.ms+'ms').join(' / ');
- if(timingOutput)timingOutput.textContent=JSON.stringify({version:'loading-20261011-2',requests:timings.filter(r=>r.name.startsWith('request:')).length,server,events:timings},null,2);
+ if(timingOutput)timingOutput.textContent=JSON.stringify({version:'loading-20261011-3',requests:timings.filter(r=>r.name.startsWith('request:')).length,server,events:timings},null,2);
 }
 function mountTiming(){if(timingOutput)return;const details=document.createElement('details');details.id='loading-timings';timingDetails=details;details.hidden=!timingEnabled;
  details.style.cssText='margin:16px 20px;max-width:100%;font:12px system-ui';const summary=document.createElement('summary');summary.textContent='載入測試紀錄（僅耗時與請求次數）';
@@ -115,15 +115,16 @@ async function refresh(allowPhone=true,forceData=false){
   const needsData=!host.sessionOnly && (!confirmed || forceData) && !cached;
   // A protected read already performs the complete server-side session,
   // eligibility, revocation, expiry and device check. Cache-only/focus paths
-  // still require a fresh server validation; owner-phone needs its eligibility.
-  const validation=(!needsData || host.ownerPhone)?phase('validate',()=>client.validate()):Promise.resolve(null);
-  const data=needsData?phase('data',()=>Promise.all([client.read('private'),client.read('kpi')])):Promise.resolve(null);
+  // still require a fresh server validation. The combined read returns the
+  // same fixed deadline and primary-owner eligibility under that authorization.
+  const validation=!needsData?phase('validate',()=>client.validate()):Promise.resolve(null);
+  const data=needsData?phase('data',()=>client.readBundle()):Promise.resolve(null);
   stage=needsData?'read':'validate';
-  const [lease,results]=await Promise.all([validation,data]);
+  const [validated,bundle]=await Promise.all([validation,data]),lease=validated||bundle;
   if(expected!==epoch || !active)return false;
   if(expiresAt<=Date.now() || lease && lease.expiresAt!==expiresAt)throw Error('B_AUTH_DENIED');
   if(lease)host.phoneEligible=lease.phoneEligible===true;
-  if(results){const [privateResult,kpiResult]=results;checkProfile(privateResult);checkProfile(kpiResult);
+  if(bundle){const {privateResult,kpiResult}=bundle;checkProfile(privateResult);checkProfile(kpiResult);
    paint({privateResult,kpiResult});saveDataCache(privateResult,kpiResult);
   }else if(!confirmed){
    if(host.sessionOnly)paint({lease});

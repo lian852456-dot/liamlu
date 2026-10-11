@@ -114,6 +114,12 @@ function createDashboardBClient(ownerExecUrl, options={}) {
       catch{clear();removePhone();try{await post({action:'employee_phone_forget',deviceId,phoneToken:p.phoneToken},generation);}finally{lastPhoneToken='';}throw Error('B_STORAGE_UNAVAILABLE');}
     },
     async read(kind) {if(!['private','kpi'].includes(kind))throw new Error('B_AUTH_DENIED');return protectedPost(kind==='private'?'employee_private_read':'employee_kpi_read');},
+    async readBundle() {
+      const result=await protectedPost('employee_dashboard_read');
+      if(result.expiresAt!==expiresAt || result.trustSource!=='password-bound' || typeof result.phoneEligible!=='boolean' ||
+        result.privateResult?.status!=='ok' || result.kpiResult?.status!=='ok')throw new Error('B_AUTH_DENIED');
+      return result;
+    },
     validate:()=>protectedPost('employee_session'),
     restore(deviceId){suspend();lastDeviceId=deviceId;const value=savedSession(deviceId);if(!value)return null;session={deviceId:value.deviceId,token:value.token};expiresAt=value.expiresAt;lastPhoneToken=savedPhone(deviceId)?.phoneToken||'';return {expiresAt};},
     suspend,
