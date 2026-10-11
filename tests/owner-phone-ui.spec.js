@@ -2,6 +2,15 @@
 const {test,expect}=require('@playwright/test');
 const fs=require('fs');
 const BASE=process.env.TEST_BASE_URL||'http://127.0.0.1:8875/',PHONE='north12b_owner_phone_v1';
+const REPORT_STORES=['通化','酒泉','台北三創','萬大','六張犁','復興南','永吉','大稻埕','杭州南'];
+const taipeiDate=(offset=0)=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(Date.now()+offset*86400000));
+function ownerReportsResult(){
+ const today=taipeiDate(),yesterday=taipeiDate(-1),segment=(date,part)=>{
+  const updatedAt=`${date}T${part===16?'16:05':'21:05'}:00+08:00`;
+  return {date,segment:part,reportResult:{status:'ok',data:Object.fromEntries(REPORT_STORES.map(store=>[store,{savedAt:updatedAt}])),summary:{date,segment:part,semantics:'formal-index-summary-v1',totalStores:9,completedStores:9,missingStores:[],updatedAt,metrics:{},stores:REPORT_STORES.map(name=>({name,reported:true,reportedAt:updatedAt,metrics:{},storeFeedback:{}}))}},peopleResult:{status:'ok',data:{}}};
+ };
+ return {schema:'daily-report-bundle-v1',date:today,yesterday,segments:[segment(today,16),segment(today,21),segment(yesterday,21)]};
+}
 async function setup(context,{owner=true}={}){
  let grant='',revoked=false,seq=0;const calls=[],errors=[];
  const expiry=()=>Date.now()+1700000;
@@ -20,6 +29,10 @@ async function setup(context,{owner=true}={}){
   else if(p.action==='employee_phone_resume')r=revoked||p.phoneToken!==grant?{status:'error'}:{...r,token:'B1_a_'+'c'.repeat(64),expiresAt:expiry(),trustSource:'password-bound',phoneExpiresAt:Date.now()+89*86400000};
   else if(p.action==='employee_phone_forget'){if(p.phoneToken!==grant)r={status:'error'};else{revoked=true;grant='';}}
   else if(p.action==='employee_logout')r={status:'ok'};
+  else if(p.action==='employee_dashboard_read')r={...r,expiresAt:setup.deadline||expiry(),trustSource:'password-bound',phoneEligible:owner,
+    privateResult:{status:'ok',profile:{maskedName:'測試同仁',store:'酒泉',role:'employee',isTrusted:false},trustSource:'password-bound',snapshot:{}},
+    kpiResult:{status:'ok',profile:{maskedName:'測試同仁',store:'酒泉',role:'employee',isTrusted:false},trustSource:'password-bound',data:{}},
+    ...(p.includeReports?{reportsResult:ownerReportsResult()}:{})};
   else r={status:'error'};
   // Match the fixed lease deadline instead of extending it on validate.
   if(p.action==='employee_login'||p.action==='employee_phone_resume')setup.deadline=r.expiresAt;
@@ -85,4 +98,11 @@ test('global website logout revokes the phone grant before reopening the App',as
  await page.goto(BASE+'home.html');await expect(page.locator('#portal-logout')).toBeVisible();page.once('dialog',d=>d.accept());await page.locator('#portal-logout').click();
  await expect.poll(async()=>{try{return await page.evaluate(k=>localStorage.getItem(k),PHONE);}catch{return 'reloading';}}).toBeNull();await expect.poll(()=>f.calls.some(p=>p.action==='employee_phone_forget')).toBe(true);
  await page.goto(BASE+'phone-test.html');await expect(page.locator('[data-b-submit]')).toBeVisible();expect(f.calls.filter(p=>p.action==='employee_phone_resume')).toHaveLength(0);
+});
+test('installed App B login requests and renders the three report rows from its bundle',async({context,page})=>{
+ const f=await setup(context);await page.goto(BASE+'app.html#home');await page.locator('[data-b-employee]').fill('SYNTH001');await page.locator('[data-b-password]').fill('SYNTHETIC_PASSWORD');await page.locator('[data-b-submit]').click();
+ await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
+ const bundle=f.calls.find(p=>p.action==='employee_dashboard_read');expect(bundle.includeReports).toBe(true);
+ await page.locator('[data-nav="report"]').click();await expect(page.locator('#reportOverview')).toContainText('9/9');
+ const before=f.calls.length;await page.locator('[data-nav="home"]').last().click();await page.locator('[data-nav="report"]').click();expect(f.calls).toHaveLength(before);expect(await page.evaluate(()=>window.DashboardBHost.includeReports)).toBe(true);
 });

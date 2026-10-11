@@ -2694,8 +2694,8 @@ function writePersonal(p) {
   }
 }
 
-function readPersonal(date, seg) {
-  const sh = getPersonalSheet();
+function readPersonal(date, seg, sourceSheet) {
+  const sh = sourceSheet || getPersonalSheet();
   const allData = sh.getDataRange().getValues();
   // 回傳 { store: { name: record } }
   const result = {};
@@ -2752,9 +2752,9 @@ function toDateStr(v) {
   return String(v).substring(0, 10);
 }
 
-function readData(date, seg, include16) {
+function readData(date, seg, include16, sourceSheet) {
   const paired = include16 === true && Number(seg) === 21;
-  const sh = getSheet();
+  const sh = sourceSheet || getSheet();
   const lastRow = sh.getLastRow();
   const lastColumn = sh.getLastColumn();
   const headers = sh.getRange(1, 1, 1, lastColumn).getValues()[0];
@@ -8769,6 +8769,10 @@ function privateDashboardBPayload_(input) {
     employee_private_read:['action','deviceId','token'],employee_kpi_read:['action','deviceId','token'],
     employee_dashboard_read:['action','deviceId','token']};
   if(!Object.prototype.hasOwnProperty.call(fields,input.action))throw new Error('B_REQUEST_INVALID');
+  if(input.action==='employee_dashboard_read' && Object.prototype.hasOwnProperty.call(input,'includeReports')) {
+    if(input.includeReports!==true)throw new Error('B_REQUEST_INVALID');
+    fields.employee_dashboard_read.push('includeReports');
+  }
   privateDashboardBShape_(input,fields[input.action]);
   if(input.action==='employee_status')return input;
   if(typeof input.deviceId!=='string' || privateDashboardCleanDeviceId(input.deviceId)!==input.deviceId)throw new Error('B_REQUEST_INVALID');
@@ -8790,6 +8794,33 @@ function privateDashboardBToken_(id,device,bindingVersion,generation,config,nonc
   // a mint uniqueness marker. No raw nonce or token is stored on the owner.
   return 'B1_'+privateDashboardGasAuthDigest_(id)[0]+'_'+privateDashboardGasAuthDigest_(JSON.stringify([
     nonce,mint,id,device,bindingVersion,generation,config.epoch,config.fingerprint]));
+}
+
+// App-only projection: dates are chosen on the owner, never by the caller.
+// Explicit source sheets keep this read from creating sheets or adding fields.
+function privateDashboardBReports_(time, profile, proof) {
+  const date=Utilities.formatDate(new Date(time),'Asia/Taipei','yyyy-MM-dd');
+  const yesterday=Utilities.formatDate(new Date(time-86400000),'Asia/Taipei','yyyy-MM-dd');
+  const ss=SpreadsheetApp.openById(SPREADSHEET_ID);
+  const reportSheet=ss.getSheetByName(SHEET_NAME),peopleSheet=ss.getSheetByName(PERSONAL_SHEET);
+  function checked(data) {
+    return privateDashboardGasRpcResult_('kpiCalcAccess',{data:data,profile:profile},
+      {deviceId:proof.deviceId,adminSecret:proof.token,bootstrapCode:''},'privateDashboardBRead_').data;
+  }
+  const segments=[[date,16],[date,21],[yesterday,21]].map(function(pair) {
+    const day=pair[0],seg=pair[1];let reportResult={status:'error'},peopleResult={status:'error'};
+    try {
+      if(!reportSheet)throw new Error('B_DATA_UNAVAILABLE');
+      const data=readData(day,seg,false,reportSheet);
+      reportResult=checked({status:'ok',data:data,summary:reportSummaryFromData_(data,day,seg)});
+    } catch(_) { /* A failed segment is explicit; never invent empty/zero data. */ }
+    try {
+      if(!peopleSheet)throw new Error('B_DATA_UNAVAILABLE');
+      peopleResult=checked({status:'ok',data:readPersonal(day,seg,peopleSheet)});
+    } catch(_) { /* Personal failure must not be presented as no failures. */ }
+    return {date:day,segment:seg,reportResult:reportResult,peopleResult:peopleResult};
+  });
+  return {schema:'daily-report-bundle-v1',date:date,yesterday:yesterday,segments:segments};
 }
 
 function privateDashboardCreateGasB_(options) {
@@ -8981,9 +9012,10 @@ function privateDashboardCreateGasB_(options) {
           // One authorized transaction projects both existing read contracts.
           // No protected result is returned until both strict validators pass.
           const privateResult=readResult('private'),kpiResult=readResult('kpi');
+          const reports=p.includeReports===true?{reportsResult:privateDashboardBReports_(now(),profile,p)}:{};
           if(now()>=s.expiresAt || now()>=config.authority.validUntil)throw new Error('B_SESSION_DENIED');
-          return {status:'ok',expiresAt:s.expiresAt,trustSource:'password-bound',
-            phoneEligible:privateDashboardIsTrustedEmployee(s.employee),privateResult:privateResult,kpiResult:kpiResult};
+          return Object.assign({status:'ok',expiresAt:s.expiresAt,trustSource:'password-bound',
+            phoneEligible:privateDashboardIsTrustedEmployee(s.employee),privateResult:privateResult,kpiResult:kpiResult},reports);
         }
         if(p.action==='employee_private_read')return readResult('private');
         if(p.action==='employee_kpi_read')return readResult('kpi');
