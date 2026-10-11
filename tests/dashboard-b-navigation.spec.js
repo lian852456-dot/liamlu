@@ -57,11 +57,26 @@ test('website first load and cross-page navigation keep the same short session',
  const cross={ms:Date.now()-t,requests:f.calls.length-from};
  expect(f.calls.filter(action=>action==='employee_login')).toHaveLength(1);
  expect(await page.evaluate(()=>document.body.dataset.private)).toBe('visible');
+ if(!baseline)f.control.readFail=true; // The next page must use recently verified data, not re-read both sources.
  const second=f.calls.length,s=Date.now();await page.locator('a[data-nav]').click();
  await expect(page).toHaveURL(origin+'/awards.html');await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
  const awards={ms:Date.now()-s,requests:f.calls.length-second};
  console.log('NAV_METRICS '+JSON.stringify({version:baseline?'before':'after',initial,cross,awards}));
- if(!baseline){expect(cross.requests).toBe(4);expect(awards.requests).toBe(4);}
+ if(!baseline){
+  expect(cross.requests).toBe(4);expect(awards.requests).toBe(2);
+  expect(f.calls.slice(second)).toEqual(expect.arrayContaining(['employee_status','employee_session']));
+  expect(f.calls.slice(second)).not.toContain('employee_private_read');
+  expect(f.calls.slice(second)).not.toContain('employee_kpi_read');
+  f.control.readFail=false;
+  await page.evaluate(()=>{const key='north12b_password_data_v1',value=JSON.parse(sessionStorage.getItem(key));value.savedAt=Date.now()-61001;sessionStorage.setItem(key,JSON.stringify(value));});
+  const expired=f.calls.length;await page.goto(origin+'/kpi.html');
+  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
+  expect(f.calls.slice(expired)).toEqual(expect.arrayContaining(['employee_private_read','employee_kpi_read']));
+  f.control.revoked=true;await page.locator('[data-b-refresh]').click();
+  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','pending');
+  expect(await page.evaluate(()=>document.body.dataset.private)).toBe('hidden');
+  expect(await page.evaluate(()=>sessionStorage.getItem('north12b_password_data_v1'))).toBeNull();
+ }
 });
 
 test('App bottom tabs switch without protected requests or repaint',async({context,page})=>{

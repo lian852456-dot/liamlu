@@ -3,7 +3,8 @@
 const DASHBOARD_B_CLIENT_ENABLED_ = true;
 const OWNER='https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
 const DEVICE_KEY='north12b_private_dashboard_device_id';
-let host,client,active=false,confirmed=false,epoch=0,expiresAt=0,expiryTimer,ready=false,loading=false,guarded=false,checking=null,panel;
+const DATA_CACHE_KEY='north12b_password_data_v1',DATA_CACHE_TTL=60000;
+let host,client,active=false,confirmed=false,epoch=0,expiresAt=0,expiryTimer,dataCacheTimer,ready=false,loading=false,guarded=false,checking=null,panel;
 const pendingHost=scope.DashboardBHost;
 let legacyObserver;
 function message(text){if(panel)panel.querySelector('[data-b-message]').textContent=text;}
@@ -27,8 +28,30 @@ function showLegacyAccess(){
  if(typeof host?.showLegacyAccess==='function')host.showLegacyAccess();
  else host?.navigate('kpi');
 }
+function clearDataCache(){scope.clearTimeout(dataCacheTimer);try{scope.sessionStorage.removeItem(DATA_CACHE_KEY);}catch{}}
+function currentProof(){try{return JSON.parse(scope.sessionStorage.getItem('north12b_password_session_v1')||'null');}catch{return null;}}
+function cachedData(){
+ try{
+  const value=JSON.parse(scope.sessionStorage.getItem(DATA_CACHE_KEY)||'null'),proof=currentProof(),now=Date.now();
+  if(!value)return null;
+  if(value.v!==1 || !proof || value.owner!==OWNER || value.token!==proof.token || value.deviceId!==proof.deviceId ||
+    value.logoutEpoch!==proof.logoutEpoch || value.expiresAt!==proof.expiresAt || !Number.isSafeInteger(value.savedAt) ||
+    value.savedAt>now || now-value.savedAt>DATA_CACHE_TTL || proof.expiresAt<=now)throw Error('B_CACHE_EXPIRED');
+  checkProfile(value.privateResult);checkProfile(value.kpiResult);
+  scope.clearTimeout(dataCacheTimer);dataCacheTimer=scope.setTimeout(clearDataCache,DATA_CACHE_TTL-(now-value.savedAt));
+  return {privateResult:value.privateResult,kpiResult:value.kpiResult};
+ }catch{clearDataCache();return null;}
+}
+function saveDataCache(privateResult,kpiResult){
+ if(host?.ownerPhone)return;
+ const proof=currentProof();if(!proof)return;
+ try{scope.sessionStorage.setItem(DATA_CACHE_KEY,JSON.stringify({v:1,owner:OWNER,token:proof.token,deviceId:proof.deviceId,
+  logoutEpoch:proof.logoutEpoch,expiresAt:proof.expiresAt,savedAt:Date.now(),privateResult,kpiResult}));
+  scope.clearTimeout(dataCacheTimer);dataCacheTimer=scope.setTimeout(clearDataCache,DATA_CACHE_TTL);
+ }catch{clearDataCache();}
+}
 function wipe(note='請重新輸入員編與指定密碼。',clearTransport=true){
- epoch++;active=false;confirmed=false;loading=false;expiresAt=0;scope.clearTimeout(expiryTimer);if(clearTransport)client?.clear();checking=null;host?.clear();state('locked');message(note);
+ epoch++;active=false;confirmed=false;loading=false;expiresAt=0;scope.clearTimeout(expiryTimer);clearDataCache();if(clearTransport)client?.clear();checking=null;host?.clear();state('locked');message(note);
  if(panel)panel.querySelector('[data-b-password]').value='';
 }
 function device(){let value=scope.localStorage.getItem(DEVICE_KEY);if(value)return value;
@@ -42,21 +65,25 @@ function checkProfile(result){if(!result?.profile || result.profile.role!=='empl
 async function refresh(allowPhone=true,forceData=false){
  if(!active)return false;if(checking)return checking;
  if(expiresAt<=Date.now()){wipe('登入已到期，請重新輸入指定密碼。');return false;}
- const expected=epoch;let stage='status';if(!confirmed)state('checking');
+ const expected=epoch;let stage='validate';if(!confirmed)state('checking');
  checking=(async()=>{try{
-  const status=await client.status();if(!status.enabled || !status.passwordAvailable)throw Error('B_DISABLED');
-  stage='validate';
-  const lease=await client.validate();host.phoneEligible=lease.phoneEligible===true;if(lease.expiresAt!==expiresAt || expiresAt<=Date.now())throw Error('B_AUTH_DENIED');
+  const [status,lease]=await Promise.all([client.status(),client.validate()]);
+  if(!status.enabled || !status.passwordAvailable)throw Error('B_DISABLED');
+  host.phoneEligible=lease.phoneEligible===true;if(lease.expiresAt!==expiresAt || expiresAt<=Date.now())throw Error('B_AUTH_DENIED');
   if(confirmed && !forceData){if(expected!==epoch)return false;state('active');return true;}
   if(host.sessionOnly){if(expected!==epoch)return false;host.accept({lease});confirmed=true;state('active');message('可直接開啟同仁專區；登入至 '+new Date(expiresAt).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})+'，換頁不延長。');return true;}
+  // The short data cache cannot authorize access: each new page first checks the owner.
+  const cached=!forceData && cachedData();
+  if(cached){if(expected!==epoch)return false;stage='cache';host.accept(cached);confirmed=true;state('active');message('指定密碼已驗證；同分頁沿用最近資料，可按「重新核驗」更新。');return true;}
   stage='read';
   const [privateResult,kpiResult]=await Promise.all([client.read('private'),client.read('kpi')]);
   if(expected!==epoch)return false;checkProfile(privateResult);checkProfile(kpiResult);
-  host.accept({privateResult,kpiResult});confirmed=true;state('active');message(host.ownerPhone&&client.hasPhone()?'這支手機已驗證，下次開啟 App 會自動登入。':'指定密碼已驗證；KPI、台獎、個績唯讀。');return true;
+  host.accept({privateResult,kpiResult});saveDataCache(privateResult,kpiResult);confirmed=true;state('active');message(host.ownerPhone&&client.hasPhone()?'這支手機已驗證，下次開啟 App 會自動登入。':'指定密碼已驗證；KPI、台獎、個績唯讀。');return true;
  }catch(error){
   if(expected!==epoch)return false;
   if(error.message==='B_DISABLED'){wipe('指定密碼通道已關閉，請重新確認。');return false;}
   if(stage==='validate' && error.message==='B_AUTH_DENIED' && allowPhone && host.ownerPhone && client.hasPhone()){checking=null;active=false;confirmed=false;return resumePhone();}
+  if(error.message==='B_AUTH_DENIED' || stage==='cache')clearDataCache();
   confirmed=false;host.clear();state('pending');message(stage==='read'?'資料讀取未完成或授權已改變，畫面已鎖定；可按「重新核驗」重試。':'登入授權無法確認，畫面已鎖定；可按「重新核驗」重試。');return false;
  }
  finally{if(expected===epoch)checking=null;}
@@ -95,7 +122,7 @@ async function resume(){
  const lease=client.restore(existingDevice);if(!lease){if(host.ownerPhone)await resumePhone();return;}
  epoch++;active=true;expiresAt=lease.expiresAt;
  scheduleExpiry();
- await refresh(true,true);
+ await refresh(true,false);
 }
 function navigateVerified(module){guarded=true;try{host.navigate(module);}finally{guarded=false;}}
 function configure(value){host=value;if(ready)mount();}
