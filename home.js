@@ -142,7 +142,9 @@
     const credential = credentials();
     const current = () => requestId === generation && !document.hidden && sameCredentials(credential)
       && Model.dateContext(new Date()).today === context.today;
-    if (!credential.employeeId || !credential.deviceId) {
+    // The default password entrance must not also launch Approved Device
+    // reads, including on portal-login-changed after a password login.
+    if (!document.body.classList.contains('dashboard-b-legacy-mode') || !credential.employeeId || !credential.deviceId) {
       feeds.sales = pending('sales', passwordVerified?'同仁專區已登入，請由下方入口查看 KPI、台獎與個績；此提醒尚未讀取。':'請在上方登入後開啟同仁專區。原裝置核准用戶可在 KPI 戰情驗證後更新提醒。', passwordVerified?'pending':'locked');
       render(); return;
     }

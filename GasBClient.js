@@ -15,7 +15,7 @@ function createDashboardBClient(ownerExecUrl, options={}) {
       return value;
     }catch{removeSaved();return null;}
   }
-  const requests=new Set(),hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+  const requests=new Set(),reads=new Map(),hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
   function removePhone(){try{phoneStorage?.removeItem(phoneKey);}catch{}}
   function savedPhone(deviceId){
     try {
@@ -32,10 +32,10 @@ function createDashboardBClient(ownerExecUrl, options={}) {
     if(storage)storage.setItem(storageKey,JSON.stringify({v:1,owner:ownerExecUrl,logoutEpoch:options.logoutEpoch?.()||'',...session,expiresAt}));
     return {expiresAt,trustSource:result.trustSource};
   }
-  function suspend(){generation++;session=null;expiresAt=0;for(const controller of requests)controller.abort();requests.clear();}
+  function suspend(){generation++;session=null;expiresAt=0;reads.clear();for(const controller of requests)controller.abort();requests.clear();}
   function clear(){suspend();removeSaved();}
   async function post(payload,expected=generation,transport=fetch) {
-    const controller=new AbortController();requests.add(controller);
+    const controller=new AbortController(),started=Date.now();let outcome='error';requests.add(controller);
     const timer=setTimeout(()=>controller.abort(),90000);
     try {
       const response=await transport(ownerExecUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),
@@ -43,11 +43,16 @@ function createDashboardBClient(ownerExecUrl, options={}) {
       if(!response.ok)throw new Error('B_SERVICE_UNAVAILABLE');const value=await response.json();
       if(expected!==generation)throw new Error('B_CONTEXT_CHANGED');
       if(controller.signal.aborted)throw new Error('B_TIMEOUT');
-      if(!value || value.status!=='ok')throw new Error('B_AUTH_DENIED');return value;
+      if(!value || value.status!=='ok')throw new Error('B_AUTH_DENIED');outcome='ok';return value;
     } catch(error){if(expected!==generation)throw new Error('B_CONTEXT_CHANGED');if(controller.signal.aborted)throw new Error('B_TIMEOUT');throw error;}
-    finally {clearTimeout(timer);requests.delete(controller);}
+    finally {clearTimeout(timer);requests.delete(controller);try{options.onRequest?.({action:payload.action,ms:Date.now()-started,outcome});}catch{}}
   }
-  async function protectedPost(action) {
+  function protectedPost(action) {
+    if(reads.has(action))return reads.get(action);
+    const operation=protectedRead(action);reads.set(action,operation);
+    const done=()=>{if(reads.get(action)===operation)reads.delete(action);};operation.then(done,done);return operation;
+  }
+  async function protectedRead(action) {
     if(!session || expiresAt<=Date.now()){clear();throw new Error('B_AUTH_DENIED');}const expected=generation,proof=session;
     // A failed read or an inconclusive server response must lock the view, but
     // the short lease can still be checked again without asking for a password.

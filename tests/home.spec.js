@@ -67,21 +67,36 @@ function deferred() {
 async function start(page, { keys = {}, reply = successful, reducedMotion = 'no-preference', viewport = {width:1280,height:1300}, now = NOW } = {}) {
   const calls = [];
   const errors = [];
+  const legacySelected = Boolean(keys.employeeId || keys.legacyEmployeeId);
   page.on('pageerror', error => errors.push(error.message));
   await page.setViewportSize(viewport);
   await page.emulateMedia({ reducedMotion });
   await page.clock.install({ time:new Date(now) });
   await page.clock.pauseAt(new Date(now));
-  await page.addInitScript(({ keys, EMPLOYEE_KEY, DEVICE_KEY, SESSION_KEY }) => {
+  await page.addInitScript(({ keys, EMPLOYEE_KEY, DEVICE_KEY, SESSION_KEY, legacySelected }) => {
     if (keys.employeeId) sessionStorage.setItem(EMPLOYEE_KEY, keys.employeeId);
     if (keys.legacyEmployeeId) localStorage.setItem(EMPLOYEE_KEY, keys.legacyEmployeeId);
     if (keys.deviceId) localStorage.setItem(DEVICE_KEY, keys.deviceId);
     if (keys.token) sessionStorage.setItem(SESSION_KEY, keys.token);
-  }, { keys, EMPLOYEE_KEY, DEVICE_KEY, SESSION_KEY });
+    if (legacySelected) {
+      const markLegacy = () => document.body?.classList.add('dashboard-b-legacy-mode');
+      if (document.body) markLegacy();
+      else {
+        const observer = new MutationObserver(() => {
+          if (!document.body) return;
+          markLegacy(); observer.disconnect();
+        });
+        observer.observe(document.documentElement || document, { childList:true, subtree:true });
+      }
+    }
+  }, { keys, EMPLOYEE_KEY, DEVICE_KEY, SESSION_KEY, legacySelected });
   // No external request can escape interception, including unexpected endpoints.
   await page.route('**/*', async route => {
     const request = route.request();
     const url = new URL(request.url());
+    if (legacySelected && url.pathname.includes('dashboard-b-shell.js')) {
+      return route.fulfill({ status:200, contentType:'application/javascript', body:'/* legacy home fixture: old entrance explicitly selected */' });
+    }
     if (url.origin === LOCAL_ORIGIN || url.protocol === 'file:') return route.continue();
     let payload;
     try { payload = request.postDataJSON(); } catch { payload = null; }
@@ -119,6 +134,7 @@ async function changeKeys(page, keys) {
     if (keys.employeeId) sessionStorage.setItem(EMPLOYEE_KEY,keys.employeeId); else sessionStorage.removeItem(EMPLOYEE_KEY);
     if (keys.deviceId) localStorage.setItem(DEVICE_KEY,keys.deviceId); else localStorage.removeItem(DEVICE_KEY);
     if (keys.token) sessionStorage.setItem(SESSION_KEY,keys.token); else sessionStorage.removeItem(SESSION_KEY);
+    document.body.classList.toggle('dashboard-b-legacy-mode',Boolean(keys.employeeId || keys.legacyEmployeeId));
     window.dispatchEvent(new StorageEvent('storage', {key:EMPLOYEE_KEY}));
   }, {keys,EMPLOYEE_KEY,DEVICE_KEY,SESSION_KEY});
 }
