@@ -62,6 +62,16 @@ async function logout(note='已登出指定密碼通道；裝置綁定保留。'
  try{await operation;return true;}catch{message(host.ownerPhone?'本機已登出；伺服器撤銷未確認，請連線後由人員與裝置管理解除手機自動登入。':'畫面已清除；伺服器登出未確認，請關閉本頁。原 session 最多存活至原30分鐘期限。');return false;}
 }
 function checkProfile(result){if(!result?.profile || result.profile.role!=='employee' || result.profile.isTrusted!==false || result.trustSource!=='password-bound')throw Error('B_AUTH_DENIED');}
+async function warmSiteData(){
+ if(!host?.sessionOnly || !active || !confirmed || expiresAt<=Date.now() || cachedData())return;
+ const expected=epoch;
+ try{
+  // Prepare the next page after login without delaying the home screen or displaying its private data.
+  const [privateResult,kpiResult]=await Promise.all([client.read('private'),client.read('kpi')]);
+  if(expected!==epoch || !active || expiresAt<=Date.now())return;
+  checkProfile(privateResult);checkProfile(kpiResult);saveDataCache(privateResult,kpiResult);
+ }catch{ /* A failed prefetch never changes authorization or asks for a password. */ }
+}
 async function refresh(allowPhone=true,forceData=false){
  if(!active)return false;if(checking)return checking;
  if(expiresAt<=Date.now()){wipe('登入已到期，請重新輸入指定密碼。');return false;}
@@ -71,7 +81,7 @@ async function refresh(allowPhone=true,forceData=false){
   if(!status.enabled || !status.passwordAvailable)throw Error('B_DISABLED');
   host.phoneEligible=lease.phoneEligible===true;if(lease.expiresAt!==expiresAt || expiresAt<=Date.now())throw Error('B_AUTH_DENIED');
   if(confirmed && !forceData){if(expected!==epoch)return false;state('active');return true;}
-  if(host.sessionOnly){if(expected!==epoch)return false;host.accept({lease});confirmed=true;state('active');message('可直接開啟同仁專區；登入至 '+new Date(expiresAt).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})+'，換頁不延長。');return true;}
+  if(host.sessionOnly){if(expected!==epoch)return false;host.accept({lease});confirmed=true;state('active');message('可直接開啟同仁專區；登入至 '+new Date(expiresAt).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})+'，換頁不延長。');void warmSiteData();return true;}
   // The short data cache cannot authorize access: each new page first checks the owner.
   const cached=!forceData && cachedData();
   if(cached){if(expected!==epoch)return false;stage='cache';host.accept(cached);confirmed=true;state('active');message('指定密碼已驗證；同分頁沿用最近資料，可按「重新核驗」更新。');return true;}

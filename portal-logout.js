@@ -89,7 +89,8 @@
     if (forcePersistent || !persistentLoginAfter(event)) {
       for (const key of [EMPLOYEE_KEY, 'bei12b_kpi_emp', PHONE_KEY]) remove('localStorage', key);
     }
-    // Only the existing protected summary cache is cleared. Draft files, prefs and device IDs remain.
+    // Clear protected display caches across every site page. Draft files, prefs and device IDs remain.
+    remove('sessionStorage', 'north12b_password_data_v1');
     try {
       for (let i = scope.sessionStorage.length - 1; i >= 0; i -= 1) {
         const key = scope.sessionStorage.key(i);
