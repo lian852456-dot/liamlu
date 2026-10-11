@@ -2103,7 +2103,9 @@
   scope.addEventListener('hashchange',()=>{ const name=location.hash.slice(1); if(all('[data-view]').some(view=>view.dataset.view===name))setView(name); });
 
   scope.DashboardBHost={
-    ownerPhone:true,
+    // The single durable phone grant belongs to the installed App, not a
+    // regular Safari/desktop tab that happens to open app.html first.
+    ownerPhone:navigator.standalone===true || !!scope.matchMedia?.('(display-mode: standalone)').matches,
     navigationSelector:null,
     clear(){resetPrivateSummary();privateAccessStatus='unauthorized';dom('#viewerState').textContent='未登入';renderAll();},
     showLegacyAccess(){setView('me');dom('#privateAccessForm')?.closest('.access-panel')?.scrollIntoView({block:'start',behavior:'smooth'});dom('#employeeId')?.focus();
@@ -2135,5 +2137,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261011-app-login-priority-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261011-app-standalone-phone-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);
