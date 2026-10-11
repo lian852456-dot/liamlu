@@ -92,6 +92,33 @@ test('trusted supervisor can use two devices without moving employee bindings; t
  assert.equal(f.props.get(BIND),before);
 });
 
+test('a full same-device login replaces its oldest lease without releasing the staff binding',()=>{
+ const f=fixture();f.ctx.privateDashboardBVerifyPassword_=()=>true;
+ const api=f.ctx.privateDashboardCreateGasB_({}),invoke=p=>api.handle(JSON.stringify(p));
+ const id='SYNTH002',device='SYNTHETIC_REUSE_DEVICE';
+ const requests='abcd'.split('').map(ch=>passwordLogin(id,device,'SYNTHETIC_PASSWORD','SYNTHETIC_REUSE_REQUEST_'+ch,ch));
+ const leases=requests.map(invoke);
+ assert.deepEqual(leases.map(x=>x.status),['ok','ok','ok','ok']);
+ const first=leases[0],next=leases[3];
+ assert.equal(invoke({action:'employee_session',deviceId:device,token:first.token}).status,'error');
+ assert.equal(invoke(requests[0]).status,'error');
+ for(let i=1;i<4;i++)assert.equal(invoke({action:'employee_session',deviceId:device,token:leases[i].token}).status,'ok');
+ assert.equal(invoke({action:'employee_session',deviceId:device,token:next.token}).status,'ok');
+ assert.equal(Object.keys(JSON.parse(f.props.get(BIND)).bindings).filter(x=>x===id).length,1);
+});
+
+test('a fourth supervisor login replaces only their oldest lease; admin reset still revokes all',()=>{
+ const f=fixture();f.ctx.privateDashboardBVerifyPassword_=()=>true;f.props.set('DASHBOARD_TRUSTED_EMPLOYEE_ID','SYNTH003');
+ const api=f.ctx.privateDashboardCreateGasB_({}),invoke=p=>api.handle(JSON.stringify(p));
+ const devices=['SYNTHETIC_SUP_DEVICE_A','SYNTHETIC_SUP_DEVICE_B','SYNTHETIC_SUP_DEVICE_C','SYNTHETIC_SUP_DEVICE_D'];
+ const leases=devices.map((device,i)=>invoke(passwordLogin('SYNTH003',device,'SYNTHETIC_PASSWORD','SYNTHETIC_SUP_REQUEST_'+i,'abcd'[i])));
+ assert.deepEqual(leases.map(x=>x.status),['ok','ok','ok','ok']);
+ assert.equal(invoke({action:'employee_session',deviceId:devices[0],token:leases[0].token}).status,'error');
+ for(let i=1;i<4;i++)assert.equal(invoke({action:'employee_session',deviceId:devices[i],token:leases[i].token}).status,'ok');
+ assert.equal(invoke({action:'employee_admin_reset_device',adminSecret:ADMIN,employeeId:'SYNTH003'}).status,'ok');
+ for(let i=1;i<4;i++)assert.equal(invoke({action:'employee_session',deviceId:devices[i],token:leases[i].token}).status,'error');
+});
+
 test('admin-only B reset preserves employee status and other bindings, removes sessions and prevents replay',()=>{
  const f=fixture();f.ctx.privateDashboardBVerifyPassword_=()=>true;
  const api=f.ctx.privateDashboardCreateGasB_({}),invoke=p=>api.handle(JSON.stringify(p));

@@ -8774,6 +8774,18 @@ function privateDashboardCreateGasB_(options) {
           s.epoch!==config.epoch || s.configHash!==config.fingerprint || time<s.issuedAt || s.digest!==privateDashboardGasAuthDigest_(token))throw new Error('B_LOGIN_DENIED');
         return {status:'ok',token:token,expiresAt:s.expiresAt,trustSource:'password-bound'};
       }
+      // When the per-employee limit is full, a fresh valid login replaces
+      // the oldest lease from this device, or the oldest supervisor lease.
+      // The active-session limit stays at three and old proofs stay revoked.
+      const own=sessions.sessions.filter(function(s){return s.employee===id;});
+      if(own.length>=3) {
+        const sameDevice=own.filter(function(s){return s.device===device;});
+        const candidates=sameDevice.length?sameDevice:trusted?own:[];
+        if(candidates.length) {
+          const oldest=candidates.sort(function(a,b){return a.issuedAt-b.issuedAt || a.digest.localeCompare(b.digest);})[0];
+          retire(sessions,function(s){return s.digest===oldest.digest;},time);
+        }
+      }
       // Reserve a durable tombstone slot for every active session, so even a
       // full ledger can invalidate every already-issued token on logout.
       if(sessions.sessions.length>=12 || sessions.sessions.length+sessions.tombstones.length>=32 ||
