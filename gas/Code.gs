@@ -6578,6 +6578,13 @@ var TradeinPerformanceCore = (function () {
     if (/^(副店長|資深業務代表|業務代表\([I]+\)|業代|銷售人員|同仁)$/.test(value || '')) return '同仁';
     return '待核';
   }
+  // Liam approved 55 as an optional employee prefix. Preserve the source value;
+  // remove it only from the seven-character form used for identity comparison.
+  function sourceEmployeeId(value) {
+    if(typeof value!=='string' || !/^(?:[A-Za-z0-9]{5}|55[A-Za-z0-9]{5})$/.test(value))
+      throw new Error('來源員編必須為五碼字串，或以55開頭的七碼字串');
+    return value.length===7?value.slice(2):value;
+  }
   // Only an owner-loaded private configuration may supply this third argument.
   // Transaction payloads cannot supply a crosswalk or grant roster/auth status.
   function references(input, config) {
@@ -6593,9 +6600,9 @@ var TradeinPerformanceCore = (function () {
       stores.set(s.store_code,name);storeNames.add(name);
     });
     config.employees.forEach(e=>{
-      if(typeof e.source_employee_id!=='string' || !/^[A-Za-z0-9]{5}$/.test(e.source_employee_id) ||
+      if(typeof e.source_employee_id!=='string' || !/^(?:[A-Za-z0-9]{5}|55[A-Za-z0-9]{5})$/.test(e.source_employee_id) ||
          typeof e.employee_key!=='string' || !/^[A-Z0-9]{7}$/.test(e.employee_key) ||
-         employees.has(e.source_employee_id) || canonical.has(e.employee_key) || !Array.isArray(e.observations) || !e.observations.length)
+         employees.has(sourceEmployeeId(e.source_employee_id)) || canonical.has(e.employee_key) || !Array.isArray(e.observations) || !e.observations.length)
         throw new Error('私有員編對照未知、重複或衝突');
       const observations=new Set();
       e.observations.forEach(o=>{
@@ -6603,7 +6610,7 @@ var TradeinPerformanceCore = (function () {
         if(observed<input.source_start || observed>input.source_end || !stores.has(o.store_code))throw new Error('員編對照觀測期間／店碼衝突');
         observations.add(JSON.stringify([observed,o.store_code]));
       });
-      employees.set(e.source_employee_id,{employee_key:e.employee_key,observations});canonical.add(e.employee_key);
+      employees.set(sourceEmployeeId(e.source_employee_id),{employee_key:e.employee_key,observations});canonical.add(e.employee_key);
     });
     return {stores,employees};
   }
@@ -6639,8 +6646,7 @@ var TradeinPerformanceCore = (function () {
       const trade=date(r.trade_date), cancel=r.cancel_date?date(r.cancel_date):null;
       if (trade<start || trade>end || cancel && (cancel<trade || cancel>statusAsOf)) throw new Error('交易／取消日期與來源期間衝突');
       if (!['單銷','RT','AQNP'].includes(r.project)) throw new Error('未知專案類別，停止計數');
-      if(typeof r.source_employee_id!=='string' || !/^[A-Za-z0-9]{5}$/.test(r.source_employee_id))throw new Error('來源員編必須保留五碼字串');
-      const seller=r.source_employee_id,identity=reference.employees.get(seller);
+      const seller=sourceEmployeeId(r.source_employee_id),identity=reference.employees.get(seller);
       if(!identity || !identity.observations.has(JSON.stringify([trade,r.store_code])))throw new Error('來源員編缺少本批日期／店碼的精確私有對照');
       if(typeof r.recycle_code!=='string' || typeof r.order_number!=='string')throw new Error('回收碼／銷貨單號必須為字串');
       const key=r.recycle_code.trim(), order=r.order_number.trim();
@@ -6751,14 +6757,15 @@ var TradeinPerformanceCore = (function () {
       const store=field(r,'店點代碼'),region=field(r,'區域別'),project=field(r,'專案類別'),seller=field(r,'員工編號');
       if(!/^DNB\d{5}$/.test(store) || region!=='北一二B')throw new Error('SAR74 店碼或區域格式衝突');
       if(!['單銷','RT','AQNP'].includes(project))throw new Error('SAR74 未知專案類別');
-      if(!/^[A-Za-z0-9]{5}$/.test(seller))throw new Error('SAR74 來源員編必須保留五碼英數字');
+      sourceEmployeeId(seller);
       const recycle=field(r,'回收代碼/IMEI'),order=field(r,'銷貨單號');
       if(!recycle || !order || recycle.length>100 || order.length>100)throw new Error('SAR74 缺少有效回收碼／銷貨單號');
       const trade=transactionDate(field(r,'日期')),cancelValue=field(r,'取消交易日期');
       const cancel=cancelValue?transactionDate(cancelValue):null;
       if(trade<start || trade>end || cancel&&(cancel<trade || cancel>statusAsOf))throw new Error('SAR74 交易／取消日期與來源期間衝突');
       // Preserve identifiers as source strings. Store verification and employee
-      // crosswalk are separate release prerequisites; no alias/prefix is inferred.
+      // crosswalk are separate release prerequisites. The optional 55 prefix is
+      // compared by sourceEmployeeId; the original export string stays intact.
       const record={store_code:store,trade_date:trade,project:project,source_employee_id:seller,
         recycle_code:recycle,order_number:order,cancel_date:cancel};
       if(names.includes('回收舊機品名'))record.recycle_model=field(r,'回收舊機品名');
@@ -6767,7 +6774,7 @@ var TradeinPerformanceCore = (function () {
     return {month:start.slice(0,7),source_start:start,source_end:end,status_as_of_date:statusAsOf,rule_id:RULE_ID,complete_nine_stores:false,header_column_count:names.length,
       printed_at:printed?printed[0]:'',records:records};
   }
-  return Object.freeze({STORES:STORES,RULE_ID:RULE_ID,monthPeriod:monthPeriod,storeName:storeName,build:build,parseSar74:parseSar74,shortModel:shortModel});
+  return Object.freeze({STORES:STORES,RULE_ID:RULE_ID,monthPeriod:monthPeriod,storeName:storeName,sourceEmployeeId:sourceEmployeeId,build:build,parseSar74:parseSar74,shortModel:shortModel});
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=TradeinPerformanceCore;
 
@@ -6835,7 +6842,8 @@ function tradeinPerformancePrivateReference_(source,roster) {
 }
 function tradeinPerformanceReuseReference_(source,roster) {
   // Only reuse the owner-held crosswalk behind this month's published version.
-  // No client mapping, login roster, name matching or employee-prefix inference.
+  // Only the approved optional-55 rule can extend identities from the verified
+  // monthly roster. Client mapping, login roster and name matching remain unused.
   const active=(tradeinPerformanceRegistry_().months[source.month] || {}).active;
   if(!active)throw new Error('本批私有員編／店碼對照尚未配置，請先核定本月首次來源');
   if(active.roster_hash!==tradeinPerformanceHash_(roster))throw new Error('核定月名冊已變更，請先核對員編及店點異動');
@@ -6853,13 +6861,17 @@ function tradeinPerformanceReuseReference_(source,roster) {
   TradeinPerformanceCore.build({month:source.month,source_start:snapshot.source_period.start,
     source_end:snapshot.source_period.end,status_as_of_date:snapshot.status_as_of_date,
     source_sha256:active.source_sha256,rule_id:TradeinPerformanceCore.RULE_ID,complete_nine_stores:true,records:[]},roster,prior);
-  const next=JSON.parse(JSON.stringify(prior)),identities=new Map(next.employees.map(function(p){return [p.source_employee_id,p];}));
+  const next=JSON.parse(JSON.stringify(prior)),identities=new Map(next.employees.map(function(p){return [TradeinPerformanceCore.sourceEmployeeId(p.source_employee_id),p];}));
   const people=new Map(roster.filter(function(p){return p.status==='active';}).map(function(p){return [p.employee_id,p];}));
   const published=new Map(snapshot.people.map(function(p){return [p.employee_key,p];}));
   const stores=new Map(next.stores.map(function(p){return [p.store_code,TradeinPerformanceCore.storeName(p.store)];}));
   const pending=new Set();
   source.records.forEach(function(record){
-    const identity=identities.get(record.source_employee_id),person=identity && people.get(identity.employee_key),
+    const sourceId=TradeinPerformanceCore.sourceEmployeeId(record.source_employee_id);
+    let identity=identities.get(sourceId);
+    if(!identity && people.has('55'+sourceId))
+      identity={source_employee_id:sourceId,employee_key:'55'+sourceId,observations:[]};
+    const person=identity && people.get(identity.employee_key),
       confirmed=identity && published.get(identity.employee_key),store=stores.get(record.store_code);
     if(!store)throw new Error('來源含九店範圍以外或未知店碼');
     if(!person || !confirmed || confirmed.identity_status!=='confirmed' ||
@@ -6867,11 +6879,13 @@ function tradeinPerformanceReuseReference_(source,roster) {
        identity.observations.some(function(o){return stores.get(o.store_code)!==store;})){
       pending.add(JSON.stringify([record.source_employee_id,record.store_code]));return;
     }
+    if(!identities.has(sourceId)){identities.set(sourceId,identity);next.employees.push(identity);}
     if(!identity.observations.some(function(o){return o.trade_date===record.trade_date && o.store_code===record.store_code;}))
       identity.observations.push({trade_date:record.trade_date,store_code:record.store_code});
   });
   if(pending.size)throw new Error('新檔有 '+pending.size+' 組新增員編或店點異動待核，請管理者更新私有對照後重新預覽');
   next.source_sha256=source.source_sha256;next.source_start=source.source_start;next.source_end=source.source_end;
+  next.employee_id_policy='optional-55-prefix/v1';
   return next;
 }
 function tradeinPerformanceSaveReference_(source,reference) {
