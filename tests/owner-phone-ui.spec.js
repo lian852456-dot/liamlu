@@ -48,6 +48,6 @@ test('real mobile App shows the first-time phone setup without horizontal overfl
 test('global website logout revokes the phone grant before reopening the App',async({context,page})=>{
  const f=await setup(context);await login(page);await expect(page.locator('h2')).toHaveText('手機自動登入已啟用');
  await page.goto(BASE+'home.html');await expect(page.locator('#portal-logout')).toBeVisible();page.once('dialog',d=>d.accept());await page.locator('#portal-logout').click();
- await expect.poll(()=>page.evaluate(k=>localStorage.getItem(k),PHONE)).toBeNull();await expect.poll(()=>f.calls.some(p=>p.action==='employee_phone_forget')).toBe(true);
+ await expect.poll(async()=>{try{return await page.evaluate(k=>localStorage.getItem(k),PHONE);}catch{return 'reloading';}}).toBeNull();await expect.poll(()=>f.calls.some(p=>p.action==='employee_phone_forget')).toBe(true);
  await page.goto(BASE+'phone-test.html');await expect(page.locator('[data-b-submit]')).toBeVisible();expect(f.calls.filter(p=>p.action==='employee_phone_resume')).toHaveLength(0);
 });

@@ -49,8 +49,10 @@ function createDashboardBClient(ownerExecUrl, options={}) {
   }
   async function protectedPost(action) {
     if(!session || expiresAt<=Date.now()){clear();throw new Error('B_AUTH_DENIED');}const expected=generation,proof=session;
-    try {return await post({action,...proof},expected);}
-    catch(error){if(expected===generation)clear();throw error;}
+    // A failed read or an inconclusive server response must lock the view, but
+    // the short lease can still be checked again without asking for a password.
+    // The server verifies eligibility, revocation and device proof on every call.
+    return post({action,...proof},expected);
   }
   return Object.freeze({
     status:()=>post({action:'employee_status'}),

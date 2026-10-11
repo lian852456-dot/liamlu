@@ -14,8 +14,8 @@ require('node:test')('same-tab proof preserves expiry and obeys logout, revocati
  a.suspend();let b=make();assert.equal(b.restore('device').expiresAt,expiry);await b.validate();assert.equal(posts.filter(p=>p.action==='employee_login').length,1);
  b.suspend();await b.logout();assert.equal(saved.size,0);assert.equal(make().restore('device'),null);
  revoked=false;a=make();await a.login('SYNTHETIC','device','synthetic-password');a.suspend();epoch='logout-event';assert.equal(make().restore('device'),null);assert.equal(saved.size,0);
- a=make();await a.login('SYNTHETIC','device','synthetic-password');a.suspend();b=make();b.restore('device');revoked=true;await assert.rejects(()=>b.validate());assert.equal(saved.size,0);
+ a=make();await a.login('SYNTHETIC','device','synthetic-password');a.suspend();b=make();b.restore('device');revoked=true;await assert.rejects(()=>b.validate());assert.equal(saved.size,1);await assert.rejects(()=>b.read('private'));assert.equal(saved.size,1);
  revoked=false;a=make();await a.login('SYNTHETIC','device','synthetic-password');a.suspend();assert.equal(make().restore('another-device'),null);
  revoked=false;a=make();await a.login('SYNTHETIC','device','synthetic-password');a.suspend();const expired=JSON.parse([...saved.values()][0]);expired.expiresAt=Date.now()-1;storage.setItem('north12b_password_session_v1',JSON.stringify(expired));assert.equal(make().restore('device'),null);
- console.log('PASS: same-tab restore without new login/expiry renewal; no password storage; logout removal; missed logout denial; server revocation clears proof; device mismatch denial');
+ console.log('PASS: same-tab restore without new login/expiry renewal; no password storage; logout removal; missed logout denial; revoked server denies reads; device mismatch denial');
 });
