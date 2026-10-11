@@ -2016,7 +2016,7 @@
   dom('[data-date-today]').addEventListener('click',()=>{ dom('#scheduleDate').value=taipeiDate(); if(patrolToken)loadPatrolData(); else renderSchedule(); });
   dom('#scheduleDate').addEventListener('change',()=>patrolToken?loadPatrolData():renderSchedule());
   dom('#scheduleStoreFilter').addEventListener('change',renderSchedule);
-  all('[data-refresh]').forEach(button=>button.addEventListener('click',()=>{ if(PREVIEW_MODE)renderAll(); else { const id=scope.localStorage.getItem(EMPLOYEE_KEY); if(scope.DashboardB?.active())scope.DashboardB.refresh(); else if(id)loadFormalSummary(id).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); }); if(patrolToken)loadPatrolData(); } }));
+  all('[data-refresh]').forEach(button=>button.addEventListener('click',()=>{ if(PREVIEW_MODE)renderAll(); else { const id=scope.localStorage.getItem(EMPLOYEE_KEY); if(scope.DashboardB?.active())scope.DashboardB.refresh(true,true); else if(id)loadFormalSummary(id).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); }); if(patrolToken)loadPatrolData(); } }));
   document.addEventListener('click',event=>{
     const patrolRetry=event.target.closest('[data-retry-patrol]');
     if(patrolRetry){
@@ -2104,7 +2104,7 @@
 
   scope.DashboardBHost={
     ownerPhone:true,
-    navigationSelector:'[data-nav], [data-battle-kind], [data-battle-scope]',
+    navigationSelector:null,
     clear(){resetPrivateSummary();privateAccessStatus='unauthorized';dom('#viewerState').textContent='未登入';renderAll();},
     showLegacyAccess(){setView('me');dom('#privateAccessForm')?.closest('.access-panel')?.scrollIntoView({block:'start',behavior:'smooth'});dom('#employeeId')?.focus();},
     accept(bundle){
@@ -2132,5 +2132,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261010-employee-login-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261011-navigation-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);
