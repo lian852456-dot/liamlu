@@ -48,10 +48,22 @@
     return [PT_KEY,UAT_KEY,AUDIT_KEY,EMPLOYEE_KEY,B_KEY].some(key => read('sessionStorage',key));
   }
   function hasPersistentIdentity() { return read('localStorage',EMPLOYEE_KEY) || read('localStorage','bei12b_kpi_emp'); }
+  function currentBSessionOnly(event) {
+    // A restored document can retain its B proof while losing the auxiliary
+    // seen marker. The proof records its own logout boundary; it still has
+    // to pass the normal server gate before any protected content is shown.
+    if ([PT_KEY,UAT_KEY,AUDIT_KEY,EMPLOYEE_KEY].some(key => read('sessionStorage',key))) return false;
+    const proof = parse(read('sessionStorage',B_KEY)), now = Date.now();
+    return proof?.v === 1 && proof.owner === B_API && proof.logoutEpoch === event.id
+      && proof.deviceId === read('localStorage','north12b_private_dashboard_device_id')
+      && typeof proof.deviceId === 'string' && proof.deviceId.length >= 16
+      && /^B1_[a-f0-9]_[a-f0-9]{64}$/.test(proof.token || '')
+      && Number.isSafeInteger(proof.expiresAt) && proof.expiresAt > now && proof.expiresAt <= now + 1800000;
+  }
   // An unseen historical logout invalidates old tab credentials. A new tab may
   // still restore a later explicit persistent login through the page's server gate.
   const missedLogout = initial && ((savedEpoch !== null && epoch !== initial.id)
-    || (savedEpoch === null && (hasSessionIdentity() || (hasPersistentIdentity() && !persistentLoginAfter(initial)))));
+    || (savedEpoch === null && ((hasSessionIdentity() && !currentBSessionOnly(initial)) || (hasPersistentIdentity() && !persistentLoginAfter(initial)))));
   if (savedEpoch === null && !missedLogout) { epoch = initial?.id || ''; write('sessionStorage', SEEN_KEY, epoch); }
   function assertActive(expected = epoch) {
     if (locked || expected !== epoch) throw new DOMException('營運中心網頁已登出，請重新驗證。', 'AbortError');
