@@ -304,7 +304,12 @@
     window.DashboardBHost = {
       navigationSelector: '[data-kpi-battle-view]',
       clear() { kpiController.failClosed('請重新驗證登入。'); awardsController.failClosed('請重新驗證登入。'); },
-      showLegacyAccess() { window.kpiBattleController.renderLock(); document.querySelector('#kpiBattleContent .private-lock')?.scrollIntoView({block:'start',behavior:'smooth'}); document.querySelector('#privateEmployeeId')?.focus(); },
+      showLegacyAccess() {
+        kpiController.renderLock();
+        const visible = document.querySelector(awardsPanel.hidden ? '#kpiBattleContent .private-lock' : '#awardsBattleContent .private-lock');
+        visible?.scrollIntoView({block:'start',behavior:'smooth'});
+        visible?.querySelector('#privateEmployeeId')?.focus();
+      },
       accept(bundle) { kpiController.acceptB(bundle); },
       navigate(module) {
         if (module === 'return') { window.location.href = 'home.html'; return; }
