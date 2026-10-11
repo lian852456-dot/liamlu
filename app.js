@@ -1008,7 +1008,11 @@
     }).join('')||'<div class="empty-state">個人台獎尚未同步。</div>'}</div></section>`;
   }
 
+  const viewScroll=new Map();let currentView='';
   function setView(name) {
+    const started=performance.now();
+    if(currentView===name)return;
+    if(currentView)viewScroll.set(currentView,scope.scrollY);
     all('[data-view]').forEach(view => { view.hidden = view.dataset.view !== name; });
     all('[data-nav]').forEach(button => {
       const active = button.dataset.nav === name;
@@ -1016,8 +1020,11 @@
       button.setAttribute('aria-current',active?'page':'false');
     });
     history.replaceState(null,'',`#${name}`);
-    scope.scrollTo({top:0,behavior:'auto'});
-    refreshIcons();
+    const top=viewScroll.get(name)||0;currentView=name;
+    scope.scrollTo({top,behavior:'auto'});
+    // Restore after the new section has laid out; hidden views keep their DOM
+    // and already-rendered icons, so switching never rebuilds private content.
+    scope.requestAnimationFrame(()=>{if(currentView!==name)return;scope.scrollTo({top,behavior:'auto'});scope.DashboardB?.recordTab(name,performance.now()-started);});
   }
 
   function renderHeader() {
@@ -2137,5 +2144,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261011-app-standalone-phone-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261011-loading-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);

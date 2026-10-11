@@ -19,7 +19,7 @@ function html(name){
  };document.addEventListener('click',e=>{if(e.target.matches('button[data-nav]')){window.__counts.nav++;document.body.dataset.view='kpi'}});</script></body></html>`;
 }
 async function fixture(context){
- const calls=[],control={readFail:false,revoked:false,validateDelay:0},expiresAt=Date.now()+25*60*1000;
+ const calls=[],control={readFail:false,revoked:false,validateDelay:0,readDelay:0},expiresAt=Date.now()+25*60*1000;
  await context.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
   if(url.origin===origin){
@@ -30,7 +30,7 @@ async function fixture(context){
   }
   if(url.hostname!=='script.google.com')return route.abort();
   const payload=request.postDataJSON();calls.push(payload.action);
-  await new Promise(resolve=>setTimeout(resolve,25+(payload.action==='employee_session'?control.validateDelay:0)));
+  await new Promise(resolve=>setTimeout(resolve,25+(payload.action==='employee_session'?control.validateDelay:payload.action.endsWith('_read')?control.readDelay:0)));
   let result={status:'ok'};
   if(payload.action==='employee_status')result={status:'ok',enabled:true,passwordAvailable:true};
   if(payload.action==='employee_login')result={status:'ok',token:'B1_a_'+'a'.repeat(64),expiresAt,trustSource:'password-bound'};
@@ -51,16 +51,16 @@ const counts=page=>page.evaluate(()=>({...window.__counts}));
 
 test('website first load and cross-page navigation keep the same short session',async({context,page})=>{
  const f=await fixture(context),start=Date.now();await login(page,'home');
- if(!baseline)await expect.poll(()=>page.evaluate(()=>Boolean(sessionStorage.getItem('north12b_password_data_v1')))).toBe(true);
+ if(!baseline)expect(await page.evaluate(()=>sessionStorage.getItem('north12b_password_data_v1'))).toBeNull();
  const initial={ms:Date.now()-start,requests:f.calls.length};
- if(!baseline)f.control.validateDelay=600;
+ if(!baseline)f.control.readDelay=600;
  const from=f.calls.length,t=Date.now();await page.locator('[data-b-module="kpi"]').click();
  await expect(page).toHaveURL(origin+'/kpi.html');
  if(!baseline){
   await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','checking');
   await expect(page.locator('#dashboard-b-access form')).toBeHidden();
  }
- await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');f.control.validateDelay=0;
+ await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');f.control.readDelay=0;
  const cross={ms:Date.now()-t,requests:f.calls.length-from};
  expect(f.calls.filter(action=>action==='employee_login')).toHaveLength(1);
  expect(await page.evaluate(()=>document.body.dataset.private)).toBe('visible');
@@ -70,8 +70,8 @@ test('website first load and cross-page navigation keep the same short session',
  const awards={ms:Date.now()-s,requests:f.calls.length-second};
  console.log('NAV_METRICS '+JSON.stringify({version:baseline?'before':'after',initial,cross,awards}));
  if(!baseline){
-  expect(cross.requests).toBe(2);expect(awards.requests).toBe(2);
-  expect(f.calls.slice(second)).toEqual(expect.arrayContaining(['employee_status','employee_session']));
+  expect(cross.requests).toBe(2);expect(awards.requests).toBe(1);
+  expect(f.calls.slice(second)).toEqual(['employee_session']);
   expect(f.calls.slice(second)).not.toContain('employee_private_read');
   expect(f.calls.slice(second)).not.toContain('employee_kpi_read');
   f.control.readFail=false;
@@ -142,7 +142,7 @@ test('website KPI, awards and personal views switch in one verified document',as
   const proof={profile:{role:'employee',isTrusted:false},trustSource:'password-bound'};
   const result=action==='employee_status'?{status:'ok',enabled:true,passwordAvailable:true}
    :action==='employee_login'?{status:'ok',token:'B1_a_'+'a'.repeat(64),expiresAt,trustSource:'password-bound'}
-   :control.revoked&&action==='employee_session'?{status:'error'}
+   :control.revoked&&['employee_session','employee_private_read','employee_kpi_read'].includes(action)?{status:'error'}
    :action==='employee_session'?{status:'ok',expiresAt,trustSource:'password-bound'}
    :action==='employee_private_read'?{status:'ok',...proof,snapshot:{kpiBattle:snapshot,awardsBattle:awards}}
    :action==='employee_kpi_read'?{status:'ok',...proof,data:kpi}:{status:'ok'};
