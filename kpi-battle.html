@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <script src="portal-logout.js?v=20261011-owner-phone-1"></script>
+  <script src="portal-logout.js?v=20261011-battle-hub-1"></script>
   <script src="GasBClient.js?v=20261011-navigation-1" defer></script>
-  <script src="dashboard-b-shell.js?v=20261011-navigation-1" defer></script>
+  <script src="dashboard-b-shell.js?v=20261011-battle-hub-1" defer></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12,12 +12,11 @@
 <meta name="robots" content="noindex, nofollow">
 <title>KPI 戰情｜北一二B 智慧營運中心</title>
 <!--
-  Phase 1A.2 standalone 直接掛載共用 KPI controller。
-  權限、Approved Device、正式資料來源、adapter、補值與 renderer 均只存在
-  kpi-battle-controller.js；本頁不得新增公式、API、JSON、資料快取或 fallback。
+  KPI、個績與台獎共用同一個已驗證畫面，沿用原有 controller 與資料來源。
+  本頁不得新增公式、API、JSON、權限捷徑或 fallback。
 -->
 <style>
-  #dashboard-b-access [data-b-module="awards"] { display: none; }
+  [data-battle-panel][hidden] { display: none !important; }
   :root {
     color-scheme: light;
     --bg-deep: #f5f6f8;
@@ -86,6 +85,7 @@
     margin: 0 auto;
     padding: 16px 12px max(24px, env(safe-area-inset-bottom));
   }
+  #panel-awards-battle { width: 100%; max-width: 1640px; min-width: 0; margin: 0 auto; padding: 16px 12px max(24px,env(safe-area-inset-bottom)); }
   .card {
     min-width: 0;
     margin-bottom: 20px;
@@ -170,12 +170,48 @@
   .kpi-metric-card .label { color: var(--text-dim); font-size: 17px; font-weight: 900; }
   .kpi-metric-card .value { margin-top: 6px; font-size: 27px; font-weight: 900; }
   .standalone-error { border-color: #fecaca; background: #fff7f7; }
+  .awards-hero { border: 2px solid #c4b5fd; background: #fcfaff; }
+  .awards-hero .card-title { color: #6d28d9; }
+  .awards-battle-note { color: var(--text-muted); font-size: 16px; font-weight: 750; line-height: 1.65; }
+  .award-summary-money { white-space: nowrap; word-break: keep-all; overflow-wrap: normal; font-size: 27px; }
+  .award-store-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(285px,100%),1fr)); gap: 16px; }
+  .award-store-card { min-width: 0; padding: 18px; border: 1px solid var(--border-dim); border-radius: 8px; background: #fff; }
+  .award-store-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .award-store-name { min-width: 0; font-size: 22px; font-weight: 900; overflow-wrap: anywhere; }
+  .award-store-rank { flex: 0 0 auto; color: #7c3aed; font-size: 16px; font-weight: 900; line-height: 1.55; white-space: nowrap; }
+  .award-role-indicator { display: inline-flex; align-items: center; min-height: 30px; max-width: 100%; margin-top: 8px; padding: 5px 9px; border-radius: 6px; background: #f5f3ff; color: #6d28d9; font-size: 15px; font-weight: 900; overflow-wrap: anywhere; }
+  .award-role-indicator.district { background: #fff7ed; color: var(--accent-bright); }
+  .award-store-values { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 16px 0; }
+  .award-value { min-width: 0; padding: 13px; border-radius: 7px; background: #f5f3ff; }
+  .award-value .label { color: var(--text-dim); font-size: 15px; font-weight: 800; }
+  .award-value .number { margin-top: 6px; color: #6d28d9; font-size: 26px; font-weight: 900; overflow-wrap: anywhere; }
+  .award-priority-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(220px,100%),1fr)); gap: 12px; }
+  .award-priority-card { min-width: 0; padding: 15px; border: 1px solid #ddd6fe; border-radius: 8px; background: #fff; }
+  .award-priority-title { color: var(--text); font-size: 19px; font-weight: 900; line-height: 1.35; overflow-wrap: anywhere; }
+  .award-priority-action { margin-top: 6px; color: #7c3aed; font-size: 17px; font-weight: 900; }
+  .award-priority-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; margin-top: 9px; }
+  .award-metric { min-width: 0; padding: 10px; border-radius: 7px; background: #f8fafc; color: var(--text-muted); font-size: 14px; font-weight: 800; }
+  .award-metric strong { display: block; margin-top: 4px; color: var(--text); font-size: 19px; overflow-wrap: anywhere; }
+  .award-metric.wide { grid-column: 1 / -1; }
+  .award-store-selector { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+  .award-store-selector label { min-width: min(220px,100%); color: var(--text-muted); font-size: 16px; font-weight: 900; }
+  .award-store-selector select { width: 100%; min-height: 48px; margin-top: 5px; padding: 10px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--text); font-size: 17px; font-weight: 800; }
+  .award-model-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 10px; }
+  .award-model { min-width: 0; padding: 13px; border: 1px solid var(--border-dim); border-radius: 8px; }
+  .award-model-name { color: var(--text); font-size: 16px; font-weight: 900; overflow-wrap: anywhere; }
+  .award-model-rate { margin-top: 4px; font-size: 24px; font-weight: 900; }
+  .award-model-sub { display: block; margin-top: 3px; color: var(--text-muted); font-size: 15px; font-weight: 700; line-height: 1.45; }
+  .award-model-tiers { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 10px; }
+  .award-model-tier { min-width: 0; padding: 9px; border: 1px solid #ddd6fe; border-radius: 7px; background: #faf5ff; color: #6d28d9; font-size: 13px; font-weight: 800; }
+  .award-model-tier strong { display: block; margin-top: 3px; color: #5b21b6; font-size: 19px; font-weight: 900; overflow-wrap: anywhere; }
+  .good { color: var(--green); } .warn { color: var(--gold); } .bad { color: var(--red); }
   @media (max-width: 700px) {
     body { font-size: 18px; }
     .shell-header { align-items: flex-start; gap: 10px; padding-bottom: 12px; }
     .subtitle { font-size: 12px; }
     .home-link { padding-inline: 11px; white-space: nowrap; }
     #panel-kpi-battle { padding: 10px 8px max(18px, env(safe-area-inset-bottom)); }
+    #panel-awards-battle { padding: 10px 8px max(18px, env(safe-area-inset-bottom)); }
     .card { padding: 18px 16px; margin-bottom: 16px; }
     .private-lock-form { grid-template-columns: 1fr; }
     .private-lock h3 { font-size: 19px; }
@@ -188,6 +224,9 @@
     tbody td { padding: 17px 13px; font-size: 17px; }
     .kpi-rate { font-size: 22px; }
     .kpi-battle-filter select { min-height: 50px; font-size: 18px; }
+    .award-store-name { font-size: 21px; }
+    .award-value .number { font-size: 24px; }
+    .award-model-grid { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -195,13 +234,13 @@
 <header class="shell-header">
   <div class="title-group">
     <p class="eyebrow">北一二B 智慧營運中心</p>
-    <h1>KPI 戰情</h1>
+    <h1 id="battleHeading">KPI 戰情</h1>
     <p class="subtitle">沿用每日回報既有正式資料、權限與計算邏輯</p>
   </div>
   <a class="home-link" href="home.html" aria-label="返回智慧營運中心">返回大廳</a>
 </header>
 
-<main id="panel-kpi-battle" aria-label="KPI 戰情內容">
+<main id="panel-kpi-battle" data-battle-panel aria-label="KPI 戰情內容">
   <div class="card">
     <div class="card-title"><span class="dot"></span>🏆 KPI戰情 · 正式每日戰報</div>
     <div class="kpi-battle-toolbar">
@@ -215,10 +254,29 @@
   <div id="kpiBattleContent"><div class="kpi-empty">讀取 KPI 戰情資料中…</div></div>
   <noscript><div class="card private-lock standalone-error"><h3>KPI 戰情暫時無法載入</h3><p>瀏覽器未啟用 JavaScript，因此不顯示任何 KPI 數值。請返回<a href="index.html">每日回報內的 KPI 戰情</a>。</p></div></noscript>
 </main>
+<main id="panel-awards-battle" data-battle-panel aria-label="台獎戰情內容" hidden>
+  <div class="card awards-hero">
+    <div class="card-title"><span class="dot"></span>🏅 台獎戰情 · 督導優先補量</div>
+    <div class="awards-battle-note" id="awardsBattleSourceNote">讀取受保護獎金資料中…</div>
+  </div>
+  <div id="awardsBattleContent"><div class="kpi-empty">讀取台獎戰情資料中…</div></div>
+</main>
 
 <script src="kpi-battle-controller.js?v=20261010-employee-login-1"></script>
+<script src="award-model-catalog.js?v=20261001-1"></script>
+<script src="awards-battle-controller.js?v=20261003-publication-date-1"></script>
 <script>
   const panel = document.getElementById('panel-kpi-battle');
+  const awardsPanel = document.getElementById('panel-awards-battle');
+  function showPanel(module) {
+    const awards = module === 'awards';
+    panel.hidden = awards;
+    awardsPanel.hidden = !awards;
+    document.getElementById('battleHeading').textContent = awards ? '台獎戰情' : module === 'personal' ? '個績排名' : 'KPI 戰情';
+    const desired = module === 'personal' ? 'personal' : 'stores';
+    const current = document.getElementById('kpiBattlePersonalBtn').classList.contains('active') ? 'personal' : 'stores';
+    if (!awards && current !== desired) window.kpiBattleController?.setView(desired);
+  }
 
   function failClosed(message) {
     panel.classList.add('standalone-failed');
@@ -229,24 +287,36 @@
   }
 
   try {
-    if (!window.KpiBattleController) throw new Error('KPI controller unavailable');
+    if (!window.KpiBattleController || !window.AwardsBattleController) throw new Error('battle controller unavailable');
     let GAS_URL = KpiBattleController.resolveGasUrl(localStorage);
+    let kpiController;
+    const awardsController = AwardsBattleController.create({window,document,renderLock:()=>kpiController.renderLock()});
     window.kpiBattleController = KpiBattleController.create({
       window,
       document,
       getGasUrl: () => GAS_URL,
+      getAwardsData: () => awardsController.getData(),
+      onKpiLoaded: payload => awardsController.acceptKpiResult(payload),
+      onKpiLoadError: () => awardsController.handleKpiLoadError(),
     });
+    kpiController = window.kpiBattleController;
+    window.awardsBattleController = awardsController;
     window.DashboardBHost = {
       navigationSelector: '[data-kpi-battle-view]',
-      clear() { window.kpiBattleController.failClosed('請重新驗證登入。'); },
+      clear() { kpiController.failClosed('請重新驗證登入。'); awardsController.failClosed('請重新驗證登入。'); },
       showLegacyAccess() { window.kpiBattleController.renderLock(); document.querySelector('#kpiBattleContent .private-lock')?.scrollIntoView({block:'start',behavior:'smooth'}); document.querySelector('#privateEmployeeId')?.focus(); },
-      accept(bundle) { window.kpiBattleController.acceptB(bundle); },
+      accept(bundle) { kpiController.acceptB(bundle); },
       navigate(module) {
         if (module === 'return') { window.location.href = 'home.html'; return; }
-        window.kpiBattleController.setView(module === 'personal' ? 'personal' : 'stores');
+        showPanel(module);
+        if (window.location.hash !== '#' + module) window.history.pushState(null,'','#' + module);
       }
     };
-    window.kpiBattleController.load();
+    kpiController.load();
+    awardsController.load();
+    window.addEventListener('hashchange',()=>showPanel(window.location.hash.slice(1)));
+    window.addEventListener('popstate',()=>showPanel(window.location.hash.slice(1)));
+    showPanel(window.location.hash.slice(1));
     panel.dataset.ready = 'true';
   } catch (error) {
     failClosed('KPI 戰情控制器載入失敗。');

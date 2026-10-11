@@ -308,7 +308,7 @@
     clear(){passwordVerified=false;updateAccessNotice();},
     accept(){passwordVerified=true;updateAccessNotice();if(!salesVerified){feeds.sales=pending('sales','同仁專區已登入，請由下方入口查看 KPI、台獎與個績；此提醒尚未讀取。');render();}},
     navigate(module){
-      const targets={kpi:'kpi-battle.html',awards:'awards-battle.html',personal:'kpi.html',return:'#zone-staff'};
+      const targets={kpi:'kpi-battle.html#kpi',awards:'kpi-battle.html#awards',personal:'kpi-battle.html#personal',return:'#zone-staff'};
       scope.location.href=targets[module]||'#zone-staff';
     }
   };

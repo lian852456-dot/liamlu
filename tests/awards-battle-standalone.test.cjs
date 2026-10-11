@@ -132,7 +132,7 @@ test('三創名稱只在顯示層縮短，獎金摘要金額固定單行', () =>
 
 test('home 戰情入口順序固定 KPI 第一、台獎第二，原 index 台獎仍保留', () => {
   const kpiEntry = home.indexOf('href="kpi-battle.html"');
-  const awardsEntry = home.indexOf('href="awards-battle.html"');
+  const awardsEntry = home.indexOf('href="kpi-battle.html#awards"');
   const reportEntry = home.indexOf('href="index.html"');
   assert.ok(kpiEntry >= 0 && awardsEntry > kpiEntry && reportEntry > awardsEntry);
   assert.match(index, /id="panel-awards-battle"/);

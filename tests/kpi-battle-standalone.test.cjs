@@ -41,17 +41,11 @@ test('唯一 controller 固定 private_access → kpicalc_access，並包含 ada
   }
 });
 
-test('同仁大廳第一張卡為 KPI 戰情，原入口仍保留原連結', () => {
-  const staff = home.match(/<nav class="board" aria-label="同仁大廳">([\s\S]*?)<\/nav>/)?.[1] || '';
-  const hrefs = Array.from(staff.matchAll(/<a class="card" href="([^"]+)"/g), match => match[1]);
-  assert.deepEqual(hrefs, [
-    'kpi-battle.html',
-    'awards-battle.html',
-    'gold-medal.html',
-    'index.html',
-    'kpi.html',
-    'kpitry.html',
-    'audit-report.html',
-    'https://twm-store-inspection.liamlu245.chatgpt.site/',
-  ]);
+test('首頁 KPI 與台獎共用戰情頁，其他工作入口維持原連結', () => {
+  const quick = home.match(/<nav class="quick-grid" aria-label="常用入口">([\s\S]*?)<\/nav>/)?.[1] || '';
+  const hrefs = Array.from(quick.matchAll(/href="([^"]+)"/g), match => match[1]);
+  assert.deepEqual(hrefs.slice(0, 4), ['kpi-battle.html','kpi-battle.html#awards','index.html','gold-medal.html']);
+  for (const href of ['kpi.html','kpitry.html','audit-report.html','https://twm-store-inspection.liamlu245.chatgpt.site/']) {
+    assert.ok(home.includes(`href="${href}"`));
+  }
 });
