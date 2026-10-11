@@ -19,7 +19,7 @@ function html(name){
  };document.addEventListener('click',e=>{if(e.target.matches('button[data-nav]')){window.__counts.nav++;document.body.dataset.view='kpi'}});</script></body></html>`;
 }
 async function fixture(context){
- const calls=[],control={readFail:false,revoked:false},expiresAt=Date.now()+25*60*1000;
+ const calls=[],control={readFail:false,revoked:false,validateDelay:0},expiresAt=Date.now()+25*60*1000;
  await context.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
   if(url.origin===origin){
@@ -30,7 +30,7 @@ async function fixture(context){
   }
   if(url.hostname!=='script.google.com')return route.abort();
   const payload=request.postDataJSON();calls.push(payload.action);
-  await new Promise(resolve=>setTimeout(resolve,25));
+  await new Promise(resolve=>setTimeout(resolve,25+(payload.action==='employee_session'?control.validateDelay:0)));
   let result={status:'ok'};
   if(payload.action==='employee_status')result={status:'ok',enabled:true,passwordAvailable:true};
   if(payload.action==='employee_login')result={status:'ok',token:'B1_a_'+'a'.repeat(64),expiresAt,trustSource:'password-bound'};
@@ -53,8 +53,14 @@ test('website first load and cross-page navigation keep the same short session',
  const f=await fixture(context),start=Date.now();await login(page,'home');
  if(!baseline)await expect.poll(()=>page.evaluate(()=>Boolean(sessionStorage.getItem('north12b_password_data_v1')))).toBe(true);
  const initial={ms:Date.now()-start,requests:f.calls.length};
+ if(!baseline)f.control.validateDelay=600;
  const from=f.calls.length,t=Date.now();await page.locator('[data-b-module="kpi"]').click();
- await expect(page).toHaveURL(origin+'/kpi.html');await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
+ await expect(page).toHaveURL(origin+'/kpi.html');
+ if(!baseline){
+  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','checking');
+  await expect(page.locator('#dashboard-b-access form')).toBeHidden();
+ }
+ await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');f.control.validateDelay=0;
  const cross={ms:Date.now()-t,requests:f.calls.length-from};
  expect(f.calls.filter(action=>action==='employee_login')).toHaveLength(1);
  expect(await page.evaluate(()=>document.body.dataset.private)).toBe('visible');

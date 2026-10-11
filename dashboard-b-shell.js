@@ -8,7 +8,7 @@ let host,client,active=false,confirmed=false,epoch=0,expiresAt=0,expiryTimer,dat
 const pendingHost=scope.DashboardBHost;
 let legacyObserver;
 function message(text){if(panel)panel.querySelector('[data-b-message]').textContent=text;}
-function state(name){if(panel){panel.dataset.state=name;panel.querySelector('h2').textContent=name==='active'?(host?.ownerPhone&&client?.hasPhone()?'手機自動登入已啟用':'同仁專區已登入'):(host?.ownerPhone?'首次驗證與手機綁定':'員編與密碼登入');panel.querySelector('[data-b-phone]').hidden=!(name==='active'&&host?.ownerPhone&&host.phoneEligible&&!client?.hasPhone());}}
+function state(name){if(panel){panel.dataset.state=name;panel.querySelector('h2').textContent=name==='active'?(host?.ownerPhone&&client?.hasPhone()?'手機自動登入已啟用':'同仁專區已登入'):name==='checking'?'正在確認登入':name==='loading'?'正在登入這台裝置':(host?.ownerPhone?'首次驗證與手機綁定':'員編與密碼登入');panel.querySelector('[data-b-phone]').hidden=!(name==='active'&&host?.ownerPhone&&host.phoneEligible&&!client?.hasPhone());}}
 function markLegacyRoots(){
  const roots=[];
  const appForm=document.querySelector('#privateAccessForm');
@@ -152,7 +152,7 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
  #home-login [data-b-return]{display:none}
  #dashboard-b-access *{box-sizing:border-box}
  #dashboard-b-access h2{margin:0 0 14px;font-size:18px;line-height:1.45;font-weight:700;color:inherit}
- #dashboard-b-access[data-state="active"] form,#dashboard-b-access[data-state="pending"] form{display:none}
+ #dashboard-b-access[data-state="active"] form,#dashboard-b-access[data-state="pending"] form,#dashboard-b-access[data-state="checking"] form,#dashboard-b-access[data-state="loading"] form{display:none}
  #dashboard-b-access form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end;gap:14px;margin:0}
  #dashboard-b-access label{display:grid;gap:6px;min-width:0;margin:0;font-size:13px;font-weight:600}
  #dashboard-b-access input{display:block;width:100%;height:44px;min-height:44px;margin:0;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#172033;font:inherit;font-size:16px;font-weight:400}
