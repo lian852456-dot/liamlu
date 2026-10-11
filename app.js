@@ -2106,7 +2106,9 @@
     ownerPhone:true,
     navigationSelector:null,
     clear(){resetPrivateSummary();privateAccessStatus='unauthorized';dom('#viewerState').textContent='未登入';renderAll();},
-    showLegacyAccess(){setView('me');dom('#privateAccessForm')?.closest('.access-panel')?.scrollIntoView({block:'start',behavior:'smooth'});dom('#employeeId')?.focus();},
+    showLegacyAccess(){setView('me');dom('#privateAccessForm')?.closest('.access-panel')?.scrollIntoView({block:'start',behavior:'smooth'});dom('#employeeId')?.focus();
+      const stored=scope.localStorage.getItem(EMPLOYEE_KEY)||'';
+      if(stored)loadFormalSummary(stored).catch(error=>{if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error');});},
     accept(bundle){
       const snapshot=bundle.privateResult.snapshot||{},data=bundle.kpiResult.data,at=nowIso();
       const kpi=adaptKpi(data,snapshot,at),awards=adaptAwards(snapshot,String(snapshot.kpiBattle&&(snapshot.kpiBattle.report_run_date||snapshot.kpiBattle.report_date)||''),at);
@@ -2127,10 +2129,11 @@
   } else {
     const stored=scope.localStorage.getItem(EMPLOYEE_KEY)||''; dom('#employeeId').value=stored;
     setPrivateAccessState('unauthorized');
-    if(stored && !scope.sessionStorage.getItem('north12b_password_session_v1')) loadFormalSummary(stored).catch(error=>{ if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error'); });
+    // The password screen must not start the legacy Approved Device read in parallel.
+    // The existing channel still loads when its button is explicitly selected.
     restorePatrol();
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261011-mobile-resume-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261011-app-login-priority-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);

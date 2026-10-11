@@ -58,6 +58,15 @@ test('stale home-screen phone grant cannot block a new password login',async({co
 });
 test('regular employees keep short sessions without being enrolled as the owner phone',async({context,page})=>{const f=await setup(context,{owner:false});await login(page);await expect(page.locator('[data-b-phone]')).toBeHidden();expect(f.calls.some(p=>p.action==='employee_phone_enroll')).toBe(false);expect(await page.evaluate(k=>localStorage.getItem(k),PHONE)).toBeNull();});
 test('real mobile App shows the first-time phone setup without horizontal overflow',async({context,page})=>{await setup(context);await page.setViewportSize({width:390,height:844});await page.goto(BASE+'app.html#me');await expect(page.locator('h2').filter({hasText:'首次驗證與手機綁定'})).toBeVisible();await expect(page.locator('[data-b-submit]')).toHaveText('首次驗證並綁定這支手機');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/owner-phone-first-setup.png'});});
+test('App password entry does not launch legacy reads until the old channel is chosen',async({context,page})=>{
+ const f=await setup(context);
+ await page.addInitScript(()=>localStorage.setItem('north12b_private_dashboard_employee_id','SYNTH001'));
+ await page.goto(BASE+'app.html#me');
+ await expect(page.locator('[data-b-submit]')).toBeVisible();
+ expect(f.calls.filter(p=>p.action==='private_access')).toHaveLength(0);
+ await page.locator('[data-b-a]').click();
+ await expect.poll(()=>f.calls.filter(p=>p.action==='private_access').length).toBe(1);
+});
 test('global website logout revokes the phone grant before reopening the App',async({context,page})=>{
  const f=await setup(context);await login(page);await expect(page.locator('h2')).toHaveText('手機自動登入已啟用');
  await page.goto(BASE+'home.html');await expect(page.locator('#portal-logout')).toBeVisible();page.once('dialog',d=>d.accept());await page.locator('#portal-logout').click();
