@@ -43,19 +43,74 @@ function tradeinPerformanceMonthRoster_(month) {
       effective_from:p.effective_from,effective_to:p.effective_to,monthly_basis_sha256:basis.source_sha256};
   });
 }
-function tradeinPerformancePrivateReference_(source) {
-  if(!source || !/^[a-f0-9]{64}$/.test(source.source_sha256 || ''))throw new Error('來源雜湊無效');
-  const file=tradeinPerformanceFile_('north12b-tradein-reference-'+source.source_sha256+'.json');
-  if(!file)throw new Error('本批私有員編／店碼對照尚未配置，停止預覽與同步');
-  const value=JSON.parse(file.getBlob().getDataAsString('UTF-8'));
-  // Monthly actuals reset independently. Until cancellation attribution has
-  // been approved, this narrow policy only admits batches with no cancellations.
-  if(value.counting_review_status!=='verified' || value.counting_rule_id!==TradeinPerformanceCore.RULE_ID ||
+function tradeinPerformanceReferencePolicy_(value) {
+  if(!value || value.counting_review_status!=='verified' || value.counting_rule_id!==TradeinPerformanceCore.RULE_ID ||
      value.counting_policy!=='monthly-reset-no-cancellations/v1')
     throw new Error('每月重新計數口徑尚未核定，停止實績計算');
+}
+function tradeinPerformancePrivateReference_(source,roster) {
+  if(!source || !/^[a-f0-9]{64}$/.test(source.source_sha256 || ''))throw new Error('來源雜湊無效');
+  const file=tradeinPerformanceFile_('north12b-tradein-reference-'+source.source_sha256+'.json');
+  // Monthly actuals reset independently. Until cancellation attribution has
+  // been approved, this narrow policy only admits batches with no cancellations.
   if(!Array.isArray(source.records) || source.records.some(function(r){return r.cancel_date!==null && r.cancel_date!==undefined && r.cancel_date!=='';}))
     throw new Error('本批含取消交易；取消／跨月沖回月份尚待核定，整批停止同步');
+  const value=file?JSON.parse(file.getBlob().getDataAsString('UTF-8')):
+    tradeinPerformanceReuseReference_(source,roster || tradeinPerformanceMonthRoster_(source.month));
+  tradeinPerformanceReferencePolicy_(value);
   return value;
+}
+function tradeinPerformanceReuseReference_(source,roster) {
+  // Only reuse the owner-held crosswalk behind this month's published version.
+  // No client mapping, login roster, name matching or employee-prefix inference.
+  const active=(tradeinPerformanceRegistry_().months[source.month] || {}).active;
+  if(!active)throw new Error('本批私有員編／店碼對照尚未配置，請先核定本月首次來源');
+  if(active.roster_hash!==tradeinPerformanceHash_(roster))throw new Error('核定月名冊已變更，請先核對員編及店點異動');
+  const snapshot=tradeinPerformanceSnapshot_(active);
+  if(snapshot.period_key!==source.month || snapshot.source_sha256!==active.source_sha256 ||
+     snapshot.source_period.start!==source.source_start || source.source_end<snapshot.source_cutoff_date)
+    throw new Error('來源月份或期間與已核定版本不符，請使用完整本月新檔');
+  const file=tradeinPerformanceFile_('north12b-tradein-reference-'+active.source_sha256+'.json');
+  if(!file)throw new Error('已發布版本的私有員編／店碼對照缺漏，請管理者核對');
+  const prior=JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if(active.reference_hash && tradeinPerformanceHash_(prior)!==active.reference_hash)
+    throw new Error('已發布版本的私有對照已變更，請管理者核對');
+  tradeinPerformanceReferencePolicy_(prior);
+  // Validate all identifiers, store mappings and original observations before reuse.
+  TradeinPerformanceCore.build({month:source.month,source_start:snapshot.source_period.start,
+    source_end:snapshot.source_period.end,status_as_of_date:snapshot.status_as_of_date,
+    source_sha256:active.source_sha256,rule_id:TradeinPerformanceCore.RULE_ID,complete_nine_stores:true,records:[]},roster,prior);
+  const next=JSON.parse(JSON.stringify(prior)),identities=new Map(next.employees.map(function(p){return [p.source_employee_id,p];}));
+  const people=new Map(roster.filter(function(p){return p.status==='active';}).map(function(p){return [p.employee_id,p];}));
+  const published=new Map(snapshot.people.map(function(p){return [p.employee_key,p];}));
+  const stores=new Map(next.stores.map(function(p){return [p.store_code,TradeinPerformanceCore.storeName(p.store)];}));
+  const pending=new Set();
+  source.records.forEach(function(record){
+    const identity=identities.get(record.source_employee_id),person=identity && people.get(identity.employee_key),
+      confirmed=identity && published.get(identity.employee_key),store=stores.get(record.store_code);
+    if(!store)throw new Error('來源含九店範圍以外或未知店碼');
+    if(!person || !confirmed || confirmed.identity_status!=='confirmed' ||
+       TradeinPerformanceCore.storeName(person.store)!==store || confirmed.store!==store ||
+       identity.observations.some(function(o){return stores.get(o.store_code)!==store;})){
+      pending.add(JSON.stringify([record.source_employee_id,record.store_code]));return;
+    }
+    if(!identity.observations.some(function(o){return o.trade_date===record.trade_date && o.store_code===record.store_code;}))
+      identity.observations.push({trade_date:record.trade_date,store_code:record.store_code});
+  });
+  if(pending.size)throw new Error('新檔有 '+pending.size+' 組新增員編或店點異動待核，請管理者更新私有對照後重新預覽');
+  next.source_sha256=source.source_sha256;next.source_start=source.source_start;next.source_end=source.source_end;
+  return next;
+}
+function tradeinPerformanceSaveReference_(source,reference) {
+  const name='north12b-tradein-reference-'+source.source_sha256+'.json',hash=tradeinPerformanceHash_(reference);
+  let file=tradeinPerformanceFile_(name);
+  if(file){
+    if(tradeinPerformanceHash_(JSON.parse(file.getBlob().getDataAsString('UTF-8')))!==hash)
+      throw new Error('本批私有對照已變更，請重新預覽');
+  }else file=tradeinPerformanceFolder_().createFile(name,JSON.stringify(reference),MimeType.PLAIN_TEXT);
+  if(tradeinPerformanceHash_(JSON.parse(file.getBlob().getDataAsString('UTF-8')))!==hash)
+    throw new Error('私有對照保存後核對失敗');
+  return hash;
 }
 function tradeinPerformanceFolder_() {
   const folder=privateDashboardFolder();
@@ -124,10 +179,10 @@ function tradeinPerformancePreview(payload) {
   return {snapshot:tradeinPerformanceProjection_(snapshot,{supervisor:true}),expectedActiveHash:current?current.snapshot_hash:null,
     rosterHash:tradeinPerformanceHash_(roster),previewHash:tradeinPerformanceHash_(snapshot),sourceHash:snapshot.source_sha256};
 }
-function tradeinPerformanceBuild_(source,roster) {
+function tradeinPerformanceBuild_(source,roster,reference) {
   const today=Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd');
   if(source.source_end>today || source.status_as_of_date>today)throw new Error('來源或取消核對日期不可晚於今天');
-  return TradeinPerformanceCore.build(source,roster,tradeinPerformancePrivateReference_(source));
+  return TradeinPerformanceCore.build(source,roster,reference || tradeinPerformancePrivateReference_(source,roster));
 }
 function tradeinPerformanceSaveRegistry_(registry) {
   const name='north12b-tradein-performance-registry.json',file=tradeinPerformanceFile_(name),body=JSON.stringify(registry);
@@ -138,7 +193,8 @@ function tradeinPerformancePublish(payload) {
   try {
     const roster=tradeinPerformanceMonthRoster_(payload.source.month);
     if(tradeinPerformanceHash_(roster)!==payload.rosterHash)throw new Error('名冊已變更，請重新預覽');
-    const value=tradeinPerformanceBuild_(payload.source,roster),registry=tradeinPerformanceRegistry_();
+    const reference=tradeinPerformancePrivateReference_(payload.source,roster),
+      value=tradeinPerformanceBuild_(payload.source,roster,reference),registry=tradeinPerformanceRegistry_();
     if(payload.previewHash!==tradeinPerformanceHash_(value))throw new Error('來源或計算結果與預覽不同，請重新預覽');
     const current=registry.months[value.period_key] || {active:null,previous:null};
     const activeHash=current.active?current.active.snapshot_hash:null;
@@ -158,11 +214,13 @@ function tradeinPerformancePublish(payload) {
       return {status:'unchanged',snapshotHash:activeHash,snapshot:tradeinPerformanceProjection_(saved,{supervisor:true})};
     }
     if(current.active && value.source_cutoff_date<current.active.source_cutoff_date)throw new Error('來源比目前版本舊，請使用回復功能');
+    const referenceHash=tradeinPerformanceSaveReference_(payload.source,reference);
     value.published_at=privateDashboardNow();
     const hash=tradeinPerformanceHash_(value),file=tradeinPerformanceFolder_().createFile(
       'north12b-tradein-performance-'+value.period_key+'-'+hash.slice(0,16)+'.json',JSON.stringify(value),MimeType.PLAIN_TEXT);
     const entry={file_id:file.getId(),snapshot_hash:hash,source_sha256:value.source_sha256,
-      source_cutoff_date:value.source_cutoff_date,roster_hash:payload.rosterHash,preview_hash:payload.previewHash,operator_hash:tradeinPerformanceDigest_(operator)};
+      source_cutoff_date:value.source_cutoff_date,roster_hash:payload.rosterHash,preview_hash:payload.previewHash,
+      reference_hash:referenceHash,operator_hash:tradeinPerformanceDigest_(operator)};
     // Validate bytes before switching active. All historical files are retained.
     tradeinPerformanceSnapshot_(entry);
     registry.months[value.period_key]={active:entry,previous:current.active};
