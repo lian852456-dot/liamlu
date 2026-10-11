@@ -106,7 +106,7 @@ async function apiFixture(context, { delay = 35, readDelay = 0 } = {}) {
     const action = payload.action || '';
     const started = Date.now();
     calls.push({ action, started, payload });
-    await new Promise(resolve => setTimeout(resolve, readDelay && ['employee_private_read','employee_kpi_read'].includes(action)?readDelay:responseDelay));
+    await new Promise(resolve => setTimeout(resolve, readDelay && ['employee_private_read','employee_kpi_read','employee_dashboard_read'].includes(action)?readDelay:responseDelay));
     let body = { status: 'ok' };
     if (action === 'employee_status') {
       body = disabled ? { status: 'error' } : { status: 'ok', enabled: true, passwordAvailable: true };
@@ -132,6 +132,13 @@ async function apiFixture(context, { delay = 35, readDelay = 0 } = {}) {
       body = revoked || disabled ? { status: 'error' } : { status: 'ok', profile: PROFILE, trustSource: 'password-bound', snapshot: SNAPSHOT };
     } else if (action === 'employee_kpi_read') {
       body = revoked || disabled ? { status: 'error' } : { status: 'ok', profile: PROFILE, trustSource: 'password-bound', data: DATA };
+    } else if (action === 'employee_dashboard_read') {
+      body = revoked || disabled ? { status: 'error' } : {
+        status: 'ok', expiresAt: serverExpired ? Date.now() - 1 : leaseExpiresAt,
+        trustSource: 'password-bound', phoneEligible: true,
+        privateResult: { status: 'ok', profile: PROFILE, trustSource: 'password-bound', snapshot: SNAPSHOT },
+        kpiResult: { status: 'ok', profile: PROFILE, trustSource: 'password-bound', data: DATA }
+      };
     } else if (action === 'employee_logout' || action === 'employee_phone_forget') {
       body = { status: 'ok' };
     } else if (action === 'private_access') {
@@ -313,7 +320,7 @@ test('real App five tabs retain protected DOM, filters, expansion and scroll; re
   await context.close();
 });
 
-test('real B request plan uses read2 for cacheless, validate only for cache hit, and owner phone reads in parallel', async ({ browser }) => {
+test('real B request plan uses dashboard bundle for cacheless, validate only for cache hit, and owner phone bundle reads', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
   const fixture = await apiFixture(context, { delay: 45 });
   const page = await appPage(context);
@@ -334,8 +341,22 @@ test('real B request plan uses read2 for cacheless, validate only for cache hit,
   console.log('B_LOADING_METRICS ' + JSON.stringify({ version: BASELINE ? 'before' : 'after', initial,phases:BASELINE?[]:await page.evaluate(()=>DashboardB.metrics()),cacheHit:{ms:cacheHitMs,actions:cacheHit}, cacheless:{ms:cachelessMs,actions:cacheless} }));
   if (!BASELINE) {
     expect(cacheHit).toEqual(['employee_session']);
-    expect(cacheless.slice().sort()).toEqual(['employee_kpi_read', 'employee_private_read']);
+    expect(cacheless).toEqual(['employee_dashboard_read']);
   }
+
+  // A protected bundle with an expired server lease must never paint the old
+  // protected view after restore. The same bundle is accepted only after the
+  // fixture restores a current lease and the user explicitly revalidates.
+  const protectedBundleMarker = (await page.locator('#battleContent').innerText()).trim().split('\n')[0];
+  fixture.setExpired();
+  fixture.reset();
+  await page.evaluate(key => sessionStorage.removeItem(key), B_CACHE);
+  await page.reload();
+  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'pending');
+  if (!BASELINE && protectedBundleMarker) await expect(page.locator('#battleContent')).not.toContainText(protectedBundleMarker);
+  fixture.setExpired(false);
+  await page.locator('[data-b-refresh]').click();
+  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'active');
   await context.close();
 
   const ownerContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
@@ -345,13 +366,11 @@ test('real B request plan uses read2 for cacheless, validate only for cache hit,
   await login(ownerPage);
   await expect.poll(() => ownerFixture.calls.filter(call => call.action === 'employee_phone_enroll').length).toBe(1);
   const firstOwnerActions = ownerFixture.actions();
-  const firstSecure = ['employee_session', 'employee_private_read', 'employee_kpi_read'];
+  const firstSecure = ['employee_dashboard_read'];
   const firstStarts = ownerFixture.starts(firstSecure);
   console.log('OWNER_PHONE_METRICS ' + JSON.stringify({ version: BASELINE ? 'before' : 'after', actions: firstOwnerActions, securedStartSpan: Math.max(...firstStarts) - Math.min(...firstStarts) }));
   if (!BASELINE) {
-    expect(firstOwnerActions.filter(action => action === 'employee_session')).toHaveLength(1);
-    expect(firstOwnerActions.filter(action => action === 'employee_private_read')).toHaveLength(1);
-    expect(firstOwnerActions.filter(action => action === 'employee_kpi_read')).toHaveLength(1);
+    expect(firstOwnerActions.filter(action => action === 'employee_dashboard_read')).toHaveLength(1);
     expect(Math.max(...firstStarts) - Math.min(...firstStarts)).toBeLessThan(35);
   }
   await ownerPage.close();
@@ -365,9 +384,9 @@ test('real B request plan uses read2 for cacheless, validate only for cache hit,
   if (!BASELINE) {
     expect(reopenActions.filter(action => action === 'employee_login')).toHaveLength(0);
     expect(reopenActions.filter(action => action === 'employee_phone_resume')).toHaveLength(1);
-    expect(reopenActions.filter(action => action === 'employee_session')).toHaveLength(1);
-    expect(reopenActions.filter(action => action === 'employee_private_read')).toHaveLength(1);
-    expect(reopenActions.filter(action => action === 'employee_kpi_read')).toHaveLength(1);
+    expect(reopenActions.filter(action => action === 'employee_session')).toHaveLength(0);
+    expect(reopenActions.filter(action => action === 'employee_dashboard_read')).toHaveLength(1);
+    expect(reopenActions).toHaveLength(2);
   }
   await ownerContext.close();
 });
@@ -409,7 +428,7 @@ test('home B login does not start legacy private_access/read', async ({ browser 
   }
   console.log('HOME_KPI_METRICS '+JSON.stringify({version:BASELINE?'before':'after',firstKpi,switches}));
   if(!BASELINE){
-    expect(firstKpi.actions.slice().sort()).toEqual(['employee_kpi_read','employee_private_read']);
+    expect(firstKpi.actions).toEqual(['employee_dashboard_read']);
     for(const row of switches)expect(row.actions).toEqual([]);
     const timing=await page.evaluate(()=>DashboardB.metrics());
     expect(timing.some(row=>row.name==='phase:restore')).toBe(true);
@@ -431,8 +450,7 @@ test('home immediate KPI navigation does not duplicate incomplete eager data rea
   const actions=fixture.actions();
   console.log('HOME_QUICK_KPI_METRICS '+JSON.stringify({version:BASELINE?'before':'after',ms:Date.now()-start,loginActions,totalActions:actions}));
   if(!BASELINE){
-    expect(actions.filter(action=>action==='employee_private_read')).toHaveLength(1);
-    expect(actions.filter(action=>action==='employee_kpi_read')).toHaveLength(1);
+    expect(actions.filter(action=>action==='employee_dashboard_read')).toHaveLength(1);
     expect(actions.filter(action=>action==='employee_login')).toHaveLength(1);
   }
   await context.close();

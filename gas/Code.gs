@@ -8766,7 +8766,8 @@ function privateDashboardBPayload_(input) {
     employee_phone_resume:['action','deviceId','phoneToken','sessionNonce','idempotencyKey'],
     employee_phone_forget:['action','deviceId','phoneToken'],
     employee_session:['action','deviceId','token'],employee_logout:['action','deviceId','token'],
-    employee_private_read:['action','deviceId','token'],employee_kpi_read:['action','deviceId','token']};
+    employee_private_read:['action','deviceId','token'],employee_kpi_read:['action','deviceId','token'],
+    employee_dashboard_read:['action','deviceId','token']};
   if(!Object.prototype.hasOwnProperty.call(fields,input.action))throw new Error('B_REQUEST_INVALID');
   privateDashboardBShape_(input,fields[input.action]);
   if(input.action==='employee_status')return input;
@@ -8960,20 +8961,33 @@ function privateDashboardCreateGasB_(options) {
         if(provider.currentGeneration(s.employee)!==s.nativeGeneration)throw new Error('B_SESSION_DENIED');
         if(p.action==='employee_session')return {status:'ok',expiresAt:s.expiresAt,trustSource:'password-bound',phoneEligible:privateDashboardIsTrustedEmployee(s.employee)};
         if(p.action==='employee_phone_enroll')return enrollPhone(p,s,config);
-        let result;
-        if(p.action==='employee_private_read')result={snapshot:privateDashboardSnapshot()};
-        else if(p.action==='employee_kpi_read') {
-          const file=kpiCalcLatestDataFile();if(!file)throw new Error('B_DATA_UNAVAILABLE');
-          const data=privateDashboardBMeasure_('kpiBlob', function() { return JSON.parse(file.getBlob().getDataAsString('UTF-8')); });
-          if(!data || !data.meta || !data.stores || !data.persons)throw new Error('B_DATA_INVALID');
-          result={data:data};
-        } else throw new Error('B_REQUEST_INVALID');
-        // Use the existing strict private-result validator under the same lock;
-        // no password/token/device proof may leak through a data projection.
-        result.profile=profile;
-        result=privateDashboardGasRpcResult_(p.action==='employee_private_read'?'privateDashboardAccess':'kpiCalcAccess',result,
-          {deviceId:p.deviceId,adminSecret:p.token,bootstrapCode:''},'privateDashboardBRead_');
-        return Object.assign({status:'ok',trustSource:'password-bound'},result);
+        function readResult(kind) {
+          let result;
+          if(kind==='private')result={snapshot:privateDashboardSnapshot()};
+          else if(kind==='kpi') {
+            const file=kpiCalcLatestDataFile();if(!file)throw new Error('B_DATA_UNAVAILABLE');
+            const data=privateDashboardBMeasure_('kpiBlob', function() { return JSON.parse(file.getBlob().getDataAsString('UTF-8')); });
+            if(!data || !data.meta || !data.stores || !data.persons)throw new Error('B_DATA_INVALID');
+            result={data:data};
+          } else throw new Error('B_REQUEST_INVALID');
+          // Use the existing strict private-result validator under the same lock;
+          // no password/token/device proof may leak through a data projection.
+          result.profile=profile;
+          result=privateDashboardGasRpcResult_(kind==='private'?'privateDashboardAccess':'kpiCalcAccess',result,
+            {deviceId:p.deviceId,adminSecret:p.token,bootstrapCode:''},'privateDashboardBRead_');
+          return Object.assign({status:'ok',trustSource:'password-bound'},result);
+        }
+        if(p.action==='employee_dashboard_read') {
+          // One authorized transaction projects both existing read contracts.
+          // No protected result is returned until both strict validators pass.
+          const privateResult=readResult('private'),kpiResult=readResult('kpi');
+          if(now()>=s.expiresAt || now()>=config.authority.validUntil)throw new Error('B_SESSION_DENIED');
+          return {status:'ok',expiresAt:s.expiresAt,trustSource:'password-bound',
+            phoneEligible:privateDashboardIsTrustedEmployee(s.employee),privateResult:privateResult,kpiResult:kpiResult};
+        }
+        if(p.action==='employee_private_read')return readResult('private');
+        if(p.action==='employee_kpi_read')return readResult('kpi');
+        throw new Error('B_REQUEST_INVALID');
       });
     });
   }
