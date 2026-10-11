@@ -57,17 +57,18 @@ function createDashboardBClient(ownerExecUrl, options={}) {
     } catch(error){if(expected!==generation)throw new Error('B_CONTEXT_CHANGED');if(controller.signal.aborted)throw new Error('B_TIMEOUT');throw error;}
     finally {clearTimeout(timer);requests.delete(controller);try{options.onRequest?.({action:payload.action,ms:clock()-started,outcome});}catch{}}
   }
-  function protectedPost(action) {
-    if(reads.has(action))return reads.get(action);
-    const operation=protectedRead(action);reads.set(action,operation);
-    const done=()=>{if(reads.get(action)===operation)reads.delete(action);};operation.then(done,done);return operation;
+  function protectedPost(action,extra={}) {
+    const key=action+JSON.stringify(extra);
+    if(reads.has(key))return reads.get(key);
+    const operation=protectedRead(action,extra);reads.set(key,operation);
+    const done=()=>{if(reads.get(key)===operation)reads.delete(key);};operation.then(done,done);return operation;
   }
-  async function protectedRead(action) {
+  async function protectedRead(action,extra) {
     if(!session || expiresAt<=Date.now()){clear();throw new Error('B_AUTH_DENIED');}const expected=generation,proof=session;
     // A failed read or an inconclusive server response must lock the view, but
     // the short lease can still be checked again without asking for a password.
     // The server verifies eligibility, revocation and device proof on every call.
-    return post({action,...proof},expected);
+    return post({action,...proof,...extra},expected);
   }
   return Object.freeze({
     status:()=>post({action:'employee_status'}),
@@ -114,10 +115,11 @@ function createDashboardBClient(ownerExecUrl, options={}) {
       catch{clear();removePhone();try{await post({action:'employee_phone_forget',deviceId,phoneToken:p.phoneToken},generation);}finally{lastPhoneToken='';}throw Error('B_STORAGE_UNAVAILABLE');}
     },
     async read(kind) {if(!['private','kpi'].includes(kind))throw new Error('B_AUTH_DENIED');return protectedPost(kind==='private'?'employee_private_read':'employee_kpi_read');},
-    async readBundle() {
-      const result=await protectedPost('employee_dashboard_read');
+    async readBundle(includeReports=false) {
+      const result=await protectedPost('employee_dashboard_read',includeReports===true?{includeReports:true}:{});
       if(result.expiresAt!==expiresAt || result.trustSource!=='password-bound' || typeof result.phoneEligible!=='boolean' ||
-        result.privateResult?.status!=='ok' || result.kpiResult?.status!=='ok')throw new Error('B_AUTH_DENIED');
+        result.privateResult?.status!=='ok' || result.kpiResult?.status!=='ok' ||
+        includeReports===true && (result.reportsResult?.schema!=='daily-report-bundle-v1' || !Array.isArray(result.reportsResult.segments) || result.reportsResult.segments.length!==3))throw new Error('B_AUTH_DENIED');
       return result;
     },
     validate:()=>protectedPost('employee_session'),

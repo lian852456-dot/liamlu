@@ -1,3 +1,9 @@
+## 2026-10-11 ｜ Codex（APP 回報合法 session 讀取）
+
+- 修復 B 登入後漏載回報與解鎖按鈕指向隱藏舊表單。APP 透過既有授權 bundle 讀今日 16／21、昨日 21；日期由 Daily 決定，未加入裸員編旁路。
+- 保留權限與固定到期；來源只讀且分別回傳失敗，缺資料／部分失敗／全部失敗都有終態，個人來源失敗不顯示零人未過關。登出或不合法 bundle 清除回報。
+- Node 202/202、載入瀏覽器 11/11、手機登入瀏覽器 8/8、formal overlay 37/37 通過。Daily v67→v68、immutable／同部署讀回完成；Pages 與安裝版實機結果另以 local receipt 記錄。細節見 `docs/releases/app-reports-20261011.md`。
+
 ## 2026-09-29 ｜ Codex（每日移動里程人工路段主檔候選）
 
 - 範圍：只修改每日移動里程。未知但已辨識的店間路段改用 `MILEAGE_DISTANCE_MISSING`，畫面就地提供 0.1–999 KM 輸入與「儲存為路段距離」；真正未知門市仍維持 `MILEAGE_STORE_MAPPING_ERROR`。

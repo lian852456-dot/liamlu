@@ -749,6 +749,116 @@
     return { segment:report.segment, failedStoreCount:new Set(people.map(person => person.store)).size, failedPeopleCount:people.length, missingStores:report.missingStores, byMetric, people };
   }
 
+  function expectedReportBundle(bundle) {
+    const today = taipeiDate();
+    const yesterday = taipeiDateOffset(-1);
+    if (!bundle || bundle.schema !== 'daily-report-bundle-v1' || bundle.date !== today || bundle.yesterday !== yesterday || !Array.isArray(bundle.segments) || bundle.segments.length !== 3) return null;
+    const wanted = [
+      { date:today, segment:16, key:'today16' },
+      { date:today, segment:21, key:'today21' },
+      { date:yesterday, segment:21, key:'yesterday21' }
+    ];
+    const result = {};
+    for (const item of wanted) {
+      const matches = bundle.segments.filter(row => row && row.date === item.date && row.segment === item.segment);
+      if (matches.length !== 1) return null;
+      result[item.key] = matches[0];
+    }
+    return { today, yesterday, ...result };
+  }
+
+  function reportEntry(entry, segment, date) {
+    const reportResult = entry && entry.reportResult;
+    const peopleResult = entry && entry.peopleResult;
+    const reportData = reportResult && reportResult.status === 'ok' ? reportResult.data : null;
+    const source = moduleSource('北一二B每日回報','index.html');
+    const failure = { unavailable:true, failedStoreCount:null, failedPeopleCount:null, missingStores:[], byMetric:null, people:null };
+    const summary=reportResult && reportResult.summary;
+    if (!reportData || typeof reportData !== 'object' || Array.isArray(reportData) ||
+      !summary || summary.date!==date || summary.segment!==segment || !/^formal-index-summary-v[12]$/.test(String(summary.semantics||''))) {
+      const note = `${date} ${segment}:00 正式回報讀取失敗`;
+      return { report:null, peopleOk:false,
+        module:C.moduleState({status:'error',updatedAt:nowIso(),sourceUpdatedAt:'',stale:false,source,data:null,note}), failure };
+    }
+    const peopleOk = Boolean(peopleResult && peopleResult.status === 'ok' && peopleResult.data && typeof peopleResult.data === 'object' && !Array.isArray(peopleResult.data));
+    const report = adaptReport(segment,reportData,peopleOk?peopleResult.data:{},reportResult.summary);
+    const status = report.completedStores === 0 ? 'no_data' : report.completedStores === 9 && report.summaryAvailable && peopleOk ? 'ok' : 'partial';
+    const note = !peopleOk ? `${date} ${segment}:00 個人回報讀取失敗；門市回報仍可查看。`
+      : !report.summaryAvailable ? '正式來源尚未提供 report summary adapter；營運摘要 fail-closed。'
+      : report.completedStores === 0 ? `尚未進入／尚無正式 ${segment}:00 回報` : '';
+    const result = { report, peopleOk,
+      module:C.moduleState({status,updatedAt:nowIso(),sourceUpdatedAt:report.updatedAt,stale:false,source,data:report,note}),
+      failure:peopleOk ? failureSummary(report) : { ...failure, missingStores:report.missingStores } };
+    return result;
+  }
+
+  function resetReportBundle(note = '正式回報 bundle 契約不完整，未沿用舊資料。') {
+    ['todayOperations','report1600','report2100','reportFailures'].forEach(key => { contract[key] = statusModule(key,'error',null,note); });
+    yesterdayFollowUpModule = statusModule('yesterdayFollowUp','error',null,note);
+  }
+
+  function loadReportBundle(reportsResult) {
+    const expected = expectedReportBundle(reportsResult);
+    if (!expected) {
+      resetReportBundle();
+      contract.generatedAt = nowIso();
+      renderAll();
+      return false;
+    }
+    const today16 = reportEntry(expected.today16,16,expected.today);
+    const today21 = reportEntry(expected.today21,21,expected.today);
+    const yesterday21 = reportEntry(expected.yesterday21,21,expected.yesterday);
+    const todayEntries = [today16,today21];
+    const todayReports = todayEntries.filter(item => item.report);
+    const todayStatuses = todayEntries.map(item => item.module.status);
+    const todayStatus = todayStatuses.every(status => status === 'error') ? 'error'
+      : todayStatuses.every(status => status === 'no_data') ? 'no_data'
+      : todayStatuses.every(status => status === 'ok') ? 'ok' : 'partial';
+    const todayNote = todayStatus === 'error' ? '今日 16:00／21:00 正式回報皆讀取失敗。'
+      : todayStatus === 'partial' ? '今日 16:00／21:00 正式回報部分讀取失敗或尚未完整。' : todayStatus === 'no_data' ? '今日尚無正式回報資料。' : '';
+    contract.report1600 = today16.module;
+    contract.report2100 = today21.module;
+    contract.todayOperations = C.moduleState({
+      status:todayStatus, updatedAt:nowIso(), sourceUpdatedAt:todayReports.map(item => item.report.updatedAt).filter(Boolean).at(-1) || '', stale:false,
+      source:moduleSource('北一二B每日回報','index.html'), data:todayReports.length ? {date:expected.today,segments:todayReports.map(item => item.report)} : null, note:todayNote
+    });
+    const failureRows = { 16:today16.failure, 21:today21.failure };
+    const failureStatus = todayEntries.every(item => !item.report) ? 'error'
+      : todayEntries.some(item => !item.peopleOk || !item.report) ? 'partial'
+      : todayStatus === 'no_data' ? 'no_data' : 'ok';
+    contract.reportFailures = C.moduleState({
+      status:failureStatus, updatedAt:nowIso(), sourceUpdatedAt:'', stale:false,
+      source:moduleSource('正式個人回報','index.html'), data:failureRows,
+      note:failureStatus === 'error' ? '正式個人回報讀取失敗。' : failureStatus === 'partial' ? '部分正式個人回報讀取失敗。' : ''
+    });
+    if (!yesterday21.report) {
+      yesterdayFollowUpModule = yesterday21.module;
+    } else {
+      const data = Y.adapt({date:expected.yesterday,report:yesterday21.report});
+      if(!yesterday21.peopleOk)Object.assign(data,{personalAvailable:false,failedStoreCount:null,failedPeopleCount:null,trackingStoreCount:null});
+      const status = !data.formalDataAvailable || yesterday21.module.status === 'no_data' ? 'no_data'
+        : yesterday21.peopleOk && yesterday21.module.status === 'ok' ? 'ok' : 'partial';
+      yesterdayFollowUpModule = C.moduleState({
+        status, updatedAt:nowIso(), sourceUpdatedAt:yesterday21.report.updatedAt, stale:false,
+        source:moduleSource('昨日 21:00 正式每日回報','index.html'), data,
+        note:status === 'no_data' ? '昨日 21:00 尚無正式資料' : !yesterday21.peopleOk ? '昨日 21:00 個人回報讀取失敗；門市回報仍可查看。' : ''
+      });
+    }
+    contract.generatedAt = nowIso();
+    renderAll();
+    return true;
+  }
+
+  function markReportLoading() {
+    contract.todayOperations = privateLoadingModule('todayOperations','正式回報資料');
+    contract.report1600 = privateLoadingModule('report1600','16:00 正式回報');
+    contract.report2100 = privateLoadingModule('report2100','21:00 正式回報');
+    contract.reportFailures = privateLoadingModule('reportFailures','正式個人回報');
+    yesterdayFollowUpModule = yesterdayLoadingModule();
+    contract.generatedAt = nowIso();
+    renderAll();
+  }
+
   async function loadFormalSummary(employeeId) {
     await scope.DashboardB?.leaveForA();
     const authContext=scope.DashboardB?.context()||0;
@@ -938,6 +1048,9 @@
   function staleBanner(module) {
     return module&&module.status==='stale'?`<p class="stale-note">${escapeHtml(module.note||'上次成功資料')}</p>`:'';
   }
+  function reportStatusBanner(module) {
+    return module&&['partial','no_data'].includes(module.status)&&module.note?`<p class="stale-note">${escapeHtml(module.note)}</p>`:staleBanner(module);
+  }
 
   function renderFullKpis(items, contextLabel) {
     const rows = Array.isArray(items) ? items : [];
@@ -1040,7 +1153,7 @@
 
   function renderOperations() {
     const rows = contract.todayOperations.data && contract.todayOperations.data.segments || [];
-    dom('#operationsRows').innerHTML = rows.length ? staleBanner(contract.todayOperations)+rows.map(segment => {
+    dom('#operationsRows').innerHTML = rows.length ? reportStatusBanner(contract.todayOperations)+rows.map(segment => {
       const failures = contract.reportFailures.data && contract.reportFailures.data[segment.segment] || {};
       const missing = segment.missingStores ? segment.missingStores.length : Math.max(0,9-segment.completedStores);
       const summaryMetrics = segment.summaryMetrics || {};
@@ -1054,7 +1167,7 @@
         <button class="attention-button" type="button" data-toggle-operation="${segment.segment}" aria-label="展開 ${segment.segment}:00 戰況"><i data-lucide="triangle-alert"></i></button>
       </div><div class="operation-detail"><div class="operation-detail-summary">${['A999','好速','R999','R1399'].filter(key=>summaryMetrics[key]).map(key=>`<span>${key} ${formatOperationMetric(summaryMetrics[key])}</span>`).join('') || '<span>正式營運摘要尚無資料</span>'}</div>
         <div class="operation-detail-summary operation-detail-percent">${['保險搭售率','設備案佔比'].filter(key=>summaryMetrics[key]).map(key=>`<span>${key==='保險搭售率'?'保險':'設備案'} ${formatOperationMetric(summaryMetrics[key])}</span>`).join('')}</div>
-        <p>${segment.missingStores.length?`未回報：${segment.missingStores.map(escapeHtml).join('、')}`:'九店已完成回報'}${failingPeople.length?`｜未過關：${failingPeople.slice(0,3).map(person=>`${escapeHtml(person.store)} ${escapeHtml(person.name)}（${escapeHtml(person.failed.join('、'))}）`).join('、')}`:'｜目前無正式未過關紀錄'}</p>
+        <p>${segment.missingStores.length?`未回報：${segment.missingStores.map(escapeHtml).join('、')}`:'九店已完成回報'}${failures.unavailable?'｜正式個人回報讀取失敗':failingPeople.length?`｜未過關：${failingPeople.slice(0,3).map(person=>`${escapeHtml(person.store)} ${escapeHtml(person.name)}（${escapeHtml(person.failed.join('、'))}）`).join('、')}`:'｜目前無正式未過關紀錄'}</p>
         <div>${segment.stores.filter(store=>store.reported).map(store=>`<div class="operation-store-mini"><span>${escapeHtml(store.name)}</span>${['A999','好速','R999','R1399'].map(key=>`<span>${store.metrics&&store.metrics[key]!=null?fmtNumber(store.metrics[key],1):'—'}</span>`).join('')}</div>`).join('')}</div>
       </div></article>`;
     }).join('') : contract.todayOperations.status==='unauthorized'
@@ -1085,15 +1198,15 @@
     }
     if(home) {
       home.hidden=false;
-      home.innerHTML=`<button type="button" data-open-yesterday-followup><span><small>${escapeHtml(data.date)} · 21:00</small><b>昨日待追蹤</b></span><strong class="${data.trackingStoreCount?'negative':'positive'}">${data.trackingStoreCount} 店</strong><i data-lucide="chevron-right"></i></button>`;
+      home.innerHTML=`<button type="button" data-open-yesterday-followup><span><small>${escapeHtml(data.date)} · 21:00</small><b>昨日待追蹤</b></span><strong class="${data.trackingStoreCount==null||data.trackingStoreCount?'negative':'positive'}">${data.trackingStoreCount==null?'待核對':data.trackingStoreCount+' 店'}</strong><i data-lucide="chevron-right"></i></button>`;
     }
     if(!detail) return;
-    detail.innerHTML=`${staleBanner(module)}<div class="yesterday-summary">
-      <article><span>未過關店數</span><b>${data.failedStoreCount}</b></article>
-      <article><span>未過關人數</span><b>${data.failedPeopleCount}</b></article>
+    detail.innerHTML=`${reportStatusBanner(module)}<div class="yesterday-summary">
+      <article><span>未過關店數</span><b>${data.failedStoreCount??'—'}</b></article>
+      <article><span>未過關人數</span><b>${data.failedPeopleCount??'—'}</b></article>
       <article><span>有請益店數</span><b>${data.consultStoreCount}</b></article>
-      <article><span>需要追蹤店數</span><b>${data.trackingStoreCount}</b></article>
-    </div>${data.stores.length?`<div class="yesterday-store-list">${data.stores.map(store=>`<article class="yesterday-store-card"><h3>${escapeHtml(store.name)}</h3>${store.failedMetrics.length?`<p><b>未過關項目</b>${escapeHtml(store.failedMetrics.join('、'))}</p>`:''}${store.failedPeople.map(person=>`<div class="yesterday-person"><p><b>${escapeHtml(person.name)}</b>${escapeHtml(person.failed.join('、')||'正式未過關')}</p>${person.reason?`<p><b>未過原因</b>${escapeHtml(person.reason)}</p>`:''}${person.improvePlan?`<p><b>個人後續追蹤</b>${escapeHtml(person.improvePlan)}</p>`:''}</div>`).join('')}${renderYesterdayFeedback(store.storeFeedback)}</article>`).join('')}</div>`:'<div class="empty-state">昨日 21:00 無需追蹤店點。</div>'}`;
+      <article><span>需要追蹤店數</span><b>${data.trackingStoreCount??'—'}</b></article>
+    </div>${data.stores.length?`<div class="yesterday-store-list">${data.stores.map(store=>`<article class="yesterday-store-card"><h3>${escapeHtml(store.name)}</h3>${store.failedMetrics.length?`<p><b>未過關項目</b>${escapeHtml(store.failedMetrics.join('、'))}</p>`:''}${store.failedPeople.map(person=>`<div class="yesterday-person"><p><b>${escapeHtml(person.name)}</b>${escapeHtml(person.failed.join('、')||'正式未過關')}</p>${person.reason?`<p><b>未過原因</b>${escapeHtml(person.reason)}</p>`:''}${person.improvePlan?`<p><b>個人後續追蹤</b>${escapeHtml(person.improvePlan)}</p>`:''}</div>`).join('')}${renderYesterdayFeedback(store.storeFeedback)}</article>`).join('')}</div>`:`<div class="empty-state">${data.personalAvailable===false?'昨日 21:00 個人回報讀取失敗；待核對追蹤店點。':'昨日 21:00 無需追蹤店點。'}</div>`}`;
   }
 
   function renderKpiHero() {
@@ -1340,7 +1453,7 @@
   function renderReport() {
     const module=activeReport(); const report=module.data; const failures=contract.reportFailures.data&&contract.reportFailures.data[reportSegment];
     if (!report) { const message=module.status==='unauthorized'?(privateAccessStatus === 'pending' ? '此 iPhone App 裝置待核准' : '解鎖後顯示 16:00／21:00 正式回報'):(module.note||'正式回報讀取失敗'); dom('#reportOverview').innerHTML=module.status==='unauthorized'?privateUnlockState(message):`<div class="empty-state">${escapeHtml(message)}</div>`; dom('#reportOperations').innerHTML=''; dom('#reportFeedbackSummary').innerHTML=''; dom('#reportFailures').innerHTML=''; dom('#reportStoreList').innerHTML=''; return; }
-    dom('#reportOverview').innerHTML=`${staleBanner(module)}<div class="report-summary"><article><span>完成店數</span><b class="${report.completedStores===9?'positive':''}">${report.completedStores}/9</b></article><article><span>尚未完成</span><b class="${report.missingStores.length?'negative':'positive'}">${report.missingStores.length}</b></article><article><span>最後更新</span><b>${escapeHtml(report.updatedAt||'—')}</b></article></div>${report.missingStores.length?`<p class="stale-note">尚未完成：${report.missingStores.map(escapeHtml).join('、')}</p>`:''}`;
+    dom('#reportOverview').innerHTML=`${reportStatusBanner(module)}<div class="report-summary"><article><span>完成店數</span><b class="${report.completedStores===9?'positive':''}">${report.completedStores}/9</b></article><article><span>尚未完成</span><b class="${report.missingStores.length?'negative':'positive'}">${report.missingStores.length}</b></article><article><span>最後更新</span><b>${escapeHtml(report.updatedAt||'—')}</b></article></div>${report.missingStores.length?`<p class="stale-note">尚未完成：${report.missingStores.map(escapeHtml).join('、')}</p>`:''}`;
     const summaryMetrics=report.summaryMetrics||{};
     dom('#reportOperations').innerHTML=report.summaryAvailable&&Object.keys(summaryMetrics).length?`<div class="report-operation-grid">${['A999','A1399','好速','R999','R1399'].filter(key=>summaryMetrics[key]).map(key=>`<article><span>${escapeHtml(key==='好速'?'好速銷售點數':key+' 上線數')}</span><b>${formatOperationMetric(summaryMetrics[key])}</b></article>`).join('')}${summaryMetrics['保險分子']&&summaryMetrics['保險分母']?`<article><span>☂️ 保險搭售 分子/分母</span><b>${fmtNumber(summaryMetrics['保險分子'].value)}/${fmtNumber(summaryMetrics['保險分母'].value)}</b></article>`:''}${reportManagementCards(report.managementFocus)}</div>`:`<div class="empty-state">${module.status==='no_data'?`尚未進入／尚無正式 ${report.segment}:00 回報`:'正式來源尚未提供營運摘要欄位；App 不自行計算。'}</div>`;
     const feedbackStores=report.stores.filter(store=>storeFeedbackEntries(store.storeFeedback).length);
@@ -2088,7 +2201,18 @@
       renderHalfMonthCheck();
       return;
     }
-    const privateUnlock=event.target.closest('[data-unlock-private]'); if(privateUnlock){ setView('me'); dom('#employeeId').focus(); return; }
+    const privateUnlock=event.target.closest('[data-unlock-private]'); if(privateUnlock){
+      const bMode=document.body.classList.contains('dashboard-b-password-mode');
+      if(bMode){
+        setView('me');
+        const panel=dom('#dashboard-b-access');
+        scope.setTimeout(()=>{ panel?.scrollIntoView({block:'start',behavior:'smooth'}); panel?.querySelector('[data-b-employee]')?.focus(); },0);
+        if(scope.DashboardB?.active?.())Promise.resolve(scope.DashboardB.refresh(true,true)).catch(()=>{});
+      } else {
+        setView('me'); dom('#employeeId')?.focus();
+      }
+      return;
+    }
     const patrolUnlock=event.target.closest('[data-unlock-patrol]'); if(patrolUnlock){ setView('me'); dom('#patrolPasscode').focus(); return; }
     const scheduleButton=event.target.closest('[data-toggle-home-schedule]'); if(scheduleButton){ const card=scheduleButton.closest('#scheduleHome'); const expanded=card.classList.toggle('expanded'); scheduleButton.setAttribute('aria-expanded',String(expanded)); scheduleButton.querySelector('span').textContent=expanded?'收合當日班表':'顯示九店當日班表'; return; }
     const operationButton=event.target.closest('[data-toggle-operation]'); if(operationButton){ const item=operationButton.closest('.operation-item'); item.classList.toggle('expanded'); operationButton.setAttribute('aria-expanded',item.classList.contains('expanded')); return; }
@@ -2113,8 +2237,10 @@
     // The single durable phone grant belongs to the installed App, not a
     // regular Safari/desktop tab that happens to open app.html first.
     ownerPhone:navigator.standalone===true || !!scope.matchMedia?.('(display-mode: standalone)').matches,
+    includeReports:true,
     navigationSelector:null,
     clear(){resetPrivateSummary();privateAccessStatus='unauthorized';dom('#viewerState').textContent='未登入';renderAll();},
+    loading(){markReportLoading();},
     showLegacyAccess(){setView('me');dom('#privateAccessForm')?.closest('.access-panel')?.scrollIntoView({block:'start',behavior:'smooth'});dom('#employeeId')?.focus();
       const stored=scope.localStorage.getItem(EMPLOYEE_KEY)||'';
       if(stored)loadFormalSummary(stored).catch(error=>{if(!privateAccessPending(error.message))setMessage('#privateAccessMessage',error.message,'error');});},
@@ -2123,7 +2249,7 @@
       const kpi=adaptKpi(data,snapshot,at),awards=adaptAwards(snapshot,String(snapshot.kpiBattle&&(snapshot.kpiBattle.report_run_date||snapshot.kpiBattle.report_date)||''),at);
       contract=C.validateContract({...contract,mode:'formal',generatedAt:at,kpiSummary:kpi.summary,kpiStores:kpi.stores,kpiFullMetrics:kpi.full,
         personalPerformance:adaptPersonalPerformance(data,snapshot,at),awardSummary:awards.summary,awardStores:awards.stores,awardTop2Models:awards.top2});
-      privateAccessStatus='approved';dom('#viewerState').textContent='指定密碼唯讀';renderAll();
+      privateAccessStatus='approved';dom('#viewerState').textContent='指定密碼唯讀';loadReportBundle(bundle.reportsResult);
     },
     navigate(module){if(module==='return'){setView('home');return;}battleKind=module==='awards'?'award':module==='personal'?'personal':'kpi';battleScope='region';
       all('[data-battle-kind]').forEach(b=>b.classList.toggle('active',b.dataset.battleKind===battleKind));setView('battle');renderBattle();}
@@ -2144,5 +2270,5 @@
   }
   const initial=location.hash.slice(1); setView(all('[data-view]').some(view=>view.dataset.view===initial)?initial:'home'); renderAll();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261011-loading-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') scope.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?v=20261011-reports-1',{scope:'./',updateViaCache:'none'}).catch(()=>{}));
 })(window);

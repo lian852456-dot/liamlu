@@ -78,6 +78,75 @@ function privateSnapshot() {
 
 const DATA = privateData();
 const SNAPSHOT = privateSnapshot();
+function taipeiDate(offset = 0) {
+  const date = new Date();
+  date.setTime(date.getTime() + offset * 86400000);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+}
+const TODAY = taipeiDate();
+const YESTERDAY = taipeiDate(-1);
+
+function reportData(date, segment) {
+  const savedAt = `${date}T${segment === 16 ? '16:05' : '21:05'}:00+08:00`;
+  return Object.fromEntries(STORES.map(store => [store, { savedAt }]));
+}
+
+function peopleData(segment) {
+  return Object.fromEntries(STORES.map(store => [store, {
+    [`回報同仁${segment}`]: {
+      failed: segment === 16 && store === '酒泉' ? ['a999'] : [],
+      data: { a999: 1, a1399: 1, achieve: 1, r1399: 1, haosu: 1 },
+      extra: { fail_reason: 'synthetic failure', improve_plan: 'synthetic plan' }
+    }
+  }]));
+}
+
+function reportSummary(date, segment, reported = true) {
+  const updatedAt = reported ? `${date}T${segment === 16 ? '16:05' : '21:05'}:00+08:00` : '';
+  return {
+    date, segment, semantics: 'formal-index-summary-v1', totalStores: 9, completedStores: reported ? 9 : 0, missingStores: reported ? [] : STORES, updatedAt,
+    metrics: reported ? { A999: { value: 9, unit: '店', sourceField: 'A999', aggregation: 'sum' } } : {},
+    stores: STORES.map(store => ({
+      name: store, reported, reportedAt: updatedAt,
+      metrics: reported ? { A999: { value: 1, unit: '件', sourceField: 'A999', aggregation: 'sum' } } : {},
+      storeFeedback: reported && store === '酒泉' ? { reason: `synthetic-${segment}`, consult: '', method: '', plan: '' } : {}
+    }))
+  };
+}
+
+function reportSegment(date, segment, status = 'ok') {
+  if (status === 'no-data') return {
+    date, segment,
+    reportResult: { status: 'ok', data: {}, summary: reportSummary(date, segment, false) },
+    peopleResult: { status: 'ok', data: {} }
+  };
+  if (status === 'people-error') return {
+    date, segment,
+    reportResult: { status: 'ok', data: reportData(date, segment), summary: reportSummary(date, segment) },
+    peopleResult: { status: 'error' }
+  };
+  if (status !== 'ok') return { date, segment, reportResult: { status: 'error' }, peopleResult: { status: 'error' } };
+  return {
+    date, segment,
+    reportResult: { status: 'ok', data: reportData(date, segment), summary: reportSummary(date, segment) },
+    peopleResult: { status: 'ok', data: peopleData(segment) }
+  };
+}
+
+function reportsBundle(mode = 'ok') {
+  if (mode === 'invalid-date') return {
+    schema: 'daily-report-bundle-v1', date: TODAY, yesterday: YESTERDAY,
+    segments: [reportSegment('2099-01-01', 16), reportSegment(TODAY, 21), reportSegment(YESTERDAY, 21)]
+  };
+  return {
+    schema: 'daily-report-bundle-v1', date: TODAY, yesterday: YESTERDAY,
+    segments: [
+      reportSegment(TODAY, 16, mode === 'partial' || mode === 'all-error' ? 'error' : mode === 'no-data' ? 'no-data' : mode === 'people-error' ? 'people-error' : 'ok'),
+      reportSegment(TODAY, 21, mode === 'all-error' ? 'error' : 'ok'),
+      reportSegment(YESTERDAY, 21, mode === 'all-error' ? 'error' : 'ok')
+    ]
+  };
+}
 // The protected shell checks the authenticated profile role separately from
 // the role filter rendered in the real App. Keep this synthetic profile in
 // the employee contract while the data rows exercise the 副店 filter.
@@ -89,6 +158,7 @@ async function apiFixture(context, { delay = 35, readDelay = 0 } = {}) {
   let revoked = false;
   let disabled = false;
   let serverExpired = false;
+  let reportsMode = 'ok';
   let leaseExpiresAt = Date.now() + 25 * 60 * 1000;
   let phoneToken = '';
   await context.route(ORIGIN+'/**',route=>{
@@ -137,7 +207,8 @@ async function apiFixture(context, { delay = 35, readDelay = 0 } = {}) {
         status: 'ok', expiresAt: serverExpired ? Date.now() - 1 : leaseExpiresAt,
         trustSource: 'password-bound', phoneEligible: true,
         privateResult: { status: 'ok', profile: PROFILE, trustSource: 'password-bound', snapshot: SNAPSHOT },
-        kpiResult: { status: 'ok', profile: PROFILE, trustSource: 'password-bound', data: DATA }
+        kpiResult: { status: 'ok', profile: PROFILE, trustSource: 'password-bound', data: DATA },
+        ...(payload.includeReports ? { reportsResult: reportsBundle(reportsMode) } : {})
       };
     } else if (action === 'employee_logout' || action === 'employee_phone_forget') {
       body = { status: 'ok' };
@@ -158,6 +229,7 @@ async function apiFixture(context, { delay = 35, readDelay = 0 } = {}) {
     setDisabled(value = true) { disabled = value; },
     setExpired(value = true) { serverExpired = value; },
     setDelay(value) { responseDelay = value; },
+    setReportsMode(value = 'ok') { reportsMode = value; },
     actions() { return calls.map(call => call.action); },
     starts(actions) { return calls.filter(call => actions.includes(call.action)).map(call => call.started); }
   };
@@ -320,7 +392,7 @@ test('real App five tabs retain protected DOM, filters, expansion and scroll; re
   await context.close();
 });
 
-test('real B request plan uses dashboard bundle for cacheless, validate only for cache hit, and owner phone bundle reads', async ({ browser }) => {
+test('App reload rereads reports and owner phone resumes through one protected dashboard bundle', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
   const fixture = await apiFixture(context, { delay: 45 });
   const page = await appPage(context);
@@ -340,7 +412,7 @@ test('real B request plan uses dashboard bundle for cacheless, validate only for
   const cacheless = fixture.actions(),cachelessMs=Date.now()-cachelessStart;
   console.log('B_LOADING_METRICS ' + JSON.stringify({ version: BASELINE ? 'before' : 'after', initial,phases:BASELINE?[]:await page.evaluate(()=>DashboardB.metrics()),cacheHit:{ms:cacheHitMs,actions:cacheHit}, cacheless:{ms:cachelessMs,actions:cacheless} }));
   if (!BASELINE) {
-    expect(cacheHit).toEqual(['employee_session']);
+    expect(cacheHit).toEqual(['employee_dashboard_read']);
     expect(cacheless).toEqual(['employee_dashboard_read']);
   }
 
@@ -453,5 +525,122 @@ test('home immediate KPI navigation does not duplicate incomplete eager data rea
     expect(actions.filter(action=>action==='employee_dashboard_read')).toHaveLength(1);
     expect(actions.filter(action=>action==='employee_login')).toHaveLength(1);
   }
+  await context.close();
+});
+
+test('B login paints today 16/21 and yesterday 21 from one protected bundle without tab reads', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+  const fixture = await apiFixture(context);
+  const page = await appPage(context);
+  await login(page);
+  const dashboardRead = fixture.calls.find(call => call.action === 'employee_dashboard_read');
+  expect(dashboardRead.payload.includeReports).toBe(true);
+  fixture.reset();
+  await page.locator('button[data-nav="report"]').click();
+  await expect(page.locator('#reportOverview')).toContainText('9/9');
+  await expect(page.locator('#reportFeedbackSummary')).toContainText('synthetic-16');
+  await page.locator('[data-report-segment="21"]').click();
+  await expect(page.locator('#reportOverview')).toContainText('9/9');
+  await expect(page.locator('#yesterdayFollowUp')).toContainText('未過關店數');
+  await page.locator('button[data-nav="home"]').last().click();
+  await expect(page.locator('#yesterdayFollowUpHome')).toBeVisible();
+  expect(fixture.calls).toHaveLength(0);
+  await context.close();
+});
+
+test('B report unlock CTA routes to the visible B panel and keeps legacy reads idle', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+  const fixture = await apiFixture(context);
+  const page = await appPage(context);
+  await login(page);
+  await page.locator('[data-b-logout]').click();
+  await page.locator('button[data-nav="report"]').click();
+  await expect(page.locator('#reportOverview [data-unlock-private]')).toBeVisible();
+  fixture.reset();
+  await page.locator('#reportOverview [data-unlock-private]').click();
+  await expect(page.locator('#dashboard-b-access')).toBeVisible();
+  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'locked');
+  await expect(page.locator('[data-b-employee]')).toBeFocused();
+  await expect(page.locator('#privateAccessForm')).toBeHidden();
+  expect(fixture.calls).toHaveLength(0);
+  await context.close();
+});
+
+test('B report bundle exposes partial and total failure terminal states without stale rows', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+  const fixture = await apiFixture(context);
+  fixture.setReportsMode('partial');
+  const page = await appPage(context);
+  await login(page);
+  await page.locator('button[data-nav="report"]').click();
+  await expect(page.locator('#reportOverview')).toContainText('正式回報讀取失敗');
+  await page.locator('[data-report-segment="21"]').click();
+  await expect(page.locator('#reportOverview')).toContainText('9/9');
+  fixture.setReportsMode('all-error');
+  fixture.reset();
+  await page.locator('[data-b-refresh]').click();
+  await expect(page.locator('#reportOverview')).toContainText('正式回報讀取失敗');
+  await page.locator('button[data-nav="home"]').last().click();
+  await expect(page.locator('#operationsRows')).toContainText('皆讀取失敗');
+  await context.close();
+});
+
+test('B report no-data is explicit and remains separate from a successful 21:00 row', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+  const fixture = await apiFixture(context);
+  fixture.setReportsMode('no-data');
+  const page = await appPage(context);
+  await login(page);
+  await page.locator('button[data-nav="report"]').click();
+  await expect(page.locator('#reportOverview')).toContainText('尚未進入／尚無正式 16:00 回報');
+  await page.locator('[data-report-segment="21"]').click();
+  await expect(page.locator('#reportOverview')).toContainText('9/9');
+  await context.close();
+});
+
+test('B people read failure never renders zero未過關 as a successful result', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+  const fixture = await apiFixture(context);
+  fixture.setReportsMode('people-error');
+  const page = await appPage(context);
+  await login(page);
+  await page.locator('button[data-nav="report"]').click();
+  await expect(page.locator('#reportOverview')).toContainText('9/9');
+  await expect(page.locator('#reportFailures')).toContainText('正式個人回報讀取失敗');
+  await expect(page.locator('#reportFailures')).not.toContainText('目前沒有正式未過關紀錄');
+  await context.close();
+});
+
+test('invalid B report dates clear the previous report instead of carrying stale data', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+  const fixture = await apiFixture(context);
+  const page = await appPage(context);
+  await login(page);
+  await page.locator('button[data-nav="report"]').click();
+  await expect(page.locator('#reportFeedbackSummary')).toContainText('synthetic-16');
+  fixture.setReportsMode('invalid-date');
+  fixture.reset();
+  await page.locator('[data-b-refresh]').click();
+  await expect(page.locator('#reportOverview')).toContainText('bundle 契約不完整');
+  await expect(page.locator('#reportFeedbackSummary')).not.toContainText('synthetic-16');
+  await context.close();
+});
+
+test('late B bundle response cannot restore report data after logout', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+  const fixture = await apiFixture(context, { delay: 35, readDelay: 180 });
+  const page = await appPage(context);
+  await login(page);
+  await page.locator('button[data-nav="report"]').click();
+  await expect(page.locator('#reportFeedbackSummary')).toContainText('synthetic-16');
+  fixture.setDelay(35);
+  fixture.reset();
+  await page.locator('[data-b-refresh]').click();
+  await page.waitForTimeout(20);
+  await page.locator('[data-b-logout]').click();
+  await page.waitForTimeout(240);
+  await expect(page.locator('#reportOverview [data-unlock-private]')).toBeVisible();
+  await expect(page.locator('#reportFeedbackSummary')).not.toContainText('synthetic-16');
+  await expect(page.locator('#reportStoreList')).not.toContainText('回報同仁16');
   await context.close();
 });

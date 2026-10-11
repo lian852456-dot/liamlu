@@ -94,7 +94,8 @@ test('trusted supervisor can use two devices without moving employee bindings; t
 
 test('a full same-device login replaces its oldest lease without releasing the staff binding',()=>{
  const f=fixture();f.ctx.privateDashboardBVerifyPassword_=()=>true;
- const api=f.ctx.privateDashboardCreateGasB_({}),invoke=p=>api.handle(JSON.stringify(p));
+ // Distinct issuedAt values make "oldest" independent of host clock resolution.
+ let time=Date.now();const api=f.ctx.privateDashboardCreateGasB_({now:()=>++time}),invoke=p=>api.handle(JSON.stringify(p));
  const id='SYNTH002',device='SYNTHETIC_REUSE_DEVICE';
  const requests='abcd'.split('').map(ch=>passwordLogin(id,device,'SYNTHETIC_PASSWORD','SYNTHETIC_REUSE_REQUEST_'+ch,ch));
  const leases=requests.map(invoke);
@@ -109,7 +110,7 @@ test('a full same-device login replaces its oldest lease without releasing the s
 
 test('a fourth supervisor login replaces only their oldest lease; admin reset still revokes all',()=>{
  const f=fixture();f.ctx.privateDashboardBVerifyPassword_=()=>true;f.props.set('DASHBOARD_TRUSTED_EMPLOYEE_ID','SYNTH003');
- const api=f.ctx.privateDashboardCreateGasB_({}),invoke=p=>api.handle(JSON.stringify(p));
+ let time=Date.now();const api=f.ctx.privateDashboardCreateGasB_({now:()=>++time}),invoke=p=>api.handle(JSON.stringify(p));
  const devices=['SYNTHETIC_SUP_DEVICE_A','SYNTHETIC_SUP_DEVICE_B','SYNTHETIC_SUP_DEVICE_C','SYNTHETIC_SUP_DEVICE_D'];
  const leases=devices.map((device,i)=>invoke(passwordLogin('SYNTH003',device,'SYNTHETIC_PASSWORD','SYNTHETIC_SUP_REQUEST_'+i,'abcd'[i])));
  assert.deepEqual(leases.map(x=>x.status),['ok','ok','ok','ok']);
