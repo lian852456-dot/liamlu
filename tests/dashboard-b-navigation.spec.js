@@ -142,6 +142,11 @@ test('website KPI, awards and personal views switch in one verified document',as
    :action==='employee_kpi_read'?{status:'ok',...proof,data:kpi}:{status:'ok'};
   return route.fulfill({contentType:'application/json',body:JSON.stringify(result)});
  });
+ await page.goto(origin+'/kpi-battle.html#awards');
+ await page.locator('[data-b-a]').click();
+ const legacyInput=page.locator('#awardsBattleContent #privateEmployeeId');
+ await expect(legacyInput).toBeVisible();
+ await expect(legacyInput).toBeFocused();
  await page.goto(origin+'/kpi-battle.html');
  await page.locator('[data-b-employee]').fill('SYNTHETIC');await page.locator('[data-b-password]').fill('SYNTHETIC_PASSWORD');
  await page.locator('[data-b-submit]').click();await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
