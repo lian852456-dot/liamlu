@@ -40,7 +40,7 @@ function createDashboardBClient(ownerExecUrl, options={}) {
     try {
       const response=await transport(ownerExecUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),
         credentials:'omit',cache:'no-store',redirect:'follow',signal:controller.signal});
-      if(!response.ok)throw new Error('B_AUTH_DENIED');const value=await response.json();
+      if(!response.ok)throw new Error('B_SERVICE_UNAVAILABLE');const value=await response.json();
       if(expected!==generation)throw new Error('B_CONTEXT_CHANGED');
       if(controller.signal.aborted)throw new Error('B_TIMEOUT');
       if(!value || value.status!=='ok')throw new Error('B_AUTH_DENIED');return value;
@@ -85,7 +85,15 @@ function createDashboardBClient(ownerExecUrl, options={}) {
         p.request={sessionNonce:hex(crypto.getRandomValues(new Uint8Array(32))),idempotencyKey:hex(crypto.getRandomValues(new Uint8Array(16))),until:Date.now()+1800000};
         savePhone(p);
       }
-      const result=await post({action:'employee_phone_resume',deviceId,phoneToken:p.phoneToken,sessionNonce:p.request.sessionNonce,idempotencyKey:p.request.idempotencyKey},expected);
+      let result;
+      try {result=await post({action:'employee_phone_resume',deviceId,phoneToken:p.phoneToken,sessionNonce:p.request.sessionNonce,idempotencyKey:p.request.idempotencyKey},expected);}
+      catch(error){
+        // A rejected grant cannot authorize another session. Discard only this
+        // stale local proof so a fresh password login is not blocked while
+        // trying to forget a grant the server no longer recognizes.
+        if(error.message==='B_AUTH_DENIED'){removePhone();lastPhoneToken='';}
+        throw error;
+      }
       if(!Number.isSafeInteger(result.phoneExpiresAt) || result.phoneExpiresAt<=Date.now() || result.phoneExpiresAt>Date.now()+phoneTtl)throw Error('B_AUTH_DENIED');
       try{const lease=saveLease(result,deviceId,expected);p.expiresAt=result.phoneExpiresAt;p.request.until=lease.expiresAt;savePhone(p);return lease;}
       catch{clear();removePhone();try{await post({action:'employee_phone_forget',deviceId,phoneToken:p.phoneToken},generation);}finally{lastPhoneToken='';}throw Error('B_STORAGE_UNAVAILABLE');}

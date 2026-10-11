@@ -18,7 +18,7 @@ async function setup(context,{owner=true}={}){
   else if(p.action==='employee_session')r=revoked?{status:'error'}:{...r,expiresAt:expiry(),phoneEligible:owner};
   else if(p.action==='employee_phone_enroll'){grant='BP1_'+'b'.repeat(64);r={...r,phoneToken:grant,expiresAt:Date.now()+89*86400000};}
   else if(p.action==='employee_phone_resume')r=revoked||p.phoneToken!==grant?{status:'error'}:{...r,token:'B1_a_'+'c'.repeat(64),expiresAt:expiry(),trustSource:'password-bound',phoneExpiresAt:Date.now()+89*86400000};
-  else if(p.action==='employee_phone_forget'){revoked=true;grant='';}
+  else if(p.action==='employee_phone_forget'){if(p.phoneToken!==grant)r={status:'error'};else{revoked=true;grant='';}}
   else if(p.action==='employee_logout')r={status:'ok'};
   else r={status:'error'};
   // Match the fixed lease deadline instead of extending it on validate.
@@ -27,7 +27,7 @@ async function setup(context,{owner=true}={}){
   await route.fulfill({contentType:'application/json',body:JSON.stringify(r)});
  });
  context.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));
- return {calls,errors,revoke:()=>revoked=true};
+ return {calls,errors,revoke:()=>revoked=true,replaceGrant:()=>{grant='BP1_'+'f'.repeat(64);}};
 }
 async function login(page){await page.goto(BASE+'phone-test.html');await page.locator('[data-b-employee]').fill('SYNTH001');await page.locator('[data-b-password]').fill('SYNTHETIC_PASSWORD');await page.locator('[data-b-submit]').click();await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');}
 test('phone survives closing the app, automatically signs in without a password, and logout revokes it',async({context,page})=>{
@@ -42,6 +42,19 @@ test('phone survives closing the app, automatically signs in without a password,
 test('server revocation and a different browser cannot silently sign in',async({browser,context,page})=>{
  const f=await setup(context);await login(page);await expect(page.locator('h2')).toHaveText('手機自動登入已啟用');f.revoke();await page.close();const next=await context.newPage();await next.goto(BASE+'phone-test.html');await expect(next.locator('[data-b-message]')).toContainText('手機驗證未完成');expect(await next.evaluate(()=>document.body.dataset.accepted)).toBe('no');
  const other=await browser.newContext();await setup(other);const unbound=await other.newPage();await unbound.goto(BASE+'phone-test.html');await expect(unbound.locator('[data-b-submit]')).toBeVisible();expect(await unbound.evaluate(k=>localStorage.getItem(k),PHONE)).toBeNull();await other.close();
+});
+test('stale home-screen phone grant cannot block a new password login',async({context,page})=>{
+ const f=await setup(context);await login(page);f.replaceGrant();await page.close();
+ const next=await context.newPage();await next.goto(BASE+'phone-test.html');
+ await expect(next.locator('[data-b-submit]')).toBeVisible();
+ expect(await next.evaluate(k=>localStorage.getItem(k),PHONE)).toBeNull();
+ await next.locator('[data-b-employee]').fill('SYNTH001');
+ await next.locator('[data-b-password]').fill('SYNTHETIC_PASSWORD');
+ await next.locator('[data-b-submit]').click();
+ await expect(next.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
+ expect(f.calls.filter(p=>p.action==='employee_login')).toHaveLength(2);
+ expect(f.calls.filter(p=>p.action==='employee_phone_forget')).toHaveLength(0);
+ expect(f.errors).toEqual([]);
 });
 test('regular employees keep short sessions without being enrolled as the owner phone',async({context,page})=>{const f=await setup(context,{owner:false});await login(page);await expect(page.locator('[data-b-phone]')).toBeHidden();expect(f.calls.some(p=>p.action==='employee_phone_enroll')).toBe(false);expect(await page.evaluate(k=>localStorage.getItem(k),PHONE)).toBeNull();});
 test('real mobile App shows the first-time phone setup without horizontal overflow',async({context,page})=>{await setup(context);await page.setViewportSize({width:390,height:844});await page.goto(BASE+'app.html#me');await expect(page.locator('h2').filter({hasText:'首次驗證與手機綁定'})).toBeVisible();await expect(page.locator('[data-b-submit]')).toHaveText('首次驗證並綁定這支手機');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/owner-phone-first-setup.png'});});
