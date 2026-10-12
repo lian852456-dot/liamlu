@@ -20,6 +20,6 @@ test('shared runtime has only official read-only tradein action and no storage o
   assert.doesNotMatch(js,/\.localStorage|\.sessionStorage|employeeId|deviceId|adminSecret|ThreecQueryCore/);
   assert.match(js,/credentials:'omit'/);
   assert.match(js,/function validate\(body\)/);
-  assert.match(js,/lian852456-dot\\.github\\.io/);
+  assert.match(js,/lian852456-dot\.github\.io/);
   assert.match(js,/if\(token!==generation\)return/);
 });
