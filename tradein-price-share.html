@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>舊機回收價查詢｜同仁共用</title>
+  <link rel="stylesheet" href="tradein-price-share.css?v=20261012-brand-1">
+  <!-- Public read-only view. No link to portal, management upload, goals, or performance. -->
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="brandline"><span class="mark" aria-hidden="true">♻</span><span>同仁共用查詢工具</span></div>
+      <h1>舊機回收價查詢</h1>
+      <p>依機款、容量、回收商及等級，比較目前正式發布的舊機回收報價。</p>
+    </header>
+    <section class="panel" aria-labelledby="query-heading">
+      <div class="section-head"><h2 id="query-heading">查詢條件</h2><button class="outline" id="refreshBtn" type="button">↻ 重新讀取報價</button></div>
+      <p class="status" id="queryStatus" role="status" aria-live="polite">正在讀取正式回收價…</p>
+      <form class="filters" id="searchForm" autocomplete="off">
+        <label class="full">搜尋品牌／機款／容量
+          <input id="keyword" name="keyword" type="search" placeholder="例如：iPhone 17 Pro、Galaxy、256GB">
+        </label>
+        <label>選擇廠牌
+          <select id="brand" name="brand" aria-controls="model"><option value="">全部廠牌</option></select>
+        </label>
+        <label>選擇機款
+          <select id="model" name="model"><option value="">全部機款</option></select>
+        </label>
+        <label>回收商
+          <select id="provider" name="provider">
+            <option value="">全部回收商</option>
+            <option value="點子行動">點子行動</option>
+            <option value="FutureDial（FDI）">FutureDial（FDI）</option>
+            <option value="愛鋒派">愛鋒派</option>
+          </select>
+        </label>
+        <label>回收等級
+          <select id="grade" name="grade">
+            <option value="">全部等級</option>
+            <option value="S">S 級</option><option value="A">A 級</option>
+            <option value="B">B 級</option><option value="C">C 級</option>
+            <option value="未分級">來源未分級</option>
+          </select>
+        </label>
+        <div class="filter-actions"><button class="outline" id="resetBtn" type="button">清除條件</button><button class="outline" id="copyBtn" type="button">複製分享連結</button></div>
+      </form>
+      <div class="source" id="sourceMeta" aria-live="polite"></div>
+    </section>
+    <section class="panel result-panel" aria-labelledby="results-heading">
+      <div class="section-head"><h2 id="results-heading">正式回收報價</h2><span id="resultCount" class="count"></span></div>
+      <div id="results" aria-live="polite"><p class="empty">讀取中，請稍候…</p></div>
+    </section>
+    <footer>
+      <strong>報價使用提醒</strong>
+      <p>報價為資料來源發布時的參考金額，實際回收金額依回收商驗機結果、適用條件與正式規定為準。本頁僅提供查詢，不接受上傳、修改或資料發布。</p>
+      <p>每次開啟或按「重新讀取報價」均向既有正式資料來源重新讀取，不在此頁儲存回收價格或人員資料。</p>
+    </footer>
+  </main>
+  <script src="tradein-price-share.js?v=20261012-brand-1"></script>
+</body>
+</html>
