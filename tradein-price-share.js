@@ -94,7 +94,7 @@
         const host=origin.hostname;
         if(origin.protocol!=='https:'||origin.port||
            !(host==='script.google.com'||host==='script.googleusercontent.com'||host.endsWith('-script.googleusercontent.com')))return;
-        if(event.source!==frame.contentWindow)return;
+        // GAS may relay through an inner frame; verified origin + unguessable requestId bind the response.
         const message=event.data;
         if(!message||message.type!=='north12b-gas-response-v1'||message.requestId!==requestId)return;
         try{finish(null,validate(message.body));}catch(error){finish(error);}
@@ -186,5 +186,13 @@
   });
   scope.addEventListener('pagehide',()=>{generation++;clear();});
   scope.addEventListener('pageshow',event=>{if(event.persisted)refresh();});
-  refresh();
+  // Never use the supervisor's GitHub Pages host as a cross-area share link.
+  // That host serves the full portal under other paths.
+  if(scope.location.hostname.toLowerCase()==='lian852456-dot.github.io'){
+    status('此網址與北一二B營運中心共用網域，不能作為跨區分享。請改用獨立查價網站。','error');
+    $('refreshBtn').disabled=true;
+    $('copyBtn').disabled=true;
+  }else{
+    refresh();
+  }
 })(window);
