@@ -12,6 +12,10 @@ test.afterAll(async()=>{server.closeAllConnections();await new Promise(resolve=>
 async function setup(page,notes){await page.route('**/exec',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({status:'ok',ledger})}));await page.route('**/gold-annotations-public.json*',route=>route.fulfill({contentType:'application/json',body:JSON.stringify(notes)}));}
 for(const width of [1440,390])test(`${width}px displays already-paid explanations while daily numbers and filters stay independent`,async({page})=>{
  await page.setViewportSize({width,height:1000});await setup(page,fixture());await page.goto(base+'gold-medal.html');
+ await expect(page.locator('#goldNotesWeek')).toBeEnabled();
+ await expect(page.locator('#goldNotesBatches')).toBeHidden();
+ await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(0);
+ await page.locator('#goldNotesWeek').selectOption('2026-10-W1');
  await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(2);await expect(page.locator('#goldNotesStatus')).toContainText('不再扣牌');
  await expect(page.locator('.gold-note-summary')).toHaveText('2 筆｜已扣說明額合計 -30｜本次追加扣牌 0');
  await expect(page.locator('#viewerSummary .summary-card').first()).toContainText('17');
@@ -21,6 +25,16 @@ for(const width of [1440,390])test(`${width}px displays already-paid explanation
  await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(2);
  await page.locator('#viewerMonth').selectOption('2026-10-01');await expect(page.locator('#viewerBody')).toContainText('20');await expect(page.locator('#viewerDailyBody')).toContainText('—');
  await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(2);
+ for(const period of ['2026-10-W2','2026-10-W3']){
+  await page.locator('#goldNotesWeek').selectOption(period);
+  await expect(page.locator('#goldNotesStatus')).toContainText(period.slice(8)+'：該週尚無資料');
+  await expect(page.locator('#goldNotesBatches')).toBeHidden();
+  await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(0);
+  await expect(page.locator('#viewerBody')).toContainText('20');
+ }
+ await page.locator('#goldNotesWeek').selectOption('2026-10-W1');
+ await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(2);
+ expect(await page.locator('#goldNotesBatches').evaluate(el=>el.getBoundingClientRect().height)).toBeLessThanOrEqual(340);
  expect(await page.evaluate(()=>Object.keys(localStorage))).toEqual([]);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:`test-results/gold-notes-${width}.png`,fullPage:true});
@@ -28,8 +42,9 @@ for(const width of [1440,390])test(`${width}px displays already-paid explanation
 test('notes failure clears explanations and leaves confirmed daily scores unchanged',async({page})=>{
  let invalid=false;await page.route('**/exec',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({status:'ok',ledger})}));
  await page.route('**/gold-annotations-public.json*',route=>{const n=fixture();if(invalid)n.batches[0].applyToBalance=true;return route.fulfill({contentType:'application/json',body:JSON.stringify(n)});});
- await page.goto(base+'gold-medal.html');await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(2);
+ await page.goto(base+'gold-medal.html');await expect(page.locator('#goldNotesWeek')).toBeEnabled();await page.locator('#goldNotesWeek').selectOption('2026-10-W1');await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(2);
  invalid=true;await page.locator('#refreshButton').click();await expect(page.locator('#goldNotesStatus')).toHaveClass(/error/);await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(0);
+ await expect(page.locator('#goldNotesWeek')).toBeDisabled();
  await expect(page.locator('#viewerBody tr')).toHaveCount(2);await expect(page.locator('#viewerSummary .summary-card').first()).toContainText('17');
  invalid=false;await page.locator('#refreshButton').click();await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(2);await expect(page.locator('#viewerSummary .summary-card').first()).toContainText('17');
 });
