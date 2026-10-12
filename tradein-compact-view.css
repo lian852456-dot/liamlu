@@ -1,0 +1,53 @@
+/* Compact price comparison, scoped to the two trade-in pages only. */
+body[data-tradein-compact] .tc-item{margin:10px 0 0;padding:10px 12px;border:1px solid #dfe3e8;border-radius:10px;background:#fff;min-width:0;max-width:100%;overflow:hidden}
+body[data-tradein-compact] .tc-item h3,body[data-tradein-compact] .tc-item .model-head h3{font-size:16px;line-height:1.4;margin:0;font-weight:700;overflow-wrap:anywhere}
+body[data-tradein-compact] .tc-item .model-head{padding:0;background:none;border:0}
+body[data-tradein-compact] .tc-unit{font-size:12px;line-height:1.4;color:#667383;margin:4px 0 6px}
+body[data-tradein-compact] .tc-prices{width:100%;max-width:100%;min-width:0;overflow-x:auto;border:1px solid #e1e5eb;border-radius:7px}
+body[data-tradein-compact] .tc-matrix{--tc-columns:4;min-width:0}
+body[data-tradein-compact] .tc-matrix.tc-wide{min-width:calc(70px + var(--tc-columns)*60px)}
+body[data-tradein-compact] .tc-grade-head,body[data-tradein-compact] .tc-provider-row .tc-original-table,body[data-tradein-compact] .tc-item.model-card .tc-provider-row{display:grid;grid-template-columns:minmax(64px,1.3fr) repeat(var(--tc-columns),minmax(0,1fr));align-items:center;column-gap:0}
+body[data-tradein-compact] .tc-grade-head{background:#f3f5f7;font-size:12px;line-height:1.3;color:#526171;padding:6px 0;text-align:right}
+body[data-tradein-compact] .tc-grade-head span{padding:0 6px}
+body[data-tradein-compact] .tc-grade-head .tc-heading-provider{text-align:left}
+body[data-tradein-compact] .tc-provider-row{padding:0;margin:0;width:100%;max-width:100%;border:0;border-top:1px solid #e8ebef;border-radius:0;background:#fff;overflow:visible}
+body[data-tradein-compact] .tc-provider-row:nth-child(odd){background:#fafbfc}
+body[data-tradein-compact] .tc-provider-row .tc-original-table{width:100%;min-width:0;max-width:100%;margin:0;border:0;border-spacing:0;background:transparent}
+body[data-tradein-compact] .tc-original-table thead,body[data-tradein-compact] .tc-original-table tbody,body[data-tradein-compact] .tc-original-table tr,body[data-tradein-compact] .tc-provider-row .price-grid,body[data-tradein-compact] .tc-provider-row .price-item{display:contents}
+body[data-tradein-compact] .tc-original-table .tc-original-grades,body[data-tradein-compact] .tc-provider-row .grade,body[data-tradein-compact] .tc-sr{display:block!important;position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;border:0!important;overflow:hidden!important;clip-path:inset(50%)!important;white-space:nowrap!important}
+body[data-tradein-compact] .tc-repeat-model{display:none!important}
+body[data-tradein-compact] .tc-provider-row .tc-provider{grid-column:1;grid-row:1;padding:8px 6px;margin:0;border:0;background:none;font-size:13px;line-height:1.3;text-align:left;color:#384755;font-weight:600;min-width:0;overflow-wrap:anywhere}
+body[data-tradein-compact] .tc-provider-row .tc-cell,body[data-tradein-compact] #tradeinResults .tc-original-table tbody td.tc-cell{grid-row:1;display:block;min-width:0;width:auto;padding:8px 6px;margin:0;border:0;background:none;text-align:right;font-size:15px;line-height:1.3;font-weight:650;color:#1d2733;font-variant-numeric:tabular-nums;white-space:nowrap}
+body[data-tradein-compact] .tc-provider-row .tc-missing{color:#8a949e;font-weight:400}
+body[data-tradein-compact] .tc-item .tc-source{font-size:12px;line-height:1.4;margin-top:4px}
+body[data-tradein-compact] .tc-source summary{display:inline-flex;align-items:center;min-height:28px;color:#617082;font-size:12px;font-weight:400;cursor:pointer}
+body[data-tradein-compact] .tc-source .group-note{font-size:12px;margin:0 0 4px}
+body[data-tradein-compact] .tc-scroll-tip{font-size:12px;line-height:1.3;color:#617082;margin:4px 0 0}
+body[data-tradein-compact] .result-list{gap:10px;margin-top:10px}
+body[data-tradein-compact] .result-list .tc-item{margin-top:0}
+body[data-tradein-compact][data-query-kind=tradein] #tradeinPane .field{font-size:16px;gap:4px}
+body[data-tradein-compact][data-query-kind=tradein] #tradeinPane .toolbar{margin-top:10px;gap:10px}
+body[data-tradein-compact][data-query-kind=tradein] #tradeinMeta{font-size:13px;padding:8px 10px;margin-top:10px;gap:8px}
+body[data-tradein-compact][data-query-kind=tradein] #tradeinMeta .source-date strong{font-size:17px}
+body[data-tradein-compact] .filters{gap:10px;margin-top:10px;font-size:16px}
+body[data-tradein-compact] .filters input,body[data-tradein-compact] .filters select{font-size:16px;min-height:44px;padding:7px 10px}
+body[data-tradein-compact] #sourceMeta{font-size:13px;margin-top:10px}
+@media(max-width:700px){
+  body[data-tradein-compact] .tc-item{padding:8px;margin-top:8px;border-radius:8px}
+  body[data-tradein-compact] .tc-provider-row .tc-cell,body[data-tradein-compact] #tradeinResults .tc-original-table tbody td.tc-cell{font-size:14px;padding:8px 4px}
+  body[data-tradein-compact] .tc-provider-row .tc-provider{font-size:12px;padding:8px 4px}
+  body[data-tradein-compact] .tc-grade-head span{padding:0 4px}
+  body[data-tradein-compact] .tc-grade-head,body[data-tradein-compact] .tc-provider-row .tc-original-table,body[data-tradein-compact] .tc-item.model-card .tc-provider-row{grid-template-columns:minmax(56px,1.2fr) repeat(var(--tc-columns),minmax(0,1fr))}
+  body[data-tradein-compact] .hero{padding:14px 16px}
+  body[data-tradein-compact] .hero h1{font-size:24px}
+  body[data-tradein-compact] .hero p{font-size:14px;line-height:1.5}
+  body[data-tradein-compact] #queryStatus{font-size:14px;margin:10px 0;padding:8px 10px}
+  body[data-tradein-compact] .result-panel{padding:14px 10px}
+  body[data-tradein-compact] .panel h2{font-size:20px}
+  body[data-tradein-compact][data-query-kind=tradein] #tradeinPane input,body[data-tradein-compact][data-query-kind=tradein] #tradeinPane select{font-size:16px;min-height:44px}
+}
+@media(min-width:1050px){
+  body[data-tradein-compact] #tradeinResults{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  body[data-tradein-compact] #tradeinResults>.status,body[data-tradein-compact] #tradeinResults>.empty{grid-column:1/-1}
+  body[data-tradein-compact] #tradeinResults>.tc-item{margin-top:0}
+}
