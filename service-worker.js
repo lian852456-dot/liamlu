@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-reports-20261011-v1';
+const CACHE_NAME = 'liam-supervisor-app-tradein-upload-20261012-v1';
 const SHELL = [
   './app.html',
   './portal-logout.js',
@@ -70,6 +70,14 @@ function networkFirstShellAsset(request) {
   }).catch(() => caches.match(request, { ignoreSearch:true }));
 }
 
+function networkFirstTradeinAsset(request) {
+  if (new URL(request.url).searchParams.has('refresh')) return fetch(request, { cache:'no-store' });
+  return fetch(request, { cache:'no-store' }).then(response => {
+    if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+    return response;
+  }).catch(() => caches.match(request));
+}
+
 function networkFirstKpiController(request) {
   return fetch(request, { cache:'no-store' }).then(async response => {
     if (!response.ok) return response;
@@ -92,6 +100,12 @@ self.addEventListener('fetch', event => {
   const relativePath = requestUrl.pathname.startsWith(scopePath) ? requestUrl.pathname.slice(scopePath.length) : '';
   if (requestUrl.pathname.endsWith('/kpi-battle-controller.js')) {
     event.respondWith(networkFirstKpiController(event.request));
+    return;
+  }
+  // Trade-in uploads must use the deployed parser and upload controller while
+  // online. Only the exact requested version may be used as an offline fallback.
+  if (['tradein-performance-core.js','tradein-public-core.js','tradein-public-progress.mjs'].includes(relativePath)) {
+    event.respondWith(networkFirstTradeinAsset(event.request));
     return;
   }
   if (SHELL_PATHS.has(relativePath)) {

@@ -63,6 +63,30 @@ for(const width of [1280,390,320])test(width+'px multiple count choices intersec
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(calls).toHaveLength(1);expect(errors).toEqual([]);
 });
 test('admin preview is read-only; C1 then publish and public projection; restore first import',async({page})=>{const {r,calls,errors}=await start(page,{empty:true});await expect(page.locator('#readMessage')).toContainText('保留未知');await page.locator('#maintenance summary').click();await page.locator('#adminEmployeeId').fill(OPERATOR);await page.locator('#adminSecret').fill(r.secret);await page.locator('#sourceFile').setInputFiles({name:'SYNTHETIC-SAR74.csv',mimeType:'text/csv',buffer:csv()});await page.locator('#completeScope').check();expect(await page.locator('#completeScope').evaluate(e=>e.getBoundingClientRect().width)).toBe(20);expect(await page.locator('#completeScope').evaluate(e=>e.getBoundingClientRect().height)).toBe(20);await page.locator('#previewUpload').click();await expect(page.locator('#uploadPreview')).toContainText('有效回收 4 台');expect(r.writes.length).toBe(0);await page.locator('#publishUpload').click();await expect(page.locator('#uploadMessage')).toContainText('同步成功');await expect(page.locator('#stats')).toContainText('4 台');expect(calls.map(p=>p.action)).toContain('tradein_performance_checkpoint_capture');expect(calls.some(p=>p.action==='private_request'||p.action==='private_access'||p.action==='tradein_performance_read')).toBe(false);await page.locator('#adminSecret').fill(r.secret);await page.locator('#rollbackUpload').click();await expect(page.locator('#uploadMessage')).toContainText('已回復');await expect(page.locator('#readMessage')).toContainText('保留未知');expect(r.files.size).toBeGreaterThan(2);expect(errors).toEqual([]);});
+test('upload refreshes a cached rejecting parser before preview and publication',async({page})=>{
+ const core=await fs.readFile(path.resolve(__dirname,'../../tradein-performance-core.js'),'utf8');let refreshes=0;
+ const {r,calls,errors}=await start(page,{empty:true});
+ await page.route('**/tradein-performance-core.js?*',route=>{
+  if(new URL(route.request().url()).searchParams.has('refresh')){refreshes++;return route.fulfill({contentType:'application/javascript',body:core});}
+  return route.fulfill({contentType:'application/javascript',body:core+'\nTradeinPerformanceCore=Object.freeze({...TradeinPerformanceCore,parseSar74(){throw Error("SAR74 欄位數衝突");}});'});
+ });
+ await page.reload();await expect(page.locator('#refreshData')).toBeEnabled();
+ await page.locator('#maintenance summary').click();await page.locator('#adminEmployeeId').fill(OPERATOR);await page.locator('#adminSecret').fill(r.secret);
+ await page.locator('#sourceFile').setInputFiles({name:'SYNTHETIC-SAR74.csv',mimeType:'text/csv',buffer:csv()});await page.locator('#completeScope').check();
+ await page.locator('#previewUpload').click();await expect(page.locator('#uploadPreview')).toContainText('有效回收 4 台');
+ expect(refreshes).toBe(1);expect(r.writes).toEqual([]);await page.locator('#publishUpload').click();
+ await expect(page.locator('#uploadMessage')).toContainText('同步成功');await expect(page.locator('#stats')).toContainText('4 台');
+ expect(calls.filter(p=>p.action==='tradein_performance_publish')).toHaveLength(1);expect(errors).toEqual([]);
+});
+test('unavailable fresh parser stops upload without using the already loaded parser',async({page})=>{
+ const {r,calls}=await start(page,{empty:true});await expect(page.locator('#refreshData')).toBeEnabled();
+ await page.route('**/tradein-performance-core.js?*',route=>new URL(route.request().url()).searchParams.has('refresh')?route.abort():route.continue());
+ await page.locator('#maintenance summary').click();await page.locator('#adminEmployeeId').fill(OPERATOR);await page.locator('#adminSecret').fill(r.secret);
+ await page.locator('#sourceFile').setInputFiles({name:'SYNTHETIC-SAR74.csv',mimeType:'text/csv',buffer:csv()});await page.locator('#completeScope').check();
+ await page.locator('#previewUpload').click();await expect(page.locator('#uploadMessage')).toContainText('解析程式載入失敗');
+ await expect(page.locator('#publishUpload')).toBeDisabled();await expect(page.locator('#previewUpload')).toBeEnabled();
+ expect(calls.some(p=>p.action==='tradein_performance_preview')).toBe(false);expect(r.writes).toEqual([]);
+});
 test('單日回收資料可與店點及筆數篩選交集並跟隨三種匯出',async({page})=>{
  const {calls,errors}=await start(page,{width:390});await page.getByRole('tab',{name:'個人進度',exact:true}).click();await page.locator('#staffStore').selectOption('萬大');await expect(page.locator('#recoveryDate')).toBeEnabled();await page.locator('#recoveryDate').fill('2026-10-02');await page.locator('#recoveryDate').dispatchEvent('change');await expect(page.locator('#staffStore')).toHaveValue('萬大');
  await expect(page.locator('#stats')).toContainText('4 台');await expect(page.locator('#stats')).toContainText('2026-10-02');await expect(page.locator('#dateModeNote')).toBeVisible();await expect(page.locator('#storeHead th:not([hidden])')).toHaveText(['店點','當日回收']);
