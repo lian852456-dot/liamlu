@@ -1,4 +1,4 @@
-import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261010-single-date-1';
+import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261012-targets-1';
 import {copyReminderText} from './tradein-clipboard.mjs?v=20261010-copy-recovery-1';
 const $=id=>document.getElementById(id);
 let contextReader,revision=0,busy=false,canvas=null;
@@ -51,7 +51,7 @@ function updatePreview(){
   canvas=null;feedback('');
   try{
     const snapshot=model();$('reminderText').value=reminderText(snapshot);$('exportScopeLabel').textContent='目前範圍：'+snapshot.scopeLabel;
-    const r=snapshot.rules;$('periodMeta').textContent=r.selectedDate?`單日 ${r.selectedDate} · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 台北時間`:`本月 ${r.start}–${r.end}（每月 3 台${r.isDemo?'；實績示意':''}） · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 來源截止 ${r.cutoff} · 台北時間${hasMonthlySource(r)?'':' · 選定月份來源未提供，實績未知'}`;
+    const r=snapshot.rules;$('periodMeta').textContent=r.selectedDate?`單日 ${r.selectedDate}${r.storeTarget?' · 門市目標 '+r.storeTarget+' 台':''} · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 台北時間`:`本月 ${r.start}–${r.end}（每人每月 ${r.staffTarget} 台${r.isDemo?'；實績示意':''}）${r.storeTarget?' · 門市目標 '+r.storeTarget+' 台':''} · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 來源截止 ${r.cutoff} · 台北時間${hasMonthlySource(r)?'':' · 選定月份來源未提供，實績未知'}`;
     buttons(busy);
     Promise.resolve(document.fonts?.ready).then(()=>{
       current(ticket);const built=createReminderCanvas(snapshot);canvas=built.canvas;

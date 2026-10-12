@@ -64,11 +64,11 @@ test('一般同仁與店長讀取只返回本人，督導九店；完全移除�
   const p=a.tradeinPerformanceProjection_(s,{id:'ZX00001',supervisor:false});assert.equal(p.people.length,1);assert.equal(p.stores.length,0);assert.equal(p.summary,null);
   assert.ok(!JSON.stringify(p).includes('ZX00001'));assert.equal(a.tradeinPerformanceProjection_(s,{supervisor:true}).people.length,2);
 });
-test('正式匯出正確標示月份、零與免目標，不出現示意字樣',async()=>{
+test('十月正式匯出含店長4台目標、零實績與正確月份，不出現示意字樣',async()=>{
   const E=await import('../tradein-export-core.mjs');
   const rules={...E.rulesForMonth('2026-10'),isDemo:false};
   const model=E.buildExportModel({active:true,mode:'supervisor',people:[['萬大','示＊甲','同仁',0],['萬大','示＊乙','店長',2]],allowedStores:['萬大']},'all',rules);
-  assert.equal(model.rows[0].remaining,3);assert.equal(model.rows[1].target,null);assert.ok(!E.reminderText(model).includes('示意'));
+  assert.equal(model.rows[0].remaining,4);assert.equal(model.rows[1].target,4);assert.ok(!E.reminderText(model).includes('示意'));
   assert.ok(!JSON.stringify(E.workbookRows(model)).includes('合成示意'));assert.equal(E.createXlsx(model)[0],0x50);
   assert.throws(()=>E.buildExportModel({active:true,mode:'self'},'all',rules));
 });
@@ -79,19 +79,19 @@ test('其他月份匯出維持未知，不借用原月實績',async()=>{
 test('公開個人差異保留未達、達標、超標與未知，Excel 為可計算的正負數',async()=>{
   const E=await import('../tradein-export-core.mjs'),rules={...E.rulesForMonth('2026-10'),isDemo:false};
   const context={active:true,mode:'public',allowedStores:['萬大'],people:[
-    ['萬大','合＊甲','同仁',1],['萬大','合＊乙','同仁',3],['萬大','合＊丙','同仁',4],
+    ['萬大','合＊甲','同仁',1],['萬大','合＊乙','同仁',4],['萬大','合＊丙','同仁',5],
     ['萬大','合＊丁','免目標',2],['萬大','合＊戊','同仁',null]
   ]};
   const model=E.buildExportModel(context,'all',rules),text=E.reminderText(model),rows=E.workbookRows(model);
-  for(const value of ['−2 台','0 台','+1 台','不適用','待核'])assert.ok(text.includes('目前差異：'+value));
+  for(const value of ['−3 台','0 台','+1 台','−2 台','待核'])assert.ok(text.includes('目前差異：'+value));
   assert.equal(rows[13][5],'目前差異（實績－月目標）');
-  assert.deepEqual(rows.slice(14).map(row=>row[5]),[-2,0,1,null,null]);
+  assert.deepEqual(rows.slice(14).map(row=>row[5]),[-3,0,1,-2,null]);
   const workbook=Buffer.from(E.createXlsx(model)).toString();
-  assert.ok(workbook.includes('<c r="F15" s="6" t="n"><v>-2</v></c>'));
+  assert.ok(workbook.includes('<c r="F15" s="6" t="n"><v>-3</v></c>'));
   assert.ok(workbook.includes('formatCode="+0;-0;0"'));
-  assert.ok(!workbook.includes('<c r="F18"'));
+  assert.ok(workbook.includes('<c r="F18"'));
   const privateModel=E.buildExportModel({...context,mode:'supervisor'},'all',rules);
-  assert.deepEqual(E.workbookRows(privateModel).slice(14).map(row=>row[5]),[2,0,0,null,null]);
+  assert.deepEqual(E.workbookRows(privateModel).slice(14).map(row=>row[5]),[3,0,0,2,null]);
   assert.throws(()=>E.createXlsx({...model,rows:[{...model.rows[0],actual:-1}]}),/不正確數值/);
 });
 function storageApi(){
