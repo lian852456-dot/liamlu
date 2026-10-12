@@ -2430,19 +2430,133 @@ function formatWeeklyHalfCheckSheet(sheet, tab) {
   });
 }
 
-function sendWeeklyPatrolReport() {
-  const tz = 'Asia/Taipei';
-  const now = new Date();
-  const monthKey = Utilities.formatDate(now, tz, 'yyyy-MM');
-  const dateStr = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
-  const todayDay = Number(Utilities.formatDate(now, tz, 'd'));
-  const monthNum = Number(monthKey.split('-')[1]);
-  const all = readPatrol();
+
+// Pure report policy. Texts mirror patrol-question-versions.js; parity is tested.
+const PT_REPORT_SEP25_TEXT = {
+  "1": "督導打卡",
+  "2": "(第一次巡檢)，1.檢查店格陳列(含招牌、布旗、中島、電視是否有聲音…等)2.展機、配件防盜功能皆正常 3.確認門市前後場環境整潔且無非公司商品",
+  "3": "(第二次巡檢)，1.檢查店格陳列(含招牌、布旗、中島、電視是否有聲音…等)2.展機、配件防盜功能皆正常 3.確認門市前後場環境整潔且無非公司商品",
+  "4": "每月1次，1.觀察同仁服裝儀容及服務過程是否熱情並符合規範2.人員出勤與班表一致並詳載休息時間",
+  "5": "每月1次，人員面談及輔導（營業績管理重點指導、帳務缺失、客訴案件關懷輔導、遠端祕客查核常見缺失輔導、QIS…等）",
+  "6": "每月1次，1.門市安全檢查:所有同仁不可於門市承租範圍抽菸及進行任何有火源的私人活動2.檢查門市現場/回放監控設備運作正常(須清晰不可模糊/麥克風須正常收音)",
+  "7": "每月1次，抽查前台一台電腦及後場店長桌電腦是否含有個資並立即刪除；檢查紙本文件與電腦各資料夾及mail，含個資資料需加密；否則一律刪除；且上傳系統之文件，無須紙本回送，就地銷毀無須保留",
+  "8": "每月1次，1.確認門市落實填寫店務日誌及安全衛生檢查表2.確認待銷毀文件以信封袋或紙袋打包歸檔(不可使用塑膠袋提醒迴紋針需移除)，上鎖於監視器可涵蓋範圍的文件櫃，並符合保存期限 3.檢查放置手機、平板、配件…等有價商品的櫃子是否有鑰匙",
+  "9": "每月1次，保全金、零找金、當日營收現金盤點、查核金庫登記表",
+  "10": "2個月1次，督導到店全盤作業（含手機、配件、卡類…等POS所有庫存）並落實商品盤差登載",
+  "11": "(以下15項NCC宣導每月1次) 請確認同仁知悉：國家通訊傳播委員會業於114年9月26日公布「電信事業提供電信服務風險管理機制指引」。",
+  "12": "請確認同仁知悉：受理電信服務申請時，需檢核之證件包含申請人（法人及自然人）及其委託代理人，均應納入KYC審核。",
+  "13": "請確認同仁知悉：申請人或其委託代理人拒絕提供相關資料、不配合者應拒絕其辦理。",
+  "14": "請確認同仁知悉：公司已成立查核部門，並將每月辦理抽測查核。",
+  "15": "請確認同仁知悉：自然人申請電信服務時，應出示雙證件正本供業者核對及留存影本或影像檔。雙證件規範須依行動寬頻服務契約辦理。",
+  "16": "請確認同仁知悉：法人、團體或商號申請電信服務時，應出示法人代表人、團體代表人或商號負責人之身分證明文件正本、政府主管機關核發之法人證明文件、商業登記證明文件供業者核對及留存影本或影像檔。雙證件規範須依行動寬頻服務契約辦理。",
+  "17": "請確認同仁知悉：法人、團體或商號申請以不得逾員工人數為原則。企業客戶應說明使用用途、製作使用清冊，以備查證，應實地查看經營業務與其申請門號及用途是否相符，相關實地查訪紀錄應以書面留存。",
+  "18": "請確認同仁知悉：委託代理人申請辦理時，該代理人並應出示身分證正本及已得合法授權之資料或文件供核對及留存影本或影像檔。",
+  "19": "請確認同仁知悉：初次申辦行動電信門號者，須臨櫃辦理，或以符合電子簽章法之數位簽章方式簽署，或派員親訪申辦。",
+  "20": "請確認同仁知悉：對於初次申辦行動通信門號者應即時拍照留存。受理電信服務所保留的影本、照片或影像檔，應至少保存至服務契約終止後一年，以供查核。",
+  "21": "請確認同仁知悉：非本國籍人士申辦30天內短效期預付卡，於採取相當風險管控措施下，始得不須現場拍照留存。",
+  "22": "請確認同仁知悉：非本國籍人士申辦門號以1門為原則，申請逾1門者應說明使用目的並提出相關證明文件或切結書，應依KYC實質審核其用途及目的並予以酌核。",
+  "23": "請確認同仁知悉：非本國籍人士提出簽證期日資料，倘申請人簽證期日少於1個月，僅能申辦提供30天內之短效期預付卡。",
+  "24": "請確認同仁知悉：曾因使用或提供電信服務進行詐欺，受司法警察機關通知限制或停止電信服務之法人、非法人團體、商號，其代表人再以不同法人、非法人團體、商號之名義向同一電信事業申請電信服務時，該電信事業應於受限制或停止通知之日起三年內限制其至多申請一門用戶號碼或一項電信服務。但法人、非法人團體、商號仍有該電信事業提供之其他用戶號碼或電信服務時，電信事業於受限制或停止通知之日起三年內不得受理其申請。",
+  "25": "請確認同仁知悉：受電信事業限制或停止電信服務之用戶，向同一電信事業再度申請電信服務時，該電信事業應於受限制或停止通知之日起三年內限制其至多申請一門用戶號碼或一項電信服務。但用戶仍有該電信事業提供之其他用戶號碼或電信服務時，電信事業於受限制或停止通知之日起三年內不得受理其申請。"
+};
+
+function ptReportVersion_(month) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month))) throw new Error('invalid report month');
+  const modern = month >= '2026-09';
+  return {
+    modern:modern,
+    total:modern ? 25 : 33,
+    monthly:modern ? [1,2,3,4,5,6,7,8,9] : [14,15,16,17],
+    bimonthly:modern ? 10 : 18,
+    ncc:modern ? Array.from({length:15}, (_, i) => i + 11) : Array.from({length:15}, (_, i) => i + 19),
+    visitsTitle:modern ? '每月到店2次間隔7天' : '上下半月2-13',
+    monthlyTitle:modern ? '每月檢核1-9' : '每月盤點14-17',
+    bimonthlyTitle:modern ? '雙月全盤10' : '雙月全盤18',
+    nccTitle:modern ? '知悉20日前11-25' : '知悉20日前19-33',
+    nccRange:modern ? '11-25' : '19-33'
+  };
+}
+
+function ptReportDate_(row) {
+  // getValues() can return a Date; reports use the existing Asia/Taipei calendar.
+  const value = row.fillTime;
+  const text = String(value || '').trim();
+  const instant = Object.prototype.toString.call(value) === '[object Date]' ? value
+    : (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(text) ? new Date(text) : null);
+  if (instant) {
+    if (!Number.isFinite(instant.getTime())) return '';
+    const date = new Date(instant.getTime() + 8 * 60 * 60 * 1000);
+    return date.getUTCFullYear() + '-' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date.getUTCDate()).slice(-2);
+  }
+  const match = text.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  return match ? match[1] + '-' + ('0' + Number(match[2])).slice(-2) + '-' + ('0' + Number(match[3])).slice(-2) : '';
+}
+
+function ptReportMonth_(row) {
+  const explicit = String(row.month || '').slice(0, 7);
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(explicit)) return explicit;
+  return (ptReportDate_({fillTime:row.arriveTime}) || ptReportDate_(row)).slice(0, 7);
+}
+
+function ptReportStoreRows_(rows, store) {
+  const normalize = value => String(value || '').replace('台灣大哥大數位生活', '').replace(/^台北/, '').trim();
+  const name = normalize(store.name);
+  return rows.filter(row => (store.code && String(row.code || '') === store.code)
+    || (name && normalize(row.store) === name));
+}
+
+function ptReportText_(row) {
+  const date = ptReportDate_(row) || ptReportDate_({fillTime:row.arriveTime});
+  const month = date ? date.slice(0, 7) : ptReportMonth_(row);
+  return (ptReportVersion_(month).modern ? PT_REPORT_SEP25_TEXT : PT_ITEM_TEXT)[Number(row.item)] || '';
+}
+
+function ptReportItem_(rows, item, months) {
+  const relevant = rows.filter(r => Number(r.item) === item && months.indexOf(ptReportMonth_(r)) !== -1);
+  const done = relevant.filter(r => String(r.result).trim().toLowerCase() === 'v')
+    .sort((a, b) => ptReportDate_(a).localeCompare(ptReportDate_(b)));
+  if (done.length) return {status:'done', row:done[0]};
+  const na = relevant.some(r => String(r.result).trim().toLowerCase() === 'na');
+  return {status:na ? 'na' : (relevant.length ? 'pending' : 'missing'), row:null};
+}
+
+function ptReportCell_(status) {
+  if (status.status === 'done') return '✓ ' + (ptReportDate_(status.row).slice(5).replace('-', '/') || '日期待確認');
+  return {na:'NA（未查／不適用）', pending:'待確認', missing:'未查到紀錄'}[status.status];
+}
+
+function ptReportAware_(rows, month, day) {
+  const version = ptReportVersion_(month);
+  const items = version.ncc.map(item => ptReportItem_(rows, item, [month]));
+  const count = items.filter(item => item.status === 'done').length;
+  const complete = count === items.length;
+  const dates = items.filter(item => item.row).map(item => ptReportDate_(item.row)).filter(Boolean).sort();
+  const date = complete && dates.length === items.length ? dates[dates.length - 1] : '';
+  const unknown = items.some(item => item.status === 'missing');
+  const na = items.filter(item => item.status === 'na').length;
+  const state = complete ? '✓ 已完成' + (date && Number(date.slice(-2)) > 20 ? '（逾20日）' : '')
+    : (day <= 20 ? '待完成，剩 ' + (20 - day) + ' 天' : '⚠ 逾期 ' + (day - 20) + ' 天')
+      + (na ? '；NA ' + na + ' 題' : '') + (unknown ? '；含未查到紀錄' : '');
+  return {count:count, complete:complete, progress:count + '／' + items.length + '題', state:state,
+    date:date ? date.slice(5).replace('-', '/') : '—'};
+}
+
+function ptReportVisits_(rows, month) {
+  const dates = [...new Set(rows.filter(r => ptReportMonth_(r) === month)
+    .map(r => ptReportDate_({fillTime:r.arriveTime || r.fillTime})).filter(Boolean))].sort();
+  const first = dates[0] || '';
+  const second = first ? dates.find(date => (Date.parse(date + 'T00:00:00Z') - Date.parse(first + 'T00:00:00Z')) / 86400000 >= 7) : '';
+  return [second ? '2／2次' : (first ? '1／2次' : '0／2次'), first || '—', second || '—',
+    second ? '✓ 已完成' : '待完成（每月2次，間隔至少7天）'];
+}
+
+function buildWeeklyPatrolReportModel_(all, configuredStores, monthKey, todayDay) {
+  const version = ptReportVersion_(monthKey);
   const isV = r => String(r.result).toLowerCase() === 'v';
-  const inMonth = r => String(r.month) === monthKey;
+  const inMonth = r => ptReportMonth_(r) === monthKey;
 
   // 每店明細（官方門市清單順序）
-  const stores = PT_STORES.map(st => ({ st: st, rows: ptStoreRows(all, st) }));
+  const stores = configuredStores.map(st => ({ st: st, rows: ptReportStoreRows_(all, st) }));
 
   // ── 分頁1：巡店紀錄（本月明細）──
   const tabDetail = [['填表時間', '店點', '題號', '檢查內容', '結果', '未查/不合格原因', '上傳時間']];
@@ -2450,7 +2564,7 @@ function sendWeeklyPatrolReport() {
     .sort((a, b) => String(a.fillTime) < String(b.fillTime) ? -1 : 1)
     .forEach(r => {
       tabDetail.push([String(r.fillTime), String(r.store), Number(r.item),
-        PT_ITEM_TEXT[Number(r.item)] || '', String(r.result || ''), String(r.reason || ''), String(r.savedAt || '')]);
+        ptReportText_(r), String(r.result || ''), String(r.reason || ''), String(r.savedAt || '')]);
     });
 
   // ── 分頁2：未巡店（本月無任何紀錄）──
@@ -2463,36 +2577,41 @@ function sendWeeklyPatrolReport() {
   });
   if (notVisited.length === 0) tabNotVisited.push(['—', '—', '✓ 九店本月皆已巡店', '—']);
 
+  let tabHalf;
+  if (version.modern) {
+    tabHalf = [['店點', '合格到店次數', '首次到店日', '第二次合格到店日', '狀態']];
+    stores.forEach(s => tabHalf.push([s.st.name].concat(ptReportVisits_(s.rows, monthKey))));
+  } else {
   // ── 分頁3：上下半月（題2-13）──
-  const tabHalf = [['店點'].concat(Array.from({length: 12}, (_, i) => String(i + 2)))];
+  tabHalf = [['店點'].concat(Array.from({length: 12}, (_, i) => String(i + 2)))];
   stores.forEach(s => {
     const row = [s.st.name];
     for (let it = 2; it <= 13; it++) {
       const mRows = s.rows.filter(r => inMonth(r) && Number(r.item) === it);
-      const h1 = mRows.some(r => isV(r) && ptDayOf(r.fillTime) <= 15);
-      const h2 = mRows.some(r => isV(r) && ptDayOf(r.fillTime) > 15);
+      const h1 = mRows.some(r => {
+        const day = Number(ptReportDate_(r).slice(-2));
+        return isV(r) && day > 0 && day <= 15;
+      });
+      const h2 = mRows.some(r => isV(r) && Number(ptReportDate_(r).slice(-2)) > 15);
       row.push(h1 && h2 ? '完成' : (h1 ? '缺下' : (h2 ? '缺上' : '未做')));
     }
     tabHalf.push(row);
   });
   tabHalf.push(['說明：完成=上下半月各1次皆✓／缺上·缺下=只做一半／未做=本月無合格紀錄']);
 
-  // ── 分頁4：每月盤點（題14-17）──
-  const tabMonthly = [['店點', '14.銷毀文件', '15.維修機盤點', '16.現金盤點', '17.iPhone盤點', '四項完成']];
+  }
+  const tabMonthly = [['店點'].concat(version.monthly.map(it => it + '.' +
+    (version.modern ? PT_REPORT_SEP25_TEXT : PT_ITEM_TEXT)[it]), ['全項完成'])];
   let monthlyDone = 0;
   stores.forEach(s => {
-    const cells = [];
-    let all4 = true;
-    for (let it = 14; it <= 17; it++) {
-      const e = s.rows.find(r => inMonth(r) && Number(r.item) === it && isV(r));
-      cells.push(e ? '✓ ' + ptDateOf(e.fillTime) : '✗');
-      if (!e) all4 = false;
-    }
-    if (all4) monthlyDone++;
-    tabMonthly.push([s.st.name].concat(cells, [all4 ? '✓' : '✗']));
+    const states = version.monthly.map(it => version.modern && it === 1
+      ? {status:'done', optional:true} : ptReportItem_(s.rows, it, [monthKey]));
+    const complete = states.every(item => item.status === 'done');
+    if (complete) monthlyDone++;
+    tabMonthly.push([s.st.name].concat(states.map(item => item.optional ? '非必要項目' : ptReportCell_(item)), [complete ? '✓' : '待完成']));
   });
 
-  // ── 分頁5：雙月全盤（題18，固定週期）──
+  // ── 分頁5：雙月全盤（依日期題版，固定週期）──
   const winM = ptWinMonths(monthKey);
   const prevStart = (Number(winM[0].split('-')[1]) === 1)
     ? (Number(winM[0].split('-')[0]) - 1) + '-11'
@@ -2502,51 +2621,53 @@ function sendWeeklyPatrolReport() {
   const tab18 = [['店點', '本期 ' + winLabel, '本期完成日', '上期完成日']];
   let done18 = 0;
   stores.forEach(s => {
-    const v18 = s.rows.filter(r => Number(r.item) === 18 && isV(r));
-    const cur = v18.find(r => winM.indexOf(String(r.month)) !== -1);
-    const prev = v18.find(r => prevWinM.indexOf(String(r.month)) !== -1);
-    if (cur) done18++;
-    tab18.push([s.st.name, cur ? '✓ 已完成' : '✗ 未完成',
-      cur ? ptDateOf(cur.fillTime) : '—', prev ? ptDateOf(prev.fillTime) : '—']);
+    const cur = ptReportItem_(s.rows, version.bimonthly, winM);
+    const prev = ptReportItem_(s.rows, ptReportVersion_(prevWinM[0]).bimonthly, prevWinM);
+    if (cur.status === 'done') done18++;
+    const state = cur.status === 'done' ? '✓ 已完成' : ptReportCell_(cur) + '（本期待完成）';
+    tab18.push([s.st.name, state, cur.row ? ptReportDate_(cur.row).slice(5).replace('-', '/') : '—',
+      prev.row ? ptReportDate_(prev.row).slice(5).replace('-', '/') : '—']);
   });
 
-  // ── 分頁6：知悉20日前（題19-33）──
+  // ── 分頁6：知悉20日前（依日期題版）──
   const daysLeft = 20 - todayDay;
   const tabAware = [['店點', '進度', '狀態', '完成日']];
   let doneAware = 0;
-  stores.forEach(s => {
-    let cnt = 0, doneDay = 0;
-    for (let it = 19; it <= 33; it++) {
-      const days = s.rows.filter(r => inMonth(r) && Number(r.item) === it && isV(r))
-        .map(r => ptDayOf(r.fillTime)).filter(d => d > 0);
-      if (days.length) {
-        cnt++;
-        const first = Math.min.apply(null, days);
-        if (first > doneDay) doneDay = first;
-      }
-    }
-    const allDone = cnt === 15;
-    if (allDone) doneAware++;
-    const state = allDone ? ('✓ 已完成' + (doneDay > 20 ? '（逾20日）' : ''))
-      : (daysLeft >= 0 ? '剩 ' + daysLeft + ' 天' : '⚠ 逾期 ' + (-daysLeft) + ' 天');
-    tabAware.push([s.st.name, cnt + '/15', state, allDone ? monthNum + '/' + doneDay : '—']);
+  const aware = stores.map(s => Object.assign({store:s.st.name}, ptReportAware_(s.rows, monthKey, todayDay)));
+  aware.forEach(r => {
+    if (r.complete) doneAware++;
+    tabAware.push([r.store, r.progress, r.state, r.date]);
   });
+  return {version:version, notVisited:notVisited, monthlyDone:monthlyDone, done18:done18, doneAware:doneAware,
+    winLabel:winLabel, daysLeft:daysLeft, aware:aware,
+    tabs:[['巡店紀錄', tabDetail], ['未巡店', tabNotVisited], [version.visitsTitle, tabHalf],
+      [version.monthlyTitle, tabMonthly], [version.bimonthlyTitle, tab18], [version.nccTitle, tabAware]]};
+}
+
+function sendWeeklyPatrolReport() {
+  const tz = 'Asia/Taipei';
+  const now = new Date();
+  const monthKey = Utilities.formatDate(now, tz, 'yyyy-MM');
+  const dateStr = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+  const todayDay = Number(Utilities.formatDate(now, tz, 'd'));
+  const monthNum = Number(monthKey.split('-')[1]);
+  const all = readPatrol();
+  const model = buildWeeklyPatrolReportModel_(all, PT_STORES, monthKey, todayDay);
+  const {version, notVisited, monthlyDone, done18, doneAware, winLabel, daysLeft} = model;
 
   // ── 分頁7：半月督導檢查的提醒、改善與照片 ──
   const halfCheckTab = buildWeeklyHalfCheckTab(monthKey);
 
   // ── 產生暫存試算表（7個分頁）→ 匯出 xlsx → 寄出 → 刪除暫存 ──
   const ss = SpreadsheetApp.create('巡店報告_' + dateStr);
-  const tabs = [
-    ['巡店紀錄', tabDetail], ['未巡店', tabNotVisited], ['上下半月2-13', tabHalf],
-    ['每月盤點14-17', tabMonthly], ['雙月全盤18', tab18], ['知悉20日前19-33', tabAware],
-    ['改善提醒與照片', halfCheckTab.rows]
-  ];
+  const tabs = model.tabs.concat([['改善提醒與照片', halfCheckTab.rows]]);
   tabs.forEach((t, i) => {
     const sh = i === 0 ? ss.getSheets()[0] : ss.insertSheet();
     sh.setName(t[0]);
     const w = Math.max.apply(null, t[1].map(r => r.length));
     const grid = t[1].map(r => r.concat(Array(w - r.length).fill('')));
+    // Set progress text before values so it cannot become an Excel date.
+    if (t[0] === version.nccTitle) sh.getRange(2, 2, grid.length - 1, 1).setNumberFormat('@');
     sh.getRange(1, 1, grid.length, w).setValues(grid);
     sh.setFrozenRows(1);
     if (t[0] === '改善提醒與照片') formatWeeklyHalfCheckSheet(sh, halfCheckTab);
@@ -2562,19 +2683,19 @@ function sendWeeklyPatrolReport() {
     '📋 巡店週報 ' + dateStr + '（追蹤月份 ' + monthKey + '）\n\n' +
     '・已巡店：' + (PT_STORES.length - notVisited.length) + '/' + PT_STORES.length +
     (notVisited.length ? '（未巡：' + notVisited.map(s => s.st.name).join('、') + '）' : '') + '\n' +
-    '・每月盤點(14-17)四項完成：' + monthlyDone + '/' + PT_STORES.length + ' 店\n' +
-    '・雙月全盤(18)本期 ' + winLabel + '：' + done18 + '/' + PT_STORES.length + ' 店\n' +
-    '・知悉(19-33)全數勾核：' + doneAware + '/' + PT_STORES.length + ' 店' +
+    '・' + version.monthlyTitle + '全項完成：' + monthlyDone + '/' + PT_STORES.length + ' 店\n' +
+    '・' + version.bimonthlyTitle + '本期 ' + winLabel + '：' + done18 + '/' + PT_STORES.length + ' 店\n' +
+    '・知悉(' + version.nccRange + ')全數勾核：' + doneAware + '/' + PT_STORES.length + ' 店' +
     (daysLeft >= 0 ? '（截止 ' + monthNum + '/20，剩 ' + daysLeft + ' 天）' : '（已逾 ' + monthNum + '/20 截止日）') + '\n\n' +
     '・本月改善／提醒：' + halfCheckTab.sourceCount + ' 項；照片：' + halfCheckTab.photoCount + ' 張\n\n' +
     '各項明細請見夾檔 Excel 的七個分頁；「改善提醒與照片」已直接嵌入照片並保留私有附件連結。\n' +
     '看板：https://lian852456-dot.github.io/liamlu/patrol.html';
-  MailApp.sendEmail(NOTIFY_EMAIL, '📊 巡店週報 ' + dateStr + '｜' + PT_TITLE, body, { attachments: [blob] });
+  MailApp.sendEmail(NOTIFY_EMAIL, '📊 巡店週報 ' + dateStr + '｜' + PT_TITLE.replace(/33(?= 項)/, String(version.total)), body, { attachments: [blob] });
   DriveApp.getFileById(ss.getId()).setTrashed(true);
 }
 
 // ════════════════════════════════════
-// 知悉宣導月中提醒（題19-33，每月20日前需全數完成）
+// 知悉宣導月中提醒（依日期題版，每月20日前需全數完成）
 //
 // 啟用方式（只需做一次）：
 //   函式選單選「setupAwareTrigger」→ 執行（會要求授權，同意即可）
@@ -2583,8 +2704,6 @@ function sendWeeklyPatrolReport() {
 // 注意：時間觸發器跑的是編輯器最新存檔的程式碼，【不需要】重新部署。
 // 想立即測試：函式選單選「testAwareNotify」執行，馬上寄一封。
 // ════════════════════════════════════
-const AWARE_FROM = 19, AWARE_TO = 33;
-const AWARE_TOTAL = AWARE_TO - AWARE_FROM + 1; // 15 題
 
 function setupAwareTrigger() {
   ScriptApp.getProjectTriggers().forEach(t => {
@@ -2604,48 +2723,31 @@ function checkAwareAndNotify() {
   const sh = getPatrolSheet();
   const data = sh.getDataRange().getValues();
   const headers = data[0];
-  const idx = {};
-  headers.forEach((h, i) => idx[h] = i);
-
-  // 每個貼上店名 → 本月已勾核(v)的知悉題號集合
-  const done = {};
-  for (let i = 1; i < data.length; i++) {
-    const r = data[i];
-    const item = Number(r[idx.item]);
-    if (item < AWARE_FROM || item > AWARE_TO) continue;
-    if (String(r[idx.result]).toLowerCase() !== 'v') continue;
-    if (String(r[idx.month]) !== monthKey) continue;
-    const store = String(r[idx.store]);
-    if (!done[store]) done[store] = {};
-    done[store][item] = true;
-  }
-
-  // 對應本區門市（貼上店名可能含「台北」前綴，用關鍵字比對）
-  const rows = PT_STORES.map(s => {
-    const key = s.name.replace('台北', '');
-    let cnt = 0;
-    Object.keys(done).forEach(ps => {
-      if (ps.indexOf(key) !== -1) cnt = Math.max(cnt, Object.keys(done[ps]).length);
-    });
-    return { store: s.name, cnt: cnt };
+  const all = data.slice(1).map(row => {
+    const record = {};
+    headers.forEach((header, index) => record[header] = row[index]);
+    return record;
   });
-  const incomplete = rows.filter(r => r.cnt < AWARE_TOTAL)
-    .sort((a, b) => a.cnt - b.cnt);
-  const complete = rows.filter(r => r.cnt >= AWARE_TOTAL);
+  const todayDay = Number(Utilities.formatDate(new Date(), tz, 'd'));
+  const version = ptReportVersion_(monthKey);
+  const rows = PT_STORES.map(store => Object.assign({store:store.name},
+    ptReportAware_(ptReportStoreRows_(all, store), monthKey, todayDay)));
+  const incomplete = rows.filter(r => !r.complete).sort((a, b) => a.count - b.count);
+  const complete = rows.filter(r => r.complete);
 
   if (incomplete.length > 0) {
     const subject = '📣 巡店知悉提醒 ' + monthKey + '：尚有 ' + incomplete.length + ' 店未完成（20日前需全數勾核）';
     const body =
-      '📋 ' + monthLabel + ' 知悉宣導（題19-33）進度檢查\n' +
+      '📋 ' + monthLabel + ' 知悉宣導（題' + version.nccRange + '）進度檢查\n' +
       '⏰ 截止：' + monthLabel + '20日前每店需全數勾核一次\n\n' +
       '🔴 未完成（' + incomplete.length + ' 店）：\n' +
-      incomplete.map(r => '　・' + r.store + '　' + r.cnt + '/' + AWARE_TOTAL).join('\n') + '\n\n' +
+      incomplete.map(r => '　・' + r.store + '　' + r.progress + '　' + r.state).join('\n') + '\n\n' +
       '✅ 已完成（' + complete.length + ' 店）：' + (complete.map(r => r.store).join('、') || '無') + '\n\n' +
       '追蹤看板：https://lian852456-dot.github.io/liamlu/patrol.html';
     MailApp.sendEmail(NOTIFY_EMAIL, subject, body);
   } else {
     const subject = '✅ 巡店知悉 ' + monthKey + ' 九店全數完成';
-    const body = monthLabel + ' 知悉宣導（題19-33）九店皆已於期限前全數勾核，無需跟進。\n\n' +
+    const body = monthLabel + ' 知悉宣導（題' + version.nccRange + '）九店皆已全數勾核。\n' + rows.map(r => r.store + '　' + r.state + '　' + r.date).join('\n') + '\n\n' +
       '追蹤看板：https://lian852456-dot.github.io/liamlu/patrol.html';
     MailApp.sendEmail(NOTIFY_EMAIL, subject, body);
   }
