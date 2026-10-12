@@ -36,6 +36,8 @@
 .gold-page .reason-cell { width: 38%; min-width: 16rem; white-space: normal; overflow-wrap: anywhere; font-size: 1.125rem; line-height: 1.6; }
 .gold-page tbody tr:nth-child(even) { background: #fafbfc; }
 .gold-page .number { font-size: 1.375rem; }
+.gold-page .gold-note-batch h4 { font-size: 1.25rem; line-height: 1.6; margin: 16px 0 8px; overflow-wrap: anywhere; }
+.gold-page .gold-note-summary { font-size: 1.125rem; line-height: 1.6; margin: 0 0 16px; color: var(--muted); overflow-wrap: anywhere; }
 .gold-page :is(a, button, select, input):focus-visible { outline: 3px solid #005fcc; outline-offset: 3px; }
 @media (max-width: 1200px) {
   .gold-page .filter-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); }

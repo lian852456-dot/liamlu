@@ -1,0 +1,112 @@
+{
+  "schema": "north12b-public-gold-annotations/v1",
+  "batches": [
+    {
+      "id": "north12b:2026-10:W1:individual-insurance:already-deducted",
+      "period": "2026-10-W1",
+      "title": "2026年10月 W1 個人保險搭售金牌，已由督導扣除，僅補記說明",
+      "alreadyApplied": true,
+      "applyToBalance": false,
+      "descriptionTotal": -200,
+      "rows": [
+        {
+          "store": "復興南",
+          "displayName": "🐟",
+          "insuranceSales": 1,
+          "attachRate": "14.29%",
+          "descriptionAmount": -20,
+          "criterion": "低於40%"
+        },
+        {
+          "store": "杭州南",
+          "displayName": "🐈",
+          "insuranceSales": 0,
+          "attachRate": "0.00%",
+          "descriptionAmount": -20,
+          "criterion": "低於40%"
+        },
+        {
+          "store": "杭州南",
+          "displayName": "賢",
+          "insuranceSales": 4,
+          "attachRate": "21.05%",
+          "descriptionAmount": -20,
+          "criterion": "低於40%"
+        },
+        {
+          "store": "萬大",
+          "displayName": "徐＊安",
+          "insuranceSales": 1,
+          "attachRate": "25.00%",
+          "descriptionAmount": -20,
+          "criterion": "低於40%"
+        },
+        {
+          "store": "通化",
+          "displayName": "周＊聖",
+          "insuranceSales": 5,
+          "attachRate": "35.71%",
+          "descriptionAmount": -20,
+          "criterion": "低於40%"
+        },
+        {
+          "store": "大稻埕",
+          "displayName": "曹＊如",
+          "insuranceSales": 5,
+          "attachRate": "45.46%",
+          "descriptionAmount": -10,
+          "criterion": "40%至未滿50%"
+        },
+        {
+          "store": "大稻埕",
+          "displayName": "王＊弘",
+          "insuranceSales": 3,
+          "attachRate": "17.65%",
+          "descriptionAmount": -20,
+          "criterion": "低於40%"
+        },
+        {
+          "store": "三創",
+          "displayName": "🥬",
+          "insuranceSales": 3,
+          "attachRate": "37.50%",
+          "descriptionAmount": -20,
+          "criterion": "低於40%"
+        },
+        {
+          "store": "三創",
+          "displayName": "鍾＊玲",
+          "insuranceSales": 6,
+          "attachRate": "42.86%",
+          "descriptionAmount": -10,
+          "criterion": "40%至未滿50%"
+        },
+        {
+          "store": "三創",
+          "displayName": "蔡＊琪",
+          "insuranceSales": 1,
+          "attachRate": "25.00%",
+          "descriptionAmount": -20,
+          "criterion": "低於40%"
+        },
+        {
+          "store": "三創",
+          "displayName": "袁＊程",
+          "insuranceSales": 3,
+          "attachRate": "42.86%",
+          "descriptionAmount": -10,
+          "criterion": "40%至未滿50%"
+        },
+        {
+          "store": "三創",
+          "displayName": "⛵️",
+          "insuranceSales": 4,
+          "attachRate": "40.00%",
+          "descriptionAmount": -10,
+          "criterion": "40%至未滿50%"
+        }
+      ]
+    }
+  ],
+  "mode": "annotation-only"
+}
