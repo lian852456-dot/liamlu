@@ -26,7 +26,7 @@ async function intercept(page, body=published()){
     const post=route.request().postData()||'{}';
     const payload=post.startsWith('{')?JSON.parse(post):JSON.parse(new URLSearchParams(post).get('payload')||'{}');
     calls.push(payload);
-    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(typeof body==='function'?body():body)});
+    await route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(typeof body==='function'?body():body)});
   });
   return calls;
 }
