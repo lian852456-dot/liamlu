@@ -69,6 +69,6 @@ for(const config of configs){
   await expect(target.locator('.tc-heading-grade')).toHaveText(['S級','A級','未分級']);await expect(target.locator('.tc-number').last()).toHaveText('100,000');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   for(let i=0;i<4;i++){await page.locator(config.keyword).fill(i%2?'':'Galaxy');await expect(target.locator('.tc-grade-head')).toHaveCount(1);}
-  api.fail();await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('失敗');await expect(target.locator('.tc-item')).toHaveCount(0);await expect(target).not.toContainText('100,000');
+  api.fail();await page.locator('#refreshBtn').click();await expect(page.locator('#queryStatus')).toContainText('拒絕讀取');await expect(page.locator('#queryStatus')).toHaveClass(/bad|error/);await expect(target.locator('.tc-item')).toHaveCount(0);await expect(target).not.toContainText('100,000');
  });
 }
