@@ -13,6 +13,8 @@
   let snapshot=null,generation=0;
   const esc=value=>String(value==null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const text=value=>value==null?'':String(value).trim();
+  // Normalize only the Samsung filter identity; never rewrite source rows or model keys.
+  const canonicalBrand=value=>{const label=text(value);return /^samsung$/i.test(label)?'Samsung':label;};
   const status=(message,kind)=>{els.status.textContent=message;els.status.className='status'+(kind?' '+kind:'');};
   function priceState(value){
     const original=text(value);
@@ -43,14 +45,15 @@
   // Brand/model options use only the current official snapshot, without extra requests.
   function updateBrandOptions(selected=''){
     const brands=Array.from(new Set((snapshot?snapshot.rows:[]).filter(hasAnyPrice)
-      .map(row=>text(row.brand)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+      .map(row=>canonicalBrand(row.brand)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'zh-Hant'));
     $('brand').innerHTML='<option value="">全部廠牌</option>'+brands.map(brand=>
       '<option value="'+esc(brand)+'">'+esc(brand)+'</option>').join('');
-    $('brand').value=brands.includes(selected)?selected:'';
+    const normalizedSelected=canonicalBrand(selected);
+    $('brand').value=brands.includes(normalizedSelected)?normalizedSelected:'';
   }
   function updateModelOptions(){
     const brand=$('brand').value,previous=$('model').value;
-    const rows=(snapshot?snapshot.rows:[]).filter(row=>!brand||text(row.brand)===brand);
+    const rows=(snapshot?snapshot.rows:[]).filter(row=>!brand||canonicalBrand(row.brand)===brand);
     const choices=options(rows);
     $('model').innerHTML='<option value="">全部機款</option>'+choices.map(o=>
       '<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>').join('');
@@ -65,7 +68,7 @@
     const provider=$('provider').value;
     const grade=$('grade').value;
     return snapshot.rows.filter(row=>{
-      if(brand&&text(row.brand)!==brand)return false;
+      if(brand&&canonicalBrand(row.brand)!==brand)return false;
       if(model&&modelKey(row)!==model)return false;
       if(query&&![row.brand,row.model,row.colorless_model].map(text).join(' ').toLocaleLowerCase().includes(query))return false;
       return PROVIDERS.some(p=>(!provider||provider===p)&&quotedGrades(row,p,grade).length);
