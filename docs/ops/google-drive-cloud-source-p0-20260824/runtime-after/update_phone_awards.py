@@ -487,7 +487,8 @@ def load_award_rules_from_y26(y26_base, groups):
     manager_rules = {}
     supervisor_rules = {}
     group_index = 0
-    for block in y26_award_blocks(len(groups)):
+    current_month = (ACTIVE_AWARD_CONFIG or {}).get("effectiveMonth", "") >= "2026-10"
+    for block in y26_award_blocks(len(groups)) if current_month else AWARD_RULE_BLOCKS:
         for start_col in block["starts"]:
             if group_index >= len(groups):
                 break
@@ -813,6 +814,13 @@ def update_y26_award_mapping(y26_base, groups):
     config = ACTIVE_AWARD_CONFIG
     if not config or not config.get("configVersion"):
         raise ValueError("Y26 price mapping requires an approved award config")
+    month = config.get("effectiveMonth", "")
+    if not re.fullmatch(r"\d{4}-\d{2}", month):
+        raise ValueError("Y26 price mapping requires an explicit config month")
+    # Historical configs intentionally only contain two roles. Preserve their
+    # original producer behavior rather than imposing October's new schema.
+    if month < "2026-10":
+        return {}
     selected = config.get("selectedModels") or []
     names = [group["name"] for group in groups]
     if not selected or len(set(selected)) != len(selected) or len(set(names)) != len(names) or set(names) != set(selected):

@@ -452,6 +452,93 @@ class Y26AwardMappingTests(unittest.TestCase):
         ]
         self.assertEqual(markers, first_markers["店"])
 
+    def test_legacy_september_config_skips_new_mapping_and_preserves_legacy_price_formulas(self):
+        legacy = copy.deepcopy(self.config)
+        legacy["effectiveMonth"] = "2026-09"
+        legacy["configVersion"] = "2026-09-v2"
+        legacy["rewardRules"] = [
+            rule for rule in legacy["rewardRules"]
+            if rule["role"] in ("manager", "supervisor")
+        ]
+        legacy.pop("emptyDeviceRewards", None)
+        self.apply_config(legacy)
+
+        # The historical main-sheet layout has five slots in each block.
+        # Point each slot at a synthetic role-sheet row with five valid bands.
+        for sheet_name in ("店", "督"):
+            role_path = producer.sheet_path_for(self.base, sheet_name)
+            role_root = ET.parse(role_path).getroot()
+            role_cells = {cell.get("r"): cell for cell in role_root.findall(f".//{q('c')}")}
+            for source_row in range(4, 9):
+                for band_idx, col in enumerate("CDEFG"):
+                    ref = f"{col}{source_row}"
+                    cell = producer.ensure_y26_cell(role_root, role_cells, ref)
+                    cell.attrib.pop("t", None)
+                    inline = cell.find(q("is"))
+                    if inline is not None:
+                        cell.remove(inline)
+                    value = cell.find(q("v"))
+                    if value is None:
+                        value = ET.SubElement(cell, q("v"))
+                    value.text = str(source_row * 10 + band_idx + 1)
+            ET.ElementTree(role_root).write(role_path, encoding="utf-8", xml_declaration=True)
+
+        main_path = producer.sheet_path_for(self.base, "台獎機款")
+        main = ET.parse(main_path).getroot()
+        main_cells = {cell.get("r"): cell for cell in main.findall(f".//{q('c')}")}
+        price_refs = {}
+        for manager_row, supervisor_row in ((3, 5), (19, 21)):
+            for offset, start_col in enumerate(("F", "J", "N", "R", "V")):
+                source_row = 4 + offset
+                for target_row, sheet_name in ((manager_row, "店"), (supervisor_row, "督")):
+                    ref = f"{start_col}{target_row}"
+                    cell = main_cells[ref]
+                    formula = cell.find(q("f"))
+                    if formula is None:
+                        formula = ET.SubElement(cell, q("f"))
+                    formula.text = f"'{sheet_name}'!C{source_row}"
+                    value = cell.find(q("v"))
+                    if value is None:
+                        value = ET.SubElement(cell, q("v"))
+                    value.text = str(40 + offset)
+                    price_refs[ref] = (formula.text, value.text)
+        ET.ElementTree(main).write(main_path, encoding="utf-8", xml_declaration=True)
+
+        before = self.sheet_bytes()
+        self.assertEqual(producer.update_y26_award_mapping(self.base, self.groups()), {})
+        self.assertEqual(self.sheet_bytes(), before)
+
+        # The legacy rule reader remains on its original five-slot blocks.
+        manager_rules, supervisor_rules = producer.load_award_rules_from_y26(self.base, self.groups())
+        self.assertEqual(set(manager_rules), set(self.names()))
+        self.assertEqual(set(supervisor_rules), set(self.names()))
+        self.assertEqual(manager_rules[self.names()[0]], [41, 42, 43, 44, 45])
+        self.assertEqual(supervisor_rules[self.names()[0]], [41, 42, 43, 44, 45])
+
+        data = [{
+            "store": "北一二B整體", "actual_total": 100, "projected": 120,
+            "rank": 1, "award": "Y",
+            "items": [{"actual": i + 1, "target": i + 2, "rate": 0.5} for i in range(10)],
+        }]
+        producer.update_y26_store_sheet(self.base, self.groups(), data)
+        updated_main = read_sheet_root(self.base, "台獎機款")
+        self.assertEqual(cell_value(updated_main, "F1"), producer.display_item_name(self.names()[0]))
+        self.assertEqual(cell_value(updated_main, "A7"), "北一二B")
+        for ref, (expected_formula, expected_cache) in price_refs.items():
+            self.assertEqual(cell_formula(updated_main, ref), expected_formula, ref)
+            cell = updated_main.find(f".//{q('c')}[@r='{ref}']")
+            value = cell.find(q("v")) if cell is not None else None
+            self.assertEqual(value.text if value is not None else None, expected_cache, ref)
+
+    def test_missing_effective_month_fails_before_any_package_write(self):
+        missing_month = copy.deepcopy(self.config)
+        missing_month.pop("effectiveMonth")
+        self.apply_config(missing_month)
+        original = self.sheet_bytes()
+        with self.assertRaisesRegex(ValueError, "explicit config month"):
+            producer.update_y26_award_mapping(self.base, self.groups())
+        self.assertEqual(self.sheet_bytes(), original)
+
 
 if __name__ == "__main__":
     unittest.main()
