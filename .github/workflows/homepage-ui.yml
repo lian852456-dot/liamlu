@@ -2,7 +2,7 @@ name: Homepage UI checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/tradein-price-share-20261012]
     paths:
       - 'design-qa.md'
       - 'home.html'
@@ -23,6 +23,9 @@ on:
       - 'tradein-price-share.html'
       - 'tradein-price-share.css'
       - 'tradein-price-share.js'
+      - 'tradein-compact-view.js'
+      - 'tradein-compact-view.css'
+      - 'tests/tradein-compact-view.spec.js'
       - 'scripts/build-tradein-share.mjs'
       - 'tests/tradein-share-build.test.cjs'
       - 'threec-query-core.js'
@@ -83,6 +86,7 @@ jobs:
         run: |
           git rev-parse HEAD
           node --check home.js
+          node --check tradein-compact-view.js
           node --test tests/home-reminder-model.test.cjs tests/home-navigation-contract.test.cjs tests/department-ops.test.cjs tests/patrol-question-versions.test.cjs tests/patrol-dashboard-contract.test.cjs tests/patrol-dashboard-client.test.cjs tests/tradein-performance.test.cjs
           node -e "new Function(require('fs').readFileSync('gas/Code.gs', 'utf8'))"
           node --test tests/tradein-owner-fence.test.cjs tests/tradein-models.test.cjs tests/tradein-targets-brief.test.cjs tests/phone-stock-sync-contract.test.cjs tests/threec-private-runtime.test.cjs tests/tradein-price-share-contract.test.cjs tests/tradein-share-build.test.cjs
@@ -97,11 +101,9 @@ jobs:
             if curl --fail --silent http://127.0.0.1:4173/home.html >/dev/null; then break; fi
             sleep 1
           done
-          # tests/home.spec.js intercepts every external browser request and uses
-          # synthetic credentials/data only. No production login or data write.
-          # Repeat exact 5-second pause/resume boundaries before the full suite.
+          # Synthetic browser tests only. No production login or data write.
           npx playwright test tests/home.spec.js --grep '提醒每 5 秒輪播|提醒滑鼠停留|滑鼠點擊可暫停' --repeat-each=5 --workers=1 --reporter=list --output=test-results/rotation-stability
-          npx playwright test tests/home.spec.js tests/tradein-performance-ui.spec.js tests/tradein-price-share.spec.js --workers=1 --reporter=list,html
+          npx playwright test tests/home.spec.js tests/tradein-performance-ui.spec.js tests/tradein-price-share.spec.js tests/tradein-compact-view.spec.js --workers=1 --reporter=list,html
           node scripts/build-tradein-share.mjs
       - name: Save screenshots and browser test report
         if: always()
