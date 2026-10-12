@@ -112,7 +112,6 @@
       provider:$('provider').value,
       grade:$('grade').value
     };
-    const view=Core.buildView('tradein',current,filters);
     const all=Core.filterTradeinByModel(current.snapshot,filters);
     // Search never invents a missing price; Core filters to quoted grades/providers.
     const shown=all.slice(0,filters.modelKey?all.length:MAX_INITIAL);
