@@ -1,5 +1,16 @@
 // One readable summary; transaction identifiers stay in private processing.
 export function addSalesSheet(book, metrics, reportDate, sourceFile) {
+  // Keep the aggregate first. Sort only this view; source rows retain their
+  // canonical store order for other reports and reconciliation.
+  const stores = metrics.rows.slice(1).sort((a,b)=>{
+    const av=a.auto_film_month_count, bv=b.auto_film_month_count;
+    const an=typeof av==='number' && Number.isFinite(av), bn=typeof bv==='number' && Number.isFinite(bv);
+    if (an!==bn) return an?-1:1;
+    return an?bv-av:0; // Stable ties retain the existing store order.
+  });
+  const rows = [metrics.rows[0], ...stores];
+  const fields = ['accessory_amount','film_amount','auto_film_month_count'];
+  const best = Object.fromEntries(fields.map(key=>[key,Math.max(0,...stores.map(row=>typeof row[key]==='number' && Number.isFinite(row[key])?row[key]:0))]));
   const sheet = book.worksheets.add('配件包膜銷售');
   sheet.showGridLines = false;
   sheet.getRange('A1:D16').format = {font:{name:'Noto Sans TC',size:16,color:'#17365D'},horizontalAlignment:'center',verticalAlignment:'center'};
@@ -12,24 +23,31 @@ export function addSalesSheet(book, metrics, reportDate, sourceFile) {
   sheet.getRange('A2').values=[[`最新單日｜${metrics.data_as_of_date ?? '尚未有資料'}`]];
   sheet.getRange('D2').values=[[`${metrics.month} 月累計｜截至 ${metrics.month_as_of_date.slice(5)}`]];
   sheet.getRange('A2:D2').format={fill:'#EAF0F8',font:{size:14,bold:true},rowHeight:36};
-  sheet.getRange('A3:D3').values=[['店點','配件銷售金額\n(元)','包膜與保貼金額\n(元)','自動保貼機適用款\n月累計銷售(筆)']];
+  sheet.getRange('A3:D3').values=[['店點','配件銷售金額\n(元)','包膜與保貼金額\n(元)','自動保貼機適用款\n月累計銷售(筆)・由高至低']];
   sheet.getRange('A3:D3').format={fill:'#FFCF17',font:{size:15,bold:true},wrapText:true,rowHeight:56};
-  for (let i=0;i<metrics.rows.length;i++) {
-    const data=metrics.rows[i], r=i+4;
+  for (let i=0;i<rows.length;i++) {
+    const data=rows[i], r=i+4;
     const show=(v,pending='尚未有資料')=>v===null || v===undefined ? pending : v;
     sheet.getRange(`A${r}:D${r}`).values=[[data.store,show(data.accessory_amount),show(data.film_amount),show(data.auto_film_month_count)]];
     sheet.getRange(`A${r}:D${r}`).format={fill:i===0?'#FFF1B8':i%2?'#FFFFFF':'#F1F5F9',font:{size:16,bold:i===0},rowHeight:38};
     sheet.getRange(`B${r}:D${r}`).format.numberFormat='#,##0.##';
+    if (i>0) fields.forEach((key,j)=>{
+      const value=data[key], cell=sheet.getRange(`${String.fromCharCode(66+j)}${r}`);
+      if (typeof value!=='number' || !Number.isFinite(value)) return;
+      // Zero alerts take precedence; an all-zero field has no best store.
+      if (value===0) cell.format={fill:'#FEE2E2',font:{color:'#DC2626',bold:true}};
+      else if (best[key]>0 && value===best[key]) cell.format={fill:'#DCFCE7',font:{color:'#166534',bold:true}};
+    });
   }
   sheet.getRange('A3:D13').format.borders={preset:'all',style:'thin',color:'#CBD5E1'};
   const notes=[
     `金額來源：${sourceFile}「上線數KPI_每日上線」；配件採「配件及其他營收」，包膜採「包膜與保貼營收」。`,
     `自動保貼機：${sourceFile}「AQ其他-包膜與保貼營收」，僅商品名稱含「自動保貼機適用款」，加總當月銷售筆數。`,
-    '月累計為本月截至資料日的銷售筆數，非整月預估。',
+    '紅色：掛蛋(0)；綠色：各欄門市最高值(含並列)。依保貼機月累計由高至低，同值沿原店序；月累計截至資料日，非整月預估。',
   ];
   notes.forEach((note,i)=>{
     const r=i+14;sheet.getRange(`A${r}:D${r}`).merge();sheet.getRange(`A${r}`).values=[[note]];
-    sheet.getRange(`A${r}:D${r}`).format={font:{size:11,color:'#475569'},horizontalAlignment:'left',wrapText:true,rowHeight:30};
+    sheet.getRange(`A${r}:D${r}`).format={font:{size:11,color:'#475569'},horizontalAlignment:'left',wrapText:true,rowHeight:i===2?42:30};
   });
   sheet.freezePanes.freezeRows(3);
   return sheet;

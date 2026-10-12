@@ -24,10 +24,23 @@ for row in range(4,14):
 assert c['latest']['formal_cases']+c['latest']['unassigned_cases']+c['latest']['anomaly_cases']==c['latest']['gap']
 sales=d['salesMetrics']
 assert len(sales['rows'])==10 and v['配件包膜銷售'].max_row==16 and v['配件包膜銷售'].max_column==4
-for index,row in enumerate(sales['rows'],4):
+sales_stores=sorted(sales['rows'][1:],key=lambda row:(not isinstance(row['auto_film_month_count'],(int,float)),-row['auto_film_month_count'] if isinstance(row['auto_film_month_count'],(int,float)) else 0))
+sales_fields=['accessory_amount','film_amount','auto_film_month_count']
+sales_best={key:max([0]+[row[key] for row in sales_stores if isinstance(row[key],(int,float))]) for key in sales_fields}
+for index,row in enumerate([sales['rows'][0]]+sales_stores,4):
     expected=[row['store'],row['accessory_amount'],row['film_amount'],row['auto_film_month_count']]
     for col,value in enumerate(expected,1):
         assert v['配件包膜銷售'].cell(index,col).value==('尚未有資料' if value is None else value),'SALES_REPORT_MISMATCH'
+        if index>4 and col>1 and isinstance(value,(int,float)):
+            key=sales_fields[col-2]
+            cell=f['配件包膜銷售'].cell(index,col)
+            fill=cell.fill.fgColor.rgb[-6:];color=cell.font.color.rgb[-6:]
+            if value==0:
+                assert (fill,color)==('FEE2E2','DC2626'),'SALES_ZERO_COLOR_MISMATCH'
+            elif sales_best[key]>0 and value==sales_best[key]:
+                assert (fill,color)==('DCFCE7','166534'),'SALES_BEST_COLOR_MISMATCH'
+            else:
+                assert fill not in ('FEE2E2','DCFCE7'),'SALES_NEUTRAL_COLOR_MISMATCH'
 for ws in v:
     for row in ws:
         for cell in row:assert not (cell.data_type=='e'),'FORMULA_ERROR '+ws.title+'!'+cell.coordinate
