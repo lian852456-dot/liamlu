@@ -1538,6 +1538,14 @@
   @media (max-width:500px) {
     #panel-personal .form-grid { grid-template-columns:minmax(0,1fr) !important; }
   }
+  /* Read status and numeric columns: presentation only. */
+  #connBadge { min-width:44px; min-height:44px; }
+  #panel-playback td:not(:first-child), #panel-perf td:not(:first-child) { text-align:right; font-variant-numeric:tabular-nums; }
+  body #dashboard-b-access button { min-width:44px; min-height:44px; }
+  @media (max-width:640px) {
+    .tab-bar { flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; }
+    .tab-bar .tab-btn { flex:0 0 auto; min-height:48px; padding:11px 14px; font-size:15px; }
+  }
 </style>
 <link rel="stylesheet" href="daily-report-layout.css?v=20261004-layout-3">
 <link rel="stylesheet" href="daily-report-summary.css?v=20261004-summary-1">
@@ -1560,7 +1568,7 @@
   </div>
   <div class="header-right">
     <div class="date-badge" id="todayBadge"></div>
-    <div class="date-badge" id="connBadge" onclick="openSettings()" style="cursor:pointer;border-color:var(--warn);color:var(--warn)">⚙️ 設定 Sheets</div>
+    <button type="button" class="date-badge" id="connBadge" onclick="openSettings()" style="cursor:pointer;border-color:var(--warn);color:var(--warn)">📋 尚未取得回報</button>
   </div>
 </header>
 
@@ -2228,6 +2236,9 @@ if (savedGasUrl !== GAS_URL) localStorage.setItem('bei12b_gas_url', GAS_URL);
 // 記憶體快取（避免重複拉資料）
 const _cache = {};
 const _cacheReadGeneration = {};
+// Display proof comes only from this session's completed reads, never local shadows.
+const reportReadDisplay = {};
+let reportConnectionDisplay = {status:'idle'};
 let dailyReportReadContext = 0;
 let playbackReadGeneration = 0, perfReadGeneration = 0;
 function invalidateDailyReportReads(date, seg) {
@@ -2238,6 +2249,11 @@ function invalidateDailyReportReads(date, seg) {
     delete _cache[key];
   }
   if (!date) Object.keys(_cache).forEach(key => delete _cache[key]);
+  if (date) delete reportReadDisplay[cacheKey(date, seg)];
+  else Object.keys(reportReadDisplay).forEach(key => delete reportReadDisplay[key]);
+  reportConnectionDisplay = {status:'idle'};
+  updateConnectionBadge();
+  updateMarquee();
 }
 for (const name of ['portal-before-logout', 'portal-login-changed']) window.addEventListener(name, () => {
   dailyReportReadContext++;
@@ -2251,6 +2267,14 @@ for (const name of ['portal-before-logout', 'portal-login-changed']) window.addE
   document.getElementById('perfResult')?.replaceChildren();
 });
 function cacheKey(date, seg) { return `${date}_${seg}`; }
+function clearReportReadDisplay() {
+  Object.keys(reportReadDisplay).forEach(key => delete reportReadDisplay[key]);
+  reportConnectionDisplay = {status:'idle'};
+  updateConnectionBadge(); updateMarquee();
+}
+window.addEventListener('pagehide', clearReportReadDisplay);
+window.addEventListener('pageshow', event => { if (event.persisted) clearReportReadDisplay(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) clearReportReadDisplay(); });
 function shadowKey(date, seg) { return `bei12b_shadow_${date}_${seg}`; }
 
 function readLocalShadow(date, seg) {
@@ -2508,21 +2532,9 @@ function updateMarquee() {
   const td = today();
   const seg = currentSeg || 16;
   const ck = td + '_' + seg;
-  const dayCache = _cache[ck] || {};
-
-  const noA999 = STORES.filter(s => {
-    if (NEW_STORES.includes(s) && td < '2026-06-25') return false;
-    const v = parseFloat(dayCache[s]?.aq999);
-    return isNaN(v) || v === 0;
-  });
-
+  const state = reportReadDisplay[ck] || {status:'idle'};
   const cheer = CHEERS[Math.floor(Date.now() / 60000) % CHEERS.length];
-  let msg = cheer;
-  if (noA999.length > 0) {
-    msg += '　　🔴 尚未開出A999：' + noA999.map(s => '【' + s + '】').join(' ') + '　快跟進！';
-  } else if (Object.keys(dayCache).length > 0) {
-    msg += '　　✅ 所有門市 A999 均已開出！太棒了！';
-  }
+  const msg = cheer + '　　' + reportMarqueeStatus(state, td, seg);
 
   const t1 = document.getElementById('marqueeText');
   const t2 = document.getElementById('marqueeText2');
@@ -2536,20 +2548,46 @@ function updateMarquee() {
   if (track) track.style.animationDuration = duration;
 }
 
+function reportMarqueeStatus(state, date, seg) {
+  if (state.status === 'loading') return '🔄 正式回報讀取中，暫不判定 A999。';
+  if (state.status === 'error') return '⚠️ 正式回報讀取失敗，尚未取得可核對資料。';
+  if (state.status !== 'ready') return '📋 尚未取得正式回報資料，暫不判定 A999。';
+  const stores = STORES.filter(s => !(NEW_STORES.includes(s) && date < '2026-06-25'));
+  const known = [], unknown = [];
+  for (const store of stores) {
+    const row = state.data?.[store];
+    const valid = row && String(row.date) === date && String(row.store) === store && Number(row.seg) === Number(seg);
+    const value = valid ? closingReportNumber(row.aq999) : null;
+    if (value === null || value < 0) unknown.push(store);
+    else known.push({store, value});
+  }
+  if (!Object.keys(state.data || {}).length) return `📋 ${date} ${seg}:00 讀取成功，本時段尚無回報；不判定零業績。`;
+  const zero = known.filter(row => row.value === 0);
+  const parts = [`📋 資料日期 ${date} · ${seg}:00`];
+  if (zero.length) parts.push('🔴 已回報 A999 為 0：' + zero.map(row => '【' + row.store + '】').join(' '));
+  else if (!unknown.length) parts.push('✅ 所有門市 A999 均已開出！');
+  if (unknown.length) parts.push('尚未取得 A999 數值：' + unknown.map(store => '【' + store + '】').join(' '));
+  return parts.join('　　');
+}
+
 function updateConnectionBadge() {
   const badge = document.getElementById('connBadge');
   if (!badge) return;
-  if (GAS_URL) {
-    badge.innerHTML = '🟢 已連接 Sheets';
+  const status = reportConnectionDisplay.endpoint === GAS_URL ? reportConnectionDisplay.status : 'idle';
+  if (GAS_URL && status === 'ready') {
+    badge.textContent = '🟢 回報讀取成功';
     badge.style.color = 'var(--green)';
     badge.style.borderColor = 'var(--green)';
     badge.style.background = 'rgba(16,185,129,0.1)';
   } else {
-    badge.innerHTML = '⚙️ 設定 Sheets';
+    badge.textContent = !GAS_URL ? '⚙️ 設定 Sheets' : status === 'loading' ? '🔄 回報讀取中' : status === 'error' ? '⚠️ 回報讀取失敗' : '📋 尚未取得回報';
     badge.style.color = 'var(--warn)';
     badge.style.borderColor = 'var(--warn)';
     badge.style.background = 'rgba(249,115,22,0.1)';
   }
+  badge.title = status === 'ready'
+    ? `資料日期 ${reportConnectionDisplay.date} · ${reportConnectionDisplay.seg}:00；頁面取得 ${reportConnectionDisplay.readAt}`
+    : '設定服務網址不代表已取得正式資料。';
 }
 function openSettings() {
   document.getElementById('settingsModal').style.display = 'flex';
@@ -2628,8 +2666,37 @@ function privateDashboardAllowedGasMessageOrigin(origin) {
 const dailyReportReads = DailyReportReadTransport.create({
   getEndpoint:() => GAS_URL,
   getContext:() => dailyReportReadContext,
-  post:(payload, signal, endpoint) => privateDashboardRequest(payload, signal, endpoint),
+  post:(payload, signal, endpoint) => readReportForDisplay(payload, signal, endpoint),
 });
+async function readReportForDisplay(payload, signal, endpoint) {
+  if (payload.action !== 'read') return privateDashboardRequest(payload, signal, endpoint);
+  const key = cacheKey(payload.date, payload.seg), context = dailyReportReadContext;
+  const state = {status:'loading', date:String(payload.date), seg:payload.seg, endpoint, data:null};
+  reportReadDisplay[key] = state;
+  reportConnectionDisplay = state;
+  updateConnectionBadge(); updateMarquee();
+  const current = () => context === dailyReportReadContext && endpoint === GAS_URL && reportReadDisplay[key] === state;
+  try {
+    const result = await privateDashboardRequest(payload, signal, endpoint);
+    if (current()) {
+      const valid = !signal?.aborted && result?.status === 'ok' && result.data && typeof result.data === 'object' && !Array.isArray(result.data) &&
+        Object.entries(result.data).every(([store,row]) => STORES.includes(store) && row &&
+          String(row.date) === state.date && String(row.store) === store && Number(row.seg) === Number(state.seg));
+      state.status = signal?.aborted ? 'idle' : valid ? 'ready' : 'error';
+      state.data = valid ? result.data : null;
+      state.readAt = new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour12:false});
+      updateConnectionBadge(); updateMarquee();
+    }
+    return result;
+  } catch (error) {
+    if (current()) {
+      state.status = error.name === 'AbortError' ? 'idle' : 'error';
+      state.data = null;
+      updateConnectionBadge(); updateMarquee();
+    }
+    throw error;
+  }
+}
 async function privateDashboardPost(payload, options) {
   globalThis.PortalLogout?.assertActive();
   if (payload.action === 'read' || payload.action === 'pread') return dailyReportReads.read(payload, options);

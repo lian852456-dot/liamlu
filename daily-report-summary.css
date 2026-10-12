@@ -99,3 +99,5 @@
  #panel-summary :is(.sum-consult,.sum-person) dl{grid-template-columns:minmax(0,1fr);gap:3px}
  #panel-summary :is(.sum-consult,.sum-person) dd{margin-bottom:10px}
 }
+
+#panel-summary :is(.sum-num,.sum-metrics b,.sum-table-scroll td){font-variant-numeric:tabular-nums}
