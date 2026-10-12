@@ -352,3 +352,52 @@ test('大手機快照先走單次 iframe，避免15秒中止後重複執行',asy
  await page.goto(PAGE_URL);await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
  expect(reads.filter(r=>r.kind==='shopping')).toEqual([{kind:'shopping',transport:'iframe'}]);expect(reads.filter(r=>r.kind==='tradein')).toEqual([{kind:'tradein',transport:'fetch'}]);
 });
+
+// Full card condition regression, run by the existing query CI entrypoint.
+{
+'use strict';
+const {test,expect}=require('@playwright/test'),path=require('node:path'),fs=require('node:fs');
+const f=require('./threec-card-options-fixture.cjs');
+async function setup(page,width){
+ const errors=[],calls=[];page.on('pageerror',e=>errors.push(e.message));await page.setViewportSize({width,height:844});
+ await page.route(/^https?:/,route=>{
+  const url=new URL(route.request().url());if(!url.pathname.startsWith('/macros/s/'))return route.abort();
+  const raw=route.request().postData();let payload;try{payload=JSON.parse(raw);}catch{payload=JSON.parse(new URLSearchParams(raw).get('payload'));}
+  calls.push(payload);expect(payload.action).toBe('threec_snapshot_read');
+  const body=payload.kind==='shopping'?f.shopping:f.tradein;
+  if(url.searchParams.get('transport')==='iframe')return route.fulfill({contentType:'text/html',body:'<!doctype html><meta charset="utf-8"><script>top.postMessage('+JSON.stringify({type:'north12b-gas-response-v1',requestId:url.searchParams.get('requestId'),body}).replace(/</g,'\\u003c')+',"*")</script>'});
+  return route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
+ });
+ await page.goto('file://'+path.resolve(__dirname,'../threec-query.html'));await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
+ if(await page.locator('.filter-details').getAttribute('open')===null)await page.locator('.filter-details summary').click();
+ return {errors,calls};
+}
+async function keys(page){return page.locator('#shoppingCardCondition option').evaluateAll(options=>options.map(o=>o.value));}
+for(const width of [1440,390]){
+ test(`${width}px card dropdown exposes every general and enterprise condition without first selecting a project`,async({page})=>{
+  const env=await setup(page,width);await page.locator('#shoppingRent').selectOption('');await page.locator('#cardModeBtn').click();
+  expect(new Set(await keys(page))).toEqual(new Set(f.consumer));
+  await page.locator('#shoppingCardCondition').selectOption(f.consumerLast);await expect(page.locator('.quote-card')).toHaveCount(3);await expect(page.locator('.quote.zero')).toHaveCount(2);await expect(page.locator('#columnNext')).toBeDisabled();
+  await page.locator('#tableModeBtn').click();await expect(page.locator('.comparison-table thead th')).toHaveCount(13);await page.locator('#columnNext').click();await expect(page.locator('#columnPage')).toHaveText('2 / 3 組');
+  await page.locator('#cardModeBtn').click();expect(new Set(await keys(page))).toEqual(new Set(f.consumer));await expect(page.locator('#columnPage')).toHaveText('1 / 1 組');
+  await page.locator('#enterpriseSegmentBtn').click();expect(new Set(await keys(page))).toEqual(new Set(f.enterprise));
+  const renewal=f.force('48','_iPhone_續約');await page.locator('#shoppingCardCondition').selectOption(renewal);await expect(page.locator('.quote-card')).toHaveCount(2);await expect(page.locator('.quote-card').first()).toContainText('續約');await expect(page.locator('.quote-card').first()).toContainText('1,000 元');
+  await page.locator('#shoppingCardCondition').selectOption(f.force('48','_iPhone_新申裝'));await expect(page.locator('.quote.zero')).toHaveCount(2);await expect(page.locator('.quote-card').first()).toContainText('新申裝');
+  await page.locator('#shoppingCardCondition').selectOption(f.force('48'));await expect(page.locator('.quote-card')).toHaveCount(1);await expect(page.locator('.quote-card')).toContainText('Galaxy');await expect(page.locator('.quote-card')).toContainText('700 元');
+  expect(env.errors).toEqual([]);expect(env.calls).toHaveLength(2);
+  if(process.env.CARD_OPTIONS_QA_DIR){fs.mkdirSync(process.env.CARD_OPTIONS_QA_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.CARD_OPTIONS_QA_DIR,`card-options-${width}.png`),fullPage:true});}
+ });
+ test(`${width}px full card conditions respect model qualification and filters, preserving zero and independent renewal prices`,async({page})=>{
+  const env=await setup(page,width);await page.locator('#enterpriseSegmentBtn').click();await page.locator('#cardModeBtn').click();
+  await page.locator('#shoppingBrand').selectOption('APPLE');await page.locator('#shoppingModel').selectOption('iPhone 合成機');await page.locator('#shoppingCapacity').selectOption('256GB');await page.locator('#shoppingProject').selectOption('企客5G員工眷5力全開-新申裝/續約');await page.locator('#shoppingRent').selectOption('999');await page.locator('#shoppingTerm').selectOption('48');
+  expect(new Set(await keys(page))).toEqual(new Set([f.force('48','_iPhone_新申裝'),f.force('48','_iPhone_續約')]));
+  await page.locator('#shoppingCardCondition').selectOption(f.force('48','_iPhone_新申裝'));await expect(page.locator('.quote.zero')).toHaveCount(1);await expect(page.locator('.quote-card')).toContainText('256GB');
+  await page.locator('#shoppingCardCondition').selectOption(f.force('48','_iPhone_續約'));await expect(page.locator('.quote-card')).toContainText('1,000 元');
+  await page.locator('#shoppingBrand').selectOption('Samsung');expect(await keys(page)).toEqual([f.force('48')]);await expect(page.locator('.quote-card')).toContainText('700 元');
+  await page.locator('#shoppingSearch').fill('不存在的機款');expect(await keys(page)).toEqual([]);await expect(page.locator('#shoppingResults')).toContainText('沒有符合');
+  await page.locator('#shoppingReset').click();expect(new Set(await keys(page))).toEqual(new Set(f.enterprise));
+  expect(env.errors).toEqual([]);expect(env.calls).toHaveLength(2);
+ });
+}
+
+}
