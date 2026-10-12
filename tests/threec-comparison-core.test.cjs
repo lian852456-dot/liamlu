@@ -147,3 +147,35 @@ test('搜尋缺價條件或另一專區條件不回傳無關有價方案',()=>{
  assert.equal(Compare.buildView(index,{segment:'enterprise',query:'24'}).totalRows,0);
  assert.equal(Compare.hasPrice('9'.repeat(400)),false);
 });
+
+test('一般／企業卡片可直接選到後段條件，全部選項不受橫向12欄分組影響',()=>{
+ const fixture=require('./threec-card-options-fixture.cjs'),snapshot=fixture.shopping.snapshot,before=JSON.stringify(snapshot),index=Compare.buildIndex(snapshot);
+ for(const segment of ['consumer','enterprise']){
+  const expected=segment==='consumer'?fixture.consumer:fixture.enterprise;
+  const key=segment==='consumer'?fixture.consumerLast:fixture.force('48','_iPhone_續約');
+  assert.ok(index.columns.filter(c=>segment==='enterprise'?/企客/.test(c.raw):!/企客/.test(c.raw)).findIndex(c=>c.key===key)>=12);
+  for(const columnPage of [0,1,99]){
+   const card=Compare.buildView(index,{segment,columnPage},{cardConditionKey:key});
+   assert.deepEqual(new Set(card.columns.map(c=>c.key)),new Set(expected));
+   assert.equal(card.cardConditionKey,key);assert.equal(card.columnPages,1);
+   assert.ok(card.rows.every(r=>Compare.hasQuote(r,Compare.condition(key))));
+   assert.equal(card.columns.some(c=>c.key===fixture.missing),false);
+  }
+  const table=Compare.buildView(index,{segment});assert.equal(table.columns.length,12);assert.equal(table.columnPages,Math.ceil(expected.length/12));
+ }
+ assert.equal(JSON.stringify(snapshot),before);
+});
+test('卡片全部條件仍依品牌／機款／容量／資費／約期／版本／專案與有價資格篩選',()=>{
+ const f=require('./threec-card-options-fixture.cjs'),index=Compare.buildIndex(f.shopping.snapshot);
+ const filters={segment:'enterprise',brand:'APPLE',model:'iPhone 合成機',capacity:'256GB',project:'企客5G員工眷5力全開-新申裝/續約',rent:'999',term:'48'};
+ const fresh=f.force('48','_iPhone_新申裝'),renew=f.force('48','_iPhone_續約');
+ const view=Compare.buildView(index,filters,{cardConditionKey:fresh});
+ assert.deepEqual(new Set(view.columns.map(c=>c.key)),new Set([fresh,renew]));
+ assert.equal(view.totalRows,1);assert.equal(Compare.cell(view.rows[0],Compare.condition(fresh)).kind,'zero');
+ const renewed=Compare.buildView(index,filters,{cardConditionKey:renew});assert.equal(Compare.cell(renewed.rows[0],Compare.condition(renew)).value,1000);
+ const android=Compare.buildView(index,{...filters,brand:'Samsung',model:'Galaxy 合成機'},{cardConditionKey:renew});
+ assert.deepEqual(android.columns.map(c=>c.key),[f.force('48')]);assert.equal(android.cardConditionKey,f.force('48'));assert.equal(Compare.cell(android.rows[0],android.columns[0]).value,700);
+ const consumer=Compare.buildView(index,{segment:'consumer',brand:'APPLE',version:'加碼',rent:'999',term:'48'},{cardConditionKey:f.consumerLast});
+ assert.deepEqual(consumer.columns.map(c=>c.key),[f.consumerLast]);
+ assert.equal(Compare.buildView(index,{...filters,capacity:'128GB'},{cardConditionKey:renew}).columns.length,0);
+});

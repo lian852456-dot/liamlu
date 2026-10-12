@@ -89,17 +89,19 @@
     const rowOffset=Math.max(0,Number(filters.rowPage||0))*20, columnOffset=Math.max(0,Number(filters.columnPage||0))*12;
     const pageColumns=columns.slice(columnOffset,columnOffset+12);
     const cardMode=viewOptions.cardConditionKey!=null;
-    let cardColumn=cardMode?pageColumns.find(col=>col.key===viewOptions.cardConditionKey):null;
+    // Card selection spans every eligible condition; the 12-column groups
+    // belong only to the horizontal comparison table.
+    let cardColumn=cardMode?columns.find(col=>col.key===viewOptions.cardConditionKey):null;
     if(cardMode&&!cardColumn){
-      const counts=new Map(pageColumns.map(col=>[col.key,rows.filter(row=>hasQuote(row,col)).length]));
-      cardColumn=pageColumns.slice().sort((a,b)=>counts.get(b.key)-counts.get(a.key))[0];
+      const counts=new Map(columns.map(col=>[col.key,rows.filter(row=>hasQuote(row,col)).length]));
+      cardColumn=columns.slice().sort((a,b)=>counts.get(b.key)-counts.get(a.key))[0];
     }
     // Match before row pagination so card counts and pages include priced rows only.
     const matching=rows.filter(row=>cardMode?(cardColumn&&hasQuote(row,cardColumn)):pageColumns.some(col=>hasQuote(row,col)));
     const pageRows=matching.slice(rowOffset,rowOffset+20);
     // Keep keyed cell positions; omit columns with no quotes on this row page.
-    const visibleColumns=cardMode?pageColumns:pageColumns.filter(col=>pageRows.some(row=>hasQuote(row,col)));
-    return {rows:pageRows,columns:visibleColumns,cardConditionKey:cardColumn?cardColumn.key:null,totalRows:matching.length,totalColumns:columns.length,rowPages:Math.max(1,Math.ceil(matching.length/20)),columnPages:Math.max(1,Math.ceil(columns.length/12)),options:viewOptions.includeOptions===false?null:options(index,filters)};
+    const visibleColumns=cardMode?columns:pageColumns.filter(col=>pageRows.some(row=>hasQuote(row,col)));
+    return {rows:pageRows,columns:visibleColumns,cardConditionKey:cardColumn?cardColumn.key:null,totalRows:matching.length,totalColumns:columns.length,rowPages:Math.max(1,Math.ceil(matching.length/20)),columnPages:cardMode?1:Math.max(1,Math.ceil(columns.length/12)),options:viewOptions.includeOptions===false?null:options(index,filters)};
   }
   function cell(row,column){
     if(!Object.prototype.hasOwnProperty.call(row.prices,column.key))return {kind:'absent',text:'未列此條件'};
