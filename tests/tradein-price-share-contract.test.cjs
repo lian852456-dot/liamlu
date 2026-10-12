@@ -19,6 +19,6 @@ test('shared runtime has only official read-only tradein action and no storage o
   assert.doesNotMatch(js,/action:'(?:threec_publish|threec_upload|threec_rollback|private_access)'/);
   assert.doesNotMatch(js,/\.localStorage|\.sessionStorage|employeeId|deviceId|adminSecret|ThreecQueryCore/);
   assert.match(js,/credentials:'omit'/);
-  assert.match(js,/assertPublicResponse/);
+  assert.match(js,/function validate\(body\)/);
   assert.match(js,/if\(token!==generation\)return/);
 });
