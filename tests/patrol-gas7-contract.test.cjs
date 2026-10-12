@@ -14,21 +14,22 @@ function functionSource(name) {
 
 test('weekly patrol report keeps all seven workbook tabs in order', () => {
   const weekly = functionSource('sendWeeklyPatrolReport');
+  const model = functionSource('buildWeeklyPatrolReportModel_');
   const tabs = [
     '巡店紀錄',
     '未巡店',
-    '上下半月2-13',
-    '每月盤點14-17',
-    '雙月全盤18',
-    '知悉20日前19-33',
-    '改善提醒與照片',
+    'version.visitsTitle',
+    'version.monthlyTitle',
+    'version.bimonthlyTitle',
+    'version.nccTitle',
   ];
   let previous = -1;
   for (const tab of tabs) {
-    const index = weekly.indexOf(`'${tab}'`);
+    const index = model.lastIndexOf(tab.startsWith('version.') ? tab : `'${tab}'`);
     assert.ok(index > previous, `${tab} missing or out of order`);
     previous = index;
   }
+  assert.match(weekly, /model.tabs.concat\(\[\['改善提醒與照片'/);
   assert.match(weekly, /七個分頁/);
   assert.match(weekly, /formatWeeklyHalfCheckSheet\(sh, halfCheckTab\)/);
 });
