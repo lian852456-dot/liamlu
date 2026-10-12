@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-tradein-upload-20261012-v1';
+const CACHE_NAME = 'liam-supervisor-app-tradein-targets-20261012-v1';
 const SHELL = [
   './app.html',
   './portal-logout.js',
@@ -104,7 +104,7 @@ self.addEventListener('fetch', event => {
   }
   // Trade-in uploads must use the deployed parser and upload controller while
   // online. Only the exact requested version may be used as an offline fallback.
-  if (['tradein-performance-core.js','tradein-public-core.js','tradein-public-progress.mjs'].includes(relativePath)) {
+  if (relativePath.startsWith('tradein-') && /\.(?:js|mjs|css)$/.test(relativePath)) {
     event.respondWith(networkFirstTradeinAsset(event.request));
     return;
   }
