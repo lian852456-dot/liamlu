@@ -31,13 +31,13 @@ async function mock(page,read=fixture){
 }
 async function ready(page){await page.goto(PAGE);await expect(page.locator('#tradeinBrand')).toBeEnabled();}
 const values=locator=>locator.locator('option').evaluateAll(options=>options.map(o=>o.value));
-test('內部廠牌在機款前，保留營運中心、進度、簡報與版本檢查',async({page})=>{
+test('內部廠牌在機款前，保留營運中心、進度與版本檢查；未驗證督導隱藏簡報',async({page})=>{
   const {calls,errors}=await mock(page);await ready(page);
   expect(await values(page.locator('#tradeinBrand'))).toEqual(['','Apple','Samsung']);
   expect(await page.locator('#tradeinPane select').evaluateAll(nodes=>nodes.map(n=>n.id))).toEqual(['tradeinBrand','tradeinModel','tradeinProvider','tradeinGrade']);
   await expect(page.locator('a[href="home.html"]')).toBeVisible();
   await expect(page.locator('a[href="tradein-progress.html"]')).toBeVisible();
-  await expect(page.locator('a[href="tradein-brief.html"]')).toBeVisible();
+  await expect(page.locator('a[href="tradein-brief.html"]')).toBeHidden();
   await expect(page.locator('#changeCard')).toBeVisible();
   await expect(page.locator('#tradeinMeta')).toContainText('4 筆來源資料');
   expect(calls.filter(c=>c.kind==='tradein')).toHaveLength(1);
