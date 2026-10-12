@@ -64,8 +64,25 @@ function setBusy(value){busy=value;['adminEmployeeId','adminSecret','sourceFile'
 function invalidate(){if(busy)return;uploadEpoch++;source=null;plan=null;admin=null;$('publishUpload').disabled=true;$('uploadPreview').replaceChildren();}
 function credentials(){const employeeId=$('adminEmployeeId').value.trim().toUpperCase(),adminSecret=$('adminSecret').value;if(!employeeId||!adminSecret)throw Error('請提供管理者員編與密碼');return {employeeId,adminSecret};}
 function expected(s){return {expectedRegistryExists:s.registryExists,expectedRegistryHash:s.registryHash,expectedPublicRegistryExists:s.publicRegistryExists,expectedPublicRegistryHash:s.publicRegistryHash,expectedActiveHash:s.activeHash,expectedMonthlyHash:s.monthlyHash,expectedReferenceHash:s.referenceHash};}
+// An installed older PWA worker may keep a parser cached even after a release.
+// Refresh the parser before validating each upload; never retry with stale code.
+let parserRefresh=0;
+function freshUploadParser(){
+ return new Promise((resolve,reject)=>{
+  const script=document.createElement('script'),url=new URL('./tradein-performance-core.js',import.meta.url);
+  url.searchParams.set('v','20261012-upload-refresh-1');url.searchParams.set('refresh',Date.now()+'-'+(++parserRefresh));
+  const finish=(error)=>{clearTimeout(timer);script.onload=null;script.onerror=null;script.remove();
+   if(error)return reject(error);const parser=window.TradeinPerformanceCore;
+   if(typeof parser?.parseSar74!=='function')return reject(Error('解析程式載入未完成，請重新整理後再預覽'));
+   resolve(parser);
+  };
+  const timer=setTimeout(()=>finish(Error('解析程式載入逾時，請確認網路後重新預覽')),15000);
+  script.onload=()=>finish();script.onerror=()=>finish(Error('解析程式載入失敗，請確認網路後重新預覽'));
+  script.src=url.href;document.head.append(script);
+ });
+}
 async function preview(){if(busy)return;const ticket=++uploadEpoch;source=null;plan=null;$('publishUpload').disabled=true;$('uploadPreview').replaceChildren();
- try{const file=$('sourceFile').files[0];if(!file||!$('completeScope').checked)throw Error('請選擇完整九店 SAR74 並確認涵蓋範圍');if(file.size>20*1024*1024)throw Error('來源檔案超過 20MB');admin=credentials();$('adminSecret').value='';setBusy(true);const bytes=await file.arrayBuffer();let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{text=new TextDecoder('big5',{fatal:true}).decode(bytes);}const parsed=CORE.parseSar74(text);parsed.complete_nine_stores=true;parsed.source_sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(b=>b.toString(16).padStart(2,'0')).join('');
+ try{const file=$('sourceFile').files[0];if(!file||!$('completeScope').checked)throw Error('請選擇完整九店 SAR74 並確認涵蓋範圍');if(file.size>20*1024*1024)throw Error('來源檔案超過 20MB');admin=credentials();$('adminSecret').value='';setBusy(true);$('uploadMessage').textContent='正在讀取檔案並核對資料…';const parser=await freshUploadParser();const bytes=await file.arrayBuffer();let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{text=new TextDecoder('big5',{fatal:true}).decode(bytes);}const parsed=parser.parseSar74(text);parsed.complete_nine_stores=true;parsed.source_sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(b=>b.toString(16).padStart(2,'0')).join('');
  const result=await request({action:'tradein_performance_preview',source:parsed,...admin});if(ticket!==uploadEpoch)return;source=parsed;plan=result;const s=result.snapshot.summary;
  $('uploadPreview').textContent=`${parsed.month}：有效回收 ${s.total_units} 台；已對應 ${s.assigned_units} 台；待核 ${s.pending_identity_units} 台。目標 ${s.target_staff_count} 人 × 3 ＝ ${s.staff_target_units} 台。`;$('uploadMessage').textContent='預覽核對完成，確認後同步本月。';
  }catch(error){source=null;plan=null;admin=null;$('uploadMessage').textContent='預覽停止：'+error.message;}finally{setBusy(false);}}
