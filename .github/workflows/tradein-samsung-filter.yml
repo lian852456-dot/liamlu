@@ -32,7 +32,7 @@ jobs:
         if: github.event_name != 'pull_request'
         env:
           LIVE_SURFACE: ${{ github.ref_name == 'main' && 'internal' || 'public' }}
-        run: npx playwright test tests/tradein-samsung-filter.spec.js --grep '^LIVE ' --workers=1 --reporter=list --output=test-results/samsung-live
+        run: npx playwright test tests/tradein-samsung-filter.spec.js --grep 'LIVE official' --workers=1 --reporter=list --output=test-results/samsung-live
       - name: Acceptance evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
