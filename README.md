@@ -30,6 +30,7 @@
 - `home.html` 的督導專區提供 `daily-log-dashboard.html` 入口，以本機 Excel／CSV 呈現北一二B九店每日四項、每週第一至第四週及每月兩項的完成狀況。
 - `home.html` 的督導專區提供 `department-ops.html`「北一二部｜部區管理」入口。月報候選版本沿用巡店短效督導驗證，登入自動載入已保存月報；更新時才在本機解密助理原檔，經差異預覽與確認後替代指定月份，保留歷史並逐值讀回。季度按員編累計、保留當月店區與缺月；Q2 已呈報資料保留，未明示確認的月份與季度標為暫定。只採全員主表淨金牌，發獎資格待確認；月報與北一二B每日接龍分開。私有儲存、契約與整合發布流程見 [月報自助更新契約](docs/DEPARTMENT_GOLD_MONTHLY.md)。此候選未代表已部署；店務頁籤由獨立模組延續。
 - `home.html` 的同仁大廳提供 `gold-medal.html`「北一二B 金牌明細」入口，免登入即可查詢；後端只回傳北一二B已確認的每日接龍代稱、結算總牌數、跨日增減及增減原因／免扣，不把員編或 A／C／D 明細送到同仁頁面。每日增減與原因置於個人總牌數之前，未提供的原因會明確標示，不從數字推測。
+- 已扣金牌備註使用獨立的 `gold-annotations-public.json` 公開遮罩投影，私有原始身份與核定來源保留於既有私有 Drive 資料夾。`gold-annotations-core.js` 僅接受 `annotation-only`、`alreadyApplied:true`、`applyToBalance:false` 的唯一批次；說明額不進入日結餘額、每日增減或 SPE。備註載入失敗不修改既有日結，重新整理會重新讀取兩個來源。
 - 尚未到期的週／月表不列入需追蹤；點擊門市可展開長細項、填寫人及最後填寫時間。第五週與失分計算仍待規則確認。
 - 候選版只在瀏覽器解析並保存目前裝置預覽，尚未建立正式日誌 API、中央寫入、readback、權限或 Pages 部署。資料契約與發布條件見 [`docs/DAILY-LOG-DASHBOARD.md`](docs/DAILY-LOG-DASHBOARD.md)。
 
