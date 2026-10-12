@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>舊機回收價查詢｜同仁共用</title>
-  <link rel="stylesheet" href="tradein-price-share.css?v=20261012-1">
+  <link rel="stylesheet" href="tradein-price-share.css?v=20261012-brand-1">
   <!-- Public read-only view. No link to portal, management upload, goals, or performance. -->
 </head>
 <body>
@@ -23,6 +23,9 @@
       <form class="filters" id="searchForm" autocomplete="off">
         <label class="full">搜尋品牌／機款／容量
           <input id="keyword" name="keyword" type="search" placeholder="例如：iPhone 17 Pro、Galaxy、256GB">
+        </label>
+        <label>選擇廠牌
+          <select id="brand" name="brand" aria-controls="model"><option value="">全部廠牌</option></select>
         </label>
         <label>選擇機款
           <select id="model" name="model"><option value="">全部機款</option></select>
@@ -57,6 +60,6 @@
       <p>每次開啟或按「重新讀取報價」均向既有正式資料來源重新讀取，不在此頁儲存回收價格或人員資料。</p>
     </footer>
   </main>
-  <script src="tradein-price-share.js?v=20261012-1"></script>
+  <script src="tradein-price-share.js?v=20261012-brand-1"></script>
 </body>
 </html>

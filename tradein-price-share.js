@@ -40,13 +40,32 @@
       return true;
     }).map(row=>({value:modelKey(row),label:[text(row.brand),text(row.colorless_model||row.model)].filter(Boolean).join(' · ')}));
   }
+  // Brand/model options use only the current official snapshot, without extra requests.
+  function updateBrandOptions(selected=''){
+    const brands=Array.from(new Set((snapshot?snapshot.rows:[]).filter(hasAnyPrice)
+      .map(row=>text(row.brand)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+    $('brand').innerHTML='<option value="">全部廠牌</option>'+brands.map(brand=>
+      '<option value="'+esc(brand)+'">'+esc(brand)+'</option>').join('');
+    $('brand').value=brands.includes(selected)?selected:'';
+  }
+  function updateModelOptions(){
+    const brand=$('brand').value,previous=$('model').value;
+    const rows=(snapshot?snapshot.rows:[]).filter(row=>!brand||text(row.brand)===brand);
+    const choices=options(rows);
+    $('model').innerHTML='<option value="">全部機款</option>'+choices.map(o=>
+      '<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>').join('');
+    // Switching brands must not leave a hidden selection from the previous brand.
+    $('model').value=choices.some(o=>o.value===previous)?previous:'';
+  }
   function filteredRows(){
     if(!snapshot)return [];
     const query=text($('keyword').value).toLocaleLowerCase();
+    const brand=$('brand').value;
     const model=$('model').value;
     const provider=$('provider').value;
     const grade=$('grade').value;
     return snapshot.rows.filter(row=>{
+      if(brand&&text(row.brand)!==brand)return false;
       if(model&&modelKey(row)!==model)return false;
       if(query&&![row.brand,row.model,row.colorless_model].map(text).join(' ').toLocaleLowerCase().includes(query))return false;
       return PROVIDERS.some(p=>(!provider||provider===p)&&quotedGrades(row,p,grade).length);
@@ -127,7 +146,8 @@
     }finally{scope.clearTimeout(timeout);}
   }
   function clear(){
-    snapshot=null;$('model').innerHTML='<option value="">全部機款</option>';
+    snapshot=null;$('brand').innerHTML='<option value="">全部廠牌</option>';
+    $('model').innerHTML='<option value="">全部機款</option>';
     els.meta.textContent='';els.count.textContent='';
     els.results.innerHTML='<p class="empty">尚無正式回收價格。</p>';
   }
@@ -154,14 +174,15 @@
   }
   async function refresh(){
     const token=++generation;
+    const selectedBrand=$('brand').value;
     clear();$('refreshBtn').disabled=true;status('正在讀取正式回收價格…');
     try{
       const incoming=await read();
       if(token!==generation)return;
       if(!incoming){status('目前尚未發布正式回收價，請稍後重新讀取。','warn');return;}
       snapshot=incoming;
-      $('model').innerHTML='<option value="">全部機款</option>'+options(incoming.rows).map(o=>
-        '<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>').join('');
+      updateBrandOptions(selectedBrand);
+      updateModelOptions();
       els.meta.innerHTML='正式來源日期：<strong>'+esc(incoming.source_version_date||'未提供')+
         '</strong>　｜　來源機款：'+esc(incoming.row_count||incoming.rows.length)+' 筆　｜　發布時間：'+esc(incoming.published_at||'未提供');
       status('已讀取正式回收價，可開始查詢。','ok');render();
@@ -172,9 +193,11 @@
   }
   $('searchForm').addEventListener('submit',event=>event.preventDefault());
   $('keyword').addEventListener('input',render);
+  $('brand').addEventListener('change',()=>{updateModelOptions();render();});
   ['model','provider','grade'].forEach(id=>$(id).addEventListener('change',render));
   $('resetBtn').addEventListener('click',()=>{
-    ['keyword','model','provider','grade'].forEach(id=>$(id).value='');
+    ['keyword','brand','model','provider','grade'].forEach(id=>$(id).value='');
+    updateModelOptions();
     render();$('keyword').focus();
   });
   $('refreshBtn').addEventListener('click',refresh);

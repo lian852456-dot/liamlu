@@ -82,7 +82,7 @@ test('回收機款與價格字串只能作為文字顯示，不可注入 HTML',a
   await expect(page.locator('#results img')).toHaveCount(0);
   expect(await page.evaluate(()=>window.injected)).toBeUndefined();
 });
-for(const width of [320,390,1280]){
+for(const width of [320,390,768,980,1280]){
   test(`在 ${width}px 畫面無整頁水平溢出`,async({page})=>{
     await page.setViewportSize({width,height:850});
     await intercept(page);
@@ -93,3 +93,82 @@ for(const width of [320,390,1280]){
     expect(dimensions.root).toBeLessThanOrEqual(dimensions.viewport);
   });
 }
+
+test('廠牌在機款之前，選單只列正式快照有報價廠牌並連動機款',async({page})=>{
+  const body=published();
+  body.snapshot.rows.push({...body.snapshot.rows[0],model:'iPhone 17 128GB',colorless_model:'iPhone 17 128GB'});
+  body.snapshot.rows.push({brand:'NoPrice',model:'No quote',quotes:{'點子行動':{A:'',S:null}}});
+  body.snapshot.row_count=body.snapshot.rows.length;
+  const calls=await intercept(page,body);
+  await page.goto(URL);
+  await expect(page.locator('#queryStatus')).toContainText('已讀取正式回收價');
+  expect(await page.locator('#searchForm select').evaluateAll(nodes=>nodes.map(node=>node.id))).toEqual(['brand','model','provider','grade']);
+  await expect(page.locator('#brand option')).toHaveText(['全部廠牌','Apple','Samsung']);
+  await page.locator('#brand').selectOption('Apple');
+  await expect(page.locator('#model option')).toHaveText(['全部機款','Apple · iPhone 17 Pro 256GB','Apple · iPhone 17 128GB']);
+  await expect(page.locator('#results')).not.toContainText('Galaxy');
+  await page.locator('#model').selectOption({label:'Apple · iPhone 17 Pro 256GB'});
+  await expect(page.locator('#results')).not.toContainText('iPhone 17 128GB');
+  expect(calls).toHaveLength(1);
+});
+
+test('切換廠牌清掉不相容機款，保留關鍵字、回收商、等級與零元處理',async({page})=>{
+  const calls=await intercept(page);
+  await page.goto(URL);
+  await expect(page.locator('#queryStatus')).toContainText('已讀取正式回收價');
+  await page.locator('#brand').selectOption('Apple');
+  await page.locator('#model').selectOption({label:'Apple · iPhone 17 Pro 256GB'});
+  await page.locator('#provider').selectOption('FutureDial（FDI）');
+  await page.locator('#grade').selectOption('A');
+  await expect(page.locator('#results')).toContainText('0 元');
+  await page.locator('#keyword').fill('512');
+  await page.locator('#brand').selectOption('Samsung');
+  await expect(page.locator('#model')).toHaveValue('');
+  await expect(page.locator('#model option')).toHaveText(['全部機款','Samsung · Galaxy S25 512GB']);
+  await expect(page.locator('#keyword')).toHaveValue('512');
+  await expect(page.locator('#provider')).toHaveValue('FutureDial（FDI）');
+  await expect(page.locator('#grade')).toHaveValue('A');
+  await expect(page.locator('#results')).toContainText('沒有符合');
+  await page.locator('#provider').selectOption('愛鋒派');
+  await expect(page.locator('#results')).toContainText('14,000 元');
+  await page.locator('#resetBtn').click();
+  for(const id of ['keyword','brand','model','provider','grade'])await expect(page.locator('#'+id)).toHaveValue('');
+  await expect(page.locator('#model option')).toHaveCount(3);
+  expect(calls).toHaveLength(1);
+});
+
+test('重新讀取保留有效廠牌，來源改版或失敗時清除過期廠牌與機款',async({page})=>{
+  let body=published();
+  await intercept(page,()=>body);
+  await page.goto(URL);
+  await expect(page.locator('#queryStatus')).toContainText('已讀取正式回收價');
+  await page.locator('#brand').selectOption('Apple');
+  await page.locator('#refreshBtn').click();
+  await expect(page.locator('#queryStatus')).toContainText('已讀取正式回收價');
+  await expect(page.locator('#brand')).toHaveValue('Apple');
+  body.snapshot.rows=body.snapshot.rows.filter(row=>row.brand==='Samsung');
+  body.snapshot.row_count=1;
+  await page.locator('#refreshBtn').click();
+  await expect(page.locator('#queryStatus')).toContainText('已讀取正式回收價');
+  await expect(page.locator('#brand')).toHaveValue('');
+  await expect(page.locator('#brand option')).toHaveText(['全部廠牌','Samsung']);
+  await expect(page.locator('#model option')).toHaveCount(2);
+  body={status:'error',message:'公開價格不可用'};
+  await page.locator('#refreshBtn').click();
+  await expect(page.locator('#queryStatus')).toContainText('讀取失敗');
+  await expect(page.locator('#brand option')).toHaveText(['全部廠牌']);
+  await expect(page.locator('#model option')).toHaveText(['全部機款']);
+  await expect(page.locator('#results')).not.toContainText('Galaxy');
+});
+
+test('廠牌特殊字元以純文字顯示，不可注入 HTML',async({page})=>{
+  const body=published(),brand='<img src=x onerror="window.injected=1">';
+  body.snapshot.rows[0].brand=brand;
+  await intercept(page,body);
+  await page.goto(URL);
+  await expect(page.locator('#queryStatus')).toContainText('已讀取正式回收價');
+  await page.locator('#brand').selectOption(brand);
+  await expect(page.locator('#results')).toContainText(brand);
+  await expect(page.locator('#brand img,#model img,#results img')).toHaveCount(0);
+  expect(await page.evaluate(()=>window.injected)).toBeUndefined();
+});
