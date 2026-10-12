@@ -32,8 +32,8 @@ test('home navigation retains PR179 performance and PR181 lab removal', () => {
     'https://twm-store-inspection.liamlu245.chatgpt.site/',
     'threec-query.html', 'tradein-progress.html'
   ]);
-  assert.equal(cards(navigation('督導專區')).length, 7);
-  assert.equal(cards(html).length, 4 + staffHrefs.length + 7);
+  assert.equal(cards(navigation('督導專區')).length, 8);
+  assert.equal(cards(html).length, 4 + staffHrefs.length + 8);
 });
 
 test('staff gold lookup lives under performance tools and uses the existing viewer', () => {
@@ -99,4 +99,10 @@ test('home and APP open target progress first and retain recovery price navigati
     assert.ok(nav.indexOf('目標進度')<nav.indexOf('回收價查詢'));
   }
   assert.doesNotMatch(html+recovery, /整合候選|尚未上線/);
+});
+
+test('trade-in presentation is a supervisor tool and explains the verification gate', () => {
+  const card = cardFor(navigation('督導專區'), 'tradein-brief.html');
+  assert.match(card, /督導驗證/);
+  assert.doesNotMatch(navigation('同仁大廳'), /href="tradein-brief\.html"/);
 });
