@@ -7,6 +7,8 @@
   const model=document.getElementById('tradeinModel');
   if(!core||!brand||!model||document.body.dataset.queryKind!=='tradein')return;
   const clean=value=>value==null?'':String(value).trim();
+  // Normalize only the Samsung filter identity; source rows and model keys stay exact.
+  const canonicalBrand=value=>{const label=clean(value);return /^samsung$/i.test(label)?'Samsung':label;};
   let activeSnapshot=null;
 
   function fill(select,choices,prompt,selected){
@@ -28,15 +30,15 @@
     if(!source){clear();return core.buildView(kind,response,filters);}
     // Options come from all quoted rows, not the first displayed page or the current keyword.
     if(source!==activeSnapshot){
-      const selected=brand.value;
-      const brands=Array.from(new Set(core.filterTradein(source,{}).map(row=>clean(row.brand)).filter(Boolean)))
+      const selected=canonicalBrand(brand.value);
+      const brands=Array.from(new Set(core.filterTradein(source,{}).map(row=>canonicalBrand(row.brand)).filter(Boolean)))
         .sort((a,b)=>a.localeCompare(b,'zh-Hant'));
       fill(brand,brands.map(value=>({value,label:value})),'全部廠牌',selected);
       brand.disabled=false;
       activeSnapshot=source;
     }
-    const selectedBrand=brand.value;
-    const scopedRows=core.rowList(source).filter(row=>!selectedBrand||clean(row.brand)===selectedBrand);
+    const selectedBrand=canonicalBrand(brand.value);
+    const scopedRows=core.rowList(source).filter(row=>!selectedBrand||canonicalBrand(row.brand)===selectedBrand);
     // Build a view-only projection without changing the official snapshot or source metadata.
     const scopedSnapshot=Object.assign({},source,{rows:scopedRows});
     const choices=core.modelOptions(scopedSnapshot,'tradein');
