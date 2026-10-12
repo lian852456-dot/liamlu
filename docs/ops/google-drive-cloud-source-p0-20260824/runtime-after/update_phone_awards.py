@@ -487,13 +487,12 @@ def load_award_rules_from_y26(y26_base, groups):
     manager_rules = {}
     supervisor_rules = {}
     group_index = 0
-    for block in AWARD_RULE_BLOCKS:
+    for block in y26_award_blocks(len(groups)):
         for start_col in block["starts"]:
             if group_index >= len(groups):
                 break
             group_name = groups[group_index]["name"]
-            # Y26 reuses campaign slots while display names change, so the formula
-            # position is authoritative for the current tracked-item ordering.
+            # The writer remaps these six-slot formulas to approved model/role rows.
             manager_rules[group_name] = award_values_from_formula(
                 y26_base,
                 formula(cells, start_col, block["manager_row"]),
@@ -517,14 +516,24 @@ def load_award_rules_from_y26(y26_base, groups):
 def load_central_award_rules(groups):
     expected = set(VISIBLE_STORE_ITEMS)
     actual = {group["name"] for group in groups}
-    if actual != expected or len(groups) != 13:
+    if actual != expected or len(groups) != len(VISIBLE_STORE_ITEMS):
         missing = sorted(expected - actual)
         unexpected = sorted(actual - expected)
         raise ValueError(
-            f"Expected 13 central phone-award items, got {len(groups)}; "
+            f"Expected {len(VISIBLE_STORE_ITEMS)} central phone-award items, got {len(groups)}; "
             f"missing={missing}, unexpected={unexpected}"
         )
     return deepcopy(MANAGER_AWARD_RULES), deepcopy(SUPERVISOR_AWARD_RULES)
+
+
+def canonical_award_model(name):
+    """Match aliases and reordered members only when the full family is equal."""
+    name = ITEM_ALIASES.get(name, name)
+    key = lambda text: sorted(re.sub(r"\s+", "", text).casefold().split("/"))
+    matches = [model for model in VISIBLE_STORE_ITEMS if key(model) == key(name)]
+    if len(matches) > 1:
+        raise ValueError(f"Ambiguous award model family: {name}")
+    return matches[0] if matches else name
 
 
 def item_groups(cells, shared, header_row, subheader_row, start_col, max_col):
@@ -546,7 +555,7 @@ def item_groups(cells, shared, header_row, subheader_row, start_col, max_col):
                     break
             if "實際數" in actual_header and target_offset is not None and rate_offset is not None:
                 short = re.sub(r"^(上線數|空機數)_\d+_", "", name)
-                short = ITEM_ALIASES.get(short, short)
+                short = canonical_award_model(short)
                 if short not in seen:
                     seen.add(short)
                     groups.append({
@@ -768,12 +777,149 @@ def clone_y26_block(root, source_start, source_end, target_start):
             dimension.set("ref", f"{start_ref}:{end_match.group(1)}{target_end}")
 
 
+def y26_award_blocks(count):
+    """Y26 has six slots per block; independent PNGs have a different layout."""
+    if count > 18:
+        raise ValueError("Y26 supports at most 18 model slots")
+    return [
+        {"header_row": row, "manager_row": row + 2, "supervisor_row": row + 4,
+         "starts": ["F", "J", "N", "R", "V", "Z"]}
+        for row in ([1, 17, 52] if count > 12 else [1, 17])
+    ]
+
+
+def ensure_y26_cell(root, cells, ref):
+    if ref in cells:
+        return cells[ref]
+    row_number = int(re.search(r"\d+$", ref).group())
+    sheet_data = root.find(q("sheetData"))
+    row = next((r for r in sheet_data.findall(q("row")) if int(r.get("r")) == row_number), None)
+    if row is None:
+        row = ET.SubElement(sheet_data, q("row"), {"r": str(row_number)})
+    cell = ET.SubElement(row, q("c"), {"r": ref})
+    cells[ref] = cell
+    row[:] = sorted(row, key=lambda c: col_to_num(re.match(r"[A-Z]+", c.get("r")).group()))
+    return cell
+
+
+def update_y26_award_mapping(y26_base, groups):
+    """Append/reuse a config-scoped price table, preserving all legacy rates.
+
+    Price rows are keyed by modelId and role, never by the old template slot.
+    Store/supervisor tables retain all configured bands, even though Y26 only
+    displays the first three. Seller and empty-device amounts use the same
+    approved config. Existing source actuals and targets are untouched.
+    """
+    config = ACTIVE_AWARD_CONFIG
+    if not config or not config.get("configVersion"):
+        raise ValueError("Y26 price mapping requires an approved award config")
+    selected = config.get("selectedModels") or []
+    names = [group["name"] for group in groups]
+    if not selected or len(set(selected)) != len(selected) or len(set(names)) != len(names) or set(names) != set(selected):
+        raise ValueError("Y26 groups must uniquely cover the approved selectedModels")
+    blocks = y26_award_blocks(len(groups))
+    rules = {row["role"]: row.get("amounts", {}) for row in config.get("rewardRules", [])}
+    empty = config.get("emptyDeviceRewards", {})
+    for role in ("manager", "supervisor", "seller"):
+        if set(rules.get(role, {})) != set(selected) or set(empty.get(role, {})) != set(selected):
+            raise ValueError(f"Y26 config is missing {role} model prices")
+        for name in selected:
+            values = rules[role][name]
+            allowed_lengths = (3,) if role == "seller" else (4, 5)
+            amounts = [*values, empty[role][name]]
+            if len(values) not in allowed_lengths or any(
+                isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0
+                for v in amounts
+            ):
+                raise ValueError(f"Y26 config has invalid {role}/{name} tiers")
+
+    shared = read_shared_strings(y26_base)
+    pending = []
+    source_rows = {}
+    for role, sheet_name, last_col in (("manager", "店", "H"), ("supervisor", "督", "H"), ("seller", "同仁", "F")):
+        path = sheet_path_for(y26_base, sheet_name)
+        root = ET.parse(path).getroot()
+        sheet_data = root.find(q("sheetData"))
+        cells = {cell.get("r"): cell for cell in root.findall(f".//{q('c')}")}
+        markers = [int(re.search(r"\d+$", ref).group()) for ref, cell in cells.items()
+                   if re.fullmatch(r"A\d+", ref) and text_of_cell(cell, shared) == config["configVersion"]]
+        if len(markers) > 1:
+            raise ValueError(f"Duplicate Y26 config section in {sheet_name}")
+        start = markers[0] if markers else max([int(row.get("r")) for row in sheet_data.findall(q("row"))] or [0]) + 2
+        templates = {int(row.get("r")): row for row in sheet_data.findall(q("row"))}
+        if not markers:
+            for offset in range(2 + len(selected)):
+                template = templates.get(offset + 1 if offset < 2 else 3)
+                row = deepcopy(template) if template is not None else ET.Element(q("row"))
+                row.set("r", str(start + offset))
+                for cell in row.findall(q("c")):
+                    cell.set("r", re.match(r"[A-Z]+", cell.get("r")).group() + str(start + offset))
+                sheet_data.append(row)
+            merge_cells = root.find(q("mergeCells"))
+            if merge_cells is not None:
+                for merge in list(merge_cells):
+                    ref = merge.get("ref", "")
+                    if all(int(r) <= 2 for r in re.findall(r"\d+", ref)):
+                        ET.SubElement(merge_cells, q("mergeCell"), {"ref": ":".join(shift_row_ref(r, start - 1) for r in ref.split(":"))})
+                merge_cells.set("count", str(len(merge_cells)))
+        cells = {cell.get("r"): cell for cell in root.findall(f".//{q('c')}")}
+        ensure_y26_cell(root, cells, f"A{start}")
+        set_cell_value(cells, f"A{start}", config["configVersion"])
+        rows_for_role = {}
+        for offset, name in enumerate(selected, start=2):
+            row = start + offset
+            rows_for_role[name] = row
+            vals = ["", name, *rules[role][name]]
+            vals += [""] * (col_to_num(last_col) - 1 - len(vals))
+            vals.append(empty[role][name])
+            for col, val in enumerate(vals, start=1):
+                ref = f"{num_to_col(col)}{row}"
+                ensure_y26_cell(root, cells, ref)
+                set_cell_value(cells, ref, val)
+        source_rows[role] = rows_for_role
+        sheet_data[:] = sorted(sheet_data, key=lambda row: int(row.get("r")))
+        dimension = root.find(q("dimension"))
+        if dimension is not None:
+            dimension.set("ref", f"A1:{last_col}{max(int(row.get('r')) for row in sheet_data)}")
+        pending.append((path, root))
+
+    path = sheet_path_for(y26_base, "台獎機款")
+    root = ET.parse(path).getroot()
+    if len(groups) > 12:
+        clone_y26_block(root, 17, 32, 52)
+    cells = {cell.get("r"): cell for cell in root.findall(f".//{q('c')}")}
+    for block_index, block in enumerate(blocks):
+        for slot, start_col in enumerate(block["starts"]):
+            idx = block_index * 6 + slot
+            name = names[idx] if idx < len(names) else None
+            for role, sheet_name in (("manager", "店"), ("supervisor", "督")):
+                row = block[f"{role}_row"]
+                labels = MANAGER_TIER_LABELS if role == "manager" else SUPERVISOR_TIER_LABELS
+                for tier in range(3):
+                    col = num_to_col(col_to_num(start_col) + tier)
+                    ref = f"{col}{row}"
+                    cell = ensure_y26_cell(root, cells, ref)
+                    set_cell_value(cells, ref, rules[role][name][tier] if name else "")
+                    if name:
+                        # Keep the numeric cache valid for non-recalculating readers.
+                        f = ET.Element(q("f"))
+                        f.text = f"'{sheet_name}'!{num_to_col(3 + tier)}{source_rows[role][name]}"
+                        cell.insert(0, f)
+                        label_ref = f"{col}{row - 1}"
+                        ensure_y26_cell(root, cells, label_ref)
+                        set_cell_value(cells, label_ref, labels[tier][1:].replace("~", "%~"))
+    pending.append((path, root))
+    # Reject every invalid config/group/schema before any package write.
+    for path, root in pending:
+        ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
+    return source_rows
+
+
 def update_y26_store_sheet(y26_base, groups, data):
+    update_y26_award_mapping(y26_base, groups)
     sheet_path = sheet_path_for(y26_base, "台獎機款")
     root = ET.parse(sheet_path).getroot()
     starts = ["F", "J", "N", "R", "V", "Z"]
-    if len(groups) > 12:
-        clone_y26_block(root, 17, 32, 52)
     cells = {cell.get("r"): cell for cell in root.findall(f".//{q('c')}")}
     blocks = [
         {"group_offset": 0, "header_row": 1, "rows": list(range(7, 17)), "starts": starts},
