@@ -123,7 +123,7 @@ latest manifest presence alone cannot authorize a source-policy change.
 
 ## Validation and remaining acceptance
 
-31 Node and 26 Python regressions pass, covering full attachment contracts,
+The original 31 Node and 26 Python regressions pass, covering full attachment contracts,
 immutable seals, source/config mismatch, both registered entrypoints, concurrent
 one-shot permits, uncertain readback, crash blocking, workbook source semantics,
 DOD, Goodspeed pagination and guarded control-plane candidates. No external test mail.
@@ -143,13 +143,23 @@ production writes were zero. This is not a live Outlook round-trip acceptance.
 
 An independent awards check passed all 160 approved prices and 60 main-sheet price
 formulas. Existing source errors outside the changed award price cells were
-preserved, with zero new Excel error cells. The Mac's current awards producer still
-emits one unnamed blank person alongside 40 named people / 4 real zero awards.
-The separately delivered 10:07 Library PNGs correctly retain those 40 people and
-were reused unchanged for this integration rehearsal, pinned to their known hashes.
-This task does not replace or deploy the other owner's person-row fix. Before
-activation, reconcile/install that owner's reviewed patch against the actual Mac
-producer and rerun final visual review; do not overwrite it with a historical copy.
+preserved, with zero new Excel error cells. The Mac's current awards producer still emits an unnamed blank row, but the
+existing owner patch has now been located in native Library and integrated into a
+guarded candidate. `owner_patches/apply_person_award_fix_20261009.py` is copied
+unchanged (SHA `70fcd557…72904d`), identical to the 10:07 processing-run receipt.
+`prepare_awards_owner_candidate.py` changes only the original personal source-reader
+function and verifies every other AST component is preserved. It is idempotent for
+an already-patched reader and never installs its candidate. The six original owner
+regressions and four integration guards pass. Real source rerun yields 40 named
+people, no blank row and all four genuine zero awards; every named person's data
+exactly matches the previous Mac-source result. Approved config and Y26 mappings
+remain unchanged. Both newly generated award PNGs were reviewed as isolated
+candidates; formal 10:07 Library images and production runtime remain untouched.
+
+The integrated current-Mac candidate passed preflight and produced a new 13+6 seal,
+then passed the same cross-entrypoint local mock transport. The earlier 57-test logs,
+13+6 seals and receipts are retained. Post-integration tests are 31 Node +30 Python
+plus the owner's six distinct regressions (67 total distinct tests).
 
 Before release approval: review the prepared current-runtime minimal patch and the
 exact control-plane diffs, then approve merge plus Mac installation and manual

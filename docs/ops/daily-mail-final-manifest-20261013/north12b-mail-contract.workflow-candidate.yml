@@ -11,6 +11,7 @@ on:
       - 'tests/mail-gate.test.mjs'
       - 'tests/entrypoint-gate.test.mjs'
       - 'tests/test_control_plane_candidate.py'
+      - 'tests/test_awards_owner_candidate.py'
       - 'tests/closure-mail-metrics.test.mjs'
       - 'tests/report-source-contract.test.mjs'
       - 'tests/north12b-dod.test.mjs'
@@ -45,4 +46,4 @@ jobs:
         run: >-
           python -m unittest tests/test_north12b_source_semantics.py
           tests/test_north12b_sales.py tests/test_render_goodspeed_detail.py
-          tests/test_control_plane_candidate.py
+          tests/test_control_plane_candidate.py tests/test_awards_owner_candidate.py
