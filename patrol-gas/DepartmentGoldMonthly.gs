@@ -37,13 +37,13 @@ function departmentGoldMonthlyRegistry_(folder) {
   return {file:file,state:state};
 }
 
-function departmentGoldMonthlyVersion_(entry, registry, folder) {
+function departmentGoldMonthlyVersion_(entry, registry, folder, checkedFile) {
   if (entry.legacyMonth) {
     const month = registry.baseMonths.find(function(m){return m.monthKey === entry.legacyMonth;});
     if (!month) throw new Error('GOLD_LEGACY_VERSION_MISSING');
     return {...month,versionId:entry.versionId,settlementStatus:month.monthKey < '2026-07' ? 'archived' : 'provisional',legacy:true};
   }
-  const file = departmentGoldMonthlyFile_(entry.fileId,folder);
+  const file = checkedFile || departmentGoldMonthlyFile_(entry.fileId,folder);
   const stored = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!stored || stored.versionId !== entry.versionId || stored.contentHash !== entry.contentHash) throw new Error('GOLD_VERSION_INVALID');
   const m = DepartmentGoldMonthlyCore.validateMonth(stored.month);
@@ -51,14 +51,14 @@ function departmentGoldMonthlyVersion_(entry, registry, folder) {
   return {...m,versionId:entry.versionId,publishedAt:entry.publishedAt};
 }
 
-function departmentGoldMonthlyMonths_(state, folder) {
+function departmentGoldMonthlyMonths_(state, folder, checkedFiles) {
   const result = new Map();
   state.baseMonths.forEach(function(m){
     if (result.has(m.monthKey)) throw new Error('GOLD_LEGACY_MONTH_DUPLICATE');
     result.set(m.monthKey,{...m,versionId:'legacy-' + ptHashHex_(JSON.stringify(m)),settlementStatus:m.monthKey < '2026-07'?'archived':'provisional',legacy:true});
   });
   Object.keys(state.activeByMonth).forEach(function(key){
-    const m = departmentGoldMonthlyVersion_(state.activeByMonth[key],state,folder);
+    const m = departmentGoldMonthlyVersion_(state.activeByMonth[key],state,folder,checkedFiles && checkedFiles[key]);
     if (m.monthKey !== key) throw new Error('GOLD_MONTH_POINTER_MISMATCH');
     result.set(key,m);
   });
@@ -67,10 +67,16 @@ function departmentGoldMonthlyMonths_(state, folder) {
 
 function departmentGoldMonthlyRead_(body) {
   const folder = departmentGoldMonthlyFolder_(), registry = departmentGoldMonthlyRegistry_(folder), state=registry.state;
-  const months = departmentGoldMonthlyMonths_(state,folder);
+  // departmentOpsRead performs the original ptRequireSession_ before this module.
+  const checkedFiles={},stamps=[];
+  Object.keys(state.activeByMonth).sort().forEach(function(key){const entry=state.activeByMonth[key];if(!entry.legacyMonth){const file=departmentGoldMonthlyFile_(entry.fileId,folder);checkedFiles[key]=file;stamps.push(file.getLastUpdated?Number(file.getLastUpdated()):null);}});
+  const readVersion=ptHashHex_(JSON.stringify({state:state,modified:stamps}));
+  // Readbacks for write receipts always download and compare the complete data.
+  if(!body.operationId&&body.knownVersion===readVersion&&stamps.every(function(v){return Number.isFinite(v)&&v>0;}))return {readContract:'department-version-read/v1',readVersion:readVersion,notModified:true,monthly:{revision:state.revision}};
+  const months = departmentGoldMonthlyMonths_(state,folder,checkedFiles);
   const history = {};
   Object.keys(state.historyByMonth).forEach(function(k){history[k]=state.historyByMonth[k].map(function(e){return {versionId:e.versionId,publishedAt:e.publishedAt,sourceName:e.sourceName,cutoff:e.cutoff,status:e.status,total:e.total};});});
-  return {available:months.length>0,gold:{type:'north12-monthly-v2',months:months},monthly:{revision:state.revision,history:history,operation:body.operationId ? state.operations[body.operationId] || null : null}};
+  return {readContract:'department-version-read/v1',readVersion:readVersion,available:months.length>0,gold:{type:'north12-monthly-v2',months:months},monthly:{revision:state.revision,history:history,operation:body.operationId ? state.operations[body.operationId] || null : null}};
 }
 
 function departmentGoldMonthlyReceipt_(claims) {

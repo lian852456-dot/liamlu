@@ -25,6 +25,10 @@
 - 九店稽核值使用既有正式 canonical ID；其中萬大為 `DNB10168`、通化為 `DNB10174`，不沿用巡店相容層的 provisional／legacy code。介面仍統一顯示「台北三創」。
 - 私有照片重新載入統一走永遠回傳 Promise 的 `ensurePrivatePhoto()`；照片仍只由 `audit_photo_read` 讀成暫時 Blob URL，頁面卸載時釋放。歷史實作與 Liam iPhone UAT evidence 見 [`docs/AUDIT_REPORT_HANDOFF.md`](docs/AUDIT_REPORT_HANDOFF.md)。
 
+## 部區管理共用讀取（第一階段候選）
+
+`department-ops.html` 的金牌月報與店務成績使用各自獨立的記憶體讀取管理器，合併並行請求、按需載入及返回時核對權限／資料版本。保存與回復仍完整讀回；未改計算公式、來源或正式部署。架構、版本相容、合成效能及待正式驗收項目見 [第一階段說明](docs/DEPARTMENT_FAST_READ_PHASE1.md) 與 [量測收據](docs/DEPARTMENT_FAST_READ_PHASE1_MEASUREMENTS.md)。
+
 ## 每日日誌檢查（本機候選）
 
 - `home.html` 的督導專區提供 `daily-log-dashboard.html` 入口，以本機 Excel／CSV 呈現北一二B九店每日四項、每週第一至第四週及每月兩項的完成狀況。

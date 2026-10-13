@@ -5,12 +5,13 @@ const PAGE=process.env.TEST_BASE_URL ? new URL('department-ops.html',process.env
 const p=months=>({action:'department_scores_publish',token:'authorized',contract:Core.CONTRACT,confirm:true,requestId:crypto.randomUUID(),expectedGeneration:0,selectedMonthKeys:months.map(m=>m.monthKey),months,sourceName:'synthetic.xlsx',sourceHash:'a'.repeat(64)});
 const encode=workbook=>Buffer.from(XLSX.write(workbook,{type:'array',bookType:'xlsx'}));
 const buffer=options=>encode(F.workbook(options));
+const session=Buffer.from(JSON.stringify({exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')+'.synthetic';
 async function setup(page,{seed=true,loseAck=false}={}){
  const b=backend(),calls=[];let deny=false;if(seed)b.invoke(p([F.month({month:6}),F.month({month:7})]));
  await page.route('https://script.google.com/**',async route=>{
   const body=route.request().postDataJSON();calls.push(body);
   let response;
-  try{if(deny&&body.action.startsWith('department_scores_'))throw new Error('AUTH_SESSION_EXPIRED');if(body.action==='ptauth')response={status:'ok',token:'authorized'};else if(body.action==='department_ops_read')response={status:'ok',available:false};else response={status:'ok',...b.invoke(body)};}
+  try{if(deny&&body.action.startsWith('department_scores_'))throw new Error('AUTH_SESSION_EXPIRED');if(body.action==='ptauth')response={status:'ok',token:session,expiresAt:Math.floor(Date.now()/1000)+3600};else if(body.action==='department_ops_read')response={status:'ok',available:false,gold:{months:[]},monthly:{revision:'synthetic-empty',history:{}}};else response={status:'ok',...b.invoke({...body,token:body.token===session?'authorized':body.token})};}
   catch(e){response={status:'error',message:e.message};}
   if(loseAck&&body.action==='department_scores_publish'){loseAck=false;return route.fulfill({status:503,body:'unavailable'});}
   await route.fulfill({contentType:'application/json',body:JSON.stringify(response)});

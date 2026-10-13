@@ -1,0 +1,38 @@
+[
+  {
+    "asset": "department-ops.html",
+    "status": 200,
+    "sha256": "71a800a8072638b67c697601072ab9ca324019e03fc42668f0d971a81b50cd45",
+    "matchesMain": true
+  },
+  {
+    "asset": "department-ops.js",
+    "status": 200,
+    "sha256": "b398d6a75fc723879ae72dcd35675cf04661c7ed858c5b5995745eea715970e6",
+    "matchesMain": true
+  },
+  {
+    "asset": "department-gold-monthly-ui.js",
+    "status": 200,
+    "sha256": "5a081d9808afa730fe4e4aa691a87685c0b85bdce58777c08d11535a7bdf377b",
+    "matchesMain": true
+  },
+  {
+    "asset": "department-scores.js",
+    "status": 200,
+    "sha256": "71df8203ffa07dd8cb048a1d7f7d7cf1c5081471099ec4a183f2e3384bd7f83c",
+    "matchesMain": true
+  },
+  {
+    "asset": "department-scores-core.js",
+    "status": 200,
+    "sha256": "a990200987bf116967dff40e25d9bd7f1481b5f3801f393c6d1409150d1887a6",
+    "matchesMain": true
+  },
+  {
+    "asset": "department-gold-monthly-core.js",
+    "status": 200,
+    "sha256": "fe2f2dd62b9509f100f425e55b19f32ac75f4787cece5232c7ffcd1708f848a4",
+    "matchesMain": true
+  }
+]

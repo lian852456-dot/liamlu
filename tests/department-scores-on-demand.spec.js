@@ -16,7 +16,7 @@ async function setup(page,{token=session(),hold=false}={}){
   if(host!=='script.google.com')return route.abort('blockedbyclient');
   const p=route.request().postDataJSON();calls.push(p);let result;
   if(p.action==='ptauth')result=deny?{status:'error',message:'AUTH_SESSION_REVOKED'}:{status:'ok',token:p.token,expiresAt:Math.floor(Date.now()/1000)+3600};
-  else if(p.action==='department_ops_read')result={status:'ok',available:false};
+  else if(p.action==='department_ops_read')result=deny?{status:'error',message:'AUTH_SESSION_REVOKED'}:{status:'ok',available:false,gold:{months:[]},monthly:{revision:'synthetic-empty',history:{}}};
   else if(p.action==='department_scores_read'){if(hold)await gate;result=deny?{status:'error',message:'AUTH_SESSION_REVOKED'}:saved;}
   else if(p.action==='department_store_rules_read')result={status:'ok',contract:'store-rule-reminders-v1',available:false,expiresAt:Math.floor(Date.now()/1000)+3600};
   else return route.abort('blockedbyclient');
@@ -61,10 +61,10 @@ test('server revocation on the visible return clears scores and locks the worksp
  const s=await setup(page);await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreBody tr')).toHaveCount(9);s.deny();
  await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#scoreBody')).toBeEmpty();expect(s.scoreReads()).toHaveLength(2);expect(s.errors).toEqual([]);
 });
-test('gold return checks revocation with auth only and coalesces repeated return events',async({page})=>{
+test('gold return checks permission and version without hidden score reads and coalesces events',async({page})=>{
  const s=await setup(page);
  await page.evaluate(()=>{document.dispatchEvent(new Event('visibilitychange'));document.dispatchEvent(new Event('visibilitychange'));});
- await expect.poll(()=>s.calls.filter(c=>c.action==='ptauth').length).toBe(2);expect(s.scoreReads()).toHaveLength(0);
+ await expect.poll(()=>s.calls.filter(c=>c.action==='department_ops_read').length).toBe(2);expect(s.scoreReads()).toHaveLength(0);expect(s.calls.filter(c=>c.action==='ptauth')).toHaveLength(1);
  // The request is counted before its response settles; end that return before revoking it.
  await page.waitForTimeout(100);
  s.deny();await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));

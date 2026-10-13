@@ -1,19 +1,26 @@
 (function() {
   'use strict';
   window.DepartmentGoldMonthlyUI = {create};
-  function create({request, readWorkbook, getToken, lockWorkspace}) {
+  function create({request, readWorkbook, getToken, getDeadline, isAuthorized, lockWorkspace}) {
     const C=window.DepartmentGoldMonthlyCore, $=id=>document.getElementById(id);
     const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const fmt=v=>v==null?'無來源':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:2});
-    let saved=[], revision='', history={}, candidate=[], plan=null, generation=0, busy=false;
+    let saved=[], revision='', loadedVersion='', history={}, candidate=[], plan=null, generation=0, busy=false, readFlight=null, readEpoch=0, needsValidation=false;
+    const reads=window.SessionReadManager.create({namespace:'department-gold-monthly',
+      getSession:()=>({identity:getToken(),expiresAt:getDeadline?.()||window.SessionReadManager.tokenDeadline(getToken())}),
+      isAuthorized:()=>isAuthorized?.()??(!$('workspace').hidden&&!window.PortalLogout?.isLocked()),
+      onExpired:()=>{clear();lockWorkspace();},
+      onMetric:detail=>window.dispatchEvent(new CustomEvent('department-read-metric',{detail}))});
     const codes={SOURCE_TOTAL_MISMATCH:'原表總計與人員淨金牌不符',EMPLOYEE_DUPLICATE:'同月員編重複，請確認原檔',SOURCE_MONTH_CONFLICT:'來源月份與截止日不一致',PRIMARY_GOLD_AMBIGUOUS:'無法唯一辨識全員主表金牌',GOLD_VERSION_CONFLICT:'已保存版本有更新，請重新載入並預覽',GOLD_PREVIEW_EXPIRED:'預覽已逾時，請重新確認',GOLD_READBACK_FAILED_PREVIOUS_RESTORED:'讀回失敗，已保留上一版',GOLD_REFRESH_REQUIRED:'請先更新後端月報版本',GOLD_STORAGE_SHARED:'私有資料權限不符',GOLD_SOURCE_HASH_CONFLICT:'相同原檔識別但內容不同，已停止儲存'};
     function message(id, text, error) {const e=$(id);e.textContent=text||'';e.className='message'+(error?' error':'');}
     function resetCandidate(){candidate=[];plan=null;$('monthlyPreview').hidden=true;$('monthlyPreviewBody').textContent='';$('monthlyConfirm').hidden=true;$('monthlyConfirmText').textContent='';$('monthlyServerDiff').textContent='';$('publishGold').disabled=true;if(!saved.length)$('goldDashboard').hidden=true;$('goldFile').value='';$('excelPassword').value='';}
-    function clear(){generation++;saved=[];revision='';history={};resetCandidate();$('goldDashboard').hidden=true;['peopleBody','peopleCount','goldSummary','goldSourceMeta','quarterStrip','monthlyStatus','monthFilter','storeFilter','employeeFilter','monthlyHistoryMonth','monthlyHistoryVersion'].forEach(id=>$(id).textContent='');['goldMessage','publishMessage'].forEach(id=>message(id,''));}
-    async function call(payload){
-      const result=await request({...payload,token:getToken()});
+    function clear(){generation++;reads.clear();readFlight=null;needsValidation=false;busy=false;saved=[];revision='';loadedVersion='';history={};resetCandidate();$('goldImport').disabled=false;$('monthlyCommit').disabled=false;$('goldDashboard').hidden=true;['peopleBody','peopleHead','peopleCount','goldSummary','goldSourceMeta','quarterStrip','monthlyStatus','monthFilter','regionFilter','storeFilter','employeeFilter','monthlyHistoryMonth','monthlyHistoryVersion'].forEach(id=>$(id).textContent='');['goldMessage','publishMessage'].forEach(id=>message(id,''));}
+    async function call(payload,signal){
+      const token=getToken(),current=generation;
+      const result=await request({...payload,token},signal);
+      if(signal?.aborted||current!==generation||getToken()!==token||!token)throw Object.assign(new Error('讀取工作階段已變更'),{code:'SESSION_READ_CANCELLED'});
       if(result?.status!=='ok'){
-        if(result?.message==='unauthorized'||result?.authReason){clear();lockWorkspace();}
+        if(['unauthorized','forbidden','denied'].includes(String(result?.status||'').trim().toLowerCase())||[result?.message,result?.code,result?.reason,result?.authReason,result?.auth?.reason].some(v=>typeof v==='string'&&(v.trim().toLowerCase()==='unauthorized'||/^(AUTH_|GOLD_STORAGE_)/.test(v.trim().toUpperCase())))){clear();lockWorkspace();}
         throw new Error(codes[result?.message]||result?.message||'資料服務未完成');
       }
       return result;
@@ -52,18 +59,41 @@
     }
     function adopt(result){
       if(!result.monthly?.revision||!Array.isArray(result.gold?.months))throw new Error('月報服務版本不相符，請更新後端');
-      saved=result.gold.months;revision=result.monthly.revision;history=result.monthly.history||{};
-      initialize();if(saved.length){render();$('goldDashboard').hidden=false;}else{$('goldDashboard').hidden=true;}
+      saved=result.gold.months;revision=result.monthly.revision;loadedVersion=result.readVersion||revision;history=result.monthly.history||{};
+      initialize();if(saved.length)render();$('goldDashboard').hidden=needsValidation||!saved.length;
     }
-    async function load(operationId){
-      const current=++generation;clearCandidateOnly();message('goldMessage','正在讀取已保存月報…');
-      try{const result=await call({action:'department_ops_read',operationId});if(current!==generation)return;adopt(result);message('goldMessage',saved.length?'已載入已保存月報；只有更新資料時才需選檔。':'尚無已保存月報。首次選檔確認後，往後登入會自動載入。');return result;}
-      catch(error){if(current!==generation)return;clear();message('goldMessage',error.message,true);}
+    function suspend(cancel=false){needsValidation=true;if(cancel&&readFlight){readEpoch++;reads.cancel('monthly');readFlight=null;}$('goldDashboard').hidden=true;$('monthlyPreview').hidden=true;$('monthlyConfirm').hidden=true;}
+    function load(operationId, {refresh=false,verify=false}={}){
+      if(readFlight)return readFlight.promise;
+      if(busy){message('goldMessage','資料正在處理或保存，請等待完整讀回後再更新。');return Promise.resolve();}
+      if(!verify)generation++;
+      const current=generation,epoch=readEpoch,flight={};readFlight=flight;
+      if(!verify)clearCandidateOnly();message('goldMessage',verify?'正在核對權限與月報版本…':'正在讀取已保存月報…');
+      flight.promise=(async()=>{
+        try{
+          const result=await reads.read('monthly',{refresh,full:Boolean(operationId),
+            fetch:({knownVersion,signal})=>call({action:'department_ops_read',operationId,knownVersion},signal),
+            version:r=>r.readVersion||r.monthly?.revision,
+            validate:r=>{if(!r.monthly?.revision||!Array.isArray(r.gold?.months))throw new Error('月報服務版本不相符，請更新後端');return r;}});
+          if(current!==generation||epoch!==readEpoch)return;
+          needsValidation=false;
+          if(!saved.length||loadedVersion!==(result.readVersion||result.monthly.revision)){if(verify)clearCandidateOnly();adopt(result);}
+          else {$('goldDashboard').hidden=!saved.length;if(candidate.length)$('monthlyPreview').hidden=false;if(plan)$('monthlyConfirm').hidden=false;}
+          needsValidation=false;message('goldMessage',saved.length?'已載入已保存月報；只有更新資料時才需選檔。':'尚無已保存月報。首次選檔確認後，往後登入會自動載入。');return result;
+        }catch(error){if(current!==generation||epoch!==readEpoch||error.code==='SESSION_READ_CANCELLED')return;reads.clear();suspend();message('goldMessage',error.message+'；請重新讀取以核對權限與版本。',true);}
+        finally{if(readFlight===flight)readFlight=null;}
+      })();return flight.promise;
+    }
+    function finishBusy(current){if(current!==generation)return;busy=false;if(needsValidation&&!document.hidden&&!$('goldPanel').hidden&&!$('workspace').hidden)void load(undefined,{refresh:true,verify:true});}
+    function revalidate(){
+      if(!busy)return load(undefined,{refresh:true,verify:true});
+      const current=generation;
+      return call({action:'ptauth'}).then(r=>{if(r.token!==getToken()){clear();lockWorkspace();}}).catch(error=>{if(current===generation){suspend();message('goldMessage',error.message+'；請重新核對權限。',true);}});
     }
     function clearCandidateOnly(){resetCandidate();}
     function diffRows(rows){return rows.length?rows.map(r=>`<tr><td>${esc(r.employeeName)}</td><td>${esc(r.employeeId)}</td><td>${r.type==='added'?'新增':r.type==='removed'?'移除':'變更'}</td><td>${fmt(r.before?.medal)}</td><td>${fmt(r.after?.medal)}</td><td>${esc(r.before?`${r.before.region}／${r.before.store}`:'無來源')}</td><td>${esc(r.after?`${r.after.region}／${r.after.store}`:'無來源')}</td></tr>`).join(''):'<tr><td colspan="7">人員淨牌與店區無差異</td></tr>';}
     function showPreview(){
-      $('monthlyPreview').hidden=false;$('monthlyConfirm').hidden=true;$('goldDashboard').hidden=false;plan=null;
+      $('monthlyPreview').hidden=needsValidation;$('monthlyConfirm').hidden=true;$('goldDashboard').hidden=needsValidation;plan=null;
       if(!saved.length)$('goldSourceMeta').textContent='首次月報候選，尚未保存。';
       $('monthlyPreviewBody').innerHTML=candidate.map(m=>{const old=saved.find(s=>s.monthKey===m.monthKey),diff=C.diff(old,m);return `<article class="data-card"><h3>${esc(m.monthKey)}｜截至 ${esc(m.dateRange.cutoff)}</h3><p>${m.validation.people} 人／${m.validation.stores} 有同仁店；原表 ${fmt(m.validation.sourceTotal)}＝解析 ${fmt(m.validation.total)}。主金牌 ${esc(m.mapping.medal)}。</p><label class="final-choice"><input type="checkbox" data-month-final="${esc(m.monthKey)}" ${m.finalConfirmed?'checked':''}> 我確認此月份為助理最終結算版（預設未結算）</label><p>${esc(m.warnings.join(' '))}</p><details><summary>檢視 ${diff.length} 人差異</summary><div class="table-scroll"><table><thead><tr><th>姓名</th><th>員編</th><th>類型</th><th>原牌數</th><th>新版</th><th>原店區</th><th>新店區</th></tr></thead><tbody>${diffRows(diff)}</tbody></table></div></details></article>`;}).join('');
       $('publishGold').disabled=false;
@@ -79,28 +109,29 @@
         candidate=C.parseWorkbook(wb,window.XLSX,{sourceName:file.name,sourceHash}).filter(m=>m.monthKey>='2026-07');
         if(!candidate.length)throw new Error('已呈報Q2保留，此次沒有可更新月份');
         showPreview();message('goldMessage',`已辨識 ${candidate.length} 個月份。尚未保存；請檢視差異與結算狀態。`);
-      }catch(error){candidate=[];plan=null;$('monthlyPreview').hidden=true;$('publishGold').disabled=true;message('goldMessage',codes[error.message]||error.message,true);}
-      finally{$('excelPassword').value='';busy=false;$('goldImport').disabled=false;}
+      }catch(error){if(current===generation){candidate=[];plan=null;$('monthlyPreview').hidden=true;$('publishGold').disabled=true;message('goldMessage',codes[error.message]||error.message,true);}}
+      finally{if(current===generation){$('excelPassword').value='';$('goldImport').disabled=false;finishBusy(current);}}
     }
     function opId(){return crypto.randomUUID();}
     async function prepare(restoring){
       if(busy)return;if(!restoring&&!candidate.length)return;busy=true;$('publishGold').disabled=true;
+      const current=generation;
       try{
         const payload=restoring?{mode:'restore-plan',monthKey:$('monthlyHistoryMonth').value,versionId:$('monthlyHistoryVersion').value}:{mode:'plan',months:candidate.map(C.validateMonth)};
-        const current=generation;
         const operationId=opId(),result=await call({action:'department_ops_publish',contract:'north12-monthly-write/v2',expectedRevision:revision,operationId,...payload});
         if(current!==generation||!getToken())return;
         plan={...payload,operationId,planReceipt:result.planReceipt,changes:result.changes};
-        $('monthlyConfirm').hidden=false;$('monthlyConfirmText').textContent=result.changes.map(c=>`${c.monthKey}：${fmt(c.beforeTotal)} → ${fmt(c.total)}；${c.changedPeople} 人差異${c.older?'，截止日較早':''}${c.finalDowngrade?'，已結算轉未結算':''}`).join('；');
+        $('monthlyConfirm').hidden=needsValidation;$('monthlyConfirmText').textContent=result.changes.map(c=>`${c.monthKey}：${fmt(c.beforeTotal)} → ${fmt(c.total)}；${c.changedPeople} 人差異${c.older?'，截止日較早':''}${c.finalDowngrade?'，已結算轉未結算':''}`).join('；');
         $('monthlyRegressionLabel').hidden=!result.changes.some(c=>c.older||c.finalDowngrade);$('monthlyRegression').checked=false;
         $('monthlyServerDiff').innerHTML=(result.differences||[]).map(d=>`<details><summary>${esc(d.monthKey)} 人員差異</summary><div class="table-scroll"><table><tbody>${diffRows(d.rows)}</tbody></table></div></details>`).join('');
         message('publishMessage','差異確認完成，正式版本尚未變更。');
-      }catch(error){plan=null;message('publishMessage',error.message,true);}
-      finally{busy=false;$('publishGold').disabled=!candidate.length;}
+      }catch(error){if(current===generation){plan=null;message('publishMessage',error.message,true);}}
+      finally{if(current===generation){$('publishGold').disabled=!candidate.length;finishBusy(current);}}
     }
     async function commit(){
       if(!plan||busy)return;busy=true;$('monthlyCommit').disabled=true;
       const p=plan,current=generation,mode=p.mode==='restore-plan'?'restore':'commit';
+      reads.invalidate('monthly');
       try{
         const result=await call({action:'department_ops_publish',contract:'north12-monthly-write/v2',...p,mode,expectedRevision:revision,confirm:true,confirmRegression:$('monthlyRegression').checked});
         const read=await call({action:'department_ops_read',operationId:p.operationId});
@@ -109,18 +140,21 @@
         if(mode==='commit')for(const m of p.months){const actual=read.gold.months.find(x=>x.monthKey===m.monthKey);if(!actual||C.contentKey(actual)!==C.contentKey(m)||actual.settlementStatus!==m.settlementStatus)throw new Error('人員逐值讀回不一致，請停止重複操作');}
         adopt(read);resetCandidate();message('publishMessage',result.result==='unchanged'?'內容與狀態相同，未建立重複版本。':'月版本已保存並完成逐值讀回；其他月份保留。');
       }catch(error){
+        if(current!==generation||!getToken())return;
         const receipt=await call({action:'department_ops_read',operationId:p.operationId}).catch(()=>null);
         if(current!==generation||!getToken())return;
         const verified=receipt?.monthly?.operation?.revision===receipt?.monthly?.revision && (mode==='restore' ? receipt.gold.months.find(m=>m.monthKey===p.monthKey)?.versionId===p.versionId : p.months.every(m=>{const actual=receipt.gold.months.find(x=>x.monthKey===m.monthKey);return actual&&C.contentKey(actual)===C.contentKey(m)&&actual.settlementStatus===m.settlementStatus;}));
         if(verified){adopt(receipt);resetCandidate();message('publishMessage','已查到此次保存紀錄並完成逐值讀回。');}
         else{plan=null;$('monthlyConfirm').hidden=true;message('publishMessage',error.message+'；請先重新載入核對，勿重複保存。',true);}
-      }finally{busy=false;$('monthlyCommit').disabled=false;}
+      }finally{if(current===generation){$('monthlyCommit').disabled=false;finishBusy(current);}}
     }
     function renderHistory(){
       setOptions($('monthlyHistoryMonth'),Object.keys(history).sort().reverse().map(k=>({value:k,label:k})),'選擇月份');historyOptions();
     }
     function historyOptions(){setOptions($('monthlyHistoryVersion'),(history[$('monthlyHistoryMonth').value]||[]).slice().reverse().map(v=>({value:v.versionId,label:`${v.cutoff}｜${fmt(v.total)}｜${v.status==='final'?'已結算':'暫定'}｜${v.sourceName}`})),'選擇歷史版');}
     function exportGold(){
+      const deadline=getDeadline?.()||window.SessionReadManager.tokenDeadline(getToken());
+      if(needsValidation||!getToken()||(isAuthorized&&!isAuthorized())||(deadline&&deadline<=Date.now()))return message('goldMessage','請先完成權限與資料版本核對。',true);
       const keys=selected(),months=saved.filter(m=>keys.includes(m.monthKey));if(keys.some(k=>k<'2026-07'))return;
       const people=C.aggregate(months,keys,filters()),wb=XLSX.utils.book_new(),rows=[['來源姓名','員編',...keys,'合計','來源月數',...keys.map(k=>k+'店區')],...people.map(p=>[p.employeeName,p.employeeId,...keys.map(k=>p.months[k]==null?'無來源':p.months[k]),p.total,p.sourceMonths,...keys.map(k=>p.placements[k]?p.placements[k].region+'／'+p.placements[k].store:'無來源')])];
       XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'每人月值');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['月份','截止日','結算狀態','來源檔','版本'],...months.map(m=>[m.monthKey,m.dateRange.cutoff,m.settlementStatus==='final'?'已結算':'暫定',m.sourceName||m.sheetName,m.versionId]),['備註','只採來源淨金牌，不判定發獎資格；缺月不補0']]),'來源與狀態');
@@ -129,11 +163,14 @@
     function bind(){
       $('monthFilter').addEventListener('change',()=>{dependent();render();});$('regionFilter').addEventListener('change',()=>{dependent();render();});$('storeFilter').addEventListener('change',()=>{dependent();render();});$('employeeFilter').addEventListener('change',render);
       $('monthlyPreviewBody').addEventListener('change',e=>{const key=e.target.dataset.monthFinal;if(!key)return;const m=candidate.find(x=>x.monthKey===key);m.finalConfirmed=e.target.checked;m.settlementStatus=e.target.checked?'final':'provisional';plan=null;$('monthlyConfirm').hidden=true;});
-      $('monthlyCommit').addEventListener('click',commit);$('monthlyCancel').addEventListener('click',()=>{resetCandidate();message('goldMessage','已取消預覽，已保存版本保持原狀。');});$('monthlyReload').addEventListener('click',()=>load());
+      $('monthlyCommit').addEventListener('click',commit);$('monthlyCancel').addEventListener('click',()=>{resetCandidate();message('goldMessage','已取消預覽，已保存版本保持原狀。');});$('monthlyReload').addEventListener('click',()=>load(undefined,{refresh:true}));
       $('monthlyHistoryMonth').addEventListener('change',historyOptions);$('monthlyRestore').addEventListener('click',()=>prepare(true));
       $('monthlyLogout').addEventListener('click',async()=>{const token=getToken();clear();lockWorkspace();await request({action:'ptlogout',token}).catch(()=>{});});
-      window.addEventListener('pagehide',clear);window.addEventListener('pageshow',e=>{if(e.persisted&&getToken())load();});
+      // The page controller owns return-time validation for both independent domains.
     }
-    return {load,importGold,prepare:()=>prepare(false),exportGold,bind,clear,workState:()=>({busy,unsaved:Boolean(candidate.length||plan||$('goldFile').files?.length)})};
+    return {load,importGold,prepare:()=>prepare(false),exportGold,bind,clear,suspend,
+      revalidate,
+      activate:()=>needsValidation?load(undefined,{refresh:true,verify:true}):Promise.resolve(),
+      workState:()=>({busy,unsaved:Boolean(candidate.length||plan||$('goldFile').files?.length)})};
   }
 })();
