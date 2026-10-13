@@ -1,4 +1,5 @@
 import {comparison} from './dod.mjs';
+import {personalPresentationRow, personalPreviousRow, qisSourceScore, companyRank} from './report_source_contract.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -371,10 +372,9 @@ function buildClosureRawSheet(workbook, sheetName, header, rows, dateColumns) {
   sheet.getRange('A1').values = [['北一二B 加掛類得分大盤解析']];
   sheet.getRange('A2').values = [[`產出日期：${generatedDate}`]];
   const stores = summaryRows.slice(1);
-  const localRank = new Map(stores.map((s, i) => [s.store, i + 1]));
   const sameMonthDod = daily.meta.sameMonthDod === true;
   const rows = summaryRows.map((s) => [
-    '北一二B', normalizeStoreName(s.store), s.store === '北一二B整體' ? '-' : localRank.get(s.store),
+    '北一二B', normalizeStoreName(s.store), companyRank(s),
     s.overall, s.addon,
     sameMonthDod ? s.addon - s.addon_dod : '暫不比較',
     sameMonthDod ? null : '暫不比較',
@@ -528,7 +528,7 @@ let goodspeedLastRow = 10;
   let qisRows = [
     [
       '北一二B整體', stores.reduce((sum, row) => sum + Number(row[5] ?? 0), 0) / 9,
-      totalCases, aggregateService, aggregateProfessional, aggregate?.[5] ?? null,
+      totalCases, aggregateService, aggregateProfessional, qisAvailable ? qisSourceScore(stores, aggregate) : null,
     ],
     ...stores.map((row) => [
       String(row[4] ?? '').includes('三創') ? '台北三創' : row[4],
@@ -705,9 +705,8 @@ for (const category of categories) {
   sheet.showGridLines = false;
   let people = currentKpi.persons.filter(category.pick).map((p, index) => {
     const summary = summaryByName.get(p.pname);
-    if (category.key !== 'manager') return { ...p, index, summary };
-    const store = currentStoreByCode.get(p.store);
-    return { ...p, official: store?.official ?? p.official, items: store?.items ?? p.items, index, summary };
+    return { ...personalPresentationRow(p, { category: category.key, reportDate,
+      store: currentStoreByCode.get(p.store) }), index, summary };
   });
   if (category.dod) people = people.sort((a, b) => (b.official ?? 0) - (a.official ?? 0));
   const baseCols = category.dod ? 5 : 4;
@@ -719,7 +718,7 @@ for (const category of categories) {
   const dodNote = category.dod && !hasValidPreviousPersonBaseline
     ? '　DOD：前日個績總達成率基準不可信，暫不比較'
     : '';
-  const sourceNote = `來源日期：${sourceRange}　差異數 = 實際數 - 目標數（100%）${dodNote}`;
+  const sourceNote = `來源日期：${sourceRange}　${reportDate >= '2026-09-01' ? '來源：個人達成率明細（依員編）　' : ''}差異數 = 實際數 - 目標數（100%）${dodNote}`;
 
   const baseHeaders = category.dod ? ['店點', '職稱', '姓名', '總達成率', 'DOD'] : ['店點', '職稱', '姓名', '總達成率'];
   baseHeaders.forEach((label, i) => {
@@ -752,7 +751,7 @@ for (const category of categories) {
   people.forEach((p, idx) => {
     const rowNum = 5 + idx;
     const candidate = hasValidPreviousPersonBaseline
-      ? (category.key === 'manager' ? previousStoreByCode.get(p.store) : previousByName.get(p.employee_id ?? `${p.store}|${p.pname}`))
+      ? personalPreviousRow(p, { category: category.key, reportDate, byEmployee: previousByName, byStore: previousStoreByCode })
       : null;
     const prev = typeof candidate?.official==='number' ? candidate : null;
     const s = p.summary ?? {};

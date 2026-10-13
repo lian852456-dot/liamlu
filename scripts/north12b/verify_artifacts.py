@@ -2,6 +2,7 @@
 import hashlib,json,os
 from pathlib import Path
 from openpyxl import load_workbook
+from source_semantics import verify as verify_source_semantics
 r=Path(os.environ['RUN_ROOT']);out=Path(os.environ['OUT_DIR']);date=os.environ['REPORT_DATE'];stem=os.environ['SOURCE_STEM']
 s=json.loads((r/f'{stem}-source-values.json').read_text());k=json.loads((r/f'kpicalc-{stem}-corrected.json').read_text());d=json.loads((r/'daily-kpi-data.json').read_text());c=json.loads((r/f'closure-audit-{stem}.json').read_text())
 b=out/f'TWM_North12B_Daily_Report_{date}.xlsx';cb=out/f'TWM_North12B_Closure_Rate_{date}.xlsx'
@@ -19,6 +20,7 @@ if not d['meta']['sameMonthDod']:
     assert all(v['主力KPI'].cell(row,8).value=='暫不比較' for row in range(3,13))
     assert all(v['加掛得分'].cell(row,7).value=='暫不比較' for row in range(3,13))
 assert sum(v[name].max_row-6 for name in ['店長（含代理）','副店長','業代（含銷售人員）'])>=len(k['persons'])
+source_contract_version=verify_source_semantics(v,k,s,d,date)
 for row in range(4,14):
     for col in range(1,12):assert v['締結率'].cell(row,col).value==cv['締結率近三日'].cell(row,col).value,'CLOSURE_REPORT_MISMATCH'
 assert c['latest']['formal_cases']+c['latest']['unassigned_cases']+c['latest']['anomaly_cases']==c['latest']['gap']
@@ -59,5 +61,14 @@ for path,sheets in files:
     data=path.read_bytes();assert data
     entries.append({'fileName':path.name,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),'sourceSheets':sheets,'renderStatus':'PENDING_VISUAL_REVIEW' if path.suffix=='.png' else 'WORKBOOK_VALIDATED'})
 assert len({x['fileName'] for x in entries})==len(entries)
-(out/'attachment-manifest.json').write_text(json.dumps({'reportDate':date,'sourceFile':os.environ['SOURCE_FILE'],'sourceSha256':k['meta']['sourceSha256'],'requiredCount':len(entries),'requiredAttachments':entries},ensure_ascii=False,indent=2))
+qis_aggregate=next((row for row in s.get('QIS店績',{}).get('values',[]) if row[0]=='北一二區' and row[2]=='北一二B' and row[3]==9),None)
+contract={'status':'pass','version':source_contract_version,'reportDate':date,'sourceSha256':k['meta']['sourceSha256'],
+    'dataCutoffDate':k['meta']['data_as_of_date'],'qisRawScore':qis_aggregate[5] if qis_aggregate else None,
+    'qisSourceDate':k['meta']['qis_data_as_of_date'],'managerBasis':'personal-employee-kpi' if date>='2026-09-01' else 'legacy',
+    'addonRankBasis':'source-company-rank','artifactHashes':{e['fileName']:e['sha256'] for e in entries}}
+contract_bytes=json.dumps(contract,ensure_ascii=False,indent=2).encode()
+(out/'source-contract-receipt.json').write_bytes(contract_bytes)
+(out/'attachment-manifest.json').write_text(json.dumps({'sourceContractVersion':source_contract_version,
+    'sourceContractReceiptSha256':hashlib.sha256(contract_bytes).hexdigest(),'reportDate':date,'sourceFile':os.environ['SOURCE_FILE'],
+    'sourceSha256':k['meta']['sourceSha256'],'requiredCount':len(entries),'requiredAttachments':entries},ensure_ascii=False,indent=2))
 print(json.dumps({'status':'pass','attachments':len(entries),'roster':len(k['persons']),'dodNote':'前日無資料時暫不比較'},ensure_ascii=False))

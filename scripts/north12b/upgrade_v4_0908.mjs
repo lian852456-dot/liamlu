@@ -109,10 +109,10 @@ const closureLast = rebuildClosure(closureMain);
 rebuildClosure(closureBook.worksheets.getItem('締結率近三日'), true);
 
 // Update the approved short display names on the existing add-on analysis.
-const labels=['Device','重點Device','換約淨','空機','配件','包膜與保貼','手機保險','Video&KKBOX','YT/天下','HBO.D+','Netflix'];
+const labels=['Device','重點Device','換約淨','空機','配件','包膜與保貼','手機保險','Video&KKBOX','Apple/Google服務及雜誌週刊開通數','HBO.D+','Netflix'];
 const addon=report.worksheets.getItem('加掛得分');
 addon.getRange('C4:C13').values=daily.summary.map(r=>[r.rank]);
-addon.getRange('C3').values=[['KPI排名']];
+addon.getRange('C3').values=[['KPI公司排名']];
 addon.getRange('H3:R3').values=[labels];
 addon.getRange('H3:R3').format={fill:yellow,font:{bold:true,color:'#17365D',size:10},wrapText:true,horizontalAlignment:'center',verticalAlignment:'center',rowHeight:44,borders:{preset:'all',style:'thin',color:'#94A3B8'}};
 
@@ -141,8 +141,8 @@ addon.getRange('A13:R14').clear({applyTo:'all'});
 addon.getRange('A14:R14').merge();
 addon.getRange('A14').values=[[`來源：${sourceFile}｜產出日期：${generatedDate}｜KPI排名採公司正式排名；前日缺有效資料時DOD暫不比較。`]];
 addon.getRange('A14:R14').format={font:{size:10,color:'#475569'},horizontalAlignment:'left',rowHeight:24};
-addon.getRange('A2:R2').values=[['營導區','店點','KPI排名','KPI','今日得分','前日得分','增減',...labels]];
-addon.getRange('A2:R2').format={font:{size:8,bold:true,color:'#0F172A'},wrapText:true,horizontalAlignment:'center',verticalAlignment:'center',rowHeight:44};
+addon.getRange('A2:R2').values=[['營導區','店點','KPI公司排名','KPI','今日得分','前日得分','增減',...labels]];
+addon.getRange('A2:R2').format={font:{size:8,bold:true,color:'#0F172A'},wrapText:true,horizontalAlignment:'center',verticalAlignment:'center',rowHeight:60};
 addon.getRange('D3:D12').format.numberFormat='0.0%';
 addon.getRange('E3:G12').format.numberFormat='0.00';
 addon.getRange('H3:R12').format.numberFormat='0.0%';
@@ -154,7 +154,7 @@ const detail=report.worksheets.add('日目標公式明細');
 target.reset(); detail.reset();
 base(target,'A1:N28'); target.getRange('A:A').format.columnWidth=19; target.getRange('B:B').format.columnWidth=18; target.getRange('C:C').format.columnWidth=13; target.getRange('D:N').format.columnWidth=14;
 band(target,'A1:N1','北一二B 加減分日目標｜目標與目前進度');
-target.getRange('A2:N2').values=[['店點','內容','目前得分',...labels.map((x,i)=>`${x}\n${units[i]}／日`)]]; hdr(target,'A2:N2'); target.getRange('A2:N2').format.rowHeight=48;
+target.getRange('A2:N2').values=[['店點','內容','目前得分',...labels.map((x,i)=>`${x}\n${units[i]}／日`)]]; hdr(target,'A2:N2'); target.getRange('A2:N2').format.rowHeight=72;
 base(detail,'A1:L120'); detail.getRange('A:A').format.columnWidth=18; detail.getRange('B:B').format.columnWidth=34; detail.getRange('L:L').format.columnWidth=24;
 band(detail,'A1:L1','加減分日目標｜可追查公式明細');
 detail.getRange('A2:L2').values=[['店點','項目','月目標','累計實績','大盤進度','全月天數','已過天數','採用倍率','100%日均','採用日目標（進位）','剩餘日均需求','口徑']]; hdr(detail,'A2:L2');

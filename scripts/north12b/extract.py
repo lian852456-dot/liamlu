@@ -350,7 +350,7 @@ formal_cases=sum(formal.values())
 if formal_cases+unassigned+anomalies!=gap:
     raise SystemExit(f"closure gap mismatch {formal_cases}+{unassigned}+{anomalies}!={gap}")
 fmtdate=lambda s:(datetime(1899,12,30)+__import__('datetime').timedelta(days=float(s))).date().isoformat()
-closure={"dates":[fmtdate(x) if x is not None else None for x in dates],"daily":daily_cl,
+closure={"sourceFile":SOURCE_FILE,"sourceSha256":SOURCE_SHA,"dates":[fmtdate(x) if x is not None else None for x in dates],"daily":daily_cl,
          "latest":{"date":fmtdate(latest),"numerator":int(latest_num_total),"denominator":int(latest_den_total),"gap":gap,
                    "formal_staff_count":len(formal_rows),"formal_cases":formal_cases,"formal_unclosed":formal_rows,
                    "unassigned_cases":unassigned,"anomaly_cases":anomalies}}
