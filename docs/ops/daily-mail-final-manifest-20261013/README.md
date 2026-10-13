@@ -170,3 +170,12 @@ Do not regenerate or resend today's already-delivered reports or retained drafts
 Authenticated UI acceptance for home KPI, home awards, app KPI and app awards remains
 blocked: the Mac is locked and Chrome's tab-focus command times out. Connector/hash
 readback does not replace rendered login UI acceptance. The bounded CI workflow is saved as `north12b-mail-contract.workflow-candidate.yml`: the current GitHub OAuth connection lacks workflow scope and cannot install it. No credential or permission changes were attempted. Existing workflow path filters do not run these contracts. A pre-existing Cloudflare Pages failure is separate from the passing local contract tests; GitHub CI acceptance remains unverified until an authorized maintainer installs the workflow candidate.
+
+## Personal QIS in the same daily image
+
+The follow-up request now appends the source's below-98 personal rows and a
+separate no-case/pending section to the existing QIS image, preserving its original
+store block and attachment name/count. See [the candidate contract and real-source
+verification](./qis-personal-candidate.md). Nine additional regressions bring the
+local evidence to 76 distinct tests. This new image is delivered for visual review;
+it remains uninstalled and unsent.

@@ -33,7 +33,7 @@ The following pieces form one activation package; none is active until individua
 5. **Control plane.** Review the exact b-2 and b-10 TOML prompt candidates, the runbook candidate, and the manual instruction tied to conversation `6aa35d1f-a438-83e8-81b2-77074837f7fc`. They preserve status, schedule/RRULE, model, project, cwd, and the existing recipient text; b-2 and manual instructions change, so they need explicit approval. b-2 is the sole scheduled sender. The manual workflow runs only on the same Mac and fails closed while retaining the draft if Mac bridge/ledger access is absent. b-10 only reconciles the shared ledger and never reserves, authorizes, or sends.
 6. **Code-only installation boundary.** Installing code, workflow, or approved prompts must result in zero Outlook sends, zero website/Drive writes, zero LINE actions, and zero report regeneration. Do not run the formal runner as part of installation. Preserve the prior runtime under a hash-verified rollback copy and keep any in-flight reservation intact.
 
-The current formal Mac targets `/Users/liamlu/Downloads/liam-agent/report-automation/work/entrypoint_gate.mjs` and `/Users/liamlu/Downloads/liam-agent/report-automation/work/final-mail-ledger` do not yet exist. The final runtime manifest and dependency list are attached to the Library approval packet. Their absence confirms installation is still pending; it does not authorize a cloud-local substitute. The complete private `install-inventory.json` now lists 24 code/control file targets, their before/after hashes, two new directories and a dependency symlink. It is included in the Library review packet.
+The current formal Mac targets `/Users/liamlu/Downloads/liam-agent/report-automation/work/entrypoint_gate.mjs` and `/Users/liamlu/Downloads/liam-agent/report-automation/work/final-mail-ledger` do not yet exist. The final runtime manifest and dependency list are attached to the Library approval packet. Their absence confirms installation is still pending; it does not authorize a cloud-local substitute. The current private `qis-candidate/install-inventory.json` lists 25 code/control file targets, their before/after hashes, two new directories and a dependency symlink. It includes the new personal QIS source helper and updated build/verification files. The previous 24-target owner-integration inventory is retained as earlier evidence.
 
 ## Exact versioned builder and dependency targets
 
@@ -42,7 +42,7 @@ The versioned library proposed in the private inventory is
 It contains `scripts/north12b/{run_report.py,extract.py,build_kpi_report.mjs,
 upgrade_v4_0908.mjs,render_xlsx_cjk.py,verify_artifacts.py,dod.mjs,
 report_source_contract.mjs,semantic-format.mjs,sales_sheet.mjs,sales_metrics.py,
-source_semantics.py}` and `scripts/render_goodspeed_detail.py`. Preserve that relative
+source_semantics.py,qis_personal.py}` and `scripts/render_goodspeed_detail.py`. Preserve that relative
 layout. It adds project-local `fonts/NotoSansTC-Regular.ttf` and
 `fonts/NotoSansTC-Bold.ttf`; it does not install system fonts. Its `node_modules`
 symlink points only to the already verified bundled dependency directory. The
@@ -59,7 +59,10 @@ invocation before final-mail preparation. This avoids taking a mail body or file
 from another run's shared outputs. Installation itself does not execute that
 invocation or overwrite current report data. The manual workflow must delegate
 all local production/send steps to this same Mac; absent that execution route,
-it retains its draft and performs no send.
+it retains its draft and performs no send. The same QIS image now includes the
+personal below-98 / no-case follow-up, with separate personal/store source dates;
+see [the QIS candidate](./qis-personal-candidate.md). Its visual acceptance remains
+pending before activation. This addition does not change the daily attachment count.
 
 ## Separate real-send acceptance
 
