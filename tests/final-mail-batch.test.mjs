@@ -129,6 +129,8 @@ async function makeFixture(t, {
       reportDate: awardsDate,
       data_as_of_date: CUTOFF,
       configVersion: '2026-10-v4',
+      configHash: CONFIG_HASH,
+      sourceHashes: {store:'c'.repeat(64),person:'d'.repeat(64)},
       requiredCount: 6,
       artifacts: awardEntries,
     }),
@@ -202,6 +204,15 @@ test('accepts dynamically named multi-page Goodspeed Detail _p1 and _p2 attachme
     'TWM_North12B_Goodspeed_Detail_2026-10-13_p1.png',
     'TWM_North12B_Goodspeed_Detail_2026-10-13_p2.png',
   ]);
+});
+
+test('same-date awards cannot inherit a config version while using different source or config bytes',async t=>{
+  for(const change of [{configHash:'f'.repeat(64)},{sourceHashes:{store:'f'.repeat(64),person:'d'.repeat(64)}}]){
+    const fixture=await makeFixture(t),file=fixture.input.awardsManifestPath;
+    const manifest=JSON.parse(await fs.readFile(file,'utf8'));
+    await writeJson(file,{...manifest,...change});
+    await assert.rejects(seal(fixture),/FINAL_MANIFEST_SOURCE_MISMATCH/);
+  }
 });
 
 test('rejects missing, duplicate, mismatched-date, and incorrect-SHA artifacts', async t => {

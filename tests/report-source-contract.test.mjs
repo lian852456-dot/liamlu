@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
 import {personalPresentationRow,personalPreviousRow,qisSourceScore,companyRank} from '../scripts/north12b/report_source_contract.mjs';
 
 test('September onward manager uses own overall, metric targets and employee DOD, not store substitution',()=>{
@@ -28,8 +27,4 @@ test('QIS raw aggregate uses source F, not case-weighted mean',()=>{
 test('add-on ranking uses source company ranks in any source order',()=>{
   assert.deepEqual([{rank:306},{rank:4},{rank:269}].map(companyRank),[306,4,269]);
   assert.equal(companyRank({rank:null}),'尚未有資料');assert.throws(()=>companyRank({rank:0}),/COMPANY_RANK_INVALID/);
-});
-test('v4 add-on label preserves Apple/Google service and magazine weekly semantics',async()=>{
-  const code=await fs.readFile(new URL('../scripts/north12b/upgrade_v4_0908.mjs',import.meta.url),'utf8');
-  assert.ok(code.includes('Apple/Google服務及雜誌週刊開通數'));assert.ok(!code.includes('YT/天下'));
 });

@@ -66,12 +66,25 @@ export async function mailGate(action, request) {
         attachment_files: mail.attachments.map(a => a.path) };
     } finally { if (!reserved) await fs.rmdir(lock); }
   }
-  need(action === 'complete', 'MAIL_GATE_ACTION_INVALID');
+  need(['authorize','complete'].includes(action), 'MAIL_GATE_ACTION_INVALID');
   const prior = await readPrior();
   need(prior?.status === 'IN_FLIGHT' && prior.token === request.token && prior.batchDigest === batch.digest, 'RESERVATION_TOKEN_MISMATCH');
+  if (action === 'authorize') {
+    need(!prior.sendPermitIssued, 'SEND_PERMIT_ALREADY_ISSUED');
+    // Lock + durable one-shot permit prevent a second connector invocation after timeout/crash.
+    await verifySealedBatch(request.manifestPath);
+    const mail = batch.mails[request.type];
+    const text_content = await fs.readFile(mail.body_path, 'utf8');
+    await fs.writeFile(path.join(lock,'permit'),new Date().toISOString(),{flag:'wx',mode:0o600});
+    await save({...prior, sendPermitIssued:true, permitIssuedAt:new Date().toISOString()});
+    return {status:'AUTHORIZED_ONCE',sendAllowed:true,token:prior.token,
+      to:[{email:'lian852456@gmail.com'}],subject:mail.subject,text_content,
+      attachment_files:mail.attachments.map(a=>a.path),save_to_sent_items:true};
+  }
   const messageId = exactMail(batch, request.type, request.sentEvidence);
   need(messageId !== 'NOT_FOUND', 'POST_SEND_NOT_FOUND_OR_UNCERTAIN');
   await save({ status: 'VERIFIED', batchDigest: batch.digest, messageId, sendCount: 1 });
+  await fs.unlink(path.join(lock,'permit')).catch(e=>{if(e.code!=='ENOENT')throw e;});
   await fs.rmdir(lock);
   return { status: 'VERIFIED', messageId, sendAllowed: false };
 }

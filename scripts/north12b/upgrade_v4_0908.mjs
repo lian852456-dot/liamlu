@@ -109,7 +109,7 @@ const closureLast = rebuildClosure(closureMain);
 rebuildClosure(closureBook.worksheets.getItem('締結率近三日'), true);
 
 // Update the approved short display names on the existing add-on analysis.
-const labels=['Device','重點Device','換約淨','空機','配件','包膜與保貼','手機保險','Video&KKBOX','Apple/Google服務及雜誌週刊開通數','HBO.D+','Netflix'];
+const labels=['Device','重點Device','換約淨','空機','配件','包膜與保貼','手機保險','Video&KKBOX','Apple/Google\n服務及雜誌週刊\n開通數','HBO.D+','Netflix'];
 const addon=report.worksheets.getItem('加掛得分');
 addon.getRange('C4:C13').values=daily.summary.map(r=>[r.rank]);
 addon.getRange('C3').values=[['KPI公司排名']];
@@ -149,8 +149,8 @@ addon.getRange('H3:R12').format.numberFormat='0.0%';
 
 const keys=['Device專案銷售數','重點Device銷售量','換約淨新增金額','空機、3C、物聯網及門市購營收','配件及其他營收','包膜與保貼營收','手機保險服務點數','MyVideo&KKBOX','Apple&Google服務及雜誌週刊開通數','HBO Max&Disney+&Prime Video銷售數','Netflix多享組銷售數'];
 const units=['數','數','元','元','元','元','點','點','數','數','數'];
-const target=report.worksheets.add('加減分日目標');
-const detail=report.worksheets.add('日目標公式明細');
+const target=report.worksheets.items.find(s=>s.name==='加減分日目標') ?? report.worksheets.add('加減分日目標');
+const detail=report.worksheets.items.find(s=>s.name==='日目標公式明細') ?? report.worksheets.add('日目標公式明細');
 target.reset(); detail.reset();
 base(target,'A1:N28'); target.getRange('A:A').format.columnWidth=19; target.getRange('B:B').format.columnWidth=18; target.getRange('C:C').format.columnWidth=13; target.getRange('D:N').format.columnWidth=14;
 band(target,'A1:N1','北一二B 加減分日目標｜目標與目前進度');

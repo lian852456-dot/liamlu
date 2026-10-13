@@ -44,42 +44,47 @@ Preflight copies validated bytes and mail bodies into a new run-scoped seal and
 records its digest. It never overwrites an existing seal or same-day run manifest.
 Subsequent sends consume those copied paths, not shared `outputs/`.
 
-## Direct connector integration that must accompany deployment
+## Concrete control-plane candidate
 
-The active b-2 sends through direct Outlook tools, not the historical P1 shell
-sender. Deploying a helper alone does not intercept those tools. Before production
-activation, update the read-before-run runbook's build and send instructions to
-require this gate for **both** the 09:45 path and any later recovery/manual path.
-Keep the schedule and recipient unchanged. The older automation prompt's 8/9-item
-instruction must not authorize a bypass; the finalized contract is the gate.
+`entrypoint_gate.mjs` now connects the scheduled `b-2` and exact manual conversation
+`6aa35d1f-a438-83e8-81b2-77074837f7fc` to the same Mac-local ledger. Its production
+CLI requires macOS and the real `/Users/liamlu/Downloads/liam-agent` checkout,
+fixes `work/final-mail-ledger` internally and rejects caller ledger overrides.
+It never calls Outlook itself. The provider's direct Outlook tools remain external;
+the reviewed prompt/runbook candidates are the binding that must be installed.
+See [control activation](../../control-activation.md) for exact owners and targets.
 
-1. Complete the existing v4 build, current awards patch/verification, and visual
-   review. Prepare `REPORT_FINAL_MAIL_INPUT` and run the patched preflight. Its
-   mail status is `sealed_pending_sent_reconcile`, not a send authorization.
-2. Query Outlook **Sent Items by exact same-day subject**, including all versions;
-   download the direct attachments and body for comparison. Record a normalized
-   private evidence JSON with a complete query (`folder:"Sent Items"`, `reportDate`,
-   `subject`, `complete:true`, `checkedAt`), and `messages`. For each message record
-   `id`, `subject`, `recipient`, downloaded `bodySha256`, `configHash`,
-   `sourceIdentitySha256`, and `attachments:[{name,bytes,sha256,inline:false},…]`.
-   Missing source identity must remain blocked. A fresh `NOT_FOUND` means a complete
-   empty same-day-subject query, not a query for only the new digest/version.
-3. Call `node mail_gate.mjs reserve request.json`, where request supplies
-   `manifestPath`, `type` (`daily` or `phone_awards`), the same durable `ledgerRoot`
-   for all entrypoints, and `sentEvidence`. Only `RESERVED/sendAllowed:true` may
-   invoke the already-authorized direct connector once with the returned body and
-   attachment paths. Reverify seal bytes immediately before connector invocation.
-   `ALREADY_PRESENT` skips send; old/partial/multiple/uncertain matches stop.
-4. Immediately read back Sent Items and call `mail_gate.mjs complete request.json`
-   with the reservation token and verified evidence. Only `VERIFIED` is success.
-   Keep the per-mail durable receipt beside the shared ledger; final processing
-   references these receipts rather than resetting a `mailIds:[]` manifest.
+`prepare_control_plane_candidate.py` reads the current b-2/b-10 TOML and runbook,
+checks their exact hashes/identity and emits private review copies plus diffs.
+Only candidate prompt fields change; schedule/status/recipients remain preserved.
+The manual instruction candidate is tied to the exact conversation. A cloud manual
+flow without access to this same Mac stops with its draft; a separate cloud lock
+cannot coordinate with the Mac. b-10 is a read-only reconciler, never a second sender.
 
-Reservations are atomic across report date + mail type, independent of source/run
-IDs. In-flight receipts and crashed locks never expire into automatic resend.
-Reconcile uncertain sends read-only; a stale lock needs explicit reviewed recovery.
-Two connector sends are sequential. Publication and other channels keep their
-existing gates; this patch does not grant publishing or sending permission.
+1. Finish existing v4 build, independent source checks and actual final-file visual
+   review, then run the guarded current-runtime preflight. It emits only
+   `sealed_pending_sent_reconcile` with all final 13+6 immutable copies.
+2. Resolve Outlook Sent Items using folder discovery. List by exact same-day
+   subject and sent date, paginate to completion, fetch full messages and download
+   every direct attachment. Supply `rawSentEvidence` containing complete query,
+   fresh checkedAt, real recipients/CC/BCC and downloaded body/attachment paths.
+   The bridge computes hashes and derives source/config identity from a version
+   line sealed into the body. Missing identity, old/partial/multiple mails or
+   unverified body extraction block sending. CRLF/HTML conversion that prevents
+   exact body verification also remains blocked; no normalization is guessed.
+3. Call `entrypoint_gate.mjs reserve request.json` with the registered entrypoint,
+   type and manifest. A reservation returns `sendAllowed:false`. Immediately call
+   `authorize` with its token; an atomic one-shot permit returns the exact `to`,
+   `subject`, `text_content`, `attachment_files`, `save_to_sent_items` parameters.
+   Only those fields may be sent once through the already-authorized connector.
+   Repeat authorize is blocked, including concurrent calls. Query/download again,
+   then call `complete` with the token and fresh raw evidence. Only exact unique
+   readback returns VERIFIED. The common ledger persists across all run/source IDs.
+
+Crashed locks and issued permits never expire into an automatic retry. Same-day
+mismatch retains the draft, without replacement or partial resend. No direct tool
+invocation was performed during this task. These candidates are not yet active;
+installation/activation requires separate explicit approval.
 
 ## Closure definitions
 
@@ -118,21 +123,40 @@ latest manifest presence alone cannot authorize a source-policy change.
 
 ## Validation and remaining acceptance
 
-23 new Node regressions cover completeness, visual/build receipts, immutable copies,
-tampering, dynamic Goodspeed pages, simultaneous reservations, crashes, uncertain
-post-send state, old same-day mail and explicit closure/source definitions. Five
-new Python tests independently reject manager store substitution, QIS weighting,
-ordinal ranks, service-label and prepaid/RT confusion in workbook cells. Existing DOD
-4 and sales/GoodSpeed Python 15 tests pass. Real 1013 source key/subset and count
-reconciliation pass. Current Mac candidate without a final input fails before data
-loads or payload emission. These tests use local fixtures; no external test mail.
+31 Node and 26 Python regressions pass, covering full attachment contracts,
+immutable seals, source/config mismatch, both registered entrypoints, concurrent
+one-shot permits, uncertain readback, crash blocking, workbook source semantics,
+DOD, Goodspeed pagination and guarded control-plane candidates. No external test mail.
 
-Before release approval: inspect the exact minimal runtime patch and configure the
-existing v4 build/visual receipts in an isolated rehearsal; bind both direct connector
-entrypoints to the shared ledger; preserve the current producer/config hashes;
-approve merge + installation separately. Do not regenerate or resend today's
-already-delivered report images or retained drafts.
+The real 1013 source (SHA `2fffcbcd…e69a`) plus verified 1012 baseline ran the existing
+seven-stage builder using an existing accepted v4 workbook as template. All stages
+passed, all 11 daily PNGs were visually reviewed, and the two workbooks passed
+independent cell/source verification. Existing generated sheets are reused so the
+existing v4 template can be rebuilt without duplicate-sheet errors. The renderer's
+positive difference missing glyph and crowded headers were corrected and reviewed.
+
+The isolated current-Mac preflight successfully sealed 13+6 attachments. A local
+mock transport using those actual sealed bytes blocked the early 9-item/old-body
+corpus for both entrypoints (4 blocks), verified one fixture delivery per mail type,
+and skipped duplicates from the other entrypoint (2 skips). External sends and
+production writes were zero. This is not a live Outlook round-trip acceptance.
+
+An independent awards check passed all 160 approved prices and 60 main-sheet price
+formulas. Existing source errors outside the changed award price cells were
+preserved, with zero new Excel error cells. The Mac's current awards producer still
+emits one unnamed blank person alongside 40 named people / 4 real zero awards.
+The separately delivered 10:07 Library PNGs correctly retain those 40 people and
+were reused unchanged for this integration rehearsal, pinned to their known hashes.
+This task does not replace or deploy the other owner's person-row fix. Before
+activation, reconcile/install that owner's reviewed patch against the actual Mac
+producer and rerun final visual review; do not overwrite it with a historical copy.
+
+Before release approval: review the prepared current-runtime minimal patch and the
+exact control-plane diffs, then approve merge plus Mac installation and manual
+workflow activation separately. Neither bridge nor ledger currently exists at the
+formal target path. Preserve current awards/config and other owners' changes.
+Do not regenerate or resend today's already-delivered reports or retained drafts.
 
 Authenticated UI acceptance for home KPI, home awards, app KPI and app awards remains
-blocked: the CUA inventory reports the Mac locked and Chrome's tab-focus command
-times out. Connector data/hash readback is not a substitute for rendered login UI.
+blocked: the Mac is locked and Chrome's tab-focus command times out. Connector/hash
+readback does not replace rendered login UI acceptance. The bounded CI workflow is saved as `north12b-mail-contract.workflow-candidate.yml`: the current GitHub OAuth connection lacks workflow scope and cannot install it. No credential or permission changes were attempted. Existing workflow path filters do not run these contracts. A pre-existing Cloudflare Pages failure is separate from the passing local contract tests; GitHub CI acceptance remains unverified until an authorized maintainer installs the workflow candidate.

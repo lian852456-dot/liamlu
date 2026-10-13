@@ -189,7 +189,8 @@ function serialToDate(serial) {
 }
 
 function buildClosureSummary(workbook, sheetName = '締結率') {
-  const sheet = workbook.worksheets.add(sheetName);
+  const sheet = workbook.worksheets.items.find(s => s.name === sheetName) ?? workbook.worksheets.add(sheetName);
+  sheet.reset();
   sheet.showGridLines = false;
   sheet.getRange('A1:E1').merge();
   sheet.getRange('A1').values = [[`北一二B 締結率｜${reportDate}`]];
@@ -700,7 +701,7 @@ const categories = [
 ];
 
 for (const category of categories) {
-  const sheet = personal.worksheets.add(category.title);
+  const sheet = personal.worksheets.items.find(s => s.name === category.title) ?? personal.worksheets.add(category.title);
   sheet.reset();
   sheet.showGridLines = false;
   let people = currentKpi.persons.filter(category.pick).map((p, index) => {
@@ -739,7 +740,7 @@ for (const category of categories) {
   const insuranceCol = colName(baseCols + metrics.length * 3 + 1);
   const reminderCol = colName(baseCols + metrics.length * 3 + 2);
   sheet.getRange(`${insuranceCol}2:${insuranceCol}3`).merge();
-  sheet.getRange(`${insuranceCol}2`).values = [[`保險搭售率\n截至 ${insuranceCutoff}`]];
+  sheet.getRange(`${insuranceCol}2`).values = [[`保險搭售率\n截至 ${String(insuranceCutoff).replace(/^\d{4}[/-]/, '')}`]];
   sheet.getRange(`${insuranceCol}2:${insuranceCol}3`).format = { fill: '#7C3AED', font: { color: '#FFFFFF', bold: true }, horizontalAlignment: 'center', verticalAlignment: 'center', wrapText: true };
   sheet.getRange(`${reminderCol}2:${reminderCol}3`).merge();
   sheet.getRange(`${reminderCol}2`).values = [['提醒']];
@@ -770,7 +771,7 @@ for (const category of categories) {
       const item = p.items[key] ?? { a: null, t: null, reportRate: null };
       const start = baseCols + metricIndex * 3 + 1;
       const diffValue = item.a == null || item.t == null ? null : item.a - item.t;
-      const diffDisplay = diffValue == null ? null : diffValue > 0 ? `​+${fmtNum(diffValue)}` : fmtNum(diffValue);
+      const diffDisplay = diffValue == null ? null : diffValue > 0 ? `+${fmtNum(diffValue)}` : fmtNum(diffValue);
       const values = [item.a ?? '尚未有資料', item.reportRate ?? '尚未有資料', diffDisplay ?? '尚未有資料'];
       const startCol = colName(start), rateCol = colName(start + 1), diffCol = colName(start + 2);
       sheet.getRange(`${startCol}${rowNum}:${diffCol}${rowNum}`).values = [values];

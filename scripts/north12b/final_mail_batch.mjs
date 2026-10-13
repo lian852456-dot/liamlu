@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 
 export const FINAL_MAIL_EFFECTIVE_DATE = '2026-10-13';
 export const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+export const mailProvenanceLine = batch => `北一二B版本核對：${hash(JSON.stringify(batch.sourceIdentity))}|${batch.configHash}`;
 const sha = value => /^[a-f0-9]{64}$/.test(String(value));
 const requireValue = (ok, code) => { if (!ok) throw new Error(code); };
 const json = async file => JSON.parse(await fs.readFile(file, 'utf8'));
@@ -69,7 +70,9 @@ export async function sealFinalMailBatch({ input, payload, sourceBatch, configHa
     && contract.dataCutoffDate === identity.cutoffDate && contract.managerBasis === 'personal-employee-kpi'
     && contract.addonRankBasis === 'source-company-rank' && lists.daily.every(e => contract.artifactHashes?.[e.name] === e.sha256), 'SOURCE_CONTRACT_RECEIPT_MISMATCH');
   requireValue(daily.sourceSha256 === identity.sources[0].sha256 && awards.data_as_of_date === identity.cutoffDate
-    && awards.configVersion === payload.award_config.configVersion, 'FINAL_MANIFEST_SOURCE_MISMATCH');
+    && awards.configVersion === payload.award_config.configVersion && awards.configHash === configHash
+    && awards.sourceHashes?.store === identity.sources[1].sha256
+    && awards.sourceHashes?.person === identity.sources[2].sha256, 'FINAL_MANIFEST_SOURCE_MISMATCH');
   requireValue(build.report_date === date && build.source_sha256 === identity.sources[0].sha256
     && build.batch_id === input.artifactRunId && build.status === 'artifacts_ready_pending_visual_review'
     && ['source_parse','workbook_build','v4_layout','png_render','goodspeed_render','goodspeed_verify','value_verify']
@@ -98,7 +101,8 @@ export async function sealFinalMailBatch({ input, payload, sourceBatch, configHa
         await fs.writeFile(path.join(dir, entry.name), data, { mode: 0o400, flag: 'wx' });
         files.push({ ...entry, path: path.join(finalDir, type, entry.name) });
       }
-      const body = await fs.readFile(payload[type].body_path);
+      const body = Buffer.from((await fs.readFile(payload[type].body_path, 'utf8')).trimEnd()
+        + '\n\n' + mailProvenanceLine({sourceIdentity: identity, configHash}) + '\n');
       await fs.writeFile(path.join(dir, 'body.txt'), body, { mode: 0o400, flag: 'wx' });
       mails[type] = { subject: payload[type].subject, body_path: path.join(finalDir, type, 'body.txt'), bodyHash: hash(body), attachments: files };
     }

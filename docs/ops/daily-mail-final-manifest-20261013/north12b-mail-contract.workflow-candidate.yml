@@ -1,0 +1,48 @@
+name: North12B mail and source contracts
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/north12b/**'
+      - 'scripts/render_goodspeed_detail.py'
+      - 'docs/ops/google-drive-cloud-source-p0-20260824/runtime-after/prepare_send_payloads.mjs'
+      - 'tests/*mail*batch*'
+      - 'tests/mail-gate.test.mjs'
+      - 'tests/entrypoint-gate.test.mjs'
+      - 'tests/test_control_plane_candidate.py'
+      - 'tests/closure-mail-metrics.test.mjs'
+      - 'tests/report-source-contract.test.mjs'
+      - 'tests/north12b-dod.test.mjs'
+      - 'tests/test_north12b*.py'
+      - 'tests/test_render_goodspeed_detail.py'
+      - '.github/workflows/north12b-mail-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install bounded test dependencies
+        run: python -m pip install openpyxl==3.1.5 Pillow==11.3.0
+      - name: Verify mail/source contracts without connectors
+        run: >-
+          node --test tests/final-mail-batch.test.mjs tests/mail-gate.test.mjs
+          tests/entrypoint-gate.test.mjs
+          tests/closure-mail-metrics.test.mjs tests/report-source-contract.test.mjs
+          tests/north12b-dod.test.mjs
+      - name: Verify workbook source semantics and renderer regressions
+        run: >-
+          python -m unittest tests/test_north12b_source_semantics.py
+          tests/test_north12b_sales.py tests/test_render_goodspeed_detail.py
+          tests/test_control_plane_candidate.py

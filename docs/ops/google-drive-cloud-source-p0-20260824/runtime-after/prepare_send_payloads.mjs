@@ -571,7 +571,7 @@ if (finalMailRequired) {
   }
   payload.final_mail_manifest = sealed.manifestPath;
   payload.final_mail_digest = sealed.digest;
-  payload.dispatch_gate = "mail_gate.mjs reserve/complete: 同日兩路 runner 共用 ledger；先 reconcile，再 reservation，再 send/readback";
+  payload.dispatch_gate = "entrypoint_gate.mjs reserve/authorize/complete: Mac 固定 ledger；先 reconcile，再 reservation，再一次性 permit/send/readback";
 }
 
 await fs.writeFile(mplusPayloadPath, JSON.stringify(payload.mplus, null, 2), "utf8");
