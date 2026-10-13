@@ -48,7 +48,11 @@ The PNG has been visually reviewed and delivered in native Library as
 `libfile_6defd20dfe80819187b15f9bee41608f` for Liam's acceptance. This is still a
 draft candidate. No formal runner, control plane, report, website, LINE output or
 mail was changed or invoked. The previous 57/67-test evidence and 13+6 seals remain
-available in the review packet; they do not certify this new PNG's changed hash.
+available in the review packet. A fresh integrated 13+6 seal includes this new QIS
+hash (digest `2df4a52c…93787`). The two-entrypoint fixture using those 19 actual files
+passes four old-mail mismatch blocks and two cross-entrypoint duplicate skips,
+with two local fixture captures and zero external sends. This is still not a live
+Outlook round-trip acceptance.
 
 Activation must install `qis_personal.py` with the versioned builder's `extract.py`,
 `build_kpi_report.mjs` and `verify_artifacts.py`. The current inventory therefore
