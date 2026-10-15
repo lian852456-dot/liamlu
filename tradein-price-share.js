@@ -7,10 +7,11 @@
    */
   const API='https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
   const PROVIDERS=['點子行動','FutureDial（FDI）','愛鋒派'];
+  const Models=scope.PriceModelView;
   const $=id=>document.getElementById(id);
   const els={status:$('queryStatus'),meta:$('sourceMeta'),results:$('results'),count:$('resultCount')};
   const INITIAL_LIMIT=60;
-  let snapshot=null,generation=0;
+  let snapshot=null,modelRows=[],generation=0;
   const esc=value=>String(value==null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const text=value=>value==null?'':String(value).trim();
   // Normalize only the Samsung filter identity; never rewrite source rows or model keys.
@@ -44,7 +45,7 @@
   }
   // Brand/model options use only the current official snapshot, without extra requests.
   function updateBrandOptions(selected=''){
-    const brands=Array.from(new Set((snapshot?snapshot.rows:[]).filter(hasAnyPrice)
+    const brands=Array.from(new Set(modelRows.filter(hasAnyPrice)
       .map(row=>canonicalBrand(row.brand)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'zh-Hant'));
     $('brand').innerHTML='<option value="">全部廠牌</option>'+brands.map(brand=>
       '<option value="'+esc(brand)+'">'+esc(brand)+'</option>').join('');
@@ -53,7 +54,7 @@
   }
   function updateModelOptions(){
     const brand=$('brand').value,previous=$('model').value;
-    const rows=(snapshot?snapshot.rows:[]).filter(row=>!brand||canonicalBrand(row.brand)===brand);
+    const rows=modelRows.filter(row=>!brand||canonicalBrand(row.brand)===brand);
     const choices=options(rows);
     $('model').innerHTML='<option value="">全部機款</option>'+choices.map(o=>
       '<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>').join('');
@@ -67,10 +68,10 @@
     const model=$('model').value;
     const provider=$('provider').value;
     const grade=$('grade').value;
-    return snapshot.rows.filter(row=>{
+    return modelRows.filter(row=>{
       if(brand&&canonicalBrand(row.brand)!==brand)return false;
       if(model&&modelKey(row)!==model)return false;
-      if(query&&![row.brand,row.model,row.colorless_model].map(text).join(' ').toLocaleLowerCase().includes(query))return false;
+      if(query&&![row.brand,row.model,row.colorless_model,...row.source_models].map(text).join(' ').toLocaleLowerCase().includes(query))return false;
       return PROVIDERS.some(p=>(!provider||provider===p)&&quotedGrades(row,p,grade).length);
     });
   }
@@ -149,7 +150,7 @@
     }finally{scope.clearTimeout(timeout);}
   }
   function clear(){
-    snapshot=null;$('brand').innerHTML='<option value="">全部廠牌</option>';
+    snapshot=null;modelRows=[];$('brand').innerHTML='<option value="">全部廠牌</option>';
     $('model').innerHTML='<option value="">全部機款</option>';
     els.meta.textContent='';els.count.textContent='';
     els.results.innerHTML='<p class="empty">尚無正式回收價格。</p>';
@@ -172,7 +173,8 @@
           return '<div class="price-item'+(price.zero?' zero':'')+'"><span class="grade">'+esc(grade==='未分級'?'來源未分級':grade+' 級')+'</span><strong>'+esc(price.label)+'</strong></div>';
         }).join('')+'</div></section>';
       }).join('');
-      return '<article class="model-card"><div class="model-head"><h3>'+esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')+'</h3></div>'+blocks+'</article>';
+      const variant=row.price_variant?'<p class="price-variant">不同報價：'+row.source_models.map(esc).join('／')+'</p>':'';
+      return '<article class="model-card"><div class="model-head"><h3>'+esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')+'</h3></div>'+variant+blocks+'<p class="group-note">原始機型：'+row.source_models.map(esc).join('／')+'</p></article>';
     }).join('')+'</div>'+(shown.length<rows.length?'<p class="result-more">目前顯示前 '+shown.length+' 筆，共 '+rows.length+' 筆。請搜尋或選擇機款以查看完整結果。</p>':'');
   }
   async function refresh(){
@@ -184,6 +186,7 @@
       if(token!==generation)return;
       if(!incoming){status('目前尚未發布正式回收價，請稍後重新讀取。','warn');return;}
       snapshot=incoming;
+      modelRows=Models.groupTradein(incoming.rows);
       updateBrandOptions(selectedBrand);
       updateModelOptions();
       els.meta.innerHTML='正式來源日期：<strong>'+esc(incoming.source_version_date||'未提供')+
