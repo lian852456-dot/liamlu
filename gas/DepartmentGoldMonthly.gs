@@ -22,10 +22,22 @@ function departmentGoldMonthlyFile_(id, folder) {
   return file;
 }
 
+function departmentGoldMonthlyLegacyFile_(folder) {
+  // Reuse this request's checked folder; mutable legacy bytes are still read fresh.
+  const files=folder.getFilesByName(DEPARTMENT_OPS_FILE);let latest=null;
+  while(files.hasNext()){
+    const file=files.next();
+    if(!latest||file.getLastUpdated().getTime()>latest.getLastUpdated().getTime())latest=file;
+  }
+  return latest?departmentGoldMonthlyFile_(latest.getId(),folder):null;
+}
+
 function departmentGoldMonthlyRegistry_(folder) {
   const files = folder.getFilesByName(DEPARTMENT_GOLD_REGISTRY);
   if (!files.hasNext()) {
-    const legacy = departmentOpsLatestSnapshot_();
+    const legacyFile=departmentGoldMonthlyLegacyFile_(folder);
+    const legacy=legacyFile?JSON.parse(legacyFile.getBlob().getDataAsString('UTF-8')):null;
+    if(legacyFile&&(!legacy||legacy.version!==1||!Array.isArray(legacy.months)))throw new Error('部區金牌快照格式不正確');
     // Existing source months, including the reported Q2, are copied untouched.
     const baseMonths = legacy && Array.isArray(legacy.months) ? legacy.months : [];
     return {file:null, state:{schema:DEPARTMENT_GOLD_REGISTRY_SCHEMA,revision:'legacy-' + ptHashHex_(JSON.stringify(baseMonths)),baseMonths:baseMonths,activeByMonth:{},historyByMonth:{},operations:{}}};

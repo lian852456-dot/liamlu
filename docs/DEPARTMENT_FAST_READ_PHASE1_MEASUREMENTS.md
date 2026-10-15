@@ -1,5 +1,7 @@
 # 第一階段量測收據
 
+以下數據是10/13的隔離合成量測。2026-10-16舊快照成本修正及最新正式驗收缺口見[跟進說明](DEPARTMENT_FAST_READ_PHASE1_FOLLOWUP.md)；不將原文當時的未部署狀態沿用為今日狀態，也不以本輪呼叫減少宣稱正式秒數改善。
+
 狀態：本機候選及合成驗證完成；正式服務量測、正式資料對帳、實體手機驗收與發布未完成。
 
 基準為正式 `11907891f218f0b3ee51b67373a8def474550e97`，公開六資產已核對相符。候選各 sample 的資產 SHA-256 已與目前程式逐檔比對，完整數值及來源版本見 [performance.json](evidence/department-fast-read-phase1-20261013/performance.json)。
