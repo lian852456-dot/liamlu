@@ -30,7 +30,7 @@
       if(!value.prior_period||iso(value.prior_period.start)>iso(value.prior_period.end)||Number(value.prior_period.start.slice(-2))!==1||Number(value.prior_period.end.slice(-2))!==days||value.prior_period.start.slice(0,7)!==value.prior_period.end.slice(0,7))fail('同期起迄尚未核實');
       const p=new Date(start+'T00:00:00Z');p.setUTCMonth(p.getUTCMonth()-1);if(p.toISOString().slice(0,7)!==value.prior_period.start.slice(0,7))fail('同期不是前一個月');
     }
-    return {schema:SCHEMA,period_start:start,cutoff,sha256:value.sha256,source_bytes:count(value.source_bytes||0,'來源大小'),source_name:String(value.source_name||value.file_name||'已驗證締結率來源').slice(0,160),stores:STORES.map(s=>({...s})),records,prior,prior_period:prior?{...value.prior_period}:null,definition:'AQ 上線合計／AQ 來客合計；RT 為符合續約資格之原 TWM＋原 TST；同期只有區間總量。'};
+    return {schema:SCHEMA,period_start:start,cutoff,sha256:value.sha256,source_bytes:count(value.source_bytes||0,'來源大小'),source_name:String(value.source_name||value.file_name||'已驗證締結率來源').slice(0,160),stores:STORES.map(s=>({...s})),records,prior,prior_period:prior?{start:value.prior_period.start,end:value.prior_period.end}:null,definition:'AQ 上線合計／AQ 來客合計；RT 為符合續約資格之原 TWM＋原 TST；同期只有區間總量。'};
   }
   function dailySeries(records,mode='daily',start,end){
     if(!['daily','cumulative'].includes(mode))fail('未知趨勢模式');const byDate=new Map();for(const r of records){if(start&&r.date<start||end&&r.date>end)continue;if(!byDate.has(r.date))byDate.set(r.date,[]);byDate.get(r.date).push(r);}

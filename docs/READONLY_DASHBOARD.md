@@ -14,7 +14,7 @@ KPI、台獎、個績重用原 KPI 轉換器、已核實補充與台獎守門器
 - HTML、repo 與 service worker 不含真實業績、原 Excel、人名清單或敏感明文包。個績使用既有來源提供的遮罩姓名，不增加揭露。
 - 單檔可由 `node scripts/build-readonly-dashboard.mjs /absolute/output.html` 建置。公開內容只有介面與程式；`file://` 入口維持鎖定，需要在原站同源部署後沿用原登入。這不是離線加密報表，不宣稱可撤銷的離線金鑰已完成。
 
-## 後續上傳更新的已完成部分
+## 來源準備與私有更新候選
 
 本機準備指令：
 
@@ -24,7 +24,15 @@ node scripts/prepare-readonly-conversion.mjs /absolute/來源.xlsx /absolute/pri
 
 最後一個舊版 JSON 可省略。輸出必須在公開 repo 外，且不可覆寫現有版本。只解析 AQ締結率、RT每日、RT締結率、樞紐四張已核實表，核對九店／逐日／TTL／分子母／同期文字及截止。原始檔不改動，也不經網路送出。重複檔不累加；店日鍵衝突、缺店、倒退截止、異月合併、移除既有鍵或截止後非零衝突都停止。現只接受已核實的 31 天來源欄位版型，其他月份需先核對來源版型。
 
-私有發布仍未接線。不能直接用既有整包 `privateDashboardPublish` 把目前 KPI／台獎來源覆蓋成舊副本。後端整合應先取得目前實際模組，確認最小範圍：在既有主管上傳驗權內新增締結率元件的預覽／確認發布／回復，以 active revision 與內容 hash 鎖定差異、不可變版本先讀回再切換；既有受保護快照讀取加入可選元件。沒有新增權限的需求，但確切現行模組與並發資料相容性仍待核對，未在本候選修改 GAS。
+`gas/ReadonlyConversion.gs` 已實作私有元件的預覽／確認發布／狀態／回復。四個公開函式都先呼叫原 `reportUploadAuthorize_`（既有管理者驗證碼＋員編白名單），不接受業務 B session 代替主管上傳權限。`readonly-conversion-upload.html` 是原站的獨立更新頁，以受控 POST 呼叫原戰情 owner；不增加 HtmlService 公開介面，也不修改目前 3C／舊換新上傳部署或價格資料。公開空殼仍沒有原始 Excel 或業績資料。
+
+預覽只將嚴格標準化的九店店日彙總放入30分鐘的伺服器暫存，不新增正式檔。確認時在原 script lock 內核對預覽操作者、期限、active revision 及 hash，先建立私有不可變 JSON 並完整讀回，再切換專用 `READONLY_CONVERSION_STATE_V1` 資料指標。該屬性只存檔案 ID／hash／版本／操作時間，並非憑證或授權設定。相同來源不累加，舊預覽不能覆寫較新版本；讀回失敗維持原指標。首版可回復到原本無元件狀態，既有版本檔不刪除。
+
+原 `privateDashboardSnapshot()` 只增加可選元件讀取；不寫入或重組原 KPI／台獎檔。新檔必須仍在原私有資料夾、維持私有分享狀態且 owner 相符。元件損壞時，KPI／台獎保留原讀取結果，締結率明確顯示不可用，不回退為零或舊資料。原 A／B 驗權、RPC 邊界、角色、會話期限與資料來源規則均不變。原站更新頁僅提供空介面；狀態及寫入仍須原主管驗權，沒有 Google cookie 或 B token 代替管理者驗證的路徑。
+
+GAS 最小候選範圍：`Code.gs` 的一行可選 reader hook 與四個受原主管驗權的 POST 路由；只新增 `ReadonlyConversion.gs`、`ReadonlyDashboardCore.gs` 兩個 GAS 模組。更新 UI 是原站 HTML／JS，SheetJS 沿用原站資產。`node scripts/build-readonly-conversion-assets.mjs` 從單一核心重建 GAS 核心資產。不得把 repo 的整份 `Code.gs` 覆蓋正式工作副本。
+
+此流程已在隔離環境連通真 XLSX 解析器、實際 doPost 解析／原管理者驗權、候選 GAS runtime 與 POST 更新 UI，驗證預覽／發布／完整讀回／重複匯入／版本衝突／回復。正式 owner 的第68版與10/12工作副本已有既存 `程式碼.gs` 差異，正式套用前需先核對並保留。此 PR 的 GAS 候選尚未套用或部署，真來源尚未正式匯入，不能將隔離通過當作正式流程已完成。
 
 ## 發布門檻
 

@@ -14,6 +14,7 @@
     const metadata={cutoff:view.data_as_of_date,reportDate:view.report_run_date||view.report_date,sourceName:view.source_file,period:view.source_date_range,version:String(snapshot.kpiBattle.processing_run_id||snapshot.kpiBattle.kpi_run_id||snapshot.publishedAt||'來源未提供版本')};
     const awardCheck=Awards.validateAwardsBattle(snapshot.awardsBattle,view,snapshot.kpiBattle);
     let conversion=null,conversionReason='尚未匯入已核實的 AQ／RT 締結率報表。';
+    if(snapshot.conversionStatus?.status==='unavailable')conversionReason='私有締結率版本尚未通過讀回核對，請由主管確認。';
     if(snapshot.conversionBattle){try{conversion=Core.validateConversion(snapshot.conversionBattle);}catch{conversionReason='締結率來源未通過完整性檢查，請核對原檔後重新更新。';}}
     return {profile:{store:privateResult.profile.store,role:privateResult.profile.role},stores:Core.STORES.filter(s=>ids.has(s.id)),
       kpi:{...metadata,data:view,stores:storeRows,available:true},personal:{...metadata,records:personal,available:personal.length>0},
