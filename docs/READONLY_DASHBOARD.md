@@ -32,10 +32,12 @@ node scripts/prepare-readonly-conversion.mjs /absolute/來源.xlsx /absolute/pri
 
 GAS 最小候選範圍：`Code.gs` 的一行可選 reader hook 與四個受原主管驗權的 POST 路由；只新增 `ReadonlyConversion.gs`、`ReadonlyDashboardCore.gs` 兩個 GAS 模組。更新 UI 是原站 HTML／JS，SheetJS 沿用原站資產。`node scripts/build-readonly-conversion-assets.mjs` 從單一核心重建 GAS 核心資產。不得把 repo 的整份 `Code.gs` 覆蓋正式工作副本。
 
-此流程已在隔離環境連通真 XLSX 解析器、實際 doPost 解析／原管理者驗權、候選 GAS runtime 與 POST 更新 UI，驗證預覽／發布／完整讀回／重複匯入／版本衝突／回復。正式 owner 的第68版與10/12工作副本已有既存 `程式碼.gs` 差異，正式套用前需先核對並保留。此 PR 的 GAS 候選尚未套用或部署，真來源尚未正式匯入，不能將隔離通過當作正式流程已完成。
+此流程已在隔離環境連通真 XLSX 解析器、實際 doPost 解析／原管理者驗權、候選 GAS runtime 與 POST 更新 UI，驗證預覽／發布／完整讀回／重複匯入／版本衝突／回復。正式 owner 已於2026-10-15台灣10:18更新為第69版，沿用原部署 ID、執行身分、存取設定與六個 OAuth 範圍，可回復第68版。套用前先比對兩個原驗權函式，並只替換 UI 選取的 POST／snapshot 函式片段；版本歷史原八處週報差異保留，僅多兩處掛接及兩個新增模組。四個新路由正式匿名檢查均由原管理者驗權拒絕，未回傳私有內容。真來源尚未正式匯入，前端仍待必要正式驗收，不能將部署或隔離通過當作流程已完成。
 
 ## 發布門檻
 
 先完成原業務登入，核對四端最新正式資料（主代理指定來源批次 10/14，不能由 10/15 頁首推斷）。以各原來源對帳九店、個績可見範圍、台獎、截止、排名與篩選；確認新增締結率元件逐鍵與 Excel 一致且 10/12 後占位不作零。再驗撤權、實體 iPhone、資料更新與回復，才發布正式入口。
 
 本機通過不代表上述正式門檻已完成；相關隔離測試皆使用合成業務資料。真來源只在私有本機解析核對，沒有嵌入產物。
+
+同網域驗收入口已由 PR236 提供：`review-20261015/readonly-dashboard.html` 與 `review-20261015/readonly-conversion-upload.html`。它們是可開啟的受保護候選，無業績資料嵌入；正式原登入／鎖定畫面已核對，合法登入後的資料與角色驗收仍待執行。
