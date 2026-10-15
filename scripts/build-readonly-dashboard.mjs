@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),destination=process.argv[2];
+if(!destination||!path.isAbsolute(destination))throw Error('Provide an absolute output HTML path');
+const text=file=>fs.readFileSync(path.join(root,file),'utf8'),hashes=[];
+let html=text('readonly-dashboard.html');
+html=html.replace(/<link rel="stylesheet" href="readonly-dashboard\.css\?[^\"]+">/,()=>'<style>'+text('readonly-dashboard.css')+'</style>');
+html=html.replace(/<script src="([a-zA-Z0-9.-]+)\?[^\"]+"><\/script>/g,(_,file)=>{const js=text(file).replace(/<\/script/gi,'<\\/script');hashes.push("'sha256-"+crypto.createHash('sha256').update(js).digest('base64')+"'");return '<script>'+js+'</script>';});
+if(/<script src=/.test(html)||/id="demo-data"/.test(html))throw Error('Standalone build contains unresolved scripts or demo data');
+html=html.replace("script-src 'self'","script-src "+hashes.join(' '));
+html=html.replaceAll('href="home.html"','href="https://lian852456-dot.github.io/liamlu/home.html"');
+fs.mkdirSync(path.dirname(destination),{recursive:true});fs.writeFileSync(destination,html);
+console.log(JSON.stringify({file:destination,bytes:Buffer.byteLength(html),sha256:crypto.createHash('sha256').update(html).digest('hex'),dataEmbedded:false,scriptHashes:hashes.length}));
