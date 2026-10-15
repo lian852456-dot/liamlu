@@ -1,8 +1,8 @@
 (function (root, factory) {
-  const api = factory();
+  const api = factory(typeof module === 'object' && module.exports ? require('./price-model-view.js') : root.PriceModelView);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.ThreecQueryCore = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (Models) {
   'use strict';
 
   // These are the identities already used by the private KPI/awards pages.
@@ -174,6 +174,9 @@
       colorlessModel: colorlessModel(row),
       quotes: normalizedQuotes,
       prices: normalizedQuotes,
+      presentationKey: row && row.presentation_key || Models.identity(row || {}),
+      sourceModels: row && row.source_models || [text(row && row.model)],
+      priceVariant: Boolean(row && row.price_variant === true),
       raw: row,
     };
   }
@@ -181,7 +184,7 @@
   function filterTradein(snapshot, filters) {
     const query = text(filters && filters.query).toLocaleLowerCase();
     const provider=text(filters&&filters.provider),grade=text(filters&&filters.grade);
-    return rowList(snapshot).map(tradeinRow).filter(row => (!query || [row.sourceSheet, row.brand, row.model, row.colorlessModel].join(' ').toLocaleLowerCase().includes(query)) && quotedProviders(row,provider,grade).length>0);
+    return Models.groupTradein(rowList(snapshot)).map(tradeinRow).filter(row => (!query || [row.sourceSheet, row.brand, row.model, row.colorlessModel,...row.sourceModels].join(' ').toLocaleLowerCase().includes(query)) && quotedProviders(row,provider,grade).length>0);
   }
 
   function modelOptions(snapshot, kind) {
