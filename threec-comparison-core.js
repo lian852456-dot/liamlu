@@ -1,8 +1,9 @@
 (function(root,factory){
-  const api=factory(typeof module==='object'&&module.exports?require('./threec-query-core.js'):root.ThreecQueryCore);
+  const node=typeof module==='object'&&module.exports;
+  const api=factory(node?require('./threec-query-core.js'):root.ThreecQueryCore,node?require('./price-model-view.js'):root.PriceModelView);
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(root)root.ThreecComparisonCore=api;
-})(typeof globalThis!=='undefined'?globalThis:this,function(Core){
+})(typeof globalThis!=='undefined'?globalThis:this,function(Core,Models){
   'use strict';
   const text=value=>String(value==null?'':value).trim();
   const unique=values=>Array.from(new Set(values)).sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}));
@@ -22,23 +23,7 @@
     const detail=parts.length>1?parts.slice(1).join('／').replace(/^\d{3,4}H/i,'').replace(/\((24|30|36|48|60)\)/g,'').replace(/^[_\s]+/,''):'';
     return {key:raw,raw,project,rent,term,version,detail};
   }
-  function specification(raw){
-    const original=text(raw.colorless_model||raw.colorlessModel||raw.model);
-    // Only a delimited parenthesised suffix after storage is colour syntax.
-    // Other unknown tokens/bundles stay part of the model identity.
-    const colourless=original.replace(/((?:\d+\s*(?:GB|TB|G)))\s*-\((?:宇宙橙|勃根地紅|午夜|星光|太空灰|鈦原色|黑色?|白色?|藍色?|粉色?|黃色?|綠色?|紫色?|銀色?|金色?)\)/gi,'$1');
-    const memory=colourless.match(/(\d+)\s*(?:GB|G)\s*\/\s*(\d+)\s*(GB|TB|G)\b/i);
-    const storageModel=colourless.replace(/\((?:4|5)G\)/gi,'');
-    const storageMatch=Array.from(storageModel.matchAll(/(?:^|[_\s])(\d+)\s*(GB|TB|G)\b/gi)).find(match=>!(match[2].toUpperCase()==='G'&&['4','5'].includes(match[1])));
-    const storage=memory?memory[2]+(memory[3].toUpperCase()==='TB'?'TB':'GB'):(storageMatch?storageMatch[1]+storageMatch[2]:'');
-    const capacity=storage.replace(/G$/i,'GB').toUpperCase();
-    const ram=memory?memory[1]+'GB':'';
-    let model=colourless;
-    if(memory)model=model.replace(memory[0],' ');
-    else if(storageMatch)model=model.replace(storageMatch[0],' ');
-    model=model.replace(/[_\s]+/g,' ').trim();
-    return {model,capacity,ram,specKey:colourless};
-  }
+  const specification=Models.specification;
   function valueSignature(value){
     const state=Core.priceState(value);
     if(state.missing)return ['missing'];
@@ -51,7 +36,7 @@
     Core.rowList(snapshot).forEach(raw=>{
       const row=Core.shoppingRow(raw),spec=specification(raw);
       row.projectPrices.forEach(price=>{if(!columns.has(price.name))columns.set(price.name,condition(price.name));});
-      const signature=JSON.stringify([row.sourceSheet,row.brand,spec.specKey,valueSignature(row.retailPrice),Object.keys(row.prices).sort().map(key=>[key,valueSignature(row.prices[key])])]);
+      const signature=JSON.stringify([row.sourceSheet,Models.identity(raw),valueSignature(row.retailPrice),Object.keys(row.prices).sort().map(key=>[key,valueSignature(row.prices[key])])]);
       if(!merged.has(signature))merged.set(signature,{...row,...spec,models:[],codes:[],sourceCount:0});
       const target=merged.get(signature);target.sourceCount++;
       if(!target.models.includes(row.model))target.models.push(row.model);
