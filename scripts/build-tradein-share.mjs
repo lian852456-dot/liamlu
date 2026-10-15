@@ -9,10 +9,11 @@ let html=src('tradein-price-share.html')
   .replace(/tradein-price-share\.css\?v=[^"]+/g,'style.css')
   .replace(/tradein-price-share\.js\?v=[^"]+/g,'app.js')
   .replace(/\s*<link rel="stylesheet" href="tradein-compact-view\.css\?v=[^"]+">/g,'')
+  .replace(/\s*<script src="price-model-view\.js\?v=[^"]+"><\/script>/g,'')
   .replace(/\s*<script src="tradein-compact-view\.js\?v=[^"]+"><\/script>/g,'');
 // Bundle only the shared presentation enhancement. The deployed site still has exactly three files.
 const css=src('tradein-price-share.css')+'\n'+src('tradein-compact-view.css');
-const js=src('tradein-price-share.js')+'\n;\n'+src('tradein-compact-view.js');
+const js=src('price-model-view.js')+'\n;\n'+src('tradein-price-share.js')+'\n;\n'+src('tradein-compact-view.js');
 if(!html.includes('href="style.css"')||!html.includes('src="app.js"'))throw Error('Portable bundle asset mapping failed');
 if(/<script\b[^>]*src="(?:https?:|\/\/)/i.test(html))throw Error('External client script is not allowed');
 if(/<a\b/i.test(html))throw Error('Share page must not provide any portal links');

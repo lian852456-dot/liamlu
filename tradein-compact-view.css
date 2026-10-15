@@ -51,3 +51,5 @@ body[data-tradein-compact] #sourceMeta{font-size:13px;margin-top:10px}
   body[data-tradein-compact] #tradeinResults>.status,body[data-tradein-compact] #tradeinResults>.empty{grid-column:1/-1}
   body[data-tradein-compact] #tradeinResults>.tc-item{margin-top:0}
 }
+
+.price-variant{font-size:14px;line-height:1.55;margin:6px 0;color:#854300;overflow-wrap:anywhere}
