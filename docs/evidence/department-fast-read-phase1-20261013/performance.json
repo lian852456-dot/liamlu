@@ -1,0 +1,1985 @@
+{
+  "schema": "department-fast-read-acceptance/v1",
+  "baselineCommit": "11907891f218f0b3ee51b67373a8def474550e97",
+  "synthetic": true,
+  "physicalIphoneUat": "NOT_RUN",
+  "formalAuthenticatedMeasurement": "BLOCKED_LOGIN_REQUIRED",
+  "profiles": {
+    "baseline": {
+      "chromium-desktop": {
+        "measuredAt": "2026-10-13T09:45:31.221Z",
+        "repetitions": 3,
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "syntheticNetworkMs": {
+          "auth": 80,
+          "scoreFull": 600,
+          "scoreVersion": 80,
+          "goldFull": 200,
+          "goldVersion": 80
+        },
+        "timings": {
+          "authMs": {
+            "min": 559.1000000238419,
+            "median": 563,
+            "max": 632.3000000119209
+          },
+          "goldInitialMs": {
+            "min": 565.1000000238419,
+            "median": 568.9000000357628,
+            "max": 638.1000000238419
+          },
+          "goldMonthMs": {
+            "min": 43,
+            "median": 43.69999998807907,
+            "max": 45.59999996423721
+          },
+          "goldRegionAMs": {
+            "min": 17.30000001192093,
+            "median": 18.600000023841858,
+            "max": 23.80000001192093
+          },
+          "goldRegionBMs": {
+            "min": 15.900000035762787,
+            "median": 17.099999964237213,
+            "max": 19.399999976158142
+          },
+          "goldRegionCMs": {
+            "min": 14.300000011920929,
+            "median": 15.199999988079071,
+            "max": 15.699999988079071
+          },
+          "goldRegionDMs": {
+            "min": 14.800000011920929,
+            "median": 14.900000035762787,
+            "max": 16.600000023841858
+          },
+          "goldRegionRestoreMs": {
+            "min": 15.800000011920929,
+            "median": 17.400000035762787,
+            "max": 20
+          },
+          "goldStoreMs": {
+            "min": 10.100000023841858,
+            "median": 10.299999952316284,
+            "max": 12.400000035762787
+          },
+          "goldMonth2026_08Ms": {
+            "min": 8.600000023841858,
+            "median": 9.300000011920929,
+            "max": 11.399999976158142
+          },
+          "goldMonthQuarterRestoreMs": {
+            "min": 8.599999964237213,
+            "median": 8.600000023841858,
+            "max": 10.800000011920929
+          },
+          "scoreFirstMs": {
+            "min": 917.3000000119209,
+            "median": 926.6999999880791,
+            "max": 957.6000000238419
+          },
+          "loadedStoreToGoldMs": {
+            "min": 20,
+            "median": 21.5,
+            "max": 21.899999976158142
+          },
+          "loadedGoldToStoreMs": {
+            "min": 148.10000002384186,
+            "median": 149,
+            "max": 150.19999998807907
+          },
+          "scoreMonthQuarterMs": {
+            "min": 14.899999976158142,
+            "median": 17.5,
+            "max": 21.599999964237213
+          },
+          "scoreRegionAMs": {
+            "min": 10.5,
+            "median": 12,
+            "max": 14.900000035762787
+          },
+          "scoreRegionBMs": {
+            "min": 9.199999988079071,
+            "median": 9.300000011920929,
+            "max": 10.099999964237213
+          },
+          "scoreRegionCMs": {
+            "min": 8.699999988079071,
+            "median": 8.699999988079071,
+            "max": 9.5
+          },
+          "scoreRegionDMs": {
+            "min": 9.400000035762787,
+            "median": 9.5,
+            "max": 9.5
+          },
+          "scoreRegionRestoreMs": {
+            "min": 8.600000023841858,
+            "median": 10.100000023841858,
+            "max": 10.699999988079071
+          },
+          "scoreStoreMs": {
+            "min": 8.599999964237213,
+            "median": 8.699999988079071,
+            "max": 9.699999988079071
+          },
+          "scoreMonth2026_07Ms": {
+            "min": 8.800000011920929,
+            "median": 9.399999976158142,
+            "max": 9.5
+          },
+          "scoreMonthQuarterRestoreMs": {
+            "min": 8.199999988079071,
+            "median": 8.600000023841858,
+            "max": 9.800000011920929
+          },
+          "scoreDetailMs": {
+            "min": 41.09999996423721,
+            "median": 43.59999996423721,
+            "max": 47.80000001192093
+          },
+          "scoreReturnMs": {
+            "min": 903.8000000119209,
+            "median": 908.3000000119209,
+            "max": 912.1999999880791
+          },
+          "scoreContinuousReturnMs": {
+            "min": 905,
+            "median": 908.6999999880791,
+            "max": 909.8000000119209
+          },
+          "scoreChangedMs": {
+            "min": 920.0999999642372,
+            "median": 923.6999999880791,
+            "max": 928.7000000476837
+          },
+          "goldReturnMs": {
+            "min": 119,
+            "median": 121.39999997615814,
+            "max": 121.59999996423721
+          },
+          "goldSameVersionReloadMs": {
+            "min": 405.10000002384186,
+            "median": 412.30000001192093,
+            "max": 413.19999998807907
+          },
+          "goldChangedMs": {
+            "min": 413,
+            "median": 416.30000001192093,
+            "max": 421
+          }
+        },
+        "requests": {
+          "total": {
+            "min": 13,
+            "median": 13,
+            "max": 13
+          },
+          "conditional": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "full": {
+            "min": 7,
+            "median": 7,
+            "max": 7
+          },
+          "notModified": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "counts": {
+            "department_ops_read": {
+              "min": 3,
+              "median": 3,
+              "max": 3
+            },
+            "department_scores_read": {
+              "min": 4,
+              "median": 4,
+              "max": 4
+            },
+            "department_store_rules_read": {
+              "min": 2,
+              "median": 2,
+              "max": 2
+            },
+            "ptauth": {
+              "min": 4,
+              "median": 4,
+              "max": 4
+            }
+          }
+        },
+        "correctness": {
+          "allSamples": [
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            }
+          ],
+          "stable": true
+        },
+        "assetHashes": {
+          "department-ops.html": "71a800a8072638b67c697601072ab9ca324019e03fc42668f0d971a81b50cd45",
+          "department-ops.js": "b398d6a75fc723879ae72dcd35675cf04661c7ed858c5b5995745eea715970e6",
+          "department-scores.js": "71df8203ffa07dd8cb048a1d7f7d7cf1c5081471099ec4a183f2e3384bd7f83c",
+          "department-gold-monthly-ui.js": "5a081d9808afa730fe4e4aa691a87685c0b85bdce58777c08d11535a7bdf377b",
+          "store-rule-reminders.js": "6a39a7800299c42c1f48c63ae4e241726d74baba396deca41104ef41e1750e94",
+          "department-scores-core.js": "a990200987bf116967dff40e25d9bd7f1481b5f3801f393c6d1409150d1887a6",
+          "department-gold-monthly-core.js": "fe2f2dd62b9509f100f425e55b19f32ac75f4787cece5232c7ffcd1708f848a4"
+        }
+      },
+      "chromium-mobile": {
+        "measuredAt": "2026-10-13T09:45:54.625Z",
+        "repetitions": 3,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "syntheticNetworkMs": {
+          "auth": 80,
+          "scoreFull": 600,
+          "scoreVersion": 80,
+          "goldFull": 200,
+          "goldVersion": 80
+        },
+        "timings": {
+          "authMs": {
+            "min": 586,
+            "median": 592,
+            "max": 624
+          },
+          "goldInitialMs": {
+            "min": 594,
+            "median": 600,
+            "max": 628
+          },
+          "goldMonthMs": {
+            "min": 61,
+            "median": 74.00000000000011,
+            "max": 78.00000000000011
+          },
+          "goldRegionAMs": {
+            "min": 26.999999999999886,
+            "median": 34.999999999999886,
+            "max": 35
+          },
+          "goldRegionBMs": {
+            "min": 20,
+            "median": 27,
+            "max": 35
+          },
+          "goldRegionCMs": {
+            "min": 21,
+            "median": 27,
+            "max": 29
+          },
+          "goldRegionDMs": {
+            "min": 21,
+            "median": 28,
+            "max": 29.000000000000114
+          },
+          "goldRegionRestoreMs": {
+            "min": 23,
+            "median": 27.999999999999886,
+            "max": 28
+          },
+          "goldStoreMs": {
+            "min": 16,
+            "median": 17,
+            "max": 22
+          },
+          "goldMonth2026_08Ms": {
+            "min": 16,
+            "median": 17,
+            "max": 24
+          },
+          "goldMonthQuarterRestoreMs": {
+            "min": 9,
+            "median": 13.000000000000114,
+            "max": 14
+          },
+          "scoreFirstMs": {
+            "min": 925,
+            "median": 927.0000000000002,
+            "max": 931
+          },
+          "loadedStoreToGoldMs": {
+            "min": 19.000000000000227,
+            "median": 23,
+            "max": 34
+          },
+          "loadedGoldToStoreMs": {
+            "min": 140,
+            "median": 140,
+            "max": 142
+          },
+          "scoreMonthQuarterMs": {
+            "min": 18,
+            "median": 26,
+            "max": 28
+          },
+          "scoreRegionAMs": {
+            "min": 13,
+            "median": 13,
+            "max": 14.000000000000455
+          },
+          "scoreRegionBMs": {
+            "min": 10,
+            "median": 11,
+            "max": 17
+          },
+          "scoreRegionCMs": {
+            "min": 11,
+            "median": 12,
+            "max": 12
+          },
+          "scoreRegionDMs": {
+            "min": 11,
+            "median": 12,
+            "max": 24
+          },
+          "scoreRegionRestoreMs": {
+            "min": 12,
+            "median": 24,
+            "max": 26
+          },
+          "scoreStoreMs": {
+            "min": 10,
+            "median": 12,
+            "max": 13
+          },
+          "scoreMonth2026_07Ms": {
+            "min": 10,
+            "median": 10,
+            "max": 17
+          },
+          "scoreMonthQuarterRestoreMs": {
+            "min": 16,
+            "median": 19,
+            "max": 27
+          },
+          "scoreDetailMs": {
+            "min": 67,
+            "median": 90,
+            "max": 93
+          },
+          "scoreReturnMs": {
+            "min": 916,
+            "median": 917,
+            "max": 923
+          },
+          "scoreContinuousReturnMs": {
+            "min": 895.0000000000009,
+            "median": 899,
+            "max": 917
+          },
+          "scoreChangedMs": {
+            "min": 900,
+            "median": 940,
+            "max": 946
+          },
+          "goldReturnMs": {
+            "min": 119,
+            "median": 135.0000000000009,
+            "max": 138
+          },
+          "goldSameVersionReloadMs": {
+            "min": 423.9999999999991,
+            "median": 429,
+            "max": 432
+          },
+          "goldChangedMs": {
+            "min": 421,
+            "median": 421.0000000000009,
+            "max": 421.9999999999991
+          }
+        },
+        "requests": {
+          "total": {
+            "min": 13,
+            "median": 13,
+            "max": 13
+          },
+          "conditional": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "full": {
+            "min": 7,
+            "median": 7,
+            "max": 7
+          },
+          "notModified": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "counts": {
+            "department_ops_read": {
+              "min": 3,
+              "median": 3,
+              "max": 3
+            },
+            "department_scores_read": {
+              "min": 4,
+              "median": 4,
+              "max": 4
+            },
+            "department_store_rules_read": {
+              "min": 2,
+              "median": 2,
+              "max": 2
+            },
+            "ptauth": {
+              "min": 4,
+              "median": 4,
+              "max": 4
+            }
+          }
+        },
+        "correctness": {
+          "allSamples": [
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            }
+          ],
+          "stable": true
+        },
+        "assetHashes": {
+          "department-ops.html": "71a800a8072638b67c697601072ab9ca324019e03fc42668f0d971a81b50cd45",
+          "department-ops.js": "b398d6a75fc723879ae72dcd35675cf04661c7ed858c5b5995745eea715970e6",
+          "department-scores.js": "71df8203ffa07dd8cb048a1d7f7d7cf1c5081471099ec4a183f2e3384bd7f83c",
+          "department-gold-monthly-ui.js": "5a081d9808afa730fe4e4aa691a87685c0b85bdce58777c08d11535a7bdf377b",
+          "store-rule-reminders.js": "6a39a7800299c42c1f48c63ae4e241726d74baba396deca41104ef41e1750e94",
+          "department-scores-core.js": "a990200987bf116967dff40e25d9bd7f1481b5f3801f393c6d1409150d1887a6",
+          "department-gold-monthly-core.js": "fe2f2dd62b9509f100f425e55b19f32ac75f4787cece5232c7ffcd1708f848a4"
+        }
+      },
+      "webkit-desktop": {
+        "measuredAt": "2026-10-13T09:46:18.730Z",
+        "repetitions": 3,
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "syntheticNetworkMs": {
+          "auth": 80,
+          "scoreFull": 600,
+          "scoreVersion": 80,
+          "goldFull": 200,
+          "goldVersion": 80
+        },
+        "timings": {
+          "authMs": {
+            "min": 603,
+            "median": 634,
+            "max": 660
+          },
+          "goldInitialMs": {
+            "min": 608,
+            "median": 640,
+            "max": 666
+          },
+          "goldMonthMs": {
+            "min": 61,
+            "median": 82,
+            "max": 90
+          },
+          "goldRegionAMs": {
+            "min": 29,
+            "median": 47,
+            "max": 55.000000000000114
+          },
+          "goldRegionBMs": {
+            "min": 25.999999999999886,
+            "median": 31,
+            "max": 50
+          },
+          "goldRegionCMs": {
+            "min": 30,
+            "median": 35,
+            "max": 40
+          },
+          "goldRegionDMs": {
+            "min": 27,
+            "median": 36.000000000000114,
+            "max": 51.000000000000114
+          },
+          "goldRegionRestoreMs": {
+            "min": 21.999999999999886,
+            "median": 21.999999999999886,
+            "max": 28
+          },
+          "goldStoreMs": {
+            "min": 31.000000000000114,
+            "median": 39,
+            "max": 41.000000000000114
+          },
+          "goldMonth2026_08Ms": {
+            "min": 11,
+            "median": 11.999999999999886,
+            "max": 13.000000000000114
+          },
+          "goldMonthQuarterRestoreMs": {
+            "min": 16.999999999999886,
+            "median": 28.000000000000114,
+            "max": 41
+          },
+          "scoreFirstMs": {
+            "min": 922,
+            "median": 944,
+            "max": 965
+          },
+          "loadedStoreToGoldMs": {
+            "min": 52,
+            "median": 52.000000000000455,
+            "max": 54.000000000000455
+          },
+          "loadedGoldToStoreMs": {
+            "min": 139,
+            "median": 150.99999999999955,
+            "max": 167.00000000000045
+          },
+          "scoreMonthQuarterMs": {
+            "min": 15,
+            "median": 17.999999999999545,
+            "max": 39
+          },
+          "scoreRegionAMs": {
+            "min": 11,
+            "median": 12,
+            "max": 24
+          },
+          "scoreRegionBMs": {
+            "min": 12,
+            "median": 30,
+            "max": 36
+          },
+          "scoreRegionCMs": {
+            "min": 10,
+            "median": 14,
+            "max": 14
+          },
+          "scoreRegionDMs": {
+            "min": 11,
+            "median": 21,
+            "max": 24
+          },
+          "scoreRegionRestoreMs": {
+            "min": 10.000000000000455,
+            "median": 11,
+            "max": 11
+          },
+          "scoreStoreMs": {
+            "min": 10,
+            "median": 10,
+            "max": 11
+          },
+          "scoreMonth2026_07Ms": {
+            "min": 20.999999999999545,
+            "median": 29.999999999999545,
+            "max": 32
+          },
+          "scoreMonthQuarterRestoreMs": {
+            "min": 9.999999999999545,
+            "median": 10,
+            "max": 11
+          },
+          "scoreDetailMs": {
+            "min": 64.00000000000045,
+            "median": 80.99999999999955,
+            "max": 92.00000000000045
+          },
+          "scoreReturnMs": {
+            "min": 945.9999999999995,
+            "median": 949,
+            "max": 952
+          },
+          "scoreContinuousReturnMs": {
+            "min": 912,
+            "median": 946,
+            "max": 953
+          },
+          "scoreChangedMs": {
+            "min": 907,
+            "median": 911,
+            "max": 923
+          },
+          "goldReturnMs": {
+            "min": 119,
+            "median": 141,
+            "max": 150
+          },
+          "goldSameVersionReloadMs": {
+            "min": 424,
+            "median": 448,
+            "max": 450
+          },
+          "goldChangedMs": {
+            "min": 419.0000000000009,
+            "median": 444,
+            "max": 447.9999999999991
+          }
+        },
+        "requests": {
+          "total": {
+            "min": 13,
+            "median": 13,
+            "max": 13
+          },
+          "conditional": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "full": {
+            "min": 7,
+            "median": 7,
+            "max": 7
+          },
+          "notModified": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "counts": {
+            "department_ops_read": {
+              "min": 3,
+              "median": 3,
+              "max": 3
+            },
+            "department_scores_read": {
+              "min": 4,
+              "median": 4,
+              "max": 4
+            },
+            "department_store_rules_read": {
+              "min": 2,
+              "median": 2,
+              "max": 2
+            },
+            "ptauth": {
+              "min": 4,
+              "median": 4,
+              "max": 4
+            }
+          }
+        },
+        "correctness": {
+          "allSamples": [
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            }
+          ],
+          "stable": true
+        },
+        "assetHashes": {
+          "department-ops.html": "71a800a8072638b67c697601072ab9ca324019e03fc42668f0d971a81b50cd45",
+          "department-ops.js": "b398d6a75fc723879ae72dcd35675cf04661c7ed858c5b5995745eea715970e6",
+          "department-scores.js": "71df8203ffa07dd8cb048a1d7f7d7cf1c5081471099ec4a183f2e3384bd7f83c",
+          "department-gold-monthly-ui.js": "5a081d9808afa730fe4e4aa691a87685c0b85bdce58777c08d11535a7bdf377b",
+          "store-rule-reminders.js": "6a39a7800299c42c1f48c63ae4e241726d74baba396deca41104ef41e1750e94",
+          "department-scores-core.js": "a990200987bf116967dff40e25d9bd7f1481b5f3801f393c6d1409150d1887a6",
+          "department-gold-monthly-core.js": "fe2f2dd62b9509f100f425e55b19f32ac75f4787cece5232c7ffcd1708f848a4"
+        }
+      },
+      "webkit-mobile": {
+        "measuredAt": "2026-10-13T09:46:41.804Z",
+        "repetitions": 3,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "syntheticNetworkMs": {
+          "auth": 80,
+          "scoreFull": 600,
+          "scoreVersion": 80,
+          "goldFull": 200,
+          "goldVersion": 80
+        },
+        "timings": {
+          "authMs": {
+            "min": 587,
+            "median": 592,
+            "max": 602
+          },
+          "goldInitialMs": {
+            "min": 593,
+            "median": 599,
+            "max": 607
+          },
+          "goldMonthMs": {
+            "min": 62,
+            "median": 73,
+            "max": 82.00000000000011
+          },
+          "goldRegionAMs": {
+            "min": 29.999999999999886,
+            "median": 34,
+            "max": 34.999999999999886
+          },
+          "goldRegionBMs": {
+            "min": 21,
+            "median": 24,
+            "max": 29
+          },
+          "goldRegionCMs": {
+            "min": 20,
+            "median": 28,
+            "max": 30
+          },
+          "goldRegionDMs": {
+            "min": 19,
+            "median": 20.000000000000114,
+            "max": 21
+          },
+          "goldRegionRestoreMs": {
+            "min": 20.999999999999886,
+            "median": 24.000000000000114,
+            "max": 27.999999999999886
+          },
+          "goldStoreMs": {
+            "min": 15.999999999999886,
+            "median": 17,
+            "max": 18
+          },
+          "goldMonth2026_08Ms": {
+            "min": 12,
+            "median": 13,
+            "max": 21
+          },
+          "goldMonthQuarterRestoreMs": {
+            "min": 12,
+            "median": 15,
+            "max": 18
+          },
+          "scoreFirstMs": {
+            "min": 915,
+            "median": 933,
+            "max": 933
+          },
+          "loadedStoreToGoldMs": {
+            "min": 29.999999999999773,
+            "median": 35.99999999999977,
+            "max": 37
+          },
+          "loadedGoldToStoreMs": {
+            "min": 130,
+            "median": 142,
+            "max": 144
+          },
+          "scoreMonthQuarterMs": {
+            "min": 17,
+            "median": 22,
+            "max": 28
+          },
+          "scoreRegionAMs": {
+            "min": 10,
+            "median": 11,
+            "max": 15
+          },
+          "scoreRegionBMs": {
+            "min": 15,
+            "median": 17,
+            "max": 19.000000000000455
+          },
+          "scoreRegionCMs": {
+            "min": 12.000000000000455,
+            "median": 13,
+            "max": 19
+          },
+          "scoreRegionDMs": {
+            "min": 9.999999999999545,
+            "median": 11,
+            "max": 13
+          },
+          "scoreRegionRestoreMs": {
+            "min": 11,
+            "median": 17,
+            "max": 17.999999999999545
+          },
+          "scoreStoreMs": {
+            "min": 10,
+            "median": 10,
+            "max": 14
+          },
+          "scoreMonth2026_07Ms": {
+            "min": 11,
+            "median": 17,
+            "max": 20.000000000000455
+          },
+          "scoreMonthQuarterRestoreMs": {
+            "min": 12.999999999999545,
+            "median": 16,
+            "max": 20
+          },
+          "scoreDetailMs": {
+            "min": 60,
+            "median": 70.00000000000045,
+            "max": 72
+          },
+          "scoreReturnMs": {
+            "min": 913,
+            "median": 914.9999999999995,
+            "max": 916
+          },
+          "scoreContinuousReturnMs": {
+            "min": 916,
+            "median": 919,
+            "max": 931.9999999999995
+          },
+          "scoreChangedMs": {
+            "min": 921,
+            "median": 930.0000000000009,
+            "max": 933
+          },
+          "goldReturnMs": {
+            "min": 120.00000000000091,
+            "median": 123.00000000000091,
+            "max": 130
+          },
+          "goldSameVersionReloadMs": {
+            "min": 401,
+            "median": 407,
+            "max": 413
+          },
+          "goldChangedMs": {
+            "min": 403,
+            "median": 411,
+            "max": 431
+          }
+        },
+        "requests": {
+          "total": {
+            "min": 13,
+            "median": 13,
+            "max": 13
+          },
+          "conditional": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "full": {
+            "min": 7,
+            "median": 7,
+            "max": 7
+          },
+          "notModified": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "counts": {
+            "department_ops_read": {
+              "min": 3,
+              "median": 3,
+              "max": 3
+            },
+            "department_scores_read": {
+              "min": 4,
+              "median": 4,
+              "max": 4
+            },
+            "department_store_rules_read": {
+              "min": 2,
+              "median": 2,
+              "max": 2
+            },
+            "ptauth": {
+              "min": 4,
+              "median": 4,
+              "max": 4
+            }
+          }
+        },
+        "correctness": {
+          "allSamples": [
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            }
+          ],
+          "stable": true
+        },
+        "assetHashes": {
+          "department-ops.html": "71a800a8072638b67c697601072ab9ca324019e03fc42668f0d971a81b50cd45",
+          "department-ops.js": "b398d6a75fc723879ae72dcd35675cf04661c7ed858c5b5995745eea715970e6",
+          "department-scores.js": "71df8203ffa07dd8cb048a1d7f7d7cf1c5081471099ec4a183f2e3384bd7f83c",
+          "department-gold-monthly-ui.js": "5a081d9808afa730fe4e4aa691a87685c0b85bdce58777c08d11535a7bdf377b",
+          "store-rule-reminders.js": "6a39a7800299c42c1f48c63ae4e241726d74baba396deca41104ef41e1750e94",
+          "department-scores-core.js": "a990200987bf116967dff40e25d9bd7f1481b5f3801f393c6d1409150d1887a6",
+          "department-gold-monthly-core.js": "fe2f2dd62b9509f100f425e55b19f32ac75f4787cece5232c7ffcd1708f848a4"
+        }
+      }
+    },
+    "candidate": {
+      "chromium-desktop": {
+        "measuredAt": "2026-10-13T09:44:07.282Z",
+        "repetitions": 3,
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "syntheticNetworkMs": {
+          "auth": 80,
+          "scoreFull": 600,
+          "scoreVersion": 80,
+          "goldFull": 200,
+          "goldVersion": 80
+        },
+        "timings": {
+          "authMs": {
+            "min": 559.8000000119209,
+            "median": 563.1999999880791,
+            "max": 607.9000000357628
+          },
+          "goldInitialMs": {
+            "min": 565.6999999880791,
+            "median": 569.3000000119209,
+            "max": 613.8000000119209
+          },
+          "goldMonthMs": {
+            "min": 43.19999998807907,
+            "median": 45.39999997615814,
+            "max": 48.10000002384186
+          },
+          "goldRegionAMs": {
+            "min": 18.69999998807907,
+            "median": 19.200000047683716,
+            "max": 19.600000023841858
+          },
+          "goldRegionBMs": {
+            "min": 14.799999952316284,
+            "median": 16.69999998807907,
+            "max": 19.900000035762787
+          },
+          "goldRegionCMs": {
+            "min": 14.5,
+            "median": 15.100000023841858,
+            "max": 16.599999964237213
+          },
+          "goldRegionDMs": {
+            "min": 14.5,
+            "median": 16,
+            "max": 18.799999952316284
+          },
+          "goldRegionRestoreMs": {
+            "min": 14.600000023841858,
+            "median": 15.399999976158142,
+            "max": 16.19999998807907
+          },
+          "goldStoreMs": {
+            "min": 10.100000023841858,
+            "median": 10.100000023841858,
+            "max": 10.199999988079071
+          },
+          "goldMonth2026_08Ms": {
+            "min": 8.299999952316284,
+            "median": 8.5,
+            "max": 8.900000035762787
+          },
+          "goldMonthQuarterRestoreMs": {
+            "min": 8.100000023841858,
+            "median": 8.600000023841858,
+            "max": 9.5
+          },
+          "scoreFirstMs": {
+            "min": 918.6000000238419,
+            "median": 936.1000000238419,
+            "max": 939.7999999523163
+          },
+          "loadedStoreToGoldMs": {
+            "min": 20,
+            "median": 27.099999964237213,
+            "max": 30.80000001192093
+          },
+          "loadedGoldToStoreMs": {
+            "min": 147.60000002384186,
+            "median": 150.5,
+            "max": 151.89999997615814
+          },
+          "scoreMonthQuarterMs": {
+            "min": 17.30000001192093,
+            "median": 21.299999952316284,
+            "max": 22.30000001192093
+          },
+          "scoreRegionAMs": {
+            "min": 11.100000023841858,
+            "median": 13.700000047683716,
+            "max": 14.199999988079071
+          },
+          "scoreRegionBMs": {
+            "min": 9.5,
+            "median": 10.299999952316284,
+            "max": 12.5
+          },
+          "scoreRegionCMs": {
+            "min": 8.800000011920929,
+            "median": 9,
+            "max": 9.199999988079071
+          },
+          "scoreRegionDMs": {
+            "min": 8.600000023841858,
+            "median": 9.099999964237213,
+            "max": 10.300000011920929
+          },
+          "scoreRegionRestoreMs": {
+            "min": 8.5,
+            "median": 10,
+            "max": 10.199999988079071
+          },
+          "scoreStoreMs": {
+            "min": 8.800000011920929,
+            "median": 8.800000011920929,
+            "max": 13.899999976158142
+          },
+          "scoreMonth2026_07Ms": {
+            "min": 8.099999964237213,
+            "median": 9.199999988079071,
+            "max": 9.399999976158142
+          },
+          "scoreMonthQuarterRestoreMs": {
+            "min": 7.699999988079071,
+            "median": 7.899999976158142,
+            "max": 10
+          },
+          "scoreDetailMs": {
+            "min": 37,
+            "median": 45.39999997615814,
+            "max": 50.700000047683716
+          },
+          "scoreReturnMs": {
+            "min": 129.60000002384186,
+            "median": 131.69999998807907,
+            "max": 134.60000002384186
+          },
+          "scoreContinuousReturnMs": {
+            "min": 127.20000004768372,
+            "median": 128.69999998807907,
+            "max": 132.80000001192093
+          },
+          "scoreChangedMs": {
+            "min": 944.8999999761581,
+            "median": 945.9000000357628,
+            "max": 948.8000000119209
+          },
+          "goldReturnMs": {
+            "min": 125.30000001192093,
+            "median": 127.39999997615814,
+            "max": 127.60000002384186
+          },
+          "goldSameVersionReloadMs": {
+            "min": 144.5,
+            "median": 150.4000000357628,
+            "max": 158.60000002384186
+          },
+          "goldChangedMs": {
+            "min": 414.60000002384186,
+            "median": 415.30000001192093,
+            "max": 419.0999999642372
+          }
+        },
+        "requests": {
+          "total": {
+            "min": 14,
+            "median": 14,
+            "max": 14
+          },
+          "conditional": {
+            "min": 7,
+            "median": 7,
+            "max": 7
+          },
+          "full": {
+            "min": 4,
+            "median": 4,
+            "max": 4
+          },
+          "notModified": {
+            "min": 5,
+            "median": 5,
+            "max": 5
+          },
+          "counts": {
+            "department_ops_read": {
+              "min": 5,
+              "median": 5,
+              "max": 5
+            },
+            "department_scores_read": {
+              "min": 4,
+              "median": 4,
+              "max": 4
+            },
+            "department_store_rules_read": {
+              "min": 2,
+              "median": 2,
+              "max": 2
+            },
+            "ptauth": {
+              "min": 3,
+              "median": 3,
+              "max": 3
+            }
+          }
+        },
+        "correctness": {
+          "allSamples": [
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            }
+          ],
+          "stable": true
+        },
+        "assetHashes": {
+          "department-ops.html": "891e155acad75014f8e72e98f8dbc12e59a3f9b45ba6b437da783e1c303c8b59",
+          "session-read-manager.js": "c853a7c517ffac989f033cca67ce57f03c1a4ee94f89cc57479317bb08f8a6a4",
+          "department-ops.js": "15ea956c44a8ac1365f40bff6adc4139ca37218c8ede2c97e09a68865a014796",
+          "department-scores.js": "e266bf709dfd01d6fc65eec9aca8a2b0e09b819f4c27348e257532531253c1f5",
+          "department-gold-monthly-ui.js": "bf84fcdd56734d72c56dc97911cdf33fdfe9b3cbb40f80f5a2683cd4ec23d97e",
+          "store-rule-reminders.js": "6a39a7800299c42c1f48c63ae4e241726d74baba396deca41104ef41e1750e94",
+          "department-scores-core.js": "a990200987bf116967dff40e25d9bd7f1481b5f3801f393c6d1409150d1887a6",
+          "department-gold-monthly-core.js": "fe2f2dd62b9509f100f425e55b19f32ac75f4787cece5232c7ffcd1708f848a4"
+        }
+      },
+      "chromium-mobile": {
+        "measuredAt": "2026-10-13T09:44:25.666Z",
+        "repetitions": 3,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "syntheticNetworkMs": {
+          "auth": 80,
+          "scoreFull": 600,
+          "scoreVersion": 80,
+          "goldFull": 200,
+          "goldVersion": 80
+        },
+        "timings": {
+          "authMs": {
+            "min": 587,
+            "median": 606,
+            "max": 661.0000000000001
+          },
+          "goldInitialMs": {
+            "min": 593,
+            "median": 612,
+            "max": 666.0000000000001
+          },
+          "goldMonthMs": {
+            "min": 62,
+            "median": 64,
+            "max": 78
+          },
+          "goldRegionAMs": {
+            "min": 27,
+            "median": 28,
+            "max": 28
+          },
+          "goldRegionBMs": {
+            "min": 33,
+            "median": 34,
+            "max": 39
+          },
+          "goldRegionCMs": {
+            "min": 20,
+            "median": 30.000000000000114,
+            "max": 32
+          },
+          "goldRegionDMs": {
+            "min": 20.999999999999886,
+            "median": 21,
+            "max": 21
+          },
+          "goldRegionRestoreMs": {
+            "min": 28,
+            "median": 30,
+            "max": 33
+          },
+          "goldStoreMs": {
+            "min": 16.000000000000114,
+            "median": 28,
+            "max": 31
+          },
+          "goldMonth2026_08Ms": {
+            "min": 9,
+            "median": 12,
+            "max": 24.999999999999886
+          },
+          "goldMonthQuarterRestoreMs": {
+            "min": 10.000000000000114,
+            "median": 13,
+            "max": 14
+          },
+          "scoreFirstMs": {
+            "min": 915,
+            "median": 920,
+            "max": 940
+          },
+          "loadedStoreToGoldMs": {
+            "min": 29.000000000000455,
+            "median": 43,
+            "max": 46.99999999999977
+          },
+          "loadedGoldToStoreMs": {
+            "min": 141,
+            "median": 141,
+            "max": 149
+          },
+          "scoreMonthQuarterMs": {
+            "min": 26,
+            "median": 30,
+            "max": 31
+          },
+          "scoreRegionAMs": {
+            "min": 12,
+            "median": 12,
+            "max": 12.999999999999545
+          },
+          "scoreRegionBMs": {
+            "min": 19,
+            "median": 25.000000000000455,
+            "max": 25.999999999999545
+          },
+          "scoreRegionCMs": {
+            "min": 11,
+            "median": 13,
+            "max": 13.000000000000455
+          },
+          "scoreRegionDMs": {
+            "min": 10,
+            "median": 13,
+            "max": 23
+          },
+          "scoreRegionRestoreMs": {
+            "min": 13,
+            "median": 14,
+            "max": 20
+          },
+          "scoreStoreMs": {
+            "min": 10,
+            "median": 11,
+            "max": 12
+          },
+          "scoreMonth2026_07Ms": {
+            "min": 17,
+            "median": 22,
+            "max": 23
+          },
+          "scoreMonthQuarterRestoreMs": {
+            "min": 12,
+            "median": 12,
+            "max": 12.000000000000455
+          },
+          "scoreDetailMs": {
+            "min": 69,
+            "median": 73,
+            "max": 80
+          },
+          "scoreReturnMs": {
+            "min": 147,
+            "median": 150.99999999999955,
+            "max": 152
+          },
+          "scoreContinuousReturnMs": {
+            "min": 137,
+            "median": 146.00000000000045,
+            "max": 147.00000000000045
+          },
+          "scoreChangedMs": {
+            "min": 945.9999999999995,
+            "median": 947,
+            "max": 949
+          },
+          "goldReturnMs": {
+            "min": 126,
+            "median": 128,
+            "max": 141
+          },
+          "goldSameVersionReloadMs": {
+            "min": 142.9999999999991,
+            "median": 146,
+            "max": 156.0000000000009
+          },
+          "goldChangedMs": {
+            "min": 408.0000000000009,
+            "median": 421,
+            "max": 422
+          }
+        },
+        "requests": {
+          "total": {
+            "min": 14,
+            "median": 14,
+            "max": 14
+          },
+          "conditional": {
+            "min": 7,
+            "median": 7,
+            "max": 7
+          },
+          "full": {
+            "min": 4,
+            "median": 4,
+            "max": 4
+          },
+          "notModified": {
+            "min": 5,
+            "median": 5,
+            "max": 5
+          },
+          "counts": {
+            "department_ops_read": {
+              "min": 5,
+              "median": 5,
+              "max": 5
+            },
+            "department_scores_read": {
+              "min": 4,
+              "median": 4,
+              "max": 4
+            },
+            "department_store_rules_read": {
+              "min": 2,
+              "median": 2,
+              "max": 2
+            },
+            "ptauth": {
+              "min": 3,
+              "median": 3,
+              "max": 3
+            }
+          }
+        },
+        "correctness": {
+          "allSamples": [
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            }
+          ],
+          "stable": true
+        },
+        "assetHashes": {
+          "department-ops.html": "891e155acad75014f8e72e98f8dbc12e59a3f9b45ba6b437da783e1c303c8b59",
+          "session-read-manager.js": "c853a7c517ffac989f033cca67ce57f03c1a4ee94f89cc57479317bb08f8a6a4",
+          "department-ops.js": "15ea956c44a8ac1365f40bff6adc4139ca37218c8ede2c97e09a68865a014796",
+          "department-scores.js": "e266bf709dfd01d6fc65eec9aca8a2b0e09b819f4c27348e257532531253c1f5",
+          "department-gold-monthly-ui.js": "bf84fcdd56734d72c56dc97911cdf33fdfe9b3cbb40f80f5a2683cd4ec23d97e",
+          "store-rule-reminders.js": "6a39a7800299c42c1f48c63ae4e241726d74baba396deca41104ef41e1750e94",
+          "department-scores-core.js": "a990200987bf116967dff40e25d9bd7f1481b5f3801f393c6d1409150d1887a6",
+          "department-gold-monthly-core.js": "fe2f2dd62b9509f100f425e55b19f32ac75f4787cece5232c7ffcd1708f848a4"
+        }
+      },
+      "webkit-desktop": {
+        "measuredAt": "2026-10-13T09:44:44.772Z",
+        "repetitions": 3,
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "syntheticNetworkMs": {
+          "auth": 80,
+          "scoreFull": 600,
+          "scoreVersion": 80,
+          "goldFull": 200,
+          "goldVersion": 80
+        },
+        "timings": {
+          "authMs": {
+            "min": 590,
+            "median": 627,
+            "max": 630
+          },
+          "goldInitialMs": {
+            "min": 595,
+            "median": 632,
+            "max": 635
+          },
+          "goldMonthMs": {
+            "min": 64.00000000000011,
+            "median": 82,
+            "max": 97
+          },
+          "goldRegionAMs": {
+            "min": 30,
+            "median": 40,
+            "max": 42
+          },
+          "goldRegionBMs": {
+            "min": 19,
+            "median": 24.000000000000114,
+            "max": 47.000000000000114
+          },
+          "goldRegionCMs": {
+            "min": 19.000000000000114,
+            "median": 28.999999999999886,
+            "max": 44.999999999999886
+          },
+          "goldRegionDMs": {
+            "min": 18,
+            "median": 27,
+            "max": 53.999999999999886
+          },
+          "goldRegionRestoreMs": {
+            "min": 23.000000000000114,
+            "median": 26,
+            "max": 42
+          },
+          "goldStoreMs": {
+            "min": 12,
+            "median": 14,
+            "max": 43.999999999999886
+          },
+          "goldMonth2026_08Ms": {
+            "min": 8,
+            "median": 13,
+            "max": 39
+          },
+          "goldMonthQuarterRestoreMs": {
+            "min": 11,
+            "median": 14,
+            "max": 47
+          },
+          "scoreFirstMs": {
+            "min": 924.0000000000005,
+            "median": 939.9999999999998,
+            "max": 969
+          },
+          "loadedStoreToGoldMs": {
+            "min": 40.000000000000455,
+            "median": 52,
+            "max": 57
+          },
+          "loadedGoldToStoreMs": {
+            "min": 152,
+            "median": 163.99999999999955,
+            "max": 408
+          },
+          "scoreMonthQuarterMs": {
+            "min": 17,
+            "median": 19,
+            "max": 41
+          },
+          "scoreRegionAMs": {
+            "min": 13,
+            "median": 14,
+            "max": 27
+          },
+          "scoreRegionBMs": {
+            "min": 13,
+            "median": 38,
+            "max": 39
+          },
+          "scoreRegionCMs": {
+            "min": 10,
+            "median": 11,
+            "max": 12
+          },
+          "scoreRegionDMs": {
+            "min": 26,
+            "median": 35,
+            "max": 37
+          },
+          "scoreRegionRestoreMs": {
+            "min": 10,
+            "median": 10,
+            "max": 11.000000000000455
+          },
+          "scoreStoreMs": {
+            "min": 10,
+            "median": 15,
+            "max": 34
+          },
+          "scoreMonth2026_07Ms": {
+            "min": 10,
+            "median": 12,
+            "max": 24
+          },
+          "scoreMonthQuarterRestoreMs": {
+            "min": 10,
+            "median": 11,
+            "max": 22
+          },
+          "scoreDetailMs": {
+            "min": 65,
+            "median": 81,
+            "max": 88
+          },
+          "scoreReturnMs": {
+            "min": 150,
+            "median": 156.00000000000045,
+            "max": 162
+          },
+          "scoreContinuousReturnMs": {
+            "min": 132,
+            "median": 161,
+            "max": 162
+          },
+          "scoreChangedMs": {
+            "min": 934.9999999999995,
+            "median": 938,
+            "max": 946
+          },
+          "goldReturnMs": {
+            "min": 129,
+            "median": 160.0000000000009,
+            "max": 163
+          },
+          "goldSameVersionReloadMs": {
+            "min": 147,
+            "median": 156,
+            "max": 160
+          },
+          "goldChangedMs": {
+            "min": 409,
+            "median": 427.0000000000009,
+            "max": 455
+          }
+        },
+        "requests": {
+          "total": {
+            "min": 14,
+            "median": 14,
+            "max": 14
+          },
+          "conditional": {
+            "min": 7,
+            "median": 7,
+            "max": 7
+          },
+          "full": {
+            "min": 4,
+            "median": 4,
+            "max": 4
+          },
+          "notModified": {
+            "min": 5,
+            "median": 5,
+            "max": 5
+          },
+          "counts": {
+            "department_ops_read": {
+              "min": 5,
+              "median": 5,
+              "max": 5
+            },
+            "department_scores_read": {
+              "min": 4,
+              "median": 4,
+              "max": 4
+            },
+            "department_store_rules_read": {
+              "min": 2,
+              "median": 2,
+              "max": 2
+            },
+            "ptauth": {
+              "min": 3,
+              "median": 3,
+              "max": 3
+            }
+          }
+        },
+        "correctness": {
+          "allSamples": [
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            }
+          ],
+          "stable": true
+        },
+        "assetHashes": {
+          "department-ops.html": "891e155acad75014f8e72e98f8dbc12e59a3f9b45ba6b437da783e1c303c8b59",
+          "session-read-manager.js": "c853a7c517ffac989f033cca67ce57f03c1a4ee94f89cc57479317bb08f8a6a4",
+          "department-ops.js": "15ea956c44a8ac1365f40bff6adc4139ca37218c8ede2c97e09a68865a014796",
+          "department-scores.js": "e266bf709dfd01d6fc65eec9aca8a2b0e09b819f4c27348e257532531253c1f5",
+          "department-gold-monthly-ui.js": "bf84fcdd56734d72c56dc97911cdf33fdfe9b3cbb40f80f5a2683cd4ec23d97e",
+          "store-rule-reminders.js": "6a39a7800299c42c1f48c63ae4e241726d74baba396deca41104ef41e1750e94",
+          "department-scores-core.js": "a990200987bf116967dff40e25d9bd7f1481b5f3801f393c6d1409150d1887a6",
+          "department-gold-monthly-core.js": "fe2f2dd62b9509f100f425e55b19f32ac75f4787cece5232c7ffcd1708f848a4"
+        }
+      },
+      "webkit-mobile": {
+        "measuredAt": "2026-10-13T09:45:02.823Z",
+        "repetitions": 3,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "syntheticNetworkMs": {
+          "auth": 80,
+          "scoreFull": 600,
+          "scoreVersion": 80,
+          "goldFull": 200,
+          "goldVersion": 80
+        },
+        "timings": {
+          "authMs": {
+            "min": 581,
+            "median": 591,
+            "max": 608
+          },
+          "goldInitialMs": {
+            "min": 586,
+            "median": 597,
+            "max": 614
+          },
+          "goldMonthMs": {
+            "min": 60,
+            "median": 61,
+            "max": 71.00000000000011
+          },
+          "goldRegionAMs": {
+            "min": 24,
+            "median": 37,
+            "max": 40
+          },
+          "goldRegionBMs": {
+            "min": 26,
+            "median": 26,
+            "max": 29
+          },
+          "goldRegionCMs": {
+            "min": 20,
+            "median": 21,
+            "max": 22
+          },
+          "goldRegionDMs": {
+            "min": 21.000000000000114,
+            "median": 22,
+            "max": 35
+          },
+          "goldRegionRestoreMs": {
+            "min": 21.999999999999886,
+            "median": 26.000000000000114,
+            "max": 33
+          },
+          "goldStoreMs": {
+            "min": 14,
+            "median": 14,
+            "max": 21.999999999999886
+          },
+          "goldMonth2026_08Ms": {
+            "min": 9,
+            "median": 10,
+            "max": 24
+          },
+          "goldMonthQuarterRestoreMs": {
+            "min": 12,
+            "median": 12,
+            "max": 17
+          },
+          "scoreFirstMs": {
+            "min": 918,
+            "median": 933.0000000000002,
+            "max": 940.0000000000002
+          },
+          "loadedStoreToGoldMs": {
+            "min": 24,
+            "median": 37.99999999999977,
+            "max": 41
+          },
+          "loadedGoldToStoreMs": {
+            "min": 129,
+            "median": 133,
+            "max": 140
+          },
+          "scoreMonthQuarterMs": {
+            "min": 25,
+            "median": 25.999999999999545,
+            "max": 27
+          },
+          "scoreRegionAMs": {
+            "min": 11,
+            "median": 11,
+            "max": 22
+          },
+          "scoreRegionBMs": {
+            "min": 21,
+            "median": 21,
+            "max": 26
+          },
+          "scoreRegionCMs": {
+            "min": 11,
+            "median": 12,
+            "max": 13
+          },
+          "scoreRegionDMs": {
+            "min": 9.999999999999545,
+            "median": 13,
+            "max": 16
+          },
+          "scoreRegionRestoreMs": {
+            "min": 14,
+            "median": 19,
+            "max": 28
+          },
+          "scoreStoreMs": {
+            "min": 10,
+            "median": 10,
+            "max": 20
+          },
+          "scoreMonth2026_07Ms": {
+            "min": 10,
+            "median": 11,
+            "max": 16
+          },
+          "scoreMonthQuarterRestoreMs": {
+            "min": 12,
+            "median": 19,
+            "max": 19
+          },
+          "scoreDetailMs": {
+            "min": 64.99999999999955,
+            "median": 77,
+            "max": 85
+          },
+          "scoreReturnMs": {
+            "min": 149,
+            "median": 149,
+            "max": 153
+          },
+          "scoreContinuousReturnMs": {
+            "min": 131,
+            "median": 144,
+            "max": 147
+          },
+          "scoreChangedMs": {
+            "min": 942,
+            "median": 951,
+            "max": 978
+          },
+          "goldReturnMs": {
+            "min": 136,
+            "median": 142,
+            "max": 146
+          },
+          "goldSameVersionReloadMs": {
+            "min": 131,
+            "median": 143.0000000000009,
+            "max": 151
+          },
+          "goldChangedMs": {
+            "min": 413,
+            "median": 418,
+            "max": 421
+          }
+        },
+        "requests": {
+          "total": {
+            "min": 14,
+            "median": 14,
+            "max": 14
+          },
+          "conditional": {
+            "min": 7,
+            "median": 7,
+            "max": 7
+          },
+          "full": {
+            "min": 4,
+            "median": 4,
+            "max": 4
+          },
+          "notModified": {
+            "min": 5,
+            "median": 5,
+            "max": 5
+          },
+          "counts": {
+            "department_ops_read": {
+              "min": 5,
+              "median": 5,
+              "max": 5
+            },
+            "department_scores_read": {
+              "min": 4,
+              "median": 4,
+              "max": 4
+            },
+            "department_store_rules_read": {
+              "min": 2,
+              "median": 2,
+              "max": 2
+            },
+            "ptauth": {
+              "min": 3,
+              "median": 3,
+              "max": 3
+            }
+          }
+        },
+        "correctness": {
+          "allSamples": [
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            },
+            {
+              "goldPeople": 160,
+              "goldRegions": 4,
+              "scoreStores": 9,
+              "scoreChanged": true,
+              "goldChanged": true
+            }
+          ],
+          "stable": true
+        },
+        "assetHashes": {
+          "department-ops.html": "891e155acad75014f8e72e98f8dbc12e59a3f9b45ba6b437da783e1c303c8b59",
+          "session-read-manager.js": "c853a7c517ffac989f033cca67ce57f03c1a4ee94f89cc57479317bb08f8a6a4",
+          "department-ops.js": "15ea956c44a8ac1365f40bff6adc4139ca37218c8ede2c97e09a68865a014796",
+          "department-scores.js": "e266bf709dfd01d6fc65eec9aca8a2b0e09b819f4c27348e257532531253c1f5",
+          "department-gold-monthly-ui.js": "bf84fcdd56734d72c56dc97911cdf33fdfe9b3cbb40f80f5a2683cd4ec23d97e",
+          "store-rule-reminders.js": "6a39a7800299c42c1f48c63ae4e241726d74baba396deca41104ef41e1750e94",
+          "department-scores-core.js": "a990200987bf116967dff40e25d9bd7f1481b5f3801f393c6d1409150d1887a6",
+          "department-gold-monthly-core.js": "fe2f2dd62b9509f100f425e55b19f32ac75f4787cece5232c7ffcd1708f848a4"
+        }
+      }
+    }
+  }
+}

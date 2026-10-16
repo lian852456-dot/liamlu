@@ -9,7 +9,11 @@
     'AUTH_SESSION_REVOKED','AUTH_DEPLOYMENT_MISMATCH','AUTH_CREDENTIAL_INVALID',
     'SCORES_OWNER_DOMAIN_UNVERIFIED','SCORES_PROTECTED_FOLDER','SCORES_FOLDER_NOT_PRIVATE','SCORES_REVISION_OUTSIDE_PRIVATE_DOMAIN'
   ]);
-  let snapshot=null,pending=null,restore=null,busy=false,verifiedToken='',loaded=false,locked=false,returnAuth=null,authGeneration=0;
+  let snapshot=null,pending=null,restore=null,busy=false,verifiedToken='',loaded=false,locked=false,readFlight=null,readEpoch=0,readGeneration=0,needsValidation=false;
+  const reads=window.SessionReadManager.create({namespace:'department-scores',
+    getSession:()=>({identity:sessionStorage.getItem(KEY),expiresAt:window.DepartmentReadDeadline?.()||window.SessionReadManager.tokenDeadline(sessionStorage.getItem(KEY))}),
+    isAuthorized:()=>!locked&&!$('workspace').hidden&&!window.PortalLogout?.isLocked(),onExpired:()=>lock(),
+    onMetric:detail=>window.dispatchEvent(new CustomEvent('department-read-metric',{detail}))});
   window.DepartmentScoresWorkState=()=>({busy,unsaved:Boolean(pending||restore||$('scoreFile').files?.length)});
   const escape=v=>String(v==null?'':v).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const number=(v,places=2)=>v==null?'缺資料':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:places});
@@ -17,7 +21,7 @@
   const digest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(v=>v.toString(16).padStart(2,'0')).join('');
   const monthHash=m=>digest(new TextEncoder().encode(C.canonical(m)));
   function presentationAuthorized(){
-    if(!(loaded&&snapshot&&!locked&&!$('workspace').hidden&&verifiedToken&&sessionStorage.getItem(KEY)===verifiedToken&&!window.PortalLogout?.isLocked()))return false;
+    if(!(loaded&&snapshot&&!needsValidation&&!locked&&!$('workspace').hidden&&verifiedToken&&sessionStorage.getItem(KEY)===verifiedToken&&!window.PortalLogout?.isLocked()))return false;
     // Only the server-verified loaded session is eligible; decode its expiry at every boundary.
     try{const part=verifiedToken.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'),claims=JSON.parse(atob(part));return Number.isFinite(claims.exp)&&Date.now()<claims.exp*1000;}catch{return false;}
   }
@@ -26,15 +30,11 @@
     isAuthorized:presentationAuthorized,
     onStatus:v=>msg(v)
   });
-  function invalidateReturnAuth() {
-    authGeneration+=1;
-    const previous=returnAuth;returnAuth=null;
-    previous?.controller.abort();
-  }
   function clearPrivateData() {
-    invalidateReturnAuth();
+    readEpoch+=1;readGeneration++;reads.clear();needsValidation=false;readFlight=null;
     presentationExporter?.invalidate();
     snapshot=null;pending=null;restore=null;loaded=false;
+    setBusy(false);
     $('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;
     for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';
   }
@@ -85,18 +85,27 @@
     if(readonly&&failure?.name==='AbortError')throw new Error(authOnly?'督導驗證逾時，請重新登入。':'保存成績讀取逾時，已停止等待。請按「重新讀取保存版本」重試，無需重新選檔。');
     throw failure;
   }
-  function setBusy(value){busy=value;for(const id of ['scoreImport','scorePublish','scoreRefresh','scoreRestore','scoreHistoryPreview'])$(id).disabled=value;updatePublish();}
+  function setBusy(value,resume=true){busy=value;for(const id of ['scoreImport','scorePublish','scoreRefresh','scoreRestore','scoreHistoryPreview'])$(id).disabled=value;updatePublish();if(resume&&!value&&needsValidation&&!readFlight&&!document.hidden&&!$('storePanel').hidden&&!$('workspace').hidden)queueMicrotask(()=>load({refresh:true,verify:true}));}
   function selectedKeys(){return Array.from(document.querySelectorAll('[data-score-month]:checked')).map(e=>e.value);}
   function updatePublish(){ $('scorePublish').disabled=busy||!pending||!loaded||!selectedKeys().length||!$('scoreConfirm').checked; $('scoreRestore').disabled=busy||!restore||!$('scoreRestoreConfirm').checked; }
-  async function read() {
+  async function read({refresh=false,full=false,verifiedReturn=false}={}) {
     presentationExporter?.invalidate();
-    snapshot=null;loaded=false;$('scoreDashboard').hidden=true;
-    const result=await request('department_scores_read');
-    if(!Array.isArray(result.months)||!Number.isInteger(result.generation))throw new Error('持久成績資料格式不完整');
-    result.months=result.months.map(slot=>({...slot,month:C.validateMonth(slot.month)}));
-    snapshot=result;loaded=true;initializeFilters();render();return result;
+    loaded=false;$('scoreDashboard').hidden=true;
+    const result=await reads.read('scores',{refresh,full,
+      fetch:({knownVersion,signal})=>request('department_scores_read',{knownVersion},signal),
+      version:r=>r.readVersion??r.generation,
+      validate:r=>{if(!Array.isArray(r.months)||!Number.isInteger(r.generation))throw new Error('持久成績資料格式不完整');return {...r,months:r.months.map(slot=>({...slot,month:C.validateMonth(slot.month)}))};}});
+    const unchanged=snapshot===result;snapshot=result;loaded=true;if(verifiedReturn)needsValidation=false;
+    if(!unchanged){initializeFilters();render();}else{$('scoreDashboard').hidden=!snapshot.available;if(pending)$('scorePreview').hidden=false;if(restore)$('scoreRestorePreview').hidden=false;}
+    if(needsValidation)$('scoreDashboard').hidden=true;return result;
   }
-  async function load(){if(busy)return;setBusy(true);msg('正在讀取已保存成績…');try{await read();pending=null;restore=null;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;msg(snapshot.available?'已讀取私有保存版本；更新資料時才需要選檔。':'尚未初始化成績。請選原檔、預覽並確認保存。');}catch(e){msg(e.message,true);}finally{setBusy(false);}}
+  function suspend(cancel=false){needsValidation=true;if(cancel&&readFlight){readGeneration++;reads.cancel('scores');setBusy(false);readFlight=null;}presentationExporter?.invalidate();$('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;}
+  function load({refresh=false,verify=false}={}){
+    if(readFlight)return readFlight.promise;if(busy)return Promise.resolve();
+    const epoch=readEpoch,generation=readGeneration,flight={};readFlight=flight;setBusy(true);msg(verify?'正在核對權限與成績版本…':'正在讀取已保存成績…');
+    flight.promise=(async()=>{try{const beforeVersion=snapshot?.readVersion??snapshot?.generation;await read({refresh,verifiedReturn:true});if(epoch!==readEpoch||generation!==readGeneration)return;if(!verify||beforeVersion!==(snapshot.readVersion??snapshot.generation)){pending=null;restore=null;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;}msg(snapshot.available?'已讀取私有保存版本；更新資料時才需要選檔。':'尚未初始化成績。請選原檔、預覽並確認保存。');}catch(e){if(epoch!==readEpoch||generation!==readGeneration||e.code==='SESSION_READ_CANCELLED')return;loaded=false;reads.clear();suspend();msg(e.message+'；請重新讀取以核對權限與版本。',true);}finally{if(readFlight===flight){readFlight=null;setBusy(false,false);}}})();return flight.promise;
+  }
+  window.DepartmentScoresReadSession={suspend,revalidate:()=>{observeAuth();if(busy&&!readFlight){const epoch=readEpoch;return request('ptauth').catch(e=>{if(epoch===readEpoch){suspend();msg(e.message+'；請重新核對權限。',true);}});}return load({refresh:true,verify:true});},activate:()=>{observeAuth();return needsValidation?load({refresh:true,verify:true}):Promise.resolve();},clear:clearPrivateData};
   function selectedMonths(){return snapshot?C.periodMonths(snapshot.months.map(s=>s.month),$('scorePeriod').value):[];}
   function initializeFilters(){
     const months=snapshot.months.map(s=>s.month),old=$('scorePeriod').value,oldRegion=$('scoreRegion').value;
@@ -144,44 +153,50 @@
   async function preview(){
     if(!loaded)return msg('請先成功讀取保存版本，才能比較更新。',true);
     const file=$('scoreFile').files?.[0];if(!file)return msg('請先選擇固定格式的店務 XLSX。',true);
+    const epoch=readEpoch,token=verifiedToken;
     pending=null;restore=null;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;setBusy(true);msg('正在本機讀取快取值與比較差異…');
     try{
       if(!/\.xlsx$/i.test(file.name)||file.size>10*1024*1024)throw new Error('請選擇10 MB以內的原格式 XLSX');
       const bytes=await file.arrayBuffer(),sourceHash=await digest(bytes),workbook=XLSX.read(bytes,{type:'array',cellFormula:true});
+      if(epoch!==readEpoch||sessionStorage.getItem(KEY)!==token||$('workspace').hidden)return;
       const parsed=C.parseWorkbook(workbook,{year:$('scoreYear').value.trim()});
       pending={...parsed,sourceHash,sourceName:file.name,expectedGeneration:snapshot.generation,requestId:crypto.randomUUID()};
       const items=await Promise.all(parsed.months.map(async m=>{const before=snapshot.months.find(s=>s.month.monthKey===m.monthKey);return {month:m,before,changed:!before||before.active.contentHash!==await monthHash(m),diff:C.diff(before?.month,m)};}));
+      if(epoch!==readEpoch||sessionStorage.getItem(KEY)!==token||$('workspace').hidden)return;
       pending.items=items;
       $('scoreConfirm').checked=false;
       $('scorePreviewMeta').textContent=`${file.name}｜可更新 ${items.length} 月｜停止 ${parsed.errors.length} 月｜${parsed.referenceNote||'以月份頁籤為準'}。未選月份及未上傳舊月份均保留。`;
       $('scoreMonthChoices').innerHTML=items.map(i=>`<label><input type="checkbox" data-score-month value="${i.month.monthKey}" ${i.changed?'checked':''}>${i.month.monthKey}｜${i.before?(i.changed?'更正版本':'相同資料，略過'):'新增月份'}｜${i.month.records.length}店｜${i.diff.length}欄差異</label>`).join('');
       $('scoreErrors').textContent=parsed.errors.map(e=>e.monthKey+'：'+e.message).concat(parsed.months.flatMap(m=>m.warnings)).join('\n');
       $('scoreDiff').innerHTML=items.map(i=>`<details><summary>${i.month.monthKey}｜平均分 ${number(C.summarize(i.before?.month.records||[]).mean)} → ${number(C.summarize(i.month.records).mean)}｜原缺失 ${number(C.summarize(i.before?.month.records||[]).defects)} → ${number(C.summarize(i.month.records).defects)}｜原扣分 ${number(C.summarize(i.before?.month.records||[]).deduction)} → ${number(C.summarize(i.month.records).deduction)}</summary><div class="table-scroll"><table><thead><tr><th>店點</th><th>變更欄位</th><th>目前</th><th>新版</th></tr></thead><tbody>${i.diff.map(d=>`<tr><td>${escape(d.store)}</td><td class="score-long">${escape(({score:'原成績 G',defects:'原缺失 E',deduction:'原扣分 F',nationalRank:'全國排名 H',region:'部區',sourceStore:'來源店名'}[d.field])||d.field)}</td><td>${escape(d.before??'缺資料')}</td><td>${escape(d.after??'缺資料')}</td></tr>`).join('')}</tbody></table></div></details>`).join('');
-      $('scorePreview').hidden=false;msg(items.some(i=>i.changed)?'預覽完成。核對差異並勾選確認後，才會持久保存。':'檔案內容與已保存月份相同，無需重複保存。');
-    }catch(e){pending=null;msg(e.message,true);}finally{setBusy(false);}
+      $('scorePreview').hidden=needsValidation;msg(items.some(i=>i.changed)?'預覽完成。核對差異並勾選確認後，才會持久保存。':'檔案內容與已保存月份相同，無需重複保存。');
+    }catch(e){if(epoch===readEpoch){pending=null;msg(e.message,true);}}finally{if(epoch===readEpoch)setBusy(false);}
   }
   async function publish(){
     if(busy||!pending||!$('scoreConfirm').checked||!selectedKeys().length)return;
-    const keys=selectedKeys(),intended=pending.months.filter(m=>keys.includes(m.monthKey));setBusy(true);msg('正在保存勾選月份並讀回對帳…');
+    const epoch=readEpoch,keys=selectedKeys(),intended=pending.months.filter(m=>keys.includes(m.monthKey));setBusy(true);msg('正在保存勾選月份並讀回對帳…');
+    reads.invalidate('scores');
     try{
       const receipt=await request('department_scores_publish',{contract:C.CONTRACT,confirm:true,requestId:pending.requestId,expectedGeneration:pending.expectedGeneration,selectedMonthKeys:keys,months:intended,sourceName:pending.sourceName,sourceHash:pending.sourceHash});
-      await read();
+      await read({refresh:true,full:true});
+      if(epoch!==readEpoch)return;
       if(snapshot.generation!==receipt.generation||intended.some(m=>C.canonical(snapshot.months.find(s=>s.month.monthKey===m.monthKey)?.month)!==C.canonical(m)))throw new Error('持久讀回與預覽不一致，請先重新讀取保存版本');
       pending=null;$('scorePreview').hidden=true;$('scoreFile').value='';msg(receipt.deduplicated?'相同資料已去重，保存版本未增加。':'保存及逐項讀回對帳完成；重新登入即可查看。');
-    }catch(e){pending=null;$('scorePublish').disabled=true;msg(e.message+'。若回應逾時，請先按「重新讀取保存版本」確認結果，再做新版預覽。',true);}finally{setBusy(false);}
+    }catch(e){if(epoch===readEpoch){pending=null;$('scorePublish').disabled=true;msg(e.message+'。若回應逾時，請先按「重新讀取保存版本」確認結果，再做新版預覽。',true);}}finally{if(epoch===readEpoch)setBusy(false);}
   }
   async function previewHistory(){
-    const value=$('scoreHistory').value;if(!value||busy)return;setBusy(true);restore=null;$('scoreRestorePreview').hidden=true;
-    try{const [monthKey,revision]=value.split('|'),result=await request('department_scores_history_read',{monthKey,revision});const month=C.validateMonth(result.month),active=snapshot.months.find(s=>s.month.monthKey===monthKey);const changes=C.diff(active.month,month);$('scoreRestoreDiff').innerHTML='<div class="table-scroll"><table><thead><tr><th>店點</th><th>變更欄位</th><th>目前</th><th>歷史版本</th></tr></thead><tbody>'+changes.map(d=>`<tr><td>${escape(d.store)}</td><td class="score-long">${escape(d.field)}</td><td>${escape(d.before??'缺資料')}</td><td>${escape(d.after??'缺資料')}</td></tr>`).join('')+'</tbody></table></div>';restore={month,monthKey,revision,expectedGeneration:result.generation,requestId:crypto.randomUUID()};$('scoreRestoreConfirm').checked=false;$('scoreRestoreMeta').textContent=`${monthKey}｜回復到 ${result.active.publishedAt} ${result.active.sourceName}｜${C.diff(active.month,month).length}欄差異；目前版本保留在歷史。`;$('scoreRestorePreview').hidden=false;msg('已讀取歷史版本，請核對後確認回復。');}catch(e){msg(e.message,true);}finally{setBusy(false);}
+    const value=$('scoreHistory').value;if(!value||busy)return;const epoch=readEpoch;setBusy(true);restore=null;$('scoreRestorePreview').hidden=true;
+    try{const [monthKey,revision]=value.split('|'),result=await request('department_scores_history_read',{monthKey,revision});if(epoch!==readEpoch)return;const month=C.validateMonth(result.month),active=snapshot.months.find(s=>s.month.monthKey===monthKey);const changes=C.diff(active.month,month);$('scoreRestoreDiff').innerHTML='<div class="table-scroll"><table><thead><tr><th>店點</th><th>變更欄位</th><th>目前</th><th>歷史版本</th></tr></thead><tbody>'+changes.map(d=>`<tr><td>${escape(d.store)}</td><td class="score-long">${escape(d.field)}</td><td>${escape(d.before??'缺資料')}</td><td>${escape(d.after??'缺資料')}</td></tr>`).join('')+'</tbody></table></div>';restore={month,monthKey,revision,expectedGeneration:result.generation,requestId:crypto.randomUUID()};$('scoreRestoreConfirm').checked=false;$('scoreRestoreMeta').textContent=`${monthKey}｜回復到 ${result.active.publishedAt} ${result.active.sourceName}｜${C.diff(active.month,month).length}欄差異；目前版本保留在歷史。`;$('scoreRestorePreview').hidden=false;msg('已讀取歷史版本，請核對後確認回復。');}catch(e){if(epoch===readEpoch)msg(e.message,true);}finally{if(epoch===readEpoch)setBusy(false);}
   }
   async function restoreHistory(){
-    if(!restore||busy||!$('scoreRestoreConfirm').checked)return;const intended=restore.month;setBusy(true);msg('正在回復並讀回對帳…');
-    try{const receipt=await request('department_scores_restore',{confirm:true,requestId:restore.requestId,expectedGeneration:restore.expectedGeneration,monthKey:restore.monthKey,revision:restore.revision});await read();if(snapshot.generation!==receipt.generation||C.canonical(snapshot.months.find(s=>s.month.monthKey===intended.monthKey)?.month)!==C.canonical(intended))throw new Error('回復讀回不一致');restore=null;$('scoreRestorePreview').hidden=true;msg('歷史回復與讀回對帳完成。');}catch(e){restore=null;msg(e.message+'；請先重新讀取保存版本。',true);}finally{setBusy(false);}
+    if(!restore||busy||!$('scoreRestoreConfirm').checked)return;const epoch=readEpoch,intended=restore.month;setBusy(true);msg('正在回復並讀回對帳…');
+    reads.invalidate('scores');
+    try{const receipt=await request('department_scores_restore',{confirm:true,requestId:restore.requestId,expectedGeneration:restore.expectedGeneration,monthKey:restore.monthKey,revision:restore.revision});if(epoch!==readEpoch)return;await read({refresh:true,full:true});if(epoch!==readEpoch)return;if(snapshot.generation!==receipt.generation||C.canonical(snapshot.months.find(s=>s.month.monthKey===intended.monthKey)?.month)!==C.canonical(intended))throw new Error('回復讀回不一致');restore=null;$('scoreRestorePreview').hidden=true;msg('歷史回復與讀回對帳完成。');}catch(e){if(epoch===readEpoch){restore=null;msg(e.message+'；請先重新讀取保存版本。',true);}}finally{if(epoch===readEpoch)setBusy(false);}
   }
-  function exportData(json){const months=selectedMonths(),data=C.brief(months,filters());if(json){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=window.URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='北一二部_店務簡報資料.json';a.click();setTimeout(()=>window.URL.revokeObjectURL(url),1000);return;}
+  function exportData(json){if(!presentationAuthorized())return msg('請先完成權限與資料版本核對。',true);const months=selectedMonths(),data=C.brief(months,filters());if(json){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=window.URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='北一二部_店務簡報資料.json';a.click();setTimeout(()=>window.URL.revokeObjectURL(url),1000);return;}
     const workbook=XLSX.utils.book_new(),sheet=[['月份','部區','店點','原成績G','原缺失E','原扣分F','全國排名H','原回收缺失','來源工作表','成績儲存格'],...data.records.map(r=>[r.monthKey,r.region,r.store,r.score,r.defects,r.deduction,r.nationalRank,r.recycleDefects,months.find(m=>m.monthKey===r.monthKey).sheetName,r.source.score.cell])];
     XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet(sheet),'門市月成績');XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([['月份','部區','店點','分類','原項目','原值','原值狀態','單位','來源儲存格'],...data.records.flatMap(r=>r.metrics.map(m=>[r.monthKey,r.region,r.store,m.group,m.label,m.value,m.status,m.unit,months.find(v=>v.monthKey===r.monthKey).sheetName+'!'+m.cell]))]),'原缺失項目');XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([['限制'],...data.limitations.map(v=>[v])]),'說明');XLSX.writeFile(workbook,'北一二部_店務成績.xlsx');}
-  $('scoreImport').addEventListener('click',preview);$('scorePublish').addEventListener('click',publish);$('scoreRefresh').addEventListener('click',load);$('scoreConfirm').addEventListener('change',updatePublish);$('scoreMonthChoices').addEventListener('change',updatePublish);
+  $('scoreImport').addEventListener('click',preview);$('scorePublish').addEventListener('click',publish);$('scoreRefresh').addEventListener('click',()=>load({refresh:true}));$('scoreConfirm').addEventListener('change',updatePublish);$('scoreMonthChoices').addEventListener('change',updatePublish);
   $('scoreFile').addEventListener('change',()=>{pending=null;$('scorePreview').hidden=true;updatePublish();});$('scoreYear').addEventListener('input',()=>{pending=null;$('scorePreview').hidden=true;updatePublish();});
   $('scorePeriod').addEventListener('change',()=>{presentationExporter?.invalidate();updateStores();render();});$('scoreRegion').addEventListener('change',()=>{presentationExporter?.invalidate();updateStores();render();});$('scoreStore').addEventListener('change',()=>{presentationExporter?.invalidate();render();});
   $('scoreBody').addEventListener('click',e=>{const b=e.target.closest('[data-score-detail]');if(b)detail(b.dataset.scoreDetail);});
@@ -199,23 +214,11 @@
     if(verifiedToken&&!token){lock();return;}
     if(token&&token!==verifiedToken){clearPrivateData();verifiedToken=token;locked=false;}
     // Gold is the initial tab. Read scores only when the user opens the store panel.
-    if(token&&!loaded&&!busy&&!$('storePanel').hidden&&!document.hidden)load();
+    if(token&&!loaded&&!busy&&!needsValidation&&!$('storePanel').hidden&&!document.hidden)load();
   }
   const authObserver=new MutationObserver(observeAuth);authObserver.observe($('workspace'),{attributes:true,attributeFilter:['hidden']});authObserver.observe($('storePanel'),{attributes:true,attributeFilter:['hidden']});
-  window.addEventListener('pageshow',observeAuth);document.addEventListener('visibilitychange',()=>{
-    if(document.hidden)return;
-    observeAuth();
-    if(!verifiedToken||$('workspace').hidden)return;
-    if(!$('storePanel').hidden){load();return;}
-    // Preserve return-time revocation checks without transferring hidden score data.
-    if(returnAuth?.token===verifiedToken&&returnAuth.generation===authGeneration)return;
-    const current={token:verifiedToken,generation:authGeneration,controller:new AbortController()};
-    returnAuth=current;
-    current.promise=request('ptauth',undefined,current.controller.signal).catch(e=>{
-      if(returnAuth===current&&authGeneration===current.generation&&verifiedToken===current.token&&!$('workspace').hidden)lock(e.message);
-    }).finally(()=>{if(returnAuth===current)returnAuth=null;});
-  });
-  window.addEventListener('portal-before-logout',()=>{invalidateReturnAuth();presentationExporter?.invalidate();});
+  // The shared page controller coalesces return events and selects the visible domain.
+  window.addEventListener('portal-before-logout',()=>{clearPrivateData();verifiedToken='';locked=true;});
   window.addEventListener('department-session-cleared',()=>lock('驗證已結束，請重新登入。'));
   setInterval(()=>{if(!verifiedToken)return;if(sessionStorage.getItem(KEY)!==verifiedToken)return lock('督導驗證已變更，請重新登入。');try{const part=verifiedToken.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'),claims=JSON.parse(atob(part));if(Number.isFinite(claims.exp)&&claims.exp*1000<=Date.now())lock();}catch{}},10000);
   observeAuth();updatePublish();

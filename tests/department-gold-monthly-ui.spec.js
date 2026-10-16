@@ -12,8 +12,9 @@ function replacement(monthNumber=9){
   const rows=[[`資料日期 : 2026/${number}/01~${number}/${lastDay}`,...Array(13).fill(null),'SPE加分總計','金牌'],[`Y26/${monthNumber}_北一二(全員)`],['部','區域','區域','督導區','營業店點代碼','服務中心','店內職稱','員編','員工姓名','職級','正/派','9M(含)以上','其他','店型',null,null,'活動金牌'],['北一區','北一二','北一二區','北一二B','SYN-B','合成二店','合成職稱','DEMO001','示*甲',null,null,null,null,null,999,20,999],['北一區','北一二','北一二區','北一二',null,'統計',null,null,null,null,null,null,null,null,999,20]];
   const wb=X.utils.book_new();X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet(rows),'動員(全員)');return {name:'synthetic.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from(X.write(wb,{type:'buffer',bookType:'xlsx'}))};
 }
-async function setup(page,{empty=false,planRouteFailures=0,loseCommitResponse=false}={}){
+async function setup(page,{empty=false,planRouteFailures=0,loseCommitResponse=false,holdCommit=false}={}){
   let revision='synthetic-r1',counter=0;
+  let releaseCommit;const commitGate=new Promise(resolve=>{releaseCommit=resolve;});
   const all=empty?[]:[month('2026-06',[staff(80)]),month('2026-07',[staff(40)],true),month('2026-08',[staff(70,{region:'北一二B',storeCode:'SYN-B',store:'合成二店'})],true),month('2026-09',[staff(10,{region:'北一二B',storeCode:'SYN-B',store:'合成二店'}),staff(2,{employeeId:'DEMO002',employeeName:'示*乙',storeCode:'SYN-C',store:'合成三店'})])];
   const versions=new Map(all.map(m=>[m.versionId,m])),history={},operations={},calls=[];
   for(const m of all)history[m.monthKey]=[{versionId:m.versionId,cutoff:m.dateRange.cutoff,total:m.validation.total,status:m.settlementStatus,sourceName:m.sourceName}];
@@ -29,6 +30,7 @@ async function setup(page,{empty=false,planRouteFailures=0,loseCommitResponse=fa
       const restoring=p.mode.startsWith('restore'),incoming=restoring?[versions.get(p.versionId)]:p.months;
       if(p.mode.endsWith('plan'))result={planReceipt:'synthetic-plan',changes:incoming.map(m=>{const old=all.find(s=>s.monthKey===m.monthKey);return {monthKey:m.monthKey,beforeTotal:old?.validation.total??null,total:m.validation.total,changedPeople:C.diff(old,m).length,older:!!old&&m.dateRange.cutoff<old.dateRange.cutoff,finalDowngrade:old?.settlementStatus==='final'&&m.settlementStatus!=='final'};}),differences:incoming.map(m=>({monthKey:m.monthKey,rows:C.diff(all.find(s=>s.monthKey===m.monthKey),m)}))};
       else {
+        if(holdCommit)await commitGate;
         for(const m of incoming){const index=all.findIndex(x=>x.monthKey===m.monthKey),saved=restoring?m:{...m,versionId:'synthetic-new-'+(++counter)};if(index<0)all.push(saved);else all[index]=saved;versions.set(saved.versionId,saved);if(!restoring)(history[m.monthKey]||=[]).push({versionId:saved.versionId,cutoff:m.dateRange.cutoff,total:m.validation.total,status:m.settlementStatus,sourceName:m.sourceName});}
         revision='synthetic-r'+(++counter+1);operations[p.operationId]={revision,operationId:p.operationId};result={result:'committed',...read(p.operationId)};
         if(loseCommitResponse){loseCommitResponse=false;result={message:'unknown patrol action'};}
@@ -38,8 +40,16 @@ async function setup(page,{empty=false,planRouteFailures=0,loseCommitResponse=fa
   });
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(baseURL+'/department-ops.html');await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#goldMessage')).not.toContainText('正在');
-  return {calls,errors,all,failNextPlan:()=>{planRouteFailures++;}};
+  return {calls,errors,all,releaseCommit,failNextPlan:()=>{planRouteFailures++;}};
 }
+test('reload and return during gold commit preserve single write and complete receipt readback',async({page})=>{
+ const s=await setup(page,{holdCommit:true});await page.locator('#goldFile').setInputFiles(replacement());await page.locator('#goldImport').click();await page.locator('#publishGold').click();await page.locator('#monthlyCommit').click();
+ await expect.poll(()=>s.calls.filter(p=>p.mode==='commit').length).toBe(1);await page.locator('#monthlyReload').click();await expect(page.locator('#goldMessage')).toContainText('等待完整讀回');
+ const authBefore=s.calls.filter(p=>p.action==='ptauth').length;
+ await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));});await expect.poll(()=>s.calls.filter(p=>p.action==='ptauth').length).toBe(authBefore+1);
+ s.releaseCommit();await expect(page.locator('#publishMessage')).toContainText('逐值讀回');await expect(page.locator('#monthlyCommit')).toBeEnabled();await expect(page.locator('#goldDashboard')).toBeVisible();
+ expect(s.calls.filter(p=>p.mode==='commit')).toHaveLength(1);const readbacks=s.calls.filter(p=>p.action==='department_ops_read'&&p.operationId);expect(readbacks).toHaveLength(1);expect(readbacks[0].knownVersion).toBeUndefined();await expect(page.locator('#goldImport')).toBeEnabled();expect(s.errors).toEqual([]);
+});
 test('July receipt recovery followed by an August route failure keeps writes single and preserves Q2',async({page})=>{
   const state=await setup(page,{loseCommitResponse:true});
   await page.locator('#goldFile').setInputFiles(replacement(7));await page.click('#goldImport');await page.click('#publishGold');await page.check('#monthlyRegression');await page.click('#monthlyCommit');

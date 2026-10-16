@@ -16,6 +16,7 @@
   let patrolToken = '';
   let sessionExpiresAt = 0;
   let accessTimer;
+  let sessionEpoch=0,authController=null,returnFlight=null;
 
   const $ = (id) => document.getElementById(id);
   const escapeHtml = (value) => String(value == null ? '' : value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
@@ -29,8 +30,10 @@
 
   const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-  async function authRequestOnce(payload) {
+  async function authRequestOnce(payload, signal) {
     const controller = new AbortController();
+    const abort=()=>controller.abort();signal?.addEventListener('abort',abort,{once:true});
+    if(signal?.aborted)controller.abort();
     const timer = setTimeout(() => controller.abort(), 20000);
     try {
       const requestURL = new URL(PATROL_URL);
@@ -46,6 +49,8 @@
         signal: controller.signal
       });
       if (!response.ok) {
+        const denied=await response.json().catch(()=>null);
+        if(['unauthorized','forbidden','denied'].includes(String(denied?.status||'').trim().toLowerCase())||[denied?.code,denied?.reason,denied?.authReason,denied?.auth?.reason,denied?.message].some(v=>typeof v==='string'&&(v.trim().toLowerCase()==='unauthorized'||/^(AUTH_|GOLD_STORAGE_)/.test(v.trim().toUpperCase()))))return denied;
         const error = new Error(`驗證服務 HTTP ${response.status}`);
         error.httpStatus = response.status;
         throw error;
@@ -53,10 +58,11 @@
       return await response.json();
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener('abort',abort);
     }
   }
 
-  async function authRequest(payload) {
+  async function authRequest(payload, signal) {
     // Apps Script 偶爾會在 doPost 已完成後，於回傳重新導向階段短暫落成 404。
     // 驗證、讀取及不寫入資料的月報差異預覽允許有限重試。
     // 正式金牌同步等寫入動作絕不自動重送，逾時後由 UI 查保存紀錄。
@@ -65,8 +71,9 @@
     const maxAttempts = canRetry ? 3 : 1;
     let lastError;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      if(signal?.aborted)throw new DOMException('讀取已取消','AbortError');
       try {
-        const result = await authRequestOnce(payload);
+        const result = await authRequestOnce(payload,signal);
         if (canRetry && result?.status === 'error' && result.message === 'unknown patrol action') {
           const error = new Error('資料服務回應未對應此次 POST');
           error.routeResponseMismatch = true;
@@ -76,7 +83,7 @@
       } catch (error) {
         lastError = error;
         const retryable = error?.routeResponseMismatch || AUTH_RETRY_STATUSES.has(Number(error?.httpStatus)) || ['AbortError', 'TypeError'].includes(error?.name);
-        if (!canRetry || !retryable || attempt === maxAttempts) break;
+        if (signal?.aborted || !canRetry || !retryable || attempt === maxAttempts) break;
         await wait(attempt === 1 ? 1200 : 2500);
       }
     }
@@ -88,7 +95,9 @@
   }
 
   async function unlockWithPasscode(passcode) {
-    const result = await authRequest({ action: 'ptauth', key: passcode });
+    const epoch=++sessionEpoch;authController?.abort();const controller=new AbortController();authController=controller;
+    const result = await authRequest({ action: 'ptauth', key: passcode },controller.signal);
+    if(epoch!==sessionEpoch||controller.signal.aborted)return;
     if (result?.status !== 'ok' || !result.token) throw new Error('通行碼驗證未成功');
     patrolToken = result.token;
     sessionStorage.setItem(SESSION_KEY, patrolToken);
@@ -100,14 +109,17 @@
   async function restoreSession() {
     const token = sessionStorage.getItem(SESSION_KEY);
     if (!token) return;
+    const epoch=++sessionEpoch;authController?.abort();const controller=new AbortController();authController=controller;
     try {
-      const result = await authRequest({ action: 'ptauth', token });
+      const result = await authRequest({ action: 'ptauth', token },controller.signal);
+      if(epoch!==sessionEpoch||controller.signal.aborted||sessionStorage.getItem(SESSION_KEY)!==token)return;
       if (result?.status !== 'ok' || !result.token) throw new Error('expired');
       patrolToken = result.token;
       sessionStorage.setItem(SESSION_KEY, patrolToken);
       showSessionDeadline(result);
       await unlockWorkspace();
     } catch {
+      if(epoch!==sessionEpoch||controller.signal.aborted)return;
       sessionStorage.removeItem(SESSION_KEY);
       setMessage('authMessage', '先前督導登入無法恢復，請重新驗證；已保存資料仍在私有資料域。', 'error');
     }
@@ -117,6 +129,8 @@
     // Display only a server-returned deadline; this UI never issues or extends a session.
     sessionExpiresAt = Number(result.expiresAt) > 0 ? Number(result.expiresAt) * 1000
       : Number(result.expiresIn) > 0 ? Date.now() + Number(result.expiresIn) * 1000 : 0;
+    const tokenExpiry=window.SessionReadManager.tokenDeadline(patrolToken);
+    if(tokenExpiry)sessionExpiresAt=sessionExpiresAt?Math.min(sessionExpiresAt,tokenExpiry):tokenExpiry;
     clearInterval(accessTimer);
     $('departmentAccess').hidden = false;
     updateSessionDeadline();
@@ -129,6 +143,7 @@
       return;
     }
     const remaining = sessionExpiresAt - Date.now();
+    if(remaining<=0){lockSharedWorkspace();return;}
     const minutes = Math.max(0, Math.ceil(remaining / 60000));
     const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} 小時${minutes % 60 ? ` ${minutes % 60} 分鐘` : ''}` : `${minutes} 分鐘`;
     const deadline = new Date(sessionExpiresAt).toLocaleTimeString('zh-TW', {timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit'});
@@ -146,12 +161,27 @@
     return {busy:gold.busy || scores.busy,unsaved:gold.unsaved || scores.unsaved};
   }
   async function unlockWorkspace() {
+    if(!patrolToken||sessionStorage.getItem(SESSION_KEY)!==patrolToken||(sessionExpiresAt&&sessionExpiresAt<=Date.now())){lockSharedWorkspace();return;}
     $('authPanel').hidden = true;
     $('workspace').hidden = false;
     $('securityBadge').textContent = '督導權限已驗證';
     $('securityBadge').classList.add('ok');
     if (monthlyUI) await monthlyUI.load();
     else setMessage('goldMessage', '月報元件未完整載入，請重新整理；目前停止讀取與上傳。', 'error');
+  }
+  function suspendReads(cancel=false){monthlyUI?.suspend(cancel);window.DepartmentScoresReadSession?.suspend(cancel);if(cancel){returnFlight=null;$('workspace').inert=false;$('workspace').style.visibility='hidden';}}
+  function validateReturn(){
+    if(document.hidden||window.PortalLogout?.isLocked())return Promise.resolve();
+    const token=sessionStorage.getItem(SESSION_KEY);
+    if(!token){if(patrolToken)lockSharedWorkspace();return Promise.resolve();}
+    if(token!==patrolToken){if(!patrolToken&&$('workspace').hidden)return Promise.resolve();lockSharedWorkspace();sessionStorage.setItem(SESSION_KEY,token);return restoreSession();}
+    if($('workspace').hidden)return Promise.resolve();
+    if(returnFlight?.epoch===sessionEpoch)return returnFlight.promise;
+    const flight={epoch:sessionEpoch};returnFlight=flight;suspendReads();$('workspace').inert=true;$('workspace').style.visibility='hidden';
+    const active=$('storePanel').hidden?monthlyUI:window.DepartmentScoresReadSession;
+    flight.promise=Promise.resolve().then(()=>active?.revalidate()).finally(()=>{
+      if(returnFlight===flight){returnFlight=null;if(flight.epoch===sessionEpoch){$('workspace').inert=false;$('workspace').style.visibility='';}}
+    });return flight.promise;
   }
 
   function readLocalJson(key, fallback) {
@@ -421,7 +451,10 @@
       const state = workState();
       if (state.unsaved || state.busy) { event.preventDefault(); event.returnValue = ''; }
     });
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && patrolToken) updateSessionDeadline(); });
+    document.addEventListener('visibilitychange', () => {if(document.hidden)suspendReads(true);else if(patrolToken){updateSessionDeadline();void validateReturn();}});
+    window.addEventListener('pagehide',()=>suspendReads(true));
+    window.addEventListener('pageshow',()=>{void validateReturn();});
+    window.addEventListener('focus',()=>{if(patrolToken)void validateReturn();});
     $('authForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       const button = event.submitter;
@@ -439,6 +472,8 @@
     document.querySelectorAll('[data-tab]').forEach((button) => button.addEventListener('click', () => {
       document.querySelectorAll('[data-tab]').forEach((item) => { item.classList.toggle('active', item === button); item.setAttribute('aria-selected', item === button ? 'true' : 'false'); });
       document.querySelectorAll('[data-panel]').forEach((panel) => { panel.hidden = panel.dataset.panel !== button.dataset.tab; });
+      if(button.dataset.tab==='gold')void monthlyUI?.activate();
+      else void window.DepartmentScoresReadSession?.activate();
     }));
     $('storeImport')?.addEventListener('click', importStore);
     if (!monthlyUI) {
@@ -453,23 +488,29 @@
 
   const monthlyUI = window.DepartmentGoldMonthlyCore && window.DepartmentGoldMonthlyUI ? window.DepartmentGoldMonthlyUI.create({
     request: authRequest, readWorkbook, getToken: () => patrolToken,
+    getDeadline:()=>sessionExpiresAt,
+    isAuthorized:()=>Boolean(patrolToken&&sessionStorage.getItem(SESSION_KEY)===patrolToken&&!$('workspace').hidden&&!window.PortalLogout?.isLocked()),
     lockWorkspace: lockSharedWorkspace
   }) : null;
   function lockSharedWorkspace() {
     if (!$('workspace')) return;
-    patrolToken = ''; sessionStorage.removeItem(SESSION_KEY);
+    sessionEpoch++;authController?.abort();authController=null;returnFlight=null;
+    patrolToken = ''; sessionStorage.removeItem(SESSION_KEY);$('workspace').inert=false;$('workspace').style.visibility='';
     clearInterval(accessTimer); sessionExpiresAt = 0;
     $('departmentAccess').hidden = true;
     $('departmentAccess').dataset.expiring = 'false';
     monthlyUI?.clear();
+    window.DepartmentScoresReadSession?.clear();
+    goldData=null;goldHistory=null;storeData=null;goldSourceName='';goldPublishedAt='';
     if (!$('workspace').hidden) $('workspace').hidden = true;
     if ($('authPanel').hidden) $('authPanel').hidden = false;
     $('securityBadge').textContent = '督導驗證'; $('securityBadge').classList.remove('ok');
   }
+  window.DepartmentReadDeadline=()=>sessionExpiresAt;
   window.addEventListener('department-session-cleared', lockSharedWorkspace);
   window.addEventListener('portal-before-logout', lockSharedWorkspace);
   new MutationObserver(() => {
-    if ($('workspace')?.hidden) lockSharedWorkspace();
+    if ($('workspace')?.hidden&&patrolToken) lockSharedWorkspace();
   }).observe($('workspace'), {attributes:true, attributeFilter:['hidden']});
   bindEvents();
   restoreSession();
