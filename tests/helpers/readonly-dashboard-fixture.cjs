@@ -1,8 +1,8 @@
 'use strict';
 const C=require('../../readonly-dashboard-core.js'),Catalog=require('../../award-model-catalog.js');
 function fixture(){
- const keys=['AQ V+D 999 (含)以上','AQ V+D 1399 (含)以上','好速案銷售點數','RT V+D 1399 (含)以上'];
- const metric=i=>Object.fromEntries(keys.map(key=>[key,{a:i+1,t:10,reportRate:(i+1)/10}]));
+ const keys=['AQ V+D 999 (含)以上','AQ V+D 1399 (含)以上','好速案銷售點數','RT V+D 1399 (含)以上',...Array.from({length:21},(_,i)=>'合成來源指標'+(i+5))];
+ const metric=i=>Object.fromEntries(keys.map(key=>[key,{a:i+1,t:10,w:.04,reportRate:(i+1)/10}]));
  const data={meta:{month:'2026-10',snapshotDay:13,monthDays:31,sourceFile:'1014.xlsx',period:'2026/10/01 ~10/13',aggregateOfficialCorrected:1.25},items:keys.map(key=>({key})),aggregateRates:Object.fromEntries(keys.map(key=>[key,1.2])),stores:C.STORES.map((s,i)=>({code:s.id,name:s.name,official:.8+i/10,items:metric(i)})),persons:C.STORES.map((s,i)=>({store:s.id,pname:'合成同仁'+(i+1),role:i%2?'業務代表':'店長',official:1,items:metric(i)}))};
  const base={report_date:'2026-10-13',report_run_date:'2026-10-14',data_as_of_date:'2026-10-13',source_file:'1014.xlsx',processing_run_id:'SYNTHETIC-20261014',aggregate:{overall_kpi:1.25,company_rank:10},stores:[],personal:[]};
  const item=Catalog.definitions('2026-10-13').map((row,i)=>({name:row.sourceName||row.shortName,display_name:row.sourceName||row.shortName,actual:i,target:10,rate:i/10}));
