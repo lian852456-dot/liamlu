@@ -3246,6 +3246,10 @@ function doPost(e) {
     else if (action === 'report_upload_commit') result = reportUploadCommit(payload);
     else if (action === 'report_upload_log') result = reportUploadLog(payload);
     else if (action === 'report_upload_rollback') result = reportUploadRollback(payload);
+    else if (action === 'readonly_conversion_status') result = readonlyConversionStatus(payload);
+    else if (action === 'readonly_conversion_preview') result = readonlyConversionPreview(payload);
+    else if (action === 'readonly_conversion_publish') result = readonlyConversionPublish(payload);
+    else if (action === 'readonly_conversion_rollback') result = readonlyConversionRollback(payload);
     else throw new Error('unknown private dashboard action');
     return privateDashboardPostResponse({ status: 'ok', ...result }, e);
   } catch (err) {
@@ -3558,7 +3562,7 @@ function privateDashboardSnapshot() {
   if (!file) throw new Error('今日私有戰情尚未更新');
   const snapshot = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
-  return snapshot;
+  return typeof readonlyConversionAttach_ === 'function' ? readonlyConversionAttach_(snapshot) : snapshot;
   });
 }
 
