@@ -2,7 +2,7 @@
   "purpose": "Same-origin protected acceptance previews; main entry points unchanged",
   "sources": {
     "pr234": "b8bf9fb5db74efd055519680b1e142b859d7e8e8",
-    "pr235": "8da6d523b35ae1ce5f23f9fb0d94f69442c273a1"
+    "pr235": "1bdc2481bdf61062d3c3c099518216794782c053"
   },
   "dataEmbedded": false,
   "authentication": "Existing Patrol / A / B / reportUploadAuthorize_, unchanged",
@@ -43,8 +43,8 @@
     },
     {
       "name": "readonly-dashboard.html",
-      "bytes": 154503,
-      "sha256": "1663198560eee08948ae86e1996a933982e8193f0b7423ca03f3c78a9f184549"
+      "bytes": 158321,
+      "sha256": "47b9d19515ecca47e4fd6dc0160985407694df66cdb7a7813ad80391dd1e4c96"
     },
     {
       "name": "session-read-manager.js",
