@@ -22,8 +22,8 @@ async function start(page,{intercept,seed=false,bytes=csv()}={}){
   const body=runtime.dispatch(payload);
   responses.push({action:payload.action,status:body.status});
   if(url.searchParams.get('transport')==='iframe'){
-   const message=JSON.stringify({type:'north12b-gas-response-v1',requestId:url.searchParams.get('requestId'),body}).replace(/</g,'\\u003c');
-   return route.fulfill({contentType:'text/html',body:'<!doctype html><script>window.top.postMessage('+message+',"*")</script>'});
+   const message=JSON.stringify({type:'north12b-gas-response-v1',requestId:url.searchParams.get('requestId'),body}).replace(/[<\u007f-\uffff]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));
+   return route.fulfill({contentType:'text/html; charset=utf-8',body:'<!doctype html><meta charset="utf-8"><script>window.top.postMessage('+message+',"*")</script>'});
   }
   return route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
  });
@@ -149,4 +149,126 @@ test('Big5 29-column CSV previews without writes and two confirmed imports keep 
  expect(responses.filter(r=>r.action==='tradein_performance_public_publish').map(r=>r.status)).toEqual(['published','unchanged']);
  expect(calls.filter(action=>action==='tradein_performance_preview')).toHaveLength(2);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('paste local preview needs no administrator and sends no source request',async({page},info)=>{
+ const {runtime,calls}=await start(page);await page.setViewportSize({width:390,height:844});
+ await page.locator('#sourceMode').selectOption('paste');await page.locator('#sourcePaste').fill(csv().toString('utf8').replaceAll(',','\t'));
+ await page.locator('#validateSource').click();await expect(page.locator('#uploadMessage')).toContainText('本機檢查完成');
+ await expect(page.locator('#uploadLocalPreview')).toContainText('4 列；4 個回收碼');
+ await expect(page.locator('#uploadLocalPreview')).toContainText('個人歸屬及正式台數仍須管理者核對');
+ await expect(page.locator('#uploadLocalPreview')).toContainText('貼上來源雜湊');
+ expect(calls.filter(a=>a!=='tradein_performance_public_read')).toEqual([]);expect(runtime.writes).toEqual([]);
+ await expect(page.locator('#publishUpload')).toBeDisabled();
+ const summary=await page.locator('#uploadLocalPreview').innerText();
+ for(const value of ['12345','SYNTHETIC-REC','SYNTHETIC-ORDER'])expect(summary).not.toContain(value);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:info.outputPath('SYNTHETIC-paste-local-preview-390.png'),fullPage:true});
+});
+
+test('unchanged file is decoded and hashed once across local and administrator preview',async({page})=>{
+ await page.addInitScript(()=>{window.syntheticByteReads=0;const original=File.prototype.arrayBuffer;File.prototype.arrayBuffer=function(){window.syntheticByteReads++;return original.call(this);};});
+ const {runtime,prepare}=await start(page);await prepare();await page.locator('#validateSource').click();
+ await expect(page.locator('#uploadLocalPreview')).toContainText('本機檢查完成');
+ await page.locator('#previewUpload').click();await expect(page.locator('#uploadMessage')).toContainText('預覽核對完成');
+ expect(await page.evaluate(()=>window.syntheticByteReads)).toBe(1);expect(runtime.writes).toEqual([]);
+});
+
+test('TSV source keeps its own hash, four requests retain backup and both verified projections',async({page},info)=>{
+ const {runtime,calls,source}=await start(page),text=csv().toString('utf8').replaceAll(',','\t');
+ const hash=require('node:crypto').createHash('sha256').update(text).digest('hex');runtime.configure({...source,source_sha256:hash});
+ await page.locator('#sourceMode').selectOption('paste');await page.locator('#sourcePaste').fill(text);
+ await page.locator('#validateSource').click();await expect(page.locator('#uploadLocalPreview')).toContainText(hash);
+ await page.locator('#adminEmployeeId').fill(OPERATOR);await page.locator('#adminSecret').fill(runtime.secret);await page.locator('#completeScope').check();
+ await page.locator('#previewUpload').click();await expect(page.locator('#publishUpload')).toBeEnabled();
+ const readsBefore=calls.filter(a=>a==='tradein_performance_public_read').length;
+ await page.locator('#publishUpload').click();await expect(page.locator('#uploadMessage')).toContainText('同步成功');
+ expect(calls.filter(a=>a!=='tradein_performance_public_read')).toEqual(['tradein_performance_preview','tradein_performance_checkpoint_capture','tradein_performance_publish','tradein_performance_public_publish']);
+ expect(calls.filter(a=>a==='tradein_performance_public_read')).toHaveLength(readsBefore);
+ expect([...runtime.files.values()].some(f=>f.getName().startsWith('north12b-tradein-checkpoint-'))).toBe(true);
+ expect(runtime.a.tradeinPerformanceRegistry_().months[source.month].active.source_sha256).toBe(hash);
+ await expect(page.locator('#publicWorkspace')).toBeVisible();await expect(page.locator('#stats')).toContainText('4 台');
+ await expect(page.locator('#rollbackUpload')).toBeEnabled();await expect(page.locator('#sourcePaste')).toHaveValue('');
+ await page.screenshot({path:info.outputPath('SYNTHETIC-four-request-verified.png'),fullPage:true});
+});
+
+test('older backend responses use the guarded status and public read fallback',async({page})=>{
+ const {calls,prepare}=await start(page,{intercept:async({route,payload,runtime})=>{
+  if(!['tradein_performance_preview','tradein_performance_public_publish'].includes(payload.action))return false;
+  const old={...payload};delete old.includeCheckpointState;delete old.includeReadback;
+  await route.fulfill({contentType:'application/json',body:JSON.stringify(runtime.dispatch(old))});return true;
+ }});
+ await prepare();await page.locator('#previewUpload').click();await expect(page.locator('#publishUpload')).toBeEnabled();
+ const before=calls.filter(a=>a==='tradein_performance_public_read').length;
+ await page.locator('#publishUpload').click();await expect(page.locator('#uploadMessage')).toContainText('同步成功');await expect(page.locator('#refreshData')).toBeEnabled();
+ expect(calls.filter(a=>a==='tradein_performance_checkpoint_status')).toHaveLength(1);
+ expect(calls.filter(a=>a==='tradein_performance_public_read')).toHaveLength(before+1);
+ await expect(page.locator('#stats')).toContainText('4 台');
+});
+
+test('source editing invalidates an approved plan and malformed paste stays local',async({page})=>{
+ const {runtime,calls}=await start(page);
+ await page.locator('#sourceMode').selectOption('paste');await page.locator('#sourcePaste').fill(csv().toString('utf8'));
+ await page.locator('#adminEmployeeId').fill(OPERATOR);await page.locator('#adminSecret').fill(runtime.secret);await page.locator('#completeScope').check();
+ await page.locator('#previewUpload').click();await expect(page.locator('#publishUpload')).toBeEnabled();
+ await page.locator('#sourcePaste').fill(csv().toString('utf8').split('\n').slice(1).join('\n'));
+ await expect(page.locator('#publishUpload')).toBeDisabled();await expect(page.locator('#uploadPreview')).toBeEmpty();
+ await expect(page.locator('#uploadLocalPreview')).toBeEmpty();await page.locator('#validateSource').click();
+ await expect(page.locator('#uploadMessage')).toContainText('本機檢查停止');
+ expect(calls.filter(a=>a==='tradein_performance_preview')).toHaveLength(1);expect(runtime.writes).toEqual([]);
+});
+
+test('legacy public read rejection never reports success and never repeats either publisher',async({page})=>{
+ let published=false;
+ const {calls,prepare}=await start(page,{intercept:async({route,payload,runtime})=>{
+  if(['tradein_performance_preview','tradein_performance_public_publish'].includes(payload.action)){
+   const old={...payload};delete old.includeCheckpointState;delete old.includeReadback;
+   const body=runtime.dispatch(old);if(payload.action==='tradein_performance_public_publish')published=true;
+   await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});return true;
+  }
+  if(published&&payload.action==='tradein_performance_public_read'){
+   const url=new URL(route.request().url()),body={status:'error',message:'SYNTHETIC_PUBLIC_READ_REJECTED'};
+   if(url.searchParams.get('transport')==='iframe'){
+    const value=JSON.stringify({type:'north12b-gas-response-v1',requestId:url.searchParams.get('requestId'),body});
+    await route.fulfill({contentType:'text/html; charset=utf-8',body:'<!doctype html><script>window.top.postMessage('+value+',"*")</script>'});
+   }else await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
+   return true;
+  }
+  return false;
+ }});
+ await prepare();await page.locator('#previewUpload').click();await expect(page.locator('#publishUpload')).toBeEnabled();
+ await page.locator('#publishUpload').click();await expect(page.locator('#uploadMessage')).toContainText('公開讀回未完成核對');
+ await expect(page.locator('#uploadMessage')).not.toContainText('同步成功');await expect(page.locator('#publishUpload')).toBeDisabled();
+ expect(calls.filter(a=>a==='tradein_performance_publish')).toHaveLength(1);expect(calls.filter(a=>a==='tradein_performance_public_publish')).toHaveLength(1);
+});
+
+test('stale bundled version is rejected during capture with no write or publish retry',async({page})=>{
+ const {runtime,calls,prepare}=await start(page);await prepare();await page.locator('#previewUpload').click();await expect(page.locator('#publishUpload')).toBeEnabled();
+ runtime.configure(parsed(),{counting_review_status:'pending'});
+ await page.locator('#publishUpload').click();await expect(page.locator('#uploadMessage')).toContainText('同步未確認');
+ expect(calls.filter(a=>a==='tradein_performance_checkpoint_capture')).toHaveLength(1);
+ expect(calls.filter(a=>a==='tradein_performance_publish')).toHaveLength(0);expect(runtime.writes).toEqual([]);
+ await expect(page.locator('#publishUpload')).toBeDisabled();
+});
+
+test('a wrong returned source hash does not claim verified publication or replay writes',async({page})=>{
+ const {calls,prepare}=await start(page,{intercept:async({route,payload,runtime})=>{
+  if(payload.action!=='tradein_performance_public_publish')return false;
+  const body=runtime.dispatch(payload);body.sourceHash='f'.repeat(64);
+  await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});return true;
+ }});
+ await prepare();await page.locator('#previewUpload').click();await expect(page.locator('#publishUpload')).toBeEnabled();
+ await page.locator('#publishUpload').click();await expect(page.locator('#uploadMessage')).toContainText('公開讀回的來源、版本或台數不符');
+ await expect(page.locator('#publishUpload')).toBeDisabled();
+ expect(calls.filter(a=>a==='tradein_performance_publish')).toHaveLength(1);expect(calls.filter(a=>a==='tradein_performance_public_publish')).toHaveLength(1);
+});
+
+test('cancellation is visible locally and stays blocked under the existing counting policy',async({page})=>{
+ const {runtime,calls}=await start(page),lines=csv().toString('utf8').split('\n'),row=lines[2].split(',');row[26]='1151003';lines[2]=row.join(',');
+ await page.locator('#sourceMode').selectOption('paste');await page.locator('#sourcePaste').fill(lines.join('\n'));
+ await page.locator('#validateSource').click();await expect(page.locator('#uploadLocalPreview')).toContainText('取消 1 筆');
+ await expect(page.locator('#uploadLocalPreview')).toContainText('不能同步');
+ await page.locator('#adminEmployeeId').fill(OPERATOR);await page.locator('#adminSecret').fill(runtime.secret);await page.locator('#completeScope').check();
+ await page.locator('#previewUpload').click();await expect(page.locator('#uploadMessage')).toContainText('整批停止同步');
+ expect(calls.filter(a=>a!=='tradein_performance_public_read')).toEqual([]);expect(runtime.writes).toEqual([]);
 });
