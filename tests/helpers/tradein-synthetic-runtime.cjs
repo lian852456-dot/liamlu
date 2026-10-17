@@ -44,8 +44,11 @@ function createRuntime(options={}){
   LockService:{getScriptLock:()=>({waitLock:()=>{assert.equal(held,false);held=true;},releaseLock:()=>{assert.ok(held);held=false;}})}});
  const gas=fs.readFileSync(require.resolve('../../gas/Code.gs'),'utf8');
  vm.runInContext(gas.slice(gas.indexOf('// Auth ownership candidate.')),context);
- vm.runInContext(fs.readFileSync(require.resolve('../../gas/TradeinPerformance.gs'),'utf8'),context);
- vm.runInContext(fs.readFileSync(require.resolve('../../gas/TradeinPublic.gs'),'utf8'),context);
+ const gasDirectory=process.env.TRADEIN_TEST_GAS_DIRECTORY;
+ for(const name of ['TradeinPerformance.gs','TradeinPublic.gs']){
+  const file=gasDirectory?require('node:path').join(gasDirectory,name):require.resolve('../../gas/'+name);
+  vm.runInContext(fs.readFileSync(file,'utf8'),context);
+ }
  function setConfig(name,value){configs.set(name,file('SYNTHETIC_CONFIG_'+name,name,JSON.stringify(value)));}
  function setMonthlyRoster(month,people,patch={}){
   setConfig('north12b-tradein-monthly-roster-'+month+'.json',{schema_version:'tradein-monthly-roster/v1',month,review_status:'verified',rule_id:Core.RULE_ID,source_sha256:'d'.repeat(64),people:people.map(p=>({...p,effective_from:p.effective_from||'2026-01-01',effective_to:p.effective_to===undefined?null:p.effective_to})),...patch});
