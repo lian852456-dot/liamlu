@@ -11,5 +11,6 @@ html=html.replace(/<script src="([a-zA-Z0-9.-]+)\?[^\"]+"><\/script>/g,(_,file)=
 if(/<script src=/.test(html)||/id="demo-data"/.test(html))throw Error('Standalone build contains unresolved scripts or demo data');
 html=html.replace("script-src 'self'","script-src "+hashes.join(' '));
 html=html.replaceAll('href="home.html"','href="https://lian852456-dot.github.io/liamlu/home.html"');
+html=html.replaceAll('href="patrol.html"','href="https://lian852456-dot.github.io/liamlu/patrol.html"');
 fs.mkdirSync(path.dirname(destination),{recursive:true});fs.writeFileSync(destination,html);
 console.log(JSON.stringify({file:destination,bytes:Buffer.byteLength(html),sha256:crypto.createHash('sha256').update(html).digest('hex'),dataEmbedded:false,scriptHashes:hashes.length}));

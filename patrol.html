@@ -252,6 +252,9 @@
   .secure-tab{border:1px solid #454545;background:#292929;color:#ddd;border-radius:9px;padding:8px 12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
   .secure-tab:hover,.secure-tab.active{background:var(--tw-orange);border-color:var(--tw-orange);color:#fff}
   .secure-tab.locked::before{content:'🔒 ';font-size:14px}
+  .secure-tabs .secure-tab-link{display:inline-flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;min-height:44px;flex:0 0 auto}
+  .readonly-entry-note{margin-top:9px;color:#ccc;font-size:14px;line-height:1.6}
+  @media(max-width:640px){.secure-tabs .secure-tab-link{flex:1 1 100%;width:100%}}
   .private-auth-bar{margin-top:12px;padding:10px 12px;border:1px solid #454545;border-radius:9px;background:#242424;color:#ddd;display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:14px;position:relative;z-index:2}
   .private-auth-bar .auth-status{flex:1;min-width:220px;color:#cfcfcf}
   .private-auth-bar .auth-status.ok{color:#9ff0b4}
@@ -533,7 +536,9 @@
       <button class="secure-tab locked" data-view="schedule" onclick="switchPatrolView('schedule')">每月班表</button>
       <button class="secure-tab locked" data-view="half" onclick="switchPatrolView('half')">督導到店檢查</button>
       <button class="secure-tab locked" data-view="halfDashboard" onclick="switchPatrolView('halfDashboard')">🗂️ 督導面談紀錄</button>
+      <a class="secure-tab secure-tab-link" href="readonly-dashboard.html" aria-describedby="readonly-entry-note">主管唯讀看板</a>
     </nav>
+    <p id="readonly-entry-note" class="readonly-entry-note">唯讀看板沿用原業務登入；情報站督導通行碼不會代替業務驗證。</p>
     <div class="private-auth-bar" aria-label="受保護資料解鎖">
       <span id="privateAuthStatus" class="auth-status ok">已通過正式後端驗證；session 關閉頁面或逾時即失效</span>
       <button id="privateLogoutBtn" class="private-auth-btn" type="button" onclick="privateSignOut()">登出</button>

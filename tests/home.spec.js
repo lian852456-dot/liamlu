@@ -23,7 +23,7 @@ const EXPECTED_HREFS = [
   'kpi-battle.html', 'kpi-battle.html#awards', 'index.html', 'gold-medal.html',
   'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'threec-query.html', 'tradein-progress.html',
   'access-management.html', 'department-ops.html', 'patrol.html',
-  'readonly-dashboard.html', 'tradein-brief.html', 'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
+  'tradein-brief.html', 'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
   'phone-stock-dashboard.html'
 ];
 const DAILY_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
@@ -144,7 +144,7 @@ test('首頁保留 PR179 個績入口與 PR181 測試入口移除，逐一核對
   await ready(page);
   await expect(page.locator('[aria-label="常用入口"] .card')).toHaveCount(4);
   await expect(page.locator('[aria-label="同仁大廳"] .card')).toHaveCount(7);
-  await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(9);
+  await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(8);
   expect(await page.locator('a.card').evaluateAll(cards => cards.map(card => card.getAttribute('href')))).toEqual(EXPECTED_HREFS);
   await expect(page.locator('.quick-card').first()).toHaveAttribute('href','kpi-battle.html');
   await expect(page.locator('.quick-card').first()).toContainText('KPI 戰情');
@@ -198,8 +198,8 @@ for (const viewport of [{width:1280,height:1300},{width:390,height:844},{width:3
 test('搜尋不分大小寫、查無結果與清除搜尋會恢復所有工具', async ({page}) => {
   await start(page); await ready(page);
   await page.locator('#tool-search').fill('kPi');
-  await expect(page.locator('a.card:visible')).toHaveCount(4);
-  await expect(page.locator('#search-result')).toHaveText('找到 4 個工具');
+  await expect(page.locator('a.card:visible')).toHaveCount(3);
+  await expect(page.locator('#search-result')).toHaveText('找到 3 個工具');
   await page.locator('#tool-search').fill('不存在的工具__TEST');
   await expect(page.locator('a.card:visible')).toHaveCount(0);
   await expect(page.locator('#search-result')).toContainText('沒有符合的工具');

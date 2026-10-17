@@ -32,8 +32,8 @@ test('home navigation retains PR179 performance and PR181 lab removal', () => {
     'https://twm-store-inspection.liamlu245.chatgpt.site/',
     'threec-query.html', 'tradein-progress.html'
   ]);
-  assert.equal(cards(navigation('督導專區')).length, 9);
-  assert.equal(cards(html).length, 4 + staffHrefs.length + 9);
+  assert.equal(cards(navigation('督導專區')).length, 8);
+  assert.equal(cards(html).length, 4 + staffHrefs.length + 8);
 });
 
 test('staff gold lookup lives under performance tools and uses the existing viewer', () => {
