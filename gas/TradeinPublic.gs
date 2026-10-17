@@ -1,7 +1,10 @@
 // Independent anonymous read. Never calls or exposes the private reader.
-function tradeinPerformancePublicRegistry_(){
-  const file=tradeinPerformanceFile_('north12b-tradein-public-registry.json');
-  const value=file?JSON.parse(file.getBlob().getDataAsString('UTF-8')):{schema_version:'tradein-public-registry/v1',months:{}};
+function tradeinPerformancePublicRegistry_(body){
+  if(body===undefined){
+    const file=tradeinPerformanceFile_('north12b-tradein-public-registry.json');
+    body=file?file.getBlob().getDataAsString('UTF-8'):JSON.stringify({schema_version:'tradein-public-registry/v1',months:{}});
+  }
+  const value=JSON.parse(body);
   if(!value||value.schema_version!=='tradein-public-registry/v1'||!value.months||typeof value.months!=='object'||Array.isArray(value.months))throw Error('公開績效版本索引無效');
   Object.keys(value.months).forEach(function(month){TradeinPerformanceCore.monthPeriod(month);});
   return value;
@@ -15,16 +18,15 @@ function tradeinPerformancePublicSnapshot_(entry,month){
   if(tradeinPerformanceHash_(value)!==entry.snapshot_hash||value.month!==month)throw Error('公開投影內容雜湊不符');
   return TradeinPublicCore.validate(value);
 }
-function tradeinPerformancePublicRead(payload){
-  TradeinPerformanceCore.monthPeriod(payload.month);
-  const lock=LockService.getScriptLock();lock.waitLock(10000);
-  try{
-    const registry=tradeinPerformancePublicRegistry_(),entry=registry.months[payload.month];
+// Call only while holding the existing script lock; reuse verified values from
+// this invocation only. Nothing from the request payload enters this context.
+function tradeinPerformancePublicReadLocked_(payload,verified){
+    const registry=verified?verified.registry:tradeinPerformancePublicRegistry_(),entry=registry.months[payload.month];
     if(!entry)return {snapshot:null,availableMonths:Object.keys(registry.months).sort()};
-    const current=(tradeinPerformanceRegistry_().months[payload.month]||{}).active;
+    const current=verified?verified.current:(tradeinPerformanceRegistry_().months[payload.month]||{}).active;
     if(!current||current.snapshot_hash!==entry.private_snapshot_hash)throw Error('本月公開進度待重新核對');
     if(tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(payload.month))!==current.roster_hash)throw Error('本月公開基線待重新核對');
-    let value=tradeinPerformancePublicSnapshot_(entry,payload.month);
+    let value=verified?verified.snapshot:tradeinPerformancePublicSnapshot_(entry,payload.month);
     const modelsFile=value.people.some(p=>p.actual_units>0&&!Array.isArray(p.recovered_models))?
       tradeinPerformanceFile_('north12b-tradein-models-'+current.source_sha256+'.json'):null;
     if(modelsFile)value=TradeinPublicCore.withModels(value,tradeinPerformanceSnapshot_(current),JSON.parse(modelsFile.getBlob().getDataAsString('UTF-8')));
@@ -35,6 +37,11 @@ function tradeinPerformancePublicRead(payload){
     if(payload.includeDays!==true)value=TradeinPublicCore.validate({...value,people:value.people.map(function(p){const safe={...p};delete safe.recovered_days;return safe;})});
     // Reconstruct the response from a strict validated allowlist, never spread registry/entry/private JSON.
     return {snapshot:value,availableMonths:Object.keys(registry.months).sort()};
+}
+function tradeinPerformancePublicRead(payload){
+  TradeinPerformanceCore.monthPeriod(payload.month);
+  const lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{return tradeinPerformancePublicReadLocked_(payload);
   }catch(error){throw Error('公開目標進度尚未完成核對，請稍後重新讀取');}
   finally{lock.releaseLock();}
 }
@@ -46,18 +53,23 @@ function tradeinPerformancePublicPublish(payload){
     if(!current||current.snapshot_hash!==payload.expectedActiveHash)throw Error('私人月版本已變更，停止公開投影');
     if(current.source_sha256!==payload.sourceHash)throw Error('公開投影來源雜湊不符');
     const registry=tradeinPerformancePublicRegistry_(),previous=registry.months[payload.month];
+    function receipt(status,value){
+      if(payload.includeReadback!==true)return {status:status};
+      return {status:status,sourceHash:current.source_sha256,privateSnapshotHash:current.snapshot_hash,
+        readback:tradeinPerformancePublicReadLocked_({month:payload.month,includeDays:true},{registry:registry,current:current,snapshot:value})};
+    }
     if(previous&&previous.private_snapshot_hash===current.snapshot_hash){
-      tradeinPerformancePublicSnapshot_(previous,payload.month);return {status:'unchanged'};
+      return receipt('unchanged',tradeinPerformancePublicSnapshot_(previous,payload.month));
     }
     const source=tradeinPerformanceSnapshot_(current);
     if(tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(payload.month))!==current.roster_hash)throw Error('核定月名冊已變更，停止公開投影');
     const value=TradeinPublicCore.project(source,function(){return Utilities.getUuid();}),hash=tradeinPerformanceHash_(value);
     const file=tradeinPerformanceFolder_().createFile('north12b-tradein-public-'+payload.month+'-'+hash.slice(0,16)+'.json',JSON.stringify(value),MimeType.PLAIN_TEXT);
     const entry={file_id:file.getId(),snapshot_hash:hash,private_snapshot_hash:current.snapshot_hash};
-    tradeinPerformancePublicSnapshot_(entry,payload.month);registry.months[payload.month]=entry;
+    const verifiedSnapshot=tradeinPerformancePublicSnapshot_(entry,payload.month);registry.months[payload.month]=entry;
     const name='north12b-tradein-public-registry.json',registryFile=tradeinPerformanceFile_(name),body=JSON.stringify(registry);
     if(registryFile)registryFile.setContent(body);else tradeinPerformanceFolder_().createFile(name,body,MimeType.PLAIN_TEXT);
     if(JSON.stringify(tradeinPerformancePublicRegistry_())!==body)throw Error('公開投影版本保存後核對失敗');
-    return {status:'published'};
+    return receipt('published',verifiedSnapshot);
   }finally{lock.releaseLock();}
 }

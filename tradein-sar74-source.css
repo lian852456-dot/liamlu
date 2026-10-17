@@ -1,0 +1,6 @@
+.sar74-source-text{display:block;width:100%;max-width:100%;min-width:0;padding:10px;border:1px solid #d5dadf;border-radius:9px;font:13px/1.5 ui-monospace,monospace;resize:vertical}
+.sar74-source-text:focus-visible{outline:3px solid #2f79b5;outline-offset:3px}
+.sar74-local-preview{overflow-wrap:anywhere;margin:12px 0}
+.sar74-local-preview:not(:empty){border-left:3px solid #137b63;padding:10px 14px;background:#f3faf7}
+.sar74-local-preview p{margin:5px 0}
+#sourcePasteHint{font-weight:400}

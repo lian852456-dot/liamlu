@@ -132,3 +132,5 @@ require('./tradein-sar74-parser.test.cjs');
 require('./tradein-private-reference.test.cjs');
 require('./tradein-monthly-basis.test.cjs');
 require('./tradein-source-preview.test.cjs');
+require('./tradein-sar74-source.test.cjs');
+require('./tradein-import-speed.test.cjs');
