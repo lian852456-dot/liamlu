@@ -17,12 +17,16 @@ function tradeinPerformanceRoster_() {
   return privateDashboardRows(privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET,PRIVATE_DASHBOARD_USERS_HEADERS),PRIVATE_DASHBOARD_USERS_HEADERS)
     .map(function(r){return {employee_id:r.employee_id,masked_name:r.masked_name,store:r.store,role:r.role,status:r.status};});
 }
-function tradeinPerformanceMonthRoster_(month) {
+function tradeinPerformanceMonthRoster_(month,body) {
   // Access roster authorizes viewing; it is not an HR/monthly-target source.
   const period=TradeinPerformanceCore.monthPeriod(month);
-  const file=tradeinPerformanceFile_('north12b-tradein-monthly-roster-'+month+'.json');
-  if(!file)throw new Error('本月正式名冊／職務生效期間尚未核實，不能用登入名冊推算目標');
-  const basis=JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if(body===undefined){
+    const file=tradeinPerformanceFile_('north12b-tradein-monthly-roster-'+month+'.json');
+    if(!file)throw new Error('本月正式名冊／職務生效期間尚未核實，不能用登入名冊推算目標');
+    body=file.getBlob().getDataAsString('UTF-8');
+  }
+  if(body===null)throw new Error('本月正式名冊／職務生效期間尚未核實，不能用登入名冊推算目標');
+  const basis=JSON.parse(body);
   if(basis.schema_version!=='tradein-monthly-roster/v1' || basis.month!==month || basis.review_status!=='verified' ||
      basis.rule_id!==TradeinPerformanceCore.RULE_ID || !/^[a-f0-9]{64}$/.test(basis.source_sha256 || '') || (!Array.isArray(basis.people) || !basis.people.length || basis.people.length>5000))
     throw new Error('月名冊來源、月份或核定狀態不符');
@@ -180,11 +184,19 @@ function tradeinPerformanceRead(payload) {
   });
 }
 function tradeinPerformancePreview(payload) {
-  reportUploadAuthorize_(payload);
-  const roster=tradeinPerformanceMonthRoster_(payload.source.month),snapshot=tradeinPerformanceBuild_(payload.source,roster);
-  const current=(tradeinPerformanceRegistry_().months[snapshot.period_key] || {}).active;
-  return {snapshot:tradeinPerformanceProjection_(snapshot,{supervisor:true}),expectedActiveHash:current?current.snapshot_hash:null,
-    rosterHash:tradeinPerformanceHash_(roster),previewHash:tradeinPerformanceHash_(snapshot),sourceHash:snapshot.source_sha256};
+  const bundled=payload.includeCheckpointState===true;
+  if(bundled)tradeinPerformanceCheckpointAuthorize_({...payload,month:payload.source.month,sourceHash:payload.source.source_sha256});
+  else reportUploadAuthorize_(payload);
+  const lock=bundled?LockService.getScriptLock():null;if(lock)lock.waitLock(10000);
+  try{
+    const state=bundled?tradeinPerformanceCheckpointState_({month:payload.source.month,sourceHash:payload.source.source_sha256}):null;
+    const roster=tradeinPerformanceMonthRoster_(payload.source.month,state?state.monthly.body:undefined),snapshot=tradeinPerformanceBuild_(payload.source,roster);
+    const current=((state?state.registry:tradeinPerformanceRegistry_()).months[snapshot.period_key] || {}).active;
+    const result={snapshot:tradeinPerformanceProjection_(snapshot,{supervisor:true}),expectedActiveHash:current?current.snapshot_hash:null,
+      rosterHash:tradeinPerformanceHash_(roster),previewHash:tradeinPerformanceHash_(snapshot),sourceHash:snapshot.source_sha256};
+    if(state)result.checkpointState={...tradeinPerformanceCheckpointSummary_(state),month:snapshot.period_key,sourceHash:snapshot.source_sha256};
+    return result;
+  }finally{if(lock)lock.releaseLock();}
 }
 function tradeinPerformanceBuild_(source,roster,reference) {
   const today=Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd');
@@ -288,7 +300,7 @@ function tradeinPerformanceCheckpointState_(payload) {
   if(slotPresent && (!slot || typeof slot!=='object' || Array.isArray(slot)))throw new Error('本月指標格式無效');
   const publicFile=tradeinPerformanceFile_('north12b-tradein-public-registry.json');
   const publicBody=publicFile?publicFile.getBlob().getDataAsString('UTF-8'):JSON.stringify({schema_version:'tradein-public-registry/v1',months:{}});
-  const publicRegistry=tradeinPerformancePublicRegistry_();
+  const publicRegistry=tradeinPerformancePublicRegistry_(publicBody);
   return {registry:registry,registryBody:registryBody,registryExists:!!registryFile,
     publicRegistry:publicRegistry,publicRegistryBody:publicBody,publicRegistryExists:!!publicFile,publicRegistryHash:tradeinPerformanceDigest_(publicBody),
     registryHash:tradeinPerformanceDigest_(registryBody),slotPresent:slotPresent,slot:slot,

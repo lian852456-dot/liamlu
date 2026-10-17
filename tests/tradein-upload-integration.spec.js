@@ -69,7 +69,7 @@ for(const width of [1280,390,320])test(width+'px synthetic CSV through real pars
  await expect(page.locator('#staffRows')).toContainText('不設目標');
  await page.locator('#staffStore').selectOption('萬大');await expect(page.locator('#staffRows tr')).toHaveCount(2);
  // Browser API double, restricted to this isolated context; leaves the owner's clipboard untouched.
- await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.syntheticClipboard=text;}}}));
+ await page.evaluate(()=>{document.execCommand=()=>false;Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.syntheticClipboard=text;}}});});
  await page.locator('#copyReminder').click();await expect(page.locator('#exportFeedback')).toContainText('已複製');
  expect(await page.evaluate(()=>window.syntheticClipboard)).toContain('萬大');
  expect(await page.evaluate(()=>window.syntheticClipboard)).not.toContain('取消回沖原');
@@ -86,6 +86,8 @@ for(const width of [1280,390,320])test(width+'px synthetic CSV through real pars
  const writes=r.writes.length;await page.reload();await expect(page.locator('#stats')).toContainText('4 台');expect(r.writes.length).toBe(writes);
  await page.goto(new URL('app.html',BASE).href);
  await page.getByRole('region',{name:'公開查價'}).getByRole('link',{name:'舊換新專區',exact:true}).click();
+ await expect(page.locator('#stats')).toContainText('4 台');
+ await page.locator('a[href="tradein-query.html"]').first().click();
  await expect(page.locator('#tradeinResults')).toContainText('示範回收');
  await page.locator('a[href="tradein-progress.html"]').click();await expect(page.locator('#stats')).toContainText('4 台');
  expect(r.writes.length).toBe(writes);expect(calls.filter(p=>p.action==='tradein_performance_publish')).toHaveLength(1);expect(errors).toEqual([]);
