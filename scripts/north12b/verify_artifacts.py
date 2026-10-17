@@ -1,7 +1,9 @@
 """Verify source values, missing baselines, formulas and dynamic attachments."""
 import hashlib,json,os
+from decimal import Decimal
 from pathlib import Path
 from openpyxl import load_workbook
+from source_semantics import verify as verify_source_semantics
 r=Path(os.environ['RUN_ROOT']);out=Path(os.environ['OUT_DIR']);date=os.environ['REPORT_DATE'];stem=os.environ['SOURCE_STEM']
 s=json.loads((r/f'{stem}-source-values.json').read_text());k=json.loads((r/f'kpicalc-{stem}-corrected.json').read_text());d=json.loads((r/'daily-kpi-data.json').read_text());c=json.loads((r/f'closure-audit-{stem}.json').read_text())
 b=out/f'TWM_North12B_Daily_Report_{date}.xlsx';cb=out/f'TWM_North12B_Closure_Rate_{date}.xlsx'
@@ -19,6 +21,52 @@ if not d['meta']['sameMonthDod']:
     assert all(v['主力KPI'].cell(row,8).value=='暫不比較' for row in range(3,13))
     assert all(v['加掛得分'].cell(row,7).value=='暫不比較' for row in range(3,13))
 assert sum(v[name].max_row-6 for name in ['店長（含代理）','副店長','業代（含銷售人員）'])>=len(k['persons'])
+source_contract_version=verify_source_semantics(v,k,s,d,date)
+personal=d['qisPersonal']
+assert personal['sourceSha256']==k['meta']['sourceSha256'],'QIS_PERSONAL_SOURCE_MISMATCH'
+assert personal['cutoffDate']==d['meta']['qisPersonalCutoff']<=date,'QIS_PERSONAL_DATE_MISMATCH'
+qsource=s['QIS個績']['values'];header=personal['header'];identity=personal['identityColumns']
+assert qsource[header['row']-1][header['countColumn']-1]=='計件數'
+assert qsource[header['row']-1][header['scoreColumn']-1]=='原始分數'
+scoped=[(rn,row) for rn,row in enumerate(qsource,1) if rn>header['row'] and '北一二B' in row
+    and (row[identity['employee']-1] or row[identity['name']-1])]
+assert len(scoped)==len(personal['rows']),'QIS_PERSONAL_ROSTER_MISMATCH'
+for person,(rn,source) in zip(personal['rows'],scoped):
+    assert person['source_row']==rn and person['employee_id']==str(source[identity['employee']-1])
+    assert person['name']==(source[identity['name']-1] or '待核姓名')
+    n=person['case_count'];score=person['current_score'];status=person['status']
+    if n is not None:assert n==source[header['countColumn']-1],'QIS_PERSONAL_COUNT_MISMATCH'
+    if score is not None:assert score==source[header['scoreColumn']-1],'QIS_PERSONAL_SCORE_MISMATCH'
+    if status=='no_data':
+        assert n==0 and score is None and person['additional_100']==1
+    elif status=='below_98':
+        assert n>0 and score<98 and score==source[header['scoreColumn']-1]
+        # Independently check the threshold inequalities using exact original XML decimal text.
+        raw_score=Decimal(person['source_score_raw']);count=Decimal(person['source_count_raw']);extra=person['additional_100']
+        assert extra>0 and (count*raw_score+100*extra)/(count+extra)>=98
+        assert (count*raw_score+100*(extra-1))/(count+extra-1)<98
+    elif status=='at_least_98':assert n>0 and score>=98 and person['additional_100']==0
+    else:assert status=='pending' and person['additional_100'] is None
+assert personal['below98']==sorted([p for p in personal['rows'] if p['status']=='below_98'],
+    key=lambda p:(-p['additional_100'],p['current_score'],p['source_row'])), 'QIS_PERSONAL_FOLLOWUP_COVERAGE_MISMATCH'
+for key,status in [('noData','no_data'),('pending','pending')]:
+    assert personal[key]==[p for p in personal['rows'] if p['status']==status],'QIS_PERSONAL_STATE_COVERAGE_MISMATCH'
+row=18
+for person in personal['below98']:
+    assert [v['QIS店績'].cell(row,col).value for col in range(1,6)]==[
+        person['store'],person['name'],person['current_score'],person['case_count'],person['additional_100']], 'QIS_PERSONAL_DISPLAY_MISMATCH'
+    row+=1
+if not personal['below98']:row+=1
+for key in ['noData','pending']:
+    if not personal[key]:continue
+    row+=3
+    for person in personal[key]:
+        score='尚無資料' if key=='noData' else person['current_score'] if person['current_score'] is not None else '待核'
+        needed='首筆100即100' if key=='noData' else '待核'
+        assert [v['QIS店績'].cell(row,col).value for col in range(1,6)]==[
+            person['store'],person['name'],score,person['case_count'] if person['case_count'] is not None else '待核',needed], 'QIS_PERSONAL_STATE_DISPLAY_MISMATCH'
+        row+=1
+assert personal['precisionNote'] in [r[0].value for r in v['QIS店績'].iter_rows()], 'QIS_PERSONAL_PRECISION_NOTE_MISSING'
 for row in range(4,14):
     for col in range(1,12):assert v['締結率'].cell(row,col).value==cv['締結率近三日'].cell(row,col).value,'CLOSURE_REPORT_MISMATCH'
 assert c['latest']['formal_cases']+c['latest']['unassigned_cases']+c['latest']['anomaly_cases']==c['latest']['gap']
@@ -47,6 +95,7 @@ for ws in v:
 # Output files follow worksheet presence and the verified paginated receipt.
 images={'主力KPI':'Main_KPI','加掛得分':'Addon_Score','手機保險':'Insurance','QIS店績':'QIS','締結率':'Closure_Rate','加減分日目標':'Daily_Targets','店長（含代理）':'Personal_Manager','副店長':'Personal_Deputy','業代（含銷售人員）':'Personal_Sales'}
 files=[(b,list(s)),(cb,['續約率(分子)','續約率(分母)'])]+[(out/f'TWM_North12B_{name}_{date}.png',[sheet]) for sheet,name in images.items() if sheet in v]
+files=[(path,['QIS店績','QIS個績'] if sheets==['QIS店績'] else sheets) for path,sheets in files]
 files.append((out/f'TWM_North12B_Sales_Overview_{date}.png',['上線數KPI_每日上線','AQ其他-包膜與保貼營收']))
 receipt=json.loads((r.parent/'private-run/goodspeed-receipt.json').read_text())
 assert receipt['status']=='pass'
@@ -59,5 +108,18 @@ for path,sheets in files:
     data=path.read_bytes();assert data
     entries.append({'fileName':path.name,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),'sourceSheets':sheets,'renderStatus':'PENDING_VISUAL_REVIEW' if path.suffix=='.png' else 'WORKBOOK_VALIDATED'})
 assert len({x['fileName'] for x in entries})==len(entries)
-(out/'attachment-manifest.json').write_text(json.dumps({'reportDate':date,'sourceFile':os.environ['SOURCE_FILE'],'sourceSha256':k['meta']['sourceSha256'],'requiredCount':len(entries),'requiredAttachments':entries},ensure_ascii=False,indent=2))
+qis_aggregate=next((row for row in s.get('QIS店績',{}).get('values',[]) if row[0]=='北一二區' and row[2]=='北一二B' and row[3]==9),None)
+contract={'status':'pass','version':source_contract_version,'reportDate':date,'sourceSha256':k['meta']['sourceSha256'],
+    'dataCutoffDate':k['meta']['data_as_of_date'],'qisRawScore':qis_aggregate[5] if qis_aggregate else None,
+    'qisSourceDate':k['meta']['qis_data_as_of_date'],'managerBasis':'personal-employee-kpi' if date>='2026-09-01' else 'legacy',
+    'addonRankBasis':'source-company-rank','artifactHashes':{e['fileName']:e['sha256'] for e in entries}}
+contract['qisPersonal']={'schema':personal['schema'],'cutoffDate':personal['cutoffDate'],
+    'sourceSha256':personal['sourceSha256'],'rows':len(personal['rows']),'below98':len(personal['below98']),
+    'noData':len(personal['noData']),'pending':len(personal['pending']), 'header':personal['header'],
+    'calculation':'reported-average-equal-weight-100-score-scenario','precisionNote':personal['precisionNote']}
+contract_bytes=json.dumps(contract,ensure_ascii=False,indent=2).encode()
+(out/'source-contract-receipt.json').write_bytes(contract_bytes)
+(out/'attachment-manifest.json').write_text(json.dumps({'sourceContractVersion':source_contract_version,
+    'sourceContractReceiptSha256':hashlib.sha256(contract_bytes).hexdigest(),'reportDate':date,'sourceFile':os.environ['SOURCE_FILE'],
+    'sourceSha256':k['meta']['sourceSha256'],'requiredCount':len(entries),'requiredAttachments':entries},ensure_ascii=False,indent=2))
 print(json.dumps({'status':'pass','attachments':len(entries),'roster':len(k['persons']),'dodNote':'前日無資料時暫不比較'},ensure_ascii=False))

@@ -289,6 +289,11 @@ for vk_path in json.loads(os.environ.get('VK_SOURCE_PATHS','[]')):
 sales_metrics = build_sales_metrics(sales_book, cur_stores, asof)
 sales_metrics['additional_sources']=vk_sources
 daily['salesMetrics'] = sales_metrics
+from qis_personal import extract_personal_qis
+personal_qis = extract_personal_qis(CUR, current_kpi, REPORT_DATE)
+daily['qisPersonal'] = personal_qis
+daily['meta']['qisPersonalCutoff'] = personal_qis['cutoffDate']
+json.dump(personal_qis, open(OUT/f'qis-personal-{Path(SOURCE_FILE).stem}.json','w'), ensure_ascii=False)
 json.dump(daily,open(OUT/'daily-kpi-data.json','w'),ensure_ascii=False)
 
 # Closure audit.
@@ -350,7 +355,7 @@ formal_cases=sum(formal.values())
 if formal_cases+unassigned+anomalies!=gap:
     raise SystemExit(f"closure gap mismatch {formal_cases}+{unassigned}+{anomalies}!={gap}")
 fmtdate=lambda s:(datetime(1899,12,30)+__import__('datetime').timedelta(days=float(s))).date().isoformat()
-closure={"dates":[fmtdate(x) if x is not None else None for x in dates],"daily":daily_cl,
+closure={"sourceFile":SOURCE_FILE,"sourceSha256":SOURCE_SHA,"dates":[fmtdate(x) if x is not None else None for x in dates],"daily":daily_cl,
          "latest":{"date":fmtdate(latest),"numerator":int(latest_num_total),"denominator":int(latest_den_total),"gap":gap,
                    "formal_staff_count":len(formal_rows),"formal_cases":formal_cases,"formal_unclosed":formal_rows,
                    "unassigned_cases":unassigned,"anomaly_cases":anomalies}}

@@ -2,6 +2,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { validateSameSourceBatch } from "./source_batch_gate.mjs";
+// During runtime installation these two modules are copied beside this file.
+import { FINAL_MAIL_EFFECTIVE_DATE, sealFinalMailBatch, validateArtifactLists } from "../../../../scripts/north12b/final_mail_batch.mjs";
+import { closureMailLines } from "../../../../scripts/north12b/closure_mail_metrics.mjs";
 
 const projectRoot = path.resolve(import.meta.dirname, "../..");
 const outputDir = path.join(projectRoot, "report-automation/outputs");
@@ -27,6 +30,12 @@ const maxOutlookDirectAttachmentBytes = 3 * 1024 * 1024;
 const mplusTargetThread = "滷蛋公務";
 const runId = process.env.REPORT_RUN_ID ?? `${reportDateIso.replaceAll("-", "")}-preflight-${createHash("sha256").update(`${reportDateIso}-${Date.now()}`).digest("hex").slice(0, 8)}`;
 const checks = [];
+const finalMailRequired = reportDateIso >= FINAL_MAIL_EFFECTIVE_DATE;
+if (finalMailRequired && !process.env.REPORT_FINAL_MAIL_INPUT) {
+  throw new Error("FINAL_MAIL_INPUT_REQUIRED: 完整新版產物及逐檔視覺驗收完成前禁止 ready/send");
+}
+const finalMailInput = finalMailRequired
+  ? JSON.parse(await fs.readFile(process.env.REPORT_FINAL_MAIL_INPUT, "utf8")) : null;
 
 function recordCheck(name, ok, detail = "") {
   checks.push({ name, ok: Boolean(ok), detail });
@@ -335,7 +344,7 @@ async function buildDailyBody(report) {
     `北一二B整體｜KPI ${percent(report.aggregate.overall_kpi)}｜公司排名 ${report.aggregate.company_rank ?? "-"}（${changeLabel(overallChanges.rank, "較前日上升", "較前日下降", "名")}）｜KPI增減 ${signed(overallChanges.kpi === null ? null : overallChanges.kpi * 100, 1, " 個百分點")}｜加掛 ${report.aggregate.addon_score ?? "-"} 分（${signed(overallChanges.addon, 2, " 分")}）`,
     `核心指標｜A999 ${percent(metricAchievement(report.aggregate, "AQ V+D 999（含）以上"))}｜好速案 ${percent(metricAchievement(report.aggregate, "好速案銷售點數"))}｜R1399 ${percent(metricAchievement(report.aggregate, "RT V+D 1399（含）以上"))}`,
     `保險｜進度 ${percent(supplementalSummary.insurance?.progress)}｜實際搭售率 ${percent(supplementalSummary.insurance?.attach_rate)}｜${Number(supplementalSummary.insurance?.sales ?? 0).toFixed(0)} / ${Number(supplementalSummary.insurance?.target ?? 0).toFixed(0)} 件`,
-    `QIS｜計件數 ${Number(supplementalSummary.qis?.count ?? 0).toFixed(0)}｜原始分數 ${Number(supplementalSummary.qis?.score ?? 0).toFixed(2)}`,
+    `QIS｜計件數 ${Number(supplementalSummary.qis?.count ?? 0).toFixed(0)}｜原始分數 ${finalMailRequired && finalSourceContract.qisRawScore == null ? '尚未有資料' : Number(finalMailRequired ? finalSourceContract.qisRawScore : supplementalSummary.qis?.score ?? 0).toFixed(2)}`,
     "",
     "各店KPI｜達成｜排名｜增減：",
     ...records.map((record) => storeKpiLine(record, previousByStore)),
@@ -445,11 +454,20 @@ const individualStoreRanks = storeAwards
 recordCheck("store ranks unique", new Set(individualStoreRanks).size === individualStoreRanks.length, individualStoreRanks.join(","));
 recordCheck("2026-08-05 summary columns regression", storeAwards.some((row) => Number(row.projected) > 0 && String(row.rank ?? "").trim()), "store projected/rank present");
 const supplementalSummary = JSON.parse(await fs.readFile(path.join(outputDir, `supplemental_daily_report_${reportDateIso}.json`), "utf8"));
+const finalSourceContract = finalMailRequired ? JSON.parse(await fs.readFile(finalMailInput.sourceContractReceiptPath, "utf8")) : null;
+if (finalMailRequired && (finalSourceContract.version !== 'north12b-source-contract/v2'
+    || finalSourceContract.sourceSha256 !== sourceBatch.kpi.sha256 || finalSourceContract.dataCutoffDate !== dataCutoffDate)) {
+  throw new Error('SOURCE_CONTRACT_RECEIPT_MISMATCH');
+}
+const finalClosureLines = finalMailRequired ? closureMailLines(
+  JSON.parse(await fs.readFile(finalMailInput.closureAuditPath, "utf8")), report.contact_close,
+  { sourceSha256: sourceBatch.kpi.sha256, cutoffDate: dataCutoffDate },
+) : [];
 
 const dailyBodyPath = path.join(outputDir, `email_body_daily_${reportDateIso}.txt`);
 const phoneBodyPath = path.join(phoneOutputDir, `email_body_phone_awards_${reportDateIso}.txt`);
 const mplusPayloadPath = path.join(outputDir, `mplus_delivery_${reportDateIso}.json`);
-const dailyBody = await buildDailyBody(report);
+const dailyBody = (await buildDailyBody(report)) + (finalClosureLines.length ? `\n${finalClosureLines.join("\n")}\n` : "");
 for (const requiredText of ["【KPI呈現區】", "公司排名TOP3", "公司排名BOT3", "【激勵】", "【落後提醒與今日行動】", "KPI增減", "加掛", "保險", "QIS"]) {
   if (!dailyBody.includes(requiredText)) {
     throw new Error(`每日戰報 mail 內文缺少必要文字：${requiredText}`);
@@ -457,7 +475,7 @@ for (const requiredText of ["【KPI呈現區】", "公司排名TOP3", "公司排
 }
 await fs.writeFile(dailyBodyPath, dailyBody, "utf8");
 
-const dailyAttachments = [
+const legacyDailyAttachments = [
   path.join(outputDir, `TWM_North12B_Daily_Report_${reportDateIso}.xlsx`),
   path.join(outputDir, `TWM_North12B_Main_KPI_${reportDateIso}.png`),
   path.join(outputDir, `TWM_North12B_Addon_Score_${reportDateIso}.png`),
@@ -467,7 +485,12 @@ const dailyAttachments = [
   path.join(outputDir, `TWM_North12B_Insurance_${reportDateIso}.png`),
   path.join(outputDir, `TWM_North12B_QIS_${reportDateIso}.png`),
 ];
-const phoneAttachments = [
+const finalLists = finalMailRequired ? validateArtifactLists(
+  JSON.parse(await fs.readFile(finalMailInput.dailyManifestPath, "utf8")),
+  JSON.parse(await fs.readFile(finalMailInput.awardsManifestPath, "utf8")), reportDateIso,
+) : null;
+const dailyAttachments = finalLists ? finalLists.daily.map(e => path.join(finalMailInput.dailyDir, e.name)) : legacyDailyAttachments;
+const legacyPhoneAttachments = [
   path.join(phoneOutputDir, "Y26重點台獎手機_台獎更新.xlsx"),
   path.join(phoneOutputDir, "01-08-03_手機競賽日報_店點達成率_台獎機款更新.xlsx"),
   path.join(phoneOutputDir, "01-08-04_手機競賽日報_個人達成率_個人台獎更新.xlsx"),
@@ -475,6 +498,7 @@ const phoneAttachments = [
   path.join(phoneOutputDir, "個人台獎.png"),
   path.join(phoneOutputDir, "台獎機款_店點進度點名.md"),
 ];
+const phoneAttachments = finalLists ? finalLists.phone_awards.map(e => path.join(finalMailInput.awardsDir, e.name)) : legacyPhoneAttachments;
 
 const payload = {
   report_date_iso: reportDateIso,
@@ -539,6 +563,16 @@ payload.award_config = {
   path: activeAwardConfig._path,
   hash: activeAwardConfig._hash,
 };
+if (finalMailRequired) {
+  const sealed = await sealFinalMailBatch({ input: finalMailInput, payload, sourceBatch,
+    configHash: activeAwardConfig._hash, sealRoot: path.join(logsDir, "mail-batches") });
+  for (const type of ["daily", "phone_awards"]) {
+    payload[type] = { status: "sealed_pending_sent_reconcile", ...sealed.mails[type] };
+  }
+  payload.final_mail_manifest = sealed.manifestPath;
+  payload.final_mail_digest = sealed.digest;
+  payload.dispatch_gate = "entrypoint_gate.mjs reserve/authorize/complete: Mac 固定 ledger；先 reconcile，再 reservation，再一次性 permit/send/readback";
+}
 
 await fs.writeFile(mplusPayloadPath, JSON.stringify(payload.mplus, null, 2), "utf8");
 
@@ -564,6 +598,8 @@ const manifest = {
   validation: Object.fromEntries(checks.map((check) => [check.name, { ok: check.ok, detail: check.detail }])),
   mailSubjects: [payload.daily.subject, payload.phone_awards.subject],
   mailIds: [],
+  finalMailManifest: payload.final_mail_manifest || null,
+  finalMailDigest: payload.final_mail_digest || null,
   drivePublishedAt: null,
   result: "preflight-ready",
 };
@@ -574,7 +610,8 @@ const manifestPath = path.resolve(
 const preflightPath = path.resolve(
   process.env.REPORT_PREFLIGHT_PATH || path.join(logsDir, `preflight-${dateToken}.md`),
 );
-await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+// New runs cannot erase a same-day prior manifest/receipt.
+await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), { encoding: "utf8", ...(finalMailRequired ? {flag: "wx"} : {}) });
 await fs.writeFile(
   preflightPath,
   [
