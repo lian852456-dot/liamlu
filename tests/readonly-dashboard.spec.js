@@ -40,3 +40,13 @@ test('MoM comparison is prominent, uses matching periods, and never fabricates a
  await page.locator('#start').fill('2026-10-03');await expect(page.locator('.period-comparison')).toHaveCount(0);await expect(page.locator('.comparison-status')).toContainText('無法計算 MoM');await page.locator('#restore-comparison').click();await expect(page.locator('#start')).toHaveValue('2026-10-01');await expect(page.locator('.period-comparison')).toHaveCount(2);
  await page.locator('#store').selectOption('DNB10062');await expect(page.locator('.metrics')).toContainText('MoM 0.00%');await page.locator('[data-tab="conversion"]').click();await expect(page.locator('.metrics')).toContainText('個百分點');expect(s.errors).toEqual([]);expect(s.calls).toHaveLength(1);
 });
+
+test('same-chart MoM plots only the two observed periods and follows store/date filters',async({page})=>{
+ const s=await setup(page);await expect(page.locator('#controls')).toBeVisible();await page.locator('[data-tab="traffic"]').click();
+ for(const c of ['aq','rt']){await expect(page.locator('#'+c+'-mom-chart path')).toHaveCount(1);await expect(page.locator('#'+c+'-mom-chart circle')).toHaveCount(2);await expect(page.locator('#'+c+'-mom-chart')).toContainText('09/01–09/11');await expect(page.locator('#'+c+'-mom-chart')).toContainText('10/01–10/11');}
+ await page.locator('#aq-mom-chart circle').first().click();await expect(page.locator('#aq-mom-readout')).toContainText('上月同期 09/01–09/11');await expect(page.locator('#aq-mom-readout')).toContainText('900 來客');
+ await page.locator('#store').selectOption('DNB10062');await expect(page.locator('#aq-mom-chart .period-value')).toHaveText(['100 人次','100 人次']);await expect(page.locator('#aq-chart circle')).toHaveCount(11);
+ await page.locator('[data-tab="conversion"]').click();await expect(page.locator('#aq-mom-chart .period-value')).toHaveText(['5.00%','10.00%']);await page.locator('#aq-mom-chart circle').first().focus();await expect(page.locator('#aq-mom-readout')).toContainText('5 上線 / 100 來客');
+ await page.locator('#start').fill('2026-10-03');await expect(page.locator('.period-chart')).toHaveCount(0);await expect(page.locator('#aq-chart circle')).toHaveCount(8);await page.locator('#restore-comparison').click();await expect(page.locator('.period-chart')).toHaveCount(2);
+ await page.evaluate(()=>window.dispatchEvent(new Event('portal-before-logout')));await expect(page.locator('.period-chart')).toHaveCount(0);expect(s.calls).toEqual(['employee_dashboard_read']);expect(s.errors).toEqual([]);expect(s.writes).toEqual([]);
+});
