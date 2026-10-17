@@ -34,8 +34,9 @@ function departmentScoresPrivateFile_(file,folder) {
   if(!contained||file.getSharingAccess()!==DriveApp.Access.PRIVATE||file.getEditors().length||file.getViewers().length||file.getOwner().getEmail()!==folder.getOwner().getEmail()) throw new Error('SCORES_REVISION_OUTSIDE_PRIVATE_DOMAIN');
 }
 
-function departmentScoresRevision_(folder,entry) {
-  const file=DriveApp.getFileById(entry.fileId);departmentScoresPrivateFile_(file,folder);
+function departmentScoresRevision_(folder,entry,checkedFile) {
+  const file=checkedFile||DriveApp.getFileById(entry.fileId);
+  if(!checkedFile)departmentScoresPrivateFile_(file,folder);
   const data=JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   const month=DepartmentScoresCore.validateMonth(data.month);
   if(data.contract!==DepartmentScoresCore.CONTRACT||data.revision!==entry.revision||month.monthKey!==entry.monthKey||departmentScoresHash_(DepartmentScoresCore.canonical(month))!==entry.contentHash) throw new Error('SCORES_REVISION_READBACK_MISMATCH');
@@ -49,8 +50,15 @@ function departmentScoresPublicEntry_(entry) {
 function departmentScoresRead_(body) {
   ptRequireSession_(body.token,'department_scores_read');
   const folder=departmentScoresFolder_(),state=departmentScoresState_(folder).state;
-  const months=Object.keys(state.months).sort().map(function(key){const slot=state.months[key];return {month:departmentScoresRevision_(folder,slot.active),active:departmentScoresPublicEntry_(slot.active),history:slot.history.map(departmentScoresPublicEntry_)};});
-  return {contract:DepartmentScoresCore.CONTRACT,available:months.length>0,generation:state.generation,months:months};
+  const keys=Object.keys(state.months).sort(),files={},stamps=[];
+  // A version hit still checks every existing session/owner/folder/file ACL.
+  // File modification times also detect changes outside the immutable publication flow.
+  keys.forEach(function(key){const file=DriveApp.getFileById(state.months[key].active.fileId);departmentScoresPrivateFile_(file,folder);files[key]=file;stamps.push(file.getLastUpdated?Number(file.getLastUpdated()):null);});
+  const readVersion=departmentScoresHash_(JSON.stringify({state:state,modified:stamps}));
+  const meta={contract:DepartmentScoresCore.CONTRACT,readContract:'department-version-read/v1',readVersion:readVersion,available:keys.length>0,generation:state.generation};
+  if(body.knownVersion===readVersion&&stamps.every(function(v){return Number.isFinite(v)&&v>0;}))return {...meta,notModified:true};
+  const months=keys.map(function(key){const slot=state.months[key];return {month:departmentScoresRevision_(folder,slot.active,files[key]),active:departmentScoresPublicEntry_(slot.active),history:slot.history.map(departmentScoresPublicEntry_)};});
+  return {...meta,months:months};
 }
 
 function departmentScoresHistoryRead_(body) {

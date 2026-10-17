@@ -10,7 +10,7 @@ function runtime({sourceFiles}={}){
   const iterator=values=>{let index=0;return {hasNext:()=>index<values.length,next:()=>values[index++]};};
   function file(name,content){
     const id='synthetic-file-'+(++serial);
-    const result={name,content,getId:()=>id,getName:()=>name,getOwner:()=>owner,getSharingAccess:()=> 'PRIVATE',getEditors:()=>[],getViewers:()=>[],getParents:()=>iterator([folder]),getSize:()=>Buffer.byteLength(result.content),getBlob:()=>{reads++;return {getDataAsString:()=>result.content};},setContent:value=>{writes++;result.content=value;return result;}};
+    const result={name,content,getId:()=>id,getName:()=>name,getOwner:()=>owner,getSharingAccess:()=> 'PRIVATE',getEditors:()=>[],getViewers:()=>[],getParents:()=>iterator([folder]),getLastUpdated:()=>new Date('2026-10-13T00:00:00Z'),getSize:()=>Buffer.byteLength(result.content),getBlob:()=>{reads++;return {getDataAsString:()=>result.content};},setContent:value=>{writes++;result.content=value;return result;}};
     files.set(id,result);return result;
   }
   const folder={getId:()=> 'synthetic-folder',getName:()=> 'Existing private domain',getOwner:()=>owner,getSharingAccess:()=> 'PRIVATE',getEditors:()=>[],getViewers:()=>[],getFilesByName:name=>{reads++;return iterator([...files.values()].filter(f=>f.name===name));},createFile:(name,content)=>{writes++;return file(name,content);}};
@@ -26,10 +26,11 @@ function runtime({sourceFiles}={}){
   const sources=sourceFiles||['patrol-gas/PatrolCode.gs','gas/DepartmentGoldMonthlyCore.gs','gas/DepartmentGoldMonthly.gs','gas/DepartmentScoresCore.gs','gas/DepartmentScores.gs','gas/StoreRules.gs'].map(relative=>path.join(root,relative));
   for(const file of sources)vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});
   const q2={monthKey:'2026-06',dateRange:{start:'2026-06-01',end:'2026-06-30',cutoff:'2026-06-30'},records:[{employeeId:'SYN-Q2',employeeName:'合成保留',region:'北一二A',storeCode:'SYN-Q2',store:'合成歷史店',role:'合成職稱',medal:77}]};
-  context.departmentOpsLatestSnapshot_=()=>({version:1,months:[clone(q2)]});
+  // Keep the real legacy reader and its ACL checks in the integration runtime.
+  const legacyFile=file(vm.runInContext('DEPARTMENT_OPS_FILE',context),JSON.stringify({version:1,months:[clone(q2)]}));
   context.ptSessionNowSeconds_=()=>now;
   file('north12-store-rule-reminders-private.json',JSON.stringify(rules()));
   const post=payload=>JSON.parse(context.doPost({postData:{contents:JSON.stringify(payload)}}).text);
-  return {context,post,files,q2:clone(q2),get reads(){return reads;},get writes(){return writes;},advance:seconds=>{now+=seconds;}};
+  return {context,post,files,folder,legacyFile,q2:clone(q2),get reads(){return reads;},get writes(){return writes;},advance:seconds=>{now+=seconds;}};
 }
 module.exports={runtime,rules,clone};

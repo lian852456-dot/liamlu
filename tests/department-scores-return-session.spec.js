@@ -24,10 +24,10 @@ async function setup(page){
   const original=window.fetch;window.__returnRace=[];
   window.fetch=(u,o)=>{
    const p=JSON.parse(o?.body||'{}');
-   if(p.action!=='ptauth'||p.key||!new URL(u).searchParams.has('_request'))return original(u,o);
+   if(p.action!=='department_ops_read'||!p.knownVersion||!new URL(u).searchParams.has('_request'))return original(u,o);
    // Deliberately allow a late response even after abort to test the stale-response guard.
    return new Promise((resolve,reject)=>{
-    const r={token:p.token,signal:o.signal,aborts:0,resolve,reject};window.__returnRace.push(r);
+    const r={token:p.token,version:p.knownVersion,signal:o.signal,aborts:0,resolve,reject};window.__returnRace.push(r);
     o.signal.addEventListener('abort',()=>{r.aborts++;},{once:true});
    });
   };
@@ -36,7 +36,7 @@ async function setup(page){
    if(kind==='timeout')return r.reject(new DOMException('Aborted','AbortError'));
    if(kind==='network')return r.reject(new TypeError('Synthetic transport failure'));
    if(kind==='http503')return r.resolve(new Response('Synthetic unavailable',{status:503}));
-   const result=kind==='denied'?{status:'error',message:'unauthorized',reason:'AUTH_SESSION_REVOKED',auth:{reason:'AUTH_SESSION_REVOKED'}}:{status:'ok',token:r.token,expiresAt:Math.floor(Date.now()/1000)+3600};
+   const result=kind==='denied'?{status:'error',message:'unauthorized',reason:'AUTH_SESSION_REVOKED',auth:{reason:'AUTH_SESSION_REVOKED'}}:{status:'ok',notModified:true,readContract:'department-version-read/v1',monthly:{revision:r.version}};
    r.resolve(new Response(JSON.stringify(result),{status:200,headers:{'Content-Type':'application/json'}}));
   };
  });
@@ -50,7 +50,7 @@ for(const kind of ['success','denied','timeout','network','http503'])test(`late 
  const s=await setup(page);await returned(page);await pending(page,1);await relogin(page);
  expect(await page.evaluate(()=>({aborted:__returnRace[0].signal.aborted,aborts:__returnRace[0].aborts}))).toEqual({aborted:true,aborts:1});
  await returned(page);await pending(page,2);expect(await page.evaluate(()=>__returnRace[1].signal.aborted)).toBe(false);
- await settle(page,0,kind);await expect(page.locator('#workspace')).toBeVisible();expect(await page.evaluate(key=>sessionStorage.getItem(key),KEY)).toBe(s.b);
+ await settle(page,0,kind);await expect(page.locator('#workspace')).toHaveJSProperty('hidden',false);await expect(page.locator('#authPanel')).toBeHidden();expect(await page.evaluate(key=>sessionStorage.getItem(key),KEY)).toBe(s.b);
  await returned(page);await page.waitForTimeout(50);await pending(page,2);
  await settle(page,1,'success');await expect(page.locator('#peopleBody')).toContainText('合成B');
  await returned(page);await pending(page,3);await settle(page,2,'denied');await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#peopleBody')).toBeEmpty();expect(s.errors).toEqual([]);
@@ -69,5 +69,6 @@ for(const event of ['department-session-cleared','portal-before-logout'])test(`$
 test('same token reused after logout gets a new generation and a new return check',async({page})=>{
  const s=await setup(page);await returned(page);await pending(page,1);
  await page.evaluate(({key,a})=>{window.dispatchEvent(new Event('department-session-cleared'));sessionStorage.setItem(key,a);document.querySelector('#workspace').hidden=false;window.dispatchEvent(new Event('pageshow'));},{key:KEY,a:s.a});
- await returned(page);await pending(page,2);await settle(page,0,'denied');await returned(page);await pending(page,2);await expect(page.locator('#workspace')).toBeVisible();await settle(page,1,'denied');await expect(page.locator('#workspace')).toBeHidden();expect(s.errors).toEqual([]);
+ await expect(page.locator('#peopleBody')).toContainText('合成A');
+ await returned(page);await pending(page,2);await settle(page,0,'denied');await returned(page);await pending(page,2);await expect(page.locator('#workspace')).toHaveJSProperty('hidden',false);await expect(page.locator('#authPanel')).toBeHidden();await settle(page,1,'denied');await expect(page.locator('#workspace')).toBeHidden();expect(s.errors).toEqual([]);
 });

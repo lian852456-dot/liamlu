@@ -75,6 +75,10 @@ async function setup(page) {
         return { kind, fileName:file.name };
       },
       buildPublishSnapshot: (kind, parsed) => {
+        if (kind === 'tradein') {
+          const row = (capacity, price) => ({source_sheet:'合成報價',brand:'合成品牌',model:'合成機_8G/'+capacity+'(5G)',quotes:{'點子行動':{S:null,A:price,B:'0',C:null},'FutureDial（FDI）':{S:'1200',A:'1000',B:'200',C:null},'愛鋒派':{S:null,A:null,B:null,C:null,'未分級':'50'}}});
+          return {schema_version:'threec-normalized-snapshot/v1',kind,source_file_name:parsed.fileName,source_version_date:'2026-09-29',source_file_sha256:'a'.repeat(64),row_count:2,source_row_count:16,excluded_no_price_count:0,quote_conflict_count:0,rows:[row('128G','100'),row('256G','200')]};
+        }
         const rows = window.noopMode ? [
           {source_sheet:'iPhone 24期',source_row_number:3,brand:'Apple',code:'TEST-B',model:'iPhone test B 256G(黑)',colorless_model:'iPhone test B 256G',retail_price:'28,900',project_prices:{'999H 24期':'1,199'}},
           {source_sheet:'iPhone 24期',source_row_number:2,brand:'Apple',code:'TEST-A',model:'iPhone test A 256G(黑)',colorless_model:'iPhone test A 256G',retail_price:'29,900',project_prices:{'999H 24期':'1,299'}}
@@ -84,10 +88,33 @@ async function setup(page) {
     };
   `;
   // Use a tiny isolated google.script.run mock with one handler chain per RPC.
-  const mockRpc = `window.google={script:{get run(){let success;const chain=new Proxy({}, {get(_,name){
+  const mockRpc = `window.google={script:{get run(){let success,failure;const chain=new Proxy({}, {get(_,name){
     if(name==='withSuccessHandler')return fn=>{success=fn;return chain};
-    if(name==='withFailureHandler')return ()=>chain;
-    return payload=>{window.rpcCalls.push({name,payload});if(name==='threec_publish')window.lastSnapshot=JSON.parse(payload.snapshotJson);let result={ok:false};if(name==='threec_diff_preview'){const active=window.noopMode?{snapshot_hash:'active-hash',source_version_date:'2026-09-29',source_file_sha256:'a'.repeat(64),row_count:2}:null;result={status:'ok',basis:{snapshot_hash:active?active.snapshot_hash:'',date:active?active.source_version_date:'',source_sha:active?active.source_file_sha256:''},registry:{shopping:{active}},changeSet:{kind:'shopping',counts:{added:0,changed:0,unchanged:window.noopMode?6:0,removed:0},addedCount:0,changedCount:0,unchangedCount:window.noopMode?6:0,removedCount:0,changeCount:0,offset:0,limit:100,hasMore:false,changes:[]}};}else if(name==='threec_readback'){let snapshot=window.lastSnapshot;if(window.noopMode&&window.nextPublishStatus==='already_current')snapshot={...window.lastSnapshot,source_version_date:'2026-09-29',source_file_sha256:'a'.repeat(64),snapshot_hash:'active-hash',rows:[...window.lastSnapshot.rows].reverse()};const updateCheck=window.noopMode&&window.nextPublishStatus==='already_current'?{status:'already_current',snapshot_hash:'active-hash',source_version_date:window.lastSnapshot.source_version_date,source_file_sha256:window.lastSnapshot.source_file_sha256,row_count:window.lastSnapshot.row_count}:null;result={snapshot:window.failReadback?{...snapshot,rows:[]} : snapshot,registry:{},updateCheck};}else if(name==='report_upload_log')result={entries:[],live:null};else if(name==='threec_publish')result={status:window.nextPublishStatus,registry:{}};else if(name==='threec_status')result={registry:{}};queueMicrotask(()=>success(result));};
+    if(name==='withFailureHandler')return fn=>{failure=fn;return chain};
+    return payload=>{
+      window.rpcCalls.push({name,payload});
+      if(name==='threec_publish')window.lastSnapshot=JSON.parse(payload.snapshotJson);
+      if((name==='threec_publish'&&window.failPublishResponse)||(name==='threec_changes_read'&&window.failChanges)){queueMicrotask(()=>failure({message:'合成連線失敗'}));return;}
+      let result={ok:false};
+      if(name==='threec_diff_preview'){
+        const active=window.noopMode?{snapshot_hash:'active-hash',source_version_date:'2026-09-29',source_file_sha256:'a'.repeat(64),row_count:2}:null;
+        result={status:'ok',basis:{snapshot_hash:active?active.snapshot_hash:'',date:active?active.source_version_date:'',source_sha:active?active.source_file_sha256:''},registry:{shopping:{active}},changeSet:{kind:'shopping',counts:{added:0,changed:0,unchanged:window.noopMode?6:0,removed:0},addedCount:0,changedCount:0,unchangedCount:window.noopMode?6:0,removedCount:0,changeCount:0,offset:0,limit:100,hasMore:false,changes:[]}};
+      }else if(name==='threec_readback'){
+        let snapshot=JSON.parse(JSON.stringify(window.lastSnapshot));
+        if(window.noopMode&&window.nextPublishStatus==='already_current')snapshot={...snapshot,source_version_date:'2026-09-29',source_file_sha256:'a'.repeat(64),snapshot_hash:'active-hash',rows:[...snapshot.rows].reverse()};
+        if(window.reorderReadback)snapshot.rows.reverse();
+        if(window.tradeinMutation==='price')snapshot.rows[0].quotes['愛鋒派']['未分級']='51';
+        if(window.tradeinMutation==='zero')snapshot.rows[0].quotes['點子行動'].B=null;
+        if(window.tradeinMutation==='duplicate')snapshot.rows[1]=JSON.parse(JSON.stringify(snapshot.rows[0]));
+        if(window.tradeinMutation==='grade')delete snapshot.rows[0].quotes['點子行動'].S;
+        const updateCheck=window.noopMode&&window.nextPublishStatus==='already_current'?{status:'already_current',snapshot_hash:'active-hash',source_version_date:window.lastSnapshot.source_version_date,source_file_sha256:window.lastSnapshot.source_file_sha256,row_count:window.lastSnapshot.row_count}:null;
+        result={snapshot:window.failReadback?{...snapshot,rows:[]} : snapshot,registry:{},updateCheck};
+      }else if(name==='report_upload_log')result={entries:[],live:null};
+      else if(name==='threec_publish')result={status:window.nextPublishStatus,registry:{}};
+      else if(name==='threec_status')result={registry:{}};
+      else if(name==='threec_changes_read')result={changeSet:{}};
+      queueMicrotask(()=>success(result));
+    };
   }});return chain;}}};`;
   const html = pageSource.replace(/<script><\?!=[\s\S]*?\?><\/script>/g, '')
     .replace('    const auth', mocks + diffCore + mockRpc + '\n    const auth');
@@ -114,7 +141,8 @@ test('登入後可選檔，解析不傳送原始 Excel，發布需要明確確�
   expect(await page.evaluate(()=>window.rpcCalls.filter(c=>c.name==='threec_publish').length)).toBe(0);
   await page.locator('#threecConfirm').check();
   await page.locator('#threecPublishBtn').click();
-  await expect(page.locator('#threecMessage')).toContainText('已發布');
+  await expect(page.locator('#threecPublishReceipt')).toContainText('已發布');
+  await expect(page.locator('#threecReadbackMessage')).toContainText('所有價格與來源預覽一致');
   await expect(page.locator('#threecPublishBtn')).toBeDisabled();
   const calls=await page.evaluate(()=>window.rpcCalls.filter(c=>c.name==='threec_publish'));
   expect(calls).toHaveLength(1);
@@ -156,7 +184,7 @@ test('同日異雜湊必須再確認，成功後發布按鈕保持停用', async
   await page.locator('#threecSameDateConfirm').check();
   await page.evaluate(()=>{window.nextPublishStatus='published';});
   await page.locator('#threecPublishBtn').click();
-  await expect(page.locator('#threecMessage')).toContainText('已發布');
+  await expect(page.locator('#threecPublishReceipt')).toContainText('已發布');
   await expect(page.locator('#threecPublishBtn')).toBeDisabled();
   const calls=await page.evaluate(()=>window.rpcCalls.filter(c=>c.name==='threec_publish'));
   expect(calls[0].payload.confirmSameDateHashChange).toBe(false);
@@ -173,10 +201,20 @@ test('來源預覽显示千分位、零元与缺價，正式讀回不一致不�
   await page.evaluate(()=>{window.failReadback=true;});
   await page.locator('#threecConfirm').check();
   await page.locator('#threecPublishBtn').click();
-  await expect(page.locator('#threecMessage')).toContainText('正式讀回與來源預覽不一致');
-  await expect(page.locator('#threecMessage')).not.toContainText('已發布');
+  await expect(page.locator('#threecPublishReceipt')).toContainText('已發布');
+  await expect(page.locator('#threecReadbackMessage')).toContainText('正式讀回與來源預覽不一致');
+  await expect(page.locator('#threecReadbackRetryBtn')).toBeEnabled();
+  await expect(page.locator('#threecPublishBtn')).toBeDisabled();
+  await expect(page.locator('#threecConfirm')).not.toBeChecked();
   const calls=await page.evaluate(()=>window.rpcCalls.map(c=>c.name));
   expect(calls.indexOf('threec_readback')).toBeGreaterThan(calls.indexOf('threec_publish'));
+  await page.evaluate(()=>{window.failReadback=false;});
+  await page.locator('#threecReadbackRetryBtn').click();
+  await expect(page.locator('#threecReadbackMessage')).toContainText('所有價格與來源預覽一致');
+  await expect(page.locator('#threecPublishReceipt')).toContainText('已發布');
+  await expect(page.locator('#threecReadbackRetryBtn')).toBeHidden();
+  expect(await page.evaluate(()=>window.rpcCalls.filter(c=>c.name==='threec_publish').length)).toBe(1);
+  expect(await page.evaluate(()=>window.rpcCalls.filter(c=>c.name==='threec_readback').length)).toBe(2);
 });
 
 test('already_current 以來源核對欄位與語意價格差異驗證，容許日期／列序更新', async ({page}) => {
@@ -190,8 +228,8 @@ test('already_current 以來源核對欄位與語意價格差異驗證，容許�
   expect(JSON.parse(preview.payload.snapshotJson).source_version_date).toBe('2026-10-02');
   await page.locator('#threecConfirm').check();
   await page.locator('#threecPublishBtn').click();
-  await expect(page.locator('#threecMessage')).toContainText('正式版本已是同日期同雜湊，未產生新寫入');
-  await expect(page.locator('#threecMessage')).not.toContainText('正式讀回與來源預覽不一致');
+  await expect(page.locator('#threecPublishReceipt')).toContainText('正式價格已是同版，未建立新價格快照');
+  await expect(page.locator('#threecReadbackMessage')).toContainText('所有價格與來源預覽一致');
   const calls = await page.evaluate(() => window.rpcCalls.map(call => call.name));
   expect(calls.indexOf('threec_readback')).toBeGreaterThan(calls.indexOf('threec_publish'));
 });
@@ -199,7 +237,7 @@ test('already_current 以來源核對欄位與語意價格差異驗證，容許�
 test('三商預覽保留來源未分級，讀回第三商或未分級價格改變必須失敗', async ({page}) => {
   await setup(page);
   const result = await page.evaluate(() => {
-    const snapshot={kind:'tradein',rows:[{source_sheet:'舊換新',brand:'Apple',model:'iPhone test',quotes:{'點子行動':{S:null,A:100,B:null,C:null},'FutureDial（FDI）':{S:null,A:null,B:null,C:null},'愛鋒派':{S:null,A:900,B:null,C:null,'未分級':0}}}]};
+    const snapshot={schema_version:'threec-normalized-snapshot/v1',kind:'tradein',row_count:1,rows:[{source_sheet:'舊換新',brand:'Apple',model:'iPhone test',quotes:{'點子行動':{S:null,A:100,B:null,C:null},'FutureDial（FDI）':{S:null,A:null,B:null,C:null},'愛鋒派':{S:null,A:900,B:null,C:null,'未分級':0}}}]};
     renderThreecPrices(snapshot);
     const before=JSON.stringify(threecComparableRows(snapshot));
     const changed=JSON.parse(JSON.stringify(snapshot));changed.rows[0].quotes['愛鋒派']['未分級']=1;
@@ -210,4 +248,66 @@ test('三商預覽保留來源未分級，讀回第三商或未分級價格改�
   expect(result.text).toContain('愛鋒派 A：900 元');
   expect(result.ungradedChanged).toBe(true);
   expect(result.providerMissing).toBe(true);
+});
+
+async function publishTradein(page) {
+  await page.locator('#tradeinFile').setInputFiles({name:'合成20260929.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from('synthetic-only')});
+  await page.locator('#tradeinPreviewBtn').click();
+  await page.locator('#threecConfirm').check();
+  await page.locator('#threecPublishBtn').click();
+}
+
+test('舊換新列序等價仍完成逐價核對，發布收據與核對結果分開顯示', async ({page}, testInfo) => {
+  await setup(page);
+  await page.evaluate(()=>{window.reorderReadback=true;});
+  await publishTradein(page);
+  await expect(page.locator('#threecPublishReceipt')).toContainText('私有快照已發布');
+  await expect(page.locator('#threecReadbackMessage')).toContainText('所有價格與來源預覽一致');
+  await expect(page.locator('#threecPublishBtn')).toBeDisabled();
+  await expect(page.locator('#threecConfirm')).toBeDisabled();
+  expect(await page.evaluate(()=>window.rpcCalls.filter(c=>c.name==='threec_publish').length)).toBe(1);
+  await page.locator('#threecPublishReceipt').scrollIntoViewIfNeeded();
+  await page.screenshot({path:testInfo.outputPath('SYNTHETIC-readback-equivalent.png')});
+});
+
+for (const mutation of ['price','zero','duplicate','grade']) test('舊換新 '+mutation+' 差異保留發布收據，唯讀重試不重送價格', async ({page}, testInfo) => {
+  await setup(page);
+  await page.evaluate(value=>{window.tradeinMutation=value;},mutation);
+  await publishTradein(page);
+  await expect(page.locator('#threecPublishReceipt')).toHaveClass(/ok/);
+  await expect(page.locator('#threecReadbackMessage')).toHaveClass(/bad/);
+  await expect(page.locator('#threecReadbackMessage')).not.toContainText('所有價格與來源預覽一致');
+  await expect(page.locator('#threecPublishBtn')).toBeDisabled();
+  if (mutation === 'price') { await page.locator('#threecReadbackMessage').scrollIntoViewIfNeeded(); await page.screenshot({path:testInfo.outputPath('SYNTHETIC-published-price-mismatch.png')}); }
+  await page.evaluate(()=>{window.tradeinMutation='';});
+  await page.locator('#threecReadbackRetryBtn').click();
+  await expect(page.locator('#threecReadbackMessage')).toHaveClass(/ok/);
+  expect(await page.evaluate(()=>window.rpcCalls.filter(c=>c.name==='threec_publish').length)).toBe(1);
+  expect(await page.evaluate(()=>window.rpcCalls.filter(c=>c.name==='threec_readback').length)).toBe(2);
+});
+
+test('發布回應不明時停用重送，唯讀查到價格也不捏造發布收據', async ({page}) => {
+  await setup(page);await page.evaluate(()=>{window.failPublishResponse=true;});
+  await publishTradein(page);
+  await expect(page.locator('#threecPublishReceipt')).toHaveClass(/warn/);
+  await expect(page.locator('#threecPublishReceipt')).toContainText('尚未取得發布收據');
+  await expect(page.locator('#threecPublishBtn')).toBeDisabled();
+  await page.locator('#threecReadbackRetryBtn').click();
+  await expect(page.locator('#threecReadbackMessage')).toHaveClass(/ok/);
+  await expect(page.locator('#threecPublishReceipt')).toHaveClass(/warn/);
+  await expect(page.locator('#threecMessage')).toContainText('原發布回應仍未取得');
+  expect(await page.evaluate(()=>window.rpcCalls.filter(c=>c.name==='threec_publish').length)).toBe(1);
+});
+
+test('異動清單連線失敗不會抹去已核對的價格結果，手機版狀態可讀', async ({page}, testInfo) => {
+  await page.setViewportSize({width:390,height:844});
+  await setup(page);await page.evaluate(()=>{window.failChanges=true;});
+  await publishTradein(page);
+  await expect(page.locator('#threecPublishReceipt')).toHaveClass(/ok/);
+  await expect(page.locator('#threecReadbackMessage')).toHaveClass(/ok/);
+  await expect(page.locator('#threecMessage')).toContainText('異動清單尚未載入');
+  await expect(page.locator('#threecReadbackRetryBtn')).toBeHidden();
+  expect(await page.evaluate(()=>window.rpcCalls.filter(c=>c.name==='threec_publish').length)).toBe(1);
+  await page.locator('#threecPublishReceipt').scrollIntoViewIfNeeded();
+  await page.screenshot({path:testInfo.outputPath('SYNTHETIC-mobile-verified-changes-unavailable.png')});
 });

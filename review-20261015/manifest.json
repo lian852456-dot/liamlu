@@ -1,0 +1,55 @@
+{
+  "purpose": "Same-origin protected acceptance previews; main entry points unchanged",
+  "sources": {
+    "pr234": "b8bf9fb5db74efd055519680b1e142b859d7e8e8",
+    "pr235": "8da6d523b35ae1ce5f23f9fb0d94f69442c273a1"
+  },
+  "dataEmbedded": false,
+  "authentication": "Existing Patrol / A / B / reportUploadAuthorize_, unchanged",
+  "backendVersions": {
+    "patrol": 19,
+    "owner": 69
+  },
+  "files": [
+    {
+      "name": "acceptance-timing.js",
+      "bytes": 1438,
+      "sha256": "63e461a9fda2ee4eaee0d37ec60e9c50e86d0326b614b8b34d4dccbc396468f2"
+    },
+    {
+      "name": "department-gold-monthly-ui.js",
+      "bytes": 21625,
+      "sha256": "bf84fcdd56734d72c56dc97911cdf33fdfe9b3cbb40f80f5a2683cd4ec23d97e"
+    },
+    {
+      "name": "department-ops.html",
+      "bytes": 12538,
+      "sha256": "48b96a4b83650243fcf1794e34cf9134729840e105d63fb9c815355dfafa0117"
+    },
+    {
+      "name": "department-ops.js",
+      "bytes": 29208,
+      "sha256": "15ea956c44a8ac1365f40bff6adc4139ca37218c8ede2c97e09a68865a014796"
+    },
+    {
+      "name": "department-scores.js",
+      "bytes": 31456,
+      "sha256": "e266bf709dfd01d6fc65eec9aca8a2b0e09b819f4c27348e257532531253c1f5"
+    },
+    {
+      "name": "readonly-conversion-upload.html",
+      "bytes": 976148,
+      "sha256": "1e865863c088062b8eeb6c97a1ddcb8351ac12fef1746ccda18c7e3b7ec4f932"
+    },
+    {
+      "name": "readonly-dashboard.html",
+      "bytes": 154503,
+      "sha256": "1663198560eee08948ae86e1996a933982e8193f0b7423ca03f3c78a9f184549"
+    },
+    {
+      "name": "session-read-manager.js",
+      "bytes": 4565,
+      "sha256": "c853a7c517ffac989f033cca67ce57f03c1a4ee94f89cc57479317bb08f8a6a4"
+    }
+  ]
+}

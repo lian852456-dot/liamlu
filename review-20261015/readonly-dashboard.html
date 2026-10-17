@@ -1,0 +1,2108 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-1UrNiBuCQZLQ4BhOZKopMhi2ACv4HkM5I/0brLfkk4Q=' 'sha256-0pEdwEHZNG9WZZ4bEQH/Fc8FjiyljmR297z/x11G8i0=' 'sha256-1R7wItB9kNcBYokyp7b7wY9UZ3GHsOJ7F05NO/Q5sR4=' 'sha256-iEYMoPgLozQb8v0GzpM1V9mE2Yf5qYiaMxrIDSppMtg=' 'sha256-ASRq5eeHsRpGTxtweT6CZ/cqmPBoxgC+t0yJ/s9qkA0=' 'sha256-9Y32+f/EXZRcoPYDUsy081P9bk1s5dRioTLTkVtbBdw=' 'sha256-FShoZuPaXDVwKYO+DS3XZ5hiofXz9xYEPFfLa8GlCak=' 'sha256-Qsq/RpaP/03yCKxITvMoc2AEC17eQiE1bqMJZj1Jl1Y='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>北一二B｜唯讀儀表板</title><style>
+:root{--ink:#152c3f;--muted:#516475;--paper:#f2f5f8;--line:#dce4eb;--aq:#be5814;--aq-fill:#fff1e5;--rt:#087f83;--rt-fill:#e8f7f5;--nav:#164569;--warn:#865508;--warn-bg:#fff5da;--radius:18px}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:700 16px/1.55 "PingFang TC","Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif}button,input,select{font:inherit;color:inherit}button,select,input{min-height:44px}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #317cba;outline-offset:3px}a{color:#164569}p{margin:.35em 0}h1,h2,h3{line-height:1.3;margin:0}h1{font-size:28px;letter-spacing:.03em}h2{font-size:22px}h3{font-size:19px}.shell{max-width:1260px;margin:auto;padding:28px 26px 42px}.eyebrow{font-size:14px;letter-spacing:.05em;color:var(--muted);margin-bottom:6px}.header{display:flex;gap:24px;align-items:center;justify-content:space-between}.header-note{font-size:15px;color:var(--muted);margin-top:7px}.pill{display:inline-flex;align-items:center;gap:8px;background:#e1ecf3;color:var(--nav);border-radius:30px;padding:5px 13px;font-size:14px}.quiet{border:1px solid var(--line);background:#fff;border-radius:12px;padding:8px 16px;white-space:nowrap}.demo{margin:21px 0 19px;background:var(--warn-bg);border:1px solid #e5cfa0;border-left:5px solid #af7b20;border-radius:12px;padding:13px 17px;display:flex;gap:12px;align-items:flex-start;color:#5e400f;font-size:16px}.demo strong{display:block;font-size:17px}.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:0 0 18px;background:#e3eaf0;padding:6px;border-radius:14px}.tab{border:0;border-radius:10px;background:transparent;font-size:17px;white-space:nowrap;padding:11px 8px}.tab[aria-selected=true]{color:white;background:var(--nav);box-shadow:0 3px 8px #1336521a}.controls{display:flex;align-items:end;gap:14px;flex-wrap:wrap;margin-bottom:18px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:14px;color:var(--muted)}select,input{border:1px solid #bccbd7;background:#fff;padding:8px 12px;border-radius:10px;max-width:100%}.field.scope{min-width:260px;flex:1}.datebox{width:173px}.seg{display:flex;border:1px solid #bccbd7;border-radius:10px;overflow:hidden;background:white}.seg button{background:transparent;border:0;padding:8px 20px;font-size:15px}.seg button[aria-pressed=true]{background:var(--nav);color:#fff}.context{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;margin:0 0 15px}.context p{font-size:15px;color:var(--muted)}.cutoff{white-space:nowrap;font-size:14px;color:var(--nav);border:1px solid #c2d3e0;background:#e6eff5;padding:6px 12px;border-radius:20px}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:18px}.metric{border:1px solid var(--line);background:white;border-radius:var(--radius);padding:20px 22px;position:relative;overflow:hidden}.metric::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--aq)}.metric.rt::before{background:var(--rt)}.metric h3{font-size:17px;color:var(--muted)}.value{font-size:39px;line-height:1.2;letter-spacing:-.03em;margin:8px 0;color:var(--aq)}.rt .value{color:var(--rt)}.metric small{font-size:14px;display:block;color:var(--muted)}.metric .change{font-size:14px;margin-top:9px}.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.panel{padding:20px;background:white;border:1px solid var(--line);border-radius:var(--radius);min-width:0}.panel .sub{font-size:14px;color:var(--muted);margin:5px 0 12px}.chart{width:100%;min-width:0;min-height:250px}.chart svg{display:block;width:100%;overflow:visible}.chart svg text{font-family:inherit;font-weight:700}.chart .dot{cursor:pointer}.day-readout{min-height:43px;background:#f3f6f9;padding:9px 12px;border-radius:9px;font-size:14px;line-height:1.6;color:var(--muted)}.legend{display:flex;gap:16px;font-size:14px;color:var(--muted);margin-top:10px;flex-wrap:wrap}.key{display:inline-flex;align-items:center;gap:7px}.swatch{width:18px;height:4px;display:inline-block;border-radius:4px}.distribution{margin-top:18px}.bar-row{display:grid;grid-template-columns:70px minmax(0,1fr) 79px;gap:10px;align-items:center;margin:12px 0;font-size:15px}.track{height:13px;background:#e8edf1;border-radius:7px;overflow:hidden}.track span{height:100%;display:block;border-radius:7px}.numeric{text-align:right;font-variant-numeric:tabular-nums}.notes{margin-top:20px;padding:16px 20px;background:#e9eff4;border:1px solid #d8e1e9;border-radius:14px;font-size:14px;color:#425969}.notes strong{font-size:15px}.footer{margin-top:22px;display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;font-size:13px;color:var(--muted)}.empty{padding:44px 30px;text-align:center;background:#fff;border:1px dashed #aabdc9;border-radius:var(--radius);margin-top:20px}.empty h2{font-size:24px;margin-bottom:12px}.empty p{max-width:740px;margin:8px auto;color:var(--muted);font-size:17px}.empty .needed{max-width:750px;margin:24px auto 0;text-align:left;background:#f3f6f9;padding:20px;border-radius:14px;font-size:16px}.empty .needed p{font-size:16px}.empty .label{display:inline-block;background:#e7edf3;border-radius:24px;padding:5px 15px;font-size:14px;margin-bottom:16px;color:var(--nav)}.no-data{grid-column:1/-1;padding:40px 24px;text-align:center;color:var(--muted);border:1px dashed #bccbd7;border-radius:14px;background:white}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}dialog{max-width:680px;width:calc(100% - 30px);padding:24px;border:0;border-radius:18px;box-shadow:0 16px 70px #172d4444}dialog::backdrop{background:#132d4666}dialog h2{margin:0 0 15px}dialog p{margin:12px 0}dialog .quiet{float:right}.count-note{font-size:14px;color:var(--muted)}[hidden]{display:none!important}
+@media(max-width:700px){.shell{padding:20px 14px 30px}.header{align-items:flex-start;gap:12px}.header h1{font-size:24px}.header-note{font-size:14px}.header .quiet{padding:5px 10px;font-size:14px;min-height:40px}.demo{margin-top:17px;padding:12px;font-size:15px;line-height:1.65}.demo strong{font-size:16px}.tabs{gap:3px;padding:4px}.tab{font-size:16px;padding:10px 2px}.controls{gap:10px}.field.scope{min-width:100%;width:100%}.datebox{flex:1;min-width:0;width:auto}.datebox input{width:100%;padding:8px}.field.mode{width:100%}.seg{width:100%}.seg button{flex:1}.context{flex-direction:column;gap:8px}.context h2{font-size:21px}.context p{font-size:14px}.cutoff{font-size:13px}.metrics{gap:10px}.metric{padding:16px 13px}.metric h3{font-size:15px}.value{font-size:32px}.metric small,.metric .change{font-size:13px;line-height:1.65}.charts{grid-template-columns:1fr;gap:14px}.panel{padding:17px 14px}.panel h3{font-size:18px}.notes{padding:14px;font-size:14px}.bar-row{grid-template-columns:65px minmax(0,1fr) 68px;font-size:14px}.empty{padding:29px 17px}.empty h2{font-size:21px}.empty p{font-size:16px}.empty .needed{padding:15px}.footer{font-size:12px}.eyebrow{font-size:13px}.pill{display:none}.chart{min-height:255px}}
+@media(prefers-reduced-motion:no-preference){.metric,.panel{animation:arrive .22s ease-out}@keyframes arrive{from{opacity:.65;transform:translateY(3px)}to{opacity:1;transform:none}}}
+@media print{.controls,.tabs,.header button{display:none}.shell{padding:0}.demo{background:#fff}.panel,.metric{break-inside:avoid}.charts{grid-template-columns:1fr 1fr}.footer{color:#333}}
+.business-metric::before{background:var(--accent)}.business-metric .value{color:var(--accent)}.source-status{font-size:15px;color:#516475;background:#e8eff5;border:1px solid #d6e1e9;padding:12px 16px;border-radius:12px;margin:0 0 16px}.biz-controls{display:flex;gap:15px;margin-bottom:18px;flex-wrap:wrap}.biz-controls .field{min-width:210px}.business-bars{margin-top:18px}.biz-row{display:grid;grid-template-columns:minmax(100px,145px) minmax(0,1fr) 80px;gap:11px;align-items:center;min-height:45px;margin:13px 0;font-size:16px}.biz-label small{display:block;font-size:13px;line-height:1.6;color:var(--muted);margin-top:3px}.biz-track{height:15px;border-radius:8px;background:#e6edf2;position:relative}.biz-track span{display:block;height:100%;border-radius:8px}.target-mark{position:absolute;border-left:2px dashed #60778a;top:-5px;height:25px}.bar-key{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);margin-top:18px}.mini-mark{height:18px;border-left:2px dashed #60778a}.fixture-note{background:#e9eff4;color:#425969;border-radius:12px;padding:14px 18px;font-size:14px;margin-top:18px}.person-detail{margin-top:18px}.person-table{width:100%;border-collapse:collapse;table-layout:fixed;text-align:left}.person-table th{font-size:14px;color:var(--muted);padding:12px 8px;border-bottom:2px solid #dce5ec}.person-table td{padding:14px 8px;border-bottom:1px solid #e2e9ef;overflow-wrap:anywhere}.person-table td small{display:block;font-size:13px;color:var(--muted);margin-top:3px}.filter-status{font-size:15px;padding:10px 14px;margin:-4px 0 16px;background:#e7f3f2;border-radius:10px;color:#176466}
+@media(max-width:700px){.source-status{font-size:14px;padding:12px}.biz-controls{gap:10px}.biz-controls .field{min-width:0;flex:1}.biz-controls select{width:100%;padding:8px;font-size:15px}.biz-row{grid-template-columns:minmax(86px,100px) minmax(0,1fr) 65px;gap:8px;font-size:14px}.biz-label small{font-size:13px}.fixture-note{font-size:14px;padding:13px}.person-table,.person-table tbody{display:block}.person-table thead{display:none}.person-table tr{display:grid;grid-template-columns:1fr 1fr;gap:12px;background:#f3f6f9;padding:14px;border-radius:12px;margin:12px 0}.person-table td{padding:0;border:0}.person-table td:first-child{grid-column:1/-1}.person-table td:before{content:attr(data-label);display:block;font-size:13px;color:var(--muted);margin-bottom:2px}.person-table td small{display:inline-block;margin-left:9px}.person-table td strong{font-size:17px}.person-table td{font-size:16px}.filter-status{font-size:14px}}
+
+.auth-status{background:#e6eff5;border:1px solid #c2d3e0;padding:16px 20px;border-radius:14px;margin:20px 0}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.toolbar a{display:inline-flex;align-items:center;min-height:44px}.auth-status.error{color:#94331b;background:#fff0e8}.empty{text-align:left}.period{font-size:14px;color:var(--muted)}.numeric{font-variant-numeric:tabular-nums}.person-table{width:100%;border-collapse:collapse}.person-table th,.person-table td{text-align:left;border-bottom:1px solid var(--line);padding:12px}.person-table td:not(:first-child){font-variant-numeric:tabular-nums}.table-scroll{max-width:100%;overflow:auto}.page-source{overflow-wrap:anywhere}.source-badge{font-size:14px;color:var(--muted)}
+
+@media(max-width:480px){.metrics{grid-template-columns:1fr}.datebox{flex-basis:calc(50% - 5px)}.field.mode{flex-basis:100%}}
+
+.metric::before{background:var(--card-accent,var(--aq))}.comparison-status,.comparison-note{font-size:14px;color:var(--muted);margin:0 0 16px}.comparison-status .quiet{margin-top:8px;white-space:normal}.period-comparison{border-top:1px solid var(--line);margin-top:16px;padding-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}.period-comparison span{display:block;font-size:13px;color:var(--muted)}.period-comparison strong{display:block;font-size:20px;color:var(--ink);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.period-comparison p{grid-column:1/-1;font-size:15px;margin:0;color:var(--nav)}.kpi-controls{margin-top:14px}.kpi-controls .field{min-width:0;width:100%}.kpi-controls select{width:100%}.kpi-table{width:100%;border-collapse:collapse;table-layout:fixed;text-align:left}.kpi-table th,.kpi-table td{padding:13px 10px;border-bottom:1px solid var(--line);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}.kpi-table th{font-size:14px;color:var(--muted)}.kpi-table th:first-child{width:38%}.kpi-table td small{display:block;font-size:13px;color:var(--muted);margin-top:4px}.kpi-definition{margin-top:15px!important;line-height:1.75}#kpi-compare-title{overflow-wrap:anywhere}
+@media(max-width:700px){.period-comparison{gap:10px}.period-comparison strong{font-size:19px}.kpi-table,.kpi-table tbody{display:block}.kpi-table thead{display:none}.kpi-table tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0;background:#f8fafc}.kpi-table td{padding:0;border:0;min-width:0}.kpi-table td:first-child{grid-column:1/-1}.kpi-table td::before{content:attr(data-label);display:block;font-size:13px;color:var(--muted);margin-bottom:3px}.kpi-table td:first-child::before{display:none}.kpi-table td strong{font-size:16px}.comparison-status,.comparison-note{font-size:14px;line-height:1.75}}
+</style>
+</head><body><main class="shell">
+<header class="header"><div><div class="eyebrow">北一二B · 營運中心</div><h1>唯讀儀表板</h1><p class="header-note">KPI、台獎、個績與 AQ／RT 趨勢</p></div><a class="quiet" href="https://lian852456-dot.github.io/liamlu/home.html">返回情報站</a></header>
+<section class="auth-status" aria-live="polite"><p id="auth-message">正在核對現有登入…</p><div class="toolbar"><button id="refresh" class="quiet" type="button">重新核驗與讀取</button><a href="https://lian852456-dot.github.io/liamlu/home.html" id="login-link">前往情報站登入</a><a href="readonly-conversion-upload.html">主管更新締結率資料</a></div></section>
+<nav class="tabs" role="tablist" aria-label="儀表板內容"><button class="tab" role="tab" aria-selected="true" data-tab="kpi">KPI</button><button class="tab" role="tab" aria-selected="false" data-tab="awards">台獎</button><button class="tab" role="tab" aria-selected="false" data-tab="personal">個績</button><button class="tab" role="tab" aria-selected="false" data-tab="conversion">締結率</button><button class="tab" role="tab" aria-selected="false" data-tab="traffic">來客數</button></nav>
+<section class="controls" id="controls" hidden><div class="field"><label for="region">區域</label><select id="region"><option value="北一二B">北一二B</option></select></div><div class="field scope"><label for="store">門市</label><select id="store"><option value="all">本次授權範圍全部門市</option></select></div><div class="field datebox" data-date-control><label for="start">起日</label><input id="start" type="date"></div><div class="field datebox" data-date-control><label for="end">迄日</label><input id="end" type="date"></div><div class="field mode" data-date-control><label>趨勢口徑</label><div class="seg"><button id="daily" type="button" aria-pressed="true">每日</button><button id="cumulative" type="button" aria-pressed="false">累計</button></div></div></section>
+<p id="filter-status" class="source-badge" role="status" hidden></p>
+<section id="content" aria-live="polite"><div class="empty"><h2>尚未取得授權資料</h2><p>先在情報站完成現有登入，再回到本頁重新核驗。</p></div></section>
+<aside class="notes page-source" id="source-note">資料只在通過現行登入後讀取；每一頁各自標示來源與截止。</aside><footer class="footer"><span>店點選擇為資料分析篩選，存取範圍沿用情報站既有授權。</span><span>介面 20261016-mom-kpi1</span></footer>
+</main>
+<script>(function (scope) {
+  'use strict';
+  const EVENT_KEY = 'north12b_portal_logout_event_v1';
+  const LOGIN_EVENT_KEY = 'north12b_portal_login_event_v1';
+  const SEEN_KEY = 'north12b_portal_logout_seen_v1';
+  const NOTE_KEY = 'north12b_portal_logout_note_v1';
+  const CHANNEL = 'north12b-portal-logout-v1';
+  const SCOPE_NOTE = '同步登出同一瀏覽器內本網站的營運中心頁籤；手機 App 另行登出。';
+  const EMPLOYEE_KEY = 'north12b_private_dashboard_employee_id';
+  const PHONE_KEY = 'north12b_owner_phone_v1';
+  const B_KEY = 'north12b_password_session_v1';
+  const B_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
+  const PT_KEY = 'bei12b_patrol_session_token_v2';
+  const UAT_KEY = 'bei12b_patrol_uat_session_token_v1';
+  const AUDIT_KEY = 'bei12b_pt_session_token';
+  const PATROL_API = 'https://script.google.com/macros/s/AKfycbxqBtW2yQw_u4qqJ9Knz6CK34hAiunaa6lIQu4pMa8Ff2voJZCWKEh8MXTJ6qAoGTax/exec';
+  const AUDIT_API = 'https://script.google.com/macros/s/AKfycbznzoWOzzPJLEh8PCwTLw8UfWEyiCXwawd0T49JXpK4MP70vTdrrfTMN1G2Grghd-Mv/exec';
+  const LOGOUT_BUTTONS = '[data-portal-logout], #portal-logout, #departmentLogout, #monthlyLogout, #store-rules-logout, #privateLogoutBtn, #privateLogout, #patrolLogout, #supervisorLogoutButton, #logoutButton, #signOutButton, a[onclick="kpiLogout()"]';
+  const nativeFetch = scope.fetch.bind(scope);
+  let locked = false;
+  let activeWrites = 0;
+  let getWorkState = () => ({});
+  let showBusy = () => scope.alert('正在保存資料，請等結果並讀回確認後再登出，避免重複提交。');
+  let channel;
+  let control;
+  let logoutPromise;
+  const memoryRevokers=new Set();
+  const auditRevocations = new Map();
+
+  function read(area, key) { try { return scope[area].getItem(key) || ''; } catch { return ''; } }
+  function write(area, key, value) { try { scope[area].setItem(key, value); return true; } catch { return false; } }
+  function remove(area, key) { try { scope[area].removeItem(key); } catch {} }
+  function parse(text) { try { return JSON.parse(text); } catch { return null; } }
+  function validEvent(value, type = 'logout') {
+    return value && value.type === type && value.version === 1 && /^[a-f0-9-]{20,80}$/i.test(value.id || '')
+      && Number.isFinite(value.at) && Object.keys(value).every(key => ['type','version','id','at'].includes(key));
+  }
+  function latestEvent() { const value = parse(read('localStorage', EVENT_KEY)); return validEvent(value) ? value : null; }
+  let savedEpoch;
+  try { savedEpoch = scope.sessionStorage.getItem(SEEN_KEY); } catch { savedEpoch = null; }
+  let epoch = savedEpoch ?? '';
+  const initial = latestEvent();
+  function persistentLoginAfter(event) {
+    const login = parse(read('localStorage',LOGIN_EVENT_KEY));
+    return validEvent(login,'login') && login.at > event.at;
+  }
+  function hasSessionIdentity() {
+    return [PT_KEY,UAT_KEY,AUDIT_KEY,EMPLOYEE_KEY,B_KEY].some(key => read('sessionStorage',key));
+  }
+  function hasPersistentIdentity() { return read('localStorage',EMPLOYEE_KEY) || read('localStorage','bei12b_kpi_emp'); }
+  function currentBSessionOnly(event) {
+    // A restored document can retain its B proof while losing the auxiliary
+    // seen marker. The proof records its own logout boundary; it still has
+    // to pass the normal server gate before any protected content is shown.
+    if ([PT_KEY,UAT_KEY,AUDIT_KEY,EMPLOYEE_KEY].some(key => read('sessionStorage',key))) return false;
+    const proof = parse(read('sessionStorage',B_KEY)), now = Date.now();
+    return proof?.v === 1 && proof.owner === B_API && proof.logoutEpoch === event.id
+      && proof.deviceId === read('localStorage','north12b_private_dashboard_device_id')
+      && typeof proof.deviceId === 'string' && proof.deviceId.length >= 16
+      && /^B1_[a-f0-9]_[a-f0-9]{64}$/.test(proof.token || '')
+      && Number.isSafeInteger(proof.expiresAt) && proof.expiresAt > now && proof.expiresAt <= now + 1800000;
+  }
+  // An unseen historical logout invalidates old tab credentials. A new tab may
+  // still restore a later explicit persistent login through the page's server gate.
+  const missedLogout = initial && ((savedEpoch !== null && epoch !== initial.id)
+    || (savedEpoch === null && ((hasSessionIdentity() && !currentBSessionOnly(initial)) || (hasPersistentIdentity() && !persistentLoginAfter(initial)))));
+  if (savedEpoch === null && !missedLogout) { epoch = initial?.id || ''; write('sessionStorage', SEEN_KEY, epoch); }
+  function assertActive(expected = epoch) {
+    if (locked || expected !== epoch) throw new DOMException('營運中心網頁已登出，請重新驗證。', 'AbortError');
+  }
+
+  // In-flight headers and body decoding both respect the logout boundary. Do not replay writes.
+  scope.fetch = async function (...args) {
+    const expected = epoch;
+    assertActive(expected);
+    let action = '';
+    try { action = JSON.parse(args[1]?.body || '{}').action || ''; } catch {}
+    const mutation = /(?:write|publish|restore|commit|upload)$/.test(action) && action !== 'ptlogout';
+    if (mutation) activeWrites += 1;
+    let finished = false;
+    const finish = () => { if (!finished && mutation) { activeWrites -= 1; finished = true; } };
+    try {
+      const response = await nativeFetch(...args);
+      assertActive(expected);
+      for (const method of ['json','text','blob','arrayBuffer']) {
+        const decode = response[method].bind(response);
+        response[method] = async () => {
+          try { assertActive(expected); const value = await decode(); assertActive(expected); return value; }
+          finally { finish(); }
+        };
+      }
+      if (!response.ok) finish();
+      return response;
+    } catch (error) { finish(); throw error; }
+  };
+
+  function clearIdentity(event,forcePersistent) {
+    for (const key of [PT_KEY, UAT_KEY, AUDIT_KEY, EMPLOYEE_KEY, B_KEY, 'bei12b_half_checks']) remove('sessionStorage', key);
+    // A delayed old-tab notification must not delete a newer shared login.
+    // It still clears every old sessionStorage credential and its private cache.
+    if (forcePersistent || !persistentLoginAfter(event)) {
+      for (const key of [EMPLOYEE_KEY, 'bei12b_kpi_emp', PHONE_KEY]) remove('localStorage', key);
+    }
+    // Clear protected display caches across every site page. Draft files, prefs and device IDs remain.
+    remove('sessionStorage', 'north12b_password_data_v1');
+    try {
+      for (let i = scope.sessionStorage.length - 1; i >= 0; i -= 1) {
+        const key = scope.sessionStorage.key(i);
+        if (key?.startsWith('patrol-summary-safe-v1:')) remove('sessionStorage', key);
+      }
+    } catch {}
+  }
+  function note(message) { write('sessionStorage', NOTE_KEY, message); }
+  function lockScreen() {
+    if (!document.body) return;
+    const main = document.createElement('main');
+    main.id = 'portal-logout-screen';
+    main.style.cssText = 'max-width:700px;margin:10vh auto;padding:28px;font:16px/1.7 system-ui;color:#171b22;background:white;border:1px solid #e5e7eb;border-radius:16px';
+    const heading = document.createElement('h1'); heading.textContent = '營運中心網頁已登出';
+    const copy = document.createElement('p'); copy.id = 'portal-logout-result'; copy.setAttribute('role','status');
+    copy.textContent = '本頁已鎖定並清除畫面。正在結束登入連線，完成後會重新開啟登入頁。';
+    const help = document.createElement('p'); help.textContent = '未保存的預覽需保留原檔重新載入。若剛才正在保存，重新登入後請先讀回確認結果，勿重複提交。手機 App 請另行登出。';
+    main.append(heading,copy,help);
+    document.body.replaceChildren(main);
+  }
+  function allowedAuditOrigin(value) {
+    try { const url = new URL(value); return url.protocol === 'https:' && !url.port &&
+      (['script.google.com','script.googleusercontent.com'].includes(url.hostname) || url.hostname.endsWith('-script.googleusercontent.com')); } catch { return false; }
+  }
+  function auditTransportSource(source, frame) {
+    // HtmlService replies from a sandbox child of the form target. Only that
+    // frame's descendant chain is accepted, alongside origin + request nonce.
+    try {
+      for (let depth = 0; source && depth < 12; depth += 1) {
+        if (source === frame.contentWindow) return true;
+        const parent = source.parent;
+        if (!parent || parent === source || parent === scope) return false;
+        source = parent;
+      }
+    } catch {}
+    return false;
+  }
+  function revokeAudit(token) {
+    // Preserve audit's existing POST form + iframe response transport.
+    return new Promise(resolve => {
+      const requestId = scope.crypto.randomUUID();
+      const frame = document.createElement('iframe');
+      const form = document.createElement('form');
+      const field = document.createElement('textarea');
+      const endpoint = new URL(AUDIT_API);
+      endpoint.searchParams.set('transport','iframe');
+      endpoint.searchParams.set('requestId',requestId);
+      endpoint.searchParams.set('origin',scope.location.origin);
+      const finish = value => {
+        auditRevocations.delete(requestId); scope.clearTimeout(timer);
+        frame.remove(); form.remove(); resolve(value);
+      };
+      const timer = scope.setTimeout(() => finish(false),12000);
+      frame.name = 'portal_logout_' + requestId; frame.hidden = true; frame.title = '結束稽核督導連線';
+      form.method = 'POST'; form.action = endpoint.href; form.target = frame.name;
+      form.enctype = 'application/x-www-form-urlencoded'; form.hidden = true;
+      field.name = 'payload'; field.value = JSON.stringify({action:'ptlogout',token});
+      form.append(field); document.body.append(frame,form);
+      auditRevocations.set(requestId,{frame,finish});
+      try { form.submit(); form.remove(); } catch { finish(false); }
+    });
+  }
+  async function revoke(url, token) {
+    if (url === AUDIT_API) return revokeAudit(token);
+    const controller = new AbortController();
+    const timer = scope.setTimeout(() => controller.abort(), 12000);
+    try {
+      const response = await nativeFetch(url, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'ptlogout',token}),cache:'no-store',credentials:'omit',keepalive:true,signal:controller.signal});
+      const result = await response.json();
+      return response.ok && (result.status === 'ok' || result.reason === 'AUTH_SESSION_REVOKED' || result.auth?.reason === 'AUTH_SESSION_REVOKED');
+    } catch { return false; }
+    finally { scope.clearTimeout(timer); }
+  }
+  async function revokeSavedB() {
+    const proof=parse(read('sessionStorage',B_KEY));
+    if(!proof || proof.owner!==B_API || !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(proof.token||'') || typeof proof.deviceId!=='string')return true;
+    const controller=new AbortController(),timer=scope.setTimeout(()=>controller.abort(),15000);
+    try {
+      const response=await nativeFetch(B_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'employee_logout',deviceId:proof.deviceId,token:proof.token}),credentials:'omit',cache:'no-store',signal:controller.signal});
+      return response.ok && (await response.json()).status==='ok';
+    }catch{return false;}finally{scope.clearTimeout(timer);}
+  }
+  async function revokeSavedPhone(event) {
+    if(persistentLoginAfter(event))return true;
+    const p=parse(read('localStorage',PHONE_KEY));
+    if(!p || p.owner!==B_API || !/^BP1_[a-f0-9]{64}$/.test(p.phoneToken||'') || typeof p.deviceId!=='string')return true;
+    const controller=new AbortController(),timer=scope.setTimeout(()=>controller.abort(),15000);
+    try{const r=await nativeFetch(B_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'employee_phone_forget',deviceId:p.deviceId,phoneToken:p.phoneToken}),credentials:'omit',cache:'no-store',signal:controller.signal});return r.ok && (await r.json()).status==='ok';}
+    catch{return false;}finally{scope.clearTimeout(timer);}
+  }
+  async function applyLogout(event, broadcast = false) {
+    if (locked) return logoutPromise;
+    const tokens = [[PATROL_API,read('sessionStorage',PT_KEY)],[PATROL_API,read('sessionStorage',UAT_KEY)],[AUDIT_API,read('sessionStorage',AUDIT_KEY)]].filter((entry,index,all) => entry[1] && all.findIndex(other => other[0] === entry[0] && other[1] === entry[1]) === index);
+    const phoneRevocation=revokeSavedPhone(event);
+    const memoryResults=[...memoryRevokers].map(fn=>Promise.resolve(fn(nativeFetch)).catch(()=>false));
+    if(!memoryRevokers.size)memoryResults.push(revokeSavedB());
+    locked = true; epoch = event.id;
+    write('sessionStorage',SEEN_KEY,epoch);
+    clearIdentity(event,broadcast);
+    note('已同步登出同一瀏覽器內本網站的營運中心頁籤。裝置核准資格保留；手機 App 請另行登出。');
+    scope.dispatchEvent(new Event('portal-before-logout'));
+    lockScreen();
+    if (broadcast) {
+      // The event deliberately contains no employee, device, token, password or report data.
+      const stored = write('localStorage',EVENT_KEY,JSON.stringify(event));
+      let posted = false;
+      try { if (channel) { channel.postMessage(event); posted = true; } } catch {}
+      if (!stored && !posted) note('本頁已登出，但頁籤同步通知未確認，請關閉其他已開啟的營運中心頁籤。');
+    }
+    logoutPromise = (async () => {
+      if (!document.body) await new Promise(resolve => document.addEventListener('DOMContentLoaded',resolve,{once:true}));
+      const results = await Promise.all([phoneRevocation,...memoryResults,...tokens.map(([url,token]) => revoke(url,token))]);
+      if (results.some(value => !value)) note('本頁已登出並通知網站頁籤；登入連線撤銷未確認，請關閉其他已開啟的營運中心頁籤。');
+      // A new document removes each page's private memory without changing its business module.
+      scope.location.reload();
+    })();
+    return logoutPromise;
+  }
+  function accept(event) {
+    if (!validEvent(event) || event.id === epoch || locked) return;
+    void applyLogout(event);
+  }
+  function checkMissedLogout() { const event = latestEvent(); if (event && event.id !== epoch) accept(event); }
+  function hasIdentity() {
+    return hasSessionIdentity() || hasPersistentIdentity() || Boolean(scope.DashboardB?.active());
+  }
+  async function requestLogout() {
+    if (locked) return logoutPromise;
+    if (getWorkState().busy || activeWrites > 0) { showBusy(); return false; }
+    if (!scope.confirm('登出會清除目前畫面與員編，並同步登出同一瀏覽器內、本網站的營運中心頁籤。未保存的預覽請先保留原檔；手機 App 需另行登出。確定登出嗎？')) return false;
+    const event = {type:'logout',version:1,id:scope.crypto.randomUUID(),at:Date.now()};
+    return applyLogout(event,true);
+  }
+  function ready() {
+    if (locked) { lockScreen(); return; }
+    const savedNote = read('sessionStorage',NOTE_KEY);
+    const sessionHost = document.querySelector('[data-portal-session-host]');
+    const ownControls = document.getElementById('portal-logout') || document.getElementById('departmentLogout')
+      || (sessionHost && document.getElementById('privateLogout'));
+    if (sessionHost || !ownControls || savedNote) {
+      control = document.createElement('aside'); control.id = 'portal-session-controls';
+      control.setAttribute('aria-label','營運中心網頁登出');
+      if (sessionHost) control.className = 'form-message';
+      else control.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 20px;background:#fff;color:#171b22;border-bottom:1px solid #e5e7eb;font:14px/1.6 system-ui;position:relative;z-index:10';
+      const copy = document.createElement('span'); copy.id = 'portal-session-note'; copy.setAttribute('role','status');
+      copy.textContent = savedNote || SCOPE_NOTE;
+      const button = document.createElement('button'); button.type = 'button'; button.dataset.portalLogout = ''; button.textContent = '登出';
+      button.style.cssText = 'margin-left:auto;min-height:44px;padding:8px 16px;border:1px solid #e5e7eb;border-radius:8px;background:white;color:#bd4700;font:inherit;font-weight:700;cursor:pointer';
+      control.append(copy,button);
+      if (sessionHost) sessionHost.append(control); else document.body.prepend(control);
+      const update = () => { if (!locked) {
+        const currentNote = read('sessionStorage',NOTE_KEY);
+        copy.textContent = currentNote || SCOPE_NOTE;
+        button.hidden = !hasIdentity() || Boolean(ownControls);
+        const visible = Boolean(((!ownControls || sessionHost) && hasIdentity()) || currentNote);
+        control.hidden = !visible; control.style.display = visible ? 'flex' : 'none';
+      } };
+      update(); scope.setInterval(update,1000);
+    }
+  }
+  function notifyLogin() {
+    assertActive(); remove('sessionStorage',NOTE_KEY);
+    const event = {type:'login',version:1,id:scope.crypto.randomUUID(),at:Date.now()};
+    write('localStorage',LOGIN_EVENT_KEY,JSON.stringify(event));
+    try { channel?.postMessage(event); } catch {}
+    scope.dispatchEvent(new Event('portal-login-changed'));
+  }
+  function acceptLogin(event) {
+    if (!locked && validEvent(event,'login')) scope.dispatchEvent(new Event('portal-login-changed'));
+  }
+  scope.PortalLogout = Object.freeze({registerMemoryRevoker(fn){if(typeof fn!=='function')throw Error('REVOCATION_REQUIRED');memoryRevokers.add(fn);return()=>memoryRevokers.delete(fn);},request:requestLogout,isLocked:() => locked,assertActive,notifyLogin,
+    beginWrite() {
+      assertActive(); activeWrites += 1; let done = false;
+      return () => { if (!done) { done = true; activeWrites -= 1; } };
+    },
+    setWorkState(reader,onBusy) { getWorkState = reader; if (onBusy) showBusy = onBusy; }});
+  document.addEventListener('click', event => {
+    if (!event.target.closest?.(LOGOUT_BUTTONS)) return;
+    event.preventDefault(); event.stopImmediatePropagation(); void requestLogout();
+  },true);
+  // Legacy iframe transports must not deliver private replies into a locked document.
+  scope.addEventListener('message',event => {
+    const message = event.data;
+    const pending = auditRevocations.get(message?.requestId);
+    if (pending && allowedAuditOrigin(event.origin)
+        && auditTransportSource(event.source,pending.frame) && message.type === 'north12b-gas-response-v1') {
+      const result = message.body;
+      pending.finish(result?.status === 'ok' || result?.reason === 'AUTH_SESSION_REVOKED');
+    }
+    if (locked) event.stopImmediatePropagation();
+  },true);
+  scope.addEventListener('pagehide',event => { if (locked) event.stopImmediatePropagation(); },true);
+  document.addEventListener('visibilitychange',event => { if (locked) event.stopImmediatePropagation(); },true);
+  scope.addEventListener('beforeunload',event => { if (locked) event.stopImmediatePropagation(); },true);
+  scope.addEventListener('storage',event => { if (event.key === EVENT_KEY) accept(parse(event.newValue));
+    else if (event.key === LOGIN_EVENT_KEY) acceptLogin(parse(event.newValue)); });
+  scope.addEventListener('pageshow',checkMissedLogout);
+  document.addEventListener('visibilitychange',() => { if (!document.hidden) checkMissedLogout(); },true);
+  try { channel = new scope.BroadcastChannel(CHANNEL); channel.onmessage = event => { accept(event.data); acceptLogin(event.data); }; } catch {}
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',ready,{once:true}); else ready();
+  if (missedLogout) void applyLogout(initial);
+})(window);
+</script><script>// Short-lived B sessions; optional primary-owner phone grant. Passwords are never saved.
+function createDashboardBClient(ownerExecUrl, options={}) {
+  if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,200}\/exec$/.test(ownerExecUrl))throw new Error('OWNER_ENDPOINT_REQUIRED');
+  const storage=options.storage,storageKey='north12b_password_session_v1';
+  const phoneStorage=options.phoneStorage,phoneKey='north12b_owner_phone_v1',phoneTtl=90*24*60*60*1000;
+  let session=null,generation=0,expiresAt=0,lastDeviceId='',lastPhoneToken='';
+  function removeSaved(){try{storage?.removeItem(storageKey);}catch{}}
+  function sessionState(name){try{options.onSessionState?.(name);}catch{}}
+  function savedSession(deviceId){
+    let reason='invalid';
+    try {
+      const value=JSON.parse(storage?.getItem(storageKey)||'null');
+      if(!value){sessionState('missing');return null;}
+      if(value.logoutEpoch!==(options.logoutEpoch?.()||'')){reason='epoch';throw Error('B_AUTH_DENIED');}
+      if(value.deviceId!==deviceId){reason='device';throw Error('B_AUTH_DENIED');}
+      if(Number.isSafeInteger(value.expiresAt)&&value.expiresAt<=Date.now()){reason='expired';throw Error('B_AUTH_DENIED');}
+      if(value.v!==1 || value.owner!==ownerExecUrl || value.logoutEpoch!==(options.logoutEpoch?.()||'') || value.deviceId!==deviceId ||
+        !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(value.token) || !Number.isSafeInteger(value.expiresAt) ||
+        value.expiresAt<=Date.now() || value.expiresAt>Date.now()+1800000)throw Error('B_AUTH_DENIED');
+      sessionState('restored');return value;
+    }catch{sessionState(reason);removeSaved();return null;}
+  }
+  const requests=new Set(),reads=new Map(),hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+  function removePhone(){try{phoneStorage?.removeItem(phoneKey);}catch{}}
+  function savedPhone(deviceId){
+    try {
+      const p=JSON.parse(phoneStorage?.getItem(phoneKey)||'null');if(!p)return null;
+      if(p.v!==1 || p.owner!==ownerExecUrl || p.deviceId!==deviceId || p.logoutEpoch!==(options.logoutEpoch?.()||'') ||
+        !/^BP1_[a-f0-9]{64}$/.test(p.phoneToken) || !Number.isSafeInteger(p.expiresAt) || p.expiresAt<=Date.now() || p.expiresAt>Date.now()+phoneTtl)throw Error('B_AUTH_DENIED');
+      return p;
+    }catch{removePhone();return null;}
+  }
+  function savePhone(p){if(!phoneStorage)throw Error('B_STORAGE_UNAVAILABLE');phoneStorage.setItem(phoneKey,JSON.stringify(p));}
+  function saveLease(result,deviceId,expected){
+    if(expected!==generation || !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(result.token) || !Number.isSafeInteger(result.expiresAt) || result.trustSource!=='password-bound' || result.expiresAt<=Date.now() || result.expiresAt>Date.now()+1800000)throw Error('B_AUTH_DENIED');
+    session={deviceId,token:result.token};expiresAt=result.expiresAt;
+    if(storage)storage.setItem(storageKey,JSON.stringify({v:1,owner:ownerExecUrl,logoutEpoch:options.logoutEpoch?.()||'',...session,expiresAt}));
+    return {expiresAt,trustSource:result.trustSource};
+  }
+  function suspend(){generation++;session=null;expiresAt=0;reads.clear();for(const controller of requests)controller.abort();requests.clear();}
+  function clear(){suspend();removeSaved();}
+  async function post(payload,expected=generation,transport=fetch) {
+    const clock=()=>typeof performance==='object'?performance.now():Date.now();
+    const controller=new AbortController(),started=clock();let outcome='error';requests.add(controller);
+    const timer=setTimeout(()=>controller.abort(),90000);
+    try {
+      const response=await transport(ownerExecUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),
+        credentials:'omit',cache:'no-store',redirect:'follow',signal:controller.signal});
+      if(!response.ok)throw new Error('B_SERVICE_UNAVAILABLE');const value=await response.json();
+      if(expected!==generation)throw new Error('B_CONTEXT_CHANGED');
+      if(controller.signal.aborted)throw new Error('B_TIMEOUT');
+      if(!value || value.status!=='ok')throw new Error('B_AUTH_DENIED');
+      if(Array.isArray(value.serverTiming)&&value.serverTiming.length<=40){for(const row of value.serverTiming){
+        if(row && /^(lockWait|flush|rosterLookup|privateDrive|kpiLocate|strictNative|resultValidation|kpiBlob|request)$/.test(row.name) &&
+          Number.isFinite(row.ms)&&row.ms>=0&&row.ms<600000)try{options.onServerTiming?.({action:payload.action,name:row.name,ms:row.ms});}catch{}
+      }}outcome='ok';return value;
+    } catch(error){if(expected!==generation)throw new Error('B_CONTEXT_CHANGED');if(controller.signal.aborted)throw new Error('B_TIMEOUT');throw error;}
+    finally {clearTimeout(timer);requests.delete(controller);try{options.onRequest?.({action:payload.action,ms:clock()-started,outcome});}catch{}}
+  }
+  function protectedPost(action,extra={}) {
+    const key=action+JSON.stringify(extra);
+    if(reads.has(key))return reads.get(key);
+    const operation=protectedRead(action,extra);reads.set(key,operation);
+    const done=()=>{if(reads.get(key)===operation)reads.delete(key);};operation.then(done,done);return operation;
+  }
+  async function protectedRead(action,extra) {
+    if(!session || expiresAt<=Date.now()){clear();throw new Error('B_AUTH_DENIED');}const expected=generation,proof=session;
+    // A failed read or an inconclusive server response must lock the view, but
+    // the short lease can still be checked again without asking for a password.
+    // The server verifies eligibility, revocation and device proof on every call.
+    return post({action,...proof,...extra},expected);
+  }
+  return Object.freeze({
+    status:()=>post({action:'employee_status'}),
+    async login(employeeId,deviceId,password) {
+      clear();lastDeviceId=deviceId;const expected=generation;
+      const nonce=hex(crypto.getRandomValues(new Uint8Array(32))),idem=hex(crypto.getRandomValues(new Uint8Array(16)));
+      const result=await post({action:'employee_login',employeeId,deviceId,track:'password-bound',password,sessionNonce:nonce,idempotencyKey:idem},expected);
+      if(expected!==generation || !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(result.token)||!Number.isSafeInteger(result.expiresAt)||result.trustSource!=='password-bound')throw new Error('B_AUTH_DENIED');
+      session={deviceId,token:result.token};expiresAt=result.expiresAt;
+      if(expiresAt<=Date.now() || expiresAt>Date.now()+1800000){clear();throw Error('B_AUTH_DENIED');}
+      if(storage){try{storage.setItem(storageKey,JSON.stringify({v:1,owner:ownerExecUrl,logoutEpoch:options.logoutEpoch?.()||'',...session,expiresAt}));}
+        catch{try{await post({action:'employee_logout',...session});}finally{clear();}throw Error('B_STORAGE_UNAVAILABLE');}}
+      return {expiresAt,trustSource:result.trustSource};
+    },
+    hasPhone(deviceId=lastDeviceId){return Boolean(savedPhone(deviceId));},
+    async enrollPhone(){
+      if(!session || !phoneStorage)throw Error('B_AUTH_DENIED');
+      const expected=generation,proof=session;
+      const result=await post({action:'employee_phone_enroll',...proof,phoneNonce:hex(crypto.getRandomValues(new Uint8Array(32)))},expected);
+      if(!/^BP1_[a-f0-9]{64}$/.test(result.phoneToken) || !Number.isSafeInteger(result.expiresAt) || result.expiresAt<=Date.now() || result.expiresAt>Date.now()+phoneTtl)throw Error('B_AUTH_DENIED');
+      try{savePhone({v:1,owner:ownerExecUrl,logoutEpoch:options.logoutEpoch?.()||'',deviceId:proof.deviceId,phoneToken:result.phoneToken,expiresAt:result.expiresAt});}
+      catch{removePhone();await post({action:'employee_phone_forget',deviceId:proof.deviceId,phoneToken:result.phoneToken},expected);throw Error('B_STORAGE_UNAVAILABLE');}
+      lastPhoneToken=result.phoneToken;return {expiresAt:result.expiresAt};
+    },
+    async resumePhone(deviceId){
+      const p=savedPhone(deviceId);if(!p)return null;
+      suspend();lastDeviceId=deviceId;lastPhoneToken=p.phoneToken;const expected=generation;
+      // Reuse a lease request across app closures/tabs, avoiding extra server sessions.
+      if(!p.request || p.request.until<=Date.now()) {
+        p.request={sessionNonce:hex(crypto.getRandomValues(new Uint8Array(32))),idempotencyKey:hex(crypto.getRandomValues(new Uint8Array(16))),until:Date.now()+1800000};
+        savePhone(p);
+      }
+      let result;
+      try {result=await post({action:'employee_phone_resume',deviceId,phoneToken:p.phoneToken,sessionNonce:p.request.sessionNonce,idempotencyKey:p.request.idempotencyKey},expected);}
+      catch(error){
+        // A rejected grant cannot authorize another session. Discard only this
+        // stale local proof so a fresh password login is not blocked while
+        // trying to forget a grant the server no longer recognizes.
+        if(error.message==='B_AUTH_DENIED'){removePhone();lastPhoneToken='';}
+        throw error;
+      }
+      if(!Number.isSafeInteger(result.phoneExpiresAt) || result.phoneExpiresAt<=Date.now() || result.phoneExpiresAt>Date.now()+phoneTtl)throw Error('B_AUTH_DENIED');
+      try{const lease=saveLease(result,deviceId,expected);p.expiresAt=result.phoneExpiresAt;p.request.until=lease.expiresAt;savePhone(p);return lease;}
+      catch{clear();removePhone();try{await post({action:'employee_phone_forget',deviceId,phoneToken:p.phoneToken},generation);}finally{lastPhoneToken='';}throw Error('B_STORAGE_UNAVAILABLE');}
+    },
+    async read(kind) {if(!['private','kpi'].includes(kind))throw new Error('B_AUTH_DENIED');return protectedPost(kind==='private'?'employee_private_read':'employee_kpi_read');},
+    async readBundle(includeReports=false) {
+      const result=await protectedPost('employee_dashboard_read',includeReports===true?{includeReports:true}:{});
+      if(result.expiresAt!==expiresAt || result.trustSource!=='password-bound' || typeof result.phoneEligible!=='boolean' ||
+        result.privateResult?.status!=='ok' || result.kpiResult?.status!=='ok' ||
+        includeReports===true && (result.reportsResult?.schema!=='daily-report-bundle-v1' || !Array.isArray(result.reportsResult.segments) || result.reportsResult.segments.length!==3))throw new Error('B_AUTH_DENIED');
+      return result;
+    },
+    validate:()=>protectedPost('employee_session'),
+    restore(deviceId){suspend();lastDeviceId=deviceId;const value=savedSession(deviceId);if(!value)return null;session={deviceId:value.deviceId,token:value.token};expiresAt=value.expiresAt;lastPhoneToken=savedPhone(deviceId)?.phoneToken||'';return {expiresAt};},
+    suspend,
+    async logout(transport=fetch) {const previous=session||savedSession(lastDeviceId),saved=savedPhone(lastDeviceId),phone=lastPhoneToken?{deviceId:lastDeviceId,phoneToken:lastPhoneToken}:null;clear();if(saved && saved.phoneToken===lastPhoneToken)removePhone();lastPhoneToken='';
+      // Forget retires all phone leases and is idempotent if another tab already revoked it.
+      if(phone)await post({action:'employee_phone_forget',deviceId:phone.deviceId,phoneToken:phone.phoneToken},generation,transport);
+      else if(previous)await post({action:'employee_logout',deviceId:previous.deviceId,token:previous.token},generation,transport);
+    },
+    clear
+  });
+}
+</script>
+<script>(function (root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.KpiBattleController = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
+  const QUICK_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
+  const TRANSIENT_HTTP_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
+  const RETRYABLE_PRIVATE_ACTIONS = new Set(['private_access', 'kpicalc_access']);
+  const DEFAULT_RETRY_DELAYS_MS = [2000, 5000];
+  const KPI_BATTLE_CORE_KEYS = { a999: 'AQ V+D 999 (含)以上', a1399: 'AQ V+D 1399 (含)以上', haosu: '好速案銷售點數', r1399: 'RT V+D 1399 (含)以上' };
+  const KPI_BATTLE_PERSONAL_KEYS = { A999: 'AQ V+D 999 (含)以上', A1399: 'AQ V+D 1399 (含)以上', '好速': '好速案銷售點數', R1399: 'RT V+D 1399 (含)以上', R999: 'RT V+D 999 (含)以上', RT: 'RT上線點數', '特維': '特殊維繫用戶續約數', '配件': '配件及其他營收', '包膜': '包膜與保貼營收' };
+  const KNOWN_HAOSU_CORRECTIONS = Object.freeze({
+    '0904.xlsx': Object.freeze({
+      dataAsOfDate: '2026-09-03',
+      districtExcluded: 5,
+      stores: Object.freeze({ '台北杭州南': 1.25, '台北通化': 2.5, '台北三創': 1.25 }),
+    }),
+  });
+
+  function resolveGasUrl(storage) {
+    const savedGasUrl = storage.getItem('bei12b_gas_url');
+    const gasUrl = savedGasUrl === DEFAULT_GAS_URL ? savedGasUrl : DEFAULT_GAS_URL;
+    if (savedGasUrl !== gasUrl) storage.setItem('bei12b_gas_url', gasUrl);
+    return gasUrl;
+  }
+
+  function diagnosticResponseUrl(value) {
+    try {
+      const parsed = new URL(String(value || ''));
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function kpiPendingCell() {
+    return '<span class="kpi-sub" style="font-weight:800;color:var(--text-muted)">尚未有資料</span>';
+  }
+
+  function kpicalcMetric(entry, meta) {
+    if (!entry) return null;
+    const actual = entry.a == null || entry.a === '' ? null : Number(entry.a);
+    const target = entry.t == null || entry.t === '' ? null : Number(entry.t);
+    const reportRate = entry.reportRate === '' || entry.reportRate === null || entry.reportRate === undefined
+      ? null : Number(entry.reportRate);
+    const expected = (target > 0 && Number(meta.monthDays) > 0) ? target * Number(meta.snapshotDay) / Number(meta.monthDays) : null;
+    return { actual, target, rate: Number.isFinite(reportRate) ? reportRate : null, daily_gap: expected == null || actual == null ? null : actual - expected };
+  }
+
+  function kpiBattleDataAsOfDate(meta) {
+    return (/^\d{4}-\d{2}$/.test(meta.month || '') && meta.snapshotDay)
+      ? `${meta.month}-${String(meta.snapshotDay).padStart(2, '0')}` : '';
+  }
+
+  function kpiBattleSourceFile(value) {
+    const raw = String(value || '').split(/[\\/]/).pop().trim().toLowerCase();
+    const staged = raw.match(/^report-upload-temp-[a-f0-9]{32,64}-(\d{4}\.xlsx)$/i);
+    return staged ? staged[1].toLowerCase() : raw;
+  }
+
+  function kpiBattleReportDateFromSource(value, dataAsOfDate) {
+    const source = kpiBattleSourceFile(value);
+    const match = source.match(/^(0[1-9]|1[0-2])([0-2][0-9]|3[01])\.xlsx$/i);
+    const asOf = String(dataAsOfDate || '');
+    const yearMatch = asOf.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match || !yearMatch) return '';
+    let year = Number(yearMatch[1]);
+    const sourceMonth = Number(match[1]);
+    const asOfMonth = Number(yearMatch[2]);
+    if (sourceMonth === 1 && asOfMonth === 12) year += 1;
+    if (sourceMonth === 12 && asOfMonth === 1) year -= 1;
+    return `${year}-${match[1]}-${match[2]}`;
+  }
+
+  function kpiBattleCorrectMetric(metric, excluded) {
+    if (!metric || !Number.isFinite(Number(excluded)) || Number(excluded) <= 0) return metric;
+    const actual = Math.max(0, (Number(metric.actual) || 0) - Number(excluded));
+    const priorActual = Number(metric.actual) || 0;
+    const priorGap = Number(metric.daily_gap);
+    const expected = Number.isFinite(priorGap) ? priorActual - priorGap : null;
+    const rate = expected && expected > 0 ? Math.min(2.5, actual / expected) : metric.rate;
+    return { ...metric, actual, rate, daily_gap: expected == null ? metric.daily_gap : actual - expected };
+  }
+
+  function kpiBattleApplyKnownCorrections(data) {
+    const copy = data || {};
+    const source = kpiBattleSourceFile(copy.source_file);
+    const correction = KNOWN_HAOSU_CORRECTIONS[source];
+    if (!correction || correction.dataAsOfDate !== String(copy.data_as_of_date || '')) return copy;
+    const key = KPI_BATTLE_CORE_KEYS.haosu;
+    const adjust = (container, excluded) => {
+      if (!container || !container.metrics || !container.metrics[key]) return;
+      const corrected = kpiBattleCorrectMetric(container.metrics[key], excluded);
+      container.metrics[key] = corrected;
+      container.core = { ...(container.core || {}), haosu: corrected };
+    };
+    adjust(copy.aggregate, correction.districtExcluded);
+    (copy.stores || []).forEach(row => adjust(row, Number(correction.stores[displayStoreName(row.store)]) || 0));
+    (copy.personal || []).forEach(row => {
+      const excluded = Number(correction.stores[displayStoreName(row.store)]) || 0;
+      if (excluded && row.metrics && row.metrics['好速']) row.metrics['好速'] = kpiBattleCorrectMetric(row.metrics['好速'], excluded);
+      row.insurance_attach_rate = null;
+      row.phone_award_actual = null;
+      row.phone_award_projected = null;
+      row.phone_award_rank = null;
+      row.phone_award_eligible = null;
+    });
+    if (copy.aggregate) copy.aggregate.insurance_attach_rate = null;
+    (copy.stores || []).forEach(row => { row.insurance_attach_rate = null; });
+    copy.supplement_status = '核心 KPI 已更新；QIS、保險與台獎待補';
+    copy.corrections = [...(copy.corrections || []), {
+      type: 'haosu-enterprise-exclusion', source_file: source,
+      excluded_points: correction.districtExcluded, effective_points: copy.aggregate?.metrics?.[key]?.actual,
+    }];
+    return copy;
+  }
+
+  function kpiBattleSourceDateRange(value) {
+    const normalized = String(value || '').trim().replace(/\s*[~～]\s*/g, '～');
+    return normalized || '—';
+  }
+
+  function kpiBattleSourceMetadata(data, supplement) {
+    const items = [
+      ['戰報日期', data.report_date || '—'],
+      ['資料統計至', data.data_as_of_date || data.source_as_of_date || '—'],
+      ['來源檔', data.source_file || '—'],
+      ['統計區間', kpiBattleSourceDateRange(data.source_date_range)],
+      ['同步狀態', supplement],
+    ];
+    return `<div class="kpi-source-metadata">${items.map(([label, value], index) => `<div class="kpi-source-item${index === 4 ? ' status' : ''}"><strong>${label}</strong><span> ${value}</span></div>`).join('')}</div>`;
+  }
+
+  function kpiBattleStoreKey(value) {
+    return String(value || '').replace(/^台灣大哥大數位生活台北/, '').replace(/^台北/, '').replace(/\s+/g, '').trim();
+  }
+
+  function displayStoreName(value) {
+    const name = String(value || '').trim();
+    return name === '台灣大哥大台北三創' || name === '台灣大哥大數位生活台北三創'
+      ? '台北三創'
+      : name;
+  }
+
+  function kpiBattlePersonKey(row) {
+    return `${kpiBattleStoreKey(row && row.store)}|${String((row && row.name) || '').replace(/[＊*]/g, '').trim()}`;
+  }
+
+  function kpiBattleSupplementIsCurrent(kpiData, snapshot) {
+    const snapshotReportDate = String((snapshot || {}).report_date || '');
+    const snapshotDataAsOf = String((snapshot || {}).data_as_of_date || '');
+    const kpiReportDate = String((kpiData || {}).report_date || '');
+    const kpiDataAsOf = String((kpiData || {}).data_as_of_date || '');
+    const snapshotSource = kpiBattleSourceFile((snapshot || {}).source_file);
+    const kpiDataSource = kpiBattleSourceFile((kpiData || {}).source_file);
+    const reportDateCompatible = snapshotReportDate === kpiReportDate || snapshotReportDate === snapshotDataAsOf;
+    return Boolean(
+      snapshot && snapshotReportDate && snapshotDataAsOf && kpiDataAsOf && snapshotSource && kpiDataSource &&
+      reportDateCompatible && snapshotDataAsOf === kpiDataAsOf && snapshotSource === kpiDataSource
+    );
+  }
+
+  function mergeKpiBattleSupplement(kpiData, snapshot) {
+    if (!kpiBattleSupplementIsCurrent(kpiData, snapshot)) return kpiBattleApplyKnownCorrections({ ...kpiData, supplement_synced: false });
+    const copy = JSON.parse(JSON.stringify(kpiData));
+    const aggregate = snapshot.aggregate || {};
+    const copyFields = (target, source, fields) => fields.forEach(field => {
+      if (source && source[field] != null) target[field] = source[field];
+    });
+    copy.report_date = String(kpiData.report_date || snapshot.report_date);
+    // Preserve the source's explicit publication day separately from its cutoff.
+    copy.report_run_date = String(snapshot.report_run_date || '');
+    copy.source_date_range = snapshot.source_date_range || copy.source_date_range;
+    copy.aggregate = { ...copy.aggregate };
+    copyFields(copy.aggregate, aggregate, ['overall_kpi', 'overall_kpi_dod', 'company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod', 'insurance_attach_rate']);
+    const snapshotStores = new Map((snapshot.stores || []).map(row => [kpiBattleStoreKey(row.store), row]));
+    copy.stores = copy.stores.map(row => {
+      const source = snapshotStores.get(kpiBattleStoreKey(row.store));
+      const merged = { ...row };
+      copyFields(merged, source, ['company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod', 'insurance_attach_rate']);
+      return merged;
+    });
+    const snapshotPeople = new Map((snapshot.personal || []).map(row => [kpiBattlePersonKey(row), row]));
+    const trustedManagerSupplement = String(snapshot.personal_semantics || '') === 'individual-v1';
+    copy.personal = copy.personal.map(row => {
+      const source = snapshotPeople.get(kpiBattlePersonKey(row));
+      const merged = { ...row };
+      const manager = /店長/.test(String(row.role || row.category || '')) && !/副店長/.test(String(row.role || row.category || ''));
+      copyFields(merged, source, manager && !trustedManagerSupplement
+        ? ['insurance_attach_rate', 'phone_award_actual', 'phone_award_projected', 'phone_award_rank', 'phone_award_eligible']
+        : ['rank', 'rank_dod', 'overall_rate_dod', 'insurance_attach_rate', 'phone_award_actual', 'phone_award_projected', 'phone_award_rank', 'phone_award_eligible']);
+      return merged;
+    });
+    return kpiBattleApplyKnownCorrections({ ...copy, supplement_synced: true });
+  }
+
+  function kpicalcToKpiBattleView(data, fetchedAt) {
+    const safeData = data || {};
+    const meta = safeData.meta || {};
+    const dataAsOfDate = kpiBattleDataAsOfDate(meta);
+    const sourceFile = kpiBattleSourceFile(meta.sourceFile);
+    // The MMDD source filename is the publication-day identity, not the
+    // business cutoff.  Leave report_date unset until the same-source formal
+    // snapshot supplies the authoritative report/data cutoff date.
+    const reportDate = '';
+    const codeName = {};
+    (safeData.stores || []).forEach(store => { codeName[store.code] = store.name; });
+    const metricsOf = itemsObj => {
+      const output = {};
+      (safeData.items || []).forEach(item => {
+        const metric = kpicalcMetric((itemsObj || {})[item.key], meta);
+        if (metric) output[item.key] = metric;
+      });
+      return output;
+    };
+    const coreOf = metrics => {
+      const core = {};
+      Object.entries(KPI_BATTLE_CORE_KEYS).forEach(([short, key]) => { core[short] = metrics[key] || null; });
+      return core;
+    };
+    const stores = (safeData.stores || []).map(store => {
+      const metrics = metricsOf(store.items);
+      return { store: store.name, overall_kpi: store.official, company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(metrics), metrics };
+    });
+    const aggregateItems = {};
+    const aggregateRates = safeData.aggregateRates || {};
+    (safeData.items || []).forEach(item => {
+      let actual = 0;
+      let target = 0;
+      let seen = false;
+      let actualComplete = true;
+      let targetComplete = true;
+      (safeData.stores || []).forEach(store => {
+        const entry = (store.items || {})[item.key];
+        if (entry) {
+          if (entry.a == null || entry.a === '') actualComplete = false; else actual += Number(entry.a);
+          if (entry.t == null || entry.t === '') targetComplete = false; else target += Number(entry.t);
+          seen = true;
+        } else { actualComplete = false; targetComplete = false; }
+      });
+      if (seen) aggregateItems[item.key] = kpicalcMetric({ a: actualComplete ? actual : null, t: targetComplete ? target : null, reportRate: aggregateRates[item.key] }, meta);
+    });
+    const personal = (safeData.persons || []).map(person => {
+      const metrics = {};
+      Object.entries(KPI_BATTLE_PERSONAL_KEYS).forEach(([short, key]) => {
+        metrics[short] = kpicalcMetric((person.items || {})[key], meta);
+      });
+      return {
+        store: codeName[person.store] || person.store,
+        category: person.role || '—',
+        role: person.role || '',
+        name: person.pname,
+        overall_rate: person.official,
+        overall_rate_dod: null,
+        rank: null,
+        rank_dod: null,
+        insurance_attach_rate: null,
+        phone_award_actual: null,
+        phone_award_projected: null,
+        metrics,
+      };
+    });
+    return {
+      source: 'kpicalc',
+      fetchedAt: fetchedAt || '',
+      source_file: sourceFile,
+      report_date: reportDate,
+      data_as_of_date: dataAsOfDate,
+      source_as_of_date: dataAsOfDate,
+      source_date_range: meta.period || '',
+      previous_report_date: null,
+      aggregate: { store: '北一二B整體', overall_kpi: meta.aggregateOfficialCorrected == null ? null : Number(meta.aggregateOfficialCorrected), company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(aggregateItems), metrics: aggregateItems },
+      stores,
+      personal,
+    };
+  }
+
+  function formatPercent(value) {
+    if (value == null || value === '') return '尚未有資料';
+    const number = Number(value);
+    return Number.isFinite(number) ? `${(number * 100).toFixed(1)}%` : '—';
+  }
+
+  function kpiBattleTone(value) {
+    if (value == null || value === '') return '';
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '';
+    if (number >= 1) return 'good';
+    if (number >= 0.8) return 'warn';
+    return 'bad';
+  }
+
+  function formatNumber(value) {
+    if (value == null || value === '') return '尚未有資料';
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '—';
+    return String(Math.round(number * 100) / 100);
+  }
+
+  function formatMoney(value) {
+    if (value == null || value === '') return '尚未有資料';
+    const number = Number(value);
+    return Number.isFinite(number) ? `$${Math.round(number).toLocaleString('en-US')}` : '—';
+  }
+
+  function kpiBattleTargetLine(metric, verbose) {
+    if (!metric || metric.actual == null || metric.target == null) return '';
+    const gap = metric.daily_gap == null ? NaN : Number(metric.daily_gap);
+    const gapText = !Number.isFinite(gap) ? '進度差 —' : gap < -0.05 ? `尚差 ${formatNumber(Math.abs(gap))}` : gap > 0.05 ? `超前 ${formatNumber(gap)}` : '已達進度';
+    const gapTone = gap > 0.05 ? 'up' : gap < -0.05 ? 'down' : '';
+    const separator = verbose ? '｜' : '｜';
+    return `<span class="kpi-sub" title="依資料截止日換算應達進度">實績 ${formatNumber(metric.actual)} ${separator} 月目標 ${formatNumber(metric.target)} ${separator} <span class="kpi-gap ${gapTone}">${gapText}</span></span>`;
+  }
+
+  function kpiBattleDod(value) {
+    if (value == null || value === '') return '';
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '';
+    const direction = number > 0.0005 ? 'up' : number < -0.0005 ? 'down' : '';
+    const wording = direction === 'up' ? `較昨日上升 ${(number * 100).toFixed(1)}pp` : direction === 'down' ? `較昨日下降 ${Math.abs(number * 100).toFixed(1)}pp` : '較昨日持平';
+    return `<span class="kpi-dod ${direction}">${wording}</span>`;
+  }
+
+  function kpiBattleRankDod(value) {
+    if (value == null || value === '') return '';
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '';
+    if (number > 0) return `<span class="kpi-dod up">DOD ↑ ${number}名</span>`;
+    if (number < 0) return `<span class="kpi-dod down">DOD ↓ ${Math.abs(number)}名</span>`;
+    return '<span class="kpi-dod">DOD 持平</span>';
+  }
+
+  function kpiBattleRate(value, dod) {
+    if (value == null || !Number.isFinite(Number(value))) return kpiPendingCell();
+    return `<span class="kpi-rate ${kpiBattleTone(value)}">${formatPercent(value)}</span>${kpiBattleDod(dod)}`;
+  }
+
+  function kpiBattleMetricCell(metric, includeDod) {
+    if (!metric) return kpiPendingCell();
+    if (metric.rate == null) return `${kpiPendingCell()}${kpiBattleTargetLine(metric)}${includeDod ? kpiBattleDod(metric.dod) : ''}`;
+    return `<span class="kpi-rate ${kpiBattleTone(metric.rate)}">${formatPercent(metric.rate)}</span>${kpiBattleTargetLine(metric)}${includeDod ? kpiBattleDod(metric.dod) : ''}`;
+  }
+
+  function kpiBattleAwardCell(row) {
+    if (row.phone_award_actual == null && row.phone_award_projected == null) return kpiPendingCell();
+    const eligible = row.phone_award_eligible === 'Y';
+    return `<span class="kpi-award-meta">實際獎金</span><span class="kpi-award-val">${formatMoney(row.phone_award_actual)}</span><span class="kpi-award-meta">推估獎金 ${formatMoney(row.phone_award_projected)}</span><span class="kpi-award-meta ${eligible ? '' : 'no'}">獎金排名 ${row.phone_award_rank ?? '—'}｜${eligible ? '可領獎' : '未領獎'}</span>`;
+  }
+
+  function kpiBattleInsuranceCell(row) {
+    if (row?.insurance_attach_rate == null) return kpiPendingCell();
+    return `<span class="kpi-rate rate-only">${formatPercent(row.insurance_attach_rate)}</span><span class="kpi-sub">實際搭售率</span>`;
+  }
+
+  function privateDashboardLockMarkup(kind) {
+    const title = kind === 'awards' ? '台獎戰情受保護' : 'KPI 戰情受保護';
+    const uploadEntry = kind === 'kpi' ? `<a class="secondary" href="${QUICK_UPLOAD_URL}" target="_blank" rel="noopener">資料快速上傳</a>` : '';
+    return `<div class="card private-lock">
+      <h3>🔐 ${title}</h3>
+      <p>僅限北一二B在職同仁使用。姓名維持遮罩，KPI、排名與獎金不會出現在公開 GitHub 頁面。</p>
+      <div class="private-lock-form">
+        <input id="privateEmployeeId" inputmode="text" autocomplete="username" autocapitalize="characters" placeholder="輸入員工編號">
+        <input id="privateBootstrapCode" inputmode="numeric" autocomplete="one-time-code" placeholder="首次綁定碼（首次才需填）">
+      </div>
+      <div class="private-lock-actions">
+        <button data-private-dashboard-action="login">以員編登入</button>
+        <button class="secondary" data-private-dashboard-action="request-binding">首次申請綁定</button>
+        <button class="secondary" data-private-dashboard-action="check-request">查看核准結果</button>
+        <button class="secondary" data-private-dashboard-action="open-admin">管理者核准</button>
+        ${uploadEntry}
+      </div>
+      <div class="private-lock-status">首次使用：輸入員編＋啟用碼提出申請；管理者核准後，該員編只綁定這一台手機或電腦。往後僅輸入員編登入。</div>
+      <div class="private-admin" id="privateAdminPanel" style="display:none;"></div>
+    </div>`;
+  }
+
+  function create(options) {
+    const config = options || {};
+    const win = config.window || (typeof window !== 'undefined' ? window : null);
+    const doc = config.document || (win && win.document);
+    if (!win || !doc) throw new Error('KPI controller requires a browser document');
+    const storage = config.localStorage || win.localStorage;
+    const session = config.sessionStorage || win.sessionStorage;
+    const getGasUrl = typeof config.getGasUrl === 'function' ? config.getGasUrl : () => DEFAULT_GAS_URL;
+    const getAwardsData = typeof config.getAwardsData === 'function' ? config.getAwardsData : () => null;
+    const onKpiLoaded = typeof config.onKpiLoaded === 'function' ? config.onKpiLoaded : () => {};
+    const onKpiLoadError = typeof config.onKpiLoadError === 'function' ? config.onKpiLoadError : () => {};
+    const transport = typeof config.post === 'function' ? config.post : post;
+    const retryDelaysMs = Array.isArray(config.retryDelaysMs) ? config.retryDelaysMs : DEFAULT_RETRY_DELAYS_MS;
+    const sleep = typeof config.sleep === 'function' ? config.sleep : delay => new Promise(resolve => win.setTimeout(resolve, delay));
+    const logger = config.logger || win.console || (typeof console !== 'undefined' ? console : null);
+    const request = payload => requestWithRetry(payload);
+    const state = { data: null, view: 'stores', profile: null, adminSecret: '' };
+
+    function privateDashboardDeviceId() {
+      const key = 'north12b_private_dashboard_device_id';
+      let deviceId = storage.getItem(key);
+      if (deviceId) return deviceId;
+      if (win.crypto && win.crypto.randomUUID) deviceId = win.crypto.randomUUID().replace(/-/g, '');
+      else {
+        const bytes = new Uint8Array(24);
+        (win.crypto || {}).getRandomValues?.(bytes);
+        deviceId = Array.from(bytes).map(value => value.toString(16).padStart(2, '0')).join('') || `${Date.now()}${Math.random()}`.replace(/\D/g, '');
+      }
+      storage.setItem(key, deviceId);
+      return deviceId;
+    }
+
+    function privateDashboardSessionEmployeeId() {
+      return session.getItem('north12b_private_dashboard_employee_id') || '';
+    }
+
+    function privateDashboardSetStatus(message, error) {
+      doc.querySelectorAll('.private-lock-status').forEach(element => {
+        element.textContent = message || '';
+        element.style.color = error ? 'var(--red)' : 'var(--text-muted)';
+      });
+    }
+
+    async function post(payload) {
+      const gasUrl = getGasUrl();
+      if (!gasUrl) throw new Error('尚未設定 Apps Script 服務網址');
+      let response;
+      try {
+        response = await win.fetch(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload),
+          cache: 'no-store',
+        });
+      } catch (error) {
+        const networkError = new Error('服務連線失敗，請稍後再試。');
+        networkError.kind = 'network';
+        networkError.exceptionType = String(error?.name || 'Error');
+        throw networkError;
+      }
+      if (!response.ok) {
+        const httpError = new Error(`服務連線失敗（HTTP ${response.status}）`);
+        httpError.kind = 'http';
+        httpError.httpStatus = Number(response.status) || 0;
+        httpError.responseUrl = diagnosticResponseUrl(response.url || gasUrl);
+        httpError.responseRedirected = Boolean(response.redirected);
+        httpError.responseContentType = String(response.headers?.get?.('content-type') || '');
+        throw httpError;
+      }
+      let body;
+      try {
+        body = await response.json();
+      } catch (error) {
+        const responseError = new Error('服務回應格式無法辨識');
+        responseError.kind = 'response';
+        responseError.exceptionType = String(error?.name || 'Error');
+        throw responseError;
+      }
+      if (!body || body.status !== 'ok') {
+        const businessError = new Error((body && body.message) || '服務回應失敗');
+        businessError.kind = 'business';
+        throw businessError;
+      }
+      return body;
+    }
+
+    function normalizeTransportError(error) {
+      if (error && error.kind) return error;
+      if (error && error.name === 'TypeError') {
+        const networkError = new Error('服務連線失敗，請稍後再試。');
+        networkError.kind = 'network';
+        networkError.exceptionType = 'TypeError';
+        return networkError;
+      }
+      return error;
+    }
+
+    function isTransientTransportError(error) {
+      return Boolean(error && (
+        error.kind === 'network' ||
+        (error.kind === 'http' && TRANSIENT_HTTP_STATUSES.has(Number(error.httpStatus)))
+      ));
+    }
+
+    function requestDiagnostic(error, payload, attempt, retrySucceeded) {
+      const gasUrl = diagnosticResponseUrl(getGasUrl());
+      const responseUrl = diagnosticResponseUrl(error?.responseUrl);
+      let failureTarget = 'original-exec';
+      if (error?.kind === 'network') failureTarget = 'network-exception';
+      else if (error?.responseRedirected || (responseUrl && responseUrl !== gasUrl)) failureTarget = 'redirect-target';
+      return {
+        timestamp: new Date().toISOString(),
+        action: String(payload?.action || 'unknown'),
+        attempt,
+        httpStatus: error?.kind === 'http' ? Number(error.httpStatus) || 0 : null,
+        responseUrl,
+        responseRedirected: Boolean(error?.responseRedirected),
+        responseContentType: String(error?.responseContentType || ''),
+        exceptionType: error?.kind === 'network' ? String(error.exceptionType || 'Error') : '',
+        retrySucceeded: Boolean(retrySucceeded),
+        failureTarget,
+      };
+    }
+
+    function finalTransportError(error) {
+      const detail = error.kind === 'http' ? `HTTP ${Number(error.httpStatus) || 0}` : '網路錯誤';
+      const finalError = new Error(`服務暫時無法連線（${detail}），請稍後再試。`);
+      finalError.kind = error.kind;
+      finalError.httpStatus = error.httpStatus || null;
+      finalError.failureTarget = error.failureTarget || '';
+      return finalError;
+    }
+
+    async function requestWithRetry(payload) {
+      const maxAttempts = retryDelaysMs.length + 1;
+      let lastDiagnostic = null;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+          const result = await transport(payload);
+          if (attempt > 1 && lastDiagnostic) {
+            logger?.info?.('[KPI Battle private request recovered after retry]', {
+              ...lastDiagnostic,
+              timestamp: new Date().toISOString(),
+              attempt,
+              retrySucceeded: true,
+            });
+          }
+          return result;
+        } catch (caught) {
+          const error = normalizeTransportError(caught);
+          if (!RETRYABLE_PRIVATE_ACTIONS.has(String(payload?.action || '')) || !isTransientTransportError(error)) throw error;
+          lastDiagnostic = requestDiagnostic(error, payload, attempt, false);
+          if (attempt >= maxAttempts) {
+            logger?.error?.('[KPI Battle private request failed after retries]', {
+              ...lastDiagnostic,
+              finalFailure: true,
+            });
+            const finalError = finalTransportError(error);
+            finalError.failureTarget = lastDiagnostic.failureTarget;
+            throw finalError;
+          }
+          logger?.warn?.('[KPI Battle private request transient failure]', lastDiagnostic);
+          privateDashboardSetStatus('服務暫時不穩定，正在重新連線…');
+          await sleep(Number(retryDelaysMs[attempt - 1]) || 0);
+        }
+      }
+      throw new Error('服務暫時無法連線，請稍後再試。');
+    }
+
+    function renderLock() {
+      const kpiContent = doc.getElementById('kpiBattleContent');
+      const awardsContent = doc.getElementById('awardsBattleContent');
+      if (kpiContent && !state.data) kpiContent.innerHTML = privateDashboardLockMarkup('kpi');
+      if (awardsContent && !getAwardsData()) awardsContent.innerHTML = privateDashboardLockMarkup('awards');
+      const storedId = privateDashboardSessionEmployeeId();
+      doc.querySelectorAll('#privateEmployeeId').forEach(input => { input.value = storedId; });
+    }
+
+    function privateDashboardEmployeeInput() {
+      const input = Array.from(doc.querySelectorAll('#privateEmployeeId')).find(element => element.offsetParent !== null) || doc.querySelector('#privateEmployeeId');
+      return String(input?.value || '').trim();
+    }
+
+    function privateDashboardBootstrapInput() {
+      const input = Array.from(doc.querySelectorAll('#privateBootstrapCode')).find(element => element.offsetParent !== null) || doc.querySelector('#privateBootstrapCode');
+      return String(input?.value || '').trim();
+    }
+
+    function renderStores() {
+      const aggregate = state.data.aggregate || {};
+      const stores = [...(state.data.stores || [])].sort((left, right) => (left.company_rank || 9999) - (right.company_rank || 9999));
+      const rows = [{ ...aggregate, store: '北一二B整體', isDistrict: true }, ...stores];
+      const selected = rows.find(row => row.store === doc.getElementById('kpiBattleStoreSelect')?.value) || rows[0];
+      return `
+        <div class="summary-grid">
+          <div class="summary-card"><div class="sc-label">北一二B KPI</div><div class="sc-val ${kpiBattleTone(aggregate.overall_kpi)}">${aggregate.overall_kpi == null ? kpiPendingCell() : formatPercent(aggregate.overall_kpi)}</div><div class="sc-sub">${kpiBattleDod(aggregate.overall_kpi_dod) || '整體達成率'}</div></div>
+          <div class="summary-card"><div class="sc-label">公司排名</div><div class="sc-val" style="color:var(--gold)">${aggregate.company_rank ?? kpiPendingCell()}</div><div class="sc-sub">${kpiBattleRankDod(aggregate.company_rank_dod) || '北一二B整體'}</div></div>
+          <div class="summary-card"><div class="sc-label">加掛得分</div><div class="sc-val" style="color:var(--purple)">${aggregate.addon_score == null ? kpiPendingCell() : formatNumber(aggregate.addon_score)}</div><div class="sc-sub">${aggregate.addon_score_dod == null ? '整體得分' : `DOD ${aggregate.addon_score_dod > 0 ? '+' : ''}${formatNumber(aggregate.addon_score_dod)} 分`}</div></div>
+          <div class="summary-card"><div class="sc-label">保險搭售率</div><div class="sc-val" style="color:#0f766e">${aggregate.insurance_attach_rate == null ? kpiPendingCell() : formatPercent(aggregate.insurance_attach_rate)}</div><div class="sc-sub">實際搭售率</div></div>
+          <div class="summary-card"><div class="sc-label">KPI未達100%</div><div class="sc-val" style="color:var(--red)">${stores.every(row => row.overall_kpi != null && row.overall_kpi !== '') ? stores.filter(row => Number(row.overall_kpi) < 1).length : kpiPendingCell()}</div><div class="sc-sub">間門市</div></div>
+        </div>
+        <div class="section-divider">北一二B／店點 KPI 排名</div>
+        <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
+          <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th><th>加掛</th><th>保險搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
+          <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${displayStoreName(row.store)}</td><td>${row.company_rank == null ? kpiPendingCell() : `<span class="val-gold">${row.company_rank}</span>`}${kpiBattleRankDod(row.company_rank_dod)}</td><td>${row.overall_kpi == null ? kpiPendingCell() : kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${row.addon_score == null ? kpiPendingCell() : formatNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${formatNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleInsuranceCell(row)}</td><td>${kpiBattleMetricCell(row.core?.a999, true)}</td><td>${kpiBattleMetricCell(row.core?.a1399, true)}</td><td>${kpiBattleMetricCell(row.core?.haosu, true)}</td><td>${kpiBattleMetricCell(row.core?.r1399, true)}</td></tr>`).join('')}</tbody>
+        </table></div></div>
+        <div class="section-divider">各項 KPI 達成</div>
+        <div class="card">
+          <div class="kpi-battle-filter"><label>選擇區／店點<select id="kpiBattleStoreSelect">${rows.map(row => `<option value="${row.store}" ${row.store === selected?.store ? 'selected' : ''}>${row.isDistrict ? '🏢 ' : ''}${displayStoreName(row.store)}</option>`).join('')}</select></label></div>
+          <div class="kpi-metric-grid">${Object.entries(selected?.metrics || {}).map(([name, metric]) => `<div class="kpi-metric-card"><div class="label">${name}</div><div class="value kpi-rate ${kpiBattleTone(metric.rate)}">${formatPercent(metric.rate)}</div>${kpiBattleTargetLine(metric, true)}${kpiBattleDod(metric.dod)}</div>`).join('')}</div>
+        </div>`;
+    }
+
+    function renderPersonal() {
+      const people = state.data.personal || [];
+      const storeOptions = [...new Set(people.map(row => row.store))];
+      const roleOptions = [...new Set(people.map(row => row.category))];
+      const store = doc.getElementById('kpiBattlePersonalStore')?.value || 'all';
+      const role = doc.getElementById('kpiBattlePersonalRole')?.value || 'all';
+      const rows = people.filter(row => (store === 'all' || row.store === store) && (role === 'all' || row.category === role))
+        .sort((left, right) => Number(right.overall_rate || -1) - Number(left.overall_rate || -1));
+      return `
+        <div class="card"><div class="kpi-battle-filter">
+          <label>店點<select id="kpiBattlePersonalStore"><option value="all">全部店點</option>${storeOptions.map(value => `<option value="${value}" ${value === store ? 'selected' : ''}>${displayStoreName(value)}</option>`).join('')}</select></label>
+          <label>職類<select id="kpiBattlePersonalRole"><option value="all">全部職類</option>${roleOptions.map(value => `<option value="${value}" ${value === role ? 'selected' : ''}>${value}</option>`).join('')}</select></label>
+          <span class="kpi-battle-note">共 ${rows.length} 人｜姓名已遮罩</span>
+        </div></div>
+        <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
+          <thead><tr><th style="text-align:left">姓名</th><th>總達成率</th><th>KPI排名</th><th>個人台獎</th><th>保險搭售率</th><th>店點</th><th>職類</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th><th>R999</th><th>RT</th><th>特維</th><th>配件</th><th>包膜</th></tr></thead>
+          <tbody>${rows.map(row => `<tr><td class="store-name">${row.name}</td><td>${kpiBattleRate(row.overall_rate, row.overall_rate_dod)}</td><td>${row.rank ?? kpiPendingCell()}${kpiBattleRankDod(row.rank_dod)}</td><td>${row.phone_award_actual == null && row.phone_award_projected == null ? kpiPendingCell() : kpiBattleAwardCell(row)}</td><td>${row.insurance_attach_rate == null ? kpiPendingCell() : `<span class="kpi-rate rate-only">${formatPercent(row.insurance_attach_rate)}</span><span class="kpi-sub">個人搭售率</span>`}</td><td>${displayStoreName(row.store)}</td><td>${row.role || '—'}</td><td>${kpiBattleMetricCell(row.metrics?.A999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.A1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.好速, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R1399, false)}</td><td>${kpiBattleMetricCell(row.metrics?.R999, false)}</td><td>${kpiBattleMetricCell(row.metrics?.RT, false)}</td><td>${kpiBattleMetricCell(row.metrics?.特維, false)}</td><td>${kpiBattleMetricCell(row.metrics?.配件, false)}</td><td>${kpiBattleMetricCell(row.metrics?.包膜, false)}</td></tr>`).join('') || '<tr><td colspan="16" class="val-dim">目前篩選條件沒有資料</td></tr>'}</tbody>
+        </table></div></div>`;
+    }
+
+    function render() {
+      if (!state.data) return;
+      const note = doc.getElementById('kpiBattleSourceNote');
+      if (note) {
+        const supplement = state.data.supplement_status || (state.data.supplement_synced ? '同次正式來源已對齊；缺項顯示尚未有資料' : '補充欄位尚未有資料；有效 KPI 已顯示');
+        note.innerHTML = kpiBattleSourceMetadata(state.data, supplement);
+      }
+      const content = doc.getElementById('kpiBattleContent');
+      if (!content) return;
+      content.innerHTML = state.view === 'personal' ? renderPersonal() : renderStores();
+    }
+
+    function setView(view) {
+      if (view !== 'stores' && view !== 'personal') return;
+      state.view = view;
+      doc.getElementById('kpiBattleStoreBtn')?.classList.toggle('active', view === 'stores');
+      doc.getElementById('kpiBattlePersonalBtn')?.classList.toggle('active', view === 'personal');
+      render();
+    }
+
+    function load() {
+      if (state.data) {
+        render();
+        return;
+      }
+      const note = doc.getElementById('kpiBattleSourceNote');
+      if (note) note.textContent = '需通過員編與已核准裝置驗證後，才會由私有 Google Drive 載入資料。';
+      renderLock();
+    }
+
+    async function login() {
+      await win.DashboardB?.leaveForA();
+      const authContext=win.DashboardB?.context()||0;
+      const employeeId = privateDashboardEmployeeInput();
+      if (!employeeId) {
+        privateDashboardSetStatus('請先輸入員工編號。', true);
+        return;
+      }
+      privateDashboardSetStatus('正在驗證這台裝置…');
+      try {
+        const deviceId = privateDashboardDeviceId();
+        const result = await request({ action: 'private_access', employeeId, deviceId });
+        if(authContext!==(win.DashboardB?.context()||0))return;
+        session.setItem('north12b_private_dashboard_employee_id', employeeId);
+        globalThis.PortalLogout?.notifyLogin();
+        state.profile = result.profile || null;
+        try {
+          const kpiResult = await request({ action: 'kpicalc_access', employeeId, deviceId });
+          if(authContext!==(win.DashboardB?.context()||0))return;
+          const kpiData = kpicalcToKpiBattleView(kpiResult.data, new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }));
+          const snapshotKpi = result.snapshot && result.snapshot.kpiBattle;
+          state.data = mergeKpiBattleSupplement(kpiData, snapshotKpi);
+          render();
+          onKpiLoaded({ result, data: state.data, profile: state.profile });
+        } catch (kpiError) {
+          if(authContext!==(win.DashboardB?.context()||0))return;
+          state.data = null;
+          privateDashboardSetStatus(kpiError.message, true);
+          const note = doc.getElementById('kpiBattleSourceNote');
+          if (note) note.textContent = `KPI 資料載入失敗：${kpiError.message}`;
+          onKpiLoadError({ result, error: kpiError, profile: state.profile });
+        }
+      } catch (error) {
+        if(authContext!==(win.DashboardB?.context()||0))return;
+        state.data = null;
+        privateDashboardSetStatus(error.message, true);
+      }
+    }
+
+    async function requestBinding() {
+      const employeeId = privateDashboardEmployeeInput();
+      const bootstrapCode = privateDashboardBootstrapInput();
+      if (!employeeId || !bootstrapCode) {
+        privateDashboardSetStatus('首次申請需要輸入員編與啟用碼。', true);
+        return;
+      }
+      privateDashboardSetStatus('正在送出裝置綁定申請…');
+      try {
+        const result = await request({ action: 'private_request', employeeId, bootstrapCode, deviceId: privateDashboardDeviceId() });
+        session.setItem('north12b_private_dashboard_employee_id', employeeId);
+        privateDashboardSetStatus(result.message || '已送出申請，請等待管理者核准。');
+      } catch (error) {
+        privateDashboardSetStatus(error.message, true);
+      }
+    }
+
+    async function checkRequest() {
+      const employeeId = privateDashboardEmployeeInput();
+      if (!employeeId) {
+        privateDashboardSetStatus('請輸入員工編號。', true);
+        return;
+      }
+      privateDashboardSetStatus('正在查看申請狀態…');
+      try {
+        const result = await request({ action: 'private_request_status', employeeId, deviceId: privateDashboardDeviceId() });
+        if (result.requestStatus === 'approved') privateDashboardSetStatus('這台裝置已核准，現在可直接登入。');
+        else if (result.requestStatus === 'pending') privateDashboardSetStatus(`已申請，等待管理者核准（${result.requestedAt || ''}）。`);
+        else if (result.requestStatus === 'superseded') privateDashboardSetStatus('此申請已被新的裝置申請取代，請重新提出綁定。', true);
+        else privateDashboardSetStatus('尚未找到此裝置的申請紀錄。', true);
+      } catch (error) {
+        privateDashboardSetStatus(error.message, true);
+      }
+    }
+
+    async function loadAdminRequests() {
+      if (!state.adminSecret) {
+        privateDashboardSetStatus('請先通過管理者驗證。', true);
+        return;
+      }
+      try {
+        const result = await request({ action: 'private_admin_requests', adminSecret: state.adminSecret });
+        doc.querySelectorAll('#privateAdminPanel').forEach(panel => {
+          panel.style.display = 'block';
+          panel.innerHTML = `<strong>管理者待核准裝置</strong><div class="private-admin-list">${(result.requests || []).map(request =>
+            `<div class="private-admin-item"><span>員編 ${request.employeeId}<br><small>${request.requestedAt}</small></span><button data-private-dashboard-action="approve" data-request-id="${request.requestId}">核准此裝置</button></div>`
+          ).join('') || '<div class="val-dim">目前沒有待核准申請</div>'}</div>`;
+        });
+      } catch (error) {
+        state.adminSecret = '';
+        privateDashboardSetStatus(error.message, true);
+      }
+    }
+
+    async function openAdmin() {
+      const secret = win.prompt('請輸入管理者密碼（不會儲存在瀏覽器）');
+      if (!secret) return;
+      state.adminSecret = secret;
+      await loadAdminRequests();
+    }
+
+    async function approve(requestId) {
+      if (!state.adminSecret) {
+        privateDashboardSetStatus('管理者驗證已逾時，請重新開啟管理者核准。', true);
+        return;
+      }
+      try {
+        await request({ action: 'private_admin_approve', adminSecret: state.adminSecret, requestId });
+        privateDashboardSetStatus('已核准此裝置；若該員編原本綁定其他裝置，舊裝置已自動失效。');
+        await loadAdminRequests();
+      } catch (error) {
+        privateDashboardSetStatus(error.message, true);
+      }
+    }
+
+    function failClosed(message) {
+      state.profile=null;state.adminSecret='';
+      state.data = null;
+      const note = doc.getElementById('kpiBattleSourceNote');
+      if (note) note.textContent = message || 'KPI 戰情目前無法載入。';
+      const content = doc.getElementById('kpiBattleContent');
+      if (content) content.innerHTML = '<div class="card private-lock"><h3>KPI 戰情暫時無法載入</h3><p>未取得正式授權資料，因此不顯示任何 KPI 數值。</p></div>';
+    }
+
+    function handleClick(event) {
+      const actionElement = event.target.closest('[data-private-dashboard-action]');
+      if (actionElement) {
+        const action = actionElement.dataset.privateDashboardAction;
+        if (action === 'login') login();
+        if (action === 'request-binding') requestBinding();
+        if (action === 'check-request') checkRequest();
+        if (action === 'open-admin') openAdmin();
+        if (action === 'approve') approve(actionElement.dataset.requestId || '');
+        return;
+      }
+      const viewElement = event.target.closest('[data-kpi-battle-view]');
+      if (viewElement) setView(viewElement.dataset.kpiBattleView);
+    }
+
+    function handleChange(event) {
+      if (['kpiBattleStoreSelect', 'kpiBattlePersonalStore', 'kpiBattlePersonalRole'].includes(event.target.id)) render();
+    }
+
+    doc.addEventListener('click', handleClick);
+    doc.addEventListener('change', handleChange);
+
+    return Object.freeze({
+      load,
+      login,
+      post: request,
+      render,
+      renderLock,
+      setView,
+      failClosed,
+      acceptB(bundle) {
+        state.profile=bundle.privateResult.profile;
+        const data=kpicalcToKpiBattleView(bundle.kpiResult.data,new Date().toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}));
+        state.data=mergeKpiBattleSupplement(data,bundle.privateResult.snapshot?.kpiBattle);
+        render();onKpiLoaded({result:bundle.privateResult,data:state.data,profile:state.profile});
+      },
+      getData: () => state.data,
+      getProfile: () => state.profile,
+    });
+  }
+
+  return Object.freeze({
+    DEFAULT_GAS_URL,
+    create,
+    resolveGasUrl,
+    kpicalcMetric,
+    kpicalcToKpiBattleView,
+    kpiBattleSupplementIsCurrent,
+    mergeKpiBattleSupplement,
+    kpiBattleSourceMetadata,
+    kpiBattleReportDateFromSource,
+    kpiBattleApplyKnownCorrections,
+    displayStoreName,
+    formatNumber,
+    formatPercent,
+    formatMoney,
+  });
+});
+</script><script>(function(root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.AwardModelCatalog = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function() {
+  'use strict';
+  // Non-sensitive monthly rules. Kept in sync with config/award-config-2026-10.json.
+  const OCTOBER = {
+  "configVersion": "2026-10-v1",
+  "effectiveMonth": "2026-10",
+  "expectedPhoneItems": 10,
+  "expectedStoreRows": 10,
+  "selectedModels": [
+    "ZFold8Ultra/ZFold8/ZFlip8",
+    "Pixel10a",
+    "Pixel11Pro/11ProXL/11ProFold",
+    "S26Ultra",
+    "Pixel11",
+    "S26/S26+",
+    "Reno16F",
+    "A57",
+    "V80Lite",
+    "A6x6G/128G/A7Pro"
+  ],
+  "modelGroups": [
+    {
+      "modelId": "ZFold8Ultra/ZFold8/ZFlip8",
+      "reportModelId": "zfold8-family",
+      "displayName": "Z Fold8 Ultra／Z Fold8／Z Flip8"
+    },
+    {
+      "modelId": "Pixel10a",
+      "reportModelId": "pixel-10a",
+      "displayName": "Google Pixel 10a"
+    },
+    {
+      "modelId": "Pixel11Pro/11ProXL/11ProFold",
+      "reportModelId": "pixel-11-pro-family",
+      "displayName": "Google Pixel 11 Pro／11 Pro XL／11 Pro Fold"
+    },
+    {
+      "modelId": "S26Ultra",
+      "reportModelId": "s26-ultra",
+      "displayName": "Samsung S26 Ultra"
+    },
+    {
+      "modelId": "Pixel11",
+      "reportModelId": "pixel-11",
+      "displayName": "Google Pixel 11"
+    },
+    {
+      "modelId": "S26/S26+",
+      "reportModelId": "s26-family",
+      "displayName": "Samsung S26／S26+"
+    },
+    {
+      "modelId": "Reno16F",
+      "reportModelId": "oppo-r16f",
+      "displayName": "OPPO Reno16 F"
+    },
+    {
+      "modelId": "A57",
+      "reportModelId": "samsung-a57",
+      "displayName": "Samsung Galaxy A57"
+    },
+    {
+      "modelId": "V80Lite",
+      "reportModelId": "vivo-v80-lite",
+      "displayName": "vivo V80 Lite"
+    },
+    {
+      "modelId": "A6x6G/128G/A7Pro",
+      "reportModelId": "oppo-a6x-a7pro",
+      "displayName": "OPPO A6x 6G/128G／OPPO A7 Pro"
+    }
+  ],
+  "modelAliases": {
+    "ZFold8Ultra/ZFold8/ZFlip8": "ZFold8Ultra/ZFold8/ZFlip8",
+    "A6x/A7Pro": "A6x6G/128G/A7Pro",
+    "A6x6G/128G&A7Pro": "A6x6G/128G/A7Pro",
+    "V80 Lite": "V80Lite"
+  },
+  "rewardRules": [
+    {
+      "role": "manager",
+      "amounts": {
+        "ZFold8Ultra/ZFold8/ZFlip8": [
+          610,
+          780,
+          910,
+          1040,
+          1305
+        ],
+        "Pixel10a": [
+          1105,
+          1420,
+          1660,
+          1895,
+          2370
+        ],
+        "Pixel11Pro/11ProXL/11ProFold": [
+          345,
+          440,
+          515,
+          590,
+          735
+        ],
+        "S26Ultra": [
+          260,
+          330,
+          385,
+          440,
+          555
+        ],
+        "Pixel11": [
+          280,
+          360,
+          420,
+          480,
+          600
+        ],
+        "S26/S26+": [
+          530,
+          680,
+          790,
+          905,
+          1130
+        ],
+        "Reno16F": [
+          945,
+          1215,
+          1415,
+          1620,
+          2025
+        ],
+        "A57": [
+          1140,
+          1465,
+          1710,
+          1950,
+          2440
+        ],
+        "V80Lite": [
+          910,
+          1170,
+          1370,
+          1565,
+          1955
+        ],
+        "A6x6G/128G/A7Pro": [
+          885,
+          1135,
+          1325,
+          1515,
+          1895
+        ]
+      }
+    },
+    {
+      "role": "supervisor",
+      "amounts": {
+        "ZFold8Ultra/ZFold8/ZFlip8": [
+          640,
+          785,
+          980,
+          1180,
+          1475
+        ],
+        "Pixel10a": [
+          1150,
+          1415,
+          1770,
+          2120,
+          2650
+        ],
+        "Pixel11Pro/11ProXL/11ProFold": [
+          360,
+          440,
+          550,
+          660,
+          825
+        ],
+        "S26Ultra": [
+          270,
+          330,
+          415,
+          495,
+          620
+        ],
+        "Pixel11": [
+          295,
+          360,
+          450,
+          540,
+          675
+        ],
+        "S26/S26+": [
+          555,
+          680,
+          850,
+          1020,
+          1275
+        ],
+        "Reno16F": [
+          990,
+          1220,
+          1525,
+          1830,
+          2285
+        ],
+        "A57": [
+          1195,
+          1470,
+          1840,
+          2205,
+          2760
+        ],
+        "V80Lite": [
+          955,
+          1180,
+          1470,
+          1765,
+          2210
+        ],
+        "A6x6G/128G/A7Pro": [
+          905,
+          1115,
+          1395,
+          1675,
+          2095
+        ]
+      }
+    },
+    {
+      "role": "seller",
+      "amounts": {
+        "ZFold8Ultra/ZFold8/ZFlip8": [
+          650,
+          1300,
+          1325
+        ],
+        "Pixel10a": [
+          490,
+          975,
+          995
+        ],
+        "Pixel11Pro/11ProXL/11ProFold": [
+          490,
+          975,
+          995
+        ],
+        "S26Ultra": [
+          490,
+          975,
+          995
+        ],
+        "Pixel11": [
+          425,
+          845,
+          860
+        ],
+        "S26/S26+": [
+          425,
+          845,
+          860
+        ],
+        "Reno16F": [
+          325,
+          650,
+          665
+        ],
+        "A57": [
+          325,
+          650,
+          665
+        ],
+        "V80Lite": [
+          325,
+          650,
+          665
+        ],
+        "A6x6G/128G/A7Pro": [
+          125,
+          250,
+          255
+        ]
+      }
+    }
+  ],
+  "emptyDeviceRewards": {
+    "seller": {
+      "ZFold8Ultra/ZFold8/ZFlip8": 1300,
+      "Pixel10a": 975,
+      "Pixel11Pro/11ProXL/11ProFold": 975,
+      "S26Ultra": 975,
+      "Pixel11": 845,
+      "S26/S26+": 845,
+      "Reno16F": 650,
+      "A57": 650,
+      "V80Lite": 650,
+      "A6x6G/128G/A7Pro": 250
+    },
+    "manager": {
+      "ZFold8Ultra/ZFold8/ZFlip8": 330,
+      "Pixel10a": 250,
+      "Pixel11Pro/11ProXL/11ProFold": 250,
+      "S26Ultra": 250,
+      "Pixel11": 215,
+      "S26/S26+": 215,
+      "Reno16F": 165,
+      "A57": 165,
+      "V80Lite": 165,
+      "A6x6G/128G/A7Pro": 65
+    },
+    "supervisor": {
+      "ZFold8Ultra/ZFold8/ZFlip8": 43,
+      "Pixel10a": 32,
+      "Pixel11Pro/11ProXL/11ProFold": 32,
+      "S26Ultra": 32,
+      "Pixel11": 28,
+      "S26/S26+": 28,
+      "Reno16F": 21,
+      "A57": 21,
+      "V80Lite": 21,
+      "A6x6G/128G/A7Pro": 8
+    }
+  },
+  "sourceImages": [
+    "image(20261001-090103).png",
+    "image(20261001-090108).png",
+    "image(20261001-090112).png"
+  ]
+};
+  const SEPTEMBER = [
+    ['pixel-10a','Pixel 10a'], ['s26u-zfold8-family','S26 Ultra／Z Fold8／Z Fold8 Ultra'],
+    ['pixel-11-pro-family','Pixel 11 Pro／11 Pro XL／11 Pro Fold'], ['s26-256g','S26 256G'],
+    ['pixel-11','Pixel 11'], ['vivo-v70fe','vivo V70 FE'], ['oppo-r16f','Reno16 F'],
+    ['samsung-a57','Galaxy A57'], ['oppo-a6x','A6x 6G／128G'], ['samsung-a27','Galaxy A27']
+  ].map(([modelId,shortName]) => ({modelId,shortName}));
+  const monthOf = date => String(date || '').slice(0,7);
+  function definitions(date) {
+    if (monthOf(date) === '2026-10') return OCTOBER.modelGroups.map(group => ({
+      modelId:group.reportModelId, shortName:group.displayName, sourceName:group.modelId,
+      managerRewards:OCTOBER.rewardRules.find(row=>row.role==='manager').amounts[group.modelId]
+    }));
+    if (monthOf(date) === '2026-09') return SEPTEMBER.map(row=>({...row}));
+    return null;
+  }
+  function expectedCount(date) { return definitions(date)?.length || 13; }
+  const normalize = name => String(name || '').replace(/Google|Samsung|Galaxy|OPPO|vivo/gi,'').replace(/[\s/／&＆+]/g,'').toLowerCase();
+  function selectionMatches(items,date) {
+    if (monthOf(date) !== '2026-10') return true;
+    if (!Array.isArray(items) || items.length !== 10) return false;
+    const expected = OCTOBER.modelGroups.map(group=>group.modelId);
+    const resolve = item => {
+      const name=String(item && (item.name || item.sourceName || item.display_name) || '');
+      const alias=OCTOBER.modelAliases[name] || name;
+      return expected.find(key=>normalize(key)===normalize(alias)) ||
+        OCTOBER.modelGroups.find(group=>normalize(group.displayName)===normalize(name))?.modelId;
+    };
+    const names=items.map(resolve);
+    return names.every(Boolean) && new Set(names).size===10;
+  }
+  return { october:OCTOBER, definitions, expectedCount, selectionMatches };
+});
+</script><script>(function (root, factory) {
+  const kpiController = typeof module === 'object' && module.exports
+    ? require('./kpi-battle-controller.js')
+    : root && root.KpiBattleController;
+  const catalog = typeof module === 'object' && module.exports
+    ? require('./award-model-catalog.js') : root && root.AwardModelCatalog;
+  const api = factory(kpiController, catalog);
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.AwardsBattleController = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (KpiBattleController, Catalog) {
+  'use strict';
+
+  const EXPECTED_PHONE_ITEMS = 13;
+  const EXPECTED_STORE_ROWS = 10;
+  const EXPECTED_STORES = 9;
+
+  function formatNumber(value) {
+    return KpiBattleController.formatNumber(value);
+  }
+
+  function formatPercent(value) {
+    return KpiBattleController.formatPercent(value);
+  }
+
+  function formatMoney(value) {
+    return KpiBattleController.formatMoney(value);
+  }
+
+  function displayStoreName(value) {
+    const name = String(value || '').trim();
+    return name === '台灣大哥大台北三創' || name === '台灣大哥大數位生活台北三創'
+      ? '台北三創'
+      : name;
+  }
+
+  function awardRateTone(value) {
+    if (value == null || value === '') return '';
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '';
+    if (number >= 1) return 'good';
+    if (number >= 0.5) return 'warn';
+    return 'bad';
+  }
+
+  function validateAwardsBattle(data, kpiData, snapshotKpi) {
+    if (!data || typeof data !== 'object') return { ok: false, reason: '尚未取得與目前 KPI 同日期的台獎資料' };
+    const awardsDate = String(data.report_run_date || data.report_date || '');
+    const kpiDate = String((kpiData || {}).report_run_date || (kpiData || {}).report_date || '');
+    const awardsCutoff = String(data.data_as_of_date || data.source_as_of_date || '');
+    const kpiCutoff = String((kpiData || {}).data_as_of_date || (kpiData || {}).source_as_of_date || '');
+    const cutoffMismatch = (awardsCutoff || kpiCutoff) && (!awardsCutoff || awardsCutoff !== kpiCutoff);
+    const snapshotRun = String((snapshotKpi || {}).processing_run_id || (snapshotKpi || {}).kpi_run_id || '');
+    const awardsRun = String(data.processing_run_id || '');
+    if (!awardsDate || !kpiDate || awardsDate !== kpiDate || (kpiData || {}).supplement_synced === false || cutoffMismatch || (snapshotRun && awardsRun !== snapshotRun)) {
+      return {
+        ok: false,
+        reason: awardsDate
+          ? `台獎戰報日期 ${awardsDate} 與 KPI 戰報日期 ${kpiDate || '—'} 不一致，或資料截止日／發布批次尚未同步`
+          : '尚未取得與目前 KPI 同日期的台獎資料',
+      };
+    }
+
+    // 依來源截止月份選方案，避免十月一日的九月收官套用十月機款。
+    const modelDate = awardsCutoff || awardsDate;
+    const expectedPhoneItems = Catalog.expectedCount(modelDate);
+    const phoneItems = Number(data.phone_items);
+    const storeRows = Number(data.store_rows);
+    const stores = Array.isArray(data.stores) ? data.stores : [];
+    const overallItems = Array.isArray(data.overall && data.overall.items) ? data.overall.items : [];
+    const storeNames = new Set(stores.map(row => String((row || {}).store || '').trim()).filter(Boolean));
+    const allStoresComplete = stores.every(row => Array.isArray(row && row.items) && row.items.length === expectedPhoneItems && Catalog.selectionMatches(row.items, modelDate));
+    if (
+      phoneItems !== expectedPhoneItems ||
+      storeRows !== EXPECTED_STORE_ROWS ||
+      stores.length !== EXPECTED_STORES ||
+      storeNames.size !== EXPECTED_STORES ||
+      overallItems.length !== expectedPhoneItems ||
+      !Catalog.selectionMatches(overallItems, modelDate) ||
+      !allStoresComplete ||
+      !data.supervisor || typeof data.supervisor !== 'object'
+    ) {
+      return { ok: false, reason: `正式台獎資料不完整（需 ${expectedPhoneItems} 款、9 店與北一二B整體），因此不顯示任何台獎數值` };
+    }
+    return { ok: true, reason: '' };
+  }
+
+  function renderAwardPriority(item) {
+    if (!item) return '';
+    const difference = item.difference == null || item.difference === '' ? NaN : Number(item.difference);
+    const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${formatNumber(difference)}` : '尚未有資料';
+    return `<div class="award-priority-card">
+      <div class="award-priority-title">${item.display_name}</div>
+      <div class="award-priority-action">${item.next_label || '已達最高獎階'}</div>
+      <div class="award-priority-metrics">
+        <div class="award-metric">實際數<strong>${formatNumber(item.actual)}</strong></div>
+        <div class="award-metric">目標數<strong>${formatNumber(item.target)}</strong></div>
+        <div class="award-metric">達成率<strong class="${awardRateTone(item.rate)}">${formatPercent(item.rate)}</strong></div>
+        <div class="award-metric">差異數<strong class="${difference < 0 ? 'bad' : 'good'}">${differenceText}</strong></div>
+        <div class="award-metric wide">會增加多少獎金<strong>${formatMoney(item.incremental_award)}</strong></div>
+      </div>
+    </div>`;
+  }
+
+  function renderAwardModel(item, district) {
+    const difference = item.difference == null || item.difference === '' ? NaN : Number(item.difference);
+    const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${formatNumber(difference)}` : '尚未有資料';
+    const levels = district
+      ? [{ label: '北一二B 80%獎金', amount: item.district_reward_80 }, { label: '北一二B 100%獎金', amount: item.district_reward_100 }]
+      : [{ label: '店點 50%獎金', amount: item.store_reward_50 }, { label: '店點 100%獎金', amount: item.store_reward_100 }];
+    const thresholdLabel = district ? '80%' : '50%';
+    return `<div class="award-model"><div class="award-model-name">${item.display_name}</div><div class="award-model-rate ${awardRateTone(item.rate)}">${formatPercent(item.rate)}</div><span class="award-model-sub">實際 ${formatNumber(item.actual)}｜目標 ${formatNumber(item.target)}</span><span class="award-model-sub">${thresholdLabel}差異 ${differenceText}｜${thresholdLabel}目標 ${formatNumber(item.threshold_target)}</span><div class="award-model-tiers">${levels.map(level => `<div class="award-model-tier">${level.label}<strong>${formatMoney(level.amount)}</strong></div>`).join('')}</div></div>`;
+  }
+
+  function renderAwardUnit(row, district) {
+    const award = (row && row.award) || {};
+    return `<div class="award-store-card"><div class="award-store-head"><div class="award-store-name">${district ? '🏢 ' : ''}${displayStoreName(row && row.store) || '—'}</div><div class="award-store-rank">排名 ${award.rank ?? '尚未有資料'}<br>${award.award === 'Y' ? '✅ 可領獎' : award.award === 'N' ? '⚠️ 未領獎' : '尚未有資料'}</div></div>
+      <div class="award-role-indicator${district ? ' district' : ''}">${district ? '督導獎金角色｜北一二B 80%／100%' : '店長獎金角色｜店點 50%／100%'}</div>
+      <div class="award-store-values"><div class="award-value"><div class="label">實際金額</div><div class="number">${formatMoney(award.actual_total)}</div></div><div class="award-value"><div class="label">推估金額</div><div class="number">${formatMoney(award.projected)}</div></div></div>
+      <div class="award-priority-grid">${((row && row.priorities) || []).map(renderAwardPriority).join('') || '<span class="val-dim">沒有符合優先順位的機款</span>'}</div>
+    </div>`;
+  }
+
+  function create(options) {
+    const config = options || {};
+    const win = config.window || (typeof window !== 'undefined' ? window : null);
+    const doc = config.document || (win && win.document);
+    if (!win || !doc) throw new Error('Awards controller requires a browser document');
+    const renderLock = typeof config.renderLock === 'function' ? config.renderLock : () => {};
+    const state = { data: null, unavailableReason: '' };
+
+    function renderUnavailable() {
+      const note = doc.getElementById('awardsBattleSourceNote');
+      if (note) note.textContent = '台獎尚未有資料，待來源更新後顯示。';
+      const content = doc.getElementById('awardsBattleContent');
+      if (!content) return;
+      content.innerHTML = `<div class="card private-lock"><h3>台獎尚未有資料</h3><p>${state.unavailableReason || '尚未取得與目前 KPI 同日期的台獎資料。'}</p><p class="kpi-battle-note">已取得的 KPI 正常顯示；台獎待正式資料到齊後更新。</p></div>`;
+    }
+
+    function render() {
+      if (!state.data) return;
+      const data = state.data;
+      const supervisor = data.supervisor || {};
+      const stores = data.stores || [];
+      const phoneItems = Number(data.phone_items);
+      const storeRows = Number(data.store_rows);
+      const eligibilityComplete = stores.every(row => row.award && ['Y', 'N'].includes(row.award.award));
+      const eligibleStores = stores.filter(row => row.award && row.award.award === 'Y').length;
+      const selectedBefore = doc.getElementById('awardsStoreSelect')?.value;
+      const selectedDistrict = !selectedBefore || selectedBefore === '北一二B整體';
+      const selectedUnit = selectedDistrict
+        ? data.overall
+        : (stores.find(row => row.store === selectedBefore) || data.overall);
+      const note = doc.getElementById('awardsBattleSourceNote');
+      if (note) note.textContent = `${phoneItems} 款重點機款｜${storeRows} 列店點與整體資料｜發布日期 ${data.report_run_date || data.report_date}｜資料截至 ${data.data_as_of_date || data.report_date}｜前三台依本月最高台獎順位；達成率超過 100% 由下一順位遞補｜店點差異數以 50% 目標無條件進位計算｜資料僅供受保護預覽`;
+      const content = doc.getElementById('awardsBattleContent');
+      if (!content) return;
+      content.innerHTML = `
+        <div class="summary-grid">
+          <div class="summary-card"><div class="sc-label">督導區實際獎金</div><div class="sc-val award-summary-money" style="color:#6d28d9">${formatMoney(supervisor.actual_total)}</div><div class="sc-sub">公司實際獎金</div></div>
+          <div class="summary-card"><div class="sc-label">督導區推估獎金</div><div class="sc-val award-summary-money" style="color:var(--accent)">${formatMoney(supervisor.projected)}</div><div class="sc-sub">依目前進度推估</div></div>
+          <div class="summary-card"><div class="sc-label">督導區排名</div><div class="sc-val" style="color:var(--gold)">${supervisor.rank ?? '尚未有資料'}</div><div class="sc-sub">公司獎金排名</div></div>
+          <div class="summary-card"><div class="sc-label">是否領獎</div><div class="sc-val" style="color:${supervisor.award === 'Y' ? 'var(--green)' : 'var(--red)'}">${supervisor.award === 'Y' ? '有' : supervisor.award === 'N' ? '無' : '尚未有資料'}</div><div class="sc-sub">督導區資格</div></div>
+          <div class="summary-card"><div class="sc-label">有領獎店</div><div class="sc-val" style="color:var(--green)">${eligibilityComplete ? eligibleStores : '尚未有資料'}</div><div class="sc-sub">家門市</div></div>
+          <div class="summary-card"><div class="sc-label">未領獎店</div><div class="sc-val" style="color:var(--red)">${eligibilityComplete ? stores.length - eligibleStores : '尚未有資料'}</div><div class="sc-sub">家門市</div></div>
+        </div>
+        <div class="section-divider">督導區及各店台獎（依實際獎金排序）</div>
+        <div class="award-store-grid">${renderAwardUnit(data.overall, true)}${stores.map(row => renderAwardUnit(row, false)).join('')}</div>
+        <div class="section-divider">北一二B／門市 ${phoneItems} 款機款篩選</div>
+        <div class="card"><div class="award-store-selector"><label>選擇北一二B／門市<select id="awardsStoreSelect"><option value="北一二B整體" ${selectedDistrict ? 'selected' : ''}>🏢 北一二B整體</option>${stores.map(row => `<option value="${row.store}" ${row.store === selectedUnit.store ? 'selected' : ''}>${displayStoreName(row.store)}</option>`).join('')}</select></label><span class="kpi-battle-note">${selectedDistrict ? '北一二B差異數＝實際數－80%目標台數（無條件進位）' : '店點差異數＝實際數－50%目標台數（無條件進位）'}</span></div><div class="award-role-indicator${selectedDistrict ? ' district' : ''}">${selectedDistrict ? '目前檢視：督導獎金角色｜北一二B 80%／100%' : '目前檢視：店長獎金角色｜店點 50%／100%'}</div><div class="award-model-grid">${selectedUnit.items.map(item => renderAwardModel(item, selectedDistrict)).join('')}</div></div>`;
+    }
+
+    function acceptKpiResult(payload) {
+      const result = (payload || {}).result || {};
+      const kpiData = (payload || {}).data || null;
+      const awards = result.snapshot && result.snapshot.awardsBattle;
+      const validation = validateAwardsBattle(awards, kpiData, result.snapshot && result.snapshot.kpiBattle);
+      if (!validation.ok) {
+        state.data = null;
+        state.unavailableReason = validation.reason;
+        renderUnavailable();
+        return false;
+      }
+      state.data = awards;
+      state.unavailableReason = '';
+      render();
+      return true;
+    }
+
+    function handleKpiLoadError() {
+      state.data = null;
+      state.unavailableReason = 'KPI 正式資料尚未讀回，因此不顯示可能過期的台獎資料';
+      renderUnavailable();
+    }
+
+    function load() {
+      if (state.data) {
+        render();
+        return;
+      }
+      if (state.unavailableReason) {
+        renderUnavailable();
+        return;
+      }
+      const note = doc.getElementById('awardsBattleSourceNote');
+      if (note) note.textContent = '需通過員編與已核准裝置驗證後，才會由私有 Google Drive 載入資料。';
+      renderLock();
+    }
+
+    function failClosed(message) {
+      state.data = null;
+      state.unavailableReason = message || '未取得正式授權資料，因此不顯示任何台獎數值';
+      renderUnavailable();
+    }
+
+    function handleChange(event) {
+      if (event.target && event.target.id === 'awardsStoreSelect') render();
+    }
+
+    doc.addEventListener('change', handleChange);
+
+    return Object.freeze({
+      load,
+      render,
+      renderUnavailable,
+      acceptKpiResult,
+      handleKpiLoadError,
+      failClosed,
+      getData: () => state.data,
+      getUnavailableReason: () => state.unavailableReason,
+    });
+  }
+
+  return Object.freeze({
+    EXPECTED_PHONE_ITEMS,
+    EXPECTED_STORE_ROWS,
+    EXPECTED_STORES,
+    create,
+    validateAwardsBattle,
+    displayStoreName,
+    renderAwardPriority,
+    renderAwardModel,
+    renderAwardUnit,
+  });
+});
+</script>
+<script>(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.ReadonlyDashboardCore=api;})(typeof globalThis==='object'?globalThis:this,function(){
+  'use strict';
+  const SCHEMA='north12-conversion/v1';
+  const STORES=[['DNB10062','酒泉','台北酒泉'],['DNB10082','永吉','台北永吉'],['DNB10094','復興南','台北復興南'],['DNB10146','杭州南','台北杭州南'],['DNB10168','萬大','台北萬大'],['DNB10174','通化','台北通化'],['DNB10284','大稻埕','台北大稻埕'],['DNB10307','三創','台灣大哥大數位生活台北三創'],['DNB10440','六張犁','台北六張犁']].map(([id,short,name])=>Object.freeze({id,short,name,region:'北一二B'}));
+  const FIELDS=['aq_n','aq_d','rt_n','rt_d'],norm=value=>String(value??'').replace(/\s+/g,'');
+  function fail(message){throw Error(message);}
+  function count(value,label){if(!Number.isSafeInteger(value)||value<0||value>100000000)fail(label+' 必須是非負整數，缺值不能當零');return value;}
+  function iso(value){if(typeof value!=='string'||!/^20\d\d-\d\d-\d\d$/.test(value)||!Number.isFinite(Date.parse(value+'T00:00:00Z'))||new Date(value+'T00:00:00Z').toISOString().slice(0,10)!==value)fail('來源日期不合法');return value;}
+  function dateSerial(value){if(!Number.isSafeInteger(value)||value<40000||value>90000)fail('來源日期不是已核實的 Excel 日序');return new Date(Date.UTC(1899,11,30)+value*86400000).toISOString().slice(0,10);}
+  function ratio(n,d){return d===0?null:n/d;}
+  function aggregate(records){const out=Object.fromEntries(FIELDS.map(k=>[k,0]));for(const row of records)for(const key of FIELDS)out[key]+=count(row[key],key);return {...out,aq_rate:ratio(out.aq_n,out.aq_d),rt_rate:ratio(out.rt_n,out.rt_d)};}
+  function dedupe(records){const rows=new Map();for(const row of records){const key=row.date+'|'+row.store,prior=rows.get(key);if(prior&&FIELDS.some(k=>prior[k]!==row[k]))fail('重複店日包含衝突，已停止整批');rows.set(key,row);}return [...rows.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.store.localeCompare(b.store));}
+  function validateConversion(value){
+    if(!value||![SCHEMA,1].includes(value.schema))fail('締結率資料契約不符');
+    const start=iso(value.period_start),cutoff=iso(value.cutoff);if(start.slice(0,7)!==cutoff.slice(0,7)||start.slice(-2)!=='01'||cutoff<start)fail('來源月份與截止不一致');
+    if(!/^[a-f0-9]{64}$/.test(value.sha256||''))fail('來源缺少 SHA-256');
+    const ids=new Set(STORES.map(s=>s.id));if(!Array.isArray(value.records)||value.records.length>9*31)fail('店日資料不完整');
+    const records=dedupe(value.records.map(row=>{
+      if(!ids.has(row.store)||row.region&&row.region!=='北一二B')fail('締結率含有未核定門市或區域');
+      const date=iso(row.date);if(date<start||date>cutoff)fail('截止以後的預填資料不得作實績');
+      const r={store:row.store,date};for(const key of FIELDS)r[key]=count(row[key],key);
+      if(r.aq_d===0&&r.aq_n!==0||r.rt_d===0&&r.rt_n!==0)fail('零分母但有上線實績');return r;
+    }));
+    const days=Number(cutoff.slice(-2));if(records.length!==9*days)fail('缺少店日，不補零');
+    for(let day=1;day<=days;day++)for(const id of ids)if(!records.some(r=>r.store===id&&r.date===start.slice(0,8)+String(day).padStart(2,'0')))fail('缺少店日，不補零');
+    let prior=null;
+    if(value.prior!=null){
+      if(!Array.isArray(value.prior)||value.prior.length!==9||new Set(value.prior.map(r=>r.store)).size!==9)fail('同期店點不完整');
+      prior=value.prior.map(row=>{if(!ids.has(row.store))fail('同期含未知門市');const r={store:row.store};for(const key of FIELDS)r[key]=count(row[key],key);if(r.aq_d===0&&r.aq_n||r.rt_d===0&&r.rt_n)fail('同期零分母衝突');return r;});
+      if(!value.prior_period||iso(value.prior_period.start)>iso(value.prior_period.end)||Number(value.prior_period.start.slice(-2))!==1||Number(value.prior_period.end.slice(-2))!==days||value.prior_period.start.slice(0,7)!==value.prior_period.end.slice(0,7))fail('同期起迄尚未核實');
+      const p=new Date(start+'T00:00:00Z');p.setUTCMonth(p.getUTCMonth()-1);if(p.toISOString().slice(0,7)!==value.prior_period.start.slice(0,7))fail('同期不是前一個月');
+    }
+    return {schema:SCHEMA,period_start:start,cutoff,sha256:value.sha256,source_bytes:count(value.source_bytes||0,'來源大小'),source_name:String(value.source_name||value.file_name||'已驗證締結率來源').slice(0,160),stores:STORES.map(s=>({...s})),records,prior,prior_period:prior?{start:value.prior_period.start,end:value.prior_period.end}:null,definition:'AQ 上線合計／AQ 來客合計；RT 為符合續約資格之原 TWM＋原 TST；同期只有區間總量。'};
+  }
+  function dailySeries(records,mode='daily',start,end){
+    if(!['daily','cumulative'].includes(mode))fail('未知趨勢模式');const byDate=new Map();for(const r of records){if(start&&r.date<start||end&&r.date>end)continue;if(!byDate.has(r.date))byDate.set(r.date,[]);byDate.get(r.date).push(r);}
+    let accumulated=[];return [...byDate.keys()].sort().map(date=>{const rows=byDate.get(date);accumulated=accumulated.concat(rows);return {date,...aggregate(mode==='cumulative'?accumulated:rows)};});
+  }
+  function diff(before,after){const current=validateConversion(after),old=before?validateConversion(before):null;if(old&&(old.period_start!==current.period_start||current.cutoff<old.cutoff))fail('新月份請另建版本；截止不得倒退');const a=new Map((old?.records||[]).map(r=>[r.date+'|'+r.store,r])),b=new Map(current.records.map(r=>[r.date+'|'+r.store,r]));const changed=[];for(const [key,r]of b)if(a.has(key)&&FIELDS.some(k=>a.get(key)[k]!==r[k]))changed.push({store:r.store,date:r.date,before:a.get(key),after:r});return {same_source:old?.sha256===current.sha256,added:[...b.keys()].filter(k=>!a.has(k)).length,removed:[...a.keys()].filter(k=>!b.has(k)).length,changed:changed.length,changes:changed,unique_keys:b.size};}
+  function workbookRows(workbook,XLSX,name){if(!workbook.Sheets[name])fail('缺少必要工作表：'+name);return XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,raw:true,defval:null,blankrows:true});}
+  function equal(value,expected,label){if(typeof value!=='number'||!Number.isFinite(value)||Math.abs(value-expected)>Math.max(1e-8,Math.abs(expected)*1e-8))fail(label+' 與逐日加總不一致');}
+  function parseWorkbook(workbook,XLSX,{sha256,source_name,source_bytes}={}){
+    const aq=workbookRows(workbook,XLSX,'AQ締結率'),rt=workbookRows(workbook,XLSX,'RT每日'),totals=workbookRows(workbook,XLSX,'RT締結率');
+    const begin=dateSerial(aq[1]?.[5]),year=Number(begin.slice(0,4)),month=Number(begin.slice(5,7)),days=new Date(Date.UTC(year,month,0)).getUTCDate();
+    // Only the reviewed 31-day source layout is accepted. A new layout needs an explicit source check.
+    if(days!==31)fail('此月份來源版型尚未核實，請先核對欄位；不套用其他月份欄號');
+    function period(rows){const m=String(rows[0]?.[0]||'').match(/(\d+)\/(\d+)\s*~\s*(\d+)\/(\d+)/);if(!m)fail('來源沒有可核實的資料起迄');const [,sm,sd,em,ed]=m.map(Number);const start=iso(year+'-'+String(sm).padStart(2,'0')+'-'+String(sd).padStart(2,'0')),end=iso(year+'-'+String(em).padStart(2,'0')+'-'+String(ed).padStart(2,'0'));if(start!==begin||end<begin||start.slice(0,7)!==end.slice(0,7))fail('截止與欄位日期不同');return end;}
+    const cutoff=period(aq);if(period(rt)!==cutoff||period(totals)!==cutoff)fail('AQ／RT 三張來源期間不同');
+    const offsets=[5,6+days,7+2*days,8+3*days],dates=Array.from({length:days},(_,i)=>begin.slice(0,8)+String(i+1).padStart(2,'0'));
+    function datesAt(rows,index){dates.forEach((d,i)=>{if(dateSerial(rows[1]?.[index+i])!==d)fail('日期欄位不連續、重複或分子母錯位');});}
+    for(const index of [offsets[0],offsets[1],offsets[2]])datesAt(aq,index);for(const index of offsets)datesAt(rt,index);
+    if(norm(aq[0]?.[5])!=='AQ上線數'||norm(aq[0]?.[offsets[1]])!=='AQ來客數'||norm(rt[0]?.[5])!=='原TWM用戶上線數'||norm(rt[0]?.[offsets[1]])!=='原TWM用戶來客數'||norm(rt[0]?.[offsets[2]])!=='原TST用戶')fail('分子母語意欄位不符');
+    function groups(rows,name){const found=new Map();for(const row of rows){const s=STORES.find(s=>s.id===row[3]);if(!s)continue;if(row[2]!=='北一二B'||norm(row[4])!==norm(s.name))fail(name+' 的店碼／店名／區域不一致');const old=found.get(s.id);if(old&&JSON.stringify(old)!==JSON.stringify(row))fail(name+' 店點重複且衝突');found.set(s.id,row);}if(found.size!==9)fail(name+' 缺店');return found;}
+    const ag=groups(aq,'AQ締結率'),rg=groups(rt,'RT每日'),tg=groups(totals,'RT締結率'),valid=Number(cutoff.slice(-2)),records=[],prior=[];
+    for(const s of STORES){const a=ag.get(s.id),r=rg.get(s.id),t=tg.get(s.id),current=[];
+      for(let j=0;j<days;j++){const row={store:s.id,date:dates[j],aq_n:count(a[offsets[0]+j],'AQ上線'),aq_d:count(a[offsets[1]+j],'AQ來客'),rt_n:count(r[offsets[0]+j],'原TWM上線')+count(r[offsets[2]+j],'原TST上線'),rt_d:count(r[offsets[1]+j],'原TWM來客')+count(r[offsets[3]+j],'原TST來客')};if(j>=valid){if(FIELDS.some(k=>row[k]!==0))fail('截止以後有非零實績，來源口徑衝突');continue;}equal(a[offsets[2]+j],ratio(row.aq_n,row.aq_d)||0,'AQ每日率');equal(r[144+j],ratio(row.rt_n,row.rt_d)||0,'RT每日率');current.push(row);records.push(row);}
+      const total=aggregate(current);for(const [value,expected,label]of [[a[offsets[0]+days],total.aq_n,'AQ分子TTL'],[a[offsets[1]+days],total.aq_d,'AQ分母TTL'],[t[15],total.rt_n,'RT分子'],[t[16],total.rt_d,'RT分母'],[t[17],total.rt_rate||0,'RT總率']])equal(value,expected,label);
+      for(const [offset,column]of [[offsets[0],5],[offsets[1],6],[offsets[2],10],[offsets[3],11]])equal(r[offset+days],t[column],'RT每日與總表');
+      prior.push({store:s.id,aq_n:count(a[169],'同期AQ上線'),aq_d:count(a[170],'同期AQ來客'),rt_n:count(t[31],'同期RT上線'),rt_d:count(t[32],'同期RT來客')});
+    }
+    const previous=new Date(Date.UTC(year,month-2,1)).toISOString().slice(0,7),priorStart=previous+'-01',priorEnd=previous+'-'+String(valid).padStart(2,'0');
+    const pivot=workbookRows(workbook,XLSX,'樞紐'),label=Number(previous.slice(5,7))+'/1';if(!pivot.flat().some(v=>typeof v==='string'&&v.includes(label)&&new RegExp('~\\s*'+Number(previous.slice(5,7))+'/'+valid+'(?:\\D|$)').test(v)))fail('同期區間文字尚未核實');
+    return validateConversion({schema:SCHEMA,period_start:begin,cutoff,sha256,source_name,source_bytes,records,prior,prior_period:{start:priorStart,end:priorEnd}});
+  }
+  function storeId(value){const n=norm(value);return STORES.find(s=>[s.id,s.short,s.name,'台北'+s.short,'台灣大哥大台北'+s.short].map(norm).includes(n))?.id||null;}
+  return Object.freeze({SCHEMA,STORES,FIELDS,aggregate,ratio,dedupe,validateConversion,dailySeries,diff,parseWorkbook,storeId});
+});
+</script><script>(function(root,factory){const node=typeof module==='object'&&module.exports;const api=factory(node?require('./readonly-dashboard-core.js'):root.ReadonlyDashboardCore,node?require('./kpi-battle-controller.js'):root.KpiBattleController,node?require('./awards-battle-controller.js'):root.AwardsBattleController);if(node)module.exports=api;else root.ReadonlyDashboardAdapter=api;})(typeof globalThis==='object'?globalThis:this,function(Core,Kpi,Awards){
+  'use strict';
+  function maskedName(value){const name=String(value||'').trim();if(/[＊*]/.test(name))return name;const letters=Array.from(name);return letters.length?letters[0]+'＊'.repeat(Math.max(1,letters.length-1)):'姓名未提供';}
+  const numeric=value=>typeof value==='number'&&Number.isFinite(value)?value:null;
+  function fullKpiMetrics(items,metrics,rawItems,aggregateRates){
+    return items.map(item=>{
+      const metric=metrics?.[item.key],raw=rawItems?.[item.key];
+      // A store-only field (notably NP OUT supervisor) must not become a
+      // district total by summing the same district reference nine times.
+      const unavailable=aggregateRates!=null&&numeric(aggregateRates[item.key])==null;
+      return {key:item.key,label:item.label,
+        actual:unavailable?null:numeric(metric?.actual),target:unavailable?null:numeric(metric?.target),rate:unavailable?null:numeric(metric?.rate),
+        weight:unavailable?null:numeric(raw?.w),score:unavailable?null:numeric(raw?.score),
+        note:unavailable?'來源未提供區整體欄位':''};
+    });
+  }
+  function periodComparison(data,{store='all',start=data.period_start,end=data.cutoff}={}){
+    const current=Core.aggregate(data.records.filter(row=>(store==='all'||row.store===store)&&row.date>=start&&row.date<=end));
+    const available=Boolean(data.prior&&start===data.period_start&&end===data.cutoff);
+    const prior=available?Core.aggregate(data.prior.filter(row=>store==='all'||row.store===store)):null;
+    const compare=(now,before)=>({current:now,prior:before,delta:now==null||before==null?null:now-before,
+      growth:now==null||before==null||before===0?null:(now-before)/before});
+    return {available,current,prior,period:available?data.prior_period:null,
+      reason:available?'':data.prior?'上月只有整段同期總量，所選日期無法計算 MoM。':'來源未提供上月同期資料。',
+      channels:Object.fromEntries(['aq','rt'].map(channel=>[channel,{
+        visitors:compare(current[channel+'_d'],prior?.[channel+'_d']??null),
+        conversion:compare(current[channel+'_rate'],prior?.[channel+'_rate']??null)}]))};
+  }
+  function fromBundle(bundle){
+    const privateResult=bundle?.privateResult,kpiResult=bundle?.kpiResult;
+    if(privateResult?.status!=='ok'||kpiResult?.status!=='ok'||!privateResult.profile||!kpiResult.data?.meta||!Array.isArray(kpiResult.data.stores)||!Array.isArray(kpiResult.data.persons))throw Error('尚未取得已驗證的正式資料');
+    const snapshot=privateResult.snapshot;
+    if(!snapshot?.kpiBattle||!snapshot.awardsBattle)throw Error('私有戰情來源不完整');
+    const view=Kpi.mergeKpiBattleSupplement(Kpi.kpicalcToKpiBattleView(kpiResult.data,''),snapshot.kpiBattle);
+    if(!/^20\d\d-\d\d-\d\d$/.test(view.data_as_of_date||''))throw Error('KPI 缺少可核實截止日');
+    const items=(kpiResult.data.items||[]).map(item=>({key:String(item.key||''),label:String(item.key||'')}));
+    if(!items.length||items.some(item=>!item.key)||new Set(items.map(item=>item.key)).size!==items.length)throw Error('KPI 項目清單不完整或重複');
+    const rawStores=new Map(kpiResult.data.stores.map(row=>[Core.storeId(row.name),row]));
+    const storeRows=view.stores.map(row=>{const id=Core.storeId(row.store);if(!id)throw Error('KPI 含未核定門市');return {...row,id,fullMetrics:fullKpiMetrics(items,row.metrics,rawStores.get(id)?.items)};});
+    const aggregate={...view.aggregate,fullMetrics:fullKpiMetrics(items,view.aggregate?.metrics,null,kpiResult.data.aggregateRates||{})};
+    const personal=view.personal.map(row=>{const id=Core.storeId(row.store);if(!id)throw Error('個績含未核定門市');return {...row,id,name:maskedName(row.name)};});
+    const ids=new Set(storeRows.map(row=>row.id));if(ids.size!==storeRows.length)throw Error('KPI 店點重複');
+    const metadata={cutoff:view.data_as_of_date,reportDate:view.report_run_date||view.report_date,sourceName:view.source_file,period:view.source_date_range,version:String(snapshot.kpiBattle.processing_run_id||snapshot.kpiBattle.kpi_run_id||snapshot.publishedAt||'來源未提供版本')};
+    const awardCheck=Awards.validateAwardsBattle(snapshot.awardsBattle,view,snapshot.kpiBattle);
+    let conversion=null,conversionReason='尚未匯入已核實的 AQ／RT 締結率報表。';
+    if(snapshot.conversionStatus?.status==='unavailable')conversionReason='私有締結率版本尚未通過讀回核對，請由主管確認。';
+    if(snapshot.conversionBattle){try{conversion=Core.validateConversion(snapshot.conversionBattle);}catch{conversionReason='締結率來源未通過完整性檢查，請核對原檔後重新更新。';}}
+    return {profile:{store:privateResult.profile.store,role:privateResult.profile.role},stores:Core.STORES.filter(s=>ids.has(s.id)),
+      kpi:{...metadata,data:{...view,aggregate},stores:storeRows,items,available:true},personal:{...metadata,records:personal,available:personal.length>0},
+      awards:{available:awardCheck.ok,data:awardCheck.ok?snapshot.awardsBattle:null,reason:awardCheck.reason,
+        cutoff:snapshot.awardsBattle.data_as_of_date||snapshot.awardsBattle.source_as_of_date||'',reportDate:snapshot.awardsBattle.report_run_date||snapshot.awardsBattle.report_date||'',version:String(snapshot.awardsBattle.processing_run_id||snapshot.publishedAt||'來源未提供版本')},
+      conversion,conversionReason};
+  }
+  return Object.freeze({fromBundle,periodComparison});
+});
+</script><script>(function(){
+  'use strict';
+  const C=window.ReadonlyDashboardCore,A=window.ReadonlyDashboardAdapter,$=s=>document.querySelector(s),OWNER=window.KpiBattleController?.DEFAULT_GAS_URL;
+  const state={tab:'kpi',store:'all',mode:'daily',start:'',end:'',metric:'a999',kpiCompare:'overall',kpiItem:'all',role:'all',model:'all'};
+  let model=null,epoch=0,flight=null,client=null,controller=null,expires=0,expiryTimer,failed=false,suspended=false,channel=null;
+  const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const number=v=>v==null||!Number.isFinite(Number(v))?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:2}),percent=v=>v==null||!Number.isFinite(Number(v))?'—':(v*100).toFixed(1)+'%',short=v=>v?String(v).slice(5).replace('-','/'):'—';
+  const title={kpi:'KPI',awards:'台獎',personal:'個績',conversion:'締結率',traffic:'來客數'},metricKeys={a999:'A999',a1399:'A1399',haosu:'好速',r1399:'R1399'};
+  function scope(){return model?.stores.find(s=>s.id===state.store)?.name||'北一二B · 本次授權範圍';}
+  function empty(message){$('#content').innerHTML='<div class="empty"><h2>'+safe(message)+'</h2><p>來源未就緒的資料不以零值或示意資料代替。</p></div>';}
+  function clear(message='畫面已清除，請重新核驗登入。'){
+    epoch++;controller?.abort();controller=null;client?.suspend();clearTimeout(expiryTimer);expires=0;flight=null;model=null;
+    $('#controls').hidden=true;$('#content').replaceChildren();$('#source-note').textContent='尚未取得本次授權資料。';$('#auth-message').textContent=message;
+    $('#refresh').disabled=false;empty('尚未取得授權資料');
+  }
+  function source(info,extra=''){$('#source-note').textContent='資料統計至 '+(info.cutoff||'來源未提供')+' · 戰報日期 '+(info.reportDate||'來源未提供')+' · '+(info.sourceName||'既有私有戰情來源')+' · 版本 '+(info.version||'來源未提供')+(extra?' · '+extra:'');}
+  function context(info){return '<div class="context"><div><h2>'+safe(scope())+' · '+title[state.tab]+'</h2><p>'+safe(info.period||'採原報已核實期間')+'</p></div><span class="cutoff">資料截止 '+safe(short(info.cutoff))+'</span></div>';}
+  function card(label,value,note,color='var(--nav)',extra=''){return '<article class="metric" style="--card-accent:'+color+'"><h3>'+safe(label)+'</h3><div class="value" style="color:'+color+'">'+safe(value)+'</div><small>'+safe(note)+'</small>'+extra+'</article>';}
+  function bars(items,color='var(--nav)',asPercent=true){const max=Math.max(asPercent?1:0,...items.map(r=>r.value??0));return items.length?items.map(r=>'<div class="bar-row"><span>'+safe(r.label)+'</span><div class="track"><span style="width:'+(r.value==null?0:Math.min(100,Math.max(0,r.value/max*100)))+'%;background:'+color+'"></span></div><span class="numeric">'+safe(asPercent?percent(r.value):number(r.value))+'</span></div>').join(''):'<p>所選範圍沒有來源資料。</p>';}
+  function selector(id,label,options,value){return '<div class="field"><label for="'+id+'">'+label+'</label><select id="'+id+'">'+options.map(o=>'<option value="'+safe(o.value)+'"'+(o.value===value?' selected':'')+'>'+safe(o.label)+'</option>').join('')+'</select></div>';}
+  function bindSelect(id,key){$('#'+id).onchange=e=>{state[key]=e.target.value;render();};}
+  function kpi(){const p=model.kpi,rows=p.stores.filter(r=>state.store==='all'||r.id===state.store),headline=state.store==='all'?p.data.aggregate:rows[0];if(!headline)return empty('所選門市沒有 KPI 來源');
+    const keys=Object.keys(headline.core||{}),items=keys.map(k=>({label:metricKeys[k]||k,value:headline.core[k]?.rate}));
+    if(state.kpiCompare!=='overall'&&!p.items.some(item=>item.key===state.kpiCompare))state.kpiCompare='overall';
+    if(state.kpiItem!=='all'&&!p.items.some(item=>item.key===state.kpiItem))state.kpiItem='all';
+    const compareLabel=state.kpiCompare==='overall'?'總進度達成率':p.items.find(item=>item.key===state.kpiCompare).label+' · 進度達成率';
+    const details=headline.fullMetrics||[],shown=details.filter(item=>state.kpiItem==='all'||item.key===state.kpiItem);
+    const hasWeight=details.some(item=>item.weight!=null),hasScore=details.some(item=>item.score!=null);
+    const table=shown.map(item=>'<tr><td data-label="項目"><strong>'+safe(item.label)+'</strong>'+(item.note?'<small>'+safe(item.note)+'</small>':'')+'</td><td data-label="實績">'+number(item.actual)+'</td><td data-label="目標">'+number(item.target)+'</td><td data-label="進度達成率">'+percent(item.rate)+'</td>'+(hasWeight?'<td data-label="原報權重">'+percent(item.weight)+'</td>':'')+(hasScore?'<td data-label="原報得分">'+number(item.score)+'</td>':'')+'</tr>').join('');
+    $('#content').innerHTML=context(p)+'<section class="metrics">'+card('原報總進度達成率',percent(headline.overall_kpi),'直接採來源總進度，不平均門市分數')+card('公司排名',number(headline.company_rank),'採同截止與同來源的已核實補充')+'</section><section class="charts"><article class="panel"><h3>重點指標 · 進度達成率</h3>'+bars(items)+'</article><article class="panel"><h3 id="kpi-compare-title">門市比較 · '+safe(compareLabel)+'</h3><div class="controls kpi-controls">'+selector('kpi-metric','門市比較指標',[{value:'overall',label:'總進度達成率'},...p.items.map(item=>({value:item.key,label:item.label}))],state.kpiCompare)+'</div>'+bars(rows.map(r=>({label:C.STORES.find(s=>s.id===r.id).short,value:state.kpiCompare==='overall'?r.overall_kpi:r.fullMetrics.find(item=>item.key===state.kpiCompare)?.rate})).sort((a,b)=>(b.value??-1)-(a.value??-1)))+'</article></section><section class="panel distribution"><h3>KPI 完整明細</h3><p class="sub">'+safe(scope())+' · 本次來源 '+p.items.length+' 項 · 顯示 '+shown.length+' 項</p><div class="controls kpi-controls">'+selector('kpi-item','明細項目',[{value:'all',label:'全部 '+p.items.length+' 項'},...p.items.map(item=>({value:item.key,label:item.label}))],state.kpiItem)+'</div><div class="table-scroll"><table class="kpi-table"><thead><tr><th>項目</th><th>實績</th><th>目標</th><th>進度達成率</th>'+(hasWeight?'<th>原報權重</th>':'')+(hasScore?'<th>原報得分</th>':'')+'</tr></thead><tbody>'+table+'</tbody></table></div><p class="sub kpi-definition">進度達成率採原報口徑，與整月目標完成比例不同。'+(!hasWeight?'本次來源未提供區整體逐項權重。':'權重沿用原報，不另作正規化。')+(!hasScore?'本次來源未提供逐項得分，不從總進度拆算。':'得分僅列來源明確提供的值。')+'缺少的欄位顯示 —。</p></section>';
+    const detailSection=$('.kpi-table').closest('section');detailSection.id='kpi-full-details';const jump=document.createElement('p');jump.className='comparison-status';jump.innerHTML='本次來源 '+p.items.length+' 項 · <a href="#kpi-full-details">查看完整明細</a>';$('#content>.metrics').after(jump);
+    bindSelect('kpi-metric','kpiCompare');bindSelect('kpi-item','kpiItem');source(p,'完整項目依本次來源清單；進度達成率採原報口徑');}
+  function personal(){const p=model.personal;if(!p.available)return empty('尚未取得個績來源');let rows=p.records.filter(r=>state.store==='all'||r.id===state.store),roles=[...new Set(rows.map(r=>r.role))];if(state.role!=='all')rows=rows.filter(r=>r.role===state.role);const key=metricKeys[state.metric],sorted=rows.slice().sort((a,b)=>(b.metrics?.[key]?.rate??-1)-(a.metrics?.[key]?.rate??-1));
+    $('#content').innerHTML=context(p)+'<div class="controls">'+selector('person-metric','表現指標',Object.entries(metricKeys).map(([value,label])=>({value,label})),state.metric)+selector('person-role','職級',[{value:'all',label:'全部職級'},...roles.map(x=>({value:x,label:x||'來源未提供'}))],state.role)+'</div><section class="metrics">'+card('來源人員',number(rows.length)+' 位','僅列本次授權回應與所選門市')+card('表現指標',key,'實績、目標與達成率均採原資料')+'</section><section class="panel table-scroll"><h3>個績明細</h3><table class="person-table"><thead><tr><th>同仁／門市</th><th>職級</th><th>實績</th><th>目標</th><th>達成率</th></tr></thead><tbody>'+sorted.map(r=>{const m=r.metrics?.[key];return '<tr><td>'+safe(r.name)+'<small>'+safe(r.store)+'</small></td><td>'+safe(r.role)+'</td><td>'+number(m?.actual)+'</td><td>'+number(m?.target)+'</td><td>'+percent(m?.rate)+'</td></tr>';}).join('')+'</tbody></table></section>';bindSelect('person-metric','metric');bindSelect('person-role','role');source(p);}
+  function awards(){const p=model.awards;if(!p.available){source(p);return empty(p.reason||'台獎來源尚未核實');}const data=p.data,unit=state.store==='all'?data.overall:data.stores.find(r=>C.storeId(r.store)===state.store);if(!unit)return empty('所選門市沒有台獎來源');const all=unit.items||[],items=all.filter((r,i)=>state.model==='all'||String(i)===state.model);
+    $('#content').innerHTML=context(p)+'<div class="controls">'+selector('award-model','機款',[{value:'all',label:'全部機款'},...all.map((r,i)=>({value:String(i),label:r.display_name}))],state.model)+'</div><section class="metrics">'+card('目前台獎',number(unit.award?.actual_total),'原報金額；不重新推算獎階')+card('推估台獎',number(unit.award?.projected),'採原報推估，與目前金額分開')+'</section><section class="panel"><h3>機款實際／目標達成</h3>'+bars(items.map(r=>({label:r.display_name,value:r.rate})))+'</section><section class="panel table-scroll distribution"><table class="person-table"><thead><tr><th>機款</th><th>實際</th><th>目標</th><th>達成率</th></tr></thead><tbody>'+items.map(r=>'<tr><td>'+safe(r.display_name)+'</td><td>'+number(r.actual)+'</td><td>'+number(r.target)+'</td><td>'+percent(r.rate)+'</td></tr>').join('')+'</tbody></table></section>';bindSelect('award-model','model');source(p,'機款與來源月份採現行台獎 catalog 核實');}
+  function signed(value,format=number){return value==null?'—':(value>0?'+':'')+format(value);}
+  function comparisonMarkup(comparison,rate){const unit=rate?'':' 人次';
+    return '<div class="period-comparison"><div><span>上月同期</span><strong>'+safe(rate?percent(comparison.prior):number(comparison.prior)+unit)+'</strong></div><div><span>較上月同期</span><strong>'+safe(rate?signed(comparison.delta==null?null:comparison.delta*100)+' 個百分點':signed(comparison.delta)+unit)+'</strong></div><p>MoM '+safe(comparison.growth==null?'—（上月為零或無有效分母）':signed(comparison.growth,v=>(v*100).toFixed(2)+'%'))+'</p></div>';}
+  function traffic(){const d=model.conversion;if(!d){$('#source-note').textContent=model.conversionReason;return empty(model.conversionReason);}const rows=d.records.filter(r=>(state.store==='all'||r.store===state.store)&&r.date>=state.start&&r.date<=state.end);const series=C.dailySeries(rows,state.mode),comparison=A.periodComparison(d,{store:state.store,start:state.start,end:state.end}),total=comparison.current,rate=state.tab==='conversion';
+    if(!rows.length){$('#source-note').textContent='所選日期沒有已核實資料；缺資料不補零。';return empty('所選區間沒有資料');}
+    let html=context({cutoff:d.cutoff,period:short(state.start)+'–'+short(state.end)});
+    html+='<p class="comparison-status">'+(comparison.available?'本月 '+short(state.start)+'–'+short(state.end)+' ／ 上月同期 '+short(comparison.period.start)+'–'+short(comparison.period.end)+'；同門市、同期間比較。':safe(comparison.reason)+(d.prior?' <button type="button" class="quiet" id="restore-comparison">恢復可比同期 '+short(d.period_start)+'–'+short(d.cutoff)+'</button>':''))+'</p><section class="metrics">';
+    for(const c of ['aq','rt'])html+=card(c.toUpperCase()+' '+(rate?'締結率':c==='rt'?'符合資格來客':'來客數'),rate?percent(total[c+'_rate']):number(total[c+'_d'])+' 人次',number(total[c+'_n'])+' 上線 / '+number(total[c+'_d'])+' 來客；所選區間合計',c==='aq'?'var(--aq)':'var(--rt)',comparison.available?comparisonMarkup(comparison.channels[c][rate?'conversion':'visitors'],rate):'');
+    html+='</section><p class="comparison-note">'+(d.prior?'來源只有上月整段同期總量，未繪製上月逐日趨勢。':'來源未提供上月同期資料，僅呈現本月實際觀測。')+'每日看波動，累計看所選區間進度。</p><section class="charts">';
+    for(const c of ['aq','rt'])html+='<article class="panel"><h3>'+c.toUpperCase()+' '+(rate?'締結率':c==='rt'?'符合資格來客':'來客')+'趨勢</h3><p class="sub">'+(state.mode==='daily'?'每日實際':'自所選起日累計')+' · '+short(state.start)+'–'+short(state.end)+' · 點選圓點查看分子母</p><div class="chart" id="'+c+'-chart"></div><p class="day-readout" id="'+c+'-readout"></p></article>';html+='</section>';
+    $('#content').innerHTML=html;for(const c of ['aq','rt'])draw(c,series,rate);if($('#restore-comparison'))$('#restore-comparison').onclick=()=>{state.start=d.period_start;state.end=d.cutoff;$('#start').value=state.start;$('#end').value=state.end;render();};source({cutoff:d.cutoff,sourceName:d.source_name,version:d.sha256.slice(0,12)},short(d.cutoff)+' 之後的未觀測日期不作實績；率由合計分子母重算');
+  }
+  function draw(c,series,rate){const el=$('#'+c+'-chart'),key=c+(rate?'_rate':'_d'),width=Math.max(240,el.clientWidth),height=250,left=50,right=15,top=20,bottom=40,w=width-left-right,h=height-top-bottom,max=Math.max(rate?.05:1,...series.map(r=>r[key]??0)),x=i=>left+(series.length===1?w/2:i*w/(series.length-1)),y=v=>top+h-h*v/max,color=c==='aq'?'#be5814':'#087f83';let svg='<svg role="img" aria-label="'+c.toUpperCase()+(rate?'締結率':'來客')+'趨勢" viewBox="0 0 '+width+' '+height+'">';for(let i=0;i<4;i++){const v=max*i/3;svg+='<line x1="'+left+'" x2="'+(width-right)+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="#dce4eb"/><text x="'+(left-7)+'" y="'+(y(v)+4)+'" text-anchor="end" fill="#516475" font-size="12">'+safe(rate?percent(v):number(Math.round(v)))+'</text>';}
+    const tickCount=Math.min(series.length,Math.max(2,Math.floor(w/58)+1)),ticks=new Set(Array.from({length:tickCount},(_,j)=>tickCount===1?0:Math.round(j*(series.length-1)/(tickCount-1))));let path='';function flush(){if(path)svg+='<path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';path='';}series.forEach((r,i)=>{if(r[key]==null){flush();return;}path+=(path?' L':'M')+x(i)+' '+y(r[key]);});flush();series.forEach((r,i)=>{if(r[key]!=null)svg+='<circle data-point="'+i+'" tabindex="0" cx="'+x(i)+'" cy="'+y(r[key])+'" r="5" fill="'+color+'" stroke="white" stroke-width="2"><title>'+short(r.date)+' '+safe(rate?percent(r[key]):number(r[key])+' 人次')+'</title></circle>';if(ticks.has(i))svg+='<text x="'+x(i)+'" y="'+(height-12)+'" text-anchor="middle" font-size="12" fill="#516475">'+short(r.date)+'</text>';});el.innerHTML=svg+'</svg>';
+    function read(i){const r=series[i];$('#'+c+'-readout').textContent=short(r.date)+' · '+(state.mode==='daily'?'當日':'自起日累計')+' '+number(r[c+'_n'])+' 上線 / '+number(r[c+'_d'])+' 來客 · '+percent(r[c+'_rate']);}el.querySelectorAll('[data-point]').forEach(e=>{e.onclick=()=>read(+e.dataset.point);e.onfocus=()=>read(+e.dataset.point);e.onkeydown=ev=>{if(['Enter',' '].includes(ev.key)){ev.preventDefault();read(+e.dataset.point);}};});if(series.length)read(series.length-1);
+  }
+  function render(){document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===state.tab)));if(!model)return;
+    if(expires&&Date.now()>=expires){failed=true;clear('登入期限已到，請在情報站重新登入。');return;}const dates=['conversion','traffic'].includes(state.tab);document.querySelectorAll('[data-date-control]').forEach(e=>e.hidden=!dates);$('#daily').setAttribute('aria-pressed',String(state.mode==='daily'));$('#cumulative').setAttribute('aria-pressed',String(state.mode==='cumulative'));
+    if(state.tab==='kpi')kpi();else if(state.tab==='personal')personal();else if(state.tab==='awards')awards();else traffic();
+  }
+  async function aRead(action,employeeId,deviceId,signal){const response=await fetch(OWNER,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,employeeId,deviceId}),credentials:'omit',cache:'no-store',signal});if(!response.ok)throw Error('未取得服務回應');const result=await response.json();if(result?.status!=='ok')throw Error('既有登入未通過驗證');return result;}
+  async function load(){if(flight||document.hidden)return flight;if(location.protocol==='file:'){clear('請由情報站同一網址開啟此頁，離線檔不包含真實資料。');return;}if(window.PortalLogout?.isLocked()){clear('已登出，請先在情報站重新登入。');return;}
+    clear('正在核對現有登入與來源…');const expected=epoch;controller=new AbortController();const signal=controller.signal;$('#refresh').disabled=true;
+    const operation=Promise.resolve().then(async()=>{try{let bundle;const deviceId=localStorage.getItem('north12b_private_dashboard_device_id');if(!deviceId)throw Error('請先在情報站完成登入');
+      // Each channel keeps its original proof and API. A denial never falls back to another channel.
+      if(!channel)channel=sessionStorage.getItem('north12b_password_session_v1')?'password':sessionStorage.getItem('north12b_private_dashboard_employee_id')?'approved':null;
+      if(channel==='password'){client=createDashboardBClient(OWNER,{storage:sessionStorage,logoutEpoch:()=>{try{return JSON.parse(localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||'';}catch{return '';}}});const lease=client.restore(deviceId);if(!lease)throw Error('既有指定密碼登入已失效');bundle=await client.readBundle();expires=lease.expiresAt;}
+      else{const employeeId=sessionStorage.getItem('north12b_private_dashboard_employee_id');if(!employeeId)throw Error('請先在情報站完成登入');const privateResult=await aRead('private_access',employeeId,deviceId,signal);const kpiResult=await aRead('kpicalc_access',employeeId,deviceId,signal);bundle={privateResult,kpiResult};}
+      if(expected!==epoch||document.hidden||signal.aborted)return;model=A.fromBundle(bundle);failed=false;suspended=false;
+      if(expires){if(expires<=Date.now())throw Error('登入已到期');expiryTimer=setTimeout(()=>{failed=true;clear('登入期限已到，請在情報站重新登入。');},Math.min(2147483647,expires-Date.now()));}
+      $('#store').innerHTML='<option value="all">本次授權範圍全部門市</option>'+model.stores.map(s=>'<option value="'+s.id+'">'+safe(s.name)+'</option>').join('');if(!model.stores.some(s=>s.id===state.store))state.store='all';$('#store').value=state.store;
+      if(model.conversion){const d=model.conversion;for(const id of ['start','end']){$('#'+id).min=d.period_start;$('#'+id).max=d.cutoff;}if(!state.start||state.start<d.period_start||state.end>d.cutoff){state.start=d.period_start;state.end=d.cutoff;}$('#start').value=state.start;$('#end').value=state.end;}
+      $('#controls').hidden=false;$('#auth-message').textContent='已完成既有登入核對；各頁採自己的來源與截止。';render();
+    }catch{if(expected!==epoch)return;failed=true;clear('未取得此頁授權資料。請先在情報站登入，再按重新核驗；資料未顯示。');}finally{if(expected===epoch){flight=null;$('#refresh').disabled=false;}}});flight=operation;return operation;
+  }
+  $('#refresh').onclick=()=>{failed=false;void load();};$('#store').onchange=e=>{state.store=e.target.value;state.role='all';render();};document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;render();});for(const mode of ['daily','cumulative'])$('#'+mode).onclick=()=>{state.mode=mode;render();};
+  for(const id of ['start','end'])$('#'+id).onchange=e=>{if(!model?.conversion)return;if(!e.target.value){state.start=model.conversion.period_start;state.end=model.conversion.cutoff;$('#start').value=state.start;$('#end').value=state.end;$('#filter-status').hidden=false;$('#filter-status').textContent='日期已恢復至來源完整期間。';}else{state[id]=e.target.value;$('#filter-status').hidden=true;}render();};
+  function suspend(){suspended=true;clear('已暫時隱藏資料，返回後重新核對登入。');}
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)suspend();else if(suspended&&!failed)void load();});window.addEventListener('pagehide',suspend);window.addEventListener('pageshow',()=>{if(suspended&&!failed)void load();});
+  for(const name of ['portal-before-logout','portal-logout'])window.addEventListener(name,()=>{failed=true;clear('已登出，所有資料已清除。');});
+  window.addEventListener('storage',e=>{if(e.key==='north12b_portal_logout_event_v1'){failed=true;clear('已從其他頁面登出，所有資料已清除。');}});
+  let resizeTimer;new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(model&&['traffic','conversion'].includes(state.tab))render();},100);}).observe($('.shell'));
+  void load();
+})();
+</script>
+</body></html>

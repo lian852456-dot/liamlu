@@ -41,6 +41,7 @@ test('combined store panel preserves both modules and logout clears them without
   const {calls,errors}=await setup(page);await login(page);
   await expect(page.locator('#storeRulesMount')).toHaveCount(1);await expect(page.locator('#scoreDashboard')).toBeVisible();
   expect(calls.filter(c=>c.action.endsWith('_publish'))).toEqual([]);
+  await page.locator('.store-rules-toggle').click();
   page.once('dialog',dialog=>dialog.accept());await page.locator('#store-rules-logout').click();await expect(page.locator('#authPanel')).toBeVisible();
   await expect(page.locator('#workspace')).toBeHidden();expect(await page.content()).not.toContain(RULE);await expect(page.locator('#scoreBody')).toBeEmpty();
   await expect(page.locator('#peopleBody')).toBeEmpty();
