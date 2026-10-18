@@ -3562,6 +3562,25 @@ function privateDashboardSnapshot() {
   if (!file) throw new Error('今日私有戰情尚未更新');
   const snapshot = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
+  // This integrity value is computed from the current private file, never trusted
+  // from an uploaded payload and never persisted in the snapshot.
+  const snapshotPayloadHash = reportVersionHash_(JSON.stringify(snapshot));
+  snapshot._read_integrity = {
+    kpi_payload_hash: reportVersionHash_(JSON.stringify(snapshot.kpiBattle)),
+    snapshot_payload_hash: snapshotPayloadHash
+  };
+  if (snapshot.awardsBattle.recovery_context) {
+    try {
+      privateDashboardValidateAwardsComponent_(snapshot.awardsBattle, snapshot.kpiBattle);
+      snapshot._read_integrity.awards_recovery_valid = true;
+    } catch (error) {
+      snapshot._read_integrity.awards_recovery_valid = false;
+      snapshot.components = snapshot.components && typeof snapshot.components === 'object' ? snapshot.components : {};
+      snapshot.components.awards = Object.assign({}, snapshot.components.awards || {}, {
+        status: 'blocked', reason: 'awards-recovery-parent-mismatch'
+      });
+    }
+  }
   return typeof readonlyConversionAttach_ === 'function' ? readonlyConversionAttach_(snapshot) : snapshot;
   });
 }
@@ -4585,6 +4604,7 @@ function privateDashboardAdminSnapshotStatus(payload) {
     awardsComponentReason: String((((snapshot.components || {}).awards || {}).reason) || ''),
     awardsComponentDataAsOfDate: String((((snapshot.components || {}).awards || {}).data_as_of_date) || ''),
     kpiPayloadHash: reportVersionHash_(JSON.stringify(snapshot.kpiBattle)),
+    snapshotPayloadHash: reportVersionHash_(JSON.stringify(snapshot)),
     awardsPayloadHash: reportVersionHash_(JSON.stringify(snapshot.awardsBattle)),
     phoneItems: snapshot.awardsBattle.phone_items || 0,
     storeRows: snapshot.awardsBattle.store_rows || 0
@@ -5432,6 +5452,93 @@ function privateDashboardValidateKpiComponent_(kpiBattle, kpicalc) {
   return { dataDate: dataDate, sourceFile: sourceFile, runId: runId };
 }
 
+// All three private-dashboard snapshot writers share this short script lock.
+// Authorization and payload decoding happen before acquisition; current state and
+// preconditions are re-read inside it so a parallel KPI/full publish cannot race.
+function privateDashboardSnapshotWriteLocked_(write) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try { return write(); } finally { lock.releaseLock(); }
+}
+
+function privateDashboardValidateAwardsRecovery_(awardsBattle, kpiBattle, sourceRunId) {
+  const context = awardsBattle.recovery_context;
+  const awardsRun = String(awardsBattle.processing_run_id || sourceRunId || '');
+  const kpiRun = String(kpiBattle.processing_run_id || kpiBattle.kpi_run_id || '');
+  if (!context && awardsRun === kpiRun && awardsRun) return;
+  if (!context || typeof context !== 'object' || Array.isArray(context) ||
+      context.schema !== 'north12b-awards-recovery/v1') {
+    throw new Error('AWARDS_RECOVERY_CONTEXT_REQUIRED：不同批次須有完整父 KPI 關聯');
+  }
+  const cutoff = String(kpiBattle.data_as_of_date || '');
+  const reportRunDate = String(kpiBattle.report_run_date || '');
+  const approvedHash = '36e4f4245bf3f3b67a1dba6137aa6c29ea5390f7f214d91a91dc40fa2604ef51';
+  const sourceSha = String((kpiBattle.source_metadata || {}).sha256 || '');
+  const kpiHash = reportVersionHash_(JSON.stringify(kpiBattle));
+  const validDate = function(value) {
+    const date = new Date(value + 'T00:00:00Z');
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) && !isNaN(date.getTime()) && date.toISOString().slice(0,10) === value;
+  };
+  if (!awardsRun || !kpiRun || awardsRun === kpiRun || !/^[a-f0-9]{64}$/.test(sourceSha) || !/^[a-f0-9]{32}$/.test(kpiHash) ||
+      String(awardsBattle.processing_run_id || '') !== awardsRun || sourceRunId !== awardsRun ||
+      String(context.recovery_run_id || '') !== awardsRun ||
+      String(context.parent_kpi_run_id || '') !== kpiRun ||
+      String(context.parent_kpi_source_sha256 || '') !== sourceSha ||
+      String(context.parent_kpi_payload_hash || '') !== kpiHash) {
+    throw new Error('AWARDS_RECOVERY_PARENT_MISMATCH：父 KPI run/source/hash 不一致');
+  }
+  if (!/^2026-10-\d{2}$/.test(cutoff) || !validDate(cutoff) || !validDate(reportRunDate) ||
+      String(context.report_run_date || '') !== reportRunDate ||
+      String(awardsBattle.report_run_date || '') !== reportRunDate ||
+      String(context.data_as_of_date || '') !== cutoff ||
+      String(awardsBattle.data_as_of_date || '') !== cutoff ||
+      String(context.award_config_hash || '') !== approvedHash ||
+      String(awardsBattle.config_hash || '') !== approvedHash ||
+      String(awardsBattle.config_version || '') !== '2026-10-v1') {
+    throw new Error('AWARDS_RECOVERY_DATE_CONFIG_MISMATCH：日期或批准月度設定不一致');
+  }
+}
+
+// Projection used both before and after the write: every field outside the three
+// explicitly authorized locations must remain identical, including unknown future components.
+function privateDashboardAwardsProtectedProjection_(snapshot) {
+  const protectedValue = JSON.parse(JSON.stringify(snapshot));
+  delete protectedValue.awardsBattle;
+  delete protectedValue.publishedAt;
+  if (protectedValue.components) {
+    delete protectedValue.components.awards;
+    if (!Object.keys(protectedValue.components).length) delete protectedValue.components;
+  }
+  return JSON.stringify(protectedValue);
+}
+
+function privateDashboardAwardsCompareAndSwap_(payload, current) {
+  const expectedKpi = String(payload.expectedKpiPayloadHash || '');
+  const expectedSnapshot = String(payload.expectedSnapshotHash || '');
+  if (!/^[a-f0-9]{32}$/.test(expectedKpi) || !/^[a-f0-9]{32}$/.test(expectedSnapshot) ||
+      expectedKpi !== reportVersionHash_(JSON.stringify(current.kpiBattle)) ||
+      expectedSnapshot !== reportVersionHash_(JSON.stringify(current))) {
+    throw new Error('AWARDS_PRECONDITION_FAILED：KPI 或快照版本已變更，請重新讀取');
+  }
+}
+
+// Never restore a whole stale snapshot. Restore only this operation's whitelist,
+// and only while the file is still exactly the version this operation wrote.
+function privateDashboardRollbackAwardsWrite_(file, writtenText, before) {
+  const latestText = file.getBlob().getDataAsString('UTF-8');
+  if (latestText !== writtenText) return false;
+  const latest = JSON.parse(latestText);
+  latest.awardsBattle = before.awardsBattle;
+  if (Object.prototype.hasOwnProperty.call(before, 'publishedAt')) latest.publishedAt = before.publishedAt;
+  else delete latest.publishedAt;
+  if (before.components && Object.prototype.hasOwnProperty.call(before.components, 'awards')) {
+    latest.components.awards = before.components.awards;
+  } else if (latest.components) delete latest.components.awards;
+  if (!before.components) delete latest.components;
+  file.setContent(JSON.stringify(latest));
+  return true;
+}
+
 // KPI 與台獎採 component-level 發布：只替換通過 protected KPI 對齊驗證的
 // kpiBattle；awardsBattle payload 原樣保留。container 的 publishedAt 只代表
 // 檔案寫入時間，consumer 必須繼續使用各 component 自己的日期與來源 gate。
@@ -5441,6 +5548,7 @@ function privateDashboardPublishKpiComponent(payload) {
   if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('KPI component 缺少或過大');
   const decoded = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
   const incomingKpi = JSON.parse(decoded);
+  return privateDashboardSnapshotWriteLocked_(function() {
   const kpiFile = kpiCalcLatestDataFile();
   if (!kpiFile) throw new Error('protected KPI 尚未發佈');
   const kpicalc = JSON.parse(kpiFile.getBlob().getDataAsString('UTF-8'));
@@ -5491,6 +5599,7 @@ function privateDashboardPublishKpiComponent(payload) {
     fileId: file.getId(),
     lastUpdated: Utilities.formatDate(file.getLastUpdated(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX")
   };
+  });
 }
 
 function privateDashboardValidateAwardsComponent_(awardsBattle, kpiBattle) {
@@ -5552,6 +5661,7 @@ function privateDashboardValidateAwardsComponent_(awardsBattle, kpiBattle) {
     if (runId && runId !== String(source.run_id)) throw new Error('awards source pair run_id 不一致');
     runId = String(source.run_id);
   });
+  privateDashboardValidateAwardsRecovery_(awardsBattle, kpiBattle, runId);
   return { cutoff:cutoff, runId:runId, provider:provider };
 }
 
@@ -5564,14 +5674,25 @@ function privateDashboardPublishAwardsComponent(payload) {
   if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('awards component 缺少或過大');
   const decoded = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
   const incomingAwards = JSON.parse(decoded);
+  return privateDashboardSnapshotWriteLocked_(function() {
   const file = privateDashboardLatestSnapshotFile_();
   if (!file) throw new Error('既有私有戰情快照不存在');
   const currentText = file.getBlob().getDataAsString('UTF-8');
   const current = JSON.parse(currentText);
   if (!current || !current.kpiBattle || !current.awardsBattle) throw new Error('既有私有戰情快照格式不完整');
+  // Preserve the original same-run call without CAS fields. Recovery requests,
+  // or any caller supplying a precondition, must provide the complete hash pair.
+  // The legacy path is still validated against current KPI/source run inside this lock.
+  if (incomingAwards.recovery_context || payload.expectedKpiPayloadHash !== undefined || payload.expectedSnapshotHash !== undefined) {
+    privateDashboardAwardsCompareAndSwap_(payload, current);
+  }
+  if (String(file.getSharingAccess()) !== 'PRIVATE' || String(file.getSharingPermission()) !== 'NONE') {
+    throw new Error('AWARDS_PRIVATE_ACCESS_REQUIRED：既有私有權限不符');
+  }
+  const before = JSON.parse(currentText);
+  const protectedBefore = privateDashboardAwardsProtectedProjection_(current);
   const identity = privateDashboardValidateAwardsComponent_(incomingAwards, current.kpiBattle);
   const kpiTextBefore = JSON.stringify(current.kpiBattle);
-  const kpiComponentBefore = JSON.stringify((current.components || {}).kpi || null);
   const publishedAt = privateDashboardNow();
   current.awardsBattle = incomingAwards;
   current.publishedAt = publishedAt;
@@ -5580,15 +5701,23 @@ function privateDashboardPublishAwardsComponent(payload) {
     status:'fresh', data_as_of_date:identity.cutoff, run_id:identity.runId,
     provider:identity.provider, published_at:publishedAt, reason:''
   };
+  if (incomingAwards.recovery_context) {
+    current.components.awards.recovery_context = JSON.parse(JSON.stringify(incomingAwards.recovery_context));
+  }
+  if (incomingAwards.config_version) current.components.awards.config_version = incomingAwards.config_version;
+  const writtenText = JSON.stringify(current);
+  if (privateDashboardAwardsProtectedProjection_(current) !== protectedBefore) {
+    throw new Error('AWARDS_WRITE_SCOPE_VIOLATION：非台獎欄位不得變更');
+  }
   try {
-    file.setContent(JSON.stringify(current));
+    file.setContent(writtenText);
     const stored = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
-    if (JSON.stringify(stored.kpiBattle) !== kpiTextBefore ||
-        JSON.stringify((stored.components || {}).kpi || null) !== kpiComponentBefore) {
-      throw new Error('KPI component 在 awards component 發布時遭修改');
+    if (JSON.stringify(stored) !== writtenText ||
+        privateDashboardAwardsProtectedProjection_(stored) !== protectedBefore) {
+      throw new Error('AWARDS_READBACK_MISMATCH：快照內容或非台獎欄位不一致');
     }
   } catch (error) {
-    file.setContent(currentText);
+    privateDashboardRollbackAwardsWrite_(file, writtenText, before);
     throw error;
   }
   reportVersionRecord_('awards', {
@@ -5600,9 +5729,11 @@ function privateDashboardPublishAwardsComponent(payload) {
     publishedAt:publishedAt, reportDate:identity.cutoff, runId:identity.runId,
     kpiPayloadHash:reportVersionHash_(kpiTextBefore),
     awardsPayloadHash:reportVersionHash_(JSON.stringify(incomingAwards)),
+    snapshotPayloadHash:reportVersionHash_(writtenText),
     fileId:file.getId(),
     lastUpdated:Utilities.formatDate(file.getLastUpdated(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX")
   };
+  });
 }
 
 // 每日自動化在寄件成功後呼叫。快照僅存於私有 Drive，不經 GitHub。
@@ -5612,7 +5743,12 @@ function privateDashboardPublish(payload) {
   if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('私有戰情快照缺少或過大');
   const decoded = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
   const snapshot = JSON.parse(decoded);
+  delete snapshot._read_integrity;
   if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('私有戰情快照格式不完整');
+  return privateDashboardSnapshotWriteLocked_(function() {
+  if (snapshot.awardsBattle.recovery_context) {
+    privateDashboardValidateAwardsComponent_(snapshot.awardsBattle, snapshot.kpiBattle);
+  }
   const publishedAt = privateDashboardNow();
   snapshot.publishedAt = publishedAt;
   const text = JSON.stringify(snapshot);
@@ -5639,6 +5775,7 @@ function privateDashboardPublish(payload) {
       "yyyy-MM-dd'T'HH:mm:ssXXX"
     )
   };
+  });
 }
 
 // ════════════════════════════════════

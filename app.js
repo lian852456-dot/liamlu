@@ -500,6 +500,29 @@
   }
 
   function adaptAwards(snapshot, expectedReportDate, readAt) {
+    // A later awards component retains its own real run. Its authenticated
+    // read must bind it to the still-current KPI payload, not only a date.
+    function recoveryCompatible(awards, kpi, integrity) {
+      const context = awards.recovery_context;
+      const sources = awards.source_files || {};
+      const run = String(awards.processing_run_id || '');
+      const parentRun = String(kpi.processing_run_id || kpi.kpi_run_id || '');
+      const hash = String(integrity && integrity.kpi_payload_hash || '');
+      const sourceHash = String(kpi.source_metadata && kpi.source_metadata.sha256 || '');
+      return !!context && context.schema === 'north12b-awards-recovery/v1' &&
+        !!integrity && integrity.awards_recovery_valid === true &&
+        !!run && !!parentRun && run !== parentRun && context.recovery_run_id === run &&
+        context.parent_kpi_run_id === parentRun &&
+        /^[0-9a-f]{32}$/.test(hash) && context.parent_kpi_payload_hash === hash &&
+        /^[0-9a-f]{64}$/.test(sourceHash) && context.parent_kpi_source_sha256 === sourceHash &&
+        context.report_run_date === awards.report_run_date && context.report_run_date === kpi.report_run_date &&
+        context.data_as_of_date === awards.data_as_of_date && context.data_as_of_date === kpi.data_as_of_date &&
+        /^2026-10-\d{2}$/.test(context.data_as_of_date) && /^\d{4}-\d{2}-\d{2}$/.test(context.report_run_date) &&
+        context.award_config_hash === '36e4f4245bf3f3b67a1dba6137aa6c29ea5390f7f214d91a91dc40fa2604ef51' &&
+        ['store', 'person'].every(kind => sources[kind] && sources[kind].run_id === run &&
+          sources[kind].source_data_date === context.data_as_of_date);
+    }
+
     const awards = snapshot && snapshot.awardsBattle || {};
     const updatedAt = String(awards.generated_at || snapshot && snapshot.publishedAt || '');
     const reportDate = String(awards.report_run_date || awards.report_date || '');
@@ -508,15 +531,21 @@
     const cutoff = String(awards.data_as_of_date || awards.source_as_of_date || '');
     const kpiCutoff = String(kpi.data_as_of_date || kpi.source_as_of_date || '');
     const run = String(kpi.processing_run_id || kpi.kpi_run_id || '');
-    if (!expectedReportDate || reportDate !== expectedReportDate || ((cutoff || kpiCutoff) && cutoff !== kpiCutoff) || (run && run !== String(awards.processing_run_id || ''))) {
+    const runMismatch = awards.recovery_context
+      ? !recoveryCompatible(awards, kpi, snapshot._read_integrity)
+      : run && run !== String(awards.processing_run_id || '');
+    if (!expectedReportDate || reportDate !== expectedReportDate || ((cutoff || kpiCutoff) && cutoff !== kpiCutoff) || runMismatch) {
       const note = reportDate ? `台獎日期 ${reportDate} 與 KPI 日期 ${expectedReportDate || '—'} 不一致` : '正式台獎未提供可對齊的資料日期';
       const missing = data => C.moduleState({ status:'no_data', updatedAt:readAt, sourceUpdatedAt:updatedAt, stale:updatedAt?stale(updatedAt):false, source, data, note });
       return { summary:missing(null), stores:missing([]), top2:missing([]) };
     }
     const sourceOverall = awards.overall || {};
     if (String(cutoff || reportDate).slice(0,7) === '2026-10' &&
-        (!scope.AwardModelCatalog.selectionMatches(sourceOverall.items, cutoff || reportDate) ||
+        (Number(awards.phone_items) !== scope.AwardModelCatalog.expectedCount(cutoff || reportDate) ||
+         Number(awards.store_rows) !== 10 || !awards.supervisor || typeof awards.supervisor !== 'object' ||
+         !scope.AwardModelCatalog.selectionMatches(sourceOverall.items, cutoff || reportDate) ||
          !Array.isArray(awards.stores) || awards.stores.length !== 9 ||
+         new Set(awards.stores.map(row=>String(row && row.store || '').trim()).filter(Boolean)).size !== 9 ||
          awards.stores.some(row=>!scope.AwardModelCatalog.selectionMatches(row.items, cutoff || reportDate)))) {
       const missing = data => C.moduleState({ status:'no_data', updatedAt:readAt, sourceUpdatedAt:updatedAt, stale:false, source, data, note:'十月台獎機款尚未同步，請更新正式來源。' });
       return {summary:missing(null), stores:missing([]), top2:missing([])};

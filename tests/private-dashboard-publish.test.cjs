@@ -3,6 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const { createHash } = require('node:crypto');
+const hash = value => createHash('md5').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex');
 
 const code = fs.readFileSync(path.join(__dirname, '..', 'gas/Code.gs'), 'utf8');
 
@@ -30,9 +32,9 @@ function functionSource(name) {
 }
 
 function createHarness(initialText, kpicalc) {
-  const state = { text: initialText || '', created: false, adminChecks: 0, kpicalc: kpicalc || null };
+  const state = { text: initialText || '', created: false, adminChecks: 0, kpicalc: kpicalc || null, lockHeld: false, acquisitions: 0, releases: 0 };
   const file = {
-    setContent(text) { state.text = text; },
+    setContent(text) { assert.equal(state.lockHeld, true); state.text = text; },
     getBlob() { return { getDataAsString: () => state.text }; },
     getId() { return 'private-file-id'; },
     getLastUpdated() { return new Date('2026-08-05T08:15:16.000Z'); },
@@ -50,6 +52,7 @@ function createHarness(initialText, kpicalc) {
       };
     },
     createFile(blob) {
+      assert.equal(state.lockHeld, true);
       state.created = true;
       state.text = blob.getDataAsString('UTF-8');
       return file;
@@ -64,7 +67,11 @@ function createHarness(initialText, kpicalc) {
       if (!state.kpicalc) return null;
       return { getBlob: () => ({ getDataAsString: () => JSON.stringify(state.kpicalc) }) };
     },
-    reportVersionHash_() { return 'hash'; },
+    reportVersionHash_: hash,
+    LockService: { getScriptLock: () => ({
+      waitLock(timeout) { assert.equal(timeout, 10000); assert.equal(state.lockHeld, false); state.lockHeld = true; state.acquisitions += 1; },
+      releaseLock() { assert.equal(state.lockHeld, true); state.lockHeld = false; state.releases += 1; },
+    }) },
     reportVersionRecord_() {},
     Utilities: {
       base64Decode(value) { return Buffer.from(value, 'base64'); },
@@ -75,6 +82,11 @@ function createHarness(initialText, kpicalc) {
       formatDate() { return '2026-08-05T16:15:16+08:00'; },
     },
   };
+  loadFunctions(context, [
+    'privateDashboardLatestSnapshotFile_', 'privateDashboardSnapshotWriteLocked_',
+    'privateDashboardValidateAwardsRecovery_', 'privateDashboardAwardsProtectedProjection_',
+    'privateDashboardAwardsCompareAndSwap_', 'privateDashboardRollbackAwardsWrite_',
+  ]);
   return { state, context };
 }
 
@@ -84,6 +96,15 @@ function loadFunctions(context, names) {
 
 function encodedSnapshot(snapshot) {
   return Buffer.from(JSON.stringify(snapshot), 'utf8').toString('base64');
+}
+
+function awardsRequest(snapshot, awardsBattle) {
+  const current = typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot;
+  return {
+    awardsBattleBase64: encodedSnapshot(awardsBattle),
+    expectedKpiPayloadHash: hash(current.kpiBattle),
+    expectedSnapshotHash: hash(current),
+  };
 }
 
 test('private_publish persists publishedAt and returns the same value', () => {
@@ -367,12 +388,12 @@ function freshAwardsComponent(overrides = {}, provider = 'onedrive-cloud') {
     canonical_basename: basename, lastModifiedDateTime: '2026-08-24T01:00:00Z',
     ...(provider === 'onedrive-cloud' ? { eTag: `${kind}-etag-v2` } : { googleDriveFileId: `${kind}-item-id` }),
     size: 2048, sha256: kind === 'store' ? 'a'.repeat(64) : 'b'.repeat(64),
-    source_data_date: '2026-08-23', run_id: 'awards-cloud-20260824-test',
+    source_data_date: '2026-08-23', run_id: 'quick-20260824-125725-777574ab',
   });
   const items = Array.from({ length: 13 }, (_, index) => ({ name: `機款${index + 1}` }));
   return {
     report_date: '2026-08-23', report_run_date: '2026-08-24', data_as_of_date: '2026-08-23',
-    generated_at: '2026-08-24T20:00:00+08:00', phone_items: 13, store_rows: 10,
+    generated_at: '2026-08-24T20:00:00+08:00', processing_run_id: 'quick-20260824-125725-777574ab', phone_items: 13, store_rows: 10,
     source_files: {
       store: source('store', '01-08-03-(密)直營_手機競賽日報_店點達成率、排名及獎金.xlsx'),
       person: source('person', '01-08-04-(密)直營_手機競賽日報_個人達成率、排名及獎金.xlsx'),
@@ -399,7 +420,7 @@ test('awards component-only publish 更新 fresh awards 並完整保留 KPI payl
   assert.equal(stored.awardsBattle.report_date, '2026-08-23');
   assert.equal(stored.awardsBattle.source_files.store.provider, 'onedrive-cloud');
   assert.equal(stored.components.awards.status, 'fresh');
-  assert.equal(stored.components.awards.run_id, 'awards-cloud-20260824-test');
+  assert.equal(stored.components.awards.run_id, kpi.kpi_run_id);
   assert.equal(result.reportDate, '2026-08-23');
 });
 
@@ -411,15 +432,13 @@ test('awards component-only publish 接受 Google Drive immutable identity 且�
   };
   const { state, context } = createHarness(JSON.stringify(initial), protectedKpi());
   loadFunctions(context, ['privateDashboardValidateAwardsComponent_', 'privateDashboardPublishAwardsComponent']);
-  const result = context.privateDashboardPublishAwardsComponent({
-    awardsBattleBase64: encodedSnapshot(freshAwardsComponent({}, 'google-drive-cloud')),
-  });
+  const result = context.privateDashboardPublishAwardsComponent(awardsRequest(initial, freshAwardsComponent({}, 'google-drive-cloud')));
   const stored = JSON.parse(state.text);
   assert.equal(stored.awardsBattle.source_files.store.provider, 'google-drive-cloud');
   assert.equal(stored.awardsBattle.source_files.store.eTag, undefined);
   assert.equal(stored.components.awards.provider, 'google-drive-cloud');
   assert.deepEqual(stored.kpiBattle, kpi);
-  assert.equal(result.runId, 'awards-cloud-20260824-test');
+  assert.equal(result.runId, kpi.kpi_run_id);
 });
 
 test('awards cutoff/source identity mismatch 必須 fail-closed 且不得改 KPI/awards', () => {
@@ -430,9 +449,7 @@ test('awards cutoff/source identity mismatch 必須 fail-closed 且不得改 KPI
   const { state, context } = createHarness(initial, protectedKpi());
   loadFunctions(context, ['privateDashboardValidateAwardsComponent_', 'privateDashboardPublishAwardsComponent']);
   assert.throws(
-    () => context.privateDashboardPublishAwardsComponent({
-      awardsBattleBase64: encodedSnapshot(freshAwardsComponent({ report_date: '2026-08-22' })),
-    }),
+    () => context.privateDashboardPublishAwardsComponent(awardsRequest(initial, freshAwardsComponent({ report_date: '2026-08-22' }))),
     /與 KPI cutoff 不一致/,
   );
   assert.equal(state.text, initial);
