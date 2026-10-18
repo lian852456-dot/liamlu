@@ -26,6 +26,11 @@ def main():
     sha=hashlib.sha256(source.read_bytes()).hexdigest();run_id='north12b-'+args.report_date.replace('-','')+'-repair-01'
     env={**os.environ,'RUN_ROOT':str(root),'OUT_DIR':str(out),'REPORT_DATE':args.report_date,'SOURCE_FILE':source.name,'SOURCE_STEM':stem,'SOURCE_LOCAL':str(source),'BATCH_ID':run_id,'PROCESSING_RUN_ID':run_id,'SOURCE_SHA256':sha,'FONT_DIR':str(args.font_dir.resolve()),'TEMPLATE_PATH':str(args.template.resolve()),'PREVIOUS_SOURCE_PATH':str(previous or root/'missing-previous.xlsx'),'PREVIOUS_SOURCE_FILE':previous.name if previous else '前日無資料'}
     record={'schema':'north12b-artifact-run/v1','report_date':args.report_date,'source_file':source.name,'source_sha256':sha,'batch_id':run_id,'started_at':datetime.now(timezone.utc).isoformat(),'stages':[],'status':'processing','website_publish':'not_run','email':'not_run'}
+    runtime_files = ['run_report.py','extract.py','qis_personal.py','build_kpi_report.mjs',
+                     'upgrade_v4_0908.mjs','render_xlsx_cjk.py','verify_artifacts.py']
+    record['runtime'] = {'python':sys.executable, 'modules':[
+        {'path':str((CODE/name).resolve()), 'sha256':hashlib.sha256((CODE/name).read_bytes()).hexdigest()}
+        for name in runtime_files]}
     recordpath=private/'artifact-run.json'
     env['VK_SOURCE_PATHS']=json.dumps([str(p.resolve()) for p in args.vk_source])
     record['vk_sources']=[{'file':p.name,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in args.vk_source]

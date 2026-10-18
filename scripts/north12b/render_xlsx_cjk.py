@@ -8,6 +8,8 @@ independent from the spreadsheet renderer that dropped CJK glyphs in staging.
 from __future__ import annotations
 
 import math
+import hashlib
+import json
 import os
 import re
 from datetime import date, datetime
@@ -215,6 +217,129 @@ def dimensions(ws, last_row, last_col):
     return widths, heights
 
 
+def qis_landscape_data(ws):
+    """Read the already verified workbook; layout changes never recalculate data."""
+    rows=list(ws.iter_rows(values_only=True))
+    def at(row,col):return rows[row-1][col-1] if col<=len(rows[row-1]) else None
+    store_headers=[i for i,r in enumerate(rows,1) if len(r)>=6 and r[0]=='店點'
+        and '達成率' in str(r[1]) and '計件數' in str(r[2]) and '原始分數' in str(r[5])]
+    personal_headers=[i for i,r in enumerate(rows,1) if list(r[:5])==['店點','同仁','目前分數','計件數','追加100分筆數']]
+    if len(store_headers)!=1 or not personal_headers:raise ValueError('QIS_LANDSCAPE_HEADER_MISMATCH')
+    stores=[]
+    for row in range(store_headers[0]+1,store_headers[0]+11):
+        values=[at(row,col) for col in range(1,7)]
+        if not isinstance(values[0],str) or not all(isinstance(v,(int,float)) and not isinstance(v,bool) for v in values[1:]):
+            raise ValueError('QIS_LANDSCAPE_STORE_VALUE_MISSING')
+        stores.append({'source_row':row,'values':values})
+    people=[]
+    for header in personal_headers:
+        row=header+1
+        while row<=len(rows) and isinstance(at(row,2),str) and at(row,2):
+            values=[at(row,col) for col in range(1,6)]
+            status='no_data' if values[2]=='尚無資料' and type(values[3]) is int and values[3]==0 else 'pending' if '待核' in values else 'below_98'
+            if status=='below_98' and not (isinstance(values[2],(int,float)) and not isinstance(values[2],bool) and values[2]<98
+                and type(values[3]) is int and values[3]>0 and type(values[4]) is int and values[4]>0):
+                raise ValueError('QIS_LANDSCAPE_PERSON_VALUE_MISMATCH')
+            people.append({'source_row':row,'values':values,'status':status});row+=1
+    if len({p['source_row'] for p in people})!=len(people):raise ValueError('QIS_LANDSCAPE_DUPLICATE_ROW')
+    band=next((str(r[0]) for r in rows if str(r[0]).startswith('個人未達98追分')),None)
+    match=re.search(r'截至 (\d{4}/\d{2}/\d{2})',band or '')
+    personal_cutoff=match[1] if match else None
+    store_notes=' '.join(str(r[0]) for r in rows[:personal_headers[0]-2])
+    match=re.search(r'截至(\d{4}-\d{2}-\d{2})',store_notes)
+    store_cutoff=match[1].replace('-','/') if match else None
+    source_match=re.search(r'來源：([^\s]+\.xlsx)',store_notes)
+    source_file=source_match[1] if source_match else None
+    coverage=next((str(r[0]) for r in rows if str(r[0]).startswith('QIS個績共')),None)
+    if not personal_cutoff or not store_cutoff or not coverage or not source_file:raise ValueError('QIS_LANDSCAPE_SOURCE_NOTE_MISSING')
+    return {'stores':stores,'people':people,'store_cutoff':store_cutoff,'personal_cutoff':personal_cutoff,'coverage':coverage,'source_file':source_file}
+
+
+def qis_landscape_layout(data):
+    """Two personal columns, complete rows, fixed large fonts, no clipping/shrink."""
+    width,height=1920,1080
+    left=[166,108,68,100,100,106]
+    right=[148,88,114,66,172]
+    panels=[{'x':24,'widths':left,'rows':data['stores'],'kind':'stores'}]
+    split=(len(data['people'])+1)//2
+    for x,people in [(696,data['people'][:split]),(1308,data['people'][split:])]:
+        panels.append({'x':x,'widths':right,'rows':people,'kind':'people'})
+    for panel in panels:
+        count=len(panel['rows'])
+        panel['row_height']=60 if panel['kind']=='stores' else 70 if count<=9 else min(70,638//count)
+        panel['compact']=panel['kind']=='people' and count>9
+        if panel['kind']=='people' and panel['row_height']<38:
+            raise ValueError('QIS_LANDSCAPE_ROWS_EXCEED_READABLE_CANVAS')
+        if 268+len(panel['rows'])*panel['row_height']>906:
+            raise ValueError('QIS_LANDSCAPE_ROWS_EXCEED_READABLE_CANVAS')
+    return {'width':width,'height':height,'panels':panels}
+
+
+def render_qis_landscape(ws, values_ws, output):
+    data=qis_landscape_data(values_ws);layout=qis_landscape_layout(data)
+    image=Image.new('RGB',(layout['width'],layout['height']),'#F8FAFC');draw=ImageDraw.Draw(image)
+    navy,yellow,ink,muted='#17365D','#FFCF17','#0F172A','#475569'
+    checked=[];drawn=[]
+    def label(box,text,size=26,color=ink,vertical_padding=10):
+        # A hard overflow gate preserves the selected font size; never squeeze a row.
+        font=ImageFont.truetype(str(FONT_BOLD),size)
+        bounds=draw.multiline_textbbox((0,0),str(text),font=font,spacing=3,align='center')
+        w,h=bounds[2]-bounds[0],bounds[3]-bounds[1]
+        if w>box[2]-box[0]-12 or h>box[3]-box[1]-vertical_padding:
+            raise ValueError('QIS_LANDSCAPE_TEXT_OVERFLOW '+str(text))
+        x=(box[0]+box[2]-w)/2-bounds[0];y=(box[1]+box[3]-h)/2-bounds[1]
+        draw.multiline_text((x,y),str(text),font=font,fill=color,spacing=3,align='center')
+        checked.append({'text':str(text),'box':box,'font_px':size,'text_bounds':[w,h],'vertical_padding':vertical_padding})
+    draw.rounded_rectangle((24,20,1896,106),radius=12,fill=navy)
+    label((40,20,1130,106),'北一二B QIS 戰報',44,'#FFFFFF')
+    label((1320,20,1880,106),REPORT_DATE.replace('-','/'),36,'#FFFFFF')
+    draw.rectangle((24,128,672,192),fill=navy)
+    label((24,128,672,192),'店績｜截至 '+data['store_cutoff'][5:],30,'#FFFFFF')
+    draw.rectangle((696,128,1896,192),fill=navy)
+    low=sum(p['status']=='below_98' for p in data['people']);empty=sum(p['status']=='no_data' for p in data['people'])
+    label((704,128,1310,192),'個人追98｜截至 '+data['personal_cutoff'][5:],30,'#FFFFFF')
+    label((1310,128,1888,192),f'未達98 {low}人／尚無計件 {empty}人',26,'#FFFFFF')
+    for panel in layout['panels']:
+        x=panel['x'];widths=panel['widths'];xs=[x]
+        for w in widths:xs.append(xs[-1]+w)
+        headers=['店點','達成率','計件\n數','服務\n態度','專業\n能力','原始\n分數'] if panel['kind']=='stores' else ['店點','同仁','目前\n分數','計件\n數','追加100分\n筆數']
+        for col,heading in enumerate(headers):
+            box=(xs[col],192,xs[col+1],268);draw.rectangle(box,fill=yellow,outline='#CBD5E1',width=2);label(box,heading,26,navy)
+        for index,row in enumerate(panel['rows']):
+            y=268+index*panel['row_height'];values=row['values'];texts=[]
+            for col,value in enumerate(values):
+                box=(xs[col],y,xs[col+1],y+panel['row_height'])
+                fill='#FFF4C2' if panel['kind']=='stores' and index==0 else '#FFFFFF' if index%2 else '#F1F5F9'
+                color=ink;size=26
+                if panel['kind']=='stores':
+                    text=str(value) if col==0 else f'{value*100:.1f}%' if col==1 else str(value) if col==2 else f'{value:.2f}'
+                    if col==1:color='#059669' if value>=1 else '#DC2626'
+                    if col==5:color='#059669' if value>=98 else '#DC2626';fill='#DCFCE7' if value>=98 else '#FEE2E2'
+                else:
+                    text=str(value);fill='#FFF1F2' if row['status']=='below_98' else '#E2E8F0'
+                    if isinstance(value,float):text=f'{value:.5f}'.rstrip('0').rstrip('.')
+                    if col==4:color='#B91C1C' if row['status']=='below_98' else muted;size=38 if isinstance(value,int) else 26
+                    if row['status']=='no_data' and col==2:text='無資料' if panel['compact'] else '尚無\n資料';size=26 if panel['compact'] else 24
+                    if row['status']=='no_data' and col==4:text='1' if panel['compact'] else '首筆100\n即100';size=38 if panel['compact'] else 26
+                draw.rectangle(box,fill=fill,outline='#CBD5E1',width=2);label(box,text,size,color,8 if panel['compact'] else 10);texts.append(text)
+            drawn.append({'kind':panel['kind'],'status':row.get('status'),'source_row':row['source_row'],'values':values,'texts':texts})
+    notes=[
+        '店績整體：達成率、服務態度與專業能力按9店算術平均；計件數加總；原始分數取來源F13。',
+        '追98追加100分筆數＝向上取整〔計件數 × (98－目前分數) ÷ 2〕，採等權平均試算。',
+        '依報表分數試算，臨界可能差1筆；實際以公司更新為準，未反推原始總分。',
+        '來源'+data['source_file']+'；'+data['coverage'],
+    ]
+    if any(panel['compact'] for panel in layout['panels']) and empty:
+        notes[-1]+=' 尚無計件者：首筆100即100。'
+    for index,note in enumerate(notes):label((24,906+index*40,1896,946+index*40),note,23,muted)
+    image.save(output,format='PNG',compress_level=6)
+    return {'status':'pass','dimensions':[image.width,image.height],'aspectRatio':'16:9','singlePng':True,
+        'storeRows':len(data['stores']),'personalRows':len(data['people']),'below98':low,'noData':empty,
+        'storeCutoff':data['store_cutoff'],'personalCutoff':data['personal_cutoff'],
+        'allTextFitsAtSelectedFontSize':True,'fontShrinking':False,'drawnRows':drawn,'textChecks':checked,
+        'pngSha256':hashlib.sha256(Path(output).read_bytes()).hexdigest()}
+
+
 def render_sheet(ws, values_ws, output):
     last_row, last_col = content_bounds(ws, values_ws)
     widths, heights = dimensions(ws, last_row, last_col)
@@ -310,6 +435,15 @@ def main():
     values = load_workbook(BOOK, data_only=True, keep_links=False)
     for sheet, filename in SHEETS.items():
         if sheet == "好速上線明細": continue
+        if sheet == 'QIS店績':
+            receipt=render_qis_landscape(wb[sheet],values[sheet],OUT/filename)
+            receipt['workbookSha256']=hashlib.sha256(BOOK.read_bytes()).hexdigest()
+            receipt['rendererSha256']=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+            receipt['fontSha256']={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [FONT_REGULAR,FONT_BOLD]}
+            private=ROOT.parent/'private-run';private.mkdir(parents=True,exist_ok=True)
+            (private/'qis-landscape-render.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2))
+            print(f"{sheet}\t1920x1080\t{filename}")
+            continue
         render_sheet(wb[sheet], values[sheet], OUT / filename)
     wb.close()
     values.close()

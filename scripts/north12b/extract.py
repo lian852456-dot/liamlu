@@ -289,6 +289,11 @@ for vk_path in json.loads(os.environ.get('VK_SOURCE_PATHS','[]')):
 sales_metrics = build_sales_metrics(sales_book, cur_stores, asof)
 sales_metrics['additional_sources']=vk_sources
 daily['salesMetrics'] = sales_metrics
+from qis_personal import extract_personal_qis
+personal_qis = extract_personal_qis(CUR, current_kpi, REPORT_DATE)
+daily['qisPersonal'] = personal_qis
+daily['meta']['qisPersonalCutoff'] = personal_qis['cutoffDate']
+json.dump(personal_qis, open(OUT/f'qis-personal-{Path(SOURCE_FILE).stem}.json','w'), ensure_ascii=False)
 json.dump(daily,open(OUT/'daily-kpi-data.json','w'),ensure_ascii=False)
 
 # Closure audit.
