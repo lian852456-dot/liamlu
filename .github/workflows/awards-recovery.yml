@@ -1,0 +1,37 @@
+name: Awards recovery contract checks
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'gas/Code.gs'
+      - 'awards-battle-controller.js'
+      - 'app.js'
+      - 'index.html'
+      - 'app.html'
+      - 'tests/awards-*.test.cjs'
+      - 'tests/private-dashboard-*.test.cjs'
+      - '.github/workflows/awards-recovery.yml'
+permissions:
+  contents: read
+concurrency:
+  group: awards-recovery-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Validate recovery and existing publication contracts
+        run: |
+          git rev-parse HEAD
+          node --check app.js
+          node --check awards-battle-controller.js
+          node -e "new Function(require('fs').readFileSync('gas/Code.gs', 'utf8'))"
+          node --test tests/awards-recovery-frontend.test.cjs tests/awards-recovery-gas.test.cjs tests/awards-publication-date.test.cjs tests/awards-battle-standalone.test.cjs tests/month-start-data.test.cjs tests/liam-supervisor-realdata-mapping.test.cjs tests/private-dashboard-*.test.cjs

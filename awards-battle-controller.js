@@ -42,7 +42,30 @@
     return 'bad';
   }
 
-  function validateAwardsBattle(data, kpiData, snapshotKpi) {
+  function validateAwardsBattle(data, kpiData, snapshotKpi, readIntegrity) {
+    // A later awards component retains its own real run. Its authenticated
+    // read must bind it to the still-current KPI payload, not only a date.
+    function recoveryCompatible(awards, kpi, integrity) {
+      const context = awards.recovery_context;
+      const sources = awards.source_files || {};
+      const run = String(awards.processing_run_id || '');
+      const parentRun = String(kpi.processing_run_id || kpi.kpi_run_id || '');
+      const hash = String(integrity && integrity.kpi_payload_hash || '');
+      const sourceHash = String(kpi.source_metadata && kpi.source_metadata.sha256 || '');
+      return !!context && context.schema === 'north12b-awards-recovery/v1' &&
+        !!integrity && integrity.awards_recovery_valid === true &&
+        !!run && !!parentRun && run !== parentRun && context.recovery_run_id === run &&
+        context.parent_kpi_run_id === parentRun &&
+        /^[0-9a-f]{32}$/.test(hash) && context.parent_kpi_payload_hash === hash &&
+        /^[0-9a-f]{64}$/.test(sourceHash) && context.parent_kpi_source_sha256 === sourceHash &&
+        context.report_run_date === awards.report_run_date && context.report_run_date === kpi.report_run_date &&
+        context.data_as_of_date === awards.data_as_of_date && context.data_as_of_date === kpi.data_as_of_date &&
+        /^2026-10-\d{2}$/.test(context.data_as_of_date) && /^\d{4}-\d{2}-\d{2}$/.test(context.report_run_date) &&
+        context.award_config_hash === '36e4f4245bf3f3b67a1dba6137aa6c29ea5390f7f214d91a91dc40fa2604ef51' &&
+        ['store', 'person'].every(kind => sources[kind] && sources[kind].run_id === run &&
+          sources[kind].source_data_date === context.data_as_of_date);
+    }
+
     if (!data || typeof data !== 'object') return { ok: false, reason: '尚未取得與目前 KPI 同日期的台獎資料' };
     const awardsDate = String(data.report_run_date || data.report_date || '');
     const kpiDate = String((kpiData || {}).report_run_date || (kpiData || {}).report_date || '');
@@ -51,7 +74,10 @@
     const cutoffMismatch = (awardsCutoff || kpiCutoff) && (!awardsCutoff || awardsCutoff !== kpiCutoff);
     const snapshotRun = String((snapshotKpi || {}).processing_run_id || (snapshotKpi || {}).kpi_run_id || '');
     const awardsRun = String(data.processing_run_id || '');
-    if (!awardsDate || !kpiDate || awardsDate !== kpiDate || (kpiData || {}).supplement_synced === false || cutoffMismatch || (snapshotRun && awardsRun !== snapshotRun)) {
+    const runMismatch = data.recovery_context
+      ? !recoveryCompatible(data, snapshotKpi || {}, readIntegrity)
+      : snapshotRun && awardsRun !== snapshotRun;
+    if (!awardsDate || !kpiDate || awardsDate !== kpiDate || (kpiData || {}).supplement_synced === false || cutoffMismatch || runMismatch) {
       return {
         ok: false,
         reason: awardsDate
@@ -173,7 +199,7 @@
       const result = (payload || {}).result || {};
       const kpiData = (payload || {}).data || null;
       const awards = result.snapshot && result.snapshot.awardsBattle;
-      const validation = validateAwardsBattle(awards, kpiData, result.snapshot && result.snapshot.kpiBattle);
+      const validation = validateAwardsBattle(awards, kpiData, result.snapshot && result.snapshot.kpiBattle, result.snapshot && result.snapshot._read_integrity);
       if (!validation.ok) {
         state.data = null;
         state.unavailableReason = validation.reason;
