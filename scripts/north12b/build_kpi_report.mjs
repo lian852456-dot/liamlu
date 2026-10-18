@@ -506,7 +506,8 @@ let goodspeedLastRow = 10;
     : `來源：${sourceFile}｜手機保險尚未有資料；未補0、未沿用前月，DOD暫不比較。`]];
 }
 
-// 5. QIS 店績：重建今日來源。
+// 5. QIS 店績與個人追98：同一工作表與同一張PNG。
+let qisLastRow = 14;
 {
   const sheet = report.worksheets.getItem('QIS店績');
   sheet.getRange('A1').values = [[`北一二B QIS店績｜${reportDate}`]];
@@ -561,6 +562,78 @@ let goodspeedLastRow = 10;
       format: { fill: '#FDE2E2', font: { color: '#DC2626', bold: true } },
     });
   }
+  const personal = daily.qisPersonal;
+  if (personal?.schema !== 'north12b-personal-qis/v1'
+      || personal.sourceSha256 !== currentKpi.meta.sourceSha256) {
+    throw new Error('QIS_PERSONAL_SOURCE_IDENTITY_MISMATCH');
+  }
+  // Remove only a prior appended personal block when reusing a generated v4 file.
+  const oldLast = Math.max(20, sheet.getUsedRange()?.rowCount ?? 20);
+  sheet.getRange(`A15:F${oldLast}`).unmerge();
+  sheet.getRange(`A15:F${oldLast}`).clear({applyTo:'all'});
+  const band = (row, label, fill='#17365D') => {
+    sheet.getRange(`A${row}:F${row}`).merge();
+    sheet.getRange(`A${row}`).values = [[label]];
+    sheet.getRange(`A${row}:F${row}`).format = {
+      fill, font:{name:CJK_FONT,size:16,bold:true,color:'#FFFFFF'},
+      horizontalAlignment:'center',verticalAlignment:'center',rowHeight:42,
+    };
+  };
+  const header = (row) => {
+    sheet.getRange(`E${row}:F${row}`).merge();
+    sheet.getRange(`A${row}:F${row}`).values = [['店點','同仁','目前分數','計件數','追加100分筆數',null]];
+    sheet.getRange(`A${row}:F${row}`).format = {
+      fill:'#FFCF17',font:{name:CJK_FONT,size:14,bold:true,color:'#17365D'},
+      horizontalAlignment:'center',verticalAlignment:'center',wrapText:true,rowHeight:44,
+      borders:{preset:'all',style:'thin',color:'#94A3B8'},
+    };
+  };
+  const personRow = (row, person) => {
+    sheet.getRange(`E${row}:F${row}`).merge();
+    const score = person.status === 'no_data' ? '尚無資料' : person.current_score ?? '待核';
+    const needed = person.status === 'no_data' ? '首筆100即100'
+      : person.status === 'pending' ? '待核' : person.additional_100;
+    sheet.getRange(`A${row}:F${row}`).values = [[person.store,person.name,score,person.case_count ?? '待核',needed,null]];
+    sheet.getRange(`A${row}:F${row}`).format = {
+      fill:person.status === 'below_98' ? '#FFF1F2' : '#F8FAFC',
+      font:{name:CJK_FONT,size:14,color:'#0F172A'},
+      horizontalAlignment:'center',verticalAlignment:'center',rowHeight:38,
+      borders:{preset:'all',style:'thin',color:'#CBD5E1'},
+    };
+    sheet.getRange(`C${row}`).format.numberFormat='0.#####';
+    sheet.getRange(`D${row}:F${row}`).format.numberFormat='0';
+    sheet.getRange(`E${row}:F${row}`).format.font={name:CJK_FONT,size:14,bold:true,color:'#B91C1C'};
+  };
+  let row = 16;
+  band(row++, `個人未達98追分｜截至 ${personal.cutoffDate.replaceAll('-','/')}｜${personal.below98.length}人`);
+  header(row++);
+  if (personal.below98.length) {
+    for (const person of personal.below98) personRow(row++,person);
+  } else {
+    band(row++, '有計件且分數完整者皆達98', '#0F766E');
+  }
+  for (const [key,label] of [['noData','尚無計件'],['pending','資料待核']]) {
+    if (!personal[key].length) continue;
+    row++;
+    band(row++, `${label}｜${personal[key].length}人`, '#64748B');
+    header(row++);
+    for (const person of personal[key]) personRow(row++,person);
+  }
+  row++;
+  const notes = [
+    `QIS個績共${personal.rows.length}人：未達98 ${personal.below98.length}人、尚無計件 ${personal.noData.length}人、達98 ${personal.rows.filter(p=>p.status==='at_least_98').length}人（摘要）、待核 ${personal.pending.length}人。`,
+    `個人截至${personal.cutoffDate.replaceAll('-','/')}；店績截至${qisCutoff.replaceAll('-','/')}，兩者更新日不同。`,
+    '追加100分筆數＝向上取整〔計件數 × (98－目前分數) ÷ 2〕，採等權平均試算。',
+    personal.precisionNote,
+  ];
+  for (const note of notes) {
+    sheet.getRange(`A${row}:F${row}`).merge();
+    sheet.getRange(`A${row}`).values=[[note]];
+    sheet.getRange(`A${row}:F${row}`).format={font:{name:CJK_FONT,size:12,color:'#475569'},
+      horizontalAlignment:'left',verticalAlignment:'center',wrapText:true,rowHeight:34};
+    row++;
+  }
+  qisLastRow=row-1;
 }
 
 // 6. 締結率：正式分子／分母口徑，店點與單日趨勢均以公式計算。
@@ -637,7 +710,7 @@ const reportFontRanges = {
   '加掛得分': 'A1:R15',
   '好速上線明細': `A1:O${goodspeedLastRow}`,
   '手機保險': 'A1:I14',
-  'QIS店績': 'A1:F14',
+  'QIS店績': `A1:F${qisLastRow}`,
   '締結率': `A1:E${closureLayout.lastRow}`,
   '主管摘要': 'A1:F50',
   '資料來源': 'A1:B8',
@@ -849,7 +922,7 @@ const mainCheck = await report.inspect({ kind: 'table', sheetId: '主力KPI', ra
 const addonCheck = await report.inspect({ kind: 'table', sheetId: '加掛得分', range: 'A1:R15', include: 'values,formulas', tableMaxRows: 15, tableMaxCols: 18, maxChars: 10000 });
 const goodspeedCheck = await report.inspect({ kind: 'table', sheetId: '好速上線明細', range: `A1:O${goodspeedLastRow}`, include: 'values,formulas', tableMaxRows: goodspeedLastRow, tableMaxCols: 15, maxChars: 12000 });
 const insuranceCheck = await report.inspect({ kind: 'table', sheetId: '手機保險', range: 'A1:I14', include: 'values,formulas', tableMaxRows: 14, tableMaxCols: 9, maxChars: 10000 });
-const qisCheck = await report.inspect({ kind: 'table', sheetId: 'QIS店績', range: 'A1:F14', include: 'values,formulas', tableMaxRows: 14, tableMaxCols: 6, maxChars: 10000 });
+const qisCheck = await report.inspect({ kind: 'table', sheetId: 'QIS店績', range: `A1:F${qisLastRow}`, include: 'values,formulas', tableMaxRows: qisLastRow, tableMaxCols: 6, maxChars: 16000 });
 const closureCheck = await report.inspect({ kind: 'table', sheetId: '締結率', range: `A1:E${closureLayout.lastRow}`, include: 'values,formulas', tableMaxRows: closureLayout.lastRow, tableMaxCols: 5, maxChars: 16000 });
 const formulaErrors = await report.inspect({ kind: 'match', searchTerm: '#REF!|#DIV/0!|#VALUE!|#NAME\\?|#N/A', options: { useRegex: true, maxResults: 300 }, summary: 'final formula error scan', maxChars: 4000 });
 const closureFormulaErrors = await closureWorkbook.inspect({ kind: 'match', searchTerm: '#REF!|#DIV/0!|#VALUE!|#NAME\\?|#N/A', options: { useRegex: true, maxResults: 300 }, summary: 'closure workbook formula error scan', maxChars: 4000 });
