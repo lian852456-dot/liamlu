@@ -3,6 +3,8 @@
   const C=window.ReadonlyDashboardCore,A=window.ReadonlyDashboardAdapter,$=s=>document.querySelector(s),OWNER=window.KpiBattleController?.DEFAULT_GAS_URL;
   const state={tab:'kpi',store:'all',mode:'daily',start:'',end:'',metric:'a999',kpiCompare:'overall',kpiItem:'all',role:'all',model:'all'};
   let model=null,epoch=0,flight=null,client=null,controller=null,expires=0,expiryTimer,failed=false,suspended=false,channel=null;
+  const exportButton=$('#store-export'),exportStatus=$('#export-status');
+  function updateExport(){if(exportButton)exportButton.disabled=!model||failed||!!flight||suspended||document.hidden||!!(expires&&Date.now()>=expires);}
   const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const number=v=>v==null||!Number.isFinite(Number(v))?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:2}),percent=v=>v==null||!Number.isFinite(Number(v))?'—':(v*100).toFixed(1)+'%',short=v=>v?String(v).slice(5).replace('-','/'):'—';
   const title={kpi:'KPI',awards:'台獎',personal:'個績',conversion:'締結率',traffic:'來客數'},metricKeys={a999:'A999',a1399:'A1399',haosu:'好速',r1399:'R1399'};
@@ -11,6 +13,8 @@
   function clear(message='畫面已清除，請重新核驗登入。'){
     epoch++;controller?.abort();controller=null;client?.suspend();clearTimeout(expiryTimer);expires=0;flight=null;model=null;
     $('#controls').hidden=true;$('#content').replaceChildren();$('#source-note').textContent='尚未取得本次授權資料。';$('#auth-message').textContent=message;
+    if(exportStatus)exportStatus.textContent='匯出全區與九店KPI、締結率及來客比較；不含個人資料或獎金。';
+    updateExport();
     $('#refresh').disabled=false;empty('尚未取得授權資料');
   }
   function source(info,extra=''){$('#source-note').textContent='資料統計至 '+(info.cutoff||'來源未提供')+' · 戰報日期 '+(info.reportDate||'來源未提供')+' · '+(info.sourceName||'既有私有戰情來源')+' · 版本 '+(info.version||'來源未提供')+(extra?' · '+extra:'');}
@@ -86,8 +90,19 @@
       $('#store').innerHTML='<option value="all">本次授權範圍全部門市</option>'+model.stores.map(s=>'<option value="'+s.id+'">'+safe(s.name)+'</option>').join('');if(!model.stores.some(s=>s.id===state.store))state.store='all';$('#store').value=state.store;
       if(model.conversion){const d=model.conversion;for(const id of ['start','end']){$('#'+id).min=d.period_start;$('#'+id).max=d.cutoff;}if(!state.start||state.start<d.period_start||state.end>d.cutoff){state.start=d.period_start;state.end=d.cutoff;}$('#start').value=state.start;$('#end').value=state.end;}
       $('#controls').hidden=false;$('#auth-message').textContent='已完成既有登入核對；各頁採自己的來源與截止。';render();
-    }catch{if(expected!==epoch)return;failed=true;clear('未取得此頁授權資料。請先在情報站登入，再按重新核驗；資料未顯示。');}finally{if(expected===epoch){flight=null;$('#refresh').disabled=false;}}});flight=operation;return operation;
+    }catch{if(expected!==epoch)return;failed=true;clear('未取得此頁授權資料。請先在情報站登入，再按重新核驗；資料未顯示。');}finally{if(expected===epoch){flight=null;$('#refresh').disabled=false;updateExport();}}});flight=operation;return operation;
   }
+  if(exportButton)exportButton.onclick=()=>{
+    if(!model||failed||flight||suspended||document.hidden||expires&&Date.now()>=expires){updateExport();if(exportStatus)exportStatus.textContent='請先完成原登入與資料核驗，再匯出門市快照。';return;}
+    const current=model;exportButton.disabled=true;
+    try{
+      const exporter=window.ReadonlyStoreSnapshot;if(!exporter)throw Error('匯出元件未載入，請重新整理。');
+      const snapshot=exporter.fromModel(current),html=exporter.buildHtml(snapshot),url=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
+      const link=document.createElement('a');link.href=url;link.download=exporter.filename(snapshot);document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      if(exportStatus)exportStatus.textContent='已產生門市HTML快照，可作為郵件附件；資料不會自動更新，不含個人資料或獎金。';
+    }catch(error){if(exportStatus)exportStatus.textContent=error.message||'未能產生門市快照，請重新核驗資料。';}
+    finally{updateExport();}
+  };
   $('#refresh').onclick=()=>{failed=false;void load();};$('#store').onchange=e=>{state.store=e.target.value;state.role='all';render();};document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;render();});for(const mode of ['daily','cumulative'])$('#'+mode).onclick=()=>{state.mode=mode;render();};
   for(const id of ['start','end'])$('#'+id).onchange=e=>{if(!model?.conversion)return;if(!e.target.value){state.start=model.conversion.period_start;state.end=model.conversion.cutoff;$('#start').value=state.start;$('#end').value=state.end;$('#filter-status').hidden=false;$('#filter-status').textContent='日期已恢復至來源完整期間。';}else{state[id]=e.target.value;$('#filter-status').hidden=true;}render();};
   function suspend(){suspended=true;clear('已暫時隱藏資料，返回後重新核對登入。');}
