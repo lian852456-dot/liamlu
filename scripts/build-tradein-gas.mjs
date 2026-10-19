@@ -9,4 +9,5 @@ const core=await readFile(new URL('../tradein-performance-core.js',import.meta.u
 const api=await readFile(new URL('../gas/TradeinPerformance.gs',import.meta.url),'utf8');
 const publicCore=await readFile(new URL('../tradein-public-core.js',import.meta.url),'utf8');
 const publicApi=await readFile(new URL('../gas/TradeinPublic.gs',import.meta.url),'utf8');
-await writeFile(target,old.slice(0,a)+start+'\n'+core+'\n'+api+'\n'+publicCore+'\n'+publicApi+'\n'+end+old.slice(b+end.length));
+const sharingApi=await readFile(new URL('../gas/TradeinSharing.gs',import.meta.url),'utf8');
+await writeFile(target,old.slice(0,a)+start+'\n'+core+'\n'+api+'\n'+publicCore+'\n'+publicApi+'\n'+sharingApi+'\n'+end+old.slice(b+end.length));

@@ -220,3 +220,52 @@ test('captured password login is rejected when an admin rotates the password con
  assert.equal(rotation.status,'ok');assert.equal(result.status,'error');
  assert.equal(JSON.parse(f.props.get(BIND)).bindings.SYNTH002,undefined);
 });
+
+// Sharing uses the same owner-local session transaction, device and eligibility gates.
+function sharingFixture(){
+ const f=fixture();f.ctx.privateDashboardBVerifyPassword_=()=>true;
+ const api=f.ctx.privateDashboardCreateGasB_({});
+ const files=new Map();let contentWrites=0;
+ f.ctx.tradeinPerformanceFile_=name=>files.has(name)?{getBlob:()=>({getDataAsString:()=>files.get(name)}),setContent:body=>{assert.ok(f.held());contentWrites++;files.set(name,body);}}:null;
+ f.ctx.tradeinPerformanceFolder_=()=>({createFile:(name,body)=>{assert.ok(f.held());contentWrites++;files.set(name,body);}});
+ const invoke=p=>deep(api.handle(JSON.stringify(p)));
+ const login=(id,n)=>invoke(passwordLogin(id,'SYNTHETIC_SHARE_DEVICE_'+n,'SYNTHETIC_PASSWORD','SYNTHETIC_SHARE_LOGIN_'+n,n));
+ const one=login('SYNTH002','a'),two=login('SYNTH003','b');assert.equal(one.status,'ok');assert.equal(two.status,'ok');
+ const call=(action,extra={},token=one.token,device='SYNTHETIC_SHARE_DEVICE_a')=>invoke({action:'employee_tradein_sharing_'+action,token,deviceId:device,month:'2026-10',...extra});
+ const draft={id:'SYNTHETIC_CASE_0001',version:0,type:'成功成交',scenario:'SYNTHETIC_SCENARIO',approach:'SYNTHETIC_APPROACH',outcome:'SYNTHETIC_OUTCOME',image:''};
+ return {f,files,call,draft,two,invoke,login,writes:()=>contentWrites};
+}
+test('sharing is private, crosses devices only after session verification, and derives authorship on the server',()=>{
+ const x=sharingFixture();
+ assert.equal(x.call('save',x.draft,'B1_0_'+'0'.repeat(64)).status,'error');assert.equal(x.writes(),0);
+ assert.equal(x.call('save',x.draft,undefined,'SYNTHETIC_WRONG_DEVICE').status,'error');assert.equal(x.writes(),0);
+ assert.equal(x.call('save',{...x.draft,owner:'SYNTH003'}).status,'error');assert.equal(x.writes(),0);
+ const saved=x.call('save',x.draft);assert.equal(saved.status,'ok');assert.equal(saved.item.author,'SYNTHETIC_MASK_1');assert.equal(saved.item.store,'永吉');
+ const peer=x.call('list',{},x.two.token,'SYNTHETIC_SHARE_DEVICE_b');assert.equal(peer.cases.length,1);assert.equal(peer.cases[0].editable,false);
+ assert.ok(!JSON.stringify(peer).includes('SYNTH002'));assert.ok(!('image' in peer.cases[0]));
+ assert.equal(x.call('save',{...x.draft,version:1},x.two.token,'SYNTHETIC_SHARE_DEVICE_b').status,'error');
+ assert.equal(x.call('moderate',{id:x.draft.id,version:1,featured:true,hidden:true}).status,'error');assert.equal(x.writes(),1);
+ x.f.rows.DashboardUsers[2][4]='revoked';assert.equal(x.call('list').status,'error');assert.equal(x.writes(),1);
+});
+test('sharing detects stale edits and ambiguous repeat submissions, bounds images, and isolates months',()=>{
+ const x=sharingFixture();assert.equal(x.call('save',x.draft).status,'ok');
+ assert.equal(x.call('save',x.draft).code,'SHARE_VERSION_CONFLICT');assert.equal(x.writes(),1);
+ assert.equal(x.call('save',{...x.draft,version:1,image:'data:image/svg+xml;base64,PHN2Zz4='}).code,'SHARE_IMAGE_INVALID');
+ assert.equal(x.call('save',{...x.draft,version:1,scenario:'x'.repeat(1001)}).code,'SHARE_INPUT_INVALID');
+ assert.equal(x.call('save',{...x.draft,version:1,image:'data:image/png;base64,iVBORw0KGgoAAA=='}).status,'ok');
+ assert.ok(x.call('detail',{id:x.draft.id}).item.image);assert.ok(!('image' in x.call('list').cases[0]));
+ assert.equal(x.call('save',{...x.draft,version:2,image:null}).status,'ok');assert.ok(x.call('detail',{id:x.draft.id}).item.image);
+ assert.equal(x.call('list',{month:'2026-11'}).cases.length,0);assert.equal(x.call('list',{month:'2026-99'}).status,'error');
+ assert.equal(x.call('save',{...x.draft,version:3,image:''}).status,'ok');assert.equal(x.call('detail',{id:x.draft.id}).item.image,'');
+});
+test('only primary supervisor role manages sharing; hidden cases stay hidden from other staff',()=>{
+ const x=sharingFixture();assert.equal(x.call('save',x.draft).status,'ok');
+ x.f.props.set('DASHBOARD_TRUSTED_EMPLOYEE_ID','SYNTHBOSS');x.f.rows.DashboardUsers.push(['SYNTHBOSS','SYNTHETIC_BOSS','北一二B','督導','active','','','']);
+ const boss=x.login('SYNTHBOSS','c');assert.equal(boss.status,'ok');
+ const moderate=(extra={})=>x.call('moderate',{id:x.draft.id,version:1,featured:true,hidden:true,...extra},boss.token,'SYNTHETIC_SHARE_DEVICE_c');
+ assert.equal(moderate().status,'ok');assert.equal(x.call('list').cases.length,1);
+ assert.equal(x.call('list',{},x.two.token,'SYNTHETIC_SHARE_DEVICE_b').cases.length,0);
+ assert.equal(x.call('detail',{id:x.draft.id},x.two.token,'SYNTHETIC_SHARE_DEVICE_b').status,'error');
+ assert.equal(moderate({version:2,hidden:false}).status,'ok');assert.equal(x.call('list',{},x.two.token,'SYNTHETIC_SHARE_DEVICE_b').cases[0].featured,true);
+ x.f.rows.DashboardUsers.at(-1)[3]='業代';assert.equal(moderate({version:3}).status,'error');
+});
