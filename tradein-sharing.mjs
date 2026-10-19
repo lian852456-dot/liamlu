@@ -11,7 +11,7 @@ function proof(){
 }
 function resetEditor(){editing=null;$('shareForm').reset();$('shareEditorTitle').textContent='＋新增分享';}
 function clear(note='請先登入同仁專區，再讀取分享。'){
-  epoch++;pending?.abort();pending=null;clearTimeout(leaseTimer);rows=[];profile=null;loadedMonth='';resetEditor();$('shareList').replaceChildren();$('shareWorkspace').hidden=true;$('shareLogin').hidden=false;busy(false);message(note);
+  epoch++;pending?.abort();pending=null;clearTimeout(leaseTimer);rows=[];profile=null;loadedMonth='';resetEditor();$('shareType').value='成功成交';$('shareAuthor').textContent='';$('shareCount').textContent='';$('shareStore').replaceChildren(option('','全部門市'));$('shareStaff').replaceChildren(option('','全部同仁'));$('shareFilterType').value='';$('shareList').replaceChildren();$('shareWorkspace').hidden=true;$('shareLogin').hidden=false;busy(false);message(note);
 }
 function busy(value){$('shareWorkspace').setAttribute('aria-busy',String(value));$('shareForm').querySelectorAll('input,textarea,select,button').forEach(el=>el.disabled=value);$('shareRefresh').disabled=value;$('shareList').querySelectorAll('button').forEach(el=>el.disabled=value);}
 async function request(action,extra={}){

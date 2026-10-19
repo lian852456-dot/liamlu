@@ -31,6 +31,16 @@ test('logout invalidates an in-flight response and re-enables controls without e
   release({status:'ok',profile:{store:'合成店',author:'合＊甲'},cases:[]});await pending;
   assert.equal(f.get('shareWorkspace').hidden,true);assert.equal(f.get('shareList').children.length,0);assert.equal(f.get('shareRefresh').disabled,false);
 });
+test('logout clears private identity and filter state before the next login',async()=>{
+  const f=fixture();f.login();f.handle(async()=>({status:'ok',profile:{store:'合成店',author:'合＊甲',supervisor:false},cases:[
+    {id:'SYNTHETIC_CASE_001',version:1,store:'合成店',author:'合＊甲',type:'成功成交',scenario:'合成情境',approach:'合成話術',outcome:'合成心得',updatedAt:'2026-10-19T00:00:00Z',editable:true},
+    {id:'SYNTHETIC_CASE_002',version:1,store:'另一店',author:'合＊乙',type:'未成交',scenario:'另一情境',approach:'另一話術',outcome:'另一心得',updatedAt:'2026-10-18T00:00:00Z',editable:false}
+  ]}));
+  await f.refresh();f.get('shareType').value='改善心得';f.get('shareStore').value='合成店';f.get('shareStaff').value='合成店｜合＊甲';f.get('shareFilterType').value='未成交';
+  f.events.get('portal-before-logout')();
+  assert.equal(f.get('shareAuthor').textContent,'');assert.equal(f.get('shareCount').textContent,'');assert.equal(f.get('shareStore').children.length,1);assert.equal(f.get('shareStore').children[0].value,'');
+  assert.equal(f.get('shareStaff').children.length,1);assert.equal(f.get('shareStaff').children[0].value,'');assert.equal(f.get('shareFilterType').value,'');assert.equal(f.get('shareType').value,'成功成交');
+});
 test('ambiguous save is never automatically resent and retains its opaque case ID',async()=>{
   const f=fixture();f.login();await f.refresh();f.get('shareScenario').value='合成情境';f.get('shareApproach').value='合成話術';f.get('shareOutcome').value='合成心得';
   f.handle(p=>{if(p.action.endsWith('_save'))throw Error('SYNTHETIC_NETWORK_FAILURE');return {status:'ok',cases:[],profile:{}};});
