@@ -135,3 +135,8 @@ require('./tradein-monthly-basis.test.cjs');
 require('./tradein-source-preview.test.cjs');
 require('./tradein-sar74-source.test.cjs');
 require('./tradein-import-speed.test.cjs');
+
+// Register sharing security regressions through the existing CI entry point.
+require('./dashboard-password-roster-renewal.test.cjs');
+require('./tradein-sharing-public.test.cjs');
+require('./tradein-sharing-ui.test.cjs');

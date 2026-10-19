@@ -269,3 +269,11 @@ test('only primary supervisor role manages sharing; hidden cases stay hidden fro
  assert.equal(moderate({version:2,hidden:false}).status,'ok');assert.equal(x.call('list',{},x.two.token,'SYNTHETIC_SHARE_DEVICE_b').cases[0].featured,true);
  x.f.rows.DashboardUsers.at(-1)[3]='業代';assert.equal(moderate({version:3}).status,'error');
 });
+
+test('authenticated new public case keeps verified ownership separate from self-filled name and cannot upgrade legacy',()=>{
+ const x=sharingFixture(),month=new Date(Date.now()+8*3600000).toISOString().slice(0,7);
+ const saved=x.call('save',{...x.draft,month,publicConsent:true,publicStore:'酒泉',publicAuthor:'自填非員編姓名'});assert.equal(saved.status,'ok');assert.equal(saved.item.authorUnverified,true);assert.equal(saved.item.author,'自填非員編姓名');assert.equal(saved.item.store,'酒泉');assert.equal(saved.item.editable,true);
+ const stored=JSON.parse(x.files.get('north12b-tradein-sharing-'+month+'.json')).cases[0];assert.equal(stored.owner,'SYNTH002');assert.equal(stored.audience,'public-link/v1');
+ assert.equal(x.call('save',{...x.draft,month,version:1,publicConsent:true,publicStore:'酒泉',publicAuthor:'改名'}).status,'error');
+ assert.equal(x.call('save',{...x.draft,month,version:1}).status,'ok');assert.equal(x.call('save',{...x.draft,month,version:2},x.two.token,'SYNTHETIC_SHARE_DEVICE_b').status,'error');
+});
