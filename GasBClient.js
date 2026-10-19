@@ -44,12 +44,16 @@ function createDashboardBClient(ownerExecUrl, options={}) {
     const controller=new AbortController(),started=clock();let outcome='error';requests.add(controller);
     const timer=setTimeout(()=>controller.abort(),90000);
     try {
-      const response=await transport(ownerExecUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),
-        credentials:'omit',cache:'no-store',redirect:'follow',signal:controller.signal});
-      if(!response.ok)throw new Error('B_SERVICE_UNAVAILABLE');const value=await response.json();
+      let response;
+      try{response=await transport(ownerExecUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),
+        credentials:'omit',cache:'no-store',redirect:'follow',signal:controller.signal});}
+      catch{throw new Error('B_NETWORK_UNAVAILABLE');}
+      if(!response.ok)throw new Error('B_SERVICE_UNAVAILABLE');
+      let value;try{value=await response.json();}catch{throw new Error('B_RESPONSE_INVALID');}
       if(expected!==generation)throw new Error('B_CONTEXT_CHANGED');
       if(controller.signal.aborted)throw new Error('B_TIMEOUT');
-      if(!value || value.status!=='ok')throw new Error('B_AUTH_DENIED');
+      if(!value || Array.isArray(value) || typeof value.status!=='string')throw new Error('B_RESPONSE_INVALID');
+      if(value.status!=='ok')throw new Error('B_AUTH_DENIED');
       if(Array.isArray(value.serverTiming)&&value.serverTiming.length<=40){for(const row of value.serverTiming){
         if(row && /^(lockWait|flush|rosterLookup|privateDrive|kpiLocate|strictNative|resultValidation|kpiBlob|request)$/.test(row.name) &&
           Number.isFinite(row.ms)&&row.ms>=0&&row.ms<600000)try{options.onServerTiming?.({action:payload.action,name:row.name,ms:row.ms});}catch{}
