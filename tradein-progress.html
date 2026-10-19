@@ -16,7 +16,7 @@
 </div>
 <section id="actual-sharing" class="panel sharing-panel" role="tabpanel" aria-labelledby="scope-sharing" hidden>
 <div class="panel-heading"><div><h2>同仁分享</h2><p class="meta">交流舊換新實際案例、推薦話術與改善心得。</p></div><button id="shareRefresh" type="button" class="secondary">讀取分享</button></div>
-<div class="sharing-dates"><label>分享檢視<select id="shareView"><option value="daily">每日</option><option value="range">彙整區間</option></select></label><div id="shareDailyControls"><label>分享日期（台灣時間）<input id="shareDay" type="date" required></label></div><div id="shareRangeControls" hidden><label>起日<input id="shareStart" type="date" required></label><label>迄日<input id="shareEnd" type="date" required></label></div></div>
+<div class="sharing-dates"><label>分享檢視<select id="shareView"><option value="daily">每日</option><option value="range">彙整區間</option><option id="shareLegacyOption" value="legacy" disabled>原月份檢視（需登入）</option></select></label><div id="shareLegacyControls" hidden><label>原分享月份<input id="shareLegacyMonth" type="month"></label></div><div id="shareDailyControls"><label>分享日期（台灣時間）<input id="shareDay" type="date" required></label></div><div id="shareRangeControls" hidden><label>起日<input id="shareStart" type="date" required></label><label>迄日<input id="shareEnd" type="date" required></label></div></div>
 <p class="meta">每日依首次建立的台灣日期歸屬，編輯不換日。彙整預設當月，單次最多 93 日；不影響原進度與回收日期。</p>
 <label class="sharing-check"><input id="sharePrivate" type="checkbox">登入後一併查看舊分享及管理權限內的案例</label><a id="shareLogin" href="home.html">同仁專區登入</a>
 <p id="shareMessage" role="status" aria-live="polite">新公開分享可免登入讀取及填寫；舊分享仍需原登入權限。</p>

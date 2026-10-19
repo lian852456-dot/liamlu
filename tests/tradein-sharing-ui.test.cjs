@@ -40,3 +40,8 @@ test('ambiguous authenticated edit reads version and content, not merely the exi
  assert.equal(f.get('shareOutcome').value,'合成新心得');assert.equal(f.get('shareEditorTitle').textContent,'編輯分享（建立日不變）');assert.equal(f.requests.filter(p=>p.action.endsWith('_save')).length,1);
  f.handle(p=>p.action.endsWith('_save')?{status:'ok',item:{...row,version:2,outcome:'合成新心得'}}:{status:'ok',profile:{supervisor:false},cases:[]});await f.submit();assert.equal(f.requests.filter(p=>p.action.endsWith('_save')).length,2);
 });
+
+test('explicit authenticated original-month view preserves legacy case access across created-date buckets',async()=>{
+ const f=fixture();f.login();f.get('sharePrivate').checked=true;f.get('shareView').value='legacy';f.get('shareLegacyMonth').value='2026-09';f.handle(async()=>({status:'ok',profile:{supervisor:false},cases:[{...row,month:'2026-09',createdDate:'2026-10-01',editable:true}]}));await f.refresh();
+ assert.equal(f.requests.length,1);assert.equal(f.requests[0].action,'employee_tradein_sharing_list');assert.equal(f.requests[0].month,'2026-09');assert.equal(f.get('shareList').children[0].tag,'article');assert.match(f.get('shareMessage').textContent,/原分享月份 2026-09/);assert.equal(f.get('periodMonth').value,'2026-10');
+});

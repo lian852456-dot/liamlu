@@ -9,6 +9,7 @@ function proof(){
 }
 function optionalProof(){try{return proof();}catch{return null;}}
 function range(){
+  if($('shareView').value==='legacy'){const month=$('shareLegacyMonth').value;if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))throw Error('請選擇有效的原分享月份。');const end=new Date(month+'-01T00:00:00Z');end.setUTCMonth(end.getUTCMonth()+1);end.setUTCDate(0);return {start:month+'-01',end:end.toISOString().slice(0,10)};}
   const start=$('shareView').value==='daily'?$('shareDay').value:$('shareStart').value,end=$('shareView').value==='daily'?start:$('shareEnd').value;
   if(!/^20\d{2}-\d{2}-\d{2}$/.test(start)||!/^20\d{2}-\d{2}-\d{2}$/.test(end)||!Number.isFinite(Date.parse(start))||!Number.isFinite(Date.parse(end))||end<start||Date.parse(end)-Date.parse(start)>92*86400000)throw Error('請選擇有效起訖，最多 93 個日曆日。');
   return {start,end};
@@ -84,12 +85,12 @@ async function reconcile(){
 async function load(){
   const ticket=epoch;message('正在讀取同仁分享…');
   try{
-    await reconcile();const r=range(),authenticated=$('sharePrivate').checked;let result;
+    await reconcile();const r=range(),authenticated=$('sharePrivate').checked,legacy=$('shareView').value==='legacy';let result;if(legacy&&!authenticated)throw Error('原月份檢視需要原同仁登入權限。');
     if(authenticated){proof();const months=[];let cursor=r.start.slice(0,7);while(cursor<=r.end.slice(0,7)){months.push(cursor);const d=new Date(cursor+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);cursor=d.toISOString().slice(0,7);}const cases=[];
-      for(const month of months){result=await request('list',{month},true);cases.push(...result.cases);}rows=cases.filter(row=>row.createdDate>=r.start&&row.createdDate<=r.end);profile=result.profile;
+      for(const month of months){result=await request('list',{month},true);cases.push(...result.cases);}rows=legacy?cases:cases.filter(row=>row.createdDate>=r.start&&row.createdDate<=r.end);profile=result.profile;
       clearTimeout(leaseTimer);leaseTimer=setTimeout(()=>{ $('sharePrivate').checked=false;clear('登入已到期，私有分享已清除；可重新讀取公開分享。',true);},Math.max(0,proof().expiresAt-Date.now()));
     }else{result=await request('list',r);rows=result.cases;profile=null;}
-    if(ticket!==epoch)return false;loaded=true;filters();render();message(`已讀取 ${r.start} 至 ${r.end} 的${authenticated?'登入可見':'公開'}分享（台灣時間）。`);return true;
+    if(ticket!==epoch)return false;loaded=true;filters();render();message(legacy?`已讀取原分享月份 ${r.start.slice(0,7)}；每則另列首次建立日（台灣時間）。`:`已讀取 ${r.start} 至 ${r.end} 的${authenticated?'登入可見':'公開'}分享（台灣時間）。`);return true;
   }catch(error){if(ticket===epoch){clear();showError(error);}return false;}
 }
 async function imageData(file){if(!file)return '';if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>800*1024)throw Error('請選擇 800 KB 以內的 PNG、JPEG 或 WebP 圖片。');return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('圖片讀取失敗。'));reader.readAsDataURL(file);});}
@@ -115,11 +116,11 @@ $('shareForm').addEventListener('submit',async event=>{
 $('shareCancel').onclick=()=>{if(needsReadback){message('請先讀取分享確認上次提交結果，再清空內容。');return;}resetEditor();};$('shareRefresh').onclick=()=>void load();
 for(const id of ['shareStore','shareStaff','shareFilterType'])$(id).addEventListener('change',()=>{if(id==='shareStore')filters();render();});
 function datesChanged(){clear('分享日期已變更，請重新讀取。');if($('scope-sharing').getAttribute('aria-selected')==='true')void load();}
-for(const id of ['shareView','shareDay','shareStart','shareEnd','sharePrivate'])$(id).addEventListener('change',()=>{ $('shareDailyControls').hidden=$('shareView').value!=='daily';$('shareRangeControls').hidden=$('shareView').value==='daily';datesChanged();});
+for(const id of ['shareView','shareDay','shareStart','shareEnd','sharePrivate','shareLegacyMonth'])$(id).addEventListener('change',()=>{if(!$('sharePrivate').checked&&$('shareView').value==='legacy')$('shareView').value='daily';$('shareLegacyOption').disabled=!$('sharePrivate').checked;$('shareDailyControls').hidden=$('shareView').value!=='daily';$('shareRangeControls').hidden=$('shareView').value!=='range';$('shareLegacyControls').hidden=$('shareView').value!=='legacy';datesChanged();});
 $('scope-sharing').addEventListener('click',()=>{if(!loaded&&!pending)void load();});
 $('scope-sharing').addEventListener('focus',()=>{if($('scope-sharing').getAttribute('aria-selected')==='true'&&!loaded&&!pending)void load();});
 window.addEventListener('pagehide',()=>clear());document.addEventListener('visibilitychange',()=>{if(document.hidden)clear('已暫停分享，返回後請重新讀取。');});
 for(const name of ['portal-before-logout','portal-login-changed'])window.addEventListener(name,()=>{$('sharePrivate').checked=false;clear('登入狀態已變更，私有分享已清除。',true);});
 window.addEventListener('storage',event=>{if(event.key===LOGOUT||event.key===null){$('sharePrivate').checked=false;clear('登入狀態已變更，私有分享已清除。',true);}});
-const day=today();$('shareDay').value=day;$('shareStart').value=day.slice(0,7)+'-01';const end=new Date(day.slice(0,7)+'-01T00:00:00Z');end.setUTCMonth(end.getUTCMonth()+1);end.setUTCDate(0);$('shareEnd').value=end.toISOString().slice(0,10);
+const day=today();$('shareLegacyMonth').value=day.slice(0,7);$('shareDay').value=day;$('shareStart').value=day.slice(0,7)+'-01';const end=new Date(day.slice(0,7)+'-01T00:00:00Z');end.setUTCMonth(end.getUTCMonth()+1);end.setUTCDate(0);$('shareEnd').value=end.toISOString().slice(0,10);
 $('shareInputStore').replaceChildren(option('','選擇店點'),...window.TradeinPerformanceCore.STORES.map(s=>option(s[1],s[1])));
