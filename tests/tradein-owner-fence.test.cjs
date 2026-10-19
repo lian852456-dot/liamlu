@@ -55,7 +55,8 @@ test('generated tradein module retains the owner wrappers on the next build', ()
   const expected = start + '\n' + fs.readFileSync(path.join(root, 'tradein-performance-core.js'), 'utf8') + '\n' +
     fs.readFileSync(path.join(root, 'gas/TradeinPerformance.gs'), 'utf8') + '\n' +
     fs.readFileSync(path.join(root, 'tradein-public-core.js'), 'utf8') + '\n' +
-    fs.readFileSync(path.join(root, 'gas/TradeinPublic.gs'), 'utf8') + '\n' + end;
+    fs.readFileSync(path.join(root, 'gas/TradeinPublic.gs'), 'utf8') + '\n' +
+    fs.readFileSync(path.join(root, 'gas/TradeinSharing.gs'), 'utf8') + '\n' + end;
   assert.equal(source.slice(source.indexOf(start), source.indexOf(end) + end.length), expected);
   for (const name of functions) assert.equal(source.split('function ' + name + '(').length - 1, 1, 'duplicate ' + name);
 });

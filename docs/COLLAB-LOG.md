@@ -1,3 +1,9 @@
+## 2026-10-19 ｜ Codex（PR248 同仁分享部署與驗收）
+
+- 沿用 PR248。由 fresh B owner v70 作四個精確差異區塊更新，追加分享與兩個私有檔案 helper，原 URL／owner 設定／release gates／登入裝置權限及其他 GAS 檔案保留；v71 immutable／editor 讀回一致，rollback v70。沒有整份覆蓋 repo Code.gs，也沒有修改進度後端。
+- 修正 generated bundle 契約漏列分享模組；另補齊登出／到期清除作者與身份篩選 DOM。相關 CI 第二組 204/204、正式候選覆疊 20/20 與四種未登入拒絕檢查通過。完整 admin 回應含變動的 serverTiming，不能以整包雜湊當作權限變動判定。
+- 前端需原 PR 檢查通過後再合併發布。正式 Chrome 密碼 session 已到期，實體 iPhone 鏡像顯示手機使用中；正式新增／圖片／跨裝置／另一同仁／督導案例管理尚待登入驗收，未建立正式測試案例。Cloudflare build 在 main 已存在失敗，需登入才能查完整日誌；GitHub Pages 發布獨立核對。部署方式見 docs/tradein-sharing.md，最終正式 readback／驗收收據留於工作區私有備份。
+
 ## 2026-10-13 ｜ Codex（部區管理共用讀取第一階段候選）
 
 - 從正式 main `1190789` 建立獨立分支，六項公開資產與基準 bytes 相符。加入 per-consumer 記憶體讀取管理與返回事件合併；金牌／成績版本及快取獨立，沿用原後端 session／ACL。實際離頁取消背景前 flight，返回完成新查核前遮住私有畫面。
