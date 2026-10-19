@@ -21,3 +21,11 @@
 上線需用實際同仁／督導登入驗證：新增及跨裝置讀取、只能修改本人案例、督導標記與隱藏、圖片、月份切換、登出清除，以及既有進度與匯出。另檢查桌機與手機四個頁籤及表單版面。自動測試使用合成資料，不表示已驗證正式登入、資料寫入或畫面。
 
 回復可先還原前端 commit，再將 B owner Web App 指回原部署版本；私有分享檔保留，不刪除正式資料。
+
+## 2026-10-19 部署核對
+
+- 正式 B owner Script ID `17XfhB1cYOIWIyIm0_1mO1a9-ba-H4QCBJHX56bYHiEX06XSSG05FWtlg`，既有 Deployment `AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6`，由 v70 更新為 v71；URL、執行身分、存取設定不變，rollback v70。
+- B owner v70 沒有舊換新進度模組；進度與管理者更新使用另一個後端。本次只將 PR 的 B allowlist／dispatch／body limit 四個差異區塊套入 fresh formal source，追加分享模組，以及原有 `tradeinPerformanceFolder_`／`tradeinPerformanceFile_` 兩個 helper。沒有整份覆蓋 repo Code.gs，也沒有部署完整進度／匯入模組至 B owner。
+- 正式 owner 設定、release gates 與其餘程式保留；其他九個 GAS 檔案未變。v71 immutable 與 editor 逐位元讀回一致。正式候選覆疊測試 20/20 通過；list／detail／save／moderate 未登入請求均拒絕。
+- 自動測試與上述讀回不代表正式案例新增、圖片、跨同仁／跨裝置、督導操作或實體 iPhone 驗收。Chrome 正式登入到期，仍需本人登入及另一位同仁提供各自已登入的驗收環境；不更改密碼或裝置綁定來替代。
+- 原 `homepage-ui` 失敗為 generated bundle 契約漏列 `TradeinSharing.gs`，已在同一 PR 修正。Cloudflare `twm-tradein-price` build 在正式 main 也失敗，需 Cloudflare 登入才能讀取其完整日誌；GitHub Pages 發布另外核對。
