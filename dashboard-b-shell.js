@@ -46,6 +46,18 @@ function mountTiming(){if(timingOutput)return;const details=document.createEleme
  timingSummary=document.createElement('pre');timingSummary.style.cssText='white-space:pre-wrap;word-break:break-all';
  timingOutput=document.createElement('pre');timingOutput.style.cssText='max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-all';details.append(summary,reset,copy,stop,timingSummary,timingOutput);panel.after(details);renderTiming();}
 function message(text){if(panel)panel.querySelector('[data-b-message]').textContent=text;}
+// Fixed, non-secret categories only. Never display a response body or exception text.
+function accessFailureMessage(error,stage='validate'){
+ const reasons={
+  B_NETWORK_UNAVAILABLE:'網路連線未完成（NETWORK）',
+  B_SERVICE_UNAVAILABLE:'服務回應失敗（SERVICE）',
+  B_RESPONSE_INVALID:'服務回應格式異常（RESPONSE）',
+  B_TIMEOUT:'服務回應逾時（TIMEOUT）',
+  B_AUTH_DENIED:'登入或目前會話未通過驗證（AUTH）'
+ };
+ return (reasons[error?.message]||(stage==='read'?'資料讀取未完成（UNKNOWN）':'登入核驗未完成（UNKNOWN）'))+
+  '；尚未確認失敗原因，畫面已鎖定。可按「重新核驗」重試，或在本頁輸入員編與指定密碼重新登入。';
+}
 function state(name){if(panel){panel.dataset.state=name;panel.querySelector('h2').textContent=name==='active'?(host?.ownerPhone&&client?.hasPhone()?'手機自動登入已啟用':'同仁專區已登入'):name==='checking'?'正在確認登入':name==='loading'?'正在登入這台裝置':(host?.ownerPhone?'首次驗證與手機綁定':'員編與密碼登入');panel.querySelector('[data-b-phone]').hidden=!(name==='active'&&host?.ownerPhone&&host.phoneEligible&&!client?.hasPhone());}}
 function markLegacyRoots(){
  const roots=[];
@@ -138,7 +150,7 @@ async function refresh(allowPhone=true,forceData=false){
   if(expected!==epoch)return false;
   if(error.message==='B_DISABLED'){wipe('指定密碼通道已關閉，請重新確認。');return false;}
   if(error.message==='B_AUTH_DENIED' && allowPhone && host.ownerPhone && client.hasPhone()){checking=null;active=false;confirmed=false;return resumePhone();}
-  clearDataCache();confirmed=false;lastCheck=0;conceal(true);host.clear();state('pending');message(stage==='read'?'資料讀取未完成或授權已改變，畫面已鎖定；可按「重新核驗」重試。':'登入授權無法確認，畫面已鎖定；可按「重新核驗」重試。');return false;
+  clearDataCache();confirmed=false;lastCheck=0;conceal(true);host.clear();state('pending');message(accessFailureMessage(error,stage));return false;
  }
  finally{if(expected===epoch)checking=null;}
  })();return checking;
@@ -155,7 +167,7 @@ async function login(event){event.preventDefault();const employee=panel.querySel
   active=true;expiresAt=lease.expiresAt;scheduleExpiry();
   const ok=await refresh(false,true);if(!ok)return;recordReady(started,expected);scope.PortalLogout?.notifyLogin();
   if(host.ownerPhone && host.phoneEligible){try{await client.enrollPhone();state('active');message('已綁定這支手機，下次開啟 App 不用再輸入帳密。');}catch{message('本次已登入，但手機綁定未完成；可登出後重試，或請管理者撤銷舊手機。');}}
- }catch(error){if(expected===epoch)wipe(error.message==='B_DISABLED'?'指定密碼通道尚未開放，請使用原員編通道。':error.message==='B_TIMEOUT'?'服務逾時，請重新登入；不會自動重送。':'無法登入，請核對員編、指定密碼及裝置。');}
+ }catch(error){if(expected===epoch)wipe(error.message==='B_DISABLED'?'指定密碼通道尚未開放，請使用原員編通道。':accessFailureMessage(error));}
  finally{password='';if(expected===epoch)loading=false;if(!loading)submit.disabled=false;}
 }
 async function resumePhone(started=performance.now()){
@@ -199,7 +211,7 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
  #home-login [data-b-return]{display:none}
  #dashboard-b-access *{box-sizing:border-box}
  #dashboard-b-access h2{margin:0 0 14px;font-size:18px;line-height:1.45;font-weight:700;color:inherit}
- #dashboard-b-access[data-state="active"] form,#dashboard-b-access[data-state="pending"] form,#dashboard-b-access[data-state="checking"] form,#dashboard-b-access[data-state="loading"] form{display:none}
+ #dashboard-b-access[data-state="active"] form,#dashboard-b-access[data-state="checking"] form,#dashboard-b-access[data-state="loading"] form{display:none}
  #dashboard-b-access form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end;gap:14px;margin:0}
  #dashboard-b-access label{display:grid;gap:6px;min-width:0;margin:0;font-size:13px;font-weight:600}
  #dashboard-b-access input{display:block;width:100%;height:44px;min-height:44px;margin:0;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#172033;font:inherit;font-size:16px;font-weight:400}
