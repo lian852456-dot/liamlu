@@ -126,3 +126,6 @@ test('a rejected API read keeps private contents and exports unavailable',async(
 
 // The public page runs beside the protected regression in the existing CI entry.
 require('./helpers/tradein-public-ui-contract.cjs')();
+
+// Public sharing runs through the unchanged production CI test entry.
+require('./helpers/tradein-sharing-ui-contract.cjs')();
