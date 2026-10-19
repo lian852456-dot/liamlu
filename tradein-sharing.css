@@ -3,3 +3,5 @@
 .sharing-dates,.sharing-identity,#shareRangeControls{display:flex;flex-wrap:wrap;gap:16px}.sharing-dates label,.sharing-identity label{min-width:0;flex:1}.sharing-panel input:not([type=checkbox]),.sharing-panel select{max-width:100%;min-width:0;box-sizing:border-box}.sharing-identity input{width:100%}@media(max-width:600px){.sharing-dates,.sharing-identity{display:grid;grid-template-columns:1fr}.sharing-dates>div{min-width:0}#shareRangeControls{gap:8px}}
 
 .sharing-panel .sharing-check,#shareConsentWrap span{display:flex;align-items:flex-start;gap:8px;line-height:1.6}.sharing-panel input[type=checkbox]{flex:0 0 20px;min-width:20px;max-width:20px;width:20px;height:20px;min-height:20px;padding:0;margin:3px 0 0}
+
+.sharing-draft-notice{padding:12px 14px;border:1px solid #e5bc88;border-radius:10px;background:#fff8ed;margin:12px 0}.sharing-draft-notice button{margin:4px 8px 4px 0;white-space:normal}#shareDraftStatus{line-height:1.6}
