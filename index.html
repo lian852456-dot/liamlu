@@ -2094,6 +2094,13 @@
       <div class="section-divider" style="color:#ef4444;">❌ 未過關項目說明（必填）</div>
       <div class="card" style="padding:14px;">
         <div id="personalFailItems"></div>
+        <div id="personalFailRule" style="font-size:12px;line-height:1.8;padding:10px;border:1px solid var(--border-dim);border-radius:8px;margin:10px 0;">
+          <strong>未過關 3 枚免扣回填提醒</strong><br>
+          自台灣回報日期 2026-10-21 起適用，2026-10-20（含）以前不追套，不追改已結算歷史。
+          當日 16:00（seg16）與 21:00（seg21）兩個時段都須有完整個人回報；每段的原因、請益店點、人員、請益內容與改善計畫皆須完整，且「請益內容」與「改善計畫」各至少 50 字（不計空白與標點，按 Unicode 字元計數）。請寫具體做法與改善行動，勿含客戶個資。<br>
+          每日資格須讀回兩時段原始個人回報，將每日完整內容提供督導覆核，督導可判定扣回；單段達標或本機保存均不代表已確認免扣。僅適用每日未過關 −3，其他動員、動店、保險、值班 −5 或 SPE 均不適用。<br>
+          既有店長／指定代理免個人回報例外保留；此例外不等於自動免未過關 −3，有爭議交督導覆核。
+        </div>
         <div style="border-top:1px solid var(--border-dim);margin:14px 0 10px;"></div>
         <div class="kpi-input-wrap" style="margin-bottom:8px;">
           <label>① 未過關原因說明 <span style="color:#ef4444">*</span></label>
@@ -2101,10 +2108,11 @@
           <textarea id="p_fail_reason" placeholder="說明今天為什麼沒過關（客流狀況、被拒絕的情境…）" rows="2" style="width:100%;background:var(--bg-deep);border:1px solid var(--border-dim);border-radius:7px;color:var(--text);padding:8px 10px;font-size:12px;resize:none;font-family:var(--font);"></textarea>
         </div>
         <div class="kpi-input-wrap" style="margin-bottom:8px;">
-          <label>② 明日改善計畫 <span style="color:#ef4444">*</span></label>
+          <label for="p_improve_plan">② 明日改善計畫 <span style="color:#ef4444">*</span></label>
           <span class="ki-icon">🎯</span>
-          <textarea id="p_improve_plan" placeholder="明天具體要怎麼做、目標幾筆…" rows="2" style="width:100%;background:var(--bg-deep);border:1px solid var(--border-dim);border-radius:7px;color:var(--text);padding:8px 10px;font-size:12px;resize:none;font-family:var(--font);"></textarea>
+          <textarea id="p_improve_plan" aria-describedby="p_improve_count personalFailRule" placeholder="明天具體要怎麼做、目標幾筆…" rows="2" style="width:100%;background:var(--bg-deep);border:1px solid var(--border-dim);border-radius:7px;color:var(--text);padding:8px 10px;font-size:12px;resize:none;font-family:var(--font);"></textarea>
         </div>
+        <div id="p_improve_count" style="font-size:12px;margin-bottom:10px;"></div>
         <div style="border-top:1px solid var(--border-dim);margin:12px 0 10px;"></div>
         <div style="font-size:12px;font-weight:700;color:var(--text-dim);margin-bottom:8px;">📞 ③ 請益紀錄（A999 / 好速）</div>
         <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
@@ -2120,14 +2128,19 @@
           </div>
         </div>
         <div class="kpi-input-wrap" style="margin-bottom:8px;">
-          <label>A999 / 好速 請益做法</label>
+          <label for="p_consult_method">A999 / 好速 請益內容與具體做法</label>
           <span class="ki-icon">💡</span>
-          <textarea id="p_consult_method" placeholder="對方分享的銷售技巧或具體做法…" rows="2" style="width:100%;background:var(--bg-deep);border:1px solid var(--border-dim);border-radius:7px;color:var(--text);padding:8px 10px;font-size:12px;resize:none;font-family:var(--font);"></textarea>
+          <textarea id="p_consult_method" aria-describedby="p_consult_count personalFailRule" placeholder="對方分享的銷售技巧或具體做法…" rows="2" style="width:100%;background:var(--bg-deep);border:1px solid var(--border-dim);border-radius:7px;color:var(--text);padding:8px 10px;font-size:12px;resize:none;font-family:var(--font);"></textarea>
         </div>
+        <div id="p_consult_count" style="font-size:12px;margin-bottom:10px;"></div>
+        <div id="personalFailQualification" role="status" style="font-size:12px;line-height:1.8;margin:10px 0;overflow-wrap:anywhere;"></div>
+        <p style="font-size:12px;color:var(--text-dim);">原因與改善計畫為保存必填；字數不足或請益欄位未完整仍可保存，但未達免扣文字條件。</p>
         <button onclick="submitPersonalFail()" style="width:100%;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;">📤 送出未過關說明</button>
       </div>
     </div>
   </div>
+
+  <div id="personalFailSavedStatus" role="status" style="display:none;font-size:12px;line-height:1.8;padding:12px;overflow-wrap:anywhere;"></div>
 
   <!-- 今日回報記錄 -->
   <div id="personalTodaySection" style="display:none;">
@@ -4528,6 +4541,7 @@ function setPersonalSeg(s) {
   personalSeg = s;
   document.getElementById('pSeg16').className = 'seg-btn' + (s===16?' active-16':'');
   document.getElementById('pSeg21').className = 'seg-btn' + (s===21?' active-21':'');
+  updatePersonalFailFeedback();
 }
 
 // ── 送出今日數據 ──
@@ -4552,6 +4566,8 @@ function submitPersonalData() {
     film:     parseFloat(document.getElementById('p_film').value)     || 0,
   };
 
+  document.getElementById('personalFailSavedStatus').style.display = 'none';
+
   // 判斷未過關項目
   const failed = PERSONAL_ITEMS.filter(item => {
     const v = data[item.key];
@@ -4570,8 +4586,9 @@ function submitPersonalData() {
   }
 
   // 有未過關 → 顯示說明區（清掉上次殘留的文字，避免沿用舊說明）
-  document.getElementById('p_fail_reason').value = '';
-  document.getElementById('p_improve_plan').value = '';
+  ['p_fail_reason', 'p_improve_plan', 'p_consult_store', 'p_consult_person', 'p_consult_method'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
   document.getElementById('personalFailSection').style.display = 'block';
   document.getElementById('personalFailSection').scrollIntoView({behavior:'smooth'});
   document.getElementById('personalFailItems').innerHTML = `
@@ -4598,13 +4615,69 @@ function submitPersonalData() {
   `;
   // 儲存暫存數據以便後續 submitPersonalFail 使用
   window._pPending = { store, name, td, data, failed };
+  updatePersonalFailFeedback();
 }
+
+// 僅作單段文字提示；不寫入免扣資格，也不從本機資料判定整日免扣。
+function personalFailCharCount(value) {
+  return Array.from(String(value || '').replace(/[\s\p{White_Space}\p{P}]/gu, '')).length;
+}
+
+function personalFailTextCheck(date, extra) {
+  const consultCount = personalFailCharCount(extra.consult_method);
+  const improveCount = personalFailCharCount(extra.improve_plan);
+  const missing = [
+    ['fail_reason', '未過關原因'], ['consult_store', '請益店點'],
+    ['consult_person', '請益人員'], ['consult_method', '請益內容'],
+    ['improve_plan', '改善計畫'],
+  ].filter(([key]) => !String(extra[key] || '').trim()).map(([, label]) => label);
+  const applies = /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= '2026-10-21';
+  return { applies, consultCount, improveCount, missing,
+    textComplete: missing.length === 0 && consultCount >= 50 && improveCount >= 50 };
+}
+
+function personalFailQualificationMessage(date, seg, check) {
+  const context = `${date} ${seg}:00｜`;
+  if (!check.applies) return context + '此回報日期不套用 2026-10-21 起的 50 字門檻，不追改歷史結算。';
+  if (check.textComplete) return context + '本段達到免扣所需字數與欄位條件；仍須讀回核對當日另一時段原始個人回報及督導覆核，尚未確認每日未過關 −3 免扣。';
+  const gaps = [];
+  if (check.missing.length) gaps.push('缺欄：' + check.missing.join('、'));
+  if (check.consultCount < 50) gaps.push(`請益內容 ${check.consultCount}/50 字`);
+  if (check.improveCount < 50) gaps.push(`改善計畫 ${check.improveCount}/50 字`);
+  return context + '本段未達免扣文字條件（' + gaps.join('；') + '）。仍可正常保存，保存不代表免扣。';
+}
+
+function personalFailFormExtra() {
+  return Object.fromEntries([
+    ['fail_reason', 'p_fail_reason'], ['improve_plan', 'p_improve_plan'],
+    ['consult_store', 'p_consult_store'], ['consult_person', 'p_consult_person'],
+    ['consult_method', 'p_consult_method'],
+  ].map(([key, id]) => [key, (document.getElementById(id)?.value || '').trim()]));
+}
+
+function updatePersonalFailFeedback() {
+  const date = window._pPending?.td || document.getElementById('fillDate').value || today();
+  const check = personalFailTextCheck(date, personalFailFormExtra());
+  [['p_consult_count', check.consultCount], ['p_improve_count', check.improveCount]].forEach(([id, count]) => {
+    document.getElementById(id).textContent = `${count} / 50 字（不計空白與標點）${check.applies ? (count >= 50 ? '・字數達標' : '・字數未達標') : '・此日期不套用門檻'}`;
+  });
+  document.getElementById('personalFailQualification').textContent = personalFailQualificationMessage(date, personalSeg, check);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  ['p_fail_reason', 'p_improve_plan', 'p_consult_store', 'p_consult_person', 'p_consult_method'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updatePersonalFailFeedback);
+  });
+  document.getElementById('fillDate').addEventListener('change', updatePersonalFailFeedback);
+  updatePersonalFailFeedback();
+});
 
 function submitPersonalFail() {
   if (!window._pPending) return;
   const { store, name, td, data, failed } = window._pPending;
-  const failReason   = (document.getElementById('p_fail_reason')?.value || '').trim();
-  const improvePlan  = (document.getElementById('p_improve_plan')?.value || '').trim();
+  const formExtra = personalFailFormExtra();
+  const failReason = formExtra.fail_reason;
+  const improvePlan = formExtra.improve_plan;
   if (!failReason) {
     showToast('⚠️ 請填寫「① 未過關原因說明」');
     document.getElementById('p_fail_reason').focus();
@@ -4616,18 +4689,17 @@ function submitPersonalFail() {
     return;
   }
   const extra = {
-    fail_reason:   failReason,
-    improve_plan:  improvePlan,
+    ...formExtra,
     customers:     (document.getElementById('p_customers')?.value || '').trim(),
     sold_items:    (document.getElementById('p_sold_items')?.value || '').trim(),
-    consult_store: (document.getElementById('p_consult_store')?.value || '').trim(),
-    consult_person:(document.getElementById('p_consult_person')?.value || '').trim(),
-    consult_method:(document.getElementById('p_consult_method')?.value || '').trim(),
   };
   _savePersonalRecord(store, name, td, personalSeg, data, failed, extra);
   document.getElementById('personalFailSection').style.display = 'none';
   window._pPending = null;
-  showToast('✅ 個人回報已儲存');
+  const savedStatus = document.getElementById('personalFailSavedStatus');
+  savedStatus.textContent = '已儲存於本機；雲端結果尚待確認。' + personalFailQualificationMessage(td, personalSeg, personalFailTextCheck(td, extra));
+  savedStatus.style.display = 'block';
+  showToast('個人回報已儲存於本機；雲端結果尚待確認');
   renderPersonal();
 }
 
