@@ -1,7 +1,8 @@
 const OWNER='https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
 const KEY='north12b_password_session_v1',LOGOUT='north12b_portal_logout_event_v1';
 const $=id=>document.getElementById(id),today=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
-let rows=[],profile=null,editing=null,epoch=0,pending=null,loaded=false,leaseTimer,attempt=null,needsReadback=false;
+let rows=[],profile=null,editing=null,epoch=0,pending=null,loaded=false,leaseTimer,attempt=null,needsReadback=false,readTask=null;
+const privateKeys=new Set(),rowKey=row=>row.month+'|'+row.id;
 const message=text=>{$('shareMessage').textContent=text;};
 function proof(){
   const p=JSON.parse(sessionStorage.getItem(KEY)||'null'),logout=JSON.parse(localStorage.getItem(LOGOUT)||'null')?.id||'';
@@ -18,13 +19,13 @@ function resetEditor(){draftClear();draftIdentity='';identityPending=false;resto
 function option(value,label){const el=document.createElement('option');el.value=value;el.textContent=label;return el;}
 function busy(value){$('shareWorkspace').setAttribute('aria-busy',String(value));$('shareForm').querySelectorAll('input,textarea,select,button').forEach(el=>el.disabled=value);$('shareRefresh').disabled=value;$('shareList').querySelectorAll('button').forEach(el=>el.disabled=value);}
 function clear(note='分享畫面已清除，請重新讀取。',dropPrivate=false){
-  epoch++;pending?.abort();pending=null;clearTimeout(leaseTimer);rows=[];profile=null;loaded=false;
+  epoch++;pending?.abort();pending=null;readTask=null;clearTimeout(leaseTimer);rows=[];profile=null;privateKeys.clear();loaded=false;
   // Clear fetched private data independently of an unsent NEW self-entered draft.
   // Private case edits and explicit login/identity changes retain the old wipe.
   if(dropPrivate)resetEditor();else if(editing){const savedAttempt=attempt,savedReadback=needsReadback;resetEditor();if(savedReadback){attempt=savedAttempt;needsReadback=true;}}else draftSave();
   $('shareList').replaceChildren();$('shareCount').textContent='';$('shareAuthor').textContent='';$('shareStore').replaceChildren(option('','全部門市'));$('shareStaff').replaceChildren(option('','全部同仁'));busy(false);message(note);
 }
-const errors={SHARE_VERSION_CONFLICT:'案例或提交內容已變更，請重新讀取確認。',SHARE_RATE_LIMIT:'分享請求暫時過多，請稍後再試。',SHARE_CAPACITY:'分享容量已滿，請洽督導。',SHARE_IMAGE_INVALID:'圖片格式或容量不符。',SHARE_INPUT_INVALID:'欄位不符，請檢查內容與公開同意。',SHARE_RANGE_INVALID:'請選擇有效起訖，最多 93 個日曆日。'};
+const errors={B_AUTH_DENIED:'登入驗證未通過，請從「同仁專區登入」重新登入後再讀取。',SHARE_VERSION_CONFLICT:'案例或提交內容已變更，請重新讀取確認。',SHARE_RATE_LIMIT:'分享請求暫時過多，請稍後再試。',SHARE_CAPACITY:'分享容量已滿，請洽督導。',SHARE_IMAGE_INVALID:'圖片格式或容量不符。',SHARE_INPUT_INVALID:'欄位不符，請檢查內容與公開同意。',SHARE_RANGE_INVALID:'請選擇有效起訖，最多 93 個日曆日。'};
 async function request(action,extra={},authenticated=false){
   if(pending)throw Error('請等待目前操作完成。');
   const p=authenticated?proof():null,ticket=epoch,selection=JSON.stringify(range()),controller=new AbortController();pending=controller;busy(true);
@@ -54,7 +55,7 @@ function render(){
     const card=node('article','','sharing-card');card.dataset.hidden=String(row.hidden);
     card.append(node('h3',(row.featured?'★ 優良案例 · ':'')+row.type+(row.hidden?'（已隱藏）':'')),node('p',row.store+' · '+row.author+(row.authorUnverified?'（自填未驗證）':'')+' · 建立日 '+row.createdDate+'（台灣時間）','meta'));
     for(const [title,value] of [['客戶情境',row.scenario],['推薦方式與話術',row.approach],['結果與改善心得',row.outcome]])card.append(node('strong',title),node('p',value));
-    const actions=node('div','','export-actions'),authenticated=$('sharePrivate').checked;
+    const actions=node('div','','export-actions'),authenticated=privateKeys.has(rowKey(row));
     if(row.hasImage)actions.append(button('查看圖片',async()=>{
       const result=await request('detail',{month:row.month,id:row.id},authenticated);
       if(!result.item?.image)return;if(!/^data:image\/(png|jpeg|webp);base64,/.test(result.item.image))throw Error('圖片格式不符。');
@@ -83,16 +84,66 @@ async function reconcile(){
   else {const r=await request('receipt',{requestId:attempt.payload.requestId});if(r.found)item=r.item;}
   needsReadback=false;if(item){resetEditor();$('shareEditor').open=false;message('已讀回上次提交；未重送。');}else message('未找到上次提交，可用原內容再次按儲存；未自動重送。');
 }
+function privateEditorReadFailed(){
+  if(!editing)return;
+  const savedAttempt=attempt,savedReadback=needsReadback;resetEditor();
+  if(savedReadback){attempt=savedAttempt;needsReadback=true;}
+}
 async function load(){
-  const ticket=epoch;message('正在讀取同仁分享…');
+  // A second click must not abort an active read or an ambiguous write.
+  if(readTask?.epoch===epoch||pending)return false;
+  const ticket=epoch,task={epoch};readTask=task;
+  rows=[];profile=null;privateKeys.clear();loaded=false;
+  $('shareList').replaceChildren();$('shareCount').textContent='';$('shareAuthor').textContent='';
+  message('正在讀取同仁分享…');
   try{
-    await reconcile();const r=range(),authenticated=$('sharePrivate').checked,legacy=$('shareView').value==='legacy';let result;if(legacy&&!authenticated)throw Error('原月份檢視需要原同仁登入權限。');
-    if(authenticated){proof();const months=[];let cursor=r.start.slice(0,7);while(cursor<=r.end.slice(0,7)){months.push(cursor);const d=new Date(cursor+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);cursor=d.toISOString().slice(0,7);}const cases=[];
-      for(const month of months){result=await request('list',{month},true);cases.push(...result.cases);}rows=legacy?cases:cases.filter(row=>row.createdDate>=r.start&&row.createdDate<=r.end);profile=result.profile;
-      clearTimeout(leaseTimer);leaseTimer=setTimeout(()=>{ $('sharePrivate').checked=false;clear('登入已到期，私有列表已清除；未送新草稿保留，既有案例需重新登入。');},Math.max(0,proof().expiresAt-Date.now()));
-    }else{result=await request('list',r);rows=result.cases;profile=null;}
-    if(ticket!==epoch)return false;loaded=true;filters();render();message(legacy?`已讀取原分享月份 ${r.start.slice(0,7)}；每則另列首次建立日（台灣時間）。`:`已讀取 ${r.start} 至 ${r.end} 的${authenticated?'登入可見':'公開'}分享（台灣時間）。`);return true;
-  }catch(error){if(ticket===epoch){clear();showError(error);}return false;}
+    const r=range(),authenticated=$('sharePrivate').checked,legacy=$('shareView').value==='legacy';
+    const selection=JSON.stringify([r,$('shareView').value,authenticated]);
+    const current=()=>{try{return ticket===epoch&&readTask===task&&selection===JSON.stringify([range(),$('shareView').value,$('sharePrivate').checked]);}catch{return false;}};
+    let readbackError,publicError,privateError,publicRows=[],privateRows=[],privateProfile,publicOK=false,privateOK=false;
+    // Readback remains mandatory before another write, but cannot hide an
+    // independent successful public list when a protected receipt is denied.
+    try{await reconcile();}catch(error){readbackError=error;}
+    if(!current())return false;
+    if(!legacy){
+      try{const result=await request('list',r);if(!Array.isArray(result.cases))throw Error('公開分享回應格式不符。');publicRows=result.cases.map(row=>({...row,editable:false}));publicOK=true;}
+      catch(error){publicError=error;}
+      if(!current())return false;
+      if(publicOK){rows=publicRows;loaded=true;filters();render();message(`已讀取 ${r.start} 至 ${r.end} 的公開分享（台灣時間）。`+(authenticated?'正在讀取登入分享…':''));}
+    }
+    if(authenticated||legacy){
+      try{
+        if(!authenticated)throw Error('原月份檢視需要原同仁登入權限。');proof();
+        let cursor=r.start.slice(0,7);
+        while(cursor<=r.end.slice(0,7)){
+          const result=await request('list',{month:cursor},true);if(!Array.isArray(result.cases))throw Error('登入分享回應格式不符。');
+          privateRows.push(...result.cases);privateProfile=result.profile;
+          const d=new Date(cursor+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);cursor=d.toISOString().slice(0,7);
+        }
+        if(!current())return false;
+        privateRows=legacy?privateRows:privateRows.filter(row=>row.createdDate>=r.start&&row.createdDate<=r.end);
+        const expiresAt=proof().expiresAt;privateOK=true;
+        clearTimeout(leaseTimer);leaseTimer=setTimeout(()=>{ $('sharePrivate').checked=false;clear('登入已到期，私有列表已清除；未送新草稿保留，既有案例需重新登入。');},Math.max(0,expiresAt-Date.now()));
+      }catch(error){privateError=error;if(current())clearTimeout(leaseTimer);}
+      if(!current())return false;
+      if(!privateOK)privateEditorReadFailed();
+    }
+    if(!current())return false;
+    const combined=new Map(publicRows.map(row=>[rowKey(row),row]));
+    if(privateOK){profile=privateProfile;for(const row of privateRows){combined.set(rowKey(row),row);privateKeys.add(rowKey(row));}}
+    rows=[...combined.values()];loaded=publicOK||privateOK;
+    if(loaded){filters();render();}
+    const explain=error=>error.name==='AbortError'?'連線已取消，請重新讀取。':error.message;
+    const notes=[];
+    if(legacy&&privateOK)notes.push(`已讀取原分享月份 ${r.start.slice(0,7)}；每則另列首次建立日（台灣時間）。`);
+    else if(loaded)notes.push(`已讀取 ${r.start} 至 ${r.end} 的${publicOK&&privateOK?'公開與登入可見':publicOK?'公開':'登入可見'}分享（台灣時間）。`);
+    if(publicError)notes.push('公開分享讀取失敗：'+explain(publicError));
+    if(privateError)notes.push('登入分享讀取失敗：'+explain(privateError)+(publicOK?' 已保留本次日期的公開分享；舊分享及管理案例未載入。':''));
+    if(readbackError)notes.push('上次提交結果尚未確認，請重新讀取；不會自動重送。');
+    message(notes.join(' '));return loaded;
+  }catch(error){
+    if(ticket===epoch&&readTask===task){privateEditorReadFailed();showError(error);}return false;
+  }finally{if(readTask===task){readTask=null;busy(false);}}
 }
 async function imageData(file){if(!file)return '';if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>800*1024)throw Error('請選擇 800 KB 以內的 PNG、JPEG 或 WebP 圖片。');return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('圖片讀取失敗。'));reader.readAsDataURL(file);});}
 $('shareForm').addEventListener('submit',async event=>{
