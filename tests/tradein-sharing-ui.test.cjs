@@ -17,8 +17,8 @@ test('anonymous bounded list safely renders unverified names and peer text witho
   const card=f.get('shareList').children[0];assert.equal(card.children.find(x=>x.textContent===row.scenario).tag,'p');assert.ok(card.children.some(x=>x.textContent.includes('自填未驗證')));assert.ok(!card.children.some(x=>x.tag==='img'));
 });
 test('private list requires original login and logout suppresses late response and clears private editor',async()=>{
-  const f=fixture();f.get('sharePrivate').checked=true;await f.refresh();assert.equal(f.requests.length,0);
-  f.login();f.get('sharePrivate').checked=true;f.fill();let release;f.handle(()=>new Promise(resolve=>release=resolve));const pending=f.refresh();await new Promise(setImmediate);f.events.get('portal-before-logout')();release({status:'ok',profile:{store:'永吉',author:'舊＊名'},cases:[row]});await pending;
+  const f=fixture();f.get('sharePrivate').checked=true;await f.refresh();assert.equal(f.requests.length,1);assert.equal(f.requests[0].action,'tradein_sharing_public_list');assert.ok(!f.requests.some(p=>p.action.startsWith('employee_')));assert.match(f.get('shareMessage').textContent,/登入分享讀取失敗.*請先登入/);
+  f.login();f.get('sharePrivate').checked=true;f.fill();let release;f.handle(p=>p.action==='tradein_sharing_public_list'?{status:'ok',cases:[]}:new Promise(resolve=>release=resolve));const pending=f.refresh();await new Promise(setImmediate);f.events.get('portal-before-logout')();release({status:'ok',profile:{store:'永吉',author:'舊＊名'},cases:[row]});await pending;
   assert.equal(f.get('shareList').children.length,0);assert.equal(f.get('sharePrivate').checked,false);assert.equal(f.get('shareScenario').value,'');assert.equal(f.get('shareRefresh').disabled,false);
 });
 test('ambiguous create blocks retry until readback and never automatically resends',async()=>{
@@ -112,4 +112,53 @@ test('draft cache rejects unexpected properties rather than carrying arbitrary c
 
 test('ambiguous private edit clears visible editor on background but keeps in-memory readback guard without caching private text',async()=>{
  const f=fixture();f.login();f.get('sharePrivate').checked=true;f.get('shareDay').value='2026-10-19';f.handle(()=>({status:'ok',profile:{supervisor:false},cases:[{...row,editable:true}]}));await f.refresh();f.get('shareList').children[0].children.at(-1).children.find(x=>x.textContent==='編輯').onclick();await new Promise(setImmediate);f.get('shareOutcome').value='合成私有修訂';f.handle(()=>{throw Error('LOST_EDIT');});await f.submit();f.events.get('pagehide')();f.events.get('pagehide')();assert.equal(f.get('shareOutcome').value,'');assert.equal(cache(f),null);await f.submit();assert.equal(writes(f).length,1);assert.match(f.get('shareMessage').textContent,/先按「讀取分享」/);
+});
+
+const publicCase=(extra={})=>({...row,audience:'public-link/v1',hidden:false,editable:false,...extra});
+const privateCase=(extra={})=>({...row,id:'SYNTHETIC_PRIVATE_0001',author:'私有合成同仁',audience:'private',hidden:false,editable:true,...extra});
+const tick=()=>new Promise(setImmediate);
+function privateView(f){f.login();f.get('sharePrivate').checked=true;f.get('shareDay').value='2026-10-19';}
+const listAuthors=f=>f.get('shareList').children.flatMap(card=>card.children||[]).map(n=>n.textContent).join('|');
+
+test('public success plus denied private read retains current public cases and actionable warning',async()=>{
+ const f=fixture();privateView(f);typed(f);f.handle(p=>p.action==='tradein_sharing_public_list'?{status:'ok',cases:[publicCase()]}:{status:'error',code:'B_AUTH_DENIED'});assert.equal(await f.refresh(),true);assert.equal(f.get('shareList').children.length,1);assert.match(f.get('shareMessage').textContent,/已讀取 2026-10-19 至 2026-10-19 的公開分享/);assert.match(f.get('shareMessage').textContent,/登入分享讀取失敗.*重新登入.*已保留本次日期的公開分享/);assert.equal(f.run('profile'),null);assert.equal(f.run('privateKeys.size'),0);assert.equal(f.get('shareScenario').value,'合成情境');assert.equal(writes(f).length,0);
+});
+test('public images still use public detail when private checkbox is checked but auth failed',async()=>{
+ const f=fixture();privateView(f);f.handle(p=>p.action==='tradein_sharing_public_list'?{status:'ok',cases:[publicCase({hasImage:true})]}:p.action==='tradein_sharing_public_detail'?{status:'ok',item:{image:'data:image/png;base64,U1lOVEhFVElD'}}:{status:'error',code:'B_AUTH_DENIED'});await f.refresh();const actions=f.get('shareList').children[0].children.at(-1);assert.equal(actions.children.length,1);actions.children[0].onclick();await tick();assert.equal(f.requests.at(-1).action,'tradein_sharing_public_detail');assert.ok(!f.requests.some(p=>p.action==='employee_tradein_sharing_detail'));
+});
+test('both lists succeed with month/id dedupe and only authenticated edit permissions',async()=>{
+ const f=fixture();privateView(f);f.handle(p=>p.action==='tradein_sharing_public_list'?{status:'ok',cases:[publicCase()]}:{status:'ok',profile:{supervisor:true},cases:[publicCase({version:2,editable:true,outcome:'登入新版合成心得'}),privateCase()]});await f.refresh();assert.equal(f.get('shareList').children.length,2);assert.equal(f.run('rows.find(r=>r.id==="SYNTHETIC_CASE_0001").version'),2);assert.equal(f.run('privateKeys.size'),2);assert.match(f.get('shareMessage').textContent,/公開與登入可見/);assert.ok(f.get('shareList').children[0].children.at(-1).children.some(n=>n.textContent==='編輯'));
+});
+test('public failure alone clears previous results and never labels failure as an empty successful list',async()=>{
+ const f=fixture();f.handle(()=>({status:'ok',cases:[publicCase()]}));await f.refresh();f.handle(()=>{throw Error('SYNTHETIC_OFFLINE');});assert.equal(await f.refresh(),false);assert.equal(f.get('shareList').children.length,0);assert.equal(f.get('shareCount').textContent,'');assert.match(f.get('shareMessage').textContent,/公開分享讀取失敗/);assert.doesNotMatch(f.get('shareMessage').textContent,/已讀取/);
+});
+test('public failure with successful auth shows only the authorized result and separate public warning',async()=>{
+ const f=fixture();privateView(f);f.handle(p=>p.action==='tradein_sharing_public_list'?{status:'error',code:'SHARE_RATE_LIMIT'}:{status:'ok',profile:{supervisor:false},cases:[privateCase()]});await f.refresh();assert.equal(f.get('shareList').children.length,1);assert.match(f.get('shareMessage').textContent,/登入可見分享/);assert.match(f.get('shareMessage').textContent,/公開分享讀取失敗/);assert.doesNotMatch(f.get('shareMessage').textContent,/公開與登入可見/);
+});
+test('both reads fail without retaining prior public/private rows or profile',async()=>{
+ const f=fixture();privateView(f);f.handle(p=>p.action==='tradein_sharing_public_list'?{status:'ok',cases:[publicCase()]}:{status:'ok',profile:{supervisor:true},cases:[privateCase()]});await f.refresh();f.handle(()=>({status:'error',code:'B_AUTH_DENIED'}));assert.equal(await f.refresh(),false);assert.equal(f.get('shareList').children.length,0);assert.equal(f.run('profile'),null);assert.equal(f.run('privateKeys.size'),0);assert.match(f.get('shareMessage').textContent,/公開分享讀取失敗.*登入分享讀取失敗/);
+});
+test('duplicate manual read joins the existing operation without aborting or issuing more requests',async()=>{
+ const f=fixture();let release;f.handle(()=>new Promise(resolve=>release=resolve));const first=f.refresh();await tick();assert.equal(await f.refresh(),false);assert.equal(f.requests.length,1);assert.equal(f.run('pending.signal.aborted'),false);release({status:'ok',cases:[publicCase()]});await first;assert.equal(f.get('shareList').children.length,1);assert.equal(f.get('shareRefresh').disabled,false);
+});
+test('date switch rejects an old public response and keeps only the new completed date',async()=>{
+ const f=fixture();f.get('shareDay').value='2026-10-19';f.get('scope-sharing').setAttribute('aria-selected','true');let release;f.handle(p=>p.start==='2026-10-19'?new Promise(resolve=>release=resolve):{status:'ok',cases:[publicCase({id:'SYNTHETIC_NEW_DATE_0001',createdDate:'2026-10-20',author:'新日期合成'})]});const old=f.refresh();await tick();f.get('shareDay').value='2026-10-20';f.get('shareDay').listeners.change();await tick();assert.match(f.get('shareMessage').textContent,/2026-10-20 至 2026-10-20/);release({status:'ok',cases:[publicCase({author:'舊日期合成'})]});await old;assert.match(listAuthors(f),/新日期合成/);assert.doesNotMatch(listAuthors(f),/舊日期合成/);assert.equal(f.get('shareRefresh').disabled,false);
+});
+test('unchecking legacy access rejects late private rows and management rights',async()=>{
+ const f=fixture();privateView(f);f.get('scope-sharing').setAttribute('aria-selected','true');let release;f.handle(p=>p.action==='tradein_sharing_public_list'?{status:'ok',cases:[publicCase()]}:new Promise(resolve=>release=resolve));const old=f.refresh();await tick();f.get('sharePrivate').checked=false;f.get('sharePrivate').listeners.change();await tick();release({status:'ok',profile:{supervisor:true},cases:[privateCase()]});await old;assert.equal(f.get('shareList').children.length,1);assert.equal(f.run('profile'),null);assert.equal(f.run('privateKeys.size'),0);assert.doesNotMatch(listAuthors(f),/私有合成同仁/);
+});
+test('late failed old private request cannot cancel a new authenticated lease',async()=>{
+ const f=fixture();privateView(f);f.get('scope-sharing').setAttribute('aria-selected','true');let release;f.handle(p=>p.action==='tradein_sharing_public_list'?{status:'ok',cases:[publicCase({createdDate:p.start})]}:p.month==='2026-10'&&f.get('shareDay').value==='2026-10-19'?new Promise(resolve=>release=resolve):{status:'ok',profile:{supervisor:false},cases:[privateCase({createdDate:'2026-10-20'})]});const old=f.refresh();await tick();f.get('shareDay').value='2026-10-20';f.get('shareDay').listeners.change();await tick();assert.equal(f.run('privateKeys.size'),1);const lease=f.run('leaseTimer');assert.ok(f.clock.has(lease));release({status:'error',code:'B_AUTH_DENIED'});await old;assert.ok(f.clock.has(lease));assert.equal(f.run('privateKeys.size'),1);
+});
+test('multi-month private failure discards all partial private results but keeps the whole public range',async()=>{
+ const f=fixture();privateView(f);f.get('shareView').value='range';f.get('shareStart').value='2026-09-30';f.get('shareEnd').value='2026-10-02';f.handle(p=>p.action==='tradein_sharing_public_list'?{status:'ok',cases:[publicCase({createdDate:'2026-10-01'})]}:p.month==='2026-09'?{status:'ok',profile:{supervisor:true},cases:[privateCase({month:'2026-09',createdDate:'2026-09-30'})]}:{status:'error',code:'B_AUTH_DENIED'});await f.refresh();assert.equal(f.get('shareList').children.length,1);assert.equal(f.run('privateKeys.size'),0);assert.equal(f.run('profile'),null);assert.doesNotMatch(listAuthors(f),/私有合成同仁/);assert.match(f.get('shareMessage').textContent,/2026-09-30 至 2026-10-02 的公開分享/);
+});
+test('client store/type filters changed while reading apply to the new list, not stale cards',async()=>{
+ const f=fixture();let release;f.handle(()=>new Promise(resolve=>release=resolve));const loading=f.refresh();await tick();f.get('shareStore').value='萬大';f.get('shareFilterType').value='改善心得';f.get('shareFilterType').listeners.change();release({status:'ok',cases:[publicCase(),publicCase({id:'SYNTHETIC_WANDA_0001',store:'萬大',type:'改善心得',author:'合成篩選同仁'})]});await loading;assert.equal(f.get('shareList').children.length,1);assert.match(listAuthors(f),/合成篩選同仁/);assert.equal(f.get('shareStore').value,'萬大');
+});
+test('legacy original-month failure never claims to have loaded public or original-month results',async()=>{
+ const f=fixture();privateView(f);f.get('shareView').value='legacy';f.get('shareLegacyMonth').value='2026-10';f.handle(()=>({status:'error',code:'B_AUTH_DENIED'}));await f.refresh();assert.ok(!f.requests.some(p=>p.action==='tradein_sharing_public_list'));assert.equal(f.get('shareList').children.length,0);assert.match(f.get('shareMessage').textContent,/登入分享讀取失敗/);assert.doesNotMatch(f.get('shareMessage').textContent,/已讀取/);
+});
+test('unknown submission readback failure keeps guard and public result without automatic retry',async()=>{
+ const f=fixture();typed(f);f.handle(()=>{throw Error('LOST');});await f.submit();f.handle(p=>p.action==='tradein_sharing_public_list'?{status:'ok',cases:[publicCase()]}:{status:'error',code:'B_AUTH_DENIED'});await f.refresh();assert.equal(f.get('shareList').children.length,1);assert.equal(f.run('needsReadback'),true);assert.match(f.get('shareMessage').textContent,/上次提交結果尚未確認/);await f.submit();assert.equal(writes(f).length,1);
 });

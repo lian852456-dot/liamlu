@@ -129,3 +129,6 @@ require('./helpers/tradein-public-ui-contract.cjs')();
 
 // Public sharing runs through the unchanged production CI test entry.
 require('./helpers/tradein-sharing-ui-contract.cjs')();
+
+// Independent sharing read outcomes use synthetic data and never production APIs.
+require('./helpers/tradein-sharing-read-ui-contract.cjs')();
