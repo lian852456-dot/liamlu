@@ -64,7 +64,7 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
       const bytes = await file.arrayBuffer();
       const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2,'0')).join('');
       const workbook = XLSX.read(bytes, {type:'array', sheets:['AQ締結率','RT每日','RT締結率','樞紐']});
-      const snapshot = core.parseWorkbook(workbook, XLSX, {sha256, source_name:file.name, source_bytes:file.size});
+      const snapshot = window.ReadonlyConversionSource.parseWorkbook(workbook, XLSX, {sha256, source_name:file.name, source_bytes:file.size});
       if (ticket !== generation) return;
       const result = await call('readonly_conversion_preview', payload({snapshot}));
       if (ticket !== generation) return;
