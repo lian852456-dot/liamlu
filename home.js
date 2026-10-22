@@ -306,7 +306,7 @@
   scope.addEventListener('pageshow', event => { if (event.persisted) refresh(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) clearPrivateView(); else refresh(); });
   scope.DashboardBHost={
-    sessionOnly:true,mountSelector:'#home-login',navigationSelector:'#zone-staff a, .quick-card',
+    sessionOnly:true,mountSelector:'#home-login',navigationSelector:'#zone-staff a, .quick-card',compactMobileLogin:true,
     clear(){passwordVerified=false;updateAccessNotice();},
     accept(){passwordVerified=true;updateAccessNotice();if(!salesVerified){feeds.sales=pending('sales','同仁專區已登入，請由下方入口查看 KPI、台獎與個績；此提醒尚未讀取。');render();}},
     navigate(module){
