@@ -1,8 +1,9 @@
 const {test,expect}=require('@playwright/test'),{fixture}=require('./helpers/readonly-dashboard-fixture.cjs');
 const url=()=>new URL('readonly-dashboard.html',process.env.TEST_BASE_URL).href;
-async function setup(page,{auth='password',deny=false,conversion=true,ttl=1800000,hold=null}={}){
+async function setup(page,{auth='password',deny=false,conversion=true,ttl=1800000,hold=null,mutate=null}={}){
  const calls=[],errors=[],writes=[],bundle=fixture(),expiresAt=Date.now()+ttl;
  if(!conversion)delete bundle.privateResult.snapshot.conversionBattle;
+ if(mutate)mutate(bundle);
  page.on('pageerror',error=>errors.push(error.message));
  if(auth!=='none')await page.addInitScript(({auth,expiresAt})=>{
   localStorage.setItem('north12b_private_dashboard_device_id','SYNTHETIC_DEVICE_123456');
@@ -46,7 +47,25 @@ test('same-chart MoM plots only the two observed periods and follows store/date 
  for(const c of ['aq','rt']){await expect(page.locator('#'+c+'-mom-chart path')).toHaveCount(1);await expect(page.locator('#'+c+'-mom-chart circle')).toHaveCount(2);await expect(page.locator('#'+c+'-mom-chart')).toContainText('09/01–09/11');await expect(page.locator('#'+c+'-mom-chart')).toContainText('10/01–10/11');}
  await page.locator('#aq-mom-chart circle').first().click();await expect(page.locator('#aq-mom-readout')).toContainText('上月同期 09/01–09/11');await expect(page.locator('#aq-mom-readout')).toContainText('900 來客');
  await page.locator('#store').selectOption('DNB10062');await expect(page.locator('#aq-mom-chart .period-value')).toHaveText(['100 人次','100 人次']);await expect(page.locator('#aq-chart circle')).toHaveCount(11);
- await page.locator('[data-tab="conversion"]').click();await expect(page.locator('#aq-mom-chart .period-value')).toHaveText(['5.00%','10.00%']);await page.locator('#aq-mom-chart circle').first().focus();await expect(page.locator('#aq-mom-readout')).toContainText('5 上線 / 100 來客');
- await page.locator('#start').fill('2026-10-03');await expect(page.locator('.period-chart')).toHaveCount(0);await expect(page.locator('#aq-chart circle')).toHaveCount(8);await page.locator('#restore-comparison').click();await expect(page.locator('.period-chart')).toHaveCount(2);
+ await page.locator('[data-tab="conversion"]').click();await expect(page.locator('.period-chart')).toHaveCount(0);await expect(page.locator('#aq-visitors-chart circle')).toHaveCount(11);await page.locator('#aq-visitors-chart circle').first().focus();await expect(page.locator('#aq-visitors-readout')).toContainText('10/01 · AQ 來客 10 人次');
+ await page.locator('#start').fill('2026-10-03');await expect(page.locator('.period-chart')).toHaveCount(0);await expect(page.locator('#aq-chart circle')).toHaveCount(8);await page.locator('#restore-comparison').click();await expect(page.locator('.daily-visitors .chart')).toHaveCount(2);
  await page.evaluate(()=>window.dispatchEvent(new Event('portal-before-logout')));await expect(page.locator('.period-chart')).toHaveCount(0);expect(s.calls).toEqual(['employee_dashboard_read']);expect(s.errors).toEqual([]);expect(s.writes).toEqual([]);
+});
+
+
+test('conversion replaces redundant period plots with observed daily visitors while keeping headline MoM',async({page})=>{
+ const s=await setup(page);await expect(page.locator('#controls')).toBeVisible();await page.locator('[data-tab="conversion"]').click();
+ const metrics=await page.locator('.metrics').innerText();
+ await expect(page.locator('.period-chart')).toHaveCount(0);await expect(page.locator('.daily-visitors h3')).toHaveText(['AQ 來客 · 每日變化','RT 符合續約資格來客 · 每日變化']);
+ for(const c of ['aq','rt']){await expect(page.locator('#'+c+'-visitors-chart circle')).toHaveCount(11);await expect(page.locator('#'+c+'-visitors-chart')).toContainText('來客數（人次）');await expect(page.locator('#'+c+'-visitors-chart')).toContainText('日期');}
+ const daily=await page.locator('#aq-visitors-chart').innerHTML();await page.locator('#cumulative').click();expect(await page.locator('#aq-visitors-chart').innerHTML()).toBe(daily);expect(await page.locator('.metrics').innerText()).toBe(metrics);
+ await page.locator('#store').selectOption('DNB10062');await page.locator('#aq-visitors-chart circle').nth(4).focus();await expect(page.locator('#aq-visitors-readout')).toContainText('10/05 · AQ 來客 0 人次');
+ await page.locator('#start').fill('2026-10-03');await expect(page.locator('#aq-visitors-chart circle')).toHaveCount(9);await expect(page.locator('.period-comparison')).toHaveCount(0);
+ await page.evaluate(()=>window.dispatchEvent(new Event('portal-before-logout')));await expect(page.locator('.daily-visitors')).toHaveCount(0);expect(s.calls).toEqual(['employee_dashboard_read']);expect(s.errors).toEqual([]);expect(s.writes).toEqual([]);
+});
+test('daily visitors do not require previous-month totals and missing store-days fail closed',async({page})=>{
+ const s=await setup(page,{mutate:b=>{delete b.privateResult.snapshot.conversionBattle.prior;delete b.privateResult.snapshot.conversionBattle.prior_period;}});await expect(page.locator('#controls')).toBeVisible();await page.locator('[data-tab="conversion"]').click();await expect(page.locator('#aq-visitors-chart circle')).toHaveCount(11);await expect(page.locator('.period-comparison')).toHaveCount(0);expect(s.errors).toEqual([]);
+});
+test('an incomplete daily source is unavailable rather than a fabricated zero or shortened line',async({page})=>{
+ const s=await setup(page,{mutate:b=>b.privateResult.snapshot.conversionBattle.records.pop()});await expect(page.locator('#controls')).toBeVisible();await page.locator('[data-tab="conversion"]').click();await expect(page.locator('#content')).toContainText('完整性檢查');await expect(page.locator('#content svg')).toHaveCount(0);await expect(page.locator('#content .value')).toHaveCount(0);expect(s.errors).toEqual([]);expect(s.writes).toEqual([]);
 });
