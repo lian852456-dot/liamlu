@@ -200,7 +200,7 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
  panel.innerHTML=`<h2>員編與密碼登入</h2>
  <form data-b-form><label>員工編號<input data-b-employee required autocomplete="username" autocapitalize="characters" maxlength="12" placeholder="輸入員工編號"></label><label>指定密碼<input data-b-password required type="password" autocomplete="off" maxlength="1024" placeholder="輸入指定密碼"></label><button data-b-submit type="submit">登入這台裝置</button></form>
  <p data-b-message role="status">同仁首次登入會綁定這台裝置；已授權督導可跨裝置登入。</p>
- <div class="b-toolbar"><nav class="b-modules" aria-label="資料入口"><button type="button" data-b-module="kpi">KPI</button><button type="button" data-b-module="awards">台獎</button><button type="button" data-b-module="personal">個績</button><button type="button" data-b-return>返回</button></nav><nav class="b-account" aria-label="登入管理"><button type="button" data-b-a>原員編通道</button><button type="button" data-b-phone hidden>綁定這支手機，之後免輸帳密</button><button type="button" data-b-refresh>重新核驗</button><button type="button" data-b-timing>載入計時</button><button type="button" data-b-logout>登出</button></nav></div>`;
+ ${host.compactMobileLogin?'<details class="b-options" open><summary>更多登入與管理選項</summary>':''}<div class="b-toolbar"><nav class="b-modules" aria-label="資料入口"><button type="button" data-b-module="kpi">KPI</button><button type="button" data-b-module="awards">台獎</button><button type="button" data-b-module="personal">個績</button><button type="button" data-b-return>返回</button></nav><nav class="b-account" aria-label="登入管理"><button type="button" data-b-a>原員編通道</button><button type="button" data-b-phone hidden>綁定這支手機，之後免輸帳密</button><button type="button" data-b-refresh>重新核驗</button><button type="button" data-b-timing>載入計時</button><button type="button" data-b-logout>登出</button></nav></div>${host.compactMobileLogin?'</details>':''}`;
  const style=document.createElement('style');style.textContent=`
  body.dashboard-b-password-mode .dashboard-b-legacy-root{display:none!important}
  body.dashboard-b-legacy-mode #dashboard-b-access{display:none!important}
@@ -219,6 +219,8 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
  #dashboard-b-access [data-b-submit]{height:44px;padding:9px 22px;border-color:#ea580c;background:#ea580c;color:#fff;font-size:15px}
  #dashboard-b-access [data-b-message]{margin:10px 0 16px;color:#64748b;font-size:13px;line-height:1.6}
  #dashboard-b-access .b-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-top:14px;border-top:1px solid #edf0f4}
+ #dashboard-b-access .b-options>summary{display:none;cursor:pointer;font-size:14px;font-weight:600;line-height:1.5;min-height:44px;padding:11px 0}
+ #dashboard-b-access .b-options>summary:focus-visible{outline:3px solid #fdba74;outline-offset:2px;border-radius:4px}
  #dashboard-b-access nav{display:flex;flex-wrap:wrap;gap:8px}
  #dashboard-b-access .b-modules button{border-color:#fed7aa;background:#fff7ed;color:#9a3412}
  #dashboard-b-access [data-b-logout]{color:#b91c1c}
@@ -228,7 +230,16 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
  @media(max-width:1100px){#dashboard-b-access{width:calc(100% - 40px)}}
  @media(max-width:760px){#dashboard-b-access{width:calc(100% - 40px)}}
  @media(max-width:600px){#dashboard-b-access{margin-bottom:12px;padding:12px 0 14px}#dashboard-b-access form{grid-template-columns:1fr;gap:12px}#dashboard-b-access [data-b-submit]{width:100%}#dashboard-b-access .b-toolbar{align-items:stretch;gap:12px}#dashboard-b-access nav{width:100%}#dashboard-b-access nav button{flex:1;padding:8px 10px}}
+ @media(max-width:600px){#dashboard-b-access .b-options{border-top:1px solid #edf0f4}#dashboard-b-access .b-options>summary{display:list-item;margin-left:18px}#dashboard-b-access .b-options .b-toolbar{border-top:0;padding-top:4px}#dashboard-b-access.b-compact-mobile input{height:auto;line-height:1.4}#dashboard-b-access.b-compact-mobile button{white-space:normal}#dashboard-b-access.b-compact-mobile nav button{flex:1 1 8em}#dashboard-b-access.b-compact-mobile [data-b-submit]{height:auto}}
  `;document.head.append(style);setAccessMode('password');const mountPoint=host.mountSelector&&document.querySelector(host.mountSelector);if(mountPoint)mountPoint.prepend(panel);else{const header=document.querySelector('header');if(header)header.insertAdjacentElement('afterend',panel);else document.body.prepend(panel);}if(!legacyObserver){legacyObserver=new MutationObserver(markLegacyRoots);legacyObserver.observe(document.body,{childList:true,subtree:true});}panel.querySelector('form').addEventListener('submit',login);if(host.ownerPhone){panel.querySelector('[data-b-submit]').textContent='首次驗證並綁定這支手機';state('locked');message('只需首次驗證；綁定後平常開啟 App 免輸入帳密。登出會取消自動登入。');}
+ panel.classList.toggle('b-compact-mobile',host.compactMobileLogin===true);
+ const options=panel.querySelector('.b-options');
+ if(options){
+  const mobile=scope.matchMedia('(max-width:600px)');let mobileOpen=false;
+  const resizeOptions=()=>{const open=!mobile.matches||mobileOpen;if(!open&&options.contains(document.activeElement))options.querySelector('summary').focus();options.open=open;};
+  options.addEventListener('toggle',()=>{if(mobile.matches)mobileOpen=options.open;});
+  mobile.addEventListener('change',resizeOptions);resizeOptions();
+ }
  panel.addEventListener('click',async event=>{const target=event.target.closest('button');if(!target)return;
   if(target.hasAttribute('data-b-timing')){timingEnabled=true;try{scope.localStorage.setItem(timingEnabledKey,'1');scope.sessionStorage.setItem(timingKey,JSON.stringify(timings));}catch{}timingDetails.hidden=false;timingDetails.open=true;renderTiming();timingDetails.scrollIntoView({block:'nearest'});return;}
   if(target.hasAttribute('data-b-a')){await scope.DashboardB.leaveForA();showLegacyAccess();return;}

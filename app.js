@@ -1222,7 +1222,8 @@
     const detail=dom('#yesterdayFollowUp');
     if(!data||!data.formalDataAvailable) {
       if(home) home.hidden=true;
-      if(detail) detail.innerHTML=`<div class="empty-state">${escapeHtml(data&&!data.formalDataAvailable?'昨日 21:00 尚無正式資料':module&&module.note||'昨日 21:00 正式資料讀取中')}</div>`;
+      const message=data&&!data.formalDataAvailable?'昨日 21:00 尚無正式資料':moduleReadLabel(module||{status:'unauthorized'},'昨日 21:00 尚無正式資料','請先解鎖正式資料，查看昨日 21:00 待追蹤。').message;
+      if(detail) detail.innerHTML=`<div class="empty-state">${escapeHtml(message)}</div>`;
       return;
     }
     if(home) {
@@ -2275,6 +2276,7 @@
     // regular Safari/desktop tab that happens to open app.html first.
     ownerPhone:navigator.standalone===true || !!scope.matchMedia?.('(display-mode: standalone)').matches,
     includeReports:true,
+    compactMobileLogin:true,
     navigationSelector:null,
     clear(){resetPrivateSummary();privateAccessStatus='unauthorized';dom('#viewerState').textContent='未登入';renderAll();},
     loading(){markReportLoading();},
