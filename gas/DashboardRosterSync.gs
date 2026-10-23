@@ -11,7 +11,7 @@ function privateDashboardRosterSyncStatus_() {
     result: state.result || 'not-run', errorCode: state.errorCode || null, sourceDate: state.sourceDate || null };
 }
 
-function privateDashboardRosterSourceMembers_(ss, fileName, today) {
+function privateDashboardRosterSourceMembers_(ss, fileName, today, approvedMembers) {
   const storeSheet = ss.getSheetByName('上線數KPI_店點達成率_明細');
   if (!storeSheet) throw new Error('ROSTER_SOURCE_SCHEMA');
   const meta = kpiCalcParseMeta(storeSheet.getRange(1,1,10,12).getValues(), fileName);
@@ -51,7 +51,31 @@ function privateDashboardRosterSourceMembers_(ss, fileName, today) {
       add(first,name,currentStore,'');
     }
   });
-  if (members.length < 9 || members.length > 64 || PRIVATE_DASHBOARD_B_STORES_.some(function(s) { return !members.some(function(m) { return m.store === s; }); })) throw new Error('B_COMPLETE_ROSTER_REQUIRED');
+  if (members.length < 9 || members.length > 64) throw new Error('B_COMPLETE_ROSTER_REQUIRED');
+  if (PRIVATE_DASHBOARD_B_STORES_.some(function(s) { return !members.some(function(m) { return m.store === s; }); })) {
+    // A performance attribution move is not an authorization roster change.
+    // Preserve the approved store only for the exact same current identities,
+    // with all nine stores independently present in the current store report.
+    const ids = members.map(function(m) { return m.employeeId; }).sort();
+    const approvedIds = approvedMembers && !Array.isArray(approvedMembers) ? Object.keys(approvedMembers).sort() : [];
+    if (ids.join('|') !== approvedIds.join('|') || approvedIds.some(function(id) {
+      return PRIVATE_DASHBOARD_B_STORES_.indexOf(approvedMembers[id]) < 0;
+    }) || PRIVATE_DASHBOARD_B_STORES_.some(function(s) {
+      return !approvedIds.some(function(id) { return approvedMembers[id] === s; });
+    }) || storeSheet.getLastRow() > 10000) throw new Error('B_COMPLETE_ROSTER_REQUIRED');
+    const codes = ['DNB10062','DNB10082','DNB10094','DNB10146','DNB10168','DNB10174','DNB10284','DNB10307','DNB10440'];
+    const coverage = Object.create(null);
+    storeSheet.getDataRange().getValues().forEach(function(row) {
+      if (String(row[2] || '').trim() !== '北一二B') return;
+      const code = String(row[3] || '').trim(), index = codes.indexOf(code);
+      if (index < 0) return;
+      const store = String(row[4] || '').trim().replace(/\s+/g,'').replace(/^台灣大哥大數位生活台北/,'').replace(/^台灣大哥大台北/,'').replace(/^台北/,'');
+      if (store !== PRIVATE_DASHBOARD_B_STORES_[index] || coverage[store]) throw new Error('B_COMPLETE_ROSTER_REQUIRED');
+      coverage[store] = true;
+    });
+    if (PRIVATE_DASHBOARD_B_STORES_.some(function(s) { return !coverage[s]; })) throw new Error('B_COMPLETE_ROSTER_REQUIRED');
+    members.forEach(function(m) { m.store = approvedMembers[m.employeeId]; });
+  }
   return members;
 }
 
@@ -76,7 +100,8 @@ function privateDashboardRefreshRoster_(payload) {
     if (bytes.length !== file.getSize() || bytes[0] !== 80 || bytes[1] !== 75) throw new Error('ROSTER_SOURCE_BYTES');
     const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes).map(function(b) { return ('0'+((b+256)%256).toString(16)).slice(-2); }).join('');
     converted = Drive.Files.create({name:'roster-tmp-'+name,mimeType:'application/vnd.google-apps.spreadsheet'},blob);
-    const members = privateDashboardRosterSourceMembers_(SpreadsheetApp.openById(converted.id),name,today);
+    const rosterConfig = privateDashboardRosterTransaction_(function() { return privateDashboardCreateGasBStore_({}).config(); });
+    const members = privateDashboardRosterSourceMembers_(SpreadsheetApp.openById(converted.id),name,today,rosterConfig.authority.members);
     DriveApp.getFileById(converted.id).setTrashed(true);
     converted = null;
     return privateDashboardRosterTransaction_(function() {
@@ -87,6 +112,7 @@ function privateDashboardRefreshRoster_(payload) {
       if (!correctParent || fresh.getName() !== name || fresh.getLastUpdated().getTime() !== modified || fresh.isTrashed() || currentToday !== today) throw new Error('ROSTER_SOURCE_CHANGED');
       const prior = JSON.parse(props.getProperty(PRIVATE_DASHBOARD_ROSTER_SYNC_KEY_) || '{}');
       const config = privateDashboardCreateGasBStore_({}).config();
+      if (JSON.stringify(config) !== JSON.stringify(rosterConfig)) throw new Error('B_CONFIG_CHANGED');
       const native = privateDashboardRows(privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET,PRIVATE_DASHBOARD_USERS_HEADERS),PRIVATE_DASHBOARD_USERS_HEADERS);
       const activeCount = native.filter(function(u) { return u.status === 'active' && PRIVATE_DASHBOARD_B_STORES_.indexOf(String(u.store).replace(/^台北/,'')) >= 0; }).length;
       if (members.length < activeCount * 0.8) throw new Error('ROSTER_SOURCE_COUNT');
