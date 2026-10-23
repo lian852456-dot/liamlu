@@ -3174,6 +3174,8 @@ function doPost(e) {
     if (reportUploadIsUploadDeployment_() && REPORT_UPLOAD_ALLOWED_ACTIONS.indexOf(action) === -1) {
       throw new Error('route-not-available-on-upload-deployment');
     }
+    const __rankAutomationResponse = personalRankAutomationMaybePost_(payload, e);
+    if (__rankAutomationResponse) return __rankAutomationResponse;
     const __authBResponse = privateDashboardGasBMaybePost_(e);
     if (__authBResponse) return __authBResponse;
     const __authRpcResponse = privateDashboardGasAuthMaybeRpcPost_(e);
