@@ -91,13 +91,13 @@
       }
     }
     const selected=units.filter(x=>x.ms>0), active=new Set(selected.map(x=>x.actor));
+    const observable=q.end>availableFrom && (q.feature==='all'?Object.values(options.features).includes('connected'):options.features[q.feature]==='connected');
     const daily=[];
     for(let d=q.start;d<q.end;d+=DAY) {
       const people=new Set();
       selected.forEach(u=>{if(u.intervals.some(x=>x[1]>d&&x[0]<d+DAY))people.add(u.actor);});
-      daily.push({date:dateKey(d),active:d+DAY<=availableFrom?null:people.size,partial:d<availableFrom&&d+DAY>availableFrom});
+      daily.push({date:dateKey(d),active:!observable||d+DAY<=availableFrom?null:people.size,partial:d<availableFrom&&d+DAY>availableFrom});
     }
-    const observable=q.end>availableFrom && (q.feature==='all'?Object.values(options.features).includes('connected'):options.features[q.feature]==='connected');
     const mapped=observable && roster?.complete===true && Number.isSafeInteger(roster.validFrom) && Number.isSafeInteger(roster.validUntil) &&
       roster.validFrom<=dataStart && roster.validUntil>=q.end && Array.isArray(roster.members);
     const eligible=mapped?new Set(roster.members.filter(m=>m.from<q.end&&m.until>dataStart &&
@@ -131,7 +131,7 @@
         activeMs:dwellKnown?assignedMs:null,ambiguousMs,
         medianMs:dwellKnown?percentile(list.filter(x=>duration(x.assigned)>0).map(x=>duration(x.assigned)),.5):null,
         p75Ms:dwellKnown?percentile(list.filter(x=>duration(x.assigned)>0).map(x=>duration(x.assigned)),.75):null,
-        loadSamples:ready.length,loadP50:percentile(ready.map(x=>x.latency),.5),loadP95:percentile(ready.map(x=>x.latency),.95),
+        loadSamples:status==='connected'?ready.length:null,loadP50:status==='connected'?percentile(ready.map(x=>x.latency),.5):null,loadP95:status==='connected'?percentile(ready.map(x=>x.latency),.95):null,
         errors:status==='connected'?errors.length:null,errorRate:status==='connected'&&ready.length+errors.length?errors.length/(ready.length+errors.length):null};
     }).filter(x=>q.feature==='all'||x.id===q.feature);
     const people=Array.from(new Set([...selected.map(x=>x.actor),...(eligible||[])])).sort().map(actor=>{
@@ -145,7 +145,7 @@
       coverage:{start:dateKey(since),availableFrom,partial:q.start<availableFrom,roster:mapped?'verified':'unknown',rosterVersion:mapped?roster.version:null,
         connected:Object.values(options.features).filter(x=>x==='connected').length,total:Object.keys(FEATURES).length},
       summary:{active:observable?active.size:null,dau:observable?new Set(units.filter(x=>x.today).map(x=>x.actor)).size:null,wau:observable?new Set(units.filter(x=>x.week).map(x=>x.actor)).size:null,
-        eligible:eligible?.size??null,usageRate:eligible?.size?eligibleActive.size/eligible.size:null,
+        eligible:eligible?.size??null,eligibleActive:eligibleActive?.size??null,usageRate:eligible?.size?eligibleActive.size/eligible.size:null,
         activeMs:observable?durationByActor(selected):null,medianMs:percentile(Array.from(workSessions.values()).map(duration),.5),unassignedMs},
       daily,features:featureRows,people};
   }

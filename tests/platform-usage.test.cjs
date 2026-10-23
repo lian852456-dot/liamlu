@@ -47,7 +47,7 @@ test('missing, stale or incomplete date roster leaves percentage unknown while p
 });
 test('numerator only includes qualification during dated eligibility; retired identities do not enter rate',()=>{
   const f=fixture();f.roster.members[0].until=NOW-2*core.DAY;
-  const r=core.aggregate(f.events,f.roster,f.options);assert.equal(r.summary.active,3);assert.equal(r.summary.usageRate,.4);
+  const r=core.aggregate(f.events,f.roster,f.options);assert.equal(r.summary.active,3);assert.equal(r.summary.eligibleActive,2);assert.equal(r.summary.usageRate,.4);
 });
 test('store and feature filters retain correct denominator and qualified counts',()=>{
   const f=fixture();f.options.filters={...f.filters,store:'萬大',feature:'awards'};
@@ -59,7 +59,7 @@ test('unknown and disabled features differ from a connected observed zero',()=>{
 });
 test('pre-collection dates and a never-connected feature remain unknown in summary',()=>{
   const f=fixture();f.options.filters={...f.filters,feature:'kpi'};f.options.features={...FEATURES,kpi:'unconnected'};
-  let r=core.aggregate([],f.roster,f.options);assert.equal(r.summary.dau,null);assert.equal(r.summary.usageRate,null);
+  let r=core.aggregate([],f.roster,f.options);assert.equal(r.summary.dau,null);assert.equal(r.summary.usageRate,null);assert.ok(r.daily.every(d=>d.active===null));assert.equal(r.features[0].loadSamples,null);
   f.options.filters={...f.filters,start:'2026-10-01',end:'2026-10-02'};r=core.aggregate([],f.roster,f.options);assert.equal(r.summary.wau,null);assert.equal(r.daily[0].active,null);
 });
 test('Taipei midnight splits day activity and pre-start history is unknown, never backfilled',()=>{

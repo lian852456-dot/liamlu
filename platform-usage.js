@@ -27,7 +27,7 @@
     if(!r||r.v!==1||!r.summary||!Array.isArray(r.features)||!Array.isArray(r.people)||r.timezone!=='Asia/Taipei')throw Error('FORMAT');
     text('mode',adapter?.environment==='synthetic'?'合成資料預覽 ／ 尚未上線':'已啟用收集');
     const s=r.summary;
-    text('rate',s.usageRate===null?'—':amount(s.usageRate*100,'%'));text('denominator',s.eligible===null?'無法計算：日期化名冊待確認':`本期觀測 ${s.active} ／ 適用 ${s.eligible} 個帳號`);
+    text('rate',s.usageRate===null?'—':amount(s.usageRate*100,'%'));text('denominator',s.eligible===null?'無法計算：日期化名冊待確認':`具資格合格 ${s.eligibleActive} ／ 適用 ${s.eligible} 個帳號`);
     text('dau',amount(s.dau));text('wau',amount(s.wau));text('median',minutes(s.medianMs));
     const today=core.dateKey(Date.now()),historical=r.filters.end!==today;
     text('dau-label',historical?`${r.filters.end} 活躍帳號`:'已驗證帳號去重');text('wau-label',`截至 ${r.filters.end}，近 7 日去重`);
@@ -44,7 +44,7 @@
     if(!r.people.length)$('people').append(node('p','本期沒有觀測到合格使用，不能據此判斷是否上班。'));
     r.people.forEach(p=>{const detail=document.createElement('details');detail.className='person';detail.append(node('summary',`${p.actor} · ${p.store} · 活躍 ${p.activeDays} 天`),node('p',`${p.identity} ｜ 合格 ${p.count} 次 ｜ 有效 ${minutes(p.activeMs)} ｜ 最近 ${p.lastDate||'本期沒有觀測到使用'}`));p.features.forEach(f=>detail.append(node('p',`${f.label}：${f.count} 次／${minutes(f.activeMs)}`)));$('people').append(detail);});
     text('quality',`統計起算 ${new Date(r.since).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})} ｜ 已接入 ${r.coverage.connected}／${r.coverage.total} 個第一期窗口 ｜ 名冊 ${r.coverage.roster==='verified'?r.coverage.rosterVersion:'未取得'} ｜ 重複 ${amount(r.quality?.duplicate)} ｜ 拒收 ${amount(r.quality?.rejected)} ｜ 跨功能重疊未歸屬 ${minutes(s.unassignedMs)}。功能停留排除無法歸屬的重疊，平台取聯集。`);
-    $('errors').replaceChildren();r.features.forEach(f=>$('errors').append(node('p',`${f.label}：載入樣本 ${f.loadSamples}，P50 ${amount(f.loadP50,' ms')}／P95 ${amount(f.loadP95,' ms')}；錯誤 ${amount(f.errors)}，已觀測錯誤率 ${f.errorRate===null?'—':amount(f.errorRate*100,'%')}。`)));
+    $('errors').replaceChildren();r.features.forEach(f=>$('errors').append(node('p',`${f.label}：載入樣本 ${amount(f.loadSamples)}，P50 ${amount(f.loadP50,' ms')}／P95 ${amount(f.loadP95,' ms')}；錯誤 ${amount(f.errors)}，已觀測錯誤率 ${f.errorRate===null?'—':amount(f.errorRate*100,'%')}。`)));
     $('errors').append(node('p','僅代表接入頁面的已觀測載入與錯誤；尚未啟動 JavaScript 的失敗、舊版或阻擋追蹤不在樣本內。'));
   }
   async function load(){
