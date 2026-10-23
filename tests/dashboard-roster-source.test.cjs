@@ -125,7 +125,7 @@ function makeConfig(validUntil = CLOCK + 6 * 60 * 60 * 1000) {
   };
 }
 
-function refreshFixture({ source = 'detail', period = '2026/10/01 ~ 10/09', filePresent = true, oldModified = false, parent = FOLDER, config = makeConfig(), recheckParents = [FOLDER], recheckName = '1010.xlsx', recheckModified = null, nativeMembers = [] } = {}) {
+function refreshFixture({ source = 'detail', period = '2026/10/01 ~ 10/09', filePresent = true, oldModified = false, parent = FOLDER, config = makeConfig(), recheckParents = [FOLDER], recheckName = '1010.xlsx', recheckModified = null, nativeMembers = [], recheckHook = null } = {}) {
   const props = new Map([
     [CONFIG, JSON.stringify(config)],
     ['DASHBOARD_AUTH_OWNER_SCRIPT_ID', 'SYNTHETIC_OWNER'],
@@ -196,7 +196,7 @@ function refreshFixture({ source = 'detail', period = '2026/10/01 ~ 10/09', file
           let index = 0;
           return {
             id,
-            getParents: () => ({ hasNext: () => index < recheckParents.length, next: () => ({ getId: () => recheckParents[index++] }) }),
+            getParents: () => { if(recheckHook)recheckHook(props); return { hasNext: () => index < recheckParents.length, next: () => ({ getId: () => recheckParents[index++] }) }; },
             getName: () => recheckName,
             getLastUpdated: () => new Date(finalModified),
             isTrashed: () => false
@@ -264,6 +264,43 @@ test('byStore source parser returns the same nine stores', () => {
   assert.deepEqual(Array.from(members.map((member) => member.store)).sort(), STORES.slice().sort());
 });
 
+const STORE_CODES = ['DNB10062','DNB10082','DNB10094','DNB10146','DNB10168','DNB10174','DNB10284','DNB10307','DNB10440'];
+function attributionFixture() {
+  const f = parserFixture(), rows = makeDetailRows(), storeRows = makeMetaRows();
+  rows[11][3] = '通化'; // Same employee, performance attributed to another existing store.
+  STORES.forEach((store, i) => storeRows.push(['北一區','北一二區','北一二B',STORE_CODES[i],'台北'+store]));
+  f.sheets['上線數KPI_個人達成率_明細'] = sheetFromRows(rows);
+  f.sheets['上線數KPI_店點達成率_明細'] = sheetFromRows(storeRows);
+  const approved = Object.fromEntries(STORES.map((store, i) => ['SYNTH'+String(i+1).padStart(3,'0'),store]));
+  return {...f, rows, storeRows, approved, parse: (members=approved) =>
+    f.context.privateDashboardRosterSourceMembers_(f.context.__spreadsheet,'1010.xlsx',TODAY,members)};
+}
+
+test('same complete employee set can retain approved stores when performance attribution empties one store', () => {
+  const f = attributionFixture(), members = f.parse();
+  assert.equal(members.length, 9);
+  assert.deepEqual(Array.from(members, m => [m.employeeId,m.store]),Object.entries(f.approved));
+  assert.ok(members.every(m => /＊/.test(m.maskedName) && m.status === 'active'));
+});
+
+test('attribution recovery rejects missing, new or duplicate employees and never accepts a partial approval set', () => {
+  for (const change of [f=>f.rows.pop(), f=>{f.rows[11][5]='SYNTH_NEW';},
+    f=>{f.rows[11][5]=f.rows[10][5];}, f=>{delete f.approved.SYNTH009;},
+    f=>{f.approved.SYNTH_NEW='永吉';}]) {
+    const f=attributionFixture();change(f);
+    assert.throws(()=>f.parse(),/ROSTER_SOURCE_MEMBER|B_COMPLETE_ROSTER_REQUIRED/);
+  }
+  const f=attributionFixture();assert.throws(()=>f.parse(null),/B_COMPLETE_ROSTER_REQUIRED/);
+});
+
+test('attribution recovery requires all nine current store rows with exact region and store codes', () => {
+  for (const change of [f=>f.storeRows.pop(), f=>{f.storeRows[11][3]='DNB_WRONG';},
+    f=>{f.storeRows[11][2]='北一二A';}, f=>f.storeRows.push([...f.storeRows[11]])]) {
+    const f=attributionFixture();change(f);
+    assert.throws(()=>f.parse(),/B_COMPLETE_ROSTER_REQUIRED/);
+  }
+});
+
 test('source parser rejects duplicate employee IDs, foreign stores, and incomplete rosters', () => {
   assert.throws(() => parseMembers({ duplicate: true }), /ROSTER_SOURCE_MEMBER/);
   assert.throws(() => parseMembers({ foreignStore: true }), /ROSTER_SOURCE_MEMBER/);
@@ -304,6 +341,13 @@ test('refresh rejects a moved or changed source during the locked recheck withou
     assert.equal(fixture.stats().syncCalls, 0);
     assert.equal(fixture.props.get(CONFIG), before);
   }
+});
+
+test('a concurrent approved roster or verifier change rejects the captured parse before synchronization', () => {
+  const fixture=refreshFixture({recheckHook:props=>{const config=JSON.parse(props.get(CONFIG));config.epoch++;props.set(CONFIG,JSON.stringify(config));}});
+  assert.throws(()=>fixture.context.privateDashboardRefreshRoster_({adminSecret:'SYNTHETIC_ADMIN'}),/ROSTER_REFRESH_FAILED/);
+  assert.equal(fixture.stats().syncCalls,0);assert.equal(fixture.stats().rosterWrites,0);
+  assert.equal(JSON.parse(fixture.props.get(CONFIG)).epoch,5);
 });
 
 test('refresh rejects a source roster that drops below the active native baseline', () => {
