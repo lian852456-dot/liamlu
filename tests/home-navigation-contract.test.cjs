@@ -32,8 +32,14 @@ test('home navigation retains PR179 performance and PR181 lab removal', () => {
     'https://twm-store-inspection.liamlu245.chatgpt.site/',
     'threec-query.html', 'tradein-progress.html'
   ]);
-  assert.equal(cards(navigation('督導專區')).length, 8);
-  assert.equal(cards(html).length, 4 + staffHrefs.length + 8);
+  assert.equal(cards(navigation('督導專區')).length, 9);
+  assert.equal(cards(html).length, 4 + staffHrefs.length + 9);
+});
+
+test('usage monitor belongs to supervisor area and clearly states collection is disabled', () => {
+  const card=cardFor(navigation('督導專區'),'platform-usage.html');
+  assert.match(card,/本人專用/);assert.match(card,/尚未啟用收集/);
+  assert.doesNotMatch(navigation('同仁大廳'),/platform-usage\.html/);
 });
 
 test('staff gold lookup lives under performance tools and uses the existing viewer', () => {

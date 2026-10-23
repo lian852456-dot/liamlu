@@ -23,7 +23,7 @@ const EXPECTED_HREFS = [
   'kpi-battle.html', 'kpi-battle.html#awards', 'index.html', 'gold-medal.html',
   'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'threec-query.html', 'tradein-progress.html',
   'access-management.html', 'department-ops.html', 'patrol.html',
-  'tradein-brief.html', 'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
+  'platform-usage.html', 'tradein-brief.html', 'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
   'phone-stock-dashboard.html'
 ];
 const DAILY_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
@@ -144,7 +144,7 @@ test('首頁保留 PR179 個績入口與 PR181 測試入口移除，逐一核對
   await ready(page);
   await expect(page.locator('[aria-label="常用入口"] .card')).toHaveCount(4);
   await expect(page.locator('[aria-label="同仁大廳"] .card')).toHaveCount(7);
-  await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(8);
+  await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(9);
   expect(await page.locator('a.card').evaluateAll(cards => cards.map(card => card.getAttribute('href')))).toEqual(EXPECTED_HREFS);
   await expect(page.locator('.quick-card').first()).toHaveAttribute('href','kpi-battle.html');
   await expect(page.locator('.quick-card').first()).toContainText('KPI 戰情');

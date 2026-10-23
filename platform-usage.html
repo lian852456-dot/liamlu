@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>平台使用概況｜北一二B</title><link rel="stylesheet" href="platform-usage.css"></head>
+<body><main>
+<header><div><a href="home.html#zone-supervisor">北一二B ／ 督導專區</a><h1>平台使用概況</h1><p>先看工具是否好用，再找出需要改善的流程。</p></div><strong class="banner" id="mode">尚未啟用收集</strong></header>
+<section class="dashboard" aria-labelledby="heading"><div class="title"><h2 id="heading">平台使用概況</h2><span>本人專用</span></div>
+<form id="filters"><label>日期<select id="period"><option value="7">近 7 天</option><option value="1">今天</option><option value="30">近 30 天</option><option value="custom">自訂</option></select></label>
+<label>門市<select id="store"><option value="all">全部門市</option></select></label><label>功能<select id="feature"><option value="all">全部功能</option><option value="home">營運中心首頁</option><option value="kpi">KPI 戰情</option><option value="awards">台獎戰情</option><option value="personal">個績</option></select></label>
+<div class="dates" id="dates" hidden><label>開始<input id="start" type="date" required></label><label>結束<input id="end" type="date" required></label></div><button type="submit" id="refresh">更新</button><small>Asia/Taipei · <span id="updated">尚未取得資料</span></small></form>
+<p id="status" role="status">本人獨立驗證尚未配置；尚未啟用收集，沒有正式使用紀錄。</p>
+<div id="metrics" class="cards"><article><h3>本期平台使用率</h3><strong id="rate">—</strong><small id="denominator">需日期化正式名冊分母</small></article><article><h3>今日活躍 DAU</h3><strong id="dau">—</strong><small id="dau-label">已驗證帳號去重</small></article><article><h3>近 7 天 WAU</h3><strong id="wau">—</strong><small id="wau-label">不是逐日相加</small></article><article><h3>有效停留中位數</h3><strong id="median">—</strong><small>估計，不代表績效</small></article></div>
+<div class="charts"><article><h3>每日活躍趨勢</h3><div id="trend" class="empty">啟用並累積資料後顯示</div></article><article><h3>各功能使用分布</h3><div id="distribution" class="empty">依功能呈現，不做員工排名</div></article></div>
+<div class="table-wrap"><table><caption>各功能使用頻率與停留</caption><thead><tr><th>功能</th><th>活躍帳號</th><th>合格次數</th><th>人均週頻率</th><th>有效停留</th><th>中位數／P75</th><th>資料狀態</th></tr></thead><tbody id="features"><tr><td>KPI／台獎／個績</td><td colspan="6">尚未接入</td></tr><tr><td>其他工作窗口</td><td colspan="6">尚未接入</td></tr></tbody></table></div>
+<details id="people-details"><summary>同仁日級彙總（帳號使用紀錄）</summary><p>依帳號代號排序，使用少不等於績效差；沒有觀測紀錄不等於沒上班。</p><div id="people">本人核驗通過後才可讀取。</div></details>
+<details open><summary>載入、錯誤與資料品質</summary><div id="quality">資料品質：未收集　｜　名冊：待核　｜　只有本人經後端核驗可讀</div><div id="errors"></div></details>
+</section>
+<section class="privacy"><h2>使用紀錄告知與隱私界線</h2><p>為改善平台與排查問題，啟用後記錄已驗證帳號代號、功能、時間、合格次數、估計有效停留及固定錯誤分類。查詢限蔚榮本人獨立驗證，私有後端管理者可能具有技術管理能力。詢問或更正請聯繫蔚榮。</p><p>不收集按鍵、輸入內容、客戶資料、畫面錄影、精確位置或平台外活動。使用頻率與停留不作考勤、績效排名或自動扣牌。</p><p>候選保留期：最小事件 30 天、個人日彙總 90 天、查詢稽核 180 天（含備份到期）。第一期查詢限 30 天，不開匯出。正式設定與同仁告知完成前，保持關閉。</p><p id="limitations">統計起算：尚未啟用。沒有歷史追蹤就不能補造過去紀錄。背景、60 秒閒置、睡眠未知間隙與重複時間排除；靜態閱讀、鍵盤專用操作、離線、舊版 App、阻擋追蹤與 OS 關頁可能低估。未接入窗口及外部網站停留未知。</p></section>
+</main><script src="platform-usage-core.js"></script><script src="platform-usage.js"></script></body></html>
