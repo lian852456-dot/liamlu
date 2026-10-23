@@ -76,6 +76,14 @@ function personalRankAutomationVerified_(payload) {
   return { action: action, data: data };
 }
 
+function personalRankAutomationStoredSnapshot_() {
+  const file = privateDashboardLatestSnapshotFile_();
+  if (!file) throw new Error('RANK_PARENT_MISSING');
+  const snapshot = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('RANK_PARENT_INVALID');
+  return snapshot;
+}
+
 function personalRankAutomationDispatch_(request) {
   if (request.action === 'private_publish_kpi_component') return privateDashboardPublishRankPatch_(request.data);
   if (request.action === 'kpicalc_access') {
@@ -85,11 +93,10 @@ function personalRankAutomationDispatch_(request) {
     if (!data || !data.meta || !Array.isArray(data.persons) || !Array.isArray(data.stores)) throw new Error('RANK_PARENT_INVALID');
     return { data: data };
   }
-  if (request.action === 'private_access') return { snapshot: privateDashboardSnapshot() };
-  const file = privateDashboardLatestSnapshotFile_();
-  if (!file) throw new Error('RANK_PARENT_MISSING');
-  const snapshot = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
-  if (!snapshot || !snapshot.kpiBattle || !snapshot.awardsBattle) throw new Error('RANK_PARENT_INVALID');
+  // The ordinary display reader attaches virtual components. A CAS parent must
+  // be the stored file itself; never persist those unrelated display additions.
+  if (request.action === 'private_access') return { snapshot: personalRankAutomationStoredSnapshot_() };
+  const snapshot = personalRankAutomationStoredSnapshot_();
   return { kpiReportDate: snapshot.kpiBattle.report_date, awardsReportDate: snapshot.awardsBattle.report_date,
     kpiComponentRunId: snapshot.kpiBattle.kpi_run_id, publishedAt: snapshot.publishedAt,
     kpiPayloadHash: privateDashboardRankHash_(snapshot.kpiBattle), snapshotPayloadHash: privateDashboardRankHash_(snapshot) };

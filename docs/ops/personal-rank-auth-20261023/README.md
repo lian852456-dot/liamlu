@@ -11,3 +11,5 @@ hook放在既有部署隔離檢查後、一般驗證分流前；未帶automation
 測試包含合法HMAC互通、所有簽章欄位篡改、過期／未來、錯audience／scope、撤銷／缺設定、防重放、損毀ledger、非排名action拒絕與實際rank writer整合。正式部署後必須先用既有helper取得合法管理status，再用fresh讀回建立排名intent。未知寫入回條先讀回，不重送。
 
 部署只在當時正式來源增兩行hook及此新模組，原其他檔與manifest保留。回復需先核後續版本，再將同一Web App deployment切回v74，編輯器只撤除此hook與模組。正常登入、runtime與正式資料不需回復；若排名已更新，資料回復必須另用最新父hash及排名白名單，禁止舊快照整份覆寫。
+
+正式v75管理簽章已通過。真實讀回接著發現兩個CAS互通差異：未指定charset的GAS雜湊把中文替換成問號，與Node UTF-8不同；普通snapshot reader附加了獨立締結率的虛擬顯示元件。排名hash改為明確UTF-8（不改一般密碼hash），排名專用讀回改讀原始儲存檔（不改普通使用者顯示reader）。完整父版本比較與其他資料保護保留，不能以關閉CAS或刪除不認識的欄位迴避。新增回歸測試分別模擬GAS預設charset與禁止讀取顯示view；實際排名寫入尚須正式重驗。

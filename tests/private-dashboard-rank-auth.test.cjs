@@ -72,3 +72,12 @@ test('compatibility hook runs after deployment fence and before general auth; or
  assert.ok(post.indexOf('reportUploadIsUploadDeployment_')<post.indexOf('personalRankAutomationMaybePost_'));assert.ok(post.indexOf('personalRankAutomationMaybePost_')<post.indexOf('privateDashboardGasBMaybePost_'));
  assert.match(adapter,/privateDashboardPublishRankPatch_\(request.data\)/);assert.doesNotMatch(adapter,/setProperties|deleteProperty|bootstrap_provision|privateDashboardAdminAuthorized\(/);
 });
+test('Unicode rank parent hashes use explicit UTF-8 while legacy password hashing stays unchanged',()=>{
+ const f=setup(),value={name:'蔡*?',store:'復興南'};
+ const text=f.ctx.privateDashboardRankCanonical_(value),expected=crypto.createHash('sha256').update(text,'utf8').digest('hex');
+ assert.equal(f.ctx.privateDashboardRankHash_(value),expected);assert.notEqual(f.ctx.privateDashboardHash(text),expected);
+});
+test('rank-only private access returns exact stored parent, excluding virtual display attachments',()=>{
+ const f=setup();f.ctx.privateDashboardSnapshot=()=>{throw Error('DISPLAY_READER_MUST_NOT_BE_USED');};
+ const r=f.post(f.signed('private_access'));assert.deepEqual(r.snapshot,JSON.parse(f.state.text));assert.equal(f.state.writes,0);
+});
