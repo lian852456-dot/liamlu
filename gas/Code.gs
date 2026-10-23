@@ -5542,8 +5542,142 @@ function privateDashboardRollbackAwardsWrite_(file, writtenText, before) {
 // KPI 與台獎採 component-level 發布：只替換通過 protected KPI 對齊驗證的
 // kpiBattle；awardsBattle payload 原樣保留。container 的 publishedAt 只代表
 // 檔案寫入時間，consumer 必須繼續使用各 component 自己的日期與來源 gate。
+function privateDashboardRankCanonical_(value) {
+  if (Array.isArray(value)) return '[' + value.map(privateDashboardRankCanonical_).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(function(key) {
+    return JSON.stringify(key) + ':' + privateDashboardRankCanonical_(value[key]);
+  }).join(',') + '}';
+  return JSON.stringify(value);
+}
+
+function privateDashboardRankHash_(value) {
+  return privateDashboardHash(privateDashboardRankCanonical_(value));
+}
+
+function privateDashboardRankShape_(value, fields) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(function(key) {
+    return fields.indexOf(key) < 0;
+  })) throw new Error('RANK_PATCH_SCHEMA');
+}
+
+function privateDashboardRankPersonKey_(row, stores) {
+  const store = privateDashboardCanonicalKpiStore_((stores || {})[row.store] || row.store);
+  const name = privateDashboardCanonicalKpiPersonName_(row.name || row.pname).replace(/［來源缺字］/g, '?');
+  const role = String(row.role || '');
+  if (!store || !name || !role) throw new Error('RANK_IDENTITY_REQUIRED');
+  return JSON.stringify([store, name, role]);
+}
+
+function privateDashboardRankNonRank_(snapshot) {
+  const copy = JSON.parse(JSON.stringify(snapshot));
+  delete copy._read_integrity;
+  delete copy.publishedAt;
+  if (copy.components && copy.components.kpi) delete copy.components.kpi.published_at;
+  if (copy.kpiBattle) {
+    delete copy.kpiBattle.personal_rank_semantics;
+    delete copy.kpiBattle.personal_rank_source;
+    (copy.kpiBattle.personal || []).forEach(function(row) {
+      delete row.rank; delete row.rank_dod;
+      row.name = String(row.name || '').replace(/［來源缺字］/g, '?');
+    });
+  }
+  return copy;
+}
+
+function privateDashboardPublishRankPatch_(payload) {
+  if (payload.kpiBattleBase64 !== undefined) throw new Error('RANK_PATCH_MIXED_WRITE');
+  const encoded = String(payload.rankPatchBase64 || '');
+  if (!encoded || encoded.length > 1024 * 1024) throw new Error('RANK_PATCH_SIZE');
+  const patch = JSON.parse(Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8'));
+  privateDashboardRankShape_(patch, ['schema','report_run_date','source_file','data_as_of_date','kpi_run_id','personal_rank_semantics','personal_rank_source','personal']);
+  const proof = patch.personal_rank_source;
+  privateDashboardRankShape_(proof, ['sheet','column','source_file','data_as_of_date','sha256','previous_sha256']);
+  const today = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd');
+  const yesterday = Utilities.formatDate(new Date(Date.now() - 86400000), 'Asia/Taipei', 'yyyy-MM-dd');
+  if (patch.schema !== 'north12b-personal-rank-patch/v1' || patch.report_run_date !== today ||
+      patch.data_as_of_date !== yesterday || patch.personal_rank_semantics !== 'individual-rank-v1' ||
+      proof.sheet !== '上線數KPI_個人達成率_明細' || proof.column !== 'I' ||
+      proof.source_file !== patch.source_file || proof.data_as_of_date !== patch.data_as_of_date ||
+      !/^[a-f0-9]{64}$/.test(String(proof.sha256 || '')) ||
+      proof.previous_sha256 !== undefined && !/^[a-f0-9]{64}$/.test(String(proof.previous_sha256))) throw new Error('RANK_SOURCE_INVALID');
+  const expectedKpi = String(payload.expectedKpiPayloadHash || '');
+  const expectedProtected = String(payload.expectedProtectedKpiPayloadHash || '');
+  const expectedSnapshot = String(payload.expectedSnapshotPayloadHash || '');
+  if (!/^[a-f0-9]{64}$/.test(expectedKpi) || !/^[a-f0-9]{64}$/.test(expectedProtected) ||
+      !/^[a-f0-9]{64}$/.test(expectedSnapshot)) throw new Error('RANK_PARENT_REQUIRED');
+  return privateDashboardSnapshotWriteLocked_(function() {
+    const protectedFile = kpiCalcLatestDataFile(), file = privateDashboardLatestSnapshotFile_();
+    if (!protectedFile || !file) throw new Error('RANK_PARENT_MISSING');
+    const protectedData = JSON.parse(protectedFile.getBlob().getDataAsString('UTF-8'));
+    const current = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+    if (!current.kpiBattle || !current.awardsBattle || !current.components || !current.components.kpi) throw new Error('RANK_PARENT_INVALID');
+    if (privateDashboardRankHash_(current) !== expectedSnapshot || privateDashboardRankHash_(current.kpiBattle) !== expectedKpi ||
+        privateDashboardRankHash_(protectedData) !== expectedProtected) throw new Error('RANK_PARENT_CHANGED');
+    const beforeNonRank = privateDashboardRankHash_(privateDashboardRankNonRank_(current));
+    const beforeAwards = privateDashboardRankHash_(current.awardsBattle);
+    const kpi = current.kpiBattle;
+    if (patch.source_file !== kpi.source_file || patch.data_as_of_date !== kpi.data_as_of_date ||
+        !kpi.kpi_run_id || patch.kpi_run_id !== kpi.kpi_run_id) throw new Error('RANK_SOURCE_MISMATCH');
+    const people = Array.isArray(protectedData.persons) ? protectedData.persons : [];
+    if (!Array.isArray(patch.personal) || !Array.isArray(kpi.personal) ||
+        patch.personal.length !== people.length || kpi.personal.length !== people.length) throw new Error('RANK_IDENTITY_SET');
+    const stores = Object.create(null), approved = Object.create(null), entries = Object.create(null), visible = Object.create(null);
+    (protectedData.stores || []).forEach(function(row) { stores[row.code] = row.name; });
+    people.forEach(function(row) {
+      const key = privateDashboardRankPersonKey_(row, stores);
+      const displayKey = JSON.stringify(JSON.parse(key).slice(0, 2));
+      if (approved[key] || visible[displayKey]) throw new Error('RANK_IDENTITY_DUPLICATE');
+      visible[displayKey] = true;
+      approved[key] = row;
+    });
+    patch.personal.forEach(function(row) {
+      privateDashboardRankShape_(row, ['store','role','name','rank','rank_dod']);
+      const key = privateDashboardRankPersonKey_(row);
+      if (!approved[key] || entries[key]) throw new Error('RANK_IDENTITY_SET');
+      if (row.rank !== null && (!Number.isSafeInteger(row.rank) || row.rank < 1) ||
+          row.rank_dod !== null && !Number.isSafeInteger(row.rank_dod) ||
+          row.rank === null && row.rank_dod !== null || row.rank_dod !== null && !proof.previous_sha256) throw new Error('RANK_VALUE_INVALID');
+      if (row.name !== approved[key].pname) throw new Error('RANK_NAME_NOT_PROTECTED');
+      entries[key] = row;
+    });
+    const after = JSON.parse(JSON.stringify(current)), seen = Object.create(null);
+    after.kpiBattle.personal.forEach(function(row) {
+      const key = privateDashboardRankPersonKey_(row), incoming = entries[key];
+      if (!incoming || seen[key]) throw new Error('RANK_IDENTITY_SET');
+      seen[key] = true;
+      if (row.name !== incoming.name && String(row.name).replace(/［來源缺字］/g, '?') !== incoming.name) throw new Error('RANK_NAME_CHANGE');
+      row.name = incoming.name; row.rank = incoming.rank; row.rank_dod = incoming.rank_dod;
+    });
+    after.kpiBattle.personal_rank_semantics = patch.personal_rank_semantics;
+    after.kpiBattle.personal_rank_source = proof;
+    const identity = privateDashboardValidateKpiComponent_(after.kpiBattle, protectedData);
+    const resultHash = privateDashboardRankHash_(after.kpiBattle);
+    const publishedAt = privateDashboardRankHash_(kpi) === resultHash ? current.publishedAt : privateDashboardNow();
+    after.publishedAt = publishedAt;
+    if (privateDashboardRankHash_(kpi) !== resultHash) after.components.kpi.published_at = publishedAt;
+    if (privateDashboardRankHash_(privateDashboardRankNonRank_(after)) !== beforeNonRank ||
+        privateDashboardRankHash_(after.awardsBattle) !== beforeAwards) throw new Error('RANK_NON_RANK_CHANGED');
+    if (privateDashboardRankHash_(JSON.parse(protectedFile.getBlob().getDataAsString('UTF-8'))) !== expectedProtected ||
+        privateDashboardRankHash_(JSON.parse(file.getBlob().getDataAsString('UTF-8'))) !== expectedSnapshot) throw new Error('RANK_PARENT_CHANGED');
+    if (resultHash !== expectedKpi) {
+      file.setContent(JSON.stringify(after));
+      const stored = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+      if (privateDashboardRankHash_(stored.kpiBattle) !== resultHash ||
+          privateDashboardRankHash_(privateDashboardRankNonRank_(stored)) !== beforeNonRank) throw new Error('RANK_READBACK_FAILED');
+      reportVersionRecord_('kpi', { dataDate: identity.dataDate, source: 'personal-rank-repair',
+        fileHash: reportVersionHash_(JSON.stringify(stored.kpiBattle)), fileName: identity.sourceFile,
+        operator: 'existing-component-rank-patch' }, 'success', { rule: 'rank-fields-only' });
+    }
+    return { status: 'ok', mode: 'personal-ranks-only', result: resultHash === expectedKpi ? 'up-to-date' : 'updated',
+      publishedAt: publishedAt, reportDate: identity.dataDate, runId: identity.runId,
+      kpiPayloadHash: resultHash, protectedKpiPayloadHash: expectedProtected,
+      nonRankPayloadHash: beforeNonRank, awardsPayloadHash: beforeAwards, people: people.length };
+  });
+}
+
 function privateDashboardPublishKpiComponent(payload) {
   privateDashboardAdminAuthorized(payload);
+  if (Object.prototype.hasOwnProperty.call(payload || {}, 'rankPatchBase64')) return privateDashboardPublishRankPatch_(payload);
   const encoded = String(payload.kpiBattleBase64 || '');
   if (!encoded || encoded.length > 8 * 1024 * 1024) throw new Error('KPI component 缺少或過大');
   const decoded = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString('UTF-8');
