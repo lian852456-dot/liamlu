@@ -1,0 +1,19 @@
+--- a/build_github_pages_data.py
++++ b/build_github_pages_data.py
+@@ -21,6 +21,7 @@
+ 
+ from openpyxl import load_workbook
+ from build_personal_kpi_report import apply_previous_rates, extract_rows
++from personal_rank_contract import repair_component
+ 
+ 
+ STORE_ORDER = [
+@@ -863,7 +864,7 @@
+             "data_as_of_date": as_of_date.isoformat(),
+             "run_id": kpi_run_id,
+         }
+-    return result
++    return repair_component(result, source_path, previous_path=previous_source_path if previous_source_path.exists() else None)
+ 
+ 
+ def main() -> None:

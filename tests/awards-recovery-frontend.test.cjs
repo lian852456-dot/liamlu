@@ -225,7 +225,7 @@ test('website controller passes authenticated read integrity from the real snaps
   assert.doesNotMatch(nodes.get('awardsBattleContent').innerHTML, /1,234/);
 });
 
-test('HTML changes only point existing scripts to the recovery guard version', () => {
+test('HTML retains recovery controller and the current App rank contract asset', () => {
   assert.match(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), /awards-battle-controller\.js\?v=20261018-awards-recovery-1/);
-  assert.match(fs.readFileSync(path.join(root, 'app.html'), 'utf8'), /app\.js\?v=20261018-awards-recovery-1/);
+  assert.match(fs.readFileSync(path.join(root, 'app.html'), 'utf8'), /app\.js\?v=20261023-personal-rank-1/);
 });

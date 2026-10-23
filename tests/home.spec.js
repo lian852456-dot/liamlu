@@ -613,3 +613,5 @@ test('Chromium 截圖：未登入桌面、手機、寬螢幕及明確標示的�
   }
   await fs.writeFile(path.join(SCREENSHOTS,'README.txt'), 'Actual Chromium renders from tests/home.spec.js. All external network is intercepted. Unauthenticated screenshots contain no private data. SYNTHETIC screenshots use generated test fixtures and non-working credentials; their store metrics are not real or verified production results. Fixed browser date: '+NOW+'\n');
 });
+
+require('./helpers/personal-rank-ui-contract.cjs')({test,expect});

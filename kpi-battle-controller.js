@@ -146,7 +146,7 @@
   }
 
   function kpiBattlePersonKey(row) {
-    return `${kpiBattleStoreKey(row && row.store)}|${String((row && row.name) || '').replace(/[＊*]/g, '').trim()}`;
+    return `${kpiBattleStoreKey(row && row.store)}|${String((row && row.name) || '').replace(/［來源缺字］/g, '?').replace(/[＊*]/g, '').trim()}`;
   }
 
   function kpiBattleSupplementIsCurrent(kpiData, snapshot) {
@@ -185,12 +185,17 @@
     });
     const snapshotPeople = new Map((snapshot.personal || []).map(row => [kpiBattlePersonKey(row), row]));
     const trustedManagerSupplement = String(snapshot.personal_semantics || '') === 'individual-v1';
+    const rankSource = snapshot.personal_rank_source || {};
+    const trustedRankSupplement = String(snapshot.personal_rank_semantics || '') === 'individual-rank-v1' &&
+      rankSource.sheet === '上線數KPI_個人達成率_明細' && rankSource.column === 'I' &&
+      rankSource.source_file === snapshot.source_file && rankSource.data_as_of_date === snapshot.data_as_of_date &&
+      /^[a-f0-9]{64}$/.test(String(rankSource.sha256 || ''));
     copy.personal = copy.personal.map(row => {
       const source = snapshotPeople.get(kpiBattlePersonKey(row));
       const merged = { ...row };
       const manager = /店長/.test(String(row.role || row.category || '')) && !/副店長/.test(String(row.role || row.category || ''));
       copyFields(merged, source, manager && !trustedManagerSupplement
-        ? ['insurance_attach_rate', 'phone_award_actual', 'phone_award_projected', 'phone_award_rank', 'phone_award_eligible']
+        ? ['insurance_attach_rate', 'phone_award_actual', 'phone_award_projected', 'phone_award_rank', 'phone_award_eligible', ...(trustedRankSupplement ? ['rank', 'rank_dod'] : [])]
         : ['rank', 'rank_dod', 'overall_rate_dod', 'insurance_attach_rate', 'phone_award_actual', 'phone_award_projected', 'phone_award_rank', 'phone_award_eligible']);
       return merged;
     });
