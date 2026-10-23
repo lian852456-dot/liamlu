@@ -678,25 +678,30 @@
     const sourceData = snapshot && snapshot.kpiBattle || {};
     const aligned=kpiSupplementIsCurrent(data,sourceData);
     const supplementPeople=new Map((aligned&&Array.isArray(sourceData.personal)?sourceData.personal:[]).map(row=>[
-      `${normalizeStore(row.store)}|${String(row.name||'')}|${String(row.role||'')}`,row
+      `${normalizeStore(row.store)}|${String(row.name||'').replace(/［來源缺字］/g,'?').replace(/＊/g,'*')}|${String(row.role||'')}`,row
     ]));
     const storeNames=new Map((Array.isArray(data&&data.stores)?data.stores:[]).map(row=>[String(row.code||''),normalizeStore(row.name)]));
     const rows=Array.isArray(data&&data.persons)?data.persons:[];
     const cutoff=kpiDataAsOfDate(data);
     const managerPersonalEnabled=/^\d{4}-\d{2}-\d{2}$/.test(cutoff) && cutoff >= '2026-09-01';
     const trustedManagerSupplement=String(sourceData.personal_semantics||'')==='individual-v1';
+    const rankSource=sourceData.personal_rank_source||{};
+    const trustedRankSupplement=String(sourceData.personal_rank_semantics||'')==='individual-rank-v1'&&
+      rankSource.sheet==='上線數KPI_個人達成率_明細'&&rankSource.column==='I'&&
+      rankSource.source_file===sourceData.source_file&&rankSource.data_as_of_date===sourceData.data_as_of_date&&
+      /^[a-f0-9]{64}$/.test(String(rankSource.sha256||''));
     const people = rows.map(row => {
       const name=String(row.pname||'');
       const store=storeNames.get(String(row.store||''))||normalizeStore(row.store);
       const role=String(row.role||'');
       const roleGroup=personalRoleGroup({role});
-      const supplement=supplementPeople.get(`${store}|${name}|${role}`)||{};
+      const supplement=supplementPeople.get(`${store}|${name.replace(/［來源缺字］/g,'?').replace(/＊/g,'*')}|${role}`)||{};
       const canUseSupplement=roleGroup!=='店長'||trustedManagerSupplement;
       return {
         name,store,role,category:role,roleGroup,managerPersonalEnabled,
-        totalRate:numberOrNull(row.official),rank:canUseSupplement?numberOrNull(supplement.rank):null,
+        totalRate:numberOrNull(row.official),rank:canUseSupplement||trustedRankSupplement?numberOrNull(supplement.rank):null,
         dod:canUseSupplement?numberOrNull(supplement.overall_rate_dod):null,
-        rankChange:canUseSupplement?numberOrNull(supplement.rank_dod):null,
+        rankChange:canUseSupplement||trustedRankSupplement?numberOrNull(supplement.rank_dod):null,
         metrics:Object.entries(KPI_PERSONAL_KEYS).map(([key,sourceKey])=>{
           const metric=row.items&&row.items[sourceKey]||{};
           const supplementMetric=canUseSupplement&&supplement.metrics&&supplement.metrics[key]||{};

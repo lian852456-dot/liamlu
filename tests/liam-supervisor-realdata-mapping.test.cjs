@@ -297,6 +297,18 @@ test('Personal performance adapter maps formal fields and derives AQ attention o
   assert.match(result.note, /正式 kpicalc/);
 });
 
+test('rank-only source semantics restore manager rank without unlocking metric or rate DOD', () => {
+  const A=loadAdapters();
+  const data={meta:{month:'2026-10',snapshotDay:22,sourceFile:'1023.xlsx'},stores:[{code:'S1',name:'甲'}],persons:[{pname:'甲*?',store:'S1',role:'店長',official:1.25,items:{}}]};
+  const component={report_date:'2026-10-22',data_as_of_date:'2026-10-22',source_as_of_date:'2026-10-22',source_file:'1023.xlsx',personal_rank_semantics:'individual-rank-v1',personal_rank_source:{sheet:'上線數KPI_個人達成率_明細',column:'I',source_file:'1023.xlsx',data_as_of_date:'2026-10-22',sha256:'a'.repeat(64)},personal:[{name:'甲*［來源缺字］',store:'甲',role:'店長',rank:17,rank_dod:3,overall_rate_dod:9,metrics:{AQ:{daily_target:99,dod:99}}}]};
+  const r=A.adaptPersonalPerformance(data,{kpiBattle:component},'').data.people[0];
+  assert.equal(r.rank,17);assert.equal(r.rankChange,3);assert.equal(r.totalRate,1.25);assert.equal(r.dod,null);
+  assert.equal(r.metrics.find(m=>m.key==='AQ').dailyTarget,null);
+  for(const change of [s=>delete s.personal_rank_semantics,s=>s.personal_rank_semantics='store-rank',s=>s.personal_rank_source.sheet='店績',s=>s.source_file='1022.xlsx',s=>s.personal[0].name='另一人',s=>s.personal[0].rank=null]) {
+    const bad=JSON.parse(JSON.stringify(component));change(bad);assert.equal(A.adaptPersonalPerformance(data,{kpiBattle:bad},'').data.people[0].rank,null);
+  }
+});
+
 test('Personal performance area groups by formal category or role without guessing from name or store', () => {
   const A=loadAdapters();
   assert.equal(A.personalRoleGroup({category:'店長',role:'業務代表(I)'}),'店長');
