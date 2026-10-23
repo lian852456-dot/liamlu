@@ -5553,7 +5553,9 @@ function privateDashboardRankCanonical_(value) {
 }
 
 function privateDashboardRankHash_(value) {
-  return privateDashboardHash(privateDashboardRankCanonical_(value));
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+    privateDashboardRankCanonical_(value), Utilities.Charset.UTF_8);
+  return bytes.map(function(value) { return ('0' + (value & 255).toString(16)).slice(-2); }).join('');
 }
 
 function privateDashboardRankShape_(value, fields) {
