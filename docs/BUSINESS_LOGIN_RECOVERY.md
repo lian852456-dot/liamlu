@@ -18,3 +18,11 @@
 合成驗證見 `tests/business-login-errors.test.cjs`、`tests/business-login-recovery.spec.js`，涵蓋 1280px／390px 的失敗、表單恢復、原會話重試、本人提交登入、原期限與證明不變、無自動登出／通道回退，以及不顯示原始錯誤內容。合成測試不是正式帳號或實體手機驗收；正式資料讀回仍須本人有效業務登入。
 
 本修補保留既有 GitHub workflow；上述兩個新增測試尚未納入 CI。可分別執行 `node --test tests/business-login-errors.test.cjs` 與 `npx playwright test tests/business-login-recovery.spec.js --workers=1`，驗證紀錄須與既有 CI 結果分開報告。
+
+## 無會話時重新核驗與服務狀態
+
+沒有有效會話時，「重新核驗」只發送不含員編、密碼或會話證明的 `employee_status`，檢查中禁止重複點擊。服務就緒則保留鎖定並提示本人輸入帳密；通道關閉或狀態檢查被拒絕則明確顯示，不自動登入、切換通道或建立綁定。已有會話時沿用原本的受保護重新讀取。
+
+`employee_status` 的拒絕分類為 `STATUS`，只表示共用服務未通過檢查，不能據此判定個人密碼錯誤。其他請求的 `AUTH` 與既有網路、格式、逾時分類保持原義。
+
+2026-10-23 直接以唯一欄位 `action: employee_status` 檢查正式 B owner，收到 `status: error, code: B_AUTH_DENIED`。這份無帳密證據確認服務狀態路徑已失敗；名冊過期、狀態資料不符或部署設定等具體原因仍須讀取正式後端。此介面修補不代表後端或正式帳號登入已恢復，也不變更名冊效期、密碼、裝置或權限。

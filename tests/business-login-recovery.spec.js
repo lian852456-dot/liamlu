@@ -2,14 +2,14 @@
 const {test,expect}=require('@playwright/test'),fs=require('node:fs'),path=require('node:path');
 const ROOT=path.resolve(__dirname,'..'),ORIGIN='https://business-recovery.test';
 const B='north12b_password_session_v1',DEVICE='north12b_private_dashboard_device_id';
-async function fixture(page,mode){
+async function fixture(page,mode,restore=true,entry='/home.html'){
  const calls=[];let current=mode,expiresAt=Date.now()+1200000;
  await page.clock.install({time:new Date()});
- await page.addInitScript(({B,DEVICE,expiresAt})=>{
+ await page.addInitScript(({B,DEVICE,expiresAt,restore})=>{
   localStorage.setItem(DEVICE,'SYNTHETIC_DEVICE');
-  sessionStorage.setItem(B,JSON.stringify({v:1,owner:'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec',
+  if(restore)sessionStorage.setItem(B,JSON.stringify({v:1,owner:'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec',
    logoutEpoch:'',deviceId:'SYNTHETIC_DEVICE',token:'B1_a_'+'a'.repeat(64),expiresAt}));
- },{B,DEVICE,expiresAt});
+ },{B,DEVICE,expiresAt,restore});
  await page.route(ORIGIN+'/**',route=>{
   const file=path.resolve(ROOT,'.'+new URL(route.request().url()).pathname);
   if(!file.startsWith(ROOT+path.sep)||!fs.existsSync(file))return route.abort();
@@ -18,7 +18,7 @@ async function fixture(page,mode){
  });
  await page.route('https://script.google.com/**',async route=>{
   const action=route.request().postDataJSON().action;calls.push(action);
-  if(action==='employee_status')return route.fulfill({json:{status:'ok',enabled:true,passwordAvailable:true}});
+  if(action==='employee_status')return route.fulfill({json:current==='status-auth'?{status:'error',code:'B_AUTH_DENIED',message:'SYNTHETIC_RAW_BACKEND_DETAIL'}:{status:'ok',enabled:true,passwordAvailable:current!=='status-disabled'}});
   if(action==='employee_logout')return route.fulfill({json:{status:'ok'}});
   if(action==='employee_login')return route.fulfill({json:{status:'ok',token:'B1_a_'+'b'.repeat(64),expiresAt,trustSource:'password-bound'}});
   if(action!=='employee_session')return route.fulfill({json:{status:'error'}});
@@ -29,8 +29,11 @@ async function fixture(page,mode){
   return route.fulfill({json:current==='auth'?{status:'error',message:'SYNTHETIC_RAW_BACKEND_DETAIL'}:
    {status:'ok',expiresAt,trustSource:'password-bound',phoneEligible:false}});
  });
- await page.goto(ORIGIN+'/home.html?timing=1');
- await expect.poll(()=>calls.includes('employee_session')).toBe(true);
+ await page.goto(ORIGIN+entry+'?timing=1');
+ await expect(page.locator('#dashboard-b-access')).toBeVisible();
+ const options=page.locator('.b-options'),summary=options.locator('summary');
+ if(await summary.isVisible() && await options.getAttribute('open')===null)await summary.click();
+ if(restore)await expect.poll(()=>calls.includes('employee_session')).toBe(true);
  if(mode==='timeout')await page.clock.fastForward(90001);
  return {calls,setMode:value=>{current=value;},proof:()=>page.evaluate(key=>sessionStorage.getItem(key),B)};
 }
@@ -61,4 +64,35 @@ test('SYNTHETIC pending permits explicit normal login; no automatic logout, logi
  expect(f.calls.filter(action=>action==='employee_logout')).toHaveLength(1); // Existing user-submitted login path only.
  expect(f.calls).not.toContain('private_access');expect(f.calls).not.toContain('read');
  expect(await f.proof()).not.toContain('SYNTHETIC_PASSWORD');
+});
+
+for(const entry of ['/home.html','/app.html'])for(const width of [1280,390]){
+ test(`SYNTHETIC ${entry} ${width}px: recheck without a lease reports service failure and recovers without sending credentials`,async({page})=>{
+  await page.setViewportSize({width,height:844});const f=await fixture(page,'status-auth',false,entry);
+  await page.locator('[data-b-refresh]').click();
+  await expect(page.locator('[data-b-message]')).toContainText('登入服務狀態檢查未通過');
+  expect(f.calls).toEqual(['employee_status']);expect(await f.proof()).toBeNull();
+  await expect(page.locator('[data-b-employee]')).toBeVisible();await expect(page.locator('[data-b-password]')).toBeVisible();
+  expect(await page.locator('[data-b-message]').textContent()).not.toContain('SYNTHETIC_RAW');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  if(entry==='/app.html')await page.screenshot({path:`test-results/business-login-recovery/SYNTHETIC-status-${width}.png`});
+  f.setMode('ok');await page.locator('[data-b-refresh]').click();
+  await expect(page.locator('[data-b-message]')).toContainText('目前沒有有效登入會話');
+  await expect(page.locator('[data-b-password]')).toBeFocused();
+  expect(f.calls).toEqual(['employee_status','employee_status']);expect(await f.proof()).toBeNull();
+ });
+}
+test('SYNTHETIC failed pre-login service status never submits the employee ID or password',async({page})=>{
+ const f=await fixture(page,'status-auth',false);
+ await page.locator('[data-b-employee]').fill('SYNTH001');await page.locator('[data-b-password]').fill('SYNTHETIC_PASSWORD');
+ await page.locator('[data-b-submit]').click();
+ await expect(page.locator('[data-b-message]')).toContainText('登入服務狀態檢查未通過');
+ expect(f.calls).toEqual(['employee_status']);expect(await f.proof()).toBeNull();
+ await expect(page.locator('[data-b-password]')).toHaveValue('');
+});
+test('SYNTHETIC locked recheck reports a disabled channel without login or fallback',async({page})=>{
+ const f=await fixture(page,'status-disabled',false);
+ await page.locator('[data-b-refresh]').click();
+ await expect(page.locator('[data-b-message]')).toContainText('指定密碼通道尚未開放');
+ expect(f.calls).toEqual(['employee_status']);expect(await f.proof()).toBeNull();
 });

@@ -33,3 +33,8 @@ for(const [mode,code]of [['network','B_NETWORK_UNAVAILABLE'],['http','B_SERVICE_
   assert.deepEqual([...f.saved],before);assert(!JSON.stringify([...f.saved]).includes('SYNTHETIC_PASSWORD'));
  });
 }
+test('anonymous status rejection is a service readiness failure, not an employee credential verdict',async()=>{
+ const f=fixture();f.mode('auth');
+ await assert.rejects(f.client.status(),error=>error.message==='B_STATUS_UNAVAILABLE');
+ assert.deepEqual(f.calls,['employee_status']);assert.deepEqual([...f.saved],[]);
+});

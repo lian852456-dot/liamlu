@@ -4,7 +4,7 @@ const DASHBOARD_B_CLIENT_ENABLED_ = true;
 const OWNER='https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
 const DEVICE_KEY='north12b_private_dashboard_device_id';
 const DATA_CACHE_KEY='north12b_password_data_v1',DATA_CACHE_TTL=60000;
-let host,client,active=false,confirmed=false,epoch=0,expiresAt=0,expiryTimer,dataCacheTimer,ready=false,loading=false,guarded=false,checking=null,panel,lastCheck=0,suspended=false;
+let host,client,active=false,confirmed=false,epoch=0,expiresAt=0,expiryTimer,dataCacheTimer,ready=false,loading=false,guarded=false,checking=null,rechecking=false,panel,lastCheck=0,suspended=false;
 const pendingHost=scope.DashboardBHost;
 let legacyObserver;
 // Opt-in, bounded timing diagnostics. Only fixed operation labels, durations
@@ -48,6 +48,7 @@ function mountTiming(){if(timingOutput)return;const details=document.createEleme
 function message(text){if(panel)panel.querySelector('[data-b-message]').textContent=text;}
 // Fixed, non-secret categories only. Never display a response body or exception text.
 function accessFailureMessage(error,stage='validate'){
+ if(error?.message==='B_STATUS_UNAVAILABLE')return '登入服務狀態檢查未通過（STATUS）；尚未送出員編與密碼。請管理者檢查正式驗證服務、名冊授權效期與同步紀錄；服務恢復後可按「重新核驗」。';
  const reasons={
   B_NETWORK_UNAVAILABLE:'網路連線未完成（NETWORK）',
   B_SERVICE_UNAVAILABLE:'服務回應失敗（SERVICE）',
@@ -115,6 +116,22 @@ async function logout(note='已登出指定密碼通道；裝置綁定保留。'
 function checkProfile(result){if(!result?.profile || result.profile.role!=='employee' || result.profile.isTrusted!==false || result.trustSource!=='password-bound')throw Error('B_AUTH_DENIED');}
 function conceal(value){
  suspended=value;document.body.classList.toggle('dashboard-b-suspended',value);
+}
+async function recheck(){
+ if(loading || checking || rechecking)return false;
+ if(active)return refresh(true,true);
+ // Without a lease, refresh() cannot authorize anything. Probe only the
+ // anonymous status route and explain the next action instead of doing nothing.
+ const expected=epoch,button=panel.querySelector('[data-b-refresh]');
+ rechecking=true;button.disabled=true;message('正在檢查登入服務…');
+ try{
+  const status=await client.status();if(expected!==epoch)return false;
+  state('locked');
+  if(!status.enabled || !status.passwordAvailable){message('指定密碼通道尚未開放，請管理者確認服務設定。');return false;}
+  message('登入服務可連線；目前沒有有效登入會話，請輸入員編與指定密碼後按登入按鈕。');
+  panel.querySelector('[data-b-password]').focus();return false;
+ }catch(error){if(expected===epoch){state('locked');message(accessFailureMessage(error));}return false;}
+ finally{rechecking=false;button.disabled=false;}
 }
 async function refresh(allowPhone=true,forceData=false){
  if(!active)return false;if(checking)return checking;
@@ -245,7 +262,7 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
   if(target.hasAttribute('data-b-a')){await scope.DashboardB.leaveForA();showLegacyAccess();return;}
   if(target.hasAttribute('data-b-logout')){await logout();return;}
   if(target.hasAttribute('data-b-phone')){target.disabled=true;try{await client.enrollPhone();state('active');message('已綁定這支手機，下次開啟 App 不用再輸入帳密。');}catch{message('手機綁定未完成；請確認連線或請管理者撤銷舊手機。');}finally{target.disabled=false;}return;}
-  if(target.hasAttribute('data-b-refresh')){await refresh(true,true);return;}
+  if(target.hasAttribute('data-b-refresh')){await recheck();return;}
   if(target.hasAttribute('data-b-return') || target.hasAttribute('data-b-module')){
    if(target.hasAttribute('data-b-return') && loading){await logout('已取消登入，返回原頁面。');host.navigate('return');return;}
    if(!active){message('請先登入指定密碼通道。');return;}

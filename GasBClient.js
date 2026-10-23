@@ -75,7 +75,15 @@ function createDashboardBClient(ownerExecUrl, options={}) {
     return post({action,...proof,...extra},expected);
   }
   return Object.freeze({
-    status:()=>post({action:'employee_status'}),
+    async status(){
+      try{return await post({action:'employee_status'});}
+      catch(error){
+        // This request contains no employee credentials or session proof.
+        // A denial here describes the shared service, never a bad password.
+        if(error.message==='B_AUTH_DENIED')throw new Error('B_STATUS_UNAVAILABLE');
+        throw error;
+      }
+    },
     async login(employeeId,deviceId,password) {
       clear();lastDeviceId=deviceId;const expected=generation;
       const nonce=hex(crypto.getRandomValues(new Uint8Array(32))),idem=hex(crypto.getRandomValues(new Uint8Array(16)));
