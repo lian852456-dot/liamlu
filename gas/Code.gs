@@ -5956,6 +5956,8 @@ function testNotify() {
 
 function checkSegAndNotify(seg) {
   const today = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd');
+  // One-day Taipei suspension exception; normal rules resume on 2026-10-25.
+  if (today === '2026-10-24') return { status: 'skipped', date: today, segment: seg, reason: 'taipei-work-suspension' };
   const data = readData(today, seg);
   const missing = STORES.filter(s => !data[s]);
 
