@@ -9440,6 +9440,29 @@ function privateDashboardCreateGasB_(options) {
       if(t<c.authority.effectiveAt || t>=c.authority.validUntil)throw new Error('B_ELIGIBILITY_DENIED');
       return {status:'ok',enabled:true,passwordAvailable:true}; });
   }
+  function primaryPatrolPassword(id,password) {
+    // Additional password channel only for the existing primary supervisor.
+    // Keep the original B verifier, session rules and password storage unchanged.
+    if(id!=='5510755' || !privateDashboardIsTrustedEmployee(id) || typeof password!=='string' || !password)return false;
+    try {
+      const response=UrlFetchApp.fetch('https://script.google.com/macros/s/AKfycbxqBtW2yQw_u4qqJ9Knz6CK34hAiunaa6lIQu4pMa8Ff2voJZCWKEh8MXTJ6qAoGTax/exec',{
+        method:'post',contentType:'application/json',payload:JSON.stringify({action:'ptauth',key:password}),
+        followRedirects:true,muteHttpExceptions:true,validateHttpsCertificates:true
+      });
+      if(response.getResponseCode()!==200)return false;
+      const text=response.getContentText();if(text.length>16000)return false;
+      const result=JSON.parse(text),time=Math.floor(now()/1000);
+      // The proof arrives only from the fixed HTTPS authority. Discard its token;
+      // issue the ordinary device-scoped B session below, without persisting it.
+      return !!result && !Array.isArray(result) &&
+        Object.keys(result).sort().join('|')==='deployment|expiresAt|expiresIn|sessionContract|status|token' &&
+        result.status==='ok' && result.deployment==='patrol-isolated-v1' && result.sessionContract==='patrol-session-v2' &&
+        typeof result.token==='string' && /^[A-Za-z0-9_-]{24,2048}\.[A-Za-z0-9_-]{32,128}$/.test(result.token) &&
+        Number.isSafeInteger(result.expiresAt) && result.expiresAt>time && result.expiresAt<=time+43260 &&
+        Number.isSafeInteger(result.expiresIn) && result.expiresIn>0 && result.expiresIn<=43200 &&
+        Math.abs(result.expiresAt-time-result.expiresIn)<=60;
+    } catch(_) { return false; }
+  }
   function login(p) {
     const id=p.employeeId,device=privateDashboardGasAuthDigest_(p.deviceId);
     const captured=transaction(function() {
@@ -9450,11 +9473,13 @@ function privateDashboardCreateGasB_(options) {
       return {config:config,snapshot:snapshot,delay:admission.delay,bindingRevision:store.bindings().revision};
     });
     sleep(captured.delay);
-    const verified=verify(p.password,captured.config.verifier);
-    if(!verified || !captured.snapshot)throw new Error('B_LOGIN_DENIED');
+    const originalVerified=verify(p.password,captured.config.verifier);
+    const patrolVerified=!originalVerified && !!captured.snapshot && primaryPatrolPassword(id,p.password);
+    if((!originalVerified && !patrolVerified) || !captured.snapshot)throw new Error('B_LOGIN_DENIED');
     return provider.commit(captured.snapshot,function() {
       const config=store.config();
       if(config.fingerprint!==captured.config.fingerprint)throw new Error('B_CONFIG_CHANGED');
+      if(patrolVerified && !privateDashboardIsTrustedEmployee(id))throw new Error('B_LOGIN_DENIED');
       privateDashboardBStrictNative_(id,config,now());
       const trusted=privateDashboardBTrusted_(id);
       const bindingState=store.bindings(),existing=bindingState.bindings[id];
