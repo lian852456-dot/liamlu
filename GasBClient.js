@@ -6,6 +6,7 @@ function createDashboardBClient(ownerExecUrl, options={}) {
   let session=null,generation=0,expiresAt=0,lastDeviceId='',lastPhoneToken='';
   function removeSaved(){try{storage?.removeItem(storageKey);}catch{}}
   function sessionState(name){try{options.onSessionState?.(name);}catch{}}
+  function rejectLogin(category){try{options.onAuthRejection?.(category);}catch{}throw new Error('B_AUTH_DENIED');}
   function savedSession(deviceId){
     let reason='invalid';
     try {
@@ -88,9 +89,13 @@ function createDashboardBClient(ownerExecUrl, options={}) {
       clear();lastDeviceId=deviceId;const expected=generation;
       const nonce=hex(crypto.getRandomValues(new Uint8Array(32))),idem=hex(crypto.getRandomValues(new Uint8Array(16)));
       const result=await post({action:'employee_login',employeeId,deviceId,track:'password-bound',password,sessionNonce:nonce,idempotencyKey:idem},expected);
-      if(expected!==generation || !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(result.token)||!Number.isSafeInteger(result.expiresAt)||result.trustSource!=='password-bound')throw new Error('B_AUTH_DENIED');
+      if(expected!==generation)rejectLogin('context');
+      if(!/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(result.token))rejectLogin('token-shape');
+      if(!Number.isSafeInteger(result.expiresAt))rejectLogin('expiry-type');
+      if(result.trustSource!=='password-bound')rejectLogin('trust-source');
       session={deviceId,token:result.token};expiresAt=result.expiresAt;
-      if(expiresAt<=Date.now() || expiresAt>Date.now()+1800000){clear();throw Error('B_AUTH_DENIED');}
+      if(expiresAt<=Date.now()){clear();rejectLogin('expiry-past');}
+      if(expiresAt>Date.now()+1800000){clear();rejectLogin('expiry-future');}
       if(storage){try{storage.setItem(storageKey,JSON.stringify({v:1,owner:ownerExecUrl,logoutEpoch:options.logoutEpoch?.()||'',...session,expiresAt}));}
         catch{try{await post({action:'employee_logout',...session});}finally{clear();}throw Error('B_STORAGE_UNAVAILABLE');}}
       return {expiresAt,trustSource:result.trustSource};
