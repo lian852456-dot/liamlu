@@ -55,6 +55,12 @@ for(const key of ['store_code','trade_date','source_employee_id','order_number',
 test('local cancellation summary keeps the original month and does not subtract twice',async()=>{
  const M=await sourceModule,s=C.parseSar74(text());s.records.push({...s.records[0],cancel_date:'2026-11-02'});
  const summary=M.summarizeSource(s,C);assert.equal(s.month,'2026-10');assert.equal(summary.cancelled,1);assert.equal(summary.active,3);assert.equal(summary.duplicates,1);
+ assert.equal(summary.crossMonthCancelled,1);assert.equal(summary.sameMonthCancelled,0);
+});
+test('local summary classifies same-month cancellation and rejects conflicting cancellation dates',async()=>{
+ const M=await sourceModule,s=C.parseSar74(text());s.records[0].cancel_date='2026-10-03';
+ const summary=M.summarizeSource(s,C);assert.equal(summary.sameMonthCancelled,1);assert.equal(summary.crossMonthCancelled,0);
+ s.records.push({...s.records[0],cancel_date:'2026-10-04'});assert.throws(()=>M.summarizeSource(s,C),/取消交易的日期衝突/);
 });
 test('unknown store fails before any server call',async()=>{
  const M=await sourceModule,s=C.parseSar74(text());s.records[0].store_code='DNB19999';assert.throws(()=>M.summarizeSource(s,C),/店碼/);

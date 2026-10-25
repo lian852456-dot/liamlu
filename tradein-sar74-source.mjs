@@ -41,13 +41,17 @@ export function summarizeSource(source,core){
   const prior=unique.get(key);
   if(prior){
    if(['store','date','employee','order','project','model'].some(field=>prior[field]!==item[field]))throw Error('同回收碼的交易、人員、店點或機款衝突');
-   if(item.cancel&&(!prior.cancel||item.cancel>prior.cancel))prior.cancel=item.cancel;
+   if(item.cancel&&prior.cancel&&item.cancel!==prior.cancel)throw Error('同筆取消交易的日期衝突');
+   if(item.cancel)prior.cancel=item.cancel;
    duplicates++;
   }else unique.set(key,item);
  }
  const rows=[...unique.values()];
  return {rows:source.records.length,unique:rows.length,duplicates,
-  cancelled:rows.filter(row=>row.cancel).length,active:rows.filter(row=>!row.cancel).length,
+  cancelled:rows.filter(row=>row.cancel).length,
+  sameMonthCancelled:rows.filter(row=>row.cancel&&row.date.slice(0,7)===source.month&&row.cancel.slice(0,7)===source.month).length,
+  crossMonthCancelled:rows.filter(row=>row.cancel&&(row.date.slice(0,7)!==source.month||row.cancel.slice(0,7)!==source.month)).length,
+  active:rows.filter(row=>!row.cancel).length,
   stores:core.STORES.map(([code,store])=>({store,rows:rows.filter(row=>row.store===code&&!row.cancel).length}))};
 }
 

@@ -263,11 +263,27 @@ test('a wrong returned source hash does not claim verified publication or replay
  expect(calls.filter(a=>a==='tradein_performance_publish')).toHaveLength(1);expect(calls.filter(a=>a==='tradein_performance_public_publish')).toHaveLength(1);
 });
 
-test('cancellation is visible locally and stays blocked under the existing counting policy',async({page})=>{
+test('same-month cancellation reaches the guarded preview and requires a reviewed exact-source policy',async({page})=>{
  const {runtime,calls}=await start(page),lines=csv().toString('utf8').split('\n'),row=lines[2].split(',');row[26]='1151003';lines[2]=row.join(',');
  await page.locator('#sourceMode').selectOption('paste');await page.locator('#sourcePaste').fill(lines.join('\n'));
  await page.locator('#validateSource').click();await expect(page.locator('#uploadLocalPreview')).toContainText('取消 1 筆');
- await expect(page.locator('#uploadLocalPreview')).toContainText('不能同步');
+ await expect(page.locator('#uploadLocalPreview')).toContainText('淨額 0');
+ await page.locator('#adminEmployeeId').fill(OPERATOR);await page.locator('#adminSecret').fill(runtime.secret);await page.locator('#completeScope').check();
+ const source=parsed(Buffer.from(lines.join('\n')));runtime.configure(source,{counting_policy:'monthly-reset-same-month-net/v2'});
+ await page.locator('#previewUpload').click();await expect(page.locator('#publishUpload')).toBeEnabled();
+ await expect(page.locator('#uploadPreview')).toContainText('有效回收 3 台');expect(runtime.writes).toEqual([]);
+ await page.locator('#publishUpload').click();await expect(page.locator('#uploadMessage')).toContainText('同步成功');
+ expect(calls.filter(a=>a==='tradein_performance_publish')).toHaveLength(1);
+ const registry=runtime.a.tradeinPerformanceRegistry_(),snapshot=runtime.a.tradeinPerformanceSnapshot_(registry.months[source.month].active);
+ expect(snapshot.cancellation_evidence.pairs).toHaveLength(1);
+ expect(snapshot.cancellation_evidence.pairs[0].sale.quantity).toBe(1);expect(snapshot.cancellation_evidence.pairs[0].cancellation.quantity).toBe(-1);
+ await page.screenshot({path:test.info().outputPath('same-month-cancellation.png'),fullPage:true});
+});
+
+test('cross-month cancellation is visible locally and sends no administrative request',async({page})=>{
+ const {runtime,calls}=await start(page),lines=csv().toString('utf8').replace('26年10月08日','26年11月03日').split('\n'),row=lines[2].split(',');row[26]='1151102';lines[2]=row.join(',');
+ await page.locator('#sourceMode').selectOption('paste');await page.locator('#sourcePaste').fill(lines.join('\n'));await page.locator('#validateSource').click();
+ await expect(page.locator('#uploadLocalPreview')).toContainText('跨月取消');await expect(page.locator('#uploadLocalPreview')).toContainText('不能同步');
  await page.locator('#adminEmployeeId').fill(OPERATOR);await page.locator('#adminSecret').fill(runtime.secret);await page.locator('#completeScope').check();
  await page.locator('#previewUpload').click();await expect(page.locator('#uploadMessage')).toContainText('整批停止同步');
  expect(calls.filter(a=>a!=='tradein_performance_public_read')).toEqual([]);expect(runtime.writes).toEqual([]);
