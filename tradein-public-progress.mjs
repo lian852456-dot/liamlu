@@ -1,9 +1,9 @@
 import {applyTargets,personalRules,targetPolicy} from './tradein-target-policy.mjs?v=20261012-targets-1';
-import {bindExports,refreshExports,clearExports} from './tradein-export-ui.mjs?v=20261012-targets-1';
-import {formatDifference,formatRecoveredModels,isDate} from './tradein-export-core.mjs?v=20261012-targets-1';
+import {bindExports,refreshExports,clearExports} from './tradein-export-ui.mjs?v=20261025-same-month-net-1';
+import {formatDifference,formatRecoveredModels,isDate} from './tradein-export-core.mjs?v=20261025-same-month-net-1';
 import {createPublicReader,readPublicFrame} from './tradein-public-read.mjs?v=20261010-date-read-1';
 import {boundedOperation} from './tradein-admin-operation.mjs?v=20261015-preview-recovery-1';
-import {prepareSource} from './tradein-sar74-source.mjs?v=20261017-paste-speed-1';
+import {prepareSource} from './tradein-sar74-source.mjs?v=20261025-same-month-net-1';
 const $=id=>document.getElementById(id),CORE=window.TradeinPerformanceCore,PUBLIC=window.TradeinPublicCore;
 const API='https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
 let snapshot=null,readEpoch=0,controller=null,source=null,plan=null,admin=null,checkpoint=null,busy=false,uploadEpoch=0,reading=false;
@@ -83,7 +83,7 @@ function renderLocal(value){
   s.stores.map(store=>store.store+' '+store.rows).join('／'),
   `${value.format} · ${value.encoding} · ${value.bytes} bytes；來源 SHA-256：${value.source.source_sha256}`,
   value.mode==='paste'?'貼上來源雜湊以本次原文字的 UTF-8 計算；與原 CSV 檔案雜湊可能不同。':'保留原 CSV 位元組的來源雜湊。',
-  s.cancelled?'本批含取消交易；依現行規則，取消／跨月沖回月份尚待核定，不能同步。':'請確認來源涵蓋完整九店、所有人員及專案（含單銷）；缺席店點不以列數推定為零。'
+  s.crossMonthCancelled?'本批含跨月取消交易；沖回月份尚待核定，不能同步。':s.sameMonthCancelled?'同月取消按原成交 +1、取消 −1，淨額 0；保留取消證據，不重複扣除。正式台數仍須管理者核對。':'請確認來源涵蓋完整九店、所有人員及專案（含單銷）；缺席店點不以列數推定為零。'
  ]){const p=document.createElement('p');p.textContent=text;host.append(p);}
 }
 async function readLocal(task){
@@ -101,7 +101,7 @@ async function validateLocal(){if(busy)return;invalidate();const task=beginUploa
 function credentials(){const employeeId=$('adminEmployeeId').value.trim().toUpperCase(),adminSecret=$('adminSecret').value;if(!employeeId||!adminSecret)throw Error('請提供管理者員編與密碼');return {employeeId,adminSecret};}
 function expected(s){return {expectedRegistryExists:s.registryExists,expectedRegistryHash:s.registryHash,expectedPublicRegistryExists:s.publicRegistryExists,expectedPublicRegistryHash:s.publicRegistryHash,expectedActiveHash:s.activeHash,expectedMonthlyHash:s.monthlyHash,expectedReferenceHash:s.referenceHash};}
 async function preview(){if(busy)return;let task;source=null;plan=null;admin=null;$('publishUpload').disabled=true;$('uploadPreview').replaceChildren();
- try{if(!$('completeScope').checked)throw Error('請提供完整九店 SAR74 並確認涵蓋範圍');const authorization=credentials();$('adminSecret').value='';task=beginUpload('preview');const local=await readLocal(task);if(local.summary.cancelled)throw Error('本批含取消交易；取消／跨月沖回月份尚待核定，整批停止同步');const parsed={...local.source,complete_nine_stores:true};
+ try{if(!$('completeScope').checked)throw Error('請提供完整九店 SAR74 並確認涵蓋範圍');const authorization=credentials();$('adminSecret').value='';task=beginUpload('preview');const local=await readLocal(task);if(local.summary.crossMonthCancelled)throw Error('本批含跨月取消交易；沖回月份尚待核定，整批停止同步');const parsed={...local.source,complete_nine_stores:true};
  const result=await request({action:'tradein_performance_preview',source:parsed,includeCheckpointState:true,...authorization},stage(task,'檔案已讀取，正在核對管理者與本月資料…'));if(!currentUpload(task))return;source=parsed;plan=result;admin=authorization;const s=result.snapshot.summary,policy=targetPolicy(parsed.month),targetPeople=policy?result.snapshot.people.length:s.target_staff_count,personalTarget=policy?.personalTarget||3;
  $('uploadPreview').textContent=`${parsed.month}：有效回收 ${s.total_units} 台；已對應 ${s.assigned_units} 台；待核 ${s.pending_identity_units} 台。目標 ${targetPeople} 人 × ${personalTarget} ＝ ${targetPeople*personalTarget} 台。${policy?"門市目標合計 159 台，與個人目標分別計算。":""}`;$('uploadMessage').textContent='預覽核對完成，確認後同步本月。';
  }catch(error){if(task&&!currentUpload(task))return;source=null;plan=null;admin=null;$('uploadMessage').textContent='預覽停止：'+error.message+'。尚未同步資料，請重新預覽。';}finally{if(task)finishUpload(task);}}

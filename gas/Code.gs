@@ -7218,20 +7218,47 @@ function tradeinPerformanceMonthRoster_(month,body) {
 }
 function tradeinPerformanceReferencePolicy_(value) {
   if(!value || value.counting_review_status!=='verified' || value.counting_rule_id!==TradeinPerformanceCore.RULE_ID ||
-     value.counting_policy!=='monthly-reset-no-cancellations/v1')
+     !['monthly-reset-no-cancellations/v1','monthly-reset-same-month-net/v2'].includes(value.counting_policy))
     throw new Error('每月重新計數口徑尚未核定，停止實績計算');
 }
 function tradeinPerformancePrivateReference_(source,roster) {
   if(!source || !/^[a-f0-9]{64}$/.test(source.source_sha256 || ''))throw new Error('來源雜湊無效');
   const file=tradeinPerformanceFile_('north12b-tradein-reference-'+source.source_sha256+'.json');
-  // Monthly actuals reset independently. Until cancellation attribution has
-  // been approved, this narrow policy only admits batches with no cancellations.
-  if(!Array.isArray(source.records) || source.records.some(function(r){return r.cancel_date!==null && r.cancel_date!==undefined && r.cancel_date!=='';}))
-    throw new Error('本批含取消交易；取消／跨月沖回月份尚待核定，整批停止同步');
+  const cancelled=tradeinPerformanceSameMonthCancellations_(source);
   const value=file?JSON.parse(file.getBlob().getDataAsString('UTF-8')):
     tradeinPerformanceReuseReference_(source,roster || tradeinPerformanceMonthRoster_(source.month));
   tradeinPerformanceReferencePolicy_(value);
+  if(cancelled.length && value.counting_policy!=='monthly-reset-same-month-net/v2')
+    throw new Error('本批私有對照尚未核定同月成交 +1／取消 −1，請管理者核對後重新預覽');
   return value;
+}
+function tradeinPerformanceSameMonthCancellations_(source) {
+  if(!Array.isArray(source.records))throw new Error('來源明細格式無效');
+  return source.records.filter(function(r){
+    if(r.cancel_date===null || r.cancel_date===undefined || r.cancel_date==='')return false;
+    if(typeof r.cancel_date!=='string' || typeof r.trade_date!=='string' ||
+       !/^\d{4}-\d{2}-\d{2}$/.test(r.cancel_date) || !/^\d{4}-\d{2}-\d{2}$/.test(r.trade_date))
+      throw new Error('交易／取消日期格式無效');
+    if(r.cancel_date.slice(0,7)!==source.month || r.trade_date.slice(0,7)!==source.month)
+      throw new Error('本批含跨月取消交易；沖回月份尚待核定，整批停止同步');
+    return true;
+  });
+}
+// Private immutable snapshot evidence, not an increment/decrement API. Stable
+// transaction keys exclude export hashes/row numbers and never leave this owner.
+function tradeinPerformanceCancellationEvidence_(source,reference) {
+  const ids=new Map(reference.employees.map(function(e){return [TradeinPerformanceCore.sourceEmployeeId(e.source_employee_id),e.employee_key];})),events=new Map();
+  tradeinPerformanceSameMonthCancellations_(source).forEach(function(r){
+    const key=tradeinPerformanceHash_([r.store_code,r.trade_date,r.order_number.trim(),r.recycle_code.trim()]);
+    const pair={transaction_key:key,store_code:r.store_code,employee_key:ids.get(TradeinPerformanceCore.sourceEmployeeId(r.source_employee_id)),
+      metadata_hash:tradeinPerformanceHash_([r.project,TradeinPerformanceCore.shortModel(r.recycle_model)]),
+      sale:{event_id:tradeinPerformanceDigest_(key+':sale'),date:r.trade_date,quantity:1},
+      cancellation:{event_id:tradeinPerformanceDigest_(key+':cancel'),date:r.cancel_date,quantity:-1}};
+    if(events.has(key) && JSON.stringify(events.get(key))!==JSON.stringify(pair))throw new Error('同筆取消交易的日期或歸屬衝突，整批停止同步');
+    events.set(key,pair);
+  });
+  return {schema_version:'tradein-same-month-cancellation/v1',policy:'sale-plus-cancel-minus/same-month/v1',
+    pairs:[...events.values()].sort(function(a,b){return a.transaction_key.localeCompare(b.transaction_key);})};
 }
 function tradeinPerformanceReuseReference_(source,roster) {
   // Only reuse the owner-held crosswalk behind this month's published version.
@@ -7279,6 +7306,9 @@ function tradeinPerformanceReuseReference_(source,roster) {
   if(pending.size)throw new Error('新檔有 '+pending.size+' 組新增員編或店點異動待核，請管理者更新私有對照後重新預覽');
   next.source_sha256=source.source_sha256;next.source_start=source.source_start;next.source_end=source.source_end;
   next.employee_id_policy='optional-55-prefix/v1';
+  // Only a new source reference derived from the verified active monthly basis
+  // adopts the narrow same-month policy. Existing exact references are not rewritten.
+  if(tradeinPerformanceSameMonthCancellations_(source).length)next.counting_policy='monthly-reset-same-month-net/v2';
   return next;
 }
 function tradeinPerformanceSaveReference_(source,reference) {
@@ -7370,7 +7400,20 @@ function tradeinPerformancePreview(payload) {
 function tradeinPerformanceBuild_(source,roster,reference) {
   const today=Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd');
   if(source.source_end>today || source.status_as_of_date>today)throw new Error('來源或取消核對日期不可晚於今天');
-  return TradeinPerformanceCore.build(source,roster,reference || tradeinPerformancePrivateReference_(source,roster));
+  const basis=reference || tradeinPerformancePrivateReference_(source,roster),value=TradeinPerformanceCore.build(source,roster,basis),
+    evidence=tradeinPerformanceCancellationEvidence_(source,basis),active=(tradeinPerformanceRegistry_().months[source.month] || {}).active,
+    prior=active?tradeinPerformanceSnapshot_(active):null;
+  if(prior && prior.cancellation_evidence){
+    const current=new Map(evidence.pairs.map(function(p){return [p.transaction_key,JSON.stringify(p)];}));
+    prior.cancellation_evidence.pairs.forEach(function(p){
+      if(current.get(p.transaction_key)!==JSON.stringify(p))throw new Error('已核取消交易在新來源缺漏或被改寫，請管理者核對原檔；整批停止同步');
+    });
+  }
+  if(evidence.pairs.length){
+    if(evidence.pairs.length!==value.summary.cancelled_units)throw new Error('取消交易去重與事件對帳失敗');
+    value.cancellation_evidence=evidence;
+  }
+  return value;
 }
 function tradeinPerformanceSaveRegistry_(registry) {
   const name='north12b-tradein-performance-registry.json',file=tradeinPerformanceFile_(name),body=JSON.stringify(registry);

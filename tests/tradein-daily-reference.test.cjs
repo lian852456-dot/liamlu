@@ -33,7 +33,7 @@ for(const [label,edit,error] of [
  ['changed source case',b=>b.records.at(-1).source_employee_id='12a45',/新增員編/],
  ['store transfer',b=>b.records.at(-1).store_code='DNB10062',/店點異動待核/],
  ['unknown store',b=>b.records.at(-1).store_code='DNB99999',/未知店碼/],
- ['cancellation',b=>b.records.at(-1).cancel_date='2026-10-10',/整批停止同步/],
+ ['cross-month cancellation',b=>{b.records.at(-1).cancel_date='2026-11-02';b.status_as_of_date='2026-11-03';},/整批停止同步/],
  ['older report',b=>{b.source_end='2026-10-06';b.status_as_of_date='2026-10-06';},/完整本月新檔/],
  ['new month',b=>{b.month='2026-11';b.source_start='2026-11-01';b.source_end='2026-11-09';},/本月首次來源/]
 ])test(label+' is rejected with no private mutation',()=>{const {r,source}=setup(),batch=next(source);edit(batch);noWriteFailure(r,batch,error);});

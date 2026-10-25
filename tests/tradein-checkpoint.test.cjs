@@ -91,7 +91,7 @@ for(const field of ['owner_script_id','month','source_sha256','registry_sha256',
  });
  const writes=r.writes.length;assert.throws(()=>r.a.tradeinPerformanceCheckpointRestore(restorePayload(r,source,bad)));assert.equal(r.writes.length,writes);assert.equal(r.held(),false);
 });
-test('C1 rejects unreviewed or cancelled batch and mismatch with preview before checkpoint creation',()=>{
+test('C1 rejects unreviewed references or a newly canceled source differing from its preview before checkpoint creation',()=>{
  for(const mode of ['preview','cancel','reference']){
   const {r,source}=setup(),p=r.a.tradeinPerformancePreview({...base(source),source});
   if(mode==='cancel')source.records[0].cancel_date='2026-10-03';

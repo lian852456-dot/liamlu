@@ -27,8 +27,8 @@ test('missing exact source reference blocks before any private writes',()=>{
 test('blank cancellations do not authorize candidate counting rules',()=>{
  const {r,source}=setup();r.configure(source,{counting_review_status:'unverified'});readonlyFailure(r,source,/重新計數口徑/);
 });
-test('any cancellation blocks the whole batch while attribution is unapproved',()=>{
- const {r,source}=setup();source.records[0].cancel_date='2026-10-03';readonlyFailure(r,source,/整批停止同步/);
+test('existing exact no-cancellation reference cannot silently authorize a new cancellation policy',()=>{
+ const {r,source}=setup();source.records[0].cancel_date='2026-10-03';readonlyFailure(r,source,/尚未核定同月/);
 });
 test('client-supplied private reference cannot override the owner-loaded file',()=>{
  const {r,source}=setup();r.configs.delete('north12b-tradein-reference-'+source.source_sha256+'.json');
