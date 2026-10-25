@@ -34,7 +34,9 @@ function tradeinPerformancePublicReadLocked_(payload,verified){
       tradeinPerformanceFile_('north12b-tradein-days-'+current.source_sha256+'.json'):null;
     if(daysFile)value=TradeinPublicCore.withDays(value,tradeinPerformanceSnapshot_(current),JSON.parse(daysFile.getBlob().getDataAsString('UTF-8')),current.roster_hash);
     // Old cached clients validate the original allowlist. Daily aggregates are opt-in.
-    if(payload.includeDays!==true)value=TradeinPublicCore.validate({...value,people:value.people.map(function(p){const safe={...p};delete safe.recovered_days;return safe;})});
+    if(payload.includeDays!==true)value=TradeinPublicCore.validate({...value,
+      people:value.people.map(function(p){const safe={...p};delete safe.recovered_days;return safe;}),
+      stores:value.stores.map(function(s){const safe={...s};delete safe.recovered_days;return safe;})});
     // Reconstruct the response from a strict validated allowlist, never spread registry/entry/private JSON.
     return {snapshot:value,availableMonths:Object.keys(registry.months).sort()};
 }
