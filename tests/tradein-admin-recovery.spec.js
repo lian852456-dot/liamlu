@@ -37,6 +37,33 @@ async function start(page,{intercept,seed=false,bytes=csv()}={}){
  return {runtime,calls,responses,source,prepare};
 }
 
+test('preview recovers from a transient HTTP 404 before enabling sync',async({page})=>{
+ let failed=false;
+ const {calls,runtime,prepare}=await start(page,{intercept:async({route,payload})=>{
+  if(payload.action!=='tradein_performance_preview'||failed)return false;
+  failed=true;await route.fulfill({status:404,contentType:'text/html',body:'SYNTHETIC temporary 404'});return true;
+ }});
+ await prepare();await page.locator('#previewUpload').click();
+ await expect(page.locator('#uploadMessage')).toContainText('正在重新連線（2/2）');
+ await expect(page.locator('#publishUpload')).toBeDisabled();
+ await page.clock.fastForward(1501);
+ await expect(page.locator('#uploadMessage')).toContainText('預覽核對完成');
+ await expect(page.locator('#publishUpload')).toBeEnabled();
+ expect(calls.filter(a=>a==='tradein_performance_preview')).toHaveLength(2);expect(runtime.writes).toEqual([]);
+});
+
+test('persistent HTTP 404 stops preview without writing or enabling sync',async({page})=>{
+ const {calls,runtime,prepare}=await start(page,{intercept:async({route,payload})=>{
+  if(payload.action!=='tradein_performance_preview')return false;
+  await route.fulfill({status:404,contentType:'text/html',body:'SYNTHETIC persistent 404'});return true;
+ }});
+ await prepare();await page.locator('#previewUpload').click();
+ await expect(page.locator('#uploadMessage')).toContainText('正在重新連線');await page.clock.fastForward(1501);
+ await expect(page.locator('#uploadMessage')).toContainText('預覽停止：服務暫時無回應（HTTP 404）');
+ await expect(page.locator('#publishUpload')).toBeDisabled();await expect(page.locator('#previewUpload')).toBeEnabled();
+ expect(calls.filter(a=>a==='tradein_performance_preview')).toHaveLength(2);expect(runtime.writes).toEqual([]);
+});
+
 test('pending preview names the server stage, times out once, and can be retried',async({page},info)=>{
  let stalled=true;
  const {calls,runtime,prepare}=await start(page,{intercept:async({payload})=>stalled&&payload.action==='tradein_performance_preview'});
