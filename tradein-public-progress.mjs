@@ -2,7 +2,7 @@ import {applyTargets,personalRules,targetPolicy} from './tradein-target-policy.m
 import {bindExports,refreshExports,clearExports} from './tradein-export-ui.mjs?v=20261025-same-month-net-1';
 import {formatDifference,formatRecoveredModels,isDate} from './tradein-export-core.mjs?v=20261025-same-month-net-1';
 import {createPublicReader,readPublicFrame} from './tradein-public-read.mjs?v=20261010-date-read-1';
-import {boundedOperation} from './tradein-admin-operation.mjs?v=20261015-preview-recovery-1';
+import {requestAdmin} from './tradein-admin-operation.mjs?v=20261025-http-recovery-1';
 import {prepareSource} from './tradein-sar74-source.mjs?v=20261025-same-month-net-1';
 const $=id=>document.getElementById(id),CORE=window.TradeinPerformanceCore,PUBLIC=window.TradeinPublicCore;
 const API='https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
@@ -30,10 +30,9 @@ function visiblePeople(){
 function filteredPeople(){const store=$('staffStore').value;return visiblePeople().filter(p=>(!store||p.store===store)&&(!selectedCounts.size||selectedCounts.has(p.actual_units===null?'unknown':String(p.actual_units))));}
 function modelsText(p){return esc(formatRecoveredModels(p.actual_units,p.recovered_models));}
 async function request(payload,{signal,onSlow}={}){
- return boundedOperation(async attemptSignal=>{
-  const response=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),cache:'no-store',credentials:'omit',signal:attemptSignal});
-  if(!response.ok)throw Error('服務暫時無回應（HTTP '+response.status+'）');const body=await response.json();if(!body||body.status==='error')throw Error(body?.message||'讀取未完成');return body;
- },{signal,onSlow,timeoutMessage:'服務核對逾時（60 秒），請稍後再試'});
+ return requestAdmin(API,payload,{signal,onSlow,onRetry:status=>{
+  if(!signal?.aborted)$('uploadMessage').textContent='預覽連線暫時失敗（HTTP '+status+'），正在重新連線（2/2）…';
+ }});
 }
 function context(){const period=CORE.monthPeriod($('periodMonth').value),people=visiblePeople();return {active:!!snapshot,mode:'public',dailyAvailable:dailyAvailable(),people:(selectedDate?people:snapshot?.people||[]).map(personTuple),currentPeople:filteredPeople().map(personTuple),countFilterLabel:selectedCounts.size?'回收 '+[...selectedCounts].map(n=>n==='unknown'?'待核':n+' 筆').join('、'):'',allowedStores:snapshot?.stores.map(s=>s.store)||[],selectedStore:$('staffStore').value,rules:{...period,month:$('periodMonth').value,periodStatus:'confirmed',cadence:'monthly',...personalRules($('periodMonth').value),storeTarget:snapshot?.target_policy?snapshot.summary.target_units:null,isDemo:false,sourceStart:snapshot?.source_period.start,sourceEnd:snapshot?.source_period.end,cutoff:snapshot?.source_cutoff_date,timezone:'Asia/Taipei',selectedDate}};}
 function wipe(){snapshot=null;selectedCounts.clear();clearExports();$('dateModeNote').hidden=true;$('publicWorkspace').hidden=true;['stats','storeRows','staffRows','staffCounts'].forEach(id=>$(id).replaceChildren());$('staffResultCount').textContent='';$('periodMeta').textContent='';$('updatedLabel').textContent='';$('staffStore').replaceChildren();$('recoveryDate').disabled=true;$('clearRecoveryDate').disabled=true;}
