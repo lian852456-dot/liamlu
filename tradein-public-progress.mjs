@@ -21,7 +21,7 @@ function dayEntry(person){
  const entry=person.recovered_days.find(day=>day&&day.date===selectedDate);
  return entry?{actual_units:entry.actual_units,recovered_models:entry.recovered_models??null}:{actual_units:0,recovered_models:[]};
 }
-function dailyAvailable(){return Boolean(selectedDate&&dateInSource(selectedDate)&&Array.isArray(snapshot?.people)&&snapshot.people.every(p=>Array.isArray(p.recovered_days)));}
+function dailyAvailable(){return Boolean(selectedDate&&dateInSource(selectedDate)&&Array.isArray(snapshot?.people)&&snapshot.people.every(p=>Array.isArray(p.recovered_days))&&(!snapshot.stores.some(s=>s.support_in_units!==undefined)||snapshot.stores.every(s=>Array.isArray(s.recovered_days))));}
 function visiblePeople(){
  if(!selectedDate)return snapshot?.people||[];
  if(!dailyAvailable())return [];
@@ -45,7 +45,10 @@ function setHeaders(daily){
  store.forEach((cell,index)=>{cell.hidden=daily&&index>1;});
  person.forEach((cell,index)=>{cell.hidden=daily&&index>2;});
  }
-function dailyRows(){const byStore=new Map(snapshot.stores.map(s=>[s.store,0]));visiblePeople().forEach(p=>byStore.set(p.store,(byStore.get(p.store)||0)+p.actual_units));return [...byStore.entries()].map(([store,actual_units])=>({store,actual_units}));}
+function dailyRows(){
+ if(snapshot.stores.every(s=>Array.isArray(s.recovered_days)))return snapshot.stores.map(s=>({store:s.store,actual_units:s.recovered_days.find(d=>d.date===selectedDate)?.actual_units||0}));
+ const byStore=new Map(snapshot.stores.map(s=>[s.store,0]));visiblePeople().forEach(p=>byStore.set(p.store,(byStore.get(p.store)||0)+p.actual_units));return [...byStore.entries()].map(([store,actual_units])=>({store,actual_units}));
+}
 function renderUnknownDay(){
  $('readMessage').textContent='選定日期資料尚未提供，當日回收、店點與人員明細保留未知。';$('dateModeNote').hidden=false;$('periodMeta').textContent=`${snapshot.month} · 統計日期 ${selectedDate||'未選定'} · 來源 ${snapshot.source_period.start}–${snapshot.source_cutoff_date}`;
  $('stats').innerHTML=[['當日回收','未提供','選定日期資料未知'],['有回收店數','未提供','選定日期資料未知'],['有回收人數','未提供','選定日期資料未知'],['統計日期',selectedDate||'未選定','台北時間']].map(v=>`<article class="kpi"><span>${v[0]}</span><strong>${v[1]}</strong><small>${v[2]}</small></article>`).join('');

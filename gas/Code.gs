@@ -7001,9 +7001,20 @@ var TradeinPerformanceCore = (function () {
       });
       employees.set(sourceEmployeeId(e.source_employee_id),{employee_key:e.employee_key,observations});canonical.add(e.employee_key);
     });
-    return {stores,employees};
+    const support=new Map();
+    if(config.support_approvals!==undefined){
+      if(!Array.isArray(config.support_approvals)||config.support_approvals.length>20000)throw new Error('跨店支援核定格式無效');
+      config.support_approvals.forEach(a=>{
+        if(!a||Object.keys(a).sort().join('|')!==['transaction_key','employee_key','home_store','store','trade_date','review_status'].sort().join('|')||
+           !/^[a-f0-9]{64}$/.test(a.transaction_key||'')||support.has(a.transaction_key)||!canonical.has(a.employee_key)||
+           !STORES.some(s=>s[1]===a.home_store)||!STORES.some(s=>s[1]===a.store)||a.home_store===a.store||a.review_status!=='verified'||
+           date(a.trade_date)<input.source_start||a.trade_date>input.source_end)throw new Error('跨店支援核定缺漏或衝突');
+        support.set(a.transaction_key,a);
+      });
+    }
+    return {stores,employees,support};
   }
-  function build(input, roster, privateConfig) {
+  function build(input, roster, privateConfig, transactionHash) {
     if (!input || input.rule_id!==RULE_ID || input.complete_nine_stores!==true) throw new Error('九店涵蓋或計數規則尚未確認');
     const period=monthPeriod(input.month), start=date(input.source_start), end=date(input.source_end);
     const statusAsOf=date(input.status_as_of_date || end);
@@ -7041,7 +7052,16 @@ var TradeinPerformanceCore = (function () {
       const key=r.recycle_code.trim(), order=r.order_number.trim();
       if (!key || !order || key.length>100 || order.length>100) throw new Error('缺少有效回收碼／銷貨單號');
       const model=shortModel(r.recycle_model);
-      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project,model:model};
+      let support=null;
+      const person=byId[identity.employee_key];
+      if(person&&person.store!==store&&reference.support.size){
+        if(typeof transactionHash!=='function')throw new Error('跨店支援交易核對程式未提供');
+        const key=transactionHash([r.store_code,trade,order,r.recycle_code.trim()]),approval=reference.support.get(key);
+        if(approval&&approval.employee_key===person.employee_key&&approval.home_store===person.store&&approval.store===store&&approval.trade_date===trade)
+          support={...approval};
+        if(!support)throw new Error('跨店交易未符合已核支援範圍');
+      }
+      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project,model:model,support:support};
       if (unique[key]) {
         const prior=unique[key];
         if (prior.store!==store || prior.trade_date!==trade || prior.employee_key!==normalized.employee_key || prior.order!==order || prior.project!==r.project) throw new Error('同回收碼的交易、人員或店點衝突');
@@ -7052,13 +7072,21 @@ var TradeinPerformanceCore = (function () {
     });
     Object.values(unique).forEach(r=>{
       const person=byId[r.employee_key];
-      if(!r.cancel_date && person && person.store!==r.store)person.identity_status='conflict';
+      if(!r.cancel_date && person && person.store!==r.store&&!r.support)person.identity_status='conflict';
     });
+    const supportEvidence=Object.values(unique).filter(r=>r.support).map(r=>r.support).sort((a,b)=>a.transaction_key.localeCompare(b.transaction_key));
+    if(input.records.length&&reference.support.size!==supportEvidence.length)throw new Error('已核跨店支援在來源缺漏或被改寫');
+    if(supportEvidence.length)stores.forEach(s=>{s.support_in_units=0;s.support_out_units=0;s.recovered_days=[];});
     Object.values(unique).forEach(r=>{
       if (r.cancel_date) {cancelled++;return;}
       const store=byStore[r.store];store.total_units++;
+      if(supportEvidence.length){
+        let day=store.recovered_days.find(d=>d.date===r.trade_date);
+        if(!day){day={date:r.trade_date,actual_units:0};store.recovered_days.push(day);}day.actual_units++;
+        if(r.support){store.support_in_units++;byStore[r.support.home_store].support_out_units++;}
+      }
       const person=byId[r.employee_key];
-      if (!person || person.store!==r.store || person.identity_status==='conflict') {store.pending_identity_units++;store.coverage='partial_identity';return;}
+      if (!person || person.store!==r.store&&!r.support || person.identity_status==='conflict') {store.pending_identity_units++;store.coverage='partial_identity';return;}
       person.actual_units++;
       let daily=person.recovered_days.find(d=>d.date===r.trade_date);
       if(!daily){daily={date:r.trade_date,actual_units:0,recovered_models:[]};person.recovered_days.push(daily);}
@@ -7068,6 +7096,7 @@ var TradeinPerformanceCore = (function () {
       if(!r.model)person.recovered_models=null;
       else if(person.recovered_models!==null){const item=person.recovered_models.find(m=>m.model===r.model);if(item)item.units++;else person.recovered_models.push({model:r.model,units:1});}
     });
+    if(supportEvidence.length)stores.forEach(s=>s.recovered_days.sort((a,b)=>a.date.localeCompare(b.date)));
     people.forEach(p=>{
       const s=byStore[p.store], exempt=['店長','代理店長'].includes(p.role);
       if(p.identity_status==='conflict'){p.actual_units=null;p.recovered_models=null;p.recovered_days=null;s.coverage='partial_identity';}
@@ -7091,7 +7120,8 @@ var TradeinPerformanceCore = (function () {
     if (summary.assigned_units+summary.pending_identity_units!==summary.total_units) throw new Error('店、人員與未分配台數對帳失敗');
     return {schema_version:'tradein-performance/v1',period_key:input.month,rule_id:RULE_ID,target_period:period,
       source_period:{start:start,end:end},source_cutoff_date:end,cutoff_precision:'date',timezone:'Asia/Taipei',
-      source_sha256:input.source_sha256,status_as_of_date:statusAsOf,printed_at:String(input.printed_at || ''),people:people,stores:stores,summary:summary};
+      source_sha256:input.source_sha256,status_as_of_date:statusAsOf,printed_at:String(input.printed_at || ''),people:people,stores:stores,summary:summary,
+      ...(supportEvidence.length?{support_evidence:supportEvidence}:{})};
   }
   function csv(text) {
     const rows=[];let row=[],cell='',quoted=false;
@@ -7280,12 +7310,13 @@ function tradeinPerformanceReuseReference_(source,roster) {
   // Validate all identifiers, store mappings and original observations before reuse.
   TradeinPerformanceCore.build({month:source.month,source_start:snapshot.source_period.start,
     source_end:snapshot.source_period.end,status_as_of_date:snapshot.status_as_of_date,
-    source_sha256:active.source_sha256,rule_id:TradeinPerformanceCore.RULE_ID,complete_nine_stores:true,records:[]},roster,prior);
+    source_sha256:active.source_sha256,rule_id:TradeinPerformanceCore.RULE_ID,complete_nine_stores:true,records:[]},roster,prior,tradeinPerformanceHash_);
   const next=JSON.parse(JSON.stringify(prior)),identities=new Map(next.employees.map(function(p){return [TradeinPerformanceCore.sourceEmployeeId(p.source_employee_id),p];}));
   const people=new Map(roster.filter(function(p){return p.status==='active';}).map(function(p){return [p.employee_id,p];}));
   const published=new Map(snapshot.people.map(function(p){return [p.employee_key,p];}));
   const stores=new Map(next.stores.map(function(p){return [p.store_code,TradeinPerformanceCore.storeName(p.store)];}));
   const pending=new Set();
+  const approvals=prior.support_approvals||[];
   source.records.forEach(function(record){
     const sourceId=TradeinPerformanceCore.sourceEmployeeId(record.source_employee_id);
     let identity=identities.get(sourceId);
@@ -7294,9 +7325,11 @@ function tradeinPerformanceReuseReference_(source,roster) {
     const person=identity && people.get(identity.employee_key),
       confirmed=identity && published.get(identity.employee_key),store=stores.get(record.store_code);
     if(!store)throw new Error('來源含九店範圍以外或未知店碼');
-    if(!person || !confirmed || confirmed.identity_status!=='confirmed' ||
-       TradeinPerformanceCore.storeName(person.store)!==store || confirmed.store!==store ||
-       identity.observations.some(function(o){return stores.get(o.store_code)!==store;})){
+    const home=person&&TradeinPerformanceCore.storeName(person.store),key=tradeinPerformanceHash_([record.store_code,record.trade_date,record.order_number.trim(),record.recycle_code.trim()]);
+    const support=approvals.some(function(a){return a.review_status==='verified'&&a.transaction_key===key&&a.employee_key===identity?.employee_key&&a.home_store===home&&a.store===store&&a.trade_date===record.trade_date;});
+    if(!person || !confirmed || confirmed.identity_status!=='confirmed' || confirmed.store!==home ||
+       home!==store&&!support ||
+       identity.observations.some(function(o){return stores.get(o.store_code)!==home&&!approvals.some(function(a){return a.review_status==='verified'&&a.employee_key===identity.employee_key&&a.home_store===home&&a.store===stores.get(o.store_code)&&a.trade_date===o.trade_date;});})){
       pending.add(JSON.stringify([record.source_employee_id,record.store_code]));return;
     }
     if(!identities.has(sourceId)){identities.set(sourceId,identity);next.employees.push(identity);}
@@ -7400,13 +7433,19 @@ function tradeinPerformancePreview(payload) {
 function tradeinPerformanceBuild_(source,roster,reference) {
   const today=Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd');
   if(source.source_end>today || source.status_as_of_date>today)throw new Error('來源或取消核對日期不可晚於今天');
-  const basis=reference || tradeinPerformancePrivateReference_(source,roster),value=TradeinPerformanceCore.build(source,roster,basis),
+  const basis=reference || tradeinPerformancePrivateReference_(source,roster),value=TradeinPerformanceCore.build(source,roster,basis,tradeinPerformanceHash_),
     evidence=tradeinPerformanceCancellationEvidence_(source,basis),active=(tradeinPerformanceRegistry_().months[source.month] || {}).active,
     prior=active?tradeinPerformanceSnapshot_(active):null;
   if(prior && prior.cancellation_evidence){
     const current=new Map(evidence.pairs.map(function(p){return [p.transaction_key,JSON.stringify(p)];}));
     prior.cancellation_evidence.pairs.forEach(function(p){
       if(current.get(p.transaction_key)!==JSON.stringify(p))throw new Error('已核取消交易在新來源缺漏或被改寫，請管理者核對原檔；整批停止同步');
+    });
+  }
+  if(prior && prior.support_evidence){
+    const current=new Map((value.support_evidence||[]).map(function(p){return [p.transaction_key,JSON.stringify(p)];}));
+    prior.support_evidence.forEach(function(p){
+      if(current.get(p.transaction_key)!==JSON.stringify(p))throw new Error('已核跨店支援在新來源缺漏或被改寫，請核對原檔；整批停止同步');
     });
   }
   if(evidence.pairs.length){
@@ -7722,13 +7761,39 @@ var TradeinPublicCore=(function(){
       if(Object.prototype.hasOwnProperty.call(p,'recovered_models'))validateModels(p.recovered_models,p.actual_units);
       if(Object.prototype.hasOwnProperty.call(p,'recovered_days'))validateDays(p.recovered_days,p.actual_units,value.source_period,p.recovered_models);
     });
+    const support=value.stores.some(s=>Object.prototype.hasOwnProperty.call(s,'support_in_units')),
+      storeDays=value.stores.some(s=>Object.prototype.hasOwnProperty.call(s,'recovered_days'));
     value.stores.forEach(function(s,i){
-      if(!keys(s,['store','actual_units','target_units','remaining_units','target_people','met_people'])||s.store!==STORES[i]||
+      const fields=['store','actual_units','target_units','remaining_units','target_people','met_people'];
+      if(support)fields.push('support_in_units','support_out_units');
+      if(storeDays)fields.push('recovered_days');
+      if(!keys(s,fields)||s.store!==STORES[i]||
         !['actual_units','target_units','remaining_units','target_people','met_people'].every(k=>number(s[k])))throw Error('公開店點白名單格式無效');
       const people=value.people.filter(p=>p.store===s.store),targets=people.filter(p=>p.target_units===3);
       if(s.target_units!==targets.length*3||s.target_people!==targets.length||s.met_people!==targets.filter(p=>p.attainment_status==='met').length||
-        s.remaining_units!==targets.reduce((n,p)=>n+(p.remaining_units||0),0)||s.actual_units<people.reduce((n,p)=>n+(p.actual_units||0),0))throw Error('公開店點數字不一致');
+        s.remaining_units!==targets.reduce((n,p)=>n+(p.remaining_units||0),0))throw Error('公開店點數字不一致');
+      const assigned=people.reduce((n,p)=>n+(p.actual_units||0),0);
+      if(support){
+        if(!number(s.support_in_units)||!number(s.support_out_units)||s.support_in_units>s.actual_units||s.support_out_units>assigned||
+          people.some(p=>p.actual_units===null)||s.actual_units+s.support_out_units-s.support_in_units!==assigned)throw Error('公開跨店支援與店、人員實績不一致');
+      }else if(s.actual_units<assigned)throw Error('公開店點數字不一致');
+      if(storeDays){
+        if(!support||!Array.isArray(s.recovered_days)||s.recovered_days.length>31)throw Error('公開店點逐日格式無效');
+        const seenDays=new Set();let total=0;
+        s.recovered_days.forEach(d=>{
+          if(!keys(d,['date','actual_units'])||!day(d.date)||d.date<value.source_period.start||d.date>value.source_period.end||seenDays.has(d.date)||!number(d.actual_units)||d.actual_units===0)throw Error('公開店點逐日數字無效');
+          seenDays.add(d.date);total+=d.actual_units;
+        });
+        if(total!==s.actual_units)throw Error('公開店點逐日與整月不一致');
+      }
     });
+    if(support&&value.stores.reduce((n,s)=>n+s.support_in_units-s.support_out_units,0)!==0)throw Error('公開跨店支援全區未對帳');
+    if(storeDays&&value.people.every(p=>Array.isArray(p.recovered_days))){
+      const peopleDays=new Map(),totals=new Map();
+      value.people.forEach(p=>p.recovered_days.forEach(d=>peopleDays.set(d.date,(peopleDays.get(d.date)||0)+d.actual_units)));
+      value.stores.forEach(s=>s.recovered_days.forEach(d=>totals.set(d.date,(totals.get(d.date)||0)+d.actual_units)));
+      if(peopleDays.size!==totals.size||[...peopleDays].some(([date,n])=>totals.get(date)!==n))throw Error('公開店、人員逐日未對帳');
+    }
     const s=value.summary;
     if(!keys(s,['actual_units','target_units','remaining_units','target_people','met_people','store_count'])||s.store_count!==9||
        !['actual_units','target_units','remaining_units','target_people','met_people'].every(k=>number(s[k])&&s[k]===value.stores.reduce((n,p)=>n+p[k],0)))throw Error('公開區數字不一致');
@@ -7747,7 +7812,9 @@ var TradeinPublicCore=(function(){
       }),stores:STORES.map(function(store){
         const s=snapshot.stores.find(s=>s.store===store);if(!s)throw Error('公開來源店點缺漏');
         return {store:store,actual_units:s.total_units,target_units:s.staff_target_units,remaining_units:s.staff_gap_units,
-          target_people:s.target_staff_count,met_people:s.met_staff_count};
+          target_people:s.target_staff_count,met_people:s.met_staff_count,
+          ...(snapshot.support_evidence?.length?{support_in_units:s.support_in_units,support_out_units:s.support_out_units,
+            recovered_days:s.recovered_days.map(d=>({date:d.date,actual_units:d.actual_units}))}:{})};
       }),summary:{}};
     ['actual_units','target_units','remaining_units','target_people','met_people'].forEach(k=>{value.summary[k]=value.stores.reduce((n,s)=>n+s[k],0);});
     value.summary.store_count=9;return validate(value);
@@ -7826,7 +7893,9 @@ function tradeinPerformancePublicReadLocked_(payload,verified){
       tradeinPerformanceFile_('north12b-tradein-days-'+current.source_sha256+'.json'):null;
     if(daysFile)value=TradeinPublicCore.withDays(value,tradeinPerformanceSnapshot_(current),JSON.parse(daysFile.getBlob().getDataAsString('UTF-8')),current.roster_hash);
     // Old cached clients validate the original allowlist. Daily aggregates are opt-in.
-    if(payload.includeDays!==true)value=TradeinPublicCore.validate({...value,people:value.people.map(function(p){const safe={...p};delete safe.recovered_days;return safe;})});
+    if(payload.includeDays!==true)value=TradeinPublicCore.validate({...value,
+      people:value.people.map(function(p){const safe={...p};delete safe.recovered_days;return safe;}),
+      stores:value.stores.map(function(s){const safe={...s};delete safe.recovered_days;return safe;})});
     // Reconstruct the response from a strict validated allowlist, never spread registry/entry/private JSON.
     return {snapshot:value,availableMonths:Object.keys(registry.months).sort()};
 }

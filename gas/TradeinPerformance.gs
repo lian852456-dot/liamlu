@@ -111,12 +111,13 @@ function tradeinPerformanceReuseReference_(source,roster) {
   // Validate all identifiers, store mappings and original observations before reuse.
   TradeinPerformanceCore.build({month:source.month,source_start:snapshot.source_period.start,
     source_end:snapshot.source_period.end,status_as_of_date:snapshot.status_as_of_date,
-    source_sha256:active.source_sha256,rule_id:TradeinPerformanceCore.RULE_ID,complete_nine_stores:true,records:[]},roster,prior);
+    source_sha256:active.source_sha256,rule_id:TradeinPerformanceCore.RULE_ID,complete_nine_stores:true,records:[]},roster,prior,tradeinPerformanceHash_);
   const next=JSON.parse(JSON.stringify(prior)),identities=new Map(next.employees.map(function(p){return [TradeinPerformanceCore.sourceEmployeeId(p.source_employee_id),p];}));
   const people=new Map(roster.filter(function(p){return p.status==='active';}).map(function(p){return [p.employee_id,p];}));
   const published=new Map(snapshot.people.map(function(p){return [p.employee_key,p];}));
   const stores=new Map(next.stores.map(function(p){return [p.store_code,TradeinPerformanceCore.storeName(p.store)];}));
   const pending=new Set();
+  const approvals=prior.support_approvals||[];
   source.records.forEach(function(record){
     const sourceId=TradeinPerformanceCore.sourceEmployeeId(record.source_employee_id);
     let identity=identities.get(sourceId);
@@ -125,9 +126,11 @@ function tradeinPerformanceReuseReference_(source,roster) {
     const person=identity && people.get(identity.employee_key),
       confirmed=identity && published.get(identity.employee_key),store=stores.get(record.store_code);
     if(!store)throw new Error('來源含九店範圍以外或未知店碼');
-    if(!person || !confirmed || confirmed.identity_status!=='confirmed' ||
-       TradeinPerformanceCore.storeName(person.store)!==store || confirmed.store!==store ||
-       identity.observations.some(function(o){return stores.get(o.store_code)!==store;})){
+    const home=person&&TradeinPerformanceCore.storeName(person.store),key=tradeinPerformanceHash_([record.store_code,record.trade_date,record.order_number.trim(),record.recycle_code.trim()]);
+    const support=approvals.some(function(a){return a.review_status==='verified'&&a.transaction_key===key&&a.employee_key===identity?.employee_key&&a.home_store===home&&a.store===store&&a.trade_date===record.trade_date;});
+    if(!person || !confirmed || confirmed.identity_status!=='confirmed' || confirmed.store!==home ||
+       home!==store&&!support ||
+       identity.observations.some(function(o){return stores.get(o.store_code)!==home&&!approvals.some(function(a){return a.review_status==='verified'&&a.employee_key===identity.employee_key&&a.home_store===home&&a.store===stores.get(o.store_code)&&a.trade_date===o.trade_date;});})){
       pending.add(JSON.stringify([record.source_employee_id,record.store_code]));return;
     }
     if(!identities.has(sourceId)){identities.set(sourceId,identity);next.employees.push(identity);}
@@ -231,13 +234,19 @@ function tradeinPerformancePreview(payload) {
 function tradeinPerformanceBuild_(source,roster,reference) {
   const today=Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd');
   if(source.source_end>today || source.status_as_of_date>today)throw new Error('來源或取消核對日期不可晚於今天');
-  const basis=reference || tradeinPerformancePrivateReference_(source,roster),value=TradeinPerformanceCore.build(source,roster,basis),
+  const basis=reference || tradeinPerformancePrivateReference_(source,roster),value=TradeinPerformanceCore.build(source,roster,basis,tradeinPerformanceHash_),
     evidence=tradeinPerformanceCancellationEvidence_(source,basis),active=(tradeinPerformanceRegistry_().months[source.month] || {}).active,
     prior=active?tradeinPerformanceSnapshot_(active):null;
   if(prior && prior.cancellation_evidence){
     const current=new Map(evidence.pairs.map(function(p){return [p.transaction_key,JSON.stringify(p)];}));
     prior.cancellation_evidence.pairs.forEach(function(p){
       if(current.get(p.transaction_key)!==JSON.stringify(p))throw new Error('已核取消交易在新來源缺漏或被改寫，請管理者核對原檔；整批停止同步');
+    });
+  }
+  if(prior && prior.support_evidence){
+    const current=new Map((value.support_evidence||[]).map(function(p){return [p.transaction_key,JSON.stringify(p)];}));
+    prior.support_evidence.forEach(function(p){
+      if(current.get(p.transaction_key)!==JSON.stringify(p))throw new Error('已核跨店支援在新來源缺漏或被改寫，請核對原檔；整批停止同步');
     });
   }
   if(evidence.pairs.length){

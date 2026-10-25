@@ -51,13 +51,39 @@ var TradeinPublicCore=(function(){
       if(Object.prototype.hasOwnProperty.call(p,'recovered_models'))validateModels(p.recovered_models,p.actual_units);
       if(Object.prototype.hasOwnProperty.call(p,'recovered_days'))validateDays(p.recovered_days,p.actual_units,value.source_period,p.recovered_models);
     });
+    const support=value.stores.some(s=>Object.prototype.hasOwnProperty.call(s,'support_in_units')),
+      storeDays=value.stores.some(s=>Object.prototype.hasOwnProperty.call(s,'recovered_days'));
     value.stores.forEach(function(s,i){
-      if(!keys(s,['store','actual_units','target_units','remaining_units','target_people','met_people'])||s.store!==STORES[i]||
+      const fields=['store','actual_units','target_units','remaining_units','target_people','met_people'];
+      if(support)fields.push('support_in_units','support_out_units');
+      if(storeDays)fields.push('recovered_days');
+      if(!keys(s,fields)||s.store!==STORES[i]||
         !['actual_units','target_units','remaining_units','target_people','met_people'].every(k=>number(s[k])))throw Error('公開店點白名單格式無效');
       const people=value.people.filter(p=>p.store===s.store),targets=people.filter(p=>p.target_units===3);
       if(s.target_units!==targets.length*3||s.target_people!==targets.length||s.met_people!==targets.filter(p=>p.attainment_status==='met').length||
-        s.remaining_units!==targets.reduce((n,p)=>n+(p.remaining_units||0),0)||s.actual_units<people.reduce((n,p)=>n+(p.actual_units||0),0))throw Error('公開店點數字不一致');
+        s.remaining_units!==targets.reduce((n,p)=>n+(p.remaining_units||0),0))throw Error('公開店點數字不一致');
+      const assigned=people.reduce((n,p)=>n+(p.actual_units||0),0);
+      if(support){
+        if(!number(s.support_in_units)||!number(s.support_out_units)||s.support_in_units>s.actual_units||s.support_out_units>assigned||
+          people.some(p=>p.actual_units===null)||s.actual_units+s.support_out_units-s.support_in_units!==assigned)throw Error('公開跨店支援與店、人員實績不一致');
+      }else if(s.actual_units<assigned)throw Error('公開店點數字不一致');
+      if(storeDays){
+        if(!support||!Array.isArray(s.recovered_days)||s.recovered_days.length>31)throw Error('公開店點逐日格式無效');
+        const seenDays=new Set();let total=0;
+        s.recovered_days.forEach(d=>{
+          if(!keys(d,['date','actual_units'])||!day(d.date)||d.date<value.source_period.start||d.date>value.source_period.end||seenDays.has(d.date)||!number(d.actual_units)||d.actual_units===0)throw Error('公開店點逐日數字無效');
+          seenDays.add(d.date);total+=d.actual_units;
+        });
+        if(total!==s.actual_units)throw Error('公開店點逐日與整月不一致');
+      }
     });
+    if(support&&value.stores.reduce((n,s)=>n+s.support_in_units-s.support_out_units,0)!==0)throw Error('公開跨店支援全區未對帳');
+    if(storeDays&&value.people.every(p=>Array.isArray(p.recovered_days))){
+      const peopleDays=new Map(),totals=new Map();
+      value.people.forEach(p=>p.recovered_days.forEach(d=>peopleDays.set(d.date,(peopleDays.get(d.date)||0)+d.actual_units)));
+      value.stores.forEach(s=>s.recovered_days.forEach(d=>totals.set(d.date,(totals.get(d.date)||0)+d.actual_units)));
+      if(peopleDays.size!==totals.size||[...peopleDays].some(([date,n])=>totals.get(date)!==n))throw Error('公開店、人員逐日未對帳');
+    }
     const s=value.summary;
     if(!keys(s,['actual_units','target_units','remaining_units','target_people','met_people','store_count'])||s.store_count!==9||
        !['actual_units','target_units','remaining_units','target_people','met_people'].every(k=>number(s[k])&&s[k]===value.stores.reduce((n,p)=>n+p[k],0)))throw Error('公開區數字不一致');
@@ -76,7 +102,9 @@ var TradeinPublicCore=(function(){
       }),stores:STORES.map(function(store){
         const s=snapshot.stores.find(s=>s.store===store);if(!s)throw Error('公開來源店點缺漏');
         return {store:store,actual_units:s.total_units,target_units:s.staff_target_units,remaining_units:s.staff_gap_units,
-          target_people:s.target_staff_count,met_people:s.met_staff_count};
+          target_people:s.target_staff_count,met_people:s.met_staff_count,
+          ...(snapshot.support_evidence?.length?{support_in_units:s.support_in_units,support_out_units:s.support_out_units,
+            recovered_days:s.recovered_days.map(d=>({date:d.date,actual_units:d.actual_units}))}:{})};
       }),summary:{}};
     ['actual_units','target_units','remaining_units','target_people','met_people'].forEach(k=>{value.summary[k]=value.stores.reduce((n,s)=>n+s[k],0);});
     value.summary.store_count=9;return validate(value);
