@@ -9,7 +9,7 @@
   <title>北一二部｜部區管理</title>
   <link rel="stylesheet" href="department-ops.css?v=20261002-display-1">
   <link rel="stylesheet" href="store-rule-reminders.css?v=20261004-collapse-1">
-  <link rel="stylesheet" href="department-scores.css?v=20261002-1">
+  <link rel="stylesheet" href="department-scores.css?v=20261026-manual-view-3">
 </head>
 <body>
   <main class="page">
@@ -23,7 +23,7 @@
       <span id="securityBadge" class="mode-badge">督導驗證</span>
     </header>
     <section id="departmentAccess" class="department-access" aria-label="督導登入控制" hidden>
-      <div><p id="departmentExpiry" role="status"></p><p id="departmentWorkNotice" role="status">操作與重新整理不會延長登入。請先完成保存並保留原檔。</p></div>
+      <div><p id="departmentExpiry" role="status"></p><p id="departmentWorkNotice" role="status">操作與重新整理不會延長登入。請先完成保存並保留原檔。</p><p>已載入資料保留於本次登入；需要更新時請手動重新讀取。</p></div>
       <button id="departmentLogout" class="secondary-button" type="button">登出</button>
     </section>
 
@@ -38,12 +38,6 @@
         <button class="primary-button" type="submit">進入部區管理</button>
       </form>
       <p id="authMessage" class="message" aria-live="polite"></p>
-    </section>
-
-    <section id="departmentReturn" class="panel monthly-history" role="status" aria-live="polite" hidden>
-      <h2 id="departmentReturnTitle">正在恢復部區管理…</h2>
-      <p id="departmentReturnMessage" class="lede">正在核對督導權限與資料版本，完成後會自動顯示。</p>
-      <button id="departmentRetry" class="secondary-button" type="button" hidden>重新讀取</button>
     </section>
 
     <div id="workspace" hidden>
@@ -142,12 +136,12 @@
   <script src="department-store-presentation-browser.js?v=20261002-store-export-2"></script>
   <script src="department-gold-monthly-core.js?v=20261002-1" defer></script>
   <script src="session-read-manager.js?v=20261013-phase1-1" defer></script>
-  <script src="department-gold-monthly-ui.js?v=20261026-return-gate-2-upload-1" defer></script>
-  <script src="department-scores.js?v=20261026-return-gate-2-upload-1" defer></script>
-  <script src="department-ops.js?v=20261026-return-gate-2-upload-1" defer></script>
-  <script src="department-readonly-assets.js?v=20261026-1" defer></script>
+  <script src="department-gold-monthly-ui.js?v=20261026-manual-view-3" defer></script>
+  <script src="department-scores.js?v=20261026-manual-view-3" defer></script>
+  <script src="department-ops.js?v=20261026-manual-view-3" defer></script>
+  <script src="department-readonly-assets.js?v=20261026-manual-view-3" defer></script>
   <script src="department-readonly-core.js?v=20261026-1" defer></script>
   <script src="department-readonly-browser.js?v=20261026-1" defer></script>
-  <script src="store-rule-reminders.js?v=20261004-collapse-1" defer></script>
+  <script src="store-rule-reminders.js?v=20261026-manual-view-3" defer></script>
 </body>
 </html>

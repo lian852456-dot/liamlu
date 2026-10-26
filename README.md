@@ -27,7 +27,7 @@
 
 ## 部區管理共用讀取（第一階段候選）
 
-`department-ops.html` 的金牌月報與店務成績使用各自獨立的記憶體讀取管理器，合併並行請求、按需載入及返回時核對權限／資料版本。保存與回復仍完整讀回；未改計算公式、來源或正式部署。架構、版本相容、合成效能及待正式驗收項目見 [第一階段說明](docs/DEPARTMENT_FAST_READ_PHASE1.md) 與 [量測收據](docs/DEPARTMENT_FAST_READ_PHASE1_MEASUREMENTS.md)。
+`department-ops.html` 的金牌月報與店務成績使用各自獨立的記憶體讀取管理器，合併並行請求、按需載入及手動更新；同一有效登入返回時保留已載入儀表板。保存與回復仍完整讀回；未改計算公式、來源或正式部署。架構、版本相容、合成效能及待正式驗收項目見 [第一階段說明](docs/DEPARTMENT_FAST_READ_PHASE1.md) 與 [量測收據](docs/DEPARTMENT_FAST_READ_PHASE1_MEASUREMENTS.md)。
 
 ## 每日日誌檢查（本機候選）
 

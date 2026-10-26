@@ -80,7 +80,7 @@
           if(!saved.length||loadedVersion!==(result.readVersion||result.monthly.revision)){if(verify)clearCandidateOnly();adopt(result);}
           else {$('goldDashboard').hidden=!saved.length;if(candidate.length)$('monthlyPreview').hidden=false;if(plan)$('monthlyConfirm').hidden=false;}
           needsValidation=false;message('goldMessage',saved.length?'已載入已保存月報；只有更新資料時才需選檔。':'尚無已保存月報。首次選檔確認後，往後登入會自動載入。');return result;
-        }catch(error){if(current!==generation||epoch!==readEpoch||error.code==='SESSION_READ_CANCELLED')return;reads.clear();suspend();message('goldMessage',error.message+'；請重新讀取以核對權限與版本。',true);}
+        }catch(error){if(current!==generation||epoch!==readEpoch||error.code==='SESSION_READ_CANCELLED')return;reads.invalidate('monthly');if(loadedVersion&&isAuthorized?.()){needsValidation=false;$('goldDashboard').hidden=!saved.length;message('goldMessage','本次更新失敗，仍顯示上次載入資料。'+error.message+'；需要更新時請手動重新讀取。',true);}else{suspend();message('goldMessage',error.message+'；請重新讀取以核對權限與版本。',true);}}
         finally{if(readFlight===flight)readFlight=null;}
       })();return flight.promise;
     }
@@ -166,7 +166,7 @@
       $('monthlyCommit').addEventListener('click',commit);$('monthlyCancel').addEventListener('click',()=>{resetCandidate();message('goldMessage','已取消預覽，已保存版本保持原狀。');});$('monthlyReload').addEventListener('click',()=>load(undefined,{refresh:true}));
       $('monthlyHistoryMonth').addEventListener('change',historyOptions);$('monthlyRestore').addEventListener('click',()=>prepare(true));
       $('monthlyLogout').addEventListener('click',async()=>{const token=getToken();clear();lockWorkspace();await request({action:'ptlogout',token}).catch(()=>{});});
-      // The page controller owns return-time validation for both independent domains.
+      // The page controller checks session changes; loaded views refresh only on user request.
     }
     function exportSnapshot(loadMissing=false){
       if(loadMissing)return (!saved.length&&!busy?load():Promise.resolve()).then(()=>exportSnapshot(false));

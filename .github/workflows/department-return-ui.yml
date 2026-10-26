@@ -38,7 +38,7 @@ jobs:
       - name: Check auth and private read contracts
         run: |
           node --check department-ops.js
-          node --test tests/session-read-manager.test.cjs tests/department-ops.test.cjs tests/department-ops-integration.test.cjs tests/department-version-read.test.cjs
+          node --test tests/session-read-manager.test.cjs tests/department-ops.test.cjs tests/department-ops-integration.test.cjs tests/department-version-read.test.cjs tests/department-readonly.test.cjs
       - name: Exercise return and recovery with synthetic data
         env:
           TEST_BASE_URL: http://127.0.0.1:8875/

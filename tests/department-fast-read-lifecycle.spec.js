@@ -1,144 +1,81 @@
 'use strict';
-const {test,expect}=require('@playwright/test'),crypto=require('node:crypto');
-const Gold=require('../department-gold-monthly-core.js'),Scores=require('../department-scores-core.js'),XLSX=require('../assets/vendor/xlsx.full.min.js'),F=require('./helpers/department-scores-synthetic.cjs');
+const {test,expect}=require('@playwright/test');
+const F=require('./helpers/department-readonly-synthetic.cjs'),S=require('../department-scores-core.js');
+const RC=require('../department-readonly-core.js'),A=require('../department-readonly-assets.js');
 const PAGE=new URL('department-ops.html',process.env.TEST_BASE_URL||'http://127.0.0.1:8772/').href,KEY='bei12b_patrol_session_token_v2';
 const gate=()=>{let release;const promise=new Promise(r=>release=r);return {promise,release};};
-function gold(medal){return Gold.validateMonth({schema:Gold.SCHEMA,monthKey:'2026-09',sheetName:'動員(全員)',sourceName:'synthetic.xlsx',sourceHash:crypto.createHash('sha256').update(String(medal)).digest('hex'),dateRange:{start:'2026-09-01',end:'2026-09-28',cutoff:'2026-09-28'},settlementStatus:'provisional',records:[{employeeId:'SYN001',employeeName:'合成同仁',region:'北一二B',storeCode:'SYN-B',store:'合成店',role:'合成職稱',medal,sourceRow:4,sourceFields:[]}],validation:{sourceTotal:medal}});}
-async function setup(page,ttl=3600,{beforeAuth,afterGoto}={}){
- const exp=Math.floor(Date.now()/1000)+ttl,token=Buffer.from(JSON.stringify({exp})).toString('base64url')+'.synthetic',state={goldVersion:1,denyGold:false,denyScores:false,denyAuth:false,hold:null},calls=[],errors=[];
+function sources(){
+ const data=F.input();
+ for(const slot of data.scores.months){
+  for(const row of slot.month.records)for(const m of row.metrics)if(m.kind==='checkScore'){m.value=100;m.raw=100;}
+  const r=slot.month.records[0];r.defects=1;r.source.defects.value=1;r.source.defects.raw=1;
+  const defects=r.metrics.filter(m=>m.kind==='defect');defects[0].value=2;defects[0].raw=2;defects[2].value=null;defects[2].raw='#REF!';defects[2].status='error';
+  const warning=r.metrics.find(m=>m.kind==='defect'&&m!==defects[0]&&m!==defects[2]);warning.kind='warning';warning.value=1;warning.raw=1;
+  slot.month=S.validateMonth(slot.month);
+ }
+ return data;
+}
+async function setup(page,ttl=3600){
+ const data=sources(),calls=[],errors=[],exp=Math.floor(Date.now()/1000)+ttl,token=Buffer.from(JSON.stringify({exp})).toString('base64url')+'.synthetic';
+ const state={hold:null,fail:false,deny:false,version:1};
  page.on('pageerror',e=>errors.push(e.message));await page.addInitScript(({key,token})=>sessionStorage.setItem(key,token),{key:KEY,token});
  await page.route('**/*',async route=>{
   const host=new URL(route.request().url()).hostname;if(host==='127.0.0.1')return route.continue();if(host!=='script.google.com')return route.abort();
-  const p=route.request().postDataJSON();calls.push(p);let result,status=200;
-  if(p.action==='ptauth'){if(beforeAuth)await beforeAuth();result=state.denyAuth?{status:'error',message:'AUTH_SESSION_REVOKED'}:{status:'ok',token,expiresAt:exp};}
-  else if(p.action==='department_ops_read'){
-   if(state.denyGold){status=503;result={status:'error',message:'unauthorized',auth:{reason:'AUTH_SESSION_REVOKED'}};}
-   else result=p.knownVersion==='gold-v'+state.goldVersion?{status:'ok',notModified:true,readContract:'department-version-read/v1',readVersion:p.knownVersion,monthly:{revision:p.knownVersion}}:{status:'ok',readVersion:'gold-v'+state.goldVersion,gold:{months:[gold(state.goldVersion*10)]},monthly:{revision:'gold-v'+state.goldVersion,history:{}}};
-  }else if(p.action==='department_scores_read'){
-   result=state.denyScores?{status:'error',message:'AUTH_SESSION_REVOKED'}:p.knownVersion==='scores-v1'?{status:'ok',contract:Scores.CONTRACT,notModified:true,readContract:'department-version-read/v1',readVersion:'scores-v1',generation:1}:{status:'ok',contract:Scores.CONTRACT,readVersion:'scores-v1',generation:1,available:true,months:[{month:F.month({month:7}),active:{revision:'synthetic'},history:[]}]};
+  const p=route.request().postDataJSON();calls.push(p.action);let result;
+  if(p.action==='ptauth')result={status:'ok',token:p.token||token,expiresAt:exp};
+  else if(['department_ops_read','department_scores_read'].includes(p.action)){
    if(state.hold)await state.hold.promise;
+   result=state.deny?{status:'error',message:'AUTH_SESSION_REVOKED'}:state.fail?{status:'error',message:'合成暫時錯誤'}:p.action==='department_ops_read'?{status:'ok',...data.gold,monthly:{...data.gold.monthly,revision:'gold-'+state.version}}:{status:'ok',...data.scores,generation:state.version};
   }else if(p.action==='department_store_rules_read')result={status:'ok',available:false,contract:'store-rule-reminders-v1',expiresAt:exp};
-  else if(p.action==='ptlogout')result={status:'ok'};
-  else return route.abort();
-  await route.fulfill({status,contentType:'application/json',body:JSON.stringify(result)}).catch(()=>{});
+  else if(p.action==='ptlogout')result={status:'ok'};else return route.abort();
+  await route.fulfill({contentType:'application/json',body:JSON.stringify(result)}).catch(()=>{});
  });
- await page.goto(PAGE);if(afterGoto)await afterGoto();if(ttl>0)await expect(page.locator('#peopleBody tr')).toHaveCount(1);return {state,calls,errors};
+ await page.goto(PAGE);await expect(page.locator('#goldDashboard')).toBeVisible();return {state,calls,errors};
 }
-test('return before initial session restoration finishes cannot strand an authenticated blank workspace',async({page})=>{
- const held=gate();
- const s=await setup(page,3600,{beforeAuth:()=>held.promise,afterGoto:async()=>{
-  await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));window.dispatchEvent(new Event('focus'));});
-  held.release();
- }});
- await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#goldDashboard')).toBeVisible();await expect(page.locator('#securityBadge')).toHaveText('督導權限已驗證');expect(s.errors).toEqual([]);
+async function store(page){await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreDashboard')).toBeVisible();}
+const lifecycle=page=>page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>window.__hidden});window.__hidden=true;document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('pagehide'));window.__hidden=false;document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('pageshow'));window.dispatchEvent(new Event('focus'));});
+for(const domain of ['gold','store'])test(`${domain}: background and return keep dashboard and selection without network; refresh is explicit`,async({page})=>{
+ const s=await setup(page);if(domain==='store'){await store(page);await page.locator('#scorePeriod').selectOption('2026-07');await page.locator('#scoreStore').selectOption('合成店A1');await page.locator('[data-score-detail]').click();}
+ else await page.locator('#monthFilter').selectOption('2026-08');
+ const dashboard=page.locator(domain==='gold'?'#goldDashboard':'#scoreDashboard'),before=s.calls.filter(x=>/department_(ops|scores)_read/.test(x)).length;
+ for(let i=0;i<3;i++)await lifecycle(page);
+ await expect(dashboard).toBeVisible();expect(s.calls.filter(x=>/department_(ops|scores)_read/.test(x))).toHaveLength(before);
+ if(domain==='store'){await expect(page.locator('#scoreStore')).toHaveValue('合成店A1');await expect(page.locator('#scoreDetail')).toBeVisible();}else await expect(page.locator('#monthFilter')).toHaveValue('2026-08');
+ await page.locator(domain==='gold'?'#monthlyReload':'#scoreRefresh').click();await expect.poll(()=>s.calls.filter(x=>/department_(ops|scores)_read/.test(x)).length).toBe(before+1);await expect(dashboard).toBeVisible();expect(s.errors).toEqual([]);
 });
-const returned=page=>page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));window.dispatchEvent(new Event('focus'));});
-test('foreground focus and redundant visible events never hide or refetch a verified workspace',async({page})=>{
- const s=await setup(page);
- for(const domain of ['gold','store']){
-  if(domain==='store')await store(page);
-  const before=s.calls.filter(p=>/department_(ops|scores)_read/.test(p.action)).length;
-  await page.evaluate(()=>{for(let i=0;i<5;i++){window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));document.dispatchEvent(new Event('visibilitychange'));}});
-  await expect(page.locator(domain==='gold'?'#goldDashboard':'#scoreDashboard')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();
-  expect(s.calls.filter(p=>/department_(ops|scores)_read/.test(p.action))).toHaveLength(before);
- }
- expect(s.errors).toEqual([]);
+for(const domain of ['gold','store'])test(`${domain}: slow or failed manual refresh retains last loaded view with a clear error`,async({page})=>{
+ const s=await setup(page);if(domain==='store')await store(page);const dashboard=page.locator(domain==='gold'?'#goldDashboard':'#scoreDashboard'),message=page.locator(domain==='gold'?'#goldMessage':'#scoreMessage');
+ const body=page.locator(domain==='gold'?'#peopleBody':'#scoreBody'),before=await body.innerText();s.state.hold=gate();const held=s.state.hold;s.state.fail=true;
+ await page.locator(domain==='gold'?'#monthlyReload':'#scoreRefresh').click();await expect(dashboard).toBeVisible();await lifecycle(page);await expect(dashboard).toBeVisible();held.release();
+ await expect(message).toContainText('本次更新失敗，仍顯示上次載入資料');expect(await body.innerText()).toBe(before);await expect(dashboard).toBeVisible();
+ s.state.hold=null;s.state.fail=false;await page.locator(domain==='gold'?'#monthlyReload':'#scoreRefresh').click();await expect(message).not.toContainText('更新失敗');expect(s.errors).toEqual([]);
 });
-test('actual visibility suspension still requires fresh proof and deduplicates foreground events',async({page})=>{
- const s=await setup(page);await store(page);s.state.hold=gate();
- await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>window.__syntheticHidden});window.__syntheticHidden=true;document.dispatchEvent(new Event('visibilitychange'));});
- await expect(page.locator('#scoreDashboard')).toBeHidden();
- await page.evaluate(()=>{window.__syntheticHidden=false;document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));});
- await expect.poll(()=>s.calls.filter(p=>p.action==='department_scores_read').length).toBe(2);await expect(page.locator('#departmentReturn')).toBeVisible();
- s.state.hold.release();await expect(page.locator('#scoreDashboard')).toBeVisible();expect(s.errors).toEqual([]);
+for(const domain of ['gold','store'])test(`${domain}: explicit server denial on refresh still clears both private domains`,async({page})=>{
+ const s=await setup(page);await store(page);if(domain==='gold')await page.locator('[data-tab="gold"]').click();s.state.deny=true;
+ await page.locator(domain==='gold'?'#monthlyReload':'#scoreRefresh').click();await expect(page.locator('#authPanel')).toBeVisible();await expect(page.locator('#peopleBody')).toBeEmpty();await expect(page.locator('#scoreBody')).toBeEmpty();expect(s.errors).toEqual([]);
 });
-for(const domain of ['gold','store'])test(`${domain} unresponsive return stops automatically, can retry, and ignores late denial`,async({page},testInfo)=>{
- await page.clock.install();const s=await setup(page);if(domain==='store')await store(page);
- await page.evaluate(({domain,contract})=>{
-  const original=window.fetch;window.__stalledReturns=[];
-  window.fetch=(u,o)=>{
-   const p=JSON.parse(o?.body||'{}'),target=domain==='gold'?'department_ops_read':'department_scores_read';
-   if(p.action!==target||!p.knownVersion)return original(u,o);
-   return new Promise(resolve=>__stalledReturns.push({resolve,p,signal:o.signal}));
-  };
-  window.__finishStalled=(i,denied=false)=>{
-   const {resolve,p}=__stalledReturns[i],result=denied?{status:'error',message:'AUTH_SESSION_REVOKED'}:{status:'ok',notModified:true,readContract:'department-version-read/v1',readVersion:p.knownVersion,...(domain==='gold'?{monthly:{revision:p.knownVersion}}:{contract,generation:1})};
-   resolve(new Response(JSON.stringify(result),{headers:{'Content-Type':'application/json'}}));
-  };
- },{domain,contract:Scores.CONTRACT});
- await returned(page);await expect.poll(()=>page.evaluate(()=>__stalledReturns.length)).toBe(1);await page.clock.runFor(15001);
- await expect(page.locator('#departmentRetry')).toBeVisible();await expect(page.locator('#departmentReturnMessage')).toContainText('已停止本次等待');await expect(page.locator('#workspace')).toBeHidden();
- expect(await page.evaluate(()=>__stalledReturns[0].signal.aborted)).toBe(true);
- await page.screenshot({path:testInfo.outputPath('return-timeout.png')});
- await page.evaluate(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));});expect(await page.evaluate(()=>__stalledReturns.length)).toBe(1);
- await page.locator('#departmentRetry').click();await expect.poll(()=>page.evaluate(()=>__stalledReturns.length)).toBe(2);await page.evaluate(()=>__finishStalled(1));
- await expect(page.locator(domain==='gold'?'#goldDashboard':'#scoreDashboard')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();
- await page.evaluate(()=>__finishStalled(0,true));await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#authPanel')).toBeHidden();
- expect(s.calls.filter(p=>/publish|restore/.test(p.action))).toEqual([]);expect(s.errors).toEqual([]);
+test('expiry clears data even while the document is hidden; focus cannot renew it',async({page})=>{
+ await page.clock.install();const s=await setup(page,3);await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));});await page.clock.runFor(3100);
+ await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#peopleBody')).toBeEmpty();expect(s.calls.filter(x=>x==='ptauth')).toHaveLength(1);expect(s.errors).toEqual([]);
 });
-async function store(page){await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreBody tr')).toHaveCount(9);}
-async function holdFile(page){
- const buffer=Buffer.from(XLSX.write(F.workbook({month:7}),{type:'array',bookType:'xlsx'}));await page.locator('#scoreYear').fill('2026');await page.locator('#scoreFile').setInputFiles({name:'synthetic.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer});
- await page.evaluate(()=>{const original=File.prototype.arrayBuffer;File.prototype.arrayBuffer=function(){return new Promise(resolve=>{window.__releaseFile=async()=>resolve(await original.call(this));});};});
- await page.locator('#scoreImport').click();await expect.poll(()=>page.evaluate(()=>Boolean(window.__releaseFile))).toBe(true);
+test('identity removal clears the old view on return',async({page})=>{
+ await setup(page);await store(page);await page.evaluate(key=>sessionStorage.removeItem(key),KEY);await lifecycle(page);await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#scoreBody')).toBeEmpty();
+});
+test('loaded reminders and dashboards neither poll after a minute nor revalidate on return',async({page})=>{
+ await page.clock.install();const s=await setup(page);await store(page);await expect(page.locator('#store-rules-status')).toContainText('尚未提供私有規則提醒');const before=s.calls.length;
+ await page.clock.runFor(65000);await lifecycle(page);expect(s.calls).toHaveLength(before);await expect(page.locator('#scoreDashboard')).toBeVisible();expect(s.errors).toEqual([]);
+});
+async function assertColors(page){
+ await page.locator('#scorePeriod').selectOption('2026-07');await page.locator('#scoreStore').selectOption('合成店A1');
+ await expect(page.locator('[data-score-field="defects"]')).toHaveClass(/score-issue/);await expect(page.locator('[data-score-field="deduction"]')).toHaveClass(/score-issue/);
+ await page.locator('[data-score-detail]').click();await expect(page.locator('#scoreDetail [data-metric-kind="rank"]')).toHaveCount(0);await expect(page.locator('#scoreDetail tbody')).not.toContainText('排名');
+ await expect(page.locator('#scoreDetail tr.score-issue')).not.toHaveCount(0);await expect(page.locator('#scoreDetail tr.score-warning')).not.toHaveCount(0);await expect(page.locator('#scoreDetail tr.score-missing')).not.toHaveCount(0);
+ const zero=page.locator('#scoreDetail tr[data-metric-kind="defect"]').filter({has:page.locator('td:nth-child(3)',{hasText:/^0$/})}).first();await expect(zero).not.toHaveClass(/score-issue/);
+ const color=await page.locator('#scoreDetail tr.score-issue').first().evaluate(e=>getComputedStyle(e).color);expect(color).toBe('rgb(165, 29, 20)');
 }
-test('coalesced return hides private scores until backend proof then preserves filters and detail',async({page})=>{
- const s=await setup(page);await store(page);await page.locator('#scorePeriod').selectOption('2026-07');await page.locator('#scoreRegion').selectOption('北一二B');await page.locator('#scoreStore').selectOption('合成店B1');await page.locator('[data-score-detail]').click();
- s.state.hold=gate();await returned(page);await expect(page.locator('#scoreDashboard')).toBeHidden();await expect(page.locator('#departmentReturn')).toBeVisible();await expect(page.locator('#workspace')).toHaveJSProperty('inert',true);await expect.poll(()=>s.calls.filter(p=>p.action==='department_scores_read').length).toBe(2);
- s.state.hold.release();await expect(page.locator('#scoreDashboard')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();await expect(page.locator('#workspace')).toHaveJSProperty('inert',false);await expect(page.locator('#scoreBody tr')).toHaveCount(1);await expect(page.locator('#scoreStore')).toHaveValue('合成店B1');await expect(page.locator('#scoreDetail')).toBeVisible();expect(s.errors).toEqual([]);
+for(const width of [1440,390])test(`all issue values and details use color, zero stays neutral, category ranks hidden at ${width}`,async({page},testInfo)=>{
+ await page.setViewportSize({width,height:1000});const s=await setup(page);await store(page);await assertColors(page);await page.screenshot({path:testInfo.outputPath('defect-detail.png')});expect(s.errors).toEqual([]);
 });
-for(const width of [1440,390])test(`gold return shows progress, recovers after repeated backgrounding and exposes retry on failure at ${width}`,async({page},testInfo)=>{
- await page.setViewportSize({width,height:900});const s=await setup(page);
- await page.evaluate(()=>{
-  const original=window.fetch;window.__goldReturns=[];
-  window.fetch=(u,o)=>{
-   const p=JSON.parse(o?.body||'{}');
-   if(p.action!=='department_ops_read'||!p.knownVersion)return original(u,o);
-   return new Promise(resolve=>window.__goldReturns.push({resolve,version:p.knownVersion}));
-  };
-  window.__finishGoldReturn=(index,failed=false)=>{
-   const r=window.__goldReturns[index];r.resolve(new Response(JSON.stringify(failed?{status:'error',message:'合成暫時讀取失敗'}:{status:'ok',notModified:true,readContract:'department-version-read/v1',readVersion:r.version,monthly:{revision:r.version}}),{headers:{'Content-Type':'application/json'}}));
-  };
- });
- for(let i=0;i<3;i++){
-  await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));window.dispatchEvent(new Event('focus'));});
-  await expect.poll(()=>page.evaluate(()=>__goldReturns.length)).toBe(i+1);
-  await expect(page.locator('#departmentReturn')).toBeVisible();await expect(page.locator('#goldDashboard')).toBeHidden();
-  if(i===0)await page.screenshot({path:testInfo.outputPath('return-pending.png')});
- }
- await page.evaluate(()=>__finishGoldReturn(2));await expect(page.locator('#goldDashboard')).toBeVisible();
- await page.evaluate(()=>{__finishGoldReturn(0);__finishGoldReturn(1);});await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();
- await page.screenshot({path:testInfo.outputPath('return-recovered.png')});
- await returned(page);await expect.poll(()=>page.evaluate(()=>__goldReturns.length)).toBe(4);await page.evaluate(()=>__finishGoldReturn(3,true));
- await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#departmentRetry')).toBeVisible();await expect(page.locator('#goldMessage')).toContainText('合成暫時讀取失敗');await expect(page.locator('#goldDashboard')).toBeHidden();
- await page.locator('#departmentRetry').click();await expect(page.locator('#goldDashboard')).toBeVisible();await expect(page.locator('#goldFile')).toHaveValue('');expect(s.errors).toEqual([]);
-});
-test('gold explicit denial over HTTP 503 clears both domains immediately without retry',async({page})=>{
- await page.clock.install();const s=await setup(page);await store(page);await page.locator('[data-tab="gold"]').click();s.state.denyGold=true;await returned(page);
- // A return hides the workspace while the request is still pending. Wait for
- // the real denial/lock before advancing the clock past its request deadline.
- await expect(page.locator('#authPanel')).toBeVisible();await page.clock.runFor(80000);
- await expect(page.locator('#peopleBody')).toBeEmpty();await expect(page.locator('#scoreBody')).toBeEmpty();expect(s.calls.filter(p=>p.action==='department_ops_read')).toHaveLength(2);expect(s.errors).toEqual([]);
-});
-test('session expiry clears both domains without waiting for a ten-second poll or a return event',async({page})=>{
- await page.clock.install();const s=await setup(page,3);await store(page);await page.clock.runFor(3100);await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#scoreBody')).toBeEmpty();await expect(page.locator('#peopleBody')).toBeEmpty();expect(await page.evaluate(key=>sessionStorage.getItem(key),KEY)).toBeNull();expect(s.errors).toEqual([]);
-});
-test('a server response with an already expired local deadline cannot unlock private views',async({page})=>{
- const s=await setup(page,-1);await expect(page.locator('#workspace')).toHaveJSProperty('hidden',true);await expect(page.locator('#authPanel')).toBeVisible();expect(s.calls.map(p=>p.action)).toEqual(['ptauth']);await expect(page.locator('#peopleBody')).toBeEmpty();await expect(page.locator('#scoreBody')).toBeEmpty();expect(s.errors).toEqual([]);
-});
-test('a pre-background score read cannot replace the new return-time revocation check',async({page})=>{
- const s=await setup(page);await store(page);const held=gate();s.state.hold=held;await page.locator('#scoreRefresh').click();await expect.poll(()=>s.calls.filter(p=>p.action==='department_scores_read').length).toBe(2);
- await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));s.state.hold=null;s.state.denyScores=true;await page.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
- await expect(page.locator('#workspace')).toBeHidden();expect(s.calls.filter(p=>p.action==='department_scores_read')).toHaveLength(3);held.release();await page.waitForTimeout(100);await expect(page.locator('#scoreBody')).toBeEmpty();expect(s.errors).toEqual([]);
-});
-test('a pre-background gold read cannot satisfy the fresh return check',async({page})=>{
- const s=await setup(page);await page.evaluate(()=>{const original=window.fetch;window.fetch=(u,o)=>{const p=JSON.parse(o?.body||'{}');if(p.action==='department_ops_read'&&p.knownVersion&&!window.__heldGold){window.__heldGold=true;return new Promise(resolve=>{window.__releaseGold=()=>resolve(new Response(JSON.stringify({status:'ok',notModified:true,readContract:'department-version-read/v1',readVersion:'gold-v1',monthly:{revision:'gold-v1'}}),{headers:{'Content-Type':'application/json'}}));});}return original(u,o);};});
- await page.locator('#monthlyReload').click();await expect.poll(()=>page.evaluate(()=>Boolean(window.__releaseGold))).toBe(true);await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));s.state.denyGold=true;await page.evaluate(()=>window.dispatchEvent(new Event('pageshow')));await expect(page.locator('#workspace')).toBeHidden();await page.evaluate(()=>window.__releaseGold());await page.waitForTimeout(100);await expect(page.locator('#peopleBody')).toBeEmpty();expect(s.errors).toEqual([]);
-});
-for(const kind of ['logout','busy-return-revocation'])test(`late local parse cannot revive private preview after ${kind}`,async({page})=>{
- const s=await setup(page);await store(page);await holdFile(page);
- if(kind==='logout')await page.evaluate(()=>window.dispatchEvent(new Event('department-session-cleared')));
- else {s.state.denyAuth=true;await returned(page);}
-  await expect(page.locator('#workspace')).toHaveJSProperty('hidden',true);expect(await page.evaluate(()=>DepartmentScoresWorkState())).toEqual({busy:false,unsaved:false});await page.evaluate(()=>window.__releaseFile());await page.waitForTimeout(100);
- await expect(page.locator('#scorePreview')).toBeHidden();await expect(page.locator('#scoreDiff')).toBeEmpty();await expect(page.locator('#scoreBody')).toBeEmpty();expect(s.calls.filter(p=>/publish|restore/.test(p.action))).toEqual([]);expect(s.errors).toEqual([]);
+test('new offline HTML uses the same defect colors and suppresses only category ranks',async({page})=>{
+ await page.setContent(RC.createHTML(sources(),A));await assertColors(page);await expect(page.locator('#scoreHead')).toContainText('部內／全國名次');await expect(page.locator('form,input')).toHaveCount(0);
 });

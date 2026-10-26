@@ -21,7 +21,7 @@
   const digest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(v=>v.toString(16).padStart(2,'0')).join('');
   const monthHash=m=>digest(new TextEncoder().encode(C.canonical(m)));
   function presentationAuthorized(){
-    if(!(loaded&&snapshot&&!needsValidation&&!locked&&!$('workspace').hidden&&verifiedToken&&sessionStorage.getItem(KEY)===verifiedToken&&!window.PortalLogout?.isLocked()))return false;
+    if(!(loaded&&snapshot&&!readFlight&&!busy&&!needsValidation&&!locked&&!$('workspace').hidden&&verifiedToken&&sessionStorage.getItem(KEY)===verifiedToken&&!window.PortalLogout?.isLocked()))return false;
     // Only the server-verified loaded session is eligible; decode its expiry at every boundary.
     try{const part=verifiedToken.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'),claims=JSON.parse(atob(part));return Number.isFinite(claims.exp)&&Date.now()<claims.exp*1000;}catch{return false;}
   }
@@ -90,7 +90,7 @@
   function updatePublish(){ $('scorePublish').disabled=busy||!pending||!loaded||!selectedKeys().length||!$('scoreConfirm').checked; $('scoreRestore').disabled=busy||!restore||!$('scoreRestoreConfirm').checked; }
   async function read({refresh=false,full=false,verifiedReturn=false}={}) {
     presentationExporter?.invalidate();
-    loaded=false;$('scoreDashboard').hidden=true;
+    if(!loaded)$('scoreDashboard').hidden=true;
     const result=await reads.read('scores',{refresh,full,
       fetch:({knownVersion,signal})=>request('department_scores_read',{knownVersion},signal),
       version:r=>r.readVersion??r.generation,
@@ -103,7 +103,7 @@
   function load({refresh=false,verify=false}={}){
     if(readFlight)return readFlight.promise;if(busy)return Promise.resolve();
     const epoch=readEpoch,generation=readGeneration,flight={};readFlight=flight;setBusy(true);msg(verify?'正在核對權限與成績版本…':'正在讀取已保存成績…');
-    flight.promise=(async()=>{try{const beforeVersion=snapshot?.readVersion??snapshot?.generation;await read({refresh,verifiedReturn:true});if(epoch!==readEpoch||generation!==readGeneration)return;if(!verify||beforeVersion!==(snapshot.readVersion??snapshot.generation)){pending=null;restore=null;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;}msg(snapshot.available?'已讀取私有保存版本；更新資料時才需要選檔。':'尚未初始化成績。請選原檔、預覽並確認保存。');return snapshot;}catch(e){if(epoch!==readEpoch||generation!==readGeneration||e.code==='SESSION_READ_CANCELLED')return;loaded=false;reads.clear();suspend();msg(e.message+'；請重新讀取以核對權限與版本。',true);}finally{if(readFlight===flight){readFlight=null;setBusy(false,false);}}})();return flight.promise;
+    flight.promise=(async()=>{try{const beforeVersion=snapshot?.readVersion??snapshot?.generation;await read({refresh,verifiedReturn:true});if(epoch!==readEpoch||generation!==readGeneration)return;if(!verify||beforeVersion!==(snapshot.readVersion??snapshot.generation)){pending=null;restore=null;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;}msg(snapshot.available?'已讀取私有保存版本；更新資料時才需要選檔。':'尚未初始化成績。請選原檔、預覽並確認保存。');return snapshot;}catch(e){if(epoch!==readEpoch||generation!==readGeneration||e.code==='SESSION_READ_CANCELLED')return;reads.invalidate('scores');if(snapshot&&verifiedToken===sessionStorage.getItem(KEY)&&!locked&&!$('workspace').hidden){loaded=true;needsValidation=false;msg('本次更新失敗，仍顯示上次載入資料。'+e.message+'；需要更新時請手動重新讀取。',true);}else{loaded=false;suspend();msg(e.message+'；請重新讀取以核對權限與版本。',true);}}finally{if(readFlight===flight){readFlight=null;setBusy(false,false);}}})();return flight.promise;
   }
   window.DepartmentScoresReadSession={suspend,revalidate:()=>{observeAuth();if(busy&&!readFlight){const epoch=readEpoch;return request('ptauth').catch(e=>{if(epoch===readEpoch){suspend();msg(e.message+'；請重新核對權限。',true);}});}return load({refresh:true,verify:true});},activate:()=>{observeAuth();return needsValidation?load({refresh:true,verify:true}):Promise.resolve();},clear:clearPrivateData};
   window.DepartmentScoresReadonlySource=function(loadMissing=false){
@@ -130,6 +130,19 @@
     const lines=valid.slice(1).map((p,i)=>p&&valid[i]?`<line x1="${valid[i].x}" y1="${valid[i].y}" x2="${p.x}" y2="${p.y}" stroke="#ed6600" stroke-width="4"/>`:'').join('');
     return `<svg viewBox="0 0 800 255" role="img" aria-label="各月份門市平均成績，縱軸 ${low} 到100分"><line x1="70" y1="190" x2="755" y2="190" stroke="#c9c2b9"/><text x="12" y="40">100分</text><text x="12" y="190">${low}分</text>${lines}${points.map((p,i)=>`<text x="${x(i)}" y="238" text-anchor="middle">${p.key.slice(5)}月</text>${p.value==null?'':`<circle cx="${x(i)}" cy="${y(p.value)}" r="6" fill="#ed6600"/><text x="${x(i)}" y="${y(p.value)-15}" text-anchor="middle">${number(p.value)}</text>`}`).join('')}</svg>`;
   }
+  function issueClass(value,kind='defect'){
+    if(value==null)return 'score-missing';
+    const n=Number(value);if(!Number.isFinite(n))return 'score-missing';
+    return (kind==='checkScore'?n<100:n>0)?'score-issue':'';
+  }
+  function metricTone(v){
+    if(v.kind==='rank'||v.kind==='verification')return '';
+    if(v.value==null)return 'score-missing';
+    if(v.kind==='warning')return Number(v.value)>0?'score-warning':'';
+    if(v.kind==='storeCount'&&!/缺失/.test(v.label))return '';
+    return issueClass(v.value,v.kind);
+  }
+  function recordTone(r){return r.defects>0||r.deduction>0||r.metrics.some(v=>metricTone(v)==='score-issue')?'score-has-issue':'';}
   function render(){
     const months=selectedMonths(),rows=months.flatMap(filtered),summary=C.summarize(rows);$('scoreDashboard').hidden=!snapshot.available;
     if(!snapshot.available)return;
@@ -137,22 +150,22 @@
     for(let i=1;i<keys.length;i++){const a=new Date(keys[i-1]+'-01T00:00:00Z'),b=new Date(keys[i]+'-01T00:00:00Z');if((b.getUTCFullYear()-a.getUTCFullYear())*12+b.getUTCMonth()-a.getUTCMonth()!==1)complete=false;}
     const scope=$('scorePeriod').value==='half'?`近半年資料${complete?'完整':'不完整'}（${months.filter(m=>m.available!==false).length}/6月）`:$('scorePeriod').value.startsWith('quarter:')?C.quarterInfo(months).map(q=>`${q.key} ${q.complete?'完整':'不完整 '+q.present.length+'/3月'}`).join('、'):'單月明細';
     $('scoreSourceMeta').textContent=`${keys.join('、')}｜${scope}｜保存版本 ${snapshot.generation}｜門市原檔 G 成績，E 缺失與 F 扣分分開`;
-    const cards=[['門市平均分',number(summary.mean),`${summary.storeMonths} 店月等權平均`],['原總缺失 E',number(summary.defects),'依原表統計口徑，未含回收'],['原扣分 F',number(summary.deduction),'直接讀取原值'],['有扣分店月',number(summary.deductedStores,0),summary.missingDeduction?`${summary.missingDeduction} 店月扣分缺資料`:'依 F > 0 判定']];
-    $('scoreSummary').innerHTML=cards.map(([label,value,note])=>`<article class="summary-card"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join('');
+    const cards=[['門市平均分',number(summary.mean),`${summary.storeMonths} 店月等權平均`,issueClass(summary.mean,'checkScore')],['原總缺失 E',number(summary.defects),'依原表統計口徑，未含回收',issueClass(summary.defects)],['原扣分 F',number(summary.deduction),'直接讀取原值',issueClass(summary.deduction)],['有扣分店月',number(summary.deductedStores,0),summary.missingDeduction?`${summary.missingDeduction} 店月扣分缺資料`:'依 F > 0 判定',issueClass(summary.deductedStores)]];
+    $('scoreSummary').innerHTML=cards.map(([label,value,note,tone])=>`<article class="summary-card ${tone||''}"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join('');
     const regionRows=months.flatMap(m=>m.records);
-    $('scoreRegions').innerHTML=C.REGIONS.map(region=>{const s=C.summarize(regionRows.filter(r=>r.region===region));return `<article><h4>${region}</h4><strong>${number(s.mean)}</strong><span>門市平均分</span><small>${s.storeMonths} 店月｜原扣分 ${number(s.deduction)}</small></article>`;}).join('');
+    $('scoreRegions').innerHTML=C.REGIONS.map(region=>{const s=C.summarize(regionRows.filter(r=>r.region===region));return `<article><h4>${region}</h4><strong class="${issueClass(s.mean,'checkScore')}">${number(s.mean)}</strong><span>門市平均分</span><small class="${issueClass(s.deduction)}">${s.storeMonths} 店月｜原扣分 ${number(s.deduction)}</small></article>`;}).join('');
     $('scoreTrend').innerHTML=trend(months)+'<div class="score-trend-labels">'+months.map(m=>`<div><span>${m.monthKey}</span><strong>${number(C.summarize(filtered(m)).mean)}</strong></div>`).join('')+'</div>';
     const allStores=[...new Set(rows.map(r=>r.store))];
     $('scoreHead').innerHTML=`<tr><th>店點／部區</th>${months.map(m=>`<th>${m.monthKey}</th>`).join('')}<th>門市平均分</th><th>原總缺失 E</th><th>原扣分 F</th><th>部內／全國名次<br>（单月）</th><th>缺失明細</th></tr>`;
     const ranked=months.length===1?C.rank(months[0].records):[];
-    $('scoreBody').innerHTML=allStores.map(store=>{const sr=rows.filter(r=>r.store===store),s=C.summarize(sr),latest=sr[sr.length-1],rank=ranked.find(r=>r.store===store);return `<tr><td><strong>${escape(store)}</strong><small>${escape(latest.region)}</small></td>${months.map(m=>{const r=m.records.find(v=>v.store===store);return `<td class="number ${r?.deduction>0?'down':''}">${number(r?.score)}</td>`;}).join('')}<td class="number">${number(s.mean)}</td><td class="number">${number(s.defects)}</td><td class="number">${number(s.deduction)}</td><td>${rank?number(rank.departmentRank,0)+'／'+number(rank.nationalRank,0):'—'}</td><td><button class="secondary-button" data-score-detail="${escape(store)}">查看</button></td></tr>`;}).join('');
+    $('scoreBody').innerHTML=allStores.map(store=>{const sr=rows.filter(r=>r.store===store),s=C.summarize(sr),latest=sr[sr.length-1],rank=ranked.find(r=>r.store===store);return `<tr class="${sr.some(r=>recordTone(r))?'score-has-issue':''}"><td><strong>${escape(store)}</strong><small>${escape(latest.region)}</small></td>${months.map(m=>{const r=m.records.find(v=>v.store===store);return `<td class="number ${issueClass(r?.score,'checkScore')}">${number(r?.score)}</td>`;}).join('')}<td class="number ${issueClass(s.mean,'checkScore')}">${number(s.mean)}</td><td data-score-field="defects" class="number ${issueClass(s.defects)}">${number(s.defects)}</td><td data-score-field="deduction" class="number ${issueClass(s.deduction)}">${number(s.deduction)}</td><td>${rank?number(rank.departmentRank,0)+'／'+number(rank.nationalRank,0):'—'}</td><td><button class="secondary-button" data-score-detail="${escape(store)}">查看</button></td></tr>`;}).join('');
     $('scoreDetail').replaceChildren();$('scoreDetail').hidden=true;
     const warnings=months.filter(m=>m.available!==false).flatMap(m=>m.warnings),missing=months.filter(m=>m.available===false).map(m=>m.monthKey);$('scoreWarnings').textContent=(missing.length?'未提供月份 '+missing.join('、')+'；缺資料不補零。':'')+(warnings.length?`來源與分項提示 ${warnings.length} 項。點進門市可核對原值；原成績仍保留。`:'原成績均有快取值。沒有改善紀錄，不推定已改善。');
   }
   function detail(store){
     const records=selectedMonths().flatMap(m=>m.records.filter(r=>r.store===store).map(r=>({m,r})));
     $('scoreDetail').hidden=false;
-    $('scoreDetail').innerHTML=`<h3>${escape(store)}｜缺失項目與來源</h3><p>下列為原檔項目，沒有個案事件或改善紀錄；頁次、店數與各原表單位分開呈現。</p>`+records.map(({m,r})=>`<details ${records.length===1?'open':''}><summary>${m.monthKey}｜原成績 ${number(r.score)}｜E ${number(r.defects)}｜F ${number(r.deduction)}｜${escape(m.sheetName)}!${r.source.score.cell}</summary><p>來源店名：${escape(r.sourceStore)}。舊機回收缺失：${m.layout==='warning-no-recycle'?'此月未提供（缺資料）':number(r.recycleDefects)}。</p><div class="table-scroll"><table><thead><tr><th>分類</th><th>原項目</th><th>原值／狀態</th><th>單位</th><th>来源儲存格</th></tr></thead><tbody>${r.metrics.filter(v=>v.kind!=='verification').map(v=>`<tr><td>${escape(v.group)}</td><td class="score-long">${escape(v.label)}${v.kind==='rank'?'（排名）':v.kind==='warning'?'（預警不扣分）':v.kind==='total'?'（原合計）':''}</td><td>${v.value==null?escape(v.status==='blank'?'空白／缺資料':String(v.raw)+'／缺資料'):number(v.value)}</td><td>${escape(v.unit)}</td><td>${escape(m.sheetName+'!'+v.cell)}</td></tr>`).join('')}</tbody></table></div></details>`).join('');
+    $('scoreDetail').innerHTML=`<h3>${escape(store)}｜缺失項目與來源</h3><p>下列為原檔項目，沒有個案事件或改善紀錄；頁次、店數與各原表單位分開呈現。</p><p class="score-legend"><span class="score-issue">紅色：有缺失／扣分</span><span class="score-warning">橘色：預警不扣分</span><span class="score-missing">橘色框：缺資料</span>　0 代表無缺失；分類不顯示排名。</p>`+records.map(({m,r})=>`<details ${records.length===1?'open':''}><summary>${m.monthKey}｜原成績 ${number(r.score)}｜<span class="${issueClass(r.defects)}">E ${number(r.defects)}</span>｜<span class="${issueClass(r.deduction)}">F ${number(r.deduction)}</span>｜${escape(m.sheetName)}!${r.source.score.cell}</summary><p>來源店名：${escape(r.sourceStore)}。<span class="${issueClass(r.recycleDefects)}">舊機回收缺失：${m.layout==='warning-no-recycle'?'此月未提供（缺資料）':number(r.recycleDefects)}</span>。</p><div class="table-scroll"><table><thead><tr><th>分類</th><th>原項目</th><th>原值／狀態</th><th>單位</th><th>来源儲存格</th></tr></thead><tbody>${r.metrics.filter(v=>!['verification','rank'].includes(v.kind)&&!/排名|名次/.test(v.label)).map(v=>`<tr class="${metricTone(v)}" data-metric-kind="${escape(v.kind)}"><td>${escape(v.group)}</td><td class="score-long">${escape(v.label)}${v.kind==='warning'?'（預警不扣分）':v.kind==='total'?'（原合計）':''}</td><td>${v.value==null?escape(v.status==='blank'?'空白／缺資料':String(v.raw)+'／缺資料'):number(v.value)}</td><td>${escape(v.unit)}</td><td>${escape(m.sheetName+'!'+v.cell)}</td></tr>`).join('')}</tbody></table></div></details>`).join('');
     $('scoreDetail').scrollIntoView({behavior:'auto',block:'start'});
   }
   async function preview(){

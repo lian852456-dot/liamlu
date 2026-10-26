@@ -16,7 +16,7 @@
   let patrolToken = '';
   let sessionExpiresAt = 0;
   let accessTimer;
-  let sessionEpoch=0,authController=null,returnFlight=null,returnNeeded=false;
+  let sessionEpoch=0,authController=null;
 
   const $ = (id) => document.getElementById(id);
   const escapeHtml = (value) => String(value == null ? '' : value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
@@ -166,54 +166,22 @@
     $('workspace').hidden = false;
     $('securityBadge').textContent = '督導權限已驗證';
     $('securityBadge').classList.add('ok');
-    // A background event may precede the initial auth response. Opening the
-    // workspace must restore presentation too, not only the HTML hidden flag.
-    if(document.hidden){suspendReads(true);return;}
-    returnNeeded=false;
-    setReturnPending(false);
+    // Keep the verified view for this login, including while the tab is hidden.
+    // Data changes are fetched only on first use, explicit refresh or write readback.
+    $('workspace').inert=false;
+    $('workspace').style.visibility='';
     if (monthlyUI) await monthlyUI.load();
     else setMessage('goldMessage', '月報元件未完整載入，請重新整理；目前停止讀取與上傳。', 'error');
   }
-  function setReturnPending(pending){
-    $('workspace').inert=pending;
-    $('workspace').style.visibility=pending?'hidden':'';
-    $('workspace').setAttribute('aria-busy',String(pending));
-    const notice=$('departmentReturn');
-    if(notice)notice.hidden=!pending;
-    if(pending){
-      if($('departmentReturnTitle'))$('departmentReturnTitle').textContent='正在恢復部區管理…';
-      if($('departmentReturnMessage'))$('departmentReturnMessage').textContent='正在核對督導權限與資料版本，完成後會自動顯示。';
-      if($('departmentRetry'))$('departmentRetry').hidden=true;
-    }
-  }
-  function suspendReads(cancel=false){monthlyUI?.suspend(cancel);window.DepartmentScoresReadSession?.suspend(cancel);if(cancel){clearTimeout(returnFlight?.timer);returnFlight=null;returnNeeded=true;setReturnPending(!$('workspace').hidden);}}
-  function validateReturn({force=false}={}){
-    if(document.hidden||window.PortalLogout?.isLocked())return Promise.resolve();
-    if(sessionExpiresAt&&sessionExpiresAt<=Date.now()){lockSharedWorkspace();return Promise.resolve();}
+  function checkWorkspaceSession(){
+    if(window.PortalLogout?.isLocked())return;
+    if(sessionExpiresAt&&sessionExpiresAt<=Date.now()){lockSharedWorkspace();return;}
     const token=sessionStorage.getItem(SESSION_KEY);
-    if(!token){if(patrolToken)lockSharedWorkspace();return Promise.resolve();}
-    if(token!==patrolToken){if(!patrolToken&&$('workspace').hidden)return Promise.resolve();lockSharedWorkspace();sessionStorage.setItem(SESSION_KEY,token);return restoreSession();}
-    if($('workspace').hidden)return Promise.resolve();
-    if(returnFlight?.epoch===sessionEpoch)return returnFlight.promise;
-    // focus/pageshow may fire for dialogs and DevTools while the document has
-    // remained visible. Only a real suspension needs a new server proof.
-    if(!returnNeeded&&!force)return Promise.resolve();
-    returnNeeded=false;
-    const flight={epoch:sessionEpoch};returnFlight=flight;suspendReads();setReturnPending(true);
-    const active=$('storePanel').hidden?monthlyUI:window.DepartmentScoresReadSession;
-    const deadline=new Promise((_,reject)=>{flight.timer=setTimeout(()=>reject(new Error('資料服務回應較慢，已停止本次等待。')),force?75000:15000);});
-    flight.promise=Promise.race([Promise.resolve().then(()=>active?.revalidate()),deadline]).then(result=>{
-      if(!result)throw new Error('資料核對未完成。');
-    }).catch(error=>{
-      if(returnFlight!==flight||flight.epoch!==sessionEpoch)return;
-      flight.failed=true;active?.suspend(true);
-      if($('departmentReturnTitle'))$('departmentReturnTitle').textContent='尚未完成資料核對';
-      if($('departmentReturnMessage'))$('departmentReturnMessage').textContent=error.message+' 請按「重新讀取」，不需要重新上傳原檔。';
-      if($('departmentRetry'))$('departmentRetry').hidden=false;
-    }).finally(()=>{
-      clearTimeout(flight.timer);
-      if(returnFlight===flight){returnFlight=null;if(flight.epoch===sessionEpoch&&!flight.failed)setReturnPending(false);}
-    });return flight.promise;
+    if(!token){if(patrolToken)lockSharedWorkspace();return;}
+    if(token!==patrolToken){
+      if(!patrolToken&&$('workspace').hidden)return;
+      lockSharedWorkspace();sessionStorage.setItem(SESSION_KEY,token);void restoreSession();
+    }
   }
 
   function readLocalJson(key, fallback) {
@@ -483,11 +451,9 @@
       const state = workState();
       if (state.unsaved || state.busy) { event.preventDefault(); event.returnValue = ''; }
     });
-    document.addEventListener('visibilitychange', () => {if(document.hidden)suspendReads(true);else if(patrolToken){updateSessionDeadline();void validateReturn();}});
-    window.addEventListener('pagehide',()=>suspendReads(true));
-    window.addEventListener('pageshow',()=>{void validateReturn();});
-    window.addEventListener('focus',()=>{if(patrolToken)void validateReturn();});
-    $('departmentRetry')?.addEventListener('click',()=>{void validateReturn({force:true});});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkWorkspaceSession();});
+    window.addEventListener('pageshow',checkWorkspaceSession);
+    window.addEventListener('focus',checkWorkspaceSession);
     $('authForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       const button = event.submitter;
@@ -528,8 +494,8 @@
   window.DepartmentGoldReadonlySource=loadMissing=>{if(!monthlyUI)throw new Error('金牌月報元件未載入');return monthlyUI.exportSnapshot(loadMissing);};
   function lockSharedWorkspace() {
     if (!$('workspace')) return;
-    sessionEpoch++;authController?.abort();authController=null;clearTimeout(returnFlight?.timer);returnFlight=null;returnNeeded=false;
-    patrolToken = ''; sessionStorage.removeItem(SESSION_KEY);setReturnPending(false);
+    sessionEpoch++;authController?.abort();authController=null;
+    patrolToken = ''; sessionStorage.removeItem(SESSION_KEY);$('workspace').inert=false;$('workspace').style.visibility='';
     clearInterval(accessTimer); sessionExpiresAt = 0;
     $('departmentAccess').hidden = true;
     $('departmentAccess').dataset.expiring = 'false';
