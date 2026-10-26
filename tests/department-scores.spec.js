@@ -5,6 +5,7 @@ const PAGE=process.env.TEST_BASE_URL ? new URL('department-ops.html',process.env
 const p=months=>({action:'department_scores_publish',token:'authorized',contract:Core.CONTRACT,confirm:true,requestId:crypto.randomUUID(),expectedGeneration:0,selectedMonthKeys:months.map(m=>m.monthKey),months,sourceName:'synthetic.xlsx',sourceHash:'a'.repeat(64)});
 const encode=workbook=>Buffer.from(XLSX.write(workbook,{type:'array',bookType:'xlsx'}));
 const buffer=options=>encode(F.workbook(options));
+const monthlyBuffer=(month=8)=>{const key=String(month).padStart(2,'0'),wb={SheetNames:['店務管理月報 疏失總表','MAIL','服務查核','近6個月缺失數'],Sheets:{'店務管理月報 疏失總表':F.sheet({month}),'MAIL':XLSX.utils.aoa_to_sheet([['區域','主管','轄下店數','店務缺失總數',`Y26${key}初版店務管理指標成績`,'排名']]),'服務查核':XLSX.utils.aoa_to_sheet([['直營',null,'轄下店數',`${month}月平反後分數`]]),'近6個月缺失數':XLSX.utils.aoa_to_sheet([['類別','指標項目',month===9?'Y2610':'Y2608']])}};return encode(wb);};
 const session=Buffer.from(JSON.stringify({exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')+'.synthetic';
 async function setup(page,{seed=true,loseAck=false}={}){
  const b=backend(),calls=[];let deny=false;if(seed)b.invoke(p([F.month({month:6}),F.month({month:7})]));
@@ -19,6 +20,17 @@ async function setup(page,{seed=true,loseAck=false}={}){
  await page.goto(PAGE);return {b,calls,expire:()=>{deny=true;}};
 }
 async function login(page){await page.locator('#passcode').fill('synthetic-passcode');await page.locator('#authForm button').click();await expect(page.locator('#workspace')).toBeVisible();await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreMessage')).not.toContainText('正在');}
+test('品管課單月原檔從上傳區可預覽、逐月保存讀回，重複點擊不重送、失敗保留舊版',async({page})=>{
+ const {b,calls}=await setup(page);await login(page);
+ const original=b.invoke({action:'department_scores_read',token:'authorized'}).months;
+ for(const month of [8,9]){
+  await page.locator('#scoreFile').setInputFiles({name:`synthetic-quality-month-${month}.xlsx`,mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:monthlyBuffer(month)});
+  await page.locator('#scoreImport').click();await expect(page.locator('#scoreUpdateMessage')).toContainText('預覽完成');await expect(page.locator('#scorePreviewMeta')).toContainText('品管課月報');await expect(page.locator('[data-score-month]')).toHaveAttribute('value','2026-0'+month);
+  await page.locator('#scoreConfirm').check();await page.locator('#scorePublish').dblclick();await expect(page.locator('#scoreUpdateMessage')).toContainText('逐項讀回對帳完成');
+ }
+ expect(calls.filter(p=>p.action==='department_scores_publish')).toHaveLength(2);const saved=b.invoke({action:'department_scores_read',token:'authorized'});expect(saved.months).toHaveLength(4);for(const slot of original)expect(saved.months.find(s=>s.month.monthKey===slot.month.monthKey)).toEqual(slot);
+ await page.locator('#scoreFile').setInputFiles({name:'bad.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from('not a workbook')});await page.locator('#scoreImport').click();await expect(page.locator('#scoreUpdateMessage')).toHaveClass(/error/);expect(b.invoke({action:'department_scores_read',token:'authorized'})).toEqual(saved);expect(calls.filter(p=>p.action==='department_scores_publish')).toHaveLength(2);
+});
 test('匿名不讀私有內容，登入後持久讀取，reload無需原檔',async({page})=>{
  const {calls}=await setup(page);await expect(page.locator('#workspace')).toBeHidden();expect(calls.length).toBe(0);await expect(page.locator('#scoreBody')).toBeEmpty();
  await login(page);await expect(page.locator('#scoreDashboard')).toBeVisible();await expect(page.locator('#scoreBody')).toContainText('合成店A1');await expect(page.locator('#scoreSourceMeta')).toContainText('不完整（2/6月）');expect(await page.locator('#scoreFile').inputValue()).toBe('');

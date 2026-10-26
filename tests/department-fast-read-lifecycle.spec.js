@@ -114,7 +114,10 @@ for(const width of [1440,390])test(`gold return shows progress, recovers after r
  await page.locator('#departmentRetry').click();await expect(page.locator('#goldDashboard')).toBeVisible();await expect(page.locator('#goldFile')).toHaveValue('');expect(s.errors).toEqual([]);
 });
 test('gold explicit denial over HTTP 503 clears both domains immediately without retry',async({page})=>{
- await page.clock.install();const s=await setup(page);await store(page);await page.locator('[data-tab="gold"]').click();s.state.denyGold=true;await returned(page);await expect(page.locator('#workspace')).toBeHidden();await page.clock.runFor(80000);
+ await page.clock.install();const s=await setup(page);await store(page);await page.locator('[data-tab="gold"]').click();s.state.denyGold=true;await returned(page);
+ // A return hides the workspace while the request is still pending. Wait for
+ // the real denial/lock before advancing the clock past its request deadline.
+ await expect(page.locator('#authPanel')).toBeVisible();await page.clock.runFor(80000);
  await expect(page.locator('#peopleBody')).toBeEmpty();await expect(page.locator('#scoreBody')).toBeEmpty();expect(s.calls.filter(p=>p.action==='department_ops_read')).toHaveLength(2);expect(s.errors).toEqual([]);
 });
 test('session expiry clears both domains without waiting for a ten-second poll or a return event',async({page})=>{

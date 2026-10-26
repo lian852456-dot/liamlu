@@ -47,6 +47,7 @@
     </section>
 
     <div id="workspace" hidden>
+      <section class="panel" aria-label="離線唯讀匯出"><button id="departmentExportHTML" class="secondary-button" type="button">下載 HTML 唯讀版</button><p id="departmentExportStatus" class="source-meta" role="status">包含已保存的店務與部區金牌月報，可離線篩選；僅供本人保管。</p></section>
       <div class="tab-bar" role="tablist" aria-label="部區管理功能">
         <button class="active" type="button" role="tab" data-tab="gold" aria-selected="true">金牌統計</button>
         <button type="button" role="tab" data-tab="store" aria-selected="false">店務成績</button>
@@ -124,6 +125,7 @@
         <section class="panel upload-panel">
           <h2>本機原檔自助更新</h2><p class="score-limits">各月頁籤沿用固定原格式。選檔只在本機解析，預覽確認後僅保存 A–D 門市明細到既有私有資料域。重開後登入即可查看。</p>
           <div class="score-update-grid"><label class="field">店務原始 XLSX<input id="scoreFile" type="file" accept=".xlsx"></label><label class="field">資料年度（原檔無年份時）<input id="scoreYear" type="text" inputmode="numeric" maxlength="4" placeholder="例如 2026"></label><button id="scoreImport" class="primary-button" type="button">讀取新版並預覽</button></div>
+          <p id="scoreUpdateMessage" class="message" role="status" aria-live="polite"></p>
           <section id="scorePreview" hidden><h3>更新預覽</h3><p id="scorePreviewMeta"></p><div id="scoreMonthChoices"></div><p id="scoreErrors"></p><div id="scoreDiff"></div><label class="score-confirm"><input id="scoreConfirm" type="checkbox">我已核對月份、差異與缺資料警告，確認保存勾選月份</label><button id="scorePublish" class="primary-button" type="button" disabled>確認保存勾選月份</button></section>
           <p class="score-limits">尚無改善紀錄與個案原因，不推定已改善或改善率。簡報範例尚未提供，目前提供資料匯出介面。</p>
         </section>
@@ -140,9 +142,12 @@
   <script src="department-store-presentation-browser.js?v=20261002-store-export-2"></script>
   <script src="department-gold-monthly-core.js?v=20261002-1" defer></script>
   <script src="session-read-manager.js?v=20261013-phase1-1" defer></script>
-  <script src="department-gold-monthly-ui.js?v=20261026-return-gate-2" defer></script>
-  <script src="department-scores.js?v=20261026-return-gate-2" defer></script>
-  <script src="department-ops.js?v=20261026-return-gate-2" defer></script>
+  <script src="department-gold-monthly-ui.js?v=20261026-return-gate-2-upload-1" defer></script>
+  <script src="department-scores.js?v=20261026-return-gate-2-upload-1" defer></script>
+  <script src="department-ops.js?v=20261026-return-gate-2-upload-1" defer></script>
+  <script src="department-readonly-assets.js?v=20261026-1" defer></script>
+  <script src="department-readonly-core.js?v=20261026-1" defer></script>
+  <script src="department-readonly-browser.js?v=20261026-1" defer></script>
   <script src="store-rule-reminders.js?v=20261004-collapse-1" defer></script>
 </body>
 </html>
