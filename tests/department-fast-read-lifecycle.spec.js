@@ -32,7 +32,50 @@ test('return before initial session restoration finishes cannot strand an authen
  }});
  await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#goldDashboard')).toBeVisible();await expect(page.locator('#securityBadge')).toHaveText('督導權限已驗證');expect(s.errors).toEqual([]);
 });
-const returned=page=>page.evaluate(()=>{document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));});
+const returned=page=>page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));window.dispatchEvent(new Event('focus'));});
+test('foreground focus and redundant visible events never hide or refetch a verified workspace',async({page})=>{
+ const s=await setup(page);
+ for(const domain of ['gold','store']){
+  if(domain==='store')await store(page);
+  const before=s.calls.filter(p=>/department_(ops|scores)_read/.test(p.action)).length;
+  await page.evaluate(()=>{for(let i=0;i<5;i++){window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));document.dispatchEvent(new Event('visibilitychange'));}});
+  await expect(page.locator(domain==='gold'?'#goldDashboard':'#scoreDashboard')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();
+  expect(s.calls.filter(p=>/department_(ops|scores)_read/.test(p.action))).toHaveLength(before);
+ }
+ expect(s.errors).toEqual([]);
+});
+test('actual visibility suspension still requires fresh proof and deduplicates foreground events',async({page})=>{
+ const s=await setup(page);await store(page);s.state.hold=gate();
+ await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>window.__syntheticHidden});window.__syntheticHidden=true;document.dispatchEvent(new Event('visibilitychange'));});
+ await expect(page.locator('#scoreDashboard')).toBeHidden();
+ await page.evaluate(()=>{window.__syntheticHidden=false;document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));});
+ await expect.poll(()=>s.calls.filter(p=>p.action==='department_scores_read').length).toBe(2);await expect(page.locator('#departmentReturn')).toBeVisible();
+ s.state.hold.release();await expect(page.locator('#scoreDashboard')).toBeVisible();expect(s.errors).toEqual([]);
+});
+for(const domain of ['gold','store'])test(`${domain} unresponsive return stops automatically, can retry, and ignores late denial`,async({page},testInfo)=>{
+ await page.clock.install();const s=await setup(page);if(domain==='store')await store(page);
+ await page.evaluate(({domain,contract})=>{
+  const original=window.fetch;window.__stalledReturns=[];
+  window.fetch=(u,o)=>{
+   const p=JSON.parse(o?.body||'{}'),target=domain==='gold'?'department_ops_read':'department_scores_read';
+   if(p.action!==target||!p.knownVersion)return original(u,o);
+   return new Promise(resolve=>__stalledReturns.push({resolve,p,signal:o.signal}));
+  };
+  window.__finishStalled=(i,denied=false)=>{
+   const {resolve,p}=__stalledReturns[i],result=denied?{status:'error',message:'AUTH_SESSION_REVOKED'}:{status:'ok',notModified:true,readContract:'department-version-read/v1',readVersion:p.knownVersion,...(domain==='gold'?{monthly:{revision:p.knownVersion}}:{contract,generation:1})};
+   resolve(new Response(JSON.stringify(result),{headers:{'Content-Type':'application/json'}}));
+  };
+ },{domain,contract:Scores.CONTRACT});
+ await returned(page);await expect.poll(()=>page.evaluate(()=>__stalledReturns.length)).toBe(1);await page.clock.runFor(15001);
+ await expect(page.locator('#departmentRetry')).toBeVisible();await expect(page.locator('#departmentReturnMessage')).toContainText('已停止本次等待');await expect(page.locator('#workspace')).toBeHidden();
+ expect(await page.evaluate(()=>__stalledReturns[0].signal.aborted)).toBe(true);
+ await page.screenshot({path:testInfo.outputPath('return-timeout.png')});
+ await page.evaluate(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));});expect(await page.evaluate(()=>__stalledReturns.length)).toBe(1);
+ await page.locator('#departmentRetry').click();await expect.poll(()=>page.evaluate(()=>__stalledReturns.length)).toBe(2);await page.evaluate(()=>__finishStalled(1));
+ await expect(page.locator(domain==='gold'?'#goldDashboard':'#scoreDashboard')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();
+ await page.evaluate(()=>__finishStalled(0,true));await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#authPanel')).toBeHidden();
+ expect(s.calls.filter(p=>/publish|restore/.test(p.action))).toEqual([]);expect(s.errors).toEqual([]);
+});
 async function store(page){await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreBody tr')).toHaveCount(9);}
 async function holdFile(page){
  const buffer=Buffer.from(XLSX.write(F.workbook({month:7}),{type:'array',bookType:'xlsx'}));await page.locator('#scoreYear').fill('2026');await page.locator('#scoreFile').setInputFiles({name:'synthetic.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer});
@@ -67,8 +110,8 @@ for(const width of [1440,390])test(`gold return shows progress, recovers after r
  await page.evaluate(()=>{__finishGoldReturn(0);__finishGoldReturn(1);});await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();
  await page.screenshot({path:testInfo.outputPath('return-recovered.png')});
  await returned(page);await expect.poll(()=>page.evaluate(()=>__goldReturns.length)).toBe(4);await page.evaluate(()=>__finishGoldReturn(3,true));
- await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();await expect(page.locator('#goldMessage')).toContainText('合成暫時讀取失敗');await expect(page.locator('#goldDashboard')).toBeHidden();
- await page.locator('#monthlyReload').click();await expect(page.locator('#goldDashboard')).toBeVisible();await expect(page.locator('#goldFile')).toHaveValue('');expect(s.errors).toEqual([]);
+ await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#departmentRetry')).toBeVisible();await expect(page.locator('#goldMessage')).toContainText('合成暫時讀取失敗');await expect(page.locator('#goldDashboard')).toBeHidden();
+ await page.locator('#departmentRetry').click();await expect(page.locator('#goldDashboard')).toBeVisible();await expect(page.locator('#goldFile')).toHaveValue('');expect(s.errors).toEqual([]);
 });
 test('gold explicit denial over HTTP 503 clears both domains immediately without retry',async({page})=>{
  await page.clock.install();const s=await setup(page);await store(page);await page.locator('[data-tab="gold"]').click();s.state.denyGold=true;await returned(page);await expect(page.locator('#workspace')).toBeHidden();await page.clock.runFor(80000);

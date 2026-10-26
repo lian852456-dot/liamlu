@@ -67,7 +67,7 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   assert.match(page, /officecrypto\.bundle\.min\.js/);
   assert.match(page, /department-ops-core\.js\?v=20260930-2/);
   assert.match(page, /session-read-manager\.js\?v=20261013-phase1-1/);
-  assert.match(page, /department-ops\.js\?v=20261026-return-recovery-1/);
+  assert.match(page, /department-ops\.js\?v=20261026-return-gate-2/);
   assert.match(page, /需要更新時才上傳助理月報原檔/);
   assert.match(page, /選檔僅供更新/);
   assert.match(page, /id="excelPassword"[^>]*placeholder="請輸入檔案密碼"/);

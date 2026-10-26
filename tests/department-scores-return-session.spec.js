@@ -42,7 +42,8 @@ async function setup(page){
  });
  return {a,b,errors,calls};
 }
-async function returned(page){await page.evaluate(()=>{document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));document.dispatchEvent(new Event('visibilitychange'));});}
+async function focused(page){await page.evaluate(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));document.dispatchEvent(new Event('visibilitychange'));});}
+async function returned(page){await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));await focused(page);}
 async function pending(page,count){await expect.poll(()=>page.evaluate(()=>__returnRace.length)).toBe(count);}
 async function settle(page,index,kind){await page.evaluate(({index,kind})=>__settleReturn(index,kind),{index,kind});await page.waitForTimeout(50);}
 async function relogin(page){await page.evaluate(()=>window.dispatchEvent(new Event('department-session-cleared')));await expect(page.locator('#workspace')).toBeHidden();await page.locator('#passcode').fill('synthetic-passcode');await page.locator('#authForm button').click();await expect(page.locator('#peopleBody')).toContainText('合成B');}
@@ -51,14 +52,14 @@ for(const kind of ['success','denied','timeout','network','http503'])test(`late 
  expect(await page.evaluate(()=>({aborted:__returnRace[0].signal.aborted,aborts:__returnRace[0].aborts}))).toEqual({aborted:true,aborts:1});
  await returned(page);await pending(page,2);expect(await page.evaluate(()=>__returnRace[1].signal.aborted)).toBe(false);
  await settle(page,0,kind);await expect(page.locator('#workspace')).toHaveJSProperty('hidden',false);await expect(page.locator('#authPanel')).toBeHidden();expect(await page.evaluate(key=>sessionStorage.getItem(key),KEY)).toBe(s.b);
- await returned(page);await page.waitForTimeout(50);await pending(page,2);
+ await focused(page);await page.waitForTimeout(50);await pending(page,2);
  await settle(page,1,'success');await expect(page.locator('#peopleBody')).toContainText('合成B');
  await returned(page);await pending(page,3);await settle(page,2,'denied');await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#peopleBody')).toBeEmpty();expect(s.errors).toEqual([]);
 });
 test('late A timeout after the old retry horizon cannot affect a fresh B return',async({page})=>{
  await page.clock.install();const s=await setup(page);await returned(page);await pending(page,1);await relogin(page);await returned(page);await pending(page,2);await settle(page,1,'success');
  await page.clock.runFor(76000);await expect(page.locator('#peopleBody')).toContainText('合成B');await returned(page);await pending(page,3);
- await settle(page,0,'timeout');await returned(page);await pending(page,3);await settle(page,2,'success');await expect(page.locator('#workspace')).toBeVisible();expect(s.errors).toEqual([]);
+ await settle(page,0,'timeout');await focused(page);await pending(page,3);await settle(page,2,'success');await expect(page.locator('#workspace')).toBeVisible();expect(s.errors).toEqual([]);
 });
 for(const event of ['department-session-cleared','portal-before-logout'])test(`${event} cancels A and a late response cannot revive private data`,async({page})=>{
  const s=await setup(page);await returned(page);await pending(page,1);
@@ -70,5 +71,5 @@ test('same token reused after logout gets a new generation and a new return chec
  const s=await setup(page);await returned(page);await pending(page,1);
  await page.evaluate(({key,a})=>{window.dispatchEvent(new Event('department-session-cleared'));sessionStorage.setItem(key,a);document.querySelector('#workspace').hidden=false;window.dispatchEvent(new Event('pageshow'));},{key:KEY,a:s.a});
  await expect(page.locator('#peopleBody')).toContainText('合成A');
- await returned(page);await pending(page,2);await settle(page,0,'denied');await returned(page);await pending(page,2);await expect(page.locator('#workspace')).toHaveJSProperty('hidden',false);await expect(page.locator('#authPanel')).toBeHidden();await settle(page,1,'denied');await expect(page.locator('#workspace')).toBeHidden();expect(s.errors).toEqual([]);
+ await returned(page);await pending(page,2);await settle(page,0,'denied');await focused(page);await pending(page,2);await expect(page.locator('#workspace')).toHaveJSProperty('hidden',false);await expect(page.locator('#authPanel')).toBeHidden();await settle(page,1,'denied');await expect(page.locator('#workspace')).toBeHidden();expect(s.errors).toEqual([]);
 });
