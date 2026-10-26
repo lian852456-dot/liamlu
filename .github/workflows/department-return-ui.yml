@@ -50,7 +50,8 @@ jobs:
             if curl --fail --silent http://127.0.0.1:8875/department-ops.html >/dev/null; then break; fi
             sleep 1
           done
-          npx playwright test tests/department-fast-read-lifecycle.spec.js tests/department-scores-return-session.spec.js tests/department-scores-denial.spec.js tests/portal-logout.spec.js --workers=2 --output=test-results/chromium
+          npx playwright test tests/department-fast-read-lifecycle.spec.js tests/department-scores-return-session.spec.js tests/department-scores-denial.spec.js --workers=2 --output=test-results/chromium
+          npx playwright test tests/portal-logout.spec.js --grep 'same-tab department password login' --workers=1 --output=test-results/department-logout
           npx playwright test tests/department-display-recovery.spec.js --grep-invert 'readable type at 390' --workers=1 --output=test-results/display
           npx playwright test tests/department-fast-read-lifecycle.spec.js --browser=webkit --workers=1 --output=test-results/webkit
       - name: Compare existing mobile width failure against the base commit
@@ -83,8 +84,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: department-return-${{ github.event.pull_request.head.sha }}
-          path: |
-            test-results/
-            ${{ github.workspace }}/../evidence/
+          path: test-results/
           if-no-files-found: warn
           retention-days: 7
