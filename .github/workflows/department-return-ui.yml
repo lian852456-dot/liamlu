@@ -53,7 +53,11 @@ jobs:
           npx playwright test tests/department-fast-read-lifecycle.spec.js tests/department-scores-return-session.spec.js tests/department-scores-denial.spec.js --workers=2 --output=test-results/chromium
           npx playwright test tests/portal-logout.spec.js --grep 'same-tab department password login' --workers=1 --output=test-results/department-logout
           npx playwright test tests/department-display-recovery.spec.js --grep-invert 'readable type at 390' --workers=1 --output=test-results/display
-          npx playwright test tests/department-fast-read-lifecycle.spec.js --browser=webkit --workers=1 --output=test-results/webkit
+          node <<'JS'
+          const fs=require('node:fs');
+          fs.writeFileSync('playwright.department-webkit.cjs',"const base=require('./playwright.config.js');module.exports={...base,use:{...base.use,browserName:'webkit',launchOptions:{}}};\n");
+          JS
+          npx playwright test tests/department-fast-read-lifecycle.spec.js --config=playwright.department-webkit.cjs --workers=1 --output=test-results/webkit
       - name: Compare existing mobile width failure against the base commit
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
