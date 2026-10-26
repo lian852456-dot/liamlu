@@ -66,8 +66,8 @@ jobs:
           candidate_pid=$!
           trap 'kill "$base_pid" "$candidate_pid"' EXIT
           mkdir -p test-results/mobile-width
-          TEST_BASE_URL=http://127.0.0.1:8876/ npx playwright test tests/department-display-recovery.spec.js --grep 'readable type at 390' --workers=1 --reporter=json >test-results/mobile-width/base.json || true
-          TEST_BASE_URL=http://127.0.0.1:8875/ npx playwright test tests/department-display-recovery.spec.js --grep 'readable type at 390' --workers=1 --reporter=json >test-results/mobile-width/candidate.json || true
+          TEST_BASE_URL=http://127.0.0.1:8876/ npx playwright test tests/department-display-recovery.spec.js --grep 'readable type at 390' --workers=1 --reporter=json --output=test-results/baseline-mobile >test-results/mobile-width/base.json || true
+          TEST_BASE_URL=http://127.0.0.1:8875/ npx playwright test tests/department-display-recovery.spec.js --grep 'readable type at 390' --workers=1 --reporter=json --output=test-results/candidate-mobile >test-results/mobile-width/candidate.json || true
           node <<'JS'
           const fs=require('node:fs'),assert=require('node:assert/strict');
           function failures(file){
