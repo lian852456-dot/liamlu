@@ -28,7 +28,7 @@ async function setup(page,{token=session(),hold=false}={}){
 for(const width of [390,1440])test(`gold cold open and return avoid hidden score reads at ${width}`,async({page})=>{
  await page.setViewportSize({width,height:1000});const s=await setup(page);
  expect(s.calls.map(c=>c.action)).toEqual(['ptauth','department_ops_read']);
- await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+ await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));});
  await page.waitForTimeout(100);expect(s.scoreReads()).toHaveLength(0);
  await page.goto(new URL('home.html',PAGE).href);await page.goBack();
  await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#goldMessage')).not.toContainText('正在');expect(s.scoreReads()).toHaveLength(0);
@@ -41,7 +41,7 @@ test('rapid tab switches coalesce the first score read; same-session return reus
  await page.locator('[data-tab="gold"]').click();await page.locator('[data-tab="store"]').click();await page.locator('[data-tab="gold"]').click();await page.locator('[data-tab="store"]').click();expect(s.scoreReads()).toHaveLength(1);
  s.release();await expect(page.locator('#scoreBody tr')).toHaveCount(9);
  await page.locator('[data-tab="gold"]').click();await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreBody tr')).toHaveCount(9);expect(s.scoreReads()).toHaveLength(1);
- await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await expect.poll(()=>s.scoreReads().length).toBe(2);await expect(page.locator('#scoreMessage')).not.toContainText('正在');
+ await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));});await expect.poll(()=>s.scoreReads().length).toBe(2);await expect(page.locator('#scoreMessage')).not.toContainText('正在');
  expect(s.calls.filter(c=>/publish|restore/.test(c.action))).toEqual([]);expect(s.errors).toEqual([]);
 });
 test('session replacement clears the previous view even while the score tab is hidden',async({page})=>{
@@ -59,15 +59,15 @@ test('a pending score response cannot repopulate the view after logout',async({p
 });
 test('server revocation on the visible return clears scores and locks the workspace',async({page})=>{
  const s=await setup(page);await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreBody tr')).toHaveCount(9);s.deny();
- await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#scoreBody')).toBeEmpty();expect(s.scoreReads()).toHaveLength(2);expect(s.errors).toEqual([]);
+ await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));});await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#scoreBody')).toBeEmpty();expect(s.scoreReads()).toHaveLength(2);expect(s.errors).toEqual([]);
 });
 test('gold return checks permission and version without hidden score reads and coalesces events',async({page})=>{
  const s=await setup(page);
- await page.evaluate(()=>{document.dispatchEvent(new Event('visibilitychange'));document.dispatchEvent(new Event('visibilitychange'));});
+ await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));window.dispatchEvent(new Event('focus'));});
  await expect.poll(()=>s.calls.filter(c=>c.action==='department_ops_read').length).toBe(2);expect(s.scoreReads()).toHaveLength(0);expect(s.calls.filter(c=>c.action==='ptauth')).toHaveLength(1);
  // The request is counted before its response settles; end that return before revoking it.
  await page.waitForTimeout(100);
- s.deny();await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+ s.deny();await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));});
  await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#peopleBody')).toBeEmpty();expect(s.scoreReads()).toHaveLength(0);expect(s.errors).toEqual([]);
 });
 test('session expiry locks the gold view without starting a hidden score read',async({page})=>{
