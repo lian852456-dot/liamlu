@@ -4,13 +4,13 @@ const Gold=require('../department-gold-monthly-core.js'),Scores=require('../depa
 const PAGE=new URL('department-ops.html',process.env.TEST_BASE_URL||'http://127.0.0.1:8772/').href,KEY='bei12b_patrol_session_token_v2';
 const gate=()=>{let release;const promise=new Promise(r=>release=r);return {promise,release};};
 function gold(medal){return Gold.validateMonth({schema:Gold.SCHEMA,monthKey:'2026-09',sheetName:'動員(全員)',sourceName:'synthetic.xlsx',sourceHash:crypto.createHash('sha256').update(String(medal)).digest('hex'),dateRange:{start:'2026-09-01',end:'2026-09-28',cutoff:'2026-09-28'},settlementStatus:'provisional',records:[{employeeId:'SYN001',employeeName:'合成同仁',region:'北一二B',storeCode:'SYN-B',store:'合成店',role:'合成職稱',medal,sourceRow:4,sourceFields:[]}],validation:{sourceTotal:medal}});}
-async function setup(page,ttl=3600){
+async function setup(page,ttl=3600,{beforeAuth,afterGoto}={}){
  const exp=Math.floor(Date.now()/1000)+ttl,token=Buffer.from(JSON.stringify({exp})).toString('base64url')+'.synthetic',state={goldVersion:1,denyGold:false,denyScores:false,denyAuth:false,hold:null},calls=[],errors=[];
  page.on('pageerror',e=>errors.push(e.message));await page.addInitScript(({key,token})=>sessionStorage.setItem(key,token),{key:KEY,token});
  await page.route('**/*',async route=>{
   const host=new URL(route.request().url()).hostname;if(host==='127.0.0.1')return route.continue();if(host!=='script.google.com')return route.abort();
   const p=route.request().postDataJSON();calls.push(p);let result,status=200;
-  if(p.action==='ptauth')result=state.denyAuth?{status:'error',message:'AUTH_SESSION_REVOKED'}:{status:'ok',token,expiresAt:exp};
+  if(p.action==='ptauth'){if(beforeAuth)await beforeAuth();result=state.denyAuth?{status:'error',message:'AUTH_SESSION_REVOKED'}:{status:'ok',token,expiresAt:exp};}
   else if(p.action==='department_ops_read'){
    if(state.denyGold){status=503;result={status:'error',message:'unauthorized',auth:{reason:'AUTH_SESSION_REVOKED'}};}
    else result=p.knownVersion==='gold-v'+state.goldVersion?{status:'ok',notModified:true,readContract:'department-version-read/v1',readVersion:p.knownVersion,monthly:{revision:p.knownVersion}}:{status:'ok',readVersion:'gold-v'+state.goldVersion,gold:{months:[gold(state.goldVersion*10)]},monthly:{revision:'gold-v'+state.goldVersion,history:{}}};
@@ -22,8 +22,16 @@ async function setup(page,ttl=3600){
   else return route.abort();
   await route.fulfill({status,contentType:'application/json',body:JSON.stringify(result)}).catch(()=>{});
  });
- await page.goto(PAGE);if(ttl>0)await expect(page.locator('#peopleBody tr')).toHaveCount(1);return {state,calls,errors};
+ await page.goto(PAGE);if(afterGoto)await afterGoto();if(ttl>0)await expect(page.locator('#peopleBody tr')).toHaveCount(1);return {state,calls,errors};
 }
+test('return before initial session restoration finishes cannot strand an authenticated blank workspace',async({page})=>{
+ const held=gate();
+ const s=await setup(page,3600,{beforeAuth:()=>held.promise,afterGoto:async()=>{
+  await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));window.dispatchEvent(new Event('focus'));});
+  held.release();
+ }});
+ await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#goldDashboard')).toBeVisible();await expect(page.locator('#securityBadge')).toHaveText('督導權限已驗證');expect(s.errors).toEqual([]);
+});
 const returned=page=>page.evaluate(()=>{document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));});
 async function store(page){await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreBody tr')).toHaveCount(9);}
 async function holdFile(page){
@@ -33,8 +41,32 @@ async function holdFile(page){
 }
 test('coalesced return hides private scores until backend proof then preserves filters and detail',async({page})=>{
  const s=await setup(page);await store(page);await page.locator('#scorePeriod').selectOption('2026-07');await page.locator('#scoreRegion').selectOption('北一二B');await page.locator('#scoreStore').selectOption('合成店B1');await page.locator('[data-score-detail]').click();
- s.state.hold=gate();await returned(page);await expect(page.locator('#scoreDashboard')).toBeHidden();await expect.poll(()=>s.calls.filter(p=>p.action==='department_scores_read').length).toBe(2);
- s.state.hold.release();await expect(page.locator('#scoreDashboard')).toBeVisible();await expect(page.locator('#scoreBody tr')).toHaveCount(1);await expect(page.locator('#scoreStore')).toHaveValue('合成店B1');await expect(page.locator('#scoreDetail')).toBeVisible();expect(s.errors).toEqual([]);
+ s.state.hold=gate();await returned(page);await expect(page.locator('#scoreDashboard')).toBeHidden();await expect(page.locator('#departmentReturn')).toBeVisible();await expect(page.locator('#workspace')).toHaveJSProperty('inert',true);await expect.poll(()=>s.calls.filter(p=>p.action==='department_scores_read').length).toBe(2);
+ s.state.hold.release();await expect(page.locator('#scoreDashboard')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();await expect(page.locator('#workspace')).toHaveJSProperty('inert',false);await expect(page.locator('#scoreBody tr')).toHaveCount(1);await expect(page.locator('#scoreStore')).toHaveValue('合成店B1');await expect(page.locator('#scoreDetail')).toBeVisible();expect(s.errors).toEqual([]);
+});
+for(const width of [1440,390])test(`gold return shows progress, recovers after repeated backgrounding and exposes retry on failure at ${width}`,async({page})=>{
+ await page.setViewportSize({width,height:900});const s=await setup(page);
+ await page.evaluate(()=>{
+  const original=window.fetch;window.__goldReturns=[];
+  window.fetch=(u,o)=>{
+   const p=JSON.parse(o?.body||'{}');
+   if(p.action!=='department_ops_read'||!p.knownVersion)return original(u,o);
+   return new Promise(resolve=>window.__goldReturns.push({resolve,version:p.knownVersion}));
+  };
+  window.__finishGoldReturn=(index,failed=false)=>{
+   const r=window.__goldReturns[index];r.resolve(new Response(JSON.stringify(failed?{status:'error',message:'合成暫時讀取失敗'}:{status:'ok',notModified:true,readContract:'department-version-read/v1',readVersion:r.version,monthly:{revision:r.version}}),{headers:{'Content-Type':'application/json'}}));
+  };
+ });
+ for(let i=0;i<3;i++){
+  await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));window.dispatchEvent(new Event('focus'));});
+  await expect.poll(()=>page.evaluate(()=>__goldReturns.length)).toBe(i+1);
+  await expect(page.locator('#departmentReturn')).toBeVisible();await expect(page.locator('#goldDashboard')).toBeHidden();
+ }
+ await page.evaluate(()=>__finishGoldReturn(2));await expect(page.locator('#goldDashboard')).toBeVisible();
+ await page.evaluate(()=>{__finishGoldReturn(0);__finishGoldReturn(1);});await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();
+ await returned(page);await expect.poll(()=>page.evaluate(()=>__goldReturns.length)).toBe(4);await page.evaluate(()=>__finishGoldReturn(3,true));
+ await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();await expect(page.locator('#goldMessage')).toContainText('合成暫時讀取失敗');await expect(page.locator('#goldDashboard')).toBeHidden();
+ await page.locator('#monthlyReload').click();await expect(page.locator('#goldDashboard')).toBeVisible();await expect(page.locator('#goldFile')).toHaveValue('');expect(s.errors).toEqual([]);
 });
 test('gold explicit denial over HTTP 503 clears both domains immediately without retry',async({page})=>{
  await page.clock.install();const s=await setup(page);await store(page);await page.locator('[data-tab="gold"]').click();s.state.denyGold=true;await returned(page);await expect(page.locator('#workspace')).toBeHidden();await page.clock.runFor(80000);

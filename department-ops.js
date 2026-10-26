@@ -166,10 +166,21 @@
     $('workspace').hidden = false;
     $('securityBadge').textContent = '督導權限已驗證';
     $('securityBadge').classList.add('ok');
+    // A background event may precede the initial auth response. Opening the
+    // workspace must restore presentation too, not only the HTML hidden flag.
+    if(document.hidden){suspendReads(true);return;}
+    setReturnPending(false);
     if (monthlyUI) await monthlyUI.load();
     else setMessage('goldMessage', '月報元件未完整載入，請重新整理；目前停止讀取與上傳。', 'error');
   }
-  function suspendReads(cancel=false){monthlyUI?.suspend(cancel);window.DepartmentScoresReadSession?.suspend(cancel);if(cancel){returnFlight=null;$('workspace').inert=false;$('workspace').style.visibility='hidden';}}
+  function setReturnPending(pending){
+    $('workspace').inert=pending;
+    $('workspace').style.visibility=pending?'hidden':'';
+    $('workspace').setAttribute('aria-busy',String(pending));
+    const notice=$('departmentReturn');
+    if(notice)notice.hidden=!pending;
+  }
+  function suspendReads(cancel=false){monthlyUI?.suspend(cancel);window.DepartmentScoresReadSession?.suspend(cancel);if(cancel){returnFlight=null;setReturnPending(!$('workspace').hidden);}}
   function validateReturn(){
     if(document.hidden||window.PortalLogout?.isLocked())return Promise.resolve();
     const token=sessionStorage.getItem(SESSION_KEY);
@@ -177,10 +188,10 @@
     if(token!==patrolToken){if(!patrolToken&&$('workspace').hidden)return Promise.resolve();lockSharedWorkspace();sessionStorage.setItem(SESSION_KEY,token);return restoreSession();}
     if($('workspace').hidden)return Promise.resolve();
     if(returnFlight?.epoch===sessionEpoch)return returnFlight.promise;
-    const flight={epoch:sessionEpoch};returnFlight=flight;suspendReads();$('workspace').inert=true;$('workspace').style.visibility='hidden';
+    const flight={epoch:sessionEpoch};returnFlight=flight;suspendReads();setReturnPending(true);
     const active=$('storePanel').hidden?monthlyUI:window.DepartmentScoresReadSession;
     flight.promise=Promise.resolve().then(()=>active?.revalidate()).finally(()=>{
-      if(returnFlight===flight){returnFlight=null;if(flight.epoch===sessionEpoch){$('workspace').inert=false;$('workspace').style.visibility='';}}
+      if(returnFlight===flight){returnFlight=null;if(flight.epoch===sessionEpoch)setReturnPending(false);}
     });return flight.promise;
   }
 
@@ -495,7 +506,7 @@
   function lockSharedWorkspace() {
     if (!$('workspace')) return;
     sessionEpoch++;authController?.abort();authController=null;returnFlight=null;
-    patrolToken = ''; sessionStorage.removeItem(SESSION_KEY);$('workspace').inert=false;$('workspace').style.visibility='';
+    patrolToken = ''; sessionStorage.removeItem(SESSION_KEY);setReturnPending(false);
     clearInterval(accessTimer); sessionExpiresAt = 0;
     $('departmentAccess').hidden = true;
     $('departmentAccess').dataset.expiring = 'false';

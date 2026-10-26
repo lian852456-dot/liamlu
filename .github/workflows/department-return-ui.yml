@@ -1,0 +1,62 @@
+name: Department return UI checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'department-ops.*'
+      - 'department-gold-monthly-ui.js'
+      - 'department-scores.js'
+      - 'session-read-manager.js'
+      - 'portal-logout.js'
+      - 'tests/department-*.spec.js'
+      - 'tests/session-read-manager.test.cjs'
+      - '.github/workflows/department-return-ui.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: department-return-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  department-return:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium webkit
+      - name: Check auth and private read contracts
+        run: |
+          node --check department-ops.js
+          node --test tests/session-read-manager.test.cjs tests/department-ops.test.cjs tests/department-ops-integration.test.cjs tests/department-version-read.test.cjs
+      - name: Exercise return and recovery with synthetic data
+        run: |
+          python3 -m http.server 8772 --bind 127.0.0.1 >/tmp/department-return-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8772/department-ops.html >/dev/null; then break; fi
+            sleep 1
+          done
+          npx playwright test tests/department-fast-read-lifecycle.spec.js tests/department-scores-return-session.spec.js tests/department-display-recovery.spec.js tests/department-scores-denial.spec.js tests/portal-logout.spec.js --workers=2 --output=test-results/chromium
+          npx playwright test tests/department-fast-read-lifecycle.spec.js --browser=webkit --workers=1 --output=test-results/webkit
+      - name: Save failure details and screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: department-return-${{ github.event.pull_request.head.sha }}
+          path: |
+            test-results/
+            ../evidence/
+          if-no-files-found: warn
+          retention-days: 7
