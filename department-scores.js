@@ -106,6 +106,11 @@
     flight.promise=(async()=>{try{const beforeVersion=snapshot?.readVersion??snapshot?.generation;await read({refresh,verifiedReturn:true});if(epoch!==readEpoch||generation!==readGeneration)return;if(!verify||beforeVersion!==(snapshot.readVersion??snapshot.generation)){pending=null;restore=null;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;}msg(snapshot.available?'已讀取私有保存版本；更新資料時才需要選檔。':'尚未初始化成績。請選原檔、預覽並確認保存。');}catch(e){if(epoch!==readEpoch||generation!==readGeneration||e.code==='SESSION_READ_CANCELLED')return;loaded=false;reads.clear();suspend();msg(e.message+'；請重新讀取以核對權限與版本。',true);}finally{if(readFlight===flight){readFlight=null;setBusy(false,false);}}})();return flight.promise;
   }
   window.DepartmentScoresReadSession={suspend,revalidate:()=>{observeAuth();if(busy&&!readFlight){const epoch=readEpoch;return request('ptauth').catch(e=>{if(epoch===readEpoch){suspend();msg(e.message+'；請重新核對權限。',true);}});}return load({refresh:true,verify:true});},activate:()=>{observeAuth();return needsValidation?load({refresh:true,verify:true}):Promise.resolve();},clear:clearPrivateData};
+  window.DepartmentScoresReadonlySource=function(loadMissing=false){
+    if(loadMissing){observeAuth();return (!loaded&&!busy?load():Promise.resolve()).then(()=>window.DepartmentScoresReadonlySource(false));}
+    if(!presentationAuthorized()||busy||readFlight||!snapshot?.available)throw new Error('店務保存版本尚未核對，請先讀取店務成績。');
+    return snapshot;
+  };
   function selectedMonths(){return snapshot?C.periodMonths(snapshot.months.map(s=>s.month),$('scorePeriod').value):[];}
   function initializeFilters(){
     const months=snapshot.months.map(s=>s.month),old=$('scorePeriod').value,oldRegion=$('scoreRegion').value;

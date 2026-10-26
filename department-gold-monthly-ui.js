@@ -168,7 +168,13 @@
       $('monthlyLogout').addEventListener('click',async()=>{const token=getToken();clear();lockWorkspace();await request({action:'ptlogout',token}).catch(()=>{});});
       // The page controller owns return-time validation for both independent domains.
     }
-    return {load,importGold,prepare:()=>prepare(false),exportGold,bind,clear,suspend,
+    function exportSnapshot(loadMissing=false){
+      if(loadMissing)return (!saved.length&&!busy?load():Promise.resolve()).then(()=>exportSnapshot(false));
+      const deadline=getDeadline?.()||window.SessionReadManager.tokenDeadline(getToken());
+      if(!saved.length||!loadedVersion||needsValidation||busy||readFlight||!getToken()||!isAuthorized?.()||!Number.isFinite(deadline)||deadline<=Date.now())throw new Error('金牌保存版本尚未核對，請先讀取金牌月報。');
+      return {readVersion:loadedVersion,gold:{months:saved},monthly:{revision}};
+    }
+    return {load,importGold,prepare:()=>prepare(false),exportGold,exportSnapshot,bind,clear,suspend,
       revalidate,
       activate:()=>needsValidation?load(undefined,{refresh:true,verify:true}):Promise.resolve(),
       workState:()=>({busy,unsaved:Boolean(candidate.length||plan||$('goldFile').files?.length)})};

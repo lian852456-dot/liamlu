@@ -41,6 +41,7 @@
     </section>
 
     <div id="workspace" hidden>
+      <section class="panel" aria-label="離線唯讀匯出"><button id="departmentExportHTML" class="secondary-button" type="button">下載 HTML 唯讀版</button><p id="departmentExportStatus" class="source-meta" role="status">包含已保存的店務與部區金牌月報，可離線篩選；僅供本人保管。</p></section>
       <div class="tab-bar" role="tablist" aria-label="部區管理功能">
         <button class="active" type="button" role="tab" data-tab="gold" aria-selected="true">金牌統計</button>
         <button type="button" role="tab" data-tab="store" aria-selected="false">店務成績</button>
@@ -134,9 +135,12 @@
   <script src="department-store-presentation-browser.js?v=20261002-store-export-2"></script>
   <script src="department-gold-monthly-core.js?v=20261002-1" defer></script>
   <script src="session-read-manager.js?v=20261013-phase1-1" defer></script>
-  <script src="department-gold-monthly-ui.js?v=20261013-phase1-1" defer></script>
-  <script src="department-scores.js?v=20261013-phase1-1" defer></script>
-  <script src="department-ops.js?v=20261013-phase1-1" defer></script>
+  <script src="department-gold-monthly-ui.js?v=20261026-readonly-1" defer></script>
+  <script src="department-scores.js?v=20261026-readonly-1" defer></script>
+  <script src="department-ops.js?v=20261026-readonly-1" defer></script>
+  <script src="department-readonly-assets.js?v=20261026-1" defer></script>
+  <script src="department-readonly-core.js?v=20261026-1" defer></script>
+  <script src="department-readonly-browser.js?v=20261026-1" defer></script>
   <script src="store-rule-reminders.js?v=20261004-collapse-1" defer></script>
 </body>
 </html>

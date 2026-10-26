@@ -492,6 +492,7 @@
     isAuthorized:()=>Boolean(patrolToken&&sessionStorage.getItem(SESSION_KEY)===patrolToken&&!$('workspace').hidden&&!window.PortalLogout?.isLocked()),
     lockWorkspace: lockSharedWorkspace
   }) : null;
+  window.DepartmentGoldReadonlySource=loadMissing=>{if(!monthlyUI)throw new Error('金牌月報元件未載入');return monthlyUI.exportSnapshot(loadMissing);};
   function lockSharedWorkspace() {
     if (!$('workspace')) return;
     sessionEpoch++;authController?.abort();authController=null;returnFlight=null;
