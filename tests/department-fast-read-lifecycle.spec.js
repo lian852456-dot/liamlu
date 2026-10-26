@@ -44,7 +44,7 @@ test('coalesced return hides private scores until backend proof then preserves f
  s.state.hold=gate();await returned(page);await expect(page.locator('#scoreDashboard')).toBeHidden();await expect(page.locator('#departmentReturn')).toBeVisible();await expect(page.locator('#workspace')).toHaveJSProperty('inert',true);await expect.poll(()=>s.calls.filter(p=>p.action==='department_scores_read').length).toBe(2);
  s.state.hold.release();await expect(page.locator('#scoreDashboard')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();await expect(page.locator('#workspace')).toHaveJSProperty('inert',false);await expect(page.locator('#scoreBody tr')).toHaveCount(1);await expect(page.locator('#scoreStore')).toHaveValue('合成店B1');await expect(page.locator('#scoreDetail')).toBeVisible();expect(s.errors).toEqual([]);
 });
-for(const width of [1440,390])test(`gold return shows progress, recovers after repeated backgrounding and exposes retry on failure at ${width}`,async({page})=>{
+for(const width of [1440,390])test(`gold return shows progress, recovers after repeated backgrounding and exposes retry on failure at ${width}`,async({page},testInfo)=>{
  await page.setViewportSize({width,height:900});const s=await setup(page);
  await page.evaluate(()=>{
   const original=window.fetch;window.__goldReturns=[];
@@ -61,9 +61,11 @@ for(const width of [1440,390])test(`gold return shows progress, recovers after r
   await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));window.dispatchEvent(new Event('focus'));});
   await expect.poll(()=>page.evaluate(()=>__goldReturns.length)).toBe(i+1);
   await expect(page.locator('#departmentReturn')).toBeVisible();await expect(page.locator('#goldDashboard')).toBeHidden();
+  if(i===0)await page.screenshot({path:testInfo.outputPath('return-pending.png')});
  }
  await page.evaluate(()=>__finishGoldReturn(2));await expect(page.locator('#goldDashboard')).toBeVisible();
  await page.evaluate(()=>{__finishGoldReturn(0);__finishGoldReturn(1);});await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();
+ await page.screenshot({path:testInfo.outputPath('return-recovered.png')});
  await returned(page);await expect.poll(()=>page.evaluate(()=>__goldReturns.length)).toBe(4);await page.evaluate(()=>__finishGoldReturn(3,true));
  await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#departmentReturn')).toBeHidden();await expect(page.locator('#goldMessage')).toContainText('合成暫時讀取失敗');await expect(page.locator('#goldDashboard')).toBeHidden();
  await page.locator('#monthlyReload').click();await expect(page.locator('#goldDashboard')).toBeVisible();await expect(page.locator('#goldFile')).toHaveValue('');expect(s.errors).toEqual([]);

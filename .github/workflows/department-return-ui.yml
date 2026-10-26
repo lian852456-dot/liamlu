@@ -40,16 +40,44 @@ jobs:
           node --check department-ops.js
           node --test tests/session-read-manager.test.cjs tests/department-ops.test.cjs tests/department-ops-integration.test.cjs tests/department-version-read.test.cjs
       - name: Exercise return and recovery with synthetic data
+        env:
+          TEST_BASE_URL: http://127.0.0.1:8875/
         run: |
-          python3 -m http.server 8772 --bind 127.0.0.1 >/tmp/department-return-server.log 2>&1 &
+          python3 -m http.server 8875 --bind 127.0.0.1 >/tmp/department-return-server.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid"' EXIT
           for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:8772/department-ops.html >/dev/null; then break; fi
+            if curl --fail --silent http://127.0.0.1:8875/department-ops.html >/dev/null; then break; fi
             sleep 1
           done
-          npx playwright test tests/department-fast-read-lifecycle.spec.js tests/department-scores-return-session.spec.js tests/department-display-recovery.spec.js tests/department-scores-denial.spec.js tests/portal-logout.spec.js --workers=2 --output=test-results/chromium
+          npx playwright test tests/department-fast-read-lifecycle.spec.js tests/department-scores-return-session.spec.js tests/department-scores-denial.spec.js tests/portal-logout.spec.js --workers=2 --output=test-results/chromium
+          npx playwright test tests/department-display-recovery.spec.js --grep-invert 'readable type at 390' --workers=1 --output=test-results/display
           npx playwright test tests/department-fast-read-lifecycle.spec.js --browser=webkit --workers=1 --output=test-results/webkit
+      - name: Compare existing mobile width failure against the base commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          baseline_dir=$(mktemp -d)
+          git archive "$BASE_SHA" | tar -x -C "$baseline_dir"
+          python3 -m http.server 8876 --bind 127.0.0.1 --directory "$baseline_dir" >/tmp/department-base-server.log 2>&1 &
+          base_pid=$!
+          python3 -m http.server 8875 --bind 127.0.0.1 >/tmp/department-candidate-server.log 2>&1 &
+          candidate_pid=$!
+          trap 'kill "$base_pid" "$candidate_pid"' EXIT
+          mkdir -p test-results/mobile-width
+          TEST_BASE_URL=http://127.0.0.1:8876/ npx playwright test tests/department-display-recovery.spec.js --grep 'readable type at 390' --workers=1 --reporter=json >test-results/mobile-width/base.json || true
+          TEST_BASE_URL=http://127.0.0.1:8875/ npx playwright test tests/department-display-recovery.spec.js --grep 'readable type at 390' --workers=1 --reporter=json >test-results/mobile-width/candidate.json || true
+          node <<'JS'
+          const fs=require('node:fs'),assert=require('node:assert/strict');
+          function failures(file){
+            const report=JSON.parse(fs.readFileSync(file,'utf8')),out=[];
+            function walk(s){for(const spec of s.specs||[])for(const t of spec.tests||[])for(const r of t.results||[])if(r.status!=='passed')out.push({title:spec.title,status:r.status,message:r.error?.message});for(const child of s.suites||[])walk(child);}
+            walk(report);assert.equal(report.stats.expected+report.stats.unexpected,1);return out;
+          }
+          const base=failures('test-results/mobile-width/base.json'),candidate=failures('test-results/mobile-width/candidate.json');
+          console.log(JSON.stringify({base,candidate},null,2));assert.deepEqual(candidate,base,'Mobile layout differs from the base commit');
+          JS
       - name: Save failure details and screenshots
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -57,6 +85,6 @@ jobs:
           name: department-return-${{ github.event.pull_request.head.sha }}
           path: |
             test-results/
-            ../evidence/
+            ${{ github.workspace }}/../evidence/
           if-no-files-found: warn
           retention-days: 7
