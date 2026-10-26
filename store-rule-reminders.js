@@ -121,7 +121,7 @@
       loadedToken = session;
       if (data) render(data); else status.textContent = '尚未提供私有規則提醒。';
       expiryTimer = setTimeout(() => clear('登入已到期，請重新登入後讀取提醒。'), Math.min(2147483647,result.expiresAt*1000-Date.now()));
-      refreshTimer = setTimeout(load,60000);
+      // Retain reminders for this login; refresh only on the explicit button.
     } catch (error) {
       if (current !== generation) return;
       clear(error.name === 'AbortError' ? '提醒服務逾時，請重新讀取。' : error.message);
@@ -136,8 +136,9 @@
   }
 
   function sync() {
-    if (!active()) { clear('開啟店務後重新驗證並讀取提醒。'); return; }
-    if (!loadedToken || loadedToken !== token()) load();
+    if (revoked || workspace.hidden || !token()) { clear('登入後讀取私有提醒。'); return; }
+    if (loadedToken && loadedToken !== token()) clear('登入已變更。');
+    if (active() && !loadedToken) load();
   }
 
   refresh.addEventListener('click',load);
@@ -156,7 +157,6 @@
   observer.observe(workspace,{attributes:true,attributeFilter:['hidden']});
   observer.observe(panel,{attributes:true,attributeFilter:['hidden']});
   document.addEventListener('visibilitychange',sync);
-  window.addEventListener('pagehide',() => clear());
   window.addEventListener('pageshow',sync);
   window.addEventListener('storage',event => { if (event.key === SESSION_KEY) sync(); });
   sync();

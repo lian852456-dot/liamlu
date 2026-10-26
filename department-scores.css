@@ -4,3 +4,15 @@
 @media(max-width:620px){#storePanel .filter-panel,.score-update-grid{grid-template-columns:1fr}#storePanel h2{font-size:26px}#storePanel .summary-card{padding:14px}#storePanel .summary-card strong{font-size:29px}.score-regions strong{font-size:29px}#storePanel .data-card{padding:16px}#scoreMonthChoices label{align-items:flex-start}#storePanel .score-actions button{flex:1}#scoreHistory{width:100%}}
 
 .score-trend-labels{display:none}@media(max-width:620px){.score-trend-labels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}.score-trend-labels div{padding:8px;background:#fff6ed;border-radius:8px;text-align:center}.score-trend-labels span{display:block;font-size:14px}.score-trend-labels strong{display:block;font-size:20px}}
+
+/* Defects use both contrast and weight; zero and audit counts stay neutral. */
+#storePanel .score-issue{color:#a51d14;font-weight:800;background:#fff0ed}
+#storePanel .score-warning{color:#875000;font-weight:750;background:#fff5df}
+#storePanel .score-missing{color:#875000;background:#fff8e8;outline:1px dashed #b87516;outline-offset:-1px}
+#storePanel tr.score-issue td{background:#fff0ed;border-bottom-color:#efc9c3}
+#storePanel tr.score-warning td{background:#fff5df}
+#storePanel tr.score-missing td{background:#fff8e8}
+#storePanel tr.score-has-issue>td:first-child{border-left:4px solid #bb3326}
+#storePanel .summary-card.score-issue strong{color:#a51d14}
+.score-legend{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:15px}
+.score-legend span{padding:4px 9px;border-radius:6px}

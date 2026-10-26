@@ -43,7 +43,7 @@ async function setup(page){
  return {a,b,errors,calls};
 }
 async function focused(page){await page.evaluate(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));document.dispatchEvent(new Event('visibilitychange'));});}
-async function returned(page){await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));await focused(page);}
+async function returned(page){await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));await focused(page);if(await page.locator('#monthlyReload').isVisible())await page.locator('#monthlyReload').click();}
 async function pending(page,count){await expect.poll(()=>page.evaluate(()=>__returnRace.length)).toBe(count);}
 async function settle(page,index,kind){await page.evaluate(({index,kind})=>__settleReturn(index,kind),{index,kind});await page.waitForTimeout(50);}
 async function relogin(page){await page.evaluate(()=>window.dispatchEvent(new Event('department-session-cleared')));await expect(page.locator('#workspace')).toBeHidden();await page.locator('#passcode').fill('synthetic-passcode');await page.locator('#authForm button').click();await expect(page.locator('#peopleBody')).toContainText('合成B');}

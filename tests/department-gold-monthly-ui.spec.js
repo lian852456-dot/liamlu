@@ -46,7 +46,7 @@ test('reload and return during gold commit preserve single write and complete re
  const s=await setup(page,{holdCommit:true});await page.locator('#goldFile').setInputFiles(replacement());await page.locator('#goldImport').click();await page.locator('#publishGold').click();await page.locator('#monthlyCommit').click();
  await expect.poll(()=>s.calls.filter(p=>p.mode==='commit').length).toBe(1);await page.locator('#monthlyReload').click();await expect(page.locator('#goldMessage')).toContainText('等待完整讀回');
  const authBefore=s.calls.filter(p=>p.action==='ptauth').length;
- await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));});await expect.poll(()=>s.calls.filter(p=>p.action==='ptauth').length).toBe(authBefore+1);
+ await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));});expect(s.calls.filter(p=>p.action==='ptauth')).toHaveLength(authBefore);
  s.releaseCommit();await expect(page.locator('#publishMessage')).toContainText('逐值讀回');await expect(page.locator('#monthlyCommit')).toBeEnabled();await expect(page.locator('#goldDashboard')).toBeVisible();
  expect(s.calls.filter(p=>p.mode==='commit')).toHaveLength(1);const readbacks=s.calls.filter(p=>p.action==='department_ops_read'&&p.operationId);expect(readbacks).toHaveLength(1);expect(readbacks[0].knownVersion).toBeUndefined();await expect(page.locator('#goldImport')).toBeEnabled();expect(s.errors).toEqual([]);
 });
