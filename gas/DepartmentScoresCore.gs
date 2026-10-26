@@ -115,8 +115,44 @@
     if (years.size > 1) throw new Error('工作簿含跨年資料，請使用含年份的月份頁籤');
     return [...years][0] || '';
   }
+  function monthlyReport(workbook) {
+    const names=workbook.SheetNames.filter(n=>text(n)==='店務管理月報 疏失總表');
+    if(!names.length)return null;
+    if(names.length!==1)throw new Error('月報主總表重複，請保留單一正式來源');
+    const mailNames=workbook.SheetNames.filter(n=>text(n).toUpperCase()==='MAIL');
+    if(mailNames.length!==1)throw new Error('月報缺少唯一 MAIL 當期成績表頭，無法核對月份');
+    const mail=workbook.Sheets[mailNames[0]],{cols}=dimensions(mail);
+    const headers=Array.from({length:cols},(_,c)=>text(mail[address(0,c)]?.v).replace(/\s/g,''));
+    const defects=headers.flatMap((v,c)=>/店務缺失總數/.test(v)?[c]:[]);
+    if(defects.length!==1)throw new Error('MAIL 當期成績表頭不明確');
+    // The current score immediately follows total defects. Later columns are
+    // earlier months; auxiliary trend sheets may carry future/stale headings.
+    const heading=headers[defects[0]+1]||'',match=heading.match(/^Y(\d{2})(0[1-9]|1[0-2])(?:初版|Final版|Final|正式版)?店務管理指標成績$/i);
+    if(!match||headers[defects[0]+2]!=='排名')throw new Error('MAIL 當期成績未明示唯一 Y年月，停止解析');
+    const monthKey='20'+match[1]+'-'+match[2];
+    const serviceNames=workbook.SheetNames.filter(n=>text(n)==='服務查核');
+    if(serviceNames.length!==1)throw new Error('月報缺少唯一服務查核月份供核對');
+    const service=workbook.Sheets[serviceNames[0]],serviceMonths=[];
+    for(const [a,c] of Object.entries(service))if(/^[A-Z]+[12]$/.test(a)){
+      const found=text(c.v).match(/^(\d{1,2})月平反後分數$/);if(found)serviceMonths.push(Number(found[1]));
+    }
+    if(serviceMonths.length!==1||serviceMonths[0]!==Number(match[2]))throw new Error('MAIL 當期月份與服務查核月份不一致，停止解析');
+    const warnings=[];
+    const trend=workbook.Sheets[workbook.SheetNames.find(n=>text(n)==='近6個月缺失數')];
+    const trendKey=text(trend?.C1?.v).match(/^Y(\d{2})(0[1-9]|1[0-2])$/i);
+    if(trendKey&&'20'+trendKey[1]+'-'+trendKey[2]!==monthKey)warnings.push('輔助近6個月缺失數 C1 標為 '+text(trend.C1.v)+'；當期採 MAIL 成績欄與服務查核共同確認的 '+monthKey+'，輔助表未納入統計');
+    return {sheetName:names[0],monthKey,heading,warnings};
+  }
   function parseWorkbook(workbook, options) {
     if (!workbook?.SheetNames || !workbook?.Sheets) throw new Error('無法辨識 XLSX 工作簿');
+    const report=monthlyReport(workbook);
+    if(report){
+      if(options?.year&&text(options.year)!==report.monthKey.slice(0,4))throw new Error('資料年度與月報 MAIL 當期成績表頭不一致');
+      if(workbook.SheetNames.some(n=>/^(?:(20\d{2})[-/.年])?(\d{1,2})月?$/.test(n)))throw new Error('月報主總表與月份頁籤混合，請分開核對來源');
+      const month=parseMonth(workbook.Sheets[report.sheetName],report.sheetName,report.monthKey);
+      month.warnings.push(...report.warnings);
+      return {contract:CONTRACT,months:[month],errors:[],referenceNote:'品管課月報：'+report.heading+'；月份已與服務查核核對，僅採疏失總表 A–D 門市 G／E／F 原值'};
+    }
     const inferred = inferYear(workbook), year = text(options?.year || inferred);
     if (!/^20\d{2}$/.test(year)) throw new Error('原檔月份頁籤缺年份，請先填寫資料年度');
     if (inferred && year !== inferred) throw new Error('資料年度與原檔表頭不一致');
@@ -202,5 +238,5 @@
     const rows=months.flatMap(m=>m.records.filter(r=>(!filters?.region||r.region===filters.region)&&(!filters?.store||r.store===filters.store)).map(r=>({monthKey:m.monthKey,...r})));
     return {contract:'north12-scores-brief-v1',period:months.map(m=>m.monthKey),missingMonths:months.filter(m=>m.available===false).map(m=>m.monthKey),filters:filters||{},summary:summarize(rows),regions:REGIONS.map(region=>({region,...summarize(rows.filter(r=>r.region===region))})),quarters:quarterInfo(months),records:rows,limitations:['缺失不同單位不合併成案件','無個案事件文字及改善紀錄，未推論原因或改善率','成績取原始快取值，未依新規章回算','簡報模板尚未提供，本輸出為資料介面']};
   }
-  return { CONTRACT, REGIONS, text, cell, column, mapping, canonicalStore, parseWorkbook, parseMonth, inferYear, validateMonth, canonical, diff, summarize, rank, quarterInfo, periodMonths, brief };
+  return { CONTRACT, REGIONS, text, cell, column, mapping, canonicalStore, parseWorkbook, parseMonth, inferYear, monthlyReport, validateMonth, canonical, diff, summarize, rank, quarterInfo, periodMonths, brief };
 });

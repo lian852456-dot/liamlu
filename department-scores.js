@@ -17,7 +17,7 @@
   window.DepartmentScoresWorkState=()=>({busy,unsaved:Boolean(pending||restore||$('scoreFile').files?.length)});
   const escape=v=>String(v==null?'':v).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const number=(v,places=2)=>v==null?'缺資料':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:places});
-  const msg=(v,error=false)=>{$('scoreMessage').textContent=v;$('scoreMessage').className='message'+(error?' error':'');};
+  const msg=(v,error=false)=>{for(const id of ['scoreMessage','scoreUpdateMessage']){const e=$(id);if(e){e.textContent=v;e.className='message'+(error?' error':'');}}};
   const digest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(v=>v.toString(16).padStart(2,'0')).join('');
   const monthHash=m=>digest(new TextEncoder().encode(C.canonical(m)));
   function presentationAuthorized(){
@@ -36,7 +36,7 @@
     snapshot=null;pending=null;restore=null;loaded=false;
     setBusy(false);
     $('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;
-    for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings'])$(id).replaceChildren();$('scoreFile').value='';
+    for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings','scoreUpdateMessage'])$(id).replaceChildren();$('scoreFile').value='';
   }
   function lock(message) {
     clearPrivateData();verifiedToken='';locked=true;
@@ -147,7 +147,7 @@
     const ranked=months.length===1?C.rank(months[0].records):[];
     $('scoreBody').innerHTML=allStores.map(store=>{const sr=rows.filter(r=>r.store===store),s=C.summarize(sr),latest=sr[sr.length-1],rank=ranked.find(r=>r.store===store);return `<tr><td><strong>${escape(store)}</strong><small>${escape(latest.region)}</small></td>${months.map(m=>{const r=m.records.find(v=>v.store===store);return `<td class="number ${r?.deduction>0?'down':''}">${number(r?.score)}</td>`;}).join('')}<td class="number">${number(s.mean)}</td><td class="number">${number(s.defects)}</td><td class="number">${number(s.deduction)}</td><td>${rank?number(rank.departmentRank,0)+'／'+number(rank.nationalRank,0):'—'}</td><td><button class="secondary-button" data-score-detail="${escape(store)}">查看</button></td></tr>`;}).join('');
     $('scoreDetail').replaceChildren();$('scoreDetail').hidden=true;
-    const warnings=months.filter(m=>m.available!==false).flatMap(m=>m.warnings),missing=months.filter(m=>m.available===false).map(m=>m.monthKey);$('scoreWarnings').textContent=(missing.length?'未提供月份 '+missing.join('、')+'；缺資料不補零。':'')+(warnings.length?`分項缺資料 ${warnings.length} 項。點進門市可核對原錯誤；原成績仍保留。`:'原成績均有快取值。沒有改善紀錄，不推定已改善。');
+    const warnings=months.filter(m=>m.available!==false).flatMap(m=>m.warnings),missing=months.filter(m=>m.available===false).map(m=>m.monthKey);$('scoreWarnings').textContent=(missing.length?'未提供月份 '+missing.join('、')+'；缺資料不補零。':'')+(warnings.length?`來源與分項提示 ${warnings.length} 項。點進門市可核對原值；原成績仍保留。`:'原成績均有快取值。沒有改善紀錄，不推定已改善。');
   }
   function detail(store){
     const records=selectedMonths().flatMap(m=>m.records.filter(r=>r.store===store).map(r=>({m,r})));
@@ -156,6 +156,7 @@
     $('scoreDetail').scrollIntoView({behavior:'auto',block:'start'});
   }
   async function preview(){
+    if(busy)return;
     if(!loaded)return msg('請先成功讀取保存版本，才能比較更新。',true);
     const file=$('scoreFile').files?.[0];if(!file)return msg('請先選擇固定格式的店務 XLSX。',true);
     const epoch=readEpoch,token=verifiedToken;
@@ -174,7 +175,7 @@
       $('scoreMonthChoices').innerHTML=items.map(i=>`<label><input type="checkbox" data-score-month value="${i.month.monthKey}" ${i.changed?'checked':''}>${i.month.monthKey}｜${i.before?(i.changed?'更正版本':'相同資料，略過'):'新增月份'}｜${i.month.records.length}店｜${i.diff.length}欄差異</label>`).join('');
       $('scoreErrors').textContent=parsed.errors.map(e=>e.monthKey+'：'+e.message).concat(parsed.months.flatMap(m=>m.warnings)).join('\n');
       $('scoreDiff').innerHTML=items.map(i=>`<details><summary>${i.month.monthKey}｜平均分 ${number(C.summarize(i.before?.month.records||[]).mean)} → ${number(C.summarize(i.month.records).mean)}｜原缺失 ${number(C.summarize(i.before?.month.records||[]).defects)} → ${number(C.summarize(i.month.records).defects)}｜原扣分 ${number(C.summarize(i.before?.month.records||[]).deduction)} → ${number(C.summarize(i.month.records).deduction)}</summary><div class="table-scroll"><table><thead><tr><th>店點</th><th>變更欄位</th><th>目前</th><th>新版</th></tr></thead><tbody>${i.diff.map(d=>`<tr><td>${escape(d.store)}</td><td class="score-long">${escape(({score:'原成績 G',defects:'原缺失 E',deduction:'原扣分 F',nationalRank:'全國排名 H',region:'部區',sourceStore:'來源店名'}[d.field])||d.field)}</td><td>${escape(d.before??'缺資料')}</td><td>${escape(d.after??'缺資料')}</td></tr>`).join('')}</tbody></table></div></details>`).join('');
-      $('scorePreview').hidden=needsValidation;msg(items.some(i=>i.changed)?'預覽完成。核對差異並勾選確認後，才會持久保存。':'檔案內容與已保存月份相同，無需重複保存。');
+      $('scorePreview').hidden=needsValidation;msg(!items.length?'沒有可更新月份：'+parsed.errors.map(e=>e.monthKey+' '+e.message).join('；'):items.some(i=>i.changed)?'預覽完成。核對差異並勾選確認後，才會持久保存。':'檔案內容與已保存月份相同，無需重複保存。',!items.length);
     }catch(e){if(epoch===readEpoch){pending=null;msg(e.message,true);}}finally{if(epoch===readEpoch)setBusy(false);}
   }
   async function publish(){

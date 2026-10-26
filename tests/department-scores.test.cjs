@@ -1,6 +1,16 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),crypto=require('node:crypto');
 const Core=require('../department-scores-core.js'),F=require('./helpers/department-scores-synthetic.cjs');
 const clone=x=>JSON.parse(JSON.stringify(x));
+function monthlyWorkbook({month=8,trendMonth=month,serviceMonth=month}={}){
+ const X=require('../assets/vendor/xlsx.full.min.js'),key=String(month).padStart(2,'0');
+ return {SheetNames:['店務管理月報 疏失總表','MAIL','服務查核','近6個月缺失數'],Sheets:{'店務管理月報 疏失總表':F.sheet({month}),'MAIL':X.utils.aoa_to_sheet([['區域','主管','轄下店數','店務缺失\n總數',`Y26${key}初版\n店務管理指標成績`,'\n排名','Y2606Final版\n店務管理指標成績']]),'服務查核':X.utils.aoa_to_sheet([['直營',null,'轄下店數',`${serviceMonth}月平反後分數`]]),'近6個月缺失數':X.utils.aoa_to_sheet([['類別','指標項目','Y26'+String(trendMonth).padStart(2,'0')]])}};
+}
+test('品管課單月原檔依 MAIL 當期欄與服務查核核對月份，不從檔名或輔助趨勢猜測',()=>{
+ for(const n of [8,9]){const p=Core.parseWorkbook(monthlyWorkbook({month:n,trendMonth:n===9?10:8}),{year:'2026'});assert.equal(p.months.length,1);assert.equal(p.months[0].monthKey,'2026-0'+n);assert.equal(p.months[0].records.length,9);assert.equal(p.months[0].sheetName,'店務管理月報 疏失總表');assert.equal(p.months[0].warnings.length,n===9?1:0);assert.match(p.referenceNote,/MAIL|月份已/);}
+ const w=monthlyWorkbook();assert.throws(()=>Core.parseWorkbook(w,{year:'2025'}),/年度/);assert.throws(()=>Core.parseWorkbook(monthlyWorkbook({serviceMonth:9})),/月份不一致/);
+ w.Sheets.MAIL.E1.v='當期成績';assert.throws(()=>Core.parseWorkbook(w),/未明示/);
+ const mixed=monthlyWorkbook();mixed.SheetNames.push('8月');mixed.Sheets['8月']=F.sheet({month:8});assert.throws(()=>Core.parseWorkbook(mixed),/混合/);
+});
 test('三版多層表頭從語義辨識，動態行與位移欄、主管合計均不混入',()=>{
  for(const layout of ['warning-no-recycle','warning-recycle','final-recycle'])for(const offset of [0,2]){
   const parsed=Core.parseWorkbook(F.workbook({layout,offset,rowStart:80}));assert.deepEqual(parsed.errors,[]);const m=parsed.months[0];assert.equal(m.records.length,9);assert.equal(m.records[0].sourceRow,81);assert.equal(m.layout,layout);assert.equal(m.records[0].deduction,.5);assert.equal(m.records[0].defects,0);assert.equal(m.records[0].score,99.5);assert.equal(m.records[0].recycleDefects,layout==='warning-no-recycle'?null:0);

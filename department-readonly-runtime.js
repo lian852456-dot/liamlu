@@ -44,7 +44,7 @@ snapshot.available=true;
     const ranked=months.length===1?C.rank(months[0].records):[];
     $('scoreBody').innerHTML=allStores.map(store=>{const sr=rows.filter(r=>r.store===store),s=C.summarize(sr),latest=sr[sr.length-1],rank=ranked.find(r=>r.store===store);return `<tr><td><strong>${escape(store)}</strong><small>${escape(latest.region)}</small></td>${months.map(m=>{const r=m.records.find(v=>v.store===store);return `<td class="number ${r?.deduction>0?'down':''}">${number(r?.score)}</td>`;}).join('')}<td class="number">${number(s.mean)}</td><td class="number">${number(s.defects)}</td><td class="number">${number(s.deduction)}</td><td>${rank?number(rank.departmentRank,0)+'／'+number(rank.nationalRank,0):'—'}</td><td><button class="secondary-button" data-score-detail="${escape(store)}">查看</button></td></tr>`;}).join('');
     $('scoreDetail').replaceChildren();$('scoreDetail').hidden=true;
-    const warnings=months.filter(m=>m.available!==false).flatMap(m=>m.warnings),missing=months.filter(m=>m.available===false).map(m=>m.monthKey);$('scoreWarnings').textContent=(missing.length?'未提供月份 '+missing.join('、')+'；缺資料不補零。':'')+(warnings.length?`分項缺資料 ${warnings.length} 項。點進門市可核對原錯誤；原成績仍保留。`:'原成績均有快取值。沒有改善紀錄，不推定已改善。');
+    const warnings=months.filter(m=>m.available!==false).flatMap(m=>m.warnings),missing=months.filter(m=>m.available===false).map(m=>m.monthKey);$('scoreWarnings').textContent=(missing.length?'未提供月份 '+missing.join('、')+'；缺資料不補零。':'')+(warnings.length?`來源與分項提示 ${warnings.length} 項。點進門市可核對原值；原成績仍保留。`:'原成績均有快取值。沒有改善紀錄，不推定已改善。');
   }
   function detail(store){
     const records=selectedMonths().flatMap(m=>m.records.filter(r=>r.store===store).map(r=>({m,r})));

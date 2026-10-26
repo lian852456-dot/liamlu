@@ -125,6 +125,7 @@
         <section class="panel upload-panel">
           <h2>本機原檔自助更新</h2><p class="score-limits">各月頁籤沿用固定原格式。選檔只在本機解析，預覽確認後僅保存 A–D 門市明細到既有私有資料域。重開後登入即可查看。</p>
           <div class="score-update-grid"><label class="field">店務原始 XLSX<input id="scoreFile" type="file" accept=".xlsx"></label><label class="field">資料年度（原檔無年份時）<input id="scoreYear" type="text" inputmode="numeric" maxlength="4" placeholder="例如 2026"></label><button id="scoreImport" class="primary-button" type="button">讀取新版並預覽</button></div>
+          <p id="scoreUpdateMessage" class="message" role="status" aria-live="polite"></p>
           <section id="scorePreview" hidden><h3>更新預覽</h3><p id="scorePreviewMeta"></p><div id="scoreMonthChoices"></div><p id="scoreErrors"></p><div id="scoreDiff"></div><label class="score-confirm"><input id="scoreConfirm" type="checkbox">我已核對月份、差異與缺資料警告，確認保存勾選月份</label><button id="scorePublish" class="primary-button" type="button" disabled>確認保存勾選月份</button></section>
           <p class="score-limits">尚無改善紀錄與個案原因，不推定已改善或改善率。簡報範例尚未提供，目前提供資料匯出介面。</p>
         </section>
