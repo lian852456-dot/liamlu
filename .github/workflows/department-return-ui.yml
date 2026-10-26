@@ -53,6 +53,8 @@ jobs:
           npx playwright test tests/department-fast-read-lifecycle.spec.js tests/department-scores-return-session.spec.js tests/department-scores-denial.spec.js --workers=2 --output=test-results/chromium
           npx playwright test tests/portal-logout.spec.js --grep 'same-tab department password login' --workers=1 --output=test-results/department-logout
           npx playwright test tests/department-display-recovery.spec.js --grep-invert 'readable type at 390' --workers=1 --output=test-results/display
+          npx playwright test tests/department-scores-on-demand.spec.js --grep-invert 'at 390' --workers=1 --output=test-results/on-demand
+          DEPARTMENT_GOLD_PREVIEW_URL=http://127.0.0.1:8875 npx playwright test tests/department-gold-monthly-ui.spec.js --grep-invert 'phone layout' --workers=1 --output=test-results/gold-write
           node <<'JS'
           const fs=require('node:fs');
           fs.writeFileSync('playwright.department-webkit.cjs',"const base=require('./playwright.config.js');module.exports={...base,use:{...base.use,browserName:'webkit',launchOptions:{}}};\n");

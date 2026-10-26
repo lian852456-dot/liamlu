@@ -338,7 +338,7 @@ async function runPerformanceRepetition(page, testInfo, sampleIndex) {
   await waitForIdle(gas);
   const scoreBeforeReturn = gas.counts().department_scores_read || 0;
   await mark(page, 'scoreReturnMs');
-  await page.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); });
+  await page.evaluate(() => { window.dispatchEvent(new Event('pagehide')); window.dispatchEvent(new Event('pageshow')); });
   await waitForReturnReady(page, '#scoreDashboard', '#scoreMessage', '#scoreBody tr', 9);
   await waitForIdle(gas);
   timings.scoreReturnMs = await elapsed(page, 'scoreReturnMs');
@@ -351,7 +351,8 @@ async function runPerformanceRepetition(page, testInfo, sampleIndex) {
   // then wait 900ms only to detect a late duplicate request.
   await mark(page, 'scoreContinuousReturnMs');
   await page.evaluate(() => {
-    for (let index = 0; index < 3; index += 1) document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('pagehide'));
+    for (let index = 0; index < 3; index += 1) window.dispatchEvent(new Event('pageshow'));
   });
   await waitForReturnReady(page, '#scoreDashboard', '#scoreMessage', '#scoreBody tr', 9);
   await waitForIdle(gas);
@@ -367,7 +368,7 @@ async function runPerformanceRepetition(page, testInfo, sampleIndex) {
   gas.bumpScores();
   const scoreBeforeChanged = gas.counts().department_scores_read || 0;
   await mark(page, 'scoreChangedMs');
-  await page.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); });
+  await page.evaluate(() => { window.dispatchEvent(new Event('pagehide')); window.dispatchEvent(new Event('pageshow')); });
   await waitForReturnReady(page, '#scoreDashboard', '#scoreMessage', '#scoreBody tr', 9);
   await expect(page.locator('#scoreSourceMeta')).toContainText('保存版本 2', { timeout: 20000 });
   await waitForIdle(gas);
@@ -387,7 +388,7 @@ async function runPerformanceRepetition(page, testInfo, sampleIndex) {
   const goldValueBeforeChange = await page.locator('#peopleBody tr').innerText();
   const goldBeforeReturn = gas.counts().department_ops_read || 0;
   await mark(page, 'goldReturnMs');
-  await page.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); });
+  await page.evaluate(() => { window.dispatchEvent(new Event('pagehide')); window.dispatchEvent(new Event('pageshow')); });
   await waitForReturnReady(page, '#goldDashboard', '#goldMessage', '#peopleBody tr', 1);
   await waitForIdle(gas);
   timings.goldReturnMs = await elapsed(page, 'goldReturnMs');

@@ -88,7 +88,7 @@
     function revalidate(){
       if(!busy)return load(undefined,{refresh:true,verify:true});
       const current=generation;
-      return call({action:'ptauth'}).then(r=>{if(r.token!==getToken()){clear();lockWorkspace();}}).catch(error=>{if(current===generation){suspend();message('goldMessage',error.message+'；請重新核對權限。',true);}});
+      return call({action:'ptauth'}).then(r=>{if(r.token!==getToken()){clear();lockWorkspace();return;}return r;}).catch(error=>{if(current===generation){suspend();message('goldMessage',error.message+'；請重新核對權限。',true);}});
     }
     function clearCandidateOnly(){resetCandidate();}
     function diffRows(rows){return rows.length?rows.map(r=>`<tr><td>${esc(r.employeeName)}</td><td>${esc(r.employeeId)}</td><td>${r.type==='added'?'新增':r.type==='removed'?'移除':'變更'}</td><td>${fmt(r.before?.medal)}</td><td>${fmt(r.after?.medal)}</td><td>${esc(r.before?`${r.before.region}／${r.before.store}`:'無來源')}</td><td>${esc(r.after?`${r.after.region}／${r.after.store}`:'無來源')}</td></tr>`).join(''):'<tr><td colspan="7">人員淨牌與店區無差異</td></tr>';}
