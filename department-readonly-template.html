@@ -1,4 +1,4 @@
-<main class="page"><header class="masthead"><div><p class="eyebrow">NORTH 12 DEPARTMENT</p><h1>北一二部｜部區管理</h1><p class="lede">已保存月報、季度累計與店務成績集中查看。正式結果以原始檔為準，本站不自行重算。</p></div><span class="mode-badge">唯讀離線快照</span></header><section class="panel"><p id="snapshotMeta"></p><p>此檔僅供本人查看及保管。保留來源姓名遮罩；下載後可直接以瀏覽器開啟與篩選。</p></section><noscript><p class="message">互動篩選需以支援 JavaScript 的瀏覽器開啟。</p></noscript><div class="tab-bar" role="tablist" aria-label="部區管理功能"><button class="active" type="button" role="tab" data-tab="gold" aria-selected="true">金牌統計</button><button type="button" role="tab" data-tab="store" aria-selected="false">店務成績</button></div><section id="goldPanel" data-panel="gold"><p id="goldMissing" class="message" hidden>本檔未包含可核對的部區金牌月報保存來源；未代入每日金牌或推測資料。</p>        <section id="goldDashboard" hidden>
+<main class="page"><header class="masthead"><div><p class="eyebrow">NORTH 12 DEPARTMENT</p><h1>北一二部｜部區管理</h1><details class="department-help"><summary>查看使用說明</summary><p class="lede">已保存月報、季度累計與店務成績集中查看。正式結果以原始檔為準，本站不自行重算。</p></details></div><span class="mode-badge">唯讀離線快照</span></header><details class="panel department-export"><summary>快照資訊與保管說明</summary><p id="snapshotMeta"></p><p>此檔僅供本人查看及保管。保留來源姓名遮罩；下載後可直接以瀏覽器開啟與篩選。</p></details><noscript><p class="message">互動篩選需以支援 JavaScript 的瀏覽器開啟。</p></noscript><div class="tab-bar" role="tablist" aria-label="部區管理功能"><button class="active" type="button" role="tab" data-tab="gold" aria-selected="true">金牌統計</button><button type="button" role="tab" data-tab="store" aria-selected="false">店務成績</button></div><section id="goldPanel" data-panel="gold"><p id="goldMissing" class="message" hidden>本檔未包含可核對的部區金牌月報保存來源；未代入每日金牌或推測資料。</p>        <section id="goldDashboard" hidden>
           <div class="dashboard-head">
             <div><p class="step-label">GOLD MEDAL MONTHLY</p><h2>金牌儀表板</h2><p id="goldSourceMeta" class="source-meta"></p></div>
 
@@ -27,21 +27,24 @@
           <p id="goldVersionMeta" class="source-meta"></p><details class="data-card"><summary>金牌正式來源與保存版本</summary><div id="goldSourceVersions" class="source-versions"></div></details>
         </section>
 
-</section><section id="storePanel" data-panel="store" hidden>        <section class="dashboard-head">
-          <div><p class="step-label">STORE OPERATIONS</p><h2>店務成績儀表板</h2><p class="score-limits">門市歷史採各月明細。原始 G 成績、E 缺失與 F 扣分分開，不依新版規章回算。</p></div>
-
+</section><section id="storePanel" data-panel="store" hidden>
+        <section class="dashboard-head">
+          <div><h2>店務成績儀表板</h2></div>
         </section>
         <p id="scoreMessage" class="message" aria-live="polite"></p>
         <section id="scoreDashboard" hidden>
-          <p id="scoreSourceMeta" class="source-meta"></p>
           <section class="filter-panel" aria-label="店務成績篩選">
             <label>月份／季度<select id="scorePeriod"></select></label>
             <label>部區<select id="scoreRegion"></select></label>
             <label>店點<select id="scoreStore"></select></label>
           </section>
+          <p id="scorePeriodStatus" class="source-meta"></p>
           <div id="scoreSummary" class="summary-grid"></div>
-          <section class="data-card"><h3>四區比較</h3><p class="score-limits">所選月份的門市平均分；部平均按各店等權計算。此區保留四區供比較。</p><div id="scoreRegions" class="score-regions"></div></section>
-          <section class="data-card"><h3>各月成績趨勢</h3><p class="score-limits">依目前部區與店點篩選，缺月不補零。</p><div id="scoreTrend"></div></section>
-          <section class="data-card"><div class="card-head"><h3>各店月成績與缺失</h3></div><p id="scoreWarnings" class="score-limits"></p><div class="table-scroll"><table><thead id="scoreHead"></thead><tbody id="scoreBody"></tbody></table></div></section>
+          <section class="data-card score-main-table"><div class="card-head"><h3>各店月成績與缺失</h3></div><p id="scoreWarnings" class="score-limits"></p><div class="table-scroll" tabindex="0" aria-label="各店成績與缺失，可左右捲動"><table><thead id="scoreHead"></thead><tbody id="scoreBody"></tbody></table></div></section>
           <section id="scoreDetail" class="data-card" hidden></section>
-</section><details class="data-card"><summary>店務正式來源與保存版本</summary><div id="scoreSourceVersions" class="source-versions"></div></details></section></main>
+          <details id="scoreComparison" class="data-card score-disclosure"><summary>四區比較與各月成績趨勢</summary><div class="score-disclosure-body"><h3>四區比較</h3><p class="score-limits">所選月份的門市平均分；部平均按各店等權計算。此區保留四區供比較。</p><div id="scoreRegions" class="score-regions"></div><h3>各月成績趨勢</h3><p class="score-limits">依目前部區與店點篩選，缺月不補零。</p><div id="scoreTrend"></div></div></details>
+          <details id="scoreMethod" class="data-card score-disclosure"><summary>資料來源與計算說明</summary><div class="score-disclosure-body"><p id="scoreSourceMeta" class="source-meta"></p><p class="score-limits">門市歷史採各月明細。原始 G 成績、E 缺失與 F 扣分分開，不依新版規章回算。</p><p class="score-limits">紅色為缺失／扣分、橘色為預警，橘色框為缺資料。沒有改善紀錄時，不推定已改善或改善率。</p></div></details>
+
+        </section>
+
+      <details class="data-card score-disclosure"><summary>店務正式來源與保存版本</summary><div id="scoreSourceVersions" class="source-versions"></div></details></section></main>

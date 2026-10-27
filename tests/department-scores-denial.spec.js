@@ -28,11 +28,12 @@ async function setup(page){
  await page.goto(PAGE);await expect(page.locator('#peopleBody tr')).toHaveCount(1);
  await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreBody tr')).toHaveCount(9);
  await expect(page.locator('#scoreFile')).toHaveValue('');
+ for(const id of ['scoreUpdateTools','scoreHistoryTools','scoreExports'])await page.locator('#'+id+' > summary').click();
  return {a,b,state,calls,errors,reads:()=>calls.filter(p=>p.action==='department_scores_read')};
 }
 async function locked(page,s){
  await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#authPanel')).toBeVisible();
- for(const id of ['scoreBody','scoreSummary','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scoreHead','scoreWarnings','peopleBody'])await expect(page.locator('#'+id)).toBeEmpty();
+ for(const id of ['scoreBody','scoreSummary','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scorePeriodStatus','scoreHead','scoreWarnings','peopleBody'])await expect(page.locator('#'+id)).toBeEmpty();
  await expect(page.locator('#scoreFile')).toHaveValue('');await expect(page.locator('#scorePreview')).toBeHidden();await expect(page.locator('#scoreRestorePreview')).toBeHidden();
  expect(await page.evaluate(({key,draft})=>({token:sessionStorage.getItem(key),draft:localStorage.getItem(draft),work:DepartmentScoresWorkState()}),{key:KEY,draft:DRAFT})).toEqual({token:null,draft:'保留的其他工作',work:{busy:false,unsaved:false}});
  expect(s.calls.filter(p=>/publish|restore$/.test(p.action))).toEqual([]);expect(s.errors).toEqual([]);
