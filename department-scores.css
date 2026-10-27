@@ -16,3 +16,79 @@
 #storePanel .summary-card.score-issue strong{color:#a51d14}
 .score-legend{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:15px}
 .score-legend span{padding:4px 9px;border-radius:6px}
+
+/* Dense, readable store view: filters, totals and store rows come first. */
+#storePanel{line-height:1.4;font-weight:650;min-width:0}
+#storePanel h2{font-size:26px;font-weight:900}
+#storePanel h3{font-size:20px;font-weight:850}
+#storePanel .dashboard-head{margin:12px 0 8px;gap:10px;align-items:center}
+#storePanel .filter-panel{padding:10px;gap:8px;margin-bottom:6px;border-radius:12px}
+#storePanel .filter-panel label{font-size:14px;gap:4px;min-width:0}
+#storePanel .filter-panel select{width:100%;min-width:0;min-height:40px;padding:7px 10px;font-size:16px;font-weight:750}
+#storePanel .source-meta{font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+#scorePeriodStatus{margin:5px 0;font-weight:750}
+#storePanel .summary-grid{gap:8px;margin:8px 0}
+#storePanel .summary-card{padding:10px 12px;border-radius:12px}
+#storePanel .summary-card span{font-size:14px;font-weight:800}
+#storePanel .summary-card strong{margin:5px 0 3px;font-size:30px;font-weight:900}
+#storePanel .summary-card small{font-size:13px;line-height:1.4;font-weight:650}
+#storePanel .data-card{margin-top:10px;padding:12px;border-radius:12px;min-width:0}
+#storePanel .card-head{gap:10px;margin-bottom:8px;align-items:center}
+#storePanel th,#storePanel td{padding:7px 10px;font-size:16px;line-height:1.4;font-weight:750}
+#storePanel th{font-size:14px;font-weight:850;letter-spacing:0}
+#storePanel .number{font-size:17px;font-weight:850}
+#storePanel td small{display:inline-block;margin-left:6px;font-size:13px;font-weight:700}
+#storePanel .table-scroll{border-radius:9px}
+#storePanel button{min-height:36px;padding:7px 11px;font-size:15px}
+#storePanel .table-scroll button{min-height:32px;padding:5px 10px;font-size:14px}
+#storePanel .score-limits{margin:6px 0;font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+#storePanel .score-limits:empty{display:none}
+#storePanel .message{margin:6px 0;padding:7px 10px;font-size:14px;line-height:1.45}
+#storePanel details.score-disclosure{padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+#storePanel .score-disclosure>summary{font-size:16px;font-weight:850;line-height:1.5}
+#storePanel .score-disclosure>summary::after{content:'展開';float:right;margin-left:12px;color:var(--muted);font-size:13px}
+#storePanel .score-disclosure[open]>summary::after{content:'收合'}
+.score-disclosure-body{margin-top:10px}
+#storePanel .score-disclosure-body>h3:not(:first-child){margin-top:14px}
+#storePanel summary:focus-visible{outline:3px solid var(--orange-dark);outline-offset:3px;border-radius:4px}
+#storePanel .score-regions{gap:8px;margin-top:8px}
+#storePanel .score-regions article{padding:10px}
+#storePanel .score-regions h4{font-size:18px}
+#storePanel .score-regions strong{font-size:28px}
+#storePanel .score-regions span{font-size:14px}
+#storePanel #scoreTrend{max-width:720px;margin:10px auto}
+#storePanel details.score-export-menu{position:relative;border:0;padding:0;flex:none;font-size:14px}
+#storePanel .score-export-menu>summary{padding:6px 10px;border:1px solid var(--line);border-radius:8px;min-height:34px;font-size:14px}
+#storePanel .score-export-menu[open] .score-actions{position:absolute;right:0;top:100%;z-index:6;display:grid;grid-template-columns:1fr;gap:6px;width:210px;margin-top:5px;padding:9px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+#storePanel .score-export-menu .score-actions button{width:100%;font-size:14px}
+#storePanel .upload-panel{margin-top:10px}
+#storePanel #scoreHistory{min-height:40px;font-size:15px}
+#storePanel .score-item-notes{padding:6px 0;font-size:14px;line-height:1.4}
+#storePanel .score-item-notes p{margin:7px 0}
+#storePanel .score-legend{gap:6px;margin:8px 0;font-size:14px}
+#storePanel .score-legend span{padding:3px 7px}
+#storePanel .score-long{min-width:220px}
+@media(max-width:900px){#storePanel .summary-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:620px){
+  #storePanel h2{font-size:22px}
+  #storePanel h3{font-size:18px}
+  #storePanel .dashboard-head{flex-direction:row;align-items:center}
+  #storePanel .dashboard-head button{max-width:140px;font-size:14px;min-height:44px}
+  #storePanel .filter-panel{grid-template-columns:1fr 1fr;padding:9px}
+  #storePanel .filter-panel label:first-child{grid-column:1/-1}
+  #storePanel .filter-panel select{min-height:44px}
+  #storePanel .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #storePanel .summary-card{padding:8px 10px}
+  #storePanel .summary-card strong{font-size:27px}
+  #storePanel .data-card{padding:10px}
+  #storePanel .card-head{flex-direction:row;align-items:center}
+  #storePanel th,#storePanel td{padding:6px 9px;font-size:16px}
+  #storePanel th{font-size:14px}
+  #storePanel button,#storePanel .table-scroll button{min-height:44px}
+  #storePanel .score-export-menu>summary{min-height:44px;padding:11px 9px}
+  #storePanel .score-disclosure>summary{min-height:24px;font-size:15px}
+  #storePanel #scoreBody td:first-child,#storePanel #scoreHead th:first-child{position:sticky;left:0;z-index:2;background:var(--card);box-shadow:1px 0 var(--line)}
+  #storePanel #scoreHead th:first-child{z-index:3;background:var(--paper)}
+  #storePanel .score-regions{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #storePanel .score-update-grid{min-width:0}
+}

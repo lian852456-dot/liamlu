@@ -19,7 +19,7 @@ async function setup(page,{seed=true,loseAck=false}={}){
  });
  await page.goto(PAGE);return {b,calls,expire:()=>{deny=true;}};
 }
-async function login(page){await page.locator('#passcode').fill('synthetic-passcode');await page.locator('#authForm button').click();await expect(page.locator('#workspace')).toBeVisible();await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreMessage')).not.toContainText('正在');}
+async function login(page){await page.locator('#passcode').fill('synthetic-passcode');await page.locator('#authForm button').click();await expect(page.locator('#workspace')).toBeVisible();await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreMessage')).not.toContainText('正在');for(const id of ['scoreUpdateTools','scoreHistoryTools','scoreExports'])await page.locator('#'+id+' > summary').click();}
 test('品管課單月原檔從上傳區可預覽、逐月保存讀回，重複點擊不重送、失敗保留舊版',async({page})=>{
  const {b,calls}=await setup(page);await login(page);
  const original=b.invoke({action:'department_scores_read',token:'authorized'}).months;

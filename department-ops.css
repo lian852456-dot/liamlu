@@ -31,5 +31,22 @@ body:has(#storePanel){--paper:#fff;--muted:#52606c}
 #goldPanel .month-placement{margin-top:6px;min-width:180px;max-width:240px;white-space:normal;font-size:16px;line-height:1.5;font-weight:500;color:var(--muted)}
 #goldPanel tbody tr:nth-child(even){background:#fafbfc}
 #goldPanel tbody tr:hover{background:#fff5ec}
+/* Shared chrome leaves room for the department's primary tables. */
+.page:has(#storePanel){padding-top:20px}
+.page:has(#storePanel) .back-link{margin-bottom:12px;font-weight:700}
+.page:has(#storePanel) .masthead{margin-bottom:12px;gap:16px}
+.page:has(#storePanel) .masthead h1{font-size:32px;line-height:1.2}
+.page:has(#storePanel) .tab-bar{margin:12px 0 10px}
+.page:has(#storePanel) .tab-bar button{padding:10px}
+.department-help{margin-top:8px;font-size:14px;color:var(--muted)}
+.department-help summary,.department-export>summary,.department-access summary{cursor:pointer;font-weight:800}
+.department-help .lede{margin:6px 0 0;font-size:14px;line-height:1.45}
+.department-export{padding:10px 14px;font-size:14px;font-weight:700}
+.department-export>p{margin:8px 0;line-height:1.45}
+.department-access{padding:10px 14px;gap:12px}
+.department-access details{margin-top:3px;font-size:13px;color:var(--muted)}
+.department-access details p{margin-top:5px}
+.department-help summary:focus-visible,.department-export>summary:focus-visible,.department-access summary:focus-visible{outline:3px solid var(--orange-dark);outline-offset:3px;border-radius:4px}
+@media(max-width:620px){.page:has(#storePanel){padding:16px 12px 40px}.page:has(#storePanel) .masthead{display:flex;align-items:flex-start;gap:8px}.page:has(#storePanel) .masthead h1{font-size:25px}.page:has(#storePanel) .mode-badge{margin-top:0;padding:7px 9px;font-size:12px}.page:has(#storePanel) .eyebrow{font-size:10px}.department-access{padding:9px 12px}}
 #goldPanel .table-hint{display:none;margin:0 0 12px;color:var(--muted);font-size:16px}
 @media(max-width:620px){#goldPanel h2{font-size:26px}#goldPanel .data-card{padding:16px}#goldPanel .summary-card{min-width:0;padding:14px}#goldPanel .summary-card strong{font-size:34px}#goldPanel th,#goldPanel td{padding:15px;font-size:19px}#goldPanel th{font-size:16px}#goldPanel .number{font-size:21px}#goldPanel .table-hint{display:block}#peopleHead th:first-child,#peopleBody td:first-child{position:sticky;left:0;z-index:2;background:var(--card);box-shadow:1px 0 var(--line)}#peopleHead th:first-child{z-index:3;background:#fff5ec}#peopleBody tr:nth-child(even) td:first-child{background:#fafbfc}}
