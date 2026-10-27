@@ -241,6 +241,13 @@ async function login(page) {
   await page.locator('[data-b-password]').fill('SYNTHETIC_PASSWORD');
   await page.locator('[data-b-submit]').click();
   await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'active');
+  await openBOptions(page);
+}
+
+async function openBOptions(page) {
+  const options=page.locator('#dashboard-b-access .b-options');
+  if(await options.count() && await options.locator('summary').isVisible() && await options.getAttribute('open')===null)
+    await options.locator('summary').click();
 }
 
 async function appPage(context) {
@@ -265,7 +272,7 @@ async function dispatchReturnBurst(page) {
   });
 }
 
-test('real App five tabs retain protected DOM, filters, expansion and scroll; resume validates once', async ({ browser }) => {
+test('real App five tabs retain data on return and read again only on request', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
   const fixture = await apiFixture(context);
   const page = await appPage(context);
@@ -311,29 +318,28 @@ test('real App five tabs retain protected DOM, filters, expansion and scroll; re
 
   await setHidden(page, true);
   if (!BASELINE) {
-    await expect(page.locator('body')).toHaveClass(/dashboard-b-suspended/);
+    await expect(page.locator('body')).not.toHaveClass(/dashboard-b-suspended/);
     await expect(page.locator('.personal-performance-item').first()).toContainText(protectedText.split('\n')[0]);
   }
   fixture.reset();
   await dispatchReturnBurst(page);
-  await expect.poll(() => fixture.calls.filter(call => call.action === 'employee_session').length).toBe(1);
   await page.waitForTimeout(60);
   const returnActions = fixture.actions();
   console.log('APP_RESUME_METRICS ' + JSON.stringify({ version: BASELINE ? 'before' : 'after', actions: returnActions }));
   if(BASELINE){await context.close();return;}
   if (!BASELINE) {
-    expect(returnActions).toEqual(['employee_session']);
+    expect(returnActions).toEqual([]);
     await expect(page.locator('body')).not.toHaveClass(/dashboard-b-suspended/);
     await expect(page.locator('.personal-performance-item').first()).toContainText(protectedText.split('\n')[0]);
   }
 
-  // A logout during a slow validation invalidates the request generation; its
-  // late response must not reveal the old protected contract again.
+  // The explicit read retains the already rendered result until it completes.
   fixture.setDelay(150);
   fixture.reset();
-  await setHidden(page, true);
-  await dispatchReturnBurst(page);
-  await expect.poll(() => fixture.calls.filter(call => call.action === 'employee_session').length).toBe(1);
+  await openBOptions(page);
+  await page.locator('[data-b-refresh]').click();
+  await expect.poll(() => fixture.calls.filter(call => call.action === 'employee_dashboard_read').length).toBe(1);
+  await expect(page.locator('.personal-performance-item').first()).toContainText(protectedText.split('\n')[0]);
   await page.locator('[data-b-logout]').click();
   await page.waitForTimeout(180);
   if (!BASELINE) {
@@ -341,7 +347,7 @@ test('real App five tabs retain protected DOM, filters, expansion and scroll; re
     await expect(page.locator('#battleContent')).not.toContainText(protectedText.split('\n')[0]);
   }
 
-  // Re-establish the short lease before exercising server-side revocation.
+  // Server denial on the next explicit read clears the protected view.
   fixture.setDelay(35);
   fixture.setRevoked(false);
   await login(page);
@@ -350,36 +356,22 @@ test('real App five tabs retain protected DOM, filters, expansion and scroll; re
   fixture.reset();
   await setHidden(page, true);
   await dispatchReturnBurst(page);
-  await expect.poll(() => fixture.calls.filter(call => call.action === 'employee_session').length).toBe(1);
-  await page.waitForTimeout(60);
+  expect(fixture.calls).toHaveLength(0);
+  await page.locator('[data-b-refresh]').click();
   if (!BASELINE) {
-    await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'pending');
+    await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'locked');
     await expect(page.locator('#battleContent')).not.toContainText(protectedText.split('\n')[0]);
   }
   fixture.setRevoked(false);
-  await page.locator('[data-b-refresh]').click();
-  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'active');
-  fixture.setDisabled();
-  fixture.reset();
-  await setHidden(page, true);
-  await dispatchReturnBurst(page);
-  await expect.poll(() => fixture.calls.filter(call => call.action === 'employee_session').length).toBe(1);
-  await page.waitForTimeout(60);
-  if (!BASELINE) {
-    await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'pending');
-    await expect(page.locator('#battleContent')).not.toContainText(protectedText.split('\n')[0]);
-  }
-  fixture.setDisabled(false);
-  await page.locator('[data-b-refresh]').click();
-  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'active');
+  await login(page);
   fixture.setExpired();
   fixture.reset();
   await setHidden(page, true);
   await dispatchReturnBurst(page);
-  await expect.poll(() => fixture.calls.filter(call => call.action === 'employee_session').length).toBe(1);
-  await page.waitForTimeout(60);
+  expect(fixture.calls).toHaveLength(0);
+  await page.locator('[data-b-refresh]').click();
   if (!BASELINE) {
-    await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'pending');
+    await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'locked');
     await expect(page.locator('#battleContent')).not.toContainText(protectedText.split('\n')[0]);
   }
   await page.locator('[data-b-logout]').click();
@@ -424,11 +416,10 @@ test('App reload rereads reports and owner phone resumes through one protected d
   fixture.reset();
   await page.evaluate(key => sessionStorage.removeItem(key), B_CACHE);
   await page.reload();
-  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'pending');
+  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'locked');
   if (!BASELINE && protectedBundleMarker) await expect(page.locator('#battleContent')).not.toContainText(protectedBundleMarker);
   fixture.setExpired(false);
-  await page.locator('[data-b-refresh]').click();
-  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state', 'active');
+  await login(page);
   await context.close();
 
   const ownerContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
@@ -486,6 +477,7 @@ test('home B login does not start legacy private_access/read', async ({ browser 
   }
   fixture.reset();
   const firstKpiStart=Date.now();
+  await openBOptions(page);
   await page.locator('[data-b-module="kpi"]').click();
   await expect(page).toHaveURL(/kpi-battle\.html#kpi$/);
   await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
@@ -516,6 +508,7 @@ test('home immediate KPI navigation does not duplicate incomplete eager data rea
   const page=await context.newPage();await page.goto(`${fixtureUrl('home.html')}?timing=1`);
   await login(page);
   const loginActions=fixture.actions(),start=Date.now();
+  await openBOptions(page);
   await page.locator('[data-b-module="kpi"]').click();
   await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
   await expect(page.locator('#kpiBattleContent')).toContainText('酒泉');

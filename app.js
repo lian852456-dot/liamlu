@@ -2250,7 +2250,7 @@
         setView('me');
         const panel=dom('#dashboard-b-access');
         scope.setTimeout(()=>{ panel?.scrollIntoView({block:'start',behavior:'smooth'}); panel?.querySelector('[data-b-employee]')?.focus(); },0);
-        if(scope.DashboardB?.active?.())Promise.resolve(scope.DashboardB.refresh(true,true)).catch(()=>{});
+        if(scope.DashboardB?.active?.())Promise.resolve(scope.DashboardB.refresh()).catch(()=>{});
       } else {
         setView('me'); dom('#employeeId')?.focus();
       }
