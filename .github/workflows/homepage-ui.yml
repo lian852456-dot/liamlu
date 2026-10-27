@@ -8,6 +8,14 @@ on:
       - 'home.html'
       - 'home.css'
       - 'home.js'
+      - 'dashboard-b-shell.js'
+      - 'app.js'
+      - 'app.html'
+      - 'kpi-battle.html'
+      - 'index.html'
+      - 'tests/dashboard-b-navigation.spec.js'
+      - 'tests/loading-state.spec.js'
+      - 'tests/business-login-recovery.spec.js'
       - 'home-reminder-model.js'
       - 'patrol-question-versions.js'
       - 'tests/home.spec.js'
@@ -86,6 +94,8 @@ jobs:
         run: |
           git rev-parse HEAD
           node --check home.js
+          node --check dashboard-b-shell.js
+          node --check app.js
           node --check tradein-brand-query.js
           node --check tradein-compact-view.js
           node --test tests/home-reminder-model.test.cjs tests/home-navigation-contract.test.cjs tests/department-ops.test.cjs tests/patrol-question-versions.test.cjs tests/patrol-dashboard-contract.test.cjs tests/patrol-dashboard-client.test.cjs tests/tradein-performance.test.cjs
@@ -105,6 +115,7 @@ jobs:
           # Synthetic browser tests only: no production login or data writes.
           npx playwright test tests/home.spec.js --grep '提醒每 5 秒輪播|提醒滑鼠停留|滑鼠點擊可暫停' --repeat-each=5 --workers=1 --reporter=list --output=test-results/rotation-stability
           npx playwright test tests/home.spec.js tests/tradein-performance-ui.spec.js tests/threec-query-ui.spec.js tests/tradein-brand-query.spec.js tests/tradein-compact-view.spec.js tests/tradein-brief-auth.spec.js --workers=1 --reporter=list,html
+          npx playwright test tests/dashboard-b-navigation.spec.js tests/loading-state.spec.js tests/business-login-recovery.spec.js --workers=2 --reporter=list
       - name: Save screenshots and browser test report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

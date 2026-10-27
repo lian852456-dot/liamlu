@@ -10,7 +10,7 @@ const origin='https://n12b-navigation.test';
 function html(name){
  const home=name==='home',app=name==='app';
  const selector=app?(baseline?'[data-nav]':null):'a[data-nav]';
- return `<!doctype html><html><head><script src="/GasBClient.js" defer></script><script src="/dashboard-b-shell.js" defer></script></head><body>
+ return `<!doctype html><html><head><meta charset="utf-8"><script src="/GasBClient.js" defer></script><script src="/dashboard-b-shell.js" defer></script></head><body>
  <header>North12B synthetic navigation</header><main><a data-nav href="/awards.html">台獎</a><button data-nav type="button">App KPI</button></main>
  <script>window.__counts={clear:0,accept:0,nav:0};window.DashboardBHost={sessionOnly:${home},ownerPhone:false,navigationSelector:${JSON.stringify(selector)},
  clear(){window.__counts.clear++;document.body.dataset.private='hidden'},
@@ -19,7 +19,7 @@ function html(name){
  };document.addEventListener('click',e=>{if(e.target.matches('button[data-nav]')){window.__counts.nav++;document.body.dataset.view='kpi'}});</script></body></html>`;
 }
 async function fixture(context){
- const calls=[],control={readFail:false,revoked:false,validateDelay:0,readDelay:0},expiresAt=Date.now()+25*60*1000;
+ const calls=[],control={networkFail:false,revoked:false,validateDelay:0,readDelay:0},expiresAt=Date.now()+25*60*1000;
  await context.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url());
   if(url.origin===origin){
@@ -35,7 +35,12 @@ async function fixture(context){
   if(payload.action==='employee_status')result={status:'ok',enabled:true,passwordAvailable:true};
   if(payload.action==='employee_login')result={status:'ok',token:'B1_a_'+'a'.repeat(64),expiresAt,trustSource:'password-bound'};
   if(payload.action==='employee_session')result=control.revoked?{status:'error'}:{status:'ok',expiresAt,trustSource:'password-bound'};
-  if(payload.action==='employee_private_read'||payload.action==='employee_kpi_read')result=control.readFail||control.revoked?{status:'error'}:{status:'ok',profile:{role:'employee',isTrusted:false},trustSource:'password-bound'};
+  if(payload.action==='employee_dashboard_read'){
+   if(control.networkFail)return route.fulfill({status:503,body:'unavailable'});
+   result=control.revoked?{status:'error'}:{status:'ok',expiresAt,trustSource:'password-bound',phoneEligible:false,
+    privateResult:{status:'ok',profile:{role:'employee',isTrusted:false},trustSource:'password-bound'},
+    kpiResult:{status:'ok',profile:{role:'employee',isTrusted:false},trustSource:'password-bound'}};
+  }
   return route.fulfill({contentType:'application/json',body:JSON.stringify(result)});
  });
  return {calls,control};
@@ -49,7 +54,7 @@ async function login(page,url){
 }
 const counts=page=>page.evaluate(()=>({...window.__counts}));
 
-test('website first load and cross-page navigation keep the same short session',async({context,page})=>{
+test('website reads once across KPI and awards, then updates only on request',async({context,page})=>{
  const f=await fixture(context),start=Date.now();await login(page,'home');
  if(!baseline)expect(await page.evaluate(()=>sessionStorage.getItem('north12b_password_data_v1'))).toBeNull();
  const initial={ms:Date.now()-start,requests:f.calls.length};
@@ -64,23 +69,32 @@ test('website first load and cross-page navigation keep the same short session',
  const cross={ms:Date.now()-t,requests:f.calls.length-from};
  expect(f.calls.filter(action=>action==='employee_login')).toHaveLength(1);
  expect(await page.evaluate(()=>document.body.dataset.private)).toBe('visible');
- if(!baseline)f.control.readFail=true; // The next page must use recently verified data, not re-read both sources.
+ if(!baseline)f.control.networkFail=true; // Return uses the verified snapshot without a new request.
  const second=f.calls.length,s=Date.now();await page.locator('a[data-nav]').click();
  await expect(page).toHaveURL(origin+'/awards.html');await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
  const awards={ms:Date.now()-s,requests:f.calls.length-second};
  console.log('NAV_METRICS '+JSON.stringify({version:baseline?'before':'after',initial,cross,awards}));
  if(!baseline){
-  expect(cross.requests).toBe(2);expect(awards.requests).toBe(1);
-  expect(f.calls.slice(second)).toEqual(['employee_session']);
-  expect(f.calls.slice(second)).not.toContain('employee_private_read');
-  expect(f.calls.slice(second)).not.toContain('employee_kpi_read');
-  f.control.readFail=false;
-  await page.evaluate(()=>{const key='north12b_password_data_v1',value=JSON.parse(sessionStorage.getItem(key));value.savedAt=Date.now()-61001;sessionStorage.setItem(key,JSON.stringify(value));});
-  const expired=f.calls.length;await page.goto(origin+'/kpi.html');
+  expect(cross.requests).toBe(1);expect(awards.requests).toBe(0);
+  expect(f.calls.slice(second)).toEqual([]);
+  await page.evaluate(()=>{const key='north12b_password_data_v1',snapshot=JSON.parse(sessionStorage.getItem(key));snapshot.savedAt=Date.now()-61001;sessionStorage.setItem(key,JSON.stringify(snapshot));});
+  const older=f.calls.length;await page.goto(origin+'/kpi.html');
   await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
-  expect(f.calls.slice(expired)).toEqual(expect.arrayContaining(['employee_private_read','employee_kpi_read']));
+  expect(f.calls.slice(older)).toEqual([]); // The snapshot remains tied to the lease, not a one-minute timer.
+  const old=await counts(page);
+  await page.locator('[data-b-refresh]').click();
+  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
+  expect((await counts(page)).accept).toBe(old.accept);
+  await expect(page.locator('[data-b-message]')).toContainText('仍顯示上次載入資料');
+  f.control.networkFail=false;
+  await page.locator('[data-b-refresh]').click();
+  expect(f.calls.at(-1)).toBe('employee_dashboard_read');
+  await page.evaluate(()=>sessionStorage.removeItem('north12b_password_data_v1'));
+  const missing=f.calls.length;await page.goto(origin+'/kpi.html');
+  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
+  expect(f.calls.slice(missing)).toEqual(['employee_dashboard_read']);
   f.control.revoked=true;await page.locator('[data-b-refresh]').click();
-  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','pending');
+  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','locked');
   expect(await page.evaluate(()=>document.body.dataset.private)).toBe('hidden');
   expect(await page.evaluate(()=>sessionStorage.getItem('north12b_password_data_v1'))).toBeNull();
  }
@@ -95,18 +109,18 @@ test('App bottom tabs switch without protected requests or repaint',async({conte
  if(!baseline){expect(switchView.requests).toBe(0);expect(switchView.clear).toBe(0);expect(switchView.accept).toBe(0);}
 });
 
-test('temporary read failure preserves the lease but hides data; revocation never reveals data',async({context,page})=>{
+test('temporary read failure retains data; explicit denial and logout remove it',async({context,page})=>{
  test.skip(baseline,'before version intentionally clears the lease');
  const f=await fixture(context);await login(page,'app');
- f.control.readFail=true;await page.locator('[data-b-refresh]').click();
- await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','pending');
- expect(await page.evaluate(()=>document.body.dataset.private)).toBe('hidden');
+ f.control.networkFail=true;await page.locator('[data-b-refresh]').click();
+ await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
+ expect(await page.evaluate(()=>document.body.dataset.private)).toBe('visible');
  expect(await page.evaluate(()=>Boolean(sessionStorage.getItem('north12b_password_session_v1')))).toBe(true);
- f.control.readFail=false;await page.locator('[data-b-refresh]').click();
+ f.control.networkFail=false;await page.locator('[data-b-refresh]').click();
  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
  expect(f.calls.filter(action=>action==='employee_login')).toHaveLength(1);
  f.control.revoked=true;await page.locator('[data-b-refresh]').click();
- await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','pending');
+ await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','locked');
  expect(await page.evaluate(()=>document.body.dataset.private)).toBe('hidden');
  await page.locator('button[data-nav]').click();expect(await page.evaluate(()=>document.body.dataset.private)).toBe('hidden');
  await page.locator('[data-b-logout]').click();
@@ -142,10 +156,11 @@ test('website KPI, awards and personal views switch in one verified document',as
   const proof={profile:{role:'employee',isTrusted:false},trustSource:'password-bound'};
   const result=action==='employee_status'?{status:'ok',enabled:true,passwordAvailable:true}
    :action==='employee_login'?{status:'ok',token:'B1_a_'+'a'.repeat(64),expiresAt,trustSource:'password-bound'}
-   :control.revoked&&['employee_session','employee_private_read','employee_kpi_read'].includes(action)?{status:'error'}
+   :control.revoked&&['employee_session','employee_dashboard_read'].includes(action)?{status:'error'}
    :action==='employee_session'?{status:'ok',expiresAt,trustSource:'password-bound'}
-   :action==='employee_private_read'?{status:'ok',...proof,snapshot:{kpiBattle:snapshot,awardsBattle:awards}}
-   :action==='employee_kpi_read'?{status:'ok',...proof,data:kpi}:{status:'ok'};
+   :action==='employee_dashboard_read'?{status:'ok',expiresAt,trustSource:'password-bound',phoneEligible:false,
+    privateResult:{status:'ok',...proof,snapshot:{kpiBattle:snapshot,awardsBattle:awards}},
+    kpiResult:{status:'ok',...proof,data:kpi}}:{status:'ok'};
   return route.fulfill({contentType:'application/json',body:JSON.stringify(result)});
  });
  await page.goto(origin+'/kpi-battle.html#awards');
@@ -174,8 +189,12 @@ test('website KPI, awards and personal views switch in one verified document',as
  expect(await page.locator('body').evaluate(body=>body.scrollWidth<=body.clientWidth)).toBe(true);
  console.log('BATTLE_HUB_METRICS '+JSON.stringify({desktopSwitches:6,desktopMs,mobileSwitches:2,mobileMs,requests:actions.length-initial}));
  expect(actions.length-initial).toBe(0);expect(new URL(page.url()).pathname).toBe(new URL(before).pathname);
+ const manual=actions.length;
+ await page.locator('[data-b-refresh]').click();
+ await expect(page.locator('#kpiBattleContent .summary-grid')).toBeVisible();
+ expect(actions.slice(manual)).toEqual(['employee_dashboard_read']);
  control.revoked=true;await page.locator('[data-b-refresh]').click();
- await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','pending');
+ await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','locked');
  await expect(page.locator('#kpiBattleContent .summary-grid')).toHaveCount(0);
  await expect(page.locator('#awardsBattleContent .summary-grid')).toHaveCount(0);
 });

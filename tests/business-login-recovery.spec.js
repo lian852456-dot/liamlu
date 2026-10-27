@@ -33,35 +33,41 @@ async function fixture(page,mode,restore=true,entry='/home.html'){
  await expect(page.locator('#dashboard-b-access')).toBeVisible();
  const options=page.locator('.b-options'),summary=options.locator('summary');
  if(await summary.isVisible() && await options.getAttribute('open')===null)await summary.click();
- if(restore)await expect.poll(()=>calls.includes('employee_session')).toBe(true);
- if(mode==='timeout')await page.clock.fastForward(90001);
+ if(restore)await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
  return {calls,setMode:value=>{current=value;},proof:()=>page.evaluate(key=>sessionStorage.getItem(key),B)};
 }
 for(const width of [1280,390])for(const [mode,label]of [['network','NETWORK'],['service','SERVICE'],['response','RESPONSE'],['auth','AUTH'],['timeout','TIMEOUT']]){
  test(`SYNTHETIC ${width}px ${mode}: pending form, safe message and same-lease recovery`,async({page})=>{
   await page.setViewportSize({width,height:844});const f=await fixture(page,mode);
-  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','pending');
   const before=await f.proof();expect(before).toBeTruthy();
-  await expect(page.locator('[data-b-employee]')).toBeVisible();await expect(page.locator('[data-b-password]')).toBeVisible();
-  await expect(page.locator('[data-b-message]')).toContainText(label);await expect(page.locator('[data-b-message]')).toContainText('尚未確認失敗原因');
+  const options=page.locator('.b-options');if(await options.locator('summary').isVisible() && await options.getAttribute('open')===null)await options.locator('summary').click();
+  await page.locator('[data-b-refresh]').click();
+  await expect.poll(()=>f.calls.includes('employee_session')).toBe(true);
+  if(mode==='timeout')await page.clock.fastForward(90001);
+  if(mode==='auth')await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','locked');
+  else{await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');await expect(page.locator('[data-b-message]')).toContainText('仍顯示上次載入資料');}
   expect(await page.locator('[data-b-message]').textContent()).not.toContain('SYNTHETIC_RAW');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   expect(f.calls.every(action=>action==='employee_session')).toBe(true);
   if(mode==='network')await page.screenshot({path:`test-results/business-login-recovery/SYNTHETIC-pending-${width}.png`});
-  f.setMode('ok');await page.locator('[data-b-refresh]').click();
+  f.setMode('ok');
+  if(mode==='auth'){
+   await page.locator('[data-b-employee]').fill('SYNTH001');await page.locator('[data-b-password]').fill('SYNTHETIC_PASSWORD');
+   await page.locator('[data-b-submit]').click();
+  }else await page.locator('[data-b-refresh]').click();
   await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
   await expect(page.locator('#portal-access-status')).toContainText('同仁專區登入已驗證');
-  await expect(page.locator('[data-b-password]')).toBeHidden();expect(await f.proof()).toBe(before);
-  expect(f.calls.every(action=>action==='employee_session')).toBe(true);
+  await expect(page.locator('[data-b-password]')).toBeHidden();
+  if(mode!=='auth')expect(await f.proof()).toBe(before);
  });
 }
 test('SYNTHETIC pending permits explicit normal login; no automatic logout, login or fallback',async({page})=>{
- const f=await fixture(page,'auth');await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','pending');
+ const f=await fixture(page,'auth');await page.locator('[data-b-refresh]').click();await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','locked');
  expect(f.calls.every(action=>action==='employee_session')).toBe(true);
  f.setMode('ok');await page.locator('[data-b-employee]').fill('SYNTH001');await page.locator('[data-b-password]').fill('SYNTHETIC_PASSWORD');
  await page.locator('[data-b-submit]').click();await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
  expect(f.calls.filter(action=>action==='employee_login')).toHaveLength(1);
- expect(f.calls.filter(action=>action==='employee_logout')).toHaveLength(1); // Existing user-submitted login path only.
+ expect(f.calls.filter(action=>action==='employee_logout')).toHaveLength(0); // Denied lease was already cleared locally.
  expect(f.calls).not.toContain('private_access');expect(f.calls).not.toContain('read');
  expect(await f.proof()).not.toContain('SYNTHETIC_PASSWORD');
 });

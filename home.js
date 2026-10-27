@@ -15,14 +15,12 @@
   let index = 0;
   let generation = 0;
   let rotationTimer;
-  let freshnessTimer;
   let patrolExpiryTimer;
   let accessNoticeTimer;
   let patrolExpiresAt = 0;
   let salesVerified = false;
   let passwordVerified = false;
   let patrolVerified = false;
-  let rolloverTimer;
   let userPaused = reducedMotion.matches;
   let hovered = false;
   let focused = false;
@@ -140,7 +138,7 @@
 
   async function loadSales(requestId) {
     const credential = credentials();
-    const current = () => requestId === generation && !document.hidden && sameCredentials(credential)
+    const current = () => requestId === generation && sameCredentials(credential)
       && Model.dateContext(new Date()).today === context.today;
     // The default password entrance must not also launch Approved Device
     // reads, including on portal-login-changed after a password login.
@@ -148,7 +146,7 @@
       feeds.sales = pending('sales', passwordVerified?'同仁專區已登入，請由下方入口查看 KPI、台獎與個績；此提醒尚未讀取。':'請在上方登入後開啟同仁專區。原裝置核准用戶可在 KPI 戰情驗證後更新提醒。', passwordVerified?'pending':'locked');
       render(); return;
     }
-    feeds.sales = pending('sales', '正在驗證原有員編與核准裝置', 'loading'); render();
+    if (!salesVerified) { feeds.sales = pending('sales', '正在驗證原有員編與核准裝置', 'loading'); render(); }
     try {
       // The legacy daily read action is not server-authenticated. Preserve the
       // existing app's Approved Device gate and never invoke it before approval.
@@ -160,9 +158,8 @@
       feeds.sales = Model.fromSales(response, context);
     } catch (error) {
       if (!current()) return;
-      feeds.sales = salesVerified ? pending('sales', '已驗證業績登入；昨日資料讀取未完成，請稍後更新，缺值不列為零業績')
-        : error.denied ? pending('sales', '員編或裝置驗證未通過，請至 KPI 戰情確認', 'locked')
-        : pending('sales', '登入狀態暫時無法確認，請稍後更新；尚未讀取私有業績');
+      if(error.denied){salesVerified=false;feeds.sales=pending('sales', '員編或裝置驗證未通過，請至 KPI 戰情確認', 'locked');updateAccessNotice();}
+      else if(!salesVerified || !feeds.sales.some(item=>['ok','attention','warning'].includes(item.status)))feeds.sales=pending('sales', '登入狀態暫時無法確認，請稍後更新；尚未讀取私有業績');
     }
     render();
   }
@@ -170,22 +167,22 @@
   async function loadPatrol(requestId) {
     const token = storage('sessionStorage', SESSION_KEY);
     let sessionLive = true;
-    const current = () => sessionLive && requestId === generation && !document.hidden && storage('sessionStorage', SESSION_KEY) === token
+    const current = () => sessionLive && requestId === generation && storage('sessionStorage', SESSION_KEY) === token
       && Model.dateContext(new Date()).today === context.today;
     if (!token) {
       feeds.patrol = pending('patrol', '請先在 Liam 情報站完成督導驗證，再返回更新提醒', 'locked');
       render(); return;
     }
-    feeds.patrol = pending('patrol', '正在驗證既有督導短效連線', 'loading'); render();
+    if (!patrolVerified) { feeds.patrol = pending('patrol', '正在驗證既有督導短效連線', 'loading'); render(); }
     try {
       const auth = await post(PATROL_API, { action: 'ptauth', token });
       if (!current()) return;
       // Restore must return the same validated session; never persist a new
       // token from this public portal or use an unverified stored token.
-      if (!auth.token || auth.token !== token) throw new Error('Session changed');
+      if (!auth.token || auth.token !== token) { const error=new Error('Session changed');error.invalidLease=true;throw error; }
       const expiresAt = Number(auth.expiresAt) > 0 ? Number(auth.expiresAt) * 1000
         : Number(auth.expiresIn) > 0 ? Date.now() + Number(auth.expiresIn) * 1000 : 0;
-      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new Error('Session expiry unavailable');
+      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) { const error=new Error('Session expiry unavailable');error.invalidLease=true;throw error; }
       patrolExpiresAt = expiresAt; patrolVerified = true; updateAccessNotice();
       clearInterval(accessNoticeTimer);
       accessNoticeTimer = scope.setInterval(updateAccessNotice, 15000);
@@ -203,43 +200,37 @@
       feeds.patrol = Model.fromPatrol(response, context);
     } catch (error) {
       if (!current()) return;
-      feeds.patrol = patrolVerified ? pending('patrol', '已驗證督導登入；巡店資料讀取未完成，請稍後更新')
-        : error.denied ? pending('patrol', '督導連線未通過驗證，請至 Liam 情報站重新驗證', 'locked')
-        : pending('patrol', '督導登入狀態暫時無法確認，請稍後更新；尚未讀取巡店資料');
+      if(error.denied || error.invalidLease && patrolVerified){patrolVerified=false;patrolExpiresAt=0;clearTimeout(patrolExpiryTimer);feeds.patrol=pending('patrol', '督導連線未通過驗證，請至 Liam 情報站重新驗證', 'locked');updateAccessNotice();}
+      else if(!patrolVerified || !feeds.patrol.some(item=>['ok','attention','warning'].includes(item.status)))feeds.patrol=pending('patrol', '督導登入狀態暫時無法確認，請稍後更新；尚未讀取巡店資料');
     }
     render();
   }
 
-  function clearPrivateView(text = '返回頁面後重新驗證，不保留先前門市資料') {
+  function clearPrivateView(text = '登入或資料日期已變更，請按更新提醒') {
     if (scope.PortalLogout?.isLocked()) { generation += 1; abortReads(); return; }
     generation += 1;
     abortReads();
-    clearTimeout(freshnessTimer);
     clearTimeout(patrolExpiryTimer);
     clearInterval(accessNoticeTimer);
     patrolExpiresAt = 0; salesVerified = false; patrolVerified = false;
     updateAccessNotice();
-    clearTimeout(rolloverTimer);
     clearTimeout(rotationTimer);
     if (!Model) return;
     context = Model.dateContext(new Date());
     feeds = { sales: pending('sales', text), patrol: pending('patrol', text) };
     render();
   }
-  async function refresh() {
+  async function refresh({reset=false}={}) {
     if (!Model || document.hidden || scope.PortalLogout?.isLocked()) return;
-    clearPrivateView('正在確認最新日期與權限');
+    const today=Model.dateContext(new Date()).today;
+    if(reset || !context || context.today!==today)clearPrivateView('正在確認最新日期與權限');
+    else{generation+=1;abortReads();}
     const requestId = generation;
-    const nextMidnight = new Date(`${context.today}T00:00:00+08:00`).getTime() + 86400000;
-    rolloverTimer = scope.setTimeout(refresh, Math.max(0, nextMidnight - Date.now()));
     $('today').textContent = new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
     $('reminder-refresh').disabled = true;
     await Promise.allSettled([loadSales(requestId), loadPatrol(requestId)]);
     if (requestId !== generation || scope.PortalLogout?.isLocked()) return;
     $('reminder-refresh').disabled = false;
-    // Bound in-memory access and freshness; verification runs again on return,
-    // explicit refresh, credential change and every minute while visible.
-    freshnessTimer = scope.setTimeout(refresh, 60000);
   }
 
   function setupSearch() {
@@ -297,14 +288,17 @@
   banner.addEventListener('focusin', () => { focused = true; scheduleRotation(); });
   banner.addEventListener('focusout', event => { focused = banner.contains(event.relatedTarget); scheduleRotation(); });
   reducedMotion.addEventListener('change', () => { userPaused = reducedMotion.matches; updatePauseButton(); });
-  scope.addEventListener('portal-before-logout', () => { generation += 1; abortReads(); clearTimeout(rotationTimer); clearTimeout(freshnessTimer); clearTimeout(patrolExpiryTimer); clearInterval(accessNoticeTimer); clearTimeout(rolloverTimer); });
-  scope.addEventListener('portal-login-changed', refresh);
+  scope.addEventListener('portal-before-logout', () => { generation += 1; abortReads(); clearTimeout(rotationTimer); clearTimeout(patrolExpiryTimer); clearInterval(accessNoticeTimer); });
+  scope.addEventListener('portal-login-changed', () => refresh({reset:true}));
   scope.addEventListener('storage', event => {
-    if (!event.key || [EMPLOYEE_KEY, DEVICE_KEY, SESSION_KEY, 'bei12b_kpi_emp'].includes(event.key)) { clearPrivateView(); refresh(); }
+    if (!event.key || [EMPLOYEE_KEY, DEVICE_KEY, SESSION_KEY, 'bei12b_kpi_emp'].includes(event.key)) { void refresh({reset:true}); }
   });
-  scope.addEventListener('pagehide', () => clearPrivateView());
-  scope.addEventListener('pageshow', event => { if (event.persisted) refresh(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) clearPrivateView(); else refresh(); });
+  function showRetainedReminders(){
+    if(context && context.today!==Model.dateContext(new Date()).today)clearPrivateView('資料日期已變更，請按更新提醒');
+    updateAccessNotice();scheduleRotation();
+  }
+  scope.addEventListener('pageshow', event => { if(event.persisted)showRetainedReminders(); });
+  document.addEventListener('visibilitychange', () => { if(document.hidden)clearTimeout(rotationTimer);else showRetainedReminders(); });
   scope.DashboardBHost={
     sessionOnly:true,mountSelector:'#home-login',navigationSelector:'#zone-staff a, .quick-card',compactMobileLogin:true,
     clear(){passwordVerified=false;updateAccessNotice();},

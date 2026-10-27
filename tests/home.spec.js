@@ -508,29 +508,33 @@ test('舊帳號的延遲 read 不會覆蓋新帳號結果', async ({page}) => {
   expect(calls.filter(call => call.payload.action === 'private_access')).toHaveLength(2);
 });
 
-test('每分鐘重新驗證，等待新資料時清除上一輪數值', async ({page}) => {
+test('已載入提醒不每分鐘重讀；手動更新時保留上一輪資料', async ({page}) => {
   const gate = deferred(); let authCount = 0;
   const {calls} = await start(page,{keys:{employeeId:KEYS.employeeId,deviceId:KEYS.deviceId},reply:payload => {
     if (payload.action === 'private_access' && ++authCount > 1) return gate.promise;
     return successful(payload);
   }}); await ready(page);
+  const before=calls.length;
   await page.clock.runFor(60000);
+  expect(calls.length).toBe(before);
+  await page.locator('#reminder-refresh').click();
   await expect.poll(() => calls.filter(call => call.payload.action === 'private_access').length).toBe(2);
   const slides = await readSlides(page);
-  expect(slides.filter(slide => slide.title.includes('昨日')).every(slide => slide.status === 'loading' && !slide.text.includes('通化'))).toBe(true);
-  gate.resolve({status:'error'}); await ready(page);
+  expect(slides.some(slide=>slide.text.includes('通化'))).toBe(true);
+  gate.resolve('NETWORK_ERROR'); await ready(page);
+  expect((await readSlides(page)).some(slide=>slide.text.includes('通化'))).toBe(true);
 });
 
-test('隱藏頁面會清除資料，返回時才重新驗證', async ({page}) => {
+test('隱藏和返回頁面保留提醒，不再發送私有請求', async ({page}) => {
   const {calls} = await start(page,{keys:KEYS}); await ready(page);
   const before = calls.length;
   await page.evaluate(() => { Object.defineProperty(document,'hidden',{configurable:true,get:() => true}); document.dispatchEvent(new Event('visibilitychange')); });
-  await expect(page.locator('#reminder-text')).not.toContainText('通化');
+  await expect(page.locator('#reminder-text')).toContainText('通化');
   await page.clock.runFor(60000); expect(calls.length).toBe(before);
   await page.evaluate(() => { Object.defineProperty(document,'hidden',{configurable:true,get:() => false}); document.dispatchEvent(new Event('visibilitychange')); });
   await ready(page);
   await expect(page.locator('#reminder-text')).toHaveText('已確認 1 店：通化');
-  expect(calls.length).toBe(before + 4);
+  expect(calls.length).toBe(before);
 });
 
 for (const [label,authFields] of [['missing',{}],['expired',{expiresAt:Math.floor(Date.parse(NOW) / 1000) - 1}]]) {
@@ -577,12 +581,15 @@ test('更換督導 token 後，舊 ptauth 不得觸發資料讀取', async ({pag
   expect((await readSlides(page)).every(slide => slide.status === 'locked')).toBe(true);
 });
 
-test('台北午夜即時重驗並改讀新昨天，不顯示前一天的結果', async ({page}) => {
+test('台北午夜保留原日期，手動更新才改讀新昨天', async ({page}) => {
   const gate = deferred(); let readCount = 0;
   const {calls} = await start(page,{keys:{employeeId:KEYS.employeeId,deviceId:KEYS.deviceId},now:'2026-09-30T15:59:59.000Z',
     reply:payload => payload.action === 'read' && ++readCount > 1 ? gate.promise : successful(payload)});
   await ready(page); await expect(page.locator('#reminder-text')).toHaveText('已確認 1 店：通化');
   await page.clock.runFor(1000);
+  expect(calls.filter(call => call.payload.action === 'read')).toHaveLength(1);
+  await expect(page.locator('#reminder-text')).toHaveText('已確認 1 店：通化');
+  await page.locator('#reminder-refresh').click();
   await expect.poll(() => calls.filter(call => call.payload.action === 'read').length).toBe(2);
   expect(calls.filter(call => call.payload.action === 'read').map(call => call.payload.date)).toEqual(['2026-09-29','2026-09-30']);
   await expect(page.locator('#today')).toContainText('2026年10月1日');
