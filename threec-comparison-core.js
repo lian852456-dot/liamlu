@@ -9,19 +9,27 @@
   const unique=values=>Array.from(new Set(values)).sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}));
   function condition(name){
     const raw=text(name), parts=raw.split('／');
-    const rentMatch=raw.match(/(?:月租\s*)?(\d{3,4})(?:H(?=$|[^A-Za-z0-9])|型|\s*元)/i)||raw.match(/月租\s*(\d{3,4})/)||raw.match(/(?:^|／)(\d{3,4})(?=專案|型|元|\s*\()/);
+    const rentMatches=Array.from(raw.matchAll(/(?:月租\s*)?(\d{3,4})(?:H(?=$|[^A-Za-z0-9])|型|\s*元)/gi));
+    const fallback=Array.from(raw.matchAll(/月租\s*(\d{3,4})/g));
+    const numeric=Array.from(raw.matchAll(/(?:^|／)(\d{3,4})(?=專案|型|元|\s*\()/g));
+    const rents=unique((rentMatches.length?rentMatches:fallback.length?fallback:numeric).map(match=>match[1]));
     const termMatch=raw.match(/(?:合約\s*)?(\d{2})(?:期|個月)/)||raw.match(/\((24|30|36|48|60)\)/);
-    const rent=rentMatch?rentMatch[1]:'',term=termMatch?termMatch[1]:'';
+    const rent=rents[0]||'',term=termMatch?termMatch[1]:'';
     const version=/加碼/.test(raw)?'加碼':/VIP/i.test(raw)?'VIP':'一般';
     // Group only the recognised plan prefix. Raw conditions remain unique keys,
     // including handset, application, renewal and speed restrictions.
     // New flat workbooks prefix a generic source group. Keep the actual
     // enterprise plan and its handset eligibility visible as separate choices.
     let project=parts.length>1&&/企客特殊專案/.test(parts[0])&&/企客|榮耀之星/.test(parts[1])?parts[1]:(parts.length>1?parts[0]:raw);
+    // Surface the original 4G families instead of hiding them under a generic group.
+    if(parts.length>1&&/企客特殊專案/.test(parts[0])){
+      if(/^4G_?ihouse智能/i.test(parts[1]))project='4G iHouse 智能';
+      else if(/^4G行動寬頻IP_Cam案/i.test(parts[1]))project='4G 行動寬頻 IP Cam';
+    }
     project=project.replace(/\((24|30|36|48|60)\)/g,'').replace(/(?:月租\s*)?\d{3,4}(?:H(?=$|[^A-Za-z0-9])|型|\s*元)/gi,'').replace(/合約\s*\d{2}期/g,'').replace(/_(?:加碼版|VIP)/gi,'').replace(/_XH/g,'').replace(/[_\s]+/g,' ').trim();
     if(!project||/^(專案價|合約)$/.test(project))project='原表條件';
     const detail=parts.length>1?parts.slice(1).join('／').replace(/^\d{3,4}H/i,'').replace(/\((24|30|36|48|60)\)/g,'').replace(/^[_\s]+/,''):'';
-    return {key:raw,raw,project,rent,term,version,detail};
+    return {key:raw,raw,project,rent,rents,term,version,detail};
   }
   const specification=Models.specification;
   function valueSignature(value){
@@ -57,10 +65,10 @@
     const keys=new Set(modelRows.flatMap(row=>Object.keys(row.prices)));
     const relevant=scopeColumns(index.columns,filters).filter(col=>keys.has(col.key)&&modelRows.some(row=>hasQuote(row,col)));
     const plans=relevant.filter(col=>!filters.project||col.project===filters.project);
-    return {brands:unique(scoped.map(row=>row.brand)),models:unique(rows.map(row=>row.model)),capacities:unique(models.map(row=>row.capacity).filter(Boolean)),projects:unique(relevant.map(col=>col.project)),versions:unique(plans.map(col=>col.version)),rents:unique(plans.map(col=>col.rent).filter(Boolean)),terms:unique(plans.map(col=>col.term).filter(Boolean))};
+    return {brands:unique(scoped.map(row=>row.brand)),models:unique(rows.map(row=>row.model)),capacities:unique(models.map(row=>row.capacity).filter(Boolean)),projects:unique(relevant.map(col=>col.project)),versions:unique(plans.map(col=>col.version)),rents:unique(plans.flatMap(col=>col.rents)),terms:unique(plans.map(col=>col.term).filter(Boolean))};
   }
   function selectColumns(columns,filters){
-    return columns.filter(col=>(!filters.project||col.project===filters.project)&&(!filters.version||col.version===filters.version)&&(!filters.term||col.term===filters.term)&&(!filters.rent||(filters.rent==='common'?(!col.rent||['999','1399'].includes(col.rent)):col.rent===filters.rent)));
+    return columns.filter(col=>(!filters.project||col.project===filters.project)&&(!filters.version||col.version===filters.version)&&(!filters.term||col.term===filters.term)&&(!filters.rent||(filters.rent==='common'?(!col.rents.length||col.rents.some(rent=>['999','1399'].includes(rent))):col.rents.includes(filters.rent))));
   }
   // Default option lists remain compatible; the query UI can skip unused catalog sorts.
   function buildView(index,filters={},viewOptions={}){

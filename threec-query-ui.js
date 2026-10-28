@@ -119,8 +119,9 @@
       fillSelect(id,options[key],label);
     });
   }
-  function columnLabel(col){return `${col.rent?col.rent+' 元':'月租未標示'} · ${col.term?col.term+'期':'期數未標示'} · ${col.version}${col.detail?' · '+col.detail:''}`;}
-  function columnHtml(col){const detail=col.detail.replace(/^[_\s]+/,'');const repeated=detail.replace(/版$/,'').toLocaleLowerCase()===col.version.toLocaleLowerCase();return `<span class="rent-label">${esc(col.rent?col.rent+' 元':'月租未標示')}</span><span class="contract-label">${esc(col.term?col.term+' 期':'期數未標示')} · ${esc(col.version)}</span>${detail&&!repeated?`<span class="condition-detail">${esc(detail)}</span>`:''}<details><summary>完整條件</summary><span class="raw-condition">${esc(col.raw)}</span></details>`;}
+  function rentLabel(col){const rents=col.rents||[col.rent].filter(Boolean);return rents.length?rents.join('／')+' 元':'月租未標示';}
+  function columnLabel(col){return `${rentLabel(col)} · ${col.term?col.term+'期':'期數未標示'} · ${col.version}${col.detail?' · '+col.detail:''}`;}
+  function columnHtml(col){const detail=col.detail.replace(/^[_\s]+/,'');const repeated=detail.replace(/版$/,'').toLocaleLowerCase()===col.version.toLocaleLowerCase();return `<span class="rent-label">${esc(rentLabel(col))}</span><span class="contract-label">${esc(col.term?col.term+' 期':'期數未標示')} · ${esc(col.version)}</span>${detail&&!repeated?`<span class="condition-detail">${esc(detail)}</span>`:''}<details><summary>完整條件</summary><span class="raw-condition">${esc(col.raw)}</span></details>`;}
   function variantLabel(row){const names=row.models.map(model=>{const matches=Array.from(model.matchAll(/(?:[-_(\s])(宇宙橙|勃根地紅|午夜|星光|太空灰|鈦原色|黑色?|白色?|藍色?|粉色?|黃色?|綠色?|紫色?|銀色?|金色?)(?=[)\s]|$)/g));return matches.length?matches[matches.length-1][1]:'';}).filter(Boolean);return Array.from(new Set(names)).join('／');}
   function specIdentity(row){return JSON.stringify([row.brand,row.model,row.capacity,row.ram]);}
   // Derive display distinctions once per accepted snapshot, never during search input.
