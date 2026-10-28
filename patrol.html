@@ -741,7 +741,7 @@
 
 <script src="patrol-question-versions.js?v=5"></script>
 <script src="patrol-read-model.js?v=10"></script>
-<script src="supervisor-interview-model.js?v=2"></script>
+<script src="supervisor-interview-model.js?v=3"></script>
 <script>
 /* ---------- 檢核規則設定 ---------- */
 // 預設門市清單（北一二B）。連上雲端後會改用 GAS 回傳的本區清單，
@@ -1517,8 +1517,7 @@ async function handleSupervisorInterviewFileSelection(event){
     const sheetNames=Array.isArray(workbook.SheetNames)?workbook.SheetNames.slice():[];
     if(!sheetNames.length) throw new Error('檔案沒有可讀取的工作表');
     const candidates=sheetNames.map(sheetName=>{
-      const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,raw:true,defval:''})
-        .filter(row=>Array.isArray(row)&&row.some(value=>supervisorInterviewCell(value)));
+      const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,raw:true,defval:'',blankrows:true});
       const totalColumns=rows.reduce((max,row)=>Math.max(max,row.length),0);
       const parsed=SupervisorInterviewModel.parseMatrix(rows);
       return {sheetName,rows,totalRows:rows.length,totalColumns,parsed};
@@ -1537,7 +1536,7 @@ async function handleSupervisorInterviewFileSelection(event){
     renderSupervisorInterviewPreview(supervisorInterviewLocalFile);
     document.getElementById('supervisorInterviewSaveButton').hidden=false;
     status.className='patrol-local-import-status good';
-    status.textContent=`本機檢查完成：${file.name}；${supervisorInterviewPendingRows.length} 筆可儲存，員編已排除。`;
+    status.textContent=`本機檢查完成：${file.name}；${supervisorInterviewPendingRows.length} 筆可儲存${selected.parsed.duplicatesRemoved?`，已合併 ${selected.parsed.duplicatesRemoved} 列完全相同的重複紀錄`:''}，員編已排除。`;
   }catch(error){
     supervisorInterviewLocalFile=null;
     supervisorInterviewPendingRows=[];
@@ -1613,13 +1612,15 @@ async function saveSupervisorInterviewFile(){
   button.disabled=true;
   status.className='patrol-local-import-status';
   status.textContent=`正在儲存 ${supervisorInterviewPendingRows.length} 筆到私有雲端面談表…`;
-  const pending=supervisorInterviewPendingRows.slice();
+  const prepared=SupervisorInterviewModel.prepareImportRows(supervisorInterviewPendingRows);
+  const pending=prepared.rows;
   try{
+    if(prepared.invalidRows.length)throw new Error(prepared.invalidRows.map(row=>`第 ${row.rowNumber} 筆：${row.errors.join('、')}`).join('；'));
     const response=await cloudCall('interview_write',{rows:pending});
     if(!response||response.status!=='ok')throw new Error(response&&response.message||'面談資料儲存失敗');
     await loadSupervisorInterviews();
-    const readbackKeys=new Set(supervisorInterviewState.records.map(SupervisorInterviewModel.recordKey));
-    if(!pending.every(row=>readbackKeys.has(SupervisorInterviewModel.recordKey(row))))throw new Error('雲端讀回尚未包含全部新紀錄');
+    const readbackRows=new Map(supervisorInterviewState.records.map(row=>[SupervisorInterviewModel.recordKey(row),row]));
+    if(!pending.every(row=>SupervisorInterviewModel.sameRecord(row,readbackRows.get(SupervisorInterviewModel.recordKey(row)))))throw new Error('雲端讀回尚未包含全部新紀錄或內容不一致');
     supervisorInterviewPendingRows=[];
     supervisorInterviewLocalFile=null;
     button.hidden=true;

@@ -115,3 +115,22 @@ test('新季度讀取先歸零但不刪舊資料，首次成功寫入後才清�
   assert.equal(interviewSheet.values.length,2,'header plus only the new Q4 row');
   assert.equal(interviewSheet.values[1][1],'2026-Q4');
 });
+
+
+test('前端合併重複列後可通過既有 GAS，重試只更新一筆且儀表板完成數不膨脹',()=>{
+  const model=require('../supervisor-interview-model.js');
+  const env=harness();
+  const incoming=model.prepareImportRows([row(),row(),row({interviewee:'同仁乙'})]);
+  assert.equal(incoming.duplicatesRemoved,1);
+  const saved=env.context.supervisorInterviewWritePayload_({token:'valid-token',rows:incoming.rows});
+  assert.equal(saved.written,2);
+  const retry=env.context.supervisorInterviewWritePayload_({token:'valid-token',rows:incoming.rows});
+  assert.equal(retry.written,0);
+  assert.equal(retry.updated,2);
+  const result=env.context.supervisorInterviewReadPayload_({token:'valid-token'});
+  assert.equal(result.records.length,2);
+  assert.ok(incoming.rows.every(item=>result.records.some(stored=>model.sameRecord(item,stored))));
+  const progress=model.quarterProgress(result.roster,result.records,result.quarter);
+  assert.equal(progress.completed,2);
+  assert.equal(progress.missing,1);
+});

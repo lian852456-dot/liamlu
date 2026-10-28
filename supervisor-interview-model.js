@@ -86,12 +86,26 @@
   function persistedRow(raw){
     const out={};PERSISTED_FIELDS.forEach(field=>{out[field]=raw[field]||'';});return out;
   }
+  function sameRecord(left,right){
+    return PERSISTED_FIELDS.every(field=>text(left&&left[field])===text(right&&right[field]));
+  }
+  function prepareImportRows(rows,rowNumbers){
+    const unique=[];const byKey=new Map();const invalidRows=[];let duplicatesRemoved=0;
+    (Array.isArray(rows)?rows:[]).forEach((row,index)=>{
+      const rowNumber=rowNumbers?rowNumbers[index]:index+1;
+      const key=recordKey(row);const previous=byKey.get(key);
+      if(!previous){byKey.set(key,{row,rowNumber});unique.push(persistedRow(row));return;}
+      if(sameRecord(previous.row,row)){duplicatesRemoved+=1;return;}
+      invalidRows.push({rowNumber,errors:[`與第 ${previous.rowNumber} 列為同一筆面談，但內容不同；請確認表單狀態、日期、指導與回饋後保留正確的一列`]});
+    });
+    return {rows:invalidRows.length?[]:unique,invalidRows,duplicatesRemoved};
+  }
   function parseMatrix(matrix){
     const rows=Array.isArray(matrix)?matrix:[];
     const header=detectHeader(rows);
     const missing=REQUIRED_FIELDS.filter(field=>!header||!Number.isInteger(header.map[field]));
     if(missing.length)return {blocked:true,rows:[],errors:[`缺少必要欄位：${missing.join('、')}`],invalidRows:[],headerRow:-1,employeeIdsDiscarded:0};
-    const parsed=[];const invalidRows=[];let employeeIdsDiscarded=0;
+    const parsed=[];const rowNumbers=[];const invalidRows=[];let employeeIdsDiscarded=0;
     rows.slice(header.rowIndex+1).forEach((cells,index)=>{
       if(!Array.isArray(cells)||!cells.some(value=>text(value)))return;
       const get=field=>Number.isInteger(header.map[field])?cells[header.map[field]]:'';
@@ -114,9 +128,11 @@
       ['reporter','organization','interviewee','reason','formStatus'].forEach(field=>{if(raw[field].length>120)errors.push(`${field} 過長`);});
       ['guidance','feedback'].forEach(field=>{if(raw[field].length>2000)errors.push(`${field} 過長`);});
       if(errors.length)invalidRows.push({rowNumber:header.rowIndex+index+2,errors});
-      else parsed.push(persistedRow(raw));
+      else {parsed.push(persistedRow(raw));rowNumbers.push(header.rowIndex+index+2);}
     });
-    return {blocked:Boolean(invalidRows.length||!parsed.length),rows:invalidRows.length?[]:parsed,errors:invalidRows.length?['存在無效資料列，整批停止']:(!parsed.length?['沒有可匯入的面談紀錄']:[]),invalidRows,headerRow:header.rowIndex,employeeIdsDiscarded};
+    const prepared=prepareImportRows(parsed,rowNumbers);
+    invalidRows.push(...prepared.invalidRows);
+    return {blocked:Boolean(invalidRows.length||!parsed.length),rows:invalidRows.length?[]:prepared.rows,errors:invalidRows.length?['存在無效或衝突資料列，整批停止']:(!parsed.length?['沒有可匯入的面談紀錄']:[]),invalidRows,headerRow:header.rowIndex,employeeIdsDiscarded,duplicatesRemoved:prepared.duplicatesRemoved};
   }
   function recordKey(row){
     return [row&&row.interviewDate,row&&row.organization,row&&row.interviewee,row&&row.reason].map(text).join('|');
@@ -160,5 +176,5 @@
     return result;
   }
 
-  return Object.freeze({FIELD_HEADERS,REQUIRED_FIELDS,PERSISTED_FIELDS,normalizeHeader,normalizeDate,quarterForDate,quarterMonths,currentQuarter,detectHeader,parseMatrix,persistedRow,recordKey,personKey,quarterProgress,monthsEnding});
+  return Object.freeze({FIELD_HEADERS,REQUIRED_FIELDS,PERSISTED_FIELDS,normalizeHeader,normalizeDate,quarterForDate,quarterMonths,currentQuarter,detectHeader,parseMatrix,persistedRow,sameRecord,prepareImportRows,recordKey,personKey,quarterProgress,monthsEnding});
 });
