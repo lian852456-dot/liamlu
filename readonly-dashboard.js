@@ -41,6 +41,9 @@
   function signed(value,format=number){return value==null?'—':(value>0?'+':'')+format(value);}
   function comparisonMarkup(comparison,rate){const unit=rate?'':' 人次';
     return '<div class="period-comparison"><div><span>上月同期</span><strong>'+safe(rate?percent(comparison.prior):number(comparison.prior)+unit)+'</strong></div><div><span>較上月同期</span><strong>'+safe(rate?signed(comparison.delta==null?null:comparison.delta*100)+' 個百分點':signed(comparison.delta)+unit)+'</strong></div><p>MoM '+safe(comparison.growth==null?'—（上月為零或無有效分母）':signed(comparison.growth,v=>(v*100).toFixed(2)+'%'))+'</p></div>';}
+  function weeklyVisitors(rows,c){
+    return '<section class="weekly-visitors" aria-label="'+c.toUpperCase()+' 每週來客數"><h4>每週來客數</h4><p class="sub">週一至週日 · 所選區間實際人次</p><dl>'+C.weeklySeries(rows).map(w=>'<div><dt>'+short(w.start)+'–'+short(w.end)+(w.partial?'<small>部分週 · 累計至 '+short(w.end)+'</small>':'')+'</dt><dd>'+number(w[c+'_d'])+'<small>人次</small></dd></div>').join('')+'</dl></section>';
+  }
   function traffic(){const d=model.conversion;if(!d){$('#source-note').textContent=model.conversionReason;return empty(model.conversionReason);}const rows=d.records.filter(r=>(state.store==='all'||r.store===state.store)&&r.date>=state.start&&r.date<=state.end);const series=C.dailySeries(rows,state.mode),comparison=A.periodComparison(d,{store:state.store,start:state.start,end:state.end}),total=comparison.current,rate=state.tab==='conversion';
     if(!rows.length){$('#source-note').textContent='所選日期沒有已核實資料；缺資料不補零。';return empty('所選區間沒有資料');}
     let html=context({cutoff:d.cutoff,period:short(state.start)+'–'+short(state.end)});
@@ -49,7 +52,7 @@
     html+='</section>';
     if(rate){
       html+='<p class="comparison-note">每日來客變化採原報逐日觀測；AQ 來客與符合 RT 續約資格的來客分列，不相加為門市總來客。缺少店日會停止顯示，不補 0；'+safe(short(d.cutoff))+' 之後尚未觀測。</p><section class="charts daily-visitors" aria-label="每日來客變化">';
-      for(const c of ['aq','rt'])html+='<article class="panel"><h3>'+c.toUpperCase()+' '+(c==='rt'?'符合續約資格來客':'來客')+' · 每日變化</h3><p class="sub">'+(c==='rt'?'原 TWM＋原 TST 符合續約資格來客':'原報 AQ 來客數')+' · 每日實際人次 · '+short(state.start)+'–'+short(state.end)+' · 點選圓點查看當日人次</p><div class="chart" id="'+c+'-visitors-chart"></div><p class="day-readout" id="'+c+'-visitors-readout"></p></article>';
+      for(const c of ['aq','rt'])html+='<article class="panel"><h3>'+c.toUpperCase()+' '+(c==='rt'?'符合續約資格來客':'來客')+' · 每日變化</h3><p class="sub">'+(c==='rt'?'原 TWM＋原 TST 符合續約資格來客':'原報 AQ 來客數')+' · 每日實際人次 · '+short(state.start)+'–'+short(state.end)+' · 點選圓點查看當日人次</p><div class="chart" id="'+c+'-visitors-chart"></div><p class="day-readout" id="'+c+'-visitors-readout"></p>'+weeklyVisitors(rows,c)+'</article>';
       html+='</section>';
     }else if(comparison.available){
       html+='<section class="charts period-charts" aria-label="上月與本月同期 MoM 比較">';
@@ -57,7 +60,7 @@
       html+='</section>';
     }
     html+='<p class="comparison-note">'+(comparison.available?'原報已提供上月同期總量，可比較 MoM；未繪製上月逐日趨勢。':d.prior?'原報只有整段同期總量，所選區間無法對比；未繪製上月逐日趨勢。':'來源未提供上月同期資料，僅呈現本月實際觀測。')+'下方每日看波動，累計看所選區間進度。</p><section class="charts">';
-    for(const c of ['aq','rt'])html+='<article class="panel"><h3>'+c.toUpperCase()+' '+(rate?'締結率':c==='rt'?'符合資格來客':'來客')+'趨勢</h3><p class="sub">'+(state.mode==='daily'?'每日實際':'自所選起日累計')+' · '+short(state.start)+'–'+short(state.end)+' · 點選圓點查看分子母</p><div class="chart" id="'+c+'-chart"></div><p class="day-readout" id="'+c+'-readout"></p></article>';html+='</section>';
+    for(const c of ['aq','rt'])html+='<article class="panel"><h3>'+c.toUpperCase()+' '+(rate?'締結率':c==='rt'?'符合資格來客':'來客')+'趨勢</h3><p class="sub">'+(state.mode==='daily'?'每日實際':'自所選起日累計')+' · '+short(state.start)+'–'+short(state.end)+' · 點選圓點查看分子母</p><div class="chart" id="'+c+'-chart"></div><p class="day-readout" id="'+c+'-readout"></p>'+(!rate?weeklyVisitors(rows,c):'')+'</article>';html+='</section>';
     $('#content').innerHTML=html;for(const c of ['aq','rt']){if(rate)draw(c,C.dailySeries(rows,'daily'),false,{suffix:'-visitors',mode:'daily'});else if(comparison.available)drawPeriod(c,comparison,rate);draw(c,series,rate);}if($('#restore-comparison'))$('#restore-comparison').onclick=()=>{state.start=d.period_start;state.end=d.cutoff;$('#start').value=state.start;$('#end').value=state.end;render();};source({cutoff:d.cutoff,sourceName:d.source_name,version:d.sha256.slice(0,12)},short(d.cutoff)+' 之後的未觀測日期不作實績；率由合計分子母重算');
   }
   function drawPeriod(c,comparison,rate){
@@ -117,3 +120,4 @@
   let resizeTimer;new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(model&&['traffic','conversion'].includes(state.tab))render();},100);}).observe($('.shell'));
   void load();
 })();
+
