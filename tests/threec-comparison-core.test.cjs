@@ -21,7 +21,7 @@ test('空白容錯只用於單一機型，不拼接品牌、來源、代碼或�
  for(const query of ['APPLE','SYN 17','續約 999','一般','256GB'])assert.equal(Compare.buildView(index,{query},{includeOptions:false}).totalRows,1);
 });
 test('完整條件解析月租、跨期數、版本且保留原始限定條件',()=>{
- assert.deepEqual({...Compare.condition(plan)}, {key:plan,raw:plan,project:'5G iPhone-新申裝/續約',rent:'999',term:'24',version:'一般',detail:''});
+ assert.deepEqual({...Compare.condition(plan)}, {key:plan,raw:plan,project:'5G iPhone-新申裝/續約',rent:'999',rents:['999'],term:'24',version:'一般',detail:''});
  const addon=Compare.condition('(企客_5G)榮耀之星599H(30)_iPhone');
  assert.equal(addon.rent,'599');assert.equal(addon.term,'30');
  assert.equal(Compare.condition('5G_XH(48)-續約／1399H_加碼版').version,'加碼');
