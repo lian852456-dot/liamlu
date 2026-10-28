@@ -36,6 +36,21 @@
     if(!['daily','cumulative'].includes(mode))fail('未知趨勢模式');const byDate=new Map();for(const r of records){if(start&&r.date<start||end&&r.date>end)continue;if(!byDate.has(r.date))byDate.set(r.date,[]);byDate.get(r.date).push(r);}
     let accumulated=[];return [...byDate.keys()].sort().map(date=>{const rows=byDate.get(date);accumulated=accumulated.concat(rows);return {date,...aggregate(mode==='cumulative'?accumulated:rows)};});
   }
+  // Calendar weeks start Monday; totals always use daily observations, never cumulative points.
+  function weeklySeries(records){
+    const weeks=new Map();
+    for(const row of records){
+      const date=iso(row.date),day=new Date(date+'T00:00:00Z');
+      day.setUTCDate(day.getUTCDate()-(day.getUTCDay()+6)%7);
+      const weekStart=day.toISOString().slice(0,10);day.setUTCDate(day.getUTCDate()+6);
+      if(!weeks.has(weekStart))weeks.set(weekStart,{weekStart,weekEnd:day.toISOString().slice(0,10),rows:[]});
+      weeks.get(weekStart).rows.push(row);
+    }
+    return [...weeks.values()].sort((a,b)=>a.weekStart.localeCompare(b.weekStart)).map(week=>{
+      const dates=week.rows.map(row=>row.date).sort(),start=dates[0],end=dates[dates.length-1];
+      return {start,end,partial:start!==week.weekStart||end!==week.weekEnd,...aggregate(week.rows)};
+    });
+  }
   function diff(before,after){const current=validateConversion(after),old=before?validateConversion(before):null;if(old&&(old.period_start!==current.period_start||current.cutoff<old.cutoff))fail('新月份請另建版本；截止不得倒退');const a=new Map((old?.records||[]).map(r=>[r.date+'|'+r.store,r])),b=new Map(current.records.map(r=>[r.date+'|'+r.store,r]));const changed=[];for(const [key,r]of b)if(a.has(key)&&FIELDS.some(k=>a.get(key)[k]!==r[k]))changed.push({store:r.store,date:r.date,before:a.get(key),after:r});return {same_source:old?.sha256===current.sha256,added:[...b.keys()].filter(k=>!a.has(k)).length,removed:[...a.keys()].filter(k=>!b.has(k)).length,changed:changed.length,changes:changed,unique_keys:b.size};}
   function workbookRows(workbook,XLSX,name){if(!workbook.Sheets[name])fail('缺少必要工作表：'+name);return XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,raw:true,defval:null,blankrows:true});}
   function equal(value,expected,label){if(typeof value!=='number'||!Number.isFinite(value)||Math.abs(value-expected)>Math.max(1e-8,Math.abs(expected)*1e-8))fail(label+' 與逐日加總不一致');}
@@ -63,5 +78,6 @@
     return validateConversion({schema:SCHEMA,period_start:begin,cutoff,sha256,source_name,source_bytes,records,prior,prior_period:{start:priorStart,end:priorEnd}});
   }
   function storeId(value){const n=norm(value);return STORES.find(s=>[s.id,s.short,s.name,'台北'+s.short,'台灣大哥大台北'+s.short].map(norm).includes(n))?.id||null;}
-  return Object.freeze({SCHEMA,STORES,FIELDS,aggregate,ratio,dedupe,validateConversion,dailySeries,diff,parseWorkbook,storeId});
+  return Object.freeze({SCHEMA,STORES,FIELDS,aggregate,ratio,dedupe,validateConversion,dailySeries,weeklySeries,diff,parseWorkbook,storeId});
 });
+
