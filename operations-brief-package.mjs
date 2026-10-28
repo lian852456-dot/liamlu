@@ -34,7 +34,7 @@ function nextId(xml){return Math.max(1,...Array.from(xml.matchAll(/<p:cNvPr\b[^>
 function append(xml,shapes){if(!xml.includes('</p:spTree>'))throw Error('範本形狀結構不符。');return xml.replace('</p:spTree>',shapes+'</p:spTree>');}
 function draftBand(xml,meta,page){
   // Transparent watermark deliberately overlays; it never hides a data row or logo.
-  const label=page===6&&meta.tradein?'待核草稿｜舊換新已對帳，來源年份待確認':'待核草稿｜範例原值及圖片未更新';
+  const label=page===16&&meta.goodspeed?'待核草稿｜好速來源彙總，尚未正式驗收':page===6&&meta.tradein?'待核草稿｜舊換新已對帳，來源年份待確認':'待核草稿｜範例原值及圖片未更新';
   const stamp=textShape(nextId(xml),'Operations draft status',label,1350000,2850000,10000000,900000,3600,'A4262C').replace('<a:srgbClr val="A4262C"/>','<a:srgbClr val="A4262C"><a:alpha val="22000"/></a:srgbClr>');
   return append(xml,stamp);
 }
@@ -56,6 +56,17 @@ function tradeinPage(base,model){
     xml=append(xml,nativeTable(id++,rows,{x,y:2650000,widths:[1280000,800000,620000],rowH:Math.min(280000,Math.floor(3450000/rows.length)),size:1100}));});
   return append(xml,textShape(id++,'舊換新口徑','H含僅折抵未換新，不代表全部買新機。零分母為N/A。各店依比率排序，零值門市保留；年份／政策尚待核。',450000,6250000,11300000,430000,1200));
 }
+function goodSpeedPage(base,model){
+  if(model.contract!=='operations-goodspeed-bbtbc-v1'||model.regions.length!==4||model.rule.longTermMonths!==36)throw Error('好速資料契約不符');
+  const pct=v=>v===null?'N/A':(v*100).toFixed(2)+'%';let xml=blankPage(base),id=nextId(xml);
+  xml=append(xml,textShape(id++,'好速標題','好速｜點數、36M長約與失敗分類',1750000,320000,9900000,620000,2800));
+  xml=append(xml,textShape(id++,'好速期間',`${model.period}｜${model.storeCount}店｜來源總進度保留原值，與點數／目標比值分列`,500000,1050000,11200000,400000,1500));
+  const rows=[['區域','點數／目標','點數／目標比','來源總進度','12/24/36M筆數','36M占比','失敗唯一單','取消V列'],...model.regions.map(r=>[r.group,`${r.points} / ${r.target}`,pct(r.pointsTargetRatio),pct(r.sourceProgress),`${r.count12}/${r.count24}/${r.count36}`,pct(r.longTermShare),r.failures.rows?String(r.failures.uniqueOrders):'無紀錄≠0',String(r.failures.duplicateCancelFlagged)])];
+  xml=append(xml,nativeTable(id++,rows,{x:400000,y:1550000,widths:[1100000,1550000,1450000,1450000,1800000,1300000,1450000,1100000],rowH:470000,size:1200}));
+  const lines=model.regions.map(r=>{const entries=Object.entries(r.failures.reasonCounts).sort((a,b)=>b[1]-a[1]);return `${r.group}：`+(entries.length?entries.slice(0,2).map(([k,n])=>`${k} ${n}單`).join('；')+(entries.length>2?`；另${entries.length-2}類見來源摘要`:''):'當期無失敗紀錄，不代表0失敗');});
+  xml=append(xml,textShape(id++,'好速失敗標準分類','失敗標準分類（每區前2類；BB明細!AY，來源列見核對摘要）\n'+lines.join('\n'),500000,4100000,11200000,1550000,1350));
+  return append(xml,textShape(id++,'好速口徑','來源：BB店點!I:K/R/AG/AR/BC；BB量能!K:M；BB明細!BN1/AY/BG。\n36M占比＝36M÷（12M＋24M＋36M）；0.5點已含來源。失敗僅涵蓋來源業者，訂單不是客戶，V另列；TBC舊資料排除。',500000,5800000,11200000,700000,1250));
+}
 export async function buildDraft(bytes,meta,JSZip){
   if(meta.status!=='DRAFT_UNMAPPED')throw Error('此版本僅提供待核草稿。');
   await inspectTemplate(bytes,JSZip);
@@ -76,9 +87,10 @@ export async function buildDraft(bytes,meta,JSZip){
   let good=blankPage(base15);
   let id=nextId(good);
   good=append(good,textShape(id++,'好速標題','好速達成、點數與長約表現',1800000,320000,9200000,650000,3000));
-  good=append(good,nativeTable(id++, [['指標','本期數值','來源與口徑'],['達成率','待公司來源','正式實績點數 ÷ 正式目標點數；缺值不補零'],['實績／目標點數','待公司來源','企客4G納入；降轉只依公司正式欄排除，勿套用VK'],['長約件數／占比','待公司定義','合約月數門檻與占比分母尚未確認'],['失敗原因彙整','尚未核對','只採好速原文；店級／個人分開去重，無紀錄不是0失敗']]));
+  good=append(good,nativeTable(id++, [['指標','本期數值','來源與口徑'],['達成率','待公司來源','來源總進度原值及實績／目標比值分列；缺值不補零'],['實績／目標點數','待公司來源','企客4G納入；降轉只依公司正式欄排除，勿套用VK'],['36M長約件數／占比','待公司來源','沿用每日36M；0.5點已含來源，分母待對映'],['失敗原因彙整','尚未核對','標準分類與來源列；不匯出客戶資料或自由備註']]));
   const failure=(meta.failures?'人工貼入、待核出處：\n'+meta.failures:'待提供好速可識別失敗原文、日期、店／個人層級及去重識別。');
   good=append(good,textShape(id++,'好速失敗原文待核',failure,650000,4050000,10800000,2250000,1700));
+  if(meta.goodspeed)good=goodSpeedPage(base15,meta.goodspeed);
   let rels=await zip.file('ppt/slides/_rels/slide15.xml.rels').async('string');
   rels=rels.replace(/<Relationship\b[^>]*Type="[^"]*\/notesSlide"[^>]*\/?>(?:<\/Relationship>)?/g,'');
   // Carry the source master logo explicitly on the new page as well. Some

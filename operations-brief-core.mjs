@@ -1,4 +1,4 @@
-// Local inspection only. Company field mappings deliberately remain unconfirmed.
+// Local-only sources; unsupported mappings remain explicitly pending.
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 export const TEMPLATE_HASH = 'fbbc86defd4de6d6739657df7ae1e76c50795c4cb0c15809174c063ab7daf803';
 // Only recognized labels may leave the parser. Never return customer/source rows.
@@ -9,8 +9,8 @@ export const SECTIONS = Object.freeze([
   ['新復原者／保險', '績效截止＋政策版本', '手機及穿戴保險件數、銷售分母、比較期與政策原文'],
   ['金牌', '近三個月', '每月正式淨金牌、區／店／識別欄；與每日D27流程分開'],
   ['好速', '公司KPI截止', '正式實績點數、目標點數及降轉標記；企客4G納入，勿套用VK口徑'],
-  ['好速長約', '公司當期定義', '長約合約月數定義、明細及占比分母，尚未設定門檻'],
-  ['好速失敗原因', '回報日期＋原文出處', '好速可識別原文、店／個人層級與去重識別；無紀錄不等於0失敗']
+  ['好速長約', '來源截止＋每日規則版本', '沿用每日36M認列；BB店點12／24／36M合計為占比分母，不額外重加0.5點'],
+  ['好速失敗原因', '來源截止＋標準分類出處', '只彙總當月BB明細標準分類；本機訂單去重，V旗標另列；不匯出個資或自由備註']
 ]);
 
 export function validateFile(file) {
@@ -43,11 +43,15 @@ export function validatePeriods(p) {
 export function draftMetadata(form, sources, template) {
   const periods=validatePeriods(form);
   if(!sources?.length||!template)throw Error('請先讀取來源檔及原始範本。');
+  const goodSources=sources.filter(s=>s.goodspeed);
+  if(new Set(goodSources.map(s=>s.sha256)).size>1)throw Error('同次有不同好速來源，請只選一個版本，避免混用期間。');
+  const goodspeed=goodSources[0]?.goodspeed||null;
   return {contract:'operations-local-draft-v1', status:'DRAFT_UNMAPPED',
     periods, highlights:cleanText(form.highlights), failures:cleanText(form.failures,400),
     sourceFiles:sources.map(s=>({name:s.name,bytes:s.bytes,sha256:s.sha256,kind:s.kind,inspection:s.inspection,category:s.category,sourcePeriod:cleanText(s.sourcePeriod,100),coverage:s.coverage})),
     templateHash:template.sha256, templateSlides:15, outputSlides:16,
-    unresolved:SECTIONS.map(s=>s[0]+(s[0]==='舊換新'&&sources.some(v=>v.tradein)?'：四區明細已對帳；來源年份及政策仍待確認':'：來源欄位與計算口徑尚未對映')),
+    unresolved:SECTIONS.map(s=>s[0]+(s[0].startsWith('好速')&&goodspeed?'：BB三表已核對，來源總進度與點數比值分列；正式驗收待完成':s[0]==='舊換新'&&sources.some(v=>v.tradein)?'：四區明細已對帳；來源年份及政策仍待確認':'：來源欄位與計算口徑尚未對映')),
     tradein:sources.find(s=>s.tradein)?.tradein||null,
-    caution:(sources.some(s=>s.tradein)?'第6頁依已對帳舊換新資料重建；其餘範本原值及圖片未更新。':'範本原值及圖片未更新；僅會議月份與人工重點已填入。')+'好速數值、長約與原因統計待公司來源。'};
+    goodspeed,
+    caution:(sources.some(s=>s.tradein)?'第6頁依已對帳舊換新資料重建；其餘範本原值及圖片未更新。':'範本原值及圖片未更新；僅會議月份與人工重點已填入。')+(goodspeed?'第16頁使用BB三表彙總，涵蓋範圍與其他來源分開。':'好速數值及原因統計待公司來源，36M規則已核。')};
 }
