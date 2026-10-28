@@ -99,6 +99,9 @@
       });
       return '<div id="'+id+'" class="chart '+(period?'period-chart':'')+'">'+svg+'</svg></div><div class="day-readout" data-chart-readout>選取資料點查看'+(period?'同期區間':'日期與數值')+'</div>';
     }
+    function weeklyVisitors(rows,c){
+    return '<section class="weekly-visitors" aria-label="'+c.toUpperCase()+' 每週來客數"><h4>每週來客數</h4><p class="sub">週一至週日 · 所選區間實際人次</p><dl>'+C.weeklySeries(rows).map(w=>'<div><dt>'+w.start.slice(5).replace('-','/')+'–'+w.end.slice(5).replace('-','/')+(w.partial?'<small>部分週 · 累計至 '+w.end.slice(5).replace('-','/')+'</small>':'')+'</dt><dd>'+num(w[c+'_d'])+'<small>人次</small></dd></div>').join('')+'</dl></section>';
+  }
     function trends(state,rate){
       const d=data.conversion,title=rate?'締結率':'來客數';
       if(!d)return '<div class="empty"><h2>'+esc(data.conversionReason)+'</h2><p>缺資料不補零。</p></div>';
@@ -116,7 +119,7 @@
       for(const c of ['aq','rt']){
         const key=c+(rate?'_rate':'_d');html+='<article class="panel"><h3>'+c.toUpperCase()+' '+title+'</h3>';
         if(comp.available)html+='<p class="sub">同期MoM：兩個已觀測區間總量</p>'+chart([{label:'上月同期',value:comp.prior[key]},{label:'本月同期',value:comp.current[key]}],{id:(state.chartPrefix||'')+c+'-mom-chart',label:c.toUpperCase()+' 同期MoM比較',rate,period:true,channel:c,width:state.chartWidth});
-        html+='<p class="sub">本月'+(state.mode==='cumulative'?'累計':'逐日')+'趨勢；未繪製上月逐日趨勢。</p>'+chart(series.map(row=>({label:row.date.slice(5).replace('-','/'),value:row[key]})),{id:(state.chartPrefix||'')+c+'-chart',label:c.toUpperCase()+' '+title+'本月趨勢',rate,mode:state.mode,channel:c,width:state.chartWidth})+'</article>';
+        html+='<p class="sub">本月'+(state.mode==='cumulative'?'累計':'逐日')+'趨勢；未繪製上月逐日趨勢。</p>'+chart(series.map(row=>({label:row.date.slice(5).replace('-','/'),value:row[key]})),{id:(state.chartPrefix||'')+c+'-chart',label:c.toUpperCase()+' '+title+'本月趨勢',rate,mode:state.mode,channel:c,width:state.chartWidth})+weeklyVisitors(rows,c)+'</article>';
       }
       return html+'</section><p class="comparison-note">零分母或缺少可比資料顯示 —；上月只有期間總量，不編造逐日數據。</p>'+source(d);
     }
@@ -159,3 +162,4 @@
   function filename(snapshot){return '北一二B_門市唯讀快照_'+snapshot.kpi.cutoff.replaceAll('-','')+'_'+snapshot.generatedAt.replace(/[-:.TZ]/g,'').slice(0,14)+'.html';}
   return Object.freeze({SCHEMA,KPI_KEYS,fromModel,validate,buildHtml,filename});
 });
+
