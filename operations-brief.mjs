@@ -18,7 +18,7 @@ function startWorker(){if(worker)return;worker=new Worker('./operations-brief-wo
 function job(type,values={},transfer=[]){startWorker();const id=++sequence;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{const w=worker;worker=null;w?.terminate();for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('讀取超過90秒，已停止並釋放檔案；請分檔或另存支援格式再讀取。'));}pending.clear();template=null;sources=[];$('inventory').replaceChildren();controls();},90000);pending.set(id,{resolve,reject,timer});worker.postMessage({id,type,...values},transfer);});}
 function addText(parent,tag,text,className=''){const e=document.createElement(tag);e.textContent=text;if(className)e.className=className;parent.append(e);return e;}
 function render(){
-  const root=$('inventory');root.replaceChildren();addText(root,'p','範本15頁、草稿16頁。第6／7／9／10／11／13頁主要為圖片；只有通過對帳的第6頁重建，其餘舊圖未更新。');
+  const root=$('inventory');root.replaceChildren();addText(root,'p',template?'範本15頁、草稿16頁。第6／7／9／10／11／13頁主要為圖片；只有通過對帳的第6頁重建，其餘舊圖未更新。':'尚未讀取作戰範本；來源可先預覽。要下載簡報時，請選原始15頁範本並再次按讀取。');
   for(const source of sources){
     const s=source,box=addText(root,'div','');addText(box,'h3',(s.category||'公司來源')+'｜'+s.name);
     if(s.slot?.startsWith('categorySource')){const i=Number(s.slot.replace('categorySource',''));document.querySelectorAll('.category-state')[i].textContent=s.kind+'：'+s.inspection;}
@@ -32,11 +32,11 @@ function render(){
   }
 }
 async function verify(key){const result=await access.verify(key===undefined?{}:{key});access.requireCurrent();$('workspace').hidden=false;$('workspace').inert=false;$('authPanel').hidden=true;$('sessionStatus').textContent='督導已驗證 · 本機資料不會上傳';controls();return result;}
-async function readFiles(){if(busy)return;try{await verify();}catch{return;}const picked=pickedFiles(),files=picked.map(v=>v.file),tf=$('templateFile').files[0];try{if(!files.length||!tf)throw Error('請同時選公司來源檔與原始PPTX範本。');if(files.length>12||files.reduce((n,f)=>n+f.size,0)>150*1024*1024)throw Error('每次最多12份來源、合計150 MiB；請分批核對。');[...files,tf].forEach(validateFile);}catch(e){status(e.message,true);return;}
+async function readFiles(){if(busy)return;try{await verify();}catch{return;}const picked=pickedFiles(),files=picked.map(v=>v.file),tf=$('templateFile').files[0];try{if(!files.length)throw Error('請先選取至少一份公司來源檔；簡報範本可稍後選取。');if(files.length>12||files.reduce((n,f)=>n+f.size,0)>150*1024*1024)throw Error('每次最多12份來源、合計150 MiB；請分批核對。');[...files,...(tf?[tf]:[])].forEach(validateFile);}catch(e){status(e.message,true);return;}
   let officePassword=$('goodSpeedPassword').value;$('goodSpeedPassword').value='';const ticket=++epoch;worker?.terminate();worker=null;sources=[];template=null;$('inventory').replaceChildren();$('acknowledge').checked=false;busy=true;controls();
-  try{status('正在本機核對原始範本…');let bytes=await tf.arrayBuffer();if(ticket!==epoch)return;access.requireCurrent();const t=await job('template',{bytes},[bytes]);if(ticket!==epoch)return;access.requireCurrent();template=t;
+  try{let bytes;if(tf){status('正在本機核對原始範本…');bytes=await tf.arrayBuffer();if(ticket!==epoch)return;access.requireCurrent();const t=await job('template',{bytes},[bytes]);if(ticket!==epoch)return;access.requireCurrent();template=t;}
     for(const item of picked){const {file}=item;status('正在本機讀取 '+file.name+'；可隨時清除停止。');bytes=await file.arrayBuffer();if(ticket!==epoch)return;access.requireCurrent();const source=await job('source',{bytes,name:file.name,category:item.category,password:item.category.startsWith('好速')?officePassword:''},[bytes]);if(ticket!==epoch)return;access.requireCurrent();sources.push({...source,category:item.category,slot:item.slot});}
-    render();status('已完成一次本機辨識。'+(sources.some(s=>s.tradein)?'舊換新已對帳，可重建第6頁；其他欄位尚未對映。':'來源欄位尚未對映。')+(sources.some(s=>s.goodspeed)?'好速BB三表已核對；第16頁可填入來源彙總。':'')+'僅可產出含缺口標示的草稿。');
+    render();status('已完成一次本機辨識。'+(sources.some(s=>s.tradein)?'舊換新已對帳，可重建第6頁；其他欄位尚未對映。':'來源欄位尚未對映。')+(sources.some(s=>s.goodspeed)?'好速BB三表已核對；第16頁可填入來源彙總。':'')+(template?'僅可產出含缺口標示的草稿。':'要下載草稿，請選原始15頁範本後再次按讀取。'));
   }catch(e){if(ticket!==epoch)return;sources=[];template=null;worker?.terminate();worker=null;$('inventory').replaceChildren();status(e.message,true);}finally{officePassword='';if(ticket===epoch){busy=false;controls();}}
 }
 function metadata(){return draftMetadata(Object.fromEntries(['meeting','sourceDate','storeMonth','goldEnd','policy','highlights','failures'].map(id=>[id,$(id).value])),sources.map(s=>{const i=s.slot?.startsWith('categorySource')?Number(s.slot.replace('categorySource','')):null;return {...s,sourcePeriod:s.category==='行銷簡報'?$('marketingPeriod').value:i===null?'待核':$('categoryPeriod'+i).value,coverage:i===null?'待核':$('categoryCoverage'+i).value};}),template);}
