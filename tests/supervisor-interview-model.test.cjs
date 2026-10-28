@@ -67,3 +67,44 @@ test('新季度只計算本季已結案紀錄，十月自動全員重設',()=>{
   assert.deepEqual({total:q4.total,completed:q4.completed,inProgress:q4.inProgress,missing:q4.missing},{total:3,completed:0,inProgress:0,missing:3});
   assert.deepEqual(q4.rows.map(row=>row.status),['not_interviewed','not_interviewed','not_interviewed']);
 });
+
+const duplicateRow=['督導A','台北測試店','123456','同仁A','例行人員訪談','已結案','2026/10/20','2026/10/20','2026/10/21','指導內容','回饋內容'];
+
+test('完全相同的重複列合併後可匯入，員編仍全部排除',()=>{
+  const parsed=model.parseMatrix([headers,duplicateRow,duplicateRow.slice(),[...duplicateRow.slice(0,2),'654321',...duplicateRow.slice(3)]]);
+  assert.equal(parsed.blocked,false);
+  assert.equal(parsed.rows.length,1);
+  assert.equal(parsed.duplicatesRemoved,2);
+  assert.equal(parsed.employeeIdsDiscarded,3);
+  assert.equal(JSON.stringify(parsed.rows).includes('123456'),false);
+  assert.equal(JSON.stringify(parsed.rows).includes('654321'),false);
+});
+
+test('同鍵但指導或狀態不同先指出原始 Excel 列號，整批不寫入',()=>{
+  for(const fieldIndex of [0,5,7,8,9,10]){
+    const changed=duplicateRow.slice();changed[fieldIndex]=fieldIndex===7||fieldIndex===8?'2026/10/22':'不同內容';
+    const parsed=model.parseMatrix([['匯出標題'],[],headers,duplicateRow,[],changed]);
+    assert.equal(parsed.blocked,true);
+    assert.deepEqual(parsed.rows,[]);
+    assert.equal(parsed.invalidRows[0].rowNumber,6);
+    assert.match(parsed.invalidRows[0].errors[0],/第 4 列.*內容不同/);
+  }
+});
+
+test('不同日期、人員、原因或組織保留獨立面談',()=>{
+  const rows=[duplicateRow];
+  for(const index of [1,3,4,6]){
+    const changed=duplicateRow.slice();changed[index]=index===6?'2026/10/22':'另一筆';rows.push(changed);
+  }
+  const parsed=model.parseMatrix([headers,...rows]);
+  assert.equal(parsed.blocked,false);
+  assert.equal(parsed.rows.length,5);
+  assert.equal(parsed.duplicatesRemoved,0);
+});
+
+test('讀回驗證比對所有保存欄位，不把同鍵舊內容當更新成功',()=>{
+  const saved=model.parseMatrix([headers,duplicateRow]).rows[0];
+  assert.equal(model.sameRecord(saved,{...saved}),true);
+  for(const field of model.PERSISTED_FIELDS)assert.equal(model.sameRecord(saved,{...saved,[field]:'舊內容'}),false,field);
+  assert.equal(model.sameRecord(saved,undefined),false);
+});
