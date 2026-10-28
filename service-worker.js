@@ -10,6 +10,7 @@ const SHELL = [
   './department-ops.js',
   './department-gold-monthly-ui.js',
   './department-scores.js',
+  './department-scores-perfect.js',
   './department-store-presentation-core.js',
   './department-store-presentation-browser.js',
   './assets/vendor/store-presentation/pptxgenjs-4.0.1.bundle.js',

@@ -92,3 +92,11 @@
   #storePanel .score-regions{grid-template-columns:repeat(2,minmax(0,1fr))}
   #storePanel .score-update-grid{min-width:0}
 }
+
+.score-perfect-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.score-perfect-region{border:1px solid #159b5b;border-top:4px solid #159b5b;border-radius:12px;padding:14px;min-width:0}
+.score-perfect-region[data-region="北一二B"]{border-color:#ea4050}.score-perfect-region[data-region="北一二C"]{border-color:#7651d5}.score-perfect-region[data-region="北一二D"]{border-color:#2879d8}
+.score-perfect-region h4{font-size:1.2rem;margin:0 0 10px;color:#159b5b}.score-perfect-region[data-region="北一二B"] h4{color:#ea4050}.score-perfect-region[data-region="北一二C"] h4{color:#7651d5}.score-perfect-region[data-region="北一二D"] h4{color:#2879d8}
+.score-perfect-six{background:#fff7e8;border-radius:8px;padding:10px;margin:0 0 12px;line-height:1.65}.score-perfect-six strong{color:#a35b00}.score-perfect-six span{display:block;overflow-wrap:anywhere}
+.score-perfect-months details{border-top:1px solid #eee5dc;padding:8px 0}.score-perfect-months summary{cursor:pointer;font-size:.92rem}.score-perfect-months summary strong{float:right;color:#137d49}.score-perfect-months p{font-size:.92rem;line-height:1.65;margin:8px 0;overflow-wrap:anywhere}.score-perfect-months small{color:#a35b00}
+@media(max-width:1100px){.score-perfect-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.score-perfect-grid{grid-template-columns:1fr}}

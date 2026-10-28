@@ -36,7 +36,7 @@
     snapshot=null;pending=null;restore=null;loaded=false;
     setBusy(false);
     $('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;
-    for(const id of ['scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scorePeriodStatus','scoreHead','scoreWarnings','scoreUpdateMessage'])$(id).replaceChildren();$('scoreFile').value='';
+    for(const id of ['scorePerfectBody','scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scorePeriodStatus','scoreHead','scoreWarnings','scoreUpdateMessage'])$(id).replaceChildren();$('scoreFile').value='';
   }
   function lock(message) {
     clearPrivateData();verifiedToken='';locked=true;
@@ -153,6 +153,7 @@
     $('scoreSourceMeta').textContent=`${keys.join('、')}｜${scope}｜保存版本 ${snapshot.generation}｜門市原檔 G 成績，E 缺失與 F 扣分分開`;
     const cards=[['門市平均分',number(summary.mean),`${summary.storeMonths} 店月等權平均`,issueClass(summary.mean,'checkScore')],['原總缺失 E',number(summary.defects),'依原表統計口徑，未含回收',issueClass(summary.defects)],['原扣分 F',number(summary.deduction),'直接讀取原值',issueClass(summary.deduction)],['有扣分店月',number(summary.deductedStores,0),summary.missingDeduction?`${summary.missingDeduction} 店月扣分缺資料`:'依 F > 0 判定',issueClass(summary.deductedStores)]];
     $('scoreSummary').innerHTML=cards.map(([label,value,note,tone])=>`<article class="summary-card ${tone||''}"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join('');
+    $('scorePerfectBody').innerHTML=window.DepartmentScoresPerfect.render(snapshot.months.map(s=>s.month),filters());
     const regionRows=months.flatMap(m=>m.records);
     $('scoreRegions').innerHTML=C.REGIONS.map(region=>{const s=C.summarize(regionRows.filter(r=>r.region===region));return `<article><h4>${region}</h4><strong class="${issueClass(s.mean,'checkScore')}">${number(s.mean)}</strong><span>門市平均分</span><small class="${issueClass(s.deduction)}">${s.storeMonths} 店月｜原扣分 ${number(s.deduction)}</small></article>`;}).join('');
     $('scoreTrend').innerHTML=trend(months)+'<div class="score-trend-labels">'+months.map(m=>`<div><span>${m.monthKey}</span><strong>${number(C.summarize(filtered(m)).mean)}</strong></div>`).join('')+'</div>';

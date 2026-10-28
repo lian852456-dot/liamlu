@@ -9,7 +9,7 @@
   <title>北一二部｜部區管理</title>
   <link rel="stylesheet" href="department-ops.css?v=20261027-compact-1">
   <link rel="stylesheet" href="store-rule-reminders.css?v=20261004-collapse-1">
-  <link rel="stylesheet" href="department-scores.css?v=20261027-compact-1">
+  <link rel="stylesheet" href="department-scores.css?v=20261028-perfect-brand-1">
 </head>
 <body>
   <main class="page">
@@ -110,6 +110,7 @@
           </section>
           <p id="scorePeriodStatus" class="source-meta"></p>
           <div id="scoreSummary" class="summary-grid"></div>
+          <section id="scorePerfect" class="data-card" aria-labelledby="scorePerfectTitle"><div class="card-head"><h3 id="scorePerfectTitle">近半年各區100分門市</h3></div><div id="scorePerfectBody"></div></section>
           <section class="data-card score-main-table"><div class="card-head"><h3>各店月成績與缺失</h3><details id="scoreExports" class="score-export-menu"><summary>匯出／簡報</summary><div class="score-actions"><button id="scoreExport" class="secondary-button" type="button">匯出 Excel</button><button id="scoreBrief" class="secondary-button" type="button">匯出簡報資料</button><button id="scorePptx" class="secondary-button" type="button">產生可編輯PPT</button><button id="scorePrintPdf" class="secondary-button" type="button">列印／另存PDF</button></div></details></div><p id="scoreWarnings" class="score-limits"></p><div class="table-scroll" tabindex="0" aria-label="各店成績與缺失，可左右捲動"><table><thead id="scoreHead"></thead><tbody id="scoreBody"></tbody></table></div></section>
           <section id="scoreDetail" class="data-card" hidden></section>
           <details id="scoreComparison" class="data-card score-disclosure"><summary>四區比較與各月成績趨勢</summary><div class="score-disclosure-body"><h3>四區比較</h3><p class="score-limits">所選月份的門市平均分；部平均按各店等權計算。此區保留四區供比較。</p><div id="scoreRegions" class="score-regions"></div><h3>各月成績趨勢</h3><p class="score-limits">依目前部區與店點篩選，缺月不補零。</p><div id="scoreTrend"></div></div></details>
@@ -121,7 +122,7 @@
           <div class="score-update-grid"><label class="field">店務原始 XLSX<input id="scoreFile" type="file" accept=".xlsx"></label><label class="field">資料年度（原檔無年份時）<input id="scoreYear" type="text" inputmode="numeric" maxlength="4" placeholder="例如 2026"></label><button id="scoreImport" class="primary-button" type="button">讀取新版並預覽</button></div>
           <p id="scoreUpdateMessage" class="message" role="status" aria-live="polite"></p>
           <section id="scorePreview" hidden><h3>更新預覽</h3><p id="scorePreviewMeta"></p><div id="scoreMonthChoices"></div><p id="scoreErrors"></p><div id="scoreDiff"></div><label class="score-confirm"><input id="scoreConfirm" type="checkbox">我已核對月份、差異與缺資料警告，確認保存勾選月份</label><button id="scorePublish" class="primary-button" type="button" disabled>確認保存勾選月份</button></section>
-          <p class="score-limits">尚無改善紀錄與個案原因，不推定已改善或改善率。簡報範例尚未提供，目前提供資料匯出介面。</p>
+          <p class="score-limits">尚無改善紀錄與個案原因，不推定已改善或改善率。簡報依16:9台灣大哥大樣板匯出，保留可編輯文字與表格。</p>
         </div></details>
         <div id="storeRulesMount" data-department-rules-mount></div>
       </section>
@@ -131,15 +132,16 @@
   <script src="assets/vendor/xlsx.full.min.js"></script>
   <script src="assets/vendor/officecrypto.bundle.min.js?v=0.0.19"></script>
   <script src="department-ops-core.js?v=20260930-2"></script>
-  <script src="department-scores-core.js?v=20261026-quality-monthly-1"></script>
-  <script src="department-store-presentation-core.js?v=20261002-store-export-2"></script>
-  <script src="department-store-presentation-browser.js?v=20261002-store-export-2"></script>
+  <script src="department-scores-core.js?v=20261028-perfect-brand-1"></script>
+  <script src="department-scores-perfect.js?v=20261028-perfect-brand-1"></script>
+  <script src="department-store-presentation-core.js?v=20261028-perfect-brand-1"></script>
+  <script src="department-store-presentation-browser.js?v=20261028-perfect-brand-1"></script>
   <script src="department-gold-monthly-core.js?v=20261002-1" defer></script>
   <script src="session-read-manager.js?v=20261013-phase1-1" defer></script>
   <script src="department-gold-monthly-ui.js?v=20261026-manual-view-3" defer></script>
-  <script src="department-scores.js?v=20261027-compact-1" defer></script>
+  <script src="department-scores.js?v=20261028-perfect-brand-1" defer></script>
   <script src="department-ops.js?v=20261026-manual-view-3" defer></script>
-  <script src="department-readonly-assets.js?v=20261027-compact-1" defer></script>
+  <script src="department-readonly-assets.js?v=20261028-perfect-brand-1" defer></script>
   <script src="department-readonly-core.js?v=20261026-1" defer></script>
   <script src="department-readonly-browser.js?v=20261026-1" defer></script>
   <script src="store-rule-reminders.js?v=20261026-manual-view-3" defer></script>

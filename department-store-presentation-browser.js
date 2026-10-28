@@ -16,31 +16,31 @@
       document.head.appendChild(s);
     });return loading;
   }
-  function buildDeck(source,PptxGenJS,{fontFace='Heiti TC'}={}) {
+  function buildDeck(source,PptxGenJS,{fontFace='Microsoft YaHei'}={}) {
     if(!C||source.contract!==C.CONTRACT)throw new Error('簡報資料契約不符');const pages=C.planPages(source);
     const ppt=new PptxGenJS();ppt.defineLayout({name:'STORE16x9',width:1600/96,height:900/96});ppt.layout='STORE16x9';
     ppt.author='北一二部';ppt.subject='店務管理月報';ppt.title='店務管理成績表現';ppt.lang='zh-TW';ppt.theme={headFontFace:fontFace,bodyFontFace:fontFace,lang:'zh-TW'};
     const color=v=>v.replace('#',''),NAVY='173C6A',GREY='73849B',RED='DE404B',GREEN='129953',ORANGE='DC8412';
-    const txt=(s,t,x,y,w,h,size=22,c=NAVY,bold=false)=>s.addText(String(t),{x:x/96,y:y/96,w:w/96,h:h/96,fontFace,fontSize:size*.75,color:c,bold,margin:0,breakLine:false,valign:'mid'});
+    const txt=(s,t,x,y,w,h,size=22,c=NAVY,bold=false)=>s.addText(String(t),{x:x/96,y:y/96,w:w/96,h:h/96,fontFace,lang:'zh-TW',fontSize:size*.75,color:c,bold,margin:0,breakLine:false,valign:'mid'});
     const box=(s,x,y,w,h,c='DCE5F0')=>s.addShape(ppt.ShapeType.roundRect,{x:x/96,y:y/96,w:w/96,h:h/96,rectRadius:.06,fill:{color:'FFFFFF'},line:{color:c,width:.7},radius:.05});
     const table=(s,values,x,y,w,widths,size=20,row=27,cellStyle=null)=>{
-      const cells=values.map((rr,ri)=>rr.map((v,ci)=>({text:String(v),options:{fill:ri===0?'EEF3F8':ri%2?'FFFFFF':'F8FAFC',color:NAVY,bold:true,align:ci===0?'left':'center',...(cellStyle?.(ri,ci)||{})}})));
-      s.addTable(cells,{x:x/96,y:y/96,w:w/96,colW:widths.map(n=>n*w/widths.reduce((a,b)=>a+b,0)/96),rowH:values.map((_,i)=>(i===0?30:Array.isArray(row)?row[i-1]:row)/96),margin:[1/96,3/96,1/96,3/96],fontFace,fontSize:size*.75,color:NAVY,align:'center',valign:'middle',border:{type:'solid',pt:.5,color:'E5EDF5'},autoPage:false,verbose:false});
+      const cells=values.map((rr,ri)=>rr.map((v,ci)=>({text:String(v),options:{fontFace,lang:'zh-TW',fill:ri===0?'EEF3F8':ri%2?'FFFFFF':'F8FAFC',color:NAVY,bold:true,align:ci===0?'left':'center',...(cellStyle?.(ri,ci)||{})}})));
+      s.addTable(cells,{x:x/96,y:y/96,w:w/96,colW:widths.map(n=>n*w/widths.reduce((a,b)=>a+b,0)/96),rowH:values.map((_,i)=>(i===0?30:Array.isArray(row)?row[i-1]:row)/96),margin:[1/96,3/96,1/96,3/96],fontFace,lang:'zh-TW',fontSize:size*.75,color:NAVY,align:'center',valign:'middle',border:{type:'solid',pt:.5,color:'E5EDF5'},autoPage:false,verbose:false});
     };
     for(const page of pages){const model=page.model;
     const month=String(Number(model.targetMonth.slice(5))),scope=`${model.scope}　${model.storeCount}家店`;
-    const header=(s,title,sub)=>{s.background={color:'FFFFFF'};txt(s,'TWM',40,26,120,42,30,NAVY,true);txt(s,title,175,22,1210,63,44,NAVY,true);txt(s,sub,40,88,1500,32,20,GREY);};
+    const header=(s,title,sub)=>{s.background={color:'FFFFFF'};s.addImage({data:C.BRAND_LOGO,x:40/96,y:28/96,w:190/96,h:59/96,altText:'台灣大哥大 LOGO'});txt(s,title,245,22,1100,63,42,NAVY,true);txt(s,sub,40,88,1500,32,20,GREY);};
     const kpi=(s,i,label,value,caption,c=NAVY)=>{const x=40+i*383;box(s,x,133,365,106);txt(s,label,x+18,142,330,32,26,NAVY,true);txt(s,value,x+18,172,335,48,48,c,true);txt(s,caption,x+18,215,334,24,18,GREY);};
-    if(page.kind==='trend'){const a=ppt.addSlide();header(a,`店舖近${model.period.length===6?'半年':model.period.length+'月'}店務管理成績表現${page.part>1?'（續'+page.part+'）':''}`,`${model.period[0].replace('-','.')} - ${model.period.at(-1).replace('-','.')}　${scope}`);
+    if(page.kind==='trend'){const a=ppt.addSlide();header(a,`門市近${model.period.length===6?'半年':model.period.length+'月'}店務管理成績表現${page.part>1?'（續'+page.part+'）':''}`,`${model.period[0].replace('-','.')} - ${model.period.at(-1).replace('-','.')}　${scope}`);
     kpi(a,0,model.period.length===6?'近半年平均':'所選期間平均',C.fmt(model.summary.mean),'有效 '+model.summary.valid+'筆店月');
     kpi(a,1,month+'月平均',C.fmt(model.single.mean),'當月原G成績','277DD3');kpi(a,2,month+'月滿分',`${model.single.perfect} / ${model.single.valid}`,'滿分率 '+C.fmt((model.single.rate==null?null:model.single.rate*100),1)+'%',GREEN);
-    kpi(a,3,'連續6月滿分',model.sixMonthEligibilityEvaluated?model.sixPerfectTotal+'店':'未評估','完整6月資料資格',ORANGE);
+    kpi(a,3,'連續6月滿分',model.sixMonthEligibilityEvaluated?model.sixPerfectTotal+'店':'未評估','完整6月資料資格，核定待確認',ORANGE);
     model.regions.forEach((r,i)=>{const x=40+i%2*612,y=266+Math.floor(i/2)*284;box(a,x,y,596,i<2?282:294,color(r.color));txt(a,r.region,x+14,y+4,340,32,30,color(r.color),true);txt(a,'平均 '+C.fmt(r.half.mean),x+385,y+7,197,28,20,GREY,true);
       const widths=[148,...model.period.map(()=>60),60],total=widths.reduce((a,b)=>a+b,0),ww=widths.map(v=>v*568/total);
       table(a,[['店舖',...model.period.map(m=>m.slice(5)),'平均'],...r.rows.map(s=>[s.store,...s.cells.map(c=>C.fmt(c.score)),C.fmt(s.mean)])],x+14,y+38,568,ww,17,21,(ri,ci)=>{if(!ri||!ci)return {};const rr=r.rows[ri-1],v=ci<=rr.cells.length?rr.cells[ci-1].score:rr.mean;return {color:v==null?GREY:v===100?GREEN:RED,fill:v==null?'EEF1F5':v===100?'E6F4E9':'FBE9E9'};});});
     box(a,1276,266,284,318,'EFB56F');txt(a,'連續6月滿分',1292,276,254,37,27,ORANGE,true);
     if(model.sixMonthEligibilityEvaluated){model.sixPerfect.slice(0,6).forEach((v,i)=>txt(a,v.store,1292,324+i*34,254,30,23,NAVY,true));if(model.sixPerfect.length>6)txt(a,`共${model.sixPerfect.length}店，完整名單見備註`,1292,528,254,25,18,GREY);}else txt(a,'資料不足6月，未評估',1292,328,254,65,23,NAVY,true);
-    txt(a,'SPE +1規則及核定\n由管理者確認',1292,536,250,42,18,ORANGE);box(a,1276,600,284,234,'EEA7AC');txt(a,month+'月重點',1292,609,254,35,28,RED,true);
+    txt(a,'完整6個月均100分\nSPE +1核定由管理者確認',1292,536,250,42,18,ORANGE);box(a,1276,600,284,234,'EEA7AC');txt(a,month+'月重點',1292,609,254,35,28,RED,true);
     txt(a,`未滿100分 ${model.single.low}店\n連續未滿100 ${model.single.continuous}店\n缺資料 ${model.single.missingStores}店`,1292,658,254,108,24,NAVY,true);txt(a,`完整未滿分清單見第${page.firstMonthlyPage}頁起`,1292,789,254,27,19,GREY);
     txt(a,'平均採有效店月原G成績。灰色—代表缺資料。店舖歷史未回填現任店長。',40,852,1500,30,18,GREY);
     a.addNotes(JSON.stringify({period:model.period,summary:model.summary,regions:model.regions,sixPerfect:model.sixPerfect,notices:model.notices}));
@@ -50,8 +50,8 @@
     txt(b,'未達100分店點排序',40,264,1130,44,30,RED,true);
     const deficit=[['序','區域','店舖',month+'月','連續','扣分','缺失原因'],...model.lowScores.map(r=>[r.order,r.region,r.store,C.fmt(r.score),r.streak>=2?'連'+r.streak+'月':'—',C.fmt(r.deduction),C.reasonText(r)])];
     if(!model.lowScores.length)deficit.push(['—','—',model.lowScoresTotal?'此頁無續列':'無未滿分店點','—','—','—','—']);
-    table(b,deficit,40,314,1086,[42,98,146,76,90,76,558],20,model.lowRowHeights.length?model.lowRowHeights:[42],(ri,ci)=>ri?ci===6?{fontSize:13.5,align:'left'}:[3,5].includes(ci)?{color:RED}:{}:{});
-    txt(b,'區域表現',1152,267,408,38,28,NAVY,true);table(b,[['區','平均','滿分/有效','%'],...model.regions.map(r=>[r.region,C.fmt(r.single.mean,1),`${r.single.perfect}/${r.single.valid}`,C.fmt((r.single.rate==null?null:r.single.rate*100),1)])],1152,314,408,[106,88,123,91],21,29,(ri,ci)=>ri&&ci===0?{color:color(model.regions[ri-1].color)}:{});
+    table(b,deficit,40,314,1086,[42,98,146,76,90,76,558],20,model.lowRowHeights.length?model.lowRowHeights:[42],(ri,ci)=>ri?ci===6?{fontSize:13.5,align:'left'}:ci===4&&model.lowScores[ri-1]?.streak>=2?{color:ORANGE,fill:'FFF2DF'}:ci===1?{color:color(model.regions.find(r=>r.region===model.lowScores[ri-1]?.region)?.color||'#173C6A')}:[3,5].includes(ci)?{color:RED}:{}:{});
+    txt(b,'區域表現',1152,267,408,38,28,NAVY,true);model.regions.forEach((r,i)=>{const x=1152+(i%2)*210,y=314+Math.floor(i/2)*82;box(b,x,y,198,74,color(r.color));txt(b,r.region,x+8,y+6,95,26,22,color(r.color),true);txt(b,'平均 '+C.fmt(r.single.mean,1),x+98,y+7,94,24,18,NAVY,true);txt(b,`滿分 ${r.single.perfect}/${r.single.valid}｜${C.fmt(r.single.rate==null?null:r.single.rate*100,1)}%`,x+8,y+40,185,25,18,GREY,true);});
     txt(b,'缺失原因 TOP',1152,490,408,38,28,ORANGE,true);table(b,[['原因（涉及店數）','店'],...model.reasonTop.map(r=>[r.category,r.stores])],1152,536,408,[335,73],21,model.reasonRowHeights);
     txt(b,'同店可多類，總數不必等於未滿分店數。',1152,788,408,62,20,GREY);
     txt(b,'連續以當月往前逐月未滿100檢查，缺月即中斷。除台日/頁次/查核分數另列，其餘分項為原表單位。\n扣分為原F值，未換算件數。最長連續僅確認所選期間，期間之前未評估。',40,846,1500,46,18,GREY);
