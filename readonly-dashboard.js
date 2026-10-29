@@ -2,7 +2,7 @@
   'use strict';
   const C=window.ReadonlyDashboardCore,A=window.ReadonlyDashboardAdapter,$=s=>document.querySelector(s),OWNER=window.KpiBattleController?.DEFAULT_GAS_URL;
   const state={tab:'kpi',store:'all',mode:'daily',start:'',end:'',metric:'a999',kpiCompare:'overall',kpiItem:'all',role:'all',model:'all'};
-  let model=null,epoch=0,flight=null,client=null,controller=null,expires=0,expiryTimer,failed=false,suspended=false,channel=null;
+  let model=null,epoch=0,flight=null,client=null,controller=null,expires=0,expiryTimer,failed=false,suspended=false,loggedOut=false;
   const exportButton=$('#store-export'),exportStatus=$('#export-status');
   function updateExport(){if(exportButton)exportButton.disabled=!model||failed||!!flight||suspended||document.hidden||!!(expires&&Date.now()>=expires);}
   const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -106,20 +106,44 @@
     if(expires&&Date.now()>=expires){failed=true;clear('登入期限已到，請在情報站重新登入。');return;}const dates=['conversion','traffic'].includes(state.tab);document.querySelectorAll('[data-date-control]').forEach(e=>e.hidden=!dates);$('#daily').setAttribute('aria-pressed',String(state.mode==='daily'));$('#cumulative').setAttribute('aria-pressed',String(state.mode==='cumulative'));
     if(state.tab==='kpi')kpi();else if(state.tab==='personal')personal();else if(state.tab==='awards')awards();else if(state.tab==='insights')insights();else traffic();
   }
-  async function aRead(action,employeeId,deviceId,signal){const response=await fetch(OWNER,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,employeeId,deviceId}),credentials:'omit',cache:'no-store',signal});if(!response.ok)throw Error('未取得服務回應');const result=await response.json();if(result?.status!=='ok')throw Error('既有登入未通過驗證');return result;}
-  async function load(){if(flight||document.hidden)return flight;if(location.protocol==='file:'){clear('請由情報站同一網址開啟此頁，離線檔不包含真實資料。');return;}if(window.PortalLogout?.isLocked()){clear('已登出，請先在情報站重新登入。');return;}
+  function accessFailure(error,stage){
+    const reasons={
+      R_AUTH_REQUIRED:'尚未取得業務登入（LOGIN）。情報站督導通行碼與業務登入分開，請按下方「前往營運中心業務登入」，在同一分頁完成員編登入，再返回本頁。',
+      R_AUTH_EXPIRED:'原業務登入已失效或到期（SESSION）。請在同一分頁重新完成業務登入，再返回本頁。',
+      B_AUTH_DENIED:'業務登入或資料存取未通過服務驗證（AUTH）。尚無法判定具體原因；請重新完成業務登入，持續失敗時由管理者檢查正式驗證服務與名冊授權。',
+      B_NETWORK_UNAVAILABLE:'資料連線未完成（NETWORK）。請確認網路後按「重新核驗與讀取」，不必反覆登入。',
+      B_SERVICE_UNAVAILABLE:'資料服務回應失敗（SERVICE）。請稍後重新讀取。',
+      B_RESPONSE_INVALID:'資料服務回應格式異常（RESPONSE）。請稍後重新讀取，持續失敗時由管理者檢查服務。',
+      B_TIMEOUT:'資料服務回應逾時（TIMEOUT）。請重新讀取。'
+    };
+    return '未取得此頁授權資料。'+(reasons[error?.message]||(stage==='source'?'已取得服務回應，但資料未通過完整性核對（DATA）。請由管理者確認來源與格式，重新登入無法修正資料。':'本次讀取未完成（UNKNOWN），請重新讀取。'));
+  }
+  async function aRead(action,employeeId,deviceId,signal){
+    const request=new AbortController(),abort=()=>request.abort();signal.addEventListener('abort',abort,{once:true});let timedOut=false;
+    const timer=setTimeout(()=>{timedOut=true;request.abort();},90000);
+    try{
+      let response;try{response=await fetch(OWNER,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,employeeId,deviceId}),credentials:'omit',cache:'no-store',signal:request.signal});}catch{throw Error(timedOut?'B_TIMEOUT':'B_NETWORK_UNAVAILABLE');}
+      if(!response.ok)throw Error('B_SERVICE_UNAVAILABLE');
+      let result;try{result=await response.json();}catch{throw Error(timedOut?'B_TIMEOUT':'B_RESPONSE_INVALID');}
+      if(!result||Array.isArray(result)||typeof result.status!=='string')throw Error('B_RESPONSE_INVALID');
+      if(result.status!=='ok')throw Error('B_AUTH_DENIED');return result;
+    }finally{clearTimeout(timer);signal.removeEventListener('abort',abort);}
+  }
+  async function load(){if(flight||document.hidden)return flight;if(location.protocol==='file:'){clear('請由情報站同一網址開啟此頁，離線檔不包含真實資料。');return;}if(loggedOut||window.PortalLogout?.isLocked()){clear('已登出，請先在營運中心重新完成業務登入。');return;}
     clear('正在核對現有登入與來源…');const expected=epoch;controller=new AbortController();const signal=controller.signal;$('#refresh').disabled=true;
-    const operation=Promise.resolve().then(async()=>{try{let bundle;const deviceId=localStorage.getItem('north12b_private_dashboard_device_id');if(!deviceId)throw Error('請先在情報站完成登入');
+    const operation=Promise.resolve().then(async()=>{let stage='identity';try{let bundle;const deviceId=localStorage.getItem('north12b_private_dashboard_device_id');if(!deviceId)throw Error('R_AUTH_REQUIRED');
       // Each channel keeps its original proof and API. A denial never falls back to another channel.
-      if(!channel)channel=sessionStorage.getItem('north12b_password_session_v1')?'password':sessionStorage.getItem('north12b_private_dashboard_employee_id')?'approved':null;
-      if(channel==='password'){client=createDashboardBClient(OWNER,{storage:sessionStorage,logoutEpoch:()=>{try{return JSON.parse(localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||'';}catch{return '';}}});const lease=client.restore(deviceId);if(!lease)throw Error('既有指定密碼登入已失效');bundle=await client.readBundle();expires=lease.expiresAt;}
-      else{const employeeId=sessionStorage.getItem('north12b_private_dashboard_employee_id');if(!employeeId)throw Error('請先在情報站完成登入');const privateResult=await aRead('private_access',employeeId,deviceId,signal);const kpiResult=await aRead('kpicalc_access',employeeId,deviceId,signal);bundle={privateResult,kpiResult};}
-      if(expected!==epoch||document.hidden||signal.aborted)return;model=A.fromBundle(bundle);failed=false;suspended=false;
+      // Re-select only at the start of a new attempt: a completed new login may
+      // replace the previous channel. Never fall back after a rejected request.
+      const channel=sessionStorage.getItem('north12b_password_session_v1')?'password':'approved';
+      if(channel==='password'){client=createDashboardBClient(OWNER,{storage:sessionStorage,logoutEpoch:()=>{try{return JSON.parse(localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||'';}catch{return '';}}});const lease=client.restore(deviceId);if(!lease)throw Error('R_AUTH_EXPIRED');stage='bundle';bundle=await client.readBundle();expires=lease.expiresAt;}
+      else{const employeeId=sessionStorage.getItem('north12b_private_dashboard_employee_id')||localStorage.getItem('north12b_private_dashboard_employee_id')||localStorage.getItem('bei12b_kpi_emp');if(!employeeId)throw Error('R_AUTH_REQUIRED');stage='private';const privateResult=await aRead('private_access',employeeId,deviceId,signal);stage='kpi';const kpiResult=await aRead('kpicalc_access',employeeId,deviceId,signal);bundle={privateResult,kpiResult};}
+      if(expected!==epoch||document.hidden||signal.aborted)return;stage='source';model=A.fromBundle(bundle);stage='render';failed=false;suspended=false;
       if(expires){if(expires<=Date.now())throw Error('登入已到期');expiryTimer=setTimeout(()=>{failed=true;clear('登入期限已到，請在情報站重新登入。');},Math.min(2147483647,expires-Date.now()));}
       $('#store').innerHTML='<option value="all">本次授權範圍全部門市</option>'+model.stores.map(s=>'<option value="'+s.id+'">'+safe(s.name)+'</option>').join('');if(!model.stores.some(s=>s.id===state.store))state.store='all';$('#store').value=state.store;
       if(model.conversion){const d=model.conversion;for(const id of ['start','end']){$('#'+id).min=d.period_start;$('#'+id).max=d.cutoff;}if(!state.start||state.start<d.period_start||state.end>d.cutoff){state.start=d.period_start;state.end=d.cutoff;}$('#start').value=state.start;$('#end').value=state.end;}
       $('#controls').hidden=false;$('#auth-message').textContent='已完成既有登入核對；各頁採自己的來源與截止。';render();
-    }catch{if(expected!==epoch)return;failed=true;clear('未取得此頁授權資料。請先在情報站登入，再按重新核驗；資料未顯示。');}finally{if(expected===epoch){flight=null;$('#refresh').disabled=false;updateExport();}}});flight=operation;return operation;
+    }catch(error){if(expected!==epoch)return;failed=true;clear(accessFailure(error,stage));}finally{if(expected===epoch){flight=null;$('#refresh').disabled=false;updateExport();}}});flight=operation;return operation;
   }
   if(exportButton)exportButton.onclick=()=>{
     if(!model||failed||flight||suspended||document.hidden||expires&&Date.now()>=expires){updateExport();if(exportStatus)exportStatus.textContent='請先完成原登入與資料核驗，再匯出門市快照。';return;}
@@ -135,9 +159,10 @@
   $('#refresh').onclick=()=>{failed=false;void load();};$('#store').onchange=e=>{state.store=e.target.value;state.role='all';render();};document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;render();});for(const mode of ['daily','cumulative'])$('#'+mode).onclick=()=>{state.mode=mode;render();};
   for(const id of ['start','end'])$('#'+id).onchange=e=>{if(!model?.conversion)return;if(!e.target.value){state.start=model.conversion.period_start;state.end=model.conversion.cutoff;$('#start').value=state.start;$('#end').value=state.end;$('#filter-status').hidden=false;$('#filter-status').textContent='日期已恢復至來源完整期間。';}else{state[id]=e.target.value;$('#filter-status').hidden=true;}render();};
   function suspend(){suspended=true;clear('已暫時隱藏資料，返回後重新核對登入。');}
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)suspend();else if(suspended&&!failed)void load();});window.addEventListener('pagehide',suspend);window.addEventListener('pageshow',()=>{if(suspended&&!failed)void load();});
-  for(const name of ['portal-before-logout','portal-logout'])window.addEventListener(name,()=>{failed=true;clear('已登出，所有資料已清除。');});
-  window.addEventListener('storage',e=>{if(e.key==='north12b_portal_logout_event_v1'){failed=true;clear('已從其他頁面登出，所有資料已清除。');}});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)suspend();else if(suspended)void load();});window.addEventListener('pagehide',suspend);window.addEventListener('pageshow',()=>{if(suspended)void load();});
+  window.addEventListener('portal-login-changed',()=>{if(!loggedOut&&!document.hidden&&!window.PortalLogout?.isLocked()){clear('登入狀態已更新，正在重新核驗…');void load();}});
+  for(const name of ['portal-before-logout','portal-logout'])window.addEventListener(name,()=>{loggedOut=true;failed=true;clear('已登出，所有資料已清除。');});
+  window.addEventListener('storage',e=>{if(e.key==='north12b_portal_logout_event_v1'){loggedOut=true;failed=true;clear('已從其他頁面登出，所有資料已清除。');}});
   let resizeTimer;new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(model&&['traffic','conversion'].includes(state.tab))render();},100);}).observe($('.shell'));
   void load();
 })();
