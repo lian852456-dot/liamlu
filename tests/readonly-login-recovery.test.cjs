@@ -19,7 +19,7 @@ function runtime({approved=false,password=false,persistent=false,deny=false,netw
    return {ok:true,json:async()=>denied?{status:'error',message:'SECRET_SERVER_DETAIL'}:{status:'ok',trustSource:'password-bound',phoneEligible:false,expiresAt:JSON.parse(session.get('north12b_password_session_v1')||'null')?.expiresAt,privateResult:{status:'ok'},kpiResult:{status:'ok'}}};}
  };
  context.window=context;vm.createContext(context);vm.runInContext(fs.readFileSync(path.join(root,'GasBClient.js'),'utf8'),context);vm.runInContext(fs.readFileSync(path.join(root,'readonly-dashboard.js'),'utf8'),context);
- return {local,session,events,node,calls,adapted:()=>adapted,setDenied:value=>denied=value};
+ return {context,local,session,events,node,calls,adapted:()=>adapted,setDenied:value=>denied=value};
 }
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 test('failed page automatically retries after same-tab login and back navigation',async()=>{
@@ -46,4 +46,16 @@ test('same-tab login notification recovers the initially locked page',async()=>{
 });
 test('logout continues to block late lifecycle reads and private presentation',async()=>{
  const r=runtime({approved:true});await settle();r.events['portal-before-logout']();r.events.pageshow();await settle();assert.equal(r.calls.length,2);assert.equal(r.node('#controls').hidden,true);assert.equal(r.node('#store-export').disabled,true);
+});
+
+for(const channel of ['approved','password'])test(channel+' retains data on visibility, focus and bfcache return with no new read',async()=>{
+ const r=runtime({[channel]:true});await settle();const count=r.calls.length;assert.equal(r.node('#controls').hidden,false);
+ for(let i=0;i<3;i++){r.context.document.hidden=true;r.events.visibilitychange();assert.equal(r.node('#controls').hidden,false);r.context.document.hidden=false;r.events.visibilitychange();r.events.pagehide();r.events.pageshow();r.events.focus();await settle();assert.equal(r.calls.length,count);assert.equal(r.node('#controls').hidden,false);}
+ r.node('#refresh').onclick();await settle();assert.equal(r.calls.length,count*2);
+});
+test('expired retained data is cleared on return without extending its deadline',async()=>{
+ const r=runtime({password:true});await settle();const proof=JSON.parse(r.session.get('north12b_password_session_v1'));r.context.Date={now:()=>proof.expiresAt+1};r.events.pageshow();await settle();assert.equal(r.node('#controls').hidden,true);assert.equal(r.node('#store-export').disabled,true);
+});
+test('changed device cannot display a retained snapshot',async()=>{
+ const r=runtime({approved:true});await settle();r.local.set('north12b_private_dashboard_device_id','DIFFERENT_SYNTHETIC_DEVICE');r.setDenied(true);r.events.focus();await settle();assert.equal(r.node('#controls').hidden,true);
 });

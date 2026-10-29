@@ -1,0 +1,29 @@
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.North12OfficerCore=api;})(typeof globalThis==='object'?globalThis:this,function(){
+'use strict';
+const REGIONS=['北一二A','北一二B','北一二C','北一二D'],SCHEMA='north12-officer/v1',norm=v=>String(v??'').replace(/\s+/g,''),number=v=>typeof v==='number'&&Number.isFinite(v)?v:null;
+const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function fail(m){throw Error(m);}
+function period(rows){const labels=rows.flat().filter(v=>typeof v==='string'&&/^20\d\d\/\d{1,2}\/\d{1,2}\s*~\s*\d{1,2}\/\d{1,2}$/.test(v.trim()));const dates=[...new Set(labels)];if(dates.length!==1)fail('來源期間缺少或不一致');const m=dates[0].match(/(20\d\d)\/(\d+)\/(\d+)\s*~\s*(\d+)\/(\d+)/),fmt=(a,b)=>m[1]+'-'+a.padStart(2,'0')+'-'+b.padStart(2,'0'),start=fmt(m[2],m[3]),end=fmt(m[4],m[5]);if(start.slice(0,7)!==end.slice(0,7)||start>end||![start,end].every(d=>new Date(d+'T00:00:00Z').toISOString().slice(0,10)===d))fail('來源日期不合法');return {start,cutoff:end};}
+function parseWorkbook(workbook,XLSX,sourceName){
+const sheet=workbook.Sheets['上線數KPI_店點達成率_明細'];if(!sheet)fail('缺少「上線數KPI_店點達成率_明細」');const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:null}),p=period(rows);
+const blocks=[];for(let i=0;i<rows.length-1;i++)if(norm(rows[i][6])==='排名'&&norm(rows[i][7])==='總進度達成率')blocks.push(i);
+if(!blocks.length)fail('無法核對排名與總進度欄位');
+const regions=new Map(),stores=new Map();let department=null;
+for(let b=0;b<blocks.length;b++){const h=blocks[b],header=rows[h],sub=rows[h+1],items=[];
+for(let c=8;c<header.length;c++)if(header[c]&&norm(sub[c])==='實際數'&&norm(sub[c+2])==='權重'&&norm(sub[c+3])==='進度達成率')items.push({key:norm(header[c]),label:String(header[c]).trim(),column:c});
+if(!items.length||new Set(items.map(x=>x.key)).size!==items.length)fail('來源 KPI 項目不完整或重複');
+for(let r=h+2;r<(blocks[b+1]??rows.length);r++){const row=rows[r],code=String(row[3]||''),region=REGIONS.find(x=>row[2]===x||row[4]===x);if(!region)continue;
+const isStore=/^DNB\d{5}$/.test(code);if(!isStore&&row[4]!==region)continue;if(number(row[7])==null)fail('來源缺少總進度達成率');
+const metrics=items.map(item=>{const c=item.column,w=typeof row[c+2]==='string'&&/^\d+(\.\d+)?%$/.test(row[c+2])?Number(row[c+2].slice(0,-1))/100:number(row[c+2]);return {key:item.key,label:item.label,actual:number(row[c]),target:number(row[c+1]),weight:w,rate:number(row[c+3])};});
+const value={region,id:isStore?code:region,name:isStore?String(row[4]||'').trim():region,rank:number(row[6]),rate:row[7],metrics,source:sourceName,cutoff:p.cutoff};if(!value.name)fail('來源店名缺少');const map=isStore?stores:regions,key=value.id;if(map.has(key)&&JSON.stringify(map.get(key))!==JSON.stringify(value))fail('來源門市或區別重複且衝突');map.set(key,value);
+}}
+if(!regions.size||!stores.size)fail('檔案沒有可核對的北一二部區與門市資料');for(const region of regions.keys())if(![...stores.values()].some(s=>s.region===region))fail('區別缺少門市明細');for(const s of stores.values())if(!regions.has(s.region))fail('門市缺少對應的區原報');
+return {schema:SCHEMA,start:p.start,cutoff:p.cutoff,regions:[...regions.values()],stores:[...stores.values()],department};
+}
+function validate(value){if(value?.schema!==SCHEMA||!/^20\d\d-\d\d-\d\d$/.test(value.cutoff||'')||!Array.isArray(value.regions)||!Array.isArray(value.stores))fail('長官版資料格式不符');
+const clean=row=>{if(!REGIONS.includes(row.region)||typeof row.name!=='string'||number(row.rate)==null||!Array.isArray(row.metrics))fail('區別或指標格式不符');return {region:row.region,id:String(row.id),name:row.name,rank:number(row.rank),rate:row.rate,source:String(row.source||''),cutoff:value.cutoff,metrics:row.metrics.map(m=>({key:String(m.key),label:String(m.label),actual:number(m.actual),target:number(m.target),weight:number(m.weight),rate:number(m.rate)}))};};
+const regions=value.regions.map(clean),stores=value.stores.map(clean);if(new Set(regions.map(r=>r.id)).size!==regions.length||new Set(stores.map(r=>r.id)).size!==stores.length)fail('區別或門市重複');for(const r of regions)if(r.id!==r.region||!stores.some(s=>s.region===r.region))fail('區原報與門市不完整');for(const s of stores)if(!/^DNB\d{5}$/.test(s.id)||!regions.some(r=>r.region===s.region))fail('門市沒有對應的區原報');return {schema:SCHEMA,start:String(value.start||''),cutoff:value.cutoff,regions,stores,department:null};}
+function merge(current,incoming){const next=validate(incoming);if(!current)return next;const old=validate(current);if(old.start!==next.start||old.cutoff!==next.cutoff)fail('四區資料期間必須相同；新日期請先清除舊資料');const replaced=new Set(next.regions.map(r=>r.region));return validate({...next,regions:old.regions.filter(r=>!replaced.has(r.region)).concat(next.regions),stores:old.stores.filter(r=>!replaced.has(r.region)).concat(next.stores)});}
+function buildHtml(value,assets){const data=validate(value),json=JSON.stringify(data).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026');let html=assets.html.replace(/<section id="import-panel">[\s\S]*?<\/section>/,'').replace(/<script src="[^\"]+"><\/script>/g,'').replace(/<link rel="stylesheet"[^>]+>/,'<style>'+assets.css.replace(/<\/style/gi,'<\\/style')+'</style>').replace(/<meta http-equiv="Content-Security-Policy"[^>]+>/,"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'\">");return html.replace('</body>','<script type="application/json" id="officer-data">'+json+'</script><script>'+assets.core.replace(/<script/gi,'\\x3cscript').replace(/<\/script/gi,'<\\/script').replace(/<\/body/gi,'<\\/body')+'</script><script>'+assets.ui.replace(/<script/gi,'\\x3cscript').replace(/<\/script/gi,'<\\/script').replace(/<\/body/gi,'<\\/body')+'</script></body>');}
+return {REGIONS,SCHEMA,safe,parseWorkbook,validate,merge,buildHtml};
+});
