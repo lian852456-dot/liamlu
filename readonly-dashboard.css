@@ -17,3 +17,31 @@
 
 
 .weekly-visitors{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}.weekly-visitors h4{font-size:17px;margin:0 0 6px}.weekly-visitors dl{margin:12px 0 0}.weekly-visitors dl>div{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 12px;background:#f3f6f9;border-radius:8px;margin-top:7px}.weekly-visitors dt{font-size:15px}.weekly-visitors dd{margin:0;white-space:nowrap;font-size:22px;font-weight:800;color:var(--nav);font-variant-numeric:tabular-nums}.weekly-visitors small{display:block;font-size:12px;color:var(--muted);font-weight:400}.weekly-visitors dd small{display:inline;margin-left:5px}
+
+/* Renewal insights V1: existing auth/source, no extra remote reads. */
+.tabs{grid-template-columns:repeat(6,minmax(0,1fr))}
+.insight-header{background:#e7f0f5;border:1px solid #bfd4e0;border-radius:16px;padding:18px 20px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.insight-header h3{font-size:21px}.insight-header p{font-size:14px;color:var(--muted)}.insight-header>span{font-size:14px;color:var(--nav)}
+.insight-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.insight-kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0;display:flex;flex-direction:column;gap:4px}
+.insight-kpi span{font-size:14px;color:var(--muted)}.insight-kpi strong{font-size:26px;line-height:1.3;color:var(--nav);font-variant-numeric:tabular-nums}.insight-kpi small{font-size:12px;color:var(--muted)}
+.insight-panel{margin-top:16px}.insight-panel .table-scroll{overflow:auto}
+.insight-table{border-collapse:collapse;min-width:900px;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+.insight-table th,.insight-table td{border-bottom:1px solid var(--line);text-align:right;padding:10px 8px;white-space:nowrap}
+.insight-table thead th{background:#eef3f7;color:#35526b}.insight-table th:first-child{text-align:left}
+.insight-danger{color:#ac3434;font-weight:900}.insight-suggest-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.insight-advice{border:1px solid #d9e4eb;border-left:5px solid #b96a26;background:#fbfcfe;border-radius:12px;padding:14px;margin:10px 0}
+.insight-advice-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}.insight-advice h4{font-size:17px;margin:0}
+.insight-advice-head span{font-size:14px;color:#865508}.insight-evidence{font-size:14px;color:var(--muted)}
+.insight-advice ol{padding-left:24px;margin:10px 0}.insight-advice li{margin:8px 0;font-size:15px}
+.insight-neutral{background:#edf5f3;padding:15px;border-radius:12px;font-size:15px}
+.insight-pending{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
+.insight-pending p{font-size:14px;color:var(--muted)}
+@media(max-width:700px){
+  .tabs{display:flex;overflow-x:auto;scroll-snap-type:x mandatory}
+  .tab{flex:0 0 auto;min-width:92px;padding:10px 12px;scroll-snap-align:start}
+  .insight-header{align-items:flex-start;flex-direction:column}
+  .insight-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .insight-kpi strong{font-size:23px}
+  .insight-pending{grid-template-columns:1fr}
+}
