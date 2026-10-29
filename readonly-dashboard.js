@@ -7,7 +7,7 @@
   function updateExport(){if(exportButton)exportButton.disabled=!model||failed||!!flight||suspended||document.hidden||!!(expires&&Date.now()>=expires);}
   const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const number=v=>v==null||!Number.isFinite(Number(v))?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:2}),percent=v=>v==null||!Number.isFinite(Number(v))?'—':(v*100).toFixed(1)+'%',short=v=>v?String(v).slice(5).replace('-','/'):'—';
-  const title={kpi:'KPI',awards:'台獎',personal:'個績',conversion:'締結率',traffic:'來客數'},metricKeys={a999:'A999',a1399:'A1399',haosu:'好速',r1399:'R1399'};
+  const title={kpi:'KPI',awards:'台獎',personal:'個績',conversion:'締結率',traffic:'來客數',insights:'續約洞察'},metricKeys={a999:'A999',a1399:'A1399',haosu:'好速',r1399:'R1399'};
   function scope(){return model?.stores.find(s=>s.id===state.store)?.name||'北一二B · 本次授權範圍';}
   function empty(message){$('#content').innerHTML='<div class="empty"><h2>'+safe(message)+'</h2><p>來源未就緒的資料不以零值或示意資料代替。</p></div>';}
   function clear(message='畫面已清除，請重新核驗登入。'){
@@ -81,9 +81,30 @@
     const tickCount=Math.min(series.length,Math.max(2,Math.floor(w/(suffix?70:58))+1)),ticks=new Set(Array.from({length:tickCount},(_,j)=>tickCount===1?0:Math.round(j*(series.length-1)/(tickCount-1))));let path='';function flush(){if(path)svg+='<path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';path='';}series.forEach((r,i)=>{if(r[key]==null){flush();return;}path+=(path?' L':'M')+x(i)+' '+y(r[key]);});flush();series.forEach((r,i)=>{if(r[key]!=null)svg+='<circle data-point="'+i+'" tabindex="0" cx="'+x(i)+'" cy="'+y(r[key])+'" r="5" fill="'+color+'" stroke="white" stroke-width="2"><title>'+short(r.date)+' '+safe(rate?percent(r[key]):number(r[key])+' 人次')+'</title></circle>';if(ticks.has(i))svg+='<text x="'+x(i)+'" y="'+(height-(suffix?28:12))+'" text-anchor="middle" font-size="12" fill="#516475">'+short(r.date)+'</text>';});el.innerHTML=svg+'</svg>';
     function read(i){const r=series[i];$('#'+c+suffix+'-readout').textContent=suffix?short(r.date)+' · '+c.toUpperCase()+' '+(c==='rt'?'符合續約資格來客':'來客')+' '+number(r[c+'_d'])+' 人次':short(r.date)+' · '+(mode==='daily'?'當日':'自起日累計')+' '+number(r[c+'_n'])+' 上線 / '+number(r[c+'_d'])+' 來客 · '+percent(r[c+'_rate']);}el.querySelectorAll('[data-point]').forEach(e=>{e.onclick=()=>read(+e.dataset.point);e.onfocus=()=>read(+e.dataset.point);e.onkeydown=ev=>{if(['Enter',' '].includes(ev.key)){ev.preventDefault();read(+e.dataset.point);}};});if(series.length)read(series.length-1);
   }
+
+  function insights(){
+    const d=model.conversion;
+    if(!d){$('#source-note').textContent=model.conversionReason;return empty(model.conversionReason);}
+    const Engine=window.ReadonlyInsightsCore,UI=window.ReadonlyInsightsUI;
+    if(!Engine||!UI)return empty('續約分析元件尚未完成載入，請重新整理。');
+    try{
+      const computed=Engine.evaluate(d,model.stores);
+      const result=UI.render(computed,{store:state.store});
+      $('#content').innerHTML=context({cutoff:d.cutoff,period:d.period_start+' 至 '+d.cutoff})+result.html;
+      const copy=$('#copy-insights'),status=$('#copy-insight-status');
+      if(copy)copy.onclick=async()=>{
+        try{
+          if(!navigator.clipboard||!result.copyText)throw Error('瀏覽器無法複製，請使用 HTTPS 重新開啟。');
+          await navigator.clipboard.writeText(result.copyText);
+          if(status)status.textContent='已複製本次已核實的門市改善指令。';
+        }catch{if(status)status.textContent='複製失敗，請手動選取畫面上的建議。';}
+      };
+      source({cutoff:d.cutoff,sourceName:d.source_name,version:d.sha256.slice(0,12)},'本頁依既有授權彙總；Tier／方案分析待資料契約核實');
+    }catch{empty('續約洞察資料無法完成核實，請重新讀取正式報表。');}
+  }
   function render(){document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===state.tab)));if(!model)return;
     if(expires&&Date.now()>=expires){failed=true;clear('登入期限已到，請在情報站重新登入。');return;}const dates=['conversion','traffic'].includes(state.tab);document.querySelectorAll('[data-date-control]').forEach(e=>e.hidden=!dates);$('#daily').setAttribute('aria-pressed',String(state.mode==='daily'));$('#cumulative').setAttribute('aria-pressed',String(state.mode==='cumulative'));
-    if(state.tab==='kpi')kpi();else if(state.tab==='personal')personal();else if(state.tab==='awards')awards();else traffic();
+    if(state.tab==='kpi')kpi();else if(state.tab==='personal')personal();else if(state.tab==='awards')awards();else if(state.tab==='insights')insights();else traffic();
   }
   async function aRead(action,employeeId,deviceId,signal){const response=await fetch(OWNER,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,employeeId,deviceId}),credentials:'omit',cache:'no-store',signal});if(!response.ok)throw Error('未取得服務回應');const result=await response.json();if(result?.status!=='ok')throw Error('既有登入未通過驗證');return result;}
   async function load(){if(flight||document.hidden)return flight;if(location.protocol==='file:'){clear('請由情報站同一網址開啟此頁，離線檔不包含真實資料。');return;}if(window.PortalLogout?.isLocked()){clear('已登出，請先在情報站重新登入。');return;}
