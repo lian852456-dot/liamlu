@@ -1,0 +1,9 @@
+✔ approved V2 hair, eyes, face, skin, 2.5-head body and animations remain byte-for-byte unchanged (239.423584ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 279.413709

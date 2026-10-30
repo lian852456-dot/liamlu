@@ -1,0 +1,1 @@
+{"pass":true,"fullViews":8,"details":4,"allBodyBoundsVisible":true}

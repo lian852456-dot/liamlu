@@ -1,0 +1,105 @@
+{
+  "origin": "http://127.0.0.1:4734",
+  "scope": "renderer-local selected peer only",
+  "formalWrites": 0,
+  "physicalIphoneUat": false,
+  "errors": [],
+  "selectedPeer": {
+    "actorId": "guest-3ca70459-46c7-49f3-af8b-39789cb5f9a7",
+    "state": {
+      "id": "guest-3ca70459-46c7-49f3-af8b-39789cb5f9a7",
+      "nickname": "整合驗收A",
+      "scene": "outdoor",
+      "zone": "jiuquan",
+      "visible": true,
+      "seat": null,
+      "rendered": {
+        "x": 0,
+        "y": 0,
+        "z": 1.5
+      },
+      "vehicle": null,
+      "position": {
+        "x": 0,
+        "z": 1.5
+      },
+      "heading": 0,
+      "moving": false
+    },
+    "visual": {
+      "hook": true,
+      "renderActorId": "guest-3ca70459-46c7-49f3-af8b-39789cb5f9a7",
+      "version": "new",
+      "hairSource": "blender-glb",
+      "glbUnderHead": true
+    }
+  },
+  "appearanceSync": {
+    "pony": {
+      "hair": "pony",
+      "hairSource": "procedural",
+      "outfit": "ocean",
+      "version": "new"
+    },
+    "bobAgain": {
+      "hair": "bob",
+      "hairSource": "blender-glb",
+      "outfit": "uniform",
+      "version": "new"
+    },
+    "profileContractUnchanged": true
+  },
+  "rollback": {
+    "disabled": {
+      "version": "legacy",
+      "hasGlb": false,
+      "profile": {
+        "id": "guest-3ca70459-46c7-49f3-af8b-39789cb5f9a7",
+        "nickname": "整合驗收A",
+        "character": "orange",
+        "skin": "orange",
+        "hair": "",
+        "outfit": "",
+        "car": "",
+        "pose": {
+          "scene": "outdoor",
+          "zone": "jiuquan",
+          "x": 0,
+          "z": 1.5,
+          "heading": 0,
+          "moving": false,
+          "action": "",
+          "revision": 1,
+          "updatedAt": 1793353965893
+        }
+      }
+    },
+    "reenabled": {
+      "version": "new",
+      "hairSource": "blender-glb",
+      "hasGlb": true,
+      "profile": {
+        "id": "guest-3ca70459-46c7-49f3-af8b-39789cb5f9a7",
+        "nickname": "整合驗收A",
+        "character": "orange",
+        "skin": "orange",
+        "hair": "",
+        "outfit": "",
+        "car": "",
+        "pose": {
+          "scene": "outdoor",
+          "zone": "jiuquan",
+          "x": 0,
+          "z": 1.5,
+          "heading": 0,
+          "moving": false,
+          "action": "",
+          "revision": 1,
+          "updatedAt": 1793353965893
+        }
+      }
+    },
+    "profilePreserved": true
+  },
+  "pass": true
+}

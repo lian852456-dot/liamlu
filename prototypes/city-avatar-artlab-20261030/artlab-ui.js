@@ -10,6 +10,8 @@
     motion: { idle: '站立', walk: '行走', wave: '揮手', sit: '坐下', highfive: '擊掌' },
   };
   const allowed = {
+    framing:new Set(['full','head']),
+    lighting:new Set(['live','day','dusk','night']),
     version: new Set(['new','v1','old']),
     focus: new Set(['character']),
     view: new Set(['front','quarter','side','back']),
@@ -21,6 +23,8 @@
     scene: 'studio',
     version: 'new',
     view: 'front',
+    framing:'full',
+    lighting:'live',
     motion: 'idle',
     hair: 'bob',
     outfit: 'uniform',
@@ -57,7 +61,9 @@
   function syncFrame() {
     if (!state.frame || !state.ready) return;
     send('version', state.version);
+    send('framing',state.framing);
     send('view', state.view);
+    if(state.scene==='game')send('lighting',state.lighting);
     send('motion', state.motion);
     send('hair', state.hair);
     send('outfit', state.outfit);
@@ -107,6 +113,8 @@
     updatePressed('version', state.version);
     updatePressed('view', state.view);
     updatePressed('motion', state.motion);
+    updatePressed('framing',state.framing);
+    updatePressed('lighting',state.lighting);
     updateSelect('hair', state.hair);
     updateSelect('outfit', state.outfit);
     document.querySelectorAll('[data-studio-only]').forEach(card => {
@@ -114,9 +122,10 @@
       card.setAttribute('aria-disabled', disabled ? 'true' : 'false');
       card.querySelectorAll('button, select').forEach(control => { control.disabled = disabled; });
     });
+    document.querySelectorAll('[data-game-only]').forEach(card=>{card.querySelectorAll('button').forEach(button=>{button.disabled=state.scene!=='game';});});
     if (refs.gameGuide) refs.gameGuide.hidden = state.scene !== 'game';
-    if (refs.sceneTitle) refs.sceneTitle.textContent = state.scene === 'studio' ? '短髮造型比較・臉部與比例保持不變' : '走進城市，和角色一起玩';
-    if (refs.sceneState) refs.sceneState.textContent = state.scene === 'studio' ? '獨立髮型示範' : '城市試玩';
+    if (refs.sceneTitle) refs.sceneTitle.textContent = state.scene === 'studio' ? '完整人物整合驗收・已確認造型保留' : '走進城市，和角色一起玩';
+    if (refs.sceneState) refs.sceneState.textContent = state.scene === 'studio' ? '第二版髮型基準・獨立驗收' : '城市試玩';
     if (refs.metricVersion) refs.metricVersion.textContent = labels.version[state.version];
   }
 
@@ -151,9 +160,9 @@
 
   function selectControl(action, value) {
     if (!isAllowed(action, value)) return;
-    if (state.scene === 'game' && ['view', 'hair', 'outfit'].includes(action)) return;
+    if (state.scene === 'game' && ['hair', 'outfit'].includes(action)) return;
     state[action] = value;
-    if (action === 'version' || action === 'view' || action === 'motion') updatePressed(action, value);
+    if (action === 'version' || action === 'view' || action === 'motion' || action==='framing' || action==='lighting') updatePressed(action, value);
     if (action === 'hair' || action === 'outfit') updateSelect(action, value);
     if (refs.metricVersion && action === 'version') refs.metricVersion.textContent = labels.version[value];
     send(action, value);

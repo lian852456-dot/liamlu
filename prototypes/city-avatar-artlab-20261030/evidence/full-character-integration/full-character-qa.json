@@ -1,0 +1,260 @@
+{
+  "origin": "http://127.0.0.1:4734",
+  "scope": "isolated full-character candidate",
+  "formalWrites": 0,
+  "physicalIphoneUat": false,
+  "cameraFraming": {
+    "front": {
+      "framing": "full",
+      "version": "blender-hair.2",
+      "bounds": {
+        "min": [
+          -0.5697930415552828,
+          0.0023678536841154063,
+          -0.47266829873932087
+        ],
+        "max": [
+          0.567787089195146,
+          2.309822721493373,
+          0.4713431018474517
+        ]
+      },
+      "ndc": {
+        "minX": -0.5637668689567825,
+        "maxX": 0.5638294368241246,
+        "minY": -0.859005712638813,
+        "maxY": 0.8521636964667845
+      },
+      "metrics": {
+        "type": "avatar-artlab/metrics",
+        "version": "new",
+        "framing": "full",
+        "calls": 15,
+        "triangles": 22822,
+        "geometries": 15,
+        "textures": 7,
+        "frameP50Ms": 42.5,
+        "frameP95Ms": 50,
+        "submitP50Ms": 0.39999985694885254,
+        "submitP95Ms": 0.39999985694885254,
+        "pixelRatio": 1,
+        "frames": 17,
+        "contextLost": false,
+        "hairAsset": {
+          "ready": true,
+          "error": null,
+          "liveInstances": 1,
+          "created": 1,
+          "released": 0,
+          "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+        },
+        "hairAssetV1": {
+          "ready": true,
+          "error": null,
+          "liveInstances": 0,
+          "created": 0,
+          "released": 0,
+          "asset": "assets/hair-glb/short-bob-v1.glb"
+        },
+        "modelTriangles": 22628,
+        "modelGeometryBytes": 729448,
+        "modelGeometries": 13,
+        "modelMaterials": 9
+      }
+    },
+    "quarter": {
+      "framing": "full",
+      "version": "blender-hair.2",
+      "bounds": {
+        "min": [
+          -0.5689643460963699,
+          0.005933810295350228,
+          -0.4726339944534644
+        ],
+        "max": [
+          0.5671133922198388,
+          2.312535518346743,
+          0.4713093264084328
+        ]
+      },
+      "ndc": {
+        "minX": -0.6532702904362597,
+        "maxX": 0.6686864546259371,
+        "minY": -0.9133594399201743,
+        "maxY": 0.9018320902207917
+      },
+      "metrics": {
+        "type": "avatar-artlab/metrics",
+        "version": "new",
+        "framing": "full",
+        "calls": 15,
+        "triangles": 22822,
+        "geometries": 15,
+        "textures": 7,
+        "frameP50Ms": 42.5,
+        "frameP95Ms": 50,
+        "submitP50Ms": 0.3000001907348633,
+        "submitP95Ms": 0.5,
+        "pixelRatio": 1,
+        "frames": 25,
+        "contextLost": false,
+        "hairAsset": {
+          "ready": true,
+          "error": null,
+          "liveInstances": 1,
+          "created": 1,
+          "released": 0,
+          "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+        },
+        "hairAssetV1": {
+          "ready": true,
+          "error": null,
+          "liveInstances": 0,
+          "created": 0,
+          "released": 0,
+          "asset": "assets/hair-glb/short-bob-v1.glb"
+        },
+        "modelTriangles": 22628,
+        "modelGeometryBytes": 729448,
+        "modelGeometries": 13,
+        "modelMaterials": 9
+      }
+    },
+    "side": {
+      "framing": "full",
+      "version": "blender-hair.2",
+      "bounds": {
+        "min": [
+          -0.5676289493833662,
+          0.011038819082144435,
+          -0.4722070401564519
+        ],
+        "max": [
+          0.5659838567237592,
+          2.3165919203647007,
+          0.47090708435461104
+        ]
+      },
+      "ndc": {
+        "minX": -0.4664386273535308,
+        "maxX": 0.4882060273349012,
+        "minY": -0.8744920928640504,
+        "maxY": 0.8756427966157708
+      },
+      "metrics": {
+        "type": "avatar-artlab/metrics",
+        "version": "new",
+        "framing": "full",
+        "calls": 15,
+        "triangles": 22822,
+        "geometries": 15,
+        "textures": 7,
+        "frameP50Ms": 49.5,
+        "frameP95Ms": 50.09999999999991,
+        "submitP50Ms": 0.2999999523162842,
+        "submitP95Ms": 0.39999985694885254,
+        "pixelRatio": 1,
+        "frames": 32,
+        "contextLost": false,
+        "hairAsset": {
+          "ready": true,
+          "error": null,
+          "liveInstances": 1,
+          "created": 1,
+          "released": 0,
+          "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+        },
+        "hairAssetV1": {
+          "ready": true,
+          "error": null,
+          "liveInstances": 0,
+          "created": 0,
+          "released": 0,
+          "asset": "assets/hair-glb/short-bob-v1.glb"
+        },
+        "modelTriangles": 22628,
+        "modelGeometryBytes": 729448,
+        "modelGeometries": 13,
+        "modelMaterials": 9
+      }
+    },
+    "back": {
+      "framing": "full",
+      "version": "blender-hair.2",
+      "bounds": {
+        "min": [
+          -0.565649277999156,
+          0.01601141956708696,
+          -0.4713394415648092
+        ],
+        "max": [
+          0.5642810150384897,
+          2.320218518981578,
+          0.47009145848017786
+        ]
+      },
+      "ndc": {
+        "minX": -0.5478649266668932,
+        "maxX": 0.5712321872313794,
+        "minY": -0.8521923047810319,
+        "maxY": 0.8626683606255926
+      },
+      "metrics": {
+        "type": "avatar-artlab/metrics",
+        "version": "new",
+        "framing": "full",
+        "calls": 15,
+        "triangles": 22822,
+        "geometries": 15,
+        "textures": 7,
+        "frameP50Ms": 49.5,
+        "frameP95Ms": 51.59999999999991,
+        "submitP50Ms": 0.20000004768371582,
+        "submitP95Ms": 0.39999985694885254,
+        "pixelRatio": 1,
+        "frames": 40,
+        "contextLost": false,
+        "hairAsset": {
+          "ready": true,
+          "error": null,
+          "liveInstances": 1,
+          "created": 1,
+          "released": 0,
+          "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+        },
+        "hairAssetV1": {
+          "ready": true,
+          "error": null,
+          "liveInstances": 0,
+          "created": 0,
+          "released": 0,
+          "asset": "assets/hair-glb/short-bob-v1.glb"
+        },
+        "modelTriangles": 22628,
+        "modelGeometryBytes": 729448,
+        "modelGeometries": 13,
+        "modelMaterials": 9
+      }
+    }
+  },
+  "headPivot": {
+    "parentedToHead": true,
+    "before": [
+      0.00000845626853595843,
+      0.007789455882197886,
+      0.0010855709477155483,
+      0.9999690724423772
+    ],
+    "after": [
+      0.00022630487674354238,
+      0.20845977700733692,
+      0.0010617541588162844,
+      0.9780303384017597
+    ],
+    "worldQuaternionDelta": 0.2228507205628634,
+    "directHeadPivot": true,
+    "productHeadLookControl": false
+  },
+  "errors": [],
+  "pass": true
+}

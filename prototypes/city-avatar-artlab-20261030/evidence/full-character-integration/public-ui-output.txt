@@ -1,0 +1,1 @@
+{"url":"https://possibility-recognised-light-webcams.trycloudflare.com","physicalIphoneUat":false,"formalWrites":0,"defaultFullBody":true,"framingControls":true,"backControl":true,"cityLightingControls":true,"cityFullBody":true,"singleIframe":true,"reviewImages":true,"errors":[],"pass":true}

@@ -1,0 +1,7 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- 'full'
+
+    at /Users/liamlu/Downloads/liam-agent/worktrees/city-avatar-full-integration-20261030/prototypes/city-avatar-artlab-20261030/capture-full-character.cjs:3:837

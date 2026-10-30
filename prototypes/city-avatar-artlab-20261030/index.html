@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f7f1e7">
-  <title>角色體驗室｜Cozy Pocket Taipei</title>
+  <title>完整人物驗收室｜Cozy Pocket Taipei</title>
   <link rel="stylesheet" href="./artlab.css">
 </head>
 <body>
@@ -14,17 +14,17 @@
         <span class="brand-mark" aria-hidden="true">✦</span>
         <div>
           <p class="eyebrow">COZY POCKET TAIPEI</p>
-          <h1>角色體驗室</h1>
+          <h1>完整人物驗收室</h1>
         </div>
       </div>
       <div class="header-note">
-        <span class="preview-chip">單一示範角色・尚未全面套用</span>
+        <span class="preview-chip">V2 髮型基準・正式城市未修改</span>
         <span class="deadline">預覽期限 10/31 23:59（台北）</span>
       </div>
     </header>
 
     <nav class="scene-tabs" aria-label="預覽場景" role="tablist">
-      <button class="scene-tab is-active" type="button" role="tab" aria-selected="true" data-scene="studio">人物細節</button>
+      <button class="scene-tab is-active" type="button" role="tab" aria-selected="true" data-scene="studio">全身與細節</button>
       <button class="scene-tab" type="button" role="tab" aria-selected="false" data-scene="game">城市試玩</button>
     </nav>
 
@@ -33,9 +33,9 @@
         <div class="preview-heading">
           <div>
             <p class="eyebrow">CHARACTER PREVIEW</p>
-            <h2 id="scene-title">看見角色的每個細節</h2>
+            <h2 id="scene-title">從頭到腳確認人物品質</h2>
           </div>
-          <span class="scene-state" id="scene-state">獨立髮型示範</span>
+          <span class="scene-state" id="scene-state">獨立全身驗收</span>
         </div>
         <div class="quick-compare" aria-label="快速版本對照"><button type="button" class="choice-button is-selected" data-action="version" data-value="new" aria-pressed="true">Blender 第二版</button><button type="button" class="choice-button" data-action="version" data-value="v1" aria-pressed="false">Blender 第一版</button><button type="button" class="choice-button" data-action="version" data-value="old" aria-pressed="false">程式化原版</button></div>
         <div class="avatar-stage" id="avatar-stage">
@@ -47,6 +47,7 @@
             <span id="preview-status">正在準備獨立預覽…</span>
           </div>
         </div>
+        <p><a class="choice-button" href="./review.html" target="_blank" rel="noopener">查看全身比較與導入準備 ↗</a></p>
         <div class="trust-notes" aria-label="使用說明">
           <p><span aria-hidden="true">↳</span> 此頁使用獨立測試存檔，原城市進度不受影響</p>
           <p><span aria-hidden="true">◌</span> iPhone Safari 真機待驗收</p>
@@ -68,7 +69,7 @@
           </div>
         </section>
 
-        <section class="control-card" data-studio-only>
+        <section class="control-card">
           <div class="card-heading">
             <div>
               <p class="eyebrow">ANGLE</p>
@@ -83,6 +84,8 @@
           </div>
         </section>
 
+        <section class="control-card"><h3>取景範圍</h3><div class="choice-grid" role="group" aria-label="取景範圍"><button type="button" class="choice-button is-selected" data-action="framing" data-value="full" aria-pressed="true">完整全身</button><button type="button" class="choice-button" data-action="framing" data-value="head" aria-pressed="false">頭部近看</button></div></section>
+        <section class="control-card" data-game-only><h3>城市光線</h3><p class="metrics-footnote">切換城市試玩後可比較；僅影響此頁光線。</p><div class="choice-grid choice-grid-four" role="group" aria-label="城市光線"><button class="choice-button is-selected" data-action="lighting" data-value="live" aria-pressed="true">即時</button><button class="choice-button" data-action="lighting" data-value="day" aria-pressed="false">日光</button><button class="choice-button" data-action="lighting" data-value="dusk" aria-pressed="false">黃昏</button><button class="choice-button" data-action="lighting" data-value="night" aria-pressed="false">夜間</button></div></section>
         <section class="control-card" data-studio-only>
           <div class="card-heading">
             <div>
@@ -132,8 +135,8 @@
           <span class="guide-icon" aria-hidden="true">⌁</span>
           <div>
             <strong>城市試玩模式</strong>
-            <p>角度、髮型與服裝交由遊戲原手帳換裝；在畫面點地即可行走。</p>
-            <button type="button" class="choice-button" data-action="focus" data-value="character">近看人物</button>
+            <p>可比較四個角度與日／昏／夜光線；服裝仍從遊戲原手帳換裝，點地即可行走。</p>
+            <button type="button" class="choice-button" data-action="focus" data-value="character">以目前角度看人物</button>
           </div>
         </section>
 

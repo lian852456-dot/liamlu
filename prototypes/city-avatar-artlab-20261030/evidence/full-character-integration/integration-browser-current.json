@@ -1,0 +1,64 @@
+{
+  "scope": "isolated synthetic character artlab current-source cookie-derived",
+  "physicalIphoneUat": false,
+  "formalWrites": 0,
+  "engines": {
+    "chromium": {
+      "nativeNewCharacter": true,
+      "walked": true,
+      "paidHairReload": true,
+      "positionRetained": true,
+      "rendererToggleDataUnchanged": true,
+      "multiplayer": true,
+      "peerVisible": true,
+      "sofaSit": true,
+      "contextLost": false,
+      "errors": [],
+      "missing": [],
+      "cookieName": "city_avatar_full_integration_20261030",
+      "browserProfileId": "guest-d5bb6e35-b87b-47d9-9444-3825e1d5de44",
+      "sessionUserId": "guest-d5bb6e35-b87b-47d9-9444-3825e1d5de44",
+      "identityMatch": true,
+      "sceneMetrics": {
+        "drawCalls": 764,
+        "triangles": 1174360,
+        "rendererMemory": {
+          "geometries": 1535,
+          "textures": 144,
+          "programs": 49
+        },
+        "meanFrameMs": 402.73
+      },
+      "testMode": "desktop engine with mobile viewport"
+    },
+    "webkit": {
+      "nativeNewCharacter": true,
+      "walked": true,
+      "paidHairReload": true,
+      "positionRetained": true,
+      "rendererToggleDataUnchanged": true,
+      "multiplayer": true,
+      "peerVisible": true,
+      "sofaSit": true,
+      "contextLost": false,
+      "errors": [],
+      "missing": [],
+      "cookieName": "city_avatar_full_integration_20261030",
+      "browserProfileId": "guest-58b3a5cb-c6cf-4244-bf35-fe0e302d8b0f",
+      "sessionUserId": "guest-58b3a5cb-c6cf-4244-bf35-fe0e302d8b0f",
+      "identityMatch": true,
+      "sceneMetrics": {
+        "drawCalls": 191,
+        "triangles": 60490,
+        "rendererMemory": {
+          "geometries": 1496,
+          "textures": 146,
+          "programs": 47
+        },
+        "meanFrameMs": 48.12
+      },
+      "testMode": "desktop engine with mobile viewport"
+    }
+  },
+  "pass": true
+}

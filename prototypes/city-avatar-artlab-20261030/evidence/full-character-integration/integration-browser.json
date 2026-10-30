@@ -1,0 +1,56 @@
+{
+  "scope": "isolated synthetic character artlab",
+  "physicalIphoneUat": false,
+  "formalWrites": 0,
+  "engines": {
+    "chromium": {
+      "nativeNewCharacter": true,
+      "walked": true,
+      "paidHairReload": true,
+      "positionRetained": true,
+      "rendererToggleDataUnchanged": true,
+      "multiplayer": true,
+      "peerVisible": true,
+      "sofaSit": true,
+      "contextLost": false,
+      "errors": [],
+      "missing": [],
+      "sceneMetrics": {
+        "drawCalls": 764,
+        "triangles": 1174360,
+        "rendererMemory": {
+          "geometries": 1543,
+          "textures": 144,
+          "programs": 49
+        },
+        "meanFrameMs": 390.67
+      },
+      "testMode": "desktop engine with mobile viewport"
+    },
+    "webkit": {
+      "nativeNewCharacter": true,
+      "walked": true,
+      "paidHairReload": true,
+      "positionRetained": true,
+      "rendererToggleDataUnchanged": true,
+      "multiplayer": true,
+      "peerVisible": true,
+      "sofaSit": true,
+      "contextLost": false,
+      "errors": [],
+      "missing": [],
+      "sceneMetrics": {
+        "drawCalls": 191,
+        "triangles": 60490,
+        "rendererMemory": {
+          "geometries": 1495,
+          "textures": 143,
+          "programs": 46
+        },
+        "meanFrameMs": 41.32
+      },
+      "testMode": "desktop engine with mobile viewport"
+    }
+  },
+  "pass": true
+}

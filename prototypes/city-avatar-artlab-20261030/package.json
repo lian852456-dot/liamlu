@@ -1,17 +1,17 @@
 {
   "name": "north12b-avatar-artlab",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test avatar-blender-hair-v2.test.cjs",
-    "test:integration": "node hair-v2-integration-browser.cjs",
+    "test": "node --test avatar-blender-hair-v2.test.cjs full-character-preservation.test.cjs",
+    "test:integration": "node full-character-integration-current.cjs",
     "test:wardrobe": "node hair-v2-wardrobe-browser.cjs",
     "test:preview": "node hair-v2-public-browser.cjs",
-    "capture": "node capture-hair-v2.cjs"
+    "capture": "node capture-full-character.cjs"
   },
   "devDependencies": {
     "playwright": "1.47.0"
