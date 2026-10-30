@@ -1,0 +1,10 @@
+{
+  "schema": "north12b-city-endpoint/v1",
+  "enabled": true,
+  "origin": "https://estates-married-accordance-makeup.trycloudflare.com",
+  "healthPath": "/health",
+  "readyPath": "/ready",
+  "fixedOrigins": [],
+  "release": "20261030-mac-stable.1",
+  "note": "固定導航入口；城市由Mac長期提供服務，通道網址可能更換。"
+}
