@@ -139,6 +139,17 @@ function createDashboardBClient(ownerExecUrl, options={}) {
         includeReports===true && (result.reportsResult?.schema!=='daily-report-bundle-v1' || !Array.isArray(result.reportsResult.segments) || result.reportsResult.segments.length!==3))throw new Error('B_AUTH_DENIED');
       return result;
     },
+    async issueCityHandoff(challenge) {
+      if(!challenge || Object.keys(challenge).sort().join('|')!=='audience|challengeId|expiresAt|nonceHash|worldId' ||
+        challenge.audience!=='north12b-city-formal-login' || !/^[A-Za-z0-9_-]{24,100}$/.test(challenge.challengeId) ||
+        !/^[a-f0-9]{64}$/.test(challenge.nonceHash) || !['current-guests','legacy-owners'].includes(challenge.worldId) ||
+        !Number.isSafeInteger(challenge.expiresAt) || challenge.expiresAt<=Date.now() || challenge.expiresAt>Date.now()+120000)throw Error('CITY_CHALLENGE_INVALID');
+      const result=await protectedPost('employee_city_handoff',{challengeId:challenge.challengeId,nonceHash:challenge.nonceHash,
+        audience:challenge.audience,worldId:challenge.worldId});
+      if(result.schema!=='city-employee-handoff/v1' || result.challengeId!==challenge.challengeId || !/^CH1_[a-f0-9]{64}$/.test(result.code) ||
+        !Number.isSafeInteger(result.expiresAt) || result.expiresAt<=Date.now() || result.expiresAt>Date.now()+120000)throw Error('CITY_HANDOFF_INVALID');
+      return {schema:result.schema,challengeId:result.challengeId,code:result.code,expiresAt:Math.min(result.expiresAt,challenge.expiresAt)};
+    },
     validate:()=>protectedPost('employee_session'),
     restore(deviceId){suspend();lastDeviceId=deviceId;const value=savedSession(deviceId);if(!value)return null;session={deviceId:value.deviceId,token:value.token};expiresAt=value.expiresAt;lastPhoneToken=savedPhone(deviceId)?.phoneToken||'';return {expiresAt};},
     suspend,
