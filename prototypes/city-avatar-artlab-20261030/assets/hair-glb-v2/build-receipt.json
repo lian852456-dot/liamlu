@@ -1,0 +1,17 @@
+{
+  "blenderVersion": "4.5.15 LTS",
+  "buildHash": "5afeabba6097",
+  "triangles": 10320,
+  "materials": 1,
+  "opaque": true,
+  "physics": false,
+  "styleReference": "head-integrated.1 procedural bob",
+  "glbBytes": 479324,
+  "sha256": "143c1540e9db1e98811a65044bf967413162a7820f0091f1cb2df164ef046413",
+  "textures": {
+    "color": 512,
+    "normal": 256,
+    "orm": 256
+  },
+  "authoring": "Blender Python editable layered volume cages, connected sculpted hair flow, thin fringe cages, smooth normals, UV/PBR; not a manual sculpt claim"
+}

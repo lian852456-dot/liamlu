@@ -1,0 +1,1 @@
+window.CozyAvatarBlenderV1=window.CozyAvatarDeluxe;

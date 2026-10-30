@@ -1,0 +1,7 @@
+{
+  "samples": 310,
+  "minClearance": 0.007039487056407057,
+  "failures": [],
+  "pass": true,
+  "scope": "exported GLB rear half against frozen approved skin mesh; static local head space"
+}

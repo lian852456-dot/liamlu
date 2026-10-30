@@ -116,3 +116,6 @@ h1 { margin-bottom: 0; font-size: clamp(22px, 3vw, 30px); letter-spacing: -.03em
 }
 
 .quick-compare {display:none;gap:8px;margin:0 0 12px}.quick-compare button {flex:1;font-size:14px}@media(max-width:900px){.quick-compare{display:flex}}
+
+.choice-grid-four{grid-template-columns:repeat(4,1fr)}
+@media(max-width:600px){.quick-compare{gap:4px}.quick-compare button{font-size:12px;padding:9px 4px}.choice-grid-four{grid-template-columns:repeat(2,1fr)}}

@@ -1,3 +1,21 @@
+# 短髮重製第二版：保留原造型的三版比較
+
+依使用者確認，以程式化 `head-integrated.1` 短髮為造型基準重製 Blender 第二版；保留原版與 Blender 第一版。七束主瀏海的起點、走向與長短節奏沿用原版，再縮薄截面、增加細分束；側後髮使用連續髮流與細緻表面，搭配原長度的臉側內外層及少量自然髮尾，避免第一版的粗厚花瓣與光滑髮殼。
+
+[可旋轉三版預覽](https://ken-mae-base-always.trycloudflare.com/) 支援「程式化原版／Blender 第一版／Blender 第二版」、正面／45 度／側面／背面及獨立城市。完整比較與驗證見 [本輪報告](evidence/blender-hair-v2/REPORT.md)。美術效果留待使用者確認，不把整合成功當作已超越原版。
+
+第二版資產與可編輯來源位於 `assets/hair-glb-v2/`，可用現有 Blender 4.5.15 LTS 執行 `tools/blender-hair/build_hair_v2.py` 重現。未安裝新工具／技能。第一版 GLB、Blender 源檔與建模腳本未改；其 factory/helper 只另存並更換命名空間，保持實際畫面可比。
+
+原版眼睛、臉型、五官、皮膚、2.5 頭身、身體／肩頸與動畫保留。僅獨立示範角色使用此版本，沒有修改正式城市、原角色、登入、金幣或多人資料契約。`base/world.js` 只有獨立 artLabFocusCharacter 的背面視角分支新增。
+
+本機入口 `http://127.0.0.1:4714/`；臨時 HTTPS 仍於台北 **2026-10-31 23:59** 關閉。實體 iPhone Safari 驗收依使用者安排延後。
+
+`npm test` 執行精確基準保留與 GLB 生命週期檢查；`node hair-v2-clearance.cjs` 對實際 GLB 與凍結頭部作背面射線檢查；`node hair-v2-integration-browser.cjs`、`node hair-v2-memory-browser.cjs`、`node hair-v2-performance.cjs` 分別驗證玩法、三版資源切換與分開暖機的 Mac WebKit 對照。桌面測試不代替手機或全城 GPU 驗收。
+
+---
+
+以下保留第一版與更早的歷史說明；本輪入口、版本與證據以上段及本輪報告為準。
+
 # Blender＋GLB 單一短髮示範
 
 以使用者確認的 `head-integrated.1` 為基準，只重製短髮（bob）。原眼睛、臉型、皮膚、2.5 頭身、身體與肩頸、動畫均保留。其他髮型、普通同伴與 NPC 沿用原系統。

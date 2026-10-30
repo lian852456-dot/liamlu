@@ -1,0 +1,105 @@
+{
+  "url": "https://ken-mae-base-always.trycloudflare.com",
+  "physicalIphoneUat": false,
+  "publicStudio": true,
+  "closeView": {
+    "pose": {
+      "scene": "outdoor",
+      "zone": "jiuquan",
+      "x": 0,
+      "z": 1.5,
+      "heading": 0,
+      "moving": false,
+      "transition": null
+    },
+    "camera": {
+      "fov": 34,
+      "x": 0.45,
+      "y": 2,
+      "z": 5.25,
+      "target": {
+        "x": 0,
+        "z": 1.5
+      }
+    },
+    "version": "new"
+  },
+  "city": {
+    "new": {
+      "meanFrameMs": 34.63,
+      "drawCalls": 437,
+      "triangles": 991398,
+      "rendererMemory": {
+        "geometries": 1586,
+        "textures": 177,
+        "programs": 34
+      },
+      "camera": {
+        "fov": 34,
+        "x": 0.45,
+        "y": 2,
+        "z": 5.25,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "position": {
+        "x": 0,
+        "z": 1.5
+      }
+    },
+    "v1": {
+      "meanFrameMs": 34.44,
+      "drawCalls": 448,
+      "triangles": 1002124,
+      "rendererMemory": {
+        "geometries": 1630,
+        "textures": 180,
+        "programs": 33
+      },
+      "camera": {
+        "fov": 34,
+        "x": 0.45,
+        "y": 2,
+        "z": 5.25,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "position": {
+        "x": 0,
+        "z": 1.5
+      }
+    },
+    "old": {
+      "meanFrameMs": 34.35,
+      "drawCalls": 492,
+      "triangles": 1017300,
+      "rendererMemory": {
+        "geometries": 1633,
+        "textures": 180,
+        "programs": 33
+      },
+      "camera": {
+        "fov": 34,
+        "x": 0.45,
+        "y": 2,
+        "z": 5.25,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "position": {
+        "x": 0,
+        "z": 1.5
+      }
+    }
+  },
+  "oneContextUi": true,
+  "errors": [],
+  "missing": [],
+  "pass": true
+}
