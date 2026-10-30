@@ -5,14 +5,14 @@
   const READY_MESSAGE = 'avatar-artlab/ready';
   const METRICS_MESSAGE = 'avatar-artlab/metrics';
   const labels = {
-    version: { new: 'Blender 精緻髮型', old: '目前程式化髮型' },
-    view: { front: '正面', quarter: '45°', side: '側面' },
+    version: { new: 'Blender 第二版', v1: 'Blender 第一版', old: '程式化原版' },
+    view: { front: '正面', quarter: '45°', side: '側面', back:'背面' },
     motion: { idle: '站立', walk: '行走', wave: '揮手', sit: '坐下', highfive: '擊掌' },
   };
   const allowed = {
-    version: new Set(['new', 'old']),
+    version: new Set(['new','v1','old']),
     focus: new Set(['character']),
-    view: new Set(['front', 'quarter', 'side']),
+    view: new Set(['front','quarter','side','back']),
     motion: new Set(['idle', 'walk', 'wave', 'sit', 'highfive']),
     hair: new Set(['bob', 'pony', 'braids', 'silver']),
     outfit: new Set(['uniform', 'forest', 'ocean', 'rose']),
@@ -125,8 +125,8 @@
   }
 
   function renderMetrics(data) {
-    if (!data || !['new', 'old'].includes(data.version)) return;
-    if (data.version === 'new' && data.hairAsset?.error) setStatus('精緻髮型未載入，暫用原短髮；可重新開啟預覽。');
+    if (!data || !['new','v1','old'].includes(data.version)) return;
+    if ((data.version === 'new' && data.hairAsset?.error) || (data.version==='v1' && data.hairAssetV1?.error)) setStatus('精緻髮型未載入，暫用原短髮；可重新開啟預覽。');
     const calls = metricNumber(data.calls);
     const triangles = metricNumber(data.triangles);
     const geometries = metricNumber(data.geometries);

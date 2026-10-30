@@ -1,0 +1,74 @@
+{
+  "at": "2026-10-30T08:18:06.175Z",
+  "baselineCommit": "41075e9",
+  "checks": [
+    {
+      "file": "avatar-deluxe-integrated.js",
+      "match": true
+    },
+    {
+      "file": "head-art.js",
+      "match": true
+    },
+    {
+      "file": "assets/hair-glb/short-bob-v1.glb",
+      "match": true
+    },
+    {
+      "file": "tools/blender-hair/build_hair.py",
+      "match": true
+    },
+    {
+      "file": "base/models.js",
+      "match": true
+    },
+    {
+      "file": "base/client.js",
+      "match": true
+    },
+    {
+      "file": "base/serve.mjs",
+      "match": true
+    },
+    {
+      "file": "base/character-gestures.js",
+      "match": true
+    },
+    {
+      "file": "avatar-deluxe-blender-v1.js",
+      "normalization": "CozyHairGLBV1→CozyHairGLB",
+      "match": true
+    },
+    {
+      "file": "hair-glb-v1.js",
+      "normalization": "CozyHairGLBV1→CozyHairGLB",
+      "match": true
+    }
+  ],
+  "originalV1Preview": [
+    {
+      "file": "index.html",
+      "match": true
+    },
+    {
+      "file": "avatar-deluxe.js",
+      "match": true
+    },
+    {
+      "file": "hair-glb.js",
+      "match": true
+    },
+    {
+      "file": "assets/hair-glb/short-bob-v1.glb",
+      "match": true
+    }
+  ],
+  "formalCityIndexHash": "c62ff42f2ba8ea8595bea573d25acc8aa94c267273d03232b6637f1f01a9c754",
+  "formalCityUntouched": true,
+  "originalDatabasesOpened": false,
+  "formalWrites": 0,
+  "rewardGrants": 0,
+  "physicalIphoneUat": "DEFERRED_BY_USER",
+  "independentOnly": true,
+  "pass": true
+}

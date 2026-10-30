@@ -2,10 +2,10 @@
  * Neither this asset nor the renderer choice enters a player profile or a sync packet. */
 (function(root){'use strict';
  let template=null,pending=null,error=null,created=0,released=0;const live=new Set();
- function stats(){return {ready:!!template,error,liveInstances:live.size,created,released,asset:'assets/hair-glb/short-bob-v1.glb'};}
+ function stats(){return {ready:!!template,error,liveInstances:live.size,created,released,asset:'assets/hair-glb-v2/short-bob-v2.glb'};}
  function load(){if(pending)return pending;pending=new Promise((resolve,reject)=>{
   const loader=new root.CozyGLTFLoader();
-  loader.load('assets/hair-glb/short-bob-v1.glb',gltf=>{template=gltf.scene;template.name='blender-short-bob-template';template.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=false;}});resolve(stats());},undefined,e=>{error=String(e?.message||'HAIR_ASSET_LOAD_FAILED');reject(Error(error));});
+  loader.load('assets/hair-glb-v2/short-bob-v2.glb',gltf=>{template=gltf.scene;template.name='blender-short-bob-template';template.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=false;}});resolve(stats());},undefined,e=>{error=String(e?.message||'HAIR_ASSET_LOAD_FAILED');reject(Error(error));});
  });return pending;}
  function create(tone){if(!template)return null;const group=template.clone(true),materials=new Map();group.userData.blenderHair=true;group.name='blender-short-bob-instance';
   group.traverse(n=>{if(!n.isMesh)return;const tint=m=>{if(!materials.has(m)){const clone=m.clone();clone.color.setHex(tone);materials.set(m,clone);}return materials.get(m);};n.material=Array.isArray(n.material)?n.material.map(tint):tint(n.material);});
