@@ -1,0 +1,33 @@
+{
+  "at": "2026-10-30T05:09:39.423Z",
+  "frozenApprovedSha256": "c728165ba255056ab9f26e62c2e29937f6d845a5f5584a7ff26ef2953afcff62",
+  "frozenHelperSha256": "700aa46c5ce3943ac2cbfc12c7d508ad1c7a3b132c1f10369972bdd320999060",
+  "frozenApprovedMatchesCommit": "62435e995de18438145d984519fe1f1587d06099",
+  "bodyFeaturesAndAnimationPreserved": "avatar-head-integrated.test.cjs tests exact body and animation source, face positions and approved proportions",
+  "formalEntrySha256": "7816d64e87b831531ffbfb4e176043e65ebaa589b662ac8741d04816740158f6",
+  "formalEntryUnchanged": true,
+  "originalApprovedPublic": {
+    "url": "https://bookmark-gear-screw-litigation.trycloudflare.com",
+    "files": [
+      {
+        "file": "index.html",
+        "http": 200,
+        "sha256": "bbcd0920a4b465865129648ea003af7f38d631dcf929ab4418cd0311241ae542",
+        "unchanged": true
+      },
+      {
+        "file": "avatar-deluxe.js",
+        "http": 200,
+        "sha256": "c728165ba255056ab9f26e62c2e29937f6d845a5f5584a7ff26ef2953afcff62",
+        "unchanged": true
+      }
+    ]
+  },
+  "formalDatabaseOpened": false,
+  "formalWrites": 0,
+  "rewardsIssued": 0,
+  "physicalIphoneUat": false,
+  "physicalIphoneStatus": "DEFERRED_BY_USER",
+  "integratedApproval": "PENDING",
+  "pass": true
+}
