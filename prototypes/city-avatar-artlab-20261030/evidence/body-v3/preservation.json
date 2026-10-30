@@ -1,0 +1,31 @@
+{
+  "at": "2026-10-30T03:15:50.125Z",
+  "frozenV2Sha256": "02e55e68452bfb7c3082623c8c0bd32d65285b80a1b57a2bb825ca22b6a9c0ac",
+  "frozenV2MatchesCommit": "5d7e6fd",
+  "headHairAnimationUnchanged": "avatar-v3.test.cjs tests exact source and local head geometry/materials",
+  "formalEntrySha256": "7816d64e87b831531ffbfb4e176043e65ebaa589b662ac8741d04816740158f6",
+  "formalEntryUnchanged": true,
+  "originalV2Public": {
+    "url": "https://gage-estimates-county-restaurant.trycloudflare.com",
+    "files": [
+      {
+        "file": "index.html",
+        "http": 200,
+        "sha256": "9dc46921ef58158118e9f9f6c7381329a39e4e78ee35f8e66b836fb31ffb413f",
+        "unchanged": true
+      },
+      {
+        "file": "avatar-deluxe.js",
+        "http": 200,
+        "sha256": "02e55e68452bfb7c3082623c8c0bd32d65285b80a1b57a2bb825ca22b6a9c0ac",
+        "unchanged": true
+      }
+    ]
+  },
+  "formalDatabaseOpened": false,
+  "formalWrites": 0,
+  "rewardsIssued": 0,
+  "physicalIphoneUat": false,
+  "bodyApproval": "PENDING",
+  "pass": true
+}

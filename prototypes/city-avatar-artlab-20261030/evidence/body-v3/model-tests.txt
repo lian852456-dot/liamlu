@@ -1,0 +1,17 @@
+✔ V2 frozen byte and V2/V3 head-hair-animation source stay exact (1.562333ms)
+✔ V3 keeps local face geometry/materials, lowers head pivot, and reaches 2.50 heads with a shorter body (1307.472167ms)
+ℹ v2 metrics {"meshCount":15,"drawUnits":15,"geometryCount":15,"materialCount":11,"vertexCount":10642,"indexCount":51732,"triangleCount":17244,"bufferBytes":569060}
+ℹ v3 metrics {"meshCount":15,"drawUnits":15,"geometryCount":15,"materialCount":11,"vertexCount":10642,"indexCount":51732,"triangleCount":17244,"bufferBytes":569060}
+✔ V2/V3 preserve animation, original gestures, finite transforms, and no external assets (1016.4775ms)
+✔ adapter routes new to V3, old to V2, and ordinary peers to original without profile version fields (1375.31425ms)
+✔ V3 body variants plateau across 20 swaps and preserve shared cache ownership (6619.785667ms)
+ℹ v3 body metrics {"meshCount":14,"drawUnits":14,"geometryCount":14,"materialCount":10,"vertexCount":9943,"indexCount":48510,"triangleCount":16170,"bufferBytes":531860}
+ℹ v3 ownership plateau [["{\"skin\":\"teal\",\"hair\":\"hair-bob\",\"outfit\":\"uniform\"}",{"geometries":14,"materials":57}],["{\"skin\":\"teal\",\"hair\":\"hair-pony\",\"outfit\":\"forest\"}",{"geometries":15,"materials":58}],["{\"skin\":\"teal\",\"hair\":\"hair-braids\",\"outfit\":\"ocean\"}",{"geometries":16,"materials":58}],["{\"skin\":\"teal\",\"hair\":\"hair-silver\",\"outfit\":\"rose\"}",{"geometries":14,"materials":57}]]
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10367.329834

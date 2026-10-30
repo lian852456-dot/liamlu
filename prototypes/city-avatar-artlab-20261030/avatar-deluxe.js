@@ -9,7 +9,7 @@
  const unitSphere=()=>baseGeo('sphere',()=>new T.SphereGeometry(1,16,10));
  const smallSphere=()=>baseGeo('small-sphere',()=>new T.SphereGeometry(1,12,6));
  function create(parent,options={}){
-  const g=new T.Group();parent?.add(g);g.name='artlab-deluxe-character';g.scale.setScalar(Number(options.scale)||1);g.userData={modelType:'character',artToy:true,artLabCandidate:true,version:'deluxe.2'};
+  const g=new T.Group();parent?.add(g);g.name='artlab-deluxe-character';g.scale.setScalar(Number(options.scale)||1);g.userData={modelType:'character',artToy:true,artLabCandidate:true,version:'deluxe.3'};
   const ownedG=new Set(),ownedM=new Set(),materials=new Map(),arms=[],legs=[],clothing=[];
   let disposed=false,skin=color(options.skin,PALETTE.orange),hairColor=color(options.hair,0xd2ad84),outfit='uniform',hairStyle='bob',baseColor=color(options.color,0x303036),profile={},blink=1,lastPhase=0,smileNode=null;
   const group=(p,x=0,y=0,z=0)=>{const n=new T.Group();n.position.set(x,y,z);p.add(n);return n;};
@@ -32,7 +32,8 @@
    for(let i=0;i<steps;i++)for(let j=0;j<sides;j++){const a=i*(sides+1)+j,b=a+sides+1;indices.push(a,b,a+1,b,b+1,a+1);}
    const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));geo.setIndex(indices);geo.computeVertexNormals();ownedG.add(geo);return mesh(p,geo,c,0,0,0,.46);
   }
-  const body=group(g),head=group(g,0,1.99,0),headSkin=group(head),face=group(head),hair=group(head),eyes=[],upperLids=[];
+  const bodyProportions=group(g,0,1.238-1.444*(.458/.542),0);bodyProportions.scale.set(1.04,.458/.542,1.06);
+  const body=group(bodyProportions),head=group(g,0,1.784,0),headSkin=group(head),face=group(head),hair=group(head),eyes=[],upperLids=[];
   function buildHead(){clear(headSkin);clear(face);eyes.length=0;upperLids.length=0;
    const geo=new T.SphereGeometry(.47,28,20),v=geo.attributes.position,colors=[];
    const base=new T.Color(skin),warm=new T.Color(0xefa19a);
@@ -101,9 +102,10 @@
     {y:-.505,rx:.084,rz:.087,x:side*.009,z:-.006,c:t.pants},
     {y:-.583,rx:.084,rz:.086,x:side*.006,z:-.010,c:t.pants},
     {y:-.608,rx:.081,rz:.082,x:side*.006,z:-.008,c:t.pants}
-   ],{segments:22});
+   ].map(r=>({...r,y:r.y*(.505/.653)+.045*(1-.505/.653),rx:r.rx*1.05,rz:r.rz*1.03})),{segments:22});
    // One last-shaped shoe: heel, ankle, instep and toe blend into one shell.
-   loft(leg,[
+   const shoe=group(leg,0,.1196,0);shoe.scale.setScalar(.94);
+   loft(shoe,[
     {y:-.800,rx:.129,rz:.187,z:.048,c:0xc5b9aa},
     {y:-.785,rx:.141,rz:.207,z:.052,c:0xe5dece},
     {y:-.754,rx:.142,rz:.211,z:.052,c:0xf4eee2},
@@ -114,11 +116,11 @@
     {y:-.592,rx:.080,rz:.084,z:-.029,c:0xddd6c8},
     {y:-.578,rx:.078,rz:.080,z:-.030,c:0xddd6c8}
    ].map(r=>({...r,y:r.y-.04})),{segments:24,shape:2.15});
-   for(const [y,z]of[[-.665,.155],[-.690,.185],[-.715,.207]])bodyCurve(leg,[[-.066,y,z],[0,y+.01,z+.012],[.066,y,z]],.008,0xfff9ed,5);
-   bodyCurve(leg,[[side*.130,-.731,-.025],[side*.138,-.719,.065],[side*.117,-.738,.165]],.010,t.accent,7);
+   for(const [y,z]of[[-.665,.155],[-.690,.185],[-.715,.207]])bodyCurve(shoe,[[-.066,y,z],[0,y+.01,z+.012],[.066,y,z]],.008,0xfff9ed,5);
+   bodyCurve(shoe,[[side*.130,-.731,-.025],[side*.138,-.719,.065],[side*.117,-.738,.165]],.010,t.accent,7);
    compile(leg);
   }
-  for(const side of[-1,1])legs.push(group(g,side*.137,.850,0));
+  for(const side of[-1,1])legs.push(group(g,side*.142,.680,0));
   function buildBody(t){clear(body);clothing.length=0;
    // A single curved jacket silhouette, from rounded hem to dropped shoulder.
    const coat=loft(body,[
@@ -166,10 +168,10 @@
      {y:-.430,x:side*.071,rx:.067,rz:.050,z:.050,c:skin,hand:.028},
      {y:-.467,x:side*.072,rx:.060,rz:.047,z:.051,c:skin,hand:.012},
      {y:-.492,x:side*.072,rx:.043,rz:.037,z:.052,c:skin}
-    ],{segments:22,thumbSide:side});compile(arm);
+    ].map(r=>({...r,y:r.y>=-.369?r.y*.90:r.y+.0369,rx:r.rx*1.015,rz:r.rz*1.015})),{segments:22,thumbSide:side});compile(arm);
    }
   }
-  for(const side of[-1,1])arms.push(group(g,side*.285,1.338,0));
+  for(const side of[-1,1])arms.push(group(g,side*.292,1.132,0));
   buildHead();buildHair(options.hairStyle||'bob',hairColor);buildBody(theme());
   function setAppearance(next={}){if(disposed)return;const nextSkin=PALETTE[next.skin]||skin,nextOutfit=String(next.outfit||'uniform').replace(/^outfit-/,''),nextHair=String(next.hair||'bob').replace(/^hair-/,''),nextTone=color(next.hairColor,({pony:0x6a4f3e,braids:0x6e4643,silver:0xb2b6bf})[nextHair]||color(options.hair,0x53473e));profile={...next};g.userData.avatarPreset=next.avatarPreset||'';
    if(nextSkin!==skin){skin=nextSkin;buildHead();buildBody(theme());}
@@ -181,7 +183,7 @@
    animate(phase,moving,sit=false,wave=false){if(disposed)return;lastPhase=Number(phase)||0;const t=lastPhase*.25,cycle=((t+1.3)%4.4),close=cycle<.13?Math.sin(cycle/.13*Math.PI):0;blink=1-close*.96;for(const eye of eyes)eye.scale.y=blink;if(smileNode)smileNode.scale.y=1+Math.sin(t*.7)*.045;
     g.position.y=sit?.34:moving?Math.abs(Math.sin(phase))*.026:Math.sin(t*1.6)*.008;body.scale.y=1+Math.sin(t*1.6)*.004;head.rotation.z=moving?Math.sin(phase*.5)*.018:Math.sin(t*.65)*.009;head.rotation.y=Math.sin(t*.47)*.018;
     legs.forEach((l,i)=>{l.rotation.x=sit?-1.16:moving?Math.sin(phase+i*Math.PI)*.43:0;l.rotation.z=sit?(i?-.04:.04):0;});arms.forEach((a,i)=>{a.rotation.x=sit?-.28:moving?-Math.sin(phase+i*Math.PI)*.33:Math.sin(t*.8+i)*.014;a.rotation.z=wave&&i===1?-2.1+Math.sin(phase*1.5)*.23:(i?-.065:.065);});
-   },state(){return {version:'deluxe.2',hair:hairStyle,outfit,blink,phase:lastPhase,disposed,profile:{...profile},ownedGeometries:ownedG.size,ownedMaterials:ownedM.size,sharedGeometries:shared.size};}
+   },state(){return {version:'deluxe.3',hair:hairStyle,outfit,blink,phase:lastPhase,disposed,profile:{...profile},ownedGeometries:ownedG.size,ownedMaterials:ownedM.size,sharedGeometries:shared.size};}
   };
  }
  root.CozyAvatarDeluxe=Object.freeze({create,themes:Object.keys(THEMES),sharedStats:()=>({geometries:shared.size}),isSharedResource:r=>[...shared.values()].includes(r)});
