@@ -2,3 +2,6 @@
 evidence/local-*/
 
 *.blend1
+# Personalized trial captures and identity readbacks remain local.
+evidence/three-people-trial/
+__pycache__/

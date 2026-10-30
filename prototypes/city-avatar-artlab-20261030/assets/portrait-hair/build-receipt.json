@@ -1,0 +1,71 @@
+{
+  "assetSet": "portrait-hair-20261030",
+  "scope": "isolated three-person trial assets; hair only; no employee IDs or source photos",
+  "styles": {
+    "a": {
+      "style": "a",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 5672,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 339112,
+      "sha256": "86e1e00634f3c3671c99e428694aeeaa9a32f31b64c867a1ca3dea11869760a7",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python editable layered volume cages with closed tapered strands, smooth normals and UV/PBR; not a manual sculpt claim"
+    },
+    "b": {
+      "style": "b",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 6168,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 357832,
+      "sha256": "c8e4dbce5c2ecca75c353b3534349245211082afde2f64d5d0db3a5ea0ef868c",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python editable layered volume cages with closed tapered strands, smooth normals and UV/PBR; not a manual sculpt claim"
+    },
+    "c": {
+      "style": "c",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 7752,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 414668,
+      "sha256": "b0825d2e2abfe8fe2bec8b8c1ca6f3fa885edf6c83ad39859aed4e49e8ca43ee",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python editable layered volume cages with closed tapered strands, smooth normals and UV/PBR; not a manual sculpt claim"
+    }
+  },
+  "visualReferences": {
+    "a": "dark-brown center-part low-tied hair",
+    "b": "near-black short pixie crop",
+    "c": "dark-brown center-part long layered hair"
+  },
+  "limits": [
+    "No hair physics",
+    "No transparent cards",
+    "No face/body/rig",
+    "Not formal city deployment"
+  ]
+}

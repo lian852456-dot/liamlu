@@ -1,0 +1,114 @@
+{
+  "scope": "Independent anonymous three-person portrait candidate",
+  "baseCommit": "62379261031f7b283ce039c60cca12670588a342",
+  "formalDeployment": false,
+  "originalCityWrites": 0,
+  "repeatedPortraitReward": false,
+  "physicalIphoneUat": false,
+  "visualApproval": "PENDING_USER_REVIEW",
+  "sourcePhotosOrEmployeeIdsPublished": false,
+  "hairAssets": {
+    "a": {
+      "style": "a",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 5672,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 339112,
+      "sha256": "86e1e00634f3c3671c99e428694aeeaa9a32f31b64c867a1ca3dea11869760a7",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python editable layered volume cages with closed tapered strands, smooth normals and UV/PBR; not a manual sculpt claim"
+    },
+    "b": {
+      "style": "b",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 6168,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 357832,
+      "sha256": "c8e4dbce5c2ecca75c353b3534349245211082afde2f64d5d0db3a5ea0ef868c",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python editable layered volume cages with closed tapered strands, smooth normals and UV/PBR; not a manual sculpt claim"
+    },
+    "c": {
+      "style": "c",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 7752,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 414668,
+      "sha256": "b0825d2e2abfe8fe2bec8b8c1ca6f3fa885edf6c83ad39859aed4e49e8ca43ee",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python editable layered volume cages with closed tapered strands, smooth normals and UV/PBR; not a manual sculpt claim"
+    }
+  },
+  "staticReadback": {
+    "files": 86,
+    "negativePaths": 11,
+    "pass": true
+  },
+  "preservation": {
+    "approvedFiles": 16,
+    "previousPreviewAssets": 7,
+    "pass": true
+  },
+  "functional": [
+    "three stable trial UID/preset mappings",
+    "unknown ID rejection and no guest creation",
+    "reload and separate contexts",
+    "walk/save/readback",
+    "wardrobe restoration",
+    "personalized peer via WebSocket",
+    "three sofa sits and return",
+    "preview focus after resize"
+  ],
+  "toggleResources": {
+    "chromium": {
+      "rounds": 40,
+      "pass": true,
+      "oldVersion": "blender-hair.2",
+      "newVersion": "portrait-trial.1",
+      "finalLiveClones": 1,
+      "created": 22,
+      "released": 21,
+      "contextLost": false
+    },
+    "webkit": {
+      "rounds": 40,
+      "pass": true,
+      "oldVersion": "blender-hair.2",
+      "newVersion": "portrait-trial.1",
+      "finalLiveClones": 1,
+      "created": 22,
+      "released": 21,
+      "contextLost": false
+    }
+  },
+  "limits": [
+    "Browser retained-resource checks are not iOS process/VRAM measurements",
+    "Generic renderer caches warm once; not a zero-delta memory claim",
+    "No formal business authentication, wallet migration or identity deployment",
+    "Likeness and inferred rear hairstyles require personal review"
+  ]
+}
