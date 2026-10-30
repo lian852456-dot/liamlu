@@ -1,16 +1,17 @@
 {
   "name": "north12b-avatar-artlab",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test avatar-v3.test.cjs",
+    "test": "node --test avatar-v4.test.cjs",
     "test:integration": "node integration-browser.cjs",
+    "test:wardrobe": "node wardrobe-browser.cjs",
     "test:preview": "node acceptance-browser.cjs",
-    "capture": "node capture-body-v3.cjs"
+    "capture": "node capture-body-v4.cjs"
   },
   "devDependencies": {
     "playwright": "1.47.0"

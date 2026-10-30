@@ -1,0 +1,31 @@
+{
+  "at": "2026-10-30T03:22:06.701Z",
+  "frozenV3Sha256": "ee36c4decb9813ab7465171c6e589c9155009a5c41401dd738681a21c8e270d8",
+  "frozenV3MatchesCommit": "755861de3ad91da9e47ff1a630b0e57004bba556",
+  "headHairAnimationUnchanged": "avatar-v4.test.cjs tests exact source and local head geometry/materials",
+  "formalEntrySha256": "7816d64e87b831531ffbfb4e176043e65ebaa589b662ac8741d04816740158f6",
+  "formalEntryUnchanged": true,
+  "originalV3Public": {
+    "url": "https://newspaper-casino-adopted-seems.trycloudflare.com",
+    "files": [
+      {
+        "file": "index.html",
+        "http": 200,
+        "sha256": "2979e241b4e5c5f9c33615f8c0b94b7a7631c7760913ff541e1664eb9dc733a8",
+        "unchanged": true
+      },
+      {
+        "file": "avatar-deluxe.js",
+        "http": 200,
+        "sha256": "ee36c4decb9813ab7465171c6e589c9155009a5c41401dd738681a21c8e270d8",
+        "unchanged": true
+      }
+    ]
+  },
+  "formalDatabaseOpened": false,
+  "formalWrites": 0,
+  "rewardsIssued": 0,
+  "physicalIphoneUat": false,
+  "bodyApproval": "PENDING",
+  "pass": true
+}
