@@ -9,7 +9,7 @@
  const unitSphere=()=>baseGeo('sphere',()=>new T.SphereGeometry(1,16,10));
  const smallSphere=()=>baseGeo('small-sphere',()=>new T.SphereGeometry(1,12,6));
  function create(parent,options={}){
-  const g=new T.Group();parent?.add(g);g.name='artlab-deluxe-character';g.scale.setScalar(Number(options.scale)||1);g.userData={modelType:'character',artToy:true,artLabCandidate:true,version:'deluxe.1'};
+  const g=new T.Group();parent?.add(g);g.name='artlab-deluxe-character';g.scale.setScalar(Number(options.scale)||1);g.userData={modelType:'character',artToy:true,artLabCandidate:true,version:'deluxe.2'};
   const ownedG=new Set(),ownedM=new Set(),materials=new Map(),arms=[],legs=[],clothing=[];
   let disposed=false,skin=color(options.skin,PALETTE.orange),hairColor=color(options.hair,0xd2ad84),outfit='uniform',hairStyle='bob',baseColor=color(options.color,0x303036),profile={},blink=1,lastPhase=0,smileNode=null;
   const group=(p,x=0,y=0,z=0)=>{const n=new T.Group();n.position.set(x,y,z);p.add(n);return n;};
@@ -70,32 +70,106 @@
    compile(hair);
   }
   const theme=()=>outfit==='uniform'?{...THEMES.uniform,top:baseColor}:(THEMES[outfit]||{...THEMES.uniform,top:baseColor});
-  function buildLeg(leg,theme){clear(leg);const pantGeo=new T.CapsuleGeometry(.108,.37,5,14);ownedG.add(pantGeo);const pant=mesh(leg,pantGeo,theme.pants,0,-.276,0);pant.scale.z=1.10;ell(leg,0x414046,0,-.54,.019,.116,.046,.128,true);
-   ell(leg,0xe8e3d5,0,-.662,.072,.145,.096,.245);ell(leg,0xf8f2e7,0,-.626,.045,.132,.111,.205);ell(leg,0xc5b9aa,0,-.719,.086,.148,.022,.239);ell(leg,0xe9c9a6,.096,-.63,.081,.032,.027,.122,true);
-   for(const y of[-.588,-.621,-.654])curve(leg,[[-.07,y,.203],[0,y+.015,.227],[.07,y,.203]],.009,0xfff9ec,5,4);
-   curve(leg,[[.13,-.66,-.06],[.14,-.642,.06],[.115,-.66,.18]],.012,theme.accent,7,4);
-   curve(leg,[[-.12,-.651,.17],[-.10,-.678,.238],[.08,-.678,.244],[.125,-.651,.173]],.007,0xd5c7b2,8,4);compile(leg);
+  // All body surfaces use the same matte vertex-color material. Clothing and
+  // hands can meet continuously without separate cylindrical joint pieces.
+  function bodyMaterial(){const key='body-sculpt-vertex';if(!materials.has(key)){const m=new T.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.72});materials.set(key,m);ownedM.add(m);}return materials.get(key);}
+  function loft(parent,rings,{segments=24,shape=2,thumbSide=0}={}){
+   const positions=[],colors=[],indices=[],step=segments+1,ascending=rings[rings.length-1].y>rings[0].y;
+   for(let i=0;i<rings.length;i++){const r=rings[i],c=new T.Color(r.c);
+    for(let j=0;j<=segments;j++){const a=j/segments*Math.PI*2,co=Math.cos(a),si=Math.sin(a),u=Math.sign(co)*Math.pow(Math.abs(co),2/shape),v=Math.sign(si)*Math.pow(Math.abs(si),2/shape);
+     const thumb=thumbSide&&r.hand?Math.pow(Math.max(0,-thumbSide*co*.83+si*.56),8)*r.hand:0;
+     positions.push((r.x||0)+(r.rx+thumb)*u,r.y-(r.slope||0)*Math.pow(Math.abs(co),1.5),(r.z||0)+(r.rz+thumb*.65)*v);colors.push(c.r,c.g,c.b);
+    }
+   }
+   for(let i=0;i<rings.length-1;i++)for(let j=0;j<segments;j++){const a=i*step+j,b=a+step;indices.push(...(ascending?[a,b,a+1,b,b+1,a+1]:[a,a+1,b,b,a+1,b+1]));}
+   for(const end of[0,rings.length-1]){const r=rings[end],c=new T.Color(r.c),center=positions.length/3;positions.push(r.x||0,r.y,r.z||0);colors.push(c.r,c.g,c.b);for(let j=0;j<segments;j++){const a=end*step+j;indices.push(...((end===0)===ascending?[center,a,a+1]:[center,a+1,a]));}}
+   const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));geo.setIndex(indices);geo.computeVertexNormals();const n=geo.attributes.normal;
+   for(let i=0;i<rings.length;i++){const a=i*step,b=a+segments,v=new T.Vector3(n.getX(a)+n.getX(b),n.getY(a)+n.getY(b),n.getZ(a)+n.getZ(b)).normalize();n.setXYZ(a,v.x,v.y,v.z);n.setXYZ(b,v.x,v.y,v.z);}
+   ownedG.add(geo);return mesh(parent,geo,bodyMaterial());
   }
-  for(const side of[-1,1]){const leg=group(g,side*.153,.828,0);legs.push(leg);}
-  function buildBody(theme){clear(body);clothing.length=0;
-   const torsoGeo=new T.LatheGeometry([new T.Vector2(0,0),new T.Vector2(.245,0),new T.Vector2(.29,.07),new T.Vector2(.293,.25),new T.Vector2(.255,.42),new T.Vector2(.18,.49),new T.Vector2(.10,.49)],22);ownedG.add(torsoGeo);const torso=mesh(body,torsoGeo,theme.top,0,.923,0);torso.scale.z=.73;clothing.push(torso);
-   ell(body,theme.pants,0,.864,0,.256,.137,.179);ell(body,theme.top,0,.952,0,.284,.064,.211);ell(body,skin,0,1.45,0,.096,.13,.085,true);
-   const collarGeo=new T.TorusGeometry(.114,.032,7,22);ownedG.add(collarGeo);const collar=mesh(body,collarGeo,theme.top,0,1.435,.01);collar.rotation.x=Math.PI/2;
-   for(const side of[-1,1]){curve(body,[[side*.025,1.435,.115],[side*.124,1.379,.20],[side*.155,1.341,.213]],.023,theme.trim,7,5);curve(body,[[side*.238,1.264,.161],[side*.237,1.10,.174],[side*.222,.99,.166]],.006,0x555052,7,4);}
-   curve(body,[[0,1.36,.207],[0,1.18,.219],[0,.967,.191]],.009,theme.trim,9,4);ell(body,0xc6baaa,0,1.31,.228,.021,.032,.015,true,.46);
-   // Small bag, curved strap, cuffs, ribbed hems and zip remain true geometry.
-   curve(body,[[-.20,1.39,.16],[-.11,1.23,.237],[.03,1.04,.254],[.25,.96,.165]],.022,0x807a6f,14,5);
+  function bodyCurve(parent,points,r,c,segments=10){const path=new T.CatmullRomCurve3(points.map(v=>new T.Vector3(...v))),geo=new T.TubeGeometry(path,segments,r,5,false),color=new T.Color(c),values=[];for(let i=0;i<geo.attributes.position.count;i++)values.push(color.r,color.g,color.b);geo.setAttribute('color',new T.Float32BufferAttribute(values,3));ownedG.add(geo);return mesh(parent,geo,bodyMaterial());}
+  function buildLeg(leg,t){clear(leg);const side=Math.sign(leg.position.x);
+   // A full thigh eases into a bent knee and tapered calf, instead of a pole.
+   loft(leg,[
+    {y:.045,rx:.104,rz:.117,z:-.006,c:t.pants},
+    {y:.005,rx:.124,rz:.128,z:-.007,c:t.pants},
+    {y:-.075,rx:.128,rz:.129,z:-.003,c:t.pants},
+    {y:-.17,rx:.118,rz:.122,x:side*.004,z:.008,c:t.pants},
+    {y:-.265,rx:.104,rz:.112,x:side*.009,z:.027,c:t.pants},
+    {y:-.34,rx:.099,rz:.103,x:side*.014,z:.025,c:t.pants},
+    {y:-.43,rx:.092,rz:.096,x:side*.013,z:.007,c:t.pants},
+    {y:-.505,rx:.084,rz:.087,x:side*.009,z:-.006,c:t.pants},
+    {y:-.583,rx:.084,rz:.086,x:side*.006,z:-.010,c:t.pants},
+    {y:-.608,rx:.081,rz:.082,x:side*.006,z:-.008,c:t.pants}
+   ],{segments:22});
+   // One last-shaped shoe: heel, ankle, instep and toe blend into one shell.
+   loft(leg,[
+    {y:-.800,rx:.129,rz:.187,z:.048,c:0xc5b9aa},
+    {y:-.785,rx:.141,rz:.207,z:.052,c:0xe5dece},
+    {y:-.754,rx:.142,rz:.211,z:.052,c:0xf4eee2},
+    {y:-.728,rx:.137,rz:.205,z:.048,c:0xf7f1e6},
+    {y:-.696,rx:.128,rz:.186,z:.037,c:0xf7f1e6},
+    {y:-.658,rx:.116,rz:.153,z:.013,c:0xf7f1e6},
+    {y:-.622,rx:.098,rz:.112,z:-.014,c:0xf7f1e6},
+    {y:-.592,rx:.080,rz:.084,z:-.029,c:0xddd6c8},
+    {y:-.578,rx:.078,rz:.080,z:-.030,c:0xddd6c8}
+   ].map(r=>({...r,y:r.y-.04})),{segments:24,shape:2.15});
+   for(const [y,z]of[[-.665,.155],[-.690,.185],[-.715,.207]])bodyCurve(leg,[[-.066,y,z],[0,y+.01,z+.012],[.066,y,z]],.008,0xfff9ed,5);
+   bodyCurve(leg,[[side*.130,-.731,-.025],[side*.138,-.719,.065],[side*.117,-.738,.165]],.010,t.accent,7);
+   compile(leg);
+  }
+  for(const side of[-1,1])legs.push(group(g,side*.137,.850,0));
+  function buildBody(t){clear(body);clothing.length=0;
+   // A single curved jacket silhouette, from rounded hem to dropped shoulder.
+   const coat=loft(body,[
+    {y:.902,rx:.244,rz:.177,z:.008,c:t.top},
+    {y:.925,rx:.262,rz:.194,z:.009,c:t.top},
+    {y:.972,rx:.273,rz:.211,z:.013,c:t.top},
+    {y:1.055,rx:.298,rz:.221,z:.014,c:t.top},
+    {y:1.145,rx:.297,rz:.215,z:.008,c:t.top},
+    {y:1.235,rx:.290,rz:.204,z:.003,c:t.top},
+    {y:1.305,rx:.282,rz:.187,z:0,c:t.top,slope:.022},
+    {y:1.354,rx:.255,rz:.166,z:0,c:t.top,slope:.026},
+    {y:1.391,rx:.220,rz:.140,z:0,c:t.top,slope:.018},
+    {y:1.425,rx:.151,rz:.112,z:0,c:t.top,slope:.007},
+    {y:1.444,rx:.104,rz:.090,z:0,c:t.top}
+   ],{segments:28});clothing.push(coat);
+   // Hips flow under the hem into the two thighs, without a separate oval pad.
+   loft(body,[{y:.953,rx:.224,rz:.171,c:t.pants},{y:.905,rx:.244,rz:.178,c:t.pants},{y:.847,rx:.222,rz:.166,z:-.004,c:t.pants},{y:.816,rx:.174,rz:.143,z:-.004,c:t.pants},{y:.805,rx:.105,rz:.109,c:t.pants}],{segments:26});
+   ell(body,skin,0,1.46,0,.085,.105,.079,true);
+   const collarGeo=new T.TorusGeometry(.104,.027,7,22);ownedG.add(collarGeo);const collar=mesh(body,collarGeo,t.top,0,1.447,.004);collar.rotation.x=Math.PI/2;
+   for(const side of[-1,1]){curve(body,[[side*.025,1.435,.111],[side*.119,1.381,.153],[side*.158,1.342,.169]],.020,t.trim,7,5);curve(body,[[side*.243,1.25,.144],[side*.248,1.11,.147],[side*.230,.981,.145]],.0045,0x555052,7,4);}
+   curve(body,[[0,1.36,.167],[0,1.18,.224],[0,.942,.201]],.008,t.trim,10,4);ell(body,0xc6baaa,0,1.31,.200,.019,.029,.013,true,.46);
+   // Keep the same outfit/accessories as V1; only re-seat them on the new shell.
+   curve(body,[[-.20,1.39,.14],[-.11,1.23,.227],[.03,1.04,.250],[.25,.96,.165]],.022,0x807a6f,14,5);
    const bag=ell(body,0x77756d,.249,1.014,.098,.137,.145,.102);bag.rotation.z=-.12;ell(body,0x8e8b80,.252,1.038,.187,.111,.066,.018,true);
-   for(const side of[-1,1])ell(body,theme.accent,side*.279,1.04,.004,.022,.022,.049,true);
-   for(let i=0;i<11;i++){const a=-1.12+i*.224;curve(body,[[Math.sin(a)*.268,.946,Math.cos(a)*.205],[Math.sin(a)*.271,.988,Math.cos(a)*.207]],.0035,theme.trim,2,3);}
-   if(outfit==='forest'||outfit==='ocean'){ell(body,theme.pants,0,1.18,-.234,.216,.24,.084);curve(body,[[-.17,1.39,-.077],[-.18,1.14,.18],[-.16,.98,.16]],.022,theme.trim,9,5);}
-   compile(body);legs.forEach(l=>buildLeg(l,theme));
-   for(let i=0;i<2;i++){const arm=arms[i],side=i?1:-1;clear(arm);const sleeveGeo=new T.CapsuleGeometry(.105,.20,5,14);ownedG.add(sleeveGeo);const sleeve=mesh(arm,sleeveGeo,theme.top,side*.01,-.155,.003);sleeve.scale.z=1.08;ell(arm,theme.trim,side*.026,-.332,.02,.112,.043,.118,true);
-    ell(arm,skin,side*.028,-.418,.025,.087,.098,.079);ell(arm,skin,-side*.035,-.403,.087,.042,.058,.04,true);for(let f=0;f<3;f++)ell(arm,skin,side*.028+(f-1)*.034,-.472,.055,.018,.024,.026,true);
-    curve(arm,[[-.07,-.27,.102],[0,-.291,.122],[.073,-.27,.102]],.006,theme.trim,6,4);compile(arm);
+   for(const side of[-1,1])ell(body,t.accent,side*.270,1.04,.004,.019,.020,.041,true);
+   if(outfit==='forest'||outfit==='ocean'){ell(body,t.pants,0,1.18,-.234,.216,.24,.084);curve(body,[[-.17,1.39,-.077],[-.18,1.14,.18],[-.16,.98,.16]],.022,t.trim,9,5);}
+   compile(body);legs.forEach(l=>buildLeg(l,t));
+   for(let i=0;i<2;i++){const arm=arms[i],side=i?1:-1;clear(arm);
+    // The sleeve starts inside the sloping shoulder, curves at the elbow and
+    // narrows into a small wrist. Skin and cuff are continuous vertex bands.
+    loft(arm,[
+     {y:.060,x:-side*.055,rx:.008,rz:.012,z:-.006,c:t.top},
+     {y:.040,x:-side*.040,rx:.042,rz:.058,z:-.005,c:t.top},
+     {y:.010,x:-side*.020,rx:.078,rz:.091,z:-.003,c:t.top},
+     {y:-.035,x:side*.010,rx:.102,rz:.109,z:0,c:t.top},
+     {y:-.090,x:side*.032,rx:.109,rz:.108,z:.005,c:t.top},
+     {y:-.120,x:side*.045,rx:.108,rz:.105,z:.008,c:t.top},
+     {y:-.195,x:side*.060,rx:.099,rz:.098,z:.024,c:t.top},
+     {y:-.265,x:side*.068,rx:.089,rz:.088,z:.039,c:t.top},
+     {y:-.320,x:side*.069,rx:.078,rz:.079,z:.043,c:t.top},
+     {y:-.341,x:side*.069,rx:.079,rz:.079,z:.044,c:t.trim},
+     {y:-.361,x:side*.069,rx:.075,rz:.074,z:.045,c:t.trim},
+     {y:-.369,x:side*.069,rx:.056,rz:.055,z:.046,c:skin},
+     {y:-.395,x:side*.070,rx:.062,rz:.049,z:.049,c:skin,hand:.023},
+     {y:-.430,x:side*.071,rx:.067,rz:.050,z:.050,c:skin,hand:.028},
+     {y:-.467,x:side*.072,rx:.060,rz:.047,z:.051,c:skin,hand:.012},
+     {y:-.492,x:side*.072,rx:.043,rz:.037,z:.052,c:skin}
+    ],{segments:22,thumbSide:side});compile(arm);
    }
   }
-  for(const side of[-1,1])arms.push(group(g,side*.365,1.393,0));
+  for(const side of[-1,1])arms.push(group(g,side*.285,1.338,0));
   buildHead();buildHair(options.hairStyle||'bob',hairColor);buildBody(theme());
   function setAppearance(next={}){if(disposed)return;const nextSkin=PALETTE[next.skin]||skin,nextOutfit=String(next.outfit||'uniform').replace(/^outfit-/,''),nextHair=String(next.hair||'bob').replace(/^hair-/,''),nextTone=color(next.hairColor,({pony:0x6a4f3e,braids:0x6e4643,silver:0xb2b6bf})[nextHair]||color(options.hair,0x53473e));profile={...next};g.userData.avatarPreset=next.avatarPreset||'';
    if(nextSkin!==skin){skin=nextSkin;buildHead();buildBody(theme());}
@@ -107,7 +181,7 @@
    animate(phase,moving,sit=false,wave=false){if(disposed)return;lastPhase=Number(phase)||0;const t=lastPhase*.25,cycle=((t+1.3)%4.4),close=cycle<.13?Math.sin(cycle/.13*Math.PI):0;blink=1-close*.96;for(const eye of eyes)eye.scale.y=blink;if(smileNode)smileNode.scale.y=1+Math.sin(t*.7)*.045;
     g.position.y=sit?.34:moving?Math.abs(Math.sin(phase))*.026:Math.sin(t*1.6)*.008;body.scale.y=1+Math.sin(t*1.6)*.004;head.rotation.z=moving?Math.sin(phase*.5)*.018:Math.sin(t*.65)*.009;head.rotation.y=Math.sin(t*.47)*.018;
     legs.forEach((l,i)=>{l.rotation.x=sit?-1.16:moving?Math.sin(phase+i*Math.PI)*.43:0;l.rotation.z=sit?(i?-.04:.04):0;});arms.forEach((a,i)=>{a.rotation.x=sit?-.28:moving?-Math.sin(phase+i*Math.PI)*.33:Math.sin(t*.8+i)*.014;a.rotation.z=wave&&i===1?-2.1+Math.sin(phase*1.5)*.23:(i?-.065:.065);});
-   },state(){return {version:'deluxe.1',hair:hairStyle,outfit,blink,phase:lastPhase,disposed,profile:{...profile},ownedGeometries:ownedG.size,ownedMaterials:ownedM.size,sharedGeometries:shared.size};}
+   },state(){return {version:'deluxe.2',hair:hairStyle,outfit,blink,phase:lastPhase,disposed,profile:{...profile},ownedGeometries:ownedG.size,ownedMaterials:ownedM.size,sharedGeometries:shared.size};}
   };
  }
  root.CozyAvatarDeluxe=Object.freeze({create,themes:Object.keys(THEMES),sharedStats:()=>({geometries:shared.size}),isSharedResource:r=>[...shared.values()].includes(r)});

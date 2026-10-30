@@ -1,0 +1,43 @@
+{
+  "at": "2026-10-30T02:59:30.335Z",
+  "frozenV1Sha256": "f4434d435e4c8c7c71846759a8e4a824f42b44195f74697d9a0fbc1576694a9a",
+  "frozenV1MatchesCommit": "b1762c6",
+  "preserved": {
+    "head": {
+      "sha256": "faa4a4f15b59b2c2cd2419f549c6379a7719700f531a94ffb051002254b68d60",
+      "identical": true
+    },
+    "hair": {
+      "sha256": "0eed3d664d69a2b9f3ebd2ccb199001f76ce371ff38f29e19b38952d97fa787e",
+      "identical": true
+    },
+    "animation": {
+      "sha256": "192b0ded2b612359928e1a5fc7fea98c597b8066351b8e1aa658329dff621f5b",
+      "identical": true
+    }
+  },
+  "v2Sha256": "02e55e68452bfb7c3082623c8c0bd32d65285b80a1b57a2bb825ca22b6a9c0ac",
+  "originalV1Public": {
+    "url": "https://counting-molecular-traveling-blocked.trycloudflare.com",
+    "files": [
+      {
+        "file": "index.html",
+        "sha256": "36dab0a97e2163d2034074e0d692d4cc9eaf26eb3ad275bc3d5a849943e5df2a",
+        "http": 200,
+        "unchanged": true
+      },
+      {
+        "file": "avatar-deluxe.js",
+        "sha256": "f4434d435e4c8c7c71846759a8e4a824f42b44195f74697d9a0fbc1576694a9a",
+        "http": 200,
+        "unchanged": true
+      }
+    ]
+  },
+  "formalEntrySha256": "7816d64e87b831531ffbfb4e176043e65ebaa589b662ac8741d04816740158f6",
+  "formalEntryUnchanged": true,
+  "formalDatabaseOpened": false,
+  "formalWrites": 0,
+  "rewardsIssued": 0,
+  "pass": true
+}
