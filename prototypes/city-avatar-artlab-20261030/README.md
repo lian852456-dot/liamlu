@@ -1,3 +1,19 @@
+# Blender＋GLB 單一短髮示範
+
+以使用者確認的 `head-integrated.1` 為基準，只重製短髮（bob）。原眼睛、臉型、皮膚、2.5 頭身、身體與肩頸、動畫均保留。其他髮型、普通同伴與 NPC 沿用原系統。
+
+[可旋轉 3D 比較](https://ciao-wrap-joel-sydney.trycloudflare.com/) 可切換「目前程式化髮型／Blender 精緻髮型」，也可進入獨立城市。比較、成本及驗證見 [本輪報告](evidence/blender-hair-v1/REPORT.md)。預覽仍於台北 **2026-10-31 23:59** 關閉，實體 iPhone 依使用者安排延後驗證。
+
+Blender 4.5.15 LTS 實際建立可編輯控制網格、細分曲面、UV 與貼圖，匯出 `assets/hair-glb/short-bob-v1.glb`。這是以 Blender Python 定義造型並使用 Blender 建模／匯出工具的示範，不宣稱美術師手工雕刻。保留 `.blend`、建模腳本與校驗收據；沒有新增技能或付費工具。GLB 單一 primitive、單一不透明材質；不通過既有會丟棄 tangent 的模型合併流程。
+
+`avatar-deluxe-integrated.js` 是確認版的精確凍結；`hair-glb.js` 只管理共用模型／貼圖與各角色的髮色材質。`avatar-deluxe.js` 只在選擇 bob 時掛上 GLB。載入失敗保留原程式化短髮，不更動 profile 或多人協定。示範採全新獨立存檔，正式城市及原角色資料未開啟或修改。
+
+本機入口 `http://127.0.0.1:4694/`。`npm test` 驗證固定基準與資源生命週期，`node hair-integration-browser.cjs` 驗證玩法，`node hair-memory-browser.cjs` 測試實際 GLB 的 40 輪切換，`node hair-performance.cjs` 分開暖機比較 Mac WebKit。這些桌面引擎與繪圖資源計數不等於實體 iPhone 或 Safari 程序記憶體驗收。
+
+---
+
+以下保留前版歷史紀錄，入口、版本與驗證以上段及本輪報告為準。
+
 # 頭部整合比較版：原版眼睛＋精緻髮型與皮膚
 
 依本輪確認方向，眼睛完整還原定版原始眼白、虹膜、瞳孔、高光比例與材質；保留前版精緻皮膚與立體髮型。側髮控制點／髮尾小幅整理，頭髮反光更柔和。2.5 頭身、臉型、五官位置、身體與肩頸保持定版。

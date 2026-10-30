@@ -1,0 +1,17 @@
+{
+  "blenderVersion": "4.5.15 LTS",
+  "buildHash": "5afeabba6097",
+  "objects": 1,
+  "triangles": 6484,
+  "materialCount": 1,
+  "transparency": false,
+  "hairPhysics": false,
+  "authoring": "Blender Python authored volume cages + subdivision + UV/PBR; no manual sculpt claim",
+  "glbBytes": 327908,
+  "sha256": "b4e533684792f8b5e0655ea0a50a4f49066a20bd8627429a4aa2d615f61dfc60",
+  "textures": {
+    "color": 512,
+    "normal": 256,
+    "orm": 256
+  }
+}
