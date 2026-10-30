@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-30T03:41:19.131Z",
+  "scope": "exact head skin vs collar vertices, edge midpoints and face centers; supported motions plus yaw +/-60deg, pitch +/-0.12rad",
+  "poses": 744,
+  "rayChecks": 181644,
+  "minimumConservativeClearance": 0.001002392540169872,
+  "neutral": {
+    "headMinY": 1.3234000113010407,
+    "approvedCollarTopY": 1.3072915322560665,
+    "revisedCollarTopY": 1.2878561062900782,
+    "approvedExposedInterval": 0.016108479044974144,
+    "revisedExposedInterval": 0.035543905010962495,
+    "collarLoweredBy": 0.01943542596598835
+  },
+  "headPositionUnchanged": true,
+  "collarIntersections": 0,
+  "physicalIphoneUat": false,
+  "pass": true
+}
