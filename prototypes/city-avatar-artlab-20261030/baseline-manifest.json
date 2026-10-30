@@ -1,7 +1,7 @@
 {
   "baseRelease": "20261030-employee.3",
   "scope": "Independent art lab; original data and entry untouched",
-  "worldDelta": "Only local artLabDemo factory selector and isolated near-character camera (centering flag/reset); no position/network/physics/persistence changes.",
+  "worldDelta": "Isolated local/selected-QA actor renderer options, full/head comparison camera and separate presentation-only lighting; no movement, network packet, physics or save contract changes.",
   "files": [
     {
       "file": "base/ambient-occlusion.js",
@@ -438,11 +438,12 @@
     },
     {
       "file": "base/world.js",
-      "sha256": "7e40f1d6bf5a0fcbbaa61a59e2bf7360dc2ffe35473bbdff9995a2faf5ff18d5",
+      "sha256": "ef242a8a557614154fdac6dfeec47e4369e2f3c916500f2716551a61f3a4499c",
       "originalSha256": "daf0f20c44b04cd039470c03467f94ecc76141b71f63f2e3703e515b96d7f7ad"
     }
   ],
   "changedFromPublicBase": [
     "base/world.js"
-  ]
+  ],
+  "approvedCharacterBase": "db15e88bec2d62a297f35fb25b1b0712ca6bc095"
 }

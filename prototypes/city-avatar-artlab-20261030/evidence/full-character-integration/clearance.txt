@@ -1,0 +1,1 @@
+{"pass":true,"samples":310,"minClearance":0.007039487056407057}

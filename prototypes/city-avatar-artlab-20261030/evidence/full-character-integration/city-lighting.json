@@ -1,0 +1,265 @@
+{
+  "presentationOnly": true,
+  "physicalIphoneUat": false,
+  "formalWrites": 0,
+  "cases": [
+    {
+      "key": "procedural",
+      "light": "day",
+      "daylight": {
+        "phase": "day",
+        "label": "白天",
+        "sky": 10145255,
+        "fog": 13229288,
+        "sunColor": 16773076,
+        "intensity": 3.6,
+        "hemiIntensity": 0.46,
+        "environmentIntensity": 0.16,
+        "nightFactor": 0,
+        "warmFactor": 0,
+        "taipeiMinutes": 720,
+        "synced": true
+      },
+      "presentation": {
+        "framing": "full",
+        "lightingEpoch": 1793332800000,
+        "targetHeight": 1.3372750115513803
+      },
+      "camera": {
+        "fov": 35,
+        "x": 3.5,
+        "y": 1.78,
+        "z": 5,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "version": "head-integrated.1",
+      "profile": {
+        "character": "violet",
+        "skin": "orange",
+        "hair": "hair-bob",
+        "outfit": "outfit-uniform",
+        "hairColor": "#d2ad84"
+      },
+      "contextLost": false
+    },
+    {
+      "key": "integrated-v2",
+      "light": "day",
+      "daylight": {
+        "phase": "day",
+        "label": "白天",
+        "sky": 10145255,
+        "fog": 13229288,
+        "sunColor": 16773076,
+        "intensity": 3.6,
+        "hemiIntensity": 0.46,
+        "environmentIntensity": 0.16,
+        "nightFactor": 0,
+        "warmFactor": 0,
+        "taipeiMinutes": 720,
+        "synced": true
+      },
+      "presentation": {
+        "framing": "full",
+        "lightingEpoch": 1793332800000,
+        "targetHeight": 1.3372750115513803
+      },
+      "camera": {
+        "fov": 35,
+        "x": 3.5,
+        "y": 1.78,
+        "z": 5,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "hairSource": "blender-glb",
+      "version": "blender-hair.2",
+      "profile": {
+        "character": "violet",
+        "skin": "orange",
+        "hair": "hair-bob",
+        "outfit": "outfit-uniform",
+        "hairColor": "#d2ad84"
+      },
+      "contextLost": false
+    },
+    {
+      "key": "procedural",
+      "light": "dusk",
+      "daylight": {
+        "phase": "dusk",
+        "label": "夕陽",
+        "sky": 15706736,
+        "fog": 14200203,
+        "sunColor": 16750936,
+        "intensity": 2.1,
+        "hemiIntensity": 0.5,
+        "environmentIntensity": 0.21,
+        "nightFactor": 0.38,
+        "warmFactor": 0.96,
+        "taipeiMinutes": 1080,
+        "synced": true
+      },
+      "presentation": {
+        "framing": "full",
+        "lightingEpoch": 1793354400000,
+        "targetHeight": 1.3372750115513803
+      },
+      "camera": {
+        "fov": 35,
+        "x": 3.5,
+        "y": 1.78,
+        "z": 5,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "version": "head-integrated.1",
+      "profile": {
+        "character": "violet",
+        "skin": "orange",
+        "hair": "hair-bob",
+        "outfit": "outfit-uniform",
+        "hairColor": "#d2ad84"
+      },
+      "contextLost": false
+    },
+    {
+      "key": "integrated-v2",
+      "light": "dusk",
+      "daylight": {
+        "phase": "dusk",
+        "label": "夕陽",
+        "sky": 15706736,
+        "fog": 14200203,
+        "sunColor": 16750936,
+        "intensity": 2.1,
+        "hemiIntensity": 0.5,
+        "environmentIntensity": 0.21,
+        "nightFactor": 0.38,
+        "warmFactor": 0.96,
+        "taipeiMinutes": 1080,
+        "synced": true
+      },
+      "presentation": {
+        "framing": "full",
+        "lightingEpoch": 1793354400000,
+        "targetHeight": 1.3372750115513803
+      },
+      "camera": {
+        "fov": 35,
+        "x": 3.5,
+        "y": 1.78,
+        "z": 5,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "hairSource": "blender-glb",
+      "version": "blender-hair.2",
+      "profile": {
+        "character": "violet",
+        "skin": "orange",
+        "hair": "hair-bob",
+        "outfit": "outfit-uniform",
+        "hairColor": "#d2ad84"
+      },
+      "contextLost": false
+    },
+    {
+      "key": "procedural",
+      "light": "night",
+      "daylight": {
+        "phase": "night",
+        "label": "夜間",
+        "sky": 2308953,
+        "fog": 3953255,
+        "sunColor": 9349328,
+        "intensity": 0.35,
+        "hemiIntensity": 0.34,
+        "environmentIntensity": 0.16,
+        "nightFactor": 1,
+        "warmFactor": 0.72,
+        "taipeiMinutes": 1260,
+        "synced": true
+      },
+      "presentation": {
+        "framing": "full",
+        "lightingEpoch": 1793365200000,
+        "targetHeight": 1.3372750115513803
+      },
+      "camera": {
+        "fov": 35,
+        "x": 3.5,
+        "y": 1.78,
+        "z": 5,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "version": "head-integrated.1",
+      "profile": {
+        "character": "violet",
+        "skin": "orange",
+        "hair": "hair-bob",
+        "outfit": "outfit-uniform",
+        "hairColor": "#d2ad84"
+      },
+      "contextLost": false
+    },
+    {
+      "key": "integrated-v2",
+      "light": "night",
+      "daylight": {
+        "phase": "night",
+        "label": "夜間",
+        "sky": 2308953,
+        "fog": 3953255,
+        "sunColor": 9349328,
+        "intensity": 0.35,
+        "hemiIntensity": 0.34,
+        "environmentIntensity": 0.16,
+        "nightFactor": 1,
+        "warmFactor": 0.72,
+        "taipeiMinutes": 1260,
+        "synced": true
+      },
+      "presentation": {
+        "framing": "full",
+        "lightingEpoch": 1793365200000,
+        "targetHeight": 1.3372750115513803
+      },
+      "camera": {
+        "fov": 35,
+        "x": 3.5,
+        "y": 1.78,
+        "z": 5,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "hairSource": "blender-glb",
+      "version": "blender-hair.2",
+      "profile": {
+        "character": "violet",
+        "skin": "orange",
+        "hair": "hair-bob",
+        "outfit": "outfit-uniform",
+        "hairColor": "#d2ad84"
+      },
+      "contextLost": false
+    }
+  ],
+  "errors": [],
+  "profileWalletUnchanged": true,
+  "pass": true
+}

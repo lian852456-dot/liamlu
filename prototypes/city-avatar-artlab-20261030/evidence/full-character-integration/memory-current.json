@@ -1,0 +1,1410 @@
+{
+  "origin": "http://127.0.0.1:4734",
+  "scope": "current-source 40-cycle resource and flag QA",
+  "physicalIphoneUat": false,
+  "gpuResidentBytesMeasured": false,
+  "cyclesPerEngine": 40,
+  "engines": {
+    "chromium": {
+      "rows": [
+        {
+          "cycle": 0,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 174,
+          "frameP95Ms": 174,
+          "submitP50Ms": 0.2999999523162842,
+          "submitP95Ms": 0.2999999523162842,
+          "pixelRatio": 1,
+          "frames": 27,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 5,
+            "released": 4,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 2,
+            "released": 2,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 22628,
+          "modelGeometryBytes": 729448,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 5,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 23200,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 33.600000000000364,
+          "frameP95Ms": 140.10000000000036,
+          "submitP50Ms": 13.700000047683716,
+          "submitP95Ms": 38.89999985694885,
+          "pixelRatio": 1,
+          "frames": 60,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 16,
+            "released": 15,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 7,
+            "released": 7,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 23006,
+          "modelGeometryBytes": 742496,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 10,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 23200,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 41.70000000000073,
+          "frameP95Ms": 148.40000000000146,
+          "submitP50Ms": 12.5,
+          "submitP95Ms": 38.5,
+          "pixelRatio": 1,
+          "frames": 93,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 27,
+            "released": 26,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 12,
+            "released": 12,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 23006,
+          "modelGeometryBytes": 742496,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 15,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 34.39999999999782,
+          "frameP95Ms": 141.70000000000073,
+          "submitP50Ms": 12,
+          "submitP95Ms": 37.89999985694885,
+          "pixelRatio": 1,
+          "frames": 126,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 38,
+            "released": 37,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 17,
+            "released": 17,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 22628,
+          "modelGeometryBytes": 729448,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 20,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 41.30000000000291,
+          "frameP95Ms": 149.79999999999563,
+          "submitP50Ms": 11.799999952316284,
+          "submitP95Ms": 38.700000047683716,
+          "pixelRatio": 1,
+          "frames": 159,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 49,
+            "released": 48,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 22,
+            "released": 22,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 22628,
+          "modelGeometryBytes": 729448,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 25,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 23200,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 41.599999999998545,
+          "frameP95Ms": 150,
+          "submitP50Ms": 14.299999952316284,
+          "submitP95Ms": 39,
+          "pixelRatio": 1,
+          "frames": 192,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 60,
+            "released": 59,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 27,
+            "released": 27,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 23006,
+          "modelGeometryBytes": 742496,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 30,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 23200,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 41.5,
+          "frameP95Ms": 149,
+          "submitP50Ms": 13.699999809265137,
+          "submitP95Ms": 40,
+          "pixelRatio": 1,
+          "frames": 225,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 71,
+            "released": 70,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 32,
+            "released": 32,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 23006,
+          "modelGeometryBytes": 742496,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 35,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 33.299999999995634,
+          "frameP95Ms": 141.70000000000437,
+          "submitP50Ms": 12.5,
+          "submitP95Ms": 37.59999990463257,
+          "pixelRatio": 1,
+          "frames": 258,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 82,
+            "released": 81,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 37,
+            "released": 37,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 22628,
+          "modelGeometryBytes": 729448,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 40,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 41.69999999999709,
+          "frameP95Ms": 158.3000000000029,
+          "submitP50Ms": 16.5,
+          "submitP95Ms": 36.59999990463257,
+          "pixelRatio": 1,
+          "frames": 291,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 93,
+            "released": 92,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 42,
+            "released": 42,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 22628,
+          "modelGeometryBytes": 729448,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        }
+      ],
+      "flagWarmup": {
+        "disabled": {
+          "enabled": false,
+          "candidateVersion": "new",
+          "wrapperVersion": "legacy",
+          "modelVersion": "legacy",
+          "hairSource": "procedural",
+          "contextLost": false
+        },
+        "reenabled": {
+          "enabled": true,
+          "candidateVersion": "new",
+          "wrapperVersion": "new",
+          "modelVersion": "blender-hair.2",
+          "hairSource": "blender-glb",
+          "contextLost": false
+        }
+      },
+      "flagChecks": [
+        {
+          "cycle": 5,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 10,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 15,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 20,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 25,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 30,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 35,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 40,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        }
+      ],
+      "turns": [
+        {
+          "yaw": -45,
+          "parentedToHead": true,
+          "assetLocalMatrix": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "headYaw": -0.7853981633974483,
+          "source": "blender-glb",
+          "contextLost": false
+        },
+        {
+          "yaw": 0,
+          "parentedToHead": true,
+          "assetLocalMatrix": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "headYaw": 0,
+          "source": "blender-glb",
+          "contextLost": false
+        },
+        {
+          "yaw": 45,
+          "parentedToHead": true,
+          "assetLocalMatrix": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "headYaw": 0.7853981633974483,
+          "source": "blender-glb",
+          "contextLost": false
+        }
+      ],
+      "fallback": {
+        "state": {
+          "version": "blender-hair.2",
+          "hair": "bob",
+          "hairSource": "procedural",
+          "outfit": "uniform",
+          "blink": 1,
+          "phase": 5.932,
+          "disposed": false,
+          "profile": {
+            "character": "violet",
+            "skin": "orange",
+            "hair": "hair-bob",
+            "outfit": "outfit-uniform",
+            "hairColor": 13806980
+          },
+          "ownedGeometries": 13,
+          "ownedMaterials": 25,
+          "sharedGeometries": 2
+        },
+        "asset": {
+          "ready": false,
+          "error": "Failed to fetch",
+          "liveInstances": 0,
+          "created": 0,
+          "released": 0,
+          "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+        },
+        "contextLost": false
+      },
+      "teardown": {
+        "before": {
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 33.30000000000291,
+          "frameP95Ms": 41.69999999999709,
+          "submitP50Ms": 0.20000004768371582,
+          "submitP95Ms": 0.40000009536743164,
+          "pixelRatio": 1,
+          "frames": 329,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 93,
+            "released": 92,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 42,
+            "released": 42,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 22628,
+          "modelGeometryBytes": 729448,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        "after": {
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 16,
+          "textures": 7,
+          "frameP50Ms": 33.30000000000291,
+          "frameP95Ms": 41.69999999999709,
+          "submitP50Ms": 0.20000004768371582,
+          "submitP95Ms": 0.40000009536743164,
+          "pixelRatio": 1,
+          "frames": 329,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": false,
+            "error": null,
+            "liveInstances": 0,
+            "created": 93,
+            "released": 93,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": false,
+            "error": null,
+            "liveInstances": 0,
+            "created": 42,
+            "released": 42,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 12308,
+          "modelGeometryBytes": 399304,
+          "modelGeometries": 12,
+          "modelMaterials": 8
+        },
+        "cache": {
+          "ready": false,
+          "error": null,
+          "liveInstances": 0,
+          "created": 93,
+          "released": 93,
+          "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+        }
+      },
+      "errors": [],
+      "pass": true
+    },
+    "webkit": {
+      "rows": [
+        {
+          "cycle": 0,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 0,
+          "frameP95Ms": 0,
+          "submitP50Ms": 10,
+          "submitP95Ms": 10,
+          "pixelRatio": 1,
+          "frames": 24,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 5,
+            "released": 4,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 2,
+            "released": 2,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 22628,
+          "modelGeometryBytes": 729448,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 5,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 23200,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 35,
+          "frameP95Ms": 41,
+          "submitP50Ms": 9,
+          "submitP95Ms": 29,
+          "pixelRatio": 1,
+          "frames": 58,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 16,
+            "released": 15,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 7,
+            "released": 7,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 23006,
+          "modelGeometryBytes": 742496,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 10,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 23200,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 34,
+          "frameP95Ms": 40,
+          "submitP50Ms": 8,
+          "submitP95Ms": 29.000000000000455,
+          "pixelRatio": 1,
+          "frames": 93,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 27,
+            "released": 26,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 12,
+            "released": 12,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 23006,
+          "modelGeometryBytes": 742496,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 15,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 32,
+          "frameP95Ms": 41,
+          "submitP50Ms": 8,
+          "submitP95Ms": 29,
+          "pixelRatio": 1,
+          "frames": 127,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 38,
+            "released": 37,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 17,
+            "released": 17,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 22628,
+          "modelGeometryBytes": 729448,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 20,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 34,
+          "frameP95Ms": 42,
+          "submitP50Ms": 9,
+          "submitP95Ms": 29.00000000000091,
+          "pixelRatio": 1,
+          "frames": 160,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 49,
+            "released": 48,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 22,
+            "released": 22,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 22628,
+          "modelGeometryBytes": 729448,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 25,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 23200,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 31,
+          "frameP95Ms": 56,
+          "submitP50Ms": 9.00000000000091,
+          "submitP95Ms": 28,
+          "pixelRatio": 1,
+          "frames": 194,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 60,
+            "released": 59,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 27,
+            "released": 27,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 23006,
+          "modelGeometryBytes": 742496,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 30,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 23200,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 32,
+          "frameP95Ms": 48,
+          "submitP50Ms": 8,
+          "submitP95Ms": 30,
+          "pixelRatio": 1,
+          "frames": 231,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 71,
+            "released": 70,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 32,
+            "released": 32,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 23006,
+          "modelGeometryBytes": 742496,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 35,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 32,
+          "frameP95Ms": 39,
+          "submitP50Ms": 8.000000000001819,
+          "submitP95Ms": 27.99999999999818,
+          "pixelRatio": 1,
+          "frames": 267,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 82,
+            "released": 81,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 37,
+            "released": 37,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 22628,
+          "modelGeometryBytes": 729448,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        {
+          "cycle": 40,
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 32,
+          "frameP95Ms": 45,
+          "submitP50Ms": 8,
+          "submitP95Ms": 28,
+          "pixelRatio": 1,
+          "frames": 300,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 93,
+            "released": 92,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 42,
+            "released": 42,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 22628,
+          "modelGeometryBytes": 729448,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        }
+      ],
+      "flagWarmup": {
+        "disabled": {
+          "enabled": false,
+          "candidateVersion": "new",
+          "wrapperVersion": "legacy",
+          "modelVersion": "legacy",
+          "hairSource": "procedural",
+          "contextLost": false
+        },
+        "reenabled": {
+          "enabled": true,
+          "candidateVersion": "new",
+          "wrapperVersion": "new",
+          "modelVersion": "blender-hair.2",
+          "hairSource": "blender-glb",
+          "contextLost": false
+        }
+      },
+      "flagChecks": [
+        {
+          "cycle": 5,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 10,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 15,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 20,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 25,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 30,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 35,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        },
+        {
+          "cycle": 40,
+          "disabled": {
+            "enabled": false,
+            "candidateVersion": "new",
+            "wrapperVersion": "legacy",
+            "modelVersion": "legacy",
+            "hairSource": "procedural",
+            "contextLost": false
+          },
+          "reenabled": {
+            "enabled": true,
+            "candidateVersion": "new",
+            "wrapperVersion": "new",
+            "modelVersion": "blender-hair.2",
+            "hairSource": "blender-glb",
+            "contextLost": false
+          }
+        }
+      ],
+      "turns": [
+        {
+          "yaw": -45,
+          "parentedToHead": true,
+          "assetLocalMatrix": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "headYaw": -0.7853981633974483,
+          "source": "blender-glb",
+          "contextLost": false
+        },
+        {
+          "yaw": 0,
+          "parentedToHead": true,
+          "assetLocalMatrix": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "headYaw": 0,
+          "source": "blender-glb",
+          "contextLost": false
+        },
+        {
+          "yaw": 45,
+          "parentedToHead": true,
+          "assetLocalMatrix": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "headYaw": 0.7853981633974483,
+          "source": "blender-glb",
+          "contextLost": false
+        }
+      ],
+      "fallback": {
+        "state": {
+          "version": "blender-hair.2",
+          "hair": "bob",
+          "hairSource": "procedural",
+          "outfit": "uniform",
+          "blink": 1,
+          "phase": 2.255,
+          "disposed": false,
+          "profile": {
+            "character": "violet",
+            "skin": "orange",
+            "hair": "hair-bob",
+            "outfit": "outfit-uniform",
+            "hairColor": 13806980
+          },
+          "ownedGeometries": 13,
+          "ownedMaterials": 25,
+          "sharedGeometries": 2
+        },
+        "asset": {
+          "ready": false,
+          "error": "Load failed",
+          "liveInstances": 0,
+          "created": 0,
+          "released": 0,
+          "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+        },
+        "contextLost": false
+      },
+      "teardown": {
+        "before": {
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 15,
+          "triangles": 22822,
+          "geometries": 18,
+          "textures": 13,
+          "frameP50Ms": 33,
+          "frameP95Ms": 41,
+          "submitP50Ms": 0.999999999998181,
+          "submitP95Ms": 1.000000000001819,
+          "pixelRatio": 1,
+          "frames": 347,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 1,
+            "created": 93,
+            "released": 92,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": true,
+            "error": null,
+            "liveInstances": 0,
+            "created": 42,
+            "released": 42,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 22628,
+          "modelGeometryBytes": 729448,
+          "modelGeometries": 13,
+          "modelMaterials": 9
+        },
+        "after": {
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "framing": "full",
+          "calls": 14,
+          "triangles": 12502,
+          "geometries": 16,
+          "textures": 7,
+          "frameP50Ms": 33,
+          "frameP95Ms": 41,
+          "submitP50Ms": 0.999999999998181,
+          "submitP95Ms": 1.000000000001819,
+          "pixelRatio": 1,
+          "frames": 348,
+          "contextLost": false,
+          "hairAsset": {
+            "ready": false,
+            "error": null,
+            "liveInstances": 0,
+            "created": 93,
+            "released": 93,
+            "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+          },
+          "hairAssetV1": {
+            "ready": false,
+            "error": null,
+            "liveInstances": 0,
+            "created": 42,
+            "released": 42,
+            "asset": "assets/hair-glb/short-bob-v1.glb"
+          },
+          "modelTriangles": 12308,
+          "modelGeometryBytes": 399304,
+          "modelGeometries": 12,
+          "modelMaterials": 8
+        },
+        "cache": {
+          "ready": false,
+          "error": null,
+          "liveInstances": 0,
+          "created": 93,
+          "released": 93,
+          "asset": "assets/hair-glb-v2/short-bob-v2.glb"
+        }
+      },
+      "errors": [],
+      "pass": true
+    }
+  },
+  "pass": true
+}

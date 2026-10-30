@@ -1,3 +1,21 @@
+# 完整人物整合驗收：Blender V2 基準
+
+本輪保留已確認的第二版髮型、原版眼睛、精緻皮膚、2.5頭身、身體與動畫原檔；只補完整取景、城市光線預覽、指定QA同伴renderer與回復演練。正式城市、角色存檔、登入與獎勵未修改。
+
+入口有全身／頭部近看、正面／45度／側面／背面、原生城市日光／黃昏／夜間，以及完整比較與導入準備頁。光線預覽使用獨立呈現變數，沒有改server clock或存檔時間。
+
+[可旋轉整合預覽](https://possibility-recognised-light-webcams.trycloudflare.com/) · [完整比較與導入準備](https://possibility-recognised-light-webcams.trycloudflare.com/review.html) · [本輪報告](evidence/full-character-integration/INTEGRATION_REPORT.md)
+
+本機：http://127.0.0.1:4734/ 。獨立HTTPS使用4735／4736與base/.private-v42-full-integration-public，原V2預覽仍保留。免費期限仍是台北2026-10-31 23:59。
+
+完整證據與導入計畫在 evidence/full-character-integration/；正式導入仍等待完整人物美術確認、實體iPhone Safari、原存檔副本與正式小範圍patch驗證，不因桌面通過直接套用。
+
+單一指定QA peer可用renderer-local __ARTLAB_PREVIEW_ACTORS選擇；setEnabled(false/true)演練回到舊factory與重啟V2，不寫入profile或網路封包。未指定同伴、NPC與騎士仍用原factory。正式城市尚未植入這些開關。
+
+---
+
+以下保留Blender V2及先前階段歷史；目前整合入口及判定以上段和本輪報告為準。
+
 # 短髮重製第二版：保留原造型的三版比較
 
 依使用者確認，以程式化 `head-integrated.1` 短髮為造型基準重製 Blender 第二版；保留原版與 Blender 第一版。七束主瀏海的起點、走向與長短節奏沿用原版，再縮薄截面、增加細分束；側後髮使用連續髮流與細緻表面，搭配原長度的臉側內外層及少量自然髮尾，避免第一版的粗厚花瓣與光滑髮殼。

@@ -1,0 +1,115 @@
+{
+  "at": "2026-10-30T10:09:46.246Z",
+  "approvedBaseCommit": "db15e88bec2d62a297f35fb25b1b0712ca6bc095",
+  "approved": [
+    {
+      "file": "avatar-deluxe.js",
+      "sha256": "76c268b24c1fc1f6b1683d319829202ec55f2048325e51e9fe301f466ba702e4",
+      "matched": true
+    },
+    {
+      "file": "avatar-deluxe-integrated.js",
+      "sha256": "0b0623999d41cd6bcc7cbc8283ea211790b354eeb56e600600d2939dd4c66673",
+      "matched": true
+    },
+    {
+      "file": "head-art.js",
+      "sha256": "01f0def91d79ea122abc789d5546b10ea3c3245601f7957137591a4ae86769ea",
+      "matched": true
+    },
+    {
+      "file": "hair-glb.js",
+      "sha256": "3e2f9de317d117817612e0d8aca1befff05783f1e4a7e37ba661d944d82a050b",
+      "matched": true
+    },
+    {
+      "file": "assets/hair-glb-v2/short-bob-v2.glb",
+      "sha256": "143c1540e9db1e98811a65044bf967413162a7820f0091f1cb2df164ef046413",
+      "matched": true
+    },
+    {
+      "file": "assets/hair-glb-v2/short-bob-v2.blend",
+      "sha256": "adccc70681ac999371d6a483748663ded40faadb1fd2b46210cc512e988a70c4",
+      "matched": true
+    },
+    {
+      "file": "assets/hair-glb-v2/hair-v2-color.png",
+      "sha256": "c8c7785144e3c9e1b2eea0b12f625e281214d81c65264452593d534476708602",
+      "matched": true
+    },
+    {
+      "file": "assets/hair-glb-v2/hair-v2-normal.png",
+      "sha256": "b95b0b32a8e6eaa28ff69f7bc907d562051da59647d83f811d246649ac2fc97e",
+      "matched": true
+    },
+    {
+      "file": "assets/hair-glb-v2/hair-v2-orm.png",
+      "sha256": "c91e02a0f118b2f95e7265a500411261dbbe641b319dab3f217c7ced6bd293b4",
+      "matched": true
+    },
+    {
+      "file": "tools/blender-hair/build_hair_v2.py",
+      "sha256": "6201705c0e4404d20e8e8d6bd8acc486e335314cdb8ea14d0946df9f8b804503",
+      "matched": true
+    },
+    {
+      "file": "base/models.js",
+      "sha256": "86d7cf8d73aba68c3a7f982b0f12b85112b3432a0ea2675bd2ba09b449433d2a",
+      "matched": true
+    },
+    {
+      "file": "base/character-gestures.js",
+      "sha256": "1a1aa8da6df030127e958961ca6f3affa7a4fb98629754445e628fb9554d78e4",
+      "matched": true
+    },
+    {
+      "file": "base/client.js",
+      "sha256": "7804e3c55c9c4dae72d3c1f8cac2e71e147408429b73b0ed8f739d5b1f882b7a",
+      "matched": true
+    },
+    {
+      "file": "base/serve.mjs",
+      "sha256": "38e80ed4ffa4534bcba83544f002f637a591cf96fa0c57d8f45c2538e4d67d41",
+      "matched": true
+    },
+    {
+      "file": "base/presence.mjs",
+      "sha256": "96619e7aca2f3a1e3184cbba09a142957ea786e979e7339e1f6de4583a045283",
+      "matched": true
+    },
+    {
+      "file": "base/game-store.mjs",
+      "sha256": "8d49a2c0cc6362ac4237a95650005f024068bf7fcbf4352a86bbf3ab3e0ea5b7",
+      "matched": true
+    }
+  ],
+  "originalEntry": {
+    "release": "20261030-employee.7",
+    "sha256": "12b7e572d840c82b65f9085c2751fd2702b3e349f7a20bc4fe978612ab4cb606",
+    "unchanged": true
+  },
+  "oldV2Preview": [
+    {
+      "file": "index.html",
+      "matched": true
+    },
+    {
+      "file": "avatar-deluxe.js",
+      "matched": true
+    },
+    {
+      "file": "hair-glb.js",
+      "matched": true
+    },
+    {
+      "file": "assets/hair-glb-v2/short-bob-v2.glb",
+      "matched": true
+    }
+  ],
+  "originalDatabaseOpened": false,
+  "originalRoleWrites": 0,
+  "originalRewardsGranted": 0,
+  "formalDeployment": false,
+  "physicalIphoneUat": false,
+  "pass": true
+}

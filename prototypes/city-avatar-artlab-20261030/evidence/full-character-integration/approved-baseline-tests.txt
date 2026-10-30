@@ -1,0 +1,15 @@
+✔ V2 GLB is one opaque Blender hair primitive with embedded PBR images (2.213083ms)
+✔ V1 and V2 helpers expose the async load, fallback, clone, and release contract (32.815959ms)
+✔ V2 preserves the fixed V1 and procedural face, eyes, skin, body, and animation baselines (3883.136459ms)
+✔ three-version candidate switches preserve profile and release V1/V2 hair resources (3181.331542ms)
+✔ failed V2 GLB load falls back to procedural bob without throwing (1508.010041ms)
+✔ baseline commit pins remain explicit and immutable (30.674584ms)
+✔ approved V2 hair, eyes, face, skin, 2.5-head body and animations remain byte-for-byte unchanged (279.83075ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8681.7355

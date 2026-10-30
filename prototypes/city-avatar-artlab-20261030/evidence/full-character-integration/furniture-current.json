@@ -1,0 +1,61 @@
+{
+  "origin": "http://127.0.0.1:4734",
+  "scope": "current-source furniture interaction",
+  "formalWrites": 0,
+  "physicalIphoneUat": false,
+  "errors": [],
+  "sit": {
+    "scene": "indoor",
+    "pose": {
+      "scene": "indoor",
+      "zone": "jiuquan",
+      "x": 4.6,
+      "z": 3.7,
+      "heading": 0,
+      "moving": true,
+      "transition": "quick",
+      "action": "sit"
+    },
+    "legRotation": 1.16,
+    "state": {
+      "version": "blender-hair.2",
+      "hair": "bob",
+      "hairSource": "blender-glb",
+      "outfit": "uniform",
+      "blink": 1,
+      "phase": 15.483199999999973,
+      "disposed": false,
+      "profile": {
+        "id": "guest-527538c4-3766-4c35-b1ac-af7fe228406e",
+        "store_id": "jiuquan",
+        "nickname": "家具驗收",
+        "character": "orange",
+        "skin": "orange",
+        "hair": "",
+        "outfit": "",
+        "car": "",
+        "home": "",
+        "revision": 0,
+        "active": 1,
+        "account_kind": "guest"
+      },
+      "ownedGeometries": 12,
+      "ownedMaterials": 26,
+      "sharedGeometries": 2
+    }
+  },
+  "left": {
+    "scene": "outdoor",
+    "pose": {
+      "scene": "outdoor",
+      "zone": "jiuquan",
+      "x": 0,
+      "z": 1.5,
+      "heading": 0,
+      "moving": true,
+      "transition": "exit"
+    },
+    "contextLost": false
+  },
+  "pass": true
+}
