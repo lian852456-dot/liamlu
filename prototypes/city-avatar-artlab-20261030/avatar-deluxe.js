@@ -1,5 +1,5 @@
 /* Opt-in Art Lab character. Original procedural meshes and API remain intact.
- * No textures, external assets, per-frame allocations, or player-data writes. */
+ * Shared head texture maps; no external services, per-frame generation or data writes. */
 (function(root){'use strict';
  const T=root.THREE, shared=new Map();
  const PALETTE={orange:0xf4c5a0,teal:0xf1bd9f,purple:0xd9a8a1};
@@ -9,7 +9,7 @@
  const unitSphere=()=>baseGeo('sphere',()=>new T.SphereGeometry(1,16,10));
  const smallSphere=()=>baseGeo('small-sphere',()=>new T.SphereGeometry(1,12,6));
  function create(parent,options={}){
-  const g=new T.Group();parent?.add(g);g.name='artlab-deluxe-character';g.scale.setScalar(Number(options.scale)||1);g.userData={modelType:'character',artToy:true,artLabCandidate:true,version:'deluxe.4-neck.2'};
+  const g=new T.Group();parent?.add(g);g.name='artlab-deluxe-character';g.scale.setScalar(Number(options.scale)||1);g.userData={modelType:'character',artToy:true,artLabCandidate:true,version:'head-art.1'};
   const ownedG=new Set(),ownedM=new Set(),materials=new Map(),arms=[],legs=[],clothing=[];
   let disposed=false,skin=color(options.skin,PALETTE.orange),hairColor=color(options.hair,0xd2ad84),outfit='uniform',hairStyle='bob',baseColor=color(options.color,0x303036),profile={},blink=1,lastPhase=0,smileNode=null;
   const group=(p,x=0,y=0,z=0)=>{const n=new T.Group();n.position.set(x,y,z);p.add(n);return n;};
@@ -34,42 +34,27 @@
   }
   const bodyProportions=group(g,0,1.238-1.444*(.458/.542),0);bodyProportions.scale.set(1.04,.458/.542,1.06);
   const body=group(bodyProportions),head=group(g,0,1.784,0),headSkin=group(head),face=group(head),hair=group(head),eyes=[],upperLids=[];
+  function artMat(kind,tone=skin){const key='head-art:'+kind+':'+tone;if(!materials.has(key)){const material=root.CozyHeadArt.material(kind,tone);materials.set(key,material);ownedM.add(material);}return materials.get(key);}
+  function skinEll(c,x,y,z,sx,sy,sz,small=false){const geo=(small?smallSphere():unitSphere()).clone(),col=new T.Color(c),values=[];for(let i=0;i<geo.attributes.position.count;i++)values.push(col.r,col.g,col.b);geo.setAttribute('color',new T.Float32BufferAttribute(values,3));ownedG.add(geo);const m=mesh(headSkin,geo,artMat('skin'),x,y,z);m.scale.set(sx,sy,sz);return m;}
   function buildHead(){clear(headSkin);clear(face);eyes.length=0;upperLids.length=0;
    const geo=new T.SphereGeometry(.47,28,20),v=geo.attributes.position,colors=[];
    const base=new T.Color(skin),warm=new T.Color(0xefa19a);
    for(let i=0;i<v.count;i++){const x=v.getX(i),y=v.getY(i),z=v.getZ(i),jaw=y<0?1-.13*Math.pow(-y/.47,1.4):1-.035*y/.47;v.setXYZ(i,x*jaw,y*.98,z*.88);
-    const cheeks=Math.exp(-((Math.abs(x)-.26)**2/.009+(y+.10)**2/.006+(z-.34)**2/.018))*.46,tint=base.clone().lerp(warm,cheeks);colors.push(tint.r,tint.g,tint.b);
+    const cheeks=Math.exp(-((Math.abs(x)-.26)**2/.009+(y+.10)**2/.006+(z-.34)**2/.018))*.26,tint=base.clone().lerp(warm,cheeks);colors.push(tint.r,tint.g,tint.b);
    }geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));geo.computeVertexNormals();ownedG.add(geo);
-   const skinMat=new T.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.65});ownedM.add(skinMat);mesh(headSkin,geo,skinMat);
-   for(const side of[-1,1]){ell(headSkin,skin,side*.447,-.035,-.005,.075,.101,.063,true);ell(headSkin,0xe5ac98,side*.478,-.04,.033,.024,.046,.018,true);}
-   ell(headSkin,skin,0,-.1,.416,.044,.035,.046,true);ell(headSkin,0xe3aa94,0,-.117,.449,.023,.012,.007,true);compile(headSkin);
+   const skinMat=artMat('skin');mesh(headSkin,geo,skinMat);
+   for(const side of[-1,1]){skinEll(skin,side*.447,-.035,-.005,.075,.101,.063,true);skinEll(0xe5ac98,side*.478,-.04,.033,.024,.046,.018,true);}
+   skinEll(skin,0,-.1,.416,.044,.035,.046,true);skinEll(0xe3aa94,0,-.117,.449,.023,.012,.007,true);compile(headSkin);
    const brows=group(face);for(const side of[-1,1]){const eye=group(face,side*.165,.015,.386);eye.rotation.y=side*.17;eyes.push(eye);
-    ell(eye,0xfff7ec,0,0,0,.100,.115,.014,false,.4);
-    ell(eye,0x8c5a36,0,-.002,.012,.080,.098,.012,false,.4);
-    ell(eye,0x462f24,0,.014,.022,.061,.078,.006,false,.4);
-    ell(eye,0x261f20,0,.013,.027,.043,.064,.004,false,.4);
-    ell(eye,0xbd8c53,0,-.068,.023,.031,.007,.004,true,.4);
-    ell(eye,0xfffbef,-.025,.048,.032,.019,.023,.004,true,.4);ell(eye,0xffedce,.026,-.033,.031,.008,.01,.003,true,.4);
+    ell(eye,artMat('white'),0,0,0,.100,.115,.014,false,.4);
+    const irisGeo=root.CozyHeadArt.irisGeometry();ownedG.add(irisGeo);mesh(eye,irisGeo,artMat('iris'),0,-.002,.012);
     curve(eye,[[-.102,.037,.009],[-.08,.105,.014],[.02,.126,.01],[.1,.064,.006]],.010,0x48342c,12,5,.4);
     const lash=curve(eye,[[side*.075,.078,.005],[side*.113,.098,0],[side*.126,.116,-.002]],.007,0x48342c,5,4,.4);upperLids.push(lash);compile(eye);
     curve(brows,[[side*.079,.166,.376],[side*.154,.189,.366],[side*.245,.168,.344]],.015,0x947355,10,5);
    }
    compile(brows);const smile=group(face);smileNode=smile;smile.name='smile';curve(smile,[[-.075,-.179,.407],[-.032,-.196,.419],[.025,-.197,.42],[.076,-.178,.405]],.0085,0x9f6256,14,5);ell(smile,0xd49786,0,-.217,.403,.048,.009,.01,true);compile(smile);
   }
-  function buildHair(style='bob',tone=hairColor){clear(hair);hairStyle=String(style||'bob').replace(/^hair-/,'');hairColor=color(tone,hairColor);const c=hairStyle==='silver'?0xbabec7:hairColor,dark=new T.Color(c).multiplyScalar(.78).getHex(),light=new T.Color(c).lerp(new T.Color(0xffe3b3),.18).getHex();
-   const capGeo=new T.SphereGeometry(.486,26,14,0,Math.PI*2,0,Math.PI*.51);const capPositions=capGeo.attributes.position;for(let i=0;i<capPositions.count;i++){const z=capPositions.getZ(i),y=capPositions.getY(i);if(z>0&&y<.19)capPositions.setY(i,y+(.19-y)*Math.min(1,z/.25));}capGeo.computeVertexNormals();ownedG.add(capGeo);const cap=mesh(hair,capGeo,c,0,.043,-.018,.46);cap.scale.set(1,1,.91);
-   for(let i=0;i<13;i++){const a=-Math.PI*.58+i/12*Math.PI*1.16,x=Math.sin(a)*.434,z=-Math.cos(a)*.38;
-    const length=hairStyle==='pony'?.19:hairStyle==='braids'?.27:.45;
-    lock(hair,[[x*.83,.30,z*.81],[x*1.065,.01,z],[x*1.04,-length,z*.87+.035]],.092,i%3===0?light:c,.57);
-   }
-   for(const side of[-1,1])lock(hair,[[side*.27,.35,.25],[side*.454,.04,.202],[side*.432,-.32,.12]],.085,c,.49);
-   for(let i=0;i<8;i++){const x=-.34+i*.094,side=i<4?-1:1;lock(hair,[[x*.72,.424,.19],[x,.28,.385],[x+side*.017,.137+(i%3)*.013,.419]],.063,i%3===0?light:c,.43);}
-   if(hairStyle==='pony'){
-    ell(hair,dark,0,.075,-.45,.125,.12,.11);lock(hair,[[0,.1,-.45],[.08,-.22,-.58],[.16,-.65,-.35]],.17,c,.8);lock(hair,[[.08,.09,-.46],[.15,-.24,-.54],[.19,-.62,-.32]],.085,light,.7);ell(hair,0xc38d66,0,.075,-.48,.13,.035,.12,true);
-   }else if(hairStyle==='braids')for(const side of[-1,1]){for(let i=0;i<5;i++)ell(hair,i%2?c:light,side*(.43+(i%2)*.026),-.20-i*.07,-.08,.083,.068,.075,true,.52);ell(hair,0xbd7f74,side*.45,-.54,-.07,.077,.029,.068,true);}
-   for(const side of[-1,1])for(let i=0;i<3;i++)curve(hair,[[side*(.31+i*.035),.31-i*.025,.20-i*.027],[side*(.452+i*.004),.01,.19-i*.024],[side*(.418+i*.012),-.255-i*.018,.145-i*.027]],.0033,light,9,4,.46);
-   compile(hair);
-  }
+  function buildHair(style='bob',tone=hairColor){clear(hair);hairStyle=String(style||'bob').replace(/^hair-/,'');hairColor=color(tone,hairColor);const c=hairStyle==='silver'?0xbabec7:hairColor;root.CozyHeadArt.hair(hair,hairStyle,artMat('hair',c),ownedG);compile(hair);}
   const theme=()=>outfit==='uniform'?{...THEMES.uniform,top:baseColor}:(THEMES[outfit]||{...THEMES.uniform,top:baseColor});
   // All body surfaces use the same matte vertex-color material. Clothing and
   // hands can meet continuously without separate cylindrical joint pieces.
@@ -212,7 +197,7 @@
    animate(phase,moving,sit=false,wave=false){if(disposed)return;lastPhase=Number(phase)||0;const t=lastPhase*.25,cycle=((t+1.3)%4.4),close=cycle<.13?Math.sin(cycle/.13*Math.PI):0;blink=1-close*.96;for(const eye of eyes)eye.scale.y=blink;if(smileNode)smileNode.scale.y=1+Math.sin(t*.7)*.045;
     g.position.y=sit?.34:moving?Math.abs(Math.sin(phase))*.026:Math.sin(t*1.6)*.008;body.scale.y=1+Math.sin(t*1.6)*.004;head.rotation.z=moving?Math.sin(phase*.5)*.018:Math.sin(t*.65)*.009;head.rotation.y=Math.sin(t*.47)*.018;
     legs.forEach((l,i)=>{l.rotation.x=sit?-1.16:moving?Math.sin(phase+i*Math.PI)*.43:0;l.rotation.z=sit?(i?-.04:.04):0;});arms.forEach((a,i)=>{a.rotation.x=sit?-.28:moving?-Math.sin(phase+i*Math.PI)*.33:Math.sin(t*.8+i)*.014;a.rotation.z=wave&&i===1?-2.1+Math.sin(phase*1.5)*.23:(i?-.065:.065);});
-   },state(){return {version:'deluxe.4-neck.2',hair:hairStyle,outfit,blink,phase:lastPhase,disposed,profile:{...profile},ownedGeometries:ownedG.size,ownedMaterials:ownedM.size,sharedGeometries:shared.size};}
+   },state(){return {version:'head-art.1',hair:hairStyle,outfit,blink,phase:lastPhase,disposed,profile:{...profile},ownedGeometries:ownedG.size,ownedMaterials:ownedM.size,sharedGeometries:shared.size};}
   };
  }
  root.CozyAvatarDeluxe=Object.freeze({create,themes:Object.keys(THEMES),sharedStats:()=>({geometries:shared.size}),isSharedResource:r=>[...shared.values()].includes(r)});

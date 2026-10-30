@@ -1,0 +1,15 @@
+HEAD_ENVELOPE_METRICS {"baseline":{"min":[-0.5587403774261475,1.3234000113010407,-0.4568187892436981],"max":[0.553359866142273,2.3129999842643736,0.4620000123977661]},"refined":{"min":[-0.5533941388130188,1.3234000113010407,-0.4568713903427124],"max":[0.5532379746437073,2.3129999842643736,0.4620000123977661]},"headUnitHeight":0.9211999773979185,"totalHeight":2.302999941349029,"headRatio":2.499999997670683}
+✔ frozen approved baseline is the 58fd45e source and alias is an exact API snapshot (71.607792ms)
+✔ head-art.1 changes only the head art source while body, legs and animation stay byte-identical (1741.011875ms)
+✔ face, features, eye-white ellipse and 2.5-head proportions remain unchanged without using hair bounds (1731.729208ms)
+✔ hair and iris geometry/materials are genuinely upgraded and texture maps survive compilation (1677.195ms)
+✔ default studio profile keeps the complete head envelope within the approved baseline (1671.1835ms)
+✔ profile, old/new switch, peer isolation, wardrobe plateau and shared texture disposal stay safe (22855.5325ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 29796.518333

@@ -1,0 +1,81 @@
+{
+  "url": "https://bookmark-gear-screw-litigation.trycloudflare.com",
+  "physicalIphoneUat": false,
+  "publicStudio": true,
+  "closeView": {
+    "pose": {
+      "scene": "outdoor",
+      "zone": "jiuquan",
+      "x": 0,
+      "z": 1.5,
+      "heading": 0,
+      "moving": false,
+      "transition": null
+    },
+    "camera": {
+      "fov": 34,
+      "x": 0.45,
+      "y": 2,
+      "z": 5.25,
+      "target": {
+        "x": 0,
+        "z": 1.5
+      }
+    },
+    "version": "new"
+  },
+  "city": {
+    "new": {
+      "meanFrameMs": 34.36,
+      "drawCalls": 441,
+      "triangles": 986774,
+      "rendererMemory": {
+        "geometries": 1591,
+        "textures": 175,
+        "programs": 35
+      },
+      "camera": {
+        "fov": 34,
+        "x": 0.45,
+        "y": 2,
+        "z": 5.25,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "position": {
+        "x": 0,
+        "z": 1.5
+      }
+    },
+    "old": {
+      "meanFrameMs": 34.36,
+      "drawCalls": 471,
+      "triangles": 1011304,
+      "rendererMemory": {
+        "geometries": 1619,
+        "textures": 175,
+        "programs": 31
+      },
+      "camera": {
+        "fov": 34,
+        "x": 0.45,
+        "y": 2,
+        "z": 5.25,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "position": {
+        "x": 0,
+        "z": 1.5
+      }
+    }
+  },
+  "oneContextUi": true,
+  "errors": [],
+  "missing": [],
+  "pass": true
+}

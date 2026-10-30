@@ -1,0 +1,281 @@
+{
+  "engine": "Mac WebKit",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "deviceScaleFactor": 1,
+  "physicalIphoneUat": false,
+  "gpuResidentMemoryMeasured": false,
+  "warmupMs": 8000,
+  "sampleMs": 10000,
+  "versions": {
+    "old": {
+      "metrics": {
+        "type": "avatar-artlab/metrics",
+        "version": "old",
+        "calls": 16,
+        "triangles": 16948,
+        "geometries": 16,
+        "textures": 1,
+        "frameP50Ms": 33,
+        "frameP95Ms": 35,
+        "submitP50Ms": 1,
+        "submitP95Ms": 1.000000000001819,
+        "pixelRatio": 1,
+        "frames": 551,
+        "contextLost": false,
+        "modelTriangles": 16754,
+        "modelGeometryBytes": 548036,
+        "modelGeometries": 14,
+        "modelMaterials": 10
+      },
+      "nativeVersion": "deluxe.4-neck.2",
+      "maxTextureSize": 16384,
+      "drawingBuffer": {
+        "width": 390,
+        "height": 844
+      },
+      "webgl2": true,
+      "textureStats": null,
+      "samples": [
+        {
+          "type": "avatar-artlab/metrics",
+          "version": "old",
+          "calls": 16,
+          "triangles": 16948,
+          "geometries": 16,
+          "textures": 1,
+          "frameP50Ms": 33,
+          "frameP95Ms": 34,
+          "submitP50Ms": 1,
+          "submitP95Ms": 1.0000000000009095,
+          "pixelRatio": 1,
+          "frames": 326,
+          "contextLost": false,
+          "modelTriangles": 16754,
+          "modelGeometryBytes": 548036,
+          "modelGeometries": 14,
+          "modelMaterials": 10
+        },
+        {
+          "type": "avatar-artlab/metrics",
+          "version": "old",
+          "calls": 16,
+          "triangles": 16948,
+          "geometries": 16,
+          "textures": 1,
+          "frameP50Ms": 33,
+          "frameP95Ms": 35,
+          "submitP50Ms": 1,
+          "submitP95Ms": 1.000000000001819,
+          "pixelRatio": 1,
+          "frames": 401,
+          "contextLost": false,
+          "modelTriangles": 16754,
+          "modelGeometryBytes": 548036,
+          "modelGeometries": 14,
+          "modelMaterials": 10
+        },
+        {
+          "type": "avatar-artlab/metrics",
+          "version": "old",
+          "calls": 16,
+          "triangles": 16948,
+          "geometries": 16,
+          "textures": 1,
+          "frameP50Ms": 33,
+          "frameP95Ms": 35,
+          "submitP50Ms": 1,
+          "submitP95Ms": 1.000000000001819,
+          "pixelRatio": 1,
+          "frames": 476,
+          "contextLost": false,
+          "modelTriangles": 16754,
+          "modelGeometryBytes": 548036,
+          "modelGeometries": 14,
+          "modelMaterials": 10
+        },
+        {
+          "type": "avatar-artlab/metrics",
+          "version": "old",
+          "calls": 16,
+          "triangles": 16948,
+          "geometries": 16,
+          "textures": 1,
+          "frameP50Ms": 33,
+          "frameP95Ms": 35,
+          "submitP50Ms": 1,
+          "submitP95Ms": 1.000000000001819,
+          "pixelRatio": 1,
+          "frames": 551,
+          "contextLost": false,
+          "modelTriangles": 16754,
+          "modelGeometryBytes": 548036,
+          "modelGeometries": 14,
+          "modelMaterials": 10
+        }
+      ],
+      "errors": []
+    },
+    "new": {
+      "metrics": {
+        "type": "avatar-artlab/metrics",
+        "version": "new",
+        "calls": 19,
+        "triangles": 18198,
+        "geometries": 19,
+        "textures": 8,
+        "frameP50Ms": 33,
+        "frameP95Ms": 35,
+        "submitP50Ms": 1,
+        "submitP95Ms": 1.000000000003638,
+        "pixelRatio": 1,
+        "frames": 551,
+        "contextLost": false,
+        "modelTriangles": 18004,
+        "modelGeometryBytes": 496032,
+        "modelGeometries": 17,
+        "modelMaterials": 10
+      },
+      "nativeVersion": "head-art.1",
+      "maxTextureSize": 16384,
+      "drawingBuffer": {
+        "width": 390,
+        "height": 844
+      },
+      "webgl2": true,
+      "textureStats": {
+        "textureCount": 7,
+        "textures": [
+          {
+            "name": "skin-color",
+            "width": 512,
+            "height": 512,
+            "rgbaBytes": 1048576
+          },
+          {
+            "name": "skin-normal",
+            "width": 256,
+            "height": 256,
+            "rgbaBytes": 262144
+          },
+          {
+            "name": "skin-roughness",
+            "width": 256,
+            "height": 256,
+            "rgbaBytes": 262144
+          },
+          {
+            "name": "hair-color",
+            "width": 512,
+            "height": 512,
+            "rgbaBytes": 1048576
+          },
+          {
+            "name": "hair-normal",
+            "width": 256,
+            "height": 256,
+            "rgbaBytes": 262144
+          },
+          {
+            "name": "hair-roughness",
+            "width": 256,
+            "height": 256,
+            "rgbaBytes": 262144
+          },
+          {
+            "name": "iris-color",
+            "width": 256,
+            "height": 256,
+            "rgbaBytes": 262144
+          }
+        ],
+        "rgbaBytes": 3407872
+      },
+      "samples": [
+        {
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "calls": 19,
+          "triangles": 18198,
+          "geometries": 19,
+          "textures": 8,
+          "frameP50Ms": 33,
+          "frameP95Ms": 35,
+          "submitP50Ms": 1,
+          "submitP95Ms": 1.0000000000009095,
+          "pixelRatio": 1,
+          "frames": 326,
+          "contextLost": false,
+          "modelTriangles": 18004,
+          "modelGeometryBytes": 496032,
+          "modelGeometries": 17,
+          "modelMaterials": 10
+        },
+        {
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "calls": 19,
+          "triangles": 18198,
+          "geometries": 19,
+          "textures": 8,
+          "frameP50Ms": 33,
+          "frameP95Ms": 35,
+          "submitP50Ms": 1,
+          "submitP95Ms": 1.000000000001819,
+          "pixelRatio": 1,
+          "frames": 401,
+          "contextLost": false,
+          "modelTriangles": 18004,
+          "modelGeometryBytes": 496032,
+          "modelGeometries": 17,
+          "modelMaterials": 10
+        },
+        {
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "calls": 19,
+          "triangles": 18198,
+          "geometries": 19,
+          "textures": 8,
+          "frameP50Ms": 33,
+          "frameP95Ms": 35,
+          "submitP50Ms": 1,
+          "submitP95Ms": 1.000000000001819,
+          "pixelRatio": 1,
+          "frames": 476,
+          "contextLost": false,
+          "modelTriangles": 18004,
+          "modelGeometryBytes": 496032,
+          "modelGeometries": 17,
+          "modelMaterials": 10
+        },
+        {
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "calls": 19,
+          "triangles": 18198,
+          "geometries": 19,
+          "textures": 8,
+          "frameP50Ms": 33,
+          "frameP95Ms": 35,
+          "submitP50Ms": 1,
+          "submitP95Ms": 1.000000000003638,
+          "pixelRatio": 1,
+          "frames": 551,
+          "contextLost": false,
+          "modelTriangles": 18004,
+          "modelGeometryBytes": 496032,
+          "modelGeometries": 17,
+          "modelMaterials": 10
+        }
+      ],
+      "errors": []
+    }
+  },
+  "frameP50Ratio": 1,
+  "estimatedAdditionalTextureBytes": 3407872,
+  "estimatedAdditionalTextureBytesWithMipmaps": 4543830,
+  "pass": true
+}

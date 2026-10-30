@@ -5,7 +5,7 @@
   const READY_MESSAGE = 'avatar-artlab/ready';
   const METRICS_MESSAGE = 'avatar-artlab/metrics';
   const labels = {
-    version: { new: '衣領微調版', old: '目前肩頸版' },
+    version: { new: '精緻頭部版', old: '定版原頭部' },
     view: { front: '正面', quarter: '45°', side: '側面' },
     motion: { idle: '站立', walk: '行走', wave: '揮手', sit: '坐下', highfive: '擊掌' },
   };
@@ -115,8 +115,8 @@
       card.querySelectorAll('button, select').forEach(control => { control.disabled = disabled; });
     });
     if (refs.gameGuide) refs.gameGuide.hidden = state.scene !== 'game';
-    if (refs.sceneTitle) refs.sceneTitle.textContent = state.scene === 'studio' ? '衣領局部微調・固定 2.5 頭身' : '走進城市，和角色一起玩';
-    if (refs.sceneState) refs.sceneState.textContent = state.scene === 'studio' ? '2.5 頭身比較' : '城市試玩';
+    if (refs.sceneTitle) refs.sceneTitle.textContent = state.scene === 'studio' ? '頭部美術升級・固定比例' : '走進城市，和角色一起玩';
+    if (refs.sceneState) refs.sceneState.textContent = state.scene === 'studio' ? '頭部材質與髮型比較' : '城市試玩';
     if (refs.metricVersion) refs.metricVersion.textContent = labels.version[state.version];
   }
 
