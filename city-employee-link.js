@@ -85,6 +85,12 @@
     };
   }
 
+  function challengeIdFromHash(hash) {
+    const input=safeText(hash).replace(/^#/,''),separator=input.indexOf('='),key=separator>0?input.slice(0,separator):'';
+    const decoded=decodeFragmentValue(key==='cityChallenge'||key==='challenge'?input.slice(separator+1):input);
+    try {const value=JSON.parse(decoded);return typeof value?.challengeId==='string'&&CHALLENGE_ID.test(value.challengeId)?value.challengeId:null;}catch{return null;}
+  }
+
   function originOf(location) {
     return safeText(location && location.origin);
   }
@@ -167,10 +173,13 @@
       state.originOk = originOf(win?.location) === FORMAL_ORIGIN
         && safeText(win?.location?.pathname).startsWith(FORMAL_PATH_PREFIX);
       state.openerOk = Boolean(win?.opener && typeof win.opener.postMessage === 'function');
-      const parsed = parseChallengeHash(win?.location?.hash, now());
-      // Parse first, then remove the fragment so the nonce hash/challenge never
-      // remains in history or can be copied from the address bar.
+      const initialHash=win?.location?.hash;
       clearFragment();
+      if(state.originOk && typeof options.syncClock==='function') {
+        try {const id=challengeIdFromHash(initialHash);if(!id)throw Error('CITY_CHALLENGE_ID_INVALID');await options.syncClock(id);}
+        catch {state.challenge=null;message('無法核對伺服器時間；請回原城市重新開啟邀請，原角色與登入保持不變。');render();return;}
+      }
+      const parsed = parseChallengeHash(initialHash, now());
       if (parsed.ok) state.challenge = parsed.challenge;
       else state.challengeError = parsed.error;
 
@@ -218,6 +227,7 @@
 
     async function login() {
       if (!state.originOk || !state.challenge || !ownerClient || typeof ownerClient.login !== 'function') return false;
+      if(state.challenge.expiresAt<=now()){message('綁定邀請已過期，請回原城市重新提出邀請；原角色保持不變。');return false;}
       const employeeId = safeText(refs.employeeId?.value).trim();
       const password = safeText(refs.password?.value);
       if (!employeeId || !password || !state.deviceId) {
