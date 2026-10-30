@@ -9,7 +9,7 @@
  const unitSphere=()=>baseGeo('sphere',()=>new T.SphereGeometry(1,16,10));
  const smallSphere=()=>baseGeo('small-sphere',()=>new T.SphereGeometry(1,12,6));
  function create(parent,options={}){
-  const g=new T.Group();parent?.add(g);g.name='artlab-deluxe-character';g.scale.setScalar(Number(options.scale)||1);g.userData={modelType:'character',artToy:true,artLabCandidate:true,version:'deluxe.4-neck.1'};
+  const g=new T.Group();parent?.add(g);g.name='artlab-deluxe-character';g.scale.setScalar(Number(options.scale)||1);g.userData={modelType:'character',artToy:true,artLabCandidate:true,version:'deluxe.4-neck.2'};
   const ownedG=new Set(),ownedM=new Set(),materials=new Map(),arms=[],legs=[],clothing=[];
   let disposed=false,skin=color(options.skin,PALETTE.orange),hairColor=color(options.hair,0xd2ad84),outfit='uniform',hairStyle='bob',baseColor=color(options.color,0x303036),profile={},blink=1,lastPhase=0,smileNode=null;
   const group=(p,x=0,y=0,z=0)=>{const n=new T.Group();n.position.set(x,y,z);p.add(n);return n;};
@@ -154,18 +154,18 @@
    ],{segments:22});neck.name='artlab-neck-seat';
    // Two open surfaces meet at a rolled lip, leaving a real neckline opening.
    const collar=loft(body,[
-    {y:1.378,rx:.202,rz:.151,z:.002,c:t.top},
-    {y:1.412,rx:.169,rz:.132,z:.002,c:t.top},
-    {y:1.460,rx:.135,rz:.114,z:.002,c:t.top},
-    {y:1.499,rx:.116,rz:.100,z:.002,c:t.top},
-    {y:1.517,rx:.108,rz:.096,z:.002,c:t.top},
-    {y:1.526,rx:.102,rz:.092,z:.002,c:t.top}
+    {y:1.378,rx:.205,rz:.145,z:.002,c:t.top},
+    {y:1.408,rx:.176,rz:.129,z:.002,c:t.top,drape:-.002},
+    {y:1.442,rx:.146,rz:.108,z:.002,c:t.top,drape:-.004},
+    {y:1.470,rx:.120,rz:.096,z:.002,c:t.top,drape:-.006},
+    {y:1.488,rx:.108,rz:.088,z:.002,c:t.top,drape:-.008},
+    {y:1.495,rx:.103,rz:.085,z:.002,c:t.top,drape:-.008}
    ],{segments:24,capEnds:false});collar.name='artlab-collar-outer';
    const collarInside=loft(body,[
-    {y:1.526,rx:.102,rz:.092,z:.002,c:t.top},
-    {y:1.520,rx:.091,rz:.082,z:.002,c:t.top},
-    {y:1.503,rx:.087,rz:.079,z:.002,c:t.top},
-    {y:1.463,rx:.086,rz:.079,z:.002,c:t.top}
+    {y:1.495,rx:.103,rz:.085,z:.002,c:t.top,drape:-.008},
+    {y:1.490,rx:.097,rz:.080,z:.002,c:t.top,drape:-.008},
+    {y:1.477,rx:.094,rz:.080,z:.002,c:t.top,drape:-.006},
+    {y:1.445,rx:.093,rz:.085,z:.002,c:t.top,drape:-.004}
    ],{segments:24,capEnds:false,inside:true});collarInside.name='artlab-collar-inner';
    for(const side of[-1,1]){curve(body,[[side*.025,1.435,.111],[side*.119,1.381,.153],[side*.158,1.342,.169]],.020,t.trim,7,5);curve(body,[[side*.243,1.25,.155],[side*.257,1.11,.153],[side*.247,.981,.157]],.0045,0x555052,7,4);}
    curve(body,[[0,1.36,.167],[0,1.18,.245],[0,.942,.239]],.008,t.trim,10,4);ell(body,0xc6baaa,0,1.31,.205,.019,.029,.013,true,.46);
@@ -212,7 +212,7 @@
    animate(phase,moving,sit=false,wave=false){if(disposed)return;lastPhase=Number(phase)||0;const t=lastPhase*.25,cycle=((t+1.3)%4.4),close=cycle<.13?Math.sin(cycle/.13*Math.PI):0;blink=1-close*.96;for(const eye of eyes)eye.scale.y=blink;if(smileNode)smileNode.scale.y=1+Math.sin(t*.7)*.045;
     g.position.y=sit?.34:moving?Math.abs(Math.sin(phase))*.026:Math.sin(t*1.6)*.008;body.scale.y=1+Math.sin(t*1.6)*.004;head.rotation.z=moving?Math.sin(phase*.5)*.018:Math.sin(t*.65)*.009;head.rotation.y=Math.sin(t*.47)*.018;
     legs.forEach((l,i)=>{l.rotation.x=sit?-1.16:moving?Math.sin(phase+i*Math.PI)*.43:0;l.rotation.z=sit?(i?-.04:.04):0;});arms.forEach((a,i)=>{a.rotation.x=sit?-.28:moving?-Math.sin(phase+i*Math.PI)*.33:Math.sin(t*.8+i)*.014;a.rotation.z=wave&&i===1?-2.1+Math.sin(phase*1.5)*.23:(i?-.065:.065);});
-   },state(){return {version:'deluxe.4-neck.1',hair:hairStyle,outfit,blink,phase:lastPhase,disposed,profile:{...profile},ownedGeometries:ownedG.size,ownedMaterials:ownedM.size,sharedGeometries:shared.size};}
+   },state(){return {version:'deluxe.4-neck.2',hair:hairStyle,outfit,blink,phase:lastPhase,disposed,profile:{...profile},ownedGeometries:ownedG.size,ownedMaterials:ownedM.size,sharedGeometries:shared.size};}
   };
  }
  root.CozyAvatarDeluxe=Object.freeze({create,themes:Object.keys(THEMES),sharedStats:()=>({geometries:shared.size}),isSharedResource:r=>[...shared.values()].includes(r)});

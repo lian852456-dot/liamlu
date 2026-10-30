@@ -1,0 +1,31 @@
+{
+  "at": "2026-10-30T03:42:42.734Z",
+  "frozenNeckV1Sha256": "ecdd9f078acf2c37cb0638a9ec2ef38a66149f8743d74a2ad116d92bb925bad1",
+  "frozenNeckV1MatchesCommit": "822f8c33685c3e4af47213bfdf0ad6fdfbb3866c",
+  "headHairAnimationUnchanged": "avatar-collar.test.cjs tests exact source and local head geometry/materials",
+  "formalEntrySha256": "7816d64e87b831531ffbfb4e176043e65ebaa589b662ac8741d04816740158f6",
+  "formalEntryUnchanged": true,
+  "originalApprovedNeckPublic": {
+    "url": "https://dietary-compare-rebel-timothy.trycloudflare.com",
+    "files": [
+      {
+        "file": "index.html",
+        "http": 200,
+        "sha256": "cc1500f143715f981374bd519ed828db167b26547a90cb61ee18364cc6967626",
+        "unchanged": true
+      },
+      {
+        "file": "avatar-deluxe.js",
+        "http": 200,
+        "sha256": "ecdd9f078acf2c37cb0638a9ec2ef38a66149f8743d74a2ad116d92bb925bad1",
+        "unchanged": true
+      }
+    ]
+  },
+  "formalDatabaseOpened": false,
+  "formalWrites": 0,
+  "rewardsIssued": 0,
+  "physicalIphoneUat": false,
+  "collarApproval": "PENDING",
+  "pass": true
+}

@@ -1,0 +1,81 @@
+{
+  "url": "https://butler-rotation-maui-quarters.trycloudflare.com",
+  "physicalIphoneUat": false,
+  "publicStudio": true,
+  "closeView": {
+    "pose": {
+      "scene": "outdoor",
+      "zone": "jiuquan",
+      "x": 0,
+      "z": 1.5,
+      "heading": 0,
+      "moving": false,
+      "transition": null
+    },
+    "camera": {
+      "fov": 34,
+      "x": 1.02,
+      "y": 4.05,
+      "z": 9.92,
+      "target": {
+        "x": 0,
+        "z": 1.5
+      }
+    },
+    "version": "new"
+  },
+  "city": {
+    "new": {
+      "meanFrameMs": 37.03,
+      "drawCalls": 508,
+      "triangles": 1097600,
+      "rendererMemory": {
+        "geometries": 1585,
+        "textures": 168,
+        "programs": 31
+      },
+      "camera": {
+        "fov": 34,
+        "x": 1.02,
+        "y": 4.1,
+        "z": 9.92,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "position": {
+        "x": 0,
+        "z": 1.5
+      }
+    },
+    "old": {
+      "meanFrameMs": 34.63,
+      "drawCalls": 504,
+      "triangles": 1105302,
+      "rendererMemory": {
+        "geometries": 1631,
+        "textures": 168,
+        "programs": 31
+      },
+      "camera": {
+        "fov": 34,
+        "x": 1.02,
+        "y": 4.1,
+        "z": 9.92,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "position": {
+        "x": 0,
+        "z": 1.5
+      }
+    }
+  },
+  "oneContextUi": true,
+  "errors": [],
+  "missing": [],
+  "pass": true
+}

@@ -1,0 +1,51 @@
+{
+  "errors": [],
+  "facePosePhase": 0,
+  "lighting": "same scene/camera/light/profile",
+  "sourceSha256": {
+    "neck1": "ecdd9f078acf2c37cb0638a9ec2ef38a66149f8743d74a2ad116d92bb925bad1",
+    "collar": "93a34c4ec9224967ea8617afa5f6beeb91cab07c84adc9993b7ef23b2978a4dd"
+  },
+  "versions": {
+    "neck1": {
+      "type": "avatar-artlab/metrics",
+      "version": "old",
+      "calls": 16,
+      "triangles": 16948,
+      "geometries": 16,
+      "textures": 1,
+      "frameP50Ms": 25.09999999999991,
+      "frameP95Ms": 66.89999999999964,
+      "submitP50Ms": 0.20000004768371582,
+      "submitP95Ms": 0.3000001907348633,
+      "pixelRatio": 1,
+      "frames": 88,
+      "contextLost": false,
+      "modelTriangles": 16754,
+      "modelGeometryBytes": 548036,
+      "modelGeometries": 14,
+      "modelMaterials": 10,
+      "nativeVersion": "deluxe.4-neck.1"
+    },
+    "collar": {
+      "type": "avatar-artlab/metrics",
+      "version": "new",
+      "calls": 16,
+      "triangles": 16948,
+      "geometries": 16,
+      "textures": 1,
+      "frameP50Ms": 25,
+      "frameP95Ms": 58.29999999999927,
+      "submitP50Ms": 0.20000004768371582,
+      "submitP95Ms": 0.2999999523162842,
+      "pixelRatio": 1,
+      "frames": 166,
+      "contextLost": false,
+      "modelTriangles": 16754,
+      "modelGeometryBytes": 548036,
+      "modelGeometries": 14,
+      "modelMaterials": 10,
+      "nativeVersion": "deluxe.4-neck.2"
+    }
+  }
+}
