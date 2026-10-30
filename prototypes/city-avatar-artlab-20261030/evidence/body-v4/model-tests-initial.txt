@@ -1,0 +1,60 @@
+V4_METRICS {"headHeight":0.9211999773979185,"totalHeight":2.302999941349029,"ratio":2.499999997670683,"legHeights":[0.7149999588727951,0.7149999588727951],"meshes":15,"geometries":15,"materials":11,"ownedGeometries":15,"ownedMaterials":42}
+✔ V3 frozen source and V4 keep face, hair, animation builders exact (0.994667ms)
+✔ V4 keeps the V3 2.5 head ratio, head size, height and leg length (1472.935042ms)
+✖ V4 body/clothing differs while operations, gestures and no external assets remain valid (619.999875ms)
+✔ adapter routes new to V4, old to V3, peers stay original and profile data is preserved (1529.545958ms)
+✖ V4 clothing variants plateau across repeated swaps and shared resources release (1965.689375ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 3
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5634.570958
+
+✖ failing tests:
+
+test at avatar-v4.test.cjs:47:1
+✖ V4 body/clothing differs while operations, gestures and no external assets remain valid (619.999875ms)
+  AssertionError [ERR_ASSERTION]: V4 has a body/clothing revision
+      at TestContext.<anonymous> (/Users/liamlu/Downloads/liam-agent/worktrees/city-avatar-body-v4-20261030/prototypes/city-avatar-artlab-20261030/avatar-v4.test.cjs:49:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '0:0.01779335793357939:0:1|0:1.784:0:3|-0.142:0.68:0:1|0.142:0.68:0:1|-0.292:1.132:0:1|0.292:1.132:0:1',
+    expected: '0:0.01779335793357939:0:1|0:1.784:0:3|-0.142:0.68:0:1|0.142:0.68:0:1|-0.292:1.132:0:1|0.292:1.132:0:1',
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at avatar-v4.test.cjs:59:1
+✖ V4 clothing variants plateau across repeated swaps and shared resources release (1965.689375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    [
+      14,
+  +   57
+  -   35
+    ]
+
+      at TestContext.<anonymous> (/Users/liamlu/Downloads/liam-agent/worktrees/city-avatar-body-v4-20261030/prototypes/city-avatar-artlab-20261030/avatar-v4.test.cjs:61:636)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 14, 57 ],
+    expected: [ 14, 35 ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
