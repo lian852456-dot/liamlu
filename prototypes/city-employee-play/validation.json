@@ -1,0 +1,20 @@
+{
+  "backendAndRegressionTests": 35,
+  "passed": 35,
+  "realEmployeeDataWrites": 0,
+  "newCoinsGranted": 0,
+  "formalAuthenticationChanged": false,
+  "modules": {
+    "employee-play-login.mjs": "678fa7ddab1faf7a3fdfc117aa14a34b126fdde88718375931e4269ec3333b43",
+    "employee-play-ui.js": "4faac83edd2e1a0d1e0df687d6f9388b33aa4f8dcae9d9c3cef5cb487df4e5f9",
+    "employee-play-ui.css": "89f2d757eae06d315ce51b78a5a19bfdc940df03a7bd0a4812d299a43d41672e",
+    "integration.patch": "83164768e9c96b0aa1506e6ad162bae953e68fd8446bae3b2bdbab6d171e9ca8"
+  },
+  "browserEngines": [
+    "Chromium",
+    "WebKit"
+  ],
+  "twoIndependentDevicesSameRole": true,
+  "full65FileClientLoginProfileReloadMultiplayer": true,
+  "physicalIphoneAcceptance": false
+}
