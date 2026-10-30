@@ -1,0 +1,15 @@
+✔ GLB binary is one opaque Blender hair primitive with embedded PBR images (1.5115ms)
+✔ hair-glb.js exposes the promised async load, fallback error, clone, and release contract (19.412958ms)
+✔ GLB provider contract loads once, clones by tone, and releases resources (1257.299541ms)
+✔ GLB hair leaves approved face, eyes, body, limbs, and animation unchanged (1751.425458ms)
+✔ failed GLB load falls back to the existing procedural bob without throwing (1523.397083ms)
+✔ repeated wardrobe and old/new switches do not accumulate GLB resources (10323.094916ms)
+✔ frozen baseline is the current pre-GLB avatar source (37.805375ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14979.642584

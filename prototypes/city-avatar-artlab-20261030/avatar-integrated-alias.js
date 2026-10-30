@@ -1,0 +1,1 @@
+window.CozyAvatarIntegrated=window.CozyAvatarDeluxe;

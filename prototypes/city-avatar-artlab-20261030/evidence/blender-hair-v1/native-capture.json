@@ -1,0 +1,69 @@
+{
+  "errors": [],
+  "facePosePhase": 0,
+  "lighting": "same scene/camera/light/profile",
+  "sourceSha256": {
+    "baseline": "0b0623999d41cd6bcc7cbc8283ea211790b354eeb56e600600d2939dd4c66673",
+    "art": "67f9a6c55df6beacd22e401846862a51705c818f49c9afbac885ddb0ad579940",
+    "headArt": "01f0def91d79ea122abc789d5546b10ea3c3245601f7957137591a4ae86769ea",
+    "previousHelper": "700aa46c5ce3943ac2cbfc12c7d508ad1c7a3b132c1f10369972bdd320999060"
+  },
+  "versions": {
+    "baseline": {
+      "type": "avatar-artlab/metrics",
+      "version": "old",
+      "calls": 15,
+      "triangles": 19526,
+      "geometries": 16,
+      "textures": 10,
+      "frameP50Ms": 41.899999999999636,
+      "frameP95Ms": 141.59999999999945,
+      "submitP50Ms": 0.2999999523162842,
+      "submitP95Ms": 0.40000009536743164,
+      "pixelRatio": 1,
+      "frames": 83,
+      "contextLost": false,
+      "hairAsset": {
+        "ready": true,
+        "error": null,
+        "liveInstances": 0,
+        "created": 1,
+        "released": 1,
+        "asset": "assets/hair-glb/short-bob-v1.glb"
+      },
+      "modelTriangles": 19332,
+      "modelGeometryBytes": 562376,
+      "modelGeometries": 13,
+      "modelMaterials": 9,
+      "nativeVersion": "head-integrated.1"
+    },
+    "art": {
+      "type": "avatar-artlab/metrics",
+      "version": "new",
+      "calls": 15,
+      "triangles": 18986,
+      "geometries": 15,
+      "textures": 10,
+      "frameP50Ms": 49.900000000001455,
+      "frameP95Ms": 133.29999999999927,
+      "submitP50Ms": 0.2999999523162842,
+      "submitP95Ms": 0.40000009536743164,
+      "pixelRatio": 1,
+      "frames": 154,
+      "contextLost": false,
+      "hairAsset": {
+        "ready": true,
+        "error": null,
+        "liveInstances": 1,
+        "created": 2,
+        "released": 1,
+        "asset": "assets/hair-glb/short-bob-v1.glb"
+      },
+      "modelTriangles": 18792,
+      "modelGeometryBytes": 605680,
+      "modelGeometries": 13,
+      "modelMaterials": 9,
+      "nativeVersion": "blender-hair.1"
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "baselineCommit": "d64145cf75d1a0dd68515abdfbb3bd57a8d1c1fb",
+  "lockedFiles": {
+    "head-art.js": {
+      "expected": "01f0def91d79ea122abc789d5546b10ea3c3245601f7957137591a4ae86769ea",
+      "actual": "01f0def91d79ea122abc789d5546b10ea3c3245601f7957137591a4ae86769ea",
+      "match": true
+    },
+    "avatar-deluxe-approved.js": {
+      "expected": "93a34c4ec9224967ea8617afa5f6beeb91cab07c84adc9993b7ef23b2978a4dd",
+      "actual": "93a34c4ec9224967ea8617afa5f6beeb91cab07c84adc9993b7ef23b2978a4dd",
+      "match": true
+    },
+    "base/world.js": {
+      "expected": "01b0d85c00556f3681022761a943b35efe9a3f093a2f0bb808b7ddec6144f71c",
+      "actual": "01b0d85c00556f3681022761a943b35efe9a3f093a2f0bb808b7ddec6144f71c",
+      "match": true
+    },
+    "base/models.js": {
+      "expected": "86d7cf8d73aba68c3a7f982b0f12b85112b3432a0ea2675bd2ba09b449433d2a",
+      "actual": "86d7cf8d73aba68c3a7f982b0f12b85112b3432a0ea2675bd2ba09b449433d2a",
+      "match": true
+    },
+    "base/client.js": {
+      "expected": "7804e3c55c9c4dae72d3c1f8cac2e71e147408429b73b0ed8f739d5b1f882b7a",
+      "actual": "7804e3c55c9c4dae72d3c1f8cac2e71e147408429b73b0ed8f739d5b1f882b7a",
+      "match": true
+    },
+    "base/serve.mjs": {
+      "expected": "38e80ed4ffa4534bcba83544f002f637a591cf96fa0c57d8f45c2538e4d67d41",
+      "actual": "38e80ed4ffa4534bcba83544f002f637a591cf96fa0c57d8f45c2538e4d67d41",
+      "match": true
+    },
+    "base/presence.mjs": {
+      "expected": "96619e7aca2f3a1e3184cbba09a142957ea786e979e7339e1f6de4583a045283",
+      "actual": "96619e7aca2f3a1e3184cbba09a142957ea786e979e7339e1f6de4583a045283",
+      "match": true
+    },
+    "base/character-gestures.js": {
+      "expected": "1a1aa8da6df030127e958961ca6f3affa7a4fb98629754445e628fb9554d78e4",
+      "actual": "1a1aa8da6df030127e958961ca6f3affa7a4fb98629754445e628fb9554d78e4",
+      "match": true
+    },
+    "frozen-integrated": {
+      "expected": "0b0623999d41cd6bcc7cbc8283ea211790b354eeb56e600600d2939dd4c66673",
+      "actual": "0b0623999d41cd6bcc7cbc8283ea211790b354eeb56e600600d2939dd4c66673",
+      "match": true
+    }
+  },
+  "originalIntegratedPreview": [
+    {
+      "file": "index.html",
+      "match": true
+    },
+    {
+      "file": "avatar-deluxe.js",
+      "match": true
+    },
+    {
+      "file": "head-art.js",
+      "match": true
+    }
+  ],
+  "formalCityIndexSha256": "7816d64e87b831531ffbfb4e176043e65ebaa589b662ac8741d04816740158f6",
+  "formalCityIndexUnchanged": true,
+  "formalWrites": 0,
+  "originalDatabasesOpened": false,
+  "rewardGrants": 0,
+  "physicalIphoneStatus": "DEFERRED_BY_USER",
+  "independentDemoOnly": true
+}

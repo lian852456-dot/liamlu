@@ -5,7 +5,7 @@
   const READY_MESSAGE = 'avatar-artlab/ready';
   const METRICS_MESSAGE = 'avatar-artlab/metrics';
   const labels = {
-    version: { new: '整合比較版', old: '前版精緻頭部' },
+    version: { new: 'Blender 精緻髮型', old: '目前程式化髮型' },
     view: { front: '正面', quarter: '45°', side: '側面' },
     motion: { idle: '站立', walk: '行走', wave: '揮手', sit: '坐下', highfive: '擊掌' },
   };
@@ -115,8 +115,8 @@
       card.querySelectorAll('button, select').forEach(control => { control.disabled = disabled; });
     });
     if (refs.gameGuide) refs.gameGuide.hidden = state.scene !== 'game';
-    if (refs.sceneTitle) refs.sceneTitle.textContent = state.scene === 'studio' ? '原眼睛＋精緻髮膚整合・固定比例' : '走進城市，和角色一起玩';
-    if (refs.sceneState) refs.sceneState.textContent = state.scene === 'studio' ? '頭部整合比較' : '城市試玩';
+    if (refs.sceneTitle) refs.sceneTitle.textContent = state.scene === 'studio' ? '短髮造型比較・臉部與比例保持不變' : '走進城市，和角色一起玩';
+    if (refs.sceneState) refs.sceneState.textContent = state.scene === 'studio' ? '獨立髮型示範' : '城市試玩';
     if (refs.metricVersion) refs.metricVersion.textContent = labels.version[state.version];
   }
 
@@ -126,6 +126,7 @@
 
   function renderMetrics(data) {
     if (!data || !['new', 'old'].includes(data.version)) return;
+    if (data.version === 'new' && data.hairAsset?.error) setStatus('精緻髮型未載入，暫用原短髮；可重新開啟預覽。');
     const calls = metricNumber(data.calls);
     const triangles = metricNumber(data.triangles);
     const geometries = metricNumber(data.geometries);

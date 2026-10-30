@@ -9,7 +9,7 @@
  const unitSphere=()=>baseGeo('sphere',()=>new T.SphereGeometry(1,16,10));
  const smallSphere=()=>baseGeo('small-sphere',()=>new T.SphereGeometry(1,12,6));
  function create(parent,options={}){
-  const g=new T.Group();parent?.add(g);g.name='artlab-deluxe-character';g.scale.setScalar(Number(options.scale)||1);g.userData={modelType:'character',artToy:true,artLabCandidate:true,version:'head-integrated.1'};
+  const g=new T.Group();parent?.add(g);g.name='artlab-deluxe-character';g.scale.setScalar(Number(options.scale)||1);g.userData={modelType:'character',artToy:true,artLabCandidate:true,version:'blender-hair.1'};
   const ownedG=new Set(),ownedM=new Set(),materials=new Map(),arms=[],legs=[],clothing=[];
   let disposed=false,skin=color(options.skin,PALETTE.orange),hairColor=color(options.hair,0xd2ad84),outfit='uniform',hairStyle='bob',baseColor=color(options.color,0x303036),profile={},blink=1,lastPhase=0,smileNode=null;
   const group=(p,x=0,y=0,z=0)=>{const n=new T.Group();n.position.set(x,y,z);p.add(n);return n;};
@@ -17,7 +17,7 @@
   const mesh=(p,geo,c,x=0,y=0,z=0,rough=.72)=>{const m=new T.Mesh(geo,c?.isMaterial?c:mat(c,rough));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;p.add(m);return m;};
   const ell=(p,c,x,y,z,sx,sy,sz,small=false,rough=.72)=>{const m=mesh(p,small?smallSphere():unitSphere(),c,x,y,z,rough);m.scale.set(sx,sy,sz);return m;};
   const curve=(p,points,r,c,segments=10,radial=5,rough=.72)=>{const q=new T.CatmullRomCurve3(points.map(v=>new T.Vector3(...v))),geo=new T.TubeGeometry(q,segments,r,radial,false);ownedG.add(geo);return mesh(p,geo,c,0,0,0,rough);};
-  function clear(p){p.traverse(n=>{if(!n.isMesh)return;if(ownedG.has(n.geometry)){n.geometry.dispose();ownedG.delete(n.geometry);}for(const m of(Array.isArray(n.material)?n.material:[n.material]))if(ownedM.has(m)&&!materials.has([...materials].find(([,v])=>v===m)?.[0])){m.dispose();ownedM.delete(m);}});p.clear();}
+  function clear(p){if(p===hair)for(const child of [...p.children])if(child.userData.blenderHair)root.CozyHairGLB?.release(child);p.traverse(n=>{if(!n.isMesh)return;if(ownedG.has(n.geometry)){n.geometry.dispose();ownedG.delete(n.geometry);}for(const m of(Array.isArray(n.material)?n.material:[n.material]))if(ownedM.has(m)&&!materials.has([...materials].find(([,v])=>v===m)?.[0])){m.dispose();ownedM.delete(m);}});p.clear();}
   function compile(p){if(!root.CozyStaticMesh?.compile)return;
    const before=[];p.traverse(n=>{if(n.isMesh)before.push(n.geometry);});root.CozyStaticMesh.compile(p,{mergeColorMaterials:true});
    for(const geo of before)if(ownedG.has(geo)){geo.dispose();ownedG.delete(geo);}
@@ -58,7 +58,7 @@
    }
    compile(brows);const smile=group(face);smileNode=smile;smile.name='smile';curve(smile,[[-.075,-.179,.407],[-.032,-.196,.419],[.025,-.197,.42],[.076,-.178,.405]],.0085,0x9f6256,14,5);ell(smile,0xd49786,0,-.217,.403,.048,.009,.01,true);compile(smile);
   }
-  function buildHair(style='bob',tone=hairColor){clear(hair);hairStyle=String(style||'bob').replace(/^hair-/,'');hairColor=color(tone,hairColor);const c=hairStyle==='silver'?0xbabec7:hairColor;root.CozyHeadArtIntegrated.hair(hair,hairStyle,artMat('hair',c),ownedG);compile(hair);}
+  function buildHair(style='bob',tone=hairColor){clear(hair);hairStyle=String(style||'bob').replace(/^hair-/,'');hairColor=color(tone,hairColor);const c=hairStyle==='silver'?0xbabec7:hairColor;const imported=hairStyle==='bob'&&root.CozyHairGLB?.ready()?root.CozyHairGLB.create(c):null;if(imported){hair.add(imported);hair.userData.source='blender-glb';}else{root.CozyHeadArtIntegrated.hair(hair,hairStyle,artMat('hair',c),ownedG);compile(hair);hair.userData.source='procedural';}}
   const theme=()=>outfit==='uniform'?{...THEMES.uniform,top:baseColor}:(THEMES[outfit]||{...THEMES.uniform,top:baseColor});
   // All body surfaces use the same matte vertex-color material. Clothing and
   // hands can meet continuously without separate cylindrical joint pieces.
@@ -191,17 +191,18 @@
   }
   for(const side of[-1,1])arms.push(group(g,side*.292,1.132,0));
   buildHead();buildHair(options.hairStyle||'bob',hairColor);buildBody(theme());
+  root.CozyHairGLB?.load().then(()=>{if(!disposed&&hairStyle==='bob'&&hair.userData.source!=='blender-glb')buildHair(hairStyle,hairColor);}).catch(()=>{});
   function setAppearance(next={}){if(disposed)return;const nextSkin=PALETTE[next.skin]||skin,nextOutfit=String(next.outfit||'uniform').replace(/^outfit-/,''),nextHair=String(next.hair||'bob').replace(/^hair-/,''),nextTone=color(next.hairColor,({pony:0x6a4f3e,braids:0x6e4643,silver:0xb2b6bf})[nextHair]||color(options.hair,0x53473e));profile={...next};g.userData.avatarPreset=next.avatarPreset||'';
    if(nextSkin!==skin){skin=nextSkin;buildHead();buildBody(theme());}
    if(nextOutfit!==outfit){outfit=nextOutfit;buildBody(theme());}
    if(nextHair!==hairStyle||nextTone!==hairColor)buildHair(nextHair,nextTone);
   }
-  function dispose(){if(disposed)return;disposed=true;for(const geo of ownedG)geo.dispose();for(const m of ownedM)m.dispose();ownedG.clear();ownedM.clear();materials.clear();g.clear();g.removeFromParent();}
+  function dispose(){if(disposed)return;disposed=true;clear(hair);for(const geo of ownedG)geo.dispose();for(const m of ownedM)m.dispose();ownedG.clear();ownedM.clear();materials.clear();g.clear();g.removeFromParent();}
   return {group:g,head,arms,legs,clothing,modelType:'character',setAppearance,setColor(c){if(disposed)return;const next=color(c,baseColor);if(next!==baseColor){baseColor=next;if(outfit==='uniform')buildBody(theme());}},setHairStyle(style,tone){if(!disposed)buildHair(style,color(tone,hairColor));},dispose,
    animate(phase,moving,sit=false,wave=false){if(disposed)return;lastPhase=Number(phase)||0;const t=lastPhase*.25,cycle=((t+1.3)%4.4),close=cycle<.13?Math.sin(cycle/.13*Math.PI):0;blink=1-close*.96;for(const eye of eyes)eye.scale.y=blink;if(smileNode)smileNode.scale.y=1+Math.sin(t*.7)*.045;
     g.position.y=sit?.34:moving?Math.abs(Math.sin(phase))*.026:Math.sin(t*1.6)*.008;body.scale.y=1+Math.sin(t*1.6)*.004;head.rotation.z=moving?Math.sin(phase*.5)*.018:Math.sin(t*.65)*.009;head.rotation.y=Math.sin(t*.47)*.018;
     legs.forEach((l,i)=>{l.rotation.x=sit?-1.16:moving?Math.sin(phase+i*Math.PI)*.43:0;l.rotation.z=sit?(i?-.04:.04):0;});arms.forEach((a,i)=>{a.rotation.x=sit?-.28:moving?-Math.sin(phase+i*Math.PI)*.33:Math.sin(t*.8+i)*.014;a.rotation.z=wave&&i===1?-2.1+Math.sin(phase*1.5)*.23:(i?-.065:.065);});
-   },state(){return {version:'head-integrated.1',hair:hairStyle,outfit,blink,phase:lastPhase,disposed,profile:{...profile},ownedGeometries:ownedG.size,ownedMaterials:ownedM.size,sharedGeometries:shared.size};}
+   },state(){return {version:'blender-hair.1',hair:hairStyle,hairSource:hair.userData.source,outfit,blink,phase:lastPhase,disposed,profile:{...profile},ownedGeometries:ownedG.size,ownedMaterials:ownedM.size,sharedGeometries:shared.size};}
   };
  }
  root.CozyAvatarDeluxe=Object.freeze({create,themes:Object.keys(THEMES),sharedStats:()=>({geometries:shared.size}),isSharedResource:r=>[...shared.values()].includes(r)});
