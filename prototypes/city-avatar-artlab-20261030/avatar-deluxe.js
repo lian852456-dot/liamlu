@@ -9,7 +9,7 @@
  const unitSphere=()=>baseGeo('sphere',()=>new T.SphereGeometry(1,16,10));
  const smallSphere=()=>baseGeo('small-sphere',()=>new T.SphereGeometry(1,12,6));
  function create(parent,options={}){
-  const g=new T.Group();parent?.add(g);g.name='artlab-deluxe-character';g.scale.setScalar(Number(options.scale)||1);g.userData={modelType:'character',artToy:true,artLabCandidate:true,version:'deluxe.4'};
+  const g=new T.Group();parent?.add(g);g.name='artlab-deluxe-character';g.scale.setScalar(Number(options.scale)||1);g.userData={modelType:'character',artToy:true,artLabCandidate:true,version:'deluxe.4-neck.1'};
   const ownedG=new Set(),ownedM=new Set(),materials=new Map(),arms=[],legs=[],clothing=[];
   let disposed=false,skin=color(options.skin,PALETTE.orange),hairColor=color(options.hair,0xd2ad84),outfit='uniform',hairStyle='bob',baseColor=color(options.color,0x303036),profile={},blink=1,lastPhase=0,smileNode=null;
   const group=(p,x=0,y=0,z=0)=>{const n=new T.Group();n.position.set(x,y,z);p.add(n);return n;};
@@ -74,7 +74,7 @@
   // All body surfaces use the same matte vertex-color material. Clothing and
   // hands can meet continuously without separate cylindrical joint pieces.
   function bodyMaterial(){const key='body-sculpt-vertex';if(!materials.has(key)){const m=new T.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.72});materials.set(key,m);ownedM.add(m);}return materials.get(key);}
-  function loft(parent,rings,{segments=24,shape=2,thumbSide=0}={}){
+  function loft(parent,rings,{segments=24,shape=2,thumbSide=0,capEnds=true,inside=false}={}){
    const positions=[],colors=[],indices=[],step=segments+1,ascending=rings[rings.length-1].y>rings[0].y;
    for(let i=0;i<rings.length;i++){const r=rings[i],c=new T.Color(r.c);
     for(let j=0;j<=segments;j++){const a=j/segments*Math.PI*2,co=Math.cos(a),si=Math.sin(a),u=Math.sign(co)*Math.pow(Math.abs(co),2/shape),v=Math.sign(si)*Math.pow(Math.abs(si),2/shape);
@@ -83,7 +83,8 @@
     }
    }
    for(let i=0;i<rings.length-1;i++)for(let j=0;j<segments;j++){const a=i*step+j,b=a+step;indices.push(...(ascending?[a,b,a+1,b,b+1,a+1]:[a,a+1,b,b,a+1,b+1]));}
-   for(const end of[0,rings.length-1]){const r=rings[end],c=new T.Color(r.c),center=positions.length/3;positions.push(r.x||0,r.y,r.z||0);colors.push(c.r,c.g,c.b);for(let j=0;j<segments;j++){const a=end*step+j;indices.push(...((end===0)===ascending?[center,a,a+1]:[center,a+1,a]));}}
+   for(const end of(capEnds?[0,rings.length-1]:[])){const r=rings[end],c=new T.Color(r.c),center=positions.length/3;positions.push(r.x||0,r.y,r.z||0);colors.push(c.r,c.g,c.b);for(let j=0;j<segments;j++){const a=end*step+j;indices.push(...((end===0)===ascending?[center,a,a+1]:[center,a+1,a]));}}
+   if(inside)for(let i=0;i<indices.length;i+=3){const b=indices[i+1];indices[i+1]=indices[i+2];indices[i+2]=b;}
    const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));geo.setIndex(indices);geo.computeVertexNormals();const n=geo.attributes.normal;
    for(let i=0;i<rings.length;i++){const a=i*step,b=a+segments,v=new T.Vector3(n.getX(a)+n.getX(b),n.getY(a)+n.getY(b),n.getZ(a)+n.getZ(b)).normalize();n.setXYZ(a,v.x,v.y,v.z);n.setXYZ(b,v.x,v.y,v.z);}
    ownedG.add(geo);return mesh(parent,geo,bodyMaterial());
@@ -142,8 +143,30 @@
    ],{segments:28});clothing.push(coat);
    // Hips flow under the hem into the two thighs, without a separate oval pad.
    loft(body,[{y:.953,rx:.224,rz:.171,c:t.pants},{y:.905,rx:.244,rz:.178,c:t.pants},{y:.847,rx:.222,rz:.166,z:-.004,c:t.pants},{y:.816,rx:.174,rz:.143,z:-.004,c:t.pants},{y:.805,rx:.105,rz:.109,c:t.pants}],{segments:26});
-   ell(body,skin,0,1.46,0,.085,.105,.079,true);
-   const collarGeo=new T.TorusGeometry(.104,.027,7,22);ownedG.add(collarGeo);const collar=mesh(body,collarGeo,t.top,0,1.447,.004);collar.rotation.x=Math.PI/2;
+   // A broad seated neck base is hidden by a soft collar. Head, jaw, height,
+   // shoulder shell and every animation pivot stay exactly at the V4 baseline.
+   const neck=loft(body,[
+    {y:1.410,rx:.110,rz:.096,c:skin},
+    {y:1.453,rx:.098,rz:.088,c:skin},
+    {y:1.505,rx:.085,rz:.078,c:skin},
+    {y:1.546,rx:.079,rz:.074,c:skin},
+    {y:1.566,rx:.076,rz:.071,c:skin}
+   ],{segments:22});neck.name='artlab-neck-seat';
+   // Two open surfaces meet at a rolled lip, leaving a real neckline opening.
+   const collar=loft(body,[
+    {y:1.378,rx:.202,rz:.151,z:.002,c:t.top},
+    {y:1.412,rx:.169,rz:.132,z:.002,c:t.top},
+    {y:1.460,rx:.135,rz:.114,z:.002,c:t.top},
+    {y:1.499,rx:.116,rz:.100,z:.002,c:t.top},
+    {y:1.517,rx:.108,rz:.096,z:.002,c:t.top},
+    {y:1.526,rx:.102,rz:.092,z:.002,c:t.top}
+   ],{segments:24,capEnds:false});collar.name='artlab-collar-outer';
+   const collarInside=loft(body,[
+    {y:1.526,rx:.102,rz:.092,z:.002,c:t.top},
+    {y:1.520,rx:.091,rz:.082,z:.002,c:t.top},
+    {y:1.503,rx:.087,rz:.079,z:.002,c:t.top},
+    {y:1.463,rx:.086,rz:.079,z:.002,c:t.top}
+   ],{segments:24,capEnds:false,inside:true});collarInside.name='artlab-collar-inner';
    for(const side of[-1,1]){curve(body,[[side*.025,1.435,.111],[side*.119,1.381,.153],[side*.158,1.342,.169]],.020,t.trim,7,5);curve(body,[[side*.243,1.25,.155],[side*.257,1.11,.153],[side*.247,.981,.157]],.0045,0x555052,7,4);}
    curve(body,[[0,1.36,.167],[0,1.18,.245],[0,.942,.239]],.008,t.trim,10,4);ell(body,0xc6baaa,0,1.31,.205,.019,.029,.013,true,.46);
    // Keep the same outfit/accessories as V1; only re-seat them on the new shell.
@@ -189,7 +212,7 @@
    animate(phase,moving,sit=false,wave=false){if(disposed)return;lastPhase=Number(phase)||0;const t=lastPhase*.25,cycle=((t+1.3)%4.4),close=cycle<.13?Math.sin(cycle/.13*Math.PI):0;blink=1-close*.96;for(const eye of eyes)eye.scale.y=blink;if(smileNode)smileNode.scale.y=1+Math.sin(t*.7)*.045;
     g.position.y=sit?.34:moving?Math.abs(Math.sin(phase))*.026:Math.sin(t*1.6)*.008;body.scale.y=1+Math.sin(t*1.6)*.004;head.rotation.z=moving?Math.sin(phase*.5)*.018:Math.sin(t*.65)*.009;head.rotation.y=Math.sin(t*.47)*.018;
     legs.forEach((l,i)=>{l.rotation.x=sit?-1.16:moving?Math.sin(phase+i*Math.PI)*.43:0;l.rotation.z=sit?(i?-.04:.04):0;});arms.forEach((a,i)=>{a.rotation.x=sit?-.28:moving?-Math.sin(phase+i*Math.PI)*.33:Math.sin(t*.8+i)*.014;a.rotation.z=wave&&i===1?-2.1+Math.sin(phase*1.5)*.23:(i?-.065:.065);});
-   },state(){return {version:'deluxe.4',hair:hairStyle,outfit,blink,phase:lastPhase,disposed,profile:{...profile},ownedGeometries:ownedG.size,ownedMaterials:ownedM.size,sharedGeometries:shared.size};}
+   },state(){return {version:'deluxe.4-neck.1',hair:hairStyle,outfit,blink,phase:lastPhase,disposed,profile:{...profile},ownedGeometries:ownedG.size,ownedMaterials:ownedM.size,sharedGeometries:shared.size};}
   };
  }
  root.CozyAvatarDeluxe=Object.freeze({create,themes:Object.keys(THEMES),sharedStats:()=>({geometries:shared.size}),isSharedResource:r=>[...shared.values()].includes(r)});

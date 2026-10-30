@@ -1,0 +1,31 @@
+{
+  "at": "2026-10-30T03:32:06.166Z",
+  "frozenV4Sha256": "04b4ecd7507b9ffa4e7908c0ec851c4c00240e673bda1d182096d18a508f34f3",
+  "frozenV4MatchesCommit": "4b5e35131ce330d939f89497e236daef0a5ab202",
+  "headHairAnimationUnchanged": "avatar-neck.test.cjs tests exact source and local head geometry/materials",
+  "formalEntrySha256": "7816d64e87b831531ffbfb4e176043e65ebaa589b662ac8741d04816740158f6",
+  "formalEntryUnchanged": true,
+  "originalV4Public": {
+    "url": "https://greensboro-blocks-anniversary-bouquet.trycloudflare.com",
+    "files": [
+      {
+        "file": "index.html",
+        "http": 200,
+        "sha256": "11692789f405b64ff7a6d108241245a2a10ba2ebdf82563856851508cbb996a6",
+        "unchanged": true
+      },
+      {
+        "file": "avatar-deluxe.js",
+        "http": 200,
+        "sha256": "04b4ecd7507b9ffa4e7908c0ec851c4c00240e673bda1d182096d18a508f34f3",
+        "unchanged": true
+      }
+    ]
+  },
+  "formalDatabaseOpened": false,
+  "formalWrites": 0,
+  "rewardsIssued": 0,
+  "physicalIphoneUat": false,
+  "bodyApproval": "PENDING",
+  "pass": true
+}
