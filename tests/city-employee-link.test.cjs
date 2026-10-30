@@ -256,3 +256,13 @@ test('candidate HTML keeps the handoff boundary explicit and never opts into noo
   assert.doesNotMatch(html, /returnUrl/i);
   assert.match(html, /city-employee-link\.js/);
 });
+
+
+test('clock synchronization clears the fragment first and fails closed before any credentials are used',async()=>{
+  const doc=makeDocument(),win=makeWindow('#cityChallenge='+encodeChallenge(validChallenge()),doc);let credentials=0;
+  const ui=UI.create({window:win,document:doc,ownerClient:{restore(){credentials++;},session(){credentials++;},login(){credentials++;}},now:()=>1700000000000,
+    syncClock:async id=>{assert.equal(id,validChallenge().challengeId);assert.equal(win.location.hash,'');throw Error('CLOCK_UNAVAILABLE');}});
+  await ui.ready;assert.equal(credentials,0);assert.equal(ui.state.challenge,null);
+  assert.equal(doc.getElementById('employee-link-login-submit').disabled,true);
+  assert.match(doc.getElementById('employee-link-status').textContent,/核對伺服器時間/);
+});

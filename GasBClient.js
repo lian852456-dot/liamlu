@@ -1,6 +1,7 @@
 // Short-lived B sessions; optional primary-owner phone grant. Passwords are never saved.
 function createDashboardBClient(ownerExecUrl, options={}) {
   if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,200}\/exec$/.test(ownerExecUrl))throw new Error('OWNER_ENDPOINT_REQUIRED');
+  const now=typeof options.now==='function'?options.now:()=>Date.now(),cityNow=typeof options.cityNow==='function'?options.cityNow:now;
   const storage=options.storage,storageKey='north12b_password_session_v1';
   const phoneStorage=options.phoneStorage,phoneKey='north12b_owner_phone_v1',phoneTtl=90*24*60*60*1000;
   let session=null,generation=0,expiresAt=0,lastDeviceId='',lastPhoneToken='';
@@ -14,10 +15,10 @@ function createDashboardBClient(ownerExecUrl, options={}) {
       if(!value){sessionState('missing');return null;}
       if(value.logoutEpoch!==(options.logoutEpoch?.()||'')){reason='epoch';throw Error('B_AUTH_DENIED');}
       if(value.deviceId!==deviceId){reason='device';throw Error('B_AUTH_DENIED');}
-      if(Number.isSafeInteger(value.expiresAt)&&value.expiresAt<=Date.now()){reason='expired';throw Error('B_AUTH_DENIED');}
+      if(Number.isSafeInteger(value.expiresAt)&&value.expiresAt<=now()){reason='expired';throw Error('B_AUTH_DENIED');}
       if(value.v!==1 || value.owner!==ownerExecUrl || value.logoutEpoch!==(options.logoutEpoch?.()||'') || value.deviceId!==deviceId ||
         !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(value.token) || !Number.isSafeInteger(value.expiresAt) ||
-        value.expiresAt<=Date.now() || value.expiresAt>Date.now()+1800000)throw Error('B_AUTH_DENIED');
+        value.expiresAt<=now() || value.expiresAt>now()+1800000)throw Error('B_AUTH_DENIED');
       sessionState('restored');return value;
     }catch{sessionState(reason);removeSaved();return null;}
   }
@@ -27,13 +28,13 @@ function createDashboardBClient(ownerExecUrl, options={}) {
     try {
       const p=JSON.parse(phoneStorage?.getItem(phoneKey)||'null');if(!p)return null;
       if(p.v!==1 || p.owner!==ownerExecUrl || p.deviceId!==deviceId || p.logoutEpoch!==(options.logoutEpoch?.()||'') ||
-        !/^BP1_[a-f0-9]{64}$/.test(p.phoneToken) || !Number.isSafeInteger(p.expiresAt) || p.expiresAt<=Date.now() || p.expiresAt>Date.now()+phoneTtl)throw Error('B_AUTH_DENIED');
+        !/^BP1_[a-f0-9]{64}$/.test(p.phoneToken) || !Number.isSafeInteger(p.expiresAt) || p.expiresAt<=now() || p.expiresAt>now()+phoneTtl)throw Error('B_AUTH_DENIED');
       return p;
     }catch{removePhone();return null;}
   }
   function savePhone(p){if(!phoneStorage)throw Error('B_STORAGE_UNAVAILABLE');phoneStorage.setItem(phoneKey,JSON.stringify(p));}
   function saveLease(result,deviceId,expected){
-    if(expected!==generation || !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(result.token) || !Number.isSafeInteger(result.expiresAt) || result.trustSource!=='password-bound' || result.expiresAt<=Date.now() || result.expiresAt>Date.now()+1800000)throw Error('B_AUTH_DENIED');
+    if(expected!==generation || !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(result.token) || !Number.isSafeInteger(result.expiresAt) || result.trustSource!=='password-bound' || result.expiresAt<=now() || result.expiresAt>now()+1800000)throw Error('B_AUTH_DENIED');
     session={deviceId,token:result.token};expiresAt=result.expiresAt;
     if(storage)storage.setItem(storageKey,JSON.stringify({v:1,owner:ownerExecUrl,logoutEpoch:options.logoutEpoch?.()||'',...session,expiresAt}));
     return {expiresAt,trustSource:result.trustSource};
@@ -41,7 +42,7 @@ function createDashboardBClient(ownerExecUrl, options={}) {
   function suspend(){generation++;session=null;expiresAt=0;reads.clear();for(const controller of requests)controller.abort();requests.clear();}
   function clear(){suspend();removeSaved();}
   async function post(payload,expected=generation,transport=fetch) {
-    const clock=()=>typeof performance==='object'?performance.now():Date.now();
+    const clock=()=>typeof performance==='object'?performance.now():now();
     const controller=new AbortController(),started=clock();let outcome='error';requests.add(controller);
     const timer=setTimeout(()=>controller.abort(),90000);
     try {
@@ -69,7 +70,7 @@ function createDashboardBClient(ownerExecUrl, options={}) {
     const done=()=>{if(reads.get(key)===operation)reads.delete(key);};operation.then(done,done);return operation;
   }
   async function protectedRead(action,extra) {
-    if(!session || expiresAt<=Date.now()){clear();throw new Error('B_AUTH_DENIED');}const expected=generation,proof=session;
+    if(!session || expiresAt<=now()){clear();throw new Error('B_AUTH_DENIED');}const expected=generation,proof=session;
     // A failed read or an inconclusive server response must lock the view, but
     // the short lease can still be checked again without asking for a password.
     // The server verifies eligibility, revocation and device proof on every call.
@@ -94,8 +95,8 @@ function createDashboardBClient(ownerExecUrl, options={}) {
       if(!Number.isSafeInteger(result.expiresAt))rejectLogin('expiry-type');
       if(result.trustSource!=='password-bound')rejectLogin('trust-source');
       session={deviceId,token:result.token};expiresAt=result.expiresAt;
-      if(expiresAt<=Date.now()){clear();rejectLogin('expiry-past');}
-      if(expiresAt>Date.now()+1800000){clear();rejectLogin('expiry-future');}
+      if(expiresAt<=now()){clear();rejectLogin('expiry-past');}
+      if(expiresAt>now()+1800000){clear();rejectLogin('expiry-future');}
       if(storage){try{storage.setItem(storageKey,JSON.stringify({v:1,owner:ownerExecUrl,logoutEpoch:options.logoutEpoch?.()||'',...session,expiresAt}));}
         catch{try{await post({action:'employee_logout',...session});}finally{clear();}throw Error('B_STORAGE_UNAVAILABLE');}}
       return {expiresAt,trustSource:result.trustSource};
@@ -105,7 +106,7 @@ function createDashboardBClient(ownerExecUrl, options={}) {
       if(!session || !phoneStorage)throw Error('B_AUTH_DENIED');
       const expected=generation,proof=session;
       const result=await post({action:'employee_phone_enroll',...proof,phoneNonce:hex(crypto.getRandomValues(new Uint8Array(32)))},expected);
-      if(!/^BP1_[a-f0-9]{64}$/.test(result.phoneToken) || !Number.isSafeInteger(result.expiresAt) || result.expiresAt<=Date.now() || result.expiresAt>Date.now()+phoneTtl)throw Error('B_AUTH_DENIED');
+      if(!/^BP1_[a-f0-9]{64}$/.test(result.phoneToken) || !Number.isSafeInteger(result.expiresAt) || result.expiresAt<=now() || result.expiresAt>now()+phoneTtl)throw Error('B_AUTH_DENIED');
       try{savePhone({v:1,owner:ownerExecUrl,logoutEpoch:options.logoutEpoch?.()||'',deviceId:proof.deviceId,phoneToken:result.phoneToken,expiresAt:result.expiresAt});}
       catch{removePhone();await post({action:'employee_phone_forget',deviceId:proof.deviceId,phoneToken:result.phoneToken},expected);throw Error('B_STORAGE_UNAVAILABLE');}
       lastPhoneToken=result.phoneToken;return {expiresAt:result.expiresAt};
@@ -114,8 +115,8 @@ function createDashboardBClient(ownerExecUrl, options={}) {
       const p=savedPhone(deviceId);if(!p)return null;
       suspend();lastDeviceId=deviceId;lastPhoneToken=p.phoneToken;const expected=generation;
       // Reuse a lease request across app closures/tabs, avoiding extra server sessions.
-      if(!p.request || p.request.until<=Date.now()) {
-        p.request={sessionNonce:hex(crypto.getRandomValues(new Uint8Array(32))),idempotencyKey:hex(crypto.getRandomValues(new Uint8Array(16))),until:Date.now()+1800000};
+      if(!p.request || p.request.until<=now()) {
+        p.request={sessionNonce:hex(crypto.getRandomValues(new Uint8Array(32))),idempotencyKey:hex(crypto.getRandomValues(new Uint8Array(16))),until:now()+1800000};
         savePhone(p);
       }
       let result;
@@ -127,7 +128,7 @@ function createDashboardBClient(ownerExecUrl, options={}) {
         if(error.message==='B_AUTH_DENIED'){removePhone();lastPhoneToken='';}
         throw error;
       }
-      if(!Number.isSafeInteger(result.phoneExpiresAt) || result.phoneExpiresAt<=Date.now() || result.phoneExpiresAt>Date.now()+phoneTtl)throw Error('B_AUTH_DENIED');
+      if(!Number.isSafeInteger(result.phoneExpiresAt) || result.phoneExpiresAt<=now() || result.phoneExpiresAt>now()+phoneTtl)throw Error('B_AUTH_DENIED');
       try{const lease=saveLease(result,deviceId,expected);p.expiresAt=result.phoneExpiresAt;p.request.until=lease.expiresAt;savePhone(p);return lease;}
       catch{clear();removePhone();try{await post({action:'employee_phone_forget',deviceId,phoneToken:p.phoneToken},generation);}finally{lastPhoneToken='';}throw Error('B_STORAGE_UNAVAILABLE');}
     },
@@ -143,12 +144,12 @@ function createDashboardBClient(ownerExecUrl, options={}) {
       if(!challenge || Object.keys(challenge).sort().join('|')!=='audience|challengeId|expiresAt|nonceHash|worldId' ||
         challenge.audience!=='north12b-city-formal-login' || !/^[A-Za-z0-9_-]{24,100}$/.test(challenge.challengeId) ||
         !/^[a-f0-9]{64}$/.test(challenge.nonceHash) || !['current-guests','legacy-owners'].includes(challenge.worldId) ||
-        !Number.isSafeInteger(challenge.expiresAt) || challenge.expiresAt<=Date.now() || challenge.expiresAt>Date.now()+120000)throw Error('CITY_CHALLENGE_INVALID');
+        !Number.isSafeInteger(challenge.expiresAt) || challenge.expiresAt<=cityNow() || challenge.expiresAt>cityNow()+120000)throw Error('CITY_CHALLENGE_INVALID');
       const result=await protectedPost('employee_city_handoff',{challengeId:challenge.challengeId,nonceHash:challenge.nonceHash,
         audience:challenge.audience,worldId:challenge.worldId});
       if(result.schema!=='city-employee-handoff/v1' || result.challengeId!==challenge.challengeId || !/^CH1_[a-f0-9]{64}$/.test(result.code) ||
-        !Number.isSafeInteger(result.expiresAt) || result.expiresAt<=Date.now() || result.expiresAt>Date.now()+120000)throw Error('CITY_HANDOFF_INVALID');
-      return {schema:result.schema,challengeId:result.challengeId,code:result.code,expiresAt:Math.min(result.expiresAt,challenge.expiresAt)};
+        !Number.isSafeInteger(result.expiresAt) || result.expiresAt<=now() || result.expiresAt>now()+120000)throw Error('CITY_HANDOFF_INVALID');
+      return {schema:result.schema,challengeId:result.challengeId,code:result.code,expiresAt:Math.min(result.expiresAt,now()+challenge.expiresAt-cityNow())};
     },
     validate:()=>protectedPost('employee_session'),
     restore(deviceId){suspend();lastDeviceId=deviceId;const value=savedSession(deviceId);if(!value)return null;session={deviceId:value.deviceId,token:value.token};expiresAt=value.expiresAt;lastPhoneToken=savedPhone(deviceId)?.phoneToken||'';return {expiresAt};},
