@@ -1,0 +1,13 @@
+{
+  "backendAndRegressionTests": 35,
+  "passed": 35,
+  "realEmployeeDataWrites": 0,
+  "newCoinsGranted": 0,
+  "formalAuthenticationChanged": false,
+  "modules": {
+    "employee-play-login.mjs": "678fa7ddab1faf7a3fdfc117aa14a34b126fdde88718375931e4269ec3333b43",
+    "employee-play-ui.js": "c523b9e78ea0d2bfd506eb1a7c230bf3da7e744b7dfe5aff2ccc7b0daf4f6241",
+    "employee-play-ui.css": "89f2d757eae06d315ce51b78a5a19bfdc940df03a7bd0a4812d299a43d41672e",
+    "integration.patch": "5efdf7048b2042e90e13c2a5dd9fa7d19bc29bde6c524e37cc71a8c0bf6ef5fd"
+  }
+}

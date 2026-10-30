@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="北一二B 小城員工角色登入操作手冊">
+  <title>北一二B 小城｜員工角色登入手冊</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #26372e;
+      --muted: #5d6d63;
+      --green: #2d6947;
+      --green-dark: #205437;
+      --paper: #fffdf8;
+      --wash: #eef4ed;
+      --line: #d9dfd6;
+      --warning: #fff3da;
+      --warning-line: #e9c77a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(160deg, #edf4ec, #f7f2e8 60%, #f0e8d9);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif;
+      line-height: 1.65;
+    }
+    main { width: min(100% - 28px, 720px); margin: 0 auto; padding: 28px 0 48px; }
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: 0 16px 38px #30453018;
+      padding: clamp(20px, 5vw, 38px);
+    }
+    .eyebrow { color: var(--green); font-size: .85rem; font-weight: 800; letter-spacing: .08em; }
+    h1 { margin: 5px 0 8px; font-size: clamp(1.55rem, 5vw, 2.25rem); line-height: 1.25; }
+    h2 { margin: 30px 0 10px; font-size: 1.25rem; line-height: 1.35; }
+    p { margin: 10px 0; }
+    .lead { color: var(--muted); font-size: 1.05rem; }
+    .notice {
+      margin: 20px 0;
+      padding: 14px 16px;
+      border: 1px solid var(--warning-line);
+      border-radius: 14px;
+      background: var(--warning);
+    }
+    .notice strong { display: block; margin-bottom: 3px; }
+    .steps { display: grid; gap: 12px; margin: 14px 0 0; padding: 0; list-style: none; counter-reset: step; }
+    .steps li { position: relative; padding: 14px 16px 14px 52px; border: 1px solid var(--line); border-radius: 14px; background: #fff; counter-increment: step; }
+    .steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--green);
+      color: #fff;
+      text-align: center;
+      line-height: 26px;
+      font-weight: 800;
+    }
+    .steps strong { display: block; color: var(--green-dark); }
+    .checklist { margin: 8px 0 0; padding-left: 1.3em; }
+    .checklist li { margin: 5px 0; }
+    .button {
+      display: inline-block;
+      margin: 8px 0 2px;
+      padding: 11px 16px;
+      border-radius: 12px;
+      background: var(--green);
+      color: #fff;
+      font-weight: 800;
+      text-decoration: none;
+    }
+    .button:hover, .button:focus-visible { background: var(--green-dark); }
+    details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+    summary { cursor: pointer; color: var(--green-dark); font-weight: 800; }
+    footer { margin-top: 24px; color: var(--muted); font-size: .88rem; }
+    code { padding: 2px 5px; border-radius: 5px; background: #edf1ed; font-size: .9em; overflow-wrap: anywhere; }
+    @media print {
+      body { background: #fff; }
+      main { width: 100%; padding: 0; }
+      .card { border: 0; box-shadow: none; padding: 0; }
+      .button { color: var(--green-dark); background: none; padding-left: 0; }
+      details { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <article class="card">
+      <div class="eyebrow">COZY POCKET TAIPEI</div>
+      <h1>北一二B 小城<br>員工角色登入操作手冊</h1>
+      <p class="lead">日常進入遊戲只要輸入自己的員編，就能回到已連結的遊戲角色。</p>
+
+      <div class="notice">
+        <strong>這是遊戲限定登入</strong>
+        員編只用來找回小城裡已連結的角色，不是正式員工網站的登入方式，也不會開啟 KPI、台獎、回報或其他正式業務資料。
+      </div>
+
+      <h2>第一次使用</h2>
+      <p>已設定過員編的同仁可直接登入。還沒設定時，請先在原裝置讀取原本的角色，核對暱稱與金幣，再在生活手帳按「連結這個角色與我的員編」。如果無法讀取舊角色，請找主管核對，不要重新建立。系統不會用相近姓名猜角色。</p>
+
+      <h2>之後每次進入遊戲</h2>
+      <ol class="steps">
+        <li><strong>開啟小城入口</strong>用手機或電腦開啟下方的「開始遊戲」。</li>
+        <li><strong>打開「我的生活手帳」</strong>點右上角生活手帳；登入後，這個按鈕會顯示角色暱稱。</li>
+        <li><strong>輸入自己的員編</strong>只填本人員編，再按「登入我的遊戲角色」。不需要輸入長續玩碼。</li>
+        <li><strong>核對角色</strong>確認畫面上的遊戲暱稱、金幣與外觀是自己的，再開始走動和遊玩。</li>
+      </ol>
+      <a class="button" href="https://immediate-temporary-cage-warriors.trycloudflare.com/">開始遊戲 ↗</a>
+
+      <h2>使用時請注意</h2>
+      <ul class="checklist">
+        <li>任何裝置都從同一個入口輸入自己的員編；不要代填別人的員編。</li>
+        <li>知道員編的人可能代登入遊戲角色，請不要公開或轉傳他人的員編。</li>
+        <li>員編不是正式網站密碼；KPI、台獎與業務資料仍照原本的本人驗證流程。</li>
+        <li>不要清除瀏覽器資料、不要重建角色，也不要把網站密碼或續玩卡交給別人。</li>
+        <li>同一角色同時在多台裝置操作時，以遊戲當下顯示的提示與最新畫面為準。</li>
+      </ul>
+
+      <details>
+        <summary>舊續玩卡怎麼辦？</summary>
+        <p>請保留原本下載的續玩卡作為備援。平常使用員編登入即可；只有員編尚未連結、服務暫時斷線或需要找回原進度時，再依主管指示使用續玩卡。</p>
+      </details>
+      <details>
+        <summary>遇到錯誤怎麼處理？</summary>
+        <ul class="checklist">
+          <li><strong>尚未設定員編：</strong>先在原裝置讀取舊角色並連結員編；無法找回時請主管協助。</li>
+          <li><strong>角色不符：</strong>先停止操作，不要建立新角色，回報主管核對員編與原暱稱。</li>
+          <li><strong>網路中斷或頁面沒有回應：</strong>先重新整理一次；仍無法進入就回報主管，不要重複建立角色。</li>
+        </ul>
+      </details>
+
+      <footer>
+        本手冊對應免費臨時遊戲入口，台北時間 2026/10/31 23:59 關閉。正式員工登入與正式業務資料不受本手冊影響。
+      </footer>
+    </article>
+  </main>
+</body>
+</html>

@@ -1,0 +1,88 @@
+--- a/client.js
++++ b/client.js
+@@ -47,7 +47,7 @@
+   function message(t){$('#form-message').textContent=t;W.notify(t);}
+   async function run(fn){try{await fn();}catch(e){message(e.message);}}
+   function stopPresence(){cancelForestCrossing();clearPendingPlayground();playgroundPlayers=[];W.clearPlayground?.();W.setSupervisor?.(null);endFloorEdit();if(presence){presence.stop();presence=null;}W.setActive(false);W.clearPeers();W.setPlacements({});spaceVersion=null;sharedSpace=null;lastWelcome=null;lastSnapshot=null;nearbyPeers=[];coarsePeers=[];const takeover=$('#presence-takeover');if(takeover)takeover.hidden=true;const status=$('#presence-status');if(status)status.textContent='未連線';syncPlaygroundControls();}
+-  function clear({preservePose=false}={}){cancelForestCrossing();const retainedPose=preservePose?W.getPose():null;window.CozyOnboarding?.clear();window.GuestAccess?.clear();window.CityGuestResume?.setState(null);window.CityShops?.setState({profile:null,inventory:[],catalog:[],wallet:null});window.CityShops?.close();W.setPetCompanion?.(null);$('#supervisor-talk')?.close();designPromptDismissed=false;closeDesigner();window.CozySocialUI?.setSignedIn(false);generation++;clearTimeout(travelTimer);clearInterval(tripTicker);$('#city-trip')?.remove();activeTravel=null;stopPresence();W.setActive(true);state=null;csrf='';currentWork=null;$('#player-area').hidden=true;$('#login-area').hidden=false;$('#nickname').value='';$('#task-list').replaceChildren();if($('#task-list-title'))$('#task-list-title').textContent='今天的小任務';if($('#task-list-note')){$('#task-list-note').hidden=true;$('#task-list-note').textContent='';}$('#inventory').replaceChildren();$('#shop-items')?.replaceChildren();$('#wardrobe')?.replaceChildren();$('#layout-items')?.replaceChildren();$('#coins').textContent='—';$('#gold').textContent='—';$('#profile-label').textContent='我的生活手帳';$('#save-status').textContent='匿名散步中，建立訪客角色或讀取續玩卡即可保存角色與進度。';W.setName('旅人');W.setAppearance({character:'orange',skin:'orange',hair:'',outfit:''});W.setPose(retainedPose||window.CozySceneRules.spawn);syncCity();liveHud('未登入');}
++  function clear({preservePose=false}={}){cancelForestCrossing();const retainedPose=preservePose?W.getPose():null;window.CozyOnboarding?.clear();window.GuestAccess?.clear();window.CityGuestResume?.setState(null);window.CityEmployeePlay?.setState(null);window.CityShops?.setState({profile:null,inventory:[],catalog:[],wallet:null});window.CityShops?.close();W.setPetCompanion?.(null);$('#supervisor-talk')?.close();designPromptDismissed=false;closeDesigner();window.CozySocialUI?.setSignedIn(false);generation++;clearTimeout(travelTimer);clearInterval(tripTicker);$('#city-trip')?.remove();activeTravel=null;stopPresence();W.setActive(true);state=null;csrf='';currentWork=null;$('#player-area').hidden=true;$('#login-area').hidden=false;$('#nickname').value='';$('#task-list').replaceChildren();if($('#task-list-title'))$('#task-list-title').textContent='今天的小任務';if($('#task-list-note')){$('#task-list-note').hidden=true;$('#task-list-note').textContent='';}$('#inventory').replaceChildren();$('#shop-items')?.replaceChildren();$('#wardrobe')?.replaceChildren();$('#layout-items')?.replaceChildren();$('#coins').textContent='—';$('#gold').textContent='—';$('#profile-label').textContent='我的生活手帳';$('#save-status').textContent='匿名散步中，建立訪客角色或讀取續玩卡即可保存角色與進度。';W.setName('旅人');W.setAppearance({character:'orange',skin:'orange',hair:'',outfit:''});W.setPose(retainedPose||window.CozySceneRules.spawn);syncCity();liveHud('未登入');}
+   window.CozyPresenceInfo=()=>{const info=presence?.getState?.()||{connected:false,replaced:false,suspended:false,stats:{}};return{connected:!!info.connected,replaced:!!info.replaced,suspended:!!info.suspended,nearby:nearbyPeers.map(p=>({id:p.id,nickname:p.nickname,scene:p.pose?.scene,zone:p.pose?.zone})),coarse:coarsePeers.map(p=>({id:p.id,nickname:p.nickname,scene:p.scene,zone:p.zone})),lastWelcome,lastSnapshot,stats:{...info.stats}};};
+   const make=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
+   function own(itemId){return (state?.inventory||[]).find(i=>i.item_id===itemId);}
+@@ -146,7 +146,7 @@
+   }
+   window.addEventListener('cozy-layout-select',event=>{const p=sharedSpace?.placements.find(p=>p.id===event.detail?.placementId);if(!floorEditing||!p)return;floorSelection={placementId:p.id,inventoryId:p.inventory_id,itemId:p.item_id,rotation:p.rotation||0};syncFloorEditor();});
+   window.addEventListener('cozy-layout-commit',event=>{const d=event.detail;if(!floorEditing||layoutSaving||!d||!['place','move'].includes(d.operation))return;run(()=>decorate(d.operation,sharedSpace?.placements.find(p=>p.id===d.placementId),d));});
+-  function render(data){if(state?.profile?.id&&data.profile?.id&&state.profile.id!==data.profile.id)clear();if(state?.profile?.id===data.profile?.id&&Number(data.stateRevision||0)<Number(state.stateRevision||0))return;state=data;window.GuestAccess?.setState(data);window.CityGuestResume?.setState(data);window.CityShops?.setState(data);W.setPetCompanion?.(data.petCompanion);window.CozySocialUI?.setSignedIn(true);W.setSelfId?.(state.profile.id);if(data.csrf)csrf=data.csrf;$('#player-area').hidden=false;$('#login-area').hidden=true;$('#nickname').value=state.profile.nickname;$('#profile-label').textContent=state.profile.nickname;$('#save-status').textContent=state.access?.accountKind==='guest'?'訪客進度已讀取 · '+state.date+' · 伺服器保存，請保留續玩卡':'已讀取 V4.3 獨立存檔 · '+state.date;$('#coins').textContent=state.wallet.coins;$('#gold').textContent=state.wallet.gold;renderDesignEntry();W.setName(state.profile.nickname);W.setAppearance(state.profile);W.setMovementSpeed?.(state.movementSpeed);syncCity();liveHud();$('#task-list').replaceChildren();const guest=state.access?.accountKind==='guest';const taskTitle=$('#task-list-title'),taskNote=$('#task-list-note');if(taskTitle)taskTitle.textContent=guest?'街區活動':'今天的小任務';if(taskNote){taskNote.hidden=!guest;taskNote.textContent=guest?'找主管來源問答每日5遊戲幣；逛九店、購物與同伴互動':'';}
++  function render(data){if(state?.profile?.id&&data.profile?.id&&state.profile.id!==data.profile.id)clear();if(state?.profile?.id===data.profile?.id&&Number(data.stateRevision||0)<Number(state.stateRevision||0))return;if(state?.profile?.id===data?.profile?.id){if(data.playLogin===undefined)data.playLogin=state.playLogin;if(data.playLink===undefined)data.playLink=state.playLink;}state=data;window.GuestAccess?.setState(data);window.CityEmployeePlay?.setState(data);window.CityGuestResume?.setState(data);window.CityShops?.setState(data);W.setPetCompanion?.(data.petCompanion);window.CozySocialUI?.setSignedIn(true);W.setSelfId?.(state.profile.id);if(data.csrf)csrf=data.csrf;$('#player-area').hidden=false;$('#login-area').hidden=true;$('#nickname').value=state.profile.nickname;$('#profile-label').textContent=state.profile.nickname;$('#save-status').textContent=state.access?.accountKind==='guest'?'訪客進度已讀取 · '+state.date+' · 伺服器保存，請保留續玩卡':'已讀取 V4.3 獨立存檔 · '+state.date;$('#coins').textContent=state.wallet.coins;$('#gold').textContent=state.wallet.gold;renderDesignEntry();W.setName(state.profile.nickname);W.setAppearance(state.profile);W.setMovementSpeed?.(state.movementSpeed);syncCity();liveHud();$('#task-list').replaceChildren();const guest=state.access?.accountKind==='guest';const taskTitle=$('#task-list-title'),taskNote=$('#task-list-note');if(taskTitle)taskTitle.textContent=guest?'街區活動':'今天的小任務';if(taskNote){taskNote.hidden=!guest;taskNote.textContent=guest?'找主管來源問答每日5遊戲幣；逛九店、購物與同伴互動':'';}
+     for(const t of state.tasks){const row=make('div');row.className='task-row';row.append(make('span',t.name+' · +'+t.coins));const b=make('button',t.status==='claimed'?'已領取':t.status==='ready'?'領取金幣':'示範練習');b.disabled=t.status==='claimed';b.onclick=()=>run(async()=>{if(t.status==='ready'){await api('building/enter',{buildingId:t.id});render(await api('claim',{task:t.id,requestId:requestId()}));message('已保存任務獎勵。');}else openCityTask(t.id);});row.append(b);$('#task-list').append(row);}
+     $('#inventory').replaceChildren();for(const i of state.inventory){const item=state.catalog.find(c=>c.id===i.item_id);const row=make('p',item?.name||i.item_id);if(i.space_id)row.append(make('small',' · 已布置'));$('#inventory').append(row);}if(!state.inventory.length)$('#inventory').append(make('p','還沒有收藏，先到商店看看。'));renderWardrobe();renderShop();renderLayout();offerCharacterDesign();queueMicrotask(()=>{if(state)window.CozyOnboarding?.setPlayer({id:state.profile.id,nickname:state.profile.nickname,setupComplete:state.appearanceSetupComplete===true});});
+   }
+@@ -234,6 +234,7 @@
+   });
+   cityPhoto=window.CozyPhotoMode?.createPhotoMode({world:W,landmarks:window.North12BCityData?.landmarks,onVisit:visitPhoto,onModeChange(open){if(open)cityPhoto?.setLandmarks(W.state().scene==='forest'?[{id:'forest-vista',name:'山林觀景台'}]:window.North12BCityData?.landmarks);document.body.classList.toggle('city-photo-active',open);if(open){window.CityUI?.setOpen(false);window.CityShops?.close();for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();}else W.finishPhoto?.();}});cityPhoto?.mount();
+   window.CityGuestResume?.init({api,onMessage:message,reconnect:()=>recovery.restore({force:true}),onRestored:async data=>{recovery.pause();generation++;render(data);connectPresence({force:true});}});
++  window.CityEmployeePlay?.init({api,onMessage:message,onRestored:async data=>{recovery.pause();generation++;render(data);authChannel?.postMessage('changed');connectPresence({force:true});}});
+   $('#logout').onclick=()=>run(async()=>{recovery.pause();stopPresence();try{await api('logout',{});authChannel?.postMessage('changed');clear();window.CityGuestResume?.refresh();message('已登出並忘記此裝置續玩，角色進度保留。');}catch(error){if(error.status===401){clear();message('登入已結束。');}else{liveHud('登出尚未完成，請恢復網路後再試');message('尚未確認登出，請恢復網路後再按一次。');}}});
+   $('#layout-floor-start')?.addEventListener('click',()=>beginFloorEdit());
+   $('#layout-done')?.addEventListener('click',endFloorEdit);
+@@ -268,5 +269,5 @@
+     }catch(error){if(epoch===generation)W.notify(error.message);}finally{supervisorStarting=false;}
+   });
+   window.addEventListener('cozy-waypoint',()=>presence?.sendPose());window.addEventListener('cozy-scene',()=>{currentWork=null;presence?.sendPose();});document.addEventListener('visibilitychange',()=>{if(document.hidden){recovery.pause();W.setActive(false);presence?.close({suspend:true,sendLastPose:true});}else resumeSession();});window.addEventListener('pagehide',()=>{recovery.pause();W.setActive(false);presence?.close({suspend:true,sendLastPose:true});});window.addEventListener('pageshow',()=>{if(!document.hidden)resumeSession();});
+-  (async()=>{const hash=new URLSearchParams(location.hash.slice(1)),invite=hash.get('invite');if(invite){history.replaceState(null,'',location.pathname);try{await loginDemo({oneTime:invite});W.notify('歡迎來到你的小城。');connectPresence();}catch(error){if(error.code==='INVITE_EXPIRED'||!error.status){await recovery.restore({force:true});if(!state)message('邀請已使用或過期；若此瀏覽器曾登入，網路恢復後會自動讀取。');}else message(error.message);}}else{await recovery.restore();if(!state&&sessionFailure==='AUTH_REQUIRED'&&!new URLSearchParams(location.search).has('continue'))await window.GuestAccess?.startAutomatic?.({sessionErrorCode:sessionFailure});}})().finally(()=>{booting=false;if(!state)W.setActive(true);});
++  (async()=>{const hash=new URLSearchParams(location.hash.slice(1)),invite=hash.get('invite');if(invite){history.replaceState(null,'',location.pathname);try{await loginDemo({oneTime:invite});W.notify('歡迎來到你的小城。');connectPresence();}catch(error){if(error.code==='INVITE_EXPIRED'||!error.status){await recovery.restore({force:true});if(!state)message('邀請已使用或過期；若此瀏覽器曾登入，網路恢復後會自動讀取。');}else message(error.message);}}else{await recovery.restore();if(!state&&!window.CityEmployeePlay&&sessionFailure==='AUTH_REQUIRED'&&!new URLSearchParams(location.search).has('continue'))await window.GuestAccess?.startAutomatic?.({sessionErrorCode:sessionFailure});}})().finally(()=>{booting=false;if(!state)W.setActive(true);});
+ })();
+--- a/employee-city-link.js
++++ b/employee-city-link.js
+@@ -170,8 +170,8 @@
+       if (!refs.panel) return;
+       refs.panel.hidden = !refs.open;
+       if (refs.launcher) {
+-        refs.launcher.textContent = statusBound ? '開啟本人員工角色' : '綁定本人員工角色';
+-        refs.launcher.setAttribute?.('aria-label', statusBound ? '開啟本人員工角色' : '綁定本人員工角色');
++        refs.launcher.textContent = statusBound ? '正式員工角色設定' : '正式員工驗證（選用）';
++        refs.launcher.setAttribute?.('aria-label', statusBound ? '正式員工角色設定' : '正式員工驗證（選用）');
+       }
+       if (refs.start) refs.start.disabled = state.busy || state.completed;
+       if (refs.employeeId) refs.employeeId.disabled = state.busy || state.completed;
+@@ -321,7 +321,7 @@
+       refs.root = root;
+       root.id = 'employee-city-link-root';
+       root.setAttribute?.('aria-label', '員工角色綁定');
+-      refs.launcher = button('綁定本人員工角色', 'employee-city-link-launcher');
++      refs.launcher = button('正式員工驗證（選用）', 'employee-city-link-launcher');
+       refs.launcher.id = 'employee-city-link-launcher';
+       refs.launcher.setAttribute?.('aria-expanded', 'false');
+       refs.panel = el('section', 'employee-city-link-panel');
+@@ -329,11 +329,11 @@
+       refs.panel.hidden = true;
+       refs.open = false;
+       const header = el('div', 'employee-city-link-header');
+-      const title = el('h2', '', '本人員工角色綁定');
++      const title = el('h2', '', '正式網站本人驗證（選用）');
+       refs.close = button('×', 'employee-city-link-close');
+       refs.close.setAttribute?.('aria-label', '關閉員工角色綁定');
+       append(header, title, refs.close);
+-      const intro = el('p', 'employee-city-link-intro', '保留目前城市角色與進度；完成後只建立本人員工綁定，不建立新帳戶、不扣款。');
++      const intro = el('p', 'employee-city-link-intro', '一般遊戲請使用生活手帳的員編登入。此處是額外的正式網站本人驗證，可能需要原網站指定密碼；原角色與進度保留。');
+       const pilots = el('ul', 'employee-city-link-pilots');
+       append(pilots,
+         el('li', '', '本次開放嘉玲、依芯與李舒緩（遊戲暱稱），請使用自己原本遊玩的角色綁定。'));
+--- a/employee-city-bootstrap.js
++++ b/employee-city-bootstrap.js
+@@ -106,11 +106,12 @@
+     };
+     const attachForSession = async () => {
+       if (disposed || !cachedSelfId) return false;
+-      if (panel && panelSessionId !== cachedSelfId) {
++      const gameOnly=cachedSession?.playLogin?.mode==='employee-id-game-only';
++      if (!gameOnly && panel && panelSessionId !== cachedSelfId) {
+         try { await panel.boot?.(); } catch (_) { /* unbound guests keep the panel hidden */ }
+         panelSessionId = cachedSelfId;
+       }
+-      if (cityLink && cityLinkSessionId !== cachedSelfId) {
++      if (!gameOnly && cityLink && cityLinkSessionId !== cachedSelfId) {
+         try { await cityLink.boot?.(); } catch (_) { /* link status is optional */ }
+         cityLinkSessionId = cachedSelfId;
+       }
