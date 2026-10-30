@@ -5,7 +5,7 @@
   const READY_MESSAGE = 'avatar-artlab/ready';
   const METRICS_MESSAGE = 'avatar-artlab/metrics';
   const labels = {
-    version: { new: '新版', old: '原版' },
+    version: { new: '第二版', old: '第一版' },
     view: { front: '正面', quarter: '45°', side: '側面' },
     motion: { idle: '站立', walk: '行走', wave: '揮手', sit: '坐下', highfive: '擊掌' },
   };
@@ -115,8 +115,8 @@
       card.querySelectorAll('button, select').forEach(control => { control.disabled = disabled; });
     });
     if (refs.gameGuide) refs.gameGuide.hidden = state.scene !== 'game';
-    if (refs.sceneTitle) refs.sceneTitle.textContent = state.scene === 'studio' ? '看見角色的每個細節' : '走進城市，和角色一起玩';
-    if (refs.sceneState) refs.sceneState.textContent = state.scene === 'studio' ? '人物細節' : '城市試玩';
+    if (refs.sceneTitle) refs.sceneTitle.textContent = state.scene === 'studio' ? '臉型五官保留・第二版重做身體輪廓' : '走進城市，和角色一起玩';
+    if (refs.sceneState) refs.sceneState.textContent = state.scene === 'studio' ? '身體比例比較' : '城市試玩';
     if (refs.metricVersion) refs.metricVersion.textContent = labels.version[state.version];
   }
 
