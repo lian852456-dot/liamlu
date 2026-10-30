@@ -1,0 +1,506 @@
+{
+  "at": "2026-10-30T04:47:22.926Z",
+  "url": "https://bookmark-gear-screw-litigation.trycloudflare.com",
+  "deadline": "2026-10-31T15:59:00.000Z",
+  "files": [
+    {
+      "file": "artlab-ui.js",
+      "http": 200,
+      "sha256": "1639c2968da87ffdbbffdb449d1b6fe09026b9928fd695347b1e2b1cc74cf338",
+      "expected": "1639c2968da87ffdbbffdb449d1b6fe09026b9928fd695347b1e2b1cc74cf338",
+      "match": true
+    },
+    {
+      "file": "artlab.css",
+      "http": 200,
+      "sha256": "7068309ae90152b0a671c6727d6ed609b0cf0c615b79a19aea5056ac65a51547",
+      "expected": "7068309ae90152b0a671c6727d6ed609b0cf0c615b79a19aea5056ac65a51547",
+      "match": true
+    },
+    {
+      "file": "avatar-approved-alias.js",
+      "http": 200,
+      "sha256": "3693c9ae9dea3bfcd144ec10de828fd584d4ea94e25e62d9e4622367fbbf4d85",
+      "expected": "3693c9ae9dea3bfcd144ec10de828fd584d4ea94e25e62d9e4622367fbbf4d85",
+      "match": true
+    },
+    {
+      "file": "avatar-candidate.js",
+      "http": 200,
+      "sha256": "86e06774343d6fb6321273af4b19e845356fee15e0bbaaa20ac73f86ff054861",
+      "expected": "86e06774343d6fb6321273af4b19e845356fee15e0bbaaa20ac73f86ff054861",
+      "match": true
+    },
+    {
+      "file": "avatar-deluxe-approved.js",
+      "http": 200,
+      "sha256": "93a34c4ec9224967ea8617afa5f6beeb91cab07c84adc9993b7ef23b2978a4dd",
+      "expected": "93a34c4ec9224967ea8617afa5f6beeb91cab07c84adc9993b7ef23b2978a4dd",
+      "match": true
+    },
+    {
+      "file": "avatar-deluxe.js",
+      "http": 200,
+      "sha256": "c728165ba255056ab9f26e62c2e29937f6d845a5f5584a7ff26ef2953afcff62",
+      "expected": "c728165ba255056ab9f26e62c2e29937f6d845a5f5584a7ff26ef2953afcff62",
+      "match": true
+    },
+    {
+      "file": "base/ambient-occlusion.js",
+      "http": 200,
+      "sha256": "4e74e74bff3cf60712c4052e68bd08507523fc6972471ce54dda835af5fd9202",
+      "expected": "4e74e74bff3cf60712c4052e68bd08507523fc6972471ce54dda835af5fd9202",
+      "match": true
+    },
+    {
+      "file": "base/ambient-routes.js",
+      "http": 200,
+      "sha256": "fa8590a18b251bc2a06771890dda0e8062a8a226f923479a8a30c6b8c06474cc",
+      "expected": "fa8590a18b251bc2a06771890dda0e8062a8a226f923479a8a30c6b8c06474cc",
+      "match": true
+    },
+    {
+      "file": "base/appearance-preview.js",
+      "http": 200,
+      "sha256": "330c991364c58edc034b0ceb9c4f0f8658eb31f2508f743bbc2ba6409f281f84",
+      "expected": "330c991364c58edc034b0ceb9c4f0f8658eb31f2508f743bbc2ba6409f281f84",
+      "match": true
+    },
+    {
+      "file": "base/architecture-materials.js",
+      "http": 200,
+      "sha256": "48794da763237808c5c6681624415bfb922f7e523913775ce9c9567c4ab13c95",
+      "expected": "48794da763237808c5c6681624415bfb922f7e523913775ce9c9567c4ab13c95",
+      "match": true
+    },
+    {
+      "file": "base/browser-presence.js",
+      "http": 200,
+      "sha256": "5ce548c76baba6484cc177f1f01a743f5081213d6a09af7581f784e226fa2cad",
+      "expected": "5ce548c76baba6484cc177f1f01a743f5081213d6a09af7581f784e226fa2cad",
+      "match": true
+    },
+    {
+      "file": "base/character-gestures.js",
+      "http": 200,
+      "sha256": "1a1aa8da6df030127e958961ca6f3affa7a4fb98629754445e628fb9554d78e4",
+      "expected": "1a1aa8da6df030127e958961ca6f3affa7a4fb98629754445e628fb9554d78e4",
+      "match": true
+    },
+    {
+      "file": "base/city-data.js",
+      "http": 200,
+      "sha256": "e2917bb1a3859f4c99a4cc7ddc56c0f5e19ef209aa2e0006a634557fd2021d81",
+      "expected": "e2917bb1a3859f4c99a4cc7ddc56c0f5e19ef209aa2e0006a634557fd2021d81",
+      "match": true
+    },
+    {
+      "file": "base/city-daylight.js",
+      "http": 200,
+      "sha256": "f6688e6052e7635b2561b5188a0da2e2aa983ae190954ab41c72c6cc5140bb53",
+      "expected": "f6688e6052e7635b2561b5188a0da2e2aa983ae190954ab41c72c6cc5140bb53",
+      "match": true
+    },
+    {
+      "file": "base/city-layout.js",
+      "http": 200,
+      "sha256": "8a1627353e4de9900f4d7ff3ecb22102861ac05465911ca8f121a8075b34a57c",
+      "expected": "8a1627353e4de9900f4d7ff3ecb22102861ac05465911ca8f121a8075b34a57c",
+      "match": true
+    },
+    {
+      "file": "base/city-lighting.js",
+      "http": 200,
+      "sha256": "0a44224f7d496daa1850b900226d63604c37083b5d61c8cb513a9910fc42e16d",
+      "expected": "0a44224f7d496daa1850b900226d63604c37083b5d61c8cb513a9910fc42e16d",
+      "match": true
+    },
+    {
+      "file": "base/city-onboarding.css",
+      "http": 200,
+      "sha256": "78aec6308cf52b1811925dc92668f10dbe903704c54a2414e7855c76f45fe1ce",
+      "expected": "78aec6308cf52b1811925dc92668f10dbe903704c54a2414e7855c76f45fe1ce",
+      "match": true
+    },
+    {
+      "file": "base/city-onboarding.js",
+      "http": 200,
+      "sha256": "2b1d3e64880602f5788f833d2d54f26c1cf87f250e95f1a76be506854d1a3f31",
+      "expected": "2b1d3e64880602f5788f833d2d54f26c1cf87f250e95f1a76be506854d1a3f31",
+      "match": true
+    },
+    {
+      "file": "base/city-scenery.js",
+      "http": 200,
+      "sha256": "efb6309795611c6d94a5340e9d6afe23b92a17182b9bcff01e342d1f4d8cfcf0",
+      "expected": "efb6309795611c6d94a5340e9d6afe23b92a17182b9bcff01e342d1f4d8cfcf0",
+      "match": true
+    },
+    {
+      "file": "base/city-shops.css",
+      "http": 200,
+      "sha256": "017cbd28f23a296db253dc657622e0ad2d219663c4b099617c1445d84f2be6f1",
+      "expected": "017cbd28f23a296db253dc657622e0ad2d219663c4b099617c1445d84f2be6f1",
+      "match": true
+    },
+    {
+      "file": "base/city-shops.js",
+      "http": 200,
+      "sha256": "24e9beddc6530398ace3335040a36ef02c4a05a040c0eec11c90af155fb156a3",
+      "expected": "24e9beddc6530398ace3335040a36ef02c4a05a040c0eec11c90af155fb156a3",
+      "match": true
+    },
+    {
+      "file": "base/city-ui.js",
+      "http": 200,
+      "sha256": "ff566a59fef55af97f6793c4ef1699eb1dd6ddd31de53e8158f35abd4f895366",
+      "expected": "ff566a59fef55af97f6793c4ef1699eb1dd6ddd31de53e8158f35abd4f895366",
+      "match": true
+    },
+    {
+      "file": "base/client.js",
+      "http": 200,
+      "sha256": "7804e3c55c9c4dae72d3c1f8cac2e71e147408429b73b0ed8f739d5b1f882b7a",
+      "expected": "7804e3c55c9c4dae72d3c1f8cac2e71e147408429b73b0ed8f739d5b1f882b7a",
+      "match": true
+    },
+    {
+      "file": "base/device-continuation.css",
+      "http": 200,
+      "sha256": "6b63ca59eaab29dc4323694fa2ebe4b459cbb70f0fa972b1a4a0da2dc3293048",
+      "expected": "6b63ca59eaab29dc4323694fa2ebe4b459cbb70f0fa972b1a4a0da2dc3293048",
+      "match": true
+    },
+    {
+      "file": "base/device-continuation.js",
+      "http": 200,
+      "sha256": "0bc8ff8801eb26c3d4e0bcd69dac1fcd2bb65b0368ec7859cb52f56607d61b4e",
+      "expected": "0bc8ff8801eb26c3d4e0bcd69dac1fcd2bb65b0368ec7859cb52f56607d61b4e",
+      "match": true
+    },
+    {
+      "file": "base/forest-city-context.js",
+      "http": 200,
+      "sha256": "253381671f53645b9dfdd4f9470eecf2fb1757db52cf4d3e30a5a2fb0970da56",
+      "expected": "253381671f53645b9dfdd4f9470eecf2fb1757db52cf4d3e30a5a2fb0970da56",
+      "match": true
+    },
+    {
+      "file": "base/forest-edge-scene.js",
+      "http": 200,
+      "sha256": "969dfdb60a38c7af7241e415a3f3bfe52068d1bda82733bb711463d938d2a253",
+      "expected": "969dfdb60a38c7af7241e415a3f3bfe52068d1bda82733bb711463d938d2a253",
+      "match": true
+    },
+    {
+      "file": "base/forest-playground-controls.css",
+      "http": 200,
+      "sha256": "b1203cc77d98920704e90ec2345adad3e6fddbc78a80600b10e81718bc067977",
+      "expected": "b1203cc77d98920704e90ec2345adad3e6fddbc78a80600b10e81718bc067977",
+      "match": true
+    },
+    {
+      "file": "base/forest-playground-controls.js",
+      "http": 200,
+      "sha256": "14fa20ef68169f60cc8d95681676edcdaf7e174174c1f6bcb9a42e142ba571a6",
+      "expected": "14fa20ef68169f60cc8d95681676edcdaf7e174174c1f6bcb9a42e142ba571a6",
+      "match": true
+    },
+    {
+      "file": "base/forest-playground.js",
+      "http": 200,
+      "sha256": "b78c0d3ec607b083dcf3d25080a7b99baaa31cd556a2b927810fb5ebc5a79d8c",
+      "expected": "b78c0d3ec607b083dcf3d25080a7b99baaa31cd556a2b927810fb5ebc5a79d8c",
+      "match": true
+    },
+    {
+      "file": "base/forest-rules.js",
+      "http": 200,
+      "sha256": "a89357966e1b4cefee9590ccf480aa7a91d4e94a50a17a280dc609708e8c4b76",
+      "expected": "a89357966e1b4cefee9590ccf480aa7a91d4e94a50a17a280dc609708e8c4b76",
+      "match": true
+    },
+    {
+      "file": "base/forest-scene.js",
+      "http": 200,
+      "sha256": "317d952eb385d7796a3cc57a9624335ba72657cddf012a50737a38f9a75a6ec3",
+      "expected": "317d952eb385d7796a3cc57a9624335ba72657cddf012a50737a38f9a75a6ec3",
+      "match": true
+    },
+    {
+      "file": "base/greenery.js",
+      "http": 200,
+      "sha256": "64fe956d2e207dd559bce9273510faf985cd2d81ae671cb127e1b9e56d7c7b0e",
+      "expected": "64fe956d2e207dd559bce9273510faf985cd2d81ae671cb127e1b9e56d7c7b0e",
+      "match": true
+    },
+    {
+      "file": "base/guest-access.css",
+      "http": 200,
+      "sha256": "1298ef4adfde176e2fc90fbc80579a6457f18eaa75969f11e857ae88defa0b37",
+      "expected": "1298ef4adfde176e2fc90fbc80579a6457f18eaa75969f11e857ae88defa0b37",
+      "match": true
+    },
+    {
+      "file": "base/guest-access.js",
+      "http": 200,
+      "sha256": "fe7dd4ca0e7dd511a7b9ff2b7c8268f16d10cb1c528d1012ee9e6701fc80a118",
+      "expected": "fe7dd4ca0e7dd511a7b9ff2b7c8268f16d10cb1c528d1012ee9e6701fc80a118",
+      "match": true
+    },
+    {
+      "file": "base/home-scene.js",
+      "http": 200,
+      "sha256": "a14bfb5044efa7812352b49fcaaa8066364025eba9a3affd3ca079ff777823d2",
+      "expected": "a14bfb5044efa7812352b49fcaaa8066364025eba9a3affd3ca079ff777823d2",
+      "match": true
+    },
+    {
+      "file": "base/models.js",
+      "http": 200,
+      "sha256": "86d7cf8d73aba68c3a7f982b0f12b85112b3432a0ea2675bd2ba09b449433d2a",
+      "expected": "86d7cf8d73aba68c3a7f982b0f12b85112b3432a0ea2675bd2ba09b449433d2a",
+      "match": true
+    },
+    {
+      "file": "base/nav.js",
+      "http": 200,
+      "sha256": "6e3a52bd548f8a31916eeaf9cdc4d36c4d40ad60c5a8acab15f1c87bba018f23",
+      "expected": "6e3a52bd548f8a31916eeaf9cdc4d36c4d40ad60c5a8acab15f1c87bba018f23",
+      "match": true
+    },
+    {
+      "file": "base/occlusion-materials.js",
+      "http": 200,
+      "sha256": "6016d33c3c4491798f1853c97989d599d88563101f7c8df7965b9b9bacef2377",
+      "expected": "6016d33c3c4491798f1853c97989d599d88563101f7c8df7965b9b9bacef2377",
+      "match": true
+    },
+    {
+      "file": "base/pet-companion.js",
+      "http": 200,
+      "sha256": "2072a0da5bc57551d100225db52b53130b1b2385c7d83cf418ca2efc0f601ecd",
+      "expected": "2072a0da5bc57551d100225db52b53130b1b2385c7d83cf418ca2efc0f601ecd",
+      "match": true
+    },
+    {
+      "file": "base/phone-displays.js",
+      "http": 200,
+      "sha256": "bd0bada35cae109d844474b98abce4200ab5aacc62194e0b58b7254569f7810f",
+      "expected": "bd0bada35cae109d844474b98abce4200ab5aacc62194e0b58b7254569f7810f",
+      "match": true
+    },
+    {
+      "file": "base/photo-capture.js",
+      "http": 200,
+      "sha256": "9711cd8a87f7ee9603fff84276dd145e9ae5b89689f1a2b878410caec7467944",
+      "expected": "9711cd8a87f7ee9603fff84276dd145e9ae5b89689f1a2b878410caec7467944",
+      "match": true
+    },
+    {
+      "file": "base/photo-mode.css",
+      "http": 200,
+      "sha256": "bb9bb87d8b51e2cd372e21c3380504cb8e89f7d00c4e0dd63686d026a451d54e",
+      "expected": "bb9bb87d8b51e2cd372e21c3380504cb8e89f7d00c4e0dd63686d026a451d54e",
+      "match": true
+    },
+    {
+      "file": "base/photo-mode.js",
+      "http": 200,
+      "sha256": "19f054004e5d6c1059a1228dab4d7712bcb23725c6735a6d10280fb3e214f41d",
+      "expected": "19f054004e5d6c1059a1228dab4d7712bcb23725c6735a6d10280fb3e214f41d",
+      "match": true
+    },
+    {
+      "file": "base/r2-geometry-index.js",
+      "http": 200,
+      "sha256": "64e04e384e99be60c7683b4984cdb0412812659873cfe8928c3520080afbd371",
+      "expected": "64e04e384e99be60c7683b4984cdb0412812659873cfe8928c3520080afbd371",
+      "match": true
+    },
+    {
+      "file": "base/render-diagnostics.js",
+      "http": 200,
+      "sha256": "1945e4ca0bf51a33e7852f6fd75ddb565d1adb53ae4806a0bff50b5c376eb134",
+      "expected": "1945e4ca0bf51a33e7852f6fd75ddb565d1adb53ae4806a0bff50b5c376eb134",
+      "match": true
+    },
+    {
+      "file": "base/render-policy.js",
+      "http": 200,
+      "sha256": "6490e50bb372f95606c860728007631e4a72685f8fe191b0d361255850cc4a8b",
+      "expected": "6490e50bb372f95606c860728007631e4a72685f8fe191b0d361255850cc4a8b",
+      "match": true
+    },
+    {
+      "file": "base/scene-rules.js",
+      "http": 200,
+      "sha256": "f5e2ba5641ec2aa0936e40685e7fc9121c10de7c3c6a57c40968ad21ae469310",
+      "expected": "f5e2ba5641ec2aa0936e40685e7fc9121c10de7c3c6a57c40968ad21ae469310",
+      "match": true
+    },
+    {
+      "file": "base/session-recovery.js",
+      "http": 200,
+      "sha256": "b0e0a1d8f9d35a3af1f91bd202ddf955a41bb8d6441b8416ad6e7fb6b7283118",
+      "expected": "b0e0a1d8f9d35a3af1f91bd202ddf955a41bb8d6441b8416ad6e7fb6b7283118",
+      "match": true
+    },
+    {
+      "file": "base/shop-locations.js",
+      "http": 200,
+      "sha256": "99d61219f0242139924324d8ce80180031887cd2f41a8450c1e6c4fe3a9a6241",
+      "expected": "99d61219f0242139924324d8ce80180031887cd2f41a8450c1e6c4fe3a9a6241",
+      "match": true
+    },
+    {
+      "file": "base/social-ui.css",
+      "http": 200,
+      "sha256": "17e493771e14b966f38d89252456c9636a4974d3e1cf1dbba01a10b3a1d852ce",
+      "expected": "17e493771e14b966f38d89252456c9636a4974d3e1cf1dbba01a10b3a1d852ce",
+      "match": true
+    },
+    {
+      "file": "base/social-ui.js",
+      "http": 200,
+      "sha256": "21b3d82bd7aa6f33b3e59497c3c63ec43099d66e162bbece0a905407a3e7f2af",
+      "expected": "21b3d82bd7aa6f33b3e59497c3c63ec43099d66e162bbece0a905407a3e7f2af",
+      "match": true
+    },
+    {
+      "file": "base/static-mesh.js",
+      "http": 200,
+      "sha256": "86f00c27a08c2c27a74e3a3cba8d1352480b4b7f6997f03069d6fccabc965784",
+      "expected": "86f00c27a08c2c27a74e3a3cba8d1352480b4b7f6997f03069d6fccabc965784",
+      "match": true
+    },
+    {
+      "file": "base/street-kit.js",
+      "http": 200,
+      "sha256": "41132d2b1d3773108a969c284ad1b45f6bac0ff1dcfab5c290092ba68ca287b1",
+      "expected": "41132d2b1d3773108a969c284ad1b45f6bac0ff1dcfab5c290092ba68ca287b1",
+      "match": true
+    },
+    {
+      "file": "base/style.css",
+      "http": 200,
+      "sha256": "55a8dcae44a158cf1c35bdc3ba33dddf2345d4d104adbb43386049986a7d53ab",
+      "expected": "55a8dcae44a158cf1c35bdc3ba33dddf2345d4d104adbb43386049986a7d53ab",
+      "match": true
+    },
+    {
+      "file": "base/vehicle-reactions.js",
+      "http": 200,
+      "sha256": "45e417cca7e0950a27f9359033954e609e54b1989a1607d1330f58d40b54160f",
+      "expected": "45e417cca7e0950a27f9359033954e609e54b1989a1607d1330f58d40b54160f",
+      "match": true
+    },
+    {
+      "file": "base/vendor/three.js",
+      "http": 200,
+      "sha256": "0789bb7a097cfbf8eeab776e3ddcb0b428b0d30913784a40890dd6c8145b37ee",
+      "expected": "0789bb7a097cfbf8eeab776e3ddcb0b428b0d30913784a40890dd6c8145b37ee",
+      "match": true
+    },
+    {
+      "file": "base/work-portals.css",
+      "http": 200,
+      "sha256": "7c7bbafa06736ca3236b9cdb0d844cfb981c9a61c641be3b921be311fd66daf8",
+      "expected": "7c7bbafa06736ca3236b9cdb0d844cfb981c9a61c641be3b921be311fd66daf8",
+      "match": true
+    },
+    {
+      "file": "base/work-portals.js",
+      "http": 200,
+      "sha256": "5bf2c532ca7af37b34bd0f924c798652e9b418d79b43b32cec403ccecdcba32e",
+      "expected": "5bf2c532ca7af37b34bd0f924c798652e9b418d79b43b32cec403ccecdcba32e",
+      "match": true
+    },
+    {
+      "file": "base/world.js",
+      "http": 200,
+      "sha256": "01b0d85c00556f3681022761a943b35efe9a3f093a2f0bb808b7ddec6144f71c",
+      "expected": "01b0d85c00556f3681022761a943b35efe9a3f093a2f0bb808b7ddec6144f71c",
+      "match": true
+    },
+    {
+      "file": "game-controls.js",
+      "http": 200,
+      "sha256": "a39e6bc308b51055e8b3eae301837865033c2a6089b8f01c2e4b6608736deb8f",
+      "expected": "a39e6bc308b51055e8b3eae301837865033c2a6089b8f01c2e4b6608736deb8f",
+      "match": true
+    },
+    {
+      "file": "game-session-bootstrap.js",
+      "http": 200,
+      "sha256": "7631114275fd49306d391956a6433897d3cebf543c5e065d7253dd48ce00957a",
+      "expected": "7631114275fd49306d391956a6433897d3cebf543c5e065d7253dd48ce00957a",
+      "match": true
+    },
+    {
+      "file": "game.html",
+      "http": 200,
+      "sha256": "6ddcc327ed85e8e7a6756953558a7e4631b066d7d05df4297ad268e75b307b2f",
+      "expected": "6ddcc327ed85e8e7a6756953558a7e4631b066d7d05df4297ad268e75b307b2f",
+      "match": true
+    },
+    {
+      "file": "head-art.js",
+      "http": 200,
+      "sha256": "700aa46c5ce3943ac2cbfc12c7d508ad1c7a3b132c1f10369972bdd320999060",
+      "expected": "700aa46c5ce3943ac2cbfc12c7d508ad1c7a3b132c1f10369972bdd320999060",
+      "match": true
+    },
+    {
+      "file": "index.html",
+      "http": 200,
+      "sha256": "bbcd0920a4b465865129648ea003af7f38d631dcf929ab4418cd0311241ae542",
+      "expected": "bbcd0920a4b465865129648ea003af7f38d631dcf929ab4418cd0311241ae542",
+      "match": true
+    },
+    {
+      "file": "studio.html",
+      "http": 200,
+      "sha256": "fb51df32011abc0296414a13bd5e1adb35e10d1dc534f314262a9f98c3070d30",
+      "expected": "fb51df32011abc0296414a13bd5e1adb35e10d1dc534f314262a9f98c3070d30",
+      "match": true
+    },
+    {
+      "file": "studio.js",
+      "http": 200,
+      "sha256": "839c4075d7001e5d2326f0b801a1a35394cb44f7a1aa2c7e7966a49d5ac9032e",
+      "expected": "839c4075d7001e5d2326f0b801a1a35394cb44f7a1aa2c7e7966a49d5ac9032e",
+      "match": true
+    }
+  ],
+  "negative": [
+    {
+      "path": "/server.mjs",
+      "http": 404
+    },
+    {
+      "path": "/transport.mjs",
+      "http": 404
+    },
+    {
+      "path": "/base/serve.mjs",
+      "http": 404
+    },
+    {
+      "path": "/base/.private-v42-artlab-public/city.sqlite",
+      "http": 404
+    },
+    {
+      "path": "/base/.private-v42-artlab-public/runtime.json",
+      "http": 404
+    },
+    {
+      "path": "/base/vendor/ws/package.json",
+      "http": 404
+    }
+  ],
+  "originalEntryChanged": false,
+  "formalRoleChanged": false,
+  "physicalIphoneUat": false,
+  "pass": true
+}

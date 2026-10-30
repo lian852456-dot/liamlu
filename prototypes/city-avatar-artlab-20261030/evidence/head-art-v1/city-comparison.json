@@ -1,0 +1,288 @@
+{
+  "scope": "independent city; native day/dusk/night lighting",
+  "physicalIphoneUat": false,
+  "formalWrites": 0,
+  "presentationClockOnly": true,
+  "otherActorsHiddenForComparison": true,
+  "cases": [
+    {
+      "light": "day",
+      "key": "baseline",
+      "camera": {
+        "fov": 35,
+        "x": 2.28,
+        "y": 2,
+        "z": 4.5,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "daylight": {
+        "phase": "day",
+        "label": "白天",
+        "sky": 10145255,
+        "fog": 13229288,
+        "sunColor": 16773076,
+        "intensity": 3.6,
+        "hemiIntensity": 0.46,
+        "environmentIntensity": 0.16,
+        "nightFactor": 0,
+        "warmFactor": 0,
+        "taipeiMinutes": 720.003166668117,
+        "synced": true
+      },
+      "position": {
+        "scene": "outdoor",
+        "zone": "jiuquan",
+        "x": 0,
+        "z": 1.5,
+        "heading": 0,
+        "moving": false,
+        "transition": null
+      },
+      "version": "deluxe.4-neck.2",
+      "profile": {
+        "character": "violet",
+        "skin": "orange",
+        "hair": "hair-bob",
+        "outfit": "outfit-uniform",
+        "hairColor": "#d2ad84"
+      },
+      "contextLost": false
+    },
+    {
+      "light": "day",
+      "key": "art",
+      "camera": {
+        "fov": 35,
+        "x": 2.28,
+        "y": 2,
+        "z": 4.5,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "daylight": {
+        "phase": "day",
+        "label": "白天",
+        "sky": 10145255,
+        "fog": 13229288,
+        "sunColor": 16773076,
+        "intensity": 3.6,
+        "hemiIntensity": 0.46,
+        "environmentIntensity": 0.16,
+        "nightFactor": 0,
+        "warmFactor": 0,
+        "taipeiMinutes": 720.0012333318591,
+        "synced": true
+      },
+      "position": {
+        "scene": "outdoor",
+        "zone": "jiuquan",
+        "x": 0,
+        "z": 1.5,
+        "heading": 0,
+        "moving": false,
+        "transition": null
+      },
+      "version": "head-art.1",
+      "profile": {
+        "character": "violet",
+        "skin": "orange",
+        "hair": "hair-bob",
+        "outfit": "outfit-uniform",
+        "hairColor": "#d2ad84"
+      },
+      "contextLost": false
+    },
+    {
+      "light": "dusk",
+      "key": "baseline",
+      "camera": {
+        "fov": 35,
+        "x": 2.28,
+        "y": 2,
+        "z": 4.5,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "daylight": {
+        "phase": "dusk",
+        "label": "夕陽",
+        "sky": 15706736,
+        "fog": 14200203,
+        "sunColor": 16750936,
+        "intensity": 2.1,
+        "hemiIntensity": 0.5,
+        "environmentIntensity": 0.21,
+        "nightFactor": 0.38,
+        "warmFactor": 0.96,
+        "taipeiMinutes": 1080.0023833326995,
+        "synced": true
+      },
+      "position": {
+        "scene": "outdoor",
+        "zone": "jiuquan",
+        "x": 0,
+        "z": 1.5,
+        "heading": 0,
+        "moving": false,
+        "transition": null
+      },
+      "version": "deluxe.4-neck.2",
+      "profile": {
+        "character": "violet",
+        "skin": "orange",
+        "hair": "hair-bob",
+        "outfit": "outfit-uniform",
+        "hairColor": "#d2ad84"
+      },
+      "contextLost": false
+    },
+    {
+      "light": "dusk",
+      "key": "art",
+      "camera": {
+        "fov": 35,
+        "x": 2.28,
+        "y": 2,
+        "z": 4.5,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "daylight": {
+        "phase": "dusk",
+        "label": "夕陽",
+        "sky": 15706736,
+        "fog": 14200203,
+        "sunColor": 16750936,
+        "intensity": 2.1,
+        "hemiIntensity": 0.5,
+        "environmentIntensity": 0.21,
+        "nightFactor": 0.38,
+        "warmFactor": 0.96,
+        "taipeiMinutes": 1080.0020999982953,
+        "synced": true
+      },
+      "position": {
+        "scene": "outdoor",
+        "zone": "jiuquan",
+        "x": 0,
+        "z": 1.5,
+        "heading": 0,
+        "moving": false,
+        "transition": null
+      },
+      "version": "head-art.1",
+      "profile": {
+        "character": "violet",
+        "skin": "orange",
+        "hair": "hair-bob",
+        "outfit": "outfit-uniform",
+        "hairColor": "#d2ad84"
+      },
+      "contextLost": false
+    },
+    {
+      "light": "night",
+      "key": "baseline",
+      "camera": {
+        "fov": 35,
+        "x": 2.28,
+        "y": 2,
+        "z": 4.5,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "daylight": {
+        "phase": "night",
+        "label": "夜間",
+        "sky": 2308953,
+        "fog": 3953255,
+        "sunColor": 9349328,
+        "intensity": 0.35,
+        "hemiIntensity": 0.34,
+        "environmentIntensity": 0.16,
+        "nightFactor": 1,
+        "warmFactor": 0.72,
+        "taipeiMinutes": 1260.0018000006676,
+        "synced": true
+      },
+      "position": {
+        "scene": "outdoor",
+        "zone": "jiuquan",
+        "x": 0,
+        "z": 1.5,
+        "heading": 0,
+        "moving": false,
+        "transition": null
+      },
+      "version": "deluxe.4-neck.2",
+      "profile": {
+        "character": "violet",
+        "skin": "orange",
+        "hair": "hair-bob",
+        "outfit": "outfit-uniform",
+        "hairColor": "#d2ad84"
+      },
+      "contextLost": false
+    },
+    {
+      "light": "night",
+      "key": "art",
+      "camera": {
+        "fov": 35,
+        "x": 2.28,
+        "y": 2,
+        "z": 4.5,
+        "target": {
+          "x": 0,
+          "z": 1.5
+        }
+      },
+      "daylight": {
+        "phase": "night",
+        "label": "夜間",
+        "sky": 2308953,
+        "fog": 3953255,
+        "sunColor": 9349328,
+        "intensity": 0.35,
+        "hemiIntensity": 0.34,
+        "environmentIntensity": 0.16,
+        "nightFactor": 1,
+        "warmFactor": 0.72,
+        "taipeiMinutes": 1260.0031500011683,
+        "synced": true
+      },
+      "position": {
+        "scene": "outdoor",
+        "zone": "jiuquan",
+        "x": 0,
+        "z": 1.5,
+        "heading": 0,
+        "moving": false,
+        "transition": null
+      },
+      "version": "head-art.1",
+      "profile": {
+        "character": "violet",
+        "skin": "orange",
+        "hair": "hair-bob",
+        "outfit": "outfit-uniform",
+        "hairColor": "#d2ad84"
+      },
+      "contextLost": false
+    }
+  ],
+  "errors": [],
+  "expectedInitialSession401": true,
+  "pass": true
+}
