@@ -1,0 +1,448 @@
+{
+  "baseRelease": "20261030-employee.3",
+  "scope": "Independent art lab; original data and entry untouched",
+  "worldDelta": "Only local artLabDemo factory selector and isolated near-character camera (centering flag/reset); no position/network/physics/persistence changes.",
+  "files": [
+    {
+      "file": "base/ambient-occlusion.js",
+      "sha256": "4e74e74bff3cf60712c4052e68bd08507523fc6972471ce54dda835af5fd9202",
+      "originalSha256": "4e74e74bff3cf60712c4052e68bd08507523fc6972471ce54dda835af5fd9202"
+    },
+    {
+      "file": "base/ambient-routes.js",
+      "sha256": "fa8590a18b251bc2a06771890dda0e8062a8a226f923479a8a30c6b8c06474cc",
+      "originalSha256": "fa8590a18b251bc2a06771890dda0e8062a8a226f923479a8a30c6b8c06474cc"
+    },
+    {
+      "file": "base/appearance-preview.js",
+      "sha256": "330c991364c58edc034b0ceb9c4f0f8658eb31f2508f743bbc2ba6409f281f84",
+      "originalSha256": "330c991364c58edc034b0ceb9c4f0f8658eb31f2508f743bbc2ba6409f281f84"
+    },
+    {
+      "file": "base/architecture-materials.js",
+      "sha256": "48794da763237808c5c6681624415bfb922f7e523913775ce9c9567c4ab13c95",
+      "originalSha256": "48794da763237808c5c6681624415bfb922f7e523913775ce9c9567c4ab13c95"
+    },
+    {
+      "file": "base/browser-presence.js",
+      "sha256": "5ce548c76baba6484cc177f1f01a743f5081213d6a09af7581f784e226fa2cad",
+      "originalSha256": "5ce548c76baba6484cc177f1f01a743f5081213d6a09af7581f784e226fa2cad"
+    },
+    {
+      "file": "base/character-gestures.js",
+      "sha256": "1a1aa8da6df030127e958961ca6f3affa7a4fb98629754445e628fb9554d78e4",
+      "originalSha256": "1a1aa8da6df030127e958961ca6f3affa7a4fb98629754445e628fb9554d78e4"
+    },
+    {
+      "file": "base/city-data.js",
+      "sha256": "e2917bb1a3859f4c99a4cc7ddc56c0f5e19ef209aa2e0006a634557fd2021d81",
+      "originalSha256": "e2917bb1a3859f4c99a4cc7ddc56c0f5e19ef209aa2e0006a634557fd2021d81"
+    },
+    {
+      "file": "base/city-daylight.js",
+      "sha256": "f6688e6052e7635b2561b5188a0da2e2aa983ae190954ab41c72c6cc5140bb53",
+      "originalSha256": "f6688e6052e7635b2561b5188a0da2e2aa983ae190954ab41c72c6cc5140bb53"
+    },
+    {
+      "file": "base/city-layout.js",
+      "sha256": "8a1627353e4de9900f4d7ff3ecb22102861ac05465911ca8f121a8075b34a57c",
+      "originalSha256": "8a1627353e4de9900f4d7ff3ecb22102861ac05465911ca8f121a8075b34a57c"
+    },
+    {
+      "file": "base/city-lighting.js",
+      "sha256": "0a44224f7d496daa1850b900226d63604c37083b5d61c8cb513a9910fc42e16d",
+      "originalSha256": "0a44224f7d496daa1850b900226d63604c37083b5d61c8cb513a9910fc42e16d"
+    },
+    {
+      "file": "base/city-onboarding.css",
+      "sha256": "78aec6308cf52b1811925dc92668f10dbe903704c54a2414e7855c76f45fe1ce",
+      "originalSha256": "78aec6308cf52b1811925dc92668f10dbe903704c54a2414e7855c76f45fe1ce"
+    },
+    {
+      "file": "base/city-onboarding.js",
+      "sha256": "2b1d3e64880602f5788f833d2d54f26c1cf87f250e95f1a76be506854d1a3f31",
+      "originalSha256": "2b1d3e64880602f5788f833d2d54f26c1cf87f250e95f1a76be506854d1a3f31"
+    },
+    {
+      "file": "base/city-scenery.js",
+      "sha256": "efb6309795611c6d94a5340e9d6afe23b92a17182b9bcff01e342d1f4d8cfcf0",
+      "originalSha256": "efb6309795611c6d94a5340e9d6afe23b92a17182b9bcff01e342d1f4d8cfcf0"
+    },
+    {
+      "file": "base/city-shops.css",
+      "sha256": "017cbd28f23a296db253dc657622e0ad2d219663c4b099617c1445d84f2be6f1",
+      "originalSha256": "017cbd28f23a296db253dc657622e0ad2d219663c4b099617c1445d84f2be6f1"
+    },
+    {
+      "file": "base/city-shops.js",
+      "sha256": "24e9beddc6530398ace3335040a36ef02c4a05a040c0eec11c90af155fb156a3",
+      "originalSha256": "24e9beddc6530398ace3335040a36ef02c4a05a040c0eec11c90af155fb156a3"
+    },
+    {
+      "file": "base/city-ui.js",
+      "sha256": "ff566a59fef55af97f6793c4ef1699eb1dd6ddd31de53e8158f35abd4f895366",
+      "originalSha256": "ff566a59fef55af97f6793c4ef1699eb1dd6ddd31de53e8158f35abd4f895366"
+    },
+    {
+      "file": "base/client.js",
+      "sha256": "7804e3c55c9c4dae72d3c1f8cac2e71e147408429b73b0ed8f739d5b1f882b7a",
+      "originalSha256": "7804e3c55c9c4dae72d3c1f8cac2e71e147408429b73b0ed8f739d5b1f882b7a"
+    },
+    {
+      "file": "base/data-safety.mjs",
+      "sha256": "62eaf6e012ca5b390b4ca98353710c76bee2af0692d5c10e974a2ef6715f532b"
+    },
+    {
+      "file": "base/device-continuation.css",
+      "sha256": "6b63ca59eaab29dc4323694fa2ebe4b459cbb70f0fa972b1a4a0da2dc3293048",
+      "originalSha256": "6b63ca59eaab29dc4323694fa2ebe4b459cbb70f0fa972b1a4a0da2dc3293048"
+    },
+    {
+      "file": "base/device-continuation.js",
+      "sha256": "0bc8ff8801eb26c3d4e0bcd69dac1fcd2bb65b0368ec7859cb52f56607d61b4e",
+      "originalSha256": "0bc8ff8801eb26c3d4e0bcd69dac1fcd2bb65b0368ec7859cb52f56607d61b4e"
+    },
+    {
+      "file": "base/employee-city-bootstrap.js",
+      "sha256": "c105ee1628d73aac9eae7dbb5c1fc24ad96236b31af9a2da199b259463251259",
+      "originalSha256": "c105ee1628d73aac9eae7dbb5c1fc24ad96236b31af9a2da199b259463251259"
+    },
+    {
+      "file": "base/employee-city-link.css",
+      "sha256": "6605066b020280360892837d8649dcd1ef4e53b1bf15531b279a57afecbbda56",
+      "originalSha256": "6605066b020280360892837d8649dcd1ef4e53b1bf15531b279a57afecbbda56"
+    },
+    {
+      "file": "base/employee-city-link.js",
+      "sha256": "36def75ba7841cd2f45364a96cd0fc0a4867743989b3705f6d25ad2759a404ac",
+      "originalSha256": "36def75ba7841cd2f45364a96cd0fc0a4867743989b3705f6d25ad2759a404ac"
+    },
+    {
+      "file": "base/employee-city-panel.css",
+      "sha256": "a253c8877c975a814426d92ec3c96d2de2b48b00c352c0f1a17962c94537b791",
+      "originalSha256": "a253c8877c975a814426d92ec3c96d2de2b48b00c352c0f1a17962c94537b791"
+    },
+    {
+      "file": "base/employee-city-panel.js",
+      "sha256": "22260450c5f955ae3903f5f8985f90aee69cdf3a52d64a75156b23863eebfc7f",
+      "originalSha256": "22260450c5f955ae3903f5f8985f90aee69cdf3a52d64a75156b23863eebfc7f"
+    },
+    {
+      "file": "base/employee-city-start.js",
+      "sha256": "6547e670485f1364a23f58e58c402ea21aa5906c808dd46528ec3b387a648c23",
+      "originalSha256": "6547e670485f1364a23f58e58c402ea21aa5906c808dd46528ec3b387a648c23"
+    },
+    {
+      "file": "base/forest-city-context.js",
+      "sha256": "253381671f53645b9dfdd4f9470eecf2fb1757db52cf4d3e30a5a2fb0970da56",
+      "originalSha256": "253381671f53645b9dfdd4f9470eecf2fb1757db52cf4d3e30a5a2fb0970da56"
+    },
+    {
+      "file": "base/forest-edge-scene.js",
+      "sha256": "969dfdb60a38c7af7241e415a3f3bfe52068d1bda82733bb711463d938d2a253",
+      "originalSha256": "969dfdb60a38c7af7241e415a3f3bfe52068d1bda82733bb711463d938d2a253"
+    },
+    {
+      "file": "base/forest-playground-controls.css",
+      "sha256": "b1203cc77d98920704e90ec2345adad3e6fddbc78a80600b10e81718bc067977",
+      "originalSha256": "b1203cc77d98920704e90ec2345adad3e6fddbc78a80600b10e81718bc067977"
+    },
+    {
+      "file": "base/forest-playground-controls.js",
+      "sha256": "14fa20ef68169f60cc8d95681676edcdaf7e174174c1f6bcb9a42e142ba571a6",
+      "originalSha256": "14fa20ef68169f60cc8d95681676edcdaf7e174174c1f6bcb9a42e142ba571a6"
+    },
+    {
+      "file": "base/forest-playground-server.mjs",
+      "sha256": "8d6befea6193b64c26cb73114bbf3db03c3a18ce852760c67614e9c4cb8adca0"
+    },
+    {
+      "file": "base/forest-playground.js",
+      "sha256": "b78c0d3ec607b083dcf3d25080a7b99baaa31cd556a2b927810fb5ebc5a79d8c",
+      "originalSha256": "b78c0d3ec607b083dcf3d25080a7b99baaa31cd556a2b927810fb5ebc5a79d8c"
+    },
+    {
+      "file": "base/forest-rules.js",
+      "sha256": "a89357966e1b4cefee9590ccf480aa7a91d4e94a50a17a280dc609708e8c4b76",
+      "originalSha256": "a89357966e1b4cefee9590ccf480aa7a91d4e94a50a17a280dc609708e8c4b76"
+    },
+    {
+      "file": "base/forest-scene.js",
+      "sha256": "317d952eb385d7796a3cc57a9624335ba72657cddf012a50737a38f9a75a6ec3",
+      "originalSha256": "317d952eb385d7796a3cc57a9624335ba72657cddf012a50737a38f9a75a6ec3"
+    },
+    {
+      "file": "base/game-config.mjs",
+      "sha256": "3c420a05e2c4ceebfe056d78ad5452d8da5e637ccc887f218b50735495423f45"
+    },
+    {
+      "file": "base/game-store.mjs",
+      "sha256": "8d49a2c0cc6362ac4237a95650005f024068bf7fcbf4352a86bbf3ab3e0ea5b7"
+    },
+    {
+      "file": "base/greenery.js",
+      "sha256": "64fe956d2e207dd559bce9273510faf985cd2d81ae671cb127e1b9e56d7c7b0e",
+      "originalSha256": "64fe956d2e207dd559bce9273510faf985cd2d81ae671cb127e1b9e56d7c7b0e"
+    },
+    {
+      "file": "base/guest-access.css",
+      "sha256": "1298ef4adfde176e2fc90fbc80579a6457f18eaa75969f11e857ae88defa0b37",
+      "originalSha256": "1298ef4adfde176e2fc90fbc80579a6457f18eaa75969f11e857ae88defa0b37"
+    },
+    {
+      "file": "base/guest-access.js",
+      "sha256": "fe7dd4ca0e7dd511a7b9ff2b7c8268f16d10cb1c528d1012ee9e6701fc80a118",
+      "originalSha256": "fe7dd4ca0e7dd511a7b9ff2b7c8268f16d10cb1c528d1012ee9e6701fc80a118"
+    },
+    {
+      "file": "base/guest-device.mjs",
+      "sha256": "3d9421c4e5f542ed96b8303159f8bd82d8396c427b6c9646dd399871b1421bd7"
+    },
+    {
+      "file": "base/guest-policy.mjs",
+      "sha256": "3cb7b03d2e2106a90d9db08213f2238d7502eec58cc74aa84ebf0c8fada51094"
+    },
+    {
+      "file": "base/home-scene.js",
+      "sha256": "a14bfb5044efa7812352b49fcaaa8066364025eba9a3affd3ca079ff777823d2",
+      "originalSha256": "a14bfb5044efa7812352b49fcaaa8066364025eba9a3affd3ca079ff777823d2"
+    },
+    {
+      "file": "base/index.html",
+      "sha256": "31be0e9a5cb455305d1783f983f5e4edd58cecf2292c8d690fc9053143f0bd16",
+      "originalSha256": "31be0e9a5cb455305d1783f983f5e4edd58cecf2292c8d690fc9053143f0bd16"
+    },
+    {
+      "file": "base/models.js",
+      "sha256": "86d7cf8d73aba68c3a7f982b0f12b85112b3432a0ea2675bd2ba09b449433d2a",
+      "originalSha256": "86d7cf8d73aba68c3a7f982b0f12b85112b3432a0ea2675bd2ba09b449433d2a"
+    },
+    {
+      "file": "base/nav.js",
+      "sha256": "6e3a52bd548f8a31916eeaf9cdc4d36c4d40ad60c5a8acab15f1c87bba018f23",
+      "originalSha256": "6e3a52bd548f8a31916eeaf9cdc4d36c4d40ad60c5a8acab15f1c87bba018f23"
+    },
+    {
+      "file": "base/network.mjs",
+      "sha256": "b796c96b4f5cdf2aab97d788961c6273e6a319d15f9bb1c794951f7bad30ddf9"
+    },
+    {
+      "file": "base/occlusion-materials.js",
+      "sha256": "6016d33c3c4491798f1853c97989d599d88563101f7c8df7965b9b9bacef2377",
+      "originalSha256": "6016d33c3c4491798f1853c97989d599d88563101f7c8df7965b9b9bacef2377"
+    },
+    {
+      "file": "base/pet-companion.js",
+      "sha256": "2072a0da5bc57551d100225db52b53130b1b2385c7d83cf418ca2efc0f601ecd",
+      "originalSha256": "2072a0da5bc57551d100225db52b53130b1b2385c7d83cf418ca2efc0f601ecd"
+    },
+    {
+      "file": "base/phone-displays.js",
+      "sha256": "bd0bada35cae109d844474b98abce4200ab5aacc62194e0b58b7254569f7810f",
+      "originalSha256": "bd0bada35cae109d844474b98abce4200ab5aacc62194e0b58b7254569f7810f"
+    },
+    {
+      "file": "base/photo-capture.js",
+      "sha256": "9711cd8a87f7ee9603fff84276dd145e9ae5b89689f1a2b878410caec7467944",
+      "originalSha256": "9711cd8a87f7ee9603fff84276dd145e9ae5b89689f1a2b878410caec7467944"
+    },
+    {
+      "file": "base/photo-mode.css",
+      "sha256": "bb9bb87d8b51e2cd372e21c3380504cb8e89f7d00c4e0dd63686d026a451d54e",
+      "originalSha256": "bb9bb87d8b51e2cd372e21c3380504cb8e89f7d00c4e0dd63686d026a451d54e"
+    },
+    {
+      "file": "base/photo-mode.js",
+      "sha256": "19f054004e5d6c1059a1228dab4d7712bcb23725c6735a6d10280fb3e214f41d",
+      "originalSha256": "19f054004e5d6c1059a1228dab4d7712bcb23725c6735a6d10280fb3e214f41d"
+    },
+    {
+      "file": "base/presence.mjs",
+      "sha256": "96619e7aca2f3a1e3184cbba09a142957ea786e979e7339e1f6de4583a045283"
+    },
+    {
+      "file": "base/r2-geometry-index.js",
+      "sha256": "64e04e384e99be60c7683b4984cdb0412812659873cfe8928c3520080afbd371",
+      "originalSha256": "64e04e384e99be60c7683b4984cdb0412812659873cfe8928c3520080afbd371"
+    },
+    {
+      "file": "base/render-diagnostics.js",
+      "sha256": "1945e4ca0bf51a33e7852f6fd75ddb565d1adb53ae4806a0bff50b5c376eb134",
+      "originalSha256": "1945e4ca0bf51a33e7852f6fd75ddb565d1adb53ae4806a0bff50b5c376eb134"
+    },
+    {
+      "file": "base/render-policy.js",
+      "sha256": "6490e50bb372f95606c860728007631e4a72685f8fe191b0d361255850cc4a8b",
+      "originalSha256": "6490e50bb372f95606c860728007631e4a72685f8fe191b0d361255850cc4a8b"
+    },
+    {
+      "file": "base/scene-rules.js",
+      "sha256": "f5e2ba5641ec2aa0936e40685e7fc9121c10de7c3c6a57c40968ad21ae469310",
+      "originalSha256": "f5e2ba5641ec2aa0936e40685e7fc9121c10de7c3c6a57c40968ad21ae469310"
+    },
+    {
+      "file": "base/serve.mjs",
+      "sha256": "38e80ed4ffa4534bcba83544f002f637a591cf96fa0c57d8f45c2538e4d67d41"
+    },
+    {
+      "file": "base/session-recovery.js",
+      "sha256": "b0e0a1d8f9d35a3af1f91bd202ddf955a41bb8d6441b8416ad6e7fb6b7283118",
+      "originalSha256": "b0e0a1d8f9d35a3af1f91bd202ddf955a41bb8d6441b8416ad6e7fb6b7283118"
+    },
+    {
+      "file": "base/shop-locations.js",
+      "sha256": "99d61219f0242139924324d8ce80180031887cd2f41a8450c1e6c4fe3a9a6241",
+      "originalSha256": "99d61219f0242139924324d8ce80180031887cd2f41a8450c1e6c4fe3a9a6241"
+    },
+    {
+      "file": "base/social-interactions.mjs",
+      "sha256": "a48d749e3ca9e57322659f0a77f384a4325d1074ada6bf2f8f746e69029039be"
+    },
+    {
+      "file": "base/social-ui.css",
+      "sha256": "17e493771e14b966f38d89252456c9636a4974d3e1cf1dbba01a10b3a1d852ce",
+      "originalSha256": "17e493771e14b966f38d89252456c9636a4974d3e1cf1dbba01a10b3a1d852ce"
+    },
+    {
+      "file": "base/social-ui.js",
+      "sha256": "21b3d82bd7aa6f33b3e59497c3c63ec43099d66e162bbece0a905407a3e7f2af",
+      "originalSha256": "21b3d82bd7aa6f33b3e59497c3c63ec43099d66e162bbece0a905407a3e7f2af"
+    },
+    {
+      "file": "base/staff-peer-render.js",
+      "sha256": "a97adedd692257599a387b25946175cad709ee508e6dce9f925803ab2466bbdf",
+      "originalSha256": "a97adedd692257599a387b25946175cad709ee508e6dce9f925803ab2466bbdf"
+    },
+    {
+      "file": "base/static-mesh.js",
+      "sha256": "86f00c27a08c2c27a74e3a3cba8d1352480b4b7f6997f03069d6fccabc965784",
+      "originalSha256": "86f00c27a08c2c27a74e3a3cba8d1352480b4b7f6997f03069d6fccabc965784"
+    },
+    {
+      "file": "base/street-kit.js",
+      "sha256": "41132d2b1d3773108a969c284ad1b45f6bac0ff1dcfab5c290092ba68ca287b1",
+      "originalSha256": "41132d2b1d3773108a969c284ad1b45f6bac0ff1dcfab5c290092ba68ca287b1"
+    },
+    {
+      "file": "base/style.css",
+      "sha256": "55a8dcae44a158cf1c35bdc3ba33dddf2345d4d104adbb43386049986a7d53ab",
+      "originalSha256": "55a8dcae44a158cf1c35bdc3ba33dddf2345d4d104adbb43386049986a7d53ab"
+    },
+    {
+      "file": "base/supervisor-knowledge.mjs",
+      "sha256": "9c8e57cb542bd6c5d8fa0dbaeb831ffb641b9565c6b3632614c78e75a7f2f403"
+    },
+    {
+      "file": "base/supervisor-rules.mjs",
+      "sha256": "d898859fc4ae9739552c3ecace11b2b57fe48fa6e083470a91a36036f4bb6339"
+    },
+    {
+      "file": "base/supervisor-service.mjs",
+      "sha256": "5673afd7e9f864a6ce8ca21f9f99f2e2cf8b095b1339a9da7d424ef6472460fc"
+    },
+    {
+      "file": "base/vehicle-reactions.js",
+      "sha256": "45e417cca7e0950a27f9359033954e609e54b1989a1607d1330f58d40b54160f",
+      "originalSha256": "45e417cca7e0950a27f9359033954e609e54b1989a1607d1330f58d40b54160f"
+    },
+    {
+      "file": "base/vendor/three.js",
+      "sha256": "0789bb7a097cfbf8eeab776e3ddcb0b428b0d30913784a40890dd6c8145b37ee",
+      "originalSha256": "0789bb7a097cfbf8eeab776e3ddcb0b428b0d30913784a40890dd6c8145b37ee"
+    },
+    {
+      "file": "base/vendor/ws/LICENSE",
+      "sha256": "2b29dcfe0d6471f7e8c92c5fb38c9f93edee10330937055440192f1832b1ecef"
+    },
+    {
+      "file": "base/vendor/ws/README.md",
+      "sha256": "bb979132f3cbff08ce47f36d041e18071f8f534d01f591c0b129ba7abf1e480e"
+    },
+    {
+      "file": "base/vendor/ws/browser.js",
+      "sha256": "010da44addea1d88b2b732540c3f1fd0cbcb28926b96623d4c64222e0ead2d0e"
+    },
+    {
+      "file": "base/vendor/ws/index.js",
+      "sha256": "924564d5be26d59b9682c4263f68320e48dde7240bd2d1ad17ec305537429dd2"
+    },
+    {
+      "file": "base/vendor/ws/lib/buffer-util.js",
+      "sha256": "8b0a45739132f82e25ea13163780abf547ccfe989267f3eb7abb475beec92da3"
+    },
+    {
+      "file": "base/vendor/ws/lib/constants.js",
+      "sha256": "391e823142b8b370e55a2fd32b022deaf03b8415c56000009674ebc86a0b4f86"
+    },
+    {
+      "file": "base/vendor/ws/lib/event-target.js",
+      "sha256": "c45d3c6e12d170c860c0c3f1a050aa0f864d9806632b609a1e607d675aba128c"
+    },
+    {
+      "file": "base/vendor/ws/lib/extension.js",
+      "sha256": "852564f0f6b460287043803eae732666fb5610f676874354fc89f06aa4e986ed"
+    },
+    {
+      "file": "base/vendor/ws/lib/limiter.js",
+      "sha256": "e0469d4b83f6ba764b15f80e1766b75c136fbff68f048f4c050f0b1c7f065f69"
+    },
+    {
+      "file": "base/vendor/ws/lib/permessage-deflate.js",
+      "sha256": "16a91536988a53c23047ee5882392068728a839a244178c3b09b8c54982f58b0"
+    },
+    {
+      "file": "base/vendor/ws/lib/receiver.js",
+      "sha256": "a6ada33c9a2d54eaf595824b821ea89ca2c6395f89aa06755c52142148274884"
+    },
+    {
+      "file": "base/vendor/ws/lib/sender.js",
+      "sha256": "d0791d30c3defd44dcabbddb879a901c757993fea2c00a7ffea01d53b23b4b77"
+    },
+    {
+      "file": "base/vendor/ws/lib/stream.js",
+      "sha256": "a56fcb6e2b152097ee820b6f5410b1f71e59819b45d08d9f8bda588fe39070ec"
+    },
+    {
+      "file": "base/vendor/ws/lib/subprotocol.js",
+      "sha256": "be3f6323d6f549568577dcba9004c1479d95c65a7abb0fe0c582875b9fac0b7c"
+    },
+    {
+      "file": "base/vendor/ws/lib/validation.js",
+      "sha256": "41ce8e83d0d434132e1704895fedb91f6703a701b42d91c80954ab29b2845593"
+    },
+    {
+      "file": "base/vendor/ws/lib/websocket-server.js",
+      "sha256": "6d8dd89a841748c80445fd5fcdb5ba8005369b53cc3525135e11304c8b9c55e5"
+    },
+    {
+      "file": "base/vendor/ws/lib/websocket.js",
+      "sha256": "7ccf305925f0cdb74e06b75b4c84de134b1bd771a220ef409b24520def08128f"
+    },
+    {
+      "file": "base/vendor/ws/package.json",
+      "sha256": "c1ef91ca04eb4754c011c5f0e7638b5078ff71104fada400c44ac761cf93e0b1"
+    },
+    {
+      "file": "base/vendor/ws/wrapper.mjs",
+      "sha256": "fe154662301fd558f935f9c217fccbe7a7dac02ff39e648a000589403ff27c7f"
+    },
+    {
+      "file": "base/work-portals.css",
+      "sha256": "7c7bbafa06736ca3236b9cdb0d844cfb981c9a61c641be3b921be311fd66daf8",
+      "originalSha256": "7c7bbafa06736ca3236b9cdb0d844cfb981c9a61c641be3b921be311fd66daf8"
+    },
+    {
+      "file": "base/work-portals.js",
+      "sha256": "5bf2c532ca7af37b34bd0f924c798652e9b418d79b43b32cec403ccecdcba32e",
+      "originalSha256": "5bf2c532ca7af37b34bd0f924c798652e9b418d79b43b32cec403ccecdcba32e"
+    },
+    {
+      "file": "base/world.js",
+      "sha256": "7e40f1d6bf5a0fcbbaa61a59e2bf7360dc2ffe35473bbdff9995a2faf5ff18d5",
+      "originalSha256": "daf0f20c44b04cd039470c03467f94ecc76141b71f63f2e3703e515b96d7f7ad"
+    }
+  ],
+  "changedFromPublicBase": [
+    "base/world.js"
+  ]
+}

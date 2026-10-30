@@ -1,0 +1,13 @@
+.guest-access{margin-top:18px;padding-top:18px;border-top:1px solid rgba(39,57,48,.14);display:grid;gap:10px}
+.guest-access[hidden]{display:none}
+.guest-access-form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:10px}
+.guest-access-form label{display:grid;gap:6px;font-size:.82rem;color:#59685d}
+.guest-access-form input{min-height:44px;border:1px solid rgba(39,57,48,.24);border-radius:12px;padding:0 12px;background:#fffdf8;color:#273930}
+.guest-access-form button,.guest-access-card-actions button{min-height:44px}
+.guest-access-status{margin:0;min-height:1.35em;color:#5b695e;font-size:.83rem}
+.guest-access-card-dialog{width:min(430px,calc(100vw - 32px));border:0;border-radius:22px;padding:28px;background:#fffdf8;color:#273930;box-shadow:0 22px 70px rgba(24,42,34,.26)}
+.guest-access-card-dialog::backdrop{background:rgba(24,42,34,.42)}
+.guest-access-card-dialog .close{position:absolute;top:12px;right:12px;border:0;background:transparent;font-size:1.6rem;line-height:1;min-width:44px;min-height:44px}
+.guest-access-card-value{display:block;min-height:50px;padding:15px;border-radius:12px;background:#eef1e8;text-align:center;letter-spacing:.12em;word-break:break-all;font-size:.95rem}
+.guest-access-card-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}
+@media (max-width:520px){.guest-access-form{grid-template-columns:1fr}.guest-access-form button{width:100%}.guest-access-card-actions{grid-template-columns:1fr}}
