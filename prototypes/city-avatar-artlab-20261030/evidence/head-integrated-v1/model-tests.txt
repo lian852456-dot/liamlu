@@ -1,0 +1,14 @@
+✔ frozen approved baseline and previous head-art snapshot remain exact (1212.573416ms)
+✔ integrated head keeps refined body, legs, animation, pivot and skin geometry unchanged (1762.499542ms)
+✔ original seven-layer eye source, geometry, material and pivots are restored exactly (2011.388084ms)
+✔ 2.5-head proportions, complete head envelope and face features remain stable (1679.142542ms)
+✔ integrated hair materially changes while retaining UV/PBR maps and six shared textures (1679.196083ms)
+✔ head-art profile switch, peer isolation, twenty wardrobe rounds and shared dispose remain safe (23202.007834ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31592.230167
