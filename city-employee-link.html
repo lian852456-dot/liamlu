@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="no-referrer">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="city-formal-origin" content="https://lian852456-dot.github.io">
+  <meta name="city-formal-path-prefix" content="/liamlu/">
+  <title>綁定目前城市角色</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif; }
+    body { margin: 0; min-height: 100vh; background: #f4f0e8; color: #27352d; }
+    main { box-sizing: border-box; width: min(100% - 32px, 560px); margin: 0 auto; padding: 32px 0 48px; }
+    .card { background: #fffdf8; border: 1px solid #ded5c3; border-radius: 18px; box-shadow: 0 12px 28px #40513a18; padding: 24px; }
+    h1 { margin: 0 0 10px; font-size: 1.45rem; }
+    p { line-height: 1.65; }
+    .note { color: #536459; font-size: .95rem; }
+    label { display: grid; gap: 6px; margin: 16px 0; font-weight: 600; }
+    input, button { box-sizing: border-box; width: 100%; min-height: 48px; border-radius: 12px; font: inherit; }
+    input { border: 1px solid #b8b3a8; padding: 10px 12px; background: #fff; }
+    button { border: 0; padding: 10px 14px; background: #2d6947; color: #fff; font-weight: 700; cursor: pointer; }
+    button.secondary { background: #5a735e; }
+    button:disabled { opacity: .48; cursor: not-allowed; }
+    #employee-link-status, #employee-link-handoff-status { min-height: 1.6em; color: #7b4b14; }
+    #employee-link-handoff-panel { border-top: 1px solid #e4ddcf; margin-top: 22px; padding-top: 18px; }
+    .security { background: #eef4ed; border-radius: 12px; padding: 12px 14px; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <main id="employee-link-app">
+    <section class="card" aria-labelledby="employee-link-title">
+      <h1 id="employee-link-title">登入本人員編並將目前城市角色綁定</h1>
+      <p class="security">此頁只在正式網站驗證員工身分；城市只會收到伺服器核發的一次性憑據，不會收到員編、原網站 session、裝置識別或原 B token。請使用原網站指定密碼。</p>
+      <p id="employee-link-status" role="status" aria-live="polite">正在檢查交接邀請…</p>
+      <form id="employee-link-login-form" novalidate>
+        <label>員編
+          <input id="employee-link-employee-id" name="employeeId" autocomplete="username" inputmode="text">
+        </label>
+        <label>原網站指定密碼
+          <input id="employee-link-password" name="password" type="password" autocomplete="current-password">
+        </label>
+        <button id="employee-link-login-submit" type="submit" disabled>登入本人員編</button>
+      </form>
+      <section id="employee-link-handoff-panel" aria-labelledby="employee-link-handoff-title">
+        <h2 id="employee-link-handoff-title">手動交接</h2>
+        <p>登入成功後，確認本人意願，再把目前已登入城市角色綁定本人員編；不建立新帳戶、不扣款。</p>
+        <button id="employee-link-handoff-submit" class="secondary" type="button" disabled>確認：綁定目前已登入城市角色</button>
+        <p id="employee-link-handoff-status" role="status" aria-live="polite"></p>
+      </section>
+    </section>
+  </main>
+  <script src="GasBClient.js?v=20261030-city-owner-1"></script>
+  <script src="city-employee-link.js?v=20261030-city-owner-1"></script>
+  <script src="city-employee-link-bootstrap.js?v=20261030-city-owner-1"></script>
+</body>
+</html>
