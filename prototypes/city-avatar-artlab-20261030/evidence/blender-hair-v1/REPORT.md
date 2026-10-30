@@ -49,7 +49,7 @@ Mac WebKit 使用 390×844、DPR 1、30 fps 節流，兩個全新 context 分開
 - Chromium／Mac WebKit：行走、原有路線、保存位置、已購髮型重新載入、雙人 WebSocket 與可見同伴、原沙發坐下／離開通過；切換版本不改伺服器 profile／錢包。
 - 兩引擎各 **40 輪**實際 GLB／原版／馬尾與服裝切換：繪圖 geometry **15→15**、texture **10→10**，活動 GLB 實例保持 **1**，舊實例材質持續釋放；沒有 context loss。這是資源計數未見累積，不是長時間手機 RAM 無洩漏證明。
 - 實際頭部左右 45° 轉動截圖及 head-parent 檢查通過；髮型跟隨頭部，已檢查預設／行走／測試轉頭的可見視角，未見新增穿出。不將少數測試姿勢擴張為所有極端動作的保證。
-- GLB 請求失敗時，兩引擎仍可顯示並操作原本程式化短髮。
+- GLB 請求失敗時，兩引擎仍可顯示並操作原本程式化短髮。退出頁面清理測試也通過：共用 GLB 的幾何、三張貼圖及 ImageBitmap 會釋放，活動實例歸零；暖機比較頁紋理數由 10 降至 7。
 - 原整合版入口三項來源 hash 未變、九項凍結來源一致、正式城市 index hash 未變。正式資料庫未開啟，正式 writes／額外金幣發放均 0。
 
 [模型來源與三視圖 raw](native-capture.json)、[玩法回歸](integration-browser.json)、[40 輪資源與轉頭／失敗回退](memory-browser.json)、[分開暖機效能](performance-webkit.json)、[城市光線](city-comparison.json)、[保留檢查](preservation.json)、[公開資產讀回](public-readback.json)、[公開預覽操作](public-browser.json)、[已購服裝續玩](wardrobe-browser.json)、[Node 測試 raw](model-tests.txt)。
