@@ -37,13 +37,13 @@ test at avatar-v4.test.cjs:59:1
 ✖ V4 clothing variants plateau across repeated swaps and shared resources release (1965.689375ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
   + actual - expected
-  
+
     [
       14,
   +   57
   -   35
     ]
-  
+
       at TestContext.<anonymous> (/Users/liamlu/Downloads/liam-agent/worktrees/city-avatar-body-v4-20261030/prototypes/city-avatar-artlab-20261030/avatar-v4.test.cjs:61:636)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1201:25)
