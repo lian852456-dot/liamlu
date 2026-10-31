@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build:patrol-gas": "node scripts/build-patrol-gas-bundle.mjs",
+    "export:price-offline": "node scripts/export-price-offline.mjs",
+    "build:price-offline-assets": "node scripts/build-price-offline-assets.mjs",
     "build:store-readonly-export": "node scripts/build-store-readonly-assets.mjs",
     "build:department-readonly-export": "node scripts/build-department-readonly-assets.mjs",
     "test": "playwright test --config=playwright.config.js"
