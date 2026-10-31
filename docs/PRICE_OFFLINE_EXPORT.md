@@ -32,7 +32,7 @@ node --test tests/export-price-offline.test.mjs tests/threec-price-transport.tes
 
 另外應將每次取得的正式來源列與 HTML `price-data` 解碼後逐值比較，檢查桌機／手機查詢、清除、兩分區反覆切換及零外部請求。產出的本機準備時間是該裝置當次實測，不能由此宣稱普遍速度提升倍數。
 
-此版本只新增離線產出器、測試、說明與 npm 入口；未合併、部署或修改正式資料。對既有查詢原始碼採檢查錨點的轉換；將來來源程式結構變動會停止匯出，請先檢查相容性。
+對既有查詢原始碼採檢查錨點的轉換；將來來源程式結構變動會停止匯出，請先檢查相容性。離線產出器不修改正式資料；管理入口的部署紀錄見下方。
 
 ## 上傳管理頁下載入口
 
@@ -44,10 +44,20 @@ node --test tests/export-price-offline.test.mjs tests/threec-price-transport.tes
 
 GAS 與 CLI 共用 `threec-price-offline-core.js` 及由原查價畫面生成的模板，避免另造價格或排版邏輯。執行 `npm run build:price-offline-assets` 產生 `gas/ThreecPriceOfflineCore.gs` 和 `gas/ThreecPriceOfflineAssets.gs`。
 
-正式部署仍需批准；不要將共用 `gas/Code.gs` 整份推到正式上傳專案。從目前正式上傳專案重新拉取私有來源後，執行：
+後續正式部署須在本人批准範圍內進行；不要將共用 `gas/Code.gs` 整份推到正式上傳專案。從目前正式上傳專案重新拉取私有來源後，執行：
 
 ```sh
 node scripts/prepare-price-offline-upload.mjs /private/fresh-upload-source /private/new-upload-candidate
 ```
 
 候選只修改 `ReportUpload.html`，新增 `ThreecPriceOfflineCore.gs`、`ThreecPriceOfflineAssets.gs`、`ThreecPriceOfflineExport.gs`。其他原檔、manifest、驗證函式與設定保持逐檔一致。產出器會在既有上傳頁／授權／正式讀取契約不同時停止，禁止以舊版覆蓋其他人的改動。部署批准後應先保存回復版本，再發布同一 upload Deployment，讀回不可變來源並完成本人登入後下載驗收；本機測試不是已上線證據。
+
+## 2026-10-31 部署紀錄
+
+依本人「上線」批准，原上傳 Deployment 已從 v97 更新為 **v101**；回復點保留 v97。從當時 editor 重新拉取後只變動上述四檔，保留既有 A 模組更新。v101 不可變來源共 17 檔已逐檔比對候選一致，其餘 13 檔（含 Code、manifest）未變；其他 Deployment 仍為 v91／v100。
+
+正式頁已讀回新按鈕，位於 `threecReadbackMessage` 後的更新結果區。正式錯誤管理碼登入顯示「管理者驗證失敗」，缺少驗證輸入無法登入，公開直接 POST 匯出路由遭拒。拉回的現行價格模組與匯出器合成測試 33 項通過，核心／產出器 12 項通過；合成管理頁的瀏覽器實際下載成功，檔內價格逐值相同且不含測試管理碼或員編。合成測試不是本人正式下載驗收。
+
+發布後 2026-10-31 03:42 UTC fresh 讀取與發布前全快照逐欄一致：手機來源 2026-11-02、14,829 列，舊換新來源 2026-11-01、620 機款；active hash 分別為 `b29facb2c3053ffb18a3a1d913187370` 與 `34b6f0acb4a55a05e3e38e13fde2a45b`。當次公開讀取耗時 5,301／5,142 ms，這是網路來源讀取時間，並非離線速度提升數字。
+
+尚待本人在正式頁以既有驗證碼登入，於正常更新成功並完成正式讀回後實際下載核對；代理未取得或讀取本人驗證碼，也沒有為了顯示下載按鈕重新發布價格。既有 11 月離線附件已交付，不因這次部署重送。
