@@ -16,12 +16,32 @@ const baseCommit='a945bf5d7ce839ab324a5e8f09190a7cac86e801';
 const knownPage=execFileSync('git',['show',baseCommit+':gas/ReportUpload.html'],{cwd:root,encoding:'utf8'});
 if(originalPage.replace(/\r\n/g,'\n')!==knownPage)throw Error('Upload page drift: review the current private baseline before applying this UI patch.');
 const names=fs.readdirSync(baseline).filter(name=>fs.statSync(path.join(baseline,name)).isFile());
-const code=names.filter(name=>/\.(gs|js)$/.test(name)).map(name=>read(path.join(baseline,name))).join('\n');
+const sources=names.filter(name=>/\.(gs|js)$/.test(name)).map(name=>({name,source:read(path.join(baseline,name))}));
+// The same GAS project keeps an older A deployment inside a private IIFE.
+// Compare the upload's global module, not identically named local functions
+// inside that isolated compatibility source. Preserve every original file.
+const uploadModules=sources.filter(file=>file.source.includes('const THREEC_PRIVATE_FOLDER_PROPERTY')&&file.source.includes('function threecPublish('));
+if(uploadModules.length!==1)throw Error('Missing or ambiguous global upload price module.');
+const code=uploadModules[0].source;
+const allCode=sources.map(file=>file.source).join('\n');
 const current=read(path.join(root,'gas/Code.gs'));
-function declaration(source,name){const a=source.indexOf('function '+name+'(');if(a<0||source.indexOf('function '+name+'(',a+1)>=0)throw Error('Missing or duplicate '+name);const next=source.slice(a+1).search(/^function /m);return source.slice(a,next<0?undefined:a+1+next).trim().replace(/\r\n/g,'\n');}
+function declaration(source,name){
+ const a=source.indexOf('function '+name+'(');if(a<0||source.indexOf('function '+name+'(',a+1)>=0)throw Error('Missing or duplicate '+name);
+ const open=source.indexOf('{',a);let depth=0,quote='',escaped=false,comment='';
+ for(let i=open;i<source.length;i++){
+  const c=source[i],next=source[i+1];
+  if(comment==='line'){if(c==='\n')comment='';continue;}
+  if(comment==='block'){if(c==='*'&&next==='/'){comment='';i++;}continue;}
+  if(quote){if(escaped)escaped=false;else if(c==='\\')escaped=true;else if(c===quote)quote='';continue;}
+  if(c==='/'&&next==='/'){comment='line';i++;continue;}if(c==='/'&&next==='*'){comment='block';i++;continue;}
+  if(c==='"'||c==="'"||c==='`'){quote=c;continue;}
+  if(c==='{')depth++;if(c==='}'&&--depth===0)return source.slice(a,i+1).replace(/\r\n/g,'\n');
+ }
+ throw Error('Unterminated '+name);
+}
 for(const name of ['privateDashboardAdminAuthorized','reportUploadAuthorize_','threecReadActive_','threecPublicResult_'])if(declaration(code,name)!==declaration(current,name))throw Error('Existing authentication or price-read contract drift: '+name);
 const additions=['ThreecPriceOfflineCore.gs','ThreecPriceOfflineAssets.gs','ThreecPriceOfflineExport.gs'];
-if(code.includes('function threec_export_readonly(')||additions.some(name=>names.includes(name)))throw Error('Export module is already present; inspect its version before updating.');
+if(allCode.includes('function threec_export_readonly(')||additions.some(name=>names.includes(name)))throw Error('Export module is already present; inspect its version before updating.');
 const transport=names.find(name=>read(path.join(baseline,name)).includes("const ENCODING='shopping-columns/v1'"));
 if(!transport)throw Error('Existing verified price transport is required.');
 fs.mkdirSync(destination);

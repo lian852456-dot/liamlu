@@ -55,6 +55,13 @@ test('generated GAS core and assets match the shared exporter sources',()=>{
  const r=runtime();assert.equal(vm.runInContext('THREEC_PRICE_OFFLINE_ASSETS.version',r.context),'price-offline/v2');
  assert.equal(vm.runInContext('THREEC_PRICE_OFFLINE_ASSETS.template.includes("@@PRICE_OFFLINE_DATA@@")',r.context),true);
 });
+test('GAS initialization can load the export core before the existing transport',()=>{
+ const r=ready(),late=vm.createContext({console});
+ vm.runInContext(read('gas/ThreecPriceOfflineCore.gs'),late);
+ vm.runInContext(read('threec-price-transport.js'),late);
+ const response={status:'ok',snapshot:JSON.parse(JSON.stringify(r.context.threecPublicResult_({snapshot:r.context.threecReadActive_('shopping',{includeChanges:false}).snapshot}).snapshot))};
+ assert.equal(late.ThreecPriceOfflineCore.publicPriceResponse(response,'shopping').snapshot.row_count,3);
+});
 function uiRuntime(){
  const nodes=new Map();function node(id){if(!nodes.has(id)){const classes=new Set(['hidden']);nodes.set(id,{disabled:true,value:'',textContent:'',classList:{toggle(c,yes){yes?classes.add(c):classes.delete(c);},add:c=>classes.add(c),remove:c=>classes.delete(c),contains:c=>classes.has(c)},classes});}return nodes.get(id);}
  const state={calls:[],downloads:[],failure:null,delay:null};

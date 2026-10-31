@@ -11,8 +11,12 @@ const metaKeys=['schema_version','kind','source_version_date','source_file_sha25
 const text=(value,label)=>{if(typeof value!=='string'||value.length>2000)throw Error('Invalid '+label);return value;};
 const price=(value,label)=>{if(value!==null&&(typeof value!=='string'||! /^(?:\d+(?:\.\d+)?|\d{1,3}(?:,\d{3})+(?:\.\d+)?)?$/.test(value)))throw Error('Invalid price: '+label);return value;};
 function publicPriceResponse(raw,kind){
+  // GAS file initialization order is not a dependency contract. Resolve the
+  // existing transport at call time when this module was initialized first.
+  const transport=Transport||(typeof globalThis!=='undefined'&&globalThis.ThreecPriceTransport);
+  if(!transport)throw Error('Price transport unavailable');
   if(raw?.status!=='ok')throw Error(kind+': formal read unsuccessful');
-  const response=Transport.decode(raw),s=response.snapshot,check=response.updateCheck;
+  const response=transport.decode(raw),s=response.snapshot,check=response.updateCheck;
   if(!s||s.kind!==kind||s.schema_version!=='threec-normalized-snapshot/v1'||!Array.isArray(s.rows)||!s.rows.length||s.rows.length!==s.row_count)throw Error(kind+': incomplete snapshot');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(s.source_version_date)||!Number.isFinite(Date.parse(s.source_version_date+'T00:00:00Z'))||!Number.isFinite(Date.parse(s.published_at))||! /^[a-f0-9]{64}$/.test(s.source_file_sha256)||! /^[a-f0-9]{32,64}$/.test(s.snapshot_hash))throw Error(kind+': invalid formal source metadata');
   if(new Date(s.source_version_date+'T00:00:00Z').toISOString().slice(0,10)!==s.source_version_date)throw Error(kind+': invalid source date');
@@ -40,7 +44,7 @@ function publicPriceResponse(raw,kind){
     }
     return result;
   });
-  return Transport.encode({status:'ok',snapshot,changesDeferred:true});
+  return transport.encode({status:'ok',snapshot,changesDeferred:true});
 }
 const json=value=>JSON.stringify(value).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
 const esc=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
