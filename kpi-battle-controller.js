@@ -398,7 +398,21 @@
     const sleep = typeof config.sleep === 'function' ? config.sleep : delay => new Promise(resolve => win.setTimeout(resolve, delay));
     const logger = config.logger || win.console || (typeof console !== 'undefined' ? console : null);
     const request = payload => requestWithRetry(payload);
-    const state = { data: null, view: 'stores', profile: null, adminSecret: '' };
+    const state = { data: null, view: 'stores', profile: null, adminSecret: '', loading: false };
+    function updateNotice(message) {
+      for (const id of ['kpiBattleContent','awardsBattleContent']) {
+        const content=doc.getElementById(id);if(!content)continue;
+        let notice=doc.getElementById(id+'ReadStatus');
+        if(!notice){notice=doc.createElement('div');notice.id=id+'ReadStatus';notice.className='card kpi-battle-note';notice.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap';content.before(notice);}
+        notice.replaceChildren();
+        if(!state.data){notice.hidden=true;notice.style.display='none';continue;}
+        notice.hidden=false;notice.style.display='flex';
+        const text=doc.createElement('span');text.setAttribute('role','status');
+        text.textContent=message||`上次讀取：${state.data.fetchedAt}。已載入的資料會保留，需要最新資料時請手動更新。`;
+        const button=doc.createElement('button');button.type='button';button.textContent='更新資料';button.disabled=state.loading;
+        button.dataset.privateDashboardAction='refresh';notice.append(text,button);
+      }
+    }
 
     function privateDashboardDeviceId() {
       const key = 'north12b_private_dashboard_device_id';
@@ -645,15 +659,18 @@
       renderLock();
     }
 
-    async function login() {
+    async function login({refresh=false}={}) {
+      if(state.loading)return;
+      if(refresh&&win.DashboardB?.active())return win.DashboardB.refresh(true,true);
       await win.DashboardB?.leaveForA();
       const authContext=win.DashboardB?.context()||0;
-      const employeeId = privateDashboardEmployeeInput();
+      const employeeId = refresh?privateDashboardSessionEmployeeId():privateDashboardEmployeeInput();
       if (!employeeId) {
         privateDashboardSetStatus('請先輸入員工編號。', true);
         return;
       }
       privateDashboardSetStatus('正在驗證這台裝置…');
+      state.loading=true;updateNotice('正在更新，仍顯示上次資料…');
       try {
         const deviceId = privateDashboardDeviceId();
         const result = await request({ action: 'private_access', employeeId, deviceId });
@@ -669,18 +686,25 @@
           state.data = mergeKpiBattleSupplement(kpiData, snapshotKpi);
           render();
           onKpiLoaded({ result, data: state.data, profile: state.profile });
+          updateNotice();
         } catch (kpiError) {
           if(authContext!==(win.DashboardB?.context()||0))return;
-          state.data = null;
+          const retain=refresh&&state.data&&isTransientTransportError(kpiError);
+          if(!retain)state.data = null;
           privateDashboardSetStatus(kpiError.message, true);
           const note = doc.getElementById('kpiBattleSourceNote');
-          if (note) note.textContent = `KPI 資料載入失敗：${kpiError.message}`;
-          onKpiLoadError({ result, error: kpiError, profile: state.profile });
+          if(!retain){failClosed(`KPI 資料載入失敗：${kpiError.message}`);renderLock();onKpiLoadError({ result, error: kpiError, profile: state.profile });}
+          updateNotice(retain?`更新失敗，仍顯示上次資料（${state.data.fetchedAt}），請稍後手動更新。`:undefined);
         }
       } catch (error) {
         if(authContext!==(win.DashboardB?.context()||0))return;
-        state.data = null;
+        const retain=refresh&&state.data&&isTransientTransportError(error);
+        if(!retain){failClosed(error.message);onKpiLoadError({error});renderLock();}
         privateDashboardSetStatus(error.message, true);
+        updateNotice(retain?`更新失敗，仍顯示上次資料（${state.data.fetchedAt}），請稍後手動更新。`:undefined);
+      } finally {
+        state.loading=false;
+        for(const id of ['kpiBattleContentReadStatus','awardsBattleContentReadStatus'])doc.getElementById(id)?.querySelector('button')?.removeAttribute('disabled');
       }
     }
 
@@ -762,6 +786,7 @@
     function failClosed(message) {
       state.profile=null;state.adminSecret='';
       state.data = null;
+      updateNotice();
       const note = doc.getElementById('kpiBattleSourceNote');
       if (note) note.textContent = message || 'KPI 戰情目前無法載入。';
       const content = doc.getElementById('kpiBattleContent');
@@ -773,6 +798,7 @@
       if (actionElement) {
         const action = actionElement.dataset.privateDashboardAction;
         if (action === 'login') login();
+        if (action === 'refresh') login({refresh:true});
         if (action === 'request-binding') requestBinding();
         if (action === 'check-request') checkRequest();
         if (action === 'open-admin') openAdmin();
@@ -800,9 +826,9 @@
       failClosed,
       acceptB(bundle) {
         state.profile=bundle.privateResult.profile;
-        const data=kpicalcToKpiBattleView(bundle.kpiResult.data,new Date().toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}));
+        const data=kpicalcToKpiBattleView(bundle.kpiResult.data,new Date(bundle.loadedAt||Date.now()).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}));
         state.data=mergeKpiBattleSupplement(data,bundle.privateResult.snapshot?.kpiBattle);
-        render();onKpiLoaded({result:bundle.privateResult,data:state.data,profile:state.profile});
+        render();onKpiLoaded({result:bundle.privateResult,data:state.data,profile:state.profile});updateNotice();
       },
       getData: () => state.data,
       getProfile: () => state.profile,

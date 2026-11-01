@@ -4,7 +4,7 @@ const DASHBOARD_B_CLIENT_ENABLED_ = true;
 const OWNER='https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
 const DEVICE_KEY='north12b_private_dashboard_device_id';
 const DATA_CACHE_KEY='north12b_password_data_v1';
-let host,client,active=false,confirmed=false,epoch=0,expiresAt=0,expiryTimer,dataCacheTimer,ready=false,loading=false,guarded=false,checking=null,rechecking=false,panel,acceptedProof=null;
+let host,client,active=false,confirmed=false,epoch=0,expiresAt=0,expiryTimer,dataCacheTimer,ready=false,loading=false,guarded=false,checking=null,rechecking=false,panel,acceptedProof=null,lastLoadedAt=0;
 const pendingHost=scope.DashboardBHost;
 let legacyObserver;
 // Opt-in, bounded timing diagnostics. Only fixed operation labels, durations
@@ -23,7 +23,8 @@ function timing(name,ms,outcome='ok'){
  if(timingEnabled){try{scope.sessionStorage.setItem(timingKey,JSON.stringify(timings));}catch{}renderTiming();}
 }
 async function phase(name,operation){const start=performance.now();try{const value=await operation();timing('phase:'+name,performance.now()-start,value===false?'error':'ok');return value;}catch(error){timing('phase:'+name,performance.now()-start,'error');throw error;}}
-function paint(bundle){const start=performance.now();host.accept(bundle);timing('phase:render',performance.now()-start);}
+function paint(bundle){const start=performance.now();lastLoadedAt=bundle.loadedAt||Date.now();host.accept({...bundle,loadedAt:lastLoadedAt});timing('phase:render',performance.now()-start);}
+function loadedTime(){return lastLoadedAt?new Date(lastLoadedAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'';}
 function recordReady(start,expected){scope.requestAnimationFrame(()=>scope.requestAnimationFrame(()=>{
  if(expected===epoch && active && confirmed && !document.hidden)timing('phase:ready',performance.now()-start);
 }));}
@@ -91,19 +92,19 @@ function cachedData(){
     value.savedAt>now || proof.expiresAt<=now)throw Error('B_CACHE_EXPIRED');
   checkProfile(value.privateResult);checkProfile(value.kpiResult);
   scope.clearTimeout(dataCacheTimer);dataCacheTimer=scope.setTimeout(clearDataCache,proof.expiresAt-now);
-  return {privateResult:value.privateResult,kpiResult:value.kpiResult};
+  return {privateResult:value.privateResult,kpiResult:value.kpiResult,loadedAt:value.savedAt};
  }catch{clearDataCache();return null;}
 }
 function saveDataCache(privateResult,kpiResult){
  if(host?.ownerPhone || host?.includeReports)return;
  const proof=currentProof();if(!proof)return;
  try{scope.sessionStorage.setItem(DATA_CACHE_KEY,JSON.stringify({v:1,owner:OWNER,token:proof.token,deviceId:proof.deviceId,
-  logoutEpoch:proof.logoutEpoch,expiresAt:proof.expiresAt,savedAt:Date.now(),privateResult,kpiResult}));
+  logoutEpoch:proof.logoutEpoch,expiresAt:proof.expiresAt,savedAt:lastLoadedAt||Date.now(),privateResult,kpiResult}));
   scope.clearTimeout(dataCacheTimer);dataCacheTimer=scope.setTimeout(clearDataCache,Math.max(0,proof.expiresAt-Date.now()));
  }catch{clearDataCache();}
 }
 function wipe(note='請重新輸入員編與指定密碼。',clearTransport=true){
- epoch++;active=false;confirmed=false;loading=false;expiresAt=0;acceptedProof=null;scope.clearTimeout(expiryTimer);clearDataCache();if(clearTransport)client?.clear();checking=null;host?.clear();state('locked');message(note);
+ epoch++;active=false;confirmed=false;loading=false;expiresAt=0;acceptedProof=null;lastLoadedAt=0;scope.clearTimeout(expiryTimer);clearDataCache();if(clearTransport)client?.clear();checking=null;host?.clear();state('locked');message(note);
  if(panel)panel.querySelector('[data-b-password]').value='';
 }
 function device(){let value=scope.localStorage.getItem(DEVICE_KEY);if(value)return value;
@@ -166,13 +167,13 @@ async function refresh(allowPhone=true,forceData=false){
    else if(cached){stage='cache';paint(cached);}
   }
   confirmed=true;state('active');
-  message(host.sessionOnly?'可直接開啟同仁專區；換頁不延長登入期限。':host.ownerPhone&&client.hasPhone()?'這支手機已驗證，下次開啟 App 會自動登入。':'已載入的 KPI、台獎與個績會保留；需要最新資料時請按「重新讀取資料」。');return true;
+  message(host.sessionOnly?'可直接開啟同仁專區；換頁不延長登入期限。':`上次讀取：${loadedTime()}。已載入的 KPI、台獎與個績會保留；需要最新資料時請按「重新讀取資料」。`);return true;
  }catch(error){
   if(expected!==epoch)return false;
   if(error.message==='B_DISABLED'){wipe('指定密碼通道已關閉，請重新確認。');return false;}
   if(error.message==='B_AUTH_DENIED' && allowPhone && host.ownerPhone && client.hasPhone()){checking=null;active=false;confirmed=false;return resumePhone();}
   if(error.message==='B_AUTH_DENIED'){wipe('登入或目前會話未通過驗證，請重新登入。');return false;}
-  if(confirmed){state('active');message('本次更新失敗，仍顯示上次載入資料；需要最新資料時請再按「重新讀取資料」。');return false;}
+  if(confirmed){state('active');message(`本次更新失敗，仍顯示上次載入資料（${loadedTime()}）；需要最新資料時請再按「重新讀取資料」。`);return false;}
   clearDataCache();host.clear();state('pending');message(accessFailureMessage(error,stage));return false;
  }
  finally{if(expected===epoch)checking=null;}

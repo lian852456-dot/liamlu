@@ -69,7 +69,6 @@
     const current = ++generation;
     active?.abort();active = new AbortController();
     const controller = active, timeout = setTimeout(() => controller.abort(),15000);
-    clearNotes();
     $('goldNotesStatus').textContent = '正在讀取已扣金牌備註…';
     $('goldNotesStatus').className = 'message';
     try {
@@ -80,14 +79,14 @@
       notes = result;updateWeeks();render();
     } catch (error) {
       if (current !== generation) return;
-      clearNotes();
-      $('goldNotesStatus').textContent = error.name === 'AbortError' ? '備註讀取逾時，請重新整理。' : (error.message || '備註讀取失敗，請重新整理。');
+      if (!notes) clearNotes();
+      const detail = error.name === 'AbortError' ? '備註讀取逾時' : (error.message || '備註讀取失敗');
+      $('goldNotesStatus').textContent = notes ? `${detail}；仍顯示上次備註，請稍後手動更新。` : `${detail}，請手動更新。`;
       $('goldNotesStatus').className = 'message error';
     } finally { clearTimeout(timeout); }
   }
   $('goldNotesWeek').addEventListener('change',() => {selectedPeriod = $('goldNotesWeek').value;render();});
   $('refreshButton').addEventListener('click',refresh);
-  window.addEventListener('pagehide',() => {generation++;active?.abort();clearNotes();});
-  window.addEventListener('pageshow',event => {if (event.persisted) refresh();});
+  // Leaving and returning does not discard a successful read or trigger a new one.
   refresh();
 })();
