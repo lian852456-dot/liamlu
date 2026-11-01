@@ -1,0 +1,109 @@
+{
+  "assetSet": "portrait-hair-photo-four-20261101",
+  "readback": [
+    {
+      "key": "p1",
+      "objects": 1,
+      "triangles": 5800,
+      "bounds": {
+        "min": [
+          -0.520495,
+          -0.425587,
+          -0.200442
+        ],
+        "max": [
+          0.520495,
+          0.520621,
+          0.535
+        ]
+      },
+      "dimensions": [
+        1.04099,
+        0.946208,
+        0.735442
+      ],
+      "materials": [
+        "Portrait hair • soft directional PBR"
+      ],
+      "hairOnly": true
+    },
+    {
+      "key": "p2",
+      "objects": 1,
+      "triangles": 7160,
+      "bounds": {
+        "min": [
+          -0.54773,
+          -0.429022,
+          -0.540569
+        ],
+        "max": [
+          0.54773,
+          0.522977,
+          0.535
+        ]
+      },
+      "dimensions": [
+        1.09546,
+        0.951999,
+        1.075569
+      ],
+      "materials": [
+        "Portrait hair • soft directional PBR.001"
+      ],
+      "hairOnly": true
+    },
+    {
+      "key": "p3",
+      "objects": 1,
+      "triangles": 7688,
+      "bounds": {
+        "min": [
+          -0.532197,
+          -0.407303,
+          -0.840246
+        ],
+        "max": [
+          0.532197,
+          0.634388,
+          0.535
+        ]
+      },
+      "dimensions": [
+        1.064394,
+        1.041691,
+        1.375246
+      ],
+      "materials": [
+        "Portrait hair • soft directional PBR.002"
+      ],
+      "hairOnly": true
+    },
+    {
+      "key": "p4",
+      "objects": 1,
+      "triangles": 7416,
+      "bounds": {
+        "min": [
+          -0.554654,
+          -0.430194,
+          -0.950193
+        ],
+        "max": [
+          0.552272,
+          0.597531,
+          0.535
+        ]
+      },
+      "dimensions": [
+        1.106927,
+        1.027725,
+        1.485193
+      ],
+      "materials": [
+        "Portrait hair • soft directional PBR.003"
+      ],
+      "hairOnly": true
+    }
+  ]
+}

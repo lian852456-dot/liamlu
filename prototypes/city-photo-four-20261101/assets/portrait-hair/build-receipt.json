@@ -1,0 +1,90 @@
+{
+  "assetSet": "portrait-hair-photo-four-20261101",
+  "scope": "isolated four-photo hair candidates; hair only; no employee IDs or source photos",
+  "styles": {
+    "p1": {
+      "style": "p1",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 5800,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 344300,
+      "sha256": "0020ea7c4edbeb9d9bf75ace76d03aab834ed269b30c541b2a04f405e7f2ce49",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python editable layered volume cages with closed tapered strands, smooth normals and UV/PBR; not a manual sculpt claim"
+    },
+    "p2": {
+      "style": "p2",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 7160,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 393064,
+      "sha256": "99425ff1b293d55f964f74bce19b7fba4cc00fe1e8b87358d8979a43fc1eaa0a",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python editable layered volume cages with closed tapered strands, smooth normals and UV/PBR; not a manual sculpt claim"
+    },
+    "p3": {
+      "style": "p3",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 7688,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 411888,
+      "sha256": "30d153514d1e2dbeb0a55349511c1f689b93c8eee84c3427aaf020a1ad0164a9",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python editable layered volume cages with closed tapered strands, smooth normals and UV/PBR; not a manual sculpt claim"
+    },
+    "p4": {
+      "style": "p4",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 7416,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 402288,
+      "sha256": "4f8fdc336fb1bd056e982f3dcd778695d3da35e0e5271002fd0ee4b8904ee880",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python editable layered volume cages with closed tapered strands, smooth normals and UV/PBR; not a manual sculpt claim"
+    }
+  },
+  "visualReferences": {
+    "p1": "near-black short side-part crop with swept top and short nape",
+    "p2": "deep-brown straight-fringe chin bob",
+    "p3": "dark brushed-back shoulder-length half-tie",
+    "p4": "deep-brown side-part long layers ending above chest"
+  },
+  "limits": [
+    "No hair physics",
+    "No transparent cards",
+    "No face/body/rig",
+    "Not formal city deployment"
+  ]
+}
