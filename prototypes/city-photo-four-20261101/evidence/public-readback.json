@@ -1,0 +1,380 @@
+{
+  "at": "2026-11-01T12:08:08.095Z",
+  "pass": true,
+  "origin": "https://forty-retired-basin-strings.trycloudflare.com",
+  "health": {
+    "status": "ok",
+    "scope": "isolated-photo-four",
+    "release": "20261101-photo-style.2",
+    "originalDataOpened": false
+  },
+  "publicAssets": 91,
+  "files": [
+    {
+      "file": "ambient-occlusion.js",
+      "sha256": "4e74e74bff3cf60712c4052e68bd08507523fc6972471ce54dda835af5fd9202"
+    },
+    {
+      "file": "ambient-routes.js",
+      "sha256": "fa8590a18b251bc2a06771890dda0e8062a8a226f923479a8a30c6b8c06474cc"
+    },
+    {
+      "file": "appearance-preview.js",
+      "sha256": "330c991364c58edc034b0ceb9c4f0f8658eb31f2508f743bbc2ba6409f281f84"
+    },
+    {
+      "file": "architecture-materials.js",
+      "sha256": "48794da763237808c5c6681624415bfb922f7e523913775ce9c9567c4ab13c95"
+    },
+    {
+      "file": "assets/portrait-hair/p1.glb",
+      "sha256": "9f3f92223887a80b9aeb622ecc46903b91be4aeb1e1931c06fcf676955dd233d"
+    },
+    {
+      "file": "assets/portrait-hair/p2.glb",
+      "sha256": "f6d931ecc74d9a4acde3dcf5069655a8f1ab96c1298dda6f67f3855a63ce9f23"
+    },
+    {
+      "file": "assets/portrait-hair/p3.glb",
+      "sha256": "2fff0ab46e8f8a91f79f31b9a6d45796062fbb8595ff026d0b51a95bcef71171"
+    },
+    {
+      "file": "assets/portrait-hair/p4.glb",
+      "sha256": "a64a433161d716a36f6fa4bd1c2392a10089a12f51b93ebf6195ba389979b289"
+    },
+    {
+      "file": "assets/portrait-hair/p5.glb",
+      "sha256": "fb0e4cd2c05b97a5946891b2163a74c1b817560346c87fb74a4db71d5459de88"
+    },
+    {
+      "file": "assets/portrait-hair-v1/p1.glb",
+      "sha256": "0020ea7c4edbeb9d9bf75ace76d03aab834ed269b30c541b2a04f405e7f2ce49"
+    },
+    {
+      "file": "assets/portrait-hair-v1/p2.glb",
+      "sha256": "99425ff1b293d55f964f74bce19b7fba4cc00fe1e8b87358d8979a43fc1eaa0a"
+    },
+    {
+      "file": "assets/portrait-hair-v1/p3.glb",
+      "sha256": "30d153514d1e2dbeb0a55349511c1f689b93c8eee84c3427aaf020a1ad0164a9"
+    },
+    {
+      "file": "assets/portrait-hair-v1/p4.glb",
+      "sha256": "4f8fdc336fb1bd056e982f3dcd778695d3da35e0e5271002fd0ee4b8904ee880"
+    },
+    {
+      "file": "avatar-portraits-v1.js",
+      "sha256": "3ee6c9a3620c12e7bf256a90703a585a0b1e2e2017b55c0fd9b72a8157eadc6e"
+    },
+    {
+      "file": "avatar-portraits.js",
+      "sha256": "b0aec7861ea9f7405a91b60de61c1873f5d5e39970df95b2d11ee4b585d1fa8f"
+    },
+    {
+      "file": "browser-presence.js",
+      "sha256": "5ce548c76baba6484cc177f1f01a743f5081213d6a09af7581f784e226fa2cad"
+    },
+    {
+      "file": "character-gestures.js",
+      "sha256": "1a1aa8da6df030127e958961ca6f3affa7a4fb98629754445e628fb9554d78e4"
+    },
+    {
+      "file": "city-data.js",
+      "sha256": "e2917bb1a3859f4c99a4cc7ddc56c0f5e19ef209aa2e0006a634557fd2021d81"
+    },
+    {
+      "file": "city-daylight.js",
+      "sha256": "f6688e6052e7635b2561b5188a0da2e2aa983ae190954ab41c72c6cc5140bb53"
+    },
+    {
+      "file": "city-layout.js",
+      "sha256": "8a1627353e4de9900f4d7ff3ecb22102861ac05465911ca8f121a8075b34a57c"
+    },
+    {
+      "file": "city-lighting.js",
+      "sha256": "0a44224f7d496daa1850b900226d63604c37083b5d61c8cb513a9910fc42e16d"
+    },
+    {
+      "file": "city-onboarding.css",
+      "sha256": "78aec6308cf52b1811925dc92668f10dbe903704c54a2414e7855c76f45fe1ce"
+    },
+    {
+      "file": "city-onboarding.js",
+      "sha256": "2b1d3e64880602f5788f833d2d54f26c1cf87f250e95f1a76be506854d1a3f31"
+    },
+    {
+      "file": "city-scenery.js",
+      "sha256": "efb6309795611c6d94a5340e9d6afe23b92a17182b9bcff01e342d1f4d8cfcf0"
+    },
+    {
+      "file": "city-server-clock.js",
+      "sha256": "737c455ccacd1ff62c584ae96db980a29ad8f290a5984978e3663795504389a9"
+    },
+    {
+      "file": "city-shops.css",
+      "sha256": "017cbd28f23a296db253dc657622e0ad2d219663c4b099617c1445d84f2be6f1"
+    },
+    {
+      "file": "city-shops.js",
+      "sha256": "24e9beddc6530398ace3335040a36ef02c4a05a040c0eec11c90af155fb156a3"
+    },
+    {
+      "file": "city-ui.js",
+      "sha256": "ff566a59fef55af97f6793c4ef1699eb1dd6ddd31de53e8158f35abd4f895366"
+    },
+    {
+      "file": "client.js",
+      "sha256": "cb337dfbebbc8d22378e3b1cbaf1bf8b9c9a087b107675b9e2c3d551c74d8a7e"
+    },
+    {
+      "file": "device-continuation.css",
+      "sha256": "6b63ca59eaab29dc4323694fa2ebe4b459cbb70f0fa972b1a4a0da2dc3293048"
+    },
+    {
+      "file": "device-continuation.js",
+      "sha256": "0bc8ff8801eb26c3d4e0bcd69dac1fcd2bb65b0368ec7859cb52f56607d61b4e"
+    },
+    {
+      "file": "employee-city-bootstrap.js",
+      "sha256": "0c4131eb52c3f59a1a2a4cdb1f4766fe7dcaf5cbbdfdebc0887899b1de58364d"
+    },
+    {
+      "file": "employee-city-link.css",
+      "sha256": "6605066b020280360892837d8649dcd1ef4e53b1bf15531b279a57afecbbda56"
+    },
+    {
+      "file": "employee-city-link.js",
+      "sha256": "a3b1b5687d6b99df223456128590819fb7246dd320724bd5c33c9b6ca44016eb"
+    },
+    {
+      "file": "employee-city-panel.css",
+      "sha256": "a253c8877c975a814426d92ec3c96d2de2b48b00c352c0f1a17962c94537b791"
+    },
+    {
+      "file": "employee-city-panel.js",
+      "sha256": "22260450c5f955ae3903f5f8985f90aee69cdf3a52d64a75156b23863eebfc7f"
+    },
+    {
+      "file": "employee-city-start.js",
+      "sha256": "6547e670485f1364a23f58e58c402ea21aa5906c808dd46528ec3b387a648c23"
+    },
+    {
+      "file": "employee-play-ui.css",
+      "sha256": "89f2d757eae06d315ce51b78a5a19bfdc940df03a7bd0a4812d299a43d41672e"
+    },
+    {
+      "file": "employee-play-ui.js",
+      "sha256": "d8ce13f5a5211bc991404bb0a3da6dfbeb93485b9ace3498248c52d9c4f02b3a"
+    },
+    {
+      "file": "forest-city-context.js",
+      "sha256": "253381671f53645b9dfdd4f9470eecf2fb1757db52cf4d3e30a5a2fb0970da56"
+    },
+    {
+      "file": "forest-edge-scene.js",
+      "sha256": "969dfdb60a38c7af7241e415a3f3bfe52068d1bda82733bb711463d938d2a253"
+    },
+    {
+      "file": "forest-playground-controls.css",
+      "sha256": "b1203cc77d98920704e90ec2345adad3e6fddbc78a80600b10e81718bc067977"
+    },
+    {
+      "file": "forest-playground-controls.js",
+      "sha256": "14fa20ef68169f60cc8d95681676edcdaf7e174174c1f6bcb9a42e142ba571a6"
+    },
+    {
+      "file": "forest-playground.js",
+      "sha256": "b78c0d3ec607b083dcf3d25080a7b99baaa31cd556a2b927810fb5ebc5a79d8c"
+    },
+    {
+      "file": "forest-rules.js",
+      "sha256": "a89357966e1b4cefee9590ccf480aa7a91d4e94a50a17a280dc609708e8c4b76"
+    },
+    {
+      "file": "forest-scene.js",
+      "sha256": "317d952eb385d7796a3cc57a9624335ba72657cddf012a50737a38f9a75a6ec3"
+    },
+    {
+      "file": "game.html",
+      "sha256": "5e3acbbd7c75df68ed6b5b53d1d314104304f443ce7eafdf03d5ec6582e9e6ae"
+    },
+    {
+      "file": "gltf-loader.js",
+      "sha256": "2e5191730cf90618336e2391c0f68f8bc44c5a6358064b4245c4bbd218f848f0"
+    },
+    {
+      "file": "greenery.js",
+      "sha256": "64fe956d2e207dd559bce9273510faf985cd2d81ae671cb127e1b9e56d7c7b0e"
+    },
+    {
+      "file": "guest-access.css",
+      "sha256": "1298ef4adfde176e2fc90fbc80579a6457f18eaa75969f11e857ae88defa0b37"
+    },
+    {
+      "file": "guest-access.js",
+      "sha256": "fe7dd4ca0e7dd511a7b9ff2b7c8268f16d10cb1c528d1012ee9e6701fc80a118"
+    },
+    {
+      "file": "head-art-previous.js",
+      "sha256": "700aa46c5ce3943ac2cbfc12c7d508ad1c7a3b132c1f10369972bdd320999060"
+    },
+    {
+      "file": "head-art.js",
+      "sha256": "01f0def91d79ea122abc789d5546b10ea3c3245601f7957137591a4ae86769ea"
+    },
+    {
+      "file": "home-scene.js",
+      "sha256": "a14bfb5044efa7812352b49fcaaa8066364025eba9a3affd3ca079ff777823d2"
+    },
+    {
+      "file": "index.html",
+      "sha256": "e2f429952713b0cd8a9e68e41b4fb3b23b9c1c66b8d2f2d270cb0fc106d5b174"
+    },
+    {
+      "file": "jialing-head-sample.js",
+      "sha256": "3edc04410860bcedebbd53a49a64a444d0f929ecb635852c4cc39b8be5ee443f"
+    },
+    {
+      "file": "models.js",
+      "sha256": "86d7cf8d73aba68c3a7f982b0f12b85112b3432a0ea2675bd2ba09b449433d2a"
+    },
+    {
+      "file": "nav.js",
+      "sha256": "6e3a52bd548f8a31916eeaf9cdc4d36c4d40ad60c5a8acab15f1c87bba018f23"
+    },
+    {
+      "file": "occlusion-materials.js",
+      "sha256": "6016d33c3c4491798f1853c97989d599d88563101f7c8df7965b9b9bacef2377"
+    },
+    {
+      "file": "pet-companion.js",
+      "sha256": "2072a0da5bc57551d100225db52b53130b1b2385c7d83cf418ca2efc0f601ecd"
+    },
+    {
+      "file": "phone-displays.js",
+      "sha256": "bd0bada35cae109d844474b98abce4200ab5aacc62194e0b58b7254569f7810f"
+    },
+    {
+      "file": "photo-capture.js",
+      "sha256": "9711cd8a87f7ee9603fff84276dd145e9ae5b89689f1a2b878410caec7467944"
+    },
+    {
+      "file": "photo-mode.css",
+      "sha256": "bb9bb87d8b51e2cd372e21c3380504cb8e89f7d00c4e0dd63686d026a451d54e"
+    },
+    {
+      "file": "photo-mode.js",
+      "sha256": "19f054004e5d6c1059a1228dab4d7712bcb23725c6735a6d10280fb3e214f41d"
+    },
+    {
+      "file": "portrait-config-v1.js",
+      "sha256": "9bd3faabf420d63bd7da533f74b590861db9bc9f8ff0afe2bb5be5e0b0b64121"
+    },
+    {
+      "file": "portrait-config.js",
+      "sha256": "3ea13a0a92614a570900aa8e3adf8eec4540cb052600b4c2943907829e4e07ad"
+    },
+    {
+      "file": "portrait-hair-library-v1.js",
+      "sha256": "fe3fdc0c208192aa22d7aae592cc216132d8c5b583ea276f85549b47ab90ec64"
+    },
+    {
+      "file": "portrait-hair-library.js",
+      "sha256": "824a858eba9f5a74421008defe06a43c49fae15243d7896d9440bde89714e166"
+    },
+    {
+      "file": "preview-game-controls.js",
+      "sha256": "8d801fd2ad606d7ce259326119c845dcdbae8fec938b6539b1605b959f5dd165"
+    },
+    {
+      "file": "preview-game-ui.js",
+      "sha256": "1fab733b80d60f95e1b36438438751ccf3a14a84d9977fd9f5aa1feacedf88bb"
+    },
+    {
+      "file": "preview.css",
+      "sha256": "1bd02dd96202b83332f35396061c42615c321fe30aab69af3e1dbd09b58f7b56"
+    },
+    {
+      "file": "preview.js",
+      "sha256": "c59975c8b93ecbc285ecba9670cb69089416d31c87afb1bddcd8bc381e222221"
+    },
+    {
+      "file": "r2-geometry-index.js",
+      "sha256": "64e04e384e99be60c7683b4984cdb0412812659873cfe8928c3520080afbd371"
+    },
+    {
+      "file": "render-diagnostics.js",
+      "sha256": "1945e4ca0bf51a33e7852f6fd75ddb565d1adb53ae4806a0bff50b5c376eb134"
+    },
+    {
+      "file": "render-policy.js",
+      "sha256": "6490e50bb372f95606c860728007631e4a72685f8fe191b0d361255850cc4a8b"
+    },
+    {
+      "file": "scene-rules.js",
+      "sha256": "f5e2ba5641ec2aa0936e40685e7fc9121c10de7c3c6a57c40968ad21ae469310"
+    },
+    {
+      "file": "session-recovery.js",
+      "sha256": "b0e0a1d8f9d35a3af1f91bd202ddf955a41bb8d6441b8416ad6e7fb6b7283118"
+    },
+    {
+      "file": "shared-avatar-adapter.js",
+      "sha256": "9ee37aa11956f223dc628032b84c6bef5891cdfb0a6a9252effc6f01413fadf2"
+    },
+    {
+      "file": "shared-avatar-ui.js",
+      "sha256": "b117c046a5d0bd4aecf277c14b4b1cffad428bade3fa9da3796969995e09524d"
+    },
+    {
+      "file": "shop-locations.js",
+      "sha256": "99d61219f0242139924324d8ce80180031887cd2f41a8450c1e6c4fe3a9a6241"
+    },
+    {
+      "file": "social-ui.css",
+      "sha256": "17e493771e14b966f38d89252456c9636a4974d3e1cf1dbba01a10b3a1d852ce"
+    },
+    {
+      "file": "social-ui.js",
+      "sha256": "21b3d82bd7aa6f33b3e59497c3c63ec43099d66e162bbece0a905407a3e7f2af"
+    },
+    {
+      "file": "staff-peer-render.js",
+      "sha256": "ab8a7dca1d283d8289ab14686de54ddc36240eb9699d4251b3d818c0a808c818"
+    },
+    {
+      "file": "static-mesh.js",
+      "sha256": "86f00c27a08c2c27a74e3a3cba8d1352480b4b7f6997f03069d6fccabc965784"
+    },
+    {
+      "file": "street-kit.js",
+      "sha256": "41132d2b1d3773108a969c284ad1b45f6bac0ff1dcfab5c290092ba68ca287b1"
+    },
+    {
+      "file": "style.css",
+      "sha256": "55a8dcae44a158cf1c35bdc3ba33dddf2345d4d104adbb43386049986a7d53ab"
+    },
+    {
+      "file": "vehicle-reactions.js",
+      "sha256": "45e417cca7e0950a27f9359033954e609e54b1989a1607d1330f58d40b54160f"
+    },
+    {
+      "file": "vendor/three.js",
+      "sha256": "0789bb7a097cfbf8eeab776e3ddcb0b428b0d30913784a40890dd6c8145b37ee"
+    },
+    {
+      "file": "work-portals.css",
+      "sha256": "7c7bbafa06736ca3236b9cdb0d844cfb981c9a61c641be3b921be311fd66daf8"
+    },
+    {
+      "file": "work-portals.js",
+      "sha256": "5bf2c532ca7af37b34bd0f924c798652e9b418d79b43b32cec403ccecdcba32e"
+    },
+    {
+      "file": "world.js",
+      "sha256": "90ff02b5cb0ea9c7db375789578f362c6fdcd7db59852910f1837f64455f5137"
+    }
+  ],
+  "privatePathsDenied": true,
+  "originalDataWrites": 0
+}

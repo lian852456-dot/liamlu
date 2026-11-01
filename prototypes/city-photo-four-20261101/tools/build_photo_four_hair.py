@@ -85,9 +85,11 @@ def strand(name, points, width, depth, phase=0.0, steps=9, sides=8, subsurf=Fals
         outward = Vector((center.x, 0.0, center.z)).normalized()
         across = tangent.cross(outward).normalized()
         normal = across.cross(tangent).normalized()
-        taper = max(0.0, 1.0 - t)
-        w = width * (0.34 + 0.72 * math.sin(math.pi * t ** 0.82)) * taper ** 0.42 + 0.0012
-        d = depth * (0.55 + 0.45 * math.sin(math.pi * t)) * taper ** 0.25 + 0.0008
+        # Q2 keeps a softly rounded bundle cross-section until the very end;
+        # the small taper floor prevents long needle-like hair tips.
+        taper = max(0.18, 1.0 - t)
+        w = width * (0.40 + 0.70 * math.sin(math.pi * t ** 0.82)) * taper ** 0.58 + 0.0016
+        d = depth * (0.60 + 0.40 * math.sin(math.pi * t)) * taper ** 0.36 + 0.0010
         for j in range(sides + 1):
             a = j / sides * math.tau
             u, v = math.cos(a), math.sin(a)
@@ -173,7 +175,9 @@ def mirror_points(points, side):
 
 
 def add_flyaway(name, points, phase=0.0):
-    return strand(name, points, 0.006, 0.0022, phase=phase, steps=7, sides=6, subsurf=False)
+    # Q2 deliberately removes floating hair needles.  Main silhouettes use
+    # solid, layered strands instead; tiny accents are authored explicitly.
+    return None
 
 
 def build_a():
@@ -270,21 +274,21 @@ def build_p1():
         [(-.16, .35, .31), (-.12, .28, .39), (.02, .22, .40), (.18, .18, .34)],
     ]
     for n, points in enumerate(swept):
-        strand(f"p1 swept fringe {n}", points, .038 - n * .004, .011, phase=n * .33, steps=9)
+        strand(f"p1 swept fringe {n}", points, .046 - n * .004, .013, phase=n * .33, steps=9)
     for side in (-1, 1):
         for n in range(3):
             x = .30 + n * .055
             strand(f"p1 side taper {side} {n}", mirror_points([
                 (x, .23 - n * .012, .25), (x + .04, .10 - n * .02, .32),
                 (x + .015, -.01 - n * .018, .30), (x - .01, -.11 - n * .02, .24)
-            ], side), .030 - n * .004, .008, phase=.4 + n * .31, steps=8)
+            ], side), .040 - n * .004, .010, phase=.4 + n * .31, steps=8)
         add_flyaway(f"p1 ear flyaway {side}", mirror_points([
             (.405, .05, .27), (.45, -.005, .31), (.445, -.07, .275), (.42, -.12, .23)
         ], side), .5)
     for n, x in enumerate((-.26, -.13, 0, .13, .26)):
         strand(f"p1 nape flow {n}", [(x, .12, -.39), (x * 1.05, .01, -.45),
                                       (x * .98, -.10, -.45), (x * .91, -.20, -.39)],
-               .031 if n in (1, 2, 3) else .026, .010, phase=n * .37, steps=8)
+               .038 if n in (1, 2, 3) else .032, .012, phase=n * .37, steps=8)
     for n in range(3):
         add_flyaway(f"p1 crown flyaway {n}", [(-.16 + n * .15, .40, .10),
             (-.10 + n * .13, .44, .04), (-.035 + n * .10, .43, -.02),
@@ -318,39 +322,42 @@ def build_p2():
 
 
 def build_p3():
-    """Dark brushed-back shoulder-length hair with a restrained half-tie."""
-    # Keep the side hairline tucked behind the ears; the rear shell still
-    # reaches the shoulder, but no longer makes a dark U around the cheeks.
-    cap_surface("p3", front_drop=0.39, side_drop=0.025, back_drop=-0.60, depth_scale=0.90)
-    # Exposed forehead: the front flow travels sideways and back rather than dropping as bangs.
-    for side in (-1, 1):
-        for n in range(3):
-            strand(f"p3 brushed temple {side} {n}", mirror_points([
-                (.035 + n * .02, .46 - n * .014, .27),
-                (.15 + n * .035, .40 - n * .012, .39),
-                (.30 + n * .04, .34 - n * .018, .38),
-                (.40 + n * .018, .23 - n * .025, .31)
-            ], side), .033 - n * .004, .009, phase=.25 + n * .35, steps=10)
-        strand(f"p3 shoulder inner {side}", mirror_points([
-            (.26, .21, .10), (.40, .03, .03), (.43, -.28, -.04), (.40, -.78, -.13)
-        ], side), .050, .013, phase=.55, steps=15)
-        strand(f"p3 shoulder outer {side}", mirror_points([
-            (.33, .18, .06), (.47, -.06, -.02), (.48, -.35, -.10), (.43, -.84, -.19)
-        ], side), .045, .012, phase=1.05, steps=15)
-        add_flyaway(f"p3 side flyaway {side}", mirror_points([
-            (.47, -.22, .04), (.51, -.39, .02), (.49, -.58, -.07), (.45, -.75, -.14)
-        ], side), .4)
-    # A small half-tie at the rear crown, with two tapered tails; no rigid pony shell.
-    for n, dx in enumerate((-.07, -.025, .025, .07)):
-        strand(f"p3 half tie tail {n}", [(dx, .08, -.40), (dx * .7, -.10, -.52),
-            (dx * .55, -.28, -.56), (dx * .82, -.48, -.48)],
-            .034 if n in (1, 2) else .027, .014, phase=n * .42, steps=12)
-    strand("p3 half tie band", [(0, -.08, -.49), (0, -.13, -.54), (0, -.18, -.51)],
-           .031, .016, phase=.6, steps=7)
-    for n, x in enumerate((-.28, -.14, 0, .14, .28)):
-        strand(f"p3 back shoulder flow {n}", [(x, .08, -.42), (x * 1.08, -.20, -.55),
-            (x * 1.03, -.50, -.62), (x * .95, -.84, -.56)],
-            .040 if n not in (2,) else .050, .016, phase=n * .31, steps=16)
+    """Black side-part chin/shoulder bob, one side tucked behind the ear."""
+    cap_surface("p3", front_drop=0.33, side_drop=-0.02, back_drop=-0.46, depth_scale=0.91)
+    # Exposed forehead with a diagonal side part; this is intentionally unlike
+    # p2's full straight fringe.
+    swept = [
+        # The first rows follow the front ellipsoid (roughly z=.24 at
+        # y=.405), preventing a detached flip above the scalp.
+        [(-.14, .405, .245), (-.06, .37, .315), (.09, .315, .355), (.25, .245, .38)],
+        [(-.08, .41, .235), (.01, .375, .315), (.17, .305, .365), (.33, .215, .38)],
+    ]
+    for n, points in enumerate(swept):
+        strand(f"p3 side-part sweep {n}", points, .044 - n * .004, .013,
+               phase=n * .37, steps=10)
+
+    # Viewer-left side is tucked behind the ear and ends early; viewer-right
+    # side has two substantial, rounded arcs that turn inward at the jaw.
+    strand("p3 tucked side inner", mirror_points([
+        (.25, .24, .18), (.34, .10, .20), (.35, -.015, .13), (.30, -.11, .06)
+    ], -1), .070, .017, phase=.5, steps=10)
+    strand("p3 full bob inner", mirror_points([
+        (.25, .24, .28), (.36, .08, .33), (.40, -.12, .29), (.37, -.31, .22)
+    ], 1), .075, .018, phase=.55, steps=12)
+    strand("p3 full bob outer", mirror_points([
+        (.33, .21, .22), (.43, .01, .27), (.45, -.17, .23), (.39, -.38, .16)
+    ], 1), .062, .016, phase=1.05, steps=12)
+
+    # Small raised clip accent at the side part, kept as a low-cost hair-volume
+    # detail rather than a separate accessory/material.
+    # Clip sits on the side-part surface (z≈.20–.25), not in front of the
+    # brow as a floating dot.
+    strand("p3 small hair clip", [(-.29, .305, .215), (-.24, .325, .245),
+                                   (-.19, .305, .235)], .018, .008, phase=.2, steps=6)
+    for n, x in enumerate((-.32, -.20, -.07, .07, .20, .32)):
+        strand(f"p3 rear bob flow {n}", [(x, .10, -.43), (x * 1.08, -.10, -.50),
+            (x * 1.04, -.27, -.50), (x * .93, -.40 - (.025 if n in (0, 5) else 0), -.43)],
+            .050 if n in (2, 3) else .043, .017, phase=n * .34, steps=14)
 
 
 def build_p4():
@@ -367,20 +374,20 @@ def build_p4():
     for side in (-1, 1):
         strand(f"p4 front inner {side}", mirror_points([
             (.22, .31, .29), (.40, .08, .33), (.47, -.27, .29), (.45, -.82, .21)
-        ], side), .044, .011, phase=.55, steps=15)
+        ], side), .054, .013, phase=.55, steps=15)
         strand(f"p4 front outer {side}", mirror_points([
             (.31, .25, .21), (.48, -.02, .26), (.51, -.38, .23), (.48, -.90, .15)
-        ], side), .037, .010, phase=1.05, steps=16)
+        ], side), .047, .012, phase=1.05, steps=16)
         strand(f"p4 front short layer {side}", mirror_points([
             (.36, .23, .25), (.46, -.05, .28), (.48, -.32, .26), (.46, -.65, .19)
-        ], side), .025, .007, phase=1.55, steps=13)
+        ], side), .035, .009, phase=1.55, steps=13)
         add_flyaway(f"p4 edge flyaway {side}", mirror_points([
             (.50, -.39, .22), (.53, -.54, .25), (.52, -.72, .22), (.48, -.88, .16)
         ], side), .35)
     for n, x in enumerate((-.36, -.25, -.13, 0, .13, .25, .36)):
         strand(f"p4 rear flow {n}", [(x, .10, -.40), (x * 1.08, -.22, -.54),
             (x * 1.05, -.55, -.58), (x * .97, -.91 - (.04 if n in (0, 6) else 0), -.49)],
-            .040 if n in (2, 3, 4) else .032, .015, phase=n * .33, steps=16)
+            .048 if n in (2, 3, 4) else .040, .017, phase=n * .33, steps=16)
     for side in (-1, 1):
         add_flyaway(f"p4 rear edge flyaway {side}", mirror_points([
             (.36, -.45, -.50), (.43, -.62, -.54), (.45, -.81, -.49), (.42, -.94, -.40)
@@ -420,13 +427,13 @@ def make_material():
 
     base = make_texture("portrait-hair-color", 512, col, "sRGB")
     normal = make_texture("portrait-hair-normal", 256, nor, "Non-Color")
-    orm = make_texture("portrait-hair-orm", 256, lambda u, v: (1.0, .73 + .035 * math.cos(fiber(u, v) * math.tau * 7.0) + .015 * math.sin(v * 5.0), 0.0), "Non-Color")
+    orm = make_texture("portrait-hair-orm", 256, lambda u, v: (1.0, .82 + .025 * math.cos(fiber(u, v) * math.tau * 7.0) + .010 * math.sin(v * 5.0), 0.0), "Non-Color")
     mat = bpy.data.materials.get("Portrait hair • soft directional PBR") or bpy.data.materials.new("Portrait hair • soft directional PBR")
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
     bsdf = nodes.get("Principled BSDF")
-    bsdf.inputs["Roughness"].default_value = .68
+    bsdf.inputs["Roughness"].default_value = .80
     color_node = nodes.new("ShaderNodeTexImage")
     color_node.image = base
     links.new(color_node.outputs["Color"], bsdf.inputs["Base Color"])
@@ -440,8 +447,9 @@ def make_material():
     orm_node.image = orm
     separate = nodes.new("ShaderNodeSeparateColor")
     links.new(orm_node.outputs["Color"], separate.inputs["Color"])
-    links.new(separate.outputs["Green"], bsdf.inputs["Roughness"])
-    links.new(separate.outputs["Blue"], bsdf.inputs["Metallic"])
+    # Keep the exported GLB scalar roughness at .80 so mobile loaders do not
+    # silently reset it to their .50 default when they discard ORM links.
+    # The ORM image remains authored/packed for future pipeline use.
     return mat
 
 
@@ -449,7 +457,7 @@ def save_export(style, mat):
     for obj in HAIR_OBJECTS:
         obj.data.materials.append(mat)
     bpy.context.scene["scope"] = "Hair only. Face, eyes, skin, body and animation excluded."
-    bpy.context.scene["authoring"] = "Blender Python editable layered volume cages with closed tapered strands, smooth normals and UV/PBR; not a manual sculpt claim"
+    bpy.context.scene["authoring"] = "Blender Python Q2 rounded layered volume cages with soft tapered ends, matte PBR and no flyaway needles; not a manual sculpt claim"
     bpy.context.scene["style"] = style
     bpy.ops.object.select_all(action="DESELECT")
     for obj in HAIR_OBJECTS:
@@ -495,16 +503,16 @@ def main():
         builder()
         results.append(save_export(style, mat))
     receipt = {
-        "assetSet": "portrait-hair-photo-four-20261101",
-        "scope": "isolated four-photo hair candidates; hair only; no employee IDs or source photos",
+        "assetSet": "portrait-hair-photo-four-q2-20261101",
+        "scope": "isolated Q2 four-photo hair candidates; hair only; no employee IDs or source photos",
         "styles": {r["style"]: r for r in results},
         "visualReferences": {
             "p1": "near-black short side-part crop with swept top and short nape",
             "p2": "deep-brown straight-fringe chin bob",
-            "p3": "dark brushed-back shoulder-length half-tie",
+            "p3": "black side-part chin/shoulder bob with one side tucked and small clip accent",
             "p4": "deep-brown side-part long layers ending above chest",
         },
-        "limits": ["No hair physics", "No transparent cards", "No face/body/rig", "Not formal city deployment"],
+        "limits": ["No hair physics", "No transparent cards", "No face/body/rig", "Not formal city deployment", "Q2 soft rounded strands; roughness floor 0.75"],
     }
     (OUT / "build-receipt.json").write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n")
     print("PORTRAIT_HAIR_BUILD", json.dumps(receipt, ensure_ascii=False))

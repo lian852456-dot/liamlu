@@ -1,2 +1,4 @@
 .private*/
-*.tar.gz
+runtime/core/.private*/
+*.blend1
+__pycache__/

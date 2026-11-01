@@ -1,6 +1,6 @@
 /* Render-only adapter. Server identity, profile fields, wallet and world pose stay authoritative. */
 (function(root){'use strict';
- const T=root.THREE,M=root.CozyModels,original=M.character,instances=new Set(),aliases={'photo-p1-v1':'photo-p1-v1','photo-p2-v1':'photo-p2-v1','photo-p3-v1':'photo-p3-v1','photo-p4-v1':'photo-p4-v1'},nativePresets=new Set();
+ const T=root.THREE,M=root.CozyModels,original=M.character,instances=new Set(),aliases={'photo-p1-v1':'photo-p1-v1','photo-p2-v1':'photo-p2-v1','photo-p3-v1':'photo-p3-v1','photo-p4-v1':'photo-p4-v1','photo-p5-v1':'photo-p5-v1'},nativePresets=new Set();
  const preset=p=>aliases[p?.avatarPreset??p?.appearance?.avatarPreset]||null;
  const isNative=key=>nativePresets.has(key);
  const publicBinding=p=>{const value=p?.portraitBinding??p?.appearance?.portraitBinding;return value==='linked'||value==='display-unlinked'?value:null;};
