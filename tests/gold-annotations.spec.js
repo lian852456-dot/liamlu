@@ -39,12 +39,12 @@ for(const width of [1440,390])test(`${width}px displays already-paid explanation
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:`test-results/gold-notes-${width}.png`,fullPage:true});
 });
-test('notes failure clears explanations and leaves confirmed daily scores unchanged',async({page})=>{
+test('notes update failure retains last valid explanations with a visible warning',async({page})=>{
  let invalid=false;await page.route('**/exec',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({status:'ok',ledger})}));
  await page.route('**/gold-annotations-public.json*',route=>{const n=fixture();if(invalid)n.batches[0].applyToBalance=true;return route.fulfill({contentType:'application/json',body:JSON.stringify(n)});});
  await page.goto(base+'gold-medal.html');await expect(page.locator('#goldNotesWeek')).toBeEnabled();await page.locator('#goldNotesWeek').selectOption('2026-10-W1');await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(2);
- invalid=true;await page.locator('#refreshButton').click();await expect(page.locator('#goldNotesStatus')).toHaveClass(/error/);await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(0);
- await expect(page.locator('#goldNotesWeek')).toBeDisabled();
+ invalid=true;await page.locator('#refreshButton').click();await expect(page.locator('#goldNotesStatus')).toHaveClass(/error/);await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(2);
+ await expect(page.locator('#goldNotesWeek')).toBeEnabled();await expect(page.locator('#goldNotesStatus')).toContainText('仍顯示上次備註');
  await expect(page.locator('#viewerBody tr')).toHaveCount(2);await expect(page.locator('#viewerSummary .summary-card').first()).toContainText('17');
  invalid=false;await page.locator('#refreshButton').click();await expect(page.locator('#goldNotesBatches tbody tr')).toHaveCount(2);await expect(page.locator('#viewerSummary .summary-card').first()).toContainText('17');
 });

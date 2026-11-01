@@ -45,10 +45,11 @@ for(const width of [390,1440])test.describe(width+'px actual controller',()=>{
   await page.evaluate(()=>{window.__heldReads[1].release();});await expect(page.locator('#summaryDateLabel')).toContainText('2099-10-03 21:00');await expect(page.locator('#sumCoverage')).toContainText('0 / 9');
   await page.evaluate(()=>{window.__heldReads[0].release();});await expect(page.locator('#summaryDateLabel')).toContainText('2099-10-03 21:00');expect(await totals(page)).toEqual(['—','—','—','—','—']);
  });
- test('failed or malformed reread clears old values and local shadows; empty success is unreported',async({page})=>{
-  await page.evaluate(()=>{localStorage.setItem(shadowKey('2099-10-02',16),JSON.stringify({酒泉:{date:'2099-10-02',seg:16,store:'酒泉',aq999:9000}}));window.__readMode='error';});
-  await page.locator('#panel-summary>.sum-toolbar [data-summary-retry]').click();await expect(page.locator('#summaryCards')).toContainText('回報資料未取得');await expect(page.locator('[data-summary-total]')).toHaveCount(0);await expect(page.locator('#sumCoverage')).toHaveText('填報狀態未確認');
-  await page.evaluate(()=>window.__readMode='malformed');await page.locator('#panel-summary>.sum-toolbar [data-summary-retry]').click();await expect(page.locator('#summaryCards')).toContainText('回報資料未取得');
+ test('failed or malformed manual update retains verified values and time; empty success replaces them',async({page})=>{
+  await page.evaluate(()=>{localStorage.setItem(shadowKey('2099-10-02',16),JSON.stringify({酒泉:{date:'2099-10-02',seg:16,store:'酒泉',aq999:9000}}));window.__readMode='throw';});
+  const original=await totals(page);await page.locator('#panel-summary>.sum-toolbar [data-summary-retry]').click();await expect(page.locator('#sumReadStatus')).toContainText('仍顯示上次資料');expect(await totals(page)).toEqual(original);await expect(page.locator('#sumCoverage')).toHaveText('已回報 7 / 9 店');
+  await page.evaluate(()=>window.__readMode='malformed');await page.locator('#panel-summary>.sum-toolbar [data-summary-retry]').click();await expect(page.locator('#sumReadStatus')).toContainText('格式不符');expect(await totals(page)).toEqual(original);
+  await page.evaluate(()=>window.__readMode='error');await page.locator('#panel-summary>.sum-toolbar [data-summary-retry]').click();await expect(page.locator('[data-summary-total]')).toHaveCount(0);await expect(page.locator('#summaryCards')).toContainText('回報資料未取得');
   await page.evaluate(()=>window.__readMode='empty');await page.locator('#panel-summary>.sum-toolbar [data-summary-retry]').click();await expect(page.locator('#sumCoverage')).toHaveText('已回報 0 / 9 店');expect(await totals(page)).toEqual(['—','—','—','—','—']);
   await page.evaluate(()=>window.__readMode='ok');await page.locator('#panel-summary>.sum-toolbar [data-summary-retry]').click();await expect(page.locator('#sumCoverage')).toHaveText('已回報 7 / 9 店');expect((await totals(page))[0]).not.toBe('9000');await noOverflow(page);
  });
@@ -86,4 +87,37 @@ for(const width of [390,1440])test.describe(width+'px actual controller',()=>{
   await page.locator('#sumSeg21').click();await group(page,'零報與請益');await page.locator('#sum-detail-0>summary').click();await page.locator('#sum-private-0>summary').click();await expect(page.locator('#sum-private-0')).toContainText('合成長姓名');await noOverflow(page);
   await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:path.join(out,'candidate-'+width+'-consult.png'),fullPage:true});
  });
+});
+
+test('completed summary and personal reads survive tabs, background and return; explicit update alone rereads',async({page})=>{
+ await group(page,'零報與請益');await page.locator('#sum-detail-0>summary').click();await page.locator('#sum-private-0>summary').click();await expect(page.locator('#sum-private-0')).toContainText('合成長姓名');
+ const before=await page.evaluate(()=>window.__summaryCalls.filter(p=>['read','pread'].includes(p.action)).length);
+ const time=await page.locator('#sumReadStatus').textContent();
+ await page.locator('.tab-btn.report-tab').first().click();
+ await page.locator('.tab-btn').filter({hasText:'彙整大盤'}).click();
+ await expect(page.locator('#sum-private-0')).toContainText('合成長姓名');
+ await expect(page.locator('#sum-private-0')).toHaveAttribute('open','');
+ await page.evaluate(()=>{window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));window.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'));});
+ expect(await page.locator('#sumReadStatus').textContent()).toBe(time);
+ expect(await page.evaluate(()=>window.__summaryCalls.filter(p=>['read','pread'].includes(p.action)).length)).toBe(before);
+ await page.evaluate(()=>window.__readMode='throw');await page.locator('#panel-summary>.sum-toolbar [data-summary-retry]').click();await expect(page.locator('#sumReadStatus')).toContainText('仍顯示上次資料');
+ await expect(page.locator('#sum-private-0')).toContainText('合成長姓名');
+ await page.evaluate(()=>window.dispatchEvent(new Event('portal-before-logout')));await expect(page.locator('#summaryCards')).toContainText('連線已失效');
+ await expect(page.locator('[data-summary-total]')).toHaveCount(0);
+});
+
+test('cached segment return rejects an outstanding different-segment response',async({page})=>{
+ const original=await totals(page);
+ await page.evaluate(()=>window.__holdRead=true);await page.locator('#sumSeg21').click();await page.waitForFunction(()=>window.__heldReads.length===1);
+ await page.locator('#sumSeg16').click();expect(await totals(page)).toEqual(original);
+ await page.evaluate(()=>window.__heldReads[0].release());await expect(page.locator('#summaryDateLabel')).toContainText('16:00');expect(await totals(page)).toEqual(original);
+ expect(await page.evaluate(()=>window.__summaryCalls.filter(p=>p.action==='read').length)).toBe(2);
+});
+
+test('report write invalidation cannot be undone by leaving the summary tab',async({page})=>{
+ const before=await page.evaluate(()=>window.__summaryCalls.filter(p=>p.action==='read').length);
+ await page.evaluate(()=>{invalidateDailyReportReads('2099-10-02',16);window.__summaryRows.find(r=>r.store==='酒泉'&&r.seg===16).aq999=8;});
+ await page.locator('.tab-btn.report-tab').first().click();await page.locator('.tab-btn').filter({hasText:'彙整大盤'}).click();
+ await expect(page.locator('[data-summary-total="aq999"]')).toHaveText('23');
+ expect(await page.evaluate(()=>window.__summaryCalls.filter(p=>p.action==='read').length)).toBe(before+1);
 });

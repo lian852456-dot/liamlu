@@ -8,9 +8,20 @@
   function create(options) {
     const {root,stores,readDay,readPersonal,localPersonal,today,onSegmentChange,assertActive} = options;
     const byId = id => root.querySelector('#'+id);
-    const state = {date:today(),seg:16,group:'sales',store:'all',filter:'all',status:'idle',rows:[],people:null,personalStatus:'idle',receivedAt:null};
+    const state = {date:today(),seg:16,group:'sales',store:'all',filter:'all',status:'idle',rows:[],people:null,personalStatus:'idle',receivedAt:null,updating:false,updateError:''};
     let generation = 0, personalGeneration = 0, locked = false;
     let dayController, personalController;
+    // Completed reads belong to this document and its existing portal session.
+    const snapshots = new Map();
+    const invalidated = new Set();
+    const scopeKey = () => `${state.date}_${state.seg}`;
+    function remember() {
+      if(state.status!=='ready'||invalidated.has(scopeKey()))return;
+      snapshots.set(scopeKey(),{rows:state.rows,people:state.people,personalStatus:state.personalStatus,receivedAt:state.receivedAt});
+      while(snapshots.size>16)snapshots.delete(snapshots.keys().next().value);
+    }
+    const readStatus=document.createElement('p');readStatus.id='sumReadStatus';readStatus.className='sum-note';readStatus.setAttribute('role','status');
+    root.querySelector('.sum-toolbar').after(readStatus);
     const visible = () => root.classList.contains('active');
     const dateInput = byId('sumDate'); dateInput.value = state.date;
     for (const name of stores) {const option = document.createElement('option');option.value=name;option.textContent=name;byId('sumStore').append(option);}
@@ -87,6 +98,8 @@
       for(const id of open)byId(id)?.setAttribute('open','');
       if(focused)byId(focused)?.focus({preventScroll:true});
       byId('sumAnnounce').textContent=`${state.date} ${state.seg}:00；${byId('sumCoverage').textContent}；${byId('sumStoreCount').textContent}`;
+      readStatus.textContent=state.updateError?`更新失敗：${state.updateError}。仍顯示上次資料（${state.receivedAt}，臺北），請手動更新。`:state.updating?`正在更新，仍顯示上次資料（${state.receivedAt}，臺北）…`:state.status==='ready'?`上次讀取：${state.receivedAt}（臺北）。切換頁籤會保留資料，需要最新資料時請按「更新資料」。`:'';
+      readStatus.className=state.updateError?'sum-notice':'sum-note';
     }
     async function loadPeople() {
       if(!visible()||state.status!=='ready'||state.personalStatus!=='idle'||state.group!=='consult')return;
@@ -98,34 +111,58 @@
         if(token!==personalGeneration||dayToken!==generation)return;
         state.people=M.personal(response,date,seg,stores,localPersonal(date,seg));state.personalStatus='ready';
       } catch (_) {if(token!==personalGeneration||dayToken!==generation)return;state.people=null;state.personalStatus='error';}
-      render();
+      remember();render();
     }
     async function refresh({force=false}={}) {
       if(!visible())return;
+      const key=scopeKey(),saved=!locked&&snapshots.get(key);
+      if(saved&&!force){
+        generation++;personalGeneration++;dayController?.abort();personalController?.abort();
+        Object.assign(state,saved,{status:'ready',updating:false,updateError:''});
+        render();await loadPeople();return;
+      }
       const samePending=state.status==='loading'&&!force&&!dayController?.signal.aborted;
       if(!samePending)dayController?.abort();
       personalController?.abort();
       const controller=samePending?dayController:new AbortController();dayController=controller;
       const token=++generation;personalGeneration++;const date=state.date,seg=state.seg;
-      state.status=locked?'locked':'loading';state.rows=[];state.people=null;state.personalStatus='idle';state.receivedAt=null;render();
+      if(saved)Object.assign(state,saved,{status:'ready',updating:true,updateError:''});
+      else Object.assign(state,{status:locked?'locked':'loading',rows:[],people:null,personalStatus:'idle',receivedAt:null,updating:false,updateError:''});
+      render();
       if(locked)return;
       try {
         active();const response=await readDay(date,seg,{signal:controller.signal,force});active();
         if(token!==generation)return;
         state.rows=M.project(response,date,seg,stores);state.status='ready';
+        state.people=null;state.personalStatus='idle';state.updating=false;
         state.receivedAt=new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour12:false});
-      } catch (error) {if(token!==generation)return;state.rows=[];state.people=null;state.status=error.name==='TimeoutError'?'timeout':'error';}
-      render();await loadPeople();
+        invalidated.delete(key);remember();
+      } catch (error) {
+        if(token!==generation)return;
+        if(saved&&!locked&&error.code!=='DAILY_REPORT_ACCESS_REJECTED')Object.assign(state,saved,{status:'ready',updating:false,updateError:error.name==='TimeoutError'?'讀取逾時':'回報資料未取得或格式不符'});
+        else {snapshots.clear();state.rows=[];state.people=null;state.updating=false;state.updateError='';state.status=error.name==='TimeoutError'?'timeout':'error';}
+      }
+      render();if(!state.updateError)await loadPeople();
     }
     function setSegment(seg) {if(![16,21].includes(Number(seg)))return;if(state.seg!==Number(seg))dayController?.abort();state.seg=Number(seg);onSegmentChange(state.seg);return refresh();}
     dateInput.addEventListener('change',()=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(dateInput.value))return;if(state.date!==dateInput.value)dayController?.abort();state.date=dateInput.value;refresh();});
     byId('sumStore').addEventListener('change',event=>{state.store=event.target.value;render();});
     byId('sumStatus').addEventListener('change',event=>{state.filter=event.target.value;render();});
     root.addEventListener('click',event=>{const group=event.target.closest('[data-summary-group]'),seg=event.target.closest('[data-summary-seg]');if(group){state.group=group.dataset.summaryGroup;render();loadPeople();}else if(seg)setSegment(seg.dataset.summarySeg);else if(event.target.closest('[data-summary-retry]'))refresh({force:true});});
-    function deactivate() {generation++;personalGeneration++;dayController?.abort();personalController?.abort();state.rows=[];state.people=null;state.status=locked?'locked':'idle';state.personalStatus='idle';render();}
-    window.addEventListener('portal-before-logout',()=>{locked=true;deactivate();});
-    window.addEventListener('portal-login-changed',()=>{locked=false;refresh();});
-    render();return Object.freeze({refresh,setSegment,deactivate});
+    function deactivate({clear=false}={}) {
+      generation++;personalGeneration++;dayController?.abort();personalController?.abort();state.updating=false;state.updateError='';
+      if(clear){snapshots.clear();invalidated.clear();state.rows=[];state.people=null;state.status=locked?'locked':'idle';state.personalStatus='idle';state.receivedAt=null;}
+      else if(state.personalStatus==='loading')state.personalStatus='idle';
+      if(!clear&&state.status==='loading')state.status='idle';
+      remember();render();
+    }
+    function invalidate(date,seg){
+      if(!date){for(const key of snapshots.keys())invalidated.add(key);snapshots.clear();}
+      else {const key=`${date}_${seg}`;invalidated.add(key);snapshots.delete(key);}
+    }
+    window.addEventListener('portal-before-logout',()=>{locked=true;deactivate({clear:true});});
+    window.addEventListener('portal-login-changed',()=>{locked=false;deactivate({clear:true});refresh();});
+    render();return Object.freeze({refresh,setSegment,deactivate,invalidate});
   }
   scope.DailyReportSummaryController=Object.freeze({create});
 })(globalThis);

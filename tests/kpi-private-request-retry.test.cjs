@@ -69,17 +69,19 @@ function harness(sequence) {
   const employeeInput = { value: 'EMPLOYEE-SENSITIVE', offsetParent: {} };
   const status = { textContent: '', style: {} };
   const note = { textContent: '', innerHTML: '' };
-  const content = { innerHTML: '' };
+  const notices = new Map();
+  const content = { innerHTML: '', before(node) { notices.set(node.id,node); } };
   const localStorage = memoryStorage();
   const sessionStorage = memoryStorage();
   const logs = [];
   const delays = [];
   const document = {
+    createElement(tag) { return {tag,children:[],style:{},dataset:{},setAttribute(){},removeAttribute(){},replaceChildren(){this.children=[];},append(...nodes){this.children.push(...nodes);},querySelector(){return this.children.find(node=>node.tag==='button');}}; },
     addEventListener() {},
     getElementById(id) {
       if (id === 'kpiBattleContent') return content;
       if (id === 'kpiBattleSourceNote') return note;
-      return null;
+      return notices.get(id) || null;
     },
     querySelector(selector) {
       if (selector === '#privateEmployeeId') return employeeInput;
@@ -262,4 +264,12 @@ test('network final failure diagnostics identify network exception without HTTP 
   assert.equal(final.detail.failureTarget, 'network-exception');
   assert.equal(final.detail.httpStatus, null);
   assert.equal(final.detail.exceptionType, 'TypeError');
+});
+
+test('manual update preserves completed KPI reads on transport failure and clears on explicit denial', async () => {
+  const env=harness([privateAccessResult(),kpicalcResult(),httpError(503),httpError(503),httpError(503),privateAccessResult(),kpicalcResult(),businessError('裝置已撤銷')]);
+  await env.controller.login();const first=env.controller.getData();assert.ok(first);
+  await env.controller.login({refresh:true});assert.equal(env.controller.getData(),first);
+  await env.controller.login({refresh:true});assert.ok(env.controller.getData());assert.notEqual(env.controller.getData(),first);
+  await env.controller.login({refresh:true});assert.equal(env.controller.getData(),null);
 });

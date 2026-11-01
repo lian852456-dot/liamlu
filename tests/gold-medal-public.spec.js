@@ -64,13 +64,13 @@ test('店點、同名個人與日期起迄一起篩選，跨日總牌數不重�
   await page.locator('#viewerDateFrom').fill('2026-10-01');
   await expect(page.locator('#viewerMeta')).toHaveText('目前篩選沒有結算資料');
 });
-test('金牌讀取失敗可重試，不保留舊結果',async({page})=>{
+test('首次失敗可重試，後續更新失敗保留最後成功資料與時間',async({page})=>{
   let fail=true;
   await page.route('**/exec',route=>route.fulfill({contentType:'application/json',body:JSON.stringify(fail?{status:'error',message:'測試讀取失敗'}:{status:'ok',ledger})}));
   await page.goto(PAGE_URL);await expect(page.locator('#loadStatus')).toContainText('測試讀取失敗');
   await expect(page.locator('#goldViewer')).toBeHidden();
   fail=false;await page.locator('#refreshButton').click();await expect(page.locator('#viewerBody')).toContainText('測試同仁');
-  fail=true;await page.locator('#refreshButton').click();await expect(page.locator('#goldViewer')).toBeHidden();
+  fail=true;await page.locator('#refreshButton').click();await expect(page.locator('#loadStatus')).toContainText('仍顯示上次資料');await expect(page.locator('#goldViewer')).toBeVisible();await expect(page.locator('#viewerBody')).toContainText('測試同仁');
 });
 
 test('public page refuses a private ledger response',async({page})=>{
@@ -84,4 +84,22 @@ test('verified supervisor renderer retains full private notes',async({page})=>{
  await expect(page.locator('#loginPanel')).toBeVisible();await expect(page.locator('#goldViewer')).toBeHidden();
  await page.locator('#passcode').fill('synthetic-only');await page.locator('#loginForm button').click();
  await expect(page.locator('#viewerDailyBody')).toContainText('測試詳細原因／測試免扣');await expect(page.locator('#viewerMeta')).toContainText('管理來源');
+});
+
+test('金牌切到背景及返回保留畫面、篩選，不自動讀取',async({page})=>{
+ let calls=0;
+ await page.route('**/exec',route=>{calls++;return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'ok',ledger})});});
+ await page.goto(PAGE_URL);await expect(page.locator('#viewerBody')).toContainText('測試同仁');
+ await page.locator('#viewerStore').selectOption('三創');
+ await page.locator('#viewerMonth').selectOption('2026-09-29');
+ const content=await page.locator('#goldViewer').innerHTML();
+ await page.evaluate(()=>{
+  window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));
+  Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));
+  Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));
+  window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));window.dispatchEvent(new Event('focus'));
+ });
+ await expect(page.locator('#goldViewer')).toBeVisible();expect(await page.locator('#goldViewer').innerHTML()).toBe(content);
+ expect(calls).toBe(1);
+ await page.locator('#refreshButton').click();await expect(page.locator('#refreshButton')).toBeEnabled();expect(calls).toBe(2);
 });
