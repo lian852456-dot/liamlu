@@ -44,5 +44,17 @@ Sheets 多表寫入不是資料庫交易。若核心／台獎或提交證據在�
 - 正式資料：11/2 的門市與個人 16/21 既有讀取成功，排除新增提交證據欄後的業務資料 canonical SHA-256 前後相同；新 `report-save-v1` 狀態路由亦以既有紀錄讀回核對日期、店別與時段。未提交測試 write/pwrite，不宣稱正式寫入驗收完成。
 - 前端：GitHub Pages 對 `343afe0` 建置成功；正式 index.html、report-save-recovery.js、daily-report-layout.js、daily-report-layout.css 均與受測候選逐位元一致。
 - 新驗證：101/101 Node、42/42 Chromium；從正式 v80 套用的精確 overlay 另通過 8/8 GAS／日期隔離測試。實體 iPhone Safari 未測。
-- CI：台獎契約 check 通過；既有 Closing／Homepage workflow 在安裝階段因 Playwright 1.55.1 不支援 Ubuntu 26.04 而停止，未跑到測試。本次不擴充 OAuth workflow scope，不修改工作流程；原 workflow 改善提案僅保留於本機候選。另有既有 Cloudflare 查價預覽 build failed，未調整該專案。正式 GitHub Pages 建置成功與上述 check 分開記錄。
+- 初次發布 CI：台獎契約 check 通過；既有 Closing／Homepage workflow 在安裝階段因 Playwright 1.55.1 不支援 Ubuntu 26.04 而停止，未跑到測試。其後的相容性修正及結果見下節。未擴充 OAuth workflow scope 或修改工作流程；原 workflow 改善提案僅保留於本機候選。Cloudflare 查價預覽與正式 GitHub Pages 建置分開記錄。
 - 回復：前端上一版 `fecf722ba383d609769b82ddb635e728fb7c8ee4`、同一 Daily Web App v80；保留原來源備份及 v81 不可變讀回。不得因此刪除提交證據欄或回蓋業績紀錄。
+
+### CI 收尾與發布時間核實
+
+[PR #309](https://github.com/lian852456-dot/liamlu/pull/309) 僅將測試依賴固定為 Playwright 1.64.1、增加收官 uncaught pageerror 斷言，並修正 synthetic 手機綁定測試的等待競態：關頁前等待既有「手機自動登入已啟用」畫面，確保延遲回應與本機 grant 已保存。未修改正式登入、回報功能、workflow、權限或憑證，未跳過測試。合併提交為 `4457704d88cbdfddfc01a538ac7ebd509393e7e6`，其完整檔案樹與受測提交 `3027f110edd730ef8a90f4643627515581362d8a` 一致。
+
+- 原 [Closing 失敗](https://github.com/lian852456-dot/liamlu/actions/runs/41485096841) 與 [Homepage 失敗](https://github.com/lian852456-dot/liamlu/actions/runs/41485096347) 的精確錯誤皆為 `ERROR: Playwright does not support chromium on ubuntu26.04-x64`。既有測試依賴不支援更新後 runner，並非回報儲存案例執行失敗。
+- 同一最終受測提交的 [Closing CI](https://github.com/lian852456-dot/liamlu/actions/runs/41490124096) 通過安裝、35 項 Node 與 4 項瀏覽器案例；[Homepage CI](https://github.com/lian852456-dot/liamlu/actions/runs/41490124055) 通過安裝、347 項 Node、15 項輪播重複驗證、149 項主要 UI 及 32 項 navigation/loading/login。沒有失敗或跳過。
+- 同一提交本機通過上述 347、35、15、149、32 項，另通過儲存／session Node 71 項、回報儲存 Chromium 42 項，沒有失敗、跳過或 flaky。本機 Node 24.15.0；CI Node 22。全部業務呼叫為 synthetic fixture。
+- Cloudflare Pages `twm-tradein-price` 預覽在受測提交仍回報 `Build failed`，摘要沒有根因。詳細日誌要求 Cloudflare 登入；對既有 main check 的正常 rerequest 返回 HTTP 404，未接受或執行重跑。與本次改動的因果關係無法判定，未改該服務設定。正式回報站的 GitHub Pages／GAS 已分別核實；不能由此宣稱 Cloudflare 預覽正常。
+- Apps Script 既有部署 API 讀回：不可變 v81 建立於 `2026-11-02T16:51:40.357Z`，同一 Daily deployment 切換更新於 `2026-11-02T16:53:37.936Z`（台灣 11/3 00:53:37）；前端回報修正 `343afe0` 的 Pages 建置於 `2026-11-02T16:57:26Z` 完成（台灣 11/3 00:57:26）。後續 CI 修正沒有更動正式前端資產或 GAS，不需重新部署 GAS。
+
+正式 Sheet 虛構測試寫入仍為 0；真實業務送出與實體 iPhone Safari 仍未驗收。上述 CI 成功不取代這兩項驗收，也不能回溯證明三創／六張犁當時送出的結果。
