@@ -2,6 +2,8 @@ const { test, expect } = require('@playwright/test');
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:4176/';
 
 test.beforeEach(async ({ page }) => {
+  page.__closingErrors = [];
+  page.on('pageerror', error => page.__closingErrors.push(error.message));
   await page.route('**/*', route => {
     return new URL(route.request().url()).origin === new URL(base).origin
       ? route.continue() : route.abort();
@@ -29,6 +31,10 @@ test.beforeEach(async ({ page }) => {
     selectStore('酒泉');
     await Promise.resolve();
   });
+});
+
+test.afterEach(async ({page}) => {
+  expect(page.__closingErrors).toEqual([]);
 });
 
 for (const viewport of [{width:1280,height:900},{width:390,height:844}]) {
