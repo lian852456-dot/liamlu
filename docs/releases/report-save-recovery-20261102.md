@@ -1,6 +1,6 @@
 # 回報儲存可靠性修正與發布（2026-11-02）
 
-狀態：已由 PR #308 合併並發布。前端程式 merge commit 為 `343afe0f1fba4567b759e0dcb8d5b34dcb3a9b1c`，GitHub Pages 已建置完成；既有 Daily Web App 已切至不可變 v81。正式 Sheet 測試寫入為 0，實體 iPhone 與真實業務送出仍待驗收。基準為 `fecf722ba383d609769b82ddb635e728fb7c8ee4`；本次讀取的公開 index.html SHA-256 與該版本一致：`7823c4c9b737858aa4aa611eaa38b5cb86209dd519e2a63004b16957b28836bd`。
+狀態：已由 PR #308 合併並發布。前端程式 merge commit 為 `343afe0f1fba4567b759e0dcb8d5b34dcb3a9b1c`，GitHub Pages 已建置完成；既有 Daily Web App 已切至不可變 v81。正式 Sheet 測試寫入為 0，實體 iPhone 與真實業務送出仍待驗收。基準為 `fecf722ba383d609769b82ddb635e728fb7c8ee4`；修正前讀取的公開 index.html SHA-256 與該版本一致：`7823c4c9b737858aa4aa611eaa38b5cb86209dd519e2a63004b16957b28836bd`。
 
 ## 可重現問題與修正
 
@@ -29,7 +29,7 @@ Sheets 多表寫入不是資料庫交易。若核心／台獎或提交證據在�
 - 全部業績寫入為記憶體 fake GAS／synthetic fetch，未送到正式 Sheet。語法檢查與 `git diff --check` 通過。
 - 原 16/21 測試 fixture 在基準版即有兩個失敗：釋放了已取消的舊 16:00 請求，沒有釋放 legacy carry16 fallback。此次只修正 fixture 釋放目標，仍驗證日期時段、鎖定及草稿隔離；沒有改動 paired-read 正式行為。
 
-未驗證：正式 GAS 部署、正式寫入讀回及實體 iPhone/Safari UAT；現有個案的原送出時間與提示不足，不能用修正或目前讀得到資料推定當時的結果。
+已驗證正式 GAS 部署與既有資料唯讀；未驗證真實業務送出的正式寫入讀回及實體 iPhone/Safari UAT；現有個案的原送出時間與提示不足，不能用修正或目前讀得到資料推定當時的結果。
 
 ## 發布與回復紀錄
 
