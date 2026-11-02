@@ -1547,9 +1547,10 @@
     .tab-bar .tab-btn { flex:0 0 auto; min-height:48px; padding:11px 14px; font-size:15px; }
   }
 </style>
-<link rel="stylesheet" href="daily-report-layout.css?v=20261004-layout-3">
+<link rel="stylesheet" href="daily-report-layout.css?v=20261102-save-state-1">
 <link rel="stylesheet" href="daily-report-summary.css?v=20261004-summary-1">
-<script src="daily-report-layout.js?v=20261007-pending-edit-1" defer></script>
+<script src="report-save-recovery.js?v=20261102-1"></script>
+<script src="daily-report-layout.js?v=20261102-draft-recovery-1" defer></script>
 <script src="GasBClient.js?v=20261024-auth-reject-1" defer></script>
 <script src="dashboard-b-shell.js?v=20261101-manual-update-1" defer></script>
 </head>
@@ -1683,7 +1684,7 @@
 
   <!-- 已有資料摘要 -->
   <div class="filled-summary" id="filledSummary">
-    <div class="filled-summary-title">✅ 本時段已填資料</div>
+    <div class="filled-summary-title">先前回報紀錄；本次修改請另確認儲存</div>
     <div class="filled-chip-row" id="filledChips"></div>
   </div>
 
@@ -2419,7 +2420,7 @@ async function fetchDayData(date, seg, options) {
 }
 
 // ── 寫入到 GAS
-async function saveToStorage(date, store, seg, data) {
+async function saveToStorage(date, store, seg, data, retryOnly = false) {
   const readContext = typeof dailyReportReadContext === 'undefined' ? null : dailyReportReadContext;
   const endpoint = GAS_URL;
   let confirmedRow = null;
@@ -2431,7 +2432,11 @@ async function saveToStorage(date, store, seg, data) {
   if (issues.length) throw new Error('請補齊或修正：' + issues.map(issue => issue.label).join('、'));
   // 先取得正式端點的可驗證回應；在伺服器讀回前，不寫 local shadow，也不顯示成功。
   let result;
-  try { result = await privateDashboardPost({ action: 'write', date, store, seg, data }); }
+  try {
+    const payload = {action:'write', date, store, seg, data};
+    result = typeof reportSaves === 'undefined' ? await privateDashboardPost(payload)
+      : await reportSaves.save(payload, globalThis.DailyReportLayout?.baseRevision(), retryOnly);
+  }
   catch (error) {
     if (error.name === 'AbortError') throw error;
     throw unconfirmedReportSave(error, false);
@@ -2470,6 +2475,7 @@ async function saveToStorage(date, store, seg, data) {
   if (typeof _cacheReadGeneration !== 'undefined') _cacheReadGeneration[ck] = (_cacheReadGeneration[ck] || 0) + 1;
   if (!_cache[ck]) _cache[ck] = {};
   _cache[ck][store] = { ...savedData, date, store, seg };
+  globalThis.DailyReportLayout?.onSaveConfirmed(store, date, seg, result.readback);
   return true;
 }
 
@@ -2588,7 +2594,7 @@ function updateConnectionBadge() {
   if (!badge) return;
   const status = reportConnectionDisplay.endpoint === GAS_URL ? reportConnectionDisplay.status : 'idle';
   if (GAS_URL && status === 'ready') {
-    badge.textContent = '🟢 回報讀取成功';
+    badge.textContent = '🟢 已讀取雲端資料';
     badge.style.color = 'var(--green)';
     badge.style.borderColor = 'var(--green)';
     badge.style.background = 'rgba(16,185,129,0.1)';
@@ -2599,7 +2605,7 @@ function updateConnectionBadge() {
     badge.style.background = 'rgba(249,115,22,0.1)';
   }
   badge.title = status === 'ready'
-    ? `資料日期 ${reportConnectionDisplay.date} · ${reportConnectionDisplay.seg}:00；頁面取得 ${reportConnectionDisplay.readAt}`
+    ? `資料日期 ${reportConnectionDisplay.date} · ${reportConnectionDisplay.seg}:00；頁面取得 ${reportConnectionDisplay.readAt}。本次送出結果請看表單儲存狀態。`
     : '設定服務網址不代表已取得正式資料。';
 }
 function openSettings() {
@@ -2722,6 +2728,51 @@ async function privateDashboardPost(payload, options) {
     return result;
   }
   finally { if (mutation && context === dailyReportReadContext) invalidateDailyReportReads(payload.date, payload.seg); }
+}
+const reportSaves = ReportSaveRecovery.create({
+  storage:localStorage, post:payload => privateDashboardPost(payload),
+  getEndpoint:() => GAS_URL, getContext:() => dailyReportReadContext,
+  onChange:showReportSaveState,
+});
+function showReportSaveState(payload, state, detail = '') {
+  const personal = payload.action === 'pwrite';
+  const matches = personal
+    ? document.getElementById('personalStore').value === payload.store && document.getElementById('personalName').value.trim() === payload.name && personalSeg === Number(payload.seg)
+    : document.getElementById('fillStore').value === payload.store && currentSeg === Number(payload.seg);
+  if (!matches || document.getElementById('fillDate').value !== payload.date) return;
+  let node = document.getElementById(personal ? 'personalFailSavedStatus' : 'reportSaveStatus');
+  if (!node) {
+    node = document.createElement('div'); node.id = 'reportSaveStatus'; node.className = 'daily-note';
+    node.setAttribute('role', 'status'); document.querySelector('.daily-submit-bar').append(node);
+  }
+  const messages = {local:'本機草稿，尚未送出。', checking:'正在核對雲端提交狀態…', uploading:'上傳中；請等候雲端確認。',
+    confirmed:'已確認儲存至雲端。', failed:'送出前核對失敗，尚未上傳；本機資料已保留。', conflict:'雲端已有不同版本；未覆蓋，草稿已保留。', unconfirmed:'儲存結果尚未確認；本機資料已保留。'};
+  node.textContent = `${personal ? '個人回報' : '門市回報'}｜${payload.store} ${payload.date} ${payload.seg}:00｜${messages[state]} ${detail}`;
+  node.style.display = 'block';
+  if (personal && payload.record?.failed?.length) node.append(' ', personalFailQualificationMessage(payload.date, payload.seg, personalFailTextCheck(payload.date, payload.record.extra || {})));
+  if (state === 'failed' || state === 'unconfirmed' || state === 'conflict') {
+    const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = '確認／重試原送出';
+    retry.onclick = () => personal ? _pushPersonalToCloud(payload.store, payload.name, payload.date, payload.seg, payload.record, !!reportSaves.pending(payload))
+      : _doSave(payload.store, payload.date, payload.data, Number(payload.seg), !!reportSaves.pending(payload));
+    node.append(document.createElement('br'), retry);
+    if (state === 'conflict') {
+      const review = document.createElement('button'); review.type = 'button'; review.textContent = '保留草稿備份，讀取雲端版本';
+      review.onclick = async () => {
+        try {
+          const latest = await reportSaves.reviewLatest(payload);
+          if (personal) {
+            if (latest.receipt.readback) localStorage.setItem(_reviewKey(payload.store, payload.name, payload.date, payload.seg), JSON.stringify({...latest.receipt.readback,cloudState:'confirmed'}));
+            renderPersonal(); node.textContent = '已讀取最新雲端紀錄；原本草稿仍保留，請核對下方紀錄後再送出。';
+          } else globalThis.DailyReportLayout.reloadCloud();
+        } catch (error) { showToast(error.message); }
+      };
+      node.append(' ', review);
+    }
+  }
+}
+function markReportDraft(store, date, seg) {
+  const payload = {action:'write', store, date, seg};
+  if (!reportSaves.busy(payload) && !reportSaves.pending(payload)) showReportSaveState(payload, 'local');
 }
 async function privateDashboardRequest(payload, signal, endpoint = GAS_URL) {
   if (!GAS_URL) throw new Error('尚未設定 Apps Script 服務網址');
@@ -3806,6 +3857,8 @@ function selectStore(store) {
     renderManagementFocusInputs(managementFocusData(data), {preserveIds:pendingEdits});
     updateFilledSummary(data);
     globalThis.DailyReportLayout?.onStoreLoaded(store, date, selectedSeg, data, afternoon);
+    const pending = reportSaves.pending({action:'write', store, date, seg:selectedSeg});
+    if (pending) showReportSaveState(pending.payload, 'unconfirmed', '已取回先前送出，請先確認結果。');
   }).catch(error => {
     if (signal.aborted || selectionGeneration !== fillSelectionGeneration) return;
     globalThis.DailyReportLayout?.onStoreLoadError(store, date, selectedSeg, error, () => selectStore(store));
@@ -4215,7 +4268,7 @@ async function saveData() {
     const haosu = parseFloat(data.haosu)  || 0;
     const r1399 = parseFloat(data.rt1399) || 0;
     if (a999 === 0 || haosu === 0 || r1399 === 0) {
-      _zeroPending = { store, date, data };
+      _zeroPending = { store, date, seg:currentSeg, data };
       openZeroModal(store);
       return;
     }
@@ -4224,20 +4277,29 @@ async function saveData() {
   await _doSave(store, date, data);
 }
 
-async function _doSave(store, date, data) {
-  const seg = currentSeg;
+async function _doSave(store, date, data, seg = currentSeg, retryOnly = false) {
+  if (reportSaves.busy({action:'write', store, date, seg})) { showToast('正在確認同一筆送出，請稍候'); return; }
   if (globalThis.DailyReportLayout?.canSubmit && !globalThis.DailyReportLayout.canSubmit(store, date, seg)) {
     showToast('已保留輸入，完成讀取已保存回報後才能送出。'); return;
   }
   const context = dailyReportReadContext;
   const saveToken = globalThis.DailyReportLayout?.beginSave(store, date, seg);
+  if (saveToken && retryOnly) {
+    const current = getFormData();
+    saveToken.preserveDraft = Object.keys(current).some(key => key !== 'savedAt' && JSON.stringify(current[key]) !== JSON.stringify(data[key]));
+  }
   showToast('🔄 上傳中…');
   try {
-    const ok = await saveToStorage(date, store, seg, data);
+    const ok = await saveToStorage(date, store, seg, data, retryOnly);
     if (context !== dailyReportReadContext) return;
     if (ok) {
       showToast(`✅ ${store} ${seg}:00 已儲存`);
-      if (!globalThis.DailyReportLayout || globalThis.DailyReportLayout.onSaveSucceeded(saveToken)) updateFilledSummary(data);
+      const clean = !globalThis.DailyReportLayout || globalThis.DailyReportLayout.onSaveSucceeded(saveToken);
+      if (clean) updateFilledSummary(data);
+      else if (document.getElementById('fillStore').value === store && document.getElementById('fillDate').value === date && currentSeg === seg) {
+        const status = document.getElementById('reportSaveStatus');
+        if (status) status.append(' 另有未送出修改，請核對後再次送出。');
+      }
 
       const achievements = [];
       if (data.kpi && parseFloat(data.kpi) >= 100) achievements.push('KPI');
@@ -4325,14 +4387,14 @@ async function submitZeroModal() {
     showToast('⚠️ 請填寫所有必填欄位');
     return;
   }
-  const { store, date, data } = _zeroPending;
+  const { store, date, seg, data } = _zeroPending;
   data.zero_reason  = document.getElementById('z_reason').value.trim();
   data.zero_consult = document.getElementById('z_consult').value.trim();
   data.zero_method  = document.getElementById('z_method').value.trim();
   data.zero_plan    = document.getElementById('z_plan').value.trim();
   document.getElementById('underModal').style.display = 'none';
   _zeroPending = null;
-  await _doSave(store, date, data);
+  await _doSave(store, date, data, seg);
 }
 
 
@@ -4541,17 +4603,64 @@ function saveNewName() {
 
 // ── 時段切換 ──
 let personalSeg = 16;
+let personalDraftSelection = '';
+const personalDraftKey = () => 'bei12b_personal_draft_v1:' + JSON.stringify([GAS_URL, document.getElementById('personalStore').value, document.getElementById('personalName').value.trim(), document.getElementById('fillDate').value, personalSeg]);
+function personalDraftValues() {
+  return Object.fromEntries(Array.from(document.querySelectorAll('#panel-personal input[id^="p_"],#panel-personal textarea[id^="p_"]')).map(el => [el.id, el.value]));
+}
+function savePersonalDraft() {
+  if (!document.getElementById('personalStore').value || !document.getElementById('personalName').value.trim()) return;
+  try { localStorage.setItem(personalDraftKey(), JSON.stringify({values:personalDraftValues(), pending:window._pPending || null})); }
+  catch { showToast('此裝置無法保留草稿；請勿關頁，並確認雲端儲存結果'); }
+}
+function restorePersonalDraft() {
+  const key = personalDraftKey();
+  if (key === personalDraftSelection) return;
+  personalDraftSelection = key;
+  document.querySelectorAll('#panel-personal input[id^="p_"],#panel-personal textarea[id^="p_"]').forEach(el => { el.value = ''; });
+  window._pPending = null;
+  document.getElementById('personalFailSection').style.display = 'none';
+  const status = document.getElementById('personalFailSavedStatus'); status.style.display = 'none';
+  try {
+    const draft = JSON.parse(localStorage.getItem(key) || 'null');
+    if (draft?.values) {
+      window._pPending = draft.pending;
+      if (draft.pending) {
+        document.getElementById('personalFailSection').style.display = 'block';
+        document.getElementById('personalFailItems').innerHTML = '<label>今日接客數<input id="p_customers" type="number"></label><label>今日上線項目<input id="p_sold_items" type="text"></label>';
+      }
+      Object.entries(draft.values).forEach(([id,value]) => { const input = document.getElementById(id); if (input) input.value = value; });
+      status.textContent = '已取回此裝置草稿；尚未確認雲端儲存。'; status.style.display = 'block';
+    }
+    const payload = {action:'pwrite', store:document.getElementById('personalStore').value, name:document.getElementById('personalName').value.trim(), date:document.getElementById('fillDate').value, seg:personalSeg};
+    const pending = reportSaves.pending(payload);
+    if (pending) showReportSaveState(pending.payload, 'unconfirmed', '已取回先前送出，請先確認結果。');
+  } catch { /* Invalid local state is not a saved report. */ }
+  updatePersonalFailFeedback();
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('panel-personal').addEventListener('input', event => { if (event.target.id.startsWith('p_')) savePersonalDraft(); });
+  document.getElementById('fillDate').addEventListener('change', restorePersonalDraft);
+});
+for (const event of ['portal-before-logout','portal-login-changed']) window.addEventListener(event, () => {
+  personalDraftSelection = '';
+  window._pPending = null;
+  for (let i = localStorage.length - 1; i >= 0; i--) { const key = localStorage.key(i); if (key.startsWith('bei12b_personal_draft_v1:')) localStorage.removeItem(key); }
+  document.querySelectorAll('#panel-personal input[id^="p_"],#panel-personal textarea[id^="p_"]').forEach(el => { el.value = ''; });
+  document.getElementById('personalFailSavedStatus').style.display = 'none';
+});
 function setPersonalSeg(s) {
   personalSeg = s;
   document.getElementById('pSeg16').className = 'seg-btn' + (s===16?' active-16':'');
   document.getElementById('pSeg21').className = 'seg-btn' + (s===21?' active-21':'');
   updatePersonalFailFeedback();
+  restorePersonalDraft();
 }
 
 // ── 送出今日數據 ──
 function submitPersonalData() {
   const store = document.getElementById('personalStore').value;
-  const name  = document.getElementById('personalName').value;
+  const name  = document.getElementById('personalName').value.trim();
   if (!store || !name) { showToast('⚠️ 請先選擇門市與姓名'); return; }
   const td = document.getElementById('fillDate').value || today();
 
@@ -4583,7 +4692,7 @@ function submitPersonalData() {
   if (failed.length === 0) {
     // 全過關 → 直接儲存並慶祝
     _savePersonalRecord(store, name, td, personalSeg, data, [], {});
-    showToast('🎉 全部過關！太棒了！');
+    showToast('已保留本機個人回報，正在確認雲端儲存');
     if (typeof CelebFX !== 'undefined') { CelebFX.coins(30); CelebFX.confetti(50); }
     renderPersonal();
     return;
@@ -4618,7 +4727,8 @@ function submitPersonalData() {
     </div>
   `;
   // 儲存暫存數據以便後續 submitPersonalFail 使用
-  window._pPending = { store, name, td, data, failed };
+  window._pPending = { store, name, td, seg:personalSeg, data, failed };
+  savePersonalDraft();
   updatePersonalFailFeedback();
 }
 
@@ -4678,7 +4788,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function submitPersonalFail() {
   if (!window._pPending) return;
-  const { store, name, td, data, failed } = window._pPending;
+  const { store, name, td, seg, data, failed } = window._pPending;
+  if (store !== document.getElementById('personalStore').value || name !== document.getElementById('personalName').value.trim() || td !== document.getElementById('fillDate').value || seg !== personalSeg) {
+    showToast('日期、門市、姓名或時段已變更；請重新確認送出'); return;
+  }
   const formExtra = personalFailFormExtra();
   const failReason = formExtra.fail_reason;
   const improvePlan = formExtra.improve_plan;
@@ -4697,18 +4810,19 @@ function submitPersonalFail() {
     customers:     (document.getElementById('p_customers')?.value || '').trim(),
     sold_items:    (document.getElementById('p_sold_items')?.value || '').trim(),
   };
-  _savePersonalRecord(store, name, td, personalSeg, data, failed, extra);
+  _savePersonalRecord(store, name, td, seg, data, failed, extra);
   document.getElementById('personalFailSection').style.display = 'none';
   window._pPending = null;
-  const savedStatus = document.getElementById('personalFailSavedStatus');
-  savedStatus.textContent = '已儲存於本機；雲端結果尚待確認。' + personalFailQualificationMessage(td, personalSeg, personalFailTextCheck(td, extra));
-  savedStatus.style.display = 'block';
   showToast('個人回報已儲存於本機；雲端結果尚待確認');
   renderPersonal();
 }
 
 function _savePersonalRecord(store, name, date, seg, data, failed, extra) {
-  const record = { date, seg, store, name, data, failed: failed.map(f=>f.key), extra, ts: Date.now() };
+  const record = { date, seg, store, name, data, failed: failed.map(f=>f.key), extra, ts: Date.now(), cloudState:'local' };
+  const payload = {action:'pwrite', date, seg, store, name, record};
+  if (reportSaves.busy(payload) || reportSaves.pending(payload)) {
+    showReportSaveState(payload, 'unconfirmed', '上一筆尚待核對，請先確認原送出。'); return;
+  }
   localStorage.setItem(_reviewKey(store, name, date, seg), JSON.stringify(record));
   // 同步到督導彙整用的公共索引
   _updateSummaryIndex(store, name, date, seg, failed.length > 0);
@@ -4717,11 +4831,21 @@ function _savePersonalRecord(store, name, date, seg, data, failed, extra) {
 }
 
 // ── 個人回報上雲（失敗不影響本機儲存）──
-function _pushPersonalToCloud(store, name, date, seg, record) {
-  if (!GAS_URL) return;
-  privateDashboardPost({ action: 'pwrite', date, seg, store, name, record }).catch(error => {
-    console.error('_pushPersonalToCloud error', error);
-  });
+async function _pushPersonalToCloud(store, name, date, seg, record, retryOnly = false) {
+  const payload = {action:'pwrite', date, seg, store, name, record};
+  const draftKey = 'bei12b_personal_draft_v1:' + JSON.stringify([GAS_URL, store, name, date, Number(seg)]);
+  const draft = localStorage.getItem(draftKey);
+  try {
+    const result = await reportSaves.save(payload, undefined, retryOnly);
+    const stored = _loadReview(store, name, date, seg);
+    if (stored?.ts === record.ts) {
+      localStorage.setItem(_reviewKey(store, name, date, seg), JSON.stringify({...result.readback, cloudState:'confirmed'}));
+      delete _pCloudCache[`${date}_${seg}`];
+      if (draft === localStorage.getItem(draftKey)) localStorage.removeItem(draftKey);
+      renderPersonal();
+      if (document.getElementById('personalStore').value === store && document.getElementById('personalName').value.trim() === name && document.getElementById('fillDate').value === date && personalSeg === Number(seg)) showToast('✅ 個人回報已確認儲存至雲端');
+    }
+  } catch (error) { showReportSaveState(payload, error.code === 'REPORT_CONFLICT' ? 'conflict' : error.code === 'REPORT_NOT_SENT' ? 'failed' : 'unconfirmed', error.message); }
 }
 
 // ── 從雲端抓某日某時段的個人回報 { store: { name: record } } ──
@@ -4760,6 +4884,7 @@ function renderPersonal() {
   const store = document.getElementById('personalStore').value;
   const name  = document.getElementById('personalName').value;
   if (!store || !name) return;
+  restorePersonalDraft();
 
   const td = document.getElementById('fillDate').value || today();
 
@@ -4805,6 +4930,7 @@ function _renderTodayCard(record, seg) {
         <span style="font-size:12px;font-weight:700;color:var(--text-dim);">${seg}:00 回報</span>
         <span style="font-size:12px;font-weight:800;color:${statusColor};">${statusText}</span>
       </div>
+      <div style="font-size:12px;overflow-wrap:anywhere;">${record.cloudState === 'confirmed' ? '雲端已確認' : '僅有本機紀錄；雲端待確認'}</div>
       <div class="report-today-metrics" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:8px 0;font-size:12px;">
         <span style="color:var(--text-dim);">KPI <strong style="color:var(--text);">${data.kpi||0}</strong></span>
         <span style="color:var(--text-dim);">R999 <strong style="color:var(--text);">${data.achieve||0} 筆</strong></span>

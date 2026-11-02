@@ -1,4 +1,4 @@
-/* Approved daily-report layout. Moves existing controls; never owns storage or APIs. */
+/* Daily-report controls and recoverable local drafts; cloud proof belongs to the save protocol. */
 (function () {
   'use strict';
   const byId = id => document.getElementById(id);
@@ -6,7 +6,19 @@
   let selected = '', selectedDate = '', selectedSeg = 16, loading = false;
   let dirty = false;
   const drafts = new Map();
+  const bases = new Map();
   const draftKey = () => JSON.stringify([selected, selectedDate, selectedSeg]);
+  const diskKey = key => 'bei12b_report_draft_v1:' + JSON.stringify([GAS_URL, key]);
+  const backupKey = () => 'bei12b_report_draft_backup_v1:' + JSON.stringify([GAS_URL, draftKey()]);
+  function persist(key = draftKey()) {
+    try {
+      const values = drafts.get(key);
+      if (values) localStorage.setItem(diskKey(key), JSON.stringify({values, baseRevision:bases.get(key)}));
+      else localStorage.removeItem(diskKey(key));
+    } catch {
+      byId('dailyDraftNote').textContent = '此裝置無法保存草稿；請勿關頁，送出後務必確認雲端結果。';
+    }
+  }
   const edits = new Map(), saves = new Map();
   const snapshot = () => Object.fromEntries(Array.from(area.querySelectorAll('input:not([readonly]),textarea')).map(input => [input.id, input.value]));
   function recordEdit() {
@@ -119,8 +131,18 @@
     rank = section('公司 KPI 排名', 'daily-rank');
     const carryNote = element('p', 'daily-note', '首次填排名與 KPI；晚間自動沿用，不用重填。'); carryNote.id = 'dailyCarryNote';
     rank.append(carryNote);
-    const draftNote = element('p', 'daily-note', '未送出修改只保留於本分頁；切換門市／日期可取回，重整、關頁或登出會清除。晚間承接以已保存的 16:00 回報為準。');
+    const draftNote = element('p', 'daily-note', '草稿保留於此裝置，可在重整或關頁後取回；尚未送至雲端。登出或切換登入會清除草稿。晚間承接以已保存的 16:00 回報為準。');
     draftNote.id = 'dailyDraftNote'; draftNote.hidden = true; rank.append(draftNote);
+    const restore = element('button', '', '取回衝突草稿供核對'); restore.type = 'button'; restore.id = 'dailyDraftRestore'; restore.hidden = true;
+    restore.onclick = () => {
+      const values = JSON.parse(localStorage.getItem(backupKey()) || 'null');
+      if (!values) return;
+      drafts.set(draftKey(), values);
+      const apply = () => Object.entries(values).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly) input.value = value; });
+      apply(); updateZero(); apply(); updateRates(); recordEdit(); persist(); dirty = true;
+      byId('dailyDraftNote').hidden = false;
+    };
+    rank.append(restore);
     const rankGrid = element('div', 'daily-grid'); moveFields(['rank','kpi'], rankGrid); rank.append(rankGrid);
     core = section('核心業績', 'daily-core');
     const coreTag = element('span', 'daily-tag', '當日累計'); coreTag.id = 'dailyCoreTag'; core.firstChild.append(coreTag);
@@ -156,6 +178,7 @@
     const dockText = element('div'); const text = element('strong'); text.id = 'dailySubmitContext';
     dockText.append(text, element('small', '', '沒有成交請填 0；空白不代表 0。'));
     submit = panel.querySelector('.btn-save-main'); dock.append(dockText, submit); area.append(dock);
+    new ResizeObserver(() => { panel.style.paddingBottom = (dock.classList.contains('daily-keyboard-open') ? 32 : dock.getBoundingClientRect().height + 32) + 'px'; }).observe(dock);
     labelControls(area);
     area.addEventListener('input', event => {
       dirty = true; byId('dailyDraftNote').hidden = false;
@@ -166,6 +189,9 @@
       }
       updateZero(); updateRates();
       recordEdit();
+      if (!loading) drafts.set(draftKey(), snapshot());
+      persist();
+      markReportDraft(selected, selectedDate, selectedSeg);
       if (event.target.hasAttribute('aria-invalid')) event.target.removeAttribute('aria-invalid');
     });
     window.visualViewport?.addEventListener('resize', keyboardLayout);
@@ -176,7 +202,11 @@
   window.DailyReportLayout = {
     resetReadContext() {
       if (!panel) return;
-      drafts.clear(); edits.clear(); saves.clear(); dirty = false; loading = true;
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key.startsWith('bei12b_report_draft_v1:') || key.startsWith('bei12b_report_draft_backup_v1:')) localStorage.removeItem(key);
+      }
+      drafts.clear(); bases.clear(); edits.clear(); saves.clear(); dirty = false; loading = true;
       selected = ''; selectedDate = ''; selectedSeg = 16;
       area.querySelectorAll('input,textarea').forEach(input => {input.value = ''; input.disabled = true;});
       byId('dailyDraftNote').hidden = true; byId('filledSummary').classList.remove('show');
@@ -189,7 +219,14 @@
       if (!panel) return;
       if (selected && !loading && dirty) drafts.set(draftKey(), snapshot());
       dirty = false; byId('dailyDraftNote').hidden = true;
+      const status = byId('reportSaveStatus'); if (status) { status.replaceChildren(); status.style.display = 'none'; }
       selected = store; selectedDate = date; selectedSeg = Number(seg); loading = true;
+      if (!drafts.has(draftKey())) {
+        try {
+          const restored = JSON.parse(localStorage.getItem(diskKey(draftKey())) || 'null');
+          if (restored?.values) { drafts.set(draftKey(), restored.values); bases.set(draftKey(), restored.baseRevision); }
+        } catch { /* A malformed local draft is never cloud proof. */ }
+      }
       panel.querySelector('.store-grid').hidden = true; byId('dailyStoreToggle').setAttribute('aria-expanded', 'false');
       byId('underForms').replaceChildren(); zero.hidden = true;
       area.querySelectorAll('input').forEach(input => { input.value = ''; input.disabled = true; input.removeAttribute('aria-invalid'); });
@@ -208,14 +245,17 @@
     },
     onStoreLoaded(store, date, seg, record, first) {
       if (!panel || selected !== store || selectedDate !== date || selectedSeg !== Number(seg)) return;
+      byId('dailyDraftRestore').hidden = !localStorage.getItem(backupKey());
       loading = false; submit.disabled = false; area.querySelectorAll('input').forEach(input => { input.disabled = false; }); labelControls(area); updateZero(record); updateRates();
       const draft = drafts.get(draftKey());
+      if (!draft || !bases.has(draftKey()) || bases.get(draftKey()) === undefined) bases.set(draftKey(), record?._report_revision ?? ReportSaveRecovery.revision(record));
       if (draft) {
         Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly && input.value !== value) input.value = value; });
         updateZero();
         Object.entries(draft).forEach(([id, value]) => { const input = byId(id); if (input && !input.readOnly && input.value !== value) input.value = value; });
         calcPct('insurance_num','insurance_den','insurance_pct'); calcPct('rt_close_num','rt_close_den','rt_close_pct'); calcManagementFocusPct(); updateRates();
         dirty = true; byId('dailyDraftNote').hidden = false;
+        persist();
       }
       if (selectedSeg !== 21) byId('dailyCarryNote').textContent = '首次填排名與 KPI；晚間自動沿用，不用重填。';
       else {
@@ -266,22 +306,35 @@
       const sequence = (saves.get(key) || 0) + 1; saves.set(key, sequence);
       return { key, revision:edits.get(key)?.revision || 0, sequence };
     },
+    baseRevision() { return bases.get(draftKey()); },
+    reloadCloud() {
+      if (drafts.has(draftKey())) localStorage.setItem(backupKey(), JSON.stringify(drafts.get(draftKey())));
+      drafts.delete(draftKey()); bases.delete(draftKey()); persist(); dirty = false;
+      invalidateDailyReportReads(selectedDate, selectedSeg); selectStore(selected);
+    },
+    onSaveConfirmed(store, date, seg, row) {
+      const key = JSON.stringify([store, date, Number(seg)]);
+      bases.set(key, row?._report_revision ?? ReportSaveRecovery.revision(row));
+      if (drafts.has(key)) persist(key);
+    },
     onSaveSucceeded(token) {
       if (!panel || !token) return false;
       const edit = edits.get(token.key);
       const current = draftKey() === token.key && !loading;
-      if ((edit?.revision || 0) !== token.revision) {
+      if (token.preserveDraft || (edit?.revision || 0) !== token.revision) {
         // An older verified write may have replaced the source; keep the later edit as a draft.
         drafts.set(token.key, current ? snapshot() : edit.values);
+        persist(token.key);
         if (current) { dirty = true; byId('dailyDraftNote').hidden = false; }
         return false;
       }
       if (saves.get(token.key) !== token.sequence) return false;
       drafts.delete(token.key);
+      persist(token.key);
       if (current) { dirty = false; byId('dailyDraftNote').hidden = true; }
       return current;
     },
-    onClear() { if (!panel) return; drafts.delete(draftKey()); dirty = loading; byId('dailyDraftNote').hidden = !dirty; byId('underForms').replaceChildren(); updateZero(); updateRates(); if (loading) drafts.set(draftKey(), snapshot()); recordEdit(); }
+    onClear() { if (!panel) return; dirty = true; byId('dailyDraftNote').hidden = false; byId('underForms').replaceChildren(); updateZero(); updateRates(); drafts.set(draftKey(), snapshot()); recordEdit(); persist(); }
   };
   document.addEventListener('DOMContentLoaded', initialize);
 })();

@@ -5,7 +5,7 @@
 const SHEET_NAME = '回報資料';
 
 const FIELDS = [
-  'date','store','seg','savedAt',
+  'date','store','seg','savedAt','_report_commit_id','_report_committed_at',
   'kpi','rank',
   'acc','film','insurance',
   'myvideo','apple_google','hbo','netflix',
@@ -120,7 +120,6 @@ function writeReportAwardModels_(date, store, seg, awardModels, versionId) {
   for (let i = 1; i < values.length; i++) {
     if (toDateStr(values[i][0]) === String(date) && String(values[i][1]) === String(seg) && String(values[i][2]) === String(store)) {
       rowIdx = i + 1;
-      break;
     }
   }
   const row = [String(date), String(seg), String(store), JSON.stringify(normalized), REPORT_AWARD_MODELS_SCHEMA, String(versionId || reportAwardVersionId_()), new Date().toISOString()];
@@ -2784,7 +2783,6 @@ function writePersonal(p) {
     if (toDateStr(r[0]) === p.date && Number(r[1]) === Number(p.seg) &&
         String(r[2]) === String(p.store) && String(r[3]) === String(p.name)) {
       rowIdx = i + 1;
-      break;
     }
   }
 
@@ -2827,9 +2825,8 @@ function writeData(date, store, seg, data) {
     const rDate  = r[headers.indexOf('date')];
     const rStore = r[headers.indexOf('store')];
     const rSeg   = r[headers.indexOf('seg')];
-    if (String(rDate) === String(date) && String(rStore) === String(store) && Number(rSeg) === Number(seg)) {
+    if (toDateStr(rDate) === String(date) && String(rStore) === String(store) && Number(rSeg) === Number(seg)) {
       rowIdx = i + 1; // 1-based
-      break;
     }
   }
 
@@ -2852,6 +2849,11 @@ function toDateStr(v) {
   if (!v && v !== 0) return '';
   if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Taipei', 'yyyy-MM-dd');
   return String(v).substring(0, 10);
+}
+
+function reportRevision_(record) {
+  if (!record) return '';
+  return JSON.stringify(Object.keys(record).filter(function(k) { return k !== '_report_revision'; }).sort().map(function(k) { return [k, record[k]]; }));
 }
 
 function readData(date, seg, include16, sourceSheet) {
@@ -2907,10 +2909,14 @@ function readData(date, seg, include16, sourceSheet) {
         const v = r[idx];
         if (h === 'savedAt') {
           obj[h] = displayTimes[i][0] || '';
+        } else if (h === '_report_committed_at' && v instanceof Date) {
+          obj[h] = v.toISOString();
         } else {
           obj[h] = (v instanceof Date) ? readDate(v) : v;
         }
       });
+      // Same canonical form as reportRevision_; keep this read function standalone.
+      obj._report_revision = JSON.stringify(Object.keys(obj).sort().map(function(k) { return [k, obj[k]]; }));
       (rowSeg === Number(seg) ? result : afternoon)[store] = obj;
     }
   }
@@ -2997,6 +3003,10 @@ function privateDashboardParsePostPayload(e) {
 }
 
 function reportWritePayload_(payload) {
+  return reportMutationLocked_(payload, function(prepared) { return reportWriteUnlocked_(prepared); });
+}
+
+function reportWriteUnlocked_(payload) {
   const data = payload.data || {};
   if (data.awardModels !== undefined) {
     const normalizedAwardModels = normalizeReportAwardModels_(data.awardModels, payload.date);
@@ -3154,8 +3164,83 @@ function reportReadPayload_(payload) {
 }
 
 function personalWritePayload_(payload) {
-  writePersonal(payload);
-  return { status: 'ok' };
+  return reportMutationLocked_(payload, function(prepared) {
+    writePersonal(prepared);
+    return {status:'ok'};
+  });
+}
+
+// Reads and writes use the last matching row. Historical duplicates are preserved.
+// The lock covers compare-and-set, core/award writes and the authoritative receipt.
+function reportMutationCurrent_(payload) {
+  return payload.kind === 'pwrite' || payload.action === 'pwrite' || !!payload.name
+    ? ((readPersonal(payload.date, Number(payload.seg))[payload.store] || {})[payload.name] || null)
+    : (readData(payload.date, Number(payload.seg))[payload.store] || null);
+}
+
+function reportMutationReceipt_(payload, record) {
+  const personal = payload.kind === 'pwrite' || payload.action === 'pwrite' || !!payload.name;
+  const commit = personal ? (record && record._report_commit) || {} : {id:record && record._report_commit_id, at:record && record._report_committed_at};
+  return {status:'ok', schema:'report-save-v1', rowWritten:true, readbackMatches:true,
+    spreadsheetId:SPREADSHEET_ID, sheetName:personal ? PERSONAL_SHEET : SHEET_NAME,
+    date:String(payload.date), store:String(payload.store), seg:Number(payload.seg), name:personal ? String(payload.name) : '',
+    commitId:commit.id || '', committedAt:commit.at || '', readback:record};
+}
+
+function reportSaveStatus_(payload) {
+  if (['write','pwrite'].indexOf(payload.kind) < 0) throw new Error('invalid report kind');
+  const record = reportMutationCurrent_(payload);
+  const receipt = reportMutationReceipt_(payload, record);
+  if (payload.kind === 'write' && record && SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(REPORT_AWARD_MODELS_SHEET)) {
+    const award = readReportAwardModels_(payload.date, payload.seg)[payload.store];
+    if (award) receipt.readback = Object.assign({}, receipt.readback, {awardModels:award.awardModels});
+  }
+  return {status:'ok', schema:'report-save-v1', revision:reportRevision_(record), commitId:receipt.commitId,
+    committedAt:receipt.committedAt, receipt:receipt};
+}
+
+function reportMutationLocked_(payload, write) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try {
+    const current = reportMutationCurrent_(payload);
+    const mutation = payload.mutation;
+    if (mutation) {
+      if (mutation.schema !== 'report-save-v1' || !/^[a-zA-Z0-9-]{16,100}$/.test(mutation.id)) throw new Error('invalid report submission');
+      const existing = reportMutationReceipt_(payload, current);
+      if (existing.commitId === mutation.id) {
+        // Core metadata is written only after all component writes complete.
+        return existing;
+      }
+      if (mutation.baseRevision !== reportRevision_(current)) throw new Error('雲端已有不同版本；未覆蓋，請重新讀取核對');
+    }
+    const id = mutation ? mutation.id : Utilities.getUuid();
+    const at = new Date().toISOString();
+    // Strip client-supplied server proof. Legacy clients remain compatible.
+    let prepared = Object.assign({}, payload);
+    if (payload.action === 'pwrite' || payload.name) {
+      const record = Object.assign({}, payload.record);
+      if (record.date !== payload.date || record.store !== payload.store || record.name !== payload.name || Number(record.seg) !== Number(payload.seg)) throw new Error('個人回報日期、門市、姓名或時段不一致');
+      delete record._report_commit;
+      prepared.record = record;
+    } else {
+      prepared.data = Object.assign({}, payload.data);
+      delete prepared.data._report_commit_id; delete prepared.data._report_committed_at; delete prepared.data._report_revision;
+    }
+    const result = write(prepared);
+    // Keep metadata out of the first phase: a partial award failure cannot claim success.
+    if (payload.action === 'pwrite' || payload.name) {
+      prepared.record._report_commit = {id:id, at:at};
+      writePersonal(prepared);
+    } else {
+      writeData(payload.date, payload.store, payload.seg, {_report_commit_id:id, _report_committed_at:at});
+    }
+    SpreadsheetApp.flush();
+    const receipt = reportMutationReceipt_(payload, reportMutationCurrent_(payload));
+    if (receipt.commitId !== id || receipt.committedAt !== at) throw new Error('提交識別寫入後讀回不一致');
+    return Object.assign({}, receipt, result, {schema:receipt.schema, commitId:receipt.commitId,
+      committedAt:receipt.committedAt, readback:Object.assign({}, result.readback || {}, receipt.readback)});
+  } finally { lock.releaseLock(); }
 }
 
 function personalReadPayload_(payload) {
@@ -3244,6 +3329,7 @@ function doPost(e) {
     else if (action === 'write') result = reportWritePayload_(payload);
     else if (action === 'pwrite') result = personalWritePayload_(payload);
     else if (action === 'pread') result = personalReadPayload_(payload);
+    else if (action === 'report_save_status') result = reportSaveStatus_(payload);
     else if (action === 'report_upload_preview') result = reportUploadPreview(payload);
     else if (action === 'report_upload_commit') result = reportUploadCommit(payload);
     else if (action === 'report_upload_log') result = reportUploadLog(payload);

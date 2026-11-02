@@ -85,11 +85,12 @@ class MockSpreadsheet {
 }
 
 function loadAwardModelFunctions(spreadsheet) {
-  const SpreadsheetApp = { openById: id => {
+  const SpreadsheetApp = { flush() {}, openById: id => {
     assert.equal(id, '10MqzAWOPc4UPE-g5ZZPNZG3tYAndKW-DApLuuhIpQWA');
     return spreadsheet;
   }};
   const Utilities = {
+    getUuid() { return 'synthetic-commit-00000001'; },
     formatDate(value) { return new Date(value).toISOString().slice(0, 10); }
   };
   const PropertiesService = { getScriptProperties: () => ({ getProperty: () => '' }) };
@@ -99,7 +100,8 @@ function loadAwardModelFunctions(spreadsheet) {
       return { body, setMimeType() { return this; }, getContentText() { return this.body; } };
     }
   };
-  return new Function('SpreadsheetApp', 'Utilities', 'PropertiesService', 'ContentService', `${gasSource}\nreturn { doGet, getReportAwardModelsSheet_, writeReportAwardModels_, readReportAwardModels_ };`)(SpreadsheetApp, Utilities, PropertiesService, ContentService);
+  const LockService = {getScriptLock:() => ({waitLock(){},releaseLock(){}})};
+  return new Function('SpreadsheetApp', 'Utilities', 'PropertiesService', 'ContentService', 'LockService', `${gasSource}\nreturn { doGet, getReportAwardModelsSheet_, writeReportAwardModels_, readReportAwardModels_ };`)(SpreadsheetApp, Utilities, PropertiesService, ContentService, LockService);
 }
 
 test('isolated ReportAwardModels write/read uses one sheet and returns auditable metadata', () => {
