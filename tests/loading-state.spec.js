@@ -428,6 +428,9 @@ test('App reload rereads reports and owner phone resumes through one protected d
   const ownerPage = await appPage(ownerContext);
   await login(ownerPage);
   await expect.poll(() => ownerFixture.calls.filter(call => call.action === 'employee_phone_enroll').length).toBe(1);
+  // Observing the request is earlier than its delayed response and local grant
+  // persistence. Only close an App that has actually completed enrollment.
+  await expect(ownerPage.locator('#dashboard-b-access h2')).toHaveText('手機自動登入已啟用');
   const firstOwnerActions = ownerFixture.actions();
   const firstSecure = ['employee_dashboard_read'];
   const firstStarts = ownerFixture.starts(firstSecure);
