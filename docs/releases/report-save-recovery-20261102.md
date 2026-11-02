@@ -1,6 +1,6 @@
-# 回報儲存恢復候選修正（2026-11-02）
+# 回報儲存可靠性修正與發布（2026-11-02）
 
-狀態：程式及隔離測試完成；未合併、未部署、未向正式 Sheet 寫入測試資料。基準為 `fecf722ba383d609769b82ddb635e728fb7c8ee4`；本次讀取的公開 index.html SHA-256 與該版本一致：`7823c4c9b737858aa4aa611eaa38b5cb86209dd519e2a63004b16957b28836bd`。
+狀態：已由 PR #308 合併並發布。前端程式 merge commit 為 `343afe0f1fba4567b759e0dcb8d5b34dcb3a9b1c`，GitHub Pages 已建置完成；既有 Daily Web App 已切至不可變 v81。正式 Sheet 測試寫入為 0，實體 iPhone 與真實業務送出仍待驗收。基準為 `fecf722ba383d609769b82ddb635e728fb7c8ee4`；本次讀取的公開 index.html SHA-256 與該版本一致：`7823c4c9b737858aa4aa611eaa38b5cb86209dd519e2a63004b16957b28836bd`。
 
 ## 可重現問題與修正
 
@@ -31,8 +31,18 @@ Sheets 多表寫入不是資料庫交易。若核心／台獎或提交證據在�
 
 未驗證：正式 GAS 部署、正式寫入讀回及實體 iPhone/Safari UAT；現有個案的原送出時間與提示不足，不能用修正或目前讀得到資料推定當時的結果。
 
-## 發布順序（已批准，執行中）
+## 發布與回復紀錄
 
 1. 先將 GAS 候選部署為既有 Web App 的新版本，維持原網址與權限；唯讀核對新 schema 及既有紀錄。
 2. 再發布前端與快取版本。以使用者正常業務回報完成正式寫入／讀回及 iPhone 驗收，不注入測試資料。
 3. 回復點為上述基準 commit 與發布前 GAS 版本。回滾前端不需刪除新證據欄或改動既有紀錄；新前端遇舊後端會保留草稿並停止送出。
+
+
+### 正式讀回與限制
+
+- GAS：同一 Daily deployment 從 v80 更新至 v81；部署清單已讀回 v81。不可變 v81 的全部 12 檔與候選一致，其他 11 檔（含 manifest）及原認證程式保留；精確增量可反向還原到 v80 原始位元。
+- 正式資料：11/2 的門市與個人 16/21 既有讀取成功，排除新增提交證據欄後的業務資料 canonical SHA-256 前後相同；新 `report-save-v1` 狀態路由亦以既有紀錄讀回核對日期、店別與時段。未提交測試 write/pwrite，不宣稱正式寫入驗收完成。
+- 前端：GitHub Pages 對 `343afe0` 建置成功；正式 index.html、report-save-recovery.js、daily-report-layout.js、daily-report-layout.css 均與受測候選逐位元一致。
+- 新驗證：101/101 Node、42/42 Chromium；從正式 v80 套用的精確 overlay 另通過 8/8 GAS／日期隔離測試。實體 iPhone Safari 未測。
+- CI：台獎契約 check 通過；既有 Closing／Homepage workflow 在安裝階段因 Playwright 1.55.1 不支援 Ubuntu 26.04 而停止，未跑到測試。本次不擴充 OAuth workflow scope，不修改工作流程；原 workflow 改善提案僅保留於本機候選。另有既有 Cloudflare 查價預覽 build failed，未調整該專案。正式 GitHub Pages 建置成功與上述 check 分開記錄。
+- 回復：前端上一版 `fecf722ba383d609769b82ddb635e728fb7c8ee4`、同一 Daily Web App v80；保留原來源備份及 v81 不可變讀回。不得因此刪除提交證據欄或回蓋業績紀錄。
