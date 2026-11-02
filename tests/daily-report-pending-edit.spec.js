@@ -41,9 +41,9 @@ for(const width of [390,1440])test.describe(`pending edit ${width}`,()=>{
   await page.evaluate(()=>saveData());expect(await page.evaluate(()=>__summaryCalls.length)).toBe(1);
   await page.evaluate(()=>__readMode='ok');await page.locator('#dailyReadRetry').click();await page.waitForFunction(()=>__heldReads.length===2);await release(page,1);await expect(page.locator('#f_aq999')).toHaveValue('55');
  });
- test('cache version and memory-only draft notice match the new editable state',async({page})=>{
-  const script=await page.locator('script[src*="daily-report-layout.js"]').getAttribute('src');expect(script).toBe('daily-report-layout.js?v=20261007-pending-edit-1');
-  await select(page);await page.locator('#f_aq999').fill('55');await expect(page.locator('#dailyDraftNote')).toContainText('只保留於本分頁');await expect(page.locator('#dailyDraftNote')).toContainText('重整、關頁或登出會清除');
+ test('cache version and durable draft notice match the new editable state',async({page})=>{
+  const script=await page.locator('script[src*="daily-report-layout.js"]').getAttribute('src');expect(script).toBe('daily-report-layout.js?v=20261102-draft-recovery-1');
+  await select(page);await page.locator('#f_aq999').fill('55');await expect(page.locator('#dailyDraftNote')).toContainText('重整或關頁後取回');await expect(page.locator('#dailyDraftNote')).toContainText('尚未送至雲端');
   expect(await page.evaluate(()=>localStorage.getItem(shadowKey('2099-10-02',16)))).toBe(null);
  });
  test('pending drafts stay with the store and reuse one physical read',async({page})=>{
@@ -61,8 +61,11 @@ for(const width of [390,1440])test.describe(`pending edit ${width}`,()=>{
   await select(page);await page.locator('#f_rank').fill('88');await page.locator('#f_aq999').fill('55');await page.locator('#newSeg21').click();await page.waitForFunction(()=>__heldReads.length===2);
   await expect(page.locator('#f_rank')).toBeDisabled();await expect(page.locator('#f_rank')).toHaveAttribute('readonly','');await page.locator('#f_aq999').fill('66');
   await page.evaluate(()=>__heldReads.find(r=>r.payload.seg===21).release());await expect(page.locator('.btn-save-main')).toBeDisabled();await expect(page.locator('#f_aq999')).toHaveValue('66');
-  await page.evaluate(()=>__heldReads.find(r=>r.payload.seg===16).release());await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#f_aq999')).toHaveValue('66');await expect(page.locator('#f_rank')).toHaveValue('21');
-  await page.locator('#newSeg16').click();await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#f_rank')).toHaveValue('88');await expect(page.locator('#f_aq999')).toHaveValue('55');expect(await page.evaluate(()=>__summaryCalls.length)).toBe(2);
+  // This legacy fixture has no carry16 pair. The original 16 read was cancelled
+  // by the selection change; release the newly subscribed fallback, not its stale predecessor.
+  await page.waitForFunction(()=>__heldReads.filter(r=>r.payload.seg===16).length===2);
+  await page.evaluate(()=>__heldReads.filter(r=>r.payload.seg===16).at(-1).release());await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#f_aq999')).toHaveValue('66');await expect(page.locator('#f_rank')).toHaveValue('21');
+  await page.locator('#newSeg16').click();await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#f_rank')).toHaveValue('88');await expect(page.locator('#f_aq999')).toHaveValue('55');expect(await page.evaluate(()=>__summaryCalls.length)).toBe(3);
  });
  test('timeout preserves editable local draft; manual retry never resends a write',async({page})=>{
   await page.clock.install({time:new Date('2099-10-02T07:00:00Z')});await select(page);await page.locator('#f_aq999').fill('55');await page.clock.fastForward(30001);

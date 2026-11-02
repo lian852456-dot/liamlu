@@ -12,10 +12,13 @@ test.beforeEach(async ({ page }) => {
     window.__closingSaved = null;
     privateDashboardPost = async payload => {
       window.__closingCalls.push(payload.action);
+      if (payload.action === 'report_save_status') return {status:'ok',schema:'report-save-v1',revision:ReportSaveRecovery.revision(window.__closingSaved)};
       if (payload.action === 'write') {
-        window.__closingSaved = { ...payload.data, date:payload.date, store:payload.store, seg:payload.seg };
-        return { status:'ok', rowWritten:true, spreadsheetId:'synthetic', sheetName:'回報資料',
-          date:payload.date, store:payload.store, seg:payload.seg, readbackMatches:true };
+        window.__closingSaved = { ...payload.data, date:payload.date, store:payload.store, seg:payload.seg,
+          _report_commit_id:payload.mutation.id,_report_committed_at:'2099-10-02T07:00:00Z' };
+        window.__closingSaved._report_revision=ReportSaveRecovery.revision(window.__closingSaved);
+        return { status:'ok',schema:'report-save-v1',commitId:payload.mutation.id,committedAt:window.__closingSaved._report_committed_at,rowWritten:true,spreadsheetId:'synthetic',sheetName:'回報資料',
+          date:payload.date,store:payload.store,seg:payload.seg,readbackMatches:true,readback:window.__closingSaved };
       }
       return {status:'ok',data:window.__closingSaved ? {'酒泉':window.__closingSaved} : {}};
     };
