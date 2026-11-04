@@ -1,3 +1,9 @@
+# V 領局部更新 · p5-vneck.1
+
+本人追加 V 領與自然胸線要求，沿同一樣板修改黑色長袖剪裁與原上胸連續曲面，修掉領緣膚色穿插點。臉、髮型、設定與隔離服務 SHA 未變。
+
+最新圖為 tools/p5-vneck-{front,quarter,side}.png 與 p5-vneck-close-{front,quarter}.png；換裝及零瀏覽器錯誤收據為 tools/p5-vneck-review.json，公開模組讀回 evidence/vneck-public-readback.json。先前 p5-new／p5-hair 圖保留為改 V 領之前的歷史，不代表最新服裝。
+
 # 李舒緩獨立修長造型 · 2026-11-04
 
 使用者接受嘉玲修長風格後，指定下一位先做李舒緩（5514420），沿本人照片的側分深色長髮、黑色紋理長袖、駝色高腰短裙與苗條身形。這是獨立造型樣板；員編只作人工核對，不設真人員編登入，也未綁定或覆寫既有角色。
