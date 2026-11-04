@@ -7,8 +7,9 @@ if(!destination||!path.isAbsolute(destination))throw Error('Provide an absolute 
 const text=file=>fs.readFileSync(path.join(root,file),'utf8'),hashes=[];
 let html=text('readonly-dashboard.html');
 html=html.replace(/<link rel="stylesheet" href="readonly-dashboard\.css\?[^\"]+">/,()=>'<style>'+text('readonly-dashboard.css')+'</style>');
-html=html.replace(/<script src="([a-zA-Z0-9.-]+)\?[^\"]+"><\/script>/g,(_,file)=>{const js=text(file).replace(/<\/script/gi,'<\\/script');hashes.push("'sha256-"+crypto.createHash('sha256').update(js).digest('base64')+"'");return '<script>'+js+'</script>';});
-if(/<script src=/.test(html)||/id="demo-data"/.test(html))throw Error('Standalone build contains unresolved scripts or demo data');
+html=html.replace(/<script src="([a-zA-Z0-9./-]+)\?[^\"]+"><\/script>/g,(_,file)=>{const js=text(file).replace(/<\/script/gi,'<\\/script');hashes.push("'sha256-"+crypto.createHash('sha256').update(js).digest('base64')+"'");return '<script>'+js+'</script>';});
+const markup=html.replace(/<script>[\s\S]*?<\/script>/g,'<script></script>');
+if(/<script src=/.test(markup)||/id="demo-data"/.test(markup))throw Error('Standalone build contains unresolved scripts or demo data');
 html=html.replace("script-src 'self'","script-src "+hashes.join(' '));
 html=html.replaceAll('href="home.html"','href="https://lian852456-dot.github.io/liamlu/home.html"');
 html=html.replaceAll('href="patrol.html"','href="https://lian852456-dot.github.io/liamlu/patrol.html"');
