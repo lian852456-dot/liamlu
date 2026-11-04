@@ -3110,7 +3110,7 @@ async function exportHalfChecksHTML(){
     const html=PatrolInspectionExport.buildHTML(snapshot);assertActive();
     const url=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
     const link=document.createElement('a');link.href=url;link.download=`北一二B_督導巡店檢查_${scope.month}_${scope.store||'全部門市'}.html`;
-    halfHtmlExportUrl=url;link.textContent='下載剛產生的 HTML 檔案';link.className='secure-btn';
+    halfHtmlExportUrl=url;link.textContent='下載剛產生的 HTML 檔案';link.className='secure-btn';link.style.display='inline-block';
     const downloadHost=document.getElementById('halfExportDownload');
     if(downloadHost)downloadHost.replaceChildren(link);else document.body.appendChild(link);
     link.click();
