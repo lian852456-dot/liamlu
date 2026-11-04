@@ -50,10 +50,12 @@
     const periodInfo=periodMeta(month,period);
     if(!periodInfo) throw new Error('半月正式期別無法判定。');
     const versionApi=scope.PatrolQuestionVersions;
-    const questions=date>=SEPTEMBER_EFFECTIVE_DATE&&versionApi
+    const checklist=scope.SupervisorVisitChecklist||(typeof require==='function'?require('./supervisor-visit-checklist.js'):null);
+    const questions=checklist?.isCurrentDate(date)?checklist.ITEMS.map(q=>Object.freeze({item:q.item,number:q.no,category:q.category,deduction:q.deduction,title:q.text})):date>=SEPTEMBER_EFFECTIVE_DATE&&versionApi
       ? versionApi.SEP25_GROUPS.monthly.map(item=>Object.freeze({item,title:versionApi.SEP25_BY_NO[item].text}))
       : QUESTIONS;
     const totalItems=questions.length;
+    const allowedItems=new Set(questions.map(q=>q.item));
     const stores=(Array.isArray(input.stores)?input.stores:[]).map(normalizeStore).filter(Boolean);
     const storeSet=new Set(stores);
     const latest=new Map();
@@ -61,7 +63,7 @@
       const store=normalizeStore(raw&&raw.store);
       const item=Number(raw&&raw.item);
       const rowMonth=String(raw&&raw.month||raw&&raw.date||'').slice(0,7);
-      if(!storeSet.has(store)||rowMonth!==month||String(raw&&raw.period||'')!==period||!Number.isInteger(item)||item<1||item>totalItems) return;
+      if(!storeSet.has(store)||rowMonth!==month||String(raw&&raw.period||'')!==period||!allowedItems.has(item)) return;
       const key=`${store}|${item}`;
       const candidate={raw,index,time:sourceTime(raw)};
       const current=latest.get(key);

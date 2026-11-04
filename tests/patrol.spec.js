@@ -2245,3 +2245,23 @@ test('資料涵蓋日期以正式報銷表為完整依據，未列於報銷表�
   expect(plans).not.toContain('2026-06-25'); // 不在報銷表內者仍不憑空出現
   expect(plans).toHaveLength(11);
 });
+
+test('Y26.11 到店檢查 29 項完整保留填寫、照片、重載與匯出',async({page})=>{
+  await stubGas(page);await openAndUnlock(page,PT_KEY,'2026-11');
+  await page.locator('[data-view="half"]').click();
+  await page.locator('#halfDate').fill('2026-11-04');await page.locator('#halfDate').dispatchEvent('change');
+  await expect(page.locator('.half-item')).toHaveCount(29);
+  const checklist=require('../supervisor-visit-checklist.js');
+  for(const q of checklist.ITEMS){const box=page.locator(`[data-half-item="${q.item}"]`);await expect(box.locator('.half-item-title')).toHaveText(q.text);await expect(box.locator('.half-no')).toHaveText(q.no);if(q.deduction)await expect(box.locator('.half-item-deduction')).toHaveText(q.deduction);else await expect(box.locator('.half-item-deduction')).toHaveCount(0);}
+  await page.locator('#halfInspector').fill('測試督導');
+  const box=page.locator('[data-half-item="104"]');await box.locator('.half-result').selectOption('abnormal');await box.locator('.half-note').fill('測試缺失');await box.locator('.half-improvement').fill('測試改善');
+  await box.locator('.half-evidence-file').setInputFiles({name:'測試照片.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/Zp0AAAAASUVORK5CYII=','base64')});
+  await box.getByRole('button',{name:'上傳選取的照片／影片'}).click();await expect.poll(()=>mediaUploads.length).toBe(1);
+  await page.getByRole('button',{name:'儲存並同步本期檢查'}).click();await expect.poll(()=>halfRows.length).toBe(29);await expect(page.locator('#halfMsg')).toContainText('已同步雲端');
+  expect(halfRows.find(r=>r.item===104).evidenceNames).toContain('media-1');expect(halfRows.find(r=>r.item===104).note).toBe('測試缺失');
+  await page.reload();await page.locator('[data-view="half"]').click();await page.locator('#halfDate').fill('2026-11-04');await page.locator('#halfDate').dispatchEvent('change');
+  await expect(page.locator('[data-half-item="104"] .half-note')).toHaveValue('測試缺失');await expect(page.locator('#halfHistory')).toContainText('1/29');
+  await page.getByRole('button',{name:/預覽／回放 1 個檔案/}).click();await expect(page.locator('#halfMediaModal img')).toBeVisible();await page.locator('#halfMediaModal .half-media-modal-close').click();
+  const d=page.waitForEvent('download');await page.getByRole('button',{name:'匯出 Excel',exact:true}).click();const xml=await fs.readFile(await(await d).path(),'utf8');for(const v of ['4.1','缺失扣1分','文件類','其他發現','media-1'])expect(xml).toContain(v);
+  await page.setViewportSize({width:390,height:844});await page.locator('#halfView').scrollIntoViewIfNeeded();await page.screenshot({path:'../inspection-mobile.png'});
+});

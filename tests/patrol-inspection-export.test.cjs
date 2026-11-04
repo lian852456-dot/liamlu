@@ -68,7 +68,7 @@ test('page integration downloads a snapshot only after cloud export succeeds',as
   const start=page.indexOf('let halfHtmlExportRunning=false;'),end=page.indexOf('function exportHalfChecksExcel(){',start);
   let download=0,revoked=0,lastMsg='';
   const controls={halfExportHtml:{disabled:false},halfExportMonth:{value:'2026-11'},halfExportStore:{value:'測試甲'}};
-  const context={PT_TOKEN:'valid',secureUnlocked:true,privateAccount:{},window:{PortalLogout:{assertActive:()=>{}}},document:{getElementById:id=>controls[id],createElement:()=>({click:()=>download++,remove:()=>{}}),body:{appendChild:()=>{}}},PatrolInspectionExport:api,privateCloudCall:async()=>snap(),halfItemText:()=> '檢查項目',showHalfMsg:text=>lastMsg=text,URL:{createObjectURL:()=> 'blob:local',revokeObjectURL:()=>revoked++},Blob,setTimeout:fn=>fn()};
+  const context={PT_TOKEN:'valid',secureUnlocked:true,privateAccount:{},window:{PortalLogout:{assertActive:()=>{}}},document:{getElementById:id=>controls[id],createElement:()=>({style:{},click:()=>download++,remove:()=>{}}),body:{appendChild:()=>{}}},PatrolInspectionExport:api,privateCloudCall:async()=>snap(),halfItemText:()=> '檢查項目',showHalfMsg:text=>lastMsg=text,URL:{createObjectURL:()=> 'blob:local',revokeObjectURL:()=>revoked++},Blob,setTimeout:fn=>fn()};
   vm.createContext(context);vm.runInContext(page.slice(start,end),context);
   await context.exportHalfChecksHTML();assert.equal(download,1);assert.equal(revoked,0);context.clearHalfHtmlExportDownload();assert.equal(revoked,1);assert.equal(controls.halfExportHtml.disabled,false);assert.match(lastMsg,/已匯出 HTML/);
   context.PT_TOKEN='';await context.exportHalfChecksHTML();assert.equal(download,1);assert.match(lastMsg,/未完成/);
@@ -77,4 +77,16 @@ test('page integration downloads a snapshot only after cloud export succeeds',as
 test('metadata-only videos stay private links, never require photo data',async()=>{
   const result=await api.collect({scope:{month:'2026-11'},assertActive:()=>{},request:async()=>snap({rows:[{...row,media:[{id:'video_123456',kind:'video',mimeType:'video/mp4',name:'影片',viewUrl:'https://drive.google.com/file/d/video_123456/view'}]}]})});
   const html=api.buildHTML(result);assert.ok(html.includes('需網路與權限'));assert.ok(!html.includes('<iframe'));
+});
+
+test('November checklist exports every decimal label and deduction without mixing legacy records',()=>{
+  const checklist=require('../supervisor-visit-checklist.js');
+  const html=api.buildHTML(snap({rows:[{...row,item:104},{...row,item:1}]}));
+  assert.equal((html.match(/class="check"/g)||[]).length,2);
+  assert.equal((html.match(/class="item /g)||[]).length,38);
+  for(const q of checklist.ITEMS){assert.ok(html.includes(apiEscape(q.text)));if(q.no)assert.ok(html.includes('>'+q.no+'</span>'));if(q.deduction)assert.ok(html.includes(q.deduction));}
+  assert.equal(checklist.ITEMS.filter(q=>!q.deduction).length,7);
+  function apiEscape(v){return v.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  const {context:c}=backend({rows:[{...row,item:104},{...row,item:129},{...row,item:130},{...row,item:1}]});
+  assert.deepEqual(Array.from(c.halfExportSnapshot_({token:'valid',month:'2026-11'}).rows,r=>r.item).sort((a,b)=>a-b),[1,104,129]);
 });

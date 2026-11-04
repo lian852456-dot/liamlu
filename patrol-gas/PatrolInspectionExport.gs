@@ -41,7 +41,7 @@ function halfExportSnapshot_(payload) {
     const item = Number(row.item);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date.slice(0,7) !== scope.month || scope.stores.indexOf(store) < 0) return;
     const max = date >= '2026-09-01' ? 9 : 18;
-    if (!Number.isInteger(item) || item < 1 || item > max) return;
+    if (!Number.isInteger(item) || !(item >= 1 && item <= max || date >= '2026-11-01' && item >= 101 && item <= 129)) return;
     const checkId = date + '|' + store + '|' + (Number(date.slice(-2)) <= 15 ? 'H1' : 'H2');
     const result = String(row.result || '');
     if (['','ok','abnormal','na'].indexOf(result) < 0) throw new Error('檢查結果格式不相容，請先核對來源');

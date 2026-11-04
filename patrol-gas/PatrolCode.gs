@@ -1493,7 +1493,7 @@ function validateHalfWriteRows_(rows, options) {
   const strictApp = config.strictApp === true;
   const mode = String(config.mode || 'legacy');
   if (strictApp && ['draft','complete'].indexOf(mode) < 0) throw new Error('invalid mode');
-  if (!Array.isArray(rows) || !rows.length || rows.length > 18) throw new Error('invalid rows');
+  if (!Array.isArray(rows) || !rows.length || rows.length > (strictApp ? 18 : 29)) throw new Error('invalid rows');
   const seen = {};
   const cleanRows = rows.map(raw => {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('invalid row');
@@ -1508,7 +1508,7 @@ function validateHalfWriteRows_(rows, options) {
     if (period !== expectedPeriod) throw new Error('invalid period');
     const store = halfCheckCanonicalStore_(raw.store);
     const item = Number(raw.item);
-    if (!Number.isInteger(item) || item < 1 || item > 18) throw new Error('invalid item');
+    if (!Number.isInteger(item) || !(item >= 1 && item <= 18 || !strictApp && date >= '2026-11-01' && item >= 101 && item <= 129)) throw new Error('invalid item');
     if (seen[item]) throw new Error('duplicate item');
     seen[item] = true;
     const result = String(raw.result || '');

@@ -1630,9 +1630,9 @@
       const abnormal=answer.result==='abnormal';
       const sourceOriginal=!abnormal&&(answer.note||answer.improvement||answer.evidence)?`<div class="half-formal-original"><b>正式來源原文</b>${answer.note?`<p>檢查紀錄：${escapeHtml(answer.note)}</p>`:''}${answer.improvement?`<p>改善說明：${escapeHtml(answer.improvement)}</p>`:''}${answer.evidence?`<p>佐證：${escapeHtml(answer.evidence)}</p>`:''}</div>`:'';
       return `<article class="half-preview-question ${abnormal?'issue':''}" data-half-preview-question="${question.item}">
-        <div class="half-preview-question-head"><span>${String(question.item).padStart(2,'0')}</span><strong>${escapeHtml(question.title)}</strong></div>
+        <div class="half-preview-question-head"><span>${escapeHtml(question.number??String(question.item).padStart(2,'0'))}</span><strong>${escapeHtml(question.title)}</strong></div>
         <small class="half-preview-result-label">目前值：${escapeHtml(H&&H.RESULT_LABELS[answer.result||'']||'尚未填寫')}</small>
-        <div class="half-preview-statuses" role="group" aria-label="第 ${question.item} 題狀態">${formStatuses.map(status=>`<button type="button" class="${answer.result===status.value?'active':''}" data-half-answer="${status.value}" ${PREVIEW_MODE?'':'disabled'}>${escapeHtml(status.label)}</button>`).join('')}</div>
+        <div class="half-preview-statuses" role="group" aria-label="${escapeHtml(question.number||question.title)} 狀態">${formStatuses.map(status=>`<button type="button" class="${answer.result===status.value?'active':''}" data-half-answer="${status.value}" ${PREVIEW_MODE?'':'disabled'}>${escapeHtml(status.label)}</button>`).join('')}</div>
         <div class="half-preview-abnormal" ${abnormal?'':'hidden'}>
           <label>缺失內容<textarea rows="2" data-half-note placeholder="原文記錄，不自動改寫" ${PREVIEW_MODE?'':'readonly'}>${escapeHtml(answer.note||'')}</textarea></label>
           <label>改善說明<textarea rows="2" data-half-improvement placeholder="改善做法／待追蹤事項" ${PREVIEW_MODE?'':'readonly'}>${escapeHtml(answer.improvement||'')}</textarea></label>

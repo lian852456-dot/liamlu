@@ -388,12 +388,12 @@
   .half-stat span{font-size:14px;color:var(--muted)}
   .half-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
   .half-meta input,.half-meta select{width:100%;font-size:17px}
-  .half-items{display:grid;gap:8px}
+  .half-items{display:grid;gap:8px}.half-category{margin:18px 0 4px;font-size:20px;color:#b94b00}.half-item-deduction{margin-top:5px;color:#b33a25;font-size:14px}
   .half-item{border:1px solid var(--line);border-radius:9px;padding:10px;background:#fff;display:grid;grid-template-columns:minmax(0,1fr) 125px;gap:8px;align-items:start}
   .half-item.issue{border-color:#f0b5b5;background:#fffafa}
   .half-item-head{display:flex;gap:8px;align-items:flex-start}
-  .half-no{width:26px;height:24px;border-radius:6px;background:#fff0df;color:#b94b00;font-weight:800;display:grid;place-items:center;flex:none;font-size:14px}
-  .half-item-title{font-size:16px;font-weight:800;line-height:1.45}
+  .half-no{min-width:38px;padding:0 5px;height:24px;border-radius:6px;background:#fff0df;color:#b94b00;font-weight:800;display:grid;place-items:center;flex:none;font-size:14px}
+  .half-item-title{white-space:pre-line;font-size:16px;font-weight:800;line-height:1.45}
   .half-item-tag{font-size:14px;color:#999;margin-top:2px}
   .half-item textarea{grid-column:1 / -1;min-height:44px;resize:vertical;font-size:16px}
   .half-item input[type=file]{grid-column:1 / -1;font-size:14px;max-width:100%}
@@ -624,7 +624,7 @@
   <section id="halfView" class="secure-view" aria-label="督導到店檢查">
     <div class="secure-card">
       <h2>督導到店檢查・缺失改善回填</h2>
-      <p class="hint">2026/09/01 起使用新版第 1–9 題；舊日期仍依原 18 題顯示。異常項目請填改善說明，照片／影片只存入私有 Drive。</p>
+      <p class="hint">依 Y26.11 巡店檢查表，共 29 個檢查／紀錄項目。保留舊版歷史紀錄；異常項目請填改善說明，照片／影片只存入私有 Drive。</p>
       <div id="halfSummary" class="half-summary"></div>
       <div class="half-meta">
         <label>檢查日期<input id="halfDate" type="date" onchange="renderHalfForm()"></label>
@@ -751,7 +751,8 @@
 <script src="patrol-question-versions.js?v=5"></script>
 <script src="patrol-read-model.js?v=10"></script>
 <script src="supervisor-interview-model.js?v=3"></script>
-<script src="patrol-inspection-export.js?v=20261104-1"></script>
+<script src="supervisor-visit-checklist.js?v=20261104-1"></script>
+<script src="patrol-inspection-export.js?v=20261104-2"></script>
 <script>
 /* ---------- 檢核規則設定 ---------- */
 // 預設門市清單（北一二B）。連上雲端後會改用 GAS 回傳的本區清單，
@@ -2716,14 +2717,17 @@ let activePatrolView = null;
 let secureUnlocked = false;
 let scheduleData = null;
 let halfChecks = [];
-// 2026/09/01 起督導到店檢查採新版第 1–9 題；舊日期 1–18 題完整保留。
+// Independent inspection version; patrol import questions are unchanged.
 const LEGACY_HALF_ITEMS = Object.freeze(Array.from({length:18}, (_,i)=>i+1));
 const SUPERVISOR_VISIT_ITEMS = PatrolQuestionVersions.SEP25_GROUPS.monthly;
-function halfItemsForDate(date){ return PatrolQuestionVersions.isSep25Date(date)?SUPERVISOR_VISIT_ITEMS:LEGACY_HALF_ITEMS; }
-function isActiveHalfItem(item,date){ return halfItemsForDate(date).includes(Number(item)); }
+function halfItemsForDate(date){ return SupervisorVisitChecklist.isCurrentDate(date)?SupervisorVisitChecklist.IDS:PatrolQuestionVersions.isSep25Date(date)?SUPERVISOR_VISIT_ITEMS:LEGACY_HALF_ITEMS; }
+function isActiveHalfItem(item,date){ return SupervisorVisitChecklist.isValidItem(item,date); }
 function activeHalfRows(rows){ return (rows||[]).filter(row=>isActiveHalfItem(row.item,row.date)); }
-function halfItemText(item,date){ return PatrolQuestionVersions.isSep25Date(date)?PatrolQuestionVersions.SEP25_BY_NO[item]?.text||'':ITEM_TEXT[item]||''; }
-function halfItemRule(item,date){ return PatrolQuestionVersions.isSep25Date(date)?PatrolQuestionVersions.SEP25_BY_NO[item]?.label||'每月執行1次':ITEM_RULES[item]?.label||'本期檢查'; }
+function halfItemText(item,date){ return SupervisorVisitChecklist.BY_ID[item]?.text||(PatrolQuestionVersions.isSep25Date(date)?PatrolQuestionVersions.SEP25_BY_NO[item]?.text||'':ITEM_TEXT[item]||''); }
+function halfItemRule(item,date){ return SupervisorVisitChecklist.BY_ID[item]?.category||(PatrolQuestionVersions.isSep25Date(date)?PatrolQuestionVersions.SEP25_BY_NO[item]?.label||'每月執行1次':ITEM_RULES[item]?.label||'本期檢查'); }
+function halfItemLabel(item){ return SupervisorVisitChecklist.labelFor(item); }
+function halfRecordKey(row){ return `${row.checkId||`${row.date}|${row.store}|${row.period}`}|${SupervisorVisitChecklist.versionFor(row)}`; }
+function halfExpectedItems(row){ return SupervisorVisitChecklist.idsForRecord(row).length; }
 
 function esc(v){
   return String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2943,7 +2947,7 @@ function initHalfSelectors(){
 }
 function currentHalfRows(){
   const date=document.getElementById('halfDate').value; const store=document.getElementById('halfStore').value; const period=halfPeriod(date); const checkId=`${date}|${store}|${period}`;
-  return {date,store,period,checkId,rows:activeHalfRows(halfChecks.filter(r=>halfKey(r).startsWith(`${checkId}|`)))};
+  return {date,store,period,checkId,rows:activeHalfRows(halfChecks.filter(r=>halfKey(r).startsWith(`${checkId}|`)&&halfItemsForDate(date).includes(Number(r.item))))};
 }
 const halfPendingMedia=new Map();
 function halfMediaKey(checkId,item){ return `${checkId}|${Number(item)}`; }
@@ -3002,7 +3006,7 @@ function renderHalfForm(){
   const items=halfItemsForDate(date);
   const inspector=document.getElementById('halfInspector'); const saved=rows.find(r=>r.inspector)?.inspector||''; if(inspector && !inspector.value) inspector.value=saved;
   const c=document.getElementById('halfForm'); if(!c) return;
-  c.innerHTML=items.map(i=>{const r=rows.find(x=>Number(x.item)===i)||{};const result=r.result||'';const key=halfMediaKey(checkId,i);const legacy=mediaItems(r.evidenceNames||'').some(x=>x.legacy)?String(r.evidenceNames||''):'';return `<div class="half-item ${result==='abnormal'?'issue':''}" data-half-item="${i}" data-media-key="${esc(key)}" data-evidence="${esc(r.evidenceNames||'')}"><div class="half-item-head"><span class="half-no">${i}</span><div><div class="half-item-title">${esc(halfItemText(i,date))}</div><div class="half-item-tag">${esc(halfItemRule(i,date))}</div></div></div><select class="half-result" aria-label="第${i}題結果"><option value="">待填</option><option value="ok" ${result==='ok'?'selected':''}>符合</option><option value="abnormal" ${result==='abnormal'?'selected':''}>缺失／異常</option><option value="na" ${result==='na'?'selected':''}>不適用</option></select><textarea class="half-note" placeholder="檢查紀錄／缺失內容">${esc(r.note||'')}</textarea><textarea class="half-improvement" placeholder="改善說明（異常時填寫）">${esc(r.improvement||'')}</textarea><input class="half-evidence-file" type="file" accept="image/*,video/*" multiple aria-label="第${i}題上傳照片或影片"><div class="half-media-actions"><button type="button" class="half-media-upload">上傳選取的照片／影片</button><span class="half-evidence">可連續拍照／多選；單檔最多 25 MB，檔案僅會存入私有 Google Drive。</span></div><div class="half-media-list"></div><input class="half-evidence-link" type="url" inputmode="url" placeholder="已有私有 Google Drive 連結可貼在此處" value="${esc(legacy)}" aria-label="第${i}題既有證據連結"></div>`;}).join('');
+  c.innerHTML=items.map((i,index)=>{const definition=SupervisorVisitChecklist.BY_ID[i];const category=definition?.category;const heading=category&&category!==SupervisorVisitChecklist.BY_ID[items[index-1]]?.category?`<h3 class="half-category">${esc(category)}</h3>`:'';const r=rows.find(x=>Number(x.item)===i)||{};const result=r.result||'';const key=halfMediaKey(checkId,i);const legacy=mediaItems(r.evidenceNames||'').some(x=>x.legacy)?String(r.evidenceNames||''):'';return `${heading}<div class="half-item ${result==='abnormal'?'issue':''}" data-half-item="${i}" data-media-key="${esc(key)}" data-evidence="${esc(r.evidenceNames||'')}"><div class="half-item-head"><span class="half-no">${esc(halfItemLabel(i))}</span><div><div class="half-item-title">${esc(halfItemText(i,date))}</div><div class="half-item-tag">${esc(halfItemRule(i,date))}</div>${definition?.deduction?`<div class="half-item-deduction">${esc(definition.deduction)}</div>`:''}</div></div><select class="half-result" aria-label="第${esc(halfItemLabel(i)||halfItemText(i,date))}項結果"><option value="">待填</option><option value="ok" ${result==='ok'?'selected':''}>符合</option><option value="abnormal" ${result==='abnormal'?'selected':''}>缺失／異常</option><option value="na" ${result==='na'?'selected':''}>不適用</option></select><textarea class="half-note" placeholder="檢查紀錄／缺失內容">${esc(r.note||'')}</textarea><textarea class="half-improvement" placeholder="改善說明（異常時填寫）">${esc(r.improvement||'')}</textarea><input class="half-evidence-file" type="file" accept="image/*,video/*" multiple aria-label="第${esc(halfItemLabel(i)||halfItemText(i,date))}項上傳照片或影片"><div class="half-media-actions"><button type="button" class="half-media-upload">上傳選取的照片／影片</button><span class="half-evidence">可連續拍照／多選；單檔最多 25 MB，檔案僅會存入私有 Google Drive。</span></div><div class="half-media-list"></div><input class="half-evidence-link" type="url" inputmode="url" placeholder="已有私有 Google Drive 連結可貼在此處" value="${esc(legacy)}" aria-label="第${esc(halfItemLabel(i)||halfItemText(i,date))}項既有證據連結"></div>`;}).join('');
   c.querySelectorAll('.half-result').forEach(el=>el.addEventListener('change',()=>el.closest('.half-item').classList.toggle('issue',el.value==='abnormal')));
   c.querySelectorAll('.half-item').forEach(box=>{renderHalfMediaList(box);box.querySelector('.half-evidence-file').addEventListener('change',e=>{const key=box.dataset.mediaKey;const current=halfPendingMedia.get(key)||[];const incoming=Array.from(e.target.files||[]);const seen=new Set(current.map(file=>`${file.name}|${file.size}|${file.lastModified}`));halfPendingMedia.set(key,[...current,...incoming.filter(file=>{const id=`${file.name}|${file.size}|${file.lastModified}`;if(seen.has(id))return false;seen.add(id);return true;})]);e.target.value='';renderHalfMediaList(box);});box.querySelector('.half-media-upload').addEventListener('click',()=>uploadHalfMedia(box));});
   document.getElementById('halfMsg').textContent=`${dateLabel(date)}・${halfPeriodLabel(period)}・${store}；共 ${rows.length}/${items.length} 題已有雲端／本機紀錄`;
@@ -3028,7 +3032,7 @@ function submitHalfCheck(){
   chain.then(async()=>{await loadHalfChecks();showHalfMsg(`已同步雲端（${written} 列）；照片／影片已連結至本期檢查，可從歷史紀錄預覽／回放`,'ok');}).catch(err=>showHalfMsg(err?.message===PATROL_REAUTH_MESSAGE?PATROL_REAUTH_MESSAGE:`雲端同步失敗：${err.message}；本機資料仍保留`,'err')).finally(()=>finishWrite?.());
 }
 function renderHalfSummary(){
-  const c=document.getElementById('halfSummary');if(!c)return;const active=activeHalfRows(halfChecks);const groups={};active.forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const issues=active.filter(r=>r.result==='abnormal').length;const pending=Object.values(groups).filter(rows=>{const expected=halfItemsForDate(rows[0]?.date).length;return rows.filter(r=>r.result).length<expected;}).length;c.innerHTML=`<div class="half-stat"><strong>${Object.keys(groups).length}</strong><span>已建立到店檢查</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>缺失／異常項目</span></div><div class="half-stat"><strong>${pending}</strong><span>尚有待填檢查</span></div>`;}
+  const c=document.getElementById('halfSummary');if(!c)return;const active=activeHalfRows(halfChecks);const groups={};active.forEach(r=>{const k=halfRecordKey(r);(groups[k]??=[]).push(r);});const issues=active.filter(r=>r.result==='abnormal').length;const pending=Object.values(groups).filter(rows=>{const expected=halfExpectedItems(rows[0]);return rows.filter(r=>r.result).length<expected;}).length;c.innerHTML=`<div class="half-stat"><strong>${Object.keys(groups).length}</strong><span>已建立到店檢查</span></div><div class="half-stat"><strong class="${issues?'status-issue':''}">${issues}</strong><span>缺失／異常項目</span></div><div class="half-stat"><strong>${pending}</strong><span>尚有待填檢查</span></div>`;}
 function dashboardStoreKey(store){ return String(store||'').replace('台灣大哥大數位生活','').replace(/^台北/,'').replace(/南$/,'').trim(); }
 function dashboardStoreList(){
   const configured=STORES.map(s=>({name:String(s.name||''),title:String(s.name||''),code:String(s.code||''),key:dashboardStoreKey(s.name)})).filter(s=>s.key);
@@ -3085,9 +3089,9 @@ function renderHalfDashboard(){
   content.innerHTML=`<p class="secure-note">資料來源：${esc(source)}。本月到店次數以不同到店日期計算。</p>`+cards.map(card=>`<article class="half-dashboard-store"><div class="half-dashboard-store-head"><strong>${esc(card.store.title)}</strong><span>本月到店 ${card.visits} 次</span></div><div class="half-dashboard-states">${dashboardStateHtml('上半月・題 2–13',card.h1)}${dashboardStateHtml('下半月・題 2–13',card.h2)}${dashboardStateHtml('每月檢查一次項目・題 14–17',card.monthly)}${dashboardStateHtml(window.label+'・題 18',card.bi)}</div></article>`).join('');
 }
 function renderHalfHistory(){
-  const c=document.getElementById('halfHistory');if(!c)return;const groups={};activeHalfRows(halfChecks).forEach(r=>{const k=r.checkId||`${r.date}|${r.store}|${r.period}`;(groups[k]??=[]).push(r);});const keys=Object.keys(groups).sort().reverse();if(!keys.length){c.innerHTML='<div class="empty-state"><div class="big">📝</div>尚無督導到店檢查紀錄</div>';return;}c.innerHTML=`<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>日期／期別</th><th>店點</th><th>督導</th><th>進度</th><th>缺失與改善</th><th>照片／影片</th></tr></thead><tbody>${keys.map(k=>{const rows=groups[k],first=rows[0],expected=halfItemsForDate(first.date).length,issue=rows.filter(r=>r.result==='abnormal').length,filled=rows.filter(r=>r.result).length,pending=Math.max(0,expected-filled),media=rows.flatMap(r=>mediaItems(r.evidenceNames));return `<tr><td>${esc(first.date)}<br>${esc(halfPeriodLabel(first.period))}</td><td>${esc(first.store)}</td><td>${esc(first.inspector||'—')}</td><td>${filled}/${expected}</td><td class="${issue?'status-issue':''}">${issue?`${issue} 項異常`:'無異常'}${pending?`・待填 ${pending} 題`:''}<br><span class="inv-last">${esc(rows.filter(r=>r.result==='abnormal'&&r.improvement).map(r=>`#${r.item} ${r.improvement}`).join('；')||'')}</span></td><td>${media.length?`<button type="button" class="half-media-view" data-check-id="${esc(k)}">預覽／回放 ${media.length} 個檔案</button>`:'—'}</td></tr>`;}).join('')}</tbody></table></div>`;c.querySelectorAll('.half-media-view').forEach(button=>button.addEventListener('click',()=>openHalfMediaViewer(button.dataset.checkId)));}
+  const c=document.getElementById('halfHistory');if(!c)return;const groups={};activeHalfRows(halfChecks).forEach(r=>{const k=halfRecordKey(r);(groups[k]??=[]).push(r);});const keys=Object.keys(groups).sort().reverse();if(!keys.length){c.innerHTML='<div class="empty-state"><div class="big">📝</div>尚無督導到店檢查紀錄</div>';return;}c.innerHTML=`<div class="secure-table-wrap"><table class="secure-table"><thead><tr><th>日期／期別</th><th>店點</th><th>督導</th><th>進度</th><th>缺失與改善</th><th>照片／影片</th></tr></thead><tbody>${keys.map(k=>{const rows=groups[k],first=rows[0],expected=halfExpectedItems(first),issue=rows.filter(r=>r.result==='abnormal').length,filled=rows.filter(r=>r.result).length,pending=Math.max(0,expected-filled),media=rows.flatMap(r=>mediaItems(r.evidenceNames));return `<tr><td>${esc(first.date)}<br>${esc(halfPeriodLabel(first.period))}<br><small>${SupervisorVisitChecklist.isCurrentItem(first.item)?'Y26.11・29項':'舊版'}</small></td><td>${esc(first.store)}</td><td>${esc(first.inspector||'—')}</td><td>${filled}/${expected}</td><td class="${issue?'status-issue':''}">${issue?`${issue} 項異常`:'無異常'}${pending?`・待填 ${pending} 題`:''}<br><span class="inv-last">${esc(rows.filter(r=>r.result==='abnormal'&&r.improvement).map(r=>`#${halfItemLabel(r.item)||halfItemText(r.item,r.date)} ${r.improvement}`).join('；')||'')}</span></td><td>${media.length?`<button type="button" class="half-media-view" data-check-id="${esc(k)}">預覽／回放 ${media.length} 個檔案</button>`:'—'}</td></tr>`;}).join('')}</tbody></table></div>`;c.querySelectorAll('.half-media-view').forEach(button=>button.addEventListener('click',()=>openHalfMediaViewer(button.dataset.checkId)));}
 function openHalfMediaViewer(checkId){
-  const rows=activeHalfRows(halfChecks.filter(r=>(r.checkId||`${r.date}|${r.store}|${r.period}`)===checkId));const items=rows.flatMap(r=>mediaItems(r.evidenceNames));if(!items.length){showHalfMsg('此期檢查尚無可預覽的照片或影片','err');return;}
+  const rows=activeHalfRows(halfChecks.filter(r=>halfRecordKey(r)===checkId));const items=rows.flatMap(r=>mediaItems(r.evidenceNames));if(!items.length){showHalfMsg('此期檢查尚無可預覽的照片或影片','err');return;}
   document.getElementById('halfMediaModal')?.remove();const modal=document.createElement('div');modal.id='halfMediaModal';modal.className='half-media-modal';modal.innerHTML=`<div class="half-media-modal-card" role="dialog" aria-modal="true" aria-label="巡店照片與影片回放"><button type="button" class="half-media-modal-close">關閉</button><h3>巡店照片／影片回放</h3><p class="hint">${esc(rows[0]?.date||'')}・${esc(rows[0]?.store||'')}</p><div class="half-media-modal-grid">${items.map(x=>halfMediaCard(x)).join('')}</div></div>`;modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});modal.querySelector('.half-media-modal-close').addEventListener('click',()=>modal.remove());document.body.appendChild(modal);
 }
 let halfHtmlExportRunning=false;
@@ -3122,12 +3126,12 @@ function exportHalfChecksExcel(){
   const active=activeHalfRows(halfChecks);if(!active.length){showHalfMsg('目前沒有督導到店檢查資料可匯出','err');return;}
   const attachmentLabel=r=>{const count=mediaItems(r.evidenceNames).length;return count?`${count} 個檔案（詳見「照片影片附件」）`:'—';};
   const sortRows=rows=>rows.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.store).localeCompare(String(b.store))||Number(a.item)-Number(b.item));
-  const rows=[['北一二B 督導到店檢查紀錄（2026/09 前第 1–18 題；2026/09 起第 1–9 題）'],['日期','期別','店點','督導','題號','檢查內容','結果','檢查紀錄','改善說明','照片／影片附件','最後更新']];
-  sortRows(active).forEach(r=>rows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,r.item,halfItemText(r.item,r.date),r.result==='ok'?'符合':r.result==='abnormal'?'缺失／異常':r.result==='na'?'不適用':'待填',r.note||'',r.improvement||'',attachmentLabel(r),r.savedAt||'']));
+  const rows=[['北一二B 督導到店檢查紀錄（2026/09 前第 1–18 題；2026/09 起第 1–9 題；Y26.11 新版 29 項）'],['日期','期別','店點','督導','題號','分類','檢查內容','缺失扣分','結果','檢查紀錄','改善說明','照片／影片附件','最後更新']];
+  sortRows(active).forEach(r=>rows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,halfItemLabel(r.item),halfItemRule(r.item,r.date),halfItemText(r.item,r.date),SupervisorVisitChecklist.BY_ID[r.item]?.deduction||'',r.result==='ok'?'符合':r.result==='abnormal'?'缺失／異常':r.result==='na'?'不適用':'待填',r.note||'',r.improvement||'',attachmentLabel(r),r.savedAt||'']));
   const issueRows=[['督導到店檢查缺失改善追蹤'],['日期','期別','店點','督導','題號','缺失內容','改善說明','照片／影片附件']];
-  active.filter(r=>r.result==='abnormal').forEach(r=>issueRows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,r.item,r.note||'',r.improvement||'',attachmentLabel(r)]));
+  active.filter(r=>r.result==='abnormal').forEach(r=>issueRows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,halfItemLabel(r.item),r.note||'',r.improvement||'',attachmentLabel(r)]));
   const mediaRows=[[excelCell('照片影片附件','Title')],['說明','附件維持在私有 Google Drive；請使用有權限的帳號開啟連結。'],['日期','期別','店點','督導','題號','檢查內容','檔案名稱','檔案類型','開啟附件','預覽／播放'].map(v=>excelCell(v,'Header'))];
-  sortRows(active).forEach(r=>mediaItems(r.evidenceNames).forEach(media=>{const kind=mediaKind(media);mediaRows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,r.item,halfItemText(r.item,r.date),media.name,kind==='video'?'影片':kind==='image'?'照片':'附件',media.viewUrl?excelLink('開啟私有附件',media.viewUrl):'—',media.previewUrl?excelLink(kind==='video'?'播放／預覽影片':'預覽照片',media.previewUrl):'—']);}));
+  sortRows(active).forEach(r=>mediaItems(r.evidenceNames).forEach(media=>{const kind=mediaKind(media);mediaRows.push([r.date,halfPeriodLabel(r.period),r.store,r.inspector,halfItemLabel(r.item),halfItemText(r.item,r.date),media.name,kind==='video'?'影片':kind==='image'?'照片':'附件',media.viewUrl?excelLink('開啟私有附件',media.viewUrl):'—',media.previewUrl?excelLink(kind==='video'?'播放／預覽影片':'預覽照片',media.previewUrl):'—']);}));
   downloadExcel(`北一二B_督導到店檢查_${new Date().toISOString().slice(0,10)}.xls`,[{name:'到店檢查紀錄',rows},{name:'缺失改善追蹤',rows:issueRows},{name:'照片影片附件',rows:mediaRows}]);
   showHalfMsg('已匯出 Excel（檢查紀錄＋缺失改善＋照片影片附件連結）','ok');
 }

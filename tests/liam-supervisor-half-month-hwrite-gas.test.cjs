@@ -138,3 +138,12 @@ test('ScriptLock serializes competing updates so one business key cannot create 
 test('hread formats inspection date without an artificial time',()=>{
   assert.match(gas,/h === '檢查日期' \? Utilities\.formatDate\(row\[idx\], 'Asia\/Taipei', 'yyyy-MM-dd'\) : patrolTimeStr/);
 });
+
+test('November checklist accepts 29 stable IDs without replacing legacy records',()=>{
+  const fresh=Array.from({length:29},(_,i)=>row({date:'2026-11-04',month:'2026-11',checkId:'2026-11-04|酒泉|H1',item:101+i}));
+  assert.equal(validate(fresh).length,29);
+  assert.doesNotThrow(()=>validate([row({date:'2026-11-04',month:'2026-11',checkId:'2026-11-04|酒泉|H1',item:1})]));
+  for(const item of [0,19,100,130,104.1])assert.throws(()=>validate([{...fresh[0],item}]),/invalid item/);
+  assert.throws(()=>validate([{...fresh[0],date:'2026-10-31',month:'2026-10',period:'H2',checkId:'2026-10-31|酒泉|H2'}]),/invalid item/);
+  assert.throws(()=>validate([fresh[0]],strictOptions),/invalid item/);
+});

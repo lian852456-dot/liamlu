@@ -68,3 +68,11 @@ test('formal recent date is date-only and never fabricates midnight',()=>{
   assert.match(halfOverview,/formatReliableDateOnly\(store\.latestDate\)/);
   assert.doesNotMatch(halfOverview,/0:00/);
 });
+
+test('November read model counts all 29 new IDs and keeps old IDs separate',()=>{
+  const checklist=require('../supervisor-visit-checklist.js');
+  const model=require('../half-month-check-read-model.js');
+  const rows=checklist.IDS.map(item=>({date:'2026-11-04',month:'2026-11',period:'H1',store:'測試店',item,result:'ok',note:'保留說明',evidenceNames:'私有照片'}));
+  const result=model.adapt({date:'2026-11-04',stores:['測試店'],rows:[...rows,{...rows[0],item:1,result:'abnormal'}]});
+  assert.equal(result.stores[0].answeredItems,29);assert.equal(result.stores[0].totalItems,29);assert.equal(result.stores[0].abnormalCount,0);assert.equal(result.stores[0].questions[3].number,'4.1');
+});
