@@ -1,0 +1,45 @@
+{
+  "source": "city-mac-stable-20261030/runtime/core",
+  "files": [
+    {
+      "file": "game-store.mjs",
+      "sha256": "8d49a2c0cc6362ac4237a95650005f024068bf7fcbf4352a86bbf3ab3e0ea5b7",
+      "unchanged": true
+    },
+    {
+      "file": "game-config.mjs",
+      "sha256": "3c420a05e2c4ceebfe056d78ad5452d8da5e637ccc887f218b50735495423f45",
+      "unchanged": true
+    },
+    {
+      "file": "guest-policy.mjs",
+      "sha256": "3cb7b03d2e2106a90d9db08213f2238d7502eec58cc74aa84ebf0c8fada51094",
+      "unchanged": true
+    },
+    {
+      "file": "scene-rules.js",
+      "sha256": "f5e2ba5641ec2aa0936e40685e7fc9121c10de7c3c6a57c40968ad21ae469310",
+      "unchanged": true
+    },
+    {
+      "file": "city-data.js",
+      "sha256": "c4859ae715892f612c8ed1a1fc2380afe0f6848f318b758f27371575657e549f",
+      "unchanged": true
+    },
+    {
+      "file": "city-layout.js",
+      "sha256": "8a1627353e4de9900f4d7ff3ecb22102861ac05465911ca8f121a8075b34a57c",
+      "unchanged": true
+    },
+    {
+      "file": "forest-rules.js",
+      "sha256": "a89357966e1b4cefee9590ccf480aa7a91d4e94a50a17a280dc609708e8c4b76",
+      "unchanged": true
+    },
+    {
+      "file": "forest-scene.js",
+      "sha256": "4f07e2048d6c0431658f533f0cb1482aba499bf6cd3dd9ed40292f20b7fdeb99",
+      "unchanged": true
+    }
+  ]
+}
