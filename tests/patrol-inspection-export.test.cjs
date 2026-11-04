@@ -70,7 +70,7 @@ test('page integration downloads a snapshot only after cloud export succeeds',as
   const controls={halfExportHtml:{disabled:false},halfExportMonth:{value:'2026-11'},halfExportStore:{value:'測試甲'}};
   const context={PT_TOKEN:'valid',secureUnlocked:true,privateAccount:{},window:{PortalLogout:{assertActive:()=>{}}},document:{getElementById:id=>controls[id],createElement:()=>({click:()=>download++,remove:()=>{}}),body:{appendChild:()=>{}}},PatrolInspectionExport:api,privateCloudCall:async()=>snap(),halfItemText:()=> '檢查項目',showHalfMsg:text=>lastMsg=text,URL:{createObjectURL:()=> 'blob:local',revokeObjectURL:()=>revoked++},Blob,setTimeout:fn=>fn()};
   vm.createContext(context);vm.runInContext(page.slice(start,end),context);
-  await context.exportHalfChecksHTML();assert.equal(download,1);assert.equal(revoked,1);assert.equal(controls.halfExportHtml.disabled,false);assert.match(lastMsg,/已匯出 HTML/);
+  await context.exportHalfChecksHTML();assert.equal(download,1);assert.equal(revoked,0);context.clearHalfHtmlExportDownload();assert.equal(revoked,1);assert.equal(controls.halfExportHtml.disabled,false);assert.match(lastMsg,/已匯出 HTML/);
   context.PT_TOKEN='';await context.exportHalfChecksHTML();assert.equal(download,1);assert.match(lastMsg,/未完成/);
 });
 
