@@ -11,7 +11,7 @@ function privateDashboardRosterSyncStatus_() {
     result: state.result || 'not-run', errorCode: state.errorCode || null, sourceDate: state.sourceDate || null };
 }
 
-function privateDashboardRosterSourceMembers_(ss, fileName, today, approvedMembers) {
+function privateDashboardRosterSourceMembers_(ss, fileName, today, approvedMembers, confirmedAbsentMembers) {
   const storeSheet = ss.getSheetByName('上線數KPI_店點達成率_明細');
   if (!storeSheet) throw new Error('ROSTER_SOURCE_SCHEMA');
   const meta = kpiCalcParseMeta(storeSheet.getRange(1,1,10,12).getValues(), fileName);
@@ -50,6 +50,10 @@ function privateDashboardRosterSourceMembers_(ss, fileName, today, approvedMembe
       }
       add(first,name,currentStore,'');
     }
+  });
+  // Owner-confirmed, month-bounded omissions retain only an existing active identity.
+  (confirmedAbsentMembers || []).forEach(function(member) {
+    if (!seen[member.employeeId]) add(member.employeeId,member.maskedName,member.store,member.role);
   });
   if (members.length < 9 || members.length > 64) throw new Error('B_COMPLETE_ROSTER_REQUIRED');
   if (PRIVATE_DASHBOARD_B_STORES_.some(function(s) { return !members.some(function(m) { return m.store === s; }); })) {
@@ -101,7 +105,9 @@ function privateDashboardRefreshRoster_(payload) {
     const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes).map(function(b) { return ('0'+((b+256)%256).toString(16)).slice(-2); }).join('');
     converted = Drive.Files.create({name:'roster-tmp-'+name,mimeType:'application/vnd.google-apps.spreadsheet'},blob);
     const rosterConfig = privateDashboardRosterTransaction_(function() { return privateDashboardCreateGasBStore_({}).config(); });
-    const members = privateDashboardRosterSourceMembers_(SpreadsheetApp.openById(converted.id),name,today,rosterConfig.authority.members);
+    const confirmedRaw = props.getProperty('DASHBOARD_ROSTER_CONFIRMED_PRESENT_V1');
+    const confirmed = privateDashboardRosterTransaction_(function() { return privateDashboardConfirmedRosterMembers_(today,rosterConfig.authority.members,confirmedRaw); });
+    const members = privateDashboardRosterSourceMembers_(SpreadsheetApp.openById(converted.id),name,today,rosterConfig.authority.members,confirmed);
     DriveApp.getFileById(converted.id).setTrashed(true);
     converted = null;
     return privateDashboardRosterTransaction_(function() {
@@ -113,6 +119,7 @@ function privateDashboardRefreshRoster_(payload) {
       const prior = JSON.parse(props.getProperty(PRIVATE_DASHBOARD_ROSTER_SYNC_KEY_) || '{}');
       const config = privateDashboardCreateGasBStore_({}).config();
       if (JSON.stringify(config) !== JSON.stringify(rosterConfig)) throw new Error('B_CONFIG_CHANGED');
+      if (props.getProperty('DASHBOARD_ROSTER_CONFIRMED_PRESENT_V1') !== confirmedRaw) throw new Error('ROSTER_CONFIRMATION_CHANGED');
       const native = privateDashboardRows(privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET,PRIVATE_DASHBOARD_USERS_HEADERS),PRIVATE_DASHBOARD_USERS_HEADERS);
       const activeCount = native.filter(function(u) { return u.status === 'active' && PRIVATE_DASHBOARD_B_STORES_.indexOf(String(u.store).replace(/^台北/,'')) >= 0; }).length;
       if (members.length < activeCount * 0.8) throw new Error('ROSTER_SOURCE_COUNT');
@@ -144,6 +151,26 @@ function privateDashboardRefreshRoster_(payload) {
   } finally {
     if (converted) DriveApp.getFileById(converted.id).setTrashed(true);
   }
+}
+
+function privateDashboardConfirmedRosterMembers_(today, approvedMembers, raw) {
+  if (!raw) return [];
+  let value;
+  try { value = JSON.parse(raw); } catch (_) { throw new Error('ROSTER_CONFIRMATION_INVALID'); }
+  if (!value || Object.keys(value).sort().join('|') !== 'employeeIds|month' ||
+      !/^\d{4}-\d{2}$/.test(value.month) || !Array.isArray(value.employeeIds) ||
+      value.employeeIds.length > 8 || new Set(value.employeeIds).size !== value.employeeIds.length) throw new Error('ROSTER_CONFIRMATION_INVALID');
+  if (value.month !== today.slice(0,7)) return [];
+  const native = privateDashboardRows(privateDashboardSheet(PRIVATE_DASHBOARD_USERS_SHEET,PRIVATE_DASHBOARD_USERS_HEADERS),PRIVATE_DASHBOARD_USERS_HEADERS);
+  return value.employeeIds.map(function(id) {
+    if (typeof id !== 'string' || privateDashboardCleanEmployeeId(id) !== id ||
+        !approvedMembers || !Object.prototype.hasOwnProperty.call(approvedMembers,id)) throw new Error('ROSTER_CONFIRMATION_INVALID');
+    const matches = native.filter(function(u) { return String(u.employee_id) === id; });
+    if (matches.length !== 1 || matches[0].status !== 'active') throw new Error('ROSTER_CONFIRMATION_INACTIVE');
+    const u = matches[0], store = String(u.store).replace(/^台北/,'');
+    if (store !== approvedMembers[id] || PRIVATE_DASHBOARD_B_STORES_.indexOf(store) < 0 || !u.masked_name) throw new Error('ROSTER_CONFIRMATION_INVALID');
+    return {employeeId:id,maskedName:u.masked_name,store:store,role:u.role,status:'active'};
+  });
 }
 
 function refreshNorth12BRoster_() {
