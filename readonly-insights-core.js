@@ -19,7 +19,7 @@
   function evaluate(data,authorizedStores){
     if(!data||!Array.isArray(data.records))throw Error('缺少已驗證的締結率資料');
     const ids=new Set(authorizedStores.map(s=>s.id));
-    const selected=C.STORES.filter(s=>ids.has(s.id));
+    const selected=(data.stores||C.STORES).filter(s=>ids.has(s.id));
     if(!selected.length)throw Error('缺少授權門市');
     const currentRows=data.records.filter(r=>ids.has(r.store));
     const overall=C.aggregate(currentRows);
@@ -44,7 +44,7 @@
       period_start:data.period_start,cutoff:data.cutoff,source_name:data.source_name,sha256:data.sha256,
       total:overall,previous,mom:comparable(overall,previous),stores:visible,prioritized,
       opportunity:stores.reduce((sum,s)=>sum+(s.achievable||0),0),
-      sampleMinimum:MIN_SAMPLE,hasPrior:!!data.prior
+      sampleMinimum:MIN_SAMPLE,hasPrior:!!data.prior,data,selectedStores:selected
     };
   }
   function actions(row){

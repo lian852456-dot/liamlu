@@ -1,19 +1,23 @@
 (function(){
   'use strict';
   const C=window.ReadonlyDashboardCore,A=window.ReadonlyDashboardAdapter,$=s=>document.querySelector(s),OWNER=window.KpiBattleController?.DEFAULT_GAS_URL;
-  const state={tab:'kpi',store:'all',mode:'daily',start:'',end:'',metric:'a999',kpiCompare:'overall',kpiItem:'all',role:'all',model:'all'};
-  let model=null,epoch=0,flight=null,client=null,controller=null,expires=0,expiryTimer,failed=false,suspended=false,loggedOut=false,acceptedIdentity=null;
-  const exportButton=$('#store-export'),exportStatus=$('#export-status');
-  function updateExport(){if(exportButton)exportButton.disabled=!model||failed||!!flight||suspended||document.hidden||!!(expires&&Date.now()>=expires);}
+  const state={tab:'kpi',region:'all',store:'all',mode:'daily',start:'',end:'',metric:'a999',kpiCompare:'overall',kpiItem:'all',role:'all',model:'all'};
+  let departmentConversion=null,importing=false,model=null,epoch=0,flight=null,client=null,controller=null,expires=0,expiryTimer,failed=false,suspended=false,loggedOut=false,acceptedIdentity=null;
+  const exportButton=$('#store-export'),exportStatus=$('#export-status'),renewalExport=$('#renewal-export'),sourceFile=$('#renewal-source'),importButton=$('#renewal-import');
+  const conversionTab=()=>['conversion','traffic','insights'].includes(state.tab);
+  function viewStores(){const stores=conversionTab()&&departmentConversion?departmentConversion.stores:(model?.stores||[]);return stores.filter(s=>!conversionTab()||!departmentConversion||state.region==='all'||s.region===state.region);}
+  function conversionData(){if(!departmentConversion)return model?.conversion;const ids=new Set(viewStores().map(s=>s.id));return {...departmentConversion,stores:viewStores(),records:departmentConversion.records.filter(r=>ids.has(r.store)),prior:departmentConversion.prior?.filter(r=>ids.has(r.store))||null};}
+  function scopeControls(){if(!model)return;const stores=viewStores(),multi=conversionTab()&&departmentConversion;$('#region').innerHTML=multi?'<option value="all">北一二部・四區比較</option>'+window.North12OfficerCore.REGIONS.map(r=>'<option value="'+r+'">'+r+(departmentConversion.stores.some(s=>s.region===r)?'':'（未提供）')+'</option>').join(''):'<option value="北一二B">北一二B</option>';$('#region').value=multi?state.region:'北一二B';if(state.store!=='all'&&!stores.some(s=>s.id===state.store))state.store='all';$('#store').innerHTML='<option value="all">本次範圍全部門市</option>'+stores.map(s=>'<option value="'+s.id+'">'+safe(s.name)+'</option>').join('');$('#store').value=state.store;}
+  function updateExport(){const blocked=!model||failed||!!flight||importing||suspended||document.hidden||!!(expires&&Date.now()>=expires);if(exportButton)exportButton.disabled=blocked;if(renewalExport)renewalExport.disabled=blocked||!departmentConversion;if(sourceFile)sourceFile.disabled=blocked;if(importButton)importButton.disabled=blocked;}
   const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const number=v=>v==null||!Number.isFinite(Number(v))?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:2}),percent=v=>v==null||!Number.isFinite(Number(v))?'—':(v*100).toFixed(1)+'%',short=v=>v?String(v).slice(5).replace('-','/'):'—';
   const title={kpi:'KPI',awards:'台獎',personal:'個績',conversion:'締結率',traffic:'來客數',insights:'續約洞察'},metricKeys={a999:'A999',a1399:'A1399',haosu:'好速',r1399:'R1399'};
-  function scope(){return model?.stores.find(s=>s.id===state.store)?.name||'北一二B · 本次授權範圍';}
+  function scope(){return viewStores().find(s=>s.id===state.store)?.name||(conversionTab()&&departmentConversion?(state.region==='all'?'北一二部 · A／B／C／D':state.region):'北一二B · 本次授權範圍');}
   function empty(message){$('#content').innerHTML='<div class="empty"><h2>'+safe(message)+'</h2><p>來源未就緒的資料不以零值或示意資料代替。</p></div>';}
   function clear(message='畫面已清除，請重新核驗登入。'){
-    epoch++;controller?.abort();controller=null;client?.suspend();clearTimeout(expiryTimer);expires=0;flight=null;model=null;acceptedIdentity=null;
+    epoch++;controller?.abort();controller=null;client?.suspend();clearTimeout(expiryTimer);expires=0;flight=null;model=null;departmentConversion=null;acceptedIdentity=null;
     $('#controls').hidden=true;$('#content').replaceChildren();$('#source-note').textContent='尚未取得本次授權資料。';$('#auth-message').textContent=message;
-    if(exportStatus)exportStatus.textContent='匯出全區與九店KPI、締結率及來客比較；不含個人資料或獎金。';
+    if(exportStatus)exportStatus.textContent='門市HTML保留原功能；新增三項匯出需匯入完整原報，包含 A／B／C／D 四區、Tier 與未續約方案。';
     updateExport();
     $('#refresh').disabled=false;empty('尚未取得授權資料');
   }
@@ -44,7 +48,7 @@
   function weeklyVisitors(rows,c){
     return '<section class="weekly-visitors" aria-label="'+c.toUpperCase()+' 每週來客數"><h4>每週來客數</h4><p class="sub">週一至週日 · 所選區間實際人次</p><dl>'+C.weeklySeries(rows).map(w=>'<div><dt>'+short(w.start)+'–'+short(w.end)+(w.partial?'<small>部分週 · 累計至 '+short(w.end)+'</small>':'')+'</dt><dd>'+number(w[c+'_d'])+'<small>人次</small></dd></div>').join('')+'</dl></section>';
   }
-  function traffic(){const d=model.conversion;if(!d){$('#source-note').textContent=model.conversionReason;return empty(model.conversionReason);}const rows=d.records.filter(r=>(state.store==='all'||r.store===state.store)&&r.date>=state.start&&r.date<=state.end);const series=C.dailySeries(rows,state.mode),comparison=A.periodComparison(d,{store:state.store,start:state.start,end:state.end}),total=comparison.current,rate=state.tab==='conversion';
+  function traffic(){const d=conversionData();if(!d){$('#source-note').textContent=model.conversionReason;return empty(model.conversionReason);}const rows=d.records.filter(r=>(state.store==='all'||r.store===state.store)&&r.date>=state.start&&r.date<=state.end);const series=C.dailySeries(rows,state.mode),comparison=A.periodComparison(d,{store:state.store,start:state.start,end:state.end}),total=comparison.current,rate=state.tab==='conversion';
     if(!rows.length){$('#source-note').textContent='所選日期沒有已核實資料；缺資料不補零。';return empty('所選區間沒有資料');}
     let html=context({cutoff:d.cutoff,period:short(state.start)+'–'+short(state.end)});
     html+='<p class="comparison-status">'+(comparison.available?'本月 '+short(state.start)+'–'+short(state.end)+' ／ 上月同期 '+short(comparison.period.start)+'–'+short(comparison.period.end)+'；同門市、同期間比較。':safe(comparison.reason)+(d.prior?' <button type="button" class="quiet" id="restore-comparison">恢復可比同期 '+short(d.period_start)+'–'+short(d.cutoff)+'</button>':''))+'</p><section class="metrics">';
@@ -83,12 +87,12 @@
   }
 
   function insights(){
-    const d=model.conversion;
+    const d=conversionData();
     if(!d){$('#source-note').textContent=model.conversionReason;return empty(model.conversionReason);}
     const Engine=window.ReadonlyInsightsCore,UI=window.ReadonlyInsightsUI;
     if(!Engine||!UI)return empty('續約分析元件尚未完成載入，請重新整理。');
     try{
-      const computed=Engine.evaluate(d,model.stores);
+      const computed=Engine.evaluate(d,viewStores());
       const result=UI.render(computed,{store:state.store});
       $('#content').innerHTML=context({cutoff:d.cutoff,period:d.period_start+' 至 '+d.cutoff})+result.html;
       const copy=$('#copy-insights'),status=$('#copy-insight-status');
@@ -99,7 +103,7 @@
           if(status)status.textContent='已複製本次已核實的門市改善指令。';
         }catch{if(status)status.textContent='複製失敗，請手動選取畫面上的建議。';}
       };
-      source({cutoff:d.cutoff,sourceName:d.source_name,version:d.sha256.slice(0,12)},'本頁依既有授權彙總；Tier／方案分析待資料契約核實');
+      source({cutoff:d.cutoff,sourceName:d.source_name,version:d.sha256.slice(0,12)},'Tier：Tier觀察／RT用戶進店行為_店；方案：未續約明細；未匯入完整原報時提示來源缺漏');
     }catch{empty('續約洞察資料無法完成核實，請重新讀取正式報表。');}
   }
   function identity(){
@@ -119,8 +123,8 @@
     return true;
   }
   function render(){document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===state.tab)));if(!model||!retained())return;
-    if(expires&&Date.now()>=expires){failed=true;clear('登入期限已到，請在營運中心重新完成業務登入。');return;}const dates=['conversion','traffic'].includes(state.tab);document.querySelectorAll('[data-date-control]').forEach(e=>e.hidden=!dates);$('#daily').setAttribute('aria-pressed',String(state.mode==='daily'));$('#cumulative').setAttribute('aria-pressed',String(state.mode==='cumulative'));
-    if(state.tab==='kpi')kpi();else if(state.tab==='personal')personal();else if(state.tab==='awards')awards();else if(state.tab==='insights')insights();else traffic();
+    if(expires&&Date.now()>=expires){failed=true;clear('登入期限已到，請在營運中心重新完成業務登入。');return;}scopeControls();const dates=['conversion','traffic'].includes(state.tab);const current=conversionData();if(current){for(const id of ['start','end']){$('#'+id).min=current.period_start;$('#'+id).max=current.cutoff;}if(!state.start||state.start<current.period_start||state.end>current.cutoff){state.start=current.period_start;state.end=current.cutoff;}$('#start').value=state.start;$('#end').value=state.end;}document.querySelectorAll('[data-date-control]').forEach(e=>e.hidden=!dates);$('#daily').setAttribute('aria-pressed',String(state.mode==='daily'));$('#cumulative').setAttribute('aria-pressed',String(state.mode==='cumulative'));
+    if(conversionTab()&&departmentConversion&&!viewStores().length){empty('所選區域尚未提供來源');return;}if(state.tab==='kpi')kpi();else if(state.tab==='personal')personal();else if(state.tab==='awards')awards();else if(state.tab==='insights')insights();else traffic();
   }
   function accessFailure(error,stage){
     const reasons={
@@ -172,8 +176,30 @@
     }catch(error){if(exportStatus)exportStatus.textContent=error.message||'未能產生門市快照，請重新核驗資料。';}
     finally{updateExport();}
   };
+  if(importButton)importButton.onclick=()=>sourceFile?.click();
+  if(sourceFile)sourceFile.onchange=async e=>{
+    const file=e.target.files[0];e.target.value='';if(!file||!retained()||flight||importing)return;const ticket=epoch;importing=true;updateExport();
+    try{
+      if(!/\.xlsx$/i.test(file.name)||file.size>40*1024*1024)throw Error('請選取40MB以內的完整 XLSX 原報。');
+      const bytes=await file.arrayBuffer(),sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+      const workbook=XLSX.read(bytes,{type:'array',sheets:['AQ締結率','RT每日','RT締結率','樞紐',...window.ReadonlyRenewalDetail.SHEETS]});
+      const next=window.North12OfficerCore.parseWorkbook(workbook,XLSX,{sha256,source_name:file.name,source_bytes:file.size});
+      if(ticket!==epoch||!retained())return;
+      if(!window.North12OfficerCore.REGIONS.every(r=>next.stores.some(s=>s.region===r)))throw Error('完整原報須包含北一二部 A／B／C／D 四區。');
+      if(!Object.values(next.renewalDetail.coverage).every(Boolean))throw Error('請選取包含 Tier觀察、RT用戶進店行為_店、未續約明細 的完整原報。');
+      if(model.conversion&&(next.period_start<model.conversion.period_start||next.period_start===model.conversion.period_start&&next.cutoff<model.conversion.cutoff))throw Error('此原報早於目前雲端來源；請使用同日或更新的完整原報。');
+      departmentConversion=next;state.region='all';state.store='all';state.start=next.period_start;state.end=next.cutoff;state.tab='insights';render();
+      exportStatus.textContent='已讀取四區 '+next.stores.length+' 店，資料至 '+next.cutoff+'；Tier／方案已完成本機彙總，可一鍵匯出三項 HTML。本次原報在此頁保留，雲端版本未變更。';
+    }catch(error){if(ticket===epoch)exportStatus.textContent='未套用原報：'+error.message;}
+    finally{importing=false;updateExport();}
+  };
+  if(renewalExport)renewalExport.onclick=()=>{
+    if(!retained()||failed||flight||importing||document.hidden||!departmentConversion)return;
+    try{const C=window.North12OfficerCore,html=C.buildHtml(departmentConversion,window.North12OfficerExportAssets),url=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='北一二部_締結率來客續約洞察_'+departmentConversion.cutoff+'.html';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);exportStatus.textContent='已匯出締結率／來客數／續約洞察，包含四區及全部店點，可離線開啟與篩選。';}catch{exportStatus.textContent='匯出未完成，請重新匯入完整原報。';}
+  };
+  $('#region').onchange=e=>{if(!departmentConversion||!conversionTab())return;state.region=e.target.value;state.store='all';render();};
   $('#refresh').onclick=()=>{failed=false;void load();};$('#store').onchange=e=>{state.store=e.target.value;state.role='all';render();};document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;render();});for(const mode of ['daily','cumulative'])$('#'+mode).onclick=()=>{state.mode=mode;render();};
-  for(const id of ['start','end'])$('#'+id).onchange=e=>{if(!model?.conversion)return;if(!e.target.value){state.start=model.conversion.period_start;state.end=model.conversion.cutoff;$('#start').value=state.start;$('#end').value=state.end;$('#filter-status').hidden=false;$('#filter-status').textContent='日期已恢復至來源完整期間。';}else{state[id]=e.target.value;$('#filter-status').hidden=true;}render();};
+  for(const id of ['start','end'])$('#'+id).onchange=e=>{const d=conversionData();if(!d)return;if(!e.target.value){state.start=d.period_start;state.end=d.cutoff;$('#start').value=state.start;$('#end').value=state.end;$('#filter-status').hidden=false;$('#filter-status').textContent='日期已恢復至來源完整期間。';}else{state[id]=e.target.value;$('#filter-status').hidden=true;}render();};
   function resumeView(){
     if(document.hidden)return;
     suspended=false;
