@@ -137,6 +137,8 @@ function doPost(e) {
     else if (action === 'north12b_gold_read') result = north12bGoldDailyRead(payload);
     else if (action === 'department_ops_publish') result = departmentOpsPublish(payload);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
+    else if (action === 'half_export_snapshot') result = halfExportSnapshot_(payload);
+    else if (action === 'half_export_photo') result = halfExportPhoto_(payload);
     else throw new Error('unknown patrol action');
     return patrolJsonResponse_({status: 'ok', ...result});
   } catch (error) {

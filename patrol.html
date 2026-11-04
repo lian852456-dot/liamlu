@@ -631,6 +631,14 @@
         <label>檢查店點<select id="halfStore" onchange="renderHalfForm()"></select></label>
         <label>督導姓名<input id="halfInspector" type="text" placeholder="請輸入督導姓名"></label>
       </div>
+      <div class="half-meta" style="margin:16px 0">
+        <label>HTML 匯出月份<input id="halfExportMonth" type="month"></label>
+        <label>HTML 匯出門市<select id="halfExportStore"><option value="">全部授權門市</option></select></label>
+        <div class="hint">匯出雲端已儲存紀錄及內嵌照片，單檔可離線唯讀；持檔者可查看內容，影片保留私有連結。</div>
+      </div>
+      <div class="half-actions">
+        <button id="halfExportHtml" class="secure-btn" type="button" onclick="exportHalfChecksHTML()">匯出 HTML 唯讀儀表板（含照片）</button>
+      </div>
       <div id="halfForm" class="half-items"></div>
       <div class="half-actions">
         <button class="secure-btn" onclick="submitHalfCheck()">儲存並同步本期檢查</button>
@@ -742,6 +750,7 @@
 <script src="patrol-question-versions.js?v=5"></script>
 <script src="patrol-read-model.js?v=10"></script>
 <script src="supervisor-interview-model.js?v=3"></script>
+<script src="patrol-inspection-export.js?v=20261104-1"></script>
 <script>
 /* ---------- 檢核規則設定 ---------- */
 // 預設門市清單（北一二B）。連上雲端後會改用 GAS 回傳的本區清單，
@@ -905,7 +914,7 @@ function patrolAuthReason(value){ return String(value?.reason||value?.auth?.reas
 function patrolShouldReauth(value){ return PATROL_REAUTH_REASONS.has(patrolAuthReason(value)); }
 function patrolAuthReasonText(value){ const reason=patrolAuthReason(value);return PATROL_AUTH_REASON_TEXT[reason]||String(value?.message||value||'巡店服務授權失敗'); }
 // Only bounded, idempotent reads can enter the transport retry loop.
-const PATROL_READ_ACTIONS = new Set(['ping','pthealth','ptsummary','ptdetail','ptmileage','ptmileage2','ptmileage_legs_read','sread','hread','ptdashboard','interview_read']);
+const PATROL_READ_ACTIONS = new Set(['ping','pthealth','ptsummary','ptdetail','ptmileage','ptmileage2','ptmileage_legs_read','sread','hread','ptdashboard','interview_read','half_export_snapshot','half_export_photo']);
 const PATROL_RETRY_STATUSES = new Set([404,429,500,502,503,504]);
 const PATROL_READ_UNAVAILABLE = '巡店後端暫時無回應，已自動重試3次。session仍保留，可按重新連線，不需要登出。';
 function patrolSafeResponseUrl(value){
@@ -1020,7 +1029,7 @@ async function patrolRequestWithReauth(request,retried=false,allowReplay=true){
 function privateCloudCall(action, params={}){
   return patrolRequestWithReauth(()=>{
     if(action!=='pthealth'&&(!secureUnlocked||!privateAccount||!PT_TOKEN)) return {status:'error',message:'unauthorized',reason:'AUTH_TOKEN_MISSING'};
-    if(['sread','hread'].includes(action))return patrolReadRequest(action,PRIVATE_GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:PT_TOKEN,...params}),cache:'no-store'});
+    if(['sread','hread','half_export_snapshot','half_export_photo'].includes(action))return patrolReadRequest(action,PRIVATE_GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:PT_TOKEN,...params}),cache:'no-store'});
     const url=new URL(PRIVATE_GAS_URL);url.searchParams.set('action',action);Object.keys(params).forEach(k=>url.searchParams.set(k,params[k]));
     if(action!=='pthealth') url.searchParams.set('token',PT_TOKEN);
     return patrolReadRequest(action,url.toString(),{method:'GET',cache:'no-store'});
@@ -2924,6 +2933,9 @@ async function loadHalfChecks(){
   }catch(err){ showHalfMsg('督導到店檢查雲端讀取失敗，先顯示本機資料','err'); }
 }
 function initHalfSelectors(){
+  const exportMonth=document.getElementById('halfExportMonth');if(exportMonth&&!exportMonth.value)exportMonth.value=currentMonth;
+  const exportStore=document.getElementById('halfExportStore');if(exportStore&&exportStore.options.length===1)exportStore.insertAdjacentHTML('beforeend',STORES.map(s=>`<option value="${esc(s.name.replace('台北',''))}">${esc(s.name.replace('台北',''))}</option>`).join(''));
+
   const store=document.getElementById('halfStore'); if(store && !store.options.length){ store.innerHTML=STORES.map(s=>`<option value="${esc(s.name.replace('台北',''))}">${esc(s.name.replace('台北',''))}</option>`).join(''); }
   const date=document.getElementById('halfDate'); if(date && !date.value) date.value=new Date().toISOString().slice(0,10);
 }
@@ -3075,6 +3087,25 @@ function renderHalfHistory(){
 function openHalfMediaViewer(checkId){
   const rows=activeHalfRows(halfChecks.filter(r=>(r.checkId||`${r.date}|${r.store}|${r.period}`)===checkId));const items=rows.flatMap(r=>mediaItems(r.evidenceNames));if(!items.length){showHalfMsg('此期檢查尚無可預覽的照片或影片','err');return;}
   document.getElementById('halfMediaModal')?.remove();const modal=document.createElement('div');modal.id='halfMediaModal';modal.className='half-media-modal';modal.innerHTML=`<div class="half-media-modal-card" role="dialog" aria-modal="true" aria-label="巡店照片與影片回放"><button type="button" class="half-media-modal-close">關閉</button><h3>巡店照片／影片回放</h3><p class="hint">${esc(rows[0]?.date||'')}・${esc(rows[0]?.store||'')}</p><div class="half-media-modal-grid">${items.map(x=>halfMediaCard(x)).join('')}</div></div>`;modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});modal.querySelector('.half-media-modal-close').addEventListener('click',()=>modal.remove());document.body.appendChild(modal);
+}
+let halfHtmlExportRunning=false;
+async function exportHalfChecksHTML(){
+  if(halfHtmlExportRunning)return;
+  const token=PT_TOKEN;
+  const assertActive=()=>{window.PortalLogout?.assertActive();if(!secureUnlocked||!privateAccount||!PT_TOKEN||PT_TOKEN!==token)throw new Error('登入狀態已改變，請重新匯出');};
+  const button=document.getElementById('halfExportHtml');
+  try{
+    assertActive();halfHtmlExportRunning=true;if(button)button.disabled=true;
+    const scope={month:document.getElementById('halfExportMonth').value,store:document.getElementById('halfExportStore').value};
+    showHalfMsg('正在核對雲端檢查紀錄與匯出範圍…','ok');
+    const snapshot=await PatrolInspectionExport.collect({scope,assertActive,request:privateCloudCall,titleFor:halfItemText,onProgress:text=>showHalfMsg(text,'ok')});
+    const html=PatrolInspectionExport.buildHTML(snapshot);assertActive();
+    const url=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
+    const link=document.createElement('a');link.href=url;link.download=`北一二B_督導巡店檢查_${scope.month}_${scope.store||'全部門市'}.html`;
+    document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+    showHalfMsg('已匯出 HTML 唯讀儀表板，包含已儲存檢查結果與照片；未同步草稿不包含於內。','ok');
+  }catch(error){showHalfMsg(`HTML 匯出未完成：${error.message}`,'err');}
+  finally{halfHtmlExportRunning=false;if(button)button.disabled=false;}
 }
 function exportHalfChecksExcel(){
   const active=activeHalfRows(halfChecks);if(!active.length){showHalfMsg('目前沒有督導到店檢查資料可匯出','err');return;}

@@ -168,6 +168,8 @@ function doPost(e) {
     else if (action === 'north12b_gold_read') result = north12bGoldDailyRead(payload);
     else if (action === 'department_ops_publish') result = departmentOpsPublish(payload);
     else if (action === 'half_media_upload') result = uploadHalfMedia(payload);
+    else if (action === 'half_export_snapshot') result = halfExportSnapshot_(payload);
+    else if (action === 'half_export_photo') result = halfExportPhoto_(payload);
     else throw new Error('unknown patrol action');
     return patrolJsonResponse_({status: 'ok', ...result});
   } catch (error) {
@@ -210,3 +212,5 @@ for (const file of ['DepartmentScoresCore.gs', 'DepartmentScores.gs']) fs.copyFi
 
 fs.copyFileSync(path.join(root, 'department-gold-monthly-core.js'), path.join(root, 'gas', 'DepartmentGoldMonthlyCore.gs'));
 for (const file of ['DepartmentGoldMonthlyCore.gs', 'DepartmentGoldMonthly.gs']) fs.copyFileSync(path.join(root, 'gas', file), path.join(outputDir, file));
+
+fs.copyFileSync(path.join(root, 'gas', 'PatrolInspectionExport.gs'), path.join(outputDir, 'PatrolInspectionExport.gs'));
