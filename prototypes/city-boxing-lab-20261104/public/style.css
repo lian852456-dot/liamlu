@@ -152,3 +152,7 @@ footer { padding: 14px 2px 0; color: #9aa6b5; font-size: 11px; text-align: cente
   .secondary-button { width: 100%; }
   .room-code-line strong { font-size: 18px; }
 }
+
+.action-buttons{grid-template-columns:repeat(5,minmax(0,1fr))}.camera-controls{position:absolute;top:8px;right:8px;display:flex;gap:6px}.camera-controls button{font:inherit;font-size:12px;padding:7px;border-radius:8px;border:0;background:#fff9}.hook{background:#bb7248}.retreat{background:#577377}@media(max-width:600px){.action-buttons{grid-template-columns:repeat(3,1fr)}.action-button{min-height:76px}}
+
+#impactCue{position:absolute;left:50%;top:20%;transform:translateX(-50%);background:#ffeb98;color:#3b2e20;padding:7px 16px;border-radius:20px;font-weight:800;pointer-events:none}

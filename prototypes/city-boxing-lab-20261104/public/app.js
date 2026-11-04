@@ -1,6 +1,7 @@
 (() => {
   'use strict';
 
+  const cityMode=new URLSearchParams(location.search).get('city')==='1';
   const $ = selector => document.querySelector(selector);
   const $$ = selector => [...document.querySelectorAll(selector)];
   const app = {
@@ -19,7 +20,7 @@
     tabId: makeId('tab'),
   };
 
-  const actionNames = { punch: '出拳', guard: '防守', dodge: '閃躲' };
+  const actionNames = { punch: '直拳', hook:'勾拳', guard: '防守', dodge: '閃躲', retreat:'後撤' };
   const presenceNames = { online: '本人在線', reconnecting: '重連中', offline: '離線巡走' };
   const errorNames = {
     NICKNAME_REQUIRED: '請先輸入暱稱。',
@@ -81,7 +82,8 @@
   }
 
   async function api(path, options = {}) {
-    const config = { credentials: 'same-origin', ...options, headers: { ...(options.headers || {}) } };
+    if(cityMode&&!path.startsWith('/api/boxing/'))path=path.replace('/api/','/api/boxing/');
+    const config = { credentials: 'same-origin', ...options, headers: { ...(options.headers || {}),...(cityMode&&app.csrf?{'x-city-csrf':app.csrf}:{}) } };
     if (options.body !== undefined) {
       config.headers['content-type'] = 'application/json';
       config.body = JSON.stringify(options.body);
@@ -306,6 +308,7 @@
   }
 
   async function ensureSession() {
+    if(cityMode){const data=await api('/api/session');app.self=data.self;app.csrf=data.csrf;startHeartbeat();return;}
     const nickname = currentNickname();
     if (!nickname) throw Object.assign(new Error('NICKNAME_REQUIRED'), { code: 'NICKNAME_REQUIRED' });
     if (!app.self || app.self.name !== nickname) {
@@ -325,12 +328,13 @@
 
   function startStatePolling() {
     if (app.stateTimer) clearInterval(app.stateTimer);
-    app.stateTimer = window.setInterval(pollState, 700);
+    app.stateTimer = window.setInterval(pollState, 150);
     void pollState();
   }
 
   async function pollState() {
-    if (!app.roomId) return;
+    if (!app.roomId || app.polling) return;
+    app.polling=true;
     try {
       const data = await api(`/api/state?roomId=${encodeURIComponent(app.roomId)}`);
       applyState(data);
@@ -339,7 +343,7 @@
         $('#connectionDot')?.classList.add('yellow');
         $('#roomState').textContent = '重連中';
       }
-    }
+    } finally {app.polling=false;}
   }
 
   async function createRoom() {
@@ -347,6 +351,7 @@
       await ensureSession();
       app.mode = document.querySelector('input[name="mode"]:checked')?.value || 'honor';
       const stake = app.mode === 'synthetic' ? app.stake : 0;
+      await api('/api/boxing/enter',{method:'POST',body:{}});
       const data = await api('/api/rooms', { method: 'POST', body: { mode: app.mode, stake } });
       applyState(data);
       startStatePolling();
@@ -360,6 +365,7 @@
       await ensureSession();
       const roomId = text($('#roomId')?.value).trim() || new URLSearchParams(location.search).get('room');
       if (!roomId) throw Object.assign(new Error('ROOM_NOT_FOUND'), { code: 'ROOM_NOT_FOUND' });
+      await api('/api/boxing/enter',{method:'POST',body:{}});
       const data = await api('/api/join', { method: 'POST', body: { roomId } });
       applyState(data);
       startStatePolling();
@@ -441,7 +447,7 @@
     $('#nickname')?.addEventListener('keydown', event => { if (event.key === 'Enter') void createRoom(); });
     document.addEventListener('keydown', event => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-      const kind = { j: 'punch', k: 'guard', l: 'dodge' }[event.key.toLowerCase()];
+      const kind = { j: 'punch', u:'hook', k: 'guard', l: 'dodge', i:'retreat' }[event.key.toLowerCase()];
       if (kind) { event.preventDefault(); void sendAction(kind); }
     });
   }
@@ -467,7 +473,7 @@
         status: room.status,
         startAt: room.startAt,
         endAt: room.endAt,
-        reason: room.reason,
+        reason: room.reason,events:room.events||[],
         result: room.result ? {
           winner: room.result.winner ?? null,
           eventId: room.result.eventId ?? null,
@@ -480,15 +486,17 @@
           seq: fighter.seq,
           action: fighter.action,
           actionAt: fighter.actionAt,
+          appearance:fighter.appearance,position:fighter.position,anchor:fighter.anchor,
           presence: fighter.presence,
         })) : [],
       } : null,
       serverNow: serverNow(),
+      metrics:stage.renderer?{frames:stage.frames,drawCalls:stage.renderer.info.render.calls,triangles:stage.renderer.info.render.triangles,geometries:stage.renderer.info.memory.geometries,textures:stage.renderer.info.memory.textures,p95:[...stage.dt].sort((a,b)=>a-b)[Math.floor(stage.dt.length*.95)]||0,hair:CozyRefinedPortraitHair.stats(),motion:stage.fighters.map(v=>v?.driver.state())}:null,
     };
   }
 
   // ----- Simple Three.js boxing stage. It renders server-provided actions only. -----
-  const stage = { scene: null, camera: null, renderer: null, fighters: [], ready: false };
+  const stage = { scene: null, camera: null, renderer: null, fighters: [], ready: false,frames:0,dt:[],lastFrame:0 };
 
   function initStage() {
     const canvas = $('#arenaCanvas');
@@ -497,18 +505,19 @@
     stage.scene = new T.Scene();
     stage.scene.background = new T.Color(0x101827);
     stage.camera = new T.PerspectiveCamera(33, 1, .1, 30);
-    stage.camera.position.set(0, 3.1, 7.4);
+    stage.camera.position.set(3.6, 2.8, 5.8);
     stage.camera.lookAt(0, 1.3, 0);
-    stage.renderer = new T.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'default' });
-    stage.renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 1.6));
+    stage.renderer = new T.WebGLRenderer({ canvas, antialias: innerWidth>600, alpha: false, powerPreference: 'default' });
+    stage.renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, innerWidth<600?1.2:1.5));
     stage.renderer.outputColorSpace = T.SRGBColorSpace;
     stage.renderer.shadowMap.enabled = true;
     stage.scene.add(new T.HemisphereLight(0xd9eeff, 0x25304a, 2.2));
     const key = new T.DirectionalLight(0xffe2c9, 3.2);
     key.position.set(-3, 6, 4); key.castShadow = true; stage.scene.add(key);
     buildRing(T);
-    stage.fighters = [makeBoxer(T, 0xf06a35, 0xffd2b4, -1), makeBoxer(T, 0x1989c4, 0xb9e8ff, 1)];
-    stage.fighters.forEach(fighter => stage.scene.add(fighter.group));
+    stage.fighters = [null,null];
+    CozyRefinedPortraitHair.load('p3').catch(()=>{});CozyRefinedPortraitHair.load('p5').catch(()=>{});
+    for(const kind of ['wide','close'])document.querySelector('#camera-'+kind).onclick=()=>{stage.camera.position.set(...(kind==='wide'?[3.6,2.8,5.8]:[2.5,2.2,3.6]));stage.camera.lookAt(0,1.15,0);};
     stage.ready = true;
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
@@ -528,68 +537,42 @@
     const apron = new T.Mesh(new T.BoxGeometry(6.2, .35, 4.3), new T.MeshStandardMaterial({ color: 0x202c43, roughness: .9 }));
     apron.position.y = -.13; stage.scene.add(apron);
     const ropeMaterial = new T.MeshStandardMaterial({ color: 0xf5f7fa, roughness: .6 });
-    [-1.9, 1.9].forEach(x => [-.1, .42, .94, 1.46].forEach(y => { const rope = new T.Mesh(new T.CylinderGeometry(.025, .025, 3.8, 8), ropeMaterial); rope.rotation.z = Math.PI / 2; rope.position.set(x, y, 0); stage.scene.add(rope); }));
-    [-1.85, 1.85].forEach(x => [-1.3, 1.3].forEach(z => { const post = new T.Mesh(new T.CylinderGeometry(.09, .09, 1.9, 12), new T.MeshStandardMaterial({ color: 0xf06a35 })); post.position.set(x, .8, z); post.castShadow = true; stage.scene.add(post); }));
+    for(const z of[-1.62,1.62])for(const y of[.50,1.0,1.48]){if(z>0&&y>.5)continue;const rope=new T.Mesh(new T.CylinderGeometry(.023,.023,5.05,8),ropeMaterial);rope.rotation.z=Math.PI/2;rope.position.set(0,y,z);stage.scene.add(rope);}
+    for(const x of[-2.52,2.52])for(const y of[.50,1.0,1.48]){const rope=new T.Mesh(new T.CylinderGeometry(.023,.023,3.24,8),ropeMaterial);rope.rotation.x=Math.PI/2;rope.position.set(x,y,0);stage.scene.add(rope);}
+    [-2.52,2.52].forEach(x=>[-1.62,1.62].forEach(z=>{const post=new T.Mesh(new T.CylinderGeometry(.09,.09,1.9,12),new T.MeshStandardMaterial({color:0xf06a35}));post.position.set(x,.8,z);stage.scene.add(post);}));
     const sign = new T.Mesh(new T.BoxGeometry(1.4, .45, .06), new T.MeshStandardMaterial({ color: 0x101827 }));
     sign.position.set(0, 2.25, -.05); stage.scene.add(sign);
   }
 
-  function makeBoxer(T, bodyColor, gloveColor, side) {
-    const facing=-side;
-    const group = new T.Group();
-    group.position.set(side * .8, 0, 0);
-    const body = new T.Mesh(new T.CapsuleGeometry(.37, .7, 6, 12), new T.MeshStandardMaterial({ color: bodyColor, roughness: .8 }));
-    body.position.y = 1.08; body.castShadow = true; group.add(body);
-    const head = new T.Mesh(new T.SphereGeometry(.28, 16, 12), new T.MeshStandardMaterial({ color: 0xf1c3a2, roughness: .9 }));
-    head.position.y = 1.85; head.castShadow = true; group.add(head);
-    const armFront = new T.Group(); armFront.position.set(facing * .27, 1.34, .02); group.add(armFront);
-    const armBack = new T.Group(); armBack.position.set(-facing * .27, 1.34, -.01); group.add(armBack);
-    [armFront, armBack].forEach((arm, index) => {
-      const sleeve = new T.Mesh(new T.CylinderGeometry(.1, .12, .47, 10), new T.MeshStandardMaterial({ color: bodyColor, roughness: .85 }));
-      sleeve.rotation.z = index ? -facing * .35 : facing * .35; sleeve.position.y = -.17; sleeve.castShadow = true; arm.add(sleeve);
-      const glove = new T.Mesh(new T.SphereGeometry(.14, 12, 8), new T.MeshStandardMaterial({ color: gloveColor, roughness: .72 }));
-      glove.scale.set(1.15, .9, .85); glove.position.set(facing * .1, -.42, .04); glove.castShadow = true; arm.add(glove);
-      arm.userData.glove = glove;
-    });
-    const legMaterial = new T.MeshStandardMaterial({ color: 0x303b50, roughness: .88 });
-    [-1, 1].forEach(side => { const leg = new T.Mesh(new T.CylinderGeometry(.12, .14, .62, 10), legMaterial); leg.position.set(side * .15, .4, 0); leg.castShadow = true; group.add(leg); });
-    group.userData = { facing, body, head, armFront, armBack, baseX: side * .8 };
-    return { group };
-  }
-
   function stageFrame(time) {
     if (!stage.ready) return;
-    const now = serverNow();
-    stage.fighters.forEach((visual, index) => updateBoxer(visual, slotFighter(index), now));
-    stage.renderer.render(stage.scene, stage.camera);
     requestAnimationFrame(stageFrame);
+    if(innerWidth<600&&time-stage.lastFrame<30)return;
+    if(stage.lastFrame){stage.dt.push(time-stage.lastFrame);if(stage.dt.length>120)stage.dt.shift();}stage.lastFrame=time;stage.frames++;
+    const now=serverNow();
+    [0,1].forEach(index=>{
+      const fighter=slotFighter(index),profile=fighter?.appearance;
+      if(!profile)return;
+      const key=JSON.stringify(profile);let visual=stage.fighters[index];
+      if(!visual||visual.key!==key){if(visual){visual.driver.dispose();visual.model.dispose();}const model=CozyRefinedAvatarPortraits.create(stage.scene,{portraitPreset:profile.avatarPreset});model.setAppearance(profile);const driver=CozyBoxingMotion.create(model,{side:index===0?-1:1});visual=stage.fighters[index]={key,model,driver};}
+      const anchor=fighter.anchor||{x:index===0?-.66:.66,z:0};visual.driver.group.position.set(anchor.x,0,anchor.z);
+      const hit=[...(app.room?.events||[])].reverse().find(e=>e.target===fighter.id&&e.outcome!=='miss'&&now-e.at<700);
+      const result=app.room?.result;
+      visual.driver.update({now,action:fighter.action,actionAt:fighter.actionAt,seq:fighter.seq,impact:hit?{at:hit.at,eventId:String(hit.id),outcome:hit.outcome,attackKind:hit.kind}:null,result:result?{winner:result.winner===null?null:result.winner===fighter.id,at:result.at??result.expiresAt-4000,expiresAt:result.expiresAt}:null});
+    });
+    const event=[...(app.room?.events||[])].reverse().find(e=>now-e.at>=0&&now-e.at<800);const cue=document.querySelector('#impactCue');if(cue){cue.hidden=!event;if(event)cue.textContent=(event.outcome==='miss'?'落空':event.outcome==='guard'?'格擋 +'+event.points:'命中 +'+event.points);}
+    stage.renderer.render(stage.scene,stage.camera);
   }
-
-  function updateBoxer(visual, fighter, now) {
-    const data = visual.group.userData;
-    const action = text(fighter?.action);
-    const age = fighter?.actionAt ? now - timestamp(fighter.actionAt) : Infinity;
-    const active = age >= 0 && age < 720 && !isNpc(fighter);
-    const progress = active ? Math.min(1, age / 360) : 0;
-    const punch = active && action === 'punch' ? Math.sin(progress * Math.PI) : 0;
-    const guard = active && action === 'guard' ? 1 : 0;
-    const dodge = active && action === 'dodge' ? Math.sin(progress * Math.PI) : 0;
-    const dir = data.facing;
-    visual.group.position.x = data.baseX - dir * dodge * .35;
-    visual.group.rotation.z = dir * punch * -.08;
-    data.armFront.rotation.z = dir * (.34 - guard * .15) + dir * punch * -.5;
-    data.armBack.rotation.z = -dir * (.34 - guard * .12);
-    data.armFront.position.y = 1.34 + guard * .16;
-    data.armBack.position.y = 1.34 + guard * .12;
-    data.armFront.userData.glove.position.x = dir * (.1 + punch * .48);
-    data.armBack.userData.glove.position.x = -dir * (.1 + guard * .08);
-    data.head.position.y = 1.85 + Math.sin(performance.now() / 600) * .015;
-  }
+  async function resumeCitySession(){try{const data=await api('/api/session');app.self=data.self;app.csrf=data.csrf;$('#nickname').value=data.self.name;$('#nickname').disabled=cityMode;if(cityMode&&data.identityScope==='same-origin-city-session')document.querySelector('.hero-copy').textContent='沿用此城市登入角色進擂台；只開放榮譽對戰。';startHeartbeat();}catch{if(cityMode)notice('此入口尚未接通本人城市登入，請返回隔離 QA 示範。','error');}}
+  document.querySelector('#returnCity').onclick=async()=>{try{await api('/api/boxing/leave',{method:'POST',body:{}});if(cityMode){parent.postMessage({type:'boxing-return'},location.origin);}else location.assign('city.html');}catch(e){notice(e.code==='FINISH_OR_CANCEL_FIRST'?'請先結束或取消對戰，再回城。':friendlyError(e),'error');}};
 
   initModeControls();
   initEvents();
   initQuery();
   initStage();
+  void resumeCitySession();
+  if(cityMode){document.querySelector('.hero-copy').textContent='正在確認此城市登入角色…';}
   app.clockTimer = window.setInterval(updateClock, 180);
+  window.addEventListener('pagehide',()=>{stage.ready=false;clearInterval(app.stateTimer);clearInterval(app.heartbeatTimer);clearInterval(app.clockTimer);for(const v of stage.fighters)if(v){v.driver.dispose();v.model.dispose();}const gs=new Set(),ms=new Set();stage.scene?.traverse(n=>{if(n.isMesh){gs.add(n.geometry);for(const m of(Array.isArray(n.material)?n.material:[n.material]))ms.add(m);}});gs.forEach(g=>g.dispose());ms.forEach(m=>m.dispose());stage.renderer?.dispose();stage.renderer?.forceContextLoss();},{once:true});
   globalThis.BoxingLab = Object.freeze({ state: debugState, refresh: pollState });
 })();

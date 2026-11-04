@@ -18,8 +18,8 @@
       <section class="hero">
         <div>
           <p class="eyebrow">CITY ARCADE / 60 SECOND BOUT</p>
-          <h1>一分鐘，出拳、守住、閃開。</h1>
-          <p class="hero-copy">雙人共享邀請碼的手機拳台。輸贏與押注只由裁判判定；本頁使用簡化 QA 拳手，不連正式員編、金幣或真實錢包。</p>
+          <h1>人偶上擂台，動作放大。</h1><p><a href="city.html">← 測試廣場</a> · <a href="review.html">看動作實錄</a> · <button id="returnCity" type="button">回到進場位置</button></p>
+          <p class="hero-copy">雙人共享邀請碼的手機拳台。輸贏與押注只由裁判判定；本頁使用與城市相同的人偶資產，由測試帳號演示，並非登入同仁本人。</p>
         </div>
         <div class="hero-sticker" aria-hidden="true"><span>J</span><span>K</span><span>L</span></div>
       </section>
@@ -39,14 +39,14 @@
                 <input type="radio" name="mode" value="honor" checked>
                 <span><strong>榮譽對戰</strong><small>由裁判結算，不押注</small></span>
               </label>
-              <label class="mode-option" data-mode-label="synthetic">
+              <label hidden class="mode-option" data-mode-label="synthetic">
                 <input type="radio" name="mode" value="synthetic">
                 <span><strong>測試練習</strong><small>100 合成幣，非真實錢包</small></span>
               </label>
             </div>
           </fieldset>
 
-          <div id="stakeChoices" class="stake-row" aria-label="合成押注">
+          <div hidden id="stakeChoices" class="stake-row" aria-label="合成押注">
             <span class="inline-label">押注</span>
             <button class="stake-button" type="button" data-stake="5" disabled>5 合成幣</button>
             <button class="stake-button" type="button" data-stake="10" disabled>10 合成幣</button>
@@ -79,17 +79,17 @@
         <div id="scoreboard" class="scoreboard" aria-live="polite"></div>
         <div class="stage-wrap">
           <canvas id="arenaCanvas" aria-label="簡單 3D 拳台與雙方拳手"></canvas>
-          <div id="countdown" class="countdown" hidden></div>
-          <div class="stage-caption"><span>出拳／防守／閃躲均由裁判判定</span><span id="serverPulse">連線更新 · —</span></div>
+          <output id="impactCue" hidden aria-live="polite"></output><div id="countdown" class="countdown" hidden></div>
+          <div class="camera-controls"><button id="camera-wide" type="button">一般視距</button><button id="camera-close" type="button">近看動作</button></div><div class="stage-caption"><span>出拳／防守／閃躲均由裁判判定</span><span id="serverPulse">連線更新 · —</span></div>
         </div>
 
         <div class="action-bar">
           <div class="action-heading"><div><p class="eyebrow">YOUR MOVE</p><h3>現在要做什麼？</h3></div><span class="key-hint">J / K / L</span></div>
           <div id="actionButtons" class="action-buttons">
             <button class="action-button punch" type="button" data-kind="punch"><kbd>J</kbd><span>出拳</span><small>快速得分機會</small></button>
-            <button class="action-button guard" type="button" data-kind="guard"><kbd>K</kbd><span>防守</span><small>穩住節奏</small></button>
+            <button class="action-button hook" type="button" data-kind="hook"><kbd>U</kbd><span>勾拳</span><small>轉腰側擊</small></button><button class="action-button guard" type="button" data-kind="guard"><kbd>K</kbd><span>防守</span><small>穩住節奏</small></button>
             <button class="action-button dodge" type="button" data-kind="dodge"><kbd>L</kbd><span>閃躲</span><small>避開正面攻擊</small></button>
-          </div>
+          <button class="action-button retreat" type="button" data-kind="retreat"><kbd>I</kbd><span>後撤</span><small>拉開距離</small></button></div>
           <p id="actionHint" class="action-hint">開賽後即可操作，輸贏由裁判判定。</p>
         </div>
         <div id="resultBanner" class="result-banner" hidden></div>
@@ -112,6 +112,6 @@
     <footer>Boxing Lab · 獨立候選頁 · 由裁判判定</footer>
   </div>
   <script src="vendor/three.js"></script>
-  <script src="app.js"></script>
+  <script src="avatars/static-mesh.js"></script><script src="avatars/head-art-previous.js"></script><script src="avatars/head-art.js"></script><script src="avatars/gltf-loader.js"></script><script src="avatars/refined-portrait-config.js"></script><script src="avatars/refined-portrait-hair.js"></script><script src="avatars/refined-avatar-portraits.js"></script><script src="avatars/refined-heads.js"></script><script src="avatars/refined-jialing-body.js"></script><script src="avatars/refined-li-body.js"></script><script src="combat-kinematics.js"></script><script src="boxing-motion.js"></script><script src="app.js"></script>
 </body>
 </html>
