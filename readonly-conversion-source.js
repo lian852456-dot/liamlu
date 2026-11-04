@@ -8,16 +8,17 @@
     const sheet=workbook.Sheets['AQ締結率'];
     if(!sheet)return core.parseWorkbook(workbook,XLSX,options);
     const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:null,blankrows:true});
+    const layout=core.aqLayout(rows);
     let normalized=null;
     for(let r=0;r<rows.length;r++){
       if(!core.STORES.some(store=>store.id===rows[r][3]))continue;
-      for(let day=0;day<31;day++){
-        const at=c=>XLSX.utils.encode_cell({r,c}),rate=sheet[at(69+day)],n=sheet[at(5+day)],d=sheet[at(37+day)];
+      for(let day=0;day<layout.days;day++){
+        const at=c=>XLSX.utils.encode_cell({r,c}),rate=sheet[at(layout.rate+day)],n=sheet[at(layout.n+day)],d=sheet[at(layout.d+day)];
         // The reviewed export uses exact text "0" for an observed AQ 0/0 placeholder.
         // Never coerce blanks, other strings, formula caches or the source count cells.
         if(rate?.t==='s'&&rate.v==='0'&&!rate.f&&n?.t==='n'&&n.v===0&&d?.t==='n'&&d.v===0){
           if(!normalized)normalized={...sheet};
-          normalized[at(69+day)]={...rate,t:'n',v:0};
+          normalized[at(layout.rate+day)]={...rate,t:'n',v:0};
         }
       }
     }

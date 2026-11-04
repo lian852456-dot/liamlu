@@ -40,7 +40,7 @@ KPI上方保留原報總進度、排名與四項重點，下方依本次私有 `
 node scripts/prepare-readonly-conversion.mjs /absolute/來源.xlsx /absolute/private/new.json /absolute/private/prior.json
 ```
 
-最後一個舊版 JSON 可省略。輸出必須在公開 repo 外，且不可覆寫現有版本。只解析 AQ締結率、RT每日、RT締結率、樞紐四張已核實表，核對九店／逐日／TTL／分子母／同期文字及截止。原始檔不改動，也不經網路送出。重複檔不累加；店日鍵衝突、缺店、倒退截止、異月合併、移除既有鍵或截止後非零衝突都停止。現只接受已核實的 31 天來源欄位版型，其他月份需先核對來源版型。
+最後一個舊版 JSON 可省略。輸出必須在公開 repo 外，且不可覆寫現有版本。只解析 AQ締結率、RT每日、RT締結率、樞紐四張已核實表，核對九店／逐日／TTL／分子母／同期文字及截止。原始檔不改動，也不經網路送出。重複檔不累加；店日鍵衝突、缺店、倒退截止、異月合併、移除既有鍵或截止後非零衝突都停止。按來源月份的實際日數（28／29／30／31 天）核對逐日日期、欄位標題與總計；RT 每日率及上月同期依標題定位，不沿用前月欄號。
 
 `gas/ReadonlyConversion.gs` 已實作私有元件的預覽／確認發布／狀態／回復。四個公開函式都先呼叫原 `reportUploadAuthorize_`（既有管理者驗證碼＋員編白名單），不接受業務 B session 代替主管上傳權限。`readonly-conversion-upload.html` 是原站的獨立更新頁，以受控 POST 呼叫原戰情 owner；不增加 HtmlService 公開介面，也不修改目前 3C／舊換新上傳部署或價格資料。公開空殼仍沒有原始 Excel 或業績資料。
 

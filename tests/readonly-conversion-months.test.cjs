@@ -1,0 +1,39 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const X=require('../assets/vendor/xlsx.full.min.js'),Core=require('../readonly-dashboard-core.js'),Source=require('../readonly-conversion-source.js'),Officer=require('../north12-officer-core.js');
+const {workbook}=require('./helpers/readonly-conversion-workbook.cjs'),{runtime}=require('./helpers/readonly-conversion-runtime.cjs');
+const opts={sha256:'b'.repeat(64),source_name:'synthetic-month.xlsx',source_bytes:1234};
+const make=options=>X.read(workbook(options),{type:'buffer'}),rows=(w,n)=>X.utils.sheet_to_json(w.Sheets[n],{header:1,raw:true,defval:null,blankrows:true});
+const layout=w=>Core.workbookLayout(rows(w,'AQ締結率'),rows(w,'RT每日'),rows(w,'RT締結率'));
+for(const month of ['2026-10','2026-11','2026-02','2028-02','2027-01'])test(month+' parses actual calendar days and keeps current/prior totals separate',()=>{
+ const w=make({month,days:3,rateGap:13,priorGap:61}),before=JSON.stringify(w),a=Source.parseWorkbook(w,X,opts),b=Officer.parseWorkbook(w,X,opts);
+ assert.equal(a.cutoff,month+'-03');assert.equal(a.records.length,27);assert.deepEqual(a.records,b.records);assert.deepEqual(a.prior,b.prior);
+ assert.deepEqual(Core.aggregate(a.records),{aq_n:54,aq_d:378,rt_n:54,rt_d:702,aq_rate:54/378,rt_rate:54/702});
+ assert.equal(a.prior[0].aq_n,2);assert.equal(a.prior[0].aq_d,10);assert.equal(JSON.stringify(w),before);
+});
+test('November full month retains all 270 store-days without inventing November 31',()=>{
+ const d=Source.parseWorkbook(make({month:'2026-11',days:30}),X,opts);assert.equal(d.records.length,270);assert.equal(d.cutoff,'2026-11-30');assert.equal(d.prior_period.end,'2026-10-30');
+});
+test('November AQ exact text-zero compatibility uses November columns without mutating source',()=>{
+ const w=make({month:'2026-11'}),a=layout(w).aq,s=w.Sheets['AQ締結率'],cell=c=>X.utils.encode_cell({r:2,c});
+ s[cell(a.n)].v=0;s[cell(a.d)].v=0;s[cell(a.rate)]={t:'s',v:'0'};s[cell(a.n+a.days)].v--;s[cell(a.d+a.days)].v-=10;
+ const before=JSON.stringify(w),d=Source.parseWorkbook(w,X,opts);assert.equal(Core.aggregate([d.records[0]]).aq_rate,null);assert.equal(JSON.stringify(w),before);
+ assert.deepEqual(d.records,Officer.parseWorkbook(w,X,opts).records);
+});
+for(const kind of ['duplicate heading','missing rate heading','wrong day','missing TTL','bad daily rate','bad prior heading','post-cutoff count'])test('November rejects '+kind+' before private publication',()=>{
+ const w=make({month:'2026-11'}),l=layout(w),cell=(r,c)=>X.utils.encode_cell({r,c}),a=w.Sheets['AQ締結率'],r=w.Sheets['RT每日'];
+ if(kind==='duplicate heading')a[cell(0,100)]={t:'s',v:'AQ來客數'};
+ if(kind==='missing rate heading')delete r[cell(0,l.rt.rate)];
+ if(kind==='wrong day')r[cell(1,l.rt.twD+1)].v++;
+ if(kind==='missing TTL')delete a[cell(1,l.aq.n+l.days)];
+ if(kind==='bad daily rate')r[cell(2,l.rt.rate)].v=.9;
+ if(kind==='bad prior heading')a[cell(1,l.aq.priorD)].v='上線數';
+ if(kind==='post-cutoff count')a[cell(2,l.aq.n+3)].v=1;
+ for(const C of [Source,Officer])assert.throws(()=>C.parseWorkbook(w,X,opts),/欄位|日期|RT每日率|截止/);
+});
+test('parsed November source previews, publishes, reads back, reimports and rolls back through existing private component',()=>{
+ const b=runtime(),old=Source.parseWorkbook(make(),X,{...opts,sha256:'a'.repeat(64)}),next=Source.parseWorkbook(make({month:'2026-11'}),X,opts);
+ const publish=s=>{const p=b.call('Preview',{snapshot:s});return b.call('Publish',{previewToken:p.token,confirm:true});};
+ const previous=publish(old),current=publish(next);assert.equal(current.live.cutoff,'2026-11-03');assert.equal(b.call('Status').live.activeHash,current.live.activeHash);assert.equal(publish(next).status,'already_current');assert.equal(b.files.size,2);
+ const result=b.call('Rollback',{confirm:true,expectedRevision:current.live.revision,expectedActiveHash:current.live.activeHash});assert.equal(result.live.activeHash,previous.live.activeHash);
+});
