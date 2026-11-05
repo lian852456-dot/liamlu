@@ -42,7 +42,7 @@ for(const width of [1280,390,320])test(`${width}px home and APP open v6 prices f
   const {calls,errors}=await intercept(page);await page.setViewportSize({width,height:900});
   await page.goto(new URL('home.html',BASE).href);
   await expect(page.locator('a.card[href="tradein-import-lab.html"]')).toHaveCount(0);
-  await expect(page.locator('a.card[href="threec-query.html"] h3')).toHaveText('手機專案價查詢');
+  await expect(page.locator('a.card[href="threec-query.html"] h3')).toHaveText('查價系統');
   await expect(page.locator('a.card[href="tradein-query.html"] h3')).toHaveText('舊換新查價');
   expect(calls).toEqual([]);
   await page.locator('a.card[href="tradein-query.html"]').click();
@@ -70,7 +70,7 @@ for(const width of [1280,390,320])test(`${width}px home and APP open v6 prices f
   await expect(page.locator('a.card[href="tradein-import-lab.html"]')).toHaveCount(0);
   await page.goto(new URL('app.html',BASE).href);
   const prices=page.getByRole('region',{name:'公開查價'});
-  await expect(prices.getByRole('link',{name:'手機專案價查詢',exact:true})).toBeVisible();
+  await expect(prices.getByRole('link',{name:'查價系統',exact:true})).toBeVisible();
   await expect(prices.getByRole('link',{name:'舊換新進度追蹤',exact:true})).toBeVisible();
   await page.screenshot({path:testInfo.outputPath(`APP-public-prices-${width}.png`),fullPage:true});
   await prices.getByRole('link',{name:'舊換新查價',exact:true}).click();
@@ -79,7 +79,7 @@ for(const width of [1280,390,320])test(`${width}px home and APP open v6 prices f
   await page.getByRole('link',{name:'目標進度',exact:true}).click();
   await expect(page.locator('#readMessage')).toContainText('保留未知');
   await page.goBack();await page.goBack();
-  await expect(prices.getByRole('link',{name:'手機專案價查詢',exact:true})).toBeVisible();
+  await expect(prices.getByRole('link',{name:'查價系統',exact:true})).toBeVisible();
   await page.locator('[data-profile-entry]').click();
   await expect(page.locator('#privateAccessForm')).toBeVisible();
   await expect(page.locator('#viewerState')).toHaveText('未登入');
