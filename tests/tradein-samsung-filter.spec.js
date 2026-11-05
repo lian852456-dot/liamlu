@@ -37,6 +37,27 @@ async function actualPrices(page,c){
 function expectedPrices(rows,provider='',grade=''){
  return rows.map(r=>P.filter(p=>(!provider||provider===p)&&G.some(g=>(!grade||grade===g)&&isQuoted(r.quotes[p]?.[g]))).map(p=>({provider:p===P[1]?'FDI':p,prices:Object.fromEntries(G.filter(g=>(!grade||grade===g)&&isQuoted(r.quotes[p]?.[g])).map(g=>[g,Number(clean(r.quotes[p][g]).replace(/,/g,'')).toLocaleString('en-US')]))})));
 }
+async function openOfficialFilters(page){const advanced=page.locator('.query-tradein-advanced');if(await advanced.count()&&await advanced.getAttribute('open')===null)await advanced.locator(':scope > summary').click();}
+async function modernMatrices(page,expectedRows){
+ const matrices=[];let index=0;
+ while(index<expectedRows.length){
+  const count=await page.locator('.official-price-table tbody tr').count();expect(count).toBeGreaterThan(0);
+  for(let i=0;i<count;i++){
+   await page.locator('.official-price-table tbody th button').nth(i).click();await page.locator('[data-oq=detail]').click();await expect(page.locator('#tradeinOfficialDialog')).toBeVisible();
+   const actual=await page.locator('[data-oq=dialog-body] tbody tr').evaluateAll(nodes=>{
+    const providers=new Map();for(const tr of nodes){const p=tr.querySelector('th').textContent.replace(/（獨立報價）/g,'').trim(),label=/FDI/.test(p)?'FDI':p,cells=tr.querySelectorAll('td'),g=cells[0].textContent.includes('未分級')?'未分級':cells[0].textContent.trim()[0];if(!providers.has(label))providers.set(label,{provider:label,prices:{}});providers.get(label).prices[g]=cells[1].textContent.replace(/\s*元\s*$/,'');}return [...providers.values()];
+   });
+   expect(actual).toEqual(expectedPrices([expectedRows[index]])[0]);matrices.push(actual);index++;await page.locator('[data-oq=close]').click();
+  }
+  if(index<expectedRows.length)await page.locator('[data-oq=next]').click();
+ }
+ expect(index).toBe(expectedRows.length);return matrices;
+}
+if(configs.some(c=>c.name==='internal'))test('default v6 mobile user opens filters and checks all supplier grades through source details',async({page})=>{
+ const C=require('../threec-query-core.js'),data=fixture(),before=JSON.stringify(data);await mock(page,data);await page.setViewportSize({width:390,height:844});await page.goto('file://'+path.join(root,'tradein-query.html'));
+ await expect(page.locator('#tradeinResults')).toHaveClass(/official-workspace/);await openOfficialFilters(page);await page.locator('#tradeinBrand').selectOption('Samsung');
+ const snapshot={...data.snapshot,rows:data.snapshot.rows.filter(r=>/^samsung$/i.test(r.brand))};for(const k of C.modelOptions(snapshot,'tradein').map(o=>o.value)){await page.locator('#tradeinModel').selectOption(k);await modernMatrices(page,C.filterTradeinByModel(snapshot,{modelKey:k}));}expect(JSON.stringify(data)).toBe(before);
+});
 for(const c of configs){
  for(const width of [320,390,1280])test(`${c.name} ${width}px Samsung aliases share one option; both price matrices remain exact`,async({page},testInfo)=>{
   const data=fixture(),original=JSON.stringify(data),api=await mock(page,data);await page.setViewportSize({width,height:900});await page.goto('file://'+path.join(root,c.file)+(c.name==='internal'?'?view=source':''));
@@ -99,15 +120,16 @@ if(process.env.LIVE_SURFACE){
    report.rawBrandCounts=Object.fromEntries(['Samsung','SAMSUNG'].map(b=>[b,rows.filter(r=>clean(r.brand)===b).length]));
    expect(report.rawBrandCounts.Samsung).toBeGreaterThan(0);expect(report.rawBrandCounts.SAMSUNG).toBeGreaterThan(0);
    const aliases=await page.locator(c.brand+' option').evaluateAll(o=>o.filter(x=>/^samsung$/i.test(x.textContent.trim())).map(x=>({label:x.textContent,value:x.value})));
-   expect(aliases).toEqual([{label:'Samsung',value:'Samsung'}]);await page.locator(c.brand).selectOption('Samsung');
-   const keys=[...new Set(rows.map(key))];expect(await page.locator(c.model+' option').evaluateAll(o=>o.slice(1).map(x=>x.value))).toEqual(keys);
+   expect(aliases).toEqual([{label:'Samsung',value:'Samsung'}]);await openOfficialFilters(page);await page.locator(c.brand).selectOption('Samsung');
+   const modern=await page.locator(c.target+'.official-workspace').count()>0,C=modern?require('../threec-query-core.js'):null,scoped={...observed,rows};
+   const keys=modern?C.modelOptions(scoped,'tradein').map(o=>o.value):[...new Set(rows.map(key))];expect(await page.locator(c.model+' option').evaluateAll(o=>o.slice(1).map(x=>x.value))).toEqual(keys);
    let quoteCount=0;
    for(const k of keys){
-    const matches=rows.filter(r=>key(r)===k);await page.locator(c.model).selectOption(k);await expect(page.locator(c.target+' .tc-item')).toHaveCount(matches.length);
-    const expected=expectedPrices(matches);expect(await actualPrices(page,c)).toEqual(expected);
+    const matches=modern?C.filterTradeinByModel(scoped,{modelKey:k}):rows.filter(r=>key(r)===k);await page.locator(c.model).selectOption(k);
+    const expected=expectedPrices(matches);if(modern){expect(await modernMatrices(page,matches)).toEqual(expected);}else{await expect(page.locator(c.target+' .tc-item')).toHaveCount(matches.length);expect(await actualPrices(page,c)).toEqual(expected);}
     quoteCount+=expected.flat().reduce((n,p)=>n+Object.keys(p.prices).length,0);
    }
-   expect(JSON.stringify(observed)).toBe(original);report.samsungRows=rows.length;report.modelOptionsChecked=keys.length;report.quoteValuesChecked=quoteCount;report.singleSamsungOption=true;report.originalPricesPreserved=true;
+   expect(JSON.stringify(observed)).toBe(original);report.samsungRows=rows.length;report.modelOptionsChecked=keys.length;report.quoteValuesChecked=quoteCount;report.singleSamsungOption=true;report.originalPricesPreserved=true;report.defaultV6Comparison=modern;
    await page.locator(c.model).selectOption(keys[0]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
    report.passed=true;
   }catch(e){report.error=String(e.message).slice(0,1600);throw e;}
