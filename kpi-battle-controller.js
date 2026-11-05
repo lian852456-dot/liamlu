@@ -411,6 +411,23 @@
         text.textContent=message||`上次讀取：${state.data.fetchedAt}。已載入的資料會保留，需要最新資料時請手動更新。`;
         const button=doc.createElement('button');button.type='button';button.textContent='更新資料';button.disabled=state.loading;
         button.dataset.privateDashboardAction='refresh';notice.append(text,button);
+        if(win.BattleHtmlExport&&win.OfflineHtml){
+          const kind=id==='kpiBattleContent'?'kpi':'awards',data=kind==='kpi'?state.data:getAwardsData();
+          if(data){
+            const exportButton=doc.createElement('button');exportButton.type='button';exportButton.textContent=kind==='kpi'?'一鍵匯出 KPI HTML':'一鍵匯出台獎 HTML';exportButton.disabled=state.loading;exportButton.dataset.battleHtmlExport=kind;
+            exportButton.addEventListener('click',()=>{
+              try{
+                win.PortalLogout?.assertActive();
+                if(state.loading||doc.hidden||!state.data||!state.profile||!(privateDashboardSessionEmployeeId()||win.DashboardB?.active()))throw Error('請先完成登入與資料核對。');
+                const current=kind==='kpi'?state.data:getAwardsData();if(!current)throw Error('來源已清除，請重新讀取。');
+                const html=kind==='kpi'?win.BattleHtmlExport.buildKpi(current):win.BattleHtmlExport.buildAwards(current);
+                win.OfflineHtml.download(html,'北一二B_'+(kind==='kpi'?'KPI個績':'台獎')+'_'+String(current.data_as_of_date||current.report_date||'快照')+'.html',doc);
+                text.textContent='HTML 已交給瀏覽器下載，包含目前已授權的完整明細，可離線開啟。';
+              }catch(error){text.textContent='匯出停止：'+error.message;}
+            });notice.append(exportButton);
+          }
+        }
+
       }
     }
 
@@ -704,7 +721,7 @@
         updateNotice(retain?`更新失敗，仍顯示上次資料（${state.data.fetchedAt}），請稍後手動更新。`:undefined);
       } finally {
         state.loading=false;
-        for(const id of ['kpiBattleContentReadStatus','awardsBattleContentReadStatus'])doc.getElementById(id)?.querySelector('button')?.removeAttribute('disabled');
+        for(const id of ['kpiBattleContentReadStatus','awardsBattleContentReadStatus'])doc.getElementById(id)?.querySelectorAll('button').forEach(button=>button.removeAttribute('disabled'));
       }
     }
 

@@ -1,4 +1,5 @@
-import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261025-same-month-net-1';
+import {reminderBrief,createTradeinHtml} from './tradein-reminder.mjs?v=20261105-1';
+import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261105-html-export-1';
 import {copyReminderText} from './tradein-clipboard.mjs?v=20261010-copy-recovery-1';
 const $=id=>document.getElementById(id);
 let contextReader,revision=0,busy=false,canvas=null;
@@ -6,7 +7,7 @@ export function currentRules(){return contextReader?.().rules || rulesForMonth($
 function rules(){return currentRules();}
 function model(){return buildExportModel(contextReader(),$('exportScope').value,rules());}
 function feedback(text,error=false){$('exportFeedback').textContent=text;$('exportFeedback').className='export-feedback'+(error?' error':'');}
-function buttons(disabled){['copyReminder','downloadReminderPng','downloadReminderXlsx'].forEach(id=>$(id).disabled=disabled);}
+function buttons(disabled){['copyReminder','downloadReminderPng','downloadReminderXlsx','downloadReminderHtml'].forEach(id=>$(id)&&($(id).disabled=disabled));}
 function current(ticket){if(ticket!==revision||!contextReader().active)throw new Error('畫面或匯出範圍已變更，請重新操作。');}
 function download(blob,name){
   if(!blob||!blob.size)throw new Error('沒有可下載的內容。');
@@ -22,12 +23,14 @@ async function operate(kind){
   busy=true;buttons(true);feedback(kind==='copy'?'正在複製提醒…':'正在產生匯出檔…');
   try{
     if(kind==='copy'){
-      current(ticket);await copyReminderText(reminderText(snapshot));current(ticket);feedback('已複製目前範圍的提醒，可貼上使用。');
+      current(ticket);await copyReminderText(reminderBrief(snapshot));current(ticket);feedback('已複製目前範圍的提醒，可貼上使用。');
     }else if(kind==='png'){
       if(document.fonts)await document.fonts.ready;current(ticket);
-      const built=createReminderCanvas(snapshot);canvas=built.canvas;
+      const built=createReminderCanvas(snapshot,{text:reminderBrief(snapshot)});canvas=built.canvas;
       const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG 圖片產生失敗。')),'image/png'));
       current(ticket);download(blob,stamp()+'.png');feedback('PNG 已交給瀏覽器處理，請在下載列表確認；尚未確認存檔完成。');
+    }else if(kind==='html'){
+      current(ticket);const html=createTradeinHtml(snapshot);current(ticket);download(new Blob([html],{type:'text/html;charset=utf-8'}),stamp()+'.html');feedback('HTML 已交給瀏覽器下載，可離線查看重點與完整明細。');
     }else{
       current(ticket);const bytes=createXlsx(snapshot);download(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),stamp()+'.xlsx');feedback('Excel 已交給瀏覽器處理，請在下載列表確認；尚未確認存檔完成。');
     }
@@ -50,11 +53,11 @@ function updatePreview(){
   const ticket=++revision;
   canvas=null;feedback('');
   try{
-    const snapshot=model();$('reminderText').value=reminderText(snapshot);$('exportScopeLabel').textContent='目前範圍：'+snapshot.scopeLabel;
+    const snapshot=model();$('reminderText').value=reminderBrief(snapshot);$('exportScopeLabel').textContent='目前範圍：'+snapshot.scopeLabel;
     const r=snapshot.rules;$('periodMeta').textContent=r.selectedDate?`單日 ${r.selectedDate}${r.storeTarget?' · 門市目標 '+r.storeTarget+' 台':''} · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 台北時間`:`本月 ${r.start}–${r.end}（每人每月 ${r.staffTarget} 台${r.isDemo?'；實績示意':''}）${r.storeTarget?' · 門市目標 '+r.storeTarget+' 台':''} · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 來源截止 ${r.cutoff} · 台北時間${hasMonthlySource(r)?'':' · 選定月份來源未提供，實績未知'}`;
     buttons(busy);
     Promise.resolve(document.fonts?.ready).then(()=>{
-      current(ticket);const built=createReminderCanvas(snapshot);canvas=built.canvas;
+      current(ticket);const built=createReminderCanvas(snapshot,{text:reminderBrief(snapshot)});canvas=built.canvas;
       $('reminderImage').src=canvas.toDataURL('image/png');$('reminderImage').hidden=false;
     }).catch(error=>{if(ticket===revision){$('reminderImage').removeAttribute('src');$('reminderImage').hidden=true;feedback('PNG 預覽產生失敗：'+error.message,true);}});
   }catch(error){$('reminderText').value='';$('reminderImage').removeAttribute('src');$('reminderImage').hidden=true;buttons(true);feedback(error.message,true);}
@@ -65,5 +68,6 @@ export function bindExports(reader){
   $('copyReminder').addEventListener('click',()=>operate('copy'));
   $('downloadReminderPng').addEventListener('click',()=>operate('png'));
   $('downloadReminderXlsx').addEventListener('click',()=>operate('xlsx'));
+  $('downloadReminderHtml')?.addEventListener('click',()=>operate('html'));
   $('exportScope').addEventListener('change',updatePreview);
 }

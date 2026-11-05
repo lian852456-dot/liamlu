@@ -68,7 +68,14 @@ export function buildExportModel(context,scope,rules=DEFAULT_RULES){
   if(rules.selectedDate)scopeLabel+=' · '+rules.selectedDate+' · 單日';
   if(!rows.length)throw new Error('此範圍沒有可匯出的資料。');
   if(rows.length>100)throw new Error('資料超過 100 人，請縮小匯出範圍。');
-  return Object.freeze({title:rules.selectedDate?'舊換新單日回收提醒':'舊換新個人提醒',scopeLabel,showDifference:context.mode==='public'&&!rules.selectedDate,rules:Object.freeze({...rules}),rows:Object.freeze(rows.map(p=>describePerson(p,rules)))});
+  const selectedStore=scope==='current'?context.selectedStore:'';
+  const allowStores=new Set(context.allowedStores||[]);
+  const stores=!hasMonthlySource(rules)||scope==='self'||scope==='current'&&context.countFilterLabel?[]:(context.storeSummaries||[])
+    .filter(p=>allowStores.has(p.store)&&(!selectedStore||p.store===selectedStore)).map(p=>{
+      for(const value of [p.actual,p.target])if(value!==null&&(!Number.isSafeInteger(value)||value<0))throw new Error('店點彙總待核，停止匯出。');
+      return Object.freeze({store:String(p.store),actual:p.actual,target:rules.selectedDate?null:p.target});
+    });
+  return Object.freeze({title:rules.selectedDate?'舊換新單日回收提醒':'舊換新個人提醒',scopeLabel,stores:Object.freeze(stores),showDifference:context.mode==='public'&&!rules.selectedDate,rules:Object.freeze({...rules}),rows:Object.freeze(rows.map(p=>describePerson(p,rules)))});
 }
 export function reminderText(model){
   const r=model.rules;
@@ -147,11 +154,11 @@ export function wrapText(ctx,text,maxWidth){
   }
   return lines;
 }
-export function createReminderCanvas(model){
+export function createReminderCanvas(model,{text=reminderText(model)}={}){
   const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
   if(!ctx)throw new Error('此瀏覽器無法產生圖片。');
   const width=900,pad=44,content=width-pad*2;
-  const lines=reminderText(model).split('\n'),layout=[];let height=36;
+  const lines=text.split('\n'),layout=[];let height=36;
   for(let i=0;i<lines.length;i++){
     const title=i===0,size=title?29:19;
     ctx.font=`${title||model.showDifference?'700':'500'} ${size}px system-ui,"PingFang TC","Microsoft JhengHei",sans-serif`;

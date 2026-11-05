@@ -76,7 +76,7 @@ function harness(sequence) {
   const logs = [];
   const delays = [];
   const document = {
-    createElement(tag) { return {tag,children:[],style:{},dataset:{},setAttribute(){},removeAttribute(){},replaceChildren(){this.children=[];},append(...nodes){this.children.push(...nodes);},querySelector(){return this.children.find(node=>node.tag==='button');}}; },
+    createElement(tag) { return {tag,children:[],style:{},dataset:{},setAttribute(){},removeAttribute(){},replaceChildren(){this.children=[];},append(...nodes){this.children.push(...nodes);},querySelector(){return this.children.find(node=>node.tag==='button');},querySelectorAll(){return this.children.filter(node=>node.tag==='button');}}; },
     addEventListener() {},
     getElementById(id) {
       if (id === 'kpiBattleContent') return content;

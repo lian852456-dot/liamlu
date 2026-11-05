@@ -31,7 +31,7 @@ function rules(){
     sourceStart:snapshot?.source_period.start,sourceEnd:snapshot?.source_period.end,cutoff:snapshot?.source_cutoff_date,statusAsOf:snapshot?.status_as_of_date,timezone:'Asia/Taipei'};
 }
 const row=p=>[p.store,p.masked_name,p.role,p.actual_units];
-function context(){return {active:active&&!!snapshot,mode:access?.mode,self:access?.mode==='self'?snapshot?.people[0]&&row(snapshot.people[0]):null,
+function context(){return {active:active&&!!snapshot,mode:access?.mode,storeSummaries:(snapshot?.stores||[]).map(s=>({store:s.store,actual:s.total_units,target:s.staff_target_units})),self:access?.mode==='self'?snapshot?.people[0]&&row(snapshot.people[0]):null,
   people:(snapshot?.people||[]).map(row),allowedStores:access?.allowedStores||[],selectedStore:$('staffStore').value,rules:rules()};}
 function wipeData(){snapshot=null;snapshotHash=null;clearExports();['self','stats','storeRows','staffRows'].forEach(id=>$(id).replaceChildren());$('exportPanel').hidden=true;$('supervisorArea').hidden=true;$('maintenance').hidden=true;}
 function clearPrivate(){
