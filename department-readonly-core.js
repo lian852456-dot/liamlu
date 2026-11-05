@@ -1,7 +1,7 @@
 (function(root,factory){
-  const api=typeof module==='object'&&module.exports?factory(require('./department-scores-core.js'),require('./department-gold-monthly-core.js')):factory(root.DepartmentScoresCore,root.DepartmentGoldMonthlyCore);
+  const api=typeof module==='object'&&module.exports?factory(require('./department-scores-core.js'),require('./department-gold-monthly-core.js'),require('./offline-html.js')):factory(root.DepartmentScoresCore,root.DepartmentGoldMonthlyCore,root.OfflineHtml);
   if(typeof module==='object'&&module.exports)module.exports=api;else root.DepartmentReadonlyCore=api;
-})(typeof globalThis!=='undefined'?globalThis:this,function(S,G){
+})(typeof globalThis!=='undefined'?globalThis:this,function(S,G,Html){
   'use strict';
   const SCHEMA='north12-department-readonly/v1';
   const text=v=>String(v==null?'':v);
@@ -43,7 +43,7 @@
     const data=project(input);
     if(!assets?.template||!assets.css||!assets.runtime||!assets.scoresCore||!assets.goldCore)throw Error('離線顯示元件未載入');
     const script=s=>'<script>'+s.replace(/<\/script/gi,'<\\/script')+'</script>';
-    return '<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow,noarchive"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; connect-src \'none\'; img-src data:; form-action \'none\'; base-uri \'none\'; frame-src \'none\'; object-src \'none\'"><title>北一二部｜店務／金牌唯讀快照</title><style>'+assets.css.replace(/<\/style/gi,'<\\/style')+'</style></head><body>'+assets.template+'<script type="application/json" id="departmentSnapshot">'+json(data)+'</script>'+script(assets.scoresCore)+script(assets.goldCore)+script(assets.runtime)+'</body></html>';
+    return Html.finalize('<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow,noarchive"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; connect-src \'none\'; img-src data:; form-action \'none\'; base-uri \'none\'; frame-src \'none\'; object-src \'none\'"><title>北一二部｜店務／金牌唯讀快照</title><style>'+assets.css.replace(/<\/style/gi,'<\\/style')+'</style></head><body>'+assets.template+'<script type="application/json" id="departmentSnapshot">'+json(data)+'</script>'+script(assets.scoresCore)+script(assets.goldCore)+script(assets.runtime)+'</body></html>');
   }
   return {SCHEMA,project,createHTML};
 });

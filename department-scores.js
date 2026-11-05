@@ -36,7 +36,7 @@
     snapshot=null;pending=null;restore=null;loaded=false;
     setBusy(false);
     $('scoreDashboard').hidden=true;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;
-    for(const id of ['scorePerfectBody','scoreSummary','scoreRegions','scoreTrend','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scorePeriodStatus','scoreHead','scoreWarnings','scoreUpdateMessage'])$(id).replaceChildren();$('scoreFile').value='';
+    for(const id of ['scorePerfectBody','scoreSummary','scoreRegions','scoreTrend','scoreTrendScope','scoreRegionRanking','scoreBody','scoreDetail','scoreHistory','scoreDiff','scoreRestoreDiff','scoreRestoreMeta','scorePreviewMeta','scoreMonthChoices','scoreErrors','scoreSourceMeta','scorePeriodStatus','scoreHead','scoreWarnings','scoreUpdateMessage'])$(id).replaceChildren();$('scoreFile').value='';
   }
   function lock(message) {
     clearPrivateData();verifiedToken='';locked=true;
@@ -130,6 +130,23 @@
     const lines=valid.slice(1).map((p,i)=>p&&valid[i]?`<line x1="${valid[i].x}" y1="${valid[i].y}" x2="${p.x}" y2="${p.y}" stroke="#ed6600" stroke-width="4"/>`:'').join('');
     return `<svg viewBox="0 0 800 255" role="img" aria-label="各月份門市平均成績，縱軸 ${low} 到100分"><line x1="70" y1="190" x2="755" y2="190" stroke="#c9c2b9"/><text x="12" y="40">100分</text><text x="12" y="190">${low}分</text>${lines}${points.map((p,i)=>`<text x="${x(i)}" y="238" text-anchor="middle">${p.key.slice(5)}月</text>${p.value==null?'':`<circle cx="${x(i)}" cy="${y(p.value)}" r="6" fill="#ed6600"/><text x="${x(i)}" y="${y(p.value)-15}" text-anchor="middle">${number(p.value)}</text>`}`).join('')}</svg>`;
   }
+  function renderRegionRanking(){
+    // Ranking uses the latest six calendar months of stored history, independently of the period selector.
+    const half=C.periodMonths(snapshot.months.map(s=>s.month),'half');
+    const keys=half.map(m=>m.monthKey);
+    const groups=C.REGIONS.map(region=>{
+      const rows=half.flatMap(m=>m.available===false?[]:m.records.filter(r=>r.region===region&&Number.isFinite(r.score)));
+      const s=C.summarize(rows);
+      return {region,mean:s.mean,count:rows.length,monthly:half.map(m=>m.available===false?null:C.summarize(m.records.filter(r=>r.region===region&&Number.isFinite(r.score))).mean)};
+    });
+    const ranks=values=>values.map(value=>value==null?null:1+values.filter(other=>other!=null&&other>value+1e-9).length);
+    const overall=ranks(groups.map(g=>g.mean));
+    const monthly=keys.map((_,i)=>ranks(groups.map(g=>g.monthly[i])));
+    const sorted=groups.map((g,i)=>({...g,rank:overall[i],monthRanks:monthly.map(r=>r[i])})).sort((a,b)=>(a.rank??99)-(b.rank??99)||a.region.localeCompare(b.region));
+    $('scoreRegionRanking').innerHTML='<table class="score-rank-table"><thead><tr><th>近半年排名</th><th>督導區</th><th>平均 G 成績</th><th>有效店月</th>'+keys.map(k=>'<th>'+escape(k.slice(5))+'月</th>').join('')+'</tr></thead><tbody>'+sorted.map(g=>'<tr><td><strong>'+(g.rank==null?'—':'第 '+g.rank+' 名')+'</strong></td><td>'+escape(g.region)+'</td><td class="number">'+number(g.mean)+'</td><td>'+g.count+'</td>'+g.monthRanks.map((r,i)=>'<td>'+(r==null?'—':'第'+r+'名')+'<small>'+number(g.monthly[i])+'分</small></td>').join('')+'</tr>').join('')+'</tbody></table>';
+    const complete=keys.length===6&&half.every(m=>m.available!==false)&&keys.every((k,i)=>i===0||((new Date(k+'-01T00:00:00Z').getUTCFullYear()-new Date(keys[i-1]+'-01T00:00:00Z').getUTCFullYear())*12+new Date(k+'-01T00:00:00Z').getUTCMonth()-new Date(keys[i-1]+'-01T00:00:00Z').getUTCMonth()===1));
+    $('scoreRegionRanking').setAttribute('data-complete',String(complete));
+  }
   function issueClass(value,kind='defect'){
     if(value==null)return 'score-missing';
     const n=Number(value);if(!Number.isFinite(n))return 'score-missing';
@@ -155,7 +172,9 @@
     $('scoreSummary').innerHTML=cards.map(([label,value,note,tone])=>`<article class="summary-card ${tone||''}"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join('');
     $('scorePerfectBody').innerHTML=window.DepartmentScoresPerfect.render(snapshot.months.map(s=>s.month),filters());
     const regionRows=months.flatMap(m=>m.records);
-    $('scoreRegions').innerHTML=C.REGIONS.map(region=>{const s=C.summarize(regionRows.filter(r=>r.region===region));return `<article><h4>${region}</h4><strong class="${issueClass(s.mean,'checkScore')}">${number(s.mean)}</strong><span>門市平均分</span><small class="${issueClass(s.deduction)}">${s.storeMonths} 店月｜原扣分 ${number(s.deduction)}</small></article>`;}).join('');
+    $('scoreRegions').innerHTML=C.REGIONS.map(region=>{const s=C.summarize(regionRows.filter(r=>r.region===region));const active=$('scoreRegion').value===region;return `<button type="button" class="score-region-choice ${active?'is-active':''}" data-score-region="${escape(region)}" aria-pressed="${active}"><span class="score-region-name">${escape(region)}</span><strong class="${issueClass(s.mean,'checkScore')}">${number(s.mean)}</strong><span>門市平均分</span><small class="${issueClass(s.deduction)}">${s.storeMonths} 店月｜原扣分 ${number(s.deduction)}</small></button>`;}).join('');
+    $('scoreTrendScope').textContent=($('scoreRegion').value||'A–D 全部')+'｜'+($('scoreStore').value||'全部店點')+'｜'+(keys[0]||'—')+' ～ '+(keys.at(-1)||'—');
+    renderRegionRanking();
     $('scoreTrend').innerHTML=trend(months)+'<div class="score-trend-labels">'+months.map(m=>`<div><span>${m.monthKey}</span><strong>${number(C.summarize(filtered(m)).mean)}</strong></div>`).join('')+'</div>';
     const allStores=[...new Set(rows.map(r=>r.store))];
     $('scoreHead').innerHTML=`<tr><th>店點／部區</th>${months.map(m=>`<th>${m.monthKey}</th>`).join('')}<th>門市平均分</th><th>原總缺失 E</th><th>原扣分 F</th><th>部內／全國名次<br>（单月）</th><th>缺失明細</th></tr>`;
@@ -220,6 +239,7 @@
   $('scoreImport').addEventListener('click',preview);$('scorePublish').addEventListener('click',publish);$('scoreRefresh').addEventListener('click',()=>load({refresh:true}));$('scoreConfirm').addEventListener('change',updatePublish);$('scoreMonthChoices').addEventListener('change',updatePublish);
   $('scoreFile').addEventListener('change',()=>{pending=null;$('scorePreview').hidden=true;updatePublish();});$('scoreYear').addEventListener('input',()=>{pending=null;$('scorePreview').hidden=true;updatePublish();});
   $('scorePeriod').addEventListener('change',()=>{presentationExporter?.invalidate();updateStores();render();});$('scoreRegion').addEventListener('change',()=>{presentationExporter?.invalidate();updateStores();render();});$('scoreStore').addEventListener('change',()=>{presentationExporter?.invalidate();render();});
+  $('scoreRegions').addEventListener('click',e=>{const target=e.target.closest('[data-score-region]');if(!target)return;const region=target.dataset.scoreRegion;$('scoreRegion').value=$('scoreRegion').value===region?'':region;presentationExporter?.invalidate();updateStores();render();});
   $('scoreBody').addEventListener('click',e=>{const b=e.target.closest('[data-score-detail]');if(b)detail(b.dataset.scoreDetail);});
   $('scoreHistoryPreview').addEventListener('click',previewHistory);$('scoreRestore').addEventListener('click',restoreHistory);$('scoreRestoreConfirm').addEventListener('change',updatePublish);$('scoreHistory').addEventListener('change',()=>{restore=null;$('scoreRestorePreview').hidden=true;updatePublish();});
   $('scoreExport').addEventListener('click',()=>exportData(false));$('scoreBrief').addEventListener('click',()=>exportData(true));

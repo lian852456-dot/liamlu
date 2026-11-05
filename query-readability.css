@@ -1,0 +1,115 @@
+/* Shared reading scale. Kept separate from price loading and source parsing. */
+body[data-query-kind]{--ink:#1f2937;--muted:#475569;--navy:#9a3b00;--ok:#176344;--warn:#783d0b;--bad:#9b2733;color:var(--ink);font-weight:500}
+body[data-query-kind] :is(button,input,select,textarea){font-weight:650}
+body[data-query-kind] :is(label,summary,th){font-weight:700}
+body[data-query-kind] :is(h1,h2,h3,strong,.quote){font-weight:800}
+body[data-query-kind] :is(summary,.home-link){color:#8f3500}
+body[data-query-kind] :is(input,textarea)::placeholder{color:#526071;opacity:1}
+body[data-query-kind] :is(input,select,textarea){border-color:#8b97a5}
+body[data-query-kind] :is(button,a,input,select,textarea,summary):focus-visible{outline:3px solid #9a3b00;outline-offset:3px}
+body[data-query-kind] :is(.brand-label,.variant-label,.hint,.scroll-hint,.source-date>span){color:#475569;font-weight:600}
+body[data-query-kind] .area-nav a{color:#334155}
+body[data-query-kind] .area-nav a.active{color:#8f3500}
+body[data-query-kind] .tab{color:#334155}
+body[data-query-kind] .tab.active,body[data-query-kind] button[aria-pressed=true]{color:#fff}
+body[data-query-kind] :is(.rent-label,.spec-tags,.source-date strong,.card-plan>.quote){color:#8f3500}
+body[data-query-kind] :is(.quote.missing,.quote.absent){color:#475569;font-weight:650}
+body[data-query-kind] .quote.zero{color:#176344}
+body[data-query-kind] .comparison-table :is(.contract-label,.condition-detail,.project-label){color:#334155;font-weight:650}
+body[data-query-kind] .comparison-table .spec-cell :is(.brand-label,.variant-label,details){font-weight:600}
+body[data-query-kind].query-workspace{font-size:16px;line-height:1.55}
+body[data-query-kind].query-workspace :is(#queryStatus,.query-shopping-filters .field,.query-extra-filters,.query-extra-filters .filter-details summary,.query-shopping-filters .shortcut-bar button,.query-shopping-quotes .comparison-toolbar p,.query-shopping-quotes .view-switch button,.query-shopping-quotes .comparison-pagination,.query-shopping-quotes .comparison-pagination button){font-size:14px!important}
+body[data-query-kind].query-workspace :is(.query-shopping-filters input,.query-shopping-filters select){font-size:16px!important;min-height:38px!important}
+body[data-query-kind].query-workspace :is(.query-shopping-filters .shortcut-bar button,.query-shopping-quotes .view-switch button,.query-shopping-quotes .comparison-pagination button){min-height:36px!important}
+body[data-query-kind].query-workspace .comparison-table :is(th,td){font-size:15px!important;line-height:1.5}
+body[data-query-kind].query-workspace .comparison-table .spec-cell{font-size:15px!important}
+body[data-query-kind].query-workspace .comparison-table .spec-cell strong{font-size:17px}
+body[data-query-kind].query-workspace .comparison-table :is(.contract-label,.condition-detail,.project-label,.spec-tags,.brand-label,.variant-label,details){font-size:14px}
+body[data-query-kind].query-workspace .comparison-table .rent-label{font-size:20px}
+body[data-query-kind].query-workspace .comparison-table .quote{font-size:20px;font-weight:800}
+body[data-query-kind].query-workspace .comparison-table :is(.quote.missing,.quote.absent){font-size:15px}
+body[data-query-kind].query-workspace #queryCard>.topbar h2{font-size:18px}
+body[data-query-kind] .tref{color:#1f2937;font-size:16px;font-weight:500}
+body[data-query-kind] .tref :is(label,button,a,summary,[role=status],.tref-list-top,.tref-period,small,.tref-source small,.tref-detection span,.tref-detection small,.tref-grade-note,caption){font-size:14px;line-height:1.55}
+body[data-query-kind] .tref :is(input,select,textarea){font-size:16px;min-height:38px;color:#1f2937}
+body[data-query-kind] .tref :is(button,a){color:#8f3500;min-height:36px}
+body[data-query-kind] .tref :is(.tref-top p,.tref-summary-head p,.tref-quotes span,small,.tref-source small,.tref-grade-note,.tref-detection span,.tref-detection small,caption){color:#475569;font-weight:600}
+body[data-query-kind] .tref .tref-quotes span{font-size:14px}
+body[data-query-kind] .tref .tref-quotes strong{font-size:23px;color:#8f3500}
+body[data-query-kind] .tref .tref-difference strong{font-size:17px;color:#1f2937}
+body[data-query-kind] .tref :is(th,td){font-size:15px;font-weight:650}
+body[data-query-kind] .tref thead th{font-size:14px;color:#334155}
+body[data-query-kind] .tref tbody th button{font-size:16px;color:#1f2937;font-weight:750;min-height:0}
+body[data-query-kind] .tref td.tref-unpriced{font-size:14px;color:#475569}
+body[data-query-kind] .tref .tref-period{color:#245239;font-weight:700}
+body[data-query-kind] .tref .tref-period:is(.expired,.unknown,.upcoming){color:#8c3020}
+body[data-query-kind] .tref-dialog :is(p,small,.tref-grade-definition h4){font-size:15px}
+body[data-query-kind] .promo-catalog :is(.promo-intro,.promo-message,.promo-count,.promo-brand,.promo-heading>span,.promo-code,.promo-note,.promo-card dt,.promo-sources small){color:#475569;font-weight:600}
+body[data-query-kind] .promo-catalog :is(.promo-filters label,.promo-options,.promo-type,.promo-validity,.promo-brand,.promo-benefits p,.promo-card dl,.promo-note,.promo-sources small){font-size:14px}
+body[data-query-kind] .promo-catalog :is(.promo-benefits strong,.promo-type){color:#8f3500}
+body[data-query-kind] .promo-validity{color:#654b2d}
+body[data-query-kind] .promo-validity.active{color:#245239}
+body[data-query-kind] .promo-validity:is(.closed,.expired){color:#8c3020}
+body[data-query-kind] .promo-dialog p,body[data-query-kind] .quote-reference [role=status]{font-size:14px;color:#475569}
+body[data-query-kind] .query-secondary-notes{font-size:12px;line-height:1.6;margin:6px 0 0;color:#475569;min-width:0}
+body[data-query-kind] .query-secondary-notes>summary{font-size:12px;color:#475569;min-height:28px;padding:4px 0}
+body[data-query-kind] .query-secondary-notes :is(p,small,#shoppingSectionDescription,.privacy,.scroll-hint,.tref-grade-note){font-size:12px!important;color:#475569!important;margin:6px 0!important;overflow-wrap:anywhere}
+body[data-query-kind] .query-secondary-notes[open]{border-left:3px solid #cbd5e1;padding-left:10px}
+body[data-query-kind] #queryResources>#queryHelp{padding:4px 14px;border:1px solid #e0e0da;border-radius:9px;background:#fff}
+body[data-query-kind] .tref [data-tref=copy-status]:empty{display:none}
+body.query-workspace:has(#tradeinTab[aria-selected=true]) #queryStatus.query-status-ready:not(.bad){display:none}
+body[data-query-kind] .tref .tref-detection{padding:6px 0;margin:7px 0;border:0;background:transparent}
+body[data-query-kind] .tref .tref-notes{margin-top:10px;border-top:1px solid #d7dde4;padding-top:4px}
+body[data-query-kind] button:disabled{opacity:1;background:#edf0f3;color:#526071;border-color:#b7c0cb}
+/* Prices and contract length lead; repeated source labels stay in the disclosure. */
+body[data-query-kind].query-workspace .comparison-table .quote{font-size:22px;font-weight:800}
+body[data-query-kind].query-workspace .comparison-table .price-value{font-size:inherit!important}
+body[data-query-kind].query-workspace .comparison-table .rent-label{font-size:19px}
+body[data-query-kind].query-workspace .comparison-table .contract-label{font-size:19px;font-weight:800;color:#1f2937;white-space:nowrap}
+body[data-query-kind] .comparison-table{table-layout:auto}
+body[data-query-kind] .comparison-table :is(th,td):not(.spec-cell){min-width:104px}
+body[data-query-kind] .comparison-table .tariff-contract{display:inline-flex!important;flex-wrap:nowrap;align-items:baseline;gap:0;white-space:nowrap;font-variant-numeric:tabular-nums;line-height:1.4}
+body[data-query-kind] .comparison-table .tariff-contract>span{display:inline!important;white-space:nowrap}
+body[data-query-kind] .comparison-table .tariff-contract.unknown-term{column-gap:4px}
+body[data-query-kind] .card-plan .tariff-contract{display:inline-block;white-space:nowrap;font-variant-numeric:tabular-nums}
+body[data-query-kind] .comparison-scroll{overflow:auto!important;max-width:100%}
+body[data-query-kind].query-workspace .comparison-table thead :is(.project-label,.condition-detail,summary){white-space:nowrap;overflow-wrap:normal}
+body[data-query-kind].query-workspace .comparison-table .project-label{font-size:11px;line-height:1.4;margin-bottom:2px}
+body[data-query-kind].query-workspace .comparison-table details{font-size:11px;line-height:1.4;margin-top:2px}
+body[data-query-kind].query-workspace .comparison-table summary{white-space:nowrap;overflow-wrap:normal}
+body[data-query-kind].query-workspace .comparison-table tbody :is(th,td){padding:4px 6px!important}
+body[data-query-kind].query-workspace .comparison-table .spec-cell strong{font-size:14px;line-height:1.25}
+body[data-query-kind].query-workspace .comparison-table .spec-cell :is(.spec-tags,.brand-label){display:inline;font-size:12px;line-height:1.35;margin-top:0}
+body[data-query-kind].query-workspace .comparison-table .brand-label::before{content:' · '}
+body[data-query-kind].query-workspace .comparison-table .spec-cell .variant-label{font-size:12px;line-height:1.3;margin-top:1px}
+body[data-query-kind].query-workspace .comparison-pagination{position:static!important;z-index:auto!important;clear:both;background:#fff;border-top:1px solid #d7dde4;padding-top:6px;isolation:isolate}
+body[data-query-kind].query-workspace .comparison-pagination button{white-space:nowrap;font-size:12px!important}
+body[data-query-kind] .version-badge{font-size:13px;font-weight:750;color:#8f3500}
+body[data-query-kind].query-workspace .comparison-table .project-label,body[data-query-kind].query-workspace .comparison-table details{font-size:11px}
+body[data-query-kind].query-workspace .comparison-table :is(.brand-label,.variant-label){font-size:13px}
+body[data-query-kind] .tref :is(.tref-detection span,.tref-detection small,.tref-source small){font-size:12px}
+body[data-query-kind] .promo-catalog .promo-sources small,body[data-query-kind] .quote-reference [role=status]{font-size:12px}
+@media(max-width:800px){
+ body[data-query-kind].query-workspace .hero h1{font-size:22px}
+ body[data-query-kind].query-workspace :is(.query-shopping-filters input,.query-shopping-filters select){font-size:16px!important;min-height:42px!important}
+ body[data-query-kind].query-workspace .query-extra-filters>summary{font-size:15px}
+ body[data-query-kind].query-workspace .comparison-table .spec-cell{min-width:145px!important;width:145px!important;max-width:165px!important}
+ body[data-query-kind].query-workspace .comparison-table .spec-cell strong{font-size:13px}
+ body[data-query-kind].query-workspace .comparison-table .quote{font-size:23px}
+ body[data-query-kind] .tref :is(input,select,textarea){min-height:42px}
+ body[data-query-kind] .tref :is(button,a){min-height:40px}
+ body[data-query-kind] .tref tbody th button{min-height:0}
+ body[data-query-kind] .tref :is(th,td){font-size:15px}
+ body[data-query-kind] .tref-quotes{grid-template-columns:repeat(2,minmax(0,1fr))}
+ body[data-query-kind] .tref-quotes>.tref-difference{grid-column:1/-1}
+ body[data-query-kind] .tref-quotes:has(>:nth-child(2):last-child){grid-template-columns:minmax(0,1fr)}
+ body[data-query-kind] .tref-top h2{font-size:19px}
+ body[data-query-kind] .tref-top>label{flex-basis:145px}
+ body[data-query-kind] .tref-summary h3{font-size:19px}
+ body[data-query-kind] .tref .tref-quotes strong{font-size:22px}
+ body[data-query-kind] .promo-filters input,body[data-query-kind] .promo-filters select{font-size:16px}
+ body[data-query-kind] .query-secondary-notes,body[data-query-kind] .query-secondary-notes>summary{font-size:13px}
+ body[data-query-kind] .query-secondary-notes :is(p,small,#shoppingSectionDescription,.privacy,.scroll-hint,.tref-grade-note){font-size:13px!important}
+ body[data-query-kind] .tref :is(.tref-detection span,.tref-detection small,.tref-source small){font-size:13px}
+ body[data-query-kind].query-workspace .comparison-table .spec-cell :is(.spec-tags,.brand-label){font-size:11px}
+}

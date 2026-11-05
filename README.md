@@ -2,6 +2,10 @@
 
 單一檔案 HTML App（`index.html`），部署於 GitHub Pages。後端為 Google Apps Script（`gas/Code.gs`）＋ Google Sheets。
 
+## 手機與舊換新優惠核對
+
+`threec-query.html` 與 `tradein-query.html` 提供當月活動JSON與已下載報價中心HTML的本機載入。保留原線上查詢，活動折價、疊加最高額、專案價與回收價分開呈現；私有內容不提交公開站。本機參考來源另有兩家獨立選級、價差、完整料號及Mac分級、回收檢測入口與複製報價。正式及參考來源共用緊湊查價工作區，正式版保留現有三家回收商、版本及異動功能；來源未提供的欄位不補猜。來源格式、日期／通路核對與測試方式見 [活動查詢說明](docs/PROMOTION_CATALOG.md)。
+
 ## 每日移動里程
 
 - `app.html` 自 2026/09 起與 `patrol.html` 共用 `patrol-question-versions.js`：App 以正式 `ptdetail` 呈現新版 25 項、每店每月 2 次且至少相隔 7 天；並以既有唯讀 `ptmileage2` 顯示本月累積公里、報銷出差日、待確認路段與最近路線。8 月以前的 33 題歷史摘要維持原規則。
