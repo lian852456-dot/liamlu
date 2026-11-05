@@ -90,7 +90,7 @@ for(const width of [1280,390])test(`${width}px retained self progress and actual
   // Exercise the documented fallback without granting clipboard permissions.
   await page.evaluate(()=>{document.execCommand=()=>false;return Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('synthetic clipboard rejection');}}});});
   await page.locator('#copyReminder').click();await expect(page.locator('#exportFeedback')).toContainText('可在下方提醒內容手動選取複製');
-  await expect(page.locator('#reminderText')).toHaveValue(/來源截止：2026-10-07/);
+  await expect(page.locator('#reminderText')).toHaveValue(/截至 2026-10-07/);
   expect(calls.every(call=>call.action==='tradein_performance_read')).toBe(true);expect(errors).toEqual([]);
 });
 for(const person of [1,2])test(`retained ${person===1?'manager':'acting manager'} keeps actuals without a target`,async({page})=>{
