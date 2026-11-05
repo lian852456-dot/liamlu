@@ -1,8 +1,8 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-function worker({offline=false}={}){
+function worker({offline=false,asset='tradein-performance-core.js'}={}){
  const handlers={},puts=[],matches=[],fetches=[],cached=new Response('OLD_PARSER');
- const scope='https://example.test/liamlu/',url=scope+'tradein-performance-core.js?v=old';
+ const scope='https://example.test/liamlu/',url=scope+asset+'?v=old';
  const context=vm.createContext({URL,Response,Headers,self:{location:{origin:'https://example.test'},registration:{scope},addEventListener:(name,fn)=>handlers[name]=fn},
   fetch:async(request,options)=>{fetches.push({url:request.url,options});if(offline)throw Error('offline');return new Response('NEW_PARSER');},
   caches:{open:async()=>({put:async(request)=>puts.push(request.url)}),match:async(request,options)=>{matches.push({url:request.url,options});return request.url===url?cached:undefined;}}
@@ -23,4 +23,10 @@ test('upload parser refresh requests neither use nor populate the persistent cac
 });
 test('private backend requests are outside the cache worker',()=>{
  const r=worker();let handled=false;r.handlers.fetch({request:{url:'https://script.google.com/macros/s/SYNTHETIC/exec',method:'GET',mode:'cors'},respondWith:()=>handled=true});assert.equal(handled,false);assert.equal(r.fetches.length,0);
+});
+test('query interface assets prefer deployed code and never fall back across versions',async()=>{
+ for(const asset of ['threec-query-ui.js','price-model-view.js','quote-reference-ui.js','query-workspace.js','query-readability.css','query-route-update.js','promotion-catalog-ui.js','tradein-official-workspace.js']){
+  const live=worker({asset});assert.equal(await(await get(live)).text(),'NEW_PARSER');assert.equal(live.fetches[0].options.cache,'no-store');assert.equal(live.matches.length,0);
+  const offline=worker({asset,offline:true});assert.equal(await(await get(offline)).text(),'OLD_PARSER');assert.equal(await get(offline,offline.url.replace('v=old','v=new')),undefined);assert.equal(offline.matches.every(m=>m.options===undefined),true);
+ }
 });

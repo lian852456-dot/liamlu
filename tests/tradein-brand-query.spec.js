@@ -2,7 +2,7 @@
 const {test,expect}=require('@playwright/test');
 const path=require('node:path');
 const fs=require('node:fs');
-const PAGE='file://'+path.resolve(__dirname,'../tradein-query.html');
+const PAGE='file://'+path.resolve(__dirname,'../tradein-query.html')+'?view=source';
 const SHOP='file://'+path.resolve(__dirname,'../threec-query.html');
 function fixture(){return {status:'ok',changesDeferred:true,snapshot:{kind:'tradein',source_version_date:'2026-10-12',snapshot_hash:'synthetic-ops-brands',row_count:4,rows:[
   {brand:'Apple',model:'iPhone 17 Pro 256GB',quotes:{'點子行動':{S:'20,000',A:'16,000',B:'',C:null},'FutureDial（FDI）':{A:0}}},

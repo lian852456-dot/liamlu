@@ -182,6 +182,8 @@
   }
   function renderTradein(view){
     const target=$('tradeinResults');
+    if(!state.tradein?.localReference&&scope.TradeinOfficialWorkspace?.render(view)){$('tradeinMeta').innerHTML=metaHtml(view.meta,false);return;}
+    scope.TradeinOfficialWorkspace?.clear();target.classList.remove('official-workspace','tref');
     if(!view){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未讀取正式舊換新資料。</div>';return;}
     if(!view.available){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未發布正式資料：舊換新。</div>';return;}
     $('tradeinMeta').innerHTML=metaHtml(view.meta,state.tradein?.localReference);

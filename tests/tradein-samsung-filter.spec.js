@@ -39,7 +39,7 @@ function expectedPrices(rows,provider='',grade=''){
 }
 for(const c of configs){
  for(const width of [320,390,1280])test(`${c.name} ${width}px Samsung aliases share one option; both price matrices remain exact`,async({page},testInfo)=>{
-  const data=fixture(),original=JSON.stringify(data),api=await mock(page,data);await page.setViewportSize({width,height:900});await page.goto('file://'+path.join(root,c.file));
+  const data=fixture(),original=JSON.stringify(data),api=await mock(page,data);await page.setViewportSize({width,height:900});await page.goto('file://'+path.join(root,c.file)+(c.name==='internal'?'?view=source':''));
   await expect(page.locator(c.brand+' option')).toHaveText(['全部廠牌','Apple','Samsung']);
   await page.locator(c.brand).selectOption('Samsung');
   await expect(page.locator(c.target+' .tc-item')).toHaveCount(2);
@@ -62,13 +62,13 @@ for(const c of configs){
   await page.screenshot({path:testInfo.outputPath('SYNTHETIC-samsung-'+c.name+'-'+width+'.png'),fullPage:true});
  });
  test(`${c.name} same model under both source aliases never overwrites a quote`,async({page})=>{
-  const data=fixture();data.snapshot.rows[1].model=data.snapshot.rows[0].model;await mock(page,data);await page.goto('file://'+path.join(root,c.file));
+  const data=fixture();data.snapshot.rows[1].model=data.snapshot.rows[0].model;await mock(page,data);await page.goto('file://'+path.join(root,c.file)+(c.name==='internal'?'?view=source':''));
   await page.locator(c.brand).selectOption('Samsung');await expect(page.locator(c.model+' option')).toHaveCount(3);
   for(const r of data.snapshot.rows.slice(0,2)){await page.locator(c.model).selectOption(key(r));await expect(page.locator(c.target+' .tc-item')).toHaveCount(1);expect(await actualPrices(page,c)).toEqual(expectedPrices([r]));}
  });
  test(`${c.name} complete catalog includes both aliases past initial display limit; error clears it`,async({page})=>{
   const data=fixture();data.snapshot.rows=Array.from({length:66},(_,i)=>row(i<33?'Samsung':'SAMSUNG','Galaxy synthetic '+i+' 256GB',1000+i));data.snapshot.row_count=66;
-  const api=await mock(page,data);await page.goto('file://'+path.join(root,c.file));await page.locator(c.brand).selectOption('Samsung');
+  const api=await mock(page,data);await page.goto('file://'+path.join(root,c.file)+(c.name==='internal'?'?view=source':''));await page.locator(c.brand).selectOption('Samsung');
   await expect(page.locator(c.brand+' option')).toHaveText(['全部廠牌','Samsung']);await expect(page.locator(c.model+' option')).toHaveCount(67);
   await page.locator(c.model).selectOption(key(data.snapshot.rows[65]));await expect(page.locator(c.target+' .tc-item')).toHaveCount(1);
   expect(await actualPrices(page,c)).toEqual(expectedPrices([data.snapshot.rows[65]]));await expect(page.locator(c.meta)).toContainText('66');

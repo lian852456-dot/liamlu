@@ -38,6 +38,27 @@ domTest('正式讀取沿用原API及三家報價，套用工作區且保留異�
   }finally{c.close();}
  }
 });
+domTest('正式預設第6版比較：三家獨立選級、65款可翻頁、完整來源及錯誤清除',async()=>{
+ const rows=Array.from({length:65},(_,i)=>({brand:'Test',model:'QA '+String(i).padStart(2,'0')+' 256GB',source_sheet:'合成工作表',quotes:{'點子行動':{A:1000+i,B:700+i},'FutureDial（FDI）':{S:1200+i,A:950+i},'愛鋒派':{'未分級':800+i}}}));
+ const response={status:'ok',snapshot:{kind:'tradein',source_version_date:'2026-11-05',snapshot_hash:'synthetic-v6',rows},changesDeferred:true},before=JSON.stringify(response);let fail=false;
+ const c=await setup({pageFile:'tradein-query.html',width:390,officialResponses:p=>p.kind==='tradein'?(fail?{status:'error',message:'合成讀取拒絕'}:response):{status:'ok',snapshot:null}});try{
+  assert(c.$('#tradeinResults').classList.contains('official-workspace'));assert.equal(c.$('.query-tradein-filters').contains(c.$('#tradeinBrand')),true);assert.equal(c.$('.query-history').open,false);
+  assert.equal(c.$('.official-price-table tbody').rows.length,20);assert.match(c.$('.tref-list-top').textContent,/65 組.*1／4/);assert.match(c.$('.tref-summary').textContent,/點子 多 50 元/);
+  const change=(p,g)=>{const s=c.$('[data-oq-grade="'+p+'"]');s.value=g;s.dispatchEvent(new c.w.Event('change'));};
+  change('FutureDial（FDI）','S');assert.match(c.$('.tref-summary').textContent,/FDI 多 200 元/);assert.equal(c.$('[data-oq-grade="點子行動"]').value,'A');assert.match(c.$('.official-price-table').textContent,/未分級/);
+  c.$('[data-oq=next]').click();assert.match(c.$('.tref-summary').textContent,/QA 20/);c.$('[data-oq=next]').click();c.$('[data-oq=next]').click();assert.equal(c.$('.official-price-table tbody').rows.length,5);assert.match(c.$('.official-price-table').textContent,/QA 64/);
+  c.$('[data-oq=detail]').click();assert.equal(c.$('#tradeinOfficialDialog').open,true);assert.match(c.$('[data-oq=dialog-body]').textContent,/愛鋒派（獨立報價）.*來源未分級/);assert.match(c.$('[data-oq=dialog-body]').textContent,/正式來源未提供/);c.$('[data-oq=close]').click();
+  c.$('[data-oq=copy]').click();await Promise.resolve();assert.match(c.copied[0],/來源日期：2026-11-05/);assert.match(c.copied[0],/有效期：正式來源未提供/);assert.match(c.copied[0],/synthetic-v6/);assert.equal(JSON.stringify(response),before);assert.equal(c.network.length,2);
+  fail=true;c.$('#refreshBtn').click();for(let i=0;i<30&&!c.$('#queryStatus').classList.contains('bad');i++)await new Promise(r=>setTimeout(r,5));assert.match(c.$('#queryStatus').textContent,/合成讀取拒絕/);assert.doesNotMatch(c.$('#tradeinResults').textContent,/QA 60/);assert.equal(c.$('.official-price-table'),null);assert.deepEqual(c.errors,[]);
+ }finally{c.close();}
+});
+domTest('正式比較容量篩選及三家零／缺價／未分級不改值，複製回覆不覆蓋新選級',async()=>{
+ const response={status:'ok',changesDeferred:true,snapshot:{kind:'tradein',source_version_date:'2026-11-05',snapshot_hash:'synthetic-v6-zero',rows:[{brand:'Test',model:'QA Zero 128GB',quotes:{'點子行動':{A:0,B:10},'FutureDial（FDI）':{A:null,S:20},'愛鋒派':{'未分級':30}}},{brand:'Test',model:'QA Other 256GB',quotes:{'點子行動':{A:50}}}]}};
+ const c=await setup({pageFile:'tradein-query.html',officialResponses:p=>p.kind==='tradein'?response:{status:'ok',snapshot:null}});try{
+  const cap=c.$('[data-oq=capacity]');cap.value='128GB';cap.dispatchEvent(new c.w.Event('change'));assert.match(c.$('.tref-list-top').textContent,/1 組/);assert.match(c.$('.official-price-table').textContent,/0 元/);assert.match(c.$('.official-price-table').textContent,/30 元/);assert.doesNotMatch(c.$('.official-price-table').textContent,/QA Other/);
+  let finish;Object.defineProperty(c.w.navigator,'clipboard',{value:{writeText:()=>new Promise(resolve=>finish=resolve)},configurable:true});c.$('[data-oq=copy]').click();const grade=c.$('[data-oq-grade="點子行動"]');grade.value='B';grade.dispatchEvent(new c.w.Event('change'));finish();await Promise.resolve();assert.equal(c.$('[data-oq=copy-status]').textContent,'');assert.deepEqual(c.errors,[]);
+ }finally{c.close();}
+});
 domTest('合約以括號呈現；重複月租／約期／版本收斂，限制條件及原文不遺失',async()=>{
  const p=pricePayload(),cases=[['999H',24],['999H',30],['999H',36],['999H',48],['999H_VIP',24],['999H_VIP加碼版',48],['999H_限新申裝',24],['999H_限高速21Mbps',30],['999H／合約36期',24],['999H','原表未提供']];
  p.prices.dicts=[['D1'],['5G_iPhone_XH-新申裝/續約'],cases.map(x=>x[0]),cases.map(x=>x[1]),[999],cases.map((_,i)=>1000+i),[29900]];

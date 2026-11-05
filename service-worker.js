@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-inspection-20261104-v1';
+const CACHE_NAME = 'liam-supervisor-app-query-v6-20261105-4';
 const SHELL = [
   './app.html',
   './portal-logout.js',
@@ -107,6 +107,12 @@ self.addEventListener('fetch', event => {
   // Trade-in uploads must use the deployed parser and upload controller while
   // online. Only the exact requested version may be used as an offline fallback.
   if (relativePath.startsWith('tradein-') && /\.(?:js|mjs|css)$/.test(relativePath)) {
+    event.respondWith(networkFirstTradeinAsset(event.request));
+    return;
+  }
+  // Query UI assets must use the deployed version while online. An offline
+  // fallback is permitted only for the exact requested asset version.
+  if (/^(?:threec-|price-model-view|quote-reference-|query-workspace|query-readability|query-route-update|promotion-catalog)/.test(relativePath) && /\.(?:js|mjs|css)$/.test(relativePath)) {
     event.respondWith(networkFirstTradeinAsset(event.request));
     return;
   }
