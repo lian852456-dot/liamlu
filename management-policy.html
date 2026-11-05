@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
+<title>管理辦法｜北一二B</title>
+<link rel="stylesheet" href="management-policy.css?v=20261104-1">
+<script defer src="app-assets/lucide.min.js"></script>
+</head>
+<body>
+<header class="masthead"><div class="shell topbar"><a class="brand" href="home.html"><i data-lucide="layers" aria-hidden="true"></i><span>北一二B 智慧營運中心<small>Liam AI Crew</small></span></a><a class="back" href="home.html#zone-supervisor">返回督導專區</a></div></header>
+<main class="shell">
+  <div class="intro"><div><p class="eyebrow">督導專區 / 管理辦法</p><h1>讓辦法清楚，讓門市好執行。</h1><p>整理管理辦法、核對適用期間，一鍵生成門市唯讀版。</p></div><span class="badge">督導專用</span></div>
+  <section id="authPanel" class="panel auth" aria-labelledby="authTitle"><i data-lucide="shield-check" aria-hidden="true"></i><div><h2 id="authTitle">先驗證督導權限</h2><p>沿用 Liam 情報站的督導通行碼，編輯內容僅在本頁暫存。</p><form id="authForm"><label for="passcode">督導通行碼</label><div class="auth-input"><input id="passcode" type="password" autocomplete="current-password" required><button id="verify" type="submit">驗證並進入</button></div></form><p id="authStatus" class="muted" role="status" aria-live="polite">尚未驗證。管理辦法與每週檔案不會自動讀取。</p></div></section>
+  <div id="workspace" hidden inert>
+    <p class="hint">目前未預載正式辦法。請載入草稿，或填入當期已核對的內容。</p>
+    <div class="toolbar"><p class="verified"><i data-lucide="shield-check" aria-hidden="true"></i>督導已驗證 · 本機編輯</p><div class="actions"><button id="clear" class="secondary" type="button">清除本頁草稿</button><button class="secondary" type="button" data-portal-logout>登出</button></div></div>
+    <div class="work-grid">
+      <div class="editor">
+        <section class="panel" aria-labelledby="infoTitle"><div class="section-title"><span class="step">01</span><div><h2 id="infoTitle">基本資料</h2><p>每一版都有自己的期間與來源。</p></div></div>
+          <div class="fields"><label class="full">辦法名稱<input id="title" maxlength="100" placeholder="例如：北一二B 管理辦法"></label><label>適用月份<input id="month" type="month"></label><label>版本名稱<input id="version" maxlength="60" placeholder="例如：10 月修訂版"></label><label>開始日期<input id="start" type="date"></label><label>結束日期<input id="end" type="date"></label><label class="full">適用對象<input id="audience" maxlength="160" placeholder="依正式來源填寫"></label><label class="full">來源與核對說明<textarea id="source" rows="3" maxlength="1200" placeholder="填寫來源文件、補充更正與尚待確認項目。請勿填入密碼、員編或個人績效。"></textarea></label></div>
+          <label class="file-label">載入本機草稿（JSON）<input id="draftFile" type="file" accept=".json,application/json"></label><p class="hint">草稿只在瀏覽器記憶體處理；不會上傳。離頁、切到背景或登出會清除，請先下載草稿。</p>
+        </section>
+        <section class="panel" aria-labelledby="rulesTitle"><div class="section-title"><span class="step">02</span><div><h2 id="rulesTitle">管理辦法內容</h2><p>以條列文字編輯，門市版會自動整理成章節。</p></div></div><div id="sections"></div><button id="addSection" class="secondary" type="button">新增章節</button></section>
+        <section class="panel" aria-labelledby="exportTitle"><div class="section-title"><span class="step">03</span><div><h2 id="exportTitle">預覽與生成</h2><p>產出獨立 HTML，門市下載後即可離線閱讀。</p></div></div>
+          <label class="check"><input id="reviewed" type="checkbox"><span>已逐條核對來源與補充更正，確認此版本內容。</span></label><label class="check"><input id="shareable" type="checkbox"><span>確認門市版僅包含可提供門市的辦法文字，未含登入資料、個人績效或未授權個資。</span></label>
+          <p class="hint">未勾選內容核對時，產出的每份文件都會標示「待核草稿」。下載檔案不另設密碼，請妥善保管。</p><div class="actions"><button id="preview" class="secondary" type="button">更新預覽</button><button id="saveDraft" class="secondary" type="button">下載編輯草稿</button><button id="export" type="button" disabled><i data-lucide="download" aria-hidden="true"></i>一鍵生成 HTML</button></div><p id="status" role="status" aria-live="polite">請填寫資料並更新預覽。</p>
+        </section>
+        <section class="panel weekly" aria-labelledby="weeklyTitle"><div class="section-title"><span class="step"><i data-lucide="file-spreadsheet" aria-hidden="true"></i></span><div><h2 id="weeklyTitle">每週 Excel</h2><p>每週更新與通知的集中入口。</p></div><span class="badge neutral">尚未啟用</span></div><p>自動產出、私有檔案保存與通知尚未連接。資料來源及收件範圍確認後，將在此顯示週別、資料截止日、核對狀態與受權限保護的下載入口。</p><p class="hint">含個人資料的 Excel 保存在既有私有資料層；不放進公開網站，也不隨門市 HTML 匯出。</p></section>
+      </div>
+      <aside class="preview-panel"><div class="preview-heading"><div><p class="eyebrow">STORE VIEW</p><h2>門市閱讀預覽</h2></div><span class="badge neutral">唯讀</span></div><p class="hint">預覽僅顯示本次辦法；不含編輯工具與每週 Excel。</p><iframe id="reader" title="管理辦法門市版預覽" sandbox="" referrerpolicy="no-referrer" srcdoc="<!doctype html><html lang='zh-Hant'><meta charset='utf-8'><body style='font-family:system-ui;color:#71757b;padding:32px;line-height:1.8'>填寫左側資料後，按「更新預覽」。</body></html>"></iframe></aside>
+    </div>
+  </div>
+  <noscript><p class="panel">請啟用 JavaScript 並完成督導驗證，才能編輯與生成 HTML。</p></noscript>
+</main><footer class="shell footer">內部工作輔助入口 · 管理辦法以經核對的適用版本為準</footer>
+<script src="portal-logout.js?v=20261012-brief-supervisor-1"></script><script type="module" src="management-policy.mjs?v=20261104-1"></script>
+</body></html>
