@@ -141,6 +141,11 @@
         <div id="threecMessage" class="message hidden" role="status"></div>
         <div id="threecPublishReceipt" class="message hidden" role="status"></div>
         <div id="threecReadbackMessage" class="message hidden" role="status"></div>
+        <div id="threecReadonlyExport" class="hidden">
+          <div class="actions"><button id="threecReadonlyExportBtn" class="secondary" type="button" disabled>下載唯讀版（HTML）</button></div>
+          <p class="small">包含目前已發布的手機與舊換新兩批價格，可離線查詢。下載時沿用現有管理碼與員編白名單重新驗證；版本日期不等於生效日期。</p>
+          <div id="threecReadonlyExportMessage" class="message hidden" role="status"></div>
+        </div>
         <div class="actions"><button id="threecReadbackRetryBtn" class="secondary hidden" type="button" disabled>重新核對已發布價格</button></div>
         <div id="threecRegistry" class="notice">目前正式版本讀取中…</div>
         <div id="threecPreview" class="hidden">
@@ -197,6 +202,8 @@
     let threecPreviewGeneration = 0;
     let threecPublishing = false;
     let threecPublicationState = null;
+    let threecReadonlyExportBusy = false;
+    let threecReadonlyExportGeneration = 0;
     let awardPreviewJobId = '';
     let awardPolling = false;
     const awardUploadState = {
@@ -332,6 +339,51 @@
       $('threecRegistry').innerHTML = threecSlotText('3C', slots.shopping) + threecSlotText('舊換新', slots.tradein);
       if ($('shoppingRollbackBtn')) $('shoppingRollbackBtn').disabled = threecPublishing || !threecRollbackAvailable.shopping;
       if ($('tradeinRollbackBtn')) $('tradeinRollbackBtn').disabled = threecPublishing || !threecRollbackAvailable.tradein;
+      updateThreecReadonlyExport();
+    }
+    function threecReadonlyHashes() {
+      const hashes = {};
+      ['shopping','tradein'].forEach(kind => {
+        const slot = threecRegistryState[kind] || (threecRegistryState.kinds && threecRegistryState.kinds[kind]);
+        hashes[kind] = String(slot && slot.active && slot.active.snapshot_hash || '');
+      });
+      return hashes;
+    }
+    function updateThreecReadonlyExport() {
+      const state = threecPublicationState;
+      const verified = !!state && state.verified && ['published','already_current'].includes(state.status);
+      const hashes = threecReadonlyHashes();
+      $('threecReadonlyExport').classList.toggle('hidden', !verified);
+      $('threecReadonlyExportBtn').disabled = !verified || threecPublishing || threecReadonlyExportBusy || !hashes.shopping || !hashes.tradein;
+      if (verified && (!hashes.shopping || !hashes.tradein)) message('threecReadonlyExportMessage', '手機與舊換新兩類正式資料均發布後，才可匯出完整唯讀版。', 'warn');
+    }
+    async function downloadThreecReadonly() {
+      const state = threecPublicationState;
+      if (threecReadonlyExportBusy || threecPublishing || !state || !state.verified || !['published','already_current'].includes(state.status)) return;
+      const expected = threecReadonlyHashes();
+      if (!expected.shopping || !expected.tradein) return message('threecReadonlyExportMessage', '手機與舊換新兩類正式資料均發布後，才可匯出完整唯讀版。', 'warn');
+      const generation = ++threecReadonlyExportGeneration;
+      threecReadonlyExportBusy = true;
+      updateThreecReadonlyExport();
+      message('threecReadonlyExportMessage', '正在重新驗證管理資格並讀取兩類正式價格…');
+      try {
+        const result = await call('threec_export_readonly', payload({expectedActiveHashes:expected}));
+        if (generation !== threecReadonlyExportGeneration || threecPublicationState !== state) return;
+        const sources = result && result.manifest && result.manifest.sources;
+        if (!result || result.status !== 'ok' || typeof result.html !== 'string' || !result.html.startsWith('<!doctype html>') || !/\.html$/.test(result.fileName || '') ||
+            !sources || ['shopping','tradein'].some(kind => !sources[kind] || sources[kind].snapshot_hash !== expected[kind])) throw new Error('匯出回應或正式版本核對失敗，未下載檔案。');
+        const url = URL.createObjectURL(new Blob([result.html], {type:'text/html;charset=utf-8'}));
+        const link = document.createElement('a');
+        link.href = url; link.download = result.fileName;
+        document.body.append(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        message('threecReadonlyExportMessage', '已產生唯讀版：手機 ' + sources.shopping.source_version_date + '／舊換新 ' + sources.tradein.source_version_date + '。請在瀏覽器下載項目取得檔案。', 'ok');
+      } catch (error) {
+        if (generation === threecReadonlyExportGeneration) message('threecReadonlyExportMessage', '下載失敗：' + error.message + '；正式資料未變更。', 'bad');
+      } finally {
+        threecReadonlyExportBusy = false;
+        updateThreecReadonlyExport();
+      }
     }
     async function refreshThreec() {
       const result = await call('threec_status', payload());
@@ -352,6 +404,9 @@
       threecFormalChangeMode = false;
       threecFormalSnapshotHash = '';
       threecPublicationState = null;
+      threecReadonlyExportGeneration += 1;
+      $('threecReadonlyExportMessage').classList.add('hidden');
+      updateThreecReadonlyExport();
       $('threecPublishReceipt').classList.add('hidden');
       $('threecReadbackMessage').classList.add('hidden');
       $('threecReadbackRetryBtn').classList.add('hidden');
@@ -374,6 +429,7 @@
       if (threecPublicationState) { $('threecConfirm').disabled = true; $('threecSameDateConfirm').disabled = true; }
       if (!busy) { $('shoppingRollbackBtn').disabled = !threecRollbackAvailable.shopping; $('tradeinRollbackBtn').disabled = !threecRollbackAvailable.tradein; }
       updateThreecPublishButton();
+      updateThreecReadonlyExport();
     }
     function threecPriceText(value) {
       if (value == null || String(value).trim() === '') return '無報價';
@@ -591,6 +647,7 @@
       try {
         const verified = await verifyThreecReadback(state.snapshot);
         state.verified = true;
+        updateThreecReadonlyExport();
         message('threecReadbackMessage', '正式讀回所有價格與來源預覽一致；門市查詢重新讀取即可更新。', 'ok');
         message('threecMessage', verified.changeWarning || (state.status === 'unconfirmed' ? '已讀回此來源正式價格；原發布回應仍未取得。' : '發布收據與正式價格核對均已完成。'), verified.changeWarning || state.status === 'unconfirmed' ? 'warn' : 'ok');
         $('threecReadbackRetryBtn').classList.add('hidden');
@@ -854,6 +911,8 @@
       finally { setBusy(button, false, '清理逾期暫存'); }
     });
     $('shoppingPreviewBtn').addEventListener('click', () => previewThreec('shopping'));
+    $('threecReadonlyExportBtn').addEventListener('click', downloadThreecReadonly);
+    window.addEventListener('pagehide', () => { threecReadonlyExportGeneration += 1; });
     $('tradeinPreviewBtn').addEventListener('click', () => previewThreec('tradein'));
     $('shoppingFile').addEventListener('change', invalidateThreecPreview);
     $('tradeinFile').addEventListener('change', invalidateThreecPreview);
