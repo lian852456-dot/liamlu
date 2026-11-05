@@ -1,5 +1,5 @@
 import {createSupervisorAccess} from './tradein-supervisor-auth.mjs?v=20261012-supervisor-1';
-import {CONTRACT,normalizePolicy,renderPolicyHTML,policyFilename} from './management-policy-core.mjs?v=20261104-1';
+import {CONTRACT,normalizePolicy,renderPolicyHTML,policyFilename} from './management-policy-core.mjs?v=20261105-2';
 const $ = id => document.getElementById(id);
 const fieldIds = ['title','month','version','start','end','audience','source'];
 const emptyPreview = '<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'"><body style="font-family:system-ui;color:#6b7179;padding:32px;line-height:1.8">填寫資料後，按「更新預覽」。</body></html>';

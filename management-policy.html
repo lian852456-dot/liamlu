@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
 <title>管理辦法｜北一二B</title>
-<link rel="stylesheet" href="management-policy.css?v=20261104-1">
+<link rel="stylesheet" href="management-policy.css?v=20261105-2">
 <script defer src="app-assets/lucide.min.js"></script>
 </head>
 <body>
@@ -12,8 +12,9 @@
   <div class="intro"><div><p class="eyebrow">督導專區 / 管理辦法</p><h1>讓辦法清楚，讓門市好執行。</h1><p>整理管理辦法、核對適用期間，一鍵生成門市唯讀版。</p></div><span class="badge">督導專用</span></div>
   <section id="authPanel" class="panel auth" aria-labelledby="authTitle"><i data-lucide="shield-check" aria-hidden="true"></i><div><h2 id="authTitle">先驗證督導權限</h2><p>沿用 Liam 情報站的督導通行碼，編輯內容僅在本頁暫存。</p><form id="authForm"><label for="passcode">督導通行碼</label><div class="auth-input"><input id="passcode" type="password" autocomplete="current-password" required><button id="verify" type="submit">驗證並進入</button></div></form><p id="authStatus" class="muted" role="status" aria-live="polite">尚未驗證。管理辦法與每週檔案不會自動讀取。</p></div></section>
   <div id="workspace" hidden inert>
-    <p class="hint">目前未預載正式辦法。請載入草稿，或填入當期已核對的內容。</p>
+    <p class="hint">編輯區不會自動載入檔案。可先下載已核對版本，或自行載入草稿。</p>
     <div class="toolbar"><p class="verified"><i data-lucide="shield-check" aria-hidden="true"></i>督導已驗證 · 本機編輯</p><div class="actions"><button id="clear" class="secondary" type="button">清除本頁草稿</button><button class="secondary" type="button" data-portal-logout>登出</button></div></div>
+    <section class="panel current-policy" aria-labelledby="currentPolicyTitle"><div class="section-title"><span class="step"><i data-lucide="file-check-2" aria-hidden="true"></i></span><div><h2 id="currentPolicyTitle">2026 年 10 月 Final</h2><p>已依 11/5 確認內容修訂；適用期間維持十月。</p></div><span class="badge">已核對</span></div><div class="source-links"><a id="currentPolicyHtml" href="https://chatgpt.com/api/library/files/libfile_c1d18fe5dd188191afa06f82ac083945/download" target="_blank" rel="noopener noreferrer">下載門市版 HTML</a><a id="currentPolicyDraft" href="https://chatgpt.com/api/library/files/libfile_afc8ce3805908191b6a34857a089e8a5/download" target="_blank" rel="noopener noreferrer">下載 JSON 編輯稿</a></div><p class="hint">檔案沿用原有私人權限，開啟時另須檔案帳號驗證。HTML 可離線閱讀與篩選月份；要修改時，先下載 JSON，再由下方載入本機草稿。未提供的月份不沿用十月資料。</p></section>
     <div class="work-grid">
       <div class="editor">
         <section class="panel" aria-labelledby="infoTitle"><div class="section-title"><span class="step">01</span><div><h2 id="infoTitle">基本資料</h2><p>每一版都有自己的期間與來源。</p></div></div>
@@ -27,10 +28,10 @@
         </section>
         <section class="panel weekly" aria-labelledby="weeklyTitle"><div class="section-title"><span class="step"><i data-lucide="file-spreadsheet" aria-hidden="true"></i></span><div><h2 id="weeklyTitle">每週 Excel</h2><p>每週更新與通知的集中入口。</p></div><span class="badge neutral">尚未啟用</span></div><p>自動產出、私有檔案保存與通知尚未連接。資料來源及收件範圍確認後，將在此顯示週別、資料截止日、核對狀態與受權限保護的下載入口。</p><p class="hint">含個人資料的 Excel 保存在既有私有資料層；不放進公開網站，也不隨門市 HTML 匯出。</p></section>
       </div>
-      <aside class="preview-panel"><div class="preview-heading"><div><p class="eyebrow">STORE VIEW</p><h2>門市閱讀預覽</h2></div><span class="badge neutral">唯讀</span></div><p class="hint">預覽僅顯示本次辦法；不含編輯工具與每週 Excel。</p><iframe id="reader" title="管理辦法門市版預覽" sandbox="" referrerpolicy="no-referrer" srcdoc="<!doctype html><html lang='zh-Hant'><meta charset='utf-8'><body style='font-family:system-ui;color:#71757b;padding:32px;line-height:1.8'>填寫左側資料後，按「更新預覽」。</body></html>"></iframe></aside>
+      <aside class="preview-panel"><div class="preview-heading"><div><p class="eyebrow">STORE VIEW</p><h2>門市閱讀預覽</h2></div><span class="badge neutral">唯讀</span></div><p class="hint">預覽僅顯示本次辦法；不含編輯工具與每週 Excel。</p><iframe id="reader" title="管理辦法門市版預覽" sandbox="allow-scripts" referrerpolicy="no-referrer" srcdoc="<!doctype html><html lang='zh-Hant'><meta charset='utf-8'><body style='font-family:system-ui;color:#71757b;padding:32px;line-height:1.8'>填寫左側資料後，按「更新預覽」。</body></html>"></iframe></aside>
     </div>
   </div>
   <noscript><p class="panel">請啟用 JavaScript 並完成督導驗證，才能編輯與生成 HTML。</p></noscript>
 </main><footer class="shell footer">內部工作輔助入口 · 管理辦法以經核對的適用版本為準</footer>
-<script src="portal-logout.js?v=20261012-brief-supervisor-1"></script><script type="module" src="management-policy.mjs?v=20261104-1"></script>
+<script src="portal-logout.js?v=20261012-brief-supervisor-1"></script><script type="module" src="management-policy.mjs?v=20261105-2"></script>
 </body></html>
