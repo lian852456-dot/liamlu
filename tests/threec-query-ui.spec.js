@@ -217,7 +217,7 @@ test('首版完整異動匯出由已驗證正式快照生成，避免重複下�
     return fulfillPublic(route,{status:200,contentType:'application/json',body:JSON.stringify(body)});
   });
   await page.goto(PAGE_URL);await expect(page.locator('#queryCard')).toBeVisible();
-  const pending=page.waitForEvent('download');await page.locator('#changeJsonBtn').click();
+  await openHistory(page);const pending=page.waitForEvent('download');await page.locator('#changeJsonBtn').click();
   const download=await pending;const exported=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
   expect(exported.changes).toHaveLength(4);expect(exported.counts.added).toBe(4);expect(calls).toBe(1);
   expect(exported.changes.some(c=>c.after.kind==='zero')).toBe(true);
