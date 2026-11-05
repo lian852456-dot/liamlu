@@ -67,7 +67,7 @@
   async function invoke(kind){const payload={action:'threec_snapshot_read',kind,includeChanges:false,priceEncoding:Transport.ENCODING};return Transport.decode(await readPublic(payload,kind==='shopping'));}
   function invokeChanges(kind,offset,limit,snapshotHash,search){return readPublic({action:'threec_changes_read',kind,offset:Number(offset||0),limit:Number(limit||1000),snapshotHash:snapshotHash||'',search:String(search||'')});}
   function clearResults(){shoppingIndex=null;shoppingView=null;splitSpecKeys=new Set();state.shopping=null;state.tradein=null;state.changePage={shopping:null,tradein:null};changeLoading.shopping=false;changeLoading.tradein=false;renderKind('shopping');renderKind('tradein');}
-  function metaHtml(meta){return `<div class="source-date"><span>正式來源日期</span><strong>${esc(meta.sourceVersionDate||'未提供')}</strong><span>${esc(meta.rowCount)} 筆來源資料</span></div><details class="source-details"><summary>資料版本與來源資訊</summary><dl><dt>正式版本</dt><dd>${esc(meta.snapshotHash||meta.version||'—')}</dd><dt>發布時間</dt><dd>${esc(meta.publishedAt||'—')}</dd><dt>來源 SHA-256</dt><dd>${esc(meta.sourceFileSha256||'—')}</dd></dl></details>`;}
+  function metaHtml(meta,local=false){const label=local?'參考檔':'正式';return `<div class="source-date"><span>${label}來源日期</span><strong>${esc(meta.sourceVersionDate||'未提供')}</strong><span>${esc(meta.rowCount)} 筆來源資料</span></div><details class="source-details"><summary>資料版本與來源資訊</summary><dl><dt>${label}版本</dt><dd>${esc(meta.snapshotHash||meta.version||'—')}</dd><dt>發布時間</dt><dd>${esc(meta.publishedAt||'—')}</dd><dt>來源 SHA-256</dt><dd>${esc(meta.sourceFileSha256||'—')}</dd></dl></details>`;}
   function renderPrice(name,value){const state=Core.priceState(value);return `<div class="price-item${state.missing?' missing':''}${state.zero?' zero':''}"><span>${esc(name)}</span><strong>${esc(Core.formatPrice(value))}</strong></div>`;}
   function changeRows(changeSet){if(!changeSet||typeof changeSet!=='object')return [];if(Array.isArray(changeSet.changePage))return changeSet.changePage;if(Array.isArray(changeSet.changes))return changeSet.changes;if(Array.isArray(changeSet.records))return changeSet.records;return [];}
   function changeCounts(changeSet){const counts=changeSet&&changeSet.counts&&typeof changeSet.counts==='object'?changeSet.counts:{};return {added:Number(changeSet&&changeSet.addedCount!=null?changeSet.addedCount:counts.added||0),changed:Number(changeSet&&changeSet.changedCount!=null?changeSet.changedCount:counts.changed||0),unchanged:Number(changeSet&&changeSet.unchangedCount!=null?changeSet.unchangedCount:counts.unchanged||0),removed:Number(changeSet&&changeSet.removedCount!=null?changeSet.removedCount:counts.removed||0)};}
@@ -78,6 +78,7 @@
   function renderChanges(kind){
     if(kind!==state.active)return;
     const response=state[kind];
+    if(response?.localReference){$('changeLoadBtn').hidden=true;$('changeTitle').textContent='本機參考檔來源';$('changeBasis').textContent='本機參考價格沒有線上 active／previous 異動紀錄。';$('changeCounts').innerHTML='';$('changeSummary').textContent='此來源不混入正式異動紀錄。';$('changeResults').replaceChildren();$('changePage').textContent='';['changePrevBtn','changeNextBtn','changeJsonBtn','changeCsvBtn'].forEach(id=>$(id).disabled=true);return;}
     $('changeLoadBtn').hidden=true;
     const title=kind==='shopping'?'手機專案／3C':'舊換新';
     $('changeTitle').textContent=title+' 本次異動／版本檢查';
@@ -100,15 +101,15 @@
     $('changePage').textContent='第 '+page+' 頁／共 '+pageCount+' 頁';$('changePrevBtn').disabled=pendingSearch||offset<=0;$('changeNextBtn').disabled=pendingSearch||!set.hasMore;$('changeJsonBtn').disabled=pendingSearch||!set;$('changeCsvBtn').disabled=pendingSearch||!set;
   }
   function changePageSize(set){return Number(set&&set.limit||100);}
-  async function loadChangePage(kind,offset,search){const requestGeneration=generation;const changeRequest=++changeRequestGeneration[kind];const response=state[kind];if(!response||!response.snapshot)return;const query=String(search==null?$('changeSearch').value.trim():search);const hash=response.snapshot.snapshot_hash||'';const result=await invokeChanges(kind,offset,100,hash,query);if(requestGeneration!==generation||changeRequest!==changeRequestGeneration[kind]||state[kind]!==response)return;state.changePage[kind]=Object.assign({},result.changeSet||{},{_search:query});renderChanges(kind);}
-  async function fetchAllChanges(kind,search){const requestGeneration=generation;const response=state[kind];if(!response||!response.snapshot)return null;const query=String(search==null?$('changeSearch').value.trim():search);const hash=response.snapshot.snapshot_hash||'';let offset=0;let first=null;let next=null;const records=[];do{const result=await invokeChanges(kind,offset,1000,hash,query);if(requestGeneration!==generation||state[kind]!==response)return null;next=result.changeSet||{};if(next.firstRelease&&DiffCore){const local=DiffCore.diffSnapshots(kind,null,response.snapshot,{limit:Infinity,search:query});return {set:local,records:changeRows(local),search:query};}if(!first)first=next;records.push(...changeRows(next));offset+=Number(next.limit||1000);}while(next.hasMore);return {set:first||{},records,search:query};}
+  async function loadChangePage(kind,offset,search){const requestGeneration=generation;const changeRequest=++changeRequestGeneration[kind];const response=state[kind];if(!response||!response.snapshot||response.localReference)return;const query=String(search==null?$('changeSearch').value.trim():search);const hash=response.snapshot.snapshot_hash||'';const result=await invokeChanges(kind,offset,100,hash,query);if(requestGeneration!==generation||changeRequest!==changeRequestGeneration[kind]||state[kind]!==response)return;state.changePage[kind]=Object.assign({},result.changeSet||{},{_search:query});renderChanges(kind);}
+  async function fetchAllChanges(kind,search){const requestGeneration=generation;const response=state[kind];if(!response||!response.snapshot||response.localReference)return null;const query=String(search==null?$('changeSearch').value.trim():search);const hash=response.snapshot.snapshot_hash||'';let offset=0;let first=null;let next=null;const records=[];do{const result=await invokeChanges(kind,offset,1000,hash,query);if(requestGeneration!==generation||state[kind]!==response)return null;next=result.changeSet||{};if(next.firstRelease&&DiffCore){const local=DiffCore.diffSnapshots(kind,null,response.snapshot,{limit:Infinity,search:query});return {set:local,records:changeRows(local),search:query};}if(!first)first=next;records.push(...changeRows(next));offset+=Number(next.limit||1000);}while(next.hasMore);return {set:first||{},records,search:query};}
   async function downloadChanges(kind,format){const fetched=await fetchAllChanges(kind);if(!fetched)return;const set=fetched.set;const records=fetched.records;const body=format==='json'?JSON.stringify({unit:'報價條件',snapshotHash:state[kind].snapshot.snapshot_hash||'',search:fetched.search,totalChangeCount:Number(set.totalChangeCount!=null?set.totalChangeCount:(set.changeCount||records.length)),changeCount:Number(set.changeCount!=null?set.changeCount:records.length),counts:changeCounts(set),changes:records},null,2):[['unit','status','model_or_capacity','condition','provider','grade','before','after'],...records.map(record=>['報價條件',record.status,record.modelCapacity||record.model,record.plan||record.condition,record.provider,record.grade,changePrice(record.before),changePrice(record.after)])].map(row=>row.map(value=>`"${String(value==null?'':value).replace(/"/g,'""')}"`).join(',')).join('\n');const url=URL.createObjectURL(new Blob([format==='json'?body:'\ufeff'+body],{type:format==='json'?'application/json;charset=utf-8':'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='threec-'+kind+'-changes.'+format;link.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
   function shoppingFilters(){return {segment:shoppingSegment,query:$('shoppingSearch').value,brand:$('shoppingBrand').value,model:$('shoppingModel').value,capacity:$('shoppingCapacity').value,project:$('shoppingProject').value,version:$('shoppingVersion').value,rent:$('shoppingRent').value,term:$('shoppingTerm').value,rowPage,columnPage};}
   function setShoppingSegment(segment){shoppingSegment=segment;$('consumerSegmentBtn').setAttribute('aria-pressed',String(segment==='consumer'));$('enterpriseSegmentBtn').setAttribute('aria-pressed',String(segment==='enterprise'));$('shoppingSectionTitle').textContent=segment==='enterprise'?'企業用戶專區':'一般手機方案';$('shoppingSectionDescription').textContent=segment==='enterprise'?'僅顯示所選機款原表有報價的企業、員工及眷屬方案；資格與申辦條件請開啟「完整原表條件」核對。':'一般申辦方案；企業、員工與眷屬優惠請切換「企業用戶專區」。';['shoppingProject','shoppingVersion','shoppingTerm'].forEach(id=>$(id).value='');$('shoppingRent').value=segment==='enterprise'?'':'common';rowPage=0;columnPage=0;renderKind('shopping');}
-  function fillSelect(id,values,label){const select=$(id),prior=select.value;select.innerHTML=(id==='shoppingRent'?'<option value="common">999＋1399</option>':'')+`<option value="">${esc(label)}</option>`+values.map(value=>`<option value="${esc(value)}">${esc(value)}${id==='shoppingRent'?' 元':id==='shoppingTerm'?' 期':''}</option>`).join('');select.value=(prior==='common'&&id==='shoppingRent')||values.includes(prior)?prior:'';}
+  function fillSelect(id,values,label){const select=$(id),prior=select.value;select.innerHTML=(id==='shoppingRent'?'<option value="common">999＋1399</option>':'')+`<option value="">${esc(label)}</option>`+values.map(value=>`<option value="${esc(value)}">${id==='shoppingTerm'?'('+esc(value)+')':esc(value)}</option>`).join('');select.value=(prior==='common'&&id==='shoppingRent')||values.includes(prior)?prior:'';}
   function updateShoppingOptions(){
     if(!shoppingIndex)return;
-    const fields=[['shoppingBrand','brands','全部品牌'],['shoppingModel','models','全部機款'],['shoppingCapacity','capacities','全部容量'],['shoppingProject','projects','全部專案'],['shoppingVersion','versions','一般／VIP／加碼'],['shoppingRent','rents','全部月租'],['shoppingTerm','terms','全部期數']];
+    const fields=[['shoppingBrand','brands','全部品牌'],['shoppingModel','models','全部機款'],['shoppingCapacity','capacities','全部容量'],['shoppingProject','projects','全部專案'],['shoppingVersion','versions','一般／VIP／加碼'],['shoppingRent','rents','全部月租'],['shoppingTerm','terms','全部期限']];
     // Reuse options within this update; invalid selections still reset in order.
     const optionSets=new Map();
     fields.forEach(([id,key,label])=>{
@@ -119,9 +120,27 @@
       fillSelect(id,options[key],label);
     });
   }
-  function rentLabel(col){const rents=col.rents||[col.rent].filter(Boolean);return rents.length?rents.join('／')+' 元':'月租未標示';}
-  function columnLabel(col){return `${rentLabel(col)} · ${col.term?col.term+'期':'期數未標示'} · ${col.version}${col.detail?' · '+col.detail:''}`;}
-  function columnHtml(col){const detail=col.detail.replace(/^[_\s]+/,'');const repeated=detail.replace(/版$/,'').toLocaleLowerCase()===col.version.toLocaleLowerCase();return `<span class="rent-label">${esc(rentLabel(col))}</span><span class="contract-label">${esc(col.term?col.term+' 期':'期數未標示')} · ${esc(col.version)}</span>${detail&&!repeated?`<span class="condition-detail">${esc(detail)}</span>`:''}<details><summary>完整條件</summary><span class="raw-condition">${esc(col.raw)}</span></details>`;}
+  function rentLabel(col){const rents=col.rents||[col.rent].filter(Boolean);return rents.length?rents.join('／'):'月租未標示';}
+  function termLabel(col){return col.term?'('+col.term+')':'約期未提供';}
+  function versionLabel(col){return col.version==='加碼'&&col.detail.split('／').some(value=>/^VIP(?:[_\s]*加碼(?:版)?)?$/i.test(value.replace(/^[_\s]+/,'').trim()))?'VIP加碼':col.version==='一般'?'':col.version;}
+  function detailLabel(col){
+    const rents=col.rents||[col.rent].filter(Boolean),project=value=>value.replace(/[_\s]+/g,'').toLocaleLowerCase();
+    return col.detail.split('／').map(value=>value.replace(/^[_\s]+/,'').trim()).filter(value=>{
+      if(!value)return false;
+      const term=value.match(/^合約\s*(\d+)(?:期|個月)$/),rent=value.match(/^月租\s*(\d+)(?:\s*元)?$/);
+      if(term&&term[1]===col.term||rent&&rents.includes(rent[1]))return false;
+      if(value.replace(/版$/,'').toLocaleLowerCase()===col.version.toLocaleLowerCase())return false;
+      if(value.replace(/[_\s]+/g,'').replace(/版$/,'').toLocaleLowerCase()===versionLabel(col).toLocaleLowerCase()||value==='VIP'&&versionLabel(col)==='VIP加碼')return false;
+      if(!col.term&&value==='約期原表未提供')return false;
+      // Remove a repeated project only when all recognised fields already agree.
+      // Source conditions and unique keys remain unchanged in the full detail.
+      const parsed=Compare.condition(value);
+      return !(col.project!=='原表條件'&&project(parsed.project)===project(col.project)&&(!parsed.term||parsed.term===col.term)&&parsed.rents.every(n=>rents.includes(n))&&(parsed.version==='一般'||parsed.version===col.version));
+    }).join('／');
+  }
+  function tariffLabel(col){return rentLabel(col)+(col.term?'':' ')+termLabel(col);}
+  function columnLabel(col){return [tariffLabel(col),versionLabel(col),detailLabel(col)].filter(Boolean).join(' ');}
+  function columnHtml(col){const detail=detailLabel(col),version=versionLabel(col);return `<span class="tariff-contract${col.term?'':' unknown-term'}" aria-label="${esc('月租 '+rentLabel(col)+'，'+(col.term?'合約 '+termLabel(col)+' 個月':'約期未提供'))}"><span class="rent-label">${esc(rentLabel(col))}</span><span class="contract-label">${esc(termLabel(col))}</span></span>${version?`<span class="version-badge">${esc(version)}</span>`:''}${detail?`<span class="condition-detail">${esc(detail)}</span>`:''}<details><summary>完整條件</summary><span class="raw-condition">${esc(col.raw)}</span></details>`;}
   function variantLabel(row){const names=row.models.map(model=>{const matches=Array.from(model.matchAll(/(?:[-_(\s])(宇宙橙|勃根地紅|午夜|星光|太空灰|鈦原色|黑色?|白色?|藍色?|粉色?|黃色?|綠色?|紫色?|銀色?|金色?)(?=[)\s]|$)/g));return matches.length?matches[matches.length-1][1]:'';}).filter(Boolean);return Array.from(new Set(names)).join('／');}
   function specIdentity(row){return JSON.stringify([row.brand,row.model,row.capacity,row.ram]);}
   // Derive display distinctions once per accepted snapshot, never during search input.
@@ -143,7 +162,7 @@
   function renderShopping(){
     const target=$('shoppingResults'),response=state.shopping;
     if(!response||!response.snapshot){$('shoppingMeta').innerHTML='';$('shoppingSummary').textContent='';target.innerHTML=`<div class="empty">${response?'尚未發布正式資料：手機專案／3C。':'尚未讀取正式手機專案資料。'}</div>`;['columnPrev','columnNext','rowPrev','rowNext'].forEach(id=>$(id).disabled=true);return;}
-    $('shoppingMeta').innerHTML=metaHtml(Core.sourceMeta(response.snapshot,response.registry,'shopping'));
+    $('shoppingMeta').innerHTML=metaHtml(Core.sourceMeta(response.snapshot,response.registry,'shopping'),response.localReference);
     const viewOptions={includeOptions:false,...(readingMode==='card'?{cardConditionKey:$('shoppingCardCondition').value}:{})};
     shoppingView=Compare.buildView(shoppingIndex,shoppingFilters(),viewOptions);
     if(rowPage>=shoppingView.rowPages||columnPage>=shoppingView.columnPages){rowPage=0;columnPage=0;shoppingView=Compare.buildView(shoppingIndex,shoppingFilters(),viewOptions);}
@@ -156,7 +175,7 @@
     if(!view.rows.length||!view.columns.length){target.innerHTML='<div class="empty">沒有符合搜尋或資費篩選的正式報價。請調整條件或重設篩選。</div>';return;}
     if(readingMode==='card'){
       const col=view.columns.find(col=>col.key===select.value)||view.columns[0];
-      target.innerHTML=`<p class="scroll-hint">一次閱讀一個方案；可切換「橫向比較」對照其他期數。</p><div class="quote-cards">`+view.rows.map(row=>`<article class="quote-card"><div class="spec-cell">${specHtml(row)}</div><div class="card-plan"><span>${esc(col.project)}</span><strong>${esc(columnLabel(col))}</strong>${cellHtml(row,col)}<details><summary>完整原表條件</summary><p>${esc(col.raw)}</p></details></div></article>`).join('')+'</div>';
+      target.innerHTML=`<p class="scroll-hint">一次閱讀一個方案；可切換「橫向比較」對照其他期數。</p><div class="quote-cards">`+view.rows.map(row=>`<article class="quote-card"><div class="spec-cell">${specHtml(row)}</div><div class="card-plan"><span>${esc(col.project)}</span><strong><span class="tariff-contract">${esc(tariffLabel(col))}</span>${versionLabel(col)?' '+esc(versionLabel(col)):''}${detailLabel(col)?' '+esc(detailLabel(col)):''}</strong>${cellHtml(row,col)}<details><summary>完整原表條件</summary><p>${esc(col.raw)}</p></details></div></article>`).join('')+'</div>';
     }else{
       target.innerHTML=`<p class="scroll-hint"><span class="narrow-scroll-hint">左右滑動比較；機款固定在左側。 </span>價格含 0 元；空格表示此機款沒有該條件報價。展開可核對完整條件。</p><div class="table-scroll comparison-scroll" tabindex="0" role="region" aria-label="手機專案橫向價格比較"><table class="comparison-table" style="--comparison-columns:${view.columns.length}"><caption class="visually-hidden">正式手機專案價格，依機款規格與完整方案條件對照</caption><thead><tr><th class="spec-cell" scope="col">機款／規格<br><span class="hint">專案價單位：元</span></th>${view.columns.map(col=>`<th scope="col"><span class="project-label" title="${esc(col.project)}">${esc(col.project)}</span>${columnHtml(col)}</th>`).join('')}</tr></thead><tbody>${view.rows.map(row=>`<tr><th scope="row" class="spec-cell">${specHtml(row)}</th>${view.columns.map(col=>`<td>${cellHtml(row,col)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
     }
@@ -165,11 +184,11 @@
     const target=$('tradeinResults');
     if(!view){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未讀取正式舊換新資料。</div>';return;}
     if(!view.available){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未發布正式資料：舊換新。</div>';return;}
-    $('tradeinMeta').innerHTML=metaHtml(view.meta);
+    $('tradeinMeta').innerHTML=metaHtml(view.meta,state.tradein?.localReference);
     if(!view.rows.length){target.innerHTML='<div class="empty">沒有符合搜尋條件的正式機款。</div>';return;}
     const notice=view.limited?`<div class="status warn">目前顯示前 ${view.displayLimit} 筆（符合條件共 ${view.totalRows} 筆）。請先從「選機款」縮小範圍後查看完整資料。</div>`:'';
     const selectedProvider=$('tradeinProvider').value,selectedGrade=$('tradeinGrade').value;
-    target.innerHTML=notice+view.rows.map(row=>`<article class="provider"><h3>${esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')}</h3>${row.priceVariant?`<p class="price-variant">不同報價：${row.sourceModels.map(esc).join('／')}</p>`:''}<p class="group-note">來源工作表：${esc(row.sourceSheet||'—')}<br>原始機型：${row.sourceModels.map(esc).join('／')}</p>${Core.quotedProviders(row,selectedProvider,selectedGrade).map(provider=>{const grades=Core.quotedGrades(row,provider,selectedGrade);return `<div class="table-scroll"><table><thead><tr><th colspan="${grades.length+1}">${esc(provider)}（獨立報價）</th></tr><tr><th>原始機型／容量</th>${grades.map(grade=>`<th>${esc(Core.gradeLabel(grade))}</th>`).join('')}</tr></thead><tbody><tr><td>${esc(row.model||'—')}</td>${grades.map(grade=>`<td>${esc(Core.formatPrice(row.quotes[provider]&&row.quotes[provider][grade]))}</td>`).join('')}</tr></tbody></table></div>`;}).join('')}</article>`).join('');
+    target.innerHTML=notice+view.rows.map(row=>`<article class="provider"><h3>${esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')}</h3>${row.priceVariant?`<p class="price-variant">不同報價：${row.sourceModels.map(esc).join('／')}</p>`:''}<p class="group-note">來源工作表：${esc(row.sourceSheet||'—')}<br>原始機型：${row.sourceModels.map(esc).join('／')}</p>${Core.quotedProviders(row,selectedProvider,selectedGrade).map(provider=>{const grades=Core.quotedGrades(row,provider,selectedGrade);return `<div class="table-scroll"><table><thead><tr><th colspan="${grades.length+1}">${esc(provider)}（獨立報價）</th></tr><tr><th>原始機型／容量</th>${grades.map(grade=>`<th>${esc(Core.gradeLabel(grade))}</th>`).join('')}</tr></thead><tbody><tr><td>${esc(row.model||'—')}</td>${grades.map(grade=>`<td>${esc(state.tradein?.localReference&&Core.priceState(row.quotes[provider]&&row.quotes[provider][grade]).zero?'待確認（來源為0）':Core.formatPrice(row.quotes[provider]&&row.quotes[provider][grade]))}</td>`).join('')}</tr></tbody></table></div>`;}).join('')}</article>`).join('');
   }
   function renderKind(kind){if(kind==='shopping'){if(shoppingIndex)updateShoppingOptions();renderShopping();renderChanges(kind);return;}const search=$('tradeinSearch').value,modelKey=$('tradeinModel').value;const response=state[kind];const view=response?Core.buildView(kind,response,{query:search,modelKey,provider:$('tradeinProvider').value,grade:$('tradeinGrade').value}):null;renderTradein(view);renderChanges(kind);if(view){const select=$('tradeinModel'),prior=select.value;select.innerHTML='<option value="">全部機款</option>'+view.modelOptions.map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');if(view.modelOptions.some(option=>option.value===prior))select.value=prior;}}
   function showKind(kind){state.active=kind;['shopping','tradein'].forEach(value=>{const tab=$(value+'Tab'),pane=$(value+'Pane');const active=value===kind;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));pane.classList.toggle('hidden',!active);});renderChanges(kind);const query=$('changeSearch').value.trim();const set=state.changePage[kind]||responseChangeSet(state[kind]);if(state[kind]&&!state[kind].changesDeferred&&(!set||String(set._search||'')!==query))loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad'));}
@@ -185,7 +204,7 @@
       const name=queryKind==='shopping'?'手機專案價查詢':'回收價查詢';
       if(result.error){setStatus(name+'：'+result.error+'；正式資料已清除，請重新整理。','bad');return;}
       const available=!!state[queryKind]?.snapshot;
-      setStatus(available?'已讀取正式資料；請依版本／日期核對後查詢。':name+' 尚未發布正式資料。',available?'ok':'warn');
+      setStatus(available?'已讀取正式資料 · 來源 '+(state[queryKind].snapshot.source_version_date||'未提供'):name+' 尚未發布正式資料。',available?'ok':'warn');
     }
     try{
       await Promise.all(['shopping','tradein'].map(async kind=>{
@@ -204,6 +223,18 @@
     }finally{if(requestGeneration===generation){state.loading=false;$('refreshBtn').disabled=false;}}
   }
   function bind(){
+    scope.addEventListener('quote-reference:load',event=>{
+      const reference=event.detail;if(!reference?.shopping?.localReference||!reference?.tradein?.localReference)return;
+      generation+=1;clearResults();state.loading=false;$('refreshBtn').disabled=false;
+      state.shopping=reference.shopping;state.tradein=reference.tradein;
+      shoppingIndex=Compare.buildIndex(reference.shopping.snapshot);splitSpecKeys=findSplitSpecs(shoppingIndex);
+      renderKind('shopping');renderKind('tradein');
+      const period=reference.tradein.validThrough.map(x=>x.file+'：'+x.date+'～'+x.validThrough).join('；');
+      setStatus('目前查詢本機參考檔，未更新線上正式資料。'+(queryKind==='tradein'?' 回收價有效期 '+period:' 手機價格來源日期 '+reference.shopping.snapshot.source_version_date)+'；按「重新整理」回到線上價格。','warn');
+      $('changeBasis').textContent='本機參考檔沒有線上 active／previous 異動紀錄。';
+      $('changeResults').innerHTML='<div class="empty">參考價格不混入正式異動紀錄。</div>';
+    });
+    scope.addEventListener('quote-reference:reset',refresh);
     $('consumerSegmentBtn').addEventListener('click',()=>setShoppingSegment('consumer'));$('enterpriseSegmentBtn').addEventListener('click',()=>setShoppingSegment('enterprise'));
     $('refreshBtn').addEventListener('click',refresh);
     $('changeLoadBtn').addEventListener('click',async()=>{const kind=state.active,readGeneration=generation;if(changeLoading[kind])return;changeLoading[kind]=true;renderChanges(kind);try{await loadChangePage(kind,0,$('changeSearch').value.trim());}catch(error){if(readGeneration!==generation||kind!==state.active)return;$('changeSummary').textContent='異動明細讀取失敗：'+error.message+'；正式價格仍可查詢。';}finally{if(readGeneration===generation){changeLoading[kind]=false;$('changeLoadBtn').disabled=false;}}});
@@ -225,9 +256,9 @@
     $('changeJsonBtn').addEventListener('click',()=>downloadChanges(state.active,'json').catch(error=>setStatus(error.message,'bad')));
     $('changeCsvBtn').addEventListener('click',()=>downloadChanges(state.active,'csv').catch(error=>setStatus(error.message,'bad')));
     scope.addEventListener('pagehide',()=>{generation+=1;clearResults();});
-    scope.addEventListener('pageshow',event=>{if(event.persisted)refresh();});
+    scope.addEventListener('pageshow',event=>{if(event.persisted&&document.body.dataset.priceMode!=='reference')refresh();});
     showKind(queryKind);
-    refresh();
+    if(document.body.dataset.priceMode==='reference')setStatus('正在載入本機參考資料…','warn');else refresh();
   }
   if(!Core||!Compare||!Transport){setStatus('查詢元件載入失敗。','bad');return;}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
 })(window);

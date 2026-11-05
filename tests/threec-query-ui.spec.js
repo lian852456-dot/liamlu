@@ -15,6 +15,9 @@ function fulfillPublic(route,options){
  const message=JSON.stringify({type:'north12b-gas-response-v1',requestId:url.searchParams.get('requestId'),body:JSON.parse(options.body)}).replace(/</g,'\\u003c');
  return route.fulfill({...options,contentType:'text/html',body:'<!doctype html><meta charset="utf-8"><script>window.top.postMessage('+message+',"*")</script>'});
 }
+async function openShoppingFilters(page){
+ for(const selector of ['.query-extra-filters','.filter-details']){const details=page.locator(selector);if(await details.count()&&await details.getAttribute('open')===null)await details.locator(':scope > summary').click();}
+}
 
 
 function response(kind) {
@@ -127,7 +130,9 @@ test('離頁會使尚未完成的讀取失效，不回寫已清除的價格', as
     await pending;
     return fulfillPublic(route,{ status:200, contentType:'application/json', body:JSON.stringify(response(payload.kind)) });
   });
-  await page.goto(PAGE_URL);
+  // The test intentionally holds an iframe request open. Waiting for load
+  // races its submission; wait for the page DOM, then explicitly await calls.
+  await page.goto(PAGE_URL, { waitUntil:'domcontentloaded' });
   await expect.poll(() => calls.length).toBe(2);
   await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
   release();
@@ -269,14 +274,16 @@ test('Google JSON 轉址回 HTML 時，限定來源與 requestId 的既有 ifram
  await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
  expect(requests.map(p=>p.kind).sort()).toEqual(['shopping','tradein']);expect(requests.every(p=>p.action==='threec_snapshot_read'&&!p.employeeId&&!p.adminSecret)).toBe(true);await expect(page.locator('iframe')).toHaveCount(0);
 });
-for(const width of [1280,390,360])test(`${width}px 桌面緊湊字級與手機大字價格保障`,async({page})=>{
+for(const width of [1280,390,360])test(`${width}px 緊湊機款字級與同列資費，價格保持醒目`,async({page})=>{
  await intercept(page);await page.setViewportSize({width,height:844});await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');
  await page.locator('#tableModeBtn').click();
- const minima=width>=1280?{'body':18,'#shoppingBrand':16,'#shoppingModel':16,'.hint':14,'.condition-detail':13,'.comparison-table details':13,'.spec-cell strong':16,'.variant-label':13,'.comparison-pagination button':14}:Object.fromEntries(['body','#shoppingBrand','#shoppingModel','.hint','.condition-detail','.comparison-table details','.spec-cell strong','.variant-label','.comparison-pagination button'].map(selector=>[selector,18]));
+ const minima={'body':16,'#shoppingBrand':16,'#shoppingModel':16,'.hint':12,'.condition-detail':12,'.comparison-table details':11,'.spec-cell strong':width>=1280?14:13,'.variant-label':12,'.comparison-pagination button':12};
  for(const [selector,minimum] of Object.entries(minima)){
  const fonts=await page.locator(selector).evaluateAll(els=>els.map(el=>parseFloat(getComputedStyle(el).fontSize)));expect(fonts.every(size=>size>=minimum)).toBe(true);
  }
- expect(await page.locator('.quote.price,.quote.zero').evaluateAll((els,minimum)=>els.every(el=>parseFloat(getComputedStyle(el).fontSize)>=minimum),width>=1280?17:24)).toBe(true);
+ expect(await page.locator('.quote.price,.quote.zero').evaluateAll((els,minimum)=>els.every(el=>parseFloat(getComputedStyle(el).fontSize)>=minimum),width>=1280?22:23)).toBe(true);
+ expect(await page.locator('.tariff-contract').evaluateAll(els=>els.every(el=>getComputedStyle(el).whiteSpace==='nowrap'))).toBe(true);
+ expect(await page.locator('.comparison-table summary').evaluateAll(els=>els.every(el=>getComputedStyle(el).whiteSpace==='nowrap'))).toBe(true);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
@@ -296,7 +303,7 @@ for(const width of [1280,390,360])test(`企業專區 ${width}px 修復截圖情�
  {source_sheet:'企客員工眷',brand:'APPLE',model:'APPLE iPhone 17 Pro 256G(黑)(5G)',colorless_model:'APPLE iPhone 17 Pro 256G(5G)',code:'test-enterprise',retail_price:39900,project_prices:{'企客特殊專案(2)／(企客_5G)榮耀之星999H(24)':'','企客特殊專案(2)／(企客_5G)榮耀之星999H(24)_iPhone':2999,'企客特殊專案(2)／(企客_5G)榮耀之星999H(30)_iPhone':0,'企客特殊專案(2)／(企客_5G)榮耀之星999H(48)_iPhone':''}}
  ];return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(data)})}if(/^https?:/.test(req.url()))return route.abort();return route.continue()});
  await page.setViewportSize({width,height:844});await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('1,234 元');await expect(page.locator('#shoppingResults')).not.toContainText('榮耀之星');
- await page.locator('#shoppingBrand').selectOption('APPLE');await page.locator('#shoppingModel').selectOption('APPLE iPhone 17 Pro (5G)');await page.locator('#shoppingCapacity').selectOption('256GB');await page.locator('#enterpriseSegmentBtn').click();await expect(page.locator('#shoppingSectionTitle')).toHaveText('企業用戶專區');if(width<700)await page.locator('.filter-details summary').click();await page.locator('#shoppingRent').selectOption('999');
+ await openShoppingFilters(page);await page.locator('#shoppingBrand').selectOption('APPLE');await page.locator('#shoppingModel').selectOption('APPLE iPhone 17 Pro (5G)');await page.locator('#shoppingCapacity').selectOption('256GB');await page.locator('#enterpriseSegmentBtn').click();await expect(page.locator('#shoppingSectionTitle')).toHaveText('企業用戶專區');await openShoppingFilters(page);await page.locator('#shoppingRent').selectOption('999');
  await expect(page.locator('#shoppingProject option')).toHaveText(['全部專案','(企客 5G)榮耀之星 iPhone']);await page.locator('#tableModeBtn').click();await expect(page.locator('.comparison-table tbody tr')).toHaveCount(1);await expect(page.locator('.comparison-table tbody td')).toHaveText(['2,999 元','0 元']);await expect(page.locator('.comparison-table tbody')).not.toContainText('未列此條件');await expect(page.locator('.comparison-table tbody')).not.toContainText('無報價');
  await page.locator('.comparison-table details').filter({hasText:'完整條件'}).first().click();await expect(page.locator('.raw-condition').first()).toHaveText('企客特殊專案(2)／(企客_5G)榮耀之星999H(24)_iPhone');
  await page.locator('#cardModeBtn').click();await expect(page.locator('.quote-card')).toContainText('2,999 元');expect(await page.locator('.quote-card .quote').evaluate(e=>parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(28);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -369,7 +376,7 @@ async function setup(page,width){
   return route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
  });
  await page.goto('file://'+path.resolve(__dirname,'../threec-query.html'));await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
- if(await page.locator('.filter-details').getAttribute('open')===null)await page.locator('.filter-details summary').click();
+ await openShoppingFilters(page);
  return {errors,calls};
 }
 async function keys(page){return page.locator('#shoppingCardCondition option').evaluateAll(options=>options.map(o=>o.value));}
