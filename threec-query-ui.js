@@ -1,7 +1,7 @@
 (function(scope){
   'use strict';
-  const queryKind=document.body.dataset.queryKind==='tradein'?'tradein':'shopping';
   const offline=document.body.dataset.priceMode==='offline'?scope.ThreecReadonlyPayload:null;
+  const queryKind=offline?.initialKind||(document.body.dataset.queryKind==='tradein'?'tradein':'shopping');
   const Core=scope.ThreecQueryCore;
   const DiffCore=scope.ThreecPriceDiffCore;
   const Transport=scope.ThreecPriceTransport;
@@ -197,15 +197,15 @@
     const selectedProvider=$('tradeinProvider').value,selectedGrade=$('tradeinGrade').value;
     target.innerHTML=notice+view.rows.map(row=>`<article class="provider"><h3>${esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')}</h3>${row.priceVariant?`<p class="price-variant">不同報價：${row.sourceModels.map(esc).join('／')}</p>`:''}<p class="group-note">來源工作表：${esc(row.sourceSheet||'—')}<br>原始機型：${row.sourceModels.map(esc).join('／')}</p>${Core.quotedProviders(row,selectedProvider,selectedGrade).map(provider=>{const grades=Core.quotedGrades(row,provider,selectedGrade);return `<div class="table-scroll"><table><thead><tr><th colspan="${grades.length+1}">${esc(provider)}（獨立報價）</th></tr><tr><th>原始機型／容量</th>${grades.map(grade=>`<th>${esc(Core.gradeLabel(grade))}</th>`).join('')}</tr></thead><tbody><tr><td>${esc(row.model||'—')}</td>${grades.map(grade=>`<td>${esc(state.tradein?.localReference&&Core.priceState(row.quotes[provider]&&row.quotes[provider][grade]).zero?'待確認（來源為0）':Core.formatPrice(row.quotes[provider]&&row.quotes[provider][grade]))}</td>`).join('')}</tr></tbody></table></div>`;}).join('')}</article>`).join('');
   }
-  function renderKind(kind){scope.ThreecQueryExport?.update(state[queryKind]);if(kind==='shopping'){if(shoppingIndex)updateShoppingOptions();renderShopping();renderChanges(kind);return;}const search=$('tradeinSearch').value,modelKey=$('tradeinModel').value;const response=state[kind];const view=response?Core.buildView(kind,response,{query:search,modelKey,provider:$('tradeinProvider').value,grade:$('tradeinGrade').value}):null;renderTradein(view);renderChanges(kind);if(view){const select=$('tradeinModel'),prior=select.value;select.innerHTML='<option value="">全部機款</option>'+view.modelOptions.map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');if(view.modelOptions.some(option=>option.value===prior))select.value=prior;}}
+  function renderKind(kind){scope.ThreecQueryExport?.update({shopping:state.shopping,tradein:state.tradein});if(kind==='shopping'){if(shoppingIndex)updateShoppingOptions();renderShopping();renderChanges(kind);return;}const search=$('tradeinSearch').value,modelKey=$('tradeinModel').value;const response=state[kind];const view=response?Core.buildView(kind,response,{query:search,modelKey,provider:$('tradeinProvider').value,grade:$('tradeinGrade').value}):null;renderTradein(view);renderChanges(kind);if(view){const select=$('tradeinModel'),prior=select.value;select.innerHTML='<option value="">全部機款</option>'+view.modelOptions.map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');if(view.modelOptions.some(option=>option.value===prior))select.value=prior;}}
   function showKind(kind){state.active=kind;['shopping','tradein'].forEach(value=>{const tab=$(value+'Tab'),pane=$(value+'Pane');const active=value===kind;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));pane.classList.toggle('hidden',!active);});renderChanges(kind);const query=$('changeSearch').value.trim();const set=state.changePage[kind]||responseChangeSet(state[kind]);if(state[kind]&&!state[kind].changesDeferred&&(!set||String(set._search||'')!==query))loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad'));}
   async function refresh(){
     if(offline){
-      clearResults();state[queryKind]=offline.response;
-      if(queryKind==='shopping'){shoppingIndex=Compare.buildIndex(offline.response.snapshot);splitSpecKeys=findSplitSpecs(shoppingIndex);}
-      renderKind(queryKind);
-      setStatus('唯讀快照 · '+(offline.response.localReference?'本機參考':'正式來源')+' '+offline.response.snapshot.source_version_date+' · 不自動更新','ok');
-      if(offline.response.referenceCatalog)setTimeout(()=>scope.dispatchEvent(new CustomEvent('query-readonly:reference',{detail:offline.response.referenceCatalog})),0);
+      clearResults();state.shopping=offline.responses.shopping;state.tradein=offline.responses.tradein;
+      shoppingIndex=Compare.buildIndex(state.shopping.snapshot);splitSpecKeys=findSplitSpecs(shoppingIndex);
+      renderKind('shopping');renderKind('tradein');
+      setStatus('唯讀快照 · '+(state.shopping.localReference?'本機參考':'正式來源')+' · 手機 '+state.shopping.snapshot.source_version_date+'／回收 '+state.tradein.snapshot.source_version_date+' · 不自動更新','ok');
+      if(state.tradein.referenceCatalog)setTimeout(()=>scope.dispatchEvent(new CustomEvent('query-readonly:reference',{detail:state.tradein.referenceCatalog})),0);
       return;
     }
     const requestGeneration=++generation;
@@ -239,7 +239,7 @@
     }finally{if(requestGeneration===generation){state.loading=false;$('refreshBtn').disabled=false;}}
   }
   function bind(){
-    scope.ThreecQueryExport?.bind(()=>state[queryKind]);
+    scope.ThreecQueryExport?.bind(()=>({shopping:state.shopping,tradein:state.tradein}));
     scope.addEventListener('quote-reference:load',event=>{
       const reference=event.detail;if(!reference?.shopping?.localReference||!reference?.tradein?.localReference)return;
       $('changeCard').classList.add('hidden');

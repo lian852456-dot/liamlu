@@ -17,7 +17,7 @@ async function openDownloadedOffline(browser,bytes,kind,info){
  if(kind==='department'){await page.locator('[data-tab=gold]').click();await expect(page.locator('#peopleBody')).toContainText('測＊員');}
  if(kind==='patrol'){await page.locator('#query').fill('合成缺失');await expect(page.locator('#visible')).toContainText('1');}
  if(kind==='tradein'){await expect(page.locator('main')).toContainText('合成高價機');await expect(page.locator('main')).toContainText('1,000 元');await page.locator('#query').fill('不存在');await expect(page.locator('#count')).toContainText('顯示 0');await page.locator('#query').fill('');}
- if(kind.startsWith('query-')){await expect(page.locator('#queryStatus')).toContainText('唯讀快照');const sourceKind=kind.slice(6);await page.locator('#'+sourceKind+'Search').fill('不存在的合成機款');await expect(page.locator('#'+sourceKind+'Results')).toContainText('沒有符合');await page.locator('#'+sourceKind+'Search').fill('');}
+ if(kind.startsWith('query-')){await expect(page.locator('#queryStatus')).toContainText('唯讀快照');const sourceKind=kind.slice(6);await page.locator('#'+sourceKind+'Tab').click();await page.locator('#'+sourceKind+'Search').fill('不存在的合成機款');await expect(page.locator('#'+sourceKind+'Results')).toContainText('沒有符合');await page.locator('#'+sourceKind+'Search').fill('');}
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);expect(network).toEqual([]);expect(errors).toEqual([]);await page.screenshot({path:info.outputPath('offline-open.png'),fullPage:false});await context.close();
  return {offlineBeforeLoad:true,externalRequests:0,pageErrors:0,sha256:crypto.createHash('sha256').update(bytes).digest('hex')};
 }

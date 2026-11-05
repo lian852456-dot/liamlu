@@ -43,19 +43,25 @@
     }
     return {kind,response:output};
   }
-  function build(kind,response,assets){
-    const payload=project(kind,response),asset=assets?.[kind];
+  function projectPair(sources){
+    const shopping=project('shopping',sources?.shopping).response,tradein=project('tradein',sources?.tradein).response;
+    if(Boolean(shopping.localReference)!==Boolean(tradein.localReference)||(shopping.localReference&&shopping.snapshot.snapshot_hash!==tradein.snapshot.snapshot_hash))throw Error('兩類價格來源不同，請重新載入同一來源後匯出');
+    return {shopping,tradein};
+  }
+  function build(kind,sources,assets){
+    const payload={initialKind:kind==='tradein'?'tradein':'shopping',responses:projectPair(sources)},asset=assets?.tradein;
     if(!H||!asset?.body||!asset?.script||!asset?.css)throw Error('離線匯出元件尚未載入');
     const json=JSON.stringify(payload).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
-    const body=asset.body.replace('<!--QUERY_OFFLINE_INFO-->', '<p class="offline-info">'+H.escape(kind==='shopping'?'商品查價':'舊換新回收價')+' · 唯讀快照 · '+H.escape(payload.response.snapshot.source_version_date)+' · '+payload.response.snapshot.row_count+' 筆完整來源資料</p>');
+    const body=asset.body.replace('<!--QUERY_OFFLINE_INFO-->', '<p class="offline-info">手機專案 '+payload.responses.shopping.snapshot.row_count+' 筆／舊換新 '+payload.responses.tradein.snapshot.row_count+' 筆完整來源資料 · 唯讀快照</p>');
     // Body attributes are applied before the bundled display-only runtime starts.
-    return H.create({title:(kind==='shopping'?'查價系統':'舊換新查價')+'｜唯讀版',body,css:asset.css,script:'document.body.dataset.queryKind='+JSON.stringify(kind)+';document.body.dataset.queryRelease="6";document.body.dataset.priceMode="offline";window.ThreecReadonlyPayload='+json+';\n'+asset.script});
+    return H.create({title:'手機專案與舊換新查價｜整合唯讀版',body,css:asset.css,script:'document.body.dataset.queryKind="combined";document.body.dataset.queryRelease="6";document.body.dataset.priceMode="offline";window.ThreecReadonlyPayload='+json+';\n'+asset.script});
   }
   let read=null,current=null,loading=null,busy=false;
-  function update(response){current=response;const button=root?.document?.getElementById('downloadQueryHtml');if(button)button.disabled=busy||!response?.snapshot;}
+  const same=(a,b)=>a?.shopping===b?.shopping&&a?.tradein===b?.tradein;
+  function update(sources){current=sources;const button=root?.document?.getElementById('downloadQueryHtml');if(button){const ready=!!sources?.shopping?.snapshot&&!!sources?.tradein?.snapshot;button.disabled=busy||!ready;button.title=ready?'一次下載一個可離線切換兩種查價的 HTML':'手機專案與舊換新資料皆完整載入後可匯出';}}
   function assets(){
     if(root.ThreecReadonlyAssets)return Promise.resolve(root.ThreecReadonlyAssets);
-    if(!loading)loading=new Promise((resolve,reject)=>{const script=root.document.createElement('script');script.src='threec-readonly-assets.js?v=20261105-export-1';script.onload=()=>root.ThreecReadonlyAssets?resolve(root.ThreecReadonlyAssets):reject(Error('匯出元件不完整'));script.onerror=()=>reject(Error('匯出元件下載失敗，請重試'));root.document.head.append(script);}).catch(error=>{loading=null;throw error;});
+    if(!loading)loading=new Promise((resolve,reject)=>{const script=root.document.createElement('script');script.src='threec-readonly-assets.js?v=20261105-integrated-1';script.onload=()=>root.ThreecReadonlyAssets?resolve(root.ThreecReadonlyAssets):reject(Error('匯出元件不完整'));script.onerror=()=>reject(Error('匯出元件下載失敗，請重試'));root.document.head.append(script);}).catch(error=>{loading=null;throw error;});
     return loading;
   }
   function bind(getResponse){
@@ -63,15 +69,15 @@
     button.addEventListener('click',async()=>{
       if(busy)return;const source=read(),kind=root.document.body.dataset.queryKind;busy=true;update(source);status.hidden=false;status.textContent='正在建立完整唯讀 HTML…';
       try{
-        project(kind,source);const bundle=await assets();
-        if(read()!==source||current!==source)throw Error('價格來源已切換，請完成讀取後重新匯出');
-        const html=build(kind,source,bundle),name=(kind==='shopping'?'查價系統':'舊換新回收價')+'_唯讀_'+source.snapshot.source_version_date+'.html';
+        projectPair(source);const bundle=await assets();
+        if(!same(read(),source)||!same(current,source))throw Error('價格來源已切換，請完成讀取後重新匯出');
+        const html=build(kind,source,bundle),name='手機專案與舊換新_整合唯讀_'+source.shopping.snapshot.source_version_date+'_'+source.tradein.snapshot.source_version_date+'.html';
         root.OfflineHtml.download(html,name);
-        status.textContent='已匯出唯讀 HTML（完整來源 '+(source.snapshot.rows||source.snapshot.data.rows).length+' 筆）；開啟下載檔即可離線查詢。';
+        status.textContent='已匯出一個整合唯讀 HTML；開啟下載檔即可切換手機專案與舊換新，離線查詢完整價格。';
       }catch(error){status.textContent=error.message||'匯出失敗，請重新整理後重試';}
       finally{busy=false;update(read());}
     });
     update(read());
   }
-  return Object.freeze({project,build,bind,update});
+  return Object.freeze({project,projectPair,build,bind,update});
 });
