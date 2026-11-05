@@ -194,6 +194,7 @@
   function showKind(kind){state.active=kind;['shopping','tradein'].forEach(value=>{const tab=$(value+'Tab'),pane=$(value+'Pane');const active=value===kind;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));pane.classList.toggle('hidden',!active);});renderChanges(kind);const query=$('changeSearch').value.trim();const set=state.changePage[kind]||responseChangeSet(state[kind]);if(state[kind]&&!state[kind].changesDeferred&&(!set||String(set._search||'')!==query))loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad'));}
   async function refresh(){
     const requestGeneration=++generation;
+    $('changeCard').classList.remove('hidden');
     state.loading=true;$('refreshBtn').disabled=true;setStatus('正在讀取正式價格…');clearResults();
     const outcomes={};
     function progress(){
@@ -225,6 +226,7 @@
   function bind(){
     scope.addEventListener('quote-reference:load',event=>{
       const reference=event.detail;if(!reference?.shopping?.localReference||!reference?.tradein?.localReference)return;
+      $('changeCard').classList.add('hidden');
       generation+=1;clearResults();state.loading=false;$('refreshBtn').disabled=false;
       state.shopping=reference.shopping;state.tradein=reference.tradein;
       shoppingIndex=Compare.buildIndex(reference.shopping.snapshot);splitSpecKeys=findSplitSpecs(shoppingIndex);

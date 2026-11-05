@@ -33,7 +33,8 @@ domTest('正式讀取沿用原API及三家報價，套用工作區且保留異�
   const c=await setup({pageFile,width,officialResponses:payload=>fail?{status:'error',message:'合成拒絕讀取'}:responses[payload.kind]});try{
    assert(c.w.document.body.classList.contains('query-workspace'));assert.equal(c.$('#quoteReference').parentElement.id,'queryResources');assert.equal(c.$('#shoppingMeta').closest('details').className,'query-price-source');assert.equal(c.$('#tradeinMeta').closest('details').className,'query-tradein-source');assert(c.$('#changeCard'));assert.equal(c.$('#changeCard').hasAttribute('hidden'),false);
    assert.match(c.$('#queryStatus').textContent,/已讀取正式資料.*2026-11/);assert.match(c.$('#shoppingResults').textContent,/999\(24\)/);assert.match(c.$('#tradeinResults').textContent,/555/);assert.match(c.$('#tradeinResults').textContent,/未分級/);assert.equal(JSON.stringify(responses),before);assert.equal(c.network.length,2);
-   fail=true;c.$('#refreshBtn').click();for(let i=0;i<30&&!c.$('#queryStatus').classList.contains('bad');i++)await new Promise(r=>setTimeout(r,5));assert.match(c.$('#queryStatus').textContent,/合成拒絕讀取/);assert(c.$('#queryStatus').classList.contains('bad'));assert.doesNotMatch(c.$('#tradeinResults').textContent,/555/);assert.doesNotMatch(c.$('#shoppingResults').textContent,/合成新機/);assert.deepEqual(c.errors,[]);
+   c.w.dispatchEvent(new c.w.CustomEvent('quote-reference:load',{detail:converted}));assert(c.$('#changeCard').classList.contains('hidden'));
+   fail=true;c.$('#refreshBtn').click();assert.equal(c.$('#changeCard').classList.contains('hidden'),false);for(let i=0;i<30&&!c.$('#queryStatus').classList.contains('bad');i++)await new Promise(r=>setTimeout(r,5));assert.match(c.$('#queryStatus').textContent,/合成拒絕讀取/);assert(c.$('#queryStatus').classList.contains('bad'));assert.doesNotMatch(c.$('#tradeinResults').textContent,/555/);assert.doesNotMatch(c.$('#shoppingResults').textContent,/合成新機/);assert.deepEqual(c.errors,[]);
   }finally{c.close();}
  }
 });
