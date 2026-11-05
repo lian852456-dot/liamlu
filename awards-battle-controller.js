@@ -110,9 +110,23 @@
     return { ok: true, reason: '' };
   }
 
+  function awardDifference(item) {
+    const number = value => !['number', 'string'].includes(typeof value) || String(value).trim() === '' ? NaN : Number(value);
+    // Explicit legacy difference, including null, remains authoritative.
+    if (Object.prototype.hasOwnProperty.call(item, 'difference')) return number(item.difference);
+    // gap is an unsigned, zero-clamped shortfall. Reconcile source quantities
+    // before displaying a signed difference; missing or conflicting values stay missing.
+    const gap = number(item.gap);
+    const actual = number(item.actual);
+    const threshold = number(item.threshold_target);
+    if (![gap, actual, threshold].every(Number.isFinite) || gap < 0 || actual < 0 || threshold < 0) return NaN;
+    const difference = actual - threshold;
+    return gap === Math.max(-difference, 0) ? difference : NaN;
+  }
+
   function renderAwardPriority(item) {
     if (!item) return '';
-    const difference = item.difference == null || item.difference === '' ? NaN : Number(item.difference);
+    const difference = awardDifference(item);
     const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${formatNumber(difference)}` : '尚未有資料';
     return `<div class="award-priority-card">
       <div class="award-priority-title">${item.display_name}</div>
@@ -128,7 +142,7 @@
   }
 
   function renderAwardModel(item, district) {
-    const difference = item.difference == null || item.difference === '' ? NaN : Number(item.difference);
+    const difference = awardDifference(item);
     const differenceText = Number.isFinite(difference) ? `${difference > 0 ? '+' : ''}${formatNumber(difference)}` : '尚未有資料';
     const levels = district
       ? [{ label: '北一二B 80%獎金', amount: item.district_reward_80 }, { label: '北一二B 100%獎金', amount: item.district_reward_100 }]

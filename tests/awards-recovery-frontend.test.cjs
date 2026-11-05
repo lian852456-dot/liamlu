@@ -226,6 +226,6 @@ test('website controller passes authenticated read integrity from the real snaps
 });
 
 test('HTML retains recovery controller and the current App rank contract asset', () => {
-  assert.match(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), /awards-battle-controller\.js\?v=20261018-awards-recovery-1/);
+  assert.match(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), /awards-battle-controller\.js\?v=20261105-awards-gap-id-1/);
   assert.match(fs.readFileSync(path.join(root, 'app.html'), 'utf8'), /app\.js\?v=20261027-manual-read-1/);
 });
