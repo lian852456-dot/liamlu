@@ -9,3 +9,5 @@ body.query-workspace #tradeinPane .tradein-limit{font-size:12px;line-height:1.5;
 .query-tradein-advanced>summary{cursor:pointer;font-size:13px;font-weight:700;margin-bottom:8px}.query-tradein-advanced .toolbar{margin:8px 0 0}
 #tradeinResults.official-workspace{display:block!important}
 @media(max-width:800px){.query-tradein-filters{display:block}.query-tradein-filters>.toolbar{display:grid}.query-tradein-advanced[open]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.query-tradein-advanced>summary{grid-column:1/-1;margin:0}.query-tradein-advanced .toolbar{display:contents}.official-workspace .tref-quotes{grid-template-columns:repeat(2,minmax(0,1fr))}.official-workspace .tref-quotes strong{font-size:18px!important}}
+
+.query-export-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.query-export-actions button{white-space:nowrap}

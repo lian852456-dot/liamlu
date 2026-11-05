@@ -17,6 +17,7 @@ async function openDownloadedOffline(browser,bytes,kind,info){
  if(kind==='department'){await page.locator('[data-tab=gold]').click();await expect(page.locator('#peopleBody')).toContainText('測＊員');}
  if(kind==='patrol'){await page.locator('#query').fill('合成缺失');await expect(page.locator('#visible')).toContainText('1');}
  if(kind==='tradein'){await expect(page.locator('main')).toContainText('合成高價機');await expect(page.locator('main')).toContainText('1,000 元');await page.locator('#query').fill('不存在');await expect(page.locator('#count')).toContainText('顯示 0');await page.locator('#query').fill('');}
+ if(kind.startsWith('query-')){await expect(page.locator('#queryStatus')).toContainText('唯讀快照');const sourceKind=kind.slice(6);await page.locator('#'+sourceKind+'Search').fill('不存在的合成機款');await expect(page.locator('#'+sourceKind+'Results')).toContainText('沒有符合');await page.locator('#'+sourceKind+'Search').fill('');}
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);expect(network).toEqual([]);expect(errors).toEqual([]);await page.screenshot({path:info.outputPath('offline-open.png'),fullPage:false});await context.close();
  return {offlineBeforeLoad:true,externalRequests:0,pageErrors:0,sha256:crypto.createHash('sha256').update(bytes).digest('hex')};
 }
@@ -54,6 +55,7 @@ for(const entry of inventory.entries)test(entry.id+' downloads its real HTML and
  else if(entry.id==='officer-renewal'){await page.goto(base+'/north12-officer.html');await page.locator('#files').setInputFiles(book());await expect(page.locator('#export')).toBeEnabled();}
  else if(entry.kind==='department')await department(page);
  else if(entry.kind==='patrol')await patrol(page);
+ else if(entry.kind.startsWith('query-')){const F=require('./threec-search-fixture.cjs');await route(page,p=>F[p.kind]());await page.goto(base+'/'+entry.page);await expect(page.locator(entry.control)).toBeEnabled();}
  else await tradein(page);
  const pending=page.waitForEvent('download');await page.locator(entry.control).click();const download=await pending;expect(download.suggestedFilename()).toMatch(/\.html$/);const bytes=await fs.readFile(await download.path());await download.saveAs(info.outputPath(entry.id+'.html'));const checks=await openDownloadedOffline(browser,bytes,entry.kind,info);if(entry.kind==='tradein'){await page.locator('#reminderPriceDate').fill('2026-11-15');await page.locator('#reminderPriceDate').dispatchEvent('change');await expect(page.locator('#reminderText')).not.toHaveValue(/1,000 元/);await expect(page.locator('#reminderText')).toHaveValue(/無有效且完整/);const wait=page.waitForEvent('download');await page.locator(entry.control).click();const expired=await wait;expect(await fs.readFile(await expired.path(),'utf8')).not.toContain('1,000 元');}results.push({...entry,...checks,bytes:bytes.length,downloadedFilename:download.suggestedFilename(),status:'passed'});
 });

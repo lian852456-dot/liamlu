@@ -23,7 +23,7 @@ async function setup({width=1280,payload=pricePayload(),privateFile='',pageFile=
  await new Promise(r=>setTimeout(r,0));
  const $=s=>w.document.querySelector(s),field=n=>$('[data-tref="'+n+'"]');
  const change=(n,value)=>{field(n).value=value;field(n).dispatchEvent(new w.Event(n==='search'||n==='date'?'input':'change',{bubbles:true}));};
- return{dom,w,$,field,change,errors,network,copied,close:()=>dom.window.close()};
+ return{dom,w,$,field,change,errors,network,copied,close:()=>{w.dispatchEvent(new w.Event('pagehide'));dom.window.close();}};
 }
 const domTest=(name,fn)=>test(name,{skip:!JSDOM?'Set NODE_PATH to a jsdom installation':false},fn);
 domTest('正式讀取沿用原API及三家報價，套用工作區且保留異動及錯誤清除',async()=>{
