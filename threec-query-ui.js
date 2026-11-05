@@ -186,7 +186,7 @@
     if(!view.available){$('tradeinMeta').innerHTML='';target.innerHTML='<div class="empty">尚未發布正式資料：舊換新。</div>';return;}
     $('tradeinMeta').innerHTML=metaHtml(view.meta,state.tradein?.localReference);
     if(!view.rows.length){target.innerHTML='<div class="empty">沒有符合搜尋條件的正式機款。</div>';return;}
-    const notice=view.limited?`<div class="status warn">目前顯示前 ${view.displayLimit} 筆（符合條件共 ${view.totalRows} 筆）。請先從「選機款」縮小範圍後查看完整資料。</div>`:'';
+    const notice=view.limited?`<div class="status warn tradein-limit" title="可選擇廠牌或機款查看其完整報價">顯示 ${view.displayLimit}／${view.totalRows} 組</div>`:'';
     const selectedProvider=$('tradeinProvider').value,selectedGrade=$('tradeinGrade').value;
     target.innerHTML=notice+view.rows.map(row=>`<article class="provider"><h3>${esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')}</h3>${row.priceVariant?`<p class="price-variant">不同報價：${row.sourceModels.map(esc).join('／')}</p>`:''}<p class="group-note">來源工作表：${esc(row.sourceSheet||'—')}<br>原始機型：${row.sourceModels.map(esc).join('／')}</p>${Core.quotedProviders(row,selectedProvider,selectedGrade).map(provider=>{const grades=Core.quotedGrades(row,provider,selectedGrade);return `<div class="table-scroll"><table><thead><tr><th colspan="${grades.length+1}">${esc(provider)}（獨立報價）</th></tr><tr><th>原始機型／容量</th>${grades.map(grade=>`<th>${esc(Core.gradeLabel(grade))}</th>`).join('')}</tr></thead><tbody><tr><td>${esc(row.model||'—')}</td>${grades.map(grade=>`<td>${esc(state.tradein?.localReference&&Core.priceState(row.quotes[provider]&&row.quotes[provider][grade]).zero?'待確認（來源為0）':Core.formatPrice(row.quotes[provider]&&row.quotes[provider][grade]))}</td>`).join('')}</tr></tbody></table></div>`;}).join('')}</article>`).join('');
   }
