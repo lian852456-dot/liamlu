@@ -28,12 +28,12 @@ test('TOP3/BOT3 keep zero, exclude unknowns, report ties and never mutate data',
  assert.equal(r.top.length,3);assert.equal(r.bottom.length,3);assert.equal(r.unknown,1);assert.equal(r.bottom[0].actual,0);
  assert.ok(!r.bottom.some(row=>r.top.some(top=>top.name===row.name)));assert.equal(JSON.stringify(s.tradein),before);
  const tied=rankings([{store:'甲',name:'測＊甲',actual:1},{store:'乙',name:'測＊乙',actual:1},{store:'丙',name:'測＊丙',actual:null}]);assert.equal(tied.equal,true);assert.equal(tied.unknown,1);
- const brief=reminderBrief(s.tradein);assert.ok(brief.includes('店點 TOP3'));assert.ok(brief.includes('個人 BOT3'));assert.ok(brief.includes('價格優勢待核'));assert.ok(!brief.includes('FDI 多'));
+ const brief=reminderBrief(s.tradein);assert.ok(brief.includes('店點 TOP3'));assert.ok(brief.includes('個人 BOT3'));assert.ok(brief.includes('回收參考價 TOP3：請'));assert.ok(!brief.includes('FDI 多'));
 });
 test('store totals use verified store summaries, keep support independent, and filtered scopes fail closed',async()=>{
  const E=await import('../tradein-export-core.mjs'),rules={...E.rulesForMonth('2026-10'),isDemo:false},c={active:true,mode:'public',allowedStores:['萬大'],people:[['萬大','測＊員','同仁',1]],storeSummaries:[{store:'萬大',actual:7,target:15}],selectedStore:'萬大'};
  const model=E.buildExportModel(c,'all',rules);assert.equal(model.stores[0].actual,7);assert.equal(model.rows[0].actual,1);
  assert.equal(E.buildExportModel({...c,currentPeople:c.people,countFilterLabel:'回收1筆'},'current',rules).stores.length,0);
- assert.equal(E.buildExportModel(c,'all',{...rules,month:'2026-11',start:'2026-11-01',end:'2026-11-30',staffTarget:3,actingManager:'exempt'}).stores.length,0);
+ assert.equal(E.buildExportModel(c,'all',{...rules,month:'2026-12',start:'2026-12-01',end:'2026-12-31',staffTarget:3,actingManager:'exempt'}).stores.length,0);
  assert.throws(()=>E.buildExportModel({...c,storeSummaries:[{store:'萬大',actual:-1,target:15}]},'all',rules));
 });

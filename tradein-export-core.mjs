@@ -1,4 +1,4 @@
-import {personalRules} from './tradein-target-policy.mjs?v=20261012-targets-1';
+import {personalRules} from './tradein-target-policy.mjs?v=20261105-all-person-3-1';
 // Export only the already authorized, de-identified projection. No raw trade data.
 export const DEFAULT_RULES = Object.freeze({month:'2026-10',start:'2026-10-01',end:'2026-10-31',periodStatus:'confirmed',cadence:'monthly',sourceStart:'2026-10-01',sourceEnd:'2026-10-07',cutoff:'2026-10-07',timezone:'Asia/Taipei',staffTarget:4,actingManager:'included',isDemo:true,selectedDate:''});
 export function isDate(value){return /^\d{4}-\d{2}-\d{2}$/.test(value||'')&&!Number.isNaN(Date.parse(value+'T00:00:00Z'))&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value;}

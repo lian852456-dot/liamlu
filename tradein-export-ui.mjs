@@ -1,11 +1,18 @@
+import {parsePriceSource,buildPriceTop3} from './tradein-price-top3.mjs?v=20261105-1';
 import {reminderBrief,createTradeinHtml} from './tradein-reminder.mjs?v=20261105-1';
-import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261105-html-export-1';
+import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261105-html-export-2';
 import {copyReminderText} from './tradein-clipboard.mjs?v=20261010-copy-recovery-1';
 const $=id=>document.getElementById(id);
-let contextReader,revision=0,busy=false,canvas=null;
+let contextReader,revision=0,busy=false,canvas=null,priceCatalog=null,priceEpoch=0;
 export function currentRules(){return contextReader?.().rules || rulesForMonth($('periodMonth').value);}
 function rules(){return currentRules();}
-function model(){return buildExportModel(contextReader(),$('exportScope').value,rules());}
+function model(){
+  const snapshot=buildExportModel(contextReader(),$('exportScope').value,rules());
+  if(!priceCatalog)return snapshot;
+  let priceTop3;try{priceTop3=buildPriceTop3(priceCatalog,{vendor:$('reminderPriceVendor').value,grade:$('reminderPriceGrade').value,category:$('reminderPriceCategory').value,asOf:$('reminderPriceDate').value});}
+  catch(error){priceTop3={rows:[],note:error.message,vendor:$('reminderPriceVendor').value,grade:$('reminderPriceGrade').value,category:$('reminderPriceCategory').value,asOf:$('reminderPriceDate').value};}
+  return Object.freeze({...snapshot,priceTop3});
+}
 function feedback(text,error=false){$('exportFeedback').textContent=text;$('exportFeedback').className='export-feedback'+(error?' error':'');}
 function buttons(disabled){['copyReminder','downloadReminderPng','downloadReminderXlsx','downloadReminderHtml'].forEach(id=>$(id)&&($(id).disabled=disabled));}
 function current(ticket){if(ticket!==revision||!contextReader().active)throw new Error('畫面或匯出範圍已變更，請重新操作。');}
@@ -63,8 +70,32 @@ function updatePreview(){
   }catch(error){$('reminderText').value='';$('reminderImage').removeAttribute('src');$('reminderImage').hidden=true;buttons(true);feedback(error.message,true);}
 }
 export function clearExports(){revision++;canvas=null;feedback('');$('reminderText').value='';$('reminderImage').removeAttribute('src');$('reminderImage').hidden=true;buttons(true);}
+function priceControls(){
+  const vendor=$('reminderPriceVendor'),grade=$('reminderPriceGrade'),category=$('reminderPriceCategory');
+  if(category.value==='Mac'){vendor.value='fdi';if(grade.value==='S')grade.value='A';}
+  const prior=grade.value;grade.replaceChildren(...(vendor.value==='dianzi'||category.value==='Mac'?['A','B','C']:['S','A','B','C']).map(value=>{const option=document.createElement('option');option.value=value;option.textContent=value+' 等';return option;}));
+  if([...grade.options].some(o=>o.value===prior))grade.value=prior;
+}
+function clearPriceSource(){priceEpoch++;priceCatalog=null;if($('reminderPriceFile')){$('reminderPriceFile').value='';$('reminderPriceStatus').textContent='選取已提供的報價中心 HTML／回收價 JSON，可補上指定廠商與等級的 TOP3 參考價。';}}
+function bindPriceSource(){
+  const file=$('reminderPriceFile');if(!file)return;
+  $('reminderPriceDate').value=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'});priceControls();
+  file.addEventListener('change',async()=>{
+    const selected=file.files[0],ticket=++priceEpoch;priceCatalog=null;updatePreview();if(!selected)return;
+    $('reminderPriceStatus').textContent='正在本機核對報價來源與有效期…';
+    try{
+      if(!/\.(?:html?|json)$/i.test(selected.name)||selected.size>20*1024*1024)throw Error('請選取 20MB 內的原報價 HTML／JSON');
+      const bytes=await selected.arrayBuffer(),sha256=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join(''),text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
+      const catalog=parsePriceSource(text,{fileName:selected.name,sha256});if(ticket!==priceEpoch)return;
+      priceCatalog=catalog;$('reminderPriceStatus').textContent='已載入 '+selected.name+'：'+catalog.devices.length+' 組機型；僅在本機讀取，參考價依下方廠商／等級及核對日列出。';updatePreview();
+    }catch(error){if(ticket===priceEpoch){priceCatalog=null;$('reminderPriceStatus').textContent='未套用回收價來源：'+error.message;updatePreview();}}
+  });
+  for(const id of ['reminderPriceVendor','reminderPriceGrade','reminderPriceCategory','reminderPriceDate'])$(id).addEventListener('change',()=>{priceControls();updatePreview();});
+  $('clearReminderPrice').addEventListener('click',()=>{clearPriceSource();updatePreview();});
+  window.addEventListener('portal-before-logout',clearPriceSource);window.addEventListener('pagehide',clearPriceSource);
+}
 export function bindExports(reader){
-  contextReader=reader;
+  contextReader=reader;bindPriceSource();
   $('copyReminder').addEventListener('click',()=>operate('copy'));
   $('downloadReminderPng').addEventListener('click',()=>operate('png'));
   $('downloadReminderXlsx').addEventListener('click',()=>operate('xlsx'));

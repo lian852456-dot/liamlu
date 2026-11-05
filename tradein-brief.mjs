@@ -1,6 +1,6 @@
 import {createSupervisorAccess} from './tradein-supervisor-auth.mjs?v=20261012-supervisor-1';
 import {createPublicReader,readPublicFrame} from './tradein-public-read.mjs?v=20261010-date-read-1';
-import {buildBrief} from './tradein-brief-core.mjs?v=20261012-targets-1';
+import {buildBrief} from './tradein-brief-core.mjs?v=20261105-all-person-3-1';
 import {buildDeck} from './tradein-brief-pptx.mjs?v=20261012-targets-1';
 const API='https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec',$=id=>document.getElementById(id);
 let model=null,epoch=0,controller=null,busy=false,vendor=null;

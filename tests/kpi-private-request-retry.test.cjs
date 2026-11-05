@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 const KpiBattleController = require('../kpi-battle-controller.js');
 
 const root = path.join(__dirname, '..');
@@ -152,14 +153,31 @@ test('network exception、第二次成功後正常登入', async () => {
   await expectLoginSuccess([new TypeError('Failed to fetch')], 3, [2000]);
 });
 
-test('主站 KPI 改走 controller scoped retry，每日回報 transport 保持獨立', () => {
+test('主站 KPI retry 與每日回報讀取／寫入 transport 保持獨立', async () => {
   const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const createBlock = index.match(/const kpiBattleController = KpiBattleController\.create\(\{([\s\S]*?)\}\);/)?.[1] || '';
   assert.doesNotMatch(createBlock, /post:\s*privateDashboardPost/);
   assert.match(index, /async function privateDashboardPost\(payload, options\)/);
-  for (const action of ['read', 'write', 'pread', 'pwrite']) {
-    assert.match(index, new RegExp(`privateDashboardPost\\(\\{ action: '${action}'`));
-  }
+  // Writes now pass through ReportSaveRecovery as payload variables. Exercise
+  // the real adapter instead of requiring an obsolete inline-call spelling.
+  const start=index.indexOf('async function privateDashboardPost(payload, options)');
+  const end=index.indexOf('const reportSaves =',start),calls=[];
+  const context={dailyReportReadContext:1,DOMException,
+    PortalLogout:{assertActive(){}},
+    dailyReportReads:{read:async(payload,options)=>{calls.push(['read',payload.action,options]);return {status:'ok'};}},
+    privateDashboardRequest:async payload=>{calls.push(['write',payload.action]);return {status:'ok'};},
+    invalidateDailyReportReads:(date,seg)=>calls.push(['invalidate',date,seg])};
+  vm.createContext(context);vm.runInContext(index.slice(start,end),context);
+  const options={isolated:true};
+  for(const action of ['read','pread'])await context.privateDashboardPost({action,date:'2026-11-05',seg:16},options);
+  assert.equal(calls.filter(c=>c[0]==='read').length,2);assert.equal(calls.filter(c=>c[0]==='write').length,0);
+  for(const action of ['write','pwrite'])await context.privateDashboardPost({action,date:'2026-11-05',seg:16});
+  assert.deepEqual(calls.filter(c=>c[0]==='write').map(c=>c[1]),['write','pwrite']);
+  assert.equal(calls.filter(c=>c[0]==='invalidate').length,4);
+  let attempts=0;context.privateDashboardRequest=async()=>{attempts++;throw Error('HTTP 503');};
+  await assert.rejects(()=>context.privateDashboardPost({action:'write',date:'2026-11-05',seg:16}),/503/);assert.equal(attempts,1);
+  context.PortalLogout.assertActive=()=>{throw Error('logged out');};
+  await assert.rejects(()=>context.privateDashboardPost({action:'pwrite'}),/logged out/);assert.equal(attempts,1);
 });
 
 test('暫時性 HTTP status 清單固定為 404/429/500/502/503/504', async () => {
