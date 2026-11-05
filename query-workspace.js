@@ -20,8 +20,16 @@
         const description=document.getElementById('shoppingSectionDescription');if(description)aside.append(description);
         for(const selector of ['.comparison-toolbar','#cardConditionField','#shoppingResults','.comparison-pagination']){const el=pane.querySelector(selector);if(el)results.append(el);}
         layout.append(aside,results);pane.append(layout);
+        const legacy=document.querySelector('#tradeinPane .tref-legacy');
+        if(legacy&&document.body.dataset.queryKind==='tradein'&&new URLSearchParams(location.search).get('view')!=='source'){
+          const layout=document.createElement('div'),filters=document.createElement('aside');layout.className='query-tradein-layout';filters.className='query-tradein-filters';filters.setAttribute('aria-label','舊換新篩選');
+          const toolbars=[...legacy.querySelectorAll(':scope>.toolbar')],advanced=document.createElement('details');advanced.className='query-tradein-advanced';advanced.open=!scope.matchMedia('(max-width:800px)').matches;advanced.innerHTML='<summary>品牌、機款與報價篩選</summary>';
+          toolbars.forEach((toolbar,i)=>(i?advanced:filters).append(toolbar));filters.append(advanced);
+          const results=document.getElementById('tradeinResults');layout.append(filters,results);legacy.append(layout);
+        }
         const meta=document.getElementById('shoppingMeta');if(meta){const details=document.createElement('details');details.className='query-price-source';details.innerHTML='<summary>手機價格來源及完整版本</summary>';details.append(meta);resources.append(details);}
         if(document.body.dataset.priceMode!=='reference'){const meta=document.getElementById('tradeinMeta');if(meta){const details=document.createElement('details');details.className='query-tradein-source';details.innerHTML='<summary>舊換新資料與說明</summary><p>金額單位：元；－表示未提供該等級報價。正式來源未提供的有效期、料號或分級定義不補猜；參考HTML仍可另外載入核對。</p>';details.append(meta);resources.append(details);}}
+        const history=document.getElementById('changeCard');if(history){const details=document.createElement('details');details.className='query-history';details.open=new URLSearchParams(location.search).get('view')==='source';details.innerHTML='<summary>本次異動與版本檢查</summary>';details.append(history);resources.append(details);}
         for(const link of document.querySelectorAll('a[href="#promotionCatalog"]'))link.addEventListener('click',()=>{const el=document.getElementById('promotionCatalog');if(el)el.open=true;});
         document.getElementById('tableModeBtn')?.click();
         scope.dispatchEvent(new Event('query-workspace:ready'));

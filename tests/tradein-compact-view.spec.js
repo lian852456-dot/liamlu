@@ -36,7 +36,7 @@ for(const config of configs){
   test(`${config.name} ${width}px same item once with aligned provider rows`,async({page},testInfo)=>{
    const errors=[];page.on('pageerror',error=>errors.push(error.message));
    const api=await mock(page);await page.setViewportSize({width,height:900});
-   await page.goto('file://'+path.join(root,config.file));
+   await page.goto('file://'+path.join(root,config.file)+(config.name==='internal'?'?view=source':''));
    const target=page.locator(config.target);await expect(target.locator('.tc-item')).toHaveCount(2);
    await page.locator(config.brand).selectOption('Apple');
    await expect(target.locator('.tc-item')).toHaveCount(1);
@@ -63,7 +63,7 @@ for(const config of configs){
   });
  }
  test(`${config.name} zero and ungraded stay distinct, re-render and failure do not retain old results`,async({page})=>{
-  const api=await mock(page);await page.setViewportSize({width:320,height:900});await page.goto('file://'+path.join(root,config.file));
+  const api=await mock(page);await page.setViewportSize({width:320,height:900});await page.goto('file://'+path.join(root,config.file)+(config.name==='internal'?'?view=source':''));
   const target=page.locator(config.target);await expect(target.locator('.tc-item')).toHaveCount(2);
   await page.locator(config.brand).selectOption('Samsung');await expect(target.locator('.tc-number').first()).toHaveText('0');
   await expect(target.locator('.tc-heading-grade')).toHaveText(['S級','A級','未分級']);await expect(target.locator('.tc-number').last()).toHaveText('100,000');

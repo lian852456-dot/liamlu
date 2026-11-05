@@ -21,7 +21,7 @@ const STORE_INSPECTION_URL = 'https://twm-store-inspection.liamlu245.chatgpt.sit
 const UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
 const EXPECTED_HREFS = [
   'kpi-battle.html', 'kpi-battle.html#awards', 'index.html', 'gold-medal.html',
-  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'threec-query.html', 'tradein-progress.html',
+  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'tradein-progress.html', 'threec-query.html', 'tradein-query.html',
   'access-management.html', 'department-ops.html', 'patrol.html',
   'operations-brief.html', 'tradein-brief.html', 'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
   'phone-stock-dashboard.html'
@@ -143,7 +143,7 @@ test('首頁保留 PR179 個績入口與 PR181 測試入口移除，逐一核對
   const {calls,errors} = await start(page);
   await ready(page);
   await expect(page.locator('[aria-label="常用入口"] .card')).toHaveCount(4);
-  await expect(page.locator('[aria-label="同仁大廳"] .card')).toHaveCount(7);
+  await expect(page.locator('[aria-label="同仁大廳"] .card')).toHaveCount(8);
   await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(9);
   expect(await page.locator('a.card').evaluateAll(cards => cards.map(card => card.getAttribute('href')))).toEqual(EXPECTED_HREFS);
   await expect(page.locator('.quick-card').first()).toHaveAttribute('href','kpi-battle.html');
@@ -277,7 +277,7 @@ for (const viewport of [{width:1280,height:1300},{width:390,height:844}]) {
     const lab = page.locator('a[href="tradein-import-lab.html"]');
     const lookup = page.locator('a.card[href="threec-query.html"]');
     const upload = page.locator(`a.card[href="${UPLOAD_URL}"]`);
-    const area = page.locator('a.card[href="tradein-progress.html"]');
+    const area = page.locator('a.card[href="tradein-query.html"]');
     await expect(lab).toHaveCount(0);
     for (const query of ['匯入測試區','3C','舊換新','']) {
       await page.locator('#tool-search').fill(query);
