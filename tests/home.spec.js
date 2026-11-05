@@ -143,7 +143,7 @@ test('首頁保留 PR179 個績入口與 PR181 測試入口移除，逐一核對
   const {calls,errors} = await start(page);
   await ready(page);
   await expect(page.locator('[aria-label="常用入口"] .card')).toHaveCount(4);
-  await expect(page.locator('[aria-label="同仁大廳"] .card')).toHaveCount(7);
+  await expect(page.locator('[aria-label="同仁大廳"] .card')).toHaveCount(8);
   await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(9);
   expect(await page.locator('a.card').evaluateAll(cards => cards.map(card => card.getAttribute('href')))).toEqual(EXPECTED_HREFS);
   await expect(page.locator('.quick-card').first()).toHaveAttribute('href','kpi-battle.html');
