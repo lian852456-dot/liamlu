@@ -288,7 +288,7 @@ for (const viewport of [{width:1280,height:1300},{width:390,height:844}]) {
       }
     }
     await expect(page.locator('a.card:visible')).toHaveCount(EXPECTED_HREFS.length);
-    await expect(lookup.locator('h3')).toHaveText('手機專案價查詢');
+    await expect(lookup.locator('h3')).toHaveText('查價系統');
     await expect(upload.locator('h3')).toHaveText('資料快速上傳');
     await noOverflow(page);
     expect(calls).toEqual([]);

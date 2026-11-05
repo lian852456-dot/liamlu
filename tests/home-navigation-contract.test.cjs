@@ -81,7 +81,7 @@ test('home omits supervisor gold entry and moves the original intelligence stati
 
 test('formal price lookup is a staff tool without publisher privileges', () => {
   const lookup = cardFor(navigation('同仁大廳'), 'threec-query.html');
-  assert.match(lookup, /手機專案價查詢/);
+  assert.match(lookup, /查價系統/);
   assert.doesNotMatch(lookup, /舊換新/);
   assert.doesNotMatch(lookup, /發布|上傳/);
 });
@@ -102,7 +102,7 @@ test('home and APP open the v6 recovery query and retain target progress navigat
   assert.match(area, /<h3>舊換新進度追蹤<\/h3>/);
   assert.match(area, /門市與同仁進度、TOP3 提醒與匯出/);
   const app=fs.readFileSync(path.resolve(__dirname,'../app.html'),'utf8');
-  assert.match(app, /href="threec-query\.html">手機專案價查詢/);
+  assert.match(app, /href="threec-query\.html">查價系統/);
   assert.match(app, /href="tradein-progress\.html">舊換新進度追蹤/);
   assert.match(app, /href="tradein-query\.html">舊換新查價/);
   const recovery=fs.readFileSync(path.resolve(__dirname,'../tradein-query.html'),'utf8');
