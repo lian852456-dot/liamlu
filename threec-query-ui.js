@@ -1,6 +1,7 @@
 (function(scope){
   'use strict';
   const queryKind=document.body.dataset.queryKind==='tradein'?'tradein':'shopping';
+  const offline=document.body.dataset.priceMode==='offline'?scope.ThreecReadonlyPayload:null;
   const Core=scope.ThreecQueryCore;
   const DiffCore=scope.ThreecPriceDiffCore;
   const Transport=scope.ThreecPriceTransport;
@@ -9,7 +10,9 @@
   let shoppingSegment=new URLSearchParams(scope.location.search).get('section')==='enterprise'?'enterprise':'consumer';
   let rowPage=0,columnPage=0;
   let readingMode=scope.matchMedia('(max-width:700px)').matches?'card':'table';
+  // OFFLINE_NETWORK_CONSTANT_START
   const API='https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
+  // OFFLINE_NETWORK_CONSTANT_END
   const state={shopping:null,tradein:null,active:'shopping',loading:false,changePage:{shopping:null,tradein:null}};
   let generation=0;
   const changeLoading={shopping:false,tradein:false};
@@ -17,6 +20,7 @@
   const $=id=>document.getElementById(id);
   function esc(value){return String(value==null?'':value).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
   function setStatus(text,kind){const el=$('queryStatus');el.textContent=text;el.className='status'+(kind?' '+kind:'');}
+  // OFFLINE_NETWORK_START
   function readPublicFrame(payload){
     return new Promise((resolve,reject)=>{
       const requestId=crypto.randomUUID();
@@ -66,6 +70,7 @@
   }
   async function invoke(kind){const payload={action:'threec_snapshot_read',kind,includeChanges:false,priceEncoding:Transport.ENCODING};return Transport.decode(await readPublic(payload,kind==='shopping'));}
   function invokeChanges(kind,offset,limit,snapshotHash,search){return readPublic({action:'threec_changes_read',kind,offset:Number(offset||0),limit:Number(limit||1000),snapshotHash:snapshotHash||'',search:String(search||'')});}
+  // OFFLINE_NETWORK_END
   function clearResults(){shoppingIndex=null;shoppingView=null;splitSpecKeys=new Set();state.shopping=null;state.tradein=null;state.changePage={shopping:null,tradein:null};changeLoading.shopping=false;changeLoading.tradein=false;renderKind('shopping');renderKind('tradein');}
   function metaHtml(meta,local=false){const label=local?'參考檔':'正式';return `<div class="source-date"><span>${label}來源日期</span><strong>${esc(meta.sourceVersionDate||'未提供')}</strong><span>${esc(meta.rowCount)} 筆來源資料</span></div><details class="source-details"><summary>資料版本與來源資訊</summary><dl><dt>${label}版本</dt><dd>${esc(meta.snapshotHash||meta.version||'—')}</dd><dt>發布時間</dt><dd>${esc(meta.publishedAt||'—')}</dd><dt>來源 SHA-256</dt><dd>${esc(meta.sourceFileSha256||'—')}</dd></dl></details>`;}
   function renderPrice(name,value){const state=Core.priceState(value);return `<div class="price-item${state.missing?' missing':''}${state.zero?' zero':''}"><span>${esc(name)}</span><strong>${esc(Core.formatPrice(value))}</strong></div>`;}
@@ -192,9 +197,17 @@
     const selectedProvider=$('tradeinProvider').value,selectedGrade=$('tradeinGrade').value;
     target.innerHTML=notice+view.rows.map(row=>`<article class="provider"><h3>${esc([row.brand,row.model].filter(Boolean).join(' · ')||'未命名機款')}</h3>${row.priceVariant?`<p class="price-variant">不同報價：${row.sourceModels.map(esc).join('／')}</p>`:''}<p class="group-note">來源工作表：${esc(row.sourceSheet||'—')}<br>原始機型：${row.sourceModels.map(esc).join('／')}</p>${Core.quotedProviders(row,selectedProvider,selectedGrade).map(provider=>{const grades=Core.quotedGrades(row,provider,selectedGrade);return `<div class="table-scroll"><table><thead><tr><th colspan="${grades.length+1}">${esc(provider)}（獨立報價）</th></tr><tr><th>原始機型／容量</th>${grades.map(grade=>`<th>${esc(Core.gradeLabel(grade))}</th>`).join('')}</tr></thead><tbody><tr><td>${esc(row.model||'—')}</td>${grades.map(grade=>`<td>${esc(state.tradein?.localReference&&Core.priceState(row.quotes[provider]&&row.quotes[provider][grade]).zero?'待確認（來源為0）':Core.formatPrice(row.quotes[provider]&&row.quotes[provider][grade]))}</td>`).join('')}</tr></tbody></table></div>`;}).join('')}</article>`).join('');
   }
-  function renderKind(kind){if(kind==='shopping'){if(shoppingIndex)updateShoppingOptions();renderShopping();renderChanges(kind);return;}const search=$('tradeinSearch').value,modelKey=$('tradeinModel').value;const response=state[kind];const view=response?Core.buildView(kind,response,{query:search,modelKey,provider:$('tradeinProvider').value,grade:$('tradeinGrade').value}):null;renderTradein(view);renderChanges(kind);if(view){const select=$('tradeinModel'),prior=select.value;select.innerHTML='<option value="">全部機款</option>'+view.modelOptions.map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');if(view.modelOptions.some(option=>option.value===prior))select.value=prior;}}
+  function renderKind(kind){scope.ThreecQueryExport?.update(state[queryKind]);if(kind==='shopping'){if(shoppingIndex)updateShoppingOptions();renderShopping();renderChanges(kind);return;}const search=$('tradeinSearch').value,modelKey=$('tradeinModel').value;const response=state[kind];const view=response?Core.buildView(kind,response,{query:search,modelKey,provider:$('tradeinProvider').value,grade:$('tradeinGrade').value}):null;renderTradein(view);renderChanges(kind);if(view){const select=$('tradeinModel'),prior=select.value;select.innerHTML='<option value="">全部機款</option>'+view.modelOptions.map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');if(view.modelOptions.some(option=>option.value===prior))select.value=prior;}}
   function showKind(kind){state.active=kind;['shopping','tradein'].forEach(value=>{const tab=$(value+'Tab'),pane=$(value+'Pane');const active=value===kind;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));pane.classList.toggle('hidden',!active);});renderChanges(kind);const query=$('changeSearch').value.trim();const set=state.changePage[kind]||responseChangeSet(state[kind]);if(state[kind]&&!state[kind].changesDeferred&&(!set||String(set._search||'')!==query))loadChangePage(kind,0,query).catch(error=>setStatus(error.message,'bad'));}
   async function refresh(){
+    if(offline){
+      clearResults();state[queryKind]=offline.response;
+      if(queryKind==='shopping'){shoppingIndex=Compare.buildIndex(offline.response.snapshot);splitSpecKeys=findSplitSpecs(shoppingIndex);}
+      renderKind(queryKind);
+      setStatus('唯讀快照 · '+(offline.response.localReference?'本機參考':'正式來源')+' '+offline.response.snapshot.source_version_date+' · 不自動更新','ok');
+      if(offline.response.referenceCatalog)setTimeout(()=>scope.dispatchEvent(new CustomEvent('query-readonly:reference',{detail:offline.response.referenceCatalog})),0);
+      return;
+    }
     const requestGeneration=++generation;
     $('changeCard').classList.remove('hidden');
     state.loading=true;$('refreshBtn').disabled=true;setStatus('正在讀取正式價格…');clearResults();
@@ -226,6 +239,7 @@
     }finally{if(requestGeneration===generation){state.loading=false;$('refreshBtn').disabled=false;}}
   }
   function bind(){
+    scope.ThreecQueryExport?.bind(()=>state[queryKind]);
     scope.addEventListener('quote-reference:load',event=>{
       const reference=event.detail;if(!reference?.shopping?.localReference||!reference?.tradein?.localReference)return;
       $('changeCard').classList.add('hidden');

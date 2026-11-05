@@ -1,18 +1,20 @@
 {
   "profile": "north12-single-html/v1",
   "scope": "Active one-click readonly HTML download routes in this website; historical fixtures, print/PDF and native PNG/XLSX/PPTX are not HTML downloads.",
-  "producers": ["kpi-battle-controller.js", "readonly-dashboard.js", "north12-officer.js", "department-readonly-browser.js", "patrol.html", "tradein-export-ui.mjs"],
+  "producers": ["kpi-battle-controller.js", "readonly-dashboard.js", "north12-officer.js", "department-readonly-browser.js", "patrol.html", "tradein-export-ui.mjs", "threec-readonly-export.js"],
   "entries": [
-    {"id":"battle-kpi", "page":"kpi-battle.html", "control":"[data-battle-html-export=kpi]", "kind":"kpi"},
-    {"id":"battle-awards", "page":"kpi-battle.html#awards", "control":"[data-battle-html-export=awards]", "kind":"awards"},
-    {"id":"awards-standalone", "page":"awards-battle.html", "control":"[data-battle-html-export=awards]", "kind":"awards"},
-    {"id":"report-kpi", "page":"index.html", "control":"[data-battle-html-export=kpi]", "kind":"kpi"},
-    {"id":"report-awards", "page":"index.html", "control":"[data-battle-html-export=awards]", "kind":"awards"},
-    {"id":"store-readonly", "page":"readonly-dashboard.html", "control":"#store-export", "kind":"store"},
-    {"id":"dashboard-renewal", "page":"readonly-dashboard.html", "control":"#renewal-export", "kind":"officer"},
-    {"id":"officer-renewal", "page":"north12-officer.html", "control":"#export", "kind":"officer"},
-    {"id":"department-scores-gold", "page":"department-ops.html", "control":"#departmentExportHTML", "kind":"department"},
-    {"id":"patrol-inspection", "page":"patrol.html", "control":"#halfExportHtml", "kind":"patrol"},
-    {"id":"tradein-progress", "page":"tradein-progress.html", "control":"#downloadReminderHtml", "kind":"tradein"}
+    {"id":"battle-kpi","page":"kpi-battle.html","control":"[data-battle-html-export=kpi]","kind":"kpi"},
+    {"id":"battle-awards","page":"kpi-battle.html#awards","control":"[data-battle-html-export=awards]","kind":"awards"},
+    {"id":"awards-standalone","page":"awards-battle.html","control":"[data-battle-html-export=awards]","kind":"awards"},
+    {"id":"report-kpi","page":"index.html","control":"[data-battle-html-export=kpi]","kind":"kpi"},
+    {"id":"report-awards","page":"index.html","control":"[data-battle-html-export=awards]","kind":"awards"},
+    {"id":"store-readonly","page":"readonly-dashboard.html","control":"#store-export","kind":"store"},
+    {"id":"dashboard-renewal","page":"readonly-dashboard.html","control":"#renewal-export","kind":"officer"},
+    {"id":"officer-renewal","page":"north12-officer.html","control":"#export","kind":"officer"},
+    {"id":"department-scores-gold","page":"department-ops.html","control":"#departmentExportHTML","kind":"department"},
+    {"id":"patrol-inspection","page":"patrol.html","control":"#halfExportHtml","kind":"patrol"},
+    {"id":"tradein-progress","page":"tradein-progress.html","control":"#downloadReminderHtml","kind":"tradein"},
+    {"id":"query-shopping","page":"threec-query.html","control":"#downloadQueryHtml","kind":"query-shopping"},
+    {"id":"query-tradein","page":"tradein-query.html","control":"#downloadQueryHtml","kind":"query-tradein"}
   ]
 }

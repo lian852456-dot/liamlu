@@ -100,6 +100,7 @@
       updateOptions();render();
     }
     scope.addEventListener('quote-reference:load',e=>{if(e.detail?.tradein?.referenceCatalog)mount(e.detail.tradein.referenceCatalog);else clear();});
+    scope.addEventListener('query-readonly:reference',e=>{if(document.body.dataset.priceMode==='offline')mount(e.detail);});
     scope.addEventListener('quote-reference:reset',clear);document.getElementById('refreshBtn')?.addEventListener('click',clear);scope.addEventListener('pagehide',clear);scope.addEventListener('north12b:logout',clear);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
