@@ -1,4 +1,4 @@
-import {personalRules} from './tradein-target-policy.mjs?v=20261105-all-person-3-1';
+import {personalRules,regionProgress} from './tradein-target-policy.mjs?v=20261106-region-154';
 // Export only the already authorized, de-identified projection. No raw trade data.
 export const DEFAULT_RULES = Object.freeze({month:'2026-10',start:'2026-10-01',end:'2026-10-31',periodStatus:'confirmed',cadence:'monthly',sourceStart:'2026-10-01',sourceEnd:'2026-10-07',cutoff:'2026-10-07',timezone:'Asia/Taipei',staffTarget:4,actingManager:'included',isDemo:true,selectedDate:''});
 export function isDate(value){return /^\d{4}-\d{2}-\d{2}$/.test(value||'')&&!Number.isNaN(Date.parse(value+'T00:00:00Z'))&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value;}
@@ -75,8 +75,10 @@ export function buildExportModel(context,scope,rules=DEFAULT_RULES){
       for(const value of [p.actual,p.target])if(value!==null&&(!Number.isSafeInteger(value)||value<0))throw new Error('店點彙總待核，停止匯出。');
       return Object.freeze({store:String(p.store),actual:p.actual,target:rules.selectedDate?null:p.target});
     });
-  return Object.freeze({title:rules.selectedDate?'舊換新單日回收提醒':'舊換新個人提醒',scopeLabel,stores:Object.freeze(stores),showDifference:context.mode==='public'&&!rules.selectedDate,rules:Object.freeze({...rules}),rows:Object.freeze(rows.map(p=>describePerson(p,rules)))});
+  const region=context.mode==='public'&&!rules.selectedDate&&stores.length===9&&stores.every(p=>p.actual!==null)?regionProgress(rules.month,stores.reduce((n,p)=>n+p.actual,0)):null;
+  return Object.freeze({title:rules.selectedDate?'舊換新單日回收提醒':'舊換新個人提醒',scopeLabel,region:region?Object.freeze(region):null,stores:Object.freeze(stores),showDifference:context.mode==='public'&&!rules.selectedDate,rules:Object.freeze({...rules}),rows:Object.freeze(rows.map(p=>describePerson(p,rules)))});
 }
+export function regionProgressLine(region){return `區目標 ${region.target} 台｜全區實績 ${region.actual} 台｜區尚缺 ${region.remaining} 台｜達成率 ${region.attainment}%`;}
 export function reminderText(model){
   const r=model.rules;
   if(r.selectedDate)return [(r.isDemo?'【舊換新單日回收｜示意資料】':'【舊換新單日回收提醒】'),`統計日期：${r.selectedDate}（${r.timezone}）`,`月份：${r.month}｜來源期間：${r.sourceStart}–${r.sourceEnd}`,`匯出範圍：${model.scopeLabel}`,'',...model.rows.flatMap(p=>[
@@ -84,7 +86,7 @@ export function reminderText(model){
     `當日回收：${p.actual===null?'未提供':p.actual+' 台'}`,
     `回收機款：${formatRecoveredModels(p.actual,p.recoveredModels)}`,''
   ]),'只統計所選日期；每月目標與達標請切回整月查看。','未知值不當成 0。'].join('\n');
-  return [(r.isDemo?'【舊換新提醒｜全為示意資料】':'【舊換新每月進度提醒】'),`月份：${r.month}｜本期 ${r.start}–${r.end}（每人每月 ${r.staffTarget} 台）`,`來源期間：${r.sourceStart}–${r.sourceEnd}`,`來源截止：${r.cutoff}（日期精度；${r.timezone}）`,...(r.statusAsOf?[`取消狀態核對至：${r.statusAsOf}（同月成交 +1／取消 −1；跨月沖回月份待核）`]:[]),`月份資料：${hasMonthlySource(r)?(r.isDemo?'選定月份截至來源截止的累積有效交易示意；未核涵蓋仍為未知':'選定月份截至報表查詢截止的有效回收；日期精度不代表當日終日'):'選定月份尚未提供來源；其他月份實績不納入'}`,`匯出範圍：${model.scopeLabel}`,'',...model.rows.flatMap(p=>[
+  return [(r.isDemo?'【舊換新提醒｜全為示意資料】':'【舊換新每月進度提醒】'),`月份：${r.month}｜本期 ${r.start}–${r.end}（每人每月 ${r.staffTarget} 台）`,...(model.region?[regionProgressLine(model.region)]:[]),`來源期間：${r.sourceStart}–${r.sourceEnd}`,`來源截止：${r.cutoff}（日期精度；${r.timezone}）`,...(r.statusAsOf?[`取消狀態核對至：${r.statusAsOf}（同月成交 +1／取消 −1；跨月沖回月份待核）`]:[]),`月份資料：${hasMonthlySource(r)?(r.isDemo?'選定月份截至來源截止的累積有效交易示意；未核涵蓋仍為未知':'選定月份截至報表查詢截止的有效回收；日期精度不代表當日終日'):'選定月份尚未提供來源；其他月份實績不納入'}`,`匯出範圍：${model.scopeLabel}`,'',...model.rows.flatMap(p=>[
     `${p.store}｜${p.name}｜${p.role}`,
     `實績：${p.actual===null?'未提供':p.actual+' 台'}；目標：${p.target===null?(p.status==='不設目標'?'不設目標':'身份待核'):p.target+' 台／月'}；${model.showDifference?'目前差異：'+formatDifference(p.actual,p.target):'尚缺：'+(p.remaining===null?'未判定':p.remaining+' 台'+(r.isDemo?'（示意）':''))}`,
     model.showDifference?`回收機款：${formatRecoveredModels(p.actual,p.recoveredModels)}`:`狀態：${p.status}；${p.reason}`,''
@@ -96,7 +98,7 @@ export function workbookRows(model){
     ['選定月開始',{date:r.start}],['選定月結束',{date:r.end}],['來源期間開始',{date:r.sourceStart}],['來源期間結束',{date:r.sourceEnd}],['來源截止',{date:r.cutoff}],['規則狀態','單日回收；每月目標與達標請切回整月查看'],['匯出範圍',model.scopeLabel],['統計日期',{date:r.selectedDate}],[],
     ['店點','人員','職務','當日回收（台）','統計日期','', '回收機款','資料範圍'],
     ...model.rows.map(p=>[p.store,p.name,p.role,p.actual,{date:r.selectedDate},null,formatRecoveredModels(p.actual,p.recoveredModels),'單日口徑'])];
-  return [[],[r.isDemo?'舊換新進度｜合成示意':'舊換新每月個人進度'],[r.isDemo?`規則已核定：每月 ${r.staffTarget} 台；${r.actingManager==='included'?'含店長及代理店長':'店長與代理店長免目標'}。人員與實績仍為合成示意。`:`每月 ${r.staffTarget} 台；${r.actingManager==='included'?'含店長及代理店長':'店長與代理店長免目標'}。單銷計入；同月成交 +1／取消 −1；跨月沖回月份待核。`],[],
+  return [[],[r.isDemo?'舊換新進度｜合成示意':'舊換新每月個人進度'],[r.isDemo?`規則已核定：每月 ${r.staffTarget} 台；${r.actingManager==='included'?'含店長及代理店長':'店長與代理店長免目標'}。人員與實績仍為合成示意。`:`每月 ${r.staffTarget} 台；${r.actingManager==='included'?'含店長及代理店長':'店長與代理店長免目標'}。單銷計入；同月成交 +1／取消 −1；跨月沖回月份待核。`],model.region?['區進度',regionProgressLine(model.region)]:[],
     ['選定月開始',{date:r.start}],['選定月結束',{date:r.end}],['來源期間開始',{date:r.sourceStart}],['來源期間結束',{date:r.sourceEnd}],['來源截止',{date:r.cutoff}],['規則狀態',`每月 ${r.staffTarget} 台；${r.actingManager==='included'?'含店長及代理店長':'店長與代理店長免目標'}`+(r.statusAsOf?'；取消狀態核對至 '+r.statusAsOf:'')],['匯出範圍',model.scopeLabel],['月份／缺值',r.month+'；'+r.timezone+'；'+(hasMonthlySource(r)?'截至來源截止；未知數值留空':'選定月份來源未提供；實績留空')],[],
     ['店點','人員','職務','實績（台）','目標（台）',model.showDifference?'目前差異（實績－月目標）':'尚缺（台）',model.showDifference?'回收機款':'達標／未知狀態','目標／資料狀態'],
     ...model.rows.map(p=>[p.store,p.name,p.role,p.actual,p.target,model.showDifference?(p.actual===null||p.target===null?null:p.actual-p.target):p.remaining,model.showDifference?formatRecoveredModels(p.actual,p.recoveredModels):p.status,p.reason])];
