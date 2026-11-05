@@ -40,8 +40,9 @@ function deferred() {
   return { promise, release };
 }
 
-function publicRuntime() {
+function publicRuntime(pending) {
   const runtime = createRuntime(), source = parsed();
+  if (pending) source.records[0].store_code = 'DNB10174';
   runtime.configure(source);
   const authorization = { employeeId:OPERATOR, adminSecret:runtime.secret };
   const preview = runtime.a.tradeinPerformancePreview({ source, ...authorization });
@@ -50,8 +51,8 @@ function publicRuntime() {
   return runtime;
 }
 
-async function start(page, { width=1280, savedToken='', staff=false, lifetime=3600, dataGate=null, entry='tradein-brief.html?month=2026-10' }={}) {
-  const runtime = publicRuntime();
+async function start(page, { width=1280, savedToken='', staff=false, lifetime=3600, dataGate=null, pending=false, entry='tradein-brief.html?month=2026-10' }={}) {
+  const runtime = publicRuntime(pending);
   const state = { authCalls:[], dataCalls:[], vendorCalls:0, downloads:[], errors:[], allow:true,
     expiresAt:Math.floor(NOW.getTime()/1000)+lifetime, dataGate, vendorGate:null };
   page.on('pageerror', error => state.errors.push(error.message));
@@ -225,6 +226,23 @@ test('a verified supervisor gets the reconciled brief, a real PPTX and the print
   expect(state.dataCalls).toEqual([{ action:'tradein_performance_public_read', month:'2026-10', includeDays:true }]);
   expect(await page.evaluate(key => sessionStorage.getItem(key), PT_SESSION)).toBe(VALID_TOKEN);
   expect(await page.evaluate(secret => Object.values(localStorage).concat(Object.values(sessionStorage)).some(value => value.includes(secret)), VALID_KEY)).toBe(false);
+  expect(state.errors).toEqual([]);
+});
+
+test('a pending personal attribution keeps the regional total and enables PPTX and print', async ({ page }) => {
+  const state = await start(page, { savedToken:VALID_TOKEN, pending:true });
+  await ready(page);
+  const preview = page.locator('#briefPreview');
+  await expect(preview).toContainText('1 台已計入店績，個人歸屬待核');
+  await expect(preview).toContainText('近五天已核對個績');
+  await expect(preview).toContainText('TOP 回收機款（已核對）');
+  await expect(preview.locator('.ranking-columns tr').filter({ hasText:'合＊5' }).locator('td')).toHaveText(['待核','合＊5／萬大','—']);
+  const downloadEvent = page.waitForEvent('download');
+  await page.locator('#downloadPptx').click();
+  const download = await downloadEvent;
+  expect((await fs.readFile(await download.path())).includes(Buffer.from('ppt/presentation.xml'))).toBe(true);
+  await page.locator('#printBrief').click();
+  await expect.poll(() => page.evaluate(() => window.__briefPrintCount)).toBe(1);
   expect(state.errors).toEqual([]);
 });
 
