@@ -127,7 +127,9 @@ test('離頁會使尚未完成的讀取失效，不回寫已清除的價格', as
     await pending;
     return fulfillPublic(route,{ status:200, contentType:'application/json', body:JSON.stringify(response(payload.kind)) });
   });
-  await page.goto(PAGE_URL);
+  // The test intentionally holds an iframe request open. Waiting for load
+  // races its submission; wait for the page DOM, then explicitly await calls.
+  await page.goto(PAGE_URL, { waitUntil:'domcontentloaded' });
   await expect.poll(() => calls.length).toBe(2);
   await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
   release();
