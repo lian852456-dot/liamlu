@@ -168,7 +168,7 @@ test('離頁後延遲的異動清單不能恢復資料或下載', async ({ page 
   await page.goto(PAGE_URL);
   await expect(page.locator('#queryCard')).toBeVisible();
   const downloads=[];page.on('download',d=>downloads.push(d));
-  await page.locator('#changeJsonBtn').click();
+  await openHistory(page);await page.locator('#changeJsonBtn').click();
   await openHistory(page);await page.locator('#changeSearch').fill('合約');
   await expect.poll(()=>requests).toBe(2);
   await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));release();

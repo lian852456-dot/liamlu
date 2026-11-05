@@ -43,7 +43,7 @@ test('home navigation retains PR179 performance and PR181 lab removal', () => {
   assert.deepEqual(staffHrefs, [
     'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html',
     'https://twm-store-inspection.liamlu245.chatgpt.site/',
-    'threec-query.html', 'tradein-query.html'
+    'tradein-progress.html', 'threec-query.html', 'tradein-query.html'
   ]);
   assert.equal(cards(navigation('督導專區')).length, 9);
   assert.equal(cards(html).length, 4 + staffHrefs.length + 9);
@@ -95,12 +95,16 @@ test('home omits the import lab entry while retaining its maintenance page and f
 });
 
 test('home and APP open the v6 recovery query and retain target progress navigation', () => {
-  const area=cardFor(navigation('同仁大廳'),'tradein-query.html');
-  assert.match(area, /<h3>舊換新專區<\/h3>/);
-  assert.match(area, /回收價比較、分級與檢測入口/);
+  const area=cardFor(navigation('同仁大廳'),'tradein-progress.html');
+  const query=cardFor(navigation('同仁大廳'),'tradein-query.html');
+  assert.match(query, /<h3>舊換新查價<\/h3>/);
+  assert.match(query, /回收價比較、分級與檢測入口/);
+  assert.match(area, /<h3>舊換新進度追蹤<\/h3>/);
+  assert.match(area, /門市與同仁進度、TOP3 提醒與匯出/);
   const app=fs.readFileSync(path.resolve(__dirname,'../app.html'),'utf8');
   assert.match(app, /href="threec-query\.html">手機專案價查詢/);
-  assert.match(app, /href="tradein-query\.html">舊換新專區/);
+  assert.match(app, /href="tradein-progress\.html">舊換新進度追蹤/);
+  assert.match(app, /href="tradein-query\.html">舊換新查價/);
   const recovery=fs.readFileSync(path.resolve(__dirname,'../tradein-query.html'),'utf8');
   assert.match(recovery, /<h1>舊換新專區<\/h1>/);
   assert.match(recovery, /id="tradeinResults"/);
