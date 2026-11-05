@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const release='v6-20261105-4';
+  const release='integrated-20261105-1';
   document.addEventListener('click',event=>{
     if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
     const link=event.target.closest('a[href]');if(!link||link.target==='_blank'||link.hasAttribute('download'))return;

@@ -895,5 +895,5 @@ svg {
 
 /* Keep both price tools together; progress remains a separate store operation. */
 .price-group{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px}
-.price-group>h3{grid-column:1/-1}
+.price-group>h3,.price-group>a:only-of-type{grid-column:1/-1}
 @media(max-width:700px){.price-group{grid-template-columns:minmax(0,1fr)}}
