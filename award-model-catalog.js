@@ -689,9 +689,11 @@
     if (monthOf(date) === '2026-11') {
       if (!Array.isArray(items) || items.length !== 10) return false;
       const resolve = item => {
-        const names = [item && item.name, item && item.sourceName, item && item.display_name, item && item.modelId].filter(Boolean);
-        return NOVEMBER.modelGroups.find(group => names.some(name =>
-          [group.modelId, group.displayName, group.reportModelId].some(key => normalize(key) === normalize(name))))?.modelId;
+        const names = [item && item.name, item && item.sourceName, item && item.display_name, item && item.modelId].filter(name => name != null && name !== '');
+        // A matching display label must not conceal a conflicting source identity.
+        const identities = names.map(name => NOVEMBER.modelGroups.find(group =>
+          [group.modelId, group.displayName, group.reportModelId].some(key => normalize(key) === normalize(name)))?.modelId);
+        return identities.length && identities.every(id => id && id === identities[0]) ? identities[0] : undefined;
       };
       const names = items.map(resolve);
       return names.every(Boolean) && new Set(names).size === 10;
