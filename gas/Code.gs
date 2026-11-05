@@ -7401,8 +7401,9 @@ function tradeinPerformanceReuseReference_(source,roster) {
   const people=new Map(roster.filter(function(p){return p.status==='active';}).map(function(p){return [p.employee_id,p];}));
   const published=new Map(snapshot.people.map(function(p){return [p.employee_key,p];}));
   const stores=new Map(next.stores.map(function(p){return [p.store_code,TradeinPerformanceCore.storeName(p.store)];}));
-  const pending=new Set();
+  const pending=new Map();
   const approvals=prior.support_approvals||[];
+  const cancellations=snapshot.cancellation_evidence?.pairs||[];
   source.records.forEach(function(record){
     const sourceId=TradeinPerformanceCore.sourceEmployeeId(record.source_employee_id);
     let identity=identities.get(sourceId);
@@ -7413,16 +7414,27 @@ function tradeinPerformanceReuseReference_(source,roster) {
     if(!store)throw new Error('來源含九店範圍以外或未知店碼');
     const home=person&&TradeinPerformanceCore.storeName(person.store),key=tradeinPerformanceHash_([record.store_code,record.trade_date,record.order_number.trim(),record.recycle_code.trim()]);
     const support=approvals.some(function(a){return a.review_status==='verified'&&a.transaction_key===key&&a.employee_key===identity?.employee_key&&a.home_store===home&&a.store===store&&a.trade_date===record.trade_date;});
-    if(!person || !confirmed || confirmed.identity_status!=='confirmed' || confirmed.store!==home ||
-       home!==store&&!support ||
-       identity.observations.some(function(o){return stores.get(o.store_code)!==home&&!approvals.some(function(a){return a.review_status==='verified'&&a.employee_key===identity.employee_key&&a.home_store===home&&a.store===stores.get(o.store_code)&&a.trade_date===o.trade_date;});})){
-      pending.add(JSON.stringify([record.source_employee_id,record.store_code]));return;
+    // A published conflict is already represented as unassigned store units.
+    // Reuse only its original owner-held observations; this never approves support
+    // or assigns personal units. The core recalculates the conflict from the rows.
+    const knownConflict=identities.has(sourceId)&&confirmed?.identity_status==='conflict'&&confirmed.store===home;
+    const knownObservation=knownConflict&&identity.observations.some(function(o){return o.trade_date===record.trade_date&&o.store_code===record.store_code;});
+    const knownCancellation=!!record.cancel_date&&cancellations.some(function(p){return p.transaction_key===key&&p.employee_key===identity?.employee_key&&p.store_code===record.store_code&&p.sale.date===record.trade_date;});
+    if(!person || !confirmed || confirmed.identity_status!=='confirmed'&&!knownConflict || confirmed.store!==home ||
+       home!==store&&!support&&!knownObservation&&!knownCancellation ||
+       !knownConflict&&identity.observations.some(function(o){return stores.get(o.store_code)!==home&&
+         !cancellations.some(function(p){return p.employee_key===identity.employee_key&&p.store_code===o.store_code&&p.sale.date===o.trade_date;})&&
+         !approvals.some(function(a){return a.review_status==='verified'&&a.employee_key===identity.employee_key&&a.home_store===home&&a.store===stores.get(o.store_code)&&a.trade_date===o.trade_date;});})){
+      const label=(person?person.masked_name+'（員編尾碼 '+sourceId.slice(-3)+'）':'員編尾碼 '+sourceId.slice(-3))+
+        '：名冊 '+(home||'無在職對應')+'／交易 '+store+' '+record.trade_date;
+      pending.set(JSON.stringify([sourceId,record.store_code]),label);return;
     }
     if(!identities.has(sourceId)){identities.set(sourceId,identity);next.employees.push(identity);}
     if(!identity.observations.some(function(o){return o.trade_date===record.trade_date && o.store_code===record.store_code;}))
       identity.observations.push({trade_date:record.trade_date,store_code:record.store_code});
   });
-  if(pending.size)throw new Error('新檔有 '+pending.size+' 組新增員編或店點異動待核，請管理者更新私有對照後重新預覽');
+  if(pending.size)throw new Error('新檔有 '+pending.size+' 組新增員編或店點異動待核，請管理者更新私有對照後重新預覽：'+
+    [...pending.values()].slice(0,8).join('；')+(pending.size>8?'；其餘 '+(pending.size-8)+' 組待核':''));
   next.source_sha256=source.source_sha256;next.source_start=source.source_start;next.source_end=source.source_end;
   next.employee_id_policy='optional-55-prefix/v1';
   // Only a new source reference derived from the verified active monthly basis

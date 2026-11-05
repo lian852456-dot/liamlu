@@ -1,4 +1,4 @@
-import {applyTargets,targetPolicy} from './tradein-target-policy.mjs?v=20261105-all-person-3-1';
+import {applyTargets,targetPolicy} from './tradein-target-policy.mjs?v=20261106-region-154';
 export const REMINDERS=Object.freeze([
  '登出 iCloud／Google，確認尋找功能與其他帳號已解除。',
  '恢復原廠設定。',
@@ -23,10 +23,10 @@ export function buildBrief(raw,validate,expectedMonth=raw?.month){
  const mobilizedPeople=people.filter(p=>p.actual_units>0).length,mobilizedStores=s.stores.filter(p=>p.actual_units>0).length;
  const assigned=people.reduce((n,p)=>n+p.actual_units,0);
  if(assigned!==s.summary.actual_units)throw Error('區與個人台數未完整對帳，停止產出簡報');
- return {month:s.month,cutoff:s.source_cutoff_date,sourceStart:s.source_period.start,actual:s.summary.actual_units,target:s.summary.target_units,
+ return {month:s.month,cutoff:s.source_cutoff_date,sourceStart:s.source_period.start,actual:s.summary.actual_units,target:s.summary.target_units,targetLabel:s.region_progress?'區目標':'店目標',
   personalTarget:policy?.personalTarget||3,personalTotal:s.summary.personal_target_units??s.summary.target_units,
   personalRule:policy?'全員每月 '+policy.personalTarget+' 台，含店長與代理':'同仁每月 3 台，店長與代理免目標',
-  targetRule:policy?.stores?'店目標為十月重點Device目標 ×12%逐店進位，合計159台。':policy?'店目標為全員人數 ×'+policy.personalTarget+'台，含店長與代理。':'店目標依來源核定同仁人數 ×3台，店長與代理免目標。',
+  targetRule:s.region_progress?'區目標 '+s.region_progress.target+' 台；門市及個人目標分別計算。':policy?.stores?'店目標為十月重點Device目標 ×12%逐店進位，合計159台。':policy?'店目標為全員人數 ×'+policy.personalTarget+'台，含店長與代理。':'店目標依來源核定同仁人數 ×3台，店長與代理免目標。',
   attainment:percent(s.summary.actual_units,s.summary.target_units),mobilizedPeople,totalPeople:people.length,peopleShare:percent(mobilizedPeople,people.length),
   mobilizedStores,totalStores:s.stores.length,storeShare:percent(mobilizedStores,s.stores.length),ranking,topModels,trend,reminders:[...REMINDERS],
   stores:s.stores.map(p=>({store:p.store,actual:p.actual_units,target:p.target_units,share:percent(p.actual_units,s.summary.actual_units)}))};

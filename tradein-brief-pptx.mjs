@@ -7,7 +7,7 @@ export function buildDeck(m,PptxGenJS,logoData){
  if(!logoData)throw Error('台灣大哥大LOGO未載入');s.addImage({data:logoData,x:.25,y:.18,w:2.1,h:2.1*80/258});
  text('北一二B舊換新成效',2.7,.23,10.1,.45,26,'133A52',true);
  text(`${m.month}　來源 ${m.sourceStart}–${m.cutoff}　${m.personalRule}`,2.72,.76,10.2,.22,12,'566A76');
- const metrics=[['累積上線',m.actual+' 台',`店目標 ${m.target} 台　達成 ${m.attainment}%`],['人員動員',m.mobilizedPeople+' / '+m.totalPeople+' 人',`動員佔比 ${m.peopleShare}%　個人合計 ${m.personalTotal} 台`],['門市動員',m.mobilizedStores+' / '+m.totalStores+' 店',`動員佔比 ${m.storeShare}%`],['近五天上線',m.trend.filter(d=>d.units!==null).reduce((n,d)=>n+d.units,0)+' 台',`${m.trend[0].date.slice(5)}–${m.cutoff.slice(5)}`]];
+ const metrics=[['累積上線',m.actual+' 台',`${m.targetLabel} ${m.target} 台　達成 ${m.attainment}%`],['人員動員',m.mobilizedPeople+' / '+m.totalPeople+' 人',`動員佔比 ${m.peopleShare}%　個人合計 ${m.personalTotal} 台`],['門市動員',m.mobilizedStores+' / '+m.totalStores+' 店',`動員佔比 ${m.storeShare}%`],['近五天上線',m.trend.filter(d=>d.units!==null).reduce((n,d)=>n+d.units,0)+' 台',`${m.trend[0].date.slice(5)}–${m.cutoff.slice(5)}`]];
  metrics.forEach(([label,value,detail],i)=>{const x=.28+i*3.27;text(label,x,1.08,3.1,.22,14,'133A52',true);text(value,x,1.38,3.1,.49,32,i===0?'E76516':'133A52',true);text(detail,x,1.92,3.1,.25,12,'566A76');});
  text('TOP 回收機款',.28,2.4,3.2,.27,15,'E76516',true);
  const table=(rows,x,y,w,widths,rowH=.27)=>s.addTable(rows,{x,y,w,colW:widths,rowH,fontFace:FONT,fontSize:12,color:'133A52',margin:[0,.02,0,.02],border:{type:'solid',pt:.3,color:'DDE5EB'},fill:'FFFFFF',autoPage:false,headerRows:1,valign:'middle'});

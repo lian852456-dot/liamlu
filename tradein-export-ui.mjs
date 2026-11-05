@@ -1,6 +1,6 @@
 import {parsePriceSource,buildPriceTop3} from './tradein-price-top3.mjs?v=20261105-1';
-import {reminderBrief,createTradeinHtml} from './tradein-reminder.mjs?v=20261105-1';
-import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261105-html-export-2';
+import {reminderBrief,createTradeinHtml} from './tradein-reminder.mjs?v=20261106-region-154';
+import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261106-region-154';
 import {copyReminderText} from './tradein-clipboard.mjs?v=20261010-copy-recovery-1';
 const $=id=>document.getElementById(id);
 let contextReader,revision=0,busy=false,canvas=null,priceCatalog=null,priceEpoch=0;
@@ -61,7 +61,7 @@ function updatePreview(){
   canvas=null;feedback('');
   try{
     const snapshot=model();$('reminderText').value=reminderBrief(snapshot);$('exportScopeLabel').textContent='目前範圍：'+snapshot.scopeLabel;
-    const r=snapshot.rules;$('periodMeta').textContent=r.selectedDate?`單日 ${r.selectedDate}${r.storeTarget?' · 門市目標 '+r.storeTarget+' 台':''} · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 台北時間`:`本月 ${r.start}–${r.end}（每人每月 ${r.staffTarget} 台${r.isDemo?'；實績示意':''}）${r.storeTarget?' · 門市目標 '+r.storeTarget+' 台':''} · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 來源截止 ${r.cutoff} · 台北時間${hasMonthlySource(r)?'':' · 選定月份來源未提供，實績未知'}`;
+    const r=snapshot.rules;$('periodMeta').textContent=r.selectedDate?`單日 ${r.selectedDate}${r.storeTarget?' · 門市目標 '+r.storeTarget+' 台':''} · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 台北時間`:`本月 ${r.start}–${r.end}（每人每月 ${r.staffTarget} 台${r.isDemo?'；實績示意':''}）${snapshot.region?' · 區目標 '+snapshot.region.target+' 台':''}${r.storeTarget?' · 門市目標 '+r.storeTarget+' 台':''} · 來源期間 ${r.sourceStart}–${r.sourceEnd} · 來源截止 ${r.cutoff} · 台北時間${hasMonthlySource(r)?'':' · 選定月份來源未提供，實績未知'}`;
     buttons(busy);
     Promise.resolve(document.fonts?.ready).then(()=>{
       current(ticket);const built=createReminderCanvas(snapshot,{text:reminderBrief(snapshot)});canvas=built.canvas;

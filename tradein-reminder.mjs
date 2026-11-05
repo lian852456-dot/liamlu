@@ -1,6 +1,6 @@
 import {priceTop3Text} from './tradein-price-top3.mjs?v=20261105-1';
 import './offline-html.js';
-import {formatDifference,formatRecoveredModels,reminderText} from './tradein-export-core.mjs';
+import {formatDifference,formatRecoveredModels,reminderText,regionProgressLine} from './tradein-export-core.mjs?v=20261106-region-154';
 const H=globalThis.OfflineHtml;
 const count=value=>value===null?'待核':value+' 台';
 const name=row=>row.name?row.store+'｜'+row.name:row.store;
@@ -30,6 +30,7 @@ export function reminderBrief(model){
   const focus=[...models].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'zh-Hant')).slice(0,3);
   return [r.isDemo?'【舊換新提醒｜示意資料】':'【舊換新重點提醒】',
     `${r.selectedDate?'單日 '+r.selectedDate:r.month+'｜截至 '+r.cutoff}｜${model.scopeLabel}`,
+    ...(model.region?[regionProgressLine(model.region)]:[]),
     r.selectedDate?'依當日回收台數排序；月目標請切回整月。':`依累積回收台數排序；個人月目標 ${r.staffTarget} 台（${r.actingManager==='included'?'含店長及代理店長':'免目標者另列'}）；店／個人目標分開計算。`,
     '',...(model.stores?.length?rankingText('店點',model.stores):['店點排名｜目前範圍無完整店點彙總，待核']),
     '',...rankingText('個人',model.rows),'',
