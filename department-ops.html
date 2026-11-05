@@ -9,7 +9,7 @@
   <title>北一二部｜部區管理</title>
   <link rel="stylesheet" href="department-ops.css?v=20261027-compact-1">
   <link rel="stylesheet" href="store-rule-reminders.css?v=20261004-collapse-1">
-  <link rel="stylesheet" href="department-scores.css?v=20261028-perfect-brand-1">
+  <link rel="stylesheet" href="department-scores.css?v=20261105-region-ranking-1">
 </head>
 <body>
   <main class="page">
@@ -110,10 +110,11 @@
           </section>
           <p id="scorePeriodStatus" class="source-meta"></p>
           <div id="scoreSummary" class="summary-grid"></div>
+          <section id="scoreComparison" class="data-card score-comparison" aria-labelledby="scoreComparisonTitle"><div class="card-head"><div><h3 id="scoreComparisonTitle">四區比較與各月成績趨勢</h3><p class="score-limits">點選 A／B／C／D 區即可切換該區趨勢；所選期間門市等權平均，缺資料不補零。</p></div></div><div id="scoreRegions" class="score-regions"></div><h3>各月成績趨勢</h3><p id="scoreTrendScope" class="score-limits"></p><div id="scoreTrend"></div><h3>近半年各督導區排名</h3><p class="score-limits">四區以近半年有效店月 G 成績平均分排名，並列出逐月名次。月份不完整時僅比較有資料的店月，不當作完整六個月。</p><div id="scoreRegionRanking" class="table-scroll" tabindex="0" aria-label="近半年各督導區排名"></div></section>
           <section id="scorePerfect" class="data-card" aria-labelledby="scorePerfectTitle"><div class="card-head"><h3 id="scorePerfectTitle">近半年各區100分門市</h3></div><div id="scorePerfectBody"></div></section>
           <section class="data-card score-main-table"><div class="card-head"><h3>各店月成績與缺失</h3><details id="scoreExports" class="score-export-menu"><summary>匯出／簡報</summary><div class="score-actions"><button id="scoreExport" class="secondary-button" type="button">匯出 Excel</button><button id="scoreBrief" class="secondary-button" type="button">匯出簡報資料</button><button id="scorePptx" class="secondary-button" type="button">產生可編輯PPT</button><button id="scorePrintPdf" class="secondary-button" type="button">列印／另存PDF</button></div></details></div><p id="scoreWarnings" class="score-limits"></p><div class="table-scroll" tabindex="0" aria-label="各店成績與缺失，可左右捲動"><table><thead id="scoreHead"></thead><tbody id="scoreBody"></tbody></table></div></section>
           <section id="scoreDetail" class="data-card" hidden></section>
-          <details id="scoreComparison" class="data-card score-disclosure"><summary>四區比較與各月成績趨勢</summary><div class="score-disclosure-body"><h3>四區比較</h3><p class="score-limits">所選月份的門市平均分；部平均按各店等權計算。此區保留四區供比較。</p><div id="scoreRegions" class="score-regions"></div><h3>各月成績趨勢</h3><p class="score-limits">依目前部區與店點篩選，缺月不補零。</p><div id="scoreTrend"></div></div></details>
+
           <details id="scoreMethod" class="data-card score-disclosure"><summary>資料來源與計算說明</summary><div class="score-disclosure-body"><p id="scoreSourceMeta" class="source-meta"></p><p class="score-limits">門市歷史採各月明細。原始 G 成績、E 缺失與 F 扣分分開，不依新版規章回算。</p><p class="score-limits">紅色為缺失／扣分、橘色為預警，橘色框為缺資料。沒有改善紀錄時，不推定已改善或改善率。</p></div></details>
           <details id="scoreHistoryTools" class="data-card score-disclosure"><summary>歷史版本回復</summary><div class="score-disclosure-body"><p class="score-limits">先預覽歷史版本，再確認回復；保留目前版本。</p><div class="score-actions"><select id="scoreHistory" aria-label="歷史版本"></select><button id="scoreHistoryPreview" class="secondary-button" type="button">預覽歷史版本</button></div><div id="scoreRestorePreview" hidden><p id="scoreRestoreMeta"></p><div id="scoreRestoreDiff"></div><label class="score-confirm"><input id="scoreRestoreConfirm" type="checkbox">我已核對此月份歷史版本，確認回復</label><button id="scoreRestore" class="primary-button" type="button" disabled>確認回復此月</button></div></div></details>
         </section>
@@ -139,7 +140,7 @@
   <script src="department-gold-monthly-core.js?v=20261002-1" defer></script>
   <script src="session-read-manager.js?v=20261013-phase1-1" defer></script>
   <script src="department-gold-monthly-ui.js?v=20261026-manual-view-3" defer></script>
-  <script src="department-scores.js?v=20261028-perfect-brand-1" defer></script>
+  <script src="department-scores.js?v=20261105-region-ranking-1" defer></script>
   <script src="department-ops.js?v=20261026-manual-view-3" defer></script>
   <script src="department-readonly-assets.js?v=20261028-perfect-brand-1" defer></script>
 <script src="offline-html.js?v=20261105-1" defer></script>
