@@ -16,7 +16,7 @@ test('query clicks add the accepted UI release without changing other routes or 
  await new Promise(r=>setImmediate(r));assert.equal(updated,1);assert.equal(registrations,0);
  function click(href,extra={}){let prevented=false;handlers.click(Object.assign({button:0,target:{closest:()=>({href,target:'',hasAttribute:()=>false})},preventDefault:()=>prevented=true},extra));return prevented;}
  assert.equal(click('https://example.test/liamlu/threec-query.html'),true);assert.equal(click('https://example.test/liamlu/tradein-query.html?view=source'),true);
- assert.match(assigned[0],/ui=v6-20261105-4/);assert.match(assigned[1],/view=source&ui=v6-20261105-4/);
+ assert.match(assigned[0],/ui=integrated-20261105-1/);assert.match(assigned[1],/view=source&ui=integrated-20261105-1/);
  assert.equal(click('https://example.test/liamlu/kpi-battle.html'),false);assert.equal(click('https://other.test/tradein-query.html'),false);assert.equal(click('https://example.test/liamlu/tradein-query.html',{ctrlKey:true}),false);assert.equal(assigned.length,2);
 });
 
@@ -43,7 +43,7 @@ test('home navigation retains PR179 performance and PR181 lab removal', () => {
   assert.deepEqual(staffHrefs, [
     'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html',
     'https://twm-store-inspection.liamlu245.chatgpt.site/',
-    'tradein-progress.html', 'threec-query.html', 'tradein-query.html'
+    'tradein-progress.html', 'threec-query.html'
   ]);
   assert.equal(cards(navigation('督導專區')).length, 9);
   assert.equal(cards(html).length, 4 + staffHrefs.length + 9);
@@ -82,7 +82,7 @@ test('home omits supervisor gold entry and moves the original intelligence stati
 test('formal price lookup is a staff tool without publisher privileges', () => {
   const lookup = cardFor(navigation('同仁大廳'), 'threec-query.html');
   assert.match(lookup, /<h3>查價&amp;回收系統<\/h3>/);
-  assert.doesNotMatch(lookup, /舊換新/);
+  assert.match(lookup, /舊機回收價與唯讀匯出/);
   assert.doesNotMatch(lookup, /發布|上傳/);
 });
 
@@ -96,15 +96,16 @@ test('home omits the import lab entry while retaining its maintenance page and f
 
 test('home and APP open the v6 recovery query and retain target progress navigation', () => {
   const area=cardFor(navigation('同仁大廳'),'tradein-progress.html');
-  const query=cardFor(navigation('同仁大廳'),'tradein-query.html');
-  assert.match(query, /<h3>舊換新查價<\/h3>/);
-  assert.match(query, /回收價比較、分級與檢測入口/);
+  assert.doesNotMatch(navigation('同仁大廳'), /href="tradein-query\.html"/);
+  const system=fs.readFileSync(path.resolve(__dirname,'../threec-query.html'),'utf8');
+  assert.match(system, /href="tradein-query\.html"/);
+  assert.match(system, /id="downloadQueryHtml"/);
   assert.match(area, /<h3>舊換新進度追蹤<\/h3>/);
   assert.match(area, /門市與同仁進度、TOP3 提醒與匯出/);
   const app=fs.readFileSync(path.resolve(__dirname,'../app.html'),'utf8');
   assert.match(app, /href="threec-query\.html">查價&amp;回收系統/);
   assert.match(app, /href="tradein-progress\.html">舊換新進度追蹤/);
-  assert.match(app, /href="tradein-query\.html">舊換新查價/);
+  assert.doesNotMatch(app, /href="tradein-query\.html"/);
   const recovery=fs.readFileSync(path.resolve(__dirname,'../tradein-query.html'),'utf8');
   assert.match(recovery, /<h1>舊換新專區<\/h1>/);
   assert.match(recovery, /id="tradeinResults"/);
