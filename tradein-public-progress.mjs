@@ -4,6 +4,7 @@ import {formatDifference,formatRecoveredModels,isDate} from './tradein-export-co
 import {createPublicReader,readPublicFrame} from './tradein-public-read.mjs?v=20261010-date-read-1';
 import {requestAdmin} from './tradein-admin-operation.mjs?v=20261025-http-recovery-1';
 import {prepareSource} from './tradein-sar74-source.mjs?v=20261025-same-month-net-1';
+import {BONUS_MONTH,estimatePersonBonus,estimateStoreBonus,formatBonusEstimate} from './tradein-bonus.mjs?v=20261106-1';
 const $=id=>document.getElementById(id),CORE=window.TradeinPerformanceCore,PUBLIC=window.TradeinPublicCore;
 const API='https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
 let snapshot=null,readEpoch=0,controller=null,source=null,plan=null,admin=null,checkpoint=null,busy=false,uploadEpoch=0,reading=false;
@@ -29,6 +30,14 @@ function visiblePeople(){
 }
 function filteredPeople(){const store=$('staffStore').value;return visiblePeople().filter(p=>(!store||p.store===store)&&(!selectedCounts.size||selectedCounts.has(p.actual_units===null?'unknown':String(p.actual_units))));}
 function modelsText(p){return esc(formatRecoveredModels(p.actual_units,p.recovered_models));}
+const showBonus=()=>snapshot?.month===BONUS_MONTH&&!selectedDate;
+const storeBonusLabel='店長獎金預估';
+const personBonusLabel='個人獎金預估';
+function bonusCell(label,estimate){
+ const breakdown=estimate?[['指定',estimate.specified],['一般',estimate.general],['排除',estimate.excluded],['待核',estimate.pending]]
+  .filter(([,count])=>count>0).map(([name,count])=>`${name} ${count} 筆`).join(' · '):'';
+ return `<td data-label="${label}"><span class="num">${formatBonusEstimate(estimate)}</span>${breakdown?`<small>${breakdown}</small>`:''}</td>`;
+}
 async function request(payload,{signal,onSlow}={}){
  return requestAdmin(API,payload,{signal,onSlow,onRetry:status=>{
   if(!signal?.aborted)$('uploadMessage').textContent='預覽連線暫時失敗（HTTP '+status+'），正在重新連線（2/2）…';
@@ -36,7 +45,13 @@ async function request(payload,{signal,onSlow}={}){
 }
 function context(){const period=CORE.monthPeriod($('periodMonth').value),people=visiblePeople();return {active:!!snapshot,mode:'public',storeSummaries:(selectedDate?(dailyAvailable()?dailyRows():[]):snapshot?.stores||[]).map(s=>({store:s.store,actual:s.actual_units,target:selectedDate?null:s.target_units})),dailyAvailable:dailyAvailable(),people:(selectedDate?people:snapshot?.people||[]).map(personTuple),currentPeople:filteredPeople().map(personTuple),countFilterLabel:selectedCounts.size?'回收 '+[...selectedCounts].map(n=>n==='unknown'?'待核':n+' 筆').join('、'):'',allowedStores:snapshot?.stores.map(s=>s.store)||[],selectedStore:$('staffStore').value,rules:{...period,month:$('periodMonth').value,periodStatus:'confirmed',cadence:'monthly',...personalRules($('periodMonth').value),storeTarget:snapshot?.target_policy?.stores?snapshot.summary.target_units:null,isDemo:false,sourceStart:snapshot?.source_period.start,sourceEnd:snapshot?.source_period.end,cutoff:snapshot?.source_cutoff_date,timezone:'Asia/Taipei',selectedDate}};}
 function wipe(){snapshot=null;selectedCounts.clear();clearExports();$('dateModeNote').hidden=true;$('publicWorkspace').hidden=true;['stats','storeRows','staffRows','staffCounts'].forEach(id=>$(id).replaceChildren());$('staffResultCount').textContent='';$('periodMeta').textContent='';$('updatedLabel').textContent='';$('staffStore').replaceChildren();$('recoveryDate').disabled=true;$('clearRecoveryDate').disabled=true;}
-function renderPeople(){const people=filteredPeople(),daily=Boolean(selectedDate);$('staffResultCount').textContent=daily&&!dailyAvailable()?'顯示未知':'顯示 '+people.length+' 人';$('allStaffCounts').setAttribute('aria-pressed',String(!selectedCounts.size));$('staffRows').innerHTML=people.length?people.map(p=>daily?`<tr data-public-id="${p.public_id}"><td data-label="人員"><strong>${esc(p.masked_name)}</strong><small>${esc(p.store)}</small></td><td data-label="當日回收">${units(p.actual_units)}</td><td data-label="回收機款" class="recovered-models">${modelsText(p)}</td></tr>`:`<tr data-public-id="${p.public_id}"><td data-label="人員"><strong>${esc(p.masked_name)}</strong><small>${esc(p.store)}</small></td><td data-label="實績">${units(p.actual_units)}</td><td data-label="目標">${p.target_units===null?'不設目標':units(p.target_units)}</td><td data-label="目前差異">${formatDifference(p.actual_units,p.target_units)}</td><td data-label="回收機款" class="recovered-models">${modelsText(p)}</td></tr>`).join(''):`<tr class="empty-people"><td colspan="${daily?3:5}">${daily&&!dailyAvailable()?'選定日期資料尚未提供，明細保留未知。':'沒有符合篩選條件的人員'}</td></tr>`;}
+function renderPeople(){
+ const people=filteredPeople(),daily=Boolean(selectedDate),bonus=showBonus();
+ $('staffResultCount').textContent=daily&&!dailyAvailable()?'顯示未知':'顯示 '+people.length+' 人';
+ $('allStaffCounts').setAttribute('aria-pressed',String(!selectedCounts.size));
+ $('staffRows').innerHTML=people.length?people.map(p=>`<tr data-public-id="${p.public_id}"><td data-label="人員"><strong>${esc(p.masked_name)}</strong><small>${esc(p.store)}</small></td><td data-label="${daily?'當日回收':'實績'}">${units(p.actual_units)}</td>${daily?'':`<td data-label="目標">${p.target_units===null?'不設目標':units(p.target_units)}</td><td data-label="目前差異">${formatDifference(p.actual_units,p.target_units)}</td>`}<td data-label="回收機款" class="recovered-models">${modelsText(p)}</td>${bonus?bonusCell(personBonusLabel,estimatePersonBonus(p)):''}</tr>`).join(''):
+  `<tr class="empty-people"><td colspan="${daily?3:bonus?6:5}">${daily&&!dailyAvailable()?'選定日期資料尚未提供，明細保留未知。':'沒有符合篩選條件的人員'}</td></tr>`;
+}
 function renderCounts(){const people=visiblePeople();if(selectedDate&&!dailyAvailable()){ $('staffCounts').replaceChildren();$('allStaffCounts').disabled=true;return; }$('allStaffCounts').disabled=false;const values=[...new Set(['0','1','2','3','4',...people.filter(p=>p.actual_units!==null).map(p=>String(p.actual_units))])].sort((a,b)=>Number(a)-Number(b));if(people.some(p=>p.actual_units===null))values.push('unknown');$('staffCounts').innerHTML=values.map(n=>`<label class="count-choice"><input type="checkbox" name="staffCount" value="${n}"><span>${n==='unknown'?'待核':n+' 筆'}</span></label>`).join('');}
 function setHeaders(daily){
  const store=$('storeHead').querySelectorAll('th'),person=$('personHead').querySelectorAll('th');
@@ -44,7 +59,18 @@ function setHeaders(daily){
  person[1].textContent=daily?'當日回收':'實績';person[2].textContent=daily?'回收機款':'目標';person[3].textContent=daily?'':'目前差異';person[4].textContent=daily?'':'回收機款';
  store.forEach((cell,index)=>{cell.hidden=daily&&index>1;});
  person.forEach((cell,index)=>{cell.hidden=daily&&index>2;});
+ const bonus=showBonus();
+ $('bonusRules').hidden=!bonus;
+ for(const [id,label] of [['storeHead',storeBonusLabel],['personHead',personBonusLabel]]){
+  const row=$(id),existing=row.querySelector('[data-bonus-header]');
+  if(!bonus)existing?.remove();
+  else if(!existing){const th=document.createElement('th');th.dataset.bonusHeader='';th.scope='col';th.textContent=label;row.append(th);}
  }
+ }
+function renderMonthlyStores(){
+ const bonus=showBonus();
+ $('storeRows').innerHTML=snapshot.stores.map(s=>`<tr><td data-label="店點"><strong>${esc(s.store)}</strong></td><td data-label="實績">${units(s.actual_units)}</td><td data-label="店目標">${units(s.target_units)}</td><td data-label="門市尚缺">${units(s.remaining_units)}</td><td data-label="達成率">${s.target_units?Math.round(s.actual_units/s.target_units*1000)/10:0}%</td><td data-label="達標人數">${s.met_people} / ${s.target_people}</td>${bonus?bonusCell(storeBonusLabel,estimateStoreBonus(s,snapshot.people)):''}</tr>`).join('');
+}
 function dailyRows(){
  if(snapshot.stores.every(s=>Array.isArray(s.recovered_days)))return snapshot.stores.map(s=>({store:s.store,actual_units:s.recovered_days.find(d=>d.date===selectedDate)?.actual_units||0}));
  const byStore=new Map(snapshot.stores.map(s=>[s.store,0]));visiblePeople().forEach(p=>byStore.set(p.store,(byStore.get(p.store)||0)+p.actual_units));return [...byStore.entries()].map(([store,actual_units])=>({store,actual_units}));
@@ -57,7 +83,7 @@ function renderUnknownDay(){
 function render(){const s=snapshot.summary,region=snapshot.region_progress,daily=Boolean(selectedDate);$('publicWorkspace').hidden=document.getElementById('scope-sharing')?.getAttribute('aria-selected')==='true';$('readMessage').textContent='';$('updatedLabel').textContent='更新於 '+snapshot.published_at;$('recoveryDate').disabled=false;$('clearRecoveryDate').disabled=false;$('recoveryDate').min=snapshot.source_period.start;$('recoveryDate').max=snapshot.source_period.end;$('dateModeNote').hidden=!daily;$('personRuleNote').textContent=daily?'當日只顯示回收數與回收機款；每月目標與達標請切回整月查看。':'目前差異＝實績－月目標；負數為未達，0 為達標，正數為超標。'+(personalRules(snapshot.month).actingManager==='included'?'含店長及代理店長，每人每月'+personalRules(snapshot.month).staffTarget+'台。':'免目標人員不計差異。')+'';setHeaders(daily);
  if(daily&&!dailyAvailable()){renderUnknownDay();return;}
  if(daily){const people=visiblePeople(),stores=dailyRows(),actual=people.reduce((n,p)=>n+p.actual_units,0),storeCount=stores.filter(p=>p.actual_units>0).length,personCount=people.filter(p=>p.actual_units>0).length;$('periodMeta').textContent=`${snapshot.month} · 統計日期 ${selectedDate} · 來源 ${snapshot.source_period.start}–${snapshot.source_cutoff_date}`;$('stats').innerHTML=[['當日回收',units(actual),'只統計所選日期'],['有回收店數',storeCount+' 店','當日實績大於 0'],['有回收人數',personCount+' 人','當日實績大於 0'],['統計日期',selectedDate,'台北時間']].map(v=>`<article class="kpi"><span>${v[0]}</span><strong>${v[1]}</strong><small>${v[2]}</small></article>`).join('');$('storeRows').innerHTML=stores.map(p=>`<tr><td data-label="店點"><strong>${esc(p.store)}</strong></td><td data-label="當日回收">${units(p.actual_units)}</td></tr>`).join('');
- }else{$('periodMeta').textContent=`${snapshot.month} · 來源 ${snapshot.source_period.start}–${snapshot.source_cutoff_date} · 每人每月 ${personalRules(snapshot.month).staffTarget} 台`;$('stats').innerHTML=[['全區實績',units(s.actual_units),'含店長與代理店長實績'],[region?'區目標':snapshot.target_policy?.stores?'門市月目標':'同仁月目標',units(s.target_units),region?'11 月全區月目標':snapshot.target_policy?.stores?'重點Device ×12%逐店進位；個人合計 '+s.personal_target_units+' 台':s.target_people+' 人 × 3 台'],['達標人數',s.met_people+' / '+s.target_people,s.target_people+' 人 × '+personalRules(snapshot.month).staffTarget+' 台'],[region?'區尚缺':'門市尚缺',units(s.remaining_units),'達成率 '+(region?.attainment??(s.target_units?Math.round(s.actual_units/s.target_units*1000)/10:0))+'%']].map(v=>`<article class="kpi"><span>${v[0]}</span><strong>${v[1]}</strong><small>${v[2]}</small></article>`).join('');$('storeRows').innerHTML=snapshot.stores.map(s=>`<tr><td data-label="店點"><strong>${esc(s.store)}</strong></td><td data-label="實績">${units(s.actual_units)}</td><td data-label="店目標">${units(s.target_units)}</td><td data-label="門市尚缺">${units(s.remaining_units)}</td><td data-label="達成率">${s.target_units?Math.round(s.actual_units/s.target_units*1000)/10:0}%</td><td data-label="達標人數">${s.met_people} / ${s.target_people}</td></tr>`).join('');}
+ }else{$('periodMeta').textContent=`${snapshot.month} · 來源 ${snapshot.source_period.start}–${snapshot.source_cutoff_date} · 每人每月 ${personalRules(snapshot.month).staffTarget} 台`;$('stats').innerHTML=[['全區實績',units(s.actual_units),'含店長與代理店長實績'],[region?'區目標':snapshot.target_policy?.stores?'門市月目標':'同仁月目標',units(s.target_units),region?'11 月全區月目標':snapshot.target_policy?.stores?'重點Device ×12%逐店進位；個人合計 '+s.personal_target_units+' 台':s.target_people+' 人 × 3 台'],['達標人數',s.met_people+' / '+s.target_people,s.target_people+' 人 × '+personalRules(snapshot.month).staffTarget+' 台'],[region?'區尚缺':'門市尚缺',units(s.remaining_units),'達成率 '+(region?.attainment??(s.target_units?Math.round(s.actual_units/s.target_units*1000)/10:0))+'%']].map(v=>`<article class="kpi"><span>${v[0]}</span><strong>${v[1]}</strong><small>${v[2]}</small></article>`).join('');renderMonthlyStores();}
  const selectedStore=$('staffStore').value;$('staffStore').replaceChildren(...[['','全區九店'],...snapshot.stores.map(s=>[s.store,s.store])].map(([value,text])=>{const o=document.createElement('option');o.value=value;o.textContent=text;return o;}));if(selectedStore&&snapshot.stores.some(s=>s.store===selectedStore))$('staffStore').value=selectedStore;renderCounts();renderPeople();refreshExports();}
 const readPublic=createPublicReader({endpoint:API,frame:(payload,signal)=>readPublicFrame(API,payload,signal),post:async(url,payload,signal)=>{
  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),cache:'no-store',credentials:'omit',signal});
