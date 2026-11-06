@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#efe9dc">
+  <title>拳台外的小城 · 隔離 QA</title>
+  <link rel="stylesheet" href="city-preview.css">
+</head>
+<body>
+  <main class="city-shell">
+    <header class="city-header">
+      <a class="city-brand" href="./">拳台 <span>／</span> 小城外場</a>
+      <span class="qa-badge">隔離 QA</span>
+    </header>
+
+    <section class="intro-card" aria-labelledby="page-title">
+      <p class="eyebrow">A SMALL QA PLAZA</p>
+      <h1 id="page-title">先在小城走一圈，再進擂台。</h1>
+      <p>這裡只演示已發布的人偶外觀與一小塊廣場。<strong>隔離相同人偶演示，非本人帳號。</strong></p>
+    </section>
+
+    <section id="sessionCard" class="panel session-card" aria-labelledby="session-title">
+      <div>
+        <p class="eyebrow">START</p>
+        <h2 id="session-title">輸入 QA 暱稱</h2>
+        <p class="muted">只建立本次測試工作階段，不使用員編，也不會改正式角色。</p>
+      </div>
+      <form id="sessionForm" class="session-form">
+        <label for="qaNickname">QA 暱稱 <span>12 字內</span></label>
+        <div class="session-row">
+          <input id="qaNickname" name="nickname" maxlength="12" autocomplete="nickname" placeholder="例如：QA 拳手" required>
+          <button id="sessionButton" class="primary-button" type="submit">開始演示</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="cityPanel" class="city-layout" hidden aria-label="小城 QA 廣場">
+      <div class="panel stage-card">
+        <div class="stage-heading">
+          <div>
+            <p class="eyebrow">QA PLAZA</p>
+            <h2>小城廣場</h2>
+          </div>
+          <span id="connectionStatus" class="status-chip">尚未連線</span>
+        </div>
+        <div class="scene-frame">
+          <canvas id="cityCanvas" aria-label="小城 QA 廣場與已發布人偶"></canvas>
+          <div class="scene-note">只展示伺服器指定外觀</div>
+        </div>
+        <div class="location-readout" aria-live="polite">
+          <span>目前位置</span>
+          <strong id="locationText">讀取中…</strong>
+        </div>
+      </div>
+
+      <aside class="panel control-card">
+        <div class="profile-block">
+          <p class="eyebrow">CURRENT QA</p>
+          <h2 id="profileName">—</h2>
+          <p id="profileText" class="muted">伺服器指定的人偶外觀</p>
+        </div>
+
+        <div class="movement-block">
+          <div class="section-heading"><h3>在廣場走動</h3><span>±4 格</span></div>
+          <div class="direction-pad" aria-label="廣場移動控制">
+            <button type="button" class="direction-button up" data-direction="up" aria-label="向前">▲</button>
+            <button type="button" class="direction-button left" data-direction="left" aria-label="向左">◀</button>
+            <button type="button" class="direction-button down" data-direction="down" aria-label="向後">▼</button>
+            <button type="button" class="direction-button right" data-direction="right" aria-label="向右">▶</button>
+          </div>
+          <p id="moveHint" class="small-note">手機按住方向鍵，電腦可用 WASD／方向鍵。</p>
+        </div>
+
+        <div class="journey-block">
+          <p class="small-note">城市位置會由測試服務保存；進擂台不會覆蓋原位置。</p>
+          <button id="arenaButton" class="primary-button wide-button" type="button">進擂台</button>
+        </div>
+        <div id="cityNotice" class="city-notice" role="status" aria-live="polite"></div>
+      </aside>
+    </section>
+
+    <footer class="city-footer">獨立 QA 示範 · 不連正式員工帳號、錢包或城市資料</footer>
+  </main>
+
+  <!-- Root provides the published avatar bundle under public/avatars. -->
+  <script src="vendor/three.js"></script>
+  <script src="avatars/static-mesh.js"></script>
+  <script src="avatars/head-art-previous.js"></script><script src="avatars/head-art.js"></script>
+  <script src="avatars/gltf-loader.js"></script>
+  <script src="avatars/refined-portrait-config.js"></script>
+  <script src="avatars/refined-portrait-hair.js"></script>
+  <script src="avatars/refined-avatar-portraits.js"></script>
+  <script src="avatars/refined-heads.js"></script>
+  <script src="avatars/refined-jialing-body.js"></script>
+  <script src="avatars/refined-li-body.js"></script>
+  <script src="city-preview.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "changed": [
+    "public/index.html",
+    "public/shared-avatar-adapter.js",
+    "runtime/employee/stage-portraits.mjs"
+  ],
+  "added": [
+    "public/assets/refined-portrait-hair/p3.glb",
+    "public/assets/refined-portrait-hair/p5.glb",
+    "public/refined-avatar-portraits.js",
+    "public/refined-heads.js",
+    "public/refined-jialing-body.js",
+    "public/refined-li-body.js",
+    "public/refined-portrait-config.js",
+    "public/refined-portrait-hair.js"
+  ],
+  "deleted": [],
+  "formalAuthChanges": false,
+  "databaseMigration": false,
+  "serverPresetsPreserved": true,
+  "realLogins": 0
+}
