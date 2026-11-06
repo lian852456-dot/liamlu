@@ -55,27 +55,52 @@
   function workbookRows(workbook,XLSX,name){if(!workbook.Sheets[name])fail('缺少必要工作表：'+name);return XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,raw:true,defval:null,blankrows:true});}
   function equal(value,expected,label){if(typeof value!=='number'||!Number.isFinite(value)||Math.abs(value-expected)>Math.max(1e-8,Math.abs(expected)*1e-8))fail(label+' 與逐日加總不一致');}
   // Resolve monthly columns from their headings; every daily block must cover
-  // the actual calendar month. Never reuse October's rate/prior column numbers.
+  // the actual calendar month. Short-month templates may retain all 31 slots.
   function header(rows,label){const columns=[];(rows[0]||[]).forEach((v,i)=>{if(norm(v)===label)columns.push(i);});if(columns.length!==1)fail('來源欄位缺少或重複：'+label);return columns[0];}
   function subheader(rows,group,label){const start=header(rows,group);let end=start+1;while(end<(rows[0]||[]).length&&!norm(rows[0][end]))end++;const columns=[];for(let c=start;c<end;c++)if(norm(rows[1]?.[c])===label)columns.push(c);if(columns.length!==1)fail(group+' 的分子母欄位不符：'+label);return columns[0];}
-  function datesAt(rows,index,dates){dates.forEach((d,i)=>{if(dateSerial(rows[1]?.[index+i])!==d)fail('日期欄位不連續、重複或分子母錯位');});if(Number.isSafeInteger(rows[1]?.[index+dates.length]))fail('日期欄位超出來源月份');}
+  function dateBlockTotal(rows,index,dates,label){
+    const headings=rows[1]||[];
+    dates.forEach((date,i)=>{if(dateSerial(headings[index+i])!==date)fail('日期欄位不連續、重複或分子母錯位');});
+    const end=index+dates.length,total=index+31;
+    if(norm(headings[end])===label)return end;
+    if(end===total||norm(headings[total])!==label)fail('逐日總計欄位不符：'+label);
+    for(let c=end;c<total;c++){
+      const offset=c-index,value=headings[c];
+      if(norm(rows[0]?.[c])||(value!=null&&value!==''&&value!==0&&value!==offset+1&&value!==headings[index]+offset))fail('日期欄位超出來源月份');
+    }
+    return total;
+  }
+  function validatePadding(rows,layout,days,storeIds){
+    const columns=Object.entries(layout.total).flatMap(([key,end])=>{
+      const start=layout[key]+days;
+      return Array.from({length:end-start},(_,i)=>start+i);
+    });
+    if(!columns.length)return;
+    for(const row of rows){
+      if(!storeIds.has(row[3]))continue;
+      if(columns.some(c=>row[c]!=null&&row[c]!==''&&row[c]!==0&&row[c]!=='0'))fail('月底後的占位欄含有資料，請核對來源月份');
+    }
+  }
   function aqLayout(rows){
     const n=header(rows,'AQ上線數'),d=header(rows,'AQ來客數'),rate=header(rows,'AQ締結率');
     const begin=dateSerial(rows[1]?.[n]),year=Number(begin.slice(0,4)),month=Number(begin.slice(5,7)),days=new Date(Date.UTC(year,month,0)).getUTCDate();
     if(begin.slice(-2)!=='01')fail('來源日期必須由月初開始');
     const dates=Array.from({length:days},(_,i)=>begin.slice(0,8)+String(i+1).padStart(2,'0'));
-    for(const c of [n,d,rate]){datesAt(rows,c,dates);if(norm(rows[1]?.[c+days])!=='TTL')fail('AQ逐日總計欄位不符');}
-    return {begin,year,month,days,dates,n,d,rate,priorN:subheader(rows,'上月同期','上線數'),priorD:subheader(rows,'上月同期','來客數')};
+    const total={n:dateBlockTotal(rows,n,dates,'TTL'),d:dateBlockTotal(rows,d,dates,'TTL'),rate:dateBlockTotal(rows,rate,dates,'TTL')};
+    return {begin,year,month,days,dates,n,d,rate,total,priorN:subheader(rows,'上月同期','上線數'),priorD:subheader(rows,'上月同期','來客數')};
   }
-  function workbookLayout(aq,rt,totals){
+  function workbookLayout(aq,rt,totals,stores=STORES){
     const a=aqLayout(aq),{begin,year,days,dates}=a;
     function period(rows){const m=String(rows[0]?.[0]||'').match(/(\d+)\/(\d+)\s*~\s*(\d+)\/(\d+)/);if(!m)fail('來源沒有可核實的資料起迄');const [,sm,sd,em,ed]=m.map(Number);const start=iso(year+'-'+String(sm).padStart(2,'0')+'-'+String(sd).padStart(2,'0')),end=iso(year+'-'+String(em).padStart(2,'0')+'-'+String(ed).padStart(2,'0'));if(start!==begin||end<begin||start.slice(0,7)!==end.slice(0,7))fail('截止與欄位日期不同');return end;}
     const cutoff=period(aq);if(period(rt)!==cutoff||period(totals)!==cutoff)fail('AQ／RT 三張來源期間不同');
-    const twN=header(rt,'原TWM用戶上線數'),twD=header(rt,'原TWM用戶來客數'),tsN=header(rt,'原TST用戶'),tsD=tsN+days+1,rate=header(rt,'RT締結率');
-    for(const c of [twN,twD,tsN,tsD,rate])datesAt(rt,c,dates);
-    for(const [c,label]of [[twN,'TTL'],[twD,'TTL'],[tsN,'上線'],[tsD,'來客'],[rate,'TTL']])if(norm(rt[1]?.[c+days])!==label)fail('RT逐日總計欄位不符：'+label);
+    const twN=header(rt,'原TWM用戶上線數'),twD=header(rt,'原TWM用戶來客數'),tsN=header(rt,'原TST用戶'),rate=header(rt,'RT締結率');
+    const tsNTotal=dateBlockTotal(rt,tsN,dates,'上線'),tsD=tsNTotal+1;
+    const r={twN,twD,tsN,tsD,rate,total:{twN:dateBlockTotal(rt,twN,dates,'TTL'),twD:dateBlockTotal(rt,twD,dates,'TTL'),tsN:tsNTotal,tsD:dateBlockTotal(rt,tsD,dates,'來客'),rate:dateBlockTotal(rt,rate,dates,'TTL')}};
+    const storeIds=new Set(stores.map(store=>store.id));
+    validatePadding(aq,a,days,storeIds);
+    validatePadding(rt,r,days,storeIds);
     const t={twN:subheader(totals,'原TWM用戶','上線數'),twD:subheader(totals,'原TWM用戶','來客數'),tsN:subheader(totals,'原TST用戶','上線數'),tsD:subheader(totals,'原TST用戶','來客數'),n:subheader(totals,'符合續約資格TTL','上線數'),d:subheader(totals,'符合續約資格TTL','來客數'),rate:subheader(totals,'符合續約資格TTL','締結率'),priorN:subheader(totals,'上月同期','TTL上線數'),priorD:subheader(totals,'上月同期','TTL來客數')};
-    return {...a,cutoff,aq:a,rt:{twN,twD,tsN,tsD,rate},totals:t};
+    return {...a,cutoff,aq:a,rt:r,totals:t};
   }
   function parseWorkbook(workbook,XLSX,{sha256,source_name,source_bytes}={}){
     const aq=workbookRows(workbook,XLSX,'AQ締結率'),rt=workbookRows(workbook,XLSX,'RT每日'),totals=workbookRows(workbook,XLSX,'RT締結率');
@@ -84,8 +109,8 @@
     const ag=groups(aq,'AQ締結率'),rg=groups(rt,'RT每日'),tg=groups(totals,'RT締結率'),valid=Number(cutoff.slice(-2)),records=[],prior=[];
     for(const s of STORES){const a=ag.get(s.id),r=rg.get(s.id),t=tg.get(s.id),current=[];
       for(let j=0;j<days;j++){const row={store:s.id,date:dates[j],aq_n:count(a[A.n+j],'AQ上線'),aq_d:count(a[A.d+j],'AQ來客'),rt_n:count(r[R.twN+j],'原TWM上線')+count(r[R.tsN+j],'原TST上線'),rt_d:count(r[R.twD+j],'原TWM來客')+count(r[R.tsD+j],'原TST來客')};if(j>=valid){if(FIELDS.some(k=>row[k]!==0))fail('截止以後有非零實績，來源口徑衝突');continue;}equal(a[A.rate+j],ratio(row.aq_n,row.aq_d)||0,'AQ每日率');equal(r[R.rate+j],ratio(row.rt_n,row.rt_d)||0,'RT每日率');current.push(row);records.push(row);}
-      const total=aggregate(current);for(const [value,expected,label]of [[a[A.n+days],total.aq_n,'AQ分子TTL'],[a[A.d+days],total.aq_d,'AQ分母TTL'],[t[T.n],total.rt_n,'RT分子'],[t[T.d],total.rt_d,'RT分母'],[t[T.rate],total.rt_rate||0,'RT總率']])equal(value,expected,label);
-      for(const key of ['twN','twD','tsN','tsD'])equal(r[R[key]+days],t[T[key]],'RT每日與總表');
+      const total=aggregate(current);for(const [value,expected,label]of [[a[A.total.n],total.aq_n,'AQ分子TTL'],[a[A.total.d],total.aq_d,'AQ分母TTL'],[t[T.n],total.rt_n,'RT分子'],[t[T.d],total.rt_d,'RT分母'],[t[T.rate],total.rt_rate||0,'RT總率']])equal(value,expected,label);
+      for(const key of ['twN','twD','tsN','tsD'])equal(r[R.total[key]],t[T[key]],'RT每日與總表');
       prior.push({store:s.id,aq_n:count(a[A.priorN],'同期AQ上線'),aq_d:count(a[A.priorD],'同期AQ來客'),rt_n:count(t[T.priorN],'同期RT上線'),rt_d:count(t[T.priorD],'同期RT來客')});
     }
     const previous=new Date(Date.UTC(year,month-2,1)).toISOString().slice(0,7),priorStart=previous+'-01',priorEnd=previous+'-'+String(valid).padStart(2,'0');

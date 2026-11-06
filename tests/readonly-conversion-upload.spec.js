@@ -36,6 +36,13 @@ test('real XLSX parser → actual doPost/original admin guard → private readba
   expect(s.calls.every(c=>c.method==='POST'&&c.headers['content-type'].startsWith('text/plain'))).toBe(true);
   expect(await page.evaluate(()=>Object.values(localStorage).concat(Object.values(sessionStorage)).some(v=>v.includes('synthetic-admin-proof')))).toBe(false);
 });
+test('November fixed-width source publishes only real store-days and reads back the correct cutoff',async({page})=>{
+  const s=await setup(page);await preview(page,{month:'2026-11',fixed31:true});await expect(page.locator('#conversionPreviewText')).toContainText('2026-11-01 至 2026-11-03');
+  const sent=s.calls.find(c=>c.name==='readonly_conversion_preview').payload.snapshot;
+  expect(sent.records).toHaveLength(27);expect(sent.records.every(r=>r.date<='2026-11-03')).toBe(true);
+  await page.locator('#conversionConfirm').check();await page.locator('#conversionPublishBtn').click();await expect(page.locator('#conversionLive')).toContainText('正式截止 2026-11-03');
+  await expect(page.locator('#conversionMessage')).toContainText('已完成私有版本讀回');expect(s.errors).toEqual([]);
+});
 test('incorrect total fails locally and never invokes private preview or publication',async({page})=>{
   const s=await setup(page);await preview(page,{bad:true});await expect(page.locator('#conversionMessage')).toContainText('TTL');expect(s.calls.some(c=>c.name==='readonly_conversion_preview'||c.name==='readonly_conversion_publish')).toBe(false);expect(s.b.state).toBeNull();await expect(page.locator('#conversionPublishBtn')).toBeDisabled();expect(s.errors).toEqual([]);
 });

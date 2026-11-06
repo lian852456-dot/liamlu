@@ -26,13 +26,15 @@ function runtime({post=false}={}){
   for(const relative of ['gas/ReadonlyDashboardCore.gs','gas/ReadonlyConversion.gs'])vm.runInContext(fs.readFileSync(path.join(root,relative),'utf8'),context,{filename:relative});
   const auth={employeeId:'SYN001',adminSecret:'synthetic-admin-proof'};
   if(post){
+    const rankAutomation='gas/PersonalRankAutomation.gs';
+    vm.runInContext(fs.readFileSync(path.join(root,rankAutomation),'utf8'),context,{filename:rankAutomation});
     const code=fs.readFileSync(path.join(root,'gas/Code.gs'),'utf8');
     const fn=name=>{const start=code.indexOf('function '+name+'('),end=code.indexOf('\n}',start);if(start<0||end<0)throw Error('Missing production function '+name);return code.slice(start,end+2);};
     properties.set('DASHBOARD_ADMIN_SECRET',auth.adminSecret);properties.set('REPORT_UPLOAD_ALLOWED_EMPLOYEES',auth.employeeId);
     context.PropertiesService={getScriptProperties:()=>props};context.ScriptApp={getService:()=>({getUrl:()=> 'https://synthetic-owner.invalid/exec'})};
     context.ContentService={MimeType:{JSON:'json',JAVASCRIPT:'javascript'},createTextOutput:text=>({text,setMimeType(){return this;}})};
     const whitelist=code.match(/const REPORT_UPLOAD_ALLOWED_ACTIONS = \[[\s\S]*?\];/)[0];vm.runInContext(whitelist,context);
-    for(const name of ['privateDashboardRequiredProperty','privateDashboardCleanEmployeeId','privateDashboardHash','privateDashboardAdminAuthorized','reportUploadAuthorize_','reportUploadIsUploadDeployment_','privateDashboardPostRawPayload','privateDashboardParsePostPayload','privateDashboardPostIsIframeTransport','privateDashboardPostResponse','jsonResponse','privateDashboardGasBMaybePost_','privateDashboardGasAuthMaybeRpcPost_','doPost'])vm.runInContext(fn(name),context,{filename:name});
+    for(const name of ['privateDashboardRequiredProperty','privateDashboardCleanEmployeeId','privateDashboardHash','privateDashboardAdminAuthorized','reportUploadAuthorize_','reportUploadIsUploadDeployment_','privateDashboardPostRawPayload','privateDashboardParsePostPayload','privateDashboardPostIsIframeTransport','privateDashboardPostResponse','jsonResponse','tradeinSharingPublicMaybePost_','privateDashboardGasBMaybePost_','privateDashboardGasAuthMaybeRpcPost_','doPost'])vm.runInContext(fn(name),context,{filename:name});
     const original=context.reportUploadAuthorize_;context.reportUploadAuthorize_=payload=>{events.push('auth');return original(payload);};
   }
   const call=(operation,payload={})=>JSON.parse(JSON.stringify(context['readonlyConversion'+operation]({...auth,...payload})));
