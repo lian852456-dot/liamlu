@@ -37,8 +37,9 @@ function merge(current,incoming){const next=validate(incoming);if(!current)retur
     const ag=groups(aq,'AQ締結率'),rg=groups(rt,'RT每日'),tg=groups(totals,'RT締結率'),valid=Number(cutoff.slice(-2)),records=[],prior=[];
     for(const s of stores){const a=ag.get(s.id),r=rg.get(s.id),t=tg.get(s.id),current=[];
       for(let j=0;j<days;j++){const row={store:s.id,date:dates[j],aq_n:count(a[A.n+j],'AQ上線'),aq_d:count(a[A.d+j],'AQ來客'),rt_n:count(r[R.twN+j],'原TWM上線')+count(r[R.tsN+j],'原TST上線'),rt_d:count(r[R.twD+j],'原TWM來客')+count(r[R.tsD+j],'原TST來客')};if(j>=valid){if(FIELDS.some(k=>row[k]!==0))fail('截止以後有非零實績，來源口徑衝突');continue;}equal(a[A.rate+j],ratio(row.aq_n,row.aq_d)||0,'AQ每日率');equal(r[R.rate+j],ratio(row.rt_n,row.rt_d)||0,'RT每日率');current.push(row);records.push(row);}
-      const total=aggregate(current);for(const [value,expected,label]of [[a[A.total.n],total.aq_n,'AQ分子TTL'],[a[A.total.d],total.aq_d,'AQ分母TTL'],[t[T.n],total.rt_n,'RT分子'],[t[T.d],total.rt_d,'RT分母'],[(t[T.n]===0&&t[T.d]===0&&t[T.rate]==null?0:t[T.rate]),total.rt_rate||0,'RT總率']])equal(value,expected,label);
+      const total=aggregate(current);for(const [value,expected,label]of [[a[A.total.n],total.aq_n,'AQ分子TTL'],[a[A.total.d],total.aq_d,'AQ分母TTL'],[t[T.n],total.rt_n,'RT分子'],[t[T.d],total.rt_d,'RT分母']])equal(value,expected,label);
       for(const key of ['twN','twD','tsN','tsD'])equal(r[R.total[key]],t[T[key]],'RT每日與總表');
+      Base.verifyRtTotalRate(t[T.rate],total,`${s.short} RT締結率!${XLSX.utils.encode_cell({r:totals.indexOf(t),c:T.rate})}`);
       prior.push({store:s.id,aq_n:count(a[A.priorN],'同期AQ上線'),aq_d:count(a[A.priorD],'同期AQ來客'),rt_n:count(t[T.priorN],'同期RT上線'),rt_d:count(t[T.priorD],'同期RT來客')});
     }
     const previous=new Date(Date.UTC(year,month-2,1)).toISOString().slice(0,7),priorStart=previous+'-01',priorEnd=previous+'-'+String(valid).padStart(2,'0');

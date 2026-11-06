@@ -36,10 +36,11 @@ test('real XLSX parser → actual doPost/original admin guard → private readba
   expect(s.calls.every(c=>c.method==='POST'&&c.headers['content-type'].startsWith('text/plain'))).toBe(true);
   expect(await page.evaluate(()=>Object.values(localStorage).concat(Object.values(sessionStorage)).some(v=>v.includes('synthetic-admin-proof')))).toBe(false);
 });
-test('November fixed-width source publishes only real store-days and reads back the correct cutoff',async({page})=>{
-  const s=await setup(page);await preview(page,{month:'2026-11',fixed31:true});await expect(page.locator('#conversionPreviewText')).toContainText('2026-11-01 至 2026-11-03');
+test('November fixed-width source with a blank zero-visitor RT rate publishes and reads back the cutoff',async({page})=>{
+  const s=await setup(page);await preview(page,{month:'2026-11',fixed31:true,blankRtTotal:true});await expect(page.locator('#conversionPreviewText')).toContainText('2026-11-01 至 2026-11-03');
   const sent=s.calls.find(c=>c.name==='readonly_conversion_preview').payload.snapshot;
   expect(sent.records).toHaveLength(27);expect(sent.records.every(r=>r.date<='2026-11-03')).toBe(true);
+  const firstStore=sent.records.filter(r=>r.store==='DNB10062');expect(firstStore).toHaveLength(3);expect(firstStore.every(r=>r.rt_n===0&&r.rt_d===0)).toBe(true);
   await page.locator('#conversionConfirm').check();await page.locator('#conversionPublishBtn').click();await expect(page.locator('#conversionLive')).toContainText('正式截止 2026-11-03');
   await expect(page.locator('#conversionMessage')).toContainText('已完成私有版本讀回');expect(s.errors).toEqual([]);
 });

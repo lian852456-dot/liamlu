@@ -1,6 +1,6 @@
 'use strict';
 const C=require('../../readonly-dashboard-core.js'),XLSX=require('../../assets/vendor/xlsx.full.min.js');
-function workbook({days=3,bad=false,month='2026-10',rateGap=11,priorGap=67,fixed31=false}={}){
+function workbook({days=3,bad=false,month='2026-10',rateGap=11,priorGap=67,fixed31=false,blankRtTotal=false}={}){
   const sheets=Object.fromEntries(['AQ締結率','RT每日','RT締結率','樞紐'].map(n=>[n,[[],[]]]));
   const [year,m]=month.split('-').map(Number),length=new Date(Date.UTC(year,m,0)).getUTCDate(),slots=fixed31?31:length,offsets=Array.from({length:4},(_,i)=>5+i*(slots+1)),[anCol,adCol,arCol,tsdCol]=offsets,rrCol=tsdCol+slots+1+rateGap,priorCol=arCol+slots+1+priorGap;
   const aq=sheets['AQ締結率'],rt=sheets['RT每日'],total=sheets['RT締結率'];
@@ -16,9 +16,11 @@ function workbook({days=3,bad=false,month='2026-10',rateGap=11,priorGap=67,fixed
   for(let j=0;j<slots;j++){const d=serial(month+'-'+String(j+1).padStart(2,'0'));for(const o of [...offsets,rrCol])rt[1][o+j]=d;for(const o of offsets.slice(0,3))aq[1][o+j]=d;}
   for(const [i,s] of C.STORES.entries()){
     const a=[],r=[],t=[];for(const row of [a,r,t]){row[2]='北一二B';row[3]=s.id;row[4]=s.name;}
+    const noRt=blankRtTotal&&i===0;
     let an=0,ad=0,tn=0,td=0,sn=0,sd=0;
     for(let j=0;j<length;j++){
-      const n=j<days?j+1:0,d=j<days?10+i:0,tw=j<days?j:0,twD=j<days?20+i:0,ts=j<days?1:0,tsD=j<days?2:0;
+      const n=j<days?j+1:0,d=j<days?10+i:0,hasRt=j<days&&!noRt;
+      const tw=hasRt?j:0,twD=hasRt?20+i:0,ts=hasRt?1:0,tsD=hasRt?2:0;
       a[anCol+j]=n;a[adCol+j]=d;a[arCol+j]=d?n/d:0;
       r[anCol+j]=tw;r[adCol+j]=twD;r[arCol+j]=ts;r[tsdCol+j]=tsD;r[rrCol+j]=twD+tsD?(tw+ts)/(twD+tsD):0;
       an+=n;ad+=d;tn+=tw;td+=twD;sn+=ts;sd+=tsD;
@@ -26,7 +28,7 @@ function workbook({days=3,bad=false,month='2026-10',rateGap=11,priorGap=67,fixed
     if(fixed31&&length<slots){a[anCol+length]=0;r[tsdCol+length]='0';}
     a[anCol+slots]=an;a[adCol+slots]=ad;a[priorCol]=2;a[priorCol+1]=10;
     r[anCol+slots]=tn;r[adCol+slots]=td;r[arCol+slots]=sn;r[tsdCol+slots]=sd;
-    t[5]=tn;t[6]=td;t[10]=sn;t[11]=sd;t[15]=tn+sn;t[16]=td+sd;t[17]=(tn+sn)/(td+sd);t[31]=3;t[32]=20;
+    t[5]=tn;t[6]=td;t[10]=sn;t[11]=sd;t[15]=tn+sn;t[16]=td+sd;t[17]=noRt?null:(tn+sn)/(td+sd);t[31]=3;t[32]=20;
     aq.push(a);rt.push(r);total.push(t);
   }
   const previous=new Date(Date.UTC(year,m-2,1)).getUTCMonth()+1;

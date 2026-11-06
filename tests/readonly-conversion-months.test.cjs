@@ -54,6 +54,19 @@ for(const kind of ['duplicate heading','missing rate heading','wrong day','missi
  if(kind==='post-cutoff count')a[cell(2,l.aq.n+3)].v=1;
  for(const C of [Source,Officer])assert.throws(()=>C.parseWorkbook(w,X,opts),/欄位|日期|RT每日率|截止/);
 });
+test('November accepts a blank RT total rate only when both verified RT counts are zero',()=>{
+ const optsNovember={month:'2026-11',fixed31:true},w=make({...optsNovember,blankRtTotal:true}),rt=w.Sheets['RT締結率'];
+ for(const parser of [Source,Officer]){
+  const snapshot=parser.parseWorkbook(w,X,opts),total=Core.aggregate(snapshot.records.filter(r=>r.store===Core.STORES[0].id));
+  assert.equal(total.rt_n,0);assert.equal(total.rt_d,0);assert.equal(total.rt_rate,null);
+ }
+ rt.R3={t:'s',v:''};assert.equal(Source.parseWorkbook(w,X,opts).records.length,27);
+ rt.R3={t:'n',v:.5};assert.throws(()=>Source.parseWorkbook(w,X,opts),/RT總率.*酒泉 RT締結率!R3.*逐日 0\/0/);
+ const nonzero=make(optsNovember),summary=nonzero.Sheets['RT締結率'];delete summary.R3;
+ for(const parser of [Source,Officer])assert.throws(()=>parser.parseWorkbook(nonzero,X,opts),/RT總率.*酒泉 RT締結率!R3.*總表 空白.*逐日 6\/66/);
+ summary.R3={t:'n',v:.75};assert.throws(()=>Source.parseWorkbook(nonzero,X,opts),/總表 75\.000000%.*逐日 6\/66/);
+ delete rt.R3;delete rt.Q3;assert.throws(()=>Source.parseWorkbook(w,X,opts),/RT分母/);
+});
 test('parsed November source previews, publishes, reads back, reimports and rolls back through existing private component',()=>{
  const b=runtime(),old=Source.parseWorkbook(make(),X,{...opts,sha256:'a'.repeat(64)}),next=Source.parseWorkbook(make({month:'2026-11',fixed31:true}),X,opts);
  const publish=s=>{const p=b.call('Preview',{snapshot:s});return b.call('Publish',{previewToken:p.token,confirm:true});};

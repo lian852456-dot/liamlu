@@ -54,6 +54,12 @@
   function diff(before,after){const current=validateConversion(after),old=before?validateConversion(before):null;if(old&&(old.period_start!==current.period_start||current.cutoff<old.cutoff))fail('新月份請另建版本；截止不得倒退');const a=new Map((old?.records||[]).map(r=>[r.date+'|'+r.store,r])),b=new Map(current.records.map(r=>[r.date+'|'+r.store,r]));const changed=[];for(const [key,r]of b)if(a.has(key)&&FIELDS.some(k=>a.get(key)[k]!==r[k]))changed.push({store:r.store,date:r.date,before:a.get(key),after:r});return {same_source:old?.sha256===current.sha256,added:[...b.keys()].filter(k=>!a.has(k)).length,removed:[...a.keys()].filter(k=>!b.has(k)).length,changed:changed.length,changes:changed,unique_keys:b.size};}
   function workbookRows(workbook,XLSX,name){if(!workbook.Sheets[name])fail('缺少必要工作表：'+name);return XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,raw:true,defval:null,blankrows:true});}
   function equal(value,expected,label){if(typeof value!=='number'||!Number.isFinite(value)||Math.abs(value-expected)>Math.max(1e-8,Math.abs(expected)*1e-8))fail(label+' 與逐日加總不一致');}
+  function verifyRtTotalRate(value,total,location){
+    const blank=value==null||value==='';
+    if(blank&&total.rt_n===0&&total.rt_d===0)return;
+    const source=blank?'空白':Number.isFinite(value)?(value*100).toFixed(6)+'%':'非數字';
+    equal(value,total.rt_rate??0,`RT總率（${location}，總表 ${source}，逐日 ${total.rt_n}/${total.rt_d}）`);
+  }
   // Resolve monthly columns from their headings; every daily block must cover
   // the actual calendar month. Short-month templates may retain all 31 slots.
   function header(rows,label){const columns=[];(rows[0]||[]).forEach((v,i)=>{if(norm(v)===label)columns.push(i);});if(columns.length!==1)fail('來源欄位缺少或重複：'+label);return columns[0];}
@@ -109,8 +115,9 @@
     const ag=groups(aq,'AQ締結率'),rg=groups(rt,'RT每日'),tg=groups(totals,'RT締結率'),valid=Number(cutoff.slice(-2)),records=[],prior=[];
     for(const s of STORES){const a=ag.get(s.id),r=rg.get(s.id),t=tg.get(s.id),current=[];
       for(let j=0;j<days;j++){const row={store:s.id,date:dates[j],aq_n:count(a[A.n+j],'AQ上線'),aq_d:count(a[A.d+j],'AQ來客'),rt_n:count(r[R.twN+j],'原TWM上線')+count(r[R.tsN+j],'原TST上線'),rt_d:count(r[R.twD+j],'原TWM來客')+count(r[R.tsD+j],'原TST來客')};if(j>=valid){if(FIELDS.some(k=>row[k]!==0))fail('截止以後有非零實績，來源口徑衝突');continue;}equal(a[A.rate+j],ratio(row.aq_n,row.aq_d)||0,'AQ每日率');equal(r[R.rate+j],ratio(row.rt_n,row.rt_d)||0,'RT每日率');current.push(row);records.push(row);}
-      const total=aggregate(current);for(const [value,expected,label]of [[a[A.total.n],total.aq_n,'AQ分子TTL'],[a[A.total.d],total.aq_d,'AQ分母TTL'],[t[T.n],total.rt_n,'RT分子'],[t[T.d],total.rt_d,'RT分母'],[t[T.rate],total.rt_rate||0,'RT總率']])equal(value,expected,label);
+      const total=aggregate(current);for(const [value,expected,label]of [[a[A.total.n],total.aq_n,'AQ分子TTL'],[a[A.total.d],total.aq_d,'AQ分母TTL'],[t[T.n],total.rt_n,'RT分子'],[t[T.d],total.rt_d,'RT分母']])equal(value,expected,label);
       for(const key of ['twN','twD','tsN','tsD'])equal(r[R.total[key]],t[T[key]],'RT每日與總表');
+      verifyRtTotalRate(t[T.rate],total,`${s.short} RT締結率!${XLSX.utils.encode_cell({r:totals.indexOf(t),c:T.rate})}`);
       prior.push({store:s.id,aq_n:count(a[A.priorN],'同期AQ上線'),aq_d:count(a[A.priorD],'同期AQ來客'),rt_n:count(t[T.priorN],'同期RT上線'),rt_d:count(t[T.priorD],'同期RT來客')});
     }
     const previous=new Date(Date.UTC(year,month-2,1)).toISOString().slice(0,7),priorStart=previous+'-01',priorEnd=previous+'-'+String(valid).padStart(2,'0');
@@ -118,5 +125,5 @@
     return validateConversion({schema:SCHEMA,period_start:begin,cutoff,sha256,source_name,source_bytes,records,prior,prior_period:{start:priorStart,end:priorEnd}});
   }
   function storeId(value){const n=norm(value);return STORES.find(s=>[s.id,s.short,s.name,'台北'+s.short,'台灣大哥大台北'+s.short].map(norm).includes(n))?.id||null;}
-  return Object.freeze({SCHEMA,STORES,FIELDS,aggregate,ratio,dedupe,validateConversion,dailySeries,weeklySeries,diff,parseWorkbook,storeId,aqLayout,workbookLayout});
+  return Object.freeze({SCHEMA,STORES,FIELDS,aggregate,ratio,dedupe,validateConversion,dailySeries,weeklySeries,diff,parseWorkbook,storeId,aqLayout,workbookLayout,verifyRtTotalRate});
 });
