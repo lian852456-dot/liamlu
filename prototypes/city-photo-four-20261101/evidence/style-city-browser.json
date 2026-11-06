@@ -1,0 +1,28 @@
+{
+  "cases": [
+    {
+      "key": "p3",
+      "walk": true,
+      "turn": true,
+      "photo": {
+        "size": 909418,
+        "type": "image/png"
+      },
+      "errors": []
+    },
+    {
+      "key": "p5",
+      "walk": true,
+      "turn": true,
+      "photo": {
+        "size": 907361,
+        "type": "image/png"
+      },
+      "errors": []
+    }
+  ],
+  "previewOnly": true,
+  "originalWrites": 0,
+  "physicalIphoneUat": false,
+  "pass": true
+}

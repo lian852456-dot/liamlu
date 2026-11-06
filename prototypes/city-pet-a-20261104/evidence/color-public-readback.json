@@ -1,0 +1,131 @@
+{
+  "at": "2026-11-04T13:41:47.470Z",
+  "origin": "https://february-missouri-palm-dis.trycloudflare.com",
+  "pass": true,
+  "files": [
+    {
+      "file": "public/index.html",
+      "status": 200,
+      "sha256": "42277f6e9a5ba97ad28e5fd40a94ba473c990a6c3955105991393a951e4cf1fd",
+      "match": true
+    },
+    {
+      "file": "public/nav.js",
+      "status": 200,
+      "sha256": "6e3a52bd548f8a31916eeaf9cdc4d36c4d40ad60c5a8acab15f1c87bba018f23",
+      "match": true
+    },
+    {
+      "file": "public/pet-a.js",
+      "status": 200,
+      "sha256": "4186cb3c8a4cda11248480a432e647086eafe401a235ab5e6e21d83744ee748e",
+      "match": true
+    },
+    {
+      "file": "public/pet-companion.js",
+      "status": 200,
+      "sha256": "2072a0da5bc57551d100225db52b53130b1b2385c7d83cf418ca2efc0f601ecd",
+      "match": true
+    },
+    {
+      "file": "public/preview.css",
+      "status": 200,
+      "sha256": "a7abece47032a7e2a64a8264c715e3559e3d37cc0ac74317c88c4ffba6bf1930",
+      "match": true
+    },
+    {
+      "file": "public/preview.js",
+      "status": 200,
+      "sha256": "22834fc3fb9c2dbc10b442f8c06cf3c9bd74e3ffcf5ba8a29c83819a5967a319",
+      "match": true
+    },
+    {
+      "file": "public/vendor/three.js",
+      "status": 200,
+      "sha256": "0789bb7a097cfbf8eeab776e3ddcb0b428b0d30913784a40890dd6c8145b37ee",
+      "match": true
+    }
+  ],
+  "products": {
+    "scope": "isolated-candidate-only",
+    "currency": "game-coins",
+    "priceStatus": "CONFIRMED",
+    "purchaseEnabled": false,
+    "upgradePolicy": "PENDING_USER_DECISION",
+    "legacyItemsUnchanged": [
+      "pet-cat",
+      "pet-dog"
+    ],
+    "products": [
+      {
+        "id": "pet-cat-a-v1",
+        "name": "A 款小貓",
+        "category": "pet",
+        "kind": "cat",
+        "coins": 60,
+        "gold": 0,
+        "variants": [
+          {
+            "id": "orange-white",
+            "name": "橘白"
+          },
+          {
+            "id": "tabby",
+            "name": "虎斑"
+          },
+          {
+            "id": "black-white",
+            "name": "黑白"
+          },
+          {
+            "id": "gray-white",
+            "name": "灰白"
+          }
+        ]
+      },
+      {
+        "id": "pet-dog-a-v1",
+        "name": "A 款小狗",
+        "category": "pet",
+        "kind": "dog",
+        "coins": 75,
+        "gold": 0,
+        "variants": [
+          {
+            "id": "cream",
+            "name": "奶油"
+          },
+          {
+            "id": "brown-white",
+            "name": "棕白"
+          },
+          {
+            "id": "black-white",
+            "name": "黑白"
+          },
+          {
+            "id": "dark-brown",
+            "name": "深棕"
+          }
+        ]
+      }
+    ],
+    "formalGoldEnabled": false,
+    "autoChargeExistingOwners": false
+  },
+  "privateRoutes": [
+    {
+      "path": "/.private-qa/",
+      "status": 404
+    },
+    {
+      "path": "/candidate-store.mjs",
+      "status": 404
+    },
+    {
+      "path": "/pricing.mjs",
+      "status": 404
+    }
+  ],
+  "physicalIphoneUat": false
+}

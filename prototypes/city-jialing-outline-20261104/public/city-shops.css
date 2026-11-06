@@ -1,0 +1,49 @@
+.city-shops {
+  position: fixed;
+  z-index: 80;
+  inset: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  max-width: 38rem;
+  margin: auto;
+  color: #27352f;
+  background: rgba(250, 249, 239, .98);
+  border: 1px solid rgba(56, 76, 63, .22);
+  border-radius: 18px;
+  box-shadow: 0 18px 45px rgba(24, 39, 30, .25);
+  overflow: hidden;
+  font: 500 15px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Noto Sans TC", sans-serif;
+}
+
+.city-shops[hidden] { display: none; }
+.city-shops__topbar, .city-shops__section-head { display: flex; align-items: center; gap: .65rem; }
+.city-shops__topbar { justify-content: space-between; padding: .75rem 1rem .45rem; }
+.city-shops h2, .city-shops h3 { margin: 0; font-size: 1.1rem; }
+.city-shops__close { min-width: 4.2rem; }
+.city-shops__tabs { display: flex; gap: .45rem; padding: .3rem .75rem .65rem; overflow-x: auto; overscroll-behavior-x: contain; }
+.city-shops__tabs button { flex: 0 0 auto; }
+.city-shops button { min-height: 44px; min-width: 44px; padding: .5rem .75rem; border: 1px solid rgba(56, 76, 63, .25); border-radius: 10px; color: inherit; background: #fff; font: inherit; cursor: pointer; }
+.city-shops button:focus-visible { outline: 3px solid #d89749; outline-offset: 2px; }
+.city-shops button:disabled { cursor: not-allowed; opacity: .55; }
+.city-shops__body { min-height: 0; max-height: min(70dvh, 34rem); overflow: auto; padding: .2rem .85rem .8rem; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.city-shops__section-head { justify-content: space-between; position: sticky; top: 0; z-index: 1; padding: .35rem 0 .55rem; background: rgba(250, 249, 239, .98); }
+.city-shops__pet-status, .city-shops__status, .city-shops__empty { color: #5d6d62; font-size: .87rem; }
+.city-shops__item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .2rem .55rem; align-items: center; margin: .48rem 0; padding: .65rem .7rem; border: 1px solid rgba(56, 76, 63, .14); border-radius: 12px; background: rgba(255, 255, 255, .8); }
+.city-shops__item > strong, .city-shops__item > small, .city-shops__description { grid-column: 1; }
+.city-shops__item > small, .city-shops__description { color: #66756b; }
+.city-shops__item-actions { grid-column: 2; grid-row: 1 / span 3; display: flex; align-items: center; justify-content: flex-end; gap: .4rem; min-width: 9rem; }
+.city-shops__item-actions > span { text-align: right; color: #68776d; font-size: .82rem; }
+.city-shops__notice { max-width: 12rem; color: #8a5e24 !important; }
+.city-shops__status { min-height: 1.25rem; margin: 0; padding: .4rem .9rem .7rem; }
+
+@media (max-width: 560px) {
+  .city-shops { inset: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); border-radius: 14px; }
+  .city-shops__body { max-height: calc(100dvh - 12rem); padding-inline: .65rem; }
+  .city-shops__item { grid-template-columns: 1fr; }
+  .city-shops__item-actions { grid-column: 1; grid-row: auto; justify-content: flex-start; min-width: 0; margin-top: .35rem; }
+  .city-shops__notice { max-width: none; }
+}
+
+@media (orientation: landscape) and (max-width: 760px) {
+  .city-shops__body { max-height: calc(100dvh - 8.5rem); }
+}

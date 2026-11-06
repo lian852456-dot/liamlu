@@ -1,0 +1,1 @@
+(function(){'use strict';const a=document.createElement('a');a.className='preview-return';a.href='/';a.textContent='← 選擇照片／3D 預覽';document.body.append(a);const p=document.querySelector('#save-status');if(p)p.textContent='獨立照片人偶試作，測試進度與共用城市分開。';})();

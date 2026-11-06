@@ -1,0 +1,17 @@
+{
+  "pass": true,
+  "origin": "https://twisted-fridge-quote-numerous.trycloudflare.com",
+  "release": "20261104-jialing-outline.1",
+  "focusedAssets": [
+    "index.html",
+    "preview.js",
+    "jialing-outline.js",
+    "jialing-head-sample.js",
+    "avatar-q2.js",
+    "head-q2.js",
+    "assets/portrait-hair/p3.glb",
+    "assets/portrait-hair-q2/p3.glb"
+  ],
+  "originalWorldsOpened": false,
+  "physicalIphoneUat": false
+}
