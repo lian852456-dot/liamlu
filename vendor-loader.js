@@ -41,54 +41,26 @@
     return pending[name];
   }
 
-  // Start downloads early (e.g. on pointerdown) without waiting or throwing.
+  // Start downloads early without waiting or throwing.
   function warm(...names) {
     names.forEach(name => { load(name).catch(() => {}); });
   }
 
-  // XLSX.read in a Web Worker. Same library, same options, same workbook
-  // (structured clone); only the thread changes. Falls back to the main
-  // thread when workers are unavailable (file://, old browsers) or the
-  // worker itself fails to start, so behaviour never depends on it.
-  const WORKER_SRC = 'xlsx-read-worker.js?v=20261108-1';
-  let workerSeq = 0;
-  async function readOnMainThread(data, options) {
-    await load('xlsx');
-    return root.XLSX.read(data, options);
-  }
-  function readWorkbook(data, options) {
-    if (typeof root.Worker !== 'function' || root.location.protocol === 'file:') {
-      return readOnMainThread(data, options);
-    }
-    let worker;
-    try { worker = new root.Worker(WORKER_SRC); } catch (_) { return readOnMainThread(data, options); }
-    const id = ++workerSeq;
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      const finish = () => { settled = true; worker.terminate(); };
-      worker.onmessage = event => {
-        const reply = event.data || {};
-        if (reply.id !== id || settled) return;
-        finish();
-        if (reply.ok) resolve(reply.workbook);
-        else reject(new Error(reply.message));
-      };
-      // A worker that cannot start (blocked script, CSP, offline without a
-      // cached copy) must not leave the upload hanging.
-      worker.onerror = event => {
-        if (settled) return;
-        if (event && typeof event.preventDefault === 'function') event.preventDefault();
-        finish();
-        readOnMainThread(data, options).then(resolve, reject);
-      };
-      worker.postMessage({ id, data, options: options || {} });
-    });
+  // Pages list what their uploads need: <script src="vendor-loader.js"
+  // data-warm="xlsx officecrypto">. Opening any file picker starts those
+  // downloads, so they finish while the user is still choosing a file.
+  const script = document.currentScript;
+  const warmOnPick = String((script && script.dataset.warm) || '').split(/\s+/).filter(name => LIBS[name]);
+  if (warmOnPick.length) {
+    document.addEventListener('click', event => {
+      const target = event.target;
+      if (target && target.matches && target.matches('input[type="file"]')) warm(...warmOnPick);
+    }, true);
   }
 
   root.VendorLoader = {
     ensure: (...names) => Promise.all(names.map(load)).then(() => undefined),
     warm,
-    readWorkbook,
     isReady: name => !!(LIBS[name] && LIBS[name].ready()),
   };
 })(window);

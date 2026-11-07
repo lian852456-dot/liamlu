@@ -67,7 +67,7 @@ test('the controller is no longer rewritten at runtime', () => {
 
 test('files the pages load on demand are precached for offline use', () => {
   const source = fs.readFileSync(require.resolve('../service-worker.js'), 'utf8');
-  for (const file of ['vendor-loader.js', 'xlsx-read-worker.js', 'assets/vendor/xlsx.full.min.js']) {
+  for (const file of ['vendor-loader.js', 'assets/vendor/xlsx.full.min.js']) {
     assert.match(source, new RegExp(`'\\./${file.replace(/[.]/g, '\\.')}'`), file);
     assert.ok(fs.existsSync(require.resolve('../' + file)), file);
   }

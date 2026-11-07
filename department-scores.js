@@ -198,7 +198,7 @@
     try{
       if(!/\.xlsx$/i.test(file.name)||file.size>10*1024*1024)throw new Error('請選擇10 MB以內的原格式 XLSX');
       await window.VendorLoader?.ensure('xlsx');
-      const bytes=await file.arrayBuffer(),sourceHash=await digest(bytes),workbook=await (window.VendorLoader?window.VendorLoader.readWorkbook:(d,o)=>Promise.resolve(XLSX.read(d,o)))(bytes,{type:'array',cellHTML:false,cellFormula:true});
+      const bytes=await file.arrayBuffer(),sourceHash=await digest(bytes),workbook=XLSX.read(bytes,{type:'array',cellHTML:false,cellFormula:true});
       if(epoch!==readEpoch||sessionStorage.getItem(KEY)!==token||$('workspace').hidden)return;
       const parsed=C.parseWorkbook(workbook,{year:$('scoreYear').value.trim()});
       pending={...parsed,sourceHash,sourceName:file.name,expectedGeneration:snapshot.generation,requestId:crypto.randomUUID()};

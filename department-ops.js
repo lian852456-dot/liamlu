@@ -207,7 +207,7 @@
         if (!password) throw new Error('請輸入 Excel 開啟密碼。');
         bytes = arrayBufferFrom(await window.OfficeCrypto.decrypt(bytes, { password }));
       }
-      return await (window.VendorLoader?window.VendorLoader.readWorkbook:(d,o)=>Promise.resolve(XLSX.read(d,o)))(bytes, { type: 'array', cellHTML: false, cellDates: true });
+      return XLSX.read(bytes, { type: 'array', cellHTML: false, cellDates: true });
     } catch (error) {
       if (/password|密碼|incorrect/i.test(String(error?.message || error))) throw new Error('Excel 密碼不正確，請重新輸入。');
       throw error;

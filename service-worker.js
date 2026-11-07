@@ -29,7 +29,6 @@ const SHELL = [
   './phone-stock-app.js',
   './phone-stock-core.js',
   './vendor-loader.js',
-  './xlsx-read-worker.js',
   './assets/vendor/xlsx.full.min.js',
   './app-data-contract.js',
   './app-preview-data.js',

@@ -31,7 +31,7 @@ test('stock CSV import loads SheetJS on demand and keeps the same result', async
   const result = await importAndRead(page, { name: 'stock.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
   expect(result.message).toBe('已匯入 3 筆庫存；資料保存在此裝置。');
   expect(result.total).toBe('符合條件 10 台');
-  expect(result.items).toBe(2);
+  expect(result.items).toBe(3);
   expect(await page.evaluate(() => typeof window.XLSX)).toBe('object');
 });
 

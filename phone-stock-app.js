@@ -36,8 +36,8 @@
         const utf8 = new TextDecoder('utf-8').decode(buffer);
         let content = utf8;
         try { const big5 = new TextDecoder('big5').decode(buffer); if ((big5.match(/店點|門市|庫存|品名/g)||[]).length > (utf8.match(/店點|門市|庫存|品名/g)||[]).length) content = big5; } catch (_) { /* UTF-8 remains available. */ }
-        workbook = await (window.VendorLoader?window.VendorLoader.readWorkbook:(d,o)=>Promise.resolve(XLSX.read(d,o)))(content, {type:'string',cellHTML:false,cellDates:true,FS:/\.tsv$/i.test(file.name)?'\t':','});
-      } else workbook = await (window.VendorLoader?window.VendorLoader.readWorkbook:(d,o)=>Promise.resolve(XLSX.read(d,o)))(buffer, {type:'array',cellHTML:false,cellDates:true});
+        workbook = window.XLSX.read(content, {type:'string',cellHTML:false,cellDates:true,FS:/\.tsv$/i.test(file.name)?'\t':','});
+      } else workbook = window.XLSX.read(buffer, {type:'array',cellHTML:false,cellDates:true});
       const selected = Core.chooseBestSheet(workbook.SheetNames.map(name => ({name,rows:window.XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,raw:true,defval:'',blankrows:false})})), 'stock', '');
       if (!selected) throw new Error('找不到店點、機型及庫存數，請確認庫存檔欄位。');
       const dated = selected.parsed.rows.filter(row => row.date).map(row => row.date).sort();

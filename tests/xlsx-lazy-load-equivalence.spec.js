@@ -1,6 +1,6 @@
-// Guards the performance change that moved XLSX.read into a Web Worker and
-// added cellHTML:false: the workbook every parser receives must be identical
-// to the old main-thread XLSX.read result, cell by cell.
+// Guards the performance changes to spreadsheet uploads: SheetJS now loads on
+// demand, and the upload reads add cellHTML:false. The workbook every parser
+// receives must be identical to the old XLSX.read result, cell by cell.
 const { test, expect } = require('@playwright/test');
 
 const BASE = 'http://127.0.0.1:8875/';
@@ -8,11 +8,6 @@ const BASE = 'http://127.0.0.1:8875/';
 async function setup(page) {
   await page.goto(BASE + 'offline.html');
   await page.addScriptTag({ url: '/vendor-loader.js' });
-  await page.evaluate(() => {
-    window.__workers = 0;
-    const Native = window.Worker;
-    window.Worker = function (...args) { window.__workers += 1; return new Native(...args); };
-  });
   await page.evaluate(() => window.VendorLoader.ensure('xlsx'));
 }
 
@@ -79,56 +74,38 @@ const CASES = [
 ];
 
 for (const [label, options] of CASES) {
-  test(`worker read equals main-thread read: ${label}`, async ({ page }) => {
+  test(`cellHTML:false read equals the original read: ${label}`, async ({ page }) => {
     await setup(page);
-    const result = await page.evaluate(async ({ build, compare, options }) => {
+    const result = await page.evaluate(({ build, compare, options }) => {
       const bytes = new Function(`return (${build})`)()();
       const before = window.XLSX.read(bytes, options);
-      const after = await window.VendorLoader.readWorkbook(bytes, { ...options, cellHTML: false });
-      return { problems: new Function(`return (${compare})`)()(before, after), workers: window.__workers, cells: Object.keys(before.Sheets[before.SheetNames[0]]).length };
+      const after = window.XLSX.read(bytes, { ...options, cellHTML: false });
+      return { problems: new Function(`return (${compare})`)()(before, after), cells: Object.keys(before.Sheets[before.SheetNames[0]]).length };
     }, { build: buildWorkbookBytes.toString(), compare: compareWorkbooks.toString(), options });
-    expect(result.workers).toBe(1);
     expect(result.cells).toBeGreaterThan(2000);
     expect(result.problems).toEqual([]);
   });
 }
 
-test('worker read equals main-thread read for CSV text (phone stock)', async ({ page }) => {
+test('cellHTML:false read equals the original read for CSV text (phone stock)', async ({ page }) => {
   await setup(page);
-  const problems = await page.evaluate(async compare => {
+  const problems = await page.evaluate(compare => {
     const csv = '店點,機型,庫存,日期\n通化,iPhone 17 Pro,3,2026/10/31\n萬大,"Galaxy S26, 512G",0,2026/11/01\n';
     const options = { type: 'string', cellDates: true, FS: ',' };
-    const before = window.XLSX.read(csv, options);
-    const after = await window.VendorLoader.readWorkbook(csv, { ...options, cellHTML: false });
-    return new Function(`return (${compare})`)()(before, after);
+    return new Function(`return (${compare})`)()(window.XLSX.read(csv, options), window.XLSX.read(csv, { ...options, cellHTML: false }));
   }, compareWorkbooks.toString());
   expect(problems).toEqual([]);
 });
 
-test('parse errors keep their original message through the worker', async ({ page }) => {
-  await setup(page);
-  const messages = await page.evaluate(async () => {
-    const bad = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4, 5]).buffer;
-    let main = '', worker = '';
-    try { window.XLSX.read(bad, { type: 'array' }); } catch (e) { main = e.message; }
-    try { await window.VendorLoader.readWorkbook(bad, { type: 'array' }); } catch (e) { worker = e.message; }
-    return { main, worker };
-  });
-  expect(messages.main).not.toBe('');
-  expect(messages.worker).toBe(messages.main);
-});
-
-test('falls back to the main thread when the worker script cannot load', async ({ page }) => {
-  await page.route('**/xlsx-read-worker.js*', route => route.abort());
-  await setup(page);
-  const ok = await page.evaluate(async () => {
-    const wb = window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet([['a', 1]]), 'S');
-    const bytes = window.XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
-    const read = await window.VendorLoader.readWorkbook(bytes, { type: 'array' });
-    return read.Sheets.S.B1.v === 1;
-  });
-  expect(ok).toBe(true);
+test('every upload read that skips cell HTML waits for SheetJS first', async () => {
+  const fs = require('fs'), path = require('path');
+  const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+  for (const [file, pattern] of [
+    ['phone-stock-app.js', /ensure\('xlsx'\);[\s\S]{0,800}XLSX\.read\(/],
+    ['department-ops.js', /ensure\('xlsx', 'officecrypto'\);[\s\S]{0,600}XLSX\.read\(/],
+    ['department-scores.js', /ensure\('xlsx'\);\s*const bytes=[^\n]*XLSX\.read\(/],
+    ['readonly-dashboard.js', /ensure\('xlsx'\);\s*const workbook=XLSX\.read\(/],
+  ]) expect(read(file), file).toMatch(pattern);
 });
 
 test('pages no longer load SheetJS or officecrypto before they are needed', async ({ page }) => {
@@ -141,4 +118,15 @@ test('pages no longer load SheetJS or officecrypto before they are needed', asyn
     expect(await page.evaluate(() => typeof window.VendorLoader?.ensure), path).toBe('function');
     page.removeAllListeners('request');
   }
+});
+
+test('opening a file picker starts the SheetJS download before a file is chosen', async ({ page }) => {
+  await page.route(u => !u.href.startsWith(BASE), r => r.abort());
+  await page.goto(BASE + 'app.html?preview=1', { waitUntil: 'load' });
+  const vendorRequest = page.waitForRequest(r => /xlsx\.full\.min\.js/.test(r.url()), { timeout: 5000 });
+  const chooser = page.waitForEvent('filechooser');
+  await page.evaluate(() => document.getElementById('stockFile').click());
+  await chooser;
+  await vendorRequest;
+  await expect.poll(() => page.evaluate(() => window.VendorLoader.isReady('xlsx'))).toBe(true);
 });

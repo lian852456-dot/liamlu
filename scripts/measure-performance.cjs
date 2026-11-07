@@ -27,6 +27,8 @@ const SLOW_4G = { offline: false, latency: 150, downloadThroughput: 1.6 * 1024 *
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg' };
 
+// Bytes the server actually sent (bodies only), incl. service-worker fetches.
+const served = { bytes: 0, full: 0, notModified: 0 };
 function serve() {
   return http.createServer((req, res) => {
     const file = path.join(repo, decodeURIComponent(new URL(req.url, ORIGIN).pathname));
@@ -36,10 +38,12 @@ function serve() {
       const type = TYPES[path.extname(file)] || 'application/octet-stream';
       const etag = '"' + crypto.createHash('md5').update(body).digest('hex') + '"';
       const headers = { 'Content-Type': type, 'Cache-Control': 'max-age=600', ETag: etag };
-      if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers); return res.end(); }
+      if (req.headers['if-none-match'] === etag) { served.notModified += 1; res.writeHead(304, headers); return res.end(); }
       const gzip = /text|javascript|json|svg|manifest/.test(type);
+      const payload = gzip ? zlib.gzipSync(body, { level: 6 }) : body;
+      served.bytes += payload.length; served.full += 1;
       res.writeHead(200, gzip ? { ...headers, 'Content-Encoding': 'gzip' } : headers);
-      res.end(gzip ? zlib.gzipSync(body, { level: 6 }) : body);
+      res.end(payload);
     });
   }).listen(PORT, '127.0.0.1');
 }
@@ -88,16 +92,18 @@ async function repeatVisits(page) {
     await tab.goto(ORIGIN + 'app.html?preview=1', { waitUntil: 'load' });
     await tab.evaluate(() => navigator.serviceWorker && navigator.serviceWorker.ready);
     await tab.waitForTimeout(1500);
-    const net = await throttle(context, tab, 1);
+    await tab.goto(ORIGIN + page, { waitUntil: 'load', timeout: 120000 });
+    await tab.waitForTimeout(800);
     const visits = [];
-    for (let i = 0; i < 2; i += 1) {
-      const start = net.bytes();
+    for (let i = 0; i < 3; i += 1) {
+      const start = { ...served };
       await tab.goto(ORIGIN + page, { waitUntil: 'load', timeout: 120000 });
       await tab.waitForTimeout(800);
-      visits.push(Math.round((net.bytes() - start) / 1024));
+      visits.push({ kb: (served.bytes - start.bytes) / 1024, full: served.full - start.full, notModified: served.notModified - start.notModified });
     }
     const controlled = await tab.evaluate(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller));
-    return { controlled, repeatTransferKB: median(visits) };
+    const mid = visits.slice().sort((a, b) => a.kb - b.kb)[1];
+    return { controlled, repeatTransferKB: Math.round(mid.kb), fullDownloads: mid.full, notModified: mid.notModified };
   } finally {
     await context.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -105,7 +111,7 @@ async function repeatVisits(page) {
 }
 
 // Main-thread blocking while a 40,000-row workbook is read, the way the
-// upload pages read it (old: XLSX.read on the page; new: VendorLoader).
+// upload pages read it (old: default options; new: cellHTML:false).
 async function parseFreeze(browser) {
   const context = await browser.newContext();
   const tab = await context.newPage();
@@ -120,22 +126,23 @@ async function parseFreeze(browser) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), '明細');
     window.__buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
   });
-  const cdp = await context.newCDPSession(tab);
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  // Desktop CPU speed; phones are roughly 3-4x slower than this.
   const result = await tab.evaluate(async useLoader => {
-    const tasks = [];
-    const observer = new PerformanceObserver(list => list.getEntries().forEach(e => tasks.push(e.duration)));
-    observer.observe({ type: 'longtask' });
+    // A 50 ms heartbeat: any gap far above 50 ms is time the page could not
+    // respond to taps or repaint.
+    let last = performance.now(), longest = 0, frozen = 0;
+    const timer = setInterval(() => { const now = performance.now(), gap = now - last; if (gap > 100) { longest = Math.max(longest, gap); frozen += gap; } last = now; }, 50);
+    await new Promise(r => setTimeout(r, 120));
     const t0 = performance.now();
-    if (useLoader) await window.VendorLoader.readWorkbook(window.__buf, { type: 'array', cellDates: true, cellHTML: false });
+    if (useLoader) XLSX.read(window.__buf, { type: 'array', cellDates: true, cellHTML: false });
     else XLSX.read(window.__buf, { type: 'array', cellDates: true });
     const total = performance.now() - t0;
-    await new Promise(r => setTimeout(r, 300));
-    observer.disconnect();
-    return { totalMs: Math.round(total), longestFreezeMs: Math.round(Math.max(0, ...tasks)), frozenMs: Math.round(tasks.reduce((a, b) => a + b, 0)) };
+    await new Promise(r => setTimeout(r, 200));
+    clearInterval(timer);
+    return { totalMs: Math.round(total), longestFreezeMs: Math.round(longest), frozenMs: Math.round(frozen) };
   }, hasLoader);
   await context.close();
-  return { mode: hasLoader ? 'worker' : 'main-thread', ...result };
+  return { mode: hasLoader ? 'cellHTML:false' : 'default', ...result };
 }
 
 (async () => {
