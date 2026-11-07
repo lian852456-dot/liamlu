@@ -11,3 +11,8 @@ data/phone-awards-latest.json
 data/schedule.js
 data/schedule.json
 private-config.js
+
+# Screenshots and evidence written by the Playwright suite on each run.
+artifacts/
+release-evidence/
+test-output/
