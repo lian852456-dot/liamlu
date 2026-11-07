@@ -1,0 +1,43 @@
+name: Generated files and GAS bundle sync
+# Reports when a committed GAS deployment bundle or embedded offline-export
+# asset no longer matches what its build script produces from the sources.
+# Runs on every push and pull request, including direct pushes to main.
+# It only reads; it never rebuilds the committed files or deploys GAS.
+on:
+  push:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: generated-sync-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Two files were already out of sync on main when this check was added
+    # (patrol-gas/DepartmentScoresCore.gs, department-readonly-assets.js).
+    # Keep this non-blocking until the owner has decided how to sync them,
+    # then delete the next line so drift fails the build.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Compare generated files with their sources
+        run: |
+          set -o pipefail
+          node scripts/check-generated-sync.mjs | tee sync-report.txt
+      - name: Publish report
+        if: always()
+        run: |
+          {
+            echo '### 產出檔同步檢查'
+            echo '```'
+            cat sync-report.txt 2>/dev/null || echo '檢查未產生報告'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
