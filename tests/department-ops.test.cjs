@@ -64,7 +64,11 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   const patrolBundle = fs.readFileSync(path.join(root, 'patrol-gas/PatrolCode.gs'), 'utf8');
   assert.match(home, /href="department-ops\.html"[\s\S]*北一二部｜部區管理/);
   assert.match(home, /href="gold-medal\.html"[\s\S]*北一二B 金牌明細/);
-  assert.match(page, /officecrypto\.bundle\.min\.js/);
+  // SheetJS and officecrypto now load on demand through vendor-loader.js,
+  // which every file read awaits before decrypting or parsing.
+  assert.match(page, /vendor-loader\.js/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'vendor-loader.js'), 'utf8'), /officecrypto\.bundle\.min\.js/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'department-ops.js'), 'utf8'), /ensure\('xlsx', 'officecrypto'\)/);
   assert.match(page, /department-ops-core\.js\?v=20260930-2/);
   assert.match(page, /session-read-manager\.js\?v=20261013-phase1-1/);
   assert.match(page, /department-ops\.js\?v=20261026-manual-view-3/);

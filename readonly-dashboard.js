@@ -182,7 +182,8 @@
     try{
       if(!/\.xlsx$/i.test(file.name)||file.size>40*1024*1024)throw Error('請選取40MB以內的完整 XLSX 原報。');
       const bytes=await file.arrayBuffer(),sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
-      const workbook=XLSX.read(bytes,{type:'array',sheets:['AQ締結率','RT每日','RT締結率','樞紐',...window.ReadonlyRenewalDetail.SHEETS]});
+      await window.VendorLoader?.ensure('xlsx');
+      const workbook=await (window.VendorLoader?window.VendorLoader.readWorkbook:(d,o)=>Promise.resolve(XLSX.read(d,o)))(bytes,{type:'array',cellHTML:false,sheets:['AQ締結率','RT每日','RT締結率','樞紐',...window.ReadonlyRenewalDetail.SHEETS]});
       const next=window.North12OfficerCore.parseWorkbook(workbook,XLSX,{sha256,source_name:file.name,source_bytes:file.size});
       if(ticket!==epoch||!retained())return;
       if(!window.North12OfficerCore.REGIONS.every(r=>next.stores.some(s=>s.region===r)))throw Error('完整原報須包含北一二部 A／B／C／D 四區。');
