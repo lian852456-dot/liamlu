@@ -4,7 +4,15 @@
 // from the current sources. It never writes to the working tree: every build
 // runs inside a temporary copy, and only the differences are reported.
 //
-//   node scripts/check-generated-sync.mjs          # exit 1 when anything drifted
+// Known differences the owner has acknowledged are listed, by exact content
+// hash, in scripts/generated-sync-baseline.json. The check fails when:
+//   - a build fails,
+//   - any file differs that is not in the baseline (new drift),
+//   - a baselined file differs in any other way than recorded (drift changed
+//     or grew: either the committed copy or the build output moved).
+// A baselined file that is now in sync passes with a note to drop the entry.
+//
+//   node scripts/check-generated-sync.mjs          # exit 1 on any blocking finding
 //   node scripts/check-generated-sync.mjs --json   # machine-readable report
 //
 // This does not and cannot tell what is deployed in Apps Script; it only
@@ -17,6 +25,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const BASELINE = path.join(root, 'scripts', 'generated-sync-baseline.json');
+const sha = buffer => crypto.createHash('sha256').update(buffer).digest('hex');
 
 // Deterministic builds that take no arguments, with what they generate.
 export const BUILDS = [
@@ -67,7 +77,8 @@ export function checkGeneratedSync() {
       const changed = [...after.keys()].filter(f => before.get(f) !== after.get(f));
       // Drift = a generated file differs from the committed/working-tree copy.
       const original = new Set(files);
-      const drift = changed.filter(f => !original.has(f) || crypto.createHash('sha256').update(fs.readFileSync(path.join(root, f))).digest('hex') !== after.get(f));
+      const drift = changed.filter(f => !original.has(f) || sha(fs.readFileSync(path.join(root, f))) !== after.get(f))
+        .map(f => ({ file: f, committedSha256: original.has(f) ? sha(fs.readFileSync(path.join(root, f))) : null, generatedSha256: after.get(f) }));
       results.push({ ...build, error, drift });
     }
     return results;
@@ -76,20 +87,46 @@ export function checkGeneratedSync() {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const results = checkGeneratedSync();
-  if (process.argv.includes('--json')) {
-    console.log(JSON.stringify(results, null, 2));
-  } else {
-    for (const r of results) {
-      const status = r.error ? `建置失敗：${r.error}` : r.drift.length ? `不同步 ${r.drift.length} 檔` : '同步';
-      console.log(`${r.drift.length || r.error ? '✗' : '✓'} ${r.purpose}（${r.script}）：${status}`);
-      for (const f of r.drift) console.log(`    - ${f}`);
+// Compares a check result with the acknowledged baseline.
+export function evaluate(results, baseline) {
+  const allowed = new Map((baseline.allowedDrift || []).map(entry => [entry.file, entry]));
+  const findings = [];
+  const seen = new Set();
+  for (const r of results) {
+    if (r.error) findings.push({ level: 'block', kind: 'build-failed', build: r.script, detail: r.error });
+    for (const d of r.drift) {
+      seen.add(d.file);
+      const entry = allowed.get(d.file);
+      if (!entry) findings.push({ level: 'block', kind: 'new-drift', build: r.script, file: d.file });
+      else if (entry.committedSha256 !== d.committedSha256 || entry.generatedSha256 !== d.generatedSha256) {
+        findings.push({ level: 'block', kind: 'drift-changed', build: r.script, file: d.file,
+          detail: entry.committedSha256 !== d.committedSha256 ? '提交版本與基準不同' : '建置輸出與基準不同' });
+      } else findings.push({ level: 'known', kind: 'known-drift', build: r.script, file: d.file, detail: entry.reason });
     }
   }
-  const bad = results.filter(r => r.error || r.drift.length);
-  if (bad.length && !process.argv.includes('--json')) {
-    console.log('\n不同步的檔案需由負責人確認後執行對應的 build 指令並提交；本檢查不會修改任何檔案，也不會部署 GAS。');
+  for (const entry of allowed.values()) {
+    if (!seen.has(entry.file)) findings.push({ level: 'note', kind: 'baseline-resolved', file: entry.file, detail: '已同步，可自基準移除' });
   }
-  process.exit(bad.length ? 1 : 0);
+  return { ok: !findings.some(f => f.level === 'block'), findings };
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const results = checkGeneratedSync();
+  const baseline = fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, 'utf8')) : { allowedDrift: [] };
+  const verdict = evaluate(results, baseline);
+  if (process.argv.includes('--json')) {
+    console.log(JSON.stringify({ ...verdict, results }, null, 2));
+  } else {
+    for (const r of results) {
+      const status = r.error ? `建置失敗：${r.error}` : r.drift.length ? `與提交版本不同 ${r.drift.length} 檔` : '同步';
+      console.log(`${r.drift.length || r.error ? '•' : '✓'} ${r.purpose}（${r.script}）：${status}`);
+    }
+    console.log('');
+    const label = { block: '✗ 阻擋', known: '△ 已知', note: 'ℹ 提醒' };
+    for (const f of verdict.findings) console.log(`${label[f.level]} ${f.kind} ${f.file || f.build}${f.detail ? '：' + f.detail : ''}`);
+    console.log(verdict.ok
+      ? `\n結果：通過（只有基準內已確認的 ${verdict.findings.filter(f => f.level === 'known').length} 項既有差異）。`
+      : '\n結果：阻擋。新增不同步、差異變動或建置失敗需由負責人確認後處理；本檢查不會修改任何檔案，也不會部署 GAS。');
+  }
+  process.exit(verdict.ok ? 0 : 1);
 }
