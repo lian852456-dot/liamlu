@@ -121,6 +121,9 @@
   // wait: an export started before a logout is refused by the page's own checks.
   // options.isCurrent(): when it returns false after the wait (logged out,
   // page locked, workspace gone), the task and its error handler are skipped.
+  // options.cooldownMs: keep the key busy (button disabled) this long after
+  // the task ran, so quick repeat taps once the library is ready do not
+  // export again; a deliberate second export after the pause still works.
   async function run(key, names, task, options = {}) {
     if (inflight[key]) return false;
     inflight[key] = true;
@@ -132,6 +135,7 @@
       await ensure(...names);
       if (!current()) return false;
       await task();
+      if (options.cooldownMs > 0) await new Promise(resolve => setTimeout(resolve, options.cooldownMs));
       return true;
     } catch (error) {
       if (!current()) return false;

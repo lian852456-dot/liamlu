@@ -195,3 +195,22 @@ test('run() skips the task and its error handler when the page context changed w
   expect(await page.evaluate(()=>window.__r)).toBe(false);
   expect(await page.evaluate(()=>window.__calls)).toEqual([]);
 });
+
+// iPhone acceptance 2026-11-08 found repeat taps exporting again once SheetJS
+// had loaded (fast network): the guard must also cover the moments after an export.
+for (const gap of [150, 400, 800]) {
+  for (const preloaded of [false, true]) {
+    test(`gold export: three taps ${gap} ms apart give one file (${preloaded ? 'SheetJS already loaded' : 'first export'})`, async ({ page }) => {
+      const state = await setup(page);
+      if (preloaded) await page.evaluate(() => window.VendorLoader.ensure('xlsx'));
+      let downloads = 0; page.on('download', () => { downloads += 1; });
+      for (let i = 0; i < 3; i += 1) { await page.click('#exportGold', { force: true, noWaitAfter: true }); await page.waitForTimeout(gap); }
+      await page.waitForTimeout(600);
+      expect(downloads).toBe(1);
+      await expect(page.locator('#exportGold')).toBeEnabled({ timeout: 6000 });
+      const next = page.waitForEvent('download'); await page.click('#exportGold'); await next; // a deliberate export after the pause still works
+      expect(downloads).toBe(2);
+      expect(state.errors).toEqual([]);
+    });
+  }
+}
