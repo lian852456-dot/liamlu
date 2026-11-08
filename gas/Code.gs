@@ -3673,6 +3673,50 @@ function privateDashboardSnapshot() {
   });
 }
 
+function privateDashboardAwardsForViewer_(snapshot, employeeId, store, supervisor) {
+  const awards = snapshot && snapshot.awardsBattle;
+  if (!awards) return snapshot;
+  const rows = awards.person_awards;
+  const personSource = (awards.source_files || {}).person || {};
+  const storeKey = function(name) {
+    return String(name || '').trim().replace(/\s+/g, '').replace(/^(?:台灣大哥大(?:數位生活)?)?台北/, '');
+  };
+  const viewer = {schema: 'north12b-awards-viewer/v1', mode: supervisor ? 'supervisor' : 'member',
+    store: storeKey(store), actual: null, projected: null};
+  // The private file is unchanged. The human response never contains raw rows
+  // or a viewer projection supplied by the published data.
+  delete awards.person_awards;
+  delete awards.viewer;
+  if (!employeeId) return snapshot;
+  awards.viewer = viewer;
+  if (!Array.isArray(rows) || !rows.length || rows.length > 1000 || !awards.data_as_of_date || !awards.processing_run_id ||
+      personSource.source_data_date !== awards.data_as_of_date || personSource.run_id !== awards.processing_run_id ||
+      !/^[a-f0-9]{64}$/.test(personSource.sha256 || '')) return snapshot;
+  const ids = new Set();
+  for (const row of rows) {
+    if (!row || typeof row.emp_id !== 'string' || !row.emp_id || ids.has(row.emp_id)) return snapshot;
+    ids.add(row.emp_id);
+  }
+  const self = rows.find(function(row) { return row.emp_id === employeeId && storeKey(row.store) === viewer.store; });
+  for (const [basis, key] of [['actual', 'actual_total'], ['projected', 'projected']]) {
+    if (rows.some(function(row) { return !Number.isFinite(row[key]); })) continue;
+    if (supervisor) {
+      const amount = Math.max.apply(null, rows.map(function(row) { return row[key]; }));
+      const leaders = rows.filter(function(row) { return row[key] === amount; });
+      viewer[basis] = {amount: amount, leaders: leaders.map(function(row) {
+        const name = String(row.name || '').trim();
+        return /^[^\s*＊○][*＊○]{1,3}[^\s*＊○]?$/.test(name) ? name : (Array.from(name)[0] || '') + '＊';
+      })};
+    } else if (self) {
+      const amount = self[key];
+      const ahead = rows.filter(function(row) { return row[key] > amount; });
+      viewer[basis] = {amount: amount, rank: ahead.length + 1,
+        gap: ahead.length ? Math.min.apply(null, ahead.map(function(row) { return row[key]; })) - amount : 0};
+    }
+  }
+  return snapshot;
+}
+
 function privateDashboardAccess(payload) {
   const __authArgs = Array.prototype.slice.call(arguments);
   return privateDashboardAuthRun_('privateDashboardAccess', __authArgs, function() {
@@ -3680,7 +3724,9 @@ function privateDashboardAccess(payload) {
   const employeeId = privateDashboardCleanEmployeeId(payload.employeeId);
   const deviceId = privateDashboardCleanDeviceId(payload.deviceId);
   const user = privateDashboardRecordLogin_(employeeId, deviceId);
-  const snapshot = privateDashboardSnapshot();
+  const snapshot = privateDashboardAwardsForViewer_(
+    privateDashboardSnapshot(), user.device_id === deviceId ? employeeId : '', user.store, false
+  );
   return { snapshot: snapshot, profile: { maskedName: user.masked_name, store: user.store, role: user.role } };
 
   });
@@ -9782,7 +9828,13 @@ function privateDashboardCreateGasB_(options) {
         if(p.action==='employee_phone_enroll')return enrollPhone(p,s,config);
         function readResult(kind) {
           let result;
-          if(kind==='private')result={snapshot:privateDashboardSnapshot()};
+          if(kind==='private') {
+            const trusted = privateDashboardIsTrustedEmployee(s.employee);
+            const user = trusted ? privateDashboardUserByEmployeeId(s.employee).user : null;
+            result={snapshot:privateDashboardAwardsForViewer_(
+              privateDashboardSnapshot(), s.employee, profile.store, !!user && user.status === 'active' && user.role === '督導'
+            )};
+          }
           else if(kind==='kpi') {
             const file=kpiCalcLatestDataFile();if(!file)throw new Error('B_DATA_UNAVAILABLE');
             const data=privateDashboardBMeasure_('kpiBlob', function() { return JSON.parse(file.getBlob().getDataAsString('UTF-8')); });
