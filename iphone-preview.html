@@ -33,7 +33,7 @@
 <main>
   <div class="banner">候選版預覽｜合成資料｜不連接正式服務、不寫入</div>
   <h1>PR #330 iPhone 驗收</h1>
-  <p class="meta">候選 commit <code>c4640c5</code>（分支 perf/phase2-batch1）＋ 本預覽頁。所有頁面以安全政策禁止連線到本站以外的網址；資料為合成資料，任何保存都會被拒絕。<br><span id="env"></span></p>
+  <p class="meta">候選 commit <code>8945802</code>（分支 perf/phase2-batch1）＋ 本預覽頁。所有頁面以安全政策禁止連線到本站以外的網址；資料為合成資料，任何保存都會被拒絕。<br><span id="env"></span></p>
 
   <section>
     <h2>開始前</h2>
@@ -59,8 +59,9 @@
   <section data-step="gold-again">
     <h2>2. 再次匯出</h2>
     <ol>
-      <li>回到部區管理預覽，再按一次「匯出目前結果 Excel」。</li>
-      <li>應立即下載（不再出現下載元件提示），檔案同樣可開啟。</li>
+      <li>回到部區管理預覽，等按鈕恢復可按（匯出後約 2.5 秒），再按一次「匯出目前結果 Excel」。</li>
+      <li>Safari 每次下載都會問「要下載…嗎？」，這是 Safari 的正常確認，不算失敗；按「下載」。</li>
+      <li>這次不應再出現畫面下方的「正在下載試算表元件…」提示；第二個檔案應可在「檔案」App 開啟。</li>
     </ol>
   </section>
 
@@ -69,7 +70,8 @@
     <ol>
       <li>關閉無痕分頁，<strong>另開一個新的無痕分頁</strong>開啟本頁，再開啟部區管理預覽。</li>
       <li>快速連按「匯出目前結果 Excel」3 次。</li>
-      <li>應只出現 1 次下載詢問；按鈕在下載元件期間為灰色。</li>
+      <li>Safari 的「要下載…嗎？」應<strong>只出現 1 次</strong>（出現 1 次是正常的）；按鈕會變灰約 2.5 秒。</li>
+      <li>如果出現 2 次以上，請在備註寫下出現幾次。</li>
     </ol>
   </section>
 
@@ -126,7 +128,7 @@
       [].forEach.call(section.querySelectorAll('.result button'),function(b){b.setAttribute('aria-pressed',String(b.dataset.v===r));});
     });
     var label={pass:'通過',fail:'失敗',skip:'未測'};
-    document.getElementById('summary').textContent=['PR #330 iPhone 驗收｜候選 c4640c5',navigator.userAgent].concat(steps.map(function(section){
+    document.getElementById('summary').textContent=['PR #330 iPhone 驗收｜候選 8945802',navigator.userAgent].concat(steps.map(function(section){
       var s=state[section.dataset.step]||{};return section.querySelector('h2').textContent+'：'+(label[s.result]||'待驗收')+(s.note?'｜'+s.note:'');
     })).join('\n');
   }
