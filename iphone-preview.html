@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'none'">
+<title>PR #330 iPhone 驗收</title>
+<style>
+  :root{--ink:#16181d;--muted:#5b616e;--line:#e3e1dc;--bg:#f7f5f0;--card:#fff;--ok:#1f7a4d;--bad:#b42318;--warn:#b45309}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 -apple-system,system-ui,"PingFang TC","Noto Sans TC",sans-serif}
+  main{max-width:720px;margin:0 auto;padding:16px 16px 48px}
+  .banner{background:var(--warn);color:#fff;font-weight:700;font-size:14px;text-align:center;padding:8px;border-radius:10px}
+  h1{font-size:22px;margin:16px 0 4px}
+  .meta{color:var(--muted);font-size:13px;margin:0 0 16px;word-break:break-all}
+  section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
+  h2{font-size:17px;margin:0 0 8px}
+  ol{padding-left:20px;margin:8px 0}
+  li{margin:4px 0}
+  a.button,button{display:inline-block;font:inherit;font-weight:600;border-radius:10px;padding:10px 14px;border:1px solid var(--ink);background:var(--ink);color:#fff;text-decoration:none;margin:4px 6px 4px 0}
+  button.ghost{background:#fff;color:var(--ink)}
+  .result{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+  .result button[data-v="pass"][aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
+  .result button[data-v="fail"][aria-pressed="true"]{background:var(--bad);border-color:var(--bad);color:#fff}
+  .result button[data-v="skip"][aria-pressed="true"]{background:var(--muted);border-color:var(--muted);color:#fff}
+  textarea{width:100%;min-height:64px;font:inherit;font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px}
+  .note{color:var(--muted);font-size:14px}
+  pre{white-space:pre-wrap;background:#f1efe9;border-radius:8px;padding:10px;font-size:13px}
+</style>
+</head>
+<body>
+<main>
+  <div class="banner">候選版預覽｜合成資料｜不連接正式服務、不寫入</div>
+  <h1>PR #330 iPhone 驗收</h1>
+  <p class="meta">候選 commit <code>c4640c5</code>（分支 perf/phase2-batch1）＋ 本預覽頁。所有頁面以安全政策禁止連線到本站以外的網址；資料為合成資料，任何保存都會被拒絕。<br><span id="env"></span></p>
+
+  <section>
+    <h2>開始前</h2>
+    <ol>
+      <li>請用 <strong>Safari 的無痕分頁</strong>開啟本頁，確保「首次」時尚未下載試算表元件。</li>
+      <li>每完成一項，按「通過／失敗／未測」，有異狀請在備註寫下看到的畫面。</li>
+      <li>全部完成後按最下方「複製結果」，貼回給小恩。結果只存在這支手機。</li>
+    </ol>
+  </section>
+
+  <section data-step="gold-first">
+    <h2>1. 首次直接匯出（金牌統計）</h2>
+    <ol>
+      <li>按下方按鈕開啟部區管理預覽（同一分頁開啟）。</li>
+      <li>停在「金牌統計」，畫面出現合成資料後，<strong>只按一次</strong>「匯出目前結果 Excel」。</li>
+      <li>畫面下方應短暫出現「正在下載試算表元件…」，按鈕變灰。</li>
+      <li>Safari 詢問下載時按「下載」，檔名應是中文且以 <code>.xlsx</code> 結尾。</li>
+      <li>從「檔案」App 開啟下載的檔案，應看到「每人月值」工作表與多列資料。</li>
+    </ol>
+    <a class="button" href="iphone-preview-department-ops.html">開啟部區管理預覽</a>
+  </section>
+
+  <section data-step="gold-again">
+    <h2>2. 再次匯出</h2>
+    <ol>
+      <li>回到部區管理預覽，再按一次「匯出目前結果 Excel」。</li>
+      <li>應立即下載（不再出現下載元件提示），檔案同樣可開啟。</li>
+    </ol>
+  </section>
+
+  <section data-step="gold-repeat-tap">
+    <h2>3. 等待中連點只匯出一次</h2>
+    <ol>
+      <li>關閉無痕分頁，<strong>另開一個新的無痕分頁</strong>開啟本頁，再開啟部區管理預覽。</li>
+      <li>快速連按「匯出目前結果 Excel」3 次。</li>
+      <li>應只出現 1 次下載詢問；按鈕在下載元件期間為灰色。</li>
+    </ol>
+  </section>
+
+  <section data-step="score-export">
+    <h2>4. 店務成績匯出（中文檔名）</h2>
+    <ol>
+      <li>在部區管理預覽切到「店務成績」，等成績出現後，展開「匯出／簡報」，按「匯出 Excel」。</li>
+      <li>檔名應以「北」開頭的中文 <code>.xlsx</code>；開啟後有「門市月成績」「原缺失項目」「說明」三張表。</li>
+    </ol>
+  </section>
+
+  <section data-step="stock-import">
+    <h2>5. 手機庫存匯入（App）</h2>
+    <ol>
+      <li>先按「下載合成庫存檔」，存到「檔案」。</li>
+      <li>按「開啟 App 預覽」，切到下方「戰情」→ 上方「庫存」→「選擇檔案」，選剛才的 CSV。</li>
+      <li>應顯示「已匯入 3 筆庫存」、「符合條件 10 台」。</li>
+    </ol>
+    <a class="button ghost" href="iphone-preview-stock.csv" download="北一二B_合成庫存.csv">下載合成庫存檔</a>
+    <a class="button" href="iphone-preview-app.html?preview=1">開啟 App 預覽</a>
+  </section>
+
+  <section>
+    <h2>結果</h2>
+    <button id="copy" type="button">複製結果</button>
+    <button id="reset" class="ghost" type="button">清除紀錄</button>
+    <pre id="summary"></pre>
+  </section>
+</main>
+<script>
+(function(){
+  'use strict';
+  var KEY='pr330_iphone_acceptance_v1';
+  var state={};
+  try{state=JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){}
+  var save=function(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}render();};
+  document.getElementById('env').textContent='裝置：'+navigator.userAgent;
+  var steps=[].slice.call(document.querySelectorAll('[data-step]'));
+  steps.forEach(function(section){
+    var id=section.dataset.step;
+    var wrap=document.createElement('div');wrap.className='result';
+    [['pass','通過'],['fail','失敗'],['skip','未測']].forEach(function(pair){
+      var b=document.createElement('button');b.type='button';b.className='ghost';b.dataset.v=pair[0];b.textContent=pair[1];
+      b.addEventListener('click',function(){state[id]=Object.assign({},state[id],{result:pair[0],at:new Date().toISOString()});save();});
+      wrap.appendChild(b);
+    });
+    var note=document.createElement('textarea');note.placeholder='備註（看到的畫面、檔名、錯誤訊息）';note.value=(state[id]&&state[id].note)||'';
+    note.addEventListener('input',function(){state[id]=Object.assign({},state[id],{note:note.value});save();});
+    section.appendChild(wrap);section.appendChild(note);
+  });
+  function render(){
+    steps.forEach(function(section){
+      var r=(state[section.dataset.step]||{}).result;
+      [].forEach.call(section.querySelectorAll('.result button'),function(b){b.setAttribute('aria-pressed',String(b.dataset.v===r));});
+    });
+    var label={pass:'通過',fail:'失敗',skip:'未測'};
+    document.getElementById('summary').textContent=['PR #330 iPhone 驗收｜候選 c4640c5',navigator.userAgent].concat(steps.map(function(section){
+      var s=state[section.dataset.step]||{};return section.querySelector('h2').textContent+'：'+(label[s.result]||'待驗收')+(s.note?'｜'+s.note:'');
+    })).join('\n');
+  }
+  document.getElementById('copy').addEventListener('click',function(){
+    var text=document.getElementById('summary').textContent;
+    (navigator.clipboard?navigator.clipboard.writeText(text):Promise.reject()).then(function(){document.getElementById('copy').textContent='已複製';},function(){
+      var r=document.createRange();r.selectNodeContents(document.getElementById('summary'));var sel=getSelection();sel.removeAllRanges();sel.addRange(r);document.getElementById('copy').textContent='已選取，請按拷貝';});
+  });
+  document.getElementById('reset').addEventListener('click',function(){state={};save();[].forEach.call(document.querySelectorAll('textarea'),function(t){t.value='';});});
+  render();
+})();
+</script>
+</body>
+</html>

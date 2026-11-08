@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'none'; frame-src 'none'; form-action 'none'">
+  <script src="iphone-preview-mock.js?v=1"></script>
+  <script src="portal-logout.js?v=20261011-b-epoch-1"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07182a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Liam Supervisor">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="app-assets/liam-intel-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="app-assets/liam-intel-icon-192.png">
+  <link rel="stylesheet" href="app.css?v=20261012-ui-states-1">
+  <title>Liam Supervisor App 1.2</title>
+<script src="GasBClient.js?v=20261023-login-status-1" defer></script>
+<script src="dashboard-b-shell.js?v=20261101-manual-update-1" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand" href="#home" data-nav="home" aria-label="Liam Supervisor 首頁">
+        <span class="brand-mark">L</span>
+        <span><strong>Liam Supervisor App 1.2</strong><small><span id="appDate">—</span><i>·</i><span id="appUpdatedAt">尚未更新</span></small></span>
+      </a>
+      <div class="header-actions"><button id="dataMode" class="mode-pill" type="button" data-nav="me" aria-label="開啟正式資料解鎖">讀取中</button><button class="profile-entry" type="button" data-nav="me" data-profile-entry aria-label="開啟個人與系統設定"><i data-lucide="user-round-cog"></i></button></div>
+    </header>
+
+    <aside id="previewBanner" class="preview-banner" hidden><i data-lucide="flask-conical"></i><span><strong>Preview／示意資料</strong><small>僅供 App 1.2 資訊架構與 UI 驗收，非正式營運數據</small></span></aside>
+
+    <main class="app-main">
+      <section data-view="home" aria-label="首頁">
+        <div class="view-heading compact-heading">
+          <div><p>北一二B</p><h1>今日營運戰況</h1></div>
+          <button class="icon-button" type="button" data-refresh aria-label="重新整理"><i data-lucide="refresh-cw"></i></button>
+        </div>
+
+        <section class="panel" aria-label="公開查價">
+          <div class="panel-head"><div><h2>價格查詢</h2><small>手機專案與舊機回收報價</small></div></div>
+          <div class="source-actions"><a href="threec-query.html">查價&amp;回收系統</a><a href="tradein-progress.html">舊換新進度追蹤</a></div>
+        </section>
+
+        <section id="operationsCard" class="panel operations-panel" aria-labelledby="operationsTitle">
+          <h2 id="operationsTitle" class="sr-only">16:00 與 21:00 回報狀態</h2>
+          <div id="operationsRows" class="operations-rows"></div>
+        </section>
+        <section id="yesterdayFollowUpHome" class="panel yesterday-follow-up-home" hidden></section>
+
+        <section id="kpiHero" class="panel kpi-hero" aria-label="北一二B KPI 摘要"></section>
+
+        <section class="panel store-board" aria-labelledby="storeBoardTitle">
+          <div class="panel-head">
+            <div><h2 id="storeBoardTitle">九店一覽</h2><small>依 KPI 排序</small></div>
+            <span id="kpiStoreUpdated">—</span>
+          </div>
+          <div class="store-table-head" aria-hidden="true"><span>店名</span><span>KPI %</span><span>公司排名</span><span>KPI DOD</span><span>排名變化</span><span>加減分</span></div>
+          <div id="homeStoreList" class="store-list"></div>
+        </section>
+
+        <section id="awardHome" class="panel award-panel" aria-labelledby="awardHomeTitle"><h2 id="awardHomeTitle" class="sr-only">台獎總覽</h2></section>
+
+        <section id="scheduleHome" class="panel compact-section" aria-labelledby="scheduleHomeTitle"></section>
+        <section id="patrolHome" class="panel compact-section" aria-labelledby="patrolHomeTitle"></section>
+      </section>
+
+      <section data-view="battle" hidden aria-label="戰情">
+        <div class="view-heading"><div><p>READ-ONLY SUMMARY</p><h1>戰情</h1></div><a class="icon-button" href="index.html" aria-label="開啟正式戰情網站"><i data-lucide="external-link"></i></a></div>
+        <div class="segment-control battle-kind-control" role="tablist" aria-label="戰情類型"><button class="active" data-battle-kind="kpi" type="button">KPI</button><button data-battle-kind="award" type="button">台獎</button><button data-battle-kind="personal" type="button">個績</button><button data-battle-kind="stock" type="button">庫存</button></div>
+        <div class="scope-control" role="tablist" aria-label="戰情範圍"><button class="active" data-battle-scope="region" type="button">北一二B</button><button data-battle-scope="store" type="button">店點</button><button data-battle-scope="bonus" type="button" hidden>同仁獎金</button></div>
+        <label id="battleStorePicker" class="select-field" hidden><span>選擇店點</span><select id="battleStoreSelect"></select></label>
+        <div id="battleContent"></div>
+        <section id="stockPanel" class="panel stock-panel" hidden aria-label="手機庫存"><div class="panel-head"><div><h2>手機庫存</h2><small id="stockMeta">尚未匯入</small></div><strong id="stockTotal">—</strong></div><button id="stockRefresh" type="button">更新</button><div class="stock-filters"><label>機款搜尋<input id="stockModel" type="search" placeholder="機款／容量／顏色"></label><label>店點<select id="stockStore"><option value="">九店全部</option><option value="台北酒泉">酒泉</option><option value="台北永吉">永吉</option><option value="台北復興南">復興南</option><option value="台北杭州南">杭州南</option><option value="台北萬大">萬大</option><option value="台北通化">通化</option><option value="台北大稻埕">大稻埕</option><option value="台北三創">三創</option><option value="台北六張犁">六張犁</option></select></label></div><div id="stockResults"></div><label class="stock-import">也可從此裝置匯入庫存檔<input id="stockFile" type="file" accept=".xlsx,.xls,.csv,.tsv"></label><p id="stockImportMessage" class="form-message">電腦發布庫存後，開啟此頁會讀取最新快照。</p></section>
+      </section>
+
+      <section data-view="report" hidden aria-label="回報">
+        <div class="view-heading"><div><p>DAILY OPERATIONS</p><h1>每日回報</h1></div><a class="icon-button" href="index.html" aria-label="開啟完整每日回報系統"><i data-lucide="external-link"></i></a></div>
+        <section id="reportTodaySection" class="report-day-section report-today-section" aria-labelledby="reportTodayTitle">
+          <header class="report-day-heading"><div><h2 id="reportTodayTitle">今日回報</h2><small>台北今日 · 時段切換只影響今日資料</small></div><span class="report-day-badge">TODAY</span></header>
+          <div class="segment-control report-segment" role="tablist" aria-label="今日回報時段"><button class="active" data-report-segment="16" type="button">16:00</button><button data-report-segment="21" type="button">21:00</button></div>
+          <div id="reportOverview"></div>
+          <section class="panel report-operations-panel"><div class="panel-head"><div><h2>全區營運摘要</h2><small>今日正式來源欄位，App 不重算</small></div></div><div id="reportOperations"></div></section>
+          <section class="panel report-feedback-panel"><div class="panel-head"><div><h2>今日門市請益彙整</h2><small>只顯示所選今日時段正式來源原文</small></div></div><div id="reportFeedbackSummary"></div></section>
+          <section class="panel report-failure-panel"><div class="panel-head"><div><h2>今日全區未過關彙整</h2><small>沿用所選今日時段正式回報結果</small></div></div><div id="reportFailures"></div></section>
+          <section class="panel report-store-panel"><div class="panel-head"><div><h2>今日九店回報</h2><small>點店展開今日個人內容</small></div></div><div id="reportStoreList"></div></section>
+          <a class="source-button" href="index.html">開啟完整每日回報系統 <i data-lucide="external-link"></i></a>
+        </section>
+        <section id="yesterdayFollowUpPanel" class="panel yesterday-follow-up-panel" aria-labelledby="yesterdayFollowUpTitle"><div class="panel-head"><div><h2 id="yesterdayFollowUpTitle">昨日待追蹤</h2><small>昨日正式 21:00 · 不受今日時段切換影響</small></div><span class="report-day-badge yesterday">YESTERDAY</span></div><div id="yesterdayFollowUp"></div></section>
+      </section>
+
+      <section data-view="schedule" hidden aria-label="班表">
+        <div class="view-heading"><div><p>DAILY SCHEDULE</p><h1>班表</h1></div><a class="icon-button" href="patrol.html" aria-label="開啟完整班表"><i data-lucide="external-link"></i></a></div>
+        <section class="panel schedule-panel" aria-labelledby="scheduleTitle">
+          <div class="panel-head"><div><h2 id="scheduleTitle">九店完整班表</h2><small id="scheduleSourceTime">尚未讀取</small></div></div>
+          <div class="date-control"><button type="button" data-date-step="-1">前一天</button><button type="button" data-date-today>今天</button><button type="button" data-date-step="1">後一天</button></div>
+          <div class="schedule-filters"><label>日期<input id="scheduleDate" type="date"></label><label>店點<select id="scheduleStoreFilter"><option value="">九店全部</option></select></label></div>
+          <div id="scheduleList" class="locked-state">請從右上角個人／設定入口解鎖，之後顯示九店人員、班別與上班／休假狀態。</div>
+          <a class="inline-link" href="patrol.html">前往完整班表 <i data-lucide="external-link"></i></a>
+        </section>
+      </section>
+
+      <section data-view="patrol" hidden aria-label="巡店">
+        <div class="view-heading"><div><p>PATROL &amp; CHECK</p><h1>巡店檢查</h1></div><a class="icon-button" href="patrol.html" aria-label="開啟完整巡店系統"><i data-lucide="external-link"></i></a></div>
+        <section class="panel patrol-visit-panel" aria-labelledby="patrolVisitTitle">
+          <div class="panel-head"><div><h2 id="patrolVisitTitle">快速到店／離店</h2><small>唯一新增寫入 · 需既有巡店短效 session</small></div></div>
+          <div class="patrol-visit-actions"><button id="patrolArrivalButton" type="button" data-patrol-visit="arrival">到店</button><button id="patrolDepartureButton" type="button" data-patrol-visit="departure">離店</button></div>
+          <p id="patrolVisitMessage" class="form-message">解鎖班表／巡店後可使用。</p>
+          <div class="patrol-visit-today"><h3>今日到離店紀錄</h3><div id="patrolVisitToday"></div></div>
+        </section>
+        <div class="segmented patrol-check-selector" role="group" aria-label="巡店檢查類型">
+          <button class="active" type="button" data-patrol-check-view="patrol" aria-pressed="true">巡店檢查</button>
+          <button type="button" data-patrol-check-view="half-month" aria-pressed="false">督導到店檢查</button>
+        </div>
+        <div id="patrolCheckContent">
+          <div id="patrolOverview"></div>
+          <div id="patrolTodayDetail"></div>
+          <div id="patrolMileage"></div>
+          <section class="panel"><div class="panel-head"><div><h2>店點狀況</h2><small>最近巡店與待追蹤</small></div></div><div id="patrolStoreList"></div></section>
+          <section class="panel"><div class="panel-head"><div><h2>最近巡店紀錄</h2><small>正式 ptdetail</small></div></div><div id="patrolRecentList"></div></section>
+          <div class="source-actions"><a href="patrol.html">完整巡店看板 <i data-lucide="external-link"></i></a><a href="patrol.html">巡店操作頁 <i data-lucide="external-link"></i></a></div>
+        </div>
+        <div id="halfMonthCheckPreview" hidden></div>
+      </section>
+
+      <dialog id="patrolVisitDialog" class="patrol-visit-dialog">
+        <form id="patrolVisitForm">
+          <div class="patrol-visit-dialog-head"><h2 id="patrolVisitDialogTitle">巡店到店</h2><button id="patrolVisitClose" type="button" aria-label="關閉">×</button></div>
+          <input id="patrolVisitAction" type="hidden">
+          <label>店點<select id="patrolVisitStore" required><option value="" disabled selected>請選擇店點</option></select></label>
+          <p id="patrolVisitCurrentStore" class="patrol-visit-current-store" hidden></p>
+          <label>備註（選填，最多 200 字）<textarea id="patrolVisitNote" maxlength="200" rows="3"></textarea></label>
+          <p>時間以伺服器收到紀錄的時間為準。</p>
+          <button id="patrolVisitSubmit" type="submit" disabled>確認到店</button>
+        </form>
+      </dialog>
+
+      <section data-view="me" hidden aria-label="我的">
+        <div class="view-heading"><div><p>LIAM ONLY</p><h1>個人與系統設定</h1></div><button class="icon-button" type="button" data-nav="home" aria-label="返回首頁"><i data-lucide="arrow-left"></i></button></div>
+        <article class="profile-card"><span class="profile-mark">L</span><div><strong>Liam Supervisor</strong><small>App 1.2 · 個績與每日回報摘要</small></div><span id="viewerState" class="status-chip">未登入</span></article>
+
+        <section class="panel access-panel" aria-labelledby="battleAccessTitle">
+          <div class="panel-head"><div><h2 id="battleAccessTitle">KPI／台獎／回報</h2><small>沿用既有員編＋Approved Device</small></div></div>
+          <p id="privateDeviceStatus" class="device-status">尚未解鎖這台 iPhone App 裝置</p>
+          <form id="privateAccessForm" class="access-form"><label>員工編號<input id="employeeId" autocomplete="username" autocapitalize="characters" inputmode="text" placeholder="請本人輸入既有員編" required></label><button type="submit">解鎖正式資料</button></form>
+          <details id="privateBindingDetails" class="access-details"><summary>首次使用這台 iPhone App</summary><form id="privateBindingForm" class="access-form"><label>既有首次啟用碼<input id="bootstrapCode" type="password" autocomplete="one-time-code" inputmode="numeric" placeholder="只在送出當下使用" required></label><button type="submit">送出裝置申請</button></form><button id="privateStatusCheck" class="text-button" type="button">查看核准狀態</button><p>使用既有 private_request／Approved Device 流程；不複製 Safari 裝置、不繞過核准。</p></details>
+          <p id="privateAccessMessage" class="form-message">App 僅使用既有授權流程；未核准前不載入正式摘要。</p>
+          <button id="privateLogout" class="text-button danger-text" type="button" hidden>登出正式摘要</button>
+        </section>
+
+        <section class="panel access-panel" aria-labelledby="patrolAccessTitle">
+          <div class="panel-head"><div><h2 id="patrolAccessTitle">班表／巡店</h2><small>督導登入最長 12 小時，可隨時自行登出</small></div></div>
+          <form id="patrolAccessForm" class="access-form"><label>督導通行碼<input id="patrolPasscode" type="password" autocomplete="current-password" placeholder="輸入既有通行碼" required></label><button type="submit">解鎖唯讀資料</button></form>
+          <p id="patrolAccessMessage" class="form-message">未驗證前不讀取班表、人名或巡店紀錄。</p>
+          <button id="patrolLogout" class="text-button danger-text" type="button" hidden>登出班表／巡店 session</button>
+        </section>
+
+        <section class="panel system-panel" data-portal-session-host aria-labelledby="systemTitle"><div class="panel-head"><div><h2 id="systemTitle">系統狀態</h2><small>工程與安全資訊集中於此</small></div></div><div id="systemStatus"></div></section>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="主要導覽">
+      <button data-nav="home" class="active" aria-current="page"><i data-lucide="house"></i><span>首頁</span></button>
+      <button data-nav="battle"><i data-lucide="chart-no-axes-combined"></i><span>戰情</span></button>
+      <button data-nav="report"><i data-lucide="send"></i><span>回報</span></button>
+      <button data-nav="schedule"><i data-lucide="calendar-days"></i><span>班表</span></button>
+      <button data-nav="patrol"><i data-lucide="route"></i><span>巡店</span></button>
+    </nav>
+  </div>
+  <script src="app-assets/lucide.min.js"></script>
+  <script src="vendor-loader.js?v=20261108-3" data-warm="xlsx"></script>
+  <script src="phone-stock-core.js?v=app-stock-20260925"></script>
+  <script src="app-data-contract.js?v=emergency-rollback-20260813-1"></script>
+  <script src="app-preview-data.js?v=emergency-rollback-20260813-1"></script>
+  <script src="patrol-read-model.js?v=13"></script>
+  <script src="patrol-question-versions.js?v=app-na-v-20260903-1"></script>
+  <script src="supervisor-visit-checklist.js?v=20261104-1"></script>
+  <script src="half-month-check-read-model.js?v=20261104-checklist-1"></script>
+  <script src="yesterday-follow-up-model.js?v=yesterday-follow-up-phase2-20260814-1"></script>
+  <script src="award-model-catalog.js?v=20261001-1" defer></script>
+  <script src="app.js?v=20261105-v6-4" defer></script>
+  <script src="phone-stock-app.js?v=20261108-lazy-1" defer></script>
+<script src="query-route-update.js?v=20261105-integrated-1"></script>
+</body>
+</html>
