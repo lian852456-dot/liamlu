@@ -5,15 +5,49 @@ vm.runInNewContext(fs.readFileSync(fixturePath,'utf8').split('\ntest(')[0]+'\nmo
  {require,module:m,exports:m.exports,__dirname,__filename:fixturePath,console,process,Buffer,Set,Map});
 const {fixture,passwordLogin}=m.exports;
 const call=(f,p)=>JSON.parse(f.ctx.privateDashboardGasBMaybePost_({postData:{type:'text/plain',contents:JSON.stringify(p)}}).text);
-function setup({primary=false}={}){
+function setup({primary=false,awardRows=false,supervisorRole=false}={}){
  const f=fixture();if(primary)f.props.set('DASHBOARD_TRUSTED_EMPLOYEE_ID','SYNTH002');
+ if(supervisorRole)f.rows.DashboardUsers[2][3]='督導';
  f.ctx.privateDashboardBVerifyPassword_=()=>true;
  const device='SYNTHETIC_BUNDLE_DEVICE',login=call(f,passwordLogin('SYNTH002',device,'SYNTHETIC_PASSWORD','SYNTHETIC_BUNDLE_REQUEST','a'));
  assert.equal(login.status,'ok');let reads=0;
- f.ctx.privateDashboardSnapshot=()=>{assert.equal(f.held(),true);reads++;return f.ctx.privateDashboardBMeasure_('privateDrive',()=>({marker:'SYNTHETIC_PRIVATE'}));};
+ f.ctx.privateDashboardSnapshot=()=>{
+  assert.equal(f.held(),true);reads++;
+  return f.ctx.privateDashboardBMeasure_('privateDrive',()=>{
+   const snapshot={marker:'SYNTHETIC_PRIVATE'};
+   if(awardRows)snapshot.awardsBattle={
+    data_as_of_date:'2026-11-07',processing_run_id:'synthetic-awards',
+    source_files:{person:{source_data_date:'2026-11-07',run_id:'synthetic-awards',sha256:'a'.repeat(64)}},
+    person_awards:[
+     {emp_id:'SYNTH002',store:f.rows.DashboardUsers[2][2],name:'甲＊',actual_total:50,projected:110},
+     {emp_id:'SYNTH003',store:'測試門市',name:'未遮罩的合成姓名',actual_total:70,projected:100},
+    ],
+   };
+   return snapshot;
+  });
+ };
  f.ctx.kpiCalcLatestDataFile=()=>{assert.equal(f.held(),true);reads++;return f.ctx.privateDashboardBMeasure_('kpiLocate',()=>({getBlob:()=>({getDataAsString:()=>JSON.stringify({meta:{marker:'SYNTHETIC_KPI'},stores:[],persons:[]})})}));};
  return {f,login,device,reads:()=>reads,read:extra=>call(f,{action:'employee_dashboard_read',deviceId:device,token:login.token,...extra})};
 }
+test('awards response uses the authenticated subject and limits personal data for each role',()=>{
+ for(const [primary,supervisorRole,mode] of [[false,false,'member'],[false,true,'member'],[true,false,'member'],[true,true,'supervisor']]){
+  const h=setup({primary,supervisorRole,awardRows:true}), result=h.read();
+  assert.equal(result.status,'ok');
+  const awards=result.privateResult.snapshot.awardsBattle;
+  assert.equal(awards.viewer.mode,mode);
+  assert.equal(result.privateResult.profile.role,'employee');
+  const text=JSON.stringify(awards);
+  for(const forbidden of ['person_awards','emp_id','SYNTH002','SYNTH003','未遮罩的合成姓名'])assert.equal(text.includes(forbidden),false);
+  if(mode==='supervisor'){
+   assert.deepEqual(awards.viewer.actual,{amount:70,leaders:['未＊']});
+   assert.deepEqual(awards.viewer.projected,{amount:110,leaders:['甲＊']});
+  }else{
+   assert.deepEqual(awards.viewer.actual,{amount:50,rank:2,gap:20});
+   assert.deepEqual(awards.viewer.projected,{amount:110,rank:1,gap:0});
+  }
+  assert.deepEqual(h.read({employeeId:'SYNTH003'}),{status:'error',code:'B_AUTH_DENIED'});
+ }
+});
 test('bundle retains both strict read projections under one unchanged owner lock and fixed lease',()=>{
  for(const primary of [false,true]){
   const h=setup({primary}),r=h.read();assert.equal(r.status,'ok');assert.equal(r.expiresAt,h.login.expiresAt);assert.equal(r.phoneEligible,primary);

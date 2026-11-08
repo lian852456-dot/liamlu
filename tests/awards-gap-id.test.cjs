@@ -62,7 +62,8 @@ test('older and unknown month behavior is unchanged and all entry points load th
   for (const [date, count] of [['2026-08-31', 13], ['2026-09-30', 10], ['2026-10-31', 10], ['2026-11-04', 10], ['2026-12-01', 13]]) assert.equal(Catalog.expectedCount(date), count);
   for (const name of ['index.html', 'awards-battle.html', 'kpi-battle.html']) {
     const html = fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
-    for (const asset of ['award-model-catalog', 'awards-battle-controller']) assert.ok(html.includes(`${asset}.js?v=20261105-awards-gap-id-1`));
+    assert.ok(html.includes('award-model-catalog.js?v=20261105-awards-gap-id-1'));
+    assert.ok(html.includes('awards-battle-controller.js?v=20261108-integrated-1'));
     assert.ok(!html.includes('award-model-pending'));
   }
 });

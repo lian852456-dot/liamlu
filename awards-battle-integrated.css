@@ -1,0 +1,46 @@
+#panel-awards-battle .award-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-block: 10px 20px;
+}
+#panel-awards-battle .award-table-wrap table {
+  width: 100%;
+  min-width: 34rem;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+#panel-awards-battle .award-table-wrap th,
+#panel-awards-battle .award-table-wrap td {
+  border-bottom: 1px solid var(--border, #dbe3ed);
+  padding: 9px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+#panel-awards-battle .award-table-wrap thead {
+  background: var(--surface, #f4f6fa);
+}
+#panel-awards-battle .award-priority-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+#panel-awards-battle .award-estimate {
+  font-weight: 800;
+  color: var(--accent, #6d28d9);
+}
+#panel-awards-battle .award-ranking-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+#panel-awards-battle .award-calculation {
+  margin-block: 12px;
+}
+#panel-awards-battle .award-calculation summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+@media (max-width: 700px) {
+  #panel-awards-battle .award-priority-grid,
+  #panel-awards-battle .award-ranking-cards {
+    grid-template-columns: 1fr;
+  }
+}

@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const november = require('../award-model-catalog.js').november;
 
 const ROOT = path.resolve(__dirname, '..');
 let server;
@@ -16,7 +17,9 @@ test.beforeAll(async () => {
       response.writeHead(404).end('Not found');
       return;
     }
-    const type = target.endsWith('.html') ? 'text/html; charset=utf-8' : target.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'application/octet-stream';
+    const type = target.endsWith('.html') ? 'text/html; charset=utf-8' :
+      target.endsWith('.js') ? 'text/javascript; charset=utf-8' :
+      target.endsWith('.css') ? 'text/css; charset=utf-8' : 'application/octet-stream';
     response.writeHead(200, { 'Content-Type': type });
     fs.createReadStream(target).pipe(response);
   });
@@ -134,6 +137,59 @@ async function loginAwards(page) {
 function normalize(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
+
+test('整合版手機：區店差台、九店優先與伺服器角色摘要', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('https://**', route => route.abort());
+  const awards = awardsFixture();
+  const cutoff = '2026-11-07', reportDate = '2026-11-08', runId = 'synthetic-integrated';
+  const source = {source_data_date:cutoff, run_id:runId, sha256:'a'.repeat(64)};
+  const prices = Object.fromEntries(november.rewardRules.map(row => [row.role,row.amounts]));
+  Object.assign(awards, {
+    report_date:cutoff, report_run_date:reportDate, data_as_of_date:cutoff, processing_run_id:runId,
+    phone_items:10, config_version:november.configVersion, config_hash:'b'.repeat(64),
+    source_files:{store:source,person:{...source}},
+    viewer:{schema:'north12b-awards-viewer/v1',mode:'member',store:'大稻埕',
+      actual:{rank:3,amount:50,gap:20},projected:{rank:1,amount:110,gap:0}},
+  });
+  for (const row of [awards.overall,...awards.stores]) {
+    row.priorities = [];
+    row.items = november.selectedModels.map(name => ({
+      name,display_name:name,actual:1,target:5,rate:0.2,threshold_target:row===awards.overall?4:3,
+      store_reward_50:prices.manager[name][0],store_reward_100:prices.manager[name][2],
+      district_reward_80:prices.supervisor[name][0],district_reward_100:prices.supervisor[name][2],
+    }));
+  }
+  const kpi = {report_run_date:reportDate,data_as_of_date:cutoff,processing_run_id:runId,supplement_synced:true};
+  const payload = {data:kpi,result:{trustSource:'password-bound',snapshot:{awardsBattle:awards,kpiBattle:kpi}}};
+  await page.goto(`${baseUrl}/kpi-battle.html#awards`);
+  const panel = page.locator('#awardsBattleContent');
+  await expect(panel).not.toContainText('$9,234');
+  await page.evaluate(value => window.awardsBattleController.acceptKpiResult(value), payload);
+  await expect(panel.getByRole('region',{name:'九店優先順位'}).locator('tbody tr')).toHaveCount(9);
+  await expect(panel.getByRole('region',{name:'優先追蹤機款'})).toContainText('督導 80% · 差 3 台');
+  await page.selectOption('#awardsStoreSelect','萬大');
+  await expect(panel.getByRole('region',{name:'優先追蹤機款'})).toContainText('店長 50% · 差 2 台');
+  await expect(panel.getByRole('region',{name:'優先追蹤機款'})).toContainText('預估 +$1,370');
+  await expect(panel).toContainText('我的店 · 大稻埕');
+  await expect(panel).toContainText('區內第 3 名 · $50 · 追平前一名還差 $20');
+  await expect(panel).not.toContainText('全區同仁第一名');
+  await page.selectOption('#awardsRankingBasis','projected');
+  await expect(panel).toContainText('區內第 1 名 · $110 · 目前領先');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+  awards.viewer={schema:'north12b-awards-viewer/v1',mode:'supervisor',store:'',
+    actual:{leaders:['甲＊'],amount:70},projected:{leaders:['乙＊'],amount:115}};
+  await page.evaluate(value => window.awardsBattleController.acceptKpiResult(value), payload);
+  await expect(panel).toContainText('全區同仁第一名');
+  await expect(panel).toContainText('乙＊ · $115');
+  await expect(panel).not.toContainText('我的台獎');
+  payload.result.trustSource = 'legacy';
+  await page.evaluate(value => window.awardsBattleController.acceptKpiResult(value), payload);
+  await expect(panel).not.toContainText('乙＊');
+  await page.evaluate(() => window.DashboardBHost.clear());
+  await expect(panel).not.toContainText('$9,234');
+});
 
 test('standalone 沿用 Approved Device 登入與 private_access → kpicalc_access，顯示 9 店與 13 款', async ({ page }) => {
   const actions = await mockFormal(page);
