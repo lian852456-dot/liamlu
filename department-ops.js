@@ -486,6 +486,7 @@
       if (!window.VendorLoader) return monthlyUI.exportGold();
       window.VendorLoader.run('gold-export', ['xlsx'], () => monthlyUI.exportGold(), {
         button: $('exportGold'),
+        cooldownMs: 2500,
         isCurrent: () => Boolean($('workspace') && !$('workspace').hidden && !window.PortalLogout?.isLocked()),
         onError: error => setMessage('goldMessage', error.message, 'error'),
       });

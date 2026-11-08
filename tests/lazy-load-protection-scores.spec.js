@@ -70,3 +70,16 @@ test('scores preview: waits for the download, then previews exactly as before',a
  await expect(page.locator('#scoreUpdateMessage')).toContainText('預覽完成');
  await expect(page.locator('[data-score-month]')).toHaveAttribute('value','2026-08');
 });
+
+// iPhone acceptance 2026-11-08: repeat taps after SheetJS is ready must not export again.
+for (const gap of [150, 800]) {
+  test(`scores export: three taps ${gap} ms apart give one file once SheetJS is loaded`, async ({ page }) => {
+    await setup(page); await login(page);
+    await page.evaluate(() => window.VendorLoader.ensure('xlsx'));
+    let downloads = 0; page.on('download', () => { downloads += 1; });
+    for (let i = 0; i < 3; i += 1) { await page.click('#scoreExport', { force: true, noWaitAfter: true }); await page.waitForTimeout(gap); }
+    await page.waitForTimeout(600);
+    expect(downloads).toBe(1);
+    await expect(page.locator('#scoreExport')).toBeEnabled({ timeout: 6000 });
+  });
+}
