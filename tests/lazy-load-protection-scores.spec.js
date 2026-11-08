@@ -29,7 +29,7 @@ async function holdVendor(page){let open;const gate=new Promise(r=>{open=r;});le
 // Holds the server-side logout so the page stays on its lock screen (no reload)
 // while the pending download finishes: the old page's guards are what is tested.
 async function holdLogoutReload(page){let open;const g=new Promise(r=>{open=r;});await page.route(/script\.google\.com/,async route=>{const body=route.request().postData()||'',url=route.request().url();if(/ptlogout/.test(body+url))await g;return route.fallback();});return open;}
-async function logoutFromOtherTab(page){const other=await page.context().newPage();other.on('dialog',d=>d.accept());await other.goto(new URL('home.html',PAGE).href);await other.waitForLoadState('networkidle');for(let i=0;i<20;i++){const r=await other.evaluate(()=>window.PortalLogout.request());if(r!==false)break;await other.waitForTimeout(250);}await other.close();}
+async function logoutFromOtherTab(page){const other=await page.context().newPage();other.on('dialog',d=>d.accept());await other.goto(new URL('home.html',PAGE).href);await other.waitForLoadState('networkidle');for(let i=0;i<20;i++){const r=await other.evaluate(()=>window.PortalLogout.request());if(r!==false)break;await other.waitForTimeout(250);}void other.close().catch(()=>{});} // closing the tab that just logged out can stall while its own logout finishes; the context is closed after the test anyway
 
 test('scores export: first direct export, repeat clicks while loading, second export',async({page})=>{
  const held=await holdVendor(page);await setup(page);await login(page);
