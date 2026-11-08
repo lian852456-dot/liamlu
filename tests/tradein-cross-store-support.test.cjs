@@ -26,17 +26,32 @@ test('reviewed support credits the selling store and the original employee once,
  const withoutDays=r.a.tradeinPerformancePublicRead({month:next.month}).snapshot;assert.ok(withoutDays.stores.every(s=>!Object.hasOwn(s,'recovered_days')));Public.validate(withoutDays);
  const before=r.writes.length;assert.equal(publish(r,next).status,'unchanged');assert.equal(r.writes.length,before);
 });
-test('later complete exports reuse only the approved transaction, retaining original observations',()=>{
+test('later complete exports keep reviewed evidence and attribute new cross-store sales by employee ID',()=>{
  const {r,next}=setup();publish(r,next);
  const later={...structuredClone(next),source_sha256:'c'.repeat(64),source_end:'2026-10-09',status_as_of_date:'2026-10-09'};
- later.records.push({...later.records[1],trade_date:'2026-10-09',recycle_code:'SYNTHETIC-LATER',order_number:'SYNTHETIC-LATER'});
- assert.equal(publish(r,later).snapshot.summary.total_units,5);
+ later.records.push({...later.records[0],store_code:'DNB10082',trade_date:'2026-10-09',recycle_code:'SYNTHETIC-LATER',order_number:'SYNTHETIC-LATER'});
+ const result=publish(r,later),saved=r.a.tradeinPerformanceSnapshot_(r.a.tradeinPerformanceRegistry_().months[later.month].active);
+ assert.equal(result.snapshot.summary.total_units,5);
+ assert.equal(saved.people.find(p=>p.employee_key==='ZX00001').actual_units,2);
+ assert.equal(saved.stores.find(s=>s.store==='永吉').support_in_units,1);
+ assert.equal(saved.stores.find(s=>s.store==='萬大').support_out_units,2);
+ assert.equal(saved.support_evidence.length,1);
+ Public.validate(Public.project(saved,crypto.randomUUID));
 });
-test('a payload cannot approve a cross-store transaction',()=>{
+test('a payload cannot add reviewed support evidence or override the employee ID',()=>{
  const {r,next,approval}=setup();r.configs.delete('north12b-tradein-reference-'+next.source_sha256+'.json');
  const before=r.writes.length;
- assert.throws(()=>r.a.tradeinPerformancePreview({...auth(next),support_approvals:[approval],privateConfig:{support_approvals:[approval]}}),/店點異動待核/);
+ const forged={...approval,employee_key:'ZX00003'};
+ const p=r.a.tradeinPerformancePreview({...auth(next),support_approvals:[forged],privateConfig:{support_approvals:[forged]}});
  assert.equal(r.writes.length,before);
+ assert.equal(p.snapshot.people.find(p=>p.masked_name==='合＊5').actual_units,1);
+ publish(r,next);
+ const saved=r.a.tradeinPerformanceSnapshot_(r.a.tradeinPerformanceRegistry_().months[next.month].active);
+ assert.equal(saved.support_evidence,undefined);
+ const projected=Public.project(saved,crypto.randomUUID);
+ const sellingStore=projected.stores.find(s=>s.store==='杭州南');
+ assert.equal(sellingStore.actual_units,2);assert.equal(sellingStore.support_in_units,1);
+ assert.equal(sellingStore.recovered_days[1].date,'2026-10-03');
 });
 for(const field of ['transaction_key','employee_key','home_store','store','trade_date','review_status'])test('approval '+field+' tampering never admits a source',()=>{
  const {r,next,approval}=setup(),bad={...approval};

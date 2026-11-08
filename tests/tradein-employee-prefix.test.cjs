@@ -45,11 +45,19 @@ test('normalized duplicate private mappings are refused rather than choosing an 
  config.employees.push({...config.employees[0],source_employee_id:'55'+config.employees[0].source_employee_id,employee_key:'5512345'});
  assert.throws(()=>C.build(source,r.a.tradeinPerformanceMonthRoster_(source.month),config),/員編對照/);
 });
-for(const [label,store,status] of [['other store','酒泉','active'],['inactive','萬大','inactive']])test('optional prefix does not admit '+label+' roster employee',()=>{
- const {r,next}=setup('12349',store,status),writes=r.writes.length;
- assert.throws(()=>r.a.tradeinPerformancePreview(args(next)),/新增員編或店點異動待核/);assert.equal(r.writes.length,writes);
+test('a first sale across stores uses the active employee ID and retains the roster store',()=>{
+ const {r,next,newcomer}=setup('12349','酒泉');
+ next.records.at(-1).source_employee_id=newcomer.employee_id;
+ const s=publish(r,next).snapshot,person=s.people.find(p=>p.masked_name===newcomer.masked_name);
+ assert.equal(person.store,'酒泉');assert.equal(person.actual_units,1);
+ assert.equal(s.stores.find(p=>p.store==='萬大').total_units,4);
+ assert.equal(s.stores.find(p=>p.store==='酒泉').total_units,0);
+});
+test('optional prefix does not admit an inactive roster employee',()=>{
+ const {r,next}=setup('12349','萬大','inactive'),writes=r.writes.length;
+ assert.throws(()=>r.a.tradeinPerformancePreview(args(next)),/員編無在職對應/);assert.equal(r.writes.length,writes);
 });
 test('optional prefix does not admit a person absent from the verified monthly roster',()=>{
  const {r,next}=setup();next.records.at(-1).source_employee_id='5512350';
- assert.throws(()=>r.a.tradeinPerformancePreview(args(next)),/新增員編或店點異動待核/);
+ assert.throws(()=>r.a.tradeinPerformancePreview(args(next)),/員編無在職對應/);
 });

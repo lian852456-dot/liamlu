@@ -103,7 +103,7 @@ var TradeinPublicCore=(function(){
         const s=snapshot.stores.find(s=>s.store===store);if(!s)throw Error('公開來源店點缺漏');
         return {store:store,actual_units:s.total_units,target_units:s.staff_target_units,remaining_units:s.staff_gap_units,
           target_people:s.target_staff_count,met_people:s.met_staff_count,
-          ...(snapshot.support_evidence?.length?{support_in_units:s.support_in_units,support_out_units:s.support_out_units,
+          ...(Object.prototype.hasOwnProperty.call(s,'support_in_units')?{support_in_units:s.support_in_units,support_out_units:s.support_out_units,
             recovered_days:s.recovered_days.map(d=>({date:d.date,actual_units:d.actual_units}))}:{})};
       }),summary:{}};
     ['actual_units','target_units','remaining_units','target_people','met_people'].forEach(k=>{value.summary[k]=value.stores.reduce((n,s)=>n+s[k],0);});

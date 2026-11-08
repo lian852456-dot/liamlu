@@ -11,30 +11,32 @@ function setup(){
  next.records.push({...source.records[1],trade_date:'2026-10-09',recycle_code:'SYNTHETIC-LATER',order_number:'SYNTHETIC-LATER'});
  return {r,source,next};
 }
-test('an existing unresolved observation does not block the next complete monthly export',()=>{
+test('the next complete monthly export attributes a legacy pending sale by employee ID',()=>{
  const {r,next}=setup(),writes=r.writes.length,p=r.a.tradeinPerformancePreview(auth(next));
  assert.equal(r.writes.length,writes,'preview is read-only');
- assert.equal(p.snapshot.summary.total_units,5);assert.equal(p.snapshot.summary.assigned_units,4);assert.equal(p.snapshot.summary.pending_identity_units,1);
- assert.equal(p.snapshot.people.find(p=>p.masked_name==='合＊5').actual_units,null);
- const saved=publish(r,next);assert.equal(saved.snapshot.summary.pending_identity_units,1);
+ assert.equal(p.snapshot.summary.total_units,5);assert.equal(p.snapshot.summary.assigned_units,5);assert.equal(p.snapshot.summary.pending_identity_units,0);
+ assert.equal(p.snapshot.people.find(p=>p.masked_name==='合＊5').actual_units,1);
+ const saved=publish(r,next);assert.equal(saved.snapshot.summary.pending_identity_units,0);
  const stored=r.a.tradeinPerformanceSnapshot_(r.a.tradeinPerformanceRegistry_().months[next.month].active);
- assert.equal(stored.people.find(p=>p.employee_key==='ZX00001').identity_status,'conflict');
+ assert.equal(stored.people.find(p=>p.employee_key==='ZX00001').identity_status,'confirmed');
  assert.equal(stored.support_evidence,undefined,'reuse does not approve support');
  const before=r.writes.length;assert.equal(publish(r,next).status,'unchanged');assert.equal(r.writes.length,before);
 });
-test('the affected employee can add a home-store sale while the original conflict remains pending',()=>{
+test('one employee receives both home-store and cross-store sales',()=>{
  const {r,next}=setup();next.records.push({...next.records[0],store_code:'DNB10168',trade_date:'2026-10-09',recycle_code:'SYNTHETIC-HOME',order_number:'SYNTHETIC-HOME'});
- const out=publish(r,next);assert.equal(out.snapshot.summary.total_units,6);assert.equal(out.snapshot.summary.pending_identity_units,2);
- assert.equal(out.snapshot.people.find(p=>p.masked_name==='合＊5').actual_units,null);
+ const out=publish(r,next);assert.equal(out.snapshot.summary.total_units,6);assert.equal(out.snapshot.summary.pending_identity_units,0);
+ assert.equal(out.snapshot.people.find(p=>p.masked_name==='合＊5').actual_units,2);
 });
-for(const change of [{trade_date:'2026-10-09'},{store_code:'DNB10307'}])test('a new unresolved store/date is still denied: '+JSON.stringify(change),()=>{
- const {r,next}=setup();Object.assign(next.records[0],change);const before=r.writes.length;
- assert.throws(()=>r.a.tradeinPerformancePreview(auth(next)),/新增員編或店點異動待核/);assert.equal(r.writes.length,before);
+test('reimporting the published legacy reference preserves the original calculation',()=>{
+ const {r,source}=setup(),before=r.writes.length;
+ assert.equal(r.a.tradeinPerformancePreview(auth(source)).snapshot.summary.pending_identity_units,1);
+ assert.equal(publish(r,source).status,'unchanged');
+ assert.equal(r.writes.length,before);
 });
 test('an unknown employee is still denied with an actionable private diagnostic',()=>{
  const {r,next}=setup();next.records.push({...next.records[1],source_employee_id:'99999',recycle_code:'SYNTHETIC-UNKNOWN',order_number:'SYNTHETIC-UNKNOWN'});
  const before=r.writes.length;
- assert.throws(()=>r.a.tradeinPerformancePreview(auth(next)),error=>/1 組新增員編或店點異動待核/.test(error.message)&&/尾碼 999/.test(error.message)&&/萬大/.test(error.message)&&!error.message.includes('SYNTHETIC-UNKNOWN'));
+ assert.throws(()=>r.a.tradeinPerformancePreview(auth(next)),error=>/1 組員編無在職對應/.test(error.message)&&/尾碼 999/.test(error.message)&&/萬大/.test(error.message)&&!error.message.includes('SYNTHETIC-UNKNOWN'));
  assert.equal(r.writes.length,before);
 });
 test('canceling the old cross-store row resolves it through the existing same-month policy',()=>{

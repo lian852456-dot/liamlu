@@ -29,14 +29,28 @@ test('known identities remain reusable after a file contains no transactions',()
  const later=next(source,'c');assert.equal(publish(r,later).snapshot.summary.total_units,5);
 });
 for(const [label,edit,error] of [
- ['new employee',b=>b.records.at(-1).source_employee_id='54321',/1 組新增員編/],
- ['changed source case',b=>b.records.at(-1).source_employee_id='12a45',/新增員編/],
- ['store transfer',b=>b.records.at(-1).store_code='DNB10062',/店點異動待核/],
+ ['new employee',b=>b.records.at(-1).source_employee_id='54321',/1 組員編無在職對應/],
+ ['changed source ID',b=>b.records.at(-1).source_employee_id='12a45',/員編無在職對應/],
  ['unknown store',b=>b.records.at(-1).store_code='DNB99999',/未知店碼/],
  ['cross-month cancellation',b=>{b.records.at(-1).cancel_date='2026-11-02';b.status_as_of_date='2026-11-03';},/整批停止同步/],
  ['older report',b=>{b.source_end='2026-10-06';b.status_as_of_date='2026-10-06';},/完整本月新檔/],
  ['new month',b=>{b.month='2026-11';b.source_start='2026-11-01';b.source_end='2026-11-09';},/本月首次來源/]
 ])test(label+' is rejected with no private mutation',()=>{const {r,source}=setup(),batch=next(source);edit(batch);noWriteFailure(r,batch,error);});
+test('a new cross-store sale credits the employee and selling store separately',()=>{
+ const {r,source}=setup(),batch=next(source);
+ batch.records.at(-1).store_code='DNB10062';
+ const writes=r.writes.length,preview=r.a.tradeinPerformancePreview(args(batch));
+ assert.equal(r.writes.length,writes);
+ assert.equal(preview.snapshot.summary.pending_identity_units,0);
+ const {snapshot}=publish(r,batch);
+ assert.equal(snapshot.summary.total_units,5);
+ assert.equal(snapshot.summary.assigned_units,5);
+ assert.deepEqual(JSON.parse(JSON.stringify(snapshot.people.find(p=>p.masked_name==='合＊5'))),{
+  store:'萬大',masked_name:'合＊5',role:'同仁',original_role:'業務代表(I)',actual_units:2,target_units:3,remaining_units:1,attainment_status:'in_progress'
+ });
+ assert.equal(snapshot.stores.find(s=>s.store==='酒泉').total_units,1);
+ assert.equal(snapshot.stores.find(s=>s.store==='萬大').total_units,3);
+});
 test('changed monthly roster cannot silently change the reusable crosswalk or targets',()=>{
  const {r,source}=setup();r.setMonthlyRoster(source.month,[employee('12345')],{source_sha256:'e'.repeat(64)});noWriteFailure(r,next(source),/核定月名冊已變更/);
 });
