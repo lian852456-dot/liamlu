@@ -37,6 +37,12 @@ body[data-performance-release="public"] #actual-person label{font-weight:700}
 body[data-performance-release="public"] #staffRows td{font-weight:700}
 body[data-performance-release="public"] .recovered-models{max-width:440px;overflow-wrap:anywhere}
 body[data-performance-release="public"] .empty-people td{text-align:center;color:var(--muted);padding:24px 12px}
+@media (741px <= width < 980px){
+ #stats:has(> .kpi:nth-child(5)){grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (min-width:980px){
+ #stats:has(> .kpi:nth-child(5)){grid-template-columns:repeat(5,minmax(0,1fr))}
+}
 @media(max-width:700px){
  body[data-performance-release="public"] main,body[data-performance-release="public"] .footer{width:calc(100% - 16px);margin:8px auto 32px}
  body[data-performance-release="public"] .hero{padding:18px 16px}

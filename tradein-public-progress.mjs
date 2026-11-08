@@ -83,7 +83,20 @@ function renderUnknownDay(){
 function render(){const s=snapshot.summary,region=snapshot.region_progress,daily=Boolean(selectedDate);$('publicWorkspace').hidden=document.getElementById('scope-sharing')?.getAttribute('aria-selected')==='true';$('readMessage').textContent='';$('updatedLabel').textContent='更新於 '+snapshot.published_at;$('recoveryDate').disabled=false;$('clearRecoveryDate').disabled=false;$('recoveryDate').min=snapshot.source_period.start;$('recoveryDate').max=snapshot.source_period.end;$('dateModeNote').hidden=!daily;$('personRuleNote').textContent=daily?'當日只顯示回收數與回收機款；每月目標與達標請切回整月查看。':'目前差異＝實績－月目標；負數為未達，0 為達標，正數為超標。'+(personalRules(snapshot.month).actingManager==='included'?'含店長及代理店長，每人每月'+personalRules(snapshot.month).staffTarget+'台。':'免目標人員不計差異。')+'';setHeaders(daily);
  if(daily&&!dailyAvailable()){renderUnknownDay();return;}
  if(daily){const people=visiblePeople(),stores=dailyRows(),actual=people.reduce((n,p)=>n+p.actual_units,0),storeCount=stores.filter(p=>p.actual_units>0).length,personCount=people.filter(p=>p.actual_units>0).length;$('periodMeta').textContent=`${snapshot.month} · 統計日期 ${selectedDate} · 來源 ${snapshot.source_period.start}–${snapshot.source_cutoff_date}`;$('stats').innerHTML=[['當日回收',units(actual),'只統計所選日期'],['有回收店數',storeCount+' 店','當日實績大於 0'],['有回收人數',personCount+' 人','當日實績大於 0'],['統計日期',selectedDate,'台北時間']].map(v=>`<article class="kpi"><span>${v[0]}</span><strong>${v[1]}</strong><small>${v[2]}</small></article>`).join('');$('storeRows').innerHTML=stores.map(p=>`<tr><td data-label="店點"><strong>${esc(p.store)}</strong></td><td data-label="當日回收">${units(p.actual_units)}</td></tr>`).join('');
- }else{$('periodMeta').textContent=`${snapshot.month} · 來源 ${snapshot.source_period.start}–${snapshot.source_cutoff_date} · 每人每月 ${personalRules(snapshot.month).staffTarget} 台`;$('stats').innerHTML=[['全區實績',units(s.actual_units),'含店長與代理店長實績'],[region?'區目標':snapshot.target_policy?.stores?'門市月目標':'同仁月目標',units(s.target_units),region?'11 月全區月目標':snapshot.target_policy?.stores?'重點Device ×12%逐店進位；個人合計 '+s.personal_target_units+' 台':s.target_people+' 人 × 3 台'],['達標人數',s.met_people+' / '+s.target_people,s.target_people+' 人 × '+personalRules(snapshot.month).staffTarget+' 台'],[region?'區尚缺':'門市尚缺',units(s.remaining_units),'達成率 '+(region?.attainment??(s.target_units?Math.round(s.actual_units/s.target_units*1000)/10:0))+'%']].map(v=>`<article class="kpi"><span>${v[0]}</span><strong>${v[1]}</strong><small>${v[2]}</small></article>`).join('');renderMonthlyStores();}
+ }else{
+  const staffTarget=personalRules(snapshot.month).staffTarget;
+  const zeroPeople=snapshot.people.filter(p=>p.target_units!==null&&p.actual_units===0).length;
+  $('periodMeta').textContent=`${snapshot.month} · 來源 ${snapshot.source_period.start}–${snapshot.source_cutoff_date} · 每人每月 ${staffTarget} 台`;
+  const cards=[
+   ['全區實績',units(s.actual_units),'含店長與代理店長實績'],
+   [region?'區目標':snapshot.target_policy?.stores?'門市月目標':'同仁月目標',units(s.target_units),region?'11 月全區月目標':snapshot.target_policy?.stores?'重點Device ×12%逐店進位；個人合計 '+s.personal_target_units+' 台':s.target_people+' 人 × 3 台'],
+   ['達標人數',s.met_people+' / '+s.target_people,s.target_people+' 人 × '+staffTarget+' 台'],
+   ['區內掛 0 人數',zeroPeople+' 人','本月回收 0 台'],
+   [region?'區尚缺':'門市尚缺',units(s.remaining_units),'達成率 '+(region?.attainment??(s.target_units?Math.round(s.actual_units/s.target_units*1000)/10:0))+'%'],
+  ];
+  $('stats').innerHTML=cards.map(([label,value,note])=>`<article class="kpi"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join('');
+  renderMonthlyStores();
+ }
  const selectedStore=$('staffStore').value;$('staffStore').replaceChildren(...[['','全區九店'],...snapshot.stores.map(s=>[s.store,s.store])].map(([value,text])=>{const o=document.createElement('option');o.value=value;o.textContent=text;return o;}));if(selectedStore&&snapshot.stores.some(s=>s.store===selectedStore))$('staffStore').value=selectedStore;renderCounts();renderPeople();refreshExports();}
 const readPublic=createPublicReader({endpoint:API,frame:(payload,signal)=>readPublicFrame(API,payload,signal),post:async(url,payload,signal)=>{
  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),cache:'no-store',credentials:'omit',signal});
