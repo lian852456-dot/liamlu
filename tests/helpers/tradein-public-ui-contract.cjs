@@ -20,6 +20,9 @@ function novemberCsv(){
 test('十一月門市與個人獎金估算，區分指定、一般、排除及待核',async({page},info)=>{
  const {errors}=await start(page,{width:320,november:true});
  await expect(page.locator('#stats')).toContainText('154 台');
+ const zeroCard=page.locator('#stats .kpi').filter({hasText:'區內掛 0 人數'});
+ await expect(zeroCard.locator('strong')).toHaveText('1 人');
+ await expect(page.locator('#stats .kpi span')).toHaveText(['全區實績','區目標','達標人數','區內掛 0 人數','區尚缺']);
  await page.getByRole('tab',{name:'店進度',exact:true}).click();
  const store=(name)=>page.locator('#storeRows tr').filter({hasText:name}).locator('[data-label="店長獎金預估"]');
  await expect(store('萬大')).toContainText('NT$105');
@@ -34,12 +37,15 @@ test('十一月門市與個人獎金估算，區分指定、一般、排除及�
  await page.locator('#recoveryDate').fill('2026-11-02');
  await page.locator('#recoveryDate').dispatchEvent('change');
  await expect(bonus).toHaveCount(0);
+ await expect(zeroCard).toHaveCount(0);
  await expect(page.locator('#bonusRules')).toBeHidden();
  await page.locator('#clearRecoveryDate').click();
  await expect(bonus).toHaveCount(4);
+ await expect(zeroCard.locator('strong')).toHaveText('1 人');
  expect(errors).toEqual([]);
 });
 for(const width of [1280,390,320])test(width+'px anonymous region, store, person, copy and real downloads',async({page},info)=>{const {r,calls,errors}=await start(page,{width});await expect(page.locator('#stats')).toContainText('4 台');await expect(page.locator('#refreshData')).toBeEnabled();await expect(page.locator('.area-nav a:visible')).toHaveText(['目標進度','回收價查詢']);await expect(page.locator('[data-supervisor-brief]')).toBeHidden();expect(await page.locator('body').evaluate(e=>getComputedStyle(e).fontSize)).toBe('18px');expect(await page.locator('main').evaluate(e=>Math.round(e.getBoundingClientRect().width))).toBe(width-(width>700?32:16));await expect(page.locator('#stats')).toContainText('159 台');await expect(page.locator('#stats')).toContainText('155 台');expect(calls).toEqual([{action:'tradein_performance_public_read',month:'2026-10',includeDays:true}]);expect(await page.locator('#employeeId').count()).toBe(0);expect(await page.locator('#bootstrapCode').count()).toBe(0);const writes=r.writes.length;
+ expect(await page.locator('#stats').evaluate(grid=>getComputedStyle(grid).gridTemplateColumns.split(' ').length)).toBe(width>740?5:2);
  for(const scope of ['region','store','person']){await page.locator('[data-public-scope="'+scope+'"]').click();await expect(page.locator('#actual-'+scope)).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:info.outputPath('SYNTHETIC-public-'+scope+'-'+width+'.png'),fullPage:true});}
  await expect(page.locator('#storeRows tr')).toHaveCount(9);await expect(page.locator('#staffRows tr')).toHaveCount(4);await expect(page.locator('#staffRows')).not.toContainText('ZX000');await expect(page.locator('#staffRows')).not.toContainText('店長');await expect(page.locator('#staffRows')).toContainText('4 台');await expect(page.locator('#actual-person th')).toHaveText(['人員','實績','目標','目前差異','回收機款']);await expect(page.locator('#staffRows [data-label="目前差異"]')).toHaveText(['−2 台','−3 台','−3 台','−4 台']);
  await expect(page.locator('#staffRows [data-label="回收機款"]').first()).toContainText('i15PM 256G');expect(await page.locator('#staffRows td').first().evaluate(e=>getComputedStyle(e).fontWeight)).toBe('700');
