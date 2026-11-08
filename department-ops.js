@@ -483,8 +483,12 @@
     $('goldImport').addEventListener('click', monthlyUI.importGold);
     $('publishGold').addEventListener('click', monthlyUI.prepare);
     $('exportGold').addEventListener('click', () => {
-      const ready = window.VendorLoader?.ensure('xlsx') || Promise.resolve();
-      ready.then(() => monthlyUI.exportGold(), error => setMessage('goldMessage', error.message, 'error'));
+      if (!window.VendorLoader) return monthlyUI.exportGold();
+      window.VendorLoader.run('gold-export', ['xlsx'], () => monthlyUI.exportGold(), {
+        button: $('exportGold'),
+        isCurrent: () => Boolean($('workspace') && !$('workspace').hidden && !window.PortalLogout?.isLocked()),
+        onError: error => setMessage('goldMessage', error.message, 'error'),
+      });
     });
     monthlyUI.bind();
   }

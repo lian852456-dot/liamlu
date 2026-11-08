@@ -7,6 +7,10 @@
   const escape = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
   let snapshot = null;
   let remote = false;
+  // Bumped by every new pick and by logout; an import that waited on the
+  // SheetJS download only applies its result if it is still the latest.
+  let importTicket = 0;
+  window.addEventListener('portal-before-logout', () => { importTicket += 1; });
   try {
     const stored = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (stored && stored.version === 1 && Array.isArray(stored.rows)) snapshot = stored;
@@ -27,9 +31,11 @@
     if (!/\.(xlsx|xls|csv|tsv)$/i.test(file.name) || !file.size || file.size > 20 * 1024 * 1024) {
       message.textContent = '請選擇 20 MB 以內的 XLSX、XLS、CSV 或 TSV 庫存檔。'; return;
     }
+    const ticket = ++importTicket;
     try {
       message.textContent = '正在解析庫存檔…';
       await window.VendorLoader?.ensure('xlsx');
+      if (ticket !== importTicket) return;
       const buffer = await file.arrayBuffer();
       let workbook;
       if (/\.(csv|tsv)$/i.test(file.name)) {
@@ -46,10 +52,11 @@
       const grouped = new Map();
       latest.forEach(row => { const key = JSON.stringify([row.store,row.model]); grouped.set(key, (grouped.get(key)||0) + row.quantity); });
       const next = {version:1,date,importedAt:new Date().toISOString(),rows:[...grouped].map(([key,quantity]) => { const [store,model] = JSON.parse(key); return {store,model,quantity}; })};
+      if (ticket !== importTicket) return;
       localStorage.setItem(KEY,JSON.stringify(next));
       snapshot = next; remote = false; message.textContent = `已匯入 ${next.rows.length} 筆庫存；資料保存在此裝置。`;
       render();
-    } catch (error) { message.textContent = `匯入失敗：${error.message}`; }
+    } catch (error) { if (ticket === importTicket) message.textContent = `匯入失敗：${error.message}`; }
   }
   async function refreshFromService() {
     const message = byId('stockImportMessage');

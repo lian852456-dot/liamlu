@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-query-v6-20261105-4';
+const CACHE_NAME = 'liam-supervisor-app-query-v7-20261108-1';
 const SHELL = [
   './app.html',
   './portal-logout.js',
