@@ -101,6 +101,8 @@ var TradeinPerformanceCore = (function () {
     if (!/^[a-f0-9]{64}$/.test(input.source_sha256 || '')) throw new Error('來源雜湊無效');
     if (!Array.isArray(input.records) || input.records.length>20000 || !Array.isArray(roster)) throw new Error('來源／名冊格式無效');
     const reference=references(input,privateConfig);
+    // Keep older exact references reproducible when reimporting a published file.
+    const matchById=privateConfig.employee_store_policy==='roster-id/v1';
     const people=[], byId={};
     roster.forEach(r=>{
       if (r.status!=='active') return;
@@ -132,14 +134,16 @@ var TradeinPerformanceCore = (function () {
       const model=shortModel(r.recycle_model);
       let support=null;
       const person=byId[identity.employee_key];
-      if(person&&person.store!==store&&reference.support.size){
+      if(matchById&&!person)throw new Error('來源員編無在職名冊對應');
+      const crossStore=!!person&&person.store!==store;
+      if(crossStore&&reference.support.size){
         if(typeof transactionHash!=='function')throw new Error('跨店支援交易核對程式未提供');
-        const key=transactionHash([r.store_code,trade,order,r.recycle_code.trim()]),approval=reference.support.get(key);
+        const approval=reference.support.get(transactionHash([r.store_code,trade,order,key]));
         if(approval&&approval.employee_key===person.employee_key&&approval.home_store===person.store&&approval.store===store&&approval.trade_date===trade)
           support={...approval};
-        if(!support)throw new Error('跨店交易未符合已核支援範圍');
+        if(!support&&(!matchById||approval))throw new Error('跨店交易未符合已核支援範圍');
       }
-      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project,model:model,support:support};
+      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project,model:model,support:support,crossStore:crossStore};
       if (unique[key]) {
         const prior=unique[key];
         if (prior.store!==store || prior.trade_date!==trade || prior.employee_key!==normalized.employee_key || prior.order!==order || prior.project!==r.project) throw new Error('同回收碼的交易、人員或店點衝突');
@@ -148,23 +152,23 @@ var TradeinPerformanceCore = (function () {
         duplicates++;
       } else unique[key]=normalized;
     });
-    Object.values(unique).forEach(r=>{
-      const person=byId[r.employee_key];
-      if(!r.cancel_date && person && person.store!==r.store&&!r.support)person.identity_status='conflict';
+    const rows=Object.values(unique);
+    if(!matchById)rows.forEach(r=>{
+      if(!r.cancel_date&&r.crossStore&&!r.support)byId[r.employee_key].identity_status='conflict';
     });
-    const supportEvidence=Object.values(unique).filter(r=>r.support).map(r=>r.support).sort((a,b)=>a.transaction_key.localeCompare(b.transaction_key));
+    const supportEvidence=rows.filter(r=>r.support).map(r=>r.support).sort((a,b)=>a.transaction_key.localeCompare(b.transaction_key));
     if(input.records.length&&reference.support.size!==supportEvidence.length)throw new Error('已核跨店支援在來源缺漏或被改寫');
-    if(supportEvidence.length)stores.forEach(s=>{s.support_in_units=0;s.support_out_units=0;s.recovered_days=[];});
-    Object.values(unique).forEach(r=>{
+    const hasStoreFlows=supportEvidence.length>0||matchById&&rows.some(r=>r.crossStore&&!r.cancel_date);
+    if(hasStoreFlows)stores.forEach(s=>{s.support_in_units=0;s.support_out_units=0;s.recovered_days=[];});
+    rows.forEach(r=>{
       if (r.cancel_date) {cancelled++;return;}
-      const store=byStore[r.store];store.total_units++;
-      if(supportEvidence.length){
+      const store=byStore[r.store],person=byId[r.employee_key];store.total_units++;
+      if(hasStoreFlows){
         let day=store.recovered_days.find(d=>d.date===r.trade_date);
         if(!day){day={date:r.trade_date,actual_units:0};store.recovered_days.push(day);}day.actual_units++;
-        if(r.support){store.support_in_units++;byStore[r.support.home_store].support_out_units++;}
+        if(r.crossStore&&(matchById||r.support)){store.support_in_units++;byStore[person.store].support_out_units++;}
       }
-      const person=byId[r.employee_key];
-      if (!person || person.store!==r.store&&!r.support || person.identity_status==='conflict') {store.pending_identity_units++;store.coverage='partial_identity';return;}
+      if (!person || person.identity_status==='conflict') {store.pending_identity_units++;store.coverage='partial_identity';return;}
       person.actual_units++;
       let daily=person.recovered_days.find(d=>d.date===r.trade_date);
       if(!daily){daily={date:r.trade_date,actual_units:0,recovered_models:[]};person.recovered_days.push(daily);}
@@ -174,7 +178,7 @@ var TradeinPerformanceCore = (function () {
       if(!r.model)person.recovered_models=null;
       else if(person.recovered_models!==null){const item=person.recovered_models.find(m=>m.model===r.model);if(item)item.units++;else person.recovered_models.push({model:r.model,units:1});}
     });
-    if(supportEvidence.length)stores.forEach(s=>s.recovered_days.sort((a,b)=>a.date.localeCompare(b.date)));
+    if(hasStoreFlows)stores.forEach(s=>s.recovered_days.sort((a,b)=>a.date.localeCompare(b.date)));
     people.forEach(p=>{
       const s=byStore[p.store], exempt=['店長','代理店長'].includes(p.role);
       if(p.identity_status==='conflict'){p.actual_units=null;p.recovered_models=null;p.recovered_days=null;s.coverage='partial_identity';}

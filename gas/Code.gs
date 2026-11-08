@@ -7109,6 +7109,8 @@ var TradeinPerformanceCore = (function () {
     if (!/^[a-f0-9]{64}$/.test(input.source_sha256 || '')) throw new Error('來源雜湊無效');
     if (!Array.isArray(input.records) || input.records.length>20000 || !Array.isArray(roster)) throw new Error('來源／名冊格式無效');
     const reference=references(input,privateConfig);
+    // Keep older exact references reproducible when reimporting a published file.
+    const matchById=privateConfig.employee_store_policy==='roster-id/v1';
     const people=[], byId={};
     roster.forEach(r=>{
       if (r.status!=='active') return;
@@ -7140,14 +7142,16 @@ var TradeinPerformanceCore = (function () {
       const model=shortModel(r.recycle_model);
       let support=null;
       const person=byId[identity.employee_key];
-      if(person&&person.store!==store&&reference.support.size){
+      if(matchById&&!person)throw new Error('來源員編無在職名冊對應');
+      const crossStore=!!person&&person.store!==store;
+      if(crossStore&&reference.support.size){
         if(typeof transactionHash!=='function')throw new Error('跨店支援交易核對程式未提供');
-        const key=transactionHash([r.store_code,trade,order,r.recycle_code.trim()]),approval=reference.support.get(key);
+        const approval=reference.support.get(transactionHash([r.store_code,trade,order,key]));
         if(approval&&approval.employee_key===person.employee_key&&approval.home_store===person.store&&approval.store===store&&approval.trade_date===trade)
           support={...approval};
-        if(!support)throw new Error('跨店交易未符合已核支援範圍');
+        if(!support&&(!matchById||approval))throw new Error('跨店交易未符合已核支援範圍');
       }
-      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project,model:model,support:support};
+      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project,model:model,support:support,crossStore:crossStore};
       if (unique[key]) {
         const prior=unique[key];
         if (prior.store!==store || prior.trade_date!==trade || prior.employee_key!==normalized.employee_key || prior.order!==order || prior.project!==r.project) throw new Error('同回收碼的交易、人員或店點衝突');
@@ -7156,23 +7160,23 @@ var TradeinPerformanceCore = (function () {
         duplicates++;
       } else unique[key]=normalized;
     });
-    Object.values(unique).forEach(r=>{
-      const person=byId[r.employee_key];
-      if(!r.cancel_date && person && person.store!==r.store&&!r.support)person.identity_status='conflict';
+    const rows=Object.values(unique);
+    if(!matchById)rows.forEach(r=>{
+      if(!r.cancel_date&&r.crossStore&&!r.support)byId[r.employee_key].identity_status='conflict';
     });
-    const supportEvidence=Object.values(unique).filter(r=>r.support).map(r=>r.support).sort((a,b)=>a.transaction_key.localeCompare(b.transaction_key));
+    const supportEvidence=rows.filter(r=>r.support).map(r=>r.support).sort((a,b)=>a.transaction_key.localeCompare(b.transaction_key));
     if(input.records.length&&reference.support.size!==supportEvidence.length)throw new Error('已核跨店支援在來源缺漏或被改寫');
-    if(supportEvidence.length)stores.forEach(s=>{s.support_in_units=0;s.support_out_units=0;s.recovered_days=[];});
-    Object.values(unique).forEach(r=>{
+    const hasStoreFlows=supportEvidence.length>0||matchById&&rows.some(r=>r.crossStore&&!r.cancel_date);
+    if(hasStoreFlows)stores.forEach(s=>{s.support_in_units=0;s.support_out_units=0;s.recovered_days=[];});
+    rows.forEach(r=>{
       if (r.cancel_date) {cancelled++;return;}
-      const store=byStore[r.store];store.total_units++;
-      if(supportEvidence.length){
+      const store=byStore[r.store],person=byId[r.employee_key];store.total_units++;
+      if(hasStoreFlows){
         let day=store.recovered_days.find(d=>d.date===r.trade_date);
         if(!day){day={date:r.trade_date,actual_units:0};store.recovered_days.push(day);}day.actual_units++;
-        if(r.support){store.support_in_units++;byStore[r.support.home_store].support_out_units++;}
+        if(r.crossStore&&(matchById||r.support)){store.support_in_units++;byStore[person.store].support_out_units++;}
       }
-      const person=byId[r.employee_key];
-      if (!person || person.store!==r.store&&!r.support || person.identity_status==='conflict') {store.pending_identity_units++;store.coverage='partial_identity';return;}
+      if (!person || person.identity_status==='conflict') {store.pending_identity_units++;store.coverage='partial_identity';return;}
       person.actual_units++;
       let daily=person.recovered_days.find(d=>d.date===r.trade_date);
       if(!daily){daily={date:r.trade_date,actual_units:0,recovered_models:[]};person.recovered_days.push(daily);}
@@ -7182,7 +7186,7 @@ var TradeinPerformanceCore = (function () {
       if(!r.model)person.recovered_models=null;
       else if(person.recovered_models!==null){const item=person.recovered_models.find(m=>m.model===r.model);if(item)item.units++;else person.recovered_models.push({model:r.model,units:1});}
     });
-    if(supportEvidence.length)stores.forEach(s=>s.recovered_days.sort((a,b)=>a.date.localeCompare(b.date)));
+    if(hasStoreFlows)stores.forEach(s=>s.recovered_days.sort((a,b)=>a.date.localeCompare(b.date)));
     people.forEach(p=>{
       const s=byStore[p.store], exempt=['店長','代理店長'].includes(p.role);
       if(p.identity_status==='conflict'){p.actual_units=null;p.recovered_models=null;p.recovered_days=null;s.coverage='partial_identity';}
@@ -7377,9 +7381,7 @@ function tradeinPerformanceCancellationEvidence_(source,reference) {
     pairs:[...events.values()].sort(function(a,b){return a.transaction_key.localeCompare(b.transaction_key);})};
 }
 function tradeinPerformanceReuseReference_(source,roster) {
-  // Only reuse the owner-held crosswalk behind this month's published version.
-  // Only the approved optional-55 rule can extend identities from the verified
-  // monthly roster. Client mapping, login roster and name matching remain unused.
+  // Reuse the owner-held crosswalk and extend it only from the verified monthly roster.
   const active=(tradeinPerformanceRegistry_().months[source.month] || {}).active;
   if(!active)throw new Error('本批私有員編／店碼對照尚未配置，請先核定本月首次來源');
   if(active.roster_hash!==tradeinPerformanceHash_(roster))throw new Error('核定月名冊已變更，請先核對員編及店點異動');
@@ -7399,44 +7401,28 @@ function tradeinPerformanceReuseReference_(source,roster) {
     source_sha256:active.source_sha256,rule_id:TradeinPerformanceCore.RULE_ID,complete_nine_stores:true,records:[]},roster,prior,tradeinPerformanceHash_);
   const next=JSON.parse(JSON.stringify(prior)),identities=new Map(next.employees.map(function(p){return [TradeinPerformanceCore.sourceEmployeeId(p.source_employee_id),p];}));
   const people=new Map(roster.filter(function(p){return p.status==='active';}).map(function(p){return [p.employee_id,p];}));
-  const published=new Map(snapshot.people.map(function(p){return [p.employee_key,p];}));
   const stores=new Map(next.stores.map(function(p){return [p.store_code,TradeinPerformanceCore.storeName(p.store)];}));
   const pending=new Map();
-  const approvals=prior.support_approvals||[];
-  const cancellations=snapshot.cancellation_evidence?.pairs||[];
   source.records.forEach(function(record){
     const sourceId=TradeinPerformanceCore.sourceEmployeeId(record.source_employee_id);
     let identity=identities.get(sourceId);
     if(!identity && people.has('55'+sourceId))
       identity={source_employee_id:sourceId,employee_key:'55'+sourceId,observations:[]};
-    const person=identity && people.get(identity.employee_key),
-      confirmed=identity && published.get(identity.employee_key),store=stores.get(record.store_code);
+    const person=identity && people.get(identity.employee_key),store=stores.get(record.store_code);
     if(!store)throw new Error('來源含九店範圍以外或未知店碼');
-    const home=person&&TradeinPerformanceCore.storeName(person.store),key=tradeinPerformanceHash_([record.store_code,record.trade_date,record.order_number.trim(),record.recycle_code.trim()]);
-    const support=approvals.some(function(a){return a.review_status==='verified'&&a.transaction_key===key&&a.employee_key===identity?.employee_key&&a.home_store===home&&a.store===store&&a.trade_date===record.trade_date;});
-    // A published conflict is already represented as unassigned store units.
-    // Reuse only its original owner-held observations; this never approves support
-    // or assigns personal units. The core recalculates the conflict from the rows.
-    const knownConflict=identities.has(sourceId)&&confirmed?.identity_status==='conflict'&&confirmed.store===home;
-    const knownObservation=knownConflict&&identity.observations.some(function(o){return o.trade_date===record.trade_date&&o.store_code===record.store_code;});
-    const knownCancellation=!!record.cancel_date&&cancellations.some(function(p){return p.transaction_key===key&&p.employee_key===identity?.employee_key&&p.store_code===record.store_code&&p.sale.date===record.trade_date;});
-    if(!person || !confirmed || confirmed.identity_status!=='confirmed'&&!knownConflict || confirmed.store!==home ||
-       home!==store&&!support&&!knownObservation&&!knownCancellation ||
-       !knownConflict&&identity.observations.some(function(o){return stores.get(o.store_code)!==home&&
-         !cancellations.some(function(p){return p.employee_key===identity.employee_key&&p.store_code===o.store_code&&p.sale.date===o.trade_date;})&&
-         !approvals.some(function(a){return a.review_status==='verified'&&a.employee_key===identity.employee_key&&a.home_store===home&&a.store===stores.get(o.store_code)&&a.trade_date===o.trade_date;});})){
-      const label=(person?person.masked_name+'（員編尾碼 '+sourceId.slice(-3)+'）':'員編尾碼 '+sourceId.slice(-3))+
-        '：名冊 '+(home||'無在職對應')+'／交易 '+store+' '+record.trade_date;
+    if(!person){
+      const label='員編尾碼 '+sourceId.slice(-3)+'：名冊無在職對應／交易 '+store+' '+record.trade_date;
       pending.set(JSON.stringify([sourceId,record.store_code]),label);return;
     }
     if(!identities.has(sourceId)){identities.set(sourceId,identity);next.employees.push(identity);}
     if(!identity.observations.some(function(o){return o.trade_date===record.trade_date && o.store_code===record.store_code;}))
       identity.observations.push({trade_date:record.trade_date,store_code:record.store_code});
   });
-  if(pending.size)throw new Error('新檔有 '+pending.size+' 組新增員編或店點異動待核，請管理者更新私有對照後重新預覽：'+
+  if(pending.size)throw new Error('新檔有 '+pending.size+' 組員編無在職對應，請管理者核對月名冊後重新預覽：'+
     [...pending.values()].slice(0,8).join('；')+(pending.size>8?'；其餘 '+(pending.size-8)+' 組待核':''));
   next.source_sha256=source.source_sha256;next.source_start=source.source_start;next.source_end=source.source_end;
   next.employee_id_policy='optional-55-prefix/v1';
+  next.employee_store_policy='roster-id/v1';
   // Only a new source reference derived from the verified active monthly basis
   // adopts the narrow same-month policy. Existing exact references are not rewritten.
   if(tradeinPerformanceSameMonthCancellations_(source).length)next.counting_policy='monthly-reset-same-month-net/v2';
@@ -7911,7 +7897,7 @@ var TradeinPublicCore=(function(){
         const s=snapshot.stores.find(s=>s.store===store);if(!s)throw Error('公開來源店點缺漏');
         return {store:store,actual_units:s.total_units,target_units:s.staff_target_units,remaining_units:s.staff_gap_units,
           target_people:s.target_staff_count,met_people:s.met_staff_count,
-          ...(snapshot.support_evidence?.length?{support_in_units:s.support_in_units,support_out_units:s.support_out_units,
+          ...(Object.prototype.hasOwnProperty.call(s,'support_in_units')?{support_in_units:s.support_in_units,support_out_units:s.support_out_units,
             recovered_days:s.recovered_days.map(d=>({date:d.date,actual_units:d.actual_units}))}:{})};
       }),summary:{}};
     ['actual_units','target_units','remaining_units','target_people','met_people'].forEach(k=>{value.summary[k]=value.stores.reduce((n,s)=>n+s[k],0);});
