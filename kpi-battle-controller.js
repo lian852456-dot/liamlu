@@ -636,6 +636,7 @@
       const metrics=selected.metrics||{};
       const labels={'AQ V+D 999 (含)以上':'A999','AQ V+D 1399 (含)以上':'A1399','好速案銷售點數':'好速','RT V+D 999 (含)以上':'R999','RT V+D 1399 (含)以上':'R1399','RT上線點數':'RT達成率'};
       const groups=kpiBattleDetailGroups(state.data.metric_keys||Object.keys(metrics));
+      if(state.metricGroup!=='all'&&!groups.some(group=>group.id===state.metricGroup&&(group.keys.length||group.id==='addon')))state.metricGroup='all';
       const metricRow=(label,metric,key=label)=>`<tr data-kpi-metric="${esc(key)}"><th scope="row">${esc(label)}</th><td>${number(metric?.target)}</td><td>${number(metric?.actual)}</td><td class="${kpiBattleTone(metric?.rate)}">${percent(metric?.rate)}</td><td>${number(metric?.target)}</td></tr>`;
       const headers='<tr><th>項目</th><th>月目標</th><th>月累計實績</th><th>進度達成率</th><th>目標<br>（不打折）</th></tr>';
       const metricTable=body=>`<div class="table-wrap" tabindex="0" role="region" aria-label="各店成績，可左右捲動"><table class="compact-details"><thead>${headers}</thead><tbody>${body||'<tr><td colspan="5">目前分類沒有項目</td></tr>'}</tbody></table></div>`;
@@ -662,7 +663,7 @@
         <h3>${esc(displayStoreName(selected.store))}｜KPI 分類明細</h3><div class="kpi-battle-toggle">${[['all','全部'],...groups.filter(group=>group.keys.length||group.id==='addon').map(group=>[group.id,group.label])].map(([id,label])=>`<button type="button" data-kpi-detail-tab="${id}" class="${state.metricGroup===id?'active':''}" aria-pressed="${state.metricGroup===id}">${label}</button>`).join('')}</div>
         ${groupTables}
         <p class="kpi-battle-note">目標（不打折）直接取正式來源原月目標，未按天數或折扣換算；進度達成率沿用正式報表。未提供的目標顯示 —。</p>
-        <details class="compact-disclosure"><summary>個別項目完整明細</summary>${metricTable(Object.entries(metrics).map(([name,metric])=>metricRow(name,metric)).join(''))}</details>
+        <details class="compact-disclosure"><summary>個別項目完整明細</summary>${metricTable(groups.flatMap(group=>group.keys).map(key=>metricRow(key,metrics[key])).join(''))}</details>
       </section>`;
     }
 

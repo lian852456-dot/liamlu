@@ -91,7 +91,14 @@ test('source item without a metric stays present as dashes; unknown source field
  await expect(page.locator('[data-kpi-group="other"]')).toContainText('來源新增待分類');
  await expect(page.locator('.compact-metric-group [data-kpi-metric]')).toHaveCount(26);
  await page.locator('#kpiBattleMetricGroup').selectOption('other');
- await expect(page.locator('[data-kpi-group="other"] [data-kpi-metric]')).toHaveCount(1);expect(f.errors).toEqual([]);
+ await expect(page.locator('[data-kpi-group="other"] [data-kpi-metric]')).toHaveCount(1);
+ const full=page.locator('.compact-store-details>.compact-disclosure');await full.locator('summary').click();
+ await expect(full.locator('[data-kpi-metric]')).toHaveCount(26);
+ await expect(full.locator('[data-kpi-metric="AQ V+D 1399 (含)以上"] td')).toHaveText(['—','—','—','—']);
+ f.kpi.items=f.kpi.items.filter(item=>item.key!=='來源新增待分類');
+ await update(page);await expect(page.locator('#kpiBattleMetricGroup')).toHaveValue('all');
+ await expect(page.locator('.compact-metric-group [data-kpi-metric]')).toHaveCount(25);
+ expect(f.errors).toEqual([]);
 });
 
 test('repeated view/lifecycle changes do not fetch or erase; failed manual update retains exact matrix',async({page})=>{
