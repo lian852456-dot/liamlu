@@ -64,14 +64,19 @@ for(const width of [1920,1024,390,320])test(width+'px approved matrix, real targ
  if(width>=700){const last=page.locator('.compact-matrix tbody tr').last(),box=await last.boundingBox();expect(box.y+box.height).toBeLessThan(780);}
  await expect(page.locator('.b-lease')).toContainText('登入至');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await expect(page.locator('[data-kpi-group="core"] [data-kpi-metric="AQ V+D 999 (含)以上"] [data-daily-target]')).toHaveText('36件／日目標資料 9/9 店');
+ await expect(page.locator('[data-daily-target-rule]')).toContainText('2026-11 全月 30 天');
  await page.locator('#kpiBattleStoreSelect').selectOption('台北三創');
  let row=page.locator('[data-kpi-group="core"] [data-kpi-metric="AQ V+D 999 (含)以上"]');
- await expect(row.locator('td')).toHaveText(['101','14','130.0%','101']); // source rate intentionally differs from actual/target
+ await expect(row.locator('td')).toHaveText(['101','14','130.0%','4件／日']); // source rate intentionally differs from actual/target
  await expect(page.locator('[data-kpi-group="core"] [data-kpi-metric]')).toHaveCount(14);
  await expect(page.locator('[data-kpi-group="addon"] [data-kpi-metric]')).toHaveCount(11);
  const rendered=await page.locator('.compact-metric-group [data-kpi-metric]').evaluateAll(rows=>rows.map(row=>({key:row.dataset.kpiMetric,values:[...row.querySelectorAll('td')].map(td=>td.textContent)})));
  expect(rendered.map(row=>row.key).sort()).toEqual([...keys].sort());
- for(const row of rendered){const i=keys.indexOf(row.key);expect(row.values).toEqual([String(101+i),'14','130.0%',String(101+i)]);}
+ for(const row of rendered){const i=keys.indexOf(row.key);expect(row.values).toEqual([String(101+i),'14','130.0%',String(Math.ceil((101+i)/30))+(row.key.includes('點數')?'點／日':['預付卡開卡面額','換約淨新增金額','空機、3C、物聯網及門市購營收','配件及其他營收','包膜與保貼營收'].includes(row.key)?'金額原單位／日':'件／日')]);}
+ const coreWrap=page.locator('[data-kpi-group="core"] .table-wrap');
+ await coreWrap.evaluate(element=>element.scrollLeft=element.scrollWidth);
+ await page.locator('[data-kpi-group="core"]').screenshot({path:info.outputPath('SYNTHETIC-daily-target-'+width+'.png')});
  await page.locator('[data-kpi-detail-tab="addon"]').click();await expect(page.locator('[data-kpi-group="addon"]')).toContainText('Netflix多享組銷售數');
  await expect(page.locator('[data-kpi-group="core"]')).toHaveCount(0);await expect(page.locator('#kpiBattleMetricGroup')).toHaveValue('addon');
  await page.locator('#kpiBattleMetricGroup').selectOption('core');await expect(page.locator('[data-kpi-group="core"]')).toContainText('RT達成率');
@@ -87,18 +92,48 @@ for(const width of [1920,1024,390,320])test(width+'px approved matrix, real targ
 
 test('source item without a metric stays present as dashes; unknown source fields stay unclassified',async({page})=>{
  const f=await start(page,{unknown:true,missingMetric:true});await page.locator('#kpiBattleStoreSelect').selectOption('台北三創');
- await expect(page.locator('[data-kpi-group="core"] [data-kpi-metric="AQ V+D 1399 (含)以上"] td')).toHaveText(['—','—','—','—']);
+ await expect(page.locator('[data-kpi-group="core"] [data-kpi-metric="AQ V+D 1399 (含)以上"] td')).toHaveText(['—','—','—','—月目標未提供']);
  await expect(page.locator('[data-kpi-group="other"]')).toContainText('來源新增待分類');
+ await expect(page.locator('[data-kpi-group="other"] [data-daily-target]')).toHaveText('—不適用');
  await expect(page.locator('.compact-metric-group [data-kpi-metric]')).toHaveCount(26);
  await page.locator('#kpiBattleMetricGroup').selectOption('other');
  await expect(page.locator('[data-kpi-group="other"] [data-kpi-metric]')).toHaveCount(1);
  const full=page.locator('.compact-store-details>.compact-disclosure');await full.locator('summary').click();
  await expect(full.locator('[data-kpi-metric]')).toHaveCount(26);
- await expect(full.locator('[data-kpi-metric="AQ V+D 1399 (含)以上"] td')).toHaveText(['—','—','—','—']);
+ await expect(full.locator('[data-kpi-metric="AQ V+D 1399 (含)以上"] td')).toHaveText(['—','—','—','—月目標未提供']);
  f.kpi.items=f.kpi.items.filter(item=>item.key!=='來源新增待分類');
  await update(page);await expect(page.locator('#kpiBattleMetricGroup')).toHaveValue('all');
  await expect(page.locator('.compact-metric-group [data-kpi-metric]')).toHaveCount(25);
  expect(f.errors).toEqual([]);
+});
+
+for(const width of [1920,390])test(width+'px daily target source edges, partial district coverage and leap-month switching',async({page},info)=>{
+ await page.setViewportSize({width,height:828});const f=await start(page),key=keys[0];
+ const values=[null,'',0,.01,true,101,101,61,89];
+ f.kpi.stores.forEach((store,i)=>store.items[key].t=values[i]);await update(page);
+ const cell=()=>page.locator('[data-kpi-group="core"] [data-kpi-metric="'+key+'"] [data-daily-target]');
+ await expect(cell()).toHaveAttribute('data-daily-target','partial');
+ await expect(cell()).toHaveText('15件／日部分合計；目標資料 6/9 店；1 店月目標為 0');
+ for(const [i,status,text] of [[0,'missing','—月目標未提供'],[1,'missing','—月目標未提供'],[2,'no-target','—無月目標（來源為 0）'],[3,'ok','1件／日'],[4,'invalid-target','—月目標無效'],[7,'ok','3件／日']]){
+  await page.locator('#kpiBattleStoreSelect').selectOption('台北'+names[i]);
+  await expect(cell()).toHaveAttribute('data-daily-target',status);await expect(cell()).toHaveText(text);
+ }
+ await page.locator('#kpiBattleStoreSelect').selectOption('北一二B整體');
+ await page.locator('[data-kpi-group="core"] .table-wrap').evaluate(element=>element.scrollLeft=element.scrollWidth);
+ await page.locator('[data-kpi-group="core"]').screenshot({path:info.outputPath('SYNTHETIC-partial-district-'+width+'.png')});
+ for(const store of f.kpi.stores)store.items[key].t=29;
+ for(const [month,days,value] of [['2027-02',28,18],['2028-02',29,9],['2026-12',31,9]]){
+  Object.assign(f.kpi.meta,{month,monthDays:days});await update(page);
+  await expect(page.locator('[data-daily-target-rule]')).toContainText(month+' 全月 '+days+' 天');
+  await expect(cell()).toHaveText(value+'件／日目標資料 9/9 店');
+  await page.locator('#kpiBattleStoreSelect').selectOption('台北三創');
+  await expect(cell()).toHaveText(Math.ceil(29/days)+'件／日');
+  await expect(page.locator('[data-kpi-group="core"] [data-kpi-metric="'+key+'"] td').nth(2)).toHaveText('130.0%');
+  await page.locator('#kpiBattleStoreSelect').selectOption('北一二B整體');
+ }
+ f.kpi.meta.monthDays=30;await update(page);
+ await expect(cell()).toHaveText('—來源月份／天數待確認');
+ expect(f.errors).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
 test('repeated view/lifecycle changes do not fetch or erase; failed manual update retains exact matrix',async({page})=>{

@@ -48,6 +48,9 @@
 .battle-compact table.compact-details{min-width:620px;font-size:15px}
 .battle-compact .compact-details td,.battle-compact .compact-details tbody th{padding:8px 12px;border-right:1px solid #e2e8f0;font-size:15px}
 .battle-compact .compact-details tbody th{text-align:left}
+.battle-compact .compact-details [data-daily-target]{min-width:115px;white-space:normal}
+.battle-compact .daily-target-unit,.battle-compact .daily-target-note{display:block;font-size:12px;line-height:1.4;font-weight:500;color:#475569}
+.battle-compact [data-daily-target="partial"]{background:#fff4da}
 .battle-compact .compact-disclosure{margin:8px 0;border:1px solid #dbe1e8;border-radius:7px;background:#fafbfc}
 .battle-compact .compact-disclosure>summary{padding:10px 14px;cursor:pointer;font-size:15px;font-weight:750}
 .battle-compact .compact-disclosure .kpi-source-metadata{padding:12px;width:100%}
