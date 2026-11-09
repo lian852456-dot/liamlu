@@ -20,17 +20,22 @@
 .battle-compact .compact-section-heading{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px}
 .battle-compact h2{font-size:23px;margin:0 10px 0 0}
 .battle-compact h3{font-size:20px;margin:14px 0 10px}
-.battle-compact .rank-top,.battle-compact .rank-bottom{display:inline-block;font-size:12px;font-weight:800;border-radius:20px;padding:2px 9px;background:#dcfce7;color:#166534;white-space:nowrap}
+.battle-compact .rank-top,.battle-compact .rank-bottom{display:inline-flex;align-items:center;gap:4px;vertical-align:middle;font-size:12px;font-weight:800;border-radius:20px;padding:2px 9px;background:#dcfce7;color:#166534;white-space:nowrap}
 .battle-compact .rank-bottom{background:#fee2e2;color:#b91c1c}
+.battle-compact .rank-icon{width:14px;height:14px;flex:none}
+.battle-compact .good{color:#166534}.battle-compact .warn{color:#925500}.battle-compact .bad{color:#b91c1c}
+.battle-compact .kpi-attention{background:#fff4da;box-shadow:inset 3px 0 #c47700}
+.battle-compact .insurance-met{color:#166534;background:#edf8f0}
+.battle-compact .insurance-low{color:#b91c1c;background:#fff0ee}
 .battle-compact .kpi-battle-note{font-size:13px;font-weight:500}
 .battle-compact .table-wrap{margin:0;border:1px solid #e2e8f0;border-radius:7px}
-.battle-compact table.compact-matrix{min-width:850px;table-layout:fixed;font-size:15px}
+.battle-compact table.compact-matrix{min-width:980px;table-layout:fixed;font-size:15px}
 .battle-compact .compact-matrix th:first-child{width:160px}
 .battle-compact .compact-matrix th,.battle-compact .compact-matrix td{padding:4px 5px;border-right:1px solid #e2e8f0;font-size:15px;line-height:1.2;font-weight:750}
 .battle-compact .compact-matrix thead th,.battle-compact .compact-details thead th{background:#f36500;color:white;border-bottom:0;font-size:14px;padding:7px}
 .battle-compact .compact-matrix tbody th{text-align:left;padding-left:13px;color:#111827}
 .battle-compact .compact-matrix small{display:block;font-size:11px;color:#64748b;line-height:1.25;font-weight:500}
-.battle-compact .compact-matrix .rank-top,.battle-compact .compact-matrix .rank-bottom{font-size:10px;padding:1px 5px}
+.battle-compact .compact-matrix .rank-top,.battle-compact .compact-matrix .rank-bottom{font-size:12px;padding:2px 5px;gap:3px}
 .battle-compact tbody tr:nth-child(even){background:#f1f4f7}
 .battle-compact .compact-store-details{margin-top:24px;padding-top:18px;border-top:1px solid #e2e8f0}
 .battle-compact .kpi-battle-filter{margin:12px 0;justify-content:space-between}
@@ -38,6 +43,8 @@
 .battle-compact .kpi-battle-filter select{min-height:40px;max-width:100%;padding:6px 12px;font-size:16px}
 .battle-compact .compact-store-details .kpi-battle-toggle{margin-bottom:10px}
 .battle-compact .compact-store-details .kpi-battle-toggle button{padding:7px 14px;min-height:38px}
+.battle-compact .compact-metric-group{margin:16px 0 20px}
+.battle-compact .compact-metric-group h4{margin:0 0 8px;padding-left:10px;border-left:4px solid #f36500;font-size:18px}
 .battle-compact table.compact-details{min-width:620px;font-size:15px}
 .battle-compact .compact-details td,.battle-compact .compact-details tbody th{padding:8px 12px;border-right:1px solid #e2e8f0;font-size:15px}
 .battle-compact .compact-details tbody th{text-align:left}
