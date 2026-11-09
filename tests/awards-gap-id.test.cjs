@@ -63,7 +63,7 @@ test('older and unknown month behavior is unchanged and all entry points load th
   for (const name of ['index.html', 'awards-battle.html', 'kpi-battle.html']) {
     const html = fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
     assert.ok(html.includes('award-model-catalog.js?v=20261105-awards-gap-id-1'));
-    assert.ok(html.includes('awards-battle-controller.js?v=20261108-integrated-1'));
+    assert.ok(html.includes('awards-battle-controller.js?v=20261109-person-ranking-1'));
     assert.ok(!html.includes('award-model-pending'));
   }
 });

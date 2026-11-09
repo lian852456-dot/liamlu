@@ -18,6 +18,7 @@ function setup({primary=false,awardRows=false,supervisorRole=false}={}){
    if(awardRows)snapshot.awardsBattle={
     data_as_of_date:'2026-11-07',processing_run_id:'synthetic-awards',
     source_files:{person:{source_data_date:'2026-11-07',run_id:'synthetic-awards',sha256:'a'.repeat(64)}},
+    stores:[{store:f.rows.DashboardUsers[2][2]},{store:'測試門市'}],
     person_awards:[
      {emp_id:'SYNTH002',store:f.rows.DashboardUsers[2][2],name:'甲＊',actual_total:50,projected:110},
      {emp_id:'SYNTH003',store:'測試門市',name:'未遮罩的合成姓名',actual_total:70,projected:100},
@@ -45,8 +46,44 @@ test('awards response uses the authenticated subject and limits personal data fo
    assert.deepEqual(awards.viewer.actual,{amount:50,rank:2,gap:20});
    assert.deepEqual(awards.viewer.projected,{amount:110,rank:1,gap:0});
   }
+  const ownStore = h.f.rows.DashboardUsers[2][2];
+  assert.deepEqual(awards.viewer.rankings.actual,[
+   {name:'未＊',store:'測試門市',amount:70,rank:1,gap:0,self:false},
+   {name:'甲＊',store:ownStore,amount:50,rank:2,gap:20,self:mode==='member'},
+  ]);
+  assert.deepEqual(awards.viewer.rankings.projected.map(row=>[row.name,row.rank,row.gap]),[['甲＊',1,0],['未＊',2,10]]);
   assert.deepEqual(h.read({employeeId:'SYNTH003'}),{status:'error',code:'B_AUTH_DENIED'});
  }
+});
+test('personal leaderboard preserves ties and zero, and suppresses unverified district data',()=>{
+ const h=setup();
+ const fixture=()=>({awardsBattle:{
+  data_as_of_date:'2026-11-07',processing_run_id:'synthetic-awards',
+  source_files:{person:{source_data_date:'2026-11-07',run_id:'synthetic-awards',sha256:'a'.repeat(64)}},
+  stores:[{store:'台北甲店'}],
+  person_awards:[
+   {emp_id:'A',store:'甲店',name:'甲＊',actual_total:50,projected:100},
+   {emp_id:'B',store:'甲店',name:'乙＊',actual_total:50,projected:null},
+   {emp_id:'C',store:'甲店',name:'丙＊',actual_total:0,projected:0},
+  ],
+ }});
+ const project=(snapshot,id='C')=>JSON.parse(JSON.stringify(
+  h.f.ctx.privateDashboardAwardsForViewer_(snapshot,id,'甲店',false).awardsBattle));
+ const valid=project(fixture());
+ assert.deepEqual(valid.viewer.rankings.actual.map(row=>[row.rank,row.amount,row.gap,row.self]),[[1,50,0,false],[1,50,0,false],[3,0,50,true]]);
+ assert.equal(valid.viewer.rankings.projected,undefined);
+ for(const mutate of [
+  value=>{value.source_files.person.run_id='wrong';},
+  value=>{value.person_awards[0].store='外區';},
+  value=>{value.person_awards[0].emp_id='C';},
+ ]){
+  const invalid=fixture();
+  mutate(invalid.awardsBattle);
+  assert.equal(project(invalid).viewer.rankings,undefined);
+ }
+ const anonymous=project(fixture(),'');
+ assert.equal(anonymous.viewer,undefined);
+ assert.equal(anonymous.person_awards,undefined);
 });
 test('bundle retains both strict read projections under one unchanged owner lock and fixed lease',()=>{
  for(const primary of [false,true]){
