@@ -80,6 +80,20 @@ function resume(phoneToken, deviceId, suffix) {
   };
 }
 
+test('short session has a hard 30-minute deadline; validation never renews it', () => {
+  const started=Date.now(),clock={value:started},f=fixture({clock:started});
+  f.props.set('DASHBOARD_TRUSTED_EMPLOYEE_ID',PRIMARY);
+  const api=makeApi(f,clock),lease=login(api,PRIMARY,DEVICE_A,'a');
+  assert.equal(lease.status,'ok');assert.equal(lease.expiresAt-started,1800000);
+  for(const elapsed of [60000,600000,1799999]){
+    clock.value=started+elapsed;
+    const validated=invoke(api,{action:'employee_session',token:lease.token,deviceId:DEVICE_A});
+    assert.equal(validated.status,'ok');assert.equal(validated.expiresAt,lease.expiresAt);
+  }
+  clock.value=lease.expiresAt;
+  assert.equal(invoke(api,{action:'employee_session',token:lease.token,deviceId:DEVICE_A}).status,'error');
+});
+
 test('primary owner enrollment and resume are device-bound and idempotent', () => {
   const started = Date.now();
   const clock = { value: started };

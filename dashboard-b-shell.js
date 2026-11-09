@@ -113,7 +113,15 @@ function wipe(note='請重新輸入員編與指定密碼。',clearTransport=true
 }
 function device(){let value=scope.localStorage.getItem(DEVICE_KEY);if(value)return value;
  value=Array.from(scope.crypto.getRandomValues(new Uint8Array(24)),b=>b.toString(16).padStart(2,'0')).join('');scope.localStorage.setItem(DEVICE_KEY,value);return value;}
-function scheduleExpiry(){acceptedProof=currentProof();scope.clearTimeout(expiryTimer);expiryTimer=scope.setTimeout(()=>{if(host.ownerPhone){active=false;confirmed=false;acceptedProof=null;void resumePhone();}else wipe('登入已到期，請重新輸入指定密碼。');},Math.max(0,expiresAt-Date.now()));}
+function expireSession(){
+ // A foreground lifecycle check can observe expiry before a throttled timer.
+ // Both paths must use the same existing, server-verified owner-phone resume.
+ // resumePhone clears the expired view before sending any request.
+ scope.clearTimeout(expiryTimer);
+ if(host.ownerPhone){if(loading)return;active=false;confirmed=false;acceptedProof=null;void resumePhone();}
+ else wipe('登入已到期，請重新輸入指定密碼。');
+}
+function scheduleExpiry(){acceptedProof=currentProof();scope.clearTimeout(expiryTimer);expiryTimer=scope.setTimeout(expireSession,Math.max(0,expiresAt-Date.now()));}
 async function logout(note='已登出指定密碼通道；裝置綁定保留。',transport){
  const operation=client?.logout(transport);wipe(host.ownerPhone?'已登出並取消手機自動登入。':note,false);
  try{await operation;return true;}catch{message(host.ownerPhone?'本機已登出；伺服器撤銷未確認，請連線後由人員與裝置管理解除手機自動登入。':'畫面已清除；伺服器登出未確認，請關閉本頁。原 session 最多存活至原30分鐘期限。');return false;}
@@ -121,7 +129,7 @@ async function logout(note='已登出指定密碼通道；裝置綁定保留。'
 function checkProfile(result){if(!result?.profile || result.profile.role!=='employee' || result.profile.isTrusted!==false || result.trustSource!=='password-bound')throw Error('B_AUTH_DENIED');}
 function localSessionValid(){
  if(!active)return false;
- if(expiresAt<=Date.now()){wipe('登入已到期，請重新輸入指定密碼。');return false;}
+ if(expiresAt<=Date.now()){expireSession();return false;}
  const proof=currentProof();let logoutEpoch='';let deviceId='';
  try{logoutEpoch=JSON.parse(scope.localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||'';deviceId=scope.localStorage.getItem(DEVICE_KEY)||'';}catch{}
  if(!acceptedProof || !proof || proof.owner!==OWNER || proof.token!==acceptedProof.token ||
