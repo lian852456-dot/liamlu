@@ -23,6 +23,61 @@
     return [...KPI_DETAIL_GROUPS.map(group=>({...group,keys:group.keys.filter(key=>source.includes(key))})),
       {id:'other',label:'來源未分類',keys:source.filter(key=>!known.has(key))}];
   }
+  const KPI_TARGET_STORES = Object.freeze(['酒泉','永吉','復興南','杭州南','萬大','通化','大稻埕','三創','六張犁']);
+  const KPI_MONEY_TARGETS = new Set(['預付卡開卡面額','換約淨新增金額','空機、3C、物聯網及門市購營收','配件及其他營收','包膜與保貼營收']);
+  const KPI_COUNT_TARGETS = new Set(KPI_DETAIL_GROUPS.flatMap(group=>group.keys));
+
+  function kpiBattleTargetMonth(meta = {}) {
+    const match = typeof meta.month === 'string' && meta.month.match(/^([1-9]\d{3})-(0[1-9]|1[0-2])$/);
+    if (!match) return {month:'',days:null};
+    const year=Number(match[1]),month=Number(match[2]);
+    const leap=year%4===0&&(year%100!==0||year%400===0);
+    const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31][month-1];
+    // The source month is authoritative; never substitute today's month or
+    // snapshotDay. Reject an inconsistent supplied full-month day count.
+    const supplied=meta.monthDays;
+    const provided=supplied!=null&&supplied!=='';
+    if (provided && !((typeof supplied==='number'||typeof supplied==='string'&&/^\d{2}$/.test(supplied))&&Number(supplied)===days)) return {month:meta.month,days:null};
+    return {month:meta.month,days};
+  }
+
+  function kpiBattleDailyTarget(rawTarget, key, calendar) {
+    // Only the 25 existing additive source metrics are eligible. A ratio,
+    // rank, score supplement, or new unclassified field has no inferred target.
+    const unit=!KPI_COUNT_TARGETS.has(key)?'':KPI_MONEY_TARGETS.has(key)?'金額原單位／日':key.includes('點數')?'點／日':'件／日';
+    const result=(status,value=null)=>({status,value,unit});
+    if (!unit) return result('not-applicable');
+    if (rawTarget==null||typeof rawTarget==='string'&&rawTarget.trim()==='') return result('missing');
+    if (!(typeof rawTarget==='number'||typeof rawTarget==='string'&&/^\+?(?:\d+(?:\.\d*)?|\.\d+)$/.test(rawTarget.trim()))) return result('invalid-target');
+    const target=Number(rawTarget);
+    if (!Number.isFinite(target)||target<0||target>Number.MAX_SAFE_INTEGER) return result('invalid-target');
+    if (target===0) return result('no-target');
+    if (!calendar?.days) return result('invalid-month');
+    // No discount, uplift, remaining-days adjustment, or performance subtraction.
+    return result('ok',Math.max(1,Math.ceil(target/calendar.days)));
+  }
+
+  function kpiBattleDistrictDailyTarget(stores, key, calendar) {
+    const byStore=new Map();
+    stores.forEach(store=>{
+      const name=kpiBattleStoreKey(store.name);
+      if (!byStore.has(name)) byStore.set(name,[]);
+      byStore.get(name).push(store);
+    });
+    const targets=KPI_TARGET_STORES.map(name=>{
+      const matches=byStore.get(name)||[];
+      return kpiBattleDailyTarget(matches.length===1?matches[0].items?.[key]?.t:undefined,key,calendar);
+    });
+    const first=targets[0];
+    if (first.status==='not-applicable') return first;
+    const known=targets.filter(target=>target.status==='ok'||target.status==='no-target').length;
+    const positive=targets.filter(target=>target.status==='ok');
+    const noTarget=targets.filter(target=>target.status==='no-target').length;
+    const coverage={known,total:KPI_TARGET_STORES.length,noTarget};
+    if (targets.some(target=>target.status==='invalid-month')) return {...first,status:'invalid-month',value:null,...coverage};
+    const status=known<KPI_TARGET_STORES.length?'partial':positive.length?'ok':'no-target';
+    return {...first,status,value:positive.length?positive.reduce((sum,target)=>sum+target.value,0):null,...coverage};
+  }
   const KNOWN_HAOSU_CORRECTIONS = Object.freeze({
     '0904.xlsx': Object.freeze({
       dataAsOfDate: '2026-09-03',
@@ -216,6 +271,7 @@
   function kpicalcToKpiBattleView(data, fetchedAt) {
     const safeData = data || {};
     const meta = safeData.meta || {};
+    const targetMonth = kpiBattleTargetMonth(meta);
     const dataAsOfDate = kpiBattleDataAsOfDate(meta);
     const sourceFile = kpiBattleSourceFile(meta.sourceFile);
     // The MMDD source filename is the publication-day identity, not the
@@ -232,6 +288,7 @@
       });
       return output;
     };
+    const dailyTargetsOf = itemsObj => Object.fromEntries((safeData.items || []).map(item=>[item.key,kpiBattleDailyTarget(itemsObj?.[item.key]?.t,item.key,targetMonth)]));
     const coreOf = metrics => {
       const core = {};
       Object.entries(KPI_BATTLE_CORE_KEYS).forEach(([short, key]) => { core[short] = metrics[key] || null; });
@@ -239,7 +296,7 @@
     };
     const stores = (safeData.stores || []).map(store => {
       const metrics = metricsOf(store.items);
-      return { store: store.name, overall_kpi: store.official, company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(metrics), metrics };
+      return { store: store.name, overall_kpi: store.official, company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(metrics), metrics, daily_targets:dailyTargetsOf(store.items) };
     });
     const aggregateItems = {};
     const aggregateRates = safeData.aggregateRates || {};
@@ -288,8 +345,10 @@
       source_as_of_date: dataAsOfDate,
       source_date_range: meta.period || '',
       metric_keys: (safeData.items || []).map(item=>item.key),
+      target_month: targetMonth,
       previous_report_date: null,
-      aggregate: { store: '北一二B整體', overall_kpi: meta.aggregateOfficialCorrected == null ? null : Number(meta.aggregateOfficialCorrected), company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(aggregateItems), metrics: aggregateItems },
+      aggregate: { store: '北一二B整體', overall_kpi: meta.aggregateOfficialCorrected == null ? null : Number(meta.aggregateOfficialCorrected), company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(aggregateItems), metrics: aggregateItems,
+        daily_targets:Object.fromEntries((safeData.items || []).map(item=>[item.key,kpiBattleDistrictDailyTarget(safeData.stores||[],item.key,targetMonth)])) },
       stores,
       personal,
     };
@@ -637,8 +696,15 @@
       const labels={'AQ V+D 999 (含)以上':'A999','AQ V+D 1399 (含)以上':'A1399','好速案銷售點數':'好速','RT V+D 999 (含)以上':'R999','RT V+D 1399 (含)以上':'R1399','RT上線點數':'RT達成率'};
       const groups=kpiBattleDetailGroups(state.data.metric_keys||Object.keys(metrics));
       if(state.metricGroup!=='all'&&!groups.some(group=>group.id===state.metricGroup&&(group.keys.length||group.id==='addon')))state.metricGroup='all';
-      const metricRow=(label,metric,key=label)=>`<tr data-kpi-metric="${esc(key)}"><th scope="row">${esc(label)}</th><td>${number(metric?.target)}</td><td>${number(metric?.actual)}</td><td class="${kpiBattleTone(metric?.rate)}">${percent(metric?.rate)}</td><td>${number(metric?.target)}</td></tr>`;
-      const headers='<tr><th>項目</th><th>月目標</th><th>月累計實績</th><th>進度達成率</th><th>目標<br>（不打折）</th></tr>';
+      const dailyCell=key=>{
+        const target=selected.daily_targets?.[key]||{status:'missing',value:null};
+        const reasons={'missing':'月目標未提供','invalid-target':'月目標無效','invalid-month':'來源月份／天數待確認','not-applicable':'不適用','no-target':'無月目標（來源為 0）'};
+        const coverage=target.total?`目標資料 ${target.known}/${target.total} 店${target.noTarget?`；${target.noTarget} 店月目標為 0`:''}`:'';
+        const detail=target.status==='partial'?`部分合計；${coverage}`:reasons[target.status]||coverage;
+        return `<td data-daily-target="${target.status}">${number(target.value)}${target.value!=null?`<small class="daily-target-unit">${esc(target.unit)}</small>`:''}${detail?`<small class="daily-target-note">${esc(detail)}</small>`:''}</td>`;
+      };
+      const metricRow=(label,metric,key=label)=>`<tr data-kpi-metric="${esc(key)}"><th scope="row">${esc(label)}</th><td>${number(metric?.target)}</td><td>${number(metric?.actual)}</td><td class="${kpiBattleTone(metric?.rate)}">${percent(metric?.rate)}</td>${dailyCell(key)}</tr>`;
+      const headers='<tr><th>項目</th><th>月目標</th><th>月累計實績</th><th>進度達成率</th><th>日目標<br>（不打折）</th></tr>';
       const metricTable=body=>`<div class="table-wrap" tabindex="0" role="region" aria-label="各店成績，可左右捲動"><table class="compact-details"><thead>${headers}</thead><tbody>${body||'<tr><td colspan="5">目前分類沒有項目</td></tr>'}</tbody></table></div>`;
       const rateCell=metric=>`<td class="${kpiBattleTone(metric?.rate)}">${percent(metric?.rate)}</td>`;
       const insuranceCell=value=>`<td data-insurance-rate class="${value==null||value===''||!Number.isFinite(Number(value))?'':Number(value)>=.5?'insurance-met':'insurance-low'}" title="保險搭售率門檻 50%">${percent(value)}</td>`;
@@ -662,7 +728,7 @@
         <div class="kpi-battle-filter"><label>選擇門市<select id="kpiBattleStoreSelect">${rows.map(row=>`<option value="${esc(row.store)}"${row.store===selected.store?' selected':''}>${esc(displayStoreName(row.store))}</option>`).join('')}</select></label><label>項目分類<select id="kpiBattleMetricGroup"><option value="all"${state.metricGroup==='all'?' selected':''}>全部項目</option>${groups.filter(group=>group.keys.length||group.id==='addon').map(group=>`<option value="${group.id}"${state.metricGroup===group.id?' selected':''}>${group.label}</option>`).join('')}</select></label></div>
         <h3>${esc(displayStoreName(selected.store))}｜KPI 分類明細</h3><div class="kpi-battle-toggle">${[['all','全部'],...groups.filter(group=>group.keys.length||group.id==='addon').map(group=>[group.id,group.label])].map(([id,label])=>`<button type="button" data-kpi-detail-tab="${id}" class="${state.metricGroup===id?'active':''}" aria-pressed="${state.metricGroup===id}">${label}</button>`).join('')}</div>
         ${groupTables}
-        <p class="kpi-battle-note">目標（不打折）直接取正式來源原月目標，未按天數或折扣換算；進度達成率沿用正式報表。未提供的目標顯示 —。</p>
+        <p class="kpi-battle-note" data-daily-target-rule>日目標（不打折）＝原月目標 ÷ ${state.data.target_month?.days?`${esc(state.data.target_month.month)} 全月 ${state.data.target_month.days} 天`:'來源月份全月日數（待確認）'}，無條件向上取整。全區逐店進位後加總；不足九店標示部分合計。件數／點數沿用原單位，金額沿原報表單位、不換算元或千元；進度達成率沿用正式報表。缺目標與無效值顯示 —，來源月目標為 0 另行標示；比率、排名及無可換算月目標項目不適用。</p>
         <details class="compact-disclosure"><summary>個別項目完整明細</summary>${metricTable(groups.flatMap(group=>group.keys).map(key=>metricRow(key,metrics[key])).join(''))}</details>
       </section>`;
     }
@@ -940,6 +1006,9 @@
     mergeKpiBattleSupplement,
     kpiBattleSourceMetadata,
     kpiBattleDetailGroups,
+    kpiBattleTargetMonth,
+    kpiBattleDailyTarget,
+    kpiBattleDistrictDailyTarget,
     kpiBattleReportDateFromSource,
     kpiBattleApplyKnownCorrections,
     displayStoreName,
