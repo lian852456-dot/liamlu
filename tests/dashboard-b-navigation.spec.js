@@ -53,6 +53,10 @@ async function login(page,url){
  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
 }
 const counts=page=>page.evaluate(()=>({...window.__counts}));
+async function refresh(page){
+ const more=page.locator('.b-more');if(await more.count())await more.evaluate(node=>node.open=true);
+ await page.locator('[data-b-refresh]').click();
+}
 
 test('website reads once across KPI and awards, then updates only on request',async({context,page})=>{
  const f=await fixture(context),start=Date.now();await login(page,'home');
@@ -88,6 +92,7 @@ test('website reads once across KPI and awards, then updates only on request',as
   await expect(page.locator('[data-b-message]')).toContainText('仍顯示上次載入資料');
   f.control.networkFail=false;
   await page.locator('[data-b-refresh]').click();
+  await expect.poll(async()=>(await counts(page)).accept).toBeGreaterThan(old.accept);
   expect(f.calls.at(-1)).toBe('employee_dashboard_read');
   await page.evaluate(()=>sessionStorage.removeItem('north12b_password_data_v1'));
   const missing=f.calls.length;await page.goto(origin+'/kpi.html');
@@ -148,8 +153,8 @@ test('website KPI, awards and personal views switch in one verified document',as
   const url=new URL(route.request().url());
   if(url.origin===origin){
    const name=path.basename(url.pathname);
-   if(!['kpi-battle.html','portal-logout.js','GasBClient.js','dashboard-b-shell.js','kpi-battle-controller.js','award-model-catalog.js','awards-battle-controller.js'].includes(name))return route.abort();
-   return route.fulfill({contentType:name.endsWith('.html')?'text/html':'text/javascript',body:fs.readFileSync(path.join(root,name))});
+   if(!['kpi-battle.html','kpi-battle-compact.css','portal-logout.js','GasBClient.js','dashboard-b-shell.js','kpi-battle-controller.js','award-model-catalog.js','awards-battle-controller.js'].includes(name))return route.abort();
+   return route.fulfill({contentType:name.endsWith('.html')?'text/html':name.endsWith('.css')?'text/css':'text/javascript',body:fs.readFileSync(path.join(root,name))});
   }
   if(url.hostname!=='script.google.com')return route.abort();
   const action=route.request().postDataJSON().action;actions.push(action);
@@ -164,6 +169,7 @@ test('website KPI, awards and personal views switch in one verified document',as
   return route.fulfill({contentType:'application/json',body:JSON.stringify(result)});
  });
  await page.goto(origin+'/kpi-battle.html#awards');
+ await page.locator('.b-more summary').click();
  await page.locator('[data-b-a]').click();
  const legacyInput=page.locator('#awardsBattleContent #privateEmployeeId');
  await expect(legacyInput).toBeVisible();
@@ -190,11 +196,14 @@ test('website KPI, awards and personal views switch in one verified document',as
  console.log('BATTLE_HUB_METRICS '+JSON.stringify({desktopSwitches:6,desktopMs,mobileSwitches:2,mobileMs,requests:actions.length-initial}));
  expect(actions.length-initial).toBe(0);expect(new URL(page.url()).pathname).toBe(new URL(before).pathname);
  const manual=actions.length;
- await page.locator('[data-b-refresh]').click();
+ await refresh(page);
  await expect(page.locator('#kpiBattleContent .summary-grid')).toBeVisible();
  expect(actions.slice(manual)).toEqual(['employee_dashboard_read']);
- control.revoked=true;await page.locator('[data-b-refresh]').click();
+ control.revoked=true;await refresh(page);
  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','locked');
  await expect(page.locator('#kpiBattleContent .summary-grid')).toHaveCount(0);
  await expect(page.locator('#awardsBattleContent .summary-grid')).toHaveCount(0);
 });
+
+// Keep the approved KPI layout and retention regressions in this CI entrypoint.
+require('./helpers/kpi-compact.cjs');

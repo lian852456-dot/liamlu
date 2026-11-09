@@ -1,0 +1,69 @@
+/* Approved compact KPI overview. Shared legacy and App layouts are unchanged. */
+.battle-compact{background:#fff}
+.battle-compact .shell-header{padding:6px 20px;gap:12px}
+.battle-compact .shell-header .home-link{min-height:36px;padding:6px 14px}
+.battle-compact .title-group{display:flex;align-items:center;gap:20px}
+.battle-compact .eyebrow{font-size:16px;margin:0}
+.battle-compact h1{font-size:25px;border-left:1px solid #dfe3e8;padding-left:20px}
+.battle-compact .subtitle{display:none}
+.battle-compact #panel-kpi-battle{padding:0 20px 24px}
+.battle-compact .compact-controls{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;margin:0;border:0;border-radius:0;box-shadow:none}
+.battle-compact #kpiCompactCutoff{margin:0;color:#334155;font-weight:750;font-size:15px}
+.battle-compact .compact-controls .kpi-battle-toggle button{min-height:36px;padding:5px 12px;font-size:15px}
+.battle-compact .compact-summary{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:12px 0 18px}
+.battle-compact .compact-summary .summary-card{min-height:100px;padding:10px;border-color:#f1d7c6;background:#fffaf6;box-shadow:none}
+.battle-compact .sc-label{color:#111827;font-size:19px}
+.battle-compact .sc-val{font-size:30px;margin:4px 0;color:#111827}
+.battle-compact .sc-sub{margin-top:4px;padding:2px;background:#f1efed;border-radius:5px;font-size:13px}
+.battle-compact .compact-refresh{min-height:36px;border:1px solid #dbe1e8;border-radius:7px;background:white;padding:5px 14px;cursor:pointer;font-size:14px;font-weight:700;margin-left:auto}
+.battle-compact .sc-sub .kpi-dod{display:inline;margin:0;font-size:inherit}
+.battle-compact .compact-section-heading{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px}
+.battle-compact h2{font-size:23px;margin:0 10px 0 0}
+.battle-compact h3{font-size:20px;margin:14px 0 10px}
+.battle-compact .rank-top,.battle-compact .rank-bottom{display:inline-block;font-size:12px;font-weight:800;border-radius:20px;padding:2px 9px;background:#dcfce7;color:#166534;white-space:nowrap}
+.battle-compact .rank-bottom{background:#fee2e2;color:#b91c1c}
+.battle-compact .kpi-battle-note{font-size:13px;font-weight:500}
+.battle-compact .table-wrap{margin:0;border:1px solid #e2e8f0;border-radius:7px}
+.battle-compact table.compact-matrix{min-width:850px;table-layout:fixed;font-size:15px}
+.battle-compact .compact-matrix th:first-child{width:160px}
+.battle-compact .compact-matrix th,.battle-compact .compact-matrix td{padding:4px 5px;border-right:1px solid #e2e8f0;font-size:15px;line-height:1.2;font-weight:750}
+.battle-compact .compact-matrix thead th,.battle-compact .compact-details thead th{background:#f36500;color:white;border-bottom:0;font-size:14px;padding:7px}
+.battle-compact .compact-matrix tbody th{text-align:left;padding-left:13px;color:#111827}
+.battle-compact .compact-matrix small{display:block;font-size:11px;color:#64748b;line-height:1.25;font-weight:500}
+.battle-compact .compact-matrix .rank-top,.battle-compact .compact-matrix .rank-bottom{font-size:10px;padding:1px 5px}
+.battle-compact tbody tr:nth-child(even){background:#f1f4f7}
+.battle-compact .compact-store-details{margin-top:24px;padding-top:18px;border-top:1px solid #e2e8f0}
+.battle-compact .kpi-battle-filter{margin:12px 0;justify-content:space-between}
+.battle-compact .kpi-battle-filter label{display:flex;align-items:center;gap:12px;font-size:15px}
+.battle-compact .kpi-battle-filter select{min-height:40px;max-width:100%;padding:6px 12px;font-size:16px}
+.battle-compact .compact-store-details .kpi-battle-toggle{margin-bottom:10px}
+.battle-compact .compact-store-details .kpi-battle-toggle button{padding:7px 14px;min-height:38px}
+.battle-compact table.compact-details{min-width:620px;font-size:15px}
+.battle-compact .compact-details td,.battle-compact .compact-details tbody th{padding:8px 12px;border-right:1px solid #e2e8f0;font-size:15px}
+.battle-compact .compact-details tbody th{text-align:left}
+.battle-compact .compact-disclosure{margin:8px 0;border:1px solid #dbe1e8;border-radius:7px;background:#fafbfc}
+.battle-compact .compact-disclosure>summary{padding:10px 14px;cursor:pointer;font-size:15px;font-weight:750}
+.battle-compact .compact-disclosure .kpi-source-metadata{padding:12px;width:100%}
+.battle-compact .compact-disclosure .table-wrap{border:0}
+.battle-compact .compact-read-status{padding:0!important;border:0!important;margin:0!important;box-shadow:none!important}
+.battle-compact .compact-read-status>span{font-size:12px;color:#64748b}
+.battle-compact .compact-read-status>button{border:1px solid #dbe1e8;border-radius:6px;background:white;padding:5px 10px;cursor:pointer;min-height:32px;font-size:13px}
+.battle-compact #dashboard-b-access[data-state="active"]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:calc(100% - 40px);margin:0 auto;padding:0;font-size:13px}
+.battle-compact #dashboard-b-access[data-state="active"]>h2{display:none}
+.battle-compact #dashboard-b-access[data-state="active"]>.b-toolbar{border:0;padding:0;flex:1;gap:12px}
+.battle-compact #dashboard-b-access[data-state="active"] button{min-height:34px;padding:5px 12px;font-size:14px}
+.battle-compact #dashboard-b-access .b-more{margin-left:auto;position:relative}
+.battle-compact #dashboard-b-access .b-more>summary{padding:7px 12px;cursor:pointer;border:1px solid #dbe1e8;border-radius:7px;font-weight:700}
+.battle-compact #dashboard-b-access .b-more[open]>.b-more-content{position:absolute;right:0;top:100%;width:min(460px,calc(100vw - 40px));padding:14px;background:#fff;box-shadow:0 6px 22px #0002;border:1px solid #e2e8f0;border-radius:8px;z-index:20}
+.battle-compact #dashboard-b-access .b-more [data-b-message]{margin:0 0 12px}
+.battle-compact #dashboard-b-access .b-lease{font-size:12px;color:#64748b;white-space:nowrap}
+.battle-compact #portal-session-controls{font-size:12px!important;padding:4px 20px!important}
+@media(max-width:700px){
+ .battle-compact .shell-header{padding:8px 12px}.battle-compact .title-group{display:block}.battle-compact .eyebrow{font-size:11px}.battle-compact h1{border:0;padding:0;font-size:21px}.battle-compact .home-link{padding:6px 10px;min-height:36px}
+ .battle-compact #panel-kpi-battle{padding:0 10px 20px}.battle-compact .compact-controls{align-items:flex-start;flex-wrap:wrap;gap:5px}.battle-compact #kpiCompactCutoff{font-size:12px}
+ .battle-compact .compact-summary{gap:7px;grid-template-columns:repeat(2,minmax(0,1fr));margin:8px 0 14px}.battle-compact .compact-summary .summary-card{min-height:95px;padding:10px}.battle-compact .sc-label{font-size:16px}.battle-compact .sc-val{font-size:27px}.battle-compact .sc-sub{font-size:12px}
+ .battle-compact h2{font-size:20px}.battle-compact .compact-section-heading{gap:5px}.battle-compact .compact-section-heading>.kpi-battle-note{width:100%;font-size:11px}
+ .battle-compact .compact-matrix tbody th{position:sticky;left:0;background:#fff;z-index:1}.battle-compact .compact-matrix tbody tr:nth-child(even) th{background:#f1f4f7}
+ .battle-compact #dashboard-b-access[data-state="active"]{width:calc(100% - 24px);flex-wrap:wrap;gap:3px}.battle-compact #dashboard-b-access[data-state="active"]>.b-toolbar{flex:1 1 100%;width:100%;gap:5px}.battle-compact #dashboard-b-access[data-state="active"] nav{width:auto;gap:4px}.battle-compact #dashboard-b-access[data-state="active"] nav button{flex:none;padding:5px 9px;font-size:13px}.battle-compact #dashboard-b-access .b-lease{font-size:11px}
+ .battle-compact .kpi-battle-filter label{flex-wrap:wrap;gap:6px}.battle-compact .kpi-battle-filter select{max-width:210px}.battle-compact #portal-session-controls{font-size:11px!important;padding:3px 12px!important}
+}

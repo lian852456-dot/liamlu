@@ -46,7 +46,9 @@ function mountTiming(){if(timingOutput)return;const details=document.createEleme
  const stop=document.createElement('button');stop.type='button';stop.textContent='停止計時';stop.onclick=()=>{timingEnabled=false;details.hidden=true;try{scope.localStorage.removeItem(timingEnabledKey);scope.sessionStorage.removeItem(timingKey);}catch{}};
  timingSummary=document.createElement('pre');timingSummary.style.cssText='white-space:pre-wrap;word-break:break-all';
  timingOutput=document.createElement('pre');timingOutput.style.cssText='max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-all';details.append(summary,reset,copy,stop,timingSummary,timingOutput);panel.after(details);renderTiming();}
-function message(text){if(panel)panel.querySelector('[data-b-message]').textContent=text;}
+function message(text){if(panel){panel.querySelector('[data-b-message]').textContent=text;
+ const summary=panel.querySelector('.b-more>summary');if(summary)summary.textContent=text.startsWith('本次更新失敗')?'更新未完成':'更多';
+}}
 // Fixed, non-secret categories only. Never display a response body or exception text.
 function accessFailureMessage(error,stage='validate'){
  if(error?.message==='B_STATUS_UNAVAILABLE')return '登入服務狀態檢查未通過（STATUS）；尚未送出員編與密碼。請管理者檢查正式驗證服務、名冊授權效期與同步紀錄；服務恢復後可按「重新核驗」。';
@@ -60,7 +62,9 @@ function accessFailureMessage(error,stage='validate'){
  return (reasons[error?.message]||(stage==='read'?'資料讀取未完成（UNKNOWN）':'登入核驗未完成（UNKNOWN）'))+
   '；尚未確認失敗原因，畫面已鎖定。可按「重新核驗」重試，或在本頁輸入員編與指定密碼重新登入。';
 }
-function state(name){if(panel){panel.dataset.state=name;panel.querySelector('h2').textContent=name==='active'?(host?.ownerPhone&&client?.hasPhone()?'手機自動登入已啟用':'同仁專區已登入'):name==='checking'?'正在確認登入':name==='loading'?'正在登入這台裝置':(host?.ownerPhone?'首次驗證與手機綁定':'員編與密碼登入');panel.querySelector('[data-b-phone]').hidden=!(name==='active'&&host?.ownerPhone&&host.phoneEligible&&!client?.hasPhone());}}
+function state(name){if(panel){panel.dataset.state=name;panel.querySelector('h2').textContent=name==='active'?(host?.ownerPhone&&client?.hasPhone()?'手機自動登入已啟用':'同仁專區已登入'):name==='checking'?'正在確認登入':name==='loading'?'正在登入這台裝置':(host?.ownerPhone?'首次驗證與手機綁定':'員編與密碼登入');panel.querySelector('[data-b-phone]').hidden=!(name==='active'&&host?.ownerPhone&&host.phoneEligible&&!client?.hasPhone());
+ const lease=panel.querySelector('.b-lease');if(lease){lease.hidden=name!=='active';lease.textContent=name==='active'?`登入至 ${new Date(expiresAt).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit'})}（臺北）` : '';}
+}}
 function markLegacyRoots(){
  const roots=[];
  const appForm=document.querySelector('#privateAccessForm');
@@ -104,7 +108,7 @@ function saveDataCache(privateResult,kpiResult){
  }catch{clearDataCache();}
 }
 function wipe(note='請重新輸入員編與指定密碼。',clearTransport=true){
- epoch++;active=false;confirmed=false;loading=false;expiresAt=0;acceptedProof=null;lastLoadedAt=0;scope.clearTimeout(expiryTimer);clearDataCache();if(clearTransport)client?.clear();checking=null;host?.clear();state('locked');message(note);
+ epoch++;active=false;confirmed=false;loading=false;expiresAt=0;acceptedProof=null;lastLoadedAt=0;scope.clearTimeout(expiryTimer);clearDataCache();if(clearTransport)client?.clear();checking=null;host?.clear(note);state('locked');message(note);
  if(panel)panel.querySelector('[data-b-password]').value='';
 }
 function device(){let value=scope.localStorage.getItem(DEVICE_KEY);if(value)return value;
@@ -256,6 +260,11 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
  @media(max-width:600px){#dashboard-b-access .b-options{border-top:1px solid #edf0f4}#dashboard-b-access .b-options>summary{display:list-item;margin-left:18px}#dashboard-b-access .b-options .b-toolbar{border-top:0;padding-top:4px}#dashboard-b-access.b-compact-mobile input{height:auto;line-height:1.4}#dashboard-b-access.b-compact-mobile button{white-space:normal}#dashboard-b-access.b-compact-mobile nav button{flex:1 1 8em}#dashboard-b-access.b-compact-mobile [data-b-submit]{height:auto}}
  `;document.head.append(style);setAccessMode('password');const mountPoint=host.mountSelector&&document.querySelector(host.mountSelector);if(mountPoint)mountPoint.prepend(panel);else{const header=document.querySelector('header');if(header)header.insertAdjacentElement('afterend',panel);else document.body.prepend(panel);}if(!legacyObserver){legacyObserver=new MutationObserver(markLegacyRoots);legacyObserver.observe(document.body,{childList:true,subtree:true});}panel.querySelector('form').addEventListener('submit',login);if(host.ownerPhone){panel.querySelector('[data-b-submit]').textContent='首次驗證並綁定這支手機';state('locked');message('只需首次驗證；綁定後平常開啟 App 免輸入帳密。登出會取消自動登入。');}
  panel.classList.toggle('b-compact-mobile',host.compactMobileLogin===true);
+ if(host.compactBattle){
+  const account=panel.querySelector('.b-account'),more=document.createElement('details'),summary=document.createElement('summary'),content=document.createElement('div'),lease=document.createElement('span');
+  more.className='b-more';summary.textContent='更多';content.className='b-more-content';lease.className='b-lease';lease.hidden=true;
+  account.replaceWith(more);content.append(panel.querySelector('[data-b-message]'),account);more.append(summary,content);panel.append(lease);
+ }
  const options=panel.querySelector('.b-options');
  if(options){
   const mobile=scope.matchMedia('(max-width:600px)');let mobileOpen=false;

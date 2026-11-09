@@ -175,12 +175,12 @@
     copy.report_run_date = String(snapshot.report_run_date || '');
     copy.source_date_range = snapshot.source_date_range || copy.source_date_range;
     copy.aggregate = { ...copy.aggregate };
-    copyFields(copy.aggregate, aggregate, ['overall_kpi', 'overall_kpi_dod', 'company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod', 'insurance_attach_rate']);
+    copyFields(copy.aggregate, aggregate, ['overall_kpi', 'overall_kpi_dod', 'company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod', 'insurance_attach_rate', 'insurance_attach_rate_dod']);
     const snapshotStores = new Map((snapshot.stores || []).map(row => [kpiBattleStoreKey(row.store), row]));
     copy.stores = copy.stores.map(row => {
       const source = snapshotStores.get(kpiBattleStoreKey(row.store));
       const merged = { ...row };
-      copyFields(merged, source, ['company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod', 'insurance_attach_rate']);
+      copyFields(merged, source, ['overall_kpi_dod', 'company_rank', 'company_rank_dod', 'addon_score', 'addon_score_dod', 'insurance_attach_rate', 'insurance_attach_rate_dod']);
       return merged;
     });
     const snapshotPeople = new Map((snapshot.personal || []).map(row => [kpiBattlePersonKey(row), row]));
@@ -398,17 +398,19 @@
     const sleep = typeof config.sleep === 'function' ? config.sleep : delay => new Promise(resolve => win.setTimeout(resolve, delay));
     const logger = config.logger || win.console || (typeof console !== 'undefined' ? console : null);
     const request = payload => requestWithRetry(payload);
-    const state = { data: null, view: 'stores', profile: null, adminSecret: '', loading: false };
+    const state = { data: null, view: 'stores', profile: null, adminSecret: '', loading: false, store: '', metricGroup: 'all', detailTab: 'core' };
     function updateNotice(message) {
+      const compactRefresh=doc.querySelector('.compact-refresh');if(compactRefresh)compactRefresh.disabled=!state.data||state.loading;
       for (const id of ['kpiBattleContent','awardsBattleContent']) {
         const content=doc.getElementById(id);if(!content)continue;
         let notice=doc.getElementById(id+'ReadStatus');
-        if(!notice){notice=doc.createElement('div');notice.id=id+'ReadStatus';notice.className='card kpi-battle-note';notice.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap';content.before(notice);}
+        if(!notice){notice=doc.createElement('div');notice.id=id+'ReadStatus';notice.className='card kpi-battle-note';notice.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap';if(config.compactOverview&&id==='kpiBattleContent')content.after(notice);else content.before(notice);}
         notice.replaceChildren();
         if(!state.data){notice.hidden=true;notice.style.display='none';continue;}
         notice.hidden=false;notice.style.display='flex';
         const text=doc.createElement('span');text.setAttribute('role','status');
-        text.textContent=message||`上次讀取：${state.data.fetchedAt}。已載入的資料會保留，需要最新資料時請手動更新。`;
+        text.textContent=message||`上次讀取：${state.data.fetchedAt}。有效登入期間保留資料；需要最新資料時請手動更新。`;
+        if(config.compactOverview)notice.classList.add('compact-read-status');
         const button=doc.createElement('button');button.type='button';button.textContent='更新資料';button.disabled=state.loading;
         button.dataset.privateDashboardAction='refresh';notice.append(text,button);
         if(win.BattleHtmlExport&&win.OfflineHtml){
@@ -601,7 +603,55 @@
       return String(input?.value || '').trim();
     }
 
+    function renderCompactStores() {
+      const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+      const number = value => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : formatNumber(value);
+      const percent = value => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : formatPercent(value);
+      const delta = (value, unit) => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : `${Number(value)>0?'+':''}${number(Number(value)*(unit==='pp'?100:1))} ${unit}`;
+      const aggregate = state.data.aggregate || {};
+      const stores = [...(state.data.stores || [])];
+      const valid = stores.filter(row => row.overall_kpi != null && row.overall_kpi !== '' && Number.isFinite(Number(row.overall_kpi))).sort((a,b)=>Number(b.overall_kpi)-Number(a.overall_kpi));
+      const rank = row => valid.includes(row) ? 1+valid.filter(other=>Number(other.overall_kpi)>Number(row.overall_kpi)).length : null;
+      const badge = row => {
+        const position=rank(row);
+        const bottom=valid.filter(other=>Number(other.overall_kpi)<Number(row.overall_kpi)).length;
+        return position == null ? '<small>區內排名待載入</small>' : `<small>區內第 ${position} 名 ${position<=3?'<b class="rank-top">TOP3</b>':bottom<3?'<b class="rank-bottom">BOT3</b>':''}</small>`;
+      };
+      const rows = [{...aggregate, store:'北一二B整體',isDistrict:true},...stores];
+      const selected = rows.find(row=>row.store===state.store)||rows[0];
+      state.store=selected.store;
+      const metrics=selected.metrics||{};
+      const defs=[['A999',KPI_BATTLE_CORE_KEYS.a999],['A1399',KPI_BATTLE_CORE_KEYS.a1399],['好速',KPI_BATTLE_CORE_KEYS.haosu],['R999','RT V+D 999 (含)以上'],['R1399',KPI_BATTLE_CORE_KEYS.r1399],['RT達成率','RT上線點數']];
+      const coreKeys=new Set(defs.map(([,key])=>key));
+      const metricRow=(label,metric)=>`<tr><th scope="row">${esc(label)}</th><td>${number(metric?.target)}</td><td>${number(metric?.actual)}</td><td class="${kpiBattleTone(metric?.rate)}">${percent(metric?.rate)}</td><td>${number(metric?.target)}</td></tr>`;
+      const metricRows=(state.detailTab==='core'?defs:Object.entries(metrics).filter(([key])=>!coreKeys.has(key)).map(([key])=>[key,key]))
+        .filter(([,key])=>state.metricGroup==='all'||(state.metricGroup==='core')===coreKeys.has(key))
+        .map(([label,key])=>metricRow(label,metrics[key])).join('');
+      const headers='<tr><th>項目</th><th>月目標</th><th>月累計實績</th><th>進度達成率</th><th>目標<br>（不打折）</th></tr>';
+      const metricTable=body=>`<div class="table-wrap" tabindex="0" role="region" aria-label="各店成績，可左右捲動"><table class="compact-details"><thead>${headers}</thead><tbody>${body||'<tr><td colspan="5">目前分類沒有項目</td></tr>'}</tbody></table></div>`;
+      const rateCell=metric=>`<td class="${kpiBattleTone(metric?.rate)}">${percent(metric?.rate)}</td>`;
+      const summary=(label,value,dod)=>`<article class="summary-card"><div class="sc-label">${label}</div><div class="sc-val">${value}</div><div class="sc-sub">DOD：${dod}</div></article>`;
+      return `<div class="summary-grid compact-summary">
+        ${summary('全區 KPI',percent(aggregate.overall_kpi),delta(aggregate.overall_kpi_dod,'pp'))}
+        ${summary('公司排名',number(aggregate.company_rank),aggregate.company_rank_dod==null?'—':kpiBattleRankDod(aggregate.company_rank_dod).replace('DOD ',''))}
+        ${summary('附掛得分',number(aggregate.addon_score),delta(aggregate.addon_score_dod,'分'))}
+        ${summary('保險搭售',percent(aggregate.insurance_attach_rate),delta(aggregate.insurance_attach_rate_dod,'pp'))}
+      </div>
+      <section class="compact-overview" aria-labelledby="storeOverviewHeading"><div class="compact-section-heading"><h2 id="storeOverviewHeading">店點總覽</h2><span class="rank-top">區內TOP3</span><span class="rank-bottom">區內BOT3</span><span class="kpi-battle-note">依有效 KPI 排名；缺值不列名次</span></div>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="九店 KPI 總覽，可左右捲動"><table class="compact-matrix"><thead><tr><th>店點／區內標示</th><th>KPI</th><th>公司排名</th><th>DOD<br>（較前日）</th><th>附掛得分</th><th>A999</th><th>A1399</th><th>好速</th><th>RT</th><th>R1399</th></tr></thead><tbody>
+      ${stores.map(row=>`<tr><th scope="row">${esc(displayStoreName(row.store))}${badge(row)}</th><td class="${kpiBattleTone(row.overall_kpi)}">${percent(row.overall_kpi)}</td><td>${number(row.company_rank)}</td><td>${delta(row.overall_kpi_dod,'pp')}</td><td>${number(row.addon_score)}<small>DOD ${delta(row.addon_score_dod,'分')}</small></td>${rateCell(row.core?.a999)}${rateCell(row.core?.a1399)}${rateCell(row.core?.haosu)}${rateCell(row.metrics?.['RT上線點數'])}${rateCell(row.core?.r1399)}</tr>`).join('')}
+      </tbody></table></div><details class="compact-disclosure"><summary>KPI 未達 100% 門市</summary><p>${stores.every(row=>row.overall_kpi!=null&&row.overall_kpi!=='')?stores.filter(row=>Number(row.overall_kpi)<1).length+' 間門市':'—'}</p></details></section>
+      <section class="compact-store-details" aria-labelledby="storeDetailHeading"><h2 id="storeDetailHeading">各店詳細成績</h2>
+        <div class="kpi-battle-filter"><label>選擇門市<select id="kpiBattleStoreSelect">${rows.map(row=>`<option value="${esc(row.store)}"${row.store===selected.store?' selected':''}>${esc(displayStoreName(row.store))}</option>`).join('')}</select></label><label>項目分類<select id="kpiBattleMetricGroup"><option value="all"${state.metricGroup==='all'?' selected':''}>全部項目</option><option value="core"${state.metricGroup==='core'?' selected':''}>主力 KPI</option><option value="addon"${state.metricGroup==='addon'?' selected':''}>附掛明細</option></select></label></div>
+        <h3>${esc(displayStoreName(selected.store))}｜主力 KPI 與附掛表現</h3><div class="kpi-battle-toggle"><button type="button" data-kpi-detail-tab="core" class="${state.detailTab==='core'?'active':''}">主力KPI</button><button type="button" data-kpi-detail-tab="addon" class="${state.detailTab==='addon'?'active':''}">附掛明細</button></div>
+        ${metricTable(metricRows+(state.detailTab==='core'&&state.metricGroup!=='addon'?`<tr><th scope="row">附掛得分</th><td>—</td><td>${number(selected.addon_score)} 分</td><td>—</td><td>—</td></tr><tr><th scope="row">保險搭售</th><td>—</td><td>${percent(selected.insurance_attach_rate)}</td><td>—</td><td>—</td></tr>`:''))}
+        <p class="kpi-battle-note">目標（不打折）直接取正式來源原月目標，未按天數或折扣換算；進度達成率沿用正式報表。未提供的目標顯示 —。</p>
+        <details class="compact-disclosure"><summary>個別項目完整明細</summary>${metricTable(Object.entries(metrics).map(([name,metric])=>metricRow(name,metric)).join(''))}</details>
+      </section>`;
+    }
+
     function renderStores() {
+      if(config.compactOverview)return renderCompactStores();
       const aggregate = state.data.aggregate || {};
       const stores = [...(state.data.stores || [])].sort((left, right) => (left.company_rank || 9999) - (right.company_rank || 9999));
       const rows = [{ ...aggregate, store: '北一二B整體', isDistrict: true }, ...stores];
@@ -652,6 +702,12 @@
       if (note) {
         const supplement = state.data.supplement_status || (state.data.supplement_synced ? '同次正式來源已對齊；缺項顯示尚未有資料' : '補充欄位尚未有資料；有效 KPI 已顯示');
         note.innerHTML = kpiBattleSourceMetadata(state.data, supplement);
+        if(config.compactOverview){
+          const summary=doc.createElement('summary');summary.textContent='資料來源與口徑';
+          const details=doc.createElement('details');details.className='compact-disclosure';
+          details.append(summary,...Array.from(note.childNodes));note.replaceChildren(details);
+          const cutoff=doc.getElementById('kpiCompactCutoff');if(cutoff)cutoff.textContent=`資料截至 ${state.data.data_as_of_date||'—'} · ${state.data.source_date_range||'統計區間待載入'}`;
+        }
       }
       const content = doc.getElementById('kpiBattleContent');
       if (!content) return;
@@ -803,6 +859,7 @@
     function failClosed(message) {
       state.profile=null;state.adminSecret='';
       state.data = null;
+      const cutoff=doc.getElementById('kpiCompactCutoff');if(cutoff)cutoff.textContent=message||'尚未取得已授權資料';
       updateNotice();
       const note = doc.getElementById('kpiBattleSourceNote');
       if (note) note.textContent = message || 'KPI 戰情目前無法載入。';
@@ -811,6 +868,8 @@
     }
 
     function handleClick(event) {
+      const detail=event.target.closest('[data-kpi-detail-tab]');
+      if(detail){state.detailTab=detail.dataset.kpiDetailTab;render();return;}
       const actionElement = event.target.closest('[data-private-dashboard-action]');
       if (actionElement) {
         const action = actionElement.dataset.privateDashboardAction;
@@ -827,6 +886,8 @@
     }
 
     function handleChange(event) {
+      if(config.compactOverview&&event.target.id==='kpiBattleStoreSelect')state.store=event.target.value;
+      if(event.target.id==='kpiBattleMetricGroup'){state.metricGroup=event.target.value;state.detailTab=state.metricGroup==='addon'?'addon':'core';render();return;}
       if (['kpiBattleStoreSelect', 'kpiBattlePersonalStore', 'kpiBattlePersonalRole'].includes(event.target.id)) render();
     }
 
