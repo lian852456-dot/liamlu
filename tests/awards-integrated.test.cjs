@@ -66,3 +66,22 @@ test('the store selector does not change the logged-in store, and the basis chan
   assert.match(supervisor, /全區同仁第一名<\/strong><p>甲＊ · \$50/);
   assert.doesNotMatch(supervisor, /我的台獎/);
 });
+
+test('the personal board renders masked peers, self, and the selected award basis', () => {
+  const data = fixture();
+  data.viewer = {mode:'member', rankings:{
+    actual:[{name:'甲＊',store:'台北甲店',amount:50,rank:1,gap:0},
+      {name:'乙＊',store:'乙店',amount:0,rank:2,gap:50,self:true}],
+    projected:[{name:'乙＊',store:'乙店',amount:110,rank:1,gap:0,self:true}],
+  }};
+  assert.doesNotMatch(renderIntegratedAwards(data, data.overall, 'actual'), /乙＊/);
+  const actual = renderIntegratedAwards(data, data.overall, 'actual', 'people');
+  assert.match(actual, /value="people" selected/);
+  assert.match(actual, /aria-label="區內同仁獎金排名"/);
+  assert.match(actual, /乙＊（我）<br><small>乙店<\/small><\/th><td>\$0<\/td><td>\$50/);
+  const projected = renderIntegratedAwards(data, data.overall, 'projected', 'people');
+  assert.match(projected, /乙＊（我）.*?\$110<\/td><td>目前領先/);
+  assert.doesNotMatch(projected, /甲＊/);
+  delete data.viewer.rankings;
+  assert.match(renderIntegratedAwards(data, data.overall, 'actual', 'people'), /同仁獎金待確認/);
+});
