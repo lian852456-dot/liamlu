@@ -283,6 +283,42 @@ test('same complete employee set can retain approved stores when performance att
   assert.ok(members.every(m => /＊/.test(m.maskedName) && m.status === 'active'));
 });
 
+test('explicit confirmed omission restores the existing identity before exact attribution validation', () => {
+  const f=attributionFixture();f.rows.pop();
+  const members=f.context.privateDashboardRosterSourceMembers_(f.context.__spreadsheet,'1010.xlsx',TODAY,f.approved,
+    [{employeeId:'SYNTH009',maskedName:'測＊九',store:'六張犁',role:'銷售人員'}]);
+  assert.equal(members.length,9);
+  assert.deepEqual(Array.from(members,m=>[m.employeeId,m.store]),Object.entries(f.approved));
+  f.rows.pop();
+  assert.throws(()=>f.context.privateDashboardRosterSourceMembers_(f.context.__spreadsheet,'1010.xlsx',TODAY,f.approved,
+    [{employeeId:'SYNTH009',maskedName:'測＊九',store:'六張犁',role:'銷售人員'}]),/B_COMPLETE_ROSTER_REQUIRED/);
+});
+
+test('confirmed presence is month bounded and cannot create or revive a native identity', () => {
+  const active={employee_id:'SYNTH009',masked_name:'測＊九',store:'六張犁',role:'銷售人員',status:'active'};
+  const f=refreshFixture({nativeMembers:[active]}),approved={SYNTH009:'六張犁'};
+  const raw=JSON.stringify({month:'2026-10',employeeIds:['SYNTH009']});
+  assert.equal(f.context.privateDashboardConfirmedRosterMembers_(TODAY,approved,raw).length,1);
+  assert.equal(f.context.privateDashboardConfirmedRosterMembers_('2026-11-01',approved,raw).length,0);
+  assert.throws(()=>f.context.privateDashboardConfirmedRosterMembers_(TODAY,{},raw),/ROSTER_CONFIRMATION_INVALID/);
+  for(const status of ['inactive','revoked']){
+    const g=refreshFixture({nativeMembers:[{...active,status}]});
+    assert.throws(()=>g.context.privateDashboardConfirmedRosterMembers_(TODAY,approved,raw),/ROSTER_CONFIRMATION_INACTIVE/);
+  }
+  const missing=refreshFixture();
+  assert.throws(()=>missing.context.privateDashboardConfirmedRosterMembers_(TODAY,approved,raw),/ROSTER_CONFIRMATION_INACTIVE/);
+  const duplicated=refreshFixture({nativeMembers:[active,active]});
+  assert.throws(()=>duplicated.context.privateDashboardConfirmedRosterMembers_(TODAY,approved,raw),/ROSTER_CONFIRMATION_INACTIVE/);
+  for(const value of [{month:'2026-10',employeeIds:['SYNTH009','SYNTH009']},{month:'2026-10',employeeIds:['SYNTH009'],extra:true}])
+    assert.throws(()=>f.context.privateDashboardConfirmedRosterMembers_(TODAY,approved,JSON.stringify(value)),/ROSTER_CONFIRMATION_INVALID/);
+});
+
+test('changing confirmed presence during source validation rejects the refresh before renewal',()=>{
+  const f=refreshFixture({recheckHook:props=>props.set('DASHBOARD_ROSTER_CONFIRMED_PRESENT_V1',JSON.stringify({month:'2026-10',employeeIds:[]}))});
+  assert.throws(()=>f.context.privateDashboardRefreshRoster_({adminSecret:'SYNTHETIC_ADMIN'}),/ROSTER_REFRESH_FAILED/);
+  assert.equal(f.stats().syncCalls,0);
+});
+
 test('attribution recovery rejects missing, new or duplicate employees and never accepts a partial approval set', () => {
   for (const change of [f=>f.rows.pop(), f=>{f.rows[11][5]='SYNTH_NEW';},
     f=>{f.rows[11][5]=f.rows[10][5];}, f=>{delete f.approved.SYNTH009;},
