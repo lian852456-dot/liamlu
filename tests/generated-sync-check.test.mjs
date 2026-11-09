@@ -1,5 +1,6 @@
-// The generated-file sync check must allow only the two acknowledged,
-// hash-pinned differences and block new drift, changed drift and build failures.
+// The generated-file sync check must allow only differences recorded with
+// exact hashes in the baseline, and block new drift, changed drift and build
+// failures. The repository baseline is empty once every file is in sync.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -10,14 +11,25 @@ import { fileURLToPath } from 'node:url';
 import { evaluate } from '../scripts/check-generated-sync.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const baseline = JSON.parse(fs.readFileSync(path.join(root, 'scripts/generated-sync-baseline.json'), 'utf8'));
-const [patrol, assets] = baseline.allowedDrift;
+const repoBaseline = JSON.parse(fs.readFileSync(path.join(root, 'scripts/generated-sync-baseline.json'), 'utf8'));
+// Fixture baseline for the rule tests, independent of the repository's state.
+const patrol = { file: 'patrol-gas/DepartmentScoresCore.gs', committedSha256: 'c1', generatedSha256: 'g1', reason: 'fixture' };
+const assets = { file: 'department-readonly-assets.js', committedSha256: 'c2', generatedSha256: 'g2', reason: 'fixture' };
+const baseline = { allowedDrift: [patrol, assets] };
 const known = entry => ({ file: entry.file, committedSha256: entry.committedSha256, generatedSha256: entry.generatedSha256 });
 const results = (...drifts) => [{ script: 'scripts/build-x.mjs', error: null, drift: drifts }];
 
-test('only the two recorded differences are allowed', () => {
-  assert.equal(baseline.allowedDrift.length, 2);
-  assert.deepEqual(baseline.allowedDrift.map(e => e.file), ['patrol-gas/DepartmentScoresCore.gs', 'department-readonly-assets.js']);
+test('the repository baseline allows nothing: every generated file is in sync', () => {
+  assert.deepEqual(repoBaseline.allowedDrift, []);
+});
+
+test('with an empty baseline any difference blocks', () => {
+  const v = evaluate(results(known(patrol)), { allowedDrift: [] });
+  assert.equal(v.ok, false);
+  assert.equal(v.findings[0].kind, 'new-drift');
+});
+
+test('differences recorded with exact hashes are allowed', () => {
   const v = evaluate(results(known(patrol), known(assets)), baseline);
   assert.equal(v.ok, true);
   assert.deepEqual(v.findings.map(f => f.kind), ['known-drift', 'known-drift']);
@@ -63,8 +75,6 @@ function scratchCopy() {
     fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true });
     fs.copyFileSync(from, path.join(dir, f));
   }
-  // Committed generated files may have been touched by other tests' builds.
-  for (const entry of baseline.allowedDrift) fs.writeFileSync(path.join(dir, entry.file), execFileSync('git', ['show', 'HEAD:' + entry.file], { cwd: root }));
   execFileSync('git', ['init', '-q'], { cwd: dir });
   return dir;
 }
@@ -75,7 +85,7 @@ test('end to end: the repository as committed passes', () => {
   try {
     const out = runCheck(dir);
     assert.equal(out.status, 0, out.stdout + out.stderr);
-    assert.equal(JSON.parse(out.stdout).findings.filter(f => f.level === 'known').length, 2);
+    assert.deepEqual(JSON.parse(out.stdout).findings.filter(f => f.level === 'block'), []);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -89,12 +99,28 @@ test('end to end: editing a generated file that was in sync blocks', () => {
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('end to end: changing the source behind a known difference blocks', () => {
+test('end to end: changing a source without regenerating blocks', () => {
   const dir = scratchCopy();
   try {
     fs.appendFileSync(path.join(dir, 'gas/DepartmentScoresCore.gs'), '\n// source change\n');
     const out = runCheck(dir);
     assert.equal(out.status, 1);
-    assert.ok(JSON.parse(out.stdout).findings.some(f => f.kind === 'drift-changed' && f.file === patrol.file));
+    assert.ok(JSON.parse(out.stdout).findings.some(f => f.kind === 'new-drift' && f.file === 'patrol-gas/DepartmentScoresCore.gs'));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('end to end: a recorded difference passes, and blocks once it changes', () => {
+  const dir = scratchCopy();
+  try {
+    fs.appendFileSync(path.join(dir, 'gas/DepartmentScoresCore.gs'), '\n// source change\n');
+    const drift = JSON.parse(runCheck(dir).stdout).results.flatMap(r => r.drift).find(d => d.file === 'patrol-gas/DepartmentScoresCore.gs');
+    fs.writeFileSync(path.join(dir, 'scripts/generated-sync-baseline.json'), JSON.stringify({ allowedDrift: [{ ...drift, reason: 'test' }] }));
+    const allowed = runCheck(dir);
+    assert.equal(allowed.status, 0, allowed.stdout);
+    assert.ok(JSON.parse(allowed.stdout).findings.some(f => f.kind === 'known-drift' && f.file === drift.file));
+    fs.appendFileSync(path.join(dir, 'gas/DepartmentScoresCore.gs'), '// another change\n');
+    const changed = runCheck(dir);
+    assert.equal(changed.status, 1);
+    assert.ok(JSON.parse(changed.stdout).findings.some(f => f.kind === 'drift-changed' && f.file === drift.file));
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

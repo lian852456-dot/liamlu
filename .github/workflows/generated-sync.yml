@@ -17,9 +17,9 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Blocking. The two differences that already existed on main are allowed
-    # only as recorded (exact hashes) in scripts/generated-sync-baseline.json;
-    # any new difference, a change to those two, or a failed build fails here.
+    # Blocking. The baseline (scripts/generated-sync-baseline.json) is empty:
+    # every generated file must match its build. Any difference, a change to
+    # a recorded difference, or a failed build fails here.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:

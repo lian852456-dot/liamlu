@@ -1,23 +1,7 @@
 {
   "description": "Known, owner-acknowledged differences between committed generated files and what their build produces. Only an exact match on both hashes is allowed; any new difference, any change to these differences, or a failed build blocks CI. Remove an entry once the file is synced.",
-  "recordedAt": "2026-11-08",
-  "recordedOnMain": "273803c",
-  "allowedDrift": [
-    {
-      "file": "patrol-gas/DepartmentScoresCore.gs",
-      "build": "scripts/build-patrol-gas-bundle.mjs",
-      "committedSha256": "a990200987bf116967dff40e25d9bd7f1481b5f3801f393c6d1409150d1887a6",
-      "generatedSha256": "3e930e7e61b5b5dd2a9a219a27602ec99b9b5dae91bfa840887e368e5c4b012d",
-      "changedLines": 38,
-      "reason": "巡店 GAS 部署包停在 10/02 版，缺 10/26 店務管理月報解析；另開修復 PR 處理。"
-    },
-    {
-      "file": "department-readonly-assets.js",
-      "build": "scripts/build-department-readonly-assets.mjs",
-      "committedSha256": "f82bdc7e2978198c99795df0737a719ae663b8d9f0b79676b45969de8fd9fee8",
-      "generatedSha256": "ebfcd2cf363d1668c2697d13eb36eb23871799daa07382b52fccd00532fa6621",
-      "changedLines": 2,
-      "reason": "部區管理離線匯出資產未重新產生；另開修復 PR 處理。"
-    }
-  ]
+  "recordedAt": "2026-11-09",
+  "recordedOnMain": "8244fa8 + #331",
+  "allowedDrift": [],
+  "history": "2026-11-08 起始基準允許 2 項（patrol-gas/DepartmentScoresCore.gs、department-readonly-assets.js）；#331 重新產生這 2 項及 main #333 造成的 threec-readonly-assets.js 後清空。"
 }
