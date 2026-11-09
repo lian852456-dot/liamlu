@@ -200,13 +200,14 @@
   }
 
   async function readWorkbook(file, password) {
+    await window.VendorLoader?.ensure('xlsx', 'officecrypto');
     let bytes = await file.arrayBuffer();
     try {
       if (window.OfficeCrypto?.isEncrypted(bytes)) {
         if (!password) throw new Error('請輸入 Excel 開啟密碼。');
         bytes = arrayBufferFrom(await window.OfficeCrypto.decrypt(bytes, { password }));
       }
-      return XLSX.read(bytes, { type: 'array', cellDates: true });
+      return XLSX.read(bytes, { type: 'array', cellHTML: false, cellDates: true });
     } catch (error) {
       if (/password|密碼|incorrect/i.test(String(error?.message || error))) throw new Error('Excel 密碼不正確，請重新輸入。');
       throw error;
@@ -481,7 +482,15 @@
     }
     $('goldImport').addEventListener('click', monthlyUI.importGold);
     $('publishGold').addEventListener('click', monthlyUI.prepare);
-    $('exportGold').addEventListener('click', monthlyUI.exportGold);
+    $('exportGold').addEventListener('click', () => {
+      if (!window.VendorLoader) return monthlyUI.exportGold();
+      window.VendorLoader.run('gold-export', ['xlsx'], () => monthlyUI.exportGold(), {
+        button: $('exportGold'),
+        cooldownMs: 2500,
+        isCurrent: () => Boolean($('workspace') && !$('workspace').hidden && !window.PortalLogout?.isLocked()),
+        onError: error => setMessage('goldMessage', error.message, 'error'),
+      });
+    });
     monthlyUI.bind();
   }
 

@@ -1,0 +1,7 @@
+{
+  "description": "Known, owner-acknowledged differences between committed generated files and what their build produces. Only an exact match on both hashes is allowed; any new difference, any change to these differences, or a failed build blocks CI. Remove an entry once the file is synced.",
+  "recordedAt": "2026-11-09",
+  "recordedOnMain": "8244fa8 + #331",
+  "allowedDrift": [],
+  "history": "2026-11-08 起始基準允許 2 項（patrol-gas/DepartmentScoresCore.gs、department-readonly-assets.js）；#331 重新產生這 2 項及 main #333 造成的 threec-readonly-assets.js 後清空。"
+}

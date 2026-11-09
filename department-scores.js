@@ -197,7 +197,8 @@
     pending=null;restore=null;$('scorePreview').hidden=true;$('scoreRestorePreview').hidden=true;setBusy(true);msg('正在本機讀取快取值與比較差異…');
     try{
       if(!/\.xlsx$/i.test(file.name)||file.size>10*1024*1024)throw new Error('請選擇10 MB以內的原格式 XLSX');
-      const bytes=await file.arrayBuffer(),sourceHash=await digest(bytes),workbook=XLSX.read(bytes,{type:'array',cellFormula:true});
+      await window.VendorLoader?.ensure('xlsx');
+      const bytes=await file.arrayBuffer(),sourceHash=await digest(bytes),workbook=XLSX.read(bytes,{type:'array',cellHTML:false,cellFormula:true});
       if(epoch!==readEpoch||sessionStorage.getItem(KEY)!==token||$('workspace').hidden)return;
       const parsed=C.parseWorkbook(workbook,{year:$('scoreYear').value.trim()});
       pending={...parsed,sourceHash,sourceName:file.name,expectedGeneration:snapshot.generation,requestId:crypto.randomUUID()};
@@ -242,7 +243,7 @@
   $('scoreRegions').addEventListener('click',e=>{const target=e.target.closest('[data-score-region]');if(!target)return;const region=target.dataset.scoreRegion;$('scoreRegion').value=$('scoreRegion').value===region?'':region;presentationExporter?.invalidate();updateStores();render();});
   $('scoreBody').addEventListener('click',e=>{const b=e.target.closest('[data-score-detail]');if(b)detail(b.dataset.scoreDetail);});
   $('scoreHistoryPreview').addEventListener('click',previewHistory);$('scoreRestore').addEventListener('click',restoreHistory);$('scoreRestoreConfirm').addEventListener('change',updatePublish);$('scoreHistory').addEventListener('change',()=>{restore=null;$('scoreRestorePreview').hidden=true;updatePublish();});
-  $('scoreExport').addEventListener('click',()=>exportData(false));$('scoreBrief').addEventListener('click',()=>exportData(true));
+  $('scoreExport').addEventListener('click',()=>{if(!window.VendorLoader)return exportData(false);window.VendorLoader.run('score-export',['xlsx'],()=>exportData(false),{button:$('scoreExport'),cooldownMs:2500,isCurrent:()=>Boolean($('workspace')&&!$('workspace').hidden&&!window.PortalLogout?.isLocked()),onError:error=>msg(error.message,true)});});$('scoreBrief').addEventListener('click',()=>exportData(true));
   $('scorePptx')?.addEventListener('click',async()=>{try{if(!presentationExporter)throw new Error('簡報模組未載入');await presentationExporter.downloadPptx();}catch(e){msg(e.message,true);}});
   $('scorePrintPdf')?.addEventListener('click',()=>{try{if(!presentationExporter)throw new Error('簡報模組未載入');presentationExporter.printPdf();}catch(e){msg(e.message,true);}});
   function observeAuth(){

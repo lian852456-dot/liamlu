@@ -1,5 +1,5 @@
 const CACHE_FAMILY = 'liam-supervisor-app-';
-const CACHE_NAME = 'liam-supervisor-app-query-v6-20261105-4';
+const CACHE_NAME = 'liam-supervisor-app-query-v7-20261108-1';
 const SHELL = [
   './app.html',
   './portal-logout.js',
@@ -28,6 +28,7 @@ const SHELL = [
   './award-model-catalog.js',
   './phone-stock-app.js',
   './phone-stock-core.js',
+  './vendor-loader.js',
   './assets/vendor/xlsx.full.min.js',
   './app-data-contract.js',
   './app-preview-data.js',
@@ -54,22 +55,28 @@ self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith(CACHE_FAMILY) && key !== CACHE_NAME).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
 
+// Pages and app-shell files are always checked with the server before use
+// (cache:'no-cache' = conditional request). An unchanged file comes back as a
+// small 304 and is served from the browser cache; a changed file is downloaded
+// in full. This keeps every visit on the deployed version, like the previous
+// 'no-store', without re-downloading unchanged files on every visit.
 function networkFirstHtml(request) {
-  return fetch(request, { cache:'no-store' }).then(response => {
+  return fetch(request, { cache:'no-cache' }).then(response => {
     if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
     return response;
   }).catch(() => caches.match(request).then(cached => cached || caches.match('./offline.html')));
 }
 
 // iOS may preserve a versioned script URL while an updated app shell is
-// installing. Prefer the deployed asset while online, and only fall back to
-// the same versioned shell file when the device is offline. This cache never
-// contains private API responses or credentials.
+// installing. Prefer the deployed asset while online (revalidated, see above),
+// and only fall back to a cached shell file when the device is offline: the
+// exact requested version first, any cached version only as a last resort.
+// This cache never contains private API responses or credentials.
 function networkFirstShellAsset(request) {
-  return fetch(request, { cache:'no-store' }).then(response => {
+  return fetch(request, { cache:'no-cache' }).then(response => {
     if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
     return response;
-  }).catch(() => caches.match(request, { ignoreSearch:true }));
+  }).catch(() => caches.match(request).then(exact => exact || caches.match(request, { ignoreSearch:true })));
 }
 
 function networkFirstTradeinAsset(request) {
@@ -80,28 +87,16 @@ function networkFirstTradeinAsset(request) {
   }).catch(() => caches.match(request));
 }
 
-function networkFirstKpiController(request) {
-  return fetch(request, { cache:'no-store' }).then(async response => {
-    if (!response.ok) return response;
-    const original = await response.text();
-    const oldGuard = `    const reportSource = kpiBattleReportSourceFile((snapshot || {}).report_date);\n    return Boolean(\n      snapshot && reportSource &&\n      snapshotDataAsOf === kpiData.data_as_of_date &&\n      snapshotSource && snapshotSource === reportSource &&\n      snapshotSource === kpiBattleSourceFile(kpiData.source_file)\n    );`;
-    const newGuard = `    return Boolean(\n      snapshot &&\n      snapshotDataAsOf === kpiData.data_as_of_date &&\n      snapshotSource &&\n      snapshotSource === kpiBattleSourceFile(kpiData.source_file)\n    );`;
-    const patched = original.includes(oldGuard) ? original.replace(oldGuard, newGuard) : original;
-    const headers = new Headers(response.headers);
-    headers.set('Content-Type', 'application/javascript; charset=utf-8');
-    headers.set('Cache-Control', 'no-store');
-    return new Response(patched, { status: response.status, statusText: response.statusText, headers });
-  }).catch(() => caches.match(request, { ignoreSearch:true }));
-}
-
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) return;
   const scopePath = new URL(self.registration.scope).pathname;
   const relativePath = requestUrl.pathname.startsWith(scopePath) ? requestUrl.pathname.slice(scopePath.length) : '';
+  // Always the deployed controller while online; it used to be rewritten
+  // here, but the guard that rewrite targeted no longer exists in the file.
   if (requestUrl.pathname.endsWith('/kpi-battle-controller.js')) {
-    event.respondWith(networkFirstKpiController(event.request));
+    event.respondWith(networkFirstShellAsset(event.request));
     return;
   }
   // Trade-in uploads must use the deployed parser and upload controller while

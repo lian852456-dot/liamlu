@@ -1,0 +1,44 @@
+name: Generated files and GAS bundle sync
+# Fails when a committed GAS deployment bundle or embedded offline-export
+# asset no longer matches what its build script produces from the sources,
+# beyond the acknowledged differences recorded in the baseline file.
+# Runs on every push and pull request, including direct pushes to main.
+# It only reads; it never rebuilds the committed files or deploys GAS.
+on:
+  push:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: generated-sync-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Blocking. The baseline (scripts/generated-sync-baseline.json) is empty:
+    # every generated file must match its build. Any difference, a change to
+    # a recorded difference, or a failed build fails here.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Check the sync check itself
+        run: node --test tests/generated-sync-check.test.mjs
+      - name: Compare generated files with their sources
+        run: |
+          set -o pipefail
+          node scripts/check-generated-sync.mjs | tee sync-report.txt
+      - name: Publish report
+        if: always()
+        run: |
+          {
+            echo '### 產出檔同步檢查'
+            echo '```'
+            cat sync-report.txt 2>/dev/null || echo '檢查未產生報告'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

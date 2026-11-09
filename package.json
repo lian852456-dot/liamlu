@@ -7,7 +7,8 @@
     "build:patrol-gas": "node scripts/build-patrol-gas-bundle.mjs",
     "build:store-readonly-export": "node scripts/build-store-readonly-assets.mjs",
     "build:department-readonly-export": "node scripts/build-department-readonly-assets.mjs",
-    "test": "playwright test --config=playwright.config.js"
+    "test": "playwright test --config=playwright.config.js",
+    "check:generated": "node scripts/check-generated-sync.mjs"
   },
   "repository": {
     "type": "git",
