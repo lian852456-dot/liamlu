@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101827">
+  <title>小城一分鐘拳台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="index.html?city=1"><span class="brand-mark">B</span><span>拳台 Boxing Lab</span></a>
+      <span class="release-badge">城市角色 · 榮譽對戰</span>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">CITY ARCADE / 60 SECOND BOUT</p>
+          <h1>和同伴打一場友誼賽。</h1><p><a href="/">← 回小城</a> · <button id="returnCity" type="button">回到進場位置</button></p>
+          <p class="hero-copy">沿用目前城市角色與造型；分享房間邀請碼，雙方接受後進行 60 秒榮譽對戰。</p>
+        </div>
+        <div class="hero-sticker" aria-hidden="true"><span>J</span><span>K</span><span>L</span></div>
+      </section>
+
+      <div id="notice" class="notice" role="status" aria-live="polite">使用目前登入角色，建立房間或貼上同伴的邀請碼。</div>
+
+      <section class="setup-grid" aria-label="房間設定">
+        <article class="card setup-card">
+          <div class="card-heading"><div><p class="eyebrow">STEP 01</p><h2>建立拳台</h2></div><span class="step-number">01</span></div>
+          <label class="field-label" for="nickname">目前城市角色 <span>沿用登入身分</span></label>
+          <input id="nickname" class="text-input" maxlength="12" autocomplete="nickname" placeholder="例如：小榮拳手">
+
+          <fieldset class="mode-fieldset">
+            <legend>對戰模式</legend>
+            <div class="mode-grid">
+              <label class="mode-option selected" data-mode-label="honor">
+                <input type="radio" name="mode" value="honor" checked>
+                <span><strong>榮譽對戰</strong><small>由裁判結算，不押注</small></span>
+              </label>
+              <label hidden class="mode-option" data-mode-label="synthetic">
+                <input type="radio" name="mode" value="synthetic">
+                <span><strong>測試練習</strong><small>100 合成幣，非真實錢包</small></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div hidden id="stakeChoices" class="stake-row" aria-label="合成押注">
+            <span class="inline-label">押注</span>
+            <button class="stake-button" type="button" data-stake="5" disabled>5 合成幣</button>
+            <button class="stake-button" type="button" data-stake="10" disabled>10 合成幣</button>
+          </div>
+          <button id="createBtn" class="primary-button" type="button">建立房間 →</button>
+          <p class="microcopy">本次不押注、不扣金幣或金牌。</p>
+        </article>
+
+        <article class="card join-card">
+          <div class="card-heading"><div><p class="eyebrow">STEP 02</p><h2>加入共享房間</h2></div><span class="step-number">02</span></div>
+          <label class="field-label" for="roomId">邀請碼／房間 ID</label>
+          <div class="inline-form"><input id="roomId" class="text-input" maxlength="80" placeholder="貼上邀請碼或 URL 中的 room"><button id="joinBtn" class="secondary-button" type="button">加入</button></div>
+          <p class="microcopy">同伴先登入小城，再開啟邀請連結並接受對戰。</p>
+
+          <div id="invitePanel" class="invite-panel" hidden>
+            <div class="invite-top"><span class="panel-label">你的房間</span><span id="roomModeLabel" class="mode-pill">榮譽對戰</span></div>
+            <div class="room-code-line"><strong id="roomCode">—</strong><button id="copyBtn" class="copy-button" type="button">複製連結</button></div>
+            <p id="inviteStatus" class="invite-status">等待第二位玩家加入。</p>
+            <div class="invite-actions"><button id="acceptBtn" class="primary-button" type="button" hidden>接受邀請並開始</button><button id="cancelBtn" class="ghost-button" type="button">取消房間</button></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="arenaCard" class="card arena-card" aria-label="拳台" hidden>
+        <div class="arena-header">
+          <div><p class="eyebrow">STEP 03 · 裁判判定</p><h2>拳台現場</h2></div>
+          <div class="arena-status"><span id="connectionDot" class="status-dot gray"></span><span id="roomState">等待房間</span><strong id="timer">—</strong></div>
+        </div>
+
+        <div id="scoreboard" class="scoreboard" aria-live="polite"></div>
+        <div class="stage-wrap">
+          <canvas id="arenaCanvas" aria-label="簡單 3D 拳台與雙方拳手"></canvas>
+          <output id="impactCue" hidden aria-live="polite"></output><div id="countdown" class="countdown" hidden></div>
+          <div class="camera-controls"><button id="camera-wide" type="button">一般視距</button><button id="camera-close" type="button">近看動作</button></div><div class="stage-caption"><span>出拳／防守／閃躲均由裁判判定</span><span id="serverPulse">連線更新 · —</span></div>
+        </div>
+
+        <div class="action-bar">
+          <div class="action-heading"><div><p class="eyebrow">YOUR MOVE</p><h3>現在要做什麼？</h3></div><span class="key-hint">J / K / L</span></div>
+          <div id="actionButtons" class="action-buttons">
+            <button class="action-button punch" type="button" data-kind="punch"><kbd>J</kbd><span>出拳</span><small>快速得分機會</small></button>
+            <button class="action-button hook" type="button" data-kind="hook"><kbd>U</kbd><span>勾拳</span><small>轉腰側擊</small></button><button class="action-button guard" type="button" data-kind="guard"><kbd>K</kbd><span>防守</span><small>穩住節奏</small></button>
+            <button class="action-button dodge" type="button" data-kind="dodge"><kbd>L</kbd><span>閃躲</span><small>避開正面攻擊</small></button>
+          <button class="action-button retreat" type="button" data-kind="retreat"><kbd>I</kbd><span>後撤</span><small>拉開距離</small></button></div>
+          <p id="actionHint" class="action-hint">開賽後即可操作，輸贏由裁判判定。</p>
+        </div>
+        <div id="resultBanner" class="result-banner" hidden></div>
+        <div id="roundLog" class="round-log" aria-live="polite"></div>
+      </section>
+
+      <section class="bottom-grid">
+        <article class="card legend-card">
+          <div class="card-heading"><div><p class="eyebrow">PRESENCE</p><h2>誰在場上？</h2></div></div>
+          <div class="presence-legend"><span><i class="status-dot green"></i>本人在線</span><span><i class="status-dot yellow"></i>重連中</span><span><i class="status-dot gray"></i>離線巡走</span></div>
+          <p class="microcopy">灰色「巡走 NPC」是展示用角色，不能當真人玩家，也不能出拳。</p>
+        </article>
+        <article class="card safety-card">
+          <div class="card-heading"><div><p class="eyebrow">BOUNDARY</p><h2>玩法提醒</h2></div></div>
+          <ul><li>本次只比榮譽，不扣金幣或金牌。</li><li>若斷線過久，這場會取消，不影響城市進度。</li><li>結束或取消房間後，按「回到進場位置」。</li></ul>
+        </article>
+      </section>
+    </main>
+
+    <footer>小城拳台 · 由裁判判定</footer>
+  </div>
+  <script src="../vendor/three.js"></script>
+<script src="../models.js"></script><script src="../static-mesh.js"></script><script src="../head-art-previous.js"></script><script src="../head-art.js"></script><script src="../gltf-loader.js"></script><script src="../portrait-config.js"></script><script src="../portrait-hair-library.js"></script><script src="../avatar-portraits.js"></script><script src="../photo-portrait-config.js"></script><script src="../photo-portrait-hair-library.js"></script><script src="../photo-avatar-portraits.js"></script><script src="../refined-portrait-config.js"></script><script src="../refined-portrait-hair.js"></script><script src="../refined-avatar-portraits.js"></script><script src="../refined-heads.js"></script><script src="../refined-jialing-body.js"></script><script src="../refined-li-body.js"></script><script src="../shared-avatar-adapter.js"></script><script src="combat-kinematics.js"></script><script src="boxing-motion.js"></script><script src="app.js"></script></body></html>

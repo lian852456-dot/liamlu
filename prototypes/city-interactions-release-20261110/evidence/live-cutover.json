@@ -1,0 +1,70 @@
+{
+  "at": "2026-11-10T03:36:39.685Z",
+  "release": "20261110-city-play.1",
+  "origin": "https://exceed-recorded-ons-any.trycloudflare.com",
+  "gatewayUnchanged": true,
+  "publicAssets": 97,
+  "allPersistentTablesUnchanged": true,
+  "currentUsers": 54,
+  "legacyUsers": 23,
+  "rewardCount": 1,
+  "rewardTotal": 200,
+  "bindings": [
+    {
+      "name": "蔡妘㮀",
+      "preset": "photo-p2-v1",
+      "mode": "display-unlinked"
+    },
+    {
+      "name": "嘉玲",
+      "preset": "portrait-jialing-v1",
+      "mode": "display-unlinked"
+    },
+    {
+      "name": "依芯",
+      "preset": "portrait-yixin-v1",
+      "mode": "display-unlinked"
+    },
+    {
+      "name": "莊佩璇",
+      "preset": "photo-p4-v1",
+      "mode": "display-unlinked"
+    },
+    {
+      "name": "劉安妮",
+      "preset": "portrait-trial-a-v1",
+      "mode": "linked-game-role"
+    },
+    {
+      "name": "李舒緩",
+      "preset": "portrait-li-shuhuan-v1",
+      "mode": "linked-game-role"
+    },
+    {
+      "name": "蔡後琪",
+      "preset": "portrait-trial-b-v1",
+      "mode": "linked-game-role"
+    },
+    {
+      "name": "袁宇程",
+      "preset": "photo-p1-v1",
+      "mode": "linked-game-role"
+    }
+  ],
+  "realEmployeeLoginsByTools": 0,
+  "realEmployeeRolesCreatedByTools": 0,
+  "formalAuthChanged": false,
+  "formalGoldEnabled": false,
+  "formalExchangeRate": 50,
+  "formalReverseExchangeEnabled": false,
+  "boxingEnabled": true,
+  "boxingMode": "honor-only",
+  "petPrices": {
+    "cat": 60,
+    "dog": 75
+  },
+  "sessionHours": 8,
+  "shutdown": null,
+  "physicalIphoneUat": false,
+  "autostart": "NOT_VERIFIED"
+}
