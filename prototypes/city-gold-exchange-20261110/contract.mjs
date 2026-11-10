@@ -1,0 +1,11 @@
+import{createHash}from'node:crypto';
+export const RATE=50, DIRECTION='gold-to-game-coins', SCHEMA='city-gold-exchange/v1';
+export class ExchangeError extends Error{constructor(code,status=409){super(code);this.code=code;this.status=status}}
+export const need=(v,c,s=409)=>{if(!v)throw new ExchangeError(c,s)};
+export const fingerprint=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
+export const validId=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,160}$/.test(v);
+export function request(body){need(body&&typeof body==='object'&&!Array.isArray(body)&&Object.keys(body).every(k=>['gold','requestId'].includes(k)),'INVALID_FIELDS',400);need(Number.isSafeInteger(body.gold)&&body.gold>0&&body.gold<=100000,'INVALID_GOLD_AMOUNT',400);need(typeof body.requestId==='string'&&/^[a-zA-Z0-9_-]{12,100}$/.test(body.requestId),'INVALID_REQUEST_ID',400);return{gold:body.gold,requestId:body.requestId}}
+export function binding(actor){need(actor?.source==='B_LOCKED_SESSION'&&actor.active===true&&Number.isSafeInteger(actor.expiresAt)&&actor.expiresAt>Date.now(),'FORMAL_IDENTITY_REQUIRED',401);need(validId(actor.employeeId)&&validId(actor.uid)&&typeof actor.lease==='string'&&actor.lease.length>0,'FORMAL_BINDING_REQUIRED',403);return actor}
+export function intent(row){return{schema:SCHEMA,txId:row.tx_id,employeeId:row.employee_id,uid:row.uid,month:row.month,gold:row.gold,coins:row.coins,rate:RATE,direction:DIRECTION}}
+export function validateIntent(i){need(i?.schema===SCHEMA&&validId(i.txId)&&validId(i.employeeId)&&validId(i.uid),'INVALID_INTENT');need(/^20\d{2}-(0[1-9]|1[0-2])$/.test(i.month),'INVALID_MONTH');need(Number.isSafeInteger(i.gold)&&i.gold>0&&i.gold<=100000&&i.rate===RATE&&i.coins===i.gold*RATE&&i.direction===DIRECTION,'EXCHANGE_POLICY_DENIED');return i}
+export function receipt(value,expected,states){validateIntent(expected);need(value&&value.schema===SCHEMA&&value.authority&&validId(value.receiptId),'SOURCE_RECEIPT_REQUIRED');for(const k of ['txId','employeeId','uid','month','gold','coins','rate','direction'])need(value[k]===expected[k],'SOURCE_RECEIPT_MISMATCH');need(states.includes(value.state),'SOURCE_STATE_UNEXPECTED');need(Number.isSafeInteger(value.sourceRevision)&&value.sourceRevision>=0&&/^[a-f0-9]{64}$/.test(value.sourceHash),'SOURCE_REVISION_INVALID');return value}
