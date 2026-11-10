@@ -1,0 +1,24 @@
+{
+  "syntheticOnly": true,
+  "realEmployeeLoginsByTools": 0,
+  "physicalIphoneUat": false,
+  "cases": [
+    {
+      "key": "p3",
+      "correctPreset": "portrait-jialing-v1",
+      "walk": true,
+      "wave": true,
+      "walletProfilePreserved": true,
+      "errors": []
+    },
+    {
+      "key": "p5",
+      "correctPreset": "portrait-li-shuhuan-v1",
+      "walk": true,
+      "wave": true,
+      "walletProfilePreserved": true,
+      "errors": []
+    }
+  ],
+  "pass": true
+}

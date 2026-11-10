@@ -1,0 +1,8 @@
+{
+  "schema": "city-owner-policy/v1",
+  "enabled": false,
+  "id": "city-owner-unpublished",
+  "generation": 1,
+  "notBefore": 0,
+  "validUntil": 0
+}

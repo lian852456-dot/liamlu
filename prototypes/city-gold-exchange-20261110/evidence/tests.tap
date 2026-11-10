@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: real HTTP source debit, one-way 1:50, two-sided readback and replay
+ok 1 - real HTTP source debit, one-way 1:50, two-sided readback and replay
+  ---
+  duration_ms: 28.114542
+  type: 'test'
+  ...
+# Subtest: concurrent retries and separate city connections credit once; competing spends cannot overspend
+ok 2 - concurrent retries and separate city connections credit once; competing spends cannot overspend
+  ---
+  duration_ms: 22.384708
+  type: 'test'
+  ...
+# Subtest: response lost after remote debit then restart resumes without another debit
+ok 3 - response lost after remote debit then restart resumes without another debit
+  ---
+  duration_ms: 10.730708
+  type: 'test'
+  ...
+# Subtest: city credit failure rolls back locally; refund is idempotent and cannot refund credited coins
+ok 4 - city credit failure rolls back locally; refund is idempotent and cannot refund credited coins
+  ---
+  duration_ms: 14.475042
+  type: 'test'
+  ...
+# Subtest: cancel racing an in-flight debit writes tombstone, no late debit or coin grant
+ok 5 - cancel racing an in-flight debit writes tombstone, no late debit or coin grant
+  ---
+  duration_ms: 10.288541
+  type: 'test'
+  ...
+# Subtest: refresh keeps spending separate from earned history; corrections and month rollover
+ok 6 - refresh keeps spending separate from earned history; corrections and month rollover
+  ---
+  duration_ms: 10.910416
+  type: 'test'
+  ...
+# Subtest: receipt mismatch and revoked formal proof never credit; disabled constructor does not migrate
+ok 7 - receipt mismatch and revoked formal proof never credit; disabled constructor does not migrate
+  ---
+  duration_ms: 6.854583
+  type: 'test'
+  ...
+# Subtest: existing city session plus separate formal owner proof required, no game-only employee-ID bypass
+ok 8 - existing city session plus separate formal owner proof required, no game-only employee-ID bypass
+  ---
+  duration_ms: 9.55725
+  type: 'test'
+  ...
+# Subtest: preexisting spending is preserved, not restored by first activation or daily refresh
+ok 9 - preexisting spending is preserved, not restored by first activation or daily refresh
+  ---
+  duration_ms: 8.606208
+  type: 'test'
+  ...
+# Subtest: refund response loss resumes from durable REFUNDING; debit and refund audit events remain
+ok 10 - refund response loss resumes from durable REFUNDING; debit and refund audit events remain
+  ---
+  duration_ms: 9.786584
+  type: 'test'
+  ...
+# Subtest: default-off API cannot migrate or change an untouched city store
+ok 11 - default-off API cannot migrate or change an untouched city store
+  ---
+  duration_ms: 8.395917
+  type: 'test'
+  ...
+# Subtest: forged success without source status cannot credit or mark a refund complete
+ok 12 - forged success without source status cannot credit or mark a refund complete
+  ---
+  duration_ms: 7.001
+  type: 'test'
+  ...
+# Subtest: host recovery completes only already authorized debits even after user lease revoked
+ok 13 - host recovery completes only already authorized debits even after user lease revoked
+  ---
+  duration_ms: 7.489875
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 208.814459

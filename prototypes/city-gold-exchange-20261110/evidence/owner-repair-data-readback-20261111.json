@@ -1,0 +1,332 @@
+{
+  "checkedAt": "2026-11-10T17:49:37.324370+00:00",
+  "worlds": {
+    "current-guests": {
+      "integrity": "ok",
+      "tables": [
+        {
+          "table": "audit",
+          "beforeCount": 139,
+          "afterCount": 139,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "city_employee_config",
+          "beforeCount": 1,
+          "afterCount": 1,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "city_employee_owners",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "city_owner_challenges",
+          "beforeCount": 1,
+          "afterCount": 1,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "city_play_links",
+          "beforeCount": 7,
+          "afterCount": 7,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "city_play_sessions",
+          "beforeCount": 1,
+          "afterCount": 1,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "demo_codes",
+          "beforeCount": 18,
+          "afterCount": 18,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "guest_devices",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "imports",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "inventory",
+          "beforeCount": 8,
+          "afterCount": 8,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "ledger",
+          "beforeCount": 76,
+          "afterCount": 76,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "placements",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "reports",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "sessions",
+          "beforeCount": 55,
+          "afterCount": 55,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "spaces",
+          "beforeCount": 9,
+          "afterCount": 9,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "staff_control_appearance",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "staff_control_leases",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "staff_control_poses",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "staff_control_requests",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "task_challenges",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "tasks",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "transactions",
+          "beforeCount": 113,
+          "afterCount": 113,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "travel_state",
+          "beforeCount": 7,
+          "afterCount": 7,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "users",
+          "beforeCount": 54,
+          "afterCount": 54,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "v42_positions",
+          "beforeCount": 32,
+          "afterCount": 32,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "v42_runtime_lock",
+          "beforeCount": 0,
+          "afterCount": 1,
+          "originalColumnsUnchanged": false
+        },
+        {
+          "table": "v43_supervisor_encounters",
+          "beforeCount": 32,
+          "afterCount": 32,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "v4_metadata",
+          "beforeCount": 47,
+          "afterCount": 47,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "wallets",
+          "beforeCount": 54,
+          "afterCount": 54,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "work_receipts",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        }
+      ],
+      "changedTables": [
+        "v42_runtime_lock"
+      ],
+      "newTables": [
+        "city_owner_policy_guard"
+      ],
+      "originalReward": {
+        "count": 1,
+        "coins": 200
+      }
+    },
+    "legacy-owners": {
+      "integrity": "ok",
+      "tables": [
+        {
+          "table": "audit",
+          "beforeCount": 66,
+          "afterCount": 66,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "demo_codes",
+          "beforeCount": 23,
+          "afterCount": 23,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "imports",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "inventory",
+          "beforeCount": 12,
+          "afterCount": 12,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "ledger",
+          "beforeCount": 37,
+          "afterCount": 37,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "placements",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "reports",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "sessions",
+          "beforeCount": 25,
+          "afterCount": 25,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "spaces",
+          "beforeCount": 9,
+          "afterCount": 9,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "task_challenges",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "tasks",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "transactions",
+          "beforeCount": 29,
+          "afterCount": 29,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "travel_state",
+          "beforeCount": 3,
+          "afterCount": 3,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "users",
+          "beforeCount": 23,
+          "afterCount": 23,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "v42_positions",
+          "beforeCount": 7,
+          "afterCount": 7,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "v42_runtime_lock",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "v43_supervisor_encounters",
+          "beforeCount": 3,
+          "afterCount": 3,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "v4_metadata",
+          "beforeCount": 5,
+          "afterCount": 5,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "wallets",
+          "beforeCount": 23,
+          "afterCount": 23,
+          "originalColumnsUnchanged": true
+        },
+        {
+          "table": "work_receipts",
+          "beforeCount": 0,
+          "afterCount": 0,
+          "originalColumnsUnchanged": true
+        }
+      ],
+      "changedTables": [],
+      "newTables": [],
+      "originalReward": {
+        "count": 0,
+        "coins": 0
+      }
+    }
+  },
+  "exchangeEnabled": false
+}

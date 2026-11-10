@@ -1,0 +1,40 @@
+{
+  "syntheticOnly": true,
+  "realEmployeeLoginsByTools": 0,
+  "physicalIphoneUat": false,
+  "cases": [
+    {
+      "key": "p1",
+      "correctPreset": "photo-p1-v1",
+      "walk": true,
+      "wave": true,
+      "walletProfilePreserved": true,
+      "errors": []
+    },
+    {
+      "key": "p2",
+      "correctPreset": "photo-p2-v1",
+      "walk": true,
+      "wave": true,
+      "walletProfilePreserved": true,
+      "errors": []
+    },
+    {
+      "key": "p4",
+      "correctPreset": "photo-p4-v1",
+      "walk": true,
+      "wave": true,
+      "walletProfilePreserved": true,
+      "errors": []
+    },
+    {
+      "key": "c",
+      "correctPreset": "portrait-li-shuhuan-v1",
+      "walk": true,
+      "wave": true,
+      "walletProfilePreserved": true,
+      "errors": []
+    }
+  ],
+  "pass": true
+}

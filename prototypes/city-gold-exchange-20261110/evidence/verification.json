@@ -1,0 +1,30 @@
+{
+  "at": "2026-11-10T04:15:25.669167+00:00",
+  "testExitCode": 0,
+  "syntaxChecks": {
+    "authority-ledger.mjs": true,
+    "city-adapter.mjs": true,
+    "contract.mjs": true,
+    "coordinator.mjs": true,
+    "tests/exchange.test.mjs": true,
+    "tests/fixture.mjs": true,
+    "transport.mjs": true
+  },
+  "mode": "isolated-synthetic-only",
+  "formalDeployment": false,
+  "formalGoldWrites": 0,
+  "sharedCityWrites": 0,
+  "realEmployeeLogins": 0,
+  "physicalIphoneUat": false,
+  "rate": 50,
+  "reverseExchange": false,
+  "hashes": {
+    "authority-ledger.mjs": "5eecc86f04da7c023fb62e1a57f0a802f798de7714e2dd179966ecfbce2f290e",
+    "city-adapter.mjs": "173862a166867bdd6745a84da88a9a105ff0efb21fed763186e036231cc07b67",
+    "contract.mjs": "8eb38775a05b61d55f4c5db0d6652da0b4dacc9372179e57d93c4f5511bfdda3",
+    "coordinator.mjs": "2bba7feed8c18d1c980d570706828b00aad48a10985eb195d5e02be560d65f8e",
+    "tests/exchange.test.mjs": "18da44624fe24a470eb50f62a43c64e4a734f1a8cbf2014b177cf7dacbc5b088",
+    "tests/fixture.mjs": "595c5a674e2c7d7a828106e0d9ccef27a29d151742a1f3afaf0bece6a79ca406",
+    "transport.mjs": "ed5308a9443d5e4643931cd794ba71f0f45a6c65460b01d63a5bf809b58df386"
+  }
+}

@@ -1,0 +1,36 @@
+✔ employee addon preserves guest state, enforces HTTP proof gates, and supports appearance flow (191.5935ms)
+✔ same bound UID across two contexts cannot take over owner control, including WS upgrade (110.141083ms)
+✔ HTTP：受保護的原李舒緩角色能提出邀請並完成本人核身，其他角色不能代綁 (98.708708ms)
+✔ returns only latest own current-month balance with provenance and disabled exchange (8.037583ms)
+✔ deep-freezes validated mapping and does not mutate input (0.269583ms)
+✔ rejects identity that is missing, expired, or not an active employee B-session (0.267167ms)
+✔ rejects caller-selected other person or unknown body fields (0.149875ms)
+✔ rejects pending, missing, expired, and store-mismatched mapping (0.403125ms)
+✔ rejects mapping overlap, blank evidence, and non-canonical store aliases (0.233458ms)
+✔ rejects ledger rows whose canonical store or alias does not match mapping (0.193417ms)
+✔ fails closed for missing current-month own row, unconfirmed settlement, and future data (0.1515ms)
+✔ fails closed for duplicate latest own records and invalid row balances (0.406042ms)
+✔ source hash covers the selected settlement, so same-label balance changes are visible (0.476875ms)
+✔ latest confirmed settlement missing the person fails without falling back to an older day (0.230875ms)
+✔ historical person store and alias changes do not block a valid current-day mapping (0.13875ms)
+✔ gateway returns only verified owner projection and rejects target IDs before any read (7.479667ms)
+✔ revocation and owner change during source reads deny result (0.442583ms)
+✔ source correction with same date and source label denies mixed read (0.560542ms)
+✔ new policy works beyond old deadline; renewal preserves same UID and does not replay first-bind effects (7.726666ms)
+✔ policy rotation never revives old leases; renewed normal handoff can keep original role (1.47625ms)
+✔ original revocation, epoch, expiry, audience and allowlist still enforced (3.09425ms)
+✔ legacy binding rows keep ownership but require a fresh normal proof under new policy (1.13ms)
+✔ normal renewal leaves existing synthetic wallet, inventory, progress and receipt rows unchanged (10.876625ms)
+✔ policy generation rollback and same-generation edits cannot resurrect an old lease (2.221917ms)
+✔ removing a policy retires its generation; restoring the same policy cannot revive proof (1.174167ms)
+✔ production runtime derives lifetime from existing authority, never renews it (3.8045ms)
+✔ owner policy provider clears stale cached policy on denial; malformed replies fail closed (0.559708ms)
+✔ repair builder requires exact runtime anchor and policy hook stays readonly (0.498875ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 532.196083

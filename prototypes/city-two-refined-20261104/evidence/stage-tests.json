@@ -1,0 +1,6 @@
+{
+  "command": "node --test tests/two-stage.test.mjs",
+  "passed": 2,
+  "failed": 0,
+  "syntheticOnly": true
+}

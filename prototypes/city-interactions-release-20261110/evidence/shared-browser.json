@@ -1,0 +1,228 @@
+{
+  "at": "2026-11-10T03:33:52.705Z",
+  "pass": true,
+  "syntheticCitySessions": true,
+  "realEmployeeLogin": false,
+  "physicalIphoneUat": false,
+  "avatarRigs": [
+    "generic",
+    "portrait-yixin-v1",
+    "portrait-trial-a-v1",
+    "portrait-trial-b-v1",
+    "portrait-trial-c-v1",
+    "photo-p1-v1",
+    "photo-p2-v1",
+    "photo-p4-v1",
+    "portrait-jialing-v1",
+    "portrait-li-shuhuan-v1"
+  ],
+  "cityReturnSaved": true,
+  "boxingHonorOnly": true,
+  "errors": [],
+  "network": [
+    [
+      403,
+      "/api/employee/me"
+    ],
+    [
+      403,
+      "/api/employee/link/status"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/me"
+    ],
+    [
+      403,
+      "/api/employee/link/status"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ],
+    [
+      403,
+      "/api/employee/me"
+    ],
+    [
+      403,
+      "/api/employee/link/status"
+    ],
+    [
+      403,
+      "/api/employee/crowd"
+    ]
+  ],
+  "metrics": {
+    "frames": 706,
+    "drawCalls": 146,
+    "triangles": 328747,
+    "geometries": 138,
+    "textures": 5,
+    "p95": 9.199999999999818,
+    "hair": {
+      "ready": [
+        "p3",
+        "p5"
+      ],
+      "sharedTextures": 0,
+      "liveInstances": 2,
+      "created": 2,
+      "released": 0
+    },
+    "motion": [
+      {
+        "now": 1794281626157,
+        "action": "idle",
+        "actionAt": 1794281624478,
+        "seq": 1,
+        "progress": 0,
+        "impact": {
+          "eventId": "6",
+          "outcome": "hit",
+          "age": 75
+        },
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.018,
+          "z": -0.12
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": -0.12,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 7,
+        "extraMaterials": 3,
+        "deformedVertices": 6692,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      },
+      {
+        "now": 1794281626157,
+        "action": "hook",
+        "actionAt": 1794281625762,
+        "seq": 1,
+        "progress": 0.395,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.035,
+          "z": 0.13790417059533394
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.035,
+          "z": 0.13790417059533394
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": 1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.7,
+          -1.25
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+✔ employee addon preserves guest state, enforces HTTP proof gates, and supports appearance flow (180.601959ms)
+✔ same bound UID across two contexts cannot take over owner control, including WS upgrade (109.334875ms)
+✔ HTTP：受保護的原李舒緩角色能提出邀請並完成本人核身，其他角色不能代綁 (99.83725ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 468.168667

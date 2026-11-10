@@ -1,0 +1,85 @@
+{
+  "changed": [
+    "CityEmployeeBridge.js"
+  ],
+  "files": [
+    {
+      "name": ".clasp.json",
+      "before": "26c9ba2f1960a75cb9005d2a83ebbf64b8f90eadf5a69868602fc0797b477c3b",
+      "after": "26c9ba2f1960a75cb9005d2a83ebbf64b8f90eadf5a69868602fc0797b477c3b",
+      "changed": false
+    },
+    {
+      "name": "CityEmployeeBridge.js",
+      "before": "abda1166bb0ea96a7a34c1e8343507c78f448de632f4fd45bd983df1e5f12a1b",
+      "after": "bc74c74d8a45eabd45dda400fc46d33f90e2d08467419f0d6b7cb46f6d4d9e1c",
+      "changed": true
+    },
+    {
+      "name": "DashboardRosterSync.js",
+      "before": "c1e750061922d10c3c2309732127b60b6e52434482c4ea33bdbd92d9657b6ab2",
+      "after": "c1e750061922d10c3c2309732127b60b6e52434482c4ea33bdbd92d9657b6ab2",
+      "changed": false
+    },
+    {
+      "name": "GoldDaily.js",
+      "before": "b549f490888e56cee5d2e9bf6d43c911d3a69c935c13edb6c27f0de505d1cffe",
+      "after": "b549f490888e56cee5d2e9bf6d43c911d3a69c935c13edb6c27f0de505d1cffe",
+      "changed": false
+    },
+    {
+      "name": "GoldDailyCore.js",
+      "before": "524b2e3a968a8b27e116520602de10c6304b232442f26b6717f78a11b0d5c379",
+      "after": "524b2e3a968a8b27e116520602de10c6304b232442f26b6717f78a11b0d5c379",
+      "changed": false
+    },
+    {
+      "name": "PersonalRankAutomation.js",
+      "before": "8c4d35c80dc59e6b5d71e601abf32966b3d778891b931cc386cb1fb138f0b0b6",
+      "after": "8c4d35c80dc59e6b5d71e601abf32966b3d778891b931cc386cb1fb138f0b0b6",
+      "changed": false
+    },
+    {
+      "name": "ReadonlyConversion.js",
+      "before": "e6f786bfa3ce571fa325dd659d80c19cc2decfc8cc3132a85accb696666ae7cd",
+      "after": "e6f786bfa3ce571fa325dd659d80c19cc2decfc8cc3132a85accb696666ae7cd",
+      "changed": false
+    },
+    {
+      "name": "ReadonlyDashboardCore.js",
+      "before": "f58df6f9ffc45d945ca0f60352ccb4f353fd6e4d6ce5d462a132d3915b5b05dc",
+      "after": "f58df6f9ffc45d945ca0f60352ccb4f353fd6e4d6ce5d462a132d3915b5b05dc",
+      "changed": false
+    },
+    {
+      "name": "ReportUpload.html",
+      "before": "e710483fa2257746ff085919d8c15ee8becba6a21f733e5a70c24646ad1950e6",
+      "after": "e710483fa2257746ff085919d8c15ee8becba6a21f733e5a70c24646ad1950e6",
+      "changed": false
+    },
+    {
+      "name": "ReportUploadSheetJs.html",
+      "before": "cc015130aa8521e7f088f88898eba949ccdcbfb38df0bd129b44b7273c3a6f41",
+      "after": "cc015130aa8521e7f088f88898eba949ccdcbfb38df0bd129b44b7273c3a6f41",
+      "changed": false
+    },
+    {
+      "name": "ReportUploadTradeInCore.html",
+      "before": "bfcdf1e122ab31a8d676a2dc77fdff0be31ee7e3c5ce2b615b8363455d98fbe3",
+      "after": "bfcdf1e122ab31a8d676a2dc77fdff0be31ee7e3c5ce2b615b8363455d98fbe3",
+      "changed": false
+    },
+    {
+      "name": "appsscript.json",
+      "before": "f71b2e84094ca36f6173eea2df9be908dbacbc08d513b43c1a53b744d940d4b6",
+      "after": "f71b2e84094ca36f6173eea2df9be908dbacbc08d513b43c1a53b744d940d4b6",
+      "changed": false
+    },
+    {
+      "name": "程式碼.js",
+      "before": "5414d49dc84a526602c4ba72bca5c9970aab09f2e49f8651202048cf24295de1",
+      "after": "5414d49dc84a526602c4ba72bca5c9970aab09f2e49f8651202048cf24295de1",
+      "changed": false
+    }
+  ]
+}
