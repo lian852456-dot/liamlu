@@ -1,0 +1,91 @@
+{
+  "assetSet": "portrait-hair-photo-four-q2-20261101",
+  "scope": "isolated Q2 four-photo hair candidates; hair only; no employee IDs or source photos",
+  "styles": {
+    "p1": {
+      "style": "p1",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 5320,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 314376,
+      "sha256": "9f3f92223887a80b9aeb622ecc46903b91be4aeb1e1931c06fcf676955dd233d",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python Q2 rounded layered volume cages with soft tapered ends, matte PBR and no flyaway needles; not a manual sculpt claim"
+    },
+    "p2": {
+      "style": "p2",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 6968,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 374372,
+      "sha256": "f6d931ecc74d9a4acde3dcf5069655a8f1ab96c1298dda6f67f3855a63ce9f23",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python Q2 rounded layered volume cages with soft tapered ends, matte PBR and no flyaway needles; not a manual sculpt claim"
+    },
+    "p3": {
+      "style": "p3",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 5592,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 323884,
+      "sha256": "2fff0ab46e8f8a91f79f31b9a6d45796062fbb8595ff026d0b51a95bcef71171",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python Q2 rounded layered volume cages with soft tapered ends, matte PBR and no flyaway needles; not a manual sculpt claim"
+    },
+    "p4": {
+      "style": "p4",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 7032,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 376100,
+      "sha256": "a64a433161d716a36f6fa4bd1c2392a10089a12f51b93ebf6195ba389979b289",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python Q2 rounded layered volume cages with soft tapered ends, matte PBR and no flyaway needles; not a manual sculpt claim"
+    }
+  },
+  "visualReferences": {
+    "p1": "near-black short side-part crop with swept top and short nape",
+    "p2": "deep-brown straight-fringe chin bob",
+    "p3": "black side-part chin/shoulder bob with one side tucked and small clip accent",
+    "p4": "deep-brown side-part long layers ending above chest"
+  },
+  "limits": [
+    "No hair physics",
+    "No transparent cards",
+    "No face/body/rig",
+    "Not formal city deployment",
+    "Q2 soft rounded strands; roughness floor 0.75"
+  ]
+}

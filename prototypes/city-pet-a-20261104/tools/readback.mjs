@@ -1,0 +1,6 @@
+import fs from 'node:fs';import path from 'node:path';import{createHash}from'node:crypto';
+const origin='https://february-missouri-palm-dis.trycloudflare.com',sha=b=>createHash('sha256').update(b).digest('hex');
+function files(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?files(path.join(dir,e.name)):[path.join(dir,e.name)]);}
+const results=[];for(const file of files('public')){const r=await fetch(origin+'/'+file.replace(/^public\//,'')),b=Buffer.from(await r.arrayBuffer());results.push({file,status:r.status,sha256:sha(b),match:r.ok&&sha(b)===sha(fs.readFileSync(file))});}
+const products=await(await fetch(origin+'/api/products')).json();const privateRoutes=[];for(const p of['/.private-qa/','/candidate-store.mjs','/pricing.mjs']){const r=await fetch(origin+p);privateRoutes.push({path:p,status:r.status});}
+const out={at:new Date().toISOString(),origin,pass:results.every(x=>x.match)&&privateRoutes.every(x=>x.status===404)&&!products.purchaseEnabled,files:results,products,privateRoutes,physicalIphoneUat:false};fs.writeFileSync('evidence/color-public-readback.json',JSON.stringify(out,null,2));console.log(JSON.stringify({pass:out.pass,assets:results.length,prices:products.products.map(p=>p.coins),privateRoutes}));if(!out.pass)process.exitCode=1;

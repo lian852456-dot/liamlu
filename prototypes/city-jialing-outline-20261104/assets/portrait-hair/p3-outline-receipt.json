@@ -1,0 +1,7 @@
+{
+  "blender": "4.5.15 LTS",
+  "triangles": 53810,
+  "bytes": 1186776,
+  "sha256": "27af1c95d97fccd9bfb029e53a04a39cbc97e95bd4e81ab9219bf0a144ee3fa5",
+  "scope": "p3 only; continuous opaque bob"
+}

@@ -1,0 +1,67 @@
+{
+  "at": "2026-11-04T12:42:44.690Z",
+  "origin": "https://seating-kids-arts-newcastle.trycloudflare.com",
+  "pass": true,
+  "release": "20261104-li-shuhuan-outline.1",
+  "files": [
+    {
+      "file": "index.html",
+      "status": 200,
+      "match": true,
+      "sha256": "198f7c0ad14571bf048bfece156fac7489c3b31d70fe3d23f8d91257dfb8e02b"
+    },
+    {
+      "file": "preview.js",
+      "status": 200,
+      "match": true,
+      "sha256": "33295b67b7ed8d94e8c15a2f06a896ec9d997d73ace6b91fb2dba7ab41a8c366"
+    },
+    {
+      "file": "li-shuhuan-outline.js",
+      "status": 200,
+      "match": true,
+      "sha256": "ce5786c53ffd0c80e25d68993c503b32c72212b01b3ec20015eb7b0a0b048932"
+    },
+    {
+      "file": "jialing-head-sample.js",
+      "status": 200,
+      "match": true,
+      "sha256": "1f6992a3e7703f665817040888138455c7840edc00ffa765c9398e61b6b2489d"
+    },
+    {
+      "file": "portrait-config.js",
+      "status": 200,
+      "match": true,
+      "sha256": "3ea13a0a92614a570900aa8e3adf8eec4540cb052600b4c2943907829e4e07ad"
+    },
+    {
+      "file": "portrait-hair-library.js",
+      "status": 200,
+      "match": true,
+      "sha256": "824a858eba9f5a74421008defe06a43c49fae15243d7896d9440bde89714e166"
+    },
+    {
+      "file": "assets/portrait-hair/p5.glb",
+      "status": 200,
+      "match": true,
+      "sha256": "27ed214bea40a4a68c297daeac019404627539616ab475e0239888424beb907e"
+    }
+  ],
+  "denied": [
+    {
+      "path": "/.private-preview/gateway.json",
+      "status": 404
+    },
+    {
+      "path": "/runtime/core/.private-v42-li-shuhuan-outline/",
+      "status": 404
+    },
+    {
+      "path": "/server.mjs",
+      "status": 404
+    }
+  ],
+  "formalDeployment": false,
+  "originalWorldsOpened": false,
+  "physicalIphoneUat": false
+}

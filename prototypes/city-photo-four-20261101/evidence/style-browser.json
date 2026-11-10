@@ -1,0 +1,168 @@
+{
+  "cases": [
+    {
+      "key": "p3",
+      "metrics": {
+        "key": "p3",
+        "view": "quarter",
+        "motion": "walk",
+        "framing": "full",
+        "light": "day",
+        "outfit": "photo",
+        "compare": "new",
+        "ready": true,
+        "frames": 287,
+        "frameMsP50": 8.300000000000182,
+        "frameMsP95": 9.799999999999955,
+        "model": {
+          "version": "photo-four-q2.1",
+          "portraitKey": "p3",
+          "hair": "portrait",
+          "hairSource": "portrait-glb",
+          "outfit": "uniform",
+          "blink": 1,
+          "phase": 15.33180000028606,
+          "disposed": false,
+          "profile": {
+            "avatarPreset": "photo-p3-v1",
+            "skin": "orange",
+            "hair": "portrait",
+            "outfit": ""
+          },
+          "ownedGeometries": 14,
+          "ownedMaterials": 25,
+          "sharedGeometries": 2,
+          "headStyle": "p3-soft-head-study.2",
+          "headStudyGeometries": 30,
+          "headStudyTextures": 1
+        },
+        "previous": {
+          "version": "photo-four.1",
+          "portraitKey": "p3",
+          "hair": "portrait",
+          "hairSource": "portrait-glb",
+          "outfit": "uniform",
+          "blink": 1,
+          "phase": 15.33180000028606,
+          "disposed": false,
+          "profile": {
+            "avatarPreset": "photo-p3-v1",
+            "skin": "orange",
+            "hair": "portrait",
+            "outfit": ""
+          },
+          "ownedGeometries": 11,
+          "ownedMaterials": 23,
+          "sharedGeometries": 2
+        },
+        "proportions": {
+          "newHeight": 2.010389088536863,
+          "oldHeight": 2.3507964371306365,
+          "newSkullHeight": 0.9395156004128498
+        },
+        "geometry": 58,
+        "textures": 11,
+        "drawCalls": 40,
+        "triangles": 37382,
+        "hair": {
+          "ready": [
+            "p3"
+          ],
+          "sharedTextures": 2,
+          "liveInstances": 1,
+          "created": 2,
+          "released": 1
+        }
+      },
+      "skirtSeat": {
+        "minY": 0.984999993443489,
+        "maxY": 1.1747500017285346
+      },
+      "walk": true,
+      "wardrobe": true
+    },
+    {
+      "key": "p5",
+      "metrics": {
+        "key": "p5",
+        "view": "quarter",
+        "motion": "walk",
+        "framing": "full",
+        "light": "day",
+        "outfit": "photo",
+        "compare": "new",
+        "ready": true,
+        "frames": 567,
+        "frameMsP50": 8.300000000000182,
+        "frameMsP95": 9.400000000000091,
+        "model": {
+          "version": "photo-four-q2.1",
+          "portraitKey": "p5",
+          "hair": "portrait",
+          "hairSource": "portrait-glb",
+          "outfit": "uniform",
+          "blink": 1,
+          "phase": 29.73120000028596,
+          "disposed": false,
+          "profile": {
+            "avatarPreset": "photo-p5-v1",
+            "skin": "orange",
+            "hair": "portrait",
+            "outfit": ""
+          },
+          "ownedGeometries": 13,
+          "ownedMaterials": 19,
+          "sharedGeometries": 2,
+          "headStyle": "p5-soft-head-study.2",
+          "headStudyGeometries": 25,
+          "headStudyTextures": 1
+        },
+        "previous": {
+          "type": "original-city-procedural"
+        },
+        "proportions": {
+          "newHeight": 2.0383670655058,
+          "oldHeight": 2.3765300293805236,
+          "newSkullHeight": 0.935139394197082
+        },
+        "geometry": 60,
+        "textures": 11,
+        "drawCalls": 35,
+        "triangles": 37088,
+        "hair": {
+          "ready": [
+            "p3",
+            "p5"
+          ],
+          "sharedTextures": 2,
+          "liveInstances": 1,
+          "created": 3,
+          "released": 2
+        }
+      },
+      "skirtSeat": {
+        "minY": 0.984999993443489,
+        "maxY": 1.1730999998748302
+      },
+      "walk": true,
+      "wardrobe": true
+    }
+  ],
+  "physicalIphoneUat": false,
+  "sharedCityChanged": false,
+  "resources": {
+    "switches": 20,
+    "before": {
+      "geometry": 50,
+      "textures": 11
+    },
+    "after": {
+      "geometry": 50,
+      "textures": 11
+    },
+    "hairLive": 1
+  },
+  "errors": [],
+  "missing": [],
+  "pass": true
+}

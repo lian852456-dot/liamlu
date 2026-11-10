@@ -1,0 +1,121 @@
+{
+  "assetSet": "portrait-hair-photo-four-q2-20261101",
+  "readback": [
+    {
+      "key": "p1",
+      "objects": 1,
+      "triangles": 5320,
+      "bounds": {
+        "min": [
+          -0.520495,
+          -0.426921,
+          -0.202696
+        ],
+        "max": [
+          0.520495,
+          0.520621,
+          0.535
+        ]
+      },
+      "dimensions": [
+        1.04099,
+        0.947542,
+        0.737696
+      ],
+      "materials": [
+        "Portrait hair • soft directional PBR"
+      ],
+      "roughnessDefaults": [
+        0.8
+      ],
+      "hairOnly": true
+    },
+    {
+      "key": "p2",
+      "objects": 1,
+      "triangles": 6968,
+      "bounds": {
+        "min": [
+          -0.54773,
+          -0.42849,
+          -0.502643
+        ],
+        "max": [
+          0.54773,
+          0.522162,
+          0.535
+        ]
+      },
+      "dimensions": [
+        1.09546,
+        0.950652,
+        1.037643
+      ],
+      "materials": [
+        "Portrait hair • soft directional PBR.001"
+      ],
+      "roughnessDefaults": [
+        0.8
+      ],
+      "hairOnly": true
+    },
+    {
+      "key": "p3",
+      "objects": 1,
+      "triangles": 5592,
+      "bounds": {
+        "min": [
+          -0.539694,
+          -0.38585,
+          -0.46
+        ],
+        "max": [
+          0.539694,
+          0.530176,
+          0.535
+        ]
+      },
+      "dimensions": [
+        1.079388,
+        0.916026,
+        0.995
+      ],
+      "materials": [
+        "Portrait hair • soft directional PBR.002"
+      ],
+      "roughnessDefaults": [
+        0.8
+      ],
+      "hairOnly": true
+    },
+    {
+      "key": "p4",
+      "objects": 1,
+      "triangles": 7032,
+      "bounds": {
+        "min": [
+          -0.554654,
+          -0.429746,
+          -0.951544
+        ],
+        "max": [
+          0.552272,
+          0.599309,
+          0.535
+        ]
+      },
+      "dimensions": [
+        1.106927,
+        1.029055,
+        1.486544
+      ],
+      "materials": [
+        "Portrait hair • soft directional PBR.003"
+      ],
+      "roughnessDefaults": [
+        0.8
+      ],
+      "hairOnly": true
+    }
+  ]
+}

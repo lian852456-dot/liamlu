@@ -1,0 +1,27 @@
+{
+  "at": "2026-11-04T12:52:29.152701+00:00",
+  "pass": true,
+  "origin": "https://seating-kids-arts-newcastle.trycloudflare.com",
+  "clothingStyle": "p5-vneck.1",
+  "unchanged": {
+    "public/jialing-head-sample.js": true,
+    "public/portrait-config.js": true,
+    "public/assets/portrait-hair/p5.glb": true,
+    "server.mjs": true
+  },
+  "files": [
+    {
+      "file": "index.html",
+      "match": true,
+      "sha256": "d50e1627c95efd517abdbd66d6e5513fbcd2ddaaa669dea7504437a8ac5f842a"
+    },
+    {
+      "file": "li-shuhuan-outline.js",
+      "match": true,
+      "sha256": "11dbdad19df033d30506334d58e5db6f4ce6f3f5d6b447ab0f5c39bae4530421"
+    }
+  ],
+  "formalDeployment": false,
+  "originalWorldsOpened": false,
+  "physicalIphoneUat": false
+}
