@@ -1,0 +1,184 @@
+TAP version 13
+# Subtest: real HTTP source debit, one-way 1:50, two-sided readback and replay
+ok 1 - real HTTP source debit, one-way 1:50, two-sided readback and replay
+  ---
+  duration_ms: 92.082791
+  type: 'test'
+  ...
+# Subtest: concurrent retries and separate city connections credit once; competing spends cannot overspend
+ok 2 - concurrent retries and separate city connections credit once; competing spends cannot overspend
+  ---
+  duration_ms: 35.944584
+  type: 'test'
+  ...
+# Subtest: response lost after remote debit then restart resumes without another debit
+ok 3 - response lost after remote debit then restart resumes without another debit
+  ---
+  duration_ms: 27.765333
+  type: 'test'
+  ...
+# Subtest: city credit failure rolls back locally; refund is idempotent and cannot refund credited coins
+ok 4 - city credit failure rolls back locally; refund is idempotent and cannot refund credited coins
+  ---
+  duration_ms: 45.252333
+  type: 'test'
+  ...
+# Subtest: cancel racing an in-flight debit writes tombstone, no late debit or coin grant
+ok 5 - cancel racing an in-flight debit writes tombstone, no late debit or coin grant
+  ---
+  duration_ms: 32.493791
+  type: 'test'
+  ...
+# Subtest: refresh keeps spending separate from earned history; corrections and month rollover
+ok 6 - refresh keeps spending separate from earned history; corrections and month rollover
+  ---
+  duration_ms: 28.413
+  type: 'test'
+  ...
+# Subtest: receipt mismatch and revoked formal proof never credit; disabled constructor does not migrate
+ok 7 - receipt mismatch and revoked formal proof never credit; disabled constructor does not migrate
+  ---
+  duration_ms: 29.453916
+  type: 'test'
+  ...
+# Subtest: existing city session plus separate formal owner proof required, no game-only employee-ID bypass
+ok 8 - existing city session plus separate formal owner proof required, no game-only employee-ID bypass
+  ---
+  duration_ms: 34.412541
+  type: 'test'
+  ...
+# Subtest: preexisting spending is preserved, not restored by first activation or daily refresh
+ok 9 - preexisting spending is preserved, not restored by first activation or daily refresh
+  ---
+  duration_ms: 16.931208
+  type: 'test'
+  ...
+# Subtest: refund response loss resumes from durable REFUNDING; debit and refund audit events remain
+ok 10 - refund response loss resumes from durable REFUNDING; debit and refund audit events remain
+  ---
+  duration_ms: 17.863084
+  type: 'test'
+  ...
+# Subtest: default-off API cannot migrate or change an untouched city store
+ok 11 - default-off API cannot migrate or change an untouched city store
+  ---
+  duration_ms: 19.541708
+  type: 'test'
+  ...
+# Subtest: forged success without source status cannot credit or mark a refund complete
+ok 12 - forged success without source status cannot credit or mark a refund complete
+  ---
+  duration_ms: 12.236416
+  type: 'test'
+  ...
+# Subtest: host recovery completes only already authorized debits even after user lease revoked
+ok 13 - host recovery completes only already authorized debits even after user lease revoked
+  ---
+  duration_ms: 12.213667
+  type: 'test'
+  ...
+# Subtest: exact current month net medals flow through HTTP debit and common city/dashboard balance without overwriting history
+ok 14 - exact current month net medals flow through HTTP debit and common city/dashboard balance without overwriting history
+  ---
+  duration_ms: 97.7545
+  type: 'test'
+  ...
+# Subtest: negative correction is preserved as net source and blocks spending, never imported as gross earned
+ok 15 - negative correction is preserved as net source and blocks spending, never imported as gross earned
+  ---
+  duration_ms: 41.05075
+  type: 'test'
+  ...
+# Subtest: unknown existing spend and duplicate employee cannot silently create an opening balance
+ok 16 - unknown existing spend and duplicate employee cannot silently create an opening balance
+  ---
+  duration_ms: 19.217542
+  type: 'test'
+  ...
+# Subtest: opaque source versions are tracked durably and replayed older snapshots rejected
+ok 17 - opaque source versions are tracked durably and replayed older snapshots rejected
+  ---
+  duration_ms: 36.62725
+  type: 'test'
+  ...
+# Subtest: owner revoked during monthly source IO cannot debit or credit
+ok 18 - owner revoked during monthly source IO cannot debit or credit
+  ---
+  duration_ms: 28.012916
+  type: 'test'
+  ...
+# Subtest: a newer monthly snapshot cannot reset previously verified external spending
+ok 19 - a newer monthly snapshot cannot reset previously verified external spending
+  ---
+  duration_ms: 29.69925
+  type: 'test'
+  ...
+# Subtest: new policy works beyond old deadline; renewal preserves same UID and does not replay first-bind effects
+ok 20 - new policy works beyond old deadline; renewal preserves same UID and does not replay first-bind effects
+  ---
+  duration_ms: 4.957209
+  type: 'test'
+  ...
+# Subtest: policy rotation never revives old leases; renewed normal handoff can keep original role
+ok 21 - policy rotation never revives old leases; renewed normal handoff can keep original role
+  ---
+  duration_ms: 1.864417
+  type: 'test'
+  ...
+# Subtest: original revocation, epoch, expiry, audience and allowlist still enforced
+ok 22 - original revocation, epoch, expiry, audience and allowlist still enforced
+  ---
+  duration_ms: 4.396458
+  type: 'test'
+  ...
+# Subtest: legacy binding rows keep ownership but require a fresh normal proof under new policy
+ok 23 - legacy binding rows keep ownership but require a fresh normal proof under new policy
+  ---
+  duration_ms: 1.315125
+  type: 'test'
+  ...
+# Subtest: normal renewal leaves existing synthetic wallet, inventory, progress and receipt rows unchanged
+ok 24 - normal renewal leaves existing synthetic wallet, inventory, progress and receipt rows unchanged
+  ---
+  duration_ms: 19.413167
+  type: 'test'
+  ...
+# Subtest: policy generation rollback and same-generation edits cannot resurrect an old lease
+ok 25 - policy generation rollback and same-generation edits cannot resurrect an old lease
+  ---
+  duration_ms: 1.741959
+  type: 'test'
+  ...
+# Subtest: removing a policy retires its generation; restoring the same policy cannot revive proof
+ok 26 - removing a policy retires its generation; restoring the same policy cannot revive proof
+  ---
+  duration_ms: 0.938458
+  type: 'test'
+  ...
+# Subtest: existing scoped contract preserves net/available, same refresh and no silent promotion to earned
+ok 27 - existing scoped contract preserves net/available, same refresh and no silent promotion to earned
+  ---
+  duration_ms: 2.250958
+  type: 'test'
+  ...
+# Subtest: scoped connector rejects wrong owner, altered balance and revoked proof after source IO
+ok 28 - scoped connector rejects wrong owner, altered balance and revoked proof after source IO
+  ---
+  duration_ms: 0.316292
+  type: 'test'
+  ...
+# Subtest: saved actual owner module denies current-date access before contacting authority
+ok 29 - saved actual owner module denies current-date access before contacting authority
+  ---
+  duration_ms: 3.1655
+  type: 'test'
+  ...
+1..29
+# tests 29
+# suites 0
+# pass 29
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 494.850084
