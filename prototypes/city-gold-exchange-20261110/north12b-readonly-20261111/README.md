@@ -1,4 +1,4 @@
-# 北一二B 暱稱對照與核身修復：待確認候選
+# 北一二B 暱稱對照與核身修復：三位核身已發布
 
 2026-11-11 臺北。僅以北一二B `gold-medal.html`／`north12b-daily-gold/v1` 為來源；部區 `DepartmentGoldMonthly` 不適用。
 
@@ -27,7 +27,17 @@
 
 這些是隔離驗證；沒有真人登入UAT或正式金牌員編逐筆驗收。28個測試不可替代正式對照確認。
 
-## 正式發布狀態與回復
+## 2026-11-11 核身修復已發布
+
+使用者在本聊天明確批准雲端三位核身修復、備份與短暫重啟，已解除先前自動核准阻礙。現有核身deployment已從v83切到**v84**；不可變版本12檔逐位元對上候選，實際差異只有CityEmployeeBridge.js。公開city_owner_info已status=ok；缺少憑證的city_lease_validate仍安全拒絕。原B授權未續期。
+
+城市5檔與manifest已套用，ownerRepair=20261111-owner.1，原通道及固定入口保留，服務ready=true。切換前與停止時各備份兩世界；原54／23位角色、餘額／物品／進度／既有owner欄位保持不變，只有runtime PID鎖更新、owner表新增空policy_id欄位及新增政策guard表。原李舒緩+200收據仍單筆。金牌公開來源hash保持相同。
+
+證據：`evidence/owner-release-20261111.json`、`owner-v84-info-readback.json`、`owner-v84-boundary-readback-20261111.json`、`owner-repair-data-readback-20261111.json`、`owner-city-public-readback-20261111.json`。
+
+沒有替三位登入或建立新handoff／綁定，真人核身及iPhone驗收仍待本人實際操作；40個金牌暱稱對照由使用者後補，正式兌換維持關閉。
+
+## 發布前歷程與回復（以下為已完成前的紀錄）
 
 **尚未推送或部署正式服務，未重啟城市。** 11/11自動核准審查拒絕對現有核身服務的`clasp push --force`，理由是正式認證邊界修改、可能覆蓋遠端版本，目前唯讀授權不足以涵蓋三位試點強制發布。已要求使用者明確批准雲端核身模組發布及備份後短暫重啟城市；未改用其他命令繞過拒絕。
 
