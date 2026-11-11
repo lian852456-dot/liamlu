@@ -1,0 +1,315 @@
+/* The control stays on the right, below the existing city/forest entry
+ * buttons, and never occupies the lower-left joystick area. */
+.cozy-playground-controls-launcher,
+.cozy-playground-controls-panel {
+  position: fixed;
+  right: 16px;
+  top: max(194px, calc(env(safe-area-inset-top) + 178px));
+  z-index: 17;
+  box-sizing: border-box;
+  color: #456d59;
+  font-family: inherit;
+}
+
+.cozy-playground-controls-launcher {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #f3e5b8;
+  border-radius: 999px;
+  background: #fff9ecf5;
+  box-shadow: 0 6px 22px #35564224;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.cozy-playground-controls-launcher:hover,
+.cozy-playground-controls-launcher:focus-visible {
+  background: #e7efdf;
+}
+
+.cozy-playground-controls-panel {
+  width: min(336px, calc(100vw - 32px));
+  max-height: min(58dvh, 470px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 15px 15px 14px;
+  border: 1px solid #fffdf4;
+  border-radius: 20px;
+  background: #fff9ecf5;
+  box-shadow: 0 16px 52px #35564235;
+  backdrop-filter: blur(16px);
+  touch-action: pan-y;
+}
+
+.cozy-playground-controls-panel-game-active {
+  max-height: min(44dvh, 360px);
+}
+
+.cozy-playground-controls-panel-game-active .cozy-playground-controls-header,
+.cozy-playground-controls-panel-game-active .cozy-playground-controls-status {
+  display: none;
+}
+
+.cozy-playground-controls-panel[hidden],
+.cozy-playground-controls-launcher[hidden] {
+  display: none !important;
+}
+
+.cozy-playground-controls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 3px;
+}
+
+.cozy-playground-controls-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: .05em;
+}
+
+.cozy-playground-controls-close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #e7eddc;
+  color: #52755f;
+  font: inherit;
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.cozy-playground-controls-status {
+  min-height: 17px;
+  margin: 2px 0 12px;
+  color: #879986;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.cozy-playground-controls-body {
+  display: grid;
+  gap: 8px;
+}
+
+.cozy-playground-controls-game-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 12px 12px;
+  border: 1px solid #dbe8d5;
+  border-radius: 15px;
+  background: #edf3e6;
+}
+
+.cozy-playground-controls-game-title {
+  color: #456d59;
+  font-size: 15px;
+  letter-spacing: .05em;
+}
+
+.cozy-playground-controls-game-status {
+  min-height: 21px;
+  margin: 0;
+  color: #587663;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.cozy-playground-controls-game-gauge {
+  min-height: 22px;
+  padding: 5px 9px;
+  border-radius: 9px;
+  background: #fffdf4;
+  color: #6f896f;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.cozy-playground-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 58px;
+  padding: 8px 9px 8px 11px;
+  border: 1px solid #e1ead9;
+  border-radius: 13px;
+  background: #f0f3e5;
+}
+
+.cozy-playground-controls-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cozy-playground-controls-copy strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cozy-playground-controls-count {
+  color: #879986;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.cozy-playground-controls-visit,
+.cozy-playground-controls-leave {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid #d3e0d0;
+  border-radius: 11px;
+  background: #fffdf4;
+  color: #4e755d;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.cozy-playground-controls-visit:hover,
+.cozy-playground-controls-visit:focus-visible {
+  background: #e1ede0;
+}
+
+.cozy-playground-controls-visit:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.cozy-playground-controls-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 4px;
+}
+
+.cozy-playground-controls-action {
+  flex: 1 1 92px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid #d3e0d0;
+  border-radius: 11px;
+  background: #fffdf4;
+  color: #4e755d;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.cozy-playground-controls-action:hover,
+.cozy-playground-controls-action:focus-visible {
+  background: #e1ede0;
+}
+
+.cozy-playground-controls-action:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.cozy-playground-controls-leave {
+  width: 100%;
+  background: #5e876d;
+  color: #fffaf0;
+  font-weight: 600;
+}
+
+.cozy-playground-controls-leave:hover,
+.cozy-playground-controls-leave:focus-visible {
+  background: #4e765d;
+}
+
+.cozy-playground-controls-launcher:focus-visible,
+.cozy-playground-controls-panel button:focus-visible {
+  outline: 3px solid #dbac6c;
+  outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .cozy-playground-controls-launcher,
+  .cozy-playground-controls-panel {
+    right: 16px;
+    top: max(194px, calc(env(safe-area-inset-top) + 178px));
+  }
+
+  .cozy-playground-controls-launcher {
+    padding: 10px 12px;
+    font-size: 11px;
+  }
+
+  .cozy-playground-controls-panel {
+    width: calc(100vw - 32px);
+    max-height: min(58dvh, 470px);
+    padding: 13px 13px 12px;
+  }
+
+  .cozy-playground-controls-panel-game-active {
+    top: auto;
+    right: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    width: min(254px, calc(100vw - 120px));
+    max-height: min(260px, calc(100dvh - 32px));
+    overflow: hidden;
+    padding: 8px;
+  }
+
+  .cozy-playground-controls-panel-game-active .cozy-playground-controls-body {
+    gap: 5px;
+  }
+
+  .cozy-playground-controls-panel-game-active .cozy-playground-controls-game-card {
+    gap: 5px;
+    padding: 8px;
+    border-radius: 13px;
+  }
+
+  .cozy-playground-controls-panel-game-active .cozy-playground-controls-game-title {
+    font-size: 14px;
+  }
+
+  .cozy-playground-controls-panel-game-active .cozy-playground-controls-game-status {
+    min-height: 18px;
+    font-size: 11px;
+  }
+
+  .cozy-playground-controls-panel-game-active .cozy-playground-controls-game-gauge {
+    min-height: 20px;
+    padding: 4px 7px;
+  }
+
+  .cozy-playground-controls-panel-game-active .cozy-playground-controls-leave {
+    min-height: 44px;
+    padding: 7px 9px;
+  }
+
+  .cozy-playground-controls-panel-game-active .cozy-playground-controls-actions {
+    gap: 6px;
+    margin: 0;
+  }
+
+  .cozy-playground-controls-panel-game-active .cozy-playground-controls-action {
+    min-height: 44px;
+    padding: 7px 8px;
+  }
+}

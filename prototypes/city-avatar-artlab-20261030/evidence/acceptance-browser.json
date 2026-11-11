@@ -1,0 +1,115 @@
+{
+  "scope": "Mac desktop browsers, 390x844 mobile viewport, DPR1; independent artlab only",
+  "physicalIphoneUat": false,
+  "engines": {
+    "chromium": {
+      "metrics": {
+        "new": {
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "calls": 15,
+          "triangles": 19772,
+          "geometries": 17,
+          "textures": 1,
+          "frameP50Ms": 33.30000000000109,
+          "frameP95Ms": 33.600000000000364,
+          "submitP50Ms": 0.20000004768371582,
+          "submitP95Ms": 0.2999999523162842,
+          "pixelRatio": 1,
+          "frames": 320,
+          "contextLost": false,
+          "modelTriangles": 19578,
+          "modelGeometryBytes": 674276,
+          "modelGeometries": 13,
+          "modelMaterials": 13
+        },
+        "old": {
+          "type": "avatar-artlab/metrics",
+          "version": "old",
+          "calls": 16,
+          "triangles": 14302,
+          "geometries": 15,
+          "textures": 1,
+          "frameP50Ms": 33.30000000000291,
+          "frameP95Ms": 34.80000000000291,
+          "submitP50Ms": 0.20000004768371582,
+          "submitP95Ms": 0.3000001907348633,
+          "pixelRatio": 1,
+          "frames": 588,
+          "contextLost": false,
+          "modelTriangles": 14108,
+          "modelGeometryBytes": 545868,
+          "modelGeometries": 13,
+          "modelMaterials": 8
+        }
+      },
+      "errors": [],
+      "missing": [],
+      "controlUi": true
+    },
+    "webkit": {
+      "metrics": {
+        "new": {
+          "type": "avatar-artlab/metrics",
+          "version": "new",
+          "calls": 15,
+          "triangles": 19772,
+          "geometries": 17,
+          "textures": 1,
+          "frameP50Ms": 33,
+          "frameP95Ms": 45,
+          "submitP50Ms": 1,
+          "submitP95Ms": 1.0000000000009095,
+          "pixelRatio": 1,
+          "frames": 316,
+          "contextLost": false,
+          "modelTriangles": 19578,
+          "modelGeometryBytes": 674276,
+          "modelGeometries": 13,
+          "modelMaterials": 13
+        },
+        "old": {
+          "type": "avatar-artlab/metrics",
+          "version": "old",
+          "calls": 16,
+          "triangles": 14302,
+          "geometries": 15,
+          "textures": 1,
+          "frameP50Ms": 33,
+          "frameP95Ms": 40,
+          "submitP50Ms": 1,
+          "submitP95Ms": 1.000000000003638,
+          "pixelRatio": 1,
+          "frames": 582,
+          "contextLost": false,
+          "modelTriangles": 14108,
+          "modelGeometryBytes": 545868,
+          "modelGeometries": 13,
+          "modelMaterials": 8
+        },
+        "fullUi": {
+          "tabs": true,
+          "firstVisitPlayable": true,
+          "closeView": true,
+          "oneIframeAfterReturn": true,
+          "rendererVersionOnly": true,
+          "camera": {
+            "fov": 34,
+            "x": 0.32,
+            "y": 4,
+            "z": 4.12,
+            "target": {
+              "x": -0.7,
+              "z": -4.3
+            }
+          }
+        }
+      },
+      "errors": [],
+      "missing": [],
+      "controlUi": true
+    }
+  },
+  "pass": true,
+  "reviewNote": "Studio controls and controlled model benchmark remain valid. The earlier game camera/readiness subcheck is superseded by final public-browser.json, which requires authenticated WebSocket readiness and centered player framing."
+}
