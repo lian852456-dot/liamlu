@@ -5306,13 +5306,28 @@ function kpiCalcParseReport(xlsxFile) {
   }
 }
 
+// 日報表頭改名對照：內部鍵名不變（前端以此取值），解析時同時接受新舊名稱
+const KPICALC_HEADER_ALIASES = {
+  'Apple&Google服務及雜誌週刊開通數': ['Google服務及雜誌週刊開通數']
+};
+function kpiCalcApplyAliases_(bands) {
+  Object.keys(KPICALC_HEADER_ALIASES).forEach(function(key) {
+    if (bands[key] !== undefined) return;
+    const alts = KPICALC_HEADER_ALIASES[key];
+    for (let i = 0; i < alts.length; i++) {
+      if (bands[alts[i]] !== undefined) { bands[key] = bands[alts[i]]; return; }
+    }
+  });
+  return bands;
+}
+
 function kpiCalcBands(headerRow, startCol0) {
   const bands = {};
   for (let c = startCol0; c <= 233; c += 4) {
     const name = String(headerRow[c] || '').trim();
     if (name) bands[name] = c;
   }
-  return bands;
+  return kpiCalcApplyAliases_(bands);
 }
 
 // 名稱列＋子標題列（實際數／目標數／權重）成對偵測，容忍合併儲存格造成的欄寬不一
@@ -5336,7 +5351,7 @@ function kpiCalcBandsPairs(nameRow, subRow, startCol0) {
     }
     if (b.a !== undefined && b.t !== undefined && b.w !== undefined) bands[name] = b;
   }
-  return bands;
+  return kpiCalcApplyAliases_(bands);
 }
 
 // 讀最近一份已發佈的 KPI 資料，取出「店代碼|姓名 → 職稱」對照
