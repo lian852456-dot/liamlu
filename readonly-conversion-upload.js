@@ -56,14 +56,17 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
   $('conversionPreviewBtn').addEventListener('click', async () => {
     if (busy) return; invalidate(); const ticket = generation;
     const file = $('conversionFile').files[0];
-    if (!file || !/\.xlsx$/i.test(file.name) || !file.size || file.size > 40 * 1024 * 1024) {
-      return message('conversionMessage', '請選擇 40 MB 以內的原始締結率 .xlsx。', 'bad');
+    if (!file || !/\.xls[xm]$/i.test(file.name)) {
+      return message('conversionMessage', '請選擇原始締結率 Excel（.xlsx 或 .xlsm）。', 'bad');
+    }
+    if (!file.size || file.size > 40 * 1024 * 1024) {
+      return message('conversionMessage', '請選擇有內容且 40 MB 以內的 Excel。', 'bad');
     }
     busy = true; controls(); message('conversionMessage', '正在本機核對四張彙總表…');
     try {
       const bytes = await file.arrayBuffer();
       const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2,'0')).join('');
-      const workbook = XLSX.read(bytes, {type:'array', sheets:['AQ締結率','RT每日','RT締結率','樞紐']});
+      const workbook = XLSX.read(bytes, {type:'array', bookVBA:false, sheets:['AQ締結率','RT每日','RT締結率','樞紐']});
       const snapshot = window.ReadonlyConversionSource.parseWorkbook(workbook, XLSX, {sha256, source_name:file.name, source_bytes:file.size});
       if (ticket !== generation) return;
       const result = await call('readonly_conversion_preview', payload({snapshot}));
