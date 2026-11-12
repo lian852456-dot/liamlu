@@ -1,4 +1,5 @@
 'use strict';
+const {createHash}=require('node:crypto');
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const X=require('../assets/vendor/xlsx.full.min.js'),Core=require('../readonly-dashboard-core.js'),Source=require('../readonly-conversion-source.js'),Officer=require('../north12-officer-core.js');
 const {workbook}=require('./helpers/readonly-conversion-workbook.cjs'),{runtime}=require('./helpers/readonly-conversion-runtime.cjs');
@@ -66,10 +67,15 @@ test('November accepts a blank RT total rate only when both verified RT counts a
  summary.R3={t:'n',v:.75};assert.throws(()=>Source.parseWorkbook(nonzero,X,opts),/總表 75\.000000%.*逐日 6\/66/);
  delete rt.R3;delete rt.Q3;assert.throws(()=>Source.parseWorkbook(w,X,opts),/RT分母/);
 });
-test('parsed November source previews, publishes, reads back, reimports and rolls back through existing private component',()=>{
- const b=runtime(),old=Source.parseWorkbook(make(),X,{...opts,sha256:'a'.repeat(64)}),next=Source.parseWorkbook(make({month:'2026-11',fixed31:true}),X,opts);
+test('November XLSM previews, publishes, reads back, reimports and rolls back after an XLSX version',()=>{
+ const b=runtime(),old=Source.parseWorkbook(make(),X,{...opts,sha256:'a'.repeat(64)});
+ const bytes=workbook({month:'2026-11',fixed31:true,bookType:'xlsm'}),name='synthetic-month.XLSM';
+ const sha256=createHash('sha256').update(bytes).digest('hex');
+ const next=Source.parseWorkbook(X.read(bytes,{type:'buffer',bookVBA:false}),X,{source_name:name,source_bytes:bytes.length,sha256});
  const publish=s=>{const p=b.call('Preview',{snapshot:s});return b.call('Publish',{previewToken:p.token,confirm:true});};
  const previous=publish(old),current=publish(next);assert.equal(current.live.cutoff,'2026-11-03');assert.equal(b.call('Status').live.activeHash,current.live.activeHash);assert.equal(publish(next).status,'already_current');assert.equal(b.files.size,2);
+ assert.equal(current.live.sourceName,name);assert.equal(current.live.sourceHash,sha256);
+ assert.throws(()=>b.call('Preview',{snapshot:{...next,source_name:'invalid.xls'}}),/締結率原始檔身分不完整/);
  const result=b.call('Rollback',{confirm:true,expectedRevision:current.live.revision,expectedActiveHash:current.live.activeHash});assert.equal(result.live.activeHash,previous.live.activeHash);
 });
 
