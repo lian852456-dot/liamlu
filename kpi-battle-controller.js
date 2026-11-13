@@ -6,7 +6,7 @@
   'use strict';
 
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
-  const QUICK_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
+  const QUICK_UPLOAD_URL = 'quick-upload.html';
   const TRANSIENT_HTTP_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
   const RETRYABLE_PRIVATE_ACTIONS = new Set(['private_access', 'kpicalc_access']);
   const DEFAULT_RETRY_DELAYS_MS = [2000, 5000];
@@ -431,9 +431,24 @@
     return `<span class="kpi-rate rate-only">${formatPercent(row.insurance_attach_rate)}</span><span class="kpi-sub">實際搭售率</span>`;
   }
 
+  function kpiBattleConversion(snapshot, core) {
+    const status = snapshot?.conversionStatus;
+    if (status?.status !== 'verified') {
+      return {message: status?.status === 'unavailable' || snapshot?.conversionBattle ? '資料未通過核對' : '尚無正式資料'};
+    }
+    try {
+      const {cutoff, records} = core.validateConversion(snapshot.conversionBattle);
+      if (!Number.isSafeInteger(status.revision) || status.revision < 1) return {message: '資料未通過核對'};
+      const byStore = new Map(core.STORES.map(({id}) => [id, core.aggregate(records.filter(row => row.store === id))]));
+      return {cutoff, revision: status.revision, byStore, district: core.aggregate(records)};
+    } catch {
+      return {message: '資料未通過核對'};
+    }
+  }
+
   function privateDashboardLockMarkup(kind) {
     const title = kind === 'awards' ? '台獎戰情受保護' : 'KPI 戰情受保護';
-    const uploadEntry = kind === 'kpi' ? `<a class="secondary" href="${QUICK_UPLOAD_URL}" target="_blank" rel="noopener">資料快速上傳</a>` : '';
+    const uploadEntry = kind === 'kpi' ? `<a class="secondary" href="${QUICK_UPLOAD_URL}">資料快速上傳</a>` : '';
     return `<div class="card private-lock">
       <h3>🔐 ${title}</h3>
       <p>僅限北一二B在職同仁使用。姓名維持遮罩，KPI、排名與獎金不會出現在公開 GitHub 頁面。</p>
@@ -469,7 +484,7 @@
     const sleep = typeof config.sleep === 'function' ? config.sleep : delay => new Promise(resolve => win.setTimeout(resolve, delay));
     const logger = config.logger || win.console || (typeof console !== 'undefined' ? console : null);
     const request = payload => requestWithRetry(payload);
-    const state = { data: null, view: 'stores', profile: null, adminSecret: '', loading: false, store: '', metricGroup: 'all' };
+    const state = { data: null, conversion: null, view: 'stores', profile: null, adminSecret: '', loading: false, store: '', metricGroup: 'all' };
     function updateNotice(message) {
       const compactRefresh=doc.querySelector('.compact-refresh');if(compactRefresh)compactRefresh.disabled=!state.data||state.loading;
       for (const id of ['kpiBattleContent','awardsBattleContent']) {
@@ -674,6 +689,22 @@
       return String(input?.value || '').trim();
     }
 
+    function conversionHeading() {
+      const conversion = state.conversion;
+      const caption = conversion?.cutoff
+        ? `截止 <time datetime="${conversion.cutoff}">${conversion.cutoff}</time><br>版本 ${conversion.revision}`
+        : conversion?.message || '尚無正式資料';
+      return `<th scope="col" class="kpi-conversion-heading">締結率<small class="kpi-sub" data-conversion-version>${caption}</small></th>`;
+    }
+
+    function conversionCell(row) {
+      const conversion = state.conversion;
+      const totals = row.isDistrict ? conversion?.district : conversion?.byStore?.get(win.ReadonlyDashboardCore.storeId(row.store));
+      if (!totals) return `<td data-conversion-rate>—${conversion?.byStore ? '<small class="kpi-sub">無店點資料</small>' : ''}</td>`;
+      const percent = rate => rate === null ? '—（分母 0）' : `${(rate * 100).toFixed(2)}%`;
+      return `<td data-conversion-rate>AQ ${percent(totals.aq_rate)}<br>RT ${percent(totals.rt_rate)}</td>`;
+    }
+
     function renderCompactStores() {
       const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
       const number = value => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : formatNumber(value);
@@ -720,10 +751,12 @@
         ${summary('附掛得分',number(aggregate.addon_score),delta(aggregate.addon_score_dod,'分'))}
         ${summary('保險搭售',percent(aggregate.insurance_attach_rate),delta(aggregate.insurance_attach_rate_dod,'pp'))}
       </div>
-      <section class="compact-overview" aria-labelledby="storeOverviewHeading"><div class="compact-section-heading"><h2 id="storeOverviewHeading">店點總覽</h2>${rankMark('top','區內TOP3')}${rankMark('bottom','區內BOT3')}<span class="kpi-battle-note">依有效 KPI 排名；缺值不列名次</span></div>
-      <div class="table-wrap" tabindex="0" role="region" aria-label="九店 KPI 總覽，可左右捲動"><table class="compact-matrix"><thead><tr><th>店點／區內標示</th><th>KPI</th><th>公司排名</th><th>DOD<br>（較前日）</th><th>附掛得分</th><th>保險<br>搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>RT</th><th>R1399</th></tr></thead><tbody>
-      ${stores.map(row=>`<tr><th scope="row">${esc(displayStoreName(row.store))}${badge(row)}</th><td data-overall-kpi class="${kpiBattleTone(row.overall_kpi)}${underTarget(row.overall_kpi)?' kpi-attention':''}">${percent(row.overall_kpi)}</td><td>${number(row.company_rank)}</td><td>${delta(row.overall_kpi_dod,'pp')}</td><td>${number(row.addon_score)}<small>DOD ${delta(row.addon_score_dod,'分')}</small></td>${insuranceCell(row.insurance_attach_rate)}${rateCell(row.core?.a999)}${rateCell(row.core?.a1399)}${rateCell(row.core?.haosu)}${rateCell(row.metrics?.['RT上線點數'])}${rateCell(row.core?.r1399)}</tr>`).join('')}
-      </tbody></table></div><p class="kpi-battle-note">KPI 以 100% 標色提醒；保險搭售率依 50% 門檻獨立標色，缺值顯示 —。</p></section>
+      <section class="compact-overview" aria-labelledby="storeOverviewHeading"><div class="compact-section-heading"><h2 id="storeOverviewHeading">北一二B／店點 KPI 排名</h2>${rankMark('top','區內TOP3')}${rankMark('bottom','區內BOT3')}<span class="kpi-battle-note">依有效 KPI 排名；缺值不列名次</span></div>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="北一二B整體與九店 KPI 排名，可左右捲動"><table class="compact-matrix"><thead><tr><th>店點／區內標示</th><th>KPI總達成</th>${conversionHeading()}<th>公司排名</th><th>DOD<br>（較前日）</th><th>附掛得分</th><th>保險<br>搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>RT</th><th>R1399</th></tr></thead><tbody>
+      ${rows.map(row=>`<tr${row.isDistrict?' class="compact-district"':''}><th scope="row">${esc(displayStoreName(row.store))}${row.isDistrict?'':badge(row)}</th><td data-overall-kpi class="${kpiBattleTone(row.overall_kpi)}${underTarget(row.overall_kpi)?' kpi-attention':''}">${percent(row.overall_kpi)}</td>${conversionCell(row)}<td>${number(row.company_rank)}</td><td>${delta(row.overall_kpi_dod,'pp')}</td><td>${number(row.addon_score)}<small>DOD ${delta(row.addon_score_dod,'分')}</small></td>${insuranceCell(row.insurance_attach_rate)}${rateCell(row.core?.a999)}${rateCell(row.core?.a1399)}${rateCell(row.core?.haosu)}${rateCell(row.metrics?.['RT上線點數'])}${rateCell(row.core?.r1399)}</tr>`).join('')}
+      </tbody></table></div>
+      <p class="kpi-battle-note">AQ 採上線數／來客數。RT 採原 TWM 與原 TST 合計的符合續約資格上線數／來客數。</p>
+      <p class="kpi-battle-note">KPI 以 100% 標色提醒；保險搭售率依 50% 門檻獨立標色，缺值顯示 —。</p></section>
       <section class="compact-store-details" aria-labelledby="storeDetailHeading"><h2 id="storeDetailHeading">各店詳細成績</h2>
         <div class="kpi-battle-filter"><label>選擇門市<select id="kpiBattleStoreSelect">${rows.map(row=>`<option value="${esc(row.store)}"${row.store===selected.store?' selected':''}>${esc(displayStoreName(row.store))}</option>`).join('')}</select></label><label>項目分類<select id="kpiBattleMetricGroup"><option value="all"${state.metricGroup==='all'?' selected':''}>全部項目</option>${groups.filter(group=>group.keys.length||group.id==='addon').map(group=>`<option value="${group.id}"${state.metricGroup===group.id?' selected':''}>${group.label}</option>`).join('')}</select></label></div>
         <h3>${esc(displayStoreName(selected.store))}｜KPI 分類明細</h3><div class="kpi-battle-toggle">${[['all','全部'],...groups.filter(group=>group.keys.length||group.id==='addon').map(group=>[group.id,group.label])].map(([id,label])=>`<button type="button" data-kpi-detail-tab="${id}" class="${state.metricGroup===id?'active':''}" aria-pressed="${state.metricGroup===id}">${label}</button>`).join('')}</div>
@@ -749,9 +782,9 @@
         </div>
         <div class="section-divider">北一二B／店點 KPI 排名</div>
         <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
-          <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th><th>加掛</th><th>保險搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
-          <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${displayStoreName(row.store)}</td><td>${row.company_rank == null ? kpiPendingCell() : `<span class="val-gold">${row.company_rank}</span>`}${kpiBattleRankDod(row.company_rank_dod)}</td><td>${row.overall_kpi == null ? kpiPendingCell() : kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${row.addon_score == null ? kpiPendingCell() : formatNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${formatNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleInsuranceCell(row)}</td><td>${kpiBattleMetricCell(row.core?.a999, true)}</td><td>${kpiBattleMetricCell(row.core?.a1399, true)}</td><td>${kpiBattleMetricCell(row.core?.haosu, true)}</td><td>${kpiBattleMetricCell(row.core?.r1399, true)}</td></tr>`).join('')}</tbody>
-        </table></div></div>
+          <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th>${conversionHeading()}<th>加掛</th><th>保險搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
+          <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${displayStoreName(row.store)}</td><td>${row.company_rank == null ? kpiPendingCell() : `<span class="val-gold">${row.company_rank}</span>`}${kpiBattleRankDod(row.company_rank_dod)}</td><td>${row.overall_kpi == null ? kpiPendingCell() : kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td>${conversionCell(row)}<td>${row.addon_score == null ? kpiPendingCell() : formatNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${formatNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleInsuranceCell(row)}</td><td>${kpiBattleMetricCell(row.core?.a999, true)}</td><td>${kpiBattleMetricCell(row.core?.a1399, true)}</td><td>${kpiBattleMetricCell(row.core?.haosu, true)}</td><td>${kpiBattleMetricCell(row.core?.r1399, true)}</td></tr>`).join('')}</tbody>
+        </table></div><p class="kpi-battle-note">AQ 採上線數／來客數。RT 採原 TWM 與原 TST 合計的符合續約資格上線數／來客數。</p></div>
         <div class="section-divider">各項 KPI 達成</div>
         <div class="card">
           <div class="kpi-battle-filter"><label>選擇區／店點<select id="kpiBattleStoreSelect">${rows.map(row => `<option value="${row.store}" ${row.store === selected?.store ? 'selected' : ''}>${row.isDistrict ? '🏢 ' : ''}${displayStoreName(row.store)}</option>`).join('')}</select></label></div>
@@ -838,8 +871,9 @@
           const kpiResult = await request({ action: 'kpicalc_access', employeeId, deviceId });
           if(authContext!==(win.DashboardB?.context()||0))return;
           const kpiData = kpicalcToKpiBattleView(kpiResult.data, new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }));
-          const snapshotKpi = result.snapshot && result.snapshot.kpiBattle;
+          const snapshotKpi = result.snapshot?.kpiBattle;
           state.data = mergeKpiBattleSupplement(kpiData, snapshotKpi);
+          state.conversion = kpiBattleConversion(result.snapshot, win.ReadonlyDashboardCore);
           render();
           onKpiLoaded({ result, data: state.data, profile: state.profile });
           updateNotice();
@@ -942,6 +976,7 @@
     function failClosed(message) {
       state.profile=null;state.adminSecret='';
       state.data = null;
+      state.conversion = null;
       const cutoff=doc.getElementById('kpiCompactCutoff');if(cutoff)cutoff.textContent=message||'尚未取得已授權資料';
       updateNotice();
       const note = doc.getElementById('kpiBattleSourceNote');
@@ -989,6 +1024,7 @@
         state.profile=bundle.privateResult.profile;
         const data=kpicalcToKpiBattleView(bundle.kpiResult.data,new Date(bundle.loadedAt||Date.now()).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}));
         state.data=mergeKpiBattleSupplement(data,bundle.privateResult.snapshot?.kpiBattle);
+        state.conversion=kpiBattleConversion(bundle.privateResult.snapshot,win.ReadonlyDashboardCore);
         render();onKpiLoaded({result:bundle.privateResult,data:state.data,profile:state.profile});updateNotice();
       },
       getData: () => state.data,
@@ -1006,6 +1042,7 @@
     mergeKpiBattleSupplement,
     kpiBattleSourceMetadata,
     kpiBattleDetailGroups,
+    kpiBattleConversion,
     kpiBattleTargetMonth,
     kpiBattleDailyTarget,
     kpiBattleDistrictDailyTarget,

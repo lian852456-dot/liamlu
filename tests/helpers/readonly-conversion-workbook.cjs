@@ -1,6 +1,6 @@
 'use strict';
 const C=require('../../readonly-dashboard-core.js'),XLSX=require('../../assets/vendor/xlsx.full.min.js');
-function workbook({days=3,bad=false,month='2026-10',rateGap=11,priorGap=67,fixed31=false,blankRtTotal=false}={}){
+function workbook({days=3,bad=false,month='2026-10',rateGap=11,priorGap=67,fixed31=false,blankRtTotal=false,bookType='xlsx'}={}){
   const sheets=Object.fromEntries(['AQ締結率','RT每日','RT締結率','樞紐'].map(n=>[n,[[],[]]]));
   const [year,m]=month.split('-').map(Number),length=new Date(Date.UTC(year,m,0)).getUTCDate(),slots=fixed31?31:length,offsets=Array.from({length:4},(_,i)=>5+i*(slots+1)),[anCol,adCol,arCol,tsdCol]=offsets,rrCol=tsdCol+slots+1+rateGap,priorCol=arCol+slots+1+priorGap;
   const aq=sheets['AQ締結率'],rt=sheets['RT每日'],total=sheets['RT締結率'];
@@ -35,6 +35,6 @@ function workbook({days=3,bad=false,month='2026-10',rateGap=11,priorGap=67,fixed
   sheets['樞紐'][0][0]=previous+'/1 ~ '+previous+'/'+days;
   if(bad)aq[2][anCol+slots]++;
   const wb=XLSX.utils.book_new();for(const [name,rows]of Object.entries(sheets))XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),name);
-  return Buffer.from(XLSX.write(wb,{type:'buffer',bookType:'xlsx'}));
+  return Buffer.from(XLSX.write(wb,{type:'buffer',bookType}));
 }
 module.exports={workbook};

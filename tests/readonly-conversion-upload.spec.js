@@ -1,4 +1,5 @@
 'use strict';
+const {createHash}=require('node:crypto');
 const {test,expect}=require('@playwright/test');
 const {runtime}=require('./helpers/readonly-conversion-runtime.cjs'),{workbook}=require('./helpers/readonly-conversion-workbook.cjs');
 const {fixture:businessFixture}=require('./helpers/readonly-dashboard-fixture.cjs');
@@ -13,7 +14,9 @@ async function setup(page,{login=true,hold=null}={}){
     const result=b.post(payload);
     await route.fulfill({headers:{'content-type':'application/json','access-control-allow-origin':origin},body:JSON.stringify(result)}).catch(()=>{});
   });
-  await page.goto(new URL('readonly-conversion-upload.html',process.env.TEST_BASE_URL).href);
+  await page.goto(new URL('quick-upload.html',process.env.TEST_BASE_URL).href);
+  await page.getByRole('link',{name:/^締結率/}).click();
+  await expect(page.getByRole('link',{name:'返回 KPI 戰情並重新讀取'})).toHaveAttribute('href','kpi-battle.html?refresh=conversion#kpi');
   if(login){await page.locator('#employeeId').fill(b.auth.employeeId);await page.locator('#adminSecret').fill(b.auth.adminSecret);await page.locator('#loginBtn').click();await expect(page.locator('#app')).toBeVisible();await expect(page.locator('#conversionPreviewBtn')).toBeEnabled();}
   return{b,calls,errors};
 }
@@ -36,12 +39,23 @@ test('real XLSX parser → actual doPost/original admin guard → private readba
   expect(s.calls.every(c=>c.method==='POST'&&c.headers['content-type'].startsWith('text/plain'))).toBe(true);
   expect(await page.evaluate(()=>Object.values(localStorage).concat(Object.values(sessionStorage)).some(v=>v.includes('synthetic-admin-proof')))).toBe(false);
 });
-test('November fixed-width source with a blank zero-visitor RT rate publishes and reads back the cutoff',async({page})=>{
-  const s=await setup(page);await preview(page,{month:'2026-11',fixed31:true,blankRtTotal:true});await expect(page.locator('#conversionPreviewText')).toContainText('2026-11-01 至 2026-11-03');
+test('November XLSM with a blank zero-visitor RT rate publishes and reads back the original file identity',async({page})=>{
+  const s=await setup(page);
+  const name='202611_AQ、RT HS締結率 的複本.xlsm';
+  const buffer=workbook({month:'2026-11',fixed31:true,blankRtTotal:true,bookType:'xlsm'});
+  const input=page.locator('#conversionFile');
+  expect((await input.getAttribute('accept')).split(',')).toContain('.xlsm');
+  await input.setInputFiles({name,mimeType:'application/vnd.ms-excel.sheet.macroEnabled.12',buffer});
+  await page.locator('#conversionPreviewBtn').click();
+  await expect(page.locator('#conversionPreviewText')).toContainText('2026-11-01 至 2026-11-03');
   const sent=s.calls.find(c=>c.name==='readonly_conversion_preview').payload.snapshot;
+  expect(sent.source_name).toBe(name);
+  expect(sent.source_bytes).toBe(buffer.length);
+  expect(sent.sha256).toBe(createHash('sha256').update(buffer).digest('hex'));
   expect(sent.records).toHaveLength(27);expect(sent.records.every(r=>r.date<='2026-11-03')).toBe(true);
   const firstStore=sent.records.filter(r=>r.store==='DNB10062');expect(firstStore).toHaveLength(3);expect(firstStore.every(r=>r.rt_n===0&&r.rt_d===0)).toBe(true);
   await page.locator('#conversionConfirm').check();await page.locator('#conversionPublishBtn').click();await expect(page.locator('#conversionLive')).toContainText('正式截止 2026-11-03');
+  await expect(page.locator('#conversionLive')).toContainText(name);
   await expect(page.locator('#conversionMessage')).toContainText('已完成私有版本讀回');expect(s.errors).toEqual([]);
 });
 test('incorrect total fails locally and never invokes private preview or publication',async({page})=>{

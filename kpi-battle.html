@@ -3,7 +3,7 @@
 <head>
   <script src="portal-logout.js?v=20261011-b-epoch-1"></script>
   <script src="GasBClient.js?v=20261023-login-status-1" defer></script>
-  <script src="dashboard-b-shell.js?v=20261109-phone-return-1" defer></script>
+  <script src="dashboard-b-shell.js?v=20261113-conversion-1" defer></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -11,7 +11,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="robots" content="noindex, nofollow">
 <title>KPI 戰情｜北一二B 智慧營運中心</title>
-<link rel="stylesheet" href="kpi-battle-compact.css?v=20261109-daily-target-1">
+<link rel="stylesheet" href="kpi-battle-compact.css?v=20261113-conversion-1">
 <!--
   KPI、個績與台獎共用同一個已驗證畫面，沿用原有 controller 與資料來源。
   本頁不得新增公式、API、JSON、權限捷徑或 fallback。
@@ -264,7 +264,8 @@
   <div id="awardsBattleContent"><div class="kpi-empty">讀取台獎戰情資料中…</div></div>
 </main>
 
-<script src="kpi-battle-controller.js?v=20261109-daily-target-1"></script>
+<script src="readonly-dashboard-core.js?v=20261113-conversion-1"></script>
+<script src="kpi-battle-controller.js?v=20261113-conversion-1"></script>
 <script src="award-model-catalog.js?v=20261105-awards-gap-id-1"></script>
 <link rel="stylesheet" href="awards-battle-integrated.css?v=20261108-1">
 <script src="awards-battle-controller.js?v=20261108-integrated-1"></script>
@@ -309,6 +310,7 @@
     window.awardsBattleController = awardsController;
     window.DashboardBHost = {
       compactBattle: true,
+      refreshOnResume: new URLSearchParams(window.location.search).get('refresh') === 'conversion',
       navigationSelector: '[data-kpi-battle-view]',
       clear(note) { kpiController.failClosed(note || '請重新驗證登入。'); awardsController.failClosed(note || '請重新驗證登入。'); },
       showLegacyAccess() {

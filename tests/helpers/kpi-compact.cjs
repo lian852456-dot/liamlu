@@ -1,10 +1,11 @@
 'use strict';
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs'),path=require('node:path');
+const Conversion=require('../../readonly-dashboard-core.js');
 const root=path.join(__dirname,'../..'),origin='https://kpi-compact.test';
 const names=['酒泉','永吉','復興南','杭州南','萬大','通化','大稻埕','三創','六張犁'];
 const keys=['AQ V+D 999 (含)以上','AQ V+D 1399 (含)以上','好速案銷售點數','RT V+D 999 (含)以上','RT V+D 1399 (含)以上','RT上線點數','5G銷售數','TTL AQ上線點數','預付卡開卡面額','特殊維繫用戶續約數','高高特維用戶續約數','自退數','解約後NP OUT','解約後NP OUT(督導績)','Device專案銷售數','重點Device銷售量','換約淨新增金額','空機、3C、物聯網及門市購營收','配件及其他營收','包膜與保貼營收','手機保險服務點數','HBO Max&Disney+&Prime Video銷售數','Netflix多享組銷售數','MyVideo&KKBOX','Apple&Google服務及雜誌週刊開通數'];
-async function start(page,{ttl=25*60*1000,failInitial=false,unknown=false,missingMetric=false}={}){
+async function start(page,{ttl=25*60*1000,failInitial=false,unknown=false,missingMetric=false,conversion}={}){
  const calls=[],errors=[],control={fail:failInitial,denied:false,delay:false},expiresAt=Date.now()+ttl;
  page.on('pageerror',error=>errors.push(error.message));
  const kpi={meta:{month:'2026-11',snapshotDay:8,monthDays:30,period:'2026/11/01 ~ 11/08',sourceFile:'1109.xlsx'},
@@ -32,7 +33,7 @@ async function start(page,{ttl=25*60*1000,failInitial=false,unknown=false,missin
   const proof={profile:{role:'employee',isTrusted:false},trustSource:'password-bound'};
   const result=action==='employee_status'?{status:'ok',enabled:true,passwordAvailable:true}
    :action==='employee_login'?{status:'ok',token:'B1_a_'+'a'.repeat(64),expiresAt,trustSource:'password-bound'}
-   :action==='employee_dashboard_read'?{status:'ok',expiresAt,trustSource:'password-bound',phoneEligible:false,privateResult:{status:'ok',...proof,snapshot:{kpiBattle:snapshot}},kpiResult:{status:'ok',...proof,data:kpi}}:{status:'ok'};
+   :action==='employee_dashboard_read'?{status:'ok',expiresAt,trustSource:'password-bound',phoneEligible:false,privateResult:{status:'ok',...proof,snapshot:{kpiBattle:snapshot,...conversion}},kpiResult:{status:'ok',...proof,data:kpi}}:{status:'ok'};
   return route.fulfill({json:result});
  });
  await page.goto(origin+'/kpi-battle.html');
@@ -47,14 +48,15 @@ for(const width of [1920,1024,390,320])test(width+'px approved matrix, real targ
  await page.setViewportSize({width,height:828});const f=await start(page);
  await expect(page.locator('.compact-summary .sc-label')).toHaveText(['全區 KPI','公司排名','附掛得分','保險搭售']);
  await expect(page.locator('.compact-summary')).toContainText('+1.5 pp');await expect(page.locator('.compact-summary')).toContainText('+0.25 分');
- await expect(page.locator('.compact-matrix tbody tr')).toHaveCount(9);
- await expect(page.locator('.compact-matrix thead th')).toHaveText(['店點／區內標示','KPI','公司排名','DOD（較前日）','附掛得分','保險搭售率','A999','A1399','好速','RT','R1399']);
+ await expect(page.locator('.compact-matrix tbody tr')).toHaveCount(10);
+ await expect(page.locator('.compact-matrix thead th')).toHaveText(['店點／區內標示','KPI總達成','締結率尚無正式資料','公司排名','DOD（較前日）','附掛得分','保險搭售率','A999','A1399','好速','RT','R1399']);
+ await expect(page.locator('.compact-matrix [data-conversion-rate]')).toHaveText(Array(10).fill('—'));
  await expect(page.locator('.compact-matrix tbody .rank-top')).toHaveCount(3);await expect(page.locator('.compact-matrix tbody .rank-bottom')).toHaveCount(3);
  await expect(page.locator('.compact-matrix tbody .rank-icon')).toHaveCount(6);
  await expect(page.locator('.compact-matrix tbody .rank-top svg').first()).toHaveAttribute('aria-hidden','true');
  await expect(page.locator('.compact-overview summary')).toHaveCount(0);
  await expect(page.locator('.compact-overview')).not.toContainText('KPI 未達 100% 門市');
- const insurance=page.locator('.compact-matrix [data-insurance-rate]');
+ const insurance=page.locator('.compact-matrix tbody tr:not(.compact-district) [data-insurance-rate]');
  await expect(insurance).toHaveText(['50.0%','49.9%','—','0.0%','60.0%','80.0%','49.0%','40.0%','70.0%']);
  await expect(insurance.nth(0)).toHaveClass('insurance-met');await expect(insurance.nth(1)).toHaveClass('insurance-low');await expect(insurance.nth(2)).toHaveClass('');
  await expect(page.locator('.compact-matrix [data-overall-kpi].kpi-attention')).toHaveCount(2);
@@ -87,6 +89,32 @@ for(const width of [1920,1024,390,320])test(width+'px approved matrix, real targ
  await expect(details).toContainText('1109.xlsx');
  await details.locator('summary').click();await page.evaluate(()=>scrollTo(0,0));
  await page.screenshot({path:info.outputPath('SYNTHETIC-kpi-'+width+'.png'),fullPage:true});
+ expect(f.errors).toEqual([]);
+});
+
+test('AQ／RT uses the published cutoff and version, weights all nine stores and refreshes after upload return',async({page})=>{
+ const conversion={
+  conversionStatus:{status:'verified',revision:7},
+  conversionBattle:{schema:Conversion.SCHEMA,sha256:'a'.repeat(64),period_start:'2026-11-01',cutoff:'2026-11-01',
+   records:Conversion.STORES.map(({id},i)=>({store:id,date:'2026-11-01',aq_n:i===0?1:0,aq_d:i===0?2:10,rt_n:i===0?0:1,rt_d:i===0?0:4}))}
+ };
+ const f=await start(page,{conversion});
+ await expect(page.locator('.compact-matrix .compact-district [data-conversion-rate]')).toHaveText('AQ 1.22%RT 25.00%');
+ await expect(page.locator('.compact-matrix tr').filter({hasText:'台北酒泉'}).locator('[data-conversion-rate]')).toHaveText('AQ 50.00%RT —（分母 0）');
+ await expect(page.locator('.compact-matrix tr').filter({hasText:'台北三創'}).locator('[data-conversion-rate]')).toHaveText('AQ 0.00%RT 25.00%');
+ await expect(page.locator('[data-conversion-version]')).toContainText('2026-11-01');
+ await expect(page.locator('[data-conversion-version]')).toContainText('版本 7');
+
+ conversion.conversionStatus.revision=8;
+ const before=f.calls.length;
+ await page.goto(origin+'/kpi-battle.html?refresh=conversion#kpi');
+ await expect(page.locator('[data-conversion-version]')).toContainText('版本 8');
+ expect(f.calls.slice(before)).toEqual(['employee_dashboard_read']);
+
+ conversion.conversionBattle.records.pop();
+ await update(page);
+ await expect(page.locator('[data-conversion-version]')).toHaveText('資料未通過核對');
+ await expect(page.locator('[data-conversion-rate]')).toHaveText(Array(10).fill('—'));
  expect(f.errors).toEqual([]);
 });
 

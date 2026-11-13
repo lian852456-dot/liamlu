@@ -3,19 +3,24 @@
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f1f5f8;color:#173349;font:16px/1.65 system-ui,"PingFang TC",sans-serif}main{max-width:900px;margin:30px auto;padding:0 18px}.hero{background:#173e56;color:white;border-radius:16px;padding:24px}.card{background:white;border:1px solid #d6e1e9;border-radius:14px;margin-top:18px;padding:22px}h1{font-size:26px}h2{font-size:21px}label{display:grid;gap:8px;font-weight:650;margin-top:14px}input,button{font:inherit;min-height:44px;border-radius:8px;padding:10px 12px}input{width:100%;border:1px solid #9db4c4}button{border:0;background:#173e56;color:white;cursor:pointer;font-weight:700}button:disabled{opacity:.5;cursor:default}.secondary{background:#e4edf4;color:#173349}.warn{background:#8e5000}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.notice,.message{padding:12px;background:#eef5fa;border-radius:8px;overflow-wrap:anywhere}.ok{background:#e3f4eb;color:#17613d}.bad{background:#fff0f0;color:#9b2735}.hidden{display:none!important}.small{font-size:14px;color:#526779}.confirm{display:flex;align-items:start;font-weight:500}.confirm input{width:22px;min-height:22px;flex-shrink:0}#conversionPreviewText{overflow-wrap:anywhere}a{color:#12527e}@media(max-width:500px){main{margin:12px auto;padding:0 10px}.card,.hero{padding:16px}.actions button{width:100%}}
 </style></head><body><main>
-<header class="hero"><h1>締結率與來客數更新</h1><p>沿用原主管上傳驗證。更新後，請回儀表板重新核驗截止與趨勢。</p></header>
+<header class="hero"><h1>AQ／RT 締結率更新</h1><p>選擇原報、核對截止與彙總，確認後更新 KPI 戰情與來客儀表板。</p></header>
 <section id="authCard" class="card"><h2>主管上傳驗證</h2><p class="small">請使用既有員編與管理者驗證碼。驗證碼僅供本次原服務核驗，不保存於瀏覽器。</p><label>員編<input id="employeeId" autocomplete="username"></label><label>管理者驗證碼<input id="adminSecret" type="password" autocomplete="current-password"></label><div class="actions"><button id="loginBtn" type="button">登入並讀取締結率版本</button></div><div id="authMessage" class="message hidden" role="status"></div></section>
 <section id="app" class="hidden"><section class="card" id="conversionUploadCard">
-<h2>AQ／RT 締結率來源</h2><p class="small">只讀取已核實的四張彙總表；原 Excel 及客戶明細不會上傳。截止後占位不作零值，同期只有區間總量。此更新獨立保存，不改 KPI、台獎或個績。</p>
-<label>締結率來源 Excel（.xlsx）<input id="conversionFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+<h2>AQ／RT 締結率來源</h2><p class="small">只發布已核實的九店逐日彙總。原始 Excel 與客戶明細留在本機。</p>
+<label>締結率來源 Excel（.xlsx／.xlsm）<input id="conversionFile" type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12"></label>
 <div class="actions"><button id="conversionPreviewBtn" type="button">檢查締結率來源</button><button id="conversionRefreshBtn" class="secondary" type="button">讀取締結率版本</button></div>
 <p id="conversionLive" class="notice">尚未核對版本。</p><div id="conversionMessage" class="message hidden" role="status"></div>
-<div id="conversionPreview" class="hidden"><p id="conversionPreviewText"></p><label class="confirm"><input id="conversionConfirm" type="checkbox">我已確認來源、真實截止及店日差異，發布此私有彙總版本。</label><div class="actions"><button id="conversionPublishBtn" type="button" disabled>發布締結率版本</button></div></div>
+<div id="conversionPreview" class="hidden"><p id="conversionPreviewText"></p><label class="confirm"><input id="conversionConfirm" type="checkbox">我已確認來源、截止及店日差異。</label><div class="actions"><button id="conversionPublishBtn" type="button" disabled>確認更新締結率</button></div></div>
 <div class="actions"><button id="conversionRollbackBtn" class="warn" type="button" disabled>回復上一個締結率版本</button></div>
-</section></section><p><a href="https://lian852456-dot.github.io/liamlu/readonly-dashboard.html">返回唯讀儀表板</a></p>
+</section></section>
+<nav class="actions" aria-label="返回資料頁">
+  <a href="kpi-battle.html?refresh=conversion#kpi">返回 KPI 戰情並重新讀取</a>
+  <a href="readonly-dashboard.html">返回唯讀儀表板</a>
+  <a href="quick-upload.html">返回資料快速上傳</a>
+</nav>
 </main>
 <script src="assets/vendor/xlsx.full.min.js"></script>
-<script src="readonly-dashboard-core.js?v=20261113-rt-import1"></script>
-<script src="readonly-conversion-source.js?v=20261104-month-layout1"></script>
-<script src="readonly-conversion-upload.js?v=20261022-aq-zero1"></script>
+<script src="readonly-dashboard-core.js?v=20261113-conversion-1"></script>
+<script src="readonly-conversion-source.js?v=20261113-conversion-1"></script>
+<script src="readonly-conversion-upload.js?v=20261113-conversion-1"></script>
 </body></html>
