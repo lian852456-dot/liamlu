@@ -73,3 +73,18 @@ test('parsed November source previews, publishes, reads back, reimports and roll
  const previous=publish(old),current=publish(next);assert.equal(current.live.cutoff,'2026-11-03');assert.equal(b.call('Status').live.activeHash,current.live.activeHash);assert.equal(publish(next).status,'already_current');assert.equal(b.files.size,2);
  const result=b.call('Rollback',{confirm:true,expectedRevision:current.live.revision,expectedActiveHash:current.live.activeHash});assert.equal(result.live.activeHash,previous.live.activeHash);
 });
+
+test('RT每日 resolves the unique dated rate block when the report has an extra label or full-width heading',()=>{
+ const w=make({month:'2026-11',fixed31:true}),r=w.Sheets['RT每日'],l=layout(w);
+ const at=(row,col)=>X.utils.encode_cell({r:row,c:col});
+ const expected=Officer.parseWorkbook(w,X,opts).records;
+ r[at(0,l.rt.rate)].v='ＲＴ\u200b 締結率';
+ r[at(0,134)]={t:'s',v:'RT 締結率'};
+ for(const parser of [Source,Officer])assert.deepEqual(parser.parseWorkbook(w,X,opts).records,expected);
+ const head=rows(w,'RT每日')[1],duplicate=l.rt.rate;
+ const other=duplicate+l.days+2;
+ for(let col=0;col<l.days;col++)r[at(1,other+col)]={t:'n',v:head[duplicate+col]};
+ r[at(0,other)]={t:'s',v:'RT締結率'};
+ r['!ref']=X.utils.encode_range({s:{r:0,c:0},e:{r:10,c:other+l.days}});
+ assert.throws(()=>Officer.parseWorkbook(w,X,opts),/RT每日.*重複的逐日欄位/);
+});
