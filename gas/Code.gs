@@ -3698,15 +3698,31 @@ function privateDashboardAwardsForViewer_(snapshot, employeeId, store, superviso
     ids.add(row.emp_id);
   }
   const self = rows.find(function(row) { return row.emp_id === employeeId && storeKey(row.store) === viewer.store; });
+  const maskName = function(row) {
+    const name = String(row.name || '').trim();
+    return /^[^\s*＊○][*＊○]{1,3}[^\s*＊○]?$/.test(name) ? name : (Array.from(name)[0] || '') + '＊';
+  };
+  const districtStores = new Map((awards.stores || []).map(function(row) { return [storeKey(row.store), row.store]; }));
+  const districtRows = rows.every(function(row) { return !!districtStores.get(storeKey(row.store)); });
+  if (districtRows) viewer.rankings = {};
   for (const [basis, key] of [['actual', 'actual_total'], ['projected', 'projected']]) {
     if (rows.some(function(row) { return !Number.isFinite(row[key]); })) continue;
+    if (districtRows) {
+      const ordered = rows.slice().sort(function(a, b) { return b[key] - a[key]; });
+      let rank = 1, gap = 0;
+      viewer.rankings[basis] = ordered.map(function(row, index) {
+        if (index && ordered[index - 1][key] !== row[key]) {
+          rank = index + 1;
+          gap = ordered[index - 1][key] - row[key];
+        }
+        return {name: maskName(row), store: districtStores.get(storeKey(row.store)), amount: row[key],
+          rank: rank, gap: gap, self: !supervisor && row === self};
+      });
+    }
     if (supervisor) {
       const amount = Math.max.apply(null, rows.map(function(row) { return row[key]; }));
       const leaders = rows.filter(function(row) { return row[key] === amount; });
-      viewer[basis] = {amount: amount, leaders: leaders.map(function(row) {
-        const name = String(row.name || '').trim();
-        return /^[^\s*＊○][*＊○]{1,3}[^\s*＊○]?$/.test(name) ? name : (Array.from(name)[0] || '') + '＊';
-      })};
+      viewer[basis] = {amount: amount, leaders: leaders.map(maskName)};
     } else if (self) {
       const amount = self[key];
       const ahead = rows.filter(function(row) { return row[key] > amount; });

@@ -117,7 +117,18 @@
     });
   }
 
-  function renderIntegratedAwards(data, selected, basis) {
+  function renderAwardRanking(rows, isPersonal) {
+    const entity = isPersonal ? '同仁' : '門市';
+    const empty = isPersonal ? '同仁獎金待確認。' : '門市獎金待確認。';
+    return `<div class="award-table-wrap"><table aria-label="區內${entity}獎金排名"><thead><tr><th>區內名次</th><th>${entity}</th><th>獎金</th><th>追平前一名還差</th></tr></thead><tbody>${rows.map(row => {
+      const identity = isPersonal
+        ? `${escapeText(row.name)}${row.self ? '（我）' : ''}<br><small>${escapeText(displayStoreName(row.store))}</small>`
+        : escapeText(displayStoreName(row.store));
+      return `<tr><td>${row.rank}</td><th scope="row">${identity}</th><td>${formatMoney(row.amount)}</td><td>${row.rank === 1 ? '目前領先' : formatMoney(row.gap)}</td></tr>`;
+    }).join('') || `<tr><td colspan="4">${empty}</td></tr>`}</tbody></table></div>`;
+  }
+
+  function renderIntegratedAwards(data, selected, basis, rankingType = 'stores') {
     const units = [data.overall, ...data.stores];
     const district = selected === data.overall;
     const threshold = district ? '80%' : '50%';
@@ -135,6 +146,8 @@
     const quantity = amount => amount === null ? '待確認' : formatNumber(amount);
     const rankings = awardRankRows(data.stores, basis);
     const viewer = data.viewer;
+    const isPersonal = rankingType === 'people';
+    const personRankings = viewer?.rankings?.[basis];
     const member = viewer?.mode === 'member';
     const supervisor = viewer?.mode === 'supervisor';
     const ownStore = member && rankings.find(row => storeKey(row.store) === viewer.store);
@@ -159,8 +172,8 @@
         const priorities = novemberPriorities(data, row);
         return `<tr><th scope="row">${escapeText(displayStoreName(row.store))}</th>${priorities ? [0, 1, 2].map(i => `<td>${priorityText(priorities[i])}</td>`).join('') : '<td colspan="3">資料待核對</td>'}</tr>`;
       }).join('')}</tbody></table></div></section>
-      <section aria-label="區內獎金排名"><div class="award-store-selector"><h2 class="section-divider">區內獎金排名</h2><label>獎金 <select id="awardsRankingBasis"><option value="actual"${basis === 'actual' ? ' selected' : ''}>實際</option><option value="projected"${basis === 'projected' ? ' selected' : ''}>推估</option></select></label></div>
-        <div class="award-ranking-cards">${ranks}</div><div class="award-table-wrap"><table><thead><tr><th>區內名次</th><th>門市</th><th>獎金</th><th>追平前一名還差</th></tr></thead><tbody>${rankings.map(row => `<tr><td>${row.rank}</td><th scope="row">${escapeText(displayStoreName(row.store))}</th><td>${formatMoney(row.amount)}</td><td>${row.rank === 1 ? '目前領先' : formatMoney(row.gap)}</td></tr>`).join('') || '<tr><td colspan="4">門市獎金待確認。</td></tr>'}</tbody></table></div>
+      <section aria-label="區內獎金排名"><div class="award-store-selector"><h2 class="section-divider">區內獎金排名</h2><label>榜單 <select id="awardsRankingType"><option value="stores"${!isPersonal ? ' selected' : ''}>門市排名</option><option value="people"${isPersonal ? ' selected' : ''}>同仁排名</option></select></label><label>獎金 <select id="awardsRankingBasis"><option value="actual"${basis === 'actual' ? ' selected' : ''}>實際</option><option value="projected"${basis === 'projected' ? ' selected' : ''}>推估</option></select></label></div>
+        <div class="award-ranking-cards">${ranks}</div>${renderAwardRanking(isPersonal ? (Array.isArray(personRankings) ? personRankings : []) : rankings, isPersonal)}
       </section>
       <details class="card"><summary>督導區與各店原始台獎明細（公司排名）</summary><div class="award-store-grid">${units.map(row => renderAwardUnit(row, row === data.overall, false)).join('')}</div><div class="award-model-grid">${selected.items.map(item => renderAwardModel(item, district)).join('')}</div></details>`;
   }
@@ -298,7 +311,7 @@
     const doc = config.document || (win && win.document);
     if (!win || !doc) throw new Error('Awards controller requires a browser document');
     const renderLock = typeof config.renderLock === 'function' ? config.renderLock : () => {};
-    const state = { data: null, unavailableReason: '', rankingBasis: 'actual' };
+    const state = { data: null, unavailableReason: '', rankingBasis: 'actual', rankingType: 'stores' };
 
     function renderUnavailable() {
       const note = doc.getElementById('awardsBattleSourceNote');
@@ -339,7 +352,7 @@
           <div class="summary-card"><div class="sc-label">未領獎店</div><div class="sc-val" style="color:var(--red)">${eligibilityComplete ? stores.length - eligibleStores : '尚未有資料'}</div><div class="sc-sub">${config.integrated ? escapeText(unawardedNote) : '家門市'}</div></div>
         </div>`;
       if (config.integrated) {
-        content.innerHTML = summary + renderIntegratedAwards(data, selectedUnit, state.rankingBasis);
+        content.innerHTML = summary + renderIntegratedAwards(data, selectedUnit, state.rankingBasis, state.rankingType);
         return;
       }
       content.innerHTML = summary + `
@@ -398,9 +411,12 @@
 
     function handleChange(event) {
       if (event.target && event.target.id === 'awardsStoreSelect') render();
-      if (event.target && event.target.id === 'awardsRankingBasis') {
-        state.rankingBasis = event.target.value === 'projected' ? 'projected' : 'actual';
+      const id = event.target?.id;
+      if (id === 'awardsRankingBasis' || id === 'awardsRankingType') {
+        if (id === 'awardsRankingBasis') state.rankingBasis = event.target.value === 'projected' ? 'projected' : 'actual';
+        else state.rankingType = event.target.value === 'people' ? 'people' : 'stores';
         render();
+        doc.getElementById(id)?.focus();
       }
     }
 
