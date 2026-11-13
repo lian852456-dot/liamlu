@@ -76,13 +76,16 @@
     }
     return total;
   }
-  function rtRateColumn(rows,dates){
+  function rtRateColumn(rows,dates,allowMissing){
     const label='RT締結率',candidates=[];
     (rows[0]||[]).forEach((value,index)=>{
       const heading=norm(String(value??'').normalize('NFKC').replace(/[\u200B-\u200D\u2060]/g,''));
       if(heading===label)candidates.push(index);
     });
-    if(!candidates.length)fail('RT每日第 1 列缺少「RT締結率」欄位');
+    if(!candidates.length){
+      if(allowMissing)return null;
+      fail('RT每日第 1 列缺少「RT締結率」欄位');
+    }
     const headings=rows[1]||[];
     const dated=candidates.filter(index=>dates.every((date,i)=>{
       const value=headings[index+i];
@@ -111,13 +114,14 @@
     const total={n:dateBlockTotal(rows,n,dates,'TTL'),d:dateBlockTotal(rows,d,dates,'TTL'),rate:dateBlockTotal(rows,rate,dates,'TTL')};
     return {begin,year,month,days,dates,n,d,rate,total,priorN:subheader(rows,'上月同期','上線數'),priorD:subheader(rows,'上月同期','來客數')};
   }
-  function workbookLayout(aq,rt,totals,stores=STORES){
+  function workbookLayout(aq,rt,totals,stores=STORES,{allowMissingRtRate=false}={}){
     const a=aqLayout(aq),{begin,year,days,dates}=a;
     function period(rows){const m=String(rows[0]?.[0]||'').match(/(\d+)\/(\d+)\s*~\s*(\d+)\/(\d+)/);if(!m)fail('來源沒有可核實的資料起迄');const [,sm,sd,em,ed]=m.map(Number);const start=iso(year+'-'+String(sm).padStart(2,'0')+'-'+String(sd).padStart(2,'0')),end=iso(year+'-'+String(em).padStart(2,'0')+'-'+String(ed).padStart(2,'0'));if(start!==begin||end<begin||start.slice(0,7)!==end.slice(0,7))fail('截止與欄位日期不同');return end;}
     const cutoff=period(aq);if(period(rt)!==cutoff||period(totals)!==cutoff)fail('AQ／RT 三張來源期間不同');
-    const twN=header(rt,'原TWM用戶上線數'),twD=header(rt,'原TWM用戶來客數'),tsN=header(rt,'原TST用戶'),rate=rtRateColumn(rt,dates);
+    const twN=header(rt,'原TWM用戶上線數'),twD=header(rt,'原TWM用戶來客數'),tsN=header(rt,'原TST用戶'),rate=rtRateColumn(rt,dates,allowMissingRtRate);
     const tsNTotal=dateBlockTotal(rt,tsN,dates,'上線'),tsD=tsNTotal+1;
-    const r={twN,twD,tsN,tsD,rate,total:{twN:dateBlockTotal(rt,twN,dates,'TTL'),twD:dateBlockTotal(rt,twD,dates,'TTL'),tsN:tsNTotal,tsD:dateBlockTotal(rt,tsD,dates,'來客'),rate:dateBlockTotal(rt,rate,dates,'TTL')}};
+    const r={twN,twD,tsN,tsD,rate,total:{twN:dateBlockTotal(rt,twN,dates,'TTL'),twD:dateBlockTotal(rt,twD,dates,'TTL'),tsN:tsNTotal,tsD:dateBlockTotal(rt,tsD,dates,'來客')}};
+    if(rate!==null)r.total.rate=dateBlockTotal(rt,rate,dates,'TTL');
     const storeIds=new Set(stores.map(store=>store.id));
     validatePadding(aq,a,days,storeIds);
     validatePadding(rt,r,days,storeIds);

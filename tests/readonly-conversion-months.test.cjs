@@ -43,10 +43,9 @@ test('November AQ exact text-zero compatibility uses November columns without mu
  const before=JSON.stringify(w),d=Source.parseWorkbook(w,X,opts);assert.equal(Core.aggregate([d.records[0]]).aq_rate,null);assert.equal(JSON.stringify(w),before);
  assert.deepEqual(d.records,Officer.parseWorkbook(w,X,opts).records);
 });
-for(const kind of ['duplicate heading','missing rate heading','wrong day','missing TTL','bad daily rate','bad prior heading','post-cutoff count'])test('November rejects '+kind+' before private publication',()=>{
+for(const kind of ['duplicate heading','wrong day','missing TTL','bad daily rate','bad prior heading','post-cutoff count'])test('November rejects '+kind+' before private publication',()=>{
  const w=make({month:'2026-11'}),l=layout(w),cell=(r,c)=>X.utils.encode_cell({r,c}),a=w.Sheets['AQ締結率'],r=w.Sheets['RT每日'];
  if(kind==='duplicate heading')a[cell(0,100)]={t:'s',v:'AQ來客數'};
- if(kind==='missing rate heading')delete r[cell(0,l.rt.rate)];
  if(kind==='wrong day')r[cell(1,l.rt.twD+1)].v++;
  if(kind==='missing TTL')delete a[cell(1,l.aq.n+l.days)];
  if(kind==='bad daily rate')r[cell(2,l.rt.rate)].v=.9;
@@ -87,4 +86,34 @@ test('RT每日 resolves the unique dated rate block when the report has an extra
  r[at(0,other)]={t:'s',v:'RT締結率'};
  r['!ref']=X.utils.encode_range({s:{r:0,c:0},e:{r:10,c:other+l.days}});
  assert.throws(()=>Officer.parseWorkbook(w,X,opts),/RT每日.*重複的逐日欄位/);
+});
+
+test('department RT rates match when the daily percentage heading or block is absent',()=>{
+ const w=make({month:'2026-11',fixed31:true}),r=w.Sheets['RT每日'],{rt}=layout(w);
+ const cell=(row,c)=>X.utils.encode_cell({r:row,c});
+ const expected=Officer.parseWorkbook(w,X,opts);
+ delete r[cell(0,rt.rate)];
+ assert.deepEqual(Officer.parseWorkbook(w,X,opts),expected);
+ assert.throws(()=>Source.parseWorkbook(w,X,opts),/RT每日第 1 列缺少/);
+ for(let row=1;row<=10;row++)for(let c=rt.rate;c<=rt.total.rate;c++)delete r[cell(row,c)];
+ assert.deepEqual(Officer.parseWorkbook(w,X,opts),expected);
+});
+
+test('missing daily percentage heading still requires valid dated counts and TWM/TST reconciliation',()=>{
+ const w=make({month:'2026-11',fixed31:true}),r=w.Sheets['RT每日'],{rt}=layout(w);
+ const cell=(row,c)=>X.utils.encode_cell({r:row,c});
+ delete r[cell(0,rt.rate)];
+ const missing=cell(2,rt.twD),saved=r[missing];
+ delete r[missing];
+ assert.throws(()=>Officer.parseWorkbook(w,X,opts),/原TWM來客.*非負整數/);
+ r[missing]=saved;
+
+ r[cell(2,rt.twN)].v++;
+ r[cell(2,rt.tsN)].v--;
+ assert.throws(()=>Officer.parseWorkbook(w,X,opts),/RT每日分項與總表/);
+ r[cell(2,rt.twN)].v--;
+ r[cell(2,rt.tsN)].v++;
+
+ r[cell(1,rt.twN+1)].v++;
+ assert.throws(()=>Officer.parseWorkbook(w,X,opts),/日期欄位/);
 });
