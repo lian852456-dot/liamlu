@@ -8,3 +8,21 @@ test('mismatched periods are not merged and same-region sources replace, not add
 test('blank RT total rate is only accepted for explicitly verified numeric zero over zero',()=>{const w=make();let rows=X.utils.sheet_to_json(w.Sheets['RT每日'],{header:1,raw:true,defval:null});for(const off of [5,37,69,101])for(let j=0;j<32;j++)rows[2][off+j]=0;for(let j=0;j<31;j++)rows[2][144+j]=0;w.Sheets['RT每日']=X.utils.aoa_to_sheet(rows);rows=X.utils.sheet_to_json(w.Sheets['RT締結率'],{header:1,raw:true,defval:null});for(const c of [5,6,10,11,15,16])rows[2][c]=0;rows[2][17]=null;w.Sheets['RT締結率']=X.utils.aoa_to_sheet(rows);const d=parse(w);assert.equal(C.aggregate(d.records.filter(r=>r.store===Base.STORES[0].id)).rt_rate,null);const bad=make();delete bad.Sheets['RT締結率'].R3;assert.throws(()=>parse(bad),/RT總率/);});
 test('offline projection has no identities, network dependencies, import form or KPI/awards UI',()=>{const scope={window:{}};vm.runInNewContext(fs.readFileSync('north12-officer-export-assets.js','utf8'),scope);const d=parse(make());d.employee='SECRET_EMPLOYEE';d.stores[0].phone='SECRET_PHONE';d.source_name='</script><img src=x onerror=alert(1)>';const html=C.buildHtml(d,scope.window.North12OfficerExportAssets),markup=html.replace(/(<script\b[^>]*>)[\s\S]*?<\/script>/g,'$1</script>');assert(!html.includes('SECRET_'));assert(!/(?:^|>)\s*<script src=/.test(markup));assert(!markup.includes('id="import-panel"'));assert(!/KPI|台獎/.test(markup));assert(!html.includes('</script><img src=x'));assert(html.includes("connect-src 'none'"));});
 test('UI retains locally loaded data and has no uploads or persistent data cache',()=>{const ui=fs.readFileSync('north12-officer.js','utf8');assert(!/fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB/.test(ui));});
+
+test('an extra RT每日 store is ignored only if absent from both totals and all RT daily and total fields are zero',()=>{
+ const w=make(),read=name=>X.utils.sheet_to_json(w.Sheets[name],{header:1,raw:true,defval:null});
+ const rows=read('RT每日'),{rt}=Base.workbookLayout(read('AQ締結率'),rows,read('RT締結率'));
+ const expected=parse(w).records;
+ const extra=rows[2].map((value,col)=>col<5?value:typeof value==='number'?0:value);
+ extra[3]='DNB20099';
+ extra[rt.total.rate]=0;
+ rows.push(extra);
+ const replace=()=>{w.Sheets['RT每日']=X.utils.aoa_to_sheet(rows);};
+ replace();
+ assert.deepEqual(parse(w).records,expected);
+ for(const [col,value] of [[rt.twN,1],[rt.twN,null],[rt.total.twN,1],[rt.total.rate,null]]){
+  extra[col]=value;replace();
+  assert.throws(()=>parse(w),/RT每日多出 DNB20099/);
+  extra[col]=0;
+ }
+});
