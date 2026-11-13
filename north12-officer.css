@@ -2,3 +2,5 @@
 
 .brand{display:block;width:170px;height:auto;margin:0 0 20px}
 .filters input{font:inherit;padding:12px;border:1px solid #b6c9d6;border-radius:9px;width:100%}.tabs{margin-top:20px}.tabs button[aria-pressed="false"]{background:#e8f0f6;color:#174b70}.trend-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.trend-grid .panel{margin:0}.trend-grid svg{width:100%;height:auto;display:block}.trend-grid text{font:12px sans-serif;fill:#516879}.summary{grid-template-columns:1fr 1fr}@media(max-width:700px){.trend-grid{grid-template-columns:1fr}.summary{grid-template-columns:1fr}.filters label{min-width:140px}.tabs button{width:auto;flex:1}}
+
+#status{white-space:pre-line;overflow-wrap:anywhere}

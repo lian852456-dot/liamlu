@@ -1,4 +1,4 @@
-(function(){'use strict';const C=window.North12OfficerCore,$=id=>document.getElementById(id),esc=C.safe,n=v=>v==null?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:2}),pct=v=>v==null?'—':(v*100).toFixed(1)+'%',signed=v=>v==null?'—':(v>0?'+':'')+n(v);let data=null,region='all',store='all',tab='conversion',start='',end='';
+(function(){'use strict';const C=window.North12OfficerCore,$=id=>document.getElementById(id),esc=C.safe,n=v=>v==null?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:2}),pct=v=>v==null?'—':(v*100).toFixed(1)+'%',signed=v=>v==null?'—':(v>0?'+':'')+n(v);let data=null,region='all',store='all',tab='conversion',start='',end='',importGeneration=0;
 function selectedStores(){return data.stores.filter(s=>(region==='all'||s.region===region)&&(store==='all'||s.id===store));}
 function totals(stores){const ids=new Set(stores.map(s=>s.id));return C.aggregate(data.records.filter(r=>ids.has(r.store)&&r.date>=start&&r.date<=end));}
 function prior(stores){if(!data.prior||start!==data.period_start||end!==data.cutoff)return null;const ids=new Set(stores.map(s=>s.id));return C.aggregate(data.prior.filter(r=>ids.has(r.store)));}
@@ -10,11 +10,34 @@ let html='<section class="region-grid summary">';for(const ch of ['aq','rt'])htm
 if(tab==='insights'){html+='<section class="panel"><h2>區／店改善建議</h2><p>依同期間的實際差異提供檢查方向，並非已確認成因。</p>';const groups=store==='all'?C.REGIONS.filter(r=>stores.some(s=>s.region===r)).map(r=>({name:r,stores:stores.filter(s=>s.region===r)})):[{name:stores[0]?.name||'',stores}];for(const g of groups){const now=totals(g.stores),old=prior(g.stores);let advice='所選期間沒有可比上月來源，先核對來客與上線紀錄後訂定改善動作。';if(old){if(now.rt_rate!=null&&old.rt_rate!=null&&now.rt_rate<old.rt_rate)advice='RT 締結率較上月同期下降，優先檢查未成交原因、方案說明與後續回訪紀錄。';else if(now.rt_d<old.rt_d)advice='RT 符合資格來客較上月同期減少，優先檢查邀約名單、到店安排與未到店追蹤。';else advice='RT 同期表現未見下降，檢視未成交案件並整理可複製的接待作法。';}html+='<div class="action"><strong>'+esc(g.name)+'</strong><p>'+esc(compare(now,old,'rt_rate',true))+'</p><p>'+advice+'</p></div>';}html+='</section>'+window.ReadonlyRenewalDetail.render(data,stores,{start,end});}
 else{html+='<div class="trend-grid">';for(const ch of ['aq','rt'])html+='<section class="panel"><h2>'+ch.toUpperCase()+' '+(rate?'締結率':'來客數')+'逐日趨勢</h2>'+chart(rows,ch,rate)+'</section>';html+='</div><section class="panel"><h2>每週來客數</h2><div class="scroll"><table><thead><tr><th>週區間</th><th>AQ 來客</th><th>RT 符合資格來客</th></tr></thead><tbody>'+C.weeklySeries(rows).map(w=>'<tr><td>'+w.start+'～'+w.end+(w.partial?'（部分週）':'')+'</td><td>'+n(w.aq_d)+'</td><td>'+n(w.rt_d)+'</td></tr>').join('')+'</tbody></table></div></section>';
 html+='<section class="panel"><h2>門市比較</h2><div class="scroll"><table><thead><tr><th>部區／門市</th><th>AQ 締結率</th><th>RT 締結率</th><th>AQ 來客</th><th>RT 符合資格來客</th></tr></thead><tbody>'+stores.map(s=>{const t=totals([s]);return '<tr><td>'+s.region+'／'+esc(s.short)+'</td><td>'+pct(t.aq_rate)+'</td><td>'+pct(t.rt_rate)+'</td><td>'+n(t.aq_d)+'</td><td>'+n(t.rt_d)+'</td></tr>';}).join('')+'</tbody></table></div></section>';}
-$('content').innerHTML=html;$('status').textContent=(data.prior?'資料已載入；切換視窗與篩選不會重新讀取。':'當期資料已載入；未提供可核對的上月同期來源，MoM 顯示未提供。');$('source').textContent='來源：'+data.source_name+'｜統計 '+data.period_start+' 至 '+data.cutoff+'｜上月同期 '+(data.prior_period?data.prior_period.start+' 至 '+data.prior_period.end:'未提供')+'｜目前選取 '+stores.length+' 店｜版本 20261113-rt-import3';if($('export'))$('export').disabled=false;}
+$('content').innerHTML=html;$('status').textContent=(data.prior?'資料已載入；切換視窗與篩選不會重新讀取。':'當期資料已載入；未提供可核對的上月同期來源，MoM 顯示未提供。');$('status').textContent+='\n'+window.ReadonlyRenewalDetail.importSummary(data.renewalDetail);$('source').textContent='來源：'+data.source_name+'｜統計 '+data.period_start+' 至 '+data.cutoff+'｜上月同期 '+(data.prior_period?data.prior_period.start+' 至 '+data.prior_period.end:'未提供')+'｜目前選取 '+stores.length+' 店｜版本 20261113-import-review1';if($('export'))$('export').disabled=false;}
 function storeOptions(){const stores=data.stores.filter(s=>region==='all'||s.region===region);if(!stores.some(s=>s.id===store))store='all';$('store').innerHTML='<option value="all">全部門市</option>'+stores.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.short)+'</option>').join('');$('store').value=store;}
 function bind(){region='all';store='all';start=data.period_start;end=data.cutoff;$('region').innerHTML='<option value="all">北一二部・全部已提供區域</option>'+C.REGIONS.filter(r=>data.stores.some(s=>s.region===r)).map(r=>'<option>'+r+'</option>').join('');storeOptions();for(const id of ['start','end']){$(id).min=start;$(id).max=end;$(id).value=id==='start'?start:end;}render();}
 $('region').onchange=e=>{region=e.target.value;store='all';storeOptions();render();};$('store').onchange=e=>{store=e.target.value;render();};for(const id of ['start','end'])$(id).onchange=e=>{const v=e.target.value;if(!v||v<data.period_start||v>data.cutoff||(id==='start'?v>end:v<start)){e.target.value=id==='start'?start:end;return;}if(id==='start')start=v;else end=v;render();};document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();});
-if($('files'))$('files').onchange=async e=>{const files=[...e.target.files];e.target.value='';let next=data;try{for(const file of files){if(!/\.xlsx$/i.test(file.name)||file.size>40*1024*1024)throw Error('請選取40MB以內的XLSX原報');const bytes=await file.arrayBuffer(),sha256=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join(''),w=XLSX.read(bytes,{type:'array',sheets:['AQ締結率','RT每日','RT締結率','樞紐',...window.ReadonlyRenewalDetail.SHEETS]});next=C.merge(next,C.parseWorkbook(w,XLSX,{sha256,source_name:file.name,source_bytes:file.size}));}data=next;bind();}catch(error){$('status').textContent='未套用本批檔案：'+error.message+'。原已載入版本保留。';}};
-if($('clear'))$('clear').onclick=()=>{data=null;$('view').hidden=true;$('content').replaceChildren();$('regions').replaceChildren();$('export').disabled=true;$('status').textContent='本次資料已清除。';$('source').textContent='尚未載入來源。';};
+if($('files'))$('files').onchange=async e=>{
+ const files=[...e.target.files];e.target.value='';
+ if(!files.length)return;
+ const generation=++importGeneration,errors=[];
+ let next=data;
+ $('status').textContent='正在檢查 '+files.length+' 份原報及續約分析工作表…';
+ for(const file of files){
+  try{
+   if(!/\.xls[xm]$/i.test(file.name)||!file.size||file.size>40*1024*1024)throw Error('請選取有內容且 40 MB 以內的 XLSX／XLSM 原報');
+   const bytes=await file.arrayBuffer();
+   const sha256=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');
+   if(generation!==importGeneration)return;
+   const wanted=new Set(['AQ締結率','RT每日','RT締結率','樞紐',...window.ReadonlyRenewalDetail.SHEETS]);
+   const names=XLSX.read(bytes,{type:'array',bookSheets:true}).SheetNames.filter(name=>wanted.has(name.normalize('NFKC').replace(/[\s\u200B-\u200D\u2060]+/g,'')));
+   const workbook=XLSX.read(bytes,{type:'array',bookVBA:false,sheets:names});
+   const incoming=C.parseWorkbook(workbook,XLSX,{sha256,source_name:file.name,source_bytes:file.size});
+   if(file===files[0]&&next&&(next.period_start!==incoming.period_start||next.cutoff!==incoming.cutoff))next=null;
+   next=C.merge(next,incoming);
+  }catch(error){errors.push(file.name+' — '+error.message);}
+ }
+ if(generation!==importGeneration)return;
+ if(errors.length){$('status').textContent='本批檔案未套用，請核對以下問題。\n'+errors.join('\n');return;}
+ data=next;bind();
+};
+if($('clear'))$('clear').onclick=()=>{importGeneration++;data=null;$('view').hidden=true;$('content').replaceChildren();$('regions').replaceChildren();$('export').disabled=true;$('status').textContent='本次資料已清除。';$('source').textContent='尚未載入來源。';};
 if($('export'))$('export').onclick=()=>{try{if(!data)return;const html=C.buildHtml(data,window.North12OfficerExportAssets),url=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='北一二部_締結率來客續約洞察_'+data.cutoff+'.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch{$('status').textContent='匯出未完成，請重新整理介面後再試。';}};
 const initial=$('officer-data');if(initial){try{data=C.validate(JSON.parse(initial.textContent));bind();}catch{$('status').textContent='快照未通過資料核對。';}}})();

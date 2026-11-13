@@ -20,14 +20,46 @@ function validate(value){
 }
 function workbookRows(workbook,XLSX,name){if(!workbook.Sheets[name])fail('缺少必要工作表：'+name);return XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,raw:true,defval:null,blankrows:true});}
 function equal(value,expected,label){if(typeof value!=='number'||!Number.isFinite(value)||Math.abs(value-expected)>Math.max(1e-8,Math.abs(expected)*1e-8))fail(label+' 與逐日加總不一致');}
+const sourceName=v=>String(v??'').normalize('NFKC').replace(/[\s\u200B-\u200D\u2060]+/g,'');
+function normalizeWorkbook(workbook,XLSX){
+ const Sheets={...workbook.Sheets};
+ const signatures={'AQ締結率':['AQ上線數','AQ來客數','AQ締結率'],'RT每日':['原TWM用戶上線數','原TWM用戶來客數','原TST用戶'],'RT締結率':['原TWM用戶','原TST用戶','符合續約資格TTL']};
+ for(const name of [...Object.keys(signatures),'樞紐']){
+  const names=Object.keys(Sheets).filter(n=>sourceName(n)===name);
+  if(names.length>1)fail(name+' 有多張同名來源，請保留一份');
+  if(!names.length)continue;
+  const sheet=Sheets[names[0]];Sheets[name]=sheet;
+  if(!signatures[name])continue;
+  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:null,blankrows:true,range:0});
+  const headers=rows.flatMap((row,r)=>signatures[name].every(label=>row.some(v=>sourceName(v)===label))&&row.some(v=>/\d+\/\d+~\d+\/\d+/.test(sourceName(v)))?[r]:[]);
+  if(headers.length>1)fail(name+' 有重複的表頭區塊，請保留單一期間');
+  if(!headers.length)continue; // Existing schema checks supply the missing-field diagnostic.
+  const top=headers[0],left=rows[top].findIndex(v=>/\d+\/\d+\s*~\s*\d+\/\d+/.test(sourceName(v)));
+  if(left<0)continue;
+  const kept=rows.map((row,r)=>({row,r})).filter(({row,r})=>r>=top&&row.some(v=>v!=null&&v!==''));
+  const shifted={};let maxC=0;
+  kept.forEach(({row,r},newR)=>{
+   if(row.slice(0,left).some(v=>v!=null&&v!==''))fail(name+' 表格左側含有未識別資料，無法安全位移');
+   for(let c=left;c<row.length;c++){
+    const cell=sheet[XLSX.utils.encode_cell({r,c})];if(!cell)continue;
+    const copy={...cell};
+    if(newR<2&&typeof copy.v==='string')copy.v=copy.v.normalize('NFKC').replace(/[\u200B-\u200D\u2060]/g,'');
+    shifted[XLSX.utils.encode_cell({r:newR,c:c-left})]=copy;maxC=Math.max(maxC,c-left);
+   }
+  });
+  shifted['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:kept.length-1,c:maxC}});Sheets[name]=shifted;
+ }
+ return {...workbook,Sheets};
+}
 function parseWorkbook(workbook,XLSX,options={}){
+ workbook=normalizeWorkbook(workbook,XLSX);
  const rows=workbookRows(workbook,XLSX,'AQ締結率'),catalog=new Map();for(const row of rows){if(!REGIONS.includes(row[2])||!/^DNB\d{5}$/.test(row[3]))continue;const store={id:row[3],name:String(row[4]||'').trim(),short:String(row[4]||'').replace('台灣大哥大數位生活台北三創','三創'),region:row[2]};if(!store.name)fail('缺少店名');if(catalog.has(store.id)&&JSON.stringify(catalog.get(store.id))!==JSON.stringify(store))fail('店碼對應衝突');catalog.set(store.id,store);}
  if(!catalog.size)fail('沒有北一二部四區的門市來源');const stores=[...catalog.values()];
  let normalized=null;const sheet=workbook.Sheets['AQ締結率'],layout=Base.aqLayout(rows,{includePrior:false});for(let r=0;r<rows.length;r++){if(!catalog.has(rows[r][3]))continue;for(let day=0;day<layout.days;day++){const at=c=>XLSX.utils.encode_cell({r,c}),rate=sheet[at(layout.rate+day)],n=sheet[at(layout.n+day)],d=sheet[at(layout.d+day)];if(rate?.t==='s'&&rate.v==='0'&&!rate.f&&n?.t==='n'&&n.v===0&&d?.t==='n'&&d.v===0){normalized??={...sheet};normalized[at(layout.rate+day)]={...rate,t:'n',v:0};}}}
  const input=normalized?{...workbook,Sheets:{...workbook.Sheets,'AQ締結率':normalized}}:workbook;
- const data=reviewedParse(input,XLSX,{...options,stores});return validate({...data,renewalDetail:Detail.parse(workbook,XLSX,data)});
+ const data=reviewedParse(input,XLSX,{...options,stores});return validate({...data,renewalDetail:Detail.parseAvailable(workbook,XLSX,data)});
 }
-function merge(current,incoming){const next=validate(incoming);if(!current)return next;const old=validate(current);if(old.period_start!==next.period_start||old.cutoff!==next.cutoff)fail('四區截止日與期間必須相同');const regions=new Set(next.stores.map(s=>s.region)),keep=new Set(old.stores.filter(s=>!regions.has(s.region)).map(s=>s.id));const a=old.renewalDetail,b=next.renewalDetail;let renewalDetail=null;if(a&&b){const keptRegions=new Set(old.stores.filter(s=>keep.has(s.id)).map(s=>s.region));renewalDetail={...b,tiers:a.tiers.filter(r=>keep.has(r.store)).concat(b.tiers),observation:a.observation.filter(r=>keptRegions.has(r.region)).concat(b.observation),plans:a.plans.filter(r=>keep.has(r.store)).concat(b.plans),coverage:Object.fromEntries(['tiers','observation','plans'].map(k=>[k,a.coverage[k]&&b.coverage[k]]))};for(const k of ['tiers','observation','plans'])if(!renewalDetail.coverage[k])renewalDetail[k]=[];}return validate({...next,renewalDetail,stores:old.stores.filter(s=>keep.has(s.id)).concat(next.stores),records:old.records.filter(r=>keep.has(r.store)).concat(next.records),prior:old.prior&&next.prior?old.prior.filter(r=>keep.has(r.store)).concat(next.prior):null,source_name:[...new Set([old.source_name,next.source_name])].join('、')});}
+function merge(current,incoming){const next=validate(incoming);if(!current)return next;const old=validate(current);if(old.period_start!==next.period_start||old.cutoff!==next.cutoff)fail('四區截止日與期間必須相同');const regions=new Set(next.stores.map(s=>s.region)),keep=new Set(old.stores.filter(s=>!regions.has(s.region)).map(s=>s.id));if(!keep.size)return next;const a=old.renewalDetail,b=next.renewalDetail;let renewalDetail=null;if(a&&b){const keptRegions=new Set(old.stores.filter(s=>keep.has(s.id)).map(s=>s.region));renewalDetail={...b,issues:{...a.issues,...b.issues},tiers:a.tiers.filter(r=>keep.has(r.store)).concat(b.tiers),observation:a.observation.filter(r=>keptRegions.has(r.region)).concat(b.observation),plans:a.plans.filter(r=>keep.has(r.store)).concat(b.plans),coverage:Object.fromEntries(['tiers','observation','plans'].map(k=>[k,a.coverage[k]&&b.coverage[k]]))};for(const k of ['tiers','observation','plans'])if(!renewalDetail.coverage[k])renewalDetail[k]=[];}return validate({...next,renewalDetail,stores:old.stores.filter(s=>keep.has(s.id)).concat(next.stores),records:old.records.filter(r=>keep.has(r.store)).concat(next.records),prior:old.prior&&next.prior?old.prior.filter(r=>keep.has(r.store)).concat(next.prior):null,source_name:[...new Set([old.source_name,next.source_name])].join('、')});}
   function reviewedParse(workbook,XLSX,{sha256,source_name,source_bytes,stores}={}){
     const aq=workbookRows(workbook,XLSX,'AQ締結率'),rt=workbookRows(workbook,XLSX,'RT每日'),totals=workbookRows(workbook,XLSX,'RT締結率');
     const includePrior=!!workbook.Sheets['樞紐'];
