@@ -14,7 +14,9 @@ async function setup(page,{login=true,hold=null}={}){
     const result=b.post(payload);
     await route.fulfill({headers:{'content-type':'application/json','access-control-allow-origin':origin},body:JSON.stringify(result)}).catch(()=>{});
   });
-  await page.goto(new URL('readonly-conversion-upload.html',process.env.TEST_BASE_URL).href);
+  await page.goto(new URL('quick-upload.html',process.env.TEST_BASE_URL).href);
+  await page.getByRole('link',{name:/^締結率/}).click();
+  await expect(page.getByRole('link',{name:'返回 KPI 戰情並重新讀取'})).toHaveAttribute('href','kpi-battle.html?refresh=conversion#kpi');
   if(login){await page.locator('#employeeId').fill(b.auth.employeeId);await page.locator('#adminSecret').fill(b.auth.adminSecret);await page.locator('#loginBtn').click();await expect(page.locator('#app')).toBeVisible();await expect(page.locator('#conversionPreviewBtn')).toBeEnabled();}
   return{b,calls,errors};
 }

@@ -18,7 +18,7 @@ const SESSION_KEY = 'bei12b_patrol_session_token_v2';
 // Deliberately synthetic, non-working credentials; no production requests occur.
 const KEYS = { employeeId:'SYNTHETIC_EMPLOYEE', deviceId:'SYNTHETIC_DEVICE', token:'SYNTHETIC_SESSION' };
 const STORE_INSPECTION_URL = 'https://twm-store-inspection.liamlu245.chatgpt.site/';
-const UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
+const UPLOAD_URL = 'quick-upload.html';
 const EXPECTED_HREFS = [
   'kpi-battle.html', 'kpi-battle.html#awards', 'index.html', 'gold-medal.html',
   'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'tradein-progress.html', 'threec-query.html',

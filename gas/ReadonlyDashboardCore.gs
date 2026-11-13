@@ -128,21 +128,47 @@
     const t={twN:subheader(totals,'原TWM用戶','上線數'),twD:subheader(totals,'原TWM用戶','來客數'),tsN:subheader(totals,'原TST用戶','上線數'),tsD:subheader(totals,'原TST用戶','來客數'),n:subheader(totals,'符合續約資格TTL','上線數'),d:subheader(totals,'符合續約資格TTL','來客數'),rate:subheader(totals,'符合續約資格TTL','締結率'),priorN:includePrior?subheader(totals,'上月同期','TTL上線數'):null,priorD:includePrior?subheader(totals,'上月同期','TTL來客數'):null};
     return {...a,cutoff,aq:a,rt:r,totals:t};
   }
-  function parseWorkbook(workbook,XLSX,{sha256,source_name,source_bytes}={}){
+  function parseWorkbook(workbook,XLSX,{sha256,source_name,source_bytes,allowMissingRtRate=false,includePrior=true}={}){
     const aq=workbookRows(workbook,XLSX,'AQ締結率'),rt=workbookRows(workbook,XLSX,'RT每日'),totals=workbookRows(workbook,XLSX,'RT締結率');
-    const layout=workbookLayout(aq,rt,totals),{begin,year,month,days,dates,cutoff}=layout,A=layout.aq,R=layout.rt,T=layout.totals;
+    const layout=workbookLayout(aq,rt,totals,STORES,{allowMissingRtRate,includePrior});
+    const {begin,year,month,days,dates,cutoff}=layout,A=layout.aq,R=layout.rt,T=layout.totals;
     function groups(rows,name){const found=new Map();for(const row of rows){const s=STORES.find(s=>s.id===row[3]);if(!s)continue;if(row[2]!=='北一二B'||norm(row[4])!==norm(s.name))fail(name+' 的店碼／店名／區域不一致');const old=found.get(s.id);if(old&&JSON.stringify(old)!==JSON.stringify(row))fail(name+' 店點重複且衝突');found.set(s.id,row);}if(found.size!==9)fail(name+' 缺店');return found;}
     const ag=groups(aq,'AQ締結率'),rg=groups(rt,'RT每日'),tg=groups(totals,'RT締結率'),valid=Number(cutoff.slice(-2)),records=[],prior=[];
     for(const s of STORES){const a=ag.get(s.id),r=rg.get(s.id),t=tg.get(s.id),current=[];
-      for(let j=0;j<days;j++){const row={store:s.id,date:dates[j],aq_n:count(a[A.n+j],'AQ上線'),aq_d:count(a[A.d+j],'AQ來客'),rt_n:count(r[R.twN+j],'原TWM上線')+count(r[R.tsN+j],'原TST上線'),rt_d:count(r[R.twD+j],'原TWM來客')+count(r[R.tsD+j],'原TST來客')};if(j>=valid){if(FIELDS.some(k=>row[k]!==0))fail('截止以後有非零實績，來源口徑衝突');continue;}equal(a[A.rate+j],ratio(row.aq_n,row.aq_d)||0,'AQ每日率');equal(r[R.rate+j],ratio(row.rt_n,row.rt_d)||0,'RT每日率');current.push(row);records.push(row);}
+      const rtCounts={twN:0,twD:0,tsN:0,tsD:0};
+      for(let j=0;j<days;j++){
+        const twN=count(r[R.twN+j],'原TWM上線'),twD=count(r[R.twD+j],'原TWM來客');
+        const tsN=count(r[R.tsN+j],'原TST上線'),tsD=count(r[R.tsD+j],'原TST來客');
+        const row={store:s.id,date:dates[j],aq_n:count(a[A.n+j],'AQ上線'),aq_d:count(a[A.d+j],'AQ來客'),rt_n:twN+tsN,rt_d:twD+tsD};
+        if(j>=valid){
+          if(FIELDS.some(k=>row[k]!==0))fail('截止以後有非零實績，來源口徑衝突');
+          continue;
+        }
+        equal(a[A.rate+j],ratio(row.aq_n,row.aq_d)||0,'AQ每日率');
+        if(R.rate!==null)equal(r[R.rate+j],ratio(row.rt_n,row.rt_d)||0,'RT每日率');
+        rtCounts.twN+=twN;
+        rtCounts.twD+=twD;
+        rtCounts.tsN+=tsN;
+        rtCounts.tsD+=tsD;
+        current.push(row);
+        records.push(row);
+      }
       const total=aggregate(current);for(const [value,expected,label]of [[a[A.total.n],total.aq_n,'AQ分子TTL'],[a[A.total.d],total.aq_d,'AQ分母TTL'],[t[T.n],total.rt_n,'RT分子'],[t[T.d],total.rt_d,'RT分母']])equal(value,expected,label);
-      for(const key of ['twN','twD','tsN','tsD'])equal(r[R.total[key]],t[T[key]],'RT每日與總表');
+      for(const key of Object.keys(rtCounts)){
+        equal(r[R.total[key]],t[T[key]],'RT每日與總表');
+        if(R.rate===null)equal(t[T[key]],rtCounts[key],s.short+' RT每日分項與總表');
+      }
       verifyRtTotalRate(t[T.rate],total,`${s.short} RT締結率!${XLSX.utils.encode_cell({r:totals.indexOf(t),c:T.rate})}`);
-      prior.push({store:s.id,aq_n:count(a[A.priorN],'同期AQ上線'),aq_d:count(a[A.priorD],'同期AQ來客'),rt_n:count(t[T.priorN],'同期RT上線'),rt_d:count(t[T.priorD],'同期RT來客')});
+      if(includePrior)prior.push({store:s.id,aq_n:count(a[A.priorN],'同期AQ上線'),aq_d:count(a[A.priorD],'同期AQ來客'),rt_n:count(t[T.priorN],'同期RT上線'),rt_d:count(t[T.priorD],'同期RT來客')});
     }
-    const previous=new Date(Date.UTC(year,month-2,1)).toISOString().slice(0,7),priorStart=previous+'-01',priorEnd=previous+'-'+String(valid).padStart(2,'0');
-    const pivot=workbookRows(workbook,XLSX,'樞紐'),label=Number(previous.slice(5,7))+'/1';if(!pivot.flat().some(v=>typeof v==='string'&&v.includes(label)&&new RegExp('~\\s*'+Number(previous.slice(5,7))+'/'+valid+'(?:\\D|$)').test(v)))fail('同期區間文字尚未核實');
-    return validateConversion({schema:SCHEMA,period_start:begin,cutoff,sha256,source_name,source_bytes,records,prior,prior_period:{start:priorStart,end:priorEnd}});
+    let priorPeriod=null;
+    if(includePrior){
+      const previous=new Date(Date.UTC(year,month-2,1)).toISOString().slice(0,7);
+      const pivot=workbookRows(workbook,XLSX,'樞紐'),label=Number(previous.slice(5,7))+'/1';
+      if(!pivot.flat().some(v=>typeof v==='string'&&v.includes(label)&&new RegExp('~\\s*'+Number(previous.slice(5,7))+'/'+valid+'(?:\\D|$)').test(v)))fail('同期區間文字尚未核實');
+      priorPeriod={start:previous+'-01',end:previous+'-'+String(valid).padStart(2,'0')};
+    }
+    return validateConversion({schema:SCHEMA,period_start:begin,cutoff,sha256,source_name,source_bytes,records,prior:includePrior?prior:null,prior_period:priorPeriod});
   }
   function storeId(value){const n=norm(value);return STORES.find(s=>[s.id,s.short,s.name,'台北'+s.short,'台灣大哥大台北'+s.short].map(norm).includes(n))?.id||null;}
   return Object.freeze({SCHEMA,STORES,FIELDS,aggregate,ratio,dedupe,validateConversion,dailySeries,weeklySeries,diff,parseWorkbook,storeId,aqLayout,workbookLayout,verifyRtTotalRate});

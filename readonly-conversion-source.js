@@ -5,10 +5,12 @@
 })(typeof globalThis==='object'?globalThis:this,function(core){
   'use strict';
   function parseWorkbook(workbook,XLSX,options){
+    const includePrior=Boolean(workbook.Sheets['樞紐']);
+    const parseOptions={...options,allowMissingRtRate:true,includePrior};
     const sheet=workbook.Sheets['AQ締結率'];
-    if(!sheet)return core.parseWorkbook(workbook,XLSX,options);
+    if(!sheet)return core.parseWorkbook(workbook,XLSX,parseOptions);
     const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:null,blankrows:true});
-    const layout=core.aqLayout(rows);
+    const layout=core.aqLayout(rows,{includePrior});
     let normalized=null;
     for(let r=0;r<rows.length;r++){
       if(!core.STORES.some(store=>store.id===rows[r][3]))continue;
@@ -25,7 +27,7 @@
     const input=normalized?{...workbook,Sheets:{...workbook.Sheets,'AQ締結率':normalized}}:workbook;
     // The existing parser still verifies dates, layout, all counts, daily rates, TTL and prior period.
     // Output keeps the original numeric counts; zero-denominator rates remain null / —.
-    return core.parseWorkbook(input,XLSX,options);
+    return core.parseWorkbook(input,XLSX,parseOptions);
   }
   return Object.freeze({parseWorkbook});
 });

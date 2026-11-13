@@ -94,15 +94,16 @@ test('RT每日 resolves the unique dated rate block when the report has an extra
  assert.throws(()=>Officer.parseWorkbook(w,X,opts),/RT每日.*重複的逐日欄位/);
 });
 
-test('department RT rates match when the daily percentage heading or block is absent',()=>{
+test('AQ／RT upload agrees with the reviewed department import when the daily percentage block is absent',()=>{
  const w=make({month:'2026-11',fixed31:true}),r=w.Sheets['RT每日'],{rt}=layout(w);
  const cell=(row,c)=>X.utils.encode_cell({r:row,c});
  const expected=Officer.parseWorkbook(w,X,opts);
  delete r[cell(0,rt.rate)];
  assert.deepEqual(Officer.parseWorkbook(w,X,opts),expected);
- assert.throws(()=>Source.parseWorkbook(w,X,opts),/RT每日第 1 列缺少/);
+ assert.deepEqual(Source.parseWorkbook(w,X,opts).records,expected.records);
  for(let row=1;row<=10;row++)for(let c=rt.rate;c<=rt.total.rate;c++)delete r[cell(row,c)];
  assert.deepEqual(Officer.parseWorkbook(w,X,opts),expected);
+ assert.deepEqual(Source.parseWorkbook(w,X,opts).records,expected.records);
 });
 
 test('missing daily percentage heading still requires valid dated counts and TWM/TST reconciliation',()=>{
@@ -111,17 +112,17 @@ test('missing daily percentage heading still requires valid dated counts and TWM
  delete r[cell(0,rt.rate)];
  const missing=cell(2,rt.twD),saved=r[missing];
  delete r[missing];
- assert.throws(()=>Officer.parseWorkbook(w,X,opts),/原TWM來客.*非負整數/);
+ for(const parser of [Source,Officer])assert.throws(()=>parser.parseWorkbook(w,X,opts),/原TWM來客.*非負整數/);
  r[missing]=saved;
 
  r[cell(2,rt.twN)].v++;
  r[cell(2,rt.tsN)].v--;
- assert.throws(()=>Officer.parseWorkbook(w,X,opts),/RT每日分項與總表/);
+ for(const parser of [Source,Officer])assert.throws(()=>parser.parseWorkbook(w,X,opts),/RT每日分項與總表/);
  r[cell(2,rt.twN)].v--;
  r[cell(2,rt.tsN)].v++;
 
  r[cell(1,rt.twN+1)].v++;
- assert.throws(()=>Officer.parseWorkbook(w,X,opts),/日期欄位/);
+ for(const parser of [Source,Officer])assert.throws(()=>parser.parseWorkbook(w,X,opts),/日期欄位/);
 });
 
 test('department imports current counts with no pivot, prior headers, daily rates or optional detail sheets',()=>{
@@ -138,16 +139,18 @@ test('department imports current counts with no pivot, prior headers, daily rate
  }
  const rt=w.Sheets['RT每日'];
  for(let r=0;r<=10;r++)for(let c=l.rt.rate;c<=l.rt.total.rate;c++)delete rt[at(r,c)];
- const before=JSON.stringify(w),actual=Officer.parseWorkbook(w,X,opts);
+ const before=JSON.stringify(w),actual=Officer.parseWorkbook(w,X,opts),b=Source.parseWorkbook(w,X,opts);
  assert.deepEqual(actual.records,expected.records);
  assert.equal(actual.prior,null);assert.equal(actual.prior_period,null);
+ assert.deepEqual(b.records,expected.records);
+ assert.equal(b.prior,null);assert.equal(b.prior_period,null);
  assert.deepEqual(actual.renewalDetail.coverage,{tiers:false,observation:false,plans:false});
  assert.equal(JSON.stringify(w),before);
  rt[at(2,l.rt.twN)].v++;
- assert.throws(()=>Officer.parseWorkbook(w,X,opts),/RT分子|總表/);
+ for(const parser of [Source,Officer])assert.throws(()=>parser.parseWorkbook(w,X,opts),/RT分子|總表/);
 });
 test('department still rejects a supplied pivot with a conflicting prior period',()=>{
  const w=make({month:'2026-11'});
  w.Sheets['樞紐'].A1.v='9/1 ~ 9/3';
- assert.throws(()=>Officer.parseWorkbook(w,X,opts),/同期區間文字尚未核實/);
+ for(const parser of [Source,Officer])assert.throws(()=>parser.parseWorkbook(w,X,opts),/同期區間文字尚未核實/);
 });

@@ -91,7 +91,10 @@ test('home omits the import lab entry while retaining its maintenance page and f
   assert.ok(fs.existsSync(path.resolve(__dirname, '../tradein-import-lab.html')));
   const upload = cards(navigation('督導專區')).filter(card => /<h3>資料快速上傳<\/h3>/.test(card));
   assert.equal(upload.length, 1);
-  assert.match(upload[0], /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
+  assert.match(upload[0], /href="quick-upload\.html"/);
+  const quickUpload=fs.readFileSync(path.resolve(__dirname,'../quick-upload.html'),'utf8');
+  assert.match(quickUpload, /href="readonly-conversion-upload\.html">\s*<strong>締結率<\/strong>/);
+  assert.match(quickUpload, /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
 });
 
 test('home and APP open the v6 recovery query and retain target progress navigation', () => {

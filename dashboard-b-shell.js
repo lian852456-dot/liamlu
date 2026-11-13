@@ -226,7 +226,8 @@ async function resume(){
  const lease=client.restore(existingDevice);if(!lease){if(host.ownerPhone)await resumePhone(started);return;}
  epoch++;active=true;expiresAt=lease.expiresAt;
  scheduleExpiry();
- const expected=epoch;if(await phase('restore',()=>refresh(true,false)))recordReady(started,expected);
+ // A return from publishing must reload the protected snapshot even with a valid cached session.
+ const expected=epoch;if(await phase('restore',()=>refresh(true,host.refreshOnResume===true)))recordReady(started,expected);
 }
 function navigateVerified(module){guarded=true;try{host.navigate(module);}finally{guarded=false;}}
 function configure(value){host=value;if(ready)mount();}
