@@ -117,3 +117,31 @@ test('missing daily percentage heading still requires valid dated counts and TWM
  r[cell(1,rt.twN+1)].v++;
  assert.throws(()=>Officer.parseWorkbook(w,X,opts),/日期欄位/);
 });
+
+test('department imports current counts with no pivot, prior headers, daily rates or optional detail sheets',()=>{
+ const w=make({month:'2026-11',fixed31:true}),l=layout(w),expected=Officer.parseWorkbook(w,X,opts);
+ delete w.Sheets['樞紐'];
+ const at=(r,c)=>X.utils.encode_cell({r,c});
+ for(const name of ['AQ締結率','RT締結率']){
+  const sheet=w.Sheets[name];
+  for(const key of Object.keys(sheet)){
+   if(key.startsWith('!'))continue;
+   const cell=X.utils.decode_cell(key);
+   if(cell.r===0&&String(sheet[key].v).replace(/\s/g,'')==='上月同期')delete sheet[key];
+  }
+ }
+ const rt=w.Sheets['RT每日'];
+ for(let r=0;r<=10;r++)for(let c=l.rt.rate;c<=l.rt.total.rate;c++)delete rt[at(r,c)];
+ const before=JSON.stringify(w),actual=Officer.parseWorkbook(w,X,opts);
+ assert.deepEqual(actual.records,expected.records);
+ assert.equal(actual.prior,null);assert.equal(actual.prior_period,null);
+ assert.deepEqual(actual.renewalDetail.coverage,{tiers:false,observation:false,plans:false});
+ assert.equal(JSON.stringify(w),before);
+ rt[at(2,l.rt.twN)].v++;
+ assert.throws(()=>Officer.parseWorkbook(w,X,opts),/RT分子|總表/);
+});
+test('department still rejects a supplied pivot with a conflicting prior period',()=>{
+ const w=make({month:'2026-11'});
+ w.Sheets['樞紐'].A1.v='9/1 ~ 9/3';
+ assert.throws(()=>Officer.parseWorkbook(w,X,opts),/同期區間文字尚未核實/);
+});
