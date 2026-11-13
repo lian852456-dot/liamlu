@@ -7,7 +7,7 @@
 <section id="authCard" class="card"><h2>主管上傳驗證</h2><p class="small">請使用既有員編與管理者驗證碼。驗證碼僅供本次原服務核驗，不保存於瀏覽器。</p><label>員編<input id="employeeId" autocomplete="username"></label><label>管理者驗證碼<input id="adminSecret" type="password" autocomplete="current-password"></label><div class="actions"><button id="loginBtn" type="button">登入並讀取締結率版本</button></div><div id="authMessage" class="message hidden" role="status"></div></section>
 <section id="app" class="hidden"><section class="card" id="conversionUploadCard">
 <h2>AQ／RT 締結率來源</h2><p class="small">只讀取已核實的四張彙總表；原 Excel 及客戶明細不會上傳。截止後占位不作零值，同期只有區間總量。此更新獨立保存，不改 KPI、台獎或個績。</p>
-<label>締結率來源 Excel（.xlsx）<input id="conversionFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+<label>締結率來源 Excel（.xlsx／.xlsm）<input id="conversionFile" type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12"></label>
 <div class="actions"><button id="conversionPreviewBtn" type="button">檢查締結率來源</button><button id="conversionRefreshBtn" class="secondary" type="button">讀取締結率版本</button></div>
 <p id="conversionLive" class="notice">尚未核對版本。</p><div id="conversionMessage" class="message hidden" role="status"></div>
 <div id="conversionPreview" class="hidden"><p id="conversionPreviewText"></p><label class="confirm"><input id="conversionConfirm" type="checkbox">我已確認來源、真實截止及店日差異，發布此私有彙總版本。</label><div class="actions"><button id="conversionPublishBtn" type="button" disabled>發布締結率版本</button></div></div>
@@ -17,5 +17,5 @@
 <script src="assets/vendor/xlsx.full.min.js"></script>
 <script src="readonly-dashboard-core.js?v=20261113-rt-import1"></script>
 <script src="readonly-conversion-source.js?v=20261104-month-layout1"></script>
-<script src="readonly-conversion-upload.js?v=20261022-aq-zero1"></script>
+<script src="readonly-conversion-upload.js?v=20261112-xlsm1"></script>
 </body></html>

@@ -27,7 +27,7 @@ function readonlyConversionState_() {
 function readonlyConversionNormalize_(incoming) {
   const value = ReadonlyDashboardCore.validateConversion(incoming);
   if (!value.source_bytes || value.source_bytes > 40 * 1024 * 1024 ||
-      !/^[^/\\\x00-\x1f]{1,155}\.xlsx$/i.test(value.source_name)) throw Error('締結率原始檔身分不完整');
+      !/^[^/\\\x00-\x1f]{1,155}\.xls[xm]$/i.test(value.source_name)) throw Error('締結率原始檔身分不完整');
   // validateConversion returns a strict aggregate projection; arbitrary original
   // workbook columns, customer records and unrecognized fields never persist.
   return value;
