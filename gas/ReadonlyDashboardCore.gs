@@ -106,16 +106,16 @@
       if(columns.some(c=>row[c]!=null&&row[c]!==''&&row[c]!==0&&row[c]!=='0'))fail('月底後的占位欄含有資料，請核對來源月份');
     }
   }
-  function aqLayout(rows){
+  function aqLayout(rows,{includePrior=true}={}){
     const n=header(rows,'AQ上線數'),d=header(rows,'AQ來客數'),rate=header(rows,'AQ締結率');
     const begin=dateSerial(rows[1]?.[n]),year=Number(begin.slice(0,4)),month=Number(begin.slice(5,7)),days=new Date(Date.UTC(year,month,0)).getUTCDate();
     if(begin.slice(-2)!=='01')fail('來源日期必須由月初開始');
     const dates=Array.from({length:days},(_,i)=>begin.slice(0,8)+String(i+1).padStart(2,'0'));
     const total={n:dateBlockTotal(rows,n,dates,'TTL'),d:dateBlockTotal(rows,d,dates,'TTL'),rate:dateBlockTotal(rows,rate,dates,'TTL')};
-    return {begin,year,month,days,dates,n,d,rate,total,priorN:subheader(rows,'上月同期','上線數'),priorD:subheader(rows,'上月同期','來客數')};
+    return {begin,year,month,days,dates,n,d,rate,total,priorN:includePrior?subheader(rows,'上月同期','上線數'):null,priorD:includePrior?subheader(rows,'上月同期','來客數'):null};
   }
-  function workbookLayout(aq,rt,totals,stores=STORES,{allowMissingRtRate=false}={}){
-    const a=aqLayout(aq),{begin,year,days,dates}=a;
+  function workbookLayout(aq,rt,totals,stores=STORES,{allowMissingRtRate=false,includePrior=true}={}){
+    const a=aqLayout(aq,{includePrior}),{begin,year,days,dates}=a;
     function period(rows){const m=String(rows[0]?.[0]||'').match(/(\d+)\/(\d+)\s*~\s*(\d+)\/(\d+)/);if(!m)fail('來源沒有可核實的資料起迄');const [,sm,sd,em,ed]=m.map(Number);const start=iso(year+'-'+String(sm).padStart(2,'0')+'-'+String(sd).padStart(2,'0')),end=iso(year+'-'+String(em).padStart(2,'0')+'-'+String(ed).padStart(2,'0'));if(start!==begin||end<begin||start.slice(0,7)!==end.slice(0,7))fail('截止與欄位日期不同');return end;}
     const cutoff=period(aq);if(period(rt)!==cutoff||period(totals)!==cutoff)fail('AQ／RT 三張來源期間不同');
     const twN=header(rt,'原TWM用戶上線數'),twD=header(rt,'原TWM用戶來客數'),tsN=header(rt,'原TST用戶'),rate=rtRateColumn(rt,dates,allowMissingRtRate);
@@ -125,7 +125,7 @@
     const storeIds=new Set(stores.map(store=>store.id));
     validatePadding(aq,a,days,storeIds);
     validatePadding(rt,r,days,storeIds);
-    const t={twN:subheader(totals,'原TWM用戶','上線數'),twD:subheader(totals,'原TWM用戶','來客數'),tsN:subheader(totals,'原TST用戶','上線數'),tsD:subheader(totals,'原TST用戶','來客數'),n:subheader(totals,'符合續約資格TTL','上線數'),d:subheader(totals,'符合續約資格TTL','來客數'),rate:subheader(totals,'符合續約資格TTL','締結率'),priorN:subheader(totals,'上月同期','TTL上線數'),priorD:subheader(totals,'上月同期','TTL來客數')};
+    const t={twN:subheader(totals,'原TWM用戶','上線數'),twD:subheader(totals,'原TWM用戶','來客數'),tsN:subheader(totals,'原TST用戶','上線數'),tsD:subheader(totals,'原TST用戶','來客數'),n:subheader(totals,'符合續約資格TTL','上線數'),d:subheader(totals,'符合續約資格TTL','來客數'),rate:subheader(totals,'符合續約資格TTL','締結率'),priorN:includePrior?subheader(totals,'上月同期','TTL上線數'):null,priorD:includePrior?subheader(totals,'上月同期','TTL來客數'):null};
     return {...a,cutoff,aq:a,rt:r,totals:t};
   }
   function parseWorkbook(workbook,XLSX,{sha256,source_name,source_bytes}={}){

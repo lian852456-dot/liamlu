@@ -23,14 +23,15 @@ function equal(value,expected,label){if(typeof value!=='number'||!Number.isFinit
 function parseWorkbook(workbook,XLSX,options={}){
  const rows=workbookRows(workbook,XLSX,'AQ締結率'),catalog=new Map();for(const row of rows){if(!REGIONS.includes(row[2])||!/^DNB\d{5}$/.test(row[3]))continue;const store={id:row[3],name:String(row[4]||'').trim(),short:String(row[4]||'').replace('台灣大哥大數位生活台北三創','三創'),region:row[2]};if(!store.name)fail('缺少店名');if(catalog.has(store.id)&&JSON.stringify(catalog.get(store.id))!==JSON.stringify(store))fail('店碼對應衝突');catalog.set(store.id,store);}
  if(!catalog.size)fail('沒有北一二部四區的門市來源');const stores=[...catalog.values()];
- let normalized=null;const sheet=workbook.Sheets['AQ締結率'],layout=Base.aqLayout(rows);for(let r=0;r<rows.length;r++){if(!catalog.has(rows[r][3]))continue;for(let day=0;day<layout.days;day++){const at=c=>XLSX.utils.encode_cell({r,c}),rate=sheet[at(layout.rate+day)],n=sheet[at(layout.n+day)],d=sheet[at(layout.d+day)];if(rate?.t==='s'&&rate.v==='0'&&!rate.f&&n?.t==='n'&&n.v===0&&d?.t==='n'&&d.v===0){normalized??={...sheet};normalized[at(layout.rate+day)]={...rate,t:'n',v:0};}}}
+ let normalized=null;const sheet=workbook.Sheets['AQ締結率'],layout=Base.aqLayout(rows,{includePrior:false});for(let r=0;r<rows.length;r++){if(!catalog.has(rows[r][3]))continue;for(let day=0;day<layout.days;day++){const at=c=>XLSX.utils.encode_cell({r,c}),rate=sheet[at(layout.rate+day)],n=sheet[at(layout.n+day)],d=sheet[at(layout.d+day)];if(rate?.t==='s'&&rate.v==='0'&&!rate.f&&n?.t==='n'&&n.v===0&&d?.t==='n'&&d.v===0){normalized??={...sheet};normalized[at(layout.rate+day)]={...rate,t:'n',v:0};}}}
  const input=normalized?{...workbook,Sheets:{...workbook.Sheets,'AQ締結率':normalized}}:workbook;
  const data=reviewedParse(input,XLSX,{...options,stores});return validate({...data,renewalDetail:Detail.parse(workbook,XLSX,data)});
 }
 function merge(current,incoming){const next=validate(incoming);if(!current)return next;const old=validate(current);if(old.period_start!==next.period_start||old.cutoff!==next.cutoff)fail('四區截止日與期間必須相同');const regions=new Set(next.stores.map(s=>s.region)),keep=new Set(old.stores.filter(s=>!regions.has(s.region)).map(s=>s.id));const a=old.renewalDetail,b=next.renewalDetail;let renewalDetail=null;if(a&&b){const keptRegions=new Set(old.stores.filter(s=>keep.has(s.id)).map(s=>s.region));renewalDetail={...b,tiers:a.tiers.filter(r=>keep.has(r.store)).concat(b.tiers),observation:a.observation.filter(r=>keptRegions.has(r.region)).concat(b.observation),plans:a.plans.filter(r=>keep.has(r.store)).concat(b.plans),coverage:Object.fromEntries(['tiers','observation','plans'].map(k=>[k,a.coverage[k]&&b.coverage[k]]))};for(const k of ['tiers','observation','plans'])if(!renewalDetail.coverage[k])renewalDetail[k]=[];}return validate({...next,renewalDetail,stores:old.stores.filter(s=>keep.has(s.id)).concat(next.stores),records:old.records.filter(r=>keep.has(r.store)).concat(next.records),prior:old.prior&&next.prior?old.prior.filter(r=>keep.has(r.store)).concat(next.prior):null,source_name:[...new Set([old.source_name,next.source_name])].join('、')});}
   function reviewedParse(workbook,XLSX,{sha256,source_name,source_bytes,stores}={}){
     const aq=workbookRows(workbook,XLSX,'AQ締結率'),rt=workbookRows(workbook,XLSX,'RT每日'),totals=workbookRows(workbook,XLSX,'RT締結率');
-    const layout=Base.workbookLayout(aq,rt,totals,stores,{allowMissingRtRate:true}),{begin,year,month,days,dates,cutoff}=layout,A=layout.aq,R=layout.rt,T=layout.totals;
+    const includePrior=!!workbook.Sheets['樞紐'];
+    const layout=Base.workbookLayout(aq,rt,totals,stores,{allowMissingRtRate:true,includePrior}),{begin,year,month,days,dates,cutoff}=layout,A=layout.aq,R=layout.rt,T=layout.totals;
     const ids=new Set(stores.map(store=>store.id));
     const inDepartment=row=>REGIONS.includes(row[2])&&/^DNB\d{5}$/.test(row[3]);
     const extraTotals=totals.filter(row=>inDepartment(row)&&!ids.has(row[3]));
@@ -74,11 +75,13 @@ function merge(current,incoming){const next=validate(incoming);if(!current)retur
         if(R.rate===null)equal(t[T[key]],rtCounts[key],s.short+' RT每日分項與總表');
       }
       Base.verifyRtTotalRate(t[T.rate],total,`${s.short} RT締結率!${XLSX.utils.encode_cell({r:totals.indexOf(t),c:T.rate})}`);
-      prior.push({store:s.id,aq_n:count(a[A.priorN],'同期AQ上線'),aq_d:count(a[A.priorD],'同期AQ來客'),rt_n:count(t[T.priorN],'同期RT上線'),rt_d:count(t[T.priorD],'同期RT來客')});
+      if(includePrior)prior.push({store:s.id,aq_n:count(a[A.priorN],'同期AQ上線'),aq_d:count(a[A.priorD],'同期AQ來客'),rt_n:count(t[T.priorN],'同期RT上線'),rt_d:count(t[T.priorD],'同期RT來客')});
     }
     const previous=new Date(Date.UTC(year,month-2,1)).toISOString().slice(0,7),priorStart=previous+'-01',priorEnd=previous+'-'+String(valid).padStart(2,'0');
+    if(includePrior){
     const pivot=workbookRows(workbook,XLSX,'樞紐'),label=Number(previous.slice(5,7))+'/1';if(!pivot.flat().some(v=>typeof v==='string'&&v.includes(label)&&new RegExp('~\\s*'+Number(previous.slice(5,7))+'/'+valid+'(?:\\D|$)').test(v)))fail('同期區間文字尚未核實');
-    return validate({schema:SCHEMA,stores,period_start:begin,cutoff,sha256,source_name,source_bytes,records,prior,prior_period:{start:priorStart,end:priorEnd}});
+    }
+    return validate({schema:SCHEMA,stores,period_start:begin,cutoff,sha256,source_name,source_bytes,records,prior:includePrior?prior:null,prior_period:includePrior?{start:priorStart,end:priorEnd}:null});
   }
 function buildHtml(value,assets){const data=validate(value),json=JSON.stringify(data).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026');let html=assets.html.replace(/<section id="import-panel">[\s\S]*?<\/section>/,'').replace(/<script src="[^\"]+"><\/script>/g,'').replace(/<link rel="stylesheet"[^>]+>/,'<style>'+assets.css.replace(/<\/style/gi,'<\\/style')+'</style>').replace(/<meta http-equiv="Content-Security-Policy"[^>]+>/,"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'\">");return Html.finalize(html.replace('</body>','<script type="application/json" id="officer-data">'+json+'</script><script>'+assets.core.replace(/<script/gi,'\\x3cscript').replace(/<\/script/gi,'<\\/script').replace(/<\/body/gi,'<\\/body')+'</script><script>'+assets.ui.replace(/<script/gi,'\\x3cscript').replace(/<\/script/gi,'<\\/script').replace(/<\/body/gi,'<\\/body')+'</script></body>'));}
 return {REGIONS,SCHEMA,safe,parseWorkbook,validate,merge,buildHtml,aggregate:Base.aggregate,dailySeries:Base.dailySeries,weeklySeries:Base.weeklySeries};
