@@ -5,10 +5,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#ffffff">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta name="robots" content="noindex,nofollow,noarchive">
+  <link rel="icon" type="image/png" href="app-assets/twm-logo.png">
+  <link rel="apple-touch-icon" href="app-assets/twm-logo.png">
   <title>北一二B 智慧營運中心</title>
-  <link rel="stylesheet" href="home.css?v=20261105-integrated-1">
+  <link rel="stylesheet" href="home.css?v=20261115-polish-1">
   <!-- Public navigation only. Reminder reads require each existing system's verified access.
        No employee records, report snapshots, credentials or private cache are published here. -->
   <script defer src="app-assets/lucide.min.js"></script>
@@ -23,7 +28,7 @@
 <header class="masthead">
   <div class="shell header-inner">
     <a class="brand" href="home.html" aria-label="北一二B 智慧營運中心首頁">
-      <span class="brand-icon"><i data-lucide="layers" aria-hidden="true"></i></span>
+      <img class="brand-logo" src="app-assets/twm-logo.png" alt="台灣大哥大" width="40" height="40">
       <span><strong>北一二B 智慧營運中心</strong><small>Liam AI Crew</small></span>
     </a>
     <div class="header-actions">
@@ -35,12 +40,16 @@
 </header>
 <main id="main">
   <div class="shell start-section">
+    <div class="intro"><div><h1>今天，從這裡開始</h1><p>常用系統一鍵進入，工作工具清楚分流</p></div><p id="today" class="today"></p></div>
+    <div class="start-panels">
+      <div class="access-panel">
     <div id="home-login"></div>
     <div class="portal-access" aria-label="目前頁面登入狀態">
       <p id="portal-access-status" role="status">尚未恢復登入</p>
       <p id="portal-expiry-notice" role="status" hidden></p>
       <small>登出會同步清除同一瀏覽器、本網站頁籤的督導與業績登入；裝置核准資格保留。手機 App 請另行登出。</small>
     </div>
+      </div>
     <section class="reminder" aria-labelledby="reminder-heading" aria-roledescription="輪播">
       <div class="reminder-label"><i data-lucide="bell-ring" aria-hidden="true"></i><strong id="reminder-heading">營運提醒</strong></div>
       <div class="reminder-main" id="reminder-display" aria-live="off" aria-atomic="true">
@@ -55,7 +64,7 @@
         <button type="button" id="reminder-refresh" aria-label="手動更新提醒"><i data-lucide="refresh-cw" aria-hidden="true"></i></button>
       </div>
     </section>
-    <div class="intro"><div><h1>今天，從這裡開始</h1><p>常用系統一鍵進入，工作工具清楚分流</p></div><p id="today" class="today"></p></div>
+    </div>
     <section class="quick-section" aria-labelledby="quick-title" data-tool-group>
       <h2 class="eyebrow" id="quick-title">常用入口</h2>
       <nav class="quick-grid" aria-label="常用入口">
@@ -94,7 +103,7 @@
     <p class="section-description">部區管理、資料查詢與追蹤</p>
     <nav aria-label="督導專區">
       <div class="management-grid" data-tool-group>
-<a class="card tool-card management-card" href="access-management.html" data-search="人員 裝置 權限 審核 撤銷 換機 督導"><div><h3>人員與裝置管理</h3><p>審核、停權、換機與督導跨裝置資格</p></div></a><a class="card tool-card management-card" href="department-ops.html" data-search="北一二部｜部區管理 A／B／C／D 部區總覽"><i data-lucide="network" aria-hidden="true"></i><div><h3>北一二部｜部區管理</h3><p>A／B／C／D 部區總覽</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a><a class="card tool-card management-card" href="patrol.html" data-search="Liam 情報站 巡店紀錄、班表、半月檢查、檢核大盤"><i data-lucide="notebook-text" aria-hidden="true"></i><div><h3>Liam 情報站</h3><p>巡店紀錄、班表、半月檢查、檢核大盤</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+<a class="card tool-card management-card" href="access-management.html" data-search="人員 裝置 權限 審核 撤銷 換機 督導"><i data-lucide="user-cog" aria-hidden="true"></i><div><h3>人員與裝置管理</h3><p>審核、停權、換機與督導跨裝置資格</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a><a class="card tool-card management-card" href="department-ops.html" data-search="北一二部｜部區管理 A／B／C／D 部區總覽"><i data-lucide="network" aria-hidden="true"></i><div><h3>北一二部｜部區管理</h3><p>A／B／C／D 部區總覽</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a><a class="card tool-card management-card" href="patrol.html" data-search="Liam 情報站 巡店紀錄、班表、半月檢查、檢核大盤"><i data-lucide="notebook-text" aria-hidden="true"></i><div><h3>Liam 情報站</h3><p>巡店紀錄、班表、半月檢查、檢核大盤</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a>
       </div>
       <div class="supervisor-grid" data-tool-group>
 <a class="card tool-card" href="operations-brief.html" data-search="作戰專區 店長會議 本機上傳 簡報 草稿 好速"><i data-lucide="presentation" aria-hidden="true"></i><div><h3>作戰專區</h3><p>本機檔案核對與店長會議簡報草稿</p></div><i data-lucide="chevron-right" aria-hidden="true"></i></a>
