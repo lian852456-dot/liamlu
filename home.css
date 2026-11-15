@@ -20,7 +20,7 @@
   font-family:-apple-system,'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth;scroll-padding-top:72px}
+html{scroll-behavior:smooth;scroll-padding-top:56px}
 body{margin:0;background:#fff;color:var(--ink);font-size:var(--fs-base);line-height:1.6;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 button,input{font:inherit}
@@ -30,85 +30,86 @@ button:disabled{cursor:wait}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-offset:3px;border-radius:6px}
 [hidden]{display:none!important}
 svg{flex:none;stroke-width:1.75}
-.shell{width:calc(100% - 64px);max-width:1200px;margin-inline:auto}
+.shell{width:calc(100% - 32px);max-width:1400px;margin-inline:auto}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .skip-link{position:fixed;top:-100px;left:16px;z-index:20;padding:12px 16px;background:var(--ink);color:#fff;border-radius:var(--r-sm)}
 .skip-link:focus{top:12px}
 
 /* 頁首 */
 .masthead{border-bottom:1px solid var(--line);background:#fff}
-.header-inner{min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:24px}
-.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.header-inner{min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
 .brand-icon{width:40px;height:40px;background:var(--accent);border-radius:10px;display:grid;place-items:center;color:#fff;flex:none}
 .brand-icon svg{width:24px;height:24px}
-.brand strong{display:block;font-size:var(--fs-md);font-weight:700;line-height:1.3}
-.brand small{display:block;color:var(--faint);font-size:13px;line-height:1.4}
+.brand strong{display:block;font-size:18px;font-weight:700;line-height:1.25}
+.brand small{display:block;color:var(--faint);font-size:12px;line-height:1.3}
 .header-actions{display:flex;align-items:center;gap:12px}
-.search-box{height:44px;width:280px;border:1px solid var(--line-strong);border-radius:var(--r-sm);display:flex;align-items:center;gap:8px;padding:0 12px;background:#fff;color:var(--faint);transition:border-color .15s ease}
+.search-box{height:40px;width:280px;border:1px solid var(--line-strong);border-radius:var(--r-sm);display:flex;align-items:center;gap:8px;padding:0 12px;background:#fff;color:var(--faint);transition:border-color .15s ease}
 .search-box:focus-within{border-color:var(--ink)}
 .search-box svg{width:18px;height:18px}
 .search-box input{width:100%;min-width:0;border:0;background:transparent;font-size:16px;color:var(--ink);outline:none}
 .search-box input::placeholder{color:var(--faint)}
-.outline-button{display:inline-flex;align-items:center;min-height:44px;border:1px solid var(--line-strong);background:#fff;color:var(--ink);padding:0 16px;border-radius:var(--r-sm);white-space:nowrap;font-size:15px;font-weight:500;transition:border-color .15s ease,background-color .15s ease}
+.outline-button{display:inline-flex;align-items:center;min-height:40px;border:1px solid var(--line-strong);background:#fff;color:var(--ink);padding:0 14px;border-radius:var(--r-sm);white-space:nowrap;font-size:15px;font-weight:500;transition:border-color .15s ease,background-color .15s ease}
 .outline-button:hover{border-color:var(--ink);background:var(--surface)}
 #portal-logout{flex:none}
 
 /* 開頭：標題 → 登入／狀態 → 提醒 */
-.start-section{padding-top:48px}
-.intro{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:0 0 24px}
-.intro h1{font-size:var(--fs-2xl);line-height:1.25;letter-spacing:-.01em;margin:0 0 8px;font-weight:700}
-.intro p{margin:0;color:var(--muted);font-size:var(--fs-base)}
-.intro .today{font-size:var(--fs-sm);color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
-.start-panels{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;align-items:stretch}
-.access-panel{border:1px solid var(--line);border-radius:var(--r-lg);padding:24px;background:#fff;display:flex;flex-direction:column;gap:16px}
+.start-section{padding-top:12px}
+.intro{display:flex;align-items:baseline;justify-content:space-between;gap:12px 16px;padding:0 0 8px}
+.intro>div{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;min-width:0}
+.intro h1{font-size:22px;line-height:1.3;letter-spacing:0;margin:0;font-weight:700}
+.intro p{margin:0;color:var(--muted);font-size:14px;line-height:1.4}
+.intro .today{font-size:13px;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
+.start-panels{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:12px;align-items:start}
+.access-panel{border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;background:#fff;display:flex;flex-direction:column;gap:8px}
 .access-panel:has(#home-login:empty){gap:0}
-.portal-access{margin:0;padding:16px 0 0;border-top:1px solid var(--line);font-size:var(--fs-sm)}
+.portal-access{margin:0;padding:8px 0 0;border-top:1px solid var(--line);font-size:13px}
 #home-login:empty + .portal-access{border-top:0;padding-top:0}
-.portal-access p{margin:0 0 4px;font-weight:500}
-.portal-access small{display:block;color:var(--muted);font-size:13px;line-height:1.6}
+.portal-access p{margin:0 0 2px;font-weight:500}
+.portal-access small{display:block;color:var(--muted);font-size:12px;line-height:1.45}
 #portal-expiry-notice{color:var(--accent-ink);font-weight:700}
 
 /* 覆寫 dashboard-b-shell.js 注入的登入面板外觀（只改樣式，不動功能） */
-body #home-login #dashboard-b-access{padding:0;border-bottom:0;font-size:15px}
-body #home-login #dashboard-b-access h2{font-size:var(--fs-md);font-weight:700;margin:0 0 16px}
-body #home-login #dashboard-b-access form{gap:12px}
-body #home-login #dashboard-b-access label{font-size:13px;font-weight:500;color:var(--muted);gap:6px}
-body #home-login #dashboard-b-access input{border-color:var(--line-strong);border-radius:var(--r-sm);font-size:16px}
+body #home-login #dashboard-b-access{padding:0;border-bottom:0;font-size:14px}
+body #home-login #dashboard-b-access h2{font-size:16px;font-weight:700;line-height:1.3;margin:0 0 6px}
+body #home-login #dashboard-b-access form{gap:8px}
+body #home-login #dashboard-b-access label{font-size:12px;font-weight:500;color:var(--muted);gap:2px}
+body #home-login #dashboard-b-access input{height:36px;min-height:36px;padding:4px 10px;border-color:var(--line-strong);border-radius:var(--r-sm);font-size:15px}
 body #home-login #dashboard-b-access input:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
-body #home-login #dashboard-b-access button{min-height:44px;border-color:var(--line-strong);border-radius:var(--r-sm);color:var(--ink);font-weight:500}
-body #home-login #dashboard-b-access [data-b-submit]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;padding:0 24px}
+body #home-login #dashboard-b-access button{min-height:32px;padding:4px 10px;border-color:var(--line-strong);border-radius:var(--r-sm);color:var(--ink);font-weight:500;font-size:13px}
+body #home-login #dashboard-b-access [data-b-submit]{height:36px;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;padding:0 14px}
 body #home-login #dashboard-b-access [data-b-submit]:hover{background:var(--accent-ink);filter:none}
-body #home-login #dashboard-b-access [data-b-message]{margin:12px 0 0;color:var(--muted)}
-body #home-login #dashboard-b-access .b-toolbar{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+body #home-login #dashboard-b-access [data-b-message]{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.4}
+body #home-login #dashboard-b-access .b-toolbar{margin-top:8px;padding-top:8px;gap:6px;border-top:1px solid var(--line)}
 body #home-login #dashboard-b-access .b-modules button{background:#fff;border-color:var(--line-strong);color:var(--ink)}
 body #home-login #dashboard-b-access [data-b-logout]{color:var(--danger)}
 
 /* 營運提醒 */
-.reminder{display:flex;flex-direction:column;gap:12px;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-lg);padding:24px}
-.reminder-label{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:var(--fs-sm)}
+.reminder{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-md);padding:12px 14px}
+.reminder-label{display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px}
 .reminder-label svg{width:18px;height:18px;color:var(--accent)}
 .reminder-main{min-width:0;flex:1}
 .reminder-meta{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;line-height:1.5;flex-wrap:wrap;font-variant-numeric:tabular-nums}
 .status-tag{border-radius:999px;background:#e8eaee;color:#454c57;padding:2px 10px;font-weight:500;font-size:12px}
 .status-tag[data-status="ok"],.status-tag[data-status="attention"],.status-tag[data-status="warning"]{color:var(--accent-ink);background:#ffe7d6}
-.reminder-main a{display:block;margin-top:8px;font-size:15px;line-height:1.65;color:var(--muted)}
+.reminder-main a{display:block;margin-top:4px;font-size:14px;line-height:1.45;color:var(--muted)}
 .reminder-main a:hover strong{text-decoration:underline;text-underline-offset:3px}
-.reminder-main strong{display:block;font-size:var(--fs-md);line-height:1.4;color:var(--ink);margin-bottom:4px}
+.reminder-main strong{display:block;font-size:16px;line-height:1.35;color:var(--ink);margin-bottom:2px}
 .reminder-main a svg{width:16px;height:16px;vertical-align:-2px;margin-left:4px;color:var(--accent-ink)}
-.reminder-controls{display:flex;align-items:center;gap:4px;flex:none;margin-top:auto;padding-top:12px;border-top:1px solid var(--line)}
-.reminder-controls button{border:0;background:transparent;display:grid;place-items:center;border-radius:var(--r-sm);color:var(--muted);width:44px;height:44px;padding:0;transition:background-color .15s ease,color .15s ease}
+.reminder-controls{display:flex;align-items:center;gap:2px;flex:none;margin-top:auto;padding-top:6px;border-top:1px solid var(--line)}
+.reminder-controls button{border:0;background:transparent;display:grid;place-items:center;border-radius:var(--r-sm);color:var(--muted);width:36px;height:36px;padding:0;transition:background-color .15s ease,color .15s ease}
 .reminder-controls button:hover{background:#eceef1;color:var(--ink)}
 .reminder-controls button:nth-of-type(3){margin-left:auto}
 .reminder-controls svg{width:18px;height:18px}
 #reminder-count{font-size:13px;white-space:nowrap;min-width:40px;text-align:center;color:var(--muted);font-variant-numeric:tabular-nums}
 
 /* 常用入口 */
-.quick-section{margin-top:48px}
-.eyebrow{font-size:var(--fs-sm);line-height:1.4;margin:0 0 16px;font-weight:700;color:var(--muted);letter-spacing:.04em}
-.quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.quick-section{margin-top:12px}
+.eyebrow{font-size:13px;line-height:1.3;margin:0 0 8px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .card{min-width:0;transition:border-color .15s ease,background-color .15s ease,box-shadow .15s ease}
-.quick-card{min-height:184px;border:1px solid var(--line);border-radius:var(--r-lg);padding:24px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;background:#fff}
-.quick-card>svg{width:28px;height:28px;color:var(--accent)}
+.quick-card{min-height:0;border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;background:#fff}
+.quick-card>svg{width:22px;height:22px;color:var(--accent)}
 .card h3{margin:0;font-size:var(--fs-md);line-height:1.4;font-weight:700}
 .card p{font-size:var(--fs-sm);line-height:1.6;color:var(--muted);margin:4px 0 0}
 .card-action{display:inline-flex;align-items:center;gap:6px;color:var(--ink);font-weight:500;font-size:var(--fs-sm);margin-top:auto}
@@ -116,7 +117,10 @@ body #home-login #dashboard-b-access [data-b-logout]{color:var(--danger)}
 .quick-card:hover{border-color:var(--line-strong);box-shadow:0 4px 16px rgba(22,25,31,.06)}
 .quick-card:hover .card-action svg{transform:translateX(2px)}
 .quick-card.primary{border-color:#fbd5bb;background:var(--accent-soft)}
-.quick-card.primary .card-action{background:var(--accent);color:#fff;border-radius:var(--r-sm);padding:8px 16px;min-height:40px;font-weight:700}
+.quick-card h3{font-size:16px;line-height:1.3}
+.quick-card p{font-size:13px;line-height:1.4;margin:0}
+.quick-card .card-action{font-size:13px;margin-top:6px}
+.quick-card.primary .card-action{background:var(--accent);color:#fff;border-radius:var(--r-sm);padding:4px 10px;min-height:32px;font-weight:700}
 .quick-card.primary:hover{border-color:var(--accent)}
 .search-result{padding:16px 0 0;margin:0;font-size:var(--fs-base);color:var(--muted)}
 
@@ -170,7 +174,7 @@ body #home-login #dashboard-b-access [data-b-logout]{color:var(--danger)}
 .footer p{margin:0}
 
 @media(max-width:1100px){
-  .shell{width:calc(100% - 48px)}
+  .shell{width:calc(100% - 32px)}
   .search-box{width:220px}
   .start-panels{grid-template-columns:1fr}
   .quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
