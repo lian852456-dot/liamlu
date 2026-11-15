@@ -17,7 +17,7 @@
   --focus:#2563eb;
   --r-sm:8px; --r-md:12px; --r-lg:16px;
   --fs-sm:14px; --fs-base:16px; --fs-md:20px; --fs-lg:25px; --fs-xl:31px; --fs-2xl:39px;
-  font-family:'Noto Sans TC','Noto Sans CJK TC','PingFang TC','Microsoft JhengHei',system-ui,sans-serif
+  font-family:-apple-system,'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;scroll-padding-top:72px}
@@ -194,13 +194,13 @@ body #home-login #dashboard-b-access [data-b-logout]{color:var(--danger)}
   .access-panel,.reminder{padding:20px 16px;border-radius:var(--r-md)}
   .reminder-main{min-height:120px}
   .quick-section{margin-top:40px}
-  .quick-grid{grid-template-columns:1fr;gap:8px}
-  .quick-card,.quick-card.primary{min-height:0;display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:4px 12px;padding:16px;border-radius:var(--r-md)}
+  .quick-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .quick-card,.quick-card.primary{min-height:0;padding:16px 12px;border-radius:var(--r-md)}
   .quick-card>svg,.quick-card.primary>svg{width:24px;height:24px}
-  .quick-card h3{font-size:17px}
-  .quick-card p{margin:0}
-  .quick-card .card-action{font-size:13px;margin:0}
-  .quick-card.primary .card-action{padding:6px 12px;min-height:36px}
+  .quick-card h3{font-size:16px}
+  .quick-card p{margin:0;font-size:13px}
+  .quick-card .card-action{font-size:13px}
+  .quick-card.primary .card-action{padding:6px 10px;min-height:36px}
   .section-nav{margin-top:40px}
   .section-nav span{display:none}
   .staff-section{padding-block:32px 40px}
