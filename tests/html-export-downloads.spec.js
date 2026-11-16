@@ -51,7 +51,7 @@ async function tradein(page){
 }
 for(const entry of inventory.entries)test(entry.id+' downloads its real HTML and opens in a fresh offline browser',async({page,browser},info)=>{
  if(['kpi','awards'].includes(entry.kind))await battle(page,entry);
- else if(entry.id==='store-readonly'||entry.id==='dashboard-renewal'){await readonly(page);if(entry.id==='dashboard-renewal'){await page.locator('#renewal-source').setInputFiles(book());await expect(page.locator('#renewal-export')).toBeEnabled();}}
+ else if(entry.id==='store-readonly'){await readonly(page);}
  else if(entry.id==='officer-renewal'){await page.goto(base+'/north12-officer.html');await page.locator('#files').setInputFiles(book());await expect(page.locator('#export')).toBeEnabled();}
  else if(entry.kind==='department')await department(page);
  else if(entry.kind==='patrol')await patrol(page);

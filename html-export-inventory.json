@@ -9,7 +9,6 @@
     {"id":"report-kpi","page":"index.html","control":"[data-battle-html-export=kpi]","kind":"kpi"},
     {"id":"report-awards","page":"index.html","control":"[data-battle-html-export=awards]","kind":"awards"},
     {"id":"store-readonly","page":"readonly-dashboard.html","control":"#store-export","kind":"store"},
-    {"id":"dashboard-renewal","page":"readonly-dashboard.html","control":"#renewal-export","kind":"officer"},
     {"id":"officer-renewal","page":"north12-officer.html","control":"#export","kind":"officer"},
     {"id":"department-scores-gold","page":"department-ops.html","control":"#departmentExportHTML","kind":"department"},
     {"id":"patrol-inspection","page":"patrol.html","control":"#halfExportHtml","kind":"patrol"},

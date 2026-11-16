@@ -45,8 +45,8 @@ test('home navigation retains PR179 performance and PR181 lab removal', () => {
     'https://twm-store-inspection.liamlu245.chatgpt.site/',
     'tradein-progress.html', 'threec-query.html'
   ]);
-  assert.equal(cards(navigation('督導專區')).length, 9);
-  assert.equal(cards(html).length, 4 + staffHrefs.length + 9);
+  assert.equal(cards(navigation('督導專區')).length, 10);
+  assert.equal(cards(html).length, 4 + staffHrefs.length + 10);
 });
 
 test('staff gold lookup lives under performance tools and uses the existing viewer', () => {
@@ -71,7 +71,7 @@ test('home omits supervisor gold entry and moves the original intelligence stati
   assert.doesNotMatch(html, /href="north12b-gold-ops\.html"/);
   assert.ok(fs.existsSync(path.resolve(__dirname, '../north12b-gold-ops.html')));
   const management=supervisor.match(/<div class="management-grid"[^>]*>([\s\S]*?)<\/div>\s*<div class="supervisor-grid"/)[1];
-  assert.deepEqual(cards(management).map(card=>card.match(/href="([^"]+)"/)[1]),['access-management.html','department-ops.html','patrol.html']);
+  assert.deepEqual(cards(management).map(card=>card.match(/href="([^"]+)"/)[1]),['access-management.html','department-ops.html','readonly-dashboard.html','patrol.html']);
   const intel=cardFor(supervisor,'patrol.html');
   assert.match(intel, /class="card tool-card management-card"/);
   assert.match(intel, /<h3>Liam 情報站<\/h3>/);
@@ -91,7 +91,10 @@ test('home omits the import lab entry while retaining its maintenance page and f
   assert.ok(fs.existsSync(path.resolve(__dirname, '../tradein-import-lab.html')));
   const upload = cards(navigation('督導專區')).filter(card => /<h3>資料快速上傳<\/h3>/.test(card));
   assert.equal(upload.length, 1);
-  assert.match(upload[0], /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
+  assert.match(upload[0], /href="quick-upload\.html"/);
+  const quickUpload=fs.readFileSync(path.resolve(__dirname,'../quick-upload.html'),'utf8');
+  assert.match(quickUpload, /href="readonly-conversion-upload\.html">\s*<strong>締結率<\/strong>/);
+  assert.match(quickUpload, /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
 });
 
 test('home and APP open the v6 recovery query and retain target progress navigation', () => {

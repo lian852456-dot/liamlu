@@ -207,3 +207,4 @@ test('website KPI, awards and personal views switch in one verified document',as
 
 // Keep the approved KPI layout and retention regressions in this CI entrypoint.
 require('./helpers/kpi-compact.cjs');
+require('./helpers/owner-phone-return.cjs');

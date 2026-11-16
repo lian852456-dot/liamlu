@@ -215,9 +215,11 @@ test('狀態顯示涵蓋成功／失敗／未執行／維持上一版四種', ()
   assert.match(page, /ok: '成功', fail: '失敗', skip: '未執行', kept: '維持上一版'/);
 });
 
-test('智慧營運中心入口直接開啟獨立 Apps Script，且本身仍不含資料或密碼', () => {
-  assert.match(home, /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
-  assert.doesNotMatch(home, /adminSecret|employeeId|REPORT_UPLOAD_ALLOWED_EMPLOYEES|DASHBOARD_ADMIN_SECRET/);
+test('智慧營運中心的資料快速上傳保留獨立 Apps Script 與既有主管驗證', () => {
+  const quickUpload=fs.readFileSync(path.join(root,'quick-upload.html'),'utf8');
+  assert.match(home, /href="quick-upload\.html"/);
+  assert.match(quickUpload, /href="https:\/\/script\.google\.com\/macros\/s\/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq\/exec"/);
+  assert.doesNotMatch(home+quickUpload, /adminSecret|employeeId|REPORT_UPLOAD_ALLOWED_EMPLOYEES|DASHBOARD_ADMIN_SECRET/);
 });
 
 // ── 純函式行為測試（把驗證函式抽出來實際跑）────────────────

@@ -6,12 +6,78 @@
   'use strict';
 
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
-  const QUICK_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzkvUUKtaFvEi7gaYWp8M98M_5fAmSD8a7g0ds5WarG5ikiOETTwalHattGKDMfqOfq/exec';
+  const QUICK_UPLOAD_URL = 'quick-upload.html';
   const TRANSIENT_HTTP_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
   const RETRYABLE_PRIVATE_ACTIONS = new Set(['private_access', 'kpicalc_access']);
   const DEFAULT_RETRY_DELAYS_MS = [2000, 5000];
   const KPI_BATTLE_CORE_KEYS = { a999: 'AQ V+D 999 (含)以上', a1399: 'AQ V+D 1399 (含)以上', haosu: '好速案銷售點數', r1399: 'RT V+D 1399 (含)以上' };
   const KPI_BATTLE_PERSONAL_KEYS = { A999: 'AQ V+D 999 (含)以上', A1399: 'AQ V+D 1399 (含)以上', '好速': '好速案銷售點數', R1399: 'RT V+D 1399 (含)以上', R999: 'RT V+D 999 (含)以上', RT: 'RT上線點數', '特維': '特殊維繫用戶續約數', '配件': '配件及其他營收', '包膜': '包膜與保貼營收' };
+  // Display grouping from the approved Y26/11 KPI weight chart. These keys
+  // only order the existing source fields; they never alter values or weights.
+  const KPI_DETAIL_GROUPS = Object.freeze([
+    {id:'core',label:'AQ／RT',keys:['5G銷售數','好速案銷售點數','TTL AQ上線點數','AQ V+D 999 (含)以上','AQ V+D 1399 (含)以上','預付卡開卡面額','RT上線點數','RT V+D 999 (含)以上','RT V+D 1399 (含)以上','特殊維繫用戶續約數','高高特維用戶續約數','自退數','解約後NP OUT','解約後NP OUT(督導績)']},
+    {id:'addon',label:'加掛／DEVICE',keys:['Device專案銷售數','重點Device銷售量','換約淨新增金額','空機、3C、物聯網及門市購營收','配件及其他營收','包膜與保貼營收','手機保險服務點數','HBO Max&Disney+&Prime Video銷售數','Netflix多享組銷售數','MyVideo&KKBOX','Apple&Google服務及雜誌週刊開通數']},
+  ]);
+  function kpiBattleDetailGroups(keys) {
+    const source=[...new Set(keys)],known=new Set(KPI_DETAIL_GROUPS.flatMap(group=>group.keys));
+    return [...KPI_DETAIL_GROUPS.map(group=>({...group,keys:group.keys.filter(key=>source.includes(key))})),
+      {id:'other',label:'來源未分類',keys:source.filter(key=>!known.has(key))}];
+  }
+  const KPI_TARGET_STORES = Object.freeze(['酒泉','永吉','復興南','杭州南','萬大','通化','大稻埕','三創','六張犁']);
+  const KPI_MONEY_TARGETS = new Set(['預付卡開卡面額','換約淨新增金額','空機、3C、物聯網及門市購營收','配件及其他營收','包膜與保貼營收']);
+  const KPI_COUNT_TARGETS = new Set(KPI_DETAIL_GROUPS.flatMap(group=>group.keys));
+
+  function kpiBattleTargetMonth(meta = {}) {
+    const match = typeof meta.month === 'string' && meta.month.match(/^([1-9]\d{3})-(0[1-9]|1[0-2])$/);
+    if (!match) return {month:'',days:null};
+    const year=Number(match[1]),month=Number(match[2]);
+    const leap=year%4===0&&(year%100!==0||year%400===0);
+    const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31][month-1];
+    // The source month is authoritative; never substitute today's month or
+    // snapshotDay. Reject an inconsistent supplied full-month day count.
+    const supplied=meta.monthDays;
+    const provided=supplied!=null&&supplied!=='';
+    if (provided && !((typeof supplied==='number'||typeof supplied==='string'&&/^\d{2}$/.test(supplied))&&Number(supplied)===days)) return {month:meta.month,days:null};
+    return {month:meta.month,days};
+  }
+
+  function kpiBattleDailyTarget(rawTarget, key, calendar) {
+    // Only the 25 existing additive source metrics are eligible. A ratio,
+    // rank, score supplement, or new unclassified field has no inferred target.
+    const unit=!KPI_COUNT_TARGETS.has(key)?'':KPI_MONEY_TARGETS.has(key)?'金額原單位／日':key.includes('點數')?'點／日':'件／日';
+    const result=(status,value=null)=>({status,value,unit});
+    if (!unit) return result('not-applicable');
+    if (rawTarget==null||typeof rawTarget==='string'&&rawTarget.trim()==='') return result('missing');
+    if (!(typeof rawTarget==='number'||typeof rawTarget==='string'&&/^\+?(?:\d+(?:\.\d*)?|\.\d+)$/.test(rawTarget.trim()))) return result('invalid-target');
+    const target=Number(rawTarget);
+    if (!Number.isFinite(target)||target<0||target>Number.MAX_SAFE_INTEGER) return result('invalid-target');
+    if (target===0) return result('no-target');
+    if (!calendar?.days) return result('invalid-month');
+    // No discount, uplift, remaining-days adjustment, or performance subtraction.
+    return result('ok',Math.max(1,Math.ceil(target/calendar.days)));
+  }
+
+  function kpiBattleDistrictDailyTarget(stores, key, calendar) {
+    const byStore=new Map();
+    stores.forEach(store=>{
+      const name=kpiBattleStoreKey(store.name);
+      if (!byStore.has(name)) byStore.set(name,[]);
+      byStore.get(name).push(store);
+    });
+    const targets=KPI_TARGET_STORES.map(name=>{
+      const matches=byStore.get(name)||[];
+      return kpiBattleDailyTarget(matches.length===1?matches[0].items?.[key]?.t:undefined,key,calendar);
+    });
+    const first=targets[0];
+    if (first.status==='not-applicable') return first;
+    const known=targets.filter(target=>target.status==='ok'||target.status==='no-target').length;
+    const positive=targets.filter(target=>target.status==='ok');
+    const noTarget=targets.filter(target=>target.status==='no-target').length;
+    const coverage={known,total:KPI_TARGET_STORES.length,noTarget};
+    if (targets.some(target=>target.status==='invalid-month')) return {...first,status:'invalid-month',value:null,...coverage};
+    const status=known<KPI_TARGET_STORES.length?'partial':positive.length?'ok':'no-target';
+    return {...first,status,value:positive.length?positive.reduce((sum,target)=>sum+target.value,0):null,...coverage};
+  }
   const KNOWN_HAOSU_CORRECTIONS = Object.freeze({
     '0904.xlsx': Object.freeze({
       dataAsOfDate: '2026-09-03',
@@ -205,6 +271,7 @@
   function kpicalcToKpiBattleView(data, fetchedAt) {
     const safeData = data || {};
     const meta = safeData.meta || {};
+    const targetMonth = kpiBattleTargetMonth(meta);
     const dataAsOfDate = kpiBattleDataAsOfDate(meta);
     const sourceFile = kpiBattleSourceFile(meta.sourceFile);
     // The MMDD source filename is the publication-day identity, not the
@@ -221,6 +288,7 @@
       });
       return output;
     };
+    const dailyTargetsOf = itemsObj => Object.fromEntries((safeData.items || []).map(item=>[item.key,kpiBattleDailyTarget(itemsObj?.[item.key]?.t,item.key,targetMonth)]));
     const coreOf = metrics => {
       const core = {};
       Object.entries(KPI_BATTLE_CORE_KEYS).forEach(([short, key]) => { core[short] = metrics[key] || null; });
@@ -228,7 +296,7 @@
     };
     const stores = (safeData.stores || []).map(store => {
       const metrics = metricsOf(store.items);
-      return { store: store.name, overall_kpi: store.official, company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(metrics), metrics };
+      return { store: store.name, overall_kpi: store.official, company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(metrics), metrics, daily_targets:dailyTargetsOf(store.items) };
     });
     const aggregateItems = {};
     const aggregateRates = safeData.aggregateRates || {};
@@ -276,8 +344,11 @@
       data_as_of_date: dataAsOfDate,
       source_as_of_date: dataAsOfDate,
       source_date_range: meta.period || '',
+      metric_keys: (safeData.items || []).map(item=>item.key),
+      target_month: targetMonth,
       previous_report_date: null,
-      aggregate: { store: '北一二B整體', overall_kpi: meta.aggregateOfficialCorrected == null ? null : Number(meta.aggregateOfficialCorrected), company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(aggregateItems), metrics: aggregateItems },
+      aggregate: { store: '北一二B整體', overall_kpi: meta.aggregateOfficialCorrected == null ? null : Number(meta.aggregateOfficialCorrected), company_rank: null, addon_score: null, insurance_attach_rate: null, core: coreOf(aggregateItems), metrics: aggregateItems,
+        daily_targets:Object.fromEntries((safeData.items || []).map(item=>[item.key,kpiBattleDistrictDailyTarget(safeData.stores||[],item.key,targetMonth)])) },
       stores,
       personal,
     };
@@ -360,9 +431,24 @@
     return `<span class="kpi-rate rate-only">${formatPercent(row.insurance_attach_rate)}</span><span class="kpi-sub">實際搭售率</span>`;
   }
 
+  function kpiBattleConversion(snapshot, core) {
+    const status = snapshot?.conversionStatus;
+    if (status?.status !== 'verified') {
+      return {message: status?.status === 'unavailable' || snapshot?.conversionBattle ? '資料未通過核對' : '尚無正式資料'};
+    }
+    try {
+      const {cutoff, records} = core.validateConversion(snapshot.conversionBattle);
+      if (!Number.isSafeInteger(status.revision) || status.revision < 1) return {message: '資料未通過核對'};
+      const byStore = new Map(core.STORES.map(({id}) => [id, core.aggregate(records.filter(row => row.store === id))]));
+      return {cutoff, revision: status.revision, byStore, district: core.aggregate(records)};
+    } catch {
+      return {message: '資料未通過核對'};
+    }
+  }
+
   function privateDashboardLockMarkup(kind) {
     const title = kind === 'awards' ? '台獎戰情受保護' : 'KPI 戰情受保護';
-    const uploadEntry = kind === 'kpi' ? `<a class="secondary" href="${QUICK_UPLOAD_URL}" target="_blank" rel="noopener">資料快速上傳</a>` : '';
+    const uploadEntry = kind === 'kpi' ? `<a class="secondary" href="${QUICK_UPLOAD_URL}">資料快速上傳</a>` : '';
     return `<div class="card private-lock">
       <h3>🔐 ${title}</h3>
       <p>僅限北一二B在職同仁使用。姓名維持遮罩，KPI、排名與獎金不會出現在公開 GitHub 頁面。</p>
@@ -398,7 +484,7 @@
     const sleep = typeof config.sleep === 'function' ? config.sleep : delay => new Promise(resolve => win.setTimeout(resolve, delay));
     const logger = config.logger || win.console || (typeof console !== 'undefined' ? console : null);
     const request = payload => requestWithRetry(payload);
-    const state = { data: null, view: 'stores', profile: null, adminSecret: '', loading: false, store: '', metricGroup: 'all', detailTab: 'core' };
+    const state = { data: null, conversion: null, view: 'stores', profile: null, adminSecret: '', loading: false, store: '', metricGroup: 'all' };
     function updateNotice(message) {
       const compactRefresh=doc.querySelector('.compact-refresh');if(compactRefresh)compactRefresh.disabled=!state.data||state.loading;
       for (const id of ['kpiBattleContent','awardsBattleContent']) {
@@ -603,6 +689,22 @@
       return String(input?.value || '').trim();
     }
 
+    function conversionHeading() {
+      const conversion = state.conversion;
+      const caption = conversion?.cutoff
+        ? `截止 <time datetime="${conversion.cutoff}">${conversion.cutoff}</time><br>版本 ${conversion.revision}`
+        : conversion?.message || '尚無正式資料';
+      return `<th scope="col" class="kpi-conversion-heading">締結率<small class="kpi-sub" data-conversion-version>${caption}</small></th>`;
+    }
+
+    function conversionCell(row) {
+      const conversion = state.conversion;
+      const totals = row.isDistrict ? conversion?.district : conversion?.byStore?.get(win.ReadonlyDashboardCore.storeId(row.store));
+      if (!totals) return `<td data-conversion-rate>—${conversion?.byStore ? '<small class="kpi-sub">無店點資料</small>' : ''}</td>`;
+      const percent = rate => rate === null ? '—（分母 0）' : `${(rate * 100).toFixed(2)}%`;
+      return `<td data-conversion-rate>AQ ${percent(totals.aq_rate)}<br>RT ${percent(totals.rt_rate)}</td>`;
+    }
+
     function renderCompactStores() {
       const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
       const number = value => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : formatNumber(value);
@@ -612,24 +714,36 @@
       const stores = [...(state.data.stores || [])];
       const valid = stores.filter(row => row.overall_kpi != null && row.overall_kpi !== '' && Number.isFinite(Number(row.overall_kpi))).sort((a,b)=>Number(b.overall_kpi)-Number(a.overall_kpi));
       const rank = row => valid.includes(row) ? 1+valid.filter(other=>Number(other.overall_kpi)>Number(row.overall_kpi)).length : null;
+      const rankMark=(kind,label)=>`<b class="rank-${kind}"><svg class="rank-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${kind==='top'?'<path d="M8 3h8v5a4 4 0 0 1-8 0V3ZM8 5H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 1v6m-4 3h8m-7 0v-3h6v3"/>':'<path d="M6 21V3m0 1h13l-3 4 3 4H6"/>'}</svg><span>${label}</span></b>`;
       const badge = row => {
         const position=rank(row);
         const bottom=valid.filter(other=>Number(other.overall_kpi)<Number(row.overall_kpi)).length;
-        return position == null ? '<small>區內排名待載入</small>' : `<small>區內第 ${position} 名 ${position<=3?'<b class="rank-top">TOP3</b>':bottom<3?'<b class="rank-bottom">BOT3</b>':''}</small>`;
+        return position == null ? '<small>區內排名待載入</small>' : `<small>區內第 ${position} 名 ${position<=3?rankMark('top','TOP3'):bottom<3?rankMark('bottom','BOT3'):''}</small>`;
       };
       const rows = [{...aggregate, store:'北一二B整體',isDistrict:true},...stores];
       const selected = rows.find(row=>row.store===state.store)||rows[0];
       state.store=selected.store;
       const metrics=selected.metrics||{};
-      const defs=[['A999',KPI_BATTLE_CORE_KEYS.a999],['A1399',KPI_BATTLE_CORE_KEYS.a1399],['好速',KPI_BATTLE_CORE_KEYS.haosu],['R999','RT V+D 999 (含)以上'],['R1399',KPI_BATTLE_CORE_KEYS.r1399],['RT達成率','RT上線點數']];
-      const coreKeys=new Set(defs.map(([,key])=>key));
-      const metricRow=(label,metric)=>`<tr><th scope="row">${esc(label)}</th><td>${number(metric?.target)}</td><td>${number(metric?.actual)}</td><td class="${kpiBattleTone(metric?.rate)}">${percent(metric?.rate)}</td><td>${number(metric?.target)}</td></tr>`;
-      const metricRows=(state.detailTab==='core'?defs:Object.entries(metrics).filter(([key])=>!coreKeys.has(key)).map(([key])=>[key,key]))
-        .filter(([,key])=>state.metricGroup==='all'||(state.metricGroup==='core')===coreKeys.has(key))
-        .map(([label,key])=>metricRow(label,metrics[key])).join('');
-      const headers='<tr><th>項目</th><th>月目標</th><th>月累計實績</th><th>進度達成率</th><th>目標<br>（不打折）</th></tr>';
+      const labels={'AQ V+D 999 (含)以上':'A999','AQ V+D 1399 (含)以上':'A1399','好速案銷售點數':'好速','RT V+D 999 (含)以上':'R999','RT V+D 1399 (含)以上':'R1399','RT上線點數':'RT達成率'};
+      const groups=kpiBattleDetailGroups(state.data.metric_keys||Object.keys(metrics));
+      if(state.metricGroup!=='all'&&!groups.some(group=>group.id===state.metricGroup&&(group.keys.length||group.id==='addon')))state.metricGroup='all';
+      const dailyCell=key=>{
+        const target=selected.daily_targets?.[key]||{status:'missing',value:null};
+        const reasons={'missing':'月目標未提供','invalid-target':'月目標無效','invalid-month':'來源月份／天數待確認','not-applicable':'不適用','no-target':'無月目標（來源為 0）'};
+        const coverage=target.total?`目標資料 ${target.known}/${target.total} 店${target.noTarget?`；${target.noTarget} 店月目標為 0`:''}`:'';
+        const detail=target.status==='partial'?`部分合計；${coverage}`:reasons[target.status]||coverage;
+        return `<td data-daily-target="${target.status}">${number(target.value)}${target.value!=null?`<small class="daily-target-unit">${esc(target.unit)}</small>`:''}${detail?`<small class="daily-target-note">${esc(detail)}</small>`:''}</td>`;
+      };
+      const metricRow=(label,metric,key=label)=>`<tr data-kpi-metric="${esc(key)}"><th scope="row">${esc(label)}</th><td>${number(metric?.target)}</td><td>${number(metric?.actual)}</td><td class="${kpiBattleTone(metric?.rate)}">${percent(metric?.rate)}</td>${dailyCell(key)}</tr>`;
+      const headers='<tr><th>項目</th><th>月目標</th><th>月累計實績</th><th>進度達成率</th><th>日目標<br>（不打折）</th></tr>';
       const metricTable=body=>`<div class="table-wrap" tabindex="0" role="region" aria-label="各店成績，可左右捲動"><table class="compact-details"><thead>${headers}</thead><tbody>${body||'<tr><td colspan="5">目前分類沒有項目</td></tr>'}</tbody></table></div>`;
       const rateCell=metric=>`<td class="${kpiBattleTone(metric?.rate)}">${percent(metric?.rate)}</td>`;
+      const insuranceCell=value=>`<td data-insurance-rate class="${value==null||value===''||!Number.isFinite(Number(value))?'':Number(value)>=.5?'insurance-met':'insurance-low'}" title="保險搭售率門檻 50%">${percent(value)}</td>`;
+      const underTarget=value=>value!=null&&value!==''&&Number.isFinite(Number(value))&&Number(value)<1;
+      const groupTables=groups.filter(group=>(group.keys.length||group.id==='addon')&&(state.metricGroup==='all'||state.metricGroup===group.id)).map(group=>{
+        const extra=group.id==='addon'?`<tr><th scope="row">附掛得分</th><td>—</td><td>${number(selected.addon_score)} 分</td><td>—</td><td>—</td></tr><tr><th scope="row">保險搭售率</th><td>—</td><td>${percent(selected.insurance_attach_rate)}</td><td>—</td><td>—</td></tr>`:'';
+        return `<section class="compact-metric-group" data-kpi-group="${group.id}"><h4>${group.label}</h4>${metricTable(group.keys.map(key=>metricRow(labels[key]||key,metrics[key],key)).join('')+extra)}</section>`;
+      }).join('');
       const summary=(label,value,dod)=>`<article class="summary-card"><div class="sc-label">${label}</div><div class="sc-val">${value}</div><div class="sc-sub">DOD：${dod}</div></article>`;
       return `<div class="summary-grid compact-summary">
         ${summary('全區 KPI',percent(aggregate.overall_kpi),delta(aggregate.overall_kpi_dod,'pp'))}
@@ -637,16 +751,18 @@
         ${summary('附掛得分',number(aggregate.addon_score),delta(aggregate.addon_score_dod,'分'))}
         ${summary('保險搭售',percent(aggregate.insurance_attach_rate),delta(aggregate.insurance_attach_rate_dod,'pp'))}
       </div>
-      <section class="compact-overview" aria-labelledby="storeOverviewHeading"><div class="compact-section-heading"><h2 id="storeOverviewHeading">店點總覽</h2><span class="rank-top">區內TOP3</span><span class="rank-bottom">區內BOT3</span><span class="kpi-battle-note">依有效 KPI 排名；缺值不列名次</span></div>
-      <div class="table-wrap" tabindex="0" role="region" aria-label="九店 KPI 總覽，可左右捲動"><table class="compact-matrix"><thead><tr><th>店點／區內標示</th><th>KPI</th><th>公司排名</th><th>DOD<br>（較前日）</th><th>附掛得分</th><th>A999</th><th>A1399</th><th>好速</th><th>RT</th><th>R1399</th></tr></thead><tbody>
-      ${stores.map(row=>`<tr><th scope="row">${esc(displayStoreName(row.store))}${badge(row)}</th><td class="${kpiBattleTone(row.overall_kpi)}">${percent(row.overall_kpi)}</td><td>${number(row.company_rank)}</td><td>${delta(row.overall_kpi_dod,'pp')}</td><td>${number(row.addon_score)}<small>DOD ${delta(row.addon_score_dod,'分')}</small></td>${rateCell(row.core?.a999)}${rateCell(row.core?.a1399)}${rateCell(row.core?.haosu)}${rateCell(row.metrics?.['RT上線點數'])}${rateCell(row.core?.r1399)}</tr>`).join('')}
-      </tbody></table></div><details class="compact-disclosure"><summary>KPI 未達 100% 門市</summary><p>${stores.every(row=>row.overall_kpi!=null&&row.overall_kpi!=='')?stores.filter(row=>Number(row.overall_kpi)<1).length+' 間門市':'—'}</p></details></section>
+      <section class="compact-overview" aria-labelledby="storeOverviewHeading"><div class="compact-section-heading"><h2 id="storeOverviewHeading">北一二B／店點 KPI 排名</h2>${rankMark('top','區內TOP3')}${rankMark('bottom','區內BOT3')}<span class="kpi-battle-note">依有效 KPI 排名；缺值不列名次</span></div>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="北一二B整體與九店 KPI 排名，可左右捲動"><table class="compact-matrix"><thead><tr><th>店點／區內標示</th><th>KPI總達成</th>${conversionHeading()}<th>公司排名</th><th>DOD<br>（較前日）</th><th>附掛得分</th><th>保險<br>搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>RT</th><th>R1399</th></tr></thead><tbody>
+      ${rows.map(row=>`<tr${row.isDistrict?' class="compact-district"':''}><th scope="row">${esc(displayStoreName(row.store))}${row.isDistrict?'':badge(row)}</th><td data-overall-kpi class="${kpiBattleTone(row.overall_kpi)}${underTarget(row.overall_kpi)?' kpi-attention':''}">${percent(row.overall_kpi)}</td>${conversionCell(row)}<td>${number(row.company_rank)}</td><td>${delta(row.overall_kpi_dod,'pp')}</td><td>${number(row.addon_score)}<small>DOD ${delta(row.addon_score_dod,'分')}</small></td>${insuranceCell(row.insurance_attach_rate)}${rateCell(row.core?.a999)}${rateCell(row.core?.a1399)}${rateCell(row.core?.haosu)}${rateCell(row.metrics?.['RT上線點數'])}${rateCell(row.core?.r1399)}</tr>`).join('')}
+      </tbody></table></div>
+      <p class="kpi-battle-note">AQ 採上線數／來客數。RT 採原 TWM 與原 TST 合計的符合續約資格上線數／來客數。</p>
+      <p class="kpi-battle-note">KPI 以 100% 標色提醒；保險搭售率依 50% 門檻獨立標色，缺值顯示 —。</p></section>
       <section class="compact-store-details" aria-labelledby="storeDetailHeading"><h2 id="storeDetailHeading">各店詳細成績</h2>
-        <div class="kpi-battle-filter"><label>選擇門市<select id="kpiBattleStoreSelect">${rows.map(row=>`<option value="${esc(row.store)}"${row.store===selected.store?' selected':''}>${esc(displayStoreName(row.store))}</option>`).join('')}</select></label><label>項目分類<select id="kpiBattleMetricGroup"><option value="all"${state.metricGroup==='all'?' selected':''}>全部項目</option><option value="core"${state.metricGroup==='core'?' selected':''}>主力 KPI</option><option value="addon"${state.metricGroup==='addon'?' selected':''}>附掛明細</option></select></label></div>
-        <h3>${esc(displayStoreName(selected.store))}｜主力 KPI 與附掛表現</h3><div class="kpi-battle-toggle"><button type="button" data-kpi-detail-tab="core" class="${state.detailTab==='core'?'active':''}">主力KPI</button><button type="button" data-kpi-detail-tab="addon" class="${state.detailTab==='addon'?'active':''}">附掛明細</button></div>
-        ${metricTable(metricRows+(state.detailTab==='core'&&state.metricGroup!=='addon'?`<tr><th scope="row">附掛得分</th><td>—</td><td>${number(selected.addon_score)} 分</td><td>—</td><td>—</td></tr><tr><th scope="row">保險搭售</th><td>—</td><td>${percent(selected.insurance_attach_rate)}</td><td>—</td><td>—</td></tr>`:''))}
-        <p class="kpi-battle-note">目標（不打折）直接取正式來源原月目標，未按天數或折扣換算；進度達成率沿用正式報表。未提供的目標顯示 —。</p>
-        <details class="compact-disclosure"><summary>個別項目完整明細</summary>${metricTable(Object.entries(metrics).map(([name,metric])=>metricRow(name,metric)).join(''))}</details>
+        <div class="kpi-battle-filter"><label>選擇門市<select id="kpiBattleStoreSelect">${rows.map(row=>`<option value="${esc(row.store)}"${row.store===selected.store?' selected':''}>${esc(displayStoreName(row.store))}</option>`).join('')}</select></label><label>項目分類<select id="kpiBattleMetricGroup"><option value="all"${state.metricGroup==='all'?' selected':''}>全部項目</option>${groups.filter(group=>group.keys.length||group.id==='addon').map(group=>`<option value="${group.id}"${state.metricGroup===group.id?' selected':''}>${group.label}</option>`).join('')}</select></label></div>
+        <h3>${esc(displayStoreName(selected.store))}｜KPI 分類明細</h3><div class="kpi-battle-toggle">${[['all','全部'],...groups.filter(group=>group.keys.length||group.id==='addon').map(group=>[group.id,group.label])].map(([id,label])=>`<button type="button" data-kpi-detail-tab="${id}" class="${state.metricGroup===id?'active':''}" aria-pressed="${state.metricGroup===id}">${label}</button>`).join('')}</div>
+        ${groupTables}
+        <p class="kpi-battle-note" data-daily-target-rule>日目標（不打折）＝原月目標 ÷ ${state.data.target_month?.days?`${esc(state.data.target_month.month)} 全月 ${state.data.target_month.days} 天`:'來源月份全月日數（待確認）'}，無條件向上取整。全區逐店進位後加總；不足九店標示部分合計。件數／點數沿用原單位，金額沿原報表單位、不換算元或千元；進度達成率沿用正式報表。缺目標與無效值顯示 —，來源月目標為 0 另行標示；比率、排名及無可換算月目標項目不適用。</p>
+        <details class="compact-disclosure"><summary>個別項目完整明細</summary>${metricTable(groups.flatMap(group=>group.keys).map(key=>metricRow(key,metrics[key])).join(''))}</details>
       </section>`;
     }
 
@@ -666,9 +782,9 @@
         </div>
         <div class="section-divider">北一二B／店點 KPI 排名</div>
         <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
-          <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th><th>加掛</th><th>保險搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
-          <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${displayStoreName(row.store)}</td><td>${row.company_rank == null ? kpiPendingCell() : `<span class="val-gold">${row.company_rank}</span>`}${kpiBattleRankDod(row.company_rank_dod)}</td><td>${row.overall_kpi == null ? kpiPendingCell() : kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td><td>${row.addon_score == null ? kpiPendingCell() : formatNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${formatNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleInsuranceCell(row)}</td><td>${kpiBattleMetricCell(row.core?.a999, true)}</td><td>${kpiBattleMetricCell(row.core?.a1399, true)}</td><td>${kpiBattleMetricCell(row.core?.haosu, true)}</td><td>${kpiBattleMetricCell(row.core?.r1399, true)}</td></tr>`).join('')}</tbody>
-        </table></div></div>
+          <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th>${conversionHeading()}<th>加掛</th><th>保險搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
+          <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${displayStoreName(row.store)}</td><td>${row.company_rank == null ? kpiPendingCell() : `<span class="val-gold">${row.company_rank}</span>`}${kpiBattleRankDod(row.company_rank_dod)}</td><td>${row.overall_kpi == null ? kpiPendingCell() : kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td>${conversionCell(row)}<td>${row.addon_score == null ? kpiPendingCell() : formatNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${formatNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleInsuranceCell(row)}</td><td>${kpiBattleMetricCell(row.core?.a999, true)}</td><td>${kpiBattleMetricCell(row.core?.a1399, true)}</td><td>${kpiBattleMetricCell(row.core?.haosu, true)}</td><td>${kpiBattleMetricCell(row.core?.r1399, true)}</td></tr>`).join('')}</tbody>
+        </table></div><p class="kpi-battle-note">AQ 採上線數／來客數。RT 採原 TWM 與原 TST 合計的符合續約資格上線數／來客數。</p></div>
         <div class="section-divider">各項 KPI 達成</div>
         <div class="card">
           <div class="kpi-battle-filter"><label>選擇區／店點<select id="kpiBattleStoreSelect">${rows.map(row => `<option value="${row.store}" ${row.store === selected?.store ? 'selected' : ''}>${row.isDistrict ? '🏢 ' : ''}${displayStoreName(row.store)}</option>`).join('')}</select></label></div>
@@ -755,8 +871,9 @@
           const kpiResult = await request({ action: 'kpicalc_access', employeeId, deviceId });
           if(authContext!==(win.DashboardB?.context()||0))return;
           const kpiData = kpicalcToKpiBattleView(kpiResult.data, new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }));
-          const snapshotKpi = result.snapshot && result.snapshot.kpiBattle;
+          const snapshotKpi = result.snapshot?.kpiBattle;
           state.data = mergeKpiBattleSupplement(kpiData, snapshotKpi);
+          state.conversion = kpiBattleConversion(result.snapshot, win.ReadonlyDashboardCore);
           render();
           onKpiLoaded({ result, data: state.data, profile: state.profile });
           updateNotice();
@@ -859,6 +976,7 @@
     function failClosed(message) {
       state.profile=null;state.adminSecret='';
       state.data = null;
+      state.conversion = null;
       const cutoff=doc.getElementById('kpiCompactCutoff');if(cutoff)cutoff.textContent=message||'尚未取得已授權資料';
       updateNotice();
       const note = doc.getElementById('kpiBattleSourceNote');
@@ -869,7 +987,7 @@
 
     function handleClick(event) {
       const detail=event.target.closest('[data-kpi-detail-tab]');
-      if(detail){state.detailTab=detail.dataset.kpiDetailTab;render();return;}
+      if(detail){state.metricGroup=detail.dataset.kpiDetailTab;render();return;}
       const actionElement = event.target.closest('[data-private-dashboard-action]');
       if (actionElement) {
         const action = actionElement.dataset.privateDashboardAction;
@@ -887,7 +1005,7 @@
 
     function handleChange(event) {
       if(config.compactOverview&&event.target.id==='kpiBattleStoreSelect')state.store=event.target.value;
-      if(event.target.id==='kpiBattleMetricGroup'){state.metricGroup=event.target.value;state.detailTab=state.metricGroup==='addon'?'addon':'core';render();return;}
+      if(event.target.id==='kpiBattleMetricGroup'){state.metricGroup=event.target.value;render();return;}
       if (['kpiBattleStoreSelect', 'kpiBattlePersonalStore', 'kpiBattlePersonalRole'].includes(event.target.id)) render();
     }
 
@@ -906,6 +1024,7 @@
         state.profile=bundle.privateResult.profile;
         const data=kpicalcToKpiBattleView(bundle.kpiResult.data,new Date(bundle.loadedAt||Date.now()).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}));
         state.data=mergeKpiBattleSupplement(data,bundle.privateResult.snapshot?.kpiBattle);
+        state.conversion=kpiBattleConversion(bundle.privateResult.snapshot,win.ReadonlyDashboardCore);
         render();onKpiLoaded({result:bundle.privateResult,data:state.data,profile:state.profile});updateNotice();
       },
       getData: () => state.data,
@@ -922,6 +1041,11 @@
     kpiBattleSupplementIsCurrent,
     mergeKpiBattleSupplement,
     kpiBattleSourceMetadata,
+    kpiBattleDetailGroups,
+    kpiBattleConversion,
+    kpiBattleTargetMonth,
+    kpiBattleDailyTarget,
+    kpiBattleDistrictDailyTarget,
     kpiBattleReportDateFromSource,
     kpiBattleApplyKnownCorrections,
     displayStoreName,

@@ -19,7 +19,6 @@ catch(error){if(ticket!==authEpoch)return;auth.employeeId='';auth.adminSecret=''
 window.addEventListener('pagehide',()=>{authEpoch++;for(const request of requests)request.abort();requests.clear();auth.employeeId='';auth.adminSecret='';$('adminSecret').value='';$('authMessage').textContent='';$('app').classList.add('hidden');$('authCard').classList.remove('hidden');});
 (function() {
   'use strict';
-  const core = window.ReadonlyDashboardCore;
   let live = null, preview = null, generation = 0, busy = false;
   const ids = ['conversionFile','conversionPreviewBtn','conversionRefreshBtn','conversionPublishBtn','conversionRollbackBtn'];
   function controls() {
@@ -56,23 +55,29 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
   $('conversionPreviewBtn').addEventListener('click', async () => {
     if (busy) return; invalidate(); const ticket = generation;
     const file = $('conversionFile').files[0];
-    if (!file || !/\.xlsx$/i.test(file.name) || !file.size || file.size > 40 * 1024 * 1024) {
-      return message('conversionMessage', '請選擇 40 MB 以內的原始締結率 .xlsx。', 'bad');
+    if (!file || !/\.xls[xm]$/i.test(file.name)) {
+      return message('conversionMessage', '請選擇原始締結率 Excel（.xlsx 或 .xlsm）。', 'bad');
     }
-    busy = true; controls(); message('conversionMessage', '正在本機核對四張彙總表…');
+    if (!file.size || file.size > 40 * 1024 * 1024) {
+      return message('conversionMessage', '請選擇有內容且 40 MB 以內的 Excel。', 'bad');
+    }
+    busy = true; controls(); message('conversionMessage', '正在本機核對 AQ／RT 彙總表…');
     try {
       const bytes = await file.arrayBuffer();
       const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2,'0')).join('');
-      const workbook = XLSX.read(bytes, {type:'array', sheets:['AQ締結率','RT每日','RT締結率','樞紐']});
+      const workbook = XLSX.read(bytes, {type:'array', bookVBA:false, sheets:['AQ締結率','RT每日','RT締結率','樞紐']});
       const snapshot = window.ReadonlyConversionSource.parseWorkbook(workbook, XLSX, {sha256, source_name:file.name, source_bytes:file.size});
       if (ticket !== generation) return;
       const result = await call('readonly_conversion_preview', payload({snapshot}));
       if (ticket !== generation) return;
-      if (result.status !== 'ok' || !result.token || !result.preview) throw Error('來源預覽回應不完整');
+      if (result.status !== 'ok' || !result.token || !result.preview?.totals) throw Error('來源預覽回應不完整');
       preview = result; renderLive(result.live);
       const p = result.preview;
+      const percent = value => value == null ? '—（分母 0）' : (value * 100).toFixed(2) + '%';
       $('conversionPreviewText').textContent = p.sourceName + ' · ' + p.periodStart + ' 至 ' + p.cutoff +
-        ' · ' + p.storeDateKeys + ' 店日 · 新增 ' + p.added + '／更正 ' + p.changed + '／移除 ' + p.removed +
+        ' · ' + p.storeDateKeys + ' 店日 · 北一二B AQ ' + percent(p.totals.aq_rate) + '／RT ' + percent(p.totals.rt_rate) +
+        ' · 新增 ' + p.added + '／更正 ' + p.changed + '／移除 ' + p.removed +
+        (snapshot.prior ? '' : ' · 來源未提供同期核對依據') +
         ' · 原始檔 SHA-256 ' + p.sourceHash + (p.sameSource ? ' · 同一原始檔，不累加' : '');
       $('conversionPreview').classList.remove('hidden');
       message('conversionMessage', '預覽通過；尚未發布。只送出已核實的九店逐日彙總。', 'ok');
@@ -92,7 +97,7 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
       if (verified.activeHash !== expected || verified.revision !== result.live.revision) throw Error('發布後版本已改變，請重新核對');
       invalidate(); message('conversionMessage', result.status === 'already_current'
         ? '正式資料已是這個版本；未重複寫入或累加。'
-        : '已完成私有版本讀回。請從情報站重新核驗儀表板，核對截止與趨勢。', 'ok');
+        : '已完成私有版本讀回。返回 KPI 戰情可核對同一版本與截止。', 'ok');
     } catch (error) { invalidate(); message('conversionMessage', error.message, 'bad'); }
     finally { busy = false; controls(); }
   });
