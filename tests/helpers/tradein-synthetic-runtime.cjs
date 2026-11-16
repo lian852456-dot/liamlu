@@ -37,6 +37,11 @@ function createRuntime(options={}){
     (options.configuredOwner===undefined?'LOCAL_CHECKPOINT_OWNER_A':options.configuredOwner):null}),
   privateDashboardCleanEmployeeId:v=>String(v||'').trim().toUpperCase(),privateDashboardCleanDeviceId:v=>{if(!v)throw Error('裝置缺漏');return String(v);},
   privateDashboardIsTrustedEmployee:id=>id===OPERATOR,privateDashboardUserByEmployeeId:id=>({user:accessRows.get(id)}),
+  threecAuthorizeRead_:({employeeId,deviceId})=>{
+   const user=accessRows.get(employeeId);
+   if(user?.status!=='active'||user.device_id!==deviceId)throw Error('此員編或裝置尚未核准');
+   return employeeId;
+  },
   privateDashboardHash:hash,privateDashboardNow:()=> '2026-10-09T12:00:00+08:00',privateDashboardFolder:()=>folder,
   reportUploadAuthorize_:p=>{if(p.adminSecret!==fakeSecret || options.operatorRequired!==false&&p.employeeId!==OPERATOR)throw Error('合成管理者驗證失敗');return OPERATOR;},
   DriveApp:{Access:{PRIVATE:'PRIVATE'},Permission:{NONE:'NONE'},getFileById:id=>{if(!files.has(id))throw Error('未知合成檔案');return files.get(id);}},

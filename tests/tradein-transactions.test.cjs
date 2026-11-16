@@ -51,7 +51,8 @@ test('old snapshot can receive details without double counting or widening its p
   assert.equal(upgraded.snapshot.summary.total_units, first.snapshot.summary.total_units);
   assert.equal(publish(runtime, detailed).status, 'unchanged');
   assert.equal(publish(runtime, old).status, 'unchanged');
-  assert.throws(() => read({employeeId:runtime.operator}), /驗證失敗/);
+  assert.throws(() => read({employeeId:runtime.operator}), /九店本人裝置/);
+  assert.throws(() => read({employeeId:runtime.operator,adminSecret:'wrong'}), /驗證失敗/);
   assert.throws(() => read({...self, deviceId:'other-device'}), /尚未核准/);
   const own = read(self);
   assert.equal(own.scope, 'self');
