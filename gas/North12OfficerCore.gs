@@ -32,11 +32,17 @@ function normalizeWorkbook(workbook,XLSX){
   if(!signatures[name])continue;
   const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:null,blankrows:true,range:0});
   const headers=rows.flatMap((row,r)=>signatures[name].every(label=>row.some(v=>sourceName(v)===label))&&row.some(v=>/\d+\/\d+~\d+\/\d+/.test(sourceName(v)))?[r]:[]);
-  if(headers.length>1)fail(name+' 有重複的表頭區塊，請保留單一期間');
+  let lastRow=rows.length;
+  if(headers.length>1){
+   const periodAt=r=>sourceName(rows[r].find(v=>/\d+\/\d+~\d+\/\d+/.test(sourceName(v)))).match(/\d+\/\d+~\d+\/\d+/)?.[0];
+   const summariesOnly=headers.slice(1).every(r=>periodAt(r)===periodAt(headers[0])) && !rows.slice(headers[1]).some(row=>row.some(v=>/^DNB\d{5}$/.test(sourceName(v))));
+   if(!summariesOnly)fail(name+' 有重複的表頭區塊，請保留單一期間');
+   lastRow=headers[1];
+  }
   if(!headers.length)continue; // Existing schema checks supply the missing-field diagnostic.
   const top=headers[0],left=rows[top].findIndex(v=>/\d+\/\d+\s*~\s*\d+\/\d+/.test(sourceName(v)));
   if(left<0)continue;
-  const kept=rows.map((row,r)=>({row,r})).filter(({row,r})=>r>=top&&row.some(v=>v!=null&&v!==''));
+  const kept=rows.map((row,r)=>({row,r})).filter(({row,r})=>r>=top&&r<lastRow&&row.some(v=>v!=null&&v!==''));
   const shifted={};let maxC=0;
   kept.forEach(({row,r},newR)=>{
    if(row.slice(0,left).some(v=>v!=null&&v!==''))fail(name+' 表格左側含有未識別資料，無法安全位移');
@@ -59,7 +65,7 @@ function parseWorkbook(workbook,XLSX,options={}){
  const input=normalized?{...workbook,Sheets:{...workbook.Sheets,'AQ締結率':normalized}}:workbook;
  const data=reviewedParse(input,XLSX,{...options,stores});return validate({...data,renewalDetail:Detail.parseAvailable(workbook,XLSX,data)});
 }
-function merge(current,incoming){const next=validate(incoming);if(!current)return next;const old=validate(current);if(old.period_start!==next.period_start||old.cutoff!==next.cutoff)fail('四區截止日與期間必須相同');const regions=new Set(next.stores.map(s=>s.region)),keep=new Set(old.stores.filter(s=>!regions.has(s.region)).map(s=>s.id));if(!keep.size)return next;const a=old.renewalDetail,b=next.renewalDetail;let renewalDetail=null;if(a&&b){const keptRegions=new Set(old.stores.filter(s=>keep.has(s.id)).map(s=>s.region));renewalDetail={...b,issues:{...a.issues,...b.issues},tiers:a.tiers.filter(r=>keep.has(r.store)).concat(b.tiers),observation:a.observation.filter(r=>keptRegions.has(r.region)).concat(b.observation),plans:a.plans.filter(r=>keep.has(r.store)).concat(b.plans),coverage:Object.fromEntries(['tiers','observation','plans'].map(k=>[k,a.coverage[k]&&b.coverage[k]]))};for(const k of ['tiers','observation','plans'])if(!renewalDetail.coverage[k])renewalDetail[k]=[];}return validate({...next,renewalDetail,stores:old.stores.filter(s=>keep.has(s.id)).concat(next.stores),records:old.records.filter(r=>keep.has(r.store)).concat(next.records),prior:old.prior&&next.prior?old.prior.filter(r=>keep.has(r.store)).concat(next.prior):null,source_name:[...new Set([old.source_name,next.source_name])].join('、')});}
+function merge(current,incoming){const next=validate(incoming);if(!current)return next;const old=validate(current);if(old.period_start!==next.period_start||old.cutoff!==next.cutoff)fail('四區截止日與期間必須相同');const regions=new Set(next.stores.map(s=>s.region)),keep=new Set(old.stores.filter(s=>!regions.has(s.region)).map(s=>s.id));if(!keep.size)return next;const a=old.renewalDetail,b=next.renewalDetail;let renewalDetail=null;if(a&&b){const keptRegions=new Set(old.stores.filter(s=>keep.has(s.id)).map(s=>s.region));renewalDetail={...b,cohortAvailable:a.cohortAvailable&&b.cohortAvailable,cohorts:a.cohortAvailable&&b.cohortAvailable?a.cohorts.filter(r=>keep.has(r.store)).concat(b.cohorts):[],issues:{...a.issues,...b.issues},tiers:a.tiers.filter(r=>keep.has(r.store)).concat(b.tiers),observation:a.observation.filter(r=>keptRegions.has(r.region)).concat(b.observation),plans:a.plans.filter(r=>keep.has(r.store)).concat(b.plans),coverage:Object.fromEntries(['tiers','observation','plans'].map(k=>[k,a.coverage[k]&&b.coverage[k]]))};for(const k of ['tiers','observation','plans'])if(!renewalDetail.coverage[k])renewalDetail[k]=[];}return validate({...next,renewalDetail,stores:old.stores.filter(s=>keep.has(s.id)).concat(next.stores),records:old.records.filter(r=>keep.has(r.store)).concat(next.records),prior:old.prior&&next.prior?old.prior.filter(r=>keep.has(r.store)).concat(next.prior):null,source_name:[...new Set([old.source_name,next.source_name])].join('、')});}
   function reviewedParse(workbook,XLSX,{sha256,source_name,source_bytes,stores}={}){
     const aq=workbookRows(workbook,XLSX,'AQ締結率'),rt=workbookRows(workbook,XLSX,'RT每日'),totals=workbookRows(workbook,XLSX,'RT締結率');
     const includePrior=!!workbook.Sheets['樞紐'];

@@ -7,10 +7,12 @@
     epoch++; controller?.abort(); controller = null;
     employeeId = ''; adminSecret = ''; publication = null; html = '';
     $('secret').value = ''; $('report').srcdoc = ''; $('coverage').textContent = '';
+    $('region').replaceChildren();
     $('workspace').hidden = true; $('auth').hidden = false;
   }
   function show() {
     html = ''; $('report').srcdoc = ''; $('export').disabled = true;
+    if (!publication) return;
     const selected = $('region').value;
     let data = publication.regions[selected];
     if (selected === 'all') {
@@ -32,6 +34,7 @@
     const timer = setTimeout(() => controller?.abort(), 45000);
     $('login').disabled = true; $('refresh').disabled = true;
     $('report').srcdoc = ''; $('export').disabled = true; html = ''; publication = null;
+    $('coverage').textContent = ''; $('region').replaceChildren();
     try {
       const response = await fetch(owner, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
         body:JSON.stringify({action:'readonly_conversion_department_read', employeeId, adminSecret}),

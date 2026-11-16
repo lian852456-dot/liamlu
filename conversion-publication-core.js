@@ -12,7 +12,7 @@
     const detail = value.renewalDetail;
     return Officer.validate({...value, stores, records:value.records.filter(row => ids.has(row.store)),
       prior:value.prior && value.prior.filter(row => ids.has(row.store)),
-      renewalDetail:detail && {...detail, tiers:detail.tiers.filter(row => ids.has(row.store)),
+      renewalDetail:detail && {...detail, cohorts:(detail.cohorts || []).filter(row => ids.has(row.store)), tiers:detail.tiers.filter(row => ids.has(row.store)),
         observation:detail.observation.filter(row => row.region === region), plans:detail.plans.filter(row => ids.has(row.store))}});
   }
   function normalize(value) {
