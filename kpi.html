@@ -35,14 +35,15 @@
   .site-header h1 { font-size:1.15rem; color:var(--accent-bright); }
   .site-header .sub { font-size:.72rem; color:var(--text-muted); }
 
-  .wrap { max-width: 1480px; margin: 0 auto; padding: 8px 16px; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 8px 16px; }
 
   .tabs { display:flex; gap:8px; margin:10px 0; }
   .tab-btn { flex:1; padding:10px; border:1px solid var(--border); background:#fff; border-radius:var(--radius); font-size:1rem; font-weight:700; color:var(--text-dim); cursor:pointer; }
   .tab-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
 
-  .selrow { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
-  .selrow select { flex:1; min-width:150px; padding:10px; font-size:1rem; border:1px solid var(--border); border-radius:10px; background:#fff; color:var(--text); }
+  .selrow { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:10px; }
+  .selrow select { width:100%; min-width:0; padding:8px; font-size:.95rem; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--text); }
+  @media(max-width:720px){ .selrow { grid-template-columns:1fr; } }
 
   .summary { background:#fff; border:1px solid var(--border-dim); border-radius:var(--radius); padding:14px 16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
   .summary .who { font-weight:700; font-size:1.02rem; margin-bottom:8px; }

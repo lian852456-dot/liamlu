@@ -32,7 +32,7 @@
   .site-header h1 { font-size:1.15rem; color:var(--accent-bright); }
   .site-header .sub { font-size:.72rem; color:var(--text-muted); margin-top:2px; }
 
-  .wrap { max-width: 1480px; margin: 0 auto; padding: 8px 16px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 8px 16px; }
 
   .intro { background:#ecfeff; border:1px solid rgba(8,145,178,.25); border-radius:var(--radius); padding:8px 10px; font-size:.78rem; color:var(--text-dim); line-height:1.35; margin-bottom:8px; }
 
@@ -40,7 +40,8 @@
   .tab-btn { flex:1; padding:10px; border:1px solid var(--border); background:#fff; border-radius:var(--radius); font-size:1rem; font-weight:700; color:var(--text-dim); cursor:pointer; }
   .tab-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
 
-  .fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:12px; }
+  .fields { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-bottom:10px; }
+  @media(max-width:720px){ .fields { grid-template-columns:1fr 1fr; } }
   .fields .fld { display:flex; flex-direction:column; gap:4px; }
   .fields .fld label { font-size:.72rem; color:var(--text-muted); }
   .fields .fld input { padding:9px; border:1px solid var(--border); border-radius:8px; font-size:1rem; }
