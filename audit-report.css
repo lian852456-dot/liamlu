@@ -6,13 +6,29 @@
 @media(max-width:760px){.page-shell{padding:25px 16px 90px}.hero{padding:24px 20px}.field-grid{grid-template-columns:1fr}.basic-card,.audit-item{grid-template-columns:34px minmax(0,1fr);padding:18px 14px}.photo-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.submit-panel{align-items:stretch;flex-direction:column}.primary-button{width:100%}.overview-grid{grid-template-columns:1fr}.review-toolbar{align-items:stretch;flex-direction:column}.review-toolbar label,.review-toolbar button{width:100%}.auth-card form{align-items:stretch;flex-direction:column}.item-title-row h3{max-width:66%}.review-actions{grid-template-columns:1fr}.photo-nav{width:42px}}
 @media(max-width:400px){.page-shell{padding-left:13px;padding-right:13px}.hero{padding-left:17px;padding-right:17px}.basic-card,.audit-item{grid-template-columns:28px minmax(0,1fr);padding-left:11px;padding-right:11px}.photo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.topbar{padding-left:12px;padding-right:12px}.mode-switch{max-width:150px}.item-title-row{display:block}.item-title-row h3{max-width:none}.item-status{display:inline-block;margin-bottom:12px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
-.page-shell{width:min(1480px,calc(100% - 32px));padding:12px 0 32px}
-.hero{padding:12px 14px;margin-bottom:10px}
-.hero h1{font-size:22px}
-.hero>p:not(.eyebrow){margin:6px 0 0;line-height:1.4}
-.quality-reminder-card{margin-bottom:10px;padding:10px}
-.quality-reminder-button img{max-height:96px;width:100%;object-fit:contain;object-position:left center}
-.section-heading{margin-bottom:8px}
+.page-shell{width:min(1120px,calc(100% - 32px));padding:12px 0 28px}
+.hero{display:block;padding:0 0 10px;margin:0;background:transparent;border:0;border-radius:0;box-shadow:none}
+.hero:after{display:none}
+.hero h1{font-size:22px;line-height:1.25}
+.hero>p:not(.eyebrow){margin:4px 0 0;max-width:62ch;font-size:13px;line-height:1.4}
+.batch-meta{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:12px}
+.section-heading{margin:0 0 8px}
 .section-heading h2{font-size:18px}
-.basic-card,.audit-item{padding:12px;margin-bottom:8px}
-@media(max-width:760px){.page-shell{padding:12px 12px 48px}.quality-reminder-button img{max-height:72px}}
+.basic-card,.audit-item{padding:12px 14px;margin-bottom:10px}
+.card-content h3{margin-bottom:10px;font-size:16px}
+input,select,textarea{min-height:40px;padding:8px 10px}
+@media(min-width:980px){
+  .hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 20px;align-items:end}
+  .hero .eyebrow,.hero h1,.hero>p:not(.eyebrow){grid-column:1}
+  .batch-meta{grid-column:2;grid-row:1 / span 3;align-self:center;margin:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);max-width:240px;text-align:left}
+  #storeView{display:grid;grid-template-columns:280px minmax(0,1fr);column-gap:16px;align-items:start}
+  #qualityReminderCard{grid-column:1;grid-row:1 / span 6;position:sticky;top:64px;margin:0;padding:12px}
+  #storeView>.section-heading,#globalMessage,#auditForm,#completionCard{grid-column:2}
+  .field-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .quality-reminder-button{max-width:none;margin:0}
+  .quality-reminder-button img{width:100%;height:auto;max-height:none}
+  .quality-reminder-card h2{font-size:16px;line-height:1.3}
+  .reminder-description{margin:6px 0 8px;font-size:13px;line-height:1.4}
+  .reminder-help{margin-top:6px;font-size:12px}
+}
+@media(max-width:979px){.page-shell{padding:12px 12px 40px}}
