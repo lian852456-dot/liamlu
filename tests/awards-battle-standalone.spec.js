@@ -3,6 +3,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const november = require('../award-model-catalog.js').november;
+const { chooseLegacyChannel, submitLegacyLogin, showAwardDetails } = require('./helpers/awards-legacy-ui.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 let server;
@@ -54,6 +55,8 @@ function awardItems(seed = 0) {
 function awardsFixture() {
   return {
     report_date: '2026-08-15',
+    report_run_date: '2026-08-16',
+    data_as_of_date: '2026-08-15',
     phone_items: 13,
     store_rows: 10,
     supervisor: { actual_total: 9234, projected: 12888, rank: 21, award: 'Y' },
@@ -87,6 +90,7 @@ const KPICALC = {
 
 const KPI_SNAPSHOT = {
   report_date: '2026-08-15',
+  report_run_date: '2026-08-16',
   data_as_of_date: '2026-08-15',
   source_as_of_date: '2026-08-15',
   source_file: '0816.xlsx',
@@ -125,13 +129,16 @@ async function openAwards(page, pageName) {
   await page.goto(`${baseUrl}/${pageName}`);
   if (pageName === 'index.html') await page.getByRole('button', { name: /台獎戰情/ }).click();
   await expect(page.locator('#awardsBattleContent')).toContainText('台獎戰情受保護');
+  await chooseLegacyChannel(page);
 }
 
 async function loginAwards(page) {
-  const content = page.locator('#awardsBattleContent');
-  await content.locator('input[placeholder="輸入員工編號"]').fill('1234567');
-  await content.getByRole('button', { name: '以員編登入' }).click();
-  await expect(page.locator('#awardsBattleSourceNote')).toContainText('台獎戰報日期 2026-08-15');
+  await submitLegacyLogin(page);
+  await expect(page.locator('#awardsBattleSourceNote')).toContainText('發布日期 2026-08-16｜資料截至 2026-08-15');
+  if (new URL(page.url()).pathname.endsWith('/index.html')) {
+    await page.getByRole('button', { name: /台獎戰情/ }).click();
+  }
+  await showAwardDetails(page);
 }
 
 function normalize(value) {
@@ -248,8 +255,7 @@ test('未授權與 KPI 讀取失敗均 fail-closed，不使用 localStorage 舊�
   await page.addInitScript(() => localStorage.setItem('phone-awards-battle-latest', JSON.stringify({ actual_total: 999999 })));
   await openAwards(page, 'awards-battle.html');
   const content = page.locator('#awardsBattleContent');
-  await content.locator('input[placeholder="輸入員工編號"]').fill('1234567');
-  await content.getByRole('button', { name: '以員編登入' }).click();
+  await submitLegacyLogin(page);
   await expect(content.locator('.private-lock-status')).toContainText('裝置尚未核准');
   await expect(content).not.toContainText('$999,999');
   expect(actions.filter(action => action === 'private_access')).toHaveLength(1);
@@ -259,9 +265,8 @@ test('未授權與 KPI 讀取失敗均 fail-closed，不使用 localStorage 舊�
   await mockFormal(second, { kpiError: 'KPI 正式資料無法讀取' });
   await openAwards(second, 'awards-battle.html');
   const secondContent = second.locator('#awardsBattleContent');
-  await secondContent.locator('input[placeholder="輸入員工編號"]').fill('1234567');
-  await secondContent.getByRole('button', { name: '以員編登入' }).click();
-  await expect(secondContent).toContainText('台獎尚未同步');
+  await submitLegacyLogin(second);
+  await expect(secondContent).toContainText('台獎尚未有資料');
   await expect(secondContent).toContainText('KPI 正式資料尚未讀回');
   await second.close();
 });
@@ -284,6 +289,8 @@ test('原 index 與 standalone 9 店逐店 exact match', async ({ browser }) => 
   for (const store of ['北一二B整體', ...STORES]) {
     await original.selectOption('#awardsStoreSelect', store);
     await standalone.selectOption('#awardsStoreSelect', store);
+    await showAwardDetails(original);
+    await showAwardDetails(standalone);
     expect(normalize(await original.locator('#awardsBattleContent > .card').textContent())).toBe(
       normalize(await standalone.locator('#awardsBattleContent > .card').textContent())
     );
@@ -297,13 +304,12 @@ test('原 index 與 standalone 9 店逐店 exact match', async ({ browser }) => 
 });
 
 test('日期不一致或缺店時不渲染任何正式台獎數值', async ({ page }) => {
-  const wrongDate = { ...awardsFixture(), report_date: '2026-08-14' };
+  const wrongDate = { ...awardsFixture(), report_run_date: '2026-08-14', data_as_of_date: '2026-08-14' };
   await mockFormal(page, { awards: wrongDate });
   await openAwards(page, 'awards-battle.html');
   const content = page.locator('#awardsBattleContent');
-  await content.locator('input[placeholder="輸入員工編號"]').fill('1234567');
-  await content.getByRole('button', { name: '以員編登入' }).click();
-  await expect(content).toContainText('台獎尚未同步');
+  await submitLegacyLogin(page);
+  await expect(content).toContainText('台獎尚未有資料');
   await expect(content).toContainText('2026-08-14');
   await expect(content).not.toContainText('$9,234');
 
@@ -313,8 +319,7 @@ test('日期不一致或缺店時不渲染任何正式台獎數值', async ({ pa
   await mockFormal(second, { awards: incomplete });
   await openAwards(second, 'awards-battle.html');
   const secondContent = second.locator('#awardsBattleContent');
-  await secondContent.locator('input[placeholder="輸入員工編號"]').fill('1234567');
-  await secondContent.getByRole('button', { name: '以員編登入' }).click();
+  await submitLegacyLogin(second);
   await expect(secondContent).toContainText('正式台獎資料不完整');
   await expect(secondContent).not.toContainText('$9,234');
   await second.close();

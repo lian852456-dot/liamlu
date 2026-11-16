@@ -3,6 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const { fixture } = require('./helpers/awards-gap-id-fixture.cjs');
+const { november } = require('../award-model-catalog.js');
+const { chooseLegacyChannel, submitLegacyLogin, showAwardDetails } = require('./helpers/awards-legacy-ui.cjs');
 
 let server, base;
 test.beforeAll(async () => {
@@ -20,6 +22,19 @@ test.afterAll(async () => { await new Promise(resolve => server.close(resolve));
 
 async function open(page, pageName, conflict = false) {
   const value = fixture(), actions = [];
+  const awards = value.snapshot.awardsBattle;
+  const source = { source_data_date: awards.data_as_of_date, run_id: awards.processing_run_id, sha256: 'a'.repeat(64) };
+  Object.assign(awards, {
+    config_version: november.configVersion, config_hash: 'b'.repeat(64),
+    source_files: { store: source, person: { ...source } },
+  });
+  const rewards = Object.fromEntries(november.rewardRules.map(rule => [rule.role, rule.amounts]));
+  for (const unit of [awards.overall, ...awards.stores]) for (const item of unit.items) {
+    Object.assign(item, {
+      store_reward_50: rewards.manager[item.name][0], store_reward_100: rewards.manager[item.name][2],
+      district_reward_80: rewards.supervisor[item.name][0], district_reward_100: rewards.supervisor[item.name][2],
+    });
+  }
   if (conflict) value.snapshot.awardsBattle.overall.items[2].modelId = 'vivo-v80';
   await page.setViewportSize({ width: 390, height: 844 });
   await page.clock.setFixedTime(new Date('2026-11-05T09:00:00Z'));
@@ -37,12 +52,8 @@ async function open(page, pageName, conflict = false) {
   });
   await page.goto(`${base}/${pageName}`);
   if (pageName === 'index.html') await page.getByRole('button', { name: /台獎戰情/ }).click();
-  const legacy = page.getByRole('button', { name: '原員編通道', exact: true });
-  if (await legacy.isVisible()) await legacy.click();
-  // The original index channel normally returns to the KPI login panel.
-  const login = page.locator(pageName === 'index.html' ? '#kpiBattleContent' : '#awardsBattleContent');
-  await login.locator('input[placeholder="輸入員工編號"]').fill('1234567');
-  await login.getByRole('button', { name: '以員編登入' }).click();
+  await chooseLegacyChannel(page);
+  await submitLegacyLogin(page);
   if (pageName === 'index.html') {
     await expect(page.locator('#kpiBattleContent .private-lock')).toHaveCount(0);
     await page.getByRole('button', { name: /台獎戰情/ }).click();
@@ -61,6 +72,7 @@ for (const pageName of ['index.html', 'awards-battle.html', 'kpi-battle.html#awa
     await expect(page.locator('#awardsStoreSelect option')).toHaveCount(10);
     for (const [index, unit] of [value.snapshot.awardsBattle.overall, ...value.snapshot.awardsBattle.stores].entries()) {
       await page.locator('#awardsStoreSelect').selectOption(unit.store);
+      await showAwardDetails(page);
       await expect(page.locator('.award-model')).toHaveCount(10);
       for (const [itemIndex, item] of unit.items.entries()) {
         const difference = item.actual - item.threshold_target;
@@ -71,6 +83,7 @@ for (const pageName of ['index.html', 'awards-battle.html', 'kpi-battle.html#awa
       await expect(content).not.toContainText('資料待核');
     }
     await page.locator('#awardsStoreSelect').selectOption('北一二B整體');
+    await showAwardDetails(page);
     await page.locator('.award-model').first().scrollIntoViewIfNeeded();
     await page.screenshot({ path: test.info().outputPath('current-gap-id-mobile.png'), fullPage: false });
     await page.locator('.award-model-grid').screenshot({ path: test.info().outputPath('current-gap-id-models.png') });
