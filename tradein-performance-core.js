@@ -23,6 +23,12 @@ var TradeinPerformanceCore = (function () {
     if(!model || model.length>80 || !/^[A-Za-z0-9 .+()\/\-]+$/.test(model))throw new Error('回收機款簡稱無法辨識');
     return model;
   }
+  function transactionDetails(record) {
+    const code=record.project_code, amount=record.tradein_credit;
+    if(code!==null && (typeof code!=='string' || !/^[A-Z0-9][A-Z0-9-]{0,19}$/i.test(code)))throw new Error('SAR74 專案代碼格式無效');
+    if(amount!==null && (!Number.isSafeInteger(amount) || amount<0 || amount>10000000))throw new Error('SAR74 舊機折抵金額格式無效');
+    return {project_code:code,tradein_credit:amount};
+  }
   function date(value) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '') || isNaN(Date.parse(value+'T00:00:00Z')) ||
         new Date(value+'T00:00:00Z').toISOString().slice(0,10)!==value) throw new Error('日期無效');
@@ -120,6 +126,7 @@ var TradeinPerformanceCore = (function () {
       manager_actual_units:0,acting_manager_actual_units:0,staff_gap_units:0,pending_staff_count:0,coverage:'complete'}));
     const byStore=Object.fromEntries(stores.map(s=>[s.store,s]));
     const unique={};let duplicates=0,cancelled=0;
+    const transactions=input.has_transaction_details===true?[]:null;
     input.records.forEach(r=>{
       const store=reference.stores.get(r.store_code);
       if (!store) throw new Error('來源含九店範圍以外或未知店碼');
@@ -132,6 +139,7 @@ var TradeinPerformanceCore = (function () {
       const key=r.recycle_code.trim(), order=r.order_number.trim();
       if (!key || !order || key.length>100 || order.length>100) throw new Error('缺少有效回收碼／銷貨單號');
       const model=shortModel(r.recycle_model);
+      const detail=transactions?transactionDetails(r):null;
       let support=null;
       const person=byId[identity.employee_key];
       if(matchById&&!person)throw new Error('來源員編無在職名冊對應');
@@ -143,11 +151,12 @@ var TradeinPerformanceCore = (function () {
           support={...approval};
         if(!support&&(!matchById||approval))throw new Error('跨店交易未符合已核支援範圍');
       }
-      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project,model:model,support:support,crossStore:crossStore};
+      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project,model:model,support:support,crossStore:crossStore,detail};
       if (unique[key]) {
         const prior=unique[key];
         if (prior.store!==store || prior.trade_date!==trade || prior.employee_key!==normalized.employee_key || prior.order!==order || prior.project!==r.project) throw new Error('同回收碼的交易、人員或店點衝突');
         if(prior.model!==model)throw new Error('同回收碼的機款衝突');
+        if(detail&&(prior.detail.project_code!==detail.project_code||prior.detail.tradein_credit!==detail.tradein_credit))throw new Error('同回收碼的專案代碼或舊機折抵金額衝突');
         if (cancel && (!prior.cancel_date || cancel>prior.cancel_date)) prior.cancel_date=cancel;
         duplicates++;
       } else unique[key]=normalized;
@@ -168,7 +177,10 @@ var TradeinPerformanceCore = (function () {
         if(!day){day={date:r.trade_date,actual_units:0};store.recovered_days.push(day);}day.actual_units++;
         if(r.crossStore&&(matchById||r.support)){store.support_in_units++;byStore[person.store].support_out_units++;}
       }
-      if (!person || person.identity_status==='conflict') {store.pending_identity_units++;store.coverage='partial_identity';return;}
+      const assigned=person&&person.identity_status!=='conflict';
+      if(transactions)transactions.push({store:r.store,date:r.trade_date,employee_key:assigned?r.employee_key:null,
+        project:r.project,model:r.model,...r.detail});
+      if (!assigned) {store.pending_identity_units++;store.coverage='partial_identity';return;}
       person.actual_units++;
       let daily=person.recovered_days.find(d=>d.date===r.trade_date);
       if(!daily){daily={date:r.trade_date,actual_units:0,recovered_models:[]};person.recovered_days.push(daily);}
@@ -203,7 +215,7 @@ var TradeinPerformanceCore = (function () {
     return {schema_version:'tradein-performance/v1',period_key:input.month,rule_id:RULE_ID,target_period:period,
       source_period:{start:start,end:end},source_cutoff_date:end,cutoff_precision:'date',timezone:'Asia/Taipei',
       source_sha256:input.source_sha256,status_as_of_date:statusAsOf,printed_at:String(input.printed_at || ''),people:people,stores:stores,summary:summary,
-      ...(supportEvidence.length?{support_evidence:supportEvidence}:{})};
+      ...(supportEvidence.length?{support_evidence:supportEvidence}:{}),...(transactions?{transactions}:{})};
   }
   function csv(text) {
     const rows=[];let row=[],cell='',quoted=false;
@@ -234,6 +246,8 @@ var TradeinPerformanceCore = (function () {
     if((!legacy30&&!sar29) || new Set(nonemptyNames).size!==nonemptyNames.length || labels.some(n=>!names.includes(n)))throw new Error('無法辨識 SAR74 欄位');
     const columns=Object.fromEntries(labels.map(n=>[n,names.indexOf(n)]));
     if(names.includes('回收舊機品名'))columns['回收舊機品名']=names.indexOf('回收舊機品名');
+    const details=['專案代碼','舊機折抵金額','回收舊機品名'].every(n=>names.includes(n));
+    if(details)for(const name of ['專案代碼','舊機折抵金額'])columns[name]=names.indexOf(name);
     const header=rows.slice(0,h).flat().join(' '),ranges=Array.from(header.matchAll(/(\d{3}\/\d{2}\/\d{2})\s*-\s*(\d{3}\/\d{2}\/\d{2})/g));
     if(ranges.length!==1)throw new Error('SAR74 查詢期間缺漏或不唯一');
     const start=roc(ranges[0][1]),end=roc(ranges[0][2]),period=monthPeriod(start.slice(0,7));
@@ -270,10 +284,15 @@ var TradeinPerformanceCore = (function () {
       const record={store_code:store,trade_date:trade,project:project,source_employee_id:seller,
         recycle_code:recycle,order_number:order,cancel_date:cancel};
       if(names.includes('回收舊機品名'))record.recycle_model=field(r,'回收舊機品名');
+      if(details){
+        const rawCredit=field(r,'舊機折抵金額');
+        const credit=rawCredit===''?null:/^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(rawCredit)?Number(rawCredit.replace(/,/g,'')):NaN;
+        Object.assign(record,transactionDetails({project_code:field(r,'專案代碼')||null,tradein_credit:credit}));
+      }
       records.push(record);
     });
     return {month:start.slice(0,7),source_start:start,source_end:end,status_as_of_date:statusAsOf,rule_id:RULE_ID,complete_nine_stores:false,header_column_count:names.length,
-      printed_at:printed?printed[0]:'',records:records};
+      printed_at:printed?printed[0]:'',records:records,...(details?{has_transaction_details:true}:{})};
   }
   return Object.freeze({STORES:STORES,RULE_ID:RULE_ID,monthPeriod:monthPeriod,storeName:storeName,sourceEmployeeId:sourceEmployeeId,build:build,parseSar74:parseSar74,shortModel:shortModel});
 })();
