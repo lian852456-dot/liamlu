@@ -5,6 +5,8 @@
   const MAX_FILE_BYTES = 20 * 1024 * 1024;
   const SUPPORTED_EXTENSIONS = new Set(['xlsx', 'xls', 'csv', 'tsv']);
   const state = { sales:null, stock:null, report:null };
+  const MODEL_PREVIEW = 12;
+  let modelExpanded = false;
   const $ = id => document.getElementById(id);
   const taipeiToday = () => {
     const parts = new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit' })
@@ -117,10 +119,20 @@
     const minSales = state.report.salesAvailable ? minimumValue('minSales') : null;
     const minStock = minimumValue('minStock');
     const filtered = (rows || []).filter(row => (!query || row.model.toLocaleLowerCase('zh-Hant').includes(query)) && (minSales == null || row.sales >= minSales) && (minStock == null || row.stock >= minStock));
+    const ranked = [...filtered].sort((a, b) => (Number(b.sales) || 0) - (Number(a.sales) || 0) || (Number(a.stock) || 0) - (Number(b.stock) || 0) || String(a.model).localeCompare(String(b.model), 'zh-Hant') || String(a.store || '').localeCompare(String(b.store || ''), 'zh-Hant'));
+    const collapsed = !modelExpanded && ranked.length > MODEL_PREVIEW;
+    const shown = collapsed ? ranked.slice(0, MODEL_PREVIEW) : ranked;
     $('modelTableHead').innerHTML = `${scoped.showStore ? '<th>店點</th>' : ''}<th>機型</th>${salesHeaderCells(state.report)}<th>目前庫存</th><th>去化率</th>`;
-    $('modelFilterSummary').textContent = `顯示 ${filtered.length} / ${(rows || []).length} ${scoped.rowLabel}`;
+    $('modelFilterSummary').textContent = collapsed
+      ? `先顯示銷售較高、其次庫存較少的 ${shown.length} / ${ranked.length} ${scoped.rowLabel}`
+      : `顯示 ${ranked.length} / ${(rows || []).length} ${scoped.rowLabel}`;
+    const toggle = $('toggleModelRows');
+    toggle.hidden = ranked.length <= MODEL_PREVIEW;
+    toggle.textContent = modelExpanded ? '收合為重點 12 列' : `展開全部 ${ranked.length} 列`;
+    toggle.setAttribute('aria-expanded', modelExpanded ? 'true' : 'false');
+    $('modelRows').closest('.table-wrap').classList.toggle('show-all', modelExpanded);
     const columnCount = state.report.salesDates.length + 4 + (scoped.showStore ? 1 : 0);
-    $('modelRows').innerHTML = filtered.length ? filtered.map(row => `<tr>${scoped.showStore ? `<td><strong>${escapeHtml(row.store)}</strong></td>` : ''}<td><strong>${escapeHtml(row.model)}</strong></td>${salesValueCells(row, state.report)}<td>${displayCount(row.stock)}</td><td>${state.report.salesAvailable ? rateCell(row.rate) : '未提供'}</td></tr>`).join('') : `<tr><td class="empty-row" colspan="${columnCount}">沒有符合篩選條件的機型。</td></tr>`;
+    $('modelRows').innerHTML = shown.length ? shown.map(row => `<tr>${scoped.showStore ? `<td><strong>${escapeHtml(row.store)}</strong></td>` : ''}<td><strong>${escapeHtml(row.model)}</strong></td>${salesValueCells(row, state.report)}<td>${displayCount(row.stock)}</td><td>${state.report.salesAvailable ? rateCell(row.rate) : '未提供'}</td></tr>`).join('') : `<tr><td class="empty-row" colspan="${columnCount}">沒有符合篩選條件的機型。</td></tr>`;
   }
   function renderReport() {
     const report = state.report;
@@ -141,7 +153,12 @@
     $('storeRows').innerHTML = report.storeSummary.map(row => `<tr><td><strong>${escapeHtml(row.store)}</strong></td>${salesValueCells(row, report)}<td>${displayCount(row.stock)}</td><td>${report.salesAvailable ? rateCell(row.rate) : '未提供'}</td></tr>`).join('')
       + `<tr class="region-total"><td><strong>N12B 加總</strong></td>${salesValueCells(regionRow, report)}<td>${displayCount(regionRow.stock)}</td><td>${report.salesAvailable ? rateCell(regionRow.rate) : '未提供'}</td></tr>`;
     $('storeFilter').innerHTML = '<option value="">— 各店庫存明細 —</option><option value="all">北一二B 整體</option>' + Core.STORE_NAMES.map(store => `<option value="${escapeHtml(store)}">${escapeHtml(store)}</option>`).join('');
+    modelExpanded = false;
     renderModelRows();
+    document.body.classList.add('has-results');
+    document.body.classList.remove('upload-open');
+    $('toggleUpload').hidden = false;
+    $('toggleUpload').textContent = '展開上傳區';
     $('results').hidden = false;
     $('results').scrollIntoView({ behavior:'smooth', block:'start' });
   }
@@ -188,6 +205,12 @@
   ['modelQuery', 'minSales', 'minStock'].forEach(id => $(id).addEventListener('input', renderModelRows));
   $('clearModelFilters').addEventListener('click', () => {
     $('storeFilter').value = ''; $('modelQuery').value = ''; $('minSales').value = ''; $('minStock').value = ''; renderModelRows();
+  });
+  $('toggleModelRows').addEventListener('click', () => { modelExpanded = !modelExpanded; renderModelRows(); });
+  $('toggleUpload').addEventListener('click', () => {
+    const open = document.body.classList.toggle('upload-open');
+    $('toggleUpload').textContent = open ? '收合上傳區' : '展開上傳區';
+    $('toggleUpload').setAttribute('aria-expanded', open ? 'true' : 'false');
   });
   $('asOfDate').addEventListener('change', () => {
     state.stock = null; state.report = null; $('results').hidden = true;
