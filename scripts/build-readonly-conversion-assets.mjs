@@ -5,3 +5,7 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const source=fs.readFileSync(path.join(root,'readonly-dashboard-core.js'));
 fs.writeFileSync(path.join(root,'gas/ReadonlyDashboardCore.gs'),source);
 console.log('Updated the GAS asset from the single reviewed conversion core.');
+
+for (const [source, target] of [["readonly-renewal-detail.js","ReadonlyRenewalDetail.gs"],["north12-officer-core.js","North12OfficerCore.gs"],["conversion-publication-core.js","ConversionPublicationCore.gs"]]) {
+  fs.copyFileSync(path.join(root, source), path.join(root,"gas",target));
+}

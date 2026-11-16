@@ -65,22 +65,24 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
     try {
       const bytes = await file.arrayBuffer();
       const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2,'0')).join('');
-      const workbook = XLSX.read(bytes, {type:'array', bookVBA:false, sheets:['AQ締結率','RT每日','RT締結率','樞紐']});
-      const snapshot = window.ReadonlyConversionSource.parseWorkbook(workbook, XLSX, {sha256, source_name:file.name, source_bytes:file.size});
+      const workbook = XLSX.read(bytes, {type:'array', bookVBA:false});
+      const department = window.North12OfficerCore.parseWorkbook(workbook, XLSX, {sha256, source_name:file.name, source_bytes:file.size});
+      const snapshot = window.ConversionPublicationCore.fromOfficer(department);
       if (ticket !== generation) return;
       const result = await call('readonly_conversion_preview', payload({snapshot}));
       if (ticket !== generation) return;
-      if (result.status !== 'ok' || !result.token || !result.preview?.totals) throw Error('來源預覽回應不完整');
+      if (result.status !== 'ok' || !result.token || !result.preview?.totals || !Array.isArray(result.preview?.coverage)) throw Error('來源預覽回應不完整');
       preview = result; renderLive(result.live);
       const p = result.preview;
       const percent = value => value == null ? '—（分母 0）' : (value * 100).toFixed(2) + '%';
       $('conversionPreviewText').textContent = p.sourceName + ' · ' + p.periodStart + ' 至 ' + p.cutoff +
         ' · ' + p.storeDateKeys + ' 店日 · 北一二B AQ ' + percent(p.totals.aq_rate) + '／RT ' + percent(p.totals.rt_rate) +
         ' · 新增 ' + p.added + '／更正 ' + p.changed + '／移除 ' + p.removed +
-        (snapshot.prior ? '' : ' · 來源未提供同期核對依據') +
+        (department.prior ? '' : ' · 來源未提供同期核對依據') +
+        ' · 區域版本：' + p.coverage.map(row => row.region + ' ' + (row.available ? row.cutoff + (row.updated ? ' 本次更新' : ' 保留前次') : '來源未提供')).join('／') +
         ' · 原始檔 SHA-256 ' + p.sourceHash + (p.sameSource ? ' · 同一原始檔，不累加' : '');
       $('conversionPreview').classList.remove('hidden');
-      message('conversionMessage', '預覽通過；尚未發布。只送出已核實的九店逐日彙總。', 'ok');
+      message('conversionMessage', '預覽通過；尚未發布。將同步更新來源涵蓋的部區與 B 區看板，其他區保留有效版本。', 'ok');
     } catch (error) { if (ticket === generation) { preview = null; message('conversionMessage', error.message, 'bad'); } }
     finally { busy = false; controls(); }
   });
@@ -97,7 +99,7 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
       if (verified.activeHash !== expected || verified.revision !== result.live.revision) throw Error('發布後版本已改變，請重新核對');
       invalidate(); message('conversionMessage', result.status === 'already_current'
         ? '正式資料已是這個版本；未重複寫入或累加。'
-        : '已完成私有版本讀回。返回 KPI 戰情可核對同一版本與截止。', 'ok');
+        : '已完成私有版本讀回。部區與 B 區畫面可讀取同一批次，請核對各區截止。', 'ok');
     } catch (error) { invalidate(); message('conversionMessage', error.message, 'bad'); }
     finally { busy = false; controls(); }
   });

@@ -23,7 +23,7 @@ function runtime({post=false}={}){
     DriveApp:{Access:{PRIVATE:'PRIVATE'},Permission:{NONE:'NONE'},getFileById(id){events.push('getFile');if(!files.has(id))throw Error('missing');return files.get(id);}},
     Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'UTF8'},computeDigest:(_,text)=>[...crypto.createHash('sha256').update(text,'utf8').digest()],
       getUuid:()=>crypto.randomUUID(),newBlob:(text,type,name)=>({text,type,name})}});
-  for(const relative of ['gas/ReadonlyDashboardCore.gs','gas/ReadonlyConversion.gs'])vm.runInContext(fs.readFileSync(path.join(root,relative),'utf8'),context,{filename:relative});
+  for(const relative of ['gas/ReadonlyDashboardCore.gs','gas/ReadonlyRenewalDetail.gs','gas/North12OfficerCore.gs','gas/ConversionPublicationCore.gs','gas/ReadonlyConversion.gs'])vm.runInContext(fs.readFileSync(path.join(root,relative),'utf8'),context,{filename:relative});
   const auth={employeeId:'SYN001',adminSecret:'synthetic-admin-proof'};
   if(post){
     const rankAutomation='gas/PersonalRankAutomation.gs';
