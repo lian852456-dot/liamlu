@@ -245,7 +245,11 @@ for (const viewport of [{width:1280,height:1300},{width:390,height:844},{width:3
     await expect(page.locator('a.card[href="north12b-gold-ops.html"]')).toHaveCount(0);
     await noOverflow(page);
     await fs.mkdir(SCREENSHOTS,{recursive:true});await page.locator('#zone-supervisor').screenshot({path:path.join(SCREENSHOTS,`GOLD-ENTRY-${viewport.width}.png`)});
-    await management.locator('a.card[href="department-ops.html"]').focus();await page.keyboard.press('Tab');await expect(intel).toBeFocused();
+    await management.locator('a.card[href="department-ops.html"]').focus();
+    await page.keyboard.press('Tab');
+    await expect(management.getByRole('link', {name:/主管唯讀看板/})).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(intel).toBeFocused();
     await intel.press('Enter');await expect(page).toHaveURL(/patrol\.html$/);
     expect(calls.filter(call=>call.method==='POST')).toEqual([]);expect(errors).toEqual([]);
   });
