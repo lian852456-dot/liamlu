@@ -27,7 +27,7 @@ async function preview(page,options={}){
 test('real XLSX parser → actual doPost/original admin guard → private readback → dashboard → rollback',async({page},info)=>{
   const s=await setup(page);await preview(page);await expect(page.locator('#conversionPreview')).toBeVisible();await expect(page.locator('#conversionPreviewText')).toContainText('27 店日');expect(s.b.files.size).toBe(0);
   await page.locator('#conversionConfirm').check();await page.locator('#conversionPublishBtn').click();await expect(page.locator('#conversionMessage')).toContainText('已完成私有版本讀回');expect(s.b.files.size).toBe(1);
-  const sent=s.calls.find(c=>c.name==='readonly_conversion_preview').payload;expect(sent.snapshot.records).toHaveLength(27);expect(sent).not.toHaveProperty('fileBase64');expect(sent).not.toHaveProperty('fileBytes');expect(sent.snapshot.cutoff).toBe('2026-10-03');
+  const sent=s.calls.find(c=>c.name==='readonly_conversion_preview').payload;expect(sent.snapshot.regions['北一二B'].records).toHaveLength(27);expect(sent).not.toHaveProperty('fileBase64');expect(sent).not.toHaveProperty('fileBytes');expect(sent.snapshot.cutoff).toBe('2026-10-03');
   await page.screenshot({path:info.outputPath('conversion-published.png'),fullPage:true});
   const consumer=await page.context().newPage(),bundle=businessFixture(),expiresAt=Date.now()+1800000;
   bundle.privateResult.snapshot=s.b.context.readonlyConversionAttach_(bundle.privateResult.snapshot);
@@ -52,8 +52,8 @@ test('November XLSM with a blank zero-visitor RT rate publishes and reads back t
   expect(sent.source_name).toBe(name);
   expect(sent.source_bytes).toBe(buffer.length);
   expect(sent.sha256).toBe(createHash('sha256').update(buffer).digest('hex'));
-  expect(sent.records).toHaveLength(27);expect(sent.records.every(r=>r.date<='2026-11-03')).toBe(true);
-  const firstStore=sent.records.filter(r=>r.store==='DNB10062');expect(firstStore).toHaveLength(3);expect(firstStore.every(r=>r.rt_n===0&&r.rt_d===0)).toBe(true);
+  expect(sent.regions['北一二B'].records).toHaveLength(27);expect(sent.regions['北一二B'].records.every(r=>r.date<='2026-11-03')).toBe(true);
+  const firstStore=sent.regions['北一二B'].records.filter(r=>r.store==='DNB10062');expect(firstStore).toHaveLength(3);expect(firstStore.every(r=>r.rt_n===0&&r.rt_d===0)).toBe(true);
   await page.locator('#conversionConfirm').check();await page.locator('#conversionPublishBtn').click();await expect(page.locator('#conversionLive')).toContainText('正式截止 2026-11-03');
   await expect(page.locator('#conversionLive')).toContainText(name);
   await expect(page.locator('#conversionMessage')).toContainText('已完成私有版本讀回');expect(s.errors).toEqual([]);

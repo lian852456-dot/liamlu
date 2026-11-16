@@ -46,11 +46,14 @@ function validate(value,stores,start,cutoff){
  const plans=list('plans',200000,r=>{if(!ids.has(r.store)||typeof r.plan!=='string'||!r.plan.trim()||r.plan.length>500)fail('未續約方案分組不符');once('p|'+r.store+'|'+r.plan);return {store:r.store,plan:r.plan,unrenewed:count(r.unrenewed)};});
  const coverage={tiers:value.coverage?.tiers===true,observation:value.coverage?.observation===true,plans:value.coverage?.plans===true};
  if(coverage.tiers&&!tiers.length||!coverage.tiers&&tiers.length||coverage.observation&&!observation.length||!coverage.observation&&observation.length||!coverage.plans&&plans.length)fail('續約分析來源完整性不符');
+ const cross=value.coverage?.cross===true?validateCross(value.cross,stores,start,cutoff):[];
+ if(value.coverage?.cross!==true&&value.cross?.length)fail('同源交叉來源完整性不符');
+ if(value.coverage?.cross!==undefined)coverage.cross=value.coverage.cross===true;
  const issues={};
- for(const key of ['tiers','observation','plans']){
+ for(const key of ['tiers','observation','plans','cross']){
   if(value.issues?.[key]&&!coverage[key])issues[key]=String(value.issues[key]).slice(0,400);
  }
- return {schema:'north12-renewal-detail/v1',period_start:start,cutoff,tiers,observation,plans,coverage,...(Object.keys(issues).length?{issues}:{})};
+ return {schema:'north12-renewal-detail/v1',period_start:start,cutoff,tiers,observation,plans,coverage,...(coverage.cross?{cross}:{}),...(Object.keys(issues).length?{issues}:{})};
 }
 function parse(w,X,data){
  const stores=data.stores,byId=new Map(stores.map(s=>[s.id,s])),regions=new Set(stores.map(s=>s.region)),tiers=[],observation=[],plans=new Map();
@@ -81,6 +84,69 @@ function parse(w,X,data){
  }
  return validate({schema:'north12-renewal-detail/v1',period_start:data.period_start,cutoff:data.cutoff,tiers:uniqueRows(tiers,r=>r.store+'|'+r.tier,SHEETS[1]),observation:uniqueRows(observation,r=>r.region+'|'+r.origin+'|'+r.tier,SHEETS[0]),plans:[...plans.values()],coverage:{tiers:!!b,observation:!!o,plans:!!p}},stores,data.period_start,data.cutoff);
 }
+// Cross only fields that coexist on the same eligible visit. Independent
+// Tier and plan totals never produce a joint distribution.
+function parseCross(workbook,XLSX,data,detail){
+ const p=rows(workbook,XLSX,SHEETS[2]);if(!p)fail('原報未提供未續約明細，無法交叉 Tier 與原資費／專案');
+ const h=(p[0]||[]).map(norm),column=(...names)=>{
+  const found=h.flatMap((label,index)=>names.includes(label)?[index]:[]);
+  if(found.length!==1)fail('同源交叉缺少或重複 '+names[0]);return found[0];
+ };
+ const si=column('進店店點代碼'),ri=column('進店課別'),di=column('進店日期'),
+  pi=column('方案描述(含換約案)','方案描述'),ti=column('Tier'),
+  fi=column('方案時專案V+D資費(含換約案)'),yi=column('續約Y/N'),
+  ei=column('@是否符合續約資格_進店(含提前續約)_E-15'),ui=column('SubscrId(2T)');
+ const stores=new Map(data.stores.map(store=>[store.id,store])),seen=new Map(),groups=new Map();
+ for(const row of p.slice(1)){
+  const store=stores.get(row[si]);if(!store)continue;
+  if(row[ri]!==store.region)fail('同源交叉店碼與區域不符');
+  if(norm(row[ei])!=='1.符合續約資格')continue;
+  const serial=row[di];if(!Number.isSafeInteger(serial)||serial<40000||serial>90000)fail('同源交叉進店日期不符');
+  const date=new Date(Date.UTC(1899,11,30)+serial*86400000).toISOString().slice(0,10);
+  if(date<data.period_start||date>data.cutoff)fail('同源交叉日期超出來源期間');
+  const tier=norm(row[ti]),plan=String(row[pi]??'').trim(),tariff=String(row[fi]??'').trim(),renewed=norm(row[yi]);
+  if(!TIERS.includes(tier)||!plan||plan.length>500||!tariff||tariff.length>100||!['Y','N'].includes(renewed))fail('同源交叉 Tier／專案／資費／續約標記不完整');
+  if(row[ui]==null||!String(row[ui]).trim())fail('同源交叉缺少去重識別');
+  const key=JSON.stringify([store.id,date,String(row[ui])]),signature=JSON.stringify([tier,plan,tariff,renewed]);
+  if(seen.has(key)){if(seen.get(key)!==signature)fail('同源交叉同店日用戶重複且衝突');continue;}seen.set(key,signature);
+  const groupKey=JSON.stringify([store.id,date,tier,plan,tariff]);
+  if(!groups.has(groupKey))groups.set(groupKey,{store:store.id,date,tier,plan,tariff,visitors:0,renewals:0,unrenewed:0});
+  const group=groups.get(groupKey);group.visitors++;if(renewed==='Y')group.renewals++;else group.unrenewed++;
+ }
+ const cross=[...groups.values()];
+ // Reject N-only extracts and incomplete visit populations before rates exist.
+ const totals=new Map();for(const row of cross){const key=row.store+'|'+row.date;if(!totals.has(key))totals.set(key,{visitors:0,renewals:0});const total=totals.get(key);total.visitors+=row.visitors;total.renewals+=row.renewals;}
+ for(const row of data.records){const total=totals.get(row.store+'|'+row.date)||{visitors:0,renewals:0};if(total.visitors!==row.rt_d||total.renewals!==row.rt_n)fail('同源交叉未與 RT 每日同店日分子／分母核平；不推估締結率');}
+ if(detail.coverage.tiers)for(const row of detail.tiers){const match=cross.filter(item=>item.store===row.store&&item.tier===row.tier);if(match.reduce((sum,item)=>sum+item.visitors,0)!==row.visitors||match.reduce((sum,item)=>sum+item.renewals,0)!==row.renewals)fail('同源交叉未與 Tier 店表核平；不拼接不同母體');}
+ return cross;
+}
+function validateCross(rows,stores,start,end){
+ if(!Array.isArray(rows)||rows.length>200000)fail('同源交叉彙總格式不符');
+ const ids=new Set(stores.map(store=>store.id)),seen=new Set();
+ return rows.map(row=>{
+  if(!ids.has(row.store)||!TIERS.includes(row.tier)||typeof row.date!=='string'||!/^20\d\d-\d\d-\d\d$/.test(row.date)||!Number.isFinite(Date.parse(row.date+'T00:00:00Z'))||new Date(row.date+'T00:00:00Z').toISOString().slice(0,10)!==row.date||row.date<start||row.date>end||typeof row.plan!=='string'||!row.plan.trim()||row.plan.length>500||typeof row.tariff!=='string'||!row.tariff.trim()||row.tariff.length>100)fail('同源交叉分組不符');
+  const clean={store:row.store,date:row.date,tier:row.tier,plan:row.plan,tariff:row.tariff,visitors:count(row.visitors),renewals:count(row.renewals),unrenewed:count(row.unrenewed)};
+  if(!clean.visitors||clean.renewals+clean.unrenewed!==clean.visitors)fail('同源交叉分子／分母不符');
+  const key=JSON.stringify([clean.store,clean.date,clean.tier,clean.plan,clean.tariff]);if(seen.has(key))fail('同源交叉彙總鍵重複');seen.add(key);return clean;
+ });
+}
+function renderCross(data,stores,{start=data.period_start,end=data.cutoff}={}){
+ const detail=data.renewalDetail;
+ let html='<section class="panel insight-panel"><h3>每週 Tier × 原資費／專案</h3><p class="sub">同源：未續約明細；同店／進店日／用戶去重，符合資格 Y＋N 為分母、Y 為分子。匯入時核對 RT 每日及已提供的 Tier 店表。F 依原表另列。本次未提供可核對的同仁集中來源。</p>';
+ if(!detail?.coverage.cross)return html+'<p>'+esc(detail?.issues?.cross||'來源未提供可核對的同源交叉欄位；無法從各自彙總推算。')+'</p></section>';
+ const ids=new Set(stores.map(store=>store.id)),groups=new Map();
+ for(const row of detail.cross){if(!ids.has(row.store)||row.date<start||row.date>end)continue;
+  const monday=new Date(row.date+'T00:00:00Z');monday.setUTCDate(monday.getUTCDate()-(monday.getUTCDay()+6)%7);const week=monday.toISOString().slice(0,10),key=JSON.stringify([row.store,week,row.tier,row.plan,row.tariff]);
+  if(!groups.has(key))groups.set(key,{...row,start:row.date,end:row.date,visitors:0,renewals:0,unrenewed:0});const total=groups.get(key);total.start=total.start<row.date?total.start:row.date;total.end=total.end>row.date?total.end:row.date;for(const field of ['visitors','renewals','unrenewed'])total[field]+=row[field];
+ }
+ const values=[...groups.values()].sort((a,b)=>b.unrenewed-a.unrenewed||a.store.localeCompare(b.store)||a.start.localeCompare(b.start));
+ const label=date=>date.slice(5)+'（'+'日一二三四五六'[new Date(date+'T00:00:00Z').getUTCDay()]+'）';
+ if(!values.length)return html+'<p>所選日期與門市沒有符合條件的進件。</p></section>';
+ html+=table(['區／門市','週內觀測日','Tier','原資費','原專案','符合資格進店','已締結','未締結','締結率'],values.map(row=>{const store=stores.find(store=>store.id===row.store);return '<tr><td>'+esc(store.region+'／'+store.short)+'</td><td>'+label(row.start)+'～'+label(row.end)+'</td><td>'+row.tier+'</td><td>'+esc(row.tariff)+'</td><td>'+esc(row.plan)+'</td><td>'+n(row.visitors)+'</td><td>'+n(row.renewals)+'</td><td>'+n(row.unrenewed)+'</td><td>'+pct(row.renewals,row.visitors)+'</td></tr>';}).join(''));
+ html+='<p class="sub">週一至週日分組；觀測日只列有符合資格進件的日期，不代表完整週。原表未提供獨立申請進件欄；進店人次不代替申請件數。</p>';
+ for(const row of values.filter(row=>row.unrenewed>0&&row.tier!=='F').slice(0,3)){const store=stores.find(store=>store.id===row.store);html+='<div class="action"><strong>'+esc(store.short+'／Tier '+row.tier+'／原資費 '+row.tariff)+'</strong><p>'+esc(row.plan)+'：'+n(row.renewals)+'／'+n(row.visitors)+'（'+pct(row.renewals,row.visitors)+'），未締結 '+n(row.unrenewed)+' 筆。先按原合約、月費與使用需求核對這批未締結的回訪紀錄；下週核對同客群未締結件數與締結率。未締結原因須由實際紀錄確認。</p></div>';}
+ return html+'</section>';
+}
 function parseAvailable(workbook,XLSX,data){
  const result=parse({Sheets:{}},XLSX,data),issues={};
  for(const [key,name] of [['tiers',SHEETS[1]],['observation',SHEETS[0]],['plans',SHEETS[2]]]){
@@ -93,11 +159,12 @@ function parseAvailable(workbook,XLSX,data){
    issues[key]=error.message;
   }
  }
+ try{result.cross=parseCross(workbook,XLSX,data,result);result.coverage.cross=true;}catch(error){result.coverage.cross=false;issues.cross=error.message;}
  return validate({...result,issues},data.stores,data.period_start,data.cutoff);
 }
 function importSummary(detail){
  if(!detail)return '';
- return [['tiers',SHEETS[1]],['observation',SHEETS[0]],['plans',SHEETS[2]]].map(([key,name])=>
+ return [['tiers',SHEETS[1]],['observation',SHEETS[0]],['plans',SHEETS[2]],['cross','同源 Tier × 資費／專案']].map(([key,name])=>
   name+' — '+(detail.coverage[key]?'已載入':detail.issues?.[key]?'未載入，'+detail.issues[key]:'未提供')
  ).join('\n');
 }
@@ -108,7 +175,7 @@ const n=v=>v.toLocaleString('zh-TW'),pct=(a,b)=>b?(100*a/b).toFixed(1)+'%':'—'
 function table(head,body){return '<div class="table-scroll scroll"><table class="insight-table"><thead><tr>'+head.map(v=>'<th>'+esc(v)+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table></div>';}
 function render(data,selectedStores,{start=data.period_start,end=data.cutoff}={}){
  const d=data.renewalDetail;if(!d)return '<section class="panel"><h3>Tier／未續約方案資料</h3><p>目前快照未包含分析頁籤；請匯入包含 Tier觀察、RT用戶進店行為_店、未續約明細 的完整原報。</p></section>';
- if(start!==data.period_start||end!==data.cutoff)return '<section class="panel"><h3>Tier／原方案未續約</h3><p>這三張來源為整段期間統計，請恢復 '+esc(data.period_start)+' 至 '+esc(data.cutoff)+' 查看，避免套用到不同日期。</p></section>';
+ if(start!==data.period_start||end!==data.cutoff)return '<section class="panel"><h3>Tier／原方案未續約</h3><p>這三張來源為整段期間統計，請恢復 '+esc(data.period_start)+' 至 '+esc(data.cutoff)+' 查看，避免套用到不同日期。</p></section>'+renderCross(data,selectedStores,{start,end});
  const ids=new Set(selectedStores.map(s=>s.id)),regions=new Set(selectedStores.map(s=>s.region)),ts=d.tiers.filter(t=>ids.has(t.store)),ps=d.plans.filter(p=>ids.has(p.store));
  const groups=TIERS.map(tier=>{const rows=ts.filter(t=>t.tier===tier),out={tier,visitors:0,renewals:0,npOut:0,terminated:0,visitOnly:0};for(const r of rows)for(const k of ['visitors','renewals','npOut','terminated','visitOnly'])out[k]+=r[k];return out;});
  let html='<section class="panel insight-panel"><h3>Tier A～F 掌握分析</h3><p class="sub">來源：RT用戶進店行為_店｜'+esc(data.period_start)+'～'+esc(data.cutoff)+'｜所選 '+selectedStores.length+' 店；締結率＝續約／符合資格進店人次。</p>';
@@ -123,7 +190,7 @@ function render(data,selectedStores,{start=data.period_start,end=data.cutoff}={}
  html+='</section><section class="panel insight-panel"><h3>原方案未續約 TOP 5</h3><p class="sub">來源：未續約明細 → 方案描述(含換約案)。限「1.符合續約資格」且續約 N；以同店／進店日／用戶去重。顯示未續約件數及占比，非方案未續約率。</p>';
  const byPlan=new Map();for(const p of ps)byPlan.set(p.plan,(byPlan.get(p.plan)||0)+p.unrenewed);const top=[...byPlan].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'zh-TW')).slice(0,5),total=ps.reduce((s,p)=>s+p.unrenewed,0);
  html+=!d.coverage.plans?unavailable(d,'plans',SHEETS[2]):!top.length?'<p>所選範圍無符合條件的未續約紀錄。</p>':table(['方案描述','未續約件數','占未續約紀錄'],top.map(([plan,c])=>'<tr><td>'+esc(plan)+'</td><td>'+n(c)+'</td><td>'+pct(c,total)+'</td></tr>').join(''))+'<p class="sub">優先檢視首位方案的費用、設備與合約需求；原方案名稱無法直接判斷未續約原因，請以實際回訪紀錄核對。</p>';
- return html+'</section>';
+ return html+'</section>'+renderCross(data,selectedStores,{start,end});
 }
-return Object.freeze({SHEETS,TIERS,parse,parseAvailable,importSummary,validate,render});
+return Object.freeze({SHEETS,TIERS,parse,parseAvailable,importSummary,validate,render,parseCross,renderCross});
 });

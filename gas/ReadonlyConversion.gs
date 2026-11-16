@@ -75,7 +75,7 @@ function readonlyConversionAttach_(snapshot) {
     const state = readonlyConversionState_().value;
     if (!state.revision) return snapshot;
     delete snapshot.conversionBattle;
-    snapshot.conversionStatus = {status:state.active ? 'verified' : 'unavailable', revision:state.revision};
+    snapshot.conversionStatus = {status:state.active ? 'verified' : 'unavailable', ...readonlyConversionSummary_(state)};
     if (state.active) {
       const data = readonlyConversionReadEntry_(state.active);
       const b = data.schema === 'north12-conversion-publication/v1' ? ConversionPublicationCore.projectB(data) : data;
@@ -128,6 +128,7 @@ function readonlyConversionPreview(payload) {
     preview:{sourceName:incoming.source_name, sourceHash:incoming.sha256,
       cutoff:incoming.cutoff, periodStart:incoming.period_start, storeDateKeys:isDepartment ? Object.values(incoming.regions).reduce((sum, data) => sum + data.records.length, 0) : incoming.records.length,
       coverage:isDepartment ? ConversionPublicationCore.coverage(incoming) : null,
+      retainedSources:isDepartment ? (incoming.retained_sources || []) : [],
       totals:b ? ReadonlyDashboardCore.aggregate(b.records) : {}, hash:hash,
       sameSource:diff.same_source, added:diff.added, changed:diff.changed, removed:diff.removed}};
 }

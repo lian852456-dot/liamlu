@@ -80,6 +80,7 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
         ' · 新增 ' + p.added + '／更正 ' + p.changed + '／移除 ' + p.removed +
         (department.prior ? '' : ' · 來源未提供同期核對依據') +
         ' · 區域版本：' + p.coverage.map(row => row.region + ' ' + (row.available ? row.cutoff + (row.updated ? ' 本次更新' : ' 保留前次') : '來源未提供')).join('／') +
+        (p.retainedSources?.length ? ' · 同截止保留：' + [...new Set(p.retainedSources.map(row => row.region + '／' + row.kind + '／' + row.source_name + '／' + row.sha256.slice(0,12)))].join('；') : '') +
         ' · 原始檔 SHA-256 ' + p.sourceHash + (p.sameSource ? ' · 同一原始檔，不累加' : '');
       $('conversionPreview').classList.remove('hidden');
       message('conversionMessage', '預覽通過；尚未發布。將同步更新來源涵蓋的部區與 B 區看板，其他區保留有效版本。', 'ok');
@@ -122,3 +123,6 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
     $('conversionLive').textContent = '尚未核對版本。'; $('conversionPreviewText').textContent = '';
     $('conversionMessage').textContent = ''; controls(); });
 })();
+
+// Inputs become actionable only after handlers and source validators are ready.
+$('loginBtn').disabled=false;
