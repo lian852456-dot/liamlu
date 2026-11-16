@@ -32,9 +32,9 @@
   .site-header h1 { font-size:1.15rem; color:var(--accent-bright); }
   .site-header .sub { font-size:.72rem; color:var(--text-muted); margin-top:2px; }
 
-  .wrap { max-width: 880px; margin: 0 auto; padding: 12px; }
+  .wrap { max-width: 1480px; margin: 0 auto; padding: 8px 16px; }
 
-  .intro { background:#ecfeff; border:1px solid rgba(8,145,178,.25); border-radius:var(--radius); padding:12px 14px; font-size:.8rem; color:var(--text-dim); line-height:1.6; margin-bottom:12px; }
+  .intro { background:#ecfeff; border:1px solid rgba(8,145,178,.25); border-radius:var(--radius); padding:8px 10px; font-size:.78rem; color:var(--text-dim); line-height:1.35; margin-bottom:8px; }
 
   .tabs { display:flex; gap:8px; margin:10px 0; }
   .tab-btn { flex:1; padding:10px; border:1px solid var(--border); background:#fff; border-radius:var(--radius); font-size:1rem; font-weight:700; color:var(--text-dim); cursor:pointer; }
@@ -45,12 +45,12 @@
   .fields .fld label { font-size:.72rem; color:var(--text-muted); }
   .fields .fld input { padding:9px; border:1px solid var(--border); border-radius:8px; font-size:1rem; }
 
-  .summary { background:#fff; border:1px solid var(--border-dim); border-radius:var(--radius); padding:14px 16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+  .summary { background:#fff; border:1px solid var(--border-dim); border-radius:var(--radius); padding:8px 10px; margin-bottom:8px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
   .summary .who { font-weight:700; font-size:1.02rem; margin-bottom:8px; }
   .sumgrid { display:flex; gap:10px; flex-wrap:wrap; }
   .sumbox { flex:1; min-width:150px; background:linear-gradient(135deg,#ecfeff,#cffafe); border:1px solid rgba(8,145,178,.35); border-radius:10px; padding:12px; text-align:center; }
   .sumbox .lbl { font-size:.72rem; color:var(--text-muted); }
-  .sumbox .val { font-size:1.7rem; font-weight:800; margin-top:2px; }
+  .sumbox .val { font-size:1.35rem; font-weight:800; margin-top:2px; }
   .sumbox .val.good { color:var(--green); }
   .sumbox .val.bad { color:var(--red); }
   .breakdown { margin-top:8px; font-size:.78rem; color:var(--text-muted); line-height:1.5; }
@@ -64,13 +64,13 @@
   .btn.toggled { background:var(--accent); color:#fff; border-color:var(--accent); }
 
   table.items { width:100%; border-collapse:collapse; background:#fff; border-radius:var(--radius); overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.05); font-size:.86rem; }
-  table.items th { background:var(--bg-panel); padding:8px 6px; font-size:.72rem; color:var(--text-muted); text-align:center; white-space:nowrap; }
-  table.items td { padding:6px 6px; border-top:1px solid var(--border-dim); text-align:center; }
+  table.items th { position:sticky; top:46px; z-index:2; background:var(--bg-panel); padding:4px 6px; font-size:.72rem; color:var(--text-muted); text-align:center; white-space:nowrap; }
+  table.items td { padding:3px 4px; border-top:1px solid var(--border-dim); text-align:center; }
   table.items tr:nth-child(even) td { background:var(--bg-row-alt); }
   td.iname { text-align:left; font-weight:600; max-width:150px; }
   td.iname .anti { color:var(--warn); font-size:.66rem; display:block; }
   .num { font-variant-numeric: tabular-nums; }
-  td input.inp { width:80px; padding:6px 4px; border:1px solid var(--border); border-radius:8px; font-size:.92rem; text-align:center; }
+  td input.inp { width:72px; padding:3px 2px; border:1px solid var(--border); border-radius:8px; font-size:.88rem; text-align:center; }
   td input.today { border:1.5px solid var(--accent); background:#ecfeff; }
   td input.wt { width:60px; padding:5px 3px; border:1px dashed var(--border); border-radius:6px; font-size:.82rem; text-align:center; }
   .rate.good { color:var(--green); font-weight:700; }

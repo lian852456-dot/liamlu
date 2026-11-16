@@ -125,3 +125,14 @@ footer { padding:0 18px calc(24px + env(safe-area-inset-bottom)); color:#718292;
   .topbar { grid-template-columns:auto 1fr auto; }.topbar strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .local-pill { font-size:10px; }.panel-heading h2 { font-size:18px; }
 }
+main{width:min(1600px,calc(100% - 32px));margin:8px auto 16px}
+.hero{padding:10px 14px}
+.hero h1{font-size:22px}
+.hero::after{display:none}
+.privacy-note{margin-top:8px;padding:6px 8px}
+.panel{margin-top:8px;padding:10px 12px}
+.upload-card{min-height:0;padding:10px}
+th,td{padding:4px 6px;font-size:12px}
+.product-table-wrap td{font-size:14px}
+.table-wrap, .product-table-wrap{overflow:auto}
+.table-wrap th, .product-table-wrap th, .region-detail-table th, .national-detail-table th{position:sticky;top:0;z-index:1;background:#f1f5f8}
