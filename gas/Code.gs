@@ -3295,6 +3295,7 @@ function doPost(e) {
     else if (action === 'private_request_status') result = privateDashboardRequestStatus(payload);
     else if (action === 'private_access') result = privateDashboardAccess(payload);
     else if (action === 'tradein_performance_read') result = tradeinPerformanceRead(payload);
+    else if (action === 'tradein_performance_transactions_read') result = tradeinPerformanceTransactionsRead(payload);
     else if (action === 'tradein_performance_public_read') result = tradeinPerformancePublicRead(payload);
     else if (action === 'tradein_performance_public_publish') result = tradeinPerformancePublicPublish(payload);
     else if (action === 'tradein_performance_preview') result = tradeinPerformancePreview(payload);
@@ -7077,6 +7078,12 @@ var TradeinPerformanceCore = (function () {
     if(!model || model.length>80 || !/^[A-Za-z0-9 .+()\/\-]+$/.test(model))throw new Error('回收機款簡稱無法辨識');
     return model;
   }
+  function transactionDetails(record) {
+    const code=record.project_code, amount=record.tradein_credit;
+    if(code!==null && (typeof code!=='string' || !/^[A-Z0-9][A-Z0-9-]{0,19}$/i.test(code)))throw new Error('SAR74 專案代碼格式無效');
+    if(amount!==null && (!Number.isSafeInteger(amount) || amount<0 || amount>10000000))throw new Error('SAR74 舊機折抵金額格式無效');
+    return {project_code:code,tradein_credit:amount};
+  }
   function date(value) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '') || isNaN(Date.parse(value+'T00:00:00Z')) ||
         new Date(value+'T00:00:00Z').toISOString().slice(0,10)!==value) throw new Error('日期無效');
@@ -7174,6 +7181,7 @@ var TradeinPerformanceCore = (function () {
       manager_actual_units:0,acting_manager_actual_units:0,staff_gap_units:0,pending_staff_count:0,coverage:'complete'}));
     const byStore=Object.fromEntries(stores.map(s=>[s.store,s]));
     const unique={};let duplicates=0,cancelled=0;
+    const transactions=input.has_transaction_details===true?[]:null;
     input.records.forEach(r=>{
       const store=reference.stores.get(r.store_code);
       if (!store) throw new Error('來源含九店範圍以外或未知店碼');
@@ -7186,6 +7194,7 @@ var TradeinPerformanceCore = (function () {
       const key=r.recycle_code.trim(), order=r.order_number.trim();
       if (!key || !order || key.length>100 || order.length>100) throw new Error('缺少有效回收碼／銷貨單號');
       const model=shortModel(r.recycle_model);
+      const detail=transactions?transactionDetails(r):null;
       let support=null;
       const person=byId[identity.employee_key];
       if(matchById&&!person)throw new Error('來源員編無在職名冊對應');
@@ -7197,11 +7206,12 @@ var TradeinPerformanceCore = (function () {
           support={...approval};
         if(!support&&(!matchById||approval))throw new Error('跨店交易未符合已核支援範圍');
       }
-      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project,model:model,support:support,crossStore:crossStore};
+      const normalized={store:store,trade_date:trade,cancel_date:cancel,employee_key:identity.employee_key,order:order,project:r.project,model:model,support:support,crossStore:crossStore,detail};
       if (unique[key]) {
         const prior=unique[key];
         if (prior.store!==store || prior.trade_date!==trade || prior.employee_key!==normalized.employee_key || prior.order!==order || prior.project!==r.project) throw new Error('同回收碼的交易、人員或店點衝突');
         if(prior.model!==model)throw new Error('同回收碼的機款衝突');
+        if(detail&&(prior.detail.project_code!==detail.project_code||prior.detail.tradein_credit!==detail.tradein_credit))throw new Error('同回收碼的專案代碼或舊機折抵金額衝突');
         if (cancel && (!prior.cancel_date || cancel>prior.cancel_date)) prior.cancel_date=cancel;
         duplicates++;
       } else unique[key]=normalized;
@@ -7222,7 +7232,10 @@ var TradeinPerformanceCore = (function () {
         if(!day){day={date:r.trade_date,actual_units:0};store.recovered_days.push(day);}day.actual_units++;
         if(r.crossStore&&(matchById||r.support)){store.support_in_units++;byStore[person.store].support_out_units++;}
       }
-      if (!person || person.identity_status==='conflict') {store.pending_identity_units++;store.coverage='partial_identity';return;}
+      const assigned=person&&person.identity_status!=='conflict';
+      if(transactions)transactions.push({store:r.store,date:r.trade_date,employee_key:assigned?r.employee_key:null,
+        project:r.project,model:r.model,...r.detail});
+      if (!assigned) {store.pending_identity_units++;store.coverage='partial_identity';return;}
       person.actual_units++;
       let daily=person.recovered_days.find(d=>d.date===r.trade_date);
       if(!daily){daily={date:r.trade_date,actual_units:0,recovered_models:[]};person.recovered_days.push(daily);}
@@ -7257,7 +7270,7 @@ var TradeinPerformanceCore = (function () {
     return {schema_version:'tradein-performance/v1',period_key:input.month,rule_id:RULE_ID,target_period:period,
       source_period:{start:start,end:end},source_cutoff_date:end,cutoff_precision:'date',timezone:'Asia/Taipei',
       source_sha256:input.source_sha256,status_as_of_date:statusAsOf,printed_at:String(input.printed_at || ''),people:people,stores:stores,summary:summary,
-      ...(supportEvidence.length?{support_evidence:supportEvidence}:{})};
+      ...(supportEvidence.length?{support_evidence:supportEvidence}:{}),...(transactions?{transactions}:{})};
   }
   function csv(text) {
     const rows=[];let row=[],cell='',quoted=false;
@@ -7288,6 +7301,8 @@ var TradeinPerformanceCore = (function () {
     if((!legacy30&&!sar29) || new Set(nonemptyNames).size!==nonemptyNames.length || labels.some(n=>!names.includes(n)))throw new Error('無法辨識 SAR74 欄位');
     const columns=Object.fromEntries(labels.map(n=>[n,names.indexOf(n)]));
     if(names.includes('回收舊機品名'))columns['回收舊機品名']=names.indexOf('回收舊機品名');
+    const details=['專案代碼','舊機折抵金額','回收舊機品名'].every(n=>names.includes(n));
+    if(details)for(const name of ['專案代碼','舊機折抵金額'])columns[name]=names.indexOf(name);
     const header=rows.slice(0,h).flat().join(' '),ranges=Array.from(header.matchAll(/(\d{3}\/\d{2}\/\d{2})\s*-\s*(\d{3}\/\d{2}\/\d{2})/g));
     if(ranges.length!==1)throw new Error('SAR74 查詢期間缺漏或不唯一');
     const start=roc(ranges[0][1]),end=roc(ranges[0][2]),period=monthPeriod(start.slice(0,7));
@@ -7324,10 +7339,15 @@ var TradeinPerformanceCore = (function () {
       const record={store_code:store,trade_date:trade,project:project,source_employee_id:seller,
         recycle_code:recycle,order_number:order,cancel_date:cancel};
       if(names.includes('回收舊機品名'))record.recycle_model=field(r,'回收舊機品名');
+      if(details){
+        const rawCredit=field(r,'舊機折抵金額');
+        const credit=rawCredit===''?null:/^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(rawCredit)?Number(rawCredit.replace(/,/g,'')):NaN;
+        Object.assign(record,transactionDetails({project_code:field(r,'專案代碼')||null,tradein_credit:credit}));
+      }
       records.push(record);
     });
     return {month:start.slice(0,7),source_start:start,source_end:end,status_as_of_date:statusAsOf,rule_id:RULE_ID,complete_nine_stores:false,header_column_count:names.length,
-      printed_at:printed?printed[0]:'',records:records};
+      printed_at:printed?printed[0]:'',records:records,...(details?{has_transaction_details:true}:{})};
   }
   return Object.freeze({STORES:STORES,RULE_ID:RULE_ID,monthPeriod:monthPeriod,storeName:storeName,sourceEmployeeId:sourceEmployeeId,build:build,parseSar74:parseSar74,shortModel:shortModel});
 })();
@@ -7545,6 +7565,27 @@ function tradeinPerformanceRead(payload) {
 
   });
 }
+function tradeinPerformanceTransactionsRead(payload) {
+  return privateDashboardTradeinReadBoundary_(payload, function() {
+    const auth=tradeinPerformanceAuthorize_(payload);
+    if(auth.supervisor)reportUploadAuthorize_(payload);
+    else if(auth.user.device_id!==privateDashboardCleanDeviceId(payload.deviceId))throw new Error('請使用已核准的本人裝置');
+    TradeinPerformanceCore.monthPeriod(payload.month);
+    const entry=(tradeinPerformanceRegistry_().months[payload.month]||{}).active;
+    const scope=auth.supervisor?'supervisor':'self';
+    if(!entry)return {scope,month:payload.month,sourcePeriod:null,rows:null};
+    if(entry.roster_hash!==tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(payload.month)))throw new Error('核定月名冊已變更，請重新核對來源');
+    const snapshot=tradeinPerformanceSnapshot_(entry);
+    if(snapshot.period_key!==payload.month)throw new Error('來源月份不符');
+    const names=new Map(snapshot.people.map(p=>[p.employee_key,p.masked_name]));
+    const rows=Array.isArray(snapshot.transactions)?snapshot.transactions.filter(row=>auth.supervisor||row.employee_key===auth.id).map(row=>({
+      date:row.date,store:row.store,staff:names.get(row.employee_key)||null,project:row.project,
+      projectCode:row.project_code,model:row.model,credit:row.tradein_credit
+    })):null;
+    const stores=auth.supervisor?TradeinPerformanceCore.STORES.map(s=>s[1]):[...new Set((rows||[]).map(row=>row.store))];
+    return {scope,month:payload.month,sourcePeriod:snapshot.source_period,rows,stores};
+  });
+}
 function tradeinPerformancePreview(payload) {
   const bundled=payload.includeCheckpointState===true;
   if(bundled)tradeinPerformanceCheckpointAuthorize_({...payload,month:payload.source.month,sourceHash:payload.source.source_sha256});
@@ -7601,6 +7642,7 @@ function tradeinPerformancePublish(payload) {
     if(payload.expectedActiveHash!==activeHash)throw new Error('同期版本已變更，請重新預覽');
     if(current.active && current.active.source_sha256===value.source_sha256 && current.active.roster_hash===payload.rosterHash) {
       const saved=tradeinPerformanceSnapshot_(current.active);
+      const backfill=!Array.isArray(saved.transactions)&&Array.isArray(value.transactions);
       if(current.active.preview_hash!==payload.previewHash){
         // A legacy snapshot may lack only the newly added safe aggregates.
         // Compare every original calculation field before preserving the no-op.
@@ -7609,9 +7651,17 @@ function tradeinPerformancePublish(payload) {
           if(saved.people.every(p=>!Object.prototype.hasOwnProperty.call(p,key)))legacy.people.forEach(p=>delete p[key]);
           else if(!saved.people.every(p=>Object.prototype.hasOwnProperty.call(p,key)))throw new Error('舊快照聚合欄位不完整');
         });
-        if(current.active.preview_hash!==tradeinPerformanceHash_(legacy))throw new Error('相同來源雜湊的計算結果不同，請核對原檔後重新預覽');
+        if(backfill)delete legacy.transactions;
+        if(current.active.preview_hash!==tradeinPerformanceHash_(legacy)){
+          // An older client re-reading the same source must not remove stored details.
+          const original=JSON.parse(JSON.stringify(saved));
+          delete original.published_at;
+          delete original.transactions;
+          if(!Array.isArray(saved.transactions)||Array.isArray(value.transactions)||tradeinPerformanceHash_(original)!==payload.previewHash)
+            throw new Error('相同來源雜湊的計算結果不同，請核對原檔後重新預覽');
+        }
       }
-      return {status:'unchanged',snapshotHash:activeHash,snapshot:tradeinPerformanceProjection_(saved,{supervisor:true})};
+      if(!backfill)return {status:'unchanged',snapshotHash:activeHash,snapshot:tradeinPerformanceProjection_(saved,{supervisor:true})};
     }
     if(current.active && value.source_cutoff_date<current.active.source_cutoff_date)throw new Error('來源比目前版本舊，請使用回復功能');
     const referenceHash=tradeinPerformanceSaveReference_(payload.source,reference);

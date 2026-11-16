@@ -37,10 +37,11 @@ export function summarizeSource(source,core){
   if(!core.STORES.some(([code])=>code===row.store_code))throw Error('來源含九店範圍以外或未知店碼');
   const key=row.recycle_code.trim(),item={store:row.store_code,date:row.trade_date,
    employee:core.sourceEmployeeId(row.source_employee_id),order:row.order_number.trim(),
-   project:row.project,model:core.shortModel(row.recycle_model),cancel:row.cancel_date};
+   project:row.project,model:core.shortModel(row.recycle_model),projectCode:row.project_code,credit:row.tradein_credit,cancel:row.cancel_date};
   const prior=unique.get(key);
   if(prior){
    if(['store','date','employee','order','project','model'].some(field=>prior[field]!==item[field]))throw Error('同回收碼的交易、人員、店點或機款衝突');
+   if(prior.projectCode!==item.projectCode||prior.credit!==item.credit)throw Error('同回收碼的專案代碼或舊機折抵金額衝突');
    if(item.cancel&&prior.cancel&&item.cancel!==prior.cancel)throw Error('同筆取消交易的日期衝突');
    if(item.cancel)prior.cancel=item.cancel;
    duplicates++;
