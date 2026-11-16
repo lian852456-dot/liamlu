@@ -472,8 +472,9 @@
       document.querySelectorAll('[data-tab]').forEach((item) => { item.classList.toggle('active', item === button); item.setAttribute('aria-selected', item === button ? 'true' : 'false'); });
       document.querySelectorAll('[data-panel]').forEach((panel) => { panel.hidden = panel.dataset.panel !== button.dataset.tab; });
       if(button.dataset.tab==='gold')void monthlyUI?.activate();
-      else void window.DepartmentScoresReadSession?.activate();
+      else if(button.dataset.tab==='store')void window.DepartmentScoresReadSession?.activate();
     }));
+    if(location.hash==='#conversion')document.querySelector('[data-tab="conversion"]')?.click();
     $('storeImport')?.addEventListener('click', importStore);
     if (!monthlyUI) {
       ['goldImport', 'publishGold', 'exportGold', 'monthlyRestore'].forEach(id => { $(id).disabled = true; });

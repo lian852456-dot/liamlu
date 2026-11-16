@@ -22,7 +22,7 @@ const UPLOAD_URL = 'quick-upload.html';
 const EXPECTED_HREFS = [
   'kpi-battle.html', 'kpi-battle.html#awards', 'index.html', 'gold-medal.html',
   'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'tradein-progress.html', 'threec-query.html',
-  'access-management.html', 'department-ops.html', 'patrol.html',
+  'access-management.html', 'department-ops.html', 'readonly-dashboard.html', 'patrol.html',
   'operations-brief.html', 'tradein-brief.html', 'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
   'phone-stock-dashboard.html'
 ];
@@ -144,7 +144,7 @@ test('首頁保留 PR179 個績入口與 PR181 測試入口移除，逐一核對
   await ready(page);
   await expect(page.locator('[aria-label="常用入口"] .card')).toHaveCount(4);
   await expect(page.locator('[aria-label="同仁大廳"] .card')).toHaveCount(7);
-  await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(9);
+  await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(10);
   expect(await page.locator('a.card').evaluateAll(cards => cards.map(card => card.getAttribute('href')))).toEqual(EXPECTED_HREFS);
   await expect(page.locator('.quick-card').first()).toHaveAttribute('href','kpi-battle.html');
   await expect(page.locator('.quick-card').first()).toContainText('KPI 戰情');
@@ -172,7 +172,7 @@ test('同仁金牌查詢與常用明細保留，督導金牌入口移除、情�
   const supervisor = page.locator('[aria-label="督導專區"]');
   const maintenance = supervisor.locator('a.card[href="north12b-gold-ops.html"]');
   await expect(maintenance).toHaveCount(0);
-  expect(await supervisor.locator('.management-grid a.card').evaluateAll(cards=>cards.map(card=>card.getAttribute('href')))).toEqual(['access-management.html','department-ops.html','patrol.html']);
+  expect(await supervisor.locator('.management-grid a.card').evaluateAll(cards=>cards.map(card=>card.getAttribute('href')))).toEqual(['access-management.html','department-ops.html','readonly-dashboard.html','patrol.html']);
   await expect(supervisor.locator('.supervisor-grid a[href="patrol.html"]')).toHaveCount(0);
   await expect(supervisor.locator('a[href="gold-medal.html"]')).toHaveCount(0);
   expect(calls).toEqual([]);
@@ -198,8 +198,9 @@ for (const viewport of [{width:1280,height:1300},{width:390,height:844},{width:3
 test('搜尋不分大小寫、查無結果與清除搜尋會恢復所有工具', async ({page}) => {
   await start(page); await ready(page);
   await page.locator('#tool-search').fill('kPi');
-  await expect(page.locator('a.card:visible')).toHaveCount(3);
-  await expect(page.locator('#search-result')).toHaveText('找到 3 個工具');
+  await expect(page.locator('a.card:visible')).toHaveCount(4);
+  await expect(page.getByRole('link', {name:/主管唯讀看板/})).toBeVisible();
+  await expect(page.locator('#search-result')).toHaveText('找到 4 個工具');
   await page.locator('#tool-search').fill('不存在的工具__TEST');
   await expect(page.locator('a.card:visible')).toHaveCount(0);
   await expect(page.locator('#search-result')).toContainText('沒有符合的工具');
@@ -229,11 +230,11 @@ test('金牌搜尋只留下原查詢入口，搜尋清空不重現督導金牌�
 });
 
 for (const viewport of [{width:1280,height:1300},{width:390,height:844},{width:320,height:800}]) {
-  test(`${viewport.width}px 情報站在管理第二位，搜尋恢復與鍵盤導覽正常`, async ({page}) => {
+  test(`${viewport.width}px 情報站與主管唯讀看板各有入口，搜尋恢復與鍵盤導覽正常`, async ({page}) => {
     const {calls,errors}=await start(page,{viewport});await ready(page);
     const management=page.locator('.management-grid');
     const intel=management.locator('a.card[href="patrol.html"]');
-    expect(await management.locator('a.card').evaluateAll(cards=>cards.map(card=>card.getAttribute('href')))).toEqual(['access-management.html','department-ops.html','patrol.html']);
+    expect(await management.locator('a.card').evaluateAll(cards=>cards.map(card=>card.getAttribute('href')))).toEqual(['access-management.html','department-ops.html','readonly-dashboard.html','patrol.html']);
     await expect(page.locator('a.card[href="patrol.html"]')).toHaveCount(1);
     const boxes=await management.locator('a.card').evaluateAll(cards=>cards.map(card=>card.getBoundingClientRect().toJSON()));
     if(viewport.width===1280) {expect(boxes[1].y).toBe(boxes[0].y);expect(boxes[1].x).toBeGreaterThan(boxes[0].x);}
@@ -245,7 +246,11 @@ for (const viewport of [{width:1280,height:1300},{width:390,height:844},{width:3
     await expect(page.locator('a.card[href="north12b-gold-ops.html"]')).toHaveCount(0);
     await noOverflow(page);
     await fs.mkdir(SCREENSHOTS,{recursive:true});await page.locator('#zone-supervisor').screenshot({path:path.join(SCREENSHOTS,`GOLD-ENTRY-${viewport.width}.png`)});
-    await management.locator('a.card[href="department-ops.html"]').focus();await page.keyboard.press('Tab');await expect(intel).toBeFocused();
+    await management.locator('a.card[href="department-ops.html"]').focus();
+    await page.keyboard.press('Tab');
+    await expect(management.getByRole('link', {name:/主管唯讀看板/})).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(intel).toBeFocused();
     await intel.press('Enter');await expect(page).toHaveURL(/patrol\.html$/);
     expect(calls.filter(call=>call.method==='POST')).toEqual([]);expect(errors).toEqual([]);
   });
