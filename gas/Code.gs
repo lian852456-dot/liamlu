@@ -7566,25 +7566,36 @@ function tradeinPerformanceRead(payload) {
   });
 }
 function tradeinPerformanceTransactionsRead(payload) {
-  return privateDashboardTradeinReadBoundary_(payload, function() {
-    const auth=tradeinPerformanceAuthorize_(payload);
-    if(auth.supervisor)reportUploadAuthorize_(payload);
-    else if(auth.user.device_id!==privateDashboardCleanDeviceId(payload.deviceId))throw new Error('請使用已核准的本人裝置');
-    TradeinPerformanceCore.monthPeriod(payload.month);
-    const entry=(tradeinPerformanceRegistry_().months[payload.month]||{}).active;
-    const scope=auth.supervisor?'supervisor':'self';
-    if(!entry)return {scope,month:payload.month,sourcePeriod:null,rows:null};
-    if(entry.roster_hash!==tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(payload.month)))throw new Error('核定月名冊已變更，請重新核對來源');
-    const snapshot=tradeinPerformanceSnapshot_(entry);
-    if(snapshot.period_key!==payload.month)throw new Error('來源月份不符');
-    const names=new Map(snapshot.people.map(p=>[p.employee_key,p.masked_name]));
-    const rows=Array.isArray(snapshot.transactions)?snapshot.transactions.filter(row=>auth.supervisor||row.employee_key===auth.id).map(row=>({
-      date:row.date,store:row.store,staff:names.get(row.employee_key)||null,project:row.project,
-      projectCode:row.project_code,model:row.model,credit:row.tradein_credit
-    })):null;
-    const stores=auth.supervisor?TradeinPerformanceCore.STORES.map(s=>s[1]):[...new Set((rows||[]).map(row=>row.store))];
-    return {scope,month:payload.month,sourcePeriod:snapshot.source_period,rows,stores};
-  });
+  const auth=tradeinPerformanceTransactionsAuthorize_(payload);
+  TradeinPerformanceCore.monthPeriod(payload.month);
+  const entry=(tradeinPerformanceRegistry_().months[payload.month]||{}).active;
+  const scope=auth.supervisor?'supervisor':'self';
+  if(!entry)return {scope,month:payload.month,sourcePeriod:null,rows:null};
+  if(entry.roster_hash!==tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(payload.month)))throw new Error('核定月名冊已變更，請重新核對來源');
+  const snapshot=tradeinPerformanceSnapshot_(entry);
+  if(snapshot.period_key!==payload.month)throw new Error('來源月份不符');
+  const names=new Map(snapshot.people.map(p=>[p.employee_key,p.masked_name]));
+  const rows=Array.isArray(snapshot.transactions)?snapshot.transactions.filter(row=>auth.supervisor||row.employee_key===auth.id).map(row=>({
+    date:row.date,store:row.store,staff:names.get(row.employee_key)||null,project:row.project,
+    projectCode:row.project_code,model:row.model,credit:row.tradein_credit
+  })):null;
+  const stores=auth.supervisor?TradeinPerformanceCore.STORES.map(s=>s[1]):[...new Set((rows||[]).map(row=>row.store))];
+  return {scope,month:payload.month,sourcePeriod:snapshot.source_period,rows,stores};
+}
+function tradeinPerformanceTransactionsAuthorize_(payload) {
+  const id=privateDashboardCleanEmployeeId(payload.employeeId);
+  const supervisor=typeof payload.adminSecret==='string'&&payload.adminSecret.length>0;
+  if(supervisor)reportUploadAuthorize_(payload);
+  const device=supervisor?null:privateDashboardCleanDeviceId(payload.deviceId);
+  if(!supervisor&&threecAuthorizeRead_({employeeId:id,deviceId:device})!==id)throw new Error('本人裝置驗證未通過');
+  const user=privateDashboardUserByEmployeeId(id).user;
+  if(!user||user.status!=='active')throw new Error('此員編尚未核准');
+  if(supervisor){
+    if(!privateDashboardIsTrustedEmployee(id)||user.role!=='督導')throw new Error('此員編未獲督導授權');
+  }else if(user.device_id!==device||!TradeinPerformanceCore.storeName(user.store)){
+    throw new Error('請使用已核准的九店本人裝置');
+  }
+  return {id,supervisor};
 }
 function tradeinPerformancePreview(payload) {
   const bundled=payload.includeCheckpointState===true;
