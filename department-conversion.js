@@ -11,11 +11,13 @@
     epoch++; controller?.abort(); controller = null;
     employeeId = ''; adminSecret = ''; publication = null; html = '';
     $('secret').value = ''; setReport(''); $('coverage').textContent = '';
+    $('region').replaceChildren();
     $('workspace').hidden = true; $('auth').hidden = false;
     $('login').disabled = false; $('refresh').disabled = false; $('export').disabled = true;
   }
   function show() {
     html = ''; $('export').disabled = true;
+    if (!publication) return;
     const selected = $('region').value;
     let data = publication.regions[selected];
     if (selected === 'all') {

@@ -12,11 +12,11 @@
     const detail = value.renewalDetail;
     return Officer.validate({...value, stores, records:value.records.filter(row => ids.has(row.store)),
       prior:value.prior && value.prior.filter(row => ids.has(row.store)),
-      renewalDetail:detail && {...detail, tiers:detail.tiers.filter(row => ids.has(row.store)),
+      renewalDetail:detail && {...detail, cohorts:(detail.cohorts || []).filter(row=>ids.has(row.store)), tiers:detail.tiers.filter(row => ids.has(row.store)),
         observation:detail.observation.filter(row => row.region === region), plans:detail.plans.filter(row => ids.has(row.store)),
         ...(detail.coverage.cross?{cross:detail.cross.filter(row=>ids.has(row.store))}:{})}});
   }
-  const KINDS = ['daily','prior','tiers','plans','observation','cross'];
+  const KINDS = ['daily','prior','tiers','plans','observation','cross','cohorts'];
   function source(data) {
     return {sha256:data.sha256, source_name:data.source_name, source_bytes:data.source_bytes,
       period_start:data.period_start, cutoff:data.cutoff};
@@ -96,13 +96,19 @@
           renewalDetail[key] = parts.flat(); renewalDetail.coverage[key] = true;
         }
       }
+      const cohortParts = stores.map(store => {
+        const detail = incomingIds.has(store.id) && b?.cohortAvailable ? b : a;
+        return detail?.cohortAvailable ? detail.cohorts.filter(row=>row.store===store.id) : null;
+      });
+      renewalDetail.cohortAvailable = cohortParts.every(rows=>rows!==null);
+      renewalDetail.cohorts = renewalDetail.cohortAvailable ? cohortParts.flat() : [];
       // Region-wide observations cannot be substituted with a partial store scope.
       const observation = incomingIds.size === stores.length && b?.coverage.observation ? b : a;
       if (observation?.coverage.observation) {
         renewalDetail.observation = observation.observation; renewalDetail.coverage.observation = true;
       }
       const issues = {...a?.issues, ...b?.issues};
-      for (const key of ['tiers','plans','observation','cross']) if (renewalDetail.coverage[key]) delete issues[key];
+      for (const key of ['tiers','plans','observation','cross','cohorts']) if (renewalDetail.coverage[key]) delete issues[key];
       if (Object.keys(issues).length) renewalDetail.issues = issues;
     }
     return Officer.validate({...data, stores,
@@ -131,7 +137,7 @@
         const ids = new Set(data.stores.map(store => store.id));
         for (const kind of KINDS) for (const store of merged.stores) {
           const usedOld = kind === 'daily' ? !ids.has(store.id) : kind === 'prior' ? !!merged.prior && (!data.prior || !ids.has(store.id))
-            : !!merged.renewalDetail?.coverage[kind] && (kind === 'observation'
+            : kind === 'cohorts' ? !!merged.renewalDetail?.cohortAvailable && (!ids.has(store.id) || !data.renewalDetail?.cohortAvailable) : !!merged.renewalDetail?.coverage[kind] && (kind === 'observation'
               ? !(ids.size === merged.stores.length && data.renewalDetail?.coverage.observation)
               : !ids.has(store.id) || !data.renewalDetail?.coverage[kind]);
           if (!usedOld) continue;

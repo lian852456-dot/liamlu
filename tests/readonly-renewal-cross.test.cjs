@@ -26,11 +26,11 @@ test('N-only data and a different Tier population cannot invent a conversion den
  const detail={coverage:{tiers:true},tiers:[{store:data.stores[0].id,tier:'A',visitors:999,renewals:2}]};
  assert.throws(()=>D.parseCross(source().workbook,X,data,detail),/Tier 店表/);
 });
-test('duplicates are counted once and conflicting joint attributes stop the cross only',()=>{
+test('duplicates are counted once and conflicting joint attributes reject the inconsistent source',()=>{
  const {data,rows}=source();rows.push(rows[1].slice());const workbook={Sheets:{未續約明細:X.utils.aoa_to_sheet(rows)}};
  assert.equal(D.parseAvailable(workbook,X,data).cross.reduce((sum,row)=>sum+row.visitors,0),54);
  rows[rows.length-1][4]='C';workbook.Sheets.未續約明細=X.utils.aoa_to_sheet(rows);
- const d=D.parseAvailable(workbook,X,data);assert.equal(d.coverage.cross,false);assert.match(d.issues.cross,/重複且衝突/);assert.equal(d.coverage.plans,true);
+ const d=D.parseAvailable(workbook,X,data);assert.equal(d.coverage.cross,false);assert.match(d.issues.cross,/重複且衝突/);assert.equal(d.coverage.plans,false);
 });
 test('cross tables survive department projection, a same-cutoff optional omission, and strict aggregate validation',()=>{
  const {data}=source(),old=P.fromOfficer(data);assert.equal(old.regions['北一二B'].renewalDetail.cross.length,data.renewalDetail.cross.length);

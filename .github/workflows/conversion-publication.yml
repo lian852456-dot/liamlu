@@ -1,0 +1,45 @@
+name: Conversion publication checks
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '*conversion*'
+      - '*renewal*'
+      - 'north12-officer*'
+      - 'gas/*Conversion*'
+      - 'gas/*Renewal*'
+      - 'gas/North12OfficerCore.gs'
+      - 'scripts/build-north12-officer.mjs'
+      - 'tests/*conversion*'
+      - 'tests/*renewal*'
+      - '.github/workflows/conversion-publication.yml'
+permissions:
+  contents: read
+jobs:
+  conversion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: node --test tests/conversion-reader-csp.test.cjs tests/conversion-publication.test.cjs tests/north12-officer-import-review.test.cjs tests/readonly-renewal-detail.test.cjs tests/readonly-renewal-import.test.cjs tests/readonly-conversion-backend.test.cjs tests/north12-officer.test.cjs tests/renewal-cohort.test.cjs tests/readonly-renewal-cross.test.cjs
+      - name: Render protected reader with synthetic data
+        env:
+          TEST_BASE_URL: http://127.0.0.1:8875/
+        run: |
+          python3 -m http.server 8875 --bind 127.0.0.1 >/tmp/conversion-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8875/department-conversion.html >/dev/null; then break; fi
+            sleep 1
+          done
+          npx playwright test tests/department-conversion-publication.spec.js tests/department-conversion.spec.js tests/readonly-conversion-upload.spec.js --workers=1

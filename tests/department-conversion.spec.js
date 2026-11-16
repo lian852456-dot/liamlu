@@ -55,7 +55,7 @@ test('transient refresh keeps the last verified report, while a denied refresh c
 test('weekly joint counts drill down with dates and escaped original plan names',async({page},info)=>{
  const s=await setup(page,{cross:true});await login(page,s.backend);const frame=page.frameLocator('#report');await expect(frame.locator('#view')).toBeVisible();
  await frame.locator('#region').selectOption('北一二B');await frame.locator('#store').selectOption('DNB10440');await frame.locator('#start').fill('2026-10-06');await frame.locator('[data-tab="insights"]').click();
- const table=frame.locator('.insight-panel').last();await expect(table).toContainText('10-06（二）～10-11（日）');await expect(table).toContainText('168');await expect(table).toContainText('123');await expect(table).toContainText('26.8%');await expect(table).toContainText('129');await expect(table).toContainText('合成專案 <標準>');
+ const table=frame.locator('.insight-panel').last();await expect(table).toContainText('10-06（二）～10-11（日）');await expect(table).toContainText('180');await expect(table).toContainText('129');await expect(table).toContainText('28.3%');await expect(table).toContainText('129');await expect(table).toContainText('合成專案 <標準>');
  await expect(frame.locator('#content script')).toHaveCount(0);await page.screenshot({path:info.outputPath('weekly-joint-counts.png')});
  await page.evaluate(()=>window.dispatchEvent(new Event('portal-before-logout')));await expect(page.locator('#report')).toHaveAttribute('srcdoc','');expect(s.errors).toEqual([]);
 });
