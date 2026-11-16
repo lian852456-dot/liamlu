@@ -8,13 +8,15 @@
   <style>
     *{box-sizing:border-box}
     body{margin:0;background:#f1f5f8;color:#173349;font:16px/1.6 system-ui,"PingFang TC",sans-serif}
-    main{max-width:680px;margin:32px auto;padding:0 16px}
-    h1{margin:14px 0 16px;font-size:28px}
+    main{width:min(1600px,calc(100% - 32px));margin:12px auto}
+    h1{margin:8px 0 10px;font-size:22px}
+    nav{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     a{color:#12527e}
-    .entry{display:block;margin:12px 0;padding:16px 20px;border:1px solid #c7d8e5;border-radius:12px;background:#fff;text-decoration:none}
+    .entry{display:block;margin:0;padding:12px 14px;border:1px solid #c7d8e5;border-radius:12px;background:#fff;text-decoration:none}
     .entry:hover,.entry:focus-visible{border-color:#12527e}
     .entry strong,.entry span{display:block}
-    .entry strong{font-size:20px}
+    .entry strong{font-size:16px}
+    @media(max-width:640px){nav{grid-template-columns:1fr}}
     .entry span{margin-top:4px;color:#526779}
   </style>
 </head>

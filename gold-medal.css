@@ -9,10 +9,10 @@
   font-size: 1.125rem;
   line-height: 1.55;
 }
-.gold-page .page { width: calc(100% - 80px); max-width: 1720px; padding: 28px 0 64px; }
+.gold-page .page { width: calc(100% - 32px); max-width: 1720px; padding: 12px 0 24px; }
 .gold-page .back-link { font-size: 1.125rem; margin-bottom: 20px; }
 .gold-page .masthead { align-items: center; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
-.gold-page h1 { font-size: clamp(2rem, 3vw, 2.75rem); line-height: 1.35; letter-spacing: 0; }
+.gold-page h1 { font-size: clamp(1.35rem, 2vw, 1.7rem); line-height: 1.25; letter-spacing: 0; }
 .gold-page h2 { font-size: 1.75rem; }
 .gold-page h3 { font-size: 1.5rem; }
 .gold-page .eyebrow, .gold-page .step-label { font-size: .875rem; }
