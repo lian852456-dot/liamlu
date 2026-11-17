@@ -54,7 +54,3 @@ body:has(#storePanel){--paper:#fff;--muted:#52606c}
 .masthead{align-items:center;gap:10px 16px;margin-bottom:10px}
 .page h1,.page:has(#storePanel) .masthead h1{font-size:22px;line-height:1.25;letter-spacing:0}
 .lede{margin:4px 0 0;font-size:13px;line-height:1.4;max-width:62ch}
-#goldPanel th,#goldPanel td{padding:6px 8px;font-size:14px;line-height:1.35}
-#goldPanel .summary-card strong{font-size:22px}
-#goldPanel th{position:sticky;top:0;z-index:2;background:#fff5ec}
-@media(max-width:620px){#goldPanel th,#goldPanel td{padding:8px;font-size:13px}#goldPanel .summary-card strong{font-size:20px}.page:has(#storePanel) .masthead h1{font-size:20px}}
