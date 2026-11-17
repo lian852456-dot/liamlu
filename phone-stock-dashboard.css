@@ -50,6 +50,8 @@ body.stock-page.has-results:not(.upload-open) .panel:not(.result-panel) .helper{
 body.stock-page .hero-row{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
 body.stock-page .hero-row .eyebrow,body.stock-page .hero-row h1{margin:0}
 body.stock-page .scan-note summary{cursor:pointer;font-size:13px}
+body.stock-page tbody tr:nth-child(even) td{background:#f4f8fb}
+body.stock-page .model-panel td:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
 @media(max-width:680px){
   body.stock-page main{width:min(100% - 16px,1240px);margin-top:6px}
   body.stock-page .upload-grid{grid-template-columns:1fr}
