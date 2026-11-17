@@ -34,7 +34,8 @@
 
   .wrap { max-width: 1080px; margin: 0 auto; padding: 8px 16px; }
 
-  .intro { background:#ecfeff; border:1px solid rgba(8,145,178,.25); border-radius:var(--radius); padding:8px 10px; font-size:.78rem; color:var(--text-dim); line-height:1.35; margin-bottom:8px; }
+  .intro { background:#ecfeff; border:1px solid rgba(8,145,178,.25); border-radius:var(--radius); padding:6px 10px; font-size:.78rem; color:var(--text-dim); line-height:1.35; margin-bottom:8px; }
+  .intro summary { cursor:pointer; font-weight:700; }
 
   .tabs { display:flex; gap:8px; margin:10px 0; }
   .tab-btn { flex:1; padding:10px; border:1px solid var(--border); background:#fff; border-radius:var(--radius); font-size:1rem; font-weight:700; color:var(--text-dim); cursor:pointer; }
@@ -51,7 +52,11 @@
   .sumgrid { display:flex; gap:10px; flex-wrap:wrap; }
   .sumbox { flex:1; min-width:150px; background:linear-gradient(135deg,#ecfeff,#cffafe); border:1px solid rgba(8,145,178,.35); border-radius:10px; padding:12px; text-align:center; }
   .sumbox .lbl { font-size:.72rem; color:var(--text-muted); }
-  .sumbox .val { font-size:1.35rem; font-weight:800; margin-top:2px; }
+  .sumbox .val { font-size:1.7rem; font-weight:800; margin-top:2px; }
+  @media(min-width:980px){
+    .calc-layout{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:8px 14px;align-items:start}
+    .calc-layout>.summary{position:sticky;top:58px;margin:0}
+  }
   .sumbox .val.good { color:var(--green); }
   .sumbox .val.bad { color:var(--red); }
   .breakdown { margin-top:8px; font-size:.78rem; color:var(--text-muted); line-height:1.5; }
@@ -89,6 +94,8 @@
   .foot { margin-top:16px; font-size:.72rem; color:var(--text-muted); line-height:1.6; }
   textarea#ioBox { width:100%; height:90px; margin-top:8px; border:1px solid var(--border); border-radius:8px; padding:8px; font-size:.78rem; font-family:monospace; }
 
+  #itemArea{min-width:0;max-width:100%;overflow-x:auto}
+  .calc-layout{min-width:0}
   @media (max-width:640px){
     table.items { font-size:.78rem; }
     td input.inp { width:64px; }
@@ -103,24 +110,24 @@
 </header>
 
 <div class="wrap">
-  <div class="intro">
-    這是<strong>通用試算工具</strong>：所有數字、店點、姓名都由你自己輸入，本頁<strong>不含任何人員或門市資料</strong>，也不會上傳。
-    計算架構（項目、權重、達成率公式、上限/下限、防退類與激勵加分規則）依中華電信門市 KPI 制度內建，算法與正式報表一致。輸入只存在你自己的裝置。
-  </div>
+  <details class="intro"><summary>試算說明</summary>
+    <p>這是<strong>通用試算工具</strong>：所有數字、店點、姓名都由你自己輸入，本頁<strong>不含任何人員或門市資料</strong>，也不會上傳。
+    計算架構（項目、權重、達成率公式、上限/下限、防退類與激勵加分規則）依中華電信門市 KPI 制度內建，算法與正式報表一致。輸入只存在你自己的裝置。</p>
+  </details>
 
   <div class="tabs">
     <button class="tab-btn active" id="tabStore" onclick="setMode('store')">🏪 店績試算</button>
     <button class="tab-btn" id="tabPerson" onclick="setMode('person')">🙋 個績試算</button>
   </div>
 
+  <div class="calc-layout">
+  <div>
   <div class="fields">
     <div class="fld"><label>對象名稱（店點／姓名，可留空）</label><input id="fLabel" type="text" placeholder="例：OO店 / 王小明" oninput="onField()"></div>
     <div class="fld"><label>本月天數</label><input id="fMonthDays" type="number" min="28" max="31" oninput="onField()"></div>
     <div class="fld"><label>累計資料到位日（實績算到第幾天）</label><input id="fSnapDay" type="number" min="1" max="31" oninput="onField()"></div>
     <div class="fld"><label>試算日（今天是第幾天）</label><input id="fCalcDay" type="number" min="1" max="31" oninput="onField()"></div>
   </div>
-
-  <div class="summary" id="summaryCard"></div>
 
   <div class="ctrlrow">
     <button class="btn" id="btnWt" onclick="toggleWtEdit()">⚖️ 編輯權重</button>
@@ -129,6 +136,9 @@
   </div>
 
   <div id="itemArea"></div>
+  </div>
+  <div class="summary" id="summaryCard"></div>
+  </div>
 
   <details class="adv">
     <summary>⚙️ 進階：激勵加分資料（選填）</summary>
@@ -153,6 +163,7 @@
     <div style="margin-top:8px"><button class="btn" onclick="doExport()">📤 匯出</button> <button class="btn" onclick="doImport()">📥 匯入</button> <span id="ioMsg" style="font-size:.78rem;color:var(--text-muted)"></span></div>
   </details>
 
+  <details class="adv"><summary>計算規則</summary>
   <div class="foot">
     ・「明日預估達成率」＝（累計實績＋今日）÷ 月目標 × 本月天數 ÷ 試算日；各項有上限 250%。<br>
     ・店績模式：部分項目有下限，低於下限該項得分打 5 折（個績模式無下限）。<br>
@@ -160,6 +171,7 @@
     ・總達成率＝各項（權重×達成率）加總＋激勵加分；未填目標的項目不計入。權重合計 105.5%（含好速、Netflix 疊加權重），全項 100% 達成時總分會略高於 100%，屬制度設計。<br>
     ・僅供試算參考，正式成績以公司報表為準。
   </div>
+  </details>
 </div>
 
 <script>
