@@ -5,10 +5,19 @@ on:
     paths:
       - 'gas/Code.gs'
       - 'awards-battle-controller.js'
+      - 'awards-battle.html'
+      - 'kpi-battle.html'
+      - 'kpi-battle-controller.js'
+      - 'dashboard-b-shell.js'
+      - 'dashboard-b-client.js'
+      - 'award-model-catalog.js'
+      - 'config/award-config-*.json'
       - 'app.js'
       - 'index.html'
       - 'app.html'
       - 'tests/awards-*.test.cjs'
+      - 'tests/awards-*.spec.js'
+      - 'tests/helpers/awards-*.cjs'
       - 'tests/private-dashboard-*.test.cjs'
       - '.github/workflows/awards-recovery.yml'
 permissions:
@@ -35,3 +44,31 @@ jobs:
           node --check awards-battle-controller.js
           node -e "new Function(require('fs').readFileSync('gas/Code.gs', 'utf8'))"
           node --test tests/awards-recovery-frontend.test.cjs tests/awards-recovery-gas.test.cjs tests/awards-publication-date.test.cjs tests/awards-battle-standalone.test.cjs tests/month-start-data.test.cjs tests/liam-supervisor-realdata-mapping.test.cjs tests/private-dashboard-*.test.cjs
+  awards-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - name: Install Chromium and rendering fonts
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y fonts-noto-cjk
+      - name: Verify protected awards entries and person rankings
+        run: |
+          git rev-parse HEAD
+          npx playwright test tests/awards-battle-standalone.spec.js tests/awards-gap-id-ui.spec.js tests/awards-publication-date-ui.spec.js tests/awards-person-ranking-ui.spec.js --workers=1 --retries=0 --trace=retain-on-failure
+      - name: Save synthetic screenshots and failed traces
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: awards-ui-${{ github.event.pull_request.head.sha }}
+          path: test-results/
+          if-no-files-found: warn
+          retention-days: 7
