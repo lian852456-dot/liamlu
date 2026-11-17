@@ -6,7 +6,7 @@
 /* 手機銷售與庫存頁：1366×650 以內先看到彙總、九店表與重點機型 */
 body.stock-page{font-size:13px;line-height:1.35}
 body.stock-page .topbar{min-height:40px;padding:4px 12px}
-body.stock-page main{width:min(1600px,calc(100% - 32px));margin:8px auto 16px}
+body.stock-page main{width:min(1240px,calc(100% - 32px));margin:8px auto 16px}
 body.stock-page .hero{padding:8px 12px;border-radius:12px;box-shadow:none}
 body.stock-page .hero::after{display:none}
 body.stock-page .hero h1{font-size:20px}
@@ -47,8 +47,11 @@ body.stock-page.has-results:not(.upload-open) .hero .eyebrow{display:none}
 body.stock-page.has-results:not(.upload-open) .hero{padding:6px 10px}
 body.stock-page.has-results:not(.upload-open) .hero h1{font-size:16px}
 body.stock-page.has-results:not(.upload-open) .panel:not(.result-panel) .helper{display:none}
+body.stock-page .hero-row{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
+body.stock-page .hero-row .eyebrow,body.stock-page .hero-row h1{margin:0}
+body.stock-page .scan-note summary{cursor:pointer;font-size:13px}
 @media(max-width:680px){
-  body.stock-page main{width:min(100% - 16px,1600px);margin-top:6px}
+  body.stock-page main{width:min(100% - 16px,1240px);margin-top:6px}
   body.stock-page .upload-grid{grid-template-columns:1fr}
   body.stock-page .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   body.stock-page .model-panel .table-wrap{max-height:200px}

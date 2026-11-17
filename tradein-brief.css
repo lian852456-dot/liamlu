@@ -3,7 +3,7 @@
 body[data-performance-release="supervisor"] .brief-slide table{font-size:16px!important;line-height:1.15}body[data-performance-release="supervisor"] .brief-slide th,body[data-performance-release="supervisor"] .brief-slide td{font-size:16px!important;line-height:1.15;padding:7px 5px}body[data-performance-release="supervisor"] .ranking-columns th,body[data-performance-release="supervisor"] .ranking-columns td{padding:1px 4px!important;line-height:1.15!important}body[data-performance-release="supervisor"] .ranking-columns th:first-child{width:48px;min-width:48px;white-space:nowrap}
 
 body[data-performance-release="supervisor"]{font:18px/1.6 system-ui,-apple-system,"Microsoft JhengHei",sans-serif}
-body[data-performance-release="supervisor"] main{width:min(1640px,calc(100% - 32px));max-width:none;margin:16px auto 32px;padding:0}
+body[data-performance-release="supervisor"] main{width:min(1240px,calc(100% - 32px));max-width:none;margin:12px auto 24px;padding:0}
 body[data-performance-release="supervisor"] .hero{padding:18px 20px;border-top:5px solid #f36b00;border-radius:14px}
 body[data-performance-release="supervisor"] .hero:after{display:none}
 body[data-performance-release="supervisor"] .hero h1{font-size:26px;margin:0}

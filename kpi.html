@@ -68,8 +68,13 @@
   .btn.toggled { background:var(--accent); color:#fff; border-color:var(--accent); }
 
   table.items { width:100%; border-collapse:collapse; background:#fff; border-radius:var(--radius); overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.05); font-size:.86rem; }
-  table.items th { background:var(--bg-panel); padding:8px 6px; font-size:.74rem; color:var(--text-muted); text-align:center; white-space:nowrap; }
-  table.items td { padding:7px 6px; border-top:1px solid var(--border-dim); text-align:center; }
+  table.items th { position:sticky; top:52px; z-index:2; background:var(--bg-panel); padding:4px 6px; font-size:.74rem; color:var(--text-muted); text-align:center; white-space:nowrap; }
+  table.items td { padding:4px 6px; border-top:1px solid var(--border-dim); text-align:center; }
+  @media(min-width:980px){
+    #calcView{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:8px 14px;align-items:start}
+    #calcView>.selrow,#calcView>.managerNote,#calcView>.ctrlrow,#calcView>#itemArea{grid-column:1}
+    #calcView>#summaryCard{grid-column:2;grid-row:1 / span 4;position:sticky;top:64px;margin:0}
+  }
   table.items tr:nth-child(even) td { background:var(--bg-row-alt); }
   td.iname { text-align:left; font-weight:600; max-width:150px; }
   td.iname .w { display:block; font-size:.68rem; color:var(--text-muted); font-weight:400; }
@@ -128,7 +133,7 @@
 
   <div class="lock" id="lockCard" style="display:none">
     <h2>🔐 北一二B 同仁專用</h2>
-    <p>僅限北一二B在職同仁使用。首次使用請輸入員編＋啟用碼提出申請，督導核准後，員編會綁定這台手機／電腦，之後輸入員編即可登入。（已在「戰情頁籤」核准過這台裝置的同仁，直接輸入員編登入即可。）</p>
+    <details class="adv"><summary>誰可以使用</summary><p>僅限北一二B在職同仁使用。首次使用請輸入員編＋啟用碼提出申請，督導核准後，員編會綁定這台手機／電腦，之後輸入員編即可登入。（已在「戰情頁籤」核准過這台裝置的同仁，直接輸入員編登入即可。）</p></details>
     <input id="lockEmp" autocomplete="username" autocapitalize="characters" placeholder="員工編號">
     <input id="lockCode" inputmode="numeric" autocomplete="one-time-code" placeholder="首次啟用碼（首次申請才需填）">
     <div class="actions">
@@ -198,6 +203,7 @@
     <div class="advnote" style="margin-top:6px">Apps Script 服務網址預設與回報系統相同；如需覆蓋，請在瀏覽器主控台設定 localStorage 的 <code>bei12b_gas_url</code>。</div>
   </details>
 
+  <details class="adv"><summary>計算規則</summary>
   <div class="foot">
     ・公式依「KPIPI資料設定」模板＋0720 日報反推驗證：逐項達成率 100% 吻合；總達成率 9 店中 7 店完全一致，其餘差異以「校正值」自動吸收。<br>
     ・「明日預估」＝（累計＋今日KEY入）÷ 月目標 × 本月天數 ÷ 試算日，各項有上限 250%、店績有下限規則、防退類反向計分（含 2025/07 解約NP OUT 新制）。<br>
@@ -205,6 +211,7 @@
     ・僅供試算參考，正式成績以公司報表為準。目標數如有異動請通知督導更新。<br>
     ・資料受員編授權保護：僅督導核准的裝置能讀取，本頁原始碼不含任何 KPI 數據。
   </div>
+  </details>
   </div><!-- /appArea -->
 </div>
 

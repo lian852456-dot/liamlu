@@ -3,7 +3,10 @@
 
 /* The progress page shares the recovery-price page's width and reading scale. */
 body[data-performance-release="public"]{--ink:#252a31;--muted:#687078;--line:#e5e5e5;--bg:#faf9f7;--orange:#d76526;--soft:#fff0e6;font:18px/1.6 system-ui,-apple-system,"Microsoft JhengHei",sans-serif}
-body[data-performance-release="public"] main{width:min(1640px,calc(100% - 32px));max-width:none;margin:16px auto 32px;padding:0}
+body[data-performance-release="public"] main{width:min(1240px,calc(100% - 32px));max-width:none;margin:12px auto 24px;padding:0}
+body[data-performance-release="public"] .hero{padding:10px 14px;border-radius:12px}
+body[data-performance-release="public"] .hero:after{display:none}
+body[data-performance-release="public"] .hero h1{font-size:22px;margin:0}
 body[data-performance-release="public"] .hero{padding:14px 20px;border:0;border-top:5px solid #f36b00;border-radius:14px;box-shadow:0 4px 24px #28200d08}
 body[data-performance-release="public"] .hero:after{display:none}
 body[data-performance-release="public"] .hero h1{margin:0;font-size:26px;line-height:1.6;letter-spacing:.02em}
@@ -21,7 +24,7 @@ body[data-performance-release="public"] .role-select>strong{margin-right:auto;fo
 body[data-performance-release="public"] .date-mode-note{margin:8px 0 0;padding:8px 12px;border-left:4px solid var(--orange);background:var(--soft);font-weight:700}
 body[data-performance-release="public"] .form-message{overflow-wrap:anywhere}
 body[data-performance-release="public"] #readMessage:empty{display:none}
-body[data-performance-release="public"] .footer{max-width:none;width:min(1640px,calc(100% - 32px));padding:18px 0;font-size:15px}
+body[data-performance-release="public"] .footer{max-width:none;width:min(1240px,calc(100% - 32px));padding:18px 0;font-size:15px}
 body[data-performance-release="public"] .export-feedback,body[data-performance-release="public"] .export-preview textarea{font-size:18px}
 body[data-performance-release="public"] #actual-person{font-weight:700}
 body[data-performance-release="public"] #actual-person td small{font-weight:650}

@@ -116,3 +116,7 @@
 #storePanel .score-regions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 @media(max-width:900px){#storePanel .score-regions{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){#storePanel .score-comparison{padding:10px}#storePanel .score-regions{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}#storePanel .score-region-choice{padding:9px;min-height:110px}}
+@media(min-width:1250px){.page:has(#storePanel){width:min(1240px,calc(100% - 32px))}}
+#storePanel h2{font-size:20px}
+#storePanel th,#storePanel td{font-size:13px;padding:6px 8px}
+#storePanel .summary-card strong,.score-regions strong{font-size:22px}
