@@ -54,3 +54,5 @@ body:has(#storePanel){--paper:#fff;--muted:#52606c}
 .masthead{align-items:center;gap:10px 16px;margin-bottom:10px}
 .page h1,.page:has(#storePanel) .masthead h1{font-size:22px;line-height:1.25;letter-spacing:0}
 .lede{margin:4px 0 0;font-size:13px;line-height:1.4;max-width:62ch}
+#peopleBody tr:nth-child(even) td{background:#f7f5f0}
+#peopleHead th{position:sticky;top:0;z-index:2;background:#fff5ec}

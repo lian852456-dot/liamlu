@@ -52,6 +52,20 @@ function render() {
   const covered = !date.value || date.value >= snapshot.sourcePeriod.start && date.value <= snapshot.sourcePeriod.end;
   $('transactionCount').textContent = !covered ? '這一天超出來源期間。'
     : selection.length ? `${selection.length} 筆有效成交` : '這個篩選範圍沒有有效成交。';
+  const credits = selection.map(row => row.credit).filter(value => value !== null);
+  const creditSum = credits.reduce((sum, value) => sum + value, 0);
+  const stores = new Set(selection.map(row => row.store).filter(Boolean));
+  const summary = $('transactionSummary');
+  summary.hidden = !selection.length;
+  summary.replaceChildren(...[
+    ['筆數', selection.length ? `${selection.length} 筆` : '0 筆'],
+    ['折抵合計', credits.length ? `NT$ ${currency.format(creditSum)}` : '未提供'],
+    ['店點', `${stores.size} 店`]
+  ].map(([label, value]) => {
+    const card = document.createElement('article');
+    card.append(node('span', label), node('strong', value));
+    return card;
+  }));
   $('transactionHighlights').hidden = !selection.length;
   renderTop('topModels', selection.map(row => row.model));
   renderTop('topProjects', selection.map(projectName));
