@@ -25,7 +25,8 @@ function readonlyConversionState_() {
 }
 
 function readonlyConversionNormalize_(incoming) {
-  const value = ReadonlyDashboardCore.validateConversion(incoming);
+  const value = incoming?.schema === 'north12-conversion-publication/v1'
+    ? ConversionPublicationCore.normalize(incoming) : ReadonlyDashboardCore.validateConversion(incoming);
   if (!value.source_bytes || value.source_bytes > 40 * 1024 * 1024 ||
       !/^[^/\\\x00-\x1f]{1,155}\.xls[xm]$/i.test(value.source_name)) throw Error('締結率原始檔身分不完整');
   // validateConversion returns a strict aggregate projection; arbitrary original
@@ -51,7 +52,7 @@ function readonlyConversionReadEntry_(entry) {
       file.getSharingPermission() !== DriveApp.Permission.NONE ||
       file.getOwner().getEmail() !== folder.getOwner().getEmail()) throw Error('締結率版本不在既有私有資料域');
   const text = file.getBlob().getDataAsString('UTF-8');
-  if (text.length > 100000 || readonlyConversionHash_(text) !== entry.hash) throw Error('締結率版本讀回雜湊不符');
+  if (text.length > 2000000 || readonlyConversionHash_(text) !== entry.hash) throw Error('締結率版本讀回雜湊不符');
   const value = readonlyConversionNormalize_(JSON.parse(text));
   if (JSON.stringify(value) !== text || value.sha256 !== entry.sourceHash ||
       value.cutoff !== entry.cutoff || value.source_name !== entry.sourceName) throw Error('締結率版本內容不完整');
@@ -74,8 +75,13 @@ function readonlyConversionAttach_(snapshot) {
     const state = readonlyConversionState_().value;
     if (!state.revision) return snapshot;
     delete snapshot.conversionBattle;
-    snapshot.conversionStatus = {status:state.active ? 'verified' : 'unavailable', revision:state.revision};
-    if (state.active) snapshot.conversionBattle = readonlyConversionReadEntry_(state.active);
+    snapshot.conversionStatus = {status:state.active ? 'verified' : 'unavailable', ...readonlyConversionSummary_(state)};
+    if (state.active) {
+      const data = readonlyConversionReadEntry_(state.active);
+      const b = data.schema === 'north12-conversion-publication/v1' ? ConversionPublicationCore.projectB(data) : data;
+      if (b) snapshot.conversionBattle = b;
+      else snapshot.conversionStatus.status = 'unavailable';
+    }
   } catch (error) {
     delete snapshot.conversionBattle;
     snapshot.conversionStatus = {status:'unavailable', reason:'私有締結率元件讀回未通過，請由主管核對版本'};
@@ -93,26 +99,37 @@ function readonlyConversionStatus(payload) {
 function readonlyConversionPreview(payload) {
   const employeeId = reportUploadAuthorize_(payload);
   const text = JSON.stringify(payload.snapshot || null);
-  if (text.length > 100000) throw Error('締結率彙總檔過大');
-  const incoming = readonlyConversionNormalize_(payload.snapshot);
+  if (text.length > 2000000) throw Error('締結率彙總檔過大');
+  let incoming = readonlyConversionNormalize_(payload.snapshot);
   const state = readonlyConversionState_().value;
   const current = readonlyConversionReadEntry_(state.active);
-  if (current && incoming.period_start < current.period_start) throw Error('不可發布較舊月份');
-  const diff = current && current.period_start === incoming.period_start
-    ? ReadonlyDashboardCore.diff(current, incoming)
-    : {same_source:false, added:incoming.records.length, changed:0, removed:0};
-  if (diff.removed) throw Error('新版本移除既有店日，停止發布');
+  let diff;
+  if (incoming.schema === 'north12-conversion-publication/v1' || current?.schema === 'north12-conversion-publication/v1') {
+    const merged = ConversionPublicationCore.combine(current, ConversionPublicationCore.migrate(incoming));
+    incoming = merged.snapshot;
+    diff = merged;
+  } else {
+    if (current && incoming.period_start < current.period_start) throw Error('不可發布較舊月份');
+    diff = current && current.period_start === incoming.period_start
+      ? ReadonlyDashboardCore.diff(current, incoming)
+      : {same_source:false, added:incoming.records.length, changed:0, removed:0};
+    if (diff.removed) throw Error('新版本移除既有店日，停止發布');
+  }
   const canonical = JSON.stringify(incoming), hash = readonlyConversionHash_(canonical);
   if (diff.same_source && state.active.hash !== hash) throw Error('相同原始檔雜湊卻有不同彙總內容');
+  const isDepartment = incoming.schema === 'north12-conversion-publication/v1';
+  const b = isDepartment ? ConversionPublicationCore.projectB(incoming) : incoming;
   const token = Utilities.getUuid().replace(/-/g, '');
   const staged = {employeeId:employeeId, expiresAt:Date.now() + 1800000,
     expectedRevision:state.revision, expectedHash:state.active ? state.active.hash : null,
     hash:hash, snapshot:incoming};
-  CacheService.getScriptCache().put(READONLY_CONVERSION_STAGE_ + token, JSON.stringify(staged), 1800);
+  readonlyConversionCachePut_(READONLY_CONVERSION_STAGE_ + token, JSON.stringify(staged));
   return {status:'ok', token:token, live:readonlyConversionSummary_(state),
     preview:{sourceName:incoming.source_name, sourceHash:incoming.sha256,
-      cutoff:incoming.cutoff, periodStart:incoming.period_start, storeDateKeys:incoming.records.length,
-      totals:ReadonlyDashboardCore.aggregate(incoming.records), hash:hash,
+      cutoff:incoming.cutoff, periodStart:incoming.period_start, storeDateKeys:isDepartment ? Object.values(incoming.regions).reduce((sum, data) => sum + data.records.length, 0) : incoming.records.length,
+      coverage:isDepartment ? ConversionPublicationCore.coverage(incoming) : null,
+      retainedSources:isDepartment ? (incoming.retained_sources || []) : [],
+      totals:b ? ReadonlyDashboardCore.aggregate(b.records) : {}, hash:hash,
       sameSource:diff.same_source, added:diff.added, changed:diff.changed, removed:diff.removed}};
 }
 
@@ -126,7 +143,7 @@ function readonlyConversionPublish(payload) {
   const employeeId = reportUploadAuthorize_(payload);
   if (payload.confirm !== true || !/^[a-f0-9]{32}$/i.test(payload.previewToken || '')) throw Error('請先預覽並確認發布');
   const cache = CacheService.getScriptCache(), key = READONLY_CONVERSION_STAGE_ + payload.previewToken;
-  const raw = cache.get(key);
+  const raw = readonlyConversionCacheGet_(key);
   if (!raw) throw Error('預覽已失效，請重新檢查原始檔');
   const staged = JSON.parse(raw);
   if (staged.employeeId !== employeeId || staged.expiresAt <= Date.now()) throw Error('預覽操作者或期限不符');
@@ -182,3 +199,35 @@ function readonlyConversionRollback(payload) {
   } finally { lock.releaseLock(); }
 }
 
+
+// Existing uploader authorization protects the complete department projection.
+function readonlyConversionDepartmentRead(payload) {
+  reportUploadAuthorize_(payload);
+  const state = readonlyConversionState_().value;
+  const data = readonlyConversionReadEntry_(state.active);
+  return {status:'ok', live:readonlyConversionSummary_(state),
+    publication:data ? ConversionPublicationCore.migrate(data) : null};
+}
+
+function readonlyConversionCachePut_(key, text) {
+  const cache = CacheService.getScriptCache();
+  if (text.length <= 20000) { cache.put(key, text, 1800); return; }
+  const chunks = Math.ceil(text.length / 20000);
+  for (let index = 0; index < chunks; index++) cache.put(key + '_' + index, text.slice(index * 20000, (index + 1) * 20000), 1800);
+  cache.put(key, JSON.stringify({chunks:chunks, hash:readonlyConversionHash_(text)}), 1800);
+}
+function readonlyConversionCacheGet_(key) {
+  const cache = CacheService.getScriptCache(), raw = cache.get(key);
+  if (!raw) return null;
+  const header = JSON.parse(raw);
+  if (!header.chunks) return raw;
+  if (!Number.isSafeInteger(header.chunks) || header.chunks > 110) throw Error('預覽格式不符');
+  let text = '';
+  for (let index = 0; index < header.chunks; index++) {
+    const chunk = cache.get(key + '_' + index);
+    if (chunk === null) throw Error('預覽已失效，請重新檢查原始檔');
+    text += chunk;
+  }
+  if (readonlyConversionHash_(text) !== header.hash) throw Error('預覽內容不完整');
+  return text;
+}

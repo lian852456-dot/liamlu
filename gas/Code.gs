@@ -3335,6 +3335,7 @@ function doPost(e) {
     else if (action === 'report_upload_commit') result = reportUploadCommit(payload);
     else if (action === 'report_upload_log') result = reportUploadLog(payload);
     else if (action === 'report_upload_rollback') result = reportUploadRollback(payload);
+    else if (action === 'readonly_conversion_department_read') result = readonlyConversionDepartmentRead(payload);
     else if (action === 'readonly_conversion_status') result = readonlyConversionStatus(payload);
     else if (action === 'readonly_conversion_preview') result = readonlyConversionPreview(payload);
     else if (action === 'readonly_conversion_publish') result = readonlyConversionPublish(payload);

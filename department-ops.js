@@ -502,6 +502,8 @@
     $('departmentAccess').dataset.expiring = 'false';
     monthlyUI?.clear();
     window.DepartmentScoresReadSession?.clear();
+    const conversionFrame = document.querySelector('iframe[title="部區正式締結率"]');
+    if (conversionFrame) conversionFrame.src = 'department-conversion.html';
     goldData=null;goldHistory=null;storeData=null;goldSourceName='';goldPublishedAt='';
     if (!$('workspace').hidden) $('workspace').hidden = true;
     if ($('authPanel').hidden) $('authPanel').hidden = false;

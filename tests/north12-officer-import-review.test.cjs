@@ -98,3 +98,15 @@ test('regional and store tables may repeat column headers without repeating the 
  }
  assert.deepEqual(parse(w),expected);
 });
+
+test('same-period trailing supervisor summary headers do not hide or duplicate store rows',()=>{
+ const w=source();
+ const baseline=parse(w);
+ for(const name of ['AQ締結率','RT締結率']){
+  const rows=X.utils.sheet_to_json(w.Sheets[name],{header:1,raw:true,defval:null});
+  const header=rows[0].slice();header[2]=header[0];header[0]=null;
+  rows.push(header,rows[1].slice(),[null,'北一區','北一二','北一二B','合成彙總']);
+  w.Sheets[name]=X.utils.aoa_to_sheet(rows);
+ }
+ assert.deepEqual(parse(w).records,baseline.records);
+});

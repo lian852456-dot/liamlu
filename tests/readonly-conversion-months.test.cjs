@@ -144,7 +144,7 @@ test('department imports current counts with no pivot, prior headers, daily rate
  assert.equal(actual.prior,null);assert.equal(actual.prior_period,null);
  assert.deepEqual(b.records,expected.records);
  assert.equal(b.prior,null);assert.equal(b.prior_period,null);
- assert.deepEqual(actual.renewalDetail.coverage,{tiers:false,observation:false,plans:false});
+ assert.deepEqual(actual.renewalDetail.coverage,{tiers:false,observation:false,plans:false,cross:false});
  assert.equal(JSON.stringify(w),before);
  rt[at(2,l.rt.twN)].v++;
  for(const parser of [Source,Officer])assert.throws(()=>parser.parseWorkbook(w,X,opts),/RT分子|總表/);
