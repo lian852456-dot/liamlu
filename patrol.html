@@ -63,22 +63,20 @@
     background:var(--bg);color:var(--ink);line-height:1.55;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{width:100%;max-width:1664px;margin:0 auto;padding:20px 32px 80px}
+  .wrap{width:min(1180px,calc(100% - 32px));margin:0 auto;padding:12px 0 48px}
   .wrap>*{min-width:0}
 
   /* Header */
   header{
-    background:var(--tw-black);color:#fff;border-radius:14px;
-    padding:22px 24px;margin-bottom:18px;position:relative;overflow:hidden;
+    background:var(--tw-black);color:#fff;border-radius:12px;
+    padding:10px 12px;margin-bottom:10px;position:relative;
   }
-  header::after{
-    content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;
-    background:radial-gradient(circle,var(--tw-orange) 0%,transparent 70%);opacity:.25;
-  }
-  header h1{font-size:24px;font-weight:800;letter-spacing:.5px;display:flex;align-items:center;gap:10px}
+  header::after{display:none}
+  .patrol-head-row{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
+  header h1{font-size:18px;font-weight:800;letter-spacing:0;display:flex;align-items:center;gap:8px;margin:0}
   header h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--tw-orange);display:inline-block}
-  header .sub{color:#bbb;font-size:16px;margin-top:6px}
-  .month-pick{margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  header .sub{color:#bbb;font-size:13px;margin:0}
+  .month-pick{margin:0 0 0 auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .month-pick label{font-size:16px;color:#ccc}
   .month-pick input{
     background:#2a2a2a;border:1px solid #3a3a3a;color:#fff;border-radius:8px;
@@ -106,7 +104,7 @@
   .stat{
     background:var(--card);border-radius:12px;padding:16px;border:1px solid var(--line);
   }
-  .stat .num{font-size:31px;font-weight:800;color:var(--tw-black)}
+  .stat .num{font-size:22px;font-weight:800;color:var(--tw-black)}
   .stat .num.warn{color:var(--miss)}
   .stat .num.good{color:var(--ok)}
   .stat .lbl{font-size:14px;color:var(--muted);margin-top:2px}
@@ -153,18 +151,23 @@
 
   /* 2026-09 起獨立 25 項巡店看板；舊 33 項 DOM 與樣式完整保留。 */
   .sep25-dashboard[hidden],.legacy-patrol-block[hidden]{display:none}
-  .sep25-version-note{margin:0 0 12px;padding:10px 12px;border-radius:9px;background:#fff5ec;color:#8a4200;font-size:16px;line-height:1.6}
+  .sep25-version-note{margin:0 0 8px;padding:6px 10px;border-radius:8px;background:#fff5ec;color:#8a4200;font-size:13px;line-height:1.4}
+  .sep25-version-note summary{cursor:pointer;font-weight:800}
   .sep25-groups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
   .sep25-group{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}
-  .sep25-group strong{display:block;font-size:23px;color:var(--tw-black)}
+  .sep25-group strong{display:block;font-size:18px;color:var(--tw-black)}
   .sep25-group span{display:block;margin-top:3px;font-size:14px;color:var(--muted);line-height:1.45}
   .sep25-group.warn strong{color:var(--miss)}
   .sep25-catalog{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
   .sep25-catalog summary{cursor:pointer;font-size:16px;font-weight:800;color:var(--tw-orange)}
   .sep25-catalog .item{align-items:flex-start}
   .sep25-source-note{font-size:14px;color:var(--muted);margin:8px 0 0}
-  .sep25-visit-reminder{margin-top:10px;padding:10px 12px;border:1px solid #f4d08a;border-radius:9px;background:#fffaf0;color:#7a5200;font-size:15px;line-height:1.6}
-  .sep25-visit-reminder strong{display:block;color:#9a6200}
+  .sep25-visit-reminder{margin-top:8px;padding:8px 10px;border:1px solid #f4d08a;border-radius:8px;background:#fffaf0;color:#7a5200;font-size:13px;line-height:1.35}
+  .sep25-visit-reminder strong{display:block;color:#9a6200;margin-bottom:6px}
+  .visit-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .visit-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:#fff;border:1px solid #f4d08a;color:#8a5c00;font-size:12px;font-weight:700}
+  .visit-chip.done{background:#e7f6ee;border-color:#bfe6d0;color:#146743}
+  .visit-chip.miss{background:#fff0ed;border-color:#efc4c4;color:#9d2f24}
   .sep25-visit-status{margin:0 0 12px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fafafa;font-size:15px;line-height:1.55}
   .sep25-visit-status.done{border-color:#bfe6d0;background:var(--ok-bg);color:var(--ok)}
   .sep25-visit-status.warn{border-color:#f4d08a;background:#fffaf0;color:#8a5c00}
@@ -248,11 +251,14 @@
   }
 
   /* ---------- 加密工作頁籤 ---------- */
-  .secure-tabs{display:flex;gap:7px;flex-wrap:wrap;margin-top:16px;position:relative;z-index:2}
-  .secure-tab{border:1px solid #454545;background:#292929;color:#ddd;border-radius:9px;padding:8px 12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+  .secure-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;position:relative;z-index:2}
+  .secure-tab{border:1px solid #454545;background:#292929;color:#ddd;border-radius:8px;padding:4px 8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
   .secure-tab:hover,.secure-tab.active{background:var(--tw-orange);border-color:var(--tw-orange);color:#fff}
   .secure-tab.locked::before{content:'🔒 ';font-size:14px}
-  .private-auth-bar{margin-top:12px;padding:10px 12px;border:1px solid #454545;border-radius:9px;background:#242424;color:#ddd;display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:14px;position:relative;z-index:2}
+  .private-auth-bar{margin-top:6px;padding:0;border:0;background:transparent;color:#ddd;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;position:relative;z-index:2}
+  .patrol-settings{color:#e8e8e8;font-size:13px}
+  .patrol-settings summary{cursor:pointer;color:#ffd7b8}
+  .patrol-settings .cloud-row{margin-top:8px}
   .private-auth-bar .auth-status{flex:1;min-width:220px;color:#cfcfcf}
   .private-auth-bar .auth-status.ok{color:#9ff0b4}
   .private-auth-btn{border:1px solid #666;background:#343434;color:#fff;border-radius:7px;padding:7px 11px;font:inherit;font-weight:800;cursor:pointer}
@@ -479,12 +485,12 @@
     .half-dashboard-states{grid-template-columns:1fr}
   }
 
-  /* Liam: larger, bold YaHei typography across the patrol site. */
-  body{font-size:18px;line-height:1.6}
+  body{font-size:15px;line-height:1.45}
   body,body *{
     font-family:"Microsoft YaHei","Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif !important;
-    font-weight:700 !important;
+    font-weight:500 !important;
   }
+  body h1,body h2,body h3,body button,.stat .num,.sep25-group strong,.pill,.visit-chip{font-weight:800 !important}
   .stat .lbl{color:#666;line-height:1.55}
   .overview{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
   .item .idx,.half-no{min-width:32px;min-height:30px}
@@ -525,8 +531,16 @@
 <template id="patrolAppTemplate">
 <div class="wrap">
   <header>
+    <div class="patrol-head-row">
     <h1><span class="dot"></span>Liam情報站</h1>
     <div class="sub" id="subTitle">北一二B區 · 33 項檢核追蹤</div>
+    <div class="month-pick">
+      <label>追蹤月份</label>
+      <input type="month" id="monthInput">
+      <span id="cloudStatus" style="font-size:13px;font-weight:700;color:#ff9c9c">● 未連線</span>
+      <button class="btn-cloud ghost" type="button" onclick="cloudLoad()">重新載入</button>
+    </div>
+    </div>
     <nav class="secure-tabs" aria-label="受保護工作頁籤">
       <button class="secure-tab active" data-view="patrol" onclick="switchPatrolView('patrol')">📋 巡店看板</button>
       <button class="secure-tab" data-view="mileage" onclick="switchPatrolView('mileage')">🚗 每日移動里程</button>
@@ -535,18 +549,17 @@
       <button class="secure-tab locked" data-view="halfDashboard" onclick="switchPatrolView('halfDashboard')">🗂️ 督導面談紀錄</button>
     </nav>
     <div class="private-auth-bar" aria-label="受保護資料解鎖">
-      <span id="privateAuthStatus" class="auth-status ok">已通過正式後端驗證；session 關閉頁面或逾時即失效</span>
+      <span id="privateAuthStatus" class="auth-status ok">已驗證</span>
       <button id="privateLogoutBtn" class="private-auth-btn" type="button" onclick="privateSignOut()">登出</button>
-    </div>
-    <div class="month-pick">
-      <label>追蹤月份</label>
-      <input type="month" id="monthInput">
-      <span id="cloudStatus" style="font-size:14px;font-weight:700;color:#ff9c9c;margin-left:6px">● 未連線</span>
-    </div>
-    <div class="cloud-row">
-      <input type="text" id="gasUrl" placeholder="貼上 Google Apps Script 網頁應用程式 URL（設定一次即可）">
-      <button class="btn-cloud" onclick="cloudConnect()">連線</button>
-      <button class="btn-cloud ghost" onclick="cloudLoad()">重新載入</button>
+      <details class="patrol-settings">
+        <summary>設定</summary>
+        <p class="hint" style="color:#ccc;margin:6px 0">session 關閉頁面或逾時即失效。連線網址只在需要時展開。</p>
+        <div class="cloud-row">
+          <input type="text" id="gasUrl" placeholder="貼上 Google Apps Script 網頁應用程式 URL（設定一次即可）">
+          <button class="btn-cloud" type="button" onclick="cloudConnect()">連線</button>
+          <button class="btn-cloud ghost" type="button" onclick="cloudLoad()">重新載入</button>
+        </div>
+      </details>
     </div>
   </header>
 
@@ -562,7 +575,7 @@
   <section id="sep25Dashboard" class="sep25-dashboard" aria-label="2026年9月起新版25項巡店看板" hidden>
     <div class="panel">
       <h2>新版 25 項巡店看板</h2>
-      <p class="sep25-version-note">2026/09/01 起依新版題目計算：只有 V 計入完成，NA 一律列為未執行缺項；每店每月巡店 2 次，兩次日期須至少相隔 7 天；第 1–9 項每月執行 1 次、第 10 項固定雙月執行 1 次、第 11–25 項為 NCC 每月宣導。2026/08/31 前的 33 項歷史看板不受影響。</p>
+      <details class="sep25-version-note"><summary>新版 25 項規則</summary><p>2026/09/01 起依新版題目計算：只有 V 計入完成，NA 一律列為未執行缺項；每店每月巡店 2 次，兩次日期須至少相隔 7 天；第 1–9 項每月執行 1 次、第 10 項固定雙月執行 1 次、第 11–25 項為 NCC 每月宣導。2026/08/31 前的 33 項歷史看板不受影響。</p></details>
       <div id="sep25LoadState" class="sep25-source-note" role="status" aria-live="polite"></div>
       <div id="sep25VisitReminder" class="sep25-visit-reminder" role="status" aria-live="polite"></div>
       <div id="sep25Overview" class="overview"></div>
@@ -1151,7 +1164,7 @@ function mountPatrolApp(){
   loadHalfLocal();
   activePatrolView='patrol';
   render();
-  setPrivateAuthStatus('已通過正式後端驗證；session 關閉頁面或逾時即失效',true);
+  setPrivateAuthStatus('已驗證',true);
   const gi=document.getElementById('gasUrl');
   if(gi){ gi.value=PRIVATE_GAS_URL; gi.readOnly=true; }
   cloudConnect();
@@ -1978,6 +1991,15 @@ function sep25DateLabel(value){
   return match?`${match[1]}/${Number(match[2])}/${Number(match[3])}`:String(value||'—');
 }
 
+function sep25VisitChip(store){
+  const visits=store.visits;
+  const name=esc(store.name);
+  if(visits.completed) return `<span class="visit-chip done" title="${sep25DateLabel(visits.firstVisit)}、${sep25DateLabel(visits.secondVisit)}，相隔 ${visits.gapDays} 天">${name} 完成</span>`;
+  if(!visits.firstVisit) return `<span class="visit-chip miss" title="尚未完成本月第 1 次巡店">${name} 未完成</span>`;
+  const extra=visits.recordedVisits>1?`已有 ${visits.recordedVisits} 個到店日，間隔仍不足 7 天`:'尚待第 2 次';
+  return `<span class="visit-chip" title="第一次 ${sep25DateLabel(visits.firstVisit)}；${extra}">${name} 最早 ${sep25DateLabel(visits.nextEligibleDate)}</span>`;
+}
+
 function sep25VisitStatusHTML(store){
   const visits=store.visits;
   if(visits.completed){
@@ -2039,7 +2061,7 @@ function renderSep25Dashboard(){
   }
   const visitPending=model.stores.filter(store=>!store.visits.completed);
   reminder.innerHTML=visitPending.length
-    ? `<strong>每月 2 次巡店提醒（兩次至少相隔 7 天）</strong>${visitPending.map(store=>store.visits.firstVisit?`${esc(store.name)}：第 2 次最早 ${sep25DateLabel(store.visits.nextEligibleDate)}`:`${esc(store.name)}：尚未完成第 1 次`).join('；')}`
+    ? `<strong>每月 2 次巡店（相隔 7 天）</strong><div class="visit-chips">${visitPending.map(sep25VisitChip).join('')}</div>`
     : '<strong>✓ 九店本月皆已完成 2 次巡店，且日期至少相隔 7 天</strong>';
   overview.innerHTML=`<div class="stat"><div class="num">${model.visitedStores}</div><div class="lbl">本月有到店店數</div></div><div class="stat"><div class="num good">${model.fullyDoneStores}</div><div class="lbl">巡店完整完成店數</div></div><div class="stat"><div class="num good">${model.visitCadenceCompleteStores}</div><div class="lbl">2 次且相隔 7 天店數</div></div><div class="stat"><div class="num good">${model.questionCompleteStores}</div><div class="lbl">25 項完成店數</div></div><div class="stat"><div class="num ${model.unvisitedStores.length?'warn':''}">${model.unvisitedStores.length}</div><div class="lbl">尚未巡店店數</div></div>`;
   const monthlyDone=model.stores.filter(store=>store.monthly.missing===0).length;

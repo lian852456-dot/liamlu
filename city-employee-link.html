@@ -10,9 +10,10 @@
   <style>
     :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif; }
     body { margin: 0; min-height: 100vh; background: #f4f0e8; color: #27352d; }
-    main { box-sizing: border-box; width: min(100% - 32px, 560px); margin: 0 auto; padding: 32px 0 48px; }
-    .card { background: #fffdf8; border: 1px solid #ded5c3; border-radius: 18px; box-shadow: 0 12px 28px #40513a18; padding: 24px; }
-    h1 { margin: 0 0 10px; font-size: 1.45rem; }
+    main { box-sizing: border-box; width: min(100% - 32px, 560px); margin: 0 auto; padding: 16px 0 32px; }
+    .card { background: #fffdf8; border: 1px solid #ded5c3; border-radius: 12px; box-shadow: none; padding: 16px; }
+    h1 { margin: 0 0 8px; font-size: 20px; line-height: 1.3; }
+    details summary { cursor: pointer; font-weight: 700; }
     p { line-height: 1.65; }
     .note { color: #536459; font-size: .95rem; }
     label { display: grid; gap: 6px; margin: 16px 0; font-weight: 600; }
@@ -30,7 +31,7 @@
   <main id="employee-link-app">
     <section class="card" aria-labelledby="employee-link-title">
       <h1 id="employee-link-title">登入本人員編並將目前城市角色綁定</h1>
-      <p class="security">此頁只在正式網站驗證員工身分；城市只會收到伺服器核發的一次性憑據，不會收到員編、原網站 session、裝置識別或原 B token。請使用原網站指定密碼。</p>
+      <details class="security"><summary>驗證範圍</summary><p>此頁只在正式網站驗證員工身分；城市只會收到伺服器核發的一次性憑據，不會收到員編、原網站 session、裝置識別或原 B token。請使用原網站指定密碼。</p></details>
       <p id="employee-link-status" role="status" aria-live="polite">正在檢查交接邀請…</p>
       <form id="employee-link-login-form" novalidate>
         <label>員編

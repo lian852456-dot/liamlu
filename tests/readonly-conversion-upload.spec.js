@@ -24,6 +24,24 @@ async function preview(page,options={}){
   await page.locator('#conversionFile').setInputFiles({name:'synthetic-conversion.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:workbook(options)});
   await page.locator('#conversionPreviewBtn').click();
 }
+for(const width of [390,1280])test(`integrated compact header keeps expandable guidance and protected read at ${width}px`,async({page},info)=>{
+  await page.setViewportSize({width,height:900});
+  const s=await setup(page,{login:false});
+  const guidance=page.locator('#authCard details');
+  await expect(guidance.locator('summary')).toHaveText('驗證說明');
+  await expect(guidance.locator('p')).toBeHidden();
+  await guidance.locator('summary').click();await expect(guidance.locator('p')).toBeVisible();
+  await guidance.locator('summary').click();
+  await expect(page.locator('.hero summary')).toHaveText('怎麼更新');
+  await page.locator('#employeeId').fill(s.b.auth.employeeId);await page.locator('#adminSecret').fill(s.b.auth.adminSecret);
+  await page.getByRole('button',{name:'登入並讀取締結率版本'}).click();
+  await expect(page.locator('#conversionUploadCard')).toContainText('A／B／C／D');
+  await expect(page.locator('#conversionUploadCard')).toContainText('B 區九店同步讀取');
+  expect(s.calls.map(c=>c.name)).toEqual(['readonly_conversion_status']);
+  expect(s.b.files.size).toBe(0);expect(s.errors).toEqual([]);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:info.outputPath(`integrated-compact-upload-${width}.png`),fullPage:true});
+});
 test('real XLSX parser → actual doPost/original admin guard → private readback → dashboard → rollback',async({page},info)=>{
   const s=await setup(page);await preview(page);await expect(page.locator('#conversionPreview')).toBeVisible();await expect(page.locator('#conversionPreviewText')).toContainText('27 店日');expect(s.b.files.size).toBe(0);
   await page.locator('#conversionConfirm').check();await page.locator('#conversionPublishBtn').click();await expect(page.locator('#conversionMessage')).toContainText('已完成私有版本讀回');expect(s.b.files.size).toBe(1);

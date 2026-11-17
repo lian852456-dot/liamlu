@@ -30,12 +30,15 @@ body{background:var(--paper);color:var(--ink);font-family:'Microsoft YaHei','Not
 button,input{font:inherit}
 button{cursor:pointer}
 .page{width:min(1040px,calc(100% - 32px));margin:0 auto;padding:12px 0 28px}
-.masthead{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;margin-bottom:28px}
+.masthead{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}
+.lede{margin:4px 0 0;font-size:13px}
+.lede summary{cursor:pointer}
 .back-link{display:inline-block;margin-bottom:22px;color:var(--ink-soft);font-size:14px;text-decoration:none}
 .back-link:hover,.back-link:focus-visible{color:var(--orange-deep)}
 .eyebrow,.step-label{margin:0 0 7px;color:var(--orange-deep);font:700 12px/1.2 ui-monospace,'SFMono-Regular',Consolas,monospace;letter-spacing:.08em}
 h1{font-size:22px;line-height:1.25;letter-spacing:0;margin:0}
-.lede{margin:12px 0 0;color:var(--ink-soft);line-height:1.7}
+.lede{margin:4px 0 0;color:var(--ink-soft);line-height:1.4;font-size:13px}
+.lede summary{cursor:pointer}
 .mode-badge{flex:none;border:1px solid var(--line);background:var(--raised);border-radius:999px;padding:9px 13px;color:var(--ink-soft);font-size:12px;font-weight:700}
 .panel{background:var(--raised);border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:none}
 .panel-heading,.dashboard-head,.dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
