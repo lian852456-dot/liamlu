@@ -37,7 +37,8 @@ for(const width of [390,1280])test(`integrated compact header keeps expandable g
   await page.getByRole('button',{name:'登入並讀取締結率版本'}).click();
   await expect(page.locator('#conversionUploadCard')).toContainText('A／B／C／D');
   await expect(page.locator('#conversionUploadCard')).toContainText('B 區九店同步讀取');
-  expect(s.calls.map(c=>c.name)).toEqual(['readonly_conversion_status']);
+  // Existing flow reads status to authenticate, then refreshes the visible version.
+  await expect.poll(()=>s.calls.map(c=>c.name)).toEqual(['readonly_conversion_status','readonly_conversion_status']);
   expect(s.b.files.size).toBe(0);expect(s.errors).toEqual([]);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:info.outputPath(`integrated-compact-upload-${width}.png`),fullPage:true});
