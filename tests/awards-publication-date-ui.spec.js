@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const config = require('../config/award-config-2026-10.json');
+const { chooseLegacyChannel, submitLegacyLogin, showAwardDetails } = require('./helpers/awards-legacy-ui.cjs');
 
 let server, base;
 test.beforeAll(async () => {
@@ -42,9 +43,12 @@ async function open(page, pageName, sourceMismatch = false) {
   });
   await page.goto(`${base}/${pageName}`);
   if (pageName === 'index.html') await page.getByRole('button', { name: /台獎戰情/ }).click();
-  const content = page.locator('#awardsBattleContent');
-  await content.locator('input[placeholder="輸入員工編號"]').fill('1234567');
-  await content.getByRole('button', { name: '以員編登入' }).click();
+  await chooseLegacyChannel(page);
+  await submitLegacyLogin(page);
+  if (pageName === 'index.html') {
+    await expect(page.locator('#kpiBattleContent .private-lock')).toHaveCount(0);
+    await page.getByRole('button', { name: /台獎戰情/ }).click();
+  }
   return actions;
 }
 
@@ -54,6 +58,7 @@ for (const pageName of ['index.html', 'awards-battle.html']) {
     page.on('pageerror', error => errors.push(error.message));
     const actions = await open(page, pageName);
     await expect(page.locator('#awardsBattleSourceNote')).toContainText('發布日期 2026-10-02｜資料截至 2026-10-01');
+    await showAwardDetails(page);
     await expect(page.locator('.award-model')).toHaveCount(10);
     await expect(page.locator('#awardsBattleContent')).toContainText('$12,345');
     await expect(page.locator('#awardsStoreSelect option')).toHaveCount(10);
