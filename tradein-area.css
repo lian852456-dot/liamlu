@@ -22,6 +22,7 @@ body[data-performance-release="public"] .pending-tabs,body[data-performance-rele
 body[data-performance-release="public"] .role-select{justify-content:flex-start;align-items:end}
 body[data-performance-release="public"] .role-select label{gap:3px;font-size:13px;line-height:1.3}
 body[data-performance-release="public"] .role-select input{display:block;width:148px;min-width:0;padding:5px 8px;font-size:16px}
+body[data-performance-release="public"] .role-select input[type="month"]{width:174px}
 body[data-performance-release="public"] .role-select button,body[data-performance-release="public"] .pending-tabs button{padding:6px 10px;font-size:15px;white-space:nowrap}
 body[data-performance-release="public"] .date-mode-note{margin:8px 0 0;padding:8px 12px;border-left:4px solid var(--orange);background:var(--soft);font-weight:700}
 body[data-performance-release="public"] .form-message{overflow-wrap:anywhere}
@@ -54,8 +55,9 @@ body[data-performance-release="public"] .empty-people td{text-align:center;color
  body[data-performance-release="public"] .panel{padding:16px 12px}
  body[data-performance-release="public"] .pending-tabs{width:100%}
  body[data-performance-release="public"] .pending-tabs button{min-width:0;padding-inline:4px;font-size:14px}
- body[data-performance-release="public"] .role-select{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
- body[data-performance-release="public"] .role-select input{width:100%;max-width:100%}
+ body[data-performance-release="public"] .role-select{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);width:100%}
+ body[data-performance-release="public"] .role-select input,
+ body[data-performance-release="public"] .role-select input[type="month"]{width:100%;max-width:100%}
  body[data-performance-release="public"] .mobile-stack td:before{font-size:18px}
  body[data-performance-release="public"] .mobile-stack td{grid-template-columns:100px minmax(0,1fr);overflow-wrap:anywhere}
  body[data-performance-release="public"] .mobile-stack td:first-child strong{font-size:18px}
