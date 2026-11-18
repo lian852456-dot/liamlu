@@ -10,7 +10,7 @@
 .battle-compact .compact-controls{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;margin:0;border:0;border-radius:0;box-shadow:none}
 .battle-compact #kpiCompactCutoff{margin:0;color:#334155;font-weight:750;font-size:15px}
 .battle-compact .compact-controls .kpi-battle-toggle button{min-height:36px;padding:5px 12px;font-size:15px}
-.battle-compact .compact-summary{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:12px 0 18px}
+.battle-compact .compact-summary{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:12px 0}
 .battle-compact .compact-summary .summary-card{min-height:100px;padding:10px;border-color:#f1d7c6;background:#fffaf6;box-shadow:none}
 .battle-compact .sc-label{color:#111827;font-size:19px}
 .battle-compact .sc-val{font-size:30px;margin:4px 0;color:#111827}
@@ -29,11 +29,12 @@
 .battle-compact .insurance-low{color:#b91c1c;background:#fff0ee}
 .battle-compact .kpi-battle-note{font-size:13px;font-weight:500}
 .battle-compact .table-wrap{margin:0;border:1px solid #e2e8f0;border-radius:7px}
-.battle-compact table.compact-matrix{min-width:980px;table-layout:fixed;font-size:15px}
+.battle-compact table.compact-matrix{min-width:1136px;table-layout:fixed;font-size:15px}
 .battle-compact .compact-matrix th:first-child{width:160px}
 .battle-compact .compact-matrix th,.battle-compact .compact-matrix td{padding:4px 5px;border-right:1px solid #e2e8f0;font-size:15px;line-height:1.2;font-weight:750}
 .battle-compact .compact-matrix thead th,.battle-compact .compact-details thead th{background:#f36500;color:white;border-bottom:0;font-size:14px;padding:7px}
-.battle-compact .compact-matrix thead th{white-space:normal}
+.battle-compact .compact-matrix thead th{padding-inline:4px;white-space:nowrap}
+.battle-compact .compact-matrix .kpi-aq-visitors-heading{width:92px}
 .battle-compact .compact-matrix [data-aq-visitors]{font-variant-numeric:tabular-nums}
 .battle-compact .compact-matrix tbody th{text-align:left;padding-left:13px;color:#111827}
 @media(min-width:701px){.battle-compact .compact-matrix tbody th,.battle-compact .compact-matrix tbody td{padding-block:2.5px}}
