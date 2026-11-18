@@ -81,3 +81,18 @@
 @media (max-width: 360px) {
   .gold-page .filter-panel { grid-template-columns: 1fr; }
 }
+.gold-page{font-size:14px;line-height:1.4}
+.gold-page .page{padding-top:8px}
+.gold-page .back-link{margin-bottom:4px;font-size:13px}
+.gold-page .masthead{padding-bottom:8px;margin-bottom:8px}
+.gold-page h1{font-size:18px}
+.gold-page h2{font-size:16px}
+.gold-page .lede{font-size:13px;margin-top:2px}
+.gold-page .summary-grid{gap:8px;margin:8px 0}
+.gold-page .summary-card{padding:8px 10px}
+.gold-page .summary-card span{font-size:12px}
+.gold-page .summary-card strong{font-size:22px}
+.gold-page th{padding:4px 8px}
+.gold-page td{padding:4px 8px}
+.gold-page .load-panel{padding:8px 10px;gap:8px}
+.gold-page .secondary-button{min-height:36px;font-size:14px}
