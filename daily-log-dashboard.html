@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f6f4ef">
 <meta name="robots" content="noindex,nofollow">
 <title>每日日誌檢查 · 北一二B</title>
-<link rel="stylesheet" href="daily-log-dashboard.css?v=20261118-dense-1">
+<link rel="stylesheet" href="daily-log-dashboard.css?v=20261118-matrix-1">
 <script src="assets/vendor/xlsx.full.min.js"></script>
 <script src="daily-log-core.js?v=20260902-6"></script>
 </head>
@@ -22,13 +22,19 @@
     <div class="mode-badge">候選版 · 本機預覽</div>
   </header>
 
-  <section class="panel upload-panel" aria-labelledby="uploadTitle">
+  <section class="panel upload-panel" id="uploadPanel" aria-labelledby="uploadTitle">
+    <div id="uploadCompact" class="upload-compact" hidden>
+      <span id="compactFiles">尚未選檔</span>
+      <span id="compactDate"></span>
+      <button class="text-button" id="reopenUpload" type="button">重新選檔</button>
+      <button class="text-button danger" id="clearSnapshot" type="button" hidden>清除本機預覽</button>
+    </div>
+    <div class="upload-body">
     <div class="panel-heading">
       <div>
         <p class="step-label">STEP 1</p>
         <h2 id="uploadTitle">選擇日誌報表</h2>
       </div>
-      <button class="text-button danger" id="clearSnapshot" type="button" hidden>清除本機預覽</button>
     </div>
     <div class="upload-grid">
       <label class="field">
@@ -54,6 +60,7 @@
     <p class="privacy-note">兩份檔案可分開選擇，系統會依店點與日期合併；檔案只在目前裝置解析，尚未寫入雲端，也不會修改公司原始表單。</p>
     <div id="parseMessage" class="message" role="status" aria-live="polite"></div>
     <div id="calendarMessage" class="message" role="status" aria-live="polite"></div>
+    </div>
     <div id="importPreview" class="import-preview" hidden>
       <div class="preview-metrics">
         <div><strong id="parsedRows">0</strong><span>有效資料列</span></div>
@@ -66,41 +73,32 @@
   </section>
 
   <section id="dashboard" hidden>
-    <div class="dashboard-head">
-      <div>
-        <p class="step-label">STEP 2</p>
-        <h2>九店完成總覽</h2>
-        <p id="sourceMeta" class="source-meta"></p>
+    <div class="log-toolbar">
+      <div class="summary-grid" aria-label="完成摘要">
+        <article><span>每日</span><strong id="dailyMetric">0 / 36</strong></article>
+        <article><span>每週</span><strong id="weeklyMetric">0 / 36</strong></article>
+        <article><span>每月</span><strong id="monthlyMetric">0 / 18</strong></article>
+        <article class="attention"><span>需追蹤</span><strong id="exceptionMetric">0</strong></article>
       </div>
-      <div class="dashboard-actions">
-        <button class="primary-button copy-button" id="copyReminder" type="button">一鍵複製群組提醒</button>
+      <div class="segmented" role="tablist" aria-label="日誌檢查分類">
+        <button class="active" type="button" role="tab" aria-selected="true" data-view="daily">每日</button>
+        <button type="button" role="tab" aria-selected="false" data-view="weekly">每週</button>
+        <button type="button" role="tab" aria-selected="false" data-view="monthly">每月</button>
+        <button type="button" role="tab" aria-selected="false" data-view="exceptions">需追蹤</button>
       </div>
+      <div class="daily-date-row">
+        <label class="field compact-field" for="viewDate">
+          <span>每日查看日期</span>
+          <input id="viewDate" type="date">
+        </label>
+      </div>
+      <button class="primary-button copy-button" id="copyReminder" type="button">一鍵複製群組提醒</button>
     </div>
+    <p id="sourceMeta" class="source-meta"></p>
     <p id="copyMessage" class="copy-message" role="status" aria-live="polite"></p>
     <div id="reminderPreview" class="reminder-preview" hidden>
       <label for="groupReminderText">群組提醒預覽</label>
       <textarea id="groupReminderText" rows="10" readonly></textarea>
-    </div>
-
-    <div class="summary-grid" aria-label="完成摘要">
-      <article><span>每日完成</span><strong id="dailyMetric">0 / 36</strong><small>九店 × 每日四項</small></article>
-      <article><span>每週完成</span><strong id="weeklyMetric">0 / 36</strong><small>九店 × 第一至第四週</small></article>
-      <article><span>每月完成</span><strong id="monthlyMetric">0 / 18</strong><small>物品清點＋資安個資</small></article>
-      <article class="attention"><span>需追蹤</span><strong id="exceptionMetric">0</strong><small>未完成、缺資料或待確認</small></article>
-    </div>
-
-    <div class="segmented" role="tablist" aria-label="日誌檢查分類">
-      <button class="active" type="button" role="tab" aria-selected="true" data-view="daily">每日</button>
-      <button type="button" role="tab" aria-selected="false" data-view="weekly">每週</button>
-      <button type="button" role="tab" aria-selected="false" data-view="monthly">每月</button>
-      <button type="button" role="tab" aria-selected="false" data-view="exceptions">需追蹤</button>
-    </div>
-
-    <div class="daily-date-row">
-      <label class="field compact-field" for="viewDate">
-        <span>每日查看日期</span>
-        <input id="viewDate" type="date">
-      </label>
     </div>
 
     <div id="storeGrid" class="store-grid"></div>
