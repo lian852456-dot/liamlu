@@ -8,7 +8,8 @@ const state = {
   pendingLog:null,
   pendingCalendar:null,
   snapshot:null,
-  view:'daily'
+  view:'daily',
+  sort:{ key:'gap', dir:-1 }
 };
 
 const $ = id => document.getElementById(id);
@@ -200,6 +201,8 @@ function clearSnapshot() {
   $('dashboard').hidden = true;
   $('importPreview').hidden = true;
   $('clearSnapshot').hidden = true;
+  $('uploadPanel').classList.remove('is-collapsed');
+  $('uploadCompact').hidden = true;
   $('fileName').textContent = '尚未選擇檔案';
   $('calendarFileName').textContent = '尚未選擇檔案';
   $('fileInput').value = '';
@@ -216,25 +219,64 @@ function metricScore(store, view) {
   return [store.monthlyDone, store.monthly.length];
 }
 
-function renderStoreCard(store, view) {
-  const forms = store[view];
-  const [done, total] = metricScore(store, view);
-  const hasDueException = forms.some(form => form.isDue && form.status !== 'done');
-  const scoreClass = hasDueException ? ' incomplete' : done === total ? ' complete' : ' neutral';
-  return `<button class="store-card" type="button" data-store="${escapeHtml(store.store)}">
-    <div class="store-card-head"><h3>${escapeHtml(store.store)}</h3><span class="score${scoreClass}">${done} / ${total}</span></div>
-    <div class="check-list">${forms.map(form => `<div class="check-row"><span>${escapeHtml(form.shortLabel)}</span><span class="status ${escapeHtml(form.status)}">${escapeHtml(statusLabel(form.status))}</span></div>`).join('')}</div>
-  </button>`;
+function shortStore(name) {
+  return String(name || '').replace(/^台北/, '');
+}
+
+function gapCount(store, view) {
+  return (store[view] || []).filter(form => form.isDue && form.status !== 'done').length;
+}
+
+function sortedStores(stores, view) {
+  const key = state.sort.key;
+  const dir = state.sort.dir;
+  return [...stores].sort((a, b) => {
+    let av;
+    let bv;
+    if (key === 'name') { av = a.store; bv = b.store; }
+    else if (key === 'done') { av = metricScore(a, view)[0]; bv = metricScore(b, view)[0]; }
+    else if (key === 'gap') { av = gapCount(a, view); bv = gapCount(b, view); }
+    else {
+      const fa = (a[view] || []).find(form => form.id === key);
+      const fb = (b[view] || []).find(form => form.id === key);
+      av = fa && fa.status === 'done' ? 1 : 0;
+      bv = fb && fb.status === 'done' ? 1 : 0;
+    }
+    if (av < bv) return -1 * dir;
+    if (av > bv) return 1 * dir;
+    return String(a.store).localeCompare(String(b.store), 'zh');
+  });
+}
+
+function markCell(store, form) {
+  const tone = form.status === 'done' ? 'ok' : form.status === 'upcoming' ? 'wait' : 'bad';
+  const mark = form.status === 'done' ? '✓' : form.status === 'upcoming' ? '·' : '✗';
+  const label = `${shortStore(store.store)} ${form.shortLabel} ${statusLabel(form.status)}`;
+  return `<td class="mark ${tone}"><button type="button" data-store="${escapeHtml(store.store)}" data-form="${escapeHtml(form.id)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${mark}</button></td>`;
+}
+
+function renderMatrix(model, view) {
+  const sample = model.stores[0] && model.stores[0][view] ? model.stores[0][view] : [];
+  const stores = sortedStores(model.stores, view);
+  const head = sample.map(form => `<th data-sort="${escapeHtml(form.id)}" scope="col">${escapeHtml(form.shortLabel)}</th>`).join('');
+  const body = stores.map(store => {
+    const [done, total] = metricScore(store, view);
+    const gap = gapCount(store, view);
+    return `<tr class="${gap ? 'has-gap' : 'all-done'}"><th scope="row"><button type="button" data-store="${escapeHtml(store.store)}" title="${escapeHtml(store.store)}">${escapeHtml(shortStore(store.store))}</button></th>${store[view].map(form => markCell(store, form)).join('')}<td class="score ${gap ? 'bad' : 'ok'}">${done}/${total}</td></tr>`;
+  }).join('');
+  return `<table class="matrix"><thead><tr><th data-sort="name" scope="col">店點</th>${head}<th data-sort="done" scope="col">完成</th></tr></thead><tbody>${body}</tbody></table>`;
 }
 
 function renderExceptions(model) {
   const rows = model.stores.flatMap(store => store.exceptions.map(form => ({ store:store.store, form })));
   const unknownRows = Array.isArray(state.snapshot.unknownForms) ? state.snapshot.unknownForms : [];
-  $('storeGrid').hidden = true;
-  $('exceptionList').hidden = false;
-  const tracked = rows.map(item => `<button class="exception-row" type="button" data-store="${escapeHtml(item.store)}" data-form="${escapeHtml(item.form.id)}"><strong>${escapeHtml(item.store)}</strong><span>${escapeHtml(item.form.label)}</span><span class="status ${escapeHtml(item.form.status)}">${escapeHtml(statusLabel(item.form.status))}</span></button>`).join('');
-  const unknown = unknownRows.map(item => `<div class="exception-row unknown-row"><strong>${escapeHtml(item.store)}</strong><span>未定義表單：${escapeHtml(item.formName)}</span><span class="status unknown">待確認</span></div>`).join('');
-  $('exceptionList').innerHTML = tracked || unknown ? tracked + unknown : '<div class="empty-state">目前沒有需追蹤項目。</div>';
+  $('exceptionList').hidden = true;
+  $('storeGrid').hidden = false;
+  const tracked = rows.map(item => `<tr><th scope="row">${escapeHtml(shortStore(item.store))}</th><td><button type="button" data-store="${escapeHtml(item.store)}" data-form="${escapeHtml(item.form.id)}">${escapeHtml(item.form.shortLabel || item.form.label)}</button></td><td class="mark bad"><span class="status ${escapeHtml(item.form.status)}">${escapeHtml(statusLabel(item.form.status))}</span></td></tr>`).join('');
+  const unknown = unknownRows.map(item => `<tr class="unknown-row"><th scope="row">${escapeHtml(shortStore(item.store))}</th><td>未定義：${escapeHtml(item.formName)}</td><td class="mark wait"><span class="status unknown">待確認</span></td></tr>`).join('');
+  $('storeGrid').innerHTML = tracked || unknown
+    ? `<table class="matrix exception-matrix"><thead><tr><th scope="col">店點</th><th scope="col">項目</th><th scope="col">狀態</th></tr></thead><tbody>${tracked}${unknown}</tbody></table>`
+    : '<div class="empty-state">目前沒有需追蹤項目。</div>';
 }
 
 function renderDashboard() {
@@ -250,7 +292,15 @@ function renderDashboard() {
     state.snapshot.fileName ? `日誌：${state.snapshot.fileName}` : '',
     state.snapshot.calendarFileName ? `行事曆：${state.snapshot.calendarFileName}` : ''
   ].filter(Boolean).join(' · ');
-  $('sourceMeta').textContent = `${sources || '本機資料'} · 資料基準日 ${selectedDate} · 僅本機預覽`;
+  $('sourceMeta').textContent = `${sources || '本機資料'} · 基準日 ${selectedDate}`;
+  const compact = $('uploadCompact');
+  if (compact) {
+    $('uploadPanel').classList.add('is-collapsed');
+    compact.hidden = false;
+    $('compactFiles').textContent = sources || '本機資料';
+    $('compactDate').textContent = `基準日 ${selectedDate}`;
+    $('clearSnapshot').hidden = false;
+  }
   $('dailyMetric').textContent = `${model.dailyDone} / ${model.dailyExpected}`;
   $('weeklyMetric').textContent = `${model.weeklyDone} / ${model.weeklyExpected}`;
   $('monthlyMetric').textContent = `${model.monthlyDone} / ${model.monthlyExpected}`;
@@ -260,7 +310,7 @@ function renderDashboard() {
   else {
     $('exceptionList').hidden = true;
     $('storeGrid').hidden = false;
-    $('storeGrid').innerHTML = model.stores.map(store => renderStoreCard(store, state.view)).join('');
+    $('storeGrid').innerHTML = renderMatrix(model, state.view);
   }
   bindDetailButtons();
 }
@@ -325,6 +375,17 @@ $('fileInput').addEventListener('change', event => parseLogFile(event.target.fil
 $('calendarFileInput').addEventListener('change', event => parseCalendarFile(event.target.files && event.target.files[0]));
 $('applyPreview').addEventListener('click', applyPending);
 $('clearSnapshot').addEventListener('click', clearSnapshot);
+$('reopenUpload').addEventListener('click', () => {
+  $('uploadPanel').classList.remove('is-collapsed');
+});
+$('storeGrid').addEventListener('click', event => {
+  const th = event.target.closest('th[data-sort]');
+  if (!th || !state.snapshot) return;
+  const key = th.dataset.sort;
+  state.sort.dir = state.sort.key === key ? -state.sort.dir : (key === 'name' ? 1 : -1);
+  state.sort.key = key;
+  renderDashboard();
+});
 $('viewDate').addEventListener('change', renderDashboard);
 $('copyReminder').addEventListener('click', copyGroupReminder);
 $('closeDialog').addEventListener('click', () => $('detailDialog').close());
