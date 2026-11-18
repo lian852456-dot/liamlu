@@ -5,6 +5,8 @@ on:
     paths:
       - 'gas/Code.gs'
       - 'awards-battle-controller.js'
+      - 'kpi-battle-controller.js'
+      - 'scripts/north12b/personal_rank_contract.py'
       - 'app.js'
       - 'index.html'
       - 'app.html'
@@ -34,4 +36,4 @@ jobs:
           node --check app.js
           node --check awards-battle-controller.js
           node -e "new Function(require('fs').readFileSync('gas/Code.gs', 'utf8'))"
-          node --test tests/awards-recovery-frontend.test.cjs tests/awards-recovery-gas.test.cjs tests/awards-publication-date.test.cjs tests/awards-battle-standalone.test.cjs tests/month-start-data.test.cjs tests/liam-supervisor-realdata-mapping.test.cjs tests/private-dashboard-*.test.cjs
+          node --test tests/awards-recovery-frontend.test.cjs tests/awards-recovery-gas.test.cjs tests/awards-publication-date.test.cjs tests/awards-battle-standalone.test.cjs tests/awards-gap-id.test.cjs tests/awards-integrated.test.cjs tests/dashboard-read-bundle.test.cjs tests/month-start-data.test.cjs tests/liam-supervisor-realdata-mapping.test.cjs tests/private-dashboard-*.test.cjs

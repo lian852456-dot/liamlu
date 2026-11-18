@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const catalog = require('../award-model-catalog.js').november;
-const { novemberPriorities, renderIntegratedAwards } = require('../awards-battle-controller.js');
+const { create, novemberPriorities, renderIntegratedAwards } = require('../awards-battle-controller.js');
 
 function fixture() {
   const rule = Object.fromEntries(catalog.rewardRules.map(row => [row.role, row.amounts]));
@@ -65,4 +65,47 @@ test('the store selector does not change the logged-in store, and the basis chan
   assert.match(supervisor, /全區店點第一名/);
   assert.match(supervisor, /全區同仁第一名<\/strong><p>甲＊ · \$50/);
   assert.doesNotMatch(supervisor, /我的台獎/);
+});
+
+test('the personal board renders masked peers, self, and the selected award basis', () => {
+  const data = fixture();
+  data.viewer = {mode:'member', rankings:{
+    actual:[{name:'甲＊',store:'台北甲店',amount:50,rank:1,gap:0},
+      {name:'乙＊',store:'乙店',amount:0,rank:2,gap:50,self:true}],
+    projected:[{name:'乙＊',store:'乙店',amount:110,rank:1,gap:0,self:true}],
+  }};
+  assert.doesNotMatch(renderIntegratedAwards(data, data.overall, 'actual'), /乙＊/);
+  const actual = renderIntegratedAwards(data, data.overall, 'actual', 'people');
+  assert.match(actual, /value="people" selected/);
+  assert.match(actual, /aria-label="區內同仁獎金排名"/);
+  assert.match(actual, /乙＊（我）<br><small>乙店<\/small><\/th><td>\$0<\/td><td>\$50/);
+  const projected = renderIntegratedAwards(data, data.overall, 'projected', 'people');
+  assert.match(projected, /乙＊（我）.*?\$110<\/td><td>目前領先/);
+  assert.doesNotMatch(projected, /甲＊/);
+  delete data.viewer.rankings;
+  assert.match(renderIntegratedAwards(data, data.overall, 'actual', 'people'), /同仁獎金待確認/);
+});
+
+test('authenticated same-batch KPI awards support the leaderboard on the existing GAS version', () => {
+  const { fixture } = require('./helpers/awards-gap-id-fixture.cjs');
+  const { snapshot } = fixture();
+  const { kpiBattle, awardsBattle } = snapshot;
+  const kpi = { ...kpiBattle, supplement_synced:true, personal:[
+    { name:'甲*', store:'合成店1', phone_award_actual:0, phone_award_projected:90, phone_award_eligible:'N' },
+    { name:'乙*', store:'合成店2', phone_award_actual:40, phone_award_projected:40, phone_award_eligible:'Y' },
+  ] };
+  awardsBattle.source_files = { person:{ run_id:kpiBattle.processing_run_id, source_data_date:kpiBattle.data_as_of_date, sha256:'a'.repeat(64) } };
+  const viewer = awardsBattle.viewer = { schema:'north12b-awards-viewer/v1', mode:'member', store:'合成店1',
+    actual:{ amount:0, rank:2, gap:40 }, projected:{ amount:90, rank:1, gap:0 } };
+  const document = { getElementById:()=>null, addEventListener(){} };
+  const controller = create({ window:{ document } });
+  const result = { snapshot, profile:{ maskedName:'甲＊' } };
+  assert.equal(controller.acceptKpiResult({ data:kpi, result }), true);
+  const projected = controller.getData().viewer.rankings.projected;
+  assert.deepEqual(projected.map(row=>[row.amount,row.rank,row.gap,row.eligible,row.self]),
+    [[90,1,0,false,true],[40,2,50,true,false]]);
+  assert.equal(viewer.rankings,undefined);
+  awardsBattle.source_files.person.run_id = 'stale';
+  controller.acceptKpiResult({ data:kpi, result });
+  assert.equal(controller.getData().viewer.rankings,undefined);
 });
