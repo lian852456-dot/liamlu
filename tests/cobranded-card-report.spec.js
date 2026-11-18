@@ -54,6 +54,7 @@ test('mobile store 16/21 saves and reloads blank/zero/count with independent OP 
  await page.reload();await page.locator('#fillDate').fill(date);await selectStore(page,21);
  await expect(page.locator('#f_cobranded_card')).toHaveValue('2');await expect(page.locator('#f_mgmt_op_target')).toHaveValue('14');
  await expect(page.locator('#cardStoreTarget')).toContainText('固定 3 張');
+ await expect(page.locator('#dailyCoreTag')).toContainText('聯名卡選填');
  await page.locator('#f_mgmt_op_target').fill('');await page.locator('.btn-save-main').click();await expect(page.locator('#closingReportError')).toContainText('OP 目標');
  await page.locator('#f_cobranded_card').scrollIntoViewIfNeeded();await page.addStyleTag({content:'#celebCanvas{visibility:hidden!important}'});await page.screenshot({path:info.outputPath('SYNTHETIC-store-card.png')});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(s.errors).toEqual([]);

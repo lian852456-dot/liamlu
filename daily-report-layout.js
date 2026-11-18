@@ -66,7 +66,7 @@
   function summaryContext() {
     byId('dailyStoreName').textContent = selected || '請選門市';
     byId('dailySubmitContext').textContent = selected + ' · ' + selectedSeg + ':00 ' + (selectedSeg === 21 ? '晚間收官' : '下午回報');
-    byId('dailyCoreTag').textContent = selectedSeg === 21 ? '晚間必填' : '當日累計';
+    byId('dailyCoreTag').textContent = selectedSeg === 21 ? '晚間核心必填；聯名卡選填' : '當日累計';
     byId('dailyManagementNote').textContent = selectedSeg === 21
       ? 'OP 與 MyCharge 晚間必填；沒有數量請填 0。'
       : '下午可先略過；21:00 再填 OP 與 MyCharge，空白不會造成下午缺件。';
