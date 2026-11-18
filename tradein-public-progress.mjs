@@ -59,9 +59,10 @@ function renderPeople(){
 function renderCounts(){const people=visiblePeople();if(selectedDate&&!dailyAvailable()){ $('staffCounts').replaceChildren();$('allStaffCounts').disabled=true;return; }$('allStaffCounts').disabled=false;const values=[...new Set(['0','1','2','3','4',...people.filter(p=>p.actual_units!==null).map(p=>String(p.actual_units))])].sort((a,b)=>Number(a)-Number(b));if(people.some(p=>p.actual_units===null))values.push('unknown');$('staffCounts').innerHTML=values.map(n=>`<label class="count-choice"><input type="checkbox" name="staffCount" value="${n}"><span>${n==='unknown'?'待核':n+' 筆'}</span></label>`).join('');}
 function setHeaders(daily){
  const store=$('storeHead').querySelectorAll('th'),person=$('personHead').querySelectorAll('th');
- store[1].textContent=daily?'當日回收':'實績';store[2].textContent=daily?'':snapshot?.target_policy?.stores?'店目標':'同仁目標';store[3].textContent=daily?'':'門市尚缺';store[4].textContent=daily?'':'達成率';store[5].textContent=daily?'':'達標人數';
+ $('storeHead').querySelector('[data-sort="actual_units"]').textContent=daily?'當日回收':'實績';
+ $('storeHead').querySelector('[data-sort="target_units"]').textContent=storeTargetLabel();
  person[1].textContent=daily?'當日回收':'實績';person[2].textContent=daily?'回收機款':'目標';person[3].textContent=daily?'':'目前差異';person[4].textContent=daily?'':'回收機款';
- store.forEach((cell,index)=>{cell.hidden=daily&&index>1;});
+ store.forEach(cell=>{cell.hidden=daily&&!['name','actual_units'].includes(cell.dataset.sort);});
  person.forEach((cell,index)=>{cell.hidden=daily&&index>2;});
  const bonus=showBonus();
  $('bonusRules').hidden=!bonus;
@@ -71,19 +72,36 @@ function setHeaders(daily){
   else if(!existing){const th=document.createElement('th');th.dataset.bonusHeader='';th.scope='col';th.textContent=label;row.append(th);}
  }
  }
-function renderMonthlyStores(){
+function storeTargetLabel(){return snapshot?.target_policy?.stores?'店目標':'同仁目標';}
+function renderStores(){
+ const daily=Boolean(selectedDate),body=$('storeRows');
+ if(daily&&!dailyAvailable()){
+  body.innerHTML='<tr class="empty-people"><td colspan="2">選定日期資料尚未提供，明細保留未知。</td></tr>';
+  return;
+ }
  const bonus=showBonus();
  const focus=$('storeFocus')?.value||'';
- let rows=snapshot.stores.filter(s=>!focus||s.store===focus);
- if(storeSort.key){
-  const key=storeSort.key;
-  rows=[...rows].sort((a,b)=>{
+ const rows=(daily?dailyRows():snapshot.stores).filter(s=>!focus||s.store===focus);
+ const key=storeSort.key;
+ if(key&&(!daily||key==='name'||key==='actual_units')){
+  rows.sort((a,b)=>{
    const av=key==='rate'?storeRate(a):key==='name'?a.store:a[key];
    const bv=key==='rate'?storeRate(b):key==='name'?b.store:b[key];
    return (av>bv?1:av<bv?-1:0)*storeSort.dir;
   });
  }
- $('storeRows').innerHTML=rows.map(s=>{const pct=storeRate(s);return `<tr class="tone-${rateTone(pct)}"><td data-label="店點"><strong>${esc(s.store)}</strong></td><td data-label="實績">${units(s.actual_units)}</td><td data-label="店目標">${units(s.target_units)}</td><td data-label="門市尚缺">${units(s.remaining_units)}</td><td data-label="達成率">${rateCell(pct)}</td><td data-label="達標人數">${s.met_people} / ${s.target_people}</td>${bonus?bonusCell(storeBonusLabel,estimateStoreBonus(s,snapshot.people)):''}</tr>`;}).join('');
+ body.innerHTML=rows.map(s=>{
+  const name=`<td data-label="店點"><strong>${esc(s.store)}</strong></td>`;
+  if(daily)return `<tr>${name}<td data-label="當日回收">${units(s.actual_units)}</td></tr>`;
+  const pct=storeRate(s);
+  return `<tr class="tone-${rateTone(pct)}">${name}
+   <td data-label="達成率">${rateCell(pct)}</td>
+   <td data-label="門市尚缺" class="store-gap${s.remaining_units>0?' has-shortfall':''}">${units(s.remaining_units)}</td>
+   <td data-label="實績">${units(s.actual_units)}</td>
+   <td data-label="${storeTargetLabel()}">${units(s.target_units)}</td>
+   <td data-label="達標人數">${s.met_people} / ${s.target_people}</td>
+   ${bonus?bonusCell(storeBonusLabel,estimateStoreBonus(s,snapshot.people)):''}</tr>`;
+ }).join('');
 }
 function dailyRows(){
  if(snapshot.stores.every(s=>Array.isArray(s.recovered_days)))return snapshot.stores.map(s=>({store:s.store,actual_units:s.recovered_days.find(d=>d.date===selectedDate)?.actual_units||0}));
@@ -92,11 +110,11 @@ function dailyRows(){
 function renderUnknownDay(){
  $('readMessage').textContent='選定日期資料尚未提供，當日回收、店點與人員明細保留未知。';$('dateModeNote').hidden=false;$('periodMeta').textContent=`${snapshot.month} · 統計日期 ${selectedDate||'未選定'} · 來源 ${snapshot.source_period.start}–${snapshot.source_cutoff_date}`;
  $('stats').innerHTML=[['當日回收','未提供','選定日期資料未知'],['有回收店數','未提供','選定日期資料未知'],['有回收人數','未提供','選定日期資料未知'],['統計日期',selectedDate||'未選定','台北時間']].map(v=>`<article class="kpi"><span>${v[0]}</span><strong>${v[1]}</strong><small>${v[2]}</small></article>`).join('');
- if($('lagStrip'))$('lagStrip').hidden=true;$('storeRows').innerHTML='<tr class="empty-people"><td colspan="2">選定日期資料尚未提供，明細保留未知。</td></tr>';$('staffRows').innerHTML='<tr class="empty-people"><td colspan="3">選定日期資料尚未提供，明細保留未知。</td></tr>';$('staffResultCount').textContent='顯示未知';$('staffCounts').replaceChildren();$('allStaffCounts').disabled=true;refreshExports();
+ if($('lagStrip'))$('lagStrip').hidden=true;renderStores();$('staffRows').innerHTML='<tr class="empty-people"><td colspan="3">選定日期資料尚未提供，明細保留未知。</td></tr>';$('staffResultCount').textContent='顯示未知';$('staffCounts').replaceChildren();$('allStaffCounts').disabled=true;refreshExports();
  }
 function render(){const s=snapshot.summary,region=snapshot.region_progress,daily=Boolean(selectedDate);$('publicWorkspace').hidden=document.getElementById('scope-sharing')?.getAttribute('aria-selected')==='true';$('readMessage').textContent='';$('updatedLabel').textContent='更新於 '+snapshot.published_at;$('recoveryDate').disabled=false;$('clearRecoveryDate').disabled=false;$('recoveryDate').min=snapshot.source_period.start;$('recoveryDate').max=snapshot.source_period.end;$('dateModeNote').hidden=!daily;$('personRuleNote').textContent=daily?'當日只顯示回收數與回收機款；每月目標與達標請切回整月查看。':'目前差異＝實績－月目標；負數為未達，0 為達標，正數為超標。'+(personalRules(snapshot.month).actingManager==='included'?'含店長及代理店長，每人每月'+personalRules(snapshot.month).staffTarget+'台。':'免目標人員不計差異。')+'';setHeaders(daily);
  if(daily&&!dailyAvailable()){renderUnknownDay();return;}
- if(daily){if($('lagStrip'))$('lagStrip').hidden=true;const people=visiblePeople(),stores=dailyRows(),actual=people.reduce((n,p)=>n+p.actual_units,0),storeCount=stores.filter(p=>p.actual_units>0).length,personCount=people.filter(p=>p.actual_units>0).length;$('periodMeta').textContent=`${snapshot.month} · 統計日期 ${selectedDate} · 來源 ${snapshot.source_period.start}–${snapshot.source_cutoff_date}`;$('stats').innerHTML=[['當日回收',units(actual),'只統計所選日期'],['有回收店數',storeCount+' 店','當日實績大於 0'],['有回收人數',personCount+' 人','當日實績大於 0'],['統計日期',selectedDate,'台北時間']].map(v=>`<article class="kpi"><span>${v[0]}</span><strong>${v[1]}</strong><small>${v[2]}</small></article>`).join('');$('storeRows').innerHTML=stores.map(p=>`<tr><td data-label="店點"><strong>${esc(p.store)}</strong></td><td data-label="當日回收">${units(p.actual_units)}</td></tr>`).join('');
+ if(daily){if($('lagStrip'))$('lagStrip').hidden=true;const people=visiblePeople(),stores=dailyRows(),actual=people.reduce((n,p)=>n+p.actual_units,0),storeCount=stores.filter(p=>p.actual_units>0).length,personCount=people.filter(p=>p.actual_units>0).length;$('periodMeta').textContent=`${snapshot.month} · 統計日期 ${selectedDate} · 來源 ${snapshot.source_period.start}–${snapshot.source_cutoff_date}`;$('stats').innerHTML=[['當日回收',units(actual),'只統計所選日期'],['有回收店數',storeCount+' 店','當日實績大於 0'],['有回收人數',personCount+' 人','當日實績大於 0'],['統計日期',selectedDate,'台北時間']].map(v=>`<article class="kpi"><span>${v[0]}</span><strong>${v[1]}</strong><small>${v[2]}</small></article>`).join('');
  }else{
   const staffTarget=personalRules(snapshot.month).staffTarget;
   const zeroPeople=snapshot.people.filter(p=>p.target_units!==null&&p.actual_units===0).length;
@@ -115,11 +133,10 @@ function render(){const s=snapshot.summary,region=snapshot.region_progress,daily
   const lags=snapshot.stores.map(s=>({store:s.store,pct:storeRate(s)})).filter(s=>s.pct<100).sort((a,b)=>a.pct-b.pct);
   const strip=$('lagStrip');
   if(strip){strip.hidden=!lags.length;strip.innerHTML=lags.length?`<span>未達標 ${lags.length} 店</span>`+lags.map(s=>`<button type="button" class="lag-chip" data-store="${esc(s.store)}">${esc(s.store)} ${s.pct}%</button>`).join(''):'';}
-  renderMonthlyStores();
  }
  const selectedStore=$('staffStore').value;$('staffStore').replaceChildren(...[['','全區九店'],...snapshot.stores.map(s=>[s.store,s.store])].map(([value,text])=>{const o=document.createElement('option');o.value=value;o.textContent=text;return o;}));if(selectedStore&&snapshot.stores.some(s=>s.store===selectedStore))$('staffStore').value=selectedStore;
  const focus=$('storeFocus');if(focus){const chosen=focus.value;focus.replaceChildren(...[['','全部店點'],...snapshot.stores.map(s=>[s.store,s.store])].map(([value,text])=>{const o=document.createElement('option');o.value=value;o.textContent=text;return o;}));if(chosen&&snapshot.stores.some(s=>s.store===chosen))focus.value=chosen;}
- renderCounts();renderPeople();refreshExports();}
+ renderStores();renderCounts();renderPeople();refreshExports();}
 const readPublic=createPublicReader({endpoint:API,frame:(payload,signal)=>readPublicFrame(API,payload,signal),post:async(url,payload,signal)=>{
  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),cache:'no-store',credentials:'omit',signal});
  if(!response.ok)throw Error('服務暫時無回應（HTTP '+response.status+'）');return response.json();
@@ -196,9 +213,9 @@ transactionLink?.addEventListener('click',()=>{
 bindExports(context);$('periodMonth').value=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'}).slice(0,7);$('recoveryDate').value='';$('recoveryDate').disabled=true;$('clearRecoveryDate').disabled=true;
 const tabs=[...document.querySelectorAll('[data-public-scope]')];tabs.forEach((b,i)=>{b.tabIndex=b.getAttribute('aria-selected')==='true'?0:-1;b.addEventListener('click',()=>scope(b.dataset.publicScope));b.addEventListener('keydown',e=>{const d=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0;if(d){e.preventDefault();const next=tabs[(i+d+tabs.length)%tabs.length];scope(next.dataset.publicScope);next.focus();}});});
 $('refreshData').addEventListener('click',()=>{if(!reading)load();});$('periodMonth').addEventListener('change',()=>{selectedDate='';$('recoveryDate').value='';selectedCounts.clear();invalidate();load();});$('recoveryDate').addEventListener('change',()=>{selectedDate=$('recoveryDate').value;selectedCounts.clear();if(snapshot)render();});$('clearRecoveryDate').addEventListener('click',()=>{$('recoveryDate').value='';selectedDate='';selectedCounts.clear();if(snapshot)render();});$('staffStore').addEventListener('change',()=>{renderPeople();refreshExports();});
-$('storeFocus')?.addEventListener('change',()=>{if(snapshot)renderMonthlyStores();});
-$('storeHead')?.addEventListener('click',event=>{const th=event.target.closest('th');if(!th?.dataset.sort||!snapshot)return;storeSort={key:th.dataset.sort,dir:storeSort.key===th.dataset.sort?-storeSort.dir:1};renderMonthlyStores();});
-$('lagStrip')?.addEventListener('click',event=>{const chip=event.target.closest('[data-store]');if(!chip||!$('storeFocus'))return;$('storeFocus').value=chip.dataset.store;scope('store');renderMonthlyStores();});
+$('storeFocus')?.addEventListener('change',()=>{if(snapshot)renderStores();});
+$('storeHead')?.addEventListener('click',event=>{const th=event.target.closest('th');if(!th?.dataset.sort||!snapshot)return;storeSort={key:th.dataset.sort,dir:storeSort.key===th.dataset.sort?-storeSort.dir:1};renderStores();});
+$('lagStrip')?.addEventListener('click',event=>{const chip=event.target.closest('[data-store]');if(!chip||!$('storeFocus'))return;$('storeFocus').value=chip.dataset.store;scope('store');renderStores();});
 $('staffCounts').addEventListener('change',e=>{if(e.target.name!=='staffCount')return;e.target.checked?selectedCounts.add(e.target.value):selectedCounts.delete(e.target.value);renderPeople();refreshExports();});
 $('allStaffCounts').addEventListener('click',()=>{selectedCounts.clear();$('staffCounts').querySelectorAll('input').forEach(input=>input.checked=false);renderPeople();refreshExports();});
 for(const id of ['adminEmployeeId','adminSecret','completeScope'])$(id).addEventListener('change',()=>invalidate());
