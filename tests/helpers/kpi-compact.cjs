@@ -44,12 +44,13 @@ async function start(page,{ttl=25*60*1000,failInitial=false,unknown=false,missin
 }
 async function update(page){await page.locator('#kpiBattleContentReadStatus [data-private-dashboard-action="refresh"]').click();}
 
-for(const width of [1920,1024,390,320])test(width+'px approved matrix, real target fields and store controls',async({page},info)=>{
+for(const width of [1920,1366,1180,1024,390,320])test(width+'px approved matrix, real target fields and store controls',async({page},info)=>{
  await page.setViewportSize({width,height:828});const f=await start(page);
  await expect(page.locator('.compact-summary .sc-label')).toHaveText(['全區 KPI','公司排名','附掛得分','保險搭售']);
  await expect(page.locator('.compact-summary')).toContainText('+1.5 pp');await expect(page.locator('.compact-summary')).toContainText('+0.25 分');
  await expect(page.locator('.compact-matrix tbody tr')).toHaveCount(10);
- await expect(page.locator('.compact-matrix thead th')).toHaveText(['店點／區內標示','KPI總達成','締結率尚無正式資料','公司排名','DOD（較前日）','附掛得分','保險搭售率','A999','A1399','好速','RT','R1399']);
+ await expect(page.locator('.compact-matrix thead th')).toHaveText(['店點／區內標示','公司排名','KPI總達成','AQ 來客數','締結率尚無正式資料','DOD（較前日）','附掛得分','保險搭售率','A999','A1399','好速','RT','R1399']);
+ await expect(page.locator('.compact-matrix [data-aq-visitors]')).toHaveText(Array(10).fill('—'));
  await expect(page.locator('.compact-matrix [data-conversion-rate]')).toHaveText(Array(10).fill('—'));
  await expect(page.locator('.compact-matrix tbody .rank-top')).toHaveCount(3);await expect(page.locator('.compact-matrix tbody .rank-bottom')).toHaveCount(3);
  await expect(page.locator('.compact-matrix tbody .rank-icon')).toHaveCount(6);
@@ -66,9 +67,23 @@ for(const width of [1920,1024,390,320])test(width+'px approved matrix, real targ
  if(width>=700){const last=page.locator('.compact-matrix tbody tr').last(),box=await last.boundingBox();expect(box.y+box.height).toBeLessThan(780);}
  await expect(page.locator('.b-lease')).toContainText('登入至');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await expect(page.locator('[data-kpi-group="core"] [data-kpi-metric="AQ V+D 999 (含)以上"] [data-daily-target]')).toHaveText('36件／日目標資料 9/9 店');
+ const coreGroup=page.locator('[data-kpi-group="core"]'),addonGroup=page.locator('[data-kpi-group="addon"]');
+ await expect(addonGroup.locator('h4')).toHaveText('DEVICE／加掛');
+ await expect(page.locator('#kpiBattleDailyCoverage')).toContainText('完整日目標資料 9/9 店');
+ await expect(coreGroup.locator('[data-kpi-metric="AQ V+D 999 (含)以上"] [data-daily-target]')).toHaveText('36件／日');
+ const left=await coreGroup.boundingBox(),right=await addonGroup.boundingBox();
+ if(width>=1180){
+  expect(right.y).toBe(left.y);
+  expect(right.x).toBeGreaterThan(left.x+left.width);
+  for(const group of [coreGroup,addonGroup])expect(await group.locator('.table-wrap').evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+ }else{
+  expect(right.x).toBe(left.x);
+  expect(right.y).toBeGreaterThan(left.y+left.height);
+ }
+ expect((await coreGroup.locator('[data-kpi-metric="5G銷售數"]').boundingBox()).height).toBeLessThan(35);
  await expect(page.locator('[data-daily-target-rule]')).toContainText('2026-11 全月 30 天');
  await page.locator('#kpiBattleStoreSelect').selectOption('台北三創');
+ await expect(page.locator('#kpiBattleDailyCoverage')).toHaveCount(0);
  let row=page.locator('[data-kpi-group="core"] [data-kpi-metric="AQ V+D 999 (含)以上"]');
  await expect(row.locator('td')).toHaveText(['101','14','130.0%','4件／日']); // source rate intentionally differs from actual/target
  await expect(page.locator('[data-kpi-group="core"] [data-kpi-metric]')).toHaveCount(14);
@@ -81,6 +96,7 @@ for(const width of [1920,1024,390,320])test(width+'px approved matrix, real targ
  await page.locator('[data-kpi-group="core"]').screenshot({path:info.outputPath('SYNTHETIC-daily-target-'+width+'.png')});
  await page.locator('[data-kpi-detail-tab="addon"]').click();await expect(page.locator('[data-kpi-group="addon"]')).toContainText('Netflix多享組銷售數');
  await expect(page.locator('[data-kpi-group="core"]')).toHaveCount(0);await expect(page.locator('#kpiBattleMetricGroup')).toHaveValue('addon');
+ if(width>=1180)expect((await addonGroup.boundingBox()).width).toBeGreaterThan(right.width);
  await page.locator('#kpiBattleMetricGroup').selectOption('core');await expect(page.locator('[data-kpi-group="core"]')).toContainText('RT達成率');
  await expect(page.locator('[data-kpi-group="addon"]')).toHaveCount(0);
  await page.locator('[data-kpi-detail-tab="all"]').click();
@@ -99,6 +115,9 @@ test('AQ／RT uses the published cutoff and version, weights all nine stores and
    records:Conversion.STORES.map(({id},i)=>({store:id,date:'2026-11-01',aq_n:i===0?1:0,aq_d:i===0?2:10,rt_n:i===0?0:1,rt_d:i===0?0:4}))}
  };
  const f=await start(page,{conversion});
+ await expect(page.locator('.compact-matrix .compact-district [data-aq-visitors]')).toHaveText('82');
+ await expect(page.locator('.compact-matrix tr').filter({hasText:'台北酒泉'}).locator('[data-aq-visitors]')).toHaveText('2');
+ await expect(page.locator('.compact-matrix tr').filter({hasText:'台北三創'}).locator('[data-aq-visitors]')).toHaveText('10');
  await expect(page.locator('.compact-matrix .compact-district [data-conversion-rate]')).toHaveText('AQ 1.22%RT 25.00%');
  await expect(page.locator('.compact-matrix tr').filter({hasText:'台北酒泉'}).locator('[data-conversion-rate]')).toHaveText('AQ 50.00%RT —（分母 0）');
  await expect(page.locator('.compact-matrix tr').filter({hasText:'台北三創'}).locator('[data-conversion-rate]')).toHaveText('AQ 0.00%RT 25.00%');
@@ -111,9 +130,14 @@ test('AQ／RT uses the published cutoff and version, weights all nine stores and
  await expect(page.locator('[data-conversion-version]')).toContainText('版本 8');
  expect(f.calls.slice(before)).toEqual(['employee_dashboard_read']);
 
+ conversion.conversionBattle.records[1].aq_d=0;
+ await update(page);
+ await expect(page.locator('.compact-matrix .compact-district [data-aq-visitors]')).toHaveText('72');
+ await expect(page.locator('.compact-matrix tr').filter({hasText:'台北永吉'}).locator('[data-aq-visitors]')).toHaveText('0');
  conversion.conversionBattle.records.pop();
  await update(page);
  await expect(page.locator('[data-conversion-version]')).toHaveText('資料未通過核對');
+ await expect(page.locator('[data-aq-visitors]')).toHaveText(Array(10).fill('—'));
  await expect(page.locator('[data-conversion-rate]')).toHaveText(Array(10).fill('—'));
  expect(f.errors).toEqual([]);
 });
@@ -153,7 +177,7 @@ for(const width of [1920,390])test(width+'px daily target source edges, partial 
  for(const [month,days,value] of [['2027-02',28,18],['2028-02',29,9],['2026-12',31,9]]){
   Object.assign(f.kpi.meta,{month,monthDays:days});await update(page);
   await expect(page.locator('[data-daily-target-rule]')).toContainText(month+' 全月 '+days+' 天');
-  await expect(cell()).toHaveText(value+'件／日目標資料 9/9 店');
+  await expect(cell()).toHaveText(value+'件／日');
   await page.locator('#kpiBattleStoreSelect').selectOption('台北三創');
   await expect(cell()).toHaveText(Math.ceil(29/days)+'件／日');
   await expect(page.locator('[data-kpi-group="core"] [data-kpi-metric="'+key+'"] td').nth(2)).toHaveText('130.0%');

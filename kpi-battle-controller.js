@@ -16,7 +16,7 @@
   // only order the existing source fields; they never alter values or weights.
   const KPI_DETAIL_GROUPS = Object.freeze([
     {id:'core',label:'AQ／RT',keys:['5G銷售數','好速案銷售點數','TTL AQ上線點數','AQ V+D 999 (含)以上','AQ V+D 1399 (含)以上','預付卡開卡面額','RT上線點數','RT V+D 999 (含)以上','RT V+D 1399 (含)以上','特殊維繫用戶續約數','高高特維用戶續約數','自退數','解約後NP OUT','解約後NP OUT(督導績)']},
-    {id:'addon',label:'加掛／DEVICE',keys:['Device專案銷售數','重點Device銷售量','換約淨新增金額','空機、3C、物聯網及門市購營收','配件及其他營收','包膜與保貼營收','手機保險服務點數','HBO Max&Disney+&Prime Video銷售數','Netflix多享組銷售數','MyVideo&KKBOX','Apple&Google服務及雜誌週刊開通數']},
+    {id:'addon',label:'DEVICE／加掛',keys:['Device專案銷售數','重點Device銷售量','換約淨新增金額','空機、3C、物聯網及門市購營收','配件及其他營收','包膜與保貼營收','手機保險服務點數','HBO Max&Disney+&Prime Video銷售數','Netflix多享組銷售數','MyVideo&KKBOX','Apple&Google服務及雜誌週刊開通數']},
   ]);
   function kpiBattleDetailGroups(keys) {
     const source=[...new Set(keys)],known=new Set(KPI_DETAIL_GROUPS.flatMap(group=>group.keys));
@@ -699,10 +699,13 @@
       return `<th scope="col" class="kpi-conversion-heading">締結率<small class="kpi-sub" data-conversion-version>${caption}</small></th>`;
     }
 
-    function conversionCell(row) {
+    function conversionTotals(row) {
       const conversion = state.conversion;
-      const totals = row.isDistrict ? conversion?.district : conversion?.byStore?.get(win.ReadonlyDashboardCore.storeId(row.store));
-      if (!totals) return `<td data-conversion-rate>—${conversion?.byStore ? '<small class="kpi-sub">無店點資料</small>' : ''}</td>`;
+      return row.isDistrict ? conversion?.district : conversion?.byStore?.get(win.ReadonlyDashboardCore.storeId(row.store));
+    }
+
+    function conversionCell(totals) {
+      if (!totals) return `<td data-conversion-rate>—${state.conversion?.byStore ? '<small class="kpi-sub">無店點資料</small>' : ''}</td>`;
       const percent = rate => rate === null ? '—（分母 0）' : `${(rate * 100).toFixed(2)}%`;
       return `<td data-conversion-rate>AQ ${percent(totals.aq_rate)}<br>RT ${percent(totals.rt_rate)}</td>`;
     }
@@ -729,22 +732,27 @@
       const labels={'AQ V+D 999 (含)以上':'A999','AQ V+D 1399 (含)以上':'A1399','好速案銷售點數':'好速','RT V+D 999 (含)以上':'R999','RT V+D 1399 (含)以上':'R1399','RT上線點數':'RT達成率'};
       const groups=kpiBattleDetailGroups(state.data.metric_keys||Object.keys(metrics));
       if(state.metricGroup!=='all'&&!groups.some(group=>group.id===state.metricGroup&&(group.keys.length||group.id==='addon')))state.metricGroup='all';
-      const dailyCell=key=>{
+      const visibleGroups=groups.filter(group=>(group.keys.length||group.id==='addon')&&(state.metricGroup==='all'||state.metricGroup===group.id));
+      const pairedGroups=state.metricGroup==='all'&&visibleGroups.some(group=>group.id==='core');
+      const hasCompleteCoverage=target=>target?.status==='ok'&&target.total>0&&target.known===target.total&&!target.noTarget;
+      const completeCoverage=visibleGroups.flatMap(group=>group.keys).map(key=>selected.daily_targets?.[key]).find(hasCompleteCoverage);
+      const dailyCell=(key,shareCoverage)=>{
         const target=selected.daily_targets?.[key]||{status:'missing',value:null};
         const reasons={'missing':'月目標未提供','invalid-target':'月目標無效','invalid-month':'來源月份／天數待確認','not-applicable':'不適用','no-target':'無月目標（來源為 0）'};
         const coverage=target.total?`目標資料 ${target.known}/${target.total} 店${target.noTarget?`；${target.noTarget} 店月目標為 0`:''}`:'';
         const detail=target.status==='partial'?`部分合計；${coverage}`:reasons[target.status]||coverage;
-        return `<td data-daily-target="${target.status}">${number(target.value)}${target.value!=null?`<small class="daily-target-unit">${esc(target.unit)}</small>`:''}${detail?`<small class="daily-target-note">${esc(detail)}</small>`:''}</td>`;
+        const rowNote=shareCoverage&&hasCompleteCoverage(target)?'':detail;
+        return `<td data-daily-target="${target.status}"><span class="daily-target-value">${number(target.value)}${target.value!=null?`<small class="daily-target-unit">${esc(target.unit)}</small>`:''}</span>${rowNote?`<small class="daily-target-note">${esc(rowNote)}</small>`:''}</td>`;
       };
-      const metricRow=(label,metric,key=label)=>`<tr data-kpi-metric="${esc(key)}"><th scope="row">${esc(label)}</th><td>${number(metric?.target)}</td><td>${number(metric?.actual)}</td><td class="${kpiBattleTone(metric?.rate)}">${percent(metric?.rate)}</td>${dailyCell(key)}</tr>`;
+      const metricRow=(label,metric,key=label,shareCoverage=false)=>`<tr data-kpi-metric="${esc(key)}"><th scope="row">${esc(label)}</th><td>${number(metric?.target)}</td><td>${number(metric?.actual)}</td><td class="${kpiBattleTone(metric?.rate)}">${percent(metric?.rate)}</td>${dailyCell(key,shareCoverage)}</tr>`;
       const headers='<tr><th>項目</th><th>月目標</th><th>月累計實績</th><th>進度達成率</th><th>日目標<br>（不打折）</th></tr>';
       const metricTable=body=>`<div class="table-wrap" tabindex="0" role="region" aria-label="各店成績，可左右捲動"><table class="compact-details"><thead>${headers}</thead><tbody>${body||'<tr><td colspan="5">目前分類沒有項目</td></tr>'}</tbody></table></div>`;
       const rateCell=metric=>`<td class="${kpiBattleTone(metric?.rate)}">${percent(metric?.rate)}</td>`;
       const insuranceCell=value=>`<td data-insurance-rate class="${value==null||value===''||!Number.isFinite(Number(value))?'':Number(value)>=.5?'insurance-met':'insurance-low'}" title="保險搭售率門檻 50%">${percent(value)}</td>`;
       const underTarget=value=>value!=null&&value!==''&&Number.isFinite(Number(value))&&Number(value)<1;
-      const groupTables=groups.filter(group=>(group.keys.length||group.id==='addon')&&(state.metricGroup==='all'||state.metricGroup===group.id)).map(group=>{
+      const groupTables=visibleGroups.map(group=>{
         const extra=group.id==='addon'?`<tr><th scope="row">附掛得分</th><td>—</td><td>${number(selected.addon_score)} 分</td><td>—</td><td>—</td></tr><tr><th scope="row">保險搭售率</th><td>—</td><td>${percent(selected.insurance_attach_rate)}</td><td>—</td><td>—</td></tr>`:'';
-        return `<section class="compact-metric-group" data-kpi-group="${group.id}"><h4>${group.label}</h4>${metricTable(group.keys.map(key=>metricRow(labels[key]||key,metrics[key],key)).join('')+extra)}</section>`;
+        return `<section class="compact-metric-group" data-kpi-group="${group.id}"><h4>${group.label}</h4>${metricTable(group.keys.map(key=>metricRow(labels[key]||key,metrics[key],key,true)).join('')+extra)}</section>`;
       }).join('');
       const summary=(label,value,dod)=>`<article class="summary-card"><div class="sc-label">${label}</div><div class="sc-val">${value}</div><div class="sc-sub">DOD：${dod}</div></article>`;
       return `<div class="summary-grid compact-summary">
@@ -754,15 +762,22 @@
         ${summary('保險搭售',percent(aggregate.insurance_attach_rate),delta(aggregate.insurance_attach_rate_dod,'pp'))}
       </div>
       <section class="compact-overview" aria-labelledby="storeOverviewHeading"><div class="compact-section-heading"><h2 id="storeOverviewHeading">北一二B／店點 KPI 排名</h2>${rankMark('top','區內TOP3')}${rankMark('bottom','區內BOT3')}<span class="kpi-battle-note">依有效 KPI 排名；缺值不列名次</span></div>
-      <div class="table-wrap" tabindex="0" role="region" aria-label="北一二B整體與九店 KPI 排名，可左右捲動"><table class="compact-matrix"><thead><tr><th>店點／區內標示</th><th>KPI總達成</th>${conversionHeading()}<th>公司排名</th><th>DOD<br>（較前日）</th><th>附掛得分</th><th>保險<br>搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>RT</th><th>R1399</th></tr></thead><tbody>
-      ${rows.map(row=>`<tr${row.isDistrict?' class="compact-district"':''}><th scope="row">${esc(displayStoreName(row.store))}${row.isDistrict?'':badge(row)}</th><td data-overall-kpi class="${kpiBattleTone(row.overall_kpi)}${underTarget(row.overall_kpi)?' kpi-attention':''}">${percent(row.overall_kpi)}</td>${conversionCell(row)}<td>${number(row.company_rank)}</td><td>${delta(row.overall_kpi_dod,'pp')}</td><td>${number(row.addon_score)}<small>DOD ${delta(row.addon_score_dod,'分')}</small></td>${insuranceCell(row.insurance_attach_rate)}${rateCell(row.core?.a999)}${rateCell(row.core?.a1399)}${rateCell(row.core?.haosu)}${rateCell(row.metrics?.['RT上線點數'])}${rateCell(row.core?.r1399)}</tr>`).join('')}
+      <div class="table-wrap" tabindex="0" role="region" aria-label="北一二B整體與九店 KPI 排名，可左右捲動"><table class="compact-matrix"><thead><tr><th>店點／區內標示</th><th>公司排名</th><th>KPI總達成</th><th scope="col" class="kpi-aq-visitors-heading" aria-describedby="kpiBattleConversionBasis">AQ 來客數</th>${conversionHeading()}<th>DOD<br>（較前日）</th><th>附掛得分</th><th>保險<br>搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>RT</th><th>R1399</th></tr></thead><tbody>
+      ${rows.map(row=>{
+        const totals=conversionTotals(row);
+        return `<tr${row.isDistrict?' class="compact-district"':''}><th scope="row">${esc(displayStoreName(row.store))}${row.isDistrict?'':badge(row)}</th><td>${number(row.company_rank)}</td><td data-overall-kpi class="${kpiBattleTone(row.overall_kpi)}${underTarget(row.overall_kpi)?' kpi-attention':''}">${percent(row.overall_kpi)}</td><td data-aq-visitors>${totals?.aq_d?.toLocaleString('zh-TW') ?? '—'}</td>${conversionCell(totals)}<td>${delta(row.overall_kpi_dod,'pp')}</td><td>${number(row.addon_score)}<small>DOD ${delta(row.addon_score_dod,'分')}</small></td>${insuranceCell(row.insurance_attach_rate)}${rateCell(row.core?.a999)}${rateCell(row.core?.a1399)}${rateCell(row.core?.haosu)}${rateCell(row.metrics?.['RT上線點數'])}${rateCell(row.core?.r1399)}</tr>`;
+      }).join('')}
       </tbody></table></div>
-      <p class="kpi-battle-note">AQ 採上線數／來客數。RT 採原 TWM 與原 TST 合計的符合續約資格上線數／來客數。</p>
+      <p class="kpi-battle-note" id="kpiBattleConversionBasis">AQ 來客數與締結率使用同一期間及版本。AQ 採上線數／來客數。RT 採原 TWM 與原 TST 合計的符合續約資格上線數／來客數。</p>
       <p class="kpi-battle-note">KPI 以 100% 標色提醒；保險搭售率依 50% 門檻獨立標色，缺值顯示 —。</p></section>
       <section class="compact-store-details" aria-labelledby="storeDetailHeading"><h2 id="storeDetailHeading">各店詳細成績</h2>
         <div class="kpi-battle-filter"><label>選擇門市<select id="kpiBattleStoreSelect">${rows.map(row=>`<option value="${esc(row.store)}"${row.store===selected.store?' selected':''}>${esc(displayStoreName(row.store))}</option>`).join('')}</select></label><label>項目分類<select id="kpiBattleMetricGroup"><option value="all"${state.metricGroup==='all'?' selected':''}>全部項目</option>${groups.filter(group=>group.keys.length||group.id==='addon').map(group=>`<option value="${group.id}"${state.metricGroup===group.id?' selected':''}>${group.label}</option>`).join('')}</select></label></div>
-        <h3>${esc(displayStoreName(selected.store))}｜KPI 分類明細</h3><div class="kpi-battle-toggle">${[['all','全部'],...groups.filter(group=>group.keys.length||group.id==='addon').map(group=>[group.id,group.label])].map(([id,label])=>`<button type="button" data-kpi-detail-tab="${id}" class="${state.metricGroup===id?'active':''}" aria-pressed="${state.metricGroup===id}">${label}</button>`).join('')}</div>
-        ${groupTables}
+        <div class="compact-detail-heading">
+          <h3>${esc(displayStoreName(selected.store))}｜KPI 分類明細</h3>
+          ${completeCoverage?`<p class="kpi-battle-note" id="kpiBattleDailyCoverage">完整日目標資料 ${completeCoverage.known}/${completeCoverage.total} 店，例外標在各項目。</p>`:''}
+        </div>
+        <div class="kpi-battle-toggle">${[['all','全部'],...groups.filter(group=>group.keys.length||group.id==='addon').map(group=>[group.id,group.label])].map(([id,label])=>`<button type="button" data-kpi-detail-tab="${id}" class="${state.metricGroup===id?'active':''}" aria-pressed="${state.metricGroup===id}">${label}</button>`).join('')}</div>
+        <div class="compact-metric-groups${pairedGroups?' is-combined':''}"${completeCoverage?' aria-describedby="kpiBattleDailyCoverage"':''}>${groupTables}</div>
         <p class="kpi-battle-note" data-daily-target-rule>日目標（不打折）＝原月目標 ÷ ${state.data.target_month?.days?`${esc(state.data.target_month.month)} 全月 ${state.data.target_month.days} 天`:'來源月份全月日數（待確認）'}，無條件向上取整。全區逐店進位後加總；不足九店標示部分合計。件數／點數沿用原單位，金額沿原報表單位、不換算元或千元；進度達成率沿用正式報表。缺目標與無效值顯示 —，來源月目標為 0 另行標示；比率、排名及無可換算月目標項目不適用。</p>
         <details class="compact-disclosure"><summary>個別項目完整明細</summary>${metricTable(groups.flatMap(group=>group.keys).map(key=>metricRow(key,metrics[key])).join(''))}</details>
       </section>`;
@@ -785,7 +800,7 @@
         <div class="section-divider">北一二B／店點 KPI 排名</div>
         <div class="card" style="padding:14px 10px;"><div class="table-wrap"><table>
           <thead><tr><th style="text-align:left">店點</th><th>公司排名</th><th>KPI總達成</th>${conversionHeading()}<th>加掛</th><th>保險搭售率</th><th>A999</th><th>A1399</th><th>好速</th><th>R1399</th></tr></thead>
-          <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${displayStoreName(row.store)}</td><td>${row.company_rank == null ? kpiPendingCell() : `<span class="val-gold">${row.company_rank}</span>`}${kpiBattleRankDod(row.company_rank_dod)}</td><td>${row.overall_kpi == null ? kpiPendingCell() : kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td>${conversionCell(row)}<td>${row.addon_score == null ? kpiPendingCell() : formatNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${formatNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleInsuranceCell(row)}</td><td>${kpiBattleMetricCell(row.core?.a999, true)}</td><td>${kpiBattleMetricCell(row.core?.a1399, true)}</td><td>${kpiBattleMetricCell(row.core?.haosu, true)}</td><td>${kpiBattleMetricCell(row.core?.r1399, true)}</td></tr>`).join('')}</tbody>
+          <tbody>${rows.map(row => `<tr${row.isDistrict ? ' style="background:rgba(255,102,0,.08);border-top:2px solid rgba(255,102,0,.35)"' : ''}><td class="store-name"${row.isDistrict ? ' style="color:var(--accent-bright)"' : ''}>${row.isDistrict ? '🏢 ' : ''}${displayStoreName(row.store)}</td><td>${row.company_rank == null ? kpiPendingCell() : `<span class="val-gold">${row.company_rank}</span>`}${kpiBattleRankDod(row.company_rank_dod)}</td><td>${row.overall_kpi == null ? kpiPendingCell() : kpiBattleRate(row.overall_kpi, row.overall_kpi_dod)}</td>${conversionCell(conversionTotals(row))}<td>${row.addon_score == null ? kpiPendingCell() : formatNumber(row.addon_score)}${row.addon_score_dod == null ? '' : `<span class="kpi-dod ${row.addon_score_dod > 0 ? 'up' : row.addon_score_dod < 0 ? 'down' : ''}">DOD ${row.addon_score_dod > 0 ? '+' : ''}${formatNumber(row.addon_score_dod)}</span>`}</td><td>${kpiBattleInsuranceCell(row)}</td><td>${kpiBattleMetricCell(row.core?.a999, true)}</td><td>${kpiBattleMetricCell(row.core?.a1399, true)}</td><td>${kpiBattleMetricCell(row.core?.haosu, true)}</td><td>${kpiBattleMetricCell(row.core?.r1399, true)}</td></tr>`).join('')}</tbody>
         </table></div><p class="kpi-battle-note">AQ 採上線數／來客數。RT 採原 TWM 與原 TST 合計的符合續約資格上線數／來客數。</p></div>
         <div class="section-divider">各項 KPI 達成</div>
         <div class="card">
