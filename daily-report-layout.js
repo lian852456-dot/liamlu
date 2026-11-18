@@ -147,7 +147,7 @@
     core = section('核心業績', 'daily-core');
     const coreTag = element('span', 'daily-tag', '當日累計'); coreTag.id = 'dailyCoreTag'; core.firstChild.append(coreTag);
     core.append(element('p', 'daily-note', '截至本時段累計，兩時段不相加。'));
-    const coreGrid = element('div', 'daily-grid'); moveFields(['aq999','aq1399','rt999','rt1399','haosu'], coreGrid); core.append(coreGrid);
+    const coreGrid = element('div', 'daily-grid'); moveFields(['aq999','aq1399','rt999','rt1399','haosu','cobranded_card'], coreGrid); core.append(coreGrid);
     const short = {aq999:['A999','V+D ≥999 · 筆'],aq1399:['A1399','V+D ≥1399 · 筆'],rt999:['R999','V+D ≥999 · 筆'],rt1399:['R1399','V+D ≥1399 · 筆'],haosu:['好速','銷售點數']};
     Object.entries(short).forEach(([key,[name,definition]]) => {
       const input = byId('f_' + key), wrap = input.closest('.kpi-input-wrap'), label = wrap.querySelector('label');

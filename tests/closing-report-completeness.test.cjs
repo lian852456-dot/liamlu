@@ -118,6 +118,7 @@ test('save button stops missing data before the zero-case explanation modal', as
     document:{getElementById(id) {
       if(id==='closingReportError') return error;
       if(id==='fillDate') return {value:'2099-10-02'};
+      if(id==='f_cobranded_card') return {value:'',validity:{badInput:false}};
       return {focus() {focused=id;}};
     }},
     showToast() {}, openZeroModal() {modal++;}, _doSave() {saves++;}

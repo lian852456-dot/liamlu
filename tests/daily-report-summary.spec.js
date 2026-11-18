@@ -19,7 +19,7 @@ const noOverflow=async page=>expect(await page.evaluate(()=>document.documentEle
 const group=(page,name)=>page.locator('#panel-summary').getByRole('button',{name,exact:true}).click();
 for(const width of [390,1440])test.describe(width+'px actual controller',()=>{
  test.use({viewport:{width,height:width===390?844:1000}});
- test('strict raw projection, 0/null/invalid values, nine stores and 32 original fields',async({page})=>{
+ test('strict raw projection, 0/null/invalid values, nine stores and 33 fields including optional card count',async({page})=>{
   await expect(page.locator('[data-summary-store]')).toHaveCount(9);
   await expect(page.locator('[data-summary-store="大稻埕"]')).toContainText('未回報');
   await expect(page.locator('[data-summary-store="杭州南"]')).toContainText('來源未取得');
@@ -29,7 +29,7 @@ for(const width of [390,1440])test.describe(width+'px actual controller',()=>{
   await expect(page.locator('#sumCoverage')).not.toContainText('完成');
   await group(page,'保險搭售');await expect(page.locator('#summaryCards')).toContainText('22 / 108 · 20.4%');await expect(page.locator('#summaryCards')).toContainText('涵蓋 5 / 9 店');
   await expect(page.locator('[data-summary-store="通化"]')).toContainText('無適用案件');
-  await page.locator('#sumComplete>summary').click();expect(await page.locator('#sumFullTable thead th').count()).toBe(33);expect(await page.locator('#sumFullTable tbody tr').count()).toBe(10);await noOverflow(page);
+  await page.locator('#sumComplete>summary').click();expect(await page.locator('#sumFullTable thead th').count()).toBe(34);expect(await page.locator('#sumFullTable tbody tr').count()).toBe(10);await noOverflow(page);
  });
  test('filters clearly scope aggregation; switch groups and segments back restores exact sums',async({page})=>{
   const original=await totals(page);
