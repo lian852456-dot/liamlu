@@ -106,6 +106,47 @@ class RankContract(unittest.TestCase):
         s['records'].append(duplicate)
         with self.assertRaises(ValueError):R.verified_ranks(c,s,p)
 
+    def test_verified_individual_source_takes_precedence_over_manager_store_rate(self):
+        c, s, p, _ = fixture()
+        c['personal'][0]['overall_rate'] = 2.5
+        c['source_metadata'] = {'sha256': s['sha256']}
+        p['meta']['sourceSha256'] = s['sha256']
+        for source_row, protected_row in zip(s['records'], p['persons']):
+            protected_row['employee_id'] = source_row['employee_id']
+        result = R.verified_ranks(c, s, p)
+        self.assertEqual(result['personal'][0]['rank'], 17)
+        self.assertEqual(result['personal'][0]['overall_rate'], 2.5)
+        p['persons'][0]['employee_id'] = 'SYNTH03'
+        with self.assertRaisesRegex(ValueError, 'RANK_PROTECTED_EMPLOYEE_MISMATCH'):
+            R.verified_ranks(c, s, p)
+
+    def test_awards_join_keeps_zero_missing_rank_and_distinct_rosters(self):
+        c, s, p, _ = fixture()
+        c.update(kpi_run_id='run', report_run_date='2026-10-23')
+        p['meta']['processingRunId'] = 'run'
+        for source_row, protected_row in zip(s['records'], p['persons']):
+            protected_row['employee_id'] = source_row['employee_id']
+        source = {'run_id':'run', 'source_data_date':'2026-10-22', 'sha256':'a' * 64}
+        a = {'report_run_date':'2026-10-23', 'data_as_of_date':'2026-10-22', 'processing_run_id':'run',
+             'source_files':{'store':source, 'person':dict(source)}, 'person_awards':[
+                 {'emp_id':'SYNTH02', 'store':'台北乙', 'name':'乙＊?', 'actual_total':0,
+                  'projected':95, 'rank':0, 'award':'N'},
+                 {'emp_id':'SYNTH03', 'store':'乙', 'name':'丙＊', 'actual_total':30},
+             ]}
+        first, second = R.join_personal_awards(c, a, p)['personal']
+        self.assertIsNone(first['phone_award_actual'])
+        self.assertEqual(second['phone_award_actual'], 0)
+        self.assertEqual(second['phone_award_projected'], 95)
+        self.assertIsNone(second['phone_award_rank'])
+        self.assertEqual(second['phone_award_eligible'], 'N')
+        self.assertNotIn('emp_id', second)
+        a['person_awards'][0]['store'] = '另一店'
+        with self.assertRaisesRegex(ValueError, 'PERSON_AWARDS_STORE_OR_NAME_MISMATCH'):
+            R.join_personal_awards(c, a, p)
+        a['source_files']['person']['run_id'] = 'other'
+        with self.assertRaisesRegex(ValueError, 'PERSON_AWARDS_SOURCE_UNVERIFIED'):
+            R.join_personal_awards(c, a, p)
+
     def test_invalid_rank_and_previous_identity_rejected(self):
         for invalid in [True, 0, -1, 1.5, float("nan"), "文字"]:
             c, s, p, _ = fixture()

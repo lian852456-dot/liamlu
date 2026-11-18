@@ -49,13 +49,15 @@ export function prepareRankRepair({snapshot,protectedKpi,candidate,reportRunDate
     proof.source_file!==meta.sourceFile||proof.data_as_of_date!==cutoff||!/^[a-f0-9]{64}$/.test(proof.sha256||''))fail('RANK_SOURCE_PROOF');
   const oldPart={...snapshot,kpiBattle:current},newPart={...snapshot,kpiBattle:next};
   assertSame(nonRank(oldPart),nonRank(newPart),'RANK_OTHER_VALUES_CHANGED');
+  const sameSourceBytes=proof.sha256===meta.sourceSha256&&proof.sha256===current.source_metadata?.sha256;
   const personal=[];
   for(const [key,row] of rows) {
     const auth=approved.get(key),old=prior.get(key);
     if(row.name!==auth.pname||row.name!==old.name&&String(old.name).replace(/［來源缺字］/g,'?')!==row.name)fail('RANK_NAME_NOT_PROTECTED');
     if(row.rank!==null&&(!Number.isSafeInteger(row.rank)||row.rank<1)||row.rank_dod!==null&&!Number.isSafeInteger(row.rank_dod)||
       row.rank===null&&row.rank_dod!==null||row.rank_dod!==null&&!/^[a-f0-9]{64}$/.test(proof.previous_sha256||''))fail('RANK_VALUE_INVALID');
-    if(Number(row.overall_rate)!==Number(auth.official))fail('RANK_OFFICIAL_RATE_MISMATCH');
+    if(Number(row.overall_rate)!==Number(auth.official)&&
+      !(sameSourceBytes&&['店長','代理店長'].includes(row.role)))fail('RANK_OFFICIAL_RATE_MISMATCH');
     personal.push({store:row.store,role:row.role,name:row.name,rank:row.rank,rank_dod:row.rank_dod});
   }
   const patch={schema:'north12b-personal-rank-patch/v1',report_run_date:reportRunDate,source_file:meta.sourceFile,data_as_of_date:cutoff,
