@@ -56,3 +56,12 @@ body:has(#storePanel){--paper:#fff;--muted:#52606c}
 .lede{margin:4px 0 0;font-size:13px;line-height:1.4;max-width:62ch}
 #peopleBody tr:nth-child(even) td{background:#f7f5f0}
 #peopleHead th{position:sticky;top:0;z-index:2;background:#fff5ec}
+.page{padding-top:8px}
+.masthead{margin-bottom:6px;gap:8px}
+.back-link{margin-bottom:4px;font-size:13px}
+.panel{padding:10px 12px;margin-bottom:8px}
+#goldPanel th,#goldPanel td{padding:4px 8px;line-height:1.3}
+#goldPanel .summary-grid{gap:8px;margin:8px 0}
+#goldPanel .summary-card{padding:8px 10px}
+#storePanel .data-card{padding:10px}
+#storePanel th,#storePanel td{padding:4px 8px;line-height:1.3}

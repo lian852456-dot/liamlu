@@ -52,6 +52,11 @@ body.stock-page .hero-row .eyebrow,body.stock-page .hero-row h1{margin:0}
 body.stock-page .scan-note summary{cursor:pointer;font-size:13px}
 body.stock-page tbody tr:nth-child(even) td{background:#f4f8fb}
 body.stock-page .model-panel td:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
+body.stock-page{font-size:14px;line-height:1.4}
+body.stock-page h2{font-size:16px}
+body.stock-page table{font-size:13px}
+body.stock-page th,body.stock-page td{padding:4px 6px;line-height:1.3}
+body.stock-page .topbar{min-height:40px;padding-top:6px;padding-bottom:6px}
 @media(max-width:680px){
   body.stock-page main{width:min(100% - 16px,1240px);margin-top:6px}
   body.stock-page .upload-grid{grid-template-columns:1fr}
