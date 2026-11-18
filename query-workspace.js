@@ -12,11 +12,26 @@
         const layout=document.createElement('div');layout.className='query-shopping-layout';
         const aside=document.createElement('aside');aside.className='query-shopping-filters';aside.setAttribute('aria-label','手機價格篩選');
         const results=document.createElement('div');results.className='query-shopping-quotes';
-        const toolbar=pane.querySelector('.shopping-toolbar'),extra=document.createElement('details'),specs=document.createElement('div');extra.className='query-extra-filters';extra.open=!scope.matchMedia('(max-width:800px)').matches;
+        const toolbar=pane.querySelector('.shopping-toolbar'),extra=document.createElement('details'),specs=document.createElement('div');extra.className='query-extra-filters';
         extra.innerHTML='<summary>品牌、機款、容量與資費篩選</summary>';specs.className='query-spec-filters';
         for(const field of [...toolbar.children])if(!field.classList.contains('search-field'))specs.append(field);
         extra.append(specs);const plan=pane.querySelector('.filter-details');if(plan)extra.append(plan);
-        aside.append(toolbar,extra);const shortcuts=pane.querySelector('.shortcut-bar');if(shortcuts)aside.append(shortcuts);
+        const shortcuts=pane.querySelector('.shortcut-bar'),common=document.createElement('div');common.className='query-common-filters';
+        const specFields=[...specs.children],commonFields=['shoppingRent','shoppingTerm'].map(id=>plan?.querySelector('#'+id)?.closest('.field')).filter(Boolean);
+        aside.append(toolbar,common,extra);if(shortcuts)aside.append(shortcuts);
+        const narrow=scope.matchMedia('(max-width:800px)');
+        function arrangeFilters(){
+          extra.open=false;
+          extra.querySelector(':scope>summary').textContent=narrow.matches?'品牌、機款、容量與資費篩選':'專案與版本篩選';
+          if(narrow.matches){
+            specs.append(...specFields);if(plan)plan.querySelector('.plan-filters').append(...commonFields);
+            aside.append(extra);if(shortcuts)aside.append(shortcuts);
+          }else{
+            toolbar.append(...specFields);common.append(...commonFields);if(shortcuts)common.append(shortcuts);common.append(extra);
+            if(plan)plan.open=true;
+          }
+        }
+        arrangeFilters();narrow.addEventListener?.('change',arrangeFilters);
         const description=document.getElementById('shoppingSectionDescription');if(description)aside.append(description);
         for(const selector of ['.comparison-toolbar','#cardConditionField','#shoppingResults','.comparison-pagination']){const el=pane.querySelector(selector);if(el)results.append(el);}
         layout.append(aside,results);pane.append(layout);

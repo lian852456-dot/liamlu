@@ -1,0 +1,56 @@
+/* Let the price matrix use the page instead of a tall filter sidebar. */
+body[data-query-kind=shopping].query-workspace main,body[data-price-mode=offline].query-workspace main{width:100%;max-width:none;margin:0 auto 20px}
+body[data-query-kind].query-workspace .query-shopping-layout{display:block}
+body[data-query-kind].query-workspace .query-shopping-filters{padding:8px 10px;margin:0 0 8px;background:#faf9f6}
+body[data-query-kind].query-workspace .query-shopping-filters .shopping-toolbar{grid-template-columns:minmax(220px,1.4fr) minmax(120px,.7fr) minmax(220px,1.4fr) minmax(110px,.6fr);gap:8px;margin:0!important}
+body[data-query-kind].query-workspace .query-common-filters{display:grid;grid-template-columns:150px 150px minmax(0,1fr) auto;gap:8px;align-items:end;margin-top:6px}
+body[data-query-kind].query-workspace .query-common-filters .shortcut-bar{margin:0!important;align-self:end;min-height:38px;gap:5px!important}
+body[data-query-kind].query-workspace .query-common-filters>.query-extra-filters{min-width:0;align-self:end}
+body[data-query-kind].query-workspace .query-common-filters>.query-extra-filters>summary{padding:7px 9px;margin:0;border:1px solid #e0d8cf;border-radius:7px;background:#fff;white-space:nowrap;min-height:38px}
+body[data-query-kind].query-workspace .query-common-filters>.query-extra-filters[open]{grid-column:1/-1}
+body[data-query-kind].query-workspace .query-common-filters .query-spec-filters{display:none}
+body[data-query-kind].query-workspace .query-common-filters .filter-details{margin:0!important;padding:6px 0 0!important;border:0;background:transparent}
+body[data-query-kind].query-workspace .query-common-filters .filter-details>summary{display:none}
+body[data-query-kind].query-workspace .query-common-filters .plan-filters{grid-template-columns:repeat(2,minmax(0,1fr));margin:0}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-scroll{max-height:none!important;margin-top:4px}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table{table-layout:fixed;width:max(100%,calc(240px + var(--comparison-columns,12)*88px));min-width:0}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table :is(th,td):not(.spec-cell){min-width:0;width:auto;max-width:none;padding:5px 3px!important}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table .spec-cell{width:240px;min-width:240px;max-width:240px;padding:5px 7px!important;line-height:1.3}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table thead :is(th,td){line-height:1.25}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table .project-label{font-size:11px;line-height:1.25;margin-bottom:1px;white-space:normal}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table :is(.rent-label,.contract-label){font-size:18px;line-height:1.3}
+body[data-query-kind].query-workspace .comparison-table .tariff-contract.unknown-term{flex-direction:column;align-items:center}
+body[data-query-kind].query-workspace .comparison-table .unknown-term .contract-label{font-size:12px}
+body[data-query-kind].query-workspace .comparison-table thead .condition-detail{white-space:normal;overflow-wrap:anywhere;font-size:12px}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table .spec-cell strong{font-size:14px;line-height:1.25}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table .spec-cell :is(.spec-tags,.brand-label){font-size:12px;line-height:1.3}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table details{font-size:11px;line-height:1.3;margin-top:1px}
+body[data-query-kind].query-workspace .comparison-table tbody .spec-cell details:not([open]){display:inline;margin-left:4px}
+body[data-query-kind].query-workspace .comparison-table tbody .spec-cell details:not([open])>summary{display:inline;text-decoration:underline;text-underline-offset:2px}
+body[data-query-kind].query-workspace .comparison-table tbody .spec-cell details:not([open])>summary::before{content:'▸ ';text-decoration:none}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table .quote{font-size:22px;line-height:1.3}
+body[data-query-kind].query-workspace .comparison-table .price-unit{display:none}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table :is(.quote.missing,.quote.absent){font-size:15px;white-space:normal}
+body[data-query-kind].query-workspace .comparison-table details[open] .raw-condition{white-space:normal;overflow-wrap:anywhere}
+body[data-query-kind].query-workspace .comparison-pagination{margin-top:6px!important}
+@media(min-width:801px){
+ body[data-query-kind=shopping].query-workspace #queryCard,body[data-price-mode=offline].query-workspace #queryCard{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px}
+ body[data-query-kind=shopping].query-workspace #queryCard>*,body[data-price-mode=offline].query-workspace #queryCard>*{grid-column:1/-1}
+ body[data-query-kind=shopping].query-workspace #queryCard>.topbar,body[data-price-mode=offline].query-workspace #queryCard>.topbar{grid-column:2;grid-row:1;justify-content:end}
+ body[data-query-kind=shopping].query-workspace #queryCard>.topbar h2,body[data-price-mode=offline].query-workspace #queryCard>.topbar h2{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ body[data-query-kind=shopping].query-workspace #queryStatus,body[data-price-mode=offline].query-workspace #queryStatus{grid-column:1;grid-row:1;margin:0!important;align-self:center}
+}
+@media(min-width:801px) and (max-width:1100px){
+ body[data-query-kind].query-workspace .query-common-filters{grid-template-columns:130px 130px minmax(0,1fr)}
+ body[data-query-kind].query-workspace .query-common-filters>.query-extra-filters{grid-column:1/-1}
+}
+@media(max-width:800px){
+ body[data-query-kind].query-workspace .query-shopping-filters .shopping-toolbar{grid-template-columns:minmax(0,1fr)}
+ body[data-query-kind].query-workspace .query-common-filters{display:none}
+ body[data-query-kind].query-workspace .query-shopping-filters{padding:7px;margin:6px 0}
+ body[data-query-kind].query-workspace .query-shopping-filters .shortcut-bar{margin:6px 0 0!important}
+ body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table{width:calc(145px + var(--comparison-columns,12)*100px)}
+ body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table .spec-cell{width:145px!important;min-width:145px!important;max-width:145px!important;padding:5px!important}
+ body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table .spec-cell strong{font-size:13px}
+ body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table .quote{font-size:23px}
+}
