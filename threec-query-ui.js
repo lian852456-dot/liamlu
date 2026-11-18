@@ -146,6 +146,12 @@
   function tariffLabel(col){return rentLabel(col)+(col.term?'':' ')+termLabel(col);}
   function columnLabel(col){return [tariffLabel(col),versionLabel(col),detailLabel(col)].filter(Boolean).join(' ');}
   function columnHtml(col){const detail=detailLabel(col),version=versionLabel(col);return `<span class="tariff-contract${col.term?'':' unknown-term'}" aria-label="${esc('月租 '+rentLabel(col)+'，'+(col.term?'合約 '+termLabel(col)+' 個月':'約期未提供'))}"><span class="rent-label">${esc(rentLabel(col))}</span><span class="contract-label">${esc(termLabel(col))}</span></span>${version?`<span class="version-badge">${esc(version)}</span>`:''}${detail?`<span class="condition-detail">${esc(detail)}</span>`:''}<details><summary>完整條件</summary><span class="raw-condition">${esc(col.raw)}</span></details>`;}
+  function comparisonHeading(col) {
+    const highlight = col.term === '48' && col.rents.length === 1 && ['999', '1399'].includes(col.rent)
+      ? ` data-highlight-rent="${col.rent}"`
+      : '';
+    return `<th scope="col"${highlight}><span class="project-label" title="${esc(col.project)}">${esc(col.project)}</span>${columnHtml(col)}</th>`;
+  }
   function variantLabel(row){const names=row.models.map(model=>{const matches=Array.from(model.matchAll(/(?:[-_(\s])(宇宙橙|勃根地紅|午夜|星光|太空灰|鈦原色|黑色?|白色?|藍色?|粉色?|黃色?|綠色?|紫色?|銀色?|金色?)(?=[)\s]|$)/g));return matches.length?matches[matches.length-1][1]:'';}).filter(Boolean);return Array.from(new Set(names)).join('／');}
   function specIdentity(row){return JSON.stringify([row.brand,row.model,row.capacity,row.ram]);}
   // Derive display distinctions once per accepted snapshot, never during search input.
@@ -182,7 +188,7 @@
       const col=view.columns.find(col=>col.key===select.value)||view.columns[0];
       target.innerHTML=`<p class="scroll-hint">一次閱讀一個方案；可切換「橫向比較」對照其他期數。</p><div class="quote-cards">`+view.rows.map(row=>`<article class="quote-card"><div class="spec-cell">${specHtml(row)}</div><div class="card-plan"><span>${esc(col.project)}</span><strong><span class="tariff-contract">${esc(tariffLabel(col))}</span>${versionLabel(col)?' '+esc(versionLabel(col)):''}${detailLabel(col)?' '+esc(detailLabel(col)):''}</strong>${cellHtml(row,col)}<details><summary>完整原表條件</summary><p>${esc(col.raw)}</p></details></div></article>`).join('')+'</div>';
     }else{
-      target.innerHTML=`<p class="scroll-hint"><span class="narrow-scroll-hint">左右滑動比較；機款固定在左側。 </span>價格含 0 元；空格表示此機款沒有該條件報價。展開可核對完整條件。</p><div class="table-scroll comparison-scroll" tabindex="0" role="region" aria-label="手機專案橫向價格比較"><table class="comparison-table" style="--comparison-columns:${view.columns.length}"><caption class="visually-hidden">正式手機專案價格，依機款規格與完整方案條件對照</caption><thead><tr><th class="spec-cell" scope="col">機款／規格<br><span class="hint">專案價單位：元</span></th>${view.columns.map(col=>`<th scope="col"><span class="project-label" title="${esc(col.project)}">${esc(col.project)}</span>${columnHtml(col)}</th>`).join('')}</tr></thead><tbody>${view.rows.map(row=>`<tr><th scope="row" class="spec-cell">${specHtml(row)}</th>${view.columns.map(col=>`<td>${cellHtml(row,col)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      target.innerHTML=`<p class="scroll-hint"><span class="narrow-scroll-hint">左右滑動比較；機款固定在左側。 </span>價格含 0 元；空格表示此機款沒有該條件報價。展開可核對完整條件。</p><div class="table-scroll comparison-scroll" tabindex="0" role="region" aria-label="手機專案橫向價格比較"><table class="comparison-table" style="--comparison-columns:${view.columns.length}"><caption class="visually-hidden">正式手機專案價格，依機款規格與完整方案條件對照</caption><thead><tr><th class="spec-cell" scope="col">機款／規格<br><span class="hint">專案價單位：元</span></th>${view.columns.map(comparisonHeading).join('')}</tr></thead><tbody>${view.rows.map(row=>`<tr><th scope="row" class="spec-cell">${specHtml(row)}</th>${view.columns.map(col=>`<td>${cellHtml(row,col)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
     }
   }
   function renderTradein(view){

@@ -319,14 +319,37 @@ test('Google JSON 轉址回 HTML 時，限定來源與 requestId 的既有 ifram
  await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');await expect(page.locator('#queryStatus')).toContainText('已讀取正式資料');
  expect(requests.map(p=>p.kind).sort()).toEqual(['shopping','tradein']);expect(requests.every(p=>p.action==='threec_snapshot_read'&&!p.employeeId&&!p.adminSecret)).toBe(true);await expect(page.locator('iframe')).toHaveCount(0);
 });
-for(const width of [1280,390,360])test(`${width}px 緊湊機款字級與同列資費，價格保持醒目`,async({page})=>{
- await intercept(page);await page.setViewportSize({width,height:844});await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');
+for(const width of [1280,390,360])test(`${width}px 價格與機款同字級，區分兩種 48 期資費`,async({page})=>{
+ await page.route('**/exec*',route=>{
+  const kind=publicPayload(route.request()).kind,data=response(kind);
+  if(kind==='shopping')data.snapshot.rows[0].project_prices={
+   '5G_XH(24)-續約／999H':1300,
+   '5G_XH(48)-續約／999H':1200,
+   '5G_XH(48)-續約／1399H':400,
+   '5G_XH(48)-續約／1399H_VIP加碼版':0,
+   '5G_XH(48)-續約／999H／1399H':900,
+  };
+  return fulfillPublic(route,{contentType:'application/json',body:JSON.stringify(data)});
+ });
+ await page.setViewportSize({width,height:844});await page.goto(PAGE_URL);await expect(page.locator('#shoppingResults')).toContainText('iPhone');
  await page.locator('#tableModeBtn').click();
  const minima={'body':16,'#shoppingBrand':16,'#shoppingModel':16,'.hint':12,'.condition-detail':12,'.comparison-table details':11,'.spec-cell strong':width>=1280?14:13,'.variant-label':12,'.comparison-pagination button':12};
  for(const [selector,minimum] of Object.entries(minima)){
  const fonts=await page.locator(selector).evaluateAll(els=>els.map(el=>parseFloat(getComputedStyle(el).fontSize)));expect(fonts.every(size=>size>=minimum)).toBe(true);
  }
- expect(await page.locator('.quote.price,.quote.zero').evaluateAll((els,minimum)=>els.every(el=>parseFloat(getComputedStyle(el).fontSize)>=minimum),width>=1280?22:23)).toBe(true);
+ const table=page.locator('.comparison-table');
+ const modelSize=await table.locator('.spec-cell strong').first().evaluate(el=>getComputedStyle(el).fontSize);
+ await expect(table.locator('.quote.price')).toHaveCount(4);
+ await expect(table.locator('.quote.zero')).toHaveCount(1);
+ for(const price of await table.locator('.price-value').all())await expect(price).toHaveCSS('font-size',modelSize);
+ const highlight999=table.locator('th[data-highlight-rent="999"]');
+ const highlight1399=table.locator('th[data-highlight-rent="1399"]');
+ await expect(highlight999.locator('.tariff-contract')).toHaveText('999(48)');
+ await expect(highlight1399.locator('.tariff-contract')).toHaveText(['1399(48)','1399(48)']);
+ const normal=table.locator('thead th:not(.spec-cell):not([data-highlight-rent])');
+ await expect(normal.locator('.tariff-contract')).toHaveText(['999(24)','999／1399(48)']);
+ const background=header=>header.evaluate(el=>getComputedStyle(el).backgroundColor);
+ expect(new Set(await Promise.all([background(highlight999),background(highlight1399.first()),background(normal.first())])).size).toBe(3);
  expect(await page.locator('.tariff-contract').evaluateAll(els=>els.every(el=>getComputedStyle(el).whiteSpace==='nowrap'))).toBe(true);
  expect(await page.locator('.comparison-table summary').evaluateAll(els=>els.every(el=>getComputedStyle(el).whiteSpace==='nowrap'))).toBe(true);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

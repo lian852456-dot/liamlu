@@ -61,7 +61,7 @@
   function update(sources){current=sources;const button=root?.document?.getElementById('downloadQueryHtml');if(button){const ready=!!sources?.shopping?.snapshot&&!!sources?.tradein?.snapshot;button.disabled=busy||!ready;button.title=ready?'一次下載一個可離線切換兩種查價的 HTML':'手機專案與舊換新資料皆完整載入後可匯出';}}
   function assets(){
     if(root.ThreecReadonlyAssets)return Promise.resolve(root.ThreecReadonlyAssets);
-    if(!loading)loading=new Promise((resolve,reject)=>{const script=root.document.createElement('script');script.src='threec-readonly-assets.js?v=20261118-overview-1';script.onload=()=>root.ThreecReadonlyAssets?resolve(root.ThreecReadonlyAssets):reject(Error('匯出元件不完整'));script.onerror=()=>reject(Error('匯出元件下載失敗，請重試'));root.document.head.append(script);}).catch(error=>{loading=null;throw error;});
+    if(!loading)loading=new Promise((resolve,reject)=>{const script=root.document.createElement('script');script.src='threec-readonly-assets.js?v=20261118-price-style-1';script.onload=()=>root.ThreecReadonlyAssets?resolve(root.ThreecReadonlyAssets):reject(Error('匯出元件不完整'));script.onerror=()=>reject(Error('匯出元件下載失敗，請重試'));root.document.head.append(script);}).catch(error=>{loading=null;throw error;});
     return loading;
   }
   function bind(getResponse){
