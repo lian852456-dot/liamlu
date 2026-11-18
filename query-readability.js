@@ -21,7 +21,7 @@
       const intro=host.querySelector('.tref-top p');if(notes&&intro)notes.append(intro);
       disclosure(host.querySelector('.tref-detection>small'),'檢測使用說明');
     }
-    function readingNotes(){document.querySelectorAll('#shoppingResults .scroll-hint').forEach(node=>disclosure(node,'操作提示'));}
+    function readingNotes(){document.querySelectorAll('#shoppingResults .scroll-hint').forEach(node=>{const help=document.getElementById('queryHelp');if(help){help.querySelector('.scroll-hint')?.remove();help.append(node);}else disclosure(node,'操作提示');});}
     pageNotes();recycleNotes();readingNotes();
     const result=document.getElementById('shoppingResults');if(result)new MutationObserver(readingNotes).observe(result,{childList:true,subtree:true});
     const host=document.getElementById('tradeinReferencePanel');if(host)new MutationObserver(recycleNotes).observe(host,{childList:true});
