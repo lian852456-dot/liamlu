@@ -95,6 +95,7 @@
   }
   function updateRates() {
     rateNote('dailyInsuranceNote', 'insurance_num', 'insurance_den');
+    updateInsuranceConsultForm();
     rateNote('dailyMyChargeNote', 'mgmt_mycharge_clicked', 'mgmt_mycharge_tagged');
   }
   function keyboardLayout() {
@@ -157,7 +158,7 @@
     });
     insurance = section('保險搭售', 'daily-insurance');
     const insuranceGrid = element('div', 'daily-grid'); moveFields(['insurance_num','insurance_den','insurance_pct'], insuranceGrid); insurance.append(insuranceGrid);
-    const insuranceNote = element('p', 'daily-note'); insuranceNote.id = 'dailyInsuranceNote'; insurance.append(insuranceNote);
+    const insuranceNote = element('p', 'daily-note'); insuranceNote.id = 'dailyInsuranceNote'; insurance.append(insuranceNote, byId('insuranceProgressStatus'), byId('insuranceConsultSection'));
     other = element('details', 'daily-section daily-other');
     other.append(element('summary', '', '其他業績（展開填寫）'));
     const otherGrid = element('div', 'daily-grid');
@@ -229,7 +230,8 @@
       }
       panel.querySelector('.store-grid').hidden = true; byId('dailyStoreToggle').setAttribute('aria-expanded', 'false');
       byId('underForms').replaceChildren(); zero.hidden = true;
-      area.querySelectorAll('input').forEach(input => { input.value = ''; input.disabled = true; input.removeAttribute('aria-invalid'); });
+      area.querySelectorAll('input,textarea').forEach(input => { input.value = ''; input.disabled = true; input.removeAttribute('aria-invalid'); });
+      updateInsuranceConsultForm();
       ['kpi','rank'].forEach(key => { byId('f_' + key).readOnly = selectedSeg === 21; });
       renderManagementFocusInputs({}); labelControls(area);
       area.querySelectorAll('input,textarea').forEach(input => { input.disabled = input.readOnly; });

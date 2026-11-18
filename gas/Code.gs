@@ -18,7 +18,8 @@ const FIELDS = [
   'tw_pixel10','tw_s26u','tw_sharpr11','tw_vivo','tw_s26','tw_reno16f',
   'tw_pixel10fold','tw_findx9s','tw_sony1','tw_poketomo',
   'tw_oppoa6x','tw_a27','tw_y21','tw_myfirst',
-  'zero_reason','zero_consult','zero_method','zero_plan'
+  'zero_reason','zero_consult','zero_method','zero_plan',
+  'insurance_consult_json'
 ];
 
 const SPREADSHEET_ID = '10MqzAWOPc4UPE-g5ZZPNZG3tYAndKW-DApLuuhIpQWA';
@@ -3016,9 +3017,38 @@ function reportCardData_(data) {
   return copy;
 }
 
+// Resolve only the already-published private KPI source. Never read a personal insurance rate.
+function reportInsuranceProgress_(store, date) {
+  try {
+    const file = kpiCalcLatestDataFile();
+    return InsuranceConsultation.resolve(file ? JSON.parse(file.getBlob().getDataAsString('UTF-8')) : null, store, date);
+  } catch (_) { return InsuranceConsultation.pending('正式門市保險進度讀取待核'); }
+}
+function reportInsuranceConsultData_(payload) {
+  const copy = Object.assign({}, payload.data);
+  const prior = readData(payload.date, Number(payload.seg))[payload.store];
+  const frozen = InsuranceConsultation.saved(prior);
+  let progress = frozen ? frozen.progress : reportInsuranceProgress_(payload.store, payload.date);
+  const supplied = InsuranceConsultation.saved(copy);
+  // Old clients remain compatible while no verified progress is available.
+  if (!supplied && !frozen && progress.status !== 'verified') { delete copy.insurance_consult_json; return copy; }
+  // Pending client context is informational only. Never turn a source outage into a required consultation.
+  // Only exact server/frozen proof can carry verified status.
+  if (!frozen && progress.status === 'pending' && supplied && supplied.progress.status === 'pending') {
+    const allowed = ['status','reason','rate','sourceFile','sourceSha256','version','publicationDate','sheet','column','periodStart','cutoff','periodEvidence','store','reportDate','code'];
+    if (Object.keys(supplied.progress).every(function(key) { return allowed.indexOf(key) >= 0; })) progress = supplied.progress;
+  }
+  if (!supplied || JSON.stringify(supplied.progress) !== JSON.stringify(progress)) throw new Error('保險進度來源已更新或尚未驗證，請重新登入讀取後送出');
+  copy.insurance_consult_json = InsuranceConsultation.serialize(progress, InsuranceConsultation.parse(copy.insurance_consult_json));
+  if (InsuranceConsultation.assess(copy).missing.length) throw new Error('保險搭售率低於 50%：請填寫以下五項');
+  return copy;
+}
 function reportWritePayload_(payload) {
   payload = Object.assign({}, payload, {data:reportCardData_(payload.data)});
-  return reportMutationLocked_(payload, function(prepared) { return reportWriteUnlocked_(prepared); });
+  return reportMutationLocked_(payload, function(prepared) {
+    prepared.data = reportInsuranceConsultData_(prepared);
+    return reportWriteUnlocked_(prepared);
+  });
 }
 
 function reportWriteUnlocked_(payload) {

@@ -48,6 +48,12 @@
       return `<div class="sum-empty"><h3>${title}</h3><p>${note}</p>${status!=='loading'&&status!=='locked'?'<button type="button" data-summary-retry>重新讀取</button>':''}</div>`;
     }
     function fields(title,columns,row) {return `<section class="sum-fields"><h4>${title}</h4><dl>${columns.map(([key,label,unit])=>`<div><dt>${label}${unit?'（'+unit+'）':''}</dt><dd class="sum-num">${unit==='%'?pct(row.values[key]):fmt(row.values[key])}</dd></div>`).join('')}</dl></section>`;}
+    function insuranceConsultation(record) {
+      const check=InsuranceConsultation.assess(record);
+      const note='<p class="sum-note">'+escape(InsuranceConsultation.label(InsuranceConsultation.saved(record)?.progress))+'</p>';
+      if(!check.applies)return note+'<p class="sum-note">本筆無有效保險進度請益。</p>';
+      return note+`<section class="sum-consult" data-insurance-consult><h4>保險搭售率低於 50%：請填寫以下五項</h4><dl>${InsuranceConsultation.fields.map(([key,label])=>`<dt>${label}</dt><dd>${escape(check.values[key]||'未提供')}</dd>`).join('')}</dl></section>`;
+    }
     function consultation(row,index) {
       const record=row.record || {};
       const keys=[['zero_reason','未開市原因'],['zero_consult','請益對象'],['zero_method','請益做法'],['zero_plan','明日計畫']];
@@ -60,7 +66,7 @@
         const failed=Array.isArray(person.failed)?person.failed:[];
         return `<section class="sum-person"><h4>${escape(name)}</h4><p>聯名卡上線數：${cardText} 張</p><p>${failed.length?`未過關項目：${failed.map(key=>{const item=options.personalItems.find(item=>item.key===key);const value=M.number(person.data?.[key]);return `${escape(item?.label||key)} ${item?.type==='pct'?pct(value):fmt(value)}`;}).join('、')}`:'本回報無未過關項目'}</p><dl>${[['customers','接客數'],['sold_items','上線項目'],['fail_reason','未過關原因'],['improve_plan','明日改善'],['consult_store','請益門市'],['consult_person','請益對象'],['consult_method','請益做法']].map(([key,label])=>`<dt>${label}</dt><dd>${escape(extra[key] === 0 ? 0 : extra[key] || '未取得／未填寫')}</dd>`).join('')}</dl></section>`;
       }).join('');
-      return storeSection+`<details class="sum-private" id="sum-private-${index}"><summary>個人回報明細（原授權區）</summary>${personalSection}</details>`;
+      return storeSection+insuranceConsultation(record)+`<details class="sum-private" id="sum-private-${index}"><summary>個人回報明細（原授權區）</summary>${personalSection}</details>`;
     }
     function metrics(row) {
       const values=row.values;
@@ -72,7 +78,7 @@
     function card(row) {
       const index=stores.indexOf(row.name),label={reported:'已回報',missing:'未回報',unknown:'來源未取得'}[row.status];
       const notes=row.status==='reported'?(M.attention(row)?'欄位待確認':''):'';
-      const detail=state.group==='consult'?consultation(row,index):state.group==='management'?fields('當月管理重點',M.management,row):state.group==='insurance'?fields('保險搭售',M.main.filter(([key])=>key.startsWith('insurance_')),row):fields('主力 KPI',M.main,row);
+      const detail=state.group==='consult'?consultation(row,index):state.group==='management'?fields('當月管理重點',M.management,row):state.group==='insurance'?fields('保險搭售',M.main.filter(([key])=>key.startsWith('insurance_')),row)+insuranceConsultation(row.record):fields('主力 KPI',M.main,row);
       return `<article class="sum-store" data-summary-store="${escape(row.name)}"><div class="sum-store-row"><div class="sum-store-name"><h3>${escape(row.name)}</h3><span class="sum-status ${row.status}">${label}</span>${notes?`<span class="sum-status unknown">${row.managementMissing?'管理待確認':notes}</span>`:''}<small>${row.status==='reported'?'回報 '+escape(row.record.savedAt||'時間未提供'):row.status==='missing'?'本時段無回報記錄':'日期／時段／門市來源不符'}</small></div><div class="sum-metrics sum-${state.group}">${metrics(row)}</div></div><details class="sum-store-detail" id="sum-detail-${index}"><summary>${escape(row.name)} · 展開完整明細</summary>${row.status==='reported'?`<p class="sum-note">KPI ${pct(row.values.kpi)} · 公司排名 ${fmt(row.values.rank)}${state.seg===21?'；沿用既有晚間承接欄位':''}。</p>${detail}<details class="sum-other" id="sum-other-${index}"><summary>其他全部欄位與請益</summary>${state.group!=='sales'?fields('主力 KPI',M.main,row):''}${fields('加掛類',M.addon,row)}${state.group!=='management'?fields('當月管理重點',M.management,row):''}${state.group!=='consult'?consultation(row,index):''}</details>`:`<p class="sum-note">${row.status==='missing'?'讀取已成功，本時段沒有此店回報。':'未取得可核對來源，不判定零業績或未回報。'}</p>`}</details></article>`;
     }
     function totalCell(rows,key,unit) {

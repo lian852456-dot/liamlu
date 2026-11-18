@@ -97,3 +97,10 @@
   #panel-fill .daily-submit-bar small { font-size:12px; }
   #panel-fill .daily-submit-bar .btn-save-main { min-width:124px; padding:10px 14px; font-size:17px; }
 }
+
+#panel-fill .daily-insurance-consult { margin-top:16px; border-top:1px solid #e5b5ad; padding-top:12px; }
+#panel-fill .daily-insurance-consult[hidden] { display:none; }
+#panel-fill .daily-insurance-consult h3 { font-size:18px; line-height:1.5; }
+#panel-fill .daily-insurance-consult label { display:block; font-weight:700; margin:12px 0 6px; }
+#panel-fill .daily-insurance-consult textarea { display:block; width:100%; box-sizing:border-box; min-height:88px; padding:10px; font:inherit; font-size:17px; border:1px solid #aebbc7; border-radius:8px; color:#172435; background:#fff; }
+#insuranceConsultError { color:#b42318; font-weight:700; }

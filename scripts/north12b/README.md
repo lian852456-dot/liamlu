@@ -29,3 +29,11 @@ The newly added MyVideo/KKBOX contract count is disabled per the user's 2026-10-
 
 Regression: `node --test tests/north12b-dod.test.mjs`. The source-to-artifact run must also be verified against the actual daily source, including a missing-prior case, zero values, missing store rows, closure reconciliation and CJK visuals.
 The optional `--vk-source` parser remains available for future explicit reactivation; it is unused by the active morning summary and its manifest.
+
+## Store insurance consultation source
+
+The extractor now adds `meta.storeInsuranceProgress` to the private KPI payload consumed by the existing authorized publication path. It contains only canonical store codes/names and column H (手機保險搭售率), never column G (進度達成率) or personal rates. The source bytes, publication date, and stable content version accompany the rows; partial/missing values remain null. Reprocessing identical input is deterministic; source corrections change the version. No new publisher, schedule, email, image or historical-row writer is introduced.
+
+This sidecar **does not reuse the renderer's personal-sheet cutoff described above**. It accepts only an unambiguous explicit statistical range on the store worksheet, beginning on the first of the month and ending no later than publication. A missing store-level range remains pending. Future alternative period evidence requires its own reviewed source binding; a period from a personal sheet or KPI cannot be promoted by editing metadata.
+
+The form consumes this field only through its existing authenticated B KPI bundle. Until the private daily pipeline actually publishes the extended KPI payload, the form reports the source as pending. Same-day source changes require a fresh read before a first save. Older publications remain clearly dated reference only, and cross-month/future sources cannot require consultation. No public static report JSON is generated.

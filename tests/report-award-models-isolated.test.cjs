@@ -4,7 +4,7 @@ const path = require('node:path');
 const test = require('node:test');
 
 const root = path.join(__dirname, '..');
-const gasSource = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8');
+const gasSource = fs.readFileSync(path.join(root, 'gas', 'Code.gs'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'gas', 'InsuranceConsultation.gs'), 'utf8');
 const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
 const MODEL_IDS = [
