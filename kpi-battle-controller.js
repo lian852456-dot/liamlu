@@ -422,8 +422,10 @@
 
   function kpiBattleAwardCell(row) {
     if (row.phone_award_actual == null && row.phone_award_projected == null) return kpiPendingCell();
-    const eligible = row.phone_award_eligible === 'Y';
-    return `<span class="kpi-award-meta">實際獎金</span><span class="kpi-award-val">${formatMoney(row.phone_award_actual)}</span><span class="kpi-award-meta">推估獎金 ${formatMoney(row.phone_award_projected)}</span><span class="kpi-award-meta ${eligible ? '' : 'no'}">獎金排名 ${row.phone_award_rank ?? '—'}｜${eligible ? '可領獎' : '未領獎'}</span>`;
+    const eligibility = row.phone_award_eligible === 'Y' ? '可領獎' :
+      row.phone_award_eligible === 'N' ? '未達領獎資格' : '資格待確認';
+    const rank = Number(row.phone_award_rank);
+    return `<span class="kpi-award-meta">實際獎金</span><span class="kpi-award-val">${formatMoney(row.phone_award_actual)}</span><span class="kpi-award-meta">推估獎金 ${formatMoney(row.phone_award_projected)}</span><span class="kpi-award-meta ${row.phone_award_eligible === 'N' ? 'no' : ''}">獎金排名 ${Number.isSafeInteger(rank) && rank > 0 ? rank : '—'}｜${eligibility}</span>`;
   }
 
   function kpiBattleInsuranceCell(row) {

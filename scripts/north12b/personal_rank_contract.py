@@ -129,9 +129,15 @@ def verified_ranks(component, source, protected=None, previous=None):
     actual = index_rows(component.get("personal", []))
     if expected.keys() != actual.keys():
         raise ValueError("RANK_IDENTITY_SET_MISMATCH")
+    # Some dashboard snapshots retain store performance in the manager rows.
+    # The protected individual workbook values can independently prove their ranks.
+    protected_source = (protected or {}).get("meta", {})
+    same_source_bytes = (protected_source.get("sourceSha256") == source["sha256"] ==
+                         (component.get("source_metadata") or {}).get("sha256"))
     for key, row in actual.items():
         if number(row.get("overall_rate")) != number(expected[key].get("overall_rate")):
-            raise ValueError("RANK_OFFICIAL_RATE_MISMATCH")
+            if not same_source_bytes or key[2] not in {"店長", "代理店長"}:
+                raise ValueError("RANK_OFFICIAL_RATE_MISMATCH")
     if protected is not None:
         meta = protected.get("meta", {})
         if meta.get("sourceFile") != source["source_file"] or str(meta.get("month")) + "-" + str(meta.get("snapshotDay")).zfill(2) != cutoff:
@@ -142,13 +148,16 @@ def verified_ranks(component, source, protected=None, previous=None):
             raise ValueError("RANK_PROTECTED_IDENTITY_MISMATCH")
         if any(number(protected_rows[k].get("official")) != number(expected[k].get("overall_rate")) for k in expected):
             raise ValueError("RANK_PROTECTED_RATE_MISMATCH")
+        if same_source_bytes and any(protected_rows[k].get("employee_id") != expected[k]["employee_id"] for k in expected):
+            raise ValueError("RANK_PROTECTED_EMPLOYEE_MISMATCH")
     prior = {}
     if previous is not None:
         if date.fromisoformat(previous["data_as_of_date"]) != date.fromisoformat(cutoff) - timedelta(days=1):
             raise ValueError("RANK_PREVIOUS_DATE_MISMATCH")
-        prior = {r["employee_id"]: r for r in previous["records"]}
-        if len(prior) != len(previous["records"]):
-            raise ValueError("RANK_PREVIOUS_IDENTITY_AMBIGUOUS")
+        if previous["data_as_of_date"][:7] == cutoff[:7]:
+            prior = {r["employee_id"]: r for r in previous["records"]}
+            if len(prior) != len(previous["records"]):
+                raise ValueError("RANK_PREVIOUS_IDENTITY_AMBIGUOUS")
     result = copy.deepcopy(component)
     for row in result["personal"]:
         original = expected[person_key(row)]
@@ -169,7 +178,7 @@ def verified_ranks(component, source, protected=None, previous=None):
     result["personal_rank_semantics"] = SEMANTICS
     result["personal_rank_source"] = {k: source[k] for k in ("source_file", "data_as_of_date", "sha256")}
     result["personal_rank_source"].update({"sheet": SHEET, "column": "I"})
-    if previous is not None:
+    if prior:
         result["personal_rank_source"]["previous_sha256"] = previous["sha256"]
     return result
 
@@ -179,12 +188,66 @@ def repair_component(component, source_path, protected=None, previous_path=None)
                           read_source(previous_path) if previous_path else None)
 
 
+def join_personal_awards(component, awards, protected):
+    """Copy approved award fields into the masked personal KPI rows before publishing."""
+    cutoff = component["data_as_of_date"]
+    run = component.get("kpi_run_id")
+    if not run or not cutoff or not component.get("report_run_date") or (
+        awards.get("report_run_date") != component["report_run_date"] or
+        awards.get("data_as_of_date") != cutoff or awards.get("processing_run_id") != run or
+        protected.get("meta", {}).get("processingRunId") != run
+    ):
+        raise ValueError("PERSON_AWARDS_BATCH_MISMATCH")
+    sources = awards.get("source_files") or {}
+    for key in ("store", "person"):
+        source = sources.get(key) or {}
+        if (source.get("source_data_date") != cutoff or source.get("run_id") != run or
+                not re.fullmatch(r"[a-f0-9]{64}", str(source.get("sha256") or ""))):
+            raise ValueError("PERSON_AWARDS_SOURCE_UNVERIFIED")
+
+    people = index_rows(protected.get("persons", []), {
+        str(store["code"]): store["name"] for store in protected.get("stores", [])
+    })
+    snapshot_people = index_rows(component.get("personal", []))
+    if people.keys() != snapshot_people.keys():
+        raise ValueError("PERSON_AWARDS_KPI_ROSTER_MISMATCH")
+    by_id = {person.get("employee_id"): key for key, person in people.items()}
+    award_rows = awards.get("person_awards") or []
+    award_ids = {award.get("emp_id") for award in award_rows}
+    if (len(by_id) != len(people) or None in by_id or "" in by_id or None in award_ids or
+            "" in award_ids or len(award_ids) != len(award_rows)):
+        raise ValueError("PERSON_AWARDS_EMPLOYEE_MISMATCH")
+
+    updates = {}
+    for award in award_rows:
+        key = by_id.get(award["emp_id"])
+        if key is None:
+            continue
+        if (store_key(award.get("store")), mask_name(award.get("name"))) != key[:2]:
+            raise ValueError("PERSON_AWARDS_STORE_OR_NAME_MISMATCH")
+        eligibility = award.get("award")
+        if eligibility not in ("Y", "N", None):
+            raise ValueError("PERSON_AWARDS_ELIGIBILITY_INVALID")
+        updates[key] = {
+            "phone_award_actual": number(award.get("actual_total")),
+            "phone_award_projected": number(award.get("projected")),
+            "phone_award_rank": number(award.get("rank") or None, rank=True),
+            "phone_award_eligible": eligibility,
+        }
+    result = copy.deepcopy(component)
+    missing = dict.fromkeys(("phone_award_actual", "phone_award_projected", "phone_award_rank", "phone_award_eligible"))
+    for row in result["personal"]:
+        row.update(updates.get(person_key(row), missing))
+    return result
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--snapshot", type=Path, required=True)
     parser.add_argument("--protected", type=Path, required=True)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--previous-source", type=Path)
+    parser.add_argument("--with-awards", action="store_true", help="Join the same-run individual awards from the private snapshot")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     inputs = {args.snapshot.resolve(), args.protected.resolve(), args.source.resolve()}
@@ -193,8 +256,12 @@ if __name__ == "__main__":
     if args.output.resolve() in inputs:
         raise SystemExit("RANK_OUTPUT_MUST_BE_NEW")
     snapshot = json.loads(args.snapshot.read_text())
-    snapshot["kpiBattle"] = repair_component(snapshot["kpiBattle"], args.source,
-        json.loads(args.protected.read_text()), args.previous_source)
+    protected = json.loads(args.protected.read_text())
+    snapshot["kpiBattle"] = repair_component(snapshot["kpiBattle"], args.source, protected, args.previous_source)
+    if args.with_awards:
+        if snapshot.get("components", {}).get("awards", {}).get("status") != "fresh":
+            raise SystemExit("PERSON_AWARDS_COMPONENT_NOT_FRESH")
+        snapshot["kpiBattle"] = join_personal_awards(snapshot["kpiBattle"], snapshot["awardsBattle"], protected)
     with args.output.open("x") as output:
         output.write(json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")))
     args.output.chmod(0o600)
