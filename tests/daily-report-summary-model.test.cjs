@@ -8,8 +8,8 @@ test('strict numeric values preserve zero, reject null/blank/booleans/partial nu
  for(const x of [null,undefined,'',' ',true,false,{},[],NaN,Infinity,'2x','0x10','Infinity',-1])assert.equal(M.number(x),null,String(x));
  for(const [input,n] of [[0,0],['0',0],[' 2.5 ',2.5],['1e2',100]])assert.equal(M.number(input),n);
 });
-test('32 original fields survive projection, management JSON and calculated ratios use raw pairs',()=>{
- assert.equal(M.fields.length,32);assert.equal(new Set(M.fields.map(([key])=>key)).size,32);
+test('33 fields including optional card count survive projection, management JSON and calculated ratios use raw pairs',()=>{
+ assert.equal(M.fields.length,33);assert.equal(new Set(M.fields.map(([key])=>key)).size,33);
  const data=project({通化:row('通化',{aq999:'0',insurance_num:'1',insurance_den:'2',insurance_pct:99,management_focus_json:'{"op_online":"0","mycharge_clicked":1,"mycharge_tagged":4,"mycharge_pct":90}'})})[0];
  assert.equal(data.values.aq999,0);assert.equal(data.values.insurance_pct,50);assert.equal(data.values.mycharge_pct,25);assert.equal(data.values.op_online,0);assert.equal(data.status,'reported');assert.ok(data.missingFields.length);
 });

@@ -68,12 +68,12 @@ async function releaseHeld(page,index=0) {
 }
 for(const width of [390,1440]) test.describe(width+'px',()=>{
   test.use({viewport:{width,height:width===390?844:1000}});
-  test('single controls, keyboard selection, rank first and all 26 fields remain',async({page})=>{
+  test('single controls, keyboard selection, rank first and all 27 fields remain',async({page})=>{
     await page.locator('.store-card[data-store="酒泉"]').focus();await page.keyboard.press('Enter');
     await expect(page.locator('.btn-save-main')).toBeEnabled();await expect(page.locator('#dailyStoreGrid')).toBeHidden();
     expect(await page.locator('#fillFormArea input').first().getAttribute('id')).toBe('f_rank');
     const ids=await page.evaluate(()=>Array.from(document.querySelectorAll('[id]')).map(el=>el.id));expect(ids.length).toBe(new Set(ids).size);
-    expect(await page.evaluate(()=>FIELDS.every(k=>document.querySelectorAll('#f_'+k).length===1)&&FIELDS.length===26)).toBe(true);
+    expect(await page.evaluate(()=>FIELDS.every(k=>document.querySelectorAll('#f_'+k).length===1)&&FIELDS.length===27)).toBe(true);
     expect(await page.locator('#fillDate').count()).toBe(1);expect(await page.locator('.btn-save-main').count()).toBe(1);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     const rank=await page.locator('.daily-rank').boundingBox(), core=await page.locator('.daily-core').boundingBox();expect(rank.y).toBeLessThan(core.y);

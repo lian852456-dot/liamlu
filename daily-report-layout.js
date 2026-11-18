@@ -66,7 +66,7 @@
   function summaryContext() {
     byId('dailyStoreName').textContent = selected || '請選門市';
     byId('dailySubmitContext').textContent = selected + ' · ' + selectedSeg + ':00 ' + (selectedSeg === 21 ? '晚間收官' : '下午回報');
-    byId('dailyCoreTag').textContent = selectedSeg === 21 ? '晚間必填' : '當日累計';
+    byId('dailyCoreTag').textContent = selectedSeg === 21 ? '晚間核心必填；聯名卡選填' : '當日累計';
     byId('dailyManagementNote').textContent = selectedSeg === 21
       ? 'OP 與 MyCharge 晚間必填；沒有數量請填 0。'
       : '下午可先略過；21:00 再填 OP 與 MyCharge，空白不會造成下午缺件。';
@@ -147,7 +147,7 @@
     core = section('核心業績', 'daily-core');
     const coreTag = element('span', 'daily-tag', '當日累計'); coreTag.id = 'dailyCoreTag'; core.firstChild.append(coreTag);
     core.append(element('p', 'daily-note', '截至本時段累計，兩時段不相加。'));
-    const coreGrid = element('div', 'daily-grid'); moveFields(['aq999','aq1399','rt999','rt1399','haosu'], coreGrid); core.append(coreGrid);
+    const coreGrid = element('div', 'daily-grid'); moveFields(['aq999','aq1399','rt999','rt1399','haosu','cobranded_card'], coreGrid); core.append(coreGrid);
     const short = {aq999:['A999','V+D ≥999 · 筆'],aq1399:['A1399','V+D ≥1399 · 筆'],rt999:['R999','V+D ≥999 · 筆'],rt1399:['R1399','V+D ≥1399 · 筆'],haosu:['好速','銷售點數']};
     Object.entries(short).forEach(([key,[name,definition]]) => {
       const input = byId('f_' + key), wrap = input.closest('.kpi-input-wrap'), label = wrap.querySelector('label');

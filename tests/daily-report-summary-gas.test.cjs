@@ -79,3 +79,11 @@ test('a segment with fewer formal fields omits absent metrics instead of inventi
   assert.equal(Object.hasOwn(result.metrics,'保險分子'),false);
   assert.equal(result.semantics,'formal-index-summary-v2');
 });
+
+test('optional card summary keeps zero, omits old/malformed values and never borrows personal totals',()=>{
+ const summarize=loadSummary();
+ const out=summarize({通化:{cobranded_card:0},酒泉:{cobranded_card:3},台北三創:{cobranded_card:1.5},六張犁:{},萬大:{cobranded_card:-1}},'2099-10-02',21);
+ assert.equal(out.metrics['聯名卡上線數'].value,3);
+ assert.equal(out.stores.find(s=>s.name==='通化').metrics['聯名卡上線數'].value,0);
+ for(const name of ['台北三創','六張犁','萬大'])assert.equal(out.stores.find(s=>s.name===name).metrics['聯名卡上線數'],undefined);
+});

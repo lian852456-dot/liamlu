@@ -14,7 +14,7 @@ const FIELDS = [
   'early_renew','rt_close_num','rt_close_den','rt_close_pct',
   'insurance_num','insurance_den','insurance_pct',
   'device_num','device_den','device_ratio',
-  'management_focus_json',
+  'management_focus_json','cobranded_card',
   'tw_pixel10','tw_s26u','tw_sharpr11','tw_vivo','tw_s26','tw_reno16f',
   'tw_pixel10fold','tw_findx9s','tw_sony1','tw_poketomo',
   'tw_oppoa6x','tw_a27','tw_y21','tw_myfirst',
@@ -3002,7 +3002,22 @@ function privateDashboardParsePostPayload(e) {
   return JSON.parse(privateDashboardPostRawPayload(e) || '{}');
 }
 
+// Optional daily cumulative count. Absence preserves legacy records; an explicit blank clears it.
+function reportCardNumber_(value) {
+  if (value === null || value === undefined || value === '') return '';
+  if (['number','string'].indexOf(typeof value) < 0 || String(value).trim() === '') throw new Error('聯名卡上線數請填非負整數，或留白');
+  const n = Number(value);
+  if (!Number.isSafeInteger(n) || n < 0) throw new Error('聯名卡上線數請填非負整數，或留白');
+  return n;
+}
+function reportCardData_(data) {
+  const copy = Object.assign({}, data);
+  if (Object.prototype.hasOwnProperty.call(copy, 'cobranded_card')) copy.cobranded_card = reportCardNumber_(copy.cobranded_card);
+  return copy;
+}
+
 function reportWritePayload_(payload) {
+  payload = Object.assign({}, payload, {data:reportCardData_(payload.data)});
   return reportMutationLocked_(payload, function(prepared) { return reportWriteUnlocked_(prepared); });
 }
 
@@ -3088,15 +3103,20 @@ function reportSummaryFromData_(data, date, seg) {
     { key:'好速', sourceField:'haosu', unit:'points', aggregation:'sum' },
     { key:'R999', sourceField:'rt999', unit:'count', aggregation:'sum' },
     { key:'R1399', sourceField:'rt1399', unit:'count', aggregation:'sum' },
+    { key:'聯名卡上線數', sourceField:'cobranded_card', unit:'count', aggregation:'sum' },
     { key:'保險分子', sourceField:'insurance_num', unit:'count', aggregation:'sum' },
     { key:'保險分母', sourceField:'insurance_den', unit:'count', aggregation:'sum' },
     { key:'保險搭售率', sourceField:'insurance_pct', unit:'percent', aggregation:'average' }
   ];
+  const metricValue = function(definition, row) {
+    const value = reportSummaryNumber_(row[definition.sourceField]);
+    return definition.sourceField === 'cobranded_card' && (!Number.isSafeInteger(value) || value < 0) ? null : value;
+  };
   const stores = STORES.map(function(store) {
     const row = source[store] || null;
     const metrics = {};
     if (row) definitions.forEach(function(definition) {
-      const value = reportSummaryNumber_(row[definition.sourceField]);
+      const value = metricValue(definition, row);
       if (value !== null) metrics[definition.key] = { value:value, unit:definition.unit, sourceField:definition.sourceField };
     });
     return {
@@ -3109,7 +3129,7 @@ function reportSummaryFromData_(data, date, seg) {
   const reportedRows = STORES.map(function(store) { return source[store] || null; }).filter(Boolean);
   const metrics = {};
   if (reportedRows.length) definitions.forEach(function(definition) {
-    const values = reportedRows.map(function(row) { return reportSummaryNumber_(row[definition.sourceField]); }).filter(function(value) { return value !== null; });
+    const values = reportedRows.map(function(row) { return metricValue(definition, row); }).filter(function(value) { return value !== null; });
     if (!values.length) return;
     const value = definition.aggregation === 'average'
       ? Number((values.reduce(function(sum, item) { return sum + item; }, 0) / values.length).toFixed(1))
@@ -3164,6 +3184,7 @@ function reportReadPayload_(payload) {
 }
 
 function personalWritePayload_(payload) {
+  if (payload.record && payload.record.data) payload = Object.assign({}, payload, {record:Object.assign({}, payload.record, {data:reportCardData_(payload.record.data)})});
   return reportMutationLocked_(payload, function(prepared) {
     writePersonal(prepared);
     return {status:'ok'};
