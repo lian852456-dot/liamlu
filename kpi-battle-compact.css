@@ -33,6 +33,8 @@
 .battle-compact .compact-matrix th:first-child{width:160px}
 .battle-compact .compact-matrix th,.battle-compact .compact-matrix td{padding:4px 5px;border-right:1px solid #e2e8f0;font-size:15px;line-height:1.2;font-weight:750}
 .battle-compact .compact-matrix thead th,.battle-compact .compact-details thead th{background:#f36500;color:white;border-bottom:0;font-size:14px;padding:7px}
+.battle-compact .compact-matrix thead th{white-space:normal}
+.battle-compact .compact-matrix [data-aq-visitors]{font-variant-numeric:tabular-nums}
 .battle-compact .compact-matrix tbody th{text-align:left;padding-left:13px;color:#111827}
 @media(min-width:701px){.battle-compact .compact-matrix tbody th,.battle-compact .compact-matrix tbody td{padding-block:2.5px}}
 .battle-compact .compact-matrix small{display:block;font-size:11px;color:#64748b;line-height:1.25;font-weight:500}
@@ -41,19 +43,29 @@
 .battle-compact .compact-matrix .compact-district,.battle-compact .compact-matrix .compact-district th{background:#fff3e9}
 .battle-compact .compact-matrix .rank-top,.battle-compact .compact-matrix .rank-bottom{font-size:12px;padding:2px 5px;gap:3px}
 .battle-compact tbody tr:nth-child(even){background:#f1f4f7}
-.battle-compact .compact-store-details{margin-top:24px;padding-top:18px;border-top:1px solid #e2e8f0}
-.battle-compact .kpi-battle-filter{margin:12px 0;justify-content:space-between}
-.battle-compact .kpi-battle-filter label{display:flex;align-items:center;gap:12px;font-size:15px}
-.battle-compact .kpi-battle-filter select{min-height:40px;max-width:100%;padding:6px 12px;font-size:16px}
-.battle-compact .compact-store-details .kpi-battle-toggle{margin-bottom:10px}
+.battle-compact .compact-store-details{margin-top:16px;padding-top:12px;border-top:1px solid #e2e8f0}
+.battle-compact .kpi-battle-filter{margin:8px 0;justify-content:flex-start;gap:8px 18px}
+.battle-compact .kpi-battle-filter label{display:flex;align-items:center;gap:8px;font-size:15px}
+.battle-compact .kpi-battle-filter select{min-height:38px;max-width:100%;padding:6px 10px;font-size:16px}
+.battle-compact .compact-detail-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:3px 16px;margin:8px 0 6px}
+.battle-compact .compact-detail-heading h3,.battle-compact .compact-detail-heading p{margin:0}
+.battle-compact .compact-store-details .kpi-battle-toggle{margin-bottom:8px}
 .battle-compact .compact-store-details .kpi-battle-toggle button{padding:7px 14px;min-height:38px}
-.battle-compact .compact-metric-group{margin:16px 0 20px}
-.battle-compact .compact-metric-group h4{margin:0 0 8px;padding-left:10px;border-left:4px solid #f36500;font-size:18px}
-.battle-compact table.compact-details{min-width:620px;font-size:15px}
-.battle-compact .compact-details td,.battle-compact .compact-details tbody th{padding:8px 12px;border-right:1px solid #e2e8f0;font-size:15px}
-.battle-compact .compact-details tbody th{text-align:left}
+.battle-compact .compact-metric-groups{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin:0 0 10px}
+.battle-compact .compact-metric-group h4{margin:0 0 5px;padding-left:8px;border-left:4px solid #f36500;font-size:18px}
+@media(min-width:1180px){
+  .battle-compact .compact-metric-groups.is-combined{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+  .battle-compact .compact-metric-groups.is-combined [data-kpi-group="other"]{grid-column:1 / -1}
+}
+.battle-compact table.compact-details{min-width:500px;font-size:15px}
+.battle-compact .compact-details td,.battle-compact .compact-details tbody th{padding:4px 7px;border-right:1px solid #e2e8f0;font-size:15px;line-height:1.3}
+.battle-compact .compact-details tbody th{width:32%;text-align:left;overflow-wrap:anywhere}
+.battle-compact .compact-details td{text-align:right;font-variant-numeric:tabular-nums}
 .battle-compact .compact-details [data-daily-target]{min-width:115px;white-space:normal}
-.battle-compact .daily-target-unit,.battle-compact .daily-target-note{display:block;font-size:12px;line-height:1.4;font-weight:500;color:#475569}
+.battle-compact .daily-target-value{white-space:nowrap}
+.battle-compact .daily-target-unit,.battle-compact .daily-target-note{font-size:12px;line-height:1.4;font-weight:500;color:#475569}
+.battle-compact .daily-target-unit{margin-inline-start:4px}
+.battle-compact .daily-target-note{display:block}
 .battle-compact [data-daily-target="partial"]{background:#fff4da}
 .battle-compact .compact-disclosure{margin:8px 0;border:1px solid #dbe1e8;border-radius:7px;background:#fafbfc}
 .battle-compact .compact-disclosure>summary{padding:10px 14px;cursor:pointer;font-size:15px;font-weight:750}
