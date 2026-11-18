@@ -13,9 +13,9 @@ body[data-query-kind].query-workspace .query-common-filters .filter-details{marg
 body[data-query-kind].query-workspace .query-common-filters .filter-details>summary{display:none}
 body[data-query-kind].query-workspace .query-common-filters .plan-filters{grid-template-columns:repeat(2,minmax(0,1fr));margin:0}
 body[data-query-kind].query-workspace .query-shopping-quotes .comparison-scroll{max-height:none!important;margin-top:4px}
-body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table{table-layout:fixed;width:max(100%,calc(240px + var(--comparison-columns,12)*88px));min-width:0}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table{table-layout:fixed;width:max(100%,calc(264px + var(--comparison-columns,12)*86px));min-width:0}
 body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table :is(th,td):not(.spec-cell){min-width:0;width:auto;max-width:none;padding:5px 3px!important}
-body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table .spec-cell{width:240px;min-width:240px;max-width:240px;padding:5px 7px!important;line-height:1.3}
+body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table .spec-cell{width:264px;min-width:264px;max-width:264px;padding:5px 7px!important;line-height:1.3}
 body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table thead :is(th,td){line-height:1.25}
 body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table .project-label{font-size:11px;line-height:1.25;margin-bottom:1px;white-space:normal}
 body[data-query-kind].query-workspace .query-shopping-quotes .comparison-table :is(.rent-label,.contract-label){font-size:18px;line-height:1.3}
