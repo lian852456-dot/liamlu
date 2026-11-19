@@ -188,7 +188,7 @@ test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', 
   assert.doesNotMatch(page, /https?:\/\//);
   assert.match(page, /<input class="file-input" id="fileInput" type="file" accept="\.xlsx,\.xls,\.csv,\.tsv">/);
   assert.doesNotMatch(page, /id="chooseFile"/);
-  assert.match(page, /<script src="daily-log-dashboard\.js\?v=20260902-6"><\/script>/);
+  assert.match(page, /<script src="daily-log-dashboard\.js\?v=20261119-layout-1"><\/script>/);
   assert.doesNotMatch(page, /type="module" src="daily-log-dashboard\.js"/);
   assert.match(page, /候選版 · 本機預覽/);
   assert.match(page, /尚未寫入雲端/);
@@ -200,10 +200,10 @@ test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', 
   assert.match(page, /id="calendarFileInput" type="file"/);
   assert.match(page, /店務行事曆 Excel/);
   assert.match(controller, /Core\.chooseBestCalendarSheet/);
-  assert.match(page, /daily-log-dashboard\.js\?v=20260902-6/);
+  assert.match(page, /daily-log-dashboard\.js\?v=20261119-layout-1/);
   assert.match(home, /href="daily-log-dashboard\.html"/);
   assert.match(home, />每日日誌檢查</);
-  assert.match(page, /daily-log-dashboard\.css\?v=20261118-matrix-1/);
-  assert.match(page, /<div class="daily-date-row">[\s\S]*?<span>每日查看日期<\/span>[\s\S]*?<input id="viewDate" type="date">/);
-  assert.ok(page.indexOf('class="daily-date-row"') > page.indexOf('data-view="daily"'), '每日查看日期應位於每日分頁列下方');
+  assert.match(page, /daily-log-dashboard\.css\?v=20261119-layout-1/);
+  assert.match(page, /<div class="daily-date-row">[\s\S]*?<span>查看日期<\/span>[\s\S]*?<input id="viewDate" type="date">/);
+  assert.ok(page.indexOf('class="daily-date-row"') > page.indexOf('data-view="daily"'), '查看日期應位於分頁控制項之後');
 });
