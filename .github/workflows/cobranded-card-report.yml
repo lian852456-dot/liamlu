@@ -18,7 +18,7 @@ on:
       - 'daily-report-layout.css'
       - 'tests/helpers/insurance-runtime.cjs'
       - 'scripts/north12b/insurance_progress.py'
-      - 'scripts/north12b/extract.py'
+      - 'scripts/north12b/insurance_report_preview.py'
       - 'tests/insurance-consultation.*'
       - 'tests/test_insurance_progress.py'
       - 'tests/fixtures/insurance-progress.cjs'

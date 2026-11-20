@@ -4,7 +4,7 @@
 
 ## 正式來源與門檻
 
-每日原報經既有 `extract.py` 產出獨立私有 `insurance-source-MMDD.json` 與 `insurance-publish-MMDD.json`，不再增加普通 KPI JSON 欄位。來源 schema 為 `insurance-consultation-source/v2`。店級讀「搭售達成率 (手機保險)」H，個人讀「搭售達成率 (手機保險) _個人」M，分別驗證身分與各自統計期。個人 D3 可獨立提供該個人頁統計起訖，不能當作店級截止。來源 SHA256、發布日與檔名須和獨立私有發布封套及原檔位元一致；版本由內容決定。無可信分子母時直接用正式公布率。
+正式原報經獨立的 `insurance_report_preview.py` 產出獨立私有 `insurance-source-MMDD.json` 與 `insurance-publish-MMDD.json`，不再增加普通 KPI JSON 欄位。來源 schema 為 `insurance-consultation-source/v2`。店級讀「搭售達成率 (手機保險)」H，個人讀「搭售達成率 (手機保險) _個人」M，分別驗證身分與各自統計期。個人 D3 可獨立提供該個人頁統計起訖，不能當作店級截止。來源 SHA256、發布日與檔名須和獨立私有發布封套及原檔位元一致；版本由內容決定。無可信分子母時直接用正式公布率。
 
 統計截止可落後發布日，頁首分別顯示兩者，不稱即時更新。尚未取得本日有效發布，或新批缺值／失敗時，保留前次率與日期並標示「舊資料／待核」，只供參考，不強制本日請益。原始率低於 50% 才要求五欄；49.9999% 仍要求，50% 免填，明確有效的 0% 要求。缺值、身份疑義、未知期間、跨月及未來批次為「資料待核」，不假算 0、不擋一般回報。來源更正後首次提交必須重新讀取版本；同批重跑不產生新任務。
 
@@ -44,13 +44,13 @@ B 動作 `employee_insurance_read` 接收 `dataDate`，回應 schema `insurance-
 
 寫後逐字讀回；complete 失敗回復到已持久化的 pending 及舊值。相同來源 hash 與內容重跑不重寫；同日更正原檔 hash 可更新。相同原檔已成功的內容不能偷偷改寫；修正解析器需另作經審核更正，不能繞過冪等驗證。網路結果不明先讀 status 對帳，不盲重送。若連 begin 都無法確認，不能宣稱已記錄失敗；保留原資料及日期，由既有發布負責人查核。
 
-`insurance_publish.mjs` 提供顯式 `publishInsuranceIntent` 接點：讀取原檔及私有 intent，驗證 SHA256，再由既有受權 publisher 注入 request 與 endpoint。此模組不讀取憑證、不在 import／建置時發送請求、不建立排程。extract 來源解析失敗會產出 failed intent，讓受權發布接點標記待核而保留舊值；私有輸出不可寫時只記錄無法準備，不阻斷原 KPI 建置。既有 09:45 外部執行者尚須核對並接上這個呼叫，repo 測試通過不代表正式接通。
+以既有唯讀來源選取最新已正式產出的原報，核日期、Drive 版本及原檔雜湊。使用原名冊的 DashboardUsers A:E 欄，將已驗證的原檔及名冊提供給獨立的 `insurance_report_preview.py`，在新的私有目錄產生預覽檔。只允許同店、唯一、有效的員編對應率。店級截止另核。正式接入時由既有受權管理者使用 `publishInsuranceIntent` 核對來源並讀回，普通同仁沿既有 B 登入讀取本人範圍。
 
 ## 發布順序與回復
 
 1. 核實現役部署版與 saved HEAD 完整私有備份，包含 manifest、Console-only 檔。repo 不代表正式副本。
 2. 在現役私有副本加入 `InsuranceConsultation.gs`、`InsuranceConsultationStore.gs`、`InsuranceSourceCore.gs`、`InsuranceSourcePublication.gs`。`Code.gs` 只套 B allowlist、受保護 dispatch、兩條 KPI redaction 及三個管理者來源動作的一行 dispatch；保留現役額外的 `employee_city_handoff` context、聯名卡及所有專有檔。manifest／URL／權限不變，不能整檔覆蓋。
-3. 後端先驗授權、空來源 pending 及來源交易回復，再部署到同一既有指標。正式發布前核對既有日報實際 runtime，在私有副本最小加入 extractor helper 與 runtime hash，保留現役 Google 別名、NP OUT、外部 batch ID、快取及 timeout。既有 publisher 接入上述私有 intent，先預覽再讀回個人來源。無獨立店級期間仍 pending。
+3. 在受保護環境驗證最新原報預覽、後端授權、來源交易讀回及回復。通過發布門檻後才部署同一既有指標，先驗本人來源再開放填寫。
 4. 發布前端後，以正式身份驗本人頁首、門市角色、一般兩時段；首次真實回覆讀回另驗，不向正式資料寫假紀錄。公開 HTML／舊換新 Preview 不代替正式登入。09:00 日報來源仍須另外對帳才切換。
 5. 回復先停止新的來源發布接點並撤下新入口，再回復備份的部署指標及前端；獨立私有來源檔和每日回覆檔均保留。若舊 KPI 檔已有 sidecar，回復無 redaction 後端前須先由原受權流程移除該 sidecar，或保留 redaction。不要刪除歷史／回填／改權限。
 

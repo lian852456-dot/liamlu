@@ -13,7 +13,7 @@ class Progress(unittest.TestCase):
  def test_period_publication_correction_retry(self):
   b=self.source();b[SHEET]['values'][1][0]='統計期間：2099/10/01～2099/10/01';s=self.extract(b);self.assertEqual(s['status'],'verified');self.assertEqual(s['cutoff'],'2099-10-01');self.assertEqual(s,self.extract(b));self.assertNotEqual(s['version'],self.extract(b,'b'*64)['version'])
  def test_missing_zero_headers_and_aliases(self):
-  for value,expected in [(None,None),('',None),(0,0),('49.999%',.49999),(-1,None),(True,None)]:
+  for value,expected in [(None,None),('',None),('0.5',None),('未知',None),(0,0),('49.999%',.49999),(-1,None),(True,None)]:
    b=self.source();b[SHEET]['values'][14][7]=value;self.assertAlmostEqual(self.extract(b)['rows'][0]['rate'],expected) if expected is not None else self.assertIsNone(self.extract(b)['rows'][0]['rate'])
   b=self.source();b[SHEET]['values'][12][7]='進度達成率';self.assertIsNone(self.extract(b)['rows'][0]['rate'])
   b=self.source();b[SHEET]['values'][14][1]='合成其他店';self.assertIsNone(self.extract(b)['rows'][0]['rate'])

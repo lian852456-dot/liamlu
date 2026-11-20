@@ -57,7 +57,7 @@ test('publisher reconciles a lost completion response without repeating writes a
 });
 test('shared core mirrors GAS; extraction writes a separate private artifact and normal KPI route remains redacted',()=>{
  assert.equal(fs.readFileSync('insurance-source-core.js','utf8'),fs.readFileSync('gas/InsuranceSourceCore.gs','utf8'));
- const extract=fs.readFileSync('scripts/north12b/extract.py','utf8');assert.doesNotMatch(extract,/meta\['insuranceConsultationSource'\]\s*=/);assert.match(extract,/write_private_publication_artifacts/);
+ const extract=fs.readFileSync('scripts/north12b/extract.py','utf8');assert.doesNotMatch(extract,/meta\['insuranceConsultationSource'\]\s*=/);assert.doesNotMatch(extract,/write_private_publication_artifacts/);assert.match(fs.readFileSync('scripts/north12b/insurance_report_preview.py','utf8'),/write_private_publication_artifacts/);
  const store=fs.readFileSync('gas/InsuranceConsultationStore.gs','utf8');assert.doesNotMatch(store,/kpiCalcLatestDataFile/);assert.match(fs.readFileSync('gas/Code.gs','utf8'),/insurance_source_status.*insurance_source_begin.*insurance_source_complete/);
 });
 test('daily private intent uses exact bytes, explicit authorized adapter and a private receipt; failed extraction preserves source',async()=>{

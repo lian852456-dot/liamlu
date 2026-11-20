@@ -11,7 +11,8 @@ def canonical_store(value):
     return re.sub(r'^(台灣大哥大數位生活台北|台灣大哥大台北|台北)', '', re.sub(r'\s+', '', str(value or '')))
 
 def rate(value):
-    if isinstance(value, bool) or value is None or value == '': return None
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)): return None
+    if isinstance(value, str) and not value.endswith('%'): return None
     try:
         result = float(value[:-1]) / 100 if isinstance(value, str) and value.endswith('%') else float(value)
         return result if 0 <= result <= 1 else None
