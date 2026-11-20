@@ -1,0 +1,45 @@
+{
+  "pass": true,
+  "scope": "isolated real city renderer with explicit fixed lighting review query",
+  "results": [
+    {
+      "key": "p3",
+      "light": "day",
+      "taipeiMinutes": 720,
+      "contextLost": false
+    },
+    {
+      "key": "p3",
+      "light": "dusk",
+      "taipeiMinutes": 1020,
+      "contextLost": false
+    },
+    {
+      "key": "p3",
+      "light": "night",
+      "taipeiMinutes": 1260,
+      "contextLost": false
+    },
+    {
+      "key": "p5",
+      "light": "day",
+      "taipeiMinutes": 720,
+      "contextLost": false
+    },
+    {
+      "key": "p5",
+      "light": "dusk",
+      "taipeiMinutes": 1020,
+      "contextLost": false
+    },
+    {
+      "key": "p5",
+      "light": "night",
+      "taipeiMinutes": 1260,
+      "contextLost": false
+    }
+  ],
+  "errors": [],
+  "physicalIphoneUat": false,
+  "originalWorldsOpened": false
+}

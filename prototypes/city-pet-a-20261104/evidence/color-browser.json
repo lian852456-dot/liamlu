@@ -1,0 +1,18 @@
+{
+  "pass": true,
+  "at": "2026-11-04T13:41:23.293Z",
+  "publicOrigin": "https://february-missouri-palm-dis.trycloudflare.com",
+  "colors": 8,
+  "prices": [
+    60,
+    75
+  ],
+  "purchaseEnabled": false,
+  "errors": [],
+  "geometryBefore": 88,
+  "texturesBefore": 1,
+  "geometryUnchangedDuringColorSwitch": true,
+  "noHorizontalOverflow": true,
+  "physicalIphoneUat": false,
+  "realWalletWrites": 0
+}

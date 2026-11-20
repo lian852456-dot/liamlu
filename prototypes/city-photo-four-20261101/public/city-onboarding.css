@@ -1,0 +1,140 @@
+.cozy-onboarding {
+  position: fixed;
+  z-index: 16;
+  top: 246px;
+  left: 20px;
+  width: min(286px, calc(100vw - 40px));
+  box-sizing: border-box;
+  padding: 13px 15px 12px;
+  border: 1px solid rgba(111, 93, 55, .2);
+  border-radius: 16px;
+  color: #3f382a;
+  background: rgba(255, 251, 240, .94);
+  box-shadow: 0 12px 30px rgba(71, 60, 40, .14);
+  backdrop-filter: blur(8px);
+}
+
+.cozy-onboarding[hidden] {
+  display: none;
+}
+
+.cozy-onboarding__eyebrow {
+  color: #927b4e;
+  font-size: .63rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.cozy-onboarding__title {
+  margin: 5px 0 4px;
+  color: #403521;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.cozy-onboarding__body {
+  margin: 0;
+  color: #615746;
+  font-size: .78rem;
+  line-height: 1.55;
+}
+
+.cozy-onboarding__progress {
+  margin: 8px 0 0;
+  color: #9a8a6b;
+  font-size: .66rem;
+  font-weight: 700;
+}
+
+.cozy-onboarding__note {
+  margin: 7px 0 0;
+  color: #59704e;
+  font-size: .72rem;
+  line-height: 1.4;
+}
+
+.cozy-onboarding__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  margin-top: 10px;
+}
+
+.cozy-onboarding__next,
+.cozy-onboarding__snooze,
+.cozy-onboarding__disable {
+  min-height: 44px;
+  padding: 7px 10px;
+  font-size: .72rem;
+}
+
+.cozy-onboarding__snooze,
+.cozy-onboarding__disable {
+  color: #75674d;
+}
+
+@media (max-width: 600px) {
+  .cozy-onboarding {
+    top: 202px;
+    left: 16px;
+    width: min(308px, calc(100vw - 32px));
+    padding: 11px 13px 10px;
+    border-radius: 14px;
+  }
+
+  .cozy-onboarding__title {
+    margin-top: 4px;
+    font-size: .93rem;
+  }
+
+  .cozy-onboarding__body {
+    font-size: .75rem;
+    line-height: 1.45;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .cozy-onboarding {
+    top: 166px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    max-height: 110px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "eyebrow progress"
+      "title actions"
+      "body actions"
+      "note note";
+    column-gap: 10px;
+    row-gap: 2px;
+    padding: 9px 11px;
+    overflow: hidden;
+  }
+
+  .cozy-onboarding__eyebrow { grid-area: eyebrow; }
+  .cozy-onboarding__title { grid-area: title; margin: 0; }
+  .cozy-onboarding__body { grid-area: body; }
+  .cozy-onboarding__progress { grid-area: progress; margin: 0; }
+  .cozy-onboarding__note { grid-area: note; margin: 0; }
+  .cozy-onboarding__actions {
+    grid-area: actions;
+    flex-wrap: nowrap;
+    align-self: center;
+    margin-top: 0;
+  }
+
+  .cozy-onboarding__body {
+    font-size: .7rem;
+    line-height: 1.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cozy-onboarding {
+    scroll-behavior: auto;
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "pass": true,
+  "errors": [],
+  "scope": "single local mobile viewport smoke",
+  "physicalIphoneUat": false,
+  "gameplayOrWalletWrites": 0,
+  "noOverflow": true,
+  "dragRotation": true,
+  "run": true,
+  "sit": true,
+  "accessory": true,
+  "follow": true,
+  "resource": {
+    "geometryBefore": 92,
+    "peak": 184,
+    "after": 93,
+    "trailBound": 64,
+    "detourBound": 24
+  },
+  "metrics": {
+    "kind": "both",
+    "view": "quarter",
+    "motion": "idle",
+    "accessory": "none",
+    "ready": true,
+    "frames": 378,
+    "p50": 8.300000000000182,
+    "p95": 9.899999999999636,
+    "geometries": 93,
+    "textures": 1,
+    "drawCalls": 71,
+    "triangles": 65652,
+    "pets": {
+      "cat": {
+        "version": "pet-art-a.3",
+        "type": "cat",
+        "pose": "idle",
+        "accessory": null,
+        "disposed": false,
+        "geometries": 48,
+        "materials": 42,
+        "phase": 9.404699999999991
+      },
+      "dog": {
+        "version": "pet-art-a.3",
+        "type": "dog",
+        "pose": "idle",
+        "accessory": null,
+        "disposed": false,
+        "geometries": 43,
+        "materials": 37,
+        "phase": 9.404699999999991
+      }
+    },
+    "follow": {
+      "cat": {
+        "active": false,
+        "kind": null,
+        "position": null,
+        "trailCount": 0,
+        "detourCount": 0,
+        "created": 1,
+        "disposed": 1,
+        "activeModels": 0
+      },
+      "dog": {
+        "active": false,
+        "kind": null,
+        "position": null,
+        "trailCount": 0,
+        "detourCount": 0,
+        "created": 1,
+        "disposed": 1,
+        "activeModels": 0
+      }
+    }
+  }
+}

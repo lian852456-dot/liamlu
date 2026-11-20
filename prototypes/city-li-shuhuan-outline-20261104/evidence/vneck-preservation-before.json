@@ -1,0 +1,9 @@
+{
+  "at": "2026-11-04T12:48:34.980076+00:00",
+  "files": {
+    "public/jialing-head-sample.js": "1f6992a3e7703f665817040888138455c7840edc00ffa765c9398e61b6b2489d",
+    "public/portrait-config.js": "3ea13a0a92614a570900aa8e3adf8eec4540cb052600b4c2943907829e4e07ad",
+    "public/assets/portrait-hair/p5.glb": "27ed214bea40a4a68c297daeac019404627539616ab475e0239888424beb907e",
+    "server.mjs": "405f2126da9efdb21f8d7f7786d59db01f4f036bcf1f2cd5e5d600f22e36301c"
+  }
+}

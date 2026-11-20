@@ -1,0 +1,34 @@
+{
+  "assetSet": "portrait-hair-photo-five-q2-20261101",
+  "scope": "isolated Q2 p5 candidate; hair only; no employee IDs or source photos",
+  "styles": {
+    "p5": {
+      "style": "p5",
+      "blenderVersion": "4.5.15 LTS",
+      "buildHash": "5afeabba6097",
+      "triangles": 7544,
+      "materials": 1,
+      "opaque": true,
+      "physics": false,
+      "hairOnly": true,
+      "glbBytes": 394744,
+      "sha256": "fb0e4cd2c05b97a5946891b2163a74c1b817560346c87fb74a4db71d5459de88",
+      "textures": {
+        "color": 512,
+        "normal": 256,
+        "orm": 256
+      },
+      "authoring": "Blender Python Q2 rounded layered volume cages with soft tapered ends, matte PBR and no flyaway needles; not a manual sculpt claim"
+    }
+  },
+  "visualReferences": {
+    "p5": "deep brown-black side-part long hair with soft waves and layered face framing"
+  },
+  "limits": [
+    "No hair physics",
+    "No transparent cards",
+    "No face/body/rig",
+    "Not formal city deployment",
+    "Q2 soft rounded strands; roughness floor 0.75"
+  ]
+}

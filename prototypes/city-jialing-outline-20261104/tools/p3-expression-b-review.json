@@ -1,0 +1,80 @@
+{
+  "errors": [],
+  "metrics": {
+    "key": "p3",
+    "view": "side",
+    "motion": "idle",
+    "framing": "head",
+    "light": "day",
+    "outfit": "photo",
+    "compare": "new",
+    "ready": true,
+    "frames": 99,
+    "frameMsP50": 8.300000000000182,
+    "frameMsP95": 9.799999999999955,
+    "model": {
+      "version": "photo-four-q2.1",
+      "portraitKey": "p3",
+      "hair": "portrait",
+      "hairSource": "portrait-glb",
+      "outfit": "uniform",
+      "blink": 1,
+      "phase": 5.579399999999999,
+      "disposed": false,
+      "profile": {
+        "avatarPreset": "photo-p3-v1",
+        "skin": "orange",
+        "hair": "portrait",
+        "outfit": ""
+      },
+      "ownedGeometries": 14,
+      "ownedMaterials": 24,
+      "sharedGeometries": 2,
+      "headStyle": "p3-expression-b.1",
+      "headStudyGeometries": 32,
+      "headStudyTextures": 1,
+      "silhouette": "p3-outline-surface.1"
+    },
+    "previous": {
+      "version": "photo-four-q2.1",
+      "portraitKey": "p3",
+      "hair": "portrait",
+      "hairSource": "portrait-glb",
+      "outfit": "uniform",
+      "blink": 1,
+      "phase": 5.579399999999999,
+      "disposed": false,
+      "profile": {
+        "avatarPreset": "photo-p3-v1",
+        "skin": "orange",
+        "hair": "portrait",
+        "outfit": ""
+      },
+      "ownedGeometries": 14,
+      "ownedMaterials": 24,
+      "sharedGeometries": 2,
+      "headStyle": "p3-soft-head-study.2",
+      "headStudyGeometries": 30,
+      "headStudyTextures": 1
+    },
+    "proportions": {
+      "newHeight": 2.2015392819369946,
+      "oldHeight": 1.9687069602006515,
+      "newSkullHeight": 0.8458788534289063
+    },
+    "geometry": 103,
+    "textures": 7,
+    "drawCalls": 49,
+    "triangles": 120746,
+    "hair": {
+      "ready": [
+        "p3"
+      ],
+      "sharedTextures": 0,
+      "liveInstances": 1,
+      "created": 1,
+      "released": 0
+    }
+  },
+  "scope": "p3 expression only; WebGL screenshots; no physical-device UAT"
+}

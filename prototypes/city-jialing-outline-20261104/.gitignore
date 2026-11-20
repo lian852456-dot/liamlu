@@ -1,0 +1,4 @@
+.private*/
+runtime/core/.private*/
+*.blend1
+__pycache__/

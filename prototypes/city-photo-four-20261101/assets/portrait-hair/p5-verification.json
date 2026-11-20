@@ -1,0 +1,34 @@
+{
+  "assetSet": "portrait-hair-photo-five-q2-20261101",
+  "readback": [
+    {
+      "key": "p5",
+      "objects": 1,
+      "triangles": 7544,
+      "bounds": {
+        "min": [
+          -0.555094,
+          -0.387829,
+          -0.901675
+        ],
+        "max": [
+          0.552712,
+          0.557463,
+          0.535
+        ]
+      },
+      "dimensions": [
+        1.107806,
+        0.945292,
+        1.436675
+      ],
+      "materials": [
+        "Portrait hair • p5 soft directional PBR"
+      ],
+      "roughnessDefaults": [
+        0.8
+      ],
+      "hairOnly": true
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "uniform": "staff-uniform",
+  "errors": [],
+  "metrics": {
+    "key": "p5",
+    "view": "quarter",
+    "motion": "idle",
+    "framing": "head",
+    "light": "day",
+    "outfit": "photo",
+    "compare": "new",
+    "ready": true,
+    "frames": 157,
+    "frameMsP50": 8.299999999999955,
+    "frameMsP95": 10,
+    "model": {
+      "version": "photo-four-q2.1",
+      "portraitKey": "p5",
+      "hair": "portrait",
+      "hairSource": "portrait-glb",
+      "outfit": "uniform",
+      "blink": 1,
+      "phase": 8.44199999942779,
+      "disposed": false,
+      "profile": {
+        "avatarPreset": "photo-p5-v1",
+        "skin": "orange",
+        "hair": "portrait",
+        "outfit": ""
+      },
+      "ownedGeometries": 13,
+      "ownedMaterials": 19,
+      "sharedGeometries": 2,
+      "headStyle": "p5-eye-surface.1",
+      "headStudyGeometries": 25,
+      "headStudyTextures": 1,
+      "silhouette": "p5-outline-surface.1",
+      "clothingStyle": "p5-vneck.1"
+    },
+    "previous": {
+      "version": "photo-four-q2.1",
+      "portraitKey": "p5",
+      "hair": "portrait-low-tie",
+      "hairSource": "procedural-fallback",
+      "outfit": "uniform",
+      "blink": 1,
+      "phase": 8.44199999942779,
+      "disposed": false,
+      "profile": {
+        "avatarPreset": "portrait-li-shuhuan-v1",
+        "skin": "orange",
+        "hair": "portrait-low-tie",
+        "outfit": ""
+      },
+      "ownedGeometries": 14,
+      "ownedMaterials": 19,
+      "sharedGeometries": 2,
+      "headStyle": "p5-soft-head-study.2",
+      "headStudyGeometries": 25,
+      "headStudyTextures": 1
+    },
+    "proportions": {
+      "newHeight": 2.2025887239196282,
+      "oldHeight": 1.9636602058671206,
+      "newSkullHeight": 1.2909658918813913
+    },
+    "geometry": 64,
+    "textures": 3,
+    "drawCalls": 40,
+    "triangles": 128717,
+    "hair": {
+      "ready": [
+        "p5"
+      ],
+      "sharedTextures": 0,
+      "liveInstances": 1,
+      "created": 1,
+      "released": 0
+    }
+  },
+  "scope": "p5 isolated candidate; no device UAT or formal changes"
+}

@@ -1,0 +1,40 @@
+{
+  "at": "2026-11-04T12:36:41.785048+00:00",
+  "origin": "https://twisted-fridge-quote-numerous.trycloudflare.com",
+  "expression": "p3-expression-b.1",
+  "pass": true,
+  "files": [
+    {
+      "file": "index.html",
+      "match": true,
+      "sha256": "bbf7d220da6000eb375bab6a8273ba721a7b5fa3237a11aac477981dd6c31f5c"
+    },
+    {
+      "file": "preview.js",
+      "match": true,
+      "sha256": "ba6abda8436b5c92181058a0adf83547d4e496d4b5bae28c2a9db7306fc9fd29"
+    },
+    {
+      "file": "jialing-head-sample.js",
+      "match": true,
+      "sha256": "846cbfdd2bb74e92f9a852578d007265dadfe8caa5d33c9fee88cc1f48da37b8"
+    },
+    {
+      "file": "jialing-outline.js",
+      "match": true,
+      "sha256": "ea1d66bd153d67a59497faec5c5b9f47a58a559ceddd349f4eb47bf3893b9363"
+    },
+    {
+      "file": "assets/portrait-hair/p3.glb",
+      "match": true,
+      "sha256": "27af1c95d97fccd9bfb029e53a04a39cbc97e95bd4e81ab9219bf0a144ee3fa5"
+    }
+  ],
+  "acceptedBodyHairConfigUnchanged": {
+    "jialing-outline.js": true,
+    "portrait-config.js": true,
+    "assets/portrait-hair/p3.glb": true
+  },
+  "originalWorldsOpened": false,
+  "physicalIphoneUat": false
+}

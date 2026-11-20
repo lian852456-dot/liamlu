@@ -1,0 +1,29 @@
+{
+  "at": "2026-11-01T12:07:58.351240+00:00",
+  "release": "20261101-photo-style.2",
+  "origin": "https://forty-retired-basin-strings.trycloudflare.com",
+  "scope": "isolated-art-candidates",
+  "featured": [
+    "p3",
+    "p5"
+  ],
+  "otherThree": "Q2-proportion-candidates-retained",
+  "originalWorldsOpened": false,
+  "realEmployeeAccountsCreated": 0,
+  "originalRewardsReissued": 0,
+  "formalDeployment": false,
+  "physicalIphoneUat": false,
+  "artApproval": "PENDING",
+  "checks": [
+    "style-browser.json",
+    "style-city-browser.json",
+    "style-city-lighting.json",
+    "style-multiplayer.json",
+    "public-readback.json"
+  ],
+  "limitations": [
+    "hair clump transitions and cloth folds remain simplified",
+    "no physical iPhone Safari memory or long-background acceptance",
+    "standard real-time skin shading differs from polished reference CG"
+  ]
+}
