@@ -1,0 +1,136 @@
+{
+  "checkedAt": "2026-11-10T17:50:53.927374+00:00",
+  "scope": "three-existing-pilot-owner-repair-only",
+  "userApproval": "explicit chat approval on 2026-11-11; cloud publication and backup-first short restart",
+  "cloud": {
+    "previousVersion": 83,
+    "deployedVersion": 84,
+    "immutableReadbackFilesMatch": 12,
+    "changedFiles": [
+      "CityEmployeeBridge.js"
+    ],
+    "infoStatus": "ok",
+    "originalBAuthorityRenewed": false,
+    "maxLeaseMs": 1800000
+  },
+  "city": {
+    "ownerRepair": "20261111-owner.1",
+    "ready": true,
+    "codeFiles": [
+      {
+        "file": "runtime/employee/employee-city-addon.mjs",
+        "before": "b66955c5ac4d5f4c37bf16a3fb0d3f365ae9cdf2b29f8cc6b6b5fa146ae1afb5",
+        "after": "01a0e39156b50fbe8377bfac8f0fbc2f79fd0e88c2f2885e3e4efff816d14b10"
+      },
+      {
+        "file": "runtime/employee/staff-owner-binding.mjs",
+        "before": "3e2856259efe535fb2858c1c7e2f99e148ad6838b5494a84807bc4f7eb6194c8",
+        "after": "9211c04fb152b00259c6c401b8df87a8a09a37affde936f3216b33fa2a335695"
+      },
+      {
+        "file": "runtime/employee/owner-policy-provider.mjs",
+        "before": null,
+        "after": "487191027b8f489901ce5720920efd5dae10c6f2c5b8ac21c3293cb0631ed13f"
+      },
+      {
+        "file": "backend-main.mjs",
+        "before": "ee90b1725ac5161dbd146ca5834a45612644c30bb4cd9396b3832e724dba1df3",
+        "after": "835db50bc0688f2243ee2b27dd21de4abc6eb76bbe9996ff65416804931dda58"
+      },
+      {
+        "file": "public/employee-city-link.js",
+        "before": "a3b1b5687d6b99df223456128590819fb7246dd320724bd5c33c9b6ca44016eb",
+        "after": "64ffcda40c581b66dba42f0a14aae7a1e611935bede9a002c7a1c8726100d57d"
+      }
+    ],
+    "originalUrlPreserved": true,
+    "restartCompleted": true,
+    "codeHashesMatch": true
+  },
+  "worlds": {
+    "current-guests": {
+      "integrity": "ok",
+      "users": 54,
+      "unchangedExistingDataTables": [
+        "audit",
+        "city_employee_config",
+        "city_employee_owners",
+        "city_owner_challenges",
+        "city_play_links",
+        "city_play_sessions",
+        "demo_codes",
+        "guest_devices",
+        "imports",
+        "inventory",
+        "ledger",
+        "placements",
+        "reports",
+        "sessions",
+        "spaces",
+        "staff_control_appearance",
+        "staff_control_leases",
+        "staff_control_poses",
+        "staff_control_requests",
+        "task_challenges",
+        "tasks",
+        "transactions",
+        "travel_state",
+        "users",
+        "v42_positions",
+        "v43_supervisor_encounters",
+        "v4_metadata",
+        "wallets",
+        "work_receipts"
+      ],
+      "changedExistingTables": [
+        "v42_runtime_lock"
+      ],
+      "newTables": [
+        "city_owner_policy_guard"
+      ],
+      "originalReward": {
+        "count": 1,
+        "coins": 200
+      }
+    },
+    "legacy-owners": {
+      "integrity": "ok",
+      "users": 23,
+      "unchangedExistingDataTables": [
+        "audit",
+        "demo_codes",
+        "imports",
+        "inventory",
+        "ledger",
+        "placements",
+        "reports",
+        "sessions",
+        "spaces",
+        "task_challenges",
+        "tasks",
+        "transactions",
+        "travel_state",
+        "users",
+        "v42_positions",
+        "v42_runtime_lock",
+        "v43_supervisor_encounters",
+        "v4_metadata",
+        "wallets",
+        "work_receipts"
+      ],
+      "changedExistingTables": [],
+      "newTables": [],
+      "originalReward": {
+        "count": 0,
+        "coins": 0
+      }
+    }
+  },
+  "financialWrites": 0,
+  "progressWrites": 0,
+  "exchangeEnabled": false,
+  "mappingConfirmed": 0,
+  "actualEmployeeLoginsVerified": false,
+  "physicalIphoneUat": false,
+  "rollback": "Cloud v83; restore five scoped code files and manifest only, never restore old game database"
+}

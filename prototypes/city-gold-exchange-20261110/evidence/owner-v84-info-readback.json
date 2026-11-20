@@ -1,0 +1,22 @@
+{
+  "checkedAt": "2026-11-10T17:47:21.798196+00:00",
+  "http": 200,
+  "response": {
+    "status": "ok",
+    "schema": "city-employee-bridge/v1",
+    "audience": "north12b-city-formal-login",
+    "policyId": "north12b-owner-0974f61dc3f02476f8e2d2f7025b47f1:30:1b657ce387d2b6c33b842c9615b162cc3d7b7cb2efd39e905a6780099a637c57",
+    "policy": {
+      "schema": "city-owner-policy/v1",
+      "id": "north12b-owner-0974f61dc3f02476f8e2d2f7025b47f1",
+      "generation": 30,
+      "enabled": true,
+      "notBefore": 1794285468714,
+      "validUntil": 1794458268714
+    },
+    "deadline": 1794458268714,
+    "maxLeaseMs": 1800000,
+    "originalTokensExported": false,
+    "serverTime": 1794332841259
+  }
+}

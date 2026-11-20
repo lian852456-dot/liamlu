@@ -1,0 +1,18 @@
+✔ new policy works beyond old deadline; renewal preserves same UID and does not replay first-bind effects (13.115917ms)
+✔ policy rotation never revives old leases; renewed normal handoff can keep original role (3.246041ms)
+✔ original revocation, epoch, expiry, audience and allowlist still enforced (7.200334ms)
+✔ legacy binding rows keep ownership but require a fresh normal proof under new policy (3.423708ms)
+✔ normal renewal leaves existing synthetic wallet, inventory, progress and receipt rows unchanged (24.205209ms)
+✔ policy generation rollback and same-generation edits cannot resurrect an old lease (1.679959ms)
+✔ removing a policy retires its generation; restoring the same policy cannot revive proof (1.070125ms)
+✔ production runtime derives lifetime from existing authority, never renews it (5.139208ms)
+✔ owner policy provider clears stale cached policy on denial; malformed replies fail closed (0.295875ms)
+✔ repair builder requires exact runtime anchor and policy hook stays readonly (1.134375ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 158.014125

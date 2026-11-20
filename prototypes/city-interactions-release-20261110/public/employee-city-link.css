@@ -1,0 +1,118 @@
+.employee-city-link-root {
+  position: fixed;
+  z-index: 24;
+  top: 206px;
+  right: 36px;
+  color: #27352d;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif;
+}
+
+.employee-city-link-launcher,
+.employee-city-link-start,
+.employee-city-link-close {
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.employee-city-link-launcher,
+.employee-city-link-start {
+  padding: 10px 14px;
+  background: #2d6947;
+  color: #fff;
+}
+
+.employee-city-link-launcher:disabled,
+.employee-city-link-start:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.employee-city-link-panel {
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(80vh, calc(100vh - 206px - 16px));
+  overflow: auto;
+  margin-top: 8px;
+  padding: 18px;
+  border: 1px solid #d9cfbe;
+  border-radius: 18px;
+  background: #fffdf8;
+  box-shadow: 0 14px 35px #3045302e;
+}
+
+.employee-city-link-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.employee-city-link-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.employee-city-link-close {
+  width: 44px;
+  background: #e8e2d6;
+  color: #27352d;
+}
+
+.employee-city-link-intro,
+.employee-city-link-status,
+.employee-city-link-popup-status {
+  line-height: 1.55;
+  font-size: .92rem;
+}
+
+.employee-city-link-pilots {
+  margin: 10px 0;
+  padding-left: 20px;
+  line-height: 1.55;
+  font-size: .9rem;
+}
+
+.employee-city-link-field {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0;
+  font-weight: 700;
+}
+
+.employee-city-link-field input {
+  box-sizing: border-box;
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid #bbb4a7;
+  border-radius: 10px;
+  padding: 9px 11px;
+  font: inherit;
+}
+
+.employee-city-link-status[data-kind="error"] {
+  color: #8a3c25;
+}
+
+.employee-city-link-popup-status {
+  color: #536459;
+}
+
+@media (max-width: 600px) {
+  .employee-city-link-root {
+    top: 184px;
+    right: 16px;
+    left: 16px;
+  }
+
+  .employee-city-link-launcher { max-width: 100%; }
+
+  .employee-city-link-panel {
+    width: 100%;
+    max-height: calc(100vh - 184px - 16px);
+    max-height: calc(100dvh - 184px - 16px);
+  }
+}

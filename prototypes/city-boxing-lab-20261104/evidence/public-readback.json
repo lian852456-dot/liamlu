@@ -1,0 +1,55 @@
+{
+  "at": "2026-11-04T14:24:15.299Z",
+  "origin": "https://wiley-hope-respondent-less.trycloudflare.com",
+  "pass": true,
+  "files": [
+    {
+      "file": "index.html",
+      "status": 200,
+      "sha256": "830a2c3d4f857d57103ca03faebfb13d51c5e1b3d88edbf6aa8e71ecd6c64461",
+      "match": true
+    },
+    {
+      "file": "app.js",
+      "status": 200,
+      "sha256": "384a8a61cf6b326dfd4f04df3a71a28bbf3629438b0282308bee13df44497263",
+      "match": true
+    },
+    {
+      "file": "style.css",
+      "status": 200,
+      "sha256": "d376d54b5ef3e238be9195d3d7c14d8488d5430e1012a86f01d457f72a9aad67",
+      "match": true
+    },
+    {
+      "file": "vendor/three.js",
+      "status": 200,
+      "sha256": "0789bb7a097cfbf8eeab776e3ddcb0b428b0d30913784a40890dd6c8145b37ee",
+      "match": true
+    }
+  ],
+  "privateRoutes": [
+    {
+      "path": "/.private-runtime/boxing.sqlite",
+      "status": 404
+    },
+    {
+      "path": "/boxing-store.mjs",
+      "status": 404
+    },
+    {
+      "path": "/server.mjs",
+      "status": 404
+    },
+    {
+      "path": "/.private-preview/gateway.json",
+      "status": 404
+    }
+  ],
+  "health": {
+    "ready": true,
+    "release": "20261104-boxing-lab.1",
+    "scope": "isolated-synthetic-only",
+    "formalWalletEnabled": false
+  }
+}

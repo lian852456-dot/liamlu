@@ -1,0 +1,20 @@
+[
+  {
+    "file": "evidence/v2-video/3c7c2086ce754f3a5a3780c1a24885a8.webm",
+    "bytes": 9169015,
+    "sha256": "a2d95c4ae8c7d065550056377ea96ace5ce7fa74fbe6da99e6265a58468a4949",
+    "archive": "local raw QA evidence; selected final clip is public/review-captures/boxing-contact.webm"
+  },
+  {
+    "file": "evidence/v2-final-video/2353abd15772bfd991292aa9cb634001.webm",
+    "bytes": 2083051,
+    "sha256": "a18bcaf90c9917b2c3fa8aa8c0d5570103a85361293702afc13baa0f80d35aae",
+    "archive": "local raw QA evidence; selected final clip is public/review-captures/boxing-contact.webm"
+  },
+  {
+    "file": "evidence/v2-contact-video/1d49f6869d5140d0048008f8767df7e1.webm",
+    "bytes": 1471340,
+    "sha256": "2a9eaacde7a494854e4b46012e2489364351eb8725df0891d269fe483fb2aee9",
+    "archive": "local raw QA evidence; selected final clip is public/review-captures/boxing-contact.webm"
+  }
+]

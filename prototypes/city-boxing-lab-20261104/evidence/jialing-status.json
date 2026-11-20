@@ -1,0 +1,15 @@
+{
+  "checkedOn": "2026-11-04",
+  "name": "嘉玲",
+  "scope": "read-only current-guests identity routing",
+  "activeRoster": true,
+  "currentEmployeeOwnerExists": false,
+  "currentGamePlayLinkExists": false,
+  "stagePreset": "portrait-jialing-v1",
+  "displayMode": "display-unlinked",
+  "firstGameOnlyLoginEligible": true,
+  "legacyAutomaticallyMerged": false,
+  "realEmployeeLoginPerformed": false,
+  "realEmployeeRoleCreated": false,
+  "databaseWrites": 0
+}

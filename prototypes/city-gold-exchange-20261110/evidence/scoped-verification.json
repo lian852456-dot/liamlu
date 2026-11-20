@@ -1,0 +1,17 @@
+{
+  "checkedAt": "2026-11-10T04:27:21.806966+00:00",
+  "tests": 3,
+  "testExitCode": 0,
+  "syntaxChecks": {
+    "scoped-read-connector.mjs": true,
+    "tests/scoped-read.test.mjs": true
+  },
+  "mode": "isolated-existing-contract-only",
+  "productionWrites": 0,
+  "realEmployeeLogins": 0,
+  "exchangeEnabled": false,
+  "hashes": {
+    "scoped-read-connector.mjs": "f5de9400c62642090721c5dd278015ae2849ab9340dddf90ac04cff3c94d5207",
+    "tests/scoped-read.test.mjs": "41e5cdc4cc079f879da974c6200530b2c0a87a7ba66b0e8d0ebf82cb2f654db1"
+  }
+}

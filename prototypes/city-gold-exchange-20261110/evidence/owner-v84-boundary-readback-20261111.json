@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-11-10T17:50:14.754825+00:00",
+  "results": [
+    {
+      "action": "city_lease_validate",
+      "http": 200,
+      "status": "error",
+      "code": "CITY_OWNER_DENIED"
+    },
+    {
+      "action": "department_gold_access",
+      "http": 200,
+      "status": "ok",
+      "code": null,
+      "sha256": "5c710fdb71568f803f5311f97f38a1f8d6101d0fbb4da07ff6a48ac042caa8f3",
+      "latestDate": "2026-11-10",
+      "rows": 40,
+      "total": 2429
+    }
+  ]
+}

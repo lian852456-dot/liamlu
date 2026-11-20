@@ -1,0 +1,13 @@
+✔ 60s server scoring: guard, dodge, cooldown, replay, expiry (20.621333ms)
+✔ synthetic stake: atomic lock, replay, opponent consent, no double spend, payout conservation (13.815583ms)
+✔ insufficient balance rolls back both locks; server ignores no forged prices (8.03125ms)
+✔ draw, disconnect and restart refund each exactly once; ledger failure rolls back (18.349959ms)
+✔ presence: tab dedupe, grace, expiry and session revocation; no NPC identity (8.33525ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 123.140375

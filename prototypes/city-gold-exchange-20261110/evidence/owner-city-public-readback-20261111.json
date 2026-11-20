@@ -1,0 +1,42 @@
+{
+  "origin": "https://exceed-recorded-ons-any.trycloudflare.com",
+  "results": [
+    {
+      "path": "/health",
+      "http": 200,
+      "body": {
+        "schema": "north12b-city-health/v1",
+        "status": "ok",
+        "ready": true,
+        "release": "20261030-mac-stable.1",
+        "mode": "mac-persistent",
+        "automaticShutdownAt": null,
+        "sessionHours": 8,
+        "time": "2026-11-10T17:49:39.797Z"
+      }
+    },
+    {
+      "path": "/ready",
+      "http": 200,
+      "body": {
+        "schema": "north12b-city-health/v1",
+        "status": "ok",
+        "ready": true,
+        "release": "20261030-mac-stable.1",
+        "mode": "mac-persistent",
+        "automaticShutdownAt": null,
+        "sessionHours": 8,
+        "time": "2026-11-10T17:49:40.218Z"
+      }
+    },
+    {
+      "path": "/api/access",
+      "http": 200
+    },
+    {
+      "path": "/employee-city-link.js",
+      "http": 200,
+      "matchesLocal": true
+    }
+  ]
+}

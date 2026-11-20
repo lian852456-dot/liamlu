@@ -1,0 +1,328 @@
+{
+  "at": "2026-11-04T16:34:55.597Z",
+  "pass": true,
+  "origin": "https://wiley-hope-respondent-less.trycloudflare.com",
+  "assets": 42,
+  "files": [
+    {
+      "file": "public/app.js",
+      "status": 200,
+      "sha256": "bc9a6f7999a5d77ed881060f1e2cbadc47bf8f76cf6a554f1ff62d839d8abbeb",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/avatars/assets/refined-portrait-hair/p3.glb",
+      "status": 200,
+      "sha256": "27af1c95d97fccd9bfb029e53a04a39cbc97e95bd4e81ab9219bf0a144ee3fa5",
+      "contentType": "model/gltf-binary",
+      "match": true
+    },
+    {
+      "file": "public/avatars/assets/refined-portrait-hair/p5.glb",
+      "status": 200,
+      "sha256": "27ed214bea40a4a68c297daeac019404627539616ab475e0239888424beb907e",
+      "contentType": "model/gltf-binary",
+      "match": true
+    },
+    {
+      "file": "public/avatars/gltf-loader.js",
+      "status": 200,
+      "sha256": "2e5191730cf90618336e2391c0f68f8bc44c5a6358064b4245c4bbd218f848f0",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/avatars/head-art-previous.js",
+      "status": 200,
+      "sha256": "700aa46c5ce3943ac2cbfc12c7d508ad1c7a3b132c1f10369972bdd320999060",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/avatars/head-art.js",
+      "status": 200,
+      "sha256": "01f0def91d79ea122abc789d5546b10ea3c3245601f7957137591a4ae86769ea",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/avatars/refined-avatar-portraits.js",
+      "status": 200,
+      "sha256": "6d19a0f8379b4c21de476feadf2275efc10dc3de3544f9148b5395d4b826cb1e",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/avatars/refined-heads.js",
+      "status": 200,
+      "sha256": "626da7236544b319da636c1f77ffd5713bdd2a7a3b785802b506bbeab958e555",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/avatars/refined-jialing-body.js",
+      "status": 200,
+      "sha256": "e462261ad6b0cd39a078a560e3eb8a25054819adf6a5d6899917de8826d084b6",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/avatars/refined-li-body.js",
+      "status": 200,
+      "sha256": "120afed6881d95021aa0c972e03cc1a5675d39378381d8365e5c14cac292dd57",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/avatars/refined-portrait-config.js",
+      "status": 200,
+      "sha256": "070bba927f6b0698a75ec68f35e82e5bf9822a47a6d2a338c5eda4bc66be7de3",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/avatars/refined-portrait-hair.js",
+      "status": 200,
+      "sha256": "6e0c93751eeb64769c03d48ab0bb7cd8a7a11b73249fec4ebdea11580f182d88",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/avatars/static-mesh.js",
+      "status": 200,
+      "sha256": "86f00c27a08c2c27a74e3a3cba8d1352480b4b7f6997f03069d6fccabc965784",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/boxing-motion.js",
+      "status": 200,
+      "sha256": "4a8a791361348800e02bf65c4d9d24bbc85e87237ab1d057d5076f25c7741f39",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/city-boxing-entry.js",
+      "status": 200,
+      "sha256": "5100e0006c10d0043676543aba9d671e9f4ec3f5496750f1f31cff3360a6b58d",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/city-preview.css",
+      "status": 200,
+      "sha256": "03643d90e1af97277faa174085bd9932bb007ac38c0cda881f0a5692cf1b2457",
+      "contentType": "text/css; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/city-preview.js",
+      "status": 200,
+      "sha256": "b15639d1755531d5fb034082daec9893a7874e4eb500cb2b19da069020520dd8",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/city.html",
+      "status": 200,
+      "sha256": "510d2ef82dabc50abf7eda3f2a836915dec2a1696255881f14f4b1316da4f0e2",
+      "contentType": "text/html; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/combat-kinematics.js",
+      "status": 200,
+      "sha256": "d771e647b1a5585618c6b54c9e4fe2327ea52cbe5f5f0bed27a28844c9909efd",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/index.html",
+      "status": 200,
+      "sha256": "f7a9c3eb883233816ca67744fbee5a7ddeb540f3fbc75a3683cf746772a866af",
+      "contentType": "text/html; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/boxing-contact.webm",
+      "status": 200,
+      "sha256": "2a9eaacde7a494854e4b46012e2489364351eb8725df0891d269fe483fb2aee9",
+      "contentType": "video/webm",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/dodge-0.png",
+      "status": 200,
+      "sha256": "e278e7528a4f1180f552947c387676996fecf37e56865298e864a642d5fc2495",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/dodge-1.png",
+      "status": 200,
+      "sha256": "48cb014d1582653e9aae1b4458a32cb2d16bb7e22ec476ff14749ed9156e8d99",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/dodge-2.png",
+      "status": 200,
+      "sha256": "22d125cefc9eb091fb65bf45e719b99f20795deb3c5ad31791b671be1367efb3",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/guard-0.png",
+      "status": 200,
+      "sha256": "9d36a48c63a0b25abdbf4449a2059e57488f82c29303c576bec43fdd4844a28e",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/guard-1.png",
+      "status": 200,
+      "sha256": "404ef8f48957c23d65e6633270138391727594f7a44688403452ad2d1e4057a6",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/guard-2.png",
+      "status": 200,
+      "sha256": "f896ddf894bfd8f0dfda6329a69d274df522b1f3e481e549feff57330ff1cf66",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/guard-3.png",
+      "status": 200,
+      "sha256": "9fc959ecbe7aba97881c3c17cafdb22a1d6f045072305d829ebc845d62bba32a",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/hook-0.png",
+      "status": 200,
+      "sha256": "fc19f29cac843d35a8028c22f4461c34a639c7b59ef715237ec6b0269edf8c0e",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/hook-1.png",
+      "status": 200,
+      "sha256": "40d83298d15ad547ab526b558dc15ba53a90791abcf8115f3920f1e113c8631d",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/hook-2.png",
+      "status": 200,
+      "sha256": "82b2506feb80e58d016b5b546a5c687acfcc94f4948f8fa31139f11baceacaab",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/hook-3.png",
+      "status": 200,
+      "sha256": "9106f2969894203dd2228604b056df27da34c792dab2f937d3e8c1cc7506b1b3",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/punch-0.png",
+      "status": 200,
+      "sha256": "3e17a23cfc29ba3e7a4aeec23414a7f016ff90f4763206f26c53923f8f3850b0",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/punch-1.png",
+      "status": 200,
+      "sha256": "d5a9401561514277ff7abc511d9bc746a11ef8e5f640b9da0ce9f6786694e1b0",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/punch-2.png",
+      "status": 200,
+      "sha256": "90b402a50ce46402085ec3a9444e27adc6f52b2bb58f48d1df7f76d21dab4867",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/punch-3.png",
+      "status": 200,
+      "sha256": "b53f9b4fa5e2388723b80545c13cb100a76af9694e01f76ad44a8d1287c50f9c",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/retreat-0.png",
+      "status": 200,
+      "sha256": "79056bc44b359befe9d996a3f8752a303a5b993c05d266925b628756bc99ea38",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/retreat-1.png",
+      "status": 200,
+      "sha256": "ea95e03ebc127b5f8073a21e00ac67fa8811becb0f6a365cff0e160d20793636",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review-captures/retreat-2.png",
+      "status": 200,
+      "sha256": "31d29d7ddfbcd1283cb7df1af4c8743611d3b35a4916b5d83fe86403ef3f7611",
+      "contentType": "image/png",
+      "match": true
+    },
+    {
+      "file": "public/review.html",
+      "status": 200,
+      "sha256": "cc49b5bd782014c53f88e648d17c6da6b3186e09563510957b3ead61f265b0fc",
+      "contentType": "text/html; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/style.css",
+      "status": 200,
+      "sha256": "06afc8534751f968a19205e7afc6059298aa3e160b67dd943d8be05ff35cd60e",
+      "contentType": "text/css; charset=utf-8",
+      "match": true
+    },
+    {
+      "file": "public/vendor/three.js",
+      "status": 200,
+      "sha256": "0789bb7a097cfbf8eeab776e3ddcb0b428b0d30913784a40890dd6c8145b37ee",
+      "contentType": "application/javascript; charset=utf-8",
+      "match": true
+    }
+  ],
+  "privateRoutes": [
+    {
+      "path": "/.private-runtime/boxing.sqlite",
+      "status": 404
+    },
+    {
+      "path": "/boxing-store.mjs",
+      "status": 404
+    },
+    {
+      "path": "/integration/city-boxing-addon.mjs",
+      "status": 404
+    },
+    {
+      "path": "/.private-backups/20261105-v1/boxing.sqlite",
+      "status": 404
+    }
+  ],
+  "health": {
+    "ready": true,
+    "release": "20261105-boxing-avatar.2",
+    "scope": "isolated-synthetic-only",
+    "formalWalletEnabled": false
+  },
+  "realIdentityEnabled": false,
+  "sharedCityEnabled": false
+}

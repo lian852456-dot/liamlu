@@ -1,0 +1,90 @@
+{
+  "pass": true,
+  "at": "2026-11-04T16:23:35.499Z",
+  "origin": "https://wiley-hope-respondent-less.trycloudflare.com",
+  "identityScope": "synthetic-qa",
+  "sameReleasedAvatarAssets": true,
+  "sixtySecondRound": true,
+  "serverResultAgreement": true,
+  "cityReturnPosePreserved": true,
+  "appearancePreserved": true,
+  "walletPreserved": true,
+  "realIdentityLogin": false,
+  "sharedCityEnabled": false,
+  "physicalIphoneUat": false,
+  "errors": [],
+  "metrics": {
+    "frames": 2451,
+    "drawCalls": 132,
+    "triangles": 326187,
+    "geometries": 132,
+    "textures": 5,
+    "p95": 10,
+    "hair": {
+      "ready": [
+        "p3",
+        "p5"
+      ],
+      "sharedTextures": 0,
+      "liveInstances": 2,
+      "created": 2,
+      "released": 0
+    },
+    "motion": [
+      {
+        "now": 1793809361104,
+        "action": "hook",
+        "actionAt": 1793809360745,
+        "seq": 6,
+        "progress": 0.359,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.035,
+          "z": 0.13943225224074507
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.035,
+          "z": 0.13943225224074507
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.1",
+        "visualOnly": true,
+        "extraMeshes": 4,
+        "extraGeometries": 1,
+        "extraMaterials": 1
+      },
+      {
+        "now": 1793809361104,
+        "action": "idle",
+        "actionAt": 1793809359425,
+        "seq": 5,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": 1,
+        "version": "boxing-motion.1",
+        "visualOnly": true,
+        "extraMeshes": 4,
+        "extraGeometries": 1,
+        "extraMaterials": 1
+      }
+    ]
+  }
+}

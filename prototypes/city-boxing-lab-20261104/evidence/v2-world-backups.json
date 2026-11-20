@@ -1,0 +1,20 @@
+{
+  "at": "2026-11-04T16:25:26.567Z",
+  "scope": "read-only independent world backups",
+  "worlds": [
+    {
+      "worldKey": "current-guests",
+      "integrity": "ok",
+      "users": 53,
+      "sha256": "15255a00a812f313cf93edddb8ecd8528fa2838c5039a5110063cfebf2b06f07"
+    },
+    {
+      "worldKey": "legacy-owners",
+      "integrity": "ok",
+      "users": 23,
+      "sha256": "51e8338b00d7729daa182a980e7ba9d443185e50762b1f5748cbde69bb603eb0"
+    }
+  ],
+  "originalDatabaseWrites": 0,
+  "originalDatabasesCopiedIntoBoxing": false
+}

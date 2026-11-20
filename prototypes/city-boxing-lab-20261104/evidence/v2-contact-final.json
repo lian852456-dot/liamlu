@@ -1,0 +1,525 @@
+{
+  "pass": true,
+  "at": "2026-11-04T16:30:51.833Z",
+  "scope": "actual local QA live actions with unchanged server scoring",
+  "errors": [],
+  "shots": [
+    {
+      "file": "evidence/v2-contact-punch-0.png",
+      "now": 1793809847007,
+      "motion": {
+        "now": 1793809847001,
+        "action": "punch",
+        "actionAt": 1793809846733,
+        "seq": 1,
+        "progress": 0.32682926829268294,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.018,
+          "z": 0.2193677564753767
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.018,
+          "z": 0.2193677564753767
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.65,
+          -0.06
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-contact-punch-1.png",
+      "now": 1793809847265,
+      "motion": {
+        "now": 1793809847243,
+        "action": "punch",
+        "actionAt": 1793809846733,
+        "seq": 1,
+        "progress": 0.6219512195121951,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.013506287498972631,
+          "z": 0.16375738226369946
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.013506287498972631,
+          "z": 0.16375738226369946
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.65,
+          -1.02552
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-contact-punch-2.png",
+      "now": 1793809847552,
+      "motion": {
+        "now": 1793809847551,
+        "action": "punch",
+        "actionAt": 1793809846733,
+        "seq": 1,
+        "progress": 0.9975609756097561,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.0000010178351278051777,
+          "z": 0.0011916327658562014
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.0000010178351278051777,
+          "z": 0.0011916327658562014
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.65,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-contact-punch-3.png",
+      "now": 1793809847803,
+      "motion": {
+        "now": 1793809847799,
+        "action": "idle",
+        "actionAt": 1793809846733,
+        "seq": 1,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-contact-hook-0.png",
+      "now": 1793809848616,
+      "motion": {
+        "now": 1793809848585,
+        "action": "hook",
+        "actionAt": 1793809848385,
+        "seq": 2,
+        "progress": 0.2,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.02806122448979592,
+          "z": 0.11640574572235635
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.02806122448979592,
+          "z": 0.11640574572235635
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.25,
+          -1.7
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-contact-hook-1.png",
+      "now": 1793809848957,
+      "motion": {
+        "now": 1793809848949,
+        "action": "hook",
+        "actionAt": 1793809848385,
+        "seq": 2,
+        "progress": 0.564,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.03111233105935387,
+          "z": 0.11834433643386393
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.03111233105935387,
+          "z": 0.11834433643386393
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.25,
+          -1.7
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-contact-hook-2.png",
+      "now": 1793809849256,
+      "motion": {
+        "now": 1793809849225,
+        "action": "hook",
+        "actionAt": 1793809848385,
+        "seq": 2,
+        "progress": 0.84,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.0071626145755071344,
+          "z": 0.05057383326620141
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.0071626145755071344,
+          "z": 0.05057383326620141
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.25,
+          -1.7
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-contact-hook-3.png",
+      "now": 1793809849521,
+      "motion": {
+        "now": 1793809849519,
+        "action": "idle",
+        "actionAt": 1793809848385,
+        "seq": 2,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-contact-guard-0.png",
+      "now": 1793809850413,
+      "motion": {
+        "now": 1793809850408,
+        "action": "guard",
+        "actionAt": 1793809850168,
+        "seq": 3,
+        "progress": 0.32,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.75,
+          -1.75
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-contact-guard-1.png",
+      "now": 1793809850702,
+      "motion": {
+        "now": 1793809850700,
+        "action": "guard",
+        "actionAt": 1793809850168,
+        "seq": 3,
+        "progress": 0.7093333333333334,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.75,
+          -1.75
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-contact-guard-2.png",
+      "now": 1793809850997,
+      "motion": {
+        "now": 1793809850992,
+        "action": "idle",
+        "actionAt": 1793809850168,
+        "seq": 3,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-contact-guard-3.png",
+      "now": 1793809851299,
+      "motion": {
+        "now": 1793809851292,
+        "action": "idle",
+        "actionAt": 1793809850168,
+        "seq": 3,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    }
+  ],
+  "metrics": {
+    "frames": 1134,
+    "drawCalls": 146,
+    "triangles": 328747,
+    "geometries": 138,
+    "textures": 5,
+    "p95": 9.700000000000728,
+    "hair": {
+      "ready": [
+        "p3",
+        "p5"
+      ],
+      "sharedTextures": 0,
+      "liveInstances": 2,
+      "created": 2,
+      "released": 0
+    },
+    "motion": [
+      {
+        "now": 1793809851800,
+        "action": "idle",
+        "actionAt": 1793809850168,
+        "seq": 3,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      },
+      {
+        "now": 1793809851800,
+        "action": "idle",
+        "actionAt": 0,
+        "seq": 0,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": 1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 7,
+        "extraMaterials": 3,
+        "deformedVertices": 6692,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    ]
+  },
+  "physicalIphoneUat": false
+}

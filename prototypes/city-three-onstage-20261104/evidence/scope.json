@@ -1,0 +1,24 @@
+{
+  "release": "20261104-three-onstage.1",
+  "publicAssets": 82,
+  "changed": [
+    "public/index.html",
+    "public/shared-avatar-adapter.js",
+    "runtime/employee/staff-city-crowd.mjs",
+    "runtime/employee/stage-portraits.mjs"
+  ],
+  "added": [
+    "public/assets/photo-portrait-hair/p1.glb",
+    "public/assets/photo-portrait-hair/p2.glb",
+    "public/assets/photo-portrait-hair/p4.glb",
+    "public/photo-avatar-portraits.js",
+    "public/photo-portrait-config.js",
+    "public/photo-portrait-hair-library.js"
+  ],
+  "unchangedPublicAssets": 74,
+  "runtimeCoreUnchanged": true,
+  "employeeAuthAndPlayLoginUnchanged": true,
+  "originalFourPortraitAssetsUnchanged": true,
+  "sourceAppearanceVersion": "20261101-photo-four.1",
+  "q2Excluded": true
+}

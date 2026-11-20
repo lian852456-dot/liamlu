@@ -1,0 +1,66 @@
+{
+  "sourceRelease": "20261104-two-refined.1",
+  "source": "city-mac-stable-20261030/public",
+  "files": [
+    {
+      "file": "static-mesh.js",
+      "sha256": "86f00c27a08c2c27a74e3a3cba8d1352480b4b7f6997f03069d6fccabc965784",
+      "unchanged": true
+    },
+    {
+      "file": "head-art-previous.js",
+      "sha256": "700aa46c5ce3943ac2cbfc12c7d508ad1c7a3b132c1f10369972bdd320999060",
+      "unchanged": true
+    },
+    {
+      "file": "head-art.js",
+      "sha256": "01f0def91d79ea122abc789d5546b10ea3c3245601f7957137591a4ae86769ea",
+      "unchanged": true
+    },
+    {
+      "file": "gltf-loader.js",
+      "sha256": "2e5191730cf90618336e2391c0f68f8bc44c5a6358064b4245c4bbd218f848f0",
+      "unchanged": true
+    },
+    {
+      "file": "refined-portrait-config.js",
+      "sha256": "070bba927f6b0698a75ec68f35e82e5bf9822a47a6d2a338c5eda4bc66be7de3",
+      "unchanged": true
+    },
+    {
+      "file": "refined-portrait-hair.js",
+      "sha256": "6e0c93751eeb64769c03d48ab0bb7cd8a7a11b73249fec4ebdea11580f182d88",
+      "unchanged": true
+    },
+    {
+      "file": "refined-avatar-portraits.js",
+      "sha256": "6d19a0f8379b4c21de476feadf2275efc10dc3de3544f9148b5395d4b826cb1e",
+      "unchanged": true
+    },
+    {
+      "file": "refined-heads.js",
+      "sha256": "626da7236544b319da636c1f77ffd5713bdd2a7a3b785802b506bbeab958e555",
+      "unchanged": true
+    },
+    {
+      "file": "refined-jialing-body.js",
+      "sha256": "e462261ad6b0cd39a078a560e3eb8a25054819adf6a5d6899917de8826d084b6",
+      "unchanged": true
+    },
+    {
+      "file": "refined-li-body.js",
+      "sha256": "120afed6881d95021aa0c972e03cc1a5675d39378381d8365e5c14cac292dd57",
+      "unchanged": true
+    },
+    {
+      "file": "assets/refined-portrait-hair/p3.glb",
+      "sha256": "27af1c95d97fccd9bfb029e53a04a39cbc97e95bd4e81ab9219bf0a144ee3fa5",
+      "unchanged": true
+    },
+    {
+      "file": "assets/refined-portrait-hair/p5.glb",
+      "sha256": "27ed214bea40a4a68c297daeac019404627539616ab475e0239888424beb907e",
+      "unchanged": true
+    }
+  ]
+}

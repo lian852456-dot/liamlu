@@ -1,0 +1,20 @@
+{
+  "pass": true,
+  "at": "2026-11-10T03:38:11.935Z",
+  "checks": [
+    {
+      "path": "/boxing/index.html?city=1",
+      "status": 200
+    },
+    {
+      "path": "/api/boxing/session",
+      "status": 401
+    },
+    {
+      "path": "/runtime/boxing/.private-current-guests/boxing.sqlite",
+      "status": 404
+    }
+  ],
+  "formalEmployeeLogins": 0,
+  "realPurchases": 0
+}

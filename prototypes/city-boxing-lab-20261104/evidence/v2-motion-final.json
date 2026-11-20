@@ -1,0 +1,813 @@
+{
+  "pass": true,
+  "at": "2026-11-04T16:28:01.424Z",
+  "scope": "actual local QA live actions with unchanged server scoring",
+  "errors": [],
+  "shots": [
+    {
+      "file": "evidence/v2-final-punch-0.png",
+      "now": 1793809672495,
+      "motion": {
+        "now": 1793809672466,
+        "action": "punch",
+        "actionAt": 1793809672268,
+        "seq": 1,
+        "progress": 0.24146341463414633,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.016539187499999997,
+          "z": 0.2117401520198024
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.016539187499999997,
+          "z": 0.2117401520198024
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.65,
+          -0.3818400000000001
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-punch-1.png",
+      "now": 1793809672793,
+      "motion": {
+        "now": 1793809672792,
+        "action": "punch",
+        "actionAt": 1793809672268,
+        "seq": 1,
+        "progress": 0.6390243902439025,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.01276758181967617,
+          "z": 0.15807068998247173
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.01276758181967617,
+          "z": 0.15807068998247173
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.65,
+          -1.10972288
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-punch-2.png",
+      "now": 1793809673192,
+      "motion": {
+        "now": 1793809673188,
+        "action": "idle",
+        "actionAt": 1793809672268,
+        "seq": 1,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-punch-3.png",
+      "now": 1793809673455,
+      "motion": {
+        "now": 1793809673433,
+        "action": "idle",
+        "actionAt": 1793809672268,
+        "seq": 1,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-hook-0.png",
+      "now": 1793809674345,
+      "motion": {
+        "now": 1793809674342,
+        "action": "hook",
+        "actionAt": 1793809674070,
+        "seq": 2,
+        "progress": 0.272,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.03491591836734694,
+          "z": 0.13613178885567476
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.03491591836734694,
+          "z": 0.13613178885567476
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.25,
+          -1.7
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-hook-1.png",
+      "now": 1793809674648,
+      "motion": {
+        "now": 1793809674641,
+        "action": "hook",
+        "actionAt": 1793809674070,
+        "seq": 2,
+        "progress": 0.571,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.030663360000000004,
+          "z": 0.1171194503056977
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.030663360000000004,
+          "z": 0.1171194503056977
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.25,
+          -1.7
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-hook-2.png",
+      "now": 1793809674942,
+      "motion": {
+        "now": 1793809674940,
+        "action": "hook",
+        "actionAt": 1793809674070,
+        "seq": 2,
+        "progress": 0.87,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": -0.004941758076634109,
+          "z": 0.041412857290177844
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": -0.004941758076634109,
+          "z": 0.041412857290177844
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.25,
+          -1.7
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-hook-3.png",
+      "now": 1793809675244,
+      "motion": {
+        "now": 1793809675242,
+        "action": "idle",
+        "actionAt": 1793809674070,
+        "seq": 2,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-guard-0.png",
+      "now": 1793809676095,
+      "motion": {
+        "now": 1793809676090,
+        "action": "guard",
+        "actionAt": 1793809675850,
+        "seq": 3,
+        "progress": 0.32,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.75,
+          -1.75
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-guard-1.png",
+      "now": 1793809676744,
+      "motion": {
+        "now": 1793809676738,
+        "action": "idle",
+        "actionAt": 1793809675850,
+        "seq": 3,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-guard-2.png",
+      "now": 1793809677051,
+      "motion": {
+        "now": 1793809677049,
+        "action": "idle",
+        "actionAt": 1793809675850,
+        "seq": 3,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-guard-3.png",
+      "now": 1793809677491,
+      "motion": {
+        "now": 1793809677461,
+        "action": "idle",
+        "actionAt": 1793809675850,
+        "seq": 3,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-dodge-0.png",
+      "now": 1793809678395,
+      "motion": {
+        "now": 1793809678393,
+        "action": "dodge",
+        "actionAt": 1793809678116,
+        "seq": 4,
+        "progress": 0.30777777777777776,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": -0.34571727478446557,
+          "y": -0.065,
+          "z": -0.09877636422413301
+        },
+        "actionLocalPosition": {
+          "x": -0.34571727478446557,
+          "y": -0.065,
+          "z": -0.09877636422413301
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-dodge-1.png",
+      "now": 1793809678839,
+      "motion": {
+        "now": 1793809678815,
+        "action": "dodge",
+        "actionAt": 1793809678116,
+        "seq": 4,
+        "progress": 0.7766666666666666,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": -0.27109222884405937,
+          "y": -0.030411993440233237,
+          "z": -0.0774549225268741
+        },
+        "actionLocalPosition": {
+          "x": -0.27109222884405937,
+          "y": -0.030411993440233237,
+          "z": -0.0774549225268741
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-dodge-2.png",
+      "now": 1793809679091,
+      "motion": {
+        "now": 1793809679084,
+        "action": "idle",
+        "actionAt": 1793809678116,
+        "seq": 4,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-dodge-3.png",
+      "now": 1793809679330,
+      "motion": {
+        "now": 1793809679324,
+        "action": "idle",
+        "actionAt": 1793809678116,
+        "seq": 4,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-retreat-0.png",
+      "now": 1793809680152,
+      "motion": {
+        "now": 1793809680149,
+        "action": "retreat",
+        "actionAt": 1793809679895,
+        "seq": 5,
+        "progress": 0.2988235294117647,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0.01596600073768271,
+          "z": -0.30659882926685433
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0.01596600073768271,
+          "z": -0.30659882926685433
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-retreat-1.png",
+      "now": 1793809680398,
+      "motion": {
+        "now": 1793809680392,
+        "action": "retreat",
+        "actionAt": 1793809679895,
+        "seq": 5,
+        "progress": 0.5847058823529412,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0.003109817021657326,
+          "z": -0.36662431342213303
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0.003109817021657326,
+          "z": -0.36662431342213303
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-retreat-2.png",
+      "now": 1793809680640,
+      "motion": {
+        "now": 1793809680636,
+        "action": "retreat",
+        "actionAt": 1793809679895,
+        "seq": 5,
+        "progress": 0.8717647058823529,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 1.959434878635765e-18,
+          "z": -0.14898044158324097
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 1.959434878635765e-18,
+          "z": -0.14898044158324097
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    },
+    {
+      "file": "evidence/v2-final-retreat-3.png",
+      "now": 1793809680891,
+      "motion": {
+        "now": 1793809680884,
+        "action": "idle",
+        "actionAt": 1793809679895,
+        "seq": 5,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    }
+  ],
+  "metrics": {
+    "frames": 1614,
+    "drawCalls": 146,
+    "triangles": 328747,
+    "geometries": 138,
+    "textures": 5,
+    "p95": 9.800000000001091,
+    "hair": {
+      "ready": [
+        "p3",
+        "p5"
+      ],
+      "sharedTextures": 0,
+      "liveInstances": 2,
+      "created": 2,
+      "released": 0
+    },
+    "motion": [
+      {
+        "now": 1793809681392,
+        "action": "idle",
+        "actionAt": 1793809679895,
+        "seq": 5,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": -1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 9,
+        "extraMaterials": 3,
+        "deformedVertices": 12282,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      },
+      {
+        "now": 1793809681392,
+        "action": "idle",
+        "actionAt": 0,
+        "seq": 0,
+        "progress": 0,
+        "impact": null,
+        "result": null,
+        "localPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "actionLocalPosition": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "visualImpactOffset": 0,
+        "disposed": false,
+        "side": 1,
+        "version": "boxing-motion.2",
+        "visualOnly": true,
+        "extraMeshes": 10,
+        "extraGeometries": 7,
+        "extraMaterials": 3,
+        "deformedVertices": 6692,
+        "elbowAngles": [
+          -1.55,
+          -1.55
+        ]
+      }
+    ]
+  },
+  "physicalIphoneUat": false
+}

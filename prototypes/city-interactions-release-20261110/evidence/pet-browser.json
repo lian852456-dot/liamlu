@@ -1,0 +1,15 @@
+{
+  "pass": true,
+  "at": "2026-11-10T03:35:19.472Z",
+  "purchaseUi": true,
+  "savedVariant": "tabby",
+  "coinDelta": -60,
+  "remoteVariantVisible": true,
+  "reloadPreserved": true,
+  "ownedColorLocked": true,
+  "repeatedPreviewCleanup": true,
+  "petModelNotRebuiltOnIdle": true,
+  "syntheticOnly": true,
+  "physicalIphoneUat": false,
+  "errors": []
+}

@@ -1,0 +1,29 @@
+{
+  "cases": [
+    {
+      "key": "p3",
+      "headStyle": "p3-expression-b.1",
+      "themes": [
+        "rose",
+        "ocean",
+        "gold"
+      ],
+      "restored": true,
+      "sitAnimation": true
+    },
+    {
+      "key": "p5",
+      "headStyle": "p5-eye-surface.1",
+      "clothingStyle": "p5-vneck.1",
+      "themes": [
+        "rose",
+        "ocean",
+        "gold"
+      ],
+      "restored": true,
+      "sitAnimation": true
+    }
+  ],
+  "syntheticOnly": true,
+  "pass": true
+}

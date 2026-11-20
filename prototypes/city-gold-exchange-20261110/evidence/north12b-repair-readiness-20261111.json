@@ -1,0 +1,37 @@
+{
+  "checkedAt": "2026-11-10T17:25:39.725326+00:00",
+  "scope": "north12b-only",
+  "formalDeploymentVersionRead": 83,
+  "editorEqualsDeployment": true,
+  "deploymentSourceFiles": 12,
+  "changedCloudFiles": [
+    "CityEmployeeBridge.js"
+  ],
+  "originalBAuthorityRenewed": false,
+  "exchangeEnabled": false,
+  "confirmedDailyAliasEmployeeMappings": 0,
+  "pendingDailyAliasCount": 40,
+  "tests": {
+    "total": 28,
+    "pass": 28,
+    "fail": 0
+  },
+  "backups": {
+    "current-guests": {
+      "users": 54,
+      "integrity": "ok"
+    },
+    "legacy-owners": {
+      "users": 23,
+      "integrity": "ok"
+    }
+  },
+  "cloudPush": "REJECTED_BY_AUTOMATIC_APPROVAL_REVIEW",
+  "cloudDeploymentPerformed": false,
+  "cityRestartPerformed": false,
+  "financialWrites": 0,
+  "progressWrites": 0,
+  "userPublicationApproval": "pending",
+  "actualEmployeeReadAcceptance": "pending",
+  "privateDailyLedgerMaterialized": false
+}

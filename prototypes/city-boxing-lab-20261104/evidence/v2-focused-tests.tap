@@ -1,0 +1,15 @@
+✔ delayed contact, straight and hook reach, guard/dodge/retreat and replay (15.00325ms)
+✔ QA appearance is server assigned; city excursion preserves pose and wallet on return (11.100208ms)
+✔ synthetic stake: atomic lock, replay, opponent consent, no double spend, payout conservation (48.951084ms)
+✔ insufficient balance rolls back both locks; server ignores no forged prices (11.976209ms)
+✔ draw, disconnect and restart refund each exactly once; ledger failure rolls back (35.357416ms)
+✔ presence: tab dedupe, grace, expiry and session revocation; no NPC identity (15.513209ms)
+✔ actual city session/CSRF selects UID; no client identity, wallet or position writes (22.552333ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 179.094208
