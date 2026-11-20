@@ -22,6 +22,39 @@ function insuranceConsultPersist_(state) {
   if(state.file)file.setContent(text);
   if(file.getBlob().getDataAsString('UTF-8')!==text)throw Error('INSURANCE_READBACK_UNCONFIRMED');
 }
+// Directory rows are independent of the daily replies and their opaque submission keys.
+function insuranceConsultDirectory_(actor, rows) {
+  const roles=['店長','代理店長','副店長','資深業務代表','業代','銷售人員','同仁','業務代表','業務代表(I)','業務代表(II)','業務代表(III)'];
+  const members=actor.members;
+  function eligible(id,store,role) {
+    return members && Object.prototype.hasOwnProperty.call(members,id) && members[id]===store &&
+      PRIVATE_DASHBOARD_B_STORES_.includes(store) && roles.includes(role);
+  }
+  if(!actor.supervisor && !eligible(actor.id,InsuranceConsultation.store(actor.store),actor.role))return null;
+  const sheet=privateDashboardRoster().getSheetByName(PRIVATE_DASHBOARD_USERS_SHEET);
+  // Strict native eligibility just validated the sheet header under this session lock.
+  const roster=sheet.getRange(2,1,sheet.getLastRow()-1,5).getValues();
+  const counts=new Map(),source=new Map();
+  for(const row of roster) {
+    const id=String(row[0]).trim().toUpperCase();
+    counts.set(id,(counts.get(id)||0)+1);
+  }
+  for(const row of rows)if(row.kind==='personal')source.set(row.id,source.has(row.id)?null:row);
+  const directory={current:[],retained:[],missing:[]};
+  for(const [rawId,rawName,rawStore,role,status] of roster) {
+    const id=String(rawId),store=InsuranceConsultation.store(rawStore),name=String(rawName||'').trim();
+    if(counts.get(id)!==1 || status!=='active' || !eligible(id,store,role))continue;
+    // Publish the existing roster display name only. Never use an ID as a fallback.
+    if(!name || name.length>60 || /[0-9@:/<>]/.test(name) || name.includes(id))continue;
+    const row=source.get(id);
+    const progress=row && row.store===store ? row.progress : null;
+    const valid=progress && InsuranceConsultation.classify(progress,progress.publicationDate)!=='pending';
+    const group=valid && progress.freshness==='current'?'current':valid && progress.referenceOnly?'retained':'missing';
+    directory[group].push({store,name,rate:group==='current'?progress.rate:null,cutoff:valid?progress.cutoff:null});
+  }
+  directory.current.sort((a,b)=>b.rate-a.rate || a.store.localeCompare(b.store,'zh-TW') || a.name.localeCompare(b.name,'zh-TW'));
+  return directory;
+}
 function insuranceConsultOperation_(p,actor) {
   const C=InsuranceConsultation,today=Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd');
   if(!C.day(p.dataDate)||p.dataDate>today||!actor||!actor.id)throw Error('INSURANCE_REQUEST_INVALID');
@@ -59,7 +92,7 @@ function insuranceConsultOperation_(p,actor) {
     return {status:'ok',schema:'insurance-consultation/v1',dataDate:p.dataDate,alreadySubmitted:Boolean(prior),item:project(target)};
   }
   if(p.action!=='employee_insurance_read')throw Error('INSURANCE_REQUEST_INVALID');
-  return {status:'ok',schema:'insurance-consultation/v1',dataDate:p.dataDate,scope:actor.supervisor?'supervisor':manager?'store-manager':'self',sourceStatus:data?'available':'pending',items:rows.map(project),weekly:insuranceConsultWeeklyPending_()};
+  return {status:'ok',schema:'insurance-consultation/v1',dataDate:p.dataDate,scope:actor.supervisor?'supervisor':manager?'store-manager':'self',sourceStatus:data?'available':'pending',items:rows.map(project),directory:p.dataDate===today?insuranceConsultDirectory_(actor,all):null,weekly:insuranceConsultWeeklyPending_()};
 }
 
 // Existing relay ledger has no verified employee-ID insurance-week mapping;

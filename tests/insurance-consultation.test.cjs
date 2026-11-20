@@ -71,3 +71,34 @@ test('own store and personal daily submissions have independent keys and preserv
 test('deputy or unrecognized native role does not gain store consultation access',()=>{
  for(const role of ['副店長','SYNTHETIC_UNKNOWN_ROLE']){const f=setup();f.rows.DashboardUsers[2][3]=role;const p=f.login(),r=read(f,p);assert.equal(r.scope,'self');assert.equal(r.items.length,1);assert.equal(r.items[0].kind,'personal');}
 });
+
+test('nine-store directory contains four display fields only, with separate current, stale and unavailable rows',()=>{
+ const d=F.data(),people=d.meta.insuranceConsultationSource.personal.rows;
+ people[0].rate=.85;people[1].rate=0;people[2].rate=null;
+ const f=setup(d),session=f.login(),self=read(f,session).items[0];
+ submit(f,session,self,{...F.values,advisor:'PRIVATE_REPLY_ONLY'});
+ const other=f.login('SYNTH003','SYNTHETIC_DIRECTORY_DEVICE'),result=read(f,other);
+ assert.equal(result.items.length,1);assert.ok(!JSON.stringify(result).includes('PRIVATE_REPLY_ONLY'));
+ const directory=result.directory;
+ assert.deepEqual(directory.current.map(r=>r.rate),[.85,...Array(6).fill(.42857),0]);
+ assert.deepEqual(directory.missing,[{store:'復興南',name:'示＊澄',rate:null,cutoff:null}]);
+ for(const row of [...directory.current,...directory.missing])assert.deepEqual(Object.keys(row).sort(),['cutoff','name','rate','store']);
+ const day=new Date(Date.parse(F.date)-86400000).toISOString().slice(0,10);
+ if(day.slice(0,7)===F.date.slice(0,7)){
+  d.meta.reportDate=day;d.meta.insuranceConsultationSource.publicationDate=day;d.meta.insuranceConsultationSource.personal.cutoff=day;
+  const stale=read(f,other).directory;assert.equal(stale.current.length,0);assert.equal(stale.retained.length,8);
+  assert.ok(stale.retained.every(r=>r.rate===null&&r.cutoff===day));
+ }
+ assert.equal(read(f,other,day).directory,null);
+});
+test('directory enforces native actor and target eligibility independently; client cannot request more fields',()=>{
+ const f=setup(),p=f.login();
+ for(const role of ['外部顧問','督導']){f.rows.DashboardUsers[2][3]=role;assert.equal(read(f,p).directory,null);}
+ f.rows.DashboardUsers[2][3]='同仁';f.rows.DashboardUsers[1][4]='inactive';f.rows.DashboardUsers[3][2]='外區';
+ f.rows.DashboardUsers[4][3]='其他';f.rows.DashboardUsers[5][1]='SYNTH005';f.rows.DashboardUsers.push([...f.rows.DashboardUsers[6]]);
+ const all=read(f,p).directory;assert.equal(all.current.length,4);
+ assert.ok(all.current.every(row=>['永吉','大稻埕','三創','六張犁'].includes(row.store)));
+ for(const extra of [{store:'外區'},{role:'督導'},{employeeId:'SYNTH003'}])assert.equal(read(f,{...p,...extra}).status,'error');
+ f.rows.DashboardUsers[2][2]='外區';assert.equal(read(f,p).status,'error');
+ assert.equal(read(f,{}).status,'error');assert.equal(f.fileWrites,0);
+});

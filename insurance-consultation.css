@@ -4,3 +4,13 @@
 
 /* This page uses the existing B session; the legacy A page has no insurance operation. */
 #insuranceLogin [data-b-a]{display:none}
+
+#advisorDirectory{background:#fff;border:1px solid #d8e1e7;border-radius:12px;padding:16px;margin:16px 0}
+#advisorDirectory h2{font-size:21px;margin:0 0 10px}
+.directory-tools{display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;color:#465768}
+.directory-tools select{font:inherit;min-height:44px;border:1px solid #aab9c6;border-radius:6px;background:white;color:inherit;padding:6px}
+#advisorDirectory table{border-collapse:collapse;width:100%;margin-top:12px;font-variant-numeric:tabular-nums}
+#advisorDirectory th,#advisorDirectory td{text-align:left;border-bottom:1px solid #e3e9ec;padding:8px 6px;overflow-wrap:anywhere}
+#advisorDirectory th{background:#f4f6f8}
+@media(max-width:600px){#advisorDirectory{padding:12px}#advisorDirectory table{font-size:14px}#advisorDirectory td:last-child{white-space:nowrap}}
+.directory-scroll{max-height:22rem;overflow:auto;margin-top:12px}#advisorDirectory table{margin-top:0}#advisorDirectory th{position:sticky;top:0}

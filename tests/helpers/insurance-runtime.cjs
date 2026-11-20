@@ -5,6 +5,8 @@ const harness=fs.readFileSync(path.join(testRoot,'dashboard-password-roster-rene
 const make=new Function('require','__dirname',harness+'\nreturn fixture;')(require,testRoot);
 function setup(source=F.data()){
  const f=make(),files=new Map();let fileWrites=0;
+ const demoNames=['示＊晴','示＊安','示＊澄','示＊華','示＊辰','示＊雨','示＊和','示＊琪','示＊楓'];
+ f.rows.DashboardUsers.slice(1).forEach((row,i)=>{row[1]=demoNames[i];row[3]='同仁';});
  for(const name of ['InsuranceConsultation.gs','InsuranceSourceCore.gs','InsuranceSourcePublication.gs','InsuranceConsultationStore.gs'])new vm.Script(fs.readFileSync(path.join(testRoot,'../gas',name),'utf8')).runInContext(f.ctx);
  f.ctx.Utilities.formatDate=()=>F.date;
  f.ctx.Utilities.computeHmacSha256Signature=(text,secret)=>[...crypto.createHmac('sha256',secret).update(text).digest()];

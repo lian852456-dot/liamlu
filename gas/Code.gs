@@ -10006,7 +10006,7 @@ function privateDashboardCreateGasB_(options) {
         if(p.action==='employee_insurance_read'||p.action==='employee_insurance_submit') {
           const user=privateDashboardUserByEmployeeId(s.employee).user;
           if(!user||user.status!=='active')throw Error('B_ELIGIBILITY_DENIED');
-          const result=insuranceConsultOperation_(p,{id:s.employee,store:profile.store,role:user.role,
+          const result=insuranceConsultOperation_(p,{id:s.employee,store:profile.store,role:user.role,members:config.authority.members,
             supervisor:privateDashboardIsTrustedEmployee(s.employee)&&user.role==='督導'});
           if(now()>=s.expiresAt||now()>=config.authority.validUntil)throw Error('B_SESSION_DENIED');
           return result;

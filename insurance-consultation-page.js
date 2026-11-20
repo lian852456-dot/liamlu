@@ -2,10 +2,10 @@
  'use strict';
  const C=InsuranceConsultation,$=id=>document.getElementById(id),owner='https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
  const today=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
- let client,epoch=0,rows=[],selected=null,attempt=null,busy=false,weekly=null;
+ let client,epoch=0,rows=[],selected=null,attempt=null,busy=false,weekly=null,directory=null;
  $('insuranceDate').value=today();$('insuranceDate').max=today();
  function text(id,v){$(id).textContent=v;}
- function clear(){epoch++;rows=[];selected=null;attempt=null;client?.suspend();$('insuranceWorkspace').hidden=true;$('insuranceForm').reset();$('insuranceForm').hidden=true;$('insuranceList').replaceChildren();$('insuranceWeeks').replaceChildren();weekly=null;text('selfTitle','登入後查看本人進度');text('selfRate','—');text('selfState','資料待核');text('selfCutoff','統計截止：待核');text('selfDataDate','每天獨立核對，不綁 16:00／21:00');$('insuranceHero').dataset.state='pending';}
+ function clear(){setDirectory(null);epoch++;rows=[];selected=null;attempt=null;client?.suspend();$('insuranceWorkspace').hidden=true;$('insuranceForm').reset();$('insuranceForm').hidden=true;$('insuranceList').replaceChildren();$('insuranceWeeks').replaceChildren();weekly=null;text('selfTitle','登入後查看本人進度');text('selfRate','—');text('selfState','資料待核');text('selfCutoff','統計截止：待核');text('selfDataDate','每天獨立核對，不綁 16:00／21:00');$('insuranceHero').dataset.state='pending';}
  function restore(){
   client??=createDashboardBClient(owner,{storage:sessionStorage,logoutEpoch:()=>JSON.parse(localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||''});
   if(!client.restore(localStorage.getItem('north12b_private_dashboard_device_id')))throw Error('LOGIN_REQUIRED');
@@ -20,8 +20,39 @@
   C.fields.forEach(([k])=>{const el=$('insuranceForm').elements[k];el.value=existing?.values[k]||'';el.readOnly=!editable;el.required=editable;el.removeAttribute('aria-invalid');});
   $('insuranceSubmit').hidden=!editable;
  }
+ function setDirectory(value){
+  const filter=$('advisorStore'),previous=filter.value;
+  directory=value;
+  filter.replaceChildren(new Option('全部門市',''));
+  $('advisorDirectory').hidden=!value;
+  if(value){
+   const stores=new Set([...value.current,...value.retained,...value.missing].map(row=>row.store));
+   for(const store of [...stores].sort((a,b)=>a.localeCompare(b,'zh-TW')))filter.add(new Option(store,store));
+   if(stores.has(previous))filter.value=previous;
+  }
+  drawDirectory();
+ }
+ function drawDirectory(){
+  const body=$('advisorRows'),store=$('advisorStore').value;
+  body.replaceChildren();
+  if(!directory)return;
+  for(const group of ['current','retained','missing']){
+   for(const row of directory[group]){
+    if(store && store!==row.store)continue;
+    const tr=document.createElement('tr');
+    const rate=group==='current'?C.rateText(row.rate):group==='retained'?'已過期':'未取得';
+    for(const value of [row.store,row.name,rate,row.cutoff||'—']){
+     const cell=document.createElement('td');cell.textContent=value;tr.append(cell);
+    }
+    body.append(tr);
+   }
+  }
+  $('advisorEmpty').hidden=body.rows.length>0;
+ }
+ $('advisorStore').onchange=drawDirectory;
  function render(result){
   if(result.schema!=='insurance-consultation/v1'||result.dataDate!==$('insuranceDate').value||!Array.isArray(result.items))throw Error('RESPONSE_MISMATCH');
+  if(Object.hasOwn(result,'directory'))setDirectory(result.directory);
   if(result.weekly)weekly=result.weekly;
   $('insuranceWeeks').replaceChildren();
   for(const w of weekly?.weeks||[]){const el=document.createElement('article');el.className='task';const h=document.createElement('h3');h.textContent=w.week;const p=document.createElement('p');p.textContent='正式比率：'+C.rateText(w.rate)+'｜截止：'+(w.cutoff||'待核')+'｜加扣：'+(w.adjustment??'待核')+'｜'+w.postingStatus;const rule=document.createElement('p');rule.textContent=w.rule;el.append(h,p,rule);$('insuranceWeeks').append(el);}
@@ -42,7 +73,7 @@
   open(self||rows[0]||{status:'pending'});
  }
  async function load(){
-  const generation=++epoch;selected=null;attempt=null;$('insuranceForm').hidden=true;text('insuranceMessage','讀取當日正式來源及已填狀態…');
+  setDirectory(null);const generation=++epoch;selected=null;attempt=null;$('insuranceForm').hidden=true;text('insuranceMessage','讀取當日正式來源及已填狀態…');
   try{restore();const date=$('insuranceDate').value,r=await client.insuranceRead(date);if(generation!==epoch)return;render(r);text('insuranceMessage','每人／每店每資料日一次；一般銷售過關不會代替本項回覆。');}
   catch(_){if(generation!==epoch)return;clear();text('selfTitle','資料讀取待核');text('insuranceMessage','未取得可核對資料，請重新登入或重新讀取；沒有判定達標或未完成。');}
  }

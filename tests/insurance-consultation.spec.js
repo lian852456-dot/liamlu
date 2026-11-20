@@ -71,3 +71,16 @@ test('general store and personal forms are compact and have no insurance-consult
 test('existing personal navigation opens the personal view, not the store KPI view',async({page})=>{
  await install(page);await expect(page.locator('[data-b-a]')).toBeHidden();await page.locator('[data-b-module="personal"]').click();await expect(page).toHaveURL(/kpi-battle\.html#personal$/);
 });
+
+for(const width of [390,1440])test('nine-store advisor filter and logout at '+width,async({page})=>{
+ await page.setViewportSize({width,height:900});
+ const data=F.data(),people=data.meta.insuranceConsultationSource.personal.rows;people[0].rate=.76;people[2].rate=null;
+ await install(page,data);const directory=page.locator('#advisorDirectory');
+ await expect(directory).toBeVisible();await expect(directory.locator('tbody tr')).toHaveCount(9);
+ await expect(directory.locator('tbody tr').first()).toContainText('76.00%');
+ await page.locator('#advisorStore').selectOption('復興南');await expect(directory.locator('tbody tr')).toHaveCount(1);
+ await expect(directory.locator('tbody')).toContainText('未取得');await expect(page.locator('#insuranceForm')).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ if(!await page.locator('[data-b-logout]').isVisible())await page.locator('#insuranceLogin .b-options > summary').click();
+ await page.locator('[data-b-logout]').click();await expect(directory).toBeHidden();await expect(directory.locator('tbody tr')).toHaveCount(0);
+});
