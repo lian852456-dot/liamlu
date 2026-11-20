@@ -46,7 +46,6 @@ var InsuranceSourceCore=(function(){
    return {...row,progress:p,requirement};
   });
  }
- function receipt(s){return {schema,version:s.version,revision:s.revision,lastAttempt:s.lastAttempt,retainedEntries:s.entries.length};}
- return {canonical,empty,assertState,begin,finish,project,receipt};
+ return {canonical,empty,assertState,begin,finish,project};
 })();
 if(typeof module==='object'&&module.exports)module.exports=InsuranceSourceCore;

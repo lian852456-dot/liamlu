@@ -3347,7 +3347,6 @@ function doPost(e) {
     else if (action === 'private_publish') result = privateDashboardPublish(payload);
     else if (action === 'kpicalc_access') result = kpiCalcAccess(payload);
     else if (action === 'kpicalc_publish') result = kpiCalcPublish(payload);
-    else if (['insurance_source_status','insurance_source_begin','insurance_source_complete'].includes(action)) result = insuranceSourcePublication_(payload);
     else if (action === 'read') result = reportReadPayload_(payload);
     else if (action === 'write') result = reportWritePayload_(payload);
     else if (action === 'pwrite') result = personalWritePayload_(payload);

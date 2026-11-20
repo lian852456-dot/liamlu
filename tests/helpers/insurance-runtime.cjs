@@ -7,7 +7,7 @@ function setup(source=F.data(),fixedSourceText){
  const f=make(),files=new Map();let fileWrites=0;
  const demoNames=['示＊晴','示＊安','示＊澄','示＊華','示＊辰','示＊雨','示＊和','示＊琪','示＊楓'];
  f.rows.DashboardUsers.slice(1).forEach((row,i)=>{row[1]=demoNames[i];row[3]='同仁';});
- for(const name of ['InsuranceConsultation.gs','InsuranceSourceCore.gs','InsuranceSourcePublication.gs','InsuranceConsultationStore.gs','InsuranceFixedSource.gs']){
+ for(const name of ['InsuranceConsultation.gs','InsuranceSourceCore.gs','InsuranceConsultationStore.gs','InsuranceFixedSource.gs']){
   const text=name==='InsuranceFixedSource.gs' && fixedSourceText!==undefined ? fixedSourceText : fs.readFileSync(path.join(testRoot,'../gas',name),'utf8');
   new vm.Script(text,{filename:name}).runInContext(f.ctx);
  }
@@ -33,6 +33,6 @@ function setup(source=F.data(),fixedSourceText){
  function login(id='SYNTH002',device='SYNTHETIC_INSURANCE_DEVICE'){
   const r=handle({action:'employee_login',employeeId:id,deviceId:device,track:'password-bound',password:'SYNTHETIC',sessionNonce:(++seq).toString(16).padStart(64,'0'),idempotencyKey:'SYNTHETIC_INSURANCE_LOGIN_'+seq});if(r.status!=='ok')throw Error('login failed '+JSON.stringify(r));return {deviceId:device,token:r.token};
  }
- return {...f,handle,login,files,useDedicatedStore(){f.ctx.insuranceConsultSource_=()=>f.ctx.insuranceSourceLoad_().data;},useFixedSource(){f.ctx.insuranceConsultSource_=dedicatedRead;},publish(p){return f.ctx.insuranceSourcePublication_({...p,adminSecret:'SYNTHETIC_ADMIN_ONLY'});},get fileWrites(){return fileWrites;},set source(v){source=v;},get source(){return source;}};
+ return {...f,handle,login,files,useFixedSource(){f.ctx.insuranceConsultSource_=dedicatedRead;},get fileWrites(){return fileWrites;},set source(v){source=v;},get source(){return source;}};
 }
 module.exports={setup};
