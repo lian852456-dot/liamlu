@@ -25,7 +25,7 @@ function insuranceConsultPersist_(state) {
 function insuranceConsultOperation_(p,actor) {
   const C=InsuranceConsultation,today=Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd');
   if(!C.day(p.dataDate)||p.dataDate>today||!actor||!actor.id)throw Error('INSURANCE_REQUEST_INVALID');
-  const manager=['店長','代理店長','副店長'].indexOf(actor.role)>=0;
+  const manager=['店長','代理店長'].indexOf(actor.role)>=0;
   let data=null;try{data=insuranceConsultSource_();}catch(_){/* Explicit source-pending state; no fallback. */}
   const all=C.source(data,p.dataDate),unique={};
   let rows=all.filter(function(r){return actor.supervisor||r.kind==='personal'&&r.id===actor.id||r.kind==='store'&&manager&&r.store===C.store(actor.store);})

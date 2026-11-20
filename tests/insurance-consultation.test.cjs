@@ -67,3 +67,7 @@ test('own store and personal daily submissions have independent keys and preserv
  assert.equal(saved.find(r=>r.kind==='store').submission.values.advisor,F.values.advisor);assert.equal(saved.find(r=>r.kind==='personal').submission.values.advisor,'合成本人請益');assert.equal(f.fileWrites,2);
  assert.equal(submit(f,p,store).alreadySubmitted,true);assert.equal(f.fileWrites,2);
 });
+
+test('deputy or unrecognized native role does not gain store consultation access',()=>{
+ for(const role of ['副店長','SYNTHETIC_UNKNOWN_ROLE']){const f=setup();f.rows.DashboardUsers[2][3]=role;const p=f.login(),r=read(f,p);assert.equal(r.scope,'self');assert.equal(r.items.length,1);assert.equal(r.items[0].kind,'personal');}
+});
