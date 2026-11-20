@@ -27,7 +27,20 @@ var TradeinPerformanceCore = (function () {
     const code=record.project_code, amount=record.tradein_credit;
     if(code!==null && (typeof code!=='string' || !/^[A-Z0-9][A-Z0-9-]{0,19}$/i.test(code)))throw new Error('SAR74 專案代碼格式無效');
     if(amount!==null && (!Number.isSafeInteger(amount) || amount<0 || amount>10000000))throw new Error('SAR74 舊機折抵金額格式無效');
-    return {project_code:code,tradein_credit:amount};
+    const details={project_code:code,tradein_credit:amount};
+    if(Object.prototype.hasOwnProperty.call(record,'project_model')){
+      const model=record.project_model;
+      if(model!==null && (typeof model!=='string' || model.length>180 || /[<>\u0000-\u001f]|\d{10,}/.test(model)))
+        throw new Error('SAR74 專案機款格式無效');
+      details.project_model=model?.replace(/-\([^()]+\)(?:\(5G\))?$/,'').replace(/_/g,' ').replace(/\s+/g,' ').trim()||null;
+    }
+    if(Object.prototype.hasOwnProperty.call(record,'sales_order_amount')){
+      const orderAmount=record.sales_order_amount;
+      if(orderAmount!==null && (!Number.isSafeInteger(orderAmount) || orderAmount<0 || orderAmount>10000000))
+        throw new Error('SAR74 銷貨單金額格式無效');
+      details.sales_order_amount=orderAmount;
+    }
+    return details;
   }
   function date(value) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '') || isNaN(Date.parse(value+'T00:00:00Z')) ||
@@ -157,6 +170,8 @@ var TradeinPerformanceCore = (function () {
         if (prior.store!==store || prior.trade_date!==trade || prior.employee_key!==normalized.employee_key || prior.order!==order || prior.project!==r.project) throw new Error('同回收碼的交易、人員或店點衝突');
         if(prior.model!==model)throw new Error('同回收碼的機款衝突');
         if(detail&&(prior.detail.project_code!==detail.project_code||prior.detail.tradein_credit!==detail.tradein_credit))throw new Error('同回收碼的專案代碼或舊機折抵金額衝突');
+        if(detail&&(prior.detail.project_model!==detail.project_model||prior.detail.sales_order_amount!==detail.sales_order_amount))
+          throw new Error('同回收碼的專案機款或銷貨單金額衝突');
         if (cancel && (!prior.cancel_date || cancel>prior.cancel_date)) prior.cancel_date=cancel;
         duplicates++;
       } else unique[key]=normalized;
@@ -230,6 +245,10 @@ var TradeinPerformanceCore = (function () {
     if(cell||row.length){row.push(cell);rows.push(row);}return rows;
   }
   function unwrap(v){return String(v || '').trim().replace(/^="(.*)"$/,'$1');}
+  function amount(value) {
+    if(value==='')return null;
+    return /^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(value)?Number(value.replace(/,/g,'')):NaN;
+  }
   function roc(v){const s=unwrap(v).replace(/[\/\-]/g,'');if(!/^\d{7}$/.test(s))throw new Error('SAR74 日期格式無效');return date(String(Number(s.slice(0,3))+1911)+'-'+s.slice(3,5)+'-'+s.slice(5,7));}
   function parseSar74(text) {
     const rows=csv(String(text).replace(/^\uFEFF/,''));
@@ -247,7 +266,8 @@ var TradeinPerformanceCore = (function () {
     const columns=Object.fromEntries(labels.map(n=>[n,names.indexOf(n)]));
     if(names.includes('回收舊機品名'))columns['回收舊機品名']=names.indexOf('回收舊機品名');
     const details=['專案代碼','舊機折抵金額','回收舊機品名'].every(n=>names.includes(n));
-    if(details)for(const name of ['專案代碼','舊機折抵金額'])columns[name]=names.indexOf(name);
+    if(details)for(const name of ['專案代碼','舊機折抵金額','專案機品名','銷貨單金額'])
+      if(names.includes(name))columns[name]=names.indexOf(name);
     const header=rows.slice(0,h).flat().join(' '),ranges=Array.from(header.matchAll(/(\d{3}\/\d{2}\/\d{2})\s*-\s*(\d{3}\/\d{2}\/\d{2})/g));
     if(ranges.length!==1)throw new Error('SAR74 查詢期間缺漏或不唯一');
     const start=roc(ranges[0][1]),end=roc(ranges[0][2]),period=monthPeriod(start.slice(0,7));
@@ -285,9 +305,10 @@ var TradeinPerformanceCore = (function () {
         recycle_code:recycle,order_number:order,cancel_date:cancel};
       if(names.includes('回收舊機品名'))record.recycle_model=field(r,'回收舊機品名');
       if(details){
-        const rawCredit=field(r,'舊機折抵金額');
-        const credit=rawCredit===''?null:/^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(rawCredit)?Number(rawCredit.replace(/,/g,'')):NaN;
-        Object.assign(record,transactionDetails({project_code:field(r,'專案代碼')||null,tradein_credit:credit}));
+        const detail={project_code:field(r,'專案代碼')||null,tradein_credit:amount(field(r,'舊機折抵金額'))};
+        if(columns['專案機品名']!==undefined)detail.project_model=field(r,'專案機品名')||null;
+        if(columns['銷貨單金額']!==undefined)detail.sales_order_amount=amount(field(r,'銷貨單金額'));
+        Object.assign(record,transactionDetails(detail));
       }
       records.push(record);
     });
