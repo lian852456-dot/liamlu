@@ -3,7 +3,7 @@
 <head>
   <script src="portal-logout.js?v=20261011-b-epoch-1"></script>
   <script src="GasBClient.js?v=20261023-login-status-1" defer></script>
-  <script src="dashboard-b-shell.js?v=20261113-conversion-1" defer></script>
+  <script src="dashboard-b-shell.js?v=20261120-login-return-1" defer></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -318,6 +318,7 @@
   try {
     if (!window.KpiBattleController || !window.AwardsBattleController) throw new Error('battle controller unavailable');
     let GAS_URL = KpiBattleController.resolveGasUrl(localStorage);
+    const returnAfterApprovedLogin = new URLSearchParams(location.search).get('login') === 'approved-readonly';
     let kpiController;
     const awardsController = AwardsBattleController.create({window,document,integrated:true,renderLock:()=>kpiController.renderLock()});
     window.kpiBattleController = KpiBattleController.create({
@@ -326,13 +327,19 @@
       document,
       getGasUrl: () => GAS_URL,
       getAwardsData: () => awardsController.getData(),
-      onKpiLoaded: payload => awardsController.acceptKpiResult(payload),
+      onKpiLoaded(payload) {
+        awardsController.acceptKpiResult(payload);
+        if (returnAfterApprovedLogin && document.body.classList.contains('dashboard-b-legacy-mode')) {
+          location.replace('readonly-dashboard.html');
+        }
+      },
       onKpiLoadError: () => awardsController.handleKpiLoadError(),
     });
     kpiController = window.kpiBattleController;
     window.awardsBattleController = awardsController;
     window.DashboardBHost = {
       compactBattle: true,
+      startWithLegacy: returnAfterApprovedLogin,
       refreshOnResume: new URLSearchParams(window.location.search).get('refresh') === 'conversion',
       navigationSelector: '[data-kpi-battle-view]',
       clear(note) { kpiController.failClosed(note || '請重新驗證登入。'); awardsController.failClosed(note || '請重新驗證登入。'); },

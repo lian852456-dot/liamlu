@@ -299,10 +299,15 @@
   }
   scope.addEventListener('pageshow', event => { if(event.persisted)showRetainedReminders(); });
   document.addEventListener('visibilitychange', () => { if(document.hidden)clearTimeout(rotationTimer);else showRetainedReminders(); });
+  const returnToDashboard = new URLSearchParams(scope.location.search).get('return') === 'readonly-dashboard';
+  function openDashboard() { scope.location.replace('readonly-dashboard.html'); }
   scope.DashboardBHost={
+    refreshOnResume:returnToDashboard,
+    onPasswordLogin(){ if(returnToDashboard)openDashboard(); },
+    showLegacyAccess(){ scope.location.href=returnToDashboard?'kpi-battle.html?login=approved-readonly':'kpi-battle.html#kpi'; },
     sessionOnly:true,mountSelector:'#home-login',navigationSelector:'#zone-staff a, .quick-card',compactMobileLogin:true,
-    clear(){passwordVerified=false;updateAccessNotice();},
-    accept(){passwordVerified=true;updateAccessNotice();if(!salesVerified){feeds.sales=pending('sales','同仁專區已登入，請由下方入口查看 KPI、台獎與個績；此提醒尚未讀取。');render();}},
+    clear(){if(returnToDashboard)$('dashboard-login-return').hidden=true;passwordVerified=false;updateAccessNotice();},
+    accept(){if(returnToDashboard)$('dashboard-login-return').hidden=false;passwordVerified=true;updateAccessNotice();if(!salesVerified){feeds.sales=pending('sales','同仁專區已登入，請由下方入口查看 KPI、台獎與個績；此提醒尚未讀取。');render();}},
     navigate(module){
       const targets={kpi:'kpi-battle.html#kpi',awards:'kpi-battle.html#awards',personal:'kpi-battle.html#personal',return:'#zone-staff'};
       scope.location.href=targets[module]||'#zone-staff';
