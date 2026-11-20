@@ -1,29 +1,29 @@
-main{width:min(1180px,calc(100% - 32px));margin:12px auto;padding:0 0 28px}
-.hero{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;padding:10px 14px;border-radius:12px}
-.hero:after{display:none}
-.hero h1{font-size:22px;margin:0}
-.hero details{font-size:13px}
-.hero summary{cursor:pointer}
-.transaction-filters,.transaction-pages{display:flex;align-items:flex-end;flex-wrap:wrap;gap:10px}
-#transactionResults th{position:sticky;top:0;z-index:2;background:#fff5ec}
-#transactionResults td:first-child,#transactionResults th:first-child{position:sticky;left:0;z-index:3;background:#fff}
-#transactionResults th:first-child{z-index:4;background:#fff5ec}
-#transactionResults tbody tr:nth-child(even) td{background:#f7f4ef}
-#transactionResults td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;color:#9a5b00}
-#transactionResults th,#transactionResults td{padding:6px 8px;font-size:13px}
-.tx-summary{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
-.tx-summary article{min-width:120px;padding:8px 10px;border:1px solid #eadfd4;border-radius:10px;background:#fff}
-.tx-summary span{display:block;color:#687078;font-size:12px}
-.tx-summary strong{display:block;font-size:20px;color:#9a3412}
-.transaction-filters input{min-width:0}
-.transaction-highlights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
-.transaction-highlights section{border:1px solid var(--line);border-radius:12px;padding:12px 16px}
-.transaction-highlights h3{font-size:17px;margin:0 0 6px}
-.transaction-highlights ul{list-style:none;margin:0;padding:0}
-.transaction-highlights li{display:flex;justify-content:space-between;gap:10px}
-.transaction-highlights li span:last-child{flex:none;color:var(--muted)}
-#transactionResults th,#transactionResults td{font-size:15px}
-#transactionCount,#transactionStatus{margin-top:14px}
+.transaction-filters{display:flex;align-items:end;flex-wrap:wrap;gap:8px;margin:12px 0 6px}
+.transaction-filters label{display:grid;gap:3px;min-width:0;flex:1 1 132px}
+.transaction-filters input,.transaction-filters select{width:100%;min-width:0}
+.transaction-filters button{flex:none}
 #transactionStatus:empty{display:none}
-.transaction-pages{justify-content:center;align-items:center;margin-top:16px}
-@media(max-width:430px){.transaction-highlights{grid-template-columns:1fr}.transaction-filters label{flex:1;min-width:105px}.transaction-filters button{flex:none}}
+#actual-transactions h3{font-size:18px;margin:16px 0 6px}
+.tx-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0 12px}
+.tx-summary article{min-width:0;padding:8px 12px;border:1px solid #eadfd4;border-radius:10px;background:#fffaf5}
+.tx-summary span,.tx-summary small{display:block;color:#594d43;font-size:13px}
+.tx-summary strong{display:block;color:#94370f;font-size:23px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.transaction-highlights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.transaction-highlights section{border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.transaction-highlights h4{font-size:16px;margin:0 0 4px}
+.transaction-highlights ul{list-style:none;margin:0;padding:0}
+.transaction-highlights li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px 8px;padding:3px 0;font-size:14px}
+.transaction-highlights li span{overflow-wrap:anywhere}
+.transaction-highlights li strong{font-variant-numeric:tabular-nums}
+.tx-bar{grid-column:1/-1;height:4px;border-radius:4px;background:linear-gradient(to right,#d76526 var(--share),#f3e7dc var(--share))}
+#actual-transactions table{margin-top:8px}
+#actual-transactions th,#actual-transactions td{padding:6px 8px;font-size:14px}
+#actual-transactions th{background:#fff5ec}
+#actual-transactions tbody tr:nth-child(even) td{background:#f7f4ef}
+#actual-transactions td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;color:#94370f}
+.transaction-pages{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:10px}
+@media(max-width:570px){
+  .transaction-highlights{grid-template-columns:1fr}
+  .tx-summary article{padding:6px 8px}
+  .tx-summary strong{font-size:17px}
+}

@@ -1,4 +1,4 @@
-(function(root,factory){const node=typeof module==='object'&&module.exports;const api=factory(node?require('./readonly-dashboard-core.js'):root.ReadonlyDashboardCore,node?require('./kpi-battle-controller.js'):root.KpiBattleController,node?require('./awards-battle-controller.js'):root.AwardsBattleController);if(node)module.exports=api;else root.ReadonlyDashboardAdapter=api;})(typeof globalThis==='object'?globalThis:this,function(Core,Kpi,Awards){
+(function(root,factory){const node=typeof module==='object'&&module.exports;const api=factory(node?require('./readonly-dashboard-core.js'):root.ReadonlyDashboardCore,node?require('./kpi-battle-controller.js'):root.KpiBattleController,node?require('./awards-battle-controller.js'):root.AwardsBattleController,node?require('./store-renewal-evidence.js'):root.StoreRenewalEvidence);if(node)module.exports=api;else root.ReadonlyDashboardAdapter=api;})(typeof globalThis==='object'?globalThis:this,function(Core,Kpi,Awards,Evidence){
   'use strict';
   function maskedName(value){const name=String(value||'').trim();if(/[＊*]/.test(name))return name;const letters=Array.from(name);return letters.length?letters[0]+'＊'.repeat(Math.max(1,letters.length-1)):'姓名未提供';}
   const numeric=value=>typeof value==='number'&&Number.isFinite(value)?value:null;
@@ -49,6 +49,7 @@
       kpi:{...metadata,data:{...view,aggregate},stores:storeRows,items,available:true},personal:{...metadata,records:personal,available:personal.length>0},
       awards:{available:awardCheck.ok,data:awardCheck.ok?snapshot.awardsBattle:null,reason:awardCheck.reason,
         cutoff:snapshot.awardsBattle.data_as_of_date||snapshot.awardsBattle.source_as_of_date||'',reportDate:snapshot.awardsBattle.report_run_date||snapshot.awardsBattle.report_date||'',version:String(snapshot.awardsBattle.processing_run_id||snapshot.publishedAt||'來源未提供版本')},
+      renewalEvidence:conversion&&snapshot.conversionBattle?.renewalDetail?Evidence.fromConversion(snapshot.conversionBattle):{},
       conversion,conversionReason};
   }
   return Object.freeze({fromBundle,periodComparison});

@@ -211,36 +211,51 @@ function tradeinPerformanceRead(payload) {
   });
 }
 function tradeinPerformanceTransactionsRead(payload) {
-  const auth=tradeinPerformanceTransactionsAuthorize_(payload);
-  TradeinPerformanceCore.monthPeriod(payload.month);
-  const entry=(tradeinPerformanceRegistry_().months[payload.month]||{}).active;
+  return privateDashboardTradeinReadBoundary_(payload, function() {
+    const id=privateDashboardCleanEmployeeId(payload.employeeId);
+    const admin=typeof payload.adminSecret==='string' && payload.adminSecret.length>0;
+    if(admin)reportUploadAuthorize_(payload);
+    const auth=tradeinPerformanceTransactionsViewer_(id,admin?undefined:privateDashboardCleanDeviceId(payload.deviceId));
+    if(admin && !auth.supervisor)throw new Error('TRADEIN_AUTH_REQUIRED');
+    return tradeinPerformanceTransactionsForViewer_(payload.month,auth);
+  });
+}
+
+function tradeinPerformanceTransactionsViewer_(id,device) {
+  const user=privateDashboardUserByEmployeeId(id).user;
+  if(!user || user.status!=='active')throw new Error('TRADEIN_AUTH_REQUIRED');
+  if(device!==undefined && user.device_id!==device)throw new Error('TRADEIN_DEVICE_NOT_APPROVED');
+  const supervisor=privateDashboardIsTrustedEmployee(id) && user.role==='督導';
+  if(!supervisor && !TradeinPerformanceCore.storeName(user.store))throw new Error('TRADEIN_AUTH_REQUIRED');
+  return {id,supervisor};
+}
+
+function tradeinPerformanceTransactionsForViewer_(month,auth) {
+  TradeinPerformanceCore.monthPeriod(month);
+  const entry=(tradeinPerformanceRegistry_().months[month]||{}).active;
   const scope=auth.supervisor?'supervisor':'self';
-  if(!entry)return {scope,month:payload.month,sourcePeriod:null,rows:null};
-  if(entry.roster_hash!==tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(payload.month)))throw new Error('核定月名冊已變更，請重新核對來源');
+  if(!entry)return {scope,month,sourcePeriod:null,rows:null};
+  if(entry.roster_hash!==tradeinPerformanceHash_(tradeinPerformanceMonthRoster_(month)))throw new Error('核定月名冊已變更，請重新核對來源');
   const snapshot=tradeinPerformanceSnapshot_(entry);
-  if(snapshot.period_key!==payload.month)throw new Error('來源月份不符');
+  if(snapshot.period_key!==month)throw new Error('來源月份不符');
   const names=new Map(snapshot.people.map(p=>[p.employee_key,p.masked_name]));
   const rows=Array.isArray(snapshot.transactions)?snapshot.transactions.filter(row=>auth.supervisor||row.employee_key===auth.id).map(row=>({
     date:row.date,store:row.store,staff:names.get(row.employee_key)||null,project:row.project,
-    projectCode:row.project_code,model:row.model,credit:row.tradein_credit
+    projectCode:row.project_code,model:row.model,credit:row.tradein_credit,
+    ...(row.project_model===undefined?{}:{projectModel:row.project_model}),
+    ...(row.sales_order_amount===undefined?{}:{orderAmount:row.sales_order_amount})
   })):null;
   const stores=auth.supervisor?TradeinPerformanceCore.STORES.map(s=>s[1]):[...new Set((rows||[]).map(row=>row.store))];
-  return {scope,month:payload.month,sourcePeriod:snapshot.source_period,rows,stores};
+  return {scope,month,sourcePeriod:snapshot.source_period,rows,stores};
 }
-function tradeinPerformanceTransactionsAuthorize_(payload) {
-  const id=privateDashboardCleanEmployeeId(payload.employeeId);
-  const supervisor=typeof payload.adminSecret==='string'&&payload.adminSecret.length>0;
-  if(supervisor)reportUploadAuthorize_(payload);
-  const device=supervisor?null:privateDashboardCleanDeviceId(payload.deviceId);
-  if(!supervisor&&threecAuthorizeRead_({employeeId:id,deviceId:device})!==id)throw new Error('本人裝置驗證未通過');
-  const user=privateDashboardUserByEmployeeId(id).user;
-  if(!user||user.status!=='active')throw new Error('此員編尚未核准');
-  if(supervisor){
-    if(!privateDashboardIsTrustedEmployee(id)||user.role!=='督導')throw new Error('此員編未獲督導授權');
-  }else if(user.device_id!==device||!TradeinPerformanceCore.storeName(user.store)){
-    throw new Error('請使用已核准的九店本人裝置');
-  }
-  return {id,supervisor};
+
+function tradeinPerformanceHasSalesDetails_(snapshot) {
+  return Array.isArray(snapshot.transactions) && snapshot.transactions.some(row=>
+    Object.prototype.hasOwnProperty.call(row,'project_model') || Object.prototype.hasOwnProperty.call(row,'sales_order_amount'));
+}
+
+function tradeinPerformanceWithoutSalesDetails_(snapshot) {
+  snapshot.transactions.forEach(function(row){delete row.project_model;delete row.sales_order_amount;});
 }
 function tradeinPerformancePreview(payload) {
   const bundled=payload.includeCheckpointState===true;
@@ -298,7 +313,9 @@ function tradeinPerformancePublish(payload) {
     if(payload.expectedActiveHash!==activeHash)throw new Error('同期版本已變更，請重新預覽');
     if(current.active && current.active.source_sha256===value.source_sha256 && current.active.roster_hash===payload.rosterHash) {
       const saved=tradeinPerformanceSnapshot_(current.active);
-      const backfill=!Array.isArray(saved.transactions)&&Array.isArray(value.transactions);
+      const hasTransactions=Array.isArray(value.transactions),hadTransactions=Array.isArray(saved.transactions);
+      const hasSales=tradeinPerformanceHasSalesDetails_(value),hadSales=tradeinPerformanceHasSalesDetails_(saved);
+      const backfill=!hadTransactions&&hasTransactions || !hadSales&&hasSales;
       if(current.active.preview_hash!==payload.previewHash){
         // A legacy snapshot may lack only the newly added safe aggregates.
         // Compare every original calculation field before preserving the no-op.
@@ -307,13 +324,15 @@ function tradeinPerformancePublish(payload) {
           if(saved.people.every(p=>!Object.prototype.hasOwnProperty.call(p,key)))legacy.people.forEach(p=>delete p[key]);
           else if(!saved.people.every(p=>Object.prototype.hasOwnProperty.call(p,key)))throw new Error('舊快照聚合欄位不完整');
         });
-        if(backfill)delete legacy.transactions;
+        if(!hadTransactions && hasTransactions)delete legacy.transactions;
+        else if(!hadSales && hasSales)tradeinPerformanceWithoutSalesDetails_(legacy);
         if(current.active.preview_hash!==tradeinPerformanceHash_(legacy)){
           // An older client re-reading the same source must not remove stored details.
           const original=JSON.parse(JSON.stringify(saved));
           delete original.published_at;
-          delete original.transactions;
-          if(!Array.isArray(saved.transactions)||Array.isArray(value.transactions)||tradeinPerformanceHash_(original)!==payload.previewHash)
+          if(hadTransactions && !hasTransactions)delete original.transactions;
+          else if(hadSales && !hasSales)tradeinPerformanceWithoutSalesDetails_(original);
+          if(tradeinPerformanceHash_(original)!==payload.previewHash)
             throw new Error('相同來源雜湊的計算結果不同，請核對原檔後重新預覽');
         }
       }
