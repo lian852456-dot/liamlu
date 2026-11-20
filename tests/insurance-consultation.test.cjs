@@ -59,3 +59,11 @@ test('unverified dates, mismatched batch and corrupt saved state never become an
  }
  const f=setup(),p=f.login();f.files.set('insurance-consultation-'+F.date+'.json','{}');assert.equal(read(f,p).status,'error');assert.equal(f.fileWrites,0);
 });
+test('own store and personal daily submissions have independent keys and preserve each other',()=>{
+ const f=setup(F.data(.42857,.4));f.rows.DashboardUsers[2][3]='店長';const p=f.login(),rows=read(f,p).items,store=rows.find(r=>r.kind==='store'),self=rows.find(r=>r.kind==='personal');
+ assert.equal(store.canSubmit,true);assert.equal(store.status,'required');assert.notEqual(store.subjectKey,self.subjectKey);
+ assert.equal(submit(f,p,store).item.status,'completed');assert.equal(read(f,p).items.find(r=>r.kind==='personal').status,'required');
+ assert.equal(submit(f,p,self,{...F.values,advisor:'合成本人請益'}).item.status,'completed');const saved=read(f,p).items;
+ assert.equal(saved.find(r=>r.kind==='store').submission.values.advisor,F.values.advisor);assert.equal(saved.find(r=>r.kind==='personal').submission.values.advisor,'合成本人請益');assert.equal(f.fileWrites,2);
+ assert.equal(submit(f,p,store).alreadySubmitted,true);assert.equal(f.fileWrites,2);
+});
