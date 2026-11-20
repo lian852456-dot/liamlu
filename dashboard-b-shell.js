@@ -113,7 +113,19 @@ function wipe(note='請重新輸入員編與指定密碼。',clearTransport=true
 }
 function device(){let value=scope.localStorage.getItem(DEVICE_KEY);if(value)return value;
  value=Array.from(scope.crypto.getRandomValues(new Uint8Array(24)),b=>b.toString(16).padStart(2,'0')).join('');scope.localStorage.setItem(DEVICE_KEY,value);return value;}
+// A history-restored document can hold an older account in memory while the
+// same tab already holds its replacement. Clear the old view before validating
+// the replacement, without deleting it or renewing its deadline.
+function restoreReplacement(){
+ const proof=currentProof();
+ if(!active || !acceptedProof || !proof || proof.token===acceptedProof.token || scope.PortalLogout?.isLocked())return false;
+ client.suspend();
+ wipe('登入已變更，正在重新核驗。',false);
+ void resume(true);
+ return true;
+}
 function expireSession(){
+ if(restoreReplacement())return;
  // A foreground lifecycle check can observe expiry before a throttled timer.
  // Both paths must use the same existing, server-verified owner-phone resume.
  // resumePhone clears the expired view before sending any request.
@@ -128,7 +140,7 @@ async function logout(note='已登出指定密碼通道；裝置綁定保留。'
 }
 function checkProfile(result){if(!result?.profile || result.profile.role!=='employee' || result.profile.isTrusted!==false || result.trustSource!=='password-bound')throw Error('B_AUTH_DENIED');}
 function localSessionValid(){
- if(!active)return false;
+ if(!active || restoreReplacement())return false;
  if(expiresAt<=Date.now()){expireSession();return false;}
  const proof=currentProof();let logoutEpoch='';let deviceId='';
  try{logoutEpoch=JSON.parse(scope.localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||'';deviceId=scope.localStorage.getItem(DEVICE_KEY)||'';}catch{}
@@ -169,7 +181,7 @@ async function refresh(allowPhone=true,forceData=false){
   const data=needsData?phase('data',()=>client.readBundle(host.includeReports===true)):Promise.resolve(null);
   stage=needsData?'read':'validate';
   const [validated,bundle]=await Promise.all([validation,data]),lease=validated||bundle;
-  if(expected!==epoch || !active)return false;
+  if(expected!==epoch || !active || !localSessionValid())return false;
   if(expiresAt<=Date.now() || lease && lease.expiresAt!==expiresAt)throw Error('B_AUTH_DENIED');
   if(lease)host.phoneEligible=lease.phoneEligible===true;
   if(bundle){const {privateResult,kpiResult}=bundle;checkProfile(privateResult);checkProfile(kpiResult);
@@ -181,7 +193,7 @@ async function refresh(allowPhone=true,forceData=false){
   confirmed=true;state('active');
   message(host.sessionOnly?'可直接開啟同仁專區；換頁不延長登入期限。':`上次讀取：${loadedTime()}。已載入的 KPI、台獎與個績會保留；需要最新資料時請按「重新讀取資料」。`);return true;
  }catch(error){
-  if(expected!==epoch)return false;
+  if(expected!==epoch || restoreReplacement())return false;
   if(error.message==='B_DISABLED'){wipe('指定密碼通道已關閉，請重新確認。');return false;}
   if(error.message==='B_AUTH_DENIED' && allowPhone && host.ownerPhone && client.hasPhone()){checking=null;active=false;confirmed=false;return resumePhone();}
   if(error.message==='B_AUTH_DENIED'){wipe('登入或目前會話未通過驗證，請重新登入。');return false;}
@@ -202,6 +214,7 @@ async function login(event){event.preventDefault();const employee=panel.querySel
   const lease=await phase('login',()=>client.login(employee,device(),password));password='';if(expected!==epoch)return;
   active=true;expiresAt=lease.expiresAt;scheduleExpiry();
   const ok=await refresh(false,true);if(!ok)return;recordReady(started,expected);scope.PortalLogout?.notifyLogin();
+  host.onPasswordLogin?.();
   if(host.ownerPhone && host.phoneEligible){try{await client.enrollPhone();state('active');message('已綁定這支手機，下次開啟 App 不用再輸入帳密。');}catch{message('本次已登入，但手機綁定未完成；可登出後重試，或請管理者撤銷舊手機。');}}
  }catch(error){if(expected===epoch)wipe(error.message==='B_DISABLED'?'指定密碼通道尚未開放，請使用原員編通道。':accessFailureMessage(error));}
  finally{password='';if(expected===epoch)loading=false;if(!loading)submit.disabled=false;}
@@ -219,15 +232,15 @@ async function resumePhone(started=performance.now()){
  }catch{if(expected===epoch)wipe('手機驗證未完成，請確認連線；若裝置已撤銷，請重新驗證。');return false;}
  finally{if(expected===epoch)loading=false;}
 }
-async function resume(){
+async function resume(replacement=false){
  if(active || loading || checking)return;
  const started=0; // First usable frame includes document and script loading.
  let existingDevice='';try{existingDevice=scope.localStorage.getItem(DEVICE_KEY)||'';}catch{}
- const lease=client.restore(existingDevice);if(!lease){if(host.ownerPhone)await resumePhone(started);return;}
+ const lease=client.restore(existingDevice);if(!lease){if(host.ownerPhone && !replacement)await resumePhone(started);return;}
  epoch++;active=true;expiresAt=lease.expiresAt;
  scheduleExpiry();
  // A return from publishing must reload the protected snapshot even with a valid cached session.
- const expected=epoch;if(await phase('restore',()=>refresh(true,host.refreshOnResume===true)))recordReady(started,expected);
+ const expected=epoch;if(await phase('restore',()=>refresh(!replacement,replacement || host.refreshOnResume===true)))recordReady(started,expected);
 }
 function navigateVerified(module){guarded=true;try{host.navigate(module);}finally{guarded=false;}}
 function configure(value){host=value;if(ready)mount();}
@@ -305,7 +318,9 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
  if(portalRegistered)scope.PortalLogout.registerMemoryRevoker(transport=>logout('網站已登出；指定密碼畫面已清除。',transport));
  scope.addEventListener('portal-before-logout',()=>{if(portalRegistered)wipe('網站已登出。',false);else void logout('網站已登出；指定密碼畫面已清除。');});
  scope.addEventListener('pagehide',()=>{timing('lifecycle:pagehide',0);});
- mountTiming();void resume();
+ mountTiming();
+ if(host.startWithLegacy && !currentProof())showLegacyAccess();
+ else void resume();
 }
 scope.DashboardB=Object.freeze({configure,active:()=>active,refresh,context:()=>epoch,metrics:()=>timings.map(row=>({...row})),recordTab:(name,ms)=>timing('tab:'+name,ms),leaveForA:async()=>{if(!DASHBOARD_B_CLIENT_ENABLED_)return;if(active || checking || loading)await logout('已返回原員編通道。');else{epoch++;client?.clear();}},clear:()=>wipe()});
 if(pendingHost)configure(pendingHost);
