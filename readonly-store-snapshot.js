@@ -1,8 +1,8 @@
 (function(root,factory){
   const node=typeof module==='object'&&module.exports;
-  const api=factory(node?require('./readonly-dashboard-core.js'):root.ReadonlyDashboardCore,node?require('./readonly-store-export-assets.js'):root.ReadonlyStoreExportAssets,node?require('./offline-html.js'):root.OfflineHtml);
+  const api=factory(node?require('./readonly-dashboard-core.js'):root.ReadonlyDashboardCore,node?require('./readonly-store-export-assets.js'):root.ReadonlyStoreExportAssets,node?require('./offline-html.js'):root.OfflineHtml,node?require('./store-renewal-evidence.js'):root.StoreRenewalEvidence);
   if(node)module.exports=api;else root.ReadonlyStoreSnapshot=api;
-})(typeof globalThis!=='undefined'?globalThis:this,function(Core,Assets,Html){
+})(typeof globalThis!=='undefined'?globalThis:this,function(Core,Assets,Html,Evidence){
   'use strict';
   const SCHEMA='north12b-store-snapshot/v1';
   // Explicit business-metric allowlist: no personnel, awards or supervisor-only fields.
@@ -47,6 +47,7 @@
       kpi:{available:true,cutoff:p.cutoff,period:dates.start+'～'+dates.end,reportDate:iso(p.reportDate)?p.reportDate:null,
         sourceName:text(p.sourceName),version:text(p.version),items,data:{aggregate:unit(p.data?.aggregate,items)},
         stores:Core.STORES.map(store=>({id:store.id,store:store.name,...unit(rows.find(row=>row.id===store.id),items)}))},
+      renewalEvidence:Evidence.validate(model.renewalEvidence||Evidence.fromConversion(model.conversion)),
       conversion,conversionReason:conversion?'':'尚未取得已核實的締結率／來客來源；本快照未包含此表，缺值不補零。'};
   }
   function validate(snapshot){
@@ -126,14 +127,16 @@
     function render(state){return state.tab==='kpi'?kpi(state):trends(state,state.tab==='conversion');}
     return {render,scope,esc};
   }
-  function mount(data,viewFactory){
+  function mount(data,viewFactory,initial){
     const view=viewFactory(data,window.ReadonlyDashboardCore),d=data.conversion;
-    const state={tab:'kpi',store:'all',kpiMetric:'overall',mode:'daily',start:d?.period_start||'',end:d?.cutoff||''};
+    const state={tab:initial.tab,store:initial.store,kpiMetric:'overall',mode:'daily',start:d?.period_start||'',end:d?.cutoff||''};
     const content=document.getElementById('snapshot-content');
-    function paint(){const columns=window.matchMedia('(max-width:700px)').matches?1:2;state.chartWidth=Math.max(240,Math.min(700,(content.clientWidth-(columns-1)*18)/columns-40));content.innerHTML=view.render(state);document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===state.tab)));}
+    function paint(){const columns=window.matchMedia('(max-width:700px)').matches?1:2;state.chartWidth=Math.max(240,Math.min(700,(content.clientWidth-(columns-1)*18)/columns-40));const insights=state.tab==='insights',findings=document.getElementById('renewal-findings');content.hidden=insights;findings.hidden=!insights;
+      if(insights)findings.querySelectorAll('[data-renewal-store]').forEach(el=>el.hidden=el.dataset.renewalStore!==state.store);
+      else content.innerHTML=view.render(state);document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===state.tab)));}
     document.documentElement.classList.add('interactive');
     document.querySelectorAll('[data-tab]').forEach(b=>{b.disabled=false;b.addEventListener('click',()=>{state.tab=b.dataset.tab;paint();});});
-    const store=document.getElementById('store');store.disabled=false;store.addEventListener('change',()=>{state.store=store.value;paint();});
+    const store=document.getElementById('store');store.value=state.store;store.disabled=false;store.addEventListener('change',()=>{state.store=store.value;paint();});
     content.addEventListener('change',event=>{
       const e=event.target;if(e.matches('[data-kpi-metric]'))state.kpiMetric=e.value;
       else if(e.matches('[data-start],[data-end]')){
@@ -147,16 +150,19 @@
     window.addEventListener('resize',paint);
     paint();
   }
-  function buildHtml(input){
+  function buildHtml(input,options={}){
+    const initial={tab:['insights','traffic','conversion'].includes(options.tab)?options.tab:'kpi',store:Core.STORES.some(s=>s.id===options.store)?options.store:'all'};
     const data=validate(input),view=snapshotView(data,Core),d=data.conversion,state={store:'all',kpiMetric:'overall',mode:'daily',start:d?.period_start||'',end:d?.cutoff||''};
     const esc=view.esc,stamp=new Date(data.generatedAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false});
     const json=JSON.stringify(data).replace(/[<>&\u2028\u2029]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));
-    const scripts=[Assets.core,'('+mount.toString()+')(JSON.parse(document.getElementById("snapshot-data").textContent),'+snapshotView.toString()+');'].map(s=>s.replace(/<\/script/gi,'<\\/script'));
-    const extra='.tabs{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:20px}.snapshot-range{margin:20px 0}.snapshot-range td:first-child{font-weight:800}.snapshot-fallback{margin-top:26px}.interactive .snapshot-fallback{display:none}button:disabled,select:disabled{cursor:default}.bar-row{display:grid;grid-template-columns:minmax(90px,1fr) minmax(45px,1fr) 68px;gap:10px;align-items:center;margin:12px 0;font-size:14px}.bar-row>span{overflow-wrap:anywhere}.bar-track{height:9px;background:#e3eaf0;border-radius:6px;overflow:hidden}.bar-track i{display:block;height:100%;background:var(--nav);border-radius:6px}.chart{overflow:hidden}.chart svg{width:100%;height:auto}.person-table{min-width:0;width:100%}.person-table td{overflow-wrap:anywhere}.snapshot-fallback .controls{display:none}@media(max-width:700px){.person-table td[data-label]::before{content:attr(data-label);display:block;font-size:12px;color:var(--muted);margin-bottom:4px}}@media(max-width:500px){.shell{padding:18px 14px 30px}.tabs .tab{font-size:16px}.snapshot-range th,.snapshot-range td{font-size:13px;padding:9px}.context{flex-wrap:wrap}.bar-row{grid-template-columns:minmax(80px,1fr) minmax(35px,.7fr) 62px}.metric .value{font-size:34px}}@media print{.tabs,.controls,.quiet{display:none}.snapshot-fallback{display:block!important}.snapshot-note{break-inside:avoid}.panel,.metric{break-inside:avoid}}';
+    const findings=[['all',Core.STORES],...Core.STORES.map(s=>[s.id,[s]])].map(([id,stores])=>
+      '<section data-renewal-store="'+id+'"'+(id==='all'?'':' hidden')+'>'+Evidence.render(data.renewalEvidence,stores,d)+'</section>').join('');
+    const scripts=[Assets.core,'('+mount.toString()+')(JSON.parse(document.getElementById("snapshot-data").textContent),'+snapshotView.toString()+','+JSON.stringify(initial)+');'].map(s=>s.replace(/<\/script/gi,'<\\/script'));
+    const extra='.tabs{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:20px}.snapshot-range{margin:20px 0}.snapshot-range td:first-child{font-weight:800}.snapshot-fallback{margin-top:26px}.interactive .snapshot-fallback{display:none}button:disabled,select:disabled{cursor:default}.bar-row{display:grid;grid-template-columns:minmax(90px,1fr) minmax(45px,1fr) 68px;gap:10px;align-items:center;margin:12px 0;font-size:14px}.bar-row>span{overflow-wrap:anywhere}.bar-track{height:9px;background:#e3eaf0;border-radius:6px;overflow:hidden}.bar-track i{display:block;height:100%;background:var(--nav);border-radius:6px}.chart{overflow:hidden}.chart svg{width:100%;height:auto}.person-table{min-width:0;width:100%}.person-table td{overflow-wrap:anywhere}.snapshot-fallback .controls{display:none}@media(max-width:700px){.person-table td[data-label]::before{content:attr(data-label);display:block;font-size:12px;color:var(--muted);margin-bottom:4px}}@media(max-width:500px){.shell{padding:18px 14px 30px}.tabs .tab{font-size:16px}.snapshot-range th,.snapshot-range td{font-size:13px;padding:9px}.context{flex-wrap:wrap}.bar-row{grid-template-columns:minmax(80px,1fr) minmax(35px,.7fr) 62px}.metric .value{font-size:34px}}@media print{.tabs,.controls,.quiet{display:none}.snapshot-fallback{display:block!important}.snapshot-note{break-inside:avoid}.panel,.metric{break-inside:avoid}}';
     const ranges='<section class="panel snapshot-range table-scroll"><h2>各表統計期間</h2><table class="person-table"><thead><tr><th>資料表</th><th>統計起訖</th><th>資料截止</th></tr></thead><tbody><tr><td>KPI</td><td data-label="統計起訖">'+esc(data.kpi.period)+'</td><td data-label="資料截止">'+esc(data.kpi.cutoff)+'</td></tr><tr><td>締結率／來客數</td><td data-label="統計起訖">'+(d?esc(d.period_start+'～'+d.cutoff):'未取得已核實來源')+'</td><td data-label="資料截止">'+(d?esc(d.cutoff):'—')+'</td></tr></tbody></table></section>';
-    return Html.finalize('<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data:; connect-src \'none\'; object-src \'none\'; base-uri \'none\'; form-action \'none\'"><title>北一二B｜門市唯讀快照</title><style>'+Assets.css+extra+'</style></head><body><main class="shell"><header class="header"><div><div class="eyebrow">北一二B · 全區與九店</div><h1>門市唯讀快照</h1><p class="header-note">KPI、締結率與來客數比較</p></div><span class="pill">離線HTML</span></header><aside class="demo snapshot-note"><div><strong>匯出時間 '+esc(stamp)+'（台灣時間）</strong><p>這是下載當下的資料快照，不會自動更新；不含個人資料或獎金。</p><p>郵件預覽若無法篩選，請下載後用瀏覽器開啟。</p>'+(data.exampleLabel?'<p>'+esc(data.exampleLabel)+'</p>':'')+'</div></aside>'+ranges+
-      '<nav class="tabs" role="tablist" aria-label="門市快照內容"><button class="tab" data-tab="kpi" role="tab" aria-selected="true" disabled>KPI</button><button class="tab" data-tab="conversion" role="tab" aria-selected="false" disabled>締結率</button><button class="tab" data-tab="traffic" role="tab" aria-selected="false" disabled>來客數</button></nav><div class="controls"><div class="field"><label for="region">區域</label><select id="region" disabled><option>北一二B</option></select></div><div class="field scope"><label for="store">門市</label><select id="store" disabled><option value="all">全區與九店比較</option>'+Core.STORES.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('')+'</select></div></div>'+
-      '<noscript><p class="demo">目前為靜態預覽，下面列出完整期間的全區資料；互動篩選請用允許JavaScript的瀏覽器開啟。</p></noscript><section id="snapshot-content" aria-live="polite">'+view.render({...state,tab:'kpi'})+'</section><section class="snapshot-fallback">'+view.render({...state,tab:'conversion',chartPrefix:'static-conversion-'})+view.render({...state,tab:'traffic',chartPrefix:'static-traffic-'})+'</section><footer class="footer">門市唯讀快照 · 已分享的區店指標 · 無編輯或回寫功能</footer></main>'+
+    return Html.finalize('<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data:; connect-src \'none\'; object-src \'none\'; base-uri \'none\'; form-action \'none\'"><title>北一二B｜門市唯讀快照</title><style>'+Assets.css+extra+'</style></head><body><main class="shell"><header class="header"><div><div class="eyebrow">北一二B · 全區與九店</div><h1>門市唯讀快照</h1><p class="header-note">KPI、締結率、來客數與續約洞察</p></div><span class="pill">離線HTML</span></header><aside class="demo snapshot-note"><div><strong>匯出時間 '+esc(stamp)+'（台灣時間）</strong><p>這是下載當下的資料快照，不會自動更新；不含個人資料或獎金。</p><p>郵件預覽若無法篩選，請下載後用瀏覽器開啟。</p>'+(data.exampleLabel?'<p>'+esc(data.exampleLabel)+'</p>':'')+'</div></aside>'+ranges+
+      '<nav class="tabs" role="tablist" aria-label="門市快照內容"><button class="tab" data-tab="kpi" role="tab" aria-selected="true" disabled>KPI</button><button class="tab" data-tab="conversion" role="tab" aria-selected="false" disabled>締結率</button><button class="tab" data-tab="traffic" role="tab" aria-selected="false" disabled>來客數</button><button class="tab" data-tab="insights" role="tab" aria-selected="false" disabled>續約洞察</button></nav><div class="controls"><div class="field"><label for="region">區域</label><select id="region" disabled><option>北一二B</option></select></div><div class="field scope"><label for="store">門市</label><select id="store" disabled><option value="all">全區與九店比較</option>'+Core.STORES.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('')+'</select></div></div>'+
+      '<noscript><p class="demo">目前為靜態預覽，下面列出完整期間的全區資料；互動篩選請用允許JavaScript的瀏覽器開啟。</p></noscript><section id="snapshot-content" aria-live="polite">'+view.render({...state,tab:'kpi'})+'</section><section id="renewal-findings">'+findings+'</section><section class="snapshot-fallback">'+view.render({...state,tab:'conversion',chartPrefix:'static-conversion-'})+view.render({...state,tab:'traffic',chartPrefix:'static-traffic-'})+'</section><footer class="footer">門市唯讀快照 · 已分享的區店指標 · 無編輯或回寫功能</footer></main>'+
       '<script id="snapshot-data" type="application/json">'+json+'</script>'+scripts.map(s=>'<script>'+s+'</script>').join('')+'</body></html>');
   }
   function filename(snapshot){return '北一二B_門市唯讀快照_'+snapshot.kpi.cutoff.replaceAll('-','')+'_'+snapshot.generatedAt.replace(/[-:.TZ]/g,'').slice(0,14)+'.html';}

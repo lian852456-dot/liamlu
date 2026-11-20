@@ -106,12 +106,23 @@ function unavailable(detail,key,name){
 }
 const n=v=>v.toLocaleString('zh-TW'),pct=(a,b)=>b?(100*a/b).toFixed(1)+'%':'—';
 function table(head,body){return '<div class="table-scroll scroll"><table class="insight-table"><thead><tr>'+head.map(v=>'<th>'+esc(v)+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table></div>';}
+function concentration(detail,stores){
+ const ids=new Set(stores.map(s=>s.id)),rows=detail.tiers.filter(t=>ids.has(t.store));
+ if(!detail.coverage.tiers||!rows.length)return '';
+ const lost=t=>t.visitors-t.renewals,total=rows.reduce((v,t)=>v+lost(t),0);
+ if(total<=0||rows.some(t=>lost(t)<0||t.visitOnly<0))return '';
+ const losses=TIERS.map(tier=>({tier,loss:rows.filter(t=>t.tier===tier).reduce((v,t)=>v+lost(t),0)})).sort((a,b)=>b.loss-a.loss);
+ const leaders=losses.filter(t=>t.loss>0).slice(0,2),combined=leaders.reduce((v,t)=>v+t.loss,0);
+ const actions=[['單純進店','visitOnly'],['NP OUT','npOut'],['退租','terminated']].map(([label,key])=>label+' '+n(rows.reduce((v,t)=>v+t[key],0))+' 人次');
+ return '<p class="insight-evidence"><strong>未續約集中在哪裡？</strong> '+n(total)+' 人次未續約，其中 Tier '+leaders.map(t=>t.tier+'（'+n(t.loss)+'）').join('、')+' 合計 '+n(combined)+' 人次，占 '+pct(combined,total)+'。</p><p>進店行為為'+actions.join('、')+'。到店目的與未接受方案的原因須由服務紀錄確認。</p>';
+}
 function render(data,selectedStores,{start=data.period_start,end=data.cutoff}={}){
  const d=data.renewalDetail;if(!d)return '<section class="panel"><h3>Tier／未續約方案資料</h3><p>目前快照未包含分析頁籤；請匯入包含 Tier觀察、RT用戶進店行為_店、未續約明細 的完整原報。</p></section>';
  if(start!==data.period_start||end!==data.cutoff)return '<section class="panel"><h3>Tier／原方案未續約</h3><p>這三張來源為整段期間統計，請恢復 '+esc(data.period_start)+' 至 '+esc(data.cutoff)+' 查看，避免套用到不同日期。</p></section>';
  const ids=new Set(selectedStores.map(s=>s.id)),regions=new Set(selectedStores.map(s=>s.region)),ts=d.tiers.filter(t=>ids.has(t.store)),ps=d.plans.filter(p=>ids.has(p.store));
  const groups=TIERS.map(tier=>{const rows=ts.filter(t=>t.tier===tier),out={tier,visitors:0,renewals:0,npOut:0,terminated:0,visitOnly:0};for(const r of rows)for(const k of ['visitors','renewals','npOut','terminated','visitOnly'])out[k]+=r[k];return out;});
  let html='<section class="panel insight-panel"><h3>Tier A～F 掌握分析</h3><p class="sub">來源：RT用戶進店行為_店｜'+esc(data.period_start)+'～'+esc(data.cutoff)+'｜所選 '+selectedStores.length+' 店；締結率＝續約／符合資格進店人次。</p>';
+ html+=concentration(d,selectedStores);
  html+=d.coverage.tiers?table(['Tier','來客','續約','締結率','NP OUT','退租','單純進店'],groups.map(t=>'<tr><th>'+t.tier+'</th><td>'+n(t.visitors)+'</td><td>'+n(t.renewals)+'</td><td>'+pct(t.renewals,t.visitors)+'</td><td>'+n(t.npOut)+'</td><td>'+n(t.terminated)+'</td><td>'+n(t.visitOnly)+'</td></tr>').join('')):unavailable(d,'tiers',SHEETS[1]);
  if(ts.some(t=>t.visitOnly<0))html+='<p class="sub">資料提示：原報有單純進店負值，保留原值並列為待核對，不補零；不以此推定原因。</p>';
  if(ts.length){const weak=groups.filter(t=>t.visitors>=30).sort((a,b)=>a.renewals/a.visitors-b.renewals/b.visitors)[0];if(weak)html+='<p class="sub">優先檢視 Tier '+weak.tier+'：'+n(weak.renewals)+'／'+n(weak.visitors)+'（'+pct(weak.renewals,weak.visitors)+'）。可先檢查單純進店未續約案件，再核對 NP OUT／退租原因；此為檢查方向。</p>';html+='<details><summary>各店同 Tier 比較</summary>'+table(['區域／門市','Tier','來客','續約','締結率'],ts.map(t=>{const s=selectedStores.find(s=>s.id===t.store);return '<tr><td>'+esc(s.region+'／'+s.short)+'</td><td>'+t.tier+'</td><td>'+n(t.visitors)+'</td><td>'+n(t.renewals)+'</td><td>'+pct(t.renewals,t.visitors)+'</td></tr>';}).join(''))+'</details>';}
@@ -125,5 +136,5 @@ function render(data,selectedStores,{start=data.period_start,end=data.cutoff}={}
  html+=!d.coverage.plans?unavailable(d,'plans',SHEETS[2]):!top.length?'<p>所選範圍無符合條件的未續約紀錄。</p>':table(['方案描述','未續約件數','占未續約紀錄'],top.map(([plan,c])=>'<tr><td>'+esc(plan)+'</td><td>'+n(c)+'</td><td>'+pct(c,total)+'</td></tr>').join(''))+'<p class="sub">優先檢視首位方案的費用、設備與合約需求；原方案名稱無法直接判斷未續約原因，請以實際回訪紀錄核對。</p>';
  return html+'</section>';
 }
-return Object.freeze({SHEETS,TIERS,parse,parseAvailable,importSummary,validate,render});
+return Object.freeze({SHEETS,TIERS,concentration,parse,parseAvailable,importSummary,validate,render});
 });
