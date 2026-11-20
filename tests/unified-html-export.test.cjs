@@ -37,3 +37,31 @@ test('store totals use verified store summaries, keep support independent, and f
  assert.equal(E.buildExportModel(c,'all',{...rules,month:'2026-12',start:'2026-12-01',end:'2026-12-31',staffTarget:3,actingManager:'exempt'}).stores.length,0);
  assert.throws(()=>E.buildExportModel({...c,storeSummaries:[{store:'萬大',actual:-1,target:15}]},'all',rules));
 });
+test('trade-in trends use reconciled store days, preserve verified zeroes and respect export scope',async()=>{
+ const E=await import('../tradein-export-core.mjs'),R=await import('../tradein-reminder.mjs');
+ const rules={...E.rulesForMonth('2026-11'),sourceStart:'2026-11-02',sourceEnd:'2026-11-04',cutoff:'2026-11-04',isDemo:false};
+ const people=[['萬大','甲＊員','同仁',1],['杭州南','乙＊員','同仁',1],['三創','丙＊員','同仁',0]];
+ const day=(date,actual_units)=>({date:'2026-11-'+date,actual_units});
+ const storeSummaries=[{store:'萬大',actual:2,target:3},{store:'杭州南',actual:1,target:3},{store:'三創',actual:0,target:3}];
+ const context={active:true,mode:'public',allowedStores:storeSummaries.map(s=>s.store),people,storeSummaries,selectedStore:'萬大',dailyAvailable:true,
+  storeDaySource:{
+   stores:[{store:'萬大',support_in_units:1,recovered_days:[day('03',2)]},{store:'杭州南',recovered_days:[day('02',1)]},{store:'三創',recovered_days:[]}],
+   people:[{store:'萬大',recovered_days:[day('04',1)],secret:'DO_NOT_EXPORT_ID'},{store:'杭州南',recovered_days:[day('02',1)]}]
+  }
+ };
+ const all=E.buildExportModel(context,'all',rules);
+ assert.deepEqual(all.storeTrend,{dates:['2026-11-02','2026-11-03','2026-11-04'],series:[
+  {store:'萬大',daily:[0,2,0]},{store:'杭州南',daily:[1,0,0]},{store:'三創',daily:[0,0,0]}
+ ]});
+ const html=R.createTradeinHtml(all);
+ inspect(html);
+ assert.ok(html.includes('萬大｜11/03｜2 台'));
+ assert.ok(!html.includes('DO_NOT_EXPORT_ID'));
+ assert.deepEqual(E.buildExportModel(context,'current',rules).storeTrend.series,[{store:'萬大',daily:[0,2,0]}]);
+ assert.equal(E.buildExportModel({...context,countFilterLabel:'回收 1 筆'},'current',rules).storeTrend,null);
+ assert.equal(E.buildExportModel(context,'all',{...rules,selectedDate:'2026-11-03'}).storeTrend,null);
+ const legacy={...context,storeDaySource:{...context.storeDaySource,stores:storeSummaries}};
+ assert.deepEqual(E.buildExportModel(legacy,'all',rules).storeTrend.series,[
+  {store:'萬大',daily:null},{store:'杭州南',daily:[1,0,0]},{store:'三創',daily:[0,0,0]}
+ ]);
+});

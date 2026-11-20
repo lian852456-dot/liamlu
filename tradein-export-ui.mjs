@@ -1,6 +1,6 @@
 import {parsePriceSource,buildPriceTop3} from './tradein-price-top3.mjs?v=20261105-1';
-import {reminderBrief,createTradeinHtml} from './tradein-reminder.mjs?v=20261106-region-154';
-import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261106-region-154';
+import {reminderBrief,createTradeinHtml} from './tradein-reminder.mjs?v=20261120-store-trend';
+import {rulesForMonth,hasMonthlySource,buildExportModel,reminderText,createReminderCanvas,createXlsx} from './tradein-export-core.mjs?v=20261120-store-trend';
 import {copyReminderText} from './tradein-clipboard.mjs?v=20261010-copy-recovery-1';
 const $=id=>document.getElementById(id);
 let contextReader,revision=0,busy=false,canvas=null,priceCatalog=null,priceEpoch=0;
