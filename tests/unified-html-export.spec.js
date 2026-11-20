@@ -31,12 +31,38 @@ test('KPI and awards download from verified memory and stop after logout',async(
  }
  expect(calls).toEqual(['private_access','kpicalc_access']);await page.evaluate(()=>window.DashboardB.clear());await expect(page.locator('[data-battle-html-export]')).toHaveCount(0);
 });
-test('trade-in HTML includes all rows while reminder is concise; month change disables download',async({page},info)=>{
+test('trade-in HTML includes all rows while reminder is concise; month change disables download',async({page,browser},info)=>{
  const r=createRuntime(),source=parsed();r.configure(source);const p=r.a.tradeinPerformancePreview({source,employeeId:OPERATOR,adminSecret:r.secret}),v=r.a.tradeinPerformancePublish({source,...p,employeeId:OPERATOR,adminSecret:r.secret});r.a.tradeinPerformancePublicPublish({employeeId:OPERATOR,adminSecret:r.secret,month:source.month,sourceHash:source.source_sha256,expectedActiveHash:v.snapshotHash});
  const calls=[],errors=[];page.on('pageerror',e=>errors.push(e.message));await page.clock.install({time:new Date('2026-10-09T14:00:00Z')});
  await page.route('**/*',async route=>{const u=new URL(route.request().url());if(u.origin===base)return route.continue();if(u.hostname!=='script.google.com')return route.abort();let payload;try{payload=JSON.parse(route.request().postData());}catch{payload=JSON.parse(new URLSearchParams(route.request().postData()).get('payload'));}calls.push(payload.action);const body=r.dispatch(payload);if(u.searchParams.get('transport')==='iframe'){const message=JSON.stringify({type:'north12b-gas-response-v1',requestId:u.searchParams.get('requestId'),body}).replace(/</g,'\\u003c');return route.fulfill({contentType:'text/html',body:'<meta charset="utf-8"><script>top.postMessage('+message+',"*")</script>'});}return route.fulfill({json:body});});
  await page.goto(base+'/tradein-progress.html');await expect(page.locator('#refreshData')).toBeEnabled();await expect(page.locator('#downloadReminderHtml')).toBeEnabled();await expect(page.locator('#reminderText')).toHaveValue(/店點 TOP3/);await expect(page.locator('#reminderText')).toHaveValue(/回收參考價 TOP3：請/);
  const pending=page.waitForEvent('download');await page.locator('#downloadReminderHtml').click();const d=await pending,text=await fs.readFile(await d.path(),'utf8');expect(text).toContain('完整人員明細（4 人）');expect(text).toContain('north12-single-html/v1');expect(text).not.toContain(r.secret);expect(calls).toEqual(['tradein_performance_public_read']);
+ const offline=await browser.newContext({offline:true,viewport:{width:390,height:900}});
+ try{
+  const exported=await offline.newPage(),offlineErrors=[];
+  exported.on('pageerror',error=>offlineErrors.push(error.message));
+  const file=info.outputPath('tradein-trend-offline.html');await d.saveAs(file);
+  await exported.goto(require('node:url').pathToFileURL(file).href);
+  const trend=exported.locator('#trend'),daily=trend.locator('[data-trend-pane="daily"]'),total=trend.locator('[data-trend-pane="cumulative"]');
+  await expect(trend.getByRole('checkbox')).toHaveCount(9);
+  await expect(daily.locator('svg g[data-trend-series]:visible')).toHaveCount(9);
+  await trend.getByRole('button',{name:'清除',exact:true}).click();
+  await expect(trend.getByRole('status')).toBeVisible();
+  await trend.getByRole('checkbox',{name:'萬大',exact:true}).check();
+  await expect(daily.locator('svg g[data-trend-series]:visible')).toHaveCount(1);
+  await trend.getByRole('button',{name:'期間累計',exact:true}).click();
+  await expect(total).toBeVisible();
+  await total.locator('summary').click();
+  await expect(total.locator('tbody tr').last().locator('td:visible')).toHaveText(['3']);
+  await expect(exported.locator('#people tbody .status-icon')).toHaveCount(4);
+  expect(await exported.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  expect(offlineErrors).toEqual([]);
+  await trend.getByRole('button',{name:'全選',exact:true}).click();
+  await trend.getByRole('button',{name:'每日回收',exact:true}).click();
+  await exported.screenshot({path:info.outputPath('tradein-trend-390.png'),fullPage:true});
+  await exported.setViewportSize({width:1280,height:900});
+  await exported.screenshot({path:info.outputPath('tradein-trend-1280.png'),fullPage:true});
+ }finally{await offline.close();}
  await page.setViewportSize({width:390,height:900});await page.locator('#reminderPreview').evaluate(el=>el.open=true);await page.screenshot({path:info.outputPath('tradein-live-reminder-390.png'),fullPage:true});
  await page.locator('#periodMonth').fill('2026-11');await page.locator('#periodMonth').dispatchEvent('change');await expect(page.locator('#reminderText')).toHaveValue('');await expect(page.locator('#downloadReminderHtml')).toBeDisabled();expect(errors).toEqual([]);
 });
