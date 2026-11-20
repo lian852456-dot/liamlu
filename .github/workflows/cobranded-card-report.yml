@@ -15,6 +15,8 @@ on:
       - 'insurance-consultation.css'
       - 'GasBClient.js'
       - 'gas/InsuranceConsultationStore.gs'
+      - 'gas/InsuranceFixedSource.gs'
+      - 'tests/insurance-fixed-source.test.cjs'
       - 'daily-report-layout.css'
       - 'tests/helpers/insurance-runtime.cjs'
       - 'scripts/north12b/insurance_progress.py'
@@ -48,7 +50,7 @@ jobs:
       - name: Verify monthly insurance source without personal-period substitution
         run: python3 -m unittest discover -s tests -p test_insurance_progress.py
       - name: Verify optional count and existing report contracts
-        run: node --test tests/dashboard-password-roster-renewal.test.cjs tests/insurance-consultation.test.cjs tests/insurance-source-publication.test.cjs tests/cobranded-card-report.test.cjs tests/daily-report-summary-model.test.cjs tests/daily-report-summary-gas.test.cjs tests/report-save-gas.test.cjs tests/report-save-recovery.test.cjs tests/closing-report-completeness.test.cjs tests/gas-date.test.cjs
+        run: node --test tests/insurance-fixed-source.test.cjs tests/dashboard-password-roster-renewal.test.cjs tests/insurance-consultation.test.cjs tests/insurance-source-publication.test.cjs tests/cobranded-card-report.test.cjs tests/daily-report-summary-model.test.cjs tests/daily-report-summary-gas.test.cjs tests/report-save-gas.test.cjs tests/report-save-recovery.test.cjs tests/closing-report-completeness.test.cjs tests/gas-date.test.cjs
       - name: Verify existing public share build boundary
         run: node --test tests/tradein-share-build.test.cjs
       - name: Verify desktop and mobile save flows
