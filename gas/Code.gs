@@ -4803,6 +4803,8 @@ function kpiCalcAccess(payload) {
   if (!file) throw new Error('KPI 試算資料尚未發佈，請通知督導');
   const data = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!data || !data.meta || !data.stores || !data.persons) throw new Error('KPI 試算資料格式不完整');
+  // Insurance source identities/rates are projected only by the dedicated authorized route.
+  delete data.meta.insuranceConsultationSource;
   return { data: data, profile: { maskedName: user.masked_name, store: user.store, role: user.role, isTrusted: privateDashboardIsTrustedEmployee(employeeId) } };
 
   });
@@ -9733,6 +9735,8 @@ function privateDashboardBPayload_(input) {
     employee_session:['action','deviceId','token'],employee_logout:['action','deviceId','token'],
     employee_private_read:['action','deviceId','token'],employee_kpi_read:['action','deviceId','token'],
     employee_tradein_transactions_read:['action','deviceId','token','month'],
+    employee_insurance_read:['action','deviceId','token','dataDate'],
+    employee_insurance_submit:['action','deviceId','token','dataDate','subjectKey','sourceVersion','values','submissionId'],
     employee_tradein_sharing_list:['action','deviceId','token','month'],
     employee_tradein_sharing_detail:['action','deviceId','token','month','id'],
     employee_tradein_sharing_save:['action','deviceId','token','month','id','version','type','scenario','approach','outcome','image'],
@@ -9979,6 +9983,7 @@ function privateDashboardCreateGasB_(options) {
             const file=kpiCalcLatestDataFile();if(!file)throw new Error('B_DATA_UNAVAILABLE');
             const data=privateDashboardBMeasure_('kpiBlob', function() { return JSON.parse(file.getBlob().getDataAsString('UTF-8')); });
             if(!data || !data.meta || !data.stores || !data.persons)throw new Error('B_DATA_INVALID');
+            delete data.meta.insuranceConsultationSource;
             result={data:data};
           } else throw new Error('B_REQUEST_INVALID');
           // Use the existing strict private-result validator under the same lock;
@@ -9996,6 +10001,14 @@ function privateDashboardCreateGasB_(options) {
           if(now()>=s.expiresAt || now()>=config.authority.validUntil)throw new Error('B_SESSION_DENIED');
           return Object.assign({status:'ok',expiresAt:s.expiresAt,trustSource:'password-bound',
             phoneEligible:privateDashboardIsTrustedEmployee(s.employee),privateResult:privateResult,kpiResult:kpiResult},reports);
+        }
+        if(p.action==='employee_insurance_read'||p.action==='employee_insurance_submit') {
+          const user=privateDashboardUserByEmployeeId(s.employee).user;
+          if(!user||user.status!=='active')throw Error('B_ELIGIBILITY_DENIED');
+          const result=insuranceConsultOperation_(p,{id:s.employee,store:profile.store,role:user.role,members:config.authority.members,
+            supervisor:privateDashboardIsTrustedEmployee(s.employee)&&user.role==='督導'});
+          if(now()>=s.expiresAt||now()>=config.authority.validUntil)throw Error('B_SESSION_DENIED');
+          return result;
         }
         if(p.action.indexOf('employee_tradein_sharing_')===0) {
           const user=privateDashboardUserByEmployeeId(s.employee).user;

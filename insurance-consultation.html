@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>保險搭售請益｜北一二B</title>
+<link rel="stylesheet" href="insurance-consultation.css?v=20261120-directory-1">
+<script src="portal-logout.js?v=20261102-1"></script><script src="GasBClient.js?v=20261120-insurance-1"></script><script src="insurance-consultation.js?v=20261120-2"></script>
+<script src="insurance-consultation-page.js?v=20261120-directory-1" defer></script><script src="dashboard-b-shell.js?v=20261120-login-return-1" defer></script>
+</head><body>
+<header><a href="index.html">← 每日回報</a><h1>保險搭售請益</h1><span>北一二B</span></header>
+<main>
+<section id="insuranceHero" class="hero" aria-labelledby="selfTitle" aria-live="polite"><div><p class="eyebrow">本人 · 正式月累計手機保險搭售率</p><h2 id="selfTitle">登入後查看本人進度</h2><strong id="selfRate">—</strong></div><div class="hero-details"><b id="selfState">資料待核</b><p id="selfCutoff">統計截止：待核</p><p>門檻：50%（含）以上免回覆</p><p id="selfDataDate">每天獨立核對，不綁 16:00／21:00</p></div></section>
+<p>比率隨最新正式報表更新，非即時數據。</p>
+<div id="insuranceLogin"></div>
+<section class="workspace" id="insuranceWorkspace" hidden>
+<div class="toolbar"><label>資料日 <input id="insuranceDate" type="date"></label><button id="insuranceRefresh" type="button">重新讀取</button></div>
+<p id="insuranceMessage" role="status">以正式月累計搭售率判斷；一般銷售過關不會代替本項回覆。</p>
+<div id="insuranceList"></div>
+<section id="advisorDirectory" hidden aria-labelledby="directoryTitle">
+<h2 id="directoryTitle">九店請益對象</h2>
+<div class="directory-tools"><label>篩選門市 <select id="advisorStore"><option value="">全部門市</option></select></label><span>依本期月累計搭售率由高至低排列</span></div>
+<div class="directory-scroll" role="region" aria-label="請益對象清單" tabindex="0"><table><thead><tr><th scope="col">店點</th><th scope="col">姓名</th><th scope="col">搭售率</th><th scope="col">統計截止</th></tr></thead><tbody id="advisorRows"></tbody></table></div>
+<p id="advisorEmpty" hidden>目前沒有可顯示的同仁。</p>
+</section>
+<form id="insuranceForm" hidden novalidate><h2 id="insuranceFormTitle">保險搭售率低於 50%：請填寫以下五項</h2><p id="insuranceFormSource"></p>
+<div class="fields">
+<label>請益對象<textarea name="advisor" rows="2" maxlength="2000" required></textarea></label>
+<label>破冰方式<textarea name="icebreaker" rows="2" maxlength="2000" required></textarea></label>
+<label>運用工具<textarea name="tools" rows="2" maxlength="2000" required></textarea></label>
+<label>建議話術／作法<textarea name="approach" rows="2" maxlength="2000" required></textarea></label>
+<label class="wide">執行提醒／待確認<textarea name="followup" rows="2" maxlength="2000" required></textarea></label>
+</div><p id="insuranceError" role="alert"></p><button id="insuranceSubmit" type="submit">送出今日請益</button><p>同一資料日每位／每店一次；送出後保留原回覆與來源。</p></form>
+<section id="insuranceWeekly" aria-labelledby="weeklyTitle"><h2 id="weeklyTitle">我的每週保險／金牌</h2><p>每週 55% 獎勵與每日低於 50% 請益分開。比率以正式週報為準，非即時更新。</p><div id="insuranceWeeks"></div><p id="insuranceRewards">累計獎勵：待結</p><p>週期截止、入帳對應或中斷後再達標口徑未核實時維持待結；不補發、追扣或重算已結週。</p></section>
+</section>
+</main></body></html>

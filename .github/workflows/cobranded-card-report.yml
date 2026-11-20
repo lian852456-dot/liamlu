@@ -5,6 +5,26 @@ on:
     paths:
       - 'index.html'
       - 'gas/Code.gs'
+      - 'gas/InsuranceConsultation.gs'
+      - 'insurance-consultation*.js'
+      - 'insurance-source-core.js'
+      - 'gas/InsuranceSource*.gs'
+      - 'tests/helpers/insurance-fixed-fixture.cjs'
+      - 'scripts/north12b/render_insurance_source.cjs'
+      - 'tests/insurance-source-publication.test.cjs'
+      - 'insurance-consultation.html'
+      - 'insurance-consultation.css'
+      - 'GasBClient.js'
+      - 'gas/InsuranceConsultationStore.gs'
+      - 'gas/InsuranceFixedSource.gs'
+      - 'tests/insurance-fixed-source.test.cjs'
+      - 'daily-report-layout.css'
+      - 'tests/helpers/insurance-runtime.cjs'
+      - 'scripts/north12b/insurance_progress.py'
+      - 'scripts/north12b/insurance_report_preview.py'
+      - 'tests/insurance-consultation.*'
+      - 'tests/test_insurance_progress.py'
+      - 'tests/fixtures/insurance-progress.cjs'
       - 'daily-report-layout.js'
       - 'daily-report-summary-*.js'
       - 'tests/cobranded-card-report.*'
@@ -28,8 +48,10 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: sudo apt-get install -y fonts-noto-cjk
+      - name: Verify monthly insurance source without personal-period substitution
+        run: python3 -m unittest discover -s tests -p test_insurance_progress.py
       - name: Verify optional count and existing report contracts
-        run: node --test tests/cobranded-card-report.test.cjs tests/daily-report-summary-model.test.cjs tests/daily-report-summary-gas.test.cjs tests/report-save-gas.test.cjs tests/report-save-recovery.test.cjs tests/closing-report-completeness.test.cjs tests/gas-date.test.cjs
+        run: node --test tests/insurance-fixed-source.test.cjs tests/dashboard-password-roster-renewal.test.cjs tests/insurance-consultation.test.cjs tests/insurance-source-publication.test.cjs tests/cobranded-card-report.test.cjs tests/daily-report-summary-model.test.cjs tests/daily-report-summary-gas.test.cjs tests/report-save-gas.test.cjs tests/report-save-recovery.test.cjs tests/closing-report-completeness.test.cjs tests/gas-date.test.cjs
       - name: Verify existing public share build boundary
         run: node --test tests/tradein-share-build.test.cjs
       - name: Verify desktop and mobile save flows
@@ -39,7 +61,7 @@ jobs:
           python3 -m http.server 4176 --bind 127.0.0.1 >/tmp/closing-report-server.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid"' EXIT
-          npx playwright test tests/cobranded-card-report.spec.js tests/daily-report-summary.spec.js tests/daily-report-save-confirmation.spec.js tests/report-save-recovery.spec.js tests/closing-report-ui.spec.js --workers=1 --reporter=list --output=test-results/card-report
+          npx playwright test tests/insurance-consultation.spec.js tests/cobranded-card-report.spec.js tests/daily-report-summary.spec.js tests/daily-report-save-confirmation.spec.js tests/report-save-recovery.spec.js tests/closing-report-ui.spec.js --workers=1 --reporter=list --output=test-results/card-report
           npx playwright test tests/daily-report-layout.spec.js --grep 'single controls' --workers=1 --reporter=list --output=test-results/card-controls
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()

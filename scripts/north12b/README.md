@@ -29,3 +29,7 @@ The newly added MyVideo/KKBOX contract count is disabled per the user's 2026-10-
 
 Regression: `node --test tests/north12b-dod.test.mjs`. The source-to-artifact run must also be verified against the actual daily source, including a missing-prior case, zero values, missing store rows, closure reconciliation and CJK visuals.
 The optional `--vk-source` parser remains available for future explicit reactivation; it is unused by the active morning summary and its manifest.
+
+## Independent insurance consultation source
+
+Use `insurance_report_preview.py` in a private workspace with the original report selected through the existing read-only source, its verified report date and SHA-256, and an authorized DashboardUsers A:E export (JSON rows including header). Supply a new private output directory. The CLI validates the bytes, reads the insurance sheets and cross-checks the identities against the workbook and native roster. It writes a private payload and intent for review. See [the consultation contract](../../docs/insurance-progress-consultation.md) for authorized publication and readback.
