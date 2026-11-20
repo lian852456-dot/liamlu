@@ -60,6 +60,6 @@
   finally{busy=false;$('insuranceSubmit').disabled=false;}
  });
  $('insuranceRefresh').onclick=load;$('insuranceDate').onchange=load;
- window.DashboardBHost={sessionOnly:true,refreshOnResume:true,mountSelector:'#insuranceLogin',compactMobileLogin:true,clear,accept:()=>void load(),navigate:module=>{location.href=module==='return'?'index.html':module==='awards'?'awards-battle.html':'kpi-battle.html';}};
+ window.DashboardBHost={sessionOnly:true,refreshOnResume:true,mountSelector:'#insuranceLogin',compactMobileLogin:true,clear,accept:()=>void load(),navigate:module=>{location.href=module==='return'?'index.html':module==='awards'?'awards-battle.html':module==='personal'?'kpi-battle.html#personal':'kpi-battle.html';}};
  window.addEventListener('portal-before-logout',clear);
 })();

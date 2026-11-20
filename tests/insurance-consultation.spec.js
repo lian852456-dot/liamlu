@@ -49,3 +49,7 @@ test('general store and personal forms are compact and have no insurance-consult
  await page.setViewportSize({width:1440,height:900});const desktop=await page.locator('#p_achieve').boundingBox(),third=await page.locator('#p_a999').boundingBox();expect(Math.abs(desktop.y-third.y)).toBeLessThan(2);await page.screenshot({path:info.outputPath('SYNTHETIC-general-personal-desktop.png')});
  await page.locator('.tab-btn.report-tab').first().click();await page.locator('.daily-core').scrollIntoViewIfNeeded();await page.screenshot({path:info.outputPath('SYNTHETIC-general-store-desktop.png')});
 });
+
+test('existing personal navigation opens the personal view, not the store KPI view',async({page})=>{
+ await install(page);await expect(page.locator('[data-b-a]')).toBeHidden();await page.locator('[data-b-module="personal"]').click();await expect(page).toHaveURL(/kpi-battle\.html#personal$/);
+});
