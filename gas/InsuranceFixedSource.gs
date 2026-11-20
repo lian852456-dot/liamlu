@@ -1,6 +1,5 @@
-// Private owner configuration. Neither function is exposed through doPost or google.script.run.
-const INSURANCE_DRIVE_PIN_='INSURANCE_DRIVE_PIN_V1';
-const INSURANCE_DRIVE_RECEIPT_='INSURANCE_DRIVE_VERIFIED_V1';
+// The private release owner substitutes a frozen, reviewed batch descriptor in an isolated copy.
+const INSURANCE_FIXED_DESCRIPTOR_ = null;
 const INSURANCE_DRIVE_NAME_='north12b-insurance-consult-source-v1.json';
 
 function insuranceFixedMetadata_(pin) {
@@ -16,15 +15,18 @@ function insuranceFixedMetadata_(pin) {
   return meta;
 }
 
-function insuranceFixedLoad_(verifyOnly) {
-  const props=privateDashboardProperties(),pin=JSON.parse(props.getProperty(INSURANCE_DRIVE_PIN_)||'null');
+function insuranceFixedLoad_() {
+  const pin=INSURANCE_FIXED_DESCRIPTOR_;
   const today=Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd');
   const digest=privateDashboardGasAuthDigest_,K=InsuranceSourceCore,C=InsuranceConsultation;
-  if(!pin || !/^[A-Za-z0-9_-]{10,200}$/.test(pin.fileId||'') || !pin.ownerEmail ||
-     !/^[a-f0-9]{64}$/.test(pin.payloadSha256||'') || !/^[a-f0-9]{64}$/.test(pin.sourceSha256||'') ||
-     pin.reportDate!==today || !C.day(pin.cutoff) || !Number.isSafeInteger(pin.people) || pin.people<1)throw Error('INSURANCE_SOURCE_NOT_CURRENT');
-  const receipt=digest(K.canonical(pin));
-  if(!verifyOnly && props.getProperty(INSURANCE_DRIVE_RECEIPT_)!==receipt)throw Error('INSURANCE_SOURCE_NOT_VERIFIED');
+  if(!pin || !Object.isFrozen(pin) ||
+     Object.keys(pin).sort().join('|')!=='cutoff|fileId|ownerEmail|payloadSha256|people|reportDate|sourceSha256' ||
+     typeof pin.fileId!=='string' || !/^[A-Za-z0-9_-]{10,200}$/.test(pin.fileId) ||
+     typeof pin.ownerEmail!=='string' || !/^[^\s@]+@[^\s@]+$/.test(pin.ownerEmail) ||
+     typeof pin.payloadSha256!=='string' || !/^[a-f0-9]{64}$/.test(pin.payloadSha256) ||
+     typeof pin.sourceSha256!=='string' || !/^[a-f0-9]{64}$/.test(pin.sourceSha256) ||
+     pin.reportDate!==today || !C.day(pin.cutoff) || pin.cutoff>today || pin.cutoff.slice(0,7)!==today.slice(0,7) ||
+     !Number.isSafeInteger(pin.people) || pin.people<1 || pin.people>10000)throw Error('INSURANCE_SOURCE_NOT_CURRENT');
   const before=insuranceFixedMetadata_(pin);
   const blob=DriveApp.getFileById(pin.fileId).getBlob();
   const actual=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,blob.getBytes())
@@ -52,17 +54,6 @@ function insuranceFixedLoad_(verifyOnly) {
        !['required','exempt'].includes(r.requirement)) ||
      data.entries.some(r=>!PRIVATE_DASHBOARD_B_STORES_.includes(r.store)))throw Error('INSURANCE_SOURCE_COVERAGE_CHANGED');
   if(insuranceFixedMetadata_(pin).version!==before.version ||
-     digest(K.canonical(JSON.parse(props.getProperty(INSURANCE_DRIVE_PIN_)||'null')))!==receipt)throw Error('INSURANCE_SOURCE_CHANGED_DURING_READ');
-  return {data,receipt,summary:{reportDate:today,cutoff:pin.cutoff,people:people.length,payloadSha256:actual}};
-}
-
-// Run only from the existing owner's private editor after approval. No write to the Drive source.
-function insuranceVerifyFixedSource_(){
-  return privateDashboardRosterTransaction_(function(){
-    const checked=insuranceFixedLoad_(true),props=privateDashboardProperties();
-    props.setProperty(INSURANCE_DRIVE_RECEIPT_,checked.receipt);
-    if(props.getProperty(INSURANCE_DRIVE_RECEIPT_)!==checked.receipt)throw Error('INSURANCE_RECEIPT_NOT_SAVED');
-    console.log(JSON.stringify(checked.summary));
-    return checked.summary;
-  });
+     Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd')!==today)throw Error('INSURANCE_SOURCE_CHANGED_DURING_READ');
+  return data;
 }

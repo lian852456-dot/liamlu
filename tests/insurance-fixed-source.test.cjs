@@ -2,53 +2,108 @@ const test=require('node:test'),assert=require('node:assert/strict'),crypto=requ
 const F=require('./fixtures/insurance-progress.cjs'),{setup}=require('./helpers/insurance-runtime.cjs');
 const hash=v=>crypto.createHash('sha256').update(v).digest('hex');
 const pinKey='INSURANCE_DRIVE_PIN_V1';
-function fixed(){
- const source=F.data(.375,.5),f=setup(source);
+const fs=require('node:fs'),path=require('node:path');
+const {render}=require('../scripts/north12b/render_insurance_source.cjs');
+const template=fs.readFileSync(path.resolve(__dirname,'../gas/InsuranceFixedSource.gs'),'utf8');
+function fixed({unconfigured=false,changePin=()=>{},changeSource=()=>{}}={}){
+ const source=F.data(.375,.5);
  const part=source.meta.insuranceConsultationSource,reportFile=F.date.slice(5).replace('-','')+'.xlsx';
  Object.assign(source.meta,{reportDate:F.date,sourceFile:reportFile});
  Object.assign(part,{sourceFile:reportFile,version:hash('synthetic-version')});
+ changeSource(source);
  const payload={schema:'insurance-source-payload/v1',data:{meta:source.meta,stores:source.stores}};
  const bytes=Buffer.from(JSON.stringify(payload)),pin={fileId:'synthetic_drive_file',ownerEmail:'owner@example.invalid',payloadSha256:hash(bytes),sourceSha256:part.sourceSha256,reportDate:F.date,cutoff:F.date,people:9};
+ changePin(pin);
+ const f=setup(source,unconfigured?template:render(template,pin));
  const meta={id:pin.fileId,name:'north12b-insurance-consult-source-v1.json',mimeType:'application/json',version:'1',size:bytes.length,parents:['root'],shared:false,trashed:false,owners:[{me:true,emailAddress:pin.ownerEmail,permissionId:'owner'}],permissions:[{id:'owner',type:'user',role:'owner'}],permissionIds:['owner']};
  let currentBytes=bytes,reads=0;
- f.props.set(pinKey,JSON.stringify(pin));
  f.ctx.Drive={Files:{get(id){assert.equal(id,pin.fileId);reads++;return {...meta};}}};
  f.ctx.DriveApp={getRootFolder:()=>({getId:()=>'root'}),getFileById(id){assert.equal(id,pin.fileId);return {getBlob:()=>({getBytes:()=>Array.from(currentBytes),getDataAsString:()=>currentBytes.toString('utf8')})};}};
  const gasDigest=f.ctx.Utilities.computeDigest;f.ctx.Utilities.computeDigest=(algo,value)=>Array.isArray(value)?Array.from(crypto.createHash('sha256').update(Buffer.from(value)).digest()):gasDigest(algo,value);
  f.ctx.console={log(){}};
  f.useFixedSource();const proof=f.login();
  const read=(session=proof)=>f.handle({action:'employee_insurance_read',...session,dataDate:F.date});
- return {f,pin,meta,proof,read,verify:()=>f.ctx.insuranceVerifyFixedSource_(),setBytes:b=>{currentBytes=b;},get reads(){return reads;}};
+ return {f,pin,meta,proof,read,setBytes:b=>{currentBytes=b;},get reads(){return reads;}};
 }
-test('fixed file opens after owner readback; employee reads four directory columns and submits once',()=>{
- const h=fixed();assert.equal(h.read().status,'error');assert.equal(h.reads,0);
- assert.equal(h.verify().people,9);assert.equal(h.verify().people,9);assert.equal(h.f.fileWrites,0);
- const result=h.read(),row=result.items[0];assert.equal(result.status,'ok');assert.equal(result.items.length,1);assert.equal(result.directory.current.length,9);
+function submission(h,row){
+ return {action:'employee_insurance_submit',...h.proof,dataDate:F.date,subjectKey:row.subjectKey,sourceVersion:row.progress.sourceVersion,values:F.values,submissionId:'SYNTHETIC_FIXED_FIRST'};
+}
+function denied(result){
+ assert.equal(result.status,'error');
+ assert.ok(!result.items && !result.item && !result.directory && !result.submission);
+ assert.ok(!JSON.stringify(result).includes(F.values.advisor));
+}
+test('release template is closed even with old properties; changing properties cannot select a source',()=>{
+ const h=fixed({unconfigured:true});
+ h.f.props.set(pinKey,JSON.stringify(h.pin));
+ h.f.props.set('INSURANCE_DRIVE_VERIFIED_V1',hash('synthetic-receipt'));
+ denied(h.read());assert.equal(h.reads,0);
+ const deployed=fixed();
+ deployed.f.props.set(pinKey,'wrong');
+ assert.equal(deployed.read().status,'ok');
+ assert.equal(typeof deployed.f.ctx.insuranceVerifyFixedSource_,'undefined');
+});
+test('authenticated reads check both ACLs; nine-store directory emits four fields, one own reply persists',()=>{
+ const h=fixed(),result=h.read();
+ assert.equal(result.status,'ok');assert.equal(h.reads,2);
+ assert.equal(result.items.length,1);assert.equal(result.directory.current.length,9);
+ assert.deepEqual(new Set(result.directory.current.map(row=>row.store)),new Set(F.stores));
  for(const r of result.directory.current)assert.deepEqual(Object.keys(r).sort(),['cutoff','name','rate','store']);
  assert.ok(!JSON.stringify(result).includes('SYNTH002'));
- const commit={action:'employee_insurance_submit',...h.proof,dataDate:F.date,subjectKey:row.subjectKey,sourceVersion:row.progress.sourceVersion,values:F.values,submissionId:'SYNTHETIC_FIXED_FIRST'};
- assert.equal(h.f.handle({...commit,values:{...F.values,tools:' '}}).status,'error');
- assert.equal(h.f.handle(commit).status,'ok');assert.deepEqual(h.read().items[0].submission.values,F.values);
- assert.equal(h.f.handle(commit).alreadySubmitted,true);assert.equal(h.f.fileWrites,1);
- assert.equal(h.read({}).status,'error');assert.equal(h.read({...h.proof,deviceId:'SYNTHETIC_WRONG_DEVICE'}).status,'error');
- h.f.rows.DashboardUsers[2][2]='外區';assert.equal(h.read().status,'error');
+ const request=submission(h,result.items[0]);
+ denied(h.f.handle({...request,values:{...F.values,tools:' '}}));
+ const other=h.read(h.f.login('SYNTH003','SYNTHETIC_SECOND_DEVICE')).items[0];
+ assert.notEqual(other.store,result.items[0].store);
+ denied(h.f.handle({...request,subjectKey:other.subjectKey}));assert.equal(h.f.fileWrites,0);
+ assert.equal(h.f.handle(request).status,'ok');assert.deepEqual(h.read().items[0].submission.values,F.values);
+ assert.equal(h.f.handle(request).alreadySubmitted,true);assert.equal(h.f.fileWrites,1);
 });
-test('bad ACL, group/link shares, replacement, changed roster, stale or corrupt data disclose no rows or replies',()=>{
+test('missing session, wrong device and non-B membership stop before source access',()=>{
+ const h=fixed();
+ denied(h.read({}));denied(h.read({...h.proof,deviceId:'SYNTHETIC_WRONG_DEVICE'}));
+ h.f.rows.DashboardUsers[2][2]='外區';denied(h.read());
+ assert.equal(h.reads,0);assert.equal(h.f.fileWrites,0);
+});
+test('ACL or byte changes, incomplete roster and stale source block reads and writes even with a saved reply',()=>{
  const changes=[
   h=>{h.meta.shared=true;},h=>{h.meta.permissions.push({type:'group',role:'reader',id:'group'});},
   h=>{delete h.meta.permissions;},h=>{h.meta.permissionIds.push('other');},h=>{h.meta.owners[0].me=false;},
   h=>{h.meta.owners[0].emailAddress='other@example.invalid';},h=>{h.meta.trashed=true;},h=>{h.meta.parents=['wrong'];},
   h=>{h.meta.mimeType='application/vnd.google-apps.shortcut';},h=>{h.meta.name='north12b-kpicalc-private-latest.json';},
-  h=>h.setBytes(Buffer.from('broken')),h=>{h.f.props.delete(pinKey);},h=>{h.f.rows.DashboardUsers[1][4]='inactive';},
-  h=>{h.f.ctx.Utilities.formatDate=()=>new Date(Date.parse(F.date)+86400000).toISOString().slice(0,10);}
+  h=>h.setBytes(Buffer.from('broken')),h=>{h.f.rows.DashboardUsers[1][4]='inactive';},
+  h=>{h.f.ctx.Utilities.formatDate=()=>new Date(Date.parse(F.date)+86400000).toISOString().slice(0,10);},
+  h=>{const get=h.f.ctx.Drive.Files.get;let v=0;h.f.ctx.Drive.Files.get=id=>({...get(id),version:String(++v)});},
+  h=>{const get=h.f.ctx.Drive.Files.get;h.f.ctx.Drive.Files.get=id=>{
+    const meta=get(id);h.f.ctx.Utilities.formatDate=()=>'2100-01-01';return meta;
+  };}
  ];
- for(const change of changes){const h=fixed();h.verify();change(h);const r=h.read();assert.equal(r.status,'error');assert.ok(!r.items&&!r.directory);assert.equal(h.f.fileWrites,0);}
+ for(const change of changes){
+  const h=fixed(),request=submission(h,h.read().items[0]);
+  assert.equal(h.f.handle(request).status,'ok');
+  const folder=h.f.ctx.privateDashboardFolder;
+  let replyFolderReads=0;
+  h.f.ctx.privateDashboardFolder=()=>{replyFolderReads++;return folder();};
+  change(h);denied(h.read());denied(h.f.handle(request));
+  assert.equal(replyFolderReads,0);assert.equal(h.f.fileWrites,1);
+ }
 });
-test('changed config needs fresh readback; metadata race and incomplete source cannot activate',()=>{
- const h=fixed();h.verify();
- h.f.props.set(pinKey,JSON.stringify({...h.pin,cutoff:'2000-01-01'}));assert.equal(h.read().status,'error');assert.throws(h.verify,/COVERAGE/);
- h.f.props.set(pinKey,JSON.stringify(h.pin));
- const prior=h.f.ctx.Drive.Files.get;let rev=0;h.f.ctx.Drive.Files.get=id=>({...prior(id),version:String(++rev)});
- assert.throws(h.verify,/DURING_READ/);assert.equal(h.read().status,'error');
- assert.equal(h.f.fileWrites,0);
+test('workbook fingerprint, report period, valid coverage and count must match the released descriptor',()=>{
+ for(const opts of [
+  {changePin:p=>{p.sourceSha256=hash('different workbook');}},
+  {changePin:p=>{p.people++;}},
+  {changeSource:s=>{s.meta.insuranceConsultationSource.personal.periodEvidence=null;}},
+  {changeSource:s=>{s.meta.insuranceConsultationSource.personal.rows.pop();}},
+  {changeSource:s=>{s.meta.insuranceConsultationSource.personal.cutoff='2000-01-01';}},
+  {changeSource:s=>{s.meta.insuranceConsultationSource.personal.rows[0].subjectId='SYNTH999';}}
+ ]){
+  const h=fixed(opts);denied(h.read());assert.equal(h.f.fileWrites,0);
+ }
+});
+test('renderer changes exactly one literal and validates the allowlisted scalar fields',()=>{
+ const h=fixed(),output=render(template,h.pin);
+ assert.equal(output.split('\n').filter((s,i)=>s!==template.split('\n')[i]).length,1);
+ assert.equal(render(template,Object.fromEntries(Object.entries(h.pin).reverse())),output);
+ for(const pin of [{...h.pin,extra:true},{...h.pin,people:'9'},{...h.pin,reportDate:'2030-02-30'},{...h.pin,cutoff:'2000-01-01'}])
+  assert.throws(()=>render(template,pin));
+ assert.throws(()=>render(output,h.pin));
 });

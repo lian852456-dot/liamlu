@@ -5,7 +5,7 @@ function insuranceConsultKey_(kind,id) {
     .map(function(b){return ('0'+(b&255).toString(16)).slice(-2);}).join('');
 }
 function insuranceConsultSource_() {
-  return insuranceFixedLoad_(false).data;
+  return insuranceFixedLoad_();
 }
 function insuranceConsultState_(dataDate) {
   const files=privateDashboardFolder().getFilesByName('insurance-consultation-'+dataDate+'.json');
