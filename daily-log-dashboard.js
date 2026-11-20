@@ -250,28 +250,33 @@ function sortedStores(stores, view) {
 
 function markCell(store, form) {
   const tone = form.status === 'done' ? 'ok' : form.status === 'upcoming' ? 'wait' : 'bad';
-  const mark = form.status === 'done' ? '✓' : form.status === 'upcoming' ? '·' : '✗';
+  const mark = form.status === 'done' ? '✓' : form.status === 'upcoming' ? '–' : '×';
   const label = `${shortStore(store.store)} ${form.shortLabel} ${statusLabel(form.status)}`;
   return `<td class="mark ${tone}"><button type="button" data-store="${escapeHtml(store.store)}" data-form="${escapeHtml(form.id)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${mark}</button></td>`;
+}
+
+function sortHeading(key, label) {
+  const active = state.sort.key === key;
+  const order = active ? (state.sort.dir === 1 ? 'ascending' : 'descending') : '';
+  const arrow = active ? (state.sort.dir === 1 ? '↑' : '↓') : '↕';
+  return `<th scope="col"${order ? ` aria-sort="${order}"` : ''}><button type="button" data-sort="${escapeHtml(key)}">${escapeHtml(label)}<span class="sort-indicator" aria-hidden="true">${arrow}</span></button></th>`;
 }
 
 function renderMatrix(model, view) {
   const sample = model.stores[0] && model.stores[0][view] ? model.stores[0][view] : [];
   const stores = sortedStores(model.stores, view);
-  const head = sample.map(form => `<th data-sort="${escapeHtml(form.id)}" scope="col">${escapeHtml(form.shortLabel)}</th>`).join('');
+  const head = sample.map(form => sortHeading(form.id, form.shortLabel)).join('');
   const body = stores.map(store => {
     const [done, total] = metricScore(store, view);
     const gap = gapCount(store, view);
     return `<tr class="${gap ? 'has-gap' : 'all-done'}"><th scope="row"><button type="button" data-store="${escapeHtml(store.store)}" title="${escapeHtml(store.store)}">${escapeHtml(shortStore(store.store))}</button></th>${store[view].map(form => markCell(store, form)).join('')}<td class="score ${gap ? 'bad' : 'ok'}">${done}/${total}</td></tr>`;
   }).join('');
-  return `<table class="matrix"><thead><tr><th data-sort="name" scope="col">店點</th>${head}<th data-sort="done" scope="col">完成</th></tr></thead><tbody>${body}</tbody></table>`;
+  return `<table class="matrix"><thead><tr>${sortHeading('name', '店點')}${head}${sortHeading('done', '完成')}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
 function renderExceptions(model) {
   const rows = model.stores.flatMap(store => store.exceptions.map(form => ({ store:store.store, form })));
   const unknownRows = Array.isArray(state.snapshot.unknownForms) ? state.snapshot.unknownForms : [];
-  $('exceptionList').hidden = true;
-  $('storeGrid').hidden = false;
   const tracked = rows.map(item => `<tr><th scope="row">${escapeHtml(shortStore(item.store))}</th><td><button type="button" data-store="${escapeHtml(item.store)}" data-form="${escapeHtml(item.form.id)}">${escapeHtml(item.form.shortLabel || item.form.label)}</button></td><td class="mark bad"><span class="status ${escapeHtml(item.form.status)}">${escapeHtml(statusLabel(item.form.status))}</span></td></tr>`).join('');
   const unknown = unknownRows.map(item => `<tr class="unknown-row"><th scope="row">${escapeHtml(shortStore(item.store))}</th><td>未定義：${escapeHtml(item.formName)}</td><td class="mark wait"><span class="status unknown">待確認</span></td></tr>`).join('');
   $('storeGrid').innerHTML = tracked || unknown
@@ -292,26 +297,18 @@ function renderDashboard() {
     state.snapshot.fileName ? `日誌：${state.snapshot.fileName}` : '',
     state.snapshot.calendarFileName ? `行事曆：${state.snapshot.calendarFileName}` : ''
   ].filter(Boolean).join(' · ');
-  $('sourceMeta').textContent = `${sources || '本機資料'} · 基準日 ${selectedDate}`;
-  const compact = $('uploadCompact');
-  if (compact) {
-    $('uploadPanel').classList.add('is-collapsed');
-    compact.hidden = false;
-    $('compactFiles').textContent = sources || '本機資料';
-    $('compactDate').textContent = `基準日 ${selectedDate}`;
-    $('clearSnapshot').hidden = false;
-  }
+  $('uploadPanel').classList.add('is-collapsed');
+  $('uploadCompact').hidden = false;
+  $('compactFiles').textContent = sources || '本機資料';
+  $('compactDate').textContent = `基準日 ${state.snapshot.asOfDate}`;
+  $('clearSnapshot').hidden = false;
   $('dailyMetric').textContent = `${model.dailyDone} / ${model.dailyExpected}`;
   $('weeklyMetric').textContent = `${model.weeklyDone} / ${model.weeklyExpected}`;
   $('monthlyMetric').textContent = `${model.monthlyDone} / ${model.monthlyExpected}`;
   const unknownCount = Array.isArray(state.snapshot.unknownForms) ? state.snapshot.unknownForms.length : 0;
   $('exceptionMetric').textContent = String(model.exceptionCount + unknownCount);
   if (state.view === 'exceptions') renderExceptions(model);
-  else {
-    $('exceptionList').hidden = true;
-    $('storeGrid').hidden = false;
-    $('storeGrid').innerHTML = renderMatrix(model, state.view);
-  }
+  else $('storeGrid').innerHTML = renderMatrix(model, state.view);
   bindDetailButtons();
 }
 
@@ -377,14 +374,16 @@ $('applyPreview').addEventListener('click', applyPending);
 $('clearSnapshot').addEventListener('click', clearSnapshot);
 $('reopenUpload').addEventListener('click', () => {
   $('uploadPanel').classList.remove('is-collapsed');
+  $('asOfDate').focus();
 });
 $('storeGrid').addEventListener('click', event => {
-  const th = event.target.closest('th[data-sort]');
-  if (!th || !state.snapshot) return;
-  const key = th.dataset.sort;
+  const button = event.target.closest('button[data-sort]');
+  if (!button || !state.snapshot) return;
+  const key = button.dataset.sort;
   state.sort.dir = state.sort.key === key ? -state.sort.dir : (key === 'name' ? 1 : -1);
   state.sort.key = key;
   renderDashboard();
+  $('storeGrid').querySelector(`button[data-sort="${CSS.escape(key)}"]`)?.focus();
 });
 $('viewDate').addEventListener('change', renderDashboard);
 $('copyReminder').addEventListener('click', copyGroupReminder);

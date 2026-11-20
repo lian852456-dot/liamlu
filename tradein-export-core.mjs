@@ -39,6 +39,32 @@ export function describePerson(person,rules=DEFAULT_RULES){
   const reason=exempt?(role==='免目標'?'不設目標':role+'免目標')+(actual===null?'；'+missing:''):!included?'身份／職務待確認':actual===null?missing+'；'+ruleLabel:(rules.isDemo?ruleLabel+'；實績為示意':ruleLabel+'；單銷計入，同月取消淨額 0；跨月取消待核');
   return Object.freeze({store:String(store),name:String(name),role:String(role),actual,target,remaining,status,reason,recoveredModels});
 }
+function buildStoreTrend(stores,source,rules){
+  if(!source||!stores.length)return null;
+  const dates=[];
+  const end=Date.parse(rules.sourceEnd+'T00:00:00Z');
+  for(let time=Date.parse(rules.sourceStart+'T00:00:00Z');time<=end;time+=86400000){
+    dates.push(new Date(time).toISOString().slice(0,10));
+  }
+  const hasStoreSupport=source.stores.some(store=>store.support_in_units!==undefined);
+  const hasPersonDays=source.people.some(person=>Array.isArray(person.recovered_days));
+  const series=stores.map(({store,actual})=>{
+    const official=source.stores.find(row=>row.store===store);
+    const people=source.people.filter(person=>person.store===store);
+    // Legacy snapshots can be rebuilt only when their daily person totals reconcile to the store.
+    const entries=Array.isArray(official?.recovered_days)?official.recovered_days:
+      !hasStoreSupport&&hasPersonDays&&people.every(person=>Array.isArray(person.recovered_days))?
+        people.flatMap(person=>person.recovered_days):null;
+    const totals=new Map(dates.map(date=>[date,0]));
+    if(!entries||actual===null||entries.some(row=>!totals.has(row.date)||!Number.isSafeInteger(row.actual_units)||row.actual_units<0)){
+      return {store,daily:null};
+    }
+    for(const row of entries)totals.set(row.date,totals.get(row.date)+row.actual_units);
+    const daily=[...totals.values()];
+    return {store,daily:daily.reduce((sum,units)=>sum+units,0)===actual?daily:null};
+  });
+  return {dates,series};
+}
 export function buildExportModel(context,scope,rules=DEFAULT_RULES){
   if(!context||!context.active)throw new Error('請先完成登入並讀取資料。');
   if(!['self','current','all'].includes(scope))throw new Error('匯出範圍無效。');
@@ -76,7 +102,8 @@ export function buildExportModel(context,scope,rules=DEFAULT_RULES){
       return Object.freeze({store:String(p.store),actual:p.actual,target:rules.selectedDate?null:p.target});
     });
   const region=context.mode==='public'&&!rules.selectedDate&&stores.length===9&&stores.every(p=>p.actual!==null)?regionProgress(rules.month,stores.reduce((n,p)=>n+p.actual,0)):null;
-  return Object.freeze({title:rules.selectedDate?'舊換新單日回收提醒':'舊換新個人提醒',scopeLabel,region:region?Object.freeze(region):null,stores:Object.freeze(stores),showDifference:context.mode==='public'&&!rules.selectedDate,rules:Object.freeze({...rules}),rows:Object.freeze(rows.map(p=>describePerson(p,rules)))});
+  const storeTrend=context.mode==='public'&&!rules.selectedDate?buildStoreTrend(stores,context.storeDaySource,rules):null;
+  return Object.freeze({title:rules.selectedDate?'舊換新單日回收提醒':'舊換新個人提醒',scopeLabel,region:region?Object.freeze(region):null,stores:Object.freeze(stores),storeTrend,showDifference:context.mode==='public'&&!rules.selectedDate,rules:Object.freeze({...rules}),rows:Object.freeze(rows.map(p=>describePerson(p,rules)))});
 }
 export function regionProgressLine(region){return `區目標 ${region.target} 台｜全區實績 ${region.actual} 台｜區尚缺 ${region.remaining} 台｜達成率 ${region.attainment}%`;}
 export function reminderText(model){
