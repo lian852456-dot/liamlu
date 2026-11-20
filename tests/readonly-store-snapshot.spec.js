@@ -36,7 +36,7 @@ test('one click downloads an offline projection without a second API call and pr
  await page.locator('[data-tab="personal"]').click();await expect(page.locator('.person-table tbody tr')).toHaveCount(9);
  const context=await browser.newContext({offline:true}),offline=await context.newPage();const requests=[];offline.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});
  await offline.goto(pathToFileURL(file).href);await expect(offline.locator('#store')).toBeEnabled();
- await expect(offline.locator('[data-tab]')).toHaveCount(3);await expect(offline.locator('script[src],link[href],form,iframe,input[type="file"]')).toHaveCount(0);
+ await expect(offline.locator('[data-tab]')).toHaveCount(4);await offline.locator('[data-tab=insights]').click();await expect(offline.locator('#renewal-findings')).toBeVisible();await expect(offline.locator('script[src],link[href],form,iframe,input[type="file"]')).toHaveCount(0);
  expect(await offline.evaluate(()=>localStorage.length+sessionStorage.length)).toBe(0);expect(requests).toEqual([]);await context.close();
 });
 test('anonymous and expired original sessions cannot export',async({page})=>{
