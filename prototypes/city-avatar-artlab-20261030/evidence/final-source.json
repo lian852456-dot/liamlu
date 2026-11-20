@@ -1,0 +1,16 @@
+{
+  "at": "2026-10-30T02:39:04.793Z",
+  "files": {
+    "avatar-deluxe.js": "f4434d435e4c8c7c71846759a8e4a824f42b44195f74697d9a0fbc1576694a9a",
+    "avatar-candidate.js": "ca30f333bd77c4b6372a360469a064d19f585102f95b255b22f97a32bdc4c569",
+    "studio.js": "c68ecd9320069dce198914d518ace20414dfd98ba4ba98a6fecb3ee5bfc6ce93",
+    "game-controls.js": "a39e6bc308b51055e8b3eae301837865033c2a6089b8f01c2e4b6608736deb8f",
+    "game-session-bootstrap.js": "7631114275fd49306d391956a6433897d3cebf543c5e065d7253dd48ce00957a",
+    "artlab-ui.js": "e35f6e0f84a2cbf89756786c9b8a60dc2864c6be55b75691b2d39dde4a6ed995",
+    "base/world.js": "7e40f1d6bf5a0fcbbaa61a59e2bf7360dc2ffe35473bbdff9995a2faf5ff18d5",
+    "base/models.js": "86d7cf8d73aba68c3a7f982b0f12b85112b3432a0ea2675bd2ba09b449433d2a"
+  },
+  "isolatedOnly": true,
+  "userArtApproval": false,
+  "physicalIphoneUat": false
+}

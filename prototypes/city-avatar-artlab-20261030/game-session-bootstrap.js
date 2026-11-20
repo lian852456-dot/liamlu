@@ -1,0 +1,6 @@
+/* First visit only, in this independent art lab world. Original city cookies,
+ * cards, identities and databases are never consulted or changed. */
+(async()=>{'use strict';const key='city-avatar-artlab-first-visit-v1';try{const response=await fetch('/api/session',{credentials:'same-origin',cache:'no-store'});if(response.status===401&&!localStorage.getItem(key)){
+ const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);const registrationKey=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');
+ const created=await fetch('/api/guest',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:'美術試玩',registrationKey})});if(created.ok){const fresh=await created.json();localStorage.setItem(key,'created');await fetch('/api/profile',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-City-CSRF':fresh.csrf},body:JSON.stringify({completeSetup:true,expectedRevision:fresh.profile.revision})});}
+ }}catch{/* Keep the original entry/recovery UI available on a network failure. */}finally{const script=document.createElement('script');script.src='base/client.js';document.body.append(script);}})();

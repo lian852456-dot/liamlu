@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f1e7">
+  <title>角色體驗室｜Cozy Pocket Taipei</title>
+  <link rel="stylesheet" href="./artlab.css">
+</head>
+<body>
+  <div class="artlab-shell">
+    <header class="artlab-header">
+      <div class="brand-lockup">
+        <span class="brand-mark" aria-hidden="true">✦</span>
+        <div>
+          <p class="eyebrow">COZY POCKET TAIPEI</p>
+          <h1>角色體驗室</h1>
+        </div>
+      </div>
+      <div class="header-note">
+        <span class="preview-chip">單一示範角色・尚未全面套用</span>
+        <span class="deadline">預覽期限 10/31 23:59（台北）</span>
+      </div>
+    </header>
+
+    <nav class="scene-tabs" aria-label="預覽場景" role="tablist">
+      <button class="scene-tab is-active" type="button" role="tab" aria-selected="true" data-scene="studio">人物細節</button>
+      <button class="scene-tab" type="button" role="tab" aria-selected="false" data-scene="game">城市試玩</button>
+    </nav>
+
+    <main class="artlab-main">
+      <section class="preview-column" aria-label="人物預覽">
+        <div class="preview-heading">
+          <div>
+            <p class="eyebrow">CHARACTER PREVIEW</p>
+            <h2 id="scene-title">看見角色的每個細節</h2>
+          </div>
+          <span class="scene-state" id="scene-state">人物細節</span>
+        </div>
+        <div class="quick-compare" aria-label="快速新舊對照"><button type="button" class="choice-button is-selected" data-action="version" data-value="new" aria-pressed="true">新版人物</button><button type="button" class="choice-button" data-action="version" data-value="old" aria-pressed="false">原版人物</button></div>
+        <div class="avatar-stage" id="avatar-stage">
+          <div class="stage-halo" aria-hidden="true"></div>
+          <div class="stage-floor" aria-hidden="true"></div>
+          <div class="frame-mount" id="frame-mount"></div>
+          <div class="stage-caption">
+            <span class="live-dot" aria-hidden="true"></span>
+            <span id="preview-status">正在準備獨立預覽…</span>
+          </div>
+        </div>
+        <div class="trust-notes" aria-label="使用說明">
+          <p><span aria-hidden="true">↳</span> 此頁使用獨立測試存檔，原城市進度不受影響</p>
+          <p><span aria-hidden="true">◌</span> iPhone Safari 真機待驗收</p>
+        </div>
+      </section>
+
+      <aside class="control-column" id="control-column" aria-label="角色控制">
+        <section class="control-card control-card-primary">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">LOOK</p>
+              <h3>選擇版本</h3>
+            </div>
+            <span class="card-index">01</span>
+          </div>
+          <div class="segmented-control" role="group" aria-label="角色版本">
+            <button type="button" class="segmented-button is-selected" data-action="version" data-value="new" aria-pressed="true">新版</button>
+            <button type="button" class="segmented-button" data-action="version" data-value="old" aria-pressed="false">原版</button>
+          </div>
+        </section>
+
+        <section class="control-card" data-studio-only>
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">ANGLE</p>
+              <h3>觀察角度</h3>
+            </div>
+            <span class="card-index">02</span>
+          </div>
+          <div class="choice-grid choice-grid-three" role="group" aria-label="觀察角度">
+            <button type="button" class="choice-button is-selected" data-action="view" data-value="front" aria-pressed="true"><span class="choice-icon">◉</span>正面</button>
+            <button type="button" class="choice-button" data-action="view" data-value="quarter" aria-pressed="false"><span class="choice-icon">◒</span>45°</button>
+            <button type="button" class="choice-button" data-action="view" data-value="side" aria-pressed="false"><span class="choice-icon">◐</span>側面</button>
+          </div>
+        </section>
+
+        <section class="control-card" data-studio-only>
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">MOTION</p>
+              <h3>讓角色動起來</h3>
+            </div>
+            <span class="card-index">03</span>
+          </div>
+          <div class="choice-grid choice-grid-five" role="group" aria-label="角色動作">
+            <button type="button" class="choice-button is-selected" data-action="motion" data-value="idle" aria-pressed="true">站立</button>
+            <button type="button" class="choice-button" data-action="motion" data-value="walk" aria-pressed="false">行走</button>
+            <button type="button" class="choice-button" data-action="motion" data-value="wave" aria-pressed="false">揮手</button>
+            <button type="button" class="choice-button" data-action="motion" data-value="sit" aria-pressed="false">坐下</button>
+            <button type="button" class="choice-button" data-action="motion" data-value="highfive" aria-pressed="false">擊掌</button>
+          </div>
+        </section>
+
+        <section class="control-card" data-studio-only>
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">STYLE</p>
+              <h3>髮型與服裝</h3>
+            </div>
+            <span class="card-index">04</span>
+          </div>
+          <label class="select-row">
+            <span>髮型</span>
+            <select data-action="hair" aria-label="髮型">
+              <option value="bob">短髮</option>
+              <option value="pony">馬尾</option>
+              <option value="braids">雙辮</option>
+              <option value="silver">銀色</option>
+            </select>
+          </label>
+          <label class="select-row">
+            <span>服裝</span>
+            <select data-action="outfit" aria-label="服裝">
+              <option value="uniform">制服</option>
+              <option value="forest">森林</option>
+              <option value="ocean">海風</option>
+              <option value="rose">玫瑰</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="game-guide" id="game-guide" hidden>
+          <span class="guide-icon" aria-hidden="true">⌁</span>
+          <div>
+            <strong>城市試玩模式</strong>
+            <p>角度、髮型與服裝交由遊戲原手帳換裝；在畫面點地即可行走。</p>
+            <button type="button" class="choice-button" data-action="focus" data-value="character">近看人物</button>
+          </div>
+        </section>
+
+        <section class="metrics-card" aria-label="預覽資訊">
+          <div class="metrics-heading">
+            <span>預覽資訊</span>
+            <span class="metrics-badge">獨立測試</span>
+          </div>
+          <div class="metrics-grid" id="metrics-grid">
+            <span>版本</span><strong id="metric-version">新版</strong>
+            <span>畫面</span><strong id="metric-frame">等待讀取</strong>
+          </div>
+          <p class="metrics-footnote" id="metrics-footnote">數值僅供此示範參考，不代表真機或全面上線結果。</p>
+        </section>
+      </aside>
+    </main>
+  </div>
+  <script src="./artlab-ui.js"></script>
+</body>
+</html>
