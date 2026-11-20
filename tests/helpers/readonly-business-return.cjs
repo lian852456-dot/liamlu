@@ -1,8 +1,8 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
-const { fixture } = require('./helpers/readonly-dashboard-fixture.cjs');
-const root = path.resolve(__dirname, '..');
+const { fixture } = require('./readonly-dashboard-fixture.cjs');
+const root = path.resolve(__dirname, '../..');
 const origin = 'https://business-return.test';
 const home = origin + '/liamlu/home.html';
 const dashboard = origin + '/liamlu/readonly-dashboard.html';
@@ -63,6 +63,15 @@ test('a business login from the locked dashboard returns in the same tab and sur
   await expect(page.locator('#controls')).toBeVisible();
   expect(calls.filter(action => action === 'employee_login')).toHaveLength(1);
   expect(calls.filter(action => action === 'employee_dashboard_read')).toHaveLength(2);
+  await page.locator('header a[href^="home.html"]').click();
+  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
+  await page.goBack();
+  await expect(page.locator('#controls')).toBeVisible();
+  await page.goForward();
+  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
+  await page.locator('a.card[href="readonly-dashboard.html"]').click();
+  await expect(page.locator('#controls')).toBeVisible();
+  expect(calls.filter(action => action === 'employee_login')).toHaveLength(1);
   revoke();
   await page.locator('#refresh').click();
   await expect(page.locator('#auth-message')).toContainText('AUTH');
