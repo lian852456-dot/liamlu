@@ -4,7 +4,6 @@ from datetime import datetime, date
 from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.utils.datetime import to_excel
-from insurance_progress import extract_consultation_source
 
 ROOT = Path(os.environ.get("RUN_ROOT", Path(__file__).resolve().parent))
 CUR = Path(sys.argv[1])
@@ -248,8 +247,12 @@ meta={"period":period,"snapshotDay":asof_dt.day,"monthDays":monthrange(asof_dt.y
       "report_run_date":REPORT_DATE,"report_date":asof,"data_as_of_date":asof,"source_file":SOURCE_FILE,"processing_run_id":BATCH_ID,
       "qis_data_as_of_date":qis_asof,"insurance_data_as_of_date":ins_asof,
       "component_completeness":{"qis":"ok" if any(r[2:3]==["北一二B"] for r in qis_values) else "no_data","insurance":"partial" if any(r[:1]==["北一二B"] for r in cur_book.get("搭售達成率 (手機保險)",{}).get("values",[])) else "no_data"}}
-# Independently verified store/personal evidence; existing images/cutoffs are unchanged.
-meta['insuranceConsultationSource'] = extract_consultation_source(cur_book, cur_stores, people, SOURCE_FILE, SOURCE_SHA, REPORT_DATE)
+# Separate private artifact; never add employee insurance identities/rates to KPI output.
+try:
+    from insurance_progress import write_private_publication_artifacts
+    write_private_publication_artifacts(OUT, cur_book, cur_stores, people, SOURCE_FILE, SOURCE_SHA, REPORT_DATE)
+except Exception:
+    print('INSURANCE_PRIVATE_INTENT_UNAVAILABLE: ordinary KPI build continues', file=sys.stderr)
 prior_by_code={s['code']:s for s in prev_stores}
 prior_person_by_id={p['employee_id']:p for p in prev_people}
 current_kpi={"meta":meta,

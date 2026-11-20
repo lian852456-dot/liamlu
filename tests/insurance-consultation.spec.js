@@ -1,7 +1,8 @@
 const {test,expect}=require('@playwright/test'),F=require('./fixtures/insurance-progress.cjs'),{setup}=require('./helpers/insurance-runtime.cjs');
 const base=process.env.TEST_BASE_URL||'http://127.0.0.1:8879/';
-async function install(page,source=F.data(),role='employee'){
+async function install(page,source=F.data(),role='employee',prepare){
  const f=setup(source),calls=[],errors=[];if(role==='manager')f.rows.DashboardUsers[2][3]='店長';
+ if(prepare)prepare(f);
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',async route=>{
   const req=route.request();if(req.url().startsWith(base))return route.continue();if(req.method()!=='POST')return route.abort();
@@ -27,6 +28,23 @@ for(const width of [390,1440])test('self hero, five fields, readback and immutab
  if(!await page.locator('[data-b-logout]').isVisible())await page.locator('#insuranceLogin .b-options > summary').click();await page.locator('[data-b-logout]').click();await expect(page.locator('#selfRate')).toHaveText('—');await expect(page.locator('#insuranceWorkspace')).toBeHidden();
 });
 function InsuranceFields(){return Object.keys(F.values).map(k=>[k]);}
+for(const width of [390,1440])test('dedicated source survives KPI replacement; failed refresh shows dated reference at '+width,async({page},info)=>{
+ const crypto=require('node:crypto'),hash=v=>crypto.createHash('sha256').update(v).digest('hex');
+ await page.setViewportSize({width,height:900});let start;
+ const s=await install(page,F.data(),'employee',f=>{
+  f.useDedicatedStore();const d=F.data(),part=d.meta.insuranceConsultationSource;
+  const sourceFile=F.date.slice(5).replace('-','')+'.xlsx',sha=hash('SYNTHETIC_PRIVATE_REPORT');
+  Object.assign(part,{sourceFile,sourceSha256:sha});Object.assign(d.meta,{sourceFile,sourceSha256:sha});
+  start=f.publish({action:'insurance_source_begin',expectedVersion:'',attempt:{reportDate:F.date,sourceFile,sourceSha256:sha}});
+  f.publish({action:'insurance_source_complete',expectedVersion:start.version,attemptId:start.lastAttempt.id,outcome:'complete',payload:{schema:'insurance-source-payload/v1',data:{meta:d.meta,stores:d.stores}}});
+ });
+ await expect(page.locator('#selfState')).toHaveText('今日需回覆');
+ s.f.source={meta:{sourceFile:'SYNTHETIC_KPI_ONLY.xlsx'},stores:[],persons:[]};await page.locator('#insuranceRefresh').click();await expect(page.locator('#selfRate')).toHaveText('42.86%');
+ start=s.f.publish({action:'insurance_source_begin',expectedVersion:s.f.publish({action:'insurance_source_status'}).version,attempt:{reportDate:F.date,sourceFile:F.date.slice(5).replace('-','')+'.xlsx',sourceSha256:hash('SYNTHETIC_FAILED_CORRECTION')}});
+ s.f.publish({action:'insurance_source_complete',expectedVersion:start.version,attemptId:start.lastAttempt.id,outcome:'failed',payload:null});
+ await page.locator('#insuranceRefresh').click();await expect(page.locator('#selfState')).toHaveText('資料待核');await expect(page.locator('#selfRate')).toHaveText('42.86%');await expect(page.locator('#insuranceHero')).toContainText('舊資料／待核');await expect(page.locator('#selfCutoff')).toContainText(F.date);await expect(page.locator('#insuranceForm')).toBeHidden();
+ await page.screenshot({path:info.outputPath('SYNTHETIC-retained-'+width+'.png')});expect(s.errors).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
 test('personal 42.857% and same-store 50% are independent; pending store does not block personal',async({page})=>{
  const source=F.data();source.meta.insuranceConsultationSource.stores.status='pending';source.meta.insuranceConsultationSource.stores.cutoff=null;
  const s=await install(page,source,'manager');await expect(page.locator('#selfState')).toHaveText('今日需回覆');await expect(page.locator('[data-kind="store"]')).toContainText('資料待核');await expect(page.locator('#insuranceForm')).toBeVisible();expect(s.errors).toEqual([]);

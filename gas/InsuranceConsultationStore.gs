@@ -5,7 +5,7 @@ function insuranceConsultKey_(kind,id) {
     .map(function(b){return ('0'+(b&255).toString(16)).slice(-2);}).join('');
 }
 function insuranceConsultSource_() {
-  const file=kpiCalcLatestDataFile();return file?JSON.parse(file.getBlob().getDataAsString('UTF-8')):null;
+  return insuranceSourceLoad_().data;
 }
 function insuranceConsultState_(dataDate) {
   const files=privateDashboardFolder().getFilesByName('insurance-consultation-'+dataDate+'.json');
@@ -27,7 +27,7 @@ function insuranceConsultOperation_(p,actor) {
   if(!C.day(p.dataDate)||p.dataDate>today||!actor||!actor.id)throw Error('INSURANCE_REQUEST_INVALID');
   const manager=['店長','代理店長'].indexOf(actor.role)>=0;
   let data=null;try{data=insuranceConsultSource_();}catch(_){/* Explicit source-pending state; no fallback. */}
-  const all=C.source(data,p.dataDate),unique={};
+  const all=data?InsuranceSourceCore.project(data,p.dataDate,C):[],unique={};
   let rows=all.filter(function(r){return actor.supervisor||r.kind==='personal'&&r.id===actor.id||r.kind==='store'&&manager&&r.store===C.store(actor.store);})
     .filter(function(r){const k=r.kind+'|'+r.id;if(unique[k])return false;unique[k]=true;return true;});
   if(!rows.some(function(r){return r.kind==='personal'&&r.id===actor.id;}))rows.unshift({kind:'personal',id:actor.id,store:C.store(actor.store),label:'本人',progress:null,requirement:'pending'});

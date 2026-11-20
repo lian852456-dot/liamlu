@@ -10,7 +10,7 @@
   client??=createDashboardBClient(owner,{storage:sessionStorage,logoutEpoch:()=>JSON.parse(localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||''});
   if(!client.restore(localStorage.getItem('north12b_private_dashboard_device_id')))throw Error('LOGIN_REQUIRED');
  }
- function sourceLabel(row){return '統計截止：'+(row.progress?.cutoff||'待核')+'｜來源發布：'+(row.progress?.publicationDate||'未取得')+'｜資料日：'+row.dataDate;}
+ function sourceLabel(row){return '統計截止：'+(row.progress?.cutoff||'待核')+'｜來源發布：'+(row.progress?.publicationDate||'未取得')+'｜資料日：'+row.dataDate+(row.progress?.referenceOnly?'｜舊資料／待核（保留前次有效值，不判定本日必填）':'');}
  function open(row){
   selected=row;attempt=null;$('insuranceForm').reset();text('insuranceError','');
   const existing=row.submission,editable=row.status==='required'&&row.canSubmit===true&&!existing;
@@ -28,7 +28,7 @@
   text('insuranceRewards','累計獎勵：'+(weekly?.cumulativeReward??'待結')+'（只顯示核實入帳）');
   rows=result.items;const self=rows.find(r=>r.isSelf),hero=$('insuranceHero');
   text('selfTitle','本人月累計保險搭售率');text('selfRate',C.rateText(self?.progress?.rate));text('selfState',C.states[self?.status]||C.states.pending);
-  text('selfCutoff','統計截止：'+(self?.progress?.cutoff||'待核'));text('selfDataDate','資料日：'+result.dataDate+'｜來源發布：'+(self?.progress?.publicationDate||'未取得'));hero.dataset.state=self?.status||'pending';
+  text('selfCutoff','統計截止：'+(self?.progress?.cutoff||'待核'));text('selfDataDate','資料日：'+result.dataDate+'｜來源發布：'+(self?.progress?.publicationDate||'未取得')+(self?.progress?.referenceOnly?'｜舊資料／待核':''));hero.dataset.state=self?.status||'pending';
   $('insuranceWorkspace').hidden=false;$('insuranceList').replaceChildren();
   for(const row of rows){
    const box=document.createElement('article');box.className='task';box.dataset.kind=row.kind;

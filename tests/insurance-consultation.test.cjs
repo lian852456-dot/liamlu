@@ -25,11 +25,11 @@ test('all five trimmed fields enforced by backend; successful submit/readback an
  const done=submit(f,p,row,Object.fromEntries(Object.entries(F.values).map(([k,v])=>[k,' '+v+' '])));assert.equal(done.status,'ok');assert.equal(done.item.status,'completed');assert.deepEqual(done.item.submission.values,F.values);assert.equal(f.fileWrites,1);
  const again=submit(f,p,row,{...F.values,advisor:'不可覆蓋'});assert.equal(again.alreadySubmitted,true);assert.deepEqual(again.item.submission.values,F.values);assert.equal(f.fileWrites,1);assert.equal(read(f,p).items[0].status,'completed');
 });
-test('yesterday submission is not today; latest lagging report can drive today with its own displayed report/cutoff dates',()=>{
+test('yesterday submission is not today; older publication is retained for reference, never silently required today',()=>{
  const f=setup(),p=f.login(),row=read(f,p).items[0];submit(f,p,row);const saved=JSON.parse([...f.files.values()][0]);const yesterday=new Date(Date.parse(F.date)-86400000).toISOString().slice(0,10);
  f.files.clear();saved.dataDate=yesterday;saved.records.forEach(r=>r.dataDate=yesterday);f.files.set('insurance-consultation-'+yesterday+'.json',JSON.stringify(saved));
  assert.equal(read(f,p).items[0].status,'required');
- if(yesterday.slice(0,7)===F.date.slice(0,7)){const d=F.data();d.meta.reportDate=yesterday;d.meta.insuranceConsultationSource.publicationDate=yesterday;for(const k of ['stores','personal'])d.meta.insuranceConsultationSource[k].cutoff=yesterday;f.source=d;const r=read(f,p);assert.equal(r.items[0].status,'required');assert.equal(r.items[0].progress.publicationDate,yesterday);}
+ if(yesterday.slice(0,7)===F.date.slice(0,7)){const d=F.data();d.meta.reportDate=yesterday;d.meta.insuranceConsultationSource.publicationDate=yesterday;for(const k of ['stores','personal'])d.meta.insuranceConsultationSource[k].cutoff=yesterday;f.source=d;const r=read(f,p);assert.equal(r.items[0].status,'pending');assert.equal(r.items[0].progress.referenceOnly,true);assert.equal(r.items[0].progress.publicationDate,yesterday);}
 });
 test('source corrections freeze valid same-day submission, reject stale first submit, and never fabricate eligibility',()=>{
  const f=setup(),p=f.login(),row=read(f,p).items[0];f.source.meta.insuranceConsultationSource.version='c'.repeat(64);assert.equal(submit(f,p,row).status,'error');assert.equal(f.fileWrites,0);

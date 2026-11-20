@@ -4,9 +4,9 @@
 
 ## 正式來源與門檻
 
-每日原報經既有 `extract.py` 產出私有 `meta.insuranceConsultationSource`，schema `insurance-consultation-source/v2`。店級讀「搭售達成率 (手機保險)」H，個人讀「搭售達成率 (手機保險) _個人」M，分別驗證身分與各自統計期。個人 D3 可獨立提供該個人頁統計起訖，不能當作店級截止。來源 SHA256、發布日與檔名須和私有 KPI 容器一致；版本由內容決定。無可信分子母時直接用正式公布率。
+每日原報經既有 `extract.py` 產出獨立私有 `insurance-source-MMDD.json` 與 `insurance-publish-MMDD.json`，不再增加普通 KPI JSON 欄位。來源 schema 為 `insurance-consultation-source/v2`。店級讀「搭售達成率 (手機保險)」H，個人讀「搭售達成率 (手機保險) _個人」M，分別驗證身分與各自統計期。個人 D3 可獨立提供該個人頁統計起訖，不能當作店級截止。來源 SHA256、發布日與檔名須和獨立私有發布封套及原檔位元一致；版本由內容決定。無可信分子母時直接用正式公布率。
 
-最新可用同月報表可以落後回報日，頁首顯示來源發布日及實際統計截止，不稱即時更新。原始率低於 50% 才要求五欄；49.9999% 仍要求，50% 免填，明確有效的 0% 要求。缺值、身份疑義、未知期間、跨月及未來批次為「資料待核」，不假算 0、不擋一般回報。來源更正後首次提交必須重新讀取版本；同批重跑不產生新任務。
+統計截止可落後發布日，頁首分別顯示兩者，不稱即時更新。尚未取得本日有效發布，或新批缺值／失敗時，保留前次率與日期並標示「舊資料／待核」，只供參考，不強制本日請益。原始率低於 50% 才要求五欄；49.9999% 仍要求，50% 免填，明確有效的 0% 要求。缺值、身份疑義、未知期間、跨月及未來批次為「資料待核」，不假算 0、不擋一般回報。來源更正後首次提交必須重新讀取版本；同批重跑不產生新任務。
 
 11/20 原報的個人分頁有獨立期間證據，可供個人流驗證；店級沒有獨立期間證據時保留待核，不能因此攔住可驗的個人流。實際來源與稽核紀錄只留私有環境。
 
@@ -36,12 +36,22 @@ B 動作 `employee_insurance_read` 接收 `dataDate`，回應 schema `insurance-
 
 目前既有 daily gold 私有 schema 只有 personKey、遮罩、餘額與原因，沒有已核對的 employee ID、保險週期、週率及入帳映射；月度 company Final 是另一帳本。故 `insurance-weekly-self/v1` 目前全部明示待結，率、截止、加扣、累計為 null，尚未接上 W1 既有結果。待原金牌流程交接本人可核對的正式週報與入帳欄再接讀；不從餘額／原因反推，不補發追扣、不重算已結週。週期或中斷後再達標規則未核仍待結，不阻擋每日請益。
 
+## 私有來源保留與發布接線
+
+來源持久化到原私有資料夾的 `north12b-insurance-source-private.json`（`insurance-source-state/v1`），與每日回覆檔及 KPI latest 檔分開。原 KPI 自動更新、快速上傳與既有 JSON 覆寫完全不需要改動；它們無法清除這個檔。個人率與員編不加入普通 KPI 產物、郵件附件、公開網站或分享包。兩條既有 KPI 回應的 redaction 保留，防止先前含 sidecar 的私有 payload 外露。
+
+只有原管理者授權可呼叫 `insurance_source_status / insurance_source_begin / insurance_source_complete`，沿用原 auth owner 及交易鎖；不增加 B 使用者權限。status 只回版本、批次與筆數，不回員編或率。begin 先以 expectedVersion 做 CAS，持久化 pending 並保留舊值；complete 逐人／店驗證後合併。缺值、無效身分／期間及截止倒退不取代舊有效值；店級待核不清個人、亦不碰週金牌。
+
+寫後逐字讀回；complete 失敗回復到已持久化的 pending 及舊值。相同來源 hash 與內容重跑不重寫；同日更正原檔 hash 可更新。相同原檔已成功的內容不能偷偷改寫；修正解析器需另作經審核更正，不能繞過冪等驗證。網路結果不明先讀 status 對帳，不盲重送。若連 begin 都無法確認，不能宣稱已記錄失敗；保留原資料及日期，由既有發布負責人查核。
+
+`insurance_publish.mjs` 提供顯式 `publishInsuranceIntent` 接點：讀取原檔及私有 intent，驗證 SHA256，再由既有受權 publisher 注入 request 與 endpoint。此模組不讀取憑證、不在 import／建置時發送請求、不建立排程。extract 來源解析失敗會產出 failed intent，讓受權發布接點標記待核而保留舊值；私有輸出不可寫時只記錄無法準備，不阻斷原 KPI 建置。既有 09:45 外部執行者尚須核對並接上這個呼叫，repo 測試通過不代表正式接通。
+
 ## 發布順序與回復
 
-1. 取得現役正式部署版及 saved HEAD 完整私有備份，包含 manifest、Console-only 檔；核實當前版本，不把 repo 當完整正式副本。
-2. 在私有副本加入 `InsuranceConsultation.gs` 與 `InsuranceConsultationStore.gs`，只套 `Code.gs` 的 B allowlist、受保護 dispatch、兩條 KPI 回應的 sidecar 移除片段。原 manifest／URL／權限不變，不整檔覆蓋。核對現役聯名卡等差異仍保留。
-3. 後端先部署並用正式身份驗證自我範圍與 KPI redaction，再啟用既有私有發布流程的新 sidecar。缺店級期間保持 pending，個人依其獨立來源驗證。不變更排程、圖片或郵件。
-4. 發布前端，正式登入驗本人頁首、門市角色、一般兩時段不受阻；以首次真實回覆讀回驗證，不在正式表寫假數字或假同仁。公開 HTML 與預覽成功不代替此驗收。
-5. 回復先撤下新入口並停止產生新 sidecar，回復已備份的部署指標及前端；已發布 KPI 檔若含 sidecar，必須保留兩處 redaction 或先用原受權發布流程移除 sidecar，不能將含身分的新 payload 交給無 redaction 的舊後端。新每日私有提交保留，不刪除、不回填、不改權限。
+1. 核實現役部署版與 saved HEAD 完整私有備份，包含 manifest、Console-only 檔。repo 不代表正式副本。
+2. 在現役私有副本加入 `InsuranceConsultation.gs`、`InsuranceConsultationStore.gs`、`InsuranceSourceCore.gs`、`InsuranceSourcePublication.gs`。`Code.gs` 只套 B allowlist、受保護 dispatch、兩條 KPI redaction 及三個管理者來源動作的一行 dispatch；保留現役額外的 `employee_city_handoff` context、聯名卡及所有專有檔。manifest／URL／權限不變，不能整檔覆蓋。
+3. 後端先驗授權、空來源 pending 及來源交易回復，再部署到同一既有指標。正式發布前核對既有日報實際 runtime，在私有副本最小加入 extractor helper 與 runtime hash，保留現役 Google 別名、NP OUT、外部 batch ID、快取及 timeout。既有 publisher 接入上述私有 intent，先預覽再讀回個人來源。無獨立店級期間仍 pending。
+4. 發布前端後，以正式身份驗本人頁首、門市角色、一般兩時段；首次真實回覆讀回另驗，不向正式資料寫假紀錄。公開 HTML／舊換新 Preview 不代替正式登入。09:00 日報來源仍須另外對帳才切換。
+5. 回復先停止新的來源發布接點並撤下新入口，再回復備份的部署指標及前端；獨立私有來源檔和每日回覆檔均保留。若舊 KPI 檔已有 sidecar，回復無 redaction 後端前須先由原受權流程移除該 sidecar，或保留 redaction。不要刪除歷史／回填／改權限。
 
-本機 repo overlay 及合成測試不能取代正式完整比對、正式發布管線讀回及登入驗收。未過門檻維持草稿，不先上可填卻無法安全保存的前端。
+本機 repo overlay、私有副本與合成測試不能代替正式完整比對、發布來源及登入讀回。本次修改不進行正式部署或任何正式資料寫入。

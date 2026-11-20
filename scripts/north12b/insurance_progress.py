@@ -1,6 +1,7 @@
 """Private insurance sources; store and personal periods are verified independently."""
 import hashlib
 import json
+import os
 import re
 from datetime import date
 
@@ -77,3 +78,35 @@ def extract_consultation_source(book, stores, people, source_file, source_sha, p
     out={'schema':'insurance-consultation-source/v2','sourceFile':source_file,'sourceSha256':source_sha,'publicationDate':publication_date,'stores':store,'personal':personal}
     out['version']=hashlib.sha256(json.dumps(out,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()).hexdigest()
     return out
+
+
+def private_publication_payload(book, stores, people, source_file, source_sha, publication_date):
+    source = extract_consultation_source(book, stores, people, source_file, source_sha, publication_date)
+    return {'schema':'insurance-source-payload/v1','data':{'meta':{'sourceFile':source_file,'sourceSha256':source_sha,'reportDate':publication_date,'insuranceConsultationSource':source},'stores':[{'code':s['code'],'name':s['name']} for s in stores]}}
+
+
+def write_private_publication_artifacts(directory, book, stores, people, source_file, source_sha, publication_date):
+    """Prepare a private publish intent, never publish or attach it to the report."""
+    from pathlib import Path
+    directory = Path(directory)
+    intent = {'schema':'insurance-source-intent/v1','sourceFile':source_file,
+              'sourceSha256':source_sha,'reportDate':publication_date,
+              'outcome':'failed','payloadFile':None,'payloadSha256':None}
+    def save(file, value):
+        raw = json.dumps(value, ensure_ascii=False).encode()
+        fd = os.open(file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, 'wb') as handle:
+            os.fchmod(handle.fileno(), 0o600)
+            handle.write(raw)
+        return hashlib.sha256(raw).hexdigest()
+    try:
+        payload = private_publication_payload(book, stores, people, source_file, source_sha, publication_date)
+        name = 'insurance-source-' + Path(source_file).stem + '.json'
+        sha = save(directory / name, payload)
+        intent.update(outcome='complete', payloadFile=name, payloadSha256=sha)
+    except Exception:
+        # Keep the ordinary KPI build independent; the explicit private publisher
+        # can durably mark this attempt failed without deleting prior valid rates.
+        pass
+    save(directory / ('insurance-publish-' + Path(source_file).stem + '.json'), intent)
+    return intent

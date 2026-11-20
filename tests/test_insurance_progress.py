@@ -1,4 +1,5 @@
-import copy, sys, unittest
+import copy, json, sys, tempfile, unittest
+from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts/north12b'))
 from insurance_progress import extract_progress, SHEET
@@ -23,6 +24,20 @@ class Progress(unittest.TestCase):
 
 
 class PersonalProgress(unittest.TestCase):
+ def test_separate_private_artifacts_and_extraction_failure_intent(self):
+  from insurance_progress import write_private_publication_artifacts
+  with tempfile.TemporaryDirectory() as folder:
+   root=Path(folder);kpi=root/'kpicalc-1002-corrected.json';kpi.write_text('{"SYNTHETIC_KPI":"unchanged"}')
+   intent=write_private_publication_artifacts(root,{},[],[],'1002.xlsx','a'*64,'2099-10-02')
+   self.assertEqual(intent['outcome'],'complete');self.assertEqual(kpi.read_text(),'{"SYNTHETIC_KPI":"unchanged"}')
+   for file in root.glob('insurance-*.json'): self.assertEqual(file.stat().st_mode & 0o777,0o600)
+   old=(root/intent['payloadFile']).read_bytes()
+   with patch('insurance_progress.private_publication_payload',side_effect=ValueError('SYNTHETIC_PARSE_FAILURE')):
+    failed=write_private_publication_artifacts(root,{},[],[],'1002.xlsx','b'*64,'2099-10-02')
+   self.assertEqual(failed['outcome'],'failed');self.assertIsNone(failed['payloadFile']);self.assertIsNone(failed['payloadSha256'])
+   self.assertEqual((root/intent['payloadFile']).read_bytes(),old)
+   self.assertEqual(json.loads((root/'insurance-publish-1002.json').read_text()),failed)
+
  def test_personal_period_independent_identity_and_column(self):
   from insurance_progress import extract_consultation_source, PERSONAL_SHEET
   rows=[[None]*13 for _ in range(7)];rows[0][0]='手機保險 KPI 進度達成率';rows[2][3]='2099/10/01 ~ 10/01';rows[4][12]='手機保險搭售率';rows[6]=['北一二區','北一二B','SYNTH_STORE','台北三創','合成角色','SYNTH_EMP','合*成',0,0,0,0,.9,.42857]
