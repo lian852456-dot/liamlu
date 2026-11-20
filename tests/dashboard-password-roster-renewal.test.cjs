@@ -92,6 +92,32 @@ test('trusted supervisor can use two devices without moving employee bindings; t
  assert.equal(f.props.get(BIND),before);
 });
 
+test('trade-in transaction reads use the server session identity and require its active device',()=>{
+ const f=fixture();
+ f.ctx.privateDashboardBVerifyPassword_=()=>true;
+ const reads=[];
+ f.ctx.tradeinPerformanceTransactionsForViewer_=(month,viewer)=>{
+  assert.equal(f.held(),true);
+  reads.push({month,id:viewer.id,supervisor:viewer.supervisor});
+  return {month,scope:viewer.supervisor?'supervisor':'self',sourcePeriod:null,rows:null};
+ };
+ const api=f.ctx.privateDashboardCreateGasB_({}),invoke=p=>api.handle(JSON.stringify(p));
+ const month='2026-11',deviceId='SYNTHETIC_SAR74_DEVICE',staff='SYNTH002',boss='SYNTHBOSS';
+ f.props.set('DASHBOARD_TRUSTED_EMPLOYEE_ID',boss);
+ f.rows.DashboardUsers.push([boss,'SYNTHETIC_BOSS','北一二B','督導','active','','','']);
+ const staffSession=invoke(passwordLogin(staff,deviceId,'SYNTHETIC_PASSWORD','SYNTHETIC_TRADEIN_STAFF','a'));
+ const bossSession=invoke(passwordLogin(boss,deviceId,'SYNTHETIC_PASSWORD','SYNTHETIC_TRADEIN_BOSS','b'));
+ const request={action:'employee_tradein_transactions_read',deviceId,month};
+ assert.equal(invoke({...request,token:staffSession.token}).scope,'self');
+ assert.equal(invoke({...request,token:bossSession.token}).scope,'supervisor');
+ assert.equal(invoke({...request,token:staffSession.token,employeeId:boss}).status,'error');
+ assert.equal(invoke({...request,token:bossSession.token,deviceId:'SYNTHETIC_WRONG_DEVICE'}).status,'error');
+ assert.equal(invoke({...request}).status,'error');
+ invoke({action:'employee_logout',token:bossSession.token,deviceId});
+ assert.equal(invoke({...request,token:bossSession.token}).status,'error');
+ assert.deepEqual(reads,[{month,id:staff,supervisor:false},{month,id:boss,supervisor:true}]);
+});
+
 test('a full same-device login replaces its oldest lease without releasing the staff binding',()=>{
  const f=fixture();f.ctx.privateDashboardBVerifyPassword_=()=>true;
  // Distinct issuedAt values make "oldest" independent of host clock resolution.
