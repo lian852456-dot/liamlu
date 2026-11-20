@@ -20,4 +20,15 @@ class Progress(unittest.TestCase):
   for text in ['統計期間：2099/09/01～2099/10/01','統計期間：2099/10/01～2099/10/03']:
    b=self.source();b[SHEET]['values'][1][0]=text;self.assertEqual(self.extract(b)['status'],'pending')
   b=self.source();b[SHEET]['values'].append(b[SHEET]['values'][14]);self.assertIsNone(self.extract(b)['rows'][0]['rate'])
-if __name__=='__main__':unittest.main()
+
+
+class PersonalProgress(unittest.TestCase):
+ def test_personal_period_independent_identity_and_column(self):
+  from insurance_progress import extract_consultation_source, PERSONAL_SHEET
+  rows=[[None]*13 for _ in range(7)];rows[0][0]='手機保險 KPI 進度達成率';rows[2][3]='2099/10/01 ~ 10/01';rows[4][12]='手機保險搭售率';rows[6]=['北一二區','北一二B','SYNTH_STORE','台北三創','合成角色','SYNTH_EMP','合*成',0,0,0,0,.9,.42857]
+  book={PERSONAL_SHEET:{'values':rows}};stores=[{'code':'SYNTH_STORE','name':'台北三創'}];people=[{'employee_id':'SYNTH_EMP','store':'SYNTH_STORE','pname':'合*成'}]
+  s=extract_consultation_source(book,stores,people,'SYNTHETIC.xlsx','a'*64,'2099-10-02');self.assertEqual(s['personal']['status'],'verified');self.assertEqual(s['personal']['cutoff'],'2099-10-01');self.assertEqual(s['personal']['rows'][0]['rate'],.42857);self.assertEqual(s['stores']['status'],'pending');self.assertIsNone(s['stores']['cutoff'])
+  rows[6][2]='OTHER_STORE';s=extract_consultation_source(book,stores,people,'SYNTHETIC.xlsx','a'*64,'2099-10-02');self.assertIsNone(s['personal']['rows'][0]['rate']);self.assertEqual(s['personal']['rows'][0]['identityStatus'],'pending')
+
+if __name__ == "__main__":
+    unittest.main()

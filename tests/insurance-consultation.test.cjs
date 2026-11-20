@@ -1,54 +1,61 @@
-const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
-const C=require('../insurance-consultation.js'),F=require('./fixtures/insurance-progress.cjs'),{setup}=require('./fixtures/report-save-gas.cjs');
-const record=(data,values=F.values)=>({insurance_consult_json:C.serialize(C.resolve(data,F.store,F.date),values)});
-test('browser and GAS share exactly the same rule, only formal monthly H rate triggers',()=>{
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
+const C=require('../insurance-consultation.js'),F=require('./fixtures/insurance-progress.cjs'),{setup}=require('./helpers/insurance-runtime.cjs');
+const read=(f,p,date=F.date)=>f.handle({action:'employee_insurance_read',...p,dataDate:date});
+function submit(f,p,row,values=F.values){return f.handle({action:'employee_insurance_submit',...p,dataDate:row.dataDate,subjectKey:row.subjectKey,sourceVersion:row.progress?.sourceVersion,values,submissionId:'SYNTHETIC_SUBMISSION_001'});}
+test('shared core: 49.99 / 50 / 0 / invalid; store and personal independent; no daily sales inputs',()=>{
  assert.equal(fs.readFileSync('insurance-consultation.js','utf8'),fs.readFileSync('gas/InsuranceConsultation.gs','utf8'));
- for(const [rate,required] of [[0,true],[0.49999,true],[0.5,false],[0.9,false],[null,false],['',false]]){
-  assert.equal(C.required({...record(F.data(rate)),insurance_num:0,insurance_den:10,insurance_pct:0}),required);
-  assert.equal(C.required({...record(F.data(rate)),insurance_num:10,insurance_den:10,insurance_pct:100}),required);
+ for(const [v,expected] of [[.4999,'required'],[.5,'exempt'],[0,'required'],[null,'pending'],['0','pending'],['','pending'],[-1,'pending']]){
+  const s=C.source(F.data(v,.5),F.date);assert.equal(s.find(x=>x.kind==='personal').requirement,expected);assert.equal(s.find(x=>x.kind==='store').requirement,'exempt');
  }
- assert.equal(C.required({insurance_num:0,insurance_den:10}),false);
+ const d=F.data();d.meta.insuranceConsultationSource.stores.status='pending';assert.equal(C.source(d,F.date).find(x=>x.kind==='personal').requirement,'required');
 });
-test('missing, cross month, newer or older publications and mixed source stay pending',()=>{
- for(const change of [s=>s.rows=[],s=>s.rows[0].rate=null,s=>s.status='pending',s=>s.cutoff='2099-09-30',s=>s.publicationDate='2099-10-03',s=>s.publicationDate='2099-10-01',s=>s.sourceSha256='c'.repeat(64),s=>s.periodEvidence=null,s=>s.column='G']){
-  const data=F.data();change(data.meta.storeInsuranceProgress);assert.equal(C.resolve(data,F.store,F.date).status,'pending');assert.equal(C.assess(record(data,{})).missing.length,0);
+test('real B session/native route projects self only; no employee ID or other store information',()=>{
+ const f=setup(),p=f.login(),r=read(f,p);assert.equal(r.status,'ok');assert.equal(r.scope,'self');assert.equal(r.items.length,1);assert.equal(r.items[0].isSelf,true);assert.equal(r.items[0].progress.rate,.42857);
+ const txt=JSON.stringify(r);for(const forbidden of ['SYNTH002','subjectId','employeeId','合*成0','台北三創'])assert.ok(!txt.includes(forbidden));
+ assert.equal(read(f,{...p,token:'B1_a_'+'e'.repeat(64)}).status,'error');assert.equal(read(f,{...p,deviceId:'SYNTHETIC_OTHER_DEVICE'}).status,'error');
+});
+test('store managers see own store and self; supervisor can reconcile approved store/person set; cross-scope submit denied',()=>{
+ const f=setup();f.rows.DashboardUsers[2][3]='店長';const manager=f.login(),r=read(f,manager);assert.equal(r.items.length,2);assert.ok(r.items.every(x=>x.store==='永吉'));assert.equal(r.items.find(x=>x.kind==='store').status,'exempt');assert.equal(r.items.find(x=>x.kind==='personal').status,'required');
+ const supervisor=f.login('SYNTHBOSS','SYNTHETIC_BOSS_DEVICE'),all=read(f,supervisor);assert.equal(all.scope,'supervisor');assert.equal(all.items.filter(x=>x.kind==='store').length,9);
+ const other=all.items.find(x=>x.kind==='personal'&&!x.isSelf&&x.store==='通化');assert.equal(other.canSubmit,false);assert.equal(submit(f,supervisor,other).status,'error');assert.equal(submit(f,manager,other).status,'error');assert.equal(f.fileWrites,0);
+});
+test('all five trimmed fields enforced by backend; successful submit/readback and daily unique key never overwrite',()=>{
+ const f=setup(),p=f.login(),row=read(f,p).items[0];
+ for(const [key] of C.fields){assert.equal(submit(f,p,row,{...F.values,[key]:' \n '}).status,'error');assert.equal(f.fileWrites,0);}
+ const done=submit(f,p,row,Object.fromEntries(Object.entries(F.values).map(([k,v])=>[k,' '+v+' '])));assert.equal(done.status,'ok');assert.equal(done.item.status,'completed');assert.deepEqual(done.item.submission.values,F.values);assert.equal(f.fileWrites,1);
+ const again=submit(f,p,row,{...F.values,advisor:'不可覆蓋'});assert.equal(again.alreadySubmitted,true);assert.deepEqual(again.item.submission.values,F.values);assert.equal(f.fileWrites,1);assert.equal(read(f,p).items[0].status,'completed');
+});
+test('yesterday submission is not today; latest lagging report can drive today with its own displayed report/cutoff dates',()=>{
+ const f=setup(),p=f.login(),row=read(f,p).items[0];submit(f,p,row);const saved=JSON.parse([...f.files.values()][0]);const yesterday=new Date(Date.parse(F.date)-86400000).toISOString().slice(0,10);
+ f.files.clear();saved.dataDate=yesterday;saved.records.forEach(r=>r.dataDate=yesterday);f.files.set('insurance-consultation-'+yesterday+'.json',JSON.stringify(saved));
+ assert.equal(read(f,p).items[0].status,'required');
+ if(yesterday.slice(0,7)===F.date.slice(0,7)){const d=F.data();d.meta.reportDate=yesterday;d.meta.insuranceConsultationSource.publicationDate=yesterday;for(const k of ['stores','personal'])d.meta.insuranceConsultationSource[k].cutoff=yesterday;f.source=d;const r=read(f,p);assert.equal(r.items[0].status,'required');assert.equal(r.items[0].progress.publicationDate,yesterday);}
+});
+test('source corrections freeze valid same-day submission, reject stale first submit, and never fabricate eligibility',()=>{
+ const f=setup(),p=f.login(),row=read(f,p).items[0];f.source.meta.insuranceConsultationSource.version='c'.repeat(64);assert.equal(submit(f,p,row).status,'error');assert.equal(f.fileWrites,0);
+ const current=read(f,p).items[0];assert.equal(submit(f,p,current).status,'ok');f.source.meta.insuranceConsultationSource.version='d'.repeat(64);assert.equal(read(f,p).items[0].status,'completed');assert.equal(read(f,p).items[0].sourceChanged,true);
+});
+test('50% and pending cannot submit; revoked account fails; weekly unknown never blocks eligible daily flow',()=>{
+ for(const rate of [.5,null]){const f=setup(F.data(rate)),p=f.login(),r=read(f,p);assert.equal(submit(f,p,r.items[0]).status,'error');assert.equal(f.fileWrites,0);}
+ const f=setup(),p=f.login(),r=read(f,p);assert.equal(r.weekly.cumulativeReward,null);assert.ok(r.weekly.weeks.every(w=>w.postingStatus==='待結'&&w.adjustment===null));assert.match(r.weekly.weeks[2].rule,/累計 8/);assert.match(r.weekly.weeks[3].rule,/累計 11/);assert.equal(submit(f,p,r.items[0]).status,'ok');
+ f.rows.DashboardUsers[2][4]='revoked';assert.equal(read(f,p).status,'error');
+});
+test('new private source is removed from legacy/B KPI projections; ordinary daily report contains no insurance consultation gate',()=>{
+ const code=fs.readFileSync('gas/Code.gs','utf8'),html=fs.readFileSync('index.html','utf8');assert.equal((code.match(/delete data.meta.insuranceConsultationSource/g)||[]).length,2);
+ assert.doesNotMatch(code,/reportInsuranceConsultData_|insurance_consult_json/);assert.doesNotMatch(html,/insuranceConsultSection|validateInsuranceConsultForm|insurance_consult_json/);assert.match(html,/href="insurance-consultation.html"/);
+});
+test('ambiguous identity or stats period stays pending, with no personal-rate substitution for stores',()=>{
+ const d=F.data();d.meta.insuranceConsultationSource.personal.rows.push({...d.meta.insuranceConsultationSource.personal.rows[1]});d.meta.insuranceConsultationSource.stores.periodEvidence=null;
+ const rows=C.source(d,F.date);assert.ok(rows.filter(x=>x.kind==='store'||x.id==='SYNTH002').every(x=>x.requirement==='pending'));
+});
+
+test('actual B KPI response strips private insurance identities while dedicated self read remains available',()=>{
+ const f=setup(),p=f.login(),r=f.handle({action:'employee_kpi_read',...p});assert.equal(r.status,'ok');assert.ok(!Object.hasOwn(r.data.meta,'insuranceConsultationSource'));assert.ok(f.source.meta.insuranceConsultationSource);assert.equal(read(f,p).items[0].status,'required');
+});
+test('unverified dates, mismatched batch and corrupt saved state never become an eligible write',()=>{
+ const previous=new Date(Date.parse(F.date.slice(0,7)+'-01')-86400000).toISOString().slice(0,10);
+ for(const change of [d=>d.meta.insuranceConsultationSource.sourceSha256='c'.repeat(64),d=>d.meta.insuranceConsultationSource.personal.cutoff='2099-12-31',d=>d.meta.insuranceConsultationSource.personal.periodStart=previous.slice(0,7)+'-01',d=>d.meta.insuranceConsultationSource.personal.periodEvidence=null]){
+  const d=F.data();change(d);const f=setup(d),p=f.login(),r=read(f,p);assert.equal(r.items[0].status,'pending');assert.equal(submit(f,p,r.items[0]).status,'error');assert.equal(f.fileWrites,0);
  }
-});
-test('both segments enforce five trimmed fields, persist independent values, preserve OP/card and duplicate receipts',()=>{
- let source=F.data();const {api}=setup({insuranceData:()=>source});
- for(const seg of [16,21]){
-  const p={action:'write',date:F.date,store:F.store,seg,data:{...record(source),insurance_num:9,insurance_den:10,insurance_pct:90,cobranded_card:0,management_focus_json:JSON.stringify({op_online:5,op_accum:9,op_target:14})}};
-  for(const [key] of C.fields){const bad={...p,data:record(source,{...F.values,[key]:' \n '})};assert.throws(()=>api.reportWritePayload_(bad),/五項/);}
-  const values={...F.values,advisor:'  合成 '+seg+'  '};p.data={...p.data,...record(source,values)};
-  p.mutation={schema:'report-save-v1',id:'synthetic-insurance-'+seg,baseRevision:api.reportSaveStatus_({...p,action:'report_save_status',kind:'write'}).revision};
-  const receipt=api.reportWritePayload_(p);assert.equal(receipt.rowWritten,true);
-  assert.equal(api.reportWritePayload_(p).commitId,receipt.commitId);
-  const row=api.readData(F.date,seg)[F.store];assert.equal(C.parse(row.insurance_consult_json).advisor,'合成 '+seg);assert.equal(row.cobranded_card,0);assert.equal(JSON.parse(row.management_focus_json).op_target,14);
- }
- source=F.data(0.8);source.meta.storeInsuranceProgress.version='c'.repeat(64);
- const row=api.readData(F.date,16)[F.store];assert.equal(C.saved(row).progress.rate,0.4);
- const edited={...row,insurance_consult_json:C.serialize(C.saved(row).progress,{...F.values,advisor:'再請益'})};
- api.reportWritePayload_({action:'write',date:F.date,store:F.store,seg:16,data:edited});assert.equal(C.saved(api.readData(F.date,16)[F.store]).progress.rate,0.4);
-});
-test('source changes before first save reject stale proof; inactive text removed; legacy absence and personal remain unchanged',()=>{
- let source=F.data();const {api}=setup({insuranceData:()=>source}),old=record(source);source=F.data(.6);
- const p={action:'write',date:F.date,store:F.store,seg:16,data:old};assert.throws(()=>api.reportWritePayload_(p),/來源已更新/);
- p.data=record(source);api.reportWritePayload_(p);assert.deepEqual(C.saved(api.readData(F.date,16)[F.store]).values,{});
- const legacy=setup();legacy.api.reportWritePayload_({...p,data:{insurance_num:0,insurance_den:10}});assert.equal(legacy.api.readData(F.date,16)[F.store].insurance_consult_json,'');
- assert.equal(C.saved({insurance_num:0,insurance_den:10}),null);
-});
-test('partial store missing does not borrow another store or personal rates',()=>{
- const data=F.data(null);data.persons=[{store:F.store,rate:0.1}];data.meta.storeInsuranceProgress.rows.push({code:'DNB-OTHER',store:'合成別店',rate:.1});assert.equal(C.resolve(data,F.store,F.date).status,'pending');
-});
-test('malformed optional source is pending, no namespace or private-source expansion',()=>{
- for(const key of ['rows']){const d=F.data();d.meta.storeInsuranceProgress[key]={};assert.equal(C.resolve(d,F.store,F.date).status,'pending');}
- const d=F.data();d.stores={};assert.equal(C.resolve(d,F.store,F.date).status,'pending');
- const html=fs.readFileSync('index.html','utf8');assert.match(html,/insuranceProgressData=bundle\.kpiResult\?\.data\|\|null/);assert.match(html,/clear\(\)\{insuranceProgressData=null;loadInsuranceConsultForm\(null\)/);
- const code=fs.readFileSync('gas/Code.gs','utf8');assert.doesNotMatch(code,/action === 'insurance_progress_(read|publish)'/);
-});
-test('source outage does not hard-block pending reports or promote pending to formal proof',()=>{
- const d=F.data();d.meta.storeInsuranceProgress.status='pending';d.meta.storeInsuranceProgress.cutoff=null;
- const {api}=setup();const p={action:'write',date:F.date,store:F.store,seg:16,data:record(d,{advisor:'殘留'})};api.reportWritePayload_(p);
- const v=C.saved(api.readData(F.date,16)[F.store]);assert.equal(v.progress.status,'pending');assert.deepEqual(v.values,{});
- assert.throws(()=>setup().api.reportWritePayload_({...p,data:record(F.data())}),/來源已更新/);
+ const f=setup(),p=f.login();f.files.set('insurance-consultation-'+F.date+'.json','{}');assert.equal(read(f,p).status,'error');assert.equal(f.fileWrites,0);
 });

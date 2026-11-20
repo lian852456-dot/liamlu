@@ -151,6 +151,8 @@ function createDashboardBClient(ownerExecUrl, options={}) {
         !Number.isSafeInteger(result.expiresAt) || result.expiresAt<=now() || result.expiresAt>now()+120000)throw Error('CITY_HANDOFF_INVALID');
       return {schema:result.schema,challengeId:result.challengeId,code:result.code,expiresAt:Math.min(result.expiresAt,now()+challenge.expiresAt-cityNow())};
     },
+    insuranceRead:dataDate=>protectedPost('employee_insurance_read',{dataDate}),
+    insuranceSubmit:payload=>protectedPost('employee_insurance_submit',payload),
     validate:()=>protectedPost('employee_session'),
     restore(deviceId){suspend();lastDeviceId=deviceId;const value=savedSession(deviceId);if(!value)return null;session={deviceId:value.deviceId,token:value.token};expiresAt=value.expiresAt;lastPhoneToken=savedPhone(deviceId)?.phoneToken||'';return {expiresAt};},
     suspend,

@@ -1,4 +1,4 @@
-"""Private store-only sidecar. No personal worksheet or inferred period is accepted."""
+"""Private insurance sources; store and personal periods are verified independently."""
 import hashlib
 import json
 import re
@@ -47,4 +47,33 @@ def extract_progress(book, stores, source_file, source_sha, publication_date):
         out['rows'].append({'code':store['code'], 'store':store['name'], 'rate':rate(matches[0][7]) if valid else None})
     # Stable across retries; a same-day correction changes the input SHA/version.
     out['version'] = hashlib.sha256(json.dumps(out,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    return out
+
+
+PERSONAL_SHEET = SHEET + ' _個人'
+
+def extract_consultation_source(book, stores, people, source_file, source_sha, publication_date):
+    store = extract_progress(book, stores, source_file, source_sha, publication_date)
+    rows = book.get(PERSONAL_SHEET, {}).get('values', [])
+    personal = {'sheet':PERSONAL_SHEET,'column':'M','status':'pending','periodStart':None,'cutoff':None,'periodEvidence':None,'rows':[]}
+    title_ok = bool(rows and rows[0] and rows[0][0] == '手機保險 KPI 進度達成率')
+    header_ok = len(rows)>4 and len(rows[4])>12 and rows[4][12]=='手機保險搭售率'
+    text = str(rows[2][3] or '') if len(rows)>2 and len(rows[2])>3 else ''
+    m = re.fullmatch(r'(20\d{2})/(\d{1,2})/(\d{1,2})\s*[~～至]\s*(?:(20\d{2})/)?(\d{1,2})/(\d{1,2})',text.strip())
+    if m and title_ok and header_ok:
+        try:
+            y,mo,da,ey,em,ed=m.groups(); start=date(int(y),int(mo),int(da)); end=date(int(ey or y),int(em),int(ed))
+            if start.day==1 and start.strftime('%Y-%m')==end.strftime('%Y-%m') and start<=end<=date.fromisoformat(publication_date):
+                personal.update(status='verified',periodStart=str(start),cutoff=str(end),periodEvidence={'sheet':PERSONAL_SHEET,'cell':'D3','text':text})
+        except ValueError: pass
+    store_names={x['code']:x['name'] for x in stores}
+    for person in people:
+        pid=str(person.get('employee_id') or '').strip(); code=str(person.get('store') or '')
+        matches=[r for r in rows[6:] if len(r)>12 and str(r[5] or '').strip()==pid and r[1]=='北一二B']
+        roster_unique=sum(str(x.get('employee_id') or '').strip()==pid for x in people)==1
+        valid=bool(pid and roster_unique and code in store_names and title_ok and header_ok and len(matches)==1 and str(matches[0][2])==code and canonical_store(matches[0][3])==canonical_store(store_names[code]) and str(matches[0][6] or '').strip()==str(person.get('pname') or '').strip())
+        masked=str(person.get('pname') or '')
+        personal['rows'].append({'subjectId':pid,'storeCode':code,'store':store_names.get(code,''),'maskedName':masked if '*' in masked or '＊' in masked else '同仁','identityStatus':'verified' if valid else 'pending','rate':rate(matches[0][12]) if valid else None})
+    out={'schema':'insurance-consultation-source/v2','sourceFile':source_file,'sourceSha256':source_sha,'publicationDate':publication_date,'stores':store,'personal':personal}
+    out['version']=hashlib.sha256(json.dumps(out,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()).hexdigest()
     return out

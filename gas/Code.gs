@@ -18,8 +18,7 @@ const FIELDS = [
   'tw_pixel10','tw_s26u','tw_sharpr11','tw_vivo','tw_s26','tw_reno16f',
   'tw_pixel10fold','tw_findx9s','tw_sony1','tw_poketomo',
   'tw_oppoa6x','tw_a27','tw_y21','tw_myfirst',
-  'zero_reason','zero_consult','zero_method','zero_plan',
-  'insurance_consult_json'
+  'zero_reason','zero_consult','zero_method','zero_plan'
 ];
 
 const SPREADSHEET_ID = '10MqzAWOPc4UPE-g5ZZPNZG3tYAndKW-DApLuuhIpQWA';
@@ -3017,38 +3016,9 @@ function reportCardData_(data) {
   return copy;
 }
 
-// Resolve only the already-published private KPI source. Never read a personal insurance rate.
-function reportInsuranceProgress_(store, date) {
-  try {
-    const file = kpiCalcLatestDataFile();
-    return InsuranceConsultation.resolve(file ? JSON.parse(file.getBlob().getDataAsString('UTF-8')) : null, store, date);
-  } catch (_) { return InsuranceConsultation.pending('正式門市保險進度讀取待核'); }
-}
-function reportInsuranceConsultData_(payload) {
-  const copy = Object.assign({}, payload.data);
-  const prior = readData(payload.date, Number(payload.seg))[payload.store];
-  const frozen = InsuranceConsultation.saved(prior);
-  let progress = frozen ? frozen.progress : reportInsuranceProgress_(payload.store, payload.date);
-  const supplied = InsuranceConsultation.saved(copy);
-  // Old clients remain compatible while no verified progress is available.
-  if (!supplied && !frozen && progress.status !== 'verified') { delete copy.insurance_consult_json; return copy; }
-  // Pending client context is informational only. Never turn a source outage into a required consultation.
-  // Only exact server/frozen proof can carry verified status.
-  if (!frozen && progress.status === 'pending' && supplied && supplied.progress.status === 'pending') {
-    const allowed = ['status','reason','rate','sourceFile','sourceSha256','version','publicationDate','sheet','column','periodStart','cutoff','periodEvidence','store','reportDate','code'];
-    if (Object.keys(supplied.progress).every(function(key) { return allowed.indexOf(key) >= 0; })) progress = supplied.progress;
-  }
-  if (!supplied || JSON.stringify(supplied.progress) !== JSON.stringify(progress)) throw new Error('保險進度來源已更新或尚未驗證，請重新登入讀取後送出');
-  copy.insurance_consult_json = InsuranceConsultation.serialize(progress, InsuranceConsultation.parse(copy.insurance_consult_json));
-  if (InsuranceConsultation.assess(copy).missing.length) throw new Error('保險搭售率低於 50%：請填寫以下五項');
-  return copy;
-}
 function reportWritePayload_(payload) {
   payload = Object.assign({}, payload, {data:reportCardData_(payload.data)});
-  return reportMutationLocked_(payload, function(prepared) {
-    prepared.data = reportInsuranceConsultData_(prepared);
-    return reportWriteUnlocked_(prepared);
-  });
+  return reportMutationLocked_(payload, function(prepared) { return reportWriteUnlocked_(prepared); });
 }
 
 function reportWriteUnlocked_(payload) {
@@ -4833,6 +4803,8 @@ function kpiCalcAccess(payload) {
   if (!file) throw new Error('KPI 試算資料尚未發佈，請通知督導');
   const data = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
   if (!data || !data.meta || !data.stores || !data.persons) throw new Error('KPI 試算資料格式不完整');
+  // Insurance source identities/rates are projected only by the dedicated authorized route.
+  delete data.meta.insuranceConsultationSource;
   return { data: data, profile: { maskedName: user.masked_name, store: user.store, role: user.role, isTrusted: privateDashboardIsTrustedEmployee(employeeId) } };
 
   });
@@ -9722,6 +9694,8 @@ function privateDashboardBPayload_(input) {
     employee_phone_forget:['action','deviceId','phoneToken'],
     employee_session:['action','deviceId','token'],employee_logout:['action','deviceId','token'],
     employee_private_read:['action','deviceId','token'],employee_kpi_read:['action','deviceId','token'],
+    employee_insurance_read:['action','deviceId','token','dataDate'],
+    employee_insurance_submit:['action','deviceId','token','dataDate','subjectKey','sourceVersion','values','submissionId'],
     employee_tradein_sharing_list:['action','deviceId','token','month'],
     employee_tradein_sharing_detail:['action','deviceId','token','month','id'],
     employee_tradein_sharing_save:['action','deviceId','token','month','id','version','type','scenario','approach','outcome','image'],
@@ -9968,6 +9942,7 @@ function privateDashboardCreateGasB_(options) {
             const file=kpiCalcLatestDataFile();if(!file)throw new Error('B_DATA_UNAVAILABLE');
             const data=privateDashboardBMeasure_('kpiBlob', function() { return JSON.parse(file.getBlob().getDataAsString('UTF-8')); });
             if(!data || !data.meta || !data.stores || !data.persons)throw new Error('B_DATA_INVALID');
+            delete data.meta.insuranceConsultationSource;
             result={data:data};
           } else throw new Error('B_REQUEST_INVALID');
           // Use the existing strict private-result validator under the same lock;
@@ -9985,6 +9960,14 @@ function privateDashboardCreateGasB_(options) {
           if(now()>=s.expiresAt || now()>=config.authority.validUntil)throw new Error('B_SESSION_DENIED');
           return Object.assign({status:'ok',expiresAt:s.expiresAt,trustSource:'password-bound',
             phoneEligible:privateDashboardIsTrustedEmployee(s.employee),privateResult:privateResult,kpiResult:kpiResult},reports);
+        }
+        if(p.action==='employee_insurance_read'||p.action==='employee_insurance_submit') {
+          const user=privateDashboardUserByEmployeeId(s.employee).user;
+          if(!user||user.status!=='active')throw Error('B_ELIGIBILITY_DENIED');
+          const result=insuranceConsultOperation_(p,{id:s.employee,store:profile.store,role:user.role,
+            supervisor:privateDashboardIsTrustedEmployee(s.employee)&&user.role==='督導'});
+          if(now()>=s.expiresAt||now()>=config.authority.validUntil)throw Error('B_SESSION_DENIED');
+          return result;
         }
         if(p.action.indexOf('employee_tradein_sharing_')===0) {
           const user=privateDashboardUserByEmployeeId(s.employee).user;

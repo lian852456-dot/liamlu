@@ -1547,11 +1547,10 @@
     .tab-bar .tab-btn { flex:0 0 auto; min-height:48px; padding:11px 14px; font-size:15px; }
   }
 </style>
-<link rel="stylesheet" href="daily-report-layout.css?v=20261118-insurance-consult-1">
+<link rel="stylesheet" href="daily-report-layout.css?v=20261120-density-1">
 <link rel="stylesheet" href="daily-report-summary.css?v=20261004-summary-1">
 <script src="report-save-recovery.js?v=20261102-1"></script>
-<script src="insurance-consultation.js?v=20261118-insurance-consult-1"></script>
-<script src="daily-report-layout.js?v=20261118-insurance-consult-1" defer></script>
+<script src="daily-report-layout.js?v=20261118-cobranded-card-1" defer></script>
 <script src="GasBClient.js?v=20261024-auth-reject-1" defer></script>
 <script src="dashboard-b-shell.js?v=20261109-phone-return-1" defer></script>
 </head>
@@ -1605,6 +1604,7 @@
 
 <!-- TABS -->
 <div class="tab-bar">
+  <a class="tab-btn" href="insurance-consultation.html" style="text-decoration:none">保險搭售請益</a>
   <button class="tab-btn report-tab active" onclick="switchTab('fill')"><span class="tab-icon" aria-hidden="true">📝</span><span>填報<span class="tab-role">（店長）</span></span></button>
   <button class="tab-btn report-tab" onclick="switchTab('summary')"><span class="tab-icon" aria-hidden="true">📊</span><span>彙整大盤<span class="tab-role">（督導）</span></span></button>
   <button class="tab-btn report-tab" onclick="switchTab('playback')"><span class="tab-icon" aria-hidden="true">🕐</span><span>日期回放</span></button>
@@ -1888,17 +1888,6 @@
     <!-- 儲存 -->    <!-- 儲存 -->
     <div class="save-btn-wrap">
       <p style="margin:0 0 12px;line-height:1.6;">21:00 收官請填齊 A999、A1399、好速、R999、R1399、保險分子／分母與當月管理重點；沒有成交請明確填 0。KPI 達成率與公司排名會自動沿用 16:00 回報，不需重填。</p>
-      <p id="insuranceProgressStatus" class="daily-note" role="status">門市保險進度待核；未啟用必填。</p>
-      <section id="insuranceConsultSection" class="daily-insurance-consult" hidden aria-labelledby="insuranceConsultTitle">
-        <h3 id="insuranceConsultTitle">保險搭售率低於 50%：請填寫以下五項</h3>
-        <p class="daily-note">依正式報表的門市月累計搭售率判斷；每日分子／分母維持原填報口徑。</p>
-        <div><label for="f_insurance_advisor">請益對象</label><textarea id="f_insurance_advisor" rows="2"></textarea></div>
-        <div><label for="f_insurance_icebreaker">破冰方式</label><textarea id="f_insurance_icebreaker" rows="2"></textarea></div>
-        <div><label for="f_insurance_tools">運用工具</label><textarea id="f_insurance_tools" rows="2"></textarea></div>
-        <div><label for="f_insurance_approach">建議話術／作法</label><textarea id="f_insurance_approach" rows="2"></textarea></div>
-        <div><label for="f_insurance_followup">執行提醒／待確認</label><textarea id="f_insurance_followup" rows="2"></textarea></div>
-        <p id="insuranceConsultError" role="alert" hidden></p>
-      </section>
       <p id="closingReportError" role="alert" hidden style="margin:0 0 12px;color:#dc2626;font-weight:700;line-height:1.6;"></p>
       <button class="btn-save-main" onclick="saveData()">
         💾 送出回報
@@ -2210,7 +2199,7 @@
 
 
 <script src="daily-report-summary-model.js?v=20261118-cobranded-card-1"></script>
-<script src="daily-report-summary-controller.js?v=20261118-insurance-consult-1"></script>
+<script src="daily-report-summary-controller.js?v=20261118-cobranded-card-1"></script>
 <script src="daily-report-read-transport.js?v=20261008-pair-1"></script>
 <script src="readonly-dashboard-core.js?v=20261113-conversion-1"></script>
 <script src="kpi-battle-controller.js?v=20261118-person-awards-1"></script>
@@ -2503,10 +2492,6 @@ async function saveToStorage(date, store, seg, data, retryOnly = false) {
   if (!_cache[ck]) _cache[ck] = {};
   _cache[ck][store] = { ...savedData, date, store, seg };
   globalThis.DailyReportLayout?.onSaveConfirmed(store, date, seg, result.readback);
-  if (globalThis.InsuranceConsultation && getSelectedStore() === store && document.getElementById('fillDate').value === date && Number(currentSeg) === Number(seg)) {
-    insuranceFrozen = InsuranceConsultation.saved(result.readback)?.progress || null;
-    updateInsuranceConsultForm();
-  }
   return true;
 }
 
@@ -2856,9 +2841,9 @@ const kpiBattleController = KpiBattleController.create({
 
 window.DashboardBHost={
   navigationSelector:'.tab-btn, [data-kpi-battle-view]',
-  clear(){insuranceProgressData=null;loadInsuranceConsultForm(null);kpiBattleController.failClosed('請重新驗證登入。');awardsBattleController.failClosed('請重新驗證登入。');},
+  clear(){kpiBattleController.failClosed('請重新驗證登入。');awardsBattleController.failClosed('請重新驗證登入。');},
   showLegacyAccess(){document.querySelector('.tab-btn[onclick*="kpi-battle"]')?.click();kpiBattleController.renderLock();document.querySelector('#kpiBattleContent .private-lock')?.scrollIntoView({block:'start',behavior:'smooth'});document.querySelector('#privateEmployeeId')?.focus();},
-  accept(bundle){kpiBattleController.acceptB(bundle);insuranceProgressData=bundle.kpiResult?.data||null;updateInsuranceConsultForm();},
+  accept(bundle){kpiBattleController.acceptB(bundle);},
   navigate(module){
     const tab=module==='awards'?'awards-battle':module==='return'?'fill':'kpi-battle';
     document.querySelector('.tab-btn[onclick*="'+tab+'"]')?.click();
@@ -3110,9 +3095,9 @@ function assertClosingReportReadback(response, date, store, seg, expected) {
   if (!row || String(row.date) !== String(date) || String(row.store) !== String(store) || Number(row.seg) !== Number(seg)) {
     throw new Error('回報讀回失敗，尚未確認完整儲存，請重試');
   }
-  const fields = ['aq999','aq1399','haosu','rt999','rt1399','insurance_num','insurance_den','insurance_pct','management_focus_json','cobranded_card','insurance_consult_json'];
+  const fields = ['aq999','aq1399','haosu','rt999','rt1399','insurance_num','insurance_den','insurance_pct','management_focus_json','cobranded_card'];
   const mismatch = fields.filter(key => {
-    if (key === 'management_focus_json' || key === 'insurance_consult_json') return String(row[key] || '') !== String(expected[key] || '');
+    if (key === 'management_focus_json') return String(row[key] || '') !== String(expected[key] || '');
     return closingReportNumber(row[key]) !== closingReportNumber(expected[key]);
   });
   if (mismatch.length) throw new Error('回報讀回不一致，尚未確認完整儲存，請重試');
@@ -3132,44 +3117,6 @@ function validateReportCardInput(id) {
   input.scrollIntoView({block:'center'}); input.focus(); return false;
 }
 
-function insuranceConsultFormValues() {
-  return Object.fromEntries(InsuranceConsultation.fields.map(([key]) => [key, document.getElementById('f_insurance_' + key).value]));
-}
-let insuranceProgressData = null, insuranceFrozen = null;
-function currentInsuranceProgress() {
-  return insuranceFrozen || InsuranceConsultation.resolve(insuranceProgressData, getSelectedStore(), document.getElementById('fillDate').value);
-}
-function updateInsuranceConsultForm() {
-  const progress = currentInsuranceProgress();
-  const applies = InsuranceConsultation.required({insurance_consult_json:InsuranceConsultation.serialize(progress,{})});
-  document.getElementById('insuranceProgressStatus').textContent = InsuranceConsultation.label(progress);
-  document.getElementById('insuranceConsultSection').hidden = !applies;
-  InsuranceConsultation.fields.forEach(([key]) => {
-    const input = document.getElementById('f_insurance_' + key); input.required = applies;
-    if (!applies) input.removeAttribute('aria-invalid');
-  });
-  document.getElementById('insuranceConsultError').hidden = true;
-}
-function loadInsuranceConsultForm(record, preserveIds = new Set()) {
-  insuranceFrozen = InsuranceConsultation.saved(record)?.progress || null;
-  const values = InsuranceConsultation.parse(record?.insurance_consult_json);
-  InsuranceConsultation.fields.forEach(([key]) => {
-    const input = document.getElementById('f_insurance_' + key);
-    if (!preserveIds.has(input.id)) input.value = values[key];
-  });
-  updateInsuranceConsultForm();
-}
-function validateInsuranceConsultForm(data) {
-  const check = InsuranceConsultation.assess(data), error = document.getElementById('insuranceConsultError');
-  error.hidden = !check.missing.length;
-  error.textContent = check.missing.length ? '請填寫：' + check.missing.map(([,label]) => label).join('、') + '。' : '';
-  InsuranceConsultation.fields.forEach(([key]) => document.getElementById('f_insurance_' + key).removeAttribute('aria-invalid'));
-  if (!check.missing.length) return true;
-  check.missing.forEach(([key]) => document.getElementById('f_insurance_' + key).setAttribute('aria-invalid','true'));
-  const first = document.getElementById('f_insurance_' + check.missing[0][0]);
-  first.scrollIntoView({block:'center'}); first.focus(); showToast('保險搭售率低於 50%，請補齊五項請益內容'); return false;
-}
-
 function getFormData() {
   const obj = {};
   FIELDS.forEach(f => {
@@ -3178,7 +3125,6 @@ function getFormData() {
   });
   obj.cobranded_card = document.getElementById('f_cobranded_card').value === '' ? '' : Number(document.getElementById('f_cobranded_card').value);
   obj.management_focus_json = JSON.stringify(getManagementFocusFormData());
-  if (insuranceProgressData || insuranceFrozen) obj.insurance_consult_json = InsuranceConsultation.serialize(currentInsuranceProgress(), insuranceConsultFormValues());
   return obj;
 }
 
@@ -3190,7 +3136,6 @@ async function saveData() {
   if (!validateReportCardInput('f_cobranded_card')) return;
   const data = getFormData();
   if (!validateClosingReportForm(data, currentSeg, date)) return;
-  if (!validateInsuranceConsultForm(data)) return;
   data.savedAt = new Date().toLocaleTimeString('zh-TW');
   showToast('🔄 上傳中…');
   try {
@@ -3211,7 +3156,6 @@ function clearForm() {
     if (el) el.value = '';
   });
   renderManagementFocusInputs({});
-  loadInsuranceConsultForm(null);
 }
 
 // ════════════════════════════════════
@@ -3919,7 +3863,6 @@ function selectStore(store) {
   const date = document.getElementById('fillDate').value;
   const selectedSeg = currentSeg;
   updateFilledSummary(null);
-  insuranceFrozen = null;
   globalThis.DailyReportLayout?.onSelectionStart(store, date, selectedSeg);
   const isNew = NEW_STORES.includes(store);
   if (isNew) showToast(`🚀 ${store} 新店！6/25 起營業`);
@@ -3945,7 +3888,6 @@ function selectStore(store) {
       }
     });
     renderManagementFocusInputs(managementFocusData(data), {preserveIds:pendingEdits});
-    loadInsuranceConsultForm(data, pendingEdits);
     updateFilledSummary(data);
     globalThis.DailyReportLayout?.onStoreLoaded(store, date, selectedSeg, data, afternoon);
     const pending = reportSaves.pending({action:'write', store, date, seg:selectedSeg});
@@ -4052,7 +3994,6 @@ function clearForm() {
     if (el) { el.value = ''; el.style.borderColor = ''; el.style.boxShadow = ''; }
   });
   renderManagementFocusInputs({});
-  loadInsuranceConsultForm(null);
   document.getElementById('filledSummary').classList.remove('show');
   globalThis.DailyReportLayout?.onClear();
   showToast('🗑️ 已清除');
@@ -4353,7 +4294,6 @@ async function saveData() {
   if (!validateReportCardInput('f_cobranded_card')) return;
   const data = getFormData();
   if (!validateClosingReportForm(data, currentSeg, date)) return;
-  if (!validateInsuranceConsultForm(data)) return;
   data.savedAt = new Date().toLocaleTimeString('zh-TW');
 
   // 21:00 零報攔截：A999=0 或 好速=0 或 R1399=0 任一項 → 強制填說明
