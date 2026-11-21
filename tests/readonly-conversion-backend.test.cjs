@@ -2,11 +2,18 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {runtime,fixture}=require('./helpers/readonly-conversion-runtime.cjs');
 const publish=(b,snapshot=fixture())=>{const p=b.call('Preview',{snapshot});return b.call('Publish',{previewToken:p.token,confirm:true});};
+const supplementalPlans=length=>({
+  detail:{source:'synthetic-renewal.xlsx',start:'2026-10-01',end:'2026-10-02',detail:{
+    schema:'north12-renewal-detail/v1',period_start:'2026-10-01',cutoff:'2026-10-02',
+    tiers:[],observation:[],coverage:{tiers:false,observation:false,plans:true},
+    plans:Array.from({length},(_,i)=>({store:'DNB10062',plan:'方案🟣'.repeat(24)+i,unrenewed:1,customer:'MUST_NOT_PERSIST'}))
+  }}
+});
 test('every public action denies before private state, cache or Drive access',()=>{
   for(const op of ['Status','Preview','Publish','Rollback']){const b=runtime();assert.throws(()=>b.context['readonlyConversion'+op]({}),/denied/);assert.deepEqual(b.events,['auth']);assert.equal(b.files.size,0);assert.equal(b.properties.size,0);}
 });
 test('preview validates aggregate grain and creates no persistent file or active pointer',()=>{
-  const b=runtime(),p=b.call('Preview',{snapshot:fixture()});assert.equal(p.preview.storeDateKeys,27);assert.equal(p.preview.added,27);assert.equal(p.live.revision,0);assert.equal(b.files.size,0);assert.equal(b.properties.size,0);assert.equal(b.cache.size,1);
+  const b=runtime(),p=b.call('Preview',{snapshot:fixture()});assert.equal(p.preview.storeDateKeys,27);assert.equal(p.preview.added,27);assert.equal(p.live.revision,0);assert.equal(b.files.size,0);assert.equal(b.properties.size,0);assert.equal(b.cache.size,2);
   const invalid=fixture();invalid.records.pop();assert.throws(()=>b.call('Preview',{snapshot:invalid}),/缺少店日/);
 });
 test('publish verifies immutable content before pointer and leaves unrelated source data intact',()=>{
@@ -44,7 +51,7 @@ test('rollback between immutable versions preserves both files and validates can
 });
 test('expired or another operator preview cannot publish',()=>{
   const b=runtime(),p=b.call('Preview',{snapshot:fixture()});b.advance(1800001);assert.throws(()=>b.call('Publish',{previewToken:p.token,confirm:true}),/期限不符/);assert.equal(b.state,null);
-  const c=runtime(),q=c.call('Preview',{snapshot:fixture()}),key=[...c.cache.keys()][0],stage=JSON.parse(c.cache.get(key));stage.employeeId='SYN002';c.cache.set(key,JSON.stringify(stage));assert.throws(()=>c.call('Publish',{previewToken:q.token,confirm:true}),/操作者/);
+  const c=runtime(),q=c.call('Preview',{snapshot:fixture()}),key='readonly_conversion_preview_'+q.token,stage=JSON.parse(c.cache.get(key));stage.employeeId='SYN002';c.cache.set(key,JSON.stringify(stage));assert.throws(()=>c.call('Publish',{previewToken:q.token,confirm:true}),/操作者/);
 });
 test('same raw hash cannot masquerade as changed aggregate, cutoff cannot regress, new month replaces',()=>{
   const b=runtime();publish(b);const altered=fixture();altered.records[0].aq_n++;
@@ -56,14 +63,45 @@ test('arbitrary workbook and prior metadata are stripped before persistence',()=
   f.prior=C.STORES.map(s=>({store:s.id,aq_n:1,aq_d:2,rt_n:1,rt_d:2,customer:'MUST_NOT_PERSIST'}));f.prior_period={start:'2026-09-01',end:'2026-09-03',customer:'MUST_NOT_PERSIST'};
   publish(b,f);assert.ok(![...b.files.values()][0].text.includes('MUST_NOT_PERSIST'));
 });
+test('supplement-only upload augments the same immutable base and preserves independently dated evidence',()=>{
+  const b=runtime({post:true}),first=publish(b);
+  const original=b.context.readonlyConversionAttach_({}).conversionBattle;
+  const preview=b.post({action:'readonly_conversion_preview',...b.auth,renewalEvidence:[supplementalPlans(800)]});
+  assert.equal(preview.status,'ok');
+  assert.equal(preview.preview.renewalEvidence.plans,'2026-10-02');
+  assert.equal(preview.preview.sameSource,true);
+  assert.ok([...b.cache.values()].every(value=>Buffer.byteLength(value)<100000));
+  const done=b.post({action:'readonly_conversion_publish',...b.auth,confirm:true,previewToken:preview.token});
+  assert.equal(done.status,'published');
+  assert.equal(done.live.cutoff,first.live.cutoff);
+  assert.equal(done.live.sourceHash,first.live.sourceHash);
+  assert.equal(b.cache.size,0);
+  const active=b.context.readonlyConversionAttach_({}).conversionBattle;
+  assert.equal(JSON.stringify(active.records),JSON.stringify(original.records));
+  assert.equal(active.renewalEvidence.detail.detail.plans.length,800);
+  assert.ok(!JSON.stringify(active.renewalEvidence).includes('MUST_NOT_PERSIST'));
+  const next=publish(b,fixture({days:4,hash:'b'}));
+  assert.equal(next.live.renewalEvidence.plans,'2026-10-02');
+  const newerMonth=publish(b,fixture({hash:'c',month:'11'}));
+  assert.equal(newerMonth.live.renewalEvidence,null);
+  assert.throws(()=>b.call('Preview',{renewalEvidence:[supplementalPlans(1)]}),/同月份/);
+});
+test('missing cached evidence chunk fails closed before changing the live version',()=>{
+  const b=runtime(),first=publish(b);
+  const preview=b.call('Preview',{renewalEvidence:[supplementalPlans(600)]});
+  b.cache.delete('readonly_conversion_preview_'+preview.token+'_1');
+  assert.throws(()=>b.call('Publish',{previewToken:preview.token,confirm:true}),/預覽已失效/);
+  assert.equal(b.call('Status').live.activeHash,first.live.activeHash);
+});
 test('shared or out-of-folder revisions fail closed; other dashboard components remain visible',()=>{
   const b=runtime();publish(b);const file=[...b.files.values()][0];file.sharing='ANYONE';
   assert.throws(()=>b.call('Status'),/私有資料域/);const original={kpiBattle:{keep:1},awardsBattle:{keep:2}};const value=b.context.readonlyConversionAttach_(original);assert.equal(value.kpiBattle.keep,1);assert.equal(value.conversionBattle,undefined);assert.equal(value.conversionStatus.status,'unavailable');
   file.sharing='PRIVATE';file.parent={getId:()=> 'other-folder'};assert.throws(()=>b.call('Status'),/私有資料域/);
 });
 test('reader is optional, generated core assets match, and scoped routes preserve original authorization',()=>{
-  const root=path.resolve(__dirname,'..'),core=fs.readFileSync(path.join(root,'readonly-dashboard-core.js'),'utf8');
-  assert.equal(fs.readFileSync(path.join(root,'gas/ReadonlyDashboardCore.gs'),'utf8'),core);
+  const root=path.resolve(__dirname,'..'),sources=['readonly-dashboard-core.js','readonly-renewal-detail.js','store-renewal-evidence.js'];
+  assert.equal(fs.readFileSync(path.join(root,'gas/ReadonlyDashboardCore.gs'),'utf8'),
+    sources.map(name=>fs.readFileSync(path.join(root,name),'utf8')).join('\n'));
   const code=fs.readFileSync(path.join(root,'gas/Code.gs'),'utf8');assert.match(code,/typeof readonlyConversionAttach_ === 'function'/);
   for(const op of ['status','preview','publish','rollback'])assert.ok(code.includes("action === 'readonly_conversion_"+op+"'"));
   assert.match(code,/function reportUploadAuthorize_\(payload\)\s*\{\s*privateDashboardAdminAuthorized\(payload\)/);

@@ -28,14 +28,26 @@
     if(!map.has(key))map.set(key,{store,label,yes:0,no:0,none:0});
     map.get(key)[flag]+=weight;
   }
+  function originRows(rows){
+    if(!Array.isArray(rows)||rows.length>ids.size*2)throw Error('原用戶別資料格式不符');
+    const seen=new Set();
+    return rows.map(({store,origin,visitors,renewals})=>{
+      const key=store+'|'+origin;
+      requireValue(ids.has(store)&&['TWM','TST'].includes(origin)&&!seen.has(key),'原用戶別店點、來源或重複鍵無法核對');
+      seen.add(key);count(visitors);count(renewals);
+      requireValue(renewals<=visitors,'原用戶別續約超過來客');
+      return {store,origin,visitors,renewals};
+    });
+  }
   function totalsSection(section,kind){
     if(!section)return null;
     const {source,start,end,rows}=section;
     requireValue(typeof source==='string'&&iso(start)&&iso(end)&&start<=end&&start.slice(0,7)===end.slice(0,7),'續約來源期間無法核對');
-    if(kind==='detail')return {source:source.slice(0,180),start,end,detail:Detail.validate(section.detail,Core.STORES,start,end)};
+    const origin=section.origins==null?{}:{origins:originRows(section.origins)};
+    if(kind==='detail')return {source:source.slice(0,180),start,end,...origin,detail:Detail.validate(section.detail,Core.STORES,start,end)};
     const seen=new Set();
     requireValue(Array.isArray(rows),'原方案彙總格式不符');
-    return {source:source.slice(0,180),start,end,rows:rows.map(r=>{
+    return {source:source.slice(0,180),start,end,...origin,rows:rows.map(r=>{
       const key=JSON.stringify([r.store,r.label]);
       requireValue(ids.has(r.store)&&typeof r.label==='string'&&r.label.length>0&&r.label.length<=500&&!seen.has(key),'原方案彙總店點、名稱或重複鍵無法核對');
       seen.add(key);return {store:r.store,label:r.label,yes:count(r.yes),no:count(r.no),none:count(r.none)};
@@ -43,21 +55,33 @@
   }
   function validate(e){return {detail:totalsSection(e?.detail,'detail'),tariffs:totalsSection(e?.tariffs),daily:totalsSection(e?.daily)};}
   function fromConversion(data){
+    if(data?.renewalEvidence)return validate(data.renewalEvidence);
     if(!data?.renewalDetail)return {};
     return {detail:totalsSection({source:data.source_name,start:data.period_start,end:data.cutoff,detail:data.renewalDetail},'detail')};
+  }
+  function sourceStatus(e){
+    const detail=e?.detail,coverage=detail?.detail?.coverage;
+    return [
+      '門市 Tier '+(coverage?.tiers?'至 '+detail.end:'未取得'),
+      '未續約原方案 '+(e?.daily?'日報至 '+e.daily.end:coverage?.plans?'至 '+detail.end:'未取得')
+    ].join(' · ');
   }
   function parseDaily(book,X,source){
     const [header,...rows]=rowsOf(book,X,'續約率(分母)');
     const [store,day,plan,status,weight]=columns(header,['營業店點代碼','統計日期','用戶最後續約之專案','是否已續約','用戶人數']);
-    const groups=new Map(),dates=new Set();
+    const origin=header.findIndex(v=>norm(v)==='用戶別'),origins=new Map(),groups=new Map(),dates=new Set();
+    let completeOrigins=origin>=0;
     for(const r of rows){
       if(!ids.has(r[store]))continue;
       const flag=({Y:'yes',N:'no','無續約':'none'})[r[status]];
       requireValue(['yes','no','none'].includes(flag),'未識別的續約標記');
-      dates.add(date(r[day]));add(groups,r[store],String(r[plan]??'').trim()||'原專案未填',flag,count(r[weight]));
+      const id=r[store],weightValue=count(r[weight]),tag=norm(r[origin]);
+      dates.add(date(r[day]));add(groups,id,String(r[plan]??'').trim()||'原專案未填',flag,weightValue);
+      if(['TWM','TST'].includes(tag))add(origins,id,tag,flag,weightValue);else completeOrigins=false;
     }
     const sorted=[...dates].sort();requireValue(sorted.length,'本報表沒有北一二B紀錄');
-    return {daily:totalsSection({source,start:sorted[0],end:sorted.at(-1),rows:[...groups.values()]})};
+    const originTotals=completeOrigins?{origins:[...origins.values()].map(r=>({store:r.store,origin:r.label,visitors:r.yes+r.no+r.none,renewals:r.yes}))}:{};
+    return {daily:totalsSection({source,start:sorted[0],end:sorted.at(-1),rows:[...groups.values()],...originTotals})};
   }
   function parseAQ(book,X,source){
     const totals=rowsOf(book,X,'RT締結率');
@@ -65,14 +89,19 @@
     const data={stores:Core.STORES,period_start:meta.begin,cutoff:meta.cutoff};
     const d=Detail.parseAvailable(book,X,data);
     requireValue(d.coverage.tiers||d.coverage.plans,'缺少可核對的門市 Tier 或原方案明細');
-    if(d.coverage.tiers){
-      for(const s of Core.STORES){
+    const origins=[];
+    for(const s of Core.STORES){
         const group=d.tiers.filter(r=>r.store===s.id),official=totals.find(r=>r[3]===s.id);
-        requireValue(official&&group.reduce((a,r)=>a+r.visitors,0)===official[meta.totals.d]&&group.reduce((a,r)=>a+r.renewals,0)===official[meta.totals.n],s.short+' Tier 與 RT 總表不符');
-      }
+        if(d.coverage.tiers)requireValue(official&&group.reduce((a,r)=>a+r.visitors,0)===official[meta.totals.d]&&group.reduce((a,r)=>a+r.renewals,0)===official[meta.totals.n],s.short+' Tier 與 RT 總表不符');
+        const {twN,twD,tsN,tsD,d:ttlD,n:ttlN}=meta.totals;
+        if(official&&[twN,twD,tsN,tsD].every(key=>Number.isSafeInteger(official[key])&&official[key]>=0)
+          &&official[twN]+official[tsN]===official[ttlN]&&official[twD]+official[tsD]===official[ttlD]){
+          origins.push({store:s.id,origin:'TWM',visitors:official[twD],renewals:official[twN]},
+            {store:s.id,origin:'TST',visitors:official[tsD],renewals:official[tsN]});
+        }
     }
     const period={source,start:meta.begin,end:meta.cutoff};
-    const out={detail:totalsSection({...period,detail:d},'detail')};
+    const out={detail:totalsSection({...period,detail:d,...(origins.length===ids.size*2?{origins}:{})},'detail')};
     if(!d.coverage.plans)return out;
     const all=rowsOf(book,X,'未續約明細'),h=all.findIndex(r=>r.some(v=>norm(v)==='進店店點代碼'));
     if(!all[h]?.some(v=>norm(v)==='方案時專案V+D資費(含換約案)'))return out;
@@ -90,6 +119,12 @@
   function parse(book,X,source){return Object.keys(book.Sheets).some(n=>norm(n)==='RT締結率')?parseAQ(book,X,source):parseDaily(book,X,source);}
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const percent=(n,d)=>d?(100*n/d).toFixed(1)+'%':'—';
+  function originsHtml(section,ids,label){
+    const rows=section?.origins?.filter(r=>ids.has(r.store));
+    if(!rows?.length)return '';
+    const groups=['TWM','TST'].map(origin=>rows.filter(r=>r.origin===origin).reduce((a,r)=>({origin,visitors:a.visitors+r.visitors,renewals:a.renewals+r.renewals}),{origin,visitors:0,renewals:0}));
+    return '<p class="insight-evidence"><strong>'+label+'原用戶別</strong>　'+groups.map(r=>'原 '+r.origin+' '+r.renewals+'／'+r.visitors+'（'+percent(r.renewals,r.visitors)+'），未續約 '+(r.visitors-r.renewals)+' 人次').join('。')+'。</p>';
+  }
   function ranked(section,stores,tariff){
     if(!section)return '';
     const selected=new Set(stores.map(s=>s.id)),groups=new Map();
@@ -104,28 +139,43 @@
     const title=tariff?'原資費未續約':'原專案未續約',total=records.reduce((v,r)=>v+loss(r),0);
     return '<section class="panel"><h3>'+title+'</h3><p>'+esc(section.start)+'～'+esc(section.end)+' · '+esc(section.source)+' · '+(tariff?'未續約明細，符合資格、同店日用戶去重':'續約率(分母)，按原報用戶人數加總')+'</p>'+
       (!records.length?'<p>所選門市沒有來源紀錄。</p>':!sorted.length?'<p>該來源的所選紀錄皆已續約。</p>':
-      '<p><strong>優先檢視 '+esc(sorted[0].label)+'</strong>　'+loss(sorted[0])+' 筆，占此表未續約 '+percent(loss(sorted[0]),total)+'。請核對當次提供的方案及客人回應。</p><div class="table-scroll"><table class="insight-table"><thead><tr><th>'+(tariff?'原資費':'原專案')+'</th><th>續約 Y</th><th>未續約 N</th>'+(tariff?'':'<th>無續約</th>')+'<th>占本表未續約</th></tr></thead><tbody>'+top.map(r=>'<tr><th>'+esc(r.label)+'</th><td>'+r.yes+'</td><td>'+r.no+'</td>'+(tariff?'':'<td>'+r.none+'</td>')+'<td>'+percent(loss(r),total)+'</td></tr>').join('')+'</tbody></table></div>')+'</section>';
+      '<p><strong>'+esc(top.filter(r=>loss(r)===loss(top[0])).map(r=>r.label).join('、'))+'</strong>　各 '+loss(top[0])+' 筆，占此表未續約 '+percent(loss(top[0]),total)+'。'+
+      (!tariff?'此表未續約合計 '+total+' 筆（N 與無續約），依 KPI 日報口徑。':'')+'</p><div class="table-scroll"><table class="insight-table"><thead><tr><th>'+(tariff?'原資費':'原專案')+'</th><th>續約 Y</th><th>未續約 N</th>'+(tariff?'':'<th>無續約</th>')+'<th>占本表未續約</th></tr></thead><tbody>'+top.map(r=>'<tr><th>'+esc(r.label)+'</th><td>'+r.yes+'</td><td>'+r.no+'</td>'+(tariff?'':'<td>'+r.none+'</td>')+'<td>'+percent(loss(r),total)+'</td></tr>').join('')+'</tbody></table></div>')+'</section>';
   }
-  function render(evidence,stores,conversion){
+  function compareCutoffs(d,conversion,records,official,prior){
+    if(!official||!prior.visitors||d.start!==conversion.period_start||d.end>=conversion.cutoff)return '';
+    const visitors=official.rt_d-prior.visitors,renewals=official.rt_n-prior.renewals;
+    if(visitors<=0||renewals<0||renewals>visitors)return '';
+    const rate=official.rt_n/official.rt_d,previous=prior.renewals/prior.visitors,delta=(rate-previous)*100;
+    const next=new Date(Date.parse(d.end)+86400000).toISOString().slice(0,10);
+    const daily=Core.dailySeries(records,'daily',next,conversion.cutoff);
+    const dailyNote=daily.length<=7?'每日續約／來客為 '+daily.map(r=>esc(r.date.slice(5).replace('-','/'))+' '+r.rt_n+'／'+r.rt_d).join('、')+'。':'';
+    return '<p class="insight-evidence"><strong>新增來客締結率 '+percent(renewals,visitors)+'</strong>　'+esc(next)+'～'+esc(conversion.cutoff)+' 新增 '+visitors+' 人次、續約 '+renewals+' 件、未續約 '+(visitors-renewals)+' 人次。'+dailyNote+'累計締結率由 '+percent(prior.renewals,prior.visitors)+' 變為 '+percent(official.rt_n,official.rt_d)+'（'+(delta>0?'+':'')+delta.toFixed(1)+' 個百分點）。此區間各 Tier 與原方案需另有同期明細才能歸因。</p>';
+  }
+  function render(evidence,stores,conversion,{showTotal=true}={}){
     const e=evidence||{},ids=new Set(stores.map(s=>s.id));
+    const records=conversion?.records.filter(r=>ids.has(r.store)),official=records?Core.aggregate(records):null;
     let html='<h2>續約洞察｜'+esc(stores.length===1?stores[0].short:'北一二B 九店')+'</h2>';
-    if(conversion){
-      const r=Core.aggregate(conversion.records.filter(r=>ids.has(r.store)));
+    if(showTotal&&official){
+      const r=official;
       html+='<p>'+esc(conversion.period_start)+'～'+esc(conversion.cutoff)+' · 續約 '+r.rt_n+'／有效來客 '+r.rt_d+'，締結率 '+percent(r.rt_n,r.rt_d)+'，未續約 '+(r.rt_d-r.rt_n)+' 人次。</p>';
     }
     if(e.detail?.detail){
       const d=e.detail;
       if(d.detail.coverage.tiers){
         const rows=d.detail.tiers.filter(t=>ids.has(t.store)),n=rows.reduce((v,t)=>v+t.renewals,0),v=rows.reduce((v,t)=>v+t.visitors,0);
+        const samePeriod=records&&Core.aggregate(records.filter(r=>r.date<=d.end));
         html+='<p>'+esc(d.start)+'～'+esc(d.end)+' · '+esc(d.source)+' · 進店行為表續約 '+n+'／'+v+'，締結率 '+percent(n,v)+'。</p>';
+        if(samePeriod&&samePeriod.rt_d===v&&samePeriod.rt_n===n)html+=compareCutoffs(d,conversion,records,official,{visitors:v,renewals:n});
+        html+=originsHtml(d,ids,'RT 總表');
       }
       html+=Detail.render({period_start:d.start,cutoff:d.end,stores:Core.STORES,renewalDetail:d.detail},stores);
-    }else html+='<p class="sub">本次來源缺少門市 Tier 進店行為明細。</p>';
-    html+=ranked(e.tariffs,stores,true)+ranked(e.daily,stores,false);
+    }else html+='<section class="panel"><h3>門市 Tier 與原方案來源</h3><p>本次來源缺少門市 Tier 進店行為明細。</p></section>';
+    html+=ranked(e.tariffs,stores,true)+ranked(e.daily,stores,false)+originsHtml(e.daily,ids,'KPI 日報');
     if(!e.daily&&!e.detail?.detail?.coverage.plans)html+='<p class="sub">本次來源缺少可核對的原專案未續約紀錄。</p>';
     if(e.tariffs||e.daily)html+='<p class="sub">各表獨立計算。資費或專案集中情形與 Tier 是否重疊，需以同期間、同用戶的服務紀錄核對。</p>';
     return html;
   }
   const sheets=['AQ締結率','RT每日','RT締結率',...Detail.SHEETS,'續約率(分母)'];
-  return {validate,fromConversion,parse,sheets,render};
+  return {validate,fromConversion,sourceStatus,parse,sheets,render};
 });

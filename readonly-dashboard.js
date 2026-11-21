@@ -90,13 +90,15 @@
   function insights(){
     const d=conversionData();
     const e=model.renewalEvidence,stores=viewStores().filter(s=>state.store==='all'||s.id===state.store);
-    if(!d&&(e?.detail||e?.daily||e?.tariffs)){$('#content').innerHTML=window.StoreRenewalEvidence.render(e,stores,d);$('#source-note').textContent='各表標示實際來源期間。';return;}
+    const Evidence=window.StoreRenewalEvidence;
+    if(!d&&(e?.detail||e?.daily||e?.tariffs)){$('#content').innerHTML=Evidence.render(e,stores,d);$('#source-note').textContent=Evidence.sourceStatus(e);return;}
     if(!d){$('#source-note').textContent=model.conversionReason;return empty(model.conversionReason);}
     const Engine=window.ReadonlyInsightsCore,UI=window.ReadonlyInsightsUI;
-    if(!Engine||!UI)return empty('續約分析元件尚未完成載入，請重新整理。');
+    if(!Engine||!UI||!Evidence)return empty('續約分析元件尚未完成載入，請重新整理。');
     try{
       const computed=Engine.evaluate(d,viewStores());
-      const result=UI.render(computed,{store:state.store,detailHtml:e?.detail||e?.daily||e?.tariffs?window.StoreRenewalEvidence.render(e,stores,null):undefined});
+      const detailHtml=Evidence.render(e,stores,d,{showTotal:false});
+      const result=UI.render(computed,{store:state.store,detailHtml});
       $('#content').innerHTML=context({cutoff:d.cutoff,period:d.period_start+' 至 '+d.cutoff})+result.html;
       const copy=$('#copy-insights'),status=$('#copy-insight-status');
       if(copy)copy.onclick=async()=>{
@@ -106,7 +108,7 @@
           if(status)status.textContent='已複製本次已核實的門市改善指令。';
         }catch{if(status)status.textContent='複製失敗，請手動選取畫面上的建議。';}
       };
-      source({cutoff:d.cutoff,sourceName:d.source_name,version:d.sha256.slice(0,12)},'Tier：Tier觀察／RT用戶進店行為_店；方案：未續約明細；未匯入完整原報時提示來源缺漏');
+      source({cutoff:d.cutoff,sourceName:d.source_name,version:d.sha256.slice(0,12)},Evidence.sourceStatus(e)+(model.renewalEvidenceError?' · '+model.renewalEvidenceError:''));
     }catch{empty('續約洞察資料無法完成核實，請重新讀取正式報表。');}
   }
   function identity(){
@@ -165,7 +167,10 @@
       if(expires){if(expires<=Date.now())throw Error('登入已到期');expiryTimer=setTimeout(()=>{failed=true;clear('登入期限已到，請在營運中心重新完成業務登入。');},Math.min(2147483647,expires-Date.now()));}
       $('#store').innerHTML='<option value="all">本次授權範圍全部門市</option>'+model.stores.map(s=>'<option value="'+s.id+'">'+safe(s.name)+'</option>').join('');if(!model.stores.some(s=>s.id===state.store))state.store='all';$('#store').value=state.store;
       if(model.conversion){const d=model.conversion;for(const id of ['start','end']){$('#'+id).min=d.period_start;$('#'+id).max=d.cutoff;}if(!state.start||state.start<d.period_start||state.end>d.cutoff){state.start=d.period_start;state.end=d.cutoff;}$('#start').value=state.start;$('#end').value=state.end;}
-      $('#store-export-sources').hidden=!model.stores.length||model.stores.length!==C.STORES.length;$('#controls').hidden=false;$('#auth-message').textContent='已載入資料；切換視窗會保留，按「更新資料」取得最新來源。';render();
+      $('#store-export-sources').hidden=!model.stores.length||model.stores.length!==C.STORES.length;
+      const evidenceStatus=window.StoreRenewalEvidence?.sourceStatus(model.renewalEvidence);
+      if(evidenceStatus)$('#renewal-import-status').textContent=evidenceStatus+'。補入的報表僅在本次登入使用。';
+      $('#controls').hidden=false;$('#auth-message').textContent='已載入資料；切換視窗會保留，按「更新資料」取得最新來源。';render();
     }catch(error){if(expected!==epoch)return;failed=true;clear(accessFailure(error,stage));}finally{if(expected===epoch){flight=null;$('#refresh').disabled=false;updateExport();}}});flight=operation;return operation;
   }
   $('#renewal-files').onchange=async event=>{
@@ -201,7 +206,7 @@
       const exporter=window.ReadonlyStoreSnapshot;if(!exporter)throw Error('匯出元件未載入，請重新整理。');
       const snapshot=exporter.fromModel(current),html=exporter.buildHtml(snapshot,{tab:state.tab,store:state.store}),url=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
       const link=document.createElement('a');link.href=url;link.download=exporter.filename(snapshot);document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-      if(exportStatus)exportStatus.textContent='已產生門市HTML快照，可作為郵件附件；資料不會自動更新，不含個人資料或獎金。';
+      if(exportStatus)exportStatus.textContent='已產生門市 HTML 快照。'+window.StoreRenewalEvidence.sourceStatus(snapshot.renewalEvidence)+'。';
     }catch(error){if(exportStatus)exportStatus.textContent=error.message||'未能產生門市快照，請重新核驗資料。';}
     finally{updateExport();}
   };
