@@ -5,6 +5,7 @@ const OWNER='https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GV
 const DEVICE_KEY='north12b_private_dashboard_device_id';
 const DATA_CACHE_KEY='north12b_password_data_v1';
 let host,client,active=false,confirmed=false,epoch=0,expiresAt=0,expiryTimer,dataCacheTimer,ready=false,loading=false,guarded=false,checking=null,rechecking=false,panel,acceptedProof=null,lastLoadedAt=0;
+let interimInsuranceCheck;
 const pendingHost=scope.DashboardBHost;
 let legacyObserver;
 // Opt-in, bounded timing diagnostics. Only fixed operation labels, durations
@@ -62,7 +63,7 @@ function accessFailureMessage(error,stage='validate'){
  return (reasons[error?.message]||(stage==='read'?'資料讀取未完成（UNKNOWN）':'登入核驗未完成（UNKNOWN）'))+
   '；尚未確認失敗原因，畫面已鎖定。可按「重新核驗」重試，或在本頁輸入員編與指定密碼重新登入。';
 }
-function state(name){if(panel){panel.dataset.state=name;panel.querySelector('h2').textContent=name==='active'?(host?.ownerPhone&&client?.hasPhone()?'手機自動登入已啟用':'同仁專區已登入'):name==='checking'?'正在確認登入':name==='loading'?'正在登入這台裝置':(host?.ownerPhone?'首次驗證與手機綁定':'員編與密碼登入');panel.querySelector('[data-b-phone]').hidden=!(name==='active'&&host?.ownerPhone&&host.phoneEligible&&!client?.hasPhone());
+function state(name){interimInsuranceCheck?.session(name==='active' && active && confirmed && expiresAt>Date.now());if(panel){panel.dataset.state=name;panel.querySelector('h2').textContent=name==='active'?(host?.ownerPhone&&client?.hasPhone()?'手機自動登入已啟用':'同仁專區已登入'):name==='checking'?'正在確認登入':name==='loading'?'正在登入這台裝置':(host?.ownerPhone?'首次驗證與手機綁定':'員編與密碼登入');panel.querySelector('[data-b-phone]').hidden=!(name==='active'&&host?.ownerPhone&&host.phoneEligible&&!client?.hasPhone());
  const lease=panel.querySelector('.b-lease');if(lease){lease.hidden=name!=='active';lease.textContent=name==='active'?`登入至 ${new Date(expiresAt).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit'})}（臺北）` : '';}
 }}
 function markLegacyRoots(){
@@ -286,6 +287,10 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
   const account=panel.querySelector('.b-account'),more=document.createElement('details'),summary=document.createElement('summary'),content=document.createElement('div'),lease=document.createElement('span');
   more.className='b-more';summary.textContent='更多';content.className='b-more-content';lease.className='b-lease';lease.hidden=true;
   account.replaceWith(more);content.append(panel.querySelector('[data-b-message]'),account);more.append(summary,content);panel.append(lease);
+ }
+ if(host.interimInsuranceCheck && scope.createInterimInsuranceCheck){
+  const authorized=()=>active && confirmed && expiresAt>Date.now();
+  interimInsuranceCheck=scope.createInterimInsuranceCheck(panel,day=>authorized()?client.interimInsuranceRead(day):Promise.reject(Error('B_AUTH_DENIED')),authorized);
  }
  const options=panel.querySelector('.b-options');
  if(options){
