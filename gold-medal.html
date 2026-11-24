@@ -6,14 +6,31 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>北一二B 金牌明細</title>
-  <link rel="stylesheet" href="department-ops.css?v=20261118-dense-1">
-  <link rel="stylesheet" href="gold-medal.css?v=20261118-dense-1">
+  <link rel="stylesheet" href="department-ops.css?v=20261124-fill-1">
+  <link rel="stylesheet" href="gold-medal.css?v=20261124-fill-1">
 </head>
 <body class="gold-page">
   <main class="page">
     <a class="back-link" href="home.html">← 返回智慧營運中心</a>
     <header class="masthead"><div><p class="eyebrow">NORTH 12B GOLD</p><h1>北一二B 金牌明細</h1><p class="lede">查看已確認的每日接龍結算總牌數與跨日增減。</p></div><span id="viewerBadge" class="mode-badge">免登入查詢</span></header>
     <section class="panel load-panel"><p id="loadStatus" class="message" role="status" aria-live="polite">正在讀取金牌資料…</p><button id="refreshButton" class="secondary-button" type="button">更新資料</button></section>
+    <section class="layout-skeleton" aria-label="載入後的版面預覽">
+      <p class="skeleton-kicker">載入後會看到九店每日增減與個人總牌數</p>
+      <div class="skeleton-board">
+        <div class="skeleton-main"><table><thead><tr><th>店點</th><th>同仁</th><th>增減</th><th>總牌數</th><th>狀態</th></tr></thead><tbody>
+          <tr><td>酒泉</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>永吉</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>復興南</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>杭州南</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>萬大</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>通化</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>大稻埕</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>三創</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>六張犁</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        </tbody></table></div>
+        <aside class="skeleton-side" aria-hidden="true"><span></span><span></span><span></span><span></span></aside>
+      </div>
+    </section>
     <section id="goldViewer" hidden>
       <div class="dashboard-head"><div><p class="step-label">CONFIRMED SETTLEMENT</p><h2>金牌查詢</h2><p id="viewerMeta" class="source-meta"></p></div></div>
       <section class="filter-panel" aria-label="金牌篩選"><label>店點<select id="viewerStore"><option value="">九店全部</option></select></label><label>個人<select id="viewerEmployee"><option value="">全部同仁</option></select></label><label>結算日期<select id="viewerMonth"></select></label><label>紀錄起日<input id="viewerDateFrom" type="date"></label><label>紀錄迄日<input id="viewerDateTo" type="date"></label><button id="viewerReset" class="secondary-button" type="button">清除篩選</button></section>

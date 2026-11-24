@@ -15,3 +15,22 @@ main table tbody tr:nth-child(even) td{background:#f4f7fa}
 header{margin-bottom:6px}
 
 #status{white-space:pre-line;overflow-wrap:anywhere}
+
+main{width:min(1240px,calc(100% - 32px));max-width:1240px;margin-left:auto;margin-right:auto;padding:10px 0 24px}
+#import-panel{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:8px 10px;margin:8px 0}
+#import-panel h2{margin:0;font-size:16px}
+#import-panel details{font-size:13px}
+#import-panel .toolbar{margin-left:auto}
+.button,button{padding:4px 10px;min-height:28px}
+.layout-skeleton{margin-top:8px}
+.skeleton-kicker{margin:0 0 6px;color:#627687;font-size:12px;font-weight:800}
+.skeleton-board{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(240px,.7fr);gap:10px}
+.skeleton-main,.skeleton-side{border:1px solid #dbe4ec;border-radius:10px;background:#fff;overflow:hidden}
+.layout-skeleton table{width:100%;border-collapse:collapse;font-size:13px}
+.layout-skeleton th,.layout-skeleton td{height:30px;padding:0 8px;border-bottom:1px solid #e8eef3;text-align:left}
+.layout-skeleton th{background:#f4f7fa;color:#627687;font-size:12px}
+.layout-skeleton .bar{display:block;height:8px;border-radius:99px;background:#e6edf3}
+.skeleton-side{display:grid;gap:8px;align-content:start;padding:10px}
+.skeleton-side span{display:block;height:36px;border-radius:8px;background:#f3f6f9}
+main:has(#view:not([hidden])) .layout-skeleton{display:none}
+@media(max-width:1099px){.skeleton-board{grid-template-columns:1fr}}
