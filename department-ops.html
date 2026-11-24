@@ -7,9 +7,9 @@
   <meta name="theme-color" content="#f7f5f0">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>北一二部｜部區管理</title>
-  <link rel="stylesheet" href="department-ops.css?v=20261118-dense-1">
+  <link rel="stylesheet" href="department-ops.css?v=20261124-fill-1">
   <link rel="stylesheet" href="store-rule-reminders.css?v=20261004-collapse-1">
-  <link rel="stylesheet" href="department-scores.css?v=20261118-dense-1">
+  <link rel="stylesheet" href="department-scores.css?v=20261124-fill-1">
 </head>
 <body>
   <main class="page">
@@ -31,13 +31,31 @@
       <div>
         <p class="step-label">SECURE ACCESS</p>
         <h2 id="authTitle">沿用督導通行碼</h2>
-        <p>驗證成功前不讀取檔案、不顯示部區人員資料。通行碼只送至既有受保護服務，頁面不會保存。</p>
+        <details><summary>登入說明</summary><p>驗證成功前不讀取檔案、不顯示部區人員資料。通行碼只送至既有受保護服務，頁面不會保存。</p></details>
       </div>
       <form id="authForm" class="auth-form">
         <label>督導通行碼<input id="passcode" type="password" autocomplete="current-password" required></label>
         <button class="primary-button" type="submit">進入部區管理</button>
       </form>
       <p id="authMessage" class="message" aria-live="polite"></p>
+    </section>
+
+    <section class="layout-skeleton" aria-label="載入後的版面預覽">
+      <p class="skeleton-kicker">載入後會看到九店金牌與成績，欄位會填入正式資料</p>
+      <div class="skeleton-board">
+        <div class="skeleton-main"><table><thead><tr><th>店點</th><th>人數</th><th>淨金牌</th><th>店務</th><th>達成</th></tr></thead><tbody>
+          <tr><td>酒泉</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>永吉</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>復興南</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>杭州南</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>萬大</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>通化</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>大稻埕</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>三創</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+          <tr><td>六張犁</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        </tbody></table></div>
+        <aside class="skeleton-side" aria-hidden="true"><span></span><span></span><span></span><span></span></aside>
+      </div>
     </section>
 
     <div id="workspace" hidden>

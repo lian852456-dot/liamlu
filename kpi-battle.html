@@ -252,6 +252,28 @@
   body #dashboard-b-access input{height:36px;min-height:36px;font-size:14px}
   body #dashboard-b-access [data-b-submit]{height:36px}
   body #dashboard-b-access .b-toolbar{padding-top:6px;gap:8px}
+  .shell-header{padding:6px 16px;min-height:40px}
+  .shell-header .eyebrow,.shell-header .subtitle{display:none}
+  .shell-header h1{font-size:18px}
+  .home-link{min-height:28px;padding:4px 10px}
+  body #dashboard-b-access{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:4px 0}
+  body #dashboard-b-access h2{margin:0;font-size:14px;white-space:nowrap}
+  body #dashboard-b-access form{display:flex;flex:1 1 420px;align-items:center;gap:8px;margin:0}
+  body #dashboard-b-access input,body #dashboard-b-access [data-b-submit]{height:28px;min-height:28px;padding:2px 8px}
+  body #dashboard-b-access [data-b-message]{flex:1 1 160px;max-width:200px;margin:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  body #dashboard-b-access .b-toolbar{padding:0;border:0}
+  .layout-skeleton{margin:8px auto 0;width:min(1240px,calc(100% - 32px))}
+  .skeleton-kicker{margin:0 0 6px;color:#6b7280;font-size:12px;font-weight:800}
+  .skeleton-board{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(240px,.7fr);gap:10px}
+  .skeleton-main,.skeleton-side{border:1px solid #e5e7eb;border-radius:10px;background:#fff;overflow:hidden}
+  .layout-skeleton table{width:100%;border-collapse:collapse;font-size:13px}
+  .layout-skeleton th,.layout-skeleton td{height:30px;padding:0 8px;border-bottom:1px solid #eef0f3;text-align:left}
+  .layout-skeleton th{background:#fff5ec;color:#6b7280;font-size:12px}
+  .layout-skeleton .bar{display:block;height:8px;border-radius:99px;background:#f3e6da}
+  .skeleton-side{display:grid;gap:8px;align-content:start;padding:10px}
+  .skeleton-side span{display:block;height:36px;border-radius:8px;background:#f6f7f9}
+  body:has(#kpiBattleContent table) .layout-skeleton{display:none}
+  @media(max-width:1099px){.skeleton-board{grid-template-columns:1fr}}
 </style>
 </head>
 <body class="battle-compact">
@@ -276,6 +298,23 @@
     </div>
   </div>
   <div id="kpiBattleContent"><div class="kpi-empty">讀取 KPI 戰情資料中…</div></div>
+  <section class="layout-skeleton" aria-label="載入後的版面預覽">
+    <p class="skeleton-kicker">登入後會看到九店 KPI 排名與達成率</p>
+    <div class="skeleton-board">
+      <div class="skeleton-main"><table><thead><tr><th>店點</th><th>公司排名</th><th>KPI總達成</th><th>AQ</th><th>好速</th><th>RT</th></tr></thead><tbody>
+        <tr><td>酒泉</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>永吉</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>復興南</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>杭州南</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>萬大</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>通化</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>大稻埕</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>三創</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>六張犁</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+      </tbody></table></div>
+      <aside class="skeleton-side" aria-hidden="true"><span></span><span></span><span></span><span></span></aside>
+    </div>
+  </section>
   <div class="kpi-battle-note" id="kpiBattleSourceNote">讀取受保護資料中…</div>
   <noscript><div class="card private-lock standalone-error"><h3>KPI 戰情暫時無法載入</h3><p>瀏覽器未啟用 JavaScript，因此不顯示任何 KPI 數值。請返回<a href="index.html">每日回報內的 KPI 戰情</a>。</p></div></noscript>
 </main>
