@@ -3,7 +3,7 @@
 <head>
   <script src="portal-logout.js?v=20261011-b-epoch-1"></script>
   <script src="GasBClient.js?v=20261023-login-status-1" defer></script>
-  <script src="dashboard-b-shell.js?v=20261120-login-return-1" defer></script>
+  <script src="dashboard-b-shell.js?v=20261124-op-series-1" defer></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -17,6 +17,7 @@
   本頁不得新增公式、API、JSON、權限捷徑或 fallback。
 -->
 <style>
+  #panel-op-series iframe{width:100%;height:80vh;min-height:420px;border:0;display:block}
   [data-battle-panel][hidden] { display: none !important; }
   :root {
     color-scheme: light;
@@ -326,6 +327,8 @@
   <div id="awardsBattleContent"><div class="kpi-empty">讀取台獎戰情資料中…</div></div>
 </main>
 
+<main id="panel-op-series" data-battle-panel aria-label="OP系列" hidden></main>
+
 <script src="readonly-dashboard-core.js?v=20261113-conversion-1"></script>
 <script src="kpi-battle-controller.js?v=20261118-kpi-layout-1"></script>
 <script src="award-model-catalog.js?v=20261105-awards-gap-id-1"></script>
@@ -336,14 +339,24 @@
 <script>
   const panel = document.getElementById('panel-kpi-battle');
   const awardsPanel = document.getElementById('panel-awards-battle');
+  const opPanel = document.getElementById('panel-op-series');
+  let opVerified = false;
   function showPanel(module) {
     const awards = module === 'awards';
-    panel.hidden = awards;
+    const op = module === 'op' && opVerified;
+    panel.hidden = awards || op;
+    opPanel.hidden = !op;
+    if (op && !opPanel.firstChild) {
+      const frame = document.createElement('iframe');
+      frame.title = 'OP 全系列九店進度與上線結構';
+      frame.src = 'op-series.html?view=battle';
+      opPanel.append(frame);
+    }
     awardsPanel.hidden = !awards;
-    document.getElementById('battleHeading').textContent = awards ? '台獎戰情' : module === 'personal' ? '個績排名' : 'KPI 戰情';
+    document.getElementById('battleHeading').textContent = op ? 'OP系列' : awards ? '台獎戰情' : module === 'personal' ? '個績排名' : 'KPI 戰情';
     const desired = module === 'personal' ? 'personal' : 'stores';
     const current = document.getElementById('kpiBattlePersonalBtn').classList.contains('active') ? 'personal' : 'stores';
-    if (!awards && current !== desired) window.kpiBattleController?.setView(desired);
+    if (!op && !awards && current !== desired) window.kpiBattleController?.setView(desired);
   }
 
   function failClosed(message) {
@@ -378,17 +391,26 @@
     window.awardsBattleController = awardsController;
     window.DashboardBHost = {
       compactBattle: true,
+      opSeries: true,
       startWithLegacy: returnAfterApprovedLogin,
       refreshOnResume: new URLSearchParams(window.location.search).get('refresh') === 'conversion',
       navigationSelector: '[data-kpi-battle-view]',
-      clear(note) { kpiController.failClosed(note || '請重新驗證登入。'); awardsController.failClosed(note || '請重新驗證登入。'); },
+      clear(note) {
+        opVerified = false;
+        opPanel.replaceChildren();
+        if (!opPanel.hidden) showPanel('kpi');
+        kpiController.failClosed(note || '請重新驗證登入。'); awardsController.failClosed(note || '請重新驗證登入。'); },
       showLegacyAccess() {
         kpiController.renderLock();
         const visible = document.querySelector(awardsPanel.hidden ? '#kpiBattleContent .private-lock' : '#awardsBattleContent .private-lock');
         visible?.scrollIntoView({block:'start',behavior:'smooth'});
         visible?.querySelector('#privateEmployeeId')?.focus();
       },
-      accept(bundle) { kpiController.acceptB(bundle); },
+      accept(bundle) {
+        kpiController.acceptB(bundle);
+        opVerified = true;
+        if (location.hash === '#op') showPanel('op');
+      },
       navigate(module) {
         if (module === 'return') { window.location.href = 'home.html'; return; }
         showPanel(module);
