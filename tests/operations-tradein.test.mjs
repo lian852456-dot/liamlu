@@ -10,3 +10,22 @@ test('all-range region filter keeps trailing zero/zero store, classification and
 test('missing required value, duplicate store or changed subtotal fails closed',()=>{for(const mutate of [r=>{r[8][7]=null;},r=>r.push(r[8]),r=>{r[2][7]=999;}]){const rows=fixture();mutate(rows);assert.throws(()=>parseTradeinRows(rows));}});
 test('unrelated helper-cell errors do not stop valid aggregate data',()=>{const rows=fixture();rows[8][18]='#REF!';assert.equal(parseTradeinRows(rows).storeCount,5);});
 test('conflicting period and missing/duplicate schema header stop mapping',()=>{const r=fixture();r[0]=['資料日期 : 9/1~9/27'];assert.throws(()=>parseTradeinRows(r));assert.throws(()=>parseTradeinRows([['wrong schema']]));});
+test('explicit source dates and official targets are used only after reconciliation', () => {
+  const rows = fixture();
+  rows[0][0] = rows[6][0] = '資料日期：2026/10/01～2026/10/27';
+  rows[1][17] = rows[7][17] = '舊換新目標';
+  for (let i = 2; i < 6; i++) rows[i][17] = 10;
+  for (let i = 8; i < 12; i++) rows[i][17] = 10;
+  rows.at(-1)[17] = 0;
+  const actual = parseTradeinRows(rows);
+  assert.equal(actual.year, 2026);
+  assert.equal(actual.cutoff, '2026-10-27');
+  assert.equal(actual.hasTarget, true);
+  assert.equal(actual.totals.target, 40);
+  rows.at(-1)[17] = null;
+  assert.equal(parseTradeinRows(rows).hasTarget, false);
+  rows.at(-1)[17] = 1;
+  assert.throws(() => parseTradeinRows(rows), /目標明細／小計不一致/);
+  rows[0][0] = rows[6][0] = '資料日期：2026/02/01～2026/02/30';
+  assert.throws(() => parseTradeinRows(rows), /無效/);
+});
