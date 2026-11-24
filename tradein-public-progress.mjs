@@ -3,13 +3,17 @@ import {bindExports,refreshExports,clearExports} from './tradein-export-ui.mjs?v
 import {formatDifference,formatRecoveredModels,isDate} from './tradein-export-core.mjs?v=20261120-store-trend';
 import {createPublicReader,readPublicFrame} from './tradein-public-read.mjs?v=20261010-date-read-1';
 import {requestAdmin} from './tradein-admin-operation.mjs?v=20261025-http-recovery-1';
-import {prepareSource} from './tradein-sar74-source.mjs?v=20261116-transactions-1';
+import {prepareSource} from './tradein-sar74-source.mjs?v=20261120-sales-analysis';
 import {BONUS_MONTH,estimatePersonBonus,estimateStoreBonus,formatBonusEstimate} from './tradein-bonus.mjs?v=20261106-1';
+import {createTransactionsPanel} from './tradein-transactions.mjs?v=20261120-sales-analysis';
 const $=id=>document.getElementById(id),CORE=window.TradeinPerformanceCore,PUBLIC=window.TradeinPublicCore;
 const API='https://script.google.com/macros/s/AKfycbwf_ms5rkOIg92FOZwZuHCft3JWpC7ENPUN6c6ebPb1Jd6eqKYfa_2tmrI8onDIl4Mi/exec';
 let snapshot=null,readEpoch=0,controller=null,source=null,plan=null,admin=null,checkpoint=null,busy=false,uploadEpoch=0,reading=false;
 let uploadController=null,uploadKind=null;
 let localSource=null;
+let activeScope='region';
+const transactions=createTransactionsPanel($('periodMonth'));
+const progressScope=()=>activeScope!=='transactions' && activeScope!=='sharing';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const units=n=>n===null?'未提供':Number(n).toLocaleString('zh-TW')+' 台';
 let storeSort={key:'',dir:1};
@@ -127,7 +131,7 @@ function renderUnknownDay(){
  $('stats').innerHTML=[['當日回收','未提供','選定日期資料未知'],['有回收店數','未提供','選定日期資料未知'],['有回收人數','未提供','選定日期資料未知'],['統計日期',selectedDate||'未選定','台北時間']].map(v=>`<article class="kpi"><span>${v[0]}</span><strong>${v[1]}</strong><small>${v[2]}</small></article>`).join('');
  if($('lagStrip'))$('lagStrip').hidden=true;renderStores();$('staffRows').innerHTML='<tr class="empty-people"><td colspan="3">選定日期資料尚未提供，明細保留未知。</td></tr>';$('staffResultCount').textContent='顯示未知';$('staffCounts').replaceChildren();$('allStaffCounts').disabled=true;refreshExports();
  }
-function render(){const s=snapshot.summary,region=snapshot.region_progress,daily=Boolean(selectedDate);$('publicWorkspace').hidden=document.getElementById('scope-sharing')?.getAttribute('aria-selected')==='true';$('readMessage').textContent='';$('updatedLabel').textContent='更新於 '+snapshot.published_at;$('recoveryDate').disabled=false;$('clearRecoveryDate').disabled=false;$('recoveryDate').min=snapshot.source_period.start;$('recoveryDate').max=snapshot.source_period.end;$('dateModeNote').hidden=!daily;$('personRuleNote').textContent=daily?'當日只顯示回收數與回收機款；每月目標與達標請切回整月查看。':'目前差異＝實績－月目標；負數為未達，0 為達標，正數為超標。'+(personalRules(snapshot.month).actingManager==='included'?'含店長及代理店長，每人每月'+personalRules(snapshot.month).staffTarget+'台。':'免目標人員不計差異。')+'';setHeaders(daily);
+function render(){const s=snapshot.summary,region=snapshot.region_progress,daily=Boolean(selectedDate);$('publicWorkspace').hidden=!progressScope();$('readMessage').textContent='';$('updatedLabel').textContent='更新於 '+snapshot.published_at;$('recoveryDate').disabled=false;$('clearRecoveryDate').disabled=false;$('recoveryDate').min=snapshot.source_period.start;$('recoveryDate').max=snapshot.source_period.end;$('dateModeNote').hidden=!daily||activeScope==='transactions';$('personRuleNote').textContent=daily?'當日只顯示回收數與回收機款；每月目標與達標請切回整月查看。':'目前差異＝實績－月目標；負數為未達，0 為達標，正數為超標。'+(personalRules(snapshot.month).actingManager==='included'?'含店長及代理店長，每人每月'+personalRules(snapshot.month).staffTarget+'台。':'免目標人員不計差異。')+'';setHeaders(daily);
  if(daily&&!dailyAvailable()){renderUnknownDay();return;}
  if(daily){if($('lagStrip'))$('lagStrip').hidden=true;const people=visiblePeople(),stores=dailyRows(),actual=people.reduce((n,p)=>n+p.actual_units,0),storeCount=stores.filter(p=>p.actual_units>0).length,personCount=people.filter(p=>p.actual_units>0).length;$('periodMeta').textContent=`${snapshot.month} · 統計日期 ${selectedDate} · 來源 ${snapshot.source_period.start}–${snapshot.source_cutoff_date}`;$('stats').innerHTML=[['當日回收',units(actual),'只統計所選日期'],['有回收店數',storeCount+' 店','當日實績大於 0'],['有回收人數',personCount+' 人','當日實績大於 0'],['統計日期',selectedDate,'台北時間']].map(v=>`<article class="kpi"><span>${v[0]}</span><strong>${v[1]}</strong><small>${v[2]}</small></article>`).join('');
  }else{
@@ -156,12 +160,29 @@ const readPublic=createPublicReader({endpoint:API,frame:(payload,signal)=>readPu
  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),cache:'no-store',credentials:'omit',signal});
  if(!response.ok)throw Error('服務暫時無回應（HTTP '+response.status+'）');return response.json();
 }});
-function readControls(){const button=$('refreshData');button.disabled=busy||reading;button.textContent=reading?'讀取中…':'重新讀取';$('publicWorkspace').setAttribute('aria-busy',String(reading));}
+function readControls(){const button=$('refreshData');button.disabled=busy||reading&&activeScope!=='transactions';button.textContent=reading&&activeScope!=='transactions'?'讀取中…':'重新讀取';$('publicWorkspace').setAttribute('aria-busy',String(reading));}
 async function load({allowBusy=false}={}){if(busy&&!allowBusy)return false;const ticket=++readEpoch,month=$('periodMonth').value;controller?.abort();controller=new AbortController();reading=true;readControls();wipe();$('readMessage').textContent='正在讀取已核對資料…';
  try{const result=await readPublic({action:'tradein_performance_public_read',month,includeDays:true},{signal:controller.signal,onFallback:()=>{if(ticket===readEpoch)$('readMessage').textContent='連線較慢，正在自動重新連線…';}});if(ticket!==readEpoch)return false;if(!result.snapshot){$('readMessage').textContent='選定月份尚未提供來源，實績、目標與缺口保留未知。';return false;}PUBLIC.validate(result.snapshot);if(result.snapshot.month!==month)throw Error('來源月份不符');snapshot=applyTargets(result.snapshot);snapshot.people.sort((a,b)=>(b.actual_units??-1)-(a.actual_units??-1)||a.masked_name.localeCompare(b.masked_name));render();return true;}
  catch(error){if(ticket===readEpoch){wipe();$('readMessage').textContent='讀取未完成：'+(error.name==='TimeoutError'?'服務連線較慢，請稍後重新讀取':error.name==='AbortError'?'讀取已取消':error.message);}return false;}finally{if(ticket===readEpoch){reading=false;readControls();}}}
 
-function scope(value){$('exportPanel').hidden=value==='sharing';$('maintenance').hidden=value==='sharing';$('publicWorkspace').hidden=value==='sharing'||!snapshot;document.querySelectorAll('[data-public-scope]').forEach(b=>{const chosen=b.dataset.publicScope===value;b.setAttribute('aria-selected',String(chosen));b.tabIndex=chosen?0:-1;$('actual-'+b.dataset.publicScope).hidden=!chosen;});}
+function scope(value){
+ const previous=activeScope;
+ activeScope=value;
+ const showTransactions=value==='transactions';
+ $('exportPanel').hidden=$('maintenance').hidden=!progressScope();
+ $('publicWorkspace').hidden=!progressScope()||!snapshot;
+ $('recoveryDateLabel').hidden=$('clearRecoveryDate').hidden=$('readMessage').hidden=showTransactions;
+ $('dateModeNote').hidden=showTransactions||!selectedDate||!snapshot;
+ document.querySelectorAll('[data-public-scope]').forEach(button=>{
+  const chosen=button.dataset.publicScope===value;
+  button.setAttribute('aria-selected',String(chosen));
+  button.tabIndex=chosen?0:-1;
+  $('actual-'+button.dataset.publicScope).hidden=!chosen;
+ });
+ readControls();
+ transactions.setActive(showTransactions);
+ if(previous==='transactions' && !showTransactions && !snapshot && !reading && !busy)void load();
+}
 function setBusy(value){busy=value;['adminEmployeeId','adminSecret','sourceMode','sourcePaste','validateSource','sourceFile','completeScope','previewUpload','publishUpload','rollbackUpload','periodMonth','recoveryDate','clearRecoveryDate','refreshData'].forEach(id=>$(id).disabled=value);$('cancelPreview').hidden=!value||uploadKind!=='preview';$('cancelPreview').disabled=!value||uploadKind!=='preview';$('maintenance').setAttribute('aria-busy',String(value));if(!value){$('publishUpload').disabled=!plan;$('rollbackUpload').disabled=!checkpoint;$('recoveryDate').disabled=!snapshot;$('clearRecoveryDate').disabled=!snapshot;}readControls();}
 function beginUpload(kind){uploadController=new AbortController();uploadKind=kind;const task={ticket:++uploadEpoch,signal:uploadController.signal};setBusy(true);return task;}
 function currentUpload(task){return task.ticket===uploadEpoch&&!task.signal.aborted;}
@@ -221,13 +242,21 @@ async function publish(){if(busy||!source||!plan||!admin)return;const task=begin
  $('periodMonth').value=source.month;$('uploadMessage').textContent='同步成功，已核對資料與公開進度；相同來源不重複累加。';source=null;plan=null;admin=null;localSource=null;$('sourceFile').value='';$('sourcePaste').value='';$('completeScope').checked=false;$('uploadPreview').replaceChildren();$('uploadLocalPreview').replaceChildren();
  }catch(error){if(!currentUpload(task))return;$('uploadMessage').textContent='同步未確認：'+error.message+'。系統未自動重送；請先重新預覽同一原檔核對目前版本，必要時回復本次更新前狀態。';source=null;plan=null;admin=null;}finally{finishUpload(task);}if(currentUpload(task)&&!publicVerified&&!readAttempted)await load();}
 async function restore(){if(busy||!checkpoint)return;let task;try{const base={...credentials(),month:checkpoint.month,sourceHash:checkpoint.sourceHash};$('adminSecret').value='';task=beginUpload('restore');const state=await request({action:'tradein_performance_checkpoint_status',...base},stage(task,'正在核對回復前版本…'));const result=await request({action:'tradein_performance_checkpoint_restore',...base,...expected(state),checkpointId:checkpoint.checkpointId,checkpointHash:checkpoint.checkpointHash,restoreMonth:true},stage(task,'正在回復並核對本月版本…'));if(!currentUpload(task))return;if(result.status!=='checkpoint_restored')throw Error('回復尚未確認');$('periodMonth').value=checkpoint.month;checkpoint=null;source=null;plan=null;admin=null;$('uploadMessage').textContent='已回復本次更新前的月版本，其他月份保留。';}catch(error){if(task&&!currentUpload(task))return;$('uploadMessage').textContent='回復未確認：'+error.message+'。系統未自動重送，請先重新讀取核對。';}finally{if(task)finishUpload(task);}if(task&&currentUpload(task))await load();}
-const transactionLink=$('transactionLink');
-transactionLink?.addEventListener('click',()=>{
- const url=new URL(transactionLink.href);url.searchParams.set('month',$('periodMonth').value);transactionLink.href=url.href;
-});
-bindExports(context);$('periodMonth').value=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'}).slice(0,7);$('recoveryDate').value='';$('recoveryDate').disabled=true;$('clearRecoveryDate').disabled=true;
+bindExports(context);
+const params=new URLSearchParams(location.search);
+const linkedMonth=params.get('month');
+const initialScope=params.get('view')==='transactions'?'transactions':'region';
+$('periodMonth').value=/^20\d{2}-(0[1-9]|1[0-2])$/.test(linkedMonth||'')?linkedMonth:new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'}).slice(0,7);
+$('recoveryDate').value='';$('recoveryDate').disabled=true;$('clearRecoveryDate').disabled=true;
 const tabs=[...document.querySelectorAll('[data-public-scope]')];tabs.forEach((b,i)=>{b.tabIndex=b.getAttribute('aria-selected')==='true'?0:-1;b.addEventListener('click',()=>scope(b.dataset.publicScope));b.addEventListener('keydown',e=>{const d=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0;if(d){e.preventDefault();const next=tabs[(i+d+tabs.length)%tabs.length];scope(next.dataset.publicScope);next.focus();}});});
-$('refreshData').addEventListener('click',()=>{if(!reading)load();});$('periodMonth').addEventListener('change',()=>{selectedDate='';$('recoveryDate').value='';selectedCounts.clear();invalidate();load();});$('recoveryDate').addEventListener('change',()=>{selectedDate=$('recoveryDate').value;selectedCounts.clear();if(snapshot)render();});$('clearRecoveryDate').addEventListener('click',()=>{$('recoveryDate').value='';selectedDate='';selectedCounts.clear();if(snapshot)render();});$('staffStore').addEventListener('change',()=>{renderPeople();refreshExports();});
+$('refreshData').addEventListener('click',()=>{if(activeScope==='transactions')void transactions.load();else if(!reading)void load();});
+$('periodMonth').addEventListener('change',()=>{
+ selectedDate='';$('recoveryDate').value='';selectedCounts.clear();invalidate();
+ if(activeScope!=='transactions'){void load();return;}
+ readEpoch++;controller?.abort();reading=false;wipe();readControls();
+ void transactions.load();
+});
+$('recoveryDate').addEventListener('change',()=>{selectedDate=$('recoveryDate').value;selectedCounts.clear();if(snapshot)render();});$('clearRecoveryDate').addEventListener('click',()=>{$('recoveryDate').value='';selectedDate='';selectedCounts.clear();if(snapshot)render();});$('staffStore').addEventListener('change',()=>{renderPeople();refreshExports();});
 $('storeFocus')?.addEventListener('change',()=>{if(snapshot)renderStores();});
 $('storeHead')?.addEventListener('click',event=>{const th=event.target.closest('th');if(!th?.dataset.sort||!snapshot)return;storeSort={key:th.dataset.sort,dir:storeSort.key===th.dataset.sort?-storeSort.dir:1};renderStores();});
 $('lagStrip')?.addEventListener('click',event=>{const chip=event.target.closest('[data-store]');if(!chip||!$('storeFocus'))return;$('storeFocus').value=chip.dataset.store;scope('store');renderStores();});
@@ -239,4 +268,5 @@ $('sourceFile').addEventListener('change',()=>invalidate(true));$('sourcePaste')
 $('validateSource').addEventListener('click',validateLocal);
 $('previewUpload').addEventListener('click',preview);$('publishUpload').addEventListener('click',publish);$('rollbackUpload').addEventListener('click',restore);
 $('cancelPreview').addEventListener('click',cancelPreview);
-window.addEventListener('pagehide',()=>{readEpoch++;controller?.abort();reading=false;uploadEpoch++;uploadController?.abort();uploadController=null;uploadKind=null;admin=null;checkpoint=null;source=null;plan=null;localSource=null;$('adminSecret').value='';$('sourcePaste').value='';$('uploadLocalPreview').replaceChildren();$('uploadPreview').replaceChildren();$('uploadMessage').textContent=busy?'操作回覆未確認，請重新預覽原檔核對目前版本。':'';setBusy(false);});load();
+window.addEventListener('pagehide',()=>{readEpoch++;controller?.abort();reading=false;uploadEpoch++;uploadController?.abort();uploadController=null;uploadKind=null;admin=null;checkpoint=null;source=null;plan=null;localSource=null;$('adminSecret').value='';$('sourcePaste').value='';$('uploadLocalPreview').replaceChildren();$('uploadPreview').replaceChildren();$('uploadMessage').textContent=busy?'操作回覆未確認，請重新預覽原檔核對目前版本。':'';setBusy(false);});scope(initialScope);
+if(initialScope!=='transactions')void load();

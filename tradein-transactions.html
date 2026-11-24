@@ -5,59 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <title>舊換新成交明細｜北一二B</title>
-  <link rel="stylesheet" href="tradein-progress.css?v=20261009-area-candidate-1">
-  <link rel="stylesheet" href="tradein-transactions.css?v=20261117-read-1">
-  <script src="portal-logout.js?v=20261011-b-epoch-1"></script>
-  <script type="module" src="tradein-transactions.mjs?v=20261117-read-1"></script>
+  <script>
+    const destination = new URL('tradein-progress.html?view=transactions', location.href);
+    const month = new URLSearchParams(location.search).get('month');
+    if (/^20\d{2}-(0[1-9]|1[0-2])$/.test(month || '')) destination.searchParams.set('month', month);
+    location.replace(destination.href);
+  </script>
 </head>
-<body>
-<main>
-  <nav class="breadcrumb" aria-label="所在位置"><a href="home.html">智慧營運中心</a> ／ <a href="tradein-progress.html">舊換新目標進度</a></nav>
-  <header class="hero"><h1>舊換新成交明細</h1><details><summary>資料範圍</summary><p>依 SAR74 已同步交易查看專案、回收機款與手機折抵金額。</p></details></header>
-  <section class="panel" aria-labelledby="readTitle">
-    <h2 id="readTitle">讀取成交明細</h2>
-    <form id="transactionRead">
-      <div class="filters">
-        <label>統計月份<input id="transactionMonth" type="month" required></label>
-        <button id="readSelf" type="submit">讀取本人明細</button>
-        <a href="kpi-battle.html" class="button secondary">員編／核准裝置登入</a>
-      </div>
-    </form>
-    <details id="supervisorControls" class="export-rules">
-      <summary>督導查看九店</summary>
-      <form id="supervisorRead" class="filters">
-        <label>管理者員編<input id="supervisorId" autocomplete="username" required></label>
-        <label>管理者密碼<input id="supervisorSecret" type="password" autocomplete="current-password" required></label>
-        <button id="readSupervisor" type="submit">驗證並讀取九店</button>
-      </form>
-    </details>
-    <p id="transactionStatus" class="form-message" role="status" aria-live="polite"></p>
-  </section>
-  <section id="transactionResults" class="panel" aria-labelledby="resultsTitle" hidden>
-    <div class="panel-heading">
-      <div><h2 id="resultsTitle">成交明細</h2><p id="sourcePeriod"></p></div>
-      <div class="transaction-filters">
-        <label>成交店<select id="transactionStore"></select></label>
-        <label>成交日<input id="transactionDate" type="date"></label>
-        <button id="clearTransactionDate" class="secondary" type="button">整月</button>
-      </div>
-    </div>
-    <p id="transactionCount" role="status"></p>
-    <div id="transactionSummary" class="tx-summary" hidden></div>
-    <div id="transactionHighlights" class="transaction-highlights" hidden>
-      <section><h3>常見回收機款</h3><ul id="topModels"></ul></section>
-      <section><h3>常見成交專案</h3><ul id="topProjects"></ul></section>
-    </div>
-    <div class="table-wrap mobile-stack"><table>
-      <thead><tr><th scope="col">成交日</th><th scope="col">成交店</th><th scope="col">同仁</th><th scope="col">專案</th><th scope="col">回收機款</th><th scope="col">手機折抵</th></tr></thead>
-      <tbody id="transactionRows"></tbody>
-    </table></div>
-    <nav id="transactionPages" class="transaction-pages" aria-label="成交明細頁數" hidden>
-      <button id="previousTransactions" class="secondary" type="button">上一頁</button>
-      <span id="transactionPage" aria-live="polite"></span>
-      <button id="nextTransactions" class="secondary" type="button">下一頁</button>
-    </nav>
-  </section>
-</main>
-</body>
+<body><p><a href="tradein-progress.html?view=transactions">開啟舊換新成交明細</a></p></body>
 </html>

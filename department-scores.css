@@ -122,3 +122,7 @@
 #storePanel .summary-card strong,.score-regions strong{font-size:22px}
 #storePanel tbody tr:nth-child(even) td{background:#f7f5f0}
 @media(min-width:1200px){#storePanel .summary-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}}
+
+@media(min-width:1250px){
+  .page:has(#workspace[hidden]){width:min(1240px,calc(100% - 32px));margin-left:auto;margin-right:auto}
+}

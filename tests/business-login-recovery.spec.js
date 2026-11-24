@@ -102,3 +102,5 @@ test('SYNTHETIC locked recheck reports a disabled channel without login or fallb
  await expect(page.locator('[data-b-message]')).toContainText('指定密碼通道尚未開放');
  expect(f.calls).toEqual(['employee_status']);expect(await f.proof()).toBeNull();
 });
+
+require('./helpers/readonly-business-return.cjs');

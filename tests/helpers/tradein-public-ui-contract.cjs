@@ -2,9 +2,65 @@
 module.exports=function registerPublicTradeinChecks(){
 const {test,expect}=require('@playwright/test'),fs=require('node:fs/promises'),http=require('node:http'),path=require('node:path');
 const {createRuntime,parsed,csv,OPERATOR}=require('./tradein-synthetic-runtime.cjs');
+const Core=require('../../tradein-performance-core.js');
 let BASE,server;
 test.beforeAll(async()=>{const root=path.resolve(__dirname,'../..');server=http.createServer(async(req,res)=>{try{const f=path.resolve(root,'.'+new URL(req.url,'http://localhost').pathname);if(path.relative(root,f).startsWith('..'))throw Error();const type={'.html':'text/html','.js':'application/javascript','.mjs':'application/javascript','.css':'text/css','.png':'image/png'}[path.extname(f)];if(!type)throw Error();res.writeHead(200,{'Content-Type':type+';charset=utf-8'});res.end(await fs.readFile(f));}catch{res.writeHead(404);res.end();}});await new Promise(r=>server.listen(0,'127.0.0.1',r));BASE='http://127.0.0.1:'+server.address().port+'/';});
 test.afterAll(async()=>{await new Promise(r=>server.close(r));});
+
+test('成交明細沿用登入，跟隨月份與篩選，登出立即清除銷售資料',async({page})=>{
+ await page.setViewportSize({width:390,height:900});
+ await page.clock.install({time:new Date('2026-11-20T08:00:00Z')});
+ const owner='https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
+ const expiresAt=new Date('2026-11-20T08:20:00Z').getTime();
+ const deviceId='SYNTHETIC_TRADEIN_APPROVED',token='B1_a_'+'b'.repeat(64),calls=[];
+ await page.addInitScript(({owner,deviceId,token,expiresAt})=>{
+  localStorage.setItem('north12b_private_dashboard_device_id',deviceId);
+  sessionStorage.setItem('north12b_password_session_v1',JSON.stringify({v:1,owner,deviceId,token,expiresAt,logoutEpoch:''}));
+ },{owner,deviceId,token,expiresAt});
+ await page.route('https://script.google.com/**',async route=>{
+  expect(route.request().url()).toBe(owner);
+  const payload=route.request().postDataJSON();calls.push(payload);
+  const body={status:'ok',scope:'supervisor',expiresAt,month:payload.month,sourcePeriod:null,rows:null};
+  if(payload.month==='2026-11'){
+   body.stores=Core.STORES.map(([,store])=>store);
+   body.sourcePeriod={start:'2026-11-01',end:'2026-11-20'};
+   body.rows=[
+    {date:'2026-11-02',store:'萬大',staff:'測＊甲',project:'RT',projectCode:'SYNTH',model:'i15 128G',credit:4200,projectModel:'iPhone 18 256G',orderAmount:19900},
+    {date:'2026-11-03',store:'杭州南',staff:'測＊乙',project:'單銷',projectCode:null,model:'i14 128G',credit:0,orderAmount:null}
+   ];
+  }
+  await route.fulfill({json:body});
+ });
+ await page.goto(BASE+'tradein-transactions.html?month=2026-11');
+ await expect(page.getByRole('tab')).toHaveText(['區進度','店進度','個人進度','成交明細','同仁分享']);
+ await expect(page.getByRole('tab',{name:'成交明細'})).toHaveAttribute('aria-selected','true');
+ await expect(page.locator('#transactionSummary')).toContainText('4,200');
+ await expect(page.locator('#transactionSummary')).toContainText('2,100');
+ await expect(page.locator('#transactionRows')).toContainText('19,900');
+ await expect(page.locator('#transactionTopSoldModels')).toContainText('iPhone 18 256G');
+ await expect(page.locator('#actual-transactions input[type=password]')).toHaveCount(0);
+ await expect(page.locator('#transactionProjectMix')).toContainText('50%');
+ expect(calls).toEqual([{action:'employee_tradein_transactions_read',deviceId,token,month:'2026-11'}]);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.locator('#transactionStore').selectOption('杭州南');
+ await expect(page.locator('#transactionRows tr')).toHaveCount(1);
+ await expect(page.locator('#transactionRows')).toContainText('未提供');
+ await page.locator('#transactionProject').selectOption('RT');
+ await expect(page.locator('#transactionCount')).toContainText('沒有有效成交');
+ await page.locator('#clearTransactionFilters').click();
+ await page.locator('#transactionSearch').fill('SYNTH');
+ await expect(page.locator('#transactionRows tr')).toHaveCount(1);
+ await page.locator('#periodMonth').fill('2026-10');
+ await page.locator('#periodMonth').dispatchEvent('change');
+ await expect(page.locator('#transactionStatus')).toContainText('尚未同步');
+ await expect(page.locator('#transactionRows tr')).toHaveCount(0);
+ await page.locator('#periodMonth').fill('2026-11');
+ await page.locator('#periodMonth').dispatchEvent('change');
+ await expect(page.locator('#transactionRows tr')).toHaveCount(2);
+ await page.evaluate(()=>window.dispatchEvent(new StorageEvent('storage',{key:'north12b_portal_logout_event_v1'})));
+ await expect(page.locator('#transactionRows tr')).toHaveCount(0);
+ await expect(page.locator('#transactionLogin')).toBeVisible();
+});
 async function start(page,{width=390,empty=false,tamper=false,frameFailure=false,staffActual=1,withoutDaily=false,november=false}={}){const r=createRuntime(),source=parsed(november?novemberCsv():csv());for(let i=1;i<staffActual;i++)source.records.push({...source.records[0],recycle_code:"SYNTHETIC-EXTRA-"+i,order_number:"SYNTHETIC-EXTRA-ORDER-"+i});r.configure(source);if(!empty){const p=r.a.tradeinPerformancePreview({source,employeeId:OPERATOR,adminSecret:r.secret}),value=r.a.tradeinPerformancePublish({source,...p,employeeId:OPERATOR,adminSecret:r.secret});r.a.tradeinPerformancePublicPublish({employeeId:OPERATOR,adminSecret:r.secret,month:source.month,sourceHash:source.source_sha256,expectedActiveHash:value.snapshotHash});}
  const calls=[],errors=[];page.on('pageerror',e=>errors.push(e.message));await page.setViewportSize({width,height:900});await page.clock.install({time:new Date((november?'2026-11':'2026-10')+'-09T14:00:00Z')});
  await page.addInitScript(()=>{localStorage.setItem('north12b_private_dashboard_employee_id','SYNTH01');localStorage.setItem('north12b_private_dashboard_device_id','SYNTHETIC_REVOKED_DEVICE');});
@@ -44,7 +100,7 @@ test('十一月門市與個人獎金估算，區分指定、一般、排除及�
  await expect(zeroCard.locator('strong')).toHaveText('1 人');
  expect(errors).toEqual([]);
 });
-for(const width of [1280,390,320])test(width+'px anonymous region, store, person, copy and real downloads',async({page},info)=>{const {r,calls,errors}=await start(page,{width});await expect(page.locator('#stats')).toContainText('4 台');await expect(page.locator('#refreshData')).toBeEnabled();await expect(page.locator('.area-nav a:visible')).toHaveText(['目標進度','成交明細','回收價查詢']);await expect(page.locator('[data-supervisor-brief]')).toBeHidden();expect(await page.locator('body').evaluate(e=>getComputedStyle(e).fontSize)).toBe('18px');expect(await page.locator('main').evaluate(e=>Math.round(e.getBoundingClientRect().width))).toBe(Math.min(1040,width-(width>700?32:16)));await expect(page.locator('#stats')).toContainText('159 台');await expect(page.locator('#stats')).toContainText('155 台');expect(calls).toEqual([{action:'tradein_performance_public_read',month:'2026-10',includeDays:true}]);expect(await page.locator('#employeeId').count()).toBe(0);expect(await page.locator('#bootstrapCode').count()).toBe(0);const writes=r.writes.length;
+for(const width of [1280,390,320])test(width+'px anonymous region, store, person, copy and real downloads',async({page},info)=>{const {r,calls,errors}=await start(page,{width});await expect(page.locator('#stats')).toContainText('4 台');await expect(page.locator('#refreshData')).toBeEnabled();await expect(page.locator('.area-nav a:visible')).toHaveText(['目標進度','回收價查詢']);await expect(page.locator('[data-supervisor-brief]')).toBeHidden();expect(await page.locator('body').evaluate(e=>getComputedStyle(e).fontSize)).toBe('18px');expect(await page.locator('main').evaluate(e=>Math.round(e.getBoundingClientRect().width))).toBe(Math.min(1040,width-(width>700?32:16)));await expect(page.locator('#stats')).toContainText('159 台');await expect(page.locator('#stats')).toContainText('155 台');expect(calls).toEqual([{action:'tradein_performance_public_read',month:'2026-10',includeDays:true}]);expect(await page.locator('#employeeId').count()).toBe(0);expect(await page.locator('#bootstrapCode').count()).toBe(0);const writes=r.writes.length;
  expect(await page.locator('#stats').evaluate(grid=>getComputedStyle(grid).gridTemplateColumns.split(' ').length)).toBe(width>740?5:2);
  for(const scope of ['region','store','person']){await page.locator('[data-public-scope="'+scope+'"]').click();await expect(page.locator('#actual-'+scope)).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:info.outputPath('SYNTHETIC-public-'+scope+'-'+width+'.png'),fullPage:true});}
  await expect(page.locator('#storeRows tr')).toHaveCount(9);

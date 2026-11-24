@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'">
+<title>OP 全系列專區｜北一二B</title>
+<link rel="stylesheet" href="op-series.css">
+<script type="module" src="op-series.mjs"></script>
+</head>
+<body><main>
+<nav><a href="kpi-battle.html#op">返回 KPI 戰情</a><a href="quick-upload.html">資料快速上傳</a></nav>
+<header><div><h1>OP 全系列專區</h1><p id="period">北一二B・排除空機</p></div><a class="action" href="#upload">更新報表</a></header>
+<section id="dashboard" hidden>
+<div class="scope"><label for="store">查看範圍</label><select id="store"></select></div>
+<div id="metrics" class="metrics"></div>
+<section><h2>九店進度</h2><div class="scroll"><table class="overview"><thead><tr><th>店點</th><th>合計／目標</th><th>進度達成率</th><th>影音</th><th>玩家</th><th>智慧家庭</th><th>科技生活</th><th>連續未動店</th></tr></thead><tbody id="stores"></tbody></table></div></section>
+<section><h2 id="structureTitle">上線結構</h2><div class="tabs" id="tabs" role="group" aria-label="上線結構分析維度"></div><p id="basis"></p><div class="scroll"><table><thead id="breakHead"></thead><tbody id="breakRows"></tbody></table></div></section>
+</section>
+<section id="upload"><h2>快速上傳 OP 報表</h2><p>選擇 OP 劇院遊戲機達成率 Excel。核對九店後，更新到這個瀏覽器。</p>
+<label class="file">選擇 Excel<input type="file" accept=".xlsx" id="file"></label>
+<p role="status" id="status">尚未選擇報表</p><button id="apply" type="button" hidden>確認更新</button>
+</section>
+</main></body></html>

@@ -20,7 +20,7 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
 (function() {
   'use strict';
   let live = null, preview = null, generation = 0, busy = false;
-  const ids = ['conversionFile','conversionPreviewBtn','conversionRefreshBtn','conversionPublishBtn','conversionRollbackBtn'];
+  const ids = ['conversionFile','renewalEvidenceFiles','conversionPreviewBtn','conversionRefreshBtn','conversionPublishBtn','conversionRollbackBtn'];
   function controls() {
     ids.forEach(id => { $(id).disabled = busy; });
     $('conversionConfirm').disabled = busy;
@@ -36,7 +36,13 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
     $('conversionLive').textContent = value?.activeHash
       ? '正式截止 ' + value.cutoff + ' · ' + value.sourceName + ' · 版本 ' + value.revision + ' · ' + value.activeHash.slice(0,12)
       : '尚無正式締結率元件' + (value ? ' · 版本 ' + value.revision : '');
+    if (value?.renewalEvidence) $('conversionLive').textContent += ' · ' + evidenceDates(value.renewalEvidence);
     controls();
+  }
+  const evidenceLabels={tiers:'門市 Tier',plans:'未續約方案',tariffs:'原資費',daily:'日報原專案'};
+  function evidenceDates(value){
+    return Object.entries(evidenceLabels).map(([key,label])=>
+      label+(value?.[key]?' 至 '+value[key]:'尚無已核對資料')).join(' · ');
   }
   async function refresh(ticket = generation) {
     const result = await call('readonly_conversion_status', payload());
@@ -45,6 +51,7 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
     renderLive(result.live); return result.live;
   }
   $('conversionFile').addEventListener('change', invalidate);
+  $('renewalEvidenceFiles').addEventListener('change', invalidate);
   $('conversionConfirm').addEventListener('change', controls);
   $('conversionRefreshBtn').addEventListener('click', async () => {
     if (busy) return; invalidate(); busy = true; controls();
@@ -54,21 +61,36 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
   });
   $('conversionPreviewBtn').addEventListener('click', async () => {
     if (busy) return; invalidate(); const ticket = generation;
-    const file = $('conversionFile').files[0];
-    if (!file || !/\.xls[xm]$/i.test(file.name)) {
-      return message('conversionMessage', '請選擇原始締結率 Excel（.xlsx 或 .xlsm）。', 'bad');
+    const file = $('conversionFile').files[0], supplements = [...$('renewalEvidenceFiles').files];
+    const files = [file, ...supplements].filter(Boolean);
+    if (!files.length || files.some(source=>!/\.xls[xm]$/i.test(source.name))) {
+      return message('conversionMessage', '請選擇締結率原報或續約洞察補充 Excel（.xlsx 或 .xlsm）。', 'bad');
     }
-    if (!file.size || file.size > 40 * 1024 * 1024) {
-      return message('conversionMessage', '請選擇有內容且 40 MB 以內的 Excel。', 'bad');
+    if (files.length>5 || files.some(source=>!source.size||source.size>40*1024*1024)) {
+      return message('conversionMessage', '請選擇最多五份有內容的 Excel，每份 40 MB 以內。', 'bad');
     }
-    busy = true; controls(); message('conversionMessage', '正在本機核對 AQ／RT 彙總表…');
+    busy = true; controls(); message('conversionMessage', '正在本機核對 AQ／RT、Tier 與未續約方案…');
     try {
-      const bytes = await file.arrayBuffer();
-      const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2,'0')).join('');
-      const workbook = XLSX.read(bytes, {type:'array', bookVBA:false, sheets:['AQ締結率','RT每日','RT締結率','樞紐']});
-      const snapshot = window.ReadonlyConversionSource.parseWorkbook(workbook, XLSX, {sha256, source_name:file.name, source_bytes:file.size});
+      const source=window.ReadonlyConversionSource, renewalEvidence=[];
+      let snapshot=null, analysisIssue='';
+      if(file){
+        const bytes=await file.arrayBuffer();
+        const sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+        const workbook=source.readSource(bytes,XLSX,'array');
+        snapshot=source.parseWorkbook(workbook,XLSX,{sha256,source_name:file.name,source_bytes:file.size});
+        try{
+          const verified=source.parseEvidence(workbook,XLSX,file.name);
+          if(verified)renewalEvidence.push(verified);
+        }catch(error){analysisIssue=' · 原報洞察未更新：'+error.message;}
+      }
+      for(const extra of supplements){
+        const workbook=source.readSource(await extra.arrayBuffer(),XLSX,'array');
+        renewalEvidence.push(source.parseEvidence(workbook,XLSX,extra.name,{supplement:true}));
+      }
       if (ticket !== generation) return;
-      const result = await call('readonly_conversion_preview', payload({snapshot}));
+      const result = await call('readonly_conversion_preview', payload({
+        ...(snapshot?{snapshot}:{}),...(renewalEvidence.length?{renewalEvidence}:{})
+      }));
       if (ticket !== generation) return;
       if (result.status !== 'ok' || !result.token || !result.preview?.totals) throw Error('來源預覽回應不完整');
       preview = result; renderLive(result.live);
@@ -77,10 +99,12 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
       $('conversionPreviewText').textContent = p.sourceName + ' · ' + p.periodStart + ' 至 ' + p.cutoff +
         ' · ' + p.storeDateKeys + ' 店日 · 北一二B AQ ' + percent(p.totals.aq_rate) + '／RT ' + percent(p.totals.rt_rate) +
         ' · 新增 ' + p.added + '／更正 ' + p.changed + '／移除 ' + p.removed +
-        (snapshot.prior ? '' : ' · 來源未提供同期核對依據') +
-        ' · 原始檔 SHA-256 ' + p.sourceHash + (p.sameSource ? ' · 同一原始檔，不累加' : '');
+        (snapshot&&!snapshot.prior ? ' · 來源未提供同期核對依據' : '') +
+        ' · 原始檔 SHA-256 ' + p.sourceHash + (p.sameSource ? ' · 同一原始檔，不累加' : '') +
+        (p.renewalEvidence?' · '+evidenceDates(p.renewalEvidence):' · 未取得門市 Tier 或未續約方案彙總。')+
+        analysisIssue;
       $('conversionPreview').classList.remove('hidden');
-      message('conversionMessage', '預覽通過；尚未發布。只送出已核實的九店逐日彙總。', 'ok');
+      message('conversionMessage', '預覽通過。確認後發布已核對的門市彙總。', 'ok');
     } catch (error) { if (ticket === generation) { preview = null; message('conversionMessage', error.message, 'bad'); } }
     finally { busy = false; controls(); }
   });
@@ -116,7 +140,7 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
     } catch (error) { live = null; message('conversionMessage', error.message, 'bad'); }
     finally { busy = false; controls(); }
   });
-  window.addEventListener('pagehide', () => { invalidate(); $('conversionFile').value = ''; live = null;
+  window.addEventListener('pagehide', () => { invalidate(); $('conversionFile').value = ''; $('renewalEvidenceFiles').value = ''; live = null;
     $('conversionLive').textContent = '尚未核對版本。'; $('conversionPreviewText').textContent = '';
     $('conversionMessage').textContent = ''; controls(); });
 })();

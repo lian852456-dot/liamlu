@@ -3,7 +3,7 @@
 <head>
   <script src="portal-logout.js?v=20261011-b-epoch-1"></script>
   <script src="GasBClient.js?v=20261023-login-status-1" defer></script>
-  <script src="dashboard-b-shell.js?v=20261023-login-status-1" defer></script>
+  <script src="dashboard-b-shell.js?v=20261120-login-return-1" defer></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -137,6 +137,30 @@
   body #dashboard-b-access input{height:36px;min-height:36px;font-size:14px}
   body #dashboard-b-access [data-b-submit]{height:36px}
   body #dashboard-b-access .b-toolbar{padding-top:6px;gap:8px}
+  .shell-header .eyebrow,.shell-header .subtitle{display:none}
+  .home-link{min-height:28px;padding:4px 10px}
+  body #dashboard-b-access{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:4px 0}
+  body #dashboard-b-access h2{margin:0;font-size:14px}
+  body #dashboard-b-access form{display:flex;flex:1 1 420px;align-items:center;gap:8px;margin:0}
+  body #dashboard-b-access input,body #dashboard-b-access [data-b-submit]{height:28px;min-height:28px;padding:2px 8px}
+  body #dashboard-b-access [data-b-message]{flex:1 1 160px;max-width:200px;margin:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  body #dashboard-b-access .b-toolbar{padding:0;border:0}
+  .awards-hero{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .awards-hero .card-title{margin:0;padding:0;border:0;font-size:16px}
+  .layout-skeleton{margin-top:8px}
+  .skeleton-kicker{margin:0 0 6px;color:#6b7280;font-size:12px;font-weight:800}
+  .skeleton-board{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(240px,.7fr);gap:10px}
+  .skeleton-main,.skeleton-side{border:1px solid #e5e7eb;border-radius:10px;background:#fff;overflow:hidden}
+  .layout-skeleton table{width:100%;border-collapse:collapse;font-size:13px}
+  .layout-skeleton th,.layout-skeleton td{height:30px;padding:0 8px;border-bottom:1px solid #eef0f3;text-align:left}
+  .layout-skeleton th{background:#f5f3ff;color:#6b7280;font-size:12px}
+  .layout-skeleton .bar{display:block;height:8px;border-radius:99px;background:#ece8f8}
+  .skeleton-side{display:grid;gap:8px;align-content:start;padding:10px}
+  .skeleton-side span{display:block;height:36px;border-radius:8px;background:#f6f7f9}
+  body:has(#awardsBattleContent table) .layout-skeleton,
+  body:has(#awardsBattleContent .award-store-card) .layout-skeleton{display:none}
+  @media(min-width:1200px){.award-store-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media(max-width:1099px){.skeleton-board{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -155,6 +179,23 @@
     <div class="awards-battle-note" id="awardsBattleSourceNote">讀取受保護獎金資料中…</div>
   </div>
   <div id="awardsBattleContent"><div class="kpi-empty">讀取台獎戰情資料中…</div></div>
+  <section class="layout-skeleton" aria-label="載入後的版面預覽">
+    <p class="skeleton-kicker">登入後會看到九店台獎與優先補量</p>
+    <div class="skeleton-board">
+      <div class="skeleton-main"><table><thead><tr><th>店點</th><th>達成</th><th>獎金</th><th>缺口</th></tr></thead><tbody>
+        <tr><td>酒泉</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>永吉</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>復興南</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>杭州南</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>萬大</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>通化</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>大稻埕</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>三創</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+        <tr><td>六張犁</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr>
+      </tbody></table></div>
+      <aside class="skeleton-side" aria-hidden="true"><span></span><span></span><span></span><span></span></aside>
+    </div>
+  </section>
   <noscript><div class="card private-lock standalone-error"><h3>台獎戰情暫時無法載入</h3><p>瀏覽器未啟用 JavaScript，因此不顯示任何台獎數值。請返回<a href="index.html">每日回報內的台獎戰情</a>。</p></div></noscript>
 </main>
 

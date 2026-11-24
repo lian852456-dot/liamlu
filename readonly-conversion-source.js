@@ -1,9 +1,26 @@
 (function(root,factory){
-  const api=factory(typeof module==='object'&&module.exports?require('./readonly-dashboard-core.js'):root.ReadonlyDashboardCore);
+  const node=typeof module==='object'&&module.exports;
+  const api=factory(node?require('./readonly-dashboard-core.js'):root.ReadonlyDashboardCore,
+    node?require('./store-renewal-evidence.js'):root.StoreRenewalEvidence);
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(root)root.ReadonlyConversionSource=api;
-})(typeof globalThis==='object'?globalThis:this,function(core){
+})(typeof globalThis==='object'?globalThis:this,function(core,evidence){
   'use strict';
+  const summarySheets=['AQ締結率','RT每日','RT締結率','樞紐'];
+  const analysisSheets=['Tier觀察','RT用戶進店行為_店','未續約明細','續約率(分母)'];
+  const normalizeSheet=name=>name.normalize('NFKC').replace(/[\s\u200B-\u200D\u2060]+/g,'');
+  function readSource(bytes,XLSX,type){
+    const names=XLSX.read(bytes,{type,bookSheets:true}).SheetNames;
+    return XLSX.read(bytes,{type,bookVBA:false,sheets:names.filter(name=>
+      summarySheets.includes(name)||analysisSheets.includes(normalizeSheet(name)))});
+  }
+  function parseEvidence(workbook,XLSX,source,{supplement=false}={}){
+    const names=Object.keys(workbook.Sheets).map(normalizeSheet);
+    if(supplement&&!names.some(name=>['RT用戶進店行為_店','未續約明細','續約率(分母)'].includes(name)))
+      throw Error('補充檔案沒有門市 Tier、未續約明細或續約率(分母)');
+    if(!names.some(name=>['RT用戶進店行為_店','未續約明細','續約率(分母)'].includes(name)))return null;
+    return evidence.parse(workbook,XLSX,source);
+  }
   function parseWorkbook(workbook,XLSX,options){
     const includePrior=Boolean(workbook.Sheets['樞紐']);
     const parseOptions={...options,allowMissingRtRate:true,includePrior};
@@ -29,5 +46,5 @@
     // Output keeps the original numeric counts; zero-denominator rates remain null / —.
     return core.parseWorkbook(input,XLSX,parseOptions);
   }
-  return Object.freeze({parseWorkbook});
+  return Object.freeze({parseWorkbook,readSource,parseEvidence});
 });

@@ -1547,12 +1547,13 @@
     .tab-bar .tab-btn { flex:0 0 auto; min-height:48px; padding:11px 14px; font-size:15px; }
   }
 </style>
-<link rel="stylesheet" href="daily-report-layout.css?v=20261102-save-state-1">
+<link rel="stylesheet" href="daily-report-layout.css?v=20261120-density-1">
 <link rel="stylesheet" href="daily-report-summary.css?v=20261004-summary-1">
 <script src="report-save-recovery.js?v=20261102-1"></script>
 <script src="daily-report-layout.js?v=20261118-cobranded-card-1" defer></script>
-<script src="GasBClient.js?v=20261024-auth-reject-1" defer></script>
-<script src="dashboard-b-shell.js?v=20261109-phone-return-1" defer></script>
+<script src="insurance-interim-check.js?v=20261121-1" defer></script>
+<script src="GasBClient.js?v=20261121-preflight-1" defer></script>
+<script src="dashboard-b-shell.js?v=20261121-preflight-1" defer></script>
 </head>
 <body>
 
@@ -2839,6 +2840,7 @@ const kpiBattleController = KpiBattleController.create({
 });
 
 window.DashboardBHost={
+  interimInsuranceCheck:true,
   navigationSelector:'.tab-btn, [data-kpi-battle-view]',
   clear(){kpiBattleController.failClosed('請重新驗證登入。');awardsBattleController.failClosed('請重新驗證登入。');},
   showLegacyAccess(){document.querySelector('.tab-btn[onclick*="kpi-battle"]')?.click();kpiBattleController.renderLock();document.querySelector('#kpiBattleContent .private-lock')?.scrollIntoView({block:'start',behavior:'smooth'});document.querySelector('#privateEmployeeId')?.focus();},

@@ -1,4 +1,4 @@
-(function(root,factory){const node=typeof module==='object'&&module.exports;const api=factory(node?require('./readonly-dashboard-core.js'):root.ReadonlyDashboardCore,node?require('./kpi-battle-controller.js'):root.KpiBattleController,node?require('./awards-battle-controller.js'):root.AwardsBattleController);if(node)module.exports=api;else root.ReadonlyDashboardAdapter=api;})(typeof globalThis==='object'?globalThis:this,function(Core,Kpi,Awards){
+(function(root,factory){const node=typeof module==='object'&&module.exports;const api=factory(node?require('./readonly-dashboard-core.js'):root.ReadonlyDashboardCore,node?require('./kpi-battle-controller.js'):root.KpiBattleController,node?require('./awards-battle-controller.js'):root.AwardsBattleController,node?require('./store-renewal-evidence.js'):root.StoreRenewalEvidence);if(node)module.exports=api;else root.ReadonlyDashboardAdapter=api;})(typeof globalThis==='object'?globalThis:this,function(Core,Kpi,Awards,Evidence){
   'use strict';
   function maskedName(value){const name=String(value||'').trim();if(/[＊*]/.test(name))return name;const letters=Array.from(name);return letters.length?letters[0]+'＊'.repeat(Math.max(1,letters.length-1)):'姓名未提供';}
   const numeric=value=>typeof value==='number'&&Number.isFinite(value)?value:null;
@@ -45,10 +45,16 @@
     let conversion=null,conversionReason='尚未匯入已核實的 AQ／RT 締結率報表。';
     if(snapshot.conversionStatus?.status==='unavailable')conversionReason='私有締結率版本尚未通過讀回核對，請由主管確認。';
     if(snapshot.conversionBattle){try{conversion=Core.validateConversion(snapshot.conversionBattle);}catch{conversionReason='締結率來源未通過完整性檢查，請核對原檔後重新更新。';}}
+    let renewalEvidence={},renewalEvidenceError='';
+    if(conversion){
+      try{renewalEvidence=Evidence.fromConversion(snapshot.conversionBattle);}
+      catch{renewalEvidenceError='正式續約明細未通過核對。';}
+    }
     return {profile:{store:privateResult.profile.store,role:privateResult.profile.role},stores:Core.STORES.filter(s=>ids.has(s.id)),
       kpi:{...metadata,data:{...view,aggregate},stores:storeRows,items,available:true},personal:{...metadata,records:personal,available:personal.length>0},
       awards:{available:awardCheck.ok,data:awardCheck.ok?snapshot.awardsBattle:null,reason:awardCheck.reason,
         cutoff:snapshot.awardsBattle.data_as_of_date||snapshot.awardsBattle.source_as_of_date||'',reportDate:snapshot.awardsBattle.report_run_date||snapshot.awardsBattle.report_date||'',version:String(snapshot.awardsBattle.processing_run_id||snapshot.publishedAt||'來源未提供版本')},
+      renewalEvidence,renewalEvidenceError,
       conversion,conversionReason};
   }
   return Object.freeze({fromBundle,periodComparison});

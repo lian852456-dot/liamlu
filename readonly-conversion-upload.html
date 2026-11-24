@@ -7,8 +7,10 @@
 <header class="hero"><h1>AQ／RT 締結率更新</h1><details><summary>怎麼更新</summary><p>選擇原報、核對截止與彙總，確認後更新 KPI 戰情與來客儀表板。</p></details></header>
 <section id="authCard" class="card"><h2>主管上傳驗證</h2><details><summary>驗證說明</summary><p class="small">請使用既有員編與管理者驗證碼。驗證碼僅供本次原服務核驗，不保存於瀏覽器。</p></details><label>員編<input id="employeeId" autocomplete="username"></label><label>管理者驗證碼<input id="adminSecret" type="password" autocomplete="current-password"></label><div class="actions"><button id="loginBtn" type="button">登入並讀取締結率版本</button></div><div id="authMessage" class="message hidden" role="status"></div></section>
 <section id="app" class="hidden"><section class="card" id="conversionUploadCard">
-<h2>AQ／RT 締結率來源</h2><p class="small">只發布已核實的九店逐日彙總。原始 Excel 與客戶明細留在本機。</p>
+<h2>AQ／RT 締結率及續約洞察來源</h2><p class="small">只發布已核實的九店彙總。原始 Excel 與客戶明細留在本機。</p>
 <label>締結率來源 Excel（.xlsx／.xlsm）<input id="conversionFile" type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12"></label>
+<label>續約洞察補充 Excel<input id="renewalEvidenceFiles" type="file" accept=".xlsx,.xlsm" multiple></label>
+<p class="small">可同時補入含門市 Tier／未續約明細的 AQ／RT 原報或含「續約率(分母)」的日報。已有正式締結率時可單獨更新洞察。</p>
 <div class="actions"><button id="conversionPreviewBtn" type="button">檢查締結率來源</button><button id="conversionRefreshBtn" class="secondary" type="button">讀取締結率版本</button></div>
 <p id="conversionLive" class="notice">尚未核對版本。</p><div id="conversionMessage" class="message hidden" role="status"></div>
 <div id="conversionPreview" class="hidden"><p id="conversionPreviewText"></p><label class="confirm"><input id="conversionConfirm" type="checkbox">我已確認來源、截止及店日差異。</label><div class="actions"><button id="conversionPublishBtn" type="button" disabled>確認更新締結率</button></div></div>
@@ -22,6 +24,8 @@
 </main>
 <script src="assets/vendor/xlsx.full.min.js"></script>
 <script src="readonly-dashboard-core.js?v=20261113-conversion-1"></script>
-<script src="readonly-conversion-source.js?v=20261113-conversion-1"></script>
-<script src="readonly-conversion-upload.js?v=20261113-conversion-1"></script>
+<script src="readonly-renewal-detail.js?v=20261121-evidence"></script>
+<script src="store-renewal-evidence.js?v=20261121-evidence"></script>
+<script src="readonly-conversion-source.js?v=20261121-evidence"></script>
+<script src="readonly-conversion-upload.js?v=20261121-evidence"></script>
 </body></html>
