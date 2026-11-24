@@ -65,7 +65,10 @@ body:has(#storePanel){--paper:#fff;--muted:#52606c}
 #goldPanel .summary-card{padding:8px 10px}
 #storePanel .data-card{padding:10px}
 #storePanel th,#storePanel td{padding:4px 8px;line-height:1.3}
-.page,.page:has(#storePanel){width:min(1240px,calc(100% - 32px));margin-left:auto;margin-right:auto}
+.page{width:min(1240px,calc(100% - 32px));margin-left:auto;margin-right:auto}
+@media(min-width:1250px){
+  .page:has(#storePanel):not(:has(#workspace[hidden])){width:min(1540px,100%)}
+}
 .auth-panel{display:flex;align-items:center;gap:8px 12px;padding:8px 10px}
 .auth-panel .step-label,.auth-panel>div>p{display:none}
 .auth-panel h2{margin:0;font-size:16px;white-space:nowrap}
