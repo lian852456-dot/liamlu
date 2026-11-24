@@ -42,15 +42,42 @@ test('timeout has a readable terminal error, re-enables refresh, and refresh rec
 test('reminders timeout cannot delay, clear, or disable saved scores',async({page})=>{
  await page.clock.install();const s=await setup(page,{rulesTimeout:true});await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreBody tr')).toHaveCount(9);await page.clock.runFor(20010);await expect(page.locator('#store-rules-status')).toContainText('逾時');await expect(page.locator('#scoreDashboard')).toBeVisible();await expect(page.locator('#scoreRefresh')).toBeEnabled();expect(s.errors).toEqual([]);
 });
-for(const width of [1440,390])test(`saved data, reminders failure, fresh reload, filters and readable type at ${width}`,async({page})=>{
- await page.setViewportSize({width,height:1000});const s=await setup(page);await expect(page.locator('#peopleBody tr')).toHaveCount(12);
- const sizes=await page.evaluate(()=>({name:parseFloat(getComputedStyle(document.querySelector('#peopleBody td')).fontSize),number:parseFloat(getComputedStyle(document.querySelector('#peopleBody .number')).fontSize),placement:parseFloat(getComputedStyle(document.querySelector('.month-placement')).fontSize),heading:parseFloat(getComputedStyle(document.querySelector('#peopleHead th')).fontSize)}));
- expect(sizes.name).toBeGreaterThanOrEqual(19);expect(sizes.number).toBeGreaterThanOrEqual(21);expect(sizes.placement).toBeGreaterThanOrEqual(16);expect(sizes.heading).toBeGreaterThanOrEqual(16);
+for(const width of [1440,390])test(`saved data, three tabs and compact dashboard at ${width}`,async({page})=>{
+ await page.setViewportSize({width,height:width===390?844:900});const s=await setup(page);await expect(page.locator('#peopleBody tr')).toHaveCount(12);
+ const tabs=page.getByRole('tab');
+ await expect(tabs).toHaveText(['金牌統計','店務成績','部區締結率']);
+ const tabTops=await tabs.evaluateAll(items=>items.map(item=>item.getBoundingClientRect().top));
+ expect(new Set(tabTops).size).toBe(1);
+ await expect(page.getByRole('tab',{name:'金牌統計',selected:true})).toBeVisible();
+ const sizes=await page.evaluate(()=>Object.fromEntries(Object.entries({
+  name:'#peopleBody td',number:'#peopleBody .number',placement:'.month-placement',heading:'#peopleHead th'
+ }).map(([key,selector])=>[key,parseFloat(getComputedStyle(document.querySelector(selector)).fontSize)])));
+ expect(sizes.name).toBeGreaterThanOrEqual(13);
+ expect(sizes.name).toBeLessThanOrEqual(16);
+ expect(sizes.number).toBeGreaterThanOrEqual(sizes.name);
+ expect(sizes.placement).toBeGreaterThanOrEqual(12);
+ expect(sizes.heading).toBeGreaterThanOrEqual(13);
+ const visibleRows=await page.locator('#peopleBody tr').evaluateAll(rows=>rows.filter(row=>row.getBoundingClientRect().bottom<=innerHeight).length);
+ expect(visibleRows).toBeGreaterThanOrEqual(width===390?2:6);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(await page.locator('#peopleBody').evaluate(e=>e.closest('.table-scroll').clientWidth<e.closest('table').scrollWidth)).toBe(width===390);
  const dir=path.resolve(__dirname,'../../evidence');await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(dir,`gold-${width}.png`),fullPage:true});await page.evaluate(()=>window.scrollTo(0,document.querySelector('#goldSummary').offsetTop-70));await page.screenshot({path:path.join(dir,`gold-table-${width}.png`)});if(width===390){await page.locator('#peopleBody').evaluate(e=>{e.closest('.table-scroll').scrollLeft=document.querySelector('#peopleHead th:nth-child(2)').offsetWidth;});await page.screenshot({path:path.join(dir,'gold-table-scroll-390.png')});}
  await page.locator('[data-tab="store"]').click();await expect(page.locator('#store-rules-status')).toContainText('提醒服務');await expect(page.locator('#scoreBody tr')).toHaveCount(9);await expect(page.locator('#scoreSourceMeta')).toContainText('完整（6/6月）');await expect(page.locator('#scoreFile')).toHaveValue('');
  await page.locator('#scorePeriod').selectOption('2026-07');await page.locator('#scoreRegion').selectOption('北一二D');await expect(page.locator('#scoreBody tr')).toHaveCount(3);await page.locator('#scoreStore').selectOption('合成店D1');await expect(page.locator('#scoreBody tr')).toHaveCount(1);await page.locator('[data-score-detail]').click();await expect(page.locator('#scoreDetail')).toContainText('7月!G');
  await page.locator('#scoreRefresh').click();await expect(page.locator('#scoreMessage')).not.toContainText('正在');await expect(page.locator('#scoreRegion')).toHaveValue('北一二D');await expect(page.locator('#scoreStore')).toHaveValue('合成店D1');
  await page.locator('[data-tab="gold"]').click();await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreBody tr')).toHaveCount(1);await page.reload();await page.locator('[data-tab="store"]').click();await expect(page.locator('#scoreBody tr')).toHaveCount(9);await expect(page.locator('#scoreFile')).toHaveValue('');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(dir,`store-${width}.png`),fullPage:true});expect(s.errors).toEqual([]);expect(s.calls.filter(p=>/publish|restore/.test(p.action))).toEqual([]);fs.writeFileSync(path.join(dir,`metrics-${width}.json`),JSON.stringify({viewport:width,sizes,readCalls:s.urls.length,noWrites:true,noFile:true,errors:s.errors},null,2));
+ await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(dir,`store-${width}.png`),fullPage:true});
+ if(width===1440){
+  const [trendTop,rankTop]=await page.locator('.score-comparison-details > div').evaluateAll(items=>items.map(item=>item.getBoundingClientRect().top));
+  expect(trendTop).toBe(rankTop);
+ }
+ await page.getByRole('tab',{name:'部區締結率'}).click();
+ await expect(page.getByRole('tab',{name:'部區締結率',selected:true})).toBeVisible();
+ await expect(page.locator('#storePanel')).toBeHidden();
+ await expect(page.locator('#goldPanel')).toBeHidden();
+ await page.getByRole('link',{name:'開啟部區報表'}).click();
+ await expect(page).toHaveURL(/north12-officer\.html$/);
+ await expect(page.locator('#import-panel')).toBeVisible();
+ await page.getByRole('link',{name:'返回部區管理'}).click();
+ await expect(page.getByRole('tab',{name:'部區締結率',selected:true})).toBeVisible();
+ expect(s.errors).toEqual([]);expect(s.calls.filter(p=>/publish|restore/.test(p.action))).toEqual([]);fs.writeFileSync(path.join(dir,`metrics-${width}.json`),JSON.stringify({viewport:width,sizes,visibleRows,readCalls:s.urls.length,noWrites:true,noFile:true,errors:s.errors},null,2));
 });

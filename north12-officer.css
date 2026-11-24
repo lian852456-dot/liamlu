@@ -34,3 +34,39 @@ main{width:min(1240px,calc(100% - 32px));max-width:1240px;margin-left:auto;margi
 .skeleton-side span{display:block;height:36px;border-radius:8px;background:#f3f6f9}
 main:has(#view:not([hidden])) .layout-skeleton{display:none}
 @media(max-width:1099px){.skeleton-board{grid-template-columns:1fr}}
+
+main {
+  max-width: 1440px;
+  padding: 16px 20px 28px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+header h1 { font-size: 21px; line-height: 1.25; }
+header .eyebrow { display: none; }
+main h2 { margin: 0 0 5px; font-size: 16px; }
+main p { margin: 4px 0; line-height: 1.45; }
+#import-panel .toolbar { margin-top: 8px; }
+#status, .notice { padding: 8px 10px; border-radius: 8px; line-height: 1.45; }
+.region-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.region-grid.summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.region-grid article { min-width: 0; padding: 8px 10px; border-radius: 10px; }
+.region-grid article h2 { margin-bottom: 2px; }
+.region-grid .rate { font-size: 22px; line-height: 1.2; }
+.filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.filters label { min-width: 0; gap: 4px; font-size: 13px; }
+.filters input, .filters select { min-width: 0; min-height: 36px; padding: 5px 8px; font-size: 14px; }
+.toolbar .button, .toolbar button { min-height: 36px; padding: 5px 10px; font-size: 14px; }
+.toolbar .button { display: inline-flex; align-items: center; justify-content: center; }
+.toolbar.tabs { margin-top: 8px; gap: 5px; }
+.trend-grid { gap: 8px; }
+.scroll { max-width: 100%; }
+footer { padding: 10px 0; font-size: 13px; }
+
+@media (max-width: 700px) {
+  main { padding: 10px 12px 20px; }
+  header h1 { font-size: 18px; }
+  .region-grid, .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .toolbar .button, .toolbar button { width: auto; min-height: 40px; }
+  .toolbar.tabs button { flex: 1 1 0; padding-inline: 4px; white-space: nowrap; }
+}
