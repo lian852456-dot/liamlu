@@ -248,11 +248,17 @@ function sortedStores(stores, view) {
   });
 }
 
+function markText(status) {
+  if (status === 'done') return '已完成';
+  if (status === 'upcoming') return '未到期';
+  if (status === 'unknown') return '待確認';
+  return '未完成';
+}
+
 function markCell(store, form) {
   const tone = form.status === 'done' ? 'ok' : form.status === 'upcoming' ? 'wait' : 'bad';
-  const mark = form.status === 'done' ? '✓' : form.status === 'upcoming' ? '–' : '×';
   const label = `${shortStore(store.store)} ${form.shortLabel} ${statusLabel(form.status)}`;
-  return `<td class="mark ${tone}"><button type="button" data-store="${escapeHtml(store.store)}" data-form="${escapeHtml(form.id)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${mark}</button></td>`;
+  return `<td class="mark ${tone}"><button type="button" data-store="${escapeHtml(store.store)}" data-form="${escapeHtml(form.id)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${markText(form.status)}</button></td>`;
 }
 
 function sortHeading(key, label) {
@@ -269,7 +275,8 @@ function renderMatrix(model, view) {
   const body = stores.map(store => {
     const [done, total] = metricScore(store, view);
     const gap = gapCount(store, view);
-    return `<tr class="${gap ? 'has-gap' : 'all-done'}"><th scope="row"><button type="button" data-store="${escapeHtml(store.store)}" title="${escapeHtml(store.store)}">${escapeHtml(shortStore(store.store))}</button></th>${store[view].map(form => markCell(store, form)).join('')}<td class="score ${gap ? 'bad' : 'ok'}">${done}/${total}</td></tr>`;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    return `<tr class="${gap ? 'has-gap' : 'all-done'}"><th scope="row"><button type="button" data-store="${escapeHtml(store.store)}" title="${escapeHtml(store.store)}">${escapeHtml(shortStore(store.store))}</button></th>${store[view].map(form => markCell(store, form)).join('')}<td class="score ${gap ? 'bad' : 'ok'}"><span class="score-line"><span>${done}/${total}</span><span class="bar" aria-hidden="true"><span style="width:${pct}%"></span></span></span></td></tr>`;
   }).join('');
   return `<table class="matrix"><thead><tr>${sortHeading('name', '店點')}${head}${sortHeading('done', '完成')}</tr></thead><tbody>${body}</tbody></table>`;
 }
@@ -282,6 +289,31 @@ function renderExceptions(model) {
   $('storeGrid').innerHTML = tracked || unknown
     ? `<table class="matrix exception-matrix"><thead><tr><th scope="col">店點</th><th scope="col">項目</th><th scope="col">狀態</th></tr></thead><tbody>${tracked}${unknown}</tbody></table>`
     : '<div class="empty-state">目前沒有需追蹤項目。</div>';
+}
+
+function renderSide(model) {
+  const gapList = $('gapList');
+  const weekBars = $('weekBars');
+  if (!gapList || !weekBars) return;
+  const stores = state.view === 'exceptions' ? model.stores : sortedStores(model.stores, state.view);
+  const forms = model.stores[0] && model.stores[0].daily ? model.stores[0].daily : [];
+  const groups = forms.map(form => ({
+    form,
+    missing:stores.filter(store => {
+      const item = (store.daily || []).find(entry => entry.id === form.id);
+      return item && item.isDue && item.status !== 'done';
+    })
+  })).filter(group => group.missing.length);
+  gapList.innerHTML = groups.length
+    ? groups.map(group => `<div class="gap-row"><span class="gap-label">${escapeHtml(group.form.shortLabel)}</span><span class="gap-stores">${group.missing.map(store => `<button type="button" data-store="${escapeHtml(store.store)}" data-form="${escapeHtml(group.form.id)}">${escapeHtml(shortStore(store.store))}</button>`).join('')}</span></div>`).join('')
+    : '<p class="side-empty">當日已到期項目都完成了。</p>';
+  weekBars.innerHTML = stores.map(store => {
+    const total = store.weekly.length || 0;
+    const done = store.weeklyDone;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    const name = shortStore(store.store);
+    return `<div class="week-row"><span class="week-name">${escapeHtml(name)}</span><span class="bar" role="img" aria-label="${escapeHtml(name)} 每週 ${done}/${total}"><span style="width:${pct}%"></span></span><span class="week-num ${done < total ? 'bad' : 'ok'}">${done}/${total}</span></div>`;
+  }).join('');
 }
 
 function renderDashboard() {
@@ -309,6 +341,7 @@ function renderDashboard() {
   $('exceptionMetric').textContent = String(model.exceptionCount + unknownCount);
   if (state.view === 'exceptions') renderExceptions(model);
   else $('storeGrid').innerHTML = renderMatrix(model, state.view);
+  renderSide(model);
   bindDetailButtons();
 }
 

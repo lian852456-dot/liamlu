@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#ffffff">
 <meta name="robots" content="noindex,nofollow">
 <title>每日日誌檢查 · 北一二B</title>
-<link rel="stylesheet" href="daily-log-dashboard.css?v=20261119-layout-1">
+<link rel="stylesheet" href="daily-log-dashboard.css?v=20261124-board-1">
 <script src="assets/vendor/xlsx.full.min.js"></script>
 <script src="daily-log-core.js?v=20260902-6"></script>
 </head>
@@ -71,37 +71,50 @@
   </section>
 
   <section id="dashboard" hidden>
-    <div class="summary-grid" role="group" aria-label="完成摘要">
-      <div><span>每日完成</span><strong id="dailyMetric">0 / 36</strong></div>
-      <div><span>每週完成</span><strong id="weeklyMetric">0 / 36</strong></div>
-      <div><span>每月完成</span><strong id="monthlyMetric">0 / 18</strong></div>
-      <div class="attention"><span>需追蹤</span><strong id="exceptionMetric">0</strong></div>
+    <div class="log-toolbar">
+      <div class="summary-grid" role="group" aria-label="完成摘要">
+        <div><span>每日完成</span><strong id="dailyMetric">0 / 36</strong></div>
+        <div><span>每週完成</span><strong id="weeklyMetric">0 / 36</strong></div>
+        <div><span>每月完成</span><strong id="monthlyMetric">0 / 18</strong></div>
+        <div class="attention"><span>需追蹤</span><strong id="exceptionMetric">0</strong></div>
+      </div>
+      <div class="segmented" role="tablist" aria-label="日誌檢查分類">
+        <button class="active" type="button" role="tab" aria-selected="true" data-view="daily">每日</button>
+        <button type="button" role="tab" aria-selected="false" data-view="weekly">每週</button>
+        <button type="button" role="tab" aria-selected="false" data-view="monthly">每月</button>
+        <button type="button" role="tab" aria-selected="false" data-view="exceptions">需追蹤</button>
+      </div>
+      <div class="report-actions">
+        <div class="daily-date-row">
+          <label class="field compact-field" for="viewDate">
+            <span>查看日期</span>
+            <input id="viewDate" type="date">
+          </label>
+        </div>
+      </div>
     </div>
-    <div class="results-panel">
-      <div class="log-toolbar">
-        <div class="segmented" role="tablist" aria-label="日誌檢查分類">
-          <button class="active" type="button" role="tab" aria-selected="true" data-view="daily">每日</button>
-          <button type="button" role="tab" aria-selected="false" data-view="weekly">每週</button>
-          <button type="button" role="tab" aria-selected="false" data-view="monthly">每月</button>
-          <button type="button" role="tab" aria-selected="false" data-view="exceptions">需追蹤</button>
-        </div>
-        <div class="report-actions">
-          <div class="daily-date-row">
-            <label class="field compact-field" for="viewDate">
-              <span>查看日期</span>
-              <input id="viewDate" type="date">
-            </label>
-          </div>
-          <button class="primary-button copy-button" id="copyReminder" type="button">一鍵複製群組提醒</button>
-        </div>
-      </div>
-      <p id="copyMessage" class="copy-message" role="status" aria-live="polite"></p>
-      <div id="reminderPreview" class="reminder-preview" hidden>
-        <label for="groupReminderText">群組提醒預覽</label>
-        <textarea id="groupReminderText" rows="10" readonly></textarea>
-      </div>
-
+    <div class="board">
       <div id="storeGrid" class="store-grid"></div>
+      <aside class="board-side" aria-label="追蹤摘要">
+        <section class="side-card" aria-labelledby="gapTitle">
+          <header class="side-head">
+            <h2 id="gapTitle">今日未完成清單</h2>
+            <button class="primary-button copy-button" id="copyReminder" type="button">一鍵複製群組提醒</button>
+          </header>
+          <div id="gapList" class="gap-list"></div>
+          <p id="copyMessage" class="copy-message" role="status" aria-live="polite"></p>
+          <div id="reminderPreview" class="reminder-preview" hidden>
+            <label for="groupReminderText">群組提醒預覽</label>
+            <textarea id="groupReminderText" rows="6" readonly></textarea>
+          </div>
+        </section>
+        <section class="side-card" aria-labelledby="weekTitle">
+          <header class="side-head">
+            <h2 id="weekTitle">本週進度</h2>
+          </header>
+          <div id="weekBars" class="week-bars"></div>
+        </section>
+      </aside>
     </div>
   </section>
 </main>
@@ -117,6 +130,6 @@
   <div id="detailBody" class="detail-body"></div>
 </dialog>
 
-<script src="daily-log-dashboard.js?v=20261119-layout-1"></script>
+<script src="daily-log-dashboard.js?v=20261124-board-1"></script>
 </body>
 </html>
