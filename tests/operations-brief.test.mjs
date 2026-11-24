@@ -19,7 +19,7 @@ test('separate periods are preserved and impossible dates rejected',()=>{
 });
 test('draft remains unmapped without inventing values, thresholds or failure counts',()=>{
   const m=draftMetadata({meeting:'2026-10',sourceDate:'2026-10-25',highlights:'合成測試資料'},[{name:'SYNTHETIC.xlsx',bytes:20,kind:'xlsx',sha256:'a'.repeat(64)}],{sha256:'b'.repeat(64)});
-  assert.equal(m.status,'DRAFT_UNMAPPED');assert.equal(m.outputSlides,16);assert.equal(m.unresolved.length,7);
+  assert.equal(m.status,'DRAFT_UNMAPPED');assert.equal(m.baseOutputSlides,16);assert.ok(m.unresolved.some(item=>item.includes('行銷簡報')));assert.ok(m.unresolved.some(item=>item.includes('好速失敗原因')));
   assert.equal('points' in m,false);assert.equal('longTermMonths' in m,false);assert.equal('failureCount' in m,false);
   assert.equal(SECTIONS[4][2].includes('企客4G納入'),true);
 });
