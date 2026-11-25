@@ -1,8 +1,9 @@
+import {downloadReadonly,section,table} from './store-readonly-export.mjs';
 import {parseFocus,tasks,families,standing} from './focus-tasks-core.mjs';
 const $ = id=>document.getElementById(id);
 const bands=['落後','全部','優異'];
 const cacheKey='north12b.focus-tasks.v1';
-let report, revision=0;
+let report, reportToken, revision=0;
 const pct=v=>v==null?'—':(100*v).toLocaleString('zh-TW',{maximumFractionDigits:1})+'%';
 function el(tag,value,cls) {
   const n=document.createElement(tag);
@@ -28,23 +29,31 @@ function progress(s,i) {
   return badge((v>=1?'達進度 ':'落後 ')+pct(v),v>=1?'good':'bad');
 }
 function numbers(s,i){return s.actual[i]+'／'+(s.targets[i]??'—');}
+function filteredPeople(all,band) {
+  return all.filter(p=>band==='全部'||standing(p.idle)===band)
+    .sort((a,b)=>(band==='落後'?b.idle-a.idle:a.idle-b.idle)||a.code.localeCompare(b.code)||a.name.localeCompare(b.name,'zh-Hant'));
+}
 function renderPeople() {
   const band=bands[+$('band').value], code=$('store').value;
   $('band').setAttribute('aria-valuetext',band);
   const all=report.people.filter(p=>!code || p.code===code);
-  const selected=all.filter(p=>band==='全部'||standing(p.idle)===band)
-    .sort((a,b)=>(band==='落後'?b.idle-a.idle:a.idle-b.idle)||a.code.localeCompare(b.code)||a.name.localeCompare(b.name,'zh-Hant'));
+  const selected=filteredPeople(all,band);
   $('personCount').textContent=band+' · 顯示 '+selected.length+'／'+all.length+' 位';
+  $('exportReadonly').textContent='一鍵匯出唯讀版（'+(report.stores.find(s=>s.code===code)?.name || '全區')+'）';
   $('people').replaceChildren();
   for(const p of selected) {
-    const grade=standing(p.idle), shop=report.stores.find(s=>s.code===p.code);
-    row($('people'),[shop.name,p.name,badge(grade,grade==='優異'?'good':grade==='落後'?'bad':'middle'),(5-p.idle)+'／5',p.iphone,
-      ...p.actual.map(n=>badge(n,n?'good':'bad'))]);
+    const shop=report.stores.find(s=>s.code===p.code);
+    row($('people'),personCells(p,shop));
   }
   if(!selected.length){
     const cell=row($('people'),[all.length?'此門市沒有符合條件的同仁。':'個人表未列此門市同仁。']).cells[0];
     cell.colSpan=10;cell.className='empty';
   }
+}
+function personCells(p,shop) {
+    const grade=standing(p.idle);
+    return [shop.name,p.name,badge(grade,grade==='優異'?'good':grade==='落後'?'bad':'middle'),(5-p.idle)+'／5',p.iphone,
+      ...p.actual.map(n=>badge(n,n?'good':'bad'))];
 }
 function renderInventory() {
   $('inventory').replaceChildren();
@@ -52,6 +61,12 @@ function renderInventory() {
     const [stock,sales,rate]=s.inventory[$('family').value];
     row($('inventory'),[s.name,stock,sales,pct(rate)]);
   }
+}
+function shopCells(s) {
+  return [s.name,...tasks.map((_,i)=>{
+    const block=el('div',numbers(s,i)),hint=el('small');
+    hint.append(progress(s,i));block.append(hint);return block;
+  })];
 }
 function display(r) {
   report=r;
@@ -66,22 +81,63 @@ function display(r) {
   $('store').replaceChildren(new Option('北一二B 全區',''));
   for(const s of r.stores) {
     $('store').add(new Option(s.name,s.code));
-    row($('shops'),[s.name,...tasks.map((_,i)=>{
-      const block=el('div',numbers(s,i)),hint=el('small');
-      hint.append(progress(s,i));block.append(hint);return block;
-    })]);
+    row($('shops'),shopCells(s));
   }
   if(r.stores.some(s=>s.code===previous))$('store').value=previous;
   const missing=r.stores.filter(s=>!r.people.some(p=>p.code===s.code)).map(s=>s.name);
   const total=r.people.reduce((a,p)=>a+p.iphone,0);
   $('coverage').textContent=(missing.length?'個人表未列 '+missing.join('、')+'，無法判定該店同仁表現。 ':'')+
     'iPhone 門市表合計 '+r.area.actual[0]+' 台，個人表合計 '+total+' 台。';
-  renderPeople();renderInventory();$('report').hidden=false;
+  renderPeople();renderInventory();$('report').hidden=false;$('exportReadonly').hidden=false;
 }
 row($('shopHead'),['門市',...tasks],'th');
 row($('personHead'),['門市','同仁','表現','已動項目','iPhone 合計','i18',...tasks.slice(1)],'th');
 for(const [key,label] of Object.entries(families))$('family').add(new Option(label,key));
 $('band').oninput=renderPeople;$('store').onchange=renderPeople;$('family').onchange=renderInventory;
+
+$('exportReadonly').onclick=()=>{
+  if(!report || activeProof()?.token!==reportToken){
+    $('status').textContent='請重新登入 KPI 戰情後匯出。';return;
+  }
+  const code=$('store').value;
+  const stores=report.stores.filter(s=>!code || s.code===code);
+  const scope=code?stores[0].name:'全區';
+  const sections=[];
+  if(!code){
+    const area=section('全區任務');
+    area.append($('metrics').cloneNode(true));sections.push(area);
+  }
+  const shops=section(code?'門市進度':'九店進度');
+  const overview=table(['門市',...tasks]);
+  for(const s of stores)row(overview.body,shopCells(s));
+  shops.append(overview.wrapper);sections.push(shops);
+  const staff=section('同仁表現');
+  const band=bands[+$('band').value];
+  staff.append(el('p','表現篩選：'+band+'。完成 3～5 項為優異，2 項為一般，0～1 項為落後。'));
+  for(const s of stores){
+    const all=report.people.filter(p=>p.code===s.code);
+    const people=filteredPeople(all,band);
+    const group=section(s.name+' · '+people.length+'／'+all.length+' 位',true);
+    group.open=!!code;
+    const grid=table(Array.from($('personHead').rows[0].cells,cell=>cell.textContent));
+    for(const p of people)row(grid.body,personCells(p,s));
+    group.append(people.length?grid.wrapper:el('p',all.length?'此門市沒有符合條件的同仁。':'個人表未列此門市同仁。'));
+    staff.append(group);
+  }
+  if(!code)staff.append(el('p',$('coverage').textContent));
+  sections.push(staff);
+  const inventory=section('機型庫存與銷量');
+  for(const [key,label] of Object.entries(families)){
+    const group=section(label,true), grid=table(['門市','庫存','銷量','去化率']);
+    for(const s of stores){
+      const [stock,sales,rate]=s.inventory[key];
+      row(grid.body,[s.name,stock,sales,pct(rate)]);
+    }
+    group.append(grid.wrapper);inventory.append(group);
+  }
+  sections.push(inventory);
+  downloadReadonly('重點任務進度',scope,report.dates.join(' ～ '),report.dates[1],sections);
+};
 
 function activeProof() {
   if(!window.frameElement?.closest('#panel-focus-tasks') || !parent.DashboardB?.active())return null;
@@ -91,6 +147,7 @@ function activeProof() {
 function boot(){
   const proof=activeProof();
   if(!proof){$('importBox').hidden=true;$('status').textContent='請從 KPI 戰情登入後開啟重點任務進度。';return;}
+  reportToken=proof.token;
   try {
     const old=JSON.parse(sessionStorage.getItem(cacheKey)||'null');
     if(old?.token===proof.token){display(old.report);$('status').textContent='';}

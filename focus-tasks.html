@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="op-series.css"><link rel="stylesheet" href="focus-tasks.css">
 <script defer src="assets/vendor/xlsx.full.min.js"></script><script type="module" src="focus-tasks.mjs"></script>
 </head><body><main>
-<header><div><h1>重點任務進度</h1><p id="period">北一二B</p></div><label id="importBox" class="file">更新本機報表<input type="file" id="file" accept=".xlsx"></label></header>
+<header><div><h1>重點任務進度</h1><p id="period">北一二B</p></div><div class="report-actions"><label id="importBox" class="file">更新本機報表<input type="file" id="file" accept=".xlsx"></label><button type="button" id="exportReadonly" hidden>一鍵匯出唯讀版</button></div></header>
 <p id="status" role="status">選擇「重點機型」Excel，查看門市及個人進度。</p>
 <div id="report" hidden>
 <section><h2>全區任務</h2><div class="metrics" id="metrics"></div></section>
