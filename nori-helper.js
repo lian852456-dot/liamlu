@@ -96,7 +96,7 @@
   function setPose(pose, message = '') {
     clearTimeout(poseTimer);
     toggle.dataset.pose = pose;
-    feedback.textContent = message;
+    if (feedback) feedback.textContent = message;
   }
   function resumeCat() {
     if (!panel.hidden) {
@@ -104,7 +104,7 @@
       return;
     }
     setPose('walk');
-    if (document.hidden || motion.matches) return;
+    if (!feedback || document.hidden || motion.matches) return;
     poseTimer = setTimeout(() => {
       setPose(nextRest);
       nextRest = nextRest === 'sit' ? 'stretch' : 'sit';
@@ -115,8 +115,8 @@
     setPose(pose, message);
     poseTimer = setTimeout(resumeCat, 3200);
   }
-  byId('nori-pet').addEventListener('click', () => playWithCat('purr', '海苔瞇起眼睛，呼嚕呼嚕。'));
-  byId('nori-toy').addEventListener('click', () => playWithCat('pounce', '海苔伸出爪子撲羽毛！'));
+  byId('nori-pet')?.addEventListener('click', () => playWithCat('purr', '海苔瞇起眼睛，呼嚕呼嚕。'));
+  byId('nori-toy')?.addEventListener('click', () => playWithCat('pounce', '海苔伸出爪子撲羽毛！'));
   document.addEventListener('visibilitychange', resumeCat);
   motion.addEventListener('change', resumeCat);
   resumeCat();
