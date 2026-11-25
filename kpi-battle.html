@@ -25,10 +25,10 @@
     }
     .battle-compact #dashboard-b-access[data-state="active"] > .b-toolbar { display:contents; }
     .battle-compact #dashboard-b-access[data-state="active"] .b-modules {
-      grid-column:1 / -1; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:3px;
+      grid-column:1 / -1; display:flex; flex-wrap:nowrap; gap:3px; min-width:0; max-width:100%; overflow-x:auto;
     }
     .battle-compact #dashboard-b-access[data-state="active"] .b-modules button {
-      min-width:0; min-height:34px; padding:3px 4px; font-size:13px;
+      flex:1 0 auto; min-height:34px; padding:3px 4px; font-size:13px;
     }
     .battle-compact #dashboard-b-access[data-state="active"] .b-more { grid-column:2; grid-row:2; }
     .battle-compact #dashboard-b-access[data-state="active"] .b-more > summary { padding:2px 8px; }

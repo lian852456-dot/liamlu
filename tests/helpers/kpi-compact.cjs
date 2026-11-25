@@ -281,7 +281,7 @@ test('focus tasks use the verified session, distinguish missing staff and filter
  expect(f.errors).toEqual([]);
 });
 
-test('KPI 締結率分頁共用完整報表，切換後保留匯入，登出清除',async({page})=>{
+test('KPI 締結率分頁共用完整報表，切換後保留匯入，登出清除',async({page},info)=>{
  await page.route('**/assets/vendor/xlsx.full.min.js',route=>route.fulfill({
   contentType:'text/javascript',body:fs.readFileSync(path.join(root,'assets/vendor/xlsx.full.min.js'))
  }));
@@ -298,7 +298,10 @@ test('KPI 締結率分頁共用完整報表，切換後保留匯入，登出清�
   ['2026-11-01','2026-11-03','北一二B','DNB10001','示範店',54,120,4,10],
   ['2026-11-01','2026-11-03','北一二A','DNB10002','跨區驗收店',5,5,5,5]];
  XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(rows),'部區月累計');
- await report.locator('#files').setInputFiles({name:'sample.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:XLSX.write(book,{type:'buffer',bookType:'xlsx'})});
+ const file=info.outputPath('sample.xlsx');
+ fs.mkdirSync(path.dirname(file),{recursive:true});
+ fs.writeFileSync(file,Buffer.from(XLSX.write(book,{type:'array',bookType:'xlsx'})));
+ await report.locator('#files').setInputFiles(file);
  await expect(report.locator('#status')).toContainText('sample.xlsx');
  await expect(report.locator('#full')).toBeVisible();
  await expect(report.locator('#region option')).toHaveText(['北一二B']);
