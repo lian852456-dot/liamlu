@@ -73,7 +73,7 @@
     } else {
       const names = new Set();
       const matches = cards.filter(card => {
-        const title = card.querySelector('h3')?.textContent;
+        const title = card.querySelector('h2,h3')?.textContent;
         if (!title || names.has(card.href)) return false;
         const words = [title, ...card.dataset.search.split(/[\s／、｜＆&]+/)].map(normalize);
         if (!words.some(word => word.length >= 2 && (q.includes(word) || (q.length >= 2 && word.includes(q))))) return false;
@@ -82,7 +82,7 @@
       });
       if (matches.length) {
         respond('可以從這些入口查看。');
-        matches.slice(0,4).forEach(card => link(card.querySelector('h3').textContent, card.href));
+        matches.slice(0,4).forEach(card => link(card.querySelector('h2,h3').textContent, card.href));
       } else showChoice(/幾|差|多少|進度|目標/.test(q) ? '你想看哪一項進度？' : '還沒找到對應的入口。可以輸入工具名稱，或選一個常查項目。', [['OP 系列','OP 進度'],['舊換新','舊換新進度'],['A999','A999 進度'],['動店','動店任務']]);
     }
   }
