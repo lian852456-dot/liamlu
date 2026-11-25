@@ -38,7 +38,7 @@ window.capacityBriefingImage = function capacityBriefingImage(columns) {
   canvas.width=width;canvas.height=height;
   ctx.fillStyle='white';ctx.fillRect(0,0,width,height);
   ctx.fillStyle='#e66720';ctx.fillRect(0,0,width,9);
-  ctx.font=font(35,true);ctx.fillStyle='#123c51';ctx.fillText('AQ／RT 量能重點',margin,61);
+  ctx.font=font(35,true);ctx.fillStyle='#123c51';ctx.fillText('門市銷售提醒｜主打資費與帶量商品',margin,61);
   for(const c of commands){
     if(c.w){ctx.fillStyle='#edf4f6';ctx.fillRect(c.x,c.y,c.w,c.h);continue;}
     ctx.font=font(c.size,c.bold);ctx.fillStyle=c.color;ctx.fillText(c.text,c.x,c.y);
