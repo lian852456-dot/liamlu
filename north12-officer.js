@@ -1,43 +1,135 @@
-(function(){'use strict';const C=window.North12OfficerCore,$=id=>document.getElementById(id),esc=C.safe,n=v=>v==null?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:2}),pct=v=>v==null?'—':(v*100).toFixed(1)+'%',signed=v=>v==null?'—':(v>0?'+':'')+n(v);let data=null,region='all',store='all',tab='conversion',start='',end='',importGeneration=0;
-function selectedStores(){return data.stores.filter(s=>(region==='all'||s.region===region)&&(store==='all'||s.id===store));}
-function totals(stores){const ids=new Set(stores.map(s=>s.id));return C.aggregate(data.records.filter(r=>ids.has(r.store)&&r.date>=start&&r.date<=end));}
-function prior(stores){if(!data.prior||start!==data.period_start||end!==data.cutoff)return null;const ids=new Set(stores.map(s=>s.id));return C.aggregate(data.prior.filter(r=>ids.has(r.store)));}
-function compare(now,before,key,rate=false){if(!before)return '未提供所選期間可比基期';const delta=now[key]==null||before[key]==null?null:now[key]-before[key],growth=before[key]===0||before[key]==null||now[key]==null?null:delta/before[key];return '上月同期 '+(rate?pct(before[key]):n(before[key])+' 人次')+'｜差異 '+(rate?signed(delta==null?null:delta*100)+' 個百分點':signed(delta)+' 人次')+'｜MoM '+(growth==null?'—':signed(growth*100)+'%');}
-function chart(rows,channel,rate){const series=C.dailySeries(rows),key=channel+(rate?'_rate':'_d'),W=660,H=240,L=58,R=20,T=28,B=45,max=Math.max(rate?.01:1,...series.map(r=>r[key]??0))*1.1,x=i=>L+(series.length===1?(W-L-R)/2:i*(W-L-R)/(series.length-1)),y=v=>H-B-v/max*(H-T-B);let svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+channel.toUpperCase()+(rate?'締結率':'來客人次')+'逐日趨勢">';for(let i=0;i<4;i++){const v=max*i/3;svg+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="#dce5ec"/><text x="'+(L-8)+'" y="'+(y(v)+4)+'" text-anchor="end">'+esc(rate?pct(v):n(Math.round(v)))+'</text>';}let path='';const flush=()=>{if(path)svg+='<path d="'+path+'" fill="none" stroke="'+(channel==='aq'?'#bb5b21':'#177e83')+'" stroke-width="3"/>';path='';};series.forEach((r,i)=>{if(r[key]==null){flush();return;}path+=(path?' L':'M')+x(i)+' '+y(r[key]);});flush();series.forEach((r,i)=>{if(r[key]!=null)svg+='<circle cx="'+x(i)+'" cy="'+y(r[key])+'" r="4" fill="#174b70"><title>'+r.date+' '+(rate?pct(r[key]):n(r[key])+'人次')+'</title></circle>';if(i===0||i===series.length-1||i%Math.max(1,Math.ceil(series.length/6))===0)svg+='<text x="'+x(i)+'" y="'+(H-15)+'" text-anchor="middle">'+r.date.slice(5)+'</text>';});return svg+'</svg>';}
-function render(){if(!data)return;const present=new Set(data.stores.map(s=>s.region)),missing=C.REGIONS.filter(r=>!present.has(r));$('view').hidden=false;$('coverage').textContent=(missing.length?'尚缺 '+missing.join('、')+'，以下為已提供區域；未冒充完整北一二部。':'A／B／C／D 四區齊備，共 '+data.stores.length+' 店。')+'｜來源截止 '+data.cutoff+'；介面更新不代表來源已更新。';$('regions').innerHTML=C.REGIONS.map(id=>{const stores=data.stores.filter(s=>s.region===id),a=totals(stores),p=prior(stores);return '<article><h2>'+id+'</h2>'+(stores.length?'<div class="rate">'+pct(a.rt_rate)+'</div><p>RT 締結率<br>AQ '+pct(a.aq_rate)+'<br>'+stores.length+' 店</p>':'<p class="missing">來源尚未提供</p>')+'</article>';}).join('');
-const stores=selectedStores(),ids=new Set(stores.map(s=>s.id)),rows=data.records.filter(r=>ids.has(r.store)&&r.date>=start&&r.date<=end),a=C.aggregate(rows),p=prior(stores),rate=tab==='conversion';document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));
-let html='<section class="region-grid summary">';for(const ch of ['aq','rt'])html+='<article><h2>'+ch.toUpperCase()+' '+(tab==='traffic'?'來客數':'締結率')+'</h2><div class="rate">'+(tab==='traffic'?n(a[ch+'_d'])+' 人次':pct(a[ch+'_rate']))+'</div><p>'+n(a[ch+'_n'])+' 上線／'+n(a[ch+'_d'])+' '+(ch==='rt'?'符合資格來客':'來客')+'</p><p>'+esc(compare(a,p,ch+(tab==='traffic'?'_d':'_rate'),tab!=='traffic'))+'</p></article>';html+='</section>';
-if(tab==='insights'){html+='<section class="panel"><h2>區／店改善建議</h2><p>依同期間的實際差異提供檢查方向，並非已確認成因。</p>';const groups=store==='all'?C.REGIONS.filter(r=>stores.some(s=>s.region===r)).map(r=>({name:r,stores:stores.filter(s=>s.region===r)})):[{name:stores[0]?.name||'',stores}];for(const g of groups){const now=totals(g.stores),old=prior(g.stores);let advice='所選期間沒有可比上月來源，先核對來客與上線紀錄後訂定改善動作。';if(old){if(now.rt_rate!=null&&old.rt_rate!=null&&now.rt_rate<old.rt_rate)advice='RT 締結率較上月同期下降，優先檢查未成交原因、方案說明與後續回訪紀錄。';else if(now.rt_d<old.rt_d)advice='RT 符合資格來客較上月同期減少，優先檢查邀約名單、到店安排與未到店追蹤。';else advice='RT 同期表現未見下降，檢視未成交案件並整理可複製的接待作法。';}html+='<div class="action"><strong>'+esc(g.name)+'</strong><p>'+esc(compare(now,old,'rt_rate',true))+'</p><p>'+advice+'</p></div>';}html+='</section>'+window.ReadonlyRenewalDetail.render(data,stores,{start,end});}
-else{html+='<div class="trend-grid">';for(const ch of ['aq','rt'])html+='<section class="panel"><h2>'+ch.toUpperCase()+' '+(rate?'締結率':'來客數')+'逐日趨勢</h2>'+chart(rows,ch,rate)+'</section>';html+='</div><section class="panel"><h2>每週來客數</h2><div class="scroll"><table><thead><tr><th>週區間</th><th>AQ 來客</th><th>RT 符合資格來客</th></tr></thead><tbody>'+C.weeklySeries(rows).map(w=>'<tr><td>'+w.start+'～'+w.end+(w.partial?'（部分週）':'')+'</td><td>'+n(w.aq_d)+'</td><td>'+n(w.rt_d)+'</td></tr>').join('')+'</tbody></table></div></section>';
-html+='<section class="panel"><h2>門市比較</h2><div class="scroll"><table><thead><tr><th>部區／門市</th><th>AQ 締結率</th><th>RT 締結率</th><th>AQ 來客</th><th>RT 符合資格來客</th></tr></thead><tbody>'+stores.map(s=>{const t=totals([s]);return '<tr><td>'+s.region+'／'+esc(s.short)+'</td><td>'+pct(t.aq_rate)+'</td><td>'+pct(t.rt_rate)+'</td><td>'+n(t.aq_d)+'</td><td>'+n(t.rt_d)+'</td></tr>';}).join('')+'</tbody></table></div></section>';}
-$('content').innerHTML=html;$('status').textContent=(data.prior?'資料已載入；切換視窗與篩選不會重新讀取。':'當期資料已載入；未提供可核對的上月同期來源，MoM 顯示未提供。');$('status').textContent+='\n'+window.ReadonlyRenewalDetail.importSummary(data.renewalDetail);$('source').textContent='來源：'+data.source_name+'｜統計 '+data.period_start+' 至 '+data.cutoff+'｜上月同期 '+(data.prior_period?data.prior_period.start+' 至 '+data.prior_period.end:'未提供')+'｜目前選取 '+stores.length+' 店｜版本 20261113-import-review1';if($('export'))$('export').disabled=false;}
-function storeOptions(){const stores=data.stores.filter(s=>region==='all'||s.region===region);if(!stores.some(s=>s.id===store))store='all';$('store').innerHTML='<option value="all">全部門市</option>'+stores.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.short)+'</option>').join('');$('store').value=store;}
-function bind(){region='all';store='all';start=data.period_start;end=data.cutoff;$('region').innerHTML='<option value="all">北一二部・全部已提供區域</option>'+C.REGIONS.filter(r=>data.stores.some(s=>s.region===r)).map(r=>'<option>'+r+'</option>').join('');storeOptions();for(const id of ['start','end']){$(id).min=start;$(id).max=end;$(id).value=id==='start'?start:end;}render();}
-$('region').onchange=e=>{region=e.target.value;store='all';storeOptions();render();};$('store').onchange=e=>{store=e.target.value;render();};for(const id of ['start','end'])$(id).onchange=e=>{const v=e.target.value;if(!v||v<data.period_start||v>data.cutoff||(id==='start'?v>end:v<start)){e.target.value=id==='start'?start:end;return;}if(id==='start')start=v;else end=v;render();};document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();});
-if($('files'))$('files').onchange=async e=>{
- const files=[...e.target.files];e.target.value='';
- if(!files.length)return;
- const generation=++importGeneration,errors=[];
- let next=data;
- $('status').textContent='正在檢查 '+files.length+' 份原報及續約分析工作表…';
- for(const file of files){
-  try{
-   if(!/\.xls[xm]$/i.test(file.name)||!file.size||file.size>40*1024*1024)throw Error('請選取有內容且 40 MB 以內的 XLSX／XLSM 原報');
-   const bytes=await file.arrayBuffer();
-   const sha256=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');
-   if(generation!==importGeneration)return;
-   const wanted=new Set(['AQ締結率','RT每日','RT締結率','樞紐',...window.ReadonlyRenewalDetail.SHEETS]);
-   const names=XLSX.read(bytes,{type:'array',bookSheets:true}).SheetNames.filter(name=>wanted.has(name.normalize('NFKC').replace(/[\s\u200B-\u200D\u2060]+/g,'')));
-   const workbook=XLSX.read(bytes,{type:'array',bookVBA:false,sheets:names});
-   const incoming=C.parseWorkbook(workbook,XLSX,{sha256,source_name:file.name,source_bytes:file.size});
-   if(file===files[0]&&next&&(next.period_start!==incoming.period_start||next.cutoff!==incoming.cutoff))next=null;
-   next=C.merge(next,incoming);
-  }catch(error){errors.push(file.name+' — '+error.message);}
- }
- if(generation!==importGeneration)return;
- if(errors.length){$('status').textContent='本批檔案未套用，請核對以下問題。\n'+errors.join('\n');return;}
- data=next;bind();
-};
-if($('clear'))$('clear').onclick=()=>{importGeneration++;data=null;$('view').hidden=true;$('content').replaceChildren();$('regions').replaceChildren();$('export').disabled=true;$('status').textContent='本次資料已清除。';$('source').textContent='尚未載入來源。';};
-if($('export'))$('export').onclick=()=>{try{if(!data)return;const html=C.buildHtml(data,window.North12OfficerExportAssets),url=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='北一二部_締結率來客續約洞察_'+data.cutoff+'.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch{$('status').textContent='匯出未完成，請重新整理介面後再試。';}};
-const initial=$('officer-data');if(initial){try{data=C.validate(JSON.parse(initial.textContent));bind();}catch{$('status').textContent='快照未通過資料核對。';}}})();
+(function(){
+  'use strict';
+  const C=window.North12OfficerCore,T=window.North12Trends,R=window.North12TrendReport,V=window.North12TrendView;
+  const $=id=>document.getElementById(id), esc=C.safe, offline=$('report-snapshot');
+  let history=new Map(),sessionBatch='',model=null,scope=T.ALL,generation=0,packet=null,compact=false;
+  let options={ch:'rt',base:'office',kind:'level',period:'wow',heatMetric:'rate',tierSource:'store',threshold:30};
+  const option=(v,label=v)=>'<option value="'+esc(v)+'">'+esc(label)+'</option>';
+  const parts=()=>[...history.values()].filter(p=>p.region!==T.OFFICE);
+  function populate(){
+    const active=parts(),latest=active.map(p=>p.cutoff).sort().at(-1);
+    const months=T.unique(active.map(p=>p.period_start)).sort().reverse();
+    $('month').innerHTML=months.map(m=>option(m,m.slice(0,7))).join('');
+    $('month').value=T.first(latest);changeMonth();
+  }
+  function changeMonth(){
+    const m=$('month').value,inputs=parts().filter(p=>p.period_start===m),end=inputs.map(p=>p.cutoff).sort().at(-1);
+    $('end').min=m;$('end').max=end;$('end').value=end;
+    $('region').innerHTML=option(T.ALL)+C.REGIONS.map(r=>option(r)).join('');
+    populateStores();refresh();
+  }
+  function populateStores(){
+    const region=$('region').value,stores=parts().filter(p=>p.period_start===$('month').value&&(region===T.ALL||region===p.region)).flatMap(p=>p.stores);
+    $('store').innerHTML=option('all','全部門市')+stores.map(s=>option(s.id,s.region+'／'+s.short)).join('');
+  }
+  function refresh(){
+    if(packet){model=packet.models.find(m=>m.scope===scope)||packet.models[0];}
+    else{
+      scope=$('store').value==='all'?$('region').value:$('store').value;
+      model=R.build(history,$('end').value,scope,$('monthMode').value==='whole');
+      $('monthMode').options[1].disabled=!model.full;
+      if(!model.full)$('monthMode').value='same';
+    }
+    draw();
+  }
+  function draw(){
+    if(!model)return;
+    $('view').hidden=false;
+    const m=model;
+    $('base').options[0].textContent=m.office?m.office.name+'（處級）':'處級基準未提供';
+    const [overview,summary]=V.summary(m,options.ch);$('overview').innerHTML=overview;$('summary').innerHTML=summary;
+    const [legend,chart]=V.trend(m,options);$('legend').innerHTML=legend;$('chart').innerHTML=chart;
+    $('comparison').innerHTML=V.comparison(m,options);$('tierBody').innerHTML=V.tier(m,options);
+    $('advice').innerHTML=V.advice(m,options);
+    const ledger=m.sources.map(s=>[s.region,s.name,s.start+' ～ '+s.end,s.stores.length+' 店・'+s.grain,s.hash]);
+    $('sourceBody').innerHTML=V.table(['區域','來源檔名','有效期間','涵蓋','SHA-256'],ledger)+
+      V.p((m.provenance||[]).join(' ／ '))+V.p('有效批次 '+sessionBatch+'。期間比較使用 '+m.historicalSources.join('、')+'。')+
+      m.sources.map(s=>V.p(s.region+' ｜ '+s.stores.join('、')+' ｜ '+['tiers','observation','plans'].map((key,i)=>['店級 Tier','區級 Tier','原方案'][i]+' '+(s.coverage[key]?'已載入':s.issues?.[key]||'未提供')).join(' ／ '))).join('')+
+      V.p(m.office?'處級涵蓋 '+m.office.name+'，共 '+m.office.stores+' 店，'+m.office.regions.join('、')+'。來源 '+m.office.source+'，截至 '+m.office.cutoff+'。':'處級基準未提供。'+T.unique(m.sources.map(s=>s.officeIssue).filter(Boolean)).join('、'))+
+      V.p('北一二部已提供 '+m.available.join('、')+'。店數依來源名冊，未列報且無歷史名冊的門市無法辨識。');
+    if($('export'))$('export').disabled=false;
+    if(!document.body.classList.contains('import-error'))$('status').textContent=(packet?'離線快照　':'有效批次　')+sessionBatch+' ｜ '+m.sources.map(s=>s.name).filter((v,i,a)=>a.indexOf(v)===i).join('、')+' ｜ 統計截至 '+m.end;
+  }
+  const controls={channel:'ch',base:'base',metric:'kind',period:'period',heatMetric:'heatMetric',threshold:'threshold',tierSource:'tierSource'};
+  for(const [id,key] of Object.entries(controls))$(id).onchange=()=>{
+    const val=$(id).value;
+    if(id==='threshold'&&(!Number.isSafeInteger(+val)||+val<1||+val>100000)){$(id).value=options.threshold;return;}
+    options[key]=id==='threshold'?+val:val;draw();
+  };
+  $('month').onchange=changeMonth;
+  $('region').onchange=()=>{
+    if(packet){scope=$('region').value;configureOfflineStores();refresh();return;}
+    populateStores();refresh();
+  };
+  $('store').onchange=()=>{if(packet)scope=$('store').value==='all'?$('region').value:$('store').value;refresh();};
+  $('monthMode').onchange=refresh;
+  $('end').onchange=()=>{
+    if(!$('end').value||!$('end').validity.valid){$('end').value=model.end;return;}refresh();
+  };
+  function configureOfflineStores(){
+    const parent=$('region').value;
+    const stores=packet.models.filter(m=>/^DNB\d+$/.test(m.scope)&&(parent===T.ALL||parent===m.scope||m.comparisons[0].region===parent));
+    $('store').innerHTML=(packet.models.some(m=>m.scope===parent)?option('all','所選範圍'):'')+stores.map(m=>option(m.scope,m.label)).join('');
+    if(!packet.models.some(m=>m.scope===parent)&&stores[0])scope=stores[0].scope;
+  }
+  function loadPacket(value){
+    if(value.schema!=='north12-trend-snapshot/v1'||!value.models?.length)throw Error('離線版本格式不符');
+    packet=value;scope=packet.models[0].scope;model=packet.models[0];options={...options,...packet.options};sessionBatch=packet.batch;
+    $('month').innerHTML=option(model.month,model.month.slice(0,7));$('month').disabled=true;
+    $('end').value=model.end;$('end').disabled=true;
+    $('monthMode').value=model.whole?'whole':'same';$('monthMode').disabled=true;
+    let regions=packet.models.filter(m=>m.scope===T.ALL||C.REGIONS.includes(m.scope));
+    if(!regions.length)regions=[model];
+    $('region').innerHTML=regions.map(m=>option(m.scope,m.label)).join('');configureOfflineStores();
+    for(const [id,key] of Object.entries(controls))$(id).value=options[key];draw();
+  }
+  async function parseFile(file){
+    if(!/\.xls[xm]$/i.test(file.name)||!file.size||file.size>40*1024*1024)throw Error('需為 40 MB 以內的 XLSX／XLSM');
+    const bytes=await file.arrayBuffer(),hash=await crypto.subtle.digest('SHA-256',bytes);
+    const sha256=Array.from(new Uint8Array(hash),v=>v.toString(16).padStart(2,'0')).join('');
+    const wanted=new Set(['部區月累計','AQ締結率','RT每日','RT締結率','樞紐',...window.ReadonlyRenewalDetail.SHEETS]);
+    const names=XLSX.read(bytes,{type:'array',bookSheets:true}).SheetNames.filter(s=>wanted.has(s.normalize('NFKC').replace(/[\s\u200B-\u200D\u2060]+/g,'')));
+    const w=XLSX.read(bytes,{type:'array',bookVBA:false,sheets:names});
+    const data=C.parseWorkbook(w,XLSX,{sha256,source_name:file.name,source_bytes:file.size});
+    if(!data.monthlyTotals)try{data.office=window.North12OfficeSource.read(w,XLSX,data);}catch(e){data.officeIssue=e.message;}
+    return data;
+  }
+  if($('files'))$('files').onchange=async event=>{
+    const files=Array.from(event.target.files);event.target.value='';if(!files.length)return;
+    const token=++generation,loaded=[];let filename='';
+    $('status').textContent='正在本機核對 '+files.length+' 份原報…';
+    try{
+      for(const file of files){filename=file.name;loaded.push(await parseFile(file));if(token!==generation)return;}
+      const next=T.apply(history,loaded);
+      const ids=T.unique([...next.values()].map(p=>p.period_start+'|'+p.region+'|'+Object.values(p.tierSnapshots||{}).map(s=>s.sha256).sort().join(','))).sort().join('\n');
+      const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(ids));
+      if(token!==generation)return;
+      sessionBatch=Array.from(new Uint8Array(digest).slice(0,6),v=>v.toString(16).padStart(2,'0')).join('');
+      history=next;document.body.classList.remove('import-error');populate();
+    }catch(error){
+      if(token!==generation)return;document.body.classList.add('import-error');
+      $('status').textContent=filename+' 匯入失敗：'+error.message+'。'+(model?'沿用批次 '+sessionBatch+'，目前檢視截至 '+model.end:'目前尚無有效資料。');
+    }
+  };
+  if($('clear'))$('clear').onclick=()=>{
+    generation++;history=new Map();model=null;$('view').hidden=true;$('export').disabled=true;
+    for(const id of ['overview','summary','sourceBody','chart','comparison','tierBody','advice','legend','region','store','month'])$(id).replaceChildren();
+    document.body.classList.remove('import-error');$('status').textContent='本次來源與分析資料已清除。';
+  };
+  if($('export'))$('export').onclick=()=>{
+    if(!model)return;
+    try{
+      const models=[model,...model.comparisons.filter(r=>r.id!==model.scope&&r.summary.stores).map(r=>R.build(history,model.end,r.id,model.whole))];
+      const value={schema:'north12-trend-snapshot/v1',batch:sessionBatch,models,options};
+      window.OfflineHtml.download(C.snapshotHtml(value,window.North12OfficerExportAssets),'北一二部_'+model.label+'_'+model.end+'.html');
+    }catch(e){$('status').textContent='匯出失敗：'+e.message;}
+  };
+  if(offline)loadPacket(JSON.parse(offline.textContent));
+  const legacy=$('officer-data');
+  if(legacy){const d=C.validate(JSON.parse(legacy.textContent));history=T.apply(new Map(),[d]);sessionBatch=d.sha256.slice(0,12);populate();}
+  if(window.parent!==window && location.hash==='#summary'){
+    compact=true;document.body.classList.add('embedded','compact');
+    window.North12ReportDisplay=expanded=>{compact=!expanded;document.body.classList.toggle('compact',compact);};
+    new ResizeObserver(()=>{window.frameElement?.setAttribute('height',String(document.querySelector('main').offsetHeight+10));}).observe(document.querySelector('main'));
+  }
+})();

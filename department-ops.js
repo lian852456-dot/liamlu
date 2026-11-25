@@ -160,10 +160,28 @@
     const scores = window.DepartmentScoresWorkState?.() || {};
     return {busy:gold.busy || scores.busy,unsaved:gold.unsaved || scores.unsaved};
   }
+  let reportFrame=null;
+  function showConversion(expanded=false) {
+    const mount=$('conversionReport'),link=$('openConversion');
+    if(!mount||!link||!patrolToken||$('workspace').hidden||$('conversionPanel').hidden)return;
+    if(!reportFrame){
+      reportFrame=document.createElement('iframe');
+      reportFrame.title='北一二部締結率報表';
+      reportFrame.src='north12-officer.html#summary';
+      reportFrame.width='100%';
+      reportFrame.setAttribute('frameborder','0');
+      reportFrame.addEventListener('load',()=>reportFrame?.contentWindow?.North12ReportDisplay?.(location.hash==='#conversion-report'));
+      mount.append(reportFrame);
+    }
+    reportFrame.contentWindow?.North12ReportDisplay?.(expanded);
+    link.textContent=expanded?'返回部區摘要':'開啟部區報表';
+    link.setAttribute('aria-expanded',String(expanded));
+  }
   async function unlockWorkspace() {
     if(!patrolToken||sessionStorage.getItem(SESSION_KEY)!==patrolToken||(sessionExpiresAt&&sessionExpiresAt<=Date.now())){lockSharedWorkspace();return;}
     $('authPanel').hidden = true;
     $('workspace').hidden = false;
+    showConversion(location.hash==='#conversion-report');
     $('securityBadge').textContent = '督導權限已驗證';
     $('securityBadge').classList.add('ok');
     // Keep the verified view for this login, including while the tab is hidden.
@@ -472,9 +490,18 @@
       document.querySelectorAll('[data-tab]').forEach((item) => { item.classList.toggle('active', item === button); item.setAttribute('aria-selected', item === button ? 'true' : 'false'); });
       document.querySelectorAll('[data-panel]').forEach((panel) => { panel.hidden = panel.dataset.panel !== button.dataset.tab; });
       if(button.dataset.tab==='gold')void monthlyUI?.activate();
+      else if(button.dataset.tab==='conversion')showConversion(location.hash==='#conversion-report');
       else if(button.dataset.tab==='store')void window.DepartmentScoresReadSession?.activate();
     }));
-    if(location.hash==='#conversion')document.querySelector('[data-tab="conversion"]')?.click();
+    $('openConversion')?.addEventListener('click',event=>{
+      if(!reportFrame)return;
+      event.preventDefault();
+      const expand=location.hash!=='#conversion-report';
+      history.pushState(null,'',expand?'#conversion-report':'#conversion');
+      showConversion(expand);
+    });
+    window.addEventListener('popstate',()=>showConversion(location.hash==='#conversion-report'));
+    if(['#conversion','#conversion-report'].includes(location.hash))document.querySelector('[data-tab="conversion"]')?.click();
     $('storeImport')?.addEventListener('click', importStore);
     if (!monthlyUI) {
       ['goldImport', 'publishGold', 'exportGold', 'monthlyRestore'].forEach(id => { $(id).disabled = true; });
@@ -502,6 +529,7 @@
     $('departmentAccess').dataset.expiring = 'false';
     monthlyUI?.clear();
     window.DepartmentScoresReadSession?.clear();
+    reportFrame?.remove();reportFrame=null;
     goldData=null;goldHistory=null;storeData=null;goldSourceName='';goldPublishedAt='';
     if (!$('workspace').hidden) $('workspace').hidden = true;
     if ($('authPanel').hidden) $('authPanel').hidden = false;
