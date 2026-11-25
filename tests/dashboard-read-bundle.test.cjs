@@ -5,8 +5,12 @@ vm.runInNewContext(fs.readFileSync(fixturePath,'utf8').split('\ntest(')[0]+'\nmo
  {require,module:m,exports:m.exports,__dirname,__filename:fixturePath,console,process,Buffer,Set,Map});
 const {fixture,passwordLogin}=m.exports;
 const call=(f,p)=>JSON.parse(f.ctx.privateDashboardGasBMaybePost_({postData:{type:'text/plain',contents:JSON.stringify(p)}}).text);
-function setup({primary=false,awardRows=false,supervisorRole=false}={}){
+function setup({primary=false,awardRows=false,supervisorRole=false,authorityUntil}={}){
  const f=fixture();if(primary)f.props.set('DASHBOARD_TRUSTED_EMPLOYEE_ID','SYNTH002');
+ if(authorityUntil){
+  const key='DASHBOARD_AUTH_B_CONFIG_V1',config=JSON.parse(f.props.get(key));
+  config.authority.validUntil=authorityUntil;f.props.set(key,JSON.stringify(config));
+ }
  if(supervisorRole)f.rows.DashboardUsers[2][3]='督導';
  f.ctx.privateDashboardBVerifyPassword_=()=>true;
  const device='SYNTHETIC_BUNDLE_DEVICE',login=call(f,passwordLogin('SYNTH002',device,'SYNTHETIC_PASSWORD','SYNTHETIC_BUNDLE_REQUEST','a'));
@@ -135,4 +139,45 @@ test('client coalesces bundle reads, rejects deadline drift and blocks late data
  pending[0].resolve();await Promise.all([a,b]);
  const drift=client.readBundle(),denied=assert.rejects(drift,/B_AUTH_DENIED/);pending[1].resolve({expiresAt:deadline+1});await denied;
  const late=client.readBundle(),stale=assert.rejects(late,/B_CONTEXT_CHANGED/);await client.logout();assert.equal(pending[2].signal.aborted,true);pending[2].resolve();await stale;
+});
+
+test('battle-only view survives 30 minutes, restores and refreshes until exactly 24 hours from login',async()=>{
+ const day=86400000,short=1800000,h=setup({authorityUntil:Date.now()+2*day});
+ const base=h.login.expiresAt-short;
+ let time=base;
+ h.f.ctx.Date=class extends Date{static now(){return time;}};
+ const url='https://script.google.com/macros/s/ABCDEFGHIJKLMNOPQRST/exec';
+ const key='north12b_password_session_v1',values=new Map();
+ const storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+ storage.setItem(key,JSON.stringify({v:1,owner:url,logoutEpoch:'',deviceId:h.device,token:h.login.token,
+  expiresAt:h.login.expiresAt,battleViewAvailable:h.login.battleViewAvailable}));
+ const requests=[];
+ const ctx=vm.createContext({AbortController,setTimeout,clearTimeout,fetch:async(_,opts)=>{
+  const payload=JSON.parse(opts.body);requests.push(payload);
+  return {ok:true,json:async()=>call(h.f,payload)};
+ }});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../GasBClient.js'),'utf8'),ctx);
+ const client=battleView=>ctx.createDashboardBClient(url,{storage,battleView,now:()=>time});
+ const view=client(true);assert.equal(view.restore(h.device).expiresAt,base+short);
+ const bundle=await view.readBundle();assert.equal(view.acceptBattleLease(bundle),base+day);
+ time=base+day-1;
+ assert.equal(client(false).restore(h.device),null);
+ const restored=client(true);assert.equal(restored.restore(h.device).expiresAt,base+day);
+ assert.equal(requests.length,1);
+ assert.equal((await restored.readBundle()).battleExpiresAt,base+day);
+ for(const action of ['employee_session','employee_private_read','employee_kpi_read','employee_phone_enroll']){
+  assert.equal(call(h.f,{action,token:h.login.token,deviceId:h.device}).status,'error');
+ }
+ assert.equal(h.read().status,'error');assert.equal(h.read({includeReports:true}).status,'error');
+ assert.equal(h.read({includeReports:true,battleView:true}).status,'error');
+ time=base+day;
+ assert.equal(client(true).restore(h.device),null);assert.equal(h.read({battleView:true}).status,'error');
+});
+
+test('battle access respects the authority deadline and explicit logout after the ordinary login expires',()=>{
+ const h=setup(),key='DASHBOARD_AUTH_B_CONFIG_V1',until=JSON.parse(h.f.props.get(key)).authority.validUntil;
+ assert.equal(h.read({battleView:true}).battleExpiresAt,until);
+ h.f.ctx.Date=class extends Date{static now(){return h.login.expiresAt+1;}};
+ assert.equal(call(h.f,{action:'employee_logout',token:h.login.token,deviceId:h.device}).status,'ok');
+ assert.equal(h.read({battleView:true}).status,'error');
 });

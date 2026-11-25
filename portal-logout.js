@@ -58,7 +58,9 @@
       && proof.deviceId === read('localStorage','north12b_private_dashboard_device_id')
       && typeof proof.deviceId === 'string' && proof.deviceId.length >= 16
       && /^B1_[a-f0-9]_[a-f0-9]{64}$/.test(proof.token || '')
-      && Number.isSafeInteger(proof.expiresAt) && proof.expiresAt > now && proof.expiresAt <= now + 1800000;
+      && Number.isSafeInteger(proof.expiresAt) && proof.expiresAt <= now + 1800000
+      && (proof.expiresAt > now || proof.battleViewAvailable === true && Number.isSafeInteger(proof.battleExpiresAt)
+        && proof.battleExpiresAt > now && proof.battleExpiresAt <= proof.expiresAt - 1800000 + 86400000);
   }
   // An unseen historical logout invalidates old tab credentials. A new tab may
   // still restore a later explicit persistent login through the page's server gate.

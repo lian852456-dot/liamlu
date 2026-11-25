@@ -9558,6 +9558,8 @@ const PRIVATE_DASHBOARD_B_BIND_KEY_ = 'DASHBOARD_AUTH_B_BIND_V1';
 const PRIVATE_DASHBOARD_B_LIMIT_KEY_ = 'DASHBOARD_AUTH_B_LIMIT_V1';
 const PRIVATE_DASHBOARD_B_SESSION_PREFIX_ = 'DASHBOARD_AUTH_B_SESS_V1_';
 const PRIVATE_DASHBOARD_B_PHONE_KEY_ = 'DASHBOARD_AUTH_B_OWNER_PHONE_V1';
+const PRIVATE_DASHBOARD_B_LOGIN_TTL_ = 30*60*1000;
+const PRIVATE_DASHBOARD_B_BATTLE_TTL_ = 24*60*60*1000;
 const PRIVATE_DASHBOARD_B_PHONE_TTL_ = 90*24*60*60*1000;
 const PRIVATE_DASHBOARD_B_STORES_ = ['酒泉','永吉','復興南','杭州南','萬大','通化','大稻埕','三創','六張犁'];
 
@@ -9642,7 +9644,7 @@ function privateDashboardCreateGasBStore_(options) {
       if(privateDashboardCleanEmployeeId(s.employee)!==s.employee || privateDashboardGasAuthDigest_(s.employee)[0]!==bucket || seen.has(s.digest) || typeof s.revoked!=='boolean')throw new Error('B_STATE_INVALID');
       seen.add(s.digest);privateDashboardBInt_(s.epoch,1);privateDashboardBInt_(s.bindingVersion,0); // zero: trusted, device-scoped session without persistent binding
       ['nativeGeneration','issuedAt','expiresAt'].forEach(function(key) { privateDashboardBInt_(s[key],0); });
-      if(s.expiresAt-s.issuedAt!==1800000)throw new Error('B_STATE_INVALID');
+      if(![PRIVATE_DASHBOARD_B_LOGIN_TTL_,PRIVATE_DASHBOARD_B_BATTLE_TTL_].includes(s.expiresAt-s.issuedAt))throw new Error('B_STATE_INVALID');
     });
     if(!Array.isArray(value.tombstones) || value.tombstones.length>32 || value.tombstones.length+value.sessions.length>32)throw new Error('B_STATE_INVALID');
     const tombstones=new Set();
@@ -9742,6 +9744,10 @@ function privateDashboardBPayload_(input) {
   if(input.action==='employee_dashboard_read' && Object.prototype.hasOwnProperty.call(input,'includeReports')) {
     if(input.includeReports!==true)throw new Error('B_REQUEST_INVALID');
     fields.employee_dashboard_read.push('includeReports');
+  }
+  if(input.action==='employee_dashboard_read' && Object.prototype.hasOwnProperty.call(input,'battleView')) {
+    if(input.battleView!==true || input.includeReports)throw new Error('B_REQUEST_INVALID');
+    fields.employee_dashboard_read.push('battleView');
   }
   if(input.action==='employee_tradein_sharing_save' && ['publicConsent','publicStore','publicAuthor'].some(function(k){return Object.prototype.hasOwnProperty.call(input,k);})) {
     if(input.publicConsent!==true)throw new Error('B_REQUEST_INVALID');
@@ -9860,7 +9866,7 @@ function privateDashboardCreateGasB_(options) {
         const token=privateDashboardBToken_(id,device,binding[1],generation,config,p.sessionNonce,s.mint);
         if(s.revoked || s.nonceHash!==nonce || s.device!==device || s.bindingVersion!==binding[1] || s.nativeGeneration!==generation ||
           s.epoch!==config.epoch || s.configHash!==config.fingerprint || time<s.issuedAt || s.digest!==privateDashboardGasAuthDigest_(token))throw new Error('B_LOGIN_DENIED');
-        return {status:'ok',token:token,expiresAt:s.expiresAt,trustSource:'password-bound'};
+        return {status:'ok',token:token,expiresAt:s.issuedAt+PRIVATE_DASHBOARD_B_LOGIN_TTL_,battleViewAvailable:true,trustSource:'password-bound'};
       }
       // When the per-employee limit is full, a fresh valid login replaces
       // the oldest lease from this device, or the oldest supervisor lease.
@@ -9880,7 +9886,7 @@ function privateDashboardCreateGasB_(options) {
         sessions.sessions.filter(function(s) { return s.employee===id; }).length>=3)throw new Error('B_CAPACITY');
       const mint=privateDashboardGasAuthDigest_(JSON.stringify([Utilities.getUuid(),time,sessions.revision+1])),token=privateDashboardBToken_(id,device,binding[1],generation,config,p.sessionNonce,mint);
       const record={digest:privateDashboardGasAuthDigest_(token),employee:id,device:device,bindingVersion:binding[1],nativeGeneration:generation,
-        epoch:config.epoch,configHash:config.fingerprint,idempotencyHash:idem,nonceHash:nonce,mint:mint,issuedAt:time,expiresAt:time+1800000,revoked:false};
+        epoch:config.epoch,configHash:config.fingerprint,idempotencyHash:idem,nonceHash:nonce,mint:mint,issuedAt:time,expiresAt:time+PRIVATE_DASHBOARD_B_LOGIN_TTL_,revoked:false};
       if(sessions.sessions.some(function(s) {return s.digest===record.digest;}))throw new Error('B_STATE_INVALID');
       if(!trusted)bindingState.bindings[id]=binding;sessions.sessions.push(record);
       // Check both capacities before either write. A partial write returns no
@@ -9893,7 +9899,7 @@ function privateDashboardCreateGasB_(options) {
       }
       if(!trusted && !existing)store.saveBindings(bindingState);
       store.saveSessions(bucket,sessions);
-      return {status:'ok',token:token,expiresAt:record.expiresAt,trustSource:'password-bound'};
+      return {status:'ok',token:token,expiresAt:record.expiresAt,battleViewAvailable:true,trustSource:'password-bound'};
   }
   function phoneGrant() {
     const text=privateDashboardProperties().getProperty(PRIVATE_DASHBOARD_B_PHONE_KEY_);
@@ -9954,7 +9960,10 @@ function privateDashboardCreateGasB_(options) {
       const matches=sessions.sessions.filter(function(s) { return s.digest===hash; });
       if(matches.length!==1 || matches[0].device!==device)throw new Error('B_SESSION_DENIED');
       const s=matches[0],time=now();
-      if(s.revoked || time<s.issuedAt || time>=s.expiresAt)throw new Error('B_SESSION_DENIED');
+      const battleRead=p.action==='employee_dashboard_read' && p.battleView===true;
+      const loginDeadline=s.issuedAt+PRIVATE_DASHBOARD_B_LOGIN_TTL_;
+      const deadline=battleRead || p.action==='employee_logout' ? s.expiresAt : loginDeadline;
+      if(s.revoked || time<s.issuedAt || time>=deadline)throw new Error('B_SESSION_DENIED');
       // Logout may invalidate the matching session after an authority change;
       // it still requires both its token and original device proof.
       if(p.action==='employee_logout') {const phone=phoneGrant();if(phone && phone.employee===s.employee && phone.device===device){savePhone(null);retire(sessions,function(record){return record.employee===s.employee && record.device===device;},time);}else retire(sessions,function(record) { return record.digest===s.digest; },time);store.saveSessions(bucket,sessions);return {status:'ok'};}
@@ -9964,7 +9973,7 @@ function privateDashboardCreateGasB_(options) {
       if(!validBinding || config.epoch!==s.epoch || config.fingerprint!==s.configHash)throw new Error('B_SESSION_DENIED');
       return provider.withEligibility(s.employee,function() {
         if(provider.currentGeneration(s.employee)!==s.nativeGeneration)throw new Error('B_SESSION_DENIED');
-        if(p.action==='employee_session')return {status:'ok',expiresAt:s.expiresAt,trustSource:'password-bound',phoneEligible:privateDashboardIsTrustedEmployee(s.employee)};
+        if(p.action==='employee_session')return {status:'ok',expiresAt:loginDeadline,trustSource:'password-bound',phoneEligible:privateDashboardIsTrustedEmployee(s.employee)};
         if(p.action==='employee_phone_enroll')return enrollPhone(p,s,config);
         function readResult(kind) {
           let result;
@@ -9993,16 +10002,27 @@ function privateDashboardCreateGasB_(options) {
           // No protected result is returned until both strict validators pass.
           const privateResult=readResult('private'),kpiResult=readResult('kpi');
           const reports=p.includeReports===true?{reportsResult:privateDashboardBReports_(now(),profile,p)}:{};
-          if(now()>=s.expiresAt || now()>=config.authority.validUntil)throw new Error('B_SESSION_DENIED');
-          return Object.assign({status:'ok',expiresAt:s.expiresAt,trustSource:'password-bound',
-            phoneEligible:privateDashboardIsTrustedEmployee(s.employee),privateResult:privateResult,kpiResult:kpiResult},reports);
+          if(now()>=deadline || now()>=config.authority.validUntil)throw new Error('B_SESSION_DENIED');
+          // Only a complete verified battle read can grant the longer viewing window.
+          // All other operations still expire at the original login deadline.
+          let battleLease={};
+          if(battleRead) {
+            const battleDeadline=s.issuedAt+PRIVATE_DASHBOARD_B_BATTLE_TTL_;
+            if(s.expiresAt!==battleDeadline) {
+              s.expiresAt=battleDeadline;
+              store.saveSessions(bucket,sessions);
+            }
+            battleLease={battleExpiresAt:Math.min(battleDeadline,config.authority.validUntil)};
+          }
+          return Object.assign({status:'ok',expiresAt:loginDeadline,trustSource:'password-bound',
+            phoneEligible:privateDashboardIsTrustedEmployee(s.employee),privateResult:privateResult,kpiResult:kpiResult},reports,battleLease);
         }
         if(p.action.indexOf('employee_tradein_sharing_')===0) {
           const user=privateDashboardUserByEmployeeId(s.employee).user;
           if(!user || user.status!=='active')throw Error('B_ELIGIBILITY_DENIED');
           const result=tradeinSharingOperation_(p,{id:s.employee,store:profile.store,author:profile.maskedName,
             supervisor:privateDashboardIsTrustedEmployee(s.employee)&&user.role==='督導'});
-          if(now()>=s.expiresAt || now()>=config.authority.validUntil)throw new Error('B_SESSION_DENIED');
+          if(now()>=deadline || now()>=config.authority.validUntil)throw new Error('B_SESSION_DENIED');
           return result;
         }
         if(p.action==='employee_tradein_transactions_read') {
@@ -10010,8 +10030,8 @@ function privateDashboardCreateGasB_(options) {
           let result;
           try{result=tradeinPerformanceTransactionsForViewer_(p.month,viewer);}
           catch(_){return {status:'error',code:'TRADEIN_DATA_UNAVAILABLE'};}
-          if(now()>=s.expiresAt || now()>=config.authority.validUntil)throw new Error('B_SESSION_DENIED');
-          return {status:'ok',expiresAt:s.expiresAt,...result};
+          if(now()>=deadline || now()>=config.authority.validUntil)throw new Error('B_SESSION_DENIED');
+          return {status:'ok',expiresAt:loginDeadline,...result};
         }
         if(p.action==='employee_private_read')return readResult('private');
         if(p.action==='employee_kpi_read')return readResult('kpi');
