@@ -1,5 +1,30 @@
 // Local-only sources; unsupported mappings remain explicitly pending.
-export const MAX_FILE_BYTES = 50 * 1024 * 1024;
+const MIB = 1024 * 1024;
+export const MAX_FILE_BYTES = 50 * MIB;
+export const MAX_MARKETING_PPTX_BYTES = 512 * MIB;
+
+export function isMarketingDeck(file, category) {
+  return category === '行銷簡報' && /\.pptx$/i.test(file?.name || '');
+}
+
+export function fileSizeText(size) {
+  return (Math.ceil(size / MIB * 100) / 100) + ' MiB';
+}
+
+// Oversized individual files receive their own actionable message without
+// preventing valid files in another slot from being read.
+export function selectionIssue(selected) {
+  if (selected.length > 45) return '每次最多選 45 份檔案，請分批核對。';
+  let decks = 0, other = 0;
+  for (const {file, category} of selected) {
+    if (isMarketingDeck(file, category)) {
+      if (file.size <= MAX_MARKETING_PPTX_BYTES) decks += file.size;
+    } else if (file.size <= MAX_FILE_BYTES) other += file.size;
+  }
+  if (decks > MAX_MARKETING_PPTX_BYTES) return '已選行銷 PPTX 合計 ' + fileSizeText(decks) + '，上限 512 MiB。請分批讀取。';
+  if (other > 250 * MIB) return '其他來源合計 ' + fileSizeText(other) + '，上限 250 MiB。請分批讀取。';
+  return '';
+}
 export const TEMPLATE_HASH = 'fbbc86defd4de6d6739657df7ae1e76c50795c4cb0c15809174c063ab7daf803';
 // Only recognized labels may leave the parser. Never return customer/source rows.
 export const HEADER_LABEL = /^(?:日期|資料日期|截止日|月份|期別|區域|區碼|部區|督導區|店點|店名|門市|門市名稱|門市代碼|店代碼|員編|員工編號|姓名|員工姓名|門號|客戶姓名|合約月數|合約期間|實績|目標|實績點數|目標點數|達成率|長約|長約件數|長約占比|失敗原因|失敗原文|原因|商品|商品名稱|好速|企客4G|降轉|Device|回收數|保險件數|銷售數|扣分|成績|原G)$/i;
@@ -13,9 +38,14 @@ export const SECTIONS = Object.freeze([
   ['好速失敗原因', '來源截止＋標準分類出處', '只彙總當月BB明細標準分類；本機訂單去重，V旗標另列；不匯出個資或自由備註']
 ]);
 
-export function validateFile(file) {
+export function validateFile(file, category) {
   if (!file || !Number.isFinite(file.size) || file.size <= 0) throw Error('檔案是空的，請重新選取。');
-  if (file.size > MAX_FILE_BYTES) throw Error('單檔上限50 MiB；35MB可處理。請分檔或另存精簡版後再試。');
+  const deck = isMarketingDeck(file, category);
+  const limit = deck ? MAX_MARKETING_PPTX_BYTES : MAX_FILE_BYTES;
+  if (file.size > limit) {
+    throw Error('目前檔案 ' + fileSizeText(file.size) + '，' + (deck ? '行銷 PPTX' : '此類來源') +
+      '單檔上限' + fileSizeText(limit) + '。請在本機分檔或壓縮圖片後重試。');
+  }
   return true;
 }
 export function detectKind(bytes) {

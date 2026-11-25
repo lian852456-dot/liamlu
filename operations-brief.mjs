@@ -1,6 +1,6 @@
 import {createSupervisorAccess} from './tradein-supervisor-auth.mjs?v=20261012-supervisor-1';
-import {SECTIONS, validateFile, draftMetadata} from './operations-brief-core.mjs?v=20261124-operations-review';
-import * as marketing from './operations-marketing-core.mjs?v=20261124-operations-review';
+import {SECTIONS, MAX_FILE_BYTES, validateFile, isMarketingDeck, selectionIssue, fileSizeText, draftMetadata} from './operations-brief-core.mjs?v=20261125-large-marketing';
+import * as marketing from './operations-marketing-core.mjs?v=20261125-large-marketing';
 import {combineMonthlyReportSections} from './operations-report-core.mjs';
 
 const $ = id => document.getElementById(id);
@@ -129,7 +129,7 @@ async function verify(key) {
 
 function startWorker() {
   if (worker) return;
-  worker = new Worker('./operations-brief-worker.js?v=20261124-operations-review');
+  worker = new Worker('./operations-brief-worker.js?v=20261125-large-marketing');
   worker.onmessage = ({data}) => {
     const job = pending.get(data.id);
     if (!job) return;
@@ -731,6 +731,7 @@ function render() {
     for (const source of files) {
       const card = element(details, 'div', '', 'source-card');
       element(card, 'h3', source.name);
+      if (source.bytes) element(card, 'small', fileSizeText(source.bytes));
       const paint = sourceDetails(source, card);
       if (name === MARKETING) renderMarketing(card, source, paint);
       else renderReportReview(card, source, paint);
@@ -756,8 +757,9 @@ async function readFiles() {
   const unread = selected.filter(({slot}) => slot === TEMPLATE ? !template : !parsed.has(slot));
   // With no new files, the same button deliberately rechecks the selection.
   const target = unread.length ? unread : selected;
-  if (selected.length > 45 || selected.reduce((size, {file}) => size + file.size, 0) > 250 * 1024 * 1024) {
-    status('每次最多 45 份檔案、合計 250 MiB。請合併逐頁圖片或分批核對。', true);
+  const limitIssue = selectionIssue(selected);
+  if (limitIssue) {
+    status(limitIssue, true);
     return;
   }
   let password = $('goodSpeedPassword').value;
@@ -775,13 +777,15 @@ async function readFiles() {
     for (const {file, slot, category} of reads) {
       status('正在本機讀取 ' + file.name + '…');
       try {
-        validateFile(file);
-        const bytes = await file.arrayBuffer();
+        validateFile(file, category);
+        // A structured-cloned File lets the worker seek into large presentations.
+        const streamed = isMarketingDeck(file, category) && file.size > MAX_FILE_BYTES;
+        const bytes = streamed ? null : await file.arrayBuffer();
         if (ticket !== generation) return;
         access.requireCurrent();
         const result = await job(slot === TEMPLATE ? 'template' : 'source', {
-          bytes, name: file.name, category, password: category?.startsWith('好速') ? password : ''
-        }, [bytes]);
+          ...(streamed ? {file} : {bytes}), name: file.name, category, password: category?.startsWith('好速') ? password : ''
+        }, streamed ? [] : [bytes]);
         if (ticket !== generation) return;
         access.requireCurrent();
         if (slot === TEMPLATE) template = {...result, name: file.name, file};
@@ -796,7 +800,7 @@ async function readFiles() {
           sourceStates.set(slot, '讀取失敗 · ' + error.message);
         } else {
           if (!updates.has(slot)) updates.set(slot, []);
-          updates.get(slot).push({name: file.name, slot, category, error: error.message});
+          updates.get(slot).push({name: file.name, bytes: file.size, slot, category, error: error.message});
         }
       }
     }

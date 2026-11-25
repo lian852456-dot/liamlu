@@ -7,9 +7,9 @@ importScripts(
   './department-gold-monthly-core.js'
 );
 const ready = Promise.all([
-  import('./operations-brief-core.mjs?v=20261124-operations-review'),
+  import('./operations-brief-core.mjs?v=20261125-large-marketing'),
   import('./operations-brief-package.mjs?v=20261124-operations-review'),
-  import('./operations-marketing-core.mjs?v=20261124-operations-review'),
+  import('./operations-marketing-core.mjs?v=20261125-large-marketing'),
   import('./operations-local-ocr.mjs'),
   import('./operations-report-core.mjs')
 ]);
@@ -37,20 +37,36 @@ self.onmessage = async ({data}) => {
       self.postMessage({id, result}, [result]);
       return;
     }
-    validateFile({size: bytes.byteLength});
-    const result = {name, bytes: bytes.byteLength, sha256: await sha(bytes), kind: detectKind(bytes), sheets: []};
+    const file = data.file;
+    if (file) {
+      if (!(file instanceof Blob) || category !== '行銷簡報' || !/\.pptx$/i.test(name)) throw Error('請從行銷簡報入口重新選取 PPTX。');
+      validateFile({name, size: file.size}, category);
+    } else {
+      validateFile({size: bytes.byteLength});
+    }
+    const header = file ? await file.slice(0, 16).arrayBuffer() : bytes;
+    const result = {name, bytes: file ? file.size : bytes.byteLength, kind: detectKind(header), sheets: []};
+    if (!file) result.sha256 = await sha(bytes);
     const marketing = category === '行銷簡報';
     const marketingZip = result.kind === 'zip' && (marketing || /\.pptx$/i.test(name));
-    const image = imageType(bytes);
+    const image = !file && imageType(bytes);
     if (marketingZip || image) {
       recognizeLocally ||= createLocalOcr();
       const onProgress = progress => self.postMessage({id, progress});
       const options = {ocr: recognizeLocally, onProgress};
       result.kind = image ? 'image' : 'pptx';
       if (image) onProgress('正在本機辨識圖片文字…');
-      const document = image
-        ? await inspectMarketingImage(bytes, name, {...options, onProgress: () => onProgress('正在本機辨識圖片文字…')})
-        : await inspectMarketing(await openPackage(bytes, self.JSZip), options);
+      let document;
+      if (file) {
+        const {inspectLocalDeck} = await import('./operations-large-deck.mjs?v=20261125-large-marketing');
+        const parsed = await inspectLocalDeck(file, options);
+        result.sha256 = parsed.sha256;
+        document = parsed.document;
+      } else if (image) {
+        document = await inspectMarketingImage(bytes, name, {...options, onProgress: () => onProgress('正在本機辨識圖片文字…')});
+      } else {
+        document = await inspectMarketing(await openPackage(bytes, self.JSZip), options);
+      }
       if (marketing) result.marketing = document;
       else result.document = document;
       result.inspection = {
@@ -62,6 +78,7 @@ self.onmessage = async ({data}) => {
       return;
     }
     if (result.kind === 'pdf') throw Error('請用本機 PDF 閱讀器將相關原頁匯出為 PNG 或 JPG，檔名標明原頁碼，再重新選取。');
+    if (marketing && result.kind === 'ole' && /\.pptx$/i.test(name)) throw Error('這份 PPTX 為加密或舊版 Office 格式。請在本機 PowerPoint 開啟，另存無開啟密碼的 PPTX 副本。');
     if (marketing && (result.kind === 'ole' || /\.ppt$/i.test(name))) {
       throw Error('舊版 PPT 請用 PowerPoint「檔案 → 另存新檔 → PowerPoint 簡報 (.pptx)」，再選未加密的副本。');
     }

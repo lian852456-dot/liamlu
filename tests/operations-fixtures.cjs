@@ -20,6 +20,6 @@ exports.marketingZip=async(JSZip,padding=0)=>{
   z.file('ppt/_rels/presentation.xml.rels','<Relationships><Relationship Id="first" Target="slides/slide2.xml"/><Relationship Id="second" Target="slides/slide1.xml"/></Relationships>');
   z.file('ppt/slides/slide2.xml','<p:sld xmlns:p="p" xmlns:a="a"><p:cSld><p:spTree><p:sp><a:t>SYNTHETIC行銷政策 2026年8月 &amp; 測試用</a:t></p:sp></p:spTree></p:cSld></p:sld>');
   z.file('ppt/slides/slide1.xml','<p:sld xmlns:p="p" xmlns:a="a"><p:cSld><p:spTree><p:sp><a:t>STALE-HIDDEN-TEXT-NEVER-ADOPT</a:t></p:sp><p:pic><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="12192000" cy="6858000"/></a:xfrm></p:spPr></p:pic></p:spTree></p:cSld></p:sld>');
-  if(padding)z.file('ppt/media/SYNTHETIC-35MiB-padding.bin',Buffer.alloc(padding));
+  if(padding)z.file('ppt/media/SYNTHETIC-padding.bin',Buffer.alloc(padding));
   return z;
 };
