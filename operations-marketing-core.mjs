@@ -1,6 +1,6 @@
 // Bounded OOXML inspection. Only relationships within the selected package are opened.
-const MAX_SLIDE_XML = 8 * 1024 * 1024;
-const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
+export const MAX_SLIDE_XML = 8 * 1024 * 1024;
+export const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
 const MAX_IMAGES = 80;
 const MIN_CONFIDENCE = 65;
 
@@ -219,6 +219,7 @@ export async function inspectMarketing(zip, {ocr, onProgress} = {}) {
 
   for (const [index, slide] of slides.entries()) {
     const page = index + 1;
+    onProgress?.(`正在本機讀取第 ${page}／${slides.length} 頁…`);
     const rel = relationships.get(attr(slide, 'r:id')) || '';
     const path = resolvePart('ppt', attr(rel, 'Target'), /^ppt\/slides\/slide\d+\.xml$/);
     const file = !attr(rel, 'TargetMode') && zip.file(path);
@@ -226,7 +227,18 @@ export async function inspectMarketing(zip, {ocr, onProgress} = {}) {
       pages.push(createPage({page, issues: ['簡報頁面遺失或連到外部檔案。請提供這一頁的本機匯出圖片或重存 PPTX。']}));
       continue;
     }
-    const xml = safeXml(await file.async('string'));
+    if (file.uncompressedSize > MAX_SLIDE_XML) {
+      pages.push(createPage({page, issues: ['單頁內容過大。請在本機將此頁另存成圖片後讀取。']}));
+      continue;
+    }
+    let pageXml;
+    try {
+      pageXml = await file.async('string');
+    } catch {
+      pages.push(createPage({page, issues: ['這一頁無法解壓或內容校驗失敗。請在 PowerPoint 另存此頁為圖片後補件。']}));
+      continue;
+    }
+    const xml = safeXml(pageXml);
     if (xml.length > MAX_SLIDE_XML) {
       pages.push(createPage({page, issues: ['單頁內容過大。請在本機將此頁另存成圖片後讀取。']}));
       continue;
@@ -250,7 +262,13 @@ export async function inspectMarketing(zip, {ocr, onProgress} = {}) {
       issues.push('此頁有圖表或其他嵌入物件。請提供這頁的完整匯出圖片及需要引用的數據，或逐頁補註。');
     }
     if (pictures.length) {
-      const slideRels = safeXml(await zip.file(path.replace(/\/([^/]+)$/, '/_rels/$1.rels'))?.async('string') || '');
+      const relFile = zip.file(path.replace(/\/([^/]+)$/, '/_rels/$1.rels'));
+      let imageRelations = '';
+      if (relFile) {
+        try { imageRelations = await relFile.async('string'); }
+        catch { issues.push('這一頁的圖片索引無法讀取。請將整頁另存為圖片補件。'); }
+      }
+      const slideRels = safeXml(imageRelations);
       const media = new Map(tags(slideRels, 'Relationship').map(rel => [attr(rel, 'Id'), rel]));
       for (const [order, [picture]] of pictures.entries()) {
         const label = `圖片 ${order + 1}`;
@@ -266,6 +284,10 @@ export async function inspectMarketing(zip, {ocr, onProgress} = {}) {
         const asset = imagePath && zip.file(imagePath);
         if (!asset) {
           issues.push(`${label}素材遺失或連到外部檔案，尚未 OCR；請提供這頁的完整匯出圖片或逐頁補註。`);
+          continue;
+        }
+        if (asset.uncompressedSize > MAX_IMAGE_BYTES) {
+          issues.push(`${label}超過 30 MiB，請縮小該圖片或另存此頁補件。`);
           continue;
         }
         if (!seenPictures.has(imagePath)) {

@@ -1,9 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateFile,detectKind,validatePeriods,draftMetadata,cleanText,SECTIONS} from '../operations-brief-core.mjs';
+import {validateFile,selectionIssue,detectKind,validatePeriods,draftMetadata,cleanText,SECTIONS} from '../operations-brief-core.mjs';
 test('35MB accepted; empty, invalid and oversized files stop',()=>{
   assert.equal(validateFile({size:35*1024*1024}),true);
   for(const size of [0,-1,NaN,51*1024*1024])assert.throws(()=>validateFile({size}));
+});
+test('the large limit applies only to marketing PPTX, independently of workbook and template limits', () => {
+  const mib = 1024 * 1024;
+  const picked = (size, name = 'test.PPTX', category = '行銷簡報') => ({file: {size: size * mib, name}, category});
+  const validate = ({file, category}) => validateFile(file, category);
+  assert.ok(validate(picked(512)));
+  assert.throws(() => validate(picked(512 + 1 / mib)), /目前檔案 512.01 MiB.*上限512 MiB/);
+  for (const source of [picked(51, 'test.jpg'), picked(51, 'test.ppt'), picked(51, 'test.xlsx'), picked(51, 'test.pptx', '範本')]) {
+    assert.throws(() => validate(source), /目前檔案 51 MiB.*上限50 MiB/);
+  }
+  const book = picked(50, 'book.xlsx', '店務');
+  assert.equal(selectionIssue([picked(300), book]), '');
+  assert.equal(selectionIssue([picked(513), book]), '');
+  assert.match(selectionIssue([picked(300), picked(213)]), /合計 513 MiB/);
+  assert.match(selectionIssue(Array(6).fill(book)), /合計 300 MiB/);
 });
 test('actual byte signatures distinguish ZIP, legacy/encrypted Office and PDF',()=>{
   assert.equal(detectKind(new Uint8Array([80,75,3,4]).buffer),'zip');

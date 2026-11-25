@@ -15,7 +15,7 @@ const mime = {
   '.wasm': 'application/wasm', '.gz': 'application/octet-stream',
   '.traineddata': 'application/octet-stream'
 };
-let server, base, largeWorkbook, marketing, encryptedGood;
+let server, base, largeWorkbook, encryptedGood;
 
 test.beforeAll(async () => {
   const root = path.resolve(__dirname, '..');
@@ -45,9 +45,6 @@ test.beforeAll(async () => {
   const zip = await JSZip.loadAsync(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
   zip.file('xl/media/SYNTHETIC-padding.bin', Buffer.alloc(35 * 1024 * 1024));
   largeWorkbook = await zip.generateAsync({ type: 'nodebuffer', compression: 'STORE' });
-
-  marketing = await (await fixtures.marketingZip(JSZip, 35 * 1024 * 1024))
-    .generateAsync({ type: 'nodebuffer', compression: 'STORE' });
 
   const goodSpeed = XLSX.utils.book_new();
   for (const [name, records] of Object.entries(fixtures.goodSpeedTables())) {
@@ -229,15 +226,19 @@ test('empty input, oversized file, wrong template and older PowerPoint explain h
   await expect(page.locator('#download')).toBeDisabled();
 });
 
-test('large marketing deck retains page provenance and flags an unrecognizable picture separately', async ({ page }) => {
+test('large marketing deck retains page provenance and flags an unrecognizable picture separately', async ({ page }, info) => {
   test.setTimeout(120000);
   const { unexpected, pageErrors } = await start(page);
   await login(page);
   await page.locator('#meeting').fill('2026-11');
-  await selectBytes(page.locator('#marketingSource'), 'SYNTHETIC-35MiB-marketing.pptx', marketing);
+  const largeDeck = await fixtures.marketingZip(JSZip, 64 * 1024 * 1024);
+  const deckPath = info.outputPath('SYNTHETIC-64MiB-marketing.pptx');
+  await fs.writeFile(deckPath, await largeDeck.generateAsync({type: 'nodebuffer', compression: 'STORE'}));
+  await page.locator('#marketingSource').setInputFiles(deckPath);
   await readFiles(page);
   const inventory = page.locator('#inventory');
-  await expect(inventory).toContainText('SYNTHETIC-35MiB-marketing.pptx');
+  await expect(inventory).toContainText('SYNTHETIC-64MiB-marketing.pptx');
+  await expect(inventory).toContainText(/64[.0-9]* MiB/);
   await expect(inventory).toContainText(/第\s*1\s*頁/);
   await expect(inventory).toContainText(/第\s*2\s*頁/);
   await expect(inventory).toContainText('2026年8月');
