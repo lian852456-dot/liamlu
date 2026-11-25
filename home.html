@@ -19,8 +19,8 @@
   <script defer src="GasBClient.js?v=20261125-battle-lease"></script>
   <script defer src="dashboard-b-shell.js?v=20261125-battle-lease"></script>
   <script defer src="home.js?v=20261120-login-return-1"></script>
-  <link rel="stylesheet" href="nori-helper.css?v=20261125-cat">
-  <script defer src="nori-helper.js?v=20261125-header"></script>
+  <link rel="stylesheet" href="nori-helper.css?v=20261125-play">
+  <script defer src="nori-helper.js?v=20261125-play"></script>
 </head>
 <body>
 <a class="skip-link" href="#main">跳至主要內容</a>
@@ -132,6 +132,11 @@
     <p id="nori-asked"></p>
     <div aria-live="polite" aria-atomic="true"><p id="nori-answer"></p><div id="nori-actions"></div></div>
     <form id="nori-form"><label class="sr-only" for="nori-question">向海苔提問</label><input id="nori-question" maxlength="180" autocomplete="off" placeholder="例如：舊換新還差幾台？"><button type="submit">提問</button></form>
+    <div class="nori-play" role="group" aria-label="和海苔玩">
+      <button type="button" id="nori-pet">摸摸海苔</button>
+      <button type="button" id="nori-toy">逗貓棒</button>
+      <span id="nori-feedback" role="status"></span>
+    </div>
   </section>
   <button id="nori-toggle" type="button" aria-controls="nori-panel" aria-expanded="false"><span class="nori-cat" aria-hidden="true"></span><span class="nori-caption">問海苔</span></button>
 </aside>
