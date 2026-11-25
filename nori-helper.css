@@ -47,3 +47,14 @@
 #nori-question {flex:1; min-width:0; border:1px solid #a2b5a8; border-radius:9px; padding:9px; font-size:16px}
 #nori-form button {border:0; border-radius:9px; background:#205540; color:white; padding:0 12px}
 body:has(#nori-helper:not([hidden])) .footer {padding-bottom:78px}
+
+.header-actions .nori-header-link {
+  background:#205540; color:#fff; border-color:#205540; white-space:nowrap;
+  min-height:36px; padding-inline:12px; font-weight:750;
+}
+.header-actions .nori-header-link:hover {background:#163f2e; color:#fff}
+.nori-header-link span {color:#ffdc85}
+@media(max-width:760px) {
+  .header-actions {flex-wrap:wrap}
+  .header-actions .search-box {flex:1 1 118px; min-width:0}
+}
