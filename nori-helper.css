@@ -1,0 +1,49 @@
+#nori-helper {
+  position:fixed; z-index:18;
+  right:max(14px,env(safe-area-inset-right)); bottom:max(12px,env(safe-area-inset-bottom));
+  color:#19322d; font-size:16px;
+}
+#nori-toggle {
+  margin-left:auto; display:flex; align-items:center; gap:8px; min-height:48px;
+  padding:5px 13px 5px 10px; border:1px solid #b7cdc0; border-radius:28px;
+  background:#fff; color:#174d3e; font-weight:750; box-shadow:0 3px 15px #163e3029;
+}
+.nori-mascot {
+  display:inline-block; position:relative; width:29px; height:34px; margin:0 4px;
+  border-radius:7px 9px 7px 5px; transform:rotate(-7deg); background:repeating-linear-gradient(105deg,#325e49 0 3px,#38694e 4px 6px);
+  box-shadow:inset -3px -2px #254b39; border:1px solid #274f3c;
+}
+.nori-mascot:before {
+  content:''; position:absolute; top:12px; left:5px; width:4px; height:5px;
+  background:#fff8df; border-radius:50%; box-shadow:12px 0 #fff8df; animation:nori-blink 5s infinite;
+}
+.nori-mascot:after {
+  content:''; position:absolute; width:7px; height:4px; left:9px; top:18px;
+  border:solid #fff8df; border-width:0 0 2px; border-radius:0 0 6px 6px;
+}
+.nori-mascot i {
+  position:absolute; width:5px; height:11px; background:#305d46; border-radius:4px;
+  right:-5px; top:10px; transform-origin:bottom; animation:nori-wave 4s ease-in-out infinite;
+}
+@keyframes nori-wave {0%,30%,100% {transform:rotate(30deg)} 10%,20% {transform:rotate(63deg)} 15%,25% {transform:rotate(16deg)}}
+@keyframes nori-blink {0%,93%,97%,100% {transform:scaleY(1)} 95% {transform:scaleY(.15)}}
+@media (prefers-reduced-motion:reduce) {#nori-helper .nori-mascot:before,#nori-helper .nori-mascot i {animation:none}}
+#nori-panel {
+  width:min(365px,calc(100vw - 30px)); max-height:calc(100vh - 95px); max-height:calc(100dvh - 95px);
+  overflow-y:auto; overscroll-behavior:contain; margin:0 0 8px; border-radius:18px; border:1px solid #c2d3c8;
+  background:white; box-shadow:0 12px 36px #163e302e; padding:16px;
+}
+.nori-heading {display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e0eae3; padding-bottom:8px}
+#nori-panel h2 {font-size:19px; margin:0}
+#nori-close {border:0; background:none; font-size:22px; color:#3a5347; width:40px; height:40px}
+#nori-panel p {margin:10px 0; line-height:1.55}
+#nori-shortcuts,#nori-actions {display:flex; flex-wrap:wrap; gap:6px}
+#nori-shortcuts button,#nori-actions button,#nori-actions a {
+  border:1px solid #c4d6c8; background:#eff6ef; color:#234e39; border-radius:10px; padding:8px 10px; font-size:14px; font-weight:650;
+}
+#nori-actions a {background:#fff5ec; color:#883807; border-color:#efc7a9}
+#nori-asked:not(:empty) {border-left:3px solid #748e78; padding-left:8px; color:#4a5e51; font-size:14px}
+#nori-form {display:flex; gap:6px; margin-top:14px}
+#nori-question {flex:1; min-width:0; border:1px solid #a2b5a8; border-radius:9px; padding:9px; font-size:16px}
+#nori-form button {border:0; border-radius:9px; background:#205540; color:white; padding:0 12px}
+body:has(#nori-helper:not([hidden])) .footer {padding-bottom:78px}
