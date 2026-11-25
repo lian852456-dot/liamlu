@@ -3,7 +3,7 @@
 <head>
   <script src="portal-logout.js?v=20261125-battle-lease"></script>
   <script src="GasBClient.js?v=20261125-battle-lease" defer></script>
-  <script src="dashboard-b-shell.js?v=20261125-battle-lease" defer></script>
+  <script src="dashboard-b-shell.js?v=20261125-focus-tasks" defer></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -17,7 +17,7 @@
   本頁不得新增公式、API、JSON、權限捷徑或 fallback。
 -->
 <style>
-  #panel-op-series iframe{width:100%;height:80vh;min-height:420px;border:0;display:block}
+  #panel-op-series iframe,#panel-focus-tasks iframe{width:100%;height:80vh;min-height:420px;border:0;display:block}
   [data-battle-panel][hidden] { display: none !important; }
   :root {
     color-scheme: light;
@@ -327,6 +327,7 @@
   <div id="awardsBattleContent"><div class="kpi-empty">讀取台獎戰情資料中…</div></div>
 </main>
 
+<main id="panel-focus-tasks" data-battle-panel aria-label="重點任務進度" hidden></main>
 <main id="panel-op-series" data-battle-panel aria-label="OP系列" hidden></main>
 
 <script src="readonly-dashboard-core.js?v=20261113-conversion-1"></script>
@@ -340,11 +341,20 @@
   const panel = document.getElementById('panel-kpi-battle');
   const awardsPanel = document.getElementById('panel-awards-battle');
   const opPanel = document.getElementById('panel-op-series');
+  const focusPanel = document.getElementById('panel-focus-tasks');
   let opVerified = false;
   function showPanel(module) {
     const awards = module === 'awards';
     const op = module === 'op' && opVerified;
-    panel.hidden = awards || op;
+    const focus = module === 'focus-tasks' && opVerified;
+    panel.hidden = awards || op || focus;
+    focusPanel.hidden = !focus;
+    if (focus && !focusPanel.firstChild) {
+      const frame = document.createElement('iframe');
+      frame.title = '重點任務九店與個人進度';
+      frame.src = 'focus-tasks.html';
+      focusPanel.append(frame);
+    }
     opPanel.hidden = !op;
     if (op && !opPanel.firstChild) {
       const frame = document.createElement('iframe');
@@ -353,10 +363,10 @@
       opPanel.append(frame);
     }
     awardsPanel.hidden = !awards;
-    document.getElementById('battleHeading').textContent = op ? 'OP系列' : awards ? '台獎戰情' : module === 'personal' ? '個績排名' : 'KPI 戰情';
+    document.getElementById('battleHeading').textContent = focus ? '重點任務進度' : op ? 'OP系列' : awards ? '台獎戰情' : module === 'personal' ? '個績排名' : 'KPI 戰情';
     const desired = module === 'personal' ? 'personal' : 'stores';
     const current = document.getElementById('kpiBattlePersonalBtn').classList.contains('active') ? 'personal' : 'stores';
-    if (!op && !awards && current !== desired) window.kpiBattleController?.setView(desired);
+    if (!focus && !op && !awards && current !== desired) window.kpiBattleController?.setView(desired);
   }
 
   function failClosed(message) {
@@ -393,13 +403,16 @@
       compactBattle: true,
       battleView: true,
       opSeries: true,
+      focusTasks: true,
       startWithLegacy: returnAfterApprovedLogin,
       refreshOnResume: new URLSearchParams(window.location.search).get('refresh') === 'conversion',
       navigationSelector: '[data-kpi-battle-view]',
       clear(note) {
         opVerified = false;
         opPanel.replaceChildren();
-        if (!opPanel.hidden) showPanel('kpi');
+        focusPanel.replaceChildren();
+        try { sessionStorage.removeItem('north12b.focus-tasks.v1'); } catch {}
+        if (!opPanel.hidden || !focusPanel.hidden) showPanel('kpi');
         kpiController.failClosed(note || '請重新驗證登入。'); awardsController.failClosed(note || '請重新驗證登入。'); },
       showLegacyAccess() {
         kpiController.renderLock();
@@ -410,7 +423,7 @@
       accept(bundle) {
         kpiController.acceptB(bundle);
         opVerified = true;
-        if (location.hash === '#op') showPanel('op');
+        if (['#op','#focus-tasks'].includes(location.hash)) showPanel(location.hash.slice(1));
       },
       navigate(module) {
         if (module === 'return') { window.location.href = 'home.html'; return; }
