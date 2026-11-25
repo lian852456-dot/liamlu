@@ -19,6 +19,8 @@
   <script defer src="GasBClient.js?v=20261125-battle-lease"></script>
   <script defer src="dashboard-b-shell.js?v=20261125-battle-lease"></script>
   <script defer src="home.js?v=20261120-login-return-1"></script>
+  <link rel="stylesheet" href="nori-helper.css">
+  <script defer src="nori-helper.js"></script>
 </head>
 <body>
 <a class="skip-link" href="#main">跳至主要內容</a>
@@ -111,6 +113,17 @@
   </section>
 </main>
 <footer class="shell footer"><p>各系統資料獨立存放，提醒唯讀且不留存於本頁</p><p>內部工作輔助入口 · 非官方對外網站</p></footer>
+<aside id="nori-helper" aria-label="海苔小幫手" hidden>
+  <section id="nori-panel" aria-labelledby="nori-title" hidden>
+    <div class="nori-heading"><h2 id="nori-title">海苔小幫手</h2><button id="nori-close" type="button" aria-label="收合海苔小幫手">×</button></div>
+    <p>想找哪份資料？</p>
+    <div id="nori-shortcuts" role="group" aria-label="常查項目"></div>
+    <p id="nori-asked"></p>
+    <div aria-live="polite" aria-atomic="true"><p id="nori-answer"></p><div id="nori-actions"></div></div>
+    <form id="nori-form"><label class="sr-only" for="nori-question">向海苔提問</label><input id="nori-question" maxlength="180" autocomplete="off" placeholder="例如：舊換新還差幾台？"><button type="submit">提問</button></form>
+  </section>
+  <button id="nori-toggle" type="button" aria-controls="nori-panel" aria-expanded="false"><span class="nori-mascot" aria-hidden="true"><i></i></span>問海苔</button>
+</aside>
 <noscript><p class="shell">請啟用 JavaScript 以搜尋工具與查看提醒。所有入口連結仍可使用。</p></noscript>
 <script src="query-route-update.js?v=20261105-integrated-1"></script>
 </body>
